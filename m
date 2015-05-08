@@ -1,55 +1,84 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 8 May 2015 14:52:00 +0530
-Subject: [PATCH] dmaengine: at_xdmac: fix slave configuration issue
-In-Reply-To: <20150506081342.GO30976@odux.rfo.atmel.com>
-References: <1429196640-8703-1-git-send-email-ludovic.desroches@atmel.com>
- <20150427033328.GH2738@intel.com>
- <20150427083358.GG26450@odux.rfo.atmel.com>
- <20150504082536.GB3521@localhost>
- <20150504091241.GA29493@odux.rfo.atmel.com>
- <20150504103644.GE3521@localhost>
- <20150504145825.GF30976@odux.rfo.atmel.com>
- <20150506033343.GL3521@localhost>
- <20150506081342.GO30976@odux.rfo.atmel.com>
-Message-ID: <20150508092200.GF3521@localhost>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 8 May 2015 11:23:46 +0200
+Subject: [PATCH v3 02/12] KVM: define common __KVM_GUESTDBG_USE_SW/HW_BP
+ values
+In-Reply-To: <1430929407-3487-3-git-send-email-alex.bennee@linaro.org>
+References: <1430929407-3487-1-git-send-email-alex.bennee@linaro.org>
+ <1430929407-3487-3-git-send-email-alex.bennee@linaro.org>
+Message-ID: <20150508092346.GB24744@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 06, 2015 at 10:13:42AM +0200, Ludovic Desroches wrote:
-> > ah yes but then you can use the channel for either direction without setting
-> > slave_dma_config...
-> > 
+On Wed, May 06, 2015 at 05:23:17PM +0100, Alex Benn?e wrote:
+> Currently x86, powerpc and soon arm64 use the same two architecture
+> specific bits for guest debug support for software and hardware
+> breakpoints. This makes the shared values explicit while leaving the
+> gate open for another architecture to use some other value if they
+> really really want to.
 > 
-> I still need dma_slave_config. In my device_config function, I don't
-> copy the dma_slave_config but I take information from it to compute a
-> dev2mem and mem2dev configuration. Then I will select the right one in
-> the prep function. I think it's quite close from that you want.
-since you do not know the direction here, you dont know how to compute
-dev2mem or mem2dev configurations
-
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> Reviewed-by: Andrew Jones <drjones@redhat.com>
 > 
-> In the device_config, I convert the maxburst value to a comprehensive
-> one for my controller. If it is not a supported one then I'll return an
-> error?
-thats fine as long as direction is not used, implicitly as well
+> diff --git a/arch/powerpc/include/uapi/asm/kvm.h b/arch/powerpc/include/uapi/asm/kvm.h
+> index ab4d473..1731569 100644
+> --- a/arch/powerpc/include/uapi/asm/kvm.h
+> +++ b/arch/powerpc/include/uapi/asm/kvm.h
+> @@ -310,8 +310,8 @@ struct kvm_guest_debug_arch {
+>   * and upper 16 bits are architecture specific. Architecture specific defines
+>   * that ioctl is for setting hardware breakpoint or software breakpoint.
+>   */
+> -#define KVM_GUESTDBG_USE_SW_BP		0x00010000
+> -#define KVM_GUESTDBG_USE_HW_BP		0x00020000
+> +#define KVM_GUESTDBG_USE_SW_BP		__KVM_GUESTDBG_USE_SW_BP
+> +#define KVM_GUESTDBG_USE_HW_BP		__KVM_GUESTDBG_USE_HW_BP
+>  
+>  /* definition of registers in kvm_run */
+>  struct kvm_sync_regs {
+> diff --git a/arch/x86/include/uapi/asm/kvm.h b/arch/x86/include/uapi/asm/kvm.h
+> index d7dcef5..1438202 100644
+> --- a/arch/x86/include/uapi/asm/kvm.h
+> +++ b/arch/x86/include/uapi/asm/kvm.h
+> @@ -250,8 +250,8 @@ struct kvm_debug_exit_arch {
+>  	__u64 dr7;
+>  };
+>  
+> -#define KVM_GUESTDBG_USE_SW_BP		0x00010000
+> -#define KVM_GUESTDBG_USE_HW_BP		0x00020000
+> +#define KVM_GUESTDBG_USE_SW_BP		__KVM_GUESTDBG_USE_SW_BP
+> +#define KVM_GUESTDBG_USE_HW_BP		__KVM_GUESTDBG_USE_HW_BP
+>  #define KVM_GUESTDBG_INJECT_DB		0x00040000
+>  #define KVM_GUESTDBG_INJECT_BP		0x00080000
+>  
+> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+> index 70ac641..3b6252e 100644
+> --- a/include/uapi/linux/kvm.h
+> +++ b/include/uapi/linux/kvm.h
+> @@ -570,8 +570,16 @@ struct kvm_s390_irq_state {
+>  
+>  /* for KVM_SET_GUEST_DEBUG */
+>  
+> -#define KVM_GUESTDBG_ENABLE		0x00000001
+> -#define KVM_GUESTDBG_SINGLESTEP		0x00000002
+> +#define KVM_GUESTDBG_ENABLE		(1 << 0)
+> +#define KVM_GUESTDBG_SINGLESTEP	(1 << 1)
+> +
+> +/*
+> + * Architecture specific stuff uses the top 16 bits of the field,
 
-> Are you okay with this procedure? If not, I have totally misunderstood
-> what you want...
-> 
-> My concern is that a device can fill only what it needs in the
-> dma_slave_config structure. When doing the configuration, the controller
-> doesn't care about the direction as you asked but if a maxburst
-> configuration is not set, I will have a zero value which is not a valid
-> one. I will return an error but is not...
-Yes that is why many drivers will save configuration. Checking values
-for sanity makes sense. No point in accepting config for 64 max burst if
-device support upto 32!
+s/stuff/<something more specific>/
 
-Then you use direction is prepare_ api to compute parameters and if
-you detect further errors in configuration for said txn then you are valid
-to return error. Again if client has sent one direction parameters and in
-prepare you will not return error as direction will be apt so current issue
-will be fixed as well
+> + * however there is some shared commonality for the common cases
+> + */
+> +#define __KVM_GUESTDBG_USE_SW_BP	(1 << 16)
+> +#define __KVM_GUESTDBG_USE_HW_BP	(1 << 17)
+> +
+>  
+>  struct kvm_guest_debug {
+>  	__u32 control;
 
--- 
-~Vinod
+We sort of left this discussion hanging with me expressing slight
+concern about the usefulness about these defines.
+
+Paolo, what are your thoughts?
+
+-Christoffer
