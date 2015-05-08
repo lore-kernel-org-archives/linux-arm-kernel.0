@@ -1,94 +1,42 @@
-From: jyri.sarha@iki.fi (Jyri Sarha)
-Date: Fri, 08 May 2015 13:56:02 +0300
-Subject: [alsa-devel] [PATCH RFC v2 10/13] sound/core: add DRM ELD helper
-In-Reply-To: <20150405172608.GA12732@n2100.arm.linux.org.uk>
-References: <20150402092050.GH24899@n2100.arm.linux.org.uk>
- <E1YdbKA-00085Q-LL@rmk-PC.arm.linux.org.uk> <s5ha8ymy3e2.wl-tiwai@suse.de>
- <20150405162034.GH13898@n2100.arm.linux.org.uk>
- <s5h4mouy14a.wl-tiwai@suse.de>
- <20150405172608.GA12732@n2100.arm.linux.org.uk>
-Message-ID: <ef04b1827963c2746c252f65bfa0d172@kapsi.fi>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 8 May 2015 11:58:57 +0100
+Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <CAKohpomU8wm0T=A7EkosdOjXbP8q2Cb726Hsjh08KTKYjoz3-A@mail.gmail.com>
+References: <CAKohponRXiWbgT26=tO83jJgbteBf38ggE7mKvLCv+wFMW1cvA@mail.gmail.com>
+ <20150505105714.GA22845@sirena.org.uk>
+ <CAKohpo=09ZhXxh5Cm7Ww9Gy-AYRp9=j82tup6atVN+aOF8twdA@mail.gmail.com>
+ <20150505171252.GI22845@sirena.org.uk>
+ <CAKohpo=kJs076afzERPMqjELgwpN6nR2yoyEjW6XY7YSEbRuCA@mail.gmail.com>
+ <20150507055231.GB32399@codeaurora.org>
+ <20150507110233.GR15510@sirena.org.uk>
+ <20150507211855.GA2455@codeaurora.org>
+ <20150507221842.GW22845@sirena.org.uk>
+ <CAKohpomU8wm0T=A7EkosdOjXbP8q2Cb726Hsjh08KTKYjoz3-A@mail.gmail.com>
+Message-ID: <20150508105857.GB22845@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-04-05 20:26, Russell King - ARM Linux wrote:
-> On Sun, Apr 05, 2015 at 06:46:13PM +0200, Takashi Iwai wrote:
->> At Sun, 5 Apr 2015 17:20:34 +0100,
->> Russell King - ARM Linux wrote:
->> > Since (afaik) ALSA has a lack of support for dynamic reconfiguration
->> > according to the attached device changing, the best we can do without
->> > a huge amount of re-work of HDMI support across all adapters is to
->> > process the capabilities of the attached device at prepare time
->> > according to the current capabilities.
->> 
->> Yeah, reconfiguration is tricky.  BTW, how is the HDMI unplug handled
->> during playback?
-> 
-> We don't handle it right now - and we don't have any notification to
-> the audio drivers that that has happened.  Even if we did have such a
-> notification, I'm not sure what the audio driver could do with it at
-> the moment.
-> 
->> > Implementing dynamic reconfiguration in ALSA is not something I want to
->> > get involved with, and as we /already/ have HDMI support merged in the
->> > kernel, this is not a blocker for at least trying to get some semblence
->> > of sanity, rather than having every driver re-implementing stuff like
->> > this.
->> 
->> Well, I didn't mean about the dynamic reconfiguration.  I thought of
->> rather min/max pairs, but it was just a wrong assumption.  Scratch
->> it.
->> 
->> One another question: don't we need to deal with the sample bits in
->> sad[2]?
-> 
-> It should, but I'm very wary about doing that without seeing more
-> examples of real SADs.
+On Fri, May 08, 2015 at 12:17:44PM +0530, Viresh Kumar wrote:
 
-If the same constraint setting helpers are to be used also with
-external HDMI encoders with i2s interface, there should be an option
-to leave out the constraints for the sample bits. There is no direct
-connection between the number of bits on I2S and HDMI link. The CPU
-DAI may apply its own constraints on the available sample formats and
-too strict constraints at the encoder end may lead to zero available
-formats.
+> Thanks Mark. I have reworded it as:
+> 
+> - opp-microamp: Current drawn by the device in micro Amperes. It is used to set
+>   the most efficient regulator operating mode.
+> 
+>   Should only be set if opp-microvolt is set for the OPP.
+> 
+>   Entries for multiple regulators must be present in the same order as
+>   regulators are specified in device's DT node. If this property isn't required
+>   for few regulators, then this should be marked as zero for them. If it isn't
+>   required for any regulator, then this property need not be present.
 
-Best regrads,
-Jyri
+> Please let me know if this looks fine now.
 
-> Right now, all my examples only support
-> one SAD with either 2 channel or 6 channel audio at the standard
-> (basic) 32, 44.1 and 48kHz rates.
-> 
-> The HDMI / CEA specs are very loose in their wording about the
-> short audio descriptors.  I've no idea whether a sink can provide
-> (for example) descriptors such as:
-> 
-> 	LPCM, 6 channel 32, 44.1, 48kHz
-> 	LPCM, 2 channel, 32, 44.1, 48, 96, 192kHz
-> 
-> or whether have to describe that as a single descriptor.  I only
-> have two TVs to test with here.
-> 
-> What I'm concerned about is that when the ALSA parameter refining
-> starts, we start with (eg) 2-8 channels, 32-192kHz.  Given that,
-> if we invoke the channel restriction before the rate restriction,
-> we would end up limiting to 2 channel at 32-192kHz.  If we apply
-> the restrictions in the opposite order, we'd restrict to 6
-> channel, 32-48kHz.  Neither are obviously correct in this
-> circumstance, and I don't really see a way to solve it given my
-> understanding of the way ALSA's parameter refinement works.
-> 
-> I suspect this is why most HDMI drivers are implemented such that
-> they take the maximum capabilities over all SADs, which would end
-> up restricting audio in the above case to: up to 6 channels, at
-> 32, 44.1, 48, 96 and 192kHz, even though 6 channel @ 192kHz isn't
-> hasn't been indicated as supported.
-> 
-> Most of this is speculation though, based off what is in the
-> documentation.  As I say, I don't have enough real-world examples
-> to get a feel for what manufacturers _actually_ do to give a hint
-> as to how the documentation should be interpreted.
-> 
-> So, maybe I should just copy what everyone else does and take the
-> maximum of all descriptors...
+That should be fine, microamperes is usually one word.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150508/c3a301e7/attachment.sig>
