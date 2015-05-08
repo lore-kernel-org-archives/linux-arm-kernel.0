@@ -1,149 +1,41 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 8 May 2015 18:59:29 +0200
-Subject: [PATCH v4 09/13] arm64: mm: explicitly bootstrap the linear
- mapping
-In-Reply-To: <20150508164327.GF12601@e104818-lin.cambridge.arm.com>
-References: <1429112064-19952-1-git-send-email-ard.biesheuvel@linaro.org>
- <1429112064-19952-10-git-send-email-ard.biesheuvel@linaro.org>
- <20150507165416.GB11067@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-26A1pawUoeY28mXb1WzhPv4O0Rh433Yj9uBjxFh0MWg@mail.gmail.com>
- <20150508144448.GE12601@e104818-lin.cambridge.arm.com>
- <CAKv+Gu9RFNpg8nTYzCNc2hE0kE2Cn8HEHebJ0AYXEyT08QC=Kw@mail.gmail.com>
- <20150508164327.GF12601@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu-MzyCGd00_pEa1VscmKqvKmJH9EL5WYPBOj9BHiDsP3w@mail.gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 08 May 2015 10:14:52 -0700
+Subject: Possible regression due to "hrtimer: Get rid of hrtimer softirq"
+In-Reply-To: <20150507132543.GA14889@verge.net.au> (Simon Horman's message of
+ "Thu, 7 May 2015 22:25:43 +0900")
+References: <20150507111711.GA17448@verge.net.au>
+ <alpine.DEB.2.11.1505071425520.4225@nanos>
+ <20150507132543.GA14889@verge.net.au>
+Message-ID: <7hvbg3gfeb.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 May 2015 at 18:43, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Fri, May 08, 2015 at 05:03:37PM +0200, Ard Biesheuvel wrote:
->> On 8 May 2015 at 16:44, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> > On Thu, May 07, 2015 at 09:21:28PM +0200, Ard Biesheuvel wrote:
->> >> On 7 May 2015 at 18:54, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> >> > On Wed, Apr 15, 2015 at 05:34:20PM +0200, Ard Biesheuvel wrote:
->> >> >> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
->> >> >> index ceec4def354b..338eaa7bcbfd 100644
->> >> >> --- a/arch/arm64/kernel/vmlinux.lds.S
->> >> >> +++ b/arch/arm64/kernel/vmlinux.lds.S
->> >> >> @@ -68,6 +68,17 @@ PECOFF_FILE_ALIGNMENT = 0x200;
->> >> >>  #define ALIGN_DEBUG_RO_MIN(min)              . = ALIGN(min);
->> >> >>  #endif
->> >> >>
->> >> >> +/*
->> >> >> + * The pgdir region needs to be mappable using a single PMD or PUD sized region,
->> >> >> + * so it should not cross a 512 MB or 1 GB alignment boundary, respectively
->> >> >> + * (depending on page size). So align to an upper bound of its size.
->> >> >> + */
->> >> >> +#if CONFIG_ARM64_PGTABLE_LEVELS == 2
->> >> >> +#define PGDIR_ALIGN  (8 * PAGE_SIZE)
->> >> >> +#else
->> >> >> +#define PGDIR_ALIGN  (16 * PAGE_SIZE)
->> >> >> +#endif
->> >> >
->> >> > Isn't 8 pages sufficient in both cases? Unless some other patch changes
->> >> > the idmap and swapper, I can count maximum 7 pages in total.
->> >>
->> >> The preceding patch moves the fixmap page tables to this region as well.
->> >> But the logic is still incorrect -> we only need 16x for 4 levels (7 +
->> >> 3 == 10), the remaining ones are all <= 8
->> >
->> > You should improve the comment here to include the maths, "upper bound
->> > of its size" is not very clear ;).
->>
->> Yes, you are right, it should read 'power-of-2 upper bound'
+Simon Horman <horms@verge.net.au> writes:
+
+> Hi Thomas,
 >
-> And the number of pages required for the initial page tables (I figured
-> out it's a power of two already ;)).
+> On Thu, May 07, 2015 at 02:35:59PM +0200, Thomas Gleixner wrote:
+>> On Thu, 7 May 2015, Simon Horman wrote:
+>> > ------------[ cut here ]------------
+>> > kernel BUG at kernel/irq_work.c:135!
+>> 
+>>   BUG_ON(!irqs_disabled());
+>> 
+>> So something enables interrupts in the periodic tick handling
+>> machinery. Seems you have high resolution timers disabled, but nohz
+>> enabled. And that code path has a local_irq_disable/enable pair which
+>> causes havoc. Patch below.
 >
-
-Ok
-
->> >> >> +     static struct bootstrap_pgtables linear_bs_pgtables __pgdir;
->> >> >> +     const phys_addr_t swapper_phys = __pa(swapper_pg_dir);
->> >> >> +     unsigned long swapper_virt = __phys_to_virt(swapper_phys) + va_offset;
->> >> >> +     struct memblock_region *reg;
->> >> >> +
->> >> >> +     bootstrap_early_mapping(swapper_virt, &linear_bs_pgtables,
->> >> >> +                             IS_ENABLED(CONFIG_ARM64_64K_PAGES));
->> >> >> +
->> >> >> +     /* now find the memblock that covers swapper_pg_dir, and clip */
->> >> >> +     for_each_memblock(memory, reg) {
->> >> >> +             phys_addr_t start = reg->base;
->> >> >> +             phys_addr_t end = start + reg->size;
->> >> >> +             unsigned long vstart, vend;
->> >> >> +
->> >> >> +             if (start > swapper_phys || end <= swapper_phys)
->> >> >> +                     continue;
->> >> >> +
->> >> >> +#ifdef CONFIG_ARM64_64K_PAGES
->> >> >> +             /* clip the region to PMD size */
->> >> >> +             vstart = max(swapper_virt & PMD_MASK,
->> >> >> +                          round_up(__phys_to_virt(start + va_offset),
->> >> >> +                                   PAGE_SIZE));
->> >> >> +             vend = min(round_up(swapper_virt, PMD_SIZE),
->> >> >> +                        round_down(__phys_to_virt(end + va_offset),
->> >> >> +                                   PAGE_SIZE));
->> >> >> +#else
->> >> >> +             /* clip the region to PUD size */
->> >> >> +             vstart = max(swapper_virt & PUD_MASK,
->> >> >> +                          round_up(__phys_to_virt(start + va_offset),
->> >> >> +                                   PMD_SIZE));
->> >> >> +             vend = min(round_up(swapper_virt, PUD_SIZE),
->> >> >> +                        round_down(__phys_to_virt(end + va_offset),
->> >> >> +                                   PMD_SIZE));
->> >> >> +#endif
->> >> >> +
->> >> >> +             create_mapping(__pa(vstart - va_offset), vstart, vend - vstart,
->> >> >> +                            PAGE_KERNEL_EXEC);
->> >> >> +
->> >> >> +             /*
->> >> >> +              * Temporarily limit the memblock range. We need to do this as
->> >> >> +              * create_mapping requires puds, pmds and ptes to be allocated
->> >> >> +              * from memory addressable from the early linear mapping.
->> >> >> +              */
->> >> >> +             memblock_set_current_limit(__pa(vend - va_offset));
->> >> >> +
->> >> >> +             return;
->> >> >> +     }
->> >> >> +     BUG();
->> >> >> +}
->> >> >
->> >> > I'll probably revisit this function after I see the whole series. But in
->> >> > the meantime, if the kernel is not loaded in the first memblock (in
->> >> > address order), isn't there a risk that we allocate memory from the
->> >> > first memblock which is not mapped yet?
->> >>
->> >> memblock allocates top down, so it should only allocate from this
->> >> region, unless the remaining room is completely reserved.
->> >
->> > I don't like to rely on this, it's not guaranteed behaviour.
->>
->> Actually, it is. Allocation is always top-down unless you call
->> memblock_set_bottom_up(), which is a NOP  unless CONFIG_MOVABLE_NODE
->> is selected.
->> That is why the memblock limit only limits at the top afaict
+> Thanks for your quick response. I have been able to confirm that
+> when applied on top of next-20150507 the problem I observed no longer
+> manifests. I have successfully tested it on all the boards
+> where I previously observed a problem.
 >
-> It currently works like this but I'm not sure it is guaranteed to always
-> behave this way (e.g. someone "improves" the memblock allocator in the
-> future). And you never know, we may need memory hotplug on arm64 at some
-> point in the future (together with CONFIG_MOVABLE_NODE).
+> If you are planning to formally submit the patch below feel free to add:
 >
+> Tested-by: Simon Horman <horms+renesas@verge.net.au>
 
-I am not it is worth the additional hassle now to take into
-consideration what someone may or may not implement at some point in
-the future. I am sure memory hotplug is going to take more effort than
-just setting the Kconfig option, and I would not be surprised if it
-imposed additional restrictions on the placement on the kernel.
+FWIW, I confirmed this fixed a boot hang on my kzm9d in next-20150507
+also.
 
-So the question is really if allowing the kernel to be placed at
-arbitrary offsets in physical memory is worth the hassle in the first
-place. There is also a rather nasty interaction with the mem= command
-line option (and that does not work 100% correctly in this version of
-the series). There is a policy decision to be made there, i.e., if you
-remove memory to uphold mem=, where do you remove it? Removing from
-the low end may waste precious <4 GB memory but removing from the top
-may be impossible if the kernel image is loaded there.
-
-Perhaps we should consider adding an early early memblock allocator
-that allocates statically from the __pgdir region. The only problem is
-finding a reasonable upper bound for the amount of memory you would
-need ...
+Tested-by: Kevin Hilman <khilman@linaro.org>
