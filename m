@@ -1,116 +1,618 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Fri, 08 May 2015 14:57:02 +0200
-Subject: [PATCH 03/18] media controller: use MEDIA_ENT_T_AV_DMA for A/V
- DMA engines
-In-Reply-To: <20150508093239.28644ad4@recife.lan>
-References: <cover.1431046915.git.mchehab@osg.samsung.com>	<afb84e3d80fc4f6f2465a123012f161b8c29f1c4.1431046915.git.mchehab@osg.samsung.com>	<554CA3DF.9030700@xs4all.nl>
- <20150508093239.28644ad4@recife.lan>
-Message-ID: <554CB29E.7090509@xs4all.nl>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri,  8 May 2015 10:05:44 -0300
+Subject: [PATCH] ARM: imx: Remove eukrea_mbimxsd35 non-dt support
+Message-ID: <1431090344-14772-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mauro,
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-On 05/08/2015 02:32 PM, Mauro Carvalho Chehab wrote:
->>> and may also not be true on embedded devices
->>> that, due to DRM reasons, don't allow writing unencrypted
->>> data on a memory that could be seen by the CPU.
->>
->> This actually might still work by using opaque DMABUF handles. But that's
->> under discussion right now in the Secure Data Path thread.
-> 
-> Well, a DMABUF opaque handler like that actually refers to either a
-> buffer that is shared only between 2 devices or to a device-to-device
-> DMA transfer.
-> 
-> Such dataflow is different than the usual meaning of the video devnode,
-> where the devnode is used to do I/O transfers. So, it may actually 
-> be mapped as a different type of entity.
-> 
-> We'll need to discuss further when we start mapping this via MC.
+eukrea_mbimxsd35 board has device tree support, so we can get rid of the
+board related files.
 
-Yes, this is quite theoretical at the moment.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/Kconfig                      |  34 ---
+ arch/arm/mach-imx/Makefile                     |   2 -
+ arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c | 318 -------------------------
+ arch/arm/mach-imx/mach-cpuimx35.c              | 206 ----------------
+ 4 files changed, 560 deletions(-)
+ delete mode 100644 arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c
+ delete mode 100644 arch/arm/mach-imx/mach-cpuimx35.c
 
->>> So, we'll eventually need to add another entity for such
->>> bridge chipsets that have a video/vbi/radio device node
->>> associated, but don't have DMA engines on (some) devnodes.
->>>
->>> As, currently, we don't have any such case,
->>
->> ??? Radio devices are exactly that.
-> 
-> I actually meant to say:
-> 
-> 	"As, currently, no driver uses Media Controller on such cases,"
-
-Ah, OK. That makes more sense :-)
-
-> 
->>> let's for now
->>> just rename the device nodes that are associated with a
->>> DMA engine as MEDIA_ENT_T_AV_DMA.
->>>
->>> So,
->>> 	MEDIA_ENT_T_DEVNODE_V4L -> MEDIA_ENT_T_AV_DMA
->>>
->>> PS.: This is not actually true for USB devices, as the
->>> DMA engine is an internal component, as it is up to the
->>> Kernel to strip the stream payload from the URB packages.
->>
->> How about MEDIA_ENT_T_DATA_STREAMING? Or perhaps DATA_IO? Perhaps even just
->> "IO"?
-> 
-> Almost entities do I/O and data streaming (exceptions are flash controller,
-> SEC and similar control subdevices). So, DATA_STREAMING, DATA_IO or IO
-> are a way too generic.
-
-For some of our products we have lots of video nodes that just control the
-receiver or transmitter (and possibly other related blocks), but leave the
-streaming to vendor code where we are forced to use that. So this can be
-a lot more common than you might think, although you won't see that appearing
-in the kernel.
-
-> 
-> DMA is a little bit more restrictive than we wanted.
-> 
-> Actually, I originally named those as MEDIA_ENT_T_AV_BRIDGE, because
-> the hardware component that implements the device->CPU I/O is typically
-> a bridge. But then I went into the drivers, and I noticed that several
-> devices with just one bridge have several different entities for I/O.
-> 
-> So, I ran this script:
-> 	$ git filter-branch -f --msg-filter 'cat && sed s,MEDIA_ENT_T_AV_BRIDGE,MEDIA_ENT_T_AV_DMA,g' origin/patchwork..
-> 	$ git filter-branch -f --tree-filter 'for i in $(git grep -l MEDIA_ENT_T_AV_BRIDGE); do sed s,MEDIA_ENT_T_AV_BRIDGE,MEDIA_ENT_T_AV_DMA,g $i >a && mv a $i; done' origin/patchwork..
-> 
-> To replace the name everywere. Provided that we decide a better name,
-> this can be easily fixable by doing the above scripting.
-> 
-> Perhaps MEDIA_ENT_T_DEV_CPU_AV_IO would be a better name?
-> 
->> That would cover USB as well, and I dislike the use of "AV", since the
->> data might contain other things besides audio and/or video.
-> 
-> True, but how to distinguish such device from an ALSA DEV/CPU IO?
-> 
-> Answering myself, I see one alternative for that... we could use
-> MEDIA_ENT_T_DEV_CPU_IO for all device->CPU I/O devices, and use
-> properties to tell what APIs are valid on such entity. The bad thing
-> is that someone could add multiple "incompatible" APIs at the same
-> device (like ALSA, V4L and DVB - all on the dame sevnode).
-> 
-> I'm running out of ideas here ;)
-> 
-> In the lack of a better name, I would keep MEDIA_ENT_T_AV_DMA, as
-> it is the closest one to what's provided by such entities (or the
-> less wrong one).
-
-See my reply to patch 10/18: I see whether streaming is supported or not as a
-function (or feature) of the entity, just like a subdev entity can be both
-a tuner and a video decoder. I.e. these are properties.
-
-I think the naming issue here shows the problem with your approach. Whereas
-having a 'streaming' property simplifies this IMHO.
-
-Regards,
-
-	Hans
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 3a3d3e9..388232c 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -444,40 +444,6 @@ config MACH_MX35_3DS
+ 	  Include support for MX35PDK platform. This includes specific
+ 	  configurations for the board and its peripherals.
+ 
+-config MACH_EUKREA_CPUIMX35SD
+-	bool "Support Eukrea CPUIMX35 Platform"
+-	select IMX_HAVE_PLATFORM_FLEXCAN
+-	select IMX_HAVE_PLATFORM_FSL_USB2_UDC
+-	select IMX_HAVE_PLATFORM_IMX2_WDT
+-	select IMX_HAVE_PLATFORM_IMX_I2C
+-	select IMX_HAVE_PLATFORM_IMX_UART
+-	select IMX_HAVE_PLATFORM_MXC_EHCI
+-	select IMX_HAVE_PLATFORM_MXC_NAND
+-	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
+-	select USB_ULPI_VIEWPORT if USB_ULPI
+-	select SOC_IMX35
+-	help
+-	  Include support for Eukrea CPUIMX35 platform. This includes
+-	  specific configurations for the board and its peripherals.
+-
+-choice
+-	prompt "Baseboard"
+-	depends on MACH_EUKREA_CPUIMX35SD
+-	default MACH_EUKREA_MBIMXSD35_BASEBOARD
+-
+-config MACH_EUKREA_MBIMXSD35_BASEBOARD
+-	bool "Eukrea MBIMXSD development board"
+-	select IMX_HAVE_PLATFORM_GPIO_KEYS
+-	select IMX_HAVE_PLATFORM_IMX_SSI
+-	select IMX_HAVE_PLATFORM_IPU_CORE
+-	select IMX_HAVE_PLATFORM_SPI_IMX
+-	select LEDS_GPIO_REGISTER
+-	help
+-	  This adds board specific devices that can be found on Eukrea's
+-	  MBIMXSD evaluation board.
+-
+-endchoice
+-
+ config MACH_VPR200
+ 	bool "Support VPR200 platform"
+ 	select IMX_HAVE_PLATFORM_FSL_USB2_UDC
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 0622ced..d195f4c 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -68,8 +68,6 @@ obj-$(CONFIG_MACH_IMX31_DT) += imx31-dt.o
+ # i.MX35 based machines
+ obj-$(CONFIG_MACH_PCM043) += mach-pcm043.o
+ obj-$(CONFIG_MACH_MX35_3DS) += mach-mx35_3ds.o
+-obj-$(CONFIG_MACH_EUKREA_CPUIMX35SD) += mach-cpuimx35.o
+-obj-$(CONFIG_MACH_EUKREA_MBIMXSD35_BASEBOARD) += eukrea_mbimxsd35-baseboard.o
+ obj-$(CONFIG_MACH_VPR200) += mach-vpr200.o
+ obj-$(CONFIG_MACH_IMX35_DT) += imx35-dt.o
+ 
+diff --git a/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c b/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c
+deleted file mode 100644
+index 6edc940..0000000
+--- a/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c
++++ /dev/null
+@@ -1,318 +0,0 @@
+-/*
+- * Copyright (C) 2010 Eric Benard - eric at eukrea.com
+- *
+- * Based on pcm970-baseboard.c which is :
+- * Copyright (C) 2008 Juergen Beisert (kernel at pengutronix.de)
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; either version 2
+- * of the License, or (at your option) any later version.
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+- * MA 02110-1301, USA.
+- */
+-
+-#include <linux/types.h>
+-#include <linux/init.h>
+-
+-#include <linux/gpio.h>
+-#include <linux/interrupt.h>
+-#include <linux/leds.h>
+-#include <linux/platform_device.h>
+-#include <linux/input.h>
+-#include <linux/spi/spi.h>
+-#include <video/platform_lcd.h>
+-#include <linux/i2c.h>
+-
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <asm/mach/time.h>
+-#include <asm/mach/map.h>
+-
+-#include "common.h"
+-#include "devices-imx35.h"
+-#include "hardware.h"
+-#include "iomux-mx35.h"
+-
+-static const struct fb_videomode fb_modedb[] = {
+-	{
+-		.name		= "CMO-QVGA",
+-		.refresh	= 60,
+-		.xres		= 320,
+-		.yres		= 240,
+-		.pixclock	= KHZ2PICOS(6500),
+-		.left_margin	= 68,
+-		.right_margin	= 20,
+-		.upper_margin	= 15,
+-		.lower_margin	= 4,
+-		.hsync_len	= 30,
+-		.vsync_len	= 3,
+-		.sync		= 0,
+-		.vmode		= FB_VMODE_NONINTERLACED,
+-		.flag		= 0,
+-	},
+-	{
+-		.name		= "DVI-VGA",
+-		.refresh	= 60,
+-		.xres		= 640,
+-		.yres		= 480,
+-		.pixclock	= 32000,
+-		.left_margin	= 100,
+-		.right_margin	= 100,
+-		.upper_margin	= 7,
+-		.lower_margin	= 100,
+-		.hsync_len	= 7,
+-		.vsync_len	= 7,
+-		.sync		= FB_SYNC_VERT_HIGH_ACT | FB_SYNC_HOR_HIGH_ACT |
+-				  FB_SYNC_OE_ACT_HIGH | FB_SYNC_CLK_INVERT,
+-		.vmode		= FB_VMODE_NONINTERLACED,
+-		.flag		= 0,
+-	},
+-	{
+-		.name		= "DVI-SVGA",
+-		.refresh	= 60,
+-		.xres		= 800,
+-		.yres		= 600,
+-		.pixclock	= 25000,
+-		.left_margin	= 75,
+-		.right_margin	= 75,
+-		.upper_margin	= 7,
+-		.lower_margin	= 75,
+-		.hsync_len	= 7,
+-		.vsync_len	= 7,
+-		.sync		= FB_SYNC_VERT_HIGH_ACT | FB_SYNC_HOR_HIGH_ACT |
+-				  FB_SYNC_OE_ACT_HIGH | FB_SYNC_CLK_INVERT,
+-		.vmode		= FB_VMODE_NONINTERLACED,
+-		.flag		= 0,
+-	},
+-};
+-
+-static struct mx3fb_platform_data mx3fb_pdata __initdata = {
+-	.name		= "CMO-QVGA",
+-	.mode		= fb_modedb,
+-	.num_modes	= ARRAY_SIZE(fb_modedb),
+-};
+-
+-static const iomux_v3_cfg_t eukrea_mbimxsd_pads[] __initconst = {
+-	/* LCD */
+-	MX35_PAD_LD0__IPU_DISPB_DAT_0,
+-	MX35_PAD_LD1__IPU_DISPB_DAT_1,
+-	MX35_PAD_LD2__IPU_DISPB_DAT_2,
+-	MX35_PAD_LD3__IPU_DISPB_DAT_3,
+-	MX35_PAD_LD4__IPU_DISPB_DAT_4,
+-	MX35_PAD_LD5__IPU_DISPB_DAT_5,
+-	MX35_PAD_LD6__IPU_DISPB_DAT_6,
+-	MX35_PAD_LD7__IPU_DISPB_DAT_7,
+-	MX35_PAD_LD8__IPU_DISPB_DAT_8,
+-	MX35_PAD_LD9__IPU_DISPB_DAT_9,
+-	MX35_PAD_LD10__IPU_DISPB_DAT_10,
+-	MX35_PAD_LD11__IPU_DISPB_DAT_11,
+-	MX35_PAD_LD12__IPU_DISPB_DAT_12,
+-	MX35_PAD_LD13__IPU_DISPB_DAT_13,
+-	MX35_PAD_LD14__IPU_DISPB_DAT_14,
+-	MX35_PAD_LD15__IPU_DISPB_DAT_15,
+-	MX35_PAD_LD16__IPU_DISPB_DAT_16,
+-	MX35_PAD_LD17__IPU_DISPB_DAT_17,
+-	MX35_PAD_D3_HSYNC__IPU_DISPB_D3_HSYNC,
+-	MX35_PAD_D3_FPSHIFT__IPU_DISPB_D3_CLK,
+-	MX35_PAD_D3_DRDY__IPU_DISPB_D3_DRDY,
+-	MX35_PAD_D3_VSYNC__IPU_DISPB_D3_VSYNC,
+-	/* Backlight */
+-	MX35_PAD_CONTRAST__IPU_DISPB_CONTR,
+-	/* LCD_PWR */
+-	MX35_PAD_D3_CLS__GPIO1_4,
+-	/* LED */
+-	MX35_PAD_LD23__GPIO3_29,
+-	/* SWITCH */
+-	MX35_PAD_LD19__GPIO3_25,
+-	/* UART2 */
+-	MX35_PAD_CTS2__UART2_CTS,
+-	MX35_PAD_RTS2__UART2_RTS,
+-	MX35_PAD_TXD2__UART2_TXD_MUX,
+-	MX35_PAD_RXD2__UART2_RXD_MUX,
+-	/* I2S */
+-	MX35_PAD_STXFS4__AUDMUX_AUD4_TXFS,
+-	MX35_PAD_STXD4__AUDMUX_AUD4_TXD,
+-	MX35_PAD_SRXD4__AUDMUX_AUD4_RXD,
+-	MX35_PAD_SCK4__AUDMUX_AUD4_TXC,
+-	/* CAN2 */
+-	MX35_PAD_TX5_RX0__CAN2_TXCAN,
+-	MX35_PAD_TX4_RX1__CAN2_RXCAN,
+-	/* SDCARD */
+-	MX35_PAD_SD1_CMD__ESDHC1_CMD,
+-	MX35_PAD_SD1_CLK__ESDHC1_CLK,
+-	MX35_PAD_SD1_DATA0__ESDHC1_DAT0,
+-	MX35_PAD_SD1_DATA1__ESDHC1_DAT1,
+-	MX35_PAD_SD1_DATA2__ESDHC1_DAT2,
+-	MX35_PAD_SD1_DATA3__ESDHC1_DAT3,
+-	/* SD1 CD */
+-	MX35_PAD_LD18__GPIO3_24,
+-	/* SPI */
+-	MX35_PAD_CSPI1_MOSI__CSPI1_MOSI,
+-	MX35_PAD_CSPI1_MISO__CSPI1_MISO,
+-	MX35_PAD_CSPI1_SS0__GPIO1_18,
+-	MX35_PAD_CSPI1_SS1__GPIO1_19,
+-	MX35_PAD_CSPI1_SCLK__CSPI1_SCLK,
+-	MX35_PAD_CSPI1_SPI_RDY__GPIO3_5,
+-};
+-
+-#define GPIO_LED1	IMX_GPIO_NR(3, 29)
+-#define GPIO_SWITCH1	IMX_GPIO_NR(3, 25)
+-#define GPIO_LCDPWR	IMX_GPIO_NR(1, 4)
+-#define GPIO_SD1CD	IMX_GPIO_NR(3, 24)
+-#define	GPIO_SPI1_SS0	IMX_GPIO_NR(1, 18)
+-#define	GPIO_SPI1_SS1	IMX_GPIO_NR(1, 19)
+-#define	GPIO_SPI1_IRQ	IMX_GPIO_NR(3, 5)
+-
+-static void eukrea_mbimxsd_lcd_power_set(struct plat_lcd_data *pd,
+-				   unsigned int power)
+-{
+-	if (power)
+-		gpio_direction_output(GPIO_LCDPWR, 1);
+-	else
+-		gpio_direction_output(GPIO_LCDPWR, 0);
+-}
+-
+-static struct plat_lcd_data eukrea_mbimxsd_lcd_power_data = {
+-	.set_power		= eukrea_mbimxsd_lcd_power_set,
+-};
+-
+-static struct platform_device eukrea_mbimxsd_lcd_powerdev = {
+-	.name			= "platform-lcd",
+-	.dev.platform_data	= &eukrea_mbimxsd_lcd_power_data,
+-};
+-
+-static struct gpio_led eukrea_mbimxsd_leds[] = {
+-	{
+-		.name			= "led1",
+-		.default_trigger	= "heartbeat",
+-		.active_low		= 1,
+-		.gpio			= GPIO_LED1,
+-	},
+-};
+-
+-static const struct gpio_led_platform_data
+-		eukrea_mbimxsd_led_info __initconst = {
+-	.leds		= eukrea_mbimxsd_leds,
+-	.num_leds	= ARRAY_SIZE(eukrea_mbimxsd_leds),
+-};
+-
+-static struct gpio_keys_button eukrea_mbimxsd_gpio_buttons[] = {
+-	{
+-		.gpio		= GPIO_SWITCH1,
+-		.code		= BTN_0,
+-		.desc		= "BP1",
+-		.active_low	= 1,
+-		.wakeup		= 1,
+-	},
+-};
+-
+-static const struct gpio_keys_platform_data
+-		eukrea_mbimxsd_button_data __initconst = {
+-	.buttons	= eukrea_mbimxsd_gpio_buttons,
+-	.nbuttons	= ARRAY_SIZE(eukrea_mbimxsd_gpio_buttons),
+-};
+-
+-static struct platform_device *platform_devices[] __initdata = {
+-	&eukrea_mbimxsd_lcd_powerdev,
+-};
+-
+-static const struct imxuart_platform_data uart_pdata __initconst = {
+-	.flags = IMXUART_HAVE_RTSCTS,
+-};
+-
+-static struct i2c_board_info eukrea_mbimxsd_i2c_devices[] = {
+-	{
+-		I2C_BOARD_INFO("tlv320aic23", 0x1a),
+-	},
+-};
+-
+-static const
+-struct imx_ssi_platform_data eukrea_mbimxsd_ssi_pdata __initconst = {
+-	.flags = IMX_SSI_SYN | IMX_SSI_NET | IMX_SSI_USE_I2S_SLAVE,
+-};
+-
+-static struct esdhc_platform_data sd1_pdata = {
+-	.cd_gpio = GPIO_SD1CD,
+-	.cd_type = ESDHC_CD_GPIO,
+-	.wp_type = ESDHC_WP_NONE,
+-};
+-
+-static struct spi_board_info eukrea_mbimxsd35_spi_board_info[] __initdata = {
+-	{
+-		.modalias = "spidev",
+-		.max_speed_hz = 20000000,
+-		.bus_num = 0,
+-		.chip_select = 0,
+-		.mode = SPI_MODE_0,
+-	},
+-	{
+-		.modalias = "spidev",
+-		.max_speed_hz = 20000000,
+-		.bus_num = 0,
+-		.chip_select = 1,
+-		.mode = SPI_MODE_0,
+-	},
+-};
+-
+-static int eukrea_mbimxsd35_spi_cs[] = {GPIO_SPI1_SS0, GPIO_SPI1_SS1};
+-
+-static const struct spi_imx_master eukrea_mbimxsd35_spi0_data __initconst = {
+-	.chipselect     = eukrea_mbimxsd35_spi_cs,
+-	.num_chipselect = ARRAY_SIZE(eukrea_mbimxsd35_spi_cs),
+-};
+-
+-/*
+- * system init for baseboard usage. Will be called by cpuimx35 init.
+- *
+- * Add platform devices present on this baseboard and init
+- * them from CPU side as far as required to use them later on
+- */
+-void __init eukrea_mbimxsd35_baseboard_init(void)
+-{
+-	if (mxc_iomux_v3_setup_multiple_pads(eukrea_mbimxsd_pads,
+-			ARRAY_SIZE(eukrea_mbimxsd_pads)))
+-		printk(KERN_ERR "error setting mbimxsd pads !\n");
+-
+-	imx35_add_imx_uart1(&uart_pdata);
+-	imx35_add_ipu_core();
+-	imx35_add_mx3_sdc_fb(&mx3fb_pdata);
+-
+-	imx35_add_imx_ssi(0, &eukrea_mbimxsd_ssi_pdata);
+-
+-	imx35_add_flexcan1();
+-	imx35_add_sdhci_esdhc_imx(0, &sd1_pdata);
+-
+-	gpio_request(GPIO_LED1, "LED1");
+-	gpio_direction_output(GPIO_LED1, 1);
+-	gpio_free(GPIO_LED1);
+-
+-	gpio_request(GPIO_SWITCH1, "SWITCH1");
+-	gpio_direction_input(GPIO_SWITCH1);
+-	gpio_free(GPIO_SWITCH1);
+-
+-	gpio_request(GPIO_LCDPWR, "LCDPWR");
+-	gpio_direction_output(GPIO_LCDPWR, 1);
+-
+-	i2c_register_board_info(0, eukrea_mbimxsd_i2c_devices,
+-				ARRAY_SIZE(eukrea_mbimxsd_i2c_devices));
+-
+-	gpio_request(GPIO_SPI1_IRQ, "SPI1_IRQ");
+-	gpio_direction_input(GPIO_SPI1_IRQ);
+-	gpio_free(GPIO_SPI1_IRQ);
+-	imx35_add_spi_imx0(&eukrea_mbimxsd35_spi0_data);
+-	spi_register_board_info(eukrea_mbimxsd35_spi_board_info,
+-		ARRAY_SIZE(eukrea_mbimxsd35_spi_board_info));
+-
+-	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
+-	gpio_led_register_device(-1, &eukrea_mbimxsd_led_info);
+-	imx_add_gpio_keys(&eukrea_mbimxsd_button_data);
+-	imx_add_platform_device("eukrea_tlv320", 0, NULL, 0, NULL, 0);
+-}
+diff --git a/arch/arm/mach-imx/mach-cpuimx35.c b/arch/arm/mach-imx/mach-cpuimx35.c
+deleted file mode 100644
+index 922ffd6..0000000
+--- a/arch/arm/mach-imx/mach-cpuimx35.c
++++ /dev/null
+@@ -1,206 +0,0 @@
+-/*
+- * Copyright (C) 2010 Eric Benard - eric at eukrea.com
+- * Copyright (C) 2009 Sascha Hauer, Pengutronix
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-
+-#include <linux/types.h>
+-#include <linux/init.h>
+-
+-#include <linux/platform_device.h>
+-#include <linux/mtd/physmap.h>
+-#include <linux/memory.h>
+-#include <linux/gpio.h>
+-#include <linux/interrupt.h>
+-#include <linux/delay.h>
+-#include <linux/i2c.h>
+-#include <linux/i2c/tsc2007.h>
+-#include <linux/usb/otg.h>
+-#include <linux/usb/ulpi.h>
+-#include <linux/i2c-gpio.h>
+-
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <asm/mach/time.h>
+-#include <asm/mach/map.h>
+-
+-#include "common.h"
+-#include "devices-imx35.h"
+-#include "ehci.h"
+-#include "eukrea-baseboards.h"
+-#include "hardware.h"
+-#include "iomux-mx35.h"
+-
+-static const struct imxuart_platform_data uart_pdata __initconst = {
+-	.flags = IMXUART_HAVE_RTSCTS,
+-};
+-
+-static const struct imxi2c_platform_data
+-		eukrea_cpuimx35_i2c0_data __initconst = {
+-	.bitrate =		100000,
+-};
+-
+-#define TSC2007_IRQGPIO		IMX_GPIO_NR(3, 2)
+-static int tsc2007_get_pendown_state(struct device *dev)
+-{
+-	return !gpio_get_value(TSC2007_IRQGPIO);
+-}
+-
+-static struct tsc2007_platform_data tsc2007_info = {
+-	.model			= 2007,
+-	.x_plate_ohms		= 180,
+-	.get_pendown_state = tsc2007_get_pendown_state,
+-};
+-
+-static struct i2c_board_info eukrea_cpuimx35_i2c_devices[] = {
+-	{
+-		I2C_BOARD_INFO("pcf8563", 0x51),
+-	}, {
+-		I2C_BOARD_INFO("tsc2007", 0x48),
+-		.platform_data	= &tsc2007_info,
+-		/* irq number is run-time assigned */
+-	},
+-};
+-
+-static const iomux_v3_cfg_t eukrea_cpuimx35_pads[] __initconst = {
+-	/* UART1 */
+-	MX35_PAD_CTS1__UART1_CTS,
+-	MX35_PAD_RTS1__UART1_RTS,
+-	MX35_PAD_TXD1__UART1_TXD_MUX,
+-	MX35_PAD_RXD1__UART1_RXD_MUX,
+-	/* FEC */
+-	MX35_PAD_FEC_TX_CLK__FEC_TX_CLK,
+-	MX35_PAD_FEC_RX_CLK__FEC_RX_CLK,
+-	MX35_PAD_FEC_RX_DV__FEC_RX_DV,
+-	MX35_PAD_FEC_COL__FEC_COL,
+-	MX35_PAD_FEC_RDATA0__FEC_RDATA_0,
+-	MX35_PAD_FEC_TDATA0__FEC_TDATA_0,
+-	MX35_PAD_FEC_TX_EN__FEC_TX_EN,
+-	MX35_PAD_FEC_MDC__FEC_MDC,
+-	MX35_PAD_FEC_MDIO__FEC_MDIO,
+-	MX35_PAD_FEC_TX_ERR__FEC_TX_ERR,
+-	MX35_PAD_FEC_RX_ERR__FEC_RX_ERR,
+-	MX35_PAD_FEC_CRS__FEC_CRS,
+-	MX35_PAD_FEC_RDATA1__FEC_RDATA_1,
+-	MX35_PAD_FEC_TDATA1__FEC_TDATA_1,
+-	MX35_PAD_FEC_RDATA2__FEC_RDATA_2,
+-	MX35_PAD_FEC_TDATA2__FEC_TDATA_2,
+-	MX35_PAD_FEC_RDATA3__FEC_RDATA_3,
+-	MX35_PAD_FEC_TDATA3__FEC_TDATA_3,
+-	/* I2C1 */
+-	MX35_PAD_I2C1_CLK__I2C1_SCL,
+-	MX35_PAD_I2C1_DAT__I2C1_SDA,
+-	/* TSC2007 IRQ */
+-	MX35_PAD_ATA_DA2__GPIO3_2,
+-};
+-
+-static const struct mxc_nand_platform_data
+-		eukrea_cpuimx35_nand_board_info __initconst = {
+-	.width		= 1,
+-	.hw_ecc		= 1,
+-	.flash_bbt	= 1,
+-};
+-
+-static int eukrea_cpuimx35_otg_init(struct platform_device *pdev)
+-{
+-	return mx35_initialize_usb_hw(pdev->id, MXC_EHCI_INTERFACE_DIFF_UNI);
+-}
+-
+-static const struct mxc_usbh_platform_data otg_pdata __initconst = {
+-	.init	= eukrea_cpuimx35_otg_init,
+-	.portsc	= MXC_EHCI_MODE_UTMI,
+-};
+-
+-static int eukrea_cpuimx35_usbh1_init(struct platform_device *pdev)
+-{
+-	return mx35_initialize_usb_hw(pdev->id, MXC_EHCI_INTERFACE_SINGLE_UNI |
+-			MXC_EHCI_INTERNAL_PHY | MXC_EHCI_IPPUE_DOWN);
+-}
+-
+-static const struct mxc_usbh_platform_data usbh1_pdata __initconst = {
+-	.init	= eukrea_cpuimx35_usbh1_init,
+-	.portsc	= MXC_EHCI_MODE_SERIAL,
+-};
+-
+-static const struct fsl_usb2_platform_data otg_device_pdata __initconst = {
+-	.operating_mode	= FSL_USB2_DR_DEVICE,
+-	.phy_mode	= FSL_USB2_PHY_UTMI,
+-	.workaround	= FLS_USB2_WORKAROUND_ENGCM09152,
+-};
+-
+-static bool otg_mode_host __initdata;
+-
+-static int __init eukrea_cpuimx35_otg_mode(char *options)
+-{
+-	if (!strcmp(options, "host"))
+-		otg_mode_host = true;
+-	else if (!strcmp(options, "device"))
+-		otg_mode_host = false;
+-	else
+-		pr_info("otg_mode neither \"host\" nor \"device\". "
+-			"Defaulting to device\n");
+-	return 1;
+-}
+-__setup("otg_mode=", eukrea_cpuimx35_otg_mode);
+-
+-/*
+- * Board specific initialization.
+- */
+-static void __init eukrea_cpuimx35_init(void)
+-{
+-	imx35_soc_init();
+-
+-	mxc_iomux_v3_setup_multiple_pads(eukrea_cpuimx35_pads,
+-			ARRAY_SIZE(eukrea_cpuimx35_pads));
+-
+-	imx35_add_fec(NULL);
+-	imx35_add_imx2_wdt();
+-
+-	imx35_add_imx_uart0(&uart_pdata);
+-	imx35_add_mxc_nand(&eukrea_cpuimx35_nand_board_info);
+-
+-	eukrea_cpuimx35_i2c_devices[1].irq = gpio_to_irq(TSC2007_IRQGPIO);
+-	i2c_register_board_info(0, eukrea_cpuimx35_i2c_devices,
+-			ARRAY_SIZE(eukrea_cpuimx35_i2c_devices));
+-	imx35_add_imx_i2c0(&eukrea_cpuimx35_i2c0_data);
+-
+-	if (otg_mode_host)
+-		imx35_add_mxc_ehci_otg(&otg_pdata);
+-	else
+-		imx35_add_fsl_usb2_udc(&otg_device_pdata);
+-
+-	imx35_add_mxc_ehci_hs(&usbh1_pdata);
+-
+-#ifdef CONFIG_MACH_EUKREA_MBIMXSD35_BASEBOARD
+-	eukrea_mbimxsd35_baseboard_init();
+-#endif
+-}
+-
+-static void __init eukrea_cpuimx35_timer_init(void)
+-{
+-	mx35_clocks_init();
+-}
+-
+-MACHINE_START(EUKREA_CPUIMX35SD, "Eukrea CPUIMX35")
+-	/* Maintainer: Eukrea Electromatique */
+-	.atag_offset = 0x100,
+-	.map_io = mx35_map_io,
+-	.init_early = imx35_init_early,
+-	.init_irq = mx35_init_irq,
+-	.init_time	= eukrea_cpuimx35_timer_init,
+-	.init_machine = eukrea_cpuimx35_init,
+-	.restart	= mxc_restart,
+-MACHINE_END
+-- 
+1.9.1
