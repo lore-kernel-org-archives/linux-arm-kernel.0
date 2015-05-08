@@ -1,55 +1,46 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Sat, 09 May 2015 03:14:04 +0900
-Subject: [PATCH 1/1] ARM: dts: Add keep-power-in-suspend to WiFi SDIO
- nodefor Snow
-In-Reply-To: <CAJKOXPc88v_VzqE54sup4JHAgqwYCn0g_zpKgJwpny3egaZAbw@mail.gmail.com>
-References: <1430929979-18119-1-git-send-email-javier.martinez@collabora.co.uk>	<CAD=FV=XJXHjXxirjwPfrJ3=xOj46GTqdSxxFstzjTVJ9HP1Q=w@mail.gmail.com>
- <CAJKOXPc88v_VzqE54sup4JHAgqwYCn0g_zpKgJwpny3egaZAbw@mail.gmail.com>
-Message-ID: <554CFCEC.5070803@kernel.org>
+From: ivan.ivanov@linaro.org (Ivan T. Ivanov)
+Date: Fri, 8 May 2015 21:17:12 +0300
+Subject: [PATCH v2 2/2] arm64: dts: qcom: Add msm8916 CoreSight components
+In-Reply-To: <20150508180052.GD11680@leverpostej>
+References: <1431012969-16338-1-git-send-email-ivan.ivanov@linaro.org>
+ <1431012969-16338-3-git-send-email-ivan.ivanov@linaro.org>
+ <CANLsYkzNXBH0d6v1Ny_JwpW6NcKr9v0oAi9K3YfipwDgHWfMMA@mail.gmail.com>
+ <1431092877.21307.18.camel@linaro.org> <20150508180052.GD11680@leverpostej>
+Message-ID: <B19B6A91-0CF2-428B-8CAC-FFEDD5D3D094@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/08/15 09:09, Krzysztof Kozlowski wrote:
-> 2015-05-07 1:36 GMT+09:00 Doug Anderson <dianders@chromium.org>:
->> Javier,
->>
->> On Wed, May 6, 2015 at 9:32 AM, Javier Martinez Canillas
->> <javier.martinez@collabora.co.uk> wrote:
->>> The Marvell mwifiex driver prevents the system to enter into a suspend
->>> state if the card power is not preserved during a suspend/resume cycle.
->>>
->>> So Suspend-to-RAM and Suspend-to-idle are failing on Exynos5250 Snow.
->>>
->>> Add the keep-power-in-suspend Power Management property to the SDIO/MMC
->>> node so the mwifiex suspend handler doesn't fail and the system is able
->>> to enter into a suspend state.
->>>
->>> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->>> ---
->>>
->>> Kukjin and Krzysztof,
->>>
->>> I didn't notice that Snow was also missing this property when I did the
->>> same change for Peach Pit and and Pi Chromebooks [0], sorry about that.
->>>
-No problem and thanks for your effort.
 
->>> Best regards,
->>> Javier
->>>
->>> [0]: https://lkml.org/lkml/2015/4/7/377
->>> ---
->>>  arch/arm/boot/dts/exynos5250-snow.dts | 1 +
->>>  1 file changed, 1 insertion(+)
->>
->> Reviewed-by: Doug Anderson <dianders@chromium.org>
+> On May 8, 2015, at 9:00 PM, Mark Rutland <mark.rutland@arm.com> wrote:
 > 
-Doug, thanks for your review.
-
-> Thanks, applied to dts-fixes branch, I'll try to push it sooner than
-> later but it depends on status of previous pull requests.
+> On Fri, May 08, 2015 at 02:47:57PM +0100, Ivan T. Ivanov wrote:
+>> 
+>> On Fri, 2015-05-08 at 07:38 -0600, Mathieu Poirier wrote:
+>>> On 7 May 2015 at 09:36, Ivan T. Ivanov ivanov at linaro.org> wrote:
+>>>> Add initial set of CoreSight components found on Qualcomm's 8x16 chipset.
+>>>> 
+>>>> 
+>>>> +       replicator at 824000 {
+>>>> +               compatible = "qcom,coresight-replicator", "arm,primecell";
+>>> 
+>>> Shouldn't it be "qcom,coresight-replicator1x" ?
+>>> 
+>> 
+>> 
+>> 
+>> True, I still wonder, why we have to have this compatible string? 
+>> Drivers are probed by amba_id and "arm,primecell", after all.
 > 
-Krzysztof, I've applied this into my tree directly.
-Thanks for your gentle reminder and time.
+> The compatible string tells you both the device _and_ the format of the
+> other properties, because it tells you which binding applies.
+> 
+> So the compatible string should be present regardless, as
+> "arm,primecell" does not define the majority of the properties you need
+> for the replicator node.
 
-- Kukjin
+Mmm, only if vendors don?t bother to update version information
+fused to revision id registers, which happens. And this could 
+be workaround by "arm,primecell-periphid?, no?
+
+Regards,
+Ivan
