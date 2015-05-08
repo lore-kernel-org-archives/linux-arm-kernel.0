@@ -1,66 +1,41 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri,  8 May 2015 14:07:50 +0100
-Subject: [PATCH v4 REPOST] Revert "serial/amba-pl011: Leave the TX IRQ alone
- when the UART is not open"
-Message-ID: <1431090470-1394-1-git-send-email-Dave.Martin@arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 8 May 2015 07:12:48 -0600
+Subject: [PATCH v3 01/11] coresight-etm4x: Adding CoreSight ETM4x driver
+In-Reply-To: <1431073649.21307.12.camel@mm-sol.com>
+References: <1430926047-9125-1-git-send-email-mathieu.poirier@linaro.org>
+ <1430926047-9125-2-git-send-email-mathieu.poirier@linaro.org>
+ <1431073649.21307.12.camel@mm-sol.com>
+Message-ID: <CANLsYkxoZ62qeS91NbQZYwz-fx2qNdY+Ygw6NLbLgxcoqmkc-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit f2ee6dfa0e8597eea8b98d240b0033994e20d215.
+On 8 May 2015 at 02:27, Ivan T. Ivanov <iivanov@mm-sol.com> wrote:
+>
+> Hi Mathieu,
+>
+> On Wed, 2015-05-06 at 09:27 -0600, Mathieu Poirier wrote:
+>>
+>> +static struct amba_id etm4_ids[] = {
+>> +       {       /* ETM 4.0 - Juno board */
+>> +               .id     = 0x000bb95e,
+>> +               .mask   = 0x000fffff,
+>> +               .data   = "ETM 4.0",
+>> +       },
+>> +       { 0, 0},
+>> +};
+>> +
+>>
+>
+> Any particular reason to remove device ID for the
+> Hi6220 board? It happens to be the same ID used in
+> Qualcomm 8x16 ETM components.
 
-Jakub Kici?ski observed that this patch can cause the pl011
-driver to hang if if the only process with a pl011 port open is
-killed by a signal, pl011_shutdown() can get called with an
-arbitrary amount of data still in the FIFO.
+Efforts to push support for the Hi6220 board upstream have been
+abandoned, hence the decision to remove the entry.  Apologies for the
+inconvenience, I will add it back.
 
-Calling _shutdown() with the TX FIFO non-empty is questionable
-behaviour and my itself be a bug.
+Mathieu
 
-Since the affected patch was speculative anyway, and brings limited
-benefit, the simplest course is to remove the assumption that TXIS
-will always be left asserted after the port is shut down.
-
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
----
-
- drivers/tty/serial/amba-pl011.c |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
-
-The original patch was a misguided optimisation and introduces a bug
-that can lead to driver deadlock.  Some people are hitting this in
-v4.0-rc1/2.
-
-The revert is straightfoward: please consider applying it for v4.1.
-
-This revert has already been posted to linux-serial and applied in
-tty-next, but is not yet scheduled for v4.1.
-
-Thanks
----Dave
-
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 5a4e9d5..6f5a072 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -1639,6 +1639,9 @@ static int pl011_startup(struct uart_port *port)
- 
- 	writew(uap->vendor->ifls, uap->port.membase + UART011_IFLS);
- 
-+	/* Assume that TX IRQ doesn't work until we see one: */
-+	uap->tx_irq_seen = 0;
-+
- 	spin_lock_irq(&uap->port.lock);
- 
- 	/* restore RTS and DTR */
-@@ -1702,7 +1705,7 @@ static void pl011_shutdown(struct uart_port *port)
- 	spin_lock_irq(&uap->port.lock);
- 	uap->im = 0;
- 	writew(uap->im, uap->port.membase + UART011_IMSC);
--	writew(0xffff & ~UART011_TXIS, uap->port.membase + UART011_ICR);
-+	writew(0xffff, uap->port.membase + UART011_ICR);
- 	spin_unlock_irq(&uap->port.lock);
- 
- 	pl011_dma_shutdown(uap);
--- 
-1.7.10.4
+>
+> Regards,
+> Ivan
