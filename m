@@ -1,31 +1,77 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 8 May 2015 12:19:40 +0530
-Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
-In-Reply-To: <20150507213015.GB2455@codeaurora.org>
-References: <cover.1430394884.git.viresh.kumar@linaro.org>
- <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
- <20150504121209.GM15510@sirena.org.uk>
- <CAKohponRXiWbgT26=tO83jJgbteBf38ggE7mKvLCv+wFMW1cvA@mail.gmail.com>
- <20150505105714.GA22845@sirena.org.uk>
- <CAKohpo=09ZhXxh5Cm7Ww9Gy-AYRp9=j82tup6atVN+aOF8twdA@mail.gmail.com>
- <20150505171252.GI22845@sirena.org.uk>
- <CAKohpo=kJs076afzERPMqjELgwpN6nR2yoyEjW6XY7YSEbRuCA@mail.gmail.com>
- <20150507055231.GB32399@codeaurora.org>
- <CAKohpomYQw67KuX29PLawmd1dSXHx7pMt7+8BzmLPfHSqhMB2g@mail.gmail.com>
- <20150507213015.GB2455@codeaurora.org>
-Message-ID: <CAKohpo=Eq=Eno6PThDkNFm_tDKv47mTPWhjb_JHPs7+78x3Q-g@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 7 May 2015 23:53:18 -0700
+Subject: [PATCH v3 0/2] clk: improve handling of orphan clocks
+In-Reply-To: <CAMAWPa-ZtEzdzcO3c2D3k3JAvi+8zVzb0s1xSqUA-LQDz-EB4w@mail.gmail.com>
+References: <1429735986-18592-1-git-send-email-heiko@sntech.de>
+ <1981330.kGUrTurMy5@diego> <5543E79F.2080400@codeaurora.org>
+ <22709390.NTAlubMgNB@diego> <55440EDA.4030905@codeaurora.org>
+ <CAMAWPa_n+59+v+x3fKkmdtW1wMJF7kqtTjLLowmv1xwGWprYJw@mail.gmail.com>
+ <554BD33D.7050907@codeaurora.org>
+ <CAMAWPa-ZtEzdzcO3c2D3k3JAvi+8zVzb0s1xSqUA-LQDz-EB4w@mail.gmail.com>
+Message-ID: <20150508065318.GA5690@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 May 2015 at 03:00, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 05/07, Viresh Kumar wrote:
+On 05/07, Kevin Hilman wrote:
+> On Thu, May 7, 2015 at 2:03 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > On 05/07/15 08:17, Kevin Hilman wrote:
+> >> On Fri, May 1, 2015 at 4:40 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> >>> On 05/01/15 15:07, Heiko St?bner wrote:
+> >>>> Am Freitag, 1. Mai 2015, 13:52:47 schrieb Stephen Boyd:
+> >>>>
+> >>>>>> Instead I guess we could hook it less deep into clk_get_sys, like in the
+> >>>>>> following patch?
+> >>>>> It looks like it will work at least, but still I'd prefer to keep the
+> >>>>> orphan check contained to clk.c. How about this compile tested only patch?
+> >>>> I gave this a spin on my rk3288-firefly board. It still boots, the clock tree
+> >>>> looks the same and it also still defers nicely in the scenario I needed it
+> >>>> for. The implementation also looks nice - and of course much more compact than
+> >>>> my check in two places :-) . I don't know if you want to put this as follow-up
+> >>>> on top or fold it into the original orphan-check, so in any case
+> >>>>
+> >>>> Tested-by: Heiko Stuebner <heiko@sntech.de>
+> >>>> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> >>> Thanks. I'm leaning towards tossing your patch 2/2 and replacing it with
+> >>> my patch and a note that it's based on an earlier patch from you.
+> >> It appears this has landed in linux-next in the form of 882667c1fcf1
+> >> clk: prevent orphan clocks from being used.  A bunch of boot failures
+> >> for sunxi in today's linux-next[1] were bisected down to that patch.
+> >>
+> >> I confirmed that reverting that commit on top of next/master gets
+> >> sunxi booting again.
+> >>
+> >>
+> >
+> > Thanks for the report. I've removed the two clk orphan patches from
+> > clk-next. Would it be possible to try with next-20150507 and
+> > clk_ignore_unused on the command line?
+> 
+> That doesn't help.  I tried on cubieboard2 and bananapi.
 
->> - Now if uV is fixed, how is the target current controlled separately ?
->
-> uV is not fixed
+Thanks for trying.
 
-I meant uV is fixed for this particular OPP, i.e. min/tar/max value.
+> 
+> > Also we can try to see if
+> > critical clocks aren't being forced on by applying this patch and
+> > looking for clk_get() failures
+> 
+> From cubieboard2, there's a few that look rather important:
+> 
+> [    0.000000] Additional per-CPU info printed with stalls.
+> [    0.000000] Build-time adjustment of leaf fanout to 32.
+> [    0.000000] RCU restricting CPUs from NR_CPUS=16 to nr_cpu_ids=2.
+> [    0.000000] RCU: Adjusting geometry for rcu_fanout_leaf=32, nr_cpu_ids=2
+> [    0.000000] NR_IRQS:16 nr_irqs:16 16
+> [    0.000000] clk: couldn't get parent clock 0 for /clocks/ahb at 01c20054
+> [    0.000000] Failed to enable critical clock cpu
+> [    0.000000] Failed to enable critical clock pll5_ddr
+> [    0.000000] Failed to enable critical clock ahb_sdram
+> [    0.000000] Architected cp15 timer(s) running at 24.00MHz (virt).
 
+Ok. So it seems we need to come up with some solution to the
+"critical clocks" problem that doesn't require the individual
+clock drivers to call clk_prepare_enable().
 
-What about the other changes? Does these fix the use cases you shared
-earlier ? I will send a new updated version then..
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
