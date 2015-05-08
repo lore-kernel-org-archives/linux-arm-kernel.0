@@ -1,173 +1,96 @@
-From: b08248@gmail.com (Stuart Yoder)
-Date: Fri, 8 May 2015 14:30:00 -0500
-Subject: Master-aware devices and sideband ID data
-In-Reply-To: <20150508154903.GH25587@arm.com>
-References: <20150324155007.GC23005@leverpostej>
- <CALRxmdAE_=SubN7dY-W1K44cjVVRhKLKknpgG9af_g64+GHPtw@mail.gmail.com>
- <20150508154903.GH25587@arm.com>
-Message-ID: <CALRxmdAEvQPGN_xvwU5Xb4eNfKegPfTyM-GKXg4jRD7JyRxHJA@mail.gmail.com>
+From: jbagg@lenbrook.com (Jonathan Bagg)
+Date: Fri, 8 May 2015 15:45:56 -0400
+Subject: imx6 sata cdrom driver issue
+In-Reply-To: <2901871.Bfl6KrJo7t@wuerfel>
+References: <5539101D.1020909@lenbrook.com> <3757889.IHh7sEV0GH@wuerfel>
+ <5547DEA7.8080009@lenbrook.com> <2901871.Bfl6KrJo7t@wuerfel>
+Message-ID: <554D1274.70804@lenbrook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 8, 2015 at 10:49 AM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Stuart,
->
-> On Thu, May 07, 2015 at 06:49:32PM +0100, Stuart Yoder wrote:
->> On Tue, Mar 24, 2015 at 10:50 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->> > Hi all,
->> >
->> > For some devices, identification of particular masters is critical to
->> > their operation (e.g. IOMMUs, MSI controllers). The identity of masters
->> > is determined from sideband signals on the bus, and it may or may not be
->> > possible to probe and/or configure this information. Worse still, these
->> > information may be rewritten by intermediate buses, so the
->> > information for a given master may differ at different points in the bus
->> > hierarchy.
->> >
->> > We currently describe this master information for devices attached to
->> > IOMMUs, with a master ID being encoded in the iommu-cells. However this
->> > only covers the ID between the master and its IOMMU(s), and we don't
->> > currently have a mechanism to describe the master IDs as they are seen
->> > by devices beyond the IOMMU(s),
+On 15-05-05 06:48 AM, Arnd Bergmann wrote:
+> On Monday 04 May 2015 17:03:35 Jonathan Bagg wrote:
+>> On 15-05-04 02:37 PM, Arnd Bergmann wrote:
+>>> On Friday 01 May 2015 11:32:49 Jonathan Bagg wrote:
+>>>> On 15-04-24 03:58 AM, Arnd Bergmann wrote:
+>>>>> On Thursday 23 April 2015 11:30:37 Jonathan Bagg wrote:
+>>>>>
+>>>>> Do you have two SATA ports on one controller, with the other one being
+>>>>> conneced to a disk drive?
+>>>> Not when this error happened, but the CD-ROM was connected through a
+>>>> port multiplier.  One time I noticed sda device appear so I mounted it
+>>>> and it was the CD-ROM filesystem!
+>>> Very strange, I'm sure something went wrong there and either the SATA
+>>> host or the CDROM driver does not work well with a port multiplier.
+>>>
+>>> Is there a way for you to reproduce the problem without the multiplier?
+>>>
+>>>>> My best guess is that something in the error handling of
+>>>>> drivers/ata/ahci_imx.c causes a reset of the entire bus and that
+>>>>> triggers the other bugs. Can you instrument that error handling to
+>>>>> see what's going on?
+>>>>>
+>>>> Also tried a cubox
+>>>> <https://www.solid-run.com/products/cubox-i-mini-computer/>, (imx6)
+>>>> running  Linux OpenELEC 3.14.18 #1 SMP Sun Sep 14 12:22:14 EDT 2014
+>>>> armv7l GNU/Linux
+>>> Can you find out if there is a port multiplier in that machine?
+>> I've tried with and without a multiplier.  I have a port multiplier on a
+>> development board that I can connect between the CDROM and Sabre SATA
+>> port or connect the CDROM directly to the Sabre SATA port .
+>>> Does it list the sda device in /proc/partitions, or just the /dev/sr0?
+>> sda is only listed in /proc/partitions if I connect up a HDD.  The issue
+>> where the CDROM filesystem mounting as sda1 has never reproduced.
 >>
->> Is there a specific case you've run across where conveying this additional
->> master info would be needed,  or are you just thinking through how to fully
->> describe hardware?
->
-> It's a combination of a few things:
->
->   1. We are aware of hardware that has ID transformations
->   2. ACPI allows this to be described in IORT
->   3. We need to be general enough to encompass current and future designs
->      in the device-tree binding.
->
->> Are there really cases out there were there is a hardwired hardware
->> relationship between RID and SID?
->
-> Yes, I believe it's actually the common case (at least, from Linux's
-> perspective).
->
->> > or in the absence of any IOMMU(s).
->> >
->> > The following are example of master IDs:
->> > * PCIe Requester IDs (RIDs) (bus:device.function AKA BDF)
->> > * SMMU Stream IDs (SIDs)
->> > * GICv3 ITS Device IDs (DIDs)
->> >
->> > In the case of a system with PCIe, SMMU and GICv3, the master IDs are
->> > rewritten in a chain of RID=>SID=>DID, as in the following diagram:
->> >
->> > +-------------+
->> > | PCIe master |
->> > +-------------+
->> >     ||
->> >     || Requester ID (RID)
->> >     || Probeable from RC.
->> >     \/
->> > +-------------------+
->> > | PCIe Root Complex |
->> > +-------------------+
->> >     ||
->> >     || SMMU Stream ID (SID)
->> >     || Derived from RID, static non-probeable mapping.
->>
->> The FSL LS2085A SoC has an actual RID->SID mapping table in the PCI
->> controller, but it is not static in the sense of fixed in hardware or
->> firmware.  It's
->> a programmable mapping table, and we envision Linux programming this table.
->
-> Ok, so I assume you're not planning to use ACPI with this system?
+>> I've also discovered, and it is 100% reproducible, that with the HDD and
+>> CDROM connected using the port multiplier, the kernel never lists the
+>> partition on the HDD.  If I connect the HDD directly to the Sabre or
+>> connect the HDD to the Sabre using the multiplier without the CDROM,
+>> /dev/sda1 will exist.
+> Ok, interesting. Does the same happen if you connect that port
+> multiplier to a PC?
+I don't think the host sata port on the PC I tried supported 
+multipliers.  I tried the port multiplier on a imx53 Quick Start Board 
+and it worked fine.  We've also discovered that cdparanoia (audio CD 
+ripper) fails to recognize the CDROM drive 100% of the time on imx6 with 
+or without the port multiplier.  On the imx53 Quick Start Board, running 
+the same kernel, just a different device tree, cdparanoia works great 
+with and without the port multiplier. If you apply the attached patch to 
+enable sata debug output, the imx6 output is different than the imx53's....
 
-Not initially, but perhaps in the future.  I guess I don't know the implications
-to ACPI yet.
+cdparanoia -vsQ
+dmesg | grep CDB
 
-> Also, we can't just program this table willy-nilly, as I'm sure you're
-> aware. For example, updating a the SMRs in a live SMMU is a big no-no,
-> so although Linux may initialise the table, it can only be safely changed
-> at device init/teardown time, surely?
+imx53
 
-Correct.  That would not be updated when a device is live.
+ata_scsi_dump_cdb: CDB (1:0,0,-571258880) 00 00 4a 01 00 00 10 00 00
+CDB rbuf: [4a 01 00 00 10 00 00 00 08]
+CDB rbuf: 00000000: 00 06 04 56 00 02 00 00
 
->> >     \/
->> > +--------------+
->> > | SMMU (IOMMU) |
->> > +--------------+
->> >     ||
->> >     || ITS Device ID (DID)
->> >     || Derived from SID, static non-probeable mapping.
->> >     \/
->>
->> Is this even architecturally possible on ARM?  Can the SMMU transform stream
->> IDs into some different number?
->
-> From the OS perspective, this is what it looks like. What we'd actually
-> have in hardware is multiple SMMUs sharing an ITS, so there would need
-> to be something prepending an SMMU ID onto the StreamID to construct a
-> device ID, otherwise you'd have devices inexplicably sharing MSIs.
->
->> > However, this conflicts/overlaps with existing bindings (at least iommus
->> > and msi-parent), and I'm not sure how to reconcile them. Am I missing a
->> > neat way of describing this that works with the existing bindings?
->> >
->> > It's also not clear to me if it's sufficient to have a generic
->> > "master-ids" property (with the relevant type being implicit from
->> > context), or if each type of ID needs each type of ID (RID, SID, DID,
->> > etc) needs its own.
->> >
->> > Which other devices out there which require side-band master
->> > information, and what do they require?
->>
->> For us, at least, the  master-id-map cannot be a static property.
->> Our PCI controller's DID->SID mapping table is programmable
->> and we won't know how to program it until Linux is running.  A PCI
->> SRIOV card may have virtual functions that appear as hot-plugged
->> devices and there is no way that boot firmware would have the knowledge
->> to have set that table up ahead of time.
->>
->> What we do need is some way to have boot firmware convey to
->> the OS what SIDs are available to be used in the DID->SID
->> table.   We have a very limited number of SIDs available and boot
->> firmware may need to convey to Linux that for example-- PCI controller #2
->> has only 8 SIDs available for DID->SID mappings.
->>
->> We had invented a property called "available-stream-ids" for some
->> proof of concept work, but perhaps the master-id-map property could
->> be used to convey available stream IDs by using a child-id-length
->> of 0.  So to convey that stream IDs 5,6,7,8 are available:
->>
->>   PCI: pci at af000000 {
->>          ...
->>          /* Requester ID of PCIe endpoints, implicit at runtime */
->>          master-id-cells = <1>;
->>
->>          /* RIDS idmapped to SIDS @ SMMU */
->>          master-id-map = <0 0 &SMMU 5
->>                                     0 0 &SMMU 6
->>                                     0 0 &SMMU 7
->>                                     0 0 &SMMU 8>;
->>   };
->>
->> I'm not sure the above would conflict with the existing IOMMU
->> binding, but would seem to be an extension of it.
->>
->> If you have a simple master with 2 stream IDS do this:          ...
->>           iommus = <&{/smmu} 23>, <&{/smmu} 24>;
->>
->> If you have a static DID->SID mapping to convey, use the map as
->> you proposed:
->>          master-id-cells = <1>;
->>          master-id-map = <0 0x10000 &SMMU 0>;;
->>
->> If your DID->SID is not static, but you need to convey the SIDs that are
->> available to this bus:
->>          master-id-cells = <1>;
->>          master-id-map = <0 0 &SMMU 23
->>                                     0 0 &SMMU 24>;
->
-> We need to be careful with terminology here. Can we use RID to mean the PCI
-> requester ID and DID to mean the GIC ITS device ID?
+imx6 - third line is always zeros
 
-Sorry, that was a typo on my part...where I said DID I meant RID.
+ata_scsi_dump_cdb: CDB (1:0,0,-1122908160) 00 00 4a 01 00 00 10 00 00
+CDB rbuf: [4a 01 00 00 10 00 00 00 08]
+CDB rbuf: 00000000: 00 00 00 00 00 00 00 00
 
-Thanks,
-Stuart
+We also tried kernel versions 3.12, 3.14, 3.19 and most recent 4.x, all 
+are effected.  imx6 sata support didn't exists in 3.10, so we couldn't 
+go further back.
+
+https://community.freescale.com/message/514169#514169
+
+
+
+-- 
+Jonathan Bagg
+Embedded Systems Developer
+NAD Electronics | Lenbrook Industries Limited
+633 Granite Court, Pickering, Ontario, Canada L1W 3K1 | 905-831-0799 ext 4478 | http://www.nadelectronics.com
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: ata_debug.patch
+Type: text/x-patch
+Size: 1450 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150508/1aa9edc8/attachment.bin>
