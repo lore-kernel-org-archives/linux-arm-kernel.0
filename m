@@ -1,124 +1,149 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 8 May 2015 18:46:49 +0200
-Subject: [PATCH v3 10/12] KVM: arm64: trap nested debug register access
-In-Reply-To: <1430989647-22501-3-git-send-email-alex.bennee@linaro.org>
-References: <1430929407-3487-1-git-send-email-alex.bennee@linaro.org>
- <1430989647-22501-3-git-send-email-alex.bennee@linaro.org>
-Message-ID: <20150508164649.GK24744@cbox>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 8 May 2015 18:59:29 +0200
+Subject: [PATCH v4 09/13] arm64: mm: explicitly bootstrap the linear
+ mapping
+In-Reply-To: <20150508164327.GF12601@e104818-lin.cambridge.arm.com>
+References: <1429112064-19952-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1429112064-19952-10-git-send-email-ard.biesheuvel@linaro.org>
+ <20150507165416.GB11067@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-26A1pawUoeY28mXb1WzhPv4O0Rh433Yj9uBjxFh0MWg@mail.gmail.com>
+ <20150508144448.GE12601@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu9RFNpg8nTYzCNc2hE0kE2Cn8HEHebJ0AYXEyT08QC=Kw@mail.gmail.com>
+ <20150508164327.GF12601@e104818-lin.cambridge.arm.com>
+Message-ID: <CAKv+Gu-MzyCGd00_pEa1VscmKqvKmJH9EL5WYPBOj9BHiDsP3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 07, 2015 at 10:07:13AM +0100, Alex Benn?e wrote:
-> When we are using the hardware registers for guest debug we need to deal
-> with the guests access to them. There is already a mechanism for dealing
-> with these accesses so we build on top of that.
-> 
->   - any access to mdscr_el1 is now stored in the mirror location
->   - access to DBG[WB][CV]R continues to go to guest's context
-> 
-> There is one register (MDCCINT_EL1) which guest debug doesn't care about
-> so this behaves as before.
-> 
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-> 
-> ---
-> v3
->   - re-factor for better flow and fall through.
->   - much simpler with debug_ptr (use the guest area as before)
->   - tweak shadow fn to avoid multi-line if
-> 
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index a44fb32..7aa3b3a 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -132,7 +132,13 @@ struct kvm_vcpu_arch {
->  	 * here.
->  	 */
->  
-> -	/* Guest registers we preserve during guest debugging */
-> +	/*
-> +	 * Guest registers we preserve during guest debugging.
-> +	 *
-> +	 * These shadow registers are updated by the kvm_handle_sys_reg
-> +	 * trap handler if the guest accesses or updates them while we
-> +	 * are using guest debug.
-> +	 */
->  	struct {
->  		u32	pstate;
->  		u32	mdscr_el1;
-> diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
-> index 1ab63dd..dc8bca8 100644
-> --- a/arch/arm64/kvm/debug.c
-> +++ b/arch/arm64/kvm/debug.c
-> @@ -50,8 +50,7 @@ static void restore_guest_debug_regs(struct kvm_vcpu *vcpu)
->  {
->  	*vcpu_cpsr(vcpu) |=
->  		(vcpu->arch.guest_debug_state.pstate & SPSR_DEBUG_MASK);
-> -	vcpu_sys_reg(vcpu, MDSCR_EL1) |=
-> -		(vcpu->arch.guest_debug_state.mdscr_el1 & MDSCR_EL1_DEBUG_MASK);
-> +	vcpu_sys_reg(vcpu, MDSCR_EL1) = vcpu->arch.guest_debug_state.mdscr_el1;
->  }
->  
->  /**
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index c370b40..95f422f 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -196,11 +196,40 @@ static bool trap_dbgauthstatus_el1(struct kvm_vcpu *vcpu,
->   * - If the dirty bit is set, save guest registers, restore host
->   *   registers and clear the dirty bit. This ensure that the host can
->   *   now use the debug registers.
-> + *
-> + * We also use this mechanism to set-up the debug registers for guest
+On 8 May 2015 at 18:43, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Fri, May 08, 2015 at 05:03:37PM +0200, Ard Biesheuvel wrote:
+>> On 8 May 2015 at 16:44, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> > On Thu, May 07, 2015 at 09:21:28PM +0200, Ard Biesheuvel wrote:
+>> >> On 7 May 2015 at 18:54, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> >> > On Wed, Apr 15, 2015 at 05:34:20PM +0200, Ard Biesheuvel wrote:
+>> >> >> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+>> >> >> index ceec4def354b..338eaa7bcbfd 100644
+>> >> >> --- a/arch/arm64/kernel/vmlinux.lds.S
+>> >> >> +++ b/arch/arm64/kernel/vmlinux.lds.S
+>> >> >> @@ -68,6 +68,17 @@ PECOFF_FILE_ALIGNMENT = 0x200;
+>> >> >>  #define ALIGN_DEBUG_RO_MIN(min)              . = ALIGN(min);
+>> >> >>  #endif
+>> >> >>
+>> >> >> +/*
+>> >> >> + * The pgdir region needs to be mappable using a single PMD or PUD sized region,
+>> >> >> + * so it should not cross a 512 MB or 1 GB alignment boundary, respectively
+>> >> >> + * (depending on page size). So align to an upper bound of its size.
+>> >> >> + */
+>> >> >> +#if CONFIG_ARM64_PGTABLE_LEVELS == 2
+>> >> >> +#define PGDIR_ALIGN  (8 * PAGE_SIZE)
+>> >> >> +#else
+>> >> >> +#define PGDIR_ALIGN  (16 * PAGE_SIZE)
+>> >> >> +#endif
+>> >> >
+>> >> > Isn't 8 pages sufficient in both cases? Unless some other patch changes
+>> >> > the idmap and swapper, I can count maximum 7 pages in total.
+>> >>
+>> >> The preceding patch moves the fixmap page tables to this region as well.
+>> >> But the logic is still incorrect -> we only need 16x for 4 levels (7 +
+>> >> 3 == 10), the remaining ones are all <= 8
+>> >
+>> > You should improve the comment here to include the maths, "upper bound
+>> > of its size" is not very clear ;).
+>>
+>> Yes, you are right, it should read 'power-of-2 upper bound'
+>
+> And the number of pages required for the initial page tables (I figured
+> out it's a power of two already ;)).
+>
 
-s/set-up/set up/
+Ok
 
-> + * debugging. If this is the case we want to ensure the guest sees
+>> >> >> +     static struct bootstrap_pgtables linear_bs_pgtables __pgdir;
+>> >> >> +     const phys_addr_t swapper_phys = __pa(swapper_pg_dir);
+>> >> >> +     unsigned long swapper_virt = __phys_to_virt(swapper_phys) + va_offset;
+>> >> >> +     struct memblock_region *reg;
+>> >> >> +
+>> >> >> +     bootstrap_early_mapping(swapper_virt, &linear_bs_pgtables,
+>> >> >> +                             IS_ENABLED(CONFIG_ARM64_64K_PAGES));
+>> >> >> +
+>> >> >> +     /* now find the memblock that covers swapper_pg_dir, and clip */
+>> >> >> +     for_each_memblock(memory, reg) {
+>> >> >> +             phys_addr_t start = reg->base;
+>> >> >> +             phys_addr_t end = start + reg->size;
+>> >> >> +             unsigned long vstart, vend;
+>> >> >> +
+>> >> >> +             if (start > swapper_phys || end <= swapper_phys)
+>> >> >> +                     continue;
+>> >> >> +
+>> >> >> +#ifdef CONFIG_ARM64_64K_PAGES
+>> >> >> +             /* clip the region to PMD size */
+>> >> >> +             vstart = max(swapper_virt & PMD_MASK,
+>> >> >> +                          round_up(__phys_to_virt(start + va_offset),
+>> >> >> +                                   PAGE_SIZE));
+>> >> >> +             vend = min(round_up(swapper_virt, PMD_SIZE),
+>> >> >> +                        round_down(__phys_to_virt(end + va_offset),
+>> >> >> +                                   PAGE_SIZE));
+>> >> >> +#else
+>> >> >> +             /* clip the region to PUD size */
+>> >> >> +             vstart = max(swapper_virt & PUD_MASK,
+>> >> >> +                          round_up(__phys_to_virt(start + va_offset),
+>> >> >> +                                   PMD_SIZE));
+>> >> >> +             vend = min(round_up(swapper_virt, PUD_SIZE),
+>> >> >> +                        round_down(__phys_to_virt(end + va_offset),
+>> >> >> +                                   PMD_SIZE));
+>> >> >> +#endif
+>> >> >> +
+>> >> >> +             create_mapping(__pa(vstart - va_offset), vstart, vend - vstart,
+>> >> >> +                            PAGE_KERNEL_EXEC);
+>> >> >> +
+>> >> >> +             /*
+>> >> >> +              * Temporarily limit the memblock range. We need to do this as
+>> >> >> +              * create_mapping requires puds, pmds and ptes to be allocated
+>> >> >> +              * from memory addressable from the early linear mapping.
+>> >> >> +              */
+>> >> >> +             memblock_set_current_limit(__pa(vend - va_offset));
+>> >> >> +
+>> >> >> +             return;
+>> >> >> +     }
+>> >> >> +     BUG();
+>> >> >> +}
+>> >> >
+>> >> > I'll probably revisit this function after I see the whole series. But in
+>> >> > the meantime, if the kernel is not loaded in the first memblock (in
+>> >> > address order), isn't there a risk that we allocate memory from the
+>> >> > first memblock which is not mapped yet?
+>> >>
+>> >> memblock allocates top down, so it should only allocate from this
+>> >> region, unless the remaining room is completely reserved.
+>> >
+>> > I don't like to rely on this, it's not guaranteed behaviour.
+>>
+>> Actually, it is. Allocation is always top-down unless you call
+>> memblock_set_bottom_up(), which is a NOP  unless CONFIG_MOVABLE_NODE
+>> is selected.
+>> That is why the memblock limit only limits at the top afaict
+>
+> It currently works like this but I'm not sure it is guaranteed to always
+> behave this way (e.g. someone "improves" the memblock allocator in the
+> future). And you never know, we may need memory hotplug on arm64 at some
+> point in the future (together with CONFIG_MOVABLE_NODE).
+>
 
-If this is the case, (comma)
+I am not it is worth the additional hassle now to take into
+consideration what someone may or may not implement at some point in
+the future. I am sure memory hotplug is going to take more effort than
+just setting the Kconfig option, and I would not be surprised if it
+imposed additional restrictions on the placement on the kernel.
 
-> + * the right versions of the registers - even if they are not going to
-> + * be effective while guest debug is using HW debug.
-> + *
->   */
-> +
-> +static bool shadow_debug_reg(struct kvm_vcpu *vcpu,
-> +			     const struct sys_reg_params *p,
-> +			     const struct sys_reg_desc *r)
-> +{
-> +	/* MDSCR_EL1 */
-> +	if (r->reg == MDSCR_EL1) {
-> +		u32 *shadow_mdscr_el1 = &vcpu->arch.guest_debug_state.mdscr_el1;
-> +
-> +		if (p->is_write)
-> +			*shadow_mdscr_el1 = *vcpu_reg(vcpu, p->Rt);
-> +		else
-> +			*vcpu_reg(vcpu, p->Rt) = *shadow_mdscr_el1;
-> +
-> +		return true;
-> +	}
-> +
-> +	return false;
-> +}
-> +
->  static bool trap_debug_regs(struct kvm_vcpu *vcpu,
->  			    const struct sys_reg_params *p,
->  			    const struct sys_reg_desc *r)
->  {
-> +	if (vcpu->guest_debug && shadow_debug_reg(vcpu, p, r))
-> +		return true;
-> +
+So the question is really if allowing the kernel to be placed at
+arbitrary offsets in physical memory is worth the hassle in the first
+place. There is also a rather nasty interaction with the mem= command
+line option (and that does not work 100% correctly in this version of
+the series). There is a policy decision to be made there, i.e., if you
+remove memory to uphold mem=, where do you remove it? Removing from
+the low end may waste precious <4 GB memory but removing from the top
+may be impossible if the kernel image is loaded there.
 
-so do we also have a MDSCR_EL1 in sys_regs and one in guest_debug_state
-now?
-
-If yes, what are the differences between the two?
-
->  	if (p->is_write) {
->  		vcpu_sys_reg(vcpu, r->reg) = *vcpu_reg(vcpu, p->Rt);
->  		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
-> -- 
-> 2.3.5
-> 
-Thanks,
--Christoffer
+Perhaps we should consider adding an early early memblock allocator
+that allocates statically from the __pgdir region. The only problem is
+finding a reasonable upper bound for the amount of memory you would
+need ...
