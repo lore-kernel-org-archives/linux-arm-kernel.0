@@ -1,39 +1,92 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 07 May 2015 17:04:05 -0700
-Subject: [PATCH 05/12] watchdog: st_wdt: Update IP layout information
- to include Clocksource
-In-Reply-To: <1431005924-21777-6-git-send-email-lee.jones@linaro.org>
-References: <1431005924-21777-1-git-send-email-lee.jones@linaro.org>
- <1431005924-21777-6-git-send-email-lee.jones@linaro.org>
-Message-ID: <554BFD75.1070601@roeck-us.net>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 8 May 2015 09:05:39 +0900
+Subject: [PATCH 5/6] ARM: Exynos: switch to using generic cpufreq driver
+ for Exynos4210
+In-Reply-To: <1428079429-4252-6-git-send-email-b.zolnierkie@samsung.com>
+References: <'@samsung.com>
+ <1428079429-4252-1-git-send-email-b.zolnierkie@samsung.com>
+ <1428079429-4252-6-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <CAJKOXPeF_Wc0EtV-p3DFw-T1nqFZxC63Xi3=vRrRpic1pCiUBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/2015 06:38 AM, Lee Jones wrote:
-> Initial submission adding support for this IP only included Watchdog and
-> the Real-Time Clock.  Now the third (and final) device is enabled this
-> trivial patch is required to update the comment in the Watchdog driver
-> to encompass Clocksource.
+2015-04-04 1:43 GMT+09:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
+> From: Thomas Abraham <thomas.ab@samsung.com>
 >
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> The new CPU clock type allows the use of generic CPUfreq driver.
+> Switch Exynos4210 to using generic cpufreq driver.
+>
+> Changes by Bartlomiej:
+> - removed non-Exynos4210 support for now
+>
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+I know this is an old patch, it looks good. Just a minor nit below.
 
 > ---
->   drivers/watchdog/st_lpc_wdt.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm/mach-exynos/exynos.c |   21 ++++++++++++++++++++-
+>  1 file changed, 20 insertions(+), 1 deletion(-)
 >
-> diff --git a/drivers/watchdog/st_lpc_wdt.c b/drivers/watchdog/st_lpc_wdt.c
-> index f32be15..6785afd 100644
-> --- a/drivers/watchdog/st_lpc_wdt.c
-> +++ b/drivers/watchdog/st_lpc_wdt.c
-> @@ -197,7 +197,7 @@ static int st_wdog_probe(struct platform_device *pdev)
->   		return -EINVAL;
->   	}
+> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+> index bcde0dd..4e13de5 100644
+> --- a/arch/arm/mach-exynos/exynos.c
+> +++ b/arch/arm/mach-exynos/exynos.c
+> @@ -197,6 +197,25 @@ static void __init exynos_init_irq(void)
+>         exynos_map_pmu();
+>  }
 >
-> -	/* LPC can either run in RTC or WDT mode */
-> +	/* LPC can either run as a Clocksource or in RTC or WDT mode */
->   	if (mode != ST_LPC_MODE_WDT)
->   		return -ENODEV;
+> +static const struct of_device_id exynos_cpufreq_matches[] = {
+> +       { .compatible = "samsung,exynos4210", .data = "cpufreq-dt" },
+> +       { /* sentinel */ }
+> +};
+> +
+> +static void __init exynos_cpufreq_init(void)
+> +{
+> +       struct device_node *root = of_find_node_by_path("/");
+> +       const struct of_device_id *match;
+> +
+> +       match = of_match_node(exynos_cpufreq_matches, root);
+> +       if (!match) {
+> +               platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
+> +               return;
+> +       }
+> +
+> +       platform_device_register_simple(match->data, -1, NULL, 0);
+
+How about something like:
+
+const char *cpufreq_dev)name = "exynos-cpufreq";
+if (match)
+  cpufreq_dev_name = match->data;
+platform_device_register_simple(cpufreq_dev_name -1, NULL, 0);
+
+Less returns and one call to platform_device_register_simple().
+Best regards,
+Krzysztof
+
+> +}
+> +
+>  static void __init exynos_dt_machine_init(void)
+>  {
+>         /*
+> @@ -218,7 +237,7 @@ static void __init exynos_dt_machine_init(void)
+>             of_machine_is_compatible("samsung,exynos5250"))
+>                 platform_device_register(&exynos_cpuidle);
 >
+> -       platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
+> +       exynos_cpufreq_init();
 >
+>         of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>  }
+> --
+> 1.7.9.5
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
