@@ -1,32 +1,49 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Fri,  8 May 2015 15:30:05 +0200
-Subject: [PATCH] ARM: dts: Add syscon property to the MIPI phy in exynos5420
-Message-ID: <1431091805-11451-1-git-send-email-tomeu.vizoso@collabora.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 08 May 2015 15:30:50 +0200
+Subject: [PATCH RFC 0/2] stmmac: stand alone platform drivers
+In-Reply-To: <1431022765-30715-1-git-send-email-manabian@gmail.com>
+References: <1431022765-30715-1-git-send-email-manabian@gmail.com>
+Message-ID: <5987007.lq0DjS0tE0@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since e4b3d38088df6f3acd40 ("phy: exynos-video-mipi: Fix regression by
-adding support for PMU regmap") the syscon property is required in
-samsung,s5pv210-mipi-video-phy nodes, but this DTS hadn't been updated
-yet.
+On Thursday 07 May 2015 20:19:23 Joachim Eastwood wrote:
+> Hi Arnd,
+> 
+> I ran into some issue using a separate platform driver[1] for lpc1850-dwmac.
+> 
+> My dts files looks like this.
+> mac: ethernet at 40010000 {
+>         compatible = "nxp,lpc1850-dwmac", "snps,dwmac-3.611", "snps,dwmac";
+>         ...
+> }
+> 
+> On boot the generic driver in stmmac_platform.c would grab the
+> device, matching on one of generic compat strings and thus blocking
+> the lpc1850-dwmac driver.
+> 
+> By changing the build order in the Makefile (see patch 1) I managed
+> to get it working, but I am not sure that is a good solution(?).
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
----
- arch/arm/boot/dts/exynos5420.dtsi | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index f67b23f..72a56f1 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -541,6 +541,7 @@
- 	mipi_phy: video-phy at 10040714 {
- 		compatible = "samsung,s5pv210-mipi-video-phy";
- 		reg = <0x10040714 12>;
-+		syscon = <&pmu_system_controller>;
- 		#phy-cells = <1>;
- 	};
+Changing the link order in the Makefile is an acceptable solution
+for managing initialization order in general, but I think it won't
+work here, because if your driver is a loadable module, the base
+driver would always be attached first.
  
--- 
-2.4.0
+> Another fix would be to remove the generic compat strings from the
+> match table in stmmac_platform but there are some dts-files that
+> only have these compat strings.
+> See abilis_tb10x.dtsi and exynos5440.dtsi.
+
+Yes, that has a high risk of causing regressions.
+
+> I could also remove the generic compat strings from my dts file but
+> I am not sure that is good solution either. If more glue is
+> converted this would then be need in those dts files also.
+
+I think it would work if you move the generic strings into a separate
+module that is not the one providing the base support. In that case,
+the kernel should first try to use the driver that matches the first
+compatible string. Can you try that?
+
+	Arnd
