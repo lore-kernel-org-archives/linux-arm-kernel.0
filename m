@@ -1,51 +1,49 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 8 May 2015 14:17:00 +0200
-Subject: [PATCH] Revert "serial/amba-pl011: Leave the TX IRQ alone when
- the UART is not open"
-In-Reply-To: <20150508085029.GA17900@e103592.cambridge.arm.com>
-References: <20150507105934.GA18402@e103592.cambridge.arm.com>
- <20150507232835.GD5449@kroah.com>
- <20150508085029.GA17900@e103592.cambridge.arm.com>
-Message-ID: <20150508121700.GA4781@kroah.com>
+From: mike.looijmans@topic.nl (Mike Looijmans)
+Date: Fri, 8 May 2015 14:17:25 +0200
+Subject: dma_alloc_coherent versus streaming DMA,
+ neither works satisfactory
+In-Reply-To: <20150508111048.GE2067@n2100.arm.linux.org.uk>
+References: <5538DD02.6050401@topic.nl> <3382997.5hgfVKmNXP@wuerfel>
+ <5540D356.50708@topic.nl> <9622793.RaVBbeJMCx@wuerfel>
+ <554B49F0.1090100@topic.nl>
+ <CAD8Lp45w6_ck13sG3PQ549AxsgTi96XQAkUEd9DQqt-i=ZXxUQ@mail.gmail.com>
+ <554B6917.40705@topic.nl> <554B71F6.5000106@topic.nl>
+ <20150507143010.GC2067@n2100.arm.linux.org.uk> <554C4FCE.6070802@topic.nl>
+ <20150508111048.GE2067@n2100.arm.linux.org.uk>
+Message-ID: <554CA955.4020205@topic.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 08, 2015 at 09:50:29AM +0100, Dave P Martin wrote:
-> On Fri, May 08, 2015 at 12:28:35AM +0100, Greg Kroah-Hartman wrote:
-> > On Thu, May 07, 2015 at 11:59:47AM +0100, Dave Martin wrote:
-> > > Calling serial maintainers...
-> > > 
-> > > Please consider the following commit for merging in v4.1.
-> > > 
-> > > f28c1d0a78a8c6a217ac5362cb719efa169ae2a7 Revert "serial/amba-pl011: Leave the TX IRQ alone when the UART is not open"
-> > > 
-> > > This backs out a misguided optimisation that is causing pl011 driver
-> > > deadlocks for some people in certain scenarios (my bad).
-> > > 
-> > > The revert is self-contained and independent of the other changes I
-> > > posted.
-> > > 
-> > > Thanks
-> > > ---Dave
-> > > 
-> > > 
-> > > Original commit message:
-> > > 
-> > > This reverts commit f2ee6dfa0e8597eea8b98d240b0033994e20d215.
-> > 
-> > Please send this in a format I can apply it in...
-> 
-> The revert has been posted twice on this list and you already applied it
-> to tty-next with commit ID f28c1d0a78a8c6a217ac5362cb719efa169ae2a7
-> (thanks btw).  I could have made that clearer...
+?On 08-05-15 13:10, Russell King - ARM Linux wrote:
+> Well, I do find the language used rather loose.  The term "coherent" is
+> well understood, but when the documentation mixes it with "consistent"
+> it becomes less clear whether the two terms mean the same thing or
+> something different.
 
-Yes, as I had no idea that is what you wanted here.
+I re-read https://www.kernel.org/doc/Documentation/DMA-API.txt with this in mind.
 
-> I'm happy to post it again, but I assumed (wrongly?) that you'd prefer
-> to cherry-pick it from your own branch.  If you really want me to
-> post a duplicate, please confirm.
+"Part Ia" starts with "dma_alloc_coherent" and (friends) but then talks about 
+"consistent" memory throughout the whole part. I think a 
+s/consistent/coherent/g in this part will make things a lot clearer for everyone.
 
-Please resend, and be more explicit, remember, I get over 1000 emails a
-day...
+Shall I submit a patch for that?
 
-greg k-h
+Part Ib continues, but switches to using the word "coherent" instead.
+
+
+
+
+Kind regards,
+
+Mike Looijmans
+System Expert
+
+TOPIC Embedded Products
+Eindhovenseweg 32-C, NL-5683 KH Best
+Postbus 440, NL-5680 AK Best
+Telefoon: +31 (0) 499 33 69 79
+Telefax: +31 (0) 499 33 69 70
+E-mail: mike.looijmans at topicproducts.com
+Website: www.topicproducts.com
+
+Please consider the environment before printing this e-mail
