@@ -1,94 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 08 May 2015 16:01:31 +0200
-Subject: [Linaro-acpi] [PATCH 2/2] ACPI / scan: Parse _CCA and setup
- device coherency
-In-Reply-To: <20150430155513.GC27755@e104818-lin.cambridge.arm.com>
-References: <1430315049-4663-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <2797677.7Ghz879K9z@wuerfel>
- <20150430155513.GC27755@e104818-lin.cambridge.arm.com>
-Message-ID: <7474451.VIDhPoBiY2@wuerfel>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 8 May 2015 08:07:39 -0600
+Subject: [PATCH 01/11] coresight-etm4x: Adding CoreSight ETM4x driver
+In-Reply-To: <CACRpkdak5-iuWEDAvhDq3uwYobK+tW_N-t-QaY+-5TUSCa7uOg@mail.gmail.com>
+References: <1429742451-11465-1-git-send-email-mathieu.poirier@linaro.org>
+ <1429742451-11465-2-git-send-email-mathieu.poirier@linaro.org>
+ <CACRpkdak5-iuWEDAvhDq3uwYobK+tW_N-t-QaY+-5TUSCa7uOg@mail.gmail.com>
+Message-ID: <CANLsYkwT9zinP6KLi6o95+fGwPbxbUgWTpMnL7yZfsfTU8p31A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 30 April 2015 16:55:14 Catalin Marinas wrote:
-> On Thu, Apr 30, 2015 at 03:52:17PM +0200, Arnd Bergmann wrote:
-> > On Thursday 30 April 2015 14:13:45 Will Deacon wrote:
-> > > On Thu, Apr 30, 2015 at 02:03:00PM +0100, Arnd Bergmann wrote:
-> > > > On Thursday 30 April 2015 12:46:15 Will Deacon wrote:
-> > > > > Cache sync doesn't exist in the ARM/arm64architecture, what are the
-> > > > > semantics supposed to be? Maybe it's just DSB for us (complete all pending
-> > > > > maintenance).
-> > > > 
-> > > > It ensures that a state of a buffer as observed by CPU and device is
-> > > > identical. It's possible that we removed all platforms that did something
-> > > > interesting here, so it's one of these:
-> > > > 
-> > > > a) On architectures that are mostly coherent, it's a barrier
-> > > >    that is broadcast to all devices, like I assume DSB is. IA64
-> > > >    currently does this for all machines, but IIRC it used to 
-> > > >    access some cluster interconnect at some point to enforce a
-> > > >    flush.
-> > > >    The ARM32 based ArmadaXP also falls into this model if the cache
-> > > >    coherency fabric is enabled, as that needs to be synchronized
-> 
-> I'm getting confused by the ArmadaXP case. IIRC, the point of the
-> arm,io-coherent property to the PL310 was precisely to make the
-> outer_sync a no-op when the coherency is enabled. So basically an mb()
-> would only issue a DSB on such platform without the PL310 cache sync.
-> 
-> On coherent systems, devices usually snoop the inner/CPU cache and not
-> the system cache, that's further down the line. So a DSB would ensure
-> the visibility at the coherent interconnect level before the system
-> cache. I don't think it needs to be broadcast all the way to devices.
+On 28 April 2015 at 06:28, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Thu, Apr 23, 2015 at 12:40 AM, Mathieu Poirier
+> <mathieu.poirier@linaro.org> wrote:
+>
+>> From: Pratik Patel <pratikp@codeaurora.org>
+>>
+>> This driver manages the CoreSight ETMv4 (Embedded Trace Macrocell) IP block
+>> to support HW assisted tracing on ARMv7 and ARMv8 architectures.
+>>
+>> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
+>> Signed-off-by: Kaixu Xia <xiakaixu@huawei.com>
+>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>
+> (...)
+>> +/* The number of ETMv4 currently registered */
+>> +static int etm4_count;
+>> +static struct etmv4_drvdata *etmdrvdata[NR_CPUS];
+>
+> Don't you need a mutex or something around etm4_count so
+> as to protect it? You could also make it an atomic.
 
-Sorry for the late reply. IIRC, the sync on Armada XP was not required
-for the cache controller, but rather for the bus fabric, to ensure
-that a DMA has made it into the memory controller.
+Sorry for the late reply, your email got lost under the pile.
 
-> > > > b) On architectures where the device may not see the state of the cache,
-> > > >    but the CPU is always aware of anything the device sends it,
-> > > >    it flushes the cache. This seems to be the case on parisc,
-> > > >    and in particular, there are some variants that do not support
-> > > >    dma_alloc_coherent but only dma_alloc_noncoherent.
-> > > > c) On architectures that need the synchronization both ways,
-> > > >    it does (almost) the same invalidate/clean/flush thing as
-> > > >    ARM, except it doesn't have to worry about cache lines from
-> > > >    speculative prefetch which make it impossible to implement on
-> > > >    ARM.
-> > > 
-> > > Okey doke, thanks for the explanation. It sounds like we can just build
-> > > the primitive out of the existing cache maintenance routines if we need
-> > > to implement it.
-> > 
-> > Cases a) and b) yes, but not c), otherwise we could simplify
-> > the ARM dma-mapping implementation and just merge __dma_page_cpu_to_dev
-> > and __dma_page_dev_to_cpu into one function.
-> 
-> I don't fully understand c) or b). Wouldn't the non-coherent ops cover
-> them both, though potentially not as efficient?
+The etm4_count is only used at boot time to avoid registering the
+notifiers twice and not used otherwise.  Since the discovery of
+coresight devices is sequential there is no point in guarding it.
 
-Turning off caches usually makes everything coherent, but the performance
-cost can be gigantic. Also, it might not help if the problem with coherency
-is the completion of the DMA as opposed to the caching.
+>
+> Also why is it a signed int ... unsigned int?
+>
+> I know, lame comments, the runtime PM stuff looks perfect now,
 
-> > > > I guess we could handle that case as well, by requiring any ACPI based
-> > > > firmware to turn off the coherency fabric on that system and just making
-> > > > it dog slow.
-> > > 
-> > > We already require something similar in Documentation/arm64/booting.txt:
-> > > 
-> > >   `System caches which do not respect architected cache maintenance by VA
-> > >    operations (not recommended) must be configured and disabled.'
-> > 
-> > Hmm, does that rule really get violated here? I think it fully respects
-> > the cache maintenance (flush/invalidate/clean) operations, but it does
-> > not fully respect the dsb/dmb instructions, which is something else.
-> 
-> If it fully respects the cache maintenance, it should also respect the
-> completion and ordering requirements of the cache maintenance
-> operations. That means that a DSB guarantees completion of such
-> operations.
+I like it too - thanks for the review.
 
-Ok.
-
-	Arnd
+> someone had a refcount comment but it's doing the right thing.
+>
+> Yours,
+> Linus Walleij
