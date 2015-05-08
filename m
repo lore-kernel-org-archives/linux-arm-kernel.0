@@ -1,71 +1,40 @@
-From: mturquette@linaro.org (Michael Turquette)
-Date: Fri, 08 May 2015 12:00:50 -0700
-Subject: [PATCH v2 2/3] ARM: dove: Add clock-names to CuBox Si5351 clk
- generator
-In-Reply-To: <554A13AE.6000904@free-electrons.com>
-References: <1430773456-15203-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1430773456-15203-3-git-send-email-sebastian.hesselbarth@gmail.com>
- <554A13AE.6000904@free-electrons.com>
-Message-ID: <20150508190050.16410.52142@quantum>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 8 May 2015 14:13:33 -0500
+Subject: [PATCH] ARM: OMAP2+: PRM: Fix am437x module reset
+In-Reply-To: <alpine.DEB.2.02.1505081749320.19833@utopia.booyaka.com>
+References: <1430508422-64913-1-git-send-email-d-gerlach@ti.com>
+ <alpine.DEB.2.02.1505081749320.19833@utopia.booyaka.com>
+Message-ID: <554D0ADD.1000304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Gregory CLEMENT (2015-05-06 06:14:22)
-> Hi Sebastian,
-> 
-> On 04/05/2015 23:04, Sebastian Hesselbarth wrote:
-> > Si5351 clock generator on CuBox uses XTAL as clock reference, name the
-> > clock phandle accordingly.
-> 
-> as soon as the binding will be accepted (in patch 1), I will apply it
-> on mvebu/fixes.
+Hi Paul,
 
-It is on the clk git mirror now. Should be picked up in -next soon.
+On 05/08/2015 12:50 PM, Paul Walmsley wrote:
+> Hi Dave 
+> 
+> On Fri, 1 May 2015, Dave Gerlach wrote:
+> 
+>> When moving to using the OMAP4+ PRM driver on am437x, we switched
+>> to using all omap4 ops for module reset management. However, reset
+>> register layout on am437x is more similar to am335x than omap4 because
+>> of the the need for an st_shift for the *_RST bits in certain *_RSTST
+>> registers, like WKUP_PROC_LRST in the PRCM_RM_WKUP_RSTST. Without this
+>> we cannot bring the Wakeup M3 IP out of reset.
+>>
+>> Because of this, we must use the am33xx prm ops for the hardreset
+>> functionality while continuing to use all other omap4 ops. To accomplish
+>> this we split out the common portion of omap44xx_prm_init and add an
+>> am437x_prm_init to register the prm_ll_data struct specific to am437x.
+>>
+>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>> Signed-off-by: Suman Anna <s-anna@ti.com>
+> 
+> I'm assuming this has been superseded by Tero's patches.  If not, please 
+> let me know.
 
-Regards,
-Mike
+Yep, thats right. You can drop/ignore this patch, we did miss Tero's
+PRCM cleanup when this patch was rebased.
 
-> 
-> Thanks,
-> 
-> Gregory
-> 
-> 
-> > 
-> > Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> > ---
-> > Cc: Mike Turquette <mturquette@linaro.org>
-> > Cc: Stephen Boyd <sboyd@codeaurora.org>
-> > Cc: Jean-Francois Moine <moinejf@free.fr>
-> > Cc: Michael Welling <mwelling@ieee.org>
-> > Cc: Russell King <rmk+linux@arm.linux.org.uk>
-> > Cc: Jason Cooper <jason@lakedaemon.net>
-> > Cc: Andrew Lunn <andrew@lunn.ch>
-> > Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> > Cc: linux-clk at vger.kernel.org
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: linux-kernel at vger.kernel.org
-> > ---
-> >  arch/arm/boot/dts/dove-cubox.dts | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/dove-cubox.dts b/arch/arm/boot/dts/dove-cubox.dts
-> > index aae7efc09b0b..e6fa251e17b9 100644
-> > --- a/arch/arm/boot/dts/dove-cubox.dts
-> > +++ b/arch/arm/boot/dts/dove-cubox.dts
-> > @@ -87,6 +87,7 @@
-> >  
-> >               /* connect xtal input to 25MHz reference */
-> >               clocks = <&ref25>;
-> > +             clock-names = "xtal";
-> >  
-> >               /* connect xtal input as source of pll0 and pll1 */
-> >               silabs,pll-source = <0 0>, <1 0>;
-> > 
-> 
-> 
-> -- 
-> Gregory Clement, Free Electrons
-> Kernel, drivers, real-time and embedded Linux
-> development, consulting, training and support.
-> http://free-electrons.com
+regards
+Suman
