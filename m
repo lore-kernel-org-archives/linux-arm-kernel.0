@@ -1,40 +1,105 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Fri, 8 May 2015 14:13:33 -0500
-Subject: [PATCH] ARM: OMAP2+: PRM: Fix am437x module reset
-In-Reply-To: <alpine.DEB.2.02.1505081749320.19833@utopia.booyaka.com>
-References: <1430508422-64913-1-git-send-email-d-gerlach@ti.com>
- <alpine.DEB.2.02.1505081749320.19833@utopia.booyaka.com>
-Message-ID: <554D0ADD.1000304@ti.com>
+From: stripathi@apm.com (Suman Tripathi)
+Date: Sat, 9 May 2015 00:43:49 +0530
+Subject: [PATCH v5 2/3] libahci: Add support to handle HOST_IRQ_STAT as
+ edge trigger latch.
+In-Reply-To: <1430853672-6227-3-git-send-email-stripathi@apm.com>
+References: <1430853672-6227-1-git-send-email-stripathi@apm.com>
+ <1430853672-6227-3-git-send-email-stripathi@apm.com>
+Message-ID: <CAOHikRA9uiqVcmN0x3CaBp7Pd9bAidfqL3UzSTC3hYESRnSdTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi Tejun
 
-On 05/08/2015 12:50 PM, Paul Walmsley wrote:
-> Hi Dave 
-> 
-> On Fri, 1 May 2015, Dave Gerlach wrote:
-> 
->> When moving to using the OMAP4+ PRM driver on am437x, we switched
->> to using all omap4 ops for module reset management. However, reset
->> register layout on am437x is more similar to am335x than omap4 because
->> of the the need for an st_shift for the *_RST bits in certain *_RSTST
->> registers, like WKUP_PROC_LRST in the PRCM_RM_WKUP_RSTST. Without this
->> we cannot bring the Wakeup M3 IP out of reset.
->>
->> Because of this, we must use the am33xx prm ops for the hardreset
->> functionality while continuing to use all other omap4 ops. To accomplish
->> this we split out the common portion of omap44xx_prm_init and add an
->> am437x_prm_init to register the prm_ll_data struct specific to am437x.
->>
->> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->> Signed-off-by: Suman Anna <s-anna@ti.com>
-> 
-> I'm assuming this has been superseded by Tero's patches.  If not, please 
-> let me know.
+On Wed, May 6, 2015 at 12:51 AM, Suman Tripathi <stripathi@apm.com> wrote:
+>
+> This patch adds the support to handle HOST_IRQ_STAT as edge trigger
+> latch.
+>
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+> ---
+>  drivers/ata/ahci.h    |  2 ++
+>  drivers/ata/libahci.c | 40 ++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 42 insertions(+)
+>
+> diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
+> index 71262e0..f442960 100644
+> --- a/drivers/ata/ahci.h
+> +++ b/drivers/ata/ahci.h
+> @@ -238,6 +238,8 @@ enum {
+>         AHCI_HFLAG_MULTI_MSI            = (1 << 16), /* multiple PCI MSIs */
+>         AHCI_HFLAG_NO_DEVSLP            = (1 << 17), /* no device sleep */
+>         AHCI_HFLAG_NO_FBS               = (1 << 18), /* no FBS */
+> +       AHCI_HFLAG_EDGE_IRQ             = (1 << 19), /* HOST_IRQ_STAT behaves as
+> +                                                       Edge Triggered */
+>
+>         /* ap->flags bits */
+>
+> diff --git a/drivers/ata/libahci.c b/drivers/ata/libahci.c
+> index aa89c8e..1add5ba 100644
+> --- a/drivers/ata/libahci.c
+> +++ b/drivers/ata/libahci.c
+> @@ -1853,6 +1853,43 @@ static u32 ahci_handle_port_intr(struct ata_host *host, u32 irq_masked)
+>         return handled;
+>  }
+>
+> +static irqreturn_t ahci_single_edge_irq_intr(int irq, void *dev_instance)
+> +{
+> +       struct ata_host *host = dev_instance;
+> +       struct ahci_host_priv *hpriv;
+> +       unsigned int rc = 0;
+> +       void __iomem *mmio;
+> +       u32 irq_stat, irq_masked;
+> +
+> +       VPRINTK("ENTER\n");
+> +
+> +       hpriv = host->private_data;
+> +       mmio = hpriv->mmio;
+> +
+> +       /* sigh.  0xffffffff is a valid return from h/w */
+> +       irq_stat = readl(mmio + HOST_IRQ_STAT);
+> +       if (!irq_stat)
+> +               return IRQ_NONE;
+> +
+> +       irq_masked = irq_stat & hpriv->port_map;
+> +
+> +       spin_lock(&host->lock);
+> +
+> +       /*
+> +        * HOST_IRQ_STAT behaves as edge triggered latch meaning that
+> +        * it should be cleared before all the port events are cleared.
+> +        */
+> +       writel(irq_stat, mmio + HOST_IRQ_STAT);
+> +
+> +       rc = ahci_handle_port_intr(host, irq_masked);
+> +
+> +       spin_unlock(&host->lock);
+> +
+> +       VPRINTK("EXIT\n");
+> +
+> +       return IRQ_RETVAL(rc);
+> +}
+> +
+>  static irqreturn_t ahci_single_level_irq_intr(int irq, void *dev_instance)
+>  {
+>         struct ata_host *host = dev_instance;
+> @@ -2495,6 +2532,9 @@ int ahci_host_activate(struct ata_host *host, int irq,
+>
+>         if (hpriv->flags & AHCI_HFLAG_MULTI_MSI)
+>                 rc = ahci_host_activate_multi_irqs(host, irq, sht);
+> +       else if (hpriv->flags & AHCI_HFLAG_EDGE_IRQ)
+> +               rc = ata_host_activate(host, irq, ahci_single_edge_irq_intr,
+> +                                      IRQF_SHARED, sht);
+>         else
+>                 rc = ata_host_activate(host, irq, ahci_single_level_irq_intr,
+>                                        IRQF_SHARED, sht);
+> --
+> 1.8.2.1
+>
 
-Yep, thats right. You can drop/ignore this patch, we did miss Tero's
-PRCM cleanup when this patch was rebased.
+Any comments on this version ??
 
-regards
-Suman
+-- 
+Thanks,
+with regards,
+Suman Tripathi
