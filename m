@@ -1,144 +1,43 @@
-From: sonic.adi@gmail.com (Sonic Zhang)
-Date: Fri, 8 May 2015 13:15:14 +0800
-Subject: [PATCH 1/2] pinctrl: move strict option to pinmux_ops
-In-Reply-To: <1430992414-10779-1-git-send-email-linus.walleij@linaro.org>
-References: <1430992414-10779-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CAJxxZ0M5GA8bKc6xcxj0QuY=ezuh=RKVW7H0vZzdddh57YPatQ@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 8 May 2015 07:15:38 +0200
+Subject: [PATCH v2 0/4] mtd: mxc_nand: fix 8 bit ECC and large oob
+In-Reply-To: <cover.1430636819.git.baruch@tkos.co.il>
+References: <cover.1430636819.git.baruch@tkos.co.il>
+Message-ID: <20150508051538.GW6325@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Walleij,
+On Sun, May 03, 2015 at 10:18:50AM +0300, Baruch Siach wrote:
+> This patch series fixes mxc_nand bugs that I encountered while trying to use 8
+> bit ECC mode on i.MX25 with the Micron MT29F8G08ABABA flash chip.
+> 
+> Many thanks to Uwe Kleine-K?nig for guiding me through the process of
+> debugging and fixing, and for contributing a clean-up patch to this series.
+> 
+> This series applies and tested on v4.1-rc1.
+> 
+> This is version 2 of the patch series, addressing the comments and suggestion
+> of Uwe Kleine-K?nig on the first series
+> (http://thread.gmane.org/gmane.linux.ports.arm.kernel/408635). See each patch
+> for detailed per-patch changelog.
+> 
+> Baruch Siach (3):
+>   mtd: mxc_nand: limit the size of used oob
+>   mtd: mxc_nand: fix truncate of unaligned oob copying
+>   mtd: mxc_nand: generate nand_ecclayout for 8 bit ECC
+> 
+> Uwe Kleine-K?nig (1):
+>   mtd: nand: mxc_nand: cleanup copy_spare function
 
-Acked-by: Sonic Zhang <sonic.zhang@analog.com>
+I looked at this version and have only found some minor coding style
+violations (spaces missing on both sides of operators).
 
+Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-Sonic
+Sascha
 
-On Thu, May 7, 2015 at 5:53 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> While the pinmux_ops are ideally just a vtable for pin mux
-> calls, the "strict" setting belongs so intuitively with the
-> pin multiplexing that we should move it here anyway. Putting
-> it in the top pinctrl_desc makes no sense.
->
-> Cc: Sonic Zhang <sonic.zhang@analog.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  Documentation/pinctrl.txt       | 2 +-
->  drivers/pinctrl/pinctrl-adi2.c  | 2 +-
->  drivers/pinctrl/pinmux.c        | 4 ++--
->  include/linux/pinctrl/pinctrl.h | 3 ---
->  include/linux/pinctrl/pinmux.h  | 4 ++++
->  5 files changed, 8 insertions(+), 7 deletions(-)
->
-> diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
-> index d6b2bed94c43..4976389e432d 100644
-> --- a/Documentation/pinctrl.txt
-> +++ b/Documentation/pinctrl.txt
-> @@ -73,7 +73,6 @@ static struct pinctrl_desc foo_desc = {
->         .pins = foo_pins,
->         .npins = ARRAY_SIZE(foo_pins),
->         .owner = THIS_MODULE,
-> -       .strict = true,
->  };
->
->  int __init foo_probe(void)
-> @@ -715,6 +714,7 @@ static struct pinmux_ops foo_pmxops = {
->         .get_function_name = foo_get_fname,
->         .get_function_groups = foo_get_groups,
->         .set_mux = foo_set_mux,
-> +       .strict = true,
->  };
->
->  /* Pinmux operations are handled by some pin controller */
-> diff --git a/drivers/pinctrl/pinctrl-adi2.c b/drivers/pinctrl/pinctrl-adi2.c
-> index fbd492668da1..49df9037b41e 100644
-> --- a/drivers/pinctrl/pinctrl-adi2.c
-> +++ b/drivers/pinctrl/pinctrl-adi2.c
-> @@ -703,6 +703,7 @@ static struct pinmux_ops adi_pinmux_ops = {
->         .get_function_name = adi_pinmux_get_func_name,
->         .get_function_groups = adi_pinmux_get_groups,
->         .gpio_request_enable = adi_pinmux_request_gpio,
-> +       .strict = true,
->  };
->
->
-> @@ -710,7 +711,6 @@ static struct pinctrl_desc adi_pinmux_desc = {
->         .name = DRIVER_NAME,
->         .pctlops = &adi_pctrl_ops,
->         .pmxops = &adi_pinmux_ops,
-> -       .strict = true,
->         .owner = THIS_MODULE,
->  };
->
-> diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
-> index 2546fa783464..c58c168b06c2 100644
-> --- a/drivers/pinctrl/pinmux.c
-> +++ b/drivers/pinctrl/pinmux.c
-> @@ -107,7 +107,7 @@ static int pin_request(struct pinctrl_dev *pctldev,
->                                 desc->name, desc->gpio_owner, owner);
->                         goto out;
->                 }
-> -               if (pctldev->desc->strict && desc->mux_usecount &&
-> +               if (ops->strict && desc->mux_usecount &&
->                     strcmp(desc->mux_owner, owner)) {
->                         dev_err(pctldev->dev,
->                                 "pin %s already requested by %s; cannot claim for %s\n",
-> @@ -123,7 +123,7 @@ static int pin_request(struct pinctrl_dev *pctldev,
->                                 desc->name, desc->mux_owner, owner);
->                         goto out;
->                 }
-> -               if (pctldev->desc->strict && desc->gpio_owner) {
-> +               if (ops->strict && desc->gpio_owner) {
->                         dev_err(pctldev->dev,
->                                 "pin %s already requested by %s; cannot claim for %s\n",
->                                 desc->name, desc->gpio_owner, owner);
-> diff --git a/include/linux/pinctrl/pinctrl.h b/include/linux/pinctrl/pinctrl.h
-> index fc6b0348c375..66e4697516de 100644
-> --- a/include/linux/pinctrl/pinctrl.h
-> +++ b/include/linux/pinctrl/pinctrl.h
-> @@ -114,8 +114,6 @@ struct pinctrl_ops {
->   *     of the pins field above
->   * @pctlops: pin control operation vtable, to support global concepts like
->   *     grouping of pins, this is optional.
-> - * @strict: check both gpio_owner and mux_owner strictly before approving
-> -       the pin request
->   * @pmxops: pinmux operations vtable, if you support pinmuxing in your driver
->   * @confops: pin config operations vtable, if you support pin configuration in
->   *     your driver
-> @@ -134,7 +132,6 @@ struct pinctrl_desc {
->         const struct pinctrl_ops *pctlops;
->         const struct pinmux_ops *pmxops;
->         const struct pinconf_ops *confops;
-> -       bool strict;
->         struct module *owner;
->  #ifdef CONFIG_GENERIC_PINCONF
->         unsigned int num_custom_params;
-> diff --git a/include/linux/pinctrl/pinmux.h b/include/linux/pinctrl/pinmux.h
-> index 511bda9ed4bf..d3740fa7073f 100644
-> --- a/include/linux/pinctrl/pinmux.h
-> +++ b/include/linux/pinctrl/pinmux.h
-> @@ -56,6 +56,9 @@ struct pinctrl_dev;
->   *     depending on whether the GPIO is configured as input or output,
->   *     a direction selector function may be implemented as a backing
->   *     to the GPIO controllers that need pin muxing.
-> + * @strict: do not allow simultaneous use of the same pin for GPIO and another
-> + *     function. Check both gpio_owner and mux_owner strictly before approving
-> + *     the pin request.
->   */
->  struct pinmux_ops {
->         int (*request) (struct pinctrl_dev *pctldev, unsigned offset);
-> @@ -79,6 +82,7 @@ struct pinmux_ops {
->                                    struct pinctrl_gpio_range *range,
->                                    unsigned offset,
->                                    bool input);
-> +       bool strict;
->  };
->
->  #endif /* CONFIG_PINMUX */
-> --
-> 1.9.3
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-gpio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
