@@ -1,122 +1,63 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 8 May 2015 15:22:59 +0800
-Subject: [PATCH Part3 v11 9/9] PCI: Remove pci_bus_assign_domain_nr()
+Date: Fri, 8 May 2015 15:22:56 +0800
+Subject: [PATCH Part3 v11 6/9] PCI: Make pci_host_bridge hold sysdata in
+ drvdata
 In-Reply-To: <1431069779-29346-1-git-send-email-wangyijing@huawei.com>
 References: <1431069779-29346-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1431069779-29346-10-git-send-email-wangyijing@huawei.com>
+Message-ID: <1431069779-29346-7-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now we save the domain number in pci_host_bridge,
-we could remove pci_bus_assign_domain_nr() and
-clean the domain member in pci_bus.
+Now platform specific sysdata is saved in pci_bus,
+and pcibios_root_bridge_prepare() need to know
+the sysdata. Later, we would move pcibios_root_bridge_prepare()
+prior to root bus creation, so we need to make
+pci_host_bridge hold sysdata.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- drivers/pci/pci.c   |    5 -----
- drivers/pci/pci.h   |    9 ---------
- drivers/pci/probe.c |   11 +++--------
- include/linux/pci.h |    3 ---
- 4 files changed, 3 insertions(+), 25 deletions(-)
+ arch/ia64/pci/pci.c |    2 +-
+ arch/x86/pci/acpi.c |    2 +-
+ drivers/pci/probe.c |    1 +
+ 3 files changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 2e2f429..a3cb571 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -4558,11 +4558,6 @@ static int pci_assign_domain_nr(struct device *dev)
+diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
+index 33803f7..c82d666 100644
+--- a/arch/ia64/pci/pci.c
++++ b/arch/ia64/pci/pci.c
+@@ -478,7 +478,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
  
- 	return domain;
- }
--
--void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
--{
--	bus->domain_nr = pci_assign_domain_nr(parent);
--}
- #endif
- #endif
+ int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+ {
+-	struct pci_controller *controller = bridge->bus->sysdata;
++	struct pci_controller *controller = dev_get_drvdata(&bridge->dev);
  
-diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
-index c2e1a6b..d8a4238 100644
---- a/drivers/pci/pci.h
-+++ b/drivers/pci/pci.h
-@@ -325,14 +325,5 @@ static inline int pci_dev_specific_reset(struct pci_dev *dev, int probe)
+ 	ACPI_COMPANION_SET(&bridge->dev, controller->companion);
+ 	return 0;
+diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
+index 7563855..948b675 100644
+--- a/arch/x86/pci/acpi.c
++++ b/arch/x86/pci/acpi.c
+@@ -462,7 +462,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
  
- struct pci_host_bridge *pci_find_host_bridge(struct pci_bus *bus);
+ int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+ {
+-	struct pci_sysdata *sd = bridge->bus->sysdata;
++	struct pci_sysdata *sd = dev_get_drvdata(&bridge->dev);
  
--#ifdef CONFIG_PCI_DOMAINS_GENERIC
--void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent);
--#else
--static inline void pci_bus_assign_domain_nr(struct pci_bus *bus,
--					struct device *parent)
--{
--}
--#endif
--
- void pci_host_assign_domain_nr(struct pci_host_bridge *host, int domain);
- #endif /* DRIVERS_PCI_H */
+ 	ACPI_COMPANION_SET(&bridge->dev, sd->companion);
+ 	return 0;
 diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index e4ef791..be60074 100644
+index f5f5de6..9ed8ab7 100644
 --- a/drivers/pci/probe.c
 +++ b/drivers/pci/probe.c
-@@ -481,7 +481,7 @@ void pci_read_bridge_bases(struct pci_bus *child)
- 	}
- }
- 
--static struct pci_bus *pci_alloc_bus(struct pci_bus *parent)
-+static struct pci_bus *pci_alloc_bus(void)
- {
- 	struct pci_bus *b;
- 
-@@ -496,10 +496,6 @@ static struct pci_bus *pci_alloc_bus(struct pci_bus *parent)
- 	INIT_LIST_HEAD(&b->resources);
- 	b->max_bus_speed = PCI_SPEED_UNKNOWN;
- 	b->cur_bus_speed = PCI_SPEED_UNKNOWN;
--#ifdef CONFIG_PCI_DOMAINS_GENERIC
--	if (parent)
--		b->domain_nr = parent->domain_nr;
--#endif
- 	return b;
- }
- 
-@@ -670,7 +666,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
- 	/*
- 	 * Allocate a new bus, and inherit stuff from the parent..
- 	 */
--	child = pci_alloc_bus(parent);
-+	child = pci_alloc_bus();
- 	if (!child)
- 		return NULL;
- 
-@@ -1936,7 +1932,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int domain,
- 		goto unregister_host;
- 	}
- 
--	b = pci_alloc_bus(NULL);
-+	b = pci_alloc_bus();
- 	if (!b)
- 		goto unregister_host;
- 
-@@ -1944,7 +1940,6 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int domain,
- 	b->sysdata = sysdata;
- 	b->ops = ops;
- 	b->number = b->busn_res.start = bus;
--	pci_bus_assign_domain_nr(b, parent);
- 
- 	b->bridge = get_device(&bridge->dev);
- 	device_enable_async_suspend(b->bridge);
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 13ed681..f010042 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -460,9 +460,6 @@ struct pci_bus {
- 	unsigned char	primary;	/* number of primary bridge */
- 	unsigned char	max_bus_speed;	/* enum pci_bus_speed */
- 	unsigned char	cur_bus_speed;	/* enum pci_bus_speed */
--#ifdef CONFIG_PCI_DOMAINS_GENERIC
--	int		domain_nr;
--#endif
- 
- 	char		name[48];
- 
+@@ -1931,6 +1931,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int domain,
+ 	bridge->domain = domain;
+ 	bridge->dev.parent = parent;
+ 	bridge->dev.release = pci_release_host_bridge_dev;
++	dev_set_drvdata(&bridge->dev, sysdata);
+ 	dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
+ 	error = pcibios_root_bridge_prepare(bridge);
+ 	if (error) {
 -- 
 1.7.1
