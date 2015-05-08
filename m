@@ -1,75 +1,87 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 8 May 2015 12:42:30 +0100
-Subject: [alsa-devel] [PATCH RFC v2 10/13] sound/core: add DRM ELD helper
-In-Reply-To: <ef04b1827963c2746c252f65bfa0d172@kapsi.fi>
-References: <20150402092050.GH24899@n2100.arm.linux.org.uk>
- <E1YdbKA-00085Q-LL@rmk-PC.arm.linux.org.uk>
- <s5ha8ymy3e2.wl-tiwai@suse.de>
- <20150405162034.GH13898@n2100.arm.linux.org.uk>
- <s5h4mouy14a.wl-tiwai@suse.de>
- <20150405172608.GA12732@n2100.arm.linux.org.uk>
- <ef04b1827963c2746c252f65bfa0d172@kapsi.fi>
-Message-ID: <20150508114230.GI2067@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 8 May 2015 13:40:40 +0200
+Subject: [PATCH 1/2] ARM: dts: sun9i: cubieboard4: Enable USB support
+In-Reply-To: <CAGb2v64VQpNkd2zmHdhTXQEfk8z1FnhYZMQW0vmLVq1Ahzg2Zw@mail.gmail.com>
+References: <1431017037-28331-1-git-send-email-wens@csie.org>
+ <1431017037-28331-2-git-send-email-wens@csie.org>
+ <20150508074616.GP11057@lukather>
+ <CAGb2v64VQpNkd2zmHdhTXQEfk8z1FnhYZMQW0vmLVq1Ahzg2Zw@mail.gmail.com>
+Message-ID: <20150508114040.GR11057@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 08, 2015 at 01:56:02PM +0300, Jyri Sarha wrote:
-> On 2015-04-05 20:26, Russell King - ARM Linux wrote:
-> >On Sun, Apr 05, 2015 at 06:46:13PM +0200, Takashi Iwai wrote:
-> >>At Sun, 5 Apr 2015 17:20:34 +0100,
-> >>Russell King - ARM Linux wrote:
-> >>> Since (afaik) ALSA has a lack of support for dynamic reconfiguration
-> >>> according to the attached device changing, the best we can do without
-> >>> a huge amount of re-work of HDMI support across all adapters is to
-> >>> process the capabilities of the attached device at prepare time
-> >>> according to the current capabilities.
-> >>
-> >>Yeah, reconfiguration is tricky.  BTW, how is the HDMI unplug handled
-> >>during playback?
+On Fri, May 08, 2015 at 04:01:14PM +0800, Chen-Yu Tsai wrote:
+> >> +&ehci0 {
+> >> +     status = "okay";
+> >> +};
+> >> +
+> >> +&ehci2 {
+> >> +     status = "okay";
+> >> +};
+> >> +
+> >> +/* usb1 is connected to a GL850G USB hub chip, so no need to enable OHCI */
 > >
-> >We don't handle it right now - and we don't have any notification to
-> >the audio drivers that that has happened.  Even if we did have such a
-> >notification, I'm not sure what the audio driver could do with it at
-> >the moment.
-> >
-> >>> Implementing dynamic reconfiguration in ALSA is not something I want to
-> >>> get involved with, and as we /already/ have HDMI support merged in the
-> >>> kernel, this is not a blocker for at least trying to get some semblence
-> >>> of sanity, rather than having every driver re-implementing stuff like
-> >>> this.
-> >>
-> >>Well, I didn't mean about the dynamic reconfiguration.  I thought of
-> >>rather min/max pairs, but it was just a wrong assumption.  Scratch
-> >>it.
-> >>
-> >>One another question: don't we need to deal with the sample bits in
-> >>sad[2]?
-> >
-> >It should, but I'm very wary about doing that without seeing more
-> >examples of real SADs.
+> > You're mentionning usb1, but I don't see it enabled anywhere, is that
+> > a typo?
 > 
-> If the same constraint setting helpers are to be used also with
-> external HDMI encoders with i2s interface, there should be an option
-> to leave out the constraints for the sample bits. There is no direct
-> connection between the number of bits on I2S and HDMI link. The CPU
-> DAI may apply its own constraints on the available sample formats and
-> too strict constraints at the encoder end may lead to zero available
-> formats.
+> usb1 (or usbphy1) == ehci/ohci0. usb0 is otg.
+> 
+> This numbering matches the fex files, and (mostly) matches the
+> specs.
 
-Possibly, but then how do we know which SAD to apply to limit the number
-of channels?
+Ok, having this comment between ehci2 and ohci2 is confusing then :)
 
-I suspect for the use case you're suggesting above, it's better left to
-the user rather than generic code to work it out otherwise things get
-far too complex.  We'd need to have some way for the driver to report
-back to this generic code the actual number of bits on the HDMI link.
+It's not the first board that has a hub, we usually don't really care
+as it's kind of obvious. Maybe we can just remove it?
 
-However, as we currently know, ALSA appears to have a problem here which
-pretty much makes properly restricting the channels and sample rates
-impossible to do.  That issue is the one I'm much more keen to solve
-right now, because without that being solved, this set of patches is
-pretty much dead in the water.
+> >>  &mmc0 {
+> >> @@ -92,8 +130,30 @@
+> >>       status = "okay";
+> >>  };
+> >>
+> >> +&reg_usb1_vbus {
+> >> +     pinctrl-0 = <&usb1_vbus_pin_cubieboard4>;
+> >> +     gpio = <&pio 7 14 GPIO_ACTIVE_HIGH>; /* PH14 */
+> >> +     status = "okay";
+> >> +};
+> >> +
+> >>  &uart0 {
+> >>       pinctrl-names = "default";
+> >>       pinctrl-0 = <&uart0_pins_a>;
+> >>       status = "okay";
+> >>  };
+> >> +
+> >> +&usbphy1 {
+> >> +     phy-supply = <&reg_usb1_vbus>;
+> >> +     status = "okay";
+> >> +};
+> >> +
+> >> +/*
+> >> + * Unfortunately reg_usb1_vbus also powers one of the ports from usb3's hub.
+> >> + * One should always make sure both regulators are enabled and working for
+> >> + * all USB ports to have power.
+> >> + */
+> >
+> > Can't we just provide the two regulators, and enable both of them so
+> > that we know that we always have the needed regulators enabled,
+> > disregarding which USB port is used?
+> 
+> Would setting "always-on" for both regulators work for you?
+> Or maybe just the one that's used by both USB hosts?
+
+I was more thinking of giving to the phy an additional regulator, so
+that it would enable both the regulators needed to power up all ports.
+
+Maxime
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150508/3a2d6a1c/attachment.sig>
