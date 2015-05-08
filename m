@@ -1,92 +1,48 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 8 May 2015 09:05:39 +0900
-Subject: [PATCH 5/6] ARM: Exynos: switch to using generic cpufreq driver
- for Exynos4210
-In-Reply-To: <1428079429-4252-6-git-send-email-b.zolnierkie@samsung.com>
-References: <'@samsung.com>
- <1428079429-4252-1-git-send-email-b.zolnierkie@samsung.com>
- <1428079429-4252-6-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <CAJKOXPeF_Wc0EtV-p3DFw-T1nqFZxC63Xi3=vRrRpic1pCiUBQ@mail.gmail.com>
+Date: Fri, 8 May 2015 09:09:15 +0900
+Subject: [PATCH 1/1] ARM: dts: Add keep-power-in-suspend to WiFi SDIO node
+ for Snow
+In-Reply-To: <CAD=FV=XJXHjXxirjwPfrJ3=xOj46GTqdSxxFstzjTVJ9HP1Q=w@mail.gmail.com>
+References: <1430929979-18119-1-git-send-email-javier.martinez@collabora.co.uk>
+ <CAD=FV=XJXHjXxirjwPfrJ3=xOj46GTqdSxxFstzjTVJ9HP1Q=w@mail.gmail.com>
+Message-ID: <CAJKOXPc88v_VzqE54sup4JHAgqwYCn0g_zpKgJwpny3egaZAbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-04-04 1:43 GMT+09:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
-> From: Thomas Abraham <thomas.ab@samsung.com>
+2015-05-07 1:36 GMT+09:00 Doug Anderson <dianders@chromium.org>:
+> Javier,
 >
-> The new CPU clock type allows the use of generic CPUfreq driver.
-> Switch Exynos4210 to using generic cpufreq driver.
+> On Wed, May 6, 2015 at 9:32 AM, Javier Martinez Canillas
+> <javier.martinez@collabora.co.uk> wrote:
+>> The Marvell mwifiex driver prevents the system to enter into a suspend
+>> state if the card power is not preserved during a suspend/resume cycle.
+>>
+>> So Suspend-to-RAM and Suspend-to-idle are failing on Exynos5250 Snow.
+>>
+>> Add the keep-power-in-suspend Power Management property to the SDIO/MMC
+>> node so the mwifiex suspend handler doesn't fail and the system is able
+>> to enter into a suspend state.
+>>
+>> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> ---
+>>
+>> Kukjin and Krzysztof,
+>>
+>> I didn't notice that Snow was also missing this property when I did the
+>> same change for Peach Pit and and Pi Chromebooks [0], sorry about that.
+>>
+>> Best regards,
+>> Javier
+>>
+>> [0]: https://lkml.org/lkml/2015/4/7/377
+>> ---
+>>  arch/arm/boot/dts/exynos5250-snow.dts | 1 +
+>>  1 file changed, 1 insertion(+)
 >
-> Changes by Bartlomiej:
-> - removed non-Exynos4210 support for now
->
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Reviewed-by: Doug Anderson <dianders@chromium.org>
 
-I know this is an old patch, it looks good. Just a minor nit below.
+Thanks, applied to dts-fixes branch, I'll try to push it sooner than
+later but it depends on status of previous pull requests.
 
-> ---
->  arch/arm/mach-exynos/exynos.c |   21 ++++++++++++++++++++-
->  1 file changed, 20 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-> index bcde0dd..4e13de5 100644
-> --- a/arch/arm/mach-exynos/exynos.c
-> +++ b/arch/arm/mach-exynos/exynos.c
-> @@ -197,6 +197,25 @@ static void __init exynos_init_irq(void)
->         exynos_map_pmu();
->  }
->
-> +static const struct of_device_id exynos_cpufreq_matches[] = {
-> +       { .compatible = "samsung,exynos4210", .data = "cpufreq-dt" },
-> +       { /* sentinel */ }
-> +};
-> +
-> +static void __init exynos_cpufreq_init(void)
-> +{
-> +       struct device_node *root = of_find_node_by_path("/");
-> +       const struct of_device_id *match;
-> +
-> +       match = of_match_node(exynos_cpufreq_matches, root);
-> +       if (!match) {
-> +               platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
-> +               return;
-> +       }
-> +
-> +       platform_device_register_simple(match->data, -1, NULL, 0);
-
-How about something like:
-
-const char *cpufreq_dev)name = "exynos-cpufreq";
-if (match)
-  cpufreq_dev_name = match->data;
-platform_device_register_simple(cpufreq_dev_name -1, NULL, 0);
-
-Less returns and one call to platform_device_register_simple().
 Best regards,
 Krzysztof
-
-> +}
-> +
->  static void __init exynos_dt_machine_init(void)
->  {
->         /*
-> @@ -218,7 +237,7 @@ static void __init exynos_dt_machine_init(void)
->             of_machine_is_compatible("samsung,exynos5250"))
->                 platform_device_register(&exynos_cpuidle);
->
-> -       platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
-> +       exynos_cpufreq_init();
->
->         of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->  }
-> --
-> 1.7.9.5
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
