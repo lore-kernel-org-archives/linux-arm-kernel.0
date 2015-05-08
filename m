@@ -1,56 +1,51 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 8 May 2015 11:28:34 +0100
-Subject: [PATCH 02/12] clocksource: sti: Provide support for the ST LPC
- Clocksource IP
-In-Reply-To: <1431079797.13593.28.camel@x220>
+Date: Fri, 8 May 2015 11:29:38 +0100
+Subject: [PATCH 03/12] clocksource: sti: Provide 'use timer as sched
+ clock' capability
+In-Reply-To: <1431078730.13593.14.camel@x220>
 References: <1431005924-21777-1-git-send-email-lee.jones@linaro.org>
- <1431005924-21777-3-git-send-email-lee.jones@linaro.org>
- <1431079797.13593.28.camel@x220>
-Message-ID: <20150508102834.GC29044@x1>
+ <1431005924-21777-4-git-send-email-lee.jones@linaro.org>
+ <1431074699.13593.4.camel@x220> <20150508093603.GB29044@x1>
+ <1431078730.13593.14.camel@x220>
+Message-ID: <20150508102938.GD29044@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, 08 May 2015, Paul Bolle wrote:
 
-> On Thu, 2015-05-07 at 14:38 +0100, Lee Jones wrote:
-> > --- a/drivers/clocksource/Kconfig
-> > +++ b/drivers/clocksource/Kconfig
+> On Fri, 2015-05-08 at 10:36 +0100, Lee Jones wrote:
+> > On Fri, 08 May 2015, Paul Bolle wrote:
+> > > On Thu, 2015-05-07 at 14:38 +0100, Lee Jones wrote:
+> > > > --- a/drivers/clocksource/Kconfig
+> > > > +++ b/drivers/clocksource/Kconfig
+> > > 
+> > > > +config CLKSRC_ST_LPC_TIMER_SCHED_CLOCK
+> > > > +	bool
+> > > > +	depends on CLKSRC_ST_LPC
+> > > > +	default y
+> > > > +	help
+> > > > +	  Use Low Power controller timer clock source as sched_clock
+> > > 
+> > > This adds, as far as I can see, a Kconfig symbol that will always be in
+> > > lockstep with CLKSRC_ST_LPC. Ie, CLKSRC_ST_LPC and
+> > > CLKSRC_ST_LPC_TIMER_SCHED_CLOCK will always both be 'n' or both be 'y'.
+> > > 
+> > > Are there plans to break that lockstep in the future?
+> > 
+> > What's stopping CONFIG_CLKSRC_ST_LPC_TIMER_SCHED_CLOCK=n?
 > 
-> > +config CLKSRC_ST_LPC
-> > +	bool
-> > +	depends on ARCH_STI
+> If CLKSRC_ST_LPC=y you mean? The lack of a prompt, I'd say. Ie, you
+> would need
+> 	bool "A very short description"
 > 
-> By itself this does nothing. You can't set this symbol to 'y', even if
-> ARCH_STI is 'y', right? Of course, ARCH_STI will select this symbol (see
-> 11/12) otherwise it would be inert. But as ARCH_STI selects
-> CLKSRC_ST_LPC I'd say this dependency isn't actually needed.
-
-I guess this is more of a representative dependency, but you're right,
-the likelihood is that no one is likely to accidentally enable it.
-
-I can remove it.
-
-> Are other selects of CLKSRC_ST_LPC expected to be added in the future?
-> If not, CLKSRC_ST_LPC should operate in lockstep with ARCH_STI. In that
-> case you might as well not bother with CLKSRC_ST_LPC and use ARCH_STI
-> directly. (But that forces you to move the select statement below into
-> the ARCH_STI entry, which might be ugly.)
-
-Although true, there might be cases where we need to stop this from
-being enabled on all ARCH_STI platforms.  It'll be easier to move
-CLKSRC_ST_LPC around in arch code than to start renaming this symbol.
-
-I'd prefer to keep this as CLKSRC_ST_LPC if you're not passionate
-about the alternative.
-
-> > +	select CLKSRC_OF if OF
-> > +	help
-> > +	  Enable this option to use the Low Power controller timer
-> > +	  as clocksource.
+> to be able to set these independently.
 > 
-> (Please add an empty line.)
+> But now I notice that I missed that there appears to be a problem with
+> CLKSRC_ST_LPC too. I'll reply to 2/12 shortly.
 
-I believe the new line comes in the next patch.
+Ah, you mean from menuconfig.  I almost forgot what that was. ;)
+
+I can add a menu option, no problem.
 
 -- 
 Lee Jones
