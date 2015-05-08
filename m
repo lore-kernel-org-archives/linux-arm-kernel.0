@@ -1,82 +1,92 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Fri,  8 May 2015 20:37:27 +0930
-Subject: [PATCHv3] clk samsung exynos5420 add CLK_RECALC_NEW_RATES flag to
- mout_apll and mout_kpll clock.
-Message-ID: <1431083247-3310-1-git-send-email-linux.amoon@gmail.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Fri, 08 May 2015 13:09:15 +0200
+Subject: [PATCH v3 02/12] KVM: define common __KVM_GUESTDBG_USE_SW/HW_BP
+ values
+In-Reply-To: <20150508092346.GB24744@cbox>
+References: <1430929407-3487-1-git-send-email-alex.bennee@linaro.org>
+ <1430929407-3487-3-git-send-email-alex.bennee@linaro.org>
+ <20150508092346.GB24744@cbox>
+Message-ID: <554C995B.6050907@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Addition of CLK_RECALC_NEW_RATES flag to support Exynos5420 cpu clk so that
-correct divider values are re-calculated after both pre/post
-clock notifiers had run for mout_apll clock and mout_kpll clock.
 
-Observation their is considerable improvement in cpufreq stats
-after applying this patch.
 
-Governer : "performance"
-$ cpupower -c 1 frequency-info
+On 08/05/2015 11:23, Christoffer Dall wrote:
+> On Wed, May 06, 2015 at 05:23:17PM +0100, Alex Benn?e wrote:
+>> Currently x86, powerpc and soon arm64 use the same two architecture
+>> specific bits for guest debug support for software and hardware
+>> breakpoints. This makes the shared values explicit while leaving the
+>> gate open for another architecture to use some other value if they
+>> really really want to.
+>>
+>> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+>> Reviewed-by: Andrew Jones <drjones@redhat.com>
+>>
+>> diff --git a/arch/powerpc/include/uapi/asm/kvm.h b/arch/powerpc/include/uapi/asm/kvm.h
+>> index ab4d473..1731569 100644
+>> --- a/arch/powerpc/include/uapi/asm/kvm.h
+>> +++ b/arch/powerpc/include/uapi/asm/kvm.h
+>> @@ -310,8 +310,8 @@ struct kvm_guest_debug_arch {
+>>   * and upper 16 bits are architecture specific. Architecture specific defines
+>>   * that ioctl is for setting hardware breakpoint or software breakpoint.
+>>   */
+>> -#define KVM_GUESTDBG_USE_SW_BP		0x00010000
+>> -#define KVM_GUESTDBG_USE_HW_BP		0x00020000
+>> +#define KVM_GUESTDBG_USE_SW_BP		__KVM_GUESTDBG_USE_SW_BP
+>> +#define KVM_GUESTDBG_USE_HW_BP		__KVM_GUESTDBG_USE_HW_BP
+>>  
+>>  /* definition of registers in kvm_run */
+>>  struct kvm_sync_regs {
+>> diff --git a/arch/x86/include/uapi/asm/kvm.h b/arch/x86/include/uapi/asm/kvm.h
+>> index d7dcef5..1438202 100644
+>> --- a/arch/x86/include/uapi/asm/kvm.h
+>> +++ b/arch/x86/include/uapi/asm/kvm.h
+>> @@ -250,8 +250,8 @@ struct kvm_debug_exit_arch {
+>>  	__u64 dr7;
+>>  };
+>>  
+>> -#define KVM_GUESTDBG_USE_SW_BP		0x00010000
+>> -#define KVM_GUESTDBG_USE_HW_BP		0x00020000
+>> +#define KVM_GUESTDBG_USE_SW_BP		__KVM_GUESTDBG_USE_SW_BP
+>> +#define KVM_GUESTDBG_USE_HW_BP		__KVM_GUESTDBG_USE_HW_BP
+>>  #define KVM_GUESTDBG_INJECT_DB		0x00040000
+>>  #define KVM_GUESTDBG_INJECT_BP		0x00080000
+>>  
+>> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+>> index 70ac641..3b6252e 100644
+>> --- a/include/uapi/linux/kvm.h
+>> +++ b/include/uapi/linux/kvm.h
+>> @@ -570,8 +570,16 @@ struct kvm_s390_irq_state {
+>>  
+>>  /* for KVM_SET_GUEST_DEBUG */
+>>  
+>> -#define KVM_GUESTDBG_ENABLE		0x00000001
+>> -#define KVM_GUESTDBG_SINGLESTEP		0x00000002
+>> +#define KVM_GUESTDBG_ENABLE		(1 << 0)
+>> +#define KVM_GUESTDBG_SINGLESTEP	(1 << 1)
+>> +
+>> +/*
+>> + * Architecture specific stuff uses the top 16 bits of the field,
+> 
+> s/stuff/<something more specific>/
+> 
+>> + * however there is some shared commonality for the common cases
+>> + */
+>> +#define __KVM_GUESTDBG_USE_SW_BP	(1 << 16)
+>> +#define __KVM_GUESTDBG_USE_HW_BP	(1 << 17)
+>> +
+>>  
+>>  struct kvm_guest_debug {
+>>  	__u32 control;
+> 
+> We sort of left this discussion hanging with me expressing slight
+> concern about the usefulness about these defines.
+> 
+> Paolo, what are your thoughts?
 
-Below is table format of the output.
-cpufreq stats:  Frequency| Before | After  |
-CPU 1
-		200 MHz  | 22.07% | 46.57% |
-	       	300 MHz  | 1.08%  | 8.18%  |
-	       	400 MHz  | 0.17%  | 1.93%  |
-	       	500 MHz  | 0.24%  | 3.51%  |
-	       	600 MHz  | 0.37%  | 2.13%  |
-	       	700 MHz  | 0.20%  | 0.88%  |
-	       	800 MHz  | 0.09%  | 1.69%  |
-		900 MHz  | 0.05%  | 1.02%  |
-		1000 MHz | 0.02%  | 2.55%  |
-		1.10 GHz | 0.12%  | 1.17%  |
-		1.20 GHz | 0.05%  | 0.88%  |
-		1.30 GHz | 0.07%  | 0.38%  |
-		1.40 GHz | 0.04%  | 0.38%  |
-		1.50 GHz | 0.02%  | 0.00%  |
-		1.60 GHz | 0.00%  | 0.15%  |
-		1.70 GHz | 0.00%  | 0.44%  |
-		1.80 GHz | 75.43% | 28.26% |
+I would just lift these two KVM_GUESTDBG_* defines to
+include/uapi/linux/kvm.h and say that architecture specific stuff uses
+the top 14 bits of the field. :)
 
-Governer : "performance"
-$ cpupower -c 0 frequency-info
-
-Below is table format of the output.
-cpufreq stats:	Frequency| Before | After  |
-CPU0 		200 MHz  | 33.95% | 60.31% |
-		300 MHz  | 4.64%  | 2.13%  |
-		400 MHz  | 1.50%  | 0.79%  |
-		500 MHz  | 1.46%  | 0.49%  |
-		600 MHz  | 0.05%  | 0.27%  |
-		700 MHz  | 0.68%  | 0.21%  |
-		800 MHz  | 0.08%  | 0.19%  |
-		900 MHz  | 0.09%  | 0.12%  |
-		1000 MHz | 0.20%  | 0.10%  |
-		1.10 GHz | 0.21%  | 0.11%, |
-		1.20 GHz | 0.51%  | 0.28%, |
-		1.30 GHz | 56.64% | 35.01% |
-
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Signed-off-by: Anand Moon <linux.amoon@gmail.com>
----
- drivers/clk/samsung/clk-exynos5420.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-index 462aaee..6c7458c 100644
---- a/drivers/clk/samsung/clk-exynos5420.c
-+++ b/drivers/clk/samsung/clk-exynos5420.c
-@@ -618,10 +618,10 @@ static struct samsung_mux_clock exynos5x_mux_clks[] __initdata = {
- 	MUX(0, "mout_mspll_cpu", mout_mspll_cpu_p, SRC_TOP7, 12, 2),
- 
- 	MUX_F(0, "mout_apll", mout_apll_p, SRC_CPU, 0, 1,
--	      CLK_SET_RATE_PARENT, 0),
-+	      CLK_SET_RATE_PARENT | CLK_RECALC_NEW_RATES, 0),
- 	MUX(0, "mout_cpu", mout_cpu_p, SRC_CPU, 16, 1),
- 	MUX_F(0, "mout_kpll", mout_kpll_p, SRC_KFC, 0, 1,
--	      CLK_SET_RATE_PARENT, 0),
-+	      CLK_SET_RATE_PARENT | CLK_RECALC_NEW_RATES, 0),
- 	MUX(0, "mout_kfc", mout_kfc_p, SRC_KFC, 16, 1),
- 
- 	MUX(0, "mout_aclk200", mout_group1_p, SRC_TOP0, 8, 2),
--- 
-1.9.1
+Paolo
