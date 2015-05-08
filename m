@@ -1,83 +1,106 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Thu, 7 May 2015 19:37:16 -0500
-Subject: [V3 PATCH 5/5] amd-xgbe: Unify coherency checking logic with
- device_dma_is_coherent()
-In-Reply-To: <1431045436-8690-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1431045436-8690-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <1431045436-8690-6-git-send-email-Suravee.Suthikulpanit@amd.com>
+From: mwelling@ieee.org (Michael Welling)
+Date: Thu, 7 May 2015 19:52:20 -0500
+Subject: [PATCH 0/4] clk: si5351: Some fixes
+In-Reply-To: <5543369F.2070207@gmail.com>
+References: <1430415954-29517-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20150430193317.GC22000@deathray> <55429417.4070103@gmail.com>
+ <20150430212059.GA14026@deathray> <5542AAE0.5020204@gmail.com>
+ <20150430223603.GA18006@deathray> <5543369F.2070207@gmail.com>
+Message-ID: <20150508005220.GA3404@deathray>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, amd-xgbe driver has separate logic to determine device
-coherency for DT vs. ACPI. This patch simplifies the code with
-a call to device_dma_is_coherent().
+On Fri, May 01, 2015 at 10:17:35AM +0200, Sebastian Hesselbarth wrote:
+> On 01.05.2015 00:36, Michael Welling wrote:
+> >On Fri, May 01, 2015 at 12:21:20AM +0200, Sebastian Hesselbarth wrote:
+> >>On 30.04.2015 23:20, Michael Welling wrote:
+> >>>On Thu, Apr 30, 2015 at 10:44:07PM +0200, Sebastian Hesselbarth wrote:
+> >>[...]
+> >>>>What I noticed about your clk2 that you always measure as 0 Hz is
+> >>>>that none of your clocks is prepared/enabled.
+> >>>>
+> >>>>Currently, the si5351 driver only ensures the output is enabled
+> >>>>when si5351_clkout_prepare() is called.
+> >>>>
+> >>>>As long as you do not have a clk consumer that properly prepare/enables
+> >>>>the clock output, it may remain disabled.
+> >>>>
+> >>>>We should probably have additional DT properties and corresponding
+> >>>>pdata to force clkoutN always on.
+> >>>
+> >>>Does the silabs,disable-state of 3 (SI5351_DISABLE_NEVER) take care
+> >>>of this?
+> >>
+> >>That would be the HW version of never disabling the clock output.
+> >>I never really tried the property, does it work as expected?
+> >
+> >This did not appear to effect the behavior.
+> 
+> I think it is also a good idea to expose register values to debugfs,
+> so we can easily check what is really written into internal registers.
+> 
+> >>
+> >>>Otherwise is there a simple registration that will do this?
+> >>
+> >>The SW version of such a property would involve CLK_IGNORE_UNUSED
+> >>and enabling all requested clock outputs on probe().
+> >>
+> >>If above HW property already works, I think it should be enough.
+> >>
+> >>[...]
+> >>>>>It should be noted that if I program the device's register map in the
+> >>>>>bootloader the device keeps the correct frequency outputs.
+> >>>>
+> >>>>"keeps"? You mean "generates", don't you?
+> >>>>
+> >>>
+> >>>Yes the clocks are generated and do not get effected by the driver.
+> >>
+> >>IIRC, clk API does check if requested rate and current rate match
+> >>already. If they do, it does not request the same rate again.
+> >
+> >So I found that the audio codec that I am driving with clk2 could
+> >register the clock and allowed the clock to be enabled and disabled
+> >by playing audio.
+> >
+> >This is when I noticed some strange behavior. The first time I attempt
+> >to play audio the clock does not turn on blocking the audio from playing.
+> >After I interrupt and the clock is disabled for the first time, the
+> >successive clock enables work as expected.
+> 
+> Does "does not turn on" mean you cannot measure any clock on the
+> output or is it just a guess because audio does not play?
 
-Signed-off-by: Tom Lendacky <thomas.lendacky@amd.com>
-Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
----
- drivers/net/ethernet/amd/xgbe/xgbe-main.c | 27 +--------------------------
- 1 file changed, 1 insertion(+), 26 deletions(-)
+The clock is stuck at around 2 volts until the first clk_disable.
+When the clock is disabled it drops to GND. Future clk_enables make the
+clock come at the reported frequency.
 
-diff --git a/drivers/net/ethernet/amd/xgbe/xgbe-main.c b/drivers/net/ethernet/amd/xgbe/xgbe-main.c
-index 7149053..6d2c702 100644
---- a/drivers/net/ethernet/amd/xgbe/xgbe-main.c
-+++ b/drivers/net/ethernet/amd/xgbe/xgbe-main.c
-@@ -168,13 +168,8 @@ static void xgbe_init_all_fptrs(struct xgbe_prv_data *pdata)
- #ifdef CONFIG_ACPI
- static int xgbe_acpi_support(struct xgbe_prv_data *pdata)
- {
--	struct acpi_device *adev = pdata->adev;
- 	struct device *dev = pdata->dev;
- 	u32 property;
--	acpi_handle handle;
--	acpi_status status;
--	unsigned long long data;
--	int cca;
- 	int ret;
- 
- 	/* Obtain the system clock setting */
-@@ -195,24 +190,6 @@ static int xgbe_acpi_support(struct xgbe_prv_data *pdata)
- 	}
- 	pdata->ptpclk_rate = property;
- 
--	/* Retrieve the device cache coherency value */
--	handle = adev->handle;
--	do {
--		status = acpi_evaluate_integer(handle, "_CCA", NULL, &data);
--		if (!ACPI_FAILURE(status)) {
--			cca = data;
--			break;
--		}
--
--		status = acpi_get_parent(handle, &handle);
--	} while (!ACPI_FAILURE(status));
--
--	if (ACPI_FAILURE(status)) {
--		dev_err(dev, "error obtaining acpi coherency value\n");
--		return -EINVAL;
--	}
--	pdata->coherent = !!cca;
--
- 	return 0;
- }
- #else   /* CONFIG_ACPI */
-@@ -243,9 +220,6 @@ static int xgbe_of_support(struct xgbe_prv_data *pdata)
- 	}
- 	pdata->ptpclk_rate = clk_get_rate(pdata->ptpclk);
- 
--	/* Retrieve the device cache coherency value */
--	pdata->coherent = of_dma_is_coherent(dev->of_node);
--
- 	return 0;
- }
- #else   /* CONFIG_OF */
-@@ -364,6 +338,7 @@ static int xgbe_probe(struct platform_device *pdev)
- 		goto err_io;
- 
- 	/* Set the DMA coherency values */
-+	pdata->coherent = device_dma_is_coherent(pdata->dev);
- 	if (pdata->coherent) {
- 		pdata->axdomain = XGBE_DMA_OS_AXDOMAIN;
- 		pdata->arcache = XGBE_DMA_OS_ARCACHE;
--- 
-2.1.0
+As for the clock being initialized incorrectly, I selectively added
+mdelay(100) at each dev_dbg with debugging disabled until the 
+initialization came up correct.
+
+I found that adding a delay at the end of si5351_msynth_round_rate
+appears to be magically fixing the incorrect frequency settings.
+Not sure if this sheds any light on the issue but I figured I would 
+share this information.
+
+> 
+> It could be that we just need to add some delay when we enable a clock
+> output. Datasheet just says 10us max from OEB pin pulled low to valid
+> clock output - not exactly what we are looking for but it could be a
+> good start.
+> 
+> >Something tells me that a fault off some kind is occurring on initial
+> >configuration.
+> 
+> What I noticed when adding the pll reset and checking DEVICE_STATUS is
+> that SYS_INIT is still set. According to the datasheet, the meaning of
+> the bit is that si5351 is still copying NVM content to its internal
+> registers and therefore, we shouldn't try to access them.
+> 
+> What really irritates me about it is that it is seconds after power-up
+> and copying the contents shouldn't really take _that_ long. However,
+> the datasheet does not mention anything about how long it may take.
+> 
+> Sebastian
+> 
