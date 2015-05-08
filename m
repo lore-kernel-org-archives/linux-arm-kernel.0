@@ -1,53 +1,126 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Fri, 8 May 2015 18:38:53 +0200
-Subject: [PATCH] ARM: dts: Add syscon property to the MIPI phy in
- exynos5420
-In-Reply-To: <1431091805-11451-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1431091805-11451-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <CABxcv=kMY6hLWqG93FjOhsjJc9AKg93T3MWDOjr+1Puv3KS0gQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 8 May 2015 17:43:28 +0100
+Subject: [PATCH v4 09/13] arm64: mm: explicitly bootstrap the linear
+ mapping
+In-Reply-To: <CAKv+Gu9RFNpg8nTYzCNc2hE0kE2Cn8HEHebJ0AYXEyT08QC=Kw@mail.gmail.com>
+References: <1429112064-19952-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1429112064-19952-10-git-send-email-ard.biesheuvel@linaro.org>
+ <20150507165416.GB11067@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-26A1pawUoeY28mXb1WzhPv4O0Rh433Yj9uBjxFh0MWg@mail.gmail.com>
+ <20150508144448.GE12601@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu9RFNpg8nTYzCNc2hE0kE2Cn8HEHebJ0AYXEyT08QC=Kw@mail.gmail.com>
+Message-ID: <20150508164327.GF12601@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tomeu,
+On Fri, May 08, 2015 at 05:03:37PM +0200, Ard Biesheuvel wrote:
+> On 8 May 2015 at 16:44, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Thu, May 07, 2015 at 09:21:28PM +0200, Ard Biesheuvel wrote:
+> >> On 7 May 2015 at 18:54, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> >> > On Wed, Apr 15, 2015 at 05:34:20PM +0200, Ard Biesheuvel wrote:
+> >> >> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> >> >> index ceec4def354b..338eaa7bcbfd 100644
+> >> >> --- a/arch/arm64/kernel/vmlinux.lds.S
+> >> >> +++ b/arch/arm64/kernel/vmlinux.lds.S
+> >> >> @@ -68,6 +68,17 @@ PECOFF_FILE_ALIGNMENT = 0x200;
+> >> >>  #define ALIGN_DEBUG_RO_MIN(min)              . = ALIGN(min);
+> >> >>  #endif
+> >> >>
+> >> >> +/*
+> >> >> + * The pgdir region needs to be mappable using a single PMD or PUD sized region,
+> >> >> + * so it should not cross a 512 MB or 1 GB alignment boundary, respectively
+> >> >> + * (depending on page size). So align to an upper bound of its size.
+> >> >> + */
+> >> >> +#if CONFIG_ARM64_PGTABLE_LEVELS == 2
+> >> >> +#define PGDIR_ALIGN  (8 * PAGE_SIZE)
+> >> >> +#else
+> >> >> +#define PGDIR_ALIGN  (16 * PAGE_SIZE)
+> >> >> +#endif
+> >> >
+> >> > Isn't 8 pages sufficient in both cases? Unless some other patch changes
+> >> > the idmap and swapper, I can count maximum 7 pages in total.
+> >>
+> >> The preceding patch moves the fixmap page tables to this region as well.
+> >> But the logic is still incorrect -> we only need 16x for 4 levels (7 +
+> >> 3 == 10), the remaining ones are all <= 8
+> >
+> > You should improve the comment here to include the maths, "upper bound
+> > of its size" is not very clear ;).
+> 
+> Yes, you are right, it should read 'power-of-2 upper bound'
 
-I'm adding Krzysztof to the cc list since he is queuing Exynos patches
-for Kukjin so is aware of this patch as well.
+And the number of pages required for the initial page tables (I figured
+out it's a power of two already ;)).
 
-On Fri, May 8, 2015 at 3:30 PM, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
-> Since e4b3d38088df6f3acd40 ("phy: exynos-video-mipi: Fix regression by
-> adding support for PMU regmap") the syscon property is required in
-> samsung,s5pv210-mipi-video-phy nodes, but this DTS hadn't been updated
-> yet.
->
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5420.dtsi | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-> index f67b23f..72a56f1 100644
-> --- a/arch/arm/boot/dts/exynos5420.dtsi
-> +++ b/arch/arm/boot/dts/exynos5420.dtsi
-> @@ -541,6 +541,7 @@
->         mipi_phy: video-phy at 10040714 {
->                 compatible = "samsung,s5pv210-mipi-video-phy";
->                 reg = <0x10040714 12>;
+> >> >> +     static struct bootstrap_pgtables linear_bs_pgtables __pgdir;
+> >> >> +     const phys_addr_t swapper_phys = __pa(swapper_pg_dir);
+> >> >> +     unsigned long swapper_virt = __phys_to_virt(swapper_phys) + va_offset;
+> >> >> +     struct memblock_region *reg;
+> >> >> +
+> >> >> +     bootstrap_early_mapping(swapper_virt, &linear_bs_pgtables,
+> >> >> +                             IS_ENABLED(CONFIG_ARM64_64K_PAGES));
+> >> >> +
+> >> >> +     /* now find the memblock that covers swapper_pg_dir, and clip */
+> >> >> +     for_each_memblock(memory, reg) {
+> >> >> +             phys_addr_t start = reg->base;
+> >> >> +             phys_addr_t end = start + reg->size;
+> >> >> +             unsigned long vstart, vend;
+> >> >> +
+> >> >> +             if (start > swapper_phys || end <= swapper_phys)
+> >> >> +                     continue;
+> >> >> +
+> >> >> +#ifdef CONFIG_ARM64_64K_PAGES
+> >> >> +             /* clip the region to PMD size */
+> >> >> +             vstart = max(swapper_virt & PMD_MASK,
+> >> >> +                          round_up(__phys_to_virt(start + va_offset),
+> >> >> +                                   PAGE_SIZE));
+> >> >> +             vend = min(round_up(swapper_virt, PMD_SIZE),
+> >> >> +                        round_down(__phys_to_virt(end + va_offset),
+> >> >> +                                   PAGE_SIZE));
+> >> >> +#else
+> >> >> +             /* clip the region to PUD size */
+> >> >> +             vstart = max(swapper_virt & PUD_MASK,
+> >> >> +                          round_up(__phys_to_virt(start + va_offset),
+> >> >> +                                   PMD_SIZE));
+> >> >> +             vend = min(round_up(swapper_virt, PUD_SIZE),
+> >> >> +                        round_down(__phys_to_virt(end + va_offset),
+> >> >> +                                   PMD_SIZE));
+> >> >> +#endif
+> >> >> +
+> >> >> +             create_mapping(__pa(vstart - va_offset), vstart, vend - vstart,
+> >> >> +                            PAGE_KERNEL_EXEC);
+> >> >> +
+> >> >> +             /*
+> >> >> +              * Temporarily limit the memblock range. We need to do this as
+> >> >> +              * create_mapping requires puds, pmds and ptes to be allocated
+> >> >> +              * from memory addressable from the early linear mapping.
+> >> >> +              */
+> >> >> +             memblock_set_current_limit(__pa(vend - va_offset));
+> >> >> +
+> >> >> +             return;
+> >> >> +     }
+> >> >> +     BUG();
+> >> >> +}
+> >> >
+> >> > I'll probably revisit this function after I see the whole series. But in
+> >> > the meantime, if the kernel is not loaded in the first memblock (in
+> >> > address order), isn't there a risk that we allocate memory from the
+> >> > first memblock which is not mapped yet?
+> >>
+> >> memblock allocates top down, so it should only allocate from this
+> >> region, unless the remaining room is completely reserved.
+> >
+> > I don't like to rely on this, it's not guaranteed behaviour.
+> 
+> Actually, it is. Allocation is always top-down unless you call
+> memblock_set_bottom_up(), which is a NOP  unless CONFIG_MOVABLE_NODE
+> is selected.
+> That is why the memblock limit only limits at the top afaict
 
-Shouldn't you remove the reg property too? the commit you mention
-removes that property from the DT binding so it shouldn't be there.
+It currently works like this but I'm not sure it is guaranteed to always
+behave this way (e.g. someone "improves" the memblock allocator in the
+future). And you never know, we may need memory hotplug on arm64 at some
+point in the future (together with CONFIG_MOVABLE_NODE).
 
-> +               syscon = <&pmu_system_controller>;
->                 #phy-cells = <1>;
->         };
->
-> --
-> 2.4.0
->
-
-With that change the patch looks good to me.
-
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-
-Best regards,
-Javier
+-- 
+Catalin
