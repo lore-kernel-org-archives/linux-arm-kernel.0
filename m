@@ -1,83 +1,144 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 8 May 2015 10:06:16 +0530
-Subject: [PATCH v2 1/5] Documentation: dmaengine: pxa-dma design
-In-Reply-To: <1428781236-25806-2-git-send-email-robert.jarzmik@free.fr>
-References: <1428781236-25806-1-git-send-email-robert.jarzmik@free.fr>
- <1428781236-25806-2-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <20150508043616.GY3521@localhost>
+From: sonic.adi@gmail.com (Sonic Zhang)
+Date: Fri, 8 May 2015 13:15:14 +0800
+Subject: [PATCH 1/2] pinctrl: move strict option to pinmux_ops
+In-Reply-To: <1430992414-10779-1-git-send-email-linus.walleij@linaro.org>
+References: <1430992414-10779-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CAJxxZ0M5GA8bKc6xcxj0QuY=ezuh=RKVW7H0vZzdddh57YPatQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 11, 2015 at 09:40:32PM +0200, Robert Jarzmik wrote:
-> Document the new design of the pxa dma driver.
-> 
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Hi Walleij,
+
+Acked-by: Sonic Zhang <sonic.zhang@analog.com>
+
+
+Sonic
+
+On Thu, May 7, 2015 at 5:53 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> While the pinmux_ops are ideally just a vtable for pin mux
+> calls, the "strict" setting belongs so intuitively with the
+> pin multiplexing that we should move it here anyway. Putting
+> it in the top pinctrl_desc makes no sense.
+>
+> Cc: Sonic Zhang <sonic.zhang@analog.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  Documentation/dmaengine/pxa_dma.txt | 157 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 157 insertions(+)
->  create mode 100644 Documentation/dmaengine/pxa_dma.txt
-> 
-> diff --git a/Documentation/dmaengine/pxa_dma.txt b/Documentation/dmaengine/pxa_dma.txt
-> new file mode 100644
-> index 0000000..63db9fe
-> --- /dev/null
-> +++ b/Documentation/dmaengine/pxa_dma.txt
-> @@ -0,0 +1,157 @@
-> +PXA/MMP - DMA Slave controller
-> +==============================
-> +
-> +Constraints
-> +-----------
-> +  a) Transfers hot queuing
-> +     A driver submitting a transfer and issuing it should be granted the transfer
-> +     is queued even on a running DMA channel.
-this is bit confusing, esp latter part.. do you mean "A driver submitting a
-transfer and issuing it should be granted the transfer queue even on a
-running DMA channel" ??
-
-> +     This implies that the queuing doesn't wait for the previous transfer end,
-> +     and that the descriptor chaining is not only done in the irq/tasklet code
-> +     triggered by the end of the transfer.
-how is it differenat than current dmaengine semantics where you say
-issue_pending() is invoked when current transfer finished? Here is you have
-to do descriptor chaining so bit it.
-> +
-> +  b) All transfers having asked for confirmation should be signaled
-> +     Any issued transfer with DMA_PREP_INTERRUPT should trigger a callback call.
-> +     This implies that even if an irq/tasklet is triggered by end of tx1, but
-> +     at the time of irq/dma tx2 is already finished, tx1->complete() and
-> +     tx2->complete() should be called.
-> +
-> +  c) Channel residue calculation
-> +     A channel should be able to report how much advanced is a transfer. The
-in a							    ^^^^
-> +     granularity is still descriptor based.
-This is not pxa specfic
-
-> +
-> +  d) Channel running state
-> +     A driver should be able to query if a channel is running or not. For the
-> +     multimedia case, such as video capture, if a transfer is submitted and then
-> +     a check of the DMA channel reports a "stopped channel", the transfer should
-> +     not be issued until the next "start of frame interrupt", hence the need to
-> +     know if a channel is in running or stopped state.
-How do you query that?
-
-> +
-> +  e) Bandwidth guarantee
-> +     The PXA architecture has 4 levels of DMAs priorities : high, normal, low.
-> +     The high prorities get twice as much bandwidth as the normal, which get twice
-> +     as much as the low priorities.
-> +     A driver should be able to request a priority, especially the real-time
-> +     ones such as pxa_camera with (big) throughputs.
-and how..?
-
-> +
-> +  f) Transfer reusability
-> +     An issued and finished transfer should be "reusable". The choice of
-> +     "DMA_CTRL_ACK" should be left to the client, not the dma driver.
-again how is this pxa specfic, if not documented we should move this to
-dmaengine documentation
-
--- 
-~Vinod
+>  Documentation/pinctrl.txt       | 2 +-
+>  drivers/pinctrl/pinctrl-adi2.c  | 2 +-
+>  drivers/pinctrl/pinmux.c        | 4 ++--
+>  include/linux/pinctrl/pinctrl.h | 3 ---
+>  include/linux/pinctrl/pinmux.h  | 4 ++++
+>  5 files changed, 8 insertions(+), 7 deletions(-)
+>
+> diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
+> index d6b2bed94c43..4976389e432d 100644
+> --- a/Documentation/pinctrl.txt
+> +++ b/Documentation/pinctrl.txt
+> @@ -73,7 +73,6 @@ static struct pinctrl_desc foo_desc = {
+>         .pins = foo_pins,
+>         .npins = ARRAY_SIZE(foo_pins),
+>         .owner = THIS_MODULE,
+> -       .strict = true,
+>  };
+>
+>  int __init foo_probe(void)
+> @@ -715,6 +714,7 @@ static struct pinmux_ops foo_pmxops = {
+>         .get_function_name = foo_get_fname,
+>         .get_function_groups = foo_get_groups,
+>         .set_mux = foo_set_mux,
+> +       .strict = true,
+>  };
+>
+>  /* Pinmux operations are handled by some pin controller */
+> diff --git a/drivers/pinctrl/pinctrl-adi2.c b/drivers/pinctrl/pinctrl-adi2.c
+> index fbd492668da1..49df9037b41e 100644
+> --- a/drivers/pinctrl/pinctrl-adi2.c
+> +++ b/drivers/pinctrl/pinctrl-adi2.c
+> @@ -703,6 +703,7 @@ static struct pinmux_ops adi_pinmux_ops = {
+>         .get_function_name = adi_pinmux_get_func_name,
+>         .get_function_groups = adi_pinmux_get_groups,
+>         .gpio_request_enable = adi_pinmux_request_gpio,
+> +       .strict = true,
+>  };
+>
+>
+> @@ -710,7 +711,6 @@ static struct pinctrl_desc adi_pinmux_desc = {
+>         .name = DRIVER_NAME,
+>         .pctlops = &adi_pctrl_ops,
+>         .pmxops = &adi_pinmux_ops,
+> -       .strict = true,
+>         .owner = THIS_MODULE,
+>  };
+>
+> diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
+> index 2546fa783464..c58c168b06c2 100644
+> --- a/drivers/pinctrl/pinmux.c
+> +++ b/drivers/pinctrl/pinmux.c
+> @@ -107,7 +107,7 @@ static int pin_request(struct pinctrl_dev *pctldev,
+>                                 desc->name, desc->gpio_owner, owner);
+>                         goto out;
+>                 }
+> -               if (pctldev->desc->strict && desc->mux_usecount &&
+> +               if (ops->strict && desc->mux_usecount &&
+>                     strcmp(desc->mux_owner, owner)) {
+>                         dev_err(pctldev->dev,
+>                                 "pin %s already requested by %s; cannot claim for %s\n",
+> @@ -123,7 +123,7 @@ static int pin_request(struct pinctrl_dev *pctldev,
+>                                 desc->name, desc->mux_owner, owner);
+>                         goto out;
+>                 }
+> -               if (pctldev->desc->strict && desc->gpio_owner) {
+> +               if (ops->strict && desc->gpio_owner) {
+>                         dev_err(pctldev->dev,
+>                                 "pin %s already requested by %s; cannot claim for %s\n",
+>                                 desc->name, desc->gpio_owner, owner);
+> diff --git a/include/linux/pinctrl/pinctrl.h b/include/linux/pinctrl/pinctrl.h
+> index fc6b0348c375..66e4697516de 100644
+> --- a/include/linux/pinctrl/pinctrl.h
+> +++ b/include/linux/pinctrl/pinctrl.h
+> @@ -114,8 +114,6 @@ struct pinctrl_ops {
+>   *     of the pins field above
+>   * @pctlops: pin control operation vtable, to support global concepts like
+>   *     grouping of pins, this is optional.
+> - * @strict: check both gpio_owner and mux_owner strictly before approving
+> -       the pin request
+>   * @pmxops: pinmux operations vtable, if you support pinmuxing in your driver
+>   * @confops: pin config operations vtable, if you support pin configuration in
+>   *     your driver
+> @@ -134,7 +132,6 @@ struct pinctrl_desc {
+>         const struct pinctrl_ops *pctlops;
+>         const struct pinmux_ops *pmxops;
+>         const struct pinconf_ops *confops;
+> -       bool strict;
+>         struct module *owner;
+>  #ifdef CONFIG_GENERIC_PINCONF
+>         unsigned int num_custom_params;
+> diff --git a/include/linux/pinctrl/pinmux.h b/include/linux/pinctrl/pinmux.h
+> index 511bda9ed4bf..d3740fa7073f 100644
+> --- a/include/linux/pinctrl/pinmux.h
+> +++ b/include/linux/pinctrl/pinmux.h
+> @@ -56,6 +56,9 @@ struct pinctrl_dev;
+>   *     depending on whether the GPIO is configured as input or output,
+>   *     a direction selector function may be implemented as a backing
+>   *     to the GPIO controllers that need pin muxing.
+> + * @strict: do not allow simultaneous use of the same pin for GPIO and another
+> + *     function. Check both gpio_owner and mux_owner strictly before approving
+> + *     the pin request.
+>   */
+>  struct pinmux_ops {
+>         int (*request) (struct pinctrl_dev *pctldev, unsigned offset);
+> @@ -79,6 +82,7 @@ struct pinmux_ops {
+>                                    struct pinctrl_gpio_range *range,
+>                                    unsigned offset,
+>                                    bool input);
+> +       bool strict;
+>  };
+>
+>  #endif /* CONFIG_PINMUX */
+> --
+> 1.9.3
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-gpio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
