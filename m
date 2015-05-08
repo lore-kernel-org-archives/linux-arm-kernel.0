@@ -1,277 +1,261 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 8 May 2015 14:28:37 +0200
-Subject: [PATCH 2/4] soc: Mediatek: Add SCPSYS power domain driver
-In-Reply-To: <20150508121944.GD6325@pengutronix.de>
-References: <1426002063-25713-1-git-send-email-s.hauer@pengutronix.de>
- <1426002063-25713-3-git-send-email-s.hauer@pengutronix.de>
- <CABuKBeLvBfeXw+b+SxAEjGA2dzPhYBs-SiJUyP5dUA28R=Rjkg@mail.gmail.com>
- <20150508121944.GD6325@pengutronix.de>
-Message-ID: <CABuKBeJ=HrwNMvV5N+6pnBgbB9k7e=8UPi3WWBTnpRFeEbTWvA@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 08 May 2015 14:28:37 +0200
+Subject: [PATCH v2 3/5] dmaengine: pxa: add pxa dmaengine driver
+In-Reply-To: <20150508063434.GZ3521@localhost> (Vinod Koul's message of "Fri,
+ 8 May 2015 12:04:34 +0530")
+References: <1428781236-25806-1-git-send-email-robert.jarzmik@free.fr>
+ <1428781236-25806-4-git-send-email-robert.jarzmik@free.fr>
+ <20150508063434.GZ3521@localhost>
+Message-ID: <873837uubu.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-08 14:19 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
-> On Fri, May 08, 2015 at 02:16:06PM +0200, Matthias Brugger wrote:
->> 2015-03-10 16:41 GMT+01:00 Sascha Hauer <s.hauer@pengutronix.de>:
->> > This adds a power domain driver for the Mediatek SCPSYS unit.
->> >
->> > The System Control Processor System (SCPSYS) has several power
->> > management related tasks in the system. The tasks include thermal
->> > measurement, dynamic voltage frequency scaling (DVFS), interrupt
->> > filter and lowlevel sleep control. The System Power Manager (SPM)
->> > inside the SCPSYS is for the MTCMOS power domain control.
->> >
->> > For now this driver only adds power domain support, the more
->> > advanced features are not yet supported. The driver implements
->> > the generic PM domain device tree bindings, the first user will
->> > most likely be the Mediatek AFE audio driver.
->> >
->> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
->> > ---
->> >  drivers/soc/mediatek/Kconfig             |   6 +
->> >  drivers/soc/mediatek/Makefile            |   1 +
->> >  drivers/soc/mediatek/mtk-scpsys.c        | 345 +++++++++++++++++++++++++++++++
->> >  include/dt-bindings/power/mt8173-power.h |  15 ++
->> >  4 files changed, 367 insertions(+)
->> >  create mode 100644 drivers/soc/mediatek/mtk-scpsys.c
->> >  create mode 100644 include/dt-bindings/power/mt8173-power.h
->> >
->> > diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
->> > index bcdb22d..1d34819 100644
->> > --- a/drivers/soc/mediatek/Kconfig
->> > +++ b/drivers/soc/mediatek/Kconfig
->> > @@ -9,3 +9,9 @@ config MTK_PMIC_WRAP
->> >           Say yes here to add support for MediaTek PMIC Wrapper found
->> >           on different MediaTek SoCs. The PMIC wrapper is a proprietary
->> >           hardware to connect the PMIC.
->> > +
->> > +config MTK_SCPSYS
->> > +       tristate "MediaTek SCPSYS Support"
->> > +       help
->> > +         Say yes here to add support for the MediaTek SCPSYS power domain
->> > +         driver.
->> > diff --git a/drivers/soc/mediatek/Makefile b/drivers/soc/mediatek/Makefile
->> > index ecaf4de..ce88693 100644
->> > --- a/drivers/soc/mediatek/Makefile
->> > +++ b/drivers/soc/mediatek/Makefile
->> > @@ -1 +1,2 @@
->> >  obj-$(CONFIG_MTK_PMIC_WRAP) += mtk-pmic-wrap.o
->> > +obj-$(CONFIG_MTK_SCPSYS) += mtk-scpsys.o
->> > diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
->> > new file mode 100644
->> > index 0000000..a72ac51
->> > --- /dev/null
->> > +++ b/drivers/soc/mediatek/mtk-scpsys.c
->> > @@ -0,0 +1,345 @@
->> > +/*
->> > + * Copyright (c) 2015 Pengutronix, Sascha Hauer <kernel@pengutronix.de>
->> > + *
->> > + * This program is free software; you can redistribute it and/or modify
->> > + * it under the terms of the GNU General Public License version 2 as
->> > + * published by the Free Software Foundation.
->> > + *
->> > + * This program is distributed in the hope that it will be useful,
->> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> > + * GNU General Public License for more details.
->> > + */
->> > +#include <linux/clk.h>
->> > +#include <linux/io.h>
->> > +#include <linux/kernel.h>
->> > +#include <linux/module.h>
->> > +#include <linux/of_device.h>
->> > +#include <linux/platform_device.h>
->> > +#include <linux/regmap.h>
->> > +#include <linux/pm_domain.h>
->> > +#include <linux/delay.h>
->> > +#include <dt-bindings/power/mt8173-power.h>
->> > +#include <linux/mfd/syscon.h>
->> > +
->> > +#define SPM_VDE_PWR_CON                        0x0210
->> > +#define SPM_MFG_PWR_CON                        0x0214
->> > +#define SPM_VEN_PWR_CON                        0x0230
->> > +#define SPM_ISP_PWR_CON                        0x0238
->> > +#define SPM_DIS_PWR_CON                        0x023c
->> > +#define SPM_VEN2_PWR_CON               0x0298
->> > +#define SPM_AUDIO_PWR_CON              0x029c
->> > +#define SPM_MFG_2D_PWR_CON             0x02c0
->> > +#define SPM_MFG_ASYNC_PWR_CON          0x02c4
->> > +#define SPM_USB_PWR_CON                        0x02cc
->> > +#define SPM_PWR_STATUS                 0x060c
->> > +#define SPM_PWR_STATUS_2ND             0x0610
->> > +
->> > +#define PWR_RST_B_BIT                  BIT(0)
->> > +#define PWR_ISO_BIT                    BIT(1)
->> > +#define PWR_ON_BIT                     BIT(2)
->> > +#define PWR_ON_2ND_BIT                 BIT(3)
->> > +#define PWR_CLK_DIS_BIT                        BIT(4)
->> > +
->> > +#define DIS_PWR_STA_MASK               BIT(3)
->> > +#define MFG_PWR_STA_MASK               BIT(4)
->> > +#define ISP_PWR_STA_MASK               BIT(5)
->> > +#define VDE_PWR_STA_MASK               BIT(7)
->> > +#define VEN2_PWR_STA_MASK              BIT(20)
->> > +#define VEN_PWR_STA_MASK               BIT(21)
->> > +#define MFG_2D_PWR_STA_MASK            BIT(22)
->> > +#define MFG_ASYNC_PWR_STA_MASK         BIT(23)
->> > +#define AUDIO_PWR_STA_MASK             BIT(24)
->> > +#define USB_PWR_STA_MASK               BIT(25)
->> > +
->> > +struct scp_domain_data {
->> > +       const char *name;
->> > +       u32 sta_mask;
->> > +       int ctl_offs;
->> > +       u32 sram_pdn_bits;
->> > +       u32 sram_pdn_ack_bits;
->> > +       int id;
->> > +};
->> > +
->> > +static struct scp_domain_data scp_domain_data[] = {
->> > +       {
->> > +               .id = MT8173_POWER_DOMAIN_VDE,
->> > +               .name = "vde",
->> > +               .sta_mask = VDE_PWR_STA_MASK,
->> > +               .ctl_offs = SPM_VDE_PWR_CON,
->> > +               .sram_pdn_bits = GENMASK(11, 8),
->> > +               .sram_pdn_ack_bits = GENMASK(12, 12),
->> > +       }, {
->> > +               .id = MT8173_POWER_DOMAIN_MFG,
->> > +               .name = "mfg",
->> > +               .sta_mask = MFG_PWR_STA_MASK,
->> > +               .ctl_offs = SPM_MFG_PWR_CON,
->> > +               .sram_pdn_bits = GENMASK(13, 8),
->> > +               .sram_pdn_ack_bits = GENMASK(21, 16),
->> > +       }, {
->> > +               .id = MT8173_POWER_DOMAIN_VEN,
->> > +               .name = "ven",
->> > +               .sta_mask = VEN_PWR_STA_MASK,
->> > +               .ctl_offs = SPM_VEN_PWR_CON,
->> > +               .sram_pdn_bits = GENMASK(11, 8),
->> > +               .sram_pdn_ack_bits = GENMASK(15, 12),
->> > +       }, {
->> > +               .id = MT8173_POWER_DOMAIN_ISP,
->> > +               .name = "isp",
->> > +               .sta_mask = ISP_PWR_STA_MASK,
->> > +               .ctl_offs = SPM_ISP_PWR_CON,
->> > +               .sram_pdn_bits = GENMASK(11, 8),
->> > +               .sram_pdn_ack_bits = GENMASK(13, 12),
->> > +       }, {
->> > +               .id = MT8173_POWER_DOMAIN_DIS,
->> > +               .name = "dis",
->> > +               .sta_mask = DIS_PWR_STA_MASK,
->> > +               .ctl_offs = SPM_DIS_PWR_CON,
->> > +               .sram_pdn_bits = GENMASK(11, 8),
->> > +               .sram_pdn_ack_bits = GENMASK(12, 12),
->> > +       }, {
->> > +               .id = MT8173_POWER_DOMAIN_VEN2,
->> > +               .name = "ven2",
->> > +               .sta_mask = VEN2_PWR_STA_MASK,
->> > +               .ctl_offs = SPM_VEN2_PWR_CON,
->> > +               .sram_pdn_bits = GENMASK(11, 8),
->> > +               .sram_pdn_ack_bits = GENMASK(15, 12),
->> > +       }, {
->> > +               .id = MT8173_POWER_DOMAIN_AUDIO,
->> > +               .name = "audio",
->> > +               .sta_mask = AUDIO_PWR_STA_MASK,
->> > +               .ctl_offs = SPM_AUDIO_PWR_CON,
->> > +               .sram_pdn_bits = GENMASK(11, 8),
->> > +               .sram_pdn_ack_bits = GENMASK(15, 12),
->> > +       }, {
->> > +               .id = MT8173_POWER_DOMAIN_MFG_2D,
->> > +               .name = "mfg_2d",
->> > +               .sta_mask = MFG_2D_PWR_STA_MASK,
->> > +               .ctl_offs = SPM_MFG_2D_PWR_CON,
->> > +               .sram_pdn_bits = GENMASK(11, 8),
->> > +               .sram_pdn_ack_bits = GENMASK(13, 12),
->> > +       }, {
->> > +               .id = MT8173_POWER_DOMAIN_MFG_ASYNC,
->> > +               .name = "mfg_async",
->> > +               .sta_mask = MFG_ASYNC_PWR_STA_MASK,
->> > +               .ctl_offs = SPM_MFG_ASYNC_PWR_CON,
->> > +               .sram_pdn_bits = GENMASK(11, 8),
->> > +               .sram_pdn_ack_bits = 0,
->> > +       }, {
->> > +               .id = MT8173_POWER_DOMAIN_USB,
->> > +               .name = "usb",
->> > +               .sta_mask = USB_PWR_STA_MASK,
->> > +               .ctl_offs = SPM_USB_PWR_CON,
->> > +               .sram_pdn_bits = GENMASK(11, 8),
->> > +               .sram_pdn_ack_bits = GENMASK(15, 12),
->> > +       },
->> > +};
->> > +
->> > +#define NUM_DOMAINS    ARRAY_SIZE(scp_domain_data)
->> > +
->> > +struct scp;
->> > +
->> > +struct scp_domain {
->> > +       struct generic_pm_domain pmd;
->> > +       struct scp_domain_data *data;
->> > +       struct scp *scp;
->> > +};
->> > +
->> > +struct scp {
->> > +       struct scp_domain domains[NUM_DOMAINS];
->> > +       struct generic_pm_domain *pmd[NUM_DOMAINS];
->> > +       struct genpd_onecell_data pd_data;
->> > +       struct device *dev;
->> > +       void __iomem *base;
->> > +};
->> > +
->> > +static int scpsys_power_on(struct generic_pm_domain *genpd)
->> > +{
->> > +       struct scp_domain *scpd = container_of(genpd, struct scp_domain, pmd);
->> > +       struct scp *scp = scpd->scp;
->> > +       struct scp_domain_data *data = scpd->data;
->> > +       unsigned long expired;
->> > +       void __iomem *ctl_addr = scpd->scp->base + data->ctl_offs;
->> > +       u32 sram_pdn_ack = data->sram_pdn_ack_bits;
->> > +       u32 val;
->> > +       int ret;
->> > +
->> > +       val = readl(ctl_addr);
->> > +       val |= PWR_ON_BIT;
->> > +       writel(val, ctl_addr);
->> > +       val |= PWR_ON_2ND_BIT;
->> > +       writel(val, ctl_addr);
->> > +
->> > +       /* wait until PWR_ACK = 1 */
->> > +       expired = jiffies + HZ;
->> > +       while (!(readl(scp->base + SPM_PWR_STATUS) & data->sta_mask) ||
->> > +                       !(readl(scp->base + SPM_PWR_STATUS_2ND) & data->sta_mask)) {
->> > +               cpu_relax();
->> > +               if (time_after(jiffies, expired)) {
->> > +                       ret = -EIO;
->> > +                       goto out;
->> > +               }
->> > +       }
->> > +
->> > +       val &= ~PWR_CLK_DIS_BIT;
->> > +       writel(val, ctl_addr);
->> > +
->> > +       val &= ~PWR_ISO_BIT;
->> > +       writel(val, ctl_addr);
->> > +
->> > +       val |= PWR_RST_B_BIT;
->> > +       writel(val, ctl_addr);
->> > +
->> > +       val &= ~data->sram_pdn_bits;
->> > +       writel(val, ctl_addr);
->> > +
->> > +       /* wait until SRAM_PDN_ACK all 0 */
->> > +       expired = jiffies + HZ;
->> > +       while (sram_pdn_ack && (readl(ctl_addr) & sram_pdn_ack)) {
->>
->> I think "sram_pdn_ack &&" was added accidently here. It is always
->> bigger then zero.
+Vinod Koul <vinod.koul@intel.com> writes:
+
+Hi Vinod,
+
+First thanks for the review.
+
+>> This is a new driver for pxa SoCs, which is also compatible with the former
+>> mmp_pdma.
+> The rationale is fine, is there a plan to remove old mmp_pdma then?
+I have this in mind, yes. I will need a test from the MMP people to assess
+pxa-dma works flawlessly with MMP architecture, with the same level of
+stability. Once I have their blessing, I'll propose to remove mmp_pdma.
+
+>> +config PXA_DMA
+>> +	bool "PXA DMA support"
+> no prompt?
+Right, this is missing.  I first thought this will always be selected by
+CONFIG_ARCH_PXA, and no user selection would be allowed. But I changed my mind
+since then, and I'll add a prompt description there. For v3.
+
+>> +#define DRCMR(n)	((((n) < 64) ? 0x0100 : 0x1100) + (((n) & 0x3f) << 2))
+> care to put a comment on this calculation
+Definitely. For v3.
+
+>> +#define DRCMR_MAPVLD	BIT(7)	/* Map Valid (read / write) */
+>> +#define DRCMR_CHLNUM	0x1f	/* mask for Channel Number (read / write) */
+>> +
+>> +#define DDADR_DESCADDR	0xfffffff0	/* Address of next descriptor (mask) */
+>> +#define DDADR_STOP	BIT(0)	/* Stop (read / write) */
+>> +
+>> +#define DCMD_INCSRCADDR	BIT(31)	/* Source Address Increment Setting. */
+>> +#define DCMD_INCTRGADDR	BIT(30)	/* Target Address Increment Setting. */
+>> +#define DCMD_FLOWSRC	BIT(29)	/* Flow Control by the source. */
+>> +#define DCMD_FLOWTRG	BIT(28)	/* Flow Control by the target. */
+>> +#define DCMD_STARTIRQEN	BIT(22)	/* Start Interrupt Enable */
+>> +#define DCMD_ENDIRQEN	BIT(21)	/* End Interrupt Enable */
+>> +#define DCMD_ENDIAN	BIT(18)	/* Device Endian-ness. */
+>> +#define DCMD_BURST8	(1 << 16)	/* 8 byte burst */
+>> +#define DCMD_BURST16	(2 << 16)	/* 16 byte burst */
+>> +#define DCMD_BURST32	(3 << 16)	/* 32 byte burst */
+>> +#define DCMD_WIDTH1	(1 << 14)	/* 1 byte width */
+>> +#define DCMD_WIDTH2	(2 << 14)	/* 2 byte width (HalfWord) */
+>> +#define DCMD_WIDTH4	(3 << 14)	/* 4 byte width (Word) */
+>> +#define DCMD_LENGTH	0x01fff		/* length mask (max = 8K - 1) */
+> Please namespace these ...
+Sorry I don't get this comment, would you care to explain me please ?
+
+>> +#define chan_dbg(_chan, fmt, arg...)					\
+>> +	dev_dbg(&(_chan)->vc.chan.dev->device, "%s(chan=%p): " fmt,	\
+>> +		__func__, (_chan), ## arg)
+...
+> am not a big fan of driver specfic debug macros, can we use dev_ ones please
+As you wish.  This will make the code ugly for all the chan_dbg() calls, which
+is a bit a pity, but if you think this should be done that way then let's do
+that.
+
+>> +#define _phy_readl_relaxed(phy, _reg)					\
+>> +	readl_relaxed((phy)->base + _reg((phy)->idx))
+>> +#define phy_readl_relaxed(phy, _reg)					\
+>> +	({								\
+>> +		u32 _v;							\
+>> +		_v = readl_relaxed((phy)->base + _reg((phy)->idx));	\
+>> +		chan_vdbg(phy->vchan, "readl(%s): 0x%08x\n", #_reg,	\
+>> +			  _v);						\
+>> +		_v;							\
+>> +	})
+>> +#define phy_writel(phy, val, _reg)					\
+>> +	do {								\
+>> +		writel((val), (phy)->base + _reg((phy)->idx));		\
+>> +		chan_vdbg((phy)->vchan, "writel(0x%08x, %s)\n",		\
+>> +			  (u32)(val), #_reg);				\
+>> +	} while (0)
+>> +#define phy_writel_relaxed(phy, val, _reg)				\
+>> +	do {								\
+>> +		writel_relaxed((val), (phy)->base + _reg((phy)->idx));	\
+>> +		chan_vdbg((phy)->vchan, "writel(0x%08x, %s)\n",		\
+>> +			  (u32)(val), #_reg);				\
+>> +	} while (0)
+>> +
+>> +/*
+> ??
+> Does this code compile?
+Oh yes, it compiles and works with both debug on and debug off. This is actually
+the most handy debug trace of this driver. I've been using that kind of
+accessors for years in my drivers, and this is truly something I need to
+maintain the driver, especially when a nasty corner case happens on a hardware I
+don't own.
+
+And I've tested this thoroughly when I was stabilizing this driver.
+
+>> +	/*
+>> +	 * dma channel priorities
+>> +	 * ch 0 - 3,  16 - 19  <--> (0)
+>> +	 * ch 4 - 7,  20 - 23  <--> (1)
+>> +	 * ch 8 - 11, 24 - 27  <--> (2)
+>> +	 * ch 12 - 15, 28 - 31  <--> (3)
+>> +	 */
+>> +
+>> +	spin_lock_irqsave(&pdev->phy_lock, flags);
+>> +	for (prio = pchan->prio; prio >= PXAD_PRIO_HIGHEST; prio--) {
+>> +		for (i = 0; i < pdev->nr_chans; i++) {
+>> +			if (prio != (i & 0xf) >> 2)
+>> +				continue;
+>> +			phy = &pdev->phys[i];
+>> +			if (!phy->vchan) {
+>> +				phy->vchan = pchan;
+>> +				found = phy;
+>> +				goto out_unlock;
+> what does phy have to do with priorty here?
+Each phy has a priority, it's part of the hardware.  IOW each phy has a "granted
+bandwidth". This guarantee is based on the number of request on the system bus
+the DMA IP can place.
+
+In PXA2xx/PXA3xx, the DMA IP can have 8 simulaneous request. The highest
+priority phys always get 4 slots, the high 2 slots, etc ...
+
+So a priority is an intrinsic property of a phy.
+
 >
-> Nope, it's zero for MT8173_POWER_DOMAIN_MFG_ASYNC.
+>> +static bool pxad_try_hotchain(struct virt_dma_chan *vc,
+>> +				  struct virt_dma_desc *vd)
+>> +{
+>> +	struct virt_dma_desc *vd_last_issued = NULL;
+>> +	struct pxad_chan *chan = to_pxad_chan(&vc->chan);
+>> +
+>> +	/*
+>> +	 * Attempt to hot chain the tx if the phy is still running. This is
+>> +	 * considered successful only if either the channel is still running
+>> +	 * after the chaining, or if the chained transfer is completed after
+>> +	 * having been hot chained.
+>> +	 * A change of alignment is not allowed, and forbids hotchaining.
+>> +	 */
+> okay, so what if while you are hotchaining the first txn completes, how do
+> we prevent these sort of races with HW?
 
-In probe you turn on all power domains defined in scp_domain_data[].
-So all but MT8173_POWER_DOMAIN_MFG_ASYNC will fail.
-Does this make sense?
+In the case where hotchaining is attempted, and while hotchaining txn completes,
+obviously the channel stops, and the hotchained descriptor is not
+"hotchained". This is the reason the function is called "...try_hotchain" and
+not hotchain.
 
+There is actually no race :
+- either you succeed the hotchain, ie. the atomic write of the dma link
+  descriptor happens before the txn finishes
+- or you fail the hotchain, in which case the channel stops without beginning
+  the new chained descriptor, ie. the atomic write of the dma link descriptor
+  happens after txn finishes
 
+It's a "try and test after" approach, and the "try" is atomic because it's a
+single u32 write to link the descriptors (which is materialized in
+pxad_desc_chain()).
+
+>> +static struct pxad_desc_sw *
+>> +pxad_alloc_desc(struct pxad_chan *chan, unsigned int nb_hw_desc)
+>> +{
+>> +	struct pxad_desc_sw *sw_desc;
+>> +	dma_addr_t dma;
+>> +	int i;
+>> +
+>> +	sw_desc = kzalloc(sizeof(*sw_desc) +
+>> +			  nb_hw_desc * sizeof(struct pxad_desc_hw *),
+>> +			  GFP_ATOMIC);
+>> +	if (!sw_desc) {
+>> +		chan_err(chan, "Couldn't allocate a sw_desc\n");
+> this is not required, memory allocator will spew this as well. I think
+> checkpatch should have warned you..
+Checkpatch did not, but I agree, will remove this print alltogether. For v3.
+
+>> +static inline struct dma_async_tx_descriptor *
+>> +pxad_tx_prep(struct virt_dma_chan *vc, struct virt_dma_desc *vd,
+>> +		 unsigned long tx_flags)
+>> +{
+>> +	struct dma_async_tx_descriptor *tx;
+>> +
+>> +	tx = vchan_tx_prep(vc, vd, tx_flags);
+>> +	tx->tx_submit = pxad_tx_submit;
+>> +	tx->tx_release = pxad_tx_release;
+> tx_release?
+Oh sorry, this is a leftover from our former discussion on descriptor
+reuse. You've convinced me since then to use async_tx_test_ack() in virt-dma.c,
+so I will remove that. For v3.
+
+>> +static int pxad_config(struct dma_chan *dchan,
+>> +		       struct dma_slave_config *cfg)
+>> +{
+>> +	struct pxad_chan *chan = to_pxad_chan(dchan);
+>> +	u32 maxburst = 0, dev_addr = 0;
+>> +	enum dma_slave_buswidth width = DMA_SLAVE_BUSWIDTH_UNDEFINED;
+>> +
+>> +	if (!dchan)
+>> +		return -EINVAL;
+>> +
+>> +	chan->dir = cfg->direction;
+>> +	chan->dcmd_base = 0;
+>> +
+>> +	if (cfg->direction == DMA_DEV_TO_MEM) {
+> direction is depricated, please copy the parameters and then use them in
+> your prep_ based on direction passed
+Understood. For v3.
+
+>> +	spin_lock_irqsave(&chan->vc.lock, flags);
+>> +
+>> +	list_for_each_entry(vd, &chan->vc.desc_issued, node) {
+>> +		sw_desc = to_pxad_sw_desc(vd);
+>> +
+>> +		if (vd->tx.cookie == cookie && !prev_completed) {
+>> +			residue = sw_desc->len;
+>> +			break;
+>> +		}
+>> +		prev_completed = is_desc_completed(vd);
+> why not use vchan_find_desc() ?
+Indeed, why not :) I had not in mind the existence of this function. I'll use it
+for v3.
+
+>> +static enum dma_status pxad_tx_status(struct dma_chan *dchan,
+>> +				      dma_cookie_t cookie,
+>> +				      struct dma_tx_state *txstate)
+>> +{
+>> +	struct pxad_chan *chan = to_pxad_chan(dchan);
+>> +	enum dma_status ret;
+>> +
+>> +	ret = dma_cookie_status(dchan, cookie, txstate);
+> pls check if txstate is valid
+My understanding is that's already the job of dma_cookie_status() and
+dma_set_residue().
+
+>> +static void pxad_free_channels(struct dma_device *dmadev)
+>> +{
+>> +	struct pxad_chan *c, *cn;
+>> +
+>> +	list_for_each_entry_safe(c, cn, &dmadev->channels,
+>> +				 vc.chan.device_node) {
+>> +		list_del(&c->vc.chan.device_node);
+>> +		tasklet_kill(&c->vc.task);
+>> +	}
+>> +}
+>> +
+>> +static int pxad_remove(struct platform_device *op)
+>> +{
+>> +	struct pxad_device *pdev = platform_get_drvdata(op);
+>> +
+> you should free up irq as well, otherwise device can still generate
+> interrupts
+They are freed automatically because I used devm_request_irq() and not
+request_irq().
+
+Cheers.
 
 -- 
-motzblog.wordpress.com
+Robert
