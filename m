@@ -1,64 +1,62 @@
-From: houpengyang@huawei.com (Hou Pengyang)
-Date: Fri, 8 May 2015 05:43:04 +0000
-Subject: [PATCH v4 2/2] arm64: perf: Fix callchain parse error with kernel
- tracepoint events
-In-Reply-To: <1431063784-137600-1-git-send-email-houpengyang@huawei.com>
-References: <1431063784-137600-1-git-send-email-houpengyang@huawei.com>
-Message-ID: <1431063784-137600-3-git-send-email-houpengyang@huawei.com>
+From: mike.looijmans@topic.nl (Mike Looijmans)
+Date: Fri, 08 May 2015 07:55:26 +0200
+Subject: dma_alloc_coherent versus streaming DMA,
+ neither works satisfactory
+In-Reply-To: <20150507143010.GC2067@n2100.arm.linux.org.uk>
+References: <5538DD02.6050401@topic.nl> <3382997.5hgfVKmNXP@wuerfel>
+ <5540D356.50708@topic.nl> <9622793.RaVBbeJMCx@wuerfel>
+ <554B49F0.1090100@topic.nl>
+ <CAD8Lp45w6_ck13sG3PQ549AxsgTi96XQAkUEd9DQqt-i=ZXxUQ@mail.gmail.com>
+ <554B6917.40705@topic.nl> <554B71F6.5000106@topic.nl>
+ <20150507143010.GC2067@n2100.arm.linux.org.uk>
+Message-ID: <554C4FCE.6070802@topic.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For ARM64, when tracing with tracepoint events, the IP and pstate are set
-to 0, preventing the perf code parsing the callchain and resolving the 
-symbols correctly.
+On 07-05-15 16:30, Russell King - ARM Linux wrote:
+> On Thu, May 07, 2015 at 04:08:54PM +0200, Mike Looijmans wrote:
+>> I read the rest of the thread, apparently it was never integrated.
+>>
+>> The patch for "non-consistent" is a BUG FIX, not some feature request or so.
+>> I was already wondering why my driver had to kalloc pages to get proper
+>> caching on it.
+>
+> I disagree.
+>
+>>  From https://www.kernel.org/doc/Documentation/DMA-attributes.txt:
+>> """
+>> DMA_ATTR_NON_CONSISTENT ... lets the platform to choose to return either
+>> consistent or non-consistent memory as it sees fit.  By using this API,
+>> you are guaranteeing to the platform that you have all the correct and
+>> necessary sync points for this memory in the driver.
+>> """
+>
+> DMA attributes are something that came in _after_ the DMA API had been
+> around for many years.  It's a "new feature" that was added to an
+> existing subsystem, and because there have been no need for it to be
+> implemented on ARM, the new feature was never implemented.
+>
+> More than that, the vast majority of ARM hardware can't provide this
+> kind of memory, and there are _no_ kernel APIs to ensure that if
 
- ./perf record -e sched:sched_switch -g --call-graph dwarf ls
-    [ perf record: Captured and wrote 0.146 MB perf.data ]
- ./perf report -f
-    Samples: 194  of event 'sched:sched_switch', Event count (approx.): 194 
-    Children      Self    Command  Shared Object     Symbol
-    100.00%       100.00%  ls       [unknown]         [.] 0000000000000000
+By "non-coherent" memory I thought it meant the same kind of memory that 
+kalloc would return. But from your answer it seems I am mistaken and 
+this is something different?
 
-The fix is to implement perf_arch_fetch_caller_regs for ARM64, which fills
-several necessary registers used for callchain unwinding, including pc,sp,
-fp and spsr .
+> cacheable memory were to be returned, they could issue the necessary
+> cache flushes to ensure that the device could see the data.
 
-With this patch, callchain can be parsed correctly as follows:
+Then what do the dma_sync_... methods do?
 
-     ......
-+    2.63%     0.00%  ls       [kernel.kallsyms]  [k] vfs_symlink
-+    2.63%     0.00%  ls       [kernel.kallsyms]  [k] follow_down
-+    2.63%     0.00%  ls       [kernel.kallsyms]  [k] pfkey_get
-+    2.63%     0.00%  ls       [kernel.kallsyms]  [k] do_execveat_common.isra.33
--    2.63%     0.00%  ls       [kernel.kallsyms]  [k] pfkey_send_policy_notify
-     pfkey_send_policy_notify
-     pfkey_get
-     v9fs_vfs_rename
-     page_follow_link_light
-     link_path_walk
-     el0_svc_naked
-    .......
+It has been my understanding that one can use dma_map... and dma_sync... 
+methods to make memory ranges visible to the device.
 
-Signed-off-by: Hou Pengyang <houpengyang@huawei.com>
----
- arch/arm64/include/asm/perf_event.h | 7 +++++++
- 1 file changed, 7 insertions(+)
+Using dma_sync on coherent memory is just a waste of resources. So how 
+do i allocate memory that I'm supposed to use with dma_sync?
 
-diff --git a/arch/arm64/include/asm/perf_event.h b/arch/arm64/include/asm/perf_event.h
-index d26d1d5..6471773 100644
---- a/arch/arm64/include/asm/perf_event.h
-+++ b/arch/arm64/include/asm/perf_event.h
-@@ -24,4 +24,11 @@ extern unsigned long perf_misc_flags(struct pt_regs *regs);
- #define perf_misc_flags(regs)	perf_misc_flags(regs)
- #endif
- 
-+#define perf_arch_fetch_caller_regs(regs, __ip) { \
-+	(regs)->pc = (__ip);    \
-+	(regs)->regs[AARCH64_INSN_REG_FP] = (unsigned long) __builtin_frame_address(0); \
-+	(regs)->sp = current_stack_pointer; \
-+	(regs)->pstate = PSR_MODE_EL1h;	\
-+}
-+
- #endif
+> So it's _not_ a bug fix, and there have been very good reasons not to
+> implement it.
+
+
 -- 
-1.8.3.4
+Mike Looijmans
