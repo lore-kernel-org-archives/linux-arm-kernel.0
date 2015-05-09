@@ -1,94 +1,65 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Sat, 09 May 2015 15:25:44 +0200
-Subject: Bulid regression with VDSO enabled
-In-Reply-To: <e376d894ce39c709192a5ffe7ca83762@agner.ch>
-References: <391d6fc127b78ef4cbc5443557f0665a@agner.ch>
- <554CD5F8.10901@mentor.com> <983cc33a8e5704f4281a7d30bbc9d1d2@agner.ch>
- <554D276D.9040205@mentor.com> <e376d894ce39c709192a5ffe7ca83762@agner.ch>
-Message-ID: <c66c257aba00dbedd17883507fc5f896@agner.ch>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 09 May 2015 15:38:16 +0200
+Subject: Memory size unaligned to section boundary
+In-Reply-To: <20150506113503.GT2067@n2100.arm.linux.org.uk>
+References: <a865bd68d706f8c4c9e82a374ff6adc4@agner.ch>
+ <20150506101104.GD2067@n2100.arm.linux.org.uk>
+ <20150506105102.GB5382@e104818-lin.cambridge.arm.com>
+ <20150506113503.GT2067@n2100.arm.linux.org.uk>
+Message-ID: <554E0DC8.4060401@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-05-09 14:41, Stefan Agner wrote:
-> On 2015-05-08 23:15, Nathan Lynch wrote:
->> On 05/08/2015 11:08 AM, Stefan Agner wrote:
->>> On 2015-05-08 17:27, Nathan Lynch wrote:
->>>> On 05/08/2015 06:13 AM, Stefan Agner wrote:
->>>>> Also, I used the BFD linker by adding LD=${CROSS_COMPILE}ld.bfd to the
->>>>> build command. Interestingly thought, I had the same issue when using
->>>>> gold linker...
->>>>
->>>> When I try this, ld.gold is used regardless.
->>>>
->>>> You can tell by doing and checking for a NT_GNU_GOLD_VERSION note:
->>>>
->>>> $ readelf -n arch/arm/vdso/vdso.so.raw
->>>>
->>>> Displaying notes found at file offset 0x000001bc with length 0x00000040:
->>>>   Owner                 Data size       Description
->>>>   GNU                  0x00000009       NT_GNU_GOLD_VERSION (gold version)
->>>>   GNU                  0x00000014       NT_GNU_BUILD_ID (unique build
->>>> ID bitstring)
->>>>     Build ID: f025409550acb7f955c61d95691291da078e6688
->>>
->>> Hm, you are right. When deleting moving ld.bfd to ld, which makes the
->>> BFD linker as default, compiling works flawless.
->>>
->>> However, so far LD=${CROSS_COMPILE}ld.bfc seems to work for other build
->>> objects, at least those do not have this note. For instance time.o does
->>> not return anything:
->>>
->>> $ readelf -n arch/arm/kernel/time.o
->>
->> This is just an object file that hasn't been linked, but your general
->> point stands -- LD is honored by other parts of the build.
->>
->>
->>> So it seems to be a vdso.so.raw specific problem not using the specified
->>> linker...?
->>
->> Yes, since it's produced by an invocation of $(CC) which is expected
->> to call the linker implicitly, and this is how the toolchain's default
->> linker ends up getting used even when you set LD on the command line.
->>
->> If I'm not mistaken, implicitly performing a link through the compiler
->> seems to be 1) conventional for all VDSOs, not just ARM's, but 2) unusual
->> for other parts of the kernel build.
->>
->> I suppose it's possible to make arch/arm/vdso/Makefile honor LD, but it
->> would basically entail a rewrite.  In the meantime, using -fuse-ld=bfd
->> may suffice:
->>
->> diff --git a/arch/arm/vdso/Makefile b/arch/arm/vdso/Makefile
->> index 8aa791051029..da0ce897edde 100644
->> --- a/arch/arm/vdso/Makefile
->> +++ b/arch/arm/vdso/Makefile
->> @@ -43,6 +43,7 @@ quiet_cmd_vdsold = VDSO    $@
->>        cmd_vdsold = $(CC) $(c_flags) -Wl,-T $(filter %.lds,$^)
->> $(filter %.o,$^) \
->>                     $(call cc-ldoption, -Wl$(comma)--build-id) \
->>                     -Wl,-Bsymbolic -Wl,-z,max-page-size=4096 \
->> +                   $(call cc-option, -fuse-ld=bfd) \
->>                     -Wl,-z,common-page-size=4096 -o $@
->>
->>  quiet_cmd_vdsomunge = MUNGE   $@
-> 
-> 
-> Thanks Nathan, your solution looks reasonable. I figured that the option
-> is available since GCC 4.8, so it should work probably for most
-> toolchains which try to make use of gold linker as default.
-> 
-> Unfortunately, I hit another problem with the configuration on my build
-> host. With your patch applied, I get:
-> collect2: fatal error: cannot find 'ld'
-> compilation terminated.
-> make[2]: *** [arch/arm/vdso/vdso.so.raw] Error 1
-> make[1]: *** [arch/arm/vdso] Error 2
-> make[1]: *** Waiting for unfinished jobs....
+Hi,
 
-Sorry for the noise, it turns out when using no paths in CROSS_COMPILE
-and instead add the location of the toolchain to PATH properly, this
-second issue is fixed.
+On 06-05-15 13:35, Russell King - ARM Linux wrote:
+> On Wed, May 06, 2015 at 11:51:03AM +0100, Catalin Marinas wrote:
+>> On Wed, May 06, 2015 at 11:11:05AM +0100, Russell King - ARM Linux wrote:
+>>> @@ -1142,7 +1142,7 @@ void __init sanity_check_meminfo(void)
+>>>   	 * last full section, which should be mapped.
+>>>   	 */
+>>>   	if (memblock_limit)
+>>> -		memblock_limit = round_down(memblock_limit, SECTION_SIZE);
+>>> +		memblock_limit = round_down(memblock_limit, 2 * SECTION_SIZE);
+>>
+>> Why not PMD_SIZE? We don't need 4MB round down with LPAE.
+>
+> No reason - PMD_SIZE would be good there.
 
---
-Stefan
+Ok, so does that mean that Mark's original patch:
+
+---->8----
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 4e6ef89..2ea13f0 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1125,9 +1125,9 @@ void __init sanity_check_meminfo(void)
+                          * occurs before any free memory is mapped.
+                          */
+                         if (!memblock_limit) {
+-                               if (!IS_ALIGNED(block_start, SECTION_SIZE))
++                               if (!IS_ALIGNED(block_start, PMD_SIZE))
+                                         memblock_limit = block_start;
+-                               else if (!IS_ALIGNED(block_end, SECTION_SIZE))
++                               else if (!IS_ALIGNED(block_end, PMD_SIZE))
+                                         memblock_limit = arm_lowmem_limit;
+                         }
+
+@@ -1142,7 +1142,7 @@ void __init sanity_check_meminfo(void)
+          * last full section, which should be mapped.
+          */
+         if (memblock_limit)
+-               memblock_limit = round_down(memblock_limit, SECTION_SIZE);
++               memblock_limit = round_down(memblock_limit, PMD_SIZE);
+         if (!memblock_limit)
+                 memblock_limit = arm_lowmem_limit;
+
+
+Is good, or do we only need to have the last chunk of this patch ?
+
+Once I know what the final patch should look like I can give this a try
+on one of the systems which sparked this whole discussion.
+
+Regards,
+
+Hans
