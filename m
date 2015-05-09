@@ -1,99 +1,167 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 09 May 2015 11:26:57 +0100
-Subject: [PATCH 13/13] drm: bridge/dw_hdmi-ahb-audio: parse ELD from HDMI
- driver
+Date: Sat, 09 May 2015 11:26:47 +0100
+Subject: [PATCH 11/13] sound/core: add IEC958 channel status helper
 In-Reply-To: <20150509102501.GO2067@n2100.arm.linux.org.uk>
 References: <20150509102501.GO2067@n2100.arm.linux.org.uk>
-Message-ID: <E1Yr1yD-0006lK-RC@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Yr1y3-0006lC-JP@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Parse the ELD (EDID like data) stored from the HDMI driver to restrict
-the sample rates and channels which are available to ALSA.  This causes
-the ALSA device to reflect the capabilities of the overall audio path,
-not just what is supported at the HDMI source interface level.
+Add a helper to create the IEC958 channel status from an ALSA
+snd_pcm_runtime structure, taking account of the sample rate and
+sample size.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/gpu/drm/bridge/Kconfig             | 1 +
- drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.c | 6 ++++++
- drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.h | 1 +
- drivers/gpu/drm/bridge/dw_hdmi.c           | 3 +++
- 4 files changed, 11 insertions(+)
+ include/sound/pcm_iec958.h |  9 +++++
+ sound/core/Kconfig         |  3 ++
+ sound/core/Makefile        |  1 +
+ sound/core/pcm_iec958.c    | 95 ++++++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 108 insertions(+)
+ create mode 100644 include/sound/pcm_iec958.h
+ create mode 100644 sound/core/pcm_iec958.c
 
-diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
-index 56ed35fe0734..204861bfb867 100644
---- a/drivers/gpu/drm/bridge/Kconfig
-+++ b/drivers/gpu/drm/bridge/Kconfig
-@@ -7,6 +7,7 @@ config DRM_DW_HDMI_AHB_AUDIO
- 	tristate "Synopsis Designware AHB Audio interface"
- 	depends on DRM_DW_HDMI && SND
- 	select SND_PCM
-+	select SND_PCM_ELD
- 	select SND_PCM_IEC958
- 	help
- 	  Support the AHB Audio interface which is part of the Synopsis
-diff --git a/drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.c b/drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.c
-index e98c291268f4..2bb68bda3cb0 100644
---- a/drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.c
-+++ b/drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.c
-@@ -12,11 +12,13 @@
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <drm/bridge/dw_hdmi.h>
-+#include <drm/drm_edid.h>
- 
- #include <sound/asoundef.h>
- #include <sound/core.h>
- #include <sound/initval.h>
- #include <sound/pcm.h>
-+#include <sound/pcm_drm_eld.h>
- #include <sound/pcm_iec958.h>
- 
- #include "dw_hdmi-ahb-audio.h"
-@@ -284,6 +286,10 @@ static int dw_hdmi_open(struct snd_pcm_substream *substream)
- 
- 	runtime->hw = dw_hdmi_hw;
- 
-+	ret = snd_pcm_hw_constraint_eld(runtime, dw->data.eld);
-+	if (ret < 0)
-+		return ret;
+diff --git a/include/sound/pcm_iec958.h b/include/sound/pcm_iec958.h
+new file mode 100644
+index 000000000000..0eed397aca8e
+--- /dev/null
++++ b/include/sound/pcm_iec958.h
+@@ -0,0 +1,9 @@
++#ifndef __SOUND_PCM_IEC958_H
++#define __SOUND_PCM_IEC958_H
 +
- 	ret = snd_pcm_limit_hw_rates(runtime);
- 	if (ret < 0)
- 		return ret;
-diff --git a/drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.h b/drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.h
-index 1e840118d90a..91f631beecc7 100644
---- a/drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.h
-+++ b/drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.h
-@@ -8,6 +8,7 @@ struct dw_hdmi_audio_data {
- 	void __iomem *base;
- 	int irq;
- 	struct dw_hdmi *hdmi;
-+	u8 *eld;
- };
++#include <linux/types.h>
++
++int snd_pcm_create_iec958_consumer(struct snd_pcm_runtime *runtime, u8 *cs,
++	size_t len);
++
++#endif
+diff --git a/sound/core/Kconfig b/sound/core/Kconfig
+index b534c8a6046b..1507469425ec 100644
+--- a/sound/core/Kconfig
++++ b/sound/core/Kconfig
+@@ -9,6 +9,9 @@ config SND_PCM
+ config SND_PCM_ELD
+ 	bool
  
- #endif
-diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
-index 1cb427935ed2..dc0aed18019d 100644
---- a/drivers/gpu/drm/bridge/dw_hdmi.c
-+++ b/drivers/gpu/drm/bridge/dw_hdmi.c
-@@ -1446,6 +1446,8 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
++config SND_PCM_IEC958
++	bool
++
+ config SND_DMAENGINE_PCM
+ 	tristate
  
- 		drm_mode_connector_update_edid_property(connector, edid);
- 		ret = drm_add_edid_modes(connector, edid);
-+		/* Store the ELD */
-+		drm_edid_to_eld(connector, edid);
- 		kfree(edid);
- 	} else {
- 		dev_dbg(hdmi->dev, "failed to get edid\n");
-@@ -1725,6 +1727,7 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
- 		audio.base = hdmi->regs;
- 		audio.irq = irq;
- 		audio.hdmi = hdmi;
-+		audio.eld = hdmi->connector.eld;
+diff --git a/sound/core/Makefile b/sound/core/Makefile
+index 591b49157b4d..2b925fcc95ea 100644
+--- a/sound/core/Makefile
++++ b/sound/core/Makefile
+@@ -14,6 +14,7 @@ snd-pcm-y := pcm.o pcm_native.o pcm_lib.o pcm_timer.o pcm_misc.o \
+ 		pcm_memory.o memalloc.o
+ snd-pcm-$(CONFIG_SND_DMA_SGBUF) += sgbuf.o
+ snd-pcm-$(CONFIG_SND_PCM_ELD) += pcm_drm_eld.o
++snd-pcm-$(CONFIG_SND_PCM_IEC958) += pcm_iec958.o
  
- 		pdevinfo.name = "dw-hdmi-ahb-audio";
- 		pdevinfo.data = &audio;
+ # for trace-points
+ CFLAGS_pcm_lib.o := -I$(src)
+diff --git a/sound/core/pcm_iec958.c b/sound/core/pcm_iec958.c
+new file mode 100644
+index 000000000000..36b2d7aca1bd
+--- /dev/null
++++ b/sound/core/pcm_iec958.c
+@@ -0,0 +1,95 @@
++/*
++ *  PCM DRM helpers
++ *
++ *   This program is free software; you can redistribute it and/or modify
++ *   it under the terms of the GNU General Public License version 2 as
++ *   published by the Free Software Foundation.
++ */
++#include <linux/export.h>
++#include <linux/types.h>
++#include <sound/asoundef.h>
++#include <sound/pcm.h>
++#include <sound/pcm_iec958.h>
++
++/**
++ * snd_pcm_create_iec958_consumer - create consumer format IEC958 channel status
++ * @runtime: pcm runtime structure with ->rate filled in
++ * @cs: channel status buffer, at least four bytes
++ * @len: length of channel status buffer
++ *
++ * Create the consumer format channel status data in @cs of maximum size
++ * @len corresponding to the parameters of the PCM runtime @runtime.
++ *
++ * Drivers may wish to tweak the contents of the buffer after creation.
++ *
++ * Returns: length of buffer, or negative error code if something failed.
++ */
++int snd_pcm_create_iec958_consumer(struct snd_pcm_runtime *runtime, u8 *cs,
++	size_t len)
++{
++	unsigned int fs, ws;
++
++	if (len < 4)
++		return -EINVAL;
++
++	switch (runtime->rate) {
++	case 32000:
++		fs = IEC958_AES3_CON_FS_32000;
++		break;
++	case 44100:
++		fs = IEC958_AES3_CON_FS_44100;
++		break;
++	case 48000:
++		fs = IEC958_AES3_CON_FS_48000;
++		break;
++	case 88200:
++		fs = IEC958_AES3_CON_FS_88200;
++		break;
++	case 96000:
++		fs = IEC958_AES3_CON_FS_96000;
++		break;
++	case 176400:
++		fs = IEC958_AES3_CON_FS_176400;
++		break;
++	case 192000:
++		fs = IEC958_AES3_CON_FS_192000;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	if (len > 4) {
++		switch (snd_pcm_format_width(runtime->format)) {
++		case 16:
++			ws = IEC958_AES4_CON_WORDLEN_20_16;
++			break;
++		case 18:
++			ws = IEC958_AES4_CON_WORDLEN_22_18;
++			break;
++		case 20:
++			ws = IEC958_AES4_CON_WORDLEN_20_16 |
++			     IEC958_AES4_CON_MAX_WORDLEN_24;
++			break;
++		case 24:
++			ws = IEC958_AES4_CON_WORDLEN_24_20 |
++			     IEC958_AES4_CON_MAX_WORDLEN_24;
++			break;
++
++		default:
++			return -EINVAL;
++		}
++	}
++
++	memset(cs, 0, len);
++
++	cs[0] = IEC958_AES0_CON_NOT_COPYRIGHT | IEC958_AES0_CON_EMPHASIS_NONE;
++	cs[1] = IEC958_AES1_CON_GENERAL;
++	cs[2] = IEC958_AES2_CON_SOURCE_UNSPEC | IEC958_AES2_CON_CHANNEL_UNSPEC;
++	cs[3] = IEC958_AES3_CON_CLOCK_1000PPM | fs;
++
++	if (len > 4)
++		cs[4] = ws;
++
++	return len;
++}
++EXPORT_SYMBOL(snd_pcm_create_iec958_consumer);
 -- 
 1.8.3.1
