@@ -1,139 +1,119 @@
 From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Sat,  9 May 2015 09:53:46 +0200
-Subject: [PATCH v8 04/16] clocksource/drivers: Add ARM System timer driver
+Date: Sat,  9 May 2015 09:53:47 +0200
+Subject: [PATCH v8 05/16] dt-bindings: mfd: Add STM32F4 RCC numeric constants
+ into DT include file
 In-Reply-To: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
 References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <1431158038-3813-5-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <1431158038-3813-6-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds clocksource support for ARMv7-M's System timer,
-also known as SysTick.
+Ths patch lists STM32F4's RCC numeric constants.
+It will be used by clock and reset drivers, and DT bindings.
 
-Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 ---
- drivers/clocksource/Kconfig          |  7 ++++
- drivers/clocksource/Makefile         |  1 +
- drivers/clocksource/armv7m_systick.c | 79 ++++++++++++++++++++++++++++++++++++
- 3 files changed, 87 insertions(+)
- create mode 100644 drivers/clocksource/armv7m_systick.c
+ include/dt-bindings/mfd/stm32f4-rcc.h | 92 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 92 insertions(+)
+ create mode 100644 include/dt-bindings/mfd/stm32f4-rcc.h
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 51d7865f..bf9364c 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -139,6 +139,13 @@ config CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
- 	help
- 	 Use ARM global timer clock source as sched_clock
- 
-+config ARMV7M_SYSTICK
-+	bool
-+	select CLKSRC_OF if OF
-+	select CLKSRC_MMIO
-+	help
-+	  This options enables support for the ARMv7M system timer unit
-+
- config ATMEL_PIT
- 	select CLKSRC_OF if OF
- 	def_bool SOC_AT91SAM9 || SOC_SAMA5
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 5b85f6a..d510c54 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -45,6 +45,7 @@ obj-$(CONFIG_MTK_TIMER)		+= mtk_timer.o
- 
- obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
- obj-$(CONFIG_ARM_GLOBAL_TIMER)		+= arm_global_timer.o
-+obj-$(CONFIG_ARMV7M_SYSTICK)		+= armv7m_systick.o
- obj-$(CONFIG_CLKSRC_METAG_GENERIC)	+= metag_generic.o
- obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)	+= dummy_timer.o
- obj-$(CONFIG_ARCH_KEYSTONE)		+= timer-keystone.o
-diff --git a/drivers/clocksource/armv7m_systick.c b/drivers/clocksource/armv7m_systick.c
+diff --git a/include/dt-bindings/mfd/stm32f4-rcc.h b/include/dt-bindings/mfd/stm32f4-rcc.h
 new file mode 100644
-index 0000000..addfd2c
+index 0000000..2f7ab9c
 --- /dev/null
-+++ b/drivers/clocksource/armv7m_systick.c
-@@ -0,0 +1,79 @@
++++ b/include/dt-bindings/mfd/stm32f4-rcc.h
+@@ -0,0 +1,92 @@
 +/*
-+ * Copyright (C) Maxime Coquelin 2015
-+ * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
-+ * License terms:  GNU General Public License (GPL), version 2
++ * This header provides constants for the STM32F4 RCC IP
 + */
 +
-+#include <linux/kernel.h>
-+#include <linux/clocksource.h>
-+#include <linux/clockchips.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/clk.h>
-+#include <linux/bitops.h>
++#ifndef _DT_BINDINGS_MFD_STM32F4_RCC_H
++#define _DT_BINDINGS_MFD_STM32F4_RCC_H
 +
-+#define SYST_CSR	0x00
-+#define SYST_RVR	0x04
-+#define SYST_CVR	0x08
-+#define SYST_CALIB	0x0c
++/* AHB1 */
++#define STM32F4_RCC_AHB1_GPIOA	0
++#define STM32F4_RCC_AHB1_GPIOB	1
++#define STM32F4_RCC_AHB1_GPIOC	2
++#define STM32F4_RCC_AHB1_GPIOD	3
++#define STM32F4_RCC_AHB1_GPIOE	4
++#define STM32F4_RCC_AHB1_GPIOF	5
++#define STM32F4_RCC_AHB1_GPIOG	6
++#define STM32F4_RCC_AHB1_GPIOH	7
++#define STM32F4_RCC_AHB1_GPIOI	8
++#define STM32F4_RCC_AHB1_GPIOJ	9
++#define STM32F4_RCC_AHB1_GPIOK	10
++#define STM32F4_RCC_AHB1_CRC	12
++#define STM32F4_RCC_AHB1_DMA1	21
++#define STM32F4_RCC_AHB1_DMA2	22
++#define STM32F4_RCC_AHB1_DMA2D	23
++#define STM32F4_RCC_AHB1_ETHMAC	25
++#define STM32F4_RCC_AHB1_OTGHS	29
 +
-+#define SYST_CSR_ENABLE BIT(0)
++#define STM32F4_AHB1_RESET(bit) (STM32F4_RCC_AHB1_##bit + (0x10 * 8))
 +
-+#define SYSTICK_LOAD_RELOAD_MASK 0x00FFFFFF
++/* AHB2 */
++#define STM32F4_RCC_AHB2_DCMI	0
++#define STM32F4_RCC_AHB2_CRYP	4
++#define STM32F4_RCC_AHB2_HASH	5
++#define STM32F4_RCC_AHB2_RNG	6
++#define STM32F4_RCC_AHB2_OTGFS	7
 +
-+static void __init system_timer_of_register(struct device_node *np)
-+{
-+	struct clk *clk = NULL;
-+	void __iomem *base;
-+	u32 rate;
-+	int ret;
++#define STM32F4_AHB2_RESET(bit)	(STM32F4_RCC_AHB2_##bit + (0x14 * 8))
 +
-+	base = of_iomap(np, 0);
-+	if (!base) {
-+		pr_warn("system-timer: invalid base address\n");
-+		return;
-+	}
++/* AHB3 */
++#define STM32F4_RCC_AHB3_FMC	0
 +
-+	ret = of_property_read_u32(np, "clock-frequency", &rate);
-+	if (ret) {
-+		clk = of_clk_get(np, 0);
-+		if (IS_ERR(clk))
-+			goto out_unmap;
++#define STM32F4_AHB3_RESET(bit)	(STM32F4_RCC_AHB3_##bit + (0x18 * 8))
 +
-+		ret = clk_prepare_enable(clk);
-+		if (ret)
-+			goto out_clk_put;
++/* APB1 */
++#define STM32F4_RCC_APB1_TIM2	0
++#define STM32F4_RCC_APB1_TIM3	1
++#define STM32F4_RCC_APB1_TIM4	2
++#define STM32F4_RCC_APB1_TIM5	3
++#define STM32F4_RCC_APB1_TIM6	4
++#define STM32F4_RCC_APB1_TIM7	5
++#define STM32F4_RCC_APB1_TIM12	6
++#define STM32F4_RCC_APB1_TIM13	7
++#define STM32F4_RCC_APB1_TIM14	8
++#define STM32F4_RCC_APB1_WWDG	11
++#define STM32F4_RCC_APB1_SPI2	14
++#define STM32F4_RCC_APB1_SPI3	15
++#define STM32F4_RCC_APB1_UART2	17
++#define STM32F4_RCC_APB1_UART3	18
++#define STM32F4_RCC_APB1_UART4	19
++#define STM32F4_RCC_APB1_UART5	20
++#define STM32F4_RCC_APB1_I2C1	21
++#define STM32F4_RCC_APB1_I2C2	22
++#define STM32F4_RCC_APB1_I2C3	23
++#define STM32F4_RCC_APB1_CAN1	25
++#define STM32F4_RCC_APB1_CAN2	26
++#define STM32F4_RCC_APB1_PWR	28
++#define STM32F4_RCC_APB1_DAC	29
++#define STM32F4_RCC_APB1_UART7	30
++#define STM32F4_RCC_APB1_UART8	31
 +
-+		rate = clk_get_rate(clk);
-+		if (!rate)
-+			goto out_clk_disable;
-+	}
++#define STM32F4_APB1_RESET(bit)	(STM32F4_RCC_APB1_##bit + (0x20 * 8))
 +
-+	writel_relaxed(SYSTICK_LOAD_RELOAD_MASK, base + SYST_RVR);
-+	writel_relaxed(SYST_CSR_ENABLE, base + SYST_CSR);
++/* APB2 */
++#define STM32F4_RCC_APB2_TIM1	0
++#define STM32F4_RCC_APB2_TIM8	1
++#define STM32F4_RCC_APB2_USART1	4
++#define STM32F4_RCC_APB2_USART6	5
++#define STM32F4_RCC_APB2_ADC	8
++#define STM32F4_RCC_APB2_SDIO	11
++#define STM32F4_RCC_APB2_SPI1	12
++#define STM32F4_RCC_APB2_SPI4	13
++#define STM32F4_RCC_APB2_SYSCFG	14
++#define STM32F4_RCC_APB2_TIM9	16
++#define STM32F4_RCC_APB2_TIM10	17
++#define STM32F4_RCC_APB2_TIM11	18
++#define STM32F4_RCC_APB2_SPI5	20
++#define STM32F4_RCC_APB2_SPI6	21
++#define STM32F4_RCC_APB2_SAI1	22
++#define STM32F4_RCC_APB2_LTDC	26
 +
-+	ret = clocksource_mmio_init(base + SYST_CVR, "arm_system_timer", rate,
-+			200, 24, clocksource_mmio_readl_down);
-+	if (ret) {
-+		pr_err("failed to init clocksource (%d)\n", ret);
-+		if (clk)
-+			goto out_clk_disable;
-+		else
-+			goto out_unmap;
-+	}
++#define STM32F4_APB2_RESET(bit)	(STM32F4_RCC_APB2_##bit + (0x24 * 8))
 +
-+	pr_info("ARM System timer initialized as clocksource\n");
-+
-+	return;
-+
-+out_clk_disable:
-+	clk_disable_unprepare(clk);
-+out_clk_put:
-+	clk_put(clk);
-+out_unmap:
-+	iounmap(base);
-+	pr_warn("ARM System timer register failed (%d)\n", ret);
-+}
-+
-+CLOCKSOURCE_OF_DECLARE(arm_systick, "arm,armv7m-systick",
-+			system_timer_of_register);
++#endif /* _DT_BINDINGS_MFD_STM32F4_RCC_H */
 -- 
 1.9.1
