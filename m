@@ -1,80 +1,101 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Sat,  9 May 2015 22:39:31 +0200
-Subject: [PATCH v6 01/12] irqdomain: Add non-hierarchy helper
- irq_domain_set_info
+Date: Sat,  9 May 2015 22:39:34 +0200
+Subject: [PATCH v6 04/12] irqchip: vf610-mscm: support NVIC parent
 In-Reply-To: <1431203982-13217-1-git-send-email-stefan@agner.ch>
 References: <1431203982-13217-1-git-send-email-stefan@agner.ch>
-Message-ID: <1431203982-13217-2-git-send-email-stefan@agner.ch>
+Message-ID: <1431203982-13217-5-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the helper irq_domain_set_info() in a non-domain hierarchy
-variant. This allows to use the helper for generic chip since not
-all chips using generic chip support domain hierarchy.
+Support the NVIC interrupt controller as node parent of the MSCM
+interrupt router. On the dual-core variants of Vybird (VF6xx), the
+NVIC interrupt controller is used by the Cortex-M4. To support
+running Linux on this core too, MSCM needs NVIC parent support too.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- include/linux/irqdomain.h |  8 ++++----
- kernel/irq/irqdomain.c    | 21 +++++++++++++++++++++
- 2 files changed, 25 insertions(+), 4 deletions(-)
+ drivers/irqchip/irq-vf610-mscm-ir.c | 32 ++++++++++++++++++++++++++------
+ 1 file changed, 26 insertions(+), 6 deletions(-)
 
-diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-index 676d730..744ac0e 100644
---- a/include/linux/irqdomain.h
-+++ b/include/linux/irqdomain.h
-@@ -258,6 +258,10 @@ int irq_domain_xlate_onetwocell(struct irq_domain *d, struct device_node *ctrlr,
- /* V2 interfaces to support hierarchy IRQ domains. */
- extern struct irq_data *irq_domain_get_irq_data(struct irq_domain *domain,
- 						unsigned int virq);
-+extern void irq_domain_set_info(struct irq_domain *domain, unsigned int virq,
-+				irq_hw_number_t hwirq, struct irq_chip *chip,
-+				void *chip_data, irq_flow_handler_t handler,
-+				void *handler_data, const char *handler_name);
- #ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
- extern struct irq_domain *irq_domain_add_hierarchy(struct irq_domain *parent,
- 			unsigned int flags, unsigned int size,
-@@ -281,10 +285,6 @@ extern int irq_domain_set_hwirq_and_chip(struct irq_domain *domain,
- 					 irq_hw_number_t hwirq,
- 					 struct irq_chip *chip,
- 					 void *chip_data);
--extern void irq_domain_set_info(struct irq_domain *domain, unsigned int virq,
--				irq_hw_number_t hwirq, struct irq_chip *chip,
--				void *chip_data, irq_flow_handler_t handler,
--				void *handler_data, const char *handler_name);
- extern void irq_domain_reset_irq_data(struct irq_data *irq_data);
- extern void irq_domain_free_irqs_common(struct irq_domain *domain,
- 					unsigned int virq,
-diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index 7fac311..41bf6dc 100644
---- a/kernel/irq/irqdomain.c
-+++ b/kernel/irq/irqdomain.c
-@@ -1232,6 +1232,27 @@ struct irq_data *irq_domain_get_irq_data(struct irq_domain *domain,
- 	return (irq_data && irq_data->domain == domain) ? irq_data : NULL;
+diff --git a/drivers/irqchip/irq-vf610-mscm-ir.c b/drivers/irqchip/irq-vf610-mscm-ir.c
+index 9521057..40b7d8d 100644
+--- a/drivers/irqchip/irq-vf610-mscm-ir.c
++++ b/drivers/irqchip/irq-vf610-mscm-ir.c
+@@ -47,6 +47,7 @@ struct vf610_mscm_ir_chip_data {
+ 	void __iomem *mscm_ir_base;
+ 	u16 cpu_mask;
+ 	u16 saved_irsprc[MSCM_IRSPRC_NUM];
++	bool is_nvic;
+ };
+ 
+ static struct vf610_mscm_ir_chip_data *mscm_ir_data;
+@@ -91,6 +92,7 @@ static void vf610_mscm_ir_enable(struct irq_data *data)
+ {
+ 	irq_hw_number_t hwirq = data->hwirq;
+ 	struct vf610_mscm_ir_chip_data *chip_data = data->chip_data;
++	struct irq_data *parent = data->parent_data;
+ 	u16 irsprc;
+ 
+ 	irsprc = readw_relaxed(chip_data->mscm_ir_base + MSCM_IRSPRC(hwirq));
+@@ -101,17 +103,25 @@ static void vf610_mscm_ir_enable(struct irq_data *data)
+ 	writew_relaxed(chip_data->cpu_mask,
+ 		       chip_data->mscm_ir_base + MSCM_IRSPRC(hwirq));
+ 
+-	irq_chip_unmask_parent(data);
++	if (parent->chip->irq_enable)
++		parent->chip->irq_enable(parent);
++	else
++		parent->chip->irq_unmask(parent);
++
  }
  
-+/**
-+ * irq_domain_set_info - Set the complete data for a @virq in @domain
-+ * @domain:		Interrupt domain to match
-+ * @virq:		IRQ number
-+ * @hwirq:		The hardware interrupt number
-+ * @chip:		The associated interrupt chip
-+ * @chip_data:		The associated interrupt chip data
-+ * @handler:		The interrupt flow handler
-+ * @handler_data:	The interrupt flow handler data
-+ * @handler_name:	The interrupt handler name
-+ */
-+void irq_domain_set_info(struct irq_domain *domain, unsigned int virq,
-+			 irq_hw_number_t hwirq, struct irq_chip *chip,
-+			 void *chip_data, irq_flow_handler_t handler,
-+			 void *handler_data, const char *handler_name)
-+{
-+	irq_set_chip_and_handler_name(virq, chip, handler, handler_name);
-+	irq_set_chip_data(virq, chip_data);
-+	irq_set_handler_data(virq, handler_data);
-+}
-+
- static void irq_domain_check_hierarchy(struct irq_domain *domain)
+ static void vf610_mscm_ir_disable(struct irq_data *data)
  {
+ 	irq_hw_number_t hwirq = data->hwirq;
+ 	struct vf610_mscm_ir_chip_data *chip_data = data->chip_data;
++	struct irq_data *parent = data->parent_data;
+ 
+ 	writew_relaxed(0x0, chip_data->mscm_ir_base + MSCM_IRSPRC(hwirq));
+ 
+-	irq_chip_mask_parent(data);
++	if (parent->chip->irq_disable)
++		parent->chip->irq_disable(parent);
++	else
++		parent->chip->irq_mask(parent);
  }
+ 
+ static struct irq_chip vf610_mscm_ir_irq_chip = {
+@@ -143,10 +153,17 @@ static int vf610_mscm_ir_domain_alloc(struct irq_domain *domain, unsigned int vi
+ 					      domain->host_data);
+ 
+ 	gic_data.np = domain->parent->of_node;
+-	gic_data.args_count = 3;
+-	gic_data.args[0] = GIC_SPI;
+-	gic_data.args[1] = irq_data->args[0];
+-	gic_data.args[2] = irq_data->args[1];
++
++	if (mscm_ir_data->is_nvic) {
++		gic_data.args_count = 1;
++		gic_data.args[0] = irq_data->args[0];
++	} else {
++		gic_data.args_count = 3;
++		gic_data.args[0] = GIC_SPI;
++		gic_data.args[1] = irq_data->args[0];
++		gic_data.args[2] = irq_data->args[1];
++	}
++
+ 	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, &gic_data);
+ }
+ 
+@@ -199,6 +216,9 @@ static int __init vf610_mscm_ir_of_init(struct device_node *node,
+ 		goto out_unmap;
+ 	}
+ 
++	if (of_device_is_compatible(domain->parent->of_node, "arm,armv7m-nvic"))
++		mscm_ir_data->is_nvic = true;
++
+ 	cpu_pm_register_notifier(&mscm_ir_notifier_block);
+ 
+ 	return 0;
 -- 
 2.4.0
