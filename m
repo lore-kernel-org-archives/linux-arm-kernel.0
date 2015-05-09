@@ -1,127 +1,198 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Sat,  9 May 2015 22:39:30 +0200
-Subject: [PATCH v6 00/12] ARM: vf610m4: Add Vybrid Cortex-M4 support
-Message-ID: <1431203982-13217-1-git-send-email-stefan@agner.ch>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 09 May 2015 22:39:40 +0200
+Subject: [GIT PULL] arm-soc fixes for 4.1-rc2
+Message-ID: <2405006.PalEckFCK2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It took me a bit longer than expected to come up with the 6th
-revision of the patchset. Support for irq domain hierarchy
-for generic chip turned out to be not as easy as thought, the
-changes lead to build errors when building without domain
-hierarchy, sorry about that Jason.
+The following changes since commit 5ebe6afaf0057ac3eaeb98defd5456894b446d22:
 
-However, in this patchset I propose adding the helper function
-irq_domain_set_info even when there is no irq domain hierarchy
-support. People familiar with that code (Jason, Marc), could
-you have a look at that and tell me whether that is acceptable?
-I also thought about other ways, e.g. create a second map
-functions in generic chip which support domain hierarchy only.
-But this new helper looks like the most straight forward way
-to me...
+  Linux 4.1-rc2 (2015-05-03 19:22:23 -0700)
 
-Otherwise, I stripped down the To list as suggested by Arnd.
-Shawn, when the IRQ stuff is ok, could you pick that patchset
-up as Arnd suggested? I guess the IRQ stuff still should go
-through Jason's tree directly (Patch 1-4)?
+are available in the git repository at:
 
-The patchset has proven to be working on the Cortex-M4 of the
-Vybrid SoC using a Colibri VF61 module. Also compiled with
-allmodconfig and without IRQ domain support, which worked fine
-this time.
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
 
-Note: This patchset has dependencies on "ARM: ARMv7-M: Enlarge
-vector table up to 256 entries" (Maxime Coquelin), which is in
-Russels patch system marked as applied (8340/1).
+for you to fetch changes up to c9d862c48c48883a4327ae82f4a6de1eef928d60:
 
-Changes since v5:
-- Remove unnecessary empty lines in Kconfig
-- Add non-hierarchy helper irq_domain_set_info
-- Rebased on v4.1-rc1
+  MAINTAINERS: add Conexant Digicolor machines entry (2015-05-08 19:00:53 +0200)
 
-Changes since v4:
-- Added ARM_SINGLE_ARMV7M as top-level config symbol for ARMv7-M
-  architectures
-- Cleaned up unnecessary selects within SOC_VF610
-- Added linux,stdout-path to device tree
+----------------------------------------------------------------
+ARM: SoC fixes for 4.1-rc2
 
-Changes since v3:
-- Added dependency IRQ_DOMAIN_HIERARCHY for ARM_NVIC
-- Fix MSCM IR disable function check
-- Remove "ARM: imx: depend MXC debug board on 3DS machines",
-  the patch has been merged
+A few patches have come up since the merge window. The largest one is a
+rewrite of the PXA lubbock/mainstone IRQ handling. This was already
+broken in 2011 by a change to the GPIO code and only noticed now.
 
-Changes since v2:
-- Update MSCM patches to merged version of MSCM interrupt router
-- Use the GPLv2/X11 dual license in the new device tree files
-- Drop SD controller in device tree (initramfs works now and is
-  probably more appropriate for most cases)
-- Disable GPIO nodes since the A5 is using them
-- Drop CONFIG_ prefixes in Kconfig changes for MXC_DEBUG_BOARD
-- Drop vector table resizing in favor of Maxime Coquelin's patch
-  (https://lkml.org/lkml/2015/2/20/399)
-- Remove !MMU dependency for ARCH_EFM32 since its part of
-  ARCH_MULTI_V7M
-- Rebased on v4.0-rc1
+The other changes contained here are:
 
-Changes since v1:
-- Remove MSCM driver
-- Support irq domain hierarchy with NVIC irq controller
-- Extend MSCM interrupt router with NVIC as parent in the irq
-  domain hierarchy 
-- Rebased on v3.19-rc1 with MSCM driver
-- NVIC: Register only the amount of IRQ's which vectors are
-  available for
+MAINTAINERS file updates:
+- Ray Jui and Scott Branden are now co-maintainers for some of the
+  mach-bcm chips, while Christian Daudt and Marc Carino have stepped
+  down.
+- Andrew Victor is no longer maintaining at91. Instead, Alexandre
+  Belloni now becomes an official maintainer, after having done a
+  bulk of the work for a while.
+- Baruch Siach, who added the mach-digicolor platform in 4.1
+  is now listed as maintainer
+- The git URL for mach-socfpga has changed
 
-Changes since RFC:
-- Unified addruart calls for MMU/!MMU
-- Add MSCM support along with routable IRQ support in NVIC
-- Rebased on Shawns for-next tree which made some changes
-  obsolete (mainly the Vybrid SoC device tree files in for-next
-  are already prepared for Cortex-M4 support)
-- Removed SRC_GPR3 hack, this is now part of a mini boot-loader:
-  https://github.com/falstaff84/vf610m4bootldr
+Bug fixes:
+- Three bug fixes for new rockchip rk3288 code
+- A regression fix to make SD card support work on certain ux500
+  boards
+- multiple smaller dts fixes for imx, omap, mvebu, and shmobile
+- a regression ?ix for omap3 power consumption
+- a fix for regression in the ARM CCI bus driver
 
-Stefan Agner (12):
-  irqdomain: Add non-hierarchy helper irq_domain_set_info
-  genirq: generic chip: support hierarchy domain
-  irqchip: nvic: support hierarchy irq domain
-  irqchip: vf610-mscm: support NVIC parent
-  ARM: ARMv7M: define size of vector table for Vybrid
-  clocksource: add dependencies for Vybrid pit clocksource
-  ARM: unify MMU/!MMU addruart calls
-  ARM: introduce ARM_SINGLE_ARMV7M for ARMv7-M platforms
-  ARM: efm32: use ARM_SINGLE_ARMV7M
-  ARM: vf610: enable Cortex-M4 configuration on Vybrid SoC
-  ARM: dts: add support for Vybrid running on Cortex-M4
-  ARM: vf610m4: add defconfig for Linux on Vybrids Cortex-M4
+Configuration changes:
+- more imx platforms are now enabled in multi_v7_defconfig
 
- Documentation/devicetree/bindings/arm/fsl.txt |  3 +
- arch/arm/Kconfig                              | 41 ++++++-----
- arch/arm/Kconfig.debug                        |  2 +-
- arch/arm/boot/dts/Makefile                    |  1 +
- arch/arm/boot/dts/vf610m4-colibri.dts         | 99 +++++++++++++++++++++++++++
- arch/arm/boot/dts/vf610m4.dtsi                | 50 ++++++++++++++
- arch/arm/configs/efm32_defconfig              |  1 +
- arch/arm/configs/vf610m4_defconfig            | 42 ++++++++++++
- arch/arm/include/debug/efm32.S                |  2 +-
- arch/arm/kernel/debug.S                       |  2 +-
- arch/arm/mach-imx/Kconfig                     | 38 +++++-----
- arch/arm/mach-imx/Makefile.boot               |  0
- arch/arm/mach-imx/mach-vf610.c                |  1 +
- arch/arm/mm/Kconfig                           |  1 +
- drivers/clocksource/Kconfig                   |  2 +
- drivers/irqchip/Kconfig                       |  1 +
- drivers/irqchip/irq-nvic.c                    | 28 +++++++-
- drivers/irqchip/irq-vf610-mscm-ir.c           | 32 +++++++--
- include/linux/irqdomain.h                     |  8 +--
- kernel/irq/generic-chip.c                     |  5 +-
- kernel/irq/irqdomain.c                        | 21 ++++++
- 21 files changed, 328 insertions(+), 52 deletions(-)
- create mode 100644 arch/arm/boot/dts/vf610m4-colibri.dts
- create mode 100644 arch/arm/boot/dts/vf610m4.dtsi
- create mode 100644 arch/arm/configs/vf610m4_defconfig
- create mode 100644 arch/arm/mach-imx/Makefile.boot
+----------------------------------------------------------------
+Arnd Bergmann (8):
+      Merge tag 'v4.1-rockchip-socfixes1' of git://git.kernel.org/.../mmind/linux-rockchip into fixes
+      Merge tag 'imx-fixes-4.1' of git://git.kernel.org/.../shawnguo/linux into fixes
+      Merge tag 'fixes-for-v4.1-rc2' of https://github.com/rjarzmik/linux into fixes
+      Merge tag 'mvebu-fixes-4.1' of git://git.infradead.org/linux-mvebu into fixes
+      Merge tag 'arm-soc/for-4.1/maintainers' of http://github.com/broadcom/stblinux into fixes
+      Merge tag 'omap-for-v4.1/fixes-rc1' of git://git.kernel.org/.../tmlind/linux-omap into fixes
+      Merge tag 'renesas-fixes-for-v4.1' of git://git.kernel.org/.../horms/renesas into fixes
+      Merge tag 'stericsson-fixes-v4.1' of git://git.kernel.org/.../linusw/linux-stericsson into fixes
 
--- 
-2.4.0
+Baruch Siach (1):
+      MAINTAINERS: add Conexant Digicolor machines entry
+
+Chris Zhong (2):
+      ARM: rockchip: disable dapswjdp during suspend
+      ARM: rockchip: fix undefined instruction of reset_ctrl_regs
+
+Dinh Nguyen (1):
+      MAINTAINERS: socfpga: update the git repo for SoCFPGA
+
+Fabio Estevam (2):
+      ARM: dts: imx23-olinuxino: Fix polarity of LED GPIO
+      ARM: multi_v7_defconfig: Select more FSL SoCs
+
+Felipe Balbi (2):
+      ARM: dts: am437x-sk: fix for new newhaven display module revision
+      ARM: dts: am437x-sk: reduce col-scan-delay-us
+
+Florian Fainelli (3):
+      MAINTAINERS: Update mach-bcm maintainers list
+      MAINTAINERS: Remove Christian Daudt for mach-bcm
+      MAINTAINERS: Update brcmstb entry
+
+Gregory CLEMENT (1):
+      ARM: mvebu: armada-xp-openblocks-ax3-4: Disable internal RTC
+
+Grygorii Strashko (1):
+      ARM: dts: am57xx-beagle-x15: Fix IRQ type for mcp7941x
+
+Heiko Stuebner (1):
+      rockchip: make sure timer7 is enabled on rk3288 platforms
+
+Illia Smyrnov (1):
+      bus: omap_l3_noc: Fix offset for DRA7 CLK1_HOST_CLK1_2 instance
+
+Laurent Pinchart (1):
+      ARM: shmobile: koelsch: Fix adv7511 IRQ sensing
+
+Marek Vasut (1):
+      ARM: dts: imx28: Fix AUART4 TX-DMA interrupt name
+
+Mark Salter (1):
+      drivers: CCI: fix used_mask init in validate_group()
+
+Markus Pargmann (1):
+      ARM: dts: imx25: Add #pwm-cells to pwm4
+
+Nicolas Ferre (1):
+      MAINTAINERS: replace an AT91 maintainer
+
+Nishanth Menon (4):
+      ARM: dts: am57xx-beagle-x15: Fix RTC aliases
+      ARM: dts: am57xx-beagle-x15: Switch UART mux pins
+      ARM: dts: am57xx-beagle-x15: Switch GPIO fan number
+      ARM: dts: dra7: Fix efuse register size for ABB
+
+Pavel Machek (1):
+      ARM: dts: OMAP3-N900: Add microphone bias voltages
+
+Philipp Zabel (1):
+      ARM: dts: imx6: phyFLEX: USB VBUS control is active-high
+
+Robert Jarzmik (3):
+      ARM: pxa: pxa_cplds: add lubbock and mainstone IO
+      ARM: pxa: mainstone: use new pxa_cplds driver
+      ARM: pxa: lubbock: use new pxa_cplds driver
+
+Roger Quadros (1):
+      ARM: omap2plus_defconfig: Enable EXTCON_USB_GPIO
+
+Sebastian Reichel (1):
+      ARM: dts: omap3: Add #iommu-cells to isp and iva iommu
+
+Shawn Guo (1):
+      ARM: dts: imx6qdl-sabreauto: remove pinctrl-assert-gpios
+
+Stefan Wahren (1):
+      ARM: dts: imx23-olinuxino: Fix dr_mode of usb0
+
+Suman Anna (1):
+      bus: omap_l3_noc: Fix master id address decoding for OMAP5
+
+Tony Lindgren (1):
+      ARM: OMAP2+: Fix omap off idle power consumption creeping up
+
+Ulf Hansson (3):
+      ARM: ux500: Move GPIO regulator for SD-card into board DTSs
+      ARM: ux500: Enable GPIO regulator for SD-card for HREF boards
+      ARM: ux500: Enable GPIO regulator for SD-card for snowball
+
+Wolfram Sang (1):
+      ARM: mach-imx: devices: platform-sdhci-esdhc-imx: fix broken email address
+
+ CREDITS                                            |   7 +
+ .../devicetree/bindings/arm/omap/l3-noc.txt        |   1 +
+ .../devicetree/bindings/dma/fsl-mxs-dma.txt        |   2 +-
+ MAINTAINERS                                        |  18 +-
+ arch/arm/boot/dts/am437x-sk-evm.dts                |   4 +-
+ arch/arm/boot/dts/am57xx-beagle-x15.dts            |  11 +-
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts   |   4 +
+ arch/arm/boot/dts/dra7.dtsi                        |  10 +-
+ arch/arm/boot/dts/imx23-olinuxino.dts              |   4 +-
+ arch/arm/boot/dts/imx25.dtsi                       |   1 +
+ arch/arm/boot/dts/imx28.dtsi                       |   2 +-
+ arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi       |   2 +
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi           |   1 -
+ arch/arm/boot/dts/omap3-n900.dts                   |   4 +
+ arch/arm/boot/dts/omap3.dtsi                       |   2 +
+ arch/arm/boot/dts/omap5.dtsi                       |   2 +-
+ arch/arm/boot/dts/r8a7791-koelsch.dts              |   2 +-
+ arch/arm/boot/dts/ste-dbx5x0.dtsi                  |  17 --
+ arch/arm/boot/dts/ste-href.dtsi                    |  15 ++
+ arch/arm/boot/dts/ste-snowball.dts                 |  13 ++
+ arch/arm/configs/multi_v7_defconfig                |   3 +
+ arch/arm/configs/omap2plus_defconfig               |   2 +-
+ .../mach-imx/devices/platform-sdhci-esdhc-imx.c    |   2 +-
+ arch/arm/mach-omap2/prm-regbits-34xx.h             |   1 +
+ arch/arm/mach-omap2/prm-regbits-44xx.h             |   1 +
+ arch/arm/mach-omap2/vc.c                           |  12 +-
+ arch/arm/mach-omap2/vc.h                           |   2 +
+ arch/arm/mach-omap2/vc3xxx_data.c                  |   1 +
+ arch/arm/mach-omap2/vc44xx_data.c                  |   1 +
+ arch/arm/mach-pxa/Kconfig                          |   9 +
+ arch/arm/mach-pxa/Makefile                         |   1 +
+ arch/arm/mach-pxa/include/mach/lubbock.h           |   7 +-
+ arch/arm/mach-pxa/include/mach/mainstone.h         |   6 +-
+ arch/arm/mach-pxa/lubbock.c                        | 108 +++--------
+ arch/arm/mach-pxa/mainstone.c                      | 115 +++---------
+ arch/arm/mach-pxa/pxa_cplds_irqs.c                 | 200 +++++++++++++++++++++
+ arch/arm/mach-rockchip/pm.c                        |  33 ++++
+ arch/arm/mach-rockchip/pm.h                        |   8 +
+ arch/arm/mach-rockchip/rockchip.c                  |  19 ++
+ drivers/bus/arm-cci.c                              |   2 +-
+ drivers/bus/omap_l3_noc.c                          |   5 +-
+ drivers/bus/omap_l3_noc.h                          |  54 ++++--
+ 42 files changed, 480 insertions(+), 234 deletions(-)
+ create mode 100644 arch/arm/mach-pxa/pxa_cplds_irqs.c
