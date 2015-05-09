@@ -1,63 +1,49 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 09 May 2015 11:26:27 +0100
-Subject: [PATCH 07/13] drm: bridge/dw_hdmi: introduce interface to setting
- sample rate
+Date: Sat, 09 May 2015 11:26:37 +0100
+Subject: [PATCH 09/13] drm/edid: add function to help find SADs
 In-Reply-To: <20150509102501.GO2067@n2100.arm.linux.org.uk>
 References: <20150509102501.GO2067@n2100.arm.linux.org.uk>
-Message-ID: <E1Yr1xj-0006kw-4K@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Yr1xt-0006l4-D0@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce dw_hdmi_set_sample_rate(), which allows us to configure the
-audio sample rate, setting the CTS/N values appropriately.
+Add a function to find the start of the SADs in the ELD.  This
+complements the helper to retrieve the SAD count.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/gpu/drm/bridge/dw_hdmi.c | 10 ++++++++++
- include/drm/bridge/dw_hdmi.h     |  5 +++++
- 2 files changed, 15 insertions(+)
+ include/drm/drm_edid.h | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
-index 75728ba552d0..0369fab5c695 100644
---- a/drivers/gpu/drm/bridge/dw_hdmi.c
-+++ b/drivers/gpu/drm/bridge/dw_hdmi.c
-@@ -366,6 +366,16 @@ static void hdmi_clk_regenerator_update_pixel_clock(struct dw_hdmi *hdmi)
- 	mutex_unlock(&hdmi->audio_mutex);
+diff --git a/include/drm/drm_edid.h b/include/drm/drm_edid.h
+index 799050198323..53c53c459b15 100644
+--- a/include/drm/drm_edid.h
++++ b/include/drm/drm_edid.h
+@@ -348,6 +348,25 @@ static inline int drm_eld_mnl(const uint8_t *eld)
  }
  
-+void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate)
+ /**
++ * drm_eld_sad - Get ELD SAD structures.
++ * @eld: pointer to an eld memory structure with sad_count set
++ */
++static inline const uint8_t *drm_eld_sad(const uint8_t *eld)
 +{
-+	mutex_lock(&hdmi->audio_mutex);
-+	hdmi->sample_rate = rate;
-+	hdmi_set_clk_regenerator(hdmi, hdmi->hdmi_data.video_mode.mpixelclock,
-+				 hdmi->sample_rate, hdmi->ratio);
-+	mutex_unlock(&hdmi->audio_mutex);
++	unsigned int ver, mnl;
++
++	ver = (eld[DRM_ELD_VER] & DRM_ELD_VER_MASK) >> DRM_ELD_VER_SHIFT;
++	if (ver != 2 && ver != 31)
++		return NULL;
++
++	mnl = drm_eld_mnl(eld);
++	if (mnl > 16)
++		return NULL;
++
++	return eld + DRM_ELD_CEA_SAD(mnl, 0);
 +}
-+EXPORT_SYMBOL_GPL(dw_hdmi_set_sample_rate);
 +
- /*
-  * this submodule is responsible for the video data synchronization.
-  * for example, for RGB 4:4:4 input, the data map is defined as
-diff --git a/include/drm/bridge/dw_hdmi.h b/include/drm/bridge/dw_hdmi.h
-index de13bfc35634..763af51e1d60 100644
---- a/include/drm/bridge/dw_hdmi.h
-+++ b/include/drm/bridge/dw_hdmi.h
-@@ -12,6 +12,8 @@
- 
- #include <drm/drmP.h>
- 
-+struct dw_hdmi;
-+
- enum {
- 	DW_HDMI_RES_8,
- 	DW_HDMI_RES_10,
-@@ -59,4 +61,7 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
- 		 void *data, struct drm_encoder *encoder,
- 		 struct resource *iores, int irq,
- 		 const struct dw_hdmi_plat_data *plat_data);
-+
-+void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate);
-+
- #endif /* __IMX_HDMI_H__ */
++/**
+  * drm_eld_sad_count - Get ELD SAD count.
+  * @eld: pointer to an eld memory structure with sad_count set
+  */
 -- 
 1.8.3.1
