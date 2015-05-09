@@ -1,64 +1,80 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Sat, 9 May 2015 17:14:23 +0530
-Subject: [PATCH v5 0/8] dmaengine/dra7x: DMA router (crossbar support)
-In-Reply-To: <1428572154-3548-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1428572154-3548-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20150509114423.GK3521@localhost>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 9 May 2015 13:44:28 +0200
+Subject: [PATCH 5/6] ARM: dts: sunxi: Add Allwinner H3 DTSI
+In-Reply-To: <554A7DE5.6040406@gmail.com>
+References: <1430904693-1404-1-git-send-email-jenskuske@gmail.com>
+ <1430904693-1404-6-git-send-email-jenskuske@gmail.com>
+ <20150506121941.GD11057@lukather> <554A7DE5.6040406@gmail.com>
+Message-ID: <20150509114428.GV11057@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 09, 2015 at 12:35:46PM +0300, Peter Ujfalusi wrote:
-> Vinod: is it OK if I send the Documnetation/dmanegine/ update a bit later when
-> I have finished it?
+On Wed, May 06, 2015 at 10:47:33PM +0200, Jens Kuske wrote:
+> >> + *     You should have received a copy of the GNU General Public
+> >> + *     License along with this file; if not, write to the Free
+> >> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+> >> + *     MA 02110-1301 USA
+> > 
+> > Could you remove that last paragraph?
+> > It generates a checkpatch warning.
 > 
-> Changes since v4:
-> - Comments from Maxime Ripard addressed:
->  - long line fixed in of-dma.c
->  - node leaks has been fixed in ti-dma-crossbar
->  - Using devm_ioremap_resource() in ti-dma-crossbar
->  - u16 casting has been addressed
-> - Router drivers are expected to return with ERR_PTR in case their
->   of_dma_route_allocate() callback fails.
-> 
-> Changes since v3:
-> - Comments from Russell:
->  - Warnings removed in case of non DT boot when taking the DMA request number
->  - Reduced the number of channels presented to DMAengine
->  - removed the dma_sig parameter from omap_dma_chan_init()
-> - Comments from Arnd:
->  - dma-device property renamed to dma-masters
->  - Allow list of phandes in dma-masters
-> 
-> Changes since v2:
-> - not using regmap for the TI crossbar driver.
-> 
-> Changes since v1:
-> - Comments from Russell King and  Paul Bolle addressed:
->  - Use the added defined in the omap-dma changes
->  - MODULE_* removed from the ti-dma-crossbar driver.
-> - DMA router documentation: do not limit the #dma-cells to be the same as the
->   dma controller's #dma-cells. It might be possible to have a router which needs
->   more information than the DMA controller (direct request pairing for example)
-> - Use defines in the ti-dma-crossbar driver
-> - Binding document for the ti-dma-crossbar driver
-> 
-> Intro mail from v1:
-> 
-> The series adds support for DMA router type of devices. They are used in SoCs
-> which has more peripherals with DMA request lines than the DMA controller can
-> handle.
-> The router itself is not part of the DMA controller and it's operation should be
-> transparent (as it is in the HW) for the SW stack.
-> 
-> This series takes into accound the comments Sricharan received for his version
-> of the crossbar driver:
-> https://lkml.org/lkml/2014/3/7/199
-> 
-> This implementation is not tied to any DMA driver so it is possible to use the
-> framework by other vendors, also ACPI version of binding can be easy enough to
-> be added.
-I have applied all but last change to topic/omap
+> Sure, will be removed. Just copied it from some other sunxi dtsi.
 
-Thanks
+Yeah, I know, I'm even the one that introduced this in the first place
+:)
+
+I sent a patch earlier this week to remove it from the other DT.
+
+> >> +		ahb12_rst: reset at 01c202c0 {
+> >> +			#reset-cells = <1>;
+> >> +			compatible = "allwinner,sun6i-a31-clock-reset";
+> >> +			reg = <0x01c202c0 0xc>;
+> >> +		};
+> > 
+> > This reset controller also resets the timers, it should be initialised
+> > much earlier.
+> > 
+> > What about having an allwinner,sun8i-h3-bus-reset, and adding it to
+> > the list of compatibles to initialise earlier in
+> > drivers/reset/reset-sunxi.c?
+> > 
+> > Of course, it would cover the other reset controllers that you have
+> > below.
+> > 
+> 
+> You mean using a single bus_rst instead of the three?
+
+Yes.
+
+> Or, why not using allwinner,sun6i-a31-ahb1-reset for ahb12_rst
+
+Strictly speaking, they do not control the same set of devices. I'd
+prefer to have a different compatible in case we need to setup a
+particular behaviour on a given SoC (for example, force out of reset a
+particular device, even if no driver is actually using it), without
+impacting the other.
+
+> and adding a .init_time = sun6i_timer_init to the sun8i machine.
+
+But we will need to do that yes.
+
+> I'm a bit confused here now, because for A23, which is almost
+> identical, it got removed after your comment:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/265064.html
+
+Hmmmm, I think I somehow overlooked the fact that the timer was there,
+even though Chen-Yu said it. My bad :/
+
+Maxime
+
 -- 
-~Vinod
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150509/9181af3e/attachment.sig>
