@@ -1,31 +1,80 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Sat,  9 May 2015 22:39:35 +0200
-Subject: [PATCH v6 05/12] ARM: ARMv7M: define size of vector table for Vybrid
+Date: Sat,  9 May 2015 22:39:39 +0200
+Subject: [PATCH v6 09/12] ARM: efm32: use ARM_SINGLE_ARMV7M
 In-Reply-To: <1431203982-13217-1-git-send-email-stefan@agner.ch>
 References: <1431203982-13217-1-git-send-email-stefan@agner.ch>
-Message-ID: <1431203982-13217-6-git-send-email-stefan@agner.ch>
+Message-ID: <1431203982-13217-10-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vybrids has 112 peripherial interrupts which can be routed to the
-Cortex-M4's NVIC interrupt controller.
+Use the new config symbol ARM_SINGLE_ARMV7M which groups config
+symbols used by modern ARMv7-M platforms. It also support multiple
+ARMv7-M platforms in one kernel image. However, this only works if
+the combined platforms share the same (main) memory layout.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/mm/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/Kconfig                 | 28 ++++++++++------------------
+ arch/arm/configs/efm32_defconfig |  1 +
+ 2 files changed, 11 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 3937af0..527ea03 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -609,6 +609,7 @@ config CPUV7M_NUM_IRQ
- 	depends on CPU_V7M
- 	default 90 if ARCH_STM32
- 	default 38 if ARCH_EFM32
-+	default 112 if SOC_VF610
- 	default 240
- 	help
- 	  This option indicates the number of interrupts connected to the NVIC.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 2361efc..d1c035d 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -411,24 +411,6 @@ config ARCH_EBSA110
+ 	  Ethernet interface, two PCMCIA sockets, two serial ports and a
+ 	  parallel port.
+ 
+-config ARCH_EFM32
+-	bool "Energy Micro efm32"
+-	depends on !MMU
+-	select ARCH_REQUIRE_GPIOLIB
+-	select ARM_NVIC
+-	select AUTO_ZRELADDR
+-	select CLKSRC_OF
+-	select COMMON_CLK
+-	select CPU_V7M
+-	select GENERIC_CLOCKEVENTS
+-	select NO_DMA
+-	select NO_IOPORT_MAP
+-	select SPARSE_IRQ
+-	select USE_OF
+-	help
+-	  Support for Energy Micro's (now Silicon Labs) efm32 Giant Gecko
+-	  processors.
+-
+ config ARCH_EP93XX
+ 	bool "EP93xx-based"
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+@@ -963,6 +945,16 @@ source "arch/arm/mach-w90x900/Kconfig"
+ 
+ source "arch/arm/mach-zynq/Kconfig"
+ 
++# ARMv7-M architecture
++config ARCH_EFM32
++	bool "Energy Micro efm32"
++	depends on ARM_SINGLE_ARMV7M
++	select ARCH_REQUIRE_GPIOLIB
++	select AUTO_ZRELADDR
++	help
++	  Support for Energy Micro's (now Silicon Labs) efm32 Giant Gecko
++	  processors.
++
+ # Definitions to make life easier
+ config ARCH_ACORN
+ 	bool
+diff --git a/arch/arm/configs/efm32_defconfig b/arch/arm/configs/efm32_defconfig
+index c4c17e3..e969f78 100644
+--- a/arch/arm/configs/efm32_defconfig
++++ b/arch/arm/configs/efm32_defconfig
+@@ -16,6 +16,7 @@ CONFIG_EMBEDDED=y
+ # CONFIG_IOSCHED_DEADLINE is not set
+ # CONFIG_IOSCHED_CFQ is not set
+ # CONFIG_MMU is not set
++CONFIG_ARM_SINGLE_ARMV7M=y
+ CONFIG_ARCH_EFM32=y
+ CONFIG_SET_MEM_PARAM=y
+ CONFIG_DRAM_BASE=0x88000000
 -- 
 2.4.0
