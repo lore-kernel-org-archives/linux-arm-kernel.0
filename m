@@ -1,168 +1,47 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 09 May 2015 11:26:42 +0100
-Subject: [PATCH 10/13] sound/core: add DRM ELD helper
-In-Reply-To: <20150509102501.GO2067@n2100.arm.linux.org.uk>
-References: <20150509102501.GO2067@n2100.arm.linux.org.uk>
-Message-ID: <E1Yr1xy-0006l8-Ft@rmk-PC.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 9 May 2015 13:29:36 +0200
+Subject: [PATCH 2/6] clk: sunxi: Add H3 clocks support
+In-Reply-To: <5549EA63.5060602@gmail.com>
+References: <1430904693-1404-1-git-send-email-jenskuske@gmail.com>
+ <1430904693-1404-3-git-send-email-jenskuske@gmail.com>
+ <CAGb2v67dHFTttPhddOo+a2Rh0jaCxHqRw=Eo3jkNnFGCOfawRQ@mail.gmail.com>
+ <5549EA63.5060602@gmail.com>
+Message-ID: <20150509112936.GU11057@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a helper for the EDID like data structure, which is typically passed
-from a HDMI adapter to its associated audio driver.  This informs the
-audio driver of the capabilities of the attached HDMI sink.
+On Wed, May 06, 2015 at 12:18:11PM +0200, Jens Kuske wrote:
+> >>  /**
+> >>   * sunxi_divs_clk_setup() - Setup function for leaf divisors on clocks
+> >>   *
+> >> @@ -1252,6 +1288,7 @@ static const struct of_device_id clk_factors_match[] __initconst = {
+> >>         {.compatible = "allwinner,sun5i-a13-ahb-clk", .data = &sun5i_a13_ahb_data,},
+> >>         {.compatible = "allwinner,sun4i-a10-apb1-clk", .data = &sun4i_apb1_data,},
+> >>         {.compatible = "allwinner,sun7i-a20-out-clk", .data = &sun7i_a20_out_data,},
+> >> +       {.compatible = "allwinner,sun8i-h3-pll8-clk", .data = &sun8i_h3_pll8_data,},
+> > 
+> > Matching comment above, no need to add a new compatible for something that's
+> > the same.
+> 
+> PLL8 doesn't have a x2 output according to User Manual, but I did it
+> wrong anyway, see first comment.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- include/sound/pcm_drm_eld.h |  6 +++
- sound/core/Kconfig          |  3 ++
- sound/core/Makefile         |  1 +
- sound/core/pcm_drm_eld.c    | 99 +++++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 109 insertions(+)
- create mode 100644 include/sound/pcm_drm_eld.h
- create mode 100644 sound/core/pcm_drm_eld.c
+Don't worry too much about that output.
 
-diff --git a/include/sound/pcm_drm_eld.h b/include/sound/pcm_drm_eld.h
-new file mode 100644
-index 000000000000..93357b25d2e2
---- /dev/null
-+++ b/include/sound/pcm_drm_eld.h
-@@ -0,0 +1,6 @@
-+#ifndef __SOUND_PCM_DRM_ELD_H
-+#define __SOUND_PCM_DRM_ELD_H
-+
-+int snd_pcm_hw_constraint_eld(struct snd_pcm_runtime *runtime, void *eld);
-+
-+#endif
-diff --git a/sound/core/Kconfig b/sound/core/Kconfig
-index 313f22e9d929..b534c8a6046b 100644
---- a/sound/core/Kconfig
-+++ b/sound/core/Kconfig
-@@ -6,6 +6,9 @@ config SND_PCM
- 	tristate
- 	select SND_TIMER
- 
-+config SND_PCM_ELD
-+	bool
-+
- config SND_DMAENGINE_PCM
- 	tristate
- 
-diff --git a/sound/core/Makefile b/sound/core/Makefile
-index 4daf2f58261c..591b49157b4d 100644
---- a/sound/core/Makefile
-+++ b/sound/core/Makefile
-@@ -13,6 +13,7 @@ snd-$(CONFIG_SND_JACK)	  += jack.o
- snd-pcm-y := pcm.o pcm_native.o pcm_lib.o pcm_timer.o pcm_misc.o \
- 		pcm_memory.o memalloc.o
- snd-pcm-$(CONFIG_SND_DMA_SGBUF) += sgbuf.o
-+snd-pcm-$(CONFIG_SND_PCM_ELD) += pcm_drm_eld.o
- 
- # for trace-points
- CFLAGS_pcm_lib.o := -I$(src)
-diff --git a/sound/core/pcm_drm_eld.c b/sound/core/pcm_drm_eld.c
-new file mode 100644
-index 000000000000..e70379fb63d0
---- /dev/null
-+++ b/sound/core/pcm_drm_eld.c
-@@ -0,0 +1,99 @@
-+/*
-+ *  PCM DRM helpers
-+ *
-+ *   This program is free software; you can redistribute it and/or modify
-+ *   it under the terms of the GNU General Public License version 2 as
-+ *   published by the Free Software Foundation.
-+ */
-+#include <linux/export.h>
-+#include <drm/drm_edid.h>
-+#include <sound/pcm.h>
-+#include <sound/pcm_drm_eld.h>
-+
-+static const unsigned int eld_rates[] = {
-+	32000,
-+	44100,
-+	48000,
-+	88200,
-+	96000,
-+	176400,
-+	192000,
-+};
-+
-+static unsigned int sad_max_channels(const u8 *sad)
-+{
-+	return 1 + (sad[0] & 7);
-+}
-+
-+static int eld_limit_rates(struct snd_pcm_hw_params *params,
-+			   struct snd_pcm_hw_rule *rule)
-+{
-+	struct snd_interval *r = hw_param_interval(params, rule->var);
-+	struct snd_interval *c;
-+	unsigned int rate_mask = 7, i;
-+	const u8 *sad, *eld = rule->private;
-+
-+	sad = drm_eld_sad(eld);
-+	if (sad) {
-+		c = hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
-+
-+		for (i = drm_eld_sad_count(eld); i > 0; i--, sad += 3) {
-+			unsigned max_channels = sad_max_channels(sad);
-+
-+			/*
-+			 * Exclude SADs which do not include the
-+			 * requested number of channels.
-+			 */
-+			if (c->min <= max_channels)
-+				rate_mask |= sad[1];
-+		}
-+	}
-+
-+	return snd_interval_list(r, ARRAY_SIZE(eld_rates), eld_rates,
-+				 rate_mask);
-+}
-+
-+static int eld_limit_channels(struct snd_pcm_hw_params *params,
-+			      struct snd_pcm_hw_rule *rule)
-+{
-+	struct snd_interval *c = hw_param_interval(params, rule->var);
-+	struct snd_interval *r;
-+	struct snd_interval t = { .min = 1, .max = 2, .integer = 1, };
-+	unsigned int i;
-+	const u8 *sad, *eld = rule->private;
-+
-+	sad = drm_eld_sad(eld);
-+	if (sad) {
-+		unsigned int rate_mask = 0;
-+
-+		/* Convert the rate interval to a mask */
-+		r = hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
-+		for (i = 0; i < ARRAY_SIZE(eld_rates); i++)
-+			if (r->min <= eld_rates[i] && r->max >= eld_rates[i])
-+				rate_mask |= BIT(i);
-+
-+		for (i = drm_eld_sad_count(eld); i > 0; i--, sad += 3)
-+			if (rate_mask & sad[1])
-+				t.max = max(t.max, sad_max_channels(sad));
-+	}
-+
-+	return snd_interval_refine(c, &t);
-+}
-+
-+int snd_pcm_hw_constraint_eld(struct snd_pcm_runtime *runtime, void *eld)
-+{
-+	int ret;
-+
-+	ret = snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
-+				  eld_limit_rates, eld,
-+				  SNDRV_PCM_HW_PARAM_CHANNELS, -1);
-+	if (ret < 0)
-+		return ret;
-+
-+	ret = snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
-+				  eld_limit_channels, eld,
-+				  SNDRV_PCM_HW_PARAM_RATE, -1);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(snd_pcm_hw_constraint_eld);
+It's not really an output, it's a pre-multiplier on a single
+child. We're discussing with Chen-Yu about refactoring this anyway, so
+it will probably go away in a near future.
+
+Maxime
+
 -- 
-1.8.3.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150509/ef264412/attachment-0001.sig>
