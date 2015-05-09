@@ -1,59 +1,35 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Sat,  9 May 2015 09:53:52 +0200
-Subject: [PATCH v8 10/16] dt-bindings: Document the STM32 USART bindings
-In-Reply-To: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
-References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <1431158038-3813-11-git-send-email-mcoquelin.stm32@gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Sat, 9 May 2015 10:54:18 +0300
+Subject: [PATCH v3 2/4] remoteproc: add a rproc ops for performing address
+ translation
+In-Reply-To: <1427917039-43206-3-git-send-email-d-gerlach@ti.com>
+References: <1427917039-43206-1-git-send-email-d-gerlach@ti.com>
+ <1427917039-43206-3-git-send-email-d-gerlach@ti.com>
+Message-ID: <CAK=WgbaSD9tGVKhUkbL3JjtW9GuAR_fbWHG6rx1m_v9TDW0Osw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds documentation of device tree bindings for the
-STM32 USART
+Hi Dave,
 
-Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
-Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
----
- .../devicetree/bindings/serial/st,stm32-usart.txt  | 32 ++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/serial/st,stm32-usart.txt
+On Wed, Apr 1, 2015 at 10:37 PM, Dave Gerlach <d-gerlach@ti.com> wrote:
+> From: Suman Anna <s-anna@ti.com>
+>
+> The rproc_da_to_va API is currently used to perform any device to
+> kernel address translations to meet the different needs of the remoteproc
+> core/drivers (eg: loading). The functionality is achieved within the
+> remoteproc core, and is limited only for carveouts allocated within the
+> core.
+>
+> A new rproc ops, da_to_va, is added to provide flexibility to platform
+> implementations to perform the address translation themselves when the
+> above conditions cannot be met by the implementations. The rproc_da_to_va()
+> API is extended to invoke this ops if present, and fallback to regular
+> processing if the platform implementation cannot provide the translation.
+> This will allow any remoteproc implementations to translate addresses for
+> dedicated memories like internal memories.
 
-diff --git a/Documentation/devicetree/bindings/serial/st,stm32-usart.txt b/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
-new file mode 100644
-index 0000000..8480a76
---- /dev/null
-+++ b/Documentation/devicetree/bindings/serial/st,stm32-usart.txt
-@@ -0,0 +1,32 @@
-+* STMicroelectronics STM32 USART
-+
-+Required properties:
-+- compatible: Can be either "st,stm32-usart" or "st,stm32-uart" depending on
-+whether the device supports synchronous mode.
-+- reg: The address and length of the peripheral registers space
-+- interrupts: The interrupt line of the USART instance
-+- clocks: The input clock of the USART instance
-+
-+Optional properties:
-+- pinctrl: The reference on the pins configuration
-+- auto-flow-control: bool flag to enable hardware flow control.
-+
-+Examples:
-+usart4: serial at 40004c00 {
-+	compatible = "st,stm32-uart";
-+	reg = <0x40004c00 0x400>;
-+	interrupts = <52>;
-+	clocks = <&clk_pclk1>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usart4>;
-+};
-+
-+usart2: serial at 40004400 {
-+	compatible = "st,stm32-usart", "st,stm32-uart";
-+	reg = <0x40004400 0x400>;
-+	interrupts = <38>;
-+	clocks = <&clk_pclk1>;
-+	auto-flow-control;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usart2 &pinctrl_usart2_rtscts>;
-+};
--- 
-1.9.1
+Can you please provide specific examples where this is needed and how
+it is going to be used?
+
+Thanks,
+Ohad.
