@@ -1,60 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 9 May 2015 14:54:58 +0100
-Subject: Memory size unaligned to section boundary
-In-Reply-To: <554E1178.5030409@redhat.com>
-References: <a865bd68d706f8c4c9e82a374ff6adc4@agner.ch>
- <20150506101104.GD2067@n2100.arm.linux.org.uk>
- <20150506105102.GB5382@e104818-lin.cambridge.arm.com>
- <20150506113503.GT2067@n2100.arm.linux.org.uk>
- <554E0DC8.4060401@redhat.com>
- <20150509134818.GP2067@n2100.arm.linux.org.uk>
- <554E1178.5030409@redhat.com>
-Message-ID: <20150509135458.GQ2067@n2100.arm.linux.org.uk>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sat, 9 May 2015 15:58:54 +0200
+Subject: [rtc-linux] [PATCH 07/12] rtc: st: Update IP layout information
+ to include Clocksource
+In-Reply-To: <1431005924-21777-8-git-send-email-lee.jones@linaro.org>
+References: <1431005924-21777-1-git-send-email-lee.jones@linaro.org>
+ <1431005924-21777-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <20150509135854.GE3338@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 09, 2015 at 03:54:00PM +0200, Hans de Goede wrote:
-> Hi,
+On 07/05/2015 at 14:38:39 +0100, Lee Jones wrote :
+> Initial submission adding support for this IP only included Watchdog and
+> the Real-Time Clock.  Now the third (and final) device is enabled this
+> trivial patch is required to update the comment in the RTC driver to
+> encompass Clocksource.
 > 
-> On 09-05-15 15:48, Russell King - ARM Linux wrote:
-> >On Sat, May 09, 2015 at 03:38:16PM +0200, Hans de Goede wrote:
-> >>Ok, so does that mean that Mark's original patch:
-> >>
-> >>---->8----
-> >>diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> >>index 4e6ef89..2ea13f0 100644
-> >>--- a/arch/arm/mm/mmu.c
-> >>+++ b/arch/arm/mm/mmu.c
-> >>@@ -1125,9 +1125,9 @@ void __init sanity_check_meminfo(void)
-> >>                          * occurs before any free memory is mapped.
-> >>                          */
-> >>                         if (!memblock_limit) {
-> >>-                               if (!IS_ALIGNED(block_start, SECTION_SIZE))
-> >>+                               if (!IS_ALIGNED(block_start, PMD_SIZE))
-> >>                                         memblock_limit = block_start;
-> >>-                               else if (!IS_ALIGNED(block_end, SECTION_SIZE))
-> >>+                               else if (!IS_ALIGNED(block_end, PMD_SIZE))
-> >>                                         memblock_limit = arm_lowmem_limit;
-> >>                         }
-> >>
-> >>@@ -1142,7 +1142,7 @@ void __init sanity_check_meminfo(void)
-> >>          * last full section, which should be mapped.
-> >>          */
-> >>         if (memblock_limit)
-> >>-               memblock_limit = round_down(memblock_limit, SECTION_SIZE);
-> >>+               memblock_limit = round_down(memblock_limit, PMD_SIZE);
-> >>         if (!memblock_limit)
-> >>                 memblock_limit = arm_lowmem_limit;
-> >>
-> >>
-> >>Is good, or do we only need to have the last chunk of this patch ?
-> >
-> >That should do it, thanks.
-> 
-> "that should do it" means the entire patch or only the last chunk?
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Entire patch.
+I'm guessing this will go through the mfd tree along with the driver?
+
+> ---
+>  drivers/rtc/rtc-st-lpc.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/rtc/rtc-st-lpc.c b/drivers/rtc/rtc-st-lpc.c
+> index 3f9d0ac..74c0a33 100644
+> --- a/drivers/rtc/rtc-st-lpc.c
+> +++ b/drivers/rtc/rtc-st-lpc.c
+> @@ -208,7 +208,7 @@ static int st_rtc_probe(struct platform_device *pdev)
+>  		return -EINVAL;
+>  	}
+>  
+> -	/* LPC can either run in RTC or WDT mode */
+> +	/* LPC can either run as a Clocksource or in RTC or WDT mode */
+>  	if (mode != ST_LPC_MODE_RTC)
+>  		return -ENODEV;
+>  
+> -- 
+> 1.9.1
+> 
+> -- 
+> -- 
+> You received this message because you are subscribed to "rtc-linux".
+> Membership options at http://groups.google.com/group/rtc-linux .
+> Please read http://groups.google.com/group/rtc-linux/web/checklist
+> before submitting a driver.
+> --- 
+> You received this message because you are subscribed to the Google Groups "rtc-linux" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to rtc-linux+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
