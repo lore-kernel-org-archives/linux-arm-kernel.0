@@ -1,51 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 9 May 2015 16:35:38 +0100
-Subject: Versatile Express no-boot with multi-platform kernels
-Message-ID: <20150509153537.GR2067@n2100.arm.linux.org.uk>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 09 May 2015 17:58:43 +0200
+Subject: [linux-sunxi] [PATCH 0/6] ARM: sunxi: Introduce Allwinner H3
+ support
+In-Reply-To: <1430904693-1404-1-git-send-email-jenskuske@gmail.com>
+References: <1430904693-1404-1-git-send-email-jenskuske@gmail.com>
+Message-ID: <554E2EB3.1000603@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've been building an OMAP4 + Versatile Express kernel in the build
-system as a check that there are no incompatibilities between the
-two creeping in.
+Hi,
 
-However, a while back, Versatile Express stopped booting with this
-configuration _after_ the resolution of the L2 cache latency issue.
+On 06-05-15 11:31, Jens Kuske wrote:
+> Hi everyone,
+>
+> This patch series introduces basic kernel support for Allwinner's H3 SoC,
+> mainly basic clocks and pinctrl. It also adds interrupts, timers,
+> watchdog, RTC, dmaengine, MMC and UARTs, which are mostly compatible to
+> those in earlier SoCs like A23 and A31, and can simply be reused.
+>
+> These patches are based on Maxime's sunxi/for-next branch from
+> git://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git
+>
+> Patch 1 adds machine support for the H3.
+>
+> Patch 2 adds support for the basic clocks. The AHB1/AHB2 split could
+> need some discussion.
+>
+> Patch 3 adds the pin sets for the H3 main PIO.
+>
+> Patch 4 adds the H3 specific parameters to the sun6i dmaengine driver.
+>
+> Patch 5 adds the DTSI for the H3.
+>
+> Patch 6 adds a DT for the Orange Pi Plus SBC, which these patches
+> were developed and tested with.
 
-I've been trying to debug it today, but what I find is that if I change
-the LL_DEBUG to the Versatile Express option, and put my printascii()
-hack into kernel/printk/printk.c, it boots.
+Cool stuff, thanks for your work on this. Do you have any plans to also
+add support for the H3 to upstream u-boot ?
 
-I can't say much more than that right now - I tried moving the debug
-output to one of the other ports, but it seems that the other ttyAMA
-ports aren't actually connected to the 9-pin D connectors on the
-chassis (well, the CTS signal appears to be, but not the TX/RX
-signals.)  Port 1 appears to be redirected permanently to one of the
-on-board micros.  Port 3, when set to 38400 baud, receives random
-characters with framing errors from an unknown source.  Port 2 appears
-to do nothing both in the TX and RX directions.
+Regards,
 
-Having the printascii hack in place but directed to one of the other
-ports also results in a non-booting scenario.
-
-It seems that printascii() on ttyAMA0 (the console) helps the kernel
-boot.
-
-I thought maybe it was a result of the recent commits to change the TX
-behaviour in the pl011 driver, so I've tried reverting:
-
-48d7ff0eaacb drivers/tty: serial: remove info message
-1c9be3101574 drivers/tty: amba: defer DMA probe until the DMA channel is require...
-f2ee6dfa0e85 serial/amba-pl011: Leave the TX IRQ alone when the UART is not open...
-734745caeb9f serial/amba-pl011: Activate TX IRQ passively
-
-but these seem to have no effect.  Reverting much before that starts
-getting quite tricky because of changes which span outside of the
-driver.
-
-The final data point is that a kernel built specifically for Versatile
-Express /does/ work.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Hans
