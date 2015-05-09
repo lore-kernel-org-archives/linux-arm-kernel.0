@@ -1,38 +1,51 @@
-From: dtor@chromium.org (Dmitry Torokhov)
-Date: Fri, 8 May 2015 17:05:44 -0700
-Subject: [PATCH] iommu: exynos: tell kmemleak to ignore 2nd level page tables
-Message-ID: <20150509000544.GA29904@dtor-ws>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Sat, 9 May 2015 09:42:45 +0900
+Subject: ARM: EXYNOS: Fixes for 4.1
+In-Reply-To: <554CFFEB.1010703@kernel.org>
+References: <1430873718-22726-1-git-send-email-k.kozlowski@samsung.com>
+ <554CFFEB.1010703@kernel.org>
+Message-ID: <CAJKOXPfXX5s-hubOESKU7b=-Akg1aWkqMUEUM5fqm6y397tRFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Cross <ccross@android.com>
+2015-05-09 3:26 GMT+09:00 Kukjin Kim <kgene@kernel.org>:
+> On 05/06/15 09:55, Krzysztof Kozlowski wrote:
+>> Krzysztof Kozlowski (1):
+>>       ARM: EXYNOS: Fix failed second suspend on Exynos4
+>>
+>>  arch/arm/mach-exynos/common.h  |  2 ++
+>>  arch/arm/mach-exynos/exynos.c  | 27 +++++++++++++++++++++++++++
+>>  arch/arm/mach-exynos/platsmp.c | 39 ++-------------------------------------
+>>  arch/arm/mach-exynos/suspend.c |  3 +++
+>>  4 files changed, 34 insertions(+), 37 deletions(-)
+>> --
+>
+> Hi Krzysztof,
+>
+> Yeah, the patch is old thing but if I remember correctly, I couldn't
+> apply it because of soc_is_xxx() macro. Yes, I agree with the way,
+> firstly fix something and if required, then update it later....But!
+>
+> Please address comments about that, if not, it will not be accepted by
+> arm-soc tree.
 
-The pointers to the 2nd level page tables are converted to 1st level
-page table entries, which means kmemleak can't find them and assumes
-they have been leaked.  Call kmemleak_ignore on the 2nd level page
-tables to prevent them from showing up in kmemleak reports.
+Hi,
 
-Signed-off-by: Colin Cross <ccross@android.com>
-Signed-off-by: Dmitry Torokhov <dtor@chromium.org>
----
- drivers/iommu/exynos-iommu.c | 1 +
- 1 file changed, 1 insertion(+)
+Actually during previous discussion I addressed all the issues:
+https://lkml.org/lkml/2015/3/18/108
+but there was no response from your side.
 
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index dc14fec4..16920b2 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -855,6 +855,7 @@ static sysmmu_pte_t *alloc_lv2entry(struct exynos_iommu_domain *priv,
- 			return ERR_PTR(-ENOMEM);
- 
- 		*sent = mk_lv1ent_page(virt_to_phys(pent));
-+		kmemleak_ignore(pent);
- 		*pgcounter = NUM_LV2ENTRIES;
- 		pgtable_flush(pent, pent + NUM_LV2ENTRIES);
- 		pgtable_flush(sent, sent + 1);
--- 
-2.2.0.rc0.207.ga3a616c
+In previous thread you also asked about proper way of using the
+DELAYED_RESET_ASSERTION. I tried to obtain additional docs from LSI
+but couldn't. In current documentation it was described vaguely so I
+looked at vendor source code. The patch IMHO is the best solution.
+Additionally it was tested (Chanwoo and Bartlomiej) and fixes the
+issue.
 
+As for the soc_is_exynos -> of_machine_is_compatible I will prepare a
+follow up to fix this.
 
--- 
-Dmitry
+Let me know if you have any other comments about it.
+
+Best regards,
+Krzysztof
