@@ -1,76 +1,166 @@
 From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Sat,  9 May 2015 09:53:48 +0200
-Subject: [PATCH v8 06/16] dt-bindings: Document the STM32 reset bindings
+Date: Sat,  9 May 2015 09:53:49 +0200
+Subject: [PATCH v8 07/16] drivers: reset: Add STM32 reset driver
 In-Reply-To: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
 References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <1431158038-3813-7-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <1431158038-3813-8-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds documentation of device tree bindings for the
-STM32 reset controller.
+The STM32 MCUs family IPs can be reset by accessing some registers
+from the RCC block.
 
+The list of available reset lines is documented in the DT bindings.
+
+Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 ---
- .../devicetree/bindings/reset/st,stm32-rcc.txt     | 50 ++++++++++++++++++++++
- 1 file changed, 50 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+ drivers/reset/Makefile      |   1 +
+ drivers/reset/reset-stm32.c | 124 ++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 125 insertions(+)
+ create mode 100644 drivers/reset/reset-stm32.c
 
-diff --git a/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+index 157d421..aed12d1 100644
+--- a/drivers/reset/Makefile
++++ b/drivers/reset/Makefile
+@@ -1,5 +1,6 @@
+ obj-$(CONFIG_RESET_CONTROLLER) += core.o
+ obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
+ obj-$(CONFIG_ARCH_BERLIN) += reset-berlin.o
++obj-$(CONFIG_ARCH_STM32) += reset-stm32.o
+ obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
+ obj-$(CONFIG_ARCH_STI) += sti/
+diff --git a/drivers/reset/reset-stm32.c b/drivers/reset/reset-stm32.c
 new file mode 100644
-index 0000000..333080c
+index 0000000..2c41858
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
-@@ -0,0 +1,50 @@
-+STMicroelectronics STM32 Peripheral Reset Controller
-+====================================================
++++ b/drivers/reset/reset-stm32.c
+@@ -0,0 +1,124 @@
++/*
++ * Copyright (C) Maxime Coquelin 2015
++ * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
++ * License terms:  GNU General Public License (GPL), version 2
++ *
++ * Heavily based on sunxi driver from Maxime Ripard.
++ */
 +
-+The RCC IP is both a reset and a clock controller. This documentation only
-+documents the reset part.
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/platform_device.h>
++#include <linux/reset-controller.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
++#include <linux/types.h>
 +
-+Please also refer to reset.txt in this directory for common reset
-+controller binding usage.
-+
-+Required properties:
-+- compatible: Should be "st,stm32-rcc"
-+- reg: should be register base and length as documented in the
-+  datasheet
-+- #reset-cells: 1, see below
-+
-+example:
-+
-+rcc: reset at 40023800 {
-+	#reset-cells = <1>;
-+	compatible = "st,stm32-rcc";
-+	reg = <0x40023800 0x400>;
++struct stm32_reset_data {
++	spinlock_t			lock;
++	void __iomem			*membase;
++	struct reset_controller_dev	rcdev;
 +};
 +
-+Specifying softreset control of devices
-+=======================================
++static int stm32_reset_assert(struct reset_controller_dev *rcdev,
++			      unsigned long id)
++{
++	struct stm32_reset_data *data = container_of(rcdev,
++						     struct stm32_reset_data,
++						     rcdev);
++	int bank = id / BITS_PER_LONG;
++	int offset = id % BITS_PER_LONG;
++	unsigned long flags;
++	u32 reg;
 +
-+Device nodes should specify the reset channel required in their "resets"
-+property, containing a phandle to the reset device node and an index specifying
-+which channel to use.
-+The index is the bit number within the RCC registers bank, starting from RCC
-+base address.
-+It is calculated as: index = register_offset / 4 * 32 + bit_offset.
-+Where bit_offset is the bit offset within the register.
-+For example, for CRC reset:
-+  crc = AHB1RSTR_offset / 4 * 32 + CRCRST_bit_offset = 0x10 / 4 * 32 + 12 = 140
++	spin_lock_irqsave(&data->lock, flags);
 +
-+To simplify the usagen and to share bit definition with the clock driver of
-+the RCC IP, macros are available to generate the index in human-readble
-+format.
++	reg = readl_relaxed(data->membase + (bank * 4));
++	writel_relaxed(reg | BIT(offset), data->membase + (bank * 4));
 +
-+For STM32F4 series, the macro are available here:
-+ - include/dt-bindings/mfd/stm32f4-rcc.h
++	spin_unlock_irqrestore(&data->lock, flags);
 +
-+example:
++	return 0;
++}
 +
-+	timer2 {
-+		resets			= <&rcc STM32F4_APB1_RESET(TIM2)>;
-+	};
++static int stm32_reset_deassert(struct reset_controller_dev *rcdev,
++				unsigned long id)
++{
++	struct stm32_reset_data *data = container_of(rcdev,
++						     struct stm32_reset_data,
++						     rcdev);
++	int bank = id / BITS_PER_LONG;
++	int offset = id % BITS_PER_LONG;
++	unsigned long flags;
++	u32 reg;
 +
++	spin_lock_irqsave(&data->lock, flags);
 +
++	reg = readl_relaxed(data->membase + (bank * 4));
++	writel_relaxed(reg & ~BIT(offset), data->membase + (bank * 4));
++
++	spin_unlock_irqrestore(&data->lock, flags);
++
++	return 0;
++}
++
++static struct reset_control_ops stm32_reset_ops = {
++	.assert		= stm32_reset_assert,
++	.deassert	= stm32_reset_deassert,
++};
++
++static const struct of_device_id stm32_reset_dt_ids[] = {
++	 { .compatible = "st,stm32-rcc", },
++	 { /* sentinel */ },
++};
++MODULE_DEVICE_TABLE(of, sstm32_reset_dt_ids);
++
++static int stm32_reset_probe(struct platform_device *pdev)
++{
++	struct stm32_reset_data *data;
++	struct resource *res;
++
++	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
++	if (!data)
++		return -ENOMEM;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	data->membase = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(data->membase))
++		return PTR_ERR(data->membase);
++
++	spin_lock_init(&data->lock);
++
++	data->rcdev.owner = THIS_MODULE;
++	data->rcdev.nr_resets = resource_size(res) * 8;
++	data->rcdev.ops = &stm32_reset_ops;
++	data->rcdev.of_node = pdev->dev.of_node;
++
++	return reset_controller_register(&data->rcdev);
++}
++
++static int stm32_reset_remove(struct platform_device *pdev)
++{
++	struct stm32_reset_data *data = platform_get_drvdata(pdev);
++
++	reset_controller_unregister(&data->rcdev);
++
++	return 0;
++}
++
++static struct platform_driver stm32_reset_driver = {
++	.probe	= stm32_reset_probe,
++	.remove	= stm32_reset_remove,
++	.driver = {
++		.name		= "stm32-rcc-reset",
++		.of_match_table	= stm32_reset_dt_ids,
++	},
++};
++module_platform_driver(stm32_reset_driver);
++
++MODULE_AUTHOR("Maxime Coquelin <maxime.coquelin@gmail.com>");
++MODULE_DESCRIPTION("STM32 MCUs Reset Controller Driver");
++MODULE_LICENSE("GPL");
 -- 
 1.9.1
