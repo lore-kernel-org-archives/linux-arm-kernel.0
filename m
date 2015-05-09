@@ -1,51 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 9 May 2015 21:10:57 +0100
-Subject: [PATCH 1/2] ARM: kvm: fix a bad BSYM() usage
-In-Reply-To: <20150509200717.GA30634@cbox>
-References: <E1YqkpO-0006zB-QJ@rmk-PC.arm.linux.org.uk>
- <20150509200717.GA30634@cbox>
-Message-ID: <20150509201057.GX2067@n2100.arm.linux.org.uk>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sat,  9 May 2015 22:39:32 +0200
+Subject: [PATCH v6 02/12] genirq: generic chip: support hierarchy domain
+In-Reply-To: <1431203982-13217-1-git-send-email-stefan@agner.ch>
+References: <1431203982-13217-1-git-send-email-stefan@agner.ch>
+Message-ID: <1431203982-13217-3-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 09, 2015 at 10:07:17PM +0200, Christoffer Dall wrote:
-> On Fri, May 08, 2015 at 05:08:42PM +0100, Russell King wrote:
-> > BSYM() should only be used when refering to local symbols in the same
-> > assembly file which are resolved by the assembler, and not for
-> > linker-fixed up symbols.  The use of BSYM() with panic is incorrect as
-> > the linker is involved in fixing up this relocation, and it knows
-> > whether panic() is ARM or Thumb.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> >  arch/arm/kvm/interrupts.S | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-> > index 79caf79b304a..87847d2c5f99 100644
-> > --- a/arch/arm/kvm/interrupts.S
-> > +++ b/arch/arm/kvm/interrupts.S
-> > @@ -309,7 +309,7 @@ ENTRY(kvm_call_hyp)
-> >  THUMB(	orr	r2, r2, #PSR_T_BIT	)
-> >  	msr	spsr_cxsf, r2
-> >  	mrs	r1, ELR_hyp
-> > -	ldr	r2, =BSYM(panic)
-> > +	ldr	r2, =panic
-> >  	msr	ELR_hyp, r2
-> >  	ldr	r0, =\panic_str
-> >  	clrex				@ Clear exclusive monitor
-> > -- 
-> > 1.8.3.1
-> > 
-> Indeed, the linker figures it out as it should.  It does seem like the
-> right result is produced with the BSYM() macro as well so not sure what
-> the harm is.
-> 
-> Anyway, I've queued this to merge via the KVM tree.
+Use the new helper function irq_domain_set_info to make sure the
+function irq_domain_set_hwirq_and_chip is being called, which is
+crucial to save irqdomain specific data to irq_data.
 
-I already have it in my tree (and linux-next) as the second patch (which
-removes the BSYM macro entirely) depends on this.
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ kernel/irq/generic-chip.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
+diff --git a/kernel/irq/generic-chip.c b/kernel/irq/generic-chip.c
+index 61024e8..15b370d 100644
+--- a/kernel/irq/generic-chip.c
++++ b/kernel/irq/generic-chip.c
+@@ -360,7 +360,7 @@ static struct lock_class_key irq_nested_lock_class;
+ int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
+ 			 irq_hw_number_t hw_irq)
+ {
+-	struct irq_data *data = irq_get_irq_data(virq);
++	struct irq_data *data = irq_domain_get_irq_data(d, virq);
+ 	struct irq_domain_chip_generic *dgc = d->gc;
+ 	struct irq_chip_generic *gc;
+ 	struct irq_chip_type *ct;
+@@ -405,8 +405,7 @@ int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
+ 	else
+ 		data->mask = 1 << idx;
+ 
+-	irq_set_chip_and_handler(virq, chip, ct->handler);
+-	irq_set_chip_data(virq, gc);
++	irq_domain_set_info(d, virq, hw_irq, chip, gc, ct->handler, NULL, NULL);
+ 	irq_modify_status(virq, dgc->irq_flags_to_clear, dgc->irq_flags_to_set);
+ 	return 0;
+ }
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.4.0
