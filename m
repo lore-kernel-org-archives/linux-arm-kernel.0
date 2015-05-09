@@ -1,112 +1,98 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Sat, 9 May 2015 09:45:43 +0900
-Subject: [GIT PULL] ARM: EXYNOS: Improvements for 4.2, try 2
-In-Reply-To: <554D0665.9090009@kernel.org>
-References: <1430878748-30149-1-git-send-email-k.kozlowski@samsung.com>
- <554D0665.9090009@kernel.org>
-Message-ID: <CAJKOXPdGrbozo3ATvxzn60yx-S__E=FpGrOAYziFU4om-E2+0w@mail.gmail.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Fri, 08 May 2015 17:48:18 -0700
+Subject: [REGRESSION?] ARM: 7677/1: LPAE: Fix mapping in alloc_init_section
+ for unaligned addresses  (was Re: Memory size unaligned to section boundary)
+In-Reply-To: <20150505161112.GB23758@leverpostej>
+References: <a865bd68d706f8c4c9e82a374ff6adc4@agner.ch>
+ <553F5B71.8030309@redhat.com> <20150505142210.GB20402@leverpostej>
+ <5548D5DB.4020407@redhat.com> <20150505161112.GB23758@leverpostej>
+Message-ID: <554D5952.4000008@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-09 3:54 GMT+09:00 Kukjin Kim <kgene@kernel.org>:
-> On 05/06/15 11:19, Krzysztof Kozlowski wrote:
->> Dear Kukjin,
+On 05/05/2015 09:11 AM, Mark Rutland wrote:
+>>> I wasn't able to come up with a DTB that would trigger this. Do you have
+>>> an example set of memory nodes + memreserves? Where are your kernel and
+>>> DTB loaded in memory?
 >>
->> Updated pull request. The first one contained an older version
->> of my patch.
->>
->> This adds coupled cpuidle for Exynos3250 and improves the Exynos
->> code in few places. Everything for upcoming 4.2 merge window.
->> Description along with a tag.
->>
->> Best regards,
->> Krzysztof
->>
->> ----------------------------------------------------------------
->> The following changes since commit 5ebe6afaf0057ac3eaeb98defd5456894b446d22:
->>
->>   Linux 4.1-rc2 (2015-05-03 19:22:23 -0700)
->>
->> are available in the git repository at:
->>
->>   https://github.com/krzk/linux.git tags/samsung-for-next-4.2
->>
->> for you to fetch changes up to 182be665abb95fcddd656355ae6208d02533b6b9:
->>
->>   ARM: plat-samsung: Constify platform_device_id (2015-05-06 11:05:43 +0900)
->>
->> ----------------------------------------------------------------
->> Extending cpuidle driver and improvements for Exynos based boards:
->> 1. Add missing return-value checks and of_node_put() for power domain
->>    driver.
->> 2. Fix missing clk_prepare in S3C24XX ADC driver.
->> 3. Rework clock handling when switching power domains on/off. Instead
->>    of settting fixed parent in DTS we grab the parent clock before
->>    turning the domain off.
->> 4. Add coupled cpuidle support for Exynos3250 to an existing
->>    cpuidle-exynos driver. As a result it enables AFTR mode
->>    (ARM-Off Top-Running) to be used by default on Exynos3250
->>    without the need to hot unplug CPU1 first.
->>
->> ----------------------------------------------------------------
->> Bartlomiej Zolnierkiewicz (5):
->>       ARM: EXYNOS: fix exynos_boot_secondary() return value on timeout
->>       ARM: EXYNOS: make exynos_core_restart() less verbose
->>       ARM: EXYNOS: add exynos_set_boot_addr() helper
->>       ARM: EXYNOS: add exynos_get_boot_addr() helper
->>       cpuidle: exynos: add coupled cpuidle support for Exynos3250
->>
->> Krzysztof Kozlowski (8):
->>       ARM: EXYNOS: Fix failed second suspend on Exynos4
->>       ARM: EXYNOS: Handle of of_iomap() failure
->>       ARM: EXYNOS: Handle of_find_device_by_node and kstrdup failures
->>       ARM: EXYNOS: Add missing of_node_put() when parsing power domains
->>       ARM: EXYNOS: Get current parent clock for power domain on/off
->>       ARM: dts: Use last parent for clocks during power domain on/off
->>       ARM: EXYNOS: Constify irq_domain_ops
->>       ARM: plat-samsung: Constify platform_device_id
->>
->> Sergiy Kibrik (1):
->>       ARM: SAMSUNG: fix clk_enable() WARNing in S3C24XX ADC
->>
->>  .../bindings/arm/exynos/power_domain.txt           |   7 +-
->>  arch/arm/boot/dts/exynos5420.dtsi                  |  13 +--
->>  arch/arm/include/asm/firmware.h                    |   4 +
->>  arch/arm/mach-exynos/common.h                      |   6 +-
->>  arch/arm/mach-exynos/exynos.c                      |  30 ++++-
->>  arch/arm/mach-exynos/firmware.c                    |  18 +++
->>  arch/arm/mach-exynos/platsmp.c                     | 123 ++++++++++-----------
->>  arch/arm/mach-exynos/pm.c                          |  51 +++++++--
->>  arch/arm/mach-exynos/pm_domains.c                  |  44 ++++++--
->>  arch/arm/mach-exynos/suspend.c                     |   5 +-
->>  arch/arm/plat-samsung/adc.c                        |   6 +-
->>  11 files changed, 208 insertions(+), 99 deletions(-)
->> --
+>> We've a single memory node/bank from 0x40000000 to end of memory, we
+>> carve out a framebuffer at the end, and do not report that to Linux, so
+>> the end becomes 0x40000000 + memory-size - fb-size, and we use no mem
+>> reserves, because if we do use mem-reserves the mmap of the fbmem by
+>> the simplefb driver fails as that maps it non cach-able and if it is
+>> part of the main membank it already is mapped cachable.
 >
-> Hi Krzysztof,
+> Sure. The only reason for caring about any memreserves was in case they
+> inadvertently affected the memblock_limit or anything else generated by
+> iterating over the memblock array. If you have none to begin with then
+> they clearly aren't involved.
 >
-> Firstly, thanks for your gentle reminder and effort.
+>> We substract exactly the necessary fb-size, one known fb-size which
+>> triggers this is 1024x600 which means we end up substracting
+>> 1024x600x4 bytes from the end of memory, so effectively we are
+>> doing the same as passing a mem= argument which is not 2MiB aligned.
 >
-> By the way, this cannot be pulled because some of them are old patches
-> even though I've missed them at that time. Sorry about that and if it is
-> required, it should be re-submitted based on latest mainline after
-> testing then reviewed in ml again...
-
-They were rebased on mainline. However some of them (cpuidle) depend
-on "ARM: EXYNOS: Fix failed second suspend on Exynos4".
-
-> And please do use 'git am' or some relevant git commend when applying
-> patches in your tree because I found there are some comments below '---'
-> in git log such as 'changes since' or some 'note' but that is not
-> required. Just it is for information in ml not git log basically.
-
-Right, this happened only for my patches which I cherry-picked thus
-leaving the separator. Next time I will be more careful.
-
+> Thanks for the info.
 >
-> Anyway I'm going to sort them out including your patches in my tree
-> directly for 4.2.
+> It turns out my bootloader was silently rewriting the memory nodes,
+> which was why I couldn't reproduce the issue with a DTB alone. With the
+> memory node reg munged to <0 0x80000000 0 0x3FDA8000> without bootloader
+> interference, TC2 dies similarly to what you described.
+>
+> As far as I can see the issue is not a regression; it looks like we'd
+> previously fail to use a (1M) section unless we had precisely 1M or 2M
+> of the section to map (as those are the only cases when end would be
+> section aligned).
+>
+> The below hack prevents the issue by rounding the memblock_limit down to
+> a full (2M) pmd boundary, so we don't try to allocate from the first
+> section in a partial pmd. That does mean that if your memory ends on a
+> 1M boundary you lose that last 1M for early memblock allocations.
+>
+> Balancing the pmd manipulation turned out to be a lot more painful than
+> I'd anticipated, so I gave up on trying to map the first section in a
+> partial pmd. If people are happy with the below diff I can respin as a
+> patch (with comment updates and so on).
+>
+> Thanks,
+> Mark.
+>
+> ---->8----
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index 4e6ef89..2ea13f0 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -1125,9 +1125,9 @@ void __init sanity_check_meminfo(void)
+>                           * occurs before any free memory is mapped.
+>                           */
+>                          if (!memblock_limit) {
+> -                               if (!IS_ALIGNED(block_start, SECTION_SIZE))
+> +                               if (!IS_ALIGNED(block_start, PMD_SIZE))
+>                                          memblock_limit = block_start;
+> -                               else if (!IS_ALIGNED(block_end, SECTION_SIZE))
+> +                               else if (!IS_ALIGNED(block_end, PMD_SIZE))
+>                                          memblock_limit = arm_lowmem_limit;
+>                          }
+>
+> @@ -1142,7 +1142,7 @@ void __init sanity_check_meminfo(void)
+>           * last full section, which should be mapped.
+>           */
+>          if (memblock_limit)
+> -               memblock_limit = round_down(memblock_limit, SECTION_SIZE);
+> +               memblock_limit = round_down(memblock_limit, PMD_SIZE);
+>          if (!memblock_limit)
+>                  memblock_limit = arm_lowmem_limit;
+>
 
-Thanks!
-Best regards,
-Krzysztof
+Trying to map just the first section is super messy and I think this
+is the correct fix overall. The intention with this code is to
+prevent the exact problem we are running into here.
+
+Looking at this made me realize there may be a slight bug elsewhere
+though: we use memblock_limit for determining the bounds for memory
+that gets passed to the buddy allocator and with this code we may
+necessarily omit memory from ZONE_NORMAL. I'll think about that
+some more.
+
+Thanks,
+Laura
