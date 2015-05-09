@@ -1,33 +1,23 @@
-From: tremyfr@gmail.com (Philippe Reynes)
-Date: Sat,  9 May 2015 22:54:30 +0200
-Subject: [PATCH] imx27: dt: only map 1 Kbyte for fec registers
-Message-ID: <1431204870-17233-1-git-send-email-tremyfr@gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Sat, 09 May 2015 17:40:53 -0400 (EDT)
+Subject: [PATCH v2] ARM: net fix emit_udiv() for BPF_ALU | BPF_DIV |
+ BPF_K intruction.
+In-Reply-To: <1430929916-15852-1-git-send-email-nschichan@freebox.fr>
+References: <1430929916-15852-1-git-send-email-nschichan@freebox.fr>
+Message-ID: <20150509.174053.1205273752891974916.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the imx27 documentation, fec has a 1 Kbyte
-memory space map, spitted in two regions of 512 bytes.
-The first one for control/status registers, and the
-second one for event/statistic registers. So, we don't
-need to map 16 Kbyte for registers, 1 Kbyte is enough.
+From: Nicolas Schichan <nschichan@freebox.fr>
+Date: Wed,  6 May 2015 18:31:56 +0200
 
-Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
----
- arch/arm/boot/dts/imx27.dtsi |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+> In that case, emit_udiv() will be called with rn == ARM_R0 (r_scratch)
+> and loading rm first into ARM_R0 will result in jit_udiv() function
+> being called the same dividend and divisor. Fix that by loading rn
+> first into ARM_R1 and then rm into ARM_R0.
+> 
+> Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
+> Cc: <stable@vger.kernel.org> # v3.13+
+> Fixes: aee636c4809f (bpf: do not use reciprocal divide)
 
-diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index 6951b66..56bb917 100644
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -533,7 +533,7 @@
- 
- 			fec: ethernet at 1002b000 {
- 				compatible = "fsl,imx27-fec";
--				reg = <0x1002b000 0x4000>;
-+				reg = <0x1002b000 0x400>;
- 				interrupts = <50>;
- 				clocks = <&clks IMX27_CLK_FEC_IPG_GATE>,
- 					 <&clks IMX27_CLK_FEC_AHB_GATE>;
--- 
-1.7.4.4
+Do you want me to push this via my net tree?
