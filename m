@@ -1,34 +1,48 @@
-From: davem@davemloft.net (David Miller)
-Date: Sat, 09 May 2015 22:28:58 -0400 (EDT)
-Subject: [PATCH v2] ARM: net: add JIT support for loads from struct
- seccomp_data.
-In-Reply-To: <1431003613-16554-1-git-send-email-nschichan@freebox.fr>
-References: <1431003613-16554-1-git-send-email-nschichan@freebox.fr>
-Message-ID: <20150509.222858.26253293963482182.davem@davemloft.net>
+From: xerofoify@gmail.com (Nicholas Krause)
+Date: Sun, 10 May 2015 00:57:34 -0400
+Subject: [PATCH] mach-omap2:Remove calls to deprecacted marco,
+ PTR_RET in the files, fb.c and pmu.c
+Message-ID: <1431233854-31982-1-git-send-email-xerofoify@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Schichan <nschichan@freebox.fr>
-Date: Thu,  7 May 2015 15:00:13 +0200
+This removes two calls to the deprecated marco,PTR_RET in
+the files,fb.c and pmu.c for the functions,omap_init_vrfb
+and omap_init_pmu respectfully. Furthermore these are now
+replaced by calling the correctly non deprecacted function,
+PTR_ERR_OR_ZERO in both functions.
 
-> Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
-> ---
-> 
-> This patch was first sent as part of a serie modifying the core
-> seccomp code to allow the use of the classic BPF JIT. As the core
-> changes have been submitted to netdev by Daniel Borkmann, it is now
-> time to re-submit this patch separately.
-> 
-> While not physically dependent of the core seccomp changes they are
-> needed for the code added in this patch to be triggered.
+Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+---
+ arch/arm/mach-omap2/fb.c  | 2 +-
+ arch/arm/mach-omap2/pmu.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-Where would you like this to be applied, my tree?
-
-This is an ongoing situation, where people have traditionally not
-consistently wanted bpf JIT patches to go into the networking tree.
-
-So I beg everyone posting such things to netdev to be _clear_
-and _explicit_ about whether you expect me to integrate the patch
-or not.
-
-Thanks.
+diff --git a/arch/arm/mach-omap2/fb.c b/arch/arm/mach-omap2/fb.c
+index 26e28e9..1f1ecf8 100644
+--- a/arch/arm/mach-omap2/fb.c
++++ b/arch/arm/mach-omap2/fb.c
+@@ -84,7 +84,7 @@ int __init omap_init_vrfb(void)
+ 	pdev = platform_device_register_resndata(NULL, "omapvrfb", -1,
+ 			res, num_res, NULL, 0);
+ 
+-	return PTR_RET(pdev);
++	return PTR_ERR_OR_ZERO(pdev);
+ }
+ #else
+ int __init omap_init_vrfb(void) { return 0; }
+diff --git a/arch/arm/mach-omap2/pmu.c b/arch/arm/mach-omap2/pmu.c
+index a69e9a3..d2adfeb 100644
+--- a/arch/arm/mach-omap2/pmu.c
++++ b/arch/arm/mach-omap2/pmu.c
+@@ -55,7 +55,7 @@ static int __init omap2_init_pmu(unsigned oh_num, char *oh_names[])
+ 	WARN(IS_ERR(omap_pmu_dev), "Can't build omap_device for %s.\n",
+ 	     dev_name);
+ 
+-	return PTR_RET(omap_pmu_dev);
++	return PTR_ERR_OR_ZERO(omap_pmu_dev);
+ }
+ 
+ static int __init omap_init_pmu(void)
+-- 
+2.1.4
