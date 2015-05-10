@@ -1,30 +1,32 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Sun, 10 May 2015 11:54:54 -0400
-Subject: [PATCH v5 3/3] ata: ahci_xgene: Add AHCI Support for 2nd HW
- version of APM X-Gene SoC AHCI SATA Host controller.
-In-Reply-To: <1430853672-6227-4-git-send-email-stripathi@apm.com>
-References: <1430853672-6227-1-git-send-email-stripathi@apm.com>
- <1430853672-6227-4-git-send-email-stripathi@apm.com>
-Message-ID: <20150510155454.GD5856@htj.duckdns.org>
+From: dev@lynxeye.de (Lucas Stach)
+Date: Sun, 10 May 2015 20:30:00 +0200
+Subject: [Patch v3 3/5] clk: tegra20: init NDFLASH clock to sensible rate
+In-Reply-To: <1431282602-7137-1-git-send-email-dev@lynxeye.de>
+References: <1431282602-7137-1-git-send-email-dev@lynxeye.de>
+Message-ID: <1431282602-7137-4-git-send-email-dev@lynxeye.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Set up the NAND Flash controller clock to run at 150MHz
+instead of the rate set by the bootloader. This is a
+conservative rate which also yields good performance.
 
-On Wed, May 06, 2015 at 12:51:12AM +0530, Suman Tripathi wrote:
-> +	switch (version) {
-> +	case XGENE_AHCI_V1:
-> +		hpriv->flags = AHCI_HFLAG_NO_NCQ;
-> +		/*
-> +		 * Override the callbacks for storm ERRATA
-> +		 */
-> +		xgene_ahci_ops.qc_issue = xgene_ahci_qc_issue;
-> +		xgene_ahci_ops.softreset = xgene_ahci_softreset;
-> +		xgene_ahci_ops.pmp_softreset = xgene_ahci_pmp_softreset;
+Signed-off-by: Lucas Stach <dev@lynxeye.de>
+---
+ drivers/clk/tegra/clk-tegra20.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Let's please create separate ops structs for v1 and v2.
-
-Thanks.
-
+diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-tegra20.c
+index 41272dc..f20424d 100644
+--- a/drivers/clk/tegra/clk-tegra20.c
++++ b/drivers/clk/tegra/clk-tegra20.c
+@@ -1063,6 +1063,7 @@ static struct tegra_clk_init_table init_table[] __initdata = {
+ 	{TEGRA20_CLK_DISP2, TEGRA20_CLK_PLL_P, 600000000, 0},
+ 	{TEGRA20_CLK_GR2D, TEGRA20_CLK_PLL_C, 300000000, 0},
+ 	{TEGRA20_CLK_GR3D, TEGRA20_CLK_PLL_C, 300000000, 0},
++	{TEGRA20_CLK_NDFLASH, TEGRA20_CLK_PLL_P, 150000000, 0},
+ 	{TEGRA20_CLK_CLK_MAX, TEGRA20_CLK_CLK_MAX, 0, 0}, /* This MUST be the last entry */
+ };
+ 
 -- 
-tejun
+2.1.0
