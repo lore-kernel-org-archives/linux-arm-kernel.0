@@ -1,43 +1,36 @@
 From: dev@lynxeye.de (Lucas Stach)
-Date: Sun, 10 May 2015 20:30:01 +0200
-Subject: [Patch v3 4/5] ARM: tegra: add Tegra20 NAND flash controller node
+Date: Sun, 10 May 2015 20:30:02 +0200
+Subject: [Patch v3 5/5] ARM: tegra: enable NAND flash on Colibri T20
 In-Reply-To: <1431282602-7137-1-git-send-email-dev@lynxeye.de>
 References: <1431282602-7137-1-git-send-email-dev@lynxeye.de>
-Message-ID: <1431282602-7137-5-git-send-email-dev@lynxeye.de>
+Message-ID: <1431282602-7137-6-git-send-email-dev@lynxeye.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add basic controller description to be extended
-by individual boards.
+This enables the on-module ONFI conformant NAND flash.
 
 Signed-off-by: Lucas Stach <dev@lynxeye.de>
 ---
- arch/arm/boot/dts/tegra20.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/boot/dts/tegra20-colibri-512.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index adf6b04..8264cb1 100644
---- a/arch/arm/boot/dts/tegra20.dtsi
-+++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -373,6 +373,19 @@
- 		status = "disabled";
+diff --git a/arch/arm/boot/dts/tegra20-colibri-512.dtsi b/arch/arm/boot/dts/tegra20-colibri-512.dtsi
+index 8e0066a..540b3fd 100644
+--- a/arch/arm/boot/dts/tegra20-colibri-512.dtsi
++++ b/arch/arm/boot/dts/tegra20-colibri-512.dtsi
+@@ -455,6 +455,13 @@
+ 		};
  	};
  
-+	nand: nand at 70008000 {
-+		compatible = "nvidia,tegra20-nand";
-+		reg = <0x70008000 0x100>;
-+		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&tegra_car TEGRA20_CLK_NDFLASH>;
-+		clock-names = "nand";
-+		resets = <&tegra_car 13>;
-+		reset-names = "nand";
-+		status = "disabled";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
++	nand at 70008000 {
++		status = "okay";
++		nand-bus-width = <8>;
++		nand-on-flash-bbt;
++		nvidia,wp-gpios = <&gpio TEGRA_GPIO(S, 0) GPIO_ACTIVE_HIGH>;
 +	};
 +
- 	pwm: pwm at 7000a000 {
- 		compatible = "nvidia,tegra20-pwm";
- 		reg = <0x7000a000 0x100>;
+ 	usb at c5004000 {
+ 		status = "okay";
+ 		nvidia,phy-reset-gpio = <&gpio TEGRA_GPIO(V, 1)
 -- 
 2.1.0
