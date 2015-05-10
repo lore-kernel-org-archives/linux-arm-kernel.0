@@ -1,67 +1,47 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sun, 10 May 2015 12:29:51 +0200
-Subject: [rtc-linux] [PATCH v2 2/4] rtc: sa1100: convert to run-time
+Date: Sun, 10 May 2015 12:31:07 +0200
+Subject: [rtc-linux] Re: [PATCH v2 2/4] rtc: sa1100: convert to run-time
  register mapping
-In-Reply-To: <1430426233-7461-3-git-send-email-robh@kernel.org>
+In-Reply-To: <87mw1ojmwz.fsf@belgarion.home>
 References: <1430426233-7461-1-git-send-email-robh@kernel.org>
  <1430426233-7461-3-git-send-email-robh@kernel.org>
-Message-ID: <20150510102951.GG3338@piout.net>
+ <87mw1ojmwz.fsf@belgarion.home>
+Message-ID: <20150510103107.GH3338@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 30/04/2015 at 15:37:11 -0500, Rob Herring wrote :
-> SA1100 and PXA differ only in register offsets which are currently
-> hardcoded in a machine specific header. Some arm64 platforms (PXA1928)
-> have this RTC block as well (and not the PXA270 variant).
+On 01/05/2015 at 18:13:48 +0200, Robert Jarzmik wrote :
+> Rob Herring <robh@kernel.org> writes:
 > 
-> Convert the driver to use ioremap and set the register offsets dynamically.
-> Since we are touching all the register accesses, convert them all to
-> readl_relaxed/writel_relaxed.
+> >  static int sa1100_rtc_read_time(struct device *dev, struct rtc_time *tm)
+> >  {
+> > -	rtc_time_to_tm(RCNR, tm);
+> > +	struct sa1100_rtc *info = dev_get_drvdata(dev);
+> > +	rtc_time_to_tm(readl_relaxed(info->rcnr), tm);
+> One nitpick here : an empty line between info declaration and code would be
+> better..
 > 
-> Currently, the rtc-sa1100 and rtc-pxa drivers co-exist as rtc-pxa has a
-> superset of functionality. This commit makes the drivers one step closer
-> to being mutually exclusive by using devm_ioremap_resource and claiming
-> the resource. The sharing of overlapping resources does not work if both
-> drivers claim the resource. That is not done currently, but will be done
-> as the drivers are converted to DT and follow proper driver rules.
-> Likely, the common portion of the 2 drivers will be made into library
-> functions for the SA1100 and PXA drivers to shared.
+> > @@ -206,8 +215,9 @@ out:
+> >
+> >  static int sa1100_rtc_proc(struct device *dev, struct seq_file *seq)
+> >  {
+> > -	seq_printf(seq, "trim/divider\t\t: 0x%08x\n", (u32) RTTR);
+> > -	seq_printf(seq, "RTSR\t\t\t: 0x%08x\n", (u32)RTSR);
+> > +	struct sa1100_rtc *info = dev_get_drvdata(dev);
+> > +	seq_printf(seq, "trim/divider\t\t: 0x%08x\n", readl_relaxed(info->rttr));
+> > +	seq_printf(seq, "RTSR\t\t\t: 0x%08x\n", readl_relaxed(info->rtsr));
+> Ditto.
 > 
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Alessandro Zummo <a.zummo@towertech.it>
-> Cc: rtc-linux at googlegroups.com
-> ---
-> v2:
-> - Rebase to v4.1-rc1
-> - Use _relaxed accessors
-> - Summarize discussion about supporting both SA1100 and PXA RTC drivers
-> 
->  drivers/rtc/rtc-sa1100.c | 86 +++++++++++++++++++++++++++++++++---------------
->  1 file changed, 59 insertions(+), 27 deletions(-)
-> 
-> diff --git a/drivers/rtc/rtc-sa1100.c b/drivers/rtc/rtc-sa1100.c
-> index b6e1ca0..a21ead5 100644
-> --- a/drivers/rtc/rtc-sa1100.c
-> +++ b/drivers/rtc/rtc-sa1100.c
-> @@ -35,12 +35,10 @@
->  #include <linux/bitops.h>
->  #include <linux/io.h>
-> 
-> -#include <mach/hardware.h>
-> -#include <mach/irqs.h>
-> -
-> -#if defined(CONFIG_ARCH_PXA) || defined(CONFIG_ARCH_MMP)
-> -#include <mach/regs-rtc.h>
-> -#endif
-> +#define RTSR_HZE	(1 << 3)	/* HZ interrupt enable */
-> +#define RTSR_ALE	(1 << 2)	/* RTC alarm interrupt enable */
-> +#define RTSR_HZ		(1 << 1)	/* HZ rising-edge detected */
-> +#define RTSR_AL		(1 << 0)	/* RTC alarm detected */
+> > @@ -244,6 +256,26 @@ static int sa1100_rtc_probe(struct platform_device *pdev)
+> >  	}
+> >  	info->irq_1hz = irq_1hz;
+> >  	info->irq_alarm = irq_alarm;
+> > +
+> > +
+> Ah here the is one too much. Too bad I had not caught it the first time.
 > 
 
-While at it, can you use BIT()?
+Those are actually reported by checkpatch --strict
 
 -- 
 Alexandre Belloni, Free Electrons
