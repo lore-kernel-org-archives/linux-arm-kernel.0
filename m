@@ -1,66 +1,76 @@
 From: vishnupatekar0510@gmail.com (Vishnu Patekar)
-Date: Sun, 10 May 2015 12:16:17 +0530
-Subject: [PATCH 0/6] Introduce Allwinner A33 support
-Message-ID: <1431240383-12763-1-git-send-email-vishnupatekar0510@gmail.com>
+Date: Sun, 10 May 2015 12:16:18 +0530
+Subject: [PATCH 1/6] ARM: sunxi: Add Machine support for A33
+In-Reply-To: <1431240383-12763-1-git-send-email-vishnupatekar0510@gmail.com>
+References: <1431240383-12763-1-git-send-email-vishnupatekar0510@gmail.com>
+Message-ID: <1431240383-12763-2-git-send-email-vishnupatekar0510@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello everyone,
+Allwinnner A33 quad core cortex-a7 based SOC.
+It is similar to A23.
 
-This patch series introduces basic kernel support for Allwinner's A33 SoC,
+Renamed cpu method to "allwinner,sun8i" for common sun8i smp.
+smp code is generic for A23, A33 and hopefully H3.
 
-A33 is very similar to A23. 
-mainly adds common sun8i dtsi, a33 pinctrl. It also adds interrupts, timers,
-watchdog, RTC, and UARTs, which are mostly compatible to
-those in earlier SoCs like A23 and A31, and can simply be reused.
+Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
+---
+ Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
+ arch/arm/mach-sunxi/Kconfig                     | 2 +-
+ arch/arm/mach-sunxi/platsmp.c                   | 2 +-
+ arch/arm/mach-sunxi/sunxi.c                     | 4 ++--
+ 4 files changed, 5 insertions(+), 4 deletions(-)
 
-These patches are based on
-https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
-
-Patch 1 adds machine support for the A33.
-
-Patch 2 adds the pin sets for the A33 main PIO.
-
-Patch 3 adds support to reuse A23 clocks. A33 specific clocks not yet implemented.
-
-Patch 4 adds common sun8i.dtsi, modified sun8i-a23.dtsi and a23 based dts, I've referred the h3 dtsi 
-by Jens Kuske.
-removed the checkpatch warning related to Linux Foundation address in dtsi,dts.
-
-Patch 5 adds the DTSI for the A33, based on common sun8i.dtsi.
-
-Patch 6 adds a DT for the ET_Q8_A33 tablet, which these patches
-were developed and tested with.
-
-Vishnu Patekar (6):
-  ARM: sunxi: Add Machine support for A33
-  pinctrl: sunxi: add allwinner A33 PIO controller support
-  clk: sunxi: Add A33 clock for compilation
-  ARM: dts: sunxi: add common sun8i dtsi
-  ARM: dts: sunxi: Add Allwinner A33 DTSI
-  ARM: dts: sun8i: Add ET-Q8 A33 support
-
- Documentation/devicetree/bindings/arm/sunxi.txt    |   1 +
- .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   2 +
- arch/arm/boot/dts/Makefile                         |   3 +-
- arch/arm/boot/dts/sun8i-a23-ippo-q8h-v1.2.dts      |   6 +-
- arch/arm/boot/dts/sun8i-a23-ippo-q8h-v5.dts        |   6 +-
- arch/arm/boot/dts/sun8i-a23.dtsi                   | 432 +----------------
- arch/arm/boot/dts/sun8i-a33-et-q8.dts              | 108 +++++
- arch/arm/boot/dts/sun8i-a33.dtsi                   | 217 +++++++++
- arch/arm/boot/dts/sun8i.dtsi                       | 481 +++++++++++++++++++
- arch/arm/mach-sunxi/Kconfig                        |   2 +-
- arch/arm/mach-sunxi/platsmp.c                      |   2 +-
- arch/arm/mach-sunxi/sunxi.c                        |   4 +-
- drivers/clk/sunxi/clk-sunxi.c                      |   1 +
- drivers/pinctrl/sunxi/Kconfig                      |   5 +
- drivers/pinctrl/sunxi/Makefile                     |   1 +
- drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c          | 513 +++++++++++++++++++++
- 16 files changed, 1340 insertions(+), 444 deletions(-)
- create mode 100644 arch/arm/boot/dts/sun8i-a33-et-q8.dts
- create mode 100644 arch/arm/boot/dts/sun8i-a33.dtsi
- create mode 100644 arch/arm/boot/dts/sun8i.dtsi
- create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c
-
+diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
+index 42941fd..e32f082 100644
+--- a/Documentation/devicetree/bindings/arm/sunxi.txt
++++ b/Documentation/devicetree/bindings/arm/sunxi.txt
+@@ -9,4 +9,5 @@ using one of the following compatible strings:
+   allwinner,sun6i-a31
+   allwinner,sun7i-a20
+   allwinner,sun8i-a23
++  allwinner,sun8i-a33
+   allwinner,sun9i-a80
+diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+index 81502b9..38bedd8 100644
+--- a/arch/arm/mach-sunxi/Kconfig
++++ b/arch/arm/mach-sunxi/Kconfig
+@@ -35,7 +35,7 @@ config MACH_SUN7I
+ 	select SUN5I_HSTIMER
+ 
+ config MACH_SUN8I
+-	bool "Allwinner A23 (sun8i) SoCs support"
++	bool "Allwinner (sun8i) SoCs support"
+ 	default ARCH_SUNXI
+ 	select ARM_GIC
+ 	select MFD_SUN6I_PRCM
+diff --git a/arch/arm/mach-sunxi/platsmp.c b/arch/arm/mach-sunxi/platsmp.c
+index e8483ec..c56b501 100644
+--- a/arch/arm/mach-sunxi/platsmp.c
++++ b/arch/arm/mach-sunxi/platsmp.c
+@@ -189,4 +189,4 @@ struct smp_operations sun8i_smp_ops __initdata = {
+ 	.smp_prepare_cpus	= sun8i_smp_prepare_cpus,
+ 	.smp_boot_secondary	= sun8i_smp_boot_secondary,
+ };
+-CPU_METHOD_OF_DECLARE(sun8i_a23_smp, "allwinner,sun8i-a23", &sun8i_smp_ops);
++CPU_METHOD_OF_DECLARE(sun8i_smp, "allwinner,sun8i", &sun8i_smp_ops);
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index 1bc811a..8937d0d 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -66,11 +66,11 @@ DT_MACHINE_START(SUN7I_DT, "Allwinner sun7i (A20) Family")
+ MACHINE_END
+ 
+ static const char * const sun8i_board_dt_compat[] = {
+-	"allwinner,sun8i-a23",
++	"allwinner,sun8i",
+ 	NULL,
+ };
+ 
+-DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i (A23) Family")
++DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i Family")
+ 	.dt_compat	= sun8i_board_dt_compat,
+ 	.init_late	= sunxi_dt_cpufreq_init,
+ MACHINE_END
 -- 
 1.9.1
