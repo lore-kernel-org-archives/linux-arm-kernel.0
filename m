@@ -1,23 +1,34 @@
 From: davem@davemloft.net (David Miller)
-Date: Sat, 09 May 2015 17:40:53 -0400 (EDT)
-Subject: [PATCH v2] ARM: net fix emit_udiv() for BPF_ALU | BPF_DIV |
- BPF_K intruction.
-In-Reply-To: <1430929916-15852-1-git-send-email-nschichan@freebox.fr>
-References: <1430929916-15852-1-git-send-email-nschichan@freebox.fr>
-Message-ID: <20150509.174053.1205273752891974916.davem@davemloft.net>
+Date: Sat, 09 May 2015 22:28:58 -0400 (EDT)
+Subject: [PATCH v2] ARM: net: add JIT support for loads from struct
+ seccomp_data.
+In-Reply-To: <1431003613-16554-1-git-send-email-nschichan@freebox.fr>
+References: <1431003613-16554-1-git-send-email-nschichan@freebox.fr>
+Message-ID: <20150509.222858.26253293963482182.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nicolas Schichan <nschichan@freebox.fr>
-Date: Wed,  6 May 2015 18:31:56 +0200
+Date: Thu,  7 May 2015 15:00:13 +0200
 
-> In that case, emit_udiv() will be called with rn == ARM_R0 (r_scratch)
-> and loading rm first into ARM_R0 will result in jit_udiv() function
-> being called the same dividend and divisor. Fix that by loading rn
-> first into ARM_R1 and then rm into ARM_R0.
-> 
 > Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
-> Cc: <stable@vger.kernel.org> # v3.13+
-> Fixes: aee636c4809f (bpf: do not use reciprocal divide)
+> ---
+> 
+> This patch was first sent as part of a serie modifying the core
+> seccomp code to allow the use of the classic BPF JIT. As the core
+> changes have been submitted to netdev by Daniel Borkmann, it is now
+> time to re-submit this patch separately.
+> 
+> While not physically dependent of the core seccomp changes they are
+> needed for the code added in this patch to be triggered.
 
-Do you want me to push this via my net tree?
+Where would you like this to be applied, my tree?
+
+This is an ongoing situation, where people have traditionally not
+consistently wanted bpf JIT patches to go into the networking tree.
+
+So I beg everyone posting such things to netdev to be _clear_
+and _explicit_ about whether you expect me to integrate the patch
+or not.
+
+Thanks.
