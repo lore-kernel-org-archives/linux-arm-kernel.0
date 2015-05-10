@@ -1,65 +1,62 @@
-From: houpengyang@huawei.com (Hou Pengyang)
-Date: Sun, 10 May 2015 11:07:40 +0000
-Subject: [PATCH v5] arm64: perf: Fix callchain parse error with kernel
- tracepoint events
-In-Reply-To: <20150508153758.GG25587@arm.com>
-References: <20150508153758.GG25587@arm.com>
-Message-ID: <1431256060-161483-1-git-send-email-houpengyang@huawei.com>
+From: mgherzan@gmail.com (Mircea Gherzan)
+Date: Sun, 10 May 2015 13:31:26 +0200
+Subject: [PATCH v2] ARM: net fix emit_udiv() for BPF_ALU | BPF_DIV | BPF_K
+ intruction.
+In-Reply-To: <1430929916-15852-1-git-send-email-nschichan@freebox.fr>
+References: <1430929916-15852-1-git-send-email-nschichan@freebox.fr>
+Message-ID: <554F418E.7010402@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For ARM64, when tracing with tracepoint events, the IP and pstate are set
-to 0, preventing the perf code parsing the callchain and resolving the
-symbols correctly.
+On 05/06/2015 06:31 PM, Nicolas Schichan wrote:
+> In that case, emit_udiv() will be called with rn == ARM_R0 (r_scratch)
+> and loading rm first into ARM_R0 will result in jit_udiv() function
+> being called the same dividend and divisor. Fix that by loading rn
+> first into ARM_R1 and then rm into ARM_R0.
+>
+> Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
+> Cc: <stable@vger.kernel.org> # v3.13+
+> Fixes: aee636c4809f (bpf: do not use reciprocal divide)
+> ---
+>   arch/arm/net/bpf_jit_32.c | 15 +++++++++++++--
+>   1 file changed, 13 insertions(+), 2 deletions(-)
+>
+> This patch was part of a serie adding support to JITed seccomp filters
+> to ARM but as it is an unrelated fix, it is more appropriate to send
+> it separately.
+>
+> Changes from previous version: add a comment clarifying how
+> emit_udiv() is called when translating BPF_ALU | BPF_DIV | BPF_K and
+> BPF_ALU | BPF_DIV | BPF_X with respect to the rm and rn parameters.
+>
+> diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
+> index e1268f9..f412b53 100644
+> --- a/arch/arm/net/bpf_jit_32.c
+> +++ b/arch/arm/net/bpf_jit_32.c
+> @@ -449,10 +449,21 @@ static inline void emit_udiv(u8 rd, u8 rm, u8 rn, struct jit_ctx *ctx)
+>   		return;
+>   	}
+>   #endif
+> -	if (rm != ARM_R0)
+> -		emit(ARM_MOV_R(ARM_R0, rm), ctx);
+> +
+> +	/*
+> +	 * For BPF_ALU | BPF_DIV | BPF_K instructions, rm is ARM_R4
+> +	 * (r_A) and rn is ARM_R0 (r_scratch) so load rn first into
+> +	 * ARM_R1 to avoid accidentally overwriting ARM_R0 with rm
+> +	 * before using it as a source for ARM_R1.
+> +	 *
+> +	 * For BPF_ALU | BPF_DIV | BPF_X rm is ARM_R4 (r_A) and rn is
+> +	 * ARM_R5 (r_X) so there is no particular register overlap
+> +	 * issues.
+> +	 */
+>   	if (rn != ARM_R1)
+>   		emit(ARM_MOV_R(ARM_R1, rn), ctx);
+> +	if (rm != ARM_R0)
+> +		emit(ARM_MOV_R(ARM_R0, rm), ctx);
+>
+>   	ctx->seen |= SEEN_CALL;
+>   	emit_mov_i(ARM_R3, (u32)jit_udiv, ctx);
+>
 
- ./perf record -e sched:sched_switch -g --call-graph dwarf ls
-    [ perf record: Captured and wrote 0.146 MB perf.data ]
- ./perf report -f
-    Samples: 194  of event 'sched:sched_switch', Event count (approx.): 194
-    Children      Self    Command  Shared Object     Symbol
-    100.00%       100.00%  ls       [unknown]         [.] 0000000000000000
-
-The fix is to implement perf_arch_fetch_caller_regs for ARM64, which fills
-several necessary registers used for callchain unwinding, including pc,sp,
-fp and spsr .
-
-With this patch, callchain can be parsed correctly as follows:
-
-     ......
-+    2.63%     0.00%  ls       [kernel.kallsyms]  [k] vfs_symlink
-+    2.63%     0.00%  ls       [kernel.kallsyms]  [k] follow_down
-+    2.63%     0.00%  ls       [kernel.kallsyms]  [k] pfkey_get
-+    2.63%     0.00%  ls       [kernel.kallsyms]  [k] do_execveat_common.isra.33
--    2.63%     0.00%  ls       [kernel.kallsyms]  [k] pfkey_send_policy_notify
-     pfkey_send_policy_notify
-     pfkey_get
-     v9fs_vfs_rename
-     page_follow_link_light
-     link_path_walk
-     el0_svc_naked
-    .......
-
-Signed-off-by: Hou Pengyang <houpengyang@huawei.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/perf_event.h | 7 +++++++
- 1 file changed, 7 insertions(+)
-
-diff --git a/arch/arm64/include/asm/perf_event.h b/arch/arm64/include/asm/perf_event.h
-index d26d1d5..6471773 100644
---- a/arch/arm64/include/asm/perf_event.h
-+++ b/arch/arm64/include/asm/perf_event.h
-@@ -24,4 +24,11 @@ extern unsigned long perf_misc_flags(struct pt_regs *regs);
- #define perf_misc_flags(regs)	perf_misc_flags(regs)
- #endif
- 
-+#define perf_arch_fetch_caller_regs(regs, __ip) { \
-+	(regs)->pc = (__ip);    \
-+	(regs)->regs[29] = (unsigned long) __builtin_frame_address(0); \
-+	(regs)->sp = current_stack_pointer; \
-+	(regs)->pstate = PSR_MODE_EL1h;	\
-+}
-+
- #endif
--- 
-1.8.5.2
+Acked-by: Mircea Gherzan <mgherzan@gmail.com>
