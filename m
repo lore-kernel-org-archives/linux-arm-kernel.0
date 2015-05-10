@@ -1,46 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 10 May 2015 20:40:28 +0100
-Subject: [PATCH v2] ARM: net: add JIT support for loads from struct
- seccomp_data.
-In-Reply-To: <20150509.222858.26253293963482182.davem@davemloft.net>
-References: <1431003613-16554-1-git-send-email-nschichan@freebox.fr>
- <20150509.222858.26253293963482182.davem@davemloft.net>
-Message-ID: <20150510194028.GA2067@n2100.arm.linux.org.uk>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Sun, 10 May 2015 15:49:42 -0400
+Subject: [PATCH 4/7] drivers/cpufreq: Convert non-modular drivers to use
+ builtin_driver_register
+In-Reply-To: <1431287385-1526-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1431287385-1526-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <1431287385-1526-5-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 09, 2015 at 10:28:58PM -0400, David Miller wrote:
-> From: Nicolas Schichan <nschichan@freebox.fr>
-> Date: Thu,  7 May 2015 15:00:13 +0200
-> 
-> > Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
-> > ---
-> > 
-> > This patch was first sent as part of a serie modifying the core
-> > seccomp code to allow the use of the classic BPF JIT. As the core
-> > changes have been submitted to netdev by Daniel Borkmann, it is now
-> > time to re-submit this patch separately.
-> > 
-> > While not physically dependent of the core seccomp changes they are
-> > needed for the code added in this patch to be triggered.
-> 
-> Where would you like this to be applied, my tree?
-> 
-> This is an ongoing situation, where people have traditionally not
-> consistently wanted bpf JIT patches to go into the networking tree.
-> 
-> So I beg everyone posting such things to netdev to be _clear_
-> and _explicit_ about whether you expect me to integrate the patch
-> or not.
+These files depend on Kconfig options all of which are a bool, so
+we use the appropriate registration function, which avoids us
+relying on an implicit inclusion of <module.h> which we are
+doing currently.
 
-I think you have taken previous ARM net JIT patches, so I think it
-makes sense if you continue to do so.  I'm not knowledgable of the
-JIT interface myself, all I can say about many of these patches is
-that they look okay to me on a superficial basis.
+While this currently works, we really don't want to be including
+the module.h header in non-modular code, which we'd be forced
+to do, pending some upcoming code relocation from init.h into
+module.h.  So we fix it now by using the non-modular equivalent.
 
-I suspect you're doing more or less the same, but from a slightly
-different perspective (presumably through not knowing ARM assembly.)
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: linux-pm at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+---
+ drivers/cpufreq/exynos-cpufreq.c  | 2 +-
+ drivers/cpufreq/s5pv210-cpufreq.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
+diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
+index 82d2fbb20f7e..2c2a19f035ee 100644
+--- a/drivers/cpufreq/exynos-cpufreq.c
++++ b/drivers/cpufreq/exynos-cpufreq.c
+@@ -236,4 +236,4 @@ static struct platform_driver exynos_cpufreq_platdrv = {
+ 	},
+ 	.probe = exynos_cpufreq_probe,
+ };
+-module_platform_driver(exynos_cpufreq_platdrv);
++builtin_platform_driver(exynos_cpufreq_platdrv);
+diff --git a/drivers/cpufreq/s5pv210-cpufreq.c b/drivers/cpufreq/s5pv210-cpufreq.c
+index b0dac7d6ba31..9e231f52150c 100644
+--- a/drivers/cpufreq/s5pv210-cpufreq.c
++++ b/drivers/cpufreq/s5pv210-cpufreq.c
+@@ -659,4 +659,4 @@ static struct platform_driver s5pv210_cpufreq_platdrv = {
+ 	},
+ 	.probe = s5pv210_cpufreq_probe,
+ };
+-module_platform_driver(s5pv210_cpufreq_platdrv);
++builtin_platform_driver(s5pv210_cpufreq_platdrv);
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.2.1
