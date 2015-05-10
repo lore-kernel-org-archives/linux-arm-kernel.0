@@ -1,174 +1,164 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 10 May 2015 12:47:13 +0200
-Subject: [PATCH 6/6] ARM: dts: sun8i: Add ET-Q8 A33 support
-In-Reply-To: <1431240383-12763-7-git-send-email-vishnupatekar0510@gmail.com>
-References: <1431240383-12763-1-git-send-email-vishnupatekar0510@gmail.com>
- <1431240383-12763-7-git-send-email-vishnupatekar0510@gmail.com>
-Message-ID: <20150510104713.GH11057@lukather>
+From: jenskuske@gmail.com (Jens Kuske)
+Date: Sun, 10 May 2015 12:54:50 +0200
+Subject: [PATCH 2/6] clk: sunxi: Add H3 clocks support
+In-Reply-To: <20150509112718.GT11057@lukather>
+References: <1430904693-1404-1-git-send-email-jenskuske@gmail.com>
+ <1430904693-1404-3-git-send-email-jenskuske@gmail.com>
+ <20150509112718.GT11057@lukather>
+Message-ID: <554F38FA.2030005@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 10, 2015 at 12:16:23PM +0530, Vishnu Patekar wrote:
-> ET-Q8_A33 is A33 based cheap tablet in common Q8 format.
+Hi,
+
+On 09/05/15 13:27, Maxime Ripard wrote:
+> On Wed, May 06, 2015 at 11:31:29AM +0200, Jens Kuske wrote:
+>> The H3 clock control unit is similar to the those of other sun8i family
+>> members like the A23.
+>>
+>> The AHB1 gates got split up into AHB1 and AHB2, with AHB2 clock source
+>> being muxable between AHB1 and PLL6/2, but still sharing gate registers.
+>> The documentation isn't totally clear about which devices belong to
+>> AHB2 now, especially USB EHIC/OHIC, so it is mostly based on Allwinner
+>> kernel source code.
+>>
+>> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
+>> ---
+>>  Documentation/devicetree/bindings/clock/sunxi.txt |  7 ++++
+>>  drivers/clk/sunxi/clk-sunxi.c                     | 46 ++++++++++++++++++++++-
+>>  2 files changed, 52 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+>> index 4fa11af..4eeb893 100644
+>> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+>> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+>> @@ -14,6 +14,8 @@ Required properties:
+>>  	"allwinner,sun4i-a10-pll5-clk" - for the PLL5 clock
+>>  	"allwinner,sun4i-a10-pll6-clk" - for the PLL6 clock
+>>  	"allwinner,sun6i-a31-pll6-clk" - for the PLL6 clock on A31
+>> +	"allwinner,sun8i-h3-pll6-clk" - for the PLL6 clock on H3
+>> +	"allwinner,sun8i-h3-pll8-clk" - for the PLL8 clock on H3
+>>  	"allwinner,sun9i-a80-gt-clk" - for the GT bus clock on A80
+>>  	"allwinner,sun4i-a10-cpu-clk" - for the CPU multiplexer clock
+>>  	"allwinner,sun4i-a10-axi-clk" - for the AXI clock
+>> @@ -28,8 +30,11 @@ Required properties:
+>>  	"allwinner,sun7i-a20-ahb-gates-clk" - for the AHB gates on A20
+>>  	"allwinner,sun6i-a31-ar100-clk" - for the AR100 on A31
+>>  	"allwinner,sun6i-a31-ahb1-clk" - for the AHB1 clock on A31
+>> +	"allwinner,sun8i-h3-ahb2-clk" - for the AHB2 clock on H3
+>>  	"allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
+>>  	"allwinner,sun8i-a23-ahb1-gates-clk" - for the AHB1 gates on A23
+>> +	"allwinner,sun8i-h3-ahb1-gates-clk" - for the AHB1 gates on H3
+>> +	"allwinner,sun8i-h3-ahb2-gates-clk" - for the AHB2 gates on H3
+>>  	"allwinner,sun9i-a80-ahb0-gates-clk" - for the AHB0 gates on A80
+>>  	"allwinner,sun9i-a80-ahb1-gates-clk" - for the AHB1 gates on A80
+>>  	"allwinner,sun9i-a80-ahb2-gates-clk" - for the AHB2 gates on A80
+>> @@ -52,8 +57,10 @@ Required properties:
+>>  	"allwinner,sun6i-a31-apb1-gates-clk" - for the APB1 gates on A31
+>>  	"allwinner,sun7i-a20-apb1-gates-clk" - for the APB1 gates on A20
+>>  	"allwinner,sun8i-a23-apb1-gates-clk" - for the APB1 gates on A23
+>> +	"allwinner,sun8i-h3-apb1-gates-clk" - for the APB1 gates on H3
+>>  	"allwinner,sun9i-a80-apb1-gates-clk" - for the APB1 gates on A80
+>>  	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
+>> +	"allwinner,sun8i-h3-apb2-gates-clk" - for the APB2 gates on H3
+>>  	"allwinner,sun8i-a23-apb2-gates-clk" - for the APB2 gates on A23
+>>  	"allwinner,sun5i-a13-mbus-clk" - for the MBUS clock on A13
+>>  	"allwinner,sun4i-a10-mmc-clk" - for the MMC clock
+>> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+>> index 7e1e2bd..152a1f7 100644
+>> --- a/drivers/clk/sunxi/clk-sunxi.c
+>> +++ b/drivers/clk/sunxi/clk-sunxi.c
+>> @@ -727,6 +727,12 @@ static const struct factors_data sun5i_a13_ahb_data __initconst = {
+>>  	.getter = sun5i_a13_get_ahb_factors,
+>>  };
+>>  
+>> +static const struct factors_data sun8i_h3_pll8_data __initconst = {
+>> +	.enable = 31,
+>> +	.table = &sun6i_a31_pll6_config,
+>> +	.getter = sun6i_a31_get_pll6_factors,
+>> +};
 > 
-> It has 512MB RAM, 4GB Nand, 7" Display, RDA5900P wifi, GSL1680 touch, etc.
+> This looks like it's just another instance of the A31 pll6.
 > 
-> Signed-off-by: VishnuPatekar <vishnupatekar0510@gmail.com>
-> ---
->  arch/arm/boot/dts/Makefile            |   3 +-
->  arch/arm/boot/dts/sun8i-a33-et-q8.dts | 108 ++++++++++++++++++++++++++++++++++
->  2 files changed, 110 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/sun8i-a33-et-q8.dts
+> In such a case, we don't need to declare a new driver, just reuse the
+> same compatible.
+
+If I reuse pll6 for pll8 I get errors because of the .name = "pll6x2"
+field, already existing clock or something like that. (And pll8 doesn't
+even have a x2 version)
+
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 82f4b9b..d44b1d6 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -570,7 +570,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
->  	sun7i-a20-wexler-tab7200.dtb
->  dtb-$(CONFIG_MACH_SUN8I) += \
->  	sun8i-a23-ippo-q8h-v5.dtb \
-> -	sun8i-a23-ippo-q8h-v1.2.dtb
-> +	sun8i-a23-ippo-q8h-v1.2.dtb \
-> +	sun8i-a33-et-q8.dtb
->  dtb-$(CONFIG_MACH_SUN9I) += \
->  	sun9i-a80-optimus.dtb \
->  	sun9i-a80-cubieboard4.dtb
-> diff --git a/arch/arm/boot/dts/sun8i-a33-et-q8.dts b/arch/arm/boot/dts/sun8i-a33-et-q8.dts
-> new file mode 100644
-> index 0000000..260d5a3
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sun8i-a33-et-q8.dts
-> @@ -0,0 +1,108 @@
-> +/*
-> + * Copyright 2015 Vishnu Patekar
-> + * Vishnu Patekar <vishnupatekar0510@gmail.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +#include "sun8i-a33.dtsi"
-> +#include "sunxi-common-regulators.dtsi"
-> +
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/input/input.h>
-> +#include <dt-bindings/pinctrl/sun4i-a10.h>
-> +
-> +/ {
-> +	model = "ET Q8 A33 ";
+>>  static const struct factors_data sun4i_apb1_data __initconst = {
+>>  	.mux = 24,
+>>  	.muxmask = BIT(1) | BIT(0),
+>> @@ -777,6 +783,10 @@ static const struct mux_data sun6i_a31_ahb1_mux_data __initconst = {
+>>  	.shift = 12,
+>>  };
+>>  
+>> +static const struct mux_data sun8i_h3_ahb2_mux_data __initconst = {
+>> +	.shift = 0,
+>> +};
+>> +
+>>  static void __init sunxi_mux_clk_setup(struct device_node *node,
+>>  				       struct mux_data *data)
+>>  {
+>> @@ -892,7 +902,7 @@ static void __init sunxi_divider_clk_setup(struct device_node *node,
+>>   * sunxi_gates_clk_setup() - Setup function for leaf gates on clocks
+>>   */
+>>  
+>> -#define SUNXI_GATES_MAX_SIZE	64
+>> +#define SUNXI_GATES_MAX_SIZE	160
+>>  
+>>  struct gates_data {
+>>  	DECLARE_BITMAP(mask, SUNXI_GATES_MAX_SIZE);
+>> @@ -926,6 +936,10 @@ static const struct gates_data sun8i_a23_ahb1_gates_data __initconst = {
+>>  	.mask = {0x25386742, 0x2505111},
+>>  };
+>>  
+>> +static const struct gates_data sun8i_h3_ahb1_gates_data __initconst = {
+>> +	.mask = {0x1fbc6760, 0x00701b39, 0x00000000, 0x00000000, 0x00000081},
+>> +};
+>> +
+> 
+> Judging from the user manual, there's a few gates in those 0
+> registers, is this normal that you don't support them?
 
-There's one trailing space here.
+They are holes for apb1 and apb2. Which is actually pretty ugly.
 
-> +	compatible = "et-q8-q33", "allwinner,sun8i", "allwinner,sun8i-a33";
+> 
+>>  static const struct gates_data sun9i_a80_ahb0_gates_data __initconst = {
+>>  	.mask = {0xF5F12B},
+>>  };
+>> @@ -938,6 +952,10 @@ static const struct gates_data sun9i_a80_ahb2_gates_data __initconst = {
+>>  	.mask = {0x9B7},
+>>  };
+>>  
+>> +static const struct gates_data sun8i_h3_ahb2_gates_data __initconst = {
+>> +	.mask = {0xe0020000},
+>> +};
+>> +
+> 
+> I don't think we should split the ahb1 and ahb2 gates here. It really
+> looks like it's the same controller.
+> 
+> The way I'm seeing it would be to have a single clock driver that
+> would handle both your ahb1 and ahb2 gates.
+> 
+> It would take two parents, ahb1 and ahb2, obviously, and would take
+> register depending on the gate w'ere registering either the ahb1 or
+> the ahb2 parent.
+> 
+> It seems like there's only a handful of devices in ahb2 anyway, so
+> that wouldn't make a very long list of devices to declare as childs of
+> ahb2.
+> 
 
-All compatibles must be under the vendor,IP format.
+I have thought about adding a bus_gates driver for all ahb1, ahb2, apb1
+and apb2 gates, as it is done in the user manual.
 
-What is the maker of your board? That should also be in the DT name,
-under the format sun8i-a33-vendor-board.dts
+But it would need a pretty big parents array and result in big gate
+numbers in devicetree, <&bus_gates 112> for uart0 for example.
 
-> +
-> +	aliases {
-> +		serial0 = &uart0;
-> +	};
-> +
-> +	chosen {
-> +		bootargs = "earlyprintk console=ttyS0,115200";
-> +	};
+Would this be ok?
 
-Please use stdout-path here, just like we're doing on the other
-boards.
-
-> +};
-> +
-> +&lradc {
-> +	vref-supply = <&reg_vcc3v0>;
-> +	status = "okay";
-> +
-> +	button at 200 {
-> +		label = "Volume Up";
-> +		linux,code = <KEY_VOLUMEUP>;
-> +		channel = <0>;
-> +		voltage = <200000>;
-> +	};
-> +
-> +	button at 400 {
-> +		label = "Volume Down";
-> +		linux,code = <KEY_VOLUMEDOWN>;
-> +		channel = <0>;
-> +		voltage = <400000>;
-> +	};
-> +};
-> +
-> +&i2c0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c0_pins_a>;
-> +	status = "okay";
-> +};
-> +
-> +&i2c1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c1_pins_a>;
-> +	status = "okay";
-> +};
-> +
-> +&i2c2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c2_pins_a>;
-> +	/* pull-ups and devices require PMIC regulator */
-> +	status = "failed";
-> +};
-
-Is this still true, or is it just a copy/paste mistake?
-
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150510/a2130a51/attachment.sig>
+Jens
