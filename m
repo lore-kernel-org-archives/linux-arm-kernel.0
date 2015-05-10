@@ -1,42 +1,98 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 10 May 2015 10:24:33 +0200
-Subject: [PATCH] ARM: sunxi: dt: Split the SPI pinctrl groups
-In-Reply-To: <1430639236-10785-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1430639236-10785-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20150510082433.GB11057@lukather>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 10 May 2015 10:49:51 +0200
+Subject: [PATCH 1/6] ARM: sunxi: Add Machine support for A33
+In-Reply-To: <1431240383-12763-2-git-send-email-vishnupatekar0510@gmail.com>
+References: <1431240383-12763-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1431240383-12763-2-git-send-email-vishnupatekar0510@gmail.com>
+Message-ID: <554F1BAF.8020709@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 03, 2015 at 09:47:16AM +0200, Maxime Ripard wrote:
-> The pinctrl groups for SPI until now were also adding the chip selects in
-> the SPI pinctrl group.
-> 
-> This was causing a few issues, since a board was forced to use a random
-> number of chipselects, even though it might use one of these chip selects
-> for another pin.
-> 
-> The number of chipselects defined was also not the same from one group to
-> another because of different needs at the time these groups have been
-> introduced, resulting in no clear view from the board DTS on what exactly
-> is being muxed, which even might change in the future.
-> 
-> Solve this by creating different pinctrl groups for the chipselects and the
-> standard SPI pins (CLK, MOSI and MISO) so that we fix both issues.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Hi,
 
-Applied.
+On 10-05-15 08:46, Vishnu Patekar wrote:
+> Allwinnner A33 quad core cortex-a7 based SOC.
+> It is similar to A23.
+>
+> Renamed cpu method to "allwinner,sun8i" for common sun8i smp.
+> smp code is generic for A23, A33 and hopefully H3.
+>
+> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
+> ---
+>   Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
+>   arch/arm/mach-sunxi/Kconfig                     | 2 +-
+>   arch/arm/mach-sunxi/platsmp.c                   | 2 +-
+>   arch/arm/mach-sunxi/sunxi.c                     | 4 ++--
+>   4 files changed, 5 insertions(+), 4 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
+> index 42941fd..e32f082 100644
+> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
+> @@ -9,4 +9,5 @@ using one of the following compatible strings:
+>     allwinner,sun6i-a31
+>     allwinner,sun7i-a20
+>     allwinner,sun8i-a23
+> +  allwinner,sun8i-a33
+>     allwinner,sun9i-a80
+> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+> index 81502b9..38bedd8 100644
+> --- a/arch/arm/mach-sunxi/Kconfig
+> +++ b/arch/arm/mach-sunxi/Kconfig
+> @@ -35,7 +35,7 @@ config MACH_SUN7I
+>   	select SUN5I_HSTIMER
+>
+>   config MACH_SUN8I
+> -	bool "Allwinner A23 (sun8i) SoCs support"
+> +	bool "Allwinner (sun8i) SoCs support"
+>   	default ARCH_SUNXI
+>   	select ARM_GIC
+>   	select MFD_SUN6I_PRCM
+> diff --git a/arch/arm/mach-sunxi/platsmp.c b/arch/arm/mach-sunxi/platsmp.c
+> index e8483ec..c56b501 100644
+> --- a/arch/arm/mach-sunxi/platsmp.c
+> +++ b/arch/arm/mach-sunxi/platsmp.c
+> @@ -189,4 +189,4 @@ struct smp_operations sun8i_smp_ops __initdata = {
+>   	.smp_prepare_cpus	= sun8i_smp_prepare_cpus,
+>   	.smp_boot_secondary	= sun8i_smp_boot_secondary,
+>   };
+> -CPU_METHOD_OF_DECLARE(sun8i_a23_smp, "allwinner,sun8i-a23", &sun8i_smp_ops);
+> +CPU_METHOD_OF_DECLARE(sun8i_smp, "allwinner,sun8i", &sun8i_smp_ops);
+> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+> index 1bc811a..8937d0d 100644
+> --- a/arch/arm/mach-sunxi/sunxi.c
+> +++ b/arch/arm/mach-sunxi/sunxi.c
+> @@ -66,11 +66,11 @@ DT_MACHINE_START(SUN7I_DT, "Allwinner sun7i (A20) Family")
+>   MACHINE_END
+>
+>   static const char * const sun8i_board_dt_compat[] = {
+> -	"allwinner,sun8i-a23",
+> +	"allwinner,sun8i",
+>   	NULL,
+>   };
 
-Maxime
+This is wrong it should be:
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150510/67ae2005/attachment.sig>
+static const char * const sun8i_board_dt_compat[] = {
+	"allwinner,sun8i-a23",
+	"allwinner,sun8i-a33",
+  	NULL,
+};
+
+To match what you've said it will be in Documentation/devicetree/bindings/arm/sunxi.txt
+(which is correct).
+
+Otherwise this patch looks good, thanks for your work on this.
+
+Regards,
+
+Hans
+
+
+>
+> -DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i (A23) Family")
+> +DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i Family")
+>   	.dt_compat	= sun8i_board_dt_compat,
+>   	.init_late	= sunxi_dt_cpufreq_init,
+>   MACHINE_END
+>
