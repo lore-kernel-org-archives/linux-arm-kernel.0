@@ -1,133 +1,197 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 10 May 2015 12:33:00 +0200
-Subject: [PATCH 1/6] ARM: sunxi: Add Machine support for A33
-In-Reply-To: <1431240383-12763-2-git-send-email-vishnupatekar0510@gmail.com>
+Date: Sun, 10 May 2015 12:43:40 +0200
+Subject: [PATCH 5/6] ARM: dts: sunxi: Add Allwinner A33 DTSI
+In-Reply-To: <1431240383-12763-6-git-send-email-vishnupatekar0510@gmail.com>
 References: <1431240383-12763-1-git-send-email-vishnupatekar0510@gmail.com>
- <1431240383-12763-2-git-send-email-vishnupatekar0510@gmail.com>
-Message-ID: <20150510103300.GD11057@lukather>
+ <1431240383-12763-6-git-send-email-vishnupatekar0510@gmail.com>
+Message-ID: <20150510104340.GG11057@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Sun, May 10, 2015 at 12:16:18PM +0530, Vishnu Patekar wrote:
-> Allwinnner A33 quad core cortex-a7 based SOC.
-
-There's one n to many in Allwinner, and having a verb in that sentence
-would help
-
-> It is similar to A23.
+On Sun, May 10, 2015 at 12:16:22PM +0530, Vishnu Patekar wrote:
+> this is based on common sun8i.dtsi patch.
+> sun8i-a23.dtsi and sun8i-a33.dtsi are same, A33 specific features
+> e.g. clocks can be added in future.
 > 
-> Renamed cpu method to "allwinner,sun8i" for common sun8i smp.
-> smp code is generic for A23, A33 and hopefully H3.
-
-Please do only one thing in a patch.
-
-> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
+> Signed-off-by: VishnuPatekar <vishnupatekar0510@gmail.com>
 > ---
->  Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
->  arch/arm/mach-sunxi/Kconfig                     | 2 +-
->  arch/arm/mach-sunxi/platsmp.c                   | 2 +-
->  arch/arm/mach-sunxi/sunxi.c                     | 4 ++--
->  4 files changed, 5 insertions(+), 4 deletions(-)
+>  arch/arm/boot/dts/sun8i-a33.dtsi | 217 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 217 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sun8i-a33.dtsi
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
-> index 42941fd..e32f082 100644
-> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
-> @@ -9,4 +9,5 @@ using one of the following compatible strings:
->    allwinner,sun6i-a31
->    allwinner,sun7i-a20
->    allwinner,sun8i-a23
-> +  allwinner,sun8i-a33
+> diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
+> new file mode 100644
+> index 0000000..32489fc
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun8i-a33.dtsi
+> @@ -0,0 +1,217 @@
+> +/*
+> + * Copyright 2014 Chen-Yu Tsai
+> + *
+> + * Chen-Yu Tsai <wens@csie.org>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +#include "sun8i.dtsi"
+> +
+> +/ {
+> +	cpus {
+> +		enable-method = "allwinner,sun8i";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		cpu at 0 {
+> +			compatible = "arm,cortex-a7";
+> +			device_type = "cpu";
+> +			reg = <0>;
+> +		};
+> +
+> +		cpu at 1 {
+> +			compatible = "arm,cortex-a7";
+> +			device_type = "cpu";
+> +			reg = <1>;
+> +		};
+> +
+> +		cpu at 2 {
+> +			compatible = "arm,cortex-a7";
+> +			device_type = "cpu";
+> +			reg = <2>;
+> +		};
+> +
+> +		cpu at 3 {
+> +			compatible = "arm,cortex-a7";
+> +			device_type = "cpu";
+> +			reg = <3>;
+> +		};
+> +	};
+> +
+> +	memory {
+> +		reg = <0x40000000 0x80000000>;
+> +	};
+> +
+> +	clocks {
+> +		/* dummy clock until actually implemented */
+> +		pll5: pll5_clk {
+> +			#clock-cells = <0>;
+> +			compatible = "fixed-clock";
+> +			clock-frequency = <0>;
+> +			clock-output-names = "pll5";
+> +		};
+> +
+> +		axi: axi_clk at 01c20050 {
+> +			#clock-cells = <0>;
+> +			compatible = "allwinner,sun8i-a23-axi-clk";
+> +			reg = <0x01c20050 0x4>;
+> +			clocks = <&cpu>;
+> +			clock-output-names = "axi";
+> +		};
+> +
+> +		ahb1_gates: clk at 01c20060 {
+> +			#clock-cells = <1>;
+> +			compatible = "allwinner,sun8i-a23-ahb1-gates-clk";
+> +			reg = <0x01c20060 0x8>;
+> +			clocks = <&ahb1>;
+> +			clock-output-names = "ahb1_mipidsi", "ahb1_dma",
+> +					"ahb1_mmc0", "ahb1_mmc1", "ahb1_mmc2",
+> +					"ahb1_nand", "ahb1_sdram",
+> +					"ahb1_hstimer", "ahb1_spi0",
+> +					"ahb1_spi1", "ahb1_otg", "ahb1_ehci",
+> +					"ahb1_ohci", "ahb1_ve", "ahb1_lcd",
+> +					"ahb1_csi", "ahb1_be",	"ahb1_fe",
+> +					"ahb1_gpu", "ahb1_spinlock",
+> +					"ahb1_drc";
+> +		};
+> +
+> +		apb1_gates: clk at 01c20068 {
+> +			#clock-cells = <1>;
+> +			compatible = "allwinner,sun8i-a23-apb1-gates-clk";
+> +			reg = <0x01c20068 0x4>;
+> +			clocks = <&apb1>;
+> +			clock-output-names = "apb1_codec", "apb1_pio",
+> +					"apb1_daudio0",	"apb1_daudio1";
+> +		};
+> +
+> +		apb2: clk at 01c20058 {
+> +			#clock-cells = <0>;
+> +			compatible = "allwinner,sun4i-a10-apb1-clk";
+> +			reg = <0x01c20058 0x4>;
+> +			clocks = <&osc32k>, <&osc24M>, <&pll6 0>, <&pll6 0>;
+> +			clock-output-names = "apb2";
+> +		};
+> +
+> +		apb2_gates: clk at 01c2006c {
+> +			#clock-cells = <1>;
+> +			compatible = "allwinner,sun8i-a23-apb2-gates-clk";
+> +			reg = <0x01c2006c 0x4>;
+> +			clocks = <&apb2>;
+> +			clock-output-names = "apb2_i2c0", "apb2_i2c1",
+> +					"apb2_i2c2", "apb2_uart0",
+> +					"apb2_uart1", "apb2_uart2",
+> +					"apb2_uart3", "apb2_uart4";
+> +		};
+> +
+> +		mbus_clk: clk at 01c2015c {
+> +			#clock-cells = <0>;
+> +			compatible = "allwinner,sun8i-a23-mbus-clk";
+> +			reg = <0x01c2015c 0x4>;
+> +			clocks = <&osc24M>, <&pll6 1>, <&pll5>;
+> +			clock-output-names = "mbus";
+> +		};
+> +	};
+> +
+> +	soc at 01c00000 {
+> +		dma: dma-controller at 01c02000 {
+> +			compatible = "allwinner,sun8i-a23-dma";
+> +			reg = <0x01c02000 0x1000>;
+> +			interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&ahb1_gates 6>;
+> +			resets = <&ahb1_rst 6>;
+> +			#dma-cells = <1>;
+> +		};
 
-Here you're introducing a new compatible for a machine that is
-sun8i-a33.... [1]
+With what device did you test DMA?
 
->    allwinner,sun9i-a80
-> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-> index 81502b9..38bedd8 100644
-> --- a/arch/arm/mach-sunxi/Kconfig
-> +++ b/arch/arm/mach-sunxi/Kconfig
-> @@ -35,7 +35,7 @@ config MACH_SUN7I
->  	select SUN5I_HSTIMER
->  
->  config MACH_SUN8I
-> -	bool "Allwinner A23 (sun8i) SoCs support"
-> +	bool "Allwinner (sun8i) SoCs support"
->  	default ARCH_SUNXI
->  	select ARM_GIC
->  	select MFD_SUN6I_PRCM
-> diff --git a/arch/arm/mach-sunxi/platsmp.c b/arch/arm/mach-sunxi/platsmp.c
-> index e8483ec..c56b501 100644
-> --- a/arch/arm/mach-sunxi/platsmp.c
-> +++ b/arch/arm/mach-sunxi/platsmp.c
-> @@ -189,4 +189,4 @@ struct smp_operations sun8i_smp_ops __initdata = {
->  	.smp_prepare_cpus	= sun8i_smp_prepare_cpus,
->  	.smp_boot_secondary	= sun8i_smp_boot_secondary,
->  };
-> -CPU_METHOD_OF_DECLARE(sun8i_a23_smp, "allwinner,sun8i-a23", &sun8i_smp_ops);
-> +CPU_METHOD_OF_DECLARE(sun8i_smp, "allwinner,sun8i", &sun8i_smp_ops);
-
-Like I was saying, this is an unrelated thing, it should be in a
-separate patch.
-
-And this is wrong.
-
-A compatible should be made for the first IP that uses it. The first
-user of that particular method has been the A23, it should be what's
-in the compatible.
-
-If the A33 is by chance using the exact same code, then we have two
-choices, either reuse that compatible, or introduce a new one if it
-slightly differs. And since the A33 has more cores than the A23, it
-does differ.
-
-So please add a new compatible.
-
-That also breaks the SMP code in the A23 which is a no-go, since the
-compatible would have changed but not the DT.
-
-> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-> index 1bc811a..8937d0d 100644
-> --- a/arch/arm/mach-sunxi/sunxi.c
-> +++ b/arch/arm/mach-sunxi/sunxi.c
-> @@ -66,11 +66,11 @@ DT_MACHINE_START(SUN7I_DT, "Allwinner sun7i (A20) Family")
->  MACHINE_END
->  
->  static const char * const sun8i_board_dt_compat[] = {
-> -	"allwinner,sun8i-a23",
-> +	"allwinner,sun8i",
-
-[1] ... And here, you don't introduce that new machine compatible, but
-remove one a use another one instead....
-
-Apart from the documentation mismatch, you really shouldn't do that.
-
-The machine compatible should be a identifier for the board and the
-SoC, so that we can identify both easily, and possibly enable
-quirks. The only question you should ask yourself whenever you add a
-new compatible is "is this exactly the same IP" ?
-
-In such a case, is the A23 *exactly* the same as the H3 and the A33?
-
-The answer is obviously no, otherwise we would not have this patchset
-in the first place.
-
-So you just need to introduce a new compatible for the A33, just like
-you did in the Documentation, and add that new compatible in the machine.
-
->  	NULL,
->  };
->  
-> -DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i (A23) Family")
-> +DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i Family")
->  	.dt_compat	= sun8i_board_dt_compat,
->  	.init_late	= sunxi_dt_cpufreq_init,
->  MACHINE_END
-> -- 
-> 1.9.1
-> 
+Maxime
 
 -- 
 Maxime Ripard, Free Electrons
@@ -139,4 +203,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150510/afadd7df/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150510/3ce01d1d/attachment.sig>
