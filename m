@@ -1,164 +1,65 @@
-From: jenskuske@gmail.com (Jens Kuske)
-Date: Sun, 10 May 2015 12:54:50 +0200
-Subject: [PATCH 2/6] clk: sunxi: Add H3 clocks support
-In-Reply-To: <20150509112718.GT11057@lukather>
-References: <1430904693-1404-1-git-send-email-jenskuske@gmail.com>
- <1430904693-1404-3-git-send-email-jenskuske@gmail.com>
- <20150509112718.GT11057@lukather>
-Message-ID: <554F38FA.2030005@gmail.com>
+From: houpengyang@huawei.com (Hou Pengyang)
+Date: Sun, 10 May 2015 11:07:40 +0000
+Subject: [PATCH v5] arm64: perf: Fix callchain parse error with kernel
+ tracepoint events
+In-Reply-To: <20150508153758.GG25587@arm.com>
+References: <20150508153758.GG25587@arm.com>
+Message-ID: <1431256060-161483-1-git-send-email-houpengyang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+For ARM64, when tracing with tracepoint events, the IP and pstate are set
+to 0, preventing the perf code parsing the callchain and resolving the
+symbols correctly.
 
-On 09/05/15 13:27, Maxime Ripard wrote:
-> On Wed, May 06, 2015 at 11:31:29AM +0200, Jens Kuske wrote:
->> The H3 clock control unit is similar to the those of other sun8i family
->> members like the A23.
->>
->> The AHB1 gates got split up into AHB1 and AHB2, with AHB2 clock source
->> being muxable between AHB1 and PLL6/2, but still sharing gate registers.
->> The documentation isn't totally clear about which devices belong to
->> AHB2 now, especially USB EHIC/OHIC, so it is mostly based on Allwinner
->> kernel source code.
->>
->> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
->> ---
->>  Documentation/devicetree/bindings/clock/sunxi.txt |  7 ++++
->>  drivers/clk/sunxi/clk-sunxi.c                     | 46 ++++++++++++++++++++++-
->>  2 files changed, 52 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
->> index 4fa11af..4eeb893 100644
->> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
->> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
->> @@ -14,6 +14,8 @@ Required properties:
->>  	"allwinner,sun4i-a10-pll5-clk" - for the PLL5 clock
->>  	"allwinner,sun4i-a10-pll6-clk" - for the PLL6 clock
->>  	"allwinner,sun6i-a31-pll6-clk" - for the PLL6 clock on A31
->> +	"allwinner,sun8i-h3-pll6-clk" - for the PLL6 clock on H3
->> +	"allwinner,sun8i-h3-pll8-clk" - for the PLL8 clock on H3
->>  	"allwinner,sun9i-a80-gt-clk" - for the GT bus clock on A80
->>  	"allwinner,sun4i-a10-cpu-clk" - for the CPU multiplexer clock
->>  	"allwinner,sun4i-a10-axi-clk" - for the AXI clock
->> @@ -28,8 +30,11 @@ Required properties:
->>  	"allwinner,sun7i-a20-ahb-gates-clk" - for the AHB gates on A20
->>  	"allwinner,sun6i-a31-ar100-clk" - for the AR100 on A31
->>  	"allwinner,sun6i-a31-ahb1-clk" - for the AHB1 clock on A31
->> +	"allwinner,sun8i-h3-ahb2-clk" - for the AHB2 clock on H3
->>  	"allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
->>  	"allwinner,sun8i-a23-ahb1-gates-clk" - for the AHB1 gates on A23
->> +	"allwinner,sun8i-h3-ahb1-gates-clk" - for the AHB1 gates on H3
->> +	"allwinner,sun8i-h3-ahb2-gates-clk" - for the AHB2 gates on H3
->>  	"allwinner,sun9i-a80-ahb0-gates-clk" - for the AHB0 gates on A80
->>  	"allwinner,sun9i-a80-ahb1-gates-clk" - for the AHB1 gates on A80
->>  	"allwinner,sun9i-a80-ahb2-gates-clk" - for the AHB2 gates on A80
->> @@ -52,8 +57,10 @@ Required properties:
->>  	"allwinner,sun6i-a31-apb1-gates-clk" - for the APB1 gates on A31
->>  	"allwinner,sun7i-a20-apb1-gates-clk" - for the APB1 gates on A20
->>  	"allwinner,sun8i-a23-apb1-gates-clk" - for the APB1 gates on A23
->> +	"allwinner,sun8i-h3-apb1-gates-clk" - for the APB1 gates on H3
->>  	"allwinner,sun9i-a80-apb1-gates-clk" - for the APB1 gates on A80
->>  	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
->> +	"allwinner,sun8i-h3-apb2-gates-clk" - for the APB2 gates on H3
->>  	"allwinner,sun8i-a23-apb2-gates-clk" - for the APB2 gates on A23
->>  	"allwinner,sun5i-a13-mbus-clk" - for the MBUS clock on A13
->>  	"allwinner,sun4i-a10-mmc-clk" - for the MMC clock
->> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
->> index 7e1e2bd..152a1f7 100644
->> --- a/drivers/clk/sunxi/clk-sunxi.c
->> +++ b/drivers/clk/sunxi/clk-sunxi.c
->> @@ -727,6 +727,12 @@ static const struct factors_data sun5i_a13_ahb_data __initconst = {
->>  	.getter = sun5i_a13_get_ahb_factors,
->>  };
->>  
->> +static const struct factors_data sun8i_h3_pll8_data __initconst = {
->> +	.enable = 31,
->> +	.table = &sun6i_a31_pll6_config,
->> +	.getter = sun6i_a31_get_pll6_factors,
->> +};
-> 
-> This looks like it's just another instance of the A31 pll6.
-> 
-> In such a case, we don't need to declare a new driver, just reuse the
-> same compatible.
+ ./perf record -e sched:sched_switch -g --call-graph dwarf ls
+    [ perf record: Captured and wrote 0.146 MB perf.data ]
+ ./perf report -f
+    Samples: 194  of event 'sched:sched_switch', Event count (approx.): 194
+    Children      Self    Command  Shared Object     Symbol
+    100.00%       100.00%  ls       [unknown]         [.] 0000000000000000
 
-If I reuse pll6 for pll8 I get errors because of the .name = "pll6x2"
-field, already existing clock or something like that. (And pll8 doesn't
-even have a x2 version)
+The fix is to implement perf_arch_fetch_caller_regs for ARM64, which fills
+several necessary registers used for callchain unwinding, including pc,sp,
+fp and spsr .
 
-> 
->>  static const struct factors_data sun4i_apb1_data __initconst = {
->>  	.mux = 24,
->>  	.muxmask = BIT(1) | BIT(0),
->> @@ -777,6 +783,10 @@ static const struct mux_data sun6i_a31_ahb1_mux_data __initconst = {
->>  	.shift = 12,
->>  };
->>  
->> +static const struct mux_data sun8i_h3_ahb2_mux_data __initconst = {
->> +	.shift = 0,
->> +};
->> +
->>  static void __init sunxi_mux_clk_setup(struct device_node *node,
->>  				       struct mux_data *data)
->>  {
->> @@ -892,7 +902,7 @@ static void __init sunxi_divider_clk_setup(struct device_node *node,
->>   * sunxi_gates_clk_setup() - Setup function for leaf gates on clocks
->>   */
->>  
->> -#define SUNXI_GATES_MAX_SIZE	64
->> +#define SUNXI_GATES_MAX_SIZE	160
->>  
->>  struct gates_data {
->>  	DECLARE_BITMAP(mask, SUNXI_GATES_MAX_SIZE);
->> @@ -926,6 +936,10 @@ static const struct gates_data sun8i_a23_ahb1_gates_data __initconst = {
->>  	.mask = {0x25386742, 0x2505111},
->>  };
->>  
->> +static const struct gates_data sun8i_h3_ahb1_gates_data __initconst = {
->> +	.mask = {0x1fbc6760, 0x00701b39, 0x00000000, 0x00000000, 0x00000081},
->> +};
->> +
-> 
-> Judging from the user manual, there's a few gates in those 0
-> registers, is this normal that you don't support them?
+With this patch, callchain can be parsed correctly as follows:
 
-They are holes for apb1 and apb2. Which is actually pretty ugly.
+     ......
++    2.63%     0.00%  ls       [kernel.kallsyms]  [k] vfs_symlink
++    2.63%     0.00%  ls       [kernel.kallsyms]  [k] follow_down
++    2.63%     0.00%  ls       [kernel.kallsyms]  [k] pfkey_get
++    2.63%     0.00%  ls       [kernel.kallsyms]  [k] do_execveat_common.isra.33
+-    2.63%     0.00%  ls       [kernel.kallsyms]  [k] pfkey_send_policy_notify
+     pfkey_send_policy_notify
+     pfkey_get
+     v9fs_vfs_rename
+     page_follow_link_light
+     link_path_walk
+     el0_svc_naked
+    .......
 
-> 
->>  static const struct gates_data sun9i_a80_ahb0_gates_data __initconst = {
->>  	.mask = {0xF5F12B},
->>  };
->> @@ -938,6 +952,10 @@ static const struct gates_data sun9i_a80_ahb2_gates_data __initconst = {
->>  	.mask = {0x9B7},
->>  };
->>  
->> +static const struct gates_data sun8i_h3_ahb2_gates_data __initconst = {
->> +	.mask = {0xe0020000},
->> +};
->> +
-> 
-> I don't think we should split the ahb1 and ahb2 gates here. It really
-> looks like it's the same controller.
-> 
-> The way I'm seeing it would be to have a single clock driver that
-> would handle both your ahb1 and ahb2 gates.
-> 
-> It would take two parents, ahb1 and ahb2, obviously, and would take
-> register depending on the gate w'ere registering either the ahb1 or
-> the ahb2 parent.
-> 
-> It seems like there's only a handful of devices in ahb2 anyway, so
-> that wouldn't make a very long list of devices to declare as childs of
-> ahb2.
-> 
+Signed-off-by: Hou Pengyang <houpengyang@huawei.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/perf_event.h | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-I have thought about adding a bus_gates driver for all ahb1, ahb2, apb1
-and apb2 gates, as it is done in the user manual.
-
-But it would need a pretty big parents array and result in big gate
-numbers in devicetree, <&bus_gates 112> for uart0 for example.
-
-Would this be ok?
-
-Jens
+diff --git a/arch/arm64/include/asm/perf_event.h b/arch/arm64/include/asm/perf_event.h
+index d26d1d5..6471773 100644
+--- a/arch/arm64/include/asm/perf_event.h
++++ b/arch/arm64/include/asm/perf_event.h
+@@ -24,4 +24,11 @@ extern unsigned long perf_misc_flags(struct pt_regs *regs);
+ #define perf_misc_flags(regs)	perf_misc_flags(regs)
+ #endif
+ 
++#define perf_arch_fetch_caller_regs(regs, __ip) { \
++	(regs)->pc = (__ip);    \
++	(regs)->regs[29] = (unsigned long) __builtin_frame_address(0); \
++	(regs)->sp = current_stack_pointer; \
++	(regs)->pstate = PSR_MODE_EL1h;	\
++}
++
+ #endif
+-- 
+1.8.5.2
