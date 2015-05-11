@@ -1,18 +1,42 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 11 May 2015 22:35:53 +0800
-Subject: [PATCH V8 6/6] ARM: config: imx_v6_v7_defconfig add imx7d support
-In-Reply-To: <1431020158-13789-7-git-send-email-Frank.Li@freescale.com>
-References: <1431020158-13789-1-git-send-email-Frank.Li@freescale.com>
- <1431020158-13789-7-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20150511143552.GO9347@dragon>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 11 May 2015 15:36:27 +0100
+Subject: [PATCH] ARM: mm: Enable PXN when running non-LPAE kernel on LPAE
+ processor
+In-Reply-To: <CAPP0e=O=XfE7s7G3qUjqS2o+HwJctuCt9TXzSoTGAKmP14_UBA@mail.gmail.com>
+References: <1419436468.4705.105.camel@decadent.org.uk>
+ <20141224172038.GE13399@e104818-lin.cambridge.arm.com>
+ <CAPP0e=O=XfE7s7G3qUjqS2o+HwJctuCt9TXzSoTGAKmP14_UBA@mail.gmail.com>
+Message-ID: <20150511143627.GH18655@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 08, 2015 at 01:35:58AM +0800, Frank.Li at freescale.com wrote:
-> From: Frank Li <Frank.Li@freescale.com>
+On Mon, May 11, 2015 at 05:09:35PM +0900, Jungseung Lee wrote:
+> Hi, Ben.
 > 
-> Add imx7d support
+> 2014-12-25 2:20 GMT+09:00 Catalin Marinas <catalin.marinas@arm.com>:
+> > On Wed, Dec 24, 2014 at 03:54:28PM +0000, Ben Hutchings wrote:
+> >> The VMSA field of MMFR0 (bottom 4 bits) is incremented for each
+> >> added feature.  PXN is supported if the value is >= 4 and LPAE
+> >> is supported if it is >= 5.
+> >>
+> >> In case a kernel with CONFIG_ARM_LPAE disabled is used on a
+> >> processor that supports LPAE, we can still use PXN in short
+> >> descriptors.  So check for >= 4 not == 4.
+> >>
+> >> Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
+> >> Cc: Jungseung Lee <js07.lee@gmail.com>
+> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> >
+> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 > 
-> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+> Is this patch handled?
 
-Applied, thanks.
+If it's not in mainline already, than it probably isn't handled.
+
+> or you can send it to Russell's patch system:
+> http://www.arm.linux.org.uk/developer/patches/
+
+Check mainline first, otherwise please submit it.
+
+-- 
+Catalin
