@@ -1,41 +1,45 @@
-From: matthias.bgg@gmail.com (Matthias Brugger_0)
-Date: Mon, 11 May 2015 18:05:20 +0200
-Subject: [PATCH v2] Mediatek SCPSYS power domain support
-In-Reply-To: <1431349882-12260-1-git-send-email-s.hauer@pengutronix.de>
-References: <1431349882-12260-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <2471388.4xC5mv0cE3@ubix>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 11 May 2015 17:08:51 +0100
+Subject: [PATCH 2/2] dt: mailbox: Remove 'mbox-names property is discouraged'
+ message from binding
+In-Reply-To: <1431360531-31337-1-git-send-email-lee.jones@linaro.org>
+References: <1431360531-31337-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1431360531-31337-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, May 11, 2015 03:11:18 PM Sascha Hauer wrote:
-> This series adds support for the MediaTek SCPSYS unit.
-> 
-> The SCPSYS unit handles several power management related tasks such
-> as thermal measurement, DVFS, interrupt filter and low level sleep
-> control.
-> 
-> The initial support only contains the generic power domain handling.
-> This is needed to turn on power to the different power domains.
-> 
-> The driver is quite straight forward now. Due to the lack of a better
-> place I have put it to drivers/soc/mediatek. As the SCPSYS unit has
-> several other tasks that also do not fit into some specific subsystem
-> this probably is a good place for this driver.
-> 
-> Please review, any input welcome.
-> 
-> Sascha
-> 
-> changes since v1:
-> - make MFG_ASYNC a subdomain of MFG_2D and MFG_2D a subdomain of MFG
-> - Add (now hopefully properly) infracfg register handling again
-> - Add clock handling
-> - Fix on/off mixup in error message
-> - Make readonly data const
-> - Fix MODULE_LICENSE to GPL v2
+A new API call has been introduced which allows channels to be
+requested by name.  This new call uses the 'mbox-names' property,
+so users need no further discouragement from supplying it.
 
-I can't find this changes. It looks like you send the wrong patches. 
-Please resend.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ Documentation/devicetree/bindings/mailbox/mailbox.txt | 10 ++--------
+ 1 file changed, 2 insertions(+), 8 deletions(-)
 
-Cheers,
-Matthias
+diff --git a/Documentation/devicetree/bindings/mailbox/mailbox.txt b/Documentation/devicetree/bindings/mailbox/mailbox.txt
+index 1a2cd3d..be05b97 100644
+--- a/Documentation/devicetree/bindings/mailbox/mailbox.txt
++++ b/Documentation/devicetree/bindings/mailbox/mailbox.txt
+@@ -22,17 +22,11 @@ Required property:
+ - mboxes: List of phandle and mailbox channel specifiers.
+ 
+ Optional property:
+-- mbox-names: List of identifier strings for each mailbox channel
+-		required by the client. The use of this property
+-		is discouraged in favor of using index in list of
+-		'mboxes' while requesting a mailbox. Instead the
+-		platforms may define channel indices, in DT headers,
+-		to something legible.
++- mbox-names: List of identifier strings for each mailbox channel.
+ 
+ Example:
+ 	pwr_cntrl: power {
+ 		...
+ 		mbox-names = "pwr-ctrl", "rpc";
+-		mboxes = <&mailbox 0
+-			&mailbox 1>;
++		mboxes = <&mailbox 0 &mailbox 1>;
+ 	};
+-- 
+1.9.1
