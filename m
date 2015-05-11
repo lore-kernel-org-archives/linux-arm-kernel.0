@@ -1,44 +1,77 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 11 May 2015 10:52:36 +0100
-Subject: Master-aware devices and sideband ID data
-In-Reply-To: <CALRxmdAEvQPGN_xvwU5Xb4eNfKegPfTyM-GKXg4jRD7JyRxHJA@mail.gmail.com>
-References: <20150324155007.GC23005@leverpostej>
- <CALRxmdAE_=SubN7dY-W1K44cjVVRhKLKknpgG9af_g64+GHPtw@mail.gmail.com>
- <20150508154903.GH25587@arm.com>
- <CALRxmdAEvQPGN_xvwU5Xb4eNfKegPfTyM-GKXg4jRD7JyRxHJA@mail.gmail.com>
-Message-ID: <20150511095236.GC1549@arm.com>
+From: Dave.Martin@arm.com (Dave P Martin)
+Date: Mon, 11 May 2015 10:56:57 +0100
+Subject: [PATCH 1/2] ARM: kvm: fix a bad BSYM() usage
+In-Reply-To: <20150511090537.GA2009@cbox>
+References: <E1YqkpO-0006zB-QJ@rmk-PC.arm.linux.org.uk>
+ <20150509200717.GA30634@cbox>
+ <CAKv+Gu922cZLGUJ3-g8CJiUCuL-5L=XHPfgXUMo-jrdPKAuokA@mail.gmail.com>
+ <20150511090537.GA2009@cbox>
+Message-ID: <20150511095657.GA5856@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 08, 2015 at 08:30:00PM +0100, Stuart Yoder wrote:
-> On Fri, May 8, 2015 at 10:49 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Thu, May 07, 2015 at 06:49:32PM +0100, Stuart Yoder wrote:
-> >> The FSL LS2085A SoC has an actual RID->SID mapping table in the PCI
-> >> controller, but it is not static in the sense of fixed in hardware or
-> >> firmware.  It's
-> >> a programmable mapping table, and we envision Linux programming this table.
-> >
-> > Ok, so I assume you're not planning to use ACPI with this system?
-> 
-> Not initially, but perhaps in the future.  I guess I don't know the implications
-> to ACPI yet.
+On Mon, May 11, 2015 at 10:05:37AM +0100, Christoffer Dall wrote:
+> On Sat, May 09, 2015 at 10:10:56PM +0200, Ard Biesheuvel wrote:
+> > On 9 May 2015 at 22:07, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> > > On Fri, May 08, 2015 at 05:08:42PM +0100, Russell King wrote:
+> > >> BSYM() should only be used when refering to local symbols in the same
+> > >> assembly file which are resolved by the assembler, and not for
+> > >> linker-fixed up symbols.  The use of BSYM() with panic is incorrect as
+> > >> the linker is involved in fixing up this relocation, and it knows
+> > >> whether panic() is ARM or Thumb.
+> > >>
+> > >> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > >> ---
+> > >>  arch/arm/kvm/interrupts.S | 2 +-
+> > >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> > >>
+> > >> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+> > >> index 79caf79b304a..87847d2c5f99 100644
+> > >> --- a/arch/arm/kvm/interrupts.S
+> > >> +++ b/arch/arm/kvm/interrupts.S
+> > >> @@ -309,7 +309,7 @@ ENTRY(kvm_call_hyp)
+> > >>  THUMB(       orr     r2, r2, #PSR_T_BIT      )
+> > >>       msr     spsr_cxsf, r2
+> > >>       mrs     r1, ELR_hyp
+> > >> -     ldr     r2, =BSYM(panic)
+> > >> +     ldr     r2, =panic
+> > >>       msr     ELR_hyp, r2
+> > >>       ldr     r0, =\panic_str
+> > >>       clrex                           @ Clear exclusive monitor
+> > >> --
+> > >> 1.8.3.1
+> > >>
+> > > Indeed, the linker figures it out as it should.  It does seem like the
+> > > right result is produced with the BSYM() macro as well so not sure what
+> > > the harm is.
+> > >
+> > 
+> > BSYM() is defined as 'sym + 1' not 'sym | 1', so if the symbol has the
+> > thumb bit set already, the result is incorrect.
+> > 
+> yeah, but the linker will look at the result of 'sym + 1', so on my
+> system it ends up with 'sym + 1' after the linker has done its thing
+> (verified by looking at the disassembly of vmlinux); I assume the
+> linker logic is that it's branching to a thumb function but the target
+> is already the +1 so no action necessary, as opposed to just blindly
+> adding 1.
 
-Well, I suggest you take a look at the IORT spec[1] asap, because I don't think
-it can describe your system if you want to go in the direction of dynamic
-mappings.
+There are a few overlapping confusions.
 
-> > Also, we can't just program this table willy-nilly, as I'm sure you're
-> > aware. For example, updating a the SMRs in a live SMMU is a big no-no,
-> > so although Linux may initialise the table, it can only be safely changed
-> > at device init/teardown time, surely?
-> 
-> Correct.  That would not be updated when a device is live.
+ldr= will do the right thing *if* the target symbol's type is correctly
+annotated.  This means that ldr =some_local_code_symbol does the right
+thing for branch target addresses if and only if some_local_code_symbol
+is marked with .type %function (or ENDPROC).
 
-Ok, so the best way for Linux is probably to abstract this in the bus code
-and have that allocate the IDs when a device is `hotplugged' on. This would
-also fit well with consolidating the group creation for platform and PCI
-devices.
+The fact that a symbol is in a code section is *not* enough.
 
-Will
+For ARM code this never mattered, so local symbols in .S files are
+probably under-annotated in general.  BSYM() might have been used to
+work around this in some cases.
 
-[1] http://infocenter.arm.com/help/topic/com.arm.doc.den0049a/DEN0049A_IO_Remapping_Table.pdf
+We should check that all the BSYMs removed by this series from ldr=
+and .long/.word etc. point to a correctly annotated symbol, and add
+the annotations if not.
+
+Cheers
+---Dave
