@@ -1,70 +1,27 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Mon, 11 May 2015 18:32:52 -0700
-Subject: [PATCH] imx: thermal: use CPU temperature grade info for
- thresholds
-In-Reply-To: <CAJ+vNU0j47Wk5mbZE-Q1=8uVtx7k3HC-YJXCgWzUwu3TGDu0bg@mail.gmail.com>
-References: <1430409757-16195-1-git-send-email-tharvey@gateworks.com>
- <CAOMZO5BU4msRswEujw=DC=HdsZY5S3YeG9KYNFxf3cwiFY6n2g@mail.gmail.com>
- <CAJ+vNU0j47Wk5mbZE-Q1=8uVtx7k3HC-YJXCgWzUwu3TGDu0bg@mail.gmail.com>
-Message-ID: <20150512013251.GF4810@localhost.localdomain>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 11 May 2015 20:53:49 +0200
+Subject: [linux-sunxi] Re: [PATCH v2 04/13] musb: Do not use
+ musb_read[b|w] / _write[b|w] wrappers in generic fifo functions
+In-Reply-To: <5550F174.6000709@redhat.com>
+References: <1426878682-14521-1-git-send-email-hdegoede@redhat.com>
+ <20150511155846.GH19476@saruman.tx.rr.com> <5550F174.6000709@redhat.com>
+Message-ID: <10106387.CZmapdhaD3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 11, 2015 at 06:31:55AM -0700, Tim Harvey wrote:
-> On Mon, May 11, 2015 at 5:26 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> > On Thu, Apr 30, 2015 at 1:02 PM, Tim Harvey <tharvey@gateworks.com> wrote:
-> >
-> >> +               /* The maximum die temp is specified by the Temperature Grade */
-> >> +               switch ((val >> 6) & 0x3) {
-> >> +               case 0: /* Commercial (0 to 95C) */
-> >> +                       data->temp_grade = "Commercial";
-> >> +                       data->temp_critical = 95000;
-> >> +                       break;
-> >> +               case 1: /* Extended Commercial (-20 to 105C) */
-> >> +                       data->temp_grade = "Extended Commercial";
-> >> +                       data->temp_critical = 105000;
-> >> +                       break;
-> >
-> > Looks good, only a minor suggestion for consistency: could you please
-> > change "Commercial" to "Consumer"?
-> >
-> > This is the term that is referenced in the datasheet, so better keep
-> > it consistent.
-> >
-> > Thanks
-> 
-> Fabio,
-> 
-> Actually this seems to be very inconsistent from Freescale and the
-> register uses the word 'commercial' - I think you are referring to the
-> part identifier which is part of the ordering information. The Part
-> Number Nomenclature in the 'datasheets' use the word 'Commercial' in
-> the temperature grade field and the word 'Consumer' in some (but not
-> all) of the Part differentiator field. The register description uses
-> the word Commercial. I believe this is more of a marketing term than
-> anything else so I don't really care what word is used. I've heard the
-> word commercial used in terms of temperature grades and not consumer
-> personally.
-> 
-> I should note that the actual OTP fuse I'm looking at is only
-> described in the IMX6DQRM (Reference manual for the DUAL and QUAD) and
-> is shown as 'reserved' in the IMX6SDLRM (SOLO and DUALLITE Reference
-> Manual) and the 'IMX6SXRM' for the SX. I have been able to show
-> expirimentaly that the speed grade and temperature grade OTP's exist
-> in the IMX6SDL (even though they are marked as 'reserved' in the RM)
-> but I do not have an IMX6SX to see if the same is true. I have a query
-> out to our FAE for clarification on the OTP registers.
+On Monday 11 May 2015 20:14:12 Hans de Goede wrote:
+> Also note, that as I've tried to explain in the commit message already this commit
+> makes no functional changes what so ever, the generic musb_default_read/write_fifo
+> functions are only used by musb platforms which do not overwrite musb_write* /
+> musb_read* and musb_write* / musb_read* are already just thin wrappers around
+> the __raw_* functions.
 
+Oh, that's a bit odd:  That would mean that the defaults are also broken on
+big-endian platforms, and fixing them would introduce the bug here, unless your
+patch is applied.
 
-Fabio, any particular preference ? Is the patch good to with the current
-nomenclature?
+Any idea why musb uses the __raw_* functions to start with? Can we change
+them to read?_relaxed()/write?_relaxed() now that those are available on
+all architectures?
 
-> 
-> Tim
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150511/fba9f6d7/attachment.sig>
+	Arnd
