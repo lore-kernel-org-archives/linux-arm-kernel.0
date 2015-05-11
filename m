@@ -1,284 +1,101 @@
-From: ivan.ivanov@linaro.org (Ivan T. Ivanov)
-Date: Mon, 11 May 2015 11:31:59 +0300
-Subject: [PATCH v3] arm64: dts: qcom: Add msm8916 CoreSight components
-Message-ID: <1431333119-13626-1-git-send-email-ivan.ivanov@linaro.org>
+From: dyoung@redhat.com (Dave Young)
+Date: Mon, 11 May 2015 16:39:30 +0800
+Subject: [v2 4/5] arm64: add kdump support
+In-Reply-To: <5550613A.3070506@linaro.org>
+References: <1429861989-8417-1-git-send-email-takahiro.akashi@linaro.org>
+ <1429861989-8417-5-git-send-email-takahiro.akashi@linaro.org>
+ <20150508121921.GA18400@localhost.localdomain>
+ <20150511074728.GA15884@dhcp-128-124.nay.redhat.com>
+ <5550613A.3070506@linaro.org>
+Message-ID: <20150511083930.GB15884@dhcp-128-124.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial set of CoreSight components found on Qualcomm's 8x16 chipset.
+On 05/11/15 at 04:58pm, AKASHI Takahiro wrote:
+> Dave,
+> 
+> On 05/11/2015 04:47 PM, Dave Young wrote:
+> >On 05/08/15 at 08:19pm, Dave Young wrote:
+> >>Hi,
+> >>
+> >>On 04/24/15 at 04:53pm, AKASHI Takahiro wrote:
+> >>>Please read the following commits for arm64-specific constraints:
+> >>>     arm64: kdump: reserve memory for crash dump kernel
+> >>>     arm64: kdump: do not go into EL2 before starting a crash dump kernel
+> >>>
+> >>>Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> >>>---
+> >>>  Documentation/kdump/kdump.txt |   31 ++++++++++++++++++++++++++++++-
+> >>>  arch/arm64/Kconfig            |   12 ++++++++++++
+> >>>  2 files changed, 42 insertions(+), 1 deletion(-)
+> >>>
+> >>>diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
+> >>>index bc4bd5a..f9cf6f5 100644
+> >>>--- a/Documentation/kdump/kdump.txt
+> >>>+++ b/Documentation/kdump/kdump.txt
+> >>>@@ -18,7 +18,7 @@ memory image to a dump file on the local disk, or across the network to
+> >>>  a remote system.
+> >>>
+> >>>  Kdump and kexec are currently supported on the x86, x86_64, ppc64, ia64,
+> >>>-s390x and arm architectures.
+> >>>+s390x, arm and arm64 architectures.
+> >>>
+> >>>  When the system kernel boots, it reserves a small section of memory for
+> >>>  the dump-capture kernel. This ensures that ongoing Direct Memory Access
+> >>>@@ -249,6 +249,29 @@ Dump-capture kernel config options (Arch Dependent, arm)
+> >>>
+> >>>      AUTO_ZRELADDR=y
+> >>>
+> >>>+Dump-capture kernel config options (Arch Dependent, arm64)
+> >>>+----------------------------------------------------------
+> >>>+
+> >>>+1) Disable symmetric multi-processing support under "Processor type and
+> >>>+   features":
+> >>>+
+> >>>+   CONFIG_SMP=n
+> >>>+
+> >>>+   (If CONFIG_SMP=y, then specify maxcpus=1 on the kernel command line
+> >>>+   when loading the dump-capture kernel, see section "Load the Dump-capture
+> >>>+   Kernel".)
+> >>>+
+> >>>+2) Under uefi, the maximum memory size on the dump-capture kernel must be
+> >>>+   limited by specifying:
+> >>>+
+> >>>+   mem=X[MG]
+> >>>+
+> >>>+   where X should be less than or equal to the size in "crashkernel="
+> >>>+   boot parameter. Kexec-tools will automatically add this.
+> >>
+> >>I noticed you are passing mem=X in kexec-tools, Pratyush found a problem
+> >>that vmcore is corrupted because kdump kernel is using the crash notes memory.
+> >>
+> >>How does kdump kernel know the system ram range especially the mem_start?
+> >>Only with the size from mem=? parammeter?
+> >>
+> >>In X86 because it use E820 so kexec-tools can pass the memory range to kdump
+> >>kernel even for UEFI booting. But in arm64 may need find other way to
+> >>communicate with 2nd kernel like memmap=exactmap in X86..
+> >
+> >Discussed with Pratyush in irc, he mentioned that start address is get from
+> >kernel->entry which was passed by kexec-tools.
+> >
+> >So sorry for the noise, it will works fine with the UEFI mem= limitation
+> >fix from Mark Salter
+> 
+> No, not at all.
+> As you know, in another thread (with Mark), we're discussing this.
+> If we conclude that we should go for "memmap=" approach, I will update my patch.
 
-Signed-off-by: Ivan T. Ivanov <ivan.ivanov@linaro.org>
----
+Ok, good to know. I did not notice the thread, will take a look.
 
-Changes since v2 [1]:
-* Added "1x" to "qcom,coresight-replicator" compatible string, to match what
-  devicetree bindings documentations says.
+There's another problem for memmap= approach though. In x86 we have problems when
+we need pass reserved memory ranges as well because of some pci mmconfig issue.
+In that case kernel command line buffer is too small and there's too many memory
+ranges for reserved ranges. Thus later we switched to pass e820 in x86 boot params
+directly.
 
-[1] http://www.spinics.net/lists/devicetree/msg77768.html
+If there's same potential problems we may consider to use memmap= only for system
+ram, and for any other reserved types we can still get from same dtb in 1st kernel.
 
- arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi | 254 ++++++++++++++++++++++++
- 1 file changed, 254 insertions(+)
- create mode 100644 arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi
-
-diff --git a/arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi b/arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi
-new file mode 100644
-index 0000000..900f1f4
---- /dev/null
-+++ b/arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi
-@@ -0,0 +1,254 @@
-+/*
-+ * Copyright (c) 2013 - 2015, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+&soc {
-+
-+	tpiu at 820000 {
-+		compatible = "arm,coresight-tpiu", "arm,primecell";
-+		reg = <0x820000 0x1000>;
-+
-+		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
-+		clock-names = "apb_pclk", "atclk";
-+
-+		port {
-+			tpiu_in: endpoint {
-+				slave-mode;
-+				remote-endpoint = <&replicator_out1>;
-+			};
-+		};
-+	};
-+
-+	funnel at 821000 {
-+		compatible = "arm,coresight-funnel", "arm,primecell";
-+		reg = <0x821000 0x1000>;
-+
-+		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
-+		clock-names = "apb_pclk", "atclk";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			/*
-+			 * Not described input ports:
-+			 * 0 - connected to Resource and Power Manger CPU ETM
-+			 * 1 - not-connected
-+			 * 2 - connected to Modem CPU ETM
-+			 * 3 - not-connected
-+			 * 5 - not-connected
-+			 * 6 - connected trought funnel to Wireless CPU ETM
-+			 * 7 - connected to STM component
-+			 */
-+			port at 4 {
-+				reg = <4>;
-+				funnel0_in4: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&funnel1_out>;
-+				};
-+			};
-+			port at 8 {
-+				reg = <0>;
-+				funnel0_out: endpoint {
-+					remote-endpoint = <&etf_in>;
-+				};
-+			};
-+		};
-+	};
-+
-+	replicator at 824000 {
-+		compatible = "qcom,coresight-replicator1x", "arm,primecell";
-+		reg = <0x824000 0x1000>;
-+
-+		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
-+		clock-names = "apb_pclk", "atclk";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				replicator_out0: endpoint {
-+					remote-endpoint = <&etr_in>;
-+				};
-+			};
-+			port at 1 {
-+				reg = <1>;
-+				replicator_out1: endpoint {
-+					remote-endpoint = <&tpiu_in>;
-+				};
-+			};
-+			port at 2 {
-+				reg = <0>;
-+				replicator_in: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&etf_out>;
-+				};
-+			};
-+		};
-+	};
-+
-+	etf at 825000 {
-+		compatible = "arm,coresight-tmc", "arm,primecell";
-+		reg = <0x825000 0x1000>;
-+
-+		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
-+		clock-names = "apb_pclk", "atclk";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				etf_out: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&funnel0_out>;
-+				};
-+			};
-+			port at 1 {
-+				reg = <0>;
-+				etf_in: endpoint {
-+					remote-endpoint = <&replicator_in>;
-+				};
-+			};
-+		};
-+	};
-+
-+	etr at 826000 {
-+		compatible = "arm,coresight-tmc", "arm,primecell";
-+		reg = <0x826000 0x1000>;
-+
-+		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
-+		clock-names = "apb_pclk", "atclk";
-+
-+		port {
-+			etr_in: endpoint {
-+				slave-mode;
-+				remote-endpoint = <&replicator_out0>;
-+			};
-+		};
-+	};
-+
-+	funnel at 841000 {	/* APSS funnel only 4 inputs are used */
-+		compatible = "arm,coresight-funnel", "arm,primecell";
-+		reg = <0x841000 0x1000>;
-+
-+		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
-+		clock-names = "apb_pclk", "atclk";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				funnel1_in0: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&etm0_out>;
-+				};
-+			};
-+			port at 1 {
-+				reg = <1>;
-+				funnel1_in1: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&etm1_out>;
-+				};
-+			};
-+			port at 2 {
-+				reg = <2>;
-+				funnel1_in2: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&etm2_out>;
-+				};
-+			};
-+			port at 3 {
-+				reg = <3>;
-+				funnel1_in3: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&etm3_out>;
-+				};
-+			};
-+			port at 4 {
-+				reg = <0>;
-+				funnel1_out: endpoint {
-+					remote-endpoint = <&funnel0_in4>;
-+				};
-+			};
-+		};
-+	};
-+
-+	etm at 85c000 {
-+		compatible = "arm,coresight-etm4x", "arm,primecell";
-+		reg = <0x85c000 0x1000>;
-+
-+		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
-+		clock-names = "apb_pclk", "atclk";
-+
-+		cpu = <&CPU0>;
-+
-+		port {
-+			etm0_out: endpoint {
-+				remote-endpoint = <&funnel1_in0>;
-+			};
-+		};
-+	};
-+
-+	etm at 85d000 {
-+		compatible = "arm,coresight-etm4x", "arm,primecell";
-+		reg = <0x85d000 0x1000>;
-+
-+		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
-+		clock-names = "apb_pclk", "atclk";
-+
-+		cpu = <&CPU1>;
-+
-+		port {
-+			etm1_out: endpoint {
-+				remote-endpoint = <&funnel1_in1>;
-+			};
-+		};
-+	};
-+
-+	etm at 85e000 {
-+		compatible = "arm,coresight-etm4x", "arm,primecell";
-+		reg = <0x85e000 0x1000>;
-+
-+		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
-+		clock-names = "apb_pclk", "atclk";
-+
-+		cpu = <&CPU2>;
-+
-+		port {
-+			etm2_out: endpoint {
-+				remote-endpoint = <&funnel1_in2>;
-+			};
-+		};
-+	};
-+
-+	etm at 85f000 {
-+		compatible = "arm,coresight-etm4x", "arm,primecell";
-+		reg = <0x85f000 0x1000>;
-+
-+		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
-+		clock-names = "apb_pclk", "atclk";
-+
-+		cpu = <&CPU3>;
-+
-+		port {
-+			etm3_out: endpoint {
-+				remote-endpoint = <&funnel1_in3>;
-+			};
-+		};
-+	};
-+};
---
-1.9.1
+Thanks
+Dave
