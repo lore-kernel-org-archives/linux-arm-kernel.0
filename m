@@ -1,85 +1,25 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 11 May 2015 11:21:47 +0200
-Subject: [PATCH] ARM: at91/dt: drop deprecated mainck node from pmc
-In-Reply-To: <1429187145-10741-1-git-send-email-g.portay@overkiz.com>
-References: <1429187145-10741-1-git-send-email-g.portay@overkiz.com>
-Message-ID: <555074AB.3060006@atmel.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 11 May 2015 11:22:50 +0200
+Subject: [PATCH 03/12] clocksource: sti: Provide 'use timer as sched
+ clock' capability
+In-Reply-To: <55506CB0.2030909@linaro.org>
+References: <1431005924-21777-1-git-send-email-lee.jones@linaro.org>
+ <1431005924-21777-4-git-send-email-lee.jones@linaro.org>
+ <1431074699.13593.4.camel@x220> <20150508093603.GB29044@x1>
+ <1431078730.13593.14.camel@x220> <20150508102938.GD29044@x1>
+ <1431085625.13593.39.camel@x220> <55506CB0.2030909@linaro.org>
+Message-ID: <1431336170.2398.73.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 16/04/2015 14:25, Ga?l PORTAY a ?crit :
-> The clock-frequency property became obsolete since the rework of the main
-> clock driver in 3.16 (see commit 27cb1c2083373a44130d50d4d2fb64cf7eff2d90).
-> 
-> It now get and uses the clock-frequency from the main_xtal node.
-> 
-> Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
+On Mon, 2015-05-11 at 10:47 +0200, Daniel Lezcano wrote:
+> The general policy is to have non-prompted options in the clocksource's 
+> Kconfig and let the platform's config to select the right components.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-and queued in at91-4.2-dt branch.
-
-Thanks!
-
-> ---
->  arch/arm/boot/dts/at91-sama5d3_xplained.dts | 6 ------
->  arch/arm/boot/dts/at91sam9rlek.dts          | 6 ------
->  arch/arm/boot/dts/sama5d3xcm.dtsi           | 6 ------
->  3 files changed, 18 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> index fec1fca..1721e9b 100644
-> --- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> +++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> @@ -204,12 +204,6 @@
->  					};
->  				};
->  			};
-> -
-> -			pmc: pmc at fffffc00 {
-> -				main: mainck {
-> -					clock-frequency = <12000000>;
-> -				};
-> -			};
->  		};
->  
->  		nand0: nand at 60000000 {
-> diff --git a/arch/arm/boot/dts/at91sam9rlek.dts b/arch/arm/boot/dts/at91sam9rlek.dts
-> index 9be5b54..d9299be3 100644
-> --- a/arch/arm/boot/dts/at91sam9rlek.dts
-> +++ b/arch/arm/boot/dts/at91sam9rlek.dts
-> @@ -181,12 +181,6 @@
->  				};
->  			};
->  
-> -			pmc: pmc at fffffc00 {
-> -				main: mainck {
-> -					clock-frequency = <12000000>;
-> -				};
-> -			};
-> -
->  			watchdog at fffffd40 {
->  				status = "okay";
->  			};
-> diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
-> index 7d6babd..ef404e9 100644
-> --- a/arch/arm/boot/dts/sama5d3xcm.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
-> @@ -67,12 +67,6 @@
->  					rxd3-skew-ps = <400>;
->  				};
->  			};
-> -
-> -			pmc: pmc at fffffc00 {
-> -				main: mainck {
-> -					clock-frequency = <12000000>;
-> -				};
-> -			};
->  		};
->  
->  		nand0: nand at 60000000 {
-> 
+If you want to stick to that policy here there's no reason to add
+CLKSRC_ST_LPC_TIMER_SCHED_CLOCK in this patch. It currently adds
+nothing, as it will always be equal to whatever value CLKSRC_ST_LPC will
+have, right?
 
 
--- 
-Nicolas Ferre
+Paul Bolle
