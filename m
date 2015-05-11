@@ -1,50 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 May 2015 11:17:39 +0100
-Subject: [PATCH 1/2] ARM: kvm: fix a bad BSYM() usage
-In-Reply-To: <20150511095657.GA5856@e103592.cambridge.arm.com>
-References: <E1YqkpO-0006zB-QJ@rmk-PC.arm.linux.org.uk>
- <20150509200717.GA30634@cbox>
- <CAKv+Gu922cZLGUJ3-g8CJiUCuL-5L=XHPfgXUMo-jrdPKAuokA@mail.gmail.com>
- <20150511090537.GA2009@cbox>
- <20150511095657.GA5856@e103592.cambridge.arm.com>
-Message-ID: <20150511101738.GC2067@n2100.arm.linux.org.uk>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Mon, 11 May 2015 12:18:51 +0200
+Subject: [PATCH v4 3/3] ARM: berlin: add an ADC node for the BG2Q
+In-Reply-To: <1431339531-11938-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1431339531-11938-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1431339531-11938-4-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 11, 2015 at 10:56:57AM +0100, Dave P Martin wrote:
-> ldr= will do the right thing *if* the target symbol's type is correctly
-> annotated.  This means that ldr =some_local_code_symbol does the right
-> thing for branch target addresses if and only if some_local_code_symbol
-> is marked with .type %function (or ENDPROC).
-> 
-> The fact that a symbol is in a code section is *not* enough.
-> 
-> For ARM code this never mattered, so local symbols in .S files are
-> probably under-annotated in general.  BSYM() might have been used to
-> work around this in some cases.
-> 
-> We should check that all the BSYMs removed by this series from ldr=
-> and .long/.word etc. point to a correctly annotated symbol, and add
-> the annotations if not.
+This patch adds the ADC node for the Berlin BG2Q, using the newly added
+Berlin IIO ADC driver.
 
-I guess the problem here is that people forget what a patch series is
-actually doing and then start making comments based on hypothetical
-stuff rather than what the series is actually doing.
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ arch/arm/boot/dts/berlin2q.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-To recap, this series:
-
-1. Removes the wrong usage of BSYM() in the KVM code.  This is used with
-   the symbol "panic" which is a function declared by generic C code.
-   Therefore, panic will have the appropriate annotations attached to
-   this symbol, unless GCC itself is buggy.
-
-   This is the _only_ case of "ldr rd, =BSYM(sym)".
-
-2. It replaces the remaining "adr rd, BSYM(sym)" with a new "badr" macro,
-   and removes the BSYM() preprocessor macro.  The new "badr" macro which
-   is identical in behaviour to the former, but ensures that BSYM()
-   doesn't get mis-used with "ldr".
-
+diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+index 187d056f7ad2..97c7e19e3ec6 100644
+--- a/arch/arm/boot/dts/berlin2q.dtsi
++++ b/arch/arm/boot/dts/berlin2q.dtsi
+@@ -565,6 +565,13 @@
+ 						function = "twsi3";
+ 					};
+ 				};
++
++				adc: adc {
++					compatible = "marvell,berlin2-adc";
++					interrupt-parent = <&sic>;
++					interrupts = <12>, <14>;
++					interrupt-names = "adc", "tsen";
++				};
+ 			};
+ 
+ 			sic: interrupt-controller at e000 {
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.4.0
