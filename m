@@ -1,41 +1,47 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 11 May 2015 13:39:54 +0100
-Subject: [PATCH 05/12] arm64: psci: support unsigned return values
-In-Reply-To: <20150511122525.GA2187@red-moon>
-References: <1431085004-32743-1-git-send-email-mark.rutland@arm.com>
- <1431085004-32743-6-git-send-email-mark.rutland@arm.com>
- <20150511122525.GA2187@red-moon>
-Message-ID: <20150511123954.GB4595@leverpostej>
+From: suzuki.poulose@arm.com (Suzuki K. Poulose)
+Date: Mon, 11 May 2015 13:50:26 +0100
+Subject: [PATCH] arm-cci: Do not enable CCI-400 PMU by default
+Message-ID: <1431348626-2767-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 11, 2015 at 01:25:25PM +0100, Lorenzo Pieralisi wrote:
-> On Fri, May 08, 2015 at 12:36:37PM +0100, Mark Rutland wrote:
-> 
-> [...]
-> 
-> > -static int psci_get_version(void)
-> > +static u32 psci_get_version(void)
-> >  {
-> > -	int err;
-> > -
-> > -	err = invoke_psci_fn(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
-> > -	return err;
-> > +	return invoke_psci_fn(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
-> >  }
-> >  
-> >  static int psci_cpu_suspend(struct psci_power_state state,
-> > @@ -295,23 +292,13 @@ static int __init psci_probe(void)
-> >  {
-> >  	int ver = psci_get_version();
-> 
-> Is there a reason to keep ver as an int ?
+From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 
-No, I just missed it when propagating the type changes. It should be
-corrected to a u32 as well.
+Do not enable CCI-400 PMU by default and fix the dependency on PERF_EVENTS
+than HW_PERF_EVENTS.
 
-> Other than that the patch looks fine.
+Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: arm at vger.kernel.org
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+---
+ drivers/bus/Kconfig |   10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-Great!
-
-Mark.
+diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+index a1d4af6..62a7ffc 100644
+--- a/drivers/bus/Kconfig
++++ b/drivers/bus/Kconfig
+@@ -13,15 +13,13 @@ config ARM_CCI400_COMMON
+ 
+ config ARM_CCI400_PMU
+ 	bool "ARM CCI400 PMU support"
+-	default y
+ 	depends on ARM || ARM64
+-	depends on HW_PERF_EVENTS
++	depends on PERF_EVENTS
+ 	select ARM_CCI400_COMMON
+ 	help
+-	  Support for PMU events monitoring on the ARM CCI cache coherent
+-	  interconnect.
+-
+-	  If unsure, say Y
++	  Support for PMU events monitoring on the ARM CCI-400 (cache coherent
++	  interconnect). CCI-400 supports counting events related to the
++	  connected slave/master interfaces.
+ 
+ config ARM_CCI400_PORT_CTRL
+ 	bool
+-- 
+1.7.9.5
