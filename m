@@ -1,38 +1,21 @@
-From: ttnguyen@apm.com (Tai Tri Nguyen)
-Date: Mon, 11 May 2015 12:15:06 -0700
-Subject: [PATCH 0/2] power: reset: Add syscon reboot/poweroff device nodes
- for APM X-Gene platform
-In-Reply-To: <1430511074-32229-1-git-send-email-ttnguyen@apm.com>
-References: <1430511074-32229-1-git-send-email-ttnguyen@apm.com>
-Message-ID: <CACgAJHzxVjg+m+4swXwyGGGf43WkJmxxGOJnXnwA=TwKmJCWTw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 11 May 2015 12:08:48 -0700
+Subject: [PATCH] Show proper respect for Heinrich Hertz by using the
+ correct unit for frequency
+In-Reply-To: <20150511131952.GD2067@n2100.arm.linux.org.uk>
+References: <20150511131952.GD2067@n2100.arm.linux.org.uk>
+Message-ID: <20150511190847.GE15563@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [150511 06:23]:
+> The SI unit of frequency is Hertz, named after Heinrich Hertz, and is
+> given the symbol "Hz" to denote this.  "hz" is not the unit of frequency,
+> and is in fact meaningless.
+> 
+> Fix arch/arm to correctly use "Hz", thereby acknowledging Heinrich Hertz
+> contribution to the modern world.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Any comment on these patches, please?
-
-Thanks,
-Tai
-
-
-On Fri, May 1, 2015 at 1:11 PM, Tai Nguyen <ttnguyen@apm.com> wrote:
-> This patch set adds syscon reboot/poweroff device nodes to support reboot and
-> poweroff features on X-Gene platform.
->
-> Tai Nguyen (2):
->   power: reset: Add syscon reboot device node for APM X-Gene platform
->   power: reset: Add syscon poweroff device node for APM X-Gene Mustang platform
->
->  arch/arm64/boot/dts/apm/apm-mustang.dts |   12 ++++++++++++
->  arch/arm64/boot/dts/apm/apm-storm.dtsi  |   12 ++++++++++++
->  2 files changed, 24 insertions(+)
->
-> --
-> 1.7.9.5
->
-
-
-
--- 
-Tai
+Acked-by: Tony Lindgren <tony@atomide.com>
