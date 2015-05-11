@@ -1,51 +1,43 @@
-From: afaerber@suse.de (=?windows-1252?Q?Andreas_F=E4rber?=)
-Date: Mon, 11 May 2015 23:39:08 +0200
-Subject: [PATCH] Show proper respect for Heinrich Hertz by using the
- correct unit for frequency
-In-Reply-To: <20150511131952.GD2067@n2100.arm.linux.org.uk>
-References: <20150511131952.GD2067@n2100.arm.linux.org.uk>
-Message-ID: <5551217C.9090504@suse.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 11 May 2015 22:40:44 +0100
+Subject: Physical memory start address for ARM cores
+In-Reply-To: <CAJWVF-whTD0Nm-cup-qOt-M-PYn-6GojSiE9pS2Db0R35D5aUQ@mail.gmail.com>
+References: <CAJWVF-whTD0Nm-cup-qOt-M-PYn-6GojSiE9pS2Db0R35D5aUQ@mail.gmail.com>
+Message-ID: <20150511214044.GJ2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 11.05.2015 um 15:19 schrieb Russell King - ARM Linux:
-> The SI unit of frequency is Hertz, named after Heinrich Hertz, and is
-> given the symbol "Hz" to denote this.  "hz" is not the unit of frequency,
-> and is in fact meaningless.
-> 
-> Fix arch/arm to correctly use "Hz", thereby acknowledging Heinrich Hertz
-> contribution to the modern world.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On Mon, May 11, 2015 at 08:47:21PM +0530, Bhaskara rao Budiredla wrote:
+> Could you please confirm if ARM architecture mandates the physical
+> memory start address to align with a MegaBye boundary (something like
+> 0xXXX00000)? I am seeing Linux Kernel crash if I relax that
+> restriction.
 
-Nice. :) Since you're being exact, should it be "Hertz' contribution"?
+The ARM architecture doesn't, but we (the kernel) does restrict it for
+the sake of cross-machine portability.  See this comment in
+arch/arm/boot/compressed.S:
 
-> diff --git a/arch/arm/boot/dts/omap3-cm-t3517.dts b/arch/arm/boot/dts/omap3-cm-t3517.dts
-> index f5b5a1d96cd7..53ae04f9104d 100644
-> --- a/arch/arm/boot/dts/omap3-cm-t3517.dts
-> +++ b/arch/arm/boot/dts/omap3-cm-t3517.dts
-> @@ -66,7 +66,7 @@
->  
->  	otg_drv_vbus: pinmux_otg_drv_vbus {
->  		pinctrl-single,pins = <
-> -			OMAP3_CORE1_IOPAD(0x2210, PIN_INPUT_PULLDOWN | MUX_MODE0) /* rmii_50Mhz_clk.usb0_drvvbus */
-> +			OMAP3_CORE1_IOPAD(0x2210, PIN_INPUT_PULLDOWN | MUX_MODE0) /* rmii_50MHz_clk.usb0_drvvbus */
+                /*
+                 * Find the start of physical memory.  As we are executing
+                 * without the MMU on, we are in the physical address space.
+                 * We just need to get rid of any offset by aligning the
+                 * address.
+                 *
+                 * This alignment is a balance between the requirements of
+                 * different platforms - we have chosen 128MB to allow
+                 * platforms which align the start of their physical memory
+                 * to 128MB to use this feature, while allowing the zImage
+                 * to be placed within the first 128MB of memory on other
+                 * platforms.  Increasing the alignment means we place
+                 * stricter alignment requirements on the start of physical
+                 * memory, but relaxing it means that we break people who
+                 * are already placing their zImage in (eg) the top 64MB
+                 * of this range.
+                 */
 
-This one looks like an identifier - did you check where it comes from
-and whether it needs to be fixed there as well?
-
->  		>;
->  	};
->  
-
-Rest looks good,
-
-Reviewed-by: Andreas F?rber <afaerber@suse.de>
-
-Cheers,
-Andreas
+We will never change this requirement, as changing it breaks existing
+platforms, and that's not allowed.
 
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Dilip Upmanyu, Graham Norton; HRB
-21284 (AG N?rnberg)
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
