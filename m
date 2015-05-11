@@ -1,44 +1,24 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 11 May 2015 09:13:08 +0200
-Subject: [PATCH 10/10] arm64/efi: adapt to relaxed kernel Image placement
- requirements
-In-Reply-To: <1431328388-3051-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1431328388-3051-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1431328388-3051-11-git-send-email-ard.biesheuvel@linaro.org>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Mon, 11 May 2015 15:20:25 +0800
+Subject: [PATCH 1/2] crypto: arm/sha512 - accelerated SHA-512 using ARM
+ generic ASM and NEON
+In-Reply-To: <CAKv+Gu9+xrX2nB43cskOoL63WjZGTDdq9ZTO-maWas5u=ng=JQ@mail.gmail.com>
+References: <1431074782-22141-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150511065952.GB2598@gondor.apana.org.au>
+ <CAKv+Gu9+xrX2nB43cskOoL63WjZGTDdq9ZTO-maWas5u=ng=JQ@mail.gmail.com>
+Message-ID: <20150511072025.GA2789@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adapts the EFI stub kernel placement to the new relaxed
-requirements, by placing the kernel Image at the highest available
-2 MB offset in physical memory.
+On Mon, May 11, 2015 at 09:00:49AM +0200, Ard Biesheuvel wrote:
+>
+> Yes, you are right. Let me figure out what's going on and send you a
+> new version.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/efi-stub.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+Don't worry.  I fixed it up while applying the patch.
 
-diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
-index f5374065ad53..60ae3324e26e 100644
---- a/arch/arm64/kernel/efi-stub.c
-+++ b/arch/arm64/kernel/efi-stub.c
-@@ -10,6 +10,7 @@
-  *
-  */
- #include <linux/efi.h>
-+#include <asm/boot.h>
- #include <asm/efi.h>
- #include <asm/sections.h>
- 
-@@ -28,8 +29,8 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table,
- 	kernel_size = _edata - _text;
- 	if (*image_addr != (dram_base + TEXT_OFFSET)) {
- 		kernel_memsize = kernel_size + (_end - _edata);
--		status = efi_low_alloc(sys_table, kernel_memsize + TEXT_OFFSET,
--				       SZ_2M, reserve_addr);
-+		status = efi_high_alloc(sys_table, kernel_memsize + TEXT_OFFSET,
-+				       MIN_KIMG_ALIGN, reserve_addr, ULONG_MAX);
- 		if (status != EFI_SUCCESS) {
- 			pr_efi_err(sys_table, "Failed to relocate kernel\n");
- 			return status;
+Cheers,
 -- 
-1.9.1
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
