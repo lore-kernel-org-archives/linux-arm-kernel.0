@@ -1,28 +1,26 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 11 May 2015 16:05:33 +0200
-Subject: [PATCH] net: ll_temac: Use one return statement instead of two
-In-Reply-To: <alpine.DEB.2.10.1505071730090.2462@hadrien>
-References: <b10b8e1e696a09152b9df535a8bd37e6500ac1c7.1431005352.git.michal.simek@xilinx.com>
- <alpine.DEB.2.10.1505071730090.2462@hadrien>
-Message-ID: <5550B72D.2020004@xilinx.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 11 May 2015 16:05:44 +0200
+Subject: [PATCH 1/3] clocksource: exynos_mct: Change exynos4_mct_tick_clear
+ return type to void
+In-Reply-To: <1430368973-23786-1-git-send-email-k.kozlowski@samsung.com>
+References: <1430368973-23786-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <5550B738.60509@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/2015 05:30 PM, Julia Lawall wrote:
-> On Thu, 7 May 2015, Michal Simek wrote:
-> 
->> From: Michal Simek <monstr@monstr.eu>
->>
->> Use one return statement instead of two to simplify the code.
->> Both are returning the same value.
->>
->> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> 
-> The from should be the same as the signed off.  You need From if you want
-> something different than what is naturally put by your mailer.  But that
-> doesn't see to be the case.
+On 04/30/2015 06:42 AM, Krzysztof Kozlowski wrote:
+> Return value of exynos4_mct_tick_clear() was never checked so it can
+> be safely changed to void.
+>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-ok. Fixed in v2.
+Applied to my tree for 4.2
 
-Thanks,
-Michal
+   -- Daniel
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
