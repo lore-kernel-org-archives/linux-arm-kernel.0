@@ -1,34 +1,35 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 11 May 2015 16:58:56 +0200
-Subject: [PATCH v5 07/12] mtd: nand: add Samsung K9GBG08U0A-M to nand_ids table
+Date: Mon, 11 May 2015 16:58:59 +0200
+Subject: [PATCH v5 10/12] mtd: nand: let Marvell Berlin SoCs select the pxa3xx
+ driver
 In-Reply-To: <1431356341-31640-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1431356341-31640-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1431356341-31640-8-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1431356341-31640-11-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the full description of the Samsung K9GBG08U0A-M nand chip in the
-nand_ids table.
+Marvell Berlin nand controller support has been added in the pxa3xx nand
+driver. Let these SoCs select the driver.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- drivers/mtd/nand/nand_ids.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/mtd/nand/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mtd/nand/nand_ids.c b/drivers/mtd/nand/nand_ids.c
-index dd620c19c619..500c33e1db06 100644
---- a/drivers/mtd/nand/nand_ids.c
-+++ b/drivers/mtd/nand/nand_ids.c
-@@ -50,6 +50,10 @@ struct nand_flash_dev nand_flash_ids[] = {
- 		{ .id = {0xad, 0xde, 0x94, 0xda, 0x74, 0xc4} },
- 		  SZ_8K, SZ_8K, SZ_2M, 0, 6, 640, NAND_ECC_INFO(40, SZ_1K),
- 		  4 },
-+	{"NAND 4GiB 3,3V 8-bit",
-+		{ .id = {0xec, 0xd7, 0x94, 0x76, 0x64, 0x43}, },
-+		  8192, 4096, SZ_1M, LP_OPTIONS, 0, 0, NAND_ECC_INFO(40, SZ_1K),
-+		  4 },
+diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+index 5897d8d8fa5a..0e41f2126e39 100644
+--- a/drivers/mtd/nand/Kconfig
++++ b/drivers/mtd/nand/Kconfig
+@@ -331,8 +331,8 @@ config MTD_NAND_ATMEL
+ 	  on Atmel AT91 and AVR32 processors.
  
- 	LEGACY_ID_NAND("NAND 4MiB 5V 8-bit",   0x6B, 4, SZ_8K, SP_OPTIONS),
- 	LEGACY_ID_NAND("NAND 4MiB 3,3V 8-bit", 0xE3, 4, SZ_8K, SP_OPTIONS),
+ config MTD_NAND_PXA3xx
+-	tristate "NAND support on PXA3xx and Armada 370/XP"
+-	depends on PXA3xx || ARCH_MMP || PLAT_ORION
++	tristate "NAND support on PXA3xx, Armada 370/XP and Marvell Berlin"
++	depends on PXA3xx || ARCH_MMP || PLAT_ORION || ARCH_BERLIN
+ 	help
+ 	  This enables the driver for the NAND flash device found on
+ 	  PXA3xx processors (NFCv1) and also on Armada 370/XP (NFCv2).
 -- 
 2.4.0
