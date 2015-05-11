@@ -1,66 +1,80 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 11 May 2015 11:44:49 +0200
-Subject: [PATCH 1/2] ARM: kvm: fix a bad BSYM() usage
-In-Reply-To: <20150511090537.GA2009@cbox>
-References: <E1YqkpO-0006zB-QJ@rmk-PC.arm.linux.org.uk>
- <20150509200717.GA30634@cbox>
- <CAKv+Gu922cZLGUJ3-g8CJiUCuL-5L=XHPfgXUMo-jrdPKAuokA@mail.gmail.com>
- <20150511090537.GA2009@cbox>
-Message-ID: <CAKv+Gu9mbytGHZvi=tt9eGwngzRq0r_V6Cwvk0aDRTsH8JtRXQ@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 11 May 2015 12:45:03 +0300
+Subject: [GIT PULL] Ux500 development for v4.2
+In-Reply-To: <CACRpkdZX-Tg-1SNV0L2MemGqkaVZG9wSwiLquYVDVMToZT02nw@mail.gmail.com>
+References: <CACRpkdZX-Tg-1SNV0L2MemGqkaVZG9wSwiLquYVDVMToZT02nw@mail.gmail.com>
+Message-ID: <20150511094503.GW2558@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 May 2015 at 11:05, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> On Sat, May 09, 2015 at 10:10:56PM +0200, Ard Biesheuvel wrote:
->> On 9 May 2015 at 22:07, Christoffer Dall <christoffer.dall@linaro.org> wrote:
->> > On Fri, May 08, 2015 at 05:08:42PM +0100, Russell King wrote:
->> >> BSYM() should only be used when refering to local symbols in the same
->> >> assembly file which are resolved by the assembler, and not for
->> >> linker-fixed up symbols.  The use of BSYM() with panic is incorrect as
->> >> the linker is involved in fixing up this relocation, and it knows
->> >> whether panic() is ARM or Thumb.
->> >>
->> >> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->> >> ---
->> >>  arch/arm/kvm/interrupts.S | 2 +-
->> >>  1 file changed, 1 insertion(+), 1 deletion(-)
->> >>
->> >> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
->> >> index 79caf79b304a..87847d2c5f99 100644
->> >> --- a/arch/arm/kvm/interrupts.S
->> >> +++ b/arch/arm/kvm/interrupts.S
->> >> @@ -309,7 +309,7 @@ ENTRY(kvm_call_hyp)
->> >>  THUMB(       orr     r2, r2, #PSR_T_BIT      )
->> >>       msr     spsr_cxsf, r2
->> >>       mrs     r1, ELR_hyp
->> >> -     ldr     r2, =BSYM(panic)
->> >> +     ldr     r2, =panic
->> >>       msr     ELR_hyp, r2
->> >>       ldr     r0, =\panic_str
->> >>       clrex                           @ Clear exclusive monitor
->> >> --
->> >> 1.8.3.1
->> >>
->> > Indeed, the linker figures it out as it should.  It does seem like the
->> > right result is produced with the BSYM() macro as well so not sure what
->> > the harm is.
->> >
->>
->> BSYM() is defined as 'sym + 1' not 'sym | 1', so if the symbol has the
->> thumb bit set already, the result is incorrect.
->>
-> yeah, but the linker will look at the result of 'sym + 1', so on my
-> system it ends up with 'sym + 1' after the linker has done its thing
-> (verified by looking at the disassembly of vmlinux);
+Hi Linus,
 
-Hmm, I though had done the same when this was under discussion a
-couple of weeks ago, and had arrived at the opposite conclusion, but
-now I cannot reproduce anymore so apparently not.
-Sorry for the noise.
+On Mon, May 11, 2015 at 11:32:04AM +0200, Linus Walleij wrote:
+> Hi ARM SoC people,
 
-> I assume the
-> linker logic is that it's branching to a thumb function but the target
-> is already the +1 so no action necessary, as opposed to just blindly
-> adding 1.
->
-> -Christoffer
+Added ARM SoC address to To:.
+
+baruch
+
+> this is some cleanup and development for Ux500 that should go
+> into ARM SoC for the v4.2 series. Details are in the signed tag.
+> 
+> I think it would look overzealous to break it in different topics, but if you
+> prefer to slice the patch set, tell me how and I'll split it as you
+> desire.
+> 
+> Please pull this to ARM SoC!
+> 
+> Yours,
+> Linus Walleij
+> 
+> The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+> 
+>   Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+> tags/ux500-v4.2-1
+> 
+> for you to fetch changes up to 11033cb60a6a660a1ced07bb9501dce85e85b0ae:
+> 
+>   ARM: ux500: add the sensors to the STUIB board (2015-05-11 11:10:16 +0200)
+> 
+> ----------------------------------------------------------------
+> Ux500 development for the v4.2 kernel series:
+> - Get some static maps out
+> - Device Trees:
+>   - Define CPU topology for Ux500's
+>   - Add CoreSight blocks for Ux500's
+>   - Fix the magnetometer compat string for TVK
+>     and Snowball
+>   - Assign sensor trigger IRQs for some boards
+>   - Add the STUIB sensors
+> - Defconfig:
+>   - Enable PERF_EVENTS as we have a PMU after all
+>   - Enable CoreSight components
+> 
+> ----------------------------------------------------------------
+> Linus Walleij (8):
+>       ARM: ux500: define CPU topology
+>       ARM: ux500: get rid of static maps
+>       ARM: ux500: add CoreSight blocks to DTS file
+>       ARM: ux500: add PERF_EVENTS to defconfig
+>       ARM: ux500: enable CoreSight in defconfig
+>       ARM: ux500: fix lsm303dlh magnetometer compat string
+>       ARM: ux500: assign the sensor trigger IRQs
+>       ARM: ux500: add the sensors to the STUIB board
+> 
+>  arch/arm/boot/dts/ste-dbx5x0.dtsi          | 154 +++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/ste-href-stuib.dtsi      |  50 ++++++++++
+>  arch/arm/boot/dts/ste-href-tvk1281618.dtsi |   7 +-
+>  arch/arm/boot/dts/ste-snowball.dts         |  23 ++++-
+>  arch/arm/configs/u8500_defconfig           |   5 +
+>  arch/arm/mach-ux500/cpu-db8500.c           |  13 +--
+>  6 files changed, 236 insertions(+), 16 deletions(-)
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
