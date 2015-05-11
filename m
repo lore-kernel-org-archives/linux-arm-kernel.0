@@ -1,38 +1,53 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 11 May 2015 11:15:33 -0300
-Subject: [PATCH v2] ARM: dts: cubox-i: add support for Broadcom
- Wifi/Bluetooth devices
-In-Reply-To: <CAOMZO5Cy1uhbqSfRKw_K++VhTQW7Z29GwKNAiLgB_UrF4YG9-Q@mail.gmail.com>
-References: <1430932810-28756-1-git-send-email-festevam@gmail.com>
- <20150511130016.GE9347@dragon>
- <CAOMZO5Cy1uhbqSfRKw_K++VhTQW7Z29GwKNAiLgB_UrF4YG9-Q@mail.gmail.com>
-Message-ID: <CAOMZO5AYq1TBWsTUZ2Csy98qy2Ma-MSt+4uwwDUOaGnZaYUiiA@mail.gmail.com>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Mon, 11 May 2015 09:18:40 -0500
+Subject: Bulid regression with VDSO enabled
+In-Reply-To: <CAKv+Gu_i6Cjr-+mYLkw=Oo6HPQkRTGwjFf5o5QX6bgiGsVFDYA@mail.gmail.com>
+References: <391d6fc127b78ef4cbc5443557f0665a@agner.ch>	<554CD5F8.10901@mentor.com>	<983cc33a8e5704f4281a7d30bbc9d1d2@agner.ch>	<554D276D.9040205@mentor.com>
+ <CAKv+Gu_i6Cjr-+mYLkw=Oo6HPQkRTGwjFf5o5QX6bgiGsVFDYA@mail.gmail.com>
+Message-ID: <5550BA40.2050504@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 11, 2015 at 10:46 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Shawn,
->
-> On Mon, May 11, 2015 at 10:00 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
->
->> One of the device tree maintainers doesn't like "clocks" container.
->> Since you're not using generic node name for child clock, the container
->> can just be saved.
->
-> Just to make sure I understand your suggestion: would you like the
-> clock nodes to look like this?
+On 05/09/2015 03:31 AM, Ard Biesheuvel wrote:
+> Hi Nathan,
+> 
+> On 8 May 2015 at 23:15, Nathan Lynch <Nathan_Lynch@mentor.com> wrote:
+>> On 05/08/2015 11:08 AM, Stefan Agner wrote:
+>>> On 2015-05-08 17:27, Nathan Lynch wrote:
+>>>> On 05/08/2015 06:13 AM, Stefan Agner wrote:
+>>>>> Also, I used the BFD linker by adding LD=${CROSS_COMPILE}ld.bfd to the
+>>>>> build command. Interestingly thought, I had the same issue when using
+>>>>> gold linker...
+>>>>
+>>>> When I try this, ld.gold is used regardless.
+>>>>
+>>>> You can tell by doing and checking for a NT_GNU_GOLD_VERSION note:
+>>>>
+>>>> $ readelf -n arch/arm/vdso/vdso.so.raw
+>>>>
+>>>> Displaying notes found at file offset 0x000001bc with length 0x00000040:
+>>>>   Owner                 Data size       Description
+>>>>   GNU                  0x00000009       NT_GNU_GOLD_VERSION (gold version)
+>>>>   GNU                  0x00000014       NT_GNU_BUILD_ID (unique build
+>>>> ID bitstring)
+>>>>     Build ID: f025409550acb7f955c61d95691291da078e6688
+>>>
+>>> Hm, you are right. When deleting moving ld.bfd to ld, which makes the
+>>> BFD linker as default, compiling works flawless.
+>>>
+>>> However, so far LD=${CROSS_COMPILE}ld.bfc seems to work for other build
+>>> objects, at least those do not have this note. For instance time.o does
+>>> not return anything:
+>>>
+>>> $ readelf -n arch/arm/kernel/time.o
+>>
+>> This is just an object file that hasn't been linked, but your general
+>> point stands -- LD is honored by other parts of the build.
+>>
+>>
+> 
+> I suppose this implies that the build only chokes on --pic-veneer when
+> linking the VDSO, and nowhere else?
 
-I think I got it. Do you mean like this?
-
-#include <dt-bindings/gpio/gpio.h>
-/ {
-    clk_sdio: sdio-clock {
-        compatible = "gpio-gate-clock";
-        #clock-cells = <0>;
-        pinctrl-names = "default";
-        pinctrl-0 = <&pinctrl_microsom_brcm_osc>;
-        enable-gpios = <&gpio5 5 GPIO_ACTIVE_HIGH>;
-    };
-
-    regulators {
-        compatible = "simple-bus";
+No, --pic-veneer isn't the problem for the VDSO; for better or worse
+LDFLAGS is ignored for the VDSO build.
