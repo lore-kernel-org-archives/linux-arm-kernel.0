@@ -1,237 +1,83 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 11 May 2015 09:13:05 +0200
-Subject: [PATCH 07/10] arm64: move kernel mapping out of linear region
+Date: Mon, 11 May 2015 09:13:06 +0200
+Subject: [PATCH 08/10] arm64: map linear region as non-executable
 In-Reply-To: <1431328388-3051-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1431328388-3051-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1431328388-3051-8-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1431328388-3051-9-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This moves the primary mapping of the kernel Image out of
-the linear region. This is a preparatory step towards allowing
-the kernel Image to reside anywhere in physical memory without
-affecting the ability to map all of it efficiently.
+Now that we moved the kernel text out of the linear region, there
+is no longer a reason to map the linear region as executable. This
+also allows us to completely get rid of the __map_mem() variant that
+only maps some of it executable if CONFIG_DEBUG_RODATA is selected.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/boot.h   |  7 +++++++
- arch/arm64/include/asm/memory.h | 19 ++++++++++++++++---
- arch/arm64/kernel/head.S        | 18 +++++++++++++-----
- arch/arm64/kernel/vmlinux.lds.S | 11 +++++++++--
- arch/arm64/mm/init.c            |  5 +++--
- arch/arm64/mm/mmu.c             | 10 +++++++++-
- 6 files changed, 57 insertions(+), 13 deletions(-)
+ arch/arm64/mm/mmu.c | 41 ++---------------------------------------
+ 1 file changed, 2 insertions(+), 39 deletions(-)
 
-diff --git a/arch/arm64/include/asm/boot.h b/arch/arm64/include/asm/boot.h
-index 81151b67b26b..092d1096ce9a 100644
---- a/arch/arm64/include/asm/boot.h
-+++ b/arch/arm64/include/asm/boot.h
-@@ -11,4 +11,11 @@
- #define MIN_FDT_ALIGN		8
- #define MAX_FDT_SIZE		SZ_2M
- 
-+/*
-+ * arm64 requires the kernel image to be 2 MB aligned and
-+ * not exceed 64 MB in size.
-+ */
-+#define MIN_KIMG_ALIGN		SZ_2M
-+#define MAX_KIMG_SIZE		SZ_64M
-+
- #endif
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index f800d45ea226..050ede7cd1ee 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -24,6 +24,7 @@
- #include <linux/compiler.h>
- #include <linux/const.h>
- #include <linux/types.h>
-+#include <asm/boot.h>
- #include <asm/sizes.h>
- 
- /*
-@@ -39,7 +40,12 @@
- #define PCI_IO_SIZE		SZ_16M
- 
- /*
-- * PAGE_OFFSET - the virtual address of the start of the kernel image (top
-+ * Offset below PAGE_OFFSET where to map the kernel Image.
-+ */
-+#define KIMAGE_OFFSET		MAX_KIMG_SIZE
-+
-+/*
-+ * PAGE_OFFSET - the virtual address of the base of the linear mapping (top
-  *		 (VA_BITS - 1))
-  * VA_BITS - the maximum number of bits for virtual addresses.
-  * TASK_SIZE - the maximum size of a user space task.
-@@ -49,7 +55,8 @@
-  */
- #define VA_BITS			(CONFIG_ARM64_VA_BITS)
- #define PAGE_OFFSET		(UL(0xffffffffffffffff) << (VA_BITS - 1))
--#define MODULES_END		(PAGE_OFFSET)
-+#define KIMAGE_VADDR		(PAGE_OFFSET - KIMAGE_OFFSET)
-+#define MODULES_END		KIMAGE_VADDR
- #define MODULES_VADDR		(MODULES_END - SZ_64M)
- #define PCI_IO_END		(MODULES_VADDR - SZ_2M)
- #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
-@@ -77,7 +84,11 @@
-  * private definitions which should NOT be used outside memory.h
-  * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
-  */
--#define __virt_to_phys(x)	(((phys_addr_t)(x) - PAGE_OFFSET + PHYS_OFFSET))
-+#define __virt_to_phys(x) ({						\
-+	long __x = (long)(x) - PAGE_OFFSET;				\
-+	__x >= 0 ? (phys_addr_t)(__x + PHYS_OFFSET) : 			\
-+		   (phys_addr_t)(__x + PHYS_OFFSET + kernel_va_offset); })
-+
- #define __phys_to_virt(x)	((unsigned long)((x) - PHYS_OFFSET + PAGE_OFFSET))
- 
- /*
-@@ -113,6 +124,8 @@ extern phys_addr_t		memstart_addr;
- /* PHYS_OFFSET - the physical address of the start of memory. */
- #define PHYS_OFFSET		({ memstart_addr; })
- 
-+extern u64 kernel_va_offset;
-+
- /*
-  * PFNs are used to describe any physical page; this means
-  * PFN 0 == physical address 0.
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index c0ff3ce4299e..3050a4066db9 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -36,8 +36,6 @@
- #include <asm/page.h>
- #include <asm/virt.h>
- 
--#define __PHYS_OFFSET	(KERNEL_START - TEXT_OFFSET)
--
- #if (TEXT_OFFSET & 0xfff) != 0
- #error TEXT_OFFSET must be at least 4KB aligned
- #elif (PAGE_OFFSET & 0x1fffff) != 0
-@@ -58,6 +56,8 @@
- 
- #define KERNEL_START	_text
- #define KERNEL_END	_end
-+#define KERNEL_BASE	(KERNEL_START - TEXT_OFFSET)
-+
- 
- /*
-  * Initial memory map attributes.
-@@ -235,7 +235,15 @@ section_table:
- ENTRY(stext)
- 	bl	preserve_boot_args
- 	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
--	adrp	x24, __PHYS_OFFSET
-+
-+	/*
-+	 * Before the linear mapping has been set up, __va() translations will
-+	 * not produce usable virtual addresses unless we tweak PHYS_OFFSET to
-+	 * compensate for the offset between the kernel mapping and the base of
-+	 * the linear mapping. We will undo this in map_mem().
-+	 */
-+	adrp	x24, KERNEL_BASE + KIMAGE_OFFSET
-+
- 	bl	set_cpu_boot_mode_flag
- 	bl	__create_page_tables		// x25=TTBR0, x26=TTBR1
- 	/*
-@@ -411,10 +419,10 @@ __create_page_tables:
- 	 * Map the kernel image (starting with PHYS_OFFSET).
- 	 */
- 	mov	x0, x26				// swapper_pg_dir
--	mov	x5, #PAGE_OFFSET
-+	ldr	x5, =KERNEL_BASE
- 	create_pgd_entry x0, x5, x3, x6
- 	ldr	x6, =KERNEL_END			// __va(KERNEL_END)
--	mov	x3, x24				// phys offset
-+	adrp	x3, KERNEL_BASE			// real PHYS_OFFSET
- 	create_block_map x0, x7, x3, x5, x6
- 
- 	/*
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 0b82c4c203fb..1f6d79eeda06 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -6,6 +6,7 @@
- 
- #include <asm-generic/vmlinux.lds.h>
- #include <asm/thread_info.h>
-+#include <asm/boot.h>
- #include <asm/memory.h>
- #include <asm/page.h>
- #include <asm/pgtable.h>
-@@ -96,7 +97,7 @@ SECTIONS
- 		*(.discard.*)
- 	}
- 
--	. = PAGE_OFFSET + TEXT_OFFSET;
-+	. = KIMAGE_VADDR + TEXT_OFFSET;
- 
- 	.head.text : {
- 		_text = .;
-@@ -204,4 +205,10 @@ ASSERT(SIZEOF(.pgdir) <= ALIGNOF(.pgdir), ".pgdir size exceeds its alignment")
- /*
-  * If padding is applied before .head.text, virt<->phys conversions will fail.
-  */
--ASSERT(_text == (PAGE_OFFSET + TEXT_OFFSET), "HEAD is misaligned")
-+ASSERT(_text == (KIMAGE_VADDR + TEXT_OFFSET), "HEAD is misaligned")
-+
-+/*
-+ * Make sure the memory footprint of the kernel Image does not exceed the limit.
-+ */
-+ASSERT(_end - _text + TEXT_OFFSET <= MAX_KIMG_SIZE,
-+	"Kernel Image memory footprint exceeds MAX_KIMG_SIZE")
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 373ea02bdb96..3909a5fe7d7c 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -164,9 +164,10 @@ void __init arm64_memblock_init(void)
- 	 * with the linear mapping.
- 	 */
- 	const s64 linear_region_size = -(s64)PAGE_OFFSET;
-+	u64 dram_base = memstart_addr - KIMAGE_OFFSET;
- 
--	memblock_remove(0, memstart_addr);
--	memblock_remove(memstart_addr + linear_region_size, ULLONG_MAX);
-+	memblock_remove(0, dram_base);
-+	memblock_remove(dram_base + linear_region_size, ULLONG_MAX);
- 
- 	memblock_enforce_memory_limit(memory_limit);
- 
 diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 32ce481d90bf..c5c8d0f886e9 100644
+index c5c8d0f886e9..9c94c8c78da7 100644
 --- a/arch/arm64/mm/mmu.c
 +++ b/arch/arm64/mm/mmu.c
-@@ -50,6 +50,8 @@ u64 idmap_t0sz = TCR_T0SZ(VA_BITS);
- struct page *empty_zero_page;
- EXPORT_SYMBOL(empty_zero_page);
+@@ -302,47 +302,10 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
+ 				phys, virt, size, prot, late_alloc);
+ }
  
-+u64 kernel_va_offset __read_mostly;
-+
- pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
- 			      unsigned long size, pgprot_t vma_prot)
+-#ifdef CONFIG_DEBUG_RODATA
+ static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
  {
-@@ -436,6 +438,9 @@ static unsigned long __init bootstrap_region(struct bootstrap_pgtables *reg,
-  * Bootstrap the linear ranges that cover the start of DRAM and swapper_pg_dir
-  * so that the statically allocated page tables as well as newly allocated ones
-  * are accessible via the linear mapping.
-+ * Since@this point, PHYS_OFFSET is still biased to redirect __va()
-+ * translations into the kernel text mapping, we need to apply an
-+ * explicit va_offset to calculate linear virtual addresses.
-  */
- static void __init bootstrap_linear_mapping(unsigned long va_offset)
- {
-@@ -465,7 +470,10 @@ static void __init map_mem(void)
- {
- 	struct memblock_region *reg;
+-	/*
+-	 * Set up the executable regions using the existing section mappings
+-	 * for now. This will get more fine grained later once all memory
+-	 * is mapped
+-	 */
+-	unsigned long kernel_x_start = round_down(__pa(_stext), SECTION_SIZE);
+-	unsigned long kernel_x_end = round_up(__pa(__init_end), SECTION_SIZE);
+-
+-	if (end < kernel_x_start) {
+-		create_mapping(start, __phys_to_virt(start),
+-			end - start, PAGE_KERNEL);
+-	} else if (start >= kernel_x_end) {
+-		create_mapping(start, __phys_to_virt(start),
+-			end - start, PAGE_KERNEL);
+-	} else {
+-		if (start < kernel_x_start)
+-			create_mapping(start, __phys_to_virt(start),
+-				kernel_x_start - start,
+-				PAGE_KERNEL);
+-		create_mapping(kernel_x_start,
+-				__phys_to_virt(kernel_x_start),
+-				kernel_x_end - kernel_x_start,
+-				PAGE_KERNEL_EXEC);
+-		if (kernel_x_end < end)
+-			create_mapping(kernel_x_end,
+-				__phys_to_virt(kernel_x_end),
+-				end - kernel_x_end,
+-				PAGE_KERNEL);
+-	}
+-
+-}
+-#else
+-static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
+-{
+-	create_mapping(start, __phys_to_virt(start), end - start,
+-			PAGE_KERNEL_EXEC);
++	create_mapping(start, __phys_to_virt(start), end - start, PAGE_KERNEL);
+ }
+-#endif
  
--	bootstrap_linear_mapping(0);
-+	bootstrap_linear_mapping(KIMAGE_OFFSET);
-+
-+	kernel_va_offset = KIMAGE_OFFSET;
-+	memstart_addr -= KIMAGE_OFFSET;
+ struct bootstrap_pgtables {
+ 	pte_t	pte[PTRS_PER_PTE];
+@@ -427,7 +390,7 @@ static unsigned long __init bootstrap_region(struct bootstrap_pgtables *reg,
+ #endif
  
- 	/* map all the memory banks */
- 	for_each_memblock(memory, reg) {
+ 		create_mapping(__pa(vstart - va_offset), vstart, vend - vstart,
+-			       PAGE_KERNEL_EXEC);
++			       PAGE_KERNEL);
+ 
+ 		return vend;
+ 	}
 -- 
 1.9.1
