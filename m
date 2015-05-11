@@ -1,134 +1,30 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 11 May 2015 21:23:22 +0200
-Subject: [PATCH 1/5] soc: mediatek: Add infracfg misc driver support
+Date: Mon, 11 May 2015 21:23:25 +0200
+Subject: [PATCH 4/5] ARM64: MediaTek: Add generic pm domain support
 In-Reply-To: <1431372206-1237-1-git-send-email-s.hauer@pengutronix.de>
 References: <1431372206-1237-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1431372206-1237-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1431372206-1237-5-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for some miscellaneous bits of the infracfg controller.
-The mtk_infracfg_set/clear_bus_protection functions are necessary for
-the scpsys power domain driver to handle the bus protection bits which
-are contained in the infacfg register space.
+Enable support for generic power domains in the config.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/soc/mediatek/Kconfig        |  9 +++++
- drivers/soc/mediatek/Makefile       |  1 +
- drivers/soc/mediatek/mtk-infracfg.c | 80 +++++++++++++++++++++++++++++++++++++
- 3 files changed, 90 insertions(+)
- create mode 100644 drivers/soc/mediatek/mtk-infracfg.c
+ arch/arm64/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
-index bcdb22d..6fae66f 100644
---- a/drivers/soc/mediatek/Kconfig
-+++ b/drivers/soc/mediatek/Kconfig
-@@ -9,3 +9,12 @@ config MTK_PMIC_WRAP
- 	  Say yes here to add support for MediaTek PMIC Wrapper found
- 	  on different MediaTek SoCs. The PMIC wrapper is a proprietary
- 	  hardware to connect the PMIC.
-+
-+config MTK_INFRACFG
-+	tristate "MediaTek INFRACFG Support"
-+	depends on ARCH_MEDIATEK
-+	select REGMAP
-+	help
-+	  Say yes here to add support for the MediaTek INFRACFG controller. The
-+	  INFRACFG controller contains various infrastructure registers not
-+	  directly associated to any device.
-diff --git a/drivers/soc/mediatek/Makefile b/drivers/soc/mediatek/Makefile
-index ecaf4de..ce39119 100644
---- a/drivers/soc/mediatek/Makefile
-+++ b/drivers/soc/mediatek/Makefile
-@@ -1 +1,2 @@
- obj-$(CONFIG_MTK_PMIC_WRAP) += mtk-pmic-wrap.o
-+obj-$(CONFIG_MTK_INFRACFG) += mtk-infracfg.o
-diff --git a/drivers/soc/mediatek/mtk-infracfg.c b/drivers/soc/mediatek/mtk-infracfg.c
-new file mode 100644
-index 0000000..b3ebfae
---- /dev/null
-+++ b/drivers/soc/mediatek/mtk-infracfg.c
-@@ -0,0 +1,80 @@
-+#include <linux/regmap.h>
-+#include <linux/export.h>
-+#include <linux/jiffies.h>
-+#include <linux/soc/mediatek/infracfg.h>
-+#include <asm/processor.h>
-+
-+#define INFRA_TOPAXI_PROTECTEN		0x0220
-+#define INFRA_TOPAXI_PROTECTSTA1	0x0228
-+
-+/**
-+ * mtk_infracfg_set_bus_protection - enable bus protection
-+ * @regmap: The infracfg regmap
-+ * @mask: The mask containing the protection bits to be enabled.
-+ *
-+ * This function enables the bus protection bits for disabled power
-+ * domains so that the system does not hanf when some unit accesses the
-+ * bus while in power down.
-+ */
-+int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask)
-+{
-+	unsigned long expired;
-+	u32 val;
-+	int ret;
-+
-+	regmap_update_bits(infracfg, INFRA_TOPAXI_PROTECTEN, mask, mask);
-+
-+	expired = jiffies + HZ;
-+
-+	while (1) {
-+		ret = regmap_read(infracfg, INFRA_TOPAXI_PROTECTSTA1, &val);
-+		if (ret)
-+			return ret;
-+
-+		if ((val & mask) == mask)
-+			break;
-+
-+		cpu_relax();
-+		if (time_after(jiffies, expired))
-+			return -EIO;
-+	}
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(mtk_infracfg_set_bus_protection);
-+
-+/**
-+ * mtk_infracfg_clear_bus_protection - disable bus protection
-+ * @regmap: The infracfg regmap
-+ * @mask: The mask containing the protection bits to be disabled.
-+ *
-+ * This function disables the bus protection bits previously enabled with
-+ * mtk_infracfg_set_bus_protection.
-+ */
-+int mtk_infracfg_clear_bus_protection(struct regmap *infracfg, u32 mask)
-+{
-+	unsigned long expired;
-+	int ret;
-+
-+	regmap_update_bits(infracfg, INFRA_TOPAXI_PROTECTEN, mask, 0);
-+
-+	expired = jiffies + HZ;
-+
-+	while (1) {
-+		u32 val;
-+
-+		ret = regmap_read(infracfg, INFRA_TOPAXI_PROTECTSTA1, &val);
-+		if (ret)
-+			return ret;
-+
-+		if (!(val & mask))
-+			break;
-+
-+		cpu_relax();
-+		if (time_after(jiffies, expired))
-+			return -EIO;
-+	}
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(mtk_infracfg_clear_bus_protection);
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 7796af4..ba8469c 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -185,6 +185,7 @@ config ARCH_MEDIATEK
+ 	bool "Mediatek MT65xx & MT81xx ARMv8 SoC"
+ 	select ARM_GIC
+ 	select PINCTRL
++	select PM_GENERIC_DOMAINS if PM
+ 	help
+ 	  Support for Mediatek MT65xx & MT81xx ARMv8 SoCs
+ 
 -- 
 2.1.4
