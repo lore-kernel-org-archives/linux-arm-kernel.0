@@ -1,30 +1,40 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 11 May 2015 16:06:25 +0200
-Subject: [PATCH 3/3] clocksource: exynos_mct: Remove old platform
- mct_init()
-In-Reply-To: <1430368973-23786-3-git-send-email-k.kozlowski@samsung.com>
-References: <1430368973-23786-1-git-send-email-k.kozlowski@samsung.com>
- <1430368973-23786-3-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <5550B761.9080208@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 11 May 2015 15:07:37 +0100
+Subject: [PATCH] arm-cci: Do not enable CCI-400 PMU by default
+In-Reply-To: <1431348626-2767-1-git-send-email-suzuki.poulose@arm.com>
+References: <1431348626-2767-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20150511140736.GF2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/30/2015 06:42 AM, Krzysztof Kozlowski wrote:
-> Since commit 228e3023eb04 ("Merge tag 'mct-exynos-for-v3.10' of ...") the
-> mct_init() was superseded by mct_init_dt() and is not referenced
-> anywhere. Remove it.
->
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+On Mon, May 11, 2015 at 01:50:26PM +0100, Suzuki K. Poulose wrote:
+>  config ARM_CCI400_PMU
+>  	bool "ARM CCI400 PMU support"
+> -	default y
+>  	depends on ARM || ARM64
+> -	depends on HW_PERF_EVENTS
+> +	depends on PERF_EVENTS
+>  	select ARM_CCI400_COMMON
+>  	help
+> -	  Support for PMU events monitoring on the ARM CCI cache coherent
+> -	  interconnect.
+> -
+> -	  If unsure, say Y
+> +	  Support for PMU events monitoring on the ARM CCI-400 (cache coherent
+> +	  interconnect). CCI-400 supports counting events related to the
+> +	  connected slave/master interfaces.
 
-Applied to my tree for 4.2
+This still needs to be better.  How do I know whether it should be enabled
+for my platform or not?
 
-Thanks !
+Presumably, we can say that CCI-400 does not appear on CPUs older than X,
+which means we can add "The CCI-400 may be provided on ARM CPUs X or
+later."
 
-   -- Daniel
+I doubt that you'll find CCI-400 on ARMv6 or older ARM architectures for
+example.  Maybe then we need "depends on ARM || ARM64" to be tighter?
+"depends on (ARM && CPU_V7) || ARM64" ?
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
