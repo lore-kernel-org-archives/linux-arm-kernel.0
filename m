@@ -1,21 +1,50 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Mon, 11 May 2015 12:13:09 +0200
-Subject: [RFC PATCH] iommu: add ARM short descriptor page table allocator.
-In-Reply-To: <20150505170541.GN1550@arm.com>
-References: <1430206881-18294-1-git-send-email-yong.wu@mediatek.com>
- <20150505161802.GA20611@8bytes.org> <20150505170541.GN1550@arm.com>
-Message-ID: <20150511101309.GH20611@8bytes.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 11 May 2015 11:17:39 +0100
+Subject: [PATCH 1/2] ARM: kvm: fix a bad BSYM() usage
+In-Reply-To: <20150511095657.GA5856@e103592.cambridge.arm.com>
+References: <E1YqkpO-0006zB-QJ@rmk-PC.arm.linux.org.uk>
+ <20150509200717.GA30634@cbox>
+ <CAKv+Gu922cZLGUJ3-g8CJiUCuL-5L=XHPfgXUMo-jrdPKAuokA@mail.gmail.com>
+ <20150511090537.GA2009@cbox>
+ <20150511095657.GA5856@e103592.cambridge.arm.com>
+Message-ID: <20150511101738.GC2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 05, 2015 at 06:05:41PM +0100, Will Deacon wrote:
-> I think the MT8173 IOMMU [1] uses this format and, since it's part of
-> the ARM architecture, the ARM SMMU can make use of it too if the
-> implementation supports it.
+On Mon, May 11, 2015 at 10:56:57AM +0100, Dave P Martin wrote:
+> ldr= will do the right thing *if* the target symbol's type is correctly
+> annotated.  This means that ldr =some_local_code_symbol does the right
+> thing for branch target addresses if and only if some_local_code_symbol
+> is marked with .type %function (or ENDPROC).
+> 
+> The fact that a symbol is in a code section is *not* enough.
+> 
+> For ARM code this never mattered, so local symbols in .S files are
+> probably under-annotated in general.  BSYM() might have been used to
+> work around this in some cases.
+> 
+> We should check that all the BSYMs removed by this series from ldr=
+> and .long/.word etc. point to a correctly annotated symbol, and add
+> the annotations if not.
 
-I think it makes more sense to merge this with a driver actually using
-it. I guess a driver for the above mentioned IOMMU will be submitted
-soon?
+I guess the problem here is that people forget what a patch series is
+actually doing and then start making comments based on hypothetical
+stuff rather than what the series is actually doing.
 
+To recap, this series:
 
-	Joerg
+1. Removes the wrong usage of BSYM() in the KVM code.  This is used with
+   the symbol "panic" which is a function declared by generic C code.
+   Therefore, panic will have the appropriate annotations attached to
+   this symbol, unless GCC itself is buggy.
+
+   This is the _only_ case of "ldr rd, =BSYM(sym)".
+
+2. It replaces the remaining "adr rd, BSYM(sym)" with a new "badr" macro,
+   and removes the BSYM() preprocessor macro.  The new "badr" macro which
+   is identical in behaviour to the former, but ensures that BSYM()
+   doesn't get mis-used with "ldr".
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
