@@ -1,35 +1,68 @@
-From: davem@davemloft.net (David Miller)
-Date: Sun, 10 May 2015 19:22:17 -0400 (EDT)
-Subject: [PATCH] ARM: net: delegate filter to kernel interpreter when
- imm_offset() return value can't fit into 12bits.
-In-Reply-To: <1431011661-10277-1-git-send-email-nschichan@freebox.fr>
-References: <1431011661-10277-1-git-send-email-nschichan@freebox.fr>
-Message-ID: <20150510.192217.1306037281172187835.davem@davemloft.net>
+From: nm@ti.com (Nishanth Menon)
+Date: Sun, 10 May 2015 19:15:04 -0500
+Subject: [PATCH] ARM: dts: add core2 padconf region for am3517
+In-Reply-To: <1431293273-19321-1-git-send-email-andrej.skvortzov@gmail.com>
+References: <1431293273-19321-1-git-send-email-andrej.skvortzov@gmail.com>
+Message-ID: <554FF488.5090805@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Schichan <nschichan@freebox.fr>
-Date: Thu,  7 May 2015 17:14:21 +0200
+On 05/10/2015 04:27 PM, Andrey Skvortsov wrote:
+> According to the technical reference manual for AM35xx system
+> controller module (SCM) PADCONFS core registers are divided in two
+> regions: 0x48002030..0x48002268 and 0x480025d8..0x480025FC.
+> First region is the same for all omap3 SoC and is described in omap3.dtsi.
+> The second region is the same as in omap34xx (see omap34xx.dtsi)
+> and omap35xx. The patch adds missing description for the second region.
+> This patch was tested on AM3517.
+> 
+> Signed-off-by: Andrey Skvortsov <andrej.skvortzov@gmail.com>
+> ---
+> 
+> Commit 3d495383648a ("ARM: dts: Split omap3 pinmux core device") notes that
+> Nishanth Menon <nm@ti.com> said that 3517 does not have padconf2 region.
+> Unfortunately I couldn't find reference to his post on mailing list.
+> This patch was tested on AM3517 SoC and original vendor code contains
+> pinmuxing for this second region as well.
 
-> The ARM JIT code emits "ldr rX, [pc, #offset]" to access the literal
-> pool. #offset maximum value is 4095 and if the generated code is too
-> large, the #offset value can overflow and not point to the expected
-> slot in the literal pool. Additionally, when overflow occurs, bits of
-> the overflow can end up changing the destination register of the ldr
-> instruction.
-> 
-> Fix that by detecting the overflow in imm_offset() and setting a flag
-> that is checked for each BPF instructions converted in
-> build_body(). As of now it can only be detected in the second pass. As
-> a result the second build_body() call can now fail, so add the
-> corresponding cleanup code in that case.
-> 
-> Using multiple literal pools in the JITed code is going to require
-> lots of intrusive changes to the JIT code (which would better be done
-> as a feature instead of fix), just delegating to the kernel BPF
-> interpreter in that case is a more straight forward, minimal fix and
-> easy to backport.
-> 
-> Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
 
-Applied, thanks Nicolas.
+http://www.ti.com/lit/ug/sprugr0c/sprugr0c.pdf
+CONTROL_PADCONF_ETK_CLK is indeed at 0x480025D8
+Apologies on missing it :(
+
+> 
+>  arch/arm/boot/dts/am3517.dtsi | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/am3517.dtsi b/arch/arm/boot/dts/am3517.dtsi
+> index c90724b..2534500 100644
+> --- a/arch/arm/boot/dts/am3517.dtsi
+> +++ b/arch/arm/boot/dts/am3517.dtsi
+> @@ -60,5 +60,16 @@
+>  			dma-names = "tx", "rx";
+>  			clock-frequency = <48000000>;
+>  		};
+> +
+> +		omap3_pmx_core2: pinmux at 480025D8 {
+> +			compatible = "ti,omap3-padconf", "pinctrl-single";
+> +			reg = <0x480025D8 0x24>;
+
+b8845074cfbbd1d1b46720a1b563d7b4240dac21 ("ARM: dts: omap3: add minimal
+l4 bus layout with control module support") moves omap3_pmx_core under
+scm -> should'nt we do the same here?
+
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			#interrupt-cells = <1>;
+> +			interrupt-controller;
+> +			pinctrl-single,register-width = <16>;
+> +			pinctrl-single,function-mask = <0xff1f>;
+> +		};
+>  	};
+>  };
+> 
+
+
+-- 
+Regards,
+Nishanth Menon
