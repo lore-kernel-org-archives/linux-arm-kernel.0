@@ -1,46 +1,64 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Mon, 11 May 2015 10:03:43 -0700
-Subject: [PATCH 0/4] ARM: keystone: Enable Netcp driver on K2 EVMs
-In-Reply-To: <5550D0FD.7060903@ti.com>
-References: <1429817852-27938-1-git-send-email-m-karicheri2@ti.com>
- <55395981.8050902@oracle.com> <553A5E12.9040202@ti.com>
- <553A630F.4060008@oracle.com> <5550D0FD.7060903@ti.com>
-Message-ID: <5550E0EF.3040203@oracle.com>
+From: mwelling@ieee.org (Michael Welling)
+Date: Mon, 11 May 2015 12:07:42 -0500
+Subject: next-20150511 / omap2-mcspi: regression for sdp4430 boot
+In-Reply-To: <5550DDCB.8010303@ti.com>
+References: <5550DDCB.8010303@ti.com>
+Message-ID: <20150511170742.GA6616@deathray>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/11/2015 8:55 AM, Murali Karicheri wrote:
-> On 04/24/2015 11:36 AM, santosh shilimkar wrote:
->> On 4/24/2015 8:15 AM, Murali Karicheri wrote:
->>> On 04/23/2015 04:43 PM, santosh shilimkar wrote:
->>>> On 4/23/2015 12:37 PM, Murali Karicheri wrote:
->>>>> NetCP driver support patches are already merged to v4.0.nd v4.1.
->>>>> This series introduce patches to update the DTS bindings and
->>>>> defconfig so that the network driver is fully functional on K2
->>>>> EVMs :- K2HK, K2L and K2E.
->>>>>
->>>> Nice and Thanks Murali for sending these up.
->>>>
->>>>> It will be great if this can be merged to v4.1.
->>>>>
->>>> Its too late for the 4.1 now. For the same reason, we also
->>>> couldn't get the MMU switching fixes in this merge window.
->>>
->>> For my reference, can you point me to the MMU switching fixes you are
->>> referring to?
->>>
->> http://www.spinics.net/lists/arm-kernel/msg411178.html
->>
->> Regards,
->> Santosh
-> Santosh,
->
-> Is MMU switching series applied to a sub system branch already that I
-> can pull to do some testing on K2 devices?
->
-Its not applied yet. RMK has posted revised version and there was one remark
-about adding some additional comments. Would be good to get some more
-tests.
+On Mon, May 11, 2015 at 11:50:19AM -0500, Nishanth Menon wrote:
+> Hi,
+> 
+> SDP4430 uses a SPI based network chip ks8851.
+> 
+> next-20150508:
+> https://github.com/nmenon/kernel-test-logs/blob/next-20150508/omap2plus_defconfig/sdp4430.txt
+> 
+> However, next-20150511:
+> https://github.com/nmenon/kernel-test-logs/blob/next-20150511/omap2plus_defconfig/sdp4430.txt
+> 
 
-Regards,
-Santosh
+I will look into this but it is going to be difficult to debug with access to the hardware.
+This is what I get for changing a driver that effects so many SoCs.
+
+> Generates infinite "ks8851 spi1.0: ks8851_irq: spi bus error" errors
+> and hangs the platform.
+> 
+> Bisected the issue down to the following two commits when reverted
+> allows the board to function:
+> 
+> 
+> commit b28cb9414db9f8e42ac18c9e360e4e99cda42489
+> Author: Michael Welling <mwelling@ieee.org>
+> Date:   Thu May 7 18:36:53 2015 -0500
+> 
+>     spi: omap2-mcspi: Switch driver to use transfer_one
+> 
+>     Switches from transfer_one_message to transfer_one to prepare
+> driver for
+>     use of GPIO chip selects.
+> 
+>     Signed-off-by: Michael Welling <mwelling@ieee.org>
+>     Signed-off-by: Mark Brown <broonie@kernel.org>
+> 
+> Reverting this alone: http://paste.ubuntu.org.cn/2594735 (did not boot up)
+> 
+> commit bc7f9bbc80bcc77745b3f54ec4e7103e3e142bb9
+> Author: Michael Welling <mwelling@ieee.org>
+> Date:   Fri May 8 13:31:01 2015 -0500
+> 
+>     spi: omap2-mcspi: Add gpio_request and init CS
+> 
+>     If GPIO chip select is specified, request the GPIO in the setup
+> function
+>     and release it in the cleanup function.
+> 
+>     Signed-off-by: Michael Welling <mwelling@ieee.org>
+>     Signed-off-by: Mark Brown <broonie@kernel.org>
+> 
+> Reverting this as well allowed boot.
+> 
+> -- 
+> Regards,
+> Nishanth Menon
