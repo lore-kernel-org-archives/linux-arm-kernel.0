@@ -1,34 +1,38 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 11 May 2015 15:12:49 +0100
-Subject: [PATCH] ARM: STi: DT: STih407: Re-order #include <*.dtsi> files
-Message-ID: <1431353569-13291-1-git-send-email-lee.jones@linaro.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 11 May 2015 11:15:33 -0300
+Subject: [PATCH v2] ARM: dts: cubox-i: add support for Broadcom
+ Wifi/Bluetooth devices
+In-Reply-To: <CAOMZO5Cy1uhbqSfRKw_K++VhTQW7Z29GwKNAiLgB_UrF4YG9-Q@mail.gmail.com>
+References: <1430932810-28756-1-git-send-email-festevam@gmail.com>
+ <20150511130016.GE9347@dragon>
+ <CAOMZO5Cy1uhbqSfRKw_K++VhTQW7Z29GwKNAiLgB_UrF4YG9-Q@mail.gmail.com>
+Message-ID: <CAOMZO5AYq1TBWsTUZ2Csy98qy2Ma-MSt+4uwwDUOaGnZaYUiiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes a regression where serial is enabled by the first
-(board) DTSI, then disabled by the second (SoC) file.  To enable
-serial and keep it enabled, we need to include the file which enables
-it last.
+On Mon, May 11, 2015 at 10:46 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> Hi Shawn,
+>
+> On Mon, May 11, 2015 at 10:00 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+>
+>> One of the device tree maintainers doesn't like "clocks" container.
+>> Since you're not using generic node name for child clock, the container
+>> can just be saved.
+>
+> Just to make sure I understand your suggestion: would you like the
+> clock nodes to look like this?
 
-Reported-by: LAVA [via Peter Griffin <peter.griffin@linaro.org>]
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/boot/dts/stih407-b2120.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I think I got it. Do you mean like this?
 
-diff --git a/arch/arm/boot/dts/stih407-b2120.dts b/arch/arm/boot/dts/stih407-b2120.dts
-index af48714..6d93475 100644
---- a/arch/arm/boot/dts/stih407-b2120.dts
-+++ b/arch/arm/boot/dts/stih407-b2120.dts
-@@ -7,8 +7,8 @@
-  * published by the Free Software Foundation.
-  */
- /dts-v1/;
--#include "stihxxx-b2120.dtsi"
- #include "stih407.dtsi"
-+#include "stihxxx-b2120.dtsi"
- / {
- 	model = "STiH407 B2120";
- 	compatible = "st,stih407-b2120", "st,stih407";
--- 
-1.9.1
+#include <dt-bindings/gpio/gpio.h>
+/ {
+    clk_sdio: sdio-clock {
+        compatible = "gpio-gate-clock";
+        #clock-cells = <0>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_microsom_brcm_osc>;
+        enable-gpios = <&gpio5 5 GPIO_ACTIVE_HIGH>;
+    };
+
+    regulators {
+        compatible = "simple-bus";
