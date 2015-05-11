@@ -1,27 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 11 May 2015 20:53:49 +0200
-Subject: [linux-sunxi] Re: [PATCH v2 04/13] musb: Do not use
- musb_read[b|w] / _write[b|w] wrappers in generic fifo functions
-In-Reply-To: <5550F174.6000709@redhat.com>
-References: <1426878682-14521-1-git-send-email-hdegoede@redhat.com>
- <20150511155846.GH19476@saruman.tx.rr.com> <5550F174.6000709@redhat.com>
-Message-ID: <10106387.CZmapdhaD3@wuerfel>
+From: mwelling@ieee.org (Michael Welling)
+Date: Mon, 11 May 2015 13:54:51 -0500
+Subject: next-20150511 / omap2-mcspi: regression for sdp4430 boot
+In-Reply-To: <5550F47C.1030902@ti.com>
+References: <5550DDCB.8010303@ti.com> <20150511170742.GA6616@deathray>
+ <5550F47C.1030902@ti.com>
+Message-ID: <20150511185451.GA16240@deathray>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 11 May 2015 20:14:12 Hans de Goede wrote:
-> Also note, that as I've tried to explain in the commit message already this commit
-> makes no functional changes what so ever, the generic musb_default_read/write_fifo
-> functions are only used by musb platforms which do not overwrite musb_write* /
-> musb_read* and musb_write* / musb_read* are already just thin wrappers around
-> the __raw_* functions.
+On Mon, May 11, 2015 at 01:27:08PM -0500, Nishanth Menon wrote:
+> On 05/11/2015 12:07 PM, Michael Welling wrote:
+> > On Mon, May 11, 2015 at 11:50:19AM -0500, Nishanth Menon wrote:
+> >> Hi,
+> >>
+> >> SDP4430 uses a SPI based network chip ks8851.
+> >>
+> >> next-20150508:
+> >> https://github.com/nmenon/kernel-test-logs/blob/next-20150508/omap2plus_defconfig/sdp4430.txt
+> >>
+> >> However, next-20150511:
+> >> https://github.com/nmenon/kernel-test-logs/blob/next-20150511/omap2plus_defconfig/sdp4430.txt
+> >>
+> > 
+> > I will look into this but it is going to be difficult to debug with access to the hardware.
+> > This is what I get for changing a driver that effects so many SoCs.
+> > 
+> 
+> Let me know if there is any test patch you'd want me to run. The board
+> is on a remote "board farm" which most of TI folks have access to as
+> well.. So, if you need anything run, just send out a debug patch OR a
+> potential fix and we can help try it out and provide logs back for
+> your debug.
+>
 
-Oh, that's a bit odd:  That would mean that the defaults are also broken on
-big-endian platforms, and fixing them would introduce the bug here, unless your
-patch is applied.
+So it appears that I have broken the native chip select support.
 
-Any idea why musb uses the __raw_* functions to start with? Can we change
-them to read?_relaxed()/write?_relaxed() now that those are available on
-all architectures?
+I have a serial flash at spi0cs0 and if I use the GPIO for chip select
+it detects:
+m25p80 spi1.0: n25q128a13 (16384 Kbytes)
 
-	Arnd
+If I use the native chip select it does not:
+m25p80 spi1.0: unrecognized JEDEC id bytes: ff, ff, ff
+
+This allows me to find the issue and provide a follow up patch.
+I will provide it when I have it ready to see if it fixes your issue.
+
+If I cannot find a fix, we may have to revert these changes.
+
+> 
+> -- 
+> Regards,
+> Nishanth Menon
