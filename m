@@ -1,31 +1,24 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 11 May 2015 10:46:10 -0300
-Subject: [PATCH v2] ARM: dts: cubox-i: add support for Broadcom
- Wifi/Bluetooth devices
-In-Reply-To: <20150511130016.GE9347@dragon>
-References: <1430932810-28756-1-git-send-email-festevam@gmail.com>
- <20150511130016.GE9347@dragon>
-Message-ID: <CAOMZO5Cy1uhbqSfRKw_K++VhTQW7Z29GwKNAiLgB_UrF4YG9-Q@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 11 May 2015 21:51:42 +0800
+Subject: [PATCH V8 2/6] ARM: dts: add imx7d soc dtsi file
+In-Reply-To: <1431020158-13789-3-git-send-email-Frank.Li@freescale.com>
+References: <1431020158-13789-1-git-send-email-Frank.Li@freescale.com>
+ <1431020158-13789-3-git-send-email-Frank.Li@freescale.com>
+Message-ID: <20150511135141.GJ9347@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Fri, May 08, 2015 at 01:35:54AM +0800, Frank.Li at freescale.com wrote:
+> From: Frank Li <Frank.Li@freescale.com>
+> 
+> Add i.mx7d support:
+> 	imx7d dtsi part
 
-On Mon, May 11, 2015 at 10:00 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+The commit log should be really improved a bit to briefly describe this
+new SoC.
 
-> One of the device tree maintainers doesn't like "clocks" container.
-> Since you're not using generic node name for child clock, the container
-> can just be saved.
+Shawn
 
-Just to make sure I understand your suggestion: would you like the
-clock nodes to look like this?
-
-    oscillator {
-        clk_sdio: sdio-clock {
-            compatible = "gpio-gate-clock";
-            #clock-cells = <0>;
-            pinctrl-names = "default";
-            pinctrl-0 = <&pinctrl_microsom_brcm_osc>;
-            enable-gpios = <&gpio5 5 GPIO_ACTIVE_HIGH>;
-        };
-    };
+> 
+> Signed-off-by: Anson Huang <b20788@freescale.com>
+> Signed-off-by: Frank Li <Frank.Li@freescale.com>
