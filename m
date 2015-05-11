@@ -1,42 +1,45 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 11 May 2015 15:36:27 +0100
-Subject: [PATCH] ARM: mm: Enable PXN when running non-LPAE kernel on LPAE
- processor
-In-Reply-To: <CAPP0e=O=XfE7s7G3qUjqS2o+HwJctuCt9TXzSoTGAKmP14_UBA@mail.gmail.com>
-References: <1419436468.4705.105.camel@decadent.org.uk>
- <20141224172038.GE13399@e104818-lin.cambridge.arm.com>
- <CAPP0e=O=XfE7s7G3qUjqS2o+HwJctuCt9TXzSoTGAKmP14_UBA@mail.gmail.com>
-Message-ID: <20150511143627.GH18655@e104818-lin.cambridge.arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 11 May 2015 22:36:45 +0800
+Subject: [PATCH v2] ARM: dts: cubox-i: add support for Broadcom
+ Wifi/Bluetooth devices
+In-Reply-To: <CAOMZO5AYq1TBWsTUZ2Csy98qy2Ma-MSt+4uwwDUOaGnZaYUiiA@mail.gmail.com>
+References: <1430932810-28756-1-git-send-email-festevam@gmail.com>
+ <20150511130016.GE9347@dragon>
+ <CAOMZO5Cy1uhbqSfRKw_K++VhTQW7Z29GwKNAiLgB_UrF4YG9-Q@mail.gmail.com>
+ <CAOMZO5AYq1TBWsTUZ2Csy98qy2Ma-MSt+4uwwDUOaGnZaYUiiA@mail.gmail.com>
+Message-ID: <20150511143644.GP9347@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 11, 2015 at 05:09:35PM +0900, Jungseung Lee wrote:
-> Hi, Ben.
-> 
-> 2014-12-25 2:20 GMT+09:00 Catalin Marinas <catalin.marinas@arm.com>:
-> > On Wed, Dec 24, 2014 at 03:54:28PM +0000, Ben Hutchings wrote:
-> >> The VMSA field of MMFR0 (bottom 4 bits) is incremented for each
-> >> added feature.  PXN is supported if the value is >= 4 and LPAE
-> >> is supported if it is >= 5.
-> >>
-> >> In case a kernel with CONFIG_ARM_LPAE disabled is used on a
-> >> processor that supports LPAE, we can still use PXN in short
-> >> descriptors.  So check for >= 4 not == 4.
-> >>
-> >> Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
-> >> Cc: Jungseung Lee <js07.lee@gmail.com>
-> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
+On Mon, May 11, 2015 at 11:15:33AM -0300, Fabio Estevam wrote:
+> On Mon, May 11, 2015 at 10:46 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> > Hi Shawn,
 > >
-> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> > On Mon, May 11, 2015 at 10:00 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> >
+> >> One of the device tree maintainers doesn't like "clocks" container.
+> >> Since you're not using generic node name for child clock, the container
+> >> can just be saved.
+> >
+> > Just to make sure I understand your suggestion: would you like the
+> > clock nodes to look like this?
 > 
-> Is this patch handled?
+> I think I got it. Do you mean like this?
 
-If it's not in mainline already, than it probably isn't handled.
+Yes.
 
-> or you can send it to Russell's patch system:
-> http://www.arm.linux.org.uk/developer/patches/
+shawn
 
-Check mainline first, otherwise please submit it.
-
--- 
-Catalin
+> 
+> #include <dt-bindings/gpio/gpio.h>
+> / {
+>     clk_sdio: sdio-clock {
+>         compatible = "gpio-gate-clock";
+>         #clock-cells = <0>;
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&pinctrl_microsom_brcm_osc>;
+>         enable-gpios = <&gpio5 5 GPIO_ACTIVE_HIGH>;
+>     };
+> 
+>     regulators {
+>         compatible = "simple-bus";
