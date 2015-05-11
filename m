@@ -1,81 +1,154 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 11 May 2015 19:13:07 +0200
-Subject: [PATCH 3/7] drivers/cpuidle: Convert non-modular drivers to use
- builtin_driver_register
-In-Reply-To: <1431287385-1526-4-git-send-email-paul.gortmaker@windriver.com>
-References: <1431287385-1526-1-git-send-email-paul.gortmaker@windriver.com>
- <1431287385-1526-4-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <5550E323.1080800@linaro.org>
+From: robert.richter@caviumnetworks.com (Robert Richter)
+Date: Mon, 11 May 2015 19:18:10 +0200
+Subject: [PATCH v2] AHCI: Add generic MSI-X interrupt support to SATA PCI
+ driver
+In-Reply-To: <20150504160652.GB1971@htj.duckdns.org>
+References: <1430725538-22162-1-git-send-email-rric@kernel.org>
+ <20150504160652.GB1971@htj.duckdns.org>
+Message-ID: <20150511171810.GB29499@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/10/2015 09:49 PM, Paul Gortmaker wrote:
-> All these drivers are configured with Kconfig options that are
-> declared as bool.  Hence it is not possible for the code
-> to be built as modular.  However the code is currently using the
-> module_platform_driver() macro for driver registration.
+Tejun,
+
+thanks for your review and answer.
+
+On 04.05.15 12:06:52, Tejun Heo wrote:
+> > This patch also enables AHCI for Cavium Thunder SoCs that uses MSI-X.
 >
-> While this currently works, we really don't want to be including
-> the module.h header in non-modular code, which we'll be forced
-> to do, pending some upcoming code relocation from init.h into
-> module.h.  So we fix it now by using the non-modular equivalent.
+> Please don't mix these two changes in the same patch.
+
+I will split the patch.
+
+> > +   /* per-port msix interrupts are not supported */
+> > +   if (n_ports > 1 && nvec >= n_ports)
+> > +           return -ENOSYS;
 >
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Michal Simek <michal.simek@xilinx.com>
-> Cc: linux-pm at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+> Hmm... can you please elaborate why the condition isn't nvec > 1?
 
-Sounds reasonable.
+I slightly changed the check and added a comment that explains that's
+going on in the function. This is the new version:
 
-   -- Daniel
+static int ahci_init_msix(struct pci_dev *pdev, unsigned int n_ports,
+			  struct ahci_host_priv *hpriv)
+{
+	int rc, nvec;
+	struct msix_entry entry = {};
 
-> ---
->   drivers/cpuidle/cpuidle-at91.c    | 3 +--
->   drivers/cpuidle/cpuidle-calxeda.c | 3 +--
->   drivers/cpuidle/cpuidle-zynq.c    | 3 +--
->   3 files changed, 3 insertions(+), 6 deletions(-)
+	/* check if msix is supported */
+	nvec = pci_msix_vec_count(pdev);
+	if (nvec <= 0)
+		return 0;
+
+	/*
+	 * Per-port msix interrupts are not supported. Assume single
+	 * port interrupts for:
+	 *
+	 *  n_ports == 1, or
+	 *  nvec < n_ports.
+	 *
+	 * We also need to check for n_ports != 0 which is implicitly
+	 * covered here since nvec > 0.
+	 */
+	if (n_ports != 1 && nvec >= n_ports)
+		return -ENOSYS;
+
+	/*
+	 * There can exist more than one vector (e.g. for error
+	 * detection or hdd hotplug). Then the first vector is used,
+	 * all others are ignored. Only enable the first entry here
+	 * (entry.entry = 0).
+	 */
+	rc = pci_enable_msix_exact(pdev, &entry, 1);
+	if (rc < 0)
+		return rc;
+
+	return 1;
+}
+
+Note that the check changed to n_ports != 1 to also cover the case
+n_ports == 0 which should return -ENOSYS.
+
+> Also, shouldn't we be printing a warning message here explaining why
+> probing is failing?
+
+I didn't want to print a warning in case -ENOSYS for backward
+compatability. Only if msi-x code fails there is a message, see
+__ahci_init_interrupts(). In any other case the behaviour is as
+before, thus no message is printed.
+
+> > +
+> > +   /* only enable the first entry (entry.entry = 0) */
+> > +   rc = pci_enable_msix_exact(pdev, &entry, 1);
 >
-> diff --git a/drivers/cpuidle/cpuidle-at91.c b/drivers/cpuidle/cpuidle-at91.c
-> index f2446c78d87c..9c5853b6ca4a 100644
-> --- a/drivers/cpuidle/cpuidle-at91.c
-> +++ b/drivers/cpuidle/cpuidle-at91.c
-> @@ -62,5 +62,4 @@ static struct platform_driver at91_cpuidle_driver = {
->   	},
->   	.probe = at91_cpuidle_probe,
->   };
-> -
-> -module_platform_driver(at91_cpuidle_driver);
-> +builtin_platform_driver(at91_cpuidle_driver);
-> diff --git a/drivers/cpuidle/cpuidle-calxeda.c b/drivers/cpuidle/cpuidle-calxeda.c
-> index 9445e6cc02be..c13feec89ea1 100644
-> --- a/drivers/cpuidle/cpuidle-calxeda.c
-> +++ b/drivers/cpuidle/cpuidle-calxeda.c
-> @@ -75,5 +75,4 @@ static struct platform_driver calxeda_cpuidle_plat_driver = {
->           },
->           .probe = calxeda_cpuidle_probe,
->   };
-> -
-> -module_platform_driver(calxeda_cpuidle_plat_driver);
-> +builtin_platform_driver(calxeda_cpuidle_plat_driver);
-> diff --git a/drivers/cpuidle/cpuidle-zynq.c b/drivers/cpuidle/cpuidle-zynq.c
-> index 543292b1d38e..6f4257fc56e5 100644
-> --- a/drivers/cpuidle/cpuidle-zynq.c
-> +++ b/drivers/cpuidle/cpuidle-zynq.c
-> @@ -73,5 +73,4 @@ static struct platform_driver zynq_cpuidle_driver = {
->   	},
->   	.probe = zynq_cpuidle_probe,
->   };
-> -
-> -module_platform_driver(zynq_cpuidle_driver);
-> +builtin_platform_driver(zynq_cpuidle_driver);
+> So, enabling the first msix works if nvec > 1 && nvec < n_ports but
+> not if nvec >= n_ports?
+
+For n_ports > 1 && nvec >= n_ports we need to assume per-port
+interrupts. There are enough vectors for all ports then.
+
+> > +	if (rc < 0)
+> > +		return rc;
+> > +
+> > +	return 1;
+> > +}
+> > +
+> > +static int __ahci_init_interrupts(struct pci_dev *pdev, unsigned int n_ports,
+> > +				  struct ahci_host_priv *hpriv)
+> >  {
+> >  	int rc, nvec;
+> >
+> > +	nvec = ahci_init_msix(pdev, n_ports, hpriv);
+> > +	if (nvec > 0)
+> > +		return nvec;
+> > +
+> > +	if (nvec && nvec != -ENOSYS)
+> > +		dev_err(&pdev->dev, "failed to enable MSI-X: %d", nvec);
+> > +
+> >  	if (hpriv->flags & AHCI_HFLAG_NO_MSI)
+> >  		goto intx;
+> >
+> > @@ -1250,6 +1285,35 @@ static int ahci_init_interrupts(struct pci_dev *pdev, unsigned int n_ports,
+> >  	return 0;
+> >  }
+> >
+> > +static struct msi_desc *msix_get_desc(struct pci_dev *dev, u16 entry)
+> > +{
+> > +	struct msi_desc *desc;
+> > +
+> > +	list_for_each_entry(desc, &dev->msi_list, list) {
+> > +		if (desc->msi_attrib.entry_nr == entry)
+> > +			return desc;
+> > +	}
+> > +
+> > +	return NULL;
+> > +}
+> > +
+> > +static int ahci_init_interrupts(struct pci_dev *pdev, unsigned int n_ports,
+> > +                           struct ahci_host_priv *hpriv)
+> > +{
+> > +   struct msi_desc *desc;
+> > +
+> > +   __ahci_init_interrupts(pdev, n_ports, hpriv);
+> > +
+> > +   if (!pdev->msix_enabled)
+> > +           return pdev->irq;
+> > +
+> > +   desc = msix_get_desc(pdev, 0);  /* first entry */
+> > +   if (!desc)
+> > +           return -ENODEV;
+> > +
+> > +   return desc->irq;
+> > +}
 >
+> Can we please do this properly?  We should be able to move port priv
+> allocation to host allocaotion time and add and use pp->irq instead,
+> right?
 
+I started working implementing this.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+Will send an updated patch set once finished.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Thanks,
+
+-Robert
