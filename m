@@ -1,53 +1,23 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 11 May 2015 17:29:45 +0100
-Subject: [PATCH 2/2] ARM64: kernel: unify ACPI and DT cpus initialization
-In-Reply-To: <1431020084-5875-2-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1431020084-5875-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1431020084-5875-2-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20150511162945.GD4595@leverpostej>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Mon, 11 May 2015 18:46:02 +0200
+Subject: [PATCH] iommu/arm-smmu: Fix sign-extension of upstream bus
+ addresses at stage 1
+In-Reply-To: <1431103462-8153-1-git-send-email-will.deacon@arm.com>
+References: <1431103462-8153-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20150511164601.GA10216@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+On Fri, May 08, 2015 at 05:44:22PM +0100, Will Deacon wrote:
+> Hi Joerg,
+> 
+> I only have this one fix pending for arm-smmu, so please could you pick
+> it up for 4.1? I can send a pull if you'd prefer, but it feels a bit
+> OTT.
+> 
+> Will
+> 
+>  drivers/iommu/arm-smmu.c | 30 ++----------------------------
+>  1 file changed, 2 insertions(+), 28 deletions(-)
 
-> +               enable_method = acpi_get_enable_method(cpu);
-> +               if (!enable_method)
-> +                       pr_err("Undefined ACPI enable-method\n");
-
-I was going to complain that "enable-method" is a DT term that doesn't
-strictly apply to ACPI, but ACPI doesn't seem to have its own
-terminology for this, so I guess this is ok.
-
-However, I'd recommend replacing "Undefined" with "Unknown/Unsupported"
-in the log message.
-
-[...]
-
-> +static u64 __init of_get_cpu_mpidr(struct device_node *dn)
-> +{
-> +       const u32 *cell;
-> +       u64 hwid;
-> +
-> +       /*
-> +        * A cpu node with missing "reg" property is
-> +        * considered invalid to build a cpu_logical_map
-> +        * entry.
-> +        */
-> +       cell = of_get_property(dn, "reg", NULL);
-> +       if (!cell) {
-> +               pr_err("%s: missing reg property\n", dn->full_name);
-> +               return INVALID_HWID;
-> +       }
-> +
-> +       hwid = of_read_number(cell, of_n_addr_cells(dn));
-
-Existing bug, but cell should be a __be32 pointer rather than a u32
-pointer (as that's what of_read_number expects).
-
-Other than that, this looks fine to me:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Tested-by: Mark Rutland <mark.rutland@arm.com> [DT]
-
-Thanks,
-Mark.
+Applied to iommu/fixes, thanks.
