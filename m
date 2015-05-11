@@ -1,92 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 11 May 2015 10:28:58 -0700
-Subject: [PATCH v3 3/4] Documentation: dt: add bindings for TI Wakeup M3
- processor
-In-Reply-To: <1427917039-43206-4-git-send-email-d-gerlach@ti.com>
-References: <1427917039-43206-1-git-send-email-d-gerlach@ti.com>
- <1427917039-43206-4-git-send-email-d-gerlach@ti.com>
-Message-ID: <20150511172858.GD15563@atomide.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 11 May 2015 18:41:43 +0100
+Subject: [PATCH 1/2] ARM: perf: fix memory leak when probing PMU PPIs
+Message-ID: <1431366104-27393-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Commit 338d9dd3e2ae ("ARM: 8351/1: perf: don't warn about missing
+interrupt-affinity property for PPIs") added a check for PPIs so that
+we avoid parsing the interrupt-affinity property for these naturally
+affine interrupts.
 
-* Dave Gerlach <d-gerlach@ti.com> [150401 12:38]:
-> Add the device tree bindings document for the TI Wakeup M3 remote
-> processor devices on AM33xx and AM43xx SoCs. These devices are used
-> to offload low-level power management functionality, and are handled
-> by the wkup_m3 remoteproc driver.
-> 
-> Signed-off-by: Suman Anna <s-anna@ti.com>
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+Unfortunately, this check can trigger an early (successful) return and
+we will leak the irqs array. This patch fixes the issue by reordering
+the code so that the check is performed before any independent
+allocation.
 
-This binding looks OK to me now, thanks for updating it:
+Reported-by: David Binderman <dcb314@hotmail.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/perf_event_cpu.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-Acked-by: Tony Lindgren <tony@atomide.com>
-
-> ---
->  .../bindings/remoteproc/wkup_m3_rproc.txt          | 52 ++++++++++++++++++++++
->  1 file changed, 52 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/remoteproc/wkup_m3_rproc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/remoteproc/wkup_m3_rproc.txt b/Documentation/devicetree/bindings/remoteproc/wkup_m3_rproc.txt
-> new file mode 100644
-> index 0000000..3a70073
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/remoteproc/wkup_m3_rproc.txt
-> @@ -0,0 +1,52 @@
-> +TI Wakeup M3 Remoteproc Driver
-> +==============================
-> +
-> +The TI AM33xx and AM43xx family of devices use a small Cortex M3 co-processor
-> +(commonly referred to as Wakeup M3 or CM3) to help with various low power tasks
-> +that cannot be controlled from the MPU. This CM3 processor requires a firmware
-> +binary to accomplish this. The wkup_m3 remoteproc driver handles the loading of
-> +the firmware and booting of the CM3.
-> +
-> +Wkup M3 Device Node:
-> +====================
-> +A wkup_m3 device node is used to represent the Wakeup M3 processor instance
-> +within the SoC. It is added as a child node of the parent interconnect bus
-> +(l4_wkup) through which it is accessible to the MPU.
-> +
-> +Required properties:
-> +--------------------
-> +- compatible:		Should be one of,
-> +				"ti,am3352-wkup-m3" for AM33xx SoCs
-> +				"ti,am4372-wkup-m3" for AM43xx SoCs
-> +- reg:			Should contain the address ranges for the two internal
-> +			memory regions, UMEM and DMEM. The parent node should
-> +			provide an appropriate ranges property for properly
-> +			translating these into bus addresses.
-> +- reg-names:		Contains the corresponding names for the two memory
-> +			regions. These should be named "umem" & "dmem".
-> +- ti,hwmods:		Name of the hwmod associated with the wkupm3 device.
-> +- ti,pm-firmware:	Name of firmware file to be used for loading and
-> +			booting the wkup_m3 remote processor.
-> +
-> +Example:
-> +--------
-> +/* AM33xx */
-> +ocp {
-> +	 l4_wkup: l4_wkup at 44c00000 {
-> +		compatible = "am335-l4-wkup", "simple-bus";
-> +		ranges = <0 0x44c00000 0x400000>;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +
-> +		wkup_m3: wkup_m3 at 100000 {
-> +			compatible = "ti,am3352-wkup-m3";
-> +			reg = <0x100000 0x4000>,
-> +			      <0x180000 0x2000>;
-> +			reg-names = "umem", "dmem";
-> +			ti,hwmods = "wkup_m3";
-> +			ti,pm-firmware = "am335x-pm-firmware.elf";
-> +		};
-> +	};
-> +
-> +	...
-> +};
-> -- 
-> 2.3.0
-> 
+diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
+index 213919ba326f..3b8c2833c537 100644
+--- a/arch/arm/kernel/perf_event_cpu.c
++++ b/arch/arm/kernel/perf_event_cpu.c
+@@ -304,16 +304,17 @@ static int probe_current_pmu(struct arm_pmu *pmu)
+ static int of_pmu_irq_cfg(struct platform_device *pdev)
+ {
+ 	int i, irq;
+-	int *irqs = kcalloc(pdev->num_resources, sizeof(*irqs), GFP_KERNEL);
+-
+-	if (!irqs)
+-		return -ENOMEM;
++	int *irqs;
+ 
+ 	/* Don't bother with PPIs; they're already affine */
+ 	irq = platform_get_irq(pdev, 0);
+ 	if (irq >= 0 && irq_is_percpu(irq))
+ 		return 0;
+ 
++	irqs = kcalloc(pdev->num_resources, sizeof(*irqs), GFP_KERNEL);
++	if (!irqs)
++		return -ENOMEM;
++
+ 	for (i = 0; i < pdev->num_resources; ++i) {
+ 		struct device_node *dn;
+ 		int cpu;
+-- 
+2.1.4
