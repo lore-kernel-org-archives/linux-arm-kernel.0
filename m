@@ -1,62 +1,45 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 11 May 2015 12:44:28 -0700
-Subject: [PATCH v2] i2c: rk3x: Increase wait timeout to 1 second
-Message-ID: <1431373468-18302-1-git-send-email-dianders@chromium.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 11 May 2015 20:59:33 +0100
+Subject: [PATCH 5/7] ARM: re-implement physical address space switching
+In-Reply-To: <5550FBD8.3070103@ti.com>
+References: <20150506103000.GF2067@n2100.arm.linux.org.uk>
+ <E1YpwbF-0000wd-MP@rmk-PC.arm.linux.org.uk>
+ <5550FBD8.3070103@ti.com>
+Message-ID: <20150511195933.GI2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Although unlikely, it is remotely possible for an i2c command to need
-more than 200ms complete. Unlike smbus, i2c devices can clock stretch
-for an unspecified amount of time. The longest time I've seen
-specified for a device is 144ms (bq27541 battery gas), but one could
-imagine a device taking a bit slower. 1 second "ought to be enough for
-anyone."
+On Mon, May 11, 2015 at 01:58:32PM -0500, Nishanth Menon wrote:
+> On 05/06/2015 05:30 AM, Russell King wrote:
+> [...]
+> > @@ -1436,75 +1435,32 @@ void __init early_paging_init(const struct machine_desc *mdesc,
+> 
+> [...]
+> > -	/* Finally flush any stale TLB values. */
+> > -	local_flush_bp_all();
+> > -	local_flush_tlb_all();
+> > +	/* Re-enable the caches and cacheable TLB walks */
+> > +	asm volatile("mcr p15, 0, %0, c2, c0, 2" : : "ttbcr");
+> ^^
+> on next-20150511, echo
+> "CONFIG_ARM_LPAE=y">>arch/arm/configs/multi_v7_defconfig ;make
+> multi_v7_defconfig;make arch/arm/mm/mmu.o
+> #
+> # configuration written to .config
+> #
+> scripts/kconfig/conf  --silentoldconfig Kconfig
+> 
+> <snip>
+>   CC      arch/arm/mm/mmu.o
+> arch/arm/mm/mmu.c: In function ?early_paging_init?:
+> arch/arm/mm/mmu.c:1461:54: error: expected ?(? before ?)? token
+> make[1]: *** [arch/arm/mm/mmu.o] Error 1
+> make: *** [arch/arm/mm/mmu.o] Error 2
+> this was using [1]
 
-The above is not the only justifcation for going above 200ms for a
-timeout, though.  It turns out that if you've got a large number of
-printks going out to a serial console, interrupts on a CPU can be
-disabled for hundreds of milliseconds. That's not a great situation to
-be in to start with (maybe we should put a cap in vprintk_emit()) but
-it's pretty annoying to start seeing unexplained i2c timeouts.
+That's why I said I'd send you an updated version.  Just replace the
+"ttbcr" with "r" (ttbcr)...
 
-Note that to understand why we can timeout when printk has interrupts
-disabled, you need to understand that on current Linux ARM kernels
-interrupts are routed to a single CPU in a multicore system. Thus,
-you can get:
-
-1. CPU1 is running rk3x_i2c_xfer()
-2. CPU0 calls vprintk_emit(), which disables all IRQs on CPU0.
-3. I2C interrupt is ready but is set to only run on CPU0, where IRQs
-   are disabled.
-4. CPU1 timeout expires. I2C interrupt is still ready, but CPU0 is
-   still sitting in the same vprintk_emit()
-5. CPU1 sees that no interrupt happened in 200ms, so timeout.
-
-A normal system shouldn't see i2c timeouts anyway, so increasing the
-timeout should help people debugging without hurting other people
-excessively.
-
-Signed-off-by: Doug Anderson <dianders@chromium.org>
-Tested-by: Caesar Wang <wxt@rock-chips.com>
----
-Changes in v2:
-- Update commit message as per Uwe
-
- drivers/i2c/busses/i2c-rk3x.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
-index 019d542..72e97e30 100644
---- a/drivers/i2c/busses/i2c-rk3x.c
-+++ b/drivers/i2c/busses/i2c-rk3x.c
-@@ -72,7 +72,7 @@ enum {
- #define REG_INT_ALL       0x7f
- 
- /* Constants */
--#define WAIT_TIMEOUT      200 /* ms */
-+#define WAIT_TIMEOUT      1000 /* ms */
- #define DEFAULT_SCL_RATE  (100 * 1000) /* Hz */
- 
- enum rk3x_i2c_state {
 -- 
-2.2.0.rc0.207.ga3a616c
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
