@@ -1,63 +1,55 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 11 May 2015 17:16:27 +0100
-Subject: [V3 PATCH 1/5] ACPI / scan: Parse _CCA and setup device coherency
-In-Reply-To: <3684853.vaQGhc4jR5@vostro.rjw.lan>
-References: <1431045436-8690-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1431045436-8690-2-git-send-email-Suravee.Suthikulpanit@amd.com>
- <3684853.vaQGhc4jR5@vostro.rjw.lan>
-Message-ID: <20150511161626.GI18655@e104818-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 11 May 2015 18:21:26 +0200
+Subject: [PATCH v2 04/13] musb: Do not use musb_read[b|w] / _write[b|w]
+ wrappers in generic fifo functions
+In-Reply-To: <20150511155846.GH19476@saruman.tx.rr.com>
+References: <1426878682-14521-1-git-send-email-hdegoede@redhat.com>
+ <1426878682-14521-5-git-send-email-hdegoede@redhat.com>
+ <20150511155846.GH19476@saruman.tx.rr.com>
+Message-ID: <23713585.ok6F49RAiY@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 08, 2015 at 10:53:59PM +0200, Rafael J. Wysocki wrote:
-> On Thursday, May 07, 2015 07:37:12 PM Suravee Suthikulpanit wrote:
-> > diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> > index ab2cbb5..7822149 100644
-> > --- a/drivers/acpi/Kconfig
-> > +++ b/drivers/acpi/Kconfig
-> > @@ -54,6 +54,12 @@ config ACPI_GENERIC_GSI
-> >  config ACPI_SYSTEM_POWER_STATES_SUPPORT
-> >  	bool
-> >  
-> > +config ACPI_CCA_REQUIRED
-> > +	bool
-> > +
-> > +config ARM64_SUPPORT_ACPI_CCA_ZERO
+On Monday 11 May 2015 10:58:46 Felipe Balbi wrote:
+> On Fri, Mar 20, 2015 at 08:11:13PM +0100, Hans de Goede wrote:
+> > The generic fifo functions already use non wrapped accesses in various
+> > cases through the iowrite#_rep functions, and all platforms which override
+> > the default musb_read[b|w] / _write[b|w] functions also provide their own
+> > fifo access functions, so we can safely drop the unnecessary indirection
+> > from the fifo access functions.
+> > 
+> > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> > ---
+> >  drivers/usb/musb/musb_core.c | 8 ++++----
+> >  1 file changed, 4 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
+> > index 01ed3a6..016b5b9 100644
+> > --- a/drivers/usb/musb/musb_core.c
+> > +++ b/drivers/usb/musb/musb_core.c
+> > @@ -313,7 +313,7 @@ static void musb_default_write_fifo(struct musb_hw_ep *hw_ep, u16 len,
+> >                               index += len & ~0x03;
+> >                       }
+> >                       if (len & 0x02) {
+> > -                             musb_writew(fifo, 0, *(u16 *)&src[index]);
+> > +                             __raw_writew(*(u16 *)&src[index], fifo);
 > 
-> Hmm.  I guess the Arnd's idea what to simply use CONFIG_ARM64 directly instead
-> of adding this new option.
-
-I agree.
-
-> > +static inline bool acpi_dma_is_supported(struct acpi_device *adev)
-> > +{
-> > +	/**
-> > +	 * Currently, we mainly support _CCA=1 (i.e. is_coherent=1)
-> > +	 * This should be equivalent to specifyig dma-coherent for
-> > +	 * a device in OF.
-> > +	 *
-> > +	 * For the case when _CCA=0 (i.e. is_coherent=0 && cca_seen=1),
-> > +	 * we would rely on arch-specific cache maintenance for
-> > +	 * non-coherence DMA operations if architecture specifies
-> > +	 * _XXX_SUPPORT_CCA_ZERO. Otherwise, we do not support
-> > +	 * DMA on this device and fallback to arch-specific default
-> > +	 * handling.
-> > +	 *
-> > +	 * For the case when _CCA is missing (i.e. cca_seen=0) but
-> > +	 * platform specifies ACPI_CCA_REQUIRED, we do not support DMA,
-> > +	 * and fallback to arch-specific default handling.
-> > +	 */
-> > +	return adev && (adev->flags.is_coherent ||
-> > +			(adev->flags.cca_seen &&
-> > +			 IS_ENABLED(CONFIG_ARM64_SUPPORT_ACPI_CCA_ZERO)));
+> not all architectures provide __raw_* accessors, right ?
 > 
-> So what exactly would be wrong with using IS_ENABLED(CONFIG_ARM64) here?
+> 
 
-I'm not sure I follow why we need to check for ARM64 here at all. Can we
-not just have something like:
+They do, but you shouldn't use them for MMIO registers normall because of
+endianess concerns.
 
-	return adev && (!IS_ENABLED(CONFIG_ACPI_CCA_REQUIRED) ||
-			adev->flags.cca_seen)
+However, FIFOs are special, and I'd assume that the code before this patch
+does not work on big-endian systems on which musb_writew is defined
+as a little-endian accessor (writew, writew_relaxed, or iowrite16).
 
--- 
-Catalin
+The reason is that a FIFO generally exposes bytes in streaming order,
+so the first byte in the FIFO has to be copied from a memory buffer
+first, while writew would do a byte swap here that is used for MMIO.
+
+This should be reflected in the changelog, and possibly tested with a
+big-endian kernel, but the patch looks correct to me.
+
+	Arnd
