@@ -1,101 +1,204 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Mon, 11 May 2015 16:39:30 +0800
-Subject: [v2 4/5] arm64: add kdump support
-In-Reply-To: <5550613A.3070506@linaro.org>
-References: <1429861989-8417-1-git-send-email-takahiro.akashi@linaro.org>
- <1429861989-8417-5-git-send-email-takahiro.akashi@linaro.org>
- <20150508121921.GA18400@localhost.localdomain>
- <20150511074728.GA15884@dhcp-128-124.nay.redhat.com>
- <5550613A.3070506@linaro.org>
-Message-ID: <20150511083930.GB15884@dhcp-128-124.nay.redhat.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 11 May 2015 10:42:47 +0200
+Subject: [PATCH 02/12] clocksource: sti: Provide support for the ST LPC
+ Clocksource IP
+In-Reply-To: <1431005924-21777-3-git-send-email-lee.jones@linaro.org>
+References: <1431005924-21777-1-git-send-email-lee.jones@linaro.org>
+ <1431005924-21777-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <55506B87.3070807@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/15 at 04:58pm, AKASHI Takahiro wrote:
-> Dave,
-> 
-> On 05/11/2015 04:47 PM, Dave Young wrote:
-> >On 05/08/15 at 08:19pm, Dave Young wrote:
-> >>Hi,
-> >>
-> >>On 04/24/15 at 04:53pm, AKASHI Takahiro wrote:
-> >>>Please read the following commits for arm64-specific constraints:
-> >>>     arm64: kdump: reserve memory for crash dump kernel
-> >>>     arm64: kdump: do not go into EL2 before starting a crash dump kernel
-> >>>
-> >>>Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> >>>---
-> >>>  Documentation/kdump/kdump.txt |   31 ++++++++++++++++++++++++++++++-
-> >>>  arch/arm64/Kconfig            |   12 ++++++++++++
-> >>>  2 files changed, 42 insertions(+), 1 deletion(-)
-> >>>
-> >>>diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
-> >>>index bc4bd5a..f9cf6f5 100644
-> >>>--- a/Documentation/kdump/kdump.txt
-> >>>+++ b/Documentation/kdump/kdump.txt
-> >>>@@ -18,7 +18,7 @@ memory image to a dump file on the local disk, or across the network to
-> >>>  a remote system.
-> >>>
-> >>>  Kdump and kexec are currently supported on the x86, x86_64, ppc64, ia64,
-> >>>-s390x and arm architectures.
-> >>>+s390x, arm and arm64 architectures.
-> >>>
-> >>>  When the system kernel boots, it reserves a small section of memory for
-> >>>  the dump-capture kernel. This ensures that ongoing Direct Memory Access
-> >>>@@ -249,6 +249,29 @@ Dump-capture kernel config options (Arch Dependent, arm)
-> >>>
-> >>>      AUTO_ZRELADDR=y
-> >>>
-> >>>+Dump-capture kernel config options (Arch Dependent, arm64)
-> >>>+----------------------------------------------------------
-> >>>+
-> >>>+1) Disable symmetric multi-processing support under "Processor type and
-> >>>+   features":
-> >>>+
-> >>>+   CONFIG_SMP=n
-> >>>+
-> >>>+   (If CONFIG_SMP=y, then specify maxcpus=1 on the kernel command line
-> >>>+   when loading the dump-capture kernel, see section "Load the Dump-capture
-> >>>+   Kernel".)
-> >>>+
-> >>>+2) Under uefi, the maximum memory size on the dump-capture kernel must be
-> >>>+   limited by specifying:
-> >>>+
-> >>>+   mem=X[MG]
-> >>>+
-> >>>+   where X should be less than or equal to the size in "crashkernel="
-> >>>+   boot parameter. Kexec-tools will automatically add this.
-> >>
-> >>I noticed you are passing mem=X in kexec-tools, Pratyush found a problem
-> >>that vmcore is corrupted because kdump kernel is using the crash notes memory.
-> >>
-> >>How does kdump kernel know the system ram range especially the mem_start?
-> >>Only with the size from mem=? parammeter?
-> >>
-> >>In X86 because it use E820 so kexec-tools can pass the memory range to kdump
-> >>kernel even for UEFI booting. But in arm64 may need find other way to
-> >>communicate with 2nd kernel like memmap=exactmap in X86..
-> >
-> >Discussed with Pratyush in irc, he mentioned that start address is get from
-> >kernel->entry which was passed by kexec-tools.
-> >
-> >So sorry for the noise, it will works fine with the UEFI mem= limitation
-> >fix from Mark Salter
-> 
-> No, not at all.
-> As you know, in another thread (with Mark), we're discussing this.
-> If we conclude that we should go for "memmap=" approach, I will update my patch.
+On 05/07/2015 03:38 PM, Lee Jones wrote:
+> This IP is shared with Watchdog and RTC functionality.  Only one of
+> these IPs can be used at the same time.  We use the device-driver
+> model combined with a DT 'mode' property to enforce this.
+>
+> The ST LPC Clocksource IP can be used as the system (tick) timer.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>   drivers/clocksource/Kconfig         |   8 +++
+>   drivers/clocksource/Makefile        |   1 +
+>   drivers/clocksource/clksrc_st_lpc.c | 123 ++++++++++++++++++++++++++++++++++++
+>   3 files changed, 132 insertions(+)
+>   create mode 100644 drivers/clocksource/clksrc_st_lpc.c
+>
+> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> index 68161f7..ac424cf 100644
+> --- a/drivers/clocksource/Kconfig
+> +++ b/drivers/clocksource/Kconfig
+> @@ -250,4 +250,12 @@ config CLKSRC_PXA
+>   	help
+>   	  This enables OST0 support available on PXA and SA-11x0
+>   	  platforms.
+> +
+> +config CLKSRC_ST_LPC
+> +	bool
+> +	depends on ARCH_STI
+> +	select CLKSRC_OF if OF
+> +	help
+> +	  Enable this option to use the Low Power controller timer
+> +	  as clocksource.
+>   endmenu
+> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+> index 752d5c7..e08da4d 100644
+> --- a/drivers/clocksource/Makefile
+> +++ b/drivers/clocksource/Makefile
+> @@ -51,3 +51,4 @@ obj-$(CONFIG_ARCH_INTEGRATOR_AP)	+= timer-integrator-ap.o
+>   obj-$(CONFIG_CLKSRC_VERSATILE)		+= versatile.o
+>   obj-$(CONFIG_CLKSRC_MIPS_GIC)		+= mips-gic-timer.o
+>   obj-$(CONFIG_ASM9260_TIMER)		+= asm9260_timer.o
+> +obj-$(CONFIG_CLKSRC_ST_LPC)		+= clksrc_st_lpc.o
+> diff --git a/drivers/clocksource/clksrc_st_lpc.c b/drivers/clocksource/clksrc_st_lpc.c
+> new file mode 100644
+> index 0000000..18a7dcd0
+> --- /dev/null
+> +++ b/drivers/clocksource/clksrc_st_lpc.c
+> @@ -0,0 +1,123 @@
+> +/*
+> + * Clocksource using the Low Power Timer found in the Low Power Controller (LPC)
+> + *
+> + * Copyright (C) 2015 STMicroelectronics ? All Rights Reserved
+> + *
+> + * Author(s): Francesco Virlinzi <francesco.virlinzi@st.com>
+> + *	      Ajit Pal Singh <ajitpal.singh@st.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/clocksource.h>
+> +#include <linux/init.h>
+> +#include <linux/of_address.h>
+> +#include <linux/slab.h>
+> +
+> +#include <dt-bindings/mfd/st-lpc.h>
+> +
+> +/* Low Power Timer */
+> +#define LPC_LPT_LSB_OFF		0x400
+> +#define LPC_LPT_MSB_OFF		0x404
+> +#define LPC_LPT_START_OFF	0x408
+> +
+> +static struct st_clksrc_ddata {
+> +	struct clk		*clk;
+> +	void __iomem		*base;
+> +} ddata;
+> +
+> +static void st_clksrc_reset(void)
+> +{
+> +	writel_relaxed(0, ddata.base + LPC_LPT_START_OFF);
+> +	writel_relaxed(0, ddata.base + LPC_LPT_MSB_OFF);
+> +	writel_relaxed(0, ddata.base + LPC_LPT_LSB_OFF);
+> +	writel_relaxed(1, ddata.base + LPC_LPT_START_OFF);
+> +}
+> +
+> +static int __init st_clksrc_init(void)
+> +{
+> +	unsigned long rate;
+> +	int ret;
+> +
+> +	st_clksrc_reset();
+> +
+> +	rate = clk_get_rate(ddata.clk);
+> +
+> +	ret = clocksource_mmio_init(ddata.base + LPC_LPT_LSB_OFF,
+> +				    "clksrc-st-lpc", rate, 300, 32,
+> +				    clocksource_mmio_readl_up);
+> +	if (ret) {
+> +		pr_err("clksrc-st-lpc: Failed to register clocksource\n");
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int st_clksrc_setup_clk(struct device_node *np)
+> +{
+> +	struct clk *clk;
+> +	int ret;
+> +
+> +	clk = of_clk_get(np, 0);
+> +	if (IS_ERR(clk)) {
+> +		pr_err("clksrc-st-lpc: Failed to get LPC clock\n");
+> +		ret = PTR_ERR(clk);
+> +		return ret;
 
-Ok, good to know. I did not notice the thread, will take a look.
+return PTR_ERR(clk);
 
-There's another problem for memmap= approach though. In x86 we have problems when
-we need pass reserved memory ranges as well because of some pci mmconfig issue.
-In that case kernel command line buffer is too small and there's too many memory
-ranges for reserved ranges. Thus later we switched to pass e820 in x86 boot params
-directly.
+so you can get rid of the 'int ret' variable.
 
-If there's same potential problems we may consider to use memmap= only for system
-ram, and for any other reserved types we can still get from same dtb in 1st kernel.
+> +	}
+> +
+> +	if (clk_prepare_enable(clk)) {
+> +		pr_err("clksrc-st-lpc: Failed to enable LPC clock\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	if (!clk_get_rate(clk)) {
+> +		pr_err("clksrc-st-lpc: Failed to get LPC clock rate\n");
+> +		clk_disable_unprepare(clk);
+> +		return -EINVAL;
+> +	}
+> +
+> +	ddata.clk = clk;
+> +
+> +	return 0;
+> +}
+> +
+> +static void __init st_clksrc_of_register(struct device_node *np)
+> +{
+> +	int ret;
+> +	uint32_t mode;
+> +
+> +	ret = of_property_read_u32(np, "st,lpc-mode", &mode);
+> +	if (ret) {
+> +		pr_err("clksrc-st-lpc: An LPC mode must be provided\n");
+> +		return;
+> +	}
+> +
+> +	/* LPC can either run as a Clocksource or in RTC or WDT mode */
+> +	if (mode != ST_LPC_MODE_CLKSRC)
+> +		return;
 
-Thanks
-Dave
+I am confused with this patch description + comment and the patch 1's 
+description.
+
+For the former, I understand the LPC could be in RTC or WDT mode and 
+used as a clocksource (clksrc + rtc / clksrc + wdt), for the latter I 
+understand there are three modes clocksource, rtc and watchdog (mutually 
+exclusive). Could you clarify ?
+
+> +
+> +	ddata.base = of_iomap(np, 0);
+> +	if (!ddata.base) {
+> +		pr_err("clksrc-st-lpc: Unable to map iomem\n");
+> +		return;
+> +	}
+> +
+> +	if (st_clksrc_setup_clk(np)) {
+> +		iounmap(ddata.base);
+> +		return;
+> +	}
+> +
+> +	if (st_clksrc_init()) {
+> +		iounmap(ddata.base);
+> +		return;
+> +	}
+> +
+> +	pr_info("clksrc-st-lpc: clocksource initialised - running @ %luHz\n",
+> +		clk_get_rate(ddata.clk));
+> +}
+> +CLOCKSOURCE_OF_DECLARE(ddata, "st,stih407-lpc", st_clksrc_of_register);
+>
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
