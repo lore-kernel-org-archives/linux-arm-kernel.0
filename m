@@ -1,45 +1,76 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 11 May 2015 17:08:51 +0100
-Subject: [PATCH 2/2] dt: mailbox: Remove 'mbox-names property is discouraged'
- message from binding
-In-Reply-To: <1431360531-31337-1-git-send-email-lee.jones@linaro.org>
-References: <1431360531-31337-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1431360531-31337-2-git-send-email-lee.jones@linaro.org>
+Date: Mon, 11 May 2015 17:08:50 +0100
+Subject: [PATCH 1/2] mailbox: Add ability for clients to request channels by
+ name
+Message-ID: <1431360531-31337-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A new API call has been introduced which allows channels to be
-requested by name.  This new call uses the 'mbox-names' property,
-so users need no further discouragement from supplying it.
+This patch supplies a new framework API; mbox_request_channel_byname().
+
+It works by supplying the usual client pointer as the first argument and
+a string as the second.  The API will search the client's node for a
+'mbox-names' property then request a channel in the normal way using the
+requested string's index as the expected second 'index' argument.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- Documentation/devicetree/bindings/mailbox/mailbox.txt | 10 ++--------
- 1 file changed, 2 insertions(+), 8 deletions(-)
+ drivers/mailbox/mailbox.c      | 29 +++++++++++++++++++++++++++++
+ include/linux/mailbox_client.h |  2 ++
+ 2 files changed, 31 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mailbox/mailbox.txt b/Documentation/devicetree/bindings/mailbox/mailbox.txt
-index 1a2cd3d..be05b97 100644
---- a/Documentation/devicetree/bindings/mailbox/mailbox.txt
-+++ b/Documentation/devicetree/bindings/mailbox/mailbox.txt
-@@ -22,17 +22,11 @@ Required property:
- - mboxes: List of phandle and mailbox channel specifiers.
+diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
+index 19b491d..c533826 100644
+--- a/drivers/mailbox/mailbox.c
++++ b/drivers/mailbox/mailbox.c
+@@ -357,6 +357,35 @@ struct mbox_chan *mbox_request_channel(struct mbox_client *cl, int index)
+ }
+ EXPORT_SYMBOL_GPL(mbox_request_channel);
  
- Optional property:
--- mbox-names: List of identifier strings for each mailbox channel
--		required by the client. The use of this property
--		is discouraged in favor of using index in list of
--		'mboxes' while requesting a mailbox. Instead the
--		platforms may define channel indices, in DT headers,
--		to something legible.
-+- mbox-names: List of identifier strings for each mailbox channel.
++struct mbox_chan *mbox_request_channel_byname(struct mbox_client *cl,
++					      const char *name)
++{
++	struct device_node *np = cl->dev->of_node;
++	struct property *prop;
++	const char *mbox_name;
++	int index = 0;
++
++	if (!np) {
++		dev_err(cl->dev, "%s() currently only supports DT\n", __func__);
++		return ERR_PTR(-ENOSYS);
++	}
++
++	if (!of_get_property(np, "mbox-names", NULL)) {
++		dev_err(cl->dev,
++			"%s() requires an \"mbox-names\" property\n", __func__);
++		return ERR_PTR(-ENOSYS);
++	}
++
++	of_property_for_each_string(np, "mbox-names", prop, mbox_name) {
++		if (!strncmp(name, mbox_name, strlen(name)))
++			break;
++		index++;
++	}
++
++	return mbox_request_channel(cl, index);
++}
++EXPORT_SYMBOL_GPL(mbox_request_channel_byname);
++
+ /**
+  * mbox_free_channel - The client relinquishes control of a mailbox
+  *			channel by this call.
+diff --git a/include/linux/mailbox_client.h b/include/linux/mailbox_client.h
+index 1726ccb..4434871 100644
+--- a/include/linux/mailbox_client.h
++++ b/include/linux/mailbox_client.h
+@@ -40,6 +40,8 @@ struct mbox_client {
+ 	void (*tx_done)(struct mbox_client *cl, void *mssg, int r);
+ };
  
- Example:
- 	pwr_cntrl: power {
- 		...
- 		mbox-names = "pwr-ctrl", "rpc";
--		mboxes = <&mailbox 0
--			&mailbox 1>;
-+		mboxes = <&mailbox 0 &mailbox 1>;
- 	};
++struct mbox_chan *mbox_request_channel_byname(struct mbox_client *cl,
++					      const char *name);
+ struct mbox_chan *mbox_request_channel(struct mbox_client *cl, int index);
+ int mbox_send_message(struct mbox_chan *chan, void *mssg);
+ void mbox_client_txdone(struct mbox_chan *chan, int r); /* atomic */
 -- 
 1.9.1
