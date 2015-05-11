@@ -1,61 +1,62 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 11 May 2015 21:35:27 +0200
-Subject: [GIT PULL] Allwinner drivers changes for 4.2
-Message-ID: <20150511193527.GA29690@lukather>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 11 May 2015 12:44:28 -0700
+Subject: [PATCH v2] i2c: rk3x: Increase wait timeout to 1 second
+Message-ID: <1431373468-18302-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof,
+Although unlikely, it is remotely possible for an i2c command to need
+more than 200ms complete. Unlike smbus, i2c devices can clock stretch
+for an unspecified amount of time. The longest time I've seen
+specified for a device is 144ms (bq27541 battery gas), but one could
+imagine a device taking a bit slower. 1 second "ought to be enough for
+anyone."
 
-Here is the first batch of drivers changes for the 4.2 merge window.
+The above is not the only justifcation for going above 200ms for a
+timeout, though.  It turns out that if you've got a large number of
+printks going out to a serial console, interrupts on a CPU can be
+disabled for hundreds of milliseconds. That's not a great situation to
+be in to start with (maybe we should put a cap in vprintk_emit()) but
+it's pretty annoying to start seeing unexplained i2c timeouts.
 
-Thanks!
-Maxime
+Note that to understand why we can timeout when printk has interrupts
+disabled, you need to understand that on current Linux ARM kernels
+interrupts are routed to a single CPU in a multicore system. Thus,
+you can get:
 
-The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+1. CPU1 is running rk3x_i2c_xfer()
+2. CPU0 calls vprintk_emit(), which disables all IRQs on CPU0.
+3. I2C interrupt is ready but is set to only run on CPU0, where IRQs
+   are disabled.
+4. CPU1 timeout expires. I2C interrupt is still ready, but CPU0 is
+   still sitting in the same vprintk_emit()
+5. CPU1 sees that no interrupt happened in 200ms, so timeout.
 
-  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+A normal system shouldn't see i2c timeouts anyway, so increasing the
+timeout should help people debugging without hurting other people
+excessively.
 
-are available in the git repository at:
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+Tested-by: Caesar Wang <wxt@rock-chips.com>
+---
+Changes in v2:
+- Update commit message as per Uwe
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-drivers-for-4.2
+ drivers/i2c/busses/i2c-rk3x.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-for you to fetch changes up to 44bb362ff9f2e6f9ab285e66ce92f55aee71808a:
-
-  drivers: soc: sunxi: Introduce SoC driver to map SRAMs (2015-05-05 20:47:08 +0200)
-
-----------------------------------------------------------------
-Allwinner drivers patches for 4.2
-
-This pull request contain a single driver to handle the SRAM mapping
-between the CPU and devices.
-
-----------------------------------------------------------------
-Maxime Ripard (1):
-      drivers: soc: sunxi: Introduce SoC driver to map SRAMs
-
- .../devicetree/bindings/soc/sunxi/sram.txt         |  64 ++++++
- drivers/soc/Kconfig                                |   1 +
- drivers/soc/Makefile                               |   1 +
- drivers/soc/sunxi/Kconfig                          |  10 +
- drivers/soc/sunxi/Makefile                         |   1 +
- drivers/soc/sunxi/sunxi_sram.c                     | 236 +++++++++++++++++++++
- include/linux/soc/sunxi/sunxi_sram.h               |  24 +++
- 7 files changed, 337 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/soc/sunxi/sram.txt
- create mode 100644 drivers/soc/sunxi/Kconfig
- create mode 100644 drivers/soc/sunxi/Makefile
- create mode 100644 drivers/soc/sunxi/sunxi_sram.c
- create mode 100644 include/linux/soc/sunxi/sunxi_sram.h
-
+diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+index 019d542..72e97e30 100644
+--- a/drivers/i2c/busses/i2c-rk3x.c
++++ b/drivers/i2c/busses/i2c-rk3x.c
+@@ -72,7 +72,7 @@ enum {
+ #define REG_INT_ALL       0x7f
+ 
+ /* Constants */
+-#define WAIT_TIMEOUT      200 /* ms */
++#define WAIT_TIMEOUT      1000 /* ms */
+ #define DEFAULT_SCL_RATE  (100 * 1000) /* Hz */
+ 
+ enum rk3x_i2c_state {
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150511/b3a3607a/attachment.sig>
+2.2.0.rc0.207.ga3a616c
