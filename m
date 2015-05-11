@@ -1,50 +1,56 @@
-From: stripathi@apm.com (Suman Tripathi)
-Date: Mon, 11 May 2015 19:01:32 +0530
-Subject: [PATCH v6 1/1] ata: ahci_xgene: Add AHCI Support for 2nd HW
- version of APM X-Gene SoC AHCI SATA Host controller.
-In-Reply-To: <20150511112800.GA11388@htj.duckdns.org>
-References: <1431333375-30433-1-git-send-email-stripathi@apm.com>
- <1431333375-30433-2-git-send-email-stripathi@apm.com>
- <20150511112800.GA11388@htj.duckdns.org>
-Message-ID: <CAOHikRBC_KOtL=hJHp7D+9DWNOnuN=VE=RQEnU_TJJ6wOXkO9g@mail.gmail.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Mon, 11 May 2015 06:31:55 -0700
+Subject: [PATCH] imx: thermal: use CPU temperature grade info for
+ thresholds
+In-Reply-To: <CAOMZO5BU4msRswEujw=DC=HdsZY5S3YeG9KYNFxf3cwiFY6n2g@mail.gmail.com>
+References: <1430409757-16195-1-git-send-email-tharvey@gateworks.com>
+ <CAOMZO5BU4msRswEujw=DC=HdsZY5S3YeG9KYNFxf3cwiFY6n2g@mail.gmail.com>
+Message-ID: <CAJ+vNU0j47Wk5mbZE-Q1=8uVtx7k3HC-YJXCgWzUwu3TGDu0bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tejun,
-
-On Mon, May 11, 2015 at 4:58 PM, Tejun Heo <tj@kernel.org> wrote:
-> Hello, Suman.
+On Mon, May 11, 2015 at 5:26 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Thu, Apr 30, 2015 at 1:02 PM, Tim Harvey <tharvey@gateworks.com> wrote:
 >
-> On Mon, May 11, 2015 at 02:06:15PM +0530, Suman Tripathi wrote:
->> -#ifdef CONFIG_ACPI
->> -static const struct acpi_device_id xgene_ahci_acpi_match[] = {
->> -     { "APMC0D0D", },
->> -     { }
->> -};
->> -MODULE_DEVICE_TABLE(acpi, xgene_ahci_acpi_match);
->> -#endif
->> -
->> -static const struct of_device_id xgene_ahci_of_match[] = {
->> -     {.compatible = "apm,xgene-ahci"},
->> -     {},
->> -};
->> -MODULE_DEVICE_TABLE(of, xgene_ahci_of_match);
+>> +               /* The maximum die temp is specified by the Temperature Grade */
+>> +               switch ((val >> 6) & 0x3) {
+>> +               case 0: /* Commercial (0 to 95C) */
+>> +                       data->temp_grade = "Commercial";
+>> +                       data->temp_critical = 95000;
+>> +                       break;
+>> +               case 1: /* Extended Commercial (-20 to 105C) */
+>> +                       data->temp_grade = "Extended Commercial";
+>> +                       data->temp_critical = 105000;
+>> +                       break;
 >
-> I applied the patch as-is this time but please don't combine code
-> movement with actual changes in the future.  Split them out to
-> separate patches.  It makes the changes a lot easier to follow and
-> verify.
-
-Sorry . I will take care of it next time onwards.
+> Looks good, only a minor suggestion for consistency: could you please
+> change "Commercial" to "Consumer"?
 >
-> Thanks.
+> This is the term that is referenced in the datasheet, so better keep
+> it consistent.
 >
-> --
-> tejun
+> Thanks
 
+Fabio,
 
+Actually this seems to be very inconsistent from Freescale and the
+register uses the word 'commercial' - I think you are referring to the
+part identifier which is part of the ordering information. The Part
+Number Nomenclature in the 'datasheets' use the word 'Commercial' in
+the temperature grade field and the word 'Consumer' in some (but not
+all) of the Part differentiator field. The register description uses
+the word Commercial. I believe this is more of a marketing term than
+anything else so I don't really care what word is used. I've heard the
+word commercial used in terms of temperature grades and not consumer
+personally.
 
--- 
-Thanks,
-with regards,
-Suman Tripathi
+I should note that the actual OTP fuse I'm looking at is only
+described in the IMX6DQRM (Reference manual for the DUAL and QUAD) and
+is shown as 'reserved' in the IMX6SDLRM (SOLO and DUALLITE Reference
+Manual) and the 'IMX6SXRM' for the SX. I have been able to show
+expirimentaly that the speed grade and temperature grade OTP's exist
+in the IMX6SDL (even though they are marked as 'reserved' in the RM)
+but I do not have an IMX6SX to see if the same is true. I have a query
+out to our FAE for clarification on the OTP registers.
+
+Tim
