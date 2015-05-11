@@ -1,44 +1,121 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 11 May 2015 10:09:56 -0500
-Subject: [PATCH v3 1/4] remoteproc: introduce rproc_get_by_phandle API
-In-Reply-To: <CAK=WgbZCqnMPEnU2992gkOp07BaCP5NJNRO-hLCAdOtUXZGRnQ@mail.gmail.com>
-References: <1427917039-43206-1-git-send-email-d-gerlach@ti.com>
- <1427917039-43206-2-git-send-email-d-gerlach@ti.com>
- <CAK=WgbZCqnMPEnU2992gkOp07BaCP5NJNRO-hLCAdOtUXZGRnQ@mail.gmail.com>
-Message-ID: <5550C644.4040005@ti.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 11 May 2015 20:39:57 +0530
+Subject: [PATCHv3 2/4] phy: core: Add devm_of_phy_get_by_index to phy-core
+In-Reply-To: <1429743853-10254-3-git-send-email-arun.ramamurthy@broadcom.com>
+References: <1429743853-10254-1-git-send-email-arun.ramamurthy@broadcom.com>
+ <1429743853-10254-3-git-send-email-arun.ramamurthy@broadcom.com>
+Message-ID: <5550C645.6090106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
+Hi,
 
-On 05/09/2015 02:39 AM, Ohad Ben-Cohen wrote:
-> Hi Dave,
-> 
-> On Wed, Apr 1, 2015 at 10:37 PM, Dave Gerlach <d-gerlach@ti.com> wrote:
->> Allow users of remoteproc the ability to get a handle to an rproc by
->> passing a phandle supplied in the user's device tree node. This is
->> useful in situations that require manual booting of the rproc.
->>
->> This patch uses the code removed by commit 40e575b1d0b3 ("remoteproc:
->> remove the get_by_name/put API") for the ref counting a rproc klist
->> code but has rproc_get_by_name replaced with an rproc_get_by_phandle API.
-> 
-> The general idea makes sense to me, but I'm not sure we really do need
-> a klist here, since the usage profile of this list is expected to be
-> super simple: very small number of accessors, looking for small number
-> of list members a small number of times, and probably never do need to
-> modify the list while accessing it.
-> 
-> I suspect that the code would be simpler to maintain, debug and
-> understand if we just use a simple list with a simple locking
-> methodology here.
+On Thursday 23 April 2015 04:34 AM, Arun Ramamurthy wrote:
+> Some generic drivers, such as ehci, may use multiple phys and for such
+> drivers referencing phy(s) by name(s) does not make sense. Instead of
+> inventing new naming schemes and using custom code to iterate through them,
+> such drivers are better of using nameless phy bindings and using this newly
+> introduced API to iterate through them.
+>
+> Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
+> Reviewed-by: Ray Jui <rjui@broadcom.com>
+> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> ---
+>   Documentation/phy.txt   |  7 ++++++-
+>   drivers/phy/phy-core.c  | 32 ++++++++++++++++++++++++++++++++
+>   include/linux/phy/phy.h |  8 ++++++++
+>   3 files changed, 46 insertions(+), 1 deletion(-)
+>
+> diff --git a/Documentation/phy.txt b/Documentation/phy.txt
+> index 371361c..b388c5a 100644
+> --- a/Documentation/phy.txt
+> +++ b/Documentation/phy.txt
+> @@ -76,6 +76,8 @@ struct phy *phy_get(struct device *dev, const char *string);
+>   struct phy *phy_optional_get(struct device *dev, const char *string);
+>   struct phy *devm_phy_get(struct device *dev, const char *string);
+>   struct phy *devm_phy_optional_get(struct device *dev, const char *string);
+> +struct phy *devm_of_phy_get_by_index(struct device *dev, struct device_node *np,
+> +				     int index);
+>
+>   phy_get, phy_optional_get, devm_phy_get and devm_phy_optional_get can
+>   be used to get the PHY. In the case of dt boot, the string arguments
+> @@ -86,7 +88,10 @@ successful PHY get. On driver detach, release function is invoked on
+>   the the devres data and devres data is freed. phy_optional_get and
+>   devm_phy_optional_get should be used when the phy is optional. These
+>   two functions will never return -ENODEV, but instead returns NULL when
+> -the phy cannot be found.
+> +the phy cannot be found.Some generic drivers, such as ehci, may use multiple
+> +phys and for such drivers referencing phy(s) by name(s) does not make sense. In
+> +this case, devm_of_phy_get_by_index can be used to get a phy reference based on
+> +the index.
+>
+>   It should be noted that NULL is a valid phy reference. All phy
+>   consumer calls on the NULL phy become NOPs. That is the release calls,
+> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+> index 3791838..964a84d 100644
+> --- a/drivers/phy/phy-core.c
+> +++ b/drivers/phy/phy-core.c
+> @@ -623,6 +623,38 @@ struct phy *devm_of_phy_get(struct device *dev, struct device_node *np,
+>   EXPORT_SYMBOL_GPL(devm_of_phy_get);
+>
+>   /**
+> + * devm_of_phy_get_by_index() - lookup and obtain a reference to a phy by index.
+> + * @dev: device that requests this phy
+> + * @np: node containing the phy
+> + * @index: index of the phy
+> + *
+> + * Gets the phy using _of_phy_get(), and associates a device with it using
+> + * devres. On driver detach, release function is invoked on the devres data,
+> + * then, devres data is freed.
+> + *
+> + */
+> +struct phy *devm_of_phy_get_by_index(struct device *dev, struct device_node *np,
+> +				     int index)
+> +{
+> +	struct phy **ptr, *phy;
+> +
+> +	ptr = devres_alloc(devm_phy_release, sizeof(*ptr), GFP_KERNEL);
+> +	if (!ptr)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	phy = _of_phy_get(np, index);
+> +	if (!IS_ERR(phy)) {
+> +		*ptr = phy;
+> +		devres_add(dev, ptr);
+> +	} else {
+> +		devres_free(ptr);
+> +	}
+> +
+> +	return phy;
+> +}
+> +EXPORT_SYMBOL_GPL(devm_of_phy_get_by_index);
+> +
+> +/**
+>    * phy_create() - create a new phy
+>    * @dev: device that is creating the new phy
+>    * @node: device node of the phy
+> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
+> index a0197fa..978d5af 100644
+> --- a/include/linux/phy/phy.h
+> +++ b/include/linux/phy/phy.h
+> @@ -133,6 +133,8 @@ struct phy *devm_phy_get(struct device *dev, const char *string);
+>   struct phy *devm_phy_optional_get(struct device *dev, const char *string);
+>   struct phy *devm_of_phy_get(struct device *dev, struct device_node *np,
+>   			    const char *con_id);
+> +struct phy *devm_of_phy_get_by_index(struct device *dev, struct device_node *np,
+> +				     int index);
+>   void phy_put(struct phy *phy);
+>   void devm_phy_put(struct device *dev, struct phy *phy);
+>   struct phy *of_phy_get(struct device_node *np, const char *con_id);
+> @@ -261,6 +263,12 @@ static inline struct phy *devm_of_phy_get(struct device *dev,
+>   	return ERR_PTR(-ENOSYS);
+>   }
+>
+> +struct phy *devm_of_phy_get_by_index(struct device *dev, struct device_node *np,
+> +				     int index);
 
-The klist usage is something that we restored from previous remoteproc
-core code as used by the rproc_get_by_name() API. This was removed in
-commit 40e575b1d0b3 ("remoteproc: remove the get_by_name/put API"). We
-chose to use the code that had been present before rather than inventing
-something new all over again. If you feel that a regular list is the way
-to go forward, we can make the switch.
+Fixed the compilation error because of the ';' in the end and merged it to 
+linux-phy.
 
-regards
-Suman
+Thanks
+Kishon
