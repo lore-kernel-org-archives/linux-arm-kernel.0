@@ -1,333 +1,146 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Tue, 12 May 2015 00:00:48 +0200
-Subject: [PATCH v4 2/7] clocksource: add lpc32xx timer driver
+Date: Tue, 12 May 2015 00:00:51 +0200
+Subject: [PATCH v4 5/7] ARM: dts: Add DT for Embedded Artists LPC4357
+ Developers Kit
 In-Reply-To: <1431381653-25356-1-git-send-email-manabian@gmail.com>
 References: <1431381653-25356-1-git-send-email-manabian@gmail.com>
-Message-ID: <1431381653-25356-3-git-send-email-manabian@gmail.com>
+Message-ID: <1431381653-25356-6-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for using the NXP LPC timer as clocksource and clock
-event. These timers are present on many NXP devices including
-LPC32xx, LPC17xx, LPC18xx and LPC43xx.
+Adds basic support for Embedded Artists' LPC4357 Developer's Kit. Board
+features a LPC4357 Soc, 32 MB SDRAM, 128 MB NAND Flash, 16 MB SPI
+Flash, USB and Ethernet.
 
-The timer has a 32-bit timer counter register with a programmable
-32-bit prescaler. It supports up to 4 compare match values with
-interrupt generation and reset/stop timer counter action.
+More information can be found on:
+http://www.embeddedartists.com/products/kits/lpc4357_kit.php
 
 Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 ---
- drivers/clocksource/Kconfig        |   5 +
- drivers/clocksource/Makefile       |   1 +
- drivers/clocksource/time-lpc32xx.c | 272 +++++++++++++++++++++++++++++++++++++
- 3 files changed, 278 insertions(+)
- create mode 100644 drivers/clocksource/time-lpc32xx.c
+ .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+ arch/arm/boot/dts/Makefile                         |  2 ++
+ arch/arm/boot/dts/lpc4357-ea4357-devkit.dts        | 41 ++++++++++++++++++++++
+ arch/arm/boot/dts/lpc4357.dtsi                     | 39 ++++++++++++++++++++
+ 4 files changed, 83 insertions(+)
+ create mode 100644 arch/arm/boot/dts/lpc4357-ea4357-devkit.dts
+ create mode 100644 arch/arm/boot/dts/lpc4357.dtsi
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 51d7865fdddb..47f9f22cd516 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -106,6 +106,11 @@ config CLKSRC_EFM32
- 	  Support to use the timers of EFM32 SoCs as clock source and clock
- 	  event device.
- 
-+config CLKSRC_LPC32XX
-+	bool
-+	select CLKSRC_MMIO
-+	select CLKSRC_OF
-+
- config ARM_ARCH_TIMER
- 	bool
- 	select CLKSRC_OF if OF
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 5b85f6adb258..5928e35cb64d 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -37,6 +37,7 @@ obj-$(CONFIG_ARCH_BCM_MOBILE)	+= bcm_kona_timer.o
- obj-$(CONFIG_CADENCE_TTC_TIMER)	+= cadence_ttc_timer.o
- obj-$(CONFIG_CLKSRC_EFM32)	+= time-efm32.o
- obj-$(CONFIG_CLKSRC_EXYNOS_MCT)	+= exynos_mct.o
-+obj-$(CONFIG_CLKSRC_LPC32XX)	+= time-lpc32xx.o
- obj-$(CONFIG_CLKSRC_SAMSUNG_PWM)	+= samsung_pwm_timer.o
- obj-$(CONFIG_FSL_FTM_TIMER)	+= fsl_ftm_timer.o
- obj-$(CONFIG_VF_PIT_TIMER)	+= vf_pit_timer.o
-diff --git a/drivers/clocksource/time-lpc32xx.c b/drivers/clocksource/time-lpc32xx.c
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 80339192c93e..ae3460c0e5fd 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -60,6 +60,7 @@ digilent	Diglent, Inc.
+ dlg	Dialog Semiconductor
+ dlink	D-Link Corporation
+ dmo	Data Modul AG
++ea	Embedded Artists AB
+ ebv	EBV Elektronik
+ edt	Emerging Display Technologies
+ elan	Elan Microelectronic Corp.
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 86217db2937a..b95d8a6a1e36 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -201,6 +201,8 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
+ 	kirkwood-ts219-6282.dtb \
+ 	kirkwood-ts419-6281.dtb \
+ 	kirkwood-ts419-6282.dtb
++dtb-$(CONFIG_ARCH_LPC18XX) += \
++	lpc4357-ea4357-devkit.dtb
+ dtb-$(CONFIG_ARCH_LPC32XX) += \
+ 	ea3250.dtb phy3250.dtb
+ dtb-$(CONFIG_MACH_MESON6) += \
+diff --git a/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts b/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts
 new file mode 100644
-index 000000000000..a1c06a2bc77c
+index 000000000000..08a6f757f924
 --- /dev/null
-+++ b/drivers/clocksource/time-lpc32xx.c
-@@ -0,0 +1,272 @@
++++ b/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts
+@@ -0,0 +1,41 @@
 +/*
-+ * Clocksource driver for NXP LPC32xx/18xx/43xx timer
++ * Embedded Artist LPC4357 Developer's Kit
 + *
-+ * Copyright (C) 2015 Joachim Eastwood <manabian@gmail.com>
++ * Copyright 2015 Joachim Eastwood <manabian@gmail.com>
 + *
-+ * Based on:
-+ * time-efm32 Copyright (C) 2013 Pengutronix
-+ * mach-lpc32xx/timer.c Copyright (C) 2009 - 2010 NXP Semiconductors
++ * This code is released using a dual license strategy: BSD/GPL
++ * You can choose the licence that better fits your requirements.
 + *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
++ * Released under the terms of 3-clause BSD License
++ * Released under the terms of GNU General Public License Version 2.0
++ *
++ */
++/dts-v1/;
++
++#include "lpc18xx.dtsi"
++#include "lpc4357.dtsi"
++
++/ {
++	model = "Embedded Artists' LPC4357 Developer's Kit";
++	compatible = "ea,lpc4357-developers-kit", "nxp,lpc4357", "nxp,lpc4350";
++
++	aliases {
++		serial0 = &uart0;
++		serial1 = &uart1;
++		serial2 = &uart2;
++		serial3 = &uart3;
++	};
++
++	chosen {
++		stdout-path = &uart0;
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x28000000 0x2000000>; /* 32 MB */
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/lpc4357.dtsi b/arch/arm/boot/dts/lpc4357.dtsi
+new file mode 100644
+index 000000000000..fb9ecc754e8d
+--- /dev/null
++++ b/arch/arm/boot/dts/lpc4357.dtsi
+@@ -0,0 +1,39 @@
++/*
++ * NXP LPC435x, LPC433x, LPC4327, LPC4325, LPC4317 and LPC4315 SoC
++ *
++ * Copyright 2015 Joachim Eastwood <manabian@gmail.com>
++ *
++ * This code is released using a dual license strategy: BSD/GPL
++ * You can choose the licence that better fits your requirements.
++ *
++ * Released under the terms of 3-clause BSD License
++ * Released under the terms of GNU General Public License Version 2.0
 + *
 + */
 +
-+#define pr_fmt(fmt) "%s: " fmt, __func__
++/ {
++	compatible = "nxp,lpc4357";
 +
-+#include <linux/clk.h>
-+#include <linux/clockchips.h>
-+#include <linux/clocksource.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/kernel.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/sched_clock.h>
++	cpus {
++		cpu at 0 {
++			compatible = "arm,cortex-m4";
++		};
++	};
 +
-+#define LPC32XX_TIMER_IR		0x000
-+#define  LPC32XX_TIMER_IR_MR0INT	BIT(0)
-+#define LPC32XX_TIMER_TCR		0x004
-+#define  LPC32XX_TIMER_TCR_CEN		BIT(0)
-+#define  LPC32XX_TIMER_TCR_CRST		BIT(1)
-+#define LPC32XX_TIMER_TC		0x008
-+#define LPC32XX_TIMER_PR		0x00c
-+#define LPC32XX_TIMER_MCR		0x014
-+#define  LPC32XX_TIMER_MCR_MR0I		BIT(0)
-+#define  LPC32XX_TIMER_MCR_MR0R		BIT(1)
-+#define  LPC32XX_TIMER_MCR_MR0S		BIT(2)
-+#define LPC32XX_TIMER_MR0		0x018
-+#define LPC32XX_TIMER_CTCR		0x070
++	soc {
++		sram0: sram at 10000000 {
++			compatible = "mmio-sram";
++			reg = <0x10000000 0x8000>; /* 32 KiB local SRAM */
++		};
 +
-+struct lpc32xx_clock_event_ddata {
-+	struct clock_event_device evtdev;
-+	void __iomem *base;
++		sram1: sram at 10080000 {
++			compatible = "mmio-sram";
++			reg = <0x10080000 0xa000>; /* 32 + 8 KiB local SRAM */
++		};
++
++		sram2: sram at 20000000 {
++			compatible = "mmio-sram";
++			reg = <0x20000000 0x10000>; /* 4 x 16 KiB AHB SRAM */
++		};
++	};
 +};
-+
-+/* Needed for the sched clock */
-+static void __iomem *clocksource_timer_counter;
-+
-+static u64 notrace lpc32xx_read_sched_clock(void)
-+{
-+	return readl(clocksource_timer_counter);
-+}
-+
-+static int lpc32xx_clkevt_next_event(unsigned long delta,
-+				     struct clock_event_device *evtdev)
-+{
-+	struct lpc32xx_clock_event_ddata *ddata =
-+		container_of(evtdev, struct lpc32xx_clock_event_ddata, evtdev);
-+
-+	/*
-+	 * Place timer in reset and program the delta in the prescale
-+	 * register (PR). When the prescale counter matches the value
-+	 * in PR the counter register is incremented and the compare
-+	 * match will trigger. After setup the timer is released from
-+	 * reset and enabled.
-+	 */
-+	writel_relaxed(LPC32XX_TIMER_TCR_CRST, ddata->base + LPC32XX_TIMER_TCR);
-+	writel_relaxed(delta, ddata->base + LPC32XX_TIMER_PR);
-+	writel_relaxed(LPC32XX_TIMER_TCR_CEN, ddata->base + LPC32XX_TIMER_TCR);
-+
-+	return 0;
-+}
-+
-+static int lpc32xx_clkevt_shutdown(struct clock_event_device *evtdev)
-+{
-+	struct lpc32xx_clock_event_ddata *ddata =
-+		container_of(evtdev, struct lpc32xx_clock_event_ddata, evtdev);
-+
-+	/* Disable the timer */
-+	writel_relaxed(0, ddata->base + LPC32XX_TIMER_TCR);
-+
-+	return 0;
-+}
-+
-+static int lpc32xx_clkevt_oneshot(struct clock_event_device *evtdev)
-+{
-+	/*
-+	 * When using oneshot, we must also disable the timer
-+	 * to wait for the first call to set_next_event().
-+	 */
-+	return lpc32xx_clkevt_shutdown(evtdev);
-+}
-+
-+static irqreturn_t lpc32xx_clock_event_handler(int irq, void *dev_id)
-+{
-+	struct lpc32xx_clock_event_ddata *ddata = dev_id;
-+
-+	/* Clear match on channel 0 */
-+	writel_relaxed(LPC32XX_TIMER_IR_MR0INT, ddata->base + LPC32XX_TIMER_IR);
-+
-+	ddata->evtdev.event_handler(&ddata->evtdev);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static struct lpc32xx_clock_event_ddata lpc32xx_clk_event_ddata = {
-+	.evtdev = {
-+		.name			= "lpc3220 clockevent",
-+		.features		= CLOCK_EVT_FEAT_ONESHOT,
-+		.rating			= 300,
-+		.set_next_event		= lpc32xx_clkevt_next_event,
-+		.set_state_shutdown	= lpc32xx_clkevt_shutdown,
-+		.set_state_oneshot	= lpc32xx_clkevt_oneshot,
-+	},
-+};
-+
-+static int __init lpc32xx_clocksource_init(struct device_node *np)
-+{
-+	void __iomem *base;
-+	unsigned long rate;
-+	struct clk *clk;
-+	int ret;
-+
-+	clk = of_clk_get_by_name(np, "timerclk");
-+	if (IS_ERR(clk)) {
-+		pr_err("clock get failed (%lu)\n", PTR_ERR(clk));
-+		return PTR_ERR(clk);
-+	}
-+
-+	ret = clk_prepare_enable(clk);
-+	if (ret) {
-+		pr_err("clock enable failed (%d)\n", ret);
-+		goto err_clk_enable;
-+	}
-+
-+	base = of_iomap(np, 0);
-+	if (!base) {
-+		pr_err("unable to map registers\n");
-+		ret = -EADDRNOTAVAIL;
-+		goto err_iomap;
-+	}
-+
-+	/*
-+	 * Disable and reset timer then set it to free running timer
-+	 * mode (CTCR) with no prescaler (PR) or match operations (MCR).
-+	 * After setup the timer is released from reset and enabled.
-+	 */
-+	writel_relaxed(LPC32XX_TIMER_TCR_CRST, base + LPC32XX_TIMER_TCR);
-+	writel_relaxed(0, base + LPC32XX_TIMER_PR);
-+	writel_relaxed(0, base + LPC32XX_TIMER_MCR);
-+	writel_relaxed(0, base + LPC32XX_TIMER_CTCR);
-+	writel_relaxed(LPC32XX_TIMER_TCR_CEN, base + LPC32XX_TIMER_TCR);
-+
-+	rate = clk_get_rate(clk);
-+	ret = clocksource_mmio_init(base + LPC32XX_TIMER_TC, "lpc3220 timer",
-+				    rate, 300, 32, clocksource_mmio_readl_up);
-+	if (ret) {
-+		pr_err("failed to init clocksource (%d)\n", ret);
-+		goto err_clocksource_init;
-+	}
-+
-+	clocksource_timer_counter = base + LPC32XX_TIMER_TC;
-+	sched_clock_register(lpc32xx_read_sched_clock, 32, rate);
-+
-+	return 0;
-+
-+err_clocksource_init:
-+	iounmap(base);
-+err_iomap:
-+	clk_disable_unprepare(clk);
-+err_clk_enable:
-+	clk_put(clk);
-+	return ret;
-+}
-+
-+static int __init lpc32xx_clockevent_init(struct device_node *np)
-+{
-+	void __iomem *base;
-+	unsigned long rate;
-+	struct clk *clk;
-+	int ret, irq;
-+
-+	clk = of_clk_get_by_name(np, "timerclk");
-+	if (IS_ERR(clk)) {
-+		pr_err("clock get failed (%lu)\n", PTR_ERR(clk));
-+		return PTR_ERR(clk);
-+	}
-+
-+	ret = clk_prepare_enable(clk);
-+	if (ret) {
-+		pr_err("clock enable failed (%d)\n", ret);
-+		goto err_clk_enable;
-+	}
-+
-+	base = of_iomap(np, 0);
-+	if (!base) {
-+		pr_err("unable to map registers\n");
-+		ret = -EADDRNOTAVAIL;
-+		goto err_iomap;
-+	}
-+
-+	irq = irq_of_parse_and_map(np, 0);
-+	if (!irq) {
-+		pr_err("get irq failed\n");
-+		ret = -ENOENT;
-+		goto err_irq;
-+	}
-+
-+	/*
-+	 * Disable timer and clear any pending interrupt (IR) on match
-+	 * channel 0 (MR0). Configure a compare match value of 1 on MR0
-+	 * and enable interrupt, reset on match and stop on match (MCR).
-+	 */
-+	writel_relaxed(0, base + LPC32XX_TIMER_TCR);
-+	writel_relaxed(0, base + LPC32XX_TIMER_CTCR);
-+	writel_relaxed(LPC32XX_TIMER_IR_MR0INT, base + LPC32XX_TIMER_IR);
-+	writel_relaxed(1, base + LPC32XX_TIMER_MR0);
-+	writel_relaxed(LPC32XX_TIMER_MCR_MR0I | LPC32XX_TIMER_MCR_MR0R |
-+		       LPC32XX_TIMER_MCR_MR0S, base + LPC32XX_TIMER_MCR);
-+
-+	rate = clk_get_rate(clk);
-+	lpc32xx_clk_event_ddata.base = base;
-+	clockevents_config_and_register(&lpc32xx_clk_event_ddata.evtdev,
-+					rate, 1, -1);
-+
-+	ret = request_irq(irq, lpc32xx_clock_event_handler,
-+			  IRQF_TIMER | IRQF_IRQPOLL, "lpc3220 clockevent",
-+			  &lpc32xx_clk_event_ddata);
-+	if (ret) {
-+		pr_err("request irq failed\n");
-+		goto err_irq;
-+	}
-+
-+	return 0;
-+
-+err_irq:
-+	iounmap(base);
-+err_iomap:
-+	clk_disable_unprepare(clk);
-+err_clk_enable:
-+	clk_put(clk);
-+	return ret;
-+}
-+
-+/*
-+ * This function asserts that we have exactly one clocksource and one
-+ * clock_event_device in the end.
-+ */
-+static void __init lpc32xx_timer_init(struct device_node *np)
-+{
-+	static int has_clocksource, has_clockevent;
-+	int ret;
-+
-+	if (!has_clocksource) {
-+		ret = lpc32xx_clocksource_init(np);
-+		if (!ret) {
-+			has_clocksource = 1;
-+			return;
-+		}
-+	}
-+
-+	if (!has_clockevent) {
-+		ret = lpc32xx_clockevent_init(np);
-+		if (!ret) {
-+			has_clockevent = 1;
-+			return;
-+		}
-+	}
-+}
-+CLOCKSOURCE_OF_DECLARE(lpc32xx_timer, "nxp,lpc3220-timer", lpc32xx_timer_init);
 -- 
 1.8.0
