@@ -1,66 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 11 May 2015 11:32:04 +0200
-Subject: [GIT PULL] Ux500 development for v4.2
-Message-ID: <CACRpkdZX-Tg-1SNV0L2MemGqkaVZG9wSwiLquYVDVMToZT02nw@mail.gmail.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 11 May 2015 11:36:55 +0200
+Subject: [PATCH 1/2] Regulator: mc34708: Add DT binding documentation
+In-Reply-To: <20150428141738.16243.18377.stgit@localhost>
+References: <20150428141736.16243.57292.stgit@localhost>
+ <20150428141738.16243.18377.stgit@localhost>
+Message-ID: <CABxcv=nEuVj-svKyUAGnptz8G=xVbXxOLVEApXmnjF7EUQawvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC people,
+Hello Martin,
 
-this is some cleanup and development for Ux500 that should go
-into ARM SoC for the v4.2 series. Details are in the signed tag.
+I haven't looked at your regulator driver in detail so this is not a
+full review but I just noticed something so I wanted mention.
 
-I think it would look overzealous to break it in different topics, but if you
-prefer to slice the patch set, tell me how and I'll split it as you
-desire.
+> +
+> +
+> +Example:
+> +&i2c3 {
+> +       pmic: mc34708 at 08 {
+> +               compatible = "fsl,mc34708";
+> +               reg = <0x08>;
+> +               regulators {
+> +#define PMIC_REGMODE_SW_PFM    1
+> +#define PMIC_REGMODE_SW_AUTO   2
+> +#define PMIC_REGMODE_SW_PWM    3
+> +#define PMIC_REGMODE_LDO_LP    1
+> +#define PMIC_REGMODE_LDO_NORMAL        2
+> +
 
-Please pull this to ARM SoC!
+I see that you are defining these constants in your driver too (albeit
+with slightly different names). These kind of constants that are
+shared between the driver implementation and the Device Tree source
+files should be added to include/dt-bindings/regulator/ and included
+in both the driver and the DTS.
 
-Yours,
-Linus Walleij
-
-The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
-
-  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-tags/ux500-v4.2-1
-
-for you to fetch changes up to 11033cb60a6a660a1ced07bb9501dce85e85b0ae:
-
-  ARM: ux500: add the sensors to the STUIB board (2015-05-11 11:10:16 +0200)
-
-----------------------------------------------------------------
-Ux500 development for the v4.2 kernel series:
-- Get some static maps out
-- Device Trees:
-  - Define CPU topology for Ux500's
-  - Add CoreSight blocks for Ux500's
-  - Fix the magnetometer compat string for TVK
-    and Snowball
-  - Assign sensor trigger IRQs for some boards
-  - Add the STUIB sensors
-- Defconfig:
-  - Enable PERF_EVENTS as we have a PMU after all
-  - Enable CoreSight components
-
-----------------------------------------------------------------
-Linus Walleij (8):
-      ARM: ux500: define CPU topology
-      ARM: ux500: get rid of static maps
-      ARM: ux500: add CoreSight blocks to DTS file
-      ARM: ux500: add PERF_EVENTS to defconfig
-      ARM: ux500: enable CoreSight in defconfig
-      ARM: ux500: fix lsm303dlh magnetometer compat string
-      ARM: ux500: assign the sensor trigger IRQs
-      ARM: ux500: add the sensors to the STUIB board
-
- arch/arm/boot/dts/ste-dbx5x0.dtsi          | 154 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/ste-href-stuib.dtsi      |  50 ++++++++++
- arch/arm/boot/dts/ste-href-tvk1281618.dtsi |   7 +-
- arch/arm/boot/dts/ste-snowball.dts         |  23 ++++-
- arch/arm/configs/u8500_defconfig           |   5 +
- arch/arm/mach-ux500/cpu-db8500.c           |  13 +--
- 6 files changed, 236 insertions(+), 16 deletions(-)
+Best regards,
+Javier
