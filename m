@@ -1,47 +1,43 @@
-From: koro.chen@mediatek.com (Koro Chen)
-Date: Mon, 11 May 2015 10:36:53 +0800
-Subject: [PATCH] ASoC: dapm: Modify widget stream name according to prefix
-Message-ID: <1431311813-37430-1-git-send-email-koro.chen@mediatek.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 11 May 2015 12:10:19 +0900
+Subject: [GIT PULL] ARM: EXYNOS: dts: DTS fixes for 4.1, second try
+Message-ID: <1431313819-16843-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When there is prefix specified, currently we will add this prefix in
-widget->name, but not in widget->sname.
-it causes failure at snd_soc_dapm_link_dai_widgets:
+Dear Kukjin,
 
-if (!w->sname || !strstr(w->sname, dai_w->name))
+This groups one fix missed in your last pull requst. This fixes suspend
+on Peach boards related to Marvell mwifiex driver. The driver was
+enabled for Exynos defconfig during merge window so currently
+the suspend on these boards on this config fails.
 
-because dai_w->name has prefix added, but w->sname does not.
-We should also add prefix for stream name
+Best regards,
+Krzysztof
 
-Signed-off-by: Koro Chen <koro.chen@mediatek.com>
----
- sound/soc/soc-dapm.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/sound/soc/soc-dapm.c b/sound/soc/soc-dapm.c
-index defe0f0..158204d 100644
---- a/sound/soc/soc-dapm.c
-+++ b/sound/soc/soc-dapm.c
-@@ -3100,11 +3100,16 @@ snd_soc_dapm_new_control(struct snd_soc_dapm_context *dapm,
- 	}
- 
- 	prefix = soc_dapm_prefix(dapm);
--	if (prefix)
-+	if (prefix) {
- 		w->name = kasprintf(GFP_KERNEL, "%s %s", prefix, widget->name);
--	else
-+		if (widget->sname)
-+			w->sname = kasprintf(GFP_KERNEL, "%s %s", prefix,
-+					     widget->sname);
-+	} else {
- 		w->name = kasprintf(GFP_KERNEL, "%s", widget->name);
--
-+		if (widget->sname)
-+			w->sname = kasprintf(GFP_KERNEL, "%s", widget->sname);
-+	}
- 	if (w->name == NULL) {
- 		kfree(w);
- 		return NULL;
--- 
-1.8.1.1.dirty
+The following changes since commit 77b0ffdc4bbd267e9589aa025047e512322fc643:
+
+  Merge branch 'v4.2-next/dt-samsung' into for-next (2015-05-09 04:03:46 +0900)
+
+are available in the git repository at:
+
+
+  https://github.com/krzk/linux.git tags/samsung-dt-fixes-4.1-2
+
+for you to fetch changes up to 2495ae559826c60e3ccde9850e3b38815725b9c9:
+
+  ARM: dts: Add keep-power-in-suspend to WiFi SDIO node for Peach Boards (2015-05-11 11:00:00 +0900)
+
+----------------------------------------------------------------
+Fix for suspend on Peach boards related to Marvell mwifiex driver.
+The driver was enabled for Exynos defconfig during 4.1 merge window
+so currently the suspend on these boards on this config fails.
+
+----------------------------------------------------------------
+Javier Martinez Canillas (1):
+      ARM: dts: Add keep-power-in-suspend to WiFi SDIO node for Peach Boards
+
+ arch/arm/boot/dts/exynos5420-peach-pit.dts | 1 +
+ arch/arm/boot/dts/exynos5800-peach-pi.dts  | 1 +
+ 2 files changed, 2 insertions(+)
