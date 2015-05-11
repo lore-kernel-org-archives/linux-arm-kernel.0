@@ -1,154 +1,52 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Mon, 11 May 2015 19:18:10 +0200
-Subject: [PATCH v2] AHCI: Add generic MSI-X interrupt support to SATA PCI
- driver
-In-Reply-To: <20150504160652.GB1971@htj.duckdns.org>
-References: <1430725538-22162-1-git-send-email-rric@kernel.org>
- <20150504160652.GB1971@htj.duckdns.org>
-Message-ID: <20150511171810.GB29499@rric.localhost>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 11 May 2015 18:24:02 +0100
+Subject: [Linaro-acpi] [PATCH 2/2] ACPI / scan: Parse _CCA and setup device
+ coherency
+In-Reply-To: <20150511171045.GJ18655@e104818-lin.cambridge.arm.com>
+References: <D1665A4F.19E17%suravee.suthikulpanit@amd.com>
+ <2817500.sgztgK2NzB@wuerfel>
+ <20150501110644.GF27755@e104818-lin.cambridge.arm.com>
+ <2927907.rePQ55aASC@wuerfel>
+ <20150511171045.GJ18655@e104818-lin.cambridge.arm.com>
+Message-ID: <5550E5B2.1030407@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tejun,
-
-thanks for your review and answer.
-
-On 04.05.15 12:06:52, Tejun Heo wrote:
-> > This patch also enables AHCI for Cavium Thunder SoCs that uses MSI-X.
+On 11/05/15 18:10, Catalin Marinas wrote:
+> On Fri, May 08, 2015 at 04:08:53PM +0200, Arnd Bergmann wrote:
+>> On Friday 01 May 2015 12:06:44 Catalin Marinas wrote:
+>>>> If we just disallow DMA to devices that are marked with _CCA=0
+>>>> in ACPI, we can avoid this case, or discuss it by the time someone has hardware
+>>>> that wants it, and then make a more informed decision about it.
+>>>
+>>> I don't think we should disallow DMA to devices with _CCA == 0 (only to
+>>> those that don't have a _CCA property at all) as long as _CCA == 0 has
+>>> clear semantics like only architected cache maintenance required (and
+>>> that's what the ARMv8 ARM requires from compliant system caches).
+>>
+>> Even if we exclude all cases in which the behavior may be unexpected,
+>> there is still the other point I raised initially:
+>>
+>>               what would that be good for?
+>>
+>> Can you think of a case where a server system has a reason to use
+>> a device in noncoherent mode? I think it's more likely to be a case
+>> where a device got misconfigured accidentally by the firmware, and
+>> we're better off warning about that in the kernel than trying to prepare
+>> for an unknown hardware that might use an obscure feature of the spec.
 >
-> Please don't mix these two changes in the same patch.
-
-I will split the patch.
-
-> > +   /* per-port msix interrupts are not supported */
-> > +   if (n_ports > 1 && nvec >= n_ports)
-> > +           return -ENOSYS;
+> Maybe some of the people involved in arm64 servers can give a better
+> answer, I'm not familiar with their hardware (plans).
 >
-> Hmm... can you please elaborate why the condition isn't nvec > 1?
+> I would expect most DMA-capable devices to be cache coherent. However,
+> for (system) performance reasons, some of them could be configured as
+> non-coherent. An example, though unlikely on servers, is a display
+> device continuously accessing a framebuffer. You may not want to
+> overload the coherent interconnect.
 
-I slightly changed the check and added a comment that explains that's
-going on in the function. This is the new version:
+FWIW, I've also had much the same argument put to me for IOMMUs, i.e. 
+they want to make the page table walk interface non-coherent because 
+they'd rather pay the cost of flushing the page tables once to save a 
+few extra cycles of latency for cache snooping on every TLB miss.
 
-static int ahci_init_msix(struct pci_dev *pdev, unsigned int n_ports,
-			  struct ahci_host_priv *hpriv)
-{
-	int rc, nvec;
-	struct msix_entry entry = {};
-
-	/* check if msix is supported */
-	nvec = pci_msix_vec_count(pdev);
-	if (nvec <= 0)
-		return 0;
-
-	/*
-	 * Per-port msix interrupts are not supported. Assume single
-	 * port interrupts for:
-	 *
-	 *  n_ports == 1, or
-	 *  nvec < n_ports.
-	 *
-	 * We also need to check for n_ports != 0 which is implicitly
-	 * covered here since nvec > 0.
-	 */
-	if (n_ports != 1 && nvec >= n_ports)
-		return -ENOSYS;
-
-	/*
-	 * There can exist more than one vector (e.g. for error
-	 * detection or hdd hotplug). Then the first vector is used,
-	 * all others are ignored. Only enable the first entry here
-	 * (entry.entry = 0).
-	 */
-	rc = pci_enable_msix_exact(pdev, &entry, 1);
-	if (rc < 0)
-		return rc;
-
-	return 1;
-}
-
-Note that the check changed to n_ports != 1 to also cover the case
-n_ports == 0 which should return -ENOSYS.
-
-> Also, shouldn't we be printing a warning message here explaining why
-> probing is failing?
-
-I didn't want to print a warning in case -ENOSYS for backward
-compatability. Only if msi-x code fails there is a message, see
-__ahci_init_interrupts(). In any other case the behaviour is as
-before, thus no message is printed.
-
-> > +
-> > +   /* only enable the first entry (entry.entry = 0) */
-> > +   rc = pci_enable_msix_exact(pdev, &entry, 1);
->
-> So, enabling the first msix works if nvec > 1 && nvec < n_ports but
-> not if nvec >= n_ports?
-
-For n_ports > 1 && nvec >= n_ports we need to assume per-port
-interrupts. There are enough vectors for all ports then.
-
-> > +	if (rc < 0)
-> > +		return rc;
-> > +
-> > +	return 1;
-> > +}
-> > +
-> > +static int __ahci_init_interrupts(struct pci_dev *pdev, unsigned int n_ports,
-> > +				  struct ahci_host_priv *hpriv)
-> >  {
-> >  	int rc, nvec;
-> >
-> > +	nvec = ahci_init_msix(pdev, n_ports, hpriv);
-> > +	if (nvec > 0)
-> > +		return nvec;
-> > +
-> > +	if (nvec && nvec != -ENOSYS)
-> > +		dev_err(&pdev->dev, "failed to enable MSI-X: %d", nvec);
-> > +
-> >  	if (hpriv->flags & AHCI_HFLAG_NO_MSI)
-> >  		goto intx;
-> >
-> > @@ -1250,6 +1285,35 @@ static int ahci_init_interrupts(struct pci_dev *pdev, unsigned int n_ports,
-> >  	return 0;
-> >  }
-> >
-> > +static struct msi_desc *msix_get_desc(struct pci_dev *dev, u16 entry)
-> > +{
-> > +	struct msi_desc *desc;
-> > +
-> > +	list_for_each_entry(desc, &dev->msi_list, list) {
-> > +		if (desc->msi_attrib.entry_nr == entry)
-> > +			return desc;
-> > +	}
-> > +
-> > +	return NULL;
-> > +}
-> > +
-> > +static int ahci_init_interrupts(struct pci_dev *pdev, unsigned int n_ports,
-> > +                           struct ahci_host_priv *hpriv)
-> > +{
-> > +   struct msi_desc *desc;
-> > +
-> > +   __ahci_init_interrupts(pdev, n_ports, hpriv);
-> > +
-> > +   if (!pdev->msix_enabled)
-> > +           return pdev->irq;
-> > +
-> > +   desc = msix_get_desc(pdev, 0);  /* first entry */
-> > +   if (!desc)
-> > +           return -ENODEV;
-> > +
-> > +   return desc->irq;
-> > +}
->
-> Can we please do this properly?  We should be able to move port priv
-> allocation to host allocaotion time and add and use pp->irq instead,
-> right?
-
-I started working implementing this.
-
-Will send an updated patch set once finished.
-
-Thanks,
-
--Robert
+Robin.
