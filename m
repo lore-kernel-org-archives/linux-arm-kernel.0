@@ -1,42 +1,66 @@
-From: bhe@redhat.com (Baoquan He)
-Date: Mon, 11 May 2015 17:41:15 +0800
-Subject: [v2 1/5] arm64: kdump: reserve memory for crash dump kernel
-In-Reply-To: <5550659D.90006@linaro.org>
-References: <1429861989-8417-1-git-send-email-takahiro.akashi@linaro.org>
- <1429861989-8417-2-git-send-email-takahiro.akashi@linaro.org>
- <20150428091935.GJ15033@dhcp-16-116.nay.redhat.com>
- <55505C91.8070503@linaro.org>
- <20150511075447.GA4290@dhcp-128-28.nay.redhat.com>
- <5550659D.90006@linaro.org>
-Message-ID: <20150511094115.GB4290@dhcp-128-28.nay.redhat.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 11 May 2015 11:44:49 +0200
+Subject: [PATCH 1/2] ARM: kvm: fix a bad BSYM() usage
+In-Reply-To: <20150511090537.GA2009@cbox>
+References: <E1YqkpO-0006zB-QJ@rmk-PC.arm.linux.org.uk>
+ <20150509200717.GA30634@cbox>
+ <CAKv+Gu922cZLGUJ3-g8CJiUCuL-5L=XHPfgXUMo-jrdPKAuokA@mail.gmail.com>
+ <20150511090537.GA2009@cbox>
+Message-ID: <CAKv+Gu9mbytGHZvi=tt9eGwngzRq0r_V6Cwvk0aDRTsH8JtRXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/15 at 05:17pm, AKASHI Takahiro wrote:
-> On 05/11/2015 04:54 PM, Baoquan He wrote:
-> >In this patch you reserve a separate memory region in 1st kernel to
-> >store elfcorehdr. I am wondering why you don't call add_buffer in
-> >kexec-tools directly. Like this you can get a region from reserved
-> >crashkernel region. Then you don't need reserve_elfcorehdr() to reserve
-> >memory for elfcorehdr specifically. Like other ARCHs do only one memory
-> >region is reserved in 1st kernel, that's crashkernel region.
-> 
-> I think that you misunderstand somewhat.
-> * Kexec-tools only locates/identifies a small region for elfcore header within crash kernel's
-> memory region while 1st kernel is running.
-> * the data in elfcore header is filled up by kexec_load system call on 1st kernel.
-> * 1st kernel doesn't reserve any region for elfcore header because the kernel
-> commandline parameters don't contains "elfcorehdr=" parameter, then elfcorehdr_size=0.
-> * Crash dump kernel does reserve the region, as I said, because we don't want to
-> corrupt the info in elfcore header accidentally while crash kernel is running.
-> 
-> Clear?
+On 11 May 2015 at 11:05, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> On Sat, May 09, 2015 at 10:10:56PM +0200, Ard Biesheuvel wrote:
+>> On 9 May 2015 at 22:07, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+>> > On Fri, May 08, 2015 at 05:08:42PM +0100, Russell King wrote:
+>> >> BSYM() should only be used when refering to local symbols in the same
+>> >> assembly file which are resolved by the assembler, and not for
+>> >> linker-fixed up symbols.  The use of BSYM() with panic is incorrect as
+>> >> the linker is involved in fixing up this relocation, and it knows
+>> >> whether panic() is ARM or Thumb.
+>> >>
+>> >> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>> >> ---
+>> >>  arch/arm/kvm/interrupts.S | 2 +-
+>> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+>> >>
+>> >> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+>> >> index 79caf79b304a..87847d2c5f99 100644
+>> >> --- a/arch/arm/kvm/interrupts.S
+>> >> +++ b/arch/arm/kvm/interrupts.S
+>> >> @@ -309,7 +309,7 @@ ENTRY(kvm_call_hyp)
+>> >>  THUMB(       orr     r2, r2, #PSR_T_BIT      )
+>> >>       msr     spsr_cxsf, r2
+>> >>       mrs     r1, ELR_hyp
+>> >> -     ldr     r2, =BSYM(panic)
+>> >> +     ldr     r2, =panic
+>> >>       msr     ELR_hyp, r2
+>> >>       ldr     r0, =\panic_str
+>> >>       clrex                           @ Clear exclusive monitor
+>> >> --
+>> >> 1.8.3.1
+>> >>
+>> > Indeed, the linker figures it out as it should.  It does seem like the
+>> > right result is produced with the BSYM() macro as well so not sure what
+>> > the harm is.
+>> >
+>>
+>> BSYM() is defined as 'sym + 1' not 'sym | 1', so if the symbol has the
+>> thumb bit set already, the result is incorrect.
+>>
+> yeah, but the linker will look at the result of 'sym + 1', so on my
+> system it ends up with 'sym + 1' after the linker has done its thing
+> (verified by looking at the disassembly of vmlinux);
 
-OK, got it now.
+Hmm, I though had done the same when this was under discussion a
+couple of weeks ago, and had arrived at the opposite conclusion, but
+now I cannot reproduce anymore so apparently not.
+Sorry for the noise.
 
-Then I am wondering why "elfcorehdr=" can't be contained in kernel
-cmdline as other ARCH does. Maybe I need go over all related threads
-then know why it is. Thanks for explanation.
-
-Thanks
-Baoquan
+> I assume the
+> linker logic is that it's branching to a thumb function but the target
+> is already the +1 so no action necessary, as opposed to just blindly
+> adding 1.
+>
+> -Christoffer
