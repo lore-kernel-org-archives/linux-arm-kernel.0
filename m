@@ -1,56 +1,96 @@
-From: Dave.Martin@arm.com (Dave P Martin)
-Date: Mon, 11 May 2015 11:27:07 +0100
-Subject: [PATCH 1/2] ARM: kvm: fix a bad BSYM() usage
-In-Reply-To: <20150511101738.GC2067@n2100.arm.linux.org.uk>
-References: <E1YqkpO-0006zB-QJ@rmk-PC.arm.linux.org.uk>
- <20150509200717.GA30634@cbox>
- <CAKv+Gu922cZLGUJ3-g8CJiUCuL-5L=XHPfgXUMo-jrdPKAuokA@mail.gmail.com>
- <20150511090537.GA2009@cbox>
- <20150511095657.GA5856@e103592.cambridge.arm.com>
- <20150511101738.GC2067@n2100.arm.linux.org.uk>
-Message-ID: <20150511102707.GC5856@e103592.cambridge.arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 11 May 2015 12:29:42 +0200
+Subject: [PATCH v3 2/7] mmc: mediatek: Add Mediatek MMC driver
+In-Reply-To: <1431335885.26820.7.camel@mhfsdcap03>
+References: <1430214525-19198-1-git-send-email-chaotian.jing@mediatek.com>
+ <1430214525-19198-3-git-send-email-chaotian.jing@mediatek.com>
+ <CAPDyKFq=R9B6ZHHgmDcSg-TNSfqQKAUKc2NjACvpwxFpmk954g@mail.gmail.com>
+ <1430895299.15154.9.camel@mhfsdcap03>
+ <CAPDyKFr+FTXAzYVn3F41dmw2zW01pSbSHPfGJHXbUFLJfvQ5CA@mail.gmail.com>
+ <1430962956.15154.48.camel@mhfsdcap03>
+ <CAPDyKFr5N_08HbLuY=4Wfv1BoVQLVR-VW+NKh_umL1hzi_KozA@mail.gmail.com>
+ <1431335885.26820.7.camel@mhfsdcap03>
+Message-ID: <CAPDyKFqeAzjpbZsyfcwb_WarC=dzoCsEeLTmxAbtvOo3Y4cYyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 11, 2015 at 11:17:39AM +0100, Russell King - ARM Linux wrote:
-> On Mon, May 11, 2015 at 10:56:57AM +0100, Dave P Martin wrote:
-> > ldr= will do the right thing *if* the target symbol's type is correctly
-> > annotated.  This means that ldr =some_local_code_symbol does the right
-> > thing for branch target addresses if and only if some_local_code_symbol
-> > is marked with .type %function (or ENDPROC).
-> > 
-> > The fact that a symbol is in a code section is *not* enough.
-> > 
-> > For ARM code this never mattered, so local symbols in .S files are
-> > probably under-annotated in general.  BSYM() might have been used to
-> > work around this in some cases.
-> > 
-> > We should check that all the BSYMs removed by this series from ldr=
-> > and .long/.word etc. point to a correctly annotated symbol, and add
-> > the annotations if not.
-> 
-> I guess the problem here is that people forget what a patch series is
-> actually doing and then start making comments based on hypothetical
-> stuff rather than what the series is actually doing.
-> 
-> To recap, this series:
-> 
-> 1. Removes the wrong usage of BSYM() in the KVM code.  This is used with
->    the symbol "panic" which is a function declared by generic C code.
->    Therefore, panic will have the appropriate annotations attached to
->    this symbol, unless GCC itself is buggy.
-> 
->    This is the _only_ case of "ldr rd, =BSYM(sym)".
+On 11 May 2015 at 11:18, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> On Fri, 2015-05-08 at 14:12 +0200, Ulf Hansson wrote:
+>> On 7 May 2015 at 03:42, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+>> > Dear Ulf,
+>> >
+>> > Thanks!
+>> > Below is my comment:
+>> >
+>> > On Wed, 2015-05-06 at 18:31 +0200, Ulf Hansson wrote:
+>> >> On 6 May 2015 at 08:54, chaotian.jing <chaotian.jing@mediatek.com> wrote:
+>> >> > Dear Ulf,
+>> >> >
+>> >> > Thanks for your review.
+>> >> > I must do a explain of our MMC host:
+>> >> > Source clock is source clock of the MMC bus, MMC host has a divider to
+>> >> > get different bus clock frequency. now the runtime suspend is gating
+>> >> > this clock.
+>> >> >
+>> >> > Hclk is the power domain of the MMC host, if Hclk is gated, the MMC host
+>> >> > cannot work(all registers readout is zero). and, all registers would be
+>> >> > reset to default value if Hclk is gated/ungated.
+>> >> > At MT8173, MSDC0 and MSDC2 has independent Hclk, MSDC1 and MSDC3's Hclk
+>> >> > was controlled by "Infra module".
+>> > Sorry for mistake, MSDC0 and MSDC3 has independent Hclk, MSDC1 and
+>> > MSDC2's Hclk was controlled by "Infra module". the Infra module is a
+>> > "power saving module", when the system go to sleep, Infra module will be
+>> > set and MSDC1 & MSDC2's Hclk will be gated automatically.
+>> >>
+>> >> Thanks for clarifying!
+>> >>
+>> >> I don't have enough knowledge about your SoC to understand the detail,
+>> >> but it seems like we are mixing clocks and power domains. I would
+>> >> rather keep this separate - if the HW allows it.
+>> >>
+>> >> I guess the key question I have is the following:
+>> >> 1) Is it hardware wise possible to gate the hclk, but without gating
+>> >> the power domain?
+>> >> 2) At what level is the reference counting done for each device in the
+>> >> power domain? In HW or in sofftware?
+>> >>
+>> >
+>> > Actually, Our MMC host do not have power domain, all the control of the
+>> > host is the Hclk.
+>>
+>> Okay, but I am not sure that fully answered my question.
+>>
+>> You said that hclk will be gated when the power domain gets gated. And
+>> the power domain (infra module, right?) will be gated at system PM
+>> sleep. And when that happens the mmc controller loses register
+>> context.
+>>
+>> But, again, can hclk be gated without gating the power domain?
+>>
+>> No matter what, it seems like a good idea to gate the power domain
+>> when all clients of it are idle. Yes we would need to manage register
+>> save/restore context, but on the other hand allow you to save more
+>> power, right?
+>>
+> For MSDC0 & MSDC3, it has independent HCLK, do not have power domain.
+> For MSDC1 & MSDC2, its HCLK was controlled by Infra module(This is a big
+> power domain for many modules).
+> So, for msdc0 & msdc3, we can control its Hclk, for msdc1 & msdc2, we
+> cannot control it.
 
-That's a sound conclusion -- you did mention before that that was the
-only BSYM with ldr=, but it slipped my mind again, sorry.
+Okay, thanks for the clarification!
 
-> 2. It replaces the remaining "adr rd, BSYM(sym)" with a new "badr" macro,
->    and removes the BSYM() preprocessor macro.  The new "badr" macro which
->    is identical in behaviour to the former, but ensures that BSYM()
->    doesn't get mis-used with "ldr".
+>
+> Yes, I will do gate/ungate HCLK & source clock in PM.
+> In addition, Since the gate/ungate HCLK is done by runtime PM, and all
+> register operation should work at HCLK is on, so the msdc_init_hw() only
+> can be called at set_ios(), because in probe(), the HCLK may have not
+> been enabled.
 
-And this part wasn't in question anyway, so all is fine.
+I suggest you to enable HCLK in ->probe() and thus you may also call
+msdc_init_hw() from there.
 
-Cheers
----Dave
+This should simplify for you, when adding the runtime PM support.
+
+Kind regards
+Uffe
