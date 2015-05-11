@@ -1,77 +1,120 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 11 May 2015 16:11:44 +0800
-Subject: [PATCH 5/6] ARM: dts: sunxi: Add Allwinner H3 DTSI
-In-Reply-To: <20150509114428.GV11057@lukather>
-References: <1430904693-1404-1-git-send-email-jenskuske@gmail.com>
- <1430904693-1404-6-git-send-email-jenskuske@gmail.com>
- <20150506121941.GD11057@lukather>
- <554A7DE5.6040406@gmail.com> <20150509114428.GV11057@lukather>
-Message-ID: <CAGb2v65ZasVzo+JjkQ9ToAobg-WYPQ49O9Kjwbo4RkJCCCKV0g@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Mon, 11 May 2015 17:17:33 +0900
+Subject: [v2 1/5] arm64: kdump: reserve memory for crash dump kernel
+In-Reply-To: <20150511075447.GA4290@dhcp-128-28.nay.redhat.com>
+References: <1429861989-8417-1-git-send-email-takahiro.akashi@linaro.org>
+ <1429861989-8417-2-git-send-email-takahiro.akashi@linaro.org>
+ <20150428091935.GJ15033@dhcp-16-116.nay.redhat.com>
+ <55505C91.8070503@linaro.org>
+ <20150511075447.GA4290@dhcp-128-28.nay.redhat.com>
+Message-ID: <5550659D.90006@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 9, 2015 at 7:44 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Wed, May 06, 2015 at 10:47:33PM +0200, Jens Kuske wrote:
->> >> + *     You should have received a copy of the GNU General Public
->> >> + *     License along with this file; if not, write to the Free
->> >> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
->> >> + *     MA 02110-1301 USA
->> >
->> > Could you remove that last paragraph?
->> > It generates a checkpatch warning.
+On 05/11/2015 04:54 PM, Baoquan He wrote:
+> On 05/11/15 at 04:38pm, AKASHI Takahiro wrote:
+>> Hi Baoquan,
 >>
->> Sure, will be removed. Just copied it from some other sunxi dtsi.
->
-> Yeah, I know, I'm even the one that introduced this in the first place
-> :)
->
-> I sent a patch earlier this week to remove it from the other DT.
->
->> >> +          ahb12_rst: reset at 01c202c0 {
->> >> +                  #reset-cells = <1>;
->> >> +                  compatible = "allwinner,sun6i-a31-clock-reset";
->> >> +                  reg = <0x01c202c0 0xc>;
->> >> +          };
->> >
->> > This reset controller also resets the timers, it should be initialised
->> > much earlier.
->> >
->> > What about having an allwinner,sun8i-h3-bus-reset, and adding it to
->> > the list of compatibles to initialise earlier in
->> > drivers/reset/reset-sunxi.c?
->> >
->> > Of course, it would cover the other reset controllers that you have
->> > below.
->> >
+>> On 04/28/2015 06:19 PM, Baoquan He wrote:
+>>>> +#ifdef CONFIG_CRASH_DUMP
+>>>> +/*
+>>>> + * reserve_elfcorehdr() - reserves memory for elf core header
+>>>> + *
+>>>> + * This function reserves memory area given in "elfcorehdr=" kernel command
+>>>> + * line parameter. The memory reserved is used by a dump capture kernel to
+>>>> + * identify the memory used by primary kernel.
+>>>> + */
+>>>
+>>> Hi AKASHI,
+>>>
+>>> May I know why elfcorehdr need be reserved separately but not locate a
+>>> memory region in crashkernel reserved region like all other ARCHs? Is
+>>> there any special reason?
 >>
->> You mean using a single bus_rst instead of the three?
+>> I don't get your point, but arm as well as arm64 locates elfcorehdr
+>> in a crash kernel's memory region.
+>> See kexec/arch/arm{,64}/crashdump-arm{,64}.c in kexec-tools.
+>>
+>> And this region is reserved at boot time *on crash kernel* because we don't want
+>> to corrupt it accidentally.
+>> (After Mark's comment, we might better remove the mmu mapping for this region, too.)
 >
-> Yes.
 >
->> Or, why not using allwinner,sun6i-a31-ahb1-reset for ahb12_rst
+> Sorry, I don't make myself clear.
 >
-> Strictly speaking, they do not control the same set of devices. I'd
-> prefer to have a different compatible in case we need to setup a
-> particular behaviour on a given SoC (for example, force out of reset a
-> particular device, even if no driver is actually using it), without
-> impacting the other.
->
->> and adding a .init_time = sun6i_timer_init to the sun8i machine.
->
-> But we will need to do that yes.
->
->> I'm a bit confused here now, because for A23, which is almost
->> identical, it got removed after your comment:
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/265064.html
->
-> Hmmmm, I think I somehow overlooked the fact that the timer was there,
-> even though Chen-Yu said it. My bad :/
+> In this patch you reserve a separate memory region in 1st kernel to
+> store elfcorehdr. I am wondering why you don't call add_buffer in
+> kexec-tools directly. Like this you can get a region from reserved
+> crashkernel region. Then you don't need reserve_elfcorehdr() to reserve
+> memory for elfcorehdr specifically. Like other ARCHs do only one memory
+> region is reserved in 1st kernel, that's crashkernel region.
 
-On the A23, the high speed timer block only has 1 timer. The sun5i-hrtimer
-driver requires 2, and turns out we weren't using them anyway, so I just
-dropped sun5i-hrtimer support on A23.
+I think that you misunderstand somewhat.
+* Kexec-tools only locates/identifies a small region for elfcore header within crash kernel's
+memory region while 1st kernel is running.
+* the data in elfcore header is filled up by kexec_load system call on 1st kernel.
+* 1st kernel doesn't reserve any region for elfcore header because the kernel
+commandline parameters don't contains "elfcorehdr=" parameter, then elfcorehdr_size=0.
+* Crash dump kernel does reserve the region, as I said, because we don't want to
+corrupt the info in elfcore header accidentally while crash kernel is running.
 
-If the other sun8i SoCs have 2 or more timers, feel free to support them.
+Clear?
 
-ChenYu
+-Takahiro AKASHI
+
+> Thanks
+> Baoquan
+>>
+>>
+>> Make sense?
+>>
+>> -Takahiro AKASHI
+>>
+>>> Thanks
+>>> Baoquan
+>>>
+>>>> +static void __init reserve_elfcorehdr(void)
+>>>> +{
+>>>> +	if (!elfcorehdr_size)
+>>>> +		return;
+>>>> +
+>>>> +	if (memblock_is_region_reserved(elfcorehdr_addr, elfcorehdr_size)) {
+>>>> +		pr_warn("elfcorehdr reservation failed - memory is in use (0x%llx)\n",
+>>>> +			elfcorehdr_addr);
+>>>> +		return;
+>>>> +	}
+>>>> +
+>>>> +	if (memblock_reserve(elfcorehdr_addr, elfcorehdr_size)) {
+>>>> +		pr_warn("elfcorehdr reservation failed - out of memory\n");
+>>>> +		return;
+>>>> +	}
+>>>> +
+>>>> +	pr_info("Reserving %lldKB of memory at %lldMB for elfcorehdr\n",
+>>>> +		elfcorehdr_size >> 10, elfcorehdr_addr >> 20);
+>>>> +}
+>>>> +#endif /* CONFIG_CRASH_DUMP */
+>>>>   /*
+>>>>    * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
+>>>>    * currently assumes that for memory starting above 4G, 32-bit devices will
+>>>> @@ -170,6 +247,13 @@ void __init arm64_memblock_init(void)
+>>>>   		memblock_reserve(__virt_to_phys(initrd_start), initrd_end - initrd_start);
+>>>>   #endif
+>>>>
+>>>> +#ifdef CONFIG_KEXEC
+>>>> +	reserve_crashkernel(memory_limit);
+>>>> +#endif
+>>>> +#ifdef CONFIG_CRASH_DUMP
+>>>> +	reserve_elfcorehdr();
+>>>> +#endif
+>>>> +
+>>>>   	early_init_fdt_scan_reserved_mem();
+>>>>
+>>>>   	/* 4GB maximum for 32-bit only capable devices */
+>>>> --
+>>>> 1.7.9.5
+>>>>
+>>>> --
+>>>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>>>> the body of a message to majordomo at vger.kernel.org
+>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>>> Please read the FAQ at  http://www.tux.org/lkml/
