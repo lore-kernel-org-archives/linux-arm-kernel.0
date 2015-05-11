@@ -1,80 +1,63 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 11 May 2015 12:45:03 +0300
-Subject: [GIT PULL] Ux500 development for v4.2
-In-Reply-To: <CACRpkdZX-Tg-1SNV0L2MemGqkaVZG9wSwiLquYVDVMToZT02nw@mail.gmail.com>
-References: <CACRpkdZX-Tg-1SNV0L2MemGqkaVZG9wSwiLquYVDVMToZT02nw@mail.gmail.com>
-Message-ID: <20150511094503.GW2558@tarshish>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 11 May 2015 11:49:24 +0200
+Subject: [GIT PULL] at91: dt for 4.2 #1
+Message-ID: <1431337764-21824-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Arnd, Olof, Kevin,
 
-On Mon, May 11, 2015 at 11:32:04AM +0200, Linus Walleij wrote:
-> Hi ARM SoC people,
+First DT batch for AT91 dedicated to enhancement coming from Overkiz. More to
+come for 4.2 obviously but I wanted to send this batch as it is ready.
 
-Added ARM SoC address to To:.
+Thanks, best regards,
 
-baruch
+The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
 
-> this is some cleanup and development for Ux500 that should go
-> into ARM SoC for the v4.2 series. Details are in the signed tag.
-> 
-> I think it would look overzealous to break it in different topics, but if you
-> prefer to slice the patch set, tell me how and I'll split it as you
-> desire.
-> 
-> Please pull this to ARM SoC!
-> 
-> Yours,
-> Linus Walleij
-> 
-> The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
-> 
->   Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-> tags/ux500-v4.2-1
-> 
-> for you to fetch changes up to 11033cb60a6a660a1ced07bb9501dce85e85b0ae:
-> 
->   ARM: ux500: add the sensors to the STUIB board (2015-05-11 11:10:16 +0200)
-> 
-> ----------------------------------------------------------------
-> Ux500 development for the v4.2 kernel series:
-> - Get some static maps out
-> - Device Trees:
->   - Define CPU topology for Ux500's
->   - Add CoreSight blocks for Ux500's
->   - Fix the magnetometer compat string for TVK
->     and Snowball
->   - Assign sensor trigger IRQs for some boards
->   - Add the STUIB sensors
-> - Defconfig:
->   - Enable PERF_EVENTS as we have a PMU after all
->   - Enable CoreSight components
-> 
-> ----------------------------------------------------------------
-> Linus Walleij (8):
->       ARM: ux500: define CPU topology
->       ARM: ux500: get rid of static maps
->       ARM: ux500: add CoreSight blocks to DTS file
->       ARM: ux500: add PERF_EVENTS to defconfig
->       ARM: ux500: enable CoreSight in defconfig
->       ARM: ux500: fix lsm303dlh magnetometer compat string
->       ARM: ux500: assign the sensor trigger IRQs
->       ARM: ux500: add the sensors to the STUIB board
-> 
->  arch/arm/boot/dts/ste-dbx5x0.dtsi          | 154 +++++++++++++++++++++++++++++
->  arch/arm/boot/dts/ste-href-stuib.dtsi      |  50 ++++++++++
->  arch/arm/boot/dts/ste-href-tvk1281618.dtsi |   7 +-
->  arch/arm/boot/dts/ste-snowball.dts         |  23 ++++-
->  arch/arm/configs/u8500_defconfig           |   5 +
->  arch/arm/mach-ux500/cpu-db8500.c           |  13 +--
->  6 files changed, 236 insertions(+), 16 deletions(-)
+  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-dt
+
+for you to fetch changes up to 7107bb0b2836f0f9b1ffed1f5189e269ee25e5b9:
+
+  ARM: at91/dt: drop deprecated mainck node from pmc (2015-05-11 11:24:01 +0200)
+
+----------------------------------------------------------------
+First batch of DT changes for 4.2:
+- cleanup and addition of Overkiz boards
+- at91sam9x5: pwm0 pinctrl definition
+- delete deprecated mainck nodes
+
+----------------------------------------------------------------
+Ga?l PORTAY (11):
+      ARM: at91/dt: kizbox: rename to at91-kizbox
+      ARM: at91/dt: at91-kizbox: sanitize file
+      ARM: at91/dt: at91-kizbox: user proper serial uart
+      ARM: at91/dt: at91-kizbox: gpio-keys related changes
+      ARM: at91/dt: at91-kizbox: leds related changes
+      ARM: at91/dt: at91-kizbox: re-size nand partitions
+      ARM: at91/dt: at91-kizbox: update chosen node
+      ARM: at91/dt: sam9x5: add pinctrl for pwm0
+      ARM: at91/dt: add support for kizboxmini
+      ARM: at91/dt: add support for kizbox2
+      ARM: at91/dt: drop deprecated mainck node from pmc
+
+ arch/arm/boot/dts/Makefile                  |   4 +-
+ arch/arm/boot/dts/at91-kizbox.dts           | 159 ++++++++++++++++++++
+ arch/arm/boot/dts/at91-kizbox2.dts          | 216 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91-kizboxmini.dts       | 129 +++++++++++++++++
+ arch/arm/boot/dts/at91-sama5d3_xplained.dts |   6 -
+ arch/arm/boot/dts/at91sam9rlek.dts          |   6 -
+ arch/arm/boot/dts/at91sam9x5.dtsi           |  46 ++++++
+ arch/arm/boot/dts/kizbox.dts                | 150 -------------------
+ arch/arm/boot/dts/sama5d3xcm.dtsi           |   6 -
+ 9 files changed, 553 insertions(+), 169 deletions(-)
+ create mode 100644 arch/arm/boot/dts/at91-kizbox.dts
+ create mode 100644 arch/arm/boot/dts/at91-kizbox2.dts
+ create mode 100644 arch/arm/boot/dts/at91-kizboxmini.dts
+ delete mode 100644 arch/arm/boot/dts/kizbox.dts
 
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Nicolas Ferre
