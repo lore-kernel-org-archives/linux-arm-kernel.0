@@ -1,209 +1,58 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 11 May 2015 15:09:28 +0200
-Subject: [PATCH] ARM: dts: kirkwood: add "nor-jedec" flash compatible
- binding
-In-Reply-To: <1431066079-19725-1-git-send-email-zajec5@gmail.com>
-References: <1431066079-19725-1-git-send-email-zajec5@gmail.com>
-Message-ID: <5550AA08.5060001@free-electrons.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 11 May 2015 15:11:19 +0200
+Subject: [PATCH 1/4] dt-bindings: soc: Add documentation for the MediaTek
+ SCPSYS unit
+In-Reply-To: <1431349882-12260-1-git-send-email-s.hauer@pengutronix.de>
+References: <1431349882-12260-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1431349882-12260-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafa?,
+This adds documentation for the MediaTek SCPSYS unit found in MT8173 SoCs.
 
-On 08/05/2015 08:21, Rafa? Mi?ecki wrote:
-> Starting with commits
-> 8ff16cf ("Documentation: devicetree: m25p80: add "nor-jedec" binding")
-> 1103b85 ("mtd: m25p80: bind to "nor-jedec" ID, for auto-detection")
-> we have "nor-jedec" binding indicating support for JEDEC identification.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ .../devicetree/bindings/soc/mediatek/scpsys.txt    | 32 ++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
 
-I have the same question that for mvebu: did you actually check that all
-the NOR flash referenced in the dts supports the JEDEC identification?
-
-Then again, if it id the case I will add it in mvebu/dt soon, unless Andrew,
-Jason or any other developer who has submitted the dts is aware of a restriction
-about applying it.
-
-Thanks,
-
-Gregory
-> 
-> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
-> ---
->  arch/arm/boot/dts/kirkwood-b3.dts              | 2 +-
->  arch/arm/boot/dts/kirkwood-cloudbox.dts        | 2 +-
->  arch/arm/boot/dts/kirkwood-dir665.dts          | 2 +-
->  arch/arm/boot/dts/kirkwood-dreamplug.dts       | 2 +-
->  arch/arm/boot/dts/kirkwood-lsxl.dtsi           | 2 +-
->  arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts | 2 +-
->  arch/arm/boot/dts/kirkwood-netxbig.dtsi        | 2 +-
->  arch/arm/boot/dts/kirkwood-ns2-common.dtsi     | 2 +-
->  arch/arm/boot/dts/kirkwood-rd88f6192.dts       | 2 +-
->  arch/arm/boot/dts/kirkwood-synology.dtsi       | 2 +-
->  arch/arm/boot/dts/kirkwood-t5325.dts           | 2 +-
->  arch/arm/boot/dts/kirkwood-ts219.dtsi          | 2 +-
->  12 files changed, 12 insertions(+), 12 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/kirkwood-b3.dts b/arch/arm/boot/dts/kirkwood-b3.dts
-> index c9247f8..103551f 100644
-> --- a/arch/arm/boot/dts/kirkwood-b3.dts
-> +++ b/arch/arm/boot/dts/kirkwood-b3.dts
-> @@ -74,7 +74,7 @@
->  			m25p16 at 0 {
->  				#address-cells = <1>;
->  				#size-cells = <1>;
-> -				compatible = "st,m25p16";
-> +				compatible = "st,m25p16", "nor-jedec";
->  				reg = <0>;
->  				spi-max-frequency = <40000000>;
->  				mode = <0>;
-> diff --git a/arch/arm/boot/dts/kirkwood-cloudbox.dts b/arch/arm/boot/dts/kirkwood-cloudbox.dts
-> index ab6ab49..4a04985 100644
-> --- a/arch/arm/boot/dts/kirkwood-cloudbox.dts
-> +++ b/arch/arm/boot/dts/kirkwood-cloudbox.dts
-> @@ -42,7 +42,7 @@
->  			flash at 0 {
->  				#address-cells = <1>;
->  				#size-cells = <1>;
-> -				compatible = "mxicy,mx25l4005a";
-> +				compatible = "mxicy,mx25l4005a", "nor-jedec";
->  				reg = <0>;
->  				spi-max-frequency = <20000000>;
->  				mode = <0>;
-> diff --git a/arch/arm/boot/dts/kirkwood-dir665.dts b/arch/arm/boot/dts/kirkwood-dir665.dts
-> index 786959e..94c80a2 100644
-> --- a/arch/arm/boot/dts/kirkwood-dir665.dts
-> +++ b/arch/arm/boot/dts/kirkwood-dir665.dts
-> @@ -93,7 +93,7 @@
->  			m25p80 at 0 {
->  				#address-cells = <1>;
->  				#size-cells = <1>;
-> -				compatible = "mxicy,mx25l12805d";
-> +				compatible = "mxicy,mx25l12805d", "nor-jedec";
->  				spi-max-frequency = <50000000>;
->  				reg = <0>;
->  
-> diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-> index 6467c79..c9a1c09 100644
-> --- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
-> +++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-> @@ -42,7 +42,7 @@
->  			m25p40 at 0 {
->  				#address-cells = <1>;
->  				#size-cells = <1>;
-> -				compatible = "mxicy,mx25l1606e";
-> +				compatible = "mxicy,mx25l1606e", "nor-jedec";
->  				reg = <0>;
->  				spi-max-frequency = <50000000>;
->  				mode = <0>;
-> diff --git a/arch/arm/boot/dts/kirkwood-lsxl.dtsi b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-> index 5348447..58e197a 100644
-> --- a/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-> @@ -74,7 +74,7 @@
->  			m25p40 at 0 {
->  				#address-cells = <1>;
->  				#size-cells = <1>;
-> -				compatible = "m25p40";
-> +				compatible = "m25p40", "nor-jedec";
->  				reg = <0>;
->  				spi-max-frequency = <25000000>;
->  				mode = <0>;
-> diff --git a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
-> index f82827d..ae68061 100644
-> --- a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
-> +++ b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
-> @@ -65,7 +65,7 @@
->  			flash at 0 {
->  				#address-cells = <1>;
->  				#size-cells = <1>;
-> -				compatible = "mxicy,mx25l12805d";
-> +				compatible = "mxicy,mx25l12805d", "nor-jedec";
->  				reg = <0>;
->  				spi-max-frequency = <50000000>;
->  				mode = <0>;
-> diff --git a/arch/arm/boot/dts/kirkwood-netxbig.dtsi b/arch/arm/boot/dts/kirkwood-netxbig.dtsi
-> index b0cfb7c..11d21c0 100644
-> --- a/arch/arm/boot/dts/kirkwood-netxbig.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood-netxbig.dtsi
-> @@ -33,7 +33,7 @@
->  			flash at 0 {
->  				#address-cells = <1>;
->  				#size-cells = <1>;
-> -				compatible = "mxicy,mx25l4005a";
-> +				compatible = "mxicy,mx25l4005a", "nor-jedec";
->  				reg = <0>;
->  				spi-max-frequency = <20000000>;
->  				mode = <0>;
-> diff --git a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-> index fe6c024..b860b7f 100644
-> --- a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-> @@ -29,7 +29,7 @@
->  			flash at 0 {
->  				#address-cells = <1>;
->  				#size-cells = <1>;
-> -				compatible = "mxicy,mx25l4005a";
-> +				compatible = "mxicy,mx25l4005a", "nor-jedec";
->  				reg = <0>;
->  				spi-max-frequency = <20000000>;
->  				mode = <0>;
-> diff --git a/arch/arm/boot/dts/kirkwood-rd88f6192.dts b/arch/arm/boot/dts/kirkwood-rd88f6192.dts
-> index 35a29de..80dff2f 100644
-> --- a/arch/arm/boot/dts/kirkwood-rd88f6192.dts
-> +++ b/arch/arm/boot/dts/kirkwood-rd88f6192.dts
-> @@ -61,7 +61,7 @@
->  			m25p128 at 0 {
->  				#address-cells = <1>;
->  				#size-cells = <1>;
-> -				compatible = "st,m25p128";
-> +				compatible = "st,m25p128", "nor-jedec";
->  				reg = <0>;
->  				spi-max-frequency = <20000000>;
->  				mode = <0>;
-> diff --git a/arch/arm/boot/dts/kirkwood-synology.dtsi b/arch/arm/boot/dts/kirkwood-synology.dtsi
-> index 8be5b2e..48f4b02 100644
-> --- a/arch/arm/boot/dts/kirkwood-synology.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood-synology.dtsi
-> @@ -217,7 +217,7 @@
->  			m25p80 at 0 {
->  				#address-cells = <1>;
->  				#size-cells = <1>;
-> -				compatible = "st,m25p80";
-> +				compatible = "st,m25p80", "nor-jedec";
->  				reg = <0>;
->  				spi-max-frequency = <20000000>;
->  				mode = <0>;
-> diff --git a/arch/arm/boot/dts/kirkwood-t5325.dts b/arch/arm/boot/dts/kirkwood-t5325.dts
-> index 610ec0f..5dbd9a0 100644
-> --- a/arch/arm/boot/dts/kirkwood-t5325.dts
-> +++ b/arch/arm/boot/dts/kirkwood-t5325.dts
-> @@ -88,7 +88,7 @@
->  			flash at 0 {
->  				#address-cells = <1>;
->  				#size-cells = <1>;
-> -				compatible = "st,m25p80";
-> +				compatible = "st,m25p80", "nor-jedec";
->  				spi-max-frequency = <86000000>;
->  				reg = <0>;
->  				mode = <0>;
-> diff --git a/arch/arm/boot/dts/kirkwood-ts219.dtsi b/arch/arm/boot/dts/kirkwood-ts219.dtsi
-> index df7f152..cbb1049 100644
-> --- a/arch/arm/boot/dts/kirkwood-ts219.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood-ts219.dtsi
-> @@ -49,7 +49,7 @@
->  			m25p128 at 0 {
->  				#address-cells = <1>;
->  				#size-cells = <1>;
-> -				compatible = "m25p128";
-> +				compatible = "m25p128", "nor-jedec";
->  				reg = <0>;
->  				spi-max-frequency = <20000000>;
->  				mode = <0>;
-> 
-
-
+diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+new file mode 100644
+index 0000000..4764a03
+--- /dev/null
++++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+@@ -0,0 +1,32 @@
++MediaTek SCPSYS
++===============
++
++The System Control Processor System (SCPSYS) has several power management
++related tasks in the system. The tasks include thermal measurement, dynamic
++voltage frequency scaling (DVFS), interrupt filter and lowlevel sleep control.
++The System Power Manager (SPM) inside the SCPSYS is for the MTCMOS power
++domain control.
++
++The driver implements the Generic PM domain bindings described in
++power/power_domain.txt. It provides the power domains defined in
++include/dt-bindings/power/mt8173-power.h.
++
++Required properties:
++- compatible: Must be "mediatek,mt8173-scpsys"
++- #power-domain-cells: Must be 1
++- reg: Address range of the SCPSYS unit
++
++Example:
++
++	scpsys: scpsys at 10006000 {
++		#power-domain-cells = <1>;
++		compatible = "mediatek,mt8173-scpsys";
++		reg = <0 0x10006000 0 0x1000>;
++	};
++
++Example consumer:
++
++	afe: mt8173-afe-pcm at 11220000 {
++		compatible = "mediatek,mt8173-afe-pcm";
++		power-domains = <&scpsys MT8173_POWER_DOMAIN_AUDIO>;
++	};
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.1.4
