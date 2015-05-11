@@ -1,126 +1,227 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 11 May 2015 10:19:30 -0500
-Subject: [PATCH 1/2] arm: boot: dts: am4372: add operating points
-In-Reply-To: <554FF686.5050704@ti.com>
-References: <1431115050-23693-1-git-send-email-balbi@ti.com>
- <554D17F3.7090008@ti.com> <554D18AB.6060901@ti.com>
- <20150508202439.GA25459@saruman.tx.rr.com>
- <554FF686.5050704@ti.com>
-Message-ID: <20150511151930.GA19183@saruman.tx.rr.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 11 May 2015 16:32:33 +0100
+Subject: [PATCH 07/12] arm64: psci: kill psci_power_state
+In-Reply-To: <1431085004-32743-8-git-send-email-mark.rutland@arm.com>
+References: <1431085004-32743-1-git-send-email-mark.rutland@arm.com>
+ <1431085004-32743-8-git-send-email-mark.rutland@arm.com>
+Message-ID: <20150511153223.GA2942@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sun, May 10, 2015 at 07:23:34PM -0500, Nishanth Menon wrote:
-> On 05/08/2015 03:24 PM, Felipe Balbi wrote:
-> > On Fri, May 08, 2015 at 03:12:27PM -0500, Nishanth Menon wrote:
-> >> On 05/08/2015 03:09 PM, Nishanth Menon wrote:
-> >>> On 05/08/2015 02:57 PM, Felipe Balbi wrote:
-> >>>> By adding operating points, cpufreq-dt has a
-> >>>> chance of running and doing something useful.
-> >>>>
-> >>>> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> >>>> ---
-> >>>>  arch/arm/boot/dts/am4372.dtsi | 9 +++++++++
-> >>>>  1 file changed, 9 insertions(+)
-> >>>>
-> >>>> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-> >>>> index c80a3e233792..ea1db20f64fc 100644
-> >>>> --- a/arch/arm/boot/dts/am4372.dtsi
-> >>>> +++ b/arch/arm/boot/dts/am4372.dtsi
-> >>>> @@ -38,6 +38,15 @@
-> >>>>  			clocks = <&dpll_mpu_ck>;
-> >>>>  			clock-names = "cpu";
-> >>>>  
-> >>>> +			operating-points = <
-> >>>> +				/* kHz		uV */
-> >>>> +				1000000		1325000 /* OPP_NITRO */
-> >>>> +				 800000		1260000 /* OPP_TURBO */
-> >>>> +				 720000		1200000 /* OPP_120 */
-> >>>> +				 600000		1100000 /* OPP_100 */
-> >>>> +				 300000		 950000 /* OPP_50 */
-> >>>> +			>;
-> >>>> +
-> >>>>  			clock-latency = <300000>; /* From omap-cpufreq driver */
-> >>>>  		};
-> >>>>  	};
-> >>>>
-> >>> which of these OPPs need AVS? which of these are dependent on Efuse bit
-> >>> dependent?
-> >>>
-> >>
-> >>
-> >> You can use
-> >> http://git.ti.com/ti-linux-kernel/ti-linux-kernel/blobs/ti-linux-3.14.y/arch/arm/mach-omap2/opp43xx_data.c
-> >> for reference.
-> > 
-> > heh, why isn't that upstream yet ? Seems to be ready already. The point
+On Fri, May 08, 2015 at 12:36:39PM +0100, Mark Rutland wrote:
+> A PSCI 1.0 implementation may choose to use the new extended StateID
+> format, the presence of which may be queried via the PSCI_FEATURES call.
+> The layout of this new StateID format is incompatible with the existing
+> format, and so to handle both we must abstract attempts to parse the
+> fields.
 > 
-> we have tried in the past[1] - unfortunately that was just bandaid since
-> the existing OPP device tree bindings have very limiting behavior across
-> multiple SoCs.This was one of the reasons why we stopped adding more
-> OPPs, since we are hoping to see the new bindings[2] which is under
-> discussion settle down and help enable support for cases like that we
-> have on TI SoCs, iMX SoCs etc.
-
-fair enough.
-
-> > is that as of now, u-boot will set maximum OPP it can find and, for
-> > AM437x, that will be 800MHz or 1GHz depending on your board. 1GHz might
-> > not be supported in all SoCs and letting that be used all the time is
-> > likely going to reduce silicon lifetime.
+> In preparation for PSCI 1.0 support, this patch introduces
+> psci_power_state_loses_context and psci_power_state_is_valid functions
+> to query information from a PSCI power state, which is no longer
+> decomposed (and hence the pack/unpack functions are removed). As it is
+> no longer decomposed, it is now passed round as an opaque u32 token.
 > 
-> > At least allowing ondemand governor run, we will be mostly running at
-> > 300MHz and only jump to "invalid" OPPs under load which, granted, is
-> > still not perfect, but better than running at 1GHz all the time, don't
-> > you agree ?
-> The fix for this should ideally be in u-boot - we are trying not to
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/kernel/psci.c | 89 ++++++++++++++++++++----------------------------
+>  1 file changed, 37 insertions(+), 52 deletions(-)
 
-right, ideally, yeah; but then we go back to the discussion regarding
-kernel vs bootloader dependencies :-)
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-> introduce dts changes in the hopes that the new proposed bindings that
-> Viresh has on discussion comes to conclusion and help introduce new dtb
-> support with proper SoC description. allowing an SoC to enter an invalid
-> OPP is broken by design. we must attempt to curb it. unfortunately, we
-> already do have a broken implementation for AM335x, DRA7 in place which
-> went with the assumption that we will be able to do modifiers on top of
-> existing dt description and the hopes that [1] will eventually get
-> upstream. But, as is clear now, [1] has no future path in upstream
-> kernel. following the same broken path for newer SoC definitions will
-> probably very short sighted by us.
+> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+> index 25e2610..185174e 100644
+> --- a/arch/arm64/kernel/psci.c
+> +++ b/arch/arm64/kernel/psci.c
+> @@ -37,11 +37,19 @@
+>  #define PSCI_POWER_STATE_TYPE_STANDBY		0
+>  #define PSCI_POWER_STATE_TYPE_POWER_DOWN	1
+>  
+> -struct psci_power_state {
+> -	u16	id;
+> -	u8	type;
+> -	u8	affinity_level;
+> -};
+> +static bool psci_power_state_loses_context(u32 state)
+> +{
+> +	return !!(state & PSCI_0_2_POWER_STATE_TYPE_MASK);
+> +}
+> +
+> +static bool psci_power_state_is_valid(u32 state)
+> +{
+> +	const u32 valid_mask = PSCI_0_2_POWER_STATE_ID_MASK |
+> +			       PSCI_0_2_POWER_STATE_TYPE_MASK |
+> +			       PSCI_0_2_POWER_STATE_AFFL_MASK;
+> +
+> +	return !(state & ~valid_mask);
+> +}
+>  
+>  /*
+>   * The CPU any Trusted OS is resident on. The trusted OS may reject CPU_OFF
+> @@ -57,9 +65,8 @@ static bool psci_tos_resident_on(int cpu)
+>  }
+>  
+>  struct psci_operations {
+> -	int (*cpu_suspend)(struct psci_power_state state,
+> -			   unsigned long entry_point);
+> -	int (*cpu_off)(struct psci_power_state state);
+> +	int (*cpu_suspend)(u32 state, unsigned long entry_point);
+> +	int (*cpu_off)(u32 state);
+>  	int (*cpu_on)(unsigned long cpuid, unsigned long entry_point);
+>  	int (*migrate)(unsigned long cpuid);
+>  	int (*affinity_info)(unsigned long target_affinity,
+> @@ -84,7 +91,7 @@ enum psci_function {
+>  	PSCI_FN_MAX,
+>  };
+>  
+> -static DEFINE_PER_CPU_READ_MOSTLY(struct psci_power_state *, psci_power_state);
+> +static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
+>  
+>  static u32 psci_function_id[PSCI_FN_MAX];
+>  
+> @@ -104,53 +111,28 @@ static int psci_to_linux_errno(int errno)
+>  	return -EINVAL;
+>  }
+>  
+> -static u32 psci_power_state_pack(struct psci_power_state state)
+> -{
+> -	return ((state.id << PSCI_0_2_POWER_STATE_ID_SHIFT)
+> -			& PSCI_0_2_POWER_STATE_ID_MASK) |
+> -		((state.type << PSCI_0_2_POWER_STATE_TYPE_SHIFT)
+> -		 & PSCI_0_2_POWER_STATE_TYPE_MASK) |
+> -		((state.affinity_level << PSCI_0_2_POWER_STATE_AFFL_SHIFT)
+> -		 & PSCI_0_2_POWER_STATE_AFFL_MASK);
+> -}
+> -
+> -static void psci_power_state_unpack(u32 power_state,
+> -				    struct psci_power_state *state)
+> -{
+> -	state->id = (power_state & PSCI_0_2_POWER_STATE_ID_MASK) >>
+> -			PSCI_0_2_POWER_STATE_ID_SHIFT;
+> -	state->type = (power_state & PSCI_0_2_POWER_STATE_TYPE_MASK) >>
+> -			PSCI_0_2_POWER_STATE_TYPE_SHIFT;
+> -	state->affinity_level =
+> -			(power_state & PSCI_0_2_POWER_STATE_AFFL_MASK) >>
+> -			PSCI_0_2_POWER_STATE_AFFL_SHIFT;
+> -}
+> -
+>  static u32 psci_get_version(void)
+>  {
+>  	return invoke_psci_fn(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
+>  }
+>  
+> -static int psci_cpu_suspend(struct psci_power_state state,
+> -			    unsigned long entry_point)
+> +static int psci_cpu_suspend(u32 state, unsigned long entry_point)
+>  {
+>  	int err;
+> -	u32 fn, power_state;
+> +	u32 fn;
+>  
+>  	fn = psci_function_id[PSCI_FN_CPU_SUSPEND];
+> -	power_state = psci_power_state_pack(state);
+> -	err = invoke_psci_fn(fn, power_state, entry_point, 0);
+> +	err = invoke_psci_fn(fn, state, entry_point, 0);
+>  	return psci_to_linux_errno(err);
+>  }
+>  
+> -static int psci_cpu_off(struct psci_power_state state)
+> +static int psci_cpu_off(u32 state)
+>  {
+>  	int err;
+> -	u32 fn, power_state;
+> +	u32 fn;
+>  
+>  	fn = psci_function_id[PSCI_FN_CPU_OFF];
+> -	power_state = psci_power_state_pack(state);
+> -	err = invoke_psci_fn(fn, power_state, 0, 0);
+> +	err = invoke_psci_fn(fn, state, 0, 0);
+>  	return psci_to_linux_errno(err);
+>  }
+>  
+> @@ -195,7 +177,7 @@ static int __maybe_unused cpu_psci_cpu_init_idle(struct device_node *cpu_node,
+>  						 unsigned int cpu)
+>  {
+>  	int i, ret, count = 0;
+> -	struct psci_power_state *psci_states;
+> +	u32 *psci_states;
+>  	struct device_node *state_node;
+>  
+>  	/*
+> @@ -220,13 +202,13 @@ static int __maybe_unused cpu_psci_cpu_init_idle(struct device_node *cpu_node,
+>  		return -ENOMEM;
+>  
+>  	for (i = 0; i < count; i++) {
+> -		u32 psci_power_state;
+> +		u32 state;
+>  
+>  		state_node = of_parse_phandle(cpu_node, "cpu-idle-states", i);
+>  
+>  		ret = of_property_read_u32(state_node,
+>  					   "arm,psci-suspend-param",
+> -					   &psci_power_state);
+> +					   &state);
+>  		if (ret) {
+>  			pr_warn(" * %s missing arm,psci-suspend-param property\n",
+>  				state_node->full_name);
+> @@ -235,9 +217,13 @@ static int __maybe_unused cpu_psci_cpu_init_idle(struct device_node *cpu_node,
+>  		}
+>  
+>  		of_node_put(state_node);
+> -		pr_debug("psci-power-state %#x index %d\n", psci_power_state,
+> -							    i);
+> -		psci_power_state_unpack(psci_power_state, &psci_states[i]);
+> +		pr_debug("psci-power-state %#x index %d\n", state, i);
+> +		if (!psci_power_state_is_valid(state)) {
+> +			pr_warn("Invalid PSCI power state %#x\n", state);
+> +			ret = -EINVAL;
+> +			goto free_mem;
+> +		}
+> +		psci_states[i] = state;
+>  	}
+>  	/* Idle states parsed correctly, initialize per-cpu pointer */
+>  	per_cpu(psci_power_state, cpu) = psci_states;
+> @@ -520,9 +506,8 @@ static void cpu_psci_cpu_die(unsigned int cpu)
+>  	 * There are no known implementations of PSCI actually using the
+>  	 * power state field, pass a sensible default for now.
+>  	 */
+> -	struct psci_power_state state = {
+> -		.type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
+> -	};
+> +	u32 state = PSCI_POWER_STATE_TYPE_POWER_DOWN <<
+> +		    PSCI_0_2_POWER_STATE_TYPE_SHIFT;
+>  
+>  	ret = psci_ops.cpu_off(state);
+>  
+> @@ -561,7 +546,7 @@ static int cpu_psci_cpu_kill(unsigned int cpu)
+>  
+>  static int psci_suspend_finisher(unsigned long index)
+>  {
+> -	struct psci_power_state *state = __this_cpu_read(psci_power_state);
+> +	u32 *state = __this_cpu_read(psci_power_state);
+>  
+>  	return psci_ops.cpu_suspend(state[index - 1],
+>  				    virt_to_phys(cpu_resume));
+> @@ -570,7 +555,7 @@ static int psci_suspend_finisher(unsigned long index)
+>  static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
+>  {
+>  	int ret;
+> -	struct psci_power_state *state = __this_cpu_read(psci_power_state);
+> +	u32 *state = __this_cpu_read(psci_power_state);
+>  	/*
+>  	 * idle state index 0 corresponds to wfi, should never be called
+>  	 * from the cpu_suspend operations
+> @@ -578,7 +563,7 @@ static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
+>  	if (WARN_ON_ONCE(!index))
+>  		return -EINVAL;
+>  
+> -	if (state[index - 1].type == PSCI_POWER_STATE_TYPE_STANDBY)
+> +	if (!psci_power_state_loses_context(state[index - 1]))
+>  		ret = psci_ops.cpu_suspend(state[index - 1], 0);
+>  	else
+>  		ret = __cpu_suspend(index, psci_suspend_finisher);
+> -- 
+> 1.9.1
 > 
-> in my opinion, doing a temporary hack in upstream kernel is not an
-> elegant approach. I suggest helping review and approving Viresh's new
-
-however this is not a hack, right ? If we get rid of OPP_NITRO and
-OPP_TURBO, then we will more than likely always be dealing with safe
-OPPs (yeah, I need to confirm this since it's not on public TRM, so as
-of now, take this statement with a grain of salt :-), moreover, even
-though we're trying to change opp bindings, the current situation is
-still very much accepted and will remain valid even after changing
-binding :-)
-
-Not to mention that people using AM43xx today might be using it under
-invalid OPPs and decreasing silicon life; I'd assume that's a very
-urgent detail to sort out.
-
-> bindings so that we have a longer term solution is more the way to do this.
-> 
-> Just my 2 cents. Thanks once again for identifying the urgent need for
-> helping Viresh's series along - will be great if folks could help review
-> and approve his series to get them upstream and help all of us ARM SoC
-> variations along.
-
-np.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150511/c2b9f3dd/attachment.sig>
