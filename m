@@ -1,80 +1,18 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon, 11 May 2015 21:01:34 +0800
-Subject: [RFC v2 1/7] ACPI/PCI: Enhance ACPI core to support sparse IO
- space
-In-Reply-To: <1430793970-11159-2-git-send-email-jiang.liu@linux.intel.com>
-References: <1430793970-11159-1-git-send-email-jiang.liu@linux.intel.com>
- <1430793970-11159-2-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <5550A82E.7040809@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 11 May 2015 21:01:37 +0800
+Subject: [PATCH] ARM: dts: imx6qdl: Add power-domain phandle to CODA
+ device node
+In-Reply-To: <1431005056-10575-1-git-send-email-p.zabel@pengutronix.de>
+References: <1431005056-10575-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20150511130137.GF9347@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?05?05? 10:46, Jiang Liu wrote:
-> Enhance ACPI resource parsing interfaces to support sparse IO space,
-> which will be used to share common code between x86 and IA64 later.
->
-> Tested-by: Tony Luck <tony.luck@intel.com>
-> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
-> ---
->   drivers/acpi/resource.c |    9 ++++++---
->   include/linux/ioport.h  |    1 +
->   2 files changed, 7 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/acpi/resource.c b/drivers/acpi/resource.c
-> index 8244f013f210..fdcc73dad2c1 100644
-> --- a/drivers/acpi/resource.c
-> +++ b/drivers/acpi/resource.c
-> @@ -123,7 +123,7 @@ bool acpi_dev_resource_memory(struct acpi_resource *ares, struct resource *res)
->   EXPORT_SYMBOL_GPL(acpi_dev_resource_memory);
->
->   static void acpi_dev_ioresource_flags(struct resource *res, u64 len,
-> -				      u8 io_decode)
-> +				      u8 io_decode, u8 translation_type)
->   {
->   	res->flags = IORESOURCE_IO;
->
-> @@ -135,6 +135,8 @@ static void acpi_dev_ioresource_flags(struct resource *res, u64 len,
->
->   	if (io_decode == ACPI_DECODE_16)
->   		res->flags |= IORESOURCE_IO_16BIT_ADDR;
-> +	if (translation_type == ACPI_SPARSE_TRANSLATION)
-> +		res->flags |= IORESOURCE_IO_SPARSE;
->   }
->
->   static void acpi_dev_get_ioresource(struct resource *res, u64 start, u64 len,
-> @@ -142,7 +144,7 @@ static void acpi_dev_get_ioresource(struct resource *res, u64 start, u64 len,
->   {
->   	res->start = start;
->   	res->end = start + len - 1;
-> -	acpi_dev_ioresource_flags(res, len, io_decode);
-> +	acpi_dev_ioresource_flags(res, len, io_decode, 0);
->   }
->
->   /**
-> @@ -227,7 +229,8 @@ static bool acpi_decode_space(struct resource_win *win,
->   		acpi_dev_memresource_flags(res, len, wp);
->   		break;
->   	case ACPI_IO_RANGE:
-> -		acpi_dev_ioresource_flags(res, len, iodec);
-> +		acpi_dev_ioresource_flags(res, len, iodec,
-> +					  addr->info.io.translation_type);
->   		break;
->   	case ACPI_BUS_NUMBER_RANGE:
->   		res->flags = IORESOURCE_BUS;
-> diff --git a/include/linux/ioport.h b/include/linux/ioport.h
-> index 388e3ae94f7a..24bea087e7af 100644
-> --- a/include/linux/ioport.h
-> +++ b/include/linux/ioport.h
-> @@ -94,6 +94,7 @@ struct resource {
->   /* PnP I/O specific bits (IORESOURCE_BITS) */
->   #define IORESOURCE_IO_16BIT_ADDR	(1<<0)
->   #define IORESOURCE_IO_FIXED		(1<<1)
-> +#define IORESOURCE_IO_SPARSE		(1<<2)
->
->   /* PCI ROM control bits (IORESOURCE_BITS) */
->   #define IORESOURCE_ROM_ENABLE		(1<<0)	/* ROM is enabled, same as PCI_ROM_ADDRESS_ENABLE */
+On Thu, May 07, 2015 at 03:24:16PM +0200, Philipp Zabel wrote:
+> The CODA960 VPU is part of the PU power domain. Add power-domains
+> phandle so it can be associated with the PU generic pm domain for
+> power gating.
+> 
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
-
-Thanks
-hanjun
+Applied, thanks.
