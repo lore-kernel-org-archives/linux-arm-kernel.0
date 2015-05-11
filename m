@@ -1,122 +1,67 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 11 May 2015 11:54:37 +0300
-Subject: [PATCHv2 11/27] ARM: OMAP2+: clock: remove support for legacy mpurate
- command line param
+Date: Mon, 11 May 2015 11:54:41 +0300
+Subject: =?UTF-8?q?=5BPATCHv2=2015/27=5D=20ARM=3A=20OMAP3=3A=20clock=3A=20remove=20clock3xxx=2Ec=20file?=
 In-Reply-To: <1431334493-24455-1-git-send-email-t-kristo@ti.com>
 References: <1431334493-24455-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1431334493-24455-12-git-send-email-t-kristo@ti.com>
+Message-ID: <1431334493-24455-16-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The legacy support is wrong and dangerous, as it doesn't take any
-OPPs into account and does not scale voltages. Switching mpurate should
-be handled through cpufreq.
+This now only has a couple of variables within it, which are used outside
+the file itself. Move these variables to where they are actually used,
+and remove the file completely as it is now empty.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/Makefile    |    2 +-
- arch/arm/mach-omap2/clock.c     |   41 ----------------------------
- arch/arm/mach-omap2/clock.h     |    1 -
- arch/arm/mach-omap2/clock2xxx.c |   57 ---------------------------------------
- arch/arm/mach-omap2/clock3xxx.c |   25 -----------------
- 5 files changed, 1 insertion(+), 125 deletions(-)
- delete mode 100644 arch/arm/mach-omap2/clock2xxx.c
+ arch/arm/mach-omap2/Makefile           |    2 +-
+ arch/arm/mach-omap2/clkt34xx_dpll3m2.c |    2 ++
+ arch/arm/mach-omap2/clock3xxx.c        |   33 --------------------------------
+ 3 files changed, 3 insertions(+), 34 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/clock3xxx.c
 
 diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index f33d011..bf5d71d 100644
+index f9d4ccf..07052656 100644
 --- a/arch/arm/mach-omap2/Makefile
 +++ b/arch/arm/mach-omap2/Makefile
-@@ -181,7 +181,7 @@ obj-$(CONFIG_SOC_DRA7XX)		+= $(clockdomain-common)
- obj-$(CONFIG_SOC_DRA7XX)		+= clockdomains7xx_data.o
- 
- # Clock framework
--obj-$(CONFIG_ARCH_OMAP2)		+= $(clock-common) clock2xxx.o
-+obj-$(CONFIG_ARCH_OMAP2)		+= $(clock-common)
- obj-$(CONFIG_ARCH_OMAP2)		+= clkt2xxx_dpllcore.o
+@@ -186,7 +186,7 @@ obj-$(CONFIG_ARCH_OMAP2)		+= clkt2xxx_dpllcore.o
  obj-$(CONFIG_ARCH_OMAP2)		+= clkt2xxx_virt_prcm_set.o
  obj-$(CONFIG_ARCH_OMAP2)		+= clkt2xxx_dpll.o
-diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-index 234cedf..94a4949 100644
---- a/arch/arm/mach-omap2/clock.c
-+++ b/arch/arm/mach-omap2/clock.c
-@@ -582,47 +582,6 @@ const struct clk_hw_omap_ops clkhwops_wait = {
- };
+ obj-$(CONFIG_SOC_OMAP2430)		+= clock2430.o
+-obj-$(CONFIG_ARCH_OMAP3)		+= $(clock-common) clock3xxx.o
++obj-$(CONFIG_ARCH_OMAP3)		+= $(clock-common)
+ obj-$(CONFIG_ARCH_OMAP3)		+= clock34xx.o clkt34xx_dpll3m2.o
+ obj-$(CONFIG_ARCH_OMAP3)		+= clock3517.o
+ obj-$(CONFIG_ARCH_OMAP4)		+= $(clock-common)
+diff --git a/arch/arm/mach-omap2/clkt34xx_dpll3m2.c b/arch/arm/mach-omap2/clkt34xx_dpll3m2.c
+index 825e3da..6cd2961 100644
+--- a/arch/arm/mach-omap2/clkt34xx_dpll3m2.c
++++ b/arch/arm/mach-omap2/clkt34xx_dpll3m2.c
+@@ -29,6 +29,8 @@
  
- /**
-- * omap2_clk_switch_mpurate_at_boot - switch ARM MPU rate by boot-time argument
-- * @mpurate_ck_name: clk name of the clock to change rate
-- *
-- * Change the ARM MPU clock rate to the rate specified on the command
-- * line, if one was specified.  @mpurate_ck_name should be
-- * "virt_prcm_set" on OMAP2xxx and "dpll1_ck" on OMAP34xx/OMAP36xx.
-- * XXX Does not handle voltage scaling - on OMAP2xxx this is currently
-- * handled by the virt_prcm_set clock, but this should be handled by
-- * the OPP layer.  XXX This is intended to be handled by the OPP layer
-- * code in the near future and should be removed from the clock code.
-- * Returns -EINVAL if 'mpurate' is zero or if clk_set_rate() rejects
-- * the rate, -ENOENT if the struct clk referred to by @mpurate_ck_name
-- * cannot be found, or 0 upon success.
-- */
--int __init omap2_clk_switch_mpurate_at_boot(const char *mpurate_ck_name)
--{
--	struct clk *mpurate_ck;
--	int r;
--
--	if (!mpurate)
--		return -EINVAL;
--
--	mpurate_ck = clk_get(NULL, mpurate_ck_name);
--	if (WARN(IS_ERR(mpurate_ck), "Failed to get %s.\n", mpurate_ck_name))
--		return -ENOENT;
--
--	r = clk_set_rate(mpurate_ck, mpurate);
--	if (r < 0) {
--		WARN(1, "clock: %s: unable to set MPU rate to %d: %d\n",
--		     mpurate_ck_name, mpurate, r);
--		clk_put(mpurate_ck);
--		return -EINVAL;
--	}
--
--	calibrate_delay();
--	clk_put(mpurate_ck);
--
--	return 0;
--}
--
--/**
-  * omap2_clk_print_new_rates - print summary of current clock tree rates
-  * @hfclkin_ck_name: clk name for the off-chip HF oscillator
-  * @core_ck_name: clk name for the on-chip CORE_CLK
-diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
-index 950a17a..e2781b4 100644
---- a/arch/arm/mach-omap2/clock.h
-+++ b/arch/arm/mach-omap2/clock.h
-@@ -186,7 +186,6 @@ void omap3_dpll_deny_idle(struct clk_hw_omap *clk);
+ #define CYCLES_PER_MHZ			1000000
  
- void __init omap2_clk_disable_clkdm_control(void);
- 
--int omap2_clk_switch_mpurate_at_boot(const char *mpurate_ck_name);
- void omap2_clk_print_new_rates(const char *hfclkin_ck_name,
- 			       const char *core_ck_name,
- 			       const char *mpu_ck_name);
-diff --git a/arch/arm/mach-omap2/clock2xxx.c b/arch/arm/mach-omap2/clock2xxx.c
++struct clk *sdrc_ick_p, *arm_fck_p;
++
+ /*
+  * CORE DPLL (DPLL3) M2 divider rate programming functions
+  *
+diff --git a/arch/arm/mach-omap2/clock3xxx.c b/arch/arm/mach-omap2/clock3xxx.c
 deleted file mode 100644
-index b870f6a..0000000
---- a/arch/arm/mach-omap2/clock2xxx.c
+index 0b0e3a87..0000000
+--- a/arch/arm/mach-omap2/clock3xxx.c
 +++ /dev/null
-@@ -1,57 +0,0 @@
+@@ -1,33 +0,0 @@
 -/*
-- * clock2xxx.c - OMAP2xxx-specific clock integration code
+- * OMAP3-specific clock framework functions
 - *
-- * Copyright (C) 2005-2008 Texas Instruments, Inc.
-- * Copyright (C) 2004-2010 Nokia Corporation
+- * Copyright (C) 2007-2008 Texas Instruments, Inc.
+- * Copyright (C) 2007-2010 Nokia Corporation
 - *
-- * Contacts:
-- * Richard Woodruff <r-woodruff2@ti.com>
 - * Paul Walmsley
+- * Jouni H?gander
 - *
-- * Based on earlier work by Tuukka Tikkanen, Tony Lindgren,
-- * Gordon McNutt and RidgeRun, Inc.
+- * Parts of this code are based on code written by
+- * Richard Woodruff, Tony Lindgren, Tuukka Tikkanen, Karthik Dasu
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License version 2 as
@@ -131,69 +76,13 @@ index b870f6a..0000000
 -
 -#include "soc.h"
 -#include "clock.h"
--#include "clock2xxx.h"
--#include "cm.h"
--#include "cm-regbits-24xx.h"
+-#include "clock3xxx.h"
+-#include "prm2xxx_3xxx.h"
+-#include "prm-regbits-34xx.h"
+-#include "cm2xxx_3xxx.h"
+-#include "cm-regbits-34xx.h"
 -
--struct clk_hw *dclk_hw;
--/*
-- * Omap24xx specific clock functions
-- */
--
--/*
-- * Switch the MPU rate if specified on cmdline.  We cannot do this
-- * early until cmdline is parsed.  XXX This should be removed from the
-- * clock code and handled by the OPP layer code in the near future.
-- */
--static int __init omap2xxx_clk_arch_init(void)
--{
--	int ret;
--
--	if (!cpu_is_omap24xx())
--		return 0;
--
--	ret = omap2_clk_switch_mpurate_at_boot("virt_prcm_set");
--	if (!ret)
--		omap2_clk_print_new_rates("sys_ck", "dpll_ck", "mpu_ck");
--
--	return ret;
--}
--
--omap_arch_initcall(omap2xxx_clk_arch_init);
--
--
-diff --git a/arch/arm/mach-omap2/clock3xxx.c b/arch/arm/mach-omap2/clock3xxx.c
-index 8bede6a..4bd6122 100644
---- a/arch/arm/mach-omap2/clock3xxx.c
-+++ b/arch/arm/mach-omap2/clock3xxx.c
-@@ -108,28 +108,3 @@ void __init omap3_clk_lock_dpll5(void)
- 	clk_disable_unprepare(dpll5_clk);
- 	return;
- }
--
--/* Common clock code */
--
--/*
-- * Switch the MPU rate if specified on cmdline.  We cannot do this
-- * early until cmdline is parsed.  XXX This should be removed from the
-- * clock code and handled by the OPP layer code in the near future.
-- */
--static int __init omap3xxx_clk_arch_init(void)
--{
--	int ret;
--
--	if (!cpu_is_omap34xx())
--		return 0;
--
--	ret = omap2_clk_switch_mpurate_at_boot("dpll1_ck");
--	if (!ret)
--		omap2_clk_print_new_rates("osc_sys_ck", "core_ck", "arm_fck");
--
--	return ret;
--}
--
--omap_arch_initcall(omap3xxx_clk_arch_init);
--
--
+-/* needed by omap3_core_dpll_m2_set_rate() */
+-struct clk *sdrc_ick_p, *arm_fck_p;
 -- 
 1.7.9.5
