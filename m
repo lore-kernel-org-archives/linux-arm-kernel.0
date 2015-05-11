@@ -1,19 +1,58 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Mon, 11 May 2015 12:20:28 -0700
-Subject: [v4.0: PATCH 0/3] ARM: dts: keystone: dt fixes for netcp driver
-In-Reply-To: <1431367530-4924-1-git-send-email-m-karicheri2@ti.com>
-References: <1431367530-4924-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <555100FC.5070901@oracle.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 11 May 2015 21:23:23 +0200
+Subject: [PATCH 2/5] dt-bindings: soc: Add documentation for the MediaTek
+ SCPSYS unit
+In-Reply-To: <1431372206-1237-1-git-send-email-s.hauer@pengutronix.de>
+References: <1431372206-1237-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1431372206-1237-3-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/11/2015 11:05 AM, Murali Karicheri wrote:
-> There are few fixes required in the dt bindings for netcp driver to
-> make the reg and range sizes to match with data sheet. Also fix the
-> typical size error (last bit 1 instead of 0). Please apply this for
-> to next branch for v4.2.
->
-Applied... It should show up in linux-next soon.
+This adds documentation for the MediaTek SCPSYS unit found in MT8173 SoCs.
 
-Regards,
-Santosh
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ .../devicetree/bindings/soc/mediatek/scpsys.txt    | 32 ++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+
+diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+new file mode 100644
+index 0000000..4764a03
+--- /dev/null
++++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+@@ -0,0 +1,32 @@
++MediaTek SCPSYS
++===============
++
++The System Control Processor System (SCPSYS) has several power management
++related tasks in the system. The tasks include thermal measurement, dynamic
++voltage frequency scaling (DVFS), interrupt filter and lowlevel sleep control.
++The System Power Manager (SPM) inside the SCPSYS is for the MTCMOS power
++domain control.
++
++The driver implements the Generic PM domain bindings described in
++power/power_domain.txt. It provides the power domains defined in
++include/dt-bindings/power/mt8173-power.h.
++
++Required properties:
++- compatible: Must be "mediatek,mt8173-scpsys"
++- #power-domain-cells: Must be 1
++- reg: Address range of the SCPSYS unit
++
++Example:
++
++	scpsys: scpsys at 10006000 {
++		#power-domain-cells = <1>;
++		compatible = "mediatek,mt8173-scpsys";
++		reg = <0 0x10006000 0 0x1000>;
++	};
++
++Example consumer:
++
++	afe: mt8173-afe-pcm at 11220000 {
++		compatible = "mediatek,mt8173-afe-pcm";
++		power-domains = <&scpsys MT8173_POWER_DOMAIN_AUDIO>;
++	};
+-- 
+2.1.4
