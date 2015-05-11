@@ -1,57 +1,63 @@
-From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
-Date: Mon, 11 May 2015 18:13:11 +0200
-Subject: [PATCH 1/1] ARM:Gemini:Fix compiler warning due wrong data type.
-Message-ID: <1431360791-11681-1-git-send-email-ulli.kroll@googlemail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 11 May 2015 17:16:27 +0100
+Subject: [V3 PATCH 1/5] ACPI / scan: Parse _CCA and setup device coherency
+In-Reply-To: <3684853.vaQGhc4jR5@vostro.rjw.lan>
+References: <1431045436-8690-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1431045436-8690-2-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <3684853.vaQGhc4jR5@vostro.rjw.lan>
+Message-ID: <20150511161626.GI18655@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes a compiler warning in gemini_restart()
-issued by commit
+On Fri, May 08, 2015 at 10:53:59PM +0200, Rafael J. Wysocki wrote:
+> On Thursday, May 07, 2015 07:37:12 PM Suravee Suthikulpanit wrote:
+> > diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> > index ab2cbb5..7822149 100644
+> > --- a/drivers/acpi/Kconfig
+> > +++ b/drivers/acpi/Kconfig
+> > @@ -54,6 +54,12 @@ config ACPI_GENERIC_GSI
+> >  config ACPI_SYSTEM_POWER_STATES_SUPPORT
+> >  	bool
+> >  
+> > +config ACPI_CCA_REQUIRED
+> > +	bool
+> > +
+> > +config ARM64_SUPPORT_ACPI_CCA_ZERO
+> 
+> Hmm.  I guess the Arnd's idea what to simply use CONFIG_ARM64 directly instead
+> of adding this new option.
 
-7b6d864b48d95e6ea1df7df64475b9cb9616dcf9
-reboot:arm: reboot_mode changes from char to enum reboot_mode.
+I agree.
 
-Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
----
- arch/arm/mach-gemini/common.h | 4 +++-
- arch/arm/mach-gemini/reset.c  | 4 +++-
- 2 files changed, 6 insertions(+), 2 deletions(-)
+> > +static inline bool acpi_dma_is_supported(struct acpi_device *adev)
+> > +{
+> > +	/**
+> > +	 * Currently, we mainly support _CCA=1 (i.e. is_coherent=1)
+> > +	 * This should be equivalent to specifyig dma-coherent for
+> > +	 * a device in OF.
+> > +	 *
+> > +	 * For the case when _CCA=0 (i.e. is_coherent=0 && cca_seen=1),
+> > +	 * we would rely on arch-specific cache maintenance for
+> > +	 * non-coherence DMA operations if architecture specifies
+> > +	 * _XXX_SUPPORT_CCA_ZERO. Otherwise, we do not support
+> > +	 * DMA on this device and fallback to arch-specific default
+> > +	 * handling.
+> > +	 *
+> > +	 * For the case when _CCA is missing (i.e. cca_seen=0) but
+> > +	 * platform specifies ACPI_CCA_REQUIRED, we do not support DMA,
+> > +	 * and fallback to arch-specific default handling.
+> > +	 */
+> > +	return adev && (adev->flags.is_coherent ||
+> > +			(adev->flags.cca_seen &&
+> > +			 IS_ENABLED(CONFIG_ARM64_SUPPORT_ACPI_CCA_ZERO)));
+> 
+> So what exactly would be wrong with using IS_ENABLED(CONFIG_ARM64) here?
 
-diff --git a/arch/arm/mach-gemini/common.h b/arch/arm/mach-gemini/common.h
-index 38a4526..dd88369 100644
---- a/arch/arm/mach-gemini/common.h
-+++ b/arch/arm/mach-gemini/common.h
-@@ -12,6 +12,8 @@
- #ifndef __GEMINI_COMMON_H__
- #define __GEMINI_COMMON_H__
- 
-+#include <linux/reboot.h>
-+
- struct mtd_partition;
- 
- extern void gemini_map_io(void);
-@@ -26,6 +28,6 @@ extern int platform_register_pflash(unsigned int size,
- 				    struct mtd_partition *parts,
- 				    unsigned int nr_parts);
- 
--extern void gemini_restart(char mode, const char *cmd);
-+extern void gemini_restart(enum reboot_mode mode, const char *cmd);
- 
- #endif /* __GEMINI_COMMON_H__ */
-diff --git a/arch/arm/mach-gemini/reset.c b/arch/arm/mach-gemini/reset.c
-index b266597..21a6d6d 100644
---- a/arch/arm/mach-gemini/reset.c
-+++ b/arch/arm/mach-gemini/reset.c
-@@ -14,7 +14,9 @@
- #include <mach/hardware.h>
- #include <mach/global_reg.h>
- 
--void gemini_restart(char mode, const char *cmd)
-+#include "common.h"
-+
-+void gemini_restart(enum reboot_mode mode, const char *cmd)
- {
- 	__raw_writel(RESET_GLOBAL | RESET_CPU1,
- 		     IO_ADDRESS(GEMINI_GLOBAL_BASE) + GLOBAL_RESET);
+I'm not sure I follow why we need to check for ARM64 here at all. Can we
+not just have something like:
+
+	return adev && (!IS_ENABLED(CONFIG_ACPI_CCA_REQUIRED) ||
+			adev->flags.cca_seen)
+
 -- 
-2.3.5
+Catalin
