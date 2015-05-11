@@ -1,41 +1,62 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 11 May 2015 15:11:22 +0200
-Subject: [PATCH 4/4] ARM64: MediaTek MT8173: Add SCPSYS device node
-In-Reply-To: <1431349882-12260-1-git-send-email-s.hauer@pengutronix.de>
-References: <1431349882-12260-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1431349882-12260-5-git-send-email-s.hauer@pengutronix.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 11 May 2015 15:15:50 +0200
+Subject: [PATCH 1/2] ARM: mvebu: add alias for mdio on Armada 38x
+In-Reply-To: <554A17DE.7090702@free-electrons.com>
+References: <1430918040-17307-1-git-send-email-kaloz@openwrt.org>
+ <1430918040-17307-2-git-send-email-kaloz@openwrt.org>
+ <554A17DE.7090702@free-electrons.com>
+Message-ID: <5550AB86.1010400@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the SCPSYS device node to the MT8173 dtsi file.
+Hi Imre,
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm64/boot/dts/mediatek/mt8173.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+On 06/05/2015 15:32, Gregory CLEMENT wrote:
+> Hi Imre,
+> 
+> On 06/05/2015 15:13, Imre Kaloz wrote:
+>> This allows us to reference it later.
+>>
+>> Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
+> 
+> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 924fdb6..3c569b5 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -125,6 +125,18 @@
- 						<GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
- 		};
- 
-+		scpsys: scpsys at 10006000 {
-+			compatible = "mediatek,mt8173-scpsys";
-+			#power-domain-cells = <1>;
-+			reg = <0 0x10006000 0 0x1000>;
-+			clocks = <&topckgen CLK_TOP_VDEC_SEL>,
-+				<&topckgen CLK_TOP_MFG_SEL>,
-+				<&topckgen CLK_TOP_VENC_SEL>,
-+				<&topckgen CLK_TOP_MM_SEL>,
-+				<&topckgen CLK_TOP_VENC_LT_SEL>;
-+			clock-names = "vdec", "mfg", "venc", "disp", "ven2";
-+		};
-+
- 		sysirq: intpol-controller at 10200620 {
- 			compatible = "mediatek,mt8173-sysirq",
- 					"mediatek,mt6577-sysirq";
+applied on mvebu/dt
+
+Thanks,
+
+Gregory
+
+> 
+> 
+> Thanks,
+> 
+> Gregory
+> 
+>> ---
+>>  arch/arm/boot/dts/armada-38x.dtsi | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+>> index ed2dd8b..839e5bf 100644
+>> --- a/arch/arm/boot/dts/armada-38x.dtsi
+>> +++ b/arch/arm/boot/dts/armada-38x.dtsi
+>> @@ -495,7 +495,7 @@
+>>  				status = "disabled";
+>>  			};
+>>  
+>> -			mdio at 72004 {
+>> +			mdio: mdio at 72004 {
+>>  				#address-cells = <1>;
+>>  				#size-cells = <0>;
+>>  				compatible = "marvell,orion-mdio";
+>>
+> 
+> 
+
+
 -- 
-2.1.4
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
