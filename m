@@ -1,232 +1,185 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 11 May 2015 13:16:50 +0200
-Subject: [PATCH 6/6] ARM: dts: sun8i: Add ET-Q8 A33 support
-In-Reply-To: <CAEzqOZv_DVF5S4Yrgpksz9T1cEFwYsQtsk-CjL_n6+52A47d5A@mail.gmail.com>
-References: <1431240383-12763-1-git-send-email-vishnupatekar0510@gmail.com>
- <1431240383-12763-7-git-send-email-vishnupatekar0510@gmail.com>
- <554F1CC9.7070508@redhat.com>
- <CAEzqOZuS4m8kDhG0RpLRGBXbnFXLPKJB8D78_Dc02vRkfwvTUA@mail.gmail.com>
- <55506743.8080200@redhat.com> <555067F2.4050809@redhat.com>
- <CAEzqOZv_DVF5S4Yrgpksz9T1cEFwYsQtsk-CjL_n6+52A47d5A@mail.gmail.com>
-Message-ID: <55508FA2.5010507@redhat.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 11 May 2015 13:18:43 +0200
+Subject: [PATCH v2] clocksource: exynos_mct: fix for sleeping in atomic
+ ctx handling cpu hotplug notif.
+In-Reply-To: <1426151496-5509-1-git-send-email-d.eppel@samsung.com>
+References: <1426151496-5509-1-git-send-email-d.eppel@samsung.com>
+Message-ID: <55509013.3040901@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 11-05-15 13:15, Vishnu Patekar wrote:
-> Hi,
+On 03/12/2015 10:11 AM, Damian Eppel wrote:
+> This is to fix an issue of sleeping in atomic context when processing
+> hotplug notifications in Exynos MCT(Multi-Core Timer).
+> The issue was reproducible on Exynos 3250 (Rinato board) and Exynos 5420
+> (Arndale Octa board).
 >
-> On Mon, May 11, 2015 at 1:57 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->> Hi,
->>
->> On 11-05-15 10:24, Hans de Goede wrote:
->>>
->>> Hi,
->>>
->>> On 11-05-15 08:23, Vishnu Patekar wrote:
->>>>
->>>> Hi,
->>>>
->>>> On Sun, May 10, 2015 at 2:24 PM, Hans de Goede <hdegoede@redhat.com>
->>>> wrote:
->>>>>
->>>>>
->>>>> Hi,
->>>>>
->>>>> On 10-05-15 08:46, Vishnu Patekar wrote:
->>>>>>
->>>>>>
->>>>>> ET-Q8_A33 is A33 based cheap tablet in common Q8 format.
->>>>>>
->>>>>> It has 512MB RAM, 4GB Nand, 7" Display, RDA5900P wifi, GSL1680 touch,
->>>>>> etc.
->>>>>
->>>>>
->>>>>
->>>>>
->>>>> Where does the ET prefix come from ? The ippo boards have an ippo prefix
->>>>> as
->>>>> that is written on the pcb ...
->>>>
->>>> Yes, on PCB it's writeen ET_Q8_A23_A33_v1.6
->>>
->>>
->>> OK, using the ET prefix is fine then.
->>
->>
->> But can you please rename the dts to include the v1.6 bit ? And can you also
->> send a u-boot patch to rename the defconfig there to
->> et_q8_v1_6_a33_defconfig,
->> and fix the CONFIG_DEFAULT_DEVICE_TREE setting too ?
+> Whilst testing cpu hotplug events on kernel configured with DEBUG_PREEMPT
+> and DEBUG_ATOMIC_SLEEP we get following BUG message, caused by calling
+> request_irq() and free_irq() in the context of hotplug notification
+> (which is in this case atomic context).
 >
-> Yes, I'll rename it to sun8i-a33-et-q8-v1.6.dts and will add
-> compatible as "et,q8-v1.6"
+> root at target:~# echo 0 > /sys/devices/system/cpu/cpu1/online
+>
+> [   25.157867] IRQ18 no longer affine to CPU1
+> ...
+> [   25.158445] CPU1: shutdown
+>
+> root at target:~# echo 1 > /sys/devices/system/cpu/cpu1/online
+>
+> [   40.785859] CPU1: Software reset
+> [   40.786660] BUG: sleeping function called from invalid context at mm/slub.c:1241
+> [   40.786668] in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/1
+> [   40.786678] Preemption disabled at:[<  (null)>]   (null)
+> [   40.786681]
+> [   40.786692] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.19.0-rc4-00024-g7dca860 #36
+> [   40.786698] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+> [   40.786728] [<c0014a00>] (unwind_backtrace) from [<c0011980>] (show_stack+0x10/0x14)
+> [   40.786747] [<c0011980>] (show_stack) from [<c0449ba0>] (dump_stack+0x70/0xbc)
+> [   40.786767] [<c0449ba0>] (dump_stack) from [<c00c6124>] (kmem_cache_alloc+0xd8/0x170)
+> [   40.786785] [<c00c6124>] (kmem_cache_alloc) from [<c005d6f8>] (request_threaded_irq+0x64/0x128)
+> [   40.786804] [<c005d6f8>] (request_threaded_irq) from [<c0350b8c>] (exynos4_local_timer_setup+0xc0/0x13c)
+> [   40.786820] [<c0350b8c>] (exynos4_local_timer_setup) from [<c0350ca8>] (exynos4_mct_cpu_notify+0x30/0xa8)
+> [   40.786838] [<c0350ca8>] (exynos4_mct_cpu_notify) from [<c003b330>] (notifier_call_chain+0x44/0x84)
+> [   40.786857] [<c003b330>] (notifier_call_chain) from [<c0022fd4>] (__cpu_notify+0x28/0x44)
+> [   40.786873] [<c0022fd4>] (__cpu_notify) from [<c0013714>] (secondary_start_kernel+0xec/0x150)
+> [   40.786886] [<c0013714>] (secondary_start_kernel) from [<40008764>] (0x40008764)
+>
+> Solution:
+> Clockevent irqs cannot be requested/freed every time cpu is
+> hot-plugged/unplugged as CPU_STARTING/CPU_DYING notifications
+> that signals hotplug or unplug events are sent with both preemption
+> and local interrupts disabled. Since request_irq() may sleep it is
+> moved to the initialization stage and performed for all possible
+> cpus prior putting them online. Then, in the case of hotplug event
+> the irq asociated with the given cpu will simply be enabled.
+> Similarly on cpu unplug event the interrupt is not freed but just
+> disabled.
+>
+> Note that after successful request_irq() call for a clockevent device
+> associated to given cpu the requested irq is disabled (via disable_irq()).
+> That is to make things symmetric as we expect hotplug event as a next
+> thing (which will enable irq again). This should not pose any problems
+> because at the time of requesting irq the clockevent device is not
+> fully initialized yet, therefore should not produce interrupts at that point.
+>
+> For disabling an irq at cpu unplug notification disable_irq_nosync() is
+> chosen which is a non-blocking function. This again shouldn't be a problem as
+> prior sending CPU_DYING notification interrupts are migrated away
+> from the cpu.
 
-Please include a33 in the compatible since we may see the same board
-being used with an a23.
+The code sounds very complex for what it is supposed to do.
 
-Regards,
+Perhaps I am missing something but you have more or less the same 
+functionality than the smp_twd timers and these ones don't look so complex.
 
-Hans
+Could you please look at the smp_twd.c implementation ?
 
-> I'll send u-boot patch as well.
->>
->> Regards,
->>
->> Hans
->>
->>
->>>
->>> Regards,
->>>
->>> Hans
->>>
->>>>>
->>>>> Regards,
->>>>>
->>>>> Hans
->>>>>
->>>>>
->>>>>>
->>>>>> Signed-off-by: VishnuPatekar <vishnupatekar0510@gmail.com>
->>>>>> ---
->>>>>>     arch/arm/boot/dts/Makefile            |   3 +-
->>>>>>     arch/arm/boot/dts/sun8i-a33-et-q8.dts | 108
->>>>>> ++++++++++++++++++++++++++++++++++
->>>>>>     2 files changed, 110 insertions(+), 1 deletion(-)
->>>>>>     create mode 100644 arch/arm/boot/dts/sun8i-a33-et-q8.dts
->>>>>>
->>>>>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->>>>>> index 82f4b9b..d44b1d6 100644
->>>>>> --- a/arch/arm/boot/dts/Makefile
->>>>>> +++ b/arch/arm/boot/dts/Makefile
->>>>>> @@ -570,7 +570,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
->>>>>>           sun7i-a20-wexler-tab7200.dtb
->>>>>>     dtb-$(CONFIG_MACH_SUN8I) += \
->>>>>>           sun8i-a23-ippo-q8h-v5.dtb \
->>>>>> -       sun8i-a23-ippo-q8h-v1.2.dtb
->>>>>> +       sun8i-a23-ippo-q8h-v1.2.dtb \
->>>>>> +       sun8i-a33-et-q8.dtb
->>>>>>     dtb-$(CONFIG_MACH_SUN9I) += \
->>>>>>           sun9i-a80-optimus.dtb \
->>>>>>           sun9i-a80-cubieboard4.dtb
->>>>>> diff --git a/arch/arm/boot/dts/sun8i-a33-et-q8.dts
->>>>>> b/arch/arm/boot/dts/sun8i-a33-et-q8.dts
->>>>>> new file mode 100644
->>>>>> index 0000000..260d5a3
->>>>>> --- /dev/null
->>>>>> +++ b/arch/arm/boot/dts/sun8i-a33-et-q8.dts
->>>>>> @@ -0,0 +1,108 @@
->>>>>> +/*
->>>>>> + * Copyright 2015 Vishnu Patekar
->>>>>> + * Vishnu Patekar <vishnupatekar0510@gmail.com>
->>>>>> + *
->>>>>> + * This file is dual-licensed: you can use it either under the terms
->>>>>> + * of the GPL or the X11 license, at your option. Note that this dual
->>>>>> + * licensing only applies to this file, and not this project as a
->>>>>> + * whole.
->>>>>> + *
->>>>>> + *  a) This file is free software; you can redistribute it and/or
->>>>>> + *     modify it under the terms of the GNU General Public License as
->>>>>> + *     published by the Free Software Foundation; either version 2 of
->>>>>> the
->>>>>> + *     License, or (at your option) any later version.
->>>>>> + *
->>>>>> + *     This file is distributed in the hope that it will be useful,
->>>>>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->>>>>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>>>>> + *     GNU General Public License for more details.
->>>>>> + *
->>>>>> + *
->>>>>> + * Or, alternatively,
->>>>>> + *
->>>>>> + *  b) Permission is hereby granted, free of charge, to any person
->>>>>> + *     obtaining a copy of this software and associated documentation
->>>>>> + *     files (the "Software"), to deal in the Software without
->>>>>> + *     restriction, including without limitation the rights to use,
->>>>>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->>>>>> + *     sell copies of the Software, and to permit persons to whom the
->>>>>> + *     Software is furnished to do so, subject to the following
->>>>>> + *     conditions:
->>>>>> + *
->>>>>> + *     The above copyright notice and this permission notice shall be
->>>>>> + *     included in all copies or substantial portions of the Software.
->>>>>> + *
->>>>>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->>>>>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->>>>>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->>>>>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->>>>>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->>>>>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->>>>>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->>>>>> + *     OTHER DEALINGS IN THE SOFTWARE.
->>>>>> + */
->>>>>> +
->>>>>> +/dts-v1/;
->>>>>> +#include "sun8i-a33.dtsi"
->>>>>> +#include "sunxi-common-regulators.dtsi"
->>>>>> +
->>>>>> +#include <dt-bindings/gpio/gpio.h>
->>>>>> +#include <dt-bindings/input/input.h>
->>>>>> +#include <dt-bindings/pinctrl/sun4i-a10.h>
->>>>>> +
->>>>>> +/ {
->>>>>> +       model = "ET Q8 A33 ";
->>>>>> +       compatible = "et-q8-q33", "allwinner,sun8i",
->>>>>> "allwinner,sun8i-a33";
->>>>>> +
->>>>>> +       aliases {
->>>>>> +               serial0 = &uart0;
->>>>>> +       };
->>>>>> +
->>>>>> +       chosen {
->>>>>> +               bootargs = "earlyprintk console=ttyS0,115200";
->>>>>> +       };
->>>>>> +};
->>>>>> +
->>>>>> +&lradc {
->>>>>> +       vref-supply = <&reg_vcc3v0>;
->>>>>> +       status = "okay";
->>>>>> +
->>>>>> +       button at 200 {
->>>>>> +               label = "Volume Up";
->>>>>> +               linux,code = <KEY_VOLUMEUP>;
->>>>>> +               channel = <0>;
->>>>>> +               voltage = <200000>;
->>>>>> +       };
->>>>>> +
->>>>>> +       button at 400 {
->>>>>> +               label = "Volume Down";
->>>>>> +               linux,code = <KEY_VOLUMEDOWN>;
->>>>>> +               channel = <0>;
->>>>>> +               voltage = <400000>;
->>>>>> +       };
->>>>>> +};
->>>>>> +
->>>>>> +&i2c0 {
->>>>>> +       pinctrl-names = "default";
->>>>>> +       pinctrl-0 = <&i2c0_pins_a>;
->>>>>> +       status = "okay";
->>>>>> +};
->>>>>> +
->>>>>> +&i2c1 {
->>>>>> +       pinctrl-names = "default";
->>>>>> +       pinctrl-0 = <&i2c1_pins_a>;
->>>>>> +       status = "okay";
->>>>>> +};
->>>>>> +
->>>>>> +&i2c2 {
->>>>>> +       pinctrl-names = "default";
->>>>>> +       pinctrl-0 = <&i2c2_pins_a>;
->>>>>> +       /* pull-ups and devices require PMIC regulator */
->>>>>> +       status = "failed";
->>>>>> +};
->>>>>> +
->>>>>> +&uart0 {
->>>>>> +       pinctrl-names = "default";
->>>>>> +       pinctrl-0 = <&uart0_pins_a>;
->>>>>> +       status = "okay";
->>>>>> +};
->>>>>>
->>
+
+> Fixes: 7114cd749a12 ("clocksource: exynos_mct: use (request/free)_irq calls for local timer registration")
+> Signed-off-by: Damian Eppel <d.eppel@samsung.com>
+> Cc: <stable@vger.kernel.org>
+> Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> (Tested on Arndale Octa Board)
+> Tested-by: Marcin Jabrzyk <m.jabrzyk@samsung.com>
+> (Tested on Rinato B2 (Exynos 3250) board)
+> ---
+>
+> Notes:
+>      Changes since v1:
+>              o added Krzysztof's and Marcin's Reviewed-by / Tested-by
+>                with information about the test HW.
+>
+>   drivers/clocksource/exynos_mct.c | 45 ++++++++++++++++++++++++++++------------
+>   1 file changed, 32 insertions(+), 13 deletions(-)
+>
+> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+> index 83564c9..9beca58 100644
+> --- a/drivers/clocksource/exynos_mct.c
+> +++ b/drivers/clocksource/exynos_mct.c
+> @@ -466,15 +466,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+>   	exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
+>
+>   	if (mct_int_type == MCT_INT_SPI) {
+> -		evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
+> -		if (request_irq(evt->irq, exynos4_mct_tick_isr,
+> -				IRQF_TIMER | IRQF_NOBALANCING,
+> -				evt->name, mevt)) {
+> -			pr_err("exynos-mct: cannot register IRQ %d\n",
+> -				evt->irq);
+> +
+> +		if (evt->irq == -1)
+>   			return -EIO;
+> -		}
+> -		irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu], cpumask_of(cpu));
+> +
+> +		irq_force_affinity(evt->irq, cpumask_of(cpu));
+> +		enable_irq(evt->irq);
+>   	} else {
+>   		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
+>   	}
+> @@ -487,10 +484,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+>   static void exynos4_local_timer_stop(struct clock_event_device *evt)
+>   {
+>   	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
+> -	if (mct_int_type == MCT_INT_SPI)
+> -		free_irq(evt->irq, this_cpu_ptr(&percpu_mct_tick));
+> -	else
+> +	if (mct_int_type == MCT_INT_SPI) {
+> +		if (evt->irq != -1)
+> +			disable_irq_nosync(evt->irq);
+> +	} else {
+>   		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
+> +	}
+>   }
+>
+>   static int exynos4_mct_cpu_notify(struct notifier_block *self,
+> @@ -522,7 +521,7 @@ static struct notifier_block exynos4_mct_cpu_nb = {
+>
+>   static void __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
+>   {
+> -	int err;
+> +	int err, cpu;
+>   	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
+>   	struct clk *mct_clk, *tick_clk;
+>
+> @@ -549,7 +548,27 @@ static void __init exynos4_timer_resources(struct device_node *np, void __iomem
+>   		WARN(err, "MCT: can't request IRQ %d (%d)\n",
+>   		     mct_irqs[MCT_L0_IRQ], err);
+>   	} else {
+> -		irq_set_affinity(mct_irqs[MCT_L0_IRQ], cpumask_of(0));
+> +		for_each_possible_cpu(cpu) {
+> +			int mct_irq = mct_irqs[MCT_L0_IRQ + cpu];
+> +			struct mct_clock_event_device *pcpu_mevt =
+> +				per_cpu_ptr(&percpu_mct_tick, cpu);
+> +
+> +			pcpu_mevt->evt.irq = -1;
+> +
+> +			if (request_irq(mct_irq,
+> +					exynos4_mct_tick_isr,
+> +					IRQF_TIMER | IRQF_NOBALANCING,
+> +					pcpu_mevt->name, pcpu_mevt)) {
+> +				pr_err("exynos-mct: cannot register IRQ (cpu%d)\n",
+> +									cpu);
+> +
+> +				continue;
+> +			}
+> +			pcpu_mevt->evt.irq = mct_irq;
+> +			irq_force_affinity(mct_irq, cpumask_of(cpu));
+> +
+> +			disable_irq(mct_irq);
+> +		}
+>   	}
+>
+>   	err = register_cpu_notifier(&exynos4_mct_cpu_nb);
+>
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
