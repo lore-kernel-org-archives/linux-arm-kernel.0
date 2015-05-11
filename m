@@ -1,45 +1,61 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 May 2015 17:00:26 +0100
-Subject: [PATCH 0/4] ARM: keystone: Enable Netcp driver on K2 EVMs
-In-Reply-To: <5550D0FD.7060903@ti.com>
-References: <1429817852-27938-1-git-send-email-m-karicheri2@ti.com>
- <55395981.8050902@oracle.com> <553A5E12.9040202@ti.com>
- <553A630F.4060008@oracle.com> <5550D0FD.7060903@ti.com>
-Message-ID: <20150511160026.GH2067@n2100.arm.linux.org.uk>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 11 May 2015 18:00:54 +0200
+Subject: [PATCH v6 00/25] Exynos SYSMMU (IOMMU) integration with DT and
+ DMA-mapping subsystem
+In-Reply-To: <1430727380-10912-1-git-send-email-m.szyprowski@samsung.com>
+References: <1430727380-10912-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CABxcv=mpCQKyuJOFsUgMdhD50yYdH+WwnEbYUNXByErMHpUuYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 11, 2015 at 11:55:41AM -0400, Murali Karicheri wrote:
-> On 04/24/2015 11:36 AM, santosh shilimkar wrote:
-> >On 4/24/2015 8:15 AM, Murali Karicheri wrote:
-> >>On 04/23/2015 04:43 PM, santosh shilimkar wrote:
-> >>>On 4/23/2015 12:37 PM, Murali Karicheri wrote:
-> >>>>NetCP driver support patches are already merged to v4.0.nd v4.1.
-> >>>>This series introduce patches to update the DTS bindings and
-> >>>>defconfig so that the network driver is fully functional on K2
-> >>>>EVMs :- K2HK, K2L and K2E.
-> >>>>
-> >>>Nice and Thanks Murali for sending these up.
-> >>>
-> >>>>It will be great if this can be merged to v4.1.
-> >>>>
-> >>>Its too late for the 4.1 now. For the same reason, we also
-> >>>couldn't get the MMU switching fixes in this merge window.
-> >>
-> >>For my reference, can you point me to the MMU switching fixes you are
-> >>referring to?
-> >>
-> >http://www.spinics.net/lists/arm-kernel/msg411178.html
-> >
-> >Regards,
-> >Santosh
-> Santosh,
-> 
-> Is MMU switching series applied to a sub system branch already that I can
-> pull to do some testing on K2 devices?
+Hello Marek,
 
-Shall I send you the patches directly?
+On Mon, May 4, 2015 at 10:15 AM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> Hello Everyone,
+>
+> This is yet another attempt to get Exynos SYSMMU driver with integrated
+> with IOMMU & DMA-mapping subsystems. The main change from previous
+> version is addition of the patches to define iommu-mapping, which need
+> to be created during system boot to avoid IOMMU fault by devices, which
+> has been left enabled by bootloader (i.e. framebuffer displaying slash
+> screen).
+>
+> Patches has been also rebased onto v4.1-rc2 with 'arm: dma-mapping: fix
+> off-by-one check in arm_setup_iommu_dma_ops' patch applied (see commit
+> 1424532b2163bf1580f4b1091a5801e12310fac5 on fixes branch in
+> git://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/linux-arm.git,
+> more information:
+> http://www.spinics.net/lists/arm-kernel/msg414722.html).
+>
+> All patches are also available in the following git repository:
+> https://git.linaro.org/people/marek.szyprowski/linux-srpol.git
+> branch v4.1-exynos-iommu.
+>
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Thanks for the new series, this time I didn't get a system hang when I
+enabled both CONFIG_DRM_EXYNOS_FIMD and CONFIG_DRM_EXYNOS_DP on my
+Exynos5420 Peach Pit Chromebook.
+
+The system finished booting and I have both a console on the HDMI and
+eDP/LVDS displays. But if I try to start X or weston, I again have a
+completele system hang with no output on the serial console. This
+works correctly without your IOMMU series.
+
+And again disabling CONFIG_DRM_EXYNOS_DP or CONFIG_DRM_EXYNOS_FIMD
+avoids the system to hang. If I only have CONFIG_DRM_EXYNOS_HDMI
+enabled, then I can start X with out issues and is displayed correctly
+in the HDMI output.
+
+So it seems your workaround for the boot-loader leaving the FIMD dma
+engine enabled is not enough? I'm not a graphics person so I can think
+of the top of my head what could trigger the system hang when X or
+weston are executed so I wondered if you have any ideas.
+
+> Best regards
+> Marek Szyprowski
+> Samsung R&D Institute Poland
+>
+
+Best regards,
+Javier
