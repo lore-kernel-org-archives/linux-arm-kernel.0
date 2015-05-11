@@ -1,83 +1,114 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 11 May 2015 22:16:00 +0200 (CEST)
-Subject: [PATCH v2 1/3] media: atmel-isi: remove the useless code which
- disable isi
-In-Reply-To: <1428570108-4961-2-git-send-email-josh.wu@atmel.com>
-References: <1428570108-4961-1-git-send-email-josh.wu@atmel.com>
- <1428570108-4961-2-git-send-email-josh.wu@atmel.com>
-Message-ID: <Pine.LNX.4.64.1505112147540.12198@axis700.grange>
+From: mwelling@ieee.org (Michael Welling)
+Date: Mon, 11 May 2015 15:16:33 -0500
+Subject: next-20150511 / omap2-mcspi: regression for sdp4430 boot
+In-Reply-To: <5550FC38.6020801@ti.com>
+References: <5550DDCB.8010303@ti.com> <20150511170742.GA6616@deathray>
+ <5550F47C.1030902@ti.com> <20150511183032.GA8085@deathray>
+ <5550FC38.6020801@ti.com>
+Message-ID: <20150511201633.GA31117@deathray>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
-
-Thanks for the patch. I'm afraid I don't quite understand why it is 
-needed, could you maybe explain a bit more? Is it because
-
-(1) during ISI configuration the pixel clock from the sensor is (usually) 
-anyway disabled, so, we don't have to additionally disable the ISI, 
-without the pixel clock the ISI is anyway already disabled.
-
-or
-
-(2) disabling the ISI at those locations below breaks something, because 
-when the ISI is disabled, the functionality, that's later used isn't 
-available.
-
-I assume it's (1), but if that's the case, then this patch is just 
-cosmetic, right? The ISI is anyway disabled, so, that operation simply has 
-no effect, but also doesn't hurt. OTOH, if some sensor keeps its master 
-clock running all the time, then switching the ISI off as in the current 
-version helps save some power, unless it breaks anything?
-
-Thanks
-Guennadi
-
-On Thu, 9 Apr 2015, Josh Wu wrote:
-
-> To program ISI control register, the pixel clock should be enabled.
-> So without pixel clock (from sensor) enabled, disable ISI controller is
-> not make sense. So this patch remove those code.
+On Mon, May 11, 2015 at 02:00:08PM -0500, Nishanth Menon wrote:
+> On 05/11/2015 01:30 PM, Michael Welling wrote:
+> > On Mon, May 11, 2015 at 01:27:08PM -0500, Nishanth Menon wrote:
+> >> On 05/11/2015 12:07 PM, Michael Welling wrote:
+> >>> On Mon, May 11, 2015 at 11:50:19AM -0500, Nishanth Menon wrote:
+> >>>> Hi,
+> >>>>
+> >>>> SDP4430 uses a SPI based network chip ks8851.
+> >>>>
+> >>>> next-20150508:
+> >>>> https://github.com/nmenon/kernel-test-logs/blob/next-20150508/omap2plus_defconfig/sdp4430.txt
+> >>>>
+> >>>> However, next-20150511:
+> >>>> https://github.com/nmenon/kernel-test-logs/blob/next-20150511/omap2plus_defconfig/sdp4430.txt
+> >>>>
+> >>>
+> >>> I will look into this but it is going to be difficult to debug with access to the hardware.
+> >>> This is what I get for changing a driver that effects so many SoCs.
+> >>>
+> >>
+> >> Let me know if there is any test patch you'd want me to run. The board
+> >> is on a remote "board farm" which most of TI folks have access to as
+> >> well.. So, if you need anything run, just send out a debug patch OR a
+> >> potential fix and we can help try it out and provide logs back for
+> >> your debug.
+> > 
+> > Okay.
+> > 
+> > It looks like you revert the patches in the wrong order above.
+> > 
+> > The GPIO patch should apply after the transfer_one patch so it should
+> > logically be reverted in the reverse order.
+> > 
+> Apologies on a slow response, was tracking another LPAE regression down.
 > 
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> ---
+> I did do that -> but logged it in reverse - unfortunately it seems to
+> have caused a little more confusion :(. is there something else you'd
+> like me to do?
+
+Okay I have another patch that appears to fix the issue on my board.
+
+Please test the attached patch and see if it fixes the issue on your board.
+
+If it does, I will send it upstream.
+
 > 
-> Changes in v2:
-> - this file is new added.
+> git log  next-20150508..next-20150511 drivers/spi
+> Tells me:
 > 
->  drivers/media/platform/soc_camera/atmel-isi.c | 5 -----
->  1 file changed, 5 deletions(-)
+> commit bc7f9bbc80bcc77745b3f54ec4e7103e3e142bb9
+> Author: Michael Welling <mwelling@ieee.org>
+> Date:   Fri May 8 13:31:01 2015 -0500
 > 
-> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
-> index c125b1d..31254b4 100644
-> --- a/drivers/media/platform/soc_camera/atmel-isi.c
-> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
-> @@ -131,8 +131,6 @@ static int configure_geometry(struct atmel_isi *isi, u32 width,
->  		return -EINVAL;
->  	}
->  
-> -	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
-> -
->  	cfg2 = isi_readl(isi, ISI_CFG2);
->  	/* Set YCC swap mode */
->  	cfg2 &= ~ISI_CFG2_YCC_SWAP_MODE_MASK;
-> @@ -843,7 +841,6 @@ static int isi_camera_set_bus_param(struct soc_camera_device *icd)
->  
->  	cfg1 |= ISI_CFG1_THMASK_BEATS_16;
->  
-> -	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
->  	isi_writel(isi, ISI_CFG1, cfg1);
->  
->  	return 0;
-> @@ -1022,8 +1019,6 @@ static int atmel_isi_probe(struct platform_device *pdev)
->  	if (isi->pdata.data_width_flags & ISI_DATAWIDTH_10)
->  		isi->width_flags |= 1 << 9;
->  
-> -	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
-> -
->  	irq = platform_get_irq(pdev, 0);
->  	if (IS_ERR_VALUE(irq)) {
->  		ret = irq;
+>     spi: omap2-mcspi: Add gpio_request and init CS
+> 
+>     If GPIO chip select is specified, request the GPIO in the setup
+> function
+>     and release it in the cleanup function.
+> 
+>     Signed-off-by: Michael Welling <mwelling@ieee.org>
+>     Signed-off-by: Mark Brown <broonie@kernel.org>
+> 
+> commit b28cb9414db9f8e42ac18c9e360e4e99cda42489
+> Author: Michael Welling <mwelling@ieee.org>
+> Date:   Thu May 7 18:36:53 2015 -0500
+> 
+>     spi: omap2-mcspi: Switch driver to use transfer_one
+> 
+>     Switches from transfer_one_message to transfer_one to prepare
+> driver for
+>     use of GPIO chip selects.
+> 
+>     Signed-off-by: Michael Welling <mwelling@ieee.org>
+>     Signed-off-by: Mark Brown <broonie@kernel.org>
+> 
+> 
+> 
+> my tested git log looks as follows: (redid it just to be sure):
+> 
+> a4617b41e04c Revert "spi: omap2-mcspi: Switch driver to use transfer_one"
+> http://paste.ubuntu.org.cn/2595136
+> 
+> b49011271c7f Revert "spi: omap2-mcspi: Add gpio_request and init CS"
+> http://paste.ubuntu.org.cn/2595142
+> 
+> 
+> 012034602bd6 HACK: Makefile: Build a uImage with dtb already appended
+> f17107cb8886 Add linux-next specific files for 20150511
+> 
+> 012034602bd6 commit is
+> https://github.com/nmenon/linux-2.6-playground/commit/177f5f71b3f2 ->
+> for legacy platforms needing uImage based booting.
+> 
 > -- 
-> 1.9.1
-> 
+> Regards,
+> Nishanth Menon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: omap-mcspi.patch
+Type: text/x-diff
+Size: 2909 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150511/b4b4d9fb/attachment.bin>
