@@ -1,116 +1,141 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 11 May 2015 15:28:28 +0200
-Subject: [PATCH] ARM: exynos_defconfig: add options to make wifi usable
-In-Reply-To: <CAOMqctTDwwbacrLZ8iS_VZKNTBayEfaSX-s50ekcuGE4E=eNfw@mail.gmail.com>
-References: <20150511105034.40580.qmail@dec59.ruk.cuni.cz>
- <5550919A.9090703@collabora.co.uk>
- <CAOMqctTDwwbacrLZ8iS_VZKNTBayEfaSX-s50ekcuGE4E=eNfw@mail.gmail.com>
-Message-ID: <5550AE7C.6050208@collabora.co.uk>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Mon, 11 May 2015 22:29:25 +0900
+Subject: [RFT PATCH v2 2/3] drm/exynos: Constify exynos_drm_crtc_ops
+In-Reply-To: <1430957086-25005-3-git-send-email-k.kozlowski@samsung.com>
+References: <1430957086-25005-1-git-send-email-k.kozlowski@samsung.com>
+ <1430957086-25005-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <5550AEB5.4020709@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2015 02:23 PM, Michal Suchanek wrote:
-> On 11 May 2015 at 13:25, Javier Martinez Canillas
-> <javier.martinez@collabora.co.uk> wrote:
->> Hello Michal,
->>
->> On 05/11/2015 12:22 PM, Michal Suchanek wrote:
->>> The Exynos defconfig includes mwifiex sdio support which is present on
->>> some of the Exynos boards.
->>>
->>> For the WiFi to be usable two extra options are needed. Usermode
->>
->> Your subject line and the commit message are somehow misleading since
->> these options are needed to make the WiFi usable with your current setup.
->>
->>> firmware helper to load out-of-kernel firmware and wireless extensions
->>
->> For example, this is only needed if the in-kernel fw loader is not
->> able to find the firmware but isn't needed if the fw is for example
->> in an initial ramdisk and the kernel is able to load it, built in the
->> kernel or if the mwifiex driver is built as a module.
+On 2015? 05? 07? 09:04, Krzysztof Kozlowski wrote:
+> From: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
 > 
-> I am not sure how is including the firmware in a ramdisk going to
-> improve things over including it in my root filesystem. As far as I am
-> aware it does not make any difference for the kernel.
+> The Exynos DRM code does not modify the ops provided by CRTC driver in
+> exynos_drm_crtc_create() call.
+
+Please check coding style with checkpatch.pl before posting it. I can
+see below warning,
+
+WARNING: line over 80 characters
+#146: FILE: drivers/gpu/drm/exynos/exynos_drm_crtc.c:244:
++					       const struct exynos_drm_crtc_ops *ops,
+
+WARNING: line over 80 characters
+#159: FILE: drivers/gpu/drm/exynos/exynos_drm_crtc.h:24:
++					       const struct exynos_drm_crtc_ops *ops,
+
+
+I modified and merged all patches.
+
+Thanks,
+Inki Dae
+
 > 
-
-My understanding is that an initial ramdisk is mounted very early in the
-kernel boot process so even a module-less initamfs that only contains a
-set of firmwares is enough to make the request_firmware() of built in
-drivers to succeed.
-
-While having those in your root filesystem located in a storage media,
-will make the request_firmware() to fail since the rootfs is mounted much
-later after built in drivers' probe functions have already been executed.
-
-But now you make me doubt if I'm wrong on my assumptions and I should
-check if that's the case.
-
-> The firmware is not included in the kernel tree nor configured as
-> extra firmware option in the defconfig, either. Otherwise the firmware
-> loader would supposedly find the firmware and we would not have this
-> discussion.
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
 > 
-> The mwifiex driver is configured as built-in in the defconfig so what
-> happens when the driver is built as a module is not relevant for this
-> defconfig.
->
-
-Yes, these two (fw built-in the kernel and driver as a module) were just
-other examples of setups that don't require the fallback user-mode helper.
-
-At least I would mention in the commit message that given the driver is
-built-in, no fw is built-in the kernel couldn't be assumed that a initram
-fs will be used, it is better to enable the user-space fw loading fallback.
-
->>
->>> so the interface can be configured with wireless-tools.
->>>
->>
->> And wireless extensions is deprecated AFAIK and is only needed for old
->> user-space since most tools should had been converted to use the netlink
->> based CONFIG_CFG80211 interface instead.
->>
->> I'm booting a debian jessie and have WiFi working without CFG80211_WEXT
->> for example.
+> ---
+> Changes since v1:
+> New patch.
+> ---
+>  drivers/gpu/drm/exynos/exynos7_drm_decon.c | 2 +-
+>  drivers/gpu/drm/exynos/exynos_drm_crtc.c   | 2 +-
+>  drivers/gpu/drm/exynos/exynos_drm_crtc.h   | 2 +-
+>  drivers/gpu/drm/exynos/exynos_drm_drv.h    | 2 +-
+>  drivers/gpu/drm/exynos/exynos_drm_fimd.c   | 2 +-
+>  drivers/gpu/drm/exynos/exynos_drm_vidi.c   | 2 +-
+>  drivers/gpu/drm/exynos/exynos_mixer.c      | 2 +-
+>  7 files changed, 7 insertions(+), 7 deletions(-)
 > 
-> I'm booting Debian Jessie as well and for me WiFi is not working
-> without CFG80211_WEXT for another example.
+> diff --git a/drivers/gpu/drm/exynos/exynos7_drm_decon.c b/drivers/gpu/drm/exynos/exynos7_drm_decon.c
+> index 1f7e33f59de6..3d00df76220d 100644
+> --- a/drivers/gpu/drm/exynos/exynos7_drm_decon.c
+> +++ b/drivers/gpu/drm/exynos/exynos7_drm_decon.c
+> @@ -710,7 +710,7 @@ static void decon_dpms(struct exynos_drm_crtc *crtc, int mode)
+>  	}
+>  }
+>  
+> -static struct exynos_drm_crtc_ops decon_crtc_ops = {
+> +static const struct exynos_drm_crtc_ops decon_crtc_ops = {
+>  	.dpms = decon_dpms,
+>  	.mode_fixup = decon_mode_fixup,
+>  	.commit = decon_commit,
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_crtc.c b/drivers/gpu/drm/exynos/exynos_drm_crtc.c
+> index eb49195cec5c..93f873f11f64 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_crtc.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_crtc.c
+> @@ -241,7 +241,7 @@ struct exynos_drm_crtc *exynos_drm_crtc_create(struct drm_device *drm_dev,
+>  					       struct drm_plane *plane,
+>  					       int pipe,
+>  					       enum exynos_drm_output_type type,
+> -					       struct exynos_drm_crtc_ops *ops,
+> +					       const struct exynos_drm_crtc_ops *ops,
+>  					       void *ctx)
+>  {
+>  	struct exynos_drm_crtc *exynos_crtc;
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_crtc.h b/drivers/gpu/drm/exynos/exynos_drm_crtc.h
+> index 0ecd8fc45cff..ed0994b3cb47 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_crtc.h
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_crtc.h
+> @@ -21,7 +21,7 @@ struct exynos_drm_crtc *exynos_drm_crtc_create(struct drm_device *drm_dev,
+>  					       struct drm_plane *plane,
+>  					       int pipe,
+>  					       enum exynos_drm_output_type type,
+> -					       struct exynos_drm_crtc_ops *ops,
+> +					       const struct exynos_drm_crtc_ops *ops,
+>  					       void *context);
+>  int exynos_drm_crtc_enable_vblank(struct drm_device *dev, int pipe);
+>  void exynos_drm_crtc_disable_vblank(struct drm_device *dev, int pipe);
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.h b/drivers/gpu/drm/exynos/exynos_drm_drv.h
+> index 44f128a03aea..0e951226ca06 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_drv.h
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_drv.h
+> @@ -226,7 +226,7 @@ struct exynos_drm_crtc {
+>  	unsigned int			dpms;
+>  	wait_queue_head_t		pending_flip_queue;
+>  	struct drm_pending_vblank_event	*event;
+> -	struct exynos_drm_crtc_ops	*ops;
+> +	const struct exynos_drm_crtc_ops	*ops;
+>  	void				*ctx;
+>  };
+>  
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimd.c b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
+> index 2fb95ccb5841..5c1a148525f8 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_fimd.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
+> @@ -962,7 +962,7 @@ static void fimd_dp_clock_enable(struct exynos_drm_crtc *crtc, bool enable)
+>  	writel(DP_MIE_CLK_DP_ENABLE, ctx->regs + DP_MIE_CLKCON);
+>  }
+>  
+> -static struct exynos_drm_crtc_ops fimd_crtc_ops = {
+> +static const struct exynos_drm_crtc_ops fimd_crtc_ops = {
+>  	.dpms = fimd_dpms,
+>  	.mode_fixup = fimd_mode_fixup,
+>  	.commit = fimd_commit,
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_vidi.c b/drivers/gpu/drm/exynos/exynos_drm_vidi.c
+> index 27e84ec21694..1b3479a8db5f 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_vidi.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_vidi.c
+> @@ -217,7 +217,7 @@ static int vidi_ctx_initialize(struct vidi_context *ctx,
+>  	return 0;
+>  }
+>  
+> -static struct exynos_drm_crtc_ops vidi_crtc_ops = {
+> +static const struct exynos_drm_crtc_ops vidi_crtc_ops = {
+>  	.dpms = vidi_dpms,
+>  	.enable_vblank = vidi_enable_vblank,
+>  	.disable_vblank = vidi_disable_vblank,
+> diff --git a/drivers/gpu/drm/exynos/exynos_mixer.c b/drivers/gpu/drm/exynos/exynos_mixer.c
+> index fbec750574e6..d4afd1abe373 100644
+> --- a/drivers/gpu/drm/exynos/exynos_mixer.c
+> +++ b/drivers/gpu/drm/exynos/exynos_mixer.c
+> @@ -1126,7 +1126,7 @@ int mixer_check_mode(struct drm_display_mode *mode)
+>  	return -EINVAL;
+>  }
+>  
+> -static struct exynos_drm_crtc_ops mixer_crtc_ops = {
+> +static const struct exynos_drm_crtc_ops mixer_crtc_ops = {
+>  	.dpms			= mixer_dpms,
+>  	.enable_vblank		= mixer_enable_vblank,
+>  	.disable_vblank		= mixer_disable_vblank,
 > 
-> So it might be that some tools have migrated to another interface but
-> at first glance I have no idea what those tools might be in Debian so
-> for me the WiFi is unusable without wireless extensions.
->
-
-I'm using the iw package [0] which according to the package description:
-
-"will become the canonical command line tool for wireless configuration
-and iwconfig/wireless-tools will no longer be required"
-
-So I guess iw uses the new netlink based interface while wireless-tools
-is still using the old ioctl based API.
-
-That's something that could also be mentioned in the commit message.
-
->>
->> That doesn't mean that I'm against your patch (I'm always happy to enable
->> more config options if that makes the defconfig more useful) but the commit
->> message should be accurate about why a change has to be done.
-> 
-> Do you have some specific suggestions about improvements to the commit message?
->
-
-I already mentioned them above. My point is that the subject and commit message
-said that WiFi is unusable without these options and that's not the case for all
-the setups.
-
-> Thanks
-> 
-> Michal
->
-
-Best regards,
-Javier
-
-[0]: https://packages.debian.org/jessie/iw
