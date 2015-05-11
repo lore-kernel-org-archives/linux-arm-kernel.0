@@ -1,64 +1,46 @@
-From: mwelling@ieee.org (Michael Welling)
-Date: Mon, 11 May 2015 12:07:42 -0500
-Subject: next-20150511 / omap2-mcspi: regression for sdp4430 boot
-In-Reply-To: <5550DDCB.8010303@ti.com>
-References: <5550DDCB.8010303@ti.com>
-Message-ID: <20150511170742.GA6616@deathray>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 11 May 2015 18:10:46 +0100
+Subject: [Linaro-acpi] [PATCH 2/2] ACPI / scan: Parse _CCA and setup
+ device coherency
+In-Reply-To: <2927907.rePQ55aASC@wuerfel>
+References: <D1665A4F.19E17%suravee.suthikulpanit@amd.com>
+ <2817500.sgztgK2NzB@wuerfel>
+ <20150501110644.GF27755@e104818-lin.cambridge.arm.com>
+ <2927907.rePQ55aASC@wuerfel>
+Message-ID: <20150511171045.GJ18655@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 11, 2015 at 11:50:19AM -0500, Nishanth Menon wrote:
-> Hi,
+On Fri, May 08, 2015 at 04:08:53PM +0200, Arnd Bergmann wrote:
+> On Friday 01 May 2015 12:06:44 Catalin Marinas wrote:
+> > > If we just disallow DMA to devices that are marked with _CCA=0
+> > > in ACPI, we can avoid this case, or discuss it by the time someone has hardware
+> > > that wants it, and then make a more informed decision about it.
+> > 
+> > I don't think we should disallow DMA to devices with _CCA == 0 (only to
+> > those that don't have a _CCA property at all) as long as _CCA == 0 has
+> > clear semantics like only architected cache maintenance required (and
+> > that's what the ARMv8 ARM requires from compliant system caches).
 > 
-> SDP4430 uses a SPI based network chip ks8851.
+> Even if we exclude all cases in which the behavior may be unexpected,
+> there is still the other point I raised initially:
 > 
-> next-20150508:
-> https://github.com/nmenon/kernel-test-logs/blob/next-20150508/omap2plus_defconfig/sdp4430.txt
+>              what would that be good for?
 > 
-> However, next-20150511:
-> https://github.com/nmenon/kernel-test-logs/blob/next-20150511/omap2plus_defconfig/sdp4430.txt
-> 
+> Can you think of a case where a server system has a reason to use
+> a device in noncoherent mode? I think it's more likely to be a case
+> where a device got misconfigured accidentally by the firmware, and
+> we're better off warning about that in the kernel than trying to prepare
+> for an unknown hardware that might use an obscure feature of the spec.
 
-I will look into this but it is going to be difficult to debug with access to the hardware.
-This is what I get for changing a driver that effects so many SoCs.
+Maybe some of the people involved in arm64 servers can give a better
+answer, I'm not familiar with their hardware (plans).
 
-> Generates infinite "ks8851 spi1.0: ks8851_irq: spi bus error" errors
-> and hangs the platform.
-> 
-> Bisected the issue down to the following two commits when reverted
-> allows the board to function:
-> 
-> 
-> commit b28cb9414db9f8e42ac18c9e360e4e99cda42489
-> Author: Michael Welling <mwelling@ieee.org>
-> Date:   Thu May 7 18:36:53 2015 -0500
-> 
->     spi: omap2-mcspi: Switch driver to use transfer_one
-> 
->     Switches from transfer_one_message to transfer_one to prepare
-> driver for
->     use of GPIO chip selects.
-> 
->     Signed-off-by: Michael Welling <mwelling@ieee.org>
->     Signed-off-by: Mark Brown <broonie@kernel.org>
-> 
-> Reverting this alone: http://paste.ubuntu.org.cn/2594735 (did not boot up)
-> 
-> commit bc7f9bbc80bcc77745b3f54ec4e7103e3e142bb9
-> Author: Michael Welling <mwelling@ieee.org>
-> Date:   Fri May 8 13:31:01 2015 -0500
-> 
->     spi: omap2-mcspi: Add gpio_request and init CS
-> 
->     If GPIO chip select is specified, request the GPIO in the setup
-> function
->     and release it in the cleanup function.
-> 
->     Signed-off-by: Michael Welling <mwelling@ieee.org>
->     Signed-off-by: Mark Brown <broonie@kernel.org>
-> 
-> Reverting this as well allowed boot.
-> 
-> -- 
-> Regards,
-> Nishanth Menon
+I would expect most DMA-capable devices to be cache coherent. However,
+for (system) performance reasons, some of them could be configured as
+non-coherent. An example, though unlikely on servers, is a display
+device continuously accessing a framebuffer. You may not want to
+overload the coherent interconnect.
+
+-- 
+Catalin
