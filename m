@@ -1,70 +1,235 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 11 May 2015 08:41:55 +0200
-Subject: [PATCH 3/8] arm64: override early_init_dt_add_memory_arch()
+Date: Mon, 11 May 2015 08:41:56 +0200
+Subject: [PATCH 4/8] efi: move FDT handling to separate object file
 In-Reply-To: <1431326520-17331-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1431326520-17331-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1431326520-17331-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1431326520-17331-5-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Override the __weak early_init_dt_add_memory_arch() with our own
-version. This allows us to relax the imposed restrictions at memory
-discovery time, which is needed if we want to defer the assignment
-of PHYS_OFFSET and make it independent of where the kernel Image
-is placed in physical memory.
-
-So copy the generic original, but only retain the check against
-regions whose sizes become zero when clipped to page alignment.
-
-For now, we will remove the range below PHYS_OFFSET explicitly
-until we rework that logic in a subsequent patch. Any memory that
-we will not be able to map due to insufficient size of the linear
-region is also removed.
+The EFI specific FDT handling is compiled conditionally, and is
+logically independent of the rest of efi.o. So move it to a separate
+file before making changes to it in subsequent patches.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/mm/init.c | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ drivers/firmware/efi/Makefile  |  1 +
+ drivers/firmware/efi/efi-fdt.c | 93 ++++++++++++++++++++++++++++++++++++++++++
+ drivers/firmware/efi/efi.c     | 86 --------------------------------------
+ 3 files changed, 94 insertions(+), 86 deletions(-)
+ create mode 100644 drivers/firmware/efi/efi-fdt.c
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 597831bdddf3..64480b65ef17 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -158,6 +158,15 @@ early_param("mem", early_mem);
- 
- void __init arm64_memblock_init(void)
- {
-+	/*
-+	 * Remove the memory that we will not be able to cover
-+	 * with the linear mapping.
-+	 */
-+	const s64 linear_region_size = -(s64)PAGE_OFFSET;
+diff --git a/drivers/firmware/efi/Makefile b/drivers/firmware/efi/Makefile
+index d8be608a9f3b..9967dde52174 100644
+--- a/drivers/firmware/efi/Makefile
++++ b/drivers/firmware/efi/Makefile
+@@ -8,3 +8,4 @@ obj-$(CONFIG_UEFI_CPER)			+= cper.o
+ obj-$(CONFIG_EFI_RUNTIME_MAP)		+= runtime-map.o
+ obj-$(CONFIG_EFI_RUNTIME_WRAPPERS)	+= runtime-wrappers.o
+ obj-$(CONFIG_EFI_STUB)			+= libstub/
++obj-$(CONFIG_EFI_PARAMS_FROM_FDT)	+= efi-fdt.o
+diff --git a/drivers/firmware/efi/efi-fdt.c b/drivers/firmware/efi/efi-fdt.c
+new file mode 100644
+index 000000000000..f0e7ef2ae0e9
+--- /dev/null
++++ b/drivers/firmware/efi/efi-fdt.c
+@@ -0,0 +1,93 @@
++/*
++ * Copyright (C) 2013 - 2015 Linaro Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
-+	memblock_remove(0, memstart_addr);
-+	memblock_remove(memstart_addr + linear_region_size, ULLONG_MAX);
++#include <linux/init.h>
++#include <linux/efi.h>
++#include <linux/of.h>
++#include <linux/of_fdt.h>
 +
- 	memblock_enforce_memory_limit(memory_limit);
- 
- 	/*
-@@ -374,3 +383,19 @@ static int __init keepinitrd_setup(char *__unused)
- 
- __setup("keepinitrd", keepinitrd_setup);
- #endif
-+
-+void __init early_init_dt_add_memory_arch(u64 base, u64 size)
-+{
-+	if (!PAGE_ALIGNED(base)) {
-+		if (size < PAGE_SIZE - (base & ~PAGE_MASK)) {
-+			pr_warn("Ignoring memory block 0x%llx - 0x%llx\n",
-+				base, base + size);
-+			return;
-+		}
-+		size -= PAGE_SIZE - (base & ~PAGE_MASK);
-+		base = PAGE_ALIGN(base);
++#define UEFI_PARAM(name, prop, field)			   \
++	{						   \
++		{ name },				   \
++		{ prop },				   \
++		offsetof(struct efi_fdt_params, field),    \
++		FIELD_SIZEOF(struct efi_fdt_params, field) \
 +	}
-+	size &= PAGE_MASK;
 +
-+	memblock_add(base, size);
++static __initdata struct {
++	const char name[32];
++	const char propname[32];
++	int offset;
++	int size;
++} dt_params[] = {
++	UEFI_PARAM("System Table", "linux,uefi-system-table", system_table),
++	UEFI_PARAM("MemMap Address", "linux,uefi-mmap-start", mmap),
++	UEFI_PARAM("MemMap Size", "linux,uefi-mmap-size", mmap_size),
++	UEFI_PARAM("MemMap Desc. Size", "linux,uefi-mmap-desc-size", desc_size),
++	UEFI_PARAM("MemMap Desc. Version", "linux,uefi-mmap-desc-ver", desc_ver)
++};
++
++struct param_info {
++	int verbose;
++	int found;
++	void *params;
++};
++
++static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
++				       int depth, void *data)
++{
++	struct param_info *info = data;
++	const void *prop;
++	void *dest;
++	u64 val;
++	int i, len;
++
++	if (depth != 1 || strcmp(uname, "chosen") != 0)
++		return 0;
++
++	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
++		prop = of_get_flat_dt_prop(node, dt_params[i].propname, &len);
++		if (!prop)
++			return 0;
++		dest = info->params + dt_params[i].offset;
++		info->found++;
++
++		val = of_read_number(prop, len / sizeof(u32));
++
++		if (dt_params[i].size == sizeof(u32))
++			*(u32 *)dest = val;
++		else
++			*(u64 *)dest = val;
++
++		if (info->verbose)
++			pr_info("  %s: 0x%0*llx\n", dt_params[i].name,
++				dt_params[i].size * 2, val);
++	}
++	return 1;
 +}
++
++int __init efi_get_fdt_params(struct efi_fdt_params *params, int verbose)
++{
++	struct param_info info;
++	int ret;
++
++	pr_info("Getting EFI parameters from FDT:\n");
++
++	info.verbose = verbose;
++	info.found = 0;
++	info.params = params;
++
++	ret = of_scan_flat_dt(fdt_find_uefi_params, &info);
++	if (!info.found)
++		pr_info("UEFI not found.\n");
++	else if (!ret)
++		pr_err("Can't find '%s' in device tree!\n",
++		       dt_params[info.found].name);
++
++	return ret;
++}
+diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+index 3061bb8629dc..e546c3e4f127 100644
+--- a/drivers/firmware/efi/efi.c
++++ b/drivers/firmware/efi/efi.c
+@@ -20,8 +20,6 @@
+ #include <linux/init.h>
+ #include <linux/device.h>
+ #include <linux/efi.h>
+-#include <linux/of.h>
+-#include <linux/of_fdt.h>
+ #include <linux/io.h>
+ #include <linux/platform_device.h>
+ 
+@@ -377,90 +375,6 @@ static int __init efi_load_efivars(void)
+ device_initcall(efi_load_efivars);
+ #endif
+ 
+-#ifdef CONFIG_EFI_PARAMS_FROM_FDT
+-
+-#define UEFI_PARAM(name, prop, field)			   \
+-	{						   \
+-		{ name },				   \
+-		{ prop },				   \
+-		offsetof(struct efi_fdt_params, field),    \
+-		FIELD_SIZEOF(struct efi_fdt_params, field) \
+-	}
+-
+-static __initdata struct {
+-	const char name[32];
+-	const char propname[32];
+-	int offset;
+-	int size;
+-} dt_params[] = {
+-	UEFI_PARAM("System Table", "linux,uefi-system-table", system_table),
+-	UEFI_PARAM("MemMap Address", "linux,uefi-mmap-start", mmap),
+-	UEFI_PARAM("MemMap Size", "linux,uefi-mmap-size", mmap_size),
+-	UEFI_PARAM("MemMap Desc. Size", "linux,uefi-mmap-desc-size", desc_size),
+-	UEFI_PARAM("MemMap Desc. Version", "linux,uefi-mmap-desc-ver", desc_ver)
+-};
+-
+-struct param_info {
+-	int verbose;
+-	int found;
+-	void *params;
+-};
+-
+-static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
+-				       int depth, void *data)
+-{
+-	struct param_info *info = data;
+-	const void *prop;
+-	void *dest;
+-	u64 val;
+-	int i, len;
+-
+-	if (depth != 1 || strcmp(uname, "chosen") != 0)
+-		return 0;
+-
+-	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
+-		prop = of_get_flat_dt_prop(node, dt_params[i].propname, &len);
+-		if (!prop)
+-			return 0;
+-		dest = info->params + dt_params[i].offset;
+-		info->found++;
+-
+-		val = of_read_number(prop, len / sizeof(u32));
+-
+-		if (dt_params[i].size == sizeof(u32))
+-			*(u32 *)dest = val;
+-		else
+-			*(u64 *)dest = val;
+-
+-		if (info->verbose)
+-			pr_info("  %s: 0x%0*llx\n", dt_params[i].name,
+-				dt_params[i].size * 2, val);
+-	}
+-	return 1;
+-}
+-
+-int __init efi_get_fdt_params(struct efi_fdt_params *params, int verbose)
+-{
+-	struct param_info info;
+-	int ret;
+-
+-	pr_info("Getting EFI parameters from FDT:\n");
+-
+-	info.verbose = verbose;
+-	info.found = 0;
+-	info.params = params;
+-
+-	ret = of_scan_flat_dt(fdt_find_uefi_params, &info);
+-	if (!info.found)
+-		pr_info("UEFI not found.\n");
+-	else if (!ret)
+-		pr_err("Can't find '%s' in device tree!\n",
+-		       dt_params[info.found].name);
+-
+-	return ret;
+-}
+-#endif /* CONFIG_EFI_PARAMS_FROM_FDT */
+-
+ static __initdata char memory_type_name[][20] = {
+ 	"Reserved",
+ 	"Loader Code",
 -- 
 1.9.1
