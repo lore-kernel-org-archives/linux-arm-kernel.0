@@ -1,81 +1,122 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 11 May 2015 12:14:24 +0900
-Subject: [GIT PULL] ARM: EXYNOS: Improvements for 4.2, second try
-Message-ID: <1431314064-17118-1-git-send-email-k.kozlowski@samsung.com>
+From: maitysanchayan@gmail.com (Sanchayan Maity)
+Date: Mon, 11 May 2015 10:41:37 +0530
+Subject: [RFC 0/2] Implement SoC bus support for Vybrid
+Message-ID: <cover.1431319599.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Kukjin,
+Hello,
 
-Updated pull request, replacing also the usage of soc_is_exynos4()
-with of_machine_is_compatible(). You requested this in comments
-for "ARM: EXYNOS: Fix failed second suspend on Exynos4".
+Currently this patchset is based of on our local branch but would like 
+some comments before I push this to mainline through Shawn's tree.
 
-This adds coupled cpuidle for Exynos3250 and improves the Exynos
-code in few places. Everything for upcoming 4.2 merge window.
-Description along with a tag.
+This patchset implements the following
+https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-devices-soc
 
-Best regards,
-Krzysztof
+Currently the required information is more or less read across the whole 
+SoC, but I guess we cannot change that since these are the locations 
+with the required information.
+
+There seem to be three options for the revision field:
+- ROM revision (see https://community.freescale.com/docs/DOC-94802)
+- ANADIG revision (ANADIG_DIGIPROC, as used for the i.MX SoC's)
+- OCOTP revision
+
+Some numbers:
+
+Colibri VF61 1.1A (2N02G)
+- 0x00000013
+- 0x00610000
+- 0x01000000
+- 0x410000c8
+
+Colibri VF61 V1.0B (1N02G)
+- 0x00000011
+- 0x00610000
+- 0x01000000
+- 0x410000c8
+
+Colibri VF61 V1.0A (which is actually a VF600 SoC, no L2 cache, since
+that was the only one we could buy back then, 1N02G printed on it)
+- 0x00000011
+- 0x00610000
+- 0x01000000
+- none...
+
+Colibri VF50 V1.0A (1N02G)
+- 0x00000011
+- 0x00610000
+- 0x01000000
+- none...
+
+Vybrid Tower Rev J (1N02G)
+- 0x00000011
+- 0x00610000
+- 0x01000000
+- 0x410000c8
+
+Read from u-boot
+md.l 0x80 1
+md.l 0x40050260 1
+md.l 0x400A5090 1
 
 
-The following changes since commit b82f3a05ff0b5eaf2c9900eeb34e58a6624db8d9:
+The ROM revision seems to differ most. So we would like to go with the 
+revision from the ROM register 0x80.
 
-  ARM: EXYNOS: Fix failed second suspend on Exynos4 (2015-05-11 11:03:09 +0900)
+Now coming to the primary question. This ROM revision register is not 
+really within any of the peripheral maps and I would like to access it 
+for the versioning information. Currently, I used ioremap like below
 
-are available in the git repository at:
+ioremap(ROM_REVISION_REGISTER, SZ_1);
 
-  https://github.com/krzk/linux.git tags/samsung-for-next-4.2-2
+which I guess probably is not the right way to do it. What would be the 
+correct or better way to do this? 
 
-for you to fetch changes up to c91889378098ff0bb5fe6f422a3c0eb554b34930:
+Also comments or feedback or any of the other parts of the patch are 
+also welcome.
 
-  ARM: plat-samsung: Constify platform_device_id (2015-05-11 11:05:31 +0900)
+Some Sample outputs are below:
+On Colibri VF61 V1.1A:
+root at colibri-vf:/sys/devices/soc0# ls
+backlight      fxosc          regulators     sound          uevent
+bl_on          gpio-keys      revision       subsystem
+clk16m         machine        soc            sxosc
+family         power          soc_id         syscon-reboot
+root at colibri-vf:/sys/devices/soc0# cat revision
+00000013
+root at colibri-vf:/sys/devices/soc0# cat soc_id
+dbc8435c211629d4
+root at colibri-vf:/sys/devices/soc0# cat family
+Freescale Vybrid VF610
 
-----------------------------------------------------------------
-Extending cpuidle driver and improvements for Exynos based boards:
-1. Replace soc_is_exynos4() with of_machine_is_compatible().
-2. Add missing return-value checks and of_node_put() for power domain
-   driver.
-3. Fix missing clk_prepare in S3C24XX ADC driver.
-4. Rework clock handling when switching power domains on/off. Instead
-   of settting fixed parent in DTS we grab the parent clock before
-   turning the domain off.
-5. Add coupled cpuidle support for Exynos3250 to an existing
-   cpuidle-exynos driver. As a result it enables AFTR mode
-   (ARM-Off Top-Running) to be used by default on Exynos3250
-   without the need to hot unplug CPU1 first.
-6. Constify irq_domain_ops and platform_device_id.
+On Colibri VF50 V1.1A:
+root at colibri-vf:/sys/devices/soc0# ls
+backlight               machine                 subsystem
+bl_on                   power                   sxosc
+clk16m                  regulators              syscon-reboot
+family                  revision                toradex,vf50_touchctrl
+fxosc                   soc                     uevent
+gpio-keys               soc_id
+root at colibri-vf:/sys/devices/soc0# cat revision
+00000013
+root at colibri-vf:/sys/devices/soc0# cat soc_id
+df63c12a2e2161d4
+root at colibri-vf:/sys/devices/soc0# cat family
+Freescale Vybrid VF500
+root at colibri-vf:/sys/devices/soc0# cat machine
+Freescale Vybrid
 
-----------------------------------------------------------------
-Bartlomiej Zolnierkiewicz (5):
-      ARM: EXYNOS: fix exynos_boot_secondary() return value on timeout
-      ARM: EXYNOS: make exynos_core_restart() less verbose
-      ARM: EXYNOS: add exynos_set_boot_addr() helper
-      ARM: EXYNOS: add exynos_get_boot_addr() helper
-      cpuidle: exynos: add coupled cpuidle support for Exynos3250
+Thanks & Regards,
+Sanchayan Maity.
 
-Krzysztof Kozlowski (8):
-      ARM: EXYNOS: Use of_machine_is_compatible instead of soc_is_exynos4
-      ARM: EXYNOS: Handle of of_iomap() failure
-      ARM: EXYNOS: Handle of_find_device_by_node and kstrdup failures
-      ARM: EXYNOS: Add missing of_node_put() when parsing power domains
-      ARM: EXYNOS: Get current parent clock for power domain on/off
-      ARM: dts: Use last parent for clocks during power domain on/off
-      ARM: EXYNOS: Constify irq_domain_ops
-      ARM: plat-samsung: Constify platform_device_id
+Sanchayan Maity (2):
+  ARM: dts: vfxxx: Add OCOTP node
+  ARM: vf610: Add SoC bus support for Vybrid
 
-Sergiy Kibrik (1):
-      ARM: SAMSUNG: fix clk_enable() WARNing in S3C24XX ADC
+ arch/arm/boot/dts/vfxxx.dtsi   |  5 +++
+ arch/arm/mach-imx/mach-vf610.c | 76 +++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 80 insertions(+), 1 deletion(-)
 
- .../bindings/arm/exynos/power_domain.txt           |  7 +-
- arch/arm/boot/dts/exynos5420.dtsi                  | 13 +---
- arch/arm/include/asm/firmware.h                    |  4 +
- arch/arm/mach-exynos/common.h                      |  4 +-
- arch/arm/mach-exynos/exynos.c                      |  5 +-
- arch/arm/mach-exynos/firmware.c                    | 18 +++++
- arch/arm/mach-exynos/platsmp.c                     | 86 +++++++++++++++-------
- arch/arm/mach-exynos/pm.c                          | 51 +++++++++++--
- arch/arm/mach-exynos/pm_domains.c                  | 44 ++++++++---
- arch/arm/mach-exynos/suspend.c                     |  2 +-
- arch/arm/plat-samsung/adc.c                        |  6 +-
- 11 files changed, 176 insertions(+), 64 deletions(-)
+-- 
+2.4.0
