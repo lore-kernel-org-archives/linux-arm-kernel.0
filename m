@@ -1,127 +1,135 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 11 May 2015 16:10:06 +0900
-Subject: [v2 2/5] arm64: kdump: implement machine_crash_shutdown()
-In-Reply-To: <20150424103900.GF29183@leverpostej>
-References: <1429861989-8417-1-git-send-email-takahiro.akashi@linaro.org>
- <1429861989-8417-3-git-send-email-takahiro.akashi@linaro.org>
- <20150424103900.GF29183@leverpostej>
-Message-ID: <555055CE.7090000@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 11 May 2015 09:12:58 +0200
+Subject: [PATCH 00/10] arm64: relax Image placement rules
+Message-ID: <1431328388-3051-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/24/2015 07:39 PM, Mark Rutland wrote:
-> On Fri, Apr 24, 2015 at 08:53:05AM +0100, AKASHI Takahiro wrote:
->> kdump calls machine_crash_shutdown() to shut down non-boot cpus and
->> save per-cpu general-purpose registers before restarting the crash dump
->> kernel. See kernel_kexec().
->> ipi_cpu_stop() is used and a bit modified to support this behavior.
->>
->> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->> ---
->>   arch/arm64/include/asm/kexec.h    |   34 ++++++++++++++++++++++-
->>   arch/arm64/kernel/machine_kexec.c |   55 ++++++++++++++++++++++++++++++++++++-
->>   arch/arm64/kernel/smp.c           |   12 ++++++--
->>   3 files changed, 97 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
->> index 3530ff5..eaf3fcb 100644
->> --- a/arch/arm64/include/asm/kexec.h
->> +++ b/arch/arm64/include/asm/kexec.h
->> @@ -30,6 +30,8 @@
->>
->>   #if !defined(__ASSEMBLY__)
->>
->> +extern bool in_crash_kexec;
->> +
->>   /**
->>    * crash_setup_regs() - save registers for the panic kernel
->>    *
->> @@ -40,7 +42,37 @@
->>   static inline void crash_setup_regs(struct pt_regs *newregs,
->>   				    struct pt_regs *oldregs)
->>   {
->> -	/* Empty routine needed to avoid build errors. */
->> +	if (oldregs) {
->> +		memcpy(newregs, oldregs, sizeof(*newregs));
->> +	} else {
->> +		__asm__ __volatile__ (
->> +			"stp	 x0,   x1, [%3]\n\t"
->
-> Why the tabs?
+This is a followup to the "arm64: update/clarify/relax Image and FDT placement
+rules" series I sent a while ago:
+(http://article.gmane.org/gmane.linux.ports.arm.kernel/407148)
 
-Don't know. Will remove them.
+This has now been split in two series: this second series deals with the
+physical and virtual placement of the kernel Image. It depends on the first
+three patches of the first series:
+http://thread.gmane.org/gmane.linux.kernel.efi/5736
 
-> Please use #16 * N as the offset for consistency with entry.S, with 0
-> for the first N.
+This series updates the mapping of the kernel Image and the linear mapping of
+system memory to allow more freedom in the choice of placement without affecting
+the accessibility of system RAM below the kernel Image, and the mapping
+efficiency (i.e., memory can always be mapped in 512 MB or 1 GB blocks).
+See below for a page table dump captured on AMD Seattle without and without this
+series applied.
 
-OK.
+Changes since previous version:
+- rebased onto v4.1-rc3
+- dropped phys_offset_bias in favor of updating memstart_addr with the bias
+  temporarily
+- bootstrap the linear mapping of the base of RAM in addition to the linear
+  mapping of the statically allocated page tables
+- fixed a bug in the handling of the mem= kernel command line parameter.
 
-> [...]
->
->> +static void machine_kexec_mask_interrupts(void)
->> +{
->> +	unsigned int i;
->> +	struct irq_desc *desc;
->> +
->> +	for_each_irq_desc(i, desc) {
->> +		struct irq_chip *chip;
->> +
->> +		chip = irq_desc_get_chip(desc);
->> +		if (!chip)
->> +			continue;
->> +
->> +		if (chip->irq_eoi && irqd_irq_inprogress(&desc->irq_data))
->> +			chip->irq_eoi(&desc->irq_data);
->> +
->> +		if (chip->irq_mask)
->> +			chip->irq_mask(&desc->irq_data);
->> +
->> +		if (chip->irq_disable && !irqd_irq_disabled(&desc->irq_data))
->> +			chip->irq_disable(&desc->irq_data);
->> +	}
->> +}
->
-> I'm surprised that this isn't left to the irqchip driver init code in
-> the crash kernel. For all we know this state could be corrupt anyway.
->
-> Is there any reason we can't get the GIC driver to nuke all of this at
-> probe time?
+Known issues:
+- the mem= command line parameter works correctly now, but removes memory from
+  the bottom first before clipping from the top, which may be undesirable since
+  it may discard precious memory below the 4 GB boundary.s
 
-I don't get the point. You mean that the code be put in probe() of GIC driver?
-To be honest, this function was copied from arm's implementation.
+Patch #1 drops the statically allocated EFI root pgd in favor of one allocated
+dynamically by pgd_alloc(). Since pgd_alloc is initialized itself in a core
+initcall, the EFI virtmap init is moved to a postcore_initcall.
 
-> [...]
->
->> @@ -542,7 +543,7 @@ static DEFINE_RAW_SPINLOCK(stop_lock);
->>   /*
->>    * ipi_cpu_stop - handle IPI from smp_send_stop()
->>    */
->> -static void ipi_cpu_stop(unsigned int cpu)
->> +static void ipi_cpu_stop(unsigned int cpu, struct pt_regs *regs)
->>   {
->>   	if (system_state == SYSTEM_BOOTING ||
->>   	    system_state == SYSTEM_RUNNING) {
->> @@ -556,6 +557,13 @@ static void ipi_cpu_stop(unsigned int cpu)
->>
->>   	local_irq_disable();
->>
->> +#ifdef CONFIG_KEXEC
->> +	if (in_crash_kexec) {
->> +		crash_save_cpu(regs, cpu);
->> +		flush_cache_all();
->
-> Any cache maintenance will need to be by VA; flush_cache_all doesn't do
-> what the name implies, though may appear to work by chance.
->
-> Is kdump implemented for ARM? I don't see equivalent for in the arch/arm
-> ipi_cpu_stop.
+Patch #2 removes the requirement that the Image be placed such that it does not
+cross a 512 MB/1 GB alignment boundary, by shrinking the ID map to a single
+page.
 
-Arm has a dedicated function in arch/arm/kernel/machine_kexec.c:
-    machine_crash_shutdown()
-       => machine_crash_nonpanic_core()
+Patch #3 is a cleanup patch related to the ID map.
 
-Thanks,
--Takahiro AKASHI
+Patch #4 changes the memblock_reserve logic so that unused page table
+reservations are left unreserved in memblock.
 
-> Mark.
->
+Patch #5 refactors early_fixmap_init() so that we can reuse its core for
+bootstrapping other memory mappings.
+
+Patch #6 bootstraps the linear mapping explicitly. Up until now, this was done
+implicitly due to the fact that the linear mapping starts at the base of the
+kernel Image.
+
+Patch #7 moves the mapping of the kernel Image outside of the linear mapping.
+
+Patch #8 changes the attributes of the linear mapping to non-executable since
+we don't execute code from it anymore.
+
+Patch #9 allows the kernel to be loaded at any 2 MB aligned offset in physical
+memory, by assigning PHYS_OFFSET based on the available memory and not based on
+the physical address of the base of the kernel Image.
+
+Patch #10 updates the UEFI stub placement logic to put the kernel at the top of
+memory. This patch is merely a proof of concept for the rest of the series, it
+is not necessarily a good idea to always load the kernel high.
+
+Ard Biesheuvel (10):
+  arm64/efi: use dynamically allocated space for EFI pgd
+  arm64: reduce ID map to a single page
+  arm64: drop sleep_idmap_phys and clean up cpu_resume()
+  arm64: use more granular reservations for static page table
+    allocations
+  arm64: split off early mapping code from early_fixmap_init()
+  arm64: mm: explicitly bootstrap the linear mapping
+  arm64: move kernel mapping out of linear region
+  arm64: map linear region as non-executable
+  arm64: allow kernel Image to be loaded anywhere in physical memory
+  arm64/efi: adapt to relaxed kernel Image placement requirements
+
+ Documentation/arm64/booting.txt   |  20 ++--
+ arch/arm64/include/asm/boot.h     |   7 ++
+ arch/arm64/include/asm/compiler.h |   2 +
+ arch/arm64/include/asm/memory.h   |  19 +++-
+ arch/arm64/kernel/efi-stub.c      |   5 +-
+ arch/arm64/kernel/efi.c           |  10 +-
+ arch/arm64/kernel/head.S          |  31 ++++--
+ arch/arm64/kernel/sleep.S         |   9 +-
+ arch/arm64/kernel/suspend.c       |   3 -
+ arch/arm64/kernel/vmlinux.lds.S   |  51 +++++++--
+ arch/arm64/mm/init.c              |  51 ++++++++-
+ arch/arm64/mm/mmu.c               | 222 ++++++++++++++++++++++++--------------
+ arch/arm64/mm/proc.S              |   3 +-
+ 13 files changed, 302 insertions(+), 131 deletions(-)
+
+
+Before:
+-------
+[...]
+---[ Fixmap start ]---
+0xffffffbffabff000-0xffffffbffac00000           4K     RW NX SHD AF    UXN DEVICE/nGnRE
+---[ Fixmap end ]---
+---[ PCI I/O start ]---
+---[ PCI I/O end ]---
+---[ Modules start ]---
+---[ Modules end ]---
+---[ Kernel Mapping ]---
+0xffffffc000000000-0xffffffc000800000           8M     RW x  SHD AF    UXN MEM/NORMAL
+0xffffffc000800000-0xffffffc00081b000         108K     RW x  SHD AF    UXN MEM/NORMAL
+0xffffffc00081b000-0xffffffc00086e000         332K     RW NX SHD AF    UXN MEM/NORMAL
+0xffffffc00086e000-0xffffffc000a00000        1608K     RW x  SHD AF    UXN MEM/NORMAL
+0xffffffc000a00000-0xffffffc3ff000000       16358M     RW x  SHD AF    UXN MEM/NORMAL
+
+After:
+------
+[...]
+---[ Fixmap start ]---
+0xffffffbff67ff000-0xffffffbff6800000           4K     RW NX SHD AF    UXN DEVICE/nGnRE
+0xffffffbff6800000-0xffffffbff6a00000           2M     ro NX SHD AF    UXN MEM/NORMAL
+---[ Fixmap end ]---
+---[ PCI I/O start ]---
+---[ PCI I/O end ]---
+---[ Modules start ]---
+---[ Modules end ]---
+0xffffffbffc000000-0xffffffbffc800000           8M     RW x  SHD AF    MEM/NORMAL
+0xffffffbffc800000-0xffffffbffc81d000         116K     RW x  SHD AF    UXN MEM/NORMAL
+0xffffffbffc81d000-0xffffffbffc870000         332K     RW NX SHD AF    UXN MEM/NORMAL
+0xffffffbffc870000-0xffffffbffca00000        1600K     RW x  SHD AF    UXN MEM/NORMAL
+---[ Kernel Mapping ]---
+0xffffffc000000000-0xffffffc400000000          16G     RW NX SHD AF    UXN MEM/NORMAL
+
+-- 
+1.9.1
