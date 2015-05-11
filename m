@@ -1,875 +1,269 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Mon, 11 May 2015 11:02:54 +0200
-Subject: [PATCH v2] arm, imx6, dts: add DT for aristainetos2 board
-Message-ID: <1431334974-27531-1-git-send-email-hs@denx.de>
+From: mfuzzey@parkeon.com (Martin Fuzzey)
+Date: Mon, 11 May 2015 11:04:39 +0200
+Subject: [PATCH 2/2] Regulator: add driver for Freescale MC34708
+In-Reply-To: <20150430194552.GE22845@sirena.org.uk>
+References: <20150428141740.16243.79036.stgit@localhost>
+ <20150430194552.GE22845@sirena.org.uk>
+Message-ID: <555070A7.2060808@parkeon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add support for the imx6dl based aristainetos2 board
-with following configuration:
+Thank you for the review.
 
-CPU:   Freescale i.MX6DL rev1.1 at 792 MHz
-MReset cause: POR
-MBoard: aristaitenos2
-DRAM:  1 GiB
-NAND:  1024 MiB
-MMC:   FSL_SDHC: 0, FSL_SDHC: 1
-SF: Detected N25Q128A with page size 256 Bytes, erase size 64 KiB, total 16 MiB
-Display: lb07wv8 (800x480)
+On 30/04/15 21:45, Mark Brown wrote:
+> On Tue, Apr 28, 2015 at 04:17:40PM +0200, Martin Fuzzey wrote:
+>> Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
+> Please use subject lines reflecting the style for the subsystem.
+>
+You mean
+regulator: mc34708: Add driver?
 
-As this board can used with 2 different display types, the
-differences between them are extracted into 2 DTS files, and
-the common settings are collected in a common file.
+I ommitted the mc34708 part because it's a new driver
 
-Signed-off-by: Heiko Schocher <hs@denx.de>
----
+>> +static int mc34708_read_bits(struct mc34708_regulator *mc34708_reg,
+>> +			     unsigned int reg, u32 mask)
+>> +{
+>> +	int ret;
+>> +	u32 val;
+>> +
+>> +	ret = mc13xxx_reg_read(mc34708_reg->mc13xxx, reg, &val);
+>> +	if (ret < 0)
+>> +		return ret;
+>> +
+>> +	val &= mask;
+>> +	val >>= ffs(mask) - 1;
+> Ick, this looks confusing - it's wrapping something which should hopefully
+> be a regmap in multiple layer.  The bitfield access helper does seem
+> reasonable though.
 
-Changes in v2:
-- add comments from Sascha Hauer:
-  - remove "clock-frequency" property in i2c nodes
-  - correct indentation in some pinctrl nodes
-  - move pin settings out of "gpiogrp" where it was possible
-    led pins not moved, as they used through sysfs
+The reason for this wrapping stuff is that this is not a standalone 
+driver, rather a "subdriver" of the mc13xxx MFD driver.
+That already exists and supports the mc34708 (for the RTC for example) 
+but not yet the regulator parts.
+It does not expose regmap (although it does use it internally).
+>> +static int mc34708_update_bits(struct mc34708_regulator *mc34708_reg,
+>> +			       unsigned int reg, u32 mask, u32 val)
+>> +{
+>> +	val <<= ffs(mask) - 1;
+>> +
+>> +	return mc13xxx_reg_rmw(mc34708_reg->mc13xxx, reg, mask, val);
+> This is a wrapper for the widely used _update_bits() interface which has
+> a different interface - that's *definitely* confusing.
+You are referring to the fact that the "val" parameter in my function is 
+the non shifted value?
+I think this makes the call sites much cleaner.
+I get your point about it having the same name but different semantics 
+as other functions though.
+Would you be happier if I rename this to mc34708_set_bitfield() for example?
 
- arch/arm/boot/dts/imx6dl-aristainetos2_4.dts | 124 ++++++
- arch/arm/boot/dts/imx6dl-aristainetos2_7.dts |  63 +++
- arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi | 627 +++++++++++++++++++++++++++
- 3 files changed, 814 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6dl-aristainetos2_4.dts
- create mode 100644 arch/arm/boot/dts/imx6dl-aristainetos2_7.dts
- create mode 100644 arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi
 
-diff --git a/arch/arm/boot/dts/imx6dl-aristainetos2_4.dts b/arch/arm/boot/dts/imx6dl-aristainetos2_4.dts
-new file mode 100644
-index 0000000..43916a0
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6dl-aristainetos2_4.dts
-@@ -0,0 +1,124 @@
-+/*
-+ * support fot the imx6 based aristainetos2 board
-+ *
-+ * Copyright (C) 2015 Heiko Schocher <hs@denx.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+/dts-v1/;
-+#include "imx6dl.dtsi"
-+#include "imx6qdl-aristainetos2.dtsi"
-+
-+/ {
-+	model = "aristainetos2 i.MX6 Dual Lite Board 4";
-+	compatible = "fsl,imx6dl";
-+
-+	backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm1 0 5000000>;
-+		brightness-levels = <0 4 8 16 32 64 128 255>;
-+		default-brightness-level = <7>;
-+		status = "okay";
-+	};
-+
-+	memory {
-+		reg = <0x10000000 0x40000000>;
-+	};
-+
-+	soc {
-+		display0: display at di0 {
-+			compatible = "fsl,imx-parallel-display";
-+			interface-pix-fmt = "rgb24";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_ipu1_1_80Ohm_clk>;
-+			fsl,panel = <&lcd_panel>;
-+			status = "okay";
-+
-+			port {
-+				display0_in: endpoint {
-+					remote-endpoint = <&ipu1_di0_disp0>;
-+				};
-+			};
-+		};
-+	};
-+};
-+
-+&ecspi1 {
-+	lcd_panel: display at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "lg,lg4573";
-+		spi-max-frequency = <10000000>;
-+		reg = <0>;
-+		power-on-delay = <10>;
-+		display-timings {
-+			480x800p57 {
-+				native-mode;
-+				clock-frequency = <27000027>;
-+				hactive = <480>;
-+				vactive = <800>;
-+				hfront-porch = <10>;
-+				hback-porch = <59>;
-+				hsync-len = <10>;
-+				vback-porch = <15>;
-+				vfront-porch = <15>;
-+				vsync-len = <15>;
-+				hsync-active = <1>;
-+				vsync-active = <1>;
-+			};
-+		};
-+	};
-+};
-+
-+&i2c3 {
-+	atmel: atmel_mxt_ts at 4b {
-+		compatible = "atmel,maxtouch";
-+		reg = <0x4b>;
-+		interrupt-parent = <&gpio2>;
-+		interrupts = <9 8>;
-+	};
-+};
-+
-+&iomuxc {
-+	ipu_disp1 {
-+		pinctrl_ipu1_1_80Ohm_clk: ipudisp1grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_DI0_DISP_CLK__IPU1_DI0_DISP_CLK 0x31
-+				MX6QDL_PAD_DI0_PIN15__IPU1_DI0_PIN15       0xE1
-+				MX6QDL_PAD_DI0_PIN2__IPU1_DI0_PIN02        0x10
-+				MX6QDL_PAD_DI0_PIN3__IPU1_DI0_PIN03        0x10
-+				MX6QDL_PAD_DISP0_DAT0__IPU1_DISP0_DATA00   0xE1
-+				MX6QDL_PAD_DISP0_DAT1__IPU1_DISP0_DATA01   0xE1
-+				MX6QDL_PAD_DISP0_DAT2__IPU1_DISP0_DATA02   0xE1
-+				MX6QDL_PAD_DISP0_DAT3__IPU1_DISP0_DATA03   0xE1
-+				MX6QDL_PAD_DISP0_DAT4__IPU1_DISP0_DATA04   0xE1
-+				MX6QDL_PAD_DISP0_DAT5__IPU1_DISP0_DATA05   0xE1
-+				MX6QDL_PAD_DISP0_DAT6__IPU1_DISP0_DATA06   0xE1
-+				MX6QDL_PAD_DISP0_DAT7__IPU1_DISP0_DATA07   0xE1
-+				MX6QDL_PAD_DISP0_DAT8__IPU1_DISP0_DATA08   0xE1
-+				MX6QDL_PAD_DISP0_DAT9__IPU1_DISP0_DATA09   0xE1
-+				MX6QDL_PAD_DISP0_DAT10__IPU1_DISP0_DATA10  0xE1
-+				MX6QDL_PAD_DISP0_DAT11__IPU1_DISP0_DATA11  0xE1
-+				MX6QDL_PAD_DISP0_DAT12__IPU1_DISP0_DATA12  0xE1
-+				MX6QDL_PAD_DISP0_DAT13__IPU1_DISP0_DATA13  0xE1
-+				MX6QDL_PAD_DISP0_DAT14__IPU1_DISP0_DATA14  0xe1
-+				MX6QDL_PAD_DISP0_DAT15__IPU1_DISP0_DATA15  0xE1
-+				MX6QDL_PAD_DISP0_DAT16__IPU1_DISP0_DATA16  0xE1
-+				MX6QDL_PAD_DISP0_DAT17__IPU1_DISP0_DATA17  0xE1
-+				MX6QDL_PAD_DISP0_DAT18__IPU1_DISP0_DATA18  0xE1
-+				MX6QDL_PAD_DISP0_DAT19__IPU1_DISP0_DATA19  0xE1
-+				MX6QDL_PAD_DISP0_DAT20__IPU1_DISP0_DATA20  0xE1
-+				MX6QDL_PAD_DISP0_DAT21__IPU1_DISP0_DATA21  0xE1
-+				MX6QDL_PAD_DISP0_DAT22__IPU1_DISP0_DATA22  0xE1
-+				MX6QDL_PAD_DISP0_DAT23__IPU1_DISP0_DATA23  0xE1
-+			>;
-+		};
-+	};
-+};
-+
-+&ipu1_di0_disp0 {
-+	remote-endpoint = <&display0_in>;
-+};
-diff --git a/arch/arm/boot/dts/imx6dl-aristainetos2_7.dts b/arch/arm/boot/dts/imx6dl-aristainetos2_7.dts
-new file mode 100644
-index 0000000..e1eaf5a
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6dl-aristainetos2_7.dts
-@@ -0,0 +1,63 @@
-+/*
-+ * support fot the imx6 based aristainetos2 board
-+ *
-+ * Copyright (C) 2015 Heiko Schocher <hs@denx.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+/dts-v1/;
-+#include "imx6dl.dtsi"
-+#include "imx6qdl-aristainetos2.dtsi"
-+
-+/ {
-+	model = "aristainetos2 i.MX6 Dual Lite Board 7";
-+	compatible = "fsl,imx6dl";
-+
-+	backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm1 0 3000>;
-+		brightness-levels = <0 4 8 16 32 64 128 255>;
-+		default-brightness-level = <6>;
-+	};
-+
-+	memory {
-+		reg = <0x10000000 0x40000000>;
-+	};
-+};
-+
-+&i2c3 {
-+	atmel: atmel_mxt_ts at 4d {
-+		compatible = "atmel,maxtouch";
-+		reg = <0x4d>;
-+		interrupt-parent = <&gpio2>;
-+		interrupts = <9 8>;
-+	};
-+};
-+
-+&ldb {
-+	status = "okay";
-+
-+	lvds-channel at 0 {
-+		fsl,data-mapping = "spwg";
-+		fsl,data-width = <24>;
-+		status = "okay";
-+
-+		display-timings {
-+			native-mode = <&timing0>;
-+			timing0: 800x480p60 {
-+				clock-frequency = <33246000>;
-+				hactive = <800>;
-+				vactive = <480>;
-+				hfront-porch = <88>;
-+				hback-porch = <88>;
-+				hsync-len = <80>;
-+				vback-porch = <10>;
-+				vfront-porch = <10>;
-+				vsync-len = <25>;
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi b/arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi
-new file mode 100644
-index 0000000..561dbea
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi
-@@ -0,0 +1,627 @@
-+/*
-+ * support fot the imx6 based aristainetos2 board
-+ *
-+ * Copyright (C) 2015 Heiko Schocher <hs@denx.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+#include <dt-bindings/gpio/gpio.h>
-+
-+/ {
-+	regulators {
-+		compatible = "simple-bus";
-+
-+		reg_2p5v: 2p5v {
-+			compatible = "regulator-fixed";
-+			regulator-name = "2P5V";
-+			regulator-min-microvolt = <2500000>;
-+			regulator-max-microvolt = <2500000>;
-+			regulator-always-on;
-+		};
-+
-+		reg_3p3v: 3p3v {
-+			compatible = "regulator-fixed";
-+			regulator-name = "3P3V";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-always-on;
-+		};
-+
-+		reg_usbh1_vbus: usb-h1-vbus {
-+			compatible = "regulator-fixed";
-+			enable-active-high;
-+			gpio = <&gpio1 0 0>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_aristainetos2_usbh1_vbus>;
-+			regulator-name = "usb_h1_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+		};
-+
-+		reg_usbotg_vbus: usb-otg-vbus {
-+			compatible = "regulator-fixed";
-+			enable-active-high;
-+			gpio = <&gpio4 15 0>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_aristainetos2_usbotg_vbus>;
-+			regulator-name = "usb_otg_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+		};
-+
-+	};
-+};
-+
-+&audmux {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_audmux>;
-+	status = "okay";
-+};
-+
-+&can1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_flexcan1>;
-+	status = "okay";
-+};
-+
-+&can2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_flexcan2>;
-+	status = "okay";
-+};
-+
-+&ecspi1 {
-+	fsl,spi-num-chipselects = <3>;
-+	cs-gpios = <&gpio4 9 0 &gpio4 10 0 &gpio4 11 0>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ecspi1>;
-+	dma-names;
-+	status = "okay";
-+};
-+
-+&ecspi2 {
-+	fsl,spi-num-chipselects = <2>;
-+	cs-gpios = <&gpio2 26 0 &gpio2 27 0>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ecspi2>;
-+	dma-names;
-+	status = "okay";
-+};
-+
-+&ecspi4 {
-+	fsl,spi-num-chipselects = <2>;
-+	cs-gpios = <&gpio3 29 0 &gpio5 2 0>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ecspi4>;
-+	dma-names;
-+	status = "okay";
-+
-+	flash: m25p80 at 1 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "micron,n25q128a11";
-+		spi-max-frequency = <20000000>;
-+		reg = <1>;
-+	};
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1>;
-+	status = "okay";
-+
-+	pmic at 58 {
-+		compatible = "dialog,da9063";
-+		reg = <0x58>;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <04 0x8>;
-+
-+		regulators {
-+			bcore1 {
-+				regulator-name = "bcore1";
-+				regulator-always-on = <1>;
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			bcore2 {
-+				regulator-name = "bcore2";
-+				regulator-always-on = <1>;
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			bpro {
-+				regulator-name = "bpro";
-+				regulator-always-on = <1>;
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			bperi {
-+				regulator-name = "bperi";
-+				regulator-always-on = <1>;
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			bmem {
-+				regulator-name = "bmem";
-+				regulator-always-on = <1>;
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			ldo2 {
-+				regulator-name = "ldo2";
-+				regulator-always-on = <1>;
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <1800000>;
-+			};
-+
-+			ldo3 {
-+				regulator-name = "ldo3";
-+				regulator-always-on = <1>;
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			ldo4 {
-+				regulator-name = "ldo4";
-+				regulator-always-on = <1>;
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			ldo5 {
-+				regulator-name = "ldo5";
-+				regulator-always-on = <1>;
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			ldo6 {
-+				regulator-name = "ldo6";
-+				regulator-always-on = <1>;
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			ldo7 {
-+				regulator-name = "ldo7";
-+				regulator-always-on = <1>;
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			ldo8 {
-+				regulator-name = "ldo8";
-+				regulator-always-on = <1>;
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			ldo9 {
-+				regulator-name = "ldo9";
-+				regulator-always-on = <1>;
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			ldo10 {
-+				regulator-name = "ldo10";
-+				regulator-always-on = <1>;
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			ldo11 {
-+				regulator-name = "ldo11";
-+				regulator-always-on = <1>;
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			bio {
-+				regulator-name = "bio";
-+				regulator-always-on = <1>;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+			};
-+		};
-+	};
-+	tmp103: tmp103 at 71 {
-+		compatible = "ti,tmp103";
-+		reg = <0x71>;
-+	};
-+};
-+
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2>;
-+	status = "okay";
-+};
-+
-+&i2c3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c3>;
-+	status = "okay";
-+
-+	expander: tca6416 at 20 {
-+		compatible = "ti,tca6416";
-+		reg = <0x20>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+	};
-+
-+	rtc at 68 {
-+		compatible = "dallas,m41t00";
-+		reg = <0x68>;
-+	};
-+};
-+
-+&i2c4 {
-+	clocks = <&clks 116>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c4>;
-+	status = "okay";
-+	eeprom at 50{
-+		compatible = "atmel,24c64";
-+		reg = <0x50>;
-+	};
-+	eeprom at 57{
-+		compatible = "atmel,24c64";
-+		reg = <0x57>;
-+	};
-+};
-+
-+&iomuxc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_backlight &pinctrl_gpio>;
-+
-+	audmux {
-+		pinctrl_audmux: audmux {
-+			fsl,pins = <
-+				MX6QDL_PAD_CSI0_DAT7__AUD3_RXD  0x80000000
-+				MX6QDL_PAD_CSI0_DAT4__AUD3_TXC  0x80000000
-+				MX6QDL_PAD_CSI0_DAT5__AUD3_TXD  0x80000000
-+				MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS 0x80000000
-+			>;
-+		};
-+	};
-+
-+	backlight {
-+		pinctrl_backlight: backlightgrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_GPIO_9__PWM1_OUT	0x1b0b0
-+				MX6QDL_PAD_EIM_BCLK__GPIO6_IO31	0x1b0b0 /* backlight enable */
-+			>;
-+		};
-+	};
-+
-+	ecspi1 {
-+		pinctrl_ecspi1: ecspi1grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_EIM_D17__ECSPI1_MISO 0x100b1
-+				MX6QDL_PAD_EIM_D18__ECSPI1_MOSI 0x100b1
-+				MX6QDL_PAD_EIM_D16__ECSPI1_SCLK 0x100b1
-+				MX6QDL_PAD_KEY_ROW1__GPIO4_IO09 0x100b1 /* SS0# */
-+				MX6QDL_PAD_KEY_COL2__GPIO4_IO10 0x100b1 /* SS1# */
-+				MX6QDL_PAD_KEY_ROW2__GPIO4_IO11 0x100b1 /* SS2# */
-+			>;
-+		};
-+	};
-+
-+	ecspi2 {
-+		pinctrl_ecspi2: ecspi2grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_EIM_OE__ECSPI2_MISO  0x100b1
-+				MX6QDL_PAD_EIM_CS0__ECSPI2_SCLK 0x100b1
-+				MX6QDL_PAD_EIM_CS1__ECSPI2_MOSI 0x100b1
-+				MX6QDL_PAD_EIM_RW__GPIO2_IO26   0x100b1 /* SS0# */
-+				MX6QDL_PAD_EIM_LBA__GPIO2_IO27  0x100b1 /* SS1# */
-+			>;
-+		};
-+	};
-+
-+	ecspi4 {
-+		pinctrl_ecspi4: ecspi4grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_EIM_D21__ECSPI4_SCLK 0x100b1
-+				MX6QDL_PAD_EIM_D22__ECSPI4_MISO 0x100b1
-+				MX6QDL_PAD_EIM_D28__ECSPI4_MOSI 0x100b1
-+				MX6QDL_PAD_EIM_D29__GPIO3_IO29  0x100b1 /* SS0# */
-+				MX6QDL_PAD_EIM_A25__GPIO5_IO02  0x100b1 /* SS1# */
-+				MX6QDL_PAD_SD4_DAT7__GPIO2_IO15 0x1b0b0 /* WP pin */
-+			>;
-+		};
-+	};
-+
-+	enet {
-+		pinctrl_enet: enetgrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_ENET_MDIO__ENET_MDIO       0x1b0b0
-+				MX6QDL_PAD_ENET_MDC__ENET_MDC         0x1b0b0
-+				MX6QDL_PAD_RGMII_TXC__RGMII_TXC       0x1b0b0
-+				MX6QDL_PAD_RGMII_TD0__RGMII_TD0       0x1b0b0
-+				MX6QDL_PAD_RGMII_TD1__RGMII_TD1       0x1b0b0
-+				MX6QDL_PAD_RGMII_TD2__RGMII_TD2       0x1b0b0
-+				MX6QDL_PAD_RGMII_TD3__RGMII_TD3       0x1b0b0
-+				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL 0x1b0b0
-+				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK  0x1b0b0
-+				MX6QDL_PAD_RGMII_RXC__RGMII_RXC       0x1b0b0
-+				MX6QDL_PAD_RGMII_RD0__RGMII_RD0       0x1b0b0
-+				MX6QDL_PAD_RGMII_RD1__RGMII_RD1       0x1b0b0
-+				MX6QDL_PAD_RGMII_RD2__RGMII_RD2       0x1b0b0
-+				MX6QDL_PAD_RGMII_RD3__RGMII_RD3       0x1b0b0
-+				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL 0x1b0b0
-+			>;
-+		};
-+	};
-+
-+	flexcan1 {
-+		pinctrl_flexcan1: flexcan1grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD3_CLK__FLEXCAN1_RX 0x80000000
-+				MX6QDL_PAD_SD3_CMD__FLEXCAN1_TX 0x80000000
-+			>;
-+		};
-+	};
-+
-+	flexcan2 {
-+		pinctrl_flexcan2: flexcan2grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD3_DAT0__FLEXCAN2_TX 0x80000000
-+				MX6QDL_PAD_SD3_DAT1__FLEXCAN2_RX 0x80000000
-+			>;
-+		};
-+	};
-+
-+	gpio {
-+		pinctrl_gpio: gpiogrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_ENET_CRS_DV__GPIO1_IO25	0x1b0b0 /* led enable */
-+				MX6QDL_PAD_NANDF_CS2__GPIO6_IO15	0x1b0b0 /* LCD power enable */
-+				MX6QDL_PAD_NANDF_CS3__GPIO6_IO16	0x1b0b0 /* led yellow */
-+				MX6QDL_PAD_EIM_EB0__GPIO2_IO28		0x1b0b0 /* led red */
-+				MX6QDL_PAD_EIM_A24__GPIO5_IO04		0x1b0b0 /* led green */
-+				MX6QDL_PAD_EIM_EB1__GPIO2_IO29		0x1b0b0 /* led blue */
-+				MX6QDL_PAD_SD3_DAT5__GPIO7_IO00		0x1b0b0 /* Profibus IRQ */
-+				MX6QDL_PAD_SD3_DAT6__GPIO6_IO18		0x1b0b0 /* FPGA IRQ */
-+				MX6QDL_PAD_EIM_A23__GPIO6_IO06		0x1b0b0 /* spi bus #2 SS driver enable */
-+				MX6QDL_PAD_GPIO_18__GPIO7_IO13		0x1b0b0 /* RST_LOC# PHY reset input (has pull-down!)*/
-+				MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID	0x1b0b0 /* USB_OTG_ID = GPIO1_24*/
-+				MX6QDL_PAD_SD4_DAT1__GPIO2_IO09		0x1b0b0 /* Touchscreen IRQ */
-+				MX6QDL_PAD_EIM_A22__GPIO2_IO16		0x1b0b0 /* PCIe reset */
-+			>;
-+		};
-+	};
-+
-+	gpmi-nand {
-+		pinctrl_gpmi_nand: gpmi-nand {
-+			fsl,pins = <
-+				MX6QDL_PAD_NANDF_CLE__NAND_CLE     0xb0b1
-+				MX6QDL_PAD_NANDF_ALE__NAND_ALE     0xb0b1
-+				MX6QDL_PAD_NANDF_WP_B__NAND_WP_B   0xb0b1
-+				MX6QDL_PAD_NANDF_RB0__NAND_READY_B 0xb000
-+				MX6QDL_PAD_NANDF_CS0__NAND_CE0_B   0xb0b1
-+				MX6QDL_PAD_SD4_CMD__NAND_RE_B      0xb0b1
-+				MX6QDL_PAD_SD4_CLK__NAND_WE_B      0xb0b1
-+				MX6QDL_PAD_NANDF_D0__NAND_DATA00   0xb0b1
-+				MX6QDL_PAD_NANDF_D1__NAND_DATA01   0xb0b1
-+				MX6QDL_PAD_NANDF_D2__NAND_DATA02   0xb0b1
-+				MX6QDL_PAD_NANDF_D3__NAND_DATA03   0xb0b1
-+				MX6QDL_PAD_NANDF_D4__NAND_DATA04   0xb0b1
-+				MX6QDL_PAD_NANDF_D5__NAND_DATA05   0xb0b1
-+				MX6QDL_PAD_NANDF_D6__NAND_DATA06   0xb0b1
-+				MX6QDL_PAD_NANDF_D7__NAND_DATA07   0xb0b1
-+			>;
-+		};
-+	};
-+
-+	i2c1 {
-+		pinctrl_i2c1: i2c1grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_CSI0_DAT8__I2C1_SDA 0x4001b8b1
-+				MX6QDL_PAD_CSI0_DAT9__I2C1_SCL 0x4001b8b1
-+			>;
-+		};
-+	};
-+
-+	i2c2 {
-+		pinctrl_i2c2: i2c2grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_KEY_COL3__I2C2_SCL 0x4001b8b1
-+				MX6QDL_PAD_KEY_ROW3__I2C2_SDA 0x4001b8b1
-+			>;
-+		};
-+	};
-+
-+	i2c3 {
-+		pinctrl_i2c3: i2c3grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_GPIO_5__I2C3_SCL 0x4001b8b1
-+				MX6QDL_PAD_GPIO_6__I2C3_SDA 0x4001b8b1
-+			>;
-+		};
-+	};
-+
-+	i2c4 {
-+		pinctrl_i2c4: i2c4grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_GPIO_7__I2C4_SCL 0x4001b8b1
-+				MX6QDL_PAD_GPIO_8__I2C4_SDA 0x4001b8b1
-+			>;
-+		};
-+	};
-+
-+	uart1 {
-+		pinctrl_uart1: uart1grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA	0x1b0b1
-+				MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA	0x1b0b1
-+				MX6QDL_PAD_EIM_D20__UART1_RTS_B		0x1b0b1
-+				MX6QDL_PAD_EIM_D19__UART1_CTS_B		0x1b0b1
-+			>;
-+		};
-+	};
-+
-+	uart2 {
-+		pinctrl_uart2: uart2grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_EIM_D26__UART2_TX_DATA 0x1b0b1
-+				MX6QDL_PAD_EIM_D27__UART2_RX_DATA 0x1b0b1
-+			>;
-+		};
-+	};
-+
-+	uart3 {
-+		pinctrl_uart3: uart3grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_EIM_D24__UART3_TX_DATA 0x1b0b1
-+				MX6QDL_PAD_EIM_D25__UART3_RX_DATA 0x1b0b1
-+				MX6QDL_PAD_EIM_D31__UART3_RTS_B	  0x1b0b1
-+				MX6QDL_PAD_EIM_D23__UART3_CTS_B	  0x1b0b1
-+			>;
-+		};
-+	};
-+
-+	uart4 {
-+		pinctrl_uart4: uart4grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_KEY_COL0__UART4_TX_DATA 0x1b0b1
-+				MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA 0x1b0b1
-+			>;
-+		};
-+	};
-+
-+	usbotg {
-+		pinctrl_usbotg: usbotggrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_GPIO_1__USB_OTG_ID 0x17059
-+			>;
-+		};
-+		pinctrl_aristainetos2_usbh1_vbus: aristainetos-usbh1-vbus {
-+			fsl,pins = <MX6QDL_PAD_GPIO_0__USB_H1_PWR 0x130b0>;
-+		};
-+		pinctrl_aristainetos2_usbotg_vbus: aristainetos-usbotg-vbus {
-+			fsl,pins = <MX6QDL_PAD_KEY_ROW4__USB_OTG_PWR 0x130b0>;
-+		};
-+	};
-+
-+	usdhc1 {
-+		pinctrl_usdhc1: usdhc1grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD1_CMD__SD1_CMD    0x17059
-+				MX6QDL_PAD_SD1_CLK__SD1_CLK    0x10059
-+				MX6QDL_PAD_SD1_DAT0__SD1_DATA0 0x17059
-+				MX6QDL_PAD_SD1_DAT1__SD1_DATA1 0x17059
-+				MX6QDL_PAD_SD1_DAT2__SD1_DATA2 0x17059
-+				MX6QDL_PAD_SD1_DAT3__SD1_DATA3 0x17059
-+				MX6QDL_PAD_ENET_RXD0__GPIO1_IO27	0x1b0b0 /* SD1 card detect input */
-+				MX6QDL_PAD_DI0_PIN4__GPIO4_IO20		0x1b0b0 /* SD1 write protect input */
-+			>;
-+		};
-+	};
-+
-+	usdhc2 {
-+		pinctrl_usdhc2: usdhc2grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD2_CMD__SD2_CMD    0x71
-+				MX6QDL_PAD_SD2_CLK__SD2_CLK    0x71
-+				MX6QDL_PAD_SD2_DAT0__SD2_DATA0 0x71
-+				MX6QDL_PAD_SD2_DAT1__SD2_DATA1 0x71
-+				MX6QDL_PAD_SD2_DAT2__SD2_DATA2 0x71
-+				MX6QDL_PAD_SD2_DAT3__SD2_DATA3 0x71
-+				MX6QDL_PAD_SD3_RST__GPIO7_IO08		0x1b0b0 /* SD2 level shifter output enable */
-+				MX6QDL_PAD_GPIO_19__GPIO4_IO05		0x1b0b0 /* SD2 card detect input */
-+				MX6QDL_PAD_SD4_DAT2__GPIO2_IO10		0x1b0b0 /* SD2 write protect input */
-+			>;
-+		};
-+	};
-+};
-+
-+&fec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet>;
-+	phy-mode = "rgmii";
-+	phy-reset-gpios = <&gpio7 18 0>;
-+	txd0-skew-ps = <0>;
-+	txd1-skew-ps = <0>;
-+	txd2-skew-ps = <0>;
-+	txd3-skew-ps = <0>;
-+	status = "okay";
-+};
-+
-+&gpmi {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_gpmi_nand>;
-+	status = "okay";
-+};
-+
-+&pcie {
-+	reset-gpio = <&gpio2 16 0>;
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	fsl,uart-has-rtscts;
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart2>;
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart3>;
-+	fsl,uart-has-rtscts;
-+	status = "okay";
-+};
-+
-+&uart4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart4>;
-+	status = "okay";
-+};
-+
-+&usbh1 {
-+	vbus-supply = <&reg_usbh1_vbus>;
-+	dr_mode = "host";
-+	status = "okay";
-+};
-+
-+&usbotg {
-+	vbus-supply = <&reg_usbotg_vbus>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbotg>;
-+	disable-over-current;
-+	dr_mode = "host";
-+	status = "okay";
-+};
-+
-+&usdhc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc1>;
-+	cd-gpios = <&gpio1 27 0>;
-+	no-1-8-v;
-+	status = "okay";
-+};
-+
-+&usdhc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc2>;
-+	cd-gpios = <&gpio4 5 0>;
-+	wp-gpios = <&gpio2 10 0>;
-+	no-1-8-v;
-+	status = "okay";
-+};
--- 
-2.1.0
+>> +static int mc34708_get_voltage_sel(struct regulator_dev *rdev)
+>> +{
+>> +	struct mc34708_regulator *mc34708_reg = rdev->reg_data;
+>> +
+>> +	return mc34708_read_bits(mc34708_reg,
+>> +				rdev->desc->vsel_reg, rdev->desc->vsel_mask);
+>> +}
+> Don't open code this, use the standard regmap helpers.
+See above.
+>
+>> +	val = mc34708_read_bits(mc34708_reg,
+>> +				mc34708_reg->def->mode_reg,
+>> +				mc34708_reg->def->mode_mask);
+>> +	if (val < 0)
+>> +		return ERR_PTR(val);
+>> +
+>> +	BUG_ON(val >= mc34708_reg->def->kind->num_hw_modes);
+> This is too severe, could be a hardware error.
+The purpose of this function is to read a number of bits from the 
+hardware and convert this to a hardware mode based on a lookup table.
+The size of this lookup table should encompase all the possible values 
+read from that bitfield.
+Hence a hardware error alone won't trigger this unless the table size 
+itself is wrong (a code BUG, not a hardware error).
+
+I could change the check to use the mask though, rather than the value 
+read from hardware to make this clearer.
+>> +static int mc34708_sw_find_hw_mode_sel(
+>> +	const struct mc34708_regulator_kind *kind,
+>> +	unsigned int normal,
+>> +	unsigned int standby)
+>> +{
+>> +	const struct mc34708_hw_mode *mode;
+>> +	int i;
+>> +
+>> +	for (i = 0, mode = kind->hw_modes;
+>> +			i < kind->num_hw_modes; i++, mode++) {
+>> +		if (mode->normal == -1 || mode->standby == -1)
+>> +			continue;
+>> +
+>> +		if (mode->standby != standby)
+>> +			continue;
+>> +
+>> +		if ((mode->normal == normal) ||
+>> +		    (normal && (mode->alt_normal == normal)))
+>> +			return i;
+>> +	}
+> I honestly don't really know what the above is supposed to do.  It's
+> mapping something to something but what exactly is unclear...  skipping
+> most of the rest of the mode code.
+The mode code is indeed complicated, but mostly because the hardware 
+doesn't map directly nor orthogonally to the regulator framework concepts.
+
+I tried to explain this in the block comments at the start of each the 
+code for each type of regulator.
+Looks like I failed :(
+
+For the switching regulators:
+There is a  4 bit "mode" field (which I call hwmode to distinguish from 
+the regulator framework concept of mode.
+This field encodes:
+* The enable / disable state when the standby signal is not asserted 
+(there is no seperate enable bit)
+* The enable / disable state when the standby signal is not asserted
+* The operating mode when the standby signal is asserted
+* The operating mode when the standby signal is not asserted
+
+Not all of the 16 possible values are valid. There is no documented or 
+discernable direct mapping of the individual bits.
+
+For the LDO regulators:
+There is a dedicated enable bit (ouf)
+There are 2 bits (VxMode, VxSTBY) controlling the regulator operating 
+mode when the standaby signal is or is not asserted. However these bits 
+are not seperate.
+ From the comment block:
+
+  *    VxMODE    VxSTBY        Normal    Standby
+  *    0    0        ON    ON
+  *    0    1        ON    OFF
+  *    1    0        LP    LP
+  *    1    1        ON    LP
+  *
+
+So, the function above takes the desired regulator modes for the normal 
+and standby states (or 0 for off) and finds the corresponding hwmode 
+(value to write to the register bits).
+
+Then the way I handle all this is just use mc34708_sw_find_hw_mode_sel() 
+to recalculate the hardware mode by walking the tables every time 
+something needs to change.
+The table is different depending on the regulator type.
+
+This turned out to be *much* simpler that the initial open code approach 
+I first tried.
+
+
+>> +static int mc34708_swbst_mode_to_hwmode(unsigned int mode)
+>> +{
+>> +	switch (mode) {
+>> +	case REGULATOR_MODE_IDLE:
+>> +	case REGULATOR_MODE_STANDBY:
+>> +		return  MC34708_SW_OPMODE_PFM;
+> No, this is broken - you're mapping two different modes to one hardware
+> setting.  If the device doesn't support something it just doesn't
+> support it, let the upper layers work out how to handle that.
+Ok
+> Also an extra space there.
+>
+>> +static int mc34708_swbst_setup(struct mc34708_regulator *mc34708_reg)
+>> +{
+>> +	int val, mode;
+>> +
+>> +	val = mc34708_read_bits(mc34708_reg,
+>> +				mc34708_reg->def->mode_reg,
+>> +				mc34708_reg->def->mode_mask);
+>> +	if (val < 0)
+>> +		return val;
+>> +
+>> +	if (val > 0) {
+>> +		mode = mc34708_swbst_hwmode_to_mode(val);
+>> +		if (mode < 0)
+>> +			return mode;
+>> +
+>> +		mc34708_reg->req_mode_normal = mode;
+>> +	} else {
+>> +		/*
+>> +		 * If regulator is intially off we don't know the mode
+>> +		 * but we need a mode to be able to enable it later.
+>> +		 */
+>> +		mc34708_reg->req_mode_normal = REGULATOR_MODE_NORMAL;
+>> +	}
+> I don't really understand what the above is supposed to do, some
+> comments would probably help.
+We need to store the desired modes (for normal and standby state) since 
+.set_mode() and .set_suspend_mode() are not always called before 
+enable() / disable().
+For example, for a .enable() on a switching regulator requires the 
+desired normal and standby mode to be known (to find the appropriate 
+value for the hardware mode bits since there is no hardware enable bit.
+I try to determine the current mode at startup to initialise the desired 
+mode for a later enable by reading the registers but that is only 
+possible if the regulator is already enabled.
+The hardware has no concept of "disabled but will be in PFM mode when 
+enabled" for example.
+
+>> +static int mc34708_ldo_set_suspend_enable(struct regulator_dev *rdev)
+>> +{
+>> +	struct mc34708_regulator *mc34708_reg = rdev->reg_data;
+>> +	int ret;
+>> +
+>> +	ret = mc34708_update_hw_mode(mc34708_reg,
+>> +				     mc34708_reg->req_mode_normal,
+>> +				     mc34708_reg->req_mode_standby);
+>> +	if (!ret)
+>> +		mc34708_reg->suspend_off = false;
+> This looks like it should be a noop.  It also seems very familiar from
+> some of the other code.
+It's not a noop.
+
+If .set_suspend_disable() is called then later .set_suspend_enable() the 
+regulator needs to be recofigured.
+Note that neither .set_suspend_enable(), nor .set_suspend_disable() 
+change the stored modes (req_mode_normal, req_mode_standby) since the 
+regulator framework seperates the concept of enable and mode but this 
+hardware does not.
+>> +static int mc34708_ldo_set_suspend_mode(struct regulator_dev *rdev,
+>> +					unsigned int mode)
+>> +{
+>> +	struct mc34708_regulator *mc34708_reg = rdev->reg_data;
+>> +	int ret;
+>> +
+>> +	if (!mc34708_ldo_has_mode_bit(mc34708_reg))
+>> +		return 0;
+> Again, if the driver doesn't support something don't implement it.
+>
+Ok
+>> +static const unsigned int mc34708_vgen1_volt_table[] = {
+>> +	1200000, 1250000, 1300000, 1350000, 1400000, 1450000, 1500000, 1550000
+>> +};
+> This looks like a linear mapping, use the standard helpers please.
+Ok
+>> +/*
+>> + * Setting some LDO standby states also requires changing the normal state.
+>> + * Therefore save the LDO configuration register on suspend and restore it
+>> + * on resume.
+>> + *
+>> + * This works because .set_suspend_X are called by the platform suspend handler
+>> + * AFTER device suspend
+>> + */
+> That's not something you can rely on, I suggest omitting this for now
+> and doing it separately.
+>
+>> +	num_regs = of_get_child_count(regs_np);
+>> +	mc34708_data = devm_kzalloc(dev, sizeof(*mc34708_data) +
+>> +					num_regs * sizeof(*mc34708_reg),
+>> +					GFP_KERNEL);
+>> +	if (!mc34708_data) {
+>> +		ret = -ENOMEM;
+>> +		goto out;
+>> +	}
+>> +
+>> +	dev_set_drvdata(dev, mc34708_data);
+>> +
+>> +	mc34708_reg = mc34708_data->regulators;
+>> +	for_each_child_of_node(regs_np, reg_np) {
+> No, this is broken - your driver should like all the others register all
+> the regulators on the device uncondtionally.  It should also be using
+> .of_match to allow the core to look up the init data.
+Ok
