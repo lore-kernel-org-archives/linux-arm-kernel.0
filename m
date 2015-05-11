@@ -1,154 +1,44 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 11 May 2015 12:38:33 -0300
-Subject: [PATCH v3] ARM: dts: cubox-i: add support for Broadcom Wifi/Bluetooth
- devices
-Message-ID: <1431358713-12379-1-git-send-email-fabio.estevam@freescale.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Mon, 11 May 2015 11:55:41 -0400
+Subject: [PATCH 0/4] ARM: keystone: Enable Netcp driver on K2 EVMs
+In-Reply-To: <553A630F.4060008@oracle.com>
+References: <1429817852-27938-1-git-send-email-m-karicheri2@ti.com>
+ <55395981.8050902@oracle.com> <553A5E12.9040202@ti.com>
+ <553A630F.4060008@oracle.com>
+Message-ID: <5550D0FD.7060903@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT support for the Broadcom Wifi/Bluetooth devices found on the
-microsom board.
+On 04/24/2015 11:36 AM, santosh shilimkar wrote:
+> On 4/24/2015 8:15 AM, Murali Karicheri wrote:
+>> On 04/23/2015 04:43 PM, santosh shilimkar wrote:
+>>> On 4/23/2015 12:37 PM, Murali Karicheri wrote:
+>>>> NetCP driver support patches are already merged to v4.0.nd v4.1.
+>>>> This series introduce patches to update the DTS bindings and
+>>>> defconfig so that the network driver is fully functional on K2
+>>>> EVMs :- K2HK, K2L and K2E.
+>>>>
+>>> Nice and Thanks Murali for sending these up.
+>>>
+>>>> It will be great if this can be merged to v4.1.
+>>>>
+>>> Its too late for the 4.1 now. For the same reason, we also
+>>> couldn't get the MMU switching fixes in this merge window.
+>>
+>> For my reference, can you point me to the MMU switching fixes you are
+>> referring to?
+>>
+> http://www.spinics.net/lists/arm-kernel/msg411178.html
+>
+> Regards,
+> Santosh
+Santosh,
 
-[Modified original Russell King's patch to use mmc-pwrseq]
+Is MMU switching series applied to a sub system branch already that I 
+can pull to do some testing on K2 devices?
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v2:
-- Remove 'clocks' container as suggested by Shawn
-Changes since v1:
-- Do not permanently keep the oscillator on. Use the proper clk bindings
-from mmc-powerseq.
+Murali
 
- arch/arm/boot/dts/imx6qdl-microsom.dtsi | 103 ++++++++++++++++++++++++++++++++
- 1 file changed, 103 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6qdl-microsom.dtsi b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
-index 349f82b..ec6c7c7 100644
---- a/arch/arm/boot/dts/imx6qdl-microsom.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
-@@ -39,15 +39,98 @@
-  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
-+#include <dt-bindings/gpio/gpio.h>
-+/ {
-+	clk_sdio: sdio-clock {
-+		compatible = "gpio-gate-clock";
-+		#clock-cells = <0>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_microsom_brcm_osc>;
-+		enable-gpios = <&gpio5 5 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+
-+		reg_brcm: brcm-reg {
-+			compatible = "regulator-fixed";
-+			enable-active-high;
-+			gpio = <&gpio3 19 0>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_microsom_brcm_reg>;
-+			regulator-name = "brcm_reg";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			startup-delay-us = <200000>;
-+		};
-+	};
-+
-+	usdhc1_pwrseq: usdhc1_pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		reset-gpios = <&gpio5 26 GPIO_ACTIVE_LOW>,
-+			      <&gpio6 0 GPIO_ACTIVE_LOW>;
-+		clocks = <&clk_sdio>;
-+		clock-names = "ext_clock";
-+	};
-+};
- 
- &iomuxc {
- 	microsom {
-+		pinctrl_microsom_brcm_bt: microsom-brcm-bt {
-+			fsl,pins = <
-+				MX6QDL_PAD_CSI0_DAT14__GPIO6_IO00	0x40013070
-+				MX6QDL_PAD_CSI0_DAT15__GPIO6_IO01	0x40013070
-+				MX6QDL_PAD_CSI0_DAT18__GPIO6_IO04	0x40013070
-+			>;
-+		};
-+
-+		pinctrl_microsom_brcm_osc: microsom-brcm-osc {
-+			fsl,pins = <
-+				MX6QDL_PAD_DISP0_DAT11__GPIO5_IO05	0x40013070
-+			>;
-+		};
-+
-+		pinctrl_microsom_brcm_reg: microsom-brcm-reg {
-+			fsl,pins = <
-+				MX6QDL_PAD_EIM_D19__GPIO3_IO19		0x40013070
-+			>;
-+		};
-+
-+		pinctrl_microsom_brcm_wifi: microsom-brcm-wifi {
-+			fsl,pins = <
-+				MX6QDL_PAD_GPIO_8__XTALOSC_REF_CLK_32K	0x1b0b0
-+				MX6QDL_PAD_CSI0_DATA_EN__GPIO5_IO20	0x40013070
-+				MX6QDL_PAD_CSI0_DAT8__GPIO5_IO26	0x40013070
-+				MX6QDL_PAD_CSI0_DAT9__GPIO5_IO27	0x40013070
-+			>;
-+		};
-+
- 		pinctrl_microsom_uart1: microsom-uart1 {
- 			fsl,pins = <
- 				MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA	0x1b0b1
- 				MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA	0x1b0b1
- 			>;
- 		};
-+
-+		pinctrl_microsom_uart4: microsom-uart4 {
-+			fsl,pins = <
-+				MX6QDL_PAD_CSI0_DAT12__UART4_TX_DATA 0x1b0b1
-+				MX6QDL_PAD_CSI0_DAT13__UART4_RX_DATA 0x1b0b1
-+				MX6QDL_PAD_CSI0_DAT16__UART4_RTS_B 0x1b0b1
-+				MX6QDL_PAD_CSI0_DAT17__UART4_CTS_B 0x1b0b1
-+			>;
-+		};
-+
-+		pinctrl_microsom_usdhc1: microsom-usdhc1 {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD1_CMD__SD1_CMD    0x17059
-+				MX6QDL_PAD_SD1_CLK__SD1_CLK    0x10059
-+				MX6QDL_PAD_SD1_DAT0__SD1_DATA0 0x17059
-+				MX6QDL_PAD_SD1_DAT1__SD1_DATA1 0x17059
-+				MX6QDL_PAD_SD1_DAT2__SD1_DATA2 0x17059
-+				MX6QDL_PAD_SD1_DAT3__SD1_DATA3 0x17059
-+			>;
-+		};
- 	};
- };
- 
-@@ -56,3 +139,23 @@
- 	pinctrl-0 = <&pinctrl_microsom_uart1>;
- 	status = "okay";
- };
-+
-+/* UART4 - Connected to optional BRCM Wifi/BT/FM */
-+&uart4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_microsom_brcm_bt &pinctrl_microsom_uart4>;
-+	fsl,uart-has-rtscts;
-+	status = "okay";
-+};
-+
-+/* USDHC1 - Connected to optional BRCM Wifi/BT/FM */
-+&usdhc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_microsom_brcm_wifi &pinctrl_microsom_usdhc1>;
-+	bus-width = <4>;
-+	mmc-pwrseq = <&usdhc1_pwrseq>;
-+	keep-power-in-suspend;
-+	non-removable;
-+	vmmc-supply = <&reg_brcm>;
-+	status = "okay";
-+};
 -- 
-1.9.1
+Murali Karicheri
+Linux Kernel, Keystone
