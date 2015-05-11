@@ -1,17 +1,30 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 11 May 2015 20:29:31 +0800
-Subject: [PATCH 1/3] ARM: dts: imx6sl-warp: Remove unused regulator
-In-Reply-To: <1430434530-12605-1-git-send-email-festevam@gmail.com>
-References: <1430434530-12605-1-git-send-email-festevam@gmail.com>
-Message-ID: <20150511122930.GB9347@dragon>
+Date: Mon, 11 May 2015 20:34:03 +0800
+Subject: [PATCH v2] ARM: dts: Gateworks GW5510 support (i.MX6)
+In-Reply-To: <1431013080-13536-1-git-send-email-tharvey@gateworks.com>
+References: <1431013080-13536-1-git-send-email-tharvey@gateworks.com>
+Message-ID: <20150511123403.GC9347@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 30, 2015 at 07:55:28PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Thu, May 07, 2015 at 08:38:00AM -0700, Tim Harvey wrote:
+> Add support for the Gateworks GW5510 board featuring:
+>  * i.MX6 SoC
+>  * up to 512MB DDR3
+>  * up to 2GB NAND flash
+>  * 1x miniPCIe socket (with USB)
+>  * HDMI out (micro-HDMI)
+>  * HDMI in (micro-HDMI) (currently supported by only vendor kernel)
+>  * TTL level I/O (supported by GW16111 breakout board):
+>   * I2C
+>   * 2x UART
+>   * CAN
+>   * 2x DIO (GPIO/PWM)
+>   * USB OTG
 > 
-> The 'reg_1p8v' regulator is not used anywhere, so let's remove it.
+> For more details see:
+>  http://www.gateworks.com/product/item/ventana-gw5510-single-board-computer
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
 
-Applied all, thanks.
+Applied, thanks.
