@@ -1,47 +1,31 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 11 May 2015 19:14:53 +0530
-Subject: [PATCHv3 0/4] add devm_of_phy_get_by_index and update platform
- drivers
-In-Reply-To: <Pine.LNX.4.44L0.1504231031170.1529-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1504231031170.1529-100000@iolanthe.rowland.org>
-Message-ID: <5550B255.3040404@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 11 May 2015 10:46:10 -0300
+Subject: [PATCH v2] ARM: dts: cubox-i: add support for Broadcom
+ Wifi/Bluetooth devices
+In-Reply-To: <20150511130016.GE9347@dragon>
+References: <1430932810-28756-1-git-send-email-festevam@gmail.com>
+ <20150511130016.GE9347@dragon>
+Message-ID: <CAOMZO5Cy1uhbqSfRKw_K++VhTQW7Z29GwKNAiLgB_UrF4YG9-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Shawn,
 
-On Thursday 23 April 2015 08:01 PM, Alan Stern wrote:
-> On Wed, 22 Apr 2015, Arun Ramamurthy wrote:
->
->> This patch set adds a new API to get phy by index when multiple
->> phys are present. This patch is based on discussion with Arnd Bergmann
->> about dt bindings for multiple phys.
->>
->> History:
->> v1:
->>      - Removed null pointers on Dmitry's suggestion
->>      - Improved documentation in commit messages
->>      - Exported new phy api
->> v2:
->>      - EHCI and OHCI platform Kconfigs select Generic Phy
->>        to fix build errors in certain configs.
->> v3:
->>      - Made GENERIC_PHY an invisible option so
->>      that other configs can select it
->>      - Added stubs for devm_of_phy_get_by_index
->>      - Reformated code
->>
->> Arun Ramamurthy (4):
->>    phy: phy-core: Make GENERIC_PHY an invisible option
->>    phy: core: Add devm_of_phy_get_by_index to phy-core
->>    usb: ehci-platform: Use devm_of_phy_get_by_index
->>    usb: ohci-platform: Use devm_of_phy_get_by_index
->
-> For patches 3 and 4:
->
-> Acked-by: Alan Stern <stern@rowland.harvard.edu>
+On Mon, May 11, 2015 at 10:00 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
 
-merged this to linux-phy.
+> One of the device tree maintainers doesn't like "clocks" container.
+> Since you're not using generic node name for child clock, the container
+> can just be saved.
 
-Thanks
-Kishon
+Just to make sure I understand your suggestion: would you like the
+clock nodes to look like this?
+
+    oscillator {
+        clk_sdio: sdio-clock {
+            compatible = "gpio-gate-clock";
+            #clock-cells = <0>;
+            pinctrl-names = "default";
+            pinctrl-0 = <&pinctrl_microsom_brcm_osc>;
+            enable-gpios = <&gpio5 5 GPIO_ACTIVE_HIGH>;
+        };
+    };
