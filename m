@@ -1,98 +1,293 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 11 May 2015 14:00:08 -0500
-Subject: next-20150511 / omap2-mcspi: regression for sdp4430 boot
-In-Reply-To: <20150511183032.GA8085@deathray>
-References: <5550DDCB.8010303@ti.com> <20150511170742.GA6616@deathray>
- <5550F47C.1030902@ti.com> <20150511183032.GA8085@deathray>
-Message-ID: <5550FC38.6020801@ti.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 11 May 2015 13:07:18 -0600
+Subject: [PATCH v2 1/2] coresight: replicator: Add Qualcomm CoreSight
+ Replicator driver
+In-Reply-To: <1431012969-16338-2-git-send-email-ivan.ivanov@linaro.org>
+References: <1431012969-16338-1-git-send-email-ivan.ivanov@linaro.org>
+ <1431012969-16338-2-git-send-email-ivan.ivanov@linaro.org>
+Message-ID: <CANLsYkx289yPQo3rJK0tCaDt+_axWjh1i2_6=rmL2p_Yw4Qr8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2015 01:30 PM, Michael Welling wrote:
-> On Mon, May 11, 2015 at 01:27:08PM -0500, Nishanth Menon wrote:
->> On 05/11/2015 12:07 PM, Michael Welling wrote:
->>> On Mon, May 11, 2015 at 11:50:19AM -0500, Nishanth Menon wrote:
->>>> Hi,
->>>>
->>>> SDP4430 uses a SPI based network chip ks8851.
->>>>
->>>> next-20150508:
->>>> https://github.com/nmenon/kernel-test-logs/blob/next-20150508/omap2plus_defconfig/sdp4430.txt
->>>>
->>>> However, next-20150511:
->>>> https://github.com/nmenon/kernel-test-logs/blob/next-20150511/omap2plus_defconfig/sdp4430.txt
->>>>
->>>
->>> I will look into this but it is going to be difficult to debug with access to the hardware.
->>> This is what I get for changing a driver that effects so many SoCs.
->>>
->>
->> Let me know if there is any test patch you'd want me to run. The board
->> is on a remote "board farm" which most of TI folks have access to as
->> well.. So, if you need anything run, just send out a debug patch OR a
->> potential fix and we can help try it out and provide logs back for
->> your debug.
-> 
-> Okay.
-> 
-> It looks like you revert the patches in the wrong order above.
-> 
-> The GPIO patch should apply after the transfer_one patch so it should
-> logically be reverted in the reverse order.
-> 
-Apologies on a slow response, was tracking another LPAE regression down.
+On 7 May 2015 at 09:36, Ivan T. Ivanov <ivan.ivanov@linaro.org> wrote:
+> From: Pratik Patel <pratikp@codeaurora.org>
+>
+> This driver manages Qualcomm CoreSight Replicator device, which
+> resides on the AMBA bus. Replicator has been made programmable to
+> allow software to turn of the replicator branch to sink that is not
+> being used. This avoids trace traffic to the unused/non-current sink
+> from causing back pressure that results in overflows at the source.
+>
+> Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
+> Signed-off-by: Ivan T. Ivanov <ivan.ivanov@linaro.org>
+> ---
+>  .../devicetree/bindings/arm/coresight.txt          |   1 +
+>  drivers/hwtracing/coresight/Kconfig                |   8 +
+>  drivers/hwtracing/coresight/Makefile               |   1 +
+>  .../coresight/coresight-replicator-qcom.c          | 214 +++++++++++++++++++++
+>  4 files changed, 224 insertions(+)
+>  create mode 100644 drivers/hwtracing/coresight/coresight-replicator-qcom.c
+>
+> diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
+> index f4d6a86..661a1be 100644
+> --- a/Documentation/devicetree/bindings/arm/coresight.txt
+> +++ b/Documentation/devicetree/bindings/arm/coresight.txt
+> @@ -18,6 +18,7 @@ its hardware characteristcs.
+>                 - "arm,coresight-funnel", "arm,primecell";
+>                 - "arm,coresight-etm3x", "arm,primecell";
+>                 - "arm,coresight-etm4x", "arm,primecell";
+> +               - "qcom,coresight-replicator1x", "arm,primecell";
+>
+>         * reg: physical base address and length of the register
+>           set(s) of the component.
+> diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
+> index 6b331d4..a57a51d 100644
+> --- a/drivers/hwtracing/coresight/Kconfig
+> +++ b/drivers/hwtracing/coresight/Kconfig
+> @@ -68,4 +68,12 @@ config CORESIGHT_SOURCE_ETM4X
+>           instructions that a processor is executing. This is primarily useful
+>           for instruction level tracing. Depending on the implemented version
+>           data tracing may also be available.
+> +
+> +config CORESIGHT_QCOM_REPLICATOR
+> +       bool "Qualcomm CoreSight Replicator driver"
+> +       help
+> +         This enables support for Qualcomm CoreSight link driver. The programmable
+> +         ATB replicator sends the ATB trace stream from the ETB/ETF to the TPIU
+> +         and ETR.
+> +
+>  endif
+> diff --git a/drivers/hwtracing/coresight/Makefile b/drivers/hwtracing/coresight/Makefile
+> index 0af28d4..99f8e5f 100644
+> --- a/drivers/hwtracing/coresight/Makefile
+> +++ b/drivers/hwtracing/coresight/Makefile
+> @@ -10,3 +10,4 @@ obj-$(CONFIG_CORESIGHT_LINKS_AND_SINKS) += coresight-funnel.o \
+>                                            coresight-replicator.o
+>  obj-$(CONFIG_CORESIGHT_SOURCE_ETM3X) += coresight-etm3x.o coresight-etm-cp14.o
+>  obj-$(CONFIG_CORESIGHT_SOURCE_ETM4X) += coresight-etm4x.o
+> +obj-$(CONFIG_CORESIGHT_QCOM_REPLICATOR) += coresight-replicator-qcom.o
+> diff --git a/drivers/hwtracing/coresight/coresight-replicator-qcom.c b/drivers/hwtracing/coresight/coresight-replicator-qcom.c
+> new file mode 100644
+> index 0000000..deacea4
+> --- /dev/null
+> +++ b/drivers/hwtracing/coresight/coresight-replicator-qcom.c
+> @@ -0,0 +1,214 @@
+> +/*
+> + * Copyright (c) 2011-2015, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/amba/bus.h>
+> +#include <linux/clk.h>
+> +#include <linux/coresight.h>
+> +#include <linux/device.h>
+> +#include <linux/err.h>
+> +#include <linux/init.h>
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/of.h>
+> +#include <linux/pm_runtime.h>
+> +#include <linux/slab.h>
+> +
+> +#include "coresight-priv.h"
+> +
+> +#define REPLICATOR_IDFILTER0           0x000
+> +#define REPLICATOR_IDFILTER1           0x004
+> +
+> +/**
+> + * struct replicator_state - specifics associated to a replicator component
+> + * @base:      memory mapped base address for this component.
+> + * @dev:       the device entity associated with this component
+> + * @atclk:     optional clock for the core parts of the replicator.
+> + * @csdev:     component vitals needed by the framework
+> + */
+> +struct replicator_state {
+> +       void __iomem            *base;
+> +       struct device           *dev;
+> +       struct clk              *atclk;
+> +       struct coresight_device *csdev;
+> +};
+> +
+> +static int replicator_enable(struct coresight_device *csdev, int inport,
+> +                             int outport)
+> +{
+> +       struct replicator_state *drvdata = dev_get_drvdata(csdev->dev.parent);
+> +
+> +       pm_runtime_get_sync(drvdata->dev);
+> +
+> +       CS_UNLOCK(drvdata->base);
+> +
+> +       /*
+> +        * Ensure that the other port is disabled
+> +        * 0x00 - passing through the replicator unimpeded
+> +        * 0xff - disable (or impede) the flow of ATB data
+> +        */
+> +       if (outport == 0) {
+> +               writel_relaxed(0x00, drvdata->base + REPLICATOR_IDFILTER0);
+> +               writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER1);
+> +       } else {
+> +               writel_relaxed(0x00, drvdata->base + REPLICATOR_IDFILTER1);
+> +               writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER0);
+> +       }
+> +
+> +       CS_LOCK(drvdata->base);
+> +
+> +       dev_info(drvdata->dev, "REPLICATOR enabled\n");
+> +       return 0;
+> +}
+> +
+> +static void replicator_disable(struct coresight_device *csdev, int inport,
+> +                               int outport)
+> +{
+> +       struct replicator_state *drvdata = dev_get_drvdata(csdev->dev.parent);
+> +
+> +       CS_UNLOCK(drvdata->base);
+> +
+> +       /* disable the flow of ATB data through port */
+> +       if (outport == 0)
+> +               writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER0);
+> +       else
+> +               writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER1);
+> +
+> +       CS_LOCK(drvdata->base);
+> +
+> +       pm_runtime_put(drvdata->dev);
+> +
+> +       dev_info(drvdata->dev, "REPLICATOR disabled\n");
+> +}
+> +
+> +static const struct coresight_ops_link replicator_link_ops = {
+> +       .enable         = replicator_enable,
+> +       .disable        = replicator_disable,
+> +};
+> +
+> +static const struct coresight_ops replicator_cs_ops = {
+> +       .link_ops       = &replicator_link_ops,
+> +};
+> +
+> +static int replicator_probe(struct amba_device *adev, const struct amba_id *id)
+> +{
+> +       int ret;
+> +       struct device *dev = &adev->dev;
+> +       struct resource *res = &adev->res;
+> +       struct coresight_platform_data *pdata = NULL;
+> +       struct replicator_state *drvdata;
+> +       struct coresight_desc *desc;
+> +       struct device_node *np = adev->dev.of_node;
+> +       void __iomem *base;
+> +
+> +       if (np) {
+> +               pdata = of_get_coresight_platform_data(dev, np);
+> +               if (IS_ERR(pdata))
+> +                       return PTR_ERR(pdata);
+> +               adev->dev.platform_data = pdata;
+> +       }
+> +
+> +       drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
+> +       if (!drvdata)
+> +               return -ENOMEM;
+> +
+> +       drvdata->dev = &adev->dev;
+> +       drvdata->atclk = devm_clk_get(&adev->dev, "atclk"); /* optional */
+> +       if (!IS_ERR(drvdata->atclk)) {
+> +               ret = clk_prepare_enable(drvdata->atclk);
+> +               if (ret)
+> +                       return ret;
+> +       }
+> +
+> +       /* Validity for the resource is already checked by the AMBA core */
+> +       base = devm_ioremap_resource(dev, res);
+> +       if (IS_ERR(base))
+> +               return PTR_ERR(base);
+> +
+> +       drvdata->base = base;
+> +       dev_set_drvdata(dev, drvdata);
+> +       pm_runtime_put(&adev->dev);
+> +
+> +       desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
+> +       if (!desc)
+> +               return -ENOMEM;
+> +
+> +       desc->type = CORESIGHT_DEV_TYPE_LINK;
+> +       desc->subtype.link_subtype = CORESIGHT_DEV_SUBTYPE_LINK_SPLIT;
+> +       desc->ops = &replicator_cs_ops;
+> +       desc->pdata = adev->dev.platform_data;
+> +       desc->dev = &adev->dev;
+> +       drvdata->csdev = coresight_register(desc);
+> +       if (IS_ERR(drvdata->csdev))
+> +               return PTR_ERR(drvdata->csdev);
+> +
+> +       dev_info(dev, "%s initialized\n", (char *)id->data);
+> +       return 0;
+> +}
+> +
+> +static int replicator_remove(struct amba_device *adev)
+> +{
+> +       struct replicator_state *drvdata = amba_get_drvdata(adev);
+> +
+> +       pm_runtime_disable(&adev->dev);
+> +       coresight_unregister(drvdata->csdev);
+> +       return 0;
+> +}
+> +
+> +#ifdef CONFIG_PM
+> +static int replicator_runtime_suspend(struct device *dev)
+> +{
+> +       struct replicator_state *drvdata = dev_get_drvdata(dev);
+> +
+> +       if (drvdata && !IS_ERR(drvdata->atclk))
+> +               clk_disable_unprepare(drvdata->atclk);
+> +
+> +       return 0;
+> +}
+> +
+> +static int replicator_runtime_resume(struct device *dev)
+> +{
+> +       struct replicator_state *drvdata = dev_get_drvdata(dev);
+> +
+> +       if (drvdata && !IS_ERR(drvdata->atclk))
+> +               clk_prepare_enable(drvdata->atclk);
+> +
+> +       return 0;
+> +}
+> +#endif
+> +
+> +static const struct dev_pm_ops replicator_dev_pm_ops = {
+> +       SET_RUNTIME_PM_OPS(replicator_runtime_suspend,
+> +                          replicator_runtime_resume,
+> +                          NULL)
+> +};
+> +
+> +static struct amba_id replicator_ids[] = {
+> +       {
+> +               .id     = 0x0003b909,
+> +               .mask   = 0x0003ffff,
+> +               .data   = "REPLICATOR 1.0",
+> +       },
+> +       { 0, 0 },
+> +};
+> +
+> +static struct amba_driver replicator_driver = {
+> +       .drv = {
+> +               .name   = "coresight-replicator-qcom",
+> +               .pm     = &replicator_dev_pm_ops,
+> +       },
+> +       .probe          = replicator_probe,
+> +       .remove         = replicator_remove,
+> +       .id_table       = replicator_ids,
+> +};
+> +
+> +module_amba_driver(replicator_driver);
+> --
+> 1.9.1
+>
 
-I did do that -> but logged it in reverse - unfortunately it seems to
-have caused a little more confusion :(. is there something else you'd
-like me to do?
-
-git log  next-20150508..next-20150511 drivers/spi
-Tells me:
-
-commit bc7f9bbc80bcc77745b3f54ec4e7103e3e142bb9
-Author: Michael Welling <mwelling@ieee.org>
-Date:   Fri May 8 13:31:01 2015 -0500
-
-    spi: omap2-mcspi: Add gpio_request and init CS
-
-    If GPIO chip select is specified, request the GPIO in the setup
-function
-    and release it in the cleanup function.
-
-    Signed-off-by: Michael Welling <mwelling@ieee.org>
-    Signed-off-by: Mark Brown <broonie@kernel.org>
-
-commit b28cb9414db9f8e42ac18c9e360e4e99cda42489
-Author: Michael Welling <mwelling@ieee.org>
-Date:   Thu May 7 18:36:53 2015 -0500
-
-    spi: omap2-mcspi: Switch driver to use transfer_one
-
-    Switches from transfer_one_message to transfer_one to prepare
-driver for
-    use of GPIO chip selects.
-
-    Signed-off-by: Michael Welling <mwelling@ieee.org>
-    Signed-off-by: Mark Brown <broonie@kernel.org>
-
-
-
-my tested git log looks as follows: (redid it just to be sure):
-
-a4617b41e04c Revert "spi: omap2-mcspi: Switch driver to use transfer_one"
-http://paste.ubuntu.org.cn/2595136
-
-b49011271c7f Revert "spi: omap2-mcspi: Add gpio_request and init CS"
-http://paste.ubuntu.org.cn/2595142
-
-
-012034602bd6 HACK: Makefile: Build a uImage with dtb already appended
-f17107cb8886 Add linux-next specific files for 20150511
-
-012034602bd6 commit is
-https://github.com/nmenon/linux-2.6-playground/commit/177f5f71b3f2 ->
-for legacy platforms needing uImage based booting.
-
--- 
-Regards,
-Nishanth Menon
+Applied - thanks.
