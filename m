@@ -1,62 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 May 2015 23:29:55 +0100
-Subject: [PATCH 1/3] ARM: cache-l2c: Add flag to skip cache unlocking
-In-Reply-To: <1431382651-15894-2-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1431382651-15894-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <1431382651-15894-2-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <20150511222955.GK2067@n2100.arm.linux.org.uk>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 11 May 2015 17:41:25 -0500
+Subject: [PATCH v3 0/4] SA1100 RTC clean-up for ARM64
+Message-ID: <1431384089-28367-1-git-send-email-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 12, 2015 at 12:17:29AM +0200, Sjoerd Simons wrote:
-> The L2C cache should only be unlocked when the cache is setup to allow
-> that. In the common case the l2x0 driver sets up the cache for that to
-> be the case (e.g. setting L310_AUX_CTRL_NS_LOCKDOWN on L2C-310), making
-> unlock safe. However when a secure firmware is in use, it may not be
-> possible for the L2c to be configured that way making unlocking unsafe.
-> 
-> To handle that case add a flag to skip unlocking the cache for machine
-> where this can't be done safely.
-> 
-> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-> ---
->  arch/arm/include/asm/outercache.h | 1 +
->  arch/arm/mm/cache-l2x0.c          | 4 +++-
->  2 files changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
-> index 563b92f..d07ca82 100644
-> --- a/arch/arm/include/asm/outercache.h
-> +++ b/arch/arm/include/asm/outercache.h
-> @@ -39,6 +39,7 @@ struct outer_cache_fns {
->  	/* This is an ARM L2C thing */
->  	void (*write_sec)(unsigned long, unsigned);
->  	void (*configure)(const struct l2x0_regs *);
-> +	bool skip_unlock;
->  };
->  
->  extern struct outer_cache_fns outer_cache;
-> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> index e309c8f..fff7888 100644
-> --- a/arch/arm/mm/cache-l2x0.c
-> +++ b/arch/arm/mm/cache-l2x0.c
-> @@ -136,7 +136,8 @@ static void l2c_enable(void __iomem *base, u32 aux, unsigned num_lock)
->  	l2x0_saved_regs.aux_ctrl = aux;
->  	l2c_configure(base);
->  
-> -	l2c_unlock(base, num_lock);
-> +	if (!outer_cache.skip_unlock)
-> +		l2c_unlock(base, num_lock);
+This series enables building the SA1100 RTC driver for ARM64 in
+preparation for enabling CONFIG_ARCH_MMP on ARM64. This is needed for
+supporting the PXA1928 SOC.
 
-I think we can do better here.  If the non-secure lockdown access bit has
-been set, then proceed with the unlock:
+The previous versions can be found here[1][2]. Changes in this version are
+some whitespace fixes and using BIT() macro. I've added Robert's ack as
+well.
 
-	if (readl_relaxed(base + L2X0_AUX_CTRL) & L310_AUX_CTRL_NS_LOCKDOWN)
-		l2c_unlock(base, num_lock);
+Russell and Eric/Haojian, Can I get an ack for the SA1100 and MMP bits so
+Alexandre can apply.
 
-I don't see any need to add a flag for this.  This also eliminates your
-second patch.
+Rob
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+[1] http://comments.gmane.org/gmane.linux.ports.arm.kernel/391410
+[2] http://comments.gmane.org/gmane.linux.ports.arm.kernel/409740
+
+Rob Herring (4):
+  ARM: pxa: add memory resource to RTC device
+  rtc: sa1100: convert to run-time register mapping
+  ARM: sa1100: remove unused RTC register definitions
+  ARM: mmp: remove unused RTC register definitions
+
+ arch/arm/mach-mmp/include/mach/regs-rtc.h   | 23 --------
+ arch/arm/mach-pxa/devices.c                 | 18 +-----
+ arch/arm/mach-sa1100/include/mach/SA-1100.h | 34 -----------
+ drivers/rtc/rtc-sa1100.c                    | 87 ++++++++++++++++++++---------
+ 4 files changed, 62 insertions(+), 100 deletions(-)
+ delete mode 100644 arch/arm/mach-mmp/include/mach/regs-rtc.h
+
+--
+2.1.0
