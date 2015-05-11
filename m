@@ -1,60 +1,56 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Tue, 12 May 2015 00:17:29 +0200
-Subject: [PATCH 1/3] ARM: cache-l2c: Add flag to skip cache unlocking
-In-Reply-To: <1431382651-15894-1-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1431382651-15894-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <1431382651-15894-2-git-send-email-sjoerd.simons@collabora.co.uk>
+From: Frank.Li@freescale.com (Frank.Li at freescale.com)
+Date: Tue, 12 May 2015 05:15:55 +0800
+Subject: [PATCH 2/2] ARM: dts: imx7d: added arch timer and gpc
+In-Reply-To: <1431378955-991-1-git-send-email-Frank.Li@freescale.com>
+References: <1431378955-991-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <1431378955-991-2-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The L2C cache should only be unlocked when the cache is setup to allow
-that. In the common case the l2x0 driver sets up the cache for that to
-be the case (e.g. setting L310_AUX_CTRL_NS_LOCKDOWN on L2C-310), making
-unlock safe. However when a secure firmware is in use, it may not be
-possible for the L2c to be configured that way making unlocking unsafe.
+From: Frank Li <Frank.Li@freescale.com>
 
-To handle that case add a flag to skip unlocking the cache for machine
-where this can't be done safely.
+add cortex a7 arch timer and gpc to enable smp
+uboot need clear virtual timer offset.
+if not, need add "arm,cpu-registers-not-fw-configured"
+in arch timer section to boot up.
 
-Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
 ---
- arch/arm/include/asm/outercache.h | 1 +
- arch/arm/mm/cache-l2x0.c          | 4 +++-
- 2 files changed, 4 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx7d.dtsi | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
-index 563b92f..d07ca82 100644
---- a/arch/arm/include/asm/outercache.h
-+++ b/arch/arm/include/asm/outercache.h
-@@ -39,6 +39,7 @@ struct outer_cache_fns {
- 	/* This is an ARM L2C thing */
- 	void (*write_sec)(unsigned long, unsigned);
- 	void (*configure)(const struct l2x0_regs *);
-+	bool skip_unlock;
- };
+diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+index c42cf8d..0318437 100644
+--- a/arch/arm/boot/dts/imx7d.dtsi
++++ b/arch/arm/boot/dts/imx7d.dtsi
+@@ -121,6 +121,15 @@
+ 		clock-output-names = "osc";
+ 	};
  
- extern struct outer_cache_fns outer_cache;
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index e309c8f..fff7888 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -136,7 +136,8 @@ static void l2c_enable(void __iomem *base, u32 aux, unsigned num_lock)
- 	l2x0_saved_regs.aux_ctrl = aux;
- 	l2c_configure(base);
++	timer {
++		compatible = "arm,armv7-timer";
++		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
++		interrupt-parent = <&intc>;
++	};
++
+ 	soc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -320,6 +329,12 @@
+ 				interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
+ 				#reset-cells = <1>;
+ 			};
++
++			gpc: gpc at 303a0000 {
++				compatible = "fsl,imx7d-gpc";
++				reg = <0x303a0000 0x10000>;
++				interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
++			};
+ 		};
  
--	l2c_unlock(base, num_lock);
-+	if (!outer_cache.skip_unlock)
-+		l2c_unlock(base, num_lock);
- 
- 	local_irq_save(flags);
- 	__l2c_op_way(base + L2X0_INV_WAY);
-@@ -849,6 +850,7 @@ static int __init __l2c_init(const struct l2c_init_data *data,
- 	fns = data->outer_cache;
- 	fns.write_sec = outer_cache.write_sec;
- 	fns.configure = outer_cache.configure;
-+	fns.skip_unlock = outer_cache.skip_unlock;
- 	if (data->fixup)
- 		data->fixup(l2x0_base, cache_id, &fns);
- 
+ 		aips3: aips-bus at 30800000 {
 -- 
-2.1.4
+1.9.1
