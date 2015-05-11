@@ -1,193 +1,52 @@
-From: g.portay@overkiz.com (=?ISO-8859-1?Q?Ga=EBl_PORTAY?=)
-Date: Mon, 11 May 2015 13:03:40 +0200
-Subject: [PATCH v5 2/2] ARM: at91/dt: add support for kizboxmini
-In-Reply-To: <555073BD.2030808@atmel.com>
-References: <1430755147-12086-1-git-send-email-g.portay@overkiz.com>
- <1430755147-12086-3-git-send-email-g.portay@overkiz.com>
- <555073BD.2030808@atmel.com>
-Message-ID: d5270621-a5a2-417a-8c67-75598d721feb@overkiz.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 11 May 2015 12:04:22 +0100
+Subject: [PATCH v2 2/2] arm64: dts: qcom: Add msm8916 CoreSight components
+In-Reply-To: <B19B6A91-0CF2-428B-8CAC-FFEDD5D3D094@linaro.org>
+References: <1431012969-16338-1-git-send-email-ivan.ivanov@linaro.org>
+ <1431012969-16338-3-git-send-email-ivan.ivanov@linaro.org>
+ <CANLsYkzNXBH0d6v1Ny_JwpW6NcKr9v0oAi9K3YfipwDgHWfMMA@mail.gmail.com>
+ <1431092877.21307.18.camel@linaro.org>
+ <20150508180052.GD11680@leverpostej>
+ <B19B6A91-0CF2-428B-8CAC-FFEDD5D3D094@linaro.org>
+Message-ID: <20150511110422.GA4595@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks
+On Fri, May 08, 2015 at 07:17:12PM +0100, Ivan T. Ivanov wrote:
+> 
+> > On May 8, 2015, at 9:00 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > 
+> > On Fri, May 08, 2015 at 02:47:57PM +0100, Ivan T. Ivanov wrote:
+> >> 
+> >> On Fri, 2015-05-08 at 07:38 -0600, Mathieu Poirier wrote:
+> >>> On 7 May 2015 at 09:36, Ivan T. Ivanov ivanov at linaro.org> wrote:
+> >>>> Add initial set of CoreSight components found on Qualcomm's 8x16 chipset.
+> >>>> 
+> >>>> 
+> >>>> +       replicator at 824000 {
+> >>>> +               compatible = "qcom,coresight-replicator", "arm,primecell";
+> >>> 
+> >>> Shouldn't it be "qcom,coresight-replicator1x" ?
+> >>> 
+> >> 
+> >> 
+> >> 
+> >> True, I still wonder, why we have to have this compatible string? 
+> >> Drivers are probed by amba_id and "arm,primecell", after all.
+> > 
+> > The compatible string tells you both the device _and_ the format of the
+> > other properties, because it tells you which binding applies.
+> > 
+> > So the compatible string should be present regardless, as
+> > "arm,primecell" does not define the majority of the properties you need
+> > for the replicator node.
+> 
+> Mmm, only if vendors don?t bother to update version information
+> fused to revision id registers, which happens. And this could 
+> be workaround by "arm,primecell-periphid?, no?
 
-Sent from my Cyanogen phone
+No. That only tells you the identity of the device, not the format of
+the binding.
 
-On May 11, 2015 11:17 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
->
-> Le 04/05/2015 17:59, Ga?l PORTAY a ?crit : 
-> > Add DT file for Kizbox mini board. 
-> > This board is based on Atmel's AT91SAM9G25 SoC. 
-> > 
-> > Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com> 
-> > Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com> 
-> > Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com> 
->
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com> 
-> Nitpicking below... 
->
-> > --- 
-> >? arch/arm/boot/dts/Makefile??????????? |?? 1 + 
-> >? arch/arm/boot/dts/at91-kizboxmini.dts | 130 ++++++++++++++++++++++++++++++++++ 
-> >? 2 files changed, 131 insertions(+) 
-> >? create mode 100644 arch/arm/boot/dts/at91-kizboxmini.dts 
-> > 
-> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile 
-> > index 21726fd..4bf72c0 100644 
-> > --- a/arch/arm/boot/dts/Makefile 
-> > +++ b/arch/arm/boot/dts/Makefile 
-> > @@ -30,6 +30,7 @@ dtb-$(CONFIG_SOC_SAM_V4_V5) += \ 
-> >? at91sam9rlek.dtb \ 
-> >? at91-ariag25.dtb \ 
-> >? at91-cosino_mega2560.dtb \ 
-> > + at91-kizboxmini.dtb \ 
-> >? at91sam9g15ek.dtb \ 
-> >? at91sam9g25ek.dtb \ 
-> >? at91sam9g35ek.dtb \ 
-> > diff --git a/arch/arm/boot/dts/at91-kizboxmini.dts b/arch/arm/boot/dts/at91-kizboxmini.dts 
-> > new file mode 100644 
-> > index 0000000..7a899ca 
-> > --- /dev/null 
-> > +++ b/arch/arm/boot/dts/at91-kizboxmini.dts 
-> > @@ -0,0 +1,130 @@ 
-> > +/* 
-> > + * at91-kizboxmini.dts - Device Tree file for Overkiz Kizbox mini board 
-> > + * 
-> > + * Copyright (C) 2014 Ga?l PORTAY <g.portay@overkiz.com> 
-> > + * 
-> > + * Licensed under GPLv2 or later. 
-> > + */ 
-> > +/dts-v1/; 
-> > +#include "at91sam9g25.dtsi" 
-> > +#include "at91sam9x5.dtsi" 
->
-> Not needed as already included in at91sam9g25.dtsi: I remove it before 
-> applying the patch. 
->
-> Bye, 
->
-> > +#include <dt-bindings/pwm/pwm.h> 
-> > + 
-> > +/ { 
-> > + model = "Overkiz Kizbox mini"; 
-> > + compatible = "overkiz,kizboxmini", "atmel,at91sam9g25", "atmel,at91sam9x5", "atmel,at91sam9"; 
-> > + 
-> > + chosen { 
-> > + bootargs = "ubi.mtd=ubi"; 
-> > + linux,stdout-path = &dbgu; 
-> > + }; 
-> > + 
-> > + memory { 
-> > + reg = <0x20000000 0x8000000>; 
-> > + }; 
-> > + 
-> > + clocks { 
-> > + slow_xtal { 
-> > + clock-frequency = <32768>; 
-> > + }; 
-> > + 
-> > + main_xtal { 
-> > + clock-frequency = <12000000>; 
-> > + }; 
-> > + }; 
-> > + 
-> > + ahb { 
-> > + apb { 
-> > + usart0: serial at f801c000 { 
-> > + status = "okay"; 
-> > + }; 
-> > + 
-> > + macb0: ethernet at f802c000 { 
-> > + phy-mode = "rmii"; 
-> > + status = "okay"; 
-> > + }; 
-> > + 
-> > + pwm0: pwm at f8034000 { 
-> > + pinctrl-names = "default"; 
-> > + pinctrl-0 = <&pinctrl_pwm0_pwm0_1 
-> > + ???? &pinctrl_pwm0_pwm1_1>; 
-> > + status = "okay"; 
-> > + }; 
-> > + 
-> > + dbgu: serial at fffff200 { 
-> > + status = "okay"; 
-> > + }; 
-> > + 
-> > + watchdog at fffffe40 { 
-> > + status = "okay"; 
-> > + }; 
-> > + }; 
-> > + 
-> > + usb0: ohci at 00600000 { 
-> > + num-ports = <1>; 
-> > + status = "okay"; 
-> > + }; 
-> > + 
-> > + usb1: ehci at 00700000 { 
-> > + status = "okay"; 
-> > + }; 
-> > + 
-> > + nand0: nand at 40000000 { 
-> > + nand-bus-width = <8>; 
-> > + nand-ecc-mode = "hw"; 
-> > + atmel,has-pmecc; 
-> > + atmel,pmecc-cap = <4>; 
-> > + atmel,pmecc-sector-size = <512>; 
-> > + nand-on-flash-bbt; 
-> > + status = "okay"; 
-> > + 
-> > + bootstrap at 0 { 
-> > + label = "bootstrap"; 
-> > + reg = <0x0 0x20000>; 
-> > + }; 
-> > + 
-> > + ubi at 20000 { 
-> > + label = "ubi"; 
-> > + reg = <0x20000 0x7fe0000>; 
-> > + }; 
-> > + }; 
-> > + }; 
-> > + 
-> > + gpio_keys { 
-> > + compatible = "gpio-keys"; 
-> > + #address-cells = <1>; 
-> > + #size-cells = <0>; 
-> > + 
-> > + prog { 
-> > + label = "PB_PROG"; 
-> > + gpios = <&pioC 17 GPIO_ACTIVE_LOW>; 
-> > + linux,code = <0x102>; 
-> > + gpio-key,wakeup; 
-> > + }; 
-> > + 
-> > + reset { 
-> > + label = "PB_RST"; 
-> > + gpios = <&pioC 16 GPIO_ACTIVE_LOW>; 
-> > + linux,code = <0x100>; 
-> > + gpio-key,wakeup; 
-> > + }; 
-> > + }; 
-> > + 
-> > + pwm_leds { 
-> > + compatible = "pwm-leds"; 
-> > + 
-> > + green { 
-> > + label = "pwm:green:user"; 
-> > + pwms = <&pwm0 0 10000000 0>; 
-> > + max-brightness = <255>; 
-> > + linux,default-trigger = "default-on"; 
-> > + }; 
-> > + 
-> > + red { 
-> > + label = "pwm:red:user"; 
-> > + pwms = <&pwm0 1 10000000 0>; 
-> > + max-brightness = <255>; 
-> > + linux,default-trigger = "default-on"; 
-> > + }; 
-> > + }; 
-> > +}; 
-> > 
->
->
-> -- 
-> Nicolas Ferre 
+Thanks,
+Mark.
