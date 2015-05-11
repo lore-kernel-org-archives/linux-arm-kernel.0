@@ -1,52 +1,92 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 11 May 2015 18:24:02 +0100
-Subject: [Linaro-acpi] [PATCH 2/2] ACPI / scan: Parse _CCA and setup device
- coherency
-In-Reply-To: <20150511171045.GJ18655@e104818-lin.cambridge.arm.com>
-References: <D1665A4F.19E17%suravee.suthikulpanit@amd.com>
- <2817500.sgztgK2NzB@wuerfel>
- <20150501110644.GF27755@e104818-lin.cambridge.arm.com>
- <2927907.rePQ55aASC@wuerfel>
- <20150511171045.GJ18655@e104818-lin.cambridge.arm.com>
-Message-ID: <5550E5B2.1030407@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 11 May 2015 10:28:58 -0700
+Subject: [PATCH v3 3/4] Documentation: dt: add bindings for TI Wakeup M3
+ processor
+In-Reply-To: <1427917039-43206-4-git-send-email-d-gerlach@ti.com>
+References: <1427917039-43206-1-git-send-email-d-gerlach@ti.com>
+ <1427917039-43206-4-git-send-email-d-gerlach@ti.com>
+Message-ID: <20150511172858.GD15563@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/15 18:10, Catalin Marinas wrote:
-> On Fri, May 08, 2015 at 04:08:53PM +0200, Arnd Bergmann wrote:
->> On Friday 01 May 2015 12:06:44 Catalin Marinas wrote:
->>>> If we just disallow DMA to devices that are marked with _CCA=0
->>>> in ACPI, we can avoid this case, or discuss it by the time someone has hardware
->>>> that wants it, and then make a more informed decision about it.
->>>
->>> I don't think we should disallow DMA to devices with _CCA == 0 (only to
->>> those that don't have a _CCA property at all) as long as _CCA == 0 has
->>> clear semantics like only architected cache maintenance required (and
->>> that's what the ARMv8 ARM requires from compliant system caches).
->>
->> Even if we exclude all cases in which the behavior may be unexpected,
->> there is still the other point I raised initially:
->>
->>               what would that be good for?
->>
->> Can you think of a case where a server system has a reason to use
->> a device in noncoherent mode? I think it's more likely to be a case
->> where a device got misconfigured accidentally by the firmware, and
->> we're better off warning about that in the kernel than trying to prepare
->> for an unknown hardware that might use an obscure feature of the spec.
->
-> Maybe some of the people involved in arm64 servers can give a better
-> answer, I'm not familiar with their hardware (plans).
->
-> I would expect most DMA-capable devices to be cache coherent. However,
-> for (system) performance reasons, some of them could be configured as
-> non-coherent. An example, though unlikely on servers, is a display
-> device continuously accessing a framebuffer. You may not want to
-> overload the coherent interconnect.
+Hi,
 
-FWIW, I've also had much the same argument put to me for IOMMUs, i.e. 
-they want to make the page table walk interface non-coherent because 
-they'd rather pay the cost of flushing the page tables once to save a 
-few extra cycles of latency for cache snooping on every TLB miss.
+* Dave Gerlach <d-gerlach@ti.com> [150401 12:38]:
+> Add the device tree bindings document for the TI Wakeup M3 remote
+> processor devices on AM33xx and AM43xx SoCs. These devices are used
+> to offload low-level power management functionality, and are handled
+> by the wkup_m3 remoteproc driver.
+> 
+> Signed-off-by: Suman Anna <s-anna@ti.com>
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 
-Robin.
+This binding looks OK to me now, thanks for updating it:
+
+Acked-by: Tony Lindgren <tony@atomide.com>
+
+> ---
+>  .../bindings/remoteproc/wkup_m3_rproc.txt          | 52 ++++++++++++++++++++++
+>  1 file changed, 52 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/remoteproc/wkup_m3_rproc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/remoteproc/wkup_m3_rproc.txt b/Documentation/devicetree/bindings/remoteproc/wkup_m3_rproc.txt
+> new file mode 100644
+> index 0000000..3a70073
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/remoteproc/wkup_m3_rproc.txt
+> @@ -0,0 +1,52 @@
+> +TI Wakeup M3 Remoteproc Driver
+> +==============================
+> +
+> +The TI AM33xx and AM43xx family of devices use a small Cortex M3 co-processor
+> +(commonly referred to as Wakeup M3 or CM3) to help with various low power tasks
+> +that cannot be controlled from the MPU. This CM3 processor requires a firmware
+> +binary to accomplish this. The wkup_m3 remoteproc driver handles the loading of
+> +the firmware and booting of the CM3.
+> +
+> +Wkup M3 Device Node:
+> +====================
+> +A wkup_m3 device node is used to represent the Wakeup M3 processor instance
+> +within the SoC. It is added as a child node of the parent interconnect bus
+> +(l4_wkup) through which it is accessible to the MPU.
+> +
+> +Required properties:
+> +--------------------
+> +- compatible:		Should be one of,
+> +				"ti,am3352-wkup-m3" for AM33xx SoCs
+> +				"ti,am4372-wkup-m3" for AM43xx SoCs
+> +- reg:			Should contain the address ranges for the two internal
+> +			memory regions, UMEM and DMEM. The parent node should
+> +			provide an appropriate ranges property for properly
+> +			translating these into bus addresses.
+> +- reg-names:		Contains the corresponding names for the two memory
+> +			regions. These should be named "umem" & "dmem".
+> +- ti,hwmods:		Name of the hwmod associated with the wkupm3 device.
+> +- ti,pm-firmware:	Name of firmware file to be used for loading and
+> +			booting the wkup_m3 remote processor.
+> +
+> +Example:
+> +--------
+> +/* AM33xx */
+> +ocp {
+> +	 l4_wkup: l4_wkup at 44c00000 {
+> +		compatible = "am335-l4-wkup", "simple-bus";
+> +		ranges = <0 0x44c00000 0x400000>;
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +
+> +		wkup_m3: wkup_m3 at 100000 {
+> +			compatible = "ti,am3352-wkup-m3";
+> +			reg = <0x100000 0x4000>,
+> +			      <0x180000 0x2000>;
+> +			reg-names = "umem", "dmem";
+> +			ti,hwmods = "wkup_m3";
+> +			ti,pm-firmware = "am335x-pm-firmware.elf";
+> +		};
+> +	};
+> +
+> +	...
+> +};
+> -- 
+> 2.3.0
+> 
