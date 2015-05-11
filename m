@@ -1,227 +1,154 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 11 May 2015 16:32:33 +0100
-Subject: [PATCH 07/12] arm64: psci: kill psci_power_state
-In-Reply-To: <1431085004-32743-8-git-send-email-mark.rutland@arm.com>
-References: <1431085004-32743-1-git-send-email-mark.rutland@arm.com>
- <1431085004-32743-8-git-send-email-mark.rutland@arm.com>
-Message-ID: <20150511153223.GA2942@red-moon>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Mon, 11 May 2015 12:38:33 -0300
+Subject: [PATCH v3] ARM: dts: cubox-i: add support for Broadcom Wifi/Bluetooth
+ devices
+Message-ID: <1431358713-12379-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 08, 2015 at 12:36:39PM +0100, Mark Rutland wrote:
-> A PSCI 1.0 implementation may choose to use the new extended StateID
-> format, the presence of which may be queried via the PSCI_FEATURES call.
-> The layout of this new StateID format is incompatible with the existing
-> format, and so to handle both we must abstract attempts to parse the
-> fields.
-> 
-> In preparation for PSCI 1.0 support, this patch introduces
-> psci_power_state_loses_context and psci_power_state_is_valid functions
-> to query information from a PSCI power state, which is no longer
-> decomposed (and hence the pack/unpack functions are removed). As it is
-> no longer decomposed, it is now passed round as an opaque u32 token.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/kernel/psci.c | 89 ++++++++++++++++++++----------------------------
->  1 file changed, 37 insertions(+), 52 deletions(-)
+Add DT support for the Broadcom Wifi/Bluetooth devices found on the
+microsom board.
 
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+[Modified original Russell King's patch to use mmc-pwrseq]
 
-> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-> index 25e2610..185174e 100644
-> --- a/arch/arm64/kernel/psci.c
-> +++ b/arch/arm64/kernel/psci.c
-> @@ -37,11 +37,19 @@
->  #define PSCI_POWER_STATE_TYPE_STANDBY		0
->  #define PSCI_POWER_STATE_TYPE_POWER_DOWN	1
->  
-> -struct psci_power_state {
-> -	u16	id;
-> -	u8	type;
-> -	u8	affinity_level;
-> -};
-> +static bool psci_power_state_loses_context(u32 state)
-> +{
-> +	return !!(state & PSCI_0_2_POWER_STATE_TYPE_MASK);
-> +}
-> +
-> +static bool psci_power_state_is_valid(u32 state)
-> +{
-> +	const u32 valid_mask = PSCI_0_2_POWER_STATE_ID_MASK |
-> +			       PSCI_0_2_POWER_STATE_TYPE_MASK |
-> +			       PSCI_0_2_POWER_STATE_AFFL_MASK;
-> +
-> +	return !(state & ~valid_mask);
-> +}
->  
->  /*
->   * The CPU any Trusted OS is resident on. The trusted OS may reject CPU_OFF
-> @@ -57,9 +65,8 @@ static bool psci_tos_resident_on(int cpu)
->  }
->  
->  struct psci_operations {
-> -	int (*cpu_suspend)(struct psci_power_state state,
-> -			   unsigned long entry_point);
-> -	int (*cpu_off)(struct psci_power_state state);
-> +	int (*cpu_suspend)(u32 state, unsigned long entry_point);
-> +	int (*cpu_off)(u32 state);
->  	int (*cpu_on)(unsigned long cpuid, unsigned long entry_point);
->  	int (*migrate)(unsigned long cpuid);
->  	int (*affinity_info)(unsigned long target_affinity,
-> @@ -84,7 +91,7 @@ enum psci_function {
->  	PSCI_FN_MAX,
->  };
->  
-> -static DEFINE_PER_CPU_READ_MOSTLY(struct psci_power_state *, psci_power_state);
-> +static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
->  
->  static u32 psci_function_id[PSCI_FN_MAX];
->  
-> @@ -104,53 +111,28 @@ static int psci_to_linux_errno(int errno)
->  	return -EINVAL;
->  }
->  
-> -static u32 psci_power_state_pack(struct psci_power_state state)
-> -{
-> -	return ((state.id << PSCI_0_2_POWER_STATE_ID_SHIFT)
-> -			& PSCI_0_2_POWER_STATE_ID_MASK) |
-> -		((state.type << PSCI_0_2_POWER_STATE_TYPE_SHIFT)
-> -		 & PSCI_0_2_POWER_STATE_TYPE_MASK) |
-> -		((state.affinity_level << PSCI_0_2_POWER_STATE_AFFL_SHIFT)
-> -		 & PSCI_0_2_POWER_STATE_AFFL_MASK);
-> -}
-> -
-> -static void psci_power_state_unpack(u32 power_state,
-> -				    struct psci_power_state *state)
-> -{
-> -	state->id = (power_state & PSCI_0_2_POWER_STATE_ID_MASK) >>
-> -			PSCI_0_2_POWER_STATE_ID_SHIFT;
-> -	state->type = (power_state & PSCI_0_2_POWER_STATE_TYPE_MASK) >>
-> -			PSCI_0_2_POWER_STATE_TYPE_SHIFT;
-> -	state->affinity_level =
-> -			(power_state & PSCI_0_2_POWER_STATE_AFFL_MASK) >>
-> -			PSCI_0_2_POWER_STATE_AFFL_SHIFT;
-> -}
-> -
->  static u32 psci_get_version(void)
->  {
->  	return invoke_psci_fn(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
->  }
->  
-> -static int psci_cpu_suspend(struct psci_power_state state,
-> -			    unsigned long entry_point)
-> +static int psci_cpu_suspend(u32 state, unsigned long entry_point)
->  {
->  	int err;
-> -	u32 fn, power_state;
-> +	u32 fn;
->  
->  	fn = psci_function_id[PSCI_FN_CPU_SUSPEND];
-> -	power_state = psci_power_state_pack(state);
-> -	err = invoke_psci_fn(fn, power_state, entry_point, 0);
-> +	err = invoke_psci_fn(fn, state, entry_point, 0);
->  	return psci_to_linux_errno(err);
->  }
->  
-> -static int psci_cpu_off(struct psci_power_state state)
-> +static int psci_cpu_off(u32 state)
->  {
->  	int err;
-> -	u32 fn, power_state;
-> +	u32 fn;
->  
->  	fn = psci_function_id[PSCI_FN_CPU_OFF];
-> -	power_state = psci_power_state_pack(state);
-> -	err = invoke_psci_fn(fn, power_state, 0, 0);
-> +	err = invoke_psci_fn(fn, state, 0, 0);
->  	return psci_to_linux_errno(err);
->  }
->  
-> @@ -195,7 +177,7 @@ static int __maybe_unused cpu_psci_cpu_init_idle(struct device_node *cpu_node,
->  						 unsigned int cpu)
->  {
->  	int i, ret, count = 0;
-> -	struct psci_power_state *psci_states;
-> +	u32 *psci_states;
->  	struct device_node *state_node;
->  
->  	/*
-> @@ -220,13 +202,13 @@ static int __maybe_unused cpu_psci_cpu_init_idle(struct device_node *cpu_node,
->  		return -ENOMEM;
->  
->  	for (i = 0; i < count; i++) {
-> -		u32 psci_power_state;
-> +		u32 state;
->  
->  		state_node = of_parse_phandle(cpu_node, "cpu-idle-states", i);
->  
->  		ret = of_property_read_u32(state_node,
->  					   "arm,psci-suspend-param",
-> -					   &psci_power_state);
-> +					   &state);
->  		if (ret) {
->  			pr_warn(" * %s missing arm,psci-suspend-param property\n",
->  				state_node->full_name);
-> @@ -235,9 +217,13 @@ static int __maybe_unused cpu_psci_cpu_init_idle(struct device_node *cpu_node,
->  		}
->  
->  		of_node_put(state_node);
-> -		pr_debug("psci-power-state %#x index %d\n", psci_power_state,
-> -							    i);
-> -		psci_power_state_unpack(psci_power_state, &psci_states[i]);
-> +		pr_debug("psci-power-state %#x index %d\n", state, i);
-> +		if (!psci_power_state_is_valid(state)) {
-> +			pr_warn("Invalid PSCI power state %#x\n", state);
-> +			ret = -EINVAL;
-> +			goto free_mem;
-> +		}
-> +		psci_states[i] = state;
->  	}
->  	/* Idle states parsed correctly, initialize per-cpu pointer */
->  	per_cpu(psci_power_state, cpu) = psci_states;
-> @@ -520,9 +506,8 @@ static void cpu_psci_cpu_die(unsigned int cpu)
->  	 * There are no known implementations of PSCI actually using the
->  	 * power state field, pass a sensible default for now.
->  	 */
-> -	struct psci_power_state state = {
-> -		.type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
-> -	};
-> +	u32 state = PSCI_POWER_STATE_TYPE_POWER_DOWN <<
-> +		    PSCI_0_2_POWER_STATE_TYPE_SHIFT;
->  
->  	ret = psci_ops.cpu_off(state);
->  
-> @@ -561,7 +546,7 @@ static int cpu_psci_cpu_kill(unsigned int cpu)
->  
->  static int psci_suspend_finisher(unsigned long index)
->  {
-> -	struct psci_power_state *state = __this_cpu_read(psci_power_state);
-> +	u32 *state = __this_cpu_read(psci_power_state);
->  
->  	return psci_ops.cpu_suspend(state[index - 1],
->  				    virt_to_phys(cpu_resume));
-> @@ -570,7 +555,7 @@ static int psci_suspend_finisher(unsigned long index)
->  static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
->  {
->  	int ret;
-> -	struct psci_power_state *state = __this_cpu_read(psci_power_state);
-> +	u32 *state = __this_cpu_read(psci_power_state);
->  	/*
->  	 * idle state index 0 corresponds to wfi, should never be called
->  	 * from the cpu_suspend operations
-> @@ -578,7 +563,7 @@ static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
->  	if (WARN_ON_ONCE(!index))
->  		return -EINVAL;
->  
-> -	if (state[index - 1].type == PSCI_POWER_STATE_TYPE_STANDBY)
-> +	if (!psci_power_state_loses_context(state[index - 1]))
->  		ret = psci_ops.cpu_suspend(state[index - 1], 0);
->  	else
->  		ret = __cpu_suspend(index, psci_suspend_finisher);
-> -- 
-> 1.9.1
-> 
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v2:
+- Remove 'clocks' container as suggested by Shawn
+Changes since v1:
+- Do not permanently keep the oscillator on. Use the proper clk bindings
+from mmc-powerseq.
+
+ arch/arm/boot/dts/imx6qdl-microsom.dtsi | 103 ++++++++++++++++++++++++++++++++
+ 1 file changed, 103 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6qdl-microsom.dtsi b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
+index 349f82b..ec6c7c7 100644
+--- a/arch/arm/boot/dts/imx6qdl-microsom.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
+@@ -39,15 +39,98 @@
+  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+  *     OTHER DEALINGS IN THE SOFTWARE.
+  */
++#include <dt-bindings/gpio/gpio.h>
++/ {
++	clk_sdio: sdio-clock {
++		compatible = "gpio-gate-clock";
++		#clock-cells = <0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_microsom_brcm_osc>;
++		enable-gpios = <&gpio5 5 GPIO_ACTIVE_HIGH>;
++	};
++
++	regulators {
++		compatible = "simple-bus";
++
++		reg_brcm: brcm-reg {
++			compatible = "regulator-fixed";
++			enable-active-high;
++			gpio = <&gpio3 19 0>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_microsom_brcm_reg>;
++			regulator-name = "brcm_reg";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			startup-delay-us = <200000>;
++		};
++	};
++
++	usdhc1_pwrseq: usdhc1_pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		reset-gpios = <&gpio5 26 GPIO_ACTIVE_LOW>,
++			      <&gpio6 0 GPIO_ACTIVE_LOW>;
++		clocks = <&clk_sdio>;
++		clock-names = "ext_clock";
++	};
++};
+ 
+ &iomuxc {
+ 	microsom {
++		pinctrl_microsom_brcm_bt: microsom-brcm-bt {
++			fsl,pins = <
++				MX6QDL_PAD_CSI0_DAT14__GPIO6_IO00	0x40013070
++				MX6QDL_PAD_CSI0_DAT15__GPIO6_IO01	0x40013070
++				MX6QDL_PAD_CSI0_DAT18__GPIO6_IO04	0x40013070
++			>;
++		};
++
++		pinctrl_microsom_brcm_osc: microsom-brcm-osc {
++			fsl,pins = <
++				MX6QDL_PAD_DISP0_DAT11__GPIO5_IO05	0x40013070
++			>;
++		};
++
++		pinctrl_microsom_brcm_reg: microsom-brcm-reg {
++			fsl,pins = <
++				MX6QDL_PAD_EIM_D19__GPIO3_IO19		0x40013070
++			>;
++		};
++
++		pinctrl_microsom_brcm_wifi: microsom-brcm-wifi {
++			fsl,pins = <
++				MX6QDL_PAD_GPIO_8__XTALOSC_REF_CLK_32K	0x1b0b0
++				MX6QDL_PAD_CSI0_DATA_EN__GPIO5_IO20	0x40013070
++				MX6QDL_PAD_CSI0_DAT8__GPIO5_IO26	0x40013070
++				MX6QDL_PAD_CSI0_DAT9__GPIO5_IO27	0x40013070
++			>;
++		};
++
+ 		pinctrl_microsom_uart1: microsom-uart1 {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA	0x1b0b1
+ 				MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA	0x1b0b1
+ 			>;
+ 		};
++
++		pinctrl_microsom_uart4: microsom-uart4 {
++			fsl,pins = <
++				MX6QDL_PAD_CSI0_DAT12__UART4_TX_DATA 0x1b0b1
++				MX6QDL_PAD_CSI0_DAT13__UART4_RX_DATA 0x1b0b1
++				MX6QDL_PAD_CSI0_DAT16__UART4_RTS_B 0x1b0b1
++				MX6QDL_PAD_CSI0_DAT17__UART4_CTS_B 0x1b0b1
++			>;
++		};
++
++		pinctrl_microsom_usdhc1: microsom-usdhc1 {
++			fsl,pins = <
++				MX6QDL_PAD_SD1_CMD__SD1_CMD    0x17059
++				MX6QDL_PAD_SD1_CLK__SD1_CLK    0x10059
++				MX6QDL_PAD_SD1_DAT0__SD1_DATA0 0x17059
++				MX6QDL_PAD_SD1_DAT1__SD1_DATA1 0x17059
++				MX6QDL_PAD_SD1_DAT2__SD1_DATA2 0x17059
++				MX6QDL_PAD_SD1_DAT3__SD1_DATA3 0x17059
++			>;
++		};
+ 	};
+ };
+ 
+@@ -56,3 +139,23 @@
+ 	pinctrl-0 = <&pinctrl_microsom_uart1>;
+ 	status = "okay";
+ };
++
++/* UART4 - Connected to optional BRCM Wifi/BT/FM */
++&uart4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_microsom_brcm_bt &pinctrl_microsom_uart4>;
++	fsl,uart-has-rtscts;
++	status = "okay";
++};
++
++/* USDHC1 - Connected to optional BRCM Wifi/BT/FM */
++&usdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_microsom_brcm_wifi &pinctrl_microsom_usdhc1>;
++	bus-width = <4>;
++	mmc-pwrseq = <&usdhc1_pwrseq>;
++	keep-power-in-suspend;
++	non-removable;
++	vmmc-supply = <&reg_brcm>;
++	status = "okay";
++};
+-- 
+1.9.1
