@@ -1,49 +1,152 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 11 May 2015 09:13:02 +0200
-Subject: [PATCH 04/10] arm64: use more granular reservations for static page
- table allocations
+Date: Mon, 11 May 2015 09:13:03 +0200
+Subject: [PATCH 05/10] arm64: split off early mapping code from
+ early_fixmap_init()
 In-Reply-To: <1431328388-3051-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1431328388-3051-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1431328388-3051-5-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1431328388-3051-6-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before introducing new statically allocated page tables and increasing
-their alignment in subsequent patches, update the reservation logic
-so that only pages that are in actual use end up as reserved with
-memblock.
+This splits off and generalises the population of the statically
+allocated fixmap page tables so that we may reuse it later for
+the linear mapping once we move the kernel text mapping out of it.
+
+This also involves taking into account that table entries at any of
+the levels we are populating may have been populated already, since
+the fixmap mapping might not be disjoint up to the pgd level anymore
+from other early mappings.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/mm/init.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/compiler.h |  2 ++
+ arch/arm64/kernel/vmlinux.lds.S   | 12 ++++----
+ arch/arm64/mm/mmu.c               | 60 +++++++++++++++++++++++++++------------
+ 3 files changed, 51 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index a3469a436a73..373ea02bdb96 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -37,6 +37,7 @@
+diff --git a/arch/arm64/include/asm/compiler.h b/arch/arm64/include/asm/compiler.h
+index ee35fd0f2236..dd342af63673 100644
+--- a/arch/arm64/include/asm/compiler.h
++++ b/arch/arm64/include/asm/compiler.h
+@@ -27,4 +27,6 @@
+  */
+ #define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
  
- #include <asm/fixmap.h>
- #include <asm/memory.h>
-+#include <asm/mmu_context.h>
- #include <asm/sections.h>
- #include <asm/setup.h>
- #include <asm/sizes.h>
-@@ -173,11 +174,13 @@ void __init arm64_memblock_init(void)
- 	 * Register the kernel text, kernel data, initrd, and initial
- 	 * pagetables with memblock.
- 	 */
--	memblock_reserve(__pa(_text), _end - _text);
-+	memblock_reserve(__pa(_text), __bss_stop - _text);
- #ifdef CONFIG_BLK_DEV_INITRD
- 	if (initrd_start)
- 		memblock_reserve(__virt_to_phys(initrd_start), initrd_end - initrd_start);
++#define __pgdir		__attribute__((section(".pgdir"),aligned(PAGE_SIZE)))
++
+ #endif	/* __ASM_COMPILER_H */
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 98073332e2d0..ceec4def354b 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -160,11 +160,13 @@ SECTIONS
+ 
+ 	BSS_SECTION(0, 0, 0)
+ 
+-	. = ALIGN(PAGE_SIZE);
+-	idmap_pg_dir = .;
+-	. += IDMAP_DIR_SIZE;
+-	swapper_pg_dir = .;
+-	. += SWAPPER_DIR_SIZE;
++	.pgdir (NOLOAD) : ALIGN(PAGE_SIZE) {
++		idmap_pg_dir = .;
++		. += IDMAP_DIR_SIZE;
++		swapper_pg_dir = .;
++		. += SWAPPER_DIR_SIZE;
++		*(.pgdir)
++	}
+ 
+ 	_end = .;
+ 
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 82d3435bf14f..f64a817af469 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -342,6 +342,44 @@ static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
+ }
  #endif
-+	memblock_reserve(__pa(idmap_pg_dir), IDMAP_DIR_SIZE);
-+	memblock_reserve(__pa(swapper_pg_dir), SWAPPER_DIR_SIZE);
  
- 	if (!efi_enabled(EFI_MEMMAP))
- 		early_init_fdt_scan_reserved_mem();
++struct bootstrap_pgtables {
++	pte_t	pte[PTRS_PER_PTE];
++	pmd_t	pmd[PTRS_PER_PMD > 1 ? PTRS_PER_PMD : 0];
++	pud_t	pud[PTRS_PER_PUD > 1 ? PTRS_PER_PUD : 0];
++};
++
++static void __init bootstrap_early_mapping(unsigned long addr,
++					   struct bootstrap_pgtables *reg,
++					   bool pte_level)
++{
++	pgd_t *pgd;
++	pud_t *pud;
++	pmd_t *pmd;
++
++	pgd = pgd_offset_k(addr);
++	if (pgd_none(*pgd)) {
++		clear_page(reg->pud);
++		memblock_reserve(__pa(reg->pud), PAGE_SIZE);
++		pgd_populate(&init_mm, pgd, reg->pud);
++	}
++	pud = pud_offset(pgd, addr);
++	if (pud_none(*pud)) {
++		clear_page(reg->pmd);
++		memblock_reserve(__pa(reg->pmd), PAGE_SIZE);
++		pud_populate(&init_mm, pud, reg->pmd);
++	}
++
++	if (!pte_level)
++		return;
++
++	pmd = pmd_offset(pud, addr);
++	if (pmd_none(*pmd)) {
++		clear_page(reg->pte);
++		memblock_reserve(__pa(reg->pte), PAGE_SIZE);
++		pmd_populate_kernel(&init_mm, pmd, reg->pte);
++	}
++}
++
+ static void __init map_mem(void)
+ {
+ 	struct memblock_region *reg;
+@@ -555,14 +593,6 @@ void vmemmap_free(unsigned long start, unsigned long end)
+ }
+ #endif	/* CONFIG_SPARSEMEM_VMEMMAP */
+ 
+-static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
+-#if CONFIG_PGTABLE_LEVELS > 2
+-static pmd_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss;
+-#endif
+-#if CONFIG_PGTABLE_LEVELS > 3
+-static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss;
+-#endif
+-
+ static inline pud_t * fixmap_pud(unsigned long addr)
+ {
+ 	pgd_t *pgd = pgd_offset_k(addr);
+@@ -592,21 +622,15 @@ static inline pte_t * fixmap_pte(unsigned long addr)
+ 
+ void __init early_fixmap_init(void)
+ {
+-	pgd_t *pgd;
+-	pud_t *pud;
++	static struct bootstrap_pgtables fixmap_bs_pgtables __pgdir;
+ 	pmd_t *pmd;
+-	unsigned long addr = FIXADDR_START;
+ 
+-	pgd = pgd_offset_k(addr);
+-	pgd_populate(&init_mm, pgd, bm_pud);
+-	pud = pud_offset(pgd, addr);
+-	pud_populate(&init_mm, pud, bm_pmd);
+-	pmd = pmd_offset(pud, addr);
+-	pmd_populate_kernel(&init_mm, pmd, bm_pte);
++	bootstrap_early_mapping(FIXADDR_START, &fixmap_bs_pgtables, true);
++	pmd = fixmap_pmd(FIXADDR_START);
+ 
+ 	/*
+ 	 * The boot-ioremap range spans multiple pmds, for which
+-	 * we are not preparted:
++	 * we are not prepared:
+ 	 */
+ 	BUILD_BUG_ON((__fix_to_virt(FIX_BTMAP_BEGIN) >> PMD_SHIFT)
+ 		     != (__fix_to_virt(FIX_BTMAP_END) >> PMD_SHIFT));
 -- 
 1.9.1
