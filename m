@@ -1,55 +1,90 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 11 May 2015 12:30:28 +0200
-Subject: [PATCH] mmc: atmel-mci: fix bad variable type for clkdiv
-In-Reply-To: <1430918206-19911-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1430918206-19911-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <CAPDyKFr5iYt47KsMuJ+KSusV6aRwhFLxYYb27=fZ003pejY3XA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 11 May 2015 11:31:30 +0100
+Subject: [PATCH] ARM: mm: handle non-pmd-aligned end of RAM
+In-Reply-To: <a865bd68d706f8c4c9e82a374ff6adc4@agner.ch>
+References: <a865bd68d706f8c4c9e82a374ff6adc4@agner.ch>
+Message-ID: <20150511103130.GA3490@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 May 2015 at 15:16, Ludovic Desroches <ludovic.desroches@atmel.com> wrote:
-> clkdiv is declared as an u32 but it can be set to a negative value
-> causing a huge divisor value. Change its type to int to avoid this case.
->
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> Cc: <stable@vger.kernel.org> # 3.4 and later
+At boot time we round the memblock limit down to section size in an
+attempt to ensure that we will have mapped this RAM with section
+mappings prior to allocating from it. When mapping RAM we iterate over
+PMD-sized chunks, creating these section mappings.
 
-Thanks, applied for fixes!
+Section mappings are only created when the end of a chunk is aligned to
+section size. Unfortunately, with classic page tables (where PMD_SIZE is
+2 * SECTION_SIZE) this means that if a chunk is between 1M and 2M in
+size the first 1M will not be mapped despite having been accounted for
+in the memblock limit. This has been observed to result in page tables
+being allocated from unmapped memory, causing boot-time hangs.
 
-Kind regards
-Uffe
+This patch modifies the memblock limit rounding to always round down to
+PMD_SIZE instead of SECTION_SIZE. For classic MMU this means that we
+will round the memblock limit down to a 2M boundary, matching the limits
+on section mappings, and preventing allocations from unmapped memory.
+For LPAE there should be no change as PMD_SIZE == SECTION_SIZE.
 
-> ---
->  drivers/mmc/host/atmel-mci.c | 9 +++++++--
->  1 file changed, 7 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
-> index 03d7c75..9a39e0b 100644
-> --- a/drivers/mmc/host/atmel-mci.c
-> +++ b/drivers/mmc/host/atmel-mci.c
-> @@ -1304,7 +1304,7 @@ static void atmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->
->         if (ios->clock) {
->                 unsigned int clock_min = ~0U;
-> -               u32 clkdiv;
-> +               int clkdiv;
->
->                 spin_lock_bh(&host->lock);
->                 if (!host->mode_reg) {
-> @@ -1328,7 +1328,12 @@ static void atmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->                 /* Calculate clock divider */
->                 if (host->caps.has_odd_clk_div) {
->                         clkdiv = DIV_ROUND_UP(host->bus_hz, clock_min) - 2;
-> -                       if (clkdiv > 511) {
-> +                       if (clkdiv < 0) {
-> +                               dev_warn(&mmc->class_dev,
-> +                                        "clock %u too fast; using %lu\n",
-> +                                        clock_min, host->bus_hz / 2);
-> +                               clkdiv = 0;
-> +                       } else if (clkdiv > 511) {
->                                 dev_warn(&mmc->class_dev,
->                                          "clock %u too slow; using %lu\n",
->                                          clock_min, host->bus_hz / (511 + 2));
-> --
-> 2.2.0
->
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reported-by: Stefan Agner <stefan@agner.ch>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Hans de Goede <hdegoede@redhat.com>
+Cc: Laura Abbott <labbott@redhat.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Steve Capper <steve.capper@linaro.org>
+---
+ arch/arm/mm/mmu.c | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 4e6ef89..7186382 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1112,22 +1112,22 @@ void __init sanity_check_meminfo(void)
+ 			}
+ 
+ 			/*
+-			 * Find the first non-section-aligned page, and point
++			 * Find the first non-pmd-aligned page, and point
+ 			 * memblock_limit at it. This relies on rounding the
+-			 * limit down to be section-aligned, which happens at
+-			 * the end of this function.
++			 * limit down to be pmd-aligned, which happens at the
++			 * end of this function.
+ 			 *
+ 			 * With this algorithm, the start or end of almost any
+-			 * bank can be non-section-aligned. The only exception
+-			 * is that the start of the bank 0 must be section-
++			 * bank can be non-pmd-aligned. The only exception is
++			 * that the start of the bank 0 must be section-
+ 			 * aligned, since otherwise memory would need to be
+ 			 * allocated when mapping the start of bank 0, which
+ 			 * occurs before any free memory is mapped.
+ 			 */
+ 			if (!memblock_limit) {
+-				if (!IS_ALIGNED(block_start, SECTION_SIZE))
++				if (!IS_ALIGNED(block_start, PMD_SIZE))
+ 					memblock_limit = block_start;
+-				else if (!IS_ALIGNED(block_end, SECTION_SIZE))
++				else if (!IS_ALIGNED(block_end, PMD_SIZE))
+ 					memblock_limit = arm_lowmem_limit;
+ 			}
+ 
+@@ -1137,12 +1137,12 @@ void __init sanity_check_meminfo(void)
+ 	high_memory = __va(arm_lowmem_limit - 1) + 1;
+ 
+ 	/*
+-	 * Round the memblock limit down to a section size.  This
++	 * Round the memblock limit down to a pmd size.  This
+ 	 * helps to ensure that we will allocate memory from the
+-	 * last full section, which should be mapped.
++	 * last full pmd, which should be mapped.
+ 	 */
+ 	if (memblock_limit)
+-		memblock_limit = round_down(memblock_limit, SECTION_SIZE);
++		memblock_limit = round_down(memblock_limit, PMD_SIZE);
+ 	if (!memblock_limit)
+ 		memblock_limit = arm_lowmem_limit;
+ 
+-- 
+1.9.1
