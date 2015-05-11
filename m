@@ -1,199 +1,49 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 11 May 2015 10:42:47 +0200
-Subject: [PATCH 02/12] clocksource: sti: Provide support for the ST LPC
- Clocksource IP
-In-Reply-To: <1431005924-21777-3-git-send-email-lee.jones@linaro.org>
-References: <1431005924-21777-1-git-send-email-lee.jones@linaro.org>
- <1431005924-21777-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <55506B87.3070807@linaro.org>
+Date: Mon, 11 May 2015 10:47:44 +0200
+Subject: [PATCH 03/12] clocksource: sti: Provide 'use timer as sched clock'
+ capability
+In-Reply-To: <1431085625.13593.39.camel@x220>
+References: <1431005924-21777-1-git-send-email-lee.jones@linaro.org>	
+ <1431005924-21777-4-git-send-email-lee.jones@linaro.org>	
+ <1431074699.13593.4.camel@x220> <20150508093603.GB29044@x1>	
+ <1431078730.13593.14.camel@x220> <20150508102938.GD29044@x1>
+ <1431085625.13593.39.camel@x220>
+Message-ID: <55506CB0.2030909@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/2015 03:38 PM, Lee Jones wrote:
-> This IP is shared with Watchdog and RTC functionality.  Only one of
-> these IPs can be used at the same time.  We use the device-driver
-> model combined with a DT 'mode' property to enforce this.
+On 05/08/2015 01:47 PM, Paul Bolle wrote:
+> On Fri, 2015-05-08 at 11:29 +0100, Lee Jones wrote:
+>> Ah, you mean from menuconfig.  I almost forgot what that was. ;)
+>>
+>> I can add a menu option, no problem.
 >
-> The ST LPC Clocksource IP can be used as the system (tick) timer.
+> It's not just menuconfig:
+>      $ grep -e CONFIG_ARCH_STI -e CONFIG_CLKSRC_ST_LPC .config
+>      CONFIG_ARCH_STI=y
+>      CONFIG_CLKSRC_ST_LPC=y
+>      CONFIG_CLKSRC_ST_LPC_TIMER_SCHED_CLOCK=y
+>      $ vim .config
+>      $ grep -e CONFIG_ARCH_STI -e CONFIG_CLKSRC_ST_LPC .config
+>      CONFIG_ARCH_STI=y
+>      # CONFIG_CLKSRC_ST_LPC is not set
+>      # CONFIG_CLKSRC_ST_LPC_TIMER_SCHED_CLOCK is not set
+>      $ make ARCH=arm silentoldconfig
+>      scripts/kconfig/conf  --silentoldconfig Kconfig
+>      #
+>      # configuration written to .config
+>      #
+>      $ grep -e CONFIG_ARCH_STI -e CONFIG_CLKSRC_ST_LPC .config
+>      CONFIG_ARCH_STI=y
+>      CONFIG_CLKSRC_ST_LPC=y
+>      CONFIG_CLKSRC_ST_LPC_TIMER_SCHED_CLOCK=y
 >
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->   drivers/clocksource/Kconfig         |   8 +++
->   drivers/clocksource/Makefile        |   1 +
->   drivers/clocksource/clksrc_st_lpc.c | 123 ++++++++++++++++++++++++++++++++++++
->   3 files changed, 132 insertions(+)
->   create mode 100644 drivers/clocksource/clksrc_st_lpc.c
->
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index 68161f7..ac424cf 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -250,4 +250,12 @@ config CLKSRC_PXA
->   	help
->   	  This enables OST0 support available on PXA and SA-11x0
->   	  platforms.
-> +
-> +config CLKSRC_ST_LPC
-> +	bool
-> +	depends on ARCH_STI
-> +	select CLKSRC_OF if OF
-> +	help
-> +	  Enable this option to use the Low Power controller timer
-> +	  as clocksource.
->   endmenu
-> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-> index 752d5c7..e08da4d 100644
-> --- a/drivers/clocksource/Makefile
-> +++ b/drivers/clocksource/Makefile
-> @@ -51,3 +51,4 @@ obj-$(CONFIG_ARCH_INTEGRATOR_AP)	+= timer-integrator-ap.o
->   obj-$(CONFIG_CLKSRC_VERSATILE)		+= versatile.o
->   obj-$(CONFIG_CLKSRC_MIPS_GIC)		+= mips-gic-timer.o
->   obj-$(CONFIG_ASM9260_TIMER)		+= asm9260_timer.o
-> +obj-$(CONFIG_CLKSRC_ST_LPC)		+= clksrc_st_lpc.o
-> diff --git a/drivers/clocksource/clksrc_st_lpc.c b/drivers/clocksource/clksrc_st_lpc.c
-> new file mode 100644
-> index 0000000..18a7dcd0
-> --- /dev/null
-> +++ b/drivers/clocksource/clksrc_st_lpc.c
-> @@ -0,0 +1,123 @@
-> +/*
-> + * Clocksource using the Low Power Timer found in the Low Power Controller (LPC)
-> + *
-> + * Copyright (C) 2015 STMicroelectronics ? All Rights Reserved
-> + *
-> + * Author(s): Francesco Virlinzi <francesco.virlinzi@st.com>
-> + *	      Ajit Pal Singh <ajitpal.singh@st.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/clocksource.h>
-> +#include <linux/init.h>
-> +#include <linux/of_address.h>
-> +#include <linux/slab.h>
-> +
-> +#include <dt-bindings/mfd/st-lpc.h>
-> +
-> +/* Low Power Timer */
-> +#define LPC_LPT_LSB_OFF		0x400
-> +#define LPC_LPT_MSB_OFF		0x404
-> +#define LPC_LPT_START_OFF	0x408
-> +
-> +static struct st_clksrc_ddata {
-> +	struct clk		*clk;
-> +	void __iomem		*base;
-> +} ddata;
-> +
-> +static void st_clksrc_reset(void)
-> +{
-> +	writel_relaxed(0, ddata.base + LPC_LPT_START_OFF);
-> +	writel_relaxed(0, ddata.base + LPC_LPT_MSB_OFF);
-> +	writel_relaxed(0, ddata.base + LPC_LPT_LSB_OFF);
-> +	writel_relaxed(1, ddata.base + LPC_LPT_START_OFF);
-> +}
-> +
-> +static int __init st_clksrc_init(void)
-> +{
-> +	unsigned long rate;
-> +	int ret;
-> +
-> +	st_clksrc_reset();
-> +
-> +	rate = clk_get_rate(ddata.clk);
-> +
-> +	ret = clocksource_mmio_init(ddata.base + LPC_LPT_LSB_OFF,
-> +				    "clksrc-st-lpc", rate, 300, 32,
-> +				    clocksource_mmio_readl_up);
-> +	if (ret) {
-> +		pr_err("clksrc-st-lpc: Failed to register clocksource\n");
-> +		return ret;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int st_clksrc_setup_clk(struct device_node *np)
-> +{
-> +	struct clk *clk;
-> +	int ret;
-> +
-> +	clk = of_clk_get(np, 0);
-> +	if (IS_ERR(clk)) {
-> +		pr_err("clksrc-st-lpc: Failed to get LPC clock\n");
-> +		ret = PTR_ERR(clk);
-> +		return ret;
+> So I think that, if you want to be able to set
+> CLKSRC_ST_LPC_TIMER_SCHED_CLOCK to 'n' even though CLKSRC_ST_LPC is 'y',
+> you need to add a prompt. Or have you found a way around this?
 
-return PTR_ERR(clk);
-
-so you can get rid of the 'int ret' variable.
-
-> +	}
-> +
-> +	if (clk_prepare_enable(clk)) {
-> +		pr_err("clksrc-st-lpc: Failed to enable LPC clock\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (!clk_get_rate(clk)) {
-> +		pr_err("clksrc-st-lpc: Failed to get LPC clock rate\n");
-> +		clk_disable_unprepare(clk);
-> +		return -EINVAL;
-> +	}
-> +
-> +	ddata.clk = clk;
-> +
-> +	return 0;
-> +}
-> +
-> +static void __init st_clksrc_of_register(struct device_node *np)
-> +{
-> +	int ret;
-> +	uint32_t mode;
-> +
-> +	ret = of_property_read_u32(np, "st,lpc-mode", &mode);
-> +	if (ret) {
-> +		pr_err("clksrc-st-lpc: An LPC mode must be provided\n");
-> +		return;
-> +	}
-> +
-> +	/* LPC can either run as a Clocksource or in RTC or WDT mode */
-> +	if (mode != ST_LPC_MODE_CLKSRC)
-> +		return;
-
-I am confused with this patch description + comment and the patch 1's 
-description.
-
-For the former, I understand the LPC could be in RTC or WDT mode and 
-used as a clocksource (clksrc + rtc / clksrc + wdt), for the latter I 
-understand there are three modes clocksource, rtc and watchdog (mutually 
-exclusive). Could you clarify ?
-
-> +
-> +	ddata.base = of_iomap(np, 0);
-> +	if (!ddata.base) {
-> +		pr_err("clksrc-st-lpc: Unable to map iomem\n");
-> +		return;
-> +	}
-> +
-> +	if (st_clksrc_setup_clk(np)) {
-> +		iounmap(ddata.base);
-> +		return;
-> +	}
-> +
-> +	if (st_clksrc_init()) {
-> +		iounmap(ddata.base);
-> +		return;
-> +	}
-> +
-> +	pr_info("clksrc-st-lpc: clocksource initialised - running @ %luHz\n",
-> +		clk_get_rate(ddata.clk));
-> +}
-> +CLOCKSOURCE_OF_DECLARE(ddata, "st,stih407-lpc", st_clksrc_of_register);
->
+The general policy is to have non-prompted options in the clocksource's 
+Kconfig and let the platform's config to select the right components.
 
 
 -- 
