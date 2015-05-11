@@ -1,110 +1,116 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 11 May 2015 15:26:18 +0200
-Subject: [PATCH 2/2] ARM: at91/dt: sama5d4: add uart0, uart1 dt nodes
-In-Reply-To: <1431350778-27023-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1431350778-27023-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <1431350778-27023-2-git-send-email-nicolas.ferre@atmel.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 11 May 2015 15:28:28 +0200
+Subject: [PATCH] ARM: exynos_defconfig: add options to make wifi usable
+In-Reply-To: <CAOMqctTDwwbacrLZ8iS_VZKNTBayEfaSX-s50ekcuGE4E=eNfw@mail.gmail.com>
+References: <20150511105034.40580.qmail@dec59.ruk.cuni.cz>
+ <5550919A.9090703@collabora.co.uk>
+ <CAOMqctTDwwbacrLZ8iS_VZKNTBayEfaSX-s50ekcuGE4E=eNfw@mail.gmail.com>
+Message-ID: <5550AE7C.6050208@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suchang Ko <suchangko@samul.kr>
+On 05/11/2015 02:23 PM, Michal Suchanek wrote:
+> On 11 May 2015 at 13:25, Javier Martinez Canillas
+> <javier.martinez@collabora.co.uk> wrote:
+>> Hello Michal,
+>>
+>> On 05/11/2015 12:22 PM, Michal Suchanek wrote:
+>>> The Exynos defconfig includes mwifiex sdio support which is present on
+>>> some of the Exynos boards.
+>>>
+>>> For the WiFi to be usable two extra options are needed. Usermode
+>>
+>> Your subject line and the commit message are somehow misleading since
+>> these options are needed to make the WiFi usable with your current setup.
+>>
+>>> firmware helper to load out-of-kernel firmware and wireless extensions
+>>
+>> For example, this is only needed if the in-kernel fw loader is not
+>> able to find the firmware but isn't needed if the fw is for example
+>> in an initial ramdisk and the kernel is able to load it, built in the
+>> kernel or if the mwifiex driver is built as a module.
+> 
+> I am not sure how is including the firmware in a ramdisk going to
+> improve things over including it in my root filesystem. As far as I am
+> aware it does not make any difference for the kernel.
+> 
 
-Add sama5d4 uart0, uart1 dt nodes, pinctrl and related aliases.
+My understanding is that an initial ramdisk is mounted very early in the
+kernel boot process so even a module-less initamfs that only contains a
+set of firmwares is enough to make the request_firmware() of built in
+drivers to succeed.
 
-Signed-off-by: Suchang Ko <suchangko@samul.kr>
-[nicolas.ferre at atmel.com: split patch, reorder & whitespace fixes]
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/boot/dts/sama5d4.dtsi | 56 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
+While having those in your root filesystem located in a storage media,
+will make the request_firmware() to fail since the rootfs is mounted much
+later after built in drivers' probe functions have already been executed.
 
-diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
-index 9900abc5f00c..dcde334c1ff2 100644
---- a/arch/arm/boot/dts/sama5d4.dtsi
-+++ b/arch/arm/boot/dts/sama5d4.dtsi
-@@ -61,6 +61,8 @@
- 		serial2 = &usart2;
- 		serial3 = &usart0;
- 		serial4 = &usart1;
-+		serial5 = &uart0;
-+		serial6 = &uart1;
- 		gpio0 = &pioA;
- 		gpio1 = &pioB;
- 		gpio2 = &pioC;
-@@ -849,6 +851,24 @@
- 				clock-names = "mci_clk";
- 			};
- 
-+			uart0: serial at f8004000 {
-+				compatible = "atmel,at91sam9260-usart";
-+				reg = <0xf8004000 0x100>;
-+				interrupts = <27 IRQ_TYPE_LEVEL_HIGH 5>;
-+				dmas = <&dma1
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-+					| AT91_XDMAC_DT_PERID(22))>,
-+				       <&dma1
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-+					| AT91_XDMAC_DT_PERID(23))>;
-+				dma-names = "tx", "rx";
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart0>;
-+				clocks = <&uart0_clk>;
-+				clock-names = "usart";
-+				status = "disabled";
-+			};
-+
- 			ssc0: ssc at f8008000 {
- 				compatible = "atmel,at91sam9g45-ssc";
- 				reg = <0xf8008000 0x4000>;
-@@ -1032,6 +1052,24 @@
- 				clock-names = "mci_clk";
- 			};
- 
-+			uart1: serial at fc004000 {
-+				compatible = "atmel,at91sam9260-usart";
-+				reg = <0xfc004000 0x100>;
-+				interrupts = <28 IRQ_TYPE_LEVEL_HIGH 5>;
-+				dmas = <&dma1
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-+					| AT91_XDMAC_DT_PERID(24))>,
-+				       <&dma1
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1)
-+					| AT91_XDMAC_DT_PERID(25))>;
-+				dma-names = "tx", "rx";
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart1>;
-+				clocks = <&uart1_clk>;
-+				clock-names = "usart";
-+				status = "disabled";
-+			};
-+
- 			usart2: serial at fc008000 {
- 				compatible = "atmel,at91sam9260-usart";
- 				reg = <0xfc008000 0x100>;
-@@ -1661,6 +1699,24 @@
- 					};
- 				};
- 
-+				uart0 {
-+					pinctrl_uart0: uart0-0 {
-+						atmel,pins =
-+							<AT91_PIOE 29 AT91_PERIPH_B AT91_PINCTRL_NONE		/* RXD */
-+							 AT91_PIOE 30 AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* TXD */
-+							>;
-+					};
-+				};
-+
-+				uart1 {
-+					pinctrl_uart1: uart1-0 {
-+						atmel,pins =
-+							<AT91_PIOC 25 AT91_PERIPH_C AT91_PINCTRL_NONE		/* RXD */
-+							 AT91_PIOC 26 AT91_PERIPH_C AT91_PINCTRL_PULL_UP	/* TXD */
-+							>;
-+					};
-+				};
-+
- 				usart0 {
- 					pinctrl_usart0: usart0-0 {
- 						atmel,pins =
--- 
-2.1.3
+But now you make me doubt if I'm wrong on my assumptions and I should
+check if that's the case.
+
+> The firmware is not included in the kernel tree nor configured as
+> extra firmware option in the defconfig, either. Otherwise the firmware
+> loader would supposedly find the firmware and we would not have this
+> discussion.
+> 
+> The mwifiex driver is configured as built-in in the defconfig so what
+> happens when the driver is built as a module is not relevant for this
+> defconfig.
+>
+
+Yes, these two (fw built-in the kernel and driver as a module) were just
+other examples of setups that don't require the fallback user-mode helper.
+
+At least I would mention in the commit message that given the driver is
+built-in, no fw is built-in the kernel couldn't be assumed that a initram
+fs will be used, it is better to enable the user-space fw loading fallback.
+
+>>
+>>> so the interface can be configured with wireless-tools.
+>>>
+>>
+>> And wireless extensions is deprecated AFAIK and is only needed for old
+>> user-space since most tools should had been converted to use the netlink
+>> based CONFIG_CFG80211 interface instead.
+>>
+>> I'm booting a debian jessie and have WiFi working without CFG80211_WEXT
+>> for example.
+> 
+> I'm booting Debian Jessie as well and for me WiFi is not working
+> without CFG80211_WEXT for another example.
+> 
+> So it might be that some tools have migrated to another interface but
+> at first glance I have no idea what those tools might be in Debian so
+> for me the WiFi is unusable without wireless extensions.
+>
+
+I'm using the iw package [0] which according to the package description:
+
+"will become the canonical command line tool for wireless configuration
+and iwconfig/wireless-tools will no longer be required"
+
+So I guess iw uses the new netlink based interface while wireless-tools
+is still using the old ioctl based API.
+
+That's something that could also be mentioned in the commit message.
+
+>>
+>> That doesn't mean that I'm against your patch (I'm always happy to enable
+>> more config options if that makes the defconfig more useful) but the commit
+>> message should be accurate about why a change has to be done.
+> 
+> Do you have some specific suggestions about improvements to the commit message?
+>
+
+I already mentioned them above. My point is that the subject and commit message
+said that WiFi is unusable without these options and that's not the case for all
+the setups.
+
+> Thanks
+> 
+> Michal
+>
+
+Best regards,
+Javier
+
+[0]: https://packages.debian.org/jessie/iw
