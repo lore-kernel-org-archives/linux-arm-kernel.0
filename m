@@ -1,54 +1,43 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 11 May 2015 09:55:09 -0500
-Subject: [PATCH v3 2/4] remoteproc: add a rproc ops for performing address
- translation
-In-Reply-To: <CAK=WgbaSD9tGVKhUkbL3JjtW9GuAR_fbWHG6rx1m_v9TDW0Osw@mail.gmail.com>
-References: <1427917039-43206-1-git-send-email-d-gerlach@ti.com>
- <1427917039-43206-3-git-send-email-d-gerlach@ti.com>
- <CAK=WgbaSD9tGVKhUkbL3JjtW9GuAR_fbWHG6rx1m_v9TDW0Osw@mail.gmail.com>
-Message-ID: <5550C2CD.5070207@ti.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Mon, 11 May 2015 16:58:51 +0200
+Subject: [PATCH v5 02/12] Documentation: bindings: document the clocks for
+ pxa3xx-nand
+In-Reply-To: <1431356341-31640-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1431356341-31640-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1431356341-31640-3-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
+The pxa3xx nand driver requires at least one clock to probe correctly.
+A second one, named 'ecc' can be specified if needed. Add the
+corresponding documentation.
 
-On 05/09/2015 02:54 AM, Ohad Ben-Cohen wrote:
-> Hi Dave,
-> 
-> On Wed, Apr 1, 2015 at 10:37 PM, Dave Gerlach <d-gerlach@ti.com> wrote:
->> From: Suman Anna <s-anna@ti.com>
->>
->> The rproc_da_to_va API is currently used to perform any device to
->> kernel address translations to meet the different needs of the remoteproc
->> core/drivers (eg: loading). The functionality is achieved within the
->> remoteproc core, and is limited only for carveouts allocated within the
->> core.
->>
->> A new rproc ops, da_to_va, is added to provide flexibility to platform
->> implementations to perform the address translation themselves when the
->> above conditions cannot be met by the implementations. The rproc_da_to_va()
->> API is extended to invoke this ops if present, and fallback to regular
->> processing if the platform implementation cannot provide the translation.
->> This will allow any remoteproc implementations to translate addresses for
->> dedicated memories like internal memories.
-> 
-> Can you please provide specific examples where this is needed and how
-> it is going to be used?
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-We will be using this for the WkupM3 remoteproc driver, and also using
-it for a PRUSS remoteproc driver (on downstream kernel for now) on TI
-AM335x/AM437x SoCs. The driver uses a firmware where all segments are
-placed only in internal RAMs (nothing in DDR), and we use the remoteproc
-core's ELF loader code to perform the loading. We need a way for the
-remoteproc elf loader core to be able to translate these device
-addresses into a kernel mapped addresses so that the loader code can
-copy the firmware segments.
-
-The previous attempt on this was to use a new resource type through the
-resource table, whereby we are publishing and storing the internal
-memory translations were stored in the remoteproc core [1].
-
-regards
-Suman
-
-[1] https://patchwork.kernel.org/patch/5602981/
+diff --git a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+index 4f833e3c4f51..ad30a02f1346 100644
+--- a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
++++ b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+@@ -8,6 +8,8 @@ Required properties:
+  - reg: 		The register base for the controller
+  - interrupts:		The interrupt to map
+  - #address-cells:	Set to <1> if the node includes partitions
++ - clocks:		A phandle to the clocks
++ - clock-names:		'nfc' and 'ecc'. The 'nfc' clock is mandatory.
+ 
+ Optional properties:
+ 
+@@ -32,6 +34,8 @@ Example:
+ 		compatible = "marvell,pxa3xx-nand";
+ 		reg = <0x43100000 90>;
+ 		interrupts = <45>;
++		clocks = <&gateclk 11>;
++		clock-names = "nfc";
+ 		#address-cells = <1>;
+ 
+ 		marvell,nand-enable-arbiter;
+-- 
+2.4.0
