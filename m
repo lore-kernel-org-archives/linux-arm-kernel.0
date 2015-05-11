@@ -1,85 +1,186 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Mon, 11 May 2015 17:18:05 +0800
-Subject: [PATCH v3 2/7] mmc: mediatek: Add Mediatek MMC driver
-In-Reply-To: <CAPDyKFr5N_08HbLuY=4Wfv1BoVQLVR-VW+NKh_umL1hzi_KozA@mail.gmail.com>
-References: <1430214525-19198-1-git-send-email-chaotian.jing@mediatek.com>
- <1430214525-19198-3-git-send-email-chaotian.jing@mediatek.com>
- <CAPDyKFq=R9B6ZHHgmDcSg-TNSfqQKAUKc2NjACvpwxFpmk954g@mail.gmail.com>
- <1430895299.15154.9.camel@mhfsdcap03>
- <CAPDyKFr+FTXAzYVn3F41dmw2zW01pSbSHPfGJHXbUFLJfvQ5CA@mail.gmail.com>
- <1430962956.15154.48.camel@mhfsdcap03>
- <CAPDyKFr5N_08HbLuY=4Wfv1BoVQLVR-VW+NKh_umL1hzi_KozA@mail.gmail.com>
-Message-ID: <1431335885.26820.7.camel@mhfsdcap03>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 11 May 2015 11:17:49 +0200
+Subject: [PATCH v5 2/2] ARM: at91/dt: add support for kizboxmini
+In-Reply-To: <1430755147-12086-3-git-send-email-g.portay@overkiz.com>
+References: <1430755147-12086-1-git-send-email-g.portay@overkiz.com>
+ <1430755147-12086-3-git-send-email-g.portay@overkiz.com>
+Message-ID: <555073BD.2030808@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-05-08 at 14:12 +0200, Ulf Hansson wrote:
-> On 7 May 2015 at 03:42, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> > Dear Ulf,
-> >
-> > Thanks!
-> > Below is my comment:
-> >
-> > On Wed, 2015-05-06 at 18:31 +0200, Ulf Hansson wrote:
-> >> On 6 May 2015 at 08:54, chaotian.jing <chaotian.jing@mediatek.com> wrote:
-> >> > Dear Ulf,
-> >> >
-> >> > Thanks for your review.
-> >> > I must do a explain of our MMC host:
-> >> > Source clock is source clock of the MMC bus, MMC host has a divider to
-> >> > get different bus clock frequency. now the runtime suspend is gating
-> >> > this clock.
-> >> >
-> >> > Hclk is the power domain of the MMC host, if Hclk is gated, the MMC host
-> >> > cannot work(all registers readout is zero). and, all registers would be
-> >> > reset to default value if Hclk is gated/ungated.
-> >> > At MT8173, MSDC0 and MSDC2 has independent Hclk, MSDC1 and MSDC3's Hclk
-> >> > was controlled by "Infra module".
-> > Sorry for mistake, MSDC0 and MSDC3 has independent Hclk, MSDC1 and
-> > MSDC2's Hclk was controlled by "Infra module". the Infra module is a
-> > "power saving module", when the system go to sleep, Infra module will be
-> > set and MSDC1 & MSDC2's Hclk will be gated automatically.
-> >>
-> >> Thanks for clarifying!
-> >>
-> >> I don't have enough knowledge about your SoC to understand the detail,
-> >> but it seems like we are mixing clocks and power domains. I would
-> >> rather keep this separate - if the HW allows it.
-> >>
-> >> I guess the key question I have is the following:
-> >> 1) Is it hardware wise possible to gate the hclk, but without gating
-> >> the power domain?
-> >> 2) At what level is the reference counting done for each device in the
-> >> power domain? In HW or in sofftware?
-> >>
-> >
-> > Actually, Our MMC host do not have power domain, all the control of the
-> > host is the Hclk.
+Le 04/05/2015 17:59, Ga?l PORTAY a ?crit :
+> Add DT file for Kizbox mini board.
+> This board is based on Atmel's AT91SAM9G25 SoC.
 > 
-> Okay, but I am not sure that fully answered my question.
-> 
-> You said that hclk will be gated when the power domain gets gated. And
-> the power domain (infra module, right?) will be gated at system PM
-> sleep. And when that happens the mmc controller loses register
-> context.
-> 
-> But, again, can hclk be gated without gating the power domain?
-> 
-> No matter what, it seems like a good idea to gate the power domain
-> when all clients of it are idle. Yes we would need to manage register
-> save/restore context, but on the other hand allow you to save more
-> power, right?
-> 
-For MSDC0 & MSDC3, it has independent HCLK, do not have power domain.
-For MSDC1 & MSDC2, its HCLK was controlled by Infra module(This is a big
-power domain for many modules).
-So, for msdc0 & msdc3, we can control its Hclk, for msdc1 & msdc2, we
-cannot control it.
+> Signed-off-by: Ga?l PORTAY <g.portay@overkiz.com>
+> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Yes, I will do gate/ungate HCLK & source clock in PM.
-In addition, Since the gate/ungate HCLK is done by runtime PM, and all
-register operation should work at HCLK is on, so the msdc_init_hw() only
-can be called at set_ios(), because in probe(), the HCLK may have not
-been enabled.
-> Kind regards
-> Uffe
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Nitpicking below...
+
+> ---
+>  arch/arm/boot/dts/Makefile            |   1 +
+>  arch/arm/boot/dts/at91-kizboxmini.dts | 130 ++++++++++++++++++++++++++++++++++
+>  2 files changed, 131 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/at91-kizboxmini.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 21726fd..4bf72c0 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -30,6 +30,7 @@ dtb-$(CONFIG_SOC_SAM_V4_V5) += \
+>  	at91sam9rlek.dtb \
+>  	at91-ariag25.dtb \
+>  	at91-cosino_mega2560.dtb \
+> +	at91-kizboxmini.dtb \
+>  	at91sam9g15ek.dtb \
+>  	at91sam9g25ek.dtb \
+>  	at91sam9g35ek.dtb \
+> diff --git a/arch/arm/boot/dts/at91-kizboxmini.dts b/arch/arm/boot/dts/at91-kizboxmini.dts
+> new file mode 100644
+> index 0000000..7a899ca
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/at91-kizboxmini.dts
+> @@ -0,0 +1,130 @@
+> +/*
+> + * at91-kizboxmini.dts - Device Tree file for Overkiz Kizbox mini board
+> + *
+> + * Copyright (C) 2014 Ga?l PORTAY <g.portay@overkiz.com>
+> + *
+> + * Licensed under GPLv2 or later.
+> + */
+> +/dts-v1/;
+> +#include "at91sam9g25.dtsi"
+> +#include "at91sam9x5.dtsi"
+
+Not needed as already included in at91sam9g25.dtsi: I remove it before
+applying the patch.
+
+Bye,
+
+> +#include <dt-bindings/pwm/pwm.h>
+> +
+> +/ {
+> +	model = "Overkiz Kizbox mini";
+> +	compatible = "overkiz,kizboxmini", "atmel,at91sam9g25", "atmel,at91sam9x5", "atmel,at91sam9";
+> +
+> +	chosen {
+> +		bootargs = "ubi.mtd=ubi";
+> +		linux,stdout-path = &dbgu;
+> +	};
+> +
+> +	memory {
+> +		reg = <0x20000000 0x8000000>;
+> +	};
+> +
+> +	clocks {
+> +		slow_xtal {
+> +			clock-frequency = <32768>;
+> +		};
+> +
+> +		main_xtal {
+> +			clock-frequency = <12000000>;
+> +		};
+> +	};
+> +
+> +	ahb {
+> +		apb {
+> +			usart0: serial at f801c000 {
+> +				status = "okay";
+> +			};
+> +
+> +			macb0: ethernet at f802c000 {
+> +				phy-mode = "rmii";
+> +				status = "okay";
+> +			};
+> +
+> +			pwm0: pwm at f8034000 {
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_pwm0_pwm0_1
+> +					     &pinctrl_pwm0_pwm1_1>;
+> +				status = "okay";
+> +			};
+> +
+> +			dbgu: serial at fffff200 {
+> +				status = "okay";
+> +			};
+> +
+> +			watchdog at fffffe40 {
+> +				status = "okay";
+> +			};
+> +		};
+> +
+> +		usb0: ohci at 00600000 {
+> +			num-ports = <1>;
+> +			status = "okay";
+> +		};
+> +
+> +		usb1: ehci at 00700000 {
+> +			status = "okay";
+> +		};
+> +
+> +		nand0: nand at 40000000 {
+> +			nand-bus-width = <8>;
+> +			nand-ecc-mode = "hw";
+> +			atmel,has-pmecc;
+> +			atmel,pmecc-cap = <4>;
+> +			atmel,pmecc-sector-size = <512>;
+> +			nand-on-flash-bbt;
+> +			status = "okay";
+> +
+> +			bootstrap at 0 {
+> +				label = "bootstrap";
+> +				reg = <0x0 0x20000>;
+> +			};
+> +
+> +			ubi at 20000 {
+> +				label = "ubi";
+> +				reg = <0x20000 0x7fe0000>;
+> +			};
+> +		};
+> +	};
+> +
+> +	gpio_keys {
+> +		compatible = "gpio-keys";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		prog {
+> +			label = "PB_PROG";
+> +			gpios = <&pioC 17 GPIO_ACTIVE_LOW>;
+> +			linux,code = <0x102>;
+> +			gpio-key,wakeup;
+> +		};
+> +
+> +		reset {
+> +			label = "PB_RST";
+> +			gpios = <&pioC 16 GPIO_ACTIVE_LOW>;
+> +			linux,code = <0x100>;
+> +			gpio-key,wakeup;
+> +		};
+> +	};
+> +
+> +	pwm_leds {
+> +		compatible = "pwm-leds";
+> +
+> +		green {
+> +			label = "pwm:green:user";
+> +			pwms = <&pwm0 0 10000000 0>;
+> +			max-brightness = <255>;
+> +			linux,default-trigger = "default-on";
+> +		};
+> +
+> +		red {
+> +			label = "pwm:red:user";
+> +			pwms = <&pwm0 1 10000000 0>;
+> +			max-brightness = <255>;
+> +			linux,default-trigger = "default-on";
+> +		};
+> +	};
+> +};
+> 
+
+
+-- 
+Nicolas Ferre
