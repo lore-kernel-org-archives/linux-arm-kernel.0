@@ -1,58 +1,85 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 11 May 2015 15:15:50 +0200
-Subject: [PATCH 1/2] ARM: mvebu: add alias for mdio on Armada 38x
-In-Reply-To: <554A17DE.7090702@free-electrons.com>
-References: <1430918040-17307-1-git-send-email-kaloz@openwrt.org>
- <1430918040-17307-2-git-send-email-kaloz@openwrt.org>
- <554A17DE.7090702@free-electrons.com>
-Message-ID: <5550AB86.1010400@free-electrons.com>
+Date: Mon, 11 May 2015 15:18:22 +0200
+Subject: [PATCH v2 2/3] ARM: dove: Add clock-names to CuBox Si5351 clk
+ generator
+In-Reply-To: <20150508190050.16410.52142@quantum>
+References: <1430773456-15203-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1430773456-15203-3-git-send-email-sebastian.hesselbarth@gmail.com>
+ <554A13AE.6000904@free-electrons.com> <20150508190050.16410.52142@quantum>
+Message-ID: <5550AC1E.6040901@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Imre,
+Hi Mike, Sebastian,
 
-On 06/05/2015 15:32, Gregory CLEMENT wrote:
-> Hi Imre,
-> 
-> On 06/05/2015 15:13, Imre Kaloz wrote:
->> This allows us to reference it later.
+On 08/05/2015 21:00, Michael Turquette wrote:
+> Quoting Gregory CLEMENT (2015-05-06 06:14:22)
+>> Hi Sebastian,
 >>
->> Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
+>> On 04/05/2015 23:04, Sebastian Hesselbarth wrote:
+>>> Si5351 clock generator on CuBox uses XTAL as clock reference, name the
+>>> clock phandle accordingly.
+>>
+>> as soon as the binding will be accepted (in patch 1), I will apply it
+>> on mvebu/fixes.
 > 
-> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-applied on mvebu/dt
+applied on mvebu/fixes
 
 Thanks,
 
 Gregory
 
+
+> It is on the clk git mirror now. Should be picked up in -next soon.
 > 
+> Regards,
+> Mike
 > 
-> Thanks,
-> 
-> Gregory
-> 
->> ---
->>  arch/arm/boot/dts/armada-38x.dtsi | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
 >>
->> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
->> index ed2dd8b..839e5bf 100644
->> --- a/arch/arm/boot/dts/armada-38x.dtsi
->> +++ b/arch/arm/boot/dts/armada-38x.dtsi
->> @@ -495,7 +495,7 @@
->>  				status = "disabled";
->>  			};
->>  
->> -			mdio at 72004 {
->> +			mdio: mdio at 72004 {
->>  				#address-cells = <1>;
->>  				#size-cells = <0>;
->>  				compatible = "marvell,orion-mdio";
+>> Thanks,
 >>
-> 
-> 
+>> Gregory
+>>
+>>
+>>>
+>>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>>> ---
+>>> Cc: Mike Turquette <mturquette@linaro.org>
+>>> Cc: Stephen Boyd <sboyd@codeaurora.org>
+>>> Cc: Jean-Francois Moine <moinejf@free.fr>
+>>> Cc: Michael Welling <mwelling@ieee.org>
+>>> Cc: Russell King <rmk+linux@arm.linux.org.uk>
+>>> Cc: Jason Cooper <jason@lakedaemon.net>
+>>> Cc: Andrew Lunn <andrew@lunn.ch>
+>>> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+>>> Cc: linux-clk at vger.kernel.org
+>>> Cc: linux-arm-kernel at lists.infradead.org
+>>> Cc: linux-kernel at vger.kernel.org
+>>> ---
+>>>  arch/arm/boot/dts/dove-cubox.dts | 1 +
+>>>  1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/dove-cubox.dts b/arch/arm/boot/dts/dove-cubox.dts
+>>> index aae7efc09b0b..e6fa251e17b9 100644
+>>> --- a/arch/arm/boot/dts/dove-cubox.dts
+>>> +++ b/arch/arm/boot/dts/dove-cubox.dts
+>>> @@ -87,6 +87,7 @@
+>>>  
+>>>               /* connect xtal input to 25MHz reference */
+>>>               clocks = <&ref25>;
+>>> +             clock-names = "xtal";
+>>>  
+>>>               /* connect xtal input as source of pll0 and pll1 */
+>>>               silabs,pll-source = <0 0>, <1 0>;
+>>>
+>>
+>>
+>> -- 
+>> Gregory Clement, Free Electrons
+>> Kernel, drivers, real-time and embedded Linux
+>> development, consulting, training and support.
+>> http://free-electrons.com
 
 
 -- 
