@@ -1,74 +1,81 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 11 May 2015 18:12:29 +0100
-Subject: [V3 PATCH 2/5] arm64 : Introduce support for ACPI _CCA object
-In-Reply-To: <1431045436-8690-3-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1431045436-8690-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1431045436-8690-3-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <20150511171229.GK18655@e104818-lin.cambridge.arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 11 May 2015 19:13:07 +0200
+Subject: [PATCH 3/7] drivers/cpuidle: Convert non-modular drivers to use
+ builtin_driver_register
+In-Reply-To: <1431287385-1526-4-git-send-email-paul.gortmaker@windriver.com>
+References: <1431287385-1526-1-git-send-email-paul.gortmaker@windriver.com>
+ <1431287385-1526-4-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <5550E323.1080800@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 07, 2015 at 07:37:13PM -0500, Suravee Suthikulpanit wrote:
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 4269dba..c7227e8 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -1,5 +1,6 @@
->  config ARM64
->  	def_bool y
-> +	select ACPI_CCA_REQUIRED if ACPI
->  	select ACPI_GENERIC_GSI if ACPI
->  	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
->  	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
-> @@ -19,6 +20,7 @@ config ARM64
->  	select ARM_GIC_V2M if PCI_MSI
->  	select ARM_GIC_V3
->  	select ARM_GIC_V3_ITS if PCI_MSI
-> +	select ARM64_SUPPORT_ACPI_CCA_ZERO if ACPI
+On 05/10/2015 09:49 PM, Paul Gortmaker wrote:
+> All these drivers are configured with Kconfig options that are
+> declared as bool.  Hence it is not possible for the code
+> to be built as modular.  However the code is currently using the
+> module_platform_driver() macro for driver registration.
+>
+> While this currently works, we really don't want to be including
+> the module.h header in non-modular code, which we'll be forced
+> to do, pending some upcoming code relocation from init.h into
+> module.h.  So we fix it now by using the non-modular equivalent.
+>
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: linux-pm at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 
-As per the other sub-thread, I don't think we need this option at all.
+Sounds reasonable.
 
-> diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-> index 9437e3d..f0d6d0b 100644
-> --- a/arch/arm64/include/asm/dma-mapping.h
-> +++ b/arch/arm64/include/asm/dma-mapping.h
-> @@ -18,6 +18,7 @@
->  
->  #ifdef __KERNEL__
->  
-> +#include <linux/acpi.h>
->  #include <linux/types.h>
->  #include <linux/vmalloc.h>
->  
-> @@ -28,13 +29,23 @@
->  
->  #define DMA_ERROR_CODE	(~(dma_addr_t)0)
->  extern struct dma_map_ops *dma_ops;
-> +extern struct dma_map_ops dummy_dma_ops;
->  
->  static inline struct dma_map_ops *__generic_dma_ops(struct device *dev)
->  {
-> -	if (unlikely(!dev) || !dev->archdata.dma_ops)
-> +	if (unlikely(!dev))
->  		return dma_ops;
-> -	else
-> +	else if (dev->archdata.dma_ops)
->  		return dev->archdata.dma_ops;
-> +	else if (acpi_disabled)
-> +		return dma_ops;
-> +
-> +	/*
-> +	 * When ACPI is enabled, if arch_set_dma_ops is not called,
-> +	 * we will disable device DMA capability by setting it
-> +	 * to dummy_dma_ops.
-> +	 */
-> +	return &dummy_dma_ops;
->  }
+   -- Daniel
 
-The code looks fine to me but Arnd had some comments that I didn't fully
-understand (dropping dummy_map_ops in favour of simply setting dma_mask
-to NULL; I don't think the existing swiotlb ops would behave in a way
-that always return NULL).
+> ---
+>   drivers/cpuidle/cpuidle-at91.c    | 3 +--
+>   drivers/cpuidle/cpuidle-calxeda.c | 3 +--
+>   drivers/cpuidle/cpuidle-zynq.c    | 3 +--
+>   3 files changed, 3 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/cpuidle/cpuidle-at91.c b/drivers/cpuidle/cpuidle-at91.c
+> index f2446c78d87c..9c5853b6ca4a 100644
+> --- a/drivers/cpuidle/cpuidle-at91.c
+> +++ b/drivers/cpuidle/cpuidle-at91.c
+> @@ -62,5 +62,4 @@ static struct platform_driver at91_cpuidle_driver = {
+>   	},
+>   	.probe = at91_cpuidle_probe,
+>   };
+> -
+> -module_platform_driver(at91_cpuidle_driver);
+> +builtin_platform_driver(at91_cpuidle_driver);
+> diff --git a/drivers/cpuidle/cpuidle-calxeda.c b/drivers/cpuidle/cpuidle-calxeda.c
+> index 9445e6cc02be..c13feec89ea1 100644
+> --- a/drivers/cpuidle/cpuidle-calxeda.c
+> +++ b/drivers/cpuidle/cpuidle-calxeda.c
+> @@ -75,5 +75,4 @@ static struct platform_driver calxeda_cpuidle_plat_driver = {
+>           },
+>           .probe = calxeda_cpuidle_probe,
+>   };
+> -
+> -module_platform_driver(calxeda_cpuidle_plat_driver);
+> +builtin_platform_driver(calxeda_cpuidle_plat_driver);
+> diff --git a/drivers/cpuidle/cpuidle-zynq.c b/drivers/cpuidle/cpuidle-zynq.c
+> index 543292b1d38e..6f4257fc56e5 100644
+> --- a/drivers/cpuidle/cpuidle-zynq.c
+> +++ b/drivers/cpuidle/cpuidle-zynq.c
+> @@ -73,5 +73,4 @@ static struct platform_driver zynq_cpuidle_driver = {
+>   	},
+>   	.probe = zynq_cpuidle_probe,
+>   };
+> -
+> -module_platform_driver(zynq_cpuidle_driver);
+> +builtin_platform_driver(zynq_cpuidle_driver);
+>
+
 
 -- 
-Catalin
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
