@@ -1,87 +1,126 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 11 May 2015 08:41:52 +0200
-Subject: [PATCH 0/8] arm64 UEFI early FDT handling
-Message-ID: <1431326520-17331-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Mon, 11 May 2015 08:41:53 +0200
+Subject: [PATCH 1/8] of/fdt: split off FDT self reservation from memreserve
+ processing
+In-Reply-To: <1431326520-17331-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1431326520-17331-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1431326520-17331-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a followup to the "arm64: update/clarify/relax Image and FDT placement
-rules" series I sent a while ago:
-(http://article.gmane.org/gmane.linux.ports.arm.kernel/407148)
+This splits off the reservation of the memory occupied by the FDT
+binary itself from the processing of the memory reservations it
+contains. This is necessary because the physical address of the FDT,
+which is needed to perform the reservation, may not be known to the
+FDT driver core, i.e., it may be mapped outside the linear direct
+mapping, in which case __pa() returns a bogus value.
 
-This has now been split in two series: this first series deals with the
-early FDT handling, primarily in the context of UEFI, but not exclusively.
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Paul Mackerras <paulus@samba.org>
+Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/mm/init.c         |  1 +
+ arch/arm64/mm/init.c       |  1 +
+ arch/powerpc/kernel/prom.c |  1 +
+ drivers/of/fdt.c           | 19 ++++++++++++++-----
+ include/linux/of_fdt.h     |  2 ++
+ 5 files changed, 19 insertions(+), 5 deletions(-)
 
-A number of minor issues exist in the early UEFI/FDT handling path, such as:
-- the FDT placement by the stub may violate the arm64/linux boot protocol in
-  some corner cases;
-- when booting via UEFI, memreserve entries are removed from the device tree but
-  the /reserved-memory node is not
-- memory nodes are removed from the device tree in a way that is not officially
-  supported by the libfdt API (i.e., you cannot delete nodes while traversing
-  the tree)
-- removal of memory nodes may discard annotations (such as NUMA topology) that
-  should ideally be retained.
-
-Patch #1 splits off the reservation of the FDT image from the reservation of the
-memreserve entries and /reserved-memory node.
-
-Patch #2 relaxes the boot protocol requirement on the placement of the FDT.
-
-Patch #3 introduces an arm64 specific version of early_init_dt_add_memory_arch()
-so that we can modify it later to ignore DT memory nodes if booting via UEFI.
-Note that having this specific version is desirable for other reasons as well,
-this is covered by the other followup series.
-
-Patch #4 moves some UEFI+FDT init code around before making changes to it.
-
-Patch #5 moves the UEFI initialization to before the early FDT scanning so we
-know at that point whether we are booting via UEFI or not.
-
-Patch #6 changes the UEFI init code so that memory nodes are simply ignored, so
-that they don't have to be removed by the stub anymore.
-
-Patch  #7 does the same as #6, but for memreserves and the /reserved-memory
-node.
-
-Patch #8 adapts the FDT placement logic used by the stub to take into account
-the new relaxed rules.
-
-Ard Biesheuvel (8):
-  of/fdt: split off FDT self reservation from memreserve processing
-  arm64: use fixmap region for permanent FDT mapping
-  arm64: override early_init_dt_add_memory_arch()
-  efi: move FDT handling to separate object file
-  arm64/efi: move EFI init before early FDT processing
-  arm64/efi: ignore DT memory nodes instead of removing them
-  arm64/efi: ignore DT memreserve entries instead of removing them
-  arm64/efi: adapt to relaxed FDT placement requirements
-
- Documentation/arm64/booting.txt         | 13 +++--
- arch/arm/mm/init.c                      |  1 +
- arch/arm64/include/asm/boot.h           | 14 ++++++
- arch/arm64/include/asm/efi.h            | 14 ++----
- arch/arm64/include/asm/fixmap.h         | 15 ++++++
- arch/arm64/include/asm/mmu.h            |  1 +
- arch/arm64/kernel/efi.c                 | 14 ++----
- arch/arm64/kernel/head.S                | 39 +--------------
- arch/arm64/kernel/setup.c               | 34 +++++--------
- arch/arm64/mm/Makefile                  |  2 +
- arch/arm64/mm/init.c                    | 35 +++++++++++++-
- arch/arm64/mm/mmu.c                     | 66 +++++++++++++++++++++++++
- arch/powerpc/kernel/prom.c              |  1 +
- drivers/firmware/efi/Makefile           |  2 +
- drivers/firmware/efi/efi-fdt.c          | 77 +++++++++++++++++++++++++++++
- drivers/firmware/efi/efi.c              | 86 ---------------------------------
- drivers/firmware/efi/libstub/arm-stub.c |  5 +-
- drivers/firmware/efi/libstub/efistub.h  |  1 -
- drivers/firmware/efi/libstub/fdt.c      | 51 ++++---------------
- drivers/of/fdt.c                        | 19 ++++++--
- include/linux/efi.h                     |  3 +-
- include/linux/of_fdt.h                  |  2 +
- 22 files changed, 274 insertions(+), 221 deletions(-)
- create mode 100644 arch/arm64/include/asm/boot.h
- create mode 100644 drivers/firmware/efi/efi-fdt.c
-
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index be92fa0f2f35..8a63b4cdc0f2 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -268,6 +268,7 @@ void __init arm_memblock_init(const struct machine_desc *mdesc)
+ 	if (mdesc->reserve)
+ 		mdesc->reserve();
+ 
++	early_init_fdt_reserve_self();
+ 	early_init_fdt_scan_reserved_mem();
+ 
+ 	/* reserve memory for DMA contiguous allocations */
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 597831bdddf3..89a05f467ffb 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -170,6 +170,7 @@ void __init arm64_memblock_init(void)
+ 		memblock_reserve(__virt_to_phys(initrd_start), initrd_end - initrd_start);
+ #endif
+ 
++	early_init_fdt_reserve_self();
+ 	early_init_fdt_scan_reserved_mem();
+ 
+ 	/* 4GB maximum for 32-bit only capable devices */
+diff --git a/arch/powerpc/kernel/prom.c b/arch/powerpc/kernel/prom.c
+index 308c5e15676b..51ea36f79307 100644
+--- a/arch/powerpc/kernel/prom.c
++++ b/arch/powerpc/kernel/prom.c
+@@ -573,6 +573,7 @@ static void __init early_reserve_mem_dt(void)
+ 	int len;
+ 	const __be32 *prop;
+ 
++	early_init_fdt_reserve_self();
+ 	early_init_fdt_scan_reserved_mem();
+ 
+ 	dt_root = of_get_flat_dt_root();
+diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+index cde35c5d0191..f2dd23a32267 100644
+--- a/drivers/of/fdt.c
++++ b/drivers/of/fdt.c
+@@ -580,11 +580,6 @@ void __init early_init_fdt_scan_reserved_mem(void)
+ 	if (!initial_boot_params)
+ 		return;
+ 
+-	/* Reserve the dtb region */
+-	early_init_dt_reserve_memory_arch(__pa(initial_boot_params),
+-					  fdt_totalsize(initial_boot_params),
+-					  0);
+-
+ 	/* Process header /memreserve/ fields */
+ 	for (n = 0; ; n++) {
+ 		fdt_get_mem_rsv(initial_boot_params, n, &base, &size);
+@@ -598,6 +593,20 @@ void __init early_init_fdt_scan_reserved_mem(void)
+ }
+ 
+ /**
++ * early_init_fdt_reserve_self() - reserve the memory used by the FDT blob
++ */
++void __init early_init_fdt_reserve_self(void)
++{
++	if (!initial_boot_params)
++		return;
++
++	/* Reserve the dtb region */
++	early_init_dt_reserve_memory_arch(__pa(initial_boot_params),
++					  fdt_totalsize(initial_boot_params),
++					  0);
++}
++
++/**
+  * of_scan_flat_dt - scan flattened tree blob and call callback on each.
+  * @it: callback function
+  * @data: context data pointer
+diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
+index 587ee507965d..fd627a58068f 100644
+--- a/include/linux/of_fdt.h
++++ b/include/linux/of_fdt.h
+@@ -64,6 +64,7 @@ extern int early_init_dt_scan_chosen(unsigned long node, const char *uname,
+ extern int early_init_dt_scan_memory(unsigned long node, const char *uname,
+ 				     int depth, void *data);
+ extern void early_init_fdt_scan_reserved_mem(void);
++extern void early_init_fdt_reserve_self(void);
+ extern void early_init_dt_add_memory_arch(u64 base, u64 size);
+ extern int early_init_dt_reserve_memory_arch(phys_addr_t base, phys_addr_t size,
+ 					     bool no_map);
+@@ -91,6 +92,7 @@ extern u64 fdt_translate_address(const void *blob, int node_offset);
+ extern void of_fdt_limit_memory(int limit);
+ #else /* CONFIG_OF_FLATTREE */
+ static inline void early_init_fdt_scan_reserved_mem(void) {}
++static inline void early_init_fdt_reserve_self(void) {}
+ static inline const char *of_flat_dt_get_machine_name(void) { return NULL; }
+ static inline void unflatten_device_tree(void) {}
+ static inline void unflatten_and_copy_device_tree(void) {}
 -- 
 1.9.1
