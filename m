@@ -1,25 +1,22 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 11 May 2015 11:22:50 +0200
-Subject: [PATCH 03/12] clocksource: sti: Provide 'use timer as sched
- clock' capability
-In-Reply-To: <55506CB0.2030909@linaro.org>
-References: <1431005924-21777-1-git-send-email-lee.jones@linaro.org>
- <1431005924-21777-4-git-send-email-lee.jones@linaro.org>
- <1431074699.13593.4.camel@x220> <20150508093603.GB29044@x1>
- <1431078730.13593.14.camel@x220> <20150508102938.GD29044@x1>
- <1431085625.13593.39.camel@x220> <55506CB0.2030909@linaro.org>
-Message-ID: <1431336170.2398.73.camel@x220>
+From: yh.huang@mediatek.com (YH Huang)
+Date: Mon, 11 May 2015 17:26:20 +0800
+Subject: [PATCH 0/2] Add Mediatek display PWM driver
+Message-ID: <1431336382-13167-1-git-send-email-yh.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-05-11 at 10:47 +0200, Daniel Lezcano wrote:
-> The general policy is to have non-prompted options in the clocksource's 
-> Kconfig and let the platform's config to select the right components.
+This patch series add the use of display PWM driver and documentation 
+for Mediatek SoCs. The driver is used to support the backlight of 
+the panel. This is based on v4.1-rc1. 
 
-If you want to stick to that policy here there's no reason to add
-CLKSRC_ST_LPC_TIMER_SCHED_CLOCK in this patch. It currently adds
-nothing, as it will always be equal to whatever value CLKSRC_ST_LPC will
-have, right?
+YH Huang (2):
+  dt-bindings: pwm: add Mediatek display PWM bindings
+  pwm: add Mediatek display PWM driver support
 
-
-Paul Bolle
+ .../devicetree/bindings/pwm/pwm-disp-mediatek.txt  |  25 +++
+ drivers/pwm/Kconfig                                |   9 +
+ drivers/pwm/Makefile                               |   1 +
+ drivers/pwm/pwm-disp-mediatek.c                    | 225 +++++++++++++++++++++
+ 4 files changed, 260 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-disp-mediatek.txt
+ create mode 100644 drivers/pwm/pwm-disp-mediatek.c
