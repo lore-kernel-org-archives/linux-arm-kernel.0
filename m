@@ -1,95 +1,29 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 11 May 2015 13:43:11 +0200
-Subject: [PATCH] ARM: mm: handle non-pmd-aligned end of RAM
-In-Reply-To: <20150511103130.GA3490@leverpostej>
-References: <a865bd68d706f8c4c9e82a374ff6adc4@agner.ch>
- <20150511103130.GA3490@leverpostej>
-Message-ID: <5dec6ce1e05fd20c214d9e0ab41dcc0d@agner.ch>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 11 May 2015 12:52:26 +0100
+Subject: [rtc-linux] [PATCH 07/12] rtc: st: Update IP layout information
+ to include Clocksource
+In-Reply-To: <20150511110307.GL3338@piout.net>
+References: <1431005924-21777-1-git-send-email-lee.jones@linaro.org>
+ <1431005924-21777-8-git-send-email-lee.jones@linaro.org>
+ <20150509135854.GE3338@piout.net> <20150511105433.GB20742@x1>
+ <20150511110307.GL3338@piout.net>
+Message-ID: <20150511115226.GC20742@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-05-11 12:31, Mark Rutland wrote:
-> At boot time we round the memblock limit down to section size in an
-> attempt to ensure that we will have mapped this RAM with section
-> mappings prior to allocating from it. When mapping RAM we iterate over
-> PMD-sized chunks, creating these section mappings.
+On Mon, 11 May 2015, Alexandre Belloni wrote:
+> On 11/05/2015 at 11:54:33 +0100, Lee Jones wrote :
+> > On Sat, 09 May 2015, Alexandre Belloni wrote:
+> > > I'm guessing this will go through the mfd tree along with the driver?
+> > 
+> > Yes, that is the plan, if that's okay with you?
 > 
-> Section mappings are only created when the end of a chunk is aligned to
-> section size. Unfortunately, with classic page tables (where PMD_SIZE is
-> 2 * SECTION_SIZE) this means that if a chunk is between 1M and 2M in
-> size the first 1M will not be mapped despite having been accounted for
-> in the memblock limit. This has been observed to result in page tables
-> being allocated from unmapped memory, causing boot-time hangs.
-> 
-> This patch modifies the memblock limit rounding to always round down to
-> PMD_SIZE instead of SECTION_SIZE. For classic MMU this means that we
-> will round the memblock limit down to a 2M boundary, matching the limits
-> on section mappings, and preventing allocations from unmapped memory.
-> For LPAE there should be no change as PMD_SIZE == SECTION_SIZE.
+> Sure!
 
-Thanks Mark, just tested that patch on the hardware I had the issue,
-looks good.
+Perfect.  Thanks Alexandre.
 
-Tested-by: Stefan Agner <stefan@agner.ch>
-
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Reported-by: Stefan Agner <stefan@agner.ch>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Hans de Goede <hdegoede@redhat.com>
-> Cc: Laura Abbott <labbott@redhat.com>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: Steve Capper <steve.capper@linaro.org>
-> ---
->  arch/arm/mm/mmu.c | 20 ++++++++++----------
->  1 file changed, 10 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index 4e6ef89..7186382 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -1112,22 +1112,22 @@ void __init sanity_check_meminfo(void)
->  			}
->  
->  			/*
-> -			 * Find the first non-section-aligned page, and point
-> +			 * Find the first non-pmd-aligned page, and point
->  			 * memblock_limit at it. This relies on rounding the
-> -			 * limit down to be section-aligned, which happens at
-> -			 * the end of this function.
-> +			 * limit down to be pmd-aligned, which happens at the
-> +			 * end of this function.
->  			 *
->  			 * With this algorithm, the start or end of almost any
-> -			 * bank can be non-section-aligned. The only exception
-> -			 * is that the start of the bank 0 must be section-
-> +			 * bank can be non-pmd-aligned. The only exception is
-> +			 * that the start of the bank 0 must be section-
->  			 * aligned, since otherwise memory would need to be
->  			 * allocated when mapping the start of bank 0, which
->  			 * occurs before any free memory is mapped.
->  			 */
->  			if (!memblock_limit) {
-> -				if (!IS_ALIGNED(block_start, SECTION_SIZE))
-> +				if (!IS_ALIGNED(block_start, PMD_SIZE))
->  					memblock_limit = block_start;
-> -				else if (!IS_ALIGNED(block_end, SECTION_SIZE))
-> +				else if (!IS_ALIGNED(block_end, PMD_SIZE))
->  					memblock_limit = arm_lowmem_limit;
->  			}
->  
-> @@ -1137,12 +1137,12 @@ void __init sanity_check_meminfo(void)
->  	high_memory = __va(arm_lowmem_limit - 1) + 1;
->  
->  	/*
-> -	 * Round the memblock limit down to a section size.  This
-> +	 * Round the memblock limit down to a pmd size.  This
->  	 * helps to ensure that we will allocate memory from the
-> -	 * last full section, which should be mapped.
-> +	 * last full pmd, which should be mapped.
->  	 */
->  	if (memblock_limit)
-> -		memblock_limit = round_down(memblock_limit, SECTION_SIZE);
-> +		memblock_limit = round_down(memblock_limit, PMD_SIZE);
->  	if (!memblock_limit)
->  		memblock_limit = arm_lowmem_limit;
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
