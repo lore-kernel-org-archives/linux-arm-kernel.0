@@ -1,54 +1,41 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 11 May 2015 21:37:05 +0900
-Subject: [PATCH] ARM: exynos_defconfig: add options to make wifi usable
-In-Reply-To: <20150511105034.40580.qmail@dec59.ruk.cuni.cz>
-References: <20150511105034.40580.qmail@dec59.ruk.cuni.cz>
-Message-ID: <CAJKOXPdj9QH13nD14wQUZBt8iGRmrAWEgHH4LNjz11+b8Ydu1Q@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 11 May 2015 13:39:54 +0100
+Subject: [PATCH 05/12] arm64: psci: support unsigned return values
+In-Reply-To: <20150511122525.GA2187@red-moon>
+References: <1431085004-32743-1-git-send-email-mark.rutland@arm.com>
+ <1431085004-32743-6-git-send-email-mark.rutland@arm.com>
+ <20150511122525.GA2187@red-moon>
+Message-ID: <20150511123954.GB4595@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-11 19:22 GMT+09:00 Michal Suchanek <hramrach@gmail.com>:
->
-> The Exynos defconfig includes mwifiex sdio support which is present on
-> some of the Exynos boards.
->
-> For the WiFi to be usable two extra options are needed. Usermode
-> firmware helper to load out-of-kernel firmware and wireless extensions
-> so the interface can be configured with wireless-tools.
->
-> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
-> ---
->  arch/arm/configs/exynos_defconfig | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index d034c96..5d4ee83f 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -42,6 +42,7 @@ CONFIG_IP_PNP_BOOTP=y
->  CONFIG_IP_PNP_RARP=y
->  CONFIG_WIRELESS=y
->  CONFIG_CFG80211=y
-> +CONFIG_CFG80211_WEXT=y
+On Mon, May 11, 2015 at 01:25:25PM +0100, Lorenzo Pieralisi wrote:
+> On Fri, May 08, 2015 at 12:36:37PM +0100, Mark Rutland wrote:
+> 
+> [...]
+> 
+> > -static int psci_get_version(void)
+> > +static u32 psci_get_version(void)
+> >  {
+> > -	int err;
+> > -
+> > -	err = invoke_psci_fn(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
+> > -	return err;
+> > +	return invoke_psci_fn(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
+> >  }
+> >  
+> >  static int psci_cpu_suspend(struct psci_power_state state,
+> > @@ -295,23 +292,13 @@ static int __init psci_probe(void)
+> >  {
+> >  	int ver = psci_get_version();
+> 
+> Is there a reason to keep ver as an int ?
 
-Hi,
+No, I just missed it when propagating the type changes. It should be
+corrected to a u32 as well.
 
-No, the CFG80211_WEXT is the old interface. I think there were some
-plans to mark it deprecated. Anyway it should not be enabled by
-default and almost none of configs enable it.
+> Other than that the patch looks fine.
 
->  CONFIG_MWIFIEX=y
->  CONFIG_MWIFIEX_SDIO=y
->  CONFIG_RFKILL_REGULATOR=y
-> @@ -49,6 +50,7 @@ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
->  CONFIG_DEVTMPFS=y
->  CONFIG_DEVTMPFS_MOUNT=y
->  CONFIG_PROC_DEVICETREE=y
-> +CONFIG_FW_LOADER_USER_HELPER_FALLBACK=y
+Great!
 
-It is an fallback, not usual way of loading firmware. In typical cases
-this should not be needed. Why Exynos defconfig should be exceptional
-here?
-
-Best regards,
-Krzysztof
+Mark.
