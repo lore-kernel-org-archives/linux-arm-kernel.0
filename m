@@ -1,53 +1,45 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Mon, 11 May 2015 09:18:40 -0500
-Subject: Bulid regression with VDSO enabled
-In-Reply-To: <CAKv+Gu_i6Cjr-+mYLkw=Oo6HPQkRTGwjFf5o5QX6bgiGsVFDYA@mail.gmail.com>
-References: <391d6fc127b78ef4cbc5443557f0665a@agner.ch>	<554CD5F8.10901@mentor.com>	<983cc33a8e5704f4281a7d30bbc9d1d2@agner.ch>	<554D276D.9040205@mentor.com>
- <CAKv+Gu_i6Cjr-+mYLkw=Oo6HPQkRTGwjFf5o5QX6bgiGsVFDYA@mail.gmail.com>
-Message-ID: <5550BA40.2050504@mentor.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Mon, 11 May 2015 15:19:00 +0100
+Subject: [PATCH] arm-cci: Do not enable CCI-400 PMU by default
+In-Reply-To: <20150511140736.GF2067@n2100.arm.linux.org.uk>
+References: <1431348626-2767-1-git-send-email-suzuki.poulose@arm.com>
+ <20150511140736.GF2067@n2100.arm.linux.org.uk>
+Message-ID: <5550BA54.4020302@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/2015 03:31 AM, Ard Biesheuvel wrote:
-> Hi Nathan,
-> 
-> On 8 May 2015 at 23:15, Nathan Lynch <Nathan_Lynch@mentor.com> wrote:
->> On 05/08/2015 11:08 AM, Stefan Agner wrote:
->>> On 2015-05-08 17:27, Nathan Lynch wrote:
->>>> On 05/08/2015 06:13 AM, Stefan Agner wrote:
->>>>> Also, I used the BFD linker by adding LD=${CROSS_COMPILE}ld.bfd to the
->>>>> build command. Interestingly thought, I had the same issue when using
->>>>> gold linker...
->>>>
->>>> When I try this, ld.gold is used regardless.
->>>>
->>>> You can tell by doing and checking for a NT_GNU_GOLD_VERSION note:
->>>>
->>>> $ readelf -n arch/arm/vdso/vdso.so.raw
->>>>
->>>> Displaying notes found at file offset 0x000001bc with length 0x00000040:
->>>>   Owner                 Data size       Description
->>>>   GNU                  0x00000009       NT_GNU_GOLD_VERSION (gold version)
->>>>   GNU                  0x00000014       NT_GNU_BUILD_ID (unique build
->>>> ID bitstring)
->>>>     Build ID: f025409550acb7f955c61d95691291da078e6688
->>>
->>> Hm, you are right. When deleting moving ld.bfd to ld, which makes the
->>> BFD linker as default, compiling works flawless.
->>>
->>> However, so far LD=${CROSS_COMPILE}ld.bfc seems to work for other build
->>> objects, at least those do not have this note. For instance time.o does
->>> not return anything:
->>>
->>> $ readelf -n arch/arm/kernel/time.o
->>
->> This is just an object file that hasn't been linked, but your general
->> point stands -- LD is honored by other parts of the build.
->>
->>
-> 
-> I suppose this implies that the build only chokes on --pic-veneer when
-> linking the VDSO, and nowhere else?
+On 11/05/15 15:07, Russell King - ARM Linux wrote:
+> On Mon, May 11, 2015 at 01:50:26PM +0100, Suzuki K. Poulose wrote:
+>>   config ARM_CCI400_PMU
+>>   	bool "ARM CCI400 PMU support"
+>> -	default y
+>>   	depends on ARM || ARM64
+>> -	depends on HW_PERF_EVENTS
+>> +	depends on PERF_EVENTS
+>>   	select ARM_CCI400_COMMON
+>>   	help
+>> -	  Support for PMU events monitoring on the ARM CCI cache coherent
+>> -	  interconnect.
+>> -
+>> -	  If unsure, say Y
+>> +	  Support for PMU events monitoring on the ARM CCI-400 (cache coherent
+>> +	  interconnect). CCI-400 supports counting events related to the
+>> +	  connected slave/master interfaces.
+>
+> This still needs to be better.  How do I know whether it should be enabled
+> for my platform or not?
+>
+> Presumably, we can say that CCI-400 does not appear on CPUs older than X,
+> which means we can add "The CCI-400 may be provided on ARM CPUs X or
+> later."
+>
+> I doubt that you'll find CCI-400 on ARMv6 or older ARM architectures for
+> example.  Maybe then we need "depends on ARM || ARM64" to be tighter?
+> "depends on (ARM && CPU_V7) || ARM64" ?
+>
+Yes, the CCI-400 could be found only on V7 or later (which could include 
+32bit only V8) for ARM32.
 
-No, --pic-veneer isn't the problem for the VDSO; for better or worse
-LDFLAGS is ignored for the VDSO build.
+I can fix that.
+
+Suzuki
