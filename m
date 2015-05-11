@@ -1,44 +1,47 @@
-From: vishnupatekar0510@gmail.com (Vishnu Patekar)
-Date: Mon, 11 May 2015 14:23:54 +0530
-Subject: [PATCH 3/6] clk: sunxi: Add A33 clock for compilation
-In-Reply-To: <20150510101750.GC11057@lukather>
-References: <1431240383-12763-1-git-send-email-vishnupatekar0510@gmail.com>
- <1431240383-12763-4-git-send-email-vishnupatekar0510@gmail.com>
- <20150510101750.GC11057@lukather>
-Message-ID: <CAEzqOZv5pDPJgBfvNKk7vZuTr5H9hLdEOweyxStRFtarNxtFhQ@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 11 May 2015 11:54:26 +0300
+Subject: [PATCHv2 00/27] ARM: OMAP2+: clock code migration to drivers/clk/ti
+Message-ID: <1431334493-24455-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Sun, May 10, 2015 at 3:47 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Sun, May 10, 2015 at 12:16:20PM +0530, Vishnu Patekar wrote:
->> A33 clock control unit is similar to A23.
->>
->> A33 specific clocks are not yet implemented, added CLK_OF_DECLARE
->> to get it compiled for A33.
->
-> That commit log doesn't make any sense.
->
-> What you're doing isn't about whether or not that will be compiled,
-> but whether you're registering the clocks and which clocks you
-> protect.
-Actually, It's just registering the a33 clocks and reusing a23 code.
-nothing to do with compile. I'll correct it in next patch version.
->
->> Signed-off-by: VishnuPatekar <vishnupatekar0510@gmail.com>
->
-> Isn't it supposed to have a space in the middle of your name, just
-> like you have in your mail address?
-Yes, There should be space.
->
-> Thanks,
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+This set moves most of the OMAP2+ clock driver code under drivers/clk.
+There are still a couple of files under mach-omap2 folder after this
+set which have either unmet dependencies still (towards PRCM driver)
+or is currently slightly broken (some of the DVFS code for OMAP2/OMAP3.)
+Earlier version of this set has been posted back in March (see
+http://www.spinics.net/lists/linux-omap/msg116418.html), mostly
+the code is the same except patches 25+ which are new.
+
+Overall diffstat for this set:
+ 42 files changed, 2644 insertions(+), 3707 deletions(-)
+
+Testing done:
+am335x-evm      : boot
+am335x-evmsk    : boot
+am3517-evm      : boot
+am37x-evm       : boot
+am43x-epos-evm  : boot
+am437x-gp-evm   : boot
+omap3-beagle-xm : boot
+omap3-beagle    : boot, suspend-resume (ret/off), cpuidle (ret/off)
+am335x-boneblack: boot
+am335x-bone     : boot
+craneboard      : boot
+dra7xx-evm      : boot
+omap3430-ldp    : boot
+omap3-n900      : boot
+omap5-uevm      : boot
+omap4-panda-es  : boot, suspend-resume (ret), cpuidle (ret)
+omap4-panda     : boot
+omap2430-sdp    : boot
+omap3430-sdp    : boot 
+omap4-sdp-es23plus: boot
+
+Branch info:
+- tree: https://github.com/t-kristo/linux-pm.git
+- branch: for-4.2/ti-clk-move
+
+-Tero
