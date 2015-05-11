@@ -1,47 +1,19 @@
-From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 11 May 2015 13:50:26 +0100
-Subject: [PATCH] arm-cci: Do not enable CCI-400 PMU by default
-Message-ID: <1431348626-2767-1-git-send-email-suzuki.poulose@arm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 11 May 2015 18:22:04 +0530
+Subject: [PATCH v3 2/7] clocksource: add lpc32xx timer driver
+In-Reply-To: <CAGhQ9VxP+-zyb1Ew_K6fMmbnph6gCLWgEVJmM1L_DmGXk0To5g@mail.gmail.com>
+References: <1431017317-23740-1-git-send-email-manabian@gmail.com>
+ <1431017317-23740-3-git-send-email-manabian@gmail.com>
+ <55508CE3.6000008@linaro.org>
+ <CAGhQ9VxnBrT3KO11MAzi_bDQwCAvBPwWtZ3FhV6qKc+foK472w@mail.gmail.com>
+ <55509494.2050008@linaro.org> <20150511114214.GA19714@linux>
+ <CAGhQ9VxP+-zyb1Ew_K6fMmbnph6gCLWgEVJmM1L_DmGXk0To5g@mail.gmail.com>
+Message-ID: <20150511125204.GA23027@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+On 11-05-15, 13:54, Joachim Eastwood wrote:
+> I see. Should I switch the API in my clocksource driver now or should
+> that also wait?
 
-Do not enable CCI-400 PMU by default and fix the dependency on PERF_EVENTS
-than HW_PERF_EVENTS.
-
-Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: arm at vger.kernel.org
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
----
- drivers/bus/Kconfig |   10 ++++------
- 1 file changed, 4 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-index a1d4af6..62a7ffc 100644
---- a/drivers/bus/Kconfig
-+++ b/drivers/bus/Kconfig
-@@ -13,15 +13,13 @@ config ARM_CCI400_COMMON
- 
- config ARM_CCI400_PMU
- 	bool "ARM CCI400 PMU support"
--	default y
- 	depends on ARM || ARM64
--	depends on HW_PERF_EVENTS
-+	depends on PERF_EVENTS
- 	select ARM_CCI400_COMMON
- 	help
--	  Support for PMU events monitoring on the ARM CCI cache coherent
--	  interconnect.
--
--	  If unsure, say Y
-+	  Support for PMU events monitoring on the ARM CCI-400 (cache coherent
-+	  interconnect). CCI-400 supports counting events related to the
-+	  connected slave/master interfaces.
- 
- config ARM_CCI400_PORT_CTRL
- 	bool
--- 
-1.7.9.5
+You don't have to wait.
