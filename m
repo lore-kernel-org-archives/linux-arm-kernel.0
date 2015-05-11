@@ -1,32 +1,32 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Mon, 11 May 2015 19:10:56 -0300
-Subject: [PATCH v5 05/12] mtd: pxa3xx_nand: rework flash detection and
- timing setup
-In-Reply-To: <1431356341-31640-6-git-send-email-antoine.tenart@free-electrons.com>
-References: <1431356341-31640-1-git-send-email-antoine.tenart@free-electrons.com>
- <1431356341-31640-6-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <555128F0.30702@vanguardiasur.com.ar>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Tue, 12 May 2015 00:17:28 +0200
+Subject: [PATCH 0/3] Fix boot on Calxeda highbank
+Message-ID: <1431382651-15894-1-git-send-email-sjoerd.simons@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+When upgrading our trusted Calxeda server to Debian Jessie recently the machine
+wedged during booting the installer. Upon further investigation, this happens
+due to the transition to the generic L2C infrastructure introduced in 3.16. The
+generic l2x0 code unlocks the cache during setup, however the Caldexa SMC
+interface doesn't seem to allow the kernel to enable enable non-secure access
+to the lock registers.. Queue Imprecise aborts and a fairly unhappy machine.
 
-On 05/11/2015 11:58 AM, Antoine Tenart wrote:
-[..]
-> -
-> -	/* calculate flash information */
-> -	host->read_id_bytes = (f->page_size == 2048) ? 4 : 2;
-> -
+First patch in this series adds a flag to indicate to the l2x0 code the
+unlocking should be skipped, second patch turns that flag on for mach-highbank,
+fixing this issue. Third patch adds a (empty) configure callback for the
+highbank l2c, reflecting the fact that there seeminglyisn't anything to
+configured via an SMC on these maches.
 
-[..]
-> @@ -1732,6 +1669,7 @@ static int alloc_nand_resource(struct platform_device *pdev)
->  		host->mtd = mtd;
->  		host->cs = cs;
->  		host->info_data = info;
-> +		host->read_id_bytes = 4;
+Sjoerd Simons (3):
+  ARM: cache-l2c: Add flag to skip cache unlocking
+  ARM: l2c: highbank: Skip l2c unlocking
+  ARM: l2c: highbank: Add dummy configure function
 
-Are you sure this is correct? The value is set according to the page
-size before this patch.
+ arch/arm/include/asm/outercache.h | 1 +
+ arch/arm/mach-highbank/highbank.c | 9 +++++++++
+ arch/arm/mm/cache-l2x0.c          | 4 +++-
+ 3 files changed, 13 insertions(+), 1 deletion(-)
 
 -- 
-Ezequiel Garcia, VanguardiaSur
-www.vanguardiasur.com.ar
+2.1.4
