@@ -1,58 +1,123 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 11 May 2015 13:24:50 -0700
-Subject: [GIT PULL] ARM: OMAP2+: first set of hwmod fixes for v4.1-rc
-In-Reply-To: <alpine.DEB.2.02.1505082043110.19833@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1505082043110.19833@utopia.booyaka.com>
-Message-ID: <20150511202449.GF15563@atomide.com>
+From: mniewoeh@stud.hs-offenburg.de (=?iso-8859-1?Q?Michael_Niew=F6hner?=)
+Date: Mon, 11 May 2015 22:54:11 +0200
+Subject: [PATCH 1/2] regulator: act8865: add restart handler for act8846
+Message-ID: <A1C80CFB-CDCA-4F88-BA5F-371918CECD97@stud.hs-offenburg.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [150508 13:44]:
-> Hi Tony,
-> 
-> The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
-> 
->   Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v4.1-rc/omap-fixes-a
-> 
-> for you to fetch changes up to a5bf00cd735fbc293da8a9bada589c02861c8132:
-> 
->   ARM: AM33xx+: hwmod: re-use omap4 implementations for reset functionality (2015-05-08 13:05:19 -0600)
-> 
-> ----------------------------------------------------------------
-> ARM: OMAP2+: first set of hwmod fixes for v4.1-rc
-> 
-> Fix a few AM43xx problems: add the VPFE hwmod data, which removes some
-> warnings; and fix the IP block hardreset implementation.
-> 
-> Basic build, boot, and PM test results are here:
-> 
-> http://www.pwsan.com/omap/testlogs/omap-hwmod-a-for-v4.1-rc/20150508130543/
-> 
-> Note that I do not have an AM43xx board in the testbed, and thus
-> cannot test on that platform.
+Rebooting radxa rock which uses act8846 results in kernel panic because the
+bootloader doesn't readjust frequency or voltage for cpu correctly. This
+workaround power cycles the act8846 at restart to reset the board.
 
-Thanks pulling into omap-for-v4.1/fixes.
+Signed-off-by: Michael Niewoehner <mniewoeh@stud.hs-offenburg.de>
+---
+ drivers/regulator/act8865-regulator.c | 43 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
-Tony
+diff --git a/drivers/regulator/act8865-regulator.c b/drivers/regulator/act8865-regulator.c
+index 2ff73d7..f8cdff3 100644
+--- a/drivers/regulator/act8865-regulator.c
++++ b/drivers/regulator/act8865-regulator.c
+@@ -27,6 +27,7 @@
+ #include <linux/of_device.h>
+ #include <linux/regulator/of_regulator.h>
+ #include <linux/regmap.h>
++#include <linux/reboot.h>
  
-> ----------------------------------------------------------------
-> Benoit Parrot (1):
->       ARM: AM43xx: hwmod: add VPFE hwmod entries
-> 
-> Tero Kristo (2):
->       ARM: OMAP4+: PRM: add support for passing status register/bit info to reset
->       ARM: AM33xx+: hwmod: re-use omap4 implementations for reset functionality
-> 
->  arch/arm/mach-omap2/omap_hwmod.c           | 68 ++++++-----------------------
->  arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 70 ++++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/prcm43xx.h             |  3 +-
->  arch/arm/mach-omap2/prminst44xx.c          | 20 +++------
->  4 files changed, 93 insertions(+), 68 deletions(-)
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+ /*
+  * ACT8600 Global Register Map.
+@@ -133,10 +134,14 @@
+ #define	ACT8865_VOLTAGE_NUM	64
+ #define ACT8600_SUDCDC_VOLTAGE_NUM	255
+ 
++#define ACT8846_SIPC_MASK 0x01
++
+ struct act8865 {
+ 	struct regmap *regmap;
+ 	int off_reg;
+ 	int off_mask;
++	int sipc_reg;
++	int sipc_mask;
+ };
+ 
+ static const struct regmap_config act8865_regmap_config = {
+@@ -402,6 +407,17 @@ static void act8865_power_off(void)
+ 	while (1);
+ }
+ 
++static int act8846_power_cycle(struct notifier_block *this,
++	unsigned long code, void *unused)
++{
++	struct act8865 *act8846;
++
++	act8846 = i2c_get_clientdata(act8865_i2c_client);
++	regmap_write(act8846->regmap, act8846->sipc_reg, act8846->sipc_mask);
++
++	return NOTIFY_DONE;
++}
++
+ static int act8865_pmic_probe(struct i2c_client *client,
+ 			      const struct i2c_device_id *i2c_id)
+ {
+@@ -413,6 +429,7 @@ static int act8865_pmic_probe(struct i2c_client *client,
+ 	struct act8865 *act8865;
+ 	unsigned long type;
+ 	int off_reg, off_mask;
++	int sipc_reg, sipc_mask;
+ 
+ 	pdata = dev_get_platdata(dev);
+ 
+@@ -434,18 +451,24 @@ static int act8865_pmic_probe(struct i2c_client *client,
+ 		num_regulators = ARRAY_SIZE(act8600_regulators);
+ 		off_reg = -1;
+ 		off_mask = -1;
++		sipc_reg = -1;
++		sipc_mask = -1;
+ 		break;
+ 	case ACT8846:
+ 		regulators = act8846_regulators;
+ 		num_regulators = ARRAY_SIZE(act8846_regulators);
+ 		off_reg = ACT8846_GLB_OFF_CTRL;
+ 		off_mask = ACT8846_OFF_SYSMASK;
++		sipc_reg = ACT8846_GLB_OFF_CTRL;
++		sipc_mask = ACT8846_SIPC_MASK;
+ 		break;
+ 	case ACT8865:
+ 		regulators = act8865_regulators;
+ 		num_regulators = ARRAY_SIZE(act8865_regulators);
+ 		off_reg = ACT8865_SYS_CTRL;
+ 		off_mask = ACT8865_MSTROFF;
++		sipc_reg = -1;
++		sipc_mask = -1;
+ 		break;
+ 	default:
+ 		dev_err(dev, "invalid device id %lu\n", type);
+@@ -494,6 +517,26 @@ static int act8865_pmic_probe(struct i2c_client *client,
+ 		}
+ 	}
+ 
++	/* Register restart handler */
++	if (of_device_is_system_power_controller(dev->of_node)
++				&& sipc_reg > 0) {
++		static struct notifier_block rockchip_restart_handler = {
++			.notifier_call = act8846_power_cycle,
++			.priority = 129,
++		};
++
++		int ret;
++
++		act8865_i2c_client = client;
++		act8865->sipc_reg = sipc_reg;
++		act8865->sipc_mask = sipc_mask;
++
++		ret = register_restart_handler(&rockchip_restart_handler);
++		if (ret)
++			pr_err("%s: cannot register restart handler, %d\n",
++			       __func__, ret);
++	}
++
+ 	/* Finally register devices */
+ 	for (i = 0; i < num_regulators; i++) {
+ 		const struct regulator_desc *desc = &regulators[i];
+-- 
+2.3.5
