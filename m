@@ -1,63 +1,44 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 11 May 2015 11:49:24 +0200
-Subject: [GIT PULL] at91: dt for 4.2 #1
-Message-ID: <1431337764-21824-1-git-send-email-nicolas.ferre@atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 11 May 2015 10:52:36 +0100
+Subject: Master-aware devices and sideband ID data
+In-Reply-To: <CALRxmdAEvQPGN_xvwU5Xb4eNfKegPfTyM-GKXg4jRD7JyRxHJA@mail.gmail.com>
+References: <20150324155007.GC23005@leverpostej>
+ <CALRxmdAE_=SubN7dY-W1K44cjVVRhKLKknpgG9af_g64+GHPtw@mail.gmail.com>
+ <20150508154903.GH25587@arm.com>
+ <CALRxmdAEvQPGN_xvwU5Xb4eNfKegPfTyM-GKXg4jRD7JyRxHJA@mail.gmail.com>
+Message-ID: <20150511095236.GC1549@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+On Fri, May 08, 2015 at 08:30:00PM +0100, Stuart Yoder wrote:
+> On Fri, May 8, 2015 at 10:49 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Thu, May 07, 2015 at 06:49:32PM +0100, Stuart Yoder wrote:
+> >> The FSL LS2085A SoC has an actual RID->SID mapping table in the PCI
+> >> controller, but it is not static in the sense of fixed in hardware or
+> >> firmware.  It's
+> >> a programmable mapping table, and we envision Linux programming this table.
+> >
+> > Ok, so I assume you're not planning to use ACPI with this system?
+> 
+> Not initially, but perhaps in the future.  I guess I don't know the implications
+> to ACPI yet.
 
-First DT batch for AT91 dedicated to enhancement coming from Overkiz. More to
-come for 4.2 obviously but I wanted to send this batch as it is ready.
+Well, I suggest you take a look at the IORT spec[1] asap, because I don't think
+it can describe your system if you want to go in the direction of dynamic
+mappings.
 
-Thanks, best regards,
+> > Also, we can't just program this table willy-nilly, as I'm sure you're
+> > aware. For example, updating a the SMRs in a live SMMU is a big no-no,
+> > so although Linux may initialise the table, it can only be safely changed
+> > at device init/teardown time, surely?
+> 
+> Correct.  That would not be updated when a device is live.
 
-The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+Ok, so the best way for Linux is probably to abstract this in the bus code
+and have that allocate the IDs when a device is `hotplugged' on. This would
+also fit well with consolidating the group creation for platform and PCI
+devices.
 
-  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+Will
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-dt
-
-for you to fetch changes up to 7107bb0b2836f0f9b1ffed1f5189e269ee25e5b9:
-
-  ARM: at91/dt: drop deprecated mainck node from pmc (2015-05-11 11:24:01 +0200)
-
-----------------------------------------------------------------
-First batch of DT changes for 4.2:
-- cleanup and addition of Overkiz boards
-- at91sam9x5: pwm0 pinctrl definition
-- delete deprecated mainck nodes
-
-----------------------------------------------------------------
-Ga?l PORTAY (11):
-      ARM: at91/dt: kizbox: rename to at91-kizbox
-      ARM: at91/dt: at91-kizbox: sanitize file
-      ARM: at91/dt: at91-kizbox: user proper serial uart
-      ARM: at91/dt: at91-kizbox: gpio-keys related changes
-      ARM: at91/dt: at91-kizbox: leds related changes
-      ARM: at91/dt: at91-kizbox: re-size nand partitions
-      ARM: at91/dt: at91-kizbox: update chosen node
-      ARM: at91/dt: sam9x5: add pinctrl for pwm0
-      ARM: at91/dt: add support for kizboxmini
-      ARM: at91/dt: add support for kizbox2
-      ARM: at91/dt: drop deprecated mainck node from pmc
-
- arch/arm/boot/dts/Makefile                  |   4 +-
- arch/arm/boot/dts/at91-kizbox.dts           | 159 ++++++++++++++++++++
- arch/arm/boot/dts/at91-kizbox2.dts          | 216 ++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91-kizboxmini.dts       | 129 +++++++++++++++++
- arch/arm/boot/dts/at91-sama5d3_xplained.dts |   6 -
- arch/arm/boot/dts/at91sam9rlek.dts          |   6 -
- arch/arm/boot/dts/at91sam9x5.dtsi           |  46 ++++++
- arch/arm/boot/dts/kizbox.dts                | 150 -------------------
- arch/arm/boot/dts/sama5d3xcm.dtsi           |   6 -
- 9 files changed, 553 insertions(+), 169 deletions(-)
- create mode 100644 arch/arm/boot/dts/at91-kizbox.dts
- create mode 100644 arch/arm/boot/dts/at91-kizbox2.dts
- create mode 100644 arch/arm/boot/dts/at91-kizboxmini.dts
- delete mode 100644 arch/arm/boot/dts/kizbox.dts
-
--- 
-Nicolas Ferre
+[1] http://infocenter.arm.com/help/topic/com.arm.doc.den0049a/DEN0049A_IO_Remapping_Table.pdf
