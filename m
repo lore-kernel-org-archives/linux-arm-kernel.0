@@ -1,42 +1,260 @@
-From: stripathi@apm.com (Suman Tripathi)
-Date: Mon, 11 May 2015 10:57:28 +0530
-Subject: [PATCH v5 3/3] ata: ahci_xgene: Add AHCI Support for 2nd HW
- version of APM X-Gene SoC AHCI SATA Host controller.
-In-Reply-To: <20150510155454.GD5856@htj.duckdns.org>
-References: <1430853672-6227-1-git-send-email-stripathi@apm.com>
- <1430853672-6227-4-git-send-email-stripathi@apm.com>
- <20150510155454.GD5856@htj.duckdns.org>
-Message-ID: <CAOHikRD5dVNDAUQ-tstk0ndkbMoZikGgXuT7N2xxm56yDVtA2Q@mail.gmail.com>
+From: ayyappa.ch.linux@gmail.com (Ayyappa Ch)
+Date: Mon, 11 May 2015 11:02:56 +0530
+Subject: [PATCH] arch/arm64 :Cyclic Test fix in ARM64 fpsimd
+In-Reply-To: <20150508000929.GE31914@8074w.roxell.se>
+References: <CAPyr0yJSGqvxkUWLtNKe0q5mNanBczAfAVx0tPKuzYeDG+eJ=Q@mail.gmail.com>
+ <20150506193803.GC32577@8074w.roxell.se>
+ <CAPyr0y+OYikc2Euh++2nTWnVb-aZ4i-tifLLk3XUiRahtHKjCA@mail.gmail.com>
+ <20150508000929.GE31914@8074w.roxell.se>
+Message-ID: <CAPyr0yLq7PsMW45G+oJzJLbQ-be6Xx9n2S2SU2CiV+AMH9jJ8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 10, 2015 at 9:24 PM, Tejun Heo <tj@kernel.org> wrote:
-> Hello,
->
-> On Wed, May 06, 2015 at 12:51:12AM +0530, Suman Tripathi wrote:
->> +     switch (version) {
->> +     case XGENE_AHCI_V1:
->> +             hpriv->flags = AHCI_HFLAG_NO_NCQ;
->> +             /*
->> +              * Override the callbacks for storm ERRATA
->> +              */
->> +             xgene_ahci_ops.qc_issue = xgene_ahci_qc_issue;
->> +             xgene_ahci_ops.softreset = xgene_ahci_softreset;
->> +             xgene_ahci_ops.pmp_softreset = xgene_ahci_pmp_softreset;
->
-> Let's please create separate ops structs for v1 and v2.
+Hello Anders Roxell,
 
-Good idea . Will do that .
+Many thanks for your inputs.
 
+But as per my observation after this change , Cyclic test did not failed.
+
+As logs are huge size , sent only to you.
+
+Can you please check the logs and let us know your view ?
+
+Thanks and regards,
+Ayyappa.Ch
+
+On Fri, May 8, 2015 at 5:39 AM, Anders Roxell <anders.roxell@linaro.org> wrote:
+> On 2015-05-07 16:39, Ayyappa Ch wrote:
+>> ./cyclictest -p 80 -t5 -n  => Cyclic test is failing after 6Lack iterations
+>> T: 0 ( 1364) P:99 I:1000 C: 668664 Min:      3 Act:    5 Avg:   11 Max:  100116
+>>
+>> After analyzing the trace log , we observed the sudden change in
+>> latency due to calling of fpsimd_preserve_current_state function.
 >
-> Thanks.
+> I'm still unable to reproduce your problem scenario and from the log
+> snippet below I'm not convinced that fpsimd_preserve_current_state is
+> the bad guy.
+>
+>>
+>> Line 149766:     ntpd-925     1....1.. 512046976us :
+>> fpsimd_preserve_current_state <-do_signal
+>> Line 149768:     ntpd-925     1....1.. 512046977us : preempt_count_add
+>> <-fpsimd_preserve_current_state
+>> Line 149770:     ntpd-925     1....2.. 512046978us : preempt_count_sub
+>> <-fpsimd_preserve_current_state
+>
+> fpsimd_preserve_current_state seams to return within 2us
+>
+>>
+>> .......
+>> Line 163170: cyclicte-964     0.....11 512065181us :
+>
+> The latency appears to be happening somewhere between the
+> fpsimd_preserve_current_state return and the resumption of the cyclictest.
+> Whatever cased the latency may have happened in the omitted portion of
+> the trace log?
+> It may not even have been traceable thread of execution, depending on
+> the trace tool that have been used.
+> If the part of the trace log that you didn't show doesn't seam to have
+> any interesting events then maybe the offending code runs outside of
+> scheduler control or never touches any defined trace points.
+>
+> Cheers,
+> Anders
+>
+>> tracing_mark_write: hit latency threshold (98383 > 500)
+>>
+>>
+>> Thanks and regards,
+>> Ayyappa.Ch
+>>
+>> ...
+>>
+>> On Thu, May 7, 2015 at 1:08 AM, Anders Roxell <anders.roxell@linaro.org> wrote:
+>> > On 2015-05-01 20:59, Ayyappa Ch wrote:
+>> >> Floating point operations in arm64 should not disable preempt .
+>> >
+>> > I thought that I would see a problem if I ran a floating point
+>> > workload and cyclictest at the same time but I don't.
+>> >
+>> > Can you please provide me some more details on how I can reproduce the
+>> > problem?
+>> >
+>> > Cheers,
+>> > Anders
+>> >
+>> >> Activating realtime features with below code.
+>> >>
+>> >> From e6a5fce9b3b55f48656240036a9354a0997c2907 Mon Sep 17 00:00:00 2001
+>> >> From: Ayyappa Ch <ayyappa.chandolu@amd.com>
+>> >> Date: Tue, 28 Apr 2015 11:53:00 +0530
+>> >> Subject: [PATCH ] floating point realtime fix
+>> >>
+>> >> ---
+>> >>  arch/arm64/kernel/fpsimd.c | 16 ++++++++--------
+>> >>  1 file changed, 8 insertions(+), 8 deletions(-)
+>> >>
+>> >> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+>> >> index 2438497..3dca156 100644
+>> >> --- a/arch/arm64/kernel/fpsimd.c
+>> >> +++ b/arch/arm64/kernel/fpsimd.c
+>> >> @@ -166,10 +166,10 @@ void fpsimd_flush_thread(void)
+>> >>   */
+>> >>  void fpsimd_preserve_current_state(void)
+>> >>  {
+>> >> - preempt_disable();
+>> >> + migrate_disable();
+>> >>   if (!test_thread_flag(TIF_FOREIGN_FPSTATE))
+>> >>   fpsimd_save_state(&current->thread.fpsimd_state);
+>> >> - preempt_enable();
+>> >> + migrate_enable();
+>> >>  }
+>> >>
+>> >>  /*
+>> >> @@ -179,7 +179,7 @@ void fpsimd_preserve_current_state(void)
+>> >>   */
+>> >>  void fpsimd_restore_current_state(void)
+>> >>  {
+>> >> - preempt_disable();
+>> >> + migrate_disable();
+>> >>   if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+>> >>   struct fpsimd_state *st = &current->thread.fpsimd_state;
+>> >>
+>> >> @@ -187,7 +187,7 @@ void fpsimd_restore_current_state(void)
+>> >>   this_cpu_write(fpsimd_last_state, st);
+>> >>   st->cpu = smp_processor_id();
+>> >>   }
+>> >> - preempt_enable();
+>> >> + migrate_enable();
+>> >>  }
+>> >>
+>> >>  /*
+>> >> @@ -197,7 +197,7 @@ void fpsimd_restore_current_state(void)
+>> >>   */
+>> >>  void fpsimd_update_current_state(struct fpsimd_state *state)
+>> >>  {
+>> >> - preempt_disable();
+>> >> + migrate_disable();
+>> >>   fpsimd_load_state(state);
+>> >>   if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+>> >>   struct fpsimd_state *st = &current->thread.fpsimd_state;
+>> >> @@ -205,7 +205,7 @@ void fpsimd_update_current_state(struct fpsimd_state *state)
+>> >>   this_cpu_write(fpsimd_last_state, st);
+>> >>   st->cpu = smp_processor_id();
+>> >>   }
+>> >> - preempt_enable();
+>> >> + migrate_enable();
+>> >>  }
+>> >>
+>> >>  /*
+>> >> @@ -239,7 +239,7 @@ void kernel_neon_begin_partial(u32 num_regs)
+>> >>   * that there is no longer userland FPSIMD state in the
+>> >>   * registers.
+>> >>   */
+>> >> - preempt_disable();
+>> >> + migrate_disable();
+>> >>   if (current->mm &&
+>> >>      !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
+>> >>   fpsimd_save_state(&current->thread.fpsimd_state);
+>> >> @@ -255,7 +255,7 @@ void kernel_neon_end(void)
+>> >>   in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
+>> >>   fpsimd_load_partial_state(s);
+>> >>   } else {
+>> >> - preempt_enable();
+>> >> + migrate_enable();
+>> >>   }
+>> >>  }
+>> >>  EXPORT_SYMBOL(kernel_neon_end);
+>> >>
+>> >> On Fri, May 1, 2015 at 1:03 PM, Ayyappa Ch <ayyappa.ch.linux@gmail.com> wrote:
+>> >> > Following Anders Roxell  patch on "Enable PREEMPT_RT_FULL" , observed
+>> >> > one issue with Cyclic test while running floating point operations. So
+>> >> > , modified below changes for that.
+>> >> >
+>> >> > From e6a5fce9b3b55f48656240036a9354a0997c2907 Mon Sep 17 00:00:00 2001
+>> >> > From: Ayyappa Ch <ayyappa.chandolu@amd.com>
+>> >> > Date: Tue, 28 Apr 2015 11:53:00 +0530
+>> >> > Subject: [PATCH ] floating point realtime fix
+>> >> >
+>> >> > ---
+>> >> >  arch/arm64/kernel/fpsimd.c | 16 ++++++++--------
+>> >> >  1 file changed, 8 insertions(+), 8 deletions(-)
+>> >> >
+>> >> > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+>> >> > index 2438497..3dca156 100644
+>> >> > --- a/arch/arm64/kernel/fpsimd.c
+>> >> > +++ b/arch/arm64/kernel/fpsimd.c
+>> >> > @@ -166,10 +166,10 @@ void fpsimd_flush_thread(void)
+>> >> >   */
+>> >> >  void fpsimd_preserve_current_state(void)
+>> >> >  {
+>> >> > - preempt_disable();
+>> >> > + migrate_disable();
+>> >> >   if (!test_thread_flag(TIF_FOREIGN_FPSTATE))
+>> >> >   fpsimd_save_state(&current->thread.fpsimd_state);
+>> >> > - preempt_enable();
+>> >> > + migrate_enable();
+>> >> >  }
+>> >> >
+>> >> >  /*
+>> >> > @@ -179,7 +179,7 @@ void fpsimd_preserve_current_state(void)
+>> >> >   */
+>> >> >  void fpsimd_restore_current_state(void)
+>> >> >  {
+>> >> > - preempt_disable();
+>> >> > + migrate_disable();
+>> >> >   if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+>> >> >   struct fpsimd_state *st = &current->thread.fpsimd_state;
+>> >> >
+>> >> > @@ -187,7 +187,7 @@ void fpsimd_restore_current_state(void)
+>> >> >   this_cpu_write(fpsimd_last_state, st);
+>> >> >   st->cpu = smp_processor_id();
+>> >> >   }
+>> >> > - preempt_enable();
+>> >> > + migrate_enable();
+>> >> >  }
+>> >> >
+>> >> >  /*
+>> >> > @@ -197,7 +197,7 @@ void fpsimd_restore_current_state(void)
+>> >> >   */
+>> >> >  void fpsimd_update_current_state(struct fpsimd_state *state)
+>> >> >  {
+>> >> > - preempt_disable();
+>> >> > + migrate_disable();
+>> >> >   fpsimd_load_state(state);
+>> >> >   if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+>> >> >   struct fpsimd_state *st = &current->thread.fpsimd_state;
+>> >> > @@ -205,7 +205,7 @@ void fpsimd_update_current_state(struct fpsimd_state *state)
+>> >> >   this_cpu_write(fpsimd_last_state, st);
+>> >> >   st->cpu = smp_processor_id();
+>> >> >   }
+>> >> > - preempt_enable();
+>> >> > + migrate_enable();
+>> >> >  }
+>> >> >
+>> >> >  /*
+>> >> > @@ -239,7 +239,7 @@ void kernel_neon_begin_partial(u32 num_regs)
+>> >> >   * that there is no longer userland FPSIMD state in the
+>> >> >   * registers.
+>> >> >   */
+>> >> > - preempt_disable();
+>> >> > + migrate_disable();
+>> >> >   if (current->mm &&
+>> >> >      !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
+>> >> >   fpsimd_save_state(&current->thread.fpsimd_state);
+>> >> > @@ -255,7 +255,7 @@ void kernel_neon_end(void)
+>> >> >   in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
+>> >> >   fpsimd_load_partial_state(s);
+>> >> >   } else {
+>> >> > - preempt_enable();
+>> >> > + migrate_enable();
+>> >> >   }
+>> >> >  }
+>> >> >  EXPORT_SYMBOL(kernel_neon_end);
+>> >> > --
+>> >> > 1.9.1
 >
 > --
-> tejun
-
-
-
--- 
-Thanks,
-with regards,
-Suman Tripathi
+> Anders Roxell
+> anders.roxell at linaro.org
+> M: +46 709 71 42 85 | IRC: roxell
