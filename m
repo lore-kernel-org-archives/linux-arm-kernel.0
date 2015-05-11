@@ -1,7 +1,9 @@
 From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Mon, 11 May 2015 14:12:08 -0500
-Subject: [GIT PULL] SoCFPGA DTS updates for v4.2
-Message-ID: <1431371529-22593-1-git-send-email-dinguyen@opensource.altera.com>
+Date: Mon, 11 May 2015 14:12:09 -0500
+Subject: [GIT PULL] SoCFPGA updates for v4.2
+In-Reply-To: <1431371529-22593-1-git-send-email-dinguyen@opensource.altera.com>
+References: <1431371529-22593-1-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <1431371529-22593-2-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,43 +20,31 @@ The following changes since commit 5ebe6afaf0057ac3eaeb98defd5456894b446d22:
 
 are available in the git repository at:
 
-  git://git.kernel.org:pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_dts_for_v4.2
+  git://git.kernel.org:pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_updates_for_v4.2
 
-for you to fetch changes up to da29d824a6709116dd4dc50b82400547447a4f53:
+for you to fetch changes up to 65ce7a37ec23c9e7878bd77e2f75b1eb9d8926e3:
 
-  ARM: socfpga: dts: add clocks to the Arria10 platform (2015-05-11 13:26:02 -0500)
-
-----------------------------------------------------------------
-SoCFPGA DTS updates for v4.2
-- Add accelerometer to sockit
-- Update and clean up support for the Arria10 platform
-- Add sdmmc_clk/4 clock node SoCFPGA Cyclone5/Arria5
-- Update ethernet nodes with multicast/unicast/fifo-depth properties
-- Add clocks for Arria10 platform
+  ARM: socfpga: remove the need to map uart_io_desc (2015-05-11 13:59:53 -0500)
 
 ----------------------------------------------------------------
-Dinh Nguyen (6):
-      ARM: socfpga: dts: add cpu1-start-addr for Arria 10
-      ARM: socfpga: dts: disable the sdmmc, and uart nodes in the base arria10
-      ARM: socfpga: dts: enable UART1 for the debug uart
-      ARM: socfpga: dts: rename socdk board file to socdk_sdmmc
-      ARM: socfpga: dts: Add a clock node for sdmmc CIU
-      ARM: socfpga: dts: add clocks to the Arria10 platform
+SoCFPGA updates for v4.2
+- Add big endian support
+- Add earlyprintk support on UART1 that is used on Arria10
+- Remove the need to map uart_io_desc
 
-Vince Bridgers (2):
-      ARM: socfpga: dts: Add multicast bins and unicast filter entries
-      ARM: socfpga: dts: Add tx-fifo-depth and rx-fifo-depth properties
+----------------------------------------------------------------
+Ben Dooks (3):
+      ARM: debug: fix big endian operation for 8250 word mode
+      ARM: socfpga: enable big endian for secondary core(s)
+      ARM: socfpga: support big endian for socfpga
 
-Walter Lozano (1):
-      ARM: socfpga: dts: Add adxl34x
+Dinh Nguyen (2):
+      ARM: socfpga: Add support for UART1 debug uart for earlyprintk
+      ARM: socfpga: remove the need to map uart_io_desc
 
- arch/arm/boot/dts/Makefile                         |   2 +-
- arch/arm/boot/dts/socfpga.dtsi                     |  14 +-
- arch/arm/boot/dts/socfpga_arria10.dtsi             | 335 ++++++++++++++++++++-
- ...rria10_socdk.dts => socfpga_arria10_socdk.dtsi} |  12 +-
- arch/arm/boot/dts/socfpga_arria10_socdk_sdmmc.dts  |  26 ++
- arch/arm/boot/dts/socfpga_cyclone5_sockit.dts      |  16 +
- 6 files changed, 380 insertions(+), 25 deletions(-)
- rename arch/arm/boot/dts/{socfpga_arria10_socdk.dts => socfpga_arria10_socdk.dtsi} (90%)
- mode change 100755 => 100644
- create mode 100644 arch/arm/boot/dts/socfpga_arria10_socdk_sdmmc.dts
+ arch/arm/Kconfig.debug          | 26 +++++++++++++++++++-------
+ arch/arm/include/debug/8250.S   |  3 +++
+ arch/arm/mach-socfpga/Kconfig   |  1 +
+ arch/arm/mach-socfpga/headsmp.S |  5 ++++-
+ arch/arm/mach-socfpga/socfpga.c |  9 ---------
+ 5 files changed, 27 insertions(+), 17 deletions(-)
