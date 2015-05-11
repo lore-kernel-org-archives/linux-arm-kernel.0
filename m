@@ -1,195 +1,284 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 11 May 2015 10:27:30 +0200
-Subject: [PATCH 6/6] ARM: dts: sun8i: Add ET-Q8 A33 support
-In-Reply-To: <55506743.8080200@redhat.com>
-References: <1431240383-12763-1-git-send-email-vishnupatekar0510@gmail.com>
- <1431240383-12763-7-git-send-email-vishnupatekar0510@gmail.com>
- <554F1CC9.7070508@redhat.com>
- <CAEzqOZuS4m8kDhG0RpLRGBXbnFXLPKJB8D78_Dc02vRkfwvTUA@mail.gmail.com>
- <55506743.8080200@redhat.com>
-Message-ID: <555067F2.4050809@redhat.com>
+From: ivan.ivanov@linaro.org (Ivan T. Ivanov)
+Date: Mon, 11 May 2015 11:31:59 +0300
+Subject: [PATCH v3] arm64: dts: qcom: Add msm8916 CoreSight components
+Message-ID: <1431333119-13626-1-git-send-email-ivan.ivanov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add initial set of CoreSight components found on Qualcomm's 8x16 chipset.
 
-On 11-05-15 10:24, Hans de Goede wrote:
-> Hi,
->
-> On 11-05-15 08:23, Vishnu Patekar wrote:
->> Hi,
->>
->> On Sun, May 10, 2015 at 2:24 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->>>
->>> Hi,
->>>
->>> On 10-05-15 08:46, Vishnu Patekar wrote:
->>>>
->>>> ET-Q8_A33 is A33 based cheap tablet in common Q8 format.
->>>>
->>>> It has 512MB RAM, 4GB Nand, 7" Display, RDA5900P wifi, GSL1680 touch, etc.
->>>
->>>
->>>
->>> Where does the ET prefix come from ? The ippo boards have an ippo prefix as
->>> that is written on the pcb ...
->> Yes, on PCB it's writeen ET_Q8_A23_A33_v1.6
->
-> OK, using the ET prefix is fine then.
+Signed-off-by: Ivan T. Ivanov <ivan.ivanov@linaro.org>
+---
 
-But can you please rename the dts to include the v1.6 bit ? And can you also
-send a u-boot patch to rename the defconfig there to et_q8_v1_6_a33_defconfig,
-and fix the CONFIG_DEFAULT_DEVICE_TREE setting too ?
+Changes since v2 [1]:
+* Added "1x" to "qcom,coresight-replicator" compatible string, to match what
+  devicetree bindings documentations says.
 
-Regards,
+[1] http://www.spinics.net/lists/devicetree/msg77768.html
 
-Hans
+ arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi | 254 ++++++++++++++++++++++++
+ 1 file changed, 254 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi
 
->
-> Regards,
->
-> Hans
->
->>>
->>> Regards,
->>>
->>> Hans
->>>
->>>
->>>>
->>>> Signed-off-by: VishnuPatekar <vishnupatekar0510@gmail.com>
->>>> ---
->>>>    arch/arm/boot/dts/Makefile            |   3 +-
->>>>    arch/arm/boot/dts/sun8i-a33-et-q8.dts | 108 ++++++++++++++++++++++++++++++++++
->>>>    2 files changed, 110 insertions(+), 1 deletion(-)
->>>>    create mode 100644 arch/arm/boot/dts/sun8i-a33-et-q8.dts
->>>>
->>>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->>>> index 82f4b9b..d44b1d6 100644
->>>> --- a/arch/arm/boot/dts/Makefile
->>>> +++ b/arch/arm/boot/dts/Makefile
->>>> @@ -570,7 +570,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
->>>>          sun7i-a20-wexler-tab7200.dtb
->>>>    dtb-$(CONFIG_MACH_SUN8I) += \
->>>>          sun8i-a23-ippo-q8h-v5.dtb \
->>>> -       sun8i-a23-ippo-q8h-v1.2.dtb
->>>> +       sun8i-a23-ippo-q8h-v1.2.dtb \
->>>> +       sun8i-a33-et-q8.dtb
->>>>    dtb-$(CONFIG_MACH_SUN9I) += \
->>>>          sun9i-a80-optimus.dtb \
->>>>          sun9i-a80-cubieboard4.dtb
->>>> diff --git a/arch/arm/boot/dts/sun8i-a33-et-q8.dts b/arch/arm/boot/dts/sun8i-a33-et-q8.dts
->>>> new file mode 100644
->>>> index 0000000..260d5a3
->>>> --- /dev/null
->>>> +++ b/arch/arm/boot/dts/sun8i-a33-et-q8.dts
->>>> @@ -0,0 +1,108 @@
->>>> +/*
->>>> + * Copyright 2015 Vishnu Patekar
->>>> + * Vishnu Patekar <vishnupatekar0510@gmail.com>
->>>> + *
->>>> + * This file is dual-licensed: you can use it either under the terms
->>>> + * of the GPL or the X11 license, at your option. Note that this dual
->>>> + * licensing only applies to this file, and not this project as a
->>>> + * whole.
->>>> + *
->>>> + *  a) This file is free software; you can redistribute it and/or
->>>> + *     modify it under the terms of the GNU General Public License as
->>>> + *     published by the Free Software Foundation; either version 2 of the
->>>> + *     License, or (at your option) any later version.
->>>> + *
->>>> + *     This file is distributed in the hope that it will be useful,
->>>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->>>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>>> + *     GNU General Public License for more details.
->>>> + *
->>>> + *
->>>> + * Or, alternatively,
->>>> + *
->>>> + *  b) Permission is hereby granted, free of charge, to any person
->>>> + *     obtaining a copy of this software and associated documentation
->>>> + *     files (the "Software"), to deal in the Software without
->>>> + *     restriction, including without limitation the rights to use,
->>>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->>>> + *     sell copies of the Software, and to permit persons to whom the
->>>> + *     Software is furnished to do so, subject to the following
->>>> + *     conditions:
->>>> + *
->>>> + *     The above copyright notice and this permission notice shall be
->>>> + *     included in all copies or substantial portions of the Software.
->>>> + *
->>>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->>>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->>>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->>>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->>>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->>>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->>>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->>>> + *     OTHER DEALINGS IN THE SOFTWARE.
->>>> + */
->>>> +
->>>> +/dts-v1/;
->>>> +#include "sun8i-a33.dtsi"
->>>> +#include "sunxi-common-regulators.dtsi"
->>>> +
->>>> +#include <dt-bindings/gpio/gpio.h>
->>>> +#include <dt-bindings/input/input.h>
->>>> +#include <dt-bindings/pinctrl/sun4i-a10.h>
->>>> +
->>>> +/ {
->>>> +       model = "ET Q8 A33 ";
->>>> +       compatible = "et-q8-q33", "allwinner,sun8i", "allwinner,sun8i-a33";
->>>> +
->>>> +       aliases {
->>>> +               serial0 = &uart0;
->>>> +       };
->>>> +
->>>> +       chosen {
->>>> +               bootargs = "earlyprintk console=ttyS0,115200";
->>>> +       };
->>>> +};
->>>> +
->>>> +&lradc {
->>>> +       vref-supply = <&reg_vcc3v0>;
->>>> +       status = "okay";
->>>> +
->>>> +       button at 200 {
->>>> +               label = "Volume Up";
->>>> +               linux,code = <KEY_VOLUMEUP>;
->>>> +               channel = <0>;
->>>> +               voltage = <200000>;
->>>> +       };
->>>> +
->>>> +       button at 400 {
->>>> +               label = "Volume Down";
->>>> +               linux,code = <KEY_VOLUMEDOWN>;
->>>> +               channel = <0>;
->>>> +               voltage = <400000>;
->>>> +       };
->>>> +};
->>>> +
->>>> +&i2c0 {
->>>> +       pinctrl-names = "default";
->>>> +       pinctrl-0 = <&i2c0_pins_a>;
->>>> +       status = "okay";
->>>> +};
->>>> +
->>>> +&i2c1 {
->>>> +       pinctrl-names = "default";
->>>> +       pinctrl-0 = <&i2c1_pins_a>;
->>>> +       status = "okay";
->>>> +};
->>>> +
->>>> +&i2c2 {
->>>> +       pinctrl-names = "default";
->>>> +       pinctrl-0 = <&i2c2_pins_a>;
->>>> +       /* pull-ups and devices require PMIC regulator */
->>>> +       status = "failed";
->>>> +};
->>>> +
->>>> +&uart0 {
->>>> +       pinctrl-names = "default";
->>>> +       pinctrl-0 = <&uart0_pins_a>;
->>>> +       status = "okay";
->>>> +};
->>>>
+diff --git a/arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi b/arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi
+new file mode 100644
+index 0000000..900f1f4
+--- /dev/null
++++ b/arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi
+@@ -0,0 +1,254 @@
++/*
++ * Copyright (c) 2013 - 2015, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++&soc {
++
++	tpiu at 820000 {
++		compatible = "arm,coresight-tpiu", "arm,primecell";
++		reg = <0x820000 0x1000>;
++
++		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
++		clock-names = "apb_pclk", "atclk";
++
++		port {
++			tpiu_in: endpoint {
++				slave-mode;
++				remote-endpoint = <&replicator_out1>;
++			};
++		};
++	};
++
++	funnel at 821000 {
++		compatible = "arm,coresight-funnel", "arm,primecell";
++		reg = <0x821000 0x1000>;
++
++		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
++		clock-names = "apb_pclk", "atclk";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			/*
++			 * Not described input ports:
++			 * 0 - connected to Resource and Power Manger CPU ETM
++			 * 1 - not-connected
++			 * 2 - connected to Modem CPU ETM
++			 * 3 - not-connected
++			 * 5 - not-connected
++			 * 6 - connected trought funnel to Wireless CPU ETM
++			 * 7 - connected to STM component
++			 */
++			port at 4 {
++				reg = <4>;
++				funnel0_in4: endpoint {
++					slave-mode;
++					remote-endpoint = <&funnel1_out>;
++				};
++			};
++			port at 8 {
++				reg = <0>;
++				funnel0_out: endpoint {
++					remote-endpoint = <&etf_in>;
++				};
++			};
++		};
++	};
++
++	replicator at 824000 {
++		compatible = "qcom,coresight-replicator1x", "arm,primecell";
++		reg = <0x824000 0x1000>;
++
++		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
++		clock-names = "apb_pclk", "atclk";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				replicator_out0: endpoint {
++					remote-endpoint = <&etr_in>;
++				};
++			};
++			port at 1 {
++				reg = <1>;
++				replicator_out1: endpoint {
++					remote-endpoint = <&tpiu_in>;
++				};
++			};
++			port at 2 {
++				reg = <0>;
++				replicator_in: endpoint {
++					slave-mode;
++					remote-endpoint = <&etf_out>;
++				};
++			};
++		};
++	};
++
++	etf at 825000 {
++		compatible = "arm,coresight-tmc", "arm,primecell";
++		reg = <0x825000 0x1000>;
++
++		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
++		clock-names = "apb_pclk", "atclk";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				etf_out: endpoint {
++					slave-mode;
++					remote-endpoint = <&funnel0_out>;
++				};
++			};
++			port at 1 {
++				reg = <0>;
++				etf_in: endpoint {
++					remote-endpoint = <&replicator_in>;
++				};
++			};
++		};
++	};
++
++	etr at 826000 {
++		compatible = "arm,coresight-tmc", "arm,primecell";
++		reg = <0x826000 0x1000>;
++
++		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
++		clock-names = "apb_pclk", "atclk";
++
++		port {
++			etr_in: endpoint {
++				slave-mode;
++				remote-endpoint = <&replicator_out0>;
++			};
++		};
++	};
++
++	funnel at 841000 {	/* APSS funnel only 4 inputs are used */
++		compatible = "arm,coresight-funnel", "arm,primecell";
++		reg = <0x841000 0x1000>;
++
++		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
++		clock-names = "apb_pclk", "atclk";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				funnel1_in0: endpoint {
++					slave-mode;
++					remote-endpoint = <&etm0_out>;
++				};
++			};
++			port at 1 {
++				reg = <1>;
++				funnel1_in1: endpoint {
++					slave-mode;
++					remote-endpoint = <&etm1_out>;
++				};
++			};
++			port at 2 {
++				reg = <2>;
++				funnel1_in2: endpoint {
++					slave-mode;
++					remote-endpoint = <&etm2_out>;
++				};
++			};
++			port at 3 {
++				reg = <3>;
++				funnel1_in3: endpoint {
++					slave-mode;
++					remote-endpoint = <&etm3_out>;
++				};
++			};
++			port at 4 {
++				reg = <0>;
++				funnel1_out: endpoint {
++					remote-endpoint = <&funnel0_in4>;
++				};
++			};
++		};
++	};
++
++	etm at 85c000 {
++		compatible = "arm,coresight-etm4x", "arm,primecell";
++		reg = <0x85c000 0x1000>;
++
++		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
++		clock-names = "apb_pclk", "atclk";
++
++		cpu = <&CPU0>;
++
++		port {
++			etm0_out: endpoint {
++				remote-endpoint = <&funnel1_in0>;
++			};
++		};
++	};
++
++	etm at 85d000 {
++		compatible = "arm,coresight-etm4x", "arm,primecell";
++		reg = <0x85d000 0x1000>;
++
++		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
++		clock-names = "apb_pclk", "atclk";
++
++		cpu = <&CPU1>;
++
++		port {
++			etm1_out: endpoint {
++				remote-endpoint = <&funnel1_in1>;
++			};
++		};
++	};
++
++	etm at 85e000 {
++		compatible = "arm,coresight-etm4x", "arm,primecell";
++		reg = <0x85e000 0x1000>;
++
++		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
++		clock-names = "apb_pclk", "atclk";
++
++		cpu = <&CPU2>;
++
++		port {
++			etm2_out: endpoint {
++				remote-endpoint = <&funnel1_in2>;
++			};
++		};
++	};
++
++	etm at 85f000 {
++		compatible = "arm,coresight-etm4x", "arm,primecell";
++		reg = <0x85f000 0x1000>;
++
++		clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
++		clock-names = "apb_pclk", "atclk";
++
++		cpu = <&CPU3>;
++
++		port {
++			etm3_out: endpoint {
++				remote-endpoint = <&funnel1_in3>;
++			};
++		};
++	};
++};
+--
+1.9.1
