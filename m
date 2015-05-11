@@ -1,63 +1,58 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Mon, 11 May 2015 20:10:58 +0530
-Subject: [PATCH 1/1] mailbox: Add ability for clients to request channels
- by name
-In-Reply-To: <1430323164-26945-1-git-send-email-lee.jones@linaro.org>
-References: <1430323164-26945-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <CAJe_Zhdw4PW3uUekhj=ifc29cJWcFHVvCHKTm18Q9Dn_801ZZQ@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 11 May 2015 20:11:01 +0530
+Subject: [PATCH v2 0/5] AHCI and SATA PHY support for Broadcom STB SoCs
+In-Reply-To: <1429757950-28789-1-git-send-email-computersforpeace@gmail.com>
+References: <1429757950-28789-1-git-send-email-computersforpeace@gmail.com>
+Message-ID: <5550BF7D.6010107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 April 2015 at 21:29, Lee Jones <lee.jones@linaro.org> wrote:
-> This patch supplies a new framework API; mbox_request_channel_byname().
->
-> It works by supplying the usual client pointer as the first argument and
-> a string as the second.  The API will search the client's node for a
-> 'mbox-names' property then request a channel in the normal way using the
-> requested string's index as the expected second 'index' argument.
->
-The api seems prudent. Thanks.
+Hi,
 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/mailbox/mailbox.c      | 23 +++++++++++++++++++++++
->  include/linux/mailbox_client.h |  2 ++
->  2 files changed, 25 insertions(+)
+On Thursday 23 April 2015 08:29 AM, Brian Norris wrote:
+> Hi,
 >
-> diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
-> index 19b491d..981a76cb 100644
-> --- a/drivers/mailbox/mailbox.c
-> +++ b/drivers/mailbox/mailbox.c
-> @@ -357,6 +357,29 @@ struct mbox_chan *mbox_request_channel(struct mbox_client *cl, int index)
->  }
->  EXPORT_SYMBOL_GPL(mbox_request_channel);
+> Here are my updates based on everyone's feedback. I'll try to include most of
+> the changelog info in each patch, but a few summary points for v1 -> v2:
 >
-> +struct mbox_chan *mbox_request_channel_byname(struct mbox_client *cl,
-> +                                             const char *name)
-> +{
-> +       struct device_node *np = cl->dev->of_node;
-> +       struct property *prop;
-> +       const char *mbox_name;
-> +       int index = 0;
-> +
-> +       if (!np) {
-> +               dev_err(cl->dev, "%s() only supports DT\n", __func__);
-> +               return ERR_PTR(-ENOSYS);
-> +       }
-> +
-> +       of_property_for_each_string(np, "mbox-names", prop, mbox_name) {
-> +               if (!strncmp(name, mbox_name, strlen(name)))
-> +                       break;
-> +               index++;
-> +       }
-> +
-> +       return mbox_request_channel(cl, index);
+>   - reworked the PHY DT binding so that we don't need do any custom xlate in the
+>     PHY driver
 >
-'mbox-names' property is specified as optional in Mailbox bindings. We
-don't want to return chan at 0 if the property isn't populated.
+>   - moved all handling of the 'SATA_TOP_CTRL' block into the SATA driver,
+>     instead of sharing it between SATA and PHY drivers. This means we have to do
+>     a little extra work in sata_brcmstb.c to decide which ports to power on, but
+>     at least this way, we're really describing the hardware, not just how the SW
+>     frameworks want to use the hardware.
 
-Also please remove the line "The use of this property is discouraged
-..." from Documentation/devicetree/bindings/mailbox/mailbox.txt now
-that we add an api for just that.
+I don't see any problems with the PHY patches. Let me know If I can take this 
+via linux-phy tree.
 
-Thanks.
+Cheers
+Kishon
+
+>
+> Enjoy,
+> Brian
+>
+> Brian Norris (5):
+>    Documentation: devicetree: add Broadcom SATA binding
+>    Documentation: devicetree: add Broadcom SATA PHY binding
+>    ata: add Broadcom AHCI SATA3 driver for STB chips
+>    phy: add Broadcom SATA3 PHY driver for Broadcom STB SoCs
+>    ARM: dts: brcmstb: add nodes for SATA controller and PHY
+>
+>   .../devicetree/bindings/ata/brcm,sata-brcmstb.txt  |  35 +++
+>   .../bindings/phy/brcm,brcmstb-sata-phy.txt         |  40 +++
+>   arch/arm/boot/dts/bcm7445.dtsi                     |  37 +++
+>   drivers/ata/Kconfig                                |   9 +
+>   drivers/ata/Makefile                               |   1 +
+>   drivers/ata/sata_brcmstb.c                         | 285 +++++++++++++++++++++
+>   drivers/phy/Kconfig                                |   9 +
+>   drivers/phy/Makefile                               |   1 +
+>   drivers/phy/phy-brcmstb-sata.c                     | 216 ++++++++++++++++
+>   9 files changed, 632 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/ata/brcm,sata-brcmstb.txt
+>   create mode 100644 Documentation/devicetree/bindings/phy/brcm,brcmstb-sata-phy.txt
+>   create mode 100644 drivers/ata/sata_brcmstb.c
+>   create mode 100644 drivers/phy/phy-brcmstb-sata.c
+>
