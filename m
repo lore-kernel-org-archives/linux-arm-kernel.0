@@ -1,45 +1,83 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 May 2015 20:59:33 +0100
-Subject: [PATCH 5/7] ARM: re-implement physical address space switching
-In-Reply-To: <5550FBD8.3070103@ti.com>
-References: <20150506103000.GF2067@n2100.arm.linux.org.uk>
- <E1YpwbF-0000wd-MP@rmk-PC.arm.linux.org.uk>
- <5550FBD8.3070103@ti.com>
-Message-ID: <20150511195933.GI2067@n2100.arm.linux.org.uk>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Mon, 11 May 2015 22:16:00 +0200 (CEST)
+Subject: [PATCH v2 1/3] media: atmel-isi: remove the useless code which
+ disable isi
+In-Reply-To: <1428570108-4961-2-git-send-email-josh.wu@atmel.com>
+References: <1428570108-4961-1-git-send-email-josh.wu@atmel.com>
+ <1428570108-4961-2-git-send-email-josh.wu@atmel.com>
+Message-ID: <Pine.LNX.4.64.1505112147540.12198@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 11, 2015 at 01:58:32PM -0500, Nishanth Menon wrote:
-> On 05/06/2015 05:30 AM, Russell King wrote:
-> [...]
-> > @@ -1436,75 +1435,32 @@ void __init early_paging_init(const struct machine_desc *mdesc,
-> 
-> [...]
-> > -	/* Finally flush any stale TLB values. */
-> > -	local_flush_bp_all();
-> > -	local_flush_tlb_all();
-> > +	/* Re-enable the caches and cacheable TLB walks */
-> > +	asm volatile("mcr p15, 0, %0, c2, c0, 2" : : "ttbcr");
-> ^^
-> on next-20150511, echo
-> "CONFIG_ARM_LPAE=y">>arch/arm/configs/multi_v7_defconfig ;make
-> multi_v7_defconfig;make arch/arm/mm/mmu.o
-> #
-> # configuration written to .config
-> #
-> scripts/kconfig/conf  --silentoldconfig Kconfig
-> 
-> <snip>
->   CC      arch/arm/mm/mmu.o
-> arch/arm/mm/mmu.c: In function ?early_paging_init?:
-> arch/arm/mm/mmu.c:1461:54: error: expected ?(? before ?)? token
-> make[1]: *** [arch/arm/mm/mmu.o] Error 1
-> make: *** [arch/arm/mm/mmu.o] Error 2
-> this was using [1]
+Hi Josh,
 
-That's why I said I'd send you an updated version.  Just replace the
-"ttbcr" with "r" (ttbcr)...
+Thanks for the patch. I'm afraid I don't quite understand why it is 
+needed, could you maybe explain a bit more? Is it because
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+(1) during ISI configuration the pixel clock from the sensor is (usually) 
+anyway disabled, so, we don't have to additionally disable the ISI, 
+without the pixel clock the ISI is anyway already disabled.
+
+or
+
+(2) disabling the ISI at those locations below breaks something, because 
+when the ISI is disabled, the functionality, that's later used isn't 
+available.
+
+I assume it's (1), but if that's the case, then this patch is just 
+cosmetic, right? The ISI is anyway disabled, so, that operation simply has 
+no effect, but also doesn't hurt. OTOH, if some sensor keeps its master 
+clock running all the time, then switching the ISI off as in the current 
+version helps save some power, unless it breaks anything?
+
+Thanks
+Guennadi
+
+On Thu, 9 Apr 2015, Josh Wu wrote:
+
+> To program ISI control register, the pixel clock should be enabled.
+> So without pixel clock (from sensor) enabled, disable ISI controller is
+> not make sense. So this patch remove those code.
+> 
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> ---
+> 
+> Changes in v2:
+> - this file is new added.
+> 
+>  drivers/media/platform/soc_camera/atmel-isi.c | 5 -----
+>  1 file changed, 5 deletions(-)
+> 
+> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
+> index c125b1d..31254b4 100644
+> --- a/drivers/media/platform/soc_camera/atmel-isi.c
+> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
+> @@ -131,8 +131,6 @@ static int configure_geometry(struct atmel_isi *isi, u32 width,
+>  		return -EINVAL;
+>  	}
+>  
+> -	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
+> -
+>  	cfg2 = isi_readl(isi, ISI_CFG2);
+>  	/* Set YCC swap mode */
+>  	cfg2 &= ~ISI_CFG2_YCC_SWAP_MODE_MASK;
+> @@ -843,7 +841,6 @@ static int isi_camera_set_bus_param(struct soc_camera_device *icd)
+>  
+>  	cfg1 |= ISI_CFG1_THMASK_BEATS_16;
+>  
+> -	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
+>  	isi_writel(isi, ISI_CFG1, cfg1);
+>  
+>  	return 0;
+> @@ -1022,8 +1019,6 @@ static int atmel_isi_probe(struct platform_device *pdev)
+>  	if (isi->pdata.data_width_flags & ISI_DATAWIDTH_10)
+>  		isi->width_flags |= 1 << 9;
+>  
+> -	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
+> -
+>  	irq = platform_get_irq(pdev, 0);
+>  	if (IS_ERR_VALUE(irq)) {
+>  		ret = irq;
+> -- 
+> 1.9.1
+> 
