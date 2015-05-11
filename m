@@ -1,68 +1,49 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 11 May 2015 09:13:01 +0200
-Subject: [PATCH 03/10] arm64: drop sleep_idmap_phys and clean up cpu_resume()
+Date: Mon, 11 May 2015 09:13:02 +0200
+Subject: [PATCH 04/10] arm64: use more granular reservations for static page
+ table allocations
 In-Reply-To: <1431328388-3051-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1431328388-3051-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1431328388-3051-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1431328388-3051-5-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Two cleanups of the asm function cpu_resume():
-- The global variable sleep_idmap_phys always points to idmap_pg_dir,
-  so we can just use that value directly in the CPU resume path.
-- Unclutter the load of sleep_save_sp::save_ptr_stash_phys.
+Before introducing new statically allocated page tables and increasing
+their alignment in subsequent patches, update the reservation logic
+so that only pages that are in actual use end up as reserved with
+memblock.
 
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Tested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/sleep.S   | 7 ++-----
- arch/arm64/kernel/suspend.c | 3 ---
- 2 files changed, 2 insertions(+), 8 deletions(-)
+ arch/arm64/mm/init.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
-index 811e61a2d847..803cfea41962 100644
---- a/arch/arm64/kernel/sleep.S
-+++ b/arch/arm64/kernel/sleep.S
-@@ -164,15 +164,12 @@ ENTRY(cpu_resume)
- #else
- 	mov	x7, xzr
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index a3469a436a73..373ea02bdb96 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -37,6 +37,7 @@
+ 
+ #include <asm/fixmap.h>
+ #include <asm/memory.h>
++#include <asm/mmu_context.h>
+ #include <asm/sections.h>
+ #include <asm/setup.h>
+ #include <asm/sizes.h>
+@@ -173,11 +174,13 @@ void __init arm64_memblock_init(void)
+ 	 * Register the kernel text, kernel data, initrd, and initial
+ 	 * pagetables with memblock.
+ 	 */
+-	memblock_reserve(__pa(_text), _end - _text);
++	memblock_reserve(__pa(_text), __bss_stop - _text);
+ #ifdef CONFIG_BLK_DEV_INITRD
+ 	if (initrd_start)
+ 		memblock_reserve(__virt_to_phys(initrd_start), initrd_end - initrd_start);
  #endif
--	adrp	x0, sleep_save_sp
--	add	x0, x0, #:lo12:sleep_save_sp
--	ldr	x0, [x0, #SLEEP_SAVE_SP_PHYS]
-+	ldr_l	x0, sleep_save_sp + SLEEP_SAVE_SP_PHYS
- 	ldr	x0, [x0, x7, lsl #3]
- 	/* load sp from context */
- 	ldr	x2, [x0, #CPU_CTX_SP]
--	adrp	x1, sleep_idmap_phys
- 	/* load physical address of identity map page table in x1 */
--	ldr	x1, [x1, #:lo12:sleep_idmap_phys]
-+	adrp	x1, idmap_pg_dir
- 	mov	sp, x2
- 	/*
- 	 * cpu_do_resume expects x0 to contain context physical address
-diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
-index d7daf45ae7a2..f6073c27d65f 100644
---- a/arch/arm64/kernel/suspend.c
-+++ b/arch/arm64/kernel/suspend.c
-@@ -118,7 +118,6 @@ int __cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
- }
++	memblock_reserve(__pa(idmap_pg_dir), IDMAP_DIR_SIZE);
++	memblock_reserve(__pa(swapper_pg_dir), SWAPPER_DIR_SIZE);
  
- struct sleep_save_sp sleep_save_sp;
--phys_addr_t sleep_idmap_phys;
- 
- static int __init cpu_suspend_init(void)
- {
-@@ -132,9 +131,7 @@ static int __init cpu_suspend_init(void)
- 
- 	sleep_save_sp.save_ptr_stash = ctx_ptr;
- 	sleep_save_sp.save_ptr_stash_phys = virt_to_phys(ctx_ptr);
--	sleep_idmap_phys = virt_to_phys(idmap_pg_dir);
- 	__flush_dcache_area(&sleep_save_sp, sizeof(struct sleep_save_sp));
--	__flush_dcache_area(&sleep_idmap_phys, sizeof(sleep_idmap_phys));
- 
- 	return 0;
- }
+ 	if (!efi_enabled(EFI_MEMMAP))
+ 		early_init_fdt_scan_reserved_mem();
 -- 
 1.9.1
