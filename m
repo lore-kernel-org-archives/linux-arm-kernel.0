@@ -1,65 +1,66 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Tue, 12 May 2015 00:00:51 +0200
-Subject: [PATCH v4 5/7] ARM: dts: Add DT for Embedded Artists LPC4357
- Developers Kit
+Date: Tue, 12 May 2015 00:00:52 +0200
+Subject: [PATCH v4 6/7] ARM: dts: Add DT for Hitex LPC4350 Evaluation Board
 In-Reply-To: <1431381653-25356-1-git-send-email-manabian@gmail.com>
 References: <1431381653-25356-1-git-send-email-manabian@gmail.com>
-Message-ID: <1431381653-25356-6-git-send-email-manabian@gmail.com>
+Message-ID: <1431381653-25356-7-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds basic support for Embedded Artists' LPC4357 Developer's Kit. Board
-features a LPC4357 Soc, 32 MB SDRAM, 128 MB NAND Flash, 16 MB SPI
-Flash, USB and Ethernet.
+From: Ariel D'Alessandro <ariel.dalessandro@gmail.com>
+
+Add basic support for Hitex LPC4350 Evaluation Board. Board
+features a LPC4350 Soc, 8 MB SDRAM, 8 MB SPI Flash, USB and
+Ethernet.
 
 More information can be found on:
-http://www.embeddedartists.com/products/kits/lpc4357_kit.php
+http://www.hitex.com/index.php?id=3212
 
+Signed-off-by: Ariel D'Alessandro <ariel.dalessandro@gmail.com>
 Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 ---
  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
- arch/arm/boot/dts/Makefile                         |  2 ++
- arch/arm/boot/dts/lpc4357-ea4357-devkit.dts        | 41 ++++++++++++++++++++++
- arch/arm/boot/dts/lpc4357.dtsi                     | 39 ++++++++++++++++++++
- 4 files changed, 83 insertions(+)
- create mode 100644 arch/arm/boot/dts/lpc4357-ea4357-devkit.dts
- create mode 100644 arch/arm/boot/dts/lpc4357.dtsi
+ arch/arm/boot/dts/Makefile                         |  1 +
+ arch/arm/boot/dts/lpc4350-hitex-eval.dts           | 45 ++++++++++++++++++++++
+ arch/arm/boot/dts/lpc4350.dtsi                     | 39 +++++++++++++++++++
+ 4 files changed, 86 insertions(+)
+ create mode 100644 arch/arm/boot/dts/lpc4350-hitex-eval.dts
+ create mode 100644 arch/arm/boot/dts/lpc4350.dtsi
 
 diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 80339192c93e..ae3460c0e5fd 100644
+index ae3460c0e5fd..7e7d7a7cae2c 100644
 --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
 +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -60,6 +60,7 @@ digilent	Diglent, Inc.
- dlg	Dialog Semiconductor
- dlink	D-Link Corporation
- dmo	Data Modul AG
-+ea	Embedded Artists AB
- ebv	EBV Elektronik
- edt	Emerging Display Technologies
- elan	Elan Microelectronic Corp.
+@@ -94,6 +94,7 @@ haoyu	Haoyu Microelectronic Co. Ltd.
+ himax	Himax Technologies, Inc.
+ hisilicon	Hisilicon Limited.
+ hit	Hitachi Ltd.
++hitex	Hitex Development Tools
+ honeywell	Honeywell
+ hp	Hewlett Packard
+ i2se	I2SE GmbH
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 86217db2937a..b95d8a6a1e36 100644
+index b95d8a6a1e36..1e5b2ea02aad 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -201,6 +201,8 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
- 	kirkwood-ts219-6282.dtb \
+@@ -202,6 +202,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
  	kirkwood-ts419-6281.dtb \
  	kirkwood-ts419-6282.dtb
-+dtb-$(CONFIG_ARCH_LPC18XX) += \
-+	lpc4357-ea4357-devkit.dtb
+ dtb-$(CONFIG_ARCH_LPC18XX) += \
++	lpc4350-hitex-eval.dtb \
+ 	lpc4357-ea4357-devkit.dtb
  dtb-$(CONFIG_ARCH_LPC32XX) += \
  	ea3250.dtb phy3250.dtb
- dtb-$(CONFIG_MACH_MESON6) += \
-diff --git a/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts b/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts
+diff --git a/arch/arm/boot/dts/lpc4350-hitex-eval.dts b/arch/arm/boot/dts/lpc4350-hitex-eval.dts
 new file mode 100644
-index 000000000000..08a6f757f924
+index 000000000000..d04072f40817
 --- /dev/null
-+++ b/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts
-@@ -0,0 +1,41 @@
++++ b/arch/arm/boot/dts/lpc4350-hitex-eval.dts
+@@ -0,0 +1,45 @@
 +/*
-+ * Embedded Artist LPC4357 Developer's Kit
++ * Hitex LPC4350 Evaluation Board
 + *
-+ * Copyright 2015 Joachim Eastwood <manabian@gmail.com>
++ * Copyright 2015 Ariel D'Alessandro <ariel.dalessandro@gmail.com>
 + *
 + * This code is released using a dual license strategy: BSD/GPL
 + * You can choose the licence that better fits your requirements.
@@ -71,11 +72,11 @@ index 000000000000..08a6f757f924
 +/dts-v1/;
 +
 +#include "lpc18xx.dtsi"
-+#include "lpc4357.dtsi"
++#include "lpc4350.dtsi"
 +
 +/ {
-+	model = "Embedded Artists' LPC4357 Developer's Kit";
-+	compatible = "ea,lpc4357-developers-kit", "nxp,lpc4357", "nxp,lpc4350";
++	model = "Hitex LPC4350 Evaluation Board";
++	compatible = "hitex,lpc4350-eval-board", "nxp,lpc4350";
 +
 +	aliases {
 +		serial0 = &uart0;
@@ -90,23 +91,27 @@ index 000000000000..08a6f757f924
 +
 +	memory {
 +		device_type = "memory";
-+		reg = <0x28000000 0x2000000>; /* 32 MB */
++		reg = <0x28000000 0x800000>; /* 8 MB */
 +	};
++};
++
++&pll1 {
++	clock-mult = <15>;
 +};
 +
 +&uart0 {
 +	status = "okay";
 +};
-diff --git a/arch/arm/boot/dts/lpc4357.dtsi b/arch/arm/boot/dts/lpc4357.dtsi
+diff --git a/arch/arm/boot/dts/lpc4350.dtsi b/arch/arm/boot/dts/lpc4350.dtsi
 new file mode 100644
-index 000000000000..fb9ecc754e8d
+index 000000000000..c4422f587055
 --- /dev/null
-+++ b/arch/arm/boot/dts/lpc4357.dtsi
++++ b/arch/arm/boot/dts/lpc4350.dtsi
 @@ -0,0 +1,39 @@
 +/*
-+ * NXP LPC435x, LPC433x, LPC4327, LPC4325, LPC4317 and LPC4315 SoC
++ * NXP LPC4350 and LPC4330 SoC
 + *
-+ * Copyright 2015 Joachim Eastwood <manabian@gmail.com>
++ * Copyright 2015 Ariel D'Alessandro <ariel.dalessandro@gmail.com>
 + *
 + * This code is released using a dual license strategy: BSD/GPL
 + * You can choose the licence that better fits your requirements.
@@ -117,7 +122,7 @@ index 000000000000..fb9ecc754e8d
 + */
 +
 +/ {
-+	compatible = "nxp,lpc4357";
++	compatible = "nxp,lpc4350", "nxp,lpc4330";
 +
 +	cpus {
 +		cpu at 0 {
@@ -128,12 +133,12 @@ index 000000000000..fb9ecc754e8d
 +	soc {
 +		sram0: sram at 10000000 {
 +			compatible = "mmio-sram";
-+			reg = <0x10000000 0x8000>; /* 32 KiB local SRAM */
++			reg = <0x10000000 0x20000>; /* 96 + 32 KiB local SRAM */
 +		};
 +
 +		sram1: sram at 10080000 {
 +			compatible = "mmio-sram";
-+			reg = <0x10080000 0xa000>; /* 32 + 8 KiB local SRAM */
++			reg = <0x10080000 0x12000>; /* 64 + 8 KiB local SRAM */
 +		};
 +
 +		sram2: sram at 20000000 {
