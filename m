@@ -1,55 +1,62 @@
-From: lho@apm.com (Loc Ho)
-Date: Mon, 11 May 2015 15:29:10 -0700
-Subject: [PATCH v8 0/4] edac: Add APM X-Gene SoC memory controller EDAC
- driver
-In-Reply-To: <2154265.kZOTsisCx2@wuerfel>
-References: <1430884947-16787-1-git-send-email-lho@apm.com>
- <20150506182900.GI22949@pd.tnic>
- <CAPw-ZTmJ8C3KmujZJN1z21S3LFQ-TRouUeAjN0Y02HOTKAG1_g@mail.gmail.com>
- <2154265.kZOTsisCx2@wuerfel>
-Message-ID: <CAPw-ZT=ubrjAvgTHBthzYQC7faSbaOvyFgX81=vcaiWKA8+bug@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 11 May 2015 23:29:55 +0100
+Subject: [PATCH 1/3] ARM: cache-l2c: Add flag to skip cache unlocking
+In-Reply-To: <1431382651-15894-2-git-send-email-sjoerd.simons@collabora.co.uk>
+References: <1431382651-15894-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <1431382651-15894-2-git-send-email-sjoerd.simons@collabora.co.uk>
+Message-ID: <20150511222955.GK2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, May 12, 2015 at 12:17:29AM +0200, Sjoerd Simons wrote:
+> The L2C cache should only be unlocked when the cache is setup to allow
+> that. In the common case the l2x0 driver sets up the cache for that to
+> be the case (e.g. setting L310_AUX_CTRL_NS_LOCKDOWN on L2C-310), making
+> unlock safe. However when a secure firmware is in use, it may not be
+> possible for the L2c to be configured that way making unlocking unsafe.
+> 
+> To handle that case add a flag to skip unlocking the cache for machine
+> where this can't be done safely.
+> 
+> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> ---
+>  arch/arm/include/asm/outercache.h | 1 +
+>  arch/arm/mm/cache-l2x0.c          | 4 +++-
+>  2 files changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
+> index 563b92f..d07ca82 100644
+> --- a/arch/arm/include/asm/outercache.h
+> +++ b/arch/arm/include/asm/outercache.h
+> @@ -39,6 +39,7 @@ struct outer_cache_fns {
+>  	/* This is an ARM L2C thing */
+>  	void (*write_sec)(unsigned long, unsigned);
+>  	void (*configure)(const struct l2x0_regs *);
+> +	bool skip_unlock;
+>  };
+>  
+>  extern struct outer_cache_fns outer_cache;
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> index e309c8f..fff7888 100644
+> --- a/arch/arm/mm/cache-l2x0.c
+> +++ b/arch/arm/mm/cache-l2x0.c
+> @@ -136,7 +136,8 @@ static void l2c_enable(void __iomem *base, u32 aux, unsigned num_lock)
+>  	l2x0_saved_regs.aux_ctrl = aux;
+>  	l2c_configure(base);
+>  
+> -	l2c_unlock(base, num_lock);
+> +	if (!outer_cache.skip_unlock)
+> +		l2c_unlock(base, num_lock);
 
->>
->> On Wed, May 6, 2015 at 11:29 AM, Borislav Petkov <bp@alien8.de> wrote:
->> > On Wed, May 06, 2015 at 11:12:20AM -0700, Loc Ho wrote:
->> >> 1. Whether to have an single driver for APM EDAC or multiple instance
->> >> of 4 different drivers. With single driver, it does not scale in the
->> >> future when we add/remove memory controllers and CPU domains. This is
->> >
->> > Why doesn't it scale? Please explain this to me more verbosely.
->>
->> Let me explain a bit more. We have four memory controller today.
->> Therefore, I would like to have 4 DTS node and the same driver probe
->> function called 4 times. If there is only one driver for the entire
->> APM EDAC, I would have to merge all the resource registers into an
->> single DTS node and its probe function called one time. In this one
->> driver design, what would I do in future chip or variant of the chip
->> in which it remove or add an addition memory controller? I would have
->> to change the driver as well as the DTS node. In the four instance
->> probe design, all I need is to add an additional DTS node.
->
-> There are lots of possible representations in DT that would solve this.
->
-> First of all, a device node can be turned into a platform_device but
-> does not have to, so you you could have one DT node for the common
-> parts (the pcp), and then subnodes underneath it, and have the driver
-> attach to the main device but parse the subnodes manually to see
-> what registers are there. There is no magic involved here, and this
-> would address the concerns that Boris and I have.
->
-> Another option would be to have multiple drivers: have one driver
-> that handles the common parts here, and make that export a shared
-> interface to which the other drivers can register, then create
-> five drivers that each do one thing. In my opinion that would work
-> just as well, and be a nice abstraction, but I suspect that Boris
-> would prefer doing it the other way.
+I think we can do better here.  If the non-secure lockdown access bit has
+been set, then proceed with the unlock:
 
-Thanks all for the comment. I will follow the design as with
-gpio-dwapb driver. This would take care of Borislav concern as
-mentioned by Arnd.
+	if (readl_relaxed(base + L2X0_AUX_CTRL) & L310_AUX_CTRL_NS_LOCKDOWN)
+		l2c_unlock(base, num_lock);
 
--Loc
+I don't see any need to add a flag for this.  This also eliminates your
+second patch.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
