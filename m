@@ -1,89 +1,195 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 11 May 2015 16:26:58 +0800
-Subject: [PATCH 1/2] ARM: dts: sun9i: cubieboard4: Enable USB support
-In-Reply-To: <20150508114040.GR11057@lukather>
-References: <1431017037-28331-1-git-send-email-wens@csie.org>
- <1431017037-28331-2-git-send-email-wens@csie.org>
- <20150508074616.GP11057@lukather>
- <CAGb2v64VQpNkd2zmHdhTXQEfk8z1FnhYZMQW0vmLVq1Ahzg2Zw@mail.gmail.com>
- <20150508114040.GR11057@lukather>
-Message-ID: <CAGb2v64eKcn6-J+Dae-YOtaZ3kdiT7=JMvnRJfBafXpEDLsYLg@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 11 May 2015 10:27:30 +0200
+Subject: [PATCH 6/6] ARM: dts: sun8i: Add ET-Q8 A33 support
+In-Reply-To: <55506743.8080200@redhat.com>
+References: <1431240383-12763-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1431240383-12763-7-git-send-email-vishnupatekar0510@gmail.com>
+ <554F1CC9.7070508@redhat.com>
+ <CAEzqOZuS4m8kDhG0RpLRGBXbnFXLPKJB8D78_Dc02vRkfwvTUA@mail.gmail.com>
+ <55506743.8080200@redhat.com>
+Message-ID: <555067F2.4050809@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 8, 2015 at 7:40 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Fri, May 08, 2015 at 04:01:14PM +0800, Chen-Yu Tsai wrote:
->> >> +&ehci0 {
->> >> +     status = "okay";
->> >> +};
->> >> +
->> >> +&ehci2 {
->> >> +     status = "okay";
->> >> +};
->> >> +
->> >> +/* usb1 is connected to a GL850G USB hub chip, so no need to enable OHCI */
->> >
->> > You're mentionning usb1, but I don't see it enabled anywhere, is that
->> > a typo?
->>
->> usb1 (or usbphy1) == ehci/ohci0. usb0 is otg.
->>
->> This numbering matches the fex files, and (mostly) matches the
->> specs.
+Hi,
+
+On 11-05-15 10:24, Hans de Goede wrote:
+> Hi,
 >
-> Ok, having this comment between ehci2 and ohci2 is confusing then :)
->
-> It's not the first board that has a hub, we usually don't really care
-> as it's kind of obvious. Maybe we can just remove it?
-
-Why not. :)
-
->> >>  &mmc0 {
->> >> @@ -92,8 +130,30 @@
->> >>       status = "okay";
->> >>  };
->> >>
->> >> +&reg_usb1_vbus {
->> >> +     pinctrl-0 = <&usb1_vbus_pin_cubieboard4>;
->> >> +     gpio = <&pio 7 14 GPIO_ACTIVE_HIGH>; /* PH14 */
->> >> +     status = "okay";
->> >> +};
->> >> +
->> >>  &uart0 {
->> >>       pinctrl-names = "default";
->> >>       pinctrl-0 = <&uart0_pins_a>;
->> >>       status = "okay";
->> >>  };
->> >> +
->> >> +&usbphy1 {
->> >> +     phy-supply = <&reg_usb1_vbus>;
->> >> +     status = "okay";
->> >> +};
->> >> +
->> >> +/*
->> >> + * Unfortunately reg_usb1_vbus also powers one of the ports from usb3's hub.
->> >> + * One should always make sure both regulators are enabled and working for
->> >> + * all USB ports to have power.
->> >> + */
->> >
->> > Can't we just provide the two regulators, and enable both of them so
->> > that we know that we always have the needed regulators enabled,
->> > disregarding which USB port is used?
+> On 11-05-15 08:23, Vishnu Patekar wrote:
+>> Hi,
 >>
->> Would setting "always-on" for both regulators work for you?
->> Or maybe just the one that's used by both USB hosts?
+>> On Sun, May 10, 2015 at 2:24 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+>>>
+>>> Hi,
+>>>
+>>> On 10-05-15 08:46, Vishnu Patekar wrote:
+>>>>
+>>>> ET-Q8_A33 is A33 based cheap tablet in common Q8 format.
+>>>>
+>>>> It has 512MB RAM, 4GB Nand, 7" Display, RDA5900P wifi, GSL1680 touch, etc.
+>>>
+>>>
+>>>
+>>> Where does the ET prefix come from ? The ippo boards have an ippo prefix as
+>>> that is written on the pcb ...
+>> Yes, on PCB it's writeen ET_Q8_A23_A33_v1.6
 >
-> I was more thinking of giving to the phy an additional regulator, so
-> that it would enable both the regulators needed to power up all ports.
+> OK, using the ET prefix is fine then.
 
-That would require adding back all the regulator-related code I
-removed from the phy driver before it was merged. (sigh) It's not
-like the regulator bindings takes a list.
+But can you please rename the dts to include the v1.6 bit ? And can you also
+send a u-boot patch to rename the defconfig there to et_q8_v1_6_a33_defconfig,
+and fix the CONFIG_DEFAULT_DEVICE_TREE setting too ?
 
-I see this as more of a hardware design flaw, and we should label
-it as such. And it might still work for self-powered devices even
-if VBUS is off. The USB hub chip is always on.
+Regards,
 
+Hans
 
-ChenYu
+>
+> Regards,
+>
+> Hans
+>
+>>>
+>>> Regards,
+>>>
+>>> Hans
+>>>
+>>>
+>>>>
+>>>> Signed-off-by: VishnuPatekar <vishnupatekar0510@gmail.com>
+>>>> ---
+>>>>    arch/arm/boot/dts/Makefile            |   3 +-
+>>>>    arch/arm/boot/dts/sun8i-a33-et-q8.dts | 108 ++++++++++++++++++++++++++++++++++
+>>>>    2 files changed, 110 insertions(+), 1 deletion(-)
+>>>>    create mode 100644 arch/arm/boot/dts/sun8i-a33-et-q8.dts
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>>>> index 82f4b9b..d44b1d6 100644
+>>>> --- a/arch/arm/boot/dts/Makefile
+>>>> +++ b/arch/arm/boot/dts/Makefile
+>>>> @@ -570,7 +570,8 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+>>>>          sun7i-a20-wexler-tab7200.dtb
+>>>>    dtb-$(CONFIG_MACH_SUN8I) += \
+>>>>          sun8i-a23-ippo-q8h-v5.dtb \
+>>>> -       sun8i-a23-ippo-q8h-v1.2.dtb
+>>>> +       sun8i-a23-ippo-q8h-v1.2.dtb \
+>>>> +       sun8i-a33-et-q8.dtb
+>>>>    dtb-$(CONFIG_MACH_SUN9I) += \
+>>>>          sun9i-a80-optimus.dtb \
+>>>>          sun9i-a80-cubieboard4.dtb
+>>>> diff --git a/arch/arm/boot/dts/sun8i-a33-et-q8.dts b/arch/arm/boot/dts/sun8i-a33-et-q8.dts
+>>>> new file mode 100644
+>>>> index 0000000..260d5a3
+>>>> --- /dev/null
+>>>> +++ b/arch/arm/boot/dts/sun8i-a33-et-q8.dts
+>>>> @@ -0,0 +1,108 @@
+>>>> +/*
+>>>> + * Copyright 2015 Vishnu Patekar
+>>>> + * Vishnu Patekar <vishnupatekar0510@gmail.com>
+>>>> + *
+>>>> + * This file is dual-licensed: you can use it either under the terms
+>>>> + * of the GPL or the X11 license, at your option. Note that this dual
+>>>> + * licensing only applies to this file, and not this project as a
+>>>> + * whole.
+>>>> + *
+>>>> + *  a) This file is free software; you can redistribute it and/or
+>>>> + *     modify it under the terms of the GNU General Public License as
+>>>> + *     published by the Free Software Foundation; either version 2 of the
+>>>> + *     License, or (at your option) any later version.
+>>>> + *
+>>>> + *     This file is distributed in the hope that it will be useful,
+>>>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>>> + *     GNU General Public License for more details.
+>>>> + *
+>>>> + *
+>>>> + * Or, alternatively,
+>>>> + *
+>>>> + *  b) Permission is hereby granted, free of charge, to any person
+>>>> + *     obtaining a copy of this software and associated documentation
+>>>> + *     files (the "Software"), to deal in the Software without
+>>>> + *     restriction, including without limitation the rights to use,
+>>>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+>>>> + *     sell copies of the Software, and to permit persons to whom the
+>>>> + *     Software is furnished to do so, subject to the following
+>>>> + *     conditions:
+>>>> + *
+>>>> + *     The above copyright notice and this permission notice shall be
+>>>> + *     included in all copies or substantial portions of the Software.
+>>>> + *
+>>>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>>>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>>>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>>>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+>>>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>>>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>>>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>>>> + *     OTHER DEALINGS IN THE SOFTWARE.
+>>>> + */
+>>>> +
+>>>> +/dts-v1/;
+>>>> +#include "sun8i-a33.dtsi"
+>>>> +#include "sunxi-common-regulators.dtsi"
+>>>> +
+>>>> +#include <dt-bindings/gpio/gpio.h>
+>>>> +#include <dt-bindings/input/input.h>
+>>>> +#include <dt-bindings/pinctrl/sun4i-a10.h>
+>>>> +
+>>>> +/ {
+>>>> +       model = "ET Q8 A33 ";
+>>>> +       compatible = "et-q8-q33", "allwinner,sun8i", "allwinner,sun8i-a33";
+>>>> +
+>>>> +       aliases {
+>>>> +               serial0 = &uart0;
+>>>> +       };
+>>>> +
+>>>> +       chosen {
+>>>> +               bootargs = "earlyprintk console=ttyS0,115200";
+>>>> +       };
+>>>> +};
+>>>> +
+>>>> +&lradc {
+>>>> +       vref-supply = <&reg_vcc3v0>;
+>>>> +       status = "okay";
+>>>> +
+>>>> +       button at 200 {
+>>>> +               label = "Volume Up";
+>>>> +               linux,code = <KEY_VOLUMEUP>;
+>>>> +               channel = <0>;
+>>>> +               voltage = <200000>;
+>>>> +       };
+>>>> +
+>>>> +       button at 400 {
+>>>> +               label = "Volume Down";
+>>>> +               linux,code = <KEY_VOLUMEDOWN>;
+>>>> +               channel = <0>;
+>>>> +               voltage = <400000>;
+>>>> +       };
+>>>> +};
+>>>> +
+>>>> +&i2c0 {
+>>>> +       pinctrl-names = "default";
+>>>> +       pinctrl-0 = <&i2c0_pins_a>;
+>>>> +       status = "okay";
+>>>> +};
+>>>> +
+>>>> +&i2c1 {
+>>>> +       pinctrl-names = "default";
+>>>> +       pinctrl-0 = <&i2c1_pins_a>;
+>>>> +       status = "okay";
+>>>> +};
+>>>> +
+>>>> +&i2c2 {
+>>>> +       pinctrl-names = "default";
+>>>> +       pinctrl-0 = <&i2c2_pins_a>;
+>>>> +       /* pull-ups and devices require PMIC regulator */
+>>>> +       status = "failed";
+>>>> +};
+>>>> +
+>>>> +&uart0 {
+>>>> +       pinctrl-names = "default";
+>>>> +       pinctrl-0 = <&uart0_pins_a>;
+>>>> +       status = "okay";
+>>>> +};
+>>>>
