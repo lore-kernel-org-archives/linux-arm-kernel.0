@@ -1,137 +1,106 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 11 May 2015 08:42:00 +0200
-Subject: [PATCH 8/8] arm64/efi: adapt to relaxed FDT placement requirements
-In-Reply-To: <1431326520-17331-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1431326520-17331-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1431326520-17331-9-git-send-email-ard.biesheuvel@linaro.org>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Mon, 11 May 2015 15:44:27 +0900
+Subject: [v2 1/5] arm64: kdump: reserve memory for crash dump kernel
+In-Reply-To: <20150424101136.GE29183@leverpostej>
+References: <1429861989-8417-1-git-send-email-takahiro.akashi@linaro.org>
+ <1429861989-8417-2-git-send-email-takahiro.akashi@linaro.org>
+ <20150424101136.GE29183@leverpostej>
+Message-ID: <55504FCB.6000306@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the relaxed FDT placement requirements in place, we can change
-the allocation strategy used by the stub to put the FDT image higher
-up in memory. At the same time, reduce the minimal alignment to 8 bytes,
-and impose a 2 MB size limit, as per the new requirements.
+On 04/24/2015 07:11 PM, Mark Rutland wrote:
+> On Fri, Apr 24, 2015 at 08:53:04AM +0100, AKASHI Takahiro wrote:
+>> On system kernel, the memory region used by crash dump kernel must be
+>> specified by "crashkernel=X at Y" boot parameter. reserve_crashkernel()
+>> will allocate the region in "System RAM" and reserve it for later use.
+>>
+>> On crash dump kernel, memory region information in system kernel is
+>> described in a specific region specified by "elfcorehdr=X at Y" boot parameter.
+>> reserve_elfcorehdr() will set aside the region to avoid data destruction
+>> by the kernel.
+>>
+>> Crash dump kernel will access memory regions in system kernel via
+>> copy_oldmem_page(), which reads a page by ioremap'ing it assuming that
+>> such pages are not part of main memory of crash dump kernel.
+>> This is true under non-UEFI environment because kexec-tools modifies
+>> a device tree adding "usablemem" attributes to memory sections.
+>
+> I'm not sure what you mean by "usablemem" here.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/include/asm/efi.h            | 10 +++-------
- drivers/firmware/efi/libstub/arm-stub.c |  5 ++---
- drivers/firmware/efi/libstub/efistub.h  |  1 -
- drivers/firmware/efi/libstub/fdt.c      | 18 +++++++++---------
- 4 files changed, 14 insertions(+), 20 deletions(-)
+I think I explained it in my previous reply.
 
-diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-index 635101f36720..43ea4ecbd361 100644
---- a/arch/arm64/include/asm/efi.h
-+++ b/arch/arm64/include/asm/efi.h
-@@ -1,6 +1,7 @@
- #ifndef _ASM_EFI_H
- #define _ASM_EFI_H
- 
-+#include <asm/boot.h>
- #include <asm/io.h>
- #include <asm/neon.h>
- 
-@@ -38,13 +39,8 @@ extern void efi_init_fdt(void *fdt);
- 
- /* arch specific definitions used by the stub code */
- 
--/*
-- * AArch64 requires the DTB to be 8-byte aligned in the first 512MiB from
-- * start of kernel and may not cross a 2MiB boundary. We set alignment to
-- * 2MiB so we know it won't cross a 2MiB boundary.
-- */
--#define EFI_FDT_ALIGN	SZ_2M   /* used by allocate_new_fdt_and_exit_boot() */
--#define MAX_FDT_OFFSET	SZ_512M
-+#define EFI_FDT_ALIGN		MIN_FDT_ALIGN
-+#define EFI_FDT_MAX_SIZE	MAX_FDT_SIZE
- 
- #define efi_call_early(f, ...) sys_table_arg->boottime->f(__VA_ARGS__)
- 
-diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-index e29560e6b40b..4e5ac133d1dc 100644
---- a/drivers/firmware/efi/libstub/arm-stub.c
-+++ b/drivers/firmware/efi/libstub/arm-stub.c
-@@ -268,9 +268,8 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
- 
- 	new_fdt_addr = fdt_addr;
- 	status = allocate_new_fdt_and_exit_boot(sys_table, handle,
--				&new_fdt_addr, dram_base + MAX_FDT_OFFSET,
--				initrd_addr, initrd_size, cmdline_ptr,
--				fdt_addr, fdt_size);
-+				&new_fdt_addr, initrd_addr, initrd_size,
-+				cmdline_ptr, fdt_addr, fdt_size);
- 
- 	/*
- 	 * If all went well, we need to return the FDT address to the
-diff --git a/drivers/firmware/efi/libstub/efistub.h b/drivers/firmware/efi/libstub/efistub.h
-index e334a01cf92f..cf14dafc348a 100644
---- a/drivers/firmware/efi/libstub/efistub.h
-+++ b/drivers/firmware/efi/libstub/efistub.h
-@@ -35,7 +35,6 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
- efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
- 					    void *handle,
- 					    unsigned long *new_fdt_addr,
--					    unsigned long max_addr,
- 					    u64 initrd_addr, u64 initrd_size,
- 					    char *cmdline_ptr,
- 					    unsigned long fdt_addr,
-diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
-index a7e87cd582f2..ab6ecb22bd6e 100644
---- a/drivers/firmware/efi/libstub/fdt.c
-+++ b/drivers/firmware/efi/libstub/fdt.c
-@@ -134,10 +134,6 @@ fdt_set_fail:
- 	return EFI_LOAD_ERROR;
- }
- 
--#ifndef EFI_FDT_ALIGN
--#define EFI_FDT_ALIGN EFI_PAGE_SIZE
--#endif
--
- /*
-  * Allocate memory for a new FDT, then add EFI, commandline, and
-  * initrd related fields to the FDT.  This routine increases the
-@@ -155,7 +151,6 @@ fdt_set_fail:
- efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
- 					    void *handle,
- 					    unsigned long *new_fdt_addr,
--					    unsigned long max_addr,
- 					    u64 initrd_addr, u64 initrd_size,
- 					    char *cmdline_ptr,
- 					    unsigned long fdt_addr,
-@@ -192,8 +187,13 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
- 	 */
- 	new_fdt_size = fdt_size + EFI_PAGE_SIZE;
- 	while (1) {
--		status = efi_high_alloc(sys_table, new_fdt_size, EFI_FDT_ALIGN,
--					new_fdt_addr, max_addr);
-+		if (new_fdt_size > EFI_FDT_MAX_SIZE) {
-+			pr_efi_err(sys_table, "FDT size exceeds EFI_FDT_MAX_SIZE.\n");
-+			goto fail;
-+		}
-+		status = sys_table->boottime->allocate_pool(EFI_LOADER_DATA,
-+							    new_fdt_size,
-+							    (void **)new_fdt_addr);
- 		if (status != EFI_SUCCESS) {
- 			pr_efi_err(sys_table, "Unable to allocate memory for new device tree.\n");
- 			goto fail;
-@@ -227,7 +227,7 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
- 			 * to get new one that reflects the free/alloc we do
- 			 * on the device tree buffer.
- 			 */
--			efi_free(sys_table, new_fdt_size, *new_fdt_addr);
-+			sys_table->boottime->free_pool((void *)*new_fdt_addr);
- 			sys_table->boottime->free_pool(memory_map);
- 			new_fdt_size += EFI_PAGE_SIZE;
- 		} else {
-@@ -285,7 +285,7 @@ fail_free_mmap:
- 	sys_table->boottime->free_pool(memory_map);
- 
- fail_free_new_fdt:
--	efi_free(sys_table, new_fdt_size, *new_fdt_addr);
-+	sys_table->boottime->free_pool((void *)*new_fdt_addr);
- 
- fail:
- 	sys_table->boottime->free_pool(runtime_map);
--- 
-1.9.1
+> Do you just mean that the memory nodes are altered such that they only
+> cover memory usable by the crash kernel?
+>
+> Why not _always_ require a command line argument for the crash kernel
+> that restricts its memory usage to a particular range? That way it
+> doesn't matter whether we're using UEFI or not.
+
+This is one option, but why does uefi ignore all the memory properties?
+
+>> Under UEFI, however, this is not true because UEFI remove memory sections
+>> in a device tree and export all the memory regions, even though they belong
+>> to system kernel.
+>>
+>> So we should add "mem=X[MG]" boot parameter to limit the memory size and
+>> avoid hitting the following assertion in ioremap():
+>>          if (WARN_ON(pfn_valid(__phys_to_pfn(phys_addr))))
+>>                  return NULL;
+>
+> That looks suspicious. What is being ioremapped at that point?
+
+As explained so far, all the memory regions are exposed to crash dump kernel,
+and it recognizes any pages which should belong to the old kernel also as
+part of crash kernel's memory. So pfn_valid() returns true.
+
+
+> [...]
+>
+>> @@ -393,6 +398,7 @@ void __init setup_arch(char **cmdline_p)
+>>          local_async_enable();
+>>
+>>          efi_init();
+>> +
+>>          arm64_memblock_init();
+>>
+>>          paging_init();
+>
+> Nit: unrelated whitespace change.
+
+Ok. Will fix it.
+
+>> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+>> index ae85da6..ea70d41 100644
+>> --- a/arch/arm64/mm/init.c
+>> +++ b/arch/arm64/mm/init.c
+>> @@ -34,6 +34,8 @@
+>>   #include <linux/dma-contiguous.h>
+>>   #include <linux/efi.h>
+>>   #include <linux/swiotlb.h>
+>> +#include <linux/kexec.h>
+>> +#include <linux/crash_dump.h>
+>
+> Nit: please keep these ordered.
+
+Yeah, but others "linux/*.h" in this file are already in a random order.
+
+
+> [...]
+>
+>> +               if (memblock_reserve(crash_base, crash_size)) {
+>> +                       pr_warn("crashkernel reservation failed - out of memory\n");
+>> +                       return;
+>> +               }
+>
+> If we can remove this memory rather than reserving it, we can limit the
+> first kernel's ability to accidentally clobber the crash kernel, at the
+> expense of having to explicitly map/unmap around loading it.
+
+Do you mean that we should remove mmu mapping of crash kernel memory?
+Might be a good idea, but it requires modifying kernel/kexec.c.
+
+-Takahiro AKASHI
+
+> Mark.
+>
