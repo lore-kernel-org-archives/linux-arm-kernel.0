@@ -1,52 +1,354 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 11 May 2015 12:04:22 +0100
-Subject: [PATCH v2 2/2] arm64: dts: qcom: Add msm8916 CoreSight components
-In-Reply-To: <B19B6A91-0CF2-428B-8CAC-FFEDD5D3D094@linaro.org>
-References: <1431012969-16338-1-git-send-email-ivan.ivanov@linaro.org>
- <1431012969-16338-3-git-send-email-ivan.ivanov@linaro.org>
- <CANLsYkzNXBH0d6v1Ny_JwpW6NcKr9v0oAi9K3YfipwDgHWfMMA@mail.gmail.com>
- <1431092877.21307.18.camel@linaro.org>
- <20150508180052.GD11680@leverpostej>
- <B19B6A91-0CF2-428B-8CAC-FFEDD5D3D094@linaro.org>
-Message-ID: <20150511110422.GA4595@leverpostej>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 11 May 2015 13:05:07 +0200
+Subject: [PATCH v3 2/7] clocksource: add lpc32xx timer driver
+In-Reply-To: <1431017317-23740-3-git-send-email-manabian@gmail.com>
+References: <1431017317-23740-1-git-send-email-manabian@gmail.com>
+ <1431017317-23740-3-git-send-email-manabian@gmail.com>
+Message-ID: <55508CE3.6000008@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 08, 2015 at 07:17:12PM +0100, Ivan T. Ivanov wrote:
-> 
-> > On May 8, 2015, at 9:00 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > 
-> > On Fri, May 08, 2015 at 02:47:57PM +0100, Ivan T. Ivanov wrote:
-> >> 
-> >> On Fri, 2015-05-08 at 07:38 -0600, Mathieu Poirier wrote:
-> >>> On 7 May 2015 at 09:36, Ivan T. Ivanov ivanov at linaro.org> wrote:
-> >>>> Add initial set of CoreSight components found on Qualcomm's 8x16 chipset.
-> >>>> 
-> >>>> 
-> >>>> +       replicator at 824000 {
-> >>>> +               compatible = "qcom,coresight-replicator", "arm,primecell";
-> >>> 
-> >>> Shouldn't it be "qcom,coresight-replicator1x" ?
-> >>> 
-> >> 
-> >> 
-> >> 
-> >> True, I still wonder, why we have to have this compatible string? 
-> >> Drivers are probed by amba_id and "arm,primecell", after all.
-> > 
-> > The compatible string tells you both the device _and_ the format of the
-> > other properties, because it tells you which binding applies.
-> > 
-> > So the compatible string should be present regardless, as
-> > "arm,primecell" does not define the majority of the properties you need
-> > for the replicator node.
-> 
-> Mmm, only if vendors don?t bother to update version information
-> fused to revision id registers, which happens. And this could 
-> be workaround by "arm,primecell-periphid?, no?
+On 05/07/2015 06:48 PM, Joachim Eastwood wrote:
+> Add support for using the NXP LPC timer as clocksource and
+> clock event. These timers are present on many NXP devices
+> including LPC32xx, LPC17xx, LPC18xx and LPC43xx.
 
-No. That only tells you the identity of the device, not the format of
-the binding.
+A brief description of the hardware would be nice.
 
-Thanks,
-Mark.
+Some comments below.
+
+Thanks !
+
+   -- Daniel
+
+> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+> ---
+>   drivers/clocksource/Kconfig        |  10 ++
+>   drivers/clocksource/Makefile       |   1 +
+>   drivers/clocksource/time-lpc32xx.c | 259 +++++++++++++++++++++++++++++++++++++
+>   3 files changed, 270 insertions(+)
+>   create mode 100644 drivers/clocksource/time-lpc32xx.c
+>
+> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> index 51d7865fdddb..71c532314f1d 100644
+> --- a/drivers/clocksource/Kconfig
+> +++ b/drivers/clocksource/Kconfig
+> @@ -106,6 +106,16 @@ config CLKSRC_EFM32
+>   	  Support to use the timers of EFM32 SoCs as clock source and clock
+>   	  event device.
+>
+> +config CLKSRC_LPC32XX
+> +	bool "Clocksource for NXP's LPC SoC series" if !ARCH_LPC18XX
+
+Except you have a really good reason, the timers are not prompted. It is 
+up to the platform's config to select the driver.
+
+> +	depends on OF && ARM && (ARCH_LPC18XX || COMPILE_TEST)
+> +	select CLKSRC_MMIO
+> +	default ARCH_LPC18XX
+> +	help
+> +	  Support to use the timers of LPC SoCs as clock source and clock
+> +	  event device. These timers are present on many NXP devices
+> +	  including LPC32xx, LPC17xx, LPC18xx and LPC43xx.
+> +
+>   config ARM_ARCH_TIMER
+>   	bool
+>   	select CLKSRC_OF if OF
+> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+> index 5b85f6adb258..5928e35cb64d 100644
+> --- a/drivers/clocksource/Makefile
+> +++ b/drivers/clocksource/Makefile
+> @@ -37,6 +37,7 @@ obj-$(CONFIG_ARCH_BCM_MOBILE)	+= bcm_kona_timer.o
+>   obj-$(CONFIG_CADENCE_TTC_TIMER)	+= cadence_ttc_timer.o
+>   obj-$(CONFIG_CLKSRC_EFM32)	+= time-efm32.o
+>   obj-$(CONFIG_CLKSRC_EXYNOS_MCT)	+= exynos_mct.o
+> +obj-$(CONFIG_CLKSRC_LPC32XX)	+= time-lpc32xx.o
+>   obj-$(CONFIG_CLKSRC_SAMSUNG_PWM)	+= samsung_pwm_timer.o
+>   obj-$(CONFIG_FSL_FTM_TIMER)	+= fsl_ftm_timer.o
+>   obj-$(CONFIG_VF_PIT_TIMER)	+= vf_pit_timer.o
+> diff --git a/drivers/clocksource/time-lpc32xx.c b/drivers/clocksource/time-lpc32xx.c
+> new file mode 100644
+> index 000000000000..bb94409cf89c
+> --- /dev/null
+> +++ b/drivers/clocksource/time-lpc32xx.c
+> @@ -0,0 +1,259 @@
+> +/*
+> + * Clocksource driver for NXP LPC32xx/18xx/43xx timer
+> + *
+> + * Copyright (C) 2015 Joachim Eastwood <manabian@gmail.com>
+> + *
+> + * Based on:
+> + * time-efm32 Copyright (C) 2013 Pengutronix
+> + * mach-lpc32xx/timer.c Copyright (C) 2009 - 2010 NXP Semiconductors
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + *
+> + */
+> +
+> +#define pr_fmt(fmt) "%s: " fmt, __func__
+> +
+> +#include <linux/clk.h>
+> +#include <linux/clockchips.h>
+> +#include <linux/clocksource.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/irq.h>
+> +#include <linux/kernel.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/sched_clock.h>
+> +
+> +#define LPC32XX_TIMER_IR		0x000
+> +#define  LPC32XX_TIMER_IR_MR0INT	BIT(0)
+> +#define LPC32XX_TIMER_TCR		0x004
+> +#define  LPC32XX_TIMER_TCR_CEN		BIT(0)
+> +#define  LPC32XX_TIMER_TCR_CRST		BIT(1)
+> +#define LPC32XX_TIMER_TC		0x008
+> +#define LPC32XX_TIMER_PR		0x00c
+> +#define LPC32XX_TIMER_MCR		0x014
+> +#define  LPC32XX_TIMER_MCR_MR0I		BIT(0)
+> +#define  LPC32XX_TIMER_MCR_MR0R		BIT(1)
+> +#define  LPC32XX_TIMER_MCR_MR0S		BIT(2)
+> +#define LPC32XX_TIMER_MR0		0x018
+> +
+> +struct lpc32xx_clock_event_ddata {
+> +	struct clock_event_device evtdev;
+> +	void __iomem *base;
+> +};
+> +
+> +/* Needed for the sched clock */
+> +static void __iomem *clocksource_timer_counter;
+> +
+> +static u64 notrace lpc32xx_read_sched_clock(void)
+> +{
+> +	return readl(clocksource_timer_counter);
+> +}
+> +
+> +static int lpc32xx_clkevt_next_event(unsigned long delta,
+> +				     struct clock_event_device *evtdev)
+> +{
+> +	struct lpc32xx_clock_event_ddata *ddata =
+> +		container_of(evtdev, struct lpc32xx_clock_event_ddata, evtdev);
+> +
+> +	writel_relaxed(LPC32XX_TIMER_TCR_CRST, ddata->base + LPC32XX_TIMER_TCR);
+> +	writel_relaxed(delta, ddata->base + LPC32XX_TIMER_PR);
+> +	writel_relaxed(LPC32XX_TIMER_TCR_CEN, ddata->base + LPC32XX_TIMER_TCR);
+> +
+> +	return 0;
+> +}
+> +
+> +static void lpc32xx_clkevt_mode(enum clock_event_mode mode,
+> +				struct clock_event_device *evtdev)
+
+See below.
+
+> +{
+> +	struct lpc32xx_clock_event_ddata *ddata =
+> +		container_of(evtdev, struct lpc32xx_clock_event_ddata, evtdev);
+> +
+> +	switch (mode) {
+> +	case CLOCK_EVT_MODE_PERIODIC:
+> +		WARN_ON(1);
+> +		break;
+> +
+> +	case CLOCK_EVT_MODE_ONESHOT:
+> +	case CLOCK_EVT_MODE_SHUTDOWN:
+> +		/*
+> +		 * Disable the timer. When using oneshot, we must also
+> +		 * disable the timer to wait for the first call to
+> +		 * set_next_event().
+> +		 */
+> +		writel_relaxed(0, ddata->base + LPC32XX_TIMER_TCR);
+> +		break;
+> +
+> +	case CLOCK_EVT_MODE_UNUSED:
+> +	case CLOCK_EVT_MODE_RESUME:
+> +		break;
+> +	}
+> +}
+> +
+> +static irqreturn_t lpc32xx_clock_event_handler(int irq, void *dev_id)
+> +{
+> +	struct lpc32xx_clock_event_ddata *ddata = dev_id;
+> +
+> +	/* Clear match */
+> +	writel_relaxed(LPC32XX_TIMER_IR_MR0INT, ddata->base + LPC32XX_TIMER_IR);
+> +
+> +	ddata->evtdev.event_handler(&ddata->evtdev);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static struct lpc32xx_clock_event_ddata lpc32xx_clk_event_ddata = {
+> +	.evtdev = {
+> +		.name           = "lpc3220 clockevent",
+> +		.features       = CLOCK_EVT_FEAT_ONESHOT,
+> +		.rating         = 300,
+> +		.set_next_event = lpc32xx_clkevt_next_event,
+> +		.set_mode       = lpc32xx_clkevt_mode,
+
+Please take the opportunity to switch to the new API (see commit 77e32c89).
+
+> +	},
+> +};
+> +
+> +static int __init lpc32xx_clocksource_init(struct device_node *np)
+> +{
+> +	void __iomem *base;
+> +	unsigned long rate;
+> +	struct clk *clk;
+> +	int ret;
+> +
+> +	clk = of_clk_get_by_name(np, "timerclk");
+> +	if (IS_ERR(clk)) {
+> +		pr_err("clock get failed (%lu)\n", PTR_ERR(clk));
+> +		return PTR_ERR(clk);
+> +	}
+> +
+> +	ret = clk_prepare_enable(clk);
+> +	if (ret) {
+> +		pr_err("clock enable failed (%d)\n", ret);
+> +		goto err_clk_enable;
+> +	}
+> +
+> +	base = of_iomap(np, 0);
+> +	if (!base) {
+> +		pr_err("unable to map registers\n");
+> +		ret = -EADDRNOTAVAIL;
+> +		goto err_iomap;
+> +	}
+> +
+> +	writel_relaxed(LPC32XX_TIMER_TCR_CRST, base + LPC32XX_TIMER_TCR);
+> +	writel_relaxed(0, base + LPC32XX_TIMER_PR);
+> +	writel_relaxed(0, base + LPC32XX_TIMER_MCR);
+> +	writel_relaxed(LPC32XX_TIMER_TCR_CEN, base + LPC32XX_TIMER_TCR);
+
+Please add a detailed comment about those 4 lines. Perhaps also group 
+them in a function.
+
+> +
+> +	rate = clk_get_rate(clk);
+> +	ret = clocksource_mmio_init(base + LPC32XX_TIMER_TC, "lpc3220 timer",
+> +				    rate, 300, 32, clocksource_mmio_readl_up);
+> +	if (ret) {
+> +		pr_err("failed to init clocksource (%d)\n", ret);
+> +		goto err_clocksource_init;
+> +	}
+> +
+> +	clocksource_timer_counter = base + LPC32XX_TIMER_TC;
+> +	sched_clock_register(lpc32xx_read_sched_clock, 32, rate);
+> +
+> +	return 0;
+> +
+> +err_clocksource_init:
+> +	iounmap(base);
+> +err_iomap:
+> +	clk_disable_unprepare(clk);
+> +err_clk_enable:
+> +	clk_put(clk);
+> +	return ret;
+> +}
+> +
+> +static int __init lpc32xx_clockevent_init(struct device_node *np)
+> +{
+> +	void __iomem *base;
+> +	unsigned long rate;
+> +	struct clk *clk;
+> +	int ret, irq;
+> +
+> +	clk = of_clk_get_by_name(np, "timerclk");
+> +	if (IS_ERR(clk)) {
+> +		pr_err("clock get failed (%lu)\n", PTR_ERR(clk));
+> +		return PTR_ERR(clk);
+> +	}
+> +
+> +	ret = clk_prepare_enable(clk);
+> +	if (ret) {
+> +		pr_err("clock enable failed (%d)\n", ret);
+> +		goto err_clk_enable;
+> +	}
+> +
+> +	base = of_iomap(np, 0);
+> +	if (!base) {
+> +		pr_err("unable to map registers\n");
+> +		ret = -EADDRNOTAVAIL;
+> +		goto err_iomap;
+> +	}
+> +
+> +	irq = irq_of_parse_and_map(np, 0);
+> +	if (!irq) {
+> +		pr_err("get irq failed\n");
+> +		ret = -ENOENT;
+> +		goto err_irq;
+> +	}
+> +
+> +	/* Initial timer setup */
+> +	writel_relaxed(0, base + LPC32XX_TIMER_TCR);
+> +	writel_relaxed(LPC32XX_TIMER_IR_MR0INT, base + LPC32XX_TIMER_IR);
+> +	writel_relaxed(1, base + LPC32XX_TIMER_MR0);
+> +	writel_relaxed(LPC32XX_TIMER_MCR_MR0I | LPC32XX_TIMER_MCR_MR0R |
+> +		       LPC32XX_TIMER_MCR_MR0S, base + LPC32XX_TIMER_MCR);
+
+Ditto.
+
+> +	rate = clk_get_rate(clk);
+> +	lpc32xx_clk_event_ddata.base = base;
+> +	clockevents_config_and_register(&lpc32xx_clk_event_ddata.evtdev,
+> +					rate, 1, -1);
+> +
+> +	ret = request_irq(irq, lpc32xx_clock_event_handler,
+> +			  IRQF_TIMER | IRQF_IRQPOLL, "lpc3220 clockevent",
+> +			  &lpc32xx_clk_event_ddata);
+> +	if (ret) {
+> +		pr_err("request irq failed\n");
+> +		goto err_irq;
+> +	}
+> +
+> +	return 0;
+> +
+> +err_irq:
+> +	iounmap(base);
+> +err_iomap:
+> +	clk_disable_unprepare(clk);
+> +err_clk_enable:
+> +	clk_put(clk);
+> +	return ret;
+> +}
+> +
+> +/*
+> + * This function asserts that we have exactly one clocksource and one
+> + * clock_event_device in the end.
+> + */
+> +static void __init lpc32xx_timer_init(struct device_node *np)
+> +{
+> +	static int has_clocksource, has_clockevent;
+> +	int ret;
+> +
+> +	if (!has_clocksource) {
+> +		ret = lpc32xx_clocksource_init(np);
+> +		if (!ret) {
+> +			has_clocksource = 1;
+> +			return;
+> +		}
+> +	}
+> +
+> +	if (!has_clockevent) {
+> +		ret = lpc32xx_clockevent_init(np);
+> +		if (!ret) {
+> +			has_clockevent = 1;
+> +			return;
+> +		}
+> +	}
+> +}
+> +CLOCKSOURCE_OF_DECLARE(lpc32xx_timer, "nxp,lpc3220-timer", lpc32xx_timer_init);
+>
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
