@@ -1,138 +1,38 @@
 From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 12 May 2015 14:13:01 -0700
-Subject: [PATCH v2 03/17] input: convert LoCoMo keyboard driver to use
- new locomo core
-In-Reply-To: <CALT56yOjiBWHH3Uuo82Hqh8Va8V_KCUaaLL7RFtPUjWmfOFbGA@mail.gmail.com>
-References: <1430178954-11138-1-git-send-email-dbaryshkov@gmail.com>
- <1430178954-11138-4-git-send-email-dbaryshkov@gmail.com>
- <20150512202106.GE20725@dtor-ws>
- <CALT56yOjiBWHH3Uuo82Hqh8Va8V_KCUaaLL7RFtPUjWmfOFbGA@mail.gmail.com>
-Message-ID: <20150512211301.GF20725@dtor-ws>
+Date: Tue, 12 May 2015 14:21:26 -0700
+Subject: [PATCH 2/3] input: keyboad: imx: add snvs power key driver
+In-Reply-To: <CAHrpEqQpyO=Fzu206xPUwQE+cvk7rpTd0r0A_bL-V1UWgT7+XA@mail.gmail.com>
+References: <1431449438-19460-1-git-send-email-Frank.Li@freescale.com>
+ <1431449438-19460-2-git-send-email-Frank.Li@freescale.com>
+ <20150512184328.GC20725@dtor-ws>
+ <CAHrpEqQpyO=Fzu206xPUwQE+cvk7rpTd0r0A_bL-V1UWgT7+XA@mail.gmail.com>
+Message-ID: <20150512212126.GG20725@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 13, 2015 at 12:01:23AM +0300, Dmitry Eremin-Solenikov wrote:
-> Hello,
-> 
-> 2015-05-12 23:21 GMT+03:00 Dmitry Torokhov <dmitry.torokhov@gmail.com>:
-> > Hi Dmitry,
+On Tue, May 12, 2015 at 03:37:41PM -0500, Zhi Li wrote:
+> >> +             ret = devm_request_irq(&pdev->dev, pdata->irq,
+> >> +                                     imx_snvs_pwrkey_interrupt,
+> >> +                                     IRQF_TRIGGER_HIGH | IRQF_NO_SUSPEND, pdev->name, pdev);
 > >
-> > On Tue, Apr 28, 2015 at 02:55:40AM +0300, Dmitry Eremin-Solenikov wrote:
-> >> As LoCoMo is switching to new device model, adapt keyboard driver to
-> >> support new locomo core driver.
-> >>
-> >> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> >> ---
-> 
-> Thanks for the review.
-> 
-> >>  /* helper functions for reading the keyboard matrix */
-> >> -static inline void locomokbd_charge_all(unsigned long membase)
-> >> +static inline void locomokbd_charge_all(struct locomokbd *locomokbd)
-> >>  {
-> >> -     locomo_writel(0x00FF, membase + LOCOMO_KSC);
-> >> +     regmap_write(locomokbd->regmap, LOCOMO_KSC, 0x00ff);
-> >>  }
-> >>
-> >> -static inline void locomokbd_activate_all(unsigned long membase)
-> >> +static inline void locomokbd_activate_all(struct locomokbd *locomokbd)
+> > Why IRQF_NO_SUSPEND? Also should we not get trigger type from OF data?
 > >
-> > Drop "inline"s from the .c file please.
-> 
-> Why?
+> wake up by PWRON key in freeze mode
 
-Because compiler usually knows better whether a function should be
-inlined or not as it keeps track of available registers, so leave the
-decision to it.
+enable_irq_wake() should adjust the handler as needed, the driver should
+request flags that are needed for it's own operations.
 
 > 
-> >
-> >>  {
-> >> -     unsigned long r;
-> >> -
-> >> -     locomo_writel(0, membase + LOCOMO_KSC);
-> >> -     r = locomo_readl(membase + LOCOMO_KIC);
-> >> -     r &= 0xFEFF;
-> >> -     locomo_writel(r, membase + LOCOMO_KIC);
-> >> +     regmap_write(locomokbd->regmap, LOCOMO_KSC, 0);
-> >> +     regmap_update_bits(locomokbd->regmap, LOCOMO_KIC, 0x100, 0);
-> >>  }
-> >>
-> 
-> [skipped]
-> 
-> >> @@ -291,16 +275,30 @@ static int locomokbd_probe(struct locomo_dev *dev)
-> >>
-> >>       input_set_drvdata(input_dev, locomokbd);
-> >>
-> >> -     memcpy(locomokbd->keycode, locomokbd_keycode, sizeof(locomokbd->keycode));
-> >> +     memcpy(locomokbd->keycode,
-> >> +                     locomokbd_keycode,
-> >> +                     sizeof(locomokbd->keycode));
-> >> +
-> >> +     if (machine_is_collie())
-> >> +             locomokbd->keycode[18] = KEY_HOME;
-> >> +     else
-> >> +             locomokbd->keycode[3] = KEY_HOME;
-> >
-> > This seems like a new addition. Ideally keymap twiddling shoudl be done
-> > from userspace.
-> 
-> This fixes a hardware issue. Home key is wired differently on two
-> devices using this driver.
-> I'd prefer to have such setting in board file or in DTS in future,
-> however that looks like an
-> overkill. What would be your suggestion?
+> Do you have any example to get trigger type from OF data?
 
-I am OK with doing this in driver, just as a separate patch please.
+You can retrieve the flags via irqd_get_trigger_type() for example, but
+you do not need to do that, because OF code will set up interrupt
+properly (based on DTS) when creating the corresponsing platform device
+(see of_irq_parse_and_map). so you just need to do:
 
-> 
-> >>       /* attempt to get the interrupt */
-> >> -     err = request_irq(dev->irq[0], locomokbd_interrupt, 0, "locomokbd", locomokbd);
-> >> +     err = request_irq(locomokbd->irq, locomokbd_interrupt, 0,
-> >> +                     "locomokbd", locomokbd);
-> >
-> > devm_request_irq()?
-> >
-> [skipped]
-> 
-> >> -static int locomokbd_remove(struct locomo_dev *dev)
-> >> +static int locomokbd_remove(struct platform_device *dev)
-> >>  {
-> >> -     struct locomokbd *locomokbd = locomo_get_drvdata(dev);
-> >> +     struct locomokbd *locomokbd = platform_get_drvdata(dev);
-> >>
-> >> -     free_irq(dev->irq[0], locomokbd);
-> >> +     free_irq(locomokbd->irq, locomokbd);
-> >
-> > Is not needed with devm.
-> 
-> Not quite. There will be a possibility for the IRQ to happen after deleting
-> a timer in locomokbd_remove() and before freeing the IRQ through the devres
-> core. Oops.
-
-Right, but if you make sure that device does not generate interrupts in
-probe() until open() is called and do the same in close(), then it
-should be OK.
-
-> 
-> >
-> >>
-> >>       del_timer_sync(&locomokbd->timer);
-> >
-> > Should likely to go into close().
-> 
-> Hmm. I will rethink this part, thank you.
-> 
-> >> +
-> >> +#ifdef CONFIG_PM_SLEEP
-> >> +static int locomokbd_suspend(struct device *dev)
-> >
-> > Mark as __maybe_unused instead of giarding with CONFIG_PM_SLEEP.
-> 
-> Fine, however I thought that #ifdef's here are a typical pattern.
-
-It is up to subsystems, __maybe_unused provides better compile coverage.
+	ret = devm_request_irq(&pdev->dev, pdata->irq,
+			       imx_snvs_pwrkey_interrupt,
+			       0, pdev->name, pdev);
 
 Thanks.
 
