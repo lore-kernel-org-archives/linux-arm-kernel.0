@@ -1,80 +1,65 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 12 May 2015 10:37:13 +0100
-Subject: [PATCH] arm: Don't use memblock limit for the lowmem bound
-In-Reply-To: <1431399221-25337-1-git-send-email-labbott@fedoraproject.org>
-References: <1431399221-25337-1-git-send-email-labbott@fedoraproject.org>
-Message-ID: <20150512093713.GB16907@leverpostej>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 May 2015 11:00:42 +0100
+Subject: [PATCH 1/1] ARM:r0 is also corrupted after calling __do_div64.
+In-Reply-To: <1431412386-1249-1-git-send-email-gangchen@rdamicro.com>
+References: <1431412386-1249-1-git-send-email-gangchen@rdamicro.com>
+Message-ID: <20150512100042.GN2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 12, 2015 at 03:53:41AM +0100, Laura Abbott wrote:
-> From: Laura Abbott <labbott@redhat.com>
-> 
-> The memblock limit is currently used in find_limits
-> to find the bounds for ZONE_NORMAL. The memblock
-> limit may need to be rounded down a PMD size to ensure
-> allocations are fully mapped though. This has the side
-> effect of reducing the amount of memory in ZONE_NORMAL.
-> Since we generally want to optimize for more lowmem, fix
-> this by using arm_lowmem_limit to calculate the bounds.
-> This what is used for actually mapping lowmem anyway.
-> 
-> Before:
-> # cat /proc/zoneinfo | grep managed
->         managed  62920
-> 
-> After:
-> # cat /proc/zoneinfo | grep managed
->         managed  63336
-> 
-> 
-> 
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
+On Tue, May 12, 2015 at 02:33:06PM +0800, Chen Gang wrote:
+> R0 is corrupted after calling __do_div64 and compiler is not informed
+> about this in macro __do_div_asm. If n is to be used again after this
+> macro, r0 is not reloaded and n will contain incorrect value
 
-I just gave this a spin on TC2, with the memory node hacked to provide
-0x3ffffc00 bytes of RAM.
+This isn't going to work if we're building for big endian (__ARMEB__
+set) because then we end up telling the compiler that __rem and __n
+are both in r0, which is impossible.
 
-Before:
-Memory: 1030380K/1046528K available (4828K kernel code, 154K rwdata, 1376K rodata, 264K init, 147K bss, 16148K reserved, 0K cma-reserved)
-$ cat /proc/zoneinfo | grep managed
-        managed  257661
+> diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
+> index a66061a..93a9985 100644
+> --- a/arch/arm/include/asm/div64.h
+> +++ b/arch/arm/include/asm/div64.h
+> @@ -34,13 +34,13 @@
+>  	register unsigned long long __n   asm("r0") = n;	\
+>  	register unsigned long long __res asm("r2");		\
+>  	register unsigned int __rem       asm(__xh);		\
 
-After:
-Memory: 1032424K/1048572K available (4828K kernel code, 154K rwdata, 1376K rodata, 264K init, 147K bss, 16148K reserved, 0K cma-reserved)
-$ cat /proc/zoneinfo | grep managed
-        managed  258172
+	register unsigned int __rem_xh    asm(__xh);            \
+	register unsigned int __rem_xl    asm(__xl);		\
 
-The patch itself looks sane to me, so:
+> -	asm(	__asmeq("%0", __xh)				\
+> +	asm(	__asmeq("%R0", __xh)				\
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Tested-by: Mark Rutland <mark.rutland@arm.com>
+	asm(	__asmeq("%0", __xh)				\
+		__asmeq("%1", __xl)				\
 
-Thanks,
-Mark.
+... and increment each following register %-spec by one...
 
-> ---
->  arch/arm/mm/init.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index be92fa0..b4f9513 100644
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -89,7 +89,7 @@ __tagtable(ATAG_INITRD2, parse_tag_initrd2);
->  static void __init find_limits(unsigned long *min, unsigned long *max_low,
->  			       unsigned long *max_high)
->  {
-> -	*max_low = PFN_DOWN(memblock_get_current_limit());
-> +	*max_low = PFN_DOWN(arm_lowmem_limit);
->  	*min = PFN_UP(memblock_start_of_DRAM());
->  	*max_high = PFN_DOWN(memblock_end_of_DRAM());
->  }
-> -- 
-> 2.1.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+>  		__asmeq("%1", "r2")				\
+>  		__asmeq("%2", "r0")				\
+>  		__asmeq("%3", "r4")				\
+>  		"bl	__do_div64"				\
+> -		: "=r" (__rem), "=r" (__res)			\
+> -		: "r" (__n), "r" (__base)			\
+> +		: "=r" (__n), "=r" (__res)			\
+> +		: "0"(__n), "r" (__base)			\
+
+This is obviously wrong because __rem is left unset, and that's one of
+the two values this macro returns.
+
+		: "=r" (__rem_xh), "=r" (__rem_xl), "=r" (__res) \
+		: "r" (__n), "r" (__base)			\
+
+>  		: "ip", "lr", "cc");				\
+>  	n = __res;						\
+>  	__rem;							\
+
+	__rem_xh;
+
+Basically this renames __rem to __rem_xh, and introduces a new __rem_xl
+to take the other half of the remainder which we don't use.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
