@@ -1,43 +1,42 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 12 May 2015 10:41:21 +0200
-Subject: [PATCH v4 0/3] Add Mediatek SoC RTC driver
-In-Reply-To: <CAGS+omArcu3caKZo56Db2u+84WAVJiMzkr+1uS6tr_zfwARQ7A@mail.gmail.com>
-References: <1430897022-63357-1-git-send-email-eddie.huang@mediatek.com>
- <20150509130846.GD3338@piout.net>
- <CAGS+omArcu3caKZo56Db2u+84WAVJiMzkr+1uS6tr_zfwARQ7A@mail.gmail.com>
-Message-ID: <20150512084121.GO3338@piout.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 12 May 2015 11:00:10 +0200
+Subject: [PATCH 1/1] gpio: omap: Fix PM runtime issue and remove most
+ BANK_USED macros
+In-Reply-To: <1429632533-23285-1-git-send-email-tony@atomide.com>
+References: <1429632533-23285-1-git-send-email-tony@atomide.com>
+Message-ID: <CACRpkdZ1nJ=-NPHrZdCQ6_TCrF7009R9Y7zVyXN1z9RWcv3a6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Apr 21, 2015 at 6:08 PM, Tony Lindgren <tony@atomide.com> wrote:
 
-On 12/05/2015 at 16:15:13 +0800, Daniel Kurtz wrote :
-> On Sat, May 9, 2015 at 9:08 PM, Alexandre Belloni
-> <alexandre.belloni@free-electrons.com> wrote:
-> > On 06/05/2015 at 15:23:39 +0800, Eddie Huang wrote :
-> >> RTC is one submodule of Mediatek MT6397 PMIC chip[1]. This series
-> >> support RTC driver that work with Mediatek SoC like MT8135, MT8173.
-> >> It implements second counter and also provide alarm function.
-> >>
-> >> This series base on 4.1-rc1, Test ok on MT8173 platform.
-> >>
-> >> [1] https://lkml.org/lkml/2015/1/23/325
-> >>
-> >
-> > All applied, thanks!
-> 
-> To which git tree & branch did you apply these patches?
-> 
+> Looks like omap_gpio_irq_type can return early at several places
+> leaving a GPIO bank enabled without doing pm_runtime_put if wrong
+> GPIO arguments are passed.
+>
+> Instead of adding more complicated BANK_USED macros, let's fix the
+> issue properly. We can pass is_irq flag to omap_enable_gpio_module
+> and omap_disble_gpio_module. And with that we can remove all the
+> similar code elsewhere to get rid of most BANK_USED macros.
+>
+> Note that the reason for the BANK_USED macro is that we need to manage
+> PM runtime on per GPIO bank basis. In the long run we want to move to
+> using PM runtime counts for each GPIO line to determine if a GPIO
+> bank is used. Once we have a solution for omap_enable_gpio_module
+> and omap_disable_gpio_module, we can remove the remaining BANK_USED
+> macros.
+>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Grygorii Strashko <grygorii.strashko@linaro.org>
+> Cc: Javier Martinez Canillas <jmartinez@softcrates.net>
+> Cc: Nishanth Menon <nm@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-They are in
-git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git rtc-next
+There is so much discussion around this patch that I can't make
+up my mind whether I should apply this or some subsequent inline
+version of it.
 
-They also landed in linux-next
+Holding this off for now...
 
-I'll update the MAINTAINERS file to add the location of that git tree.
-
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Yours,
+Linus Walleij
