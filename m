@@ -1,61 +1,74 @@
 From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 12 May 2015 16:28:19 -0700
-Subject: [PATCH v3 1/5] Documentation: devicetree: add Broadcom SATA binding
+Date: Tue, 12 May 2015 16:28:20 -0700
+Subject: [PATCH v3 2/5] Documentation: devicetree: add Broadcom SATA PHY
+ binding
 In-Reply-To: <1431473303-18873-1-git-send-email-computersforpeace@gmail.com>
 References: <1431473303-18873-1-git-send-email-computersforpeace@gmail.com>
-Message-ID: <1431473303-18873-2-git-send-email-computersforpeace@gmail.com>
+Message-ID: <1431473303-18873-3-git-send-email-computersforpeace@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+For 28nm STB chips, based on BCM7445.
 
 Signed-off-by: Brian Norris <computersforpeace@gmail.com>
 ---
 v3: no change
-v2: no change
 
- .../devicetree/bindings/ata/brcm,sata-brcmstb.txt  | 35 ++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/ata/brcm,sata-brcmstb.txt
+v2:
+  - make each subnode into a provider, so we can use direct phandle references
+    to them
+  - drop the 'port-ctrl' register range, since this was shared with the SATA
+    node 
 
-diff --git a/Documentation/devicetree/bindings/ata/brcm,sata-brcmstb.txt b/Documentation/devicetree/bindings/ata/brcm,sata-brcmstb.txt
+ .../bindings/phy/brcm,brcmstb-sata-phy.txt         | 40 ++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/brcm,brcmstb-sata-phy.txt
+
+diff --git a/Documentation/devicetree/bindings/phy/brcm,brcmstb-sata-phy.txt b/Documentation/devicetree/bindings/phy/brcm,brcmstb-sata-phy.txt
 new file mode 100644
-index 000000000000..afeede13e195
+index 000000000000..7f81ef90146a
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/ata/brcm,sata-brcmstb.txt
-@@ -0,0 +1,35 @@
-+* Broadcom SATA3 AHCI Controller for STB
-+
-+SATA nodes are defined to describe on-chip Serial ATA controllers.
-+Each SATA controller should have its own node.
++++ b/Documentation/devicetree/bindings/phy/brcm,brcmstb-sata-phy.txt
+@@ -0,0 +1,40 @@
++* Broadcom SATA3 PHY for STB
 +
 +Required properties:
-+- compatible         : compatible list, may contain "brcm,bcm7445-ahci" and/or
-+                       "brcm,sata3-ahci"
-+- reg                : register mappings for AHCI and SATA_TOP_CTRL
-+- reg-names          : "ahci" and "top-ctrl"
-+- interrupts         : interrupt mapping for SATA IRQ
++- compatible: should be one or more of
++     "brcm,bcm7445-sata-phy"
++     "brcm,phy-sata3"
++- address-cells: should be 1
++- size-cells: should be 0
++- reg: register range for the PHY PCB interface
++- reg-names: should be "phy"
 +
-+Also see ahci-platform.txt.
++Sub-nodes:
++  Each port's PHY should be represented as a sub-node.
++
++Sub-nodes required properties:
++- reg: the PHY number
++- phy-cells: generic PHY binding; must be 0
++Optional:
++- brcm,enable-ssc: use spread spectrum clocking (SSC) on this port
++
 +
 +Example:
 +
-+	sata at f045a000 {
-+		compatible = "brcm,bcm7445-ahci", "brcm,sata3-ahci";
-+		reg = <0xf045a000 0xa9c>, <0xf0458040 0x24>;
-+		reg-names = "ahci", "top-ctrl";
-+		interrupts = <0 30 0>;
++	sata-phy at f0458100 {
++		compatible = "brcm,bcm7445-sata-phy", "brcm,phy-sata3";
++		reg = <0xf0458100 0x1e00>, <0xf045804c 0x10>;
++		reg-names = "phy";
 +		#address-cells = <1>;
 +		#size-cells = <0>;
 +
-+		sata0: sata-port at 0 {
++		sata-phy at 0 {
 +			reg = <0>;
-+			phys = <&sata_phy 0>;
++			#phy-cells = <0>;
 +		};
 +
-+		sata1: sata-port at 1 {
++		sata-phy at 1 {
 +			reg = <1>;
-+			phys = <&sata_phy 1>;
++			#phy-cells = <0>;
 +		};
 +	};
-+
 -- 
 1.9.1
