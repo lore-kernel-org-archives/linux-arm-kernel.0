@@ -1,22 +1,22 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 12 May 2015 13:37:23 +0200
-Subject: [PATCH 0/6] Introduce Allwinner A33 support
-In-Reply-To: <1431240383-12763-1-git-send-email-vishnupatekar0510@gmail.com>
-References: <1431240383-12763-1-git-send-email-vishnupatekar0510@gmail.com>
-Message-ID: <CACRpkdYQ1+6tE1xiW2Andn7oOKD55XZk34PuACW_=CgdYMn+oA@mail.gmail.com>
+Date: Tue, 12 May 2015 13:47:57 +0200
+Subject: [GIT PULL] Ux500 development for v4.2
+In-Reply-To: <20150511094503.GW2558@tarshish>
+References: <CACRpkdZX-Tg-1SNV0L2MemGqkaVZG9wSwiLquYVDVMToZT02nw@mail.gmail.com>
+ <20150511094503.GW2558@tarshish>
+Message-ID: <CACRpkdbwYToDwTLg2JRCB4gkbjy88ogvKsKLEzkGpDoBExChFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 10, 2015 at 8:46 AM, Vishnu Patekar
-<vishnupatekar0510@gmail.com> wrote:
-
-> Hello everyone,
+On Mon, May 11, 2015 at 11:45 AM, Baruch Siach <baruch@tkos.co.il> wrote:
+> Hi Linus,
 >
-> This patch series introduces basic kernel support for Allwinner's A33 SoC,
+> On Mon, May 11, 2015 at 11:32:04AM +0200, Linus Walleij wrote:
+>> Hi ARM SoC people,
+>
+> Added ARM SoC address to To:.
 
-I'll wait for a new set addressing Paul's comments before commiting
-the pinctrl portions. Add Maxime's ACKs to the patches so I know
-he's verified them.
+Darn confused arm at kernel.org with Russell's address .. sorry.
 
 Yours,
 Linus Walleij
