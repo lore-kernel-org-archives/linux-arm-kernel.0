@@ -1,27 +1,27 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Tue, 12 May 2015 09:33:49 +0530
-Subject: [PATCH 1/3 v6] dt/bindings: Add binding for the BCM2835 mailbox
- driver
-In-Reply-To: <1430857666-18877-1-git-send-email-eric@anholt.net>
-References: <1430857666-18877-1-git-send-email-eric@anholt.net>
-Message-ID: <CABb+yY3fDP_U8dz7TEJ+N6gKwhkQKdsfXDq209nQUCWu-zZYgg@mail.gmail.com>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Tue, 12 May 2015 06:54:22 +0200
+Subject: [PATCH] ARM: dts: imx: add "nor-jedec" flash compatible binding
+In-Reply-To: <20150511132052.GH9347@dragon>
+References: <1431066065-19644-1-git-send-email-zajec5@gmail.com>
+ <20150511132052.GH9347@dragon>
+Message-ID: <CACna6ryDk2TTsXnVMbaica2T8-4Xo2tU40Ov6sq3FVkx_p=zhw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 6, 2015 at 1:57 AM, Eric Anholt <eric@anholt.net> wrote:
-> From: Lubomir Rintel <lkundrak@v3.sk>
+On 11 May 2015 at 15:20, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Fri, May 08, 2015 at 08:21:05AM +0200, Rafa? Mi?ecki wrote:
+>> Starting with commits
+>> 8ff16cf ("Documentation: devicetree: m25p80: add "nor-jedec" binding")
+>> 1103b85 ("mtd: m25p80: bind to "nor-jedec" ID, for auto-detection")
+>> we have "nor-jedec" binding indicating support for JEDEC identification.
+>>
+>> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
 >
-> This patch was split out of Lubomir's original mailbox patch by Eric
-> Anholt, and the required properties documentation and examples have
-> been filled out more completely and updated for the driver being
-> changed to expose a single channel.
->
-> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-> Signed-off-by: Craig McGeachie <slapdau@yahoo.com.au>
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-> ---
-Thanks to the reviewers. Applied all 3 patches.
+> Applied, thanks.
 
-Thanks.
+Thanks, unfortunately after some discussion started by tegra patch, it
+may happen we will rename it to jedec,spi-nor :( If that happens, I'll
+care to provide another patch. Sorry for the problem.
+
+-- 
+Rafa?
