@@ -1,37 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 May 2015 22:30:12 +0200
-Subject: [PATCH v3 1/4] ARM: pxa: add memory resource to RTC device
-In-Reply-To: <878uctmtm6.fsf@belgarion.home>
-References: <1431384089-28367-1-git-send-email-robh@kernel.org>
- <87lhgumi4b.fsf@belgarion.home> <878uctmtm6.fsf@belgarion.home>
-Message-ID: <53644246.uSkhGz7C05@wuerfel>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Tue, 12 May 2015 22:31:11 +0200
+Subject: [PATCH RFC 0/2] stmmac: stand alone platform drivers
+In-Reply-To: <5948526.xNXlKiLpxq@wuerfel>
+References: <1431022765-30715-1-git-send-email-manabian@gmail.com>
+ <5987007.lq0DjS0tE0@wuerfel>
+ <CAGhQ9Vx0DQf-HcqEiohFLrBJPBe5qYjLgXiH3qGx85fAruh8UQ@mail.gmail.com>
+ <5948526.xNXlKiLpxq@wuerfel>
+Message-ID: <CAGhQ9Vxx+uLx=EDdHJog3G4RXE-1MJf=Ra2h1TAtaXQtmms_UQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 May 2015 22:24:49 Robert Jarzmik wrote:
-> 
-> I made the try, and Russell was right, this breaks the pxa architecture. The
-> relevant extract of kernel message is in [1].
-> 
-> The consequences with your patches :
->  - pxa27x_init()
->    - platform_add_devices()
->      - the pxa_device_rtc fails (as resource is duplicated)
->      - all the devices are unregistered (rollback)
-> And pxa27x fails.
-> 
-> Now I'm pondering about the right approach :
->  - either remove sa1100_device_rtc from pxas
->  - or remove pxa_device_rtc
->  - or both
->  - or something else
-> 
-> Let me think a bit about it.
-> 
+On 12 May 2015 at 21:49, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 12 May 2015 19:20:45 Joachim Eastwood wrote:
+>>
+>> I have now created a generic dt dwmac driver which contain all compat
+>> strings that doesn't have any match data. As long as this driver is
+>> linked last this works for my built-in drivers configuration. I am not
+>> able to test using modules because of my very limited rootfs. This is
+>> a Cortex-M system after all.
+>>
+>> I also converted all the other DT dwmac drivers and the entire patch
+>> set can be found on:
+>> https://github.com/manabian/linux-lpc
+>>
+>> After I have done some more cleanups and added proper commit messages
+>> I will put them on netdev again.
+>>
+>>
+>
+> Yes, this looks really nice (with the cleanup bits that are obviously
+> missing applied), thanks a lot!
+>
+> We should probably try to keep existing defconfig files working,
+> which could be done e.g. like
+>
+>  config DWMAC_ROCKCHIP
+>         tristate "Rockchip dwmac support"
+> +       default ARCH_ROCKCHIP
+>         depends on OF
+>         select MFD_SYSCON
+>
+> so that any configuration that currently has ARCH_ROCKCHIP and DW_MAC
+> enabled ends up with DWMAC_ROCKCHIP enabled as well.
 
-To solve the problem with the duplicate registration of one resource,
-I'd suggest using platform_device_register_simple() for the registration,
-which will copy the resource. You can then mark the resource as __initconst
-and remove the device to save a little memory at runtime.
+Ah, yes, indeed. I will add a default statement in the Kconfig of the
+converted drivers.
 
-	Arnd
+regards,
+Joachim Eastwood
