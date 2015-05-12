@@ -1,59 +1,85 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Tue, 12 May 2015 13:43:04 +0800
-Subject: [v2 0/5] arm64: add kdump support
-In-Reply-To: <55504956.9020007@linaro.org>
-References: <1429861989-8417-1-git-send-email-takahiro.akashi@linaro.org>
- <20150424095312.GD29183@leverpostej> <55504956.9020007@linaro.org>
-Message-ID: <20150512054304.GA29874@localhost.localdomain>
+From: dave.long@linaro.org (David Long)
+Date: Tue, 12 May 2015 01:54:11 -0400
+Subject: [PATCH v6 0/6] arm64: Add kernel probes (kprobes) support
+In-Reply-To: <20150505154830.GI1550@arm.com>
+References: <1429561187-3661-1-git-send-email-dave.long@linaro.org>
+ <55363791.4070706@hitachi.com> <553AB222.50609@redhat.com>
+ <553EF74D.8020706@redhat.com> <20150429102346.GK8236@arm.com>
+ <55442BFA.50101@redhat.com> <554851CB.2010909@linaro.org>
+ <20150505154830.GI1550@arm.com>
+Message-ID: <55519583.9020507@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/15 at 03:16pm, AKASHI Takahiro wrote:
-> Hi
-> 
-> Sorry for late response. I was on vacation.
-> 
-> On 04/24/2015 06:53 PM, Mark Rutland wrote:
-> >Hi,
-> >
-> >On Fri, Apr 24, 2015 at 08:53:03AM +0100, AKASHI Takahiro wrote:
-> >>This patch set enables kdump (crash dump kernel) support on arm64 on top of
-> >>Geoff's kexec patchset.
-> >>
-> >>In this version, there are some arm64-specific usage/constraints:
-> >>1) "mem=" boot parameter must be specified on crash dump kernel
-> >>    if the system starts on uefi.
-> >
-> >This sounds very painful. Why is this the case, and how do x86 and/or
-> >ia64 get around that?
-> 
-> As Dave (Young) said, x86 uses "memmap=XX" kernel commandline parameters
-> to specify usable memory for crash dump kernel.
+On 05/05/15 11:48, Will Deacon wrote:
+> On Tue, May 05, 2015 at 06:14:51AM +0100, David Long wrote:
+>> On 05/01/15 21:44, William Cohen wrote:
+>>> Dave Long and I did some additional experimentation to better
+>>> understand what is condition causes the kernel to sometimes spew:
+>>>
+>>> Unexpected kernel single-step exception at EL1
+>>>
+>>> The functioncallcount.stp test instruments the entry and return of
+>>> every function in the mm files, including kfree.  In most cases the
+>>> arm64 trampoline_probe_handler just determines which return probe
+>>> instance matches the current conditions, runs the associated handler,
+>>> and recycles the return probe instance for another use by placing it
+>>> on a hlist.  However, it is possible that a return probe instance has
+>>> been set up on function entry and the return probe is unregistered
+>>> before the return probe instance fires.  In this case kfree is called
+>>> by the trampoline handler to remove the return probe instances related
+>>> to the unregistered kretprobe.  This case where the the kprobed kfree
+>>> is called within the arm64 trampoline_probe_handler function trigger
+>>> the problem.
+>>>
+>>> The kprobe breakpoint for the kfree call from within the
+>>> trampoline_probe_handler is encountered and started, but things go
+>>> wrong when attempting the single step on the instruction.
+>>>
+>>> It took a while to trigger this problem with the sytemtap testsuite.
+>>> Dave Long came up with steps that reproduce this more quickly with a
+>>> probed function that is always called within the trampoline handler.
+>>> Trying the same on x86_64 doesn't trigger the problem.  It appears
+>>> that the x86_64 code can handle a single step from within the
+>>> trampoline_handler.
+>>>
+>>
+>> I'm assuming there are no plans for supporting software breakpoint debug
+>> exceptions during processing of single-step exceptions, any time soon on
+>> arm64.  Given that the only solution that I can come with for this is
+>> instead of making this orphaned kretprobe instance list exist only
+>> temporarily (in the scope of the kretprobe trampoline handler), make it
+>> always exist and kfree any items found on it as part of a periodic
+>> cleanup running outside of the handler context.  I think these changes
+>> would still all be in archiecture-specific code.  This doesn't feel to
+>> me like a bad solution.  Does anyone think there is a simpler way out of
+>> this?
+>
+> Just to clarify, is the problem here the software breakpoint exception,
+> or trying to step the faulting instruction whilst we were already handling
+> a step?
+>
 
-Originally x86 use memmap=exactmap memmap=XX to specify each section of
-memories for 2nd kernel. But later because a lot of reserved type ranges
-need to be passed ie. for pci mmconfig, and kernel cmdline buffer is
-limited so kexec-tools later switch to passing these in x86 boot params as
-E820 memory ranges directly.
+Sorry for the delay, I got tripped up with some global optimizations 
+that happened when I made more testing changes.  When the kprobes 
+software breakpoint handler for kretprobes is reentered it sets up the 
+single-step and that ends up hitting inside entry.S, apparently in 
+el1_undef.
 
-> On my arm64 implementation, "linux,usable-memory" property is added
-> to device tree blob by kexec-tools for this purpose.
-> This is because, when I first implemented kdump on arm64, ppc is the only
-> architecture that supports kdump AND utilizes device trees.
-> Since kexec-tools as well as the kernel already has this framework,
-> I believed that device-tree approach was smarter than a commandline
-> parameter.
-> 
-> However, uefi-based kernel ignores all the memory-related properties
-> in a device tree and so this "mem=" workaround was added.
+> I think I'd be inclined to keep the code run in debug context to a minimum.
+> We already can't block there, and the more code we add the more black spots
+> we end up with in the kernel itself. The alternative would be to make your
+> kprobes code re-entrant, but that sounds like a nightmare.
+>
+> You say this works on x86. How do they handle it? Is the nested probe
+> on kfree ignored or handled?
+>
 
-Kdump kernel reuses the memmap info getting from firmware during 1st kernel
-boot, I do not think the memmap info can be cooked for crash kernel usable
-memory. But it might be a better way to use a special fdt node for crash
-kernel memory even for UEFI..
+Will Cohen's email pointing out x86 does not use a breakpoint for the 
+trampoline handler explains a lot.  I'm experimenting starting with his 
+proposed new trampoline code.  I can't see a reason this can't be made 
+to work and so given everything it doesn't seem interesting to try and 
+understand the failure in reentering the kprobe break handler in any 
+more detail.
 
-Another way is introducing a similar memmap=, but maybe consider only
-system_ram type ranges. For other memory areas still use UEFI memmap.
-
-Thanks
-Dave
+-dave long
