@@ -1,324 +1,99 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 12 May 2015 21:43:45 +0800
-Subject: [PATCH 1/2] ARM64: kernel: make cpu_ops hooks DT agnostic
-In-Reply-To: <1431020084-5875-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1431020084-5875-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <55520391.6050104@linaro.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 12 May 2015 14:44:26 +0100
+Subject: [PATCH] serial/amba-pl011: Unconditionally poll for FIFO space before
+ each TX char
+Message-ID: <1431438266-28094-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?05?08? 01:34, Lorenzo Pieralisi wrote:
-> ARM64 CPU operations such as cpu_init and cpu_init_idle take
-> a struct device_node pointer as a parameter, which corresponds to
-> the device tree node of the logical cpu on which the operation
-> has to be applied.
->
-> With the advent of ACPI on arm64, where MADT static table entries
-> are used to initialize cpus, the device tree node parameter
-> in cpu_ops hooks become useless when booting with ACPI, since
-> in that case cpu device tree nodes are not present and can not be
-> used for cpu initialization.
->
-> The current cpu_init hook requires a struct device_node pointer
-> parameter because it is called while parsing the device tree to
-> initialize CPUs, when the cpu_logical_map (that is used to match
-> a cpu node reg property to a device tree node) for a given logical
-> cpu id is not set up yet. This means that the cpu_init hook cannot
-> rely on the of_get_cpu_node function to retrieve the device tree
-> node corresponding to the logical cpu id passed in as parameter,
-> so the cpu device tree node must be passed in as a parameter to fix
-> this catch-22 dependency cycle.
->
-> This patch reshuffles the cpu_logical_map initialization code so
-> that the cpu_init cpu_ops hook can safely use the of_get_cpu_node
-> function to retrieve the cpu device tree node, removing the need for
-> the device tree node pointer parameter.
->
-> In the process, the patch removes device tree node parameters
-> from all cpu_ops hooks, in preparation for SMP DT/ACPI cpus
-> initialization consolidation.
->
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> ---
+Commit 734745caeb9f155ab58918834a8c70e83fa6afd3 serial/amba-pl011:
+(Activate TX IRQ passively) introduces a race which causes the driver
+sometimes to attempt to write a character to the TX FIFO when the FIFO
+is already full.
 
-I tested this patch set, and it boot smp OK on
-ACPI based system, and this patch set addressed
-the comment raised by Sudeep in ARM64 ACPI core patch
-set, also address part of cleanup suggestions from
-Olof, for both two patches:
+The PL011 does not guarantee its behaviour when the FIFO is overfilled.
+In practice, this can cause duplicate and/or dropped characters to be
+output on the wire.  The problem is common enough to be readily
+observable on the ARM Juno platform when the PL011 UART is used as
+the console and DMA is not in use.
 
-Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
+This patch fixes this problem by always polling for space before each
+character is written to the FIFO.
 
-Thanks
-Hanjun
+This will be amended to a less brute-force approach in a later commit,
+but this patch should help ensure correct behaviour for now.
 
->   arch/arm64/include/asm/cpu_ops.h   | 25 ++++++++++++------------
->   arch/arm64/kernel/acpi.c           |  2 +-
->   arch/arm64/kernel/cpu_ops.c        | 23 +++++++++++-----------
->   arch/arm64/kernel/cpuidle.c        |  7 +------
->   arch/arm64/kernel/psci.c           | 11 +++++++----
->   arch/arm64/kernel/smp.c            | 39 +++++++++++++++++++++++++++-----------
->   arch/arm64/kernel/smp_spin_table.c |  8 +++++++-
->   7 files changed, 68 insertions(+), 47 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/cpu_ops.h b/arch/arm64/include/asm/cpu_ops.h
-> index 5a31d67..53d4555 100644
-> --- a/arch/arm64/include/asm/cpu_ops.h
-> +++ b/arch/arm64/include/asm/cpu_ops.h
-> @@ -19,15 +19,12 @@
->   #include <linux/init.h>
->   #include <linux/threads.h>
->
-> -struct device_node;
-> -
->   /**
->    * struct cpu_operations - Callback operations for hotplugging CPUs.
->    *
-> - * @name:	Name of the property as appears in a devicetree cpu node's
-> - *		enable-method property.
-> - * @cpu_init:	Reads any data necessary for a specific enable-method from the
-> - *		devicetree, for a given cpu node and proposed logical id.
-> + * @name:	Name of the enable-method.
-> + * @cpu_init:	Reads any data necessary for a specific enable-method for a
-> + *		proposed logical id.
->    * @cpu_prepare: Early one-time preparation step for a cpu. If there is a
->    *		mechanism for doing so, tests whether it is possible to boot
->    *		the given CPU.
-> @@ -40,15 +37,15 @@ struct device_node;
->    * @cpu_die:	Makes a cpu leave the kernel. Must not fail. Called from the
->    *		cpu being killed.
->    * @cpu_kill:  Ensures a cpu has left the kernel. Called from another cpu.
-> - * @cpu_init_idle: Reads any data necessary to initialize CPU idle states from
-> - *		devicetree, for a given cpu node and proposed logical id.
-> + * @cpu_init_idle: Reads any data necessary to initialize CPU idle states for
-> + *		   a proposed logical id.
->    * @cpu_suspend: Suspends a cpu and saves the required context. May fail owing
->    *               to wrong parameters or error conditions. Called from the
->    *               CPU being suspended. Must be called with IRQs disabled.
->    */
->   struct cpu_operations {
->   	const char	*name;
-> -	int		(*cpu_init)(struct device_node *, unsigned int);
-> +	int		(*cpu_init)(unsigned int);
->   	int		(*cpu_prepare)(unsigned int);
->   	int		(*cpu_boot)(unsigned int);
->   	void		(*cpu_postboot)(void);
-> @@ -58,14 +55,18 @@ struct cpu_operations {
->   	int		(*cpu_kill)(unsigned int cpu);
->   #endif
->   #ifdef CONFIG_CPU_IDLE
-> -	int		(*cpu_init_idle)(struct device_node *, unsigned int);
-> +	int		(*cpu_init_idle)(unsigned int);
->   	int		(*cpu_suspend)(unsigned long);
->   #endif
->   };
->
->   extern const struct cpu_operations *cpu_ops[NR_CPUS];
-> -int __init cpu_read_ops(struct device_node *dn, int cpu);
-> -void __init cpu_read_bootcpu_ops(void);
-> +int __init cpu_read_ops(int cpu);
->   const struct cpu_operations *cpu_get_ops(const char *name);
->
-> +static inline void __init cpu_read_bootcpu_ops(void)
-> +{
-> +	cpu_read_ops(0);
-> +}
-> +
->   #endif /* ifndef __ASM_CPU_OPS_H */
-> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> index 8b83955..945cc1f 100644
-> --- a/arch/arm64/kernel/acpi.c
-> +++ b/arch/arm64/kernel/acpi.c
-> @@ -154,7 +154,7 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
->   		if (!cpu_ops[enabled_cpus])
->   			return;
->
-> -		if (cpu_ops[enabled_cpus]->cpu_init(NULL, enabled_cpus))
-> +		if (cpu_ops[enabled_cpus]->cpu_init(enabled_cpus))
->   			return;
->
->   		/* map the logical cpu id to cpu MPIDR */
-> diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
-> index fb8ff9b..bbda2d2 100644
-> --- a/arch/arm64/kernel/cpu_ops.c
-> +++ b/arch/arm64/kernel/cpu_ops.c
-> @@ -52,9 +52,18 @@ const struct cpu_operations * __init cpu_get_ops(const char *name)
->   /*
->    * Read a cpu's enable method from the device tree and record it in cpu_ops.
->    */
-> -int __init cpu_read_ops(struct device_node *dn, int cpu)
-> +int __init cpu_read_ops(int cpu)
->   {
-> -	const char *enable_method = of_get_property(dn, "enable-method", NULL);
-> +	const char *enable_method;
-> +	struct device_node *dn = of_get_cpu_node(cpu, NULL);
-> +
-> +	if (!dn) {
-> +		if (!cpu)
-> +			pr_err("Failed to find device node for boot cpu\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	enable_method = of_get_property(dn, "enable-method", NULL);
->   	if (!enable_method) {
->   		/*
->   		 * The boot CPU may not have an enable method (e.g. when
-> @@ -75,13 +84,3 @@ int __init cpu_read_ops(struct device_node *dn, int cpu)
->
->   	return 0;
->   }
-> -
-> -void __init cpu_read_bootcpu_ops(void)
-> -{
-> -	struct device_node *dn = of_get_cpu_node(0, NULL);
-> -	if (!dn) {
-> -		pr_err("Failed to find device node for boot cpu\n");
-> -		return;
-> -	}
-> -	cpu_read_ops(dn, 0);
-> -}
-> diff --git a/arch/arm64/kernel/cpuidle.c b/arch/arm64/kernel/cpuidle.c
-> index a78143a..f8aa169 100644
-> --- a/arch/arm64/kernel/cpuidle.c
-> +++ b/arch/arm64/kernel/cpuidle.c
-> @@ -18,15 +18,10 @@
->   int arm_cpuidle_init(unsigned int cpu)
->   {
->   	int ret = -EOPNOTSUPP;
-> -	struct device_node *cpu_node = of_cpu_device_node_get(cpu);
-> -
-> -	if (!cpu_node)
-> -		return -ENODEV;
->
->   	if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_init_idle)
-> -		ret = cpu_ops[cpu]->cpu_init_idle(cpu_node, cpu);
-> +		ret = cpu_ops[cpu]->cpu_init_idle(cpu);
->
-> -	of_node_put(cpu_node);
->   	return ret;
->   }
->
-> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-> index ea18cb5..efe3480 100644
-> --- a/arch/arm64/kernel/psci.c
-> +++ b/arch/arm64/kernel/psci.c
-> @@ -186,12 +186,15 @@ static int psci_migrate_info_type(void)
->   	return err;
->   }
->
-> -static int __maybe_unused cpu_psci_cpu_init_idle(struct device_node *cpu_node,
-> -						 unsigned int cpu)
-> +static int __maybe_unused cpu_psci_cpu_init_idle(unsigned int cpu)
->   {
->   	int i, ret, count = 0;
->   	struct psci_power_state *psci_states;
-> -	struct device_node *state_node;
-> +	struct device_node *state_node, *cpu_node;
-> +
-> +	cpu_node = of_get_cpu_node(cpu, NULL);
-> +	if (!cpu_node)
-> +		return -ENODEV;
->
->   	/*
->   	 * If the PSCI cpu_suspend function hook has not been initialized
-> @@ -444,7 +447,7 @@ int __init psci_acpi_init(void)
->
->   #ifdef CONFIG_SMP
->
-> -static int __init cpu_psci_cpu_init(struct device_node *dn, unsigned int cpu)
-> +static int __init cpu_psci_cpu_init(unsigned int cpu)
->   {
->   	return 0;
->   }
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index 2cb0081..98eb68b 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -319,6 +319,23 @@ void __init smp_prepare_boot_cpu(void)
->   }
->
->   /*
-> + * Initialize cpu operations for a logical cpu and
-> + * set it in the possible mask on success
-> + */
-> +static int __init smp_cpu_setup(int cpu)
-> +{
-> +	if (cpu_read_ops(cpu))
-> +		return -ENODEV;
-> +
-> +	if (cpu_ops[cpu]->cpu_init(cpu))
-> +		return -ENODEV;
-> +
-> +	set_cpu_possible(cpu, true);
-> +
-> +	return 0;
-> +}
-> +
-> +/*
->    * Enumerate the possible CPU set from the device tree and build the
->    * cpu logical map array containing MPIDR values related to logical
->    * cpus. Assumes that cpu_logical_map(0) has already been initialized.
-> @@ -395,12 +412,6 @@ void __init of_smp_init_cpus(void)
->   		if (cpu >= NR_CPUS)
->   			goto next;
->
-> -		if (cpu_read_ops(dn, cpu) != 0)
-> -			goto next;
-> -
-> -		if (cpu_ops[cpu]->cpu_init(dn, cpu))
-> -			goto next;
-> -
->   		pr_debug("cpu logical map 0x%llx\n", hwid);
->   		cpu_logical_map(cpu) = hwid;
->   next:
-> @@ -418,12 +429,18 @@ next:
->   	}
->
->   	/*
-> -	 * All the cpus that made it to the cpu_logical_map have been
-> -	 * validated so set them as possible cpus.
-> +	 * We need to set the cpu_logical_map entries before enabling
-> +	 * the cpus so that cpu processor description entries (DT cpu nodes
-> +	 * and ACPI MADT entries) can be retrieved by matching the cpu hwid
-> +	 * with entries in cpu_logical_map while initializing the cpus.
-> +	 * If the cpu set-up fails, invalidate the cpu_logical_map entry.
->   	 */
-> -	for (i = 0; i < NR_CPUS; i++)
-> -		if (cpu_logical_map(i) != INVALID_HWID)
-> -			set_cpu_possible(i, true);
-> +	for (i = 1; i < NR_CPUS; i++) {
-> +		if (cpu_logical_map(i) != INVALID_HWID) {
-> +			if (smp_cpu_setup(i))
-> +				cpu_logical_map(i) = INVALID_HWID;
-> +		}
-> +	}
->   }
->
->   void __init smp_prepare_cpus(unsigned int max_cpus)
-> diff --git a/arch/arm64/kernel/smp_spin_table.c b/arch/arm64/kernel/smp_spin_table.c
-> index 14944e5..aef3605 100644
-> --- a/arch/arm64/kernel/smp_spin_table.c
-> +++ b/arch/arm64/kernel/smp_spin_table.c
-> @@ -49,8 +49,14 @@ static void write_pen_release(u64 val)
->   }
->
->
-> -static int smp_spin_table_cpu_init(struct device_node *dn, unsigned int cpu)
-> +static int smp_spin_table_cpu_init(unsigned int cpu)
->   {
-> +	struct device_node *dn;
-> +
-> +	dn = of_get_cpu_node(cpu, NULL);
-> +	if (!dn)
-> +		return -ENODEV;
-> +
->   	/*
->   	 * Determine the address from which the CPU is polling.
->   	 */
->
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
+
+The patch is based on gregkh/tty.git tty-linus.
+
+Please consider applying it for v4.1.  Without it, we have a regression
+compared with v4.0.
+
+*Note*
+This will cause a conflict with tty-next because it pulls forward
+some changes made by commit 1e84d22 (serial/amba-pl011: Refactor and
+simplify TX FIFO handling); however, the resolution is simple except
+for the following lines which may need to be deleted manually from
+amba-pl011.c:pl011_startup():
+
+-8<-
+	/* Assume that TX IRQ doesn't work until we see one: */
+	uap->tx_irq_seen = 0;
+
+->8-
+
+(This is is the same mismerge already observed by Steven Rothwell when
+building next.)
+
+Cheers
+---Dave
+
+
+ drivers/tty/serial/amba-pl011.c |   16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 6f5a072..763eb20 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1249,20 +1249,19 @@ __acquires(&uap->port.lock)
+ 
+ /*
+  * Transmit a character
+- * There must be at least one free entry in the TX FIFO to accept the char.
+  *
+- * Returns true if the FIFO might have space in it afterwards;
+- * returns false if the FIFO definitely became full.
++ * Returns true if the character was successfully queued to the FIFO.
++ * Returns false otherwise.
+  */
+ static bool pl011_tx_char(struct uart_amba_port *uap, unsigned char c)
+ {
++	if (readw(uap->port.membase + UART01x_FR) & UART01x_FR_TXFF)
++		return false; /* unable to transmit character */
++
+ 	writew(c, uap->port.membase + UART01x_DR);
+ 	uap->port.icount.tx++;
+ 
+-	if (likely(uap->tx_irq_seen > 1))
+-		return true;
+-
+-	return !(readw(uap->port.membase + UART01x_FR) & UART01x_FR_TXFF);
++	return true;
+ }
+ 
+ static bool pl011_tx_chars(struct uart_amba_port *uap)
+@@ -1296,7 +1295,8 @@ static bool pl011_tx_chars(struct uart_amba_port *uap)
+ 		return false;
+ 
+ 	if (uap->port.x_char) {
+-		pl011_tx_char(uap, uap->port.x_char);
++		if (!pl011_tx_char(uap, uap->port.x_char))
++			goto done;
+ 		uap->port.x_char = 0;
+ 		--count;
+ 	}
+-- 
+1.7.10.4
