@@ -1,63 +1,20 @@
-From: gangchen@rdamicro.com (Chen Gang)
-Date: Tue, 12 May 2015 18:42:47 +0800
-Subject: [PATCH 1/1] ARM:r0 is also corrupted after calling __do_div64.
-In-Reply-To: <20150512100042.GN2067@n2100.arm.linux.org.uk>
-References: <1431412386-1249-1-git-send-email-gangchen@rdamicro.com>
- <20150512100042.GN2067@n2100.arm.linux.org.uk>
-Message-ID: <5551D927.7070306@rdamicro.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 12 May 2015 12:43:29 +0200
+Subject: [PATCH 1/3] dt-bindings: add brcmstb-gpio GPIO binding
+In-Reply-To: <1430901477-10678-2-git-send-email-gregory.0xf0@gmail.com>
+References: <1430901477-10678-1-git-send-email-gregory.0xf0@gmail.com>
+ <1430901477-10678-2-git-send-email-gregory.0xf0@gmail.com>
+Message-ID: <CACRpkda4yWHpneyvkmTaecp4KY8JAJ+d8zY6d-d2hsB2ZJVoFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, May 6, 2015 at 10:37 AM, Gregory Fong <gregory.0xf0@gmail.com> wrote:
 
+> Add binding for Broadcom STB "UPG GIO" GPIO controller.
+>
+> Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
 
-On 05/12/2015 06:00 PM, Russell King - ARM Linux wrote:
-> On Tue, May 12, 2015 at 02:33:06PM +0800, Chen Gang wrote:
->> R0 is corrupted after calling __do_div64 and compiler is not informed
->> about this in macro __do_div_asm. If n is to be used again after this
->> macro, r0 is not reloaded and n will contain incorrect value
-> This isn't going to work if we're building for big endian (__ARMEB__
-> set) because then we end up telling the compiler that __rem and __n
-> are both in r0, which is impossible.
-We tested your suggestion , it works and it feels better. I have
-sent another patch based on your suggestions.
->
->> diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
->> index a66061a..93a9985 100644
->> --- a/arch/arm/include/asm/div64.h
->> +++ b/arch/arm/include/asm/div64.h
->> @@ -34,13 +34,13 @@
->>   	register unsigned long long __n   asm("r0") = n;	\
->>   	register unsigned long long __res asm("r2");		\
->>   	register unsigned int __rem       asm(__xh);		\
-> 	register unsigned int __rem_xh    asm(__xh);            \
-> 	register unsigned int __rem_xl    asm(__xl);		\
->
->> -	asm(	__asmeq("%0", __xh)				\
->> +	asm(	__asmeq("%R0", __xh)				\
-> 	asm(	__asmeq("%0", __xh)				\
-> 		__asmeq("%1", __xl)				\
->
-> ... and increment each following register %-spec by one...
->
->>   		__asmeq("%1", "r2")				\
->>   		__asmeq("%2", "r0")				\
->>   		__asmeq("%3", "r4")				\
->>   		"bl	__do_div64"				\
->> -		: "=r" (__rem), "=r" (__res)			\
->> -		: "r" (__n), "r" (__base)			\
->> +		: "=r" (__n), "=r" (__res)			\
->> +		: "0"(__n), "r" (__base)			\
-> This is obviously wrong because __rem is left unset, and that's one of
-> the two values this macro returns.
->
-> 		: "=r" (__rem_xh), "=r" (__rem_xl), "=r" (__res) \
-> 		: "r" (__n), "r" (__base)			\
->
->>   		: "ip", "lr", "cc");				\
->>   	n = __res;						\
->>   	__rem;							\
-> 	__rem_xh;
->
-> Basically this renames __rem to __rem_xh, and introduces a new __rem_xl
-> to take the other half of the remainder which we don't use.
->
+Looks all right so patch applied.
+
+Yours,
+Linus Walleij
