@@ -1,103 +1,161 @@
-From: mwelling@ieee.org (Michael Welling)
-Date: Tue, 12 May 2015 12:38:57 -0500
-Subject: [PATCH] spi: omap2-mcspi: Fix native cs with new set_cs
-Message-ID: <1431452337-19280-1-git-send-email-mwelling@ieee.org>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Tue, 12 May 2015 19:44:35 +0200
+Subject: [PATCH 2/2] doc: dt: add documentation for pl172 memory bindings
+In-Reply-To: <1430241879-30046-3-git-send-email-manabian@gmail.com>
+References: <1430241879-30046-1-git-send-email-manabian@gmail.com>
+ <1430241879-30046-3-git-send-email-manabian@gmail.com>
+Message-ID: <CAGhQ9VybD9Oar8fdW5cJnFpqVK1pniz0-nHkK-wGAETBoXk97g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPIO chip select patch series appears to have broken the native chip select
-support. This patch pulls the manual native chip select toggling out of
-the transfer_one routine and adds a set_cs routine.
+Hi DT maintainers,
 
-Tested natively on AM3354 with SPI serial flash on spi0cs0.
+Do you have any comments on the bindings below?
 
-Signed-off-by: Michael Welling <mwelling@ieee.org>
----
- drivers/spi/spi-omap2-mcspi.c |   33 +++++++++++----------------------
- 1 file changed, 11 insertions(+), 22 deletions(-)
+These bindings are based on bindings for "ti,davinci-aemif" found
+under memory-controllers/ti-aemif.txt
 
-diff --git a/drivers/spi/spi-omap2-mcspi.c b/drivers/spi/spi-omap2-mcspi.c
-index 90cf7e7..a7d85c5 100644
---- a/drivers/spi/spi-omap2-mcspi.c
-+++ b/drivers/spi/spi-omap2-mcspi.c
-@@ -243,17 +243,20 @@ static void omap2_mcspi_set_enable(const struct spi_device *spi, int enable)
- 	mcspi_read_cs_reg(spi, OMAP2_MCSPI_CHCTRL0);
- }
- 
--static void omap2_mcspi_force_cs(struct spi_device *spi, int cs_active)
-+static void omap2_mcspi_set_cs(struct spi_device *spi, bool enable)
- {
- 	u32 l;
- 
--	l = mcspi_cached_chconf0(spi);
--	if (cs_active)
--		l |= OMAP2_MCSPI_CHCONF_FORCE;
--	else
--		l &= ~OMAP2_MCSPI_CHCONF_FORCE;
-+	if (spi->controller_state) {
-+		l = mcspi_cached_chconf0(spi);
- 
--	mcspi_write_chconf0(spi, l);
-+		if (enable)
-+			l &= ~OMAP2_MCSPI_CHCONF_FORCE;
-+		else
-+			l |= OMAP2_MCSPI_CHCONF_FORCE;
-+
-+		mcspi_write_chconf0(spi, l);
-+	}
- }
- 
- static void omap2_mcspi_set_master_mode(struct spi_master *master)
-@@ -1075,7 +1078,6 @@ static int omap2_mcspi_work_one(struct omap2_mcspi *mcspi,
- 
- 	struct spi_master		*master;
- 	struct omap2_mcspi_dma		*mcspi_dma;
--	int				cs_active = 0;
- 	struct omap2_mcspi_cs		*cs;
- 	struct omap2_mcspi_device_config *cd;
- 	int				par_override = 0;
-@@ -1118,11 +1120,6 @@ static int omap2_mcspi_work_one(struct omap2_mcspi *mcspi,
- 			mcspi_read_cs_reg(spi, OMAP2_MCSPI_MODULCTRL);
- 	}
- 
--	if (!cs_active) {
--		omap2_mcspi_force_cs(spi, 1);
--		cs_active = 1;
--	}
--
- 	chconf = mcspi_cached_chconf0(spi);
- 	chconf &= ~OMAP2_MCSPI_CHCONF_TRM_MASK;
- 	chconf &= ~OMAP2_MCSPI_CHCONF_TURBO;
-@@ -1169,12 +1166,6 @@ static int omap2_mcspi_work_one(struct omap2_mcspi *mcspi,
- 	if (t->delay_usecs)
- 		udelay(t->delay_usecs);
- 
--	/* ignore the "leave it on after last xfer" hint */
--	if (t->cs_change) {
--		omap2_mcspi_force_cs(spi, 0);
--		cs_active = 0;
--	}
--
- 	omap2_mcspi_set_enable(spi, 0);
- 
- 	if (mcspi->fifo_depth > 0)
-@@ -1187,9 +1178,6 @@ out:
- 		status = omap2_mcspi_setup_transfer(spi, NULL);
- 	}
- 
--	if (cs_active)
--		omap2_mcspi_force_cs(spi, 0);
--
- 	if (cd && cd->cs_per_word) {
- 		chconf = mcspi->ctx.modulctrl;
- 		chconf |= OMAP2_MCSPI_MODULCTRL_SINGLE;
-@@ -1334,6 +1322,7 @@ static int omap2_mcspi_probe(struct platform_device *pdev)
- 	master->setup = omap2_mcspi_setup;
- 	master->auto_runtime_pm = true;
- 	master->transfer_one = omap2_mcspi_transfer_one;
-+	master->set_cs = omap2_mcspi_set_cs;
- 	master->cleanup = omap2_mcspi_cleanup;
- 	master->dev.of_node = node;
- 	master->max_speed_hz = OMAP2_MCSPI_MAX_FREQ;
--- 
-1.7.9.5
+regards,
+Joachim Eastwood
+
+On 28 April 2015 at 19:24, Joachim Eastwood <manabian@gmail.com> wrote:
+> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+> ---
+>  .../bindings/memory-controllers/arm,pl172.txt      | 125 +++++++++++++++++++++
+>  1 file changed, 125 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/memory-controllers/arm,pl172.txt
+>
+> diff --git a/Documentation/devicetree/bindings/memory-controllers/arm,pl172.txt b/Documentation/devicetree/bindings/memory-controllers/arm,pl172.txt
+> new file mode 100644
+> index 000000000000..e6df32f9986d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/memory-controllers/arm,pl172.txt
+> @@ -0,0 +1,125 @@
+> +* Device tree bindings for ARM PL172 MultiPort Memory Controller
+> +
+> +Required properties:
+> +
+> +- compatible:          "arm,pl172", "arm,primecell"
+> +
+> +- reg:                 Must contains offset/length value for controller.
+> +
+> +- #address-cells:      Must be 2. The partition number has to be encoded in the
+> +                       first address cell and it may accept values 0..N-1
+> +                       (N - total number of partitions). The second cell is the
+> +                       offset into the partition.
+> +
+> +- #size-cells:         Must be set to 1.
+> +
+> +- ranges:              Must contain one or more chip select memory regions.
+> +
+> +- clocks:              Must contain references to controller clocks.
+> +
+> +- clock-names:         Must contain "mpmcclk" and "apb_pclk".
+> +
+> +- clock-ranges:                Empty property indicating that child nodes can inherit
+> +                       named clocks. Required only if clock tree data present
+> +                       in device tree.
+> +                       See clock-bindings.txt
+> +
+> +Child chip-select (cs) nodes contain the memory devices nodes connected to
+> +such as NOR (e.g. cfi-flash) and NAND.
+> +
+> +Required child cs node properties:
+> +
+> +- #address-cells:      Must be 2.
+> +
+> +- #size-cells:         Must be 1.
+> +
+> +- ranges:              Empty property indicating that child nodes can inherit
+> +                       memory layout.
+> +
+> +- clock-ranges:                Empty property indicating that child nodes can inherit
+> +                       named clocks. Required only if clock tree data present
+> +                       in device tree.
+> +
+> +- mpmc,cs:             Chip select number. Indicates to the pl0172 driver
+> +                       which chipselect is used for accessing the memory.
+> +
+> +- mpmc,memory-width:   Width of the chip select memory. Must be equal to
+> +                       either 8, 16 or 32.
+> +
+> +Optional child cs node config properties:
+> +
+> +- mpmc,async-page-mode:        Enable asynchronous page mode.
+> +
+> +- mpmc,cs-active-high: Set chip select polarity to active high.
+> +
+> +- mpmc,byte-lane-low:  Set byte lane state to low.
+> +
+> +- mpmc,extended-wait:  Enable extended wait.
+> +
+> +- mpmc,buffer-enable:  Enable write buffer.
+> +
+> +- mpmc,write-protect:  Enable write protect.
+> +
+> +Optional child cs node timing properties:
+> +
+> +- mpmc,write-enable-delay:     Delay from chip select assertion to write
+> +                               enable (WE signal) in nano seconds.
+> +
+> +- mpmc,output-enable-delay:    Delay from chip select assertion to output
+> +                               enable (OE signal) in nano seconds.
+> +
+> +- mpmc,write-access-delay:     Delay from chip select assertion to write
+> +                               access in nano seconds.
+> +
+> +- mpmc,read-access-delay:      Delay from chip select assertion to read
+> +                               access in nano seconds.
+> +
+> +- mpmc,page-mode-read-delay:   Delay for asynchronous page mode sequential
+> +                               accesses in nano seconds.
+> +
+> +- mpmc,turn-round-delay:       Delay between access to memory banks in nano
+> +                               seconds.
+> +
+> +If any of the above timing parameters are absent, current parameter value will
+> +be taken from the corresponding HW reg.
+> +
+> +Example for pl172 with nor flash on chip select 0 shown below.
+> +
+> +emc: memory-controller at 40005000 {
+> +       compatible = "arm,pl172", "arm,primecell";
+> +       reg = <0x40005000 0x1000>;
+> +       clocks = <&ccu1 CLK_CPU_EMCDIV>, <&ccu1 CLK_CPU_EMC>;
+> +       clock-names = "mpmcclk", "apb_pclk";
+> +       #address-cells = <2>;
+> +       #size-cells = <1>;
+> +       ranges = <0 0 0x1c000000 0x1000000
+> +                 1 0 0x1d000000 0x1000000
+> +                 2 0 0x1e000000 0x1000000
+> +                 3 0 0x1f000000 0x1000000>;
+> +
+> +       cs0 {
+> +               #address-cells = <2>;
+> +               #size-cells = <1>;
+> +               ranges;
+> +
+> +               mpmc,cs = <0>;
+> +               mpmc,memory-width = <16>;
+> +               mpmc,byte-lane-low;
+> +               mpmc,write-enable-delay = <0>;
+> +               mpmc,output-enable-delay = <0>;
+> +               mpmc,read-enable-delay = <70>;
+> +               mpmc,page-mode-read-delay = <70>;
+> +
+> +               flash at 0,0 {
+> +                       compatible = "sst,sst39vf320", "cfi-flash";
+> +                       reg = <0 0 0x400000>;
+> +                       bank-width = <2>;
+> +                       #address-cells = <1>;
+> +                       #size-cells = <1>;
+> +                       partition at 0 {
+> +                               label = "data";
+> +                               reg = <0 0x400000>;
+> +                       };
+> +               };
+> +       };
+> +};
+> --
+> 1.8.0
+>
