@@ -1,91 +1,69 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 12 May 2015 16:08:23 -0600
-Subject: [PATCH 2/3] ARM: bcm2835: Add the Raspberry Pi firmware driver
-In-Reply-To: <87a8x94rk5.fsf@eliezer.anholt.net>
-References: <1430176449-12322-1-git-send-email-eric@anholt.net>
- <1430176449-12322-3-git-send-email-eric@anholt.net>
- <55403AD1.4030103@wwwdotorg.org> <87oam6q0v1.fsf@eliezer.anholt.net>
- <55416DA2.5040902@wwwdotorg.org> <87a8x94rk5.fsf@eliezer.anholt.net>
-Message-ID: <555279D7.5020500@wwwdotorg.org>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Tue, 12 May 2015 17:05:07 -0500
+Subject: [GIT PULL] SoCFPGA updates for v4.2
+In-Reply-To: <4196844.lz3ZASOAJx@wuerfel>
+References: <1431371529-22593-1-git-send-email-dinguyen@opensource.altera.com>
+ <1431371529-22593-2-git-send-email-dinguyen@opensource.altera.com>
+ <4187963.lx6hRMGsoN@wuerfel> <4196844.lz3ZASOAJx@wuerfel>
+Message-ID: <55527913.6010807@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/2015 11:46 AM, Eric Anholt wrote:
-> Stephen Warren <swarren@wwwdotorg.org> writes:
->
->> On 04/29/15 11:51, Eric Anholt wrote:
->>> Stephen Warren <swarren@wwwdotorg.org> writes:
+On 05/12/2015 03:25 PM, Arnd Bergmann wrote:
+> On Tuesday 12 May 2015 22:20:53 Arnd Bergmann wrote:
+>> On Monday 11 May 2015 14:12:09 dinguyen at opensource.altera.com wrote:
+>>> SoCFPGA updates for v4.2
+>>> - Add big endian support
+>>> - Add earlyprintk support on UART1 that is used on Arria10
+>>> - Remove the need to map uart_io_desc
 >>>
->>>> On 04/27/2015 05:14 PM, Eric Anholt wrote:
->>>>> This gives us a function for making mailbox property channel requests
->>>>> of the firmware, and uses it to control the 3 power domains provided
->>>>> by the firmware.
->>>>
->>>>> diff --git a/arch/arm/mach-bcm/raspberrypi-firmware.c b/arch/arm/mach-bcm/raspberrypi-firmware.c
->>>>
->>>>> +/*
->>>>> + * Submits a set of concatenated tags to the VPU firmware through the
->>>>> + * mailbox property interface.
->>>>> + *
->>>>> + * The buffer header and the ending tag are added by this function and
->>>>> + * don't need to be supplied, just the actual tags for your operation.
->>>>> + * See struct raspberrypi_firmware_property_tag_header for the per-tag structure.
->>>>> + */
->>>>> +int raspberrypi_firmware_property(void *data, size_t tag_size)
->>>>> +{
->>>>> +	size_t size = tag_size + 12;
->>>>> +	u32 *buf;
->>>>> +	dma_addr_t bus_addr;
->>>>> +	int ret = 0;
->>>>> +
->>>>> +	if (!firmware)
->>>>> +		return -EPROBE_DEFER;
->>>>
->>>> I think it'd make more sense if the clients looked up the firmware
->>>> driver via phandle at their probe time. This would mean:
->>>>
->>>> * No need for global "firmware", since clients could pass the firmware
->>>> driver handle into this function.
->>>>
->>>> * Clients resolve deferred probe at their probe time. That way, they
->>>> won't register themselves with subsystems asserting they can provide
->>>> services, but find out they can't yet provide the service at that time.
->>>
->>> The one client so far (vc4) was resolving deferred probe at its probe
->>> time, but not taking a reference on the firmware driver.  I figure I'll
->>> have it do the phandle lookup and refcount -- do you still want the
->>> struct platform_device passed in here?  If we de-global firmware, it's
->>> going to mean some faffing in the power domain side of things to find
->>> the device again, it seems.
 >>
->> I think I'd expect the API in the firmware driver to require the client
->> to pass the client DT node pointer plus a property name, and do all the
->> lookup itself. That's what most DT resource lookup APIs in the kernel do
->> now.
->
-> I've made this change, but it's not great -- the client has to know some
-> details of how this driver is structured (that it sets the drvdata) in
-> order to figure out whether the driver is loaded or not and return
-> -EPROBE_DEFERRED.  I couldn't find any other existing solutions than
-> that in the tree.
+>> The patches look almost ok, but please clarify a minor issue:
+>>
+>>  static void __init socfpga_map_io(void)
+>>  {
+>>         socfpga_scu_map_io();
+>> -       iotable_init(&uart_io_desc, 1);
+>> -       early_printk("Early printk initialized\n");
+>>  }
+>>
+>>
+>> You have a map_io() function here, which means that the debug_ll_io_init()
+>> function is not called. How does the debug_ll mapping get created then?
+>>
+>> If it's not, I think the best solution is to remove the socfpga_map_io()
+>> function entirely, and turn socfpga_scu_base_addr into a local variable
+>> in arch/arm/mach-socfpga/platsmp.c that gets set using of_iomap().
+>>
+> 
+> 
+> One more thing: the socfpga board in Olof's boot farm fails to boot
+> with multi_v7_defconfig, see
+> http://arm-soc.lixom.net/bootlogs/arm-soc/v4.1-rc3-165-g3d58f43/socfpga-arm-multi_v7_defconfig.html
+> 
+> Could you have a look and see if you can reproduce that probem and send
+> a fix if possible? It seems to work fine with socfpga_defconfig, so maybe
+> it's just some Kconfig option we need to enable?
+> 
 
-The client shouldn't need to know that.
+Yes, I've started debugging this, but got sidetracked. The issue is that
+the multi_v7_defconfig is enabling both CONFIG_PL330_DMA and CONFIG_PM.
+There was a patch recently that mapped the UARTs on the platform to it's
+proper DMA channel:
 
-I'd expect the client to pass a DT node pointer to the provider's 
-driver, and that provider driver would know and isolate all the details 
-about its own internals. The provider could return some kind of 
-handler/... to the provider device if required.
+commit 78c03c7af897 ARM: socfpga: fix uart DMA binding error
 
-I would expect any subsystem that supports client->provider references 
-in DT would have an example of this (e.g. IRQs, GPIOs, regulators, ...). 
-However, the code for those can be rather complex to dive into for the 
-first time. For a fairly simple standalone example, check out:
+So after the kernel has booted, and user space takes over, it tries to
+open up the debug uart using DMA. But it appears the DMA has been
+suspended and did not resume, thus the clock to the PL330 DMA is turned
+off, and the UART hangs.
 
-Provider:
-drivers/amba/tegra-ahb.c
-tegra_ahb_enable_smmu()
+In case, you're curious here's a link to an incorrect patch that I sent
+to turn on the PL330's clock:
 
-Consumer:
-drivers/iommu/tegra-smmu.c
-tegra_smmu_ahb_enable()
-(called from tegra_smmu_probe() in the same file)
+http://www.spinics.net/lists/dmaengine/msg04409.html
+
+I'll try to get back on this asap.
+
+Thanks,
+Dinh
