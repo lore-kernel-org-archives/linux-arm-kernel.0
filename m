@@ -1,60 +1,41 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Tue, 12 May 2015 10:28:55 +0200
-Subject: [PATCH] ARM: dts: Fix typo in trip point temperature for
- exynos5420/5440
-In-Reply-To: <1430988887-6743-1-git-send-email-a.kesavan@samsung.com>
-References: <1430988887-6743-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <20150512102855.340ebb31@amdc2363>
+From: rbthomas@pobox.com (Rick Thomas)
+Date: Tue, 12 May 2015 01:33:54 -0700
+Subject: Bug#782364: linux-image-3.16.0-4-armmp: please configure drivers
+ for both Cubox i4pro real time clocks
+In-Reply-To: <1250B1D0-EBAA-404C-B0F2-686DE9E4D156@pobox.com>
+References: <20150410232854.23367.58862.reportbug@cube.rcthomas.org>
+ <1428710930.29665.17.camel@decadent.org.uk>
+ <20150429085705.GG12732@n2100.arm.linux.org.uk>
+ <1430582464.15640.186.camel@hellion.org.uk>
+ <20150502161226.GS12732@n2100.arm.linux.org.uk>
+ <1430583695.15640.190.camel@hellion.org.uk>
+ <1430899272.15640.237.camel@debian.org>
+ <64A51823-C50B-48D5-8180-CBC44F691CCB@pobox.com>
+ <1430908023.2660.203.camel@debian.org>
+ <1250B1D0-EBAA-404C-B0F2-686DE9E4D156@pobox.com>
+Message-ID: <47E9FE80-96C8-4D91-B161-53A61A8A5FCB@pobox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Abhilash,
 
-> Remove the extra zero in the "cpu-crit-0" trip point for exynos5420
-> and exynos5440.
+On May 6, 2015, at 3:35 AM, Rick Thomas <rbthomas@pobox.com> wrote:
+
 > 
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5420-trip-points.dtsi | 2 +-
->  arch/arm/boot/dts/exynos5440-trip-points.dtsi | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
+> On May 6, 2015, at 3:27 AM, Ian Campbell <ijc@debian.org> wrote:
 > 
-> diff --git a/arch/arm/boot/dts/exynos5420-trip-points.dtsi
-> b/arch/arm/boot/dts/exynos5420-trip-points.dtsi index
-> 5d31fc1..2180a01 100644 ---
-> a/arch/arm/boot/dts/exynos5420-trip-points.dtsi +++
-> b/arch/arm/boot/dts/exynos5420-trip-points.dtsi @@ -28,7 +28,7 @@
-> trips { type = "active";
->  	};
->  	cpu-crit-0 {
-> -		temperature = <1200000>; /* millicelsius */
-> +		temperature = <120000>; /* millicelsius */
->  		hysteresis = <0>; /* millicelsius */
->  		type = "critical";
->  	};
-> diff --git a/arch/arm/boot/dts/exynos5440-trip-points.dtsi
-> b/arch/arm/boot/dts/exynos5440-trip-points.dtsi index
-> 48adfa8..356e963 100644 ---
-> a/arch/arm/boot/dts/exynos5440-trip-points.dtsi +++
-> b/arch/arm/boot/dts/exynos5440-trip-points.dtsi @@ -18,7 +18,7 @@
-> trips { type = "active";
->  	};
->  	cpu-crit-0 {
-> -		temperature = <1050000>; /* millicelsius */
-> +		temperature = <105000>; /* millicelsius */
->  		hysteresis = <0>; /* millicelsius */
->  		type = "critical";
->  	};
+>> It would be preferable to test the thing in Sid before the upload to
+>> jessie-proposed-updates
+> 
+> I?ll keep an eye out for it.
+> 
+> But I don?t have one of the cubox models without the battery-backed RTC, so I won?t be able to test that case.   Is there anyone out there in debian-arm land with an appropriate test box?
+> 
+> Enjoy!
+> Rick
 
-Abhilash, thanks for spotting this mistake.
+Am I looking in the wrong place?  I would have expected to see something show up in sid by now.
 
-Acked-by: Lukasz Majewski <l.majewski@samsung.com>
+Is there a particular linux-image?.deb I should download from somewhere to test this?
 
-Thanks Krzysztof for picking this fix during my absence :-)
-
--- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+Thanks for all your help!
+Rick
