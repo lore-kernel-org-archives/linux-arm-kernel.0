@@ -1,48 +1,94 @@
-From: labbott@fedoraproject.org (Laura Abbott)
-Date: Mon, 11 May 2015 19:53:41 -0700
-Subject: [PATCH] arm: Don't use memblock limit for the lowmem bound
-Message-ID: <1431399221-25337-1-git-send-email-labbott@fedoraproject.org>
+From: labbott@redhat.com (Laura Abbott)
+Date: Mon, 11 May 2015 19:54:16 -0700
+Subject: [PATCH] ARM: mm: handle non-pmd-aligned end of RAM
+In-Reply-To: <20150511103130.GA3490@leverpostej>
+References: <a865bd68d706f8c4c9e82a374ff6adc4@agner.ch>
+ <20150511103130.GA3490@leverpostej>
+Message-ID: <55516B58.20507@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laura Abbott <labbott@redhat.com>
+On 05/11/2015 03:31 AM, Mark Rutland wrote:
+> At boot time we round the memblock limit down to section size in an
+> attempt to ensure that we will have mapped this RAM with section
+> mappings prior to allocating from it. When mapping RAM we iterate over
+> PMD-sized chunks, creating these section mappings.
+>
+> Section mappings are only created when the end of a chunk is aligned to
+> section size. Unfortunately, with classic page tables (where PMD_SIZE is
+> 2 * SECTION_SIZE) this means that if a chunk is between 1M and 2M in
+> size the first 1M will not be mapped despite having been accounted for
+> in the memblock limit. This has been observed to result in page tables
+> being allocated from unmapped memory, causing boot-time hangs.
+>
+> This patch modifies the memblock limit rounding to always round down to
+> PMD_SIZE instead of SECTION_SIZE. For classic MMU this means that we
+> will round the memblock limit down to a 2M boundary, matching the limits
+> on section mappings, and preventing allocations from unmapped memory.
+> For LPAE there should be no change as PMD_SIZE == SECTION_SIZE.
+>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Reported-by: Stefan Agner <stefan@agner.ch>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Hans de Goede <hdegoede@redhat.com>
+> Cc: Laura Abbott <labbott@redhat.com>
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> Cc: Steve Capper <steve.capper@linaro.org>
 
-The memblock limit is currently used in find_limits
-to find the bounds for ZONE_NORMAL. The memblock
-limit may need to be rounded down a PMD size to ensure
-allocations are fully mapped though. This has the side
-effect of reducing the amount of memory in ZONE_NORMAL.
-Since we generally want to optimize for more lowmem, fix
-this by using arm_lowmem_limit to calculate the bounds.
-This what is used for actually mapping lowmem anyway.
+Acked-by: Laura Abbott <labbott@redhat.com>
 
-Before:
-# cat /proc/zoneinfo | grep managed
-        managed  62920
-
-After:
-# cat /proc/zoneinfo | grep managed
-        managed  63336
-
-
-
-Signed-off-by: Laura Abbott <labbott@redhat.com>
----
- arch/arm/mm/init.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index be92fa0..b4f9513 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -89,7 +89,7 @@ __tagtable(ATAG_INITRD2, parse_tag_initrd2);
- static void __init find_limits(unsigned long *min, unsigned long *max_low,
- 			       unsigned long *max_high)
- {
--	*max_low = PFN_DOWN(memblock_get_current_limit());
-+	*max_low = PFN_DOWN(arm_lowmem_limit);
- 	*min = PFN_UP(memblock_start_of_DRAM());
- 	*max_high = PFN_DOWN(memblock_end_of_DRAM());
- }
--- 
-2.1.0
+> ---
+>   arch/arm/mm/mmu.c | 20 ++++++++++----------
+>   1 file changed, 10 insertions(+), 10 deletions(-)
+>
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index 4e6ef89..7186382 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -1112,22 +1112,22 @@ void __init sanity_check_meminfo(void)
+>   			}
+>
+>   			/*
+> -			 * Find the first non-section-aligned page, and point
+> +			 * Find the first non-pmd-aligned page, and point
+>   			 * memblock_limit at it. This relies on rounding the
+> -			 * limit down to be section-aligned, which happens at
+> -			 * the end of this function.
+> +			 * limit down to be pmd-aligned, which happens at the
+> +			 * end of this function.
+>   			 *
+>   			 * With this algorithm, the start or end of almost any
+> -			 * bank can be non-section-aligned. The only exception
+> -			 * is that the start of the bank 0 must be section-
+> +			 * bank can be non-pmd-aligned. The only exception is
+> +			 * that the start of the bank 0 must be section-
+>   			 * aligned, since otherwise memory would need to be
+>   			 * allocated when mapping the start of bank 0, which
+>   			 * occurs before any free memory is mapped.
+>   			 */
+>   			if (!memblock_limit) {
+> -				if (!IS_ALIGNED(block_start, SECTION_SIZE))
+> +				if (!IS_ALIGNED(block_start, PMD_SIZE))
+>   					memblock_limit = block_start;
+> -				else if (!IS_ALIGNED(block_end, SECTION_SIZE))
+> +				else if (!IS_ALIGNED(block_end, PMD_SIZE))
+>   					memblock_limit = arm_lowmem_limit;
+>   			}
+>
+> @@ -1137,12 +1137,12 @@ void __init sanity_check_meminfo(void)
+>   	high_memory = __va(arm_lowmem_limit - 1) + 1;
+>
+>   	/*
+> -	 * Round the memblock limit down to a section size.  This
+> +	 * Round the memblock limit down to a pmd size.  This
+>   	 * helps to ensure that we will allocate memory from the
+> -	 * last full section, which should be mapped.
+> +	 * last full pmd, which should be mapped.
+>   	 */
+>   	if (memblock_limit)
+> -		memblock_limit = round_down(memblock_limit, SECTION_SIZE);
+> +		memblock_limit = round_down(memblock_limit, PMD_SIZE);
+>   	if (!memblock_limit)
+>   		memblock_limit = arm_lowmem_limit;
+>
+>
