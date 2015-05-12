@@ -1,26 +1,113 @@
-From: Dave.Martin@arm.com (Dave P Martin)
-Date: Tue, 12 May 2015 16:00:38 +0100
-Subject: [PATCH] serial/amba-pl011: Unconditionally poll for FIFO space
- before each TX char
-In-Reply-To: <20150512160027.21244f64@north>
-References: <1431438266-28094-1-git-send-email-Dave.Martin@arm.com>
- <20150512160027.21244f64@north>
-Message-ID: <20150512150037.GA29594@e103592.cambridge.arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 12 May 2015 17:01:43 +0200
+Subject: [PATCH 6/8] arm64/efi: ignore DT memory nodes instead of removing
+ them
+In-Reply-To: <20150512143115.GQ24474@bivouac.eciton.net>
+References: <1431326520-17331-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1431326520-17331-7-git-send-email-ard.biesheuvel@linaro.org>
+ <20150512143115.GQ24474@bivouac.eciton.net>
+Message-ID: <CAKv+Gu83ufL1YE80jg3XOc84ERjMzqSm=oTm14Wie-xb-+2kGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 12, 2015 at 03:00:27PM +0100, Jakub Kici?ski wrote:
-> On Tue, 12 May 2015 14:44:26 +0100, Dave Martin wrote:
-> > This will cause a conflict with tty-next because it pulls forward
-> > some changes made by commit 1e84d22 (serial/amba-pl011: Refactor and
-> > simplify TX FIFO handling); however, the resolution is simple except
-> > for the following lines which may need to be deleted manually from
-> > amba-pl011.c:pl011_startup():
-> 
-> By resolution is simple you mean: keep the code as it is in tty-next,
-> right?
+On 12 May 2015 at 16:31, Leif Lindholm <leif.lindholm@linaro.org> wrote:
+> On Mon, May 11, 2015 at 08:41:58AM +0200, Ard Biesheuvel wrote:
+>> There are two problems with the UEFI stub DT memory node removal
+>> routine:
+>> - it deletes nodes as it traverses the tree, which happens to work
+>>   but is not supported, as deletion invalidates the node iterator;
+>> - deleting memory nodes entirely may discard annotations in the form
+>>   of additional properties on the nodes.
+>>
+>> Now that the UEFI initialization has moved to an earlier stage, we can
+>> actually just ignore any memblocks that are installed after we have
+>> processed the UEFI memory map. This way, it is no longer necessary to
+>> remove the nodes, so we can remove that logic from the stub as well.
+>
+> So ... I don't have an issue with this patch as such, but keeping the
+> memory nodes around for NUMA topology when the UEFI memory map is
+> the one being used for memblock leads to a spooky redefinition of what
+> that memory node _is_; it would now describe a region which may only
+> partially be populated with RAM.
+>
 
-Yes, that's right.
+How does that not apply to ACPI? It is still the responsibility of the
+firmware to ensure that all information it supplies is consistent with
+itself.
 
-Cheers
----Dave
+But I agree that we should carefully consider this interaction before
+accepting any NUMA changes to the memnode bindings and implementation.
+
+-- 
+Ard.
+
+
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm64/mm/init.c               |  7 +++++++
+>>  drivers/firmware/efi/libstub/fdt.c | 24 +-----------------------
+>>  2 files changed, 8 insertions(+), 23 deletions(-)
+>>
+>> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+>> index 64480b65ef17..95c239f43384 100644
+>> --- a/arch/arm64/mm/init.c
+>> +++ b/arch/arm64/mm/init.c
+>> @@ -386,6 +386,13 @@ __setup("keepinitrd", keepinitrd_setup);
+>>
+>>  void __init early_init_dt_add_memory_arch(u64 base, u64 size)
+>>  {
+>> +     /*
+>> +      * EFI_MEMMAP will be set /after/ UEFI has installed all memory based
+>> +      * on the content of the UEFI memory map.
+>> +      */
+>> +     if (efi_enabled(EFI_MEMMAP))
+>> +             return;
+>> +
+>>       if (!PAGE_ALIGNED(base)) {
+>>               if (size < PAGE_SIZE - (base & ~PAGE_MASK)) {
+>>                       pr_warn("Ignoring memory block 0x%llx - 0x%llx\n",
+>> diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
+>> index ef5d764e2a27..343e7992bd8f 100644
+>> --- a/drivers/firmware/efi/libstub/fdt.c
+>> +++ b/drivers/firmware/efi/libstub/fdt.c
+>> @@ -24,7 +24,7 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
+>>                       unsigned long map_size, unsigned long desc_size,
+>>                       u32 desc_ver)
+>>  {
+>> -     int node, prev, num_rsv;
+>> +     int node, num_rsv;
+>>       int status;
+>>       u32 fdt_val32;
+>>       u64 fdt_val64;
+>> @@ -54,28 +54,6 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
+>>               goto fdt_set_fail;
+>>
+>>       /*
+>> -      * Delete any memory nodes present. We must delete nodes which
+>> -      * early_init_dt_scan_memory may try to use.
+>> -      */
+>> -     prev = 0;
+>> -     for (;;) {
+>> -             const char *type;
+>> -             int len;
+>> -
+>> -             node = fdt_next_node(fdt, prev, NULL);
+>> -             if (node < 0)
+>> -                     break;
+>> -
+>> -             type = fdt_getprop(fdt, node, "device_type", &len);
+>> -             if (type && strncmp(type, "memory", len) == 0) {
+>> -                     fdt_del_node(fdt, node);
+>> -                     continue;
+>> -             }
+>> -
+>> -             prev = node;
+>> -     }
+>> -
+>> -     /*
+>>        * Delete all memory reserve map entries. When booting via UEFI,
+>>        * kernel will use the UEFI memory map to find reserved regions.
+>>        */
+>> --
+>> 1.9.1
+>>
