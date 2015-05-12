@@ -1,66 +1,36 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 12 May 2015 18:03:40 +0200
-Subject: schedule_timeout sleeps too long after dividing CPU frequency
-In-Reply-To: <20150512152332.GO2067@n2100.arm.linux.org.uk>
-References: <55520F0F.5010906@free.fr>
- <20150512152332.GO2067@n2100.arm.linux.org.uk>
-Message-ID: <5552245C.2080701@free.fr>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 May 2015 18:03:34 +0200
+Subject: [PATCH 2/8] dmaengine: mv_xor: add support for a38x command in
+ descriptor mode
+In-Reply-To: <20150512175431.378c346e@free-electrons.com>
+References: <1431445063-20226-1-git-send-email-maxime.ripard@free-electrons.com>
+ <4862159.g8Sk9nOiS2@wuerfel> <20150512175431.378c346e@free-electrons.com>
+Message-ID: <3020836.4xH6fTICuR@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/2015 17:23, Russell King - ARM Linux wrote:
-
-> On Tue, May 12, 2015 at 04:32:47PM +0200, Mason wrote:
+On Tuesday 12 May 2015 17:54:31 Thomas Petazzoni wrote:
+> Dear Arnd Bergmann,
 > 
->> I'm working on a Cortex A9 based platform.
->>
->> I have a basic clock tree, and a very basic cpufreq driver using
->> mostly generic driver glue:
->>
->> static struct cpufreq_driver tangox_cpufreq_driver = {
->> 	.name		= "tangox-cpufreq",
->> 	.init		= tangox_cpu_init,
->> 	.verify		= cpufreq_generic_frequency_table_verify,
->> 	.target_index	= tangox_target,
->> 	.get		= cpufreq_generic_get,
->> 	.exit		= cpufreq_generic_exit,
->> 	.attr		= cpufreq_generic_attr,
->> };
->>
->> My target_index function is trivial:
->>
->> static int tangox_target(struct cpufreq_policy *policy, unsigned int idx)
->> {
->> 	return clk_set_rate(policy->clk, freq_table[idx].frequency * 1000);
->> }
->>
->> I was testing an unrelated driver at low frequencies, with the nominal
->> frequency (999 MHz) divided by 54 (i.e. freq = 18.5 MHz) and I noticed
->> that when the driver calls
->>
->>     schedule_timeout(HZ);
->>
->> the thread sleeps 54 seconds instead of 1.
+> On Tue, 12 May 2015 17:49:08 +0200, Arnd Bergmann wrote:
 > 
-> I'm guessing that this will be because your local timer changes frequency
-> with the CPU, which means that the clockevent which was set for one second
-> ends up timing out after 54 seconds.
+> > Using 
+> > 
+> >       if (IS_ENABLED(__BIG_ENDIAN))
+> > 
+> > here would make it more readable by avoiding the #if. Alternatively,
+> > you could leave the XOR_DESCRIPTOR_SWAP flag disabled and just swap
+> > the descriptors manually like a lot of other drivers do. You have
+> > to swap the mmio accesses anywya.
+> 
+> Agreed on IS_ENABLED(). However, I don't understand the comment about
+> the need to swap mmio accesses? We're using readl_relaxed() /
+> writel_relaxed(), and they do the swapping already. Am I missing
+> something?
+> 
 
-That's the first thing I suspected, but smp_twd.c registers a clk_notifier
-to be notified of CPU frequency changes:
+Sorry for being unclear. This was exactly my point: readl_relaxed()
+has to do swaps internally, and you can also do swaps when accessing
+the descriptor in memory.
 
-static struct notifier_block twd_clk_nb = {
-	.notifier_call = twd_rate_change,
-};
-
-static int twd_clk_init(void)
-{
-	if (twd_evt && __this_cpu_ptr(twd_evt) && !IS_ERR(twd_clk))
-		return clk_notifier_register(twd_clk, &twd_clk_nb);
-
-	return 0;
-}
-
-And I instrumented twd_update_frequency() to check it was being called.
-
-Regards.
+	Arnd
