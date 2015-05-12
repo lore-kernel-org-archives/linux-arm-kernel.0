@@ -1,9 +1,9 @@
 From: ygardi@codeaurora.org (ygardi at codeaurora.org)
-Date: Tue, 12 May 2015 07:05:29 -0000
-Subject: [PATCH] phy: qcom-ufs: Switch dependency to ARCH_QCOM
-In-Reply-To: <1428707466-24526-3-git-send-email-sboyd@codeaurora.org>
-References: <1428707466-24526-3-git-send-email-sboyd@codeaurora.org>
-Message-ID: <42019bf2314bad314c737a10f9c7628b.squirrel@www.codeaurora.org>
+Date: Tue, 12 May 2015 07:05:24 -0000
+Subject: [PATCH] ufs-qcom: Switch dependency to ARCH_QCOM
+In-Reply-To: <1428707466-24526-5-git-send-email-sboyd@codeaurora.org>
+References: <1428707466-24526-5-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1730be19bac4946d9c15fa7c99cfbbc0.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,34 +12,39 @@ looks good.
 Acked-by: Yaniv Gardi <ygardi@codeaurora.org>
 
 
-> This phy only exists on platforms under ARCH_QCOM, not ARCH_MSM.
+> This device only exists on platforms under ARCH_QCOM, not
+> ARCH_MSM.
 >
 > Cc: Yaniv Gardi <ygardi@codeaurora.org>
 > Cc: Dov Levenglick <dovl@codeaurora.org>
-> Cc: Christoph Hellwig <hch@lst.de>
+> Cc: Vinayak Holikatti <vinholikatti@gmail.com>
 > Cc: David Brown <davidb@codeaurora.org>
 > Cc: Bryan Huntsman <bryanh@codeaurora.org>
 > Cc: Daniel Walker <dwalker@fifo99.com>
 > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > ---
->  drivers/phy/Kconfig | 2 +-
+>  drivers/scsi/ufs/Kconfig | 2 +-
 >  1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> index 2962de205ba7..9b1ff313bd51 100644
-> --- a/drivers/phy/Kconfig
-> +++ b/drivers/phy/Kconfig
-> @@ -286,7 +286,7 @@ config PHY_STIH41X_USB
+> diff --git a/drivers/scsi/ufs/Kconfig b/drivers/scsi/ufs/Kconfig
+> index 8a1f4b355416..e94538362536 100644
+> --- a/drivers/scsi/ufs/Kconfig
+> +++ b/drivers/scsi/ufs/Kconfig
+> @@ -73,7 +73,7 @@ config SCSI_UFSHCD_PLATFORM
 >
->  config PHY_QCOM_UFS
->  	tristate "Qualcomm UFS PHY driver"
-> -	depends on OF && ARCH_MSM
-> +	depends on OF && ARCH_QCOM
->  	select GENERIC_PHY
+>  config SCSI_UFS_QCOM
+>  	bool "QCOM specific hooks to UFS controller platform driver"
+> -	depends on SCSI_UFSHCD_PLATFORM && ARCH_MSM
+> +	depends on SCSI_UFSHCD_PLATFORM && ARCH_QCOM
+>  	select PHY_QCOM_UFS
 >  	help
->  	  Support for UFS PHY on QCOM chipsets.
+>  	  This selects the QCOM specific additions to UFSHCD platform driver.
 > --
 > The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 > a Linux Foundation Collaborative Project
 >
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-scsi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 >
