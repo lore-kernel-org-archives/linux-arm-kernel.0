@@ -1,21 +1,22 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Wed, 13 May 2015 03:01:26 +0900
-Subject: exynos_defconfig: Enable SENSORS_PWM_FAN, SENSORS_INA2XX, LEDS
- for OdroidXU3
-In-Reply-To: <1431444262-29531-1-git-send-email-linux.amoon@gmail.com>
-References: <Anand Moon <linux.amoon@gmail.com>
- <1431444262-29531-1-git-send-email-linux.amoon@gmail.com>
-Message-ID: <55523FF6.7020505@kernel.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 12 May 2015 19:07:39 +0100
+Subject: [PATCH] ASoC: dapm: Modify widget stream name according to prefix
+In-Reply-To: <1431311813-37430-1-git-send-email-koro.chen@mediatek.com>
+References: <1431311813-37430-1-git-send-email-koro.chen@mediatek.com>
+Message-ID: <20150512180738.GN3066@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/13/15 00:24, Anand Moon wrote:
-> Enable SENSORS_PWM_FAN, SENSORS_INA2XX, LEDS for OdroidXU3.
-> 
-Basically, I have no objection on this series so for the test on other
-exynos boards. Of course, if any problems on other boards, need to fix
-it maybe it will not be happened...anyway, I'll pick them in my tree
-once the dependent patch you mentioned is ready.
+On Mon, May 11, 2015 at 10:36:53AM +0800, Koro Chen wrote:
+> When there is prefix specified, currently we will add this prefix in
+> widget->name, but not in widget->sname.
+> it causes failure at snd_soc_dapm_link_dai_widgets:
 
-Thanks,
-Kukjin
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150512/a9493189/attachment.sig>
