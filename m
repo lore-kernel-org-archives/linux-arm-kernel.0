@@ -1,53 +1,33 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 12 May 2015 16:32:39 +0900
-Subject: [v2 1/5] arm64: kdump: reserve memory for crash dump kernel
-In-Reply-To: <20150511094115.GB4290@dhcp-128-28.nay.redhat.com>
-References: <1429861989-8417-1-git-send-email-takahiro.akashi@linaro.org>
- <1429861989-8417-2-git-send-email-takahiro.akashi@linaro.org>
- <20150428091935.GJ15033@dhcp-16-116.nay.redhat.com>
- <55505C91.8070503@linaro.org>
- <20150511075447.GA4290@dhcp-128-28.nay.redhat.com>
- <5550659D.90006@linaro.org>
- <20150511094115.GB4290@dhcp-128-28.nay.redhat.com>
-Message-ID: <5551AC97.9040802@linaro.org>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Tue, 12 May 2015 09:39:13 +0200
+Subject: [PATCH 0/2 v2] Fix boot on Calxeda highbank
+Message-ID: <1431416355-7693-1-git-send-email-sjoerd.simons@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2015 06:41 PM, Baoquan He wrote:
-> On 05/11/15 at 05:17pm, AKASHI Takahiro wrote:
->> On 05/11/2015 04:54 PM, Baoquan He wrote:
->>> In this patch you reserve a separate memory region in 1st kernel to
->>> store elfcorehdr. I am wondering why you don't call add_buffer in
->>> kexec-tools directly. Like this you can get a region from reserved
->>> crashkernel region. Then you don't need reserve_elfcorehdr() to reserve
->>> memory for elfcorehdr specifically. Like other ARCHs do only one memory
->>> region is reserved in 1st kernel, that's crashkernel region.
->>
->> I think that you misunderstand somewhat.
->> * Kexec-tools only locates/identifies a small region for elfcore header within crash kernel's
->> memory region while 1st kernel is running.
->> * the data in elfcore header is filled up by kexec_load system call on 1st kernel.
->> * 1st kernel doesn't reserve any region for elfcore header because the kernel
->> commandline parameters don't contains "elfcorehdr=" parameter, then elfcorehdr_size=0.
->> * Crash dump kernel does reserve the region, as I said, because we don't want to
->> corrupt the info in elfcore header accidentally while crash kernel is running.
->>
->> Clear?
->
-> OK, got it now.
->
-> Then I am wondering why "elfcorehdr=" can't be contained in kernel
-> cmdline as other ARCH does. Maybe I need go over all related threads
-> then know why it is. Thanks for explanation.
+When upgrading our trusted Calxeda server to Debian Jessie recently the machine
+wedged during booting the installer. Upon further investigation, this happens
+due to the transition to the generic L2C infrastructure introduced in 3.16. The
+generic l2x0 code unlocks the cache during setup, however the Caldexa SMC
+interface doesn't seem to allow the kernel to enable enable non-secure access
+to the lock registers.. Queue Imprecise aborts and a fairly unhappy machine.
 
-Kexec-tools on 1st kernel appends "elfcorehdr=" to the kernel command line,
-actually chosen/bootargs in a device tree, that is passed to *crash dump kernel*.
-So when crash dump kernel boots up, it can recognizes that area (and reserves it
-for later use of managing /proc/vmcore.)
+First patch in this series adds detection to the l2x0 code to check if
+unlocking is possible. Second patch adds a (empty) configure callback for the
+highbank l2c, reflecting the fact that there seemingly isn't anything to
+configured via an SMC on these maches.
 
-Thanks,
--Takahiro AKASHI
+Changes since v1:
+ - Auto-detect when unlocking the cache is unsafe rather then requiring a
+   explicit flag to be set in the machine-specific code
 
-> Thanks
-> Baoquan
->
+Sjoerd Simons (2):
+  ARM: cache-l2c: Detect whether it's safe to unlock
+  ARM: l2c: highbank: Add dummy configure function
+
+ arch/arm/mach-highbank/highbank.c |  8 ++++++++
+ arch/arm/mm/cache-l2x0.c          | 20 ++++++++++++++++++++
+ 2 files changed, 28 insertions(+)
+
+-- 
+2.1.4
