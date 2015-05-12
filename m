@@ -1,51 +1,38 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 12 May 2015 08:22:01 +0200
-Subject: [PATCH] ARM: zynq: Set bit 22 in PL310 AuxCtrl register (6395/1)
-Message-ID: <812979c5a158a3306d8036e7f9731947c58a3ab7.1431411716.git.michal.simek@xilinx.com>
+From: daniels@collabora.com (Daniel Stone)
+Date: Tue, 12 May 2015 07:33:04 +0100
+Subject: "drm: Add reference counting to blob properties" breaks Tegra124
+ Jetson TK1 in linux-next
+In-Reply-To: <55517AE5.30700@nvidia.com>
+References: <55517AE5.30700@nvidia.com>
+Message-ID: <5DC9157B-3CE7-4794-B77A-865C609DFB05@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Betker <thomas.betker@rohde-schwarz.com>
+Hi Paul,
 
-This patch is based on the
-commit 1a8e41cd672f ("ARM: 6395/1: VExpress: Set bit 22 in the PL310
-(cache controller) AuxCtlr register")
+> On 12 May 2015, at 5:00 am, Paul Walmsley <pwalmsley@nvidia.com> wrote:
+> 
+> Hi folks
+> 
+> Tegra124 Jetson TK1 hangs during boot in next-20150508 and beyond:
+> 
+> http://nvt.pwsan.com/experimental/linux-next/testlogs/test_next-20150508/20150508101018/boot/tegra124-jetson-tk1/tegra124-jetson-tk1/tegra_defconfig_log.txt 
+> http://nvt.pwsan.com/experimental/linux-next/testlogs/test_next-20150511/20150511004533/boot/tegra124-jetson-tk1/tegra124-jetson-tk1/tegra_defconfig_log.txt 
 
-Clearing bit 22 in the PL310 Auxiliary Control register (shared
-attribute override enable) has the side effect of transforming Normal
-Shared Non-cacheable reads into Cacheable no-allocate reads.
+Weirdly enough, it seems to work in kernelci:
+http://kernelci.org/boot/tegra124-jetson-tk1_rootfs:nfs/job/next/kernel/next-20150511/defconfig/tegra_defconfig/lab/lab-khilman/?_id=5550ef6259b5147b64e060b4
 
-Coherent DMA buffers in Linux always have a cacheable alias via the
-kernel linear mapping and the processor can speculatively load cache
-lines into the PL310 controller. With bit 22 cleared, Non-cacheable
-reads would unexpectedly hit such cache lines leading to buffer
-corruption.
+Though maybe it's just good fortune that Kevin doesn't have a display plugged into his TK1.
 
-For Zynq, this fix avoids memory inconsistencies between Gigabit
-Ethernet controller (GEM) and CPU when DMA_CMA is disabled.
+> Reverting commit 672cb1d6aec7da2799afd1b529d5136d84ed2561 ("drm: Add reference counting to blob properties") gets it booting again:
+> 
+> http://nvt.pwsan.com/pub/pwalmsley-tester/testlogs/test_20150511204703_3838232431c2636ff539f2354c630c0ca3d4b7ad/20150511204703/boot/tegra124-jetson-tk1/tegra124-jetson-tk1/tegra_defconfig_log.txt
+> 
+> I'm not a DRM expert but maybe one of you knows what's going on here?
 
-Suggested-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
-Signed-off-by: Thomas Betker <thomas.betker@rohde-schwarz.com>
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+Thanks for the catch. I have a Nyan-Big Chromebook here, so will try to work it out locally and let you know.
 
- arch/arm/mach-zynq/common.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Sorry for the inconvenience!
 
-diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index 39c1c7d43522..af36dc2545c1 100644
---- a/arch/arm/mach-zynq/common.c
-+++ b/arch/arm/mach-zynq/common.c
-@@ -197,8 +197,8 @@ static const char * const zynq_dt_match[] = {
- 
- DT_MACHINE_START(XILINX_EP107, "Xilinx Zynq Platform")
- 	/* 64KB way size, 8-way associativity, parity disabled */
--	.l2c_aux_val	= 0x00000000,
--	.l2c_aux_mask	= 0xffffffff,
-+	.l2c_aux_val    = 0x00400000,
-+	.l2c_aux_mask	= 0xffbfffff,
- 	.smp		= smp_ops(zynq_smp_ops),
- 	.map_io		= zynq_map_io,
- 	.init_irq	= zynq_irq_init,
--- 
-2.3.5
+Cheers,
+Daniel
