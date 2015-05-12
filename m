@@ -1,49 +1,89 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 12 May 2015 07:13:49 -0700
-Subject: [PATCH 1/1] gpio: omap: Fix PM runtime issue and remove most
- BANK_USED macros
-In-Reply-To: <CACRpkdZ1nJ=-NPHrZdCQ6_TCrF7009R9Y7zVyXN1z9RWcv3a6A@mail.gmail.com>
-References: <1429632533-23285-1-git-send-email-tony@atomide.com>
- <CACRpkdZ1nJ=-NPHrZdCQ6_TCrF7009R9Y7zVyXN1z9RWcv3a6A@mail.gmail.com>
-Message-ID: <20150512141348.GG15563@atomide.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 12 May 2015 15:14:45 +0100
+Subject: [PATCH v4 01/11] drivers: PL011: avoid potential unregister_driver
+ call
+In-Reply-To: <1431440095-5146-1-git-send-email-andre.przywara@arm.com>
+References: <1431440095-5146-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1431440095-5146-2-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [150512 02:01]:
-> On Tue, Apr 21, 2015 at 6:08 PM, Tony Lindgren <tony@atomide.com> wrote:
-> 
-> > Looks like omap_gpio_irq_type can return early at several places
-> > leaving a GPIO bank enabled without doing pm_runtime_put if wrong
-> > GPIO arguments are passed.
-> >
-> > Instead of adding more complicated BANK_USED macros, let's fix the
-> > issue properly. We can pass is_irq flag to omap_enable_gpio_module
-> > and omap_disble_gpio_module. And with that we can remove all the
-> > similar code elsewhere to get rid of most BANK_USED macros.
-> >
-> > Note that the reason for the BANK_USED macro is that we need to manage
-> > PM runtime on per GPIO bank basis. In the long run we want to move to
-> > using PM runtime counts for each GPIO line to determine if a GPIO
-> > bank is used. Once we have a solution for omap_enable_gpio_module
-> > and omap_disable_gpio_module, we can remove the remaining BANK_USED
-> > macros.
-> >
-> > Cc: Felipe Balbi <balbi@ti.com>
-> > Cc: Grygorii Strashko <grygorii.strashko@linaro.org>
-> > Cc: Javier Martinez Canillas <jmartinez@softcrates.net>
-> > Cc: Nishanth Menon <nm@ti.com>
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> There is so much discussion around this patch that I can't make
-> up my mind whether I should apply this or some subsequent inline
-> version of it.
-> 
-> Holding this off for now...
+Although we care about not unregistering the driver if there are
+still ports connected during the .remove callback, we do miss this
+check in the pl011_probe function. So if the current port allocation
+fails, but there are other ports already registered, we will kill
+those.
+So factor out the port removal into a separate function and use that
+in the probe function, too.
 
-Yeah let's see what Grygorii comes up, sounds like he may have
-a minimal fix coming up. Then we can do the rest as clean-up
-later on.
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ drivers/tty/serial/amba-pl011.c | 37 +++++++++++++++++++++----------------
+ 1 file changed, 21 insertions(+), 16 deletions(-)
 
-Regards,
-
-Tony
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index f5bd842..d08951f 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -2135,6 +2135,24 @@ static int pl011_probe_dt_alias(int index, struct device *dev)
+ 	return ret;
+ }
+ 
++/* unregisters the driver also if no more ports are left */
++static void pl011_unregister_port(struct uart_amba_port *uap)
++{
++	int i;
++	bool busy = false;
++
++	for (i = 0; i < ARRAY_SIZE(amba_ports); i++) {
++		if (amba_ports[i] == uap)
++			amba_ports[i] = NULL;
++		else if (amba_ports[i])
++			busy = true;
++	}
++	pl011_dma_remove(uap);
++	if (!busy)
++		uart_unregister_driver(&amba_reg);
++}
++
++
+ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ {
+ 	struct uart_amba_port *uap;
+@@ -2200,10 +2218,8 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ 	}
+ 
+ 	ret = uart_add_one_port(&amba_reg, &uap->port);
+-	if (ret) {
+-		amba_ports[i] = NULL;
+-		uart_unregister_driver(&amba_reg);
+-	}
++	if (ret)
++		pl011_unregister_port(uap);
+ 
+ 	return ret;
+ }
+@@ -2211,20 +2227,9 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ static int pl011_remove(struct amba_device *dev)
+ {
+ 	struct uart_amba_port *uap = amba_get_drvdata(dev);
+-	bool busy = false;
+-	int i;
+ 
+ 	uart_remove_one_port(&amba_reg, &uap->port);
+-
+-	for (i = 0; i < ARRAY_SIZE(amba_ports); i++)
+-		if (amba_ports[i] == uap)
+-			amba_ports[i] = NULL;
+-		else if (amba_ports[i])
+-			busy = true;
+-
+-	pl011_dma_remove(uap);
+-	if (!busy)
+-		uart_unregister_driver(&amba_reg);
++	pl011_unregister_port(uap);
+ 	return 0;
+ }
+ 
+-- 
+2.3.5
