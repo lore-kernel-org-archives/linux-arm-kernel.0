@@ -1,47 +1,75 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 12 May 2015 17:37:35 +0200
-Subject: [PATCH 0/8] ARM: mvebu: Add support for RAID6 PQ offloading
-Message-ID: <1431445063-20226-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Tue, 12 May 2015 17:37:43 +0200
+Subject: [PATCH 8/8] ARM: mvebu: a38x: Enable A38x XOR engine features
+In-Reply-To: <1431445063-20226-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1431445063-20226-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1431445063-20226-9-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Lior Amsalem <alior@marvell.com>
 
-This serie refactors the mv_xor in order to support the latest Armada
-38x features, including the PQ support in order to offload the RAID6
-PQ operations.
+The new XOR engine has a new compatible of its own, together with new
+channel capabilities.
 
-Not all the PQ operations are supported by the XOR engine, so we had
-to introduce new async_tx flags in the process to identify
-un-supported operations.
+Use that new compatible now that we have a driver that can handle it.
 
-Please note that this is currently not usable because of a possible
-regression in the RAID stack in 4.1 that is being discussed at the
-moment here: https://lkml.org/lkml/2015/5/7/527
+Signed-off-by: Lior Amsalem <alior@marvell.com>
+Reviewed-by: Ofer Heifetz <oferh@marvell.com>
+Reviewed-by: Nadav Haklai <nadavh@marvell.com>
+Tested-by: Nadav Haklai <nadavh@marvell.com>
+---
+ arch/arm/boot/dts/armada-38x.dtsi | 20 ++++++--------------
+ 1 file changed, 6 insertions(+), 14 deletions(-)
 
-Let me know what you think,
-Maxime
-
-Lior Amsalem (7):
-  dmaengine: mv_xor: add support for a38x command in descriptor mode
-  dmaengine: mv_xor: Enlarge descriptor pool size
-  dmaengine: mv_xor: improve descriptors list handling and reduce
-    locking
-  dmaengine: mv_xor: bug fix for racing condition in descriptors cleanup
-  async_tx: adding mult and sum_product flags
-  dmaengine: mv_xor: add support for a38x RAID6 support
-  ARM: mvebu: a38x: Enable A38x XOR engine features
-
-Maxime Ripard (1):
-  dmaengine: mv_xor: Rename function for consistent naming
-
- Documentation/devicetree/bindings/dma/mv-xor.txt |   2 +-
- arch/arm/boot/dts/armada-38x.dtsi                |  20 +-
- crypto/async_tx/async_raid6_recov.c              |   4 +-
- drivers/dma/mv_xor.c                             | 459 +++++++++++++++--------
- drivers/dma/mv_xor.h                             |  32 +-
- include/linux/dmaengine.h                        |   4 +
- 6 files changed, 326 insertions(+), 195 deletions(-)
-
+diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+index ed2dd8ba4080..6d07b7389415 100644
+--- a/arch/arm/boot/dts/armada-38x.dtsi
++++ b/arch/arm/boot/dts/armada-38x.dtsi
+@@ -448,7 +448,7 @@
+ 			};
+ 
+ 			xor at 60800 {
+-				compatible = "marvell,orion-xor";
++				compatible = "marvell,a38x-xor";
+ 				reg = <0x60800 0x100
+ 				       0x60a00 0x100>;
+ 				clocks = <&gateclk 22>;
+@@ -458,17 +458,13 @@
+ 					interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
+ 					dmacap,memcpy;
+ 					dmacap,xor;
+-				};
+-				xor01 {
+-					interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
+-					dmacap,memcpy;
+-					dmacap,xor;
+-					dmacap,memset;
++					dmacap,pq;
++					dmacap,interrupt;
+ 				};
+ 			};
+ 
+ 			xor at 60900 {
+-				compatible = "marvell,orion-xor";
++				compatible = "marvell,a38x-xor";
+ 				reg = <0x60900 0x100
+ 				       0x60b00 0x100>;
+ 				clocks = <&gateclk 28>;
+@@ -478,12 +474,8 @@
+ 					interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
+ 					dmacap,memcpy;
+ 					dmacap,xor;
+-				};
+-				xor11 {
+-					interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
+-					dmacap,memcpy;
+-					dmacap,xor;
+-					dmacap,memset;
++					dmacap,pq;
++					dmacap,interrupt;
+ 				};
+ 			};
+ 
 -- 
 2.4.0
