@@ -1,38 +1,44 @@
-From: tyler.baker@linaro.org (tyler.baker at linaro.org)
-Date: Tue, 12 May 2015 14:59:07 -0700
-Subject: [PATCH 2/2] selftests/breakpoints: only set TEST_PROGS when built
-In-Reply-To: <1431467947-29847-1-git-send-email-tyler.baker@linaro.org>
-References: <1431467947-29847-1-git-send-email-tyler.baker@linaro.org>
-Message-ID: <1431467947-29847-3-git-send-email-tyler.baker@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 May 2015 00:00:33 +0200
+Subject: [PATCH] rtc: armada38x: remove unused variables
+Message-ID: <2116673.Ym6IPoTTaZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tyler Baker <tyler.baker@linaro.org>
+A recent bugfix introduced a new compiler warning in the rtc-armada38x
+driver:
 
-Set TEST_PROGS only when a build has occurred.
+drivers/rtc/rtc-armada38x.c: In function 'armada38x_rtc_read_time':
+drivers/rtc/rtc-armada38x.c:67:34: warning: unused variable 'flags' [-Wunused-variable]
+  unsigned long time, time_check, flags;
 
-Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
----
- tools/testing/selftests/breakpoints/Makefile | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+This removes the now obsolete variables to get rid of the warning.
+As the orginal fix was marked for stable backports [4.0], this one
+should be backported as well.
 
-diff --git a/tools/testing/selftests/breakpoints/Makefile b/tools/testing/selftests/breakpoints/Makefile
-index 1822356..54cc3e7 100644
---- a/tools/testing/selftests/breakpoints/Makefile
-+++ b/tools/testing/selftests/breakpoints/Makefile
-@@ -12,12 +12,11 @@ endif
- all:
- ifeq ($(ARCH),x86)
- 	gcc breakpoint_test.c -o breakpoint_test
-+	TEST_PROGS := breakpoint_test
- else
- 	echo "Not an x86 target, can't build breakpoints selftests"
- endif
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 489405fe5ed38 ("rtc: armada38x: fix concurrency access in armada38x_rtc_set_time")
+Cc: stable at vger.kernel.org
+
+diff --git a/drivers/rtc/rtc-armada38x.c b/drivers/rtc/rtc-armada38x.c
+index cb70ced7e0db..2b08cac62f07 100644
+--- a/drivers/rtc/rtc-armada38x.c
++++ b/drivers/rtc/rtc-armada38x.c
+@@ -64,7 +64,7 @@ static void rtc_delayed_write(u32 val, struct armada38x_rtc *rtc, int offset)
+ static int armada38x_rtc_read_time(struct device *dev, struct rtc_time *tm)
+ {
+ 	struct armada38x_rtc *rtc = dev_get_drvdata(dev);
+-	unsigned long time, time_check, flags;
++	unsigned long time, time_check;
  
--TEST_PROGS := breakpoint_test
--
- include ../lib.mk
+ 	mutex_lock(&rtc->mutex_time);
+ 	time = readl(rtc->regs + RTC_TIME);
+@@ -88,7 +88,7 @@ static int armada38x_rtc_set_time(struct device *dev, struct rtc_time *tm)
+ {
+ 	struct armada38x_rtc *rtc = dev_get_drvdata(dev);
+ 	int ret = 0;
+-	unsigned long time, flags;
++	unsigned long time;
  
- clean:
--- 
-2.1.4
+ 	ret = rtc_tm_to_time(tm, &time);
+ 
