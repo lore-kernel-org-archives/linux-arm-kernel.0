@@ -1,220 +1,233 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 12 May 2015 13:01:36 +0300
-Subject: [PATCH/RFC 0/4] Probe deferral for IOMMU DT integration
-In-Reply-To: <54F6CE64.8040503@samsung.com>
-References: <1423182722-16646-1-git-send-email-lauraa@codeaurora.org>
- <1519819.qZaXvuQI61@avalon> <54F6CE64.8040503@samsung.com>
-Message-ID: <68165351.x47CMduWiL@avalon>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 12 May 2015 13:10:00 +0300
+Subject: [PATCHv2 00/27] ARM: OMAP2+: clock code migration to
+ drivers/clk/ti
+In-Reply-To: <alpine.DEB.2.02.1505111747460.19833@utopia.booyaka.com>
+References: <1431334493-24455-1-git-send-email-t-kristo@ti.com>
+ <alpine.DEB.2.02.1505111747460.19833@utopia.booyaka.com>
+Message-ID: <5551D178.3000904@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On 05/11/2015 11:21 PM, Paul Walmsley wrote:
+> Hi
+>
+> On Mon, 11 May 2015, Tero Kristo wrote:
+>
+>> This set moves most of the OMAP2+ clock driver code under drivers/clk.
+>> There are still a couple of files under mach-omap2 folder after this
+>> set which have either unmet dependencies still (towards PRCM driver)
+>> or is currently slightly broken (some of the DVFS code for OMAP2/OMAP3.)
+>> Earlier version of this set has been posted back in March (see
+>> http://www.spinics.net/lists/linux-omap/msg116418.html), mostly
+>> the code is the same except patches 25+ which are new.
+>>
+>> Overall diffstat for this set:
+>>   42 files changed, 2644 insertions(+), 3707 deletions(-)
+>>
+>> Testing done:
+>> am335x-evm      : boot
+>> am335x-evmsk    : boot
+>> am3517-evm      : boot
+>> am37x-evm       : boot
+>> am43x-epos-evm  : boot
+>> am437x-gp-evm   : boot
+>> omap3-beagle-xm : boot
+>> omap3-beagle    : boot, suspend-resume (ret/off), cpuidle (ret/off)
+>> am335x-boneblack: boot
+>> am335x-bone     : boot
+>> craneboard      : boot
+>> dra7xx-evm      : boot
+>> omap3430-ldp    : boot
+>> omap3-n900      : boot
+>> omap5-uevm      : boot
+>> omap4-panda-es  : boot, suspend-resume (ret), cpuidle (ret)
+>> omap4-panda     : boot
+>> omap2430-sdp    : boot
+>> omap3430-sdp    : boot
+>> omap4-sdp-es23plus: boot
+>>
+>> Branch info:
+>> - tree: https://github.com/t-kristo/linux-pm.git
+>> - branch: for-4.2/ti-clk-move
+>
+> I can't replicate your test results.  Several Kconfigs fail to build here,
+> and many boards don't even boot.
+>
+> Could you please post a copy of your boot logs?
+>
+> - Paul
+>
+> http://www.pwsan.com/omap/testlogs/test-tkristo-clk-move-v4.2/20150511115145/
+>
+> OMAP development test results for test-tkristo-clk-move-v4.2 20150511115145
 
-On Wednesday 04 March 2015 10:20:36 Marek Szyprowski wrote:
-> On 2015-02-16 17:14, Laurent Pinchart wrote:
-> > On Thursday 05 February 2015 16:31:58 Laura Abbott wrote:
-> >> Hi,
-> >> 
-> >> On the heels of Exynos integrating SMMU in to the DT for probing,
-> >> this series attempts to add support to make SMMU drivers work with
-> >> deferred probing. This has been referenced before[1] but this is
-> >> some actual code to use as a starting point for discussion.
-> >> 
-> >> The requirement for this is based on a previous patch to add clock
-> >> support to the ARM SMMU driver[2]. Once we have clock support, it's
-> >> possible that the driver itself may need to be defered which breaks
-> >> a bunch of assumptions about how SMMU probing is supposed to work.
-> >> The concept here is to have the driver call of_dma_configure which
-> >> may return -EPROBE_DEFER. of_dma_configure could possibly be moved
-> >> up to probe level. The existing method of initialization still needs
-> >> to be done as well which might mean we have the worst of both worlds.
-> >> 
-> >> Open questions:
-> >> - This still doesn't really address Arnd's concerns[3] about disabling
-> >> IOMMUs
-> > 
-> > Arnd, Will and I have discussed IOMMU probe deferral last week. Here's a
-> > summary of the discussion, before the details blur away.
-> > 
-> > The discussion covered both higher level concepts and lower level details,
-> > in various directions. I'll try to make the summary clear by filling the
-> > gaps between pieces where needed, so some of the information below might
-> > not be a direct result of the discussions. Arnd and Will, please feel
-> > free to correct me.
-> > 
-> > The first question we've discussed was whether probe deferral for IOMMUs
-> > is really needed. Various dependencies between IOMMU devices and other
-> > devices exist, in particular on clocks (as you have mentioned above) and
-> > on power domains (as mentioned by Marek in
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/32323
-> > 8.html). While there are mechanism to handle some of them with probe
-> > deferral (for instance by using the OF_DECLARE macros to register clock
-> > drivers), generalizing those mechanisms would essentially recreate a
-> > probe ordering mechanism similar to link order probe ordering and
-> > couldn't really scale.
-> > 
-> > Additionally, IOMMUs could also be present hot-pluggable devices and
-> > depend on resources that are thus hot-plugged. OF_DECLARE wouldn't help
-> > in that case. For all those reasons we have concluded that probe deferral
-> > for IOMMUs is desired if it can be implemented cleanly.
-> > 
-> > The second question we've discussed was how to implement probe deferral
-> > cleanly :-)
-> > 
-> > The current implementation configures DMA at device creation time and sets
-> > the following properties:
-> > 
-> > - dma_map_ops (IOMMU, SWIOTLB, linear mapping)
-> > - initial DMA mask
-> > - DMA offset
-> > - DMA coherency
-> > 
-> > Additionally the IOMMU group (when an IOMMU is present) will also be
-> > configured at the same time (patches are under review).
-> > 
-> > The base idea is to defer probing of bus master devices when their IOMMU
-> > isn't present. Three cases need to be handled.
-> > 
-> > 1. No IOMMU is declared by the firmware (through DT, ACPI, ...) for the
-> > bus master device. The bus master device probe doesn't need to be deferred
-> > due to the IOMMU. dma_map_ops must be set to SWIOTLB or linear mapping
-> > (the later should likely be implemented through SWIOTLB).
-> > 
-> > 2. An IOMMU is declared for the bus master device and the IOMMU has been
-> > successfully probed and registered. The bus master device probe doesn't
-> > need to be deferred due to the IOMMU. dma_map_ops must be set to IOMMU
-> > ops.
-> > 
-> > 3. An IOMMU is declared for the bus master device but the IOMMU isn't
-> > registered. This can be caused by different reasons:
-> > 
-> > - a. No driver is loaded for this IOMMU (for instance because DT describes
-> > the IOMMU connection, but the IOMMU driver hasn't been developed yet, or
-> > an older kernel is used). If the IOMMU is optional the bus master device
-> > probe should succeed, and dma_map_ops should be set to linear. If the
-> > IOMMU is mandatory the bus master device probe should fail.
-> > 
-> > Note that, as we require IOMMU drivers to be compiled in, we don't need to
-> > handle the case of loadable IOMMU drivers that haven't been loaded yet.
-> > 
-> > - b. A driver is loaded for this IOMMU but the IOMMU hasn't been probed
-> > yet, or its probe has been deferred. The bus master device probe should
-> > be deferred.
-> > 
-> > - c. A driver is loaded for this IOMMU but the IOMMU probe has failed
-> > permanently. It's not clear at the moment whether we should try to recover
-> > from this automatically using the same mechanism as case 3.a, or if we can
-> > considered this as an abnormal failure and disable the bus master device.
-> > 
-> > Assuming that we should try to recover from such an error, we can't
-> > predict this case when the device is instantiated (even if IOMMUs are
-> > registered before bus master devices are added, for instance using the
-> > OF_DECLARE mechanism that Will has implemented). We thus need to setup the
-> > dma_map_ops and IOMMU group at bus master device probe time.
-> > 
-> > Furthermore, we can't distinguish cases 3.a and 3.b at bus master probe
-> > time without early registration of IOMMU drivers. Case 3.a would instead
-> > be considered as 3.b, leading to infinite probe deferral of bus master
-> > devices.
-> > 
-> > For those reasons we have concluded that IOMMU probe deferral needs to be
-> > implemented with a combination of several mechanisms. The following steps
-> > should happen at bus master device probe time.
-> > 
-> > 1. The IOMMU device referenced by the firmware with the bus master device
-> > is looked up. On DT-based systems, this will be the IOMMU DT node
-> > referenced by the iommus property. If no IOMMU device is associated,
-> > dma_map_ops will be set to linear mapping or SWIOTLB and device probe
-> > will continue.
-> > 
-> > 2. An IOMMU device is referenced for the bus master device.
-> > 
-> > The corresponding IOMMU instance is looked up. This requires a new IOMMU
-> > registration system. IOMMU drivers will create IOMMU instances at probe
-> > time and register them with the IOMMU core.
-> > 
-> > If an IOMMU instance is found for the referenced IOMMU device, the IOMMU
-> > instance's of_xlate function will be called to setup the IOMMU.
-> > 
-> > If the of_xlate call succeeds dma_map_ops will be set to IOMMU ops and
-> > device probe will continue. If the call fails we can either fail the bus
-> > master device probe, or fall back to non-IOMMU dma_map_ops (to be
-> > discussed).
-> > 
-> > 3. The IOMMU device referenced for the bus master device isn't present,
-> > due to the IOMMU device probe not having been performed yet, having been
-> > deferred, or having failed.
-> > 
-> > The IOMMU driver associated with the IOMMU device is looked up. This was
-> > initially thought to require an early registration mechanism for IOMMU
-> > drivers (using an OF_DECLARE mechanism for DT-based systems for
-> > instance), but on second thought it might be possible to implement this
-> > based on normal driver registration (to be researched).
-> > 
-> > If an IOMMU driver is found for the referenced IOMMU device, a callback
-> > function of the IOMMU driver is called to check whether an IOMMU instance
-> > is expected to be registered later (most IOMMU drivers will just return
-> > true, so we could skip this callback function until an IOMMU driver
-> > requires it). If an IOMMU instance is expected to be registered later the
-> > bus master device probe is deferred. Otherwise dma_map_ops will be set to
-> > linear mapping/SWIOTLB and device probe will continue.
-> > 
-> > 
-> > The initial DMA mask and the DMA offset can still be configured at device
-> > instantiation time if desired.
-> 
-> I'm sorry for not participating in the discussions, I was terribly busy
-> with our internal stuff.
+Oh hmm, I seem to have introduced a Makefile issue which breaks a couple 
+of special builds. I just force pushed updated branch.
 
-No worries, I know the feeling. My reply is two months later :-/
+Here are the boot logs for it, I tried also single-soc builds with 
+am3/am4/omap2/omap3/omap4/omap5/dra7:
 
-> The approach you have described looks fine although I would like also to
-> know a bit more about the roadmap of development. The IOMMU integration is
-> being discussed for over 2 years and right now we are STILL discussing.
-> 
-> Do you plan to post any patches implementing this approach? I would
-> really like to merge something simple, maybe not fully optimized and then
-> resolve all the corner cases and possible integration details.
+   : Board           : Boot url
+  1: am335x-evm      : PASS http://paste.ubuntu.com/11093628/
+  2: am335x-evmsk    : PASS http://paste.ubuntu.com/11093629/
+  3: am3517-evm      : PASS http://paste.ubuntu.com/11093630/
+  4: am37x-evm       : PASS http://paste.ubuntu.com/11093632/
+  5: am43x-epos-evm  : PASS http://paste.ubuntu.com/11093633/
+  6: am437x-gp-evm   : PASS http://paste.ubuntu.com/11093634/
+  7: am57xx-evm      : FAIL http://paste.ubuntu.com/11093635/
+  8: omap3-beagle-xm : PASS http://paste.ubuntu.com/11093636/
+  9: omap3-beagle    : PASS http://paste.ubuntu.com/11093637/
+10: am335x-boneblack: PASS http://paste.ubuntu.com/11093638/
+11: am335x-bone     : PASS http://paste.ubuntu.com/11093639/
+12: craneboard      : PASS http://paste.ubuntu.com/11093640/
+13: dra7xx-evm      : PASS http://paste.ubuntu.com/11093641/
+14: omap3430-ldp    : PASS http://paste.ubuntu.com/11093642/
+15: omap3-n900      : PASS http://paste.ubuntu.com/11093643/
+16: omap5-uevm      : PASS http://paste.ubuntu.com/11093645/
+17: omap4-panda-es  : PASS http://paste.ubuntu.com/11093646/
+18: omap4-panda     : PASS http://paste.ubuntu.com/11093647/
+19: omap2430-sdp    : PASS http://paste.ubuntu.com/11093648/
+20: omap3430-sdp    : PASS http://paste.ubuntu.com/11093649/
+21: omap4-sdp-es23plus: PASS http://paste.ubuntu.com/11093650/
+TOTAL = 21 boards, Booted Boards = 20, No Boot boards = 1
 
-I secretly hoped that someone would beat me to it but that wasn't the case. I 
-started giving it a go, and I'll try to post patches soon. It will be an RFC 
-though.
+AM57xx-evm boot fails as it is missing some patches from Nishanth (I 
+think the UART mux has changed.)
 
-> >> - Currently tested where we knew the driver was going to be deferring.
-> >> Probably need some logic for calling of_dma_configure again.
-> >> 
-> >> This is based on Robin Murphy's work for dma mapping[4] and a few
-> >> patches from Murali Kaicheri[5] for of_dma_configure.
-> >> 
-> >> 
-> >> [1] http://lists.linuxfoundation.org/pipermail/iommu/2015-> >> January/011764.html
-> >> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-> >> August/279036.html
-> >> [3] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-> >> December/311579.html
-> >> [4] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-> >> January/315459.html
-> >> [5] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-> >> January/319390.html
-> >> 
-> >> Laura Abbott (3):
-> >>    dma-mapping: Make arch_setup_dma_ops return an error code
-> >>    of: Return error codes from of_dma_configure
-> >>    iommu/arm-smmu: Support deferred probing
-> >> 
-> >> Mitchel Humpherys (1):
-> >>    iommu/arm-smmu: add support for specifying clocks
-> >>   
-> >>   arch/arm/include/asm/dma-mapping.h   |   2 +-
-> >>   arch/arm/mm/dma-mapping.c            |   4 +-
-> >>   arch/arm64/include/asm/dma-mapping.h |   2 +-
-> >>   arch/arm64/mm/dma-mapping.c          |  16 +--
-> >>   drivers/iommu/arm-smmu.c             | 186 ++++++++++++++++++++++++++--
-> >>   drivers/iommu/iommu.c                |  49 ++++++++-
-> >>   drivers/iommu/of_iommu.c             |  14 ++-
-> >>   drivers/of/device.c                  |   9 +-
-> >>   include/linux/dma-mapping.h          |   7 +-
-> >>   include/linux/iommu.h                |   2 +
-> >>   include/linux/of_device.h            |   4 +-
-> >>   11 files changed, 268 insertions(+), 27 deletions(-)
+-Tero
 
--- 
-Regards,
-
-Laurent Pinchart
+>
+>
+> Test summary
+> ------------
+>
+> Build: uImage:
+>      Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+> 		  omap1_defconfig_5912osk_only
+>
+> Build: uImage+dtb:
+>      FAIL ( 2/13): omap2plus_defconfig_am33xx_only/am335x-bone,
+> 		  omap2plus_defconfig_n800_only_a/omap2420-n800
+>      Pass (11/13): omap2plus_defconfig/omap4-panda,
+> 		  omap2plus_defconfig/omap4-panda-es,
+> 		  omap2plus_defconfig/omap4-var-som,
+> 		  omap2plus_defconfig/omap3-evm-37xx,
+> 		  omap2plus_defconfig/omap2430-sdp,
+> 		  omap2plus_defconfig/am3517-evm,
+> 		  omap2plus_defconfig/omap3-beagle,
+> 		  omap2plus_defconfig/omap3-beagle-xm,
+> 		  omap2plus_defconfig/omap3-sbc-t3517,
+> 		  omap2plus_defconfig/omap5-uevm,
+> 		  omap2plus_defconfig/omap5-sbc-t54
+>
+> Build: zImage:
+>      FAIL ( 9/17): omap2plus_defconfig_am33xx_only,
+> 		  omap2plus_defconfig_n800_only_a,
+> 		  omap2plus_defconfig_n800_multi_omap2xxx,
+> 		  omap2plus_defconfig_omap2_4_only,
+> 		  omap2plus_defconfig_omap5_only,
+> 		  omap2plus_defconfig_dra7xx_only,
+> 		  omap2plus_defconfig_am43xx_only,
+> 		  rmk_omap4430_sdp_oldconfig,
+> 		  rmk_omap4430_sdp_allnoconfig
+>      Pass ( 8/17): omap2plus_defconfig,
+> 		  omap2plus_defconfig_2430sdp_only,
+> 		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+> 		  omap2plus_defconfig_omap3_4_only,
+> 		  rmk_omap3430_ldp_oldconfig,
+> 		  rmk_omap3430_ldp_allnoconfig, multi_v7_defconfig
+>
+> Build warnings from toolchain: uImage:
+>      FAIL ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+> 		  omap1_defconfig_5912osk_only
+>
+> Build warnings from toolchain: uImage+dtb:
+>      FAIL ( 2/13): omap2plus_defconfig_am33xx_only/am335x-bone,
+> 		  omap2plus_defconfig_n800_only_a/omap2420-n800
+>
+> Build warnings from toolchain: zImage:
+>      FAIL (14/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+> 		  omap2plus_defconfig_n800_only_a,
+> 		  omap2plus_defconfig_n800_multi_omap2xxx,
+> 		  omap2plus_defconfig_2430sdp_only,
+> 		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+> 		  omap2plus_defconfig_omap2_4_only,
+> 		  omap2plus_defconfig_omap3_4_only,
+> 		  omap2plus_defconfig_omap5_only,
+> 		  omap2plus_defconfig_dra7xx_only,
+> 		  omap2plus_defconfig_am43xx_only,
+> 		  rmk_omap3430_ldp_oldconfig,
+> 		  rmk_omap4430_sdp_oldconfig
+>
+> Boot to userspace:
+>      FAIL ( 6/17): 4460varsomom, 2430sdp, 3530es3beagle, 3530es31beagle,
+> 		  cmt3517, 5430es2sbct54
+>      skip ( 5/17): 5912osk, 3517evm, am335xbonelt, am335xbone, 2420n800
+>      Pass ( 6/17): 4430es2panda, 4460pandaes, 37xxevm, 3730beaglexm,
+> 		  3730es12beaglexm, 5430es2uevm
+>
+> Kernel warnings during boot to userspace:
+>      FAIL ( 1/17): 4430es2panda
+>
+> PM: chip retention via suspend:
+>      skip ( 1/12): am335xbonelt
+>      FAIL ( 7/12): 4430es2panda, 4460varsomom, 3530es3beagle,
+> 		  3530es31beagle, 2430sdp, 5430es2uevm, 5430es2sbct54
+>      Pass ( 4/12): 4460pandaes, 37xxevm, 3730beaglexm, 3730es12beaglexm
+>
+> PM: chip retention via dynamic idle:
+>      skip ( 1/12): am335xbonelt
+>      FAIL ( 7/12): 4430es2panda, 4460varsomom, 3530es3beagle,
+> 		  3530es31beagle, 2430sdp, 5430es2uevm, 5430es2sbct54
+>      Pass ( 4/12): 4460pandaes, 37xxevm, 3730beaglexm, 3730es12beaglexm
+>
+> PM: chip off (except CORE, due to errata) via suspend:
+>      Pass ( 1/ 1): 3730beaglexm
+>
+> PM: chip off (except CORE, due to errata) via dynamic idle:
+>      Pass ( 1/ 1): 3730beaglexm
+>
+> PM: chip off via suspend:
+>      FAIL ( 2/ 4): 3530es3beagle, 3530es31beagle
+>      Pass ( 2/ 4): 37xxevm, 3730es12beaglexm
+>
+> PM: chip off via dynamic idle:
+>      FAIL ( 2/ 4): 3530es3beagle, 3530es31beagle
+>      Pass ( 2/ 4): 37xxevm, 3730es12beaglexm
+>
+> Kernel warnings during PM test:
+>      FAIL ( 1/17): 4430es2panda
+>
+> Obsolete Kconfig symbols:
+>      FAIL ( 1/20): multi_v7_defconfig
+>
+>
+> vmlinux object size
+> (delta in bytes from test_v4.1-rc2 (5ebe6afaf0057ac3eaeb98defd5456894b446d22)):
+>     text     data      bss    total  kernel
+>        0        0        0        0  omap1_defconfig
+>        0        0        0        0  omap1_defconfig_1510innovator_only
+>        0        0        0        0  omap1_defconfig_5912osk_only
+>    -1484       -8        0    -1492  multi_v7_defconfig
+>    -2108      +56        0    -2052  omap2plus_defconfig
+>        0        0        0        0  omap2plus_defconfig_2430sdp_only
+>    -6140      +56      -64    -6148  omap2plus_defconfig_cpupm
+>    -6204       -8        0    -6212  omap2plus_defconfig_no_pm
+>    -1908       -8        0    -1916  omap2plus_defconfig_omap3_4_only
+>    -2804       -4     +780    -2028  rmk_omap3430_ldp_allnoconfig
+>    -1812       -8      +64    -1756  rmk_omap3430_ldp_oldconfig
+>
+> Boot-time memory difference
+> (delta in bytes from test_v4.1-rc2 (5ebe6afaf0057ac3eaeb98defd5456894b446d22))
+>    avail  rsrvd   high  freed  board          kconfig
+>   -117644k -13428k      .  -168k  2420n800       omap2plus_defconfig_n800_only_a
+>      -4k     4k      .      .  5430es2sbct54  omap2plus_defconfig
+>   -79556k -51516k      .  -364k  am335xbone     omap2plus_defconfig_am33xx_only
+>   -224000k -37120k      .  -440k  am335xbonelt   omap2plus_defconfig
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
