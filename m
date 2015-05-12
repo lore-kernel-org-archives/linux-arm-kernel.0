@@ -1,23 +1,49 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 12 May 2015 16:07:41 +0200
-Subject: [PATCH 01/12] arm/arm64: kvm: add missing PSCI include
-In-Reply-To: <1431085004-32743-2-git-send-email-mark.rutland@arm.com>
-References: <1431085004-32743-1-git-send-email-mark.rutland@arm.com>
- <1431085004-32743-2-git-send-email-mark.rutland@arm.com>
-Message-ID: <20150512140741.GH32765@cbox>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 12 May 2015 07:13:49 -0700
+Subject: [PATCH 1/1] gpio: omap: Fix PM runtime issue and remove most
+ BANK_USED macros
+In-Reply-To: <CACRpkdZ1nJ=-NPHrZdCQ6_TCrF7009R9Y7zVyXN1z9RWcv3a6A@mail.gmail.com>
+References: <1429632533-23285-1-git-send-email-tony@atomide.com>
+ <CACRpkdZ1nJ=-NPHrZdCQ6_TCrF7009R9Y7zVyXN1z9RWcv3a6A@mail.gmail.com>
+Message-ID: <20150512141348.GG15563@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 08, 2015 at 12:36:33PM +0100, Mark Rutland wrote:
-> We make use of the PSCI function IDs, but don't explicitly include the
-> header which defines them. Relying on transitive header includes is
-> fragile and will be broken as headers are refactored.
+* Linus Walleij <linus.walleij@linaro.org> [150512 02:01]:
+> On Tue, Apr 21, 2015 at 6:08 PM, Tony Lindgren <tony@atomide.com> wrote:
 > 
-> This patch includes the relevant header file directly so as to avoid
-> future breakage.
+> > Looks like omap_gpio_irq_type can return early at several places
+> > leaving a GPIO bank enabled without doing pm_runtime_put if wrong
+> > GPIO arguments are passed.
+> >
+> > Instead of adding more complicated BANK_USED macros, let's fix the
+> > issue properly. We can pass is_irq flag to omap_enable_gpio_module
+> > and omap_disble_gpio_module. And with that we can remove all the
+> > similar code elsewhere to get rid of most BANK_USED macros.
+> >
+> > Note that the reason for the BANK_USED macro is that we need to manage
+> > PM runtime on per GPIO bank basis. In the long run we want to move to
+> > using PM runtime counts for each GPIO line to determine if a GPIO
+> > bank is used. Once we have a solution for omap_enable_gpio_module
+> > and omap_disable_gpio_module, we can remove the remaining BANK_USED
+> > macros.
+> >
+> > Cc: Felipe Balbi <balbi@ti.com>
+> > Cc: Grygorii Strashko <grygorii.strashko@linaro.org>
+> > Cc: Javier Martinez Canillas <jmartinez@softcrates.net>
+> > Cc: Nishanth Menon <nm@ti.com>
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
 > 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> There is so much discussion around this patch that I can't make
+> up my mind whether I should apply this or some subsequent inline
+> version of it.
+> 
+> Holding this off for now...
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Yeah let's see what Grygorii comes up, sounds like he may have
+a minimal fix coming up. Then we can do the rest as clean-up
+later on.
+
+Regards,
+
+Tony
