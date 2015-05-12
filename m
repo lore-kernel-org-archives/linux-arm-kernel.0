@@ -1,52 +1,54 @@
-From: gregory.0xf0@gmail.com (Gregory Fong)
-Date: Tue, 12 May 2015 12:38:43 -0700
-Subject: [PATCH 0/3] GPIO support for BRCMSTB
-In-Reply-To: <CACRpkda3EDa7YdzeT6FQ=cQw1RrDath7pQsCos-JeB2y4r18gw@mail.gmail.com>
-References: <1430901477-10678-1-git-send-email-gregory.0xf0@gmail.com>
- <CACRpkda3EDa7YdzeT6FQ=cQw1RrDath7pQsCos-JeB2y4r18gw@mail.gmail.com>
-Message-ID: <CADtm3G45-u82Rp_0dHf2EfdMokf8E4FaQ84PHnocpvXxU+5_+g@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 12 May 2015 20:41:34 +0100
+Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <5552510B.9010306@ti.com>
+References: <CAKohpo=kJs076afzERPMqjELgwpN6nR2yoyEjW6XY7YSEbRuCA@mail.gmail.com>
+ <20150507055231.GB32399@codeaurora.org>
+ <20150507110233.GR15510@sirena.org.uk>
+ <20150507211855.GA2455@codeaurora.org>
+ <20150507221842.GW22845@sirena.org.uk>
+ <CAKohpomU8wm0T=A7EkosdOjXbP8q2Cb726Hsjh08KTKYjoz3-A@mail.gmail.com>
+ <555000B6.2010107@ti.com> <20150512052033.GC32300@linux>
+ <20150512190134.16410.89041@quantum> <5552510B.9010306@ti.com>
+Message-ID: <20150512194134.GC3066@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 12, 2015 at 3:59 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Wed, May 6, 2015 at 10:37 AM, Gregory Fong <gregory.0xf0@gmail.com> wrote:
->
->> There is only one IRQ for each GIO IP block (i.e. several register banks share
->> an IRQ).  After briefly looking into the generic IRQ chip implementation, it
->> seemed like in this case that using it would result in the driver being more
->> complex than necessary because AFAICT it expects a 1:1 mapping of
->> irq_chip_generic to gpio_chip.  It seemed like less of a pain to have a single
->> irq_chip since we have a single IRQ for all register banks (multiple
->> gpio_chips).  I might be missing something, maybe using a shared IRQ across
->> multiple irq_chips is easier than I think?  Suggestions welcome.
->
-> What is needed is a 1:1 mapping between GPIO offsets and IRQ
-> offsets.
->
-> If you just number your GPIOs 0...n and your IRQs 0...n
-> it should work just fine with one irqchip for all banks.
->
-> What screws things up is likely that the hardware supports
-> 32 lines per bank and not all are used.
->
-> I suggest you enable 32 line and 32 IRQs per bank,
-> so that hwirq maps nicely 1:1 on the GPIO offsets,
-> then just use the width thing to NACK operations on
-> GPIO lines you are not using. This way you can also
-> decode and warn on spurious IRQs on the unused lines.
+On Tue, May 12, 2015 at 02:14:19PM -0500, Nishanth Menon wrote:
 
-For having 32 lines per bank, the big problem here is the upper limit
-of 256 GPIOs.  We would hit that limit on SoCs that already exist with
-the SoC GPIOs alone, let alone any GPIO extenders.  I'm really not
-sure what the right way would be to deal with that.
+> While TWLxx series was kind of nascent in it's ability of choosing
+> PWM/PFM or auto mode depending on the current targets, newer PMICs
+> have their own unique techniques -> but, that said, this is a
+> description of power consumption for a given OPP for the "device", How
+> would stephen's case work with a PMIC and 2 devices which have
+> different leakage characteristics (based on which end of the process
+> spectrum they come from), Lets take an example:
+> device X consumes 800mA for OPPx
+> device Y consumes 900mA for OPPy
 
-Anyway, I don't think I understand IRQ domains and irq_chip_generic
-very well.  One possibility _might_ be to use multiple irq_chips.  But
-from what I do understand, if there's only a single parent IRQ used by
-all of the GPIO banks, in order to use an irq_chip per bank, this
-would have to stop using the chained irq logic because the parent IRQ
-is shared across banks, and that implementation seems unnecessarily
-confusing.  Any other ideas?
+The system integrator would need to be somewhat conservative when
+specifying the currents involved.  For plausible applications these are
+likely to be ballpark figures rather than anything too accurate - if
+nothing else the instantaneous current draw normally varies very
+substantially so realistically you're talking about a maximum here.  If
+the corners vary that dramatically then I'd expect you'd see different
+OPP tables being used anyway.
 
-Best regards,
-Gregory
+> It is a lot more impactful than using relative numbers for other
+> purposes - for example energy aware scheduling as an example -> here
+> the actuals might have better optimization, but hints of relative
+> power numbers by itself is pretty powerful information to help
+> scheduling. The usage, in this case, unlike the usage for a PMIC
+> efficiency selection, is not based on absolutes and is meant more of a
+> hint (closer to usage such as clock transition latency numbers).
+
+You're not comparing two similar types of object here, you're trying to
+provide information on an actual physical value to get fed into other
+actual physical values.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150512/fec87ce5/attachment.sig>
