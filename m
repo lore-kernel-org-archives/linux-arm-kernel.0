@@ -1,99 +1,74 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 12 May 2015 15:57:15 +0100
-Subject: Fwd: Re: Re: [EDT] [PATCH 1/1] Fix: hw watchpoint continually
- triggers callback
-In-Reply-To: <1609501084.68951431436373294.JavaMail.weblogic@ep2mlwas08a>
-References: <1609501084.68951431436373294.JavaMail.weblogic@ep2mlwas08a>
-Message-ID: <20150512145714.GC2062@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 12 May 2015 16:57:17 +0200
+Subject: [PATCH 1/2] ARM: dts: sun9i: cubieboard4: Enable USB support
+In-Reply-To: <CAGb2v64eKcn6-J+Dae-YOtaZ3kdiT7=JMvnRJfBafXpEDLsYLg@mail.gmail.com>
+References: <1431017037-28331-1-git-send-email-wens@csie.org>
+ <1431017037-28331-2-git-send-email-wens@csie.org>
+ <20150508074616.GP11057@lukather>
+ <CAGb2v64VQpNkd2zmHdhTXQEfk8z1FnhYZMQW0vmLVq1Ahzg2Zw@mail.gmail.com>
+ <20150508114040.GR11057@lukather>
+ <CAGb2v64eKcn6-J+Dae-YOtaZ3kdiT7=JMvnRJfBafXpEDLsYLg@mail.gmail.com>
+Message-ID: <20150512145717.GN10961@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 12, 2015 at 02:12:54PM +0100, Vaneet Narang wrote:
-> On Tue, May 12, 2015 at 12:48:13PM +0100, Maninder Singh wrote:
-> >> On ARM, when a watchpoint is registered using register_wide_hw_breakpoint, 
-> >> the callback handler endlessly runs until the watchpoint is unregistered.
-> >> The reason for this issue is debug interrupts gets raised before
-> >> executing the instruction, and after interrupt handling ARM tries to
-> >> execute the same instruction again , which results in interrupt getting
-> >> raised again.
-> >> 
-> >> This patch fixes this issue by using KPROBES (getting the instruction
-> >> executed and incrementing PC to next instruction).
-> >> 
-> >> Signed-off-by: Vaneet Narang <v.narang@samsung.com>
-> >> Signed-off-by: Maninder Singh <maninder1.s@samsung.com>
-> >> Reviewed-by: Amit Arora <amit.arora@samsung.com>
-> >> Reviewed-by: Ajeet Yadav <ajeet.y@samsung.com>
-> >> ---
-> >>  arch/arm/kernel/hw_breakpoint.c |   18 ++++++++++++++++++
-> >>  1 files changed, 18 insertions(+), 0 deletions(-)
-> >> 
-> >> diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-> >> index dc7d0a9..ec72f86 100644
-> >> --- a/arch/arm/kernel/hw_breakpoint.c
-> >> +++ b/arch/arm/kernel/hw_breakpoint.c
-> >> @@ -37,6 +37,9 @@
-> >>  #include <asm/hw_breakpoint.h>
-> >>  #include <asm/kdebug.h>
-> >>  #include <asm/traps.h>
-> >> +#ifdef CONFIG_KPROBES
-> >> +#include <linux/kprobes.h>
-> >> +#endif
-> >>  
-> >>  /* Breakpoint currently in use for each BRP. */
-> >>  static DEFINE_PER_CPU(struct perf_event *, bp_on_reg[ARM_MAX_BRP]);
-> >> @@ -757,6 +760,21 @@ static void watchpoint_handler(unsigned long addr, unsigned int fsr,
-> >>  		 */
-> >>  		if (!wp->overflow_handler)
-> >>  			enable_single_step(wp, instruction_pointer(regs));
-> >> +#ifdef CONFIG_KPROBES
-> >> +		else {
-> >> +			struct kprobe kp;
-> >> +			unsigned long flags;
-> >> +
-> >> +			arch_uninstall_hw_breakpoint(wp);
-> >> +			kp.addr = (kprobe_opcode_t *)instruction_pointer(regs);
-> >> +			if (!arch_prepare_kprobe(&kp)) {
-> >> +				local_irq_save(flags);
-> >> +				kp.ainsn.insn_singlestep(&kp, regs);
-> >> +				local_irq_restore(flags);
-> >> +			}
-> >> +			arch_install_hw_breakpoint(wp);
-> >> +		}
-> >> +#endif
+On Mon, May 11, 2015 at 04:26:58PM +0800, Chen-Yu Tsai wrote:
+> >> >> +&usbphy1 {
+> >> >> +     phy-supply = <&reg_usb1_vbus>;
+> >> >> +     status = "okay";
+> >> >> +};
+> >> >> +
+> >> >> +/*
+> >> >> + * Unfortunately reg_usb1_vbus also powers one of the ports from usb3's hub.
+> >> >> + * One should always make sure both regulators are enabled and working for
+> >> >> + * all USB ports to have power.
+> >> >> + */
+> >> >
+> >> > Can't we just provide the two regulators, and enable both of them so
+> >> > that we know that we always have the needed regulators enabled,
+> >> > disregarding which USB port is used?
+> >>
+> >> Would setting "always-on" for both regulators work for you?
+> >> Or maybe just the one that's used by both USB hosts?
+> >
+> > I was more thinking of giving to the phy an additional regulator, so
+> > that it would enable both the regulators needed to power up all ports.
 > 
-> >I don't think this is the right thing to do at all; the kernel already
-> >handles step exceptions using mismatched breakpoints when there is no
-> >overflow handler specified (e.g. using perf mem events). If you register a
-> >handler (e.g. gdb via ptrace) then you have to handle the step yourself.
-> 
-> This fix is given for kernel developers who wants to use perf interface by
-> registering callback using register_wide_hw_breakpoint API.  On every
-> callback trigger they have to unregister watchpoints otherwise callback
-> gets called in a loop and now issue is "when to register watch point back
-> ?". 
+> That would require adding back all the regulator-related code I
+> removed from the phy driver before it was merged. (sigh) It's not
+> like the regulator bindings takes a list.
 
-If you want to solve this, I think we need a better way to expose software
-single-step/emulation to the overflow handler. If we try to do this in
-the hw_breakpoint code itself, we run into problems:
+Yeah, but maybe we can just add an optional device-supply property or
+something like that to power up the devices connected on the bus.
 
-  - What if another thread hits the same instruction whilst we are trying
-    to step it?
+> I see this as more of a hardware design flaw, and we should label
+> it as such.
 
-  - What if there are two breakpoints or a breakpoint + watchpoint
-    triggered by the same instruction?
+This can be seen as one, and we can debate it for some time I guess,
+but if the hardware guys were not making crazy stuff like that, we
+would run out of work pretty quickly :)
 
-  - What if the debugger didn't want to execute the instruction at all?
+What we really need to do is find a proper and reliable way to handle
+this case. Whether we declare it as a flaw or not is a separate
+debate.
 
-> With this issue in place, it makes perf interface unusable. We didn't
-> faced this issue with x86. 
+> And it might still work for self-powered devices even if VBUS is
+> off. The USB hub chip is always on.
 
-This is a good point. If perf/hw_breakpoint are supposed to hide the
-internal details of the debug architecture and make everything look and
-smell like x86, I'd like to see that documented somewhere. I don't think
-we'd generally be able to achieve that whilst solving the caveats I mention
-above, so we'd probably just end up removing this feature altogether, which
-would be a shame (and I don't think possible as it stands, since
-hw_breakpoint doesn't know about its caller).
+That still leaves a significant amount of devices out and non
+functional, especially very standard devices like USB keys, keyboards
+or headsets that you would expect to just work.
 
-Will
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150512/b950273a/attachment.sig>
