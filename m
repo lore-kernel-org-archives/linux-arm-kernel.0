@@ -1,85 +1,33 @@
-From: dave.long@linaro.org (David Long)
-Date: Tue, 12 May 2015 01:54:11 -0400
-Subject: [PATCH v6 0/6] arm64: Add kernel probes (kprobes) support
-In-Reply-To: <20150505154830.GI1550@arm.com>
-References: <1429561187-3661-1-git-send-email-dave.long@linaro.org>
- <55363791.4070706@hitachi.com> <553AB222.50609@redhat.com>
- <553EF74D.8020706@redhat.com> <20150429102346.GK8236@arm.com>
- <55442BFA.50101@redhat.com> <554851CB.2010909@linaro.org>
- <20150505154830.GI1550@arm.com>
-Message-ID: <55519583.9020507@linaro.org>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 12 May 2015 07:58:22 +0200
+Subject: [PATCH] net: ll_temac: Fix DMA map size bug
+Message-ID: <d76f13c52ce740544e8fac27f2a5904b9537a226.1431410298.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/15 11:48, Will Deacon wrote:
-> On Tue, May 05, 2015 at 06:14:51AM +0100, David Long wrote:
->> On 05/01/15 21:44, William Cohen wrote:
->>> Dave Long and I did some additional experimentation to better
->>> understand what is condition causes the kernel to sometimes spew:
->>>
->>> Unexpected kernel single-step exception at EL1
->>>
->>> The functioncallcount.stp test instruments the entry and return of
->>> every function in the mm files, including kfree.  In most cases the
->>> arm64 trampoline_probe_handler just determines which return probe
->>> instance matches the current conditions, runs the associated handler,
->>> and recycles the return probe instance for another use by placing it
->>> on a hlist.  However, it is possible that a return probe instance has
->>> been set up on function entry and the return probe is unregistered
->>> before the return probe instance fires.  In this case kfree is called
->>> by the trampoline handler to remove the return probe instances related
->>> to the unregistered kretprobe.  This case where the the kprobed kfree
->>> is called within the arm64 trampoline_probe_handler function trigger
->>> the problem.
->>>
->>> The kprobe breakpoint for the kfree call from within the
->>> trampoline_probe_handler is encountered and started, but things go
->>> wrong when attempting the single step on the instruction.
->>>
->>> It took a while to trigger this problem with the sytemtap testsuite.
->>> Dave Long came up with steps that reproduce this more quickly with a
->>> probed function that is always called within the trampoline handler.
->>> Trying the same on x86_64 doesn't trigger the problem.  It appears
->>> that the x86_64 code can handle a single step from within the
->>> trampoline_handler.
->>>
->>
->> I'm assuming there are no plans for supporting software breakpoint debug
->> exceptions during processing of single-step exceptions, any time soon on
->> arm64.  Given that the only solution that I can come with for this is
->> instead of making this orphaned kretprobe instance list exist only
->> temporarily (in the scope of the kretprobe trampoline handler), make it
->> always exist and kfree any items found on it as part of a periodic
->> cleanup running outside of the handler context.  I think these changes
->> would still all be in archiecture-specific code.  This doesn't feel to
->> me like a bad solution.  Does anyone think there is a simpler way out of
->> this?
->
-> Just to clarify, is the problem here the software breakpoint exception,
-> or trying to step the faulting instruction whilst we were already handling
-> a step?
->
+DMA allocates skb->len instead of headlen
+which is used for DMA.
 
-Sorry for the delay, I got tripped up with some global optimizations 
-that happened when I made more testing changes.  When the kprobes 
-software breakpoint handler for kretprobes is reentered it sets up the 
-single-step and that ends up hitting inside entry.S, apparently in 
-el1_undef.
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-> I think I'd be inclined to keep the code run in debug context to a minimum.
-> We already can't block there, and the more code we add the more black spots
-> we end up with in the kernel itself. The alternative would be to make your
-> kprobes code re-entrant, but that sounds like a nightmare.
->
-> You say this works on x86. How do they handle it? Is the nested probe
-> on kfree ignored or handled?
->
+ drivers/net/ethernet/xilinx/ll_temac_main.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Will Cohen's email pointing out x86 does not use a breakpoint for the 
-trampoline handler explains a lot.  I'm experimenting starting with his 
-proposed new trampoline code.  I can't see a reason this can't be made 
-to work and so given everything it doesn't seem interesting to try and 
-understand the failure in reentering the kprobe break handler in any 
-more detail.
-
--dave long
+diff --git a/drivers/net/ethernet/xilinx/ll_temac_main.c b/drivers/net/ethernet/xilinx/ll_temac_main.c
+index ca640d04fd93..cfb6bdb37fdc 100644
+--- a/drivers/net/ethernet/xilinx/ll_temac_main.c
++++ b/drivers/net/ethernet/xilinx/ll_temac_main.c
+@@ -705,8 +705,8 @@ static int temac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+ 
+ 	cur_p->app0 |= STS_CTRL_APP0_SOP;
+ 	cur_p->len = skb_headlen(skb);
+-	cur_p->phys = dma_map_single(ndev->dev.parent, skb->data, skb->len,
+-				     DMA_TO_DEVICE);
++	cur_p->phys = dma_map_single(ndev->dev.parent, skb->data,
++				skb_headlen(skb), DMA_TO_DEVICE);
+ 	cur_p->app4 = (unsigned long)skb;
+ 
+ 	for (ii = 0; ii < num_frag; ii++) {
+-- 
+2.3.5
