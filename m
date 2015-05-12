@@ -1,49 +1,61 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 11 May 2015 19:39:07 -0700
-Subject: [GIT PULL] omap fixes against v4.1-rc3
-Message-ID: <20150512023907.GE3409@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 11 May 2015 20:41:43 -0600
+Subject: [PATCH 2/3 v8] mailbox: Enable BCM2835 mailbox support
+In-Reply-To: <87a8xenagd.fsf@eliezer.anholt.net>
+References: <1430857666-18877-1-git-send-email-eric@anholt.net>
+ <554BA0B7.8040600@tronnes.org> <87mw1grwnn.fsf@eliezer.anholt.net>
+ <2464203.68HkYCAlx7@kongar> <87a8xenagd.fsf@eliezer.anholt.net>
+Message-ID: <55516867.3020203@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit e7309c2673a389a495fcfad70376d3bae8b9bc89:
+On 05/08/2015 01:19 PM, Eric Anholt wrote:
+> Alexander Stein <alexanders83@web.de> writes:
+> 
+>> On Thursday 07 May 2015, 12:54:20 wrote Eric Anholt:
+>>> Noralf Tr?nnes <noralf@tronnes.org> writes:
+>>> 
+>>>> Den 05.05.2015 22:27, skrev Eric Anholt:
+>>>>> From: Lubomir Rintel <lkundrak@v3.sk>
+>>>>> 
+>>>>> This mailbox driver provides a single mailbox channel to
+>>>>> write 32-bit values to the VPU and get a 32-bit response.
+>>>>> The Raspberry Pi firmware uses this mailbox channel to
+>>>>> implement firmware calls, while Roku 2 (despite being
+>>>>> derived from the same firmware tree) doesn't.
+>>>>> 
+>>>>> The driver was originally submitted by Lubomir, based on
+>>>>> the out-of-tree 2708 mailbox driver.  Eric Anholt fixed it
+>>>>> up for upstreaming, with the major functional change being
+>>>>> that it now has no notion of multiple channels (since that
+>>>>> is a firmware-dependent concept) and instead the
+>>>>> raspberrypi-firmware driver will do that bit-twiddling in
+>>>>> its own messages.
+>>>> ...
+>>>>> +static struct platform_driver bcm2835_mbox_driver = { +
+>>>>> .driver = { +		.name = "bcm2835-mbox", +		.owner =
+>>>>> THIS_MODULE, +		.of_match_table = bcm2835_mbox_of_match, +
+>>>>> }, +	.probe		= bcm2835_mbox_probe, +	.remove		=
+>>>>> bcm2835_mbox_remove, +}; 
+>>>>> +module_platform_driver(bcm2835_mbox_driver);
+>>>> 
+>>>> I have tested this driver and the firmware driver booting
+>>>> directly from the VideoCore bootloader (no uboot). The
+>>>> mailbox driver loads too late to turn on USB power:
+>>> 
+>>> Yeah, I have a patch on my branches that returns -EPROBE_DEFER
+>>> when trying to get a power domain and not finding the provider.
+>>> It was rejected by the maintainers in favor of a proposed
+>>> solution whose description I didn't quite follow.
+>> 
+>> Do you have a link for this thread?
+> 
+> https://lkml.org/lkml/2015/3/11/483
 
-  bus: omap_l3_noc: Fix master id address decoding for OMAP5 (2015-05-04 10:21:01 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.1/fixes-rc2
-
-for you to fetch changes up to e60a8fe1792dcd3aacda0959e0f4865bfefb7bb5:
-
-  Merge tag 'for-v4.1-rc/omap-fixes-a' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into omap-for-v4.1/fixes (2015-05-11 13:23:19 -0700)
-
-----------------------------------------------------------------
-Few fixes for omap clocks, PRM and hwmod code:
-
-- Fix bogus comparison of struct clk pointers, turns out
-  we can fix it by just removing the comparison
-
-- Fix am437 hardreset implementation and remove boottime
-  warnings by adding the VPFE hwmod data
-
-- Regression fix for am43xx PRM code, simplify things
-  by reusing the omap4 PRM implementation
-
-----------------------------------------------------------------
-Benoit Parrot (1):
-      ARM: AM43xx: hwmod: add VPFE hwmod entries
-
-Tero Kristo (2):
-      ARM: OMAP4+: PRM: add support for passing status register/bit info to reset
-      ARM: AM33xx+: hwmod: re-use omap4 implementations for reset functionality
-
-Tony Lindgren (2):
-      ARM: OMAP2+: Remove bogus struct clk comparison for timer clock
-      Merge tag 'for-v4.1-rc/omap-fixes-a' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v4.1/fixes
-
- arch/arm/mach-omap2/omap_hwmod.c           | 68 ++++++-----------------------
- arch/arm/mach-omap2/omap_hwmod_43xx_data.c | 70 ++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/prcm43xx.h             |  3 +-
- arch/arm/mach-omap2/prminst44xx.c          | 20 +++------
- arch/arm/mach-omap2/timer.c                | 13 +++---
- 5 files changed, 98 insertions(+), 76 deletions(-)
+That's really odd; -EPROBE_DEFER was clearly invented exactly to
+handle dependencies just like this. Playing with initcall levels
+simply isn't scalable, and in the main people are actively working not
+to use them for dependencies like this; they're far too implicit.
+While the timeout mentioned earlier in the thread might work (I didn't
+really look at the details), again it's far too indirect/accidental to
+be a good solution.
