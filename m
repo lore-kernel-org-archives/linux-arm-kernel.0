@@ -1,48 +1,30 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Tue, 12 May 2015 15:41:36 -0700
-Subject: [PATCH 1/2] selftests/lib.mk: fix INSTALL_RULE
-In-Reply-To: <555279B8.2000304@osg.samsung.com>
-References: <1431467947-29847-1-git-send-email-tyler.baker@linaro.org>
- <1431467947-29847-2-git-send-email-tyler.baker@linaro.org>
- <55527893.4070305@osg.samsung.com>
- <CANMBJr69_WM1dKw627J+zFv6UwsF5Sv9D+rjnK5YHD60DH5Nig@mail.gmail.com>
- <555279B8.2000304@osg.samsung.com>
-Message-ID: <CANMBJr4sqZ9tB-CRZYqmyhpAFU1inGMkp3+kobsZBV7d=KjrtQ@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 12 May 2015 15:42:16 -0700
+Subject: [PATCH v3] dma-buf: add ref counting for module as exporter
+In-Reply-To: <1431092563-19799-1-git-send-email-sumit.semwal@linaro.org>
+References: <1431092563-19799-1-git-send-email-sumit.semwal@linaro.org>
+Message-ID: <20150512224216.GA16712@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 May 2015 at 15:07, Shuah Khan <shuahkh@osg.samsung.com> wrote:
-> On 05/12/2015 04:04 PM, Tyler Baker wrote:
->> On 12 May 2015 at 15:02, Shuah Khan <shuahkh@osg.samsung.com> wrote:
->>> On 05/12/2015 03:59 PM, tyler.baker at linaro.org wrote:
->>>> From: Tyler Baker <tyler.baker@linaro.org>
->>>
->>> This is odd. Did you use git send-email to send the patches?
->>
->> Yes I did.
->>
->
-> No need to resend. I will try to apply them. Check your .gitconfig.
-> The extra From is odd.
+On Fri, May 08, 2015 at 07:12:43PM +0530, Sumit Semwal wrote:
+> Add reference counting on a kernel module that exports dma-buf and
+> implements its operations. This prevents the module from being unloaded
+> while DMABUF file is in use.
+> 
+> The original patch [1] was submitted by Tomasz Stanislawski, but this
+> is a simpler way to do it.
+> 
+> v3: call module_put() as late as possible, per gregkh's comment.
+> v2: move owner to struct dma_buf, and use DEFINE_DMA_BUF_EXPORT_INFO
+>     macro to simplify the change.
+> 
+> Signed-off-by: Sumit Semwal <sumit.semwal@linaro.org>
+> 
+> [1]: https://lkml.org/lkml/2012/8/8/163
+> ---
+>  drivers/dma-buf/dma-buf.c | 10 +++++++++-
+>  include/linux/dma-buf.h   | 10 ++++++++--
+>  2 files changed, 17 insertions(+), 3 deletions(-)
 
-Sorry about that, not sure why this has happened. I'll investigate on
-my end. Thanks.
-
->
-> -- Shuah
->
-> --
-> Shuah Khan
-> Sr. Linux Kernel Developer
-> Open Source Innovation Group
-> Samsung Research America (Silicon Valley)
-> shuahkh at osg.samsung.com | (970) 217-8978
-
-
-
--- 
-Tyler Baker
-Tech Lead, LAVA
-Linaro.org | Open source software for ARM SoCs
-Follow Linaro: http://www.facebook.com/pages/Linaro
-http://twitter.com/#!/linaroorg - http://www.linaro.org/linaro-blog
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
