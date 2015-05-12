@@ -1,81 +1,45 @@
-From: wsa@the-dreams.de (wsa at the-dreams.de)
-Date: Tue, 12 May 2015 14:37:09 +0200
-Subject: [PATCH v7 1/3] dt-bindings: Add I2C bindings for mt65xx/mt81xx.
-In-Reply-To: <1430901427-65146-2-git-send-email-eddie.huang@mediatek.com>
-References: <1430901427-65146-1-git-send-email-eddie.huang@mediatek.com>
- <1430901427-65146-2-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <20150512123709.GA4447@schokonusskuchen.bad>
+From: Thomas.Betker@rohde-schwarz.com (Thomas.Betker at rohde-schwarz.com)
+Date: Tue, 12 May 2015 14:42:02 +0200
+Subject: [PATCH] ARM: zynq: Set bit 22 in PL310 AuxCtrl register (6395/1)
+In-Reply-To: <5551A2C8.1070803@xilinx.com>
+References: <812979c5a158a3306d8036e7f9731947c58a3ab7.1431411716.git.michal.simek@xilinx.com>
+ <55519E47.7040008@de.bosch.com> <5551A2C8.1070803@xilinx.com>
+Message-ID: <OF5BDDADA7.8131210F-ONC1257E43.00444460-C1257E43.0045C4A1@rohde-schwarz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 06, 2015 at 04:37:05PM +0800, Eddie Huang wrote:
-> From: Xudong Chen <xudong.chen@mediatek.com>
+> >> This patch is based on the
+> >> commit 1a8e41cd672f ("ARM: 6395/1: VExpress: Set bit 22 in the PL310
+> >> (cache controller) AuxCtlr register")
+> > 
+> > 
+> > I've been under the impression that this shouldn't be done in the
+> > kernel, but in the boot loader/firmware:
+> > 
+> > https://lkml.org/lkml/2015/2/20/199
+> > 
+> > http://lists.denx.de/pipermail/u-boot/2015-March/207803.html
 > 
-> Add devicetree bindings for Mediatek Soc I2C driver.
+> Tegra, Exynos, sti still have this bit set.
+
+In 4.1-rc3, the bit is set by berlin, exynos, nomadik, omap2, sti, tegra, 
+vexpress.
+
+> Does that mean that they should be just removed because fix should be in
+> bootloader?
 > 
-> Signed-off-by: Xudong Chen <xudong.chen@mediatek.com>
-> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+> Anyway it is normal that bootloader stay on system untouched and only OS
+> is updated. But OK - let's make this in bootloader if this is preferred
+> solution.
 
-Sascha, Uwe: Can you ack these patches if you are fine with them?
-Would be nice since you did quite some review and were involved in the
-"have-pmic" binding discussion.
+So the plan is to update each and every Zynq bootloader for a problem we 
+have encountered in Linux (in our case, a problem we have been hunting for 
+months)? My u-boot doesn't even use the cache; it's disabled until the 
+kernel boots.
 
-Thanks,
+I do understand that the kernel should not overwrite hardwired settings 
+such as cache size, but shouldn't we at least allow to fix things that 
+definitely need to be fixed?
 
-   Wolfram
-
-> ---
->  .../devicetree/bindings/i2c/i2c-mt6577.txt         | 41 ++++++++++++++++++++++
->  1 file changed, 41 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
-> new file mode 100644
-> index 0000000..0ce6fa3
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
-> @@ -0,0 +1,41 @@
-> +* Mediatek's I2C controller
-> +
-> +The Mediatek's I2C controller is used to interface with I2C devices.
-> +
-> +Required properties:
-> +  - compatible: value should be either of the following.
-> +      (a) "mediatek,mt6577-i2c", for i2c compatible with mt6577 i2c.
-> +      (b) "mediatek,mt6589-i2c", for i2c compatible with mt6589 i2c.
-> +      (c) "mediatek,mt8127-i2c", for i2c compatible with mt8127 i2c.
-> +      (d) "mediatek,mt8135-i2c", for i2c compatible with mt8135 i2c.
-> +      (e) "mediatek,mt8173-i2c", for i2c compatible with mt8173 i2c.
-> +  - reg: physical base address of the controller and dma base, length of memory
-> +    mapped region.
-> +  - interrupts: interrupt number to the cpu.
-> +  - clock-div: the fixed value for frequency divider of clock source in i2c
-> +    module. Each IC may be different.
-> +  - clocks: clock name from clock manager
-> +  - clock-names: Must include "main" and "dma", if enable have-pmic need include
-> +    "pmic" extra.
-> +
-> +Optional properties:
-> +  - clock-frequency: Frequency in Hz of the bus when transfer, the default value
-> +    is 100000.
-> +  - mediatek,have-pmic: platform can control i2c form special pmic side.
-> +    Only mt6589 and mt8135 support this feature.
-> +  - mediatek,use-push-pull: IO config use push-pull mode.
-> +
-> +Example:
-> +
-> +	i2c0: i2c at 1100d000 {
-> +			compatible = "mediatek,mt6577-i2c";
-> +			reg = <0x1100d000 0x70>,
-> +			      <0x11000300 0x80>;
-> +			interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_LOW>;
-> +			clock-frequency = <400000>;
-> +			mediatek,have-pmic;
-> +			clock-div = <16>;
-> +			clocks = <&i2c0_ck>, <&ap_dma_ck>;
-> +			clock-names = "main", "dma";
-> +	};
-> +
-> -- 
-> 1.8.1.1.dirty
-> 
+Best regards,
+Thomas Betker
