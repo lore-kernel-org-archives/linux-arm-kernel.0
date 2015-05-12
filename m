@@ -1,72 +1,42 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 12 May 2015 23:49:05 +0800
-Subject: [PATCH 1/2] ARM: dts: sun9i: cubieboard4: Enable USB support
-In-Reply-To: <20150512145717.GN10961@lukather>
-References: <1431017037-28331-1-git-send-email-wens@csie.org>
- <1431017037-28331-2-git-send-email-wens@csie.org>
- <20150508074616.GP11057@lukather>
- <CAGb2v64VQpNkd2zmHdhTXQEfk8z1FnhYZMQW0vmLVq1Ahzg2Zw@mail.gmail.com>
- <20150508114040.GR11057@lukather>
- <CAGb2v64eKcn6-J+Dae-YOtaZ3kdiT7=JMvnRJfBafXpEDLsYLg@mail.gmail.com>
- <20150512145717.GN10961@lukather>
-Message-ID: <CAGb2v67_-m29AEg=1JKsuumqQYgJTcUMZYOmq6ucKdarbdiGjA@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 12 May 2015 17:49:36 +0200
+Subject: [PATCH 2/8] dmaengine: mv_xor: add support for a38x command in
+ descriptor mode
+In-Reply-To: <1431445063-20226-3-git-send-email-maxime.ripard@free-electrons.com>
+References: <1431445063-20226-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1431445063-20226-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20150512174936.284783d4@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 12, 2015 at 10:57 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Mon, May 11, 2015 at 04:26:58PM +0800, Chen-Yu Tsai wrote:
->> >> >> +&usbphy1 {
->> >> >> +     phy-supply = <&reg_usb1_vbus>;
->> >> >> +     status = "okay";
->> >> >> +};
->> >> >> +
->> >> >> +/*
->> >> >> + * Unfortunately reg_usb1_vbus also powers one of the ports from usb3's hub.
->> >> >> + * One should always make sure both regulators are enabled and working for
->> >> >> + * all USB ports to have power.
->> >> >> + */
->> >> >
->> >> > Can't we just provide the two regulators, and enable both of them so
->> >> > that we know that we always have the needed regulators enabled,
->> >> > disregarding which USB port is used?
->> >>
->> >> Would setting "always-on" for both regulators work for you?
->> >> Or maybe just the one that's used by both USB hosts?
->> >
->> > I was more thinking of giving to the phy an additional regulator, so
->> > that it would enable both the regulators needed to power up all ports.
->>
->> That would require adding back all the regulator-related code I
->> removed from the phy driver before it was merged. (sigh) It's not
->> like the regulator bindings takes a list.
->
-> Yeah, but maybe we can just add an optional device-supply property or
-> something like that to power up the devices connected on the bus.
+Maxime,
 
-(CC-ed Kishon)
-Do we think this generic enough to go into the generic phy core?
+On Tue, 12 May 2015 17:37:37 +0200, Maxime Ripard wrote:
 
->> I see this as more of a hardware design flaw, and we should label
->> it as such.
->
-> This can be seen as one, and we can debate it for some time I guess,
-> but if the hardware guys were not making crazy stuff like that, we
-> would run out of work pretty quickly :)
+>  Required properties:
+> -- compatible: Should be "marvell,orion-xor"
+> +- compatible: Should be "marvell,orion-xor" or "marvell,a38x-xor"
 
-Ah yes, but the users would be happier. :)
+I believe the new compatible string should be armada-380-xor or
+armada380-xor. Wildcards in compatible strings are generally not
+recommended, and we don't use the a38x- prefix anywhere in the tree, as
+far as I can see:
 
-> What we really need to do is find a proper and reliable way to handle
-> this case. Whether we declare it as a flaw or not is a separate
-> debate.
->
->> And it might still work for self-powered devices even if VBUS is
->> off. The USB hub chip is always on.
->
-> That still leaves a significant amount of devices out and non
-> functional, especially very standard devices like USB keys, keyboards
-> or headsets that you would expect to just work.
+drivers/ata/ahci_mvebu.c:	{ .compatible = "marvell,armada-380-ahci", },
+drivers/bus/mvebu-mbus.c:	{ .compatible = "marvell,armada380-mbus",
+drivers/mmc/host/sdhci-pxav3.c:		.compatible = "marvell,armada-380-sdhci",
+drivers/rtc/rtc-armada38x.c:	{ .compatible = "marvell,armada-380-rtc", },
+drivers/thermal/armada_thermal.c:		.compatible = "marvell,armada380-thermal",
+drivers/usb/host/xhci-plat.c:	{ .compatible = "marvell,armada-380-xhci"},
+drivers/watchdog/orion_wdt.c:		.compatible = "marvell,armada-380-wdt",
 
-I agree. So the question is where should this go in.
+Yes, we're not very consistent between armada380 and armada-380, but
+we're not using a38x anywhere.
 
-ChenYu
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
