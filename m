@@ -1,68 +1,73 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 12 May 2015 11:09:04 -0500
-Subject: [PATCH V4 2/3] OPP: Allow multiple OPP tables to be passed via DT
-In-Reply-To: <d734a94af2263285fe8cef9f177212f15f218944.1430394884.git.viresh.kumar@linaro.org>
-References: <cover.1430394884.git.viresh.kumar@linaro.org>
- <d734a94af2263285fe8cef9f177212f15f218944.1430394884.git.viresh.kumar@linaro.org>
-Message-ID: <555225A0.8050707@ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 12 May 2015 18:05:35 +0200
+Subject: [PATCH 6/8] async_tx: adding mult and sum_product flags
+In-Reply-To: <1431445063-20226-7-git-send-email-maxime.ripard@free-electrons.com>
+References: <1431445063-20226-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1431445063-20226-7-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20150512160535.GK19927@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/30/2015 07:08 AM, Viresh Kumar wrote:
-> On some platforms (Like Qualcomm's SoCs), it is not decided until
-> runtime on what OPPs to use. The OPP tables can be fixed at compile
-> time, but which table to use is found out only after reading some efuses
-> (sort of an eeprom) and knowing characteristics of the SoC.
-
-they are more like prom than eeprom in many instances.
-
+On Tue, May 12, 2015 at 05:37:41PM +0200, Maxime Ripard wrote:
+> From: Lior Amsalem <alior@marvell.com>
 > 
-> To support such platform we need to pass multiple OPP tables per device
-> and hardware should be able to choose one and only one table out of
-> those.
+> Some engines (like Marvell mv_xor) do not support mult and sum_product
+> operations as part of the pq support.
 > 
-> Update OPP-v2 bindings to support that.
+> This patch adds new flags: DMA_PREP_PQ_MULT & DMA_PREP_PQ_SUM_PRODUCT these
+> flags helps the driver identify such operations.
 > 
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Signed-off-by: Lior Amsalem <alior@marvell.com>
+> Reviewed-by: Ofer Heifetz <oferh@marvell.com>
+> Reviewed-by: Nadav Haklai <nadavh@marvell.com>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > ---
->  Documentation/devicetree/bindings/power/opp.txt | 5 +++++
->  1 file changed, 5 insertions(+)
+>  crypto/async_tx/async_raid6_recov.c | 4 ++--
+>  include/linux/dmaengine.h           | 4 ++++
+>  2 files changed, 6 insertions(+), 2 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/power/opp.txt b/Documentation/devicetree/bindings/power/opp.txt
-> index 3b67a5c8d965..07959903ec32 100644
-> --- a/Documentation/devicetree/bindings/power/opp.txt
-> +++ b/Documentation/devicetree/bindings/power/opp.txt
-> @@ -14,6 +14,9 @@ Devices supporting OPPs must set their "operating-points-v2" property with
->  phandle to a OPP descriptor in their DT node. The OPP core will use this phandle
->  to find the operating points for the device.
+> diff --git a/crypto/async_tx/async_raid6_recov.c b/crypto/async_tx/async_raid6_recov.c
+> index 934a84981495..2db5486fd873 100644
+> --- a/crypto/async_tx/async_raid6_recov.c
+> +++ b/crypto/async_tx/async_raid6_recov.c
+> @@ -47,7 +47,7 @@ async_sum_product(struct page *dest, struct page **srcs, unsigned char *coef,
+>  		struct device *dev = dma->dev;
+>  		dma_addr_t pq[2];
+>  		struct dma_async_tx_descriptor *tx;
+> -		enum dma_ctrl_flags dma_flags = DMA_PREP_PQ_DISABLE_P;
+> +		enum dma_ctrl_flags dma_flags = DMA_PREP_PQ_DISABLE_P | DMA_PREP_PQ_SUM_PRODUCT;
 >  
-> +Devices may want to choose OPP tables at runtime and so can provide a list of
-> +phandles here. But only *one* of them should be chosen at runtime.
-> +
+>  		if (submit->flags & ASYNC_TX_FENCE)
+>  			dma_flags |= DMA_PREP_FENCE;
+> @@ -111,7 +111,7 @@ async_mult(struct page *dest, struct page *src, u8 coef, size_t len,
+>  		dma_addr_t dma_dest[2];
+>  		struct device *dev = dma->dev;
+>  		struct dma_async_tx_descriptor *tx;
+> -		enum dma_ctrl_flags dma_flags = DMA_PREP_PQ_DISABLE_P;
+> +		enum dma_ctrl_flags dma_flags = DMA_PREP_PQ_DISABLE_P | DMA_PREP_PQ_MULT;
 >  
->  * OPP Descriptor Node
->  
-> @@ -28,6 +31,8 @@ This describes the OPPs belonging to a device. This node can have following
->    reference an OPP.
->  
->  Optional properties:
-> +- opp-name: Name of the OPP table, to uniquely identify it if more than one OPP
-> +  table is supplied in "operating-points-v2" property of device.
->  - shared-opp: Indicates that device nodes using this OPP descriptor's phandle
->    switch their DVFS state together, i.e. they share clock/voltage/current lines.
->    Missing property means devices have independent clock/voltage/current lines,
-> 
+>  		if (submit->flags & ASYNC_TX_FENCE)
+>  			dma_flags |= DMA_PREP_FENCE;
+> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+> index ad419757241f..f19ecebb4d3f 100644
+> --- a/include/linux/dmaengine.h
+> +++ b/include/linux/dmaengine.h
+> @@ -174,6 +174,8 @@ struct dma_interleaved_template {
+>   *  operation it continues the calculation with new sources
+>   * @DMA_PREP_FENCE - tell the driver that subsequent operations depend
+>   *  on the result of this operation
+> + * @DMA_PREP_PQ_MULT - tell the driver that this is a mult request
+> + * @DMA_PREP_PQ_SUM_PRODUCT - tell the driver that this is a sum product request
+>   */
+>  enum dma_ctrl_flags {
+>  	DMA_PREP_INTERRUPT = (1 << 0),
+> @@ -182,6 +184,8 @@ enum dma_ctrl_flags {
+>  	DMA_PREP_PQ_DISABLE_Q = (1 << 3),
+>  	DMA_PREP_CONTINUE = (1 << 4),
+>  	DMA_PREP_FENCE = (1 << 5),
+> +	DMA_PREP_PQ_MULT = (1 << 10),
+> +	DMA_PREP_PQ_SUM_PRODUCT = (1 << 11),
 
-With some SoCs like AM335x - thanks to some brain dead incompatible
-hardware design choices, this might end up as a big list or various
-OPP tables. but overall, I must prefer this approach as well.
+Any reason for skipping 6 to 9?
 
-Thanks for proposing this. will be great to see examples documented in
-bindings doc as well.
-
-With no further issues,
-Acked-by: Nishanth Menon <nm@ti.com>
-
--- 
-Regards,
-Nishanth Menon
+    Andrew
