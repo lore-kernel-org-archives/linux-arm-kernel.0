@@ -1,22 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 May 2015 23:21:06 +0200
-Subject: [PATCH v8 14/16] ARM: dts: Introduce STM32F429 MCU
-In-Reply-To: <1431158038-3813-15-git-send-email-mcoquelin.stm32@gmail.com>
-References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1431158038-3813-15-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <2789447.8FUTAOJOHR@wuerfel>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Tue, 12 May 2015 23:22:59 +0200
+Subject: [PATCH 0/2] PCI: iproc: add bcma PCIe 2.0 controller
+Message-ID: <1431465781-10753-1-git-send-email-hauke@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 09 May 2015 09:53:56 Maxime Coquelin wrote:
-> +#include  <dt-bindings/mfd/stm32f4-rcc.h>
-> +
-> 
+After Ray submitted the PCIe controller for the iProc devices using 
+pure device tree this adds support for the devices using bcma to scan 
+the bus. This should replaces the driver I initially send for inclusion.
 
-Can you find a way to avoid this dependency?
+@Ray The driver found in the Broadcom SDK does some more stuff:
+* setting up some DMA memory areas
+* chaining MPS and MRRS to 512
+* PHY changes:
+ * "improving" the PCIe jitter 
+ * some special initializations for the 3rd PCIe port
 
-Maybe you can change the bindings so that the numbers you pass as
-arguments to the reset and clock specifiers reflect the numbers that
-the hardware use?
+For me it works without these additions, but I haven't tested for 
+performance or stability or 3rd port. Can you check if this is needed 
+at all for the devices found on the market?
 
-	Arnd
+Hauke Mehrtens (2):
+  PCI: iproc: make of_irq_parse_and_map_pci() configurable
+  PCI: iproc: add bcma pcie driver
+
+ drivers/pci/host/Kconfig               |  11 ++++
+ drivers/pci/host/Makefile              |   1 +
+ drivers/pci/host/pcie-iproc-bcma.c     | 112 +++++++++++++++++++++++++++++++++
+ drivers/pci/host/pcie-iproc-platform.c |   2 +
+ drivers/pci/host/pcie-iproc.c          |   2 +-
+ drivers/pci/host/pcie-iproc.h          |   1 +
+ 6 files changed, 128 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/pci/host/pcie-iproc-bcma.c
+
+-- 
+2.1.4
