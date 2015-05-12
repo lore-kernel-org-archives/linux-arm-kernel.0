@@ -1,72 +1,66 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 12 May 2015 18:30:59 +0200
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Replace USB_RCAR_GEN2_PHY by
- PHY_RCAR_GEN2
-In-Reply-To: <3385193.PYJYK5jiMy@wuerfel>
-References: <1430222884-2095-1-git-send-email-geert+renesas@glider.be>
- <20150430001743.GF17758@verge.net.au>
- <20150509021403.GA18443@verge.net.au> <3385193.PYJYK5jiMy@wuerfel>
-Message-ID: <CAMuHMdU9363XjsEGNmy8CyLL6OR91khWFGQjn72qwWLr9=J1cQ@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 12 May 2015 17:34:12 +0100
+Subject: [PATCH v2 1/2] PCI: generic: remove dependency on hw_pci
+In-Reply-To: <20150512133431.GA2898@google.com>
+References: <1430791333-26013-1-git-send-email-jchandra@broadcom.com>
+ <20150505155346.GJ1550@arm.com> <20150506141859.GC26028@red-moon>
+ <CAErSpo7z_Sf5QvMa8MBY0f7DQOmwhcpUnCFG=ZsmHuwT2HouQw@mail.gmail.com>
+ <554ADCE0.8020603@amd.com> <20150512133431.GA2898@google.com>
+Message-ID: <20150512163412.GD16079@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Tue, May 12, 2015 at 02:34:31PM +0100, Bjorn Helgaas wrote:
 
-On Tue, May 12, 2015 at 5:15 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Saturday 09 May 2015 11:14:03 Simon Horman wrote:
->> On Thu, Apr 30, 2015 at 09:17:44AM +0900, Simon Horman wrote:
->> > On Tue, Apr 28, 2015 at 02:08:04PM +0200, Geert Uytterhoeven wrote:
->> > > The legacy-only USB_RCAR_GEN2_PHY driver was replaced by the DT-only
->> > > PHY_RCAR_GEN2 driver.
->> > >
->> > > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->> > > ---
->> > > Oops, CONFIG_USB_RCAR_GEN2_PHY shouldn't have been in a multiplatform
->> > > defconfig, as it supports legacy platform data only.
->> >
->> > Acked-by: Simon Horman <horms+renesas@verge.net.au>
->> >
->> > Olof, Arnd, Kevin,
->> >
->> > I'm assuming that you want to take this directly (or not!).
->> > However, if you would like me to queue up these kind of changes
->> > in my defconfig branch please just let me know.
->>
->> Hi,
->>
->> I'm wondering if you could take a moment to either review this patch
->> or indicate that you would like me to queue up changes like this.
->
-> The patch looks ok to me, and I've queued it up in the next/defconfig
-> branch for 4.2 now.
+[...]
 
-Thanks!
+> > +void pci_claim_one_bus(struct pci_bus *b)
+> > +{
+> > +	struct pci_dev *pdev;
+> > +	struct pci_bus *child_bus;
+> > +
+> > +	list_for_each_entry(pdev, &b->devices, bus_list) {
+> > +		int i;
+> > +
+> > +		for (i = 0; i < PCI_NUM_RESOURCES; i++) {
+> > +			struct resource *r = &pdev->resource[i];
+> > +
+> > +			if (r->parent || !r->start || !r->flags)
+> > +				continue;
+> > +
+> > +			if (pci_has_flag(PCI_PROBE_ONLY) ||
+> > +			    (r->flags & IORESOURCE_PCI_FIXED)) {
+> > +				if (pci_claim_resource(pdev, i) == 0)
+> > +					continue;
+> > +
+> > +				pci_claim_bridge_resource(pdev, i);
+> > +			}
+> > +		}
+> > +	}
+> > +
+> > +	list_for_each_entry(child_bus, &b->children, node) {
+> > +		pci_claim_one_bus(child_bus);
+> > +	}
+> > +}
+> > +EXPORT_SYMBOL(pci_claim_one_bus);
+> 
+> I'm not a fan of pci_claim_one_bus(), on the philosophical grounds that
+> claiming resources is a per-device thing, and I don't want to encourage
+> people to do it on a per-bus level.
+> 
+> I'd rather claim them somewhere in the pci_device_add() path, as s390 does
+> in pcibios_add_device().  In fact, I'd *like* to do it even earlier, when
+> we read each BAR, so we could identify invalid or unassigned BARs
+> immediately.
 
-> In general, I think it's easier if you take all patches at first and
-> then forward them to us, that way we can rely on you to have an
-> overview of what is missing.
->
-> If you only have one patch for a particular branch, sending a patch
-> (instead of a pull request) to arm at kernel.org works as well, but it's
-> less ambiguous if you relay that patch with your signed-off-by line
-> added than to have us figure out whether you want the patch to be
-> applied directly or not.
+You mean claiming the resources in __pci_read_base (and unset the resource
+if claiming it fails ?) regardless of PCI_PROBE_ONLY ?
 
-I think Simon's question was more about asking what's the proper process
-for updating multi_v7_defconfig.
+I will give it a go, I fear it might trigger regressions on other archs
+though.
 
-Should this go through you / arm at kernel.org directly?
-Should it go through arm subarchitecture maintainers, causing merge conflicts?
+We could claim the resources in pcibios_add_device on arm64, but this
+means arm code should be patched too since I am not happy at all to let
+arm and arm64 diverge even more.
 
-BTW, arm at kernel.org isn't documented in MAINTAINERS.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Lorenzo
