@@ -1,55 +1,59 @@
-From: noralf@tronnes.org (=?windows-1252?Q?Noralf_Tr=F8nnes?=)
-Date: Tue, 12 May 2015 17:28:47 +0200
-Subject: [PATCH 2/3 v8] mailbox: Enable BCM2835 mailbox support
-In-Reply-To: <1430857666-18877-2-git-send-email-eric@anholt.net>
-References: <1430857666-18877-1-git-send-email-eric@anholt.net>
- <1430857666-18877-2-git-send-email-eric@anholt.net>
-Message-ID: <55521C2F.5030809@tronnes.org>
+From: grygorii.strashko@linaro.org (Grygorii.Strashko@linaro.org)
+Date: Tue, 12 May 2015 18:31:49 +0300
+Subject: [PATCH 1/1] gpio: omap: Fix PM runtime issue and remove most
+ BANK_USED macros
+In-Reply-To: <20150512141348.GG15563@atomide.com>
+References: <1429632533-23285-1-git-send-email-tony@atomide.com>
+ <CACRpkdZ1nJ=-NPHrZdCQ6_TCrF7009R9Y7zVyXN1z9RWcv3a6A@mail.gmail.com>
+ <20150512141348.GG15563@atomide.com>
+Message-ID: <55521CE5.8070903@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Tony, Linus,
 
-Den 05.05.2015 22:27, skrev Eric Anholt:
-> From: Lubomir Rintel <lkundrak@v3.sk>
->
-> This mailbox driver provides a single mailbox channel to write 32-bit
-> values to the VPU and get a 32-bit response.  The Raspberry Pi
-> firmware uses this mailbox channel to implement firmware calls, while
-> Roku 2 (despite being derived from the same firmware tree) doesn't.
->
-> The driver was originally submitted by Lubomir, based on the
-> out-of-tree 2708 mailbox driver.  Eric Anholt fixed it up for
-> upstreaming, with the major functional change being that it now has no
-> notion of multiple channels (since that is a firmware-dependent
-> concept) and instead the raspberrypi-firmware driver will do that
-> bit-twiddling in its own messages.
->
-> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-> Signed-off-by: Craig McGeachie <slapdau@yahoo.com.au>
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> Cc: Jassi Brar <jassisinghbrar@gmail.com>
-> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-> ---
-[...]
-> diff --git a/drivers/mailbox/bcm2835-mailbox.c b/drivers/mailbox/bcm2835-mailbox.c
-[...]
-> +static bool bcm2835_last_tx_done(struct mbox_chan *link)
-> +{
-> +	struct bcm2835_mbox *mbox = bcm2835_link_mbox(link);
-> +	bool ret;
-> +
-> +	spin_lock(&mbox->lock);
-> +	ret = !(readl(mbox->regs + MAIL0_STA) & ARM_MS_FULL);
+On 05/12/2015 05:13 PM, Tony Lindgren wrote:
+> * Linus Walleij <linus.walleij@linaro.org> [150512 02:01]:
+>> On Tue, Apr 21, 2015 at 6:08 PM, Tony Lindgren <tony@atomide.com> wrote:
+>>
+>>> Looks like omap_gpio_irq_type can return early at several places
+>>> leaving a GPIO bank enabled without doing pm_runtime_put if wrong
+>>> GPIO arguments are passed.
+>>>
+>>> Instead of adding more complicated BANK_USED macros, let's fix the
+>>> issue properly. We can pass is_irq flag to omap_enable_gpio_module
+>>> and omap_disble_gpio_module. And with that we can remove all the
+>>> similar code elsewhere to get rid of most BANK_USED macros.
+>>>
+>>> Note that the reason for the BANK_USED macro is that we need to manage
+>>> PM runtime on per GPIO bank basis. In the long run we want to move to
+>>> using PM runtime counts for each GPIO line to determine if a GPIO
+>>> bank is used. Once we have a solution for omap_enable_gpio_module
+>>> and omap_disable_gpio_module, we can remove the remaining BANK_USED
+>>> macros.
+>>>
+>>> Cc: Felipe Balbi <balbi@ti.com>
+>>> Cc: Grygorii Strashko <grygorii.strashko@linaro.org>
+>>> Cc: Javier Martinez Canillas <jmartinez@softcrates.net>
+>>> Cc: Nishanth Menon <nm@ti.com>
+>>> Signed-off-by: Tony Lindgren <tony@atomide.com>
+>>
+>> There is so much discussion around this patch that I can't make
+>> up my mind whether I should apply this or some subsequent inline
+>> version of it.
+>>
+>> Holding this off for now...
+> 
+> Yeah let's see what Grygorii comes up, sounds like he may have
+> a minimal fix coming up. Then we can do the rest as clean-up
+> later on.
 
-I don't know how the mailbox framework uses this function,
-but MAIL0_STA might be wrong here.
+Thanks for your patience and sorry for delay - was ooo last week.
 
-Phil Elwell detected a bug in the downstream mailbox driver in
-the mbox_write function where it waits for space to be available
-in the FIFO. His observation:
-With the VC reader blocked and the ARM writing, MAIL0_STA reads
-empty permanently while MAIL1_STA goes from empty (0x40000000)
-to non-empty (0x00000001-0x00000007) to full (0x80000008).
+I'll try to come up with some patches as soon as possible, and,
+yes, In my personal opinion, it could be better if OMAP GPIO driver
+will be reworked/cleaned up/fixed in a different way.
 
-See:
-https://github.com/raspberrypi/linux/commit/3018d8a0996ad2340ba1b3f473f705ef285b01b5
+-- 
+regards,
+-grygorii
