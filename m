@@ -1,30 +1,91 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 12 May 2015 10:03:52 -0600
-Subject: BCM2836 (Raspberry Pi 2) port
-In-Reply-To: <1701192.WcfjCoBWQN@kongar>
-References: <1429639796-2169-1-git-send-email-eric@anholt.net>
- <4137213.WVJY1et48u@kongar> <55516738.306@wwwdotorg.org>
- <1701192.WcfjCoBWQN@kongar>
-Message-ID: <55522468.3050606@wwwdotorg.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 12 May 2015 11:04:50 -0500
+Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <20150512051633.GB32300@linux>
+References: <cover.1430394884.git.viresh.kumar@linaro.org>
+ <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
+ <554FFFA3.1060801@ti.com> <20150512051633.GB32300@linux>
+Message-ID: <555224A2.7000308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/2015 09:39 AM, Alexander Stein wrote:
-> On Monday 11 May 2015, 20:36:40 wrote Stephen Warren:
->> On 05/08/2015 10:14 AM, Alexander Stein wrote:
->>> On Thursday 23 April 2015, 22:25:08 wrote Stephen Warren:
->>>>> Hit any key to stop autoboot:  0
->>>>> U-Boot> setenv fdt_high fffffff
->>>
->>> Any specific reason to set fdt_high to fffffff?
->>
->> Yes, it prevents U-Boot's annoying habit of moving the DTB from where it
->> was loaded to some other place. This was especially important in this
->> case since I was trying to find out exactly which piece of RAM being
->> over-written caused the issues I was seeing.
->
-> Shouldn't this then be part of the default raspberry (2 only?) environment?
+Hi Viresh,
+On 05/12/2015 12:16 AM, Viresh Kumar wrote:
+[..]
+> On 10-05-15, 20:02, Nishanth Menon wrote:
+>> On 04/30/2015 07:07 AM, Viresh Kumar wrote:
 
-Eventually yes. So far, nobody seems to know which areas of RAM are 
-off-limits (presumably since the RAM is used as a CPU1..3 pen), so I was 
-experimenting to try and find that out.
+One additional comment - after re-reading the bindings again..
+> 
+> +- opp-microvolt: voltage in micro Volts. It can contain entries for multiple
+> +  regulators.
+> +
+> +  A single regulator's voltage is specified with an array of size one or three.
+> +  Single entry is for target voltage and three entries are for <target min max>
+> +  voltages.
+
+Just curious -> is'nt it better to just have min<->max range? binding
+as it stands right now is open to interpretation as to what will be
+attempted and in what sequence? with a valid min, target or max -
+is'nt it more power efficient always to go for a "min" than a target?
+
+Further, min<->max implies anywhere in that range and is more
+consistent with "regulator like" description.
+
+
+>> That said, flexibility of this approach is awesome, thanks for doing
+>> this, I believe we did have a discussion about "safe OPP" for thermal
+>> behavior -> now that we have phandles for OPPs, we  can give phandle
+>> pointer to the thermal framework. in addition, we can also use phandle
+>> for marking throttling information in thermal framework instead of
+>> indices as well. which allows a lot of flexibility.
+>>
+>> in some systems, we'd have need to mark certain OPPs for entry into
+>> suspend(tegra?) or during shutdown (for example) - do we allow for such
+>> description as phandle pointer back to the OPP nodes (from cpu0 device)
+>> OR do we describe them as additional properties?
+> 
+> Haven't thought about it earlier. In case we need them, probably it
+> should go in the OPP table.
+
+> 
+> NOTE: Mike T. once told me that we shouldn't over-abuse the bindings
+> by putting every detail there. And I am not sure at all on how to draw
+> that line.
+
+True. one option might be to allow for vendor specific property
+extensions - that will let vendors add in additional quirky data
+custom to their SoCs as needed.
+
+> 
+>>> +- status: Marks the node enabled/disabled.
+>>
+>> One question we'd probably want the new framework to address is the need
+>> for OPPs based on Efuse options - Am I correct in believing that the
+>> solution that iMX, and TI SoCs probably need is something similar to
+>> modifying the status to disabled? or do we have Vendor specfic modifier
+>> properties that would be allowed?
+> 
+> See PATCH 2/3 for that.
+
+Sorry about that. I had kind of expected all bindings to be a single
+patch :)..
+
+>  
+>> One additional behavior need I noticed in various old threads is a need
+>> to restrict transition OPPs -> certain SoCs might have constraints on
+>> next OPP they can transition from certain OPPs in-order to achieve a new
+>> OPP. again, such behavior could be phandle lists OR properties that link
+>> the chain up together. Number of such needs did sound less, but still
+>> just thought to bring it up.
+> 
+> See 0/3 and 3/3 for that. Its present in my solution but Mike T. is
+> strictly against keeping that in OPP table. And so 3/3 may get Nak'd.
+> 
+
+missed this as well :(
+
+
+-- 
+Regards,
+Nishanth Menon
