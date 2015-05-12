@@ -1,34 +1,44 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 May 2015 21:42:40 +0200
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Replace USB_RCAR_GEN2_PHY by
- PHY_RCAR_GEN2
-In-Reply-To: <CAMuHMdU9363XjsEGNmy8CyLL6OR91khWFGQjn72qwWLr9=J1cQ@mail.gmail.com>
-References: <1430222884-2095-1-git-send-email-geert+renesas@glider.be>
- <3385193.PYJYK5jiMy@wuerfel>
- <CAMuHMdU9363XjsEGNmy8CyLL6OR91khWFGQjn72qwWLr9=J1cQ@mail.gmail.com>
-Message-ID: <2579991.7Fqv0Atap3@wuerfel>
+Date: Tue, 12 May 2015 21:49:04 +0200
+Subject: [PATCH RFC 0/2] stmmac: stand alone platform drivers
+In-Reply-To: <CAGhQ9Vx0DQf-HcqEiohFLrBJPBe5qYjLgXiH3qGx85fAruh8UQ@mail.gmail.com>
+References: <1431022765-30715-1-git-send-email-manabian@gmail.com>
+ <5987007.lq0DjS0tE0@wuerfel>
+ <CAGhQ9Vx0DQf-HcqEiohFLrBJPBe5qYjLgXiH3qGx85fAruh8UQ@mail.gmail.com>
+Message-ID: <5948526.xNXlKiLpxq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 May 2015 18:30:59 Geert Uytterhoeven wrote:
+On Tuesday 12 May 2015 19:20:45 Joachim Eastwood wrote:
 > 
-> I think Simon's question was more about asking what's the proper process
-> for updating multi_v7_defconfig.
+> I have now created a generic dt dwmac driver which contain all compat
+> strings that doesn't have any match data. As long as this driver is
+> linked last this works for my built-in drivers configuration. I am not
+> able to test using modules because of my very limited rootfs. This is
+> a Cortex-M system after all.
 > 
-> Should this go through you / arm at kernel.org directly?
-> Should it go through arm subarchitecture maintainers, causing merge conflicts?
+> I also converted all the other DT dwmac drivers and the entire patch
+> set can be found on:
+> https://github.com/manabian/linux-lpc
+> 
+> After I have done some more cleanups and added proper commit messages
+> I will put them on netdev again.
+> 
+> 
 
-I think it should go through subarch maintainers, and we'll handle the
-conflicts as they arise when merging into the next/defconfig branch.
-This does mean that it's important to send the defconfig changes separately
-from other changes if possible, but it's fine to have a branch that touches
-both platform-specific and generic defconfig files.
+Yes, this looks really nice (with the cleanup bits that are obviously
+missing applied), thanks a lot!
 
-> BTW, arm at kernel.org isn't documented in MAINTAINERS.
+We should probably try to keep existing defconfig files working,
+which could be done e.g. like
 
-Right, that is intentional. We don't want to get Cc'd on 4000 patches per
-month that get sent to the mailing list for mach-*. By having a maintainer
-for each subdirectory and letting them decide what to forward to us,
-we're able to do our job better.
+ config DWMAC_ROCKCHIP
+	tristate "Rockchip dwmac support"
++	default ARCH_ROCKCHIP
+	depends on OF
+	select MFD_SYSCON
+
+so that any configuration that currently has ARCH_ROCKCHIP and DW_MAC
+enabled ends up with DWMAC_ROCKCHIP enabled as well.
 
 	Arnd
