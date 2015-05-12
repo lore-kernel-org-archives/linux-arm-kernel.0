@@ -1,52 +1,99 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Tue, 12 May 2015 07:15:38 +0200
-Subject: [PATCH] ARM: dts: kirkwood: add "nor-jedec" flash compatible
- binding
-In-Reply-To: <20150511132504.GR18496@lunn.ch>
-References: <1431066079-19725-1-git-send-email-zajec5@gmail.com>
- <5550AA08.5060001@free-electrons.com>
- <20150511132504.GR18496@lunn.ch>
-Message-ID: <CACna6rxb5zuTbJdqrta_220P6QWE4+Z_HEw41NRnZYn1cgjqtg@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 12 May 2015 10:46:33 +0530
+Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <554FFFA3.1060801@ti.com>
+References: <cover.1430394884.git.viresh.kumar@linaro.org>
+ <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
+ <554FFFA3.1060801@ti.com>
+Message-ID: <20150512051633.GB32300@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 May 2015 at 15:25, Andrew Lunn <andrew@lunn.ch> wrote:
-> On Mon, May 11, 2015 at 03:09:28PM +0200, Gregory CLEMENT wrote:
->> On 08/05/2015 08:21, Rafa?? Mi??ecki wrote:
->> > Starting with commits
->> > 8ff16cf ("Documentation: devicetree: m25p80: add "nor-jedec" binding")
->> > 1103b85 ("mtd: m25p80: bind to "nor-jedec" ID, for auto-detection")
->> > we have "nor-jedec" binding indicating support for JEDEC identification.
->>
->> I have the same question that for mvebu: did you actually check that all
->> the NOR flash referenced in the dts supports the JEDEC identification?
->
-> Rafa??, what is the long term plan?
+Hi Nishanth,
 
-One thing we should do for sure is:
-1) Not adding support for new bidnings in the spi-nor driver unless
-some chip really needs some special handling
-2) Make sure all new entries will include both: specific chip &
-generic JEDEC bindings
+On 10-05-15, 20:02, Nishanth Menon wrote:
+> On 04/30/2015 07:07 AM, Viresh Kumar wrote:
 
+> > +the liberty of choosing these. These triplets are called Operating Performance
+> 
+> I suggest we dont call them as triplets either -> note, we have added
+> clk transition latency per OPP, so they are not exactly triplets either.
 
-> Will the device specific property
-> be removed sometime in the future, and nor-jedec probing be used to
-> identify the device? Is this already the actual behaviour?
+Sure.
 
-Probably not really, because of keeping backward compatibility. Please
-mind some out-of-tree DT users and some DTB files being natively on
-flashes instead of appended to the kernel. The cost is low, so
-probably we can live with that.
+> > +Points aka OPPs. This document defines bindings for these OPPs applicable across
+> > +wide range of devices. For illustration purpose, this document uses CPU as a
+> > +device.
+> > +
+> > +
+> 
+> Would be good to point to operating-points (the legacy document) as
+> well. It might be good to state that only one of the properties should
+> be used for the device node OPP description.
 
+Hmm, okay.
 
-> I've seen
-> warnings when the DT entry specified the wrong device, something like:
-> Found ABC, Expected XYZ.
+> > +Optional properties:
+> > +- shared-opp: Indicates that device nodes using this OPP descriptor's phandle
+> > +  switch their DVFS state together, i.e. they share clock/voltage/current lines.
+> > +  Missing property means devices have independent clock/voltage/current lines,
+> > +  but they share OPP tables.
+> 
+> Is'nt this property redundant? by the fact that phandle is reused for
+> cpu1 should indicate shared OPP table, correct?
 
-This happens when DT/platform data provides wrong info about flash
-chipset. Driver always queries hardware, even if a flash model was
-provided. In case of finding different flash, it prints a warning.
+There are two things we can share:
+- OPP tables (And not the clock lines themselves). For example,
+  consider a quad-core platform with independent clock/voltage lines
+  for all CPUs but all the CPUs have same OPP table.
 
--- 
-Rafa?
+- Clock/voltage rails: This is described by the above property. I
+  thought the examples should have made this clear, anything left
+  there ?
+
+> > +- turbo-mode: Marks the OPP to be used only for turbo modes.
+> 
+> Might be great to add some description for what "turbo mode" means here.
+
+Okay.
+
+> That said, flexibility of this approach is awesome, thanks for doing
+> this, I believe we did have a discussion about "safe OPP" for thermal
+> behavior -> now that we have phandles for OPPs, we  can give phandle
+> pointer to the thermal framework. in addition, we can also use phandle
+> for marking throttling information in thermal framework instead of
+> indices as well. which allows a lot of flexibility.
+> 
+> in some systems, we'd have need to mark certain OPPs for entry into
+> suspend(tegra?) or during shutdown (for example) - do we allow for such
+> description as phandle pointer back to the OPP nodes (from cpu0 device)
+> OR do we describe them as additional properties?
+
+Haven't thought about it earlier. In case we need them, probably it
+should go in the OPP table.
+
+NOTE: Mike T. once told me that we shouldn't over-abuse the bindings
+by putting every detail there. And I am not sure at all on how to draw
+that line.
+
+> > +- status: Marks the node enabled/disabled.
+> 
+> One question we'd probably want the new framework to address is the need
+> for OPPs based on Efuse options - Am I correct in believing that the
+> solution that iMX, and TI SoCs probably need is something similar to
+> modifying the status to disabled? or do we have Vendor specfic modifier
+> properties that would be allowed?
+
+See PATCH 2/3 for that.
+ 
+> One additional behavior need I noticed in various old threads is a need
+> to restrict transition OPPs -> certain SoCs might have constraints on
+> next OPP they can transition from certain OPPs in-order to achieve a new
+> OPP. again, such behavior could be phandle lists OR properties that link
+> the chain up together. Number of such needs did sound less, but still
+> just thought to bring it up.
+
+See 0/3 and 3/3 for that. Its present in my solution but Mike T. is
+strictly against keeping that in OPP table. And so 3/3 may get Nak'd.
+
+Thanks a lot for your reviews.
