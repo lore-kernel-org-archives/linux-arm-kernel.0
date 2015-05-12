@@ -1,66 +1,39 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 12 May 2015 17:34:12 +0100
-Subject: [PATCH v2 1/2] PCI: generic: remove dependency on hw_pci
-In-Reply-To: <20150512133431.GA2898@google.com>
-References: <1430791333-26013-1-git-send-email-jchandra@broadcom.com>
- <20150505155346.GJ1550@arm.com> <20150506141859.GC26028@red-moon>
- <CAErSpo7z_Sf5QvMa8MBY0f7DQOmwhcpUnCFG=ZsmHuwT2HouQw@mail.gmail.com>
- <554ADCE0.8020603@amd.com> <20150512133431.GA2898@google.com>
-Message-ID: <20150512163412.GD16079@red-moon>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Tue, 12 May 2015 10:36:50 -0600
+Subject: [RFC PATCH v2 0/1] ARM: cpuidle: heterogeneous systems extension
+In-Reply-To: <20150422085507.GA22601@red-moon>
+References: <1429200617-9546-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <CAMAWPa_fMhgFfL8krDxT9h42mydVogkaYQt1Me1qJTsKeH5dSA@mail.gmail.com>
+ <20150422085507.GA22601@red-moon>
+Message-ID: <20150512163650.GM16124@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 12, 2015 at 02:34:31PM +0100, Bjorn Helgaas wrote:
+On Wed, Apr 22 2015 at 02:55 -0600, Lorenzo Pieralisi wrote:
+>On Tue, Apr 21, 2015 at 07:24:54PM +0100, Kevin Hilman wrote:
+>> On Thu, Apr 16, 2015 at 9:10 AM, Lorenzo Pieralisi
+>> <lorenzo.pieralisi@arm.com> wrote:
+>>
+>> [...]
+>>
+>> > This patch sets the maximum number of static CPUidle drivers allowed to
+>> > two, since it is hard to foresee systems with more than two sets of CPUs
+>> > having different idle states
+>>
+>> It's not hard to forsee anymore:
+>>
+>>    http://www.cnx-software.com/2015/04/21/mediatek-helio-x20-deca-core-processor/
+>>    https://liliputing.com/2015/04/closer-look-at-mediateks-upcoming-10-core-helio-x20-processor.html
+>
+>Eheh I stand corrected :). Not a big deal, drivers can be allocated
+>dynamically; it seems that the designs above leave us no choice, the
+>idle states are the only differentiating factor when it comes
+>to CPUidle driver logical cpumask creation, happy to hear more
+>opinions on this, but I do not really see what we can use instead.
 
-[...]
 
-> > +void pci_claim_one_bus(struct pci_bus *b)
-> > +{
-> > +	struct pci_dev *pdev;
-> > +	struct pci_bus *child_bus;
-> > +
-> > +	list_for_each_entry(pdev, &b->devices, bus_list) {
-> > +		int i;
-> > +
-> > +		for (i = 0; i < PCI_NUM_RESOURCES; i++) {
-> > +			struct resource *r = &pdev->resource[i];
-> > +
-> > +			if (r->parent || !r->start || !r->flags)
-> > +				continue;
-> > +
-> > +			if (pci_has_flag(PCI_PROBE_ONLY) ||
-> > +			    (r->flags & IORESOURCE_PCI_FIXED)) {
-> > +				if (pci_claim_resource(pdev, i) == 0)
-> > +					continue;
-> > +
-> > +				pci_claim_bridge_resource(pdev, i);
-> > +			}
-> > +		}
-> > +	}
-> > +
-> > +	list_for_each_entry(child_bus, &b->children, node) {
-> > +		pci_claim_one_bus(child_bus);
-> > +	}
-> > +}
-> > +EXPORT_SYMBOL(pci_claim_one_bus);
-> 
-> I'm not a fan of pci_claim_one_bus(), on the philosophical grounds that
-> claiming resources is a per-device thing, and I don't want to encourage
-> people to do it on a per-bus level.
-> 
-> I'd rather claim them somewhere in the pci_device_add() path, as s390 does
-> in pcibios_add_device().  In fact, I'd *like* to do it even earlier, when
-> we read each BAR, so we could identify invalid or unassigned BARs
-> immediately.
+Dynamic idle driver would be nice. Otherwise, the patch looks good to
+me.
 
-You mean claiming the resources in __pci_read_base (and unset the resource
-if claiming it fails ?) regardless of PCI_PROBE_ONLY ?
-
-I will give it a go, I fear it might trigger regressions on other archs
-though.
-
-We could claim the resources in pcibios_add_device on arm64, but this
-means arm code should be patched too since I am not happy at all to let
-arm and arm64 diverge even more.
-
-Lorenzo
+Thanks,
+Lina
