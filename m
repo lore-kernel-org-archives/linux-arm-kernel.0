@@ -1,41 +1,43 @@
-From: rbthomas@pobox.com (Rick Thomas)
-Date: Tue, 12 May 2015 01:33:54 -0700
-Subject: Bug#782364: linux-image-3.16.0-4-armmp: please configure drivers
- for both Cubox i4pro real time clocks
-In-Reply-To: <1250B1D0-EBAA-404C-B0F2-686DE9E4D156@pobox.com>
-References: <20150410232854.23367.58862.reportbug@cube.rcthomas.org>
- <1428710930.29665.17.camel@decadent.org.uk>
- <20150429085705.GG12732@n2100.arm.linux.org.uk>
- <1430582464.15640.186.camel@hellion.org.uk>
- <20150502161226.GS12732@n2100.arm.linux.org.uk>
- <1430583695.15640.190.camel@hellion.org.uk>
- <1430899272.15640.237.camel@debian.org>
- <64A51823-C50B-48D5-8180-CBC44F691CCB@pobox.com>
- <1430908023.2660.203.camel@debian.org>
- <1250B1D0-EBAA-404C-B0F2-686DE9E4D156@pobox.com>
-Message-ID: <47E9FE80-96C8-4D91-B161-53A61A8A5FCB@pobox.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 12 May 2015 10:41:21 +0200
+Subject: [PATCH v4 0/3] Add Mediatek SoC RTC driver
+In-Reply-To: <CAGS+omArcu3caKZo56Db2u+84WAVJiMzkr+1uS6tr_zfwARQ7A@mail.gmail.com>
+References: <1430897022-63357-1-git-send-email-eddie.huang@mediatek.com>
+ <20150509130846.GD3338@piout.net>
+ <CAGS+omArcu3caKZo56Db2u+84WAVJiMzkr+1uS6tr_zfwARQ7A@mail.gmail.com>
+Message-ID: <20150512084121.GO3338@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-On May 6, 2015, at 3:35 AM, Rick Thomas <rbthomas@pobox.com> wrote:
+On 12/05/2015 at 16:15:13 +0800, Daniel Kurtz wrote :
+> On Sat, May 9, 2015 at 9:08 PM, Alexandre Belloni
+> <alexandre.belloni@free-electrons.com> wrote:
+> > On 06/05/2015 at 15:23:39 +0800, Eddie Huang wrote :
+> >> RTC is one submodule of Mediatek MT6397 PMIC chip[1]. This series
+> >> support RTC driver that work with Mediatek SoC like MT8135, MT8173.
+> >> It implements second counter and also provide alarm function.
+> >>
+> >> This series base on 4.1-rc1, Test ok on MT8173 platform.
+> >>
+> >> [1] https://lkml.org/lkml/2015/1/23/325
+> >>
+> >
+> > All applied, thanks!
+> 
+> To which git tree & branch did you apply these patches?
+> 
 
-> 
-> On May 6, 2015, at 3:27 AM, Ian Campbell <ijc@debian.org> wrote:
-> 
->> It would be preferable to test the thing in Sid before the upload to
->> jessie-proposed-updates
-> 
-> I?ll keep an eye out for it.
-> 
-> But I don?t have one of the cubox models without the battery-backed RTC, so I won?t be able to test that case.   Is there anyone out there in debian-arm land with an appropriate test box?
-> 
-> Enjoy!
-> Rick
+They are in
+git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git rtc-next
 
-Am I looking in the wrong place?  I would have expected to see something show up in sid by now.
+They also landed in linux-next
 
-Is there a particular linux-image?.deb I should download from somewhere to test this?
+I'll update the MAINTAINERS file to add the location of that git tree.
 
-Thanks for all your help!
-Rick
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
