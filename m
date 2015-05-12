@@ -1,44 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 May 2015 00:00:33 +0200
-Subject: [PATCH] rtc: armada38x: remove unused variables
-Message-ID: <2116673.Ym6IPoTTaZ@wuerfel>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Tue, 12 May 2015 16:02:59 -0600
+Subject: [PATCH 1/2] selftests/lib.mk: fix INSTALL_RULE
+In-Reply-To: <1431467947-29847-2-git-send-email-tyler.baker@linaro.org>
+References: <1431467947-29847-1-git-send-email-tyler.baker@linaro.org>
+ <1431467947-29847-2-git-send-email-tyler.baker@linaro.org>
+Message-ID: <55527893.4070305@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A recent bugfix introduced a new compiler warning in the rtc-armada38x
-driver:
+On 05/12/2015 03:59 PM, tyler.baker at linaro.org wrote:
+> From: Tyler Baker <tyler.baker@linaro.org>
 
-drivers/rtc/rtc-armada38x.c: In function 'armada38x_rtc_read_time':
-drivers/rtc/rtc-armada38x.c:67:34: warning: unused variable 'flags' [-Wunused-variable]
-  unsigned long time, time_check, flags;
+This is odd. Did you use git send-email to send the patches?
 
-This removes the now obsolete variables to get rid of the warning.
-As the orginal fix was marked for stable backports [4.0], this one
-should be backported as well.
+-- Shuah
+> 
+> This patch fixes the INSTALL_RULE to gracefully handle the case where
+> TEST_PROGS and TEST_PROGS_EXTENDED and TEST_FILES are not set. In this case,
+> install is called without any SOURCE arguments causing make install to fail.
+> The proposed fix is to loop over the items in these variables and only call
+> install if there is a test artifact present.
+> 
+> Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
+> ---
+>  tools/testing/selftests/lib.mk | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/tools/testing/selftests/lib.mk b/tools/testing/selftests/lib.mk
+> index ee412ba..89dd785f 100644
+> --- a/tools/testing/selftests/lib.mk
+> +++ b/tools/testing/selftests/lib.mk
+> @@ -13,10 +13,12 @@ run_tests: all
+>  
+>  define INSTALL_RULE
+>  	mkdir -p $(INSTALL_PATH)
+> -	@for TEST_DIR in $(TEST_DIRS); do\
+> +	@for TEST_DIR in $(TEST_DIRS); do \
+>  		cp -r $$TEST_DIR $(INSTALL_PATH); \
+>  	done;
+> -	install -t $(INSTALL_PATH) $(TEST_PROGS) $(TEST_PROGS_EXTENDED) $(TEST_FILES)
+> +	@for ARTIFACT in $(TEST_PROGS) $(TEST_PROGS_EXTENDED) $(TEST_FILES); do \
+> +		install -t $(INSTALL_PATH) $$ARTIFACT; \
+> +	done;
+>  endef
+>  
+>  install: all
+> 
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 489405fe5ed38 ("rtc: armada38x: fix concurrency access in armada38x_rtc_set_time")
-Cc: stable at vger.kernel.org
 
-diff --git a/drivers/rtc/rtc-armada38x.c b/drivers/rtc/rtc-armada38x.c
-index cb70ced7e0db..2b08cac62f07 100644
---- a/drivers/rtc/rtc-armada38x.c
-+++ b/drivers/rtc/rtc-armada38x.c
-@@ -64,7 +64,7 @@ static void rtc_delayed_write(u32 val, struct armada38x_rtc *rtc, int offset)
- static int armada38x_rtc_read_time(struct device *dev, struct rtc_time *tm)
- {
- 	struct armada38x_rtc *rtc = dev_get_drvdata(dev);
--	unsigned long time, time_check, flags;
-+	unsigned long time, time_check;
- 
- 	mutex_lock(&rtc->mutex_time);
- 	time = readl(rtc->regs + RTC_TIME);
-@@ -88,7 +88,7 @@ static int armada38x_rtc_set_time(struct device *dev, struct rtc_time *tm)
- {
- 	struct armada38x_rtc *rtc = dev_get_drvdata(dev);
- 	int ret = 0;
--	unsigned long time, flags;
-+	unsigned long time;
- 
- 	ret = rtc_tm_to_time(tm, &time);
- 
+-- 
+Shuah Khan
+Sr. Linux Kernel Developer
+Open Source Innovation Group
+Samsung Research America (Silicon Valley)
+shuahkh at osg.samsung.com | (970) 217-8978
