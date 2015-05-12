@@ -1,74 +1,30 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 12 May 2015 16:57:17 +0200
-Subject: [PATCH 1/2] ARM: dts: sun9i: cubieboard4: Enable USB support
-In-Reply-To: <CAGb2v64eKcn6-J+Dae-YOtaZ3kdiT7=JMvnRJfBafXpEDLsYLg@mail.gmail.com>
-References: <1431017037-28331-1-git-send-email-wens@csie.org>
- <1431017037-28331-2-git-send-email-wens@csie.org>
- <20150508074616.GP11057@lukather>
- <CAGb2v64VQpNkd2zmHdhTXQEfk8z1FnhYZMQW0vmLVq1Ahzg2Zw@mail.gmail.com>
- <20150508114040.GR11057@lukather>
- <CAGb2v64eKcn6-J+Dae-YOtaZ3kdiT7=JMvnRJfBafXpEDLsYLg@mail.gmail.com>
-Message-ID: <20150512145717.GN10961@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 May 2015 17:00:04 +0200
+Subject: [PATCH v7 0/4] ARM: SoC: add a new platform,
+ UniPhier (arch/arm/mach-uniphier)
+In-Reply-To: <1431058034-5508-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1431058034-5508-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <2101307.fSn8Z2ZyBq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 11, 2015 at 04:26:58PM +0800, Chen-Yu Tsai wrote:
-> >> >> +&usbphy1 {
-> >> >> +     phy-supply = <&reg_usb1_vbus>;
-> >> >> +     status = "okay";
-> >> >> +};
-> >> >> +
-> >> >> +/*
-> >> >> + * Unfortunately reg_usb1_vbus also powers one of the ports from usb3's hub.
-> >> >> + * One should always make sure both regulators are enabled and working for
-> >> >> + * all USB ports to have power.
-> >> >> + */
-> >> >
-> >> > Can't we just provide the two regulators, and enable both of them so
-> >> > that we know that we always have the needed regulators enabled,
-> >> > disregarding which USB port is used?
-> >>
-> >> Would setting "always-on" for both regulators work for you?
-> >> Or maybe just the one that's used by both USB hosts?
-> >
-> > I was more thinking of giving to the phy an additional regulator, so
-> > that it would enable both the regulators needed to power up all ports.
+On Friday 08 May 2015 13:07:10 Masahiro Yamada wrote:
+> This is an initial series for supporting Socionext UniPhier SoCs,
+> based on ARM Cortex-A9, mainly used for digital TVs, video recorders, etc.
 > 
-> That would require adding back all the regulator-related code I
-> removed from the phy driver before it was merged. (sigh) It's not
-> like the regulator bindings takes a list.
+> 
+> Masahiro Yamada (4):
+>   ARM: UniPhier: add basic support for UniPhier architecture
+>   ARM: multi_v7_defconfig: enable UniPhier SoC family
+>   ARM: dts: UniPhier: add support for UniPhier SoCs and boards
+>   MAINTAINERS: add myself as ARM/UniPhier maintainer
 
-Yeah, but maybe we can just add an optional device-supply property or
-something like that to power up the devices connected on the bus.
+Applied all four patches, to the next/soc, next/defconfig, next/dt and
+next/soc branches respectively.
 
-> I see this as more of a hardware design flaw, and we should label
-> it as such.
+Welcome as our latest new maintainer. In the future, please send
+any follow-up patches for the architecture specific code to
+arm at kernel.org in addition to the normal recipients, once you
+consider them ready to be applied.
 
-This can be seen as one, and we can debate it for some time I guess,
-but if the hardware guys were not making crazy stuff like that, we
-would run out of work pretty quickly :)
-
-What we really need to do is find a proper and reliable way to handle
-this case. Whether we declare it as a flaw or not is a separate
-debate.
-
-> And it might still work for self-powered devices even if VBUS is
-> off. The USB hub chip is always on.
-
-That still leaves a significant amount of devices out and non
-functional, especially very standard devices like USB keys, keyboards
-or headsets that you would expect to just work.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150512/b950273a/attachment.sig>
+	Arnd
