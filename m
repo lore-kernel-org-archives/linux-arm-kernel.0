@@ -1,94 +1,108 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Mon, 11 May 2015 19:54:16 -0700
-Subject: [PATCH] ARM: mm: handle non-pmd-aligned end of RAM
-In-Reply-To: <20150511103130.GA3490@leverpostej>
-References: <a865bd68d706f8c4c9e82a374ff6adc4@agner.ch>
- <20150511103130.GA3490@leverpostej>
-Message-ID: <55516B58.20507@redhat.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Tue, 12 May 2015 11:00:05 +0800
+Subject: [PATCH v2 1/3] media: atmel-isi: remove the useless code which
+ disable isi
+In-Reply-To: <Pine.LNX.4.64.1505112147540.12198@axis700.grange>
+References: <1428570108-4961-1-git-send-email-josh.wu@atmel.com>
+ <1428570108-4961-2-git-send-email-josh.wu@atmel.com>
+ <Pine.LNX.4.64.1505112147540.12198@axis700.grange>
+Message-ID: <55516CB5.5020601@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2015 03:31 AM, Mark Rutland wrote:
-> At boot time we round the memblock limit down to section size in an
-> attempt to ensure that we will have mapped this RAM with section
-> mappings prior to allocating from it. When mapping RAM we iterate over
-> PMD-sized chunks, creating these section mappings.
->
-> Section mappings are only created when the end of a chunk is aligned to
-> section size. Unfortunately, with classic page tables (where PMD_SIZE is
-> 2 * SECTION_SIZE) this means that if a chunk is between 1M and 2M in
-> size the first 1M will not be mapped despite having been accounted for
-> in the memblock limit. This has been observed to result in page tables
-> being allocated from unmapped memory, causing boot-time hangs.
->
-> This patch modifies the memblock limit rounding to always round down to
-> PMD_SIZE instead of SECTION_SIZE. For classic MMU this means that we
-> will round the memblock limit down to a 2M boundary, matching the limits
-> on section mappings, and preventing allocations from unmapped memory.
-> For LPAE there should be no change as PMD_SIZE == SECTION_SIZE.
->
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Reported-by: Stefan Agner <stefan@agner.ch>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Hans de Goede <hdegoede@redhat.com>
-> Cc: Laura Abbott <labbott@redhat.com>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: Steve Capper <steve.capper@linaro.org>
+Hi, Guennadi
 
-Acked-by: Laura Abbott <labbott@redhat.com>
+On 5/12/2015 4:16 AM, Guennadi Liakhovetski wrote:
+> Hi Josh,
+>
+> Thanks for the patch. I'm afraid I don't quite understand why it is
+> needed, could you maybe explain a bit more? Is it because
+>
+> (1) during ISI configuration the pixel clock from the sensor is (usually)
+> anyway disabled, so, we don't have to additionally disable the ISI,
+> without the pixel clock the ISI is anyway already disabled.
+>
+> or
+>
+> (2) disabling the ISI at those locations below breaks something, because
+> when the ISI is disabled, the functionality, that's later used isn't
+> available.
+>
+> I assume it's (1), but if that's the case, then this patch is just
+> cosmetic, right?
+Right, it is (1). This patch doesn't impact the function of isi.
 
-> ---
->   arch/arm/mm/mmu.c | 20 ++++++++++----------
->   1 file changed, 10 insertions(+), 10 deletions(-)
+The point is when we disable the ISI, we need make sure ISI peripheral 
+clock and pixel clock is enabled. And also need to check the status 
+register or irq to know whether the disable operation is successful. So 
+best way to disable ISI is to call atmel_isi_wait_status(isi, 
+WAIT_ISI_DISABLE).
+
+ From this point, the isi_write(isi, ISI_CTRL, ISI_CTRL_DIS) in 
+atmel_isi_probe() is not useful as ISI peripheral clock is not enable yet.
+but the other two in configure_geometry(), isi_camera_set_bus_param() 
+can work and may protect the case the ISI is not in off state.
+
+> The ISI is anyway disabled, so, that operation simply has
+> no effect, but also doesn't hurt. OTOH, if some sensor keeps its master
+> clock running all the time, then switching the ISI off as in the current
+> version helps save some power, unless it breaks anything?
+So what about to keep the isi_write(isi, ISI_CTRL, ISI_CTRL_DIS) in 
+configure_geometry() and isi_camera_set_bus_param().
+Only remove it from atmel_isi_probe()?
+
+Best Regards,
+Josh Wu
+
 >
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index 4e6ef89..7186382 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -1112,22 +1112,22 @@ void __init sanity_check_meminfo(void)
->   			}
+> Thanks
+> Guennadi
 >
->   			/*
-> -			 * Find the first non-section-aligned page, and point
-> +			 * Find the first non-pmd-aligned page, and point
->   			 * memblock_limit at it. This relies on rounding the
-> -			 * limit down to be section-aligned, which happens at
-> -			 * the end of this function.
-> +			 * limit down to be pmd-aligned, which happens at the
-> +			 * end of this function.
->   			 *
->   			 * With this algorithm, the start or end of almost any
-> -			 * bank can be non-section-aligned. The only exception
-> -			 * is that the start of the bank 0 must be section-
-> +			 * bank can be non-pmd-aligned. The only exception is
-> +			 * that the start of the bank 0 must be section-
->   			 * aligned, since otherwise memory would need to be
->   			 * allocated when mapping the start of bank 0, which
->   			 * occurs before any free memory is mapped.
->   			 */
->   			if (!memblock_limit) {
-> -				if (!IS_ALIGNED(block_start, SECTION_SIZE))
-> +				if (!IS_ALIGNED(block_start, PMD_SIZE))
->   					memblock_limit = block_start;
-> -				else if (!IS_ALIGNED(block_end, SECTION_SIZE))
-> +				else if (!IS_ALIGNED(block_end, PMD_SIZE))
->   					memblock_limit = arm_lowmem_limit;
->   			}
+> On Thu, 9 Apr 2015, Josh Wu wrote:
 >
-> @@ -1137,12 +1137,12 @@ void __init sanity_check_meminfo(void)
->   	high_memory = __va(arm_lowmem_limit - 1) + 1;
->
->   	/*
-> -	 * Round the memblock limit down to a section size.  This
-> +	 * Round the memblock limit down to a pmd size.  This
->   	 * helps to ensure that we will allocate memory from the
-> -	 * last full section, which should be mapped.
-> +	 * last full pmd, which should be mapped.
->   	 */
->   	if (memblock_limit)
-> -		memblock_limit = round_down(memblock_limit, SECTION_SIZE);
-> +		memblock_limit = round_down(memblock_limit, PMD_SIZE);
->   	if (!memblock_limit)
->   		memblock_limit = arm_lowmem_limit;
->
->
+>> To program ISI control register, the pixel clock should be enabled.
+>> So without pixel clock (from sensor) enabled, disable ISI controller is
+>> not make sense. So this patch remove those code.
+>>
+>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>> ---
+>>
+>> Changes in v2:
+>> - this file is new added.
+>>
+>>   drivers/media/platform/soc_camera/atmel-isi.c | 5 -----
+>>   1 file changed, 5 deletions(-)
+>>
+>> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
+>> index c125b1d..31254b4 100644
+>> --- a/drivers/media/platform/soc_camera/atmel-isi.c
+>> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
+>> @@ -131,8 +131,6 @@ static int configure_geometry(struct atmel_isi *isi, u32 width,
+>>   		return -EINVAL;
+>>   	}
+>>   
+>> -	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
+>> -
+>>   	cfg2 = isi_readl(isi, ISI_CFG2);
+>>   	/* Set YCC swap mode */
+>>   	cfg2 &= ~ISI_CFG2_YCC_SWAP_MODE_MASK;
+>> @@ -843,7 +841,6 @@ static int isi_camera_set_bus_param(struct soc_camera_device *icd)
+>>   
+>>   	cfg1 |= ISI_CFG1_THMASK_BEATS_16;
+>>   
+>> -	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
+>>   	isi_writel(isi, ISI_CFG1, cfg1);
+>>   
+>>   	return 0;
+>> @@ -1022,8 +1019,6 @@ static int atmel_isi_probe(struct platform_device *pdev)
+>>   	if (isi->pdata.data_width_flags & ISI_DATAWIDTH_10)
+>>   		isi->width_flags |= 1 << 9;
+>>   
+>> -	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
+>> -
+>>   	irq = platform_get_irq(pdev, 0);
+>>   	if (IS_ERR_VALUE(irq)) {
+>>   		ret = irq;
+>> -- 
+>> 1.9.1
+>>
