@@ -1,20 +1,18 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 May 2015 16:36:11 +0200
-Subject: [GIT PULL] simple-mfd
-In-Reply-To: <CACRpkdYcabVWJb8tm1E+aGotaH43-T+no=jm5QXy7zOe101u4A@mail.gmail.com>
-References: <CACRpkdYcabVWJb8tm1E+aGotaH43-T+no=jm5QXy7zOe101u4A@mail.gmail.com>
-Message-ID: <201505121636.12156.arnd@arndb.de>
+Date: Tue, 12 May 2015 16:38:30 +0200
+Subject: [PATCH] ARM:Gemini:Maintainers update
+In-Reply-To: <1431019743-19556-1-git-send-email-ulli.kroll@googlemail.com>
+References: <1431019743-19556-1-git-send-email-ulli.kroll@googlemail.com>
+Message-ID: <15384241.lydDnb3i8P@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 11 May 2015, Linus Walleij wrote:
-> Simple MFD base patches and cleanups:
-> - Document MFD DT bindings
-> - Instantiate subdevices for simple MFDs
-> - Switch Integrator and RealView to use the simple MFD
-> - Augment LED driver to probe from platform device
-> - Add LEDs to Juno Vexpress64
+On Thursday 07 May 2015 19:29:03 Hans Ulli Kroll wrote:
+> Back in business.
+> New place for my repo on github
+> 
+> 
 
-Pulled into next/drivers, thanks!
+Applied to fixes, thanks!
 
 	Arnd
