@@ -1,35 +1,36 @@
-From: tremyfr@gmail.com (Philippe Reynes)
-Date: Tue, 12 May 2015 23:51:30 +0200
-Subject: [PATCH v2] imx27: dt: only map 4 Kbyte for fec registers
-Message-ID: <1431467490-22253-1-git-send-email-tremyfr@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 May 2015 23:54:25 +0200
+Subject: [PATCH] brcmfmac: avoid gcc-5.1 warning
+Message-ID: <2201884.BixNBcLJhn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the imx27 documentation, fec has a 4 Kbyte
-memory space map. So, we don't need to map 16 Kbyte for
-registers, 4 Kbyte is enough.
+gcc-5.0 gained a new warning in the fwsignal portion of the brcmfmac
+driver:
 
-Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
+drivers/net/wireless/brcm80211/brcmfmac/fwsignal.c: In function 'brcmf_fws_txs_process':
+drivers/net/wireless/brcm80211/brcmfmac/fwsignal.c:1478:8: warning: 'skb' may be used uninitialized in this function [-Wmaybe-uninitialized]
+
+This is a false positive, and marking the brcmf_fws_hanger_poppkt function
+as 'static inline' makes the warning go away. I have checked the object
+file output and while a little code gets moved around, the size of
+the binary remains identical.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/boot/dts/imx27.dtsi |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Found while building the ARM imx_v6_v7_defconfig configuration with gcc-5.
+We try to get all ARM defconfigs to build without warnings normally.
 
-Changelog:
-v2: (thanks Shawn Guo and Uwe Kleine-Konig)
-- map 4 Kbyte instead of 1 Kbyte
-
-diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index 6951b66..bc215e4 100644
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -533,7 +533,7 @@
+diff --git a/drivers/net/wireless/brcm80211/brcmfmac/fwsignal.c b/drivers/net/wireless/brcm80211/brcmfmac/fwsignal.c
+index f0dda0ecd23b..5017eaa4af45 100644
+--- a/drivers/net/wireless/brcm80211/brcmfmac/fwsignal.c
++++ b/drivers/net/wireless/brcm80211/brcmfmac/fwsignal.c
+@@ -635,7 +635,7 @@ static int brcmf_fws_hanger_pushpkt(struct brcmf_fws_hanger *h,
+ 	return 0;
+ }
  
- 			fec: ethernet at 1002b000 {
- 				compatible = "fsl,imx27-fec";
--				reg = <0x1002b000 0x4000>;
-+				reg = <0x1002b000 0x1000>;
- 				interrupts = <50>;
- 				clocks = <&clks IMX27_CLK_FEC_IPG_GATE>,
- 					 <&clks IMX27_CLK_FEC_AHB_GATE>;
--- 
-1.7.4.4
+-static int brcmf_fws_hanger_poppkt(struct brcmf_fws_hanger *h,
++static inline int brcmf_fws_hanger_poppkt(struct brcmf_fws_hanger *h,
+ 					  u32 slot_id, struct sk_buff **pktout,
+ 					  bool remove_item)
+ {
