@@ -1,45 +1,63 @@
 From: gangchen@rdamicro.com (Chen Gang)
-Date: Tue, 12 May 2015 18:40:01 +0800
+Date: Tue, 12 May 2015 18:42:47 +0800
 Subject: [PATCH 1/1] ARM:r0 is also corrupted after calling __do_div64.
 In-Reply-To: <20150512100042.GN2067@n2100.arm.linux.org.uk>
-References: <20150512100042.GN2067@n2100.arm.linux.org.uk>
-Message-ID: <1431427201-14371-1-git-send-email-gangchen@rdamicro.com>
+References: <1431412386-1249-1-git-send-email-gangchen@rdamicro.com>
+ <20150512100042.GN2067@n2100.arm.linux.org.uk>
+Message-ID: <5551D927.7070306@rdamicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-R0 is corrupted after calling __do_div64 and compiler is not informed
-about this in macro __do_div_asm. If n is to be used again after this
-macro, r0 is not reloaded and n will contain incorrect value
 
-Signed-off-by: Chen Gang <gangchen@rdamicro.com>
----
- arch/arm/include/asm/div64.h | 12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
-index a66061a..4829618 100644
---- a/arch/arm/include/asm/div64.h
-+++ b/arch/arm/include/asm/div64.h
-@@ -34,13 +34,15 @@
- 	register unsigned long long __n   asm("r0") = n;	\
- 	register unsigned long long __res asm("r2");		\
- 	register unsigned int __rem       asm(__xh);		\
-+	register unsigned int __clobber   asm(__xl);		\
- 	asm(	__asmeq("%0", __xh)				\
--		__asmeq("%1", "r2")				\
--		__asmeq("%2", "r0")				\
--		__asmeq("%3", "r4")				\
-+		__asmeq("%1", __xl)				\
-+		__asmeq("%2", "r2")				\
-+		__asmeq("%3", "r0")				\
-+		__asmeq("%4", "r4")				\
- 		"bl	__do_div64"				\
--		: "=r" (__rem), "=r" (__res)			\
--		: "r" (__n), "r" (__base)			\
-+		: "=r"(__rem), "=r"(__clobber), "=r"(__res)	\
-+		: "r"(__n), "r"(__base)				\
- 		: "ip", "lr", "cc");				\
- 	n = __res;						\
- 	__rem;							\
--- 
-1.9.1
+On 05/12/2015 06:00 PM, Russell King - ARM Linux wrote:
+> On Tue, May 12, 2015 at 02:33:06PM +0800, Chen Gang wrote:
+>> R0 is corrupted after calling __do_div64 and compiler is not informed
+>> about this in macro __do_div_asm. If n is to be used again after this
+>> macro, r0 is not reloaded and n will contain incorrect value
+> This isn't going to work if we're building for big endian (__ARMEB__
+> set) because then we end up telling the compiler that __rem and __n
+> are both in r0, which is impossible.
+We tested your suggestion , it works and it feels better. I have
+sent another patch based on your suggestions.
+>
+>> diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
+>> index a66061a..93a9985 100644
+>> --- a/arch/arm/include/asm/div64.h
+>> +++ b/arch/arm/include/asm/div64.h
+>> @@ -34,13 +34,13 @@
+>>   	register unsigned long long __n   asm("r0") = n;	\
+>>   	register unsigned long long __res asm("r2");		\
+>>   	register unsigned int __rem       asm(__xh);		\
+> 	register unsigned int __rem_xh    asm(__xh);            \
+> 	register unsigned int __rem_xl    asm(__xl);		\
+>
+>> -	asm(	__asmeq("%0", __xh)				\
+>> +	asm(	__asmeq("%R0", __xh)				\
+> 	asm(	__asmeq("%0", __xh)				\
+> 		__asmeq("%1", __xl)				\
+>
+> ... and increment each following register %-spec by one...
+>
+>>   		__asmeq("%1", "r2")				\
+>>   		__asmeq("%2", "r0")				\
+>>   		__asmeq("%3", "r4")				\
+>>   		"bl	__do_div64"				\
+>> -		: "=r" (__rem), "=r" (__res)			\
+>> -		: "r" (__n), "r" (__base)			\
+>> +		: "=r" (__n), "=r" (__res)			\
+>> +		: "0"(__n), "r" (__base)			\
+> This is obviously wrong because __rem is left unset, and that's one of
+> the two values this macro returns.
+>
+> 		: "=r" (__rem_xh), "=r" (__rem_xl), "=r" (__res) \
+> 		: "r" (__n), "r" (__base)			\
+>
+>>   		: "ip", "lr", "cc");				\
+>>   	n = __res;						\
+>>   	__rem;							\
+> 	__rem_xh;
+>
+> Basically this renames __rem to __rem_xh, and introduces a new __rem_xl
+> to take the other half of the remainder which we don't use.
+>
