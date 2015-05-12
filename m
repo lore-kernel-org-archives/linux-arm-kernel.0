@@ -1,78 +1,19 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 12 May 2015 15:36:21 +0200
-Subject: [PATCH RFC v9.5 09/20] drm/dsi: Add a helper to get bits per
- pixel of MIPI DSI pixel format
-In-Reply-To: <1423805119-32008-1-git-send-email-Ying.Liu@freescale.com>
-References: <1423805119-32008-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <20150512133620.GA24939@ulmo.nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 May 2015 15:41:30 +0200
+Subject: [GIT PULL] ARM: tegra: Device tree fixes for v4.1-rc3
+In-Reply-To: <1430740662-30151-1-git-send-email-thierry.reding@gmail.com>
+References: <1430740662-30151-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <201505121541.30881.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 13, 2015 at 01:25:19PM +0800, Liu Ying wrote:
-> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+On Monday 04 May 2015, Thierry Reding wrote:
+> ----------------------------------------------------------------
+> ARM: tegra: Device tree fixes for v4.1-rc3
+> 
+> This contains a fix for a bug that was introduced a couple of months ago
+> by a patch that git misapplied because of a lack of context.
 
-This could use a commit message. Describe for example why this is useful
-or when to use it.
+Merge into the fixes branch now, sorry for missing it earlier.
 
-> ---
-> v9->v9.5:
->  * Add kernel-doc for the new helper function to address Daniel Vetter's
->    comment.
-> 
-> v8->v9:
->  * Rebase onto the imx-drm/next branch of Philipp Zabel's open git repository.
-> 
-> v7->v8:
->  * None.
-> 
-> v6->v7:
->  * None.
-> 
-> v5->v6:
->  * Address the over 80 characters in one line warning reported by the
->    checkpatch.pl script.
-> 
-> v4->v5:
->  * None.
-> 
-> v3->v4:
->  * None.
-> 
-> v2->v3:
->  * None.
-> 
-> v1->v2:
->  * Thierry Reding suggested that the mipi_dsi_pixel_format_to_bpp() function
->    could be placed at the common DRM MIPI DSI driver.
->    This patch is newly added.
-> 
->  include/drm/drm_mipi_dsi.h | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
-> 
-> diff --git a/include/drm/drm_mipi_dsi.h b/include/drm/drm_mipi_dsi.h
-> index f1d8d0d..cabc910 100644
-> --- a/include/drm/drm_mipi_dsi.h
-> +++ b/include/drm/drm_mipi_dsi.h
-> @@ -163,6 +163,28 @@ static inline struct mipi_dsi_device *to_mipi_dsi_device(struct device *dev)
->  	return container_of(dev, struct mipi_dsi_device, dev);
->  }
->  
-> +/**
-> + * mipi_dsi_pixel_format_to_bpp() - get bits per pixel for a mipi dsi
-> + *    pixel format
-> + * @fmt: mipi dsi pixel format
-> + *
-> + * Return: The bits per pixel value for the mipi dsi pixel format on success or
-> + *    a negative error code on failure.
-> + */
-
-s/mipi dsi/MIPI DSI/, please.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150512/5280e193/attachment.sig>
+	Arnd
