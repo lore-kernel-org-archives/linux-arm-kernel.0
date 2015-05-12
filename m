@@ -1,18 +1,23 @@
-From: moorray3@wp.pl (Jakub =?UTF-8?B?S2ljacWEc2tp?=)
-Date: Tue, 12 May 2015 17:18:50 +0200
-Subject: [PATCH v4 00/11] drivers: PL011: add ARM SBSA Generic UART support
-In-Reply-To: <1431440095-5146-1-git-send-email-andre.przywara@arm.com>
-References: <1431440095-5146-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <20150512171850.21019f22@north>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 May 2015 17:21:24 +0200
+Subject: [GIT PULL] Support for Fujitsu MB86S7X SoCs
+In-Reply-To: <CAKR0VNJdCEEoM8mqFrc-teQ-q=DopGisos16+uKt=ky2mRjF8g@mail.gmail.com>
+References: <CAKR0VNJdCEEoM8mqFrc-teQ-q=DopGisos16+uKt=ky2mRjF8g@mail.gmail.com>
+Message-ID: <15694945.yohly9UYlA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 May 2015 15:14:44 +0100, Andre Przywara wrote:
-> This is the fourth revision of the SBSA UART support series, now
-> based on the current tty-next branch.
-> Compared to v3 I addressed some comments Jakub had on v3 (thanks for
-> the review!). Also since some basic ACPI support for ARM64 is now
-> upstream, I include the necessary ACPI binding as a new patch 11
-> on top.
+On Wednesday 18 March 2015 14:44:30 Vincent Yang wrote:
+> Hi Arnd and Olof,
+> 
+> Please consider pulling in these patches for series of Fujitsu SoC
+> based around variations of 2xCA7+2xCA15 big.LITTLE architecture.
+> 
+> The MHU driver is already queued in Mailbox tree.
+> 
+> 
 
-Thanks, apart from minor checkpatch --strict warnings it looks good now.
+If you want to make sure it gets into 4.2, now  would be a good time
+to send a new pull request based on 4.1-rc1.
+
+	Arnd
