@@ -1,37 +1,49 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 12 May 2015 14:13:58 +0100
-Subject: [PATCH] MAINTAINERS: Add Arnd Bergmann as Syscon reviewer
-Message-ID: <1431436438-23434-1-git-send-email-lee.jones@linaro.org>
+Date: Tue, 12 May 2015 13:58:14 +0100
+Subject: [PATCH v2 06/12] watchdog: bindings: Supply knowledge of a third
+ supported device - clocksource
+In-Reply-To: <1431435500-22899-1-git-send-email-lee.jones@linaro.org>
+References: <1431435500-22899-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1431435500-22899-7-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The System Configuration (syscon) driver is an important one, which
-effects many ARM-SoC based platforms.  I'm adding Arnd as a primary
-reviewer as he is highly competent in this area and has a keen
-interest in ARM-SoC.
-
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- MAINTAINERS | 7 +++++++
- 1 file changed, 7 insertions(+)
+ Documentation/devicetree/bindings/watchdog/st_lpc_wdt.txt | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index efbcb50..39fa313 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -9468,6 +9468,13 @@ F:	arch/arc/
- F:	Documentation/devicetree/bindings/arc/
- F:	drivers/tty/serial/arc_uart.c
+diff --git a/Documentation/devicetree/bindings/watchdog/st_lpc_wdt.txt b/Documentation/devicetree/bindings/watchdog/st_lpc_wdt.txt
+index 388c88a..039c5ca 100644
+--- a/Documentation/devicetree/bindings/watchdog/st_lpc_wdt.txt
++++ b/Documentation/devicetree/bindings/watchdog/st_lpc_wdt.txt
+@@ -1,9 +1,11 @@
+ STMicroelectronics Low Power Controller (LPC) - Watchdog
+ ========================================================
  
-+SYSTEM CONFIGURATION (SYSCON)
-+M:	Lee Jones <lee.jones@linaro.org>
-+M:	Arnd Bergmann <arnd@arndb.de>
-+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git
-+S:	Supported
-+F:	drivers/mfd/syscon.c
-+
- SYSV FILESYSTEM
- M:	Christoph Hellwig <hch@infradead.org>
- S:	Maintained
+-LPC currently supports Watchdog OR Real Time Clock functionality.
++LPC currently supports Watchdog OR Real Time Clock OR Clocksource
++functionality.
+ 
+ [See: ../rtc/rtc-st-lpc.txt for RTC options]
++[See: ../timer/st,stih407-lpc for Clocksource options]
+ 
+ Required properties
+ 
+@@ -12,9 +14,11 @@ Required properties
+ - reg		: LPC registers base address + size
+ - interrupts    : LPC interrupt line number and associated flags
+ - clocks	: Clock used by LPC device (See: ../clock/clock-bindings.txt)
+-- st,lpc-mode	: The LPC can run either one of two modes ST_LPC_MODE_RTC [0] or
+-		  ST_LPC_MODE_WDT [1].  One (and only one) mode must be
+-		  selected.
++- st,lpc-mode	: The LPC can run either one of three modes:
++                  ST_LPC_MODE_RTC    [0]
++                  ST_LPC_MODE_WDT    [1]
++                  ST_LPC_MODE_CLKSRC [2]
++		 One (and only one) mode must be selected.
+ 
+ Required properties [watchdog mode]
+ 
 -- 
 1.9.1
