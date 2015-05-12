@@ -1,42 +1,60 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Tue, 12 May 2015 16:15:13 +0800
-Subject: [PATCH v4 0/3] Add Mediatek SoC RTC driver
-In-Reply-To: <20150509130846.GD3338@piout.net>
-References: <1430897022-63357-1-git-send-email-eddie.huang@mediatek.com>
- <20150509130846.GD3338@piout.net>
-Message-ID: <CAGS+omArcu3caKZo56Db2u+84WAVJiMzkr+1uS6tr_zfwARQ7A@mail.gmail.com>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Tue, 12 May 2015 10:28:55 +0200
+Subject: [PATCH] ARM: dts: Fix typo in trip point temperature for
+ exynos5420/5440
+In-Reply-To: <1430988887-6743-1-git-send-email-a.kesavan@samsung.com>
+References: <1430988887-6743-1-git-send-email-a.kesavan@samsung.com>
+Message-ID: <20150512102855.340ebb31@amdc2363>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
+Hi Abhilash,
 
-On Sat, May 9, 2015 at 9:08 PM, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
-> On 06/05/2015 at 15:23:39 +0800, Eddie Huang wrote :
->> RTC is one submodule of Mediatek MT6397 PMIC chip[1]. This series
->> support RTC driver that work with Mediatek SoC like MT8135, MT8173.
->> It implements second counter and also provide alarm function.
->>
->> This series base on 4.1-rc1, Test ok on MT8173 platform.
->>
->> [1] https://lkml.org/lkml/2015/1/23/325
->>
->
-> All applied, thanks!
+> Remove the extra zero in the "cpu-crit-0" trip point for exynos5420
+> and exynos5440.
+> 
+> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5420-trip-points.dtsi | 2 +-
+>  arch/arm/boot/dts/exynos5440-trip-points.dtsi | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5420-trip-points.dtsi
+> b/arch/arm/boot/dts/exynos5420-trip-points.dtsi index
+> 5d31fc1..2180a01 100644 ---
+> a/arch/arm/boot/dts/exynos5420-trip-points.dtsi +++
+> b/arch/arm/boot/dts/exynos5420-trip-points.dtsi @@ -28,7 +28,7 @@
+> trips { type = "active";
+>  	};
+>  	cpu-crit-0 {
+> -		temperature = <1200000>; /* millicelsius */
+> +		temperature = <120000>; /* millicelsius */
+>  		hysteresis = <0>; /* millicelsius */
+>  		type = "critical";
+>  	};
+> diff --git a/arch/arm/boot/dts/exynos5440-trip-points.dtsi
+> b/arch/arm/boot/dts/exynos5440-trip-points.dtsi index
+> 48adfa8..356e963 100644 ---
+> a/arch/arm/boot/dts/exynos5440-trip-points.dtsi +++
+> b/arch/arm/boot/dts/exynos5440-trip-points.dtsi @@ -18,7 +18,7 @@
+> trips { type = "active";
+>  	};
+>  	cpu-crit-0 {
+> -		temperature = <1050000>; /* millicelsius */
+> +		temperature = <105000>; /* millicelsius */
+>  		hysteresis = <0>; /* millicelsius */
+>  		type = "critical";
+>  	};
 
-To which git tree & branch did you apply these patches?
+Abhilash, thanks for spotting this mistake.
 
-Thanks,
--Daniel
+Acked-by: Lukasz Majewski <l.majewski@samsung.com>
 
->
->
-> --
-> Alexandre Belloni, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Thanks Krzysztof for picking this fix during my absence :-)
+
+-- 
+Best regards,
+
+Lukasz Majewski
+
+Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
