@@ -1,70 +1,37 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 12 May 2015 03:20:04 +0200
-Subject: [V3 PATCH 1/5] ACPI / scan: Parse _CCA and setup device coherency
-In-Reply-To: <20150511161626.GI18655@e104818-lin.cambridge.arm.com>
-References: <1431045436-8690-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <3684853.vaQGhc4jR5@vostro.rjw.lan>
- <20150511161626.GI18655@e104818-lin.cambridge.arm.com>
-Message-ID: <1664523.WMm4AqWTY5@vostro.rjw.lan>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Tue, 12 May 2015 09:31:31 +0800
+Subject: [PATCH 1/2] ARM64: kernel: make cpu_ops hooks DT agnostic
+In-Reply-To: <20150511160401.GC4595@leverpostej>
+References: <1431020084-5875-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20150511160401.GC4595@leverpostej>
+Message-ID: <555157F3.8040404@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, May 11, 2015 05:16:27 PM Catalin Marinas wrote:
-> On Fri, May 08, 2015 at 10:53:59PM +0200, Rafael J. Wysocki wrote:
-> > On Thursday, May 07, 2015 07:37:12 PM Suravee Suthikulpanit wrote:
-> > > diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> > > index ab2cbb5..7822149 100644
-> > > --- a/drivers/acpi/Kconfig
-> > > +++ b/drivers/acpi/Kconfig
-> > > @@ -54,6 +54,12 @@ config ACPI_GENERIC_GSI
-> > >  config ACPI_SYSTEM_POWER_STATES_SUPPORT
-> > >  	bool
-> > >  
-> > > +config ACPI_CCA_REQUIRED
-> > > +	bool
-> > > +
-> > > +config ARM64_SUPPORT_ACPI_CCA_ZERO
-> > 
-> > Hmm.  I guess the Arnd's idea what to simply use CONFIG_ARM64 directly instead
-> > of adding this new option.
-> 
-> I agree.
-> 
-> > > +static inline bool acpi_dma_is_supported(struct acpi_device *adev)
-> > > +{
-> > > +	/**
-> > > +	 * Currently, we mainly support _CCA=1 (i.e. is_coherent=1)
-> > > +	 * This should be equivalent to specifyig dma-coherent for
-> > > +	 * a device in OF.
-> > > +	 *
-> > > +	 * For the case when _CCA=0 (i.e. is_coherent=0 && cca_seen=1),
-> > > +	 * we would rely on arch-specific cache maintenance for
-> > > +	 * non-coherence DMA operations if architecture specifies
-> > > +	 * _XXX_SUPPORT_CCA_ZERO. Otherwise, we do not support
-> > > +	 * DMA on this device and fallback to arch-specific default
-> > > +	 * handling.
-> > > +	 *
-> > > +	 * For the case when _CCA is missing (i.e. cca_seen=0) but
-> > > +	 * platform specifies ACPI_CCA_REQUIRED, we do not support DMA,
-> > > +	 * and fallback to arch-specific default handling.
-> > > +	 */
-> > > +	return adev && (adev->flags.is_coherent ||
-> > > +			(adev->flags.cca_seen &&
-> > > +			 IS_ENABLED(CONFIG_ARM64_SUPPORT_ACPI_CCA_ZERO)));
-> > 
-> > So what exactly would be wrong with using IS_ENABLED(CONFIG_ARM64) here?
-> 
-> I'm not sure I follow why we need to check for ARM64 here at all. Can we
-> not just have something like:
-> 
-> 	return adev && (!IS_ENABLED(CONFIG_ACPI_CCA_REQUIRED) ||
-> 			adev->flags.cca_seen)
+On 2015/5/12 0:04, Mark Rutland wrote:
+> Hi Lorenzo,
+>
+>>  /**
+>>   * struct cpu_operations - Callback operations for hotplugging CPUs.
+>>   *
+>> - * @name:	Name of the property as appears in a devicetree cpu node's
+>> - *		enable-method property.
+>> - * @cpu_init:	Reads any data necessary for a specific enable-method from the
+>> - *		devicetree, for a given cpu node and proposed logical id.
+>> + * @name:	Name of the enable-method.
+> I'm not keen on dropping the DT portion from the name documentation,
+> given the name must be the DT enable-method string. I'd prefer to leave
+> the original comment, or something at least mentioning that the name is
+> a DT enable-method string.
+>
+> Other than that, this patch looks fine to me, and I don't see issues
+> booting on a (DT) system, so:
+>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Tested-by: Mark Rutland <mark.rutland@arm.com> [DT]
+>
+> Has this has been tested on an ACPI system?
 
-If _CCA returns 0 on non-ARM64, DMA is not supported for this device, so
-in that case the function should return 'false' while the above check will
-make it return 'true'.
+I will test and review this patch set today, thanks.
 
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Hanjun
