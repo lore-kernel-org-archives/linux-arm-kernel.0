@@ -1,161 +1,76 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Tue, 12 May 2015 19:44:35 +0200
-Subject: [PATCH 2/2] doc: dt: add documentation for pl172 memory bindings
-In-Reply-To: <1430241879-30046-3-git-send-email-manabian@gmail.com>
-References: <1430241879-30046-1-git-send-email-manabian@gmail.com>
- <1430241879-30046-3-git-send-email-manabian@gmail.com>
-Message-ID: <CAGhQ9VybD9Oar8fdW5cJnFpqVK1pniz0-nHkK-wGAETBoXk97g@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 12 May 2015 10:46:34 -0700
+Subject: [PATCH 2/3] ARM: bcm2835: Add the Raspberry Pi firmware driver
+In-Reply-To: <55416DA2.5040902@wwwdotorg.org>
+References: <1430176449-12322-1-git-send-email-eric@anholt.net>
+ <1430176449-12322-3-git-send-email-eric@anholt.net>
+ <55403AD1.4030103@wwwdotorg.org> <87oam6q0v1.fsf@eliezer.anholt.net>
+ <55416DA2.5040902@wwwdotorg.org>
+Message-ID: <87a8x94rk5.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi DT maintainers,
+Stephen Warren <swarren@wwwdotorg.org> writes:
 
-Do you have any comments on the bindings below?
-
-These bindings are based on bindings for "ti,davinci-aemif" found
-under memory-controllers/ti-aemif.txt
-
-regards,
-Joachim Eastwood
-
-On 28 April 2015 at 19:24, Joachim Eastwood <manabian@gmail.com> wrote:
-> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
-> ---
->  .../bindings/memory-controllers/arm,pl172.txt      | 125 +++++++++++++++++++++
->  1 file changed, 125 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/memory-controllers/arm,pl172.txt
+> On 04/29/15 11:51, Eric Anholt wrote:
+>> Stephen Warren <swarren@wwwdotorg.org> writes:
+>>
+>>> On 04/27/2015 05:14 PM, Eric Anholt wrote:
+>>>> This gives us a function for making mailbox property channel requests
+>>>> of the firmware, and uses it to control the 3 power domains provided
+>>>> by the firmware.
+>>>
+>>>> diff --git a/arch/arm/mach-bcm/raspberrypi-firmware.c b/arch/arm/mach-bcm/raspberrypi-firmware.c
+>>>
+>>>> +/*
+>>>> + * Submits a set of concatenated tags to the VPU firmware through the
+>>>> + * mailbox property interface.
+>>>> + *
+>>>> + * The buffer header and the ending tag are added by this function and
+>>>> + * don't need to be supplied, just the actual tags for your operation.
+>>>> + * See struct raspberrypi_firmware_property_tag_header for the per-tag structure.
+>>>> + */
+>>>> +int raspberrypi_firmware_property(void *data, size_t tag_size)
+>>>> +{
+>>>> +	size_t size = tag_size + 12;
+>>>> +	u32 *buf;
+>>>> +	dma_addr_t bus_addr;
+>>>> +	int ret = 0;
+>>>> +
+>>>> +	if (!firmware)
+>>>> +		return -EPROBE_DEFER;
+>>>
+>>> I think it'd make more sense if the clients looked up the firmware
+>>> driver via phandle at their probe time. This would mean:
+>>>
+>>> * No need for global "firmware", since clients could pass the firmware
+>>> driver handle into this function.
+>>>
+>>> * Clients resolve deferred probe at their probe time. That way, they
+>>> won't register themselves with subsystems asserting they can provide
+>>> services, but find out they can't yet provide the service at that time.
+>>
+>> The one client so far (vc4) was resolving deferred probe at its probe
+>> time, but not taking a reference on the firmware driver.  I figure I'll
+>> have it do the phandle lookup and refcount -- do you still want the
+>> struct platform_device passed in here?  If we de-global firmware, it's
+>> going to mean some faffing in the power domain side of things to find
+>> the device again, it seems.
 >
-> diff --git a/Documentation/devicetree/bindings/memory-controllers/arm,pl172.txt b/Documentation/devicetree/bindings/memory-controllers/arm,pl172.txt
-> new file mode 100644
-> index 000000000000..e6df32f9986d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/memory-controllers/arm,pl172.txt
-> @@ -0,0 +1,125 @@
-> +* Device tree bindings for ARM PL172 MultiPort Memory Controller
-> +
-> +Required properties:
-> +
-> +- compatible:          "arm,pl172", "arm,primecell"
-> +
-> +- reg:                 Must contains offset/length value for controller.
-> +
-> +- #address-cells:      Must be 2. The partition number has to be encoded in the
-> +                       first address cell and it may accept values 0..N-1
-> +                       (N - total number of partitions). The second cell is the
-> +                       offset into the partition.
-> +
-> +- #size-cells:         Must be set to 1.
-> +
-> +- ranges:              Must contain one or more chip select memory regions.
-> +
-> +- clocks:              Must contain references to controller clocks.
-> +
-> +- clock-names:         Must contain "mpmcclk" and "apb_pclk".
-> +
-> +- clock-ranges:                Empty property indicating that child nodes can inherit
-> +                       named clocks. Required only if clock tree data present
-> +                       in device tree.
-> +                       See clock-bindings.txt
-> +
-> +Child chip-select (cs) nodes contain the memory devices nodes connected to
-> +such as NOR (e.g. cfi-flash) and NAND.
-> +
-> +Required child cs node properties:
-> +
-> +- #address-cells:      Must be 2.
-> +
-> +- #size-cells:         Must be 1.
-> +
-> +- ranges:              Empty property indicating that child nodes can inherit
-> +                       memory layout.
-> +
-> +- clock-ranges:                Empty property indicating that child nodes can inherit
-> +                       named clocks. Required only if clock tree data present
-> +                       in device tree.
-> +
-> +- mpmc,cs:             Chip select number. Indicates to the pl0172 driver
-> +                       which chipselect is used for accessing the memory.
-> +
-> +- mpmc,memory-width:   Width of the chip select memory. Must be equal to
-> +                       either 8, 16 or 32.
-> +
-> +Optional child cs node config properties:
-> +
-> +- mpmc,async-page-mode:        Enable asynchronous page mode.
-> +
-> +- mpmc,cs-active-high: Set chip select polarity to active high.
-> +
-> +- mpmc,byte-lane-low:  Set byte lane state to low.
-> +
-> +- mpmc,extended-wait:  Enable extended wait.
-> +
-> +- mpmc,buffer-enable:  Enable write buffer.
-> +
-> +- mpmc,write-protect:  Enable write protect.
-> +
-> +Optional child cs node timing properties:
-> +
-> +- mpmc,write-enable-delay:     Delay from chip select assertion to write
-> +                               enable (WE signal) in nano seconds.
-> +
-> +- mpmc,output-enable-delay:    Delay from chip select assertion to output
-> +                               enable (OE signal) in nano seconds.
-> +
-> +- mpmc,write-access-delay:     Delay from chip select assertion to write
-> +                               access in nano seconds.
-> +
-> +- mpmc,read-access-delay:      Delay from chip select assertion to read
-> +                               access in nano seconds.
-> +
-> +- mpmc,page-mode-read-delay:   Delay for asynchronous page mode sequential
-> +                               accesses in nano seconds.
-> +
-> +- mpmc,turn-round-delay:       Delay between access to memory banks in nano
-> +                               seconds.
-> +
-> +If any of the above timing parameters are absent, current parameter value will
-> +be taken from the corresponding HW reg.
-> +
-> +Example for pl172 with nor flash on chip select 0 shown below.
-> +
-> +emc: memory-controller at 40005000 {
-> +       compatible = "arm,pl172", "arm,primecell";
-> +       reg = <0x40005000 0x1000>;
-> +       clocks = <&ccu1 CLK_CPU_EMCDIV>, <&ccu1 CLK_CPU_EMC>;
-> +       clock-names = "mpmcclk", "apb_pclk";
-> +       #address-cells = <2>;
-> +       #size-cells = <1>;
-> +       ranges = <0 0 0x1c000000 0x1000000
-> +                 1 0 0x1d000000 0x1000000
-> +                 2 0 0x1e000000 0x1000000
-> +                 3 0 0x1f000000 0x1000000>;
-> +
-> +       cs0 {
-> +               #address-cells = <2>;
-> +               #size-cells = <1>;
-> +               ranges;
-> +
-> +               mpmc,cs = <0>;
-> +               mpmc,memory-width = <16>;
-> +               mpmc,byte-lane-low;
-> +               mpmc,write-enable-delay = <0>;
-> +               mpmc,output-enable-delay = <0>;
-> +               mpmc,read-enable-delay = <70>;
-> +               mpmc,page-mode-read-delay = <70>;
-> +
-> +               flash at 0,0 {
-> +                       compatible = "sst,sst39vf320", "cfi-flash";
-> +                       reg = <0 0 0x400000>;
-> +                       bank-width = <2>;
-> +                       #address-cells = <1>;
-> +                       #size-cells = <1>;
-> +                       partition at 0 {
-> +                               label = "data";
-> +                               reg = <0 0x400000>;
-> +                       };
-> +               };
-> +       };
-> +};
-> --
-> 1.8.0
->
+> I think I'd expect the API in the firmware driver to require the client 
+> to pass the client DT node pointer plus a property name, and do all the 
+> lookup itself. That's what most DT resource lookup APIs in the kernel do 
+> now.
+
+I've made this change, but it's not great -- the client has to know some
+details of how this driver is structured (that it sets the drvdata) in
+order to figure out whether the driver is loaded or not and return
+-EPROBE_DEFERRED.  I couldn't find any other existing solutions than
+that in the tree.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150512/8ec643cb/attachment.sig>
