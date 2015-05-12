@@ -1,107 +1,59 @@
-From: stripathi@apm.com (Suman Tripathi)
-Date: Tue, 12 May 2015 11:03:46 +0530
-Subject: [PATCH RESEND v6 1/2] arm64: dts: Add the arasan sdhci nodes in
- apm-storm.dtsi
-In-Reply-To: <1431333531-30491-2-git-send-email-stripathi@apm.com>
-References: <1431333531-30491-1-git-send-email-stripathi@apm.com>
- <1431333531-30491-2-git-send-email-stripathi@apm.com>
-Message-ID: <CAOHikRAeOH5Pt4WZFk1C29dUytO7H0ox_dgq578oW19ue8Eb8Q@mail.gmail.com>
+From: dyoung@redhat.com (Dave Young)
+Date: Tue, 12 May 2015 13:43:04 +0800
+Subject: [v2 0/5] arm64: add kdump support
+In-Reply-To: <55504956.9020007@linaro.org>
+References: <1429861989-8417-1-git-send-email-takahiro.akashi@linaro.org>
+ <20150424095312.GD29183@leverpostej> <55504956.9020007@linaro.org>
+Message-ID: <20150512054304.GA29874@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ,
+On 05/11/15 at 03:16pm, AKASHI Takahiro wrote:
+> Hi
+> 
+> Sorry for late response. I was on vacation.
+> 
+> On 04/24/2015 06:53 PM, Mark Rutland wrote:
+> >Hi,
+> >
+> >On Fri, Apr 24, 2015 at 08:53:03AM +0100, AKASHI Takahiro wrote:
+> >>This patch set enables kdump (crash dump kernel) support on arm64 on top of
+> >>Geoff's kexec patchset.
+> >>
+> >>In this version, there are some arm64-specific usage/constraints:
+> >>1) "mem=" boot parameter must be specified on crash dump kernel
+> >>    if the system starts on uefi.
+> >
+> >This sounds very painful. Why is this the case, and how do x86 and/or
+> >ia64 get around that?
+> 
+> As Dave (Young) said, x86 uses "memmap=XX" kernel commandline parameters
+> to specify usable memory for crash dump kernel.
 
-On Mon, May 11, 2015 at 2:08 PM, Suman Tripathi <stripathi@apm.com> wrote:
-> This patch adds the arasan sdhci nodes to reuse the of-arasan
-> driver for APM X-Gene SoC.
->
-> Signed-off-by: Suman Tripathi <stripathi@apm.com>
-> ---
->  arch/arm64/boot/dts/apm/apm-mustang.dts |  4 +++
->  arch/arm64/boot/dts/apm/apm-storm.dtsi  | 43 +++++++++++++++++++++++++++++++++
->  2 files changed, 47 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/apm/apm-mustang.dts b/arch/arm64/boot/dts/apm/apm-mustang.dts
-> index 83578e7..7ccd517 100644
-> --- a/arch/arm64/boot/dts/apm/apm-mustang.dts
-> +++ b/arch/arm64/boot/dts/apm/apm-mustang.dts
-> @@ -52,3 +52,7 @@
->  &xgenet {
->         status = "ok";
->  };
-> +
-> +&sdhci0 {
-> +       status = "ok";
-> +};
-> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> index c8d3e0e..b5d2698 100644
-> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> @@ -145,6 +145,40 @@
->                                 clock-output-names = "socplldiv2";
->                         };
->
-> +                       ahbclk: ahbclk at 1f2ac000 {
-> +                               compatible = "apm,xgene-device-clock";
-> +                               #clock-cells = <1>;
-> +                               clocks = <&socplldiv2 0>;
-> +                               reg = <0x0 0x1f2ac000 0x0 0x1000
-> +                                       0x0 0x17000000 0x0 0x2000>;
-> +                               reg-names = "csr-reg", "div-reg";
-> +                               csr-offset = <0x0>;
-> +                               csr-mask = <0x1>;
-> +                               enable-offset = <0x8>;
-> +                               enable-mask = <0x1>;
-> +                               divider-offset = <0x164>;
-> +                               divider-width = <0x5>;
-> +                               divider-shift = <0x0>;
-> +                               clock-output-names = "ahbclk";
-> +                       };
-> +
-> +                       sdioclk: sdioclk at 1f2ac000 {
-> +                               compatible = "apm,xgene-device-clock";
-> +                               #clock-cells = <1>;
-> +                               clocks = <&socplldiv2 0>;
-> +                               reg = <0x0 0x1f2ac000 0x0 0x1000
-> +                                       0x0 0x17000000 0x0 0x2000>;
-> +                               reg-names = "csr-reg", "div-reg";
-> +                               csr-offset = <0x0>;
-> +                               csr-mask = <0x2>;
-> +                               enable-offset = <0x8>;
-> +                               enable-mask = <0x2>;
-> +                               divider-offset = <0x178>;
-> +                               divider-width = <0x8>;
-> +                               divider-shift = <0x0>;
-> +                               clock-output-names = "sdioclk";
-> +                       };
-> +
->                         qmlclk: qmlclk {
->                                 compatible = "apm,xgene-device-clock";
->                                 #clock-cells = <1>;
-> @@ -533,6 +567,15 @@
->                         interrupts = <0x0 0x4f 0x4>;
->                 };
->
-> +               sdhci0: sdhci at 1c000000 {
-> +                       compatible = "arasan,sdhci-4.9a";
-> +                       reg = <0x0 0x1c000000 0x0 0x100>;
-> +                       interrupts = <0x0 0x49 0x4>;
-> +                       dma-coherent;
-> +                       clock-names = "clk_xin", "clk_ahb";
-> +                       clocks = <&sdioclk 0>, <&ahbclk 0>;
-> +               };
-> +
->                 phy1: phy at 1f21a000 {
->                         compatible = "apm,xgene-phy";
->                         reg = <0x0 0x1f21a000 0x0 0x100>;
-> --
-> 1.8.2.1
->
+Originally x86 use memmap=exactmap memmap=XX to specify each section of
+memories for 2nd kernel. But later because a lot of reserved type ranges
+need to be passed ie. for pci mmconfig, and kernel cmdline buffer is
+limited so kexec-tools later switch to passing these in x86 boot params as
+E820 memory ranges directly.
 
-Can anyone from dt community review this patch ? I have changed the dts node
-names from sdhc to sdhci as per Arnd, Michael comments .
+> On my arm64 implementation, "linux,usable-memory" property is added
+> to device tree blob by kexec-tools for this purpose.
+> This is because, when I first implemented kdump on arm64, ppc is the only
+> architecture that supports kdump AND utilizes device trees.
+> Since kexec-tools as well as the kernel already has this framework,
+> I believed that device-tree approach was smarter than a commandline
+> parameter.
+> 
+> However, uefi-based kernel ignores all the memory-related properties
+> in a device tree and so this "mem=" workaround was added.
 
--- 
-Thanks,
-with regards,
-Suman Tripathi
+Kdump kernel reuses the memmap info getting from firmware during 1st kernel
+boot, I do not think the memmap info can be cooked for crash kernel usable
+memory. But it might be a better way to use a special fdt node for crash
+kernel memory even for UEFI..
+
+Another way is introducing a similar memmap=, but maybe consider only
+system_ram type ranges. For other memory areas still use UEFI memmap.
+
+Thanks
+Dave
