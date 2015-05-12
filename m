@@ -1,23 +1,44 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Tue, 12 May 2015 15:37:41 -0500
-Subject: [PATCH 2/3] input: keyboad: imx: add snvs power key driver
-In-Reply-To: <20150512184328.GC20725@dtor-ws>
-References: <1431449438-19460-1-git-send-email-Frank.Li@freescale.com>
- <1431449438-19460-2-git-send-email-Frank.Li@freescale.com>
- <20150512184328.GC20725@dtor-ws>
-Message-ID: <CAHrpEqQpyO=Fzu206xPUwQE+cvk7rpTd0r0A_bL-V1UWgT7+XA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 May 2015 21:36:13 +0100
+Subject: [PATCH v3 1/4] ARM: pxa: add memory resource to RTC device
+In-Reply-To: <53644246.uSkhGz7C05@wuerfel>
+References: <1431384089-28367-1-git-send-email-robh@kernel.org>
+ <87lhgumi4b.fsf@belgarion.home> <878uctmtm6.fsf@belgarion.home>
+ <53644246.uSkhGz7C05@wuerfel>
+Message-ID: <20150512203613.GQ2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> +             ret = devm_request_irq(&pdev->dev, pdata->irq,
->> +                                     imx_snvs_pwrkey_interrupt,
->> +                                     IRQF_TRIGGER_HIGH | IRQF_NO_SUSPEND, pdev->name, pdev);
->
-> Why IRQF_NO_SUSPEND? Also should we not get trigger type from OF data?
->
-wake up by PWRON key in freeze mode
+On Tue, May 12, 2015 at 10:30:12PM +0200, Arnd Bergmann wrote:
+> On Tuesday 12 May 2015 22:24:49 Robert Jarzmik wrote:
+> > 
+> > I made the try, and Russell was right, this breaks the pxa architecture. The
+> > relevant extract of kernel message is in [1].
+> > 
+> > The consequences with your patches :
+> >  - pxa27x_init()
+> >    - platform_add_devices()
+> >      - the pxa_device_rtc fails (as resource is duplicated)
+> >      - all the devices are unregistered (rollback)
+> > And pxa27x fails.
+> > 
+> > Now I'm pondering about the right approach :
+> >  - either remove sa1100_device_rtc from pxas
+> >  - or remove pxa_device_rtc
+> >  - or both
+> >  - or something else
+> > 
+> > Let me think a bit about it.
+> > 
+> 
+> To solve the problem with the duplicate registration of one resource,
+> I'd suggest using platform_device_register_simple() for the registration,
+> which will copy the resource. You can then mark the resource as __initconst
+> and remove the device to save a little memory at runtime.
 
-Do you have any example to get trigger type from OF data?
+No, a better solution is to solve the problem which requires the
+duplication in the first place, which is a broken driver structure.
 
-best regards
-Frank Li
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
