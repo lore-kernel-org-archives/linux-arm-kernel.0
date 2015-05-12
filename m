@@ -1,67 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 13 May 2015 00:23:22 +0100
-Subject: [PATCH] ARM: berlin: add CPU hotplug support
-In-Reply-To: <1431440186-14075-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1431440186-14075-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <20150512232322.GR2067@n2100.arm.linux.org.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 12 May 2015 16:23:48 -0700
+Subject: Automatic clock disabling on clk_put()
+In-Reply-To: <20150511060129.GG6325@pengutronix.de>
+References: <20150511060129.GG6325@pengutronix.de>
+Message-ID: <55528B84.5050700@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 12, 2015 at 04:16:26PM +0200, Antoine Tenart wrote:
-> Adds CPU hotplug support for Berlin SoCs (currently BG2 and BG2Q). The
-> CPUs are put in WFI after disabling the coherency.
-> 
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> ---
->  arch/arm/mach-berlin/platsmp.c | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/arch/arm/mach-berlin/platsmp.c b/arch/arm/mach-berlin/platsmp.c
-> index 702e7982015a..d9c62057be76 100644
-> --- a/arch/arm/mach-berlin/platsmp.c
-> +++ b/arch/arm/mach-berlin/platsmp.c
-> @@ -14,6 +14,7 @@
->  #include <linux/of_address.h>
->  
->  #include <asm/cacheflush.h>
-> +#include <asm/cp15.h>
+On 05/10/15 23:01, Sascha Hauer wrote:
+> Hi,
+>
+> Since we now have per-user clks we could automatically disable clks on
+> clk_put() to make the drivers errors paths easier. AFAIR that was one
+> of the motivations to switch to per user clks. Is this just not yet
+> implemented or are there problems implementing this?
+>
+>
 
-I don't see anything being added by this patch which would need this
-include.
+I don't recall that as being a motivation for per-user clks. The
+documentation explicitly states:
 
->  #include <asm/smp_plat.h>
->  #include <asm/smp_scu.h>
->  
-> @@ -92,8 +93,20 @@ unmap_scu:
->  	iounmap(scu_base);
->  }
->  
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +static void berlin_cpu_die(unsigned int cpu)
-> +{
-> +	v7_exit_coherency_flush(louis);
-> +	while (1)
-> +		cpu_do_idle();
-> +}
-> +#endif
-> +
->  static struct smp_operations berlin_smp_ops __initdata = {
->  	.smp_prepare_cpus	= berlin_smp_prepare_cpus,
->  	.smp_boot_secondary	= berlin_boot_secondary,
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +	.cpu_die		= berlin_cpu_die,
-> +#endif
->  };
->  CPU_METHOD_OF_DECLARE(berlin_smp, "marvell,berlin-smp", &berlin_smp_ops);
-> -- 
-> 2.4.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ * Note: drivers must ensure that all clk_enable calls made on this
+ * clock source are balanced by clk_disable calls prior to calling
+ * this function.
+
+so it seems that such a behavior would be an API change. Is it really
+that hard to call clk_disable_unprepare() on a clock at the end of an
+error path? Maybe you could add a devm_clk_get_prepare_enable() that
+does what you want and then call clk_disable_unprepare on the exit path?
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
