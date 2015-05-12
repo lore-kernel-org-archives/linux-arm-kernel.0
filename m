@@ -1,70 +1,80 @@
-From: acgzxing@gmail.com (Xing Zheng)
-Date: Tue, 12 May 2015 17:26:37 +0800
-Subject: [PATCH 4/4] ASoC: rockchip-audio-machine: add rockchip machine driver
- bindings
-In-Reply-To: <1431422797-31903-1-git-send-email-zhengxing@rock-chips.com>
-References: <1431422797-31903-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <1431422797-31903-5-git-send-email-zhengxing@rock-chips.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 12 May 2015 10:37:13 +0100
+Subject: [PATCH] arm: Don't use memblock limit for the lowmem bound
+In-Reply-To: <1431399221-25337-1-git-send-email-labbott@fedoraproject.org>
+References: <1431399221-25337-1-git-send-email-labbott@fedoraproject.org>
+Message-ID: <20150512093713.GB16907@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: zhengxing <zhengxing@rock-chips.com>
+On Tue, May 12, 2015 at 03:53:41AM +0100, Laura Abbott wrote:
+> From: Laura Abbott <labbott@redhat.com>
+> 
+> The memblock limit is currently used in find_limits
+> to find the bounds for ZONE_NORMAL. The memblock
+> limit may need to be rounded down a PMD size to ensure
+> allocations are fully mapped though. This has the side
+> effect of reducing the amount of memory in ZONE_NORMAL.
+> Since we generally want to optimize for more lowmem, fix
+> this by using arm_lowmem_limit to calculate the bounds.
+> This what is used for actually mapping lowmem anyway.
+> 
+> Before:
+> # cat /proc/zoneinfo | grep managed
+>         managed  62920
+> 
+> After:
+> # cat /proc/zoneinfo | grep managed
+>         managed  63336
+> 
+> 
+> 
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
 
-Add documentation to the machine driver of the device-tree
-bindings for the soundcard of the Rockchip board.
+I just gave this a spin on TC2, with the memory node hacked to provide
+0x3ffffc00 bytes of RAM.
 
-Signed-off-by: zhengxing <zhengxing@rock-chips.com>
+Before:
+Memory: 1030380K/1046528K available (4828K kernel code, 154K rwdata, 1376K rodata, 264K init, 147K bss, 16148K reserved, 0K cma-reserved)
+$ cat /proc/zoneinfo | grep managed
+        managed  257661
 
----
+After:
+Memory: 1032424K/1048572K available (4828K kernel code, 154K rwdata, 1376K rodata, 264K init, 147K bss, 16148K reserved, 0K cma-reserved)
+$ cat /proc/zoneinfo | grep managed
+        managed  258172
 
- .../sound/rockchip,rockchip-audio-machine.txt      |   38 ++++++++++++++++++++
- 1 file changed, 38 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/rockchip,rockchip-audio-machine.txt
+The patch itself looks sane to me, so:
 
-diff --git a/Documentation/devicetree/bindings/sound/rockchip,rockchip-audio-machine.txt b/Documentation/devicetree/bindings/sound/rockchip,rockchip-audio-machine.txt
-new file mode 100644
-index 0000000..36864fd
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/rockchip,rockchip-audio-machine.txt
-@@ -0,0 +1,38 @@
-+ROCKCHIP rk3288 audio complex, with AUDIO CODEC
-+
-+Required properties:
-+- (machine) compatible : "rockchip,rockchip-audio-machine"
-+- (codec) compatible : The child node name of compatible.
-+- rockchip,model : The user-visible name of this sound complex.
-+
-+- rockchip,i2s-controller : The phandle of the Rockchip I2S controller that's
-+  connected to the CODEC.
-+- rockchip,audio-codec : The phandle of the audio codec.
-+- rockchip,headset-codec : The phandle of the jack detection ic.
-+
-+Optional properties:
-+- rockchip,hp-det-gpios : The GPIO that detect headphones are plugged in
-+- rockchip,mic-det-gpios : The GPIO that detect microphones are plugged in
-+
-+Example:
-+
-+sound {
-+	compatible = "rockchip,rockchip-audio-machine";
-+
-+	/* child node */
-+	sound_rtl {
-+		compatible = "rockchip,rockchip-audio-rt5645";
-+		rockchip,model = "I2S-RT5650";
-+		rockchip,i2s-controller = <&i2s>;
-+		rockchip,audio-codec = <&rt5645>;
-+	};
-+
-+	/* child node */
-+	sound_maxim {
-+		compatible = "rockchip,rockchip-audio-max98090";
-+		rockchip,model = "ROCKCHIP-I2S";
-+		rockchip,i2s-controller = <&i2s>;
-+		rockchip,audio-codec = <&max98090>;
-+		rockchip,headset-codec = <&headsetcodec>;
-+	};
-+};
-\ No newline at end of file
--- 
-1.7.9.5
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
+
+> ---
+>  arch/arm/mm/init.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index be92fa0..b4f9513 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -89,7 +89,7 @@ __tagtable(ATAG_INITRD2, parse_tag_initrd2);
+>  static void __init find_limits(unsigned long *min, unsigned long *max_low,
+>  			       unsigned long *max_high)
+>  {
+> -	*max_low = PFN_DOWN(memblock_get_current_limit());
+> +	*max_low = PFN_DOWN(arm_lowmem_limit);
+>  	*min = PFN_UP(memblock_start_of_DRAM());
+>  	*max_high = PFN_DOWN(memblock_end_of_DRAM());
+>  }
+> -- 
+> 2.1.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
