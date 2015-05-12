@@ -1,27 +1,28 @@
 From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Tue, 12 May 2015 06:54:22 +0200
-Subject: [PATCH] ARM: dts: imx: add "nor-jedec" flash compatible binding
-In-Reply-To: <20150511132052.GH9347@dragon>
-References: <1431066065-19644-1-git-send-email-zajec5@gmail.com>
- <20150511132052.GH9347@dragon>
-Message-ID: <CACna6ryDk2TTsXnVMbaica2T8-4Xo2tU40Ov6sq3FVkx_p=zhw@mail.gmail.com>
+Date: Tue, 12 May 2015 07:00:41 +0200
+Subject: [PATCH] ARM: mvebu: add "nor-jedec" flash compatible binding
+In-Reply-To: <5550A92A.2040408@free-electrons.com>
+References: <1431066023-19479-1-git-send-email-zajec5@gmail.com>
+ <5550A92A.2040408@free-electrons.com>
+Message-ID: <CACna6rz9cisJt492kPyzX2nbvsSCig-ubhr6eGAxnxHzUNTvag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 May 2015 at 15:20, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Fri, May 08, 2015 at 08:21:05AM +0200, Rafa? Mi?ecki wrote:
+On 11 May 2015 at 15:05, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> On 08/05/2015 08:20, Rafa? Mi?ecki wrote:
 >> Starting with commits
 >> 8ff16cf ("Documentation: devicetree: m25p80: add "nor-jedec" binding")
 >> 1103b85 ("mtd: m25p80: bind to "nor-jedec" ID, for auto-detection")
 >> we have "nor-jedec" binding indicating support for JEDEC identification.
->>
->> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
 >
-> Applied, thanks.
+> did you actually check that all the NOR flash referenced in the dts supports
+> the JEDEC identification?
 
-Thanks, unfortunately after some discussion started by tegra patch, it
-may happen we will rename it to jedec,spi-nor :( If that happens, I'll
-care to provide another patch. Sorry for the problem.
+Yes, I did, yes, they do.
 
--- 
-Rafa?
+
+> If it is the case I will add it in mvebu/dt soon.
+
+Please drop this patch as there is a discussion (in tegra patch) about
+renaming the binding to "jedec,spi-nor".
