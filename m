@@ -1,39 +1,21 @@
-From: Frank.Li@freescale.com (Frank.Li at freescale.com)
-Date: Wed, 13 May 2015 00:50:38 +0800
-Subject: [PATCH 3/3] arm: dts: imx6sx: enable snvs power key
-In-Reply-To: <1431449438-19460-1-git-send-email-Frank.Li@freescale.com>
-References: <1431449438-19460-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <1431449438-19460-3-git-send-email-Frank.Li@freescale.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Wed, 13 May 2015 03:01:26 +0900
+Subject: exynos_defconfig: Enable SENSORS_PWM_FAN, SENSORS_INA2XX, LEDS
+ for OdroidXU3
+In-Reply-To: <1431444262-29531-1-git-send-email-linux.amoon@gmail.com>
+References: <Anand Moon <linux.amoon@gmail.com>
+ <1431444262-29531-1-git-send-email-linux.amoon@gmail.com>
+Message-ID: <55523FF6.7020505@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Li <Frank.Li@freescale.com>
+On 05/13/15 00:24, Anand Moon wrote:
+> Enable SENSORS_PWM_FAN, SENSORS_INA2XX, LEDS for OdroidXU3.
+> 
+Basically, I have no objection on this series so for the test on other
+exynos boards. Of course, if any problems on other boards, need to fix
+it maybe it will not be happened...anyway, I'll pick them in my tree
+once the dependent patch you mentioned is ready.
 
-enable snvs ONOFF power key support
-
-Signed-off-by: Frank Li <Frank.Li@freescale.com>
----
- arch/arm/boot/dts/imx6sx.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index 708175d..1350d2e 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -680,6 +680,14 @@
- 				};
- 			};
- 
-+			snvs-pwrkey at 0x020cc000 {
-+				compatible = "fsl,imx6sx-snvs-pwrkey";
-+				reg = <0x020cc000 0x4000>;
-+				interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+				fsl,keycode = <116>; /* KEY_POWER */
-+				fsl,wakeup;
-+			};
-+
- 			epit1: epit at 020d0000 {
- 				reg = <0x020d0000 0x4000>;
- 				interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
--- 
-1.9.1
+Thanks,
+Kukjin
