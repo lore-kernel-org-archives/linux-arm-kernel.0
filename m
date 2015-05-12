@@ -1,35 +1,42 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 12 May 2015 20:22:15 +0100
-Subject: [PATCH 1/4] ASoC: rockchip: add rockchip machine driver
-In-Reply-To: <1431422797-31903-2-git-send-email-zhengxing@rock-chips.com>
-References: <1431422797-31903-1-git-send-email-zhengxing@rock-chips.com>
- <1431422797-31903-2-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <20150512192215.GZ3066@sirena.org.uk>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 12 May 2015 21:24:13 +0200
+Subject: [PATCH v2 10/17] i2c: add locomo i2c driver
+In-Reply-To: <1430178954-11138-11-git-send-email-dbaryshkov@gmail.com>
+References: <1430178954-11138-1-git-send-email-dbaryshkov@gmail.com>
+ <1430178954-11138-11-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <20150512192413.GE4449@schokonusskuchen.bad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 12, 2015 at 05:26:34PM +0800, Xing Zheng wrote:
-> From: zhengxing <zhengxing@rock-chips.com>
+On Tue, Apr 28, 2015 at 02:55:47AM +0300, Dmitry Eremin-Solenikov wrote:
+> LoCoMo chip contains a tiny i2c controller destined to control
+> M62332 DAC. Provide a separate I2C driver for this cell.
 > 
-> In most cases, we maybe use simple-card as generic machine driver
-> on next kernel, but there are some issue that jack detection and
-> widgets extandable on simple-card.
-> 
-> Own machine drvier can select one valid codec from supported codecs,
-> and add needful function from dts on rockchip platform.
+> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 
-Is it not possible to extend simple card to handle your use cases?
-Given the very generic naming and the fact that things like jack
-detection and so on should depend on the CODEC and board usually rather
-than on the SoC it doesn't sound like this is Rockchip specific.
+Thanks for the submission!
 
-This also looks like you're reimplementing some device model enumeration
-stuff which probably shouldn't be happening but let's understand the
-problem you're trying to solve here before going too far into the code.
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/regmap.h>
+> +#include <linux/slab.h>
+> +#include <linux/mfd/locomo.h>
+> +
+> +#include <linux/i2c.h>
+> +#include <linux/i2c-algo-bit.h>
+
+To avoid duplicates, I prefer the includes to be sorted. No need to
+resend because of that, though.
+
+Kudos for brushing up old code! Do you want the drivers go via the
+subsystem trees? Or is there a dependency so it should go in via some
+other tree in one go?
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 473 bytes
+Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150512/2899f902/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150512/231ff613/attachment.sig>
