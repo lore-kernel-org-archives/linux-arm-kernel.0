@@ -1,575 +1,193 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 12 May 2015 17:15:17 -0500
-Subject: [PATCH] arm: boot: dts: add DTS for Baltos IR5221
-Message-ID: <1431468917-27697-1-git-send-email-balbi@ti.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Tue, 12 May 2015 15:18:04 -0700
+Subject: [PATCH 2/2] PCI: iproc: add bcma pcie driver
+In-Reply-To: <1431465781-10753-3-git-send-email-hauke@hauke-m.de>
+References: <1431465781-10753-1-git-send-email-hauke@hauke-m.de>
+ <1431465781-10753-3-git-send-email-hauke@hauke-m.de>
+Message-ID: <55527C1C.7090901@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yegor Yefremov <yegorslists@googlemail.com>
+Hi Hauke,
 
-This device is an industrial PC based on
-AM335x SoC.
+On 5/12/2015 2:23 PM, Hauke Mehrtens wrote:
+> This driver adds support for the PCIe 2.0 controller found on the bcma
+> bus. This controller can be found on (mostly) all Broadcom BCM470X /
+> BCM5301X ARM SoCs.
+> 
+> The driver found in the Broadcom SDK does some more stuff, like setting
+> up some DMA memory areas, chaining MPS and MRRS to 512 and also some
+> PHY changes like "improving" the PCIe jitter and doing some special
+> initializations for the 3rd PCIe port.
+> 
+> This was tested on a bcm4708 board with 2 PCIe ports and wireless cards
+> connected to them.
+> 
+> PCI_DOMAINS is needed by this driver, because normally there is more
+> than one PCIe controller and without PCI_DOMAINS only the first
+> controller gets registered.
+> This controller gets 6 IRQs, the last one is trigged by all IRQ events.
+> 
+> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+> ---
+>  drivers/pci/host/Kconfig           |  11 ++++
+>  drivers/pci/host/Makefile          |   1 +
+>  drivers/pci/host/pcie-iproc-bcma.c | 112 +++++++++++++++++++++++++++++++++++++
+>  3 files changed, 124 insertions(+)
+>  create mode 100644 drivers/pci/host/pcie-iproc-bcma.c
+> 
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index 1dfb567..f23f96d 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -125,4 +125,15 @@ config PCIE_IPROC_PLATFORM
+>  	  Say Y here if you want to use the Broadcom iProc PCIe controller
+>  	  through the generic platform bus interface
+>  
+> +config PCIE_IPROC_BCMA
+> +	bool "Broadcom iProc PCIe bcma bus driver"
+> +	depends on ARCH_BCM_IPROC || (ARM && COMPILE_TEST)
+> +	select PCIE_IPROC
+> +	select BCMA
+> +	select PCI_DOMAINS
+> +	default ARCH_BCM_5301X
+> +	help
+> +	  Say Y here if you want to use the Broadcom iProc PCIe controller
+> +	  through the bcma bus interface
+> +
+>  endmenu
+> diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
+> index f733b4e..2f7c36f 100644
+> --- a/drivers/pci/host/Makefile
+> +++ b/drivers/pci/host/Makefile
+> @@ -15,3 +15,4 @@ obj-$(CONFIG_PCI_LAYERSCAPE) += pci-layerscape.o
+>  obj-$(CONFIG_PCI_VERSATILE) += pci-versatile.o
+>  obj-$(CONFIG_PCIE_IPROC) += pcie-iproc.o
+>  obj-$(CONFIG_PCIE_IPROC_PLATFORM) += pcie-iproc-platform.o
+> +obj-$(CONFIG_PCIE_IPROC_BCMA) += pcie-iproc-bcma.o
+> diff --git a/drivers/pci/host/pcie-iproc-bcma.c b/drivers/pci/host/pcie-iproc-bcma.c
+> new file mode 100644
+> index 0000000..c318f19
+> --- /dev/null
+> +++ b/drivers/pci/host/pcie-iproc-bcma.c
+> @@ -0,0 +1,112 @@
+> +/* 
+> + * Copyright (C) 2015 Broadcom Corporation
+> + * Copyright (C) 2015 Hauke Mehrtens <hauke@hauke-m.de>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation version 2.
+> + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> + * kind, whether express or implied; without even the implied warranty
+> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/pci.h>
+> +#include <linux/module.h>
+> +#include <linux/slab.h>
+> +#include <linux/phy/phy.h>
+> +#include <linux/bcma/bcma.h>
+> +#include <linux/ioport.h>
+> +
+> +#include "pcie-iproc.h"
+> +
+> +
+> +/* NS: CLASS field is R/O, and set to wrong 0x200 value */
+> +static void bcma_pcie2_fixup_class(struct pci_dev *dev)
+> +{
+> +	dev->class = PCI_CLASS_BRIDGE_PCI << 8;
+> +}
+> +DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_BROADCOM, 0x8011, bcma_pcie2_fixup_class);
+> +DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_BROADCOM, 0x8012, bcma_pcie2_fixup_class);
+> +
+> +static int iproc_pcie_bcma_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+> +{
+> +	struct pci_sys_data *sys = dev->sysdata;
+> +	struct iproc_pcie *pcie = sys->private_data;
+> +	struct bcma_device *bdev = container_of(pcie->dev, struct bcma_device, dev);
+> +
+> +	return bcma_core_irq(bdev, 5);
+> +}
+> +
+> +static int iproc_pcie_bcma_probe(struct bcma_device *bdev)
+> +{
+> +	struct iproc_pcie *pcie;
+> +	LIST_HEAD(res);
+> +	struct resource res_mem;
+> +	int ret;
+> +
+> +	pcie = devm_kzalloc(&bdev->dev, sizeof(*pcie), GFP_KERNEL);
+> +	if (!pcie)
+> +		return -ENOMEM;
+> +
+> +	pcie->dev = &bdev->dev;
+> +	bcma_set_drvdata(bdev, pcie);
+> +
+> +	pcie->base = bdev->io_addr;
+> +
+> +	res_mem.start = bdev->addr_s[0];
+> +	res_mem.end = bdev->addr_s[0] + SZ_128M - 1;
+> +	res_mem.name = "PCIe MEM space";
+> +	res_mem.flags = IORESOURCE_MEM;
+> +	pci_add_resource(&res, &res_mem);
+> +
+> +	pcie->resources = &res;
+> +
+> +	pcie->map_irq = iproc_pcie_bcma_map_irq;
+> +
+> +	ret = iproc_pcie_setup(pcie);
+> +	if (ret) {
+> +		dev_err(pcie->dev, "PCIe controller setup failed\n");
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static void iproc_pcie_bcma_remove(struct bcma_device *bdev)
+> +{
+> +	struct iproc_pcie *pcie = bcma_get_drvdata(bdev);
+> +
+> +	iproc_pcie_remove(pcie);
+> +}
+> +
+> +static const struct bcma_device_id iproc_pcie_bcma_table[] = {
+> +	BCMA_CORE(BCMA_MANUF_BCM, BCMA_CORE_NS_PCIEG2, BCMA_ANY_REV, BCMA_ANY_CLASS),
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(bcma, iproc_pcie_bcma_table);
+> +
+> +static struct bcma_driver iproc_pcie_bcma_driver = {
+> +	.name		= KBUILD_MODNAME,
+> +	.id_table	= iproc_pcie_bcma_table,
+> +	.probe		= iproc_pcie_bcma_probe,
+> +	.remove		= iproc_pcie_bcma_remove,
+> +};
+> +
+> +static int __init iproc_pcie_bcma_init(void)
+> +{
+> +	return bcma_driver_register(&iproc_pcie_bcma_driver);
+> +}
+> +module_init(iproc_pcie_bcma_init);
+> +
+> +static void __exit iproc_pcie_bcma_exit(void)
+> +{
+> +	bcma_driver_unregister(&iproc_pcie_bcma_driver);
+> +}
+> +module_exit(iproc_pcie_bcma_exit);
+> +
+> +MODULE_AUTHOR("Hauke Mehrtens");
+> +MODULE_DESCRIPTION("Broadcom iPROC PCIe bcma driver");
+> +MODULE_LICENSE("GPLv2");
+> 
 
-[ balbi at ti.com : updated to fit current mainline ]
+This change looks okay to me in general. But I'm not that familiar with
+BCMA, so someone else should also review this code.
 
-Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
+Thanks,
 
-Note that this is just a respin of DTS available from [1]
-
-[1] https://github.com/visionsystemsgmbh/onrisc_br_bsp/blob/master/board/vscom/dts/3.15/onrisc-baltos-ir-5221.dts
-
- arch/arm/boot/dts/Makefile          |   1 +
- arch/arm/boot/dts/am335x-baltos.dts | 528 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 529 insertions(+)
- create mode 100644 arch/arm/boot/dts/am335x-baltos.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 86217db2937a..941217b405e9 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -406,6 +406,7 @@ dtb-$(CONFIG_ARCH_OMAP3) += \
- dtb-$(CONFIG_SOC_TI81XX) += \
- 	dm8168-evm.dtb
- dtb-$(CONFIG_SOC_AM33XX) += \
-+	am335x-baltos.dtb \
- 	am335x-base0033.dtb \
- 	am335x-bone.dtb \
- 	am335x-boneblack.dtb \
-diff --git a/arch/arm/boot/dts/am335x-baltos.dts b/arch/arm/boot/dts/am335x-baltos.dts
-new file mode 100644
-index 000000000000..296965ab8bb5
---- /dev/null
-+++ b/arch/arm/boot/dts/am335x-baltos.dts
-@@ -0,0 +1,528 @@
-+/*
-+ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/*
-+ * VScom OnRISC
-+ * http://www.vscom.de
-+ */
-+
-+/dts-v1/;
-+
-+#include "am33xx.dtsi"
-+#include <dt-bindings/pwm/pwm.h>
-+
-+/ {
-+	model = "OnRISC Baltos iR 5221";
-+	compatible = "vscom,onrisc", "ti,am33xx";
-+
-+	cpus {
-+		cpu at 0 {
-+			cpu0-supply = <&vdd1_reg>;
-+		};
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x10000000>; /* 256 MB */
-+	};
-+
-+	vbat: fixedregulator at 0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vbat";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-boot-on;
-+	};
-+
-+	lis3_reg: fixedregulator at 1 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "lis3_reg";
-+		regulator-boot-on;
-+	};
-+
-+	wl12xx_vmmc: fixedregulator at 2 {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&wl12xx_gpio>;
-+		compatible = "regulator-fixed";
-+		regulator-name = "vwl1271";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio3 8 0>;
-+		startup-delay-us = <70000>;
-+		enable-active-high;
-+	};
-+};
-+
-+&am33xx_pinmux {
-+	mmc2_pins: pinmux_mmc2_pins {
-+		pinctrl-single,pins = <
-+			0x020 (PIN_INPUT_PULLUP | MUX_MODE2)      /* gpmc_ad8.mmc1_dat0_mux0 */
-+			0x024 (PIN_INPUT_PULLUP | MUX_MODE2)      /* gpmc_ad9.mmc1_dat1_mux0 */
-+			0x028 (PIN_INPUT_PULLUP | MUX_MODE2)      /* gpmc_ad10.mmc1_dat2_mux0 */
-+			0x02c (PIN_INPUT_PULLUP | MUX_MODE2)      /* gpmc_ad11.mmc1_dat3_mux0 */
-+			0x080 (PIN_INPUT_PULLUP | MUX_MODE2)      /* gpmc_csn1.mmc1_clk_mux0 */
-+			0x084 (PIN_INPUT_PULLUP | MUX_MODE2)      /* gpmc_csn2.mmc1_cmd_mux0 */
-+			0x1e4 (PIN_INPUT_PULLUP | MUX_MODE7)      /* emu0.gpio3[7] */
-+		>;
-+	};
-+
-+	wl12xx_gpio: pinmux_wl12xx_gpio {
-+		pinctrl-single,pins = <
-+			0x1e8 (PIN_OUTPUT_PULLUP | MUX_MODE7)      /* emu1.gpio3[8] */
-+		>;
-+	};
-+
-+	tps65910_pins: pinmux_tps65910_pins {
-+		pinctrl-single,pins = <
-+			0x078 (PIN_INPUT_PULLUP | MUX_MODE7)      /* gpmc_ben1.gpio1[28] */
-+		>;
-+	};
-+
-+	tca6416_pins: pinmux_tca6416_pins {
-+		pinctrl-single,pins = <
-+			0x1b4 (PIN_INPUT_PULLUP | MUX_MODE7)      /* xdma_event_intr1.gpio0[20] tca6416 stuff */
-+		>;
-+	};
-+
-+	i2c1_pins: pinmux_i2c1_pins {
-+		pinctrl-single,pins = <
-+			0x158 0x2a      /* spi0_d1.i2c1_sda_mux3, INPUT | MODE2 */
-+			0x15c 0x2a      /* spi0_cs0.i2c1_scl_mux3, INPUT | MODE2 */
-+		>;
-+	};
-+
-+	dcan1_pins: pinmux_dcan1_pins {
-+		pinctrl-single,pins = <
-+			0x168 0x0a      /* uart0_ctsn.dcan1_tx_mux0, OUTPUT | MODE2 */
-+			0x16c 0x2a      /* uart0_rtsn.dcan1_rx_mux0, INPUT | MODE2 */
-+		>;
-+	};
-+
-+	uart0_pins: pinmux_uart0_pins {
-+		pinctrl-single,pins = <
-+			0x170 (PIN_INPUT_PULLUP | MUX_MODE0)	/* uart0_rxd.uart0_rxd */
-+			0x174 (PIN_OUTPUT_PULLDOWN | MUX_MODE0)		/* uart0_txd.uart0_txd */
-+		>;
-+	};
-+
-+	uart1_pins: pinmux_uart1_pins {
-+		pinctrl-single,pins = <
-+			0x180 0x28      /* uart1_rxd, INPUT | MODE0 */
-+			0x184 0x28      /* uart1_txd, INPUT | MODE0 */
-+			/*0x178 0x28*/      /* uart1_ctsn, INPUT | MODE0 */
-+			/*0x17c 0x08*/      /* uart1_rtsn, OUTPUT | MODE0 */
-+			0x178 (PIN_INPUT_PULLDOWN | MUX_MODE7)      /* uart1_ctsn, INPUT | MODE0 */
-+			0x17c (PIN_OUTPUT_PULLDOWN | MUX_MODE7)      /* uart1_rtsn, OUTPUT | MODE0 */
-+			0x0e0 (PIN_OUTPUT_PULLDOWN | MUX_MODE7)      /* lcd_vsync.gpio2[22] DTR */
-+			0x0e4 (PIN_INPUT_PULLDOWN | MUX_MODE7)      /* lcd_hsync.gpio2[23] DSR */
-+			0x0e8 (PIN_INPUT_PULLDOWN | MUX_MODE7)      /* lcd_pclk.gpio2[24] DCD */
-+			0x0ec (PIN_INPUT_PULLDOWN | MUX_MODE7)      /* lcd_ac_bias_en.gpio2[25] RI */
-+		>;
-+	};
-+
-+	uart2_pins: pinmux_uart2_pins {
-+		pinctrl-single,pins = <
-+			0x150 0x29      /* spi0_sclk.uart2_rxd_mux3, INPUT | MODE1 */
-+			0x154 0x09      /* spi0_d0.uart2_txd_mux3, OUTPUT | MODE1 */
-+			/*0x188 0x2a*/      /* i2c0_sda.uart2_ctsn_mux0, INPUT | MODE2 */
-+			/*0x18c 0x2a*/      /* i2c0_scl.uart2_rtsn_mux0, INPUT | MODE2 */
-+			0x188 (PIN_INPUT_PULLDOWN | MUX_MODE7)      /* i2c0_sda.uart2_ctsn_mux0 */
-+			0x18c (PIN_OUTPUT_PULLDOWN | MUX_MODE7)      /* i2c0_scl.uart2_rtsn_mux0 */
-+			0x030 (PIN_OUTPUT_PULLDOWN | MUX_MODE7)      /* gpmc_ad12.gpio1[12] DTR */
-+			0x034 (PIN_INPUT_PULLDOWN | MUX_MODE7)      /* gpmc_ad13.gpio1[13] DSR */
-+			0x038 (PIN_INPUT_PULLDOWN | MUX_MODE7)      /* gpmc_ad14.gpio1[14] DCD */
-+			0x03c (PIN_INPUT_PULLDOWN | MUX_MODE7)     /* gpmc_ad15.gpio1[15] RI */
-+
-+			0x1a0 (PIN_INPUT_PULLUP | MUX_MODE7)      /* mcasp0_aclkr.gpio3[18], INPUT_PULLDOWN | MODE7 */
-+		>;
-+	};
-+
-+	cpsw_default: cpsw_default {
-+		pinctrl-single,pins = <
-+			/* Slave 1 */
-+			0x10c (PIN_INPUT_PULLDOWN | MUX_MODE1)       /* mii1_crs.rmii1_crs_dv */
-+			0x114 (PIN_OUTPUT_PULLDOWN | MUX_MODE1)      /* mii1_tx_en.rmii1_txen */
-+			0x124 (PIN_OUTPUT_PULLDOWN | MUX_MODE1)      /* mii1_txd1.rmii1_txd1 */
-+			0x128 (PIN_OUTPUT_PULLDOWN | MUX_MODE1)      /* mii1_txd0.rmii1_txd0 */
-+			0x13c (PIN_INPUT_PULLDOWN | MUX_MODE1)      /* mii1_rxd1.rmii1_rxd1 */
-+			0x140 (PIN_INPUT_PULLDOWN | MUX_MODE1)      /* mii1_rxd0.rmii1_rxd0 */
-+			0x144 (PIN_INPUT_PULLDOWN | MUX_MODE0)      /* rmii1_ref_clk.rmii1_refclk */
-+
-+
-+			/* Slave 2 */
-+			0x40 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a0.rgmii2_tctl */
-+			0x44 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a1.rgmii2_rctl */
-+			0x48 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a2.rgmii2_td3 */
-+			0x4c (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a3.rgmii2_td2 */
-+			0x50 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a4.rgmii2_td1 */
-+			0x54 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a5.rgmii2_td0 */
-+			0x58 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a6.rgmii2_tclk */
-+			0x5c (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a7.rgmii2_rclk */
-+			0x60 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a8.rgmii2_rd3 */
-+			0x64 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a9.rgmii2_rd2 */
-+			0x68 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a10.rgmii2_rd1 */
-+			0x6c (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a11.rgmii2_rd0 */
-+		>;
-+	};
-+
-+	cpsw_sleep: cpsw_sleep {
-+		pinctrl-single,pins = <
-+			/* Slave 1 reset value */
-+			0x10c (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x114 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x124 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x128 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x13c (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x140 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x144 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+
-+			/* Slave 2 reset value*/
-+			0x40 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x44 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x48 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x4c (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x50 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x54 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x58 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x5c (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x60 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x64 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x68 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x6c (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+		>;
-+	};
-+
-+	davinci_mdio_default: davinci_mdio_default {
-+		pinctrl-single,pins = <
-+			/* MDIO */
-+			0x148 (PIN_INPUT_PULLUP | SLEWCTRL_FAST | MUX_MODE0)	/* mdio_data.mdio_data */
-+			0x14c (PIN_OUTPUT_PULLUP | MUX_MODE0)			/* mdio_clk.mdio_clk */
-+		>;
-+	};
-+
-+	davinci_mdio_sleep: davinci_mdio_sleep {
-+		pinctrl-single,pins = <
-+			/* MDIO reset value */
-+			0x148 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			0x14c (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+		>;
-+	};
-+
-+	nandflash_pins_s0: nandflash_pins_s0 {
-+		pinctrl-single,pins = <
-+			0x0 (PIN_INPUT_PULLUP | MUX_MODE0)	/* gpmc_ad0.gpmc_ad0 */
-+			0x4 (PIN_INPUT_PULLUP | MUX_MODE0)	/* gpmc_ad1.gpmc_ad1 */
-+			0x8 (PIN_INPUT_PULLUP | MUX_MODE0)	/* gpmc_ad2.gpmc_ad2 */
-+			0xc (PIN_INPUT_PULLUP | MUX_MODE0)	/* gpmc_ad3.gpmc_ad3 */
-+			0x10 (PIN_INPUT_PULLUP | MUX_MODE0)	/* gpmc_ad4.gpmc_ad4 */
-+			0x14 (PIN_INPUT_PULLUP | MUX_MODE0)	/* gpmc_ad5.gpmc_ad5 */
-+			0x18 (PIN_INPUT_PULLUP | MUX_MODE0)	/* gpmc_ad6.gpmc_ad6 */
-+			0x1c (PIN_INPUT_PULLUP | MUX_MODE0)	/* gpmc_ad7.gpmc_ad7 */
-+			0x70 (PIN_INPUT_PULLUP | MUX_MODE0)	/* gpmc_wait0.gpmc_wait0 */
-+			0x74 (PIN_INPUT_PULLUP | MUX_MODE7)	/* gpmc_wpn.gpio0_30 */
-+			0x7c (PIN_OUTPUT | MUX_MODE0)		/* gpmc_csn0.gpmc_csn0  */
-+			0x90 (PIN_OUTPUT | MUX_MODE0)		/* gpmc_advn_ale.gpmc_advn_ale */
-+			0x94 (PIN_OUTPUT | MUX_MODE0)		/* gpmc_oen_ren.gpmc_oen_ren */
-+			0x98 (PIN_OUTPUT | MUX_MODE0)		/* gpmc_wen.gpmc_wen */
-+			0x9c (PIN_OUTPUT | MUX_MODE0)		/* gpmc_be0n_cle.gpmc_be0n_cle */
-+		>;
-+	};
-+};
-+
-+&elm {
-+	status = "okay";
-+};
-+
-+&gpmc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&nandflash_pins_s0>;
-+	ranges = <0 0 0x08000000 0x10000000>;	/* CS0: NAND */
-+	status = "okay";
-+
-+	nand at 0,0 {
-+		reg = <0 0 0>; /* CS0, offset 0 */
-+		nand-bus-width = <8>;
-+		ti,nand-ecc-opt = "bch8";
-+		ti,nand-xfer-type = "polled";
-+
-+		gpmc,device-nand = "true";
-+		gpmc,device-width = <1>;
-+		gpmc,sync-clk-ps = <0>;
-+		gpmc,cs-on-ns = <0>;
-+		gpmc,cs-rd-off-ns = <44>;
-+		gpmc,cs-wr-off-ns = <44>;
-+		gpmc,adv-on-ns = <6>;
-+		gpmc,adv-rd-off-ns = <34>;
-+		gpmc,adv-wr-off-ns = <44>;
-+		gpmc,we-on-ns = <0>;
-+		gpmc,we-off-ns = <40>;
-+		gpmc,oe-on-ns = <0>;
-+		gpmc,oe-off-ns = <54>;
-+		gpmc,access-ns = <64>;
-+		gpmc,rd-cycle-ns = <82>;
-+		gpmc,wr-cycle-ns = <82>;
-+		gpmc,wait-on-read = "true";
-+		gpmc,wait-on-write = "true";
-+		gpmc,bus-turnaround-ns = <0>;
-+		gpmc,cycle2cycle-delay-ns = <0>;
-+		gpmc,clk-activation-ns = <0>;
-+		gpmc,wait-monitoring-ns = <0>;
-+		gpmc,wr-access-ns = <40>;
-+		gpmc,wr-data-mux-bus-ns = <0>;
-+
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		elm_id = <&elm>;
-+	};
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins>;
-+
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_pins>;
-+	dtr-gpios = <&gpio2 22 GPIO_ACTIVE_LOW>;
-+	dsr-gpios = <&gpio2 23 GPIO_ACTIVE_LOW>;
-+	dcd-gpios = <&gpio2 24 GPIO_ACTIVE_LOW>;
-+	rng-gpios = <&gpio2 25 GPIO_ACTIVE_LOW>;
-+	cts-gpios = <&gpio0 12 GPIO_ACTIVE_LOW>;
-+	rts-gpios = <&gpio0 13 GPIO_ACTIVE_LOW>;
-+
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart2_pins>;
-+	dtr-gpios = <&gpio1 12 GPIO_ACTIVE_LOW>;
-+	dsr-gpios = <&gpio1 13 GPIO_ACTIVE_LOW>;
-+	dcd-gpios = <&gpio1 14 GPIO_ACTIVE_LOW>;
-+	rng-gpios = <&gpio1 15 GPIO_ACTIVE_LOW>;
-+	cts-gpios = <&gpio3 5 GPIO_ACTIVE_LOW>;
-+	rts-gpios = <&gpio3 6 GPIO_ACTIVE_LOW>;
-+
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins>;
-+
-+	status = "okay";
-+	clock-frequency = <400000>;
-+
-+	tps: tps at 2d {
-+		reg = <0x2d>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <28 GPIO_ACTIVE_LOW>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&tps65910_pins>;
-+	};
-+
-+	at24 at 50 {
-+		compatible = "at24,24c02";
-+		pagesize = <8>;
-+		reg = <0x50>;
-+	};
-+
-+	tca6416: gpio at 20 {
-+		compatible = "ti,tca6416";
-+		reg = <0x20>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		interrupt-parent = <&gpio0>;
-+		interrupts = <20 GPIO_ACTIVE_LOW>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&tca6416_pins>;
-+	};
-+};
-+
-+&usb {
-+	status = "okay";
-+
-+	control at 44e10620 {
-+		status = "okay";
-+	};
-+
-+	usb-phy at 47401300 {
-+		status = "okay";
-+	};
-+
-+	usb-phy at 47401b00 {
-+		status = "okay";
-+	};
-+
-+	usb at 47401000 {
-+		status = "okay";
-+		dr_mode = "host";
-+	};
-+
-+	usb at 47401800 {
-+		status = "okay";
-+		dr_mode = "otg";
-+	};
-+
-+	dma-controller at 47402000  {
-+		status = "okay";
-+	};
-+};
-+
-+#include "tps65910.dtsi"
-+
-+&tps {
-+	vcc1-supply = <&vbat>;
-+	vcc2-supply = <&vbat>;
-+	vcc3-supply = <&vbat>;
-+	vcc4-supply = <&vbat>;
-+	vcc5-supply = <&vbat>;
-+	vcc6-supply = <&vbat>;
-+	vcc7-supply = <&vbat>;
-+	vccio-supply = <&vbat>;
-+
-+	ti,en-ck32k-xtal = <1>;
-+
-+	regulators {
-+		vrtc_reg: regulator at 0 {
-+			regulator-always-on;
-+		};
-+
-+		vio_reg: regulator at 1 {
-+			regulator-always-on;
-+		};
-+
-+		vdd1_reg: regulator at 2 {
-+			/* VDD_MPU voltage limits 0.95V - 1.26V with +/-4% tolerance */
-+			regulator-name = "vdd_mpu";
-+			regulator-min-microvolt = <912500>;
-+			regulator-max-microvolt = <1312500>;
-+			regulator-boot-on;
-+			regulator-always-on;
-+		};
-+
-+		vdd2_reg: regulator at 3 {
-+			/* VDD_CORE voltage limits 0.95V - 1.1V with +/-4% tolerance */
-+			regulator-name = "vdd_core";
-+			regulator-min-microvolt = <912500>;
-+			regulator-max-microvolt = <1150000>;
-+			regulator-boot-on;
-+			regulator-always-on;
-+		};
-+
-+		vdd3_reg: regulator at 4 {
-+			regulator-always-on;
-+		};
-+
-+		vdig1_reg: regulator at 5 {
-+			regulator-always-on;
-+		};
-+
-+		vdig2_reg: regulator at 6 {
-+			regulator-always-on;
-+		};
-+
-+		vpll_reg: regulator at 7 {
-+			regulator-always-on;
-+		};
-+
-+		vdac_reg: regulator at 8 {
-+			regulator-always-on;
-+		};
-+
-+		vaux1_reg: regulator at 9 {
-+			regulator-always-on;
-+		};
-+
-+		vaux2_reg: regulator at 10 {
-+			regulator-always-on;
-+		};
-+
-+		vaux33_reg: regulator at 11 {
-+			regulator-always-on;
-+		};
-+
-+		vmmc_reg: regulator at 12 {
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-always-on;
-+		};
-+	};
-+};
-+
-+&mac {
-+	pinctrl-names = "default", "sleep";
-+	pinctrl-0 = <&cpsw_default>;
-+	pinctrl-1 = <&cpsw_sleep>;
-+	dual_emac = <1>;
-+
-+	status = "okay";
-+};
-+
-+&davinci_mdio {
-+	pinctrl-names = "default", "sleep";
-+	pinctrl-0 = <&davinci_mdio_default>;
-+	pinctrl-1 = <&davinci_mdio_sleep>;
-+
-+	status = "okay";
-+};
-+
-+&cpsw_emac0 {
-+	phy_id = <&davinci_mdio>, <0>;
-+	phy-mode = "rmii";
-+	dual_emac_res_vlan = <1>;
-+};
-+
-+&cpsw_emac1 {
-+	phy_id = <&davinci_mdio>, <7>;
-+	phy-mode = "rgmii-txid";
-+	dual_emac_res_vlan = <2>;
-+};
-+
-+&phy_sel {
-+	rmii-clock-ext = <1>;
-+};
-+
-+&mmc1 {
-+	vmmc-supply = <&vmmc_reg>;
-+	status = "okay";
-+};
-+
-+&mmc2 {
-+	status = "okay";
-+	vmmc-supply = <&wl12xx_vmmc>;
-+	ti,non-removable;
-+	bus-width = <4>;
-+	cap-power-off-card;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc2_pins>;
-+};
-+
-+&sham {
-+	status = "okay";
-+};
-+
-+&aes {
-+	status = "okay";
-+};
-+
-+&gpio0 {
-+	ti,no-reset-on-init;
-+};
-+
-+&dcan1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&dcan1_pins>;
-+
-+	status = "okay";
-+};
--- 
-2.4.0.rc3
+Ray
