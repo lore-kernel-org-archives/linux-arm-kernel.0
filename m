@@ -1,44 +1,52 @@
-From: xuwei5@hisilicon.com (xuwei (O))
-Date: Tue, 12 May 2015 15:07:50 +0000
-Subject: [GIT PULL]Hisilicon hip04 soc defconfig updates for v4.2
-In-Reply-To: <2377043.muyzvjXoX2@wuerfel>
-References: <554CC95E.2060701@hisilicon.com> <2377043.muyzvjXoX2@wuerfel>
-Message-ID: <8B36690B4C1B584EAD95DD4902A4FF37096C7520@SZXEMA511-MBS.china.huawei.com>
+From: joshc@ni.com (Josh Cartwright)
+Date: Tue, 12 May 2015 10:12:05 -0500
+Subject: [PATCH] ARM: zynq: Set bit 22 in PL310 AuxCtrl register (6395/1)
+In-Reply-To: <812979c5a158a3306d8036e7f9731947c58a3ab7.1431411716.git.michal.simek@xilinx.com>
+References: <812979c5a158a3306d8036e7f9731947c58a3ab7.1431411716.git.michal.simek@xilinx.com>
+Message-ID: <20150512151205.GS669@jcartwri.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Something tells me that Russell's patch system won't like to accept a
+patch with a duplicate ID (although, I could be wrong).
 
-
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Tuesday, May 12, 2015 4:05 PM
-> To: xuwei (O)
-> Cc: Olof; khilman at kernel.org; arm at kernel.org; linux-arm-
-> kernel at lists.infradead.org; Yanhaifeng; Liguozhu (Kenneth); zhangfei;
-> Fathi Boudra; Wangzhou (B); Haojian Zhuang; Guodong Xu; Sanil kumar;
-> Shameerali Kolothum Thodi; Linuxarm
-> Subject: Re: [GIT PULL]Hisilicon hip04 soc defconfig updates for v4.2
+On Tue, May 12, 2015 at 08:22:01AM +0200, Michal Simek wrote:
+> From: Thomas Betker <thomas.betker@rohde-schwarz.com>
 > 
-> On Friday 08 May 2015 15:34:06 Wei Xu wrote:
-> > ARM: HIP04: configure updates for 4.2
-> >
-> > - Enable ethernet on hip04 SoC
-> > - Enable Sysnopsis GPIO controller on hip04 SoC
-> >
-
-Hi Arnd,
-
-> Pulled into next/defconfig. Can you please send another update that
-> adds the drivers as loadable modules to the multi_v7_defconfig file?
+> This patch is based on the
+> commit 1a8e41cd672f ("ARM: 6395/1: VExpress: Set bit 22 in the PL310
+> (cache controller) AuxCtlr register")
 > 
-> We should make sure that all ARMv7 platforms we support work with
-> multi_v7_defconfig as well.
-
-Thanks!
-I will send that patch.
-
-Best Regards,
-Wei
-
+> Clearing bit 22 in the PL310 Auxiliary Control register (shared
+> attribute override enable) has the side effect of transforming Normal
+> Shared Non-cacheable reads into Cacheable no-allocate reads.
 > 
-> 	Arnd
+> Coherent DMA buffers in Linux always have a cacheable alias via the
+> kernel linear mapping and the processor can speculatively load cache
+> lines into the PL310 controller. With bit 22 cleared, Non-cacheable
+> reads would unexpectedly hit such cache lines leading to buffer
+> corruption.
+> 
+> For Zynq, this fix avoids memory inconsistencies between Gigabit
+> Ethernet controller (GEM) and CPU when DMA_CMA is disabled.
+
+In practice, we've seen corruption not only with the GEM but also the
+UDC (and likely other things as well).  So, this patch is welcome!
+
+> Suggested-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
+> Signed-off-by: Thomas Betker <thomas.betker@rohde-schwarz.com>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+
+This feels like stable material as well, to me.  (Although, I'd expect a
+bit of manual work to get it backported, with the fairly recent L2
+reworking).
+
+Thanks,
+  Josh
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150512/f8e77e05/attachment.sig>
