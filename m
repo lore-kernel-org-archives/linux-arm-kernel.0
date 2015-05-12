@@ -1,50 +1,49 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 12 May 2015 13:51:49 +0100
-Subject: [PATCH 12/13] ARM: STi: STiH407: Enable PMU IRQs
-In-Reply-To: <1431435110-22595-1-git-send-email-lee.jones@linaro.org>
-References: <1431435110-22595-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1431435110-22595-13-git-send-email-lee.jones@linaro.org>
+Date: Tue, 12 May 2015 13:58:08 +0100
+Subject: [PATCH v2 00/12] mfd: Add support for Clocksource to LPC set
+Message-ID: <1431435500-22899-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver is used to enable System Configuration Register controlled
-External, CTI (Core Sight), PMU (Performance Management), and PL310 L2
-Cache IRQs prior to use.
-
-Here we are enabling PMU IRQs on both channels.
-
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/boot/dts/stih407-family.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
-
-diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-index 412206e..e096105 100644
---- a/arch/arm/boot/dts/stih407-family.dtsi
-+++ b/arch/arm/boot/dts/stih407-family.dtsi
-@@ -10,6 +10,7 @@
- #include <dt-bindings/mfd/st-lpc.h>
- #include <dt-bindings/phy/phy.h>
- #include <dt-bindings/reset-controller/stih407-resets.h>
-+#include <dt-bindings/interrupt-controller/irq-st.h>
- / {
- 	#address-cells = <1>;
- 	#size-cells = <1>;
-@@ -127,6 +128,15 @@
- 			reg = <0x94b5100 0x1000>;
- 		};
+ST's Low Power Controller (LPC) controls three devices; watchdog, RTC
+and a Clocksource Timer.  Only one of the devices can be used at any
+one time, which is enforced by the Device Driver model.
  
-+		irq-syscfg {
-+			compatible    = "st,stih407-irq-syscfg";
-+			st,syscfg     = <&syscfg_core>;
-+			st,irq-device = <ST_IRQ_SYSCFG_PMU_0>,
-+					<ST_IRQ_SYSCFG_PMU_1>;
-+			st,fiq-device = <ST_IRQ_SYSCFG_DISABLED>,
-+					<ST_IRQ_SYSCFG_DISABLED>;
-+		};
-+
- 		serial at 9830000 {
- 			compatible = "st,asc";
- 			reg = <0x9830000 0x2c>;
+This patchset provides support for the Clocksource driver.  Watchdog
+and RTC are already in -next.
+
+Lee Jones (12):
+  mfd: dt-bindings: Provide human readable define for Clocksource mode
+  clocksource: sti: Provide support for the ST LPC Clocksource IP
+  clocksource: sti: Provide 'use timer as sched clock' capability
+  clocksource: bindings: Provide bindings for ST's LPC Clocksource
+    device
+  watchdog: st_wdt: Update IP layout information to include Clocksource
+  watchdog: bindings: Supply knowledge of a third supported device -
+    clocksource
+  rtc: st: Update IP layout information to include Clocksource
+  rtc: bindings: Supply knowledge of a third supported device -
+    clocksource
+  MAINTAINERS: Add the LPC Clocksource to STi maintained driver list
+  ARM: STi: DT: STih407: Switch LPC mode from RTC to Clocksource
+  ARM: STi: Enable LPC Clocksource
+  ARM: STi: Update platform level menuconfig 'help'
+
+ .../devicetree/bindings/rtc/rtc-st-lpc.txt         |  15 ++-
+ .../devicetree/bindings/timer/st,stih407-lpc       |  28 +++++
+ .../devicetree/bindings/watchdog/st_lpc_wdt.txt    |  12 +-
+ MAINTAINERS                                        |   1 +
+ arch/arm/boot/dts/stih407-family.dtsi              |   2 +-
+ arch/arm/mach-sti/Kconfig                          |  10 +-
+ drivers/clocksource/Kconfig                        |   9 ++
+ drivers/clocksource/Makefile                       |   1 +
+ drivers/clocksource/clksrc_st_lpc.c                | 129 +++++++++++++++++++++
+ drivers/rtc/rtc-st-lpc.c                           |   2 +-
+ drivers/watchdog/st_lpc_wdt.c                      |   2 +-
+ include/dt-bindings/mfd/st-lpc.h                   |   1 +
+ 12 files changed, 194 insertions(+), 18 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/timer/st,stih407-lpc
+ create mode 100644 drivers/clocksource/clksrc_st_lpc.c
+
 -- 
 1.9.1
