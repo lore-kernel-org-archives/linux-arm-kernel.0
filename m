@@ -1,41 +1,45 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 12 May 2015 12:34:44 +0530
-Subject: [PATCH 4/7] drivers/cpufreq: Convert non-modular drivers to use
- builtin_driver_register
-In-Reply-To: <1431287385-1526-5-git-send-email-paul.gortmaker@windriver.com>
-References: <1431287385-1526-1-git-send-email-paul.gortmaker@windriver.com>
- <1431287385-1526-5-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <20150512070444.GE32300@linux>
+From: ygardi@codeaurora.org (ygardi at codeaurora.org)
+Date: Tue, 12 May 2015 07:05:29 -0000
+Subject: [PATCH] phy: qcom-ufs: Switch dependency to ARCH_QCOM
+In-Reply-To: <1428707466-24526-3-git-send-email-sboyd@codeaurora.org>
+References: <1428707466-24526-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <42019bf2314bad314c737a10f9c7628b.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10-05-15, 15:49, Paul Gortmaker wrote:
-> These files depend on Kconfig options all of which are a bool, so
-> we use the appropriate registration function, which avoids us
-> relying on an implicit inclusion of <module.h> which we are
-> doing currently.
-> 
-> While this currently works, we really don't want to be including
-> the module.h header in non-modular code, which we'd be forced
-> to do, pending some upcoming code relocation from init.h into
-> module.h.  So we fix it now by using the non-modular equivalent.
-> 
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: linux-pm at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+looks good.
+
+Acked-by: Yaniv Gardi <ygardi@codeaurora.org>
+
+
+> This phy only exists on platforms under ARCH_QCOM, not ARCH_MSM.
+>
+> Cc: Yaniv Gardi <ygardi@codeaurora.org>
+> Cc: Dov Levenglick <dovl@codeaurora.org>
+> Cc: Christoph Hellwig <hch@lst.de>
+> Cc: David Brown <davidb@codeaurora.org>
+> Cc: Bryan Huntsman <bryanh@codeaurora.org>
+> Cc: Daniel Walker <dwalker@fifo99.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > ---
->  drivers/cpufreq/exynos-cpufreq.c  | 2 +-
-
-Exynos can be compiled as a module:
-
-drivers/cpufreq/Kconfig.arm:
-
-config ARM_EXYNOS_CPUFREQ
-	tristate "SAMSUNG EXYNOS CPUfreq Driver"
-	depends on CPU_EXYNOS4210 || SOC_EXYNOS4212 || SOC_EXYNOS4412 || SOC_EXYNOS5250
-
---
-viresh
+>  drivers/phy/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index 2962de205ba7..9b1ff313bd51 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -286,7 +286,7 @@ config PHY_STIH41X_USB
+>
+>  config PHY_QCOM_UFS
+>  	tristate "Qualcomm UFS PHY driver"
+> -	depends on OF && ARCH_MSM
+> +	depends on OF && ARCH_QCOM
+>  	select GENERIC_PHY
+>  	help
+>  	  Support for UFS PHY on QCOM chipsets.
+> --
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+>
+>
