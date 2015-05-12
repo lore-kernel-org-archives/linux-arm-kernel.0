@@ -1,19 +1,23 @@
-From: moorray3@wp.pl (Jakub =?UTF-8?B?S2ljacWEc2tp?=)
-Date: Tue, 12 May 2015 16:00:27 +0200
-Subject: [PATCH] serial/amba-pl011: Unconditionally poll for FIFO space
- before each TX char
-In-Reply-To: <1431438266-28094-1-git-send-email-Dave.Martin@arm.com>
-References: <1431438266-28094-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20150512160027.21244f64@north>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 12 May 2015 16:07:41 +0200
+Subject: [PATCH 01/12] arm/arm64: kvm: add missing PSCI include
+In-Reply-To: <1431085004-32743-2-git-send-email-mark.rutland@arm.com>
+References: <1431085004-32743-1-git-send-email-mark.rutland@arm.com>
+ <1431085004-32743-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <20150512140741.GH32765@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 May 2015 14:44:26 +0100, Dave Martin wrote:
-> This will cause a conflict with tty-next because it pulls forward
-> some changes made by commit 1e84d22 (serial/amba-pl011: Refactor and
-> simplify TX FIFO handling); however, the resolution is simple except
-> for the following lines which may need to be deleted manually from
-> amba-pl011.c:pl011_startup():
+On Fri, May 08, 2015 at 12:36:33PM +0100, Mark Rutland wrote:
+> We make use of the PSCI function IDs, but don't explicitly include the
+> header which defines them. Relying on transitive header includes is
+> fragile and will be broken as headers are refactored.
+> 
+> This patch includes the relevant header file directly so as to avoid
+> future breakage.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
 
-By resolution is simple you mean: keep the code as it is in tty-next,
-right?
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
