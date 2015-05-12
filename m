@@ -1,26 +1,18 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 May 2015 17:18:14 +0200
-Subject: [GIT PULL] Ux500 development for v4.2
-In-Reply-To: <CACRpkdZX-Tg-1SNV0L2MemGqkaVZG9wSwiLquYVDVMToZT02nw@mail.gmail.com>
-References: <CACRpkdZX-Tg-1SNV0L2MemGqkaVZG9wSwiLquYVDVMToZT02nw@mail.gmail.com>
-Message-ID: <2276241.LvodlDYmFH@wuerfel>
+From: moorray3@wp.pl (Jakub =?UTF-8?B?S2ljacWEc2tp?=)
+Date: Tue, 12 May 2015 17:18:50 +0200
+Subject: [PATCH v4 00/11] drivers: PL011: add ARM SBSA Generic UART support
+In-Reply-To: <1431440095-5146-1-git-send-email-andre.przywara@arm.com>
+References: <1431440095-5146-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <20150512171850.21019f22@north>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 11 May 2015 11:32:04 Linus Walleij wrote:
-> Hi ARM SoC people,
-> 
-> this is some cleanup and development for Ux500 that should go
-> into ARM SoC for the v4.2 series. Details are in the signed tag.
-> 
-> I think it would look overzealous to break it in different topics, but if you
-> prefer to slice the patch set, tell me how and I'll split it as you
-> desire.
-> 
+On Tue, 12 May 2015 15:14:44 +0100, Andre Przywara wrote:
+> This is the fourth revision of the SBSA UART support series, now
+> based on the current tty-next branch.
+> Compared to v3 I addressed some comments Jakub had on v3 (thanks for
+> the review!). Also since some basic ACPI support for ARM64 is now
+> upstream, I include the necessary ACPI binding as a new patch 11
+> on top.
 
-Yes, please split it up, unless there are interdependencies.
-
-Feel free to use git-send-email if you want to avoid preparing a pull
-request for a branch that only has one or two patches in it.
-
-	Arnd
+Thanks, apart from minor checkpatch --strict warnings it looks good now.
