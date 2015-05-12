@@ -1,39 +1,51 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 12 May 2015 08:20:52 +0200
-Subject: [PATCH v3 1/4] ARM: pxa: add memory resource to RTC device
-In-Reply-To: <CAL_Jsq+tNStipTDRH05XRHVDz30B8w92YTD1ZKUTrCp-Lj7=1w@mail.gmail.com>
- (Rob Herring's message of "Mon, 11 May 2015 19:35:24 -0500")
-References: <1431384089-28367-1-git-send-email-robh@kernel.org>
- <1431384089-28367-2-git-send-email-robh@kernel.org>
- <20150511224934.GL2067@n2100.arm.linux.org.uk>
- <CAL_Jsq+tNStipTDRH05XRHVDz30B8w92YTD1ZKUTrCp-Lj7=1w@mail.gmail.com>
-Message-ID: <87lhgumi4b.fsf@belgarion.home>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 12 May 2015 08:22:01 +0200
+Subject: [PATCH] ARM: zynq: Set bit 22 in PL310 AuxCtrl register (6395/1)
+Message-ID: <812979c5a158a3306d8036e7f9731947c58a3ab7.1431411716.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob Herring <robh@kernel.org> writes:
+From: Thomas Betker <thomas.betker@rohde-schwarz.com>
 
->> This really isn't a good idea - what do you think happens when
->> the same struct resource gets passed into insert_resource()
->> twice?
->
-> Bad things. If you recall, we discussed this on v1[1]. See the commit
-> msg of patch 2 for the summary. There is not currently a problem
-> because the rtc-pxa driver does not request the resource.
+This patch is based on the
+commit 1a8e41cd672f ("ARM: 6395/1: VExpress: Set bit 22 in the PL310
+(cache controller) AuxCtlr register")
 
-I think you're talking about resource claiming, while Russell is talking about
-resource declaration.
+Clearing bit 22 in the PL310 Auxiliary Control register (shared
+attribute override enable) has the side effect of transforming Normal
+Shared Non-cacheable reads into Cacheable no-allocate reads.
 
-The point Russell is raising is if you do a platform_add_device() twice with the
-same resource (which is done in pxa, once for sa1100-rtc, once for pxa-rtc), you
-call insert_resource() twice with the same resource structure.
+Coherent DMA buffers in Linux always have a cacheable alias via the
+kernel linear mapping and the processor can speculatively load cache
+lines into the PL310 controller. With bit 22 cleared, Non-cacheable
+reads would unexpectedly hit such cache lines leading to buffer
+corruption.
 
-I had not thought of that before (that's in my reply noted "nasty consequences"
-in [1]), and I'll do my homework this week, and try this only patch, but if I
-follow Russell's thinking, then sa1100-rtc and pxa-rtc cannot be declared
-together anymore.
+For Zynq, this fix avoids memory inconsistencies between Gigabit
+Ethernet controller (GEM) and CPU when DMA_CMA is disabled.
 
-Cheers.
+Suggested-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
+Signed-off-by: Thomas Betker <thomas.betker@rohde-schwarz.com>
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
---
-Robert
+ arch/arm/mach-zynq/common.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+index 39c1c7d43522..af36dc2545c1 100644
+--- a/arch/arm/mach-zynq/common.c
++++ b/arch/arm/mach-zynq/common.c
+@@ -197,8 +197,8 @@ static const char * const zynq_dt_match[] = {
+ 
+ DT_MACHINE_START(XILINX_EP107, "Xilinx Zynq Platform")
+ 	/* 64KB way size, 8-way associativity, parity disabled */
+-	.l2c_aux_val	= 0x00000000,
+-	.l2c_aux_mask	= 0xffffffff,
++	.l2c_aux_val    = 0x00400000,
++	.l2c_aux_mask	= 0xffbfffff,
+ 	.smp		= smp_ops(zynq_smp_ops),
+ 	.map_io		= zynq_map_io,
+ 	.init_irq	= zynq_irq_init,
+-- 
+2.3.5
