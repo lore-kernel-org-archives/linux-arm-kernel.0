@@ -1,342 +1,457 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 12 May 2015 15:32:04 +0200
-Subject: [PATCH 2/2] pwm: add Mediatek display PWM driver support
-In-Reply-To: <1431336382-13167-3-git-send-email-yh.huang@mediatek.com>
-References: <1431336382-13167-1-git-send-email-yh.huang@mediatek.com>
- <1431336382-13167-3-git-send-email-yh.huang@mediatek.com>
-Message-ID: <20150512133202.GA24684@ulmo.nvidia.com>
+From: mfuzzey@parkeon.com (Martin Fuzzey)
+Date: Tue, 12 May 2015 15:31:03 +0200
+Subject: [PATCH V2] ARM: imx53: Set DDR pins to high impedance when in suspend
+ to RAM.
+Message-ID: <20150512124032.7328.18562.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 11, 2015 at 05:26:22PM +0800, YH Huang wrote:
-> Add display PWM driver support to modify backlight for MT8173/MT6595.
-> 
-> Signed-off-by: YH Huang <yh.huang@mediatek.com>
-> ---
->  drivers/pwm/Kconfig             |   9 ++
->  drivers/pwm/Makefile            |   1 +
->  drivers/pwm/pwm-disp-mediatek.c | 225 ++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 235 insertions(+)
->  create mode 100644 drivers/pwm/pwm-disp-mediatek.c
-> 
-> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-> index b1541f4..9edbb5a 100644
-> --- a/drivers/pwm/Kconfig
-> +++ b/drivers/pwm/Kconfig
-> @@ -111,6 +111,15 @@ config PWM_CLPS711X
->  	  To compile this driver as a module, choose M here: the module
->  	  will be called pwm-clps711x.
->  
-> +config PWM_DISP_MEDIATEK
+In order to save power the DDR pins should be put into high
+impedance when in suspend to RAM.
 
-Please make this "PWM_MEDIATEK_DISP" so we can keep everything sorted by
-vendor.
+This requires manually requesting self refresh (rather than using the
+automatic mode implemented by the CCM / ESDCTL), followed by
+reconfiguring the IOMUXC.
 
-> +	tristate "MEDIATEK display PWM driver"
+Of course the code to do this cannot itself run from DDR so the
+code is copied to and executed from internal memory.
 
-"MediaTek"?
+In my tests using a custom i.MX53 board with LPDDR2 RAM
+this reduced the suspend power consumption from 200mW to 60mW.
 
-> +	depends on OF
+Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
+---
 
-Technically I think you need depends on HAS_IOMEM here to avoid breakage
-on randconfig builds.
+Changes since V1:
+ * Drop struct imx5_suspend_io_config and just use struct imx5_suspend_io_state
+ * Populate IRAM state structures with memcpy()
 
-> +	help
-> +	  Generic PWM framework driver for mediatek disp-pwm device.
 
-"MediaTek"? Also perhaps this should describe what this PWM is instead
-of just the "disp-pwm" which leaves everyone guessing what it is. From
-the name I'd expect it to be the PWM that is used to control the
-backlight brightness for display, but I think this description should
-say that explicitly.
+ arch/arm/mach-imx/Makefile        |    1 
+ arch/arm/mach-imx/common.h        |    4 +
+ arch/arm/mach-imx/pm-imx5.c       |  190 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/suspend-imx53.S |  139 +++++++++++++++++++++++++++
+ 4 files changed, 333 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-imx/suspend-imx53.S
 
-> +
-> +	  To compile this driver as a module, choose M here: the module
-> +	  will be called pwm-disp-mediatek.
-
-pwm-mediatek-disp
-
-> +
->  config PWM_EP93XX
->  	tristate "Cirrus Logic EP93xx PWM support"
->  	depends on ARCH_EP93XX
-> diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-> index ec50eb5..c5ff72a 100644
-> --- a/drivers/pwm/Makefile
-> +++ b/drivers/pwm/Makefile
-> @@ -8,6 +8,7 @@ obj-$(CONFIG_PWM_BCM_KONA)	+= pwm-bcm-kona.o
->  obj-$(CONFIG_PWM_BCM2835)	+= pwm-bcm2835.o
->  obj-$(CONFIG_PWM_BFIN)		+= pwm-bfin.o
->  obj-$(CONFIG_PWM_CLPS711X)	+= pwm-clps711x.o
-> +obj-$(CONFIG_PWM_DISP_MEDIATEK)	+= pwm-disp-mediatek.o
-
-Also name this "pwm-mediatek-disp.o" to reflect the Kconfig name.
-
->  obj-$(CONFIG_PWM_EP93XX)	+= pwm-ep93xx.o
->  obj-$(CONFIG_PWM_FSL_FTM)	+= pwm-fsl-ftm.o
->  obj-$(CONFIG_PWM_IMG)		+= pwm-img.o
-> diff --git a/drivers/pwm/pwm-disp-mediatek.c b/drivers/pwm/pwm-disp-mediatek.c
-> new file mode 100644
-> index 0000000..38293af
-> --- /dev/null
-> +++ b/drivers/pwm/pwm-disp-mediatek.c
-> @@ -0,0 +1,225 @@
-> +/*
-> + * Mediatek display pulse-width-modulation controller driver.
-> + * Copyright (c) 2015 MediaTek Inc.
-> + * Author: YH Huang <yh.huang@mediatek.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/pwm.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/slab.h>
-> +
-> +#define DISP_PWM_EN_OFF			(0x0)
-
-The _OFF suffix here is unfortunate because I'm reading this as being
-the "OFF" value for a field named "DISP_PWM_EN". I think it'd be better
-to name this one DISP_PWM_EN. The same goes for any of the following
-registers.
-
-Also, drop the parentheses if the expression is simple.
-
-> +#define PWM_ENABLE_SHIFT		(0x0)
-> +#define PWM_ENABLE_MASK			(0x1 << PWM_ENABLE_SHIFT)
-> +
-> +#define DISP_PWM_COMMIT_OFF		(0x08)
-> +#define PWM_COMMIT_SHIFT		(0x0)
-> +#define PWM_COMMIT_MASK			(0x1 << PWM_COMMIT_SHIFT)
-> +
-> +#define DISP_PWM_CON_0_OFF		(0x10)
-> +#define PWM_CLKDIV_SHIFT		(0x10)
-> +#define PWM_CLKDIV_MASK			(0x3ff << PWM_CLKDIV_SHIFT)
-> +#define PWM_CLKDIV_MAX			(0x000003ff)
-> +
-> +#define DISP_PWM_CON_1_OFF		(0x14)
-> +#define PWM_PERIOD_SHIFT		(0x0)
-> +#define PWM_PERIOD_MASK			(0xfff << PWM_PERIOD_SHIFT)
-> +#define PWM_PERIOD_MAX			(0x00000fff)
-> +/* Shift log2(PWM_PERIOD_MAX + 1) as divisor */
-> +#define PWM_PERIOD_BIT_SHIFT		12
-
-This is confusing, see below.
-
-> +
-> +#define PWM_HIGH_WIDTH_SHIFT		(0x10)
-> +#define PWM_HIGH_WIDTH_MASK		(0x1fff << PWM_HIGH_WIDTH_SHIFT)
-> +
-> +#define NUM_PWM 1
-
-You can drop this, it's only used once.
-
-> +
-> +struct mtk_disp_pwm_chip {
-> +	struct pwm_chip	chip;
-> +	struct device	*dev;
-> +	struct clk	*clk_main;
-> +	struct clk	*clk_mm;
-> +	void __iomem	*mmio_base;
-> +};
-
-Please don't add this artificial padding, a single space is enough as a
-separator. Also, I think you can drop the _chip suffix on the structure
-name.
-
-> +
-> +static void mtk_disp_pwm_setting(void __iomem *address, u32 value, u32 mask)
-
-This is a bad name. I think you should adopt the naming of regmap, which
-this effectively copies, so this should be:
-
-	static void mtk_disp_pwm_update_bits(void __iomem *address, u32 mask, u32 value)
-
-> +static int mtk_disp_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-> +			       int duty_ns, int period_ns)
-> +{
-> +	struct mtk_disp_pwm_chip *mpc;
-> +	u64 div, rate;
-> +	u32 clk_div, period, high_width, rem;
-> +
-> +	/*
-> +	 * Find period, high_width and clk_div to suit duty_ns and period_ns.
-> +	 * Calculate proper div value to keep period value in the bound.
-> +	 *
-> +	 * period_ns = 10^9 * (clk_div + 1) * (period +1) / PWM_CLK_RATE
-> +	 * duty_ns = 10^9 * (clk_div + 1) * (high_width + 1) / PWM_CLK_RATE
-> +	 *
-> +	 * period = (PWM_CLK_RATE * period_ns) / (10^9 * (clk_div + 1)) - 1
-> +	 * high_width = (PWM_CLK_RATE * duty_ns) / (10^9 * (clk_div + 1)) - 1
-> +	 */
-> +	mpc = container_of(chip, struct mtk_disp_pwm_chip, chip);
-
-Can you add a static inline function to wrap the container_of()
-invocation? You need to do this quite often and the wrapper will shorten
-the code significantly:
-
-	static inline struct mtk_disp_pwm *to_mtk_disp_pwm(struct pwm_chip *chip)
-	{
-		return container_of(chip, struct mtk_disp_pwm, chip);
-	}
-
-Also it's slightly more canonical to initialize the mpc variable as part
-of the declaration.
-
-> +	rate = clk_get_rate(mpc->clk_main);
-> +	clk_div = div_u64_rem(rate * period_ns, NSEC_PER_SEC, &rem) >>
-> +				PWM_PERIOD_BIT_SHIFT;
-> +	if (clk_div > PWM_CLKDIV_MAX)
-> +		return -EINVAL;
-> +
-> +	div = clk_div + 1;
-> +	period = div64_u64(rate * period_ns, NSEC_PER_SEC * div);
-> +	if (period > 0)
-> +		period--;
-> +	high_width = div64_u64(rate * duty_ns, NSEC_PER_SEC * div);
-> +	if (high_width > 0)
-> +		high_width--;
-> +
-> +	mtk_disp_pwm_setting(mpc->mmio_base + DISP_PWM_CON_0_OFF,
-> +			     clk_div << PWM_CLKDIV_SHIFT, PWM_CLKDIV_MASK);
-> +	mtk_disp_pwm_setting(mpc->mmio_base + DISP_PWM_CON_1_OFF,
-> +			     (period << PWM_PERIOD_SHIFT) |
-> +			(high_width << PWM_HIGH_WIDTH_SHIFT),
-> +			PWM_PERIOD_MASK | PWM_HIGH_WIDTH_MASK);
-
-Can you align these differently to make it more readable?
-
-	mtk_display_pwm_update_bits(mpc->mmio_base + DISP_PWM_CON_1,
-				    PWM_PERIOD_MASK | PWM_HIGH_WIDTH_MASK,
-				    (period << PWM_PERIOD_SHIFT) |
-					(high_width << PWM_HIGH_WIDTH_SHIFT));
-
-Or perhaps split it into multiple steps to make it even more readable:
-
-	value = (high_width << PWM_HIGH_WIDTH_SHIFT) |
-		(period << PWM_PERIOD_SHIFT);
-	mtk_display_pwm_update_bits(mpc->mmio_base + DISP_PWM_CON_1,
-				    PWM_HIGH_WIDTH_MASK | PWM_PERIOD_MASK,
-				    value);
-
-> +static int mtk_disp_pwm_probe(struct platform_device *pdev)
-> +{
-> +	struct mtk_disp_pwm_chip *pwm;
-> +	struct resource *r;
-> +	int ret;
-> +
-> +	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
-> +	if (!pwm)
-> +		return -ENOMEM;
-> +
-> +	pwm->dev = &pdev->dev;
-> +
-> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	pwm->mmio_base = devm_ioremap_resource(&pdev->dev, r);
-> +	if (IS_ERR(pwm->mmio_base))
-> +		return PTR_ERR(pwm->mmio_base);
-> +
-> +	pwm->clk_main = devm_clk_get(&pdev->dev, "main");
-> +	if (IS_ERR(pwm->clk_main))
-> +		return PTR_ERR(pwm->clk_main);
-> +	pwm->clk_mm = devm_clk_get(&pdev->dev, "mm");
-
-I think it's more readable if a blank line separates the above two
-lines.
-
-> +	if (IS_ERR(pwm->clk_mm))
-> +		return PTR_ERR(pwm->clk_mm);
-> +
-> +	ret = clk_prepare_enable(pwm->clk_main);
-> +	if (ret < 0)
-> +		return ret;
-> +	ret = clk_prepare_enable(pwm->clk_mm);
-
-Same here.
-
-> +	if (ret < 0) {
-> +		clk_disable_unprepare(pwm->clk_main);
-> +		return ret;
-> +	}
-> +
-> +	platform_set_drvdata(pdev, pwm);
-> +
-> +	pwm->chip.dev = &pdev->dev;
-> +	pwm->chip.ops = &mtk_disp_pwm_ops;
-> +	pwm->chip.base = -1;
-> +	pwm->chip.npwm = NUM_PWM;
-> +
-> +	ret = pwmchip_add(&pwm->chip);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "pwmchip_add() failed: %d\n", ret);
-
-Shouldn't you disable the clocks here?
-
-> +		return ret;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int mtk_disp_pwm_remove(struct platform_device *pdev)
-> +{
-> +	struct mtk_disp_pwm_chip *pc = platform_get_drvdata(pdev);
-> +
-> +	if (WARN_ON(!pc))
-> +		return -ENODEV;
-
-You can drop this. Better to let it crash so that you have to fix it if
-you ever encounter it.
-
-> +
-> +	clk_disable_unprepare(pc->clk_main);
-> +	clk_disable_unprepare(pc->clk_mm);
-> +
-> +	return pwmchip_remove(&pc->chip);
-> +}
-> +
-> +static const struct of_device_id mtk_disp_pwm_of_match[] = {
-> +	{ .compatible = "mediatek,mt6595-disp-pwm" },
-> +	{ }
-> +};
-> +
-> +MODULE_DEVICE_TABLE(of, mtk_disp_pwm_of_match);
-
-No blank line between the above two lines.
-
-> +
-> +static struct platform_driver mtk_disp_pwm_driver = {
-> +	.driver = {
-> +		.name = "mediatek-disp-pwm",
-> +		.owner = THIS_MODULE,
-> +		.of_match_table = mtk_disp_pwm_of_match,
-> +	},
-> +	.probe = mtk_disp_pwm_probe,
-> +	.remove = mtk_disp_pwm_remove,
-> +};
-> +
-> +module_platform_driver(mtk_disp_pwm_driver);
-
-Same here. Also, no need to initialize .driver.owner,
-module_platform_driver() does that for you.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150512/1391cf0a/attachment.sig>
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 3244cf1..6ba3894 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -94,6 +94,7 @@ obj-$(CONFIG_SOC_IMX6SX) += clk-imx6sx.o mach-imx6sx.o
+ ifeq ($(CONFIG_SUSPEND),y)
+ AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
+ obj-$(CONFIG_SOC_IMX6) += suspend-imx6.o
++obj-$(CONFIG_SOC_IMX53) += suspend-imx53.o
+ endif
+ obj-$(CONFIG_SOC_IMX6) += pm-imx6.o
+ 
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 0f04e30..9ade280c 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -121,9 +121,13 @@ int imx_cpu_kill(unsigned int cpu);
+ 
+ #ifdef CONFIG_SUSPEND
+ void v7_cpu_resume(void);
++void imx53_suspend(void __iomem *ocram_vbase);
++extern const u32 imx53_suspend_sz;
+ void imx6_suspend(void __iomem *ocram_vbase);
+ #else
+ static inline void v7_cpu_resume(void) {}
++static inline void imx53_suspend(void __iomem *ocram_vbase) {}
++static const u32 imx53_suspend_sz;
+ static inline void imx6_suspend(void __iomem *ocram_vbase) {}
+ #endif
+ 
+diff --git a/arch/arm/mach-imx/pm-imx5.c b/arch/arm/mach-imx/pm-imx5.c
+index f1f80ab..5dba62e 100644
+--- a/arch/arm/mach-imx/pm-imx5.c
++++ b/arch/arm/mach-imx/pm-imx5.c
+@@ -13,7 +13,14 @@
+ #include <linux/io.h>
+ #include <linux/err.h>
+ #include <linux/export.h>
++
++#include <linux/genalloc.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_platform.h>
++
+ #include <asm/cacheflush.h>
++#include <asm/fncpy.h>
+ #include <asm/system_misc.h>
+ #include <asm/tlbflush.h>
+ 
+@@ -49,9 +56,49 @@
+  */
+ #define IMX5_DEFAULT_CPU_IDLE_STATE WAIT_UNCLOCKED_POWER_OFF
+ 
++struct imx5_suspend_io_state {
++	u32	offset;
++	u32	clear;
++	u32	set;
++	u32	saved_value;
++};
++
+ struct imx5_pm_data {
+ 	phys_addr_t cortex_addr;
+ 	phys_addr_t gpc_addr;
++	phys_addr_t m4if_addr;
++	phys_addr_t iomuxc_addr;
++	void (*suspend_asm)(void __iomem *ocram_vbase);
++	const u32 *suspend_asm_sz;
++	const struct imx5_suspend_io_state *suspend_io_config;
++	int suspend_io_count;
++};
++
++static const struct imx5_suspend_io_state imx53_suspend_io_config[] = {
++#define MX53_DSE_HIGHZ_MASK (0x7 << 19)
++	{.offset = 0x584, .clear = MX53_DSE_HIGHZ_MASK}, /* DQM0 */
++	{.offset = 0x594, .clear = MX53_DSE_HIGHZ_MASK}, /* DQM1 */
++	{.offset = 0x560, .clear = MX53_DSE_HIGHZ_MASK}, /* DQM2 */
++	{.offset = 0x554, .clear = MX53_DSE_HIGHZ_MASK}, /* DQM3 */
++	{.offset = 0x574, .clear = MX53_DSE_HIGHZ_MASK}, /* CAS */
++	{.offset = 0x588, .clear = MX53_DSE_HIGHZ_MASK}, /* RAS */
++	{.offset = 0x578, .clear = MX53_DSE_HIGHZ_MASK}, /* SDCLK_0 */
++	{.offset = 0x570, .clear = MX53_DSE_HIGHZ_MASK}, /* SDCLK_1 */
++
++	{.offset = 0x580, .clear = MX53_DSE_HIGHZ_MASK}, /* SDODT0 */
++	{.offset = 0x564, .clear = MX53_DSE_HIGHZ_MASK}, /* SDODT1 */
++	{.offset = 0x57c, .clear = MX53_DSE_HIGHZ_MASK}, /* SDQS0 */
++	{.offset = 0x590, .clear = MX53_DSE_HIGHZ_MASK}, /* SDQS1 */
++	{.offset = 0x568, .clear = MX53_DSE_HIGHZ_MASK}, /* SDQS2 */
++	{.offset = 0x558, .clear = MX53_DSE_HIGHZ_MASK}, /* SDSQ3 */
++	{.offset = 0x6f0, .clear = MX53_DSE_HIGHZ_MASK}, /* GRP_ADDS */
++	{.offset = 0x718, .clear = MX53_DSE_HIGHZ_MASK}, /* GRP_BODS */
++	{.offset = 0x71c, .clear = MX53_DSE_HIGHZ_MASK}, /* GRP_B1DS */
++	{.offset = 0x728, .clear = MX53_DSE_HIGHZ_MASK}, /* GRP_B2DS */
++	{.offset = 0x72c, .clear = MX53_DSE_HIGHZ_MASK}, /* GRP_B3DS */
++
++	/* Controls the CKE signal which is required to leave self refresh */
++	{.offset = 0x720, .clear = MX53_DSE_HIGHZ_MASK, .set = 1 << 19}, /* CTLDS */
+ };
+ 
+ static const struct imx5_pm_data imx51_pm_data __initconst = {
+@@ -62,11 +109,35 @@ static const struct imx5_pm_data imx51_pm_data __initconst = {
+ static const struct imx5_pm_data imx53_pm_data __initconst = {
+ 	.cortex_addr = 0x63fa0000,
+ 	.gpc_addr = 0x53fd8000,
++	.m4if_addr = 0x63fd8000,
++	.iomuxc_addr = 0x53fa8000,
++	.suspend_asm = &imx53_suspend,
++	.suspend_asm_sz = &imx53_suspend_sz,
++	.suspend_io_config = imx53_suspend_io_config,
++	.suspend_io_count = ARRAY_SIZE(imx53_suspend_io_config),
+ };
+ 
++#define MX5_MAX_SUSPEND_IOSTATE ARRAY_SIZE(imx53_suspend_io_config)
++
++/*
++ * This structure is for passing necessary data for low level ocram
++ * suspend code(arch/arm/mach-imx/suspend-imx53.S), if this struct
++ * definition is changed, the offset definition in that file
++ * must be also changed accordingly otherwise, the suspend to ocram
++ * function will be broken!
++ */
++struct imx5_cpu_suspend_info {
++	void __iomem	*m4if_base;
++	void __iomem	*iomuxc_base;
++	u32		io_count;
++	struct imx5_suspend_io_state io_state[MX5_MAX_SUSPEND_IOSTATE];
++} __aligned(8);
++
+ static void __iomem *ccm_base;
+ static void __iomem *cortex_base;
+ static void __iomem *gpc_base;
++static void __iomem *suspend_ocram_base;
++static void (*imx5_suspend_in_ocram_fn)(void __iomem *ocram_vbase);
+ 
+ void __init imx5_pm_set_ccm_base(void __iomem *base)
+ {
+@@ -161,8 +232,15 @@ static int mx5_suspend_enter(suspend_state_t state)
+ 		/*clear the EMPGC0/1 bits */
+ 		__raw_writel(0, gpc_base + MXC_SRPG_EMPGC0_SRPGCR);
+ 		__raw_writel(0, gpc_base + MXC_SRPG_EMPGC1_SRPGCR);
++
++		if (imx5_suspend_in_ocram_fn)
++			imx5_suspend_in_ocram_fn(suspend_ocram_base);
++		else
++			cpu_do_idle();
++
++	} else {
++		cpu_do_idle();
+ 	}
+-	cpu_do_idle();
+ 
+ 	/* return registers to default idle state */
+ 	mx5_cpu_lp_set(IMX5_DEFAULT_CPU_IDLE_STATE);
+@@ -194,6 +272,111 @@ static void imx5_pm_idle(void)
+ 	imx5_cpu_do_idle();
+ }
+ 
++static int __init imx_suspend_alloc_ocram(
++				size_t size,
++				void __iomem **virt_out,
++				phys_addr_t *phys_out)
++{
++	struct device_node *node;
++	struct platform_device *pdev;
++	struct gen_pool *ocram_pool;
++	unsigned long ocram_base;
++	void __iomem *virt;
++	phys_addr_t phys;
++	int ret = 0;
++
++	/* Copied from imx6: TODO factorize */
++	node = of_find_compatible_node(NULL, NULL, "mmio-sram");
++	if (!node) {
++		pr_warn("%s: failed to find ocram node!\n", __func__);
++		return -ENODEV;
++	}
++
++	pdev = of_find_device_by_node(node);
++	if (!pdev) {
++		pr_warn("%s: failed to find ocram device!\n", __func__);
++		ret = -ENODEV;
++		goto put_node;
++	}
++
++	ocram_pool = dev_get_gen_pool(&pdev->dev);
++	if (!ocram_pool) {
++		pr_warn("%s: ocram pool unavailable!\n", __func__);
++		ret = -ENODEV;
++		goto put_node;
++	}
++
++	ocram_base = gen_pool_alloc(ocram_pool, size);
++	if (!ocram_base) {
++		pr_warn("%s: unable to alloc ocram!\n", __func__);
++		ret = -ENOMEM;
++		goto put_node;
++	}
++
++	phys = gen_pool_virt_to_phys(ocram_pool, ocram_base);
++	virt = __arm_ioremap_exec(phys, size, false);
++	if (phys_out)
++		*phys_out = phys;
++	if (virt_out)
++		*virt_out = virt;
++
++put_node:
++	of_node_put(node);
++
++	return ret;
++}
++
++static int __init imx5_suspend_init(const struct imx5_pm_data *soc_data)
++{
++	struct imx5_cpu_suspend_info *suspend_info;
++	int ret;
++	/* Need this to avoid compile error due to const typeof in fncpy.h */
++	void (*suspend_asm)(void __iomem *) = soc_data->suspend_asm;
++
++	if (!suspend_asm)
++		return 0;
++
++	if (!soc_data->suspend_asm_sz || !*soc_data->suspend_asm_sz)
++		return -EINVAL;
++
++	ret = imx_suspend_alloc_ocram(
++		*soc_data->suspend_asm_sz + sizeof(*suspend_info),
++		&suspend_ocram_base, NULL);
++	if (ret)
++		return ret;
++
++	suspend_info = suspend_ocram_base;
++
++	suspend_info->io_count = soc_data->suspend_io_count;
++	memcpy(suspend_info->io_state, soc_data->suspend_io_config,
++	       sizeof(*suspend_info->io_state) * soc_data->suspend_io_count);
++
++	suspend_info->m4if_base = ioremap(soc_data->m4if_addr, SZ_16K);
++	if (!suspend_info->m4if_base) {
++		ret = -ENOMEM;
++		goto failed_map_m4if;
++	}
++
++	suspend_info->iomuxc_base = ioremap(soc_data->iomuxc_addr, SZ_16K);
++	if (!suspend_info->iomuxc_base) {
++		ret = -ENOMEM;
++		goto failed_map_iomuxc;
++	}
++
++	imx5_suspend_in_ocram_fn = fncpy(
++		suspend_ocram_base + sizeof(*suspend_info),
++		suspend_asm,
++		*soc_data->suspend_asm_sz);
++
++	return 0;
++
++failed_map_iomuxc:
++	iounmap(suspend_info->m4if_base);
++
++failed_map_m4if:
++	return ret;
++}
++
+ static int __init imx5_pm_common_init(const struct imx5_pm_data *data)
+ {
+ 	int ret;
+@@ -219,6 +402,11 @@ static int __init imx5_pm_common_init(const struct imx5_pm_data *data)
+ 	if (ret)
+ 		pr_warn("%s: cpuidle init failed %d\n", __func__, ret);
+ 
++	ret = imx5_suspend_init(data);
++	if (ret)
++		pr_warn("%s: No DDR LPM support with suspend %d!\n",
++			__func__, ret);
++
+ 	suspend_set_ops(&mx5_suspend_ops);
+ 
+ 	return 0;
+diff --git a/arch/arm/mach-imx/suspend-imx53.S b/arch/arm/mach-imx/suspend-imx53.S
+new file mode 100644
+index 0000000..5ed078a
+--- /dev/null
++++ b/arch/arm/mach-imx/suspend-imx53.S
+@@ -0,0 +1,139 @@
++/*
++ * Copyright (C) 2008-2011 Freescale Semiconductor, Inc.
++ */
++/*
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include <linux/linkage.h>
++
++#define M4IF_MCR0_OFFSET			(0x008C)
++#define M4IF_MCR0_FDVFS				(0x1 << 11)
++#define M4IF_MCR0_FDVACK			(0x1 << 27)
++
++	.align 3
++
++/*
++ * ==================== low level suspend ====================
++ *
++ * On entry
++ * r0: pm_info structure address;
++ *
++ * suspend ocram space layout:
++ * ======================== high address ======================
++ *                              .
++ *                              .
++ *                              .
++ *                              ^
++ *                              ^
++ *                              ^
++ *                      imx53_suspend code
++ *              PM_INFO structure(imx53_suspend_info)
++ * ======================== low address =======================
++ */
++
++/* Offsets of members of struct imx53_suspend_info */
++#define SUSPEND_INFO_MX53_M4IF_V_OFFSET		0x0
++#define SUSPEND_INFO_MX53_IOMUXC_V_OFFSET	0x4
++#define SUSPEND_INFO_MX53_IO_COUNT_OFFSET	0x8
++#define SUSPEND_INFO_MX53_IO_STATE_OFFSET	0xc
++
++ENTRY(imx53_suspend)
++	stmfd	sp!, {r4,r5,r6,r7}
++
++	/* Save pad config */
++	ldr	r1, [r0, #SUSPEND_INFO_MX53_IO_COUNT_OFFSET]
++	cmp	r1, #0
++	beq	skip_pad_conf_1
++
++	add	r2, r0, #SUSPEND_INFO_MX53_IO_STATE_OFFSET
++	ldr	r3, [r0, #SUSPEND_INFO_MX53_IOMUXC_V_OFFSET]
++
++1:
++	ldr	r5, [r2], #12	/* IOMUXC register offset */
++	ldr	r6, [r3, r5]	/* current value */
++	str	r6, [r2], #4	/* save area */
++	subs	r1, r1, #1
++	bne	1b
++
++skip_pad_conf_1:
++	/* Set FDVFS bit of M4IF_MCR0 to request DDR to enter self-refresh */
++	ldr	r1, [r0, #SUSPEND_INFO_MX53_M4IF_V_OFFSET]
++	ldr	r2,[r1, #M4IF_MCR0_OFFSET]
++	orr	r2, r2, #M4IF_MCR0_FDVFS
++	str	r2,[r1, #M4IF_MCR0_OFFSET]
++
++	/* Poll FDVACK bit of M4IF_MCR to wait for DDR to enter self-refresh */
++wait_sr_ack:
++	ldr	r2,[r1, #M4IF_MCR0_OFFSET]
++	ands	r2, r2, #M4IF_MCR0_FDVACK
++	beq	wait_sr_ack
++
++	/* Set pad config */
++	ldr	r1, [r0, #SUSPEND_INFO_MX53_IO_COUNT_OFFSET]
++	cmp	r1, #0
++	beq	skip_pad_conf_2
++
++	add	r2, r0, #SUSPEND_INFO_MX53_IO_STATE_OFFSET
++	ldr	r3, [r0, #SUSPEND_INFO_MX53_IOMUXC_V_OFFSET]
++
++2:
++	ldr	r5, [r2], #4	/* IOMUXC register offset */
++	ldr	r6, [r2], #4	/* clear */
++	ldr	r7, [r3, r5]
++	bic	r7, r7, r6
++	ldr	r6, [r2], #8	/* set */
++	orr	r7, r7, r6
++	str	r7, [r3, r5]
++	subs	r1, r1, #1
++	bne	2b
++
++skip_pad_conf_2:
++	/* Zzz, enter stop mode */
++	wfi
++	nop
++	nop
++	nop
++	nop
++
++	/* Restore pad config */
++	ldr	r1, [r0, #SUSPEND_INFO_MX53_IO_COUNT_OFFSET]
++	cmp	r1, #0
++	beq	skip_pad_conf_3
++
++	add	r2, r0, #SUSPEND_INFO_MX53_IO_STATE_OFFSET
++	ldr	r3, [r0, #SUSPEND_INFO_MX53_IOMUXC_V_OFFSET]
++
++3:
++	ldr	r5, [r2], #12	/* IOMUXC register offset */
++	ldr	r6, [r2], #4	/* saved value */
++	str	r6, [r3, r5]
++	subs	r1, r1, #1
++	bne	3b
++
++skip_pad_conf_3:
++	/* Clear FDVFS bit of M4IF_MCR0 to request DDR to exit self-refresh */
++	ldr	r1, [r0, #SUSPEND_INFO_MX53_M4IF_V_OFFSET]
++	ldr	r2,[r1, #M4IF_MCR0_OFFSET]
++	bic	r2, r2, #M4IF_MCR0_FDVFS
++	str	r2,[r1, #M4IF_MCR0_OFFSET]
++
++	/* Poll FDVACK bit of M4IF_MCR to wait for DDR to exit self-refresh */
++wait_ar_ack:
++	ldr	r2,[r1, #M4IF_MCR0_OFFSET]
++	ands	r2, r2, #M4IF_MCR0_FDVACK
++	bne	wait_ar_ack
++
++	/* Restore registers */
++	ldmfd	sp!, {r4,r5,r6,r7}
++	mov	pc, lr
++
++ENDPROC(imx53_suspend)
++
++ENTRY(imx53_suspend_sz)
++        .word   . - imx53_suspend
