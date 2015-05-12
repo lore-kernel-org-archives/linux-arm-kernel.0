@@ -1,67 +1,47 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Tue, 12 May 2015 18:20:49 +0200
-Subject: [PATCH 4/4] arm64: gicv3: its: Increase FORCE_MAX_ZONEORDER for
- Cavium ThunderX
-In-Reply-To: <20150512123056.GA2062@arm.com>
-References: <1430686172-18222-1-git-send-email-rric@kernel.org>
- <1430686172-18222-5-git-send-email-rric@kernel.org>
- <20150505105329.GC1550@arm.com>
- <20150511091438.GW4251@rric.localhost>
- <20150512123056.GA2062@arm.com>
-Message-ID: <20150512162049.GP10428@rric.localhost>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 12 May 2015 11:19:45 -0500
+Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
+References: <cover.1430394884.git.viresh.kumar@linaro.org>
+ <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
+Message-ID: <20150512161945.GE8699@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will,
-
-On 12.05.15 13:30:57, Will Deacon wrote:
-> On Mon, May 11, 2015 at 10:14:38AM +0100, Robert Richter wrote:
-> > On 05.05.15 11:53:29, Will Deacon wrote:
-> > > On Sun, May 03, 2015 at 09:49:32PM +0100, Robert Richter wrote:
-> > > > From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
-> > > > 
-> > > > In case of ARCH_THUNDER, there is a need to allocate the GICv3 ITS table
-> > > > which is bigger than the allowed max order. So we are forcing it only in
-> > > > case of 4KB page size.
-> > > 
-> > > Does this problem disappear if the ITS driver uses dma_alloc_coherent
-> > > instead? That would also allow us to remove the __flush_dcache_area abuse
-> > > from the driver.
-> > 
-> > __get_free_pages() is also used internally in dma_alloc_coherent().
-> > 
-> > There is another case if the device brings dma mem with it. I am not
-> > sure if it would be possible to assign some phys memory via devicetree
-> > to the interrupt controller and then assign that range for its table
-> > allocation.
-> > 
-> > Another option would be to allocate a hugepage. This would require
-> > setting up hugepages during boottime. I need to figure out whether
-> > that could work.
-
-For allocation of 16MB cont. phys mem of a defconfig kernel (4KB
-default pagesize) I see this different approaches:
-
- * set FORCE_MAX_ZONEORDER to 13 as default,
-
- * set FORCE_MAX_ZONEORDER to 13 if ARM_GIC_V3 is set,
-
- * set FORCE_MAX_ZONEORDER to 13 if ARCH_THUNDER is set (this patch),
-
- * use hugepages if enabled (defconfig has the following options
-   enable: CGROUP_HUGETLB, TRANSPARENT_HUGEPAGE, HUGETLBFS, this might
-   work with current default kernel without changing defconfig
-   options),
-
- * use devicetree to reserve mem for gicv3 (need to check ACPI).
-
-Do you see any direction?
-
-> > What about on the remaining 3 patches?
+On Thu, Apr 30, 2015 at 05:37:59PM +0530, Viresh Kumar wrote:
+> Current OPP (Operating performance point) DT bindings are proven to be
+> insufficient at multiple instances.
 > 
-> Marc would be the best guy to review those, but he's on holiday for a couple
-> of weeks at the moment.
+> The shortcomings we are trying to solve here:
+> 
+> - Getting clock sharing information between CPUs. Single shared clock vs
+>   independent clock per core vs shared clock per cluster.
+> 
+> - Support for specifying current levels along with voltages.
+> 
+> - Support for multiple regulators.
+> 
+> - Support for turbo modes.
+> 
+> - Other per OPP settings: transition latencies, disabled status, etc.?
+> 
+> - Expandability of OPPs in future.
+> 
+> This patch introduces new bindings "operating-points-v2" to get these problems
 
-Thanks for the note and your comments.
+operating-points-v2 is kinda awkward, how about
+operating-points-extended, much like interrupts-extended ?
 
--Robert
+Other than this, I very much like the new approach.
+
+Regards
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150512/cfdb15c5/attachment.sig>
