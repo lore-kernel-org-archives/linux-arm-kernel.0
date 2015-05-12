@@ -1,28 +1,33 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 12 May 2015 13:51:42 +0100
-Subject: [PATCH 05/13] ARM: multi_v7_defconfig: Enable ST's PWM driver
+Date: Tue, 12 May 2015 13:51:43 +0100
+Subject: [PATCH 06/13] ARM: STi: STiH407: Add Restart support for Cannes
 In-Reply-To: <1431435110-22595-1-git-send-email-lee.jones@linaro.org>
 References: <1431435110-22595-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1431435110-22595-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <1431435110-22595-7-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/stih407-family.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index a841847..5dc85db 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -556,6 +556,7 @@ CONFIG_PWM_RENESAS_TPU=y
- CONFIG_PWM_TEGRA=y
- CONFIG_PWM_VT8500=y
- CONFIG_PHY_HIX5HD2_SATA=y
-+CONFIG_PWM_STI=y
- CONFIG_OMAP_USB2=y
- CONFIG_TI_PIPE3=y
- CONFIG_PHY_MIPHY28LP=y
+diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+index 85159b8..46e6a38 100644
+--- a/arch/arm/boot/dts/stih407-family.dtsi
++++ b/arch/arm/boot/dts/stih407-family.dtsi
+@@ -65,6 +65,12 @@
+ 		ranges;
+ 		compatible = "simple-bus";
+ 
++		restart {
++			compatible = "st,stih407-restart";
++			st,syscfg = <&syscfg_sbc_reg>;
++			status = "okay";
++		};
++
+ 		powerdown: powerdown-controller {
+ 			compatible = "st,stih407-powerdown";
+ 			#reset-cells = <1>;
 -- 
 1.9.1
