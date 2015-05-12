@@ -1,56 +1,56 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Wed, 13 May 2015 03:27:38 +0900
-Subject: [GIT PULL] ARM: EXYNOS: dts: DTS fixes for 4.1, second try
-In-Reply-To: <1431313819-16843-1-git-send-email-k.kozlowski@samsung.com>
-References: <1431313819-16843-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <5552461A.6070304@kernel.org>
+From: bhaskarbudiredla@gmail.com (Bhaskara rao Budiredla)
+Date: Wed, 13 May 2015 00:03:09 +0530
+Subject: Physical memory start address for ARM cores
+In-Reply-To: <20150511214044.GJ2067@n2100.arm.linux.org.uk>
+References: <CAJWVF-whTD0Nm-cup-qOt-M-PYn-6GojSiE9pS2Db0R35D5aUQ@mail.gmail.com>
+ <20150511214044.GJ2067@n2100.arm.linux.org.uk>
+Message-ID: <CAJWVF-yORg=t=ccrCppRYNOc5-Ar4P1rpmYUVDqjXdBg8BWsow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/15 12:10, Krzysztof Kozlowski wrote:
-> Dear Kukjin,
-> 
-> This groups one fix missed in your last pull requst. This fixes suspend
-> on Peach boards related to Marvell mwifiex driver. The driver was
-> enabled for Exynos defconfig during merge window so currently
-> the suspend on these boards on this config fails.
-> 
-Yes, you're right. Only exynos5250-snow related patch has been fixed
-before and this should be sent to upstream together. I've applied this
-into samsung-fixes-2 with your signed-off-by.
-
-Note this will be sent to arm-soc before a couple of days of -rc4 with
-your other fix for suspend on exynos4.
+Sure, we can live with that. Thank you for the quick help.
 
 Thanks,
-Kukjin
+Bhaskara
 
-> Best regards,
-> Krzysztof
-> 
-> 
-> The following changes since commit 77b0ffdc4bbd267e9589aa025047e512322fc643:
-> 
->   Merge branch 'v4.2-next/dt-samsung' into for-next (2015-05-09 04:03:46 +0900)
-> 
-> are available in the git repository at:
-> 
-> 
->   https://github.com/krzk/linux.git tags/samsung-dt-fixes-4.1-2
-> 
-> for you to fetch changes up to 2495ae559826c60e3ccde9850e3b38815725b9c9:
-> 
->   ARM: dts: Add keep-power-in-suspend to WiFi SDIO node for Peach Boards (2015-05-11 11:00:00 +0900)
-> 
-> ----------------------------------------------------------------
-> Fix for suspend on Peach boards related to Marvell mwifiex driver.
-> The driver was enabled for Exynos defconfig during 4.1 merge window
-> so currently the suspend on these boards on this config fails.
-> 
-> ----------------------------------------------------------------
-> Javier Martinez Canillas (1):
->       ARM: dts: Add keep-power-in-suspend to WiFi SDIO node for Peach Boards
-> 
->  arch/arm/boot/dts/exynos5420-peach-pit.dts | 1 +
->  arch/arm/boot/dts/exynos5800-peach-pi.dts  | 1 +
->  2 files changed, 2 insertions(+)
+On Tue, May 12, 2015 at 3:10 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, May 11, 2015 at 08:47:21PM +0530, Bhaskara rao Budiredla wrote:
+>> Could you please confirm if ARM architecture mandates the physical
+>> memory start address to align with a MegaBye boundary (something like
+>> 0xXXX00000)? I am seeing Linux Kernel crash if I relax that
+>> restriction.
+>
+> The ARM architecture doesn't, but we (the kernel) does restrict it for
+> the sake of cross-machine portability.  See this comment in
+> arch/arm/boot/compressed.S:
+>
+>                 /*
+>                  * Find the start of physical memory.  As we are executing
+>                  * without the MMU on, we are in the physical address space.
+>                  * We just need to get rid of any offset by aligning the
+>                  * address.
+>                  *
+>                  * This alignment is a balance between the requirements of
+>                  * different platforms - we have chosen 128MB to allow
+>                  * platforms which align the start of their physical memory
+>                  * to 128MB to use this feature, while allowing the zImage
+>                  * to be placed within the first 128MB of memory on other
+>                  * platforms.  Increasing the alignment means we place
+>                  * stricter alignment requirements on the start of physical
+>                  * memory, but relaxing it means that we break people who
+>                  * are already placing their zImage in (eg) the top 64MB
+>                  * of this range.
+>                  */
+>
+> We will never change this requirement, as changing it breaks existing
+> platforms, and that's not allowed.
+>
+> --
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
+
+
+
+-- 
+.
