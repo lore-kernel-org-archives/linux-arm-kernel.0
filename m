@@ -1,42 +1,39 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 12 May 2015 08:06:31 +0200
-Subject: [PATCH] net: ll_temac: Fix DMA map size bug
-In-Reply-To: <alpine.DEB.2.02.1505120801390.2075@localhost6.localdomain6>
-References: <d76f13c52ce740544e8fac27f2a5904b9537a226.1431410298.git.michal.simek@xilinx.com>
- <alpine.DEB.2.02.1505120801390.2075@localhost6.localdomain6>
-Message-ID: <55519867.2090205@xilinx.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 12 May 2015 08:20:52 +0200
+Subject: [PATCH v3 1/4] ARM: pxa: add memory resource to RTC device
+In-Reply-To: <CAL_Jsq+tNStipTDRH05XRHVDz30B8w92YTD1ZKUTrCp-Lj7=1w@mail.gmail.com>
+ (Rob Herring's message of "Mon, 11 May 2015 19:35:24 -0500")
+References: <1431384089-28367-1-git-send-email-robh@kernel.org>
+ <1431384089-28367-2-git-send-email-robh@kernel.org>
+ <20150511224934.GL2067@n2100.arm.linux.org.uk>
+ <CAL_Jsq+tNStipTDRH05XRHVDz30B8w92YTD1ZKUTrCp-Lj7=1w@mail.gmail.com>
+Message-ID: <87lhgumi4b.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/2015 08:03 AM, Julia Lawall wrote:
-> On Tue, 12 May 2015, Michal Simek wrote:
-> 
->> DMA allocates skb->len instead of headlen
->> which is used for DMA.
->>
->> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->> ---
->>
->>  drivers/net/ethernet/xilinx/ll_temac_main.c | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/net/ethernet/xilinx/ll_temac_main.c b/drivers/net/ethernet/xilinx/ll_temac_main.c
->> index ca640d04fd93..cfb6bdb37fdc 100644
->> --- a/drivers/net/ethernet/xilinx/ll_temac_main.c
->> +++ b/drivers/net/ethernet/xilinx/ll_temac_main.c
->> @@ -705,8 +705,8 @@ static int temac_start_xmit(struct sk_buff *skb, struct net_device *ndev)
->>  
->>  	cur_p->app0 |= STS_CTRL_APP0_SOP;
->>  	cur_p->len = skb_headlen(skb);
->> -	cur_p->phys = dma_map_single(ndev->dev.parent, skb->data, skb->len,
->> -				     DMA_TO_DEVICE);
->> +	cur_p->phys = dma_map_single(ndev->dev.parent, skb->data,
->> +				skb_headlen(skb), DMA_TO_DEVICE);
-> 
-> I think you could align the later arguments with the right side of the 
-> parenthesis, as done in the original code.
+Rob Herring <robh@kernel.org> writes:
 
-Fixed and send v2.
+>> This really isn't a good idea - what do you think happens when
+>> the same struct resource gets passed into insert_resource()
+>> twice?
+>
+> Bad things. If you recall, we discussed this on v1[1]. See the commit
+> msg of patch 2 for the summary. There is not currently a problem
+> because the rtc-pxa driver does not request the resource.
 
-Thanks,
-Michal
+I think you're talking about resource claiming, while Russell is talking about
+resource declaration.
+
+The point Russell is raising is if you do a platform_add_device() twice with the
+same resource (which is done in pxa, once for sa1100-rtc, once for pxa-rtc), you
+call insert_resource() twice with the same resource structure.
+
+I had not thought of that before (that's in my reply noted "nasty consequences"
+in [1]), and I'll do my homework this week, and try this only patch, but if I
+follow Russell's thinking, then sa1100-rtc and pxa-rtc cannot be declared
+together anymore.
+
+Cheers.
+
+--
+Robert
