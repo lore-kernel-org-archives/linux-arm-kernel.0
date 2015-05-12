@@ -1,44 +1,27 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Mon, 11 May 2015 22:00:37 -0600
-Subject: "drm: Add reference counting to blob properties" breaks Tegra124
- Jetson TK1 in linux-next
-Message-ID: <55517AE5.30700@nvidia.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Tue, 12 May 2015 09:33:49 +0530
+Subject: [PATCH 1/3 v6] dt/bindings: Add binding for the BCM2835 mailbox
+ driver
+In-Reply-To: <1430857666-18877-1-git-send-email-eric@anholt.net>
+References: <1430857666-18877-1-git-send-email-eric@anholt.net>
+Message-ID: <CABb+yY3fDP_U8dz7TEJ+N6gKwhkQKdsfXDq209nQUCWu-zZYgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi folks
+On Wed, May 6, 2015 at 1:57 AM, Eric Anholt <eric@anholt.net> wrote:
+> From: Lubomir Rintel <lkundrak@v3.sk>
+>
+> This patch was split out of Lubomir's original mailbox patch by Eric
+> Anholt, and the required properties documentation and examples have
+> been filled out more completely and updated for the driver being
+> changed to expose a single channel.
+>
+> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+> Signed-off-by: Craig McGeachie <slapdau@yahoo.com.au>
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+> ---
+Thanks to the reviewers. Applied all 3 patches.
 
-Tegra124 Jetson TK1 hangs during boot in next-20150508 and beyond:
-
-http://nvt.pwsan.com/experimental/linux-next/testlogs/test_next-20150508/20150508101018/boot/tegra124-jetson-tk1/tegra124-jetson-tk1/tegra_defconfig_log.txt 
-
-http://nvt.pwsan.com/experimental/linux-next/testlogs/test_next-20150511/20150511004533/boot/tegra124-jetson-tk1/tegra124-jetson-tk1/tegra_defconfig_log.txt 
-
-
-Reverting commit 672cb1d6aec7da2799afd1b529d5136d84ed2561 ("drm: Add 
-reference counting to blob properties") gets it booting again:
-
-http://nvt.pwsan.com/pub/pwalmsley-tester/testlogs/test_20150511204703_3838232431c2636ff539f2354c630c0ca3d4b7ad/20150511204703/boot/tegra124-jetson-tk1/tegra124-jetson-tk1/tegra_defconfig_log.txt
-
-I'm not a DRM expert but maybe one of you knows what's going on here?
-
-
-- Paul
-
-
-commit 672cb1d6aec7da2799afd1b529d5136d84ed2561
-Author: Daniel Stone <daniels@collabora.com>
-Date:   Mon Apr 20 19:22:55 2015 +0100
-
-     drm: Add reference counting to blob properties
-
-     Reference-count drm_property_blob objects, changing the API to
-     ref/unref.
-
-     Signed-off-by: Daniel Stone <daniels@collabora.com>
-     Reviewed-by: Maarten Lankhorst <maarten.lankhorst@linux.intel.com>
-     Signed-off-by: Daniel Vetter <daniel.vetter@ffwll.ch>
-
-
---
-nvpublic
+Thanks.
