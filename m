@@ -1,77 +1,57 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 12 May 2015 20:19:13 +0800
-Subject: [RFC v2 6/7] x86/PCI/ACPI: Use common interface to support PCI
- host bridge
-In-Reply-To: <1430793970-11159-7-git-send-email-jiang.liu@linux.intel.com>
-References: <1430793970-11159-1-git-send-email-jiang.liu@linux.intel.com>
- <1430793970-11159-7-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <5551EFC1.2010704@linaro.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 12 May 2015 14:30:29 +0200
+Subject: [PATCH RESEND v6 1/2] arm64: dts: Add the arasan sdhci nodes in
+ apm-storm.dtsi
+In-Reply-To: <5446694.nHWK6QO1on@wuerfel>
+References: <1431333531-30491-1-git-send-email-stripathi@apm.com>
+ <1431333531-30491-2-git-send-email-stripathi@apm.com>
+ <CAOHikRAeOH5Pt4WZFk1C29dUytO7H0ox_dgq578oW19ue8Eb8Q@mail.gmail.com>
+ <5446694.nHWK6QO1on@wuerfel>
+Message-ID: <CAPDyKFrY+UQETZy3cgtrS5UTGYLq6JyFsGXaNsAfg=9Eat6ooA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
->   struct pci_root_info {
-> -	struct acpi_device *bridge;
-> -	char name[16];
-> -	struct pci_controller sd;
-> +	struct acpi_pci_root_info_common common;
->   #ifdef	CONFIG_PCI_MMCONFIG
->   	bool mcfg_added;
->   	u16 segment;
-> @@ -165,14 +164,17 @@ static int check_segment(u16 seg, struct device *dev, char *estr)
->   	return 0;
->   }
+On 12 May 2015 at 09:28, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 12 May 2015 11:03:46 Suman Tripathi wrote:
+>> > @@ -533,6 +567,15 @@
+>> >                         interrupts = <0x0 0x4f 0x4>;
+>> >                 };
+>> >
+>> > +               sdhci0: sdhci at 1c000000 {
+>> > +                       compatible = "arasan,sdhci-4.9a";
+>> > +                       reg = <0x0 0x1c000000 0x0 0x100>;
+>> > +                       interrupts = <0x0 0x49 0x4>;
+>> > +                       dma-coherent;
+>> > +                       clock-names = "clk_xin", "clk_ahb";
+>> > +                       clocks = <&sdioclk 0>, <&ahbclk 0>;
+>> > +               };
+>> > +
+>> >                 phy1: phy at 1f21a000 {
+>> >                         compatible = "apm,xgene-phy";
+>> >                         reg = <0x0 0x1f21a000 0x0 0x100>;
+>> > --
+>> > 1.8.2.1
+>> >
+>>
+>> Can anyone from dt community review this patch ? I have changed the dts node
+>> names from sdhc to sdhci as per Arnd, Michael comments .
 >
-> -static int setup_mcfg_map(struct pci_root_info *info, u16 seg, u8 start,
-> -			  u8 end, phys_addr_t addr)
-> +static int setup_mcfg_map(struct acpi_pci_root_info_common *ci)
->   {
->   	int result;
-> -	struct device *dev = &info->bridge->dev;
-> +	struct pci_root_info *info;
-> +	struct acpi_pci_root *root = ci->root;
-> +	struct device *dev = &ci->bridge->dev;
-> +	int seg = ci->controller.segment;
+> I was actually asking for it to be named 'mmc', not 'sdhci', because the
+> name is supposed to indicate the purpose of the device, not the
+> implementation. I realize that we are inconsistent here, just as with
+> 'uart' vs 'serial', and that ePAPR does not define what to do.
 
-...
-
->
-> -	info->start_bus = start;
-> -	info->end_bus = end;
-> +	info = container_of(ci, struct pci_root_info, common);
-> +	info->start_bus = (u8)root->secondary.start;
-> +	info->end_bus = (u8)root->secondary.end;
->   	info->mcfg_added = false;
-
-info->segment is not initialized here
+Then we need a common name to address the following purposes: SD, MMC,
+eMMC, SDIO.
 
 >
->   	/* return success if MMCFG is not in use */
-> @@ -182,7 +184,8 @@ static int setup_mcfg_map(struct pci_root_info *info, u16 seg, u8 start,
->   	if (!(pci_probe & PCI_PROBE_MMCONF))
->   		return check_segment(seg, dev, "MMCONFIG is disabled,");
+> We should probably add something to Documentation/devicetree/bindings/mmc/mmc.txt
+> about this topic and change all the dts files accordingly (unless there
+> is a risk for regressions). At the moment, the mmc.txt file also includes
+> an example with 'sdhci', not 'mmc'.
 >
-> -	result = pci_mmconfig_insert(dev, seg, start, end, addr);
-> +	result = pci_mmconfig_insert(dev, seg, info->start_bus, info->end_bus,
-> +				     root->mcfg_addr);
->   	if (result == 0) {
->   		/* enable MMCFG if it hasn't been enabled yet */
->   		if (raw_pci_ext_ops == NULL)
-> @@ -195,8 +198,11 @@ static int setup_mcfg_map(struct pci_root_info *info, u16 seg, u8 start,
->   	return 0;
->   }
->
-> -static void teardown_mcfg_map(struct pci_root_info *info)
-> +static void teardown_mcfg_map(struct acpi_pci_root_info_common *ci)
->   {
-> +	struct pci_root_info *info;
-> +
-> +	info = container_of(ci, struct pci_root_info, common);
->   	if (info->mcfg_added) {
->   		pci_mmconfig_delete(info->segment, info->start_bus,
 
-But the segment is used here to delete mmconfig entry, it seems that
-the domain is 0 so there will be no problem, did I miss something?
+I am happy to change, as long as we can come up with something better.
 
-Thanks
-Hanjun
+Kind regards
+Uffe
