@@ -1,34 +1,55 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 May 2015 23:27:02 +0200
-Subject: [PATCH] rtc: pfc8563: fix uninitialized variable warning
-Message-ID: <2293546.ekQV1ek12O@wuerfel>
+Date: Tue, 12 May 2015 23:29:32 +0200
+Subject: [PATCH] ARM: avoid cmpxchg warning in kernel/acct.c
+Message-ID: <2137098.src0nTNAZ2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gcc is unable to prove that alm_pending is always initialized
-when it is used, so it prints a harmless warning:
+A recent change in kernel/acct.c added a new warning for many
+configurations on ARM:
 
-drivers/rtc/rtc-pcf8563.c: In function 'pcf8563_probe':
-drivers/rtc/rtc-pcf8563.c:449:5: warning: 'alm_pending' may be used uninitialized in this function [-Wmaybe-uninitialized]
+kernel/acct.c: In function 'acct_pin_kill':
+arch/arm/include/asm/cmpxchg.h:122:3: warning: value computed is not used [-Wunused-value]
+  ((__typeof__(*(ptr)))__cmpxchg_local_generic((ptr), (unsigned long)(o),\
 
-This uses the same conditional expression that is used inside of
-the pcf8563_get_alarm_mode() function, to help gcc figure it out
-and shut up that warning, and make the ARM defconfigs build again
-with no warnings.
+The code is in fact correct, it's just a cmpxchg() call that intentionally
+ignores the result, and no other code does that. The warning does not
+show up on x86 because of the way that its cmpxchg() macro is written.
+
+This changes the ARM implementation to use a similar construct with a
+compound expression instead of a typecast, which causes the compiler to
+not complain about an unused result.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: a45d528aab8b ("rtc: pcf8563: clear expired alarm at boot time")
+Fixes: 3b994d98a815 ("get rid of the second argument of acct_kill()")
+---
+This helps build some of the ARM defconfigs without warnings once more.
 
-diff --git a/drivers/rtc/rtc-pcf8563.c b/drivers/rtc/rtc-pcf8563.c
-index 0ba7e59929be..8e52c029cf1a 100644
---- a/drivers/rtc/rtc-pcf8563.c
-+++ b/drivers/rtc/rtc-pcf8563.c
-@@ -437,7 +437,7 @@ static int pcf8563_probe(struct i2c_client *client,
- 	}
+diff --git a/arch/arm/include/asm/cmpxchg.h b/arch/arm/include/asm/cmpxchg.h
+index abb2c3769b01..04be894f7c4e 100644
+--- a/arch/arm/include/asm/cmpxchg.h
++++ b/arch/arm/include/asm/cmpxchg.h
+@@ -119,8 +119,8 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
+  * them available.
+  */
+ #define cmpxchg_local(ptr, o, n)				  	       \
+-	((__typeof__(*(ptr)))__cmpxchg_local_generic((ptr), (unsigned long)(o),\
+-			(unsigned long)(n), sizeof(*(ptr))))
++	({(__typeof__(*(ptr)))__cmpxchg_local_generic((ptr), (unsigned long)(o),\
++			(unsigned long)(n), sizeof(*(ptr)));})
+ #define cmpxchg64_local(ptr, o, n) __cmpxchg64_local_generic((ptr), (o), (n))
  
- 	err = pcf8563_get_alarm_mode(client, NULL, &alm_pending);
--	if (err < 0) {
-+	if (err) {
- 		dev_err(&client->dev, "%s: read error\n", __func__);
- 		return err;
- 	}
+ #ifndef CONFIG_SMP
+@@ -202,10 +202,10 @@ static inline unsigned long __cmpxchg_mb(volatile void *ptr, unsigned long old,
+ }
+ 
+ #define cmpxchg(ptr,o,n)						\
+-	((__typeof__(*(ptr)))__cmpxchg_mb((ptr),			\
++	({(__typeof__(*(ptr)))__cmpxchg_mb((ptr),			\
+ 					  (unsigned long)(o),		\
+ 					  (unsigned long)(n),		\
+-					  sizeof(*(ptr))))
++					  sizeof(*(ptr)));})
+ 
+ static inline unsigned long __cmpxchg_local(volatile void *ptr,
+ 					    unsigned long old,
