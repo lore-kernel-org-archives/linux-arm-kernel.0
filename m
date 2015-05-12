@@ -1,50 +1,102 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 12 May 2015 16:16:26 +0200
-Subject: [PATCH] ARM: berlin: add CPU hotplug support
-Message-ID: <1431440186-14075-1-git-send-email-antoine.tenart@free-electrons.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Tue, 12 May 2015 15:31:15 +0100
+Subject: [PATCH 6/8] arm64/efi: ignore DT memory nodes instead of
+ removing them
+In-Reply-To: <1431326520-17331-7-git-send-email-ard.biesheuvel@linaro.org>
+References: <1431326520-17331-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1431326520-17331-7-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150512143115.GQ24474@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds CPU hotplug support for Berlin SoCs (currently BG2 and BG2Q). The
-CPUs are put in WFI after disabling the coherency.
+On Mon, May 11, 2015 at 08:41:58AM +0200, Ard Biesheuvel wrote:
+> There are two problems with the UEFI stub DT memory node removal
+> routine:
+> - it deletes nodes as it traverses the tree, which happens to work
+>   but is not supported, as deletion invalidates the node iterator;
+> - deleting memory nodes entirely may discard annotations in the form
+>   of additional properties on the nodes.
+> 
+> Now that the UEFI initialization has moved to an earlier stage, we can
+> actually just ignore any memblocks that are installed after we have
+> processed the UEFI memory map. This way, it is no longer necessary to
+> remove the nodes, so we can remove that logic from the stub as well.
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
- arch/arm/mach-berlin/platsmp.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+So ... I don't have an issue with this patch as such, but keeping the
+memory nodes around for NUMA topology when the UEFI memory map is
+the one being used for memblock leads to a spooky redefinition of what
+that memory node _is_; it would now describe a region which may only
+partially be populated with RAM.
 
-diff --git a/arch/arm/mach-berlin/platsmp.c b/arch/arm/mach-berlin/platsmp.c
-index 702e7982015a..d9c62057be76 100644
---- a/arch/arm/mach-berlin/platsmp.c
-+++ b/arch/arm/mach-berlin/platsmp.c
-@@ -14,6 +14,7 @@
- #include <linux/of_address.h>
- 
- #include <asm/cacheflush.h>
-+#include <asm/cp15.h>
- #include <asm/smp_plat.h>
- #include <asm/smp_scu.h>
- 
-@@ -92,8 +93,20 @@ unmap_scu:
- 	iounmap(scu_base);
- }
- 
-+#ifdef CONFIG_HOTPLUG_CPU
-+static void berlin_cpu_die(unsigned int cpu)
-+{
-+	v7_exit_coherency_flush(louis);
-+	while (1)
-+		cpu_do_idle();
-+}
-+#endif
-+
- static struct smp_operations berlin_smp_ops __initdata = {
- 	.smp_prepare_cpus	= berlin_smp_prepare_cpus,
- 	.smp_boot_secondary	= berlin_boot_secondary,
-+#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_die		= berlin_cpu_die,
-+#endif
- };
- CPU_METHOD_OF_DECLARE(berlin_smp, "marvell,berlin-smp", &berlin_smp_ops);
--- 
-2.4.0
+/
+    Leif
+
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/mm/init.c               |  7 +++++++
+>  drivers/firmware/efi/libstub/fdt.c | 24 +-----------------------
+>  2 files changed, 8 insertions(+), 23 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index 64480b65ef17..95c239f43384 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -386,6 +386,13 @@ __setup("keepinitrd", keepinitrd_setup);
+>  
+>  void __init early_init_dt_add_memory_arch(u64 base, u64 size)
+>  {
+> +	/*
+> +	 * EFI_MEMMAP will be set /after/ UEFI has installed all memory based
+> +	 * on the content of the UEFI memory map.
+> +	 */
+> +	if (efi_enabled(EFI_MEMMAP))
+> +		return;
+> +
+>  	if (!PAGE_ALIGNED(base)) {
+>  		if (size < PAGE_SIZE - (base & ~PAGE_MASK)) {
+>  			pr_warn("Ignoring memory block 0x%llx - 0x%llx\n",
+> diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
+> index ef5d764e2a27..343e7992bd8f 100644
+> --- a/drivers/firmware/efi/libstub/fdt.c
+> +++ b/drivers/firmware/efi/libstub/fdt.c
+> @@ -24,7 +24,7 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
+>  			unsigned long map_size, unsigned long desc_size,
+>  			u32 desc_ver)
+>  {
+> -	int node, prev, num_rsv;
+> +	int node, num_rsv;
+>  	int status;
+>  	u32 fdt_val32;
+>  	u64 fdt_val64;
+> @@ -54,28 +54,6 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
+>  		goto fdt_set_fail;
+>  
+>  	/*
+> -	 * Delete any memory nodes present. We must delete nodes which
+> -	 * early_init_dt_scan_memory may try to use.
+> -	 */
+> -	prev = 0;
+> -	for (;;) {
+> -		const char *type;
+> -		int len;
+> -
+> -		node = fdt_next_node(fdt, prev, NULL);
+> -		if (node < 0)
+> -			break;
+> -
+> -		type = fdt_getprop(fdt, node, "device_type", &len);
+> -		if (type && strncmp(type, "memory", len) == 0) {
+> -			fdt_del_node(fdt, node);
+> -			continue;
+> -		}
+> -
+> -		prev = node;
+> -	}
+> -
+> -	/*
+>  	 * Delete all memory reserve map entries. When booting via UEFI,
+>  	 * kernel will use the UEFI memory map to find reserved regions.
+>  	 */
+> -- 
+> 1.9.1
+> 
