@@ -1,50 +1,80 @@
-From: mike.turquette@linaro.org (Michael Turquette)
-Date: Tue, 12 May 2015 12:01:34 -0700
-Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
-In-Reply-To: <20150512052033.GC32300@linux>
-References: <20150505105714.GA22845@sirena.org.uk>
- <20150505171252.GI22845@sirena.org.uk>
- <CAKohpo=kJs076afzERPMqjELgwpN6nR2yoyEjW6XY7YSEbRuCA@mail.gmail.com>
- <20150507055231.GB32399@codeaurora.org>
- <20150507110233.GR15510@sirena.org.uk> <20150507211855.GA2455@codeaurora.org>
- <20150507221842.GW22845@sirena.org.uk>
- <CAKohpomU8wm0T=A7EkosdOjXbP8q2Cb726Hsjh08KTKYjoz3-A@mail.gmail.com>
- <555000B6.2010107@ti.com> <20150512052033.GC32300@linux>
-Message-ID: <20150512190134.16410.89041@quantum>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 12 May 2015 21:13:20 +0200
+Subject: [PATCH v2 1/5] Documentation: dmaengine: pxa-dma design
+In-Reply-To: <20150512101201.GB5418@localhost> (Vinod Koul's message of "Tue,
+ 12 May 2015 15:42:01 +0530")
+References: <1428781236-25806-1-git-send-email-robert.jarzmik@free.fr>
+ <1428781236-25806-2-git-send-email-robert.jarzmik@free.fr>
+ <20150508043616.GY3521@localhost> <87y4kzten5.fsf@belgarion.home>
+ <20150512101201.GB5418@localhost>
+Message-ID: <87h9rhmwxb.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Viresh Kumar (2015-05-11 22:20:33)
-> On 10-05-15, 20:07, Nishanth Menon wrote:
-> > just one minor concern being in the SoC end of the world :). In most
-> > times, the current consumption for a specific OPP varies depending on
-> > the specific location in the process node the die is -> this is even
-> > true among a single lot of wafers as well. some SoC vendors use hot,
-> > nominal and cold terminology to indicate the characteristics of the
-> > specific sample.
-> > 
-> > it might help state which sample end of the spectrum we are talking
-> > about here. reason being: if I put in values based on my board
-> > measurement, the results may not be similar to what someone else's
-> > sample be. Depending on technology, speed binning strategy used by the
-> > vendor, temperature and few other characteristics, these numbers could
-> > be widely divergent.
-> 
-> I don't have any clue about this.. :(
-> 
-> @Mark/stephen: Any inputs ?
+Vinod Koul <vinod.koul@intel.com> writes:
 
-Nishanth,
+> On Fri, May 08, 2015 at 02:52:46PM +0200, Robert Jarzmik wrote:
+>> Vinod Koul <vinod.koul@intel.com> writes:
+>> 
+>> Euh no, I meant that a transfer which is submitted and issued on a _phy_
+>> doesn't wait for a _phy_ to stop and restart, but is submitted on a "running
+>> channel". The other drivers, especially mmp_pdma waited for the phy to stop
+>> before relaunching a new transfer.
+>> 
+>> I don't have a clear idea on a better wording yet ...
+> Ah okay, with that explanation it helps, can you add that to
+> comments/documentation
+Sure, for v3.
 
-I do not think the idea of the mA property is to perfectly model current
-consumption at a given opp. Instead it is a nominal value that may be
-useful, e.g. for configuring a regulator in Stephen's case.
+>> >> +     This implies that the queuing doesn't wait for the previous transfer end,
+>> >> +     and that the descriptor chaining is not only done in the irq/tasklet code
+>> >> +     triggered by the end of the transfer.
+>> > how is it differenat than current dmaengine semantics where you say
+>> > issue_pending() is invoked when current transfer finished? Here is you have
+>> > to do descriptor chaining so bit it.
+>> Your sentence is a bit difficult for me to understand.
+> Sorry for typo, meant:
+> how is it different than current dmaengine semantics where you say
+> issue_pending() is invoked when current transfer finishes? Here you are
+> doing descriptor chaining, so be it.
 
-The TWLxxxx series of PMICs from TI have configurable SMPS which could
-possibly benefit from this info as well. Most of the time those are left
-in an "automatic mode", but there are manual programming steps to
-achieve higher efficiencies and this property could potentially help you
-do that.
+It is not "different" from dmaengine semantics. It's an implementation choice
+which is not strictly required by dmaengine, and therefore a requirement on top
+of what dmaengine offers.
+Dmaengine requires to submit a transfer, and gives issue_pending() to provide a
+guarantee the transfer will be executed. The dmaengine drivers can choose to
+either queue the transfer when the previous one's completion is notified
+(interrupt), or hot-queue the transfer while the channel is running.
 
-Regards,
-Mike
+This constraint documents the fact that this specific dmaengine driver's
+implementation chose to hot-chain transfers whenever possible.
+
+> Ideally dmaengine driver should keep submitting txns and opportunistically
+> based on HW optimize it. All this is transparent to clients, they submit and
+> wait for callback.
+True. Yet this is not a requirement, it's a "good design" behavior. I wonder how
+many dmaengine drivers are behaving in an optimize way ...
+
+>> >> +     granularity is still descriptor based.
+>> > This is not pxa specfic
+>> True. Do you want me to remove the (c) from the document ?
+> yes
+Ok, for v3.
+
+>> >> +  f) Transfer reusability
+>> >> +     An issued and finished transfer should be "reusable". The choice of
+>> >> +     "DMA_CTRL_ACK" should be left to the client, not the dma driver.
+>> > again how is this pxa specfic, if not documented we should move this to
+>> > dmaengine documentation
+>> 
+>> Yes, I agree. I should move this to dmaengine slave documentation, in
+>> Documentation/dmaengine/provider.txt (in the Misc notes section). Do you want me
+>> to submit a patch to change the "Undocumented feature" into a properly
+>> documented feature ?
+> That would be great
+On my way, for v3.
+
+Cheers.
+
+-- 
+Robert
