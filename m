@@ -1,29 +1,107 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Tue, 12 May 2015 13:30:37 +0800
-Subject: [RFC PATCH] iommu: add ARM short descriptor page table allocator.
-In-Reply-To: <20150511104030.GA4795@arm.com>
-References: <1430206881-18294-1-git-send-email-yong.wu@mediatek.com>
- <20150505161802.GA20611@8bytes.org> <20150505170541.GN1550@arm.com>
- <20150511101309.GH20611@8bytes.org> <20150511104030.GA4795@arm.com>
-Message-ID: <1431408637.31603.4.camel@mhfsdcap03>
+From: stripathi@apm.com (Suman Tripathi)
+Date: Tue, 12 May 2015 11:03:46 +0530
+Subject: [PATCH RESEND v6 1/2] arm64: dts: Add the arasan sdhci nodes in
+ apm-storm.dtsi
+In-Reply-To: <1431333531-30491-2-git-send-email-stripathi@apm.com>
+References: <1431333531-30491-1-git-send-email-stripathi@apm.com>
+ <1431333531-30491-2-git-send-email-stripathi@apm.com>
+Message-ID: <CAOHikRAeOH5Pt4WZFk1C29dUytO7H0ox_dgq578oW19ue8Eb8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-05-11 at 11:40 +0100, Will Deacon wrote:
-> On Mon, May 11, 2015 at 11:13:09AM +0100, Joerg Roedel wrote:
-> > On Tue, May 05, 2015 at 06:05:41PM +0100, Will Deacon wrote:
-> > > I think the MT8173 IOMMU [1] uses this format and, since it's part of
-> > > the ARM architecture, the ARM SMMU can make use of it too if the
-> > > implementation supports it.
-> > 
-> > I think it makes more sense to merge this with a driver actually using
-> > it. I guess a driver for the above mentioned IOMMU will be submitted
-> > soon?
-> 
-> I completely agree; since there are already patches floating around for
-> that IOMMU, it's probably worth them being put into a single series.
-> 
-> Will
-Hi Joerg, Will, 
-     Thanks. We will put this into the mtk-iommu patch series and
-prepare to send in this week.
+Hi ,
+
+On Mon, May 11, 2015 at 2:08 PM, Suman Tripathi <stripathi@apm.com> wrote:
+> This patch adds the arasan sdhci nodes to reuse the of-arasan
+> driver for APM X-Gene SoC.
+>
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+> ---
+>  arch/arm64/boot/dts/apm/apm-mustang.dts |  4 +++
+>  arch/arm64/boot/dts/apm/apm-storm.dtsi  | 43 +++++++++++++++++++++++++++++++++
+>  2 files changed, 47 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/apm/apm-mustang.dts b/arch/arm64/boot/dts/apm/apm-mustang.dts
+> index 83578e7..7ccd517 100644
+> --- a/arch/arm64/boot/dts/apm/apm-mustang.dts
+> +++ b/arch/arm64/boot/dts/apm/apm-mustang.dts
+> @@ -52,3 +52,7 @@
+>  &xgenet {
+>         status = "ok";
+>  };
+> +
+> +&sdhci0 {
+> +       status = "ok";
+> +};
+> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> index c8d3e0e..b5d2698 100644
+> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> @@ -145,6 +145,40 @@
+>                                 clock-output-names = "socplldiv2";
+>                         };
+>
+> +                       ahbclk: ahbclk at 1f2ac000 {
+> +                               compatible = "apm,xgene-device-clock";
+> +                               #clock-cells = <1>;
+> +                               clocks = <&socplldiv2 0>;
+> +                               reg = <0x0 0x1f2ac000 0x0 0x1000
+> +                                       0x0 0x17000000 0x0 0x2000>;
+> +                               reg-names = "csr-reg", "div-reg";
+> +                               csr-offset = <0x0>;
+> +                               csr-mask = <0x1>;
+> +                               enable-offset = <0x8>;
+> +                               enable-mask = <0x1>;
+> +                               divider-offset = <0x164>;
+> +                               divider-width = <0x5>;
+> +                               divider-shift = <0x0>;
+> +                               clock-output-names = "ahbclk";
+> +                       };
+> +
+> +                       sdioclk: sdioclk at 1f2ac000 {
+> +                               compatible = "apm,xgene-device-clock";
+> +                               #clock-cells = <1>;
+> +                               clocks = <&socplldiv2 0>;
+> +                               reg = <0x0 0x1f2ac000 0x0 0x1000
+> +                                       0x0 0x17000000 0x0 0x2000>;
+> +                               reg-names = "csr-reg", "div-reg";
+> +                               csr-offset = <0x0>;
+> +                               csr-mask = <0x2>;
+> +                               enable-offset = <0x8>;
+> +                               enable-mask = <0x2>;
+> +                               divider-offset = <0x178>;
+> +                               divider-width = <0x8>;
+> +                               divider-shift = <0x0>;
+> +                               clock-output-names = "sdioclk";
+> +                       };
+> +
+>                         qmlclk: qmlclk {
+>                                 compatible = "apm,xgene-device-clock";
+>                                 #clock-cells = <1>;
+> @@ -533,6 +567,15 @@
+>                         interrupts = <0x0 0x4f 0x4>;
+>                 };
+>
+> +               sdhci0: sdhci at 1c000000 {
+> +                       compatible = "arasan,sdhci-4.9a";
+> +                       reg = <0x0 0x1c000000 0x0 0x100>;
+> +                       interrupts = <0x0 0x49 0x4>;
+> +                       dma-coherent;
+> +                       clock-names = "clk_xin", "clk_ahb";
+> +                       clocks = <&sdioclk 0>, <&ahbclk 0>;
+> +               };
+> +
+>                 phy1: phy at 1f21a000 {
+>                         compatible = "apm,xgene-phy";
+>                         reg = <0x0 0x1f21a000 0x0 0x100>;
+> --
+> 1.8.2.1
+>
+
+Can anyone from dt community review this patch ? I have changed the dts node
+names from sdhc to sdhci as per Arnd, Michael comments .
+
+-- 
+Thanks,
+with regards,
+Suman Tripathi
