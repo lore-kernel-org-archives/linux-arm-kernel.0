@@ -1,178 +1,79 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 12 May 2015 22:22:56 +0200
-Subject: [PATCH 1/2] regulator: act8865: add restart handler for act8846
-In-Reply-To: <A1C80CFB-CDCA-4F88-BA5F-371918CECD97@stud.hs-offenburg.de>
-References: <A1C80CFB-CDCA-4F88-BA5F-371918CECD97@stud.hs-offenburg.de>
-Message-ID: <2204003.IdqJV6LE2e@phil>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 12 May 2015 22:24:49 +0200
+Subject: [PATCH v3 1/4] ARM: pxa: add memory resource to RTC device
+In-Reply-To: <87lhgumi4b.fsf@belgarion.home> (Robert Jarzmik's message of
+ "Tue, 12 May 2015 08:20:52 +0200")
+References: <1431384089-28367-1-git-send-email-robh@kernel.org>
+ <1431384089-28367-2-git-send-email-robh@kernel.org>
+ <20150511224934.GL2067@n2100.arm.linux.org.uk>
+ <CAL_Jsq+tNStipTDRH05XRHVDz30B8w92YTD1ZKUTrCp-Lj7=1w@mail.gmail.com>
+ <87lhgumi4b.fsf@belgarion.home>
+Message-ID: <878uctmtm6.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michael,
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-Am Montag, 11. Mai 2015, 22:54:11 schrieb Michael Niew?hner:
-> Rebooting radxa rock which uses act8846 results in kernel panic because the
-> bootloader doesn't readjust frequency or voltage for cpu correctly. This
-> workaround power cycles the act8846 at restart to reset the board.
+> Rob Herring <robh@kernel.org> writes:
+>
+>>> This really isn't a good idea - what do you think happens when
+>>> the same struct resource gets passed into insert_resource()
+>>> twice?
+>>
+>> Bad things. If you recall, we discussed this on v1[1]. See the commit
+>> msg of patch 2 for the summary. There is not currently a problem
+>> because the rtc-pxa driver does not request the resource.
+>
+> I think you're talking about resource claiming, while Russell is talking about
+> resource declaration.
+>
+> The point Russell is raising is if you do a platform_add_device() twice with the
+> same resource (which is done in pxa, once for sa1100-rtc, once for pxa-rtc), you
+> call insert_resource() twice with the same resource structure.
+>
+> I had not thought of that before (that's in my reply noted "nasty consequences"
+> in [1]), and I'll do my homework this week, and try this only patch, but if I
+> follow Russell's thinking, then sa1100-rtc and pxa-rtc cannot be declared
+> together anymore.
 
-Hmm, it might be nice to reword this, as this being a "workaround" for the 
-radxarock is a bit "short sighted".
+I made the try, and Russell was right, this breaks the pxa architecture. The
+relevant extract of kernel message is in [1].
 
-The act8846 simply provides means to reset the system when used as main pmic 
-[hence the reliance on the system-power-controller] and other socs/boards 
-using it as pmic might also profit from exposing this function - for example if 
-there is no other means of reset.
+The consequences with your patches :
+ - pxa27x_init()
+   - platform_add_devices()
+     - the pxa_device_rtc fails (as resource is duplicated)
+     - all the devices are unregistered (rollback)
+And pxa27x fails.
 
+Now I'm pondering about the right approach :
+ - either remove sa1100_device_rtc from pxas
+ - or remove pxa_device_rtc
+ - or both
+ - or something else
 
-> Signed-off-by: Michael Niewoehner <mniewoeh@stud.hs-offenburg.de>
-> ---
->  drivers/regulator/act8865-regulator.c | 43
-> +++++++++++++++++++++++++++++++++++ 1 file changed, 43 insertions(+)
-> 
-> diff --git a/drivers/regulator/act8865-regulator.c
-> b/drivers/regulator/act8865-regulator.c index 2ff73d7..f8cdff3 100644
-> --- a/drivers/regulator/act8865-regulator.c
-> +++ b/drivers/regulator/act8865-regulator.c
-> @@ -27,6 +27,7 @@
->  #include <linux/of_device.h>
->  #include <linux/regulator/of_regulator.h>
->  #include <linux/regmap.h>
-> +#include <linux/reboot.h>
-> 
->  /*
->   * ACT8600 Global Register Map.
-> @@ -133,10 +134,14 @@
->  #define	ACT8865_VOLTAGE_NUM	64
->  #define ACT8600_SUDCDC_VOLTAGE_NUM	255
-> 
-> +#define ACT8846_SIPC_MASK 0x01
-> +
->  struct act8865 {
->  	struct regmap *regmap;
->  	int off_reg;
->  	int off_mask;
-> +	int sipc_reg;
-> +	int sipc_mask;
->  };
-> 
->  static const struct regmap_config act8865_regmap_config = {
-> @@ -402,6 +407,17 @@ static void act8865_power_off(void)
->  	while (1);
->  }
-> 
-> +static int act8846_power_cycle(struct notifier_block *this,
-> +	unsigned long code, void *unused)
-> +{
-> +	struct act8865 *act8846;
-> +
-> +	act8846 = i2c_get_clientdata(act8865_i2c_client);
-> +	regmap_write(act8846->regmap, act8846->sipc_reg, act8846->sipc_mask);
+Let me think a bit about it.
 
-The act8846 is currently the only one of the three types providing such 
-functionality, so until the second chip variant surfaces that provides a reset 
-capability, it might be less intrusive to simply do
+-- 
+Robert
 
-	regmap_write(act8846->regmap, ACT8846_GLB_OFF_CTRL, ACT8846_SIPC_MASK);
-
-here and skip all the infrastructure like sipc_reg and sipc_mask assignment 
-and handling? But I guess that is Mark's call what he likes better.
-
-
-> +
-> +	return NOTIFY_DONE;
-> +}
-> +
-
-structs like the restart_handler normally live near the function they 
-reference and not as static part of some function. And as the restart 
-functionality is not rockchip-specific, it should also not be named 
-rockchip_foo as below ;-)
-
-static struct notifier_block act8846_restart_handler = {
-	.notifier_call = act8846_power_cycle,
-	.priority = 129,
-};
-
-
-
->  static int act8865_pmic_probe(struct i2c_client *client,
->  			      const struct i2c_device_id *i2c_id)
->  {
-> @@ -413,6 +429,7 @@ static int act8865_pmic_probe(struct i2c_client *client,
-> struct act8865 *act8865;
->  	unsigned long type;
->  	int off_reg, off_mask;
-> +	int sipc_reg, sipc_mask;
-> 
->  	pdata = dev_get_platdata(dev);
-> 
-> @@ -434,18 +451,24 @@ static int act8865_pmic_probe(struct i2c_client
-> *client, num_regulators = ARRAY_SIZE(act8600_regulators);
->  		off_reg = -1;
->  		off_mask = -1;
-> +		sipc_reg = -1;
-> +		sipc_mask = -1;
->  		break;
->  	case ACT8846:
->  		regulators = act8846_regulators;
->  		num_regulators = ARRAY_SIZE(act8846_regulators);
->  		off_reg = ACT8846_GLB_OFF_CTRL;
->  		off_mask = ACT8846_OFF_SYSMASK;
-> +		sipc_reg = ACT8846_GLB_OFF_CTRL;
-> +		sipc_mask = ACT8846_SIPC_MASK;
->  		break;
->  	case ACT8865:
->  		regulators = act8865_regulators;
->  		num_regulators = ARRAY_SIZE(act8865_regulators);
->  		off_reg = ACT8865_SYS_CTRL;
->  		off_mask = ACT8865_MSTROFF;
-> +		sipc_reg = -1;
-> +		sipc_mask = -1;
->  		break;
->  	default:
->  		dev_err(dev, "invalid device id %lu\n", type);
-> @@ -494,6 +517,26 @@ static int act8865_pmic_probe(struct i2c_client
-> *client, }
->  	}
-
-no need to add a second check for of_device_is_system_power_controller() as we 
-already have a check for this property directly above, simply extend it with 
-something like the following.
-
-if (of_device_is_system_power_controller(dev->of_node)) {
-	int ret;
-
-	/* already existing code to set poweroff handler */
-
-	if (type == ACT8846) {
-		ret = register_restart_handler(&act8846_restart_handler);
-		if (ret)
-		pr_err("%s: cannot register restart handler, %d\n",
-		       __func__, ret);
-	}
-}
-
-
-> 
-> +	/* Register restart handler */
-> +	if (of_device_is_system_power_controller(dev->of_node)
-> +				&& sipc_reg > 0) {
-> +		static struct notifier_block rockchip_restart_handler = {
-> +			.notifier_call = act8846_power_cycle,
-> +			.priority = 129,
-> +		};
-> +
-> +		int ret;
-> +
-> +		act8865_i2c_client = client;
-> +		act8865->sipc_reg = sipc_reg;
-> +		act8865->sipc_mask = sipc_mask;
-> +
-> +		ret = register_restart_handler(&rockchip_restart_handler);
-> +		if (ret)
-> +			pr_err("%s: cannot register restart handler, %d\n",
-> +			       __func__, ret);
-> +	}
-> +
->  	/* Finally register devices */
->  	for (i = 0; i < num_regulators; i++) {
->  		const struct regulator_desc *desc = &regulators[i];
+[1]
+2015/05/12  22:12:57  ------------[ cut here ]------------
+2015/05/12  22:12:57  WARNING: CPU: 0 PID: 1 at kernel/resource.c:755 __insert_resource+0x74/0x134()
+2015/05/12  22:12:57  Modules linked in:
+2015/05/12  22:12:57  CPU: 0 PID: 1 Comm: swapper Tainted: G        W       4.0.0-00004-g7fa5ed0 #528
+2015/05/12  22:12:57  Hardware name: Intel HCDDBBVA0 Development Platform (aka Mainstone)
+2015/05/12  22:12:57  [<c000e170>] (unwind_backtrace) from [<c000c064>] (show_stack+0x10/0x14)
+2015/05/12  22:12:57  [<c000c064>] (show_stack) from [<c00176b0>] (warn_slowpath_common+0x7c/0xb4)
+2015/05/12  22:12:57  [<c00176b0>] (warn_slowpath_common) from [<c0017784>] (warn_slowpath_null+0x1c/0x24)
+2015/05/12  22:12:57  [<c0017784>] (warn_slowpath_null) from [<c001ada4>] (__insert_resource+0x74/0x134)
+2015/05/12  22:12:57  [<c001ada4>] (__insert_resource) from [<c001bfd4>] (insert_resource_conflict+0x20/0x60)
+2015/05/12  22:12:57  [<c001bfd4>] (insert_resource_conflict) from [<c001c01c>] (insert_resource+0x8/0x18)
+2015/05/12  22:12:57  [<c001c01c>] (insert_resource) from [<c0207a7c>] (platform_device_add+0x88/0x254)
+2015/05/12  22:12:57  [<c0207a7c>] (platform_device_add) from [<c02082c4>] (platform_add_devices+0x34/0x70)
+2015/05/12  22:12:57  [<c02082c4>] (platform_add_devices) from [<c00088e0>] (do_one_initcall+0xa8/0x204)
+2015/05/12  22:12:58  [<c00088e0>] (do_one_initcall) from [<c050dd6c>] (kernel_init_freeable+0xf4/0x1b4)
+2015/05/12  22:12:58  [<c050dd6c>] (kernel_init_freeable) from [<c03b5a9c>] (kernel_init+0x8/0xec)
+2015/05/12  22:12:58  [<c03b5a9c>] (kernel_init) from [<c0009698>] (ret_from_fork+0x14/0x3c)
+2015/05/12  22:12:58  ---[ end trace cb88537fdc8fa201 ]---
+2015/05/12  22:12:58  platform pxa-rtc: failed to claim resource 0
