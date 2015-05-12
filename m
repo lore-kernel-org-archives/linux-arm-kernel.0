@@ -1,71 +1,67 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 12 May 2015 16:10:50 -0700
-Subject: [PATCH] MAINTAINERS: add brcmstb regex
-In-Reply-To: <20150512230207.GB11598@ld-irv-0074>
-References: <1426727345-5838-1-git-send-email-computersforpeace@gmail.com>
- <20150512230207.GB11598@ld-irv-0074>
-Message-ID: <1431472250.2884.101.camel@perches.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 13 May 2015 00:23:22 +0100
+Subject: [PATCH] ARM: berlin: add CPU hotplug support
+In-Reply-To: <1431440186-14075-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1431440186-14075-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20150512232322.GR2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(cc'ing Andrew Morton)
-
-On Tue, 2015-05-12 at 16:02 -0700, Brian Norris wrote:
-> On Wed, Mar 18, 2015 at 06:09:05PM -0700, Brian Norris wrote:
-> > This could probably consolidate a few file listings. And it satisfies
-> > the spirit of the highly annoying [1] checkpatch warning for every new
-> > file, though it sadly won't quash it.
-> > 
-> > [1] https://lkml.org/lkml/2014/12/17/24
-> > 
-> > Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+On Tue, May 12, 2015 at 04:16:26PM +0200, Antoine Tenart wrote:
+> Adds CPU hotplug support for Berlin SoCs (currently BG2 and BG2Q). The
+> CPUs are put in WFI after disabling the coherency.
 > 
-> Ping? Is this a good entry?
-
-As you're a MAINTAINER of this section, if you want it to
-be a good entry, it's a good entry.
-
-You should get someone (Andrew?) to apply it.
-
-Be aware that N: matches aren't as "owned" as F: matches.
-
-Note from MAINTAINERS:
-	N: Files and directories with regex patterns.
-	   One pattern per line.  Multiple N: lines acceptable.
-	   scripts/get_maintainer.pl has different behavior for files that
-	   match F: pattern and matches of N: patterns.  By default,
-	   get_maintainer will not look at git log history when an F: pattern
-	   match occurs.  When an N: match occurs, git log history is used
-	   to also notify the people that have git commit signatures.
-
-> One problem is that there may be 'brcmstb' drivers for MIPS as well as
-> ARM. But on that train of thought: there are several drivers which are
-> already somewhat inaccurately-listed. The following are listed under
-> either the BCM7XXX ARM subarchitecture or BMIPS MIPS subarchitecture,
-> though they are actually used on both:
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> ---
+>  arch/arm/mach-berlin/platsmp.c | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
 > 
->  drivers/bus/brcmstb_gisb.c
->  drivers/irqchip/irq-brcmstb-l2.c
->  drivers/irqchip/irq-bcm7120-l2.c
+> diff --git a/arch/arm/mach-berlin/platsmp.c b/arch/arm/mach-berlin/platsmp.c
+> index 702e7982015a..d9c62057be76 100644
+> --- a/arch/arm/mach-berlin/platsmp.c
+> +++ b/arch/arm/mach-berlin/platsmp.c
+> @@ -14,6 +14,7 @@
+>  #include <linux/of_address.h>
+>  
+>  #include <asm/cacheflush.h>
+> +#include <asm/cp15.h>
+
+I don't see anything being added by this patch which would need this
+include.
+
+>  #include <asm/smp_plat.h>
+>  #include <asm/smp_scu.h>
+>  
+> @@ -92,8 +93,20 @@ unmap_scu:
+>  	iounmap(scu_base);
+>  }
+>  
+> +#ifdef CONFIG_HOTPLUG_CPU
+> +static void berlin_cpu_die(unsigned int cpu)
+> +{
+> +	v7_exit_coherency_flush(louis);
+> +	while (1)
+> +		cpu_do_idle();
+> +}
+> +#endif
+> +
+>  static struct smp_operations berlin_smp_ops __initdata = {
+>  	.smp_prepare_cpus	= berlin_smp_prepare_cpus,
+>  	.smp_boot_secondary	= berlin_boot_secondary,
+> +#ifdef CONFIG_HOTPLUG_CPU
+> +	.cpu_die		= berlin_cpu_die,
+> +#endif
+>  };
+>  CPU_METHOD_OF_DECLARE(berlin_smp, "marvell,berlin-smp", &berlin_smp_ops);
+> -- 
+> 2.4.0
 > 
-> Brian
 > 
-> > ---
-> >  MAINTAINERS | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/MAINTAINERS b/MAINTAINERS
-> > index 0e1abe8cc684..52a1cf7cd18a 100644
-> > --- a/MAINTAINERS
-> > +++ b/MAINTAINERS
-> > @@ -2179,6 +2179,7 @@ S:	Maintained
-> >  F:	arch/arm/mach-bcm/*brcmstb*
-> >  F:	arch/arm/boot/dts/bcm7*.dts*
-> >  F:	drivers/bus/brcmstb_gisb.c
-> > +N:	brcmstb
-> >  
-> >  BROADCOM BMIPS MIPS ARCHITECTURE
-> >  M:	Kevin Cernekee <cernekee@gmail.com>
-> > -- 
-> > 1.9.1
-> > 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
