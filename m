@@ -1,23 +1,19 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 12 May 2015 14:55:01 +0100
-Subject: [PATCH 0/4] ARM/ARM64: vexpress: fixes for v4.1
-In-Reply-To: <1431009905-29265-1-git-send-email-sudeep.holla@arm.com>
-References: <1431009905-29265-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <55520635.9080801@arm.com>
+From: moorray3@wp.pl (Jakub =?UTF-8?B?S2ljacWEc2tp?=)
+Date: Tue, 12 May 2015 16:00:27 +0200
+Subject: [PATCH] serial/amba-pl011: Unconditionally poll for FIFO space
+ before each TX char
+In-Reply-To: <1431438266-28094-1-git-send-email-Dave.Martin@arm.com>
+References: <1431438266-28094-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20150512160027.21244f64@north>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Tue, 12 May 2015 14:44:26 +0100, Dave Martin wrote:
+> This will cause a conflict with tty-next because it pulls forward
+> some changes made by commit 1e84d22 (serial/amba-pl011: Refactor and
+> simplify TX FIFO handling); however, the resolution is simple except
+> for the following lines which may need to be deleted manually from
+> amba-pl011.c:pl011_startup():
 
-On 07/05/15 15:45, Sudeep Holla wrote:
-> Hi Arnd/Olof,
->
-> Here are few fixes posted on the list and are scattered around.
-> So I am sending them as a series so that you can pick them up easily.
-> Let me know if you prefer a pull request.
->
-
-Can you consider this series for your next v4.1-rc* fixes ?
-
-Regards,
-Sudeep
+By resolution is simple you mean: keep the code as it is in tty-next,
+right?
