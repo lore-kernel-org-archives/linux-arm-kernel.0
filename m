@@ -1,51 +1,26 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 May 2015 17:16:11 +0200
-Subject: [PATCH RESEND] arm64: dts: kill skeleton.dtsi
-In-Reply-To: <1431011699-15455-1-git-send-email-mark.rutland@arm.com>
-References: <1431011699-15455-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <3292743.JoE0ExITrf@wuerfel>
+Date: Tue, 12 May 2015 17:18:14 +0200
+Subject: [GIT PULL] Ux500 development for v4.2
+In-Reply-To: <CACRpkdZX-Tg-1SNV0L2MemGqkaVZG9wSwiLquYVDVMToZT02nw@mail.gmail.com>
+References: <CACRpkdZX-Tg-1SNV0L2MemGqkaVZG9wSwiLquYVDVMToZT02nw@mail.gmail.com>
+Message-ID: <2276241.LvodlDYmFH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 07 May 2015 16:14:59 Mark Rutland wrote:
-> While skeleton.dtsi was initially conceived as a simple way to bootstrap
-> writing a dts, it has proven to be problematic:
+On Monday 11 May 2015 11:32:04 Linus Walleij wrote:
+> Hi ARM SoC people,
 > 
-> * The #address-cells and #size-cells values used in skeleton.dtsi may
->   not match what a user wants (e.g. when they need to describe a range
->   larger than 4GB).
+> this is some cleanup and development for Ux500 that should go
+> into ARM SoC for the v4.2 series. Details are in the signed tag.
 > 
-> * For dts files where memory nodes have unit-addresses, it adds a
->   redundant /memory node, for which the reg entry may not be
->   appropriately sized (e.g. where #size-cells has been overridden).
-> 
-> * For dts files which assume that a bootloader will fill in the memory
->   node(s), no node is present in the dts (and hence there is no attached
->   comment), making it hard to distinguish these cases from bad dts
->   files, and masking any warnings dtc may produce w.r.t. missing nodes.
-> 
-> * The default empty /chosen and /aliases are somewhat useless, and it
->   would be preferable for dts to fill these in (e.g. for
->   /aliases/serial0 and /chosen/stdout-path).
-> 
-> This patch removes skeleton.dtsi from arm64. There are currently no
-> users, so we can remove it before any appear.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Rob Herring <rob.herring@arm.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/boot/dts/skeleton.dtsi | 13 -------------
->  1 file changed, 13 deletions(-)
->  delete mode 100644 arch/arm64/boot/dts/skeleton.dtsi
-> 
-> Arnd, Olof, are you happy to pick this up for v4.2?
-> 
+> I think it would look overzealous to break it in different topics, but if you
+> prefer to slice the patch set, tell me how and I'll split it as you
+> desire.
 > 
 
-Applied to next/cleanup now, thanks!
+Yes, please split it up, unless there are interdependencies.
+
+Feel free to use git-send-email if you want to avoid preparing a pull
+request for a branch that only has one or two patches in it.
 
 	Arnd
