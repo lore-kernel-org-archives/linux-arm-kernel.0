@@ -1,118 +1,430 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Tue, 12 May 2015 09:39:14 +0200
-Subject: [PATCH 1/2] ARM: cache-l2c: Detect whether it's safe to unlock
-In-Reply-To: <1431416355-7693-1-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1431416355-7693-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <1431416355-7693-2-git-send-email-sjoerd.simons@collabora.co.uk>
+From: thunder.leizhen@huawei.com (leizhen)
+Date: Tue, 12 May 2015 15:40:06 +0800
+Subject: [PATCH 2/3] iommu/arm-smmu: Add initial driver support for ARM
+ SMMUv3 devices
+In-Reply-To: <1431108046-9675-3-git-send-email-will.deacon@arm.com>
+References: <1431108046-9675-1-git-send-email-will.deacon@arm.com>
+ <1431108046-9675-3-git-send-email-will.deacon@arm.com>
+Message-ID: <5551AE56.6050906@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The L2C cache should only be unlocked when the cache is setup to allow
-that. In the common case the l2x0 driver sets up the cache for that to
-be the case (e.g. setting L310_AUX_CTRL_NS_LOCKDOWN on L2C-310), making
-unlock safe. However when a secure firmware is in use, it may not be
-possible for the L2c to be configured that way making unlocking unsafe.
 
-To handle that, for caches where special configuration is needed to allow
-unlocking, check whether this has been setup before unlocking.
+> +
+> +static int queue_poll_cons(struct arm_smmu_queue *q, u32 until, bool wfe)
+> +{
+> +	ktime_t timeout = ktime_add_us(ktime_get(), ARM_SMMU_POLL_TIMEOUT_US);
+> +
+> +	while (queue_sync_cons(q), __queue_cons_before(q, until)) {
+> +		if (ktime_compare(ktime_get(), timeout) > 0)
 
-Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
----
- arch/arm/mm/cache-l2x0.c | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+Is it good to limit hardware behavior? May be wait for ever will be better. If SMMU
+can not consume queue items under normal condition, the SMMU hardware is broken,
+will lead software system to be crashed later.
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index e309c8f..2563458 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -42,6 +42,7 @@ struct l2c_init_data {
- 	void (*fixup)(void __iomem *, u32, struct outer_cache_fns *);
- 	void (*save)(void __iomem *);
- 	void (*configure)(void __iomem *);
-+	bool (*can_unlock)(void __iomem *);
- 	struct outer_cache_fns outer_cache;
- };
- 
-@@ -100,6 +101,9 @@ static inline void l2c_unlock(void __iomem *base, unsigned num)
- {
- 	unsigned i;
- 
-+	if (l2x0_data->can_unlock && !l2x0_data->can_unlock(base))
-+		return;
-+
- 	for (i = 0; i < num; i++) {
- 		writel_relaxed(0, base + L2X0_LOCKDOWN_WAY_D_BASE +
- 			       i * L2X0_LOCKDOWN_STRIDE);
-@@ -403,12 +407,18 @@ static void l2c220_enable(void __iomem *base, u32 aux, unsigned num_lock)
- 	l2c_enable(base, aux, num_lock);
- }
- 
-+static bool l2c220_can_unlock(void __iomem *base)
-+{
-+	return readl_relaxed(base + L2X0_AUX_CTRL) & L220_AUX_CTRL_NS_LOCKDOWN;
-+}
-+
- static const struct l2c_init_data l2c220_data = {
- 	.type = "L2C-220",
- 	.way_size_0 = SZ_8K,
- 	.num_lock = 1,
- 	.enable = l2c220_enable,
- 	.save = l2c_save,
-+	.can_unlock = l2c220_can_unlock,
- 	.outer_cache = {
- 		.inv_range = l2c220_inv_range,
- 		.clean_range = l2c220_clean_range,
-@@ -681,6 +691,11 @@ static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
- 	}
- }
- 
-+static bool l2c310_can_unlock(void __iomem *base)
-+{
-+	return readl_relaxed(base + L2X0_AUX_CTRL) & L310_AUX_CTRL_NS_LOCKDOWN;
-+}
-+
- static void __init l2c310_fixup(void __iomem *base, u32 cache_id,
- 	struct outer_cache_fns *fns)
- {
-@@ -763,6 +778,7 @@ static const struct l2c_init_data l2c310_init_fns __initconst = {
- 	.fixup = l2c310_fixup,
- 	.save = l2c310_save,
- 	.configure = l2c310_configure,
-+	.can_unlock = l2c310_can_unlock,
- 	.outer_cache = {
- 		.inv_range = l2c210_inv_range,
- 		.clean_range = l2c210_clean_range,
-@@ -1084,6 +1100,7 @@ static const struct l2c_init_data of_l2c220_data __initconst = {
- 	.of_parse = l2x0_of_parse,
- 	.enable = l2c220_enable,
- 	.save = l2c_save,
-+	.can_unlock = l2c220_can_unlock,
- 	.outer_cache = {
- 		.inv_range   = l2c220_inv_range,
- 		.clean_range = l2c220_clean_range,
-@@ -1211,6 +1228,7 @@ static const struct l2c_init_data of_l2c310_data __initconst = {
- 	.fixup = l2c310_fixup,
- 	.save  = l2c310_save,
- 	.configure = l2c310_configure,
-+	.can_unlock = l2c310_can_unlock,
- 	.outer_cache = {
- 		.inv_range   = l2c210_inv_range,
- 		.clean_range = l2c210_clean_range,
-@@ -1240,6 +1258,7 @@ static const struct l2c_init_data of_l2c310_coherent_data __initconst = {
- 	.fixup = l2c310_fixup,
- 	.save  = l2c310_save,
- 	.configure = l2c310_configure,
-+	.can_unlock = l2c310_can_unlock,
- 	.outer_cache = {
- 		.inv_range   = l2c210_inv_range,
- 		.clean_range = l2c210_clean_range,
-@@ -1585,6 +1604,7 @@ static const struct l2c_init_data of_bcm_l2x0_data __initconst = {
- 	.enable = l2c310_enable,
- 	.save  = l2c310_save,
- 	.configure = l2c310_configure,
-+	.can_unlock = l2c310_can_unlock,
- 	.outer_cache = {
- 		.inv_range   = bcm_inv_range,
- 		.clean_range = bcm_clean_range,
--- 
-2.1.4
+> +			return -ETIMEDOUT;
+> +
+> +		if (wfe) {
+> +			wfe();
+> +		} else {
+> +			cpu_relax();
+> +			udelay(1);
+> +		}
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static void queue_write(__le64 *dst, u64 *src, size_t n_dwords)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < n_dwords; ++i)
+> +		*dst++ = cpu_to_le64(*src++);
+> +}
+> +
+> +static int queue_insert_raw(struct arm_smmu_queue *q, u64 *ent)
+> +{
+> +	if (queue_full(q))
+> +		return -ENOSPC;
+> +
+> +	queue_write(Q_ENT(q, q->prod), ent, q->ent_dwords);
+
+A dmb or dsb maybe needed. We must insure all data written are completed, then notify hardware to consume.
+
+> +	queue_inc_prod(q);
+> +	return 0;
+> +}
+> +
+> +
+> +/* High-level queue accessors */
+> +static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
+> +{
+> +	memset(cmd, 0, CMDQ_ENT_DWORDS << 3);
+> +	cmd[0] |= (ent->opcode & CMDQ_0_OP_MASK) << CMDQ_0_OP_SHIFT;
+> +
+> +	switch (ent->opcode) {
+> +	case CMDQ_OP_TLBI_EL2_ALL:
+
+> +	case CMDQ_OP_CMD_SYNC:
+> +		cmd[0] |= CMDQ_SYNC_0_CS_SEV;
+
+We can not always set SIG_SEV, actually it should base upon SMMU_IDR0.SEV(smmu->features & ARM_SMMU_FEAT_SEV)
+
+> +		break;
+> +	default:
+> +		return -ENOENT;
+> +	}
+> +
+> +	return 0;
+> +}
+
+> +
+> +static int arm_smmu_domain_finalise_s1(struct arm_smmu_domain *smmu_domain,
+> +				       struct io_pgtable_cfg *pgtbl_cfg)
+> +{
+> +	int ret;
+> +	u16 asid;
+> +	struct arm_smmu_device *smmu = smmu_domain->smmu;
+> +	struct arm_smmu_s1_cfg *cfg = &smmu_domain->s1_cfg;
+> +
+> +	asid = arm_smmu_bitmap_alloc(smmu->asid_map, smmu->asid_bits);
+> +	if (IS_ERR_VALUE(asid))
+> +		return asid;
+> +
+> +	cfg->cdptr = dma_zalloc_coherent(smmu->dev, CTXDESC_CD_DWORDS << 3,
+> +					 &cfg->cdptr_dma, GFP_KERNEL);
+
+Why use dma_zalloc_coherent? iova is coverted from PA by calling phys_to_dma. I afraid
+PA and iova maybe not equal. In fact, the mapping between iova and PA is rely on SMMU
+driver itself. Why not use virt_to_phys to get PA, SMMU hardware actually require PA.
+
+> +	if (!cfg->cdptr) {
+> +		dev_warn(smmu->dev, "failed to allocate context descriptor\n");
+> +		goto out_free_asid;
+> +	}
+> +
+> +	cfg->cd.asid	= asid;
+> +	cfg->cd.ttbr	= pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
+> +	cfg->cd.tcr	= pgtbl_cfg->arm_lpae_s1_cfg.tcr;
+> +	cfg->cd.mair	= pgtbl_cfg->arm_lpae_s1_cfg.mair[0];
+> +	return 0;
+> +
+> +out_free_asid:
+> +	arm_smmu_bitmap_free(smmu->asid_map, asid);
+> +	return ret;
+> +}
+> +
+
+
+> +
+> +static int arm_smmu_add_device(struct device *dev)
+> +{
+> +	int i, ret;
+> +	u32 sid, *sids;
+> +	struct pci_dev *pdev;
+> +	struct iommu_group *group;
+> +	struct arm_smmu_group *smmu_group;
+> +
+> +	/* We only support PCI, for now */
+> +	if (!dev_is_pci(dev))
+> +		return -ENODEV;
+> +
+> +	pdev = to_pci_dev(dev);
+> +	group = iommu_group_get_for_dev(dev);
+> +	if (IS_ERR(group))
+> +		return PTR_ERR(group);
+> +
+> +	smmu_group = iommu_group_get_iommudata(group);
+> +	if (!smmu_group) {
+> +		struct arm_smmu_device *smmu = arm_smmu_get_for_pci_dev(pdev);
+> +		if (!smmu) {
+> +			ret = -ENOENT;
+> +			goto out_put_group;
+> +		}
+> +
+> +		smmu_group = kzalloc(sizeof(*smmu_group), GFP_KERNEL);
+> +		if (!smmu_group) {
+> +			ret = -ENOMEM;
+> +			goto out_put_group;
+> +		}
+> +
+> +		smmu_group->ste.valid	= true;
+> +		smmu_group->smmu	= smmu;
+> +		iommu_group_set_iommudata(group, smmu_group,
+> +					  __arm_smmu_release_pci_iommudata);
+> +	}
+> +
+> +	/* Assume SID == RID until firmware tells us otherwise */
+> +	pci_for_each_dma_alias(pdev, __arm_smmu_get_pci_sid, &sid);
+> +	for (i = 0; i < smmu_group->num_sids; ++i) {
+> +		/* If we already know about this SID, then we're done */
+> +		if (smmu_group->sids[i] == sid)
+> +			return 0;
+> +	}
+> +
+> +	/* Check the SID is in range of the SMMU and our stream table */
+> +	if (!arm_smmu_sid_in_range(smmu_group->smmu, sid)) {
+> +		ret = -ERANGE;
+> +		goto out_put_group;
+> +	}
+> +
+> +	/* Resize the SID array for the group */
+> +	smmu_group->num_sids++;
+> +	sids = krealloc(smmu_group->sids, smmu_group->num_sids * sizeof(*sids),
+> +			GFP_KERNEL);
+> +	if (!sids) {
+> +		smmu_group->num_sids--;
+> +		ret = -ENOMEM;
+> +		goto out_put_group;
+> +	}
+> +
+> +	/* Add the new SID */
+> +	sids[smmu_group->num_sids - 1] = sid;
+> +	smmu_group->sids = sids;
+> +	return 0;
+> +
+> +out_put_group:
+> +	iommu_group_put(group);
+> +	return ret;
+> +}
+
+> +static int arm_smmu_alloc_l2_strtab(struct arm_smmu_device *smmu)
+> +{
+> +	int ret;
+> +	unsigned int i;
+> +	struct arm_smmu_strtab_cfg *cfg = &smmu->strtab_cfg;
+> +	size_t size = sizeof(*cfg->l1_desc) * cfg->num_l1_descs;
+> +	void *strtab = smmu->strtab_cfg.strtab;
+> +
+> +	cfg->l1_desc = devm_kzalloc(smmu->dev, size, GFP_KERNEL);
+> +	if (!cfg->l1_desc) {
+> +		dev_err(smmu->dev, "failed to allocate l1 stream table desc\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	size = 1 << (STRTAB_SPLIT + ilog2(STRTAB_STE_DWORDS) + 3);
+> +	for (i = 0; i < cfg->num_l1_descs; ++i) {
+> +		struct arm_smmu_strtab_l1_desc *desc = &cfg->l1_desc[i];
+> +
+> +		desc->span = STRTAB_SPLIT + 1;
+> +		desc->l2ptr = dma_zalloc_coherent(smmu->dev, size,
+> +						  &desc->l2ptr_dma, GFP_KERNEL);
+
+No, no, please don't allocate all Lv2 table memory, we should dynamic allocation when needed.
+Otherwise we can not save memory relative to one level table. And cfg->l1_desc seems not necessary.
+Before create mapping for a specified StreamID, we read corresponding Lv1 table entry, if L2Ptr is NULL,
+then we build Lv2 table. Otherwise, means this Lv2 table have already been built, because a Lv2 table is
+shared by a group of StreamIDs.
+
+> +		if (!desc->l2ptr) {
+> +			dev_err(smmu->dev,
+> +				"failed to allocate l2 stream table %u\n", i);
+> +			ret = -ENOMEM;
+> +			goto out_free_l2;
+> +		}
+> +
+> +		arm_smmu_init_bypass_stes(desc->l2ptr, 1 << STRTAB_SPLIT);
+> +		arm_smmu_write_strtab_l1_desc(strtab, desc);
+> +		strtab += STRTAB_STE_DWORDS;
+> +	}
+> +
+> +	return 0;
+> +
+> +out_free_l2:
+> +	arm_smmu_free_l2_strtab(smmu);
+> +	return ret;
+> +}
+> +
+> +static int arm_smmu_init_strtab(struct arm_smmu_device *smmu)
+> +{
+> +	void *strtab;
+> +	u64 reg;
+> +	u32 size;
+> +	int ret = 0;
+> +
+> +	strtab = dma_zalloc_coherent(smmu->dev, 1 << STRTAB_L1_SZ_SHIFT,
+> +				     &smmu->strtab_cfg.strtab_dma, GFP_KERNEL);
+
+As above, when Lv2 tables are dynamic allocation, we can create Lv1 table base on SMMU_IDR1.SIDSIZE
+and support non-pic devices. Oh, if SIDSIZE is too large, like 32. Maybe we should use 64K size Lv2 table.
+But we can only use PAGE_SIZE first, for lazy.
+
+> +	if (!strtab) {
+> +		dev_err(smmu->dev, "failed to allocate l1 stream table\n");
+> +		return -ENOMEM;
+> +	}
+> +	smmu->strtab_cfg.strtab = strtab;
+> +
+> +	reg  = smmu->strtab_cfg.strtab_dma &
+> +	       STRTAB_BASE_ADDR_MASK << STRTAB_BASE_ADDR_SHIFT;
+> +	reg |= STRTAB_BASE_RA;
+> +	smmu->strtab_cfg.strtab_base = reg;
+> +
+> +	if (smmu->features & ARM_SMMU_FEAT_2_LVL_STRTAB) {
+> +		size = STRTAB_L1_SZ_SHIFT - (ilog2(STRTAB_L1_DESC_DWORDS) + 3);
+> +		smmu->strtab_cfg.num_l1_descs = 1 << size;
+> +		size += STRTAB_SPLIT;
+> +		reg = STRTAB_BASE_CFG_FMT_2LVL;
+> +
+> +		ret = arm_smmu_alloc_l2_strtab(smmu);
+> +		if (ret)
+> +			goto out_free_l1;
+> +	} else {
+> +		size = STRTAB_L1_SZ_SHIFT - (ilog2(STRTAB_STE_DWORDS) + 3);
+> +		smmu->strtab_cfg.num_l1_descs = 0;
+> +		reg = STRTAB_BASE_CFG_FMT_LINEAR;
+> +		arm_smmu_init_bypass_stes(strtab, 1 << size);
+> +	}
+> +
+> +	if (size < smmu->sid_bits)
+> +		dev_warn(smmu->dev, "%s strtab only covers %u/%u bits of SID\n",
+> +			 smmu->features & ARM_SMMU_FEAT_2_LVL_STRTAB ?
+> +			 "2-level" : "linear",
+> +			 size, smmu->sid_bits);
+> +
+> +	reg |= (size & STRTAB_BASE_CFG_LOG2SIZE_MASK)
+> +		<< STRTAB_BASE_CFG_LOG2SIZE_SHIFT;
+> +	reg |= (STRTAB_SPLIT & STRTAB_BASE_CFG_SPLIT_MASK)
+> +		<< STRTAB_BASE_CFG_SPLIT_SHIFT;
+> +	smmu->strtab_cfg.strtab_base_cfg = reg;
+> +
+> +	/* Allocate the first VMID for stage-2 bypass STEs */
+> +	set_bit(0, smmu->vmid_map);
+> +	return 0;
+> +
+> +out_free_l1:
+> +	dma_free_coherent(smmu->dev, 1 << STRTAB_L1_SZ_SHIFT, strtab,
+> +			  smmu->strtab_cfg.strtab_dma);
+> +	return ret;
+> +}
+> +
+> +static void arm_smmu_free_strtab(struct arm_smmu_device *smmu)
+> +{
+> +	struct arm_smmu_strtab_cfg *cfg = &smmu->strtab_cfg;
+> +
+> +	arm_smmu_free_l2_strtab(smmu);
+> +	dma_free_coherent(smmu->dev, 1 << STRTAB_L1_SZ_SHIFT, cfg->strtab,
+> +			  cfg->strtab_dma);
+> +}
+> +
+
+> +
+> +static int arm_smmu_device_reset(struct arm_smmu_device *smmu)
+> +{
+> +	int ret;
+> +	u32 reg, enables;
+> +	struct arm_smmu_cmdq_ent cmd;
+> +
+> +	/* Clear CR0 and sync (disables SMMU and queue processing) */
+> +	reg = readl_relaxed(smmu->base + ARM_SMMU_CR0);
+> +	if (reg & CR0_SMMUEN)
+> +		dev_warn(smmu->dev, "SMMU currently enabled! Resetting...\n");
+> +
+> +	ret = arm_smmu_device_disable(smmu);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/* CR1 (table and queue memory attributes) */
+> +	reg = (CR1_SH_ISH << CR1_TABLE_SH_SHIFT) |
+> +	      (CR1_CACHE_WB << CR1_TABLE_OC_SHIFT) |
+> +	      (CR1_CACHE_WB << CR1_TABLE_IC_SHIFT) |
+> +	      (CR1_SH_ISH << CR1_QUEUE_SH_SHIFT) |
+> +	      (CR1_CACHE_WB << CR1_QUEUE_OC_SHIFT) |
+> +	      (CR1_CACHE_WB << CR1_QUEUE_IC_SHIFT);
+> +	writel_relaxed(reg, smmu->base + ARM_SMMU_CR1);
+> +
+> +	/* CR2 (random crap) */
+> +	reg = CR2_PTM | CR2_RECINVMID | CR2_E2H;
+
+Do we need to explicitly set CR2_E2H? Linux only run at EL1.
+
+> +	writel_relaxed(reg, smmu->base + ARM_SMMU_CR2);
+> +
+> +	/* Stream table */
+> +	writeq_relaxed(smmu->strtab_cfg.strtab_base,
+> +		       smmu->base + ARM_SMMU_STRTAB_BASE);
+> +	writel_relaxed(smmu->strtab_cfg.strtab_base_cfg,
+> +		       smmu->base + ARM_SMMU_STRTAB_BASE_CFG);
+> +
+> +	/* Command queue */
+> +	writeq_relaxed(smmu->cmdq.q.q_base, smmu->base + ARM_SMMU_CMDQ_BASE);
+> +	writel_relaxed(smmu->cmdq.q.prod, smmu->base + ARM_SMMU_CMDQ_PROD);
+> +	writel_relaxed(smmu->cmdq.q.cons, smmu->base + ARM_SMMU_CMDQ_CONS);
+> +
+> +	enables = CR0_CMDQEN;
+> +	ret = arm_smmu_write_reg_sync(smmu, enables, ARM_SMMU_CR0,
+> +				      ARM_SMMU_CR0ACK);
+> +	if (ret) {
+> +		dev_err(smmu->dev, "failed to enable command queue\n");
+> +		return ret;
+> +	}
+> +
+> +	/* Invalidate any cached configuration */
+> +	cmd.opcode = CMDQ_OP_CFGI_ALL;
+> +	arm_smmu_cmdq_issue_cmd(smmu, &cmd);
+> +	cmd.opcode = CMDQ_OP_CMD_SYNC;
+> +	arm_smmu_cmdq_issue_cmd(smmu, &cmd);
+> +
+> +	/* Invalidate any stale TLB entries */
+> +	cmd.opcode = CMDQ_OP_TLBI_EL2_ALL;
+
+Do we need to execute CMDQ_OP_TLBI_EL2_ALL? Linux only run at EL1. It at least rely
+on SMMU_IDR0.Hyp
+
+
+> +	arm_smmu_cmdq_issue_cmd(smmu, &cmd);
+> +	cmd.opcode = CMDQ_OP_TLBI_NSNH_ALL;
+> +	arm_smmu_cmdq_issue_cmd(smmu, &cmd);
+> +	cmd.opcode = CMDQ_OP_CMD_SYNC;
+> +	arm_smmu_cmdq_issue_cmd(smmu, &cmd);
+> +
+> +	/* Event queue */
+> +	writeq_relaxed(smmu->evtq.q.q_base, smmu->base + ARM_SMMU_EVTQ_BASE);
+> +	writel_relaxed(smmu->evtq.q.prod, smmu->base + ARM_SMMU_EVTQ_PROD);
+> +	writel_relaxed(smmu->evtq.q.cons, smmu->base + ARM_SMMU_EVTQ_CONS);
+> +
+> +	enables |= CR0_EVTQEN;
+> +	ret = arm_smmu_write_reg_sync(smmu, enables, ARM_SMMU_CR0,
+> +				      ARM_SMMU_CR0ACK);
+> +	if (ret) {
+> +		dev_err(smmu->dev, "failed to enable event queue\n");
+> +		return ret;
+> +	}
+> +
+> +	/* PRI queue */
+> +	if (smmu->features & ARM_SMMU_FEAT_PRI) {
+> +		writeq_relaxed(smmu->priq.q.q_base,
+> +			       smmu->base + ARM_SMMU_PRIQ_BASE);
+> +		writel_relaxed(smmu->priq.q.prod,
+> +			       smmu->base + ARM_SMMU_PRIQ_PROD);
+> +		writel_relaxed(smmu->priq.q.cons,
+> +			       smmu->base + ARM_SMMU_PRIQ_CONS);
+> +
+> +		enables |= CR0_PRIQEN;
+> +		ret = arm_smmu_write_reg_sync(smmu, enables, ARM_SMMU_CR0,
+> +					      ARM_SMMU_CR0ACK);
+> +		if (ret) {
+> +			dev_err(smmu->dev, "failed to enable PRI queue\n");
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	ret = arm_smmu_setup_irqs(smmu);
+> +	if (ret) {
+> +		dev_err(smmu->dev, "failed to setup irqs\n");
+> +		return ret;
+> +	}
+> +
+> +	/* Enable the SMMU interface */
+> +	enables |= CR0_SMMUEN;
+> +	ret = arm_smmu_write_reg_sync(smmu, enables, ARM_SMMU_CR0,
+> +				      ARM_SMMU_CR0ACK);
+> +	if (ret) {
+> +		dev_err(smmu->dev, "failed to enable SMMU interface\n");
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
