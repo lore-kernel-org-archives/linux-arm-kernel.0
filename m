@@ -1,99 +1,94 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 12 May 2015 14:44:26 +0100
-Subject: [PATCH] serial/amba-pl011: Unconditionally poll for FIFO space before
- each TX char
-Message-ID: <1431438266-28094-1-git-send-email-Dave.Martin@arm.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Tue, 12 May 2015 14:45:07 +0100
+Subject: [PATCH] arm/mach-exynos: suspend: Don't try to initialize
+ suspend/suspend on old DT
+Message-ID: <1431438307-25410-1-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 734745caeb9f155ab58918834a8c70e83fa6afd3 serial/amba-pl011:
-(Activate TX IRQ passively) introduces a race which causes the driver
-sometimes to attempt to write a character to the TX FIFO when the FIFO
-is already full.
+Since commit 8b283c0 "ARM: exynos4/5: convert pmu wakeup to stacked domains",
+a suspend/resume is not supported on old DT.
 
-The PL011 does not guarantee its behaviour when the FIFO is overfilled.
-In practice, this can cause duplicate and/or dropped characters to be
-output on the wire.  The problem is common enough to be readily
-observable on the ARM Juno platform when the PL011 UART is used as
-the console and DMA is not in use.
+Although, rather than printing a warning and continue to boot, the
+kernel will segfault just after:
 
-This patch fixes this problem by always polling for space before each
-character is written to the FIFO.
+------------[ cut here ]------------
 
-This will be amended to a less brute-force approach in a later commit,
-but this patch should help ensure correct behaviour for now.
+WARNING: CPU: 1 PID: 1 at arch/arm/mach-exynos/suspend.c:726 exynos_pm_init+0x4c/0xc8()
+Modules linked in:
+CPU: 1 PID: 1 Comm: swapper/0 Not tainted 4.1.0-rc3 #1
+Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+[<c02181c4>] (unwind_backtrace) from [<c0213b2c>] (show_stack+0x10/0x14)
+[<c0213b2c>] (show_stack) from [<c0949890>] (dump_stack+0x70/0x8c)
+[<c0949890>] (dump_stack) from [<c024f0b0>] (warn_slowpath_common+0x74/0xac)
+[<c024f0b0>] (warn_slowpath_common) from [<c024f104>] (warn_slowpath_null+0x1c/0x24)
+[<c024f104>] (warn_slowpath_null) from [<c0cf1d28>] (exynos_pm_init+0x4c/0xc8)
+[<c0cf1d28>] (exynos_pm_init) from [<c0ceaae8>] (init_machine_late+0x1c/0x28)
+[<c0ceaae8>] (init_machine_late) from [<c020aa64>] (do_one_initcall+0x80/0x1d0)
+[<c020aa64>] (do_one_initcall) from [<c0ce8d4c>] (kernel_init_freeable+0x10c/0x1d8)
+[<c0ce8d4c>] (kernel_init_freeable) from [<c0944a2c>] (kernel_init+0x8/0xe4)
+[<c0944a2c>] (kernel_init) from [<c0210e60>] (ret_from_fork+0x14/0x34)
+---[ end trace 335bd937d409f3c7 ]---
+Outdated DT detected, suspend/resume will NOT work
+Unable to handle kernel NULL pointer dereference at virtual address 00000608
+pgd = c0204000
+[00000608] *pgd=00000000
+Internal error: Oops: 5 [#1] SMP ARM
+Modules linked in:
+CPU: 1 PID: 1 Comm: swapper/0 Tainted: G        W       4.1.0-rc3 #1
+Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+task: db06c000 ti: db05a000 task.ti: db05a000
+PC is at exynos_pm_init+0x6c/0xc8
+LR is at exynos_pm_init+0x54/0xc8
+pc : [<c0cf1d48>]    lr : [<c0cf1d30>]    psr: 60000113
+sp : db05bee8  ip : 00000000  fp : 00000000
+r10: 00000116  r9 : c0dab2d4  r8 : d8d5f440
+r7 : c0db7ad8  r6 : c0db7ad8  r5 : 00000000  r4 : c0ceaacc
+r3 : c0eb2aec  r2 : c0951e40  r1 : 00000000  r0 : c0eb2acc
+Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+Control: 10c5387d  Table: 6020406a  DAC: 00000015
+Process swapper/0 (pid: 1, stack limit = 0xdb05a220)
+Stack: (0xdb05bee8 to 0xdb05c000)
+bee0:                   c0db7ad8 c0d8fe34 c0cf17c8 c0ceaae8 00000000 c020aa64
+bf00: 00000033 c09580b8 db04fd00 c0ed79a4 c0eb1000 c0ce8588 c0ca2bc4 c0353fcc
+bf20: 00000000 c0df358c 60000113 00000000 dbfffba4 00000000 c0ca2bc4 c026654c
+bf40: c0b80134 c0ca1a64 00000007 00000007 c0df3554 c0d6c2f4 00000007 c0d6c2d4
+bf60: c0eb1000 c0ce8588 c0dab2d4 00000116 00000000 c0ce8d4c 00000007 00000007
+bf80: c0ce8588 c0944a24 00000000 c0944a24 00000000 00000000 00000000 00000000
+bfa0: 00000000 c0944a2c 00000000 c0210e60 00000000 00000000 00000000 00000000
+bfc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+bfe0: 00000000 00000000 00000000 00000000 00000013 00000000 00000000 00000000
+[<c0cf1d48>] (exynos_pm_init) from [<c0ceaae8>] (init_machine_late+0x1c/0x28)
+[<c0ceaae8>] (init_machine_late) from [<c020aa64>] (do_one_initcall+0x80/0x1d0)
+[<c020aa64>] (do_one_initcall) from [<c0ce8d4c>] (kernel_init_freeable+0x10c/0x1d8)
+[<c0ce8d4c>] (kernel_init_freeable) from [<c0944a2c>] (kernel_init+0x8/0xe4)
+[<c0944a2c>] (kernel_init) from [<c0210e60>] (ret_from_fork+0x14/0x34)
+Code: e59f005c e59220c0 e5901000 e5832000 (e591e608)
+---[ end trace 335bd937d409f3c8 ]---
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+This is happening because pmu_base_addr is only initialized when the
+PMU is an interrupt controller. It's not the case on old DT.
+
+Signed-off-by: Julien Grall <julien.grall@citrix.com>
 ---
+ arch/arm/mach-exynos/suspend.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-The patch is based on gregkh/tty.git tty-linus.
-
-Please consider applying it for v4.1.  Without it, we have a regression
-compared with v4.0.
-
-*Note*
-This will cause a conflict with tty-next because it pulls forward
-some changes made by commit 1e84d22 (serial/amba-pl011: Refactor and
-simplify TX FIFO handling); however, the resolution is simple except
-for the following lines which may need to be deleted manually from
-amba-pl011.c:pl011_startup():
-
--8<-
-	/* Assume that TX IRQ doesn't work until we see one: */
-	uap->tx_irq_seen = 0;
-
-->8-
-
-(This is is the same mismerge already observed by Steven Rothwell when
-building next.)
-
-Cheers
----Dave
-
-
- drivers/tty/serial/amba-pl011.c |   16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 6f5a072..763eb20 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -1249,20 +1249,19 @@ __acquires(&uap->port.lock)
- 
- /*
-  * Transmit a character
-- * There must be at least one free entry in the TX FIFO to accept the char.
-  *
-- * Returns true if the FIFO might have space in it afterwards;
-- * returns false if the FIFO definitely became full.
-+ * Returns true if the character was successfully queued to the FIFO.
-+ * Returns false otherwise.
-  */
- static bool pl011_tx_char(struct uart_amba_port *uap, unsigned char c)
- {
-+	if (readw(uap->port.membase + UART01x_FR) & UART01x_FR_TXFF)
-+		return false; /* unable to transmit character */
-+
- 	writew(c, uap->port.membase + UART01x_DR);
- 	uap->port.icount.tx++;
- 
--	if (likely(uap->tx_irq_seen > 1))
--		return true;
--
--	return !(readw(uap->port.membase + UART01x_FR) & UART01x_FR_TXFF);
-+	return true;
- }
- 
- static bool pl011_tx_chars(struct uart_amba_port *uap)
-@@ -1296,7 +1295,8 @@ static bool pl011_tx_chars(struct uart_amba_port *uap)
- 		return false;
- 
- 	if (uap->port.x_char) {
--		pl011_tx_char(uap, uap->port.x_char);
-+		if (!pl011_tx_char(uap, uap->port.x_char))
-+			goto done;
- 		uap->port.x_char = 0;
- 		--count;
+diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
+index 3e6aea7..b6f3ddc 100644
+--- a/arch/arm/mach-exynos/suspend.c
++++ b/arch/arm/mach-exynos/suspend.c
+@@ -723,8 +723,10 @@ void __init exynos_pm_init(void)
+ 		return;
  	}
+ 
+-	if (WARN_ON(!of_find_property(np, "interrupt-controller", NULL)))
++	if (WARN_ON(!of_find_property(np, "interrupt-controller", NULL))) {
+ 		pr_warn("Outdated DT detected, suspend/resume will NOT work\n");
++		return;
++	}
+ 
+ 	pm_data = (const struct exynos_pm_data *) match->data;
+ 
 -- 
-1.7.10.4
+2.1.4
