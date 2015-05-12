@@ -1,72 +1,50 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Tue, 12 May 2015 19:20:45 +0200
-Subject: [PATCH RFC 0/2] stmmac: stand alone platform drivers
-In-Reply-To: <5987007.lq0DjS0tE0@wuerfel>
-References: <1431022765-30715-1-git-send-email-manabian@gmail.com>
- <5987007.lq0DjS0tE0@wuerfel>
-Message-ID: <CAGhQ9Vx0DQf-HcqEiohFLrBJPBe5qYjLgXiH3qGx85fAruh8UQ@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 12 May 2015 12:22:33 -0500
+Subject: [PATCH 5/7] ARM: re-implement physical address space switching
+In-Reply-To: <20150511195933.GI2067@n2100.arm.linux.org.uk>
+References: <20150506103000.GF2067@n2100.arm.linux.org.uk>
+ <E1YpwbF-0000wd-MP@rmk-PC.arm.linux.org.uk>
+ <5550FBD8.3070103@ti.com>
+ <20150511195933.GI2067@n2100.arm.linux.org.uk>
+Message-ID: <CAGo_u6ph1L7=+DDUZSzXjv6z1CtjBfuhPpLLppO_OxKZhyjQVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 May 2015 at 15:30, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 07 May 2015 20:19:23 Joachim Eastwood wrote:
->> Hi Arnd,
+On Mon, May 11, 2015 at 2:59 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, May 11, 2015 at 01:58:32PM -0500, Nishanth Menon wrote:
+>> On 05/06/2015 05:30 AM, Russell King wrote:
+>> [...]
+>> > @@ -1436,75 +1435,32 @@ void __init early_paging_init(const struct machine_desc *mdesc,
 >>
->> I ran into some issue using a separate platform driver[1] for lpc1850-dwmac.
+>> [...]
+>> > -   /* Finally flush any stale TLB values. */
+>> > -   local_flush_bp_all();
+>> > -   local_flush_tlb_all();
+>> > +   /* Re-enable the caches and cacheable TLB walks */
+>> > +   asm volatile("mcr p15, 0, %0, c2, c0, 2" : : "ttbcr");
+>> ^^
+>> on next-20150511, echo
+>> "CONFIG_ARM_LPAE=y">>arch/arm/configs/multi_v7_defconfig ;make
+>> multi_v7_defconfig;make arch/arm/mm/mmu.o
+>> #
+>> # configuration written to .config
+>> #
+>> scripts/kconfig/conf  --silentoldconfig Kconfig
 >>
->> My dts files looks like this.
->> mac: ethernet at 40010000 {
->>         compatible = "nxp,lpc1850-dwmac", "snps,dwmac-3.611", "snps,dwmac";
->>         ...
->> }
->>
->> On boot the generic driver in stmmac_platform.c would grab the
->> device, matching on one of generic compat strings and thus blocking
->> the lpc1850-dwmac driver.
->>
->> By changing the build order in the Makefile (see patch 1) I managed
->> to get it working, but I am not sure that is a good solution(?).
+>> <snip>
+>>   CC      arch/arm/mm/mmu.o
+>> arch/arm/mm/mmu.c: In function ?early_paging_init?:
+>> arch/arm/mm/mmu.c:1461:54: error: expected ?(? before ?)? token
+>> make[1]: *** [arch/arm/mm/mmu.o] Error 1
+>> make: *** [arch/arm/mm/mmu.o] Error 2
+>> this was using [1]
 >
-> Changing the link order in the Makefile is an acceptable solution
-> for managing initialization order in general, but I think it won't
-> work here, because if your driver is a loadable module, the base
-> driver would always be attached first.
+> That's why I said I'd send you an updated version.  Just replace the
+> "ttbcr" with "r" (ttbcr)...
 
-That is true.
+Was reporting regression on 20150511. 20150512 seems to have built fine.
 
-The setup/configuration I am testing doesn't use modules though and
-the only way I can get the lpc1850-dwmac driver to probe the device is
-to link the generic driver last.
-
->> Another fix would be to remove the generic compat strings from the
->> match table in stmmac_platform but there are some dts-files that
->> only have these compat strings.
->> See abilis_tb10x.dtsi and exynos5440.dtsi.
->
-> Yes, that has a high risk of causing regressions.
->
->> I could also remove the generic compat strings from my dts file but
->> I am not sure that is good solution either. If more glue is
->> converted this would then be need in those dts files also.
->
-> I think it would work if you move the generic strings into a separate
-> module that is not the one providing the base support. In that case,
-> the kernel should first try to use the driver that matches the first
-> compatible string. Can you try that?
-
-I have now created a generic dt dwmac driver which contain all compat
-strings that doesn't have any match data. As long as this driver is
-linked last this works for my built-in drivers configuration. I am not
-able to test using modules because of my very limited rootfs. This is
-a Cortex-M system after all.
-
-I also converted all the other DT dwmac drivers and the entire patch
-set can be found on:
-https://github.com/manabian/linux-lpc
-
-After I have done some more cleanups and added proper commit messages
-I will put them on netdev again.
-
-
-regards,
-Joachim Eastwood
+---
+Regards,
+Nishanth Menon
