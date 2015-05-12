@@ -1,85 +1,67 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 12 May 2015 18:13:14 +0200
-Subject: [PATCH 8/8] ARM: mvebu: a38x: Enable A38x XOR engine features
-In-Reply-To: <1431445063-20226-9-git-send-email-maxime.ripard@free-electrons.com>
-References: <1431445063-20226-1-git-send-email-maxime.ripard@free-electrons.com>
- <1431445063-20226-9-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20150512161314.GL19927@lunn.ch>
+From: robert.richter@caviumnetworks.com (Robert Richter)
+Date: Tue, 12 May 2015 18:20:49 +0200
+Subject: [PATCH 4/4] arm64: gicv3: its: Increase FORCE_MAX_ZONEORDER for
+ Cavium ThunderX
+In-Reply-To: <20150512123056.GA2062@arm.com>
+References: <1430686172-18222-1-git-send-email-rric@kernel.org>
+ <1430686172-18222-5-git-send-email-rric@kernel.org>
+ <20150505105329.GC1550@arm.com>
+ <20150511091438.GW4251@rric.localhost>
+ <20150512123056.GA2062@arm.com>
+Message-ID: <20150512162049.GP10428@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 12, 2015 at 05:37:43PM +0200, Maxime Ripard wrote:
-> From: Lior Amsalem <alior@marvell.com>
-> 
-> The new XOR engine has a new compatible of its own, together with new
-> channel capabilities.
-> 
-> Use that new compatible now that we have a driver that can handle it.
-> 
-> Signed-off-by: Lior Amsalem <alior@marvell.com>
-> Reviewed-by: Ofer Heifetz <oferh@marvell.com>
-> Reviewed-by: Nadav Haklai <nadavh@marvell.com>
-> Tested-by: Nadav Haklai <nadavh@marvell.com>
-> ---
->  arch/arm/boot/dts/armada-38x.dtsi | 20 ++++++--------------
->  1 file changed, 6 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-> index ed2dd8ba4080..6d07b7389415 100644
-> --- a/arch/arm/boot/dts/armada-38x.dtsi
-> +++ b/arch/arm/boot/dts/armada-38x.dtsi
-> @@ -448,7 +448,7 @@
->  			};
->  
->  			xor at 60800 {
-> -				compatible = "marvell,orion-xor";
-> +				compatible = "marvell,a38x-xor";
->  				reg = <0x60800 0x100
->  				       0x60a00 0x100>;
->  				clocks = <&gateclk 22>;
-> @@ -458,17 +458,13 @@
->  					interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
->  					dmacap,memcpy;
->  					dmacap,xor;
-> -				};
-> -				xor01 {
-> -					interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
-> -					dmacap,memcpy;
-> -					dmacap,xor;
-> -					dmacap,memset;
-> +					dmacap,pq;
-> +					dmacap,interrupt;
+Will,
 
-Does this mean the hardware only has one channel?
-And memset is no longer supported?
+On 12.05.15 13:30:57, Will Deacon wrote:
+> On Mon, May 11, 2015 at 10:14:38AM +0100, Robert Richter wrote:
+> > On 05.05.15 11:53:29, Will Deacon wrote:
+> > > On Sun, May 03, 2015 at 09:49:32PM +0100, Robert Richter wrote:
+> > > > From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+> > > > 
+> > > > In case of ARCH_THUNDER, there is a need to allocate the GICv3 ITS table
+> > > > which is bigger than the allowed max order. So we are forcing it only in
+> > > > case of 4KB page size.
+> > > 
+> > > Does this problem disappear if the ITS driver uses dma_alloc_coherent
+> > > instead? That would also allow us to remove the __flush_dcache_area abuse
+> > > from the driver.
+> > 
+> > __get_free_pages() is also used internally in dma_alloc_coherent().
+> > 
+> > There is another case if the device brings dma mem with it. I am not
+> > sure if it would be possible to assign some phys memory via devicetree
+> > to the interrupt controller and then assign that range for its table
+> > allocation.
+> > 
+> > Another option would be to allocate a hugepage. This would require
+> > setting up hugepages during boottime. I need to figure out whether
+> > that could work.
 
-    Andrew
+For allocation of 16MB cont. phys mem of a defconfig kernel (4KB
+default pagesize) I see this different approaches:
 
+ * set FORCE_MAX_ZONEORDER to 13 as default,
 
->  				};
->  			};
->  
->  			xor at 60900 {
-> -				compatible = "marvell,orion-xor";
-> +				compatible = "marvell,a38x-xor";
->  				reg = <0x60900 0x100
->  				       0x60b00 0x100>;
->  				clocks = <&gateclk 28>;
-> @@ -478,12 +474,8 @@
->  					interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
->  					dmacap,memcpy;
->  					dmacap,xor;
-> -				};
-> -				xor11 {
-> -					interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
-> -					dmacap,memcpy;
-> -					dmacap,xor;
-> -					dmacap,memset;
-> +					dmacap,pq;
-> +					dmacap,interrupt;
->  				};
->  			};
->  
-> -- 
-> 2.4.0
+ * set FORCE_MAX_ZONEORDER to 13 if ARM_GIC_V3 is set,
+
+ * set FORCE_MAX_ZONEORDER to 13 if ARCH_THUNDER is set (this patch),
+
+ * use hugepages if enabled (defconfig has the following options
+   enable: CGROUP_HUGETLB, TRANSPARENT_HUGEPAGE, HUGETLBFS, this might
+   work with current default kernel without changing defconfig
+   options),
+
+ * use devicetree to reserve mem for gicv3 (need to check ACPI).
+
+Do you see any direction?
+
+> > What about on the remaining 3 patches?
 > 
+> Marc would be the best guy to review those, but he's on holiday for a couple
+> of weeks at the moment.
+
+Thanks for the note and your comments.
+
+-Robert
