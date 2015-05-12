@@ -1,95 +1,60 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 12 May 2015 13:51:39 +0100
-Subject: [PATCH 02/13] ARM: STi: STiH416: Add Pinctrl settings for PWM
+Date: Tue, 12 May 2015 13:51:38 +0100
+Subject: [PATCH 01/13] ARM: STi: STiH407: Add DT nodes for for PWM
 In-Reply-To: <1431435110-22595-1-git-send-email-lee.jones@linaro.org>
 References: <1431435110-22595-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1431435110-22595-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1431435110-22595-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Supply the Pinctrl configuration to enable PWM{0,1} lines on STiH416
-based development boards.
+Supply top level nodes for the STiH407 based development boards.
+The Pinctrl configuration has already been applied, so the only
+missing piece of the DT puzzle is for a board's DTB to enable
+the nodes.
 
 Signed-off-by: Ajit Pal Singh <ajitpal.singh@st.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/stih416-pinctrl.dtsi | 50 ++++++++++++++++++++++++++++++++++
- 1 file changed, 50 insertions(+)
+ arch/arm/boot/dts/stih407.dtsi | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stih416-pinctrl.dtsi b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-index 9cccf2d..051fc16 100644
---- a/arch/arm/boot/dts/stih416-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stih416-pinctrl.dtsi
-@@ -216,6 +216,29 @@
- 					};
+diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
+index 3efa3b2..2c560fc3 100644
+--- a/arch/arm/boot/dts/stih407.dtsi
++++ b/arch/arm/boot/dts/stih407.dtsi
+@@ -147,5 +147,33 @@
  				};
  			};
-+
-+			pwm1 {
-+				pinctrl_pwm1_chan0_default: pwm1-0-default {
-+					st,pins {
-+						pwm-out    = <&pio3 0 ALT1 OUT>;
-+					};
-+				};
-+				pinctrl_pwm1_chan1_default: pwm1-1-default {
-+					st,pins {
-+						pwm-out    = <&pio4 4 ALT1 OUT>;
-+					};
-+				};
-+				pinctrl_pwm1_chan2_default: pwm1-2-default {
-+					st,pins {
-+						pwm-out    = <&pio4 6 ALT3 OUT>;
-+					};
-+				};
-+				pinctrl_pwm1_chan3_default: pwm1-3-default {
-+					st,pins {
-+						pwm-out    = <&pio4 7 ALT3 OUT>;
-+					};
-+				};
-+			};
  		};
- 
- 		pin-controller-front {
-@@ -310,6 +333,14 @@
- 				st,bank-name	= "PIO31";
- 			};
- 
-+			pwm0 {
-+				pinctrl_pwm0_chan0_default: pwm0-0-default {
-+					st,pins {
-+						pwm-out    = <&pio9 7 ALT2 OUT>;
-+					};
-+				};
-+			};
 +
- 			serial2-oe {
- 				pinctrl_serial2_oe: serial2-1 {
- 					st,pins {
-@@ -540,6 +571,25 @@
- 					};
- 				};
- 			};
++		/* COMMS PWM Module */
++		pwm0: pwm at 9810000 {
++			compatible	= "st,sti-pwm";
++			status		= "disabled";
++			#pwm-cells	= <2>;
++			reg		= <0x9810000 0x68>;
++			pinctrl-names	= "default";
++			pinctrl-0	= <&pinctrl_pwm0_chan0_default>;
++			clock-names	= "pwm";
++			clocks		= <&clk_sysin>;
++		};
 +
-+			pwm0 {
-+				pinctrl_pwm0_chan1_default: pwm0-1-default {
-+					st,pins {
-+						pwm-out    = <&pio13 2 ALT2 OUT>;
-+					};
-+				};
-+				pinctrl_pwm0_chan2_default: pwm0-2-default {
-+					st,pins {
-+						pwm-out    = <&pio15 2 ALT4 OUT>;
-+					};
-+				};
-+				pinctrl_pwm0_chan3_default: pwm0-3-default {
-+					st,pins {
-+						pwm-out    = <&pio17 4 ALT1 OUT>;
-+					};
-+				};
-+			};
-+
- 		};
- 
- 		pin-controller-fvdp-fe {
++		/* SBC PWM Module */
++		pwm1: pwm at 9510000 {
++			compatible	= "st,sti-pwm";
++			status		= "disabled";
++			#pwm-cells	= <2>;
++			reg		= <0x9510000 0x68>;
++			pinctrl-names	= "default";
++			pinctrl-0	= <&pinctrl_pwm1_chan0_default
++					&pinctrl_pwm1_chan1_default
++					&pinctrl_pwm1_chan2_default
++					&pinctrl_pwm1_chan3_default>;
++			clock-names	= "pwm";
++			clocks		= <&clk_sysin>;
++			st,pwm-num-chan = <4>;
++		};
+ 	};
+ };
 -- 
 1.9.1
