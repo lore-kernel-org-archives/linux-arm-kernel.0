@@ -1,47 +1,24 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 12 May 2015 11:19:45 -0500
-Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
-In-Reply-To: <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
-References: <cover.1430394884.git.viresh.kumar@linaro.org>
- <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
-Message-ID: <20150512161945.GE8699@saruman.tx.rr.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 12 May 2015 18:29:17 +0200
+Subject: [PATCH 1/4] i2c: imx: Constify platform_device_id
+In-Reply-To: <1430495668-31878-1-git-send-email-k.kozlowski.k@gmail.com>
+References: <1430495668-31878-1-git-send-email-k.kozlowski.k@gmail.com>
+Message-ID: <20150512162917.GE6805@schokonusskuchen.bad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 30, 2015 at 05:37:59PM +0530, Viresh Kumar wrote:
-> Current OPP (Operating performance point) DT bindings are proven to be
-> insufficient at multiple instances.
+On Sat, May 02, 2015 at 12:54:25AM +0900, Krzysztof Kozlowski wrote:
+> The platform_device_id is not modified by the driver and core uses it as
+> const.
 > 
-> The shortcomings we are trying to solve here:
-> 
-> - Getting clock sharing information between CPUs. Single shared clock vs
->   independent clock per core vs shared clock per cluster.
-> 
-> - Support for specifying current levels along with voltages.
-> 
-> - Support for multiple regulators.
-> 
-> - Support for turbo modes.
-> 
-> - Other per OPP settings: transition latencies, disabled status, etc.?
-> 
-> - Expandability of OPPs in future.
-> 
-> This patch introduces new bindings "operating-points-v2" to get these problems
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
 
-operating-points-v2 is kinda awkward, how about
-operating-points-extended, much like interrupts-extended ?
+Squashed the 4 patches and applied to for-next, thanks!
 
-Other than this, I very much like the new approach.
-
-Regards
-
--- 
-balbi
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 819 bytes
+Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150512/cfdb15c5/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150512/f2773fe7/attachment.sig>
