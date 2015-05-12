@@ -1,30 +1,31 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 12 May 2015 23:40:12 +0300
-Subject: [PATCH v2 04/17] input: locomokbd: provide an Alt-SysRQ
- combination
-In-Reply-To: <20150512201215.GD20725@dtor-ws>
-References: <1430178954-11138-1-git-send-email-dbaryshkov@gmail.com>
- <1430178954-11138-5-git-send-email-dbaryshkov@gmail.com>
- <20150512201215.GD20725@dtor-ws>
-Message-ID: <CALT56yO+fiPfm6hhx+E3dAyrE1G8SSdcX3VpXXqW4=UuTh-4qA@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 12 May 2015 22:44:09 +0200
+Subject: [PATCH 2/2] ARM: dts: rockchip: add system-power-controller to
+ act8846
+In-Reply-To: <64DE272A-FD25-406C-A51B-6C5B76DA5171@stud.hs-offenburg.de>
+References: <64DE272A-FD25-406C-A51B-6C5B76DA5171@stud.hs-offenburg.de>
+Message-ID: <2003800.TXlUqeQVab@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-12 23:12 GMT+03:00 Dmitry Torokhov <dmitry.torokhov@gmail.com>:
-> Hi Dmitry,
->
-> On Tue, Apr 28, 2015 at 02:55:41AM +0300, Dmitry Eremin-Solenikov wrote:
->> It is usefull sometimes to have an Alt-SysRQ combo on the keyboard to be
->> able to trigger sysrq functions directly. Add an option providing sysrq
->> mapping for Contact-Home keys.
->
-> No, if you want to remap the keys please do it from usepspace; locomokbd
-> supports it (EVIOCSKEYCODE ioctl).
+Am Montag, 11. Mai 2015, 22:57:21 schrieb Michael Niew?hner:
+> Add system-power-controller to act8846 in rk3188-radxarock.dts in addition
+> to the act8846 patch fixing the reboot kernel panic
+> 
+> Signed-off-by: Michael Niewoehner <mniewoeh@stud.hs-offenburg.de>
 
-OK, this was useful to boot kernels with minimal to no userspace (tiny
-initramfs)
-and still have the SysRQ at hand. I'll keep this as a local/OE patch instead.
+As the act8846 is the system-power-controller in any case (for example to
+powerdown the board) I've applied this patch to my dts branch for 4.2 [0],
+after adapting the commit message slightly to make it a bit more generic:
+----
+ARM: dts: rockchip: add system-power-controller to act8846 on radxarock
+The act8846 is the main pmic and system-power-controller on radxarock boards,
+so add the necessary property.
+----
 
--- 
-With best wishes
-Dmitry
+Hope that is ok with you :-)
+
+Heiko
+
+
+[0] https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/commit/?h=v4.2-armsoc/dts&id=9ab79be0da98e371f1d2f9c01ac25745639718d1
