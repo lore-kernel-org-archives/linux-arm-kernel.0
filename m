@@ -1,33 +1,45 @@
 From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Tue, 12 May 2015 09:39:13 +0200
-Subject: [PATCH 0/2 v2] Fix boot on Calxeda highbank
-Message-ID: <1431416355-7693-1-git-send-email-sjoerd.simons@collabora.co.uk>
+Date: Tue, 12 May 2015 09:39:15 +0200
+Subject: [PATCH 2/2] ARM: l2c: highbank: Add dummy configure function
+In-Reply-To: <1431416355-7693-1-git-send-email-sjoerd.simons@collabora.co.uk>
+References: <1431416355-7693-1-git-send-email-sjoerd.simons@collabora.co.uk>
+Message-ID: <1431416355-7693-3-git-send-email-sjoerd.simons@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When upgrading our trusted Calxeda server to Debian Jessie recently the machine
-wedged during booting the installer. Upon further investigation, this happens
-due to the transition to the generic L2C infrastructure introduced in 3.16. The
-generic l2x0 code unlocks the cache during setup, however the Caldexa SMC
-interface doesn't seem to allow the kernel to enable enable non-secure access
-to the lock registers.. Queue Imprecise aborts and a fairly unhappy machine.
+Add empty configure function for the highbank l2c to reflect that the
+cache can't be confured through a SMC. This prevent a useless
+WARN_ONCE during early boot.
 
-First patch in this series adds detection to the l2x0 code to check if
-unlocking is possible. Second patch adds a (empty) configure callback for the
-highbank l2c, reflecting the fact that there seemingly isn't anything to
-configured via an SMC on these maches.
+Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+---
+ arch/arm/mach-highbank/highbank.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Changes since v1:
- - Auto-detect when unlocking the cache is unsafe rather then requiring a
-   explicit flag to be set in the machine-specific code
-
-Sjoerd Simons (2):
-  ARM: cache-l2c: Detect whether it's safe to unlock
-  ARM: l2c: highbank: Add dummy configure function
-
- arch/arm/mach-highbank/highbank.c |  8 ++++++++
- arch/arm/mm/cache-l2x0.c          | 20 ++++++++++++++++++++
- 2 files changed, 28 insertions(+)
-
+diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+index 231fba0..623eb5e8 100644
+--- a/arch/arm/mach-highbank/highbank.c
++++ b/arch/arm/mach-highbank/highbank.c
+@@ -60,12 +60,20 @@ static void highbank_l2c310_write_sec(unsigned long val, unsigned reg)
+ 			  reg);
+ }
+ 
++static void highbank_l2c310_configure(const struct l2x0_regs *regs)
++{
++}
++
+ static void __init highbank_init_irq(void)
+ {
+ 	irqchip_init();
+ 
+ 	if (of_find_compatible_node(NULL, NULL, "arm,cortex-a9"))
+ 		highbank_scu_map_io();
++
++	if (IS_ENABLED(CONFIG_CACHE_L2X0)) {
++		outer_cache.configure = highbank_l2c310_configure;
++	}
+ }
+ 
+ static void highbank_power_off(void)
 -- 
 2.1.4
