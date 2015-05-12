@@ -1,20 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 12 May 2015 12:43:29 +0200
-Subject: [PATCH 1/3] dt-bindings: add brcmstb-gpio GPIO binding
-In-Reply-To: <1430901477-10678-2-git-send-email-gregory.0xf0@gmail.com>
-References: <1430901477-10678-1-git-send-email-gregory.0xf0@gmail.com>
- <1430901477-10678-2-git-send-email-gregory.0xf0@gmail.com>
-Message-ID: <CACRpkda4yWHpneyvkmTaecp4KY8JAJ+d8zY6d-d2hsB2ZJVoFw@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 12 May 2015 11:45:29 +0100
+Subject: [PATCH 1/2] ARM64: kernel: make cpu_ops hooks DT agnostic
+In-Reply-To: <20150511160401.GC4595@leverpostej>
+References: <1431020084-5875-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20150511160401.GC4595@leverpostej>
+Message-ID: <20150512104529.GC16079@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 6, 2015 at 10:37 AM, Gregory Fong <gregory.0xf0@gmail.com> wrote:
+On Mon, May 11, 2015 at 05:04:02PM +0100, Mark Rutland wrote:
+> Hi Lorenzo,
+> 
+> >  /**
+> >   * struct cpu_operations - Callback operations for hotplugging CPUs.
+> >   *
+> > - * @name:	Name of the property as appears in a devicetree cpu node's
+> > - *		enable-method property.
+> > - * @cpu_init:	Reads any data necessary for a specific enable-method from the
+> > - *		devicetree, for a given cpu node and proposed logical id.
+> > + * @name:	Name of the enable-method.
+> 
+> I'm not keen on dropping the DT portion from the name documentation,
+> given the name must be the DT enable-method string. I'd prefer to leave
+> the original comment, or something at least mentioning that the name is
+> a DT enable-method string.
 
-> Add binding for Broadcom STB "UPG GIO" GPIO controller.
->
-> Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
+Ok, I will reword the comment so that that string makes sense in ACPI
+too, leaving DT wording unchanged.
 
-Looks all right so patch applied.
+> Other than that, this patch looks fine to me, and I don't see issues
+> booting on a (DT) system, so:
+> 
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Tested-by: Mark Rutland <mark.rutland@arm.com> [DT]
+> 
+> Has this has been tested on an ACPI system?
 
-Yours,
-Linus Walleij
+Yes I tested ACPI SMP boot on Juno with it applied.
+
+Thank you !
+Lorenzo
