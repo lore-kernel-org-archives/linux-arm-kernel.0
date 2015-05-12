@@ -1,79 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 May 2015 17:49:08 +0200
-Subject: [PATCH 2/8] dmaengine: mv_xor: add support for a38x command in
- descriptor mode
-In-Reply-To: <1431445063-20226-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1431445063-20226-1-git-send-email-maxime.ripard@free-electrons.com>
- <1431445063-20226-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <4862159.g8Sk9nOiS2@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 May 2015 16:50:04 +0100
+Subject: schedule_timeout sleeps too long after dividing CPU frequency
+In-Reply-To: <555218C7.5050602@free.fr>
+References: <55520F0F.5010906@free.fr>
+ <CAKohpo=eMA6L9=jK=bAnbFuDxcdtpQNub0WFnSy6MOqB3jOdjA@mail.gmail.com>
+ <555218C7.5050602@free.fr>
+Message-ID: <20150512155004.GP2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 May 2015 17:37:37 Maxime Ripard wrote:
-> From: Lior Amsalem <alior@marvell.com>
+On Tue, May 12, 2015 at 05:14:15PM +0200, Mason wrote:
+> This ties in to another thread I started in LAKML:
+> ("High-resolution timers not supported when using smp_twd on Cortex A9")
 > 
-> The Marvell Armada 38x SoC introduce new features to the XOR engine,
-> especially the fact that the engine mode (MEMCPY/XOR/PQ/etc) can be part of
-> the descriptor and not set through the controller registers.
+> $ git show 5388a6b2 arch/arm/kernel/smp_twd.c
+> commit 5388a6b266e9c3357353332ba0cd5549082887f1
+> Author: Russell King <rmk+kernel@arm.linux.org.uk>
+> Date:   Mon Jul 26 13:19:43 2010 +0100
 > 
-> This new feature allows mixing of different commands (even PQ) on the same
-> channel/chain without the need to stop the engine to reconfigure the engine
-> mode.
+>     ARM: SMP: Always enable clock event broadcast support
+>     
+>     The TWD local timers are unable to wake up the CPU when it is placed
+>     into a low power mode, eg. C3.  Therefore, we need to adapt things
+>     such that the TWD code can cope with this.
+>     
+>     We do this by always providing a broadcast tick function, and marking
+>     the fact that the TWD local timer will stop in low power modes.  This
+>     means that when the CPU is placed into a low power mode, the core
+>     timer code marks this fact, and allows an IPI to be given to the core.
 > 
-> Refactor the driver to be able to use that new feature on the Armada 38x,
-> while keeping the old behaviour on the older SoCs.
-> 
-> Signed-off-by: Lior Amsalem <alior@marvell.com>
-> Reviewed-by: Ofer Heifetz <oferh@marvell.com>
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> This mentions a "broadcast tick function" (of which I know nothing).
+> Is this what you're referring to?
 
-Two minimal style comments:
+No.  This has nothing to do with low power modes.
 
-> +static void mv_chan_set_mode_to_desc(struct mv_xor_chan *chan)
-> +{
-> +	u32 op_mode;
-> +	u32 config = readl_relaxed(XOR_CONFIG(chan));
-> +
-> +	op_mode = XOR_OPERATION_MODE_IN_DESC;
-> +
-> +	config &= ~0x7;
-> +	config |= op_mode;
-> +
-> +#if defined(__BIG_ENDIAN)
-> +	config |= XOR_DESCRIPTOR_SWAP;
-> +#else
-> +	config &= ~XOR_DESCRIPTOR_SWAP;
-> +#endif
-> +
-> +	writel_relaxed(config, XOR_CONFIG(chan));
-> +}
+How this works depends on how your kernel is configured, but essentially
+it's something like this:
 
-Using 
+* The CPU which will be idling sets its local timer to wake up after N
+  counter cycles, where N is calculated from the timer frequency.
 
-	if (IS_ENABLED(__BIG_ENDIAN))
+* When the local timer fires, the CPU is kicked out of the idle loop, and
+  it reads the current system time.  If the current system time indicates
+  that the software timer set in schedule_timeout() has fired, that
+  software timer fires.
 
-here would make it more readable by avoiding the #if. Alternatively,
-you could leave the XOR_DESCRIPTOR_SWAP flag disabled and just swap
-the descriptors manually like a lot of other drivers do. You have
-to swap the mmio accesses anywya.
+If the local timer changes frequency without the idling CPU being woken
+up, then the problem you're referring to can happen.
 
->  }
->  
-> +#ifdef CONFIG_OF
-> +static const struct of_device_id mv_xor_dt_ids[] = {
-> +	{ .compatible = "marvell,orion-xor", .data = (void *)XOR_MODE_IN_REG },
-> +	{ .compatible = "marvell,a38x-xor", .data = (void *)XOR_MODE_IN_DESC },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, mv_xor_dt_ids);
-> +#endif
-> +
+As you're not giving much information about your system (including
+indicating where we might see some source code) we're not able to help
+more than providing above descriptions.  Maybe if you posted your
+patches so far to support the project you're working on, we could
+provide better answers.
 
-Just leave out the #ifdef here. Almost all the mvebu machines use DT now,
-so it's not worth the size benefit of leaving it out on the few machines
-that don't.
+Thanks.
 
-You'll have to remove the of_match_ptr() invocation as well if you do that,
-to avoid a warning about an unused symbol.
-
-	Arnd
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
