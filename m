@@ -1,44 +1,70 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 12 May 2015 16:03:38 -0600
-Subject: BCM2836 (Raspberry Pi 2) port
-In-Reply-To: <87d2254s6y.fsf@eliezer.anholt.net>
-References: <1429639796-2169-1-git-send-email-eric@anholt.net>
- <4137213.WVJY1et48u@kongar> <55516738.306@wwwdotorg.org>
- <1701192.WcfjCoBWQN@kongar> <55522468.3050606@wwwdotorg.org>
- <87d2254s6y.fsf@eliezer.anholt.net>
-Message-ID: <555278BA.50903@wwwdotorg.org>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Tue, 12 May 2015 15:04:42 -0700
+Subject: [PATCH 1/2] selftests/lib.mk: fix INSTALL_RULE
+In-Reply-To: <55527893.4070305@osg.samsung.com>
+References: <1431467947-29847-1-git-send-email-tyler.baker@linaro.org>
+ <1431467947-29847-2-git-send-email-tyler.baker@linaro.org>
+ <55527893.4070305@osg.samsung.com>
+Message-ID: <CANMBJr69_WM1dKw627J+zFv6UwsF5Sv9D+rjnK5YHD60DH5Nig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/2015 11:32 AM, Eric Anholt wrote:
-> Stephen Warren <swarren@wwwdotorg.org> writes:
+On 12 May 2015 at 15:02, Shuah Khan <shuahkh@osg.samsung.com> wrote:
+> On 05/12/2015 03:59 PM, tyler.baker at linaro.org wrote:
+>> From: Tyler Baker <tyler.baker@linaro.org>
 >
->> On 05/12/2015 09:39 AM, Alexander Stein wrote:
->>> On Monday 11 May 2015, 20:36:40 wrote Stephen Warren:
->>>> On 05/08/2015 10:14 AM, Alexander Stein wrote:
->>>>> On Thursday 23 April 2015, 22:25:08 wrote Stephen Warren:
->>>>>>> Hit any key to stop autoboot:  0
->>>>>>> U-Boot> setenv fdt_high fffffff
->>>>>
->>>>> Any specific reason to set fdt_high to fffffff?
->>>>
->>>> Yes, it prevents U-Boot's annoying habit of moving the DTB from where it
->>>> was loaded to some other place. This was especially important in this
->>>> case since I was trying to find out exactly which piece of RAM being
->>>> over-written caused the issues I was seeing.
->>>
->>> Shouldn't this then be part of the default raspberry (2 only?) environment?
->>
->> Eventually yes. So far, nobody seems to know which areas of RAM are
->> off-limits (presumably since the RAM is used as a CPU1..3 pen), so I was
->> experimenting to try and find that out.
->
-> If I'm reading this right, the CPU1-3 pen is in the bottom 8k of memory
-> (actually much less than 8k).
+> This is odd. Did you use git send-email to send the patches?
 
-Hmm. I wondered if that was the case. I don't think anything I was doing 
-in U-Boot /should/ touch those pages, but there have been bugs before 
-where some pointer was left at NULL, and some DM (U-Boot Device Model) 
-code ended up putting structures in page 0 by mistake. Perhaps something 
-like that has resurfaced. I'll try to find time to diff page 0 
-before/after various U-Boot operations, and see if it's getting modified...
+Yes I did.
+
+>
+> -- Shuah
+>>
+>> This patch fixes the INSTALL_RULE to gracefully handle the case where
+>> TEST_PROGS and TEST_PROGS_EXTENDED and TEST_FILES are not set. In this case,
+>> install is called without any SOURCE arguments causing make install to fail.
+>> The proposed fix is to loop over the items in these variables and only call
+>> install if there is a test artifact present.
+>>
+>> Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
+>> ---
+>>  tools/testing/selftests/lib.mk | 6 ++++--
+>>  1 file changed, 4 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/tools/testing/selftests/lib.mk b/tools/testing/selftests/lib.mk
+>> index ee412ba..89dd785f 100644
+>> --- a/tools/testing/selftests/lib.mk
+>> +++ b/tools/testing/selftests/lib.mk
+>> @@ -13,10 +13,12 @@ run_tests: all
+>>
+>>  define INSTALL_RULE
+>>       mkdir -p $(INSTALL_PATH)
+>> -     @for TEST_DIR in $(TEST_DIRS); do\
+>> +     @for TEST_DIR in $(TEST_DIRS); do \
+>>               cp -r $$TEST_DIR $(INSTALL_PATH); \
+>>       done;
+>> -     install -t $(INSTALL_PATH) $(TEST_PROGS) $(TEST_PROGS_EXTENDED) $(TEST_FILES)
+>> +     @for ARTIFACT in $(TEST_PROGS) $(TEST_PROGS_EXTENDED) $(TEST_FILES); do \
+>> +             install -t $(INSTALL_PATH) $$ARTIFACT; \
+>> +     done;
+>>  endef
+>>
+>>  install: all
+>>
+>
+>
+> --
+> Shuah Khan
+> Sr. Linux Kernel Developer
+> Open Source Innovation Group
+> Samsung Research America (Silicon Valley)
+> shuahkh at osg.samsung.com | (970) 217-8978
+
+
+
+-- 
+Tyler Baker
+Tech Lead, LAVA
+Linaro.org | Open source software for ARM SoCs
+Follow Linaro: http://www.facebook.com/pages/Linaro
+http://twitter.com/#!/linaroorg - http://www.linaro.org/linaro-blog
