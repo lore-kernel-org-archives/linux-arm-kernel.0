@@ -1,50 +1,30 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 12 May 2015 13:15:25 +0200
-Subject: [PATCH v2 08/17] gpio: locomo: implement per-pin irq handling
-In-Reply-To: <CALT56yNJutWTW5zsos+=Uh+BDvO4o_tqBEj+H621TncVK6eD_Q@mail.gmail.com>
-References: <1430178954-11138-1-git-send-email-dbaryshkov@gmail.com>
- <1430178954-11138-9-git-send-email-dbaryshkov@gmail.com>
- <CACRpkdZt+rjzVSqXE6MDaY5S9gezeTu+2QWu31xKsg08TpXibw@mail.gmail.com>
- <CALT56yNJutWTW5zsos+=Uh+BDvO4o_tqBEj+H621TncVK6eD_Q@mail.gmail.com>
-Message-ID: <CACRpkdYQFYaA87N2f1uizRo=sDj2P4k4m1O_0_cQsi4BZbeGkg@mail.gmail.com>
+Date: Tue, 12 May 2015 13:18:11 +0200
+Subject: [PATCH] pinctrl: lpc18xx: create pin cap lookup helper
+In-Reply-To: <1430932281-3432-1-git-send-email-manabian@gmail.com>
+References: <1430932281-3432-1-git-send-email-manabian@gmail.com>
+Message-ID: <CACRpkdY-_+Y3UqoSM7BHTukbwtRfi9w5Sf00NQsRQuPxXgr_gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 6, 2015 at 6:42 PM, Dmitry Eremin-Solenikov
-<dbaryshkov@gmail.com> wrote:
-> 2015-05-06 17:15 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
->> On Tue, Apr 28, 2015 at 1:55 AM, Dmitry Eremin-Solenikov
->> <dbaryshkov@gmail.com> wrote:
->>
->>> LoCoMo has a possibility to generate per-GPIO edge irqs. Support for
->>> that was there in old locomo driver, got 'cleaned up' during old driver
->>> IRQ cascading cleanup and is now reimplemented. It is expected that
->>> SL-5500 (collie) will use locomo gpio irqs for mmc detection irq.
->>>
->>> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
->>
->> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
->
-> Thanks for review of the patches.
->
->> Assume this will also go through MFD.
->>
->>> +       irq_set_chained_handler(lg->irq, NULL);
->>> +       irq_set_handler_data(lg->irq, NULL);
->>
->> Why is this needed? If the GPIOLIB_IRQCHIP code in
->> gpiolib.c is not doing this then maybe it's the core code that
->> needs fixing rather than having this in the driver.
->
-> I have skimmed through the rest of drivers using
-> gpiochip_set_chained_irqchip(). Indeed none of the drivers NULL
-> the chained handled and handler data. However I couldn't locate
-> the code where they would be cleared.
->
-> Should I still send the patch fixing the GPIOLIB_IRQCHIP?
+On Wed, May 6, 2015 at 7:11 PM, Joachim Eastwood <manabian@gmail.com> wrote:
 
-Yes I guess you need to save parent_irq in struct gpio_chip and
-remove it in gpiochip_irqchip_remove() if it's != 0.
+> Both pconf_get_pin and pconf_set_pin needs to lookup pin cap based
+> on the pin number. Create a common helper function that both
+> functions can use that also handles the case where no pin number is
+> found in the pins array.
+>
+> This also fixes a small bug in pconf_get_pin where pconf_get_i2c0
+> would use the pins array index rather than the pin number.
+>
+> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+> ---
+> Hi Linus,
+>
+> Patch is based on your linux-pinctrl devel branch.
+> Since it's a new driver feel free to squash it with the initial commit.
+
+Patch applied, removed the other hackish check.
 
 Yours,
 Linus Walleij
