@@ -1,94 +1,52 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 12 May 2015 13:12:15 -0700
-Subject: [PATCH v2 04/17] input: locomokbd: provide an Alt-SysRQ
- combination
-In-Reply-To: <1430178954-11138-5-git-send-email-dbaryshkov@gmail.com>
-References: <1430178954-11138-1-git-send-email-dbaryshkov@gmail.com>
- <1430178954-11138-5-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <20150512201215.GD20725@dtor-ws>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 May 2015 22:15:20 +0200
+Subject: [GIT PULL] Allwinner drivers changes for 4.2
+In-Reply-To: <20150511193527.GA29690@lukather>
+References: <20150511193527.GA29690@lukather>
+Message-ID: <2615254.66Y5XGdzL1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
-
-On Tue, Apr 28, 2015 at 02:55:41AM +0300, Dmitry Eremin-Solenikov wrote:
-> It is usefull sometimes to have an Alt-SysRQ combo on the keyboard to be
-> able to trigger sysrq functions directly. Add an option providing sysrq
-> mapping for Contact-Home keys.
-
-No, if you want to remap the keys please do it from usepspace; locomokbd
-supports it (EVIOCSKEYCODE ioctl).
-
-Thanks.
-
+On Monday 11 May 2015 21:35:27 Maxime Ripard wrote:
+> Hi Arnd, Kevin, Olof,
 > 
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> ---
->  drivers/input/keyboard/Kconfig     |  7 +++++++
->  drivers/input/keyboard/locomokbd.c | 14 +++++++++++---
->  2 files changed, 18 insertions(+), 3 deletions(-)
+> Here is the first batch of drivers changes for the 4.2 merge window.
 > 
-> diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
-> index 0a3d875..eb8b11b 100644
-> --- a/drivers/input/keyboard/Kconfig
-> +++ b/drivers/input/keyboard/Kconfig
-> @@ -343,6 +343,13 @@ config KEYBOARD_LOCOMO
->  	  To compile this driver as a module, choose M here: the
->  	  module will be called locomokbd.
->  
-> +config KEYBOARD_LOCOMO_SYSRQ
-> +	bool "Provide SysRQ key on LoCoMo keyboard"
-> +	depends on KEYBOARD_LOCOMO
-> +	help
-> +	  Say Y here to be able to use Contact-Home as Alt-Sysrq combo.
-> +	  Say N if you want to use them as usual keys.
-> +
->  config KEYBOARD_LPC32XX
->  	tristate "LPC32XX matrix key scanner support"
->  	depends on ARCH_LPC32XX && OF
-> diff --git a/drivers/input/keyboard/locomokbd.c b/drivers/input/keyboard/locomokbd.c
-> index eed0a94..eb8dbe2 100644
-> --- a/drivers/input/keyboard/locomokbd.c
-> +++ b/drivers/input/keyboard/locomokbd.c
-> @@ -40,6 +40,14 @@
->  #define KEY_CONTACT		KEY_F18
->  #define KEY_CENTER		KEY_F15
->  
-> +#ifdef CONFIG_KEYBOARD_LOCOMOKBD_SYSRQ
-> +#define LOCOMO_KEY_CONTACT	KEY_LEFTALT
-> +#define LOCOMO_KEY_HOME		KEY_SYSRQ
-> +#else
-> +#define LOCOMO_KEY_CONTACT	KEY_CONTACT
-> +#define LOCOMO_KEY_HOME		KEY_HOME
-> +#endif
-> +
->  #define KB_ROWS			16
->  #define KB_COLS			8
->  #define LOCOMOKBD_NUMKEYS	(KB_ROWS * KB_COLS)
-> @@ -48,7 +56,7 @@
->  static const unsigned char
->  locomokbd_keycode[LOCOMOKBD_NUMKEYS] = {
->  	0, KEY_ESC, KEY_ACTIVITY, 0, 0, 0, 0, 0, 0, 0,				/* 0 - 9 */
-> -	0, 0, 0, 0, 0, 0, 0, KEY_MENU, 0, KEY_CONTACT,				/* 10 - 19 */
-> +	0, 0, 0, 0, 0, 0, 0, KEY_MENU, 0, LOCOMO_KEY_CONTACT,			/* 10 - 19 */
->  	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,						/* 20 - 29 */
->  	0, 0, 0, KEY_CENTER, 0, KEY_MAIL, 0, 0, 0, 0,				/* 30 - 39 */
->  	0, 0, 0, 0, 0, 0, 0, 0, 0, KEY_RIGHT,					/* 40 - 49 */
-> @@ -280,9 +288,9 @@ static int locomokbd_probe(struct platform_device *dev)
->  			sizeof(locomokbd->keycode));
->  
->  	if (machine_is_collie())
-> -		locomokbd->keycode[18] = KEY_HOME;
-> +		locomokbd->keycode[18] = LOCOMO_KEY_HOME;
->  	else
-> -		locomokbd->keycode[3] = KEY_HOME;
-> +		locomokbd->keycode[3] = LOCOMO_KEY_HOME;
->  
->  	for (i = 0; i < LOCOMOKBD_NUMKEYS; i++)
->  		input_set_capability(input_dev, EV_KEY, locomokbd->keycode[i]);
-> -- 
-> 2.1.4
+> Thanks!
+> Maxime
+> 
+> The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+> 
+>   Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+> 
+> are available in the git repository at:
+> 
+>   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-drivers-for-4.2
+> 
+> for you to fetch changes up to 44bb362ff9f2e6f9ab285e66ce92f55aee71808a:
+> 
+>   drivers: soc: sunxi: Introduce SoC driver to map SRAMs (2015-05-05 20:47:08 +0200)
+> 
+> ----------------------------------------------------------------
+> Allwinner drivers patches for 4.2
+> 
+> This pull request contain a single driver to handle the SRAM mapping
+> between the CPU and devices.
 > 
 
--- 
-Dmitry
+Hi Maxime,
+
+Sorry I hadn't looked at the new driver before, but I did now and need a little
+clarification. It seems to me that the device should be compatible with the
+generic DT binding we have in Documentation/devicetree/bindings/misc/sram.txt,
+and use more generic code. At least I can't see much in here that is really sunxi
+specific.
+
+Were you not aware of that generic binding, or did you have a good reason
+not to use it? In the latter case, please document that in the patch description
+(after replying here).
+
+One small bug I found in the DT binding: the main DT node is lacking
+a "ranges" property.
+
+	Arnd
