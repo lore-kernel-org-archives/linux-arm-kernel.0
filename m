@@ -1,62 +1,45 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 12 May 2015 11:37:31 +0100
-Subject: [PATCH 2/2] ARM64: kernel: unify ACPI and DT cpus initialization
-In-Reply-To: <20150511162945.GD4595@leverpostej>
-References: <1431020084-5875-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1431020084-5875-2-git-send-email-lorenzo.pieralisi@arm.com>
- <20150511162945.GD4595@leverpostej>
-Message-ID: <20150512103731.GB16079@red-moon>
+From: gangchen@rdamicro.com (Chen Gang)
+Date: Tue, 12 May 2015 18:40:01 +0800
+Subject: [PATCH 1/1] ARM:r0 is also corrupted after calling __do_div64.
+In-Reply-To: <20150512100042.GN2067@n2100.arm.linux.org.uk>
+References: <20150512100042.GN2067@n2100.arm.linux.org.uk>
+Message-ID: <1431427201-14371-1-git-send-email-gangchen@rdamicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 11, 2015 at 05:29:45PM +0100, Mark Rutland wrote:
-> Hi Lorenzo,
-> 
-> > +               enable_method = acpi_get_enable_method(cpu);
-> > +               if (!enable_method)
-> > +                       pr_err("Undefined ACPI enable-method\n");
-> 
-> I was going to complain that "enable-method" is a DT term that doesn't
-> strictly apply to ACPI, but ACPI doesn't seem to have its own
-> terminology for this, so I guess this is ok.
-> 
-> However, I'd recommend replacing "Undefined" with "Unknown/Unsupported"
-> in the log message.
+R0 is corrupted after calling __do_div64 and compiler is not informed
+about this in macro __do_div_asm. If n is to be used again after this
+macro, r0 is not reloaded and n will contain incorrect value
 
-Well yes (and that's a problem for cpu_ops header comments too - see other
-patch in this series), in ACPI-speak enable-method means nothing, I
-think we will have to live with that.
+Signed-off-by: Chen Gang <gangchen@rdamicro.com>
+---
+ arch/arm/include/asm/div64.h | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
 
-> 
-> [...]
-> 
-> > +static u64 __init of_get_cpu_mpidr(struct device_node *dn)
-> > +{
-> > +       const u32 *cell;
-> > +       u64 hwid;
-> > +
-> > +       /*
-> > +        * A cpu node with missing "reg" property is
-> > +        * considered invalid to build a cpu_logical_map
-> > +        * entry.
-> > +        */
-> > +       cell = of_get_property(dn, "reg", NULL);
-> > +       if (!cell) {
-> > +               pr_err("%s: missing reg property\n", dn->full_name);
-> > +               return INVALID_HWID;
-> > +       }
-> > +
-> > +       hwid = of_read_number(cell, of_n_addr_cells(dn));
-> 
-> Existing bug, but cell should be a __be32 pointer rather than a u32
-> pointer (as that's what of_read_number expects).
-
-Will fix it, thanks.
-
-> Other than that, this looks fine to me:
-> 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Tested-by: Mark Rutland <mark.rutland@arm.com> [DT]
-
-Thank you,
-Lorenzo
+diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
+index a66061a..4829618 100644
+--- a/arch/arm/include/asm/div64.h
++++ b/arch/arm/include/asm/div64.h
+@@ -34,13 +34,15 @@
+ 	register unsigned long long __n   asm("r0") = n;	\
+ 	register unsigned long long __res asm("r2");		\
+ 	register unsigned int __rem       asm(__xh);		\
++	register unsigned int __clobber   asm(__xl);		\
+ 	asm(	__asmeq("%0", __xh)				\
+-		__asmeq("%1", "r2")				\
+-		__asmeq("%2", "r0")				\
+-		__asmeq("%3", "r4")				\
++		__asmeq("%1", __xl)				\
++		__asmeq("%2", "r2")				\
++		__asmeq("%3", "r0")				\
++		__asmeq("%4", "r4")				\
+ 		"bl	__do_div64"				\
+-		: "=r" (__rem), "=r" (__res)			\
+-		: "r" (__n), "r" (__base)			\
++		: "=r"(__rem), "=r"(__clobber), "=r"(__res)	\
++		: "r"(__n), "r"(__base)				\
+ 		: "ip", "lr", "cc");				\
+ 	n = __res;						\
+ 	__rem;							\
+-- 
+1.9.1
