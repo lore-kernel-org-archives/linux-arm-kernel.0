@@ -1,53 +1,36 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 11 May 2015 17:20:54 -0700
-Subject: [PATCH v5 0/6] arm64,hi6220: Enable Hisilicon Hi6220 SoC
-In-Reply-To: <CAAS=xmjR9a-M961-7+9LF2G18qiXYhT+1sb5TEbbrQcW1fnRtw@mail.gmail.com>
-References: <1431007225-8513-1-git-send-email-bintian.wang@huawei.com>
- <7ha8xgi10e.fsf@linaro.org>
- <CAAS=xmjR9a-M961-7+9LF2G18qiXYhT+1sb5TEbbrQcW1fnRtw@mail.gmail.com>
-Message-ID: <CAGa+x85QDAzP_8_rPF3H0KpXO9rR2OhzYnMnAFydmBMicDzmEw@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 11 May 2015 19:35:24 -0500
+Subject: [PATCH v3 1/4] ARM: pxa: add memory resource to RTC device
+In-Reply-To: <20150511224934.GL2067@n2100.arm.linux.org.uk>
+References: <1431384089-28367-1-git-send-email-robh@kernel.org>
+ <1431384089-28367-2-git-send-email-robh@kernel.org>
+ <20150511224934.GL2067@n2100.arm.linux.org.uk>
+Message-ID: <CAL_Jsq+tNStipTDRH05XRHVDz30B8w92YTD1ZKUTrCp-Lj7=1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 7, 2015 at 4:11 PM, Brent Wang <wangbintian@gmail.com> wrote:
-> Hello Kevin,
+On Mon, May 11, 2015 at 5:49 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, May 11, 2015 at 05:41:26PM -0500, Rob Herring wrote:
+>> Add the memory resource for the sa1100-rtc device. Since the memory
+>> resource is already present in the pxa_rtc_resources, that makes
+>> sa1100_rtc_resources and pxa_rtc_resources equivalent, so use
+>> pxa_rtc_resources for both devices and remove the duplicate
+>> sa1100_rtc_resources.
 >
-> 2015-05-08 4:30 GMT+08:00 Kevin Hilman <khilman@linaro.org>:
->> Bintian Wang <bintian.wang@huawei.com> writes:
->>
->>> Hi6220 is one mobile solution of Hisilicon, this patchset contains
->>> initial support for Hi6220 SoC and HiKey development board, which
->>> supports octal ARM Cortex A53 cores. Initial support is minimal and
->>> includes just the arch configuration, clock driver, device tree
->>> configuration.
->>>
->>> PSCI is enabled in device tree and there is no problem to boot all the
->>> octal cores, and the CPU hotplug is also working now, you can download
->>> and compile the latest firmware based on the following link to run this
->>> patch set:
->>> https://github.com/96boards/documentation/wiki/UEFI
->>
->> Do you have any tips for booting this using the HiSi bootloader?  It
->> seems that I need to add the magic hisi,boardid property for dtbTool to
->> work.  Could you share what that magic value is?
-> Yes, you need it.
-> Hisilicon has many different development boards and those boards have some
-> different hardware configuration, so we need different device tree
-> files for them.
-> the original hisi,boardid is used to distinguish different boards and
-> used by the
-> bootloader to judge which device tree to use at boot-up.
+> This really isn't a good idea - what do you think happens when
+> the same struct resource gets passed into insert_resource()
+> twice?
+
+Bad things. If you recall, we discussed this on v1[1]. See the commit
+msg of patch 2 for the summary. There is not currently a problem
+because the rtc-pxa driver does not request the resource.
+
+Rob
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/322355.html
+
 >
->> and maybe add it to the wiki someplace?
-> Maybe add to section "Known Issues" in
-> "https://github.com/96boards/documentation/wiki/UEFI"
-> is a good choice, I will update this section later.
-
-You updated the wiki, but you didn't specify what the value should be
-for this to work with the old bootloader.
-
-Can you please give the value of that property?
-
-Also, have you tested this series with the old bootloader as well?
-
-Kevin
+> --
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
