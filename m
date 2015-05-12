@@ -1,30 +1,22 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 12 May 2015 13:18:11 +0200
-Subject: [PATCH] pinctrl: lpc18xx: create pin cap lookup helper
-In-Reply-To: <1430932281-3432-1-git-send-email-manabian@gmail.com>
-References: <1430932281-3432-1-git-send-email-manabian@gmail.com>
-Message-ID: <CACRpkdY-_+Y3UqoSM7BHTukbwtRfi9w5Sf00NQsRQuPxXgr_gg@mail.gmail.com>
+Date: Tue, 12 May 2015 13:37:23 +0200
+Subject: [PATCH 0/6] Introduce Allwinner A33 support
+In-Reply-To: <1431240383-12763-1-git-send-email-vishnupatekar0510@gmail.com>
+References: <1431240383-12763-1-git-send-email-vishnupatekar0510@gmail.com>
+Message-ID: <CACRpkdYQ1+6tE1xiW2Andn7oOKD55XZk34PuACW_=CgdYMn+oA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 6, 2015 at 7:11 PM, Joachim Eastwood <manabian@gmail.com> wrote:
+On Sun, May 10, 2015 at 8:46 AM, Vishnu Patekar
+<vishnupatekar0510@gmail.com> wrote:
 
-> Both pconf_get_pin and pconf_set_pin needs to lookup pin cap based
-> on the pin number. Create a common helper function that both
-> functions can use that also handles the case where no pin number is
-> found in the pins array.
+> Hello everyone,
 >
-> This also fixes a small bug in pconf_get_pin where pconf_get_i2c0
-> would use the pins array index rather than the pin number.
->
-> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
-> ---
-> Hi Linus,
->
-> Patch is based on your linux-pinctrl devel branch.
-> Since it's a new driver feel free to squash it with the initial commit.
+> This patch series introduces basic kernel support for Allwinner's A33 SoC,
 
-Patch applied, removed the other hackish check.
+I'll wait for a new set addressing Paul's comments before commiting
+the pinctrl portions. Add Maxime's ACKs to the patches so I know
+he's verified them.
 
 Yours,
 Linus Walleij
