@@ -1,61 +1,61 @@
-From: ygardi@codeaurora.org (ygardi at codeaurora.org)
-Date: Tue, 12 May 2015 07:20:24 -0000
-Subject: [PATCH] ufs-qcom: Switch dependency to ARCH_QCOM
-In-Reply-To: <1730be19bac4946d9c15fa7c99cfbbc0.squirrel@www.codeaurora.org>
-References: <1428707466-24526-5-git-send-email-sboyd@codeaurora.org>
- <1730be19bac4946d9c15fa7c99cfbbc0.squirrel@www.codeaurora.org>
-Message-ID: <9e7a75b3e508f29e0fb350ef853ce229.squirrel@www.codeaurora.org>
+From: mniewoeh@stud.hs-offenburg.de (=?UTF-8?Q?Michael=20Niew=C3=B6hner?=)
+Date: Tue, 12 May 2015 09:22:42 +0200
+Subject: [PATCH 2/2] ARM: dts: rockchip: add
+ system-power-controller toact8846
+In-Reply-To: <2270228.43yCmaWq86@phil>
+References: <64DE272A-FD25-406C-A51B-6C5B76DA5171@stud.hs-offenburg.de>
+ <2270228.43yCmaWq86@phil>
+Message-ID: <5551C66C020000D0000AFA23@gwia2.rz.hs-offenburg.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'd change the tag to Reviewed-by.
+I agree on relicensing to gpl2/x11.
 
-looks-good.
-
-Reviewed-by: Yaniv Gardi <ygardi@codeaurora.org>
+Michael
 
 
-> looks good.
->
-> Acked-by: Yaniv Gardi <ygardi@codeaurora.org>
->
->
->> This device only exists on platforms under ARCH_QCOM, not
->> ARCH_MSM.
->>
->> Cc: Yaniv Gardi <ygardi@codeaurora.org>
->> Cc: Dov Levenglick <dovl@codeaurora.org>
->> Cc: Vinayak Holikatti <vinholikatti@gmail.com>
->> Cc: David Brown <davidb@codeaurora.org>
->> Cc: Bryan Huntsman <bryanh@codeaurora.org>
->> Cc: Daniel Walker <dwalker@fifo99.com>
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+
+
+
+> Am 11.05.2015 um 23:58 schrieb Heiko Stuebner <heiko@sntech.de>:
+> 
+> Am Montag, 11. Mai 2015, 22:57:21 schrieb Michael Niew?hner:
+>> Add system-power-controller to act8846 in rk3188-radxarock.dts in
+addition
+>> to the act8846 patch fixing the reboot kernel panic
+>> 
+>> Signed-off-by: Michael Niewoehner <mniewoeh@stud.hs-offenburg.de>
+> 
+> I have to ask, are you ok with the pending dts relicensing to a
+gpl2/x11 dual 
+> license [0]?
+> 
+> Otherwise this looks fine and the act8846 is the power-controller of
+the 
+> radxarock in any case, so I'll take this one in any case.
+> 
+> 
+> Heiko
+> 
+> [0]
+http://lists.infradead.org/pipermail/linux-rockchip/2015-March/002644.html
+> 
+> 
 >> ---
->>  drivers/scsi/ufs/Kconfig | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/scsi/ufs/Kconfig b/drivers/scsi/ufs/Kconfig
->> index 8a1f4b355416..e94538362536 100644
->> --- a/drivers/scsi/ufs/Kconfig
->> +++ b/drivers/scsi/ufs/Kconfig
->> @@ -73,7 +73,7 @@ config SCSI_UFSHCD_PLATFORM
->>
->>  config SCSI_UFS_QCOM
->>  	bool "QCOM specific hooks to UFS controller platform driver"
->> -	depends on SCSI_UFSHCD_PLATFORM && ARCH_MSM
->> +	depends on SCSI_UFSHCD_PLATFORM && ARCH_QCOM
->>  	select PHY_QCOM_UFS
->>  	help
->>  	  This selects the QCOM specific additions to UFSHCD platform driver.
->> --
->> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
->> Forum,
->> a Linux Foundation Collaborative Project
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-scsi" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
->
->
+>> arch/arm/boot/dts/rk3188-radxarock.dts | 1 +
+>> 1 file changed, 1 insertion(+)
+>> 
+>> diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts
+>> b/arch/arm/boot/dts/rk3188-radxarock.dts index bdf8570..225a0eb
+100644
+>> --- a/arch/arm/boot/dts/rk3188-radxarock.dts
+>> +++ b/arch/arm/boot/dts/rk3188-radxarock.dts
+>> @@ -152,6 +152,7 @@
+>>        compatible = "active-semi,act8846";
+>>        reg = <0x5a>;
+>>        status = "okay";
+>> +        system-power-controller;
+>> 
+>>        pinctrl-names = "default";
+>>        pinctrl-0 = <&act8846_dvs0_ctl>;
+> 
