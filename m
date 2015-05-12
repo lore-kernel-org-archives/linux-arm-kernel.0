@@ -1,66 +1,29 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 12 May 2015 14:46:11 -0700
-Subject: [PATCH] RFC: mmc: core: Increase delay for voltage to stabilize from
- 3.3V to 1.8V
-Message-ID: <1431467171-12937-1-git-send-email-dianders@chromium.org>
+From: mike.turquette@linaro.org (Michael Turquette)
+Date: Tue, 12 May 2015 14:47:14 -0700
+Subject: [PATCH V4 3/3] OPP: Add 'opp-next' in operating-points-v2 bindings
+In-Reply-To: <1ee98ae5b45083e681c7f530e0ae9195e5636119.1430394884.git.viresh.kumar@linaro.org>
+References: <cover.1430394884.git.viresh.kumar@linaro.org>
+ <1ee98ae5b45083e681c7f530e0ae9195e5636119.1430394884.git.viresh.kumar@linaro.org>
+Message-ID: <20150512214714.16410.59831@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the regulator used for the SDMMC IO voltage is not expected to
-draw a lot of current, most systems will probably use an inexpensive
-LDO for it.  LDO regulators apparently have the feature that they
-don't actively drive the voltage down--they wait for other components
-in the system to drag the voltage down.  Thus they will transition
-faster under heavy loads and slower under light loads.
+Quoting Viresh Kumar (2015-04-30 05:08:01)
+> Many platforms require to switch to a intermediate frequency before
+> switching to a final frequency. Or they can switch to only particular
+> OPPs from any OPP.
+> 
+> For these add another property in OPP-v2, 'opp-next'.
+> 
+> Refer to the bindings for more details.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-During an SDMMC voltage change from 3.3V to 1.8V, we are almost
-certainly under a light load.  To be specific:
-* The regulator is hooked through pulls to CMD0-3 and DAT.  Probably
-  the CMD pulls are something like 47K and the DAT is something like
-  10K.
-* The card is supposed to be driving DAT0-3 low during voltage change
-  which will draw _some_ current, but not a lot.
-* The regulator is also provided to the SDMMC host controller, but the
-  SDMMC host controller is in open drain mode during the voltage
-  change and so shouldn't be drawing much current.
+We should never encode any aspect of the dvfs transition sequence into
+DT. Raw data such as clock frequency or supply voltage might be OK, but
+the programming steps should be left entirely to drivers.
 
-In order to keep the SDMMC host working properly (or for noise
-reasons), there might also be a capacitor attached to the SDMMC IO
-regulator.  This also will have the effect of slowing down transitions
-of the regulator, especially under light loads.
+So this patch gets a NAK from me.
 
->From experimental evidence, we've seen the voltage change fail if the
-card doesn't detect that the voltage fell to less than about 2.3V when
-we turn on the clock.  On one device (that admittedly had a 47K CMD
-pullup instead of a 10K CMD pullup) we saw that the voltage was just
-about 2.3V after 5ms and thus the voltage change would sometimes fail.
-Doubling the delay gave margin and made the voltage change work 100%
-of the time, despite the slightly weaker CMD pull.
-
-At the moment submitting this as an RFC patch since my problem _could_
-be fixed by increasing the pull strength (or using a smaller
-capacitor).  However being a little bit more lenient to strange
-hardware could also be a good thing.
-
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
- drivers/mmc/core/core.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-index 92e7671..a7e6110 100644
---- a/drivers/mmc/core/core.c
-+++ b/drivers/mmc/core/core.c
-@@ -1551,8 +1551,8 @@ int mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage, u32 ocr)
- 		goto power_cycle;
- 	}
- 
--	/* Keep clock gated for at least 5 ms */
--	mmc_delay(5);
-+	/* Keep clock gated for at least 10 ms, though spec only says 5 ms */
-+	mmc_delay(10);
- 	host->ios.clock = clock;
- 	mmc_set_ios(host);
- 
--- 
-2.2.0.rc0.207.ga3a616c
+Regards,
+Mike
