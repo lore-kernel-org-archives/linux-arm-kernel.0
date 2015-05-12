@@ -1,36 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 May 2015 23:54:25 +0200
-Subject: [PATCH] brcmfmac: avoid gcc-5.1 warning
-Message-ID: <2201884.BixNBcLJhn@wuerfel>
+From: tyler.baker@linaro.org (tyler.baker at linaro.org)
+Date: Tue, 12 May 2015 14:59:06 -0700
+Subject: [PATCH 1/2] selftests/lib.mk: fix INSTALL_RULE
+In-Reply-To: <1431467947-29847-1-git-send-email-tyler.baker@linaro.org>
+References: <1431467947-29847-1-git-send-email-tyler.baker@linaro.org>
+Message-ID: <1431467947-29847-2-git-send-email-tyler.baker@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gcc-5.0 gained a new warning in the fwsignal portion of the brcmfmac
-driver:
+From: Tyler Baker <tyler.baker@linaro.org>
 
-drivers/net/wireless/brcm80211/brcmfmac/fwsignal.c: In function 'brcmf_fws_txs_process':
-drivers/net/wireless/brcm80211/brcmfmac/fwsignal.c:1478:8: warning: 'skb' may be used uninitialized in this function [-Wmaybe-uninitialized]
+This patch fixes the INSTALL_RULE to gracefully handle the case where
+TEST_PROGS and TEST_PROGS_EXTENDED and TEST_FILES are not set. In this case,
+install is called without any SOURCE arguments causing make install to fail.
+The proposed fix is to loop over the items in these variables and only call
+install if there is a test artifact present.
 
-This is a false positive, and marking the brcmf_fws_hanger_poppkt function
-as 'static inline' makes the warning go away. I have checked the object
-file output and while a little code gets moved around, the size of
-the binary remains identical.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
 ---
-Found while building the ARM imx_v6_v7_defconfig configuration with gcc-5.
-We try to get all ARM defconfigs to build without warnings normally.
+ tools/testing/selftests/lib.mk | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/net/wireless/brcm80211/brcmfmac/fwsignal.c b/drivers/net/wireless/brcm80211/brcmfmac/fwsignal.c
-index f0dda0ecd23b..5017eaa4af45 100644
---- a/drivers/net/wireless/brcm80211/brcmfmac/fwsignal.c
-+++ b/drivers/net/wireless/brcm80211/brcmfmac/fwsignal.c
-@@ -635,7 +635,7 @@ static int brcmf_fws_hanger_pushpkt(struct brcmf_fws_hanger *h,
- 	return 0;
- }
+diff --git a/tools/testing/selftests/lib.mk b/tools/testing/selftests/lib.mk
+index ee412ba..89dd785f 100644
+--- a/tools/testing/selftests/lib.mk
++++ b/tools/testing/selftests/lib.mk
+@@ -13,10 +13,12 @@ run_tests: all
  
--static int brcmf_fws_hanger_poppkt(struct brcmf_fws_hanger *h,
-+static inline int brcmf_fws_hanger_poppkt(struct brcmf_fws_hanger *h,
- 					  u32 slot_id, struct sk_buff **pktout,
- 					  bool remove_item)
- {
+ define INSTALL_RULE
+ 	mkdir -p $(INSTALL_PATH)
+-	@for TEST_DIR in $(TEST_DIRS); do\
++	@for TEST_DIR in $(TEST_DIRS); do \
+ 		cp -r $$TEST_DIR $(INSTALL_PATH); \
+ 	done;
+-	install -t $(INSTALL_PATH) $(TEST_PROGS) $(TEST_PROGS_EXTENDED) $(TEST_FILES)
++	@for ARTIFACT in $(TEST_PROGS) $(TEST_PROGS_EXTENDED) $(TEST_FILES); do \
++		install -t $(INSTALL_PATH) $$ARTIFACT; \
++	done;
+ endef
+ 
+ install: all
+-- 
+2.1.4
