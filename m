@@ -1,33 +1,91 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Tue, 12 May 2015 16:07:52 -0600
-Subject: [PATCH 1/2] selftests/lib.mk: fix INSTALL_RULE
-In-Reply-To: <CANMBJr69_WM1dKw627J+zFv6UwsF5Sv9D+rjnK5YHD60DH5Nig@mail.gmail.com>
-References: <1431467947-29847-1-git-send-email-tyler.baker@linaro.org>
- <1431467947-29847-2-git-send-email-tyler.baker@linaro.org>
- <55527893.4070305@osg.samsung.com>
- <CANMBJr69_WM1dKw627J+zFv6UwsF5Sv9D+rjnK5YHD60DH5Nig@mail.gmail.com>
-Message-ID: <555279B8.2000304@osg.samsung.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 12 May 2015 16:08:23 -0600
+Subject: [PATCH 2/3] ARM: bcm2835: Add the Raspberry Pi firmware driver
+In-Reply-To: <87a8x94rk5.fsf@eliezer.anholt.net>
+References: <1430176449-12322-1-git-send-email-eric@anholt.net>
+ <1430176449-12322-3-git-send-email-eric@anholt.net>
+ <55403AD1.4030103@wwwdotorg.org> <87oam6q0v1.fsf@eliezer.anholt.net>
+ <55416DA2.5040902@wwwdotorg.org> <87a8x94rk5.fsf@eliezer.anholt.net>
+Message-ID: <555279D7.5020500@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/2015 04:04 PM, Tyler Baker wrote:
-> On 12 May 2015 at 15:02, Shuah Khan <shuahkh@osg.samsung.com> wrote:
->> On 05/12/2015 03:59 PM, tyler.baker at linaro.org wrote:
->>> From: Tyler Baker <tyler.baker@linaro.org>
+On 05/12/2015 11:46 AM, Eric Anholt wrote:
+> Stephen Warren <swarren@wwwdotorg.org> writes:
+>
+>> On 04/29/15 11:51, Eric Anholt wrote:
+>>> Stephen Warren <swarren@wwwdotorg.org> writes:
+>>>
+>>>> On 04/27/2015 05:14 PM, Eric Anholt wrote:
+>>>>> This gives us a function for making mailbox property channel requests
+>>>>> of the firmware, and uses it to control the 3 power domains provided
+>>>>> by the firmware.
+>>>>
+>>>>> diff --git a/arch/arm/mach-bcm/raspberrypi-firmware.c b/arch/arm/mach-bcm/raspberrypi-firmware.c
+>>>>
+>>>>> +/*
+>>>>> + * Submits a set of concatenated tags to the VPU firmware through the
+>>>>> + * mailbox property interface.
+>>>>> + *
+>>>>> + * The buffer header and the ending tag are added by this function and
+>>>>> + * don't need to be supplied, just the actual tags for your operation.
+>>>>> + * See struct raspberrypi_firmware_property_tag_header for the per-tag structure.
+>>>>> + */
+>>>>> +int raspberrypi_firmware_property(void *data, size_t tag_size)
+>>>>> +{
+>>>>> +	size_t size = tag_size + 12;
+>>>>> +	u32 *buf;
+>>>>> +	dma_addr_t bus_addr;
+>>>>> +	int ret = 0;
+>>>>> +
+>>>>> +	if (!firmware)
+>>>>> +		return -EPROBE_DEFER;
+>>>>
+>>>> I think it'd make more sense if the clients looked up the firmware
+>>>> driver via phandle at their probe time. This would mean:
+>>>>
+>>>> * No need for global "firmware", since clients could pass the firmware
+>>>> driver handle into this function.
+>>>>
+>>>> * Clients resolve deferred probe at their probe time. That way, they
+>>>> won't register themselves with subsystems asserting they can provide
+>>>> services, but find out they can't yet provide the service at that time.
+>>>
+>>> The one client so far (vc4) was resolving deferred probe at its probe
+>>> time, but not taking a reference on the firmware driver.  I figure I'll
+>>> have it do the phandle lookup and refcount -- do you still want the
+>>> struct platform_device passed in here?  If we de-global firmware, it's
+>>> going to mean some faffing in the power domain side of things to find
+>>> the device again, it seems.
 >>
->> This is odd. Did you use git send-email to send the patches?
-> 
-> Yes I did.
-> 
+>> I think I'd expect the API in the firmware driver to require the client
+>> to pass the client DT node pointer plus a property name, and do all the
+>> lookup itself. That's what most DT resource lookup APIs in the kernel do
+>> now.
+>
+> I've made this change, but it's not great -- the client has to know some
+> details of how this driver is structured (that it sets the drvdata) in
+> order to figure out whether the driver is loaded or not and return
+> -EPROBE_DEFERRED.  I couldn't find any other existing solutions than
+> that in the tree.
 
-No need to resend. I will try to apply them. Check your .gitconfig.
-The extra From is odd.
+The client shouldn't need to know that.
 
--- Shuah
+I'd expect the client to pass a DT node pointer to the provider's 
+driver, and that provider driver would know and isolate all the details 
+about its own internals. The provider could return some kind of 
+handler/... to the provider device if required.
 
--- 
-Shuah Khan
-Sr. Linux Kernel Developer
-Open Source Innovation Group
-Samsung Research America (Silicon Valley)
-shuahkh at osg.samsung.com | (970) 217-8978
+I would expect any subsystem that supports client->provider references 
+in DT would have an example of this (e.g. IRQs, GPIOs, regulators, ...). 
+However, the code for those can be rather complex to dive into for the 
+first time. For a fairly simple standalone example, check out:
+
+Provider:
+drivers/amba/tegra-ahb.c
+tegra_ahb_enable_smmu()
+
+Consumer:
+drivers/iommu/tegra-smmu.c
+tegra_smmu_ahb_enable()
+(called from tegra_smmu_probe() in the same file)
