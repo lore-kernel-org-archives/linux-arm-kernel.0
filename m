@@ -1,49 +1,32 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 12 May 2015 13:58:14 +0100
-Subject: [PATCH v2 06/12] watchdog: bindings: Supply knowledge of a third
- supported device - clocksource
+Date: Tue, 12 May 2015 13:58:18 +0100
+Subject: [PATCH v2 10/12] ARM: STi: DT: STih407: Switch LPC mode from RTC to
+ Clocksource
 In-Reply-To: <1431435500-22899-1-git-send-email-lee.jones@linaro.org>
 References: <1431435500-22899-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1431435500-22899-7-git-send-email-lee.jones@linaro.org>
+Message-ID: <1431435500-22899-11-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This aligns with the internal configuration.
+
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- Documentation/devicetree/bindings/watchdog/st_lpc_wdt.txt | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/stih407-family.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/watchdog/st_lpc_wdt.txt b/Documentation/devicetree/bindings/watchdog/st_lpc_wdt.txt
-index 388c88a..039c5ca 100644
---- a/Documentation/devicetree/bindings/watchdog/st_lpc_wdt.txt
-+++ b/Documentation/devicetree/bindings/watchdog/st_lpc_wdt.txt
-@@ -1,9 +1,11 @@
- STMicroelectronics Low Power Controller (LPC) - Watchdog
- ========================================================
- 
--LPC currently supports Watchdog OR Real Time Clock functionality.
-+LPC currently supports Watchdog OR Real Time Clock OR Clocksource
-+functionality.
- 
- [See: ../rtc/rtc-st-lpc.txt for RTC options]
-+[See: ../timer/st,stih407-lpc for Clocksource options]
- 
- Required properties
- 
-@@ -12,9 +14,11 @@ Required properties
- - reg		: LPC registers base address + size
- - interrupts    : LPC interrupt line number and associated flags
- - clocks	: Clock used by LPC device (See: ../clock/clock-bindings.txt)
--- st,lpc-mode	: The LPC can run either one of two modes ST_LPC_MODE_RTC [0] or
--		  ST_LPC_MODE_WDT [1].  One (and only one) mode must be
--		  selected.
-+- st,lpc-mode	: The LPC can run either one of three modes:
-+                  ST_LPC_MODE_RTC    [0]
-+                  ST_LPC_MODE_WDT    [1]
-+                  ST_LPC_MODE_CLKSRC [2]
-+		 One (and only one) mode must be selected.
- 
- Required properties [watchdog mode]
- 
+diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+index 2b2315d..bf1c7f5 100644
+--- a/arch/arm/boot/dts/stih407-family.dtsi
++++ b/arch/arm/boot/dts/stih407-family.dtsi
+@@ -354,7 +354,7 @@
+ 			reg = <0x8788000 0x1000>;
+ 			interrupts = <GIC_SPI 130 IRQ_TYPE_EDGE_RISING>;
+ 			clocks = <&clk_s_d3_flexgen CLK_LPC_1>;
+-			st,lpc-mode = <ST_LPC_MODE_RTC>;
++			st,lpc-mode = <ST_LPC_MODE_CLKSRC>;
+ 		};
+ 	};
+ };
 -- 
 1.9.1
