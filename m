@@ -1,83 +1,53 @@
-From: jchandra@broadcom.com (Jayachandran C.)
-Date: Tue, 12 May 2015 05:37:47 +0530
-Subject: [PATCH v2 1/2] PCI: generic: remove dependency on hw_pci
-In-Reply-To: <20150505155346.GJ1550@arm.com>
-References: <1430791333-26013-1-git-send-email-jchandra@broadcom.com>
- <20150505155346.GJ1550@arm.com>
-Message-ID: <20150512000746.GA31418@jayachandranc.netlogicmicro.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Mon, 11 May 2015 17:20:54 -0700
+Subject: [PATCH v5 0/6] arm64,hi6220: Enable Hisilicon Hi6220 SoC
+In-Reply-To: <CAAS=xmjR9a-M961-7+9LF2G18qiXYhT+1sb5TEbbrQcW1fnRtw@mail.gmail.com>
+References: <1431007225-8513-1-git-send-email-bintian.wang@huawei.com>
+ <7ha8xgi10e.fsf@linaro.org>
+ <CAAS=xmjR9a-M961-7+9LF2G18qiXYhT+1sb5TEbbrQcW1fnRtw@mail.gmail.com>
+Message-ID: <CAGa+x85QDAzP_8_rPF3H0KpXO9rR2OhzYnMnAFydmBMicDzmEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 05, 2015 at 04:53:46PM +0100, Will Deacon wrote:
-> On Tue, May 05, 2015 at 03:02:12AM +0100, Jayachandran C wrote:
-> > The current code in pci-host-generic.c uses pci_common_init_dev()
-> > from the arch/arm/ to do a part of the PCI initialization, and this
-> > prevents it from being used on arm64.
-> > 
-> > The initialization done by pci_common_init_dev() that is really
-> > needed by pci-host-generic.c can be done in the same file without
-> > using the hw_pci API of ARM.
-> > 
-> > The ARM platform requires a pci_sys_data as sysdata for the PCI bus,
-> > this is be handled by setting up 'struct gen_pci' to embed a
-> > pci_sys_data variable as the first element on the ARM platform.
-> > 
-> > Signed-off-by: Jayachandran C <jchandra@broadcom.com>
-> > ---
-> > Here's v2 of the patches, this enables use of pci-host-generic on
-> > arm64.
-> > 
-> > This has been tested on both qemu and fast model for arm64, and on
-> > qemu for arm32.
-> > 
-> > v1->v2
-> >  - Address comments from Arnd Bergmann and Lorenzo Pieralisi
-> >     - move contents of gen_pci_init to gen_pci_probe
-> >     - assign resources only when !probe_only
-> >  - tested on ARM32 with qemu option -M virt
-> 
-> I tried this with an arm64 kernel running under kvmtool, but I get the
-> following errors (a 32-bit ARM kernel does seem to work):
-> 
->   PCI host bridge /pci ranges:
->      IO 0x00000000..0x0000ffff -> 0x00000000
->     MEM 0x41000000..0x7fffffff -> 0x41000000
->   pci-host-generic 40000000.pci: PCI host bridge to bus 0000:00
->   pci_bus 0000:00: root bus resource [bus 00-01]
->   pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
->   pci_bus 0000:00: root bus resource [mem 0x41000000-0x7fffffff]
->   pci_bus 0000:00: scanning bus
->   pci 0000:00:00.0: [1af4:1009] type 00 class 0xff0000
->   pci 0000:00:00.0: reg 0x10: [mem 0x41000000-0x410003ff]
->   pci 0000:00:00.0: reg 0x14: [io  0x6200-0x65ff]
->   pci 0000:00:00.0: reg 0x18: [mem 0x41000400-0x410005ff]
->   pci 0000:00:01.0: [1af4:1009] type 00 class 0xff0000
->   pci 0000:00:01.0: reg 0x10: [mem 0x41000800-0x41000bff]
->   pci 0000:00:01.0: reg 0x14: [io  0x6600-0x69ff]
->   pci 0000:00:01.0: reg 0x18: [mem 0x41000c00-0x41000dff]
->   pci_bus 0000:00: fixups for bus
->   pci_bus 0000:00: bus scan returning with max=00
->   pci 0000:00:00.0: fixup irq: got 10
->   pci 0000:00:00.0: assigning IRQ 10
->   pci 0000:00:01.0: fixup irq: got 11
->   pci 0000:00:01.0: assigning IRQ 11
->   virtio-pci 0000:00:00.0: can't enable device: BAR 0 [mem 0x41000000-0x410003ff] not claimed
->   virtio-pci: probe of 0000:00:00.0 failed with error -22
->   virtio-pci 0000:00:01.0: can't enable device: BAR 0 [mem 0x41000800-0x41000bff] not claimed
->   virtio-pci: probe of 0000:00:01.0 failed with error -22
+On Thu, May 7, 2015 at 4:11 PM, Brent Wang <wangbintian@gmail.com> wrote:
+> Hello Kevin,
+>
+> 2015-05-08 4:30 GMT+08:00 Kevin Hilman <khilman@linaro.org>:
+>> Bintian Wang <bintian.wang@huawei.com> writes:
+>>
+>>> Hi6220 is one mobile solution of Hisilicon, this patchset contains
+>>> initial support for Hi6220 SoC and HiKey development board, which
+>>> supports octal ARM Cortex A53 cores. Initial support is minimal and
+>>> includes just the arch configuration, clock driver, device tree
+>>> configuration.
+>>>
+>>> PSCI is enabled in device tree and there is no problem to boot all the
+>>> octal cores, and the CPU hotplug is also working now, you can download
+>>> and compile the latest firmware based on the following link to run this
+>>> patch set:
+>>> https://github.com/96boards/documentation/wiki/UEFI
+>>
+>> Do you have any tips for booting this using the HiSi bootloader?  It
+>> seems that I need to add the magic hisi,boardid property for dtbTool to
+>> work.  Could you share what that magic value is?
+> Yes, you need it.
+> Hisilicon has many different development boards and those boards have some
+> different hardware configuration, so we need different device tree
+> files for them.
+> the original hisi,boardid is used to distinguish different boards and
+> used by the
+> bootloader to judge which device tree to use at boot-up.
+>
+>> and maybe add it to the wiki someplace?
+> Maybe add to section "Known Issues" in
+> "https://github.com/96boards/documentation/wiki/UEFI"
+> is a good choice, I will update this section later.
 
-PCI_PROBE_ONLY does not work yet for arm64, this will need further changes
-in either arm64 or pci as noted by Lorenzo. This is not due to a problem with
-this patch per se.
+You updated the wiki, but you didn't specify what the value should be
+for this to work with the old bootloader.
 
-More importantly, this does not change the current arm32 behavior and adds
-support for arm64 for two very useful cases
- - we can use "pci-host-ecam-generic" for a host bridge controller that is
-   initialized by firmware, without adding a custom driver.
- - qemu virt platform works on arm64
+Can you please give the value of that property?
 
-If you think there are any furhter changes needed in this patchset please
-let me know.
+Also, have you tested this series with the old bootloader as well?
 
-Thanks,
-JC.
+Kevin
