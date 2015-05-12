@@ -1,109 +1,101 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 12 May 2015 14:44:20 +0200
-Subject: [PATCH 2/2] pwm: add Mediatek display PWM driver support
-In-Reply-To: <CABuKBeJz_=Nxcen9QU_KHds6UJwUJL0yNpYDhvT3eFoV_EY5xA@mail.gmail.com>
-References: <1431336382-13167-1-git-send-email-yh.huang@mediatek.com>
- <1431336382-13167-3-git-send-email-yh.huang@mediatek.com>
- <CABuKBeJz_=Nxcen9QU_KHds6UJwUJL0yNpYDhvT3eFoV_EY5xA@mail.gmail.com>
-Message-ID: <CABuKBeJc3Kvdoejyi0XFbQMU2saztzV5S7jiXCg-09juYeh4pg@mail.gmail.com>
+From: leilk.liu@mediatek.com (leilk liu)
+Date: Tue, 12 May 2015 20:39:16 +0800
+Subject: [PATCH 2/3] spi: mediatek: Add spi bus for Mediatek MT8173
+In-Reply-To: <20150508175306.GG2761@sirena.org.uk>
+References: <1431075343-7887-1-git-send-email-leilk.liu@mediatek.com>
+ <1431075343-7887-3-git-send-email-leilk.liu@mediatek.com>
+ <20150508175306.GG2761@sirena.org.uk>
+Message-ID: <1431434356.2128.9.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-12 14:37 GMT+02:00 Matthias Brugger <matthias.bgg@gmail.com>:
-> Hi YH,
->
-> 2015-05-11 11:26 GMT+02:00 YH Huang <yh.huang@mediatek.com>:
->> Add display PWM driver support to modify backlight for MT8173/MT6595.
->>
->> Signed-off-by: YH Huang <yh.huang@mediatek.com>
->> ---
->>  drivers/pwm/Kconfig             |   9 ++
->>  drivers/pwm/Makefile            |   1 +
->>  drivers/pwm/pwm-disp-mediatek.c | 225 ++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 235 insertions(+)
->>  create mode 100644 drivers/pwm/pwm-disp-mediatek.c
->>
->> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
->> index b1541f4..9edbb5a 100644
->> --- a/drivers/pwm/Kconfig
->> +++ b/drivers/pwm/Kconfig
->> @@ -111,6 +111,15 @@ config PWM_CLPS711X
->>           To compile this driver as a module, choose M here: the module
->>           will be called pwm-clps711x.
->>
->> +config PWM_DISP_MEDIATEK
->> +       tristate "MEDIATEK display PWM driver"
->> +       depends on OF
->> +       help
->> +         Generic PWM framework driver for mediatek disp-pwm device.
->> +
->> +         To compile this driver as a module, choose M here: the module
->> +         will be called pwm-disp-mediatek.
->> +
->>  config PWM_EP93XX
->>         tristate "Cirrus Logic EP93xx PWM support"
->>         depends on ARCH_EP93XX
->> diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
->> index ec50eb5..c5ff72a 100644
->> --- a/drivers/pwm/Makefile
->> +++ b/drivers/pwm/Makefile
->> @@ -8,6 +8,7 @@ obj-$(CONFIG_PWM_BCM_KONA)      += pwm-bcm-kona.o
->>  obj-$(CONFIG_PWM_BCM2835)      += pwm-bcm2835.o
->>  obj-$(CONFIG_PWM_BFIN)         += pwm-bfin.o
->>  obj-$(CONFIG_PWM_CLPS711X)     += pwm-clps711x.o
->> +obj-$(CONFIG_PWM_DISP_MEDIATEK)        += pwm-disp-mediatek.o
->>  obj-$(CONFIG_PWM_EP93XX)       += pwm-ep93xx.o
->>  obj-$(CONFIG_PWM_FSL_FTM)      += pwm-fsl-ftm.o
->>  obj-$(CONFIG_PWM_IMG)          += pwm-img.o
->> diff --git a/drivers/pwm/pwm-disp-mediatek.c b/drivers/pwm/pwm-disp-mediatek.c
->> new file mode 100644
->> index 0000000..38293af
->> --- /dev/null
->> +++ b/drivers/pwm/pwm-disp-mediatek.c
->> @@ -0,0 +1,225 @@
->> +/*
->> + * Mediatek display pulse-width-modulation controller driver.
->> + * Copyright (c) 2015 MediaTek Inc.
->> + * Author: YH Huang <yh.huang@mediatek.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include <linux/clk.h>
->> +#include <linux/err.h>
->> +#include <linux/io.h>
->> +#include <linux/module.h>
->> +#include <linux/of.h>
->> +#include <linux/pwm.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/slab.h>
->> +
->> +#define DISP_PWM_EN_OFF                        (0x0)
->> +#define PWM_ENABLE_SHIFT               (0x0)
->> +#define PWM_ENABLE_MASK                        (0x1 << PWM_ENABLE_SHIFT)
->
-> Get rid of the _SHIFT which are actually zero, it will make the code
-> more readable.
->
->> +
->> +#define DISP_PWM_COMMIT_OFF            (0x08)
->> +#define PWM_COMMIT_SHIFT               (0x0)
->> +#define PWM_COMMIT_MASK                        (0x1 << PWM_COMMIT_SHIFT)
->> +
->> +#define DISP_PWM_CON_0_OFF             (0x10)
->> +#define PWM_CLKDIV_SHIFT               (0x10)
+Thanks for your review.
 
-I prefer to have the shift values in decimal instead of hex, as it
-makes it easier to see which bits in the registers are the relevant
-ones.
-Sorry forgot that one.
+On Fri, 2015-05-08 at 18:53 +0100, Mark Brown wrote:
+> On Fri, May 08, 2015 at 04:55:42PM +0800, leilk.liu at mediatek.com wrote:
+> > From: Leilk Liu <leilk.liu@mediatek.com>
+> > 
+> > This patch adds basic spi bus for MT8173.
+> 
+> Please try to only CC relevant people on patches, you've got a very
+> broad CC list here and I'm not sure I understand why everyone is on it.
+> Sending people irrelevant patches adds to the volume of mail people have
+> to handle which takes time away from other things.
+> 
 
-Cheers,
-Matthias
+I use scripts/get_maintainer.pl on the patches and keep all maintainers.
+I'll further refine the list in the future.
+
+> > +config SPI_MT65XX
+> > +	tristate "MediaTek SPI controller"
+> > +	depends on ARCH_MEDIATEK || COMPILE_TEST
+> > +	select SPI_BITBANG
+> 
+> Unless your controller is geniunely bitbanging you shouldn't be using
+> the bitbang framework, modern drivers should implement set_cs() and
+> transfer_one() instead.  You should also be using the core helpers for
+> DMA mapping.
+> 
+
+I will implement set_cs() and transfer_one() instead in next patch.
+
+Could you tell me more details about "You should also be using the core
+helpers for DMA mapping"?
+
+> The driver looks basically good other than this, it shouldn't be too
+> much work (and ought to save you some code) to refactor to the modern
+> interfaces.
+> 
+> > +#define IDLE 0
+> > +#define INPROGRESS 1
+> > +#define PAUSED 2
+> > +
+> > +#define PACKET_SIZE 1024
+> 
+> You should namespace the constants you're using to avoid clashes with
+> headers.
+> 
+> > +static const struct of_device_id mtk_spi_of_match[] = {
+> > +	{ .compatible = "mediatek,mt6589-spi", .data = (void *)COMPAT_MT6589},
+> > +	{ .compatible = "mediatek,mt8173-spi", .data = (void *)COMPAT_MT8173},
+> > +	{}
+> > +};
+> > +MODULE_DEVICE_TABLE(of, mtk_spi_of_match);
+> 
+> There were three compatible strings listed in the DT binding but only
+> two here.
+> 
+
+MT6589 and MT8135 is compatible; 
+For MT8135 IC, it can use the follow way in dts to probe:
+  compatible = "mediatek,mt8135-spi", 
+	       "mediatek,mt6589-spi";
+And I test it's ok on MT8135 platform. So I add struct of_device_id
+mtk_spi_of_match like this in spi driver code.
+
+> > +	/*set the software reset bit in SPI_CMD_REG.*/
+> 
+> /* Spaces please */
+> 
+> > +static unsigned long mtk_get_device_prop(struct platform_device *pdev)
+> > +{
+> > +	const struct of_device_id *match;
+> > +
+> > +	match = of_match_node(mtk_spi_of_match, pdev->dev.of_node);
+> > +	return (unsigned long)match->data;
+> > +}
+> 
+> This wrapper doesn't seem to be doing a lot and will crash if we somehow
+> manage to get the driver loaded without a match (eg, if someone tries to
+> instantiate as a regular platform device).
+> 
+> > +	ret = clk_prepare_enable(mdata->clk);
+> > +	if (ret < 0) {
+> > +		dev_err(&pdev->dev, "failed to enable clock (%d)\n", ret);
+> > +		goto err;
+> > +	}
+> 
+> I'd expect to see runtime PM callbacks to enable and disable this clock
+> in order to minimise power consumption.
+
+In the case of other review comments, I will also fix them in next/OK.
