@@ -1,54 +1,60 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 12 May 2015 21:28:38 +0200
-Subject: [PATCH v2 10/17] i2c: add locomo i2c driver
-In-Reply-To: <CALT56yNHvJ1Swj2pp2JrBaJBensSP703JXQKfvivFrJOYf85QA@mail.gmail.com>
-References: <1430178954-11138-1-git-send-email-dbaryshkov@gmail.com>
- <1430178954-11138-11-git-send-email-dbaryshkov@gmail.com>
- <20150512192413.GE4449@schokonusskuchen.bad>
- <CALT56yNHvJ1Swj2pp2JrBaJBensSP703JXQKfvivFrJOYf85QA@mail.gmail.com>
-Message-ID: <20150512192837.GF4449@schokonusskuchen.bad>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 12 May 2015 20:30:14 +0100
+Subject: [PATCH 3/4] ASoC: rockchip: add rockchip machine driver for
+ rt5650/rt5645
+In-Reply-To: <1431422797-31903-4-git-send-email-zhengxing@rock-chips.com>
+References: <1431422797-31903-1-git-send-email-zhengxing@rock-chips.com>
+ <1431422797-31903-4-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <20150512193014.GB3066@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 12, 2015 at 10:27:07PM +0300, Dmitry Eremin-Solenikov wrote:
-> 2015-05-12 22:24 GMT+03:00 Wolfram Sang <wsa@the-dreams.de>:
-> > On Tue, Apr 28, 2015 at 02:55:47AM +0300, Dmitry Eremin-Solenikov wrote:
-> >> LoCoMo chip contains a tiny i2c controller destined to control
-> >> M62332 DAC. Provide a separate I2C driver for this cell.
-> >>
-> >> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> >
-> > Thanks for the submission!
-> >
-> >> +#include <linux/kernel.h>
-> >> +#include <linux/module.h>
-> >> +#include <linux/platform_device.h>
-> >> +#include <linux/regmap.h>
-> >> +#include <linux/slab.h>
-> >> +#include <linux/mfd/locomo.h>
-> >> +
-> >> +#include <linux/i2c.h>
-> >> +#include <linux/i2c-algo-bit.h>
-> >
-> > To avoid duplicates, I prefer the includes to be sorted. No need to
-> > resend because of that, though.
-> >
-> > Kudos for brushing up old code! Do you want the drivers go via the
-> > subsystem trees? Or is there a dependency so it should go in via some
-> > other tree in one go?
+On Tue, May 12, 2015 at 05:26:36PM +0800, Xing Zheng wrote:
+> From: zhengxing <zhengxing@rock-chips.com>
 > 
-> There is a header dependency -- <linux/mfd/locomo.h> is a new header.
-> I'd prefer for these patches to go in via one of MFD, arm-soc or ARM trees
-> as a whole series (if that would be ok with respective maintainers).
+> The driver is used for rockchip board using a rt5650/rt5645.
+> Test on RK3288 with rt5650.
 
-Fine with me.
+Similar comments to the Maxim driver plus...
 
-Reviewed-by: Wolfram Sang <wsa@the-dreams.de>
+> +/* Jack detect via rt5645 driver. */
+> +extern int rt5645_set_jack_detect(struct snd_soc_codec *codec,
+> +				  struct snd_soc_jack *hp_jack,
+> +				  struct snd_soc_jack *mic_jack,
+> +				  struct snd_soc_jack *btn_jack);
+> +
+> +/* For compatible. */
+> +int __weak rt5645_set_jack_detect(struct snd_soc_codec *codec,
+> +				  struct snd_soc_jack *hp_jack,
+> +				  struct snd_soc_jack *mic_jack,
+> +				  struct snd_soc_jack *btn_jack)
+> +{
+> +	dev_warn(codec->dev, "Jack detect dummy, have no implement it?\n");
+> +
+> +	return 0;
+> +}
 
+Don't do this - if the functionality isn't there in the CODEC driver get
+it implemented before you use it.  Make sure you're using the API the
+CODEC actually ends up exporting.
+
+> +	/* Enable Headset and 4 Buttons Jack detection */
+> +	ret = snd_soc_card_jack_new(card, "Headphone Jack",
+> +				    SND_JACK_HEADPHONE | SND_JACK_MICROPHONE,
+
+> +	ret = snd_soc_card_jack_new(card, "Mic Jack",
+> +
+> +	ret = snd_soc_card_jack_new(card, "Button Jack",
+
+No, don't do this - as discussed in another Chromebook review (I'm
+guessing this is a Chromebook) the jacks should represent the physical
+jacks in the system.  It's possible you have separate headphone and
+microphone jacks but I really expect microphone and button to be on the
+same socket.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
+Size: 473 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150512/71aeee56/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150512/31a15cfb/attachment.sig>
