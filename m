@@ -1,61 +1,55 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Tue, 12 May 2015 19:46:51 +0200
-Subject: [PATCH 4/4] arm64: gicv3: its: Increase FORCE_MAX_ZONEORDER for
- Cavium ThunderX
-In-Reply-To: <20150512172416.GF2062@arm.com>
-References: <1430686172-18222-1-git-send-email-rric@kernel.org>
- <1430686172-18222-5-git-send-email-rric@kernel.org>
- <20150505105329.GC1550@arm.com>
- <20150511091438.GW4251@rric.localhost>
- <20150512123056.GA2062@arm.com>
- <20150512162049.GP10428@rric.localhost>
- <20150512172416.GF2062@arm.com>
-Message-ID: <20150512174651.GQ10428@rric.localhost>
+From: Frank.Li@freescale.com (Frank.Li at freescale.com)
+Date: Wed, 13 May 2015 00:50:36 +0800
+Subject: [PATCH 1/3] document: devicetree: input: imx: i.mx snvs power device
+ tree bindings
+Message-ID: <1431449438-19460-1-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12.05.15 18:24:16, Will Deacon wrote:
-> On Tue, May 12, 2015 at 05:20:49PM +0100, Robert Richter wrote:
-> > For allocation of 16MB cont. phys mem of a defconfig kernel (4KB
-> > default pagesize) I see this different approaches:
-> 
-> 16MB sounds like an awful lot. Is this because you have tonnes of MSIs or
-> a sparse DeviceID space or both?
-> 
-> >  * set FORCE_MAX_ZONEORDER to 13 as default,
-> > 
-> >  * set FORCE_MAX_ZONEORDER to 13 if ARM_GIC_V3 is set,
-> > 
-> >  * set FORCE_MAX_ZONEORDER to 13 if ARCH_THUNDER is set (this patch),
-> 
-> I'm not hugely fond of these suggestions, as there's still no guarantee
-> that such a huge allocation is going to succeed and we end up bumping
-> MAX_ORDER for all platforms in defconfig if we enable THUNDER there.
+From: Frank Li <Frank.Li@freescale.com>
 
-I actually was expecting this...
+The snvs-pwrkey is designed to enable POWER key function which controlled
+by SNVS ONOFF. the driver can report the status of POWER key and wakeup
+system if pressed after system suspend.
 
-> >  * use hugepages if enabled (defconfig has the following options
-> >    enable: CGROUP_HUGETLB, TRANSPARENT_HUGEPAGE, HUGETLBFS, this might
-> >    work with current default kernel without changing defconfig
-> >    options),
-> 
-> I don't think hugepages help with DMA.
-> 
-> >  * use devicetree to reserve mem for gicv3 (need to check ACPI).
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
+Signed-off-by: Robin Gong <b38343@freescale.com>
+---
+ .../devicetree/bindings/input/snvs-pwrkey.txt      | 26 ++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/snvs-pwrkey.txt
 
-I am quite a bit concerned letting firmware handle this. But if that
-would solve it, fine.
-
-> Using a carveout like this might be the best bet. I assume the memory used
-> by the ITS can never be reclaimed by the syste (and therefore there's no
-> issue with wastage)?
-> 
-> > Do you see any direction?
-> 
-> Dunno, does CMA also require the MAX_ORDER bump?
-
-Looks promising at the first glance. Will look into it.
-
-Thanks,
-
--Robert
+diff --git a/Documentation/devicetree/bindings/input/snvs-pwrkey.txt b/Documentation/devicetree/bindings/input/snvs-pwrkey.txt
+new file mode 100644
+index 0000000..8f0826f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/input/snvs-pwrkey.txt
+@@ -0,0 +1,26 @@
++* Freescale i.MX SNVS powerkey device tree bindings
++
++The snvs-pwrkey is designed to enable POWER key function which controlled
++by SNVS ONOFF, the driver can report the status of POWER key and wakeup
++system if pressed after system suspend.
++
++Required SoC Specific Properties:
++- compatible: Should be "fsl,imx6sx-snvs-pwrkey".
++
++- reg: Physical base address of the SNVS and length of memory mapped
++  region.
++
++- interrupts: The SNVS interrupt number to the CPU(s).
++
++- fsl,keycode: Keycode to emit, KEY_POWER by default.
++
++- fsl,wakeup: Button can wake-up the system
++
++Example:
++snvs-pwrkey at 0x020cc000 {
++	compatible = "fsl,imx6sx-snvs-pwrkey";
++	reg = <0x020cc000 0x4000>;
++	interrupts = <0 4 0x4>;
++	fsl,keycode = <116>; /* KEY_POWER */
++	fsl,wakeup;
++};
+-- 
+1.9.1
