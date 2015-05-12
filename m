@@ -1,55 +1,77 @@
-From: afaerber@suse.de (=?windows-1252?Q?Andreas_F=E4rber?=)
-Date: Tue, 12 May 2015 14:13:20 +0200
-Subject: [PATCH 2/6] ARM: Zynq: DT: Enable xadc node in zynq-parallella.dts
-In-Reply-To: <1431037945-40360-2-git-send-email-xander.huff@ni.com>
-References: <1431037945-40360-1-git-send-email-xander.huff@ni.com>
- <1431037945-40360-2-git-send-email-xander.huff@ni.com>
-Message-ID: <5551EE60.40601@suse.de>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 12 May 2015 20:19:13 +0800
+Subject: [RFC v2 6/7] x86/PCI/ACPI: Use common interface to support PCI
+ host bridge
+In-Reply-To: <1430793970-11159-7-git-send-email-jiang.liu@linux.intel.com>
+References: <1430793970-11159-1-git-send-email-jiang.liu@linux.intel.com>
+ <1430793970-11159-7-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <5551EFC1.2010704@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 08.05.2015 um 00:32 schrieb Xander Huff:
-> Now that zynq-7000 disables xadc by default, enable in zynq-parallella
-> to retain existing behavior.
-> 
-> Signed-off-by: Xander Huff <xander.huff@ni.com>
-> ---
->  arch/arm/boot/dts/zynq-parallella.dts | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/zynq-parallella.dts b/arch/arm/boot/dts/zynq-parallella.dts
-> index 1745712..b1a1f7a 100644
-> --- a/arch/arm/boot/dts/zynq-parallella.dts
-> +++ b/arch/arm/boot/dts/zynq-parallella.dts
-> @@ -32,6 +32,12 @@
->  		bootargs = "console=ttyPS0,115200 earlyprintk root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait";
->  		linux,stdout-path = "/amba/serial at e0001000";
->  	};
+[...]
+>   struct pci_root_info {
+> -	struct acpi_device *bridge;
+> -	char name[16];
+> -	struct pci_controller sd;
+> +	struct acpi_pci_root_info_common common;
+>   #ifdef	CONFIG_PCI_MMCONFIG
+>   	bool mcfg_added;
+>   	u16 segment;
+> @@ -165,14 +164,17 @@ static int check_segment(u16 seg, struct device *dev, char *estr)
+>   	return 0;
+>   }
+>
+> -static int setup_mcfg_map(struct pci_root_info *info, u16 seg, u8 start,
+> -			  u8 end, phys_addr_t addr)
+> +static int setup_mcfg_map(struct acpi_pci_root_info_common *ci)
+>   {
+>   	int result;
+> -	struct device *dev = &info->bridge->dev;
+> +	struct pci_root_info *info;
+> +	struct acpi_pci_root *root = ci->root;
+> +	struct device *dev = &ci->bridge->dev;
+> +	int seg = ci->controller.segment;
+
+...
+
+>
+> -	info->start_bus = start;
+> -	info->end_bus = end;
+> +	info = container_of(ci, struct pci_root_info, common);
+> +	info->start_bus = (u8)root->secondary.start;
+> +	info->end_bus = (u8)root->secondary.end;
+>   	info->mcfg_added = false;
+
+info->segment is not initialized here
+
+>
+>   	/* return success if MMCFG is not in use */
+> @@ -182,7 +184,8 @@ static int setup_mcfg_map(struct pci_root_info *info, u16 seg, u8 start,
+>   	if (!(pci_probe & PCI_PROBE_MMCONF))
+>   		return check_segment(seg, dev, "MMCONFIG is disabled,");
+>
+> -	result = pci_mmconfig_insert(dev, seg, start, end, addr);
+> +	result = pci_mmconfig_insert(dev, seg, info->start_bus, info->end_bus,
+> +				     root->mcfg_addr);
+>   	if (result == 0) {
+>   		/* enable MMCFG if it hasn't been enabled yet */
+>   		if (raw_pci_ext_ops == NULL)
+> @@ -195,8 +198,11 @@ static int setup_mcfg_map(struct pci_root_info *info, u16 seg, u8 start,
+>   	return 0;
+>   }
+>
+> -static void teardown_mcfg_map(struct pci_root_info *info)
+> +static void teardown_mcfg_map(struct acpi_pci_root_info_common *ci)
+>   {
+> +	struct pci_root_info *info;
 > +
-> +	amba {
-> +		adc: adc at f8007100 {
-> +			status = "okay";
-> +		};
-> +	};
+> +	info = container_of(ci, struct pci_root_info, common);
+>   	if (info->mcfg_added) {
+>   		pci_mmconfig_delete(info->segment, info->start_bus,
 
-You've already discarded this patchset, but please note for the future
-that the desired style would've been the one you see below, i.e.
+But the segment is used here to delete mmconfig entry, it seems that
+the domain is 0 so there will be no problem, did I miss something?
 
->  };
-
-&adc {
-	status = "okay";
-};
-
-Regards,
-Andreas
-
->  
->  &clkc {
-> 
-
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Dilip Upmanyu, Graham Norton; HRB
-21284 (AG N?rnberg)
+Thanks
+Hanjun
