@@ -1,61 +1,47 @@
-From: mniewoeh@stud.hs-offenburg.de (=?UTF-8?Q?Michael=20Niew=C3=B6hner?=)
-Date: Tue, 12 May 2015 09:22:42 +0200
-Subject: [PATCH 2/2] ARM: dts: rockchip: add
- system-power-controller toact8846
-In-Reply-To: <2270228.43yCmaWq86@phil>
-References: <64DE272A-FD25-406C-A51B-6C5B76DA5171@stud.hs-offenburg.de>
- <2270228.43yCmaWq86@phil>
-Message-ID: <5551C66C020000D0000AFA23@gwia2.rz.hs-offenburg.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 12 May 2015 09:28:10 +0200
+Subject: [PATCH RESEND v6 1/2] arm64: dts: Add the arasan sdhci nodes in
+ apm-storm.dtsi
+In-Reply-To: <CAOHikRAeOH5Pt4WZFk1C29dUytO7H0ox_dgq578oW19ue8Eb8Q@mail.gmail.com>
+References: <1431333531-30491-1-git-send-email-stripathi@apm.com>
+ <1431333531-30491-2-git-send-email-stripathi@apm.com>
+ <CAOHikRAeOH5Pt4WZFk1C29dUytO7H0ox_dgq578oW19ue8Eb8Q@mail.gmail.com>
+Message-ID: <5446694.nHWK6QO1on@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I agree on relicensing to gpl2/x11.
+On Tuesday 12 May 2015 11:03:46 Suman Tripathi wrote:
+> > @@ -533,6 +567,15 @@
+> >                         interrupts = <0x0 0x4f 0x4>;
+> >                 };
+> >
+> > +               sdhci0: sdhci at 1c000000 {
+> > +                       compatible = "arasan,sdhci-4.9a";
+> > +                       reg = <0x0 0x1c000000 0x0 0x100>;
+> > +                       interrupts = <0x0 0x49 0x4>;
+> > +                       dma-coherent;
+> > +                       clock-names = "clk_xin", "clk_ahb";
+> > +                       clocks = <&sdioclk 0>, <&ahbclk 0>;
+> > +               };
+> > +
+> >                 phy1: phy at 1f21a000 {
+> >                         compatible = "apm,xgene-phy";
+> >                         reg = <0x0 0x1f21a000 0x0 0x100>;
+> > --
+> > 1.8.2.1
+> >
+> 
+> Can anyone from dt community review this patch ? I have changed the dts node
+> names from sdhc to sdhci as per Arnd, Michael comments .
 
-Michael
+I was actually asking for it to be named 'mmc', not 'sdhci', because the
+name is supposed to indicate the purpose of the device, not the
+implementation. I realize that we are inconsistent here, just as with
+'uart' vs 'serial', and that ePAPR does not define what to do.
 
+We should probably add something to Documentation/devicetree/bindings/mmc/mmc.txt
+about this topic and change all the dts files accordingly (unless there
+is a risk for regressions). At the moment, the mmc.txt file also includes
+an example with 'sdhci', not 'mmc'.
 
-
-
-
-> Am 11.05.2015 um 23:58 schrieb Heiko Stuebner <heiko@sntech.de>:
-> 
-> Am Montag, 11. Mai 2015, 22:57:21 schrieb Michael Niew?hner:
->> Add system-power-controller to act8846 in rk3188-radxarock.dts in
-addition
->> to the act8846 patch fixing the reboot kernel panic
->> 
->> Signed-off-by: Michael Niewoehner <mniewoeh@stud.hs-offenburg.de>
-> 
-> I have to ask, are you ok with the pending dts relicensing to a
-gpl2/x11 dual 
-> license [0]?
-> 
-> Otherwise this looks fine and the act8846 is the power-controller of
-the 
-> radxarock in any case, so I'll take this one in any case.
-> 
-> 
-> Heiko
-> 
-> [0]
-http://lists.infradead.org/pipermail/linux-rockchip/2015-March/002644.html
-> 
-> 
->> ---
->> arch/arm/boot/dts/rk3188-radxarock.dts | 1 +
->> 1 file changed, 1 insertion(+)
->> 
->> diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts
->> b/arch/arm/boot/dts/rk3188-radxarock.dts index bdf8570..225a0eb
-100644
->> --- a/arch/arm/boot/dts/rk3188-radxarock.dts
->> +++ b/arch/arm/boot/dts/rk3188-radxarock.dts
->> @@ -152,6 +152,7 @@
->>        compatible = "active-semi,act8846";
->>        reg = <0x5a>;
->>        status = "okay";
->> +        system-power-controller;
->> 
->>        pinctrl-names = "default";
->>        pinctrl-0 = <&act8846_dvs0_ctl>;
-> 
+	Arnd
