@@ -1,101 +1,69 @@
-From: leilk.liu@mediatek.com (leilk liu)
-Date: Tue, 12 May 2015 20:39:16 +0800
-Subject: [PATCH 2/3] spi: mediatek: Add spi bus for Mediatek MT8173
-In-Reply-To: <20150508175306.GG2761@sirena.org.uk>
-References: <1431075343-7887-1-git-send-email-leilk.liu@mediatek.com>
- <1431075343-7887-3-git-send-email-leilk.liu@mediatek.com>
- <20150508175306.GG2761@sirena.org.uk>
-Message-ID: <1431434356.2128.9.camel@mhfsdcap03>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 12 May 2015 13:45:23 +0100
+Subject: [EDT] [PATCH 1/1] Fix: hw watchpoint continually triggers callback
+In-Reply-To: <1010527489.65391431431292840.JavaMail.weblogic@ep2mlwas02a>
+References: <1010527489.65391431431292840.JavaMail.weblogic@ep2mlwas02a>
+Message-ID: <20150512124523.GB2062@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for your review.
+On Tue, May 12, 2015 at 12:48:13PM +0100, Maninder Singh wrote:
+> EP-2DAD0AFA905A4ACB804C4F82A001242F
+> 
+> On ARM, when a watchpoint is registered using register_wide_hw_breakpoint, 
+> the callback handler endlessly runs until the watchpoint is unregistered.
+> The reason for this issue is debug interrupts gets raised before executing the instruction,
+> and after interrupt handling ARM tries to execute the same instruction again , which results
+> in interrupt getting raised again.
+> 
+> This patch fixes this issue by using KPROBES (getting the instruction executed and incrementing PC
+> to next instruction).
+> 
+> Signed-off-by: Vaneet Narang <v.narang@samsung.com>
+> Signed-off-by: Maninder Singh <maninder1.s@samsung.com>
+> Reviewed-by: Amit Arora <amit.arora@samsung.com>
+> Reviewed-by: Ajeet Yadav <ajeet.y@samsung.com>
+> ---
+>  arch/arm/kernel/hw_breakpoint.c |   18 ++++++++++++++++++
+>  1 files changed, 18 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+> index dc7d0a9..ec72f86 100644
+> --- a/arch/arm/kernel/hw_breakpoint.c
+> +++ b/arch/arm/kernel/hw_breakpoint.c
+> @@ -37,6 +37,9 @@
+>  #include <asm/hw_breakpoint.h>
+>  #include <asm/kdebug.h>
+>  #include <asm/traps.h>
+> +#ifdef CONFIG_KPROBES
+> +#include <linux/kprobes.h>
+> +#endif
+>  
+>  /* Breakpoint currently in use for each BRP. */
+>  static DEFINE_PER_CPU(struct perf_event *, bp_on_reg[ARM_MAX_BRP]);
+> @@ -757,6 +760,21 @@ static void watchpoint_handler(unsigned long addr, unsigned int fsr,
+>  		 */
+>  		if (!wp->overflow_handler)
+>  			enable_single_step(wp, instruction_pointer(regs));
+> +#ifdef CONFIG_KPROBES
+> +		else {
+> +			struct kprobe kp;
+> +			unsigned long flags;
+> +
+> +			arch_uninstall_hw_breakpoint(wp);
+> +			kp.addr = (kprobe_opcode_t *)instruction_pointer(regs);
+> +			if (!arch_prepare_kprobe(&kp)) {
+> +				local_irq_save(flags);
+> +				kp.ainsn.insn_singlestep(&kp, regs);
+> +				local_irq_restore(flags);
+> +			}
+> +			arch_install_hw_breakpoint(wp);
+> +		}
+> +#endif
 
-On Fri, 2015-05-08 at 18:53 +0100, Mark Brown wrote:
-> On Fri, May 08, 2015 at 04:55:42PM +0800, leilk.liu at mediatek.com wrote:
-> > From: Leilk Liu <leilk.liu@mediatek.com>
-> > 
-> > This patch adds basic spi bus for MT8173.
-> 
-> Please try to only CC relevant people on patches, you've got a very
-> broad CC list here and I'm not sure I understand why everyone is on it.
-> Sending people irrelevant patches adds to the volume of mail people have
-> to handle which takes time away from other things.
-> 
+I don't think this is the right thing to do at all; the kernel already
+handles step exceptions using mismatched breakpoints when there is no
+overflow handler specified (e.g. using perf mem events). If you register a
+handler (e.g. gdb via ptrace) then you have to handle the step yourself.
 
-I use scripts/get_maintainer.pl on the patches and keep all maintainers.
-I'll further refine the list in the future.
-
-> > +config SPI_MT65XX
-> > +	tristate "MediaTek SPI controller"
-> > +	depends on ARCH_MEDIATEK || COMPILE_TEST
-> > +	select SPI_BITBANG
-> 
-> Unless your controller is geniunely bitbanging you shouldn't be using
-> the bitbang framework, modern drivers should implement set_cs() and
-> transfer_one() instead.  You should also be using the core helpers for
-> DMA mapping.
-> 
-
-I will implement set_cs() and transfer_one() instead in next patch.
-
-Could you tell me more details about "You should also be using the core
-helpers for DMA mapping"?
-
-> The driver looks basically good other than this, it shouldn't be too
-> much work (and ought to save you some code) to refactor to the modern
-> interfaces.
-> 
-> > +#define IDLE 0
-> > +#define INPROGRESS 1
-> > +#define PAUSED 2
-> > +
-> > +#define PACKET_SIZE 1024
-> 
-> You should namespace the constants you're using to avoid clashes with
-> headers.
-> 
-> > +static const struct of_device_id mtk_spi_of_match[] = {
-> > +	{ .compatible = "mediatek,mt6589-spi", .data = (void *)COMPAT_MT6589},
-> > +	{ .compatible = "mediatek,mt8173-spi", .data = (void *)COMPAT_MT8173},
-> > +	{}
-> > +};
-> > +MODULE_DEVICE_TABLE(of, mtk_spi_of_match);
-> 
-> There were three compatible strings listed in the DT binding but only
-> two here.
-> 
-
-MT6589 and MT8135 is compatible; 
-For MT8135 IC, it can use the follow way in dts to probe:
-  compatible = "mediatek,mt8135-spi", 
-	       "mediatek,mt6589-spi";
-And I test it's ok on MT8135 platform. So I add struct of_device_id
-mtk_spi_of_match like this in spi driver code.
-
-> > +	/*set the software reset bit in SPI_CMD_REG.*/
-> 
-> /* Spaces please */
-> 
-> > +static unsigned long mtk_get_device_prop(struct platform_device *pdev)
-> > +{
-> > +	const struct of_device_id *match;
-> > +
-> > +	match = of_match_node(mtk_spi_of_match, pdev->dev.of_node);
-> > +	return (unsigned long)match->data;
-> > +}
-> 
-> This wrapper doesn't seem to be doing a lot and will crash if we somehow
-> manage to get the driver loaded without a match (eg, if someone tries to
-> instantiate as a regular platform device).
-> 
-> > +	ret = clk_prepare_enable(mdata->clk);
-> > +	if (ret < 0) {
-> > +		dev_err(&pdev->dev, "failed to enable clock (%d)\n", ret);
-> > +		goto err;
-> > +	}
-> 
-> I'd expect to see runtime PM callbacks to enable and disable this clock
-> in order to minimise power consumption.
-
-In the case of other review comments, I will also fix them in next/OK.
+Will
