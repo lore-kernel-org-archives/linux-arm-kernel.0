@@ -1,45 +1,109 @@
-From: Thomas.Betker@rohde-schwarz.com (Thomas.Betker at rohde-schwarz.com)
-Date: Tue, 12 May 2015 14:42:02 +0200
-Subject: [PATCH] ARM: zynq: Set bit 22 in PL310 AuxCtrl register (6395/1)
-In-Reply-To: <5551A2C8.1070803@xilinx.com>
-References: <812979c5a158a3306d8036e7f9731947c58a3ab7.1431411716.git.michal.simek@xilinx.com>
- <55519E47.7040008@de.bosch.com> <5551A2C8.1070803@xilinx.com>
-Message-ID: <OF5BDDADA7.8131210F-ONC1257E43.00444460-C1257E43.0045C4A1@rohde-schwarz.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 12 May 2015 14:44:20 +0200
+Subject: [PATCH 2/2] pwm: add Mediatek display PWM driver support
+In-Reply-To: <CABuKBeJz_=Nxcen9QU_KHds6UJwUJL0yNpYDhvT3eFoV_EY5xA@mail.gmail.com>
+References: <1431336382-13167-1-git-send-email-yh.huang@mediatek.com>
+ <1431336382-13167-3-git-send-email-yh.huang@mediatek.com>
+ <CABuKBeJz_=Nxcen9QU_KHds6UJwUJL0yNpYDhvT3eFoV_EY5xA@mail.gmail.com>
+Message-ID: <CABuKBeJc3Kvdoejyi0XFbQMU2saztzV5S7jiXCg-09juYeh4pg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> This patch is based on the
-> >> commit 1a8e41cd672f ("ARM: 6395/1: VExpress: Set bit 22 in the PL310
-> >> (cache controller) AuxCtlr register")
-> > 
-> > 
-> > I've been under the impression that this shouldn't be done in the
-> > kernel, but in the boot loader/firmware:
-> > 
-> > https://lkml.org/lkml/2015/2/20/199
-> > 
-> > http://lists.denx.de/pipermail/u-boot/2015-March/207803.html
-> 
-> Tegra, Exynos, sti still have this bit set.
+2015-05-12 14:37 GMT+02:00 Matthias Brugger <matthias.bgg@gmail.com>:
+> Hi YH,
+>
+> 2015-05-11 11:26 GMT+02:00 YH Huang <yh.huang@mediatek.com>:
+>> Add display PWM driver support to modify backlight for MT8173/MT6595.
+>>
+>> Signed-off-by: YH Huang <yh.huang@mediatek.com>
+>> ---
+>>  drivers/pwm/Kconfig             |   9 ++
+>>  drivers/pwm/Makefile            |   1 +
+>>  drivers/pwm/pwm-disp-mediatek.c | 225 ++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 235 insertions(+)
+>>  create mode 100644 drivers/pwm/pwm-disp-mediatek.c
+>>
+>> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+>> index b1541f4..9edbb5a 100644
+>> --- a/drivers/pwm/Kconfig
+>> +++ b/drivers/pwm/Kconfig
+>> @@ -111,6 +111,15 @@ config PWM_CLPS711X
+>>           To compile this driver as a module, choose M here: the module
+>>           will be called pwm-clps711x.
+>>
+>> +config PWM_DISP_MEDIATEK
+>> +       tristate "MEDIATEK display PWM driver"
+>> +       depends on OF
+>> +       help
+>> +         Generic PWM framework driver for mediatek disp-pwm device.
+>> +
+>> +         To compile this driver as a module, choose M here: the module
+>> +         will be called pwm-disp-mediatek.
+>> +
+>>  config PWM_EP93XX
+>>         tristate "Cirrus Logic EP93xx PWM support"
+>>         depends on ARCH_EP93XX
+>> diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
+>> index ec50eb5..c5ff72a 100644
+>> --- a/drivers/pwm/Makefile
+>> +++ b/drivers/pwm/Makefile
+>> @@ -8,6 +8,7 @@ obj-$(CONFIG_PWM_BCM_KONA)      += pwm-bcm-kona.o
+>>  obj-$(CONFIG_PWM_BCM2835)      += pwm-bcm2835.o
+>>  obj-$(CONFIG_PWM_BFIN)         += pwm-bfin.o
+>>  obj-$(CONFIG_PWM_CLPS711X)     += pwm-clps711x.o
+>> +obj-$(CONFIG_PWM_DISP_MEDIATEK)        += pwm-disp-mediatek.o
+>>  obj-$(CONFIG_PWM_EP93XX)       += pwm-ep93xx.o
+>>  obj-$(CONFIG_PWM_FSL_FTM)      += pwm-fsl-ftm.o
+>>  obj-$(CONFIG_PWM_IMG)          += pwm-img.o
+>> diff --git a/drivers/pwm/pwm-disp-mediatek.c b/drivers/pwm/pwm-disp-mediatek.c
+>> new file mode 100644
+>> index 0000000..38293af
+>> --- /dev/null
+>> +++ b/drivers/pwm/pwm-disp-mediatek.c
+>> @@ -0,0 +1,225 @@
+>> +/*
+>> + * Mediatek display pulse-width-modulation controller driver.
+>> + * Copyright (c) 2015 MediaTek Inc.
+>> + * Author: YH Huang <yh.huang@mediatek.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#include <linux/clk.h>
+>> +#include <linux/err.h>
+>> +#include <linux/io.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of.h>
+>> +#include <linux/pwm.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/slab.h>
+>> +
+>> +#define DISP_PWM_EN_OFF                        (0x0)
+>> +#define PWM_ENABLE_SHIFT               (0x0)
+>> +#define PWM_ENABLE_MASK                        (0x1 << PWM_ENABLE_SHIFT)
+>
+> Get rid of the _SHIFT which are actually zero, it will make the code
+> more readable.
+>
+>> +
+>> +#define DISP_PWM_COMMIT_OFF            (0x08)
+>> +#define PWM_COMMIT_SHIFT               (0x0)
+>> +#define PWM_COMMIT_MASK                        (0x1 << PWM_COMMIT_SHIFT)
+>> +
+>> +#define DISP_PWM_CON_0_OFF             (0x10)
+>> +#define PWM_CLKDIV_SHIFT               (0x10)
 
-In 4.1-rc3, the bit is set by berlin, exynos, nomadik, omap2, sti, tegra, 
-vexpress.
+I prefer to have the shift values in decimal instead of hex, as it
+makes it easier to see which bits in the registers are the relevant
+ones.
+Sorry forgot that one.
 
-> Does that mean that they should be just removed because fix should be in
-> bootloader?
-> 
-> Anyway it is normal that bootloader stay on system untouched and only OS
-> is updated. But OK - let's make this in bootloader if this is preferred
-> solution.
-
-So the plan is to update each and every Zynq bootloader for a problem we 
-have encountered in Linux (in our case, a problem we have been hunting for 
-months)? My u-boot doesn't even use the cache; it's disabled until the 
-kernel boots.
-
-I do understand that the kernel should not overwrite hardwired settings 
-such as cache size, but shouldn't we at least allow to fix things that 
-definitely need to be fixed?
-
-Best regards,
-Thomas Betker
+Cheers,
+Matthias
