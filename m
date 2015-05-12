@@ -1,61 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 12 May 2015 16:50:04 +0100
-Subject: schedule_timeout sleeps too long after dividing CPU frequency
-In-Reply-To: <555218C7.5050602@free.fr>
-References: <55520F0F.5010906@free.fr>
- <CAKohpo=eMA6L9=jK=bAnbFuDxcdtpQNub0WFnSy6MOqB3jOdjA@mail.gmail.com>
- <555218C7.5050602@free.fr>
-Message-ID: <20150512155004.GP2067@n2100.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 12 May 2015 17:51:17 +0200
+Subject: [PATCH 5/8] dmaengine: mv_xor: bug fix for racing condition in
+ descriptors cleanup
+In-Reply-To: <1431445063-20226-6-git-send-email-maxime.ripard@free-electrons.com>
+References: <1431445063-20226-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1431445063-20226-6-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20150512175117.1eaff739@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 12, 2015 at 05:14:15PM +0200, Mason wrote:
-> This ties in to another thread I started in LAKML:
-> ("High-resolution timers not supported when using smp_twd on Cortex A9")
+Maxime,
+
+On Tue, 12 May 2015 17:37:40 +0200, Maxime Ripard wrote:
+> From: Lior Amsalem <alior@marvell.com>
 > 
-> $ git show 5388a6b2 arch/arm/kernel/smp_twd.c
-> commit 5388a6b266e9c3357353332ba0cd5549082887f1
-> Author: Russell King <rmk+kernel@arm.linux.org.uk>
-> Date:   Mon Jul 26 13:19:43 2010 +0100
+> This patch fixes a bug in the XOR driver where the cleanup function can be
+> called and free descriptors that never been processed by the engine (which
+> result in data errors).
 > 
->     ARM: SMP: Always enable clock event broadcast support
->     
->     The TWD local timers are unable to wake up the CPU when it is placed
->     into a low power mode, eg. C3.  Therefore, we need to adapt things
->     such that the TWD code can cope with this.
->     
->     We do this by always providing a broadcast tick function, and marking
->     the fact that the TWD local timer will stop in low power modes.  This
->     means that when the CPU is placed into a low power mode, the core
->     timer code marks this fact, and allows an IPI to be given to the core.
+> The cleanup function will free descriptors based on the ownership bit in
+> the descriptors.
 > 
-> This mentions a "broadcast tick function" (of which I know nothing).
-> Is this what you're referring to?
+> Signed-off-by: Lior Amsalem <alior@marvell.com>
+> Reviewed-by: Ofer Heifetz <oferh@marvell.com>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-No.  This has nothing to do with low power modes.
+If this is fixing a bug, shouldn't it be Cc'ed to stable@ ? But then it
+needs to be the first patch in the series.
 
-How this works depends on how your kernel is configured, but essentially
-it's something like this:
+>From what I remember, this series both fixes some issues *and* adds
+RAID6 support. We need to separate out the two things so that the fixes
+can be propagated to stable.
 
-* The CPU which will be idling sets its local timer to wake up after N
-  counter cycles, where N is calculated from the timer frequency.
+Thanks,
 
-* When the local timer fires, the CPU is kicked out of the idle loop, and
-  it reads the current system time.  If the current system time indicates
-  that the software timer set in schedule_timeout() has fired, that
-  software timer fires.
-
-If the local timer changes frequency without the idling CPU being woken
-up, then the problem you're referring to can happen.
-
-As you're not giving much information about your system (including
-indicating where we might see some source code) we're not able to help
-more than providing above descriptions.  Maybe if you posted your
-patches so far to support the project you're working on, we could
-provide better answers.
-
-Thanks.
-
+Thomas
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
