@@ -1,30 +1,29 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 12 May 2015 13:58:19 +0100
-Subject: [PATCH v2 11/12] ARM: STi: Enable LPC Clocksource
+Date: Tue, 12 May 2015 13:58:17 +0100
+Subject: [PATCH v2 09/12] MAINTAINERS: Add the LPC Clocksource to STi
+ maintained driver list
 In-Reply-To: <1431435500-22899-1-git-send-email-lee.jones@linaro.org>
 References: <1431435500-22899-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1431435500-22899-12-git-send-email-lee.jones@linaro.org>
+Message-ID: <1431435500-22899-10-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This timer can be used as the system (tick) timer.
-
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-sti/Kconfig | 1 +
+ MAINTAINERS | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-sti/Kconfig b/arch/arm/mach-sti/Kconfig
-index 3b1ac46..cb886de 100644
---- a/arch/arm/mach-sti/Kconfig
-+++ b/arch/arm/mach-sti/Kconfig
-@@ -2,6 +2,7 @@ menuconfig ARCH_STI
- 	bool "STMicroelectronics Consumer Electronics SOCs" if ARCH_MULTI_V7
- 	select ARM_GIC
- 	select ARM_GLOBAL_TIMER
-+	select CLKSRC_ST_LPC
- 	select PINCTRL
- 	select PINCTRL_ST
- 	select MFD_SYSCON
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 2bc71e7..af9e952 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1454,6 +1454,7 @@ S:	Maintained
+ F:	arch/arm/mach-sti/
+ F:	arch/arm/boot/dts/sti*
+ F:	drivers/clocksource/arm_global_timer.c
++F:	drivers/clocksource/clksrc_st_lpc.c
+ F:	drivers/i2c/busses/i2c-st.c
+ F:	drivers/media/rc/st_rc.c
+ F:	drivers/mmc/host/sdhci-st.c
 -- 
 1.9.1
