@@ -1,60 +1,52 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 12 May 2015 20:30:14 +0100
-Subject: [PATCH 3/4] ASoC: rockchip: add rockchip machine driver for
- rt5650/rt5645
-In-Reply-To: <1431422797-31903-4-git-send-email-zhengxing@rock-chips.com>
-References: <1431422797-31903-1-git-send-email-zhengxing@rock-chips.com>
- <1431422797-31903-4-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <20150512193014.GB3066@sirena.org.uk>
+From: gregory.0xf0@gmail.com (Gregory Fong)
+Date: Tue, 12 May 2015 12:38:43 -0700
+Subject: [PATCH 0/3] GPIO support for BRCMSTB
+In-Reply-To: <CACRpkda3EDa7YdzeT6FQ=cQw1RrDath7pQsCos-JeB2y4r18gw@mail.gmail.com>
+References: <1430901477-10678-1-git-send-email-gregory.0xf0@gmail.com>
+ <CACRpkda3EDa7YdzeT6FQ=cQw1RrDath7pQsCos-JeB2y4r18gw@mail.gmail.com>
+Message-ID: <CADtm3G45-u82Rp_0dHf2EfdMokf8E4FaQ84PHnocpvXxU+5_+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 12, 2015 at 05:26:36PM +0800, Xing Zheng wrote:
-> From: zhengxing <zhengxing@rock-chips.com>
-> 
-> The driver is used for rockchip board using a rt5650/rt5645.
-> Test on RK3288 with rt5650.
+On Tue, May 12, 2015 at 3:59 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Wed, May 6, 2015 at 10:37 AM, Gregory Fong <gregory.0xf0@gmail.com> wrote:
+>
+>> There is only one IRQ for each GIO IP block (i.e. several register banks share
+>> an IRQ).  After briefly looking into the generic IRQ chip implementation, it
+>> seemed like in this case that using it would result in the driver being more
+>> complex than necessary because AFAICT it expects a 1:1 mapping of
+>> irq_chip_generic to gpio_chip.  It seemed like less of a pain to have a single
+>> irq_chip since we have a single IRQ for all register banks (multiple
+>> gpio_chips).  I might be missing something, maybe using a shared IRQ across
+>> multiple irq_chips is easier than I think?  Suggestions welcome.
+>
+> What is needed is a 1:1 mapping between GPIO offsets and IRQ
+> offsets.
+>
+> If you just number your GPIOs 0...n and your IRQs 0...n
+> it should work just fine with one irqchip for all banks.
+>
+> What screws things up is likely that the hardware supports
+> 32 lines per bank and not all are used.
+>
+> I suggest you enable 32 line and 32 IRQs per bank,
+> so that hwirq maps nicely 1:1 on the GPIO offsets,
+> then just use the width thing to NACK operations on
+> GPIO lines you are not using. This way you can also
+> decode and warn on spurious IRQs on the unused lines.
 
-Similar comments to the Maxim driver plus...
+For having 32 lines per bank, the big problem here is the upper limit
+of 256 GPIOs.  We would hit that limit on SoCs that already exist with
+the SoC GPIOs alone, let alone any GPIO extenders.  I'm really not
+sure what the right way would be to deal with that.
 
-> +/* Jack detect via rt5645 driver. */
-> +extern int rt5645_set_jack_detect(struct snd_soc_codec *codec,
-> +				  struct snd_soc_jack *hp_jack,
-> +				  struct snd_soc_jack *mic_jack,
-> +				  struct snd_soc_jack *btn_jack);
-> +
-> +/* For compatible. */
-> +int __weak rt5645_set_jack_detect(struct snd_soc_codec *codec,
-> +				  struct snd_soc_jack *hp_jack,
-> +				  struct snd_soc_jack *mic_jack,
-> +				  struct snd_soc_jack *btn_jack)
-> +{
-> +	dev_warn(codec->dev, "Jack detect dummy, have no implement it?\n");
-> +
-> +	return 0;
-> +}
+Anyway, I don't think I understand IRQ domains and irq_chip_generic
+very well.  One possibility _might_ be to use multiple irq_chips.  But
+from what I do understand, if there's only a single parent IRQ used by
+all of the GPIO banks, in order to use an irq_chip per bank, this
+would have to stop using the chained irq logic because the parent IRQ
+is shared across banks, and that implementation seems unnecessarily
+confusing.  Any other ideas?
 
-Don't do this - if the functionality isn't there in the CODEC driver get
-it implemented before you use it.  Make sure you're using the API the
-CODEC actually ends up exporting.
-
-> +	/* Enable Headset and 4 Buttons Jack detection */
-> +	ret = snd_soc_card_jack_new(card, "Headphone Jack",
-> +				    SND_JACK_HEADPHONE | SND_JACK_MICROPHONE,
-
-> +	ret = snd_soc_card_jack_new(card, "Mic Jack",
-> +
-> +	ret = snd_soc_card_jack_new(card, "Button Jack",
-
-No, don't do this - as discussed in another Chromebook review (I'm
-guessing this is a Chromebook) the jacks should represent the physical
-jacks in the system.  It's possible you have separate headphone and
-microphone jacks but I really expect microphone and button to be on the
-same socket.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150512/31a15cfb/attachment.sig>
+Best regards,
+Gregory
