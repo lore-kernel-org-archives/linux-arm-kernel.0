@@ -1,36 +1,39 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 12 May 2015 15:31:26 -0700
-Subject: [PATCH v2 0/4] Clk drivers for NXP LPC18xx family
-In-Reply-To: <1430170693-28303-1-git-send-email-manabian@gmail.com>
+From: mturquette@linaro.org (Michael Turquette)
+Date: Tue, 12 May 2015 15:32:41 -0700
+Subject: [PATCH v2 3/4] clk: add lpc18xx ccu clk driver
+In-Reply-To: <1430170693-28303-4-git-send-email-manabian@gmail.com>
 References: <1430170693-28303-1-git-send-email-manabian@gmail.com>
-Message-ID: <20150512223126.GA14873@codeaurora.org>
+ <1430170693-28303-4-git-send-email-manabian@gmail.com>
+Message-ID: <20150512223241.16410.79958@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/27, Joachim Eastwood wrote:
-> This patch set adds support for the two main clock peripherals in the
-> LPC18xx/43xx MCU family.
-> 
-> The Clock Generation Unit (CGU) is the base source of all clocks. It has
-> five external inputs and contains PLLs, dividers and muxes. The outputs
-> from the CGU are then routed to a Clock Control Unit (CCU) and a few
-> peripherals directly. There are two CCUs in the MCU. The CCU is a
-> collection of gates and a few dividers that sits between the CGU and
-> most of the peripherals.
-> 
-> Which clocks that are available depends on the specific device and it's
-> peripherals. It's possible in DT to setup the routing between the CGU
-> and the CCUs.
+Quoting Joachim Eastwood (2015-04-27 14:38:12)
+> +static int of_clk_get_parent_arg(struct device_node *np, int index)
+> +{
+> +       struct of_phandle_args clkspec;
+> +       int rc;
+> +
+> +       if (index < 0)
+> +               return -EINVAL;
+> +
+> +       rc = of_parse_phandle_with_args(np, "clocks", "#clock-cells", index,
+> +                                       &clkspec);
+> +       if (rc)
+> +               return -EINVAL;
+> +
+> +       return clkspec.args_count ? clkspec.args[0] : -EINVAL;
+> +}
 
-Is there any reason why this uses CLK_OF_DECLARE over the
-platform device model? Typically we have CLK_OF_DECLARE for cases
-where a provider needs to be up and running early during boot for
-hardware that can't probe defer (i.e. timers, irq controllers).
-Otherwise we should be able to use the standard linux device
-model to probe clk providers. It looks like the clocksource is
-using something from CCU, but perhaps CGU isn't "special" and
-could be using device model.
+Hi Joachim,
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+I'm not sure why you need this. I guess it is related to my question in
+patch #2 about using clock-indices? Can you explain why this function is
+required?
+
+Anyways if returning the clock index is something that is really needed
+then why not rename it to "of_clk_get_index" and put it in
+drivers/clk/clk.c?
+
+Thanks,
+Mike
