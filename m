@@ -1,76 +1,61 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 12 May 2015 10:46:34 -0700
-Subject: [PATCH 2/3] ARM: bcm2835: Add the Raspberry Pi firmware driver
-In-Reply-To: <55416DA2.5040902@wwwdotorg.org>
-References: <1430176449-12322-1-git-send-email-eric@anholt.net>
- <1430176449-12322-3-git-send-email-eric@anholt.net>
- <55403AD1.4030103@wwwdotorg.org> <87oam6q0v1.fsf@eliezer.anholt.net>
- <55416DA2.5040902@wwwdotorg.org>
-Message-ID: <87a8x94rk5.fsf@eliezer.anholt.net>
+From: robert.richter@caviumnetworks.com (Robert Richter)
+Date: Tue, 12 May 2015 19:46:51 +0200
+Subject: [PATCH 4/4] arm64: gicv3: its: Increase FORCE_MAX_ZONEORDER for
+ Cavium ThunderX
+In-Reply-To: <20150512172416.GF2062@arm.com>
+References: <1430686172-18222-1-git-send-email-rric@kernel.org>
+ <1430686172-18222-5-git-send-email-rric@kernel.org>
+ <20150505105329.GC1550@arm.com>
+ <20150511091438.GW4251@rric.localhost>
+ <20150512123056.GA2062@arm.com>
+ <20150512162049.GP10428@rric.localhost>
+ <20150512172416.GF2062@arm.com>
+Message-ID: <20150512174651.GQ10428@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> writes:
+On 12.05.15 18:24:16, Will Deacon wrote:
+> On Tue, May 12, 2015 at 05:20:49PM +0100, Robert Richter wrote:
+> > For allocation of 16MB cont. phys mem of a defconfig kernel (4KB
+> > default pagesize) I see this different approaches:
+> 
+> 16MB sounds like an awful lot. Is this because you have tonnes of MSIs or
+> a sparse DeviceID space or both?
+> 
+> >  * set FORCE_MAX_ZONEORDER to 13 as default,
+> > 
+> >  * set FORCE_MAX_ZONEORDER to 13 if ARM_GIC_V3 is set,
+> > 
+> >  * set FORCE_MAX_ZONEORDER to 13 if ARCH_THUNDER is set (this patch),
+> 
+> I'm not hugely fond of these suggestions, as there's still no guarantee
+> that such a huge allocation is going to succeed and we end up bumping
+> MAX_ORDER for all platforms in defconfig if we enable THUNDER there.
 
-> On 04/29/15 11:51, Eric Anholt wrote:
->> Stephen Warren <swarren@wwwdotorg.org> writes:
->>
->>> On 04/27/2015 05:14 PM, Eric Anholt wrote:
->>>> This gives us a function for making mailbox property channel requests
->>>> of the firmware, and uses it to control the 3 power domains provided
->>>> by the firmware.
->>>
->>>> diff --git a/arch/arm/mach-bcm/raspberrypi-firmware.c b/arch/arm/mach-bcm/raspberrypi-firmware.c
->>>
->>>> +/*
->>>> + * Submits a set of concatenated tags to the VPU firmware through the
->>>> + * mailbox property interface.
->>>> + *
->>>> + * The buffer header and the ending tag are added by this function and
->>>> + * don't need to be supplied, just the actual tags for your operation.
->>>> + * See struct raspberrypi_firmware_property_tag_header for the per-tag structure.
->>>> + */
->>>> +int raspberrypi_firmware_property(void *data, size_t tag_size)
->>>> +{
->>>> +	size_t size = tag_size + 12;
->>>> +	u32 *buf;
->>>> +	dma_addr_t bus_addr;
->>>> +	int ret = 0;
->>>> +
->>>> +	if (!firmware)
->>>> +		return -EPROBE_DEFER;
->>>
->>> I think it'd make more sense if the clients looked up the firmware
->>> driver via phandle at their probe time. This would mean:
->>>
->>> * No need for global "firmware", since clients could pass the firmware
->>> driver handle into this function.
->>>
->>> * Clients resolve deferred probe at their probe time. That way, they
->>> won't register themselves with subsystems asserting they can provide
->>> services, but find out they can't yet provide the service at that time.
->>
->> The one client so far (vc4) was resolving deferred probe at its probe
->> time, but not taking a reference on the firmware driver.  I figure I'll
->> have it do the phandle lookup and refcount -- do you still want the
->> struct platform_device passed in here?  If we de-global firmware, it's
->> going to mean some faffing in the power domain side of things to find
->> the device again, it seems.
->
-> I think I'd expect the API in the firmware driver to require the client 
-> to pass the client DT node pointer plus a property name, and do all the 
-> lookup itself. That's what most DT resource lookup APIs in the kernel do 
-> now.
+I actually was expecting this...
 
-I've made this change, but it's not great -- the client has to know some
-details of how this driver is structured (that it sets the drvdata) in
-order to figure out whether the driver is loaded or not and return
--EPROBE_DEFERRED.  I couldn't find any other existing solutions than
-that in the tree.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150512/8ec643cb/attachment.sig>
+> >  * use hugepages if enabled (defconfig has the following options
+> >    enable: CGROUP_HUGETLB, TRANSPARENT_HUGEPAGE, HUGETLBFS, this might
+> >    work with current default kernel without changing defconfig
+> >    options),
+> 
+> I don't think hugepages help with DMA.
+> 
+> >  * use devicetree to reserve mem for gicv3 (need to check ACPI).
+
+I am quite a bit concerned letting firmware handle this. But if that
+would solve it, fine.
+
+> Using a carveout like this might be the best bet. I assume the memory used
+> by the ITS can never be reclaimed by the syste (and therefore there's no
+> issue with wastage)?
+> 
+> > Do you see any direction?
+> 
+> Dunno, does CMA also require the MAX_ORDER bump?
+
+Looks promising at the first glance. Will look into it.
+
+Thanks,
+
+-Robert
