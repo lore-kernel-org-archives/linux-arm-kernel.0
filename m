@@ -1,19 +1,78 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 May 2015 15:35:02 +0200
-Subject: [PATCH] MAINTAINERS: Add Arnd Bergmann as Syscon reviewer
-In-Reply-To: <1431436438-23434-1-git-send-email-lee.jones@linaro.org>
-References: <1431436438-23434-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <2210561.4yU3UcNY2c@wuerfel>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 12 May 2015 15:36:21 +0200
+Subject: [PATCH RFC v9.5 09/20] drm/dsi: Add a helper to get bits per
+ pixel of MIPI DSI pixel format
+In-Reply-To: <1423805119-32008-1-git-send-email-Ying.Liu@freescale.com>
+References: <1423805119-32008-1-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <20150512133620.GA24939@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 May 2015 14:13:58 Lee Jones wrote:
-> The System Configuration (syscon) driver is an important one, which
-> effects many ARM-SoC based platforms.  I'm adding Arnd as a primary
-> reviewer as he is highly competent in this area and has a keen
-> interest in ARM-SoC.
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
+On Fri, Feb 13, 2015 at 01:25:19PM +0800, Liu Ying wrote:
+> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+This could use a commit message. Describe for example why this is useful
+or when to use it.
+
+> ---
+> v9->v9.5:
+>  * Add kernel-doc for the new helper function to address Daniel Vetter's
+>    comment.
+> 
+> v8->v9:
+>  * Rebase onto the imx-drm/next branch of Philipp Zabel's open git repository.
+> 
+> v7->v8:
+>  * None.
+> 
+> v6->v7:
+>  * None.
+> 
+> v5->v6:
+>  * Address the over 80 characters in one line warning reported by the
+>    checkpatch.pl script.
+> 
+> v4->v5:
+>  * None.
+> 
+> v3->v4:
+>  * None.
+> 
+> v2->v3:
+>  * None.
+> 
+> v1->v2:
+>  * Thierry Reding suggested that the mipi_dsi_pixel_format_to_bpp() function
+>    could be placed at the common DRM MIPI DSI driver.
+>    This patch is newly added.
+> 
+>  include/drm/drm_mipi_dsi.h | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
+> 
+> diff --git a/include/drm/drm_mipi_dsi.h b/include/drm/drm_mipi_dsi.h
+> index f1d8d0d..cabc910 100644
+> --- a/include/drm/drm_mipi_dsi.h
+> +++ b/include/drm/drm_mipi_dsi.h
+> @@ -163,6 +163,28 @@ static inline struct mipi_dsi_device *to_mipi_dsi_device(struct device *dev)
+>  	return container_of(dev, struct mipi_dsi_device, dev);
+>  }
+>  
+> +/**
+> + * mipi_dsi_pixel_format_to_bpp() - get bits per pixel for a mipi dsi
+> + *    pixel format
+> + * @fmt: mipi dsi pixel format
+> + *
+> + * Return: The bits per pixel value for the mipi dsi pixel format on success or
+> + *    a negative error code on failure.
+> + */
+
+s/mipi dsi/MIPI DSI/, please.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150512/5280e193/attachment.sig>
