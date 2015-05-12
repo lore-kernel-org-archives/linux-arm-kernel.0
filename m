@@ -1,25 +1,19 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 12 May 2015 22:04:18 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: enable asm and NEON accelerated
- crypto modules
-In-Reply-To: <1431338798-26909-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1431338798-26909-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <15086315.7fcREg1jQ0@wuerfel>
+Date: Tue, 12 May 2015 22:05:44 +0200
+Subject: [GIT PULL] Allwinner core changes for 4.2
+In-Reply-To: <20150511193648.GA29957@lukather>
+References: <20150511193648.GA29957@lukather>
+Message-ID: <5274714.prY8DZurKt@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 11 May 2015 12:06:38 Ard Biesheuvel wrote:
-> Enable all drivers under CONFIG_ARM_CRYPTO as modules. Enable
-> CONFIG_KERNEL_MODE_NEON as well so that the modules that either
-> contain a NEON alternative or consist solely of a NEON (or ARMv8
-> crypto extensions) accelerated implementation are enabled fully as
-> well.
+On Monday 11 May 2015 21:36:48 Maxime Ripard wrote:
+> Allwinner core additions for 4.2
 > 
-> Note that the ARMv8 modules will only be built if the detected
-> toolchain version is recent enough (binutils 2.23 or higher).
+> This pull request contains only the changes needed to support the SMP on
+> the Allwinner A23.
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Applied to next/defconfig, thanks!
+Pulled into next/soc, thanks!
 
 	Arnd
