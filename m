@@ -1,33 +1,35 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 12 May 2015 13:51:43 +0100
-Subject: [PATCH 06/13] ARM: STi: STiH407: Add Restart support for Cannes
+Date: Tue, 12 May 2015 13:51:46 +0100
+Subject: [PATCH 09/13] ARM: STi: STiH416: Enable Cortex-A9 PMU support
 In-Reply-To: <1431435110-22595-1-git-send-email-lee.jones@linaro.org>
 References: <1431435110-22595-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1431435110-22595-7-git-send-email-lee.jones@linaro.org>
+Message-ID: <1431435110-22595-10-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This is ARM's generic Performance Monitoring Unit.
+
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/stih407-family.dtsi | 6 ++++++
+ arch/arm/boot/dts/stih416.dtsi | 6 ++++++
  1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-index 85159b8..46e6a38 100644
---- a/arch/arm/boot/dts/stih407-family.dtsi
-+++ b/arch/arm/boot/dts/stih407-family.dtsi
-@@ -65,6 +65,12 @@
- 		ranges;
- 		compatible = "simple-bus";
+diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
+index 6452d33..cc5b78d 100644
+--- a/arch/arm/boot/dts/stih416.dtsi
++++ b/arch/arm/boot/dts/stih416.dtsi
+@@ -23,6 +23,12 @@
+ 		cache-level = <2>;
+ 	};
  
-+		restart {
-+			compatible = "st,stih407-restart";
-+			st,syscfg = <&syscfg_sbc_reg>;
-+			status = "okay";
-+		};
++	arm-pmu {
++		compatible = "arm,cortex-a9-pmu";
++		interrupt-parent = <&intc>;
++		interrupts = <GIC_PPI 15 IRQ_TYPE_LEVEL_HIGH>;
++	};
 +
- 		powerdown: powerdown-controller {
- 			compatible = "st,stih407-powerdown";
- 			#reset-cells = <1>;
+ 	soc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
 -- 
 1.9.1
