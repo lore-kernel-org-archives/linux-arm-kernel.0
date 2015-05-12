@@ -1,117 +1,90 @@
-From: wsa@the-dreams.de (wsa at the-dreams.de)
-Date: Tue, 12 May 2015 14:58:32 +0200
-Subject: [PATCH v7 2/3] I2C: mediatek: Add driver for MediaTek I2C
- controller
-In-Reply-To: <1430901427-65146-3-git-send-email-eddie.huang@mediatek.com>
-References: <1430901427-65146-1-git-send-email-eddie.huang@mediatek.com>
- <1430901427-65146-3-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <20150512125832.GB4447@schokonusskuchen.bad>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 12 May 2015 15:00:05 +0200
+Subject: [PATCH 2/2] pwm: add Mediatek display PWM driver support
+In-Reply-To: <1431336382-13167-3-git-send-email-yh.huang@mediatek.com>
+References: <1431336382-13167-1-git-send-email-yh.huang@mediatek.com>
+ <1431336382-13167-3-git-send-email-yh.huang@mediatek.com>
+Message-ID: <20150512130005.GS6325@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/slab.h>
-> +#include <linux/i2c.h>
-> +#include <linux/init.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/sched.h>
-> +#include <linux/delay.h>
-> +#include <linux/errno.h>
-> +#include <linux/err.h>
-> +#include <linux/device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/mm.h>
-> +#include <linux/dma-mapping.h>
-> +#include <linux/scatterlist.h>
-> +#include <linux/io.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/clk.h>
-> +#include <linux/completion.h>
-
-Please sort the includes to avoid duplicates.
-
-> +struct mtk_i2c_compatible {
-> +	const struct i2c_adapter_quirks *quirks;
-> +	unsigned char pmic_i2c;
-> +	unsigned char dcm;
-> +};
-
-I wonder if the unsigned char options can be bits in a flags variable?
-
-> +static const struct i2c_adapter_quirks mt6577_i2c_quirks = {
-> +	.flags = I2C_AQ_COMB_WRITE_THEN_READ,
-> +	.max_num_msgs = MAX_MSG_NUM_MT6577,
-> +	.max_write_len = MAX_DMA_TRANS_SIZE_MT6577,
-> +	.max_read_len = MAX_DMA_TRANS_SIZE_MT6577,
-> +	.max_comb_1st_msg_len = MAX_DMA_TRANS_SIZE_MT6577,
-> +	.max_comb_2nd_msg_len = MAX_WRRD_TRANS_SIZE_MT6577,
-> +};
-
-I would think plain numbers are much more readable than defines here.
-They are used only once, too.
-
-> +static const struct of_device_id mtk_i2c_of_match[] = {
-> +	{ .compatible = "mediatek,mt6577-i2c", .data = (void *)&mt6577_compat },
-> +	{ .compatible = "mediatek,mt6589-i2c", .data = (void *)&mt6589_compat },
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(of, mtk_i2c_of_match);
-
-No need for casts.
-
-> +static inline void mtk_i2c_writew(u16 value, struct mtk_i2c *i2c, u8 offset)
-> +{
-> +	writew(value, i2c->base + offset);
-> +}
+On Mon, May 11, 2015 at 05:26:22PM +0800, YH Huang wrote:
 > +
-> +static inline u16 mtk_i2c_readw(struct mtk_i2c *i2c, u8 offset)
+> +static int mtk_disp_pwm_probe(struct platform_device *pdev)
 > +{
-> +	return readw(i2c->base + offset);
-> +}
+> +	struct mtk_disp_pwm_chip *pwm;
 
-I am not a big fan of such extremly thin wrappers, but if you like them...
+The struct mtk_disp_pwm_chip * is named 'mpc' in the other functions.
+For consistency reasons you should do that here aswell.
 
-> +		rpaddr = dma_map_single(i2c->adap.dev.parent, msgs->buf,
-> +						msgs->len, DMA_FROM_DEVICE);
-
-I think you shouldn't use the adapter device here and later, but the dma
-channel device.
-
-> +	/* flush before sending start */
-> +	mb();
-> +	mtk_i2c_writel_dma(I2C_DMA_START_EN, i2c, OFFSET_EN);
-
-Is mb() really needed when you use writel after that?
-
-> +	if (i2c->irq_stat & (I2C_HS_NACKERR | I2C_ACKERR)) {
-> +		dev_dbg(i2c->dev, "addr: %x, transfer ACK error\n", msgs->addr);
-> +		mtk_i2c_init_hw(i2c);
-> +		return -EREMOTEIO;
-
--ENXIO. Please check Documentation/i2c/fault-codes for a reference and
-check all your error values.
-
-> +	ret = of_property_read_u32(np, "clock-div", clk_src_div);
+> +	struct resource *r;
+> +	int ret;
+> +
+> +	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
+> +	if (!pwm)
+> +		return -ENOMEM;
+> +
+> +	pwm->dev = &pdev->dev;
+> +
+> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	pwm->mmio_base = devm_ioremap_resource(&pdev->dev, r);
+> +	if (IS_ERR(pwm->mmio_base))
+> +		return PTR_ERR(pwm->mmio_base);
+> +
+> +	pwm->clk_main = devm_clk_get(&pdev->dev, "main");
+> +	if (IS_ERR(pwm->clk_main))
+> +		return PTR_ERR(pwm->clk_main);
+> +	pwm->clk_mm = devm_clk_get(&pdev->dev, "mm");
+> +	if (IS_ERR(pwm->clk_mm))
+> +		return PTR_ERR(pwm->clk_mm);
+> +
+> +	ret = clk_prepare_enable(pwm->clk_main);
 > +	if (ret < 0)
 > +		return ret;
+> +	ret = clk_prepare_enable(pwm->clk_mm);
+> +	if (ret < 0) {
+> +		clk_disable_unprepare(pwm->clk_main);
+> +		return ret;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, pwm);
+> +
+> +	pwm->chip.dev = &pdev->dev;
+> +	pwm->chip.ops = &mtk_disp_pwm_ops;
+> +	pwm->chip.base = -1;
+> +	pwm->chip.npwm = NUM_PWM;
+> +
+> +	ret = pwmchip_add(&pwm->chip);
+> +	if (ret < 0) {
+> +		dev_err(&pdev->dev, "pwmchip_add() failed: %d\n", ret);
+> +		return ret;
 
-Do we need a property for that in the i2c-block? Can't the clock
-provider driver deliver a properly divided clock already?
+This error path leaves the clocks enabled.
 
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int mtk_disp_pwm_remove(struct platform_device *pdev)
+> +{
+> +	struct mtk_disp_pwm_chip *pc = platform_get_drvdata(pdev);
+> +
+> +	if (WARN_ON(!pc))
+> +		return -ENODEV;
+> +
+> +	clk_disable_unprepare(pc->clk_main);
+> +	clk_disable_unprepare(pc->clk_mm);
+> +
+> +	return pwmchip_remove(&pc->chip);
 
-And cppcheck says:
+You should first remove the pwmchip and disable the clocks afterwards.
+Also note that this function can fail.
 
-drivers/i2c/busses/i2c-mt65xx.c:133: style: struct or union member 'mtk_i2c_data::clk_frequency' is never used.
-drivers/i2c/busses/i2c-mt65xx.c:135: style: struct or union member 'mtk_i2c_data::clk_src_div' is never used.
+Sascha
 
-Rest looks good, thanks!
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150512/6e08758c/attachment.sig>
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
