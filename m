@@ -1,35 +1,46 @@
-From: bintian.wang@huawei.com (Bintian)
-Date: Wed, 13 May 2015 18:17:47 +0800
-Subject: [PATCH v4 0/5] arm64,hi6220: Enable Hisilicon Hi6220 SoC
-In-Reply-To: <20150513091644.GA1564@arm.com>
-References: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>
- <5552FE59.30505@huawei.com> <20150513091644.GA1564@arm.com>
-Message-ID: <555324CB.8050409@huawei.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 13 May 2015 12:27:13 +0200
+Subject: [GIT PULL] Ux500 device tree changes for v4.2
+Message-ID: <CACRpkdbaiYWRh8tGJbhvsnXXdsKYVVWo3V_C2_OPsZG3Xjuu5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Will,
+Hi ARM SoC folks,
 
-On 2015/5/13 17:16, Will Deacon wrote:
-> On Wed, May 13, 2015 at 08:33:45AM +0100, Bintian wrote:
->> Any other suggestions for this patch set?
->
-> You sent a v5, right, so this version (4) has been superseded?
-Sorry for my mistake, I just want to get feedback about v5, but send
-this email with v4, v5 includes some changes based on some suggestions
-from Mark.
+here is a set of device tree changes for Ux500 targeted for the v4.2
+merge window. Split off from the earlier big pull request.
 
-Please consider the version (5).
+Please pull it in!
 
-Thanks,
 
-Bintian
+The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
 
-> The patches should all go via arm-soc once you've got the relevant acks
-> in place (I don't think you need anything from me or Catalin -- the Kconfig
-> changes are trivial).
->
-> Will
->
-> .
->
+  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+tags/ux500-v4.2-dt
+
+for you to fetch changes up to df44ad87abcbe3bbba18b7e34555f343256e7b21:
+
+  ARM: ux500: add the sensors to the STUIB board (2015-05-13 12:22:19 +0200)
+
+----------------------------------------------------------------
+Ux500 Device Tree changes for the v4.2 series:
+Define CPU topology, connect that with CoreSight blocks,
+add sensor information to DT boards.
+
+----------------------------------------------------------------
+Linus Walleij (5):
+      ARM: ux500: define CPU topology
+      ARM: ux500: add CoreSight blocks to DTS file
+      ARM: ux500: fix lsm303dlh magnetometer compat string
+      ARM: ux500: assign the sensor trigger IRQs
+      ARM: ux500: add the sensors to the STUIB board
+
+ arch/arm/boot/dts/ste-dbx5x0.dtsi          | 154 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/ste-href-stuib.dtsi      |  50 ++++++++++
+ arch/arm/boot/dts/ste-href-tvk1281618.dtsi |   7 +-
+ arch/arm/boot/dts/ste-snowball.dts         |  23 ++++-
+ 4 files changed, 230 insertions(+), 4 deletions(-)
