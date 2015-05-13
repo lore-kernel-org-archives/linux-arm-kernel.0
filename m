@@ -1,24 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 May 2015 16:18:18 +0200
-Subject: [GIT PULL] ARM: rockchip: fixup duplicate suspend fix
-In-Reply-To: <4262241.MKs4C65R3h@phil>
-References: <4262241.MKs4C65R3h@phil>
-Message-ID: <41527875.jtmyBXaoXQ@wuerfel>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Wed, 13 May 2015 09:12:48 -0500
+Subject: [GIT PULL] SoCFPGA DTS updates for v4.2, part 2
+Message-ID: <1431526369-1388-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 May 2015 16:17:24 Heiko Stuebner wrote:
-> Hi Arnd, Olof,
-> 
-> it looks like I got confused when going through the patches fixing suspend
-> issues and from the two of them only one is actually necessary, as both fix
-> the same symptom. Thankfully Chris pointed out this issue and also
-> confirmed which patch should actually be kept. So this pull-req reverts the
-> other (obsolete) one.
-> 
-> Sorry for the mess-up.
-> 
+Hi Arnd, Kevin and Olof,
 
-Pulled into the fixes branch, thanks!
+Please pull this patch for v4.2.
 
-	Arnd
+Thanks,
+Dinh
+
+The following changes since commit 5ebe6afaf0057ac3eaeb98defd5456894b446d22:
+
+  Linux 4.1-rc2 (2015-05-03 19:22:23 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org:pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_dts_for_v4.2_part_2
+
+for you to fetch changes up to 8508452e57f7d50216338c28db6d42dfe585389a:
+
+  ARM: socfpga: dts: add the a9-scu node (2015-05-13 08:30:03 -0500)
+
+----------------------------------------------------------------
+SoCFPGA update for v4.2 part 2
+- Add a DTS node for the A9 SCU
+
+----------------------------------------------------------------
+Dinh Nguyen (1):
+      ARM: socfpga: dts: add the a9-scu node
+
+ arch/arm/boot/dts/socfpga.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
