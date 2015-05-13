@@ -1,49 +1,28 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 13 May 2015 11:09:36 -0700
-Subject: [PATCHv2] ARM: socfpga: dts: Add a clock node for sdmmc CIU
-In-Reply-To: <5553671E.3070301@opensource.altera.com>
-References: <1429027519-22209-1-git-send-email-dinguyen@opensource.altera.com>
- <20150513075438.GE15988@codeaurora.org>
- <5553671E.3070301@opensource.altera.com>
-Message-ID: <20150513180936.GG15988@codeaurora.org>
+From: tj@kernel.org (Tejun Heo)
+Date: Wed, 13 May 2015 14:10:54 -0400
+Subject: [PATCH v2] AHCI: Add generic MSI-X interrupt support to SATA PCI
+ driver
+In-Reply-To: <20150513180705.GZ10428@rric.localhost>
+References: <20150513143353.GU11388@htj.duckdns.org>
+ <20150513143906.GV11388@htj.duckdns.org>
+ <20150513172828.GA8449@rric.localhost>
+ <20150513174640.GZ11388@htj.duckdns.org>
+ <20150513180705.GZ10428@rric.localhost>
+Message-ID: <20150513181054.GB11388@htj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/13, Dinh Nguyen wrote:
-> 
-> 
-> On 5/13/15 2:54 AM, Stephen Boyd wrote:
-> > On 04/14, dinguyen at opensource.altera.com wrote:
-> >> From: Dinh Nguyen <dinguyen@opensource.altera.com>
-> >>
-> >> The CIU(Card Interface Unit) get its clock from the sdmmc_clk_divided clock
-> >> which is used to clock the card. The sdmmc_clk_divided clock is the sdmmc_clk
-> >> passed through a fixed divider of 4. This patch adds the sdmmc_clk_divided
-> >> node and makes the sdmmc_clk it's parent.
-> >>
-> >> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
-> >> ---
-> > 
-> > Is this a fix of some sort? I'm confused why this was sent to the
-> > clk maintainers when it seems to be more appropriate to go
-> > through the arm-soc tree.
-> > 
-> 
-> Ok, sorry about that. I thought since it was clock nodes, it would
-> appropriate to CC clk maintainers.
+Hello,
 
-Sure, Cc is fine, but I believe the mail was sent "To" us so that
-led to my confusion.
+On Wed, May 13, 2015 at 08:07:05PM +0200, Robert Richter wrote:
+> So I will move msix after msi then and mark it as a special case if
+> msi is not supported. I don't want to move it after intx since this is
+> the fallback if nothing else works, there is no explicit check for
+> intx, I even don't know if that is possible at all.
 
-> 
-> BTW, can I take patches from drivers/clk/socfpga/* through the arm-soc
-> tree or would that go through you guys?
-> 
+Sure, that sounds good to me.
 
-Unless there's some sort of complicated dependency between the
-clk tree and the arm-soc tree I'd prefer any patches against
-drivers/clk/* go through the clk tree.
+Thanks.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+tejun
