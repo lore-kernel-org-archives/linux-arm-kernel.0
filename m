@@ -1,127 +1,37 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 13 May 2015 10:52:39 +0200
-Subject: [PATCH 11/15] thermal: thermal: Add support for hardware-tracked trip
- points
+Date: Wed, 13 May 2015 10:52:31 +0200
+Subject: [PATCH 03/15] thermal: remove useless call to
+ thermal_zone_device_set_polling
 In-Reply-To: <1431507163-19933-1-git-send-email-s.hauer@pengutronix.de>
 References: <1431507163-19933-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1431507163-19933-12-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1431507163-19933-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for hardware-tracked trip points to the device tree
-thermal sensor framework.
-
-The framework supports an arbitrary number of trip points. Whenever
-the current temperature is updated, the trip points immediately
-below and above the current temperature are found. A .set_trips
-callback is then called with the temperatures. If there is no trip
-point above or below the current temperature, the passed trip
-temperature will be -INT_MAX or INT_MAX respectively. In this callback,
-the driver should program the hardware such that it is notified
-when either of these trip points are triggered. When a trip point
-is triggered, the driver should call `thermal_zone_device_update'
-for the respective thermal zone. This will cause the trip points
-to be updated again.
-
-If .set_trips is not implemented, the framework behaves as before.
-
-This patch is based on an earlier version from Mikko Perttunen
-<mikko.perttunen@kapsi.fi>
+When the thermal zone has no get_temp callback then thermal_zone_device_register()
+calls thermal_zone_device_set_polling() with a polling delay of 0. This
+only cancels the poll_queue. Since the poll_queue hasn't been scheduled this
+is a no-op. Remove it.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Acked-by: Eduardo Valentin <edubezval@gmail.com>
 ---
- drivers/thermal/thermal_core.c | 43 ++++++++++++++++++++++++++++++++++++++++++
- include/linux/thermal.h        |  3 +++
- 2 files changed, 46 insertions(+)
+ drivers/thermal/thermal_core.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
 diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
-index 6bbf61f..3ae1795 100644
+index 244784f..1b68d20 100644
 --- a/drivers/thermal/thermal_core.c
 +++ b/drivers/thermal/thermal_core.c
-@@ -453,6 +453,45 @@ int thermal_zone_get_temp(struct thermal_zone_device *tz, int *temp)
- }
- EXPORT_SYMBOL_GPL(thermal_zone_get_temp);
+@@ -1571,9 +1571,6 @@ struct thermal_zone_device *thermal_zone_device_register(const char *type,
  
-+static void thermal_zone_set_trips(struct thermal_zone_device *tz)
-+{
-+	int low = -INT_MAX;
-+	int high = INT_MAX;
-+	int trip_temp, hysteresis;
-+	int temp = tz->temperature;
-+	int i;
-+
-+	if (!tz->ops->set_trips)
-+		return;
-+
-+	/* No need to change trip points */
-+	if (temp > tz->prev_low_trip && temp < tz->prev_high_trip)
-+		return;
-+
-+	for (i = 0; i < tz->trips; i++) {
-+		int trip_low;
-+
-+		tz->ops->get_trip_temp(tz, i, &trip_temp);
-+		tz->ops->get_trip_hyst(tz, i, &hysteresis);
-+
-+		trip_low = trip_temp - hysteresis;
-+
-+		if (trip_low < temp && trip_low > low)
-+			low = trip_low;
-+
-+		if (trip_temp > temp && trip_temp < high)
-+			high = trip_temp;
-+	}
-+
-+	tz->prev_low_trip = low;
-+	tz->prev_high_trip = high;
-+
-+	dev_dbg(&tz->device, "new temperature boundaries: %d < x < %d\n",
-+			low, high);
-+
-+	tz->ops->set_trips(tz, low, high);
-+}
-+
- void thermal_zone_device_update(struct thermal_zone_device *tz)
- {
- 	int temp, ret, count;
-@@ -479,6 +518,8 @@ void thermal_zone_device_update(struct thermal_zone_device *tz)
- 	dev_dbg(&tz->device, "last_temperature=%d, current_temperature=%d\n",
- 				tz->last_temperature, tz->temperature);
+ 	INIT_DELAYED_WORK(&(tz->poll_queue), thermal_zone_device_check);
  
-+	thermal_zone_set_trips(tz);
-+
- 	for (count = 0; count < tz->trips; count++)
- 		handle_thermal_trip(tz, count);
- }
-@@ -1494,6 +1535,8 @@ struct thermal_zone_device *thermal_zone_device_register(const char *type,
- 	tz->trips = trips;
- 	tz->passive_delay = passive_delay;
- 	tz->polling_delay = polling_delay;
-+	tz->prev_low_trip = INT_MAX;
-+	tz->prev_high_trip = -INT_MAX;
+-	if (!tz->ops->get_temp)
+-		thermal_zone_device_set_polling(tz, 0);
+-
+ 	thermal_zone_device_update(tz);
  
- 	dev_set_name(&tz->device, "thermal_zone%d", tz->id);
- 	result = device_register(&tz->device);
-diff --git a/include/linux/thermal.h b/include/linux/thermal.h
-index 07bd5e8..aef6e13 100644
---- a/include/linux/thermal.h
-+++ b/include/linux/thermal.h
-@@ -87,6 +87,7 @@ struct thermal_zone_device_ops {
- 	int (*unbind) (struct thermal_zone_device *,
- 		       struct thermal_cooling_device *);
- 	int (*get_temp) (struct thermal_zone_device *, int *);
-+	int (*set_trips) (struct thermal_zone_device *, int, int);
- 	int (*get_mode) (struct thermal_zone_device *,
- 			 enum thermal_device_mode *);
- 	int (*set_mode) (struct thermal_zone_device *,
-@@ -180,6 +181,8 @@ struct thermal_zone_device {
- 	int last_temperature;
- 	int emul_temperature;
- 	int passive;
-+	int prev_low_trip;
-+	int prev_high_trip;
- 	unsigned int forced_passive;
- 	const struct thermal_zone_device_ops *ops;
- 	const struct thermal_zone_params *tzp;
+ 	return tz;
 -- 
 2.1.4
