@@ -1,87 +1,67 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 13 May 2015 10:45:27 +0200
-Subject: [PATCH 6/8] async_tx: adding mult and sum_product flags
-In-Reply-To: <20150512160535.GK19927@lunn.ch>
-References: <1431445063-20226-1-git-send-email-maxime.ripard@free-electrons.com>
- <1431445063-20226-7-git-send-email-maxime.ripard@free-electrons.com>
- <20150512160535.GK19927@lunn.ch>
-Message-ID: <20150513084527.GV10961@lukather>
+From: lee@kernel.org (Lee Jones)
+Date: Wed, 13 May 2015 09:51:19 +0100
+Subject: [PATCH] ARM: bcm2835: Use 0x4 prefix for DMA bus addresses to
+ SDRAM.
+In-Reply-To: <87wq0mol7e.fsf@eliezer.anholt.net>
+References: <1430768034-12734-1-git-send-email-eric@anholt.net>
+ <55491A12.3070608@wwwdotorg.org>
+ <87wq0mol7e.fsf@eliezer.anholt.net>
+Message-ID: <20150513085119.GD3394@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 12, 2015 at 06:05:35PM +0200, Andrew Lunn wrote:
-> On Tue, May 12, 2015 at 05:37:41PM +0200, Maxime Ripard wrote:
-> > From: Lior Amsalem <alior@marvell.com>
-> > 
-> > Some engines (like Marvell mv_xor) do not support mult and sum_product
-> > operations as part of the pq support.
-> > 
-> > This patch adds new flags: DMA_PREP_PQ_MULT & DMA_PREP_PQ_SUM_PRODUCT these
-> > flags helps the driver identify such operations.
-> > 
-> > Signed-off-by: Lior Amsalem <alior@marvell.com>
-> > Reviewed-by: Ofer Heifetz <oferh@marvell.com>
-> > Reviewed-by: Nadav Haklai <nadavh@marvell.com>
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  crypto/async_tx/async_raid6_recov.c | 4 ++--
-> >  include/linux/dmaengine.h           | 4 ++++
-> >  2 files changed, 6 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/crypto/async_tx/async_raid6_recov.c b/crypto/async_tx/async_raid6_recov.c
-> > index 934a84981495..2db5486fd873 100644
-> > --- a/crypto/async_tx/async_raid6_recov.c
-> > +++ b/crypto/async_tx/async_raid6_recov.c
-> > @@ -47,7 +47,7 @@ async_sum_product(struct page *dest, struct page **srcs, unsigned char *coef,
-> >  		struct device *dev = dma->dev;
-> >  		dma_addr_t pq[2];
-> >  		struct dma_async_tx_descriptor *tx;
-> > -		enum dma_ctrl_flags dma_flags = DMA_PREP_PQ_DISABLE_P;
-> > +		enum dma_ctrl_flags dma_flags = DMA_PREP_PQ_DISABLE_P | DMA_PREP_PQ_SUM_PRODUCT;
-> >  
-> >  		if (submit->flags & ASYNC_TX_FENCE)
-> >  			dma_flags |= DMA_PREP_FENCE;
-> > @@ -111,7 +111,7 @@ async_mult(struct page *dest, struct page *src, u8 coef, size_t len,
-> >  		dma_addr_t dma_dest[2];
-> >  		struct device *dev = dma->dev;
-> >  		struct dma_async_tx_descriptor *tx;
-> > -		enum dma_ctrl_flags dma_flags = DMA_PREP_PQ_DISABLE_P;
-> > +		enum dma_ctrl_flags dma_flags = DMA_PREP_PQ_DISABLE_P | DMA_PREP_PQ_MULT;
-> >  
-> >  		if (submit->flags & ASYNC_TX_FENCE)
-> >  			dma_flags |= DMA_PREP_FENCE;
-> > diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-> > index ad419757241f..f19ecebb4d3f 100644
-> > --- a/include/linux/dmaengine.h
-> > +++ b/include/linux/dmaengine.h
-> > @@ -174,6 +174,8 @@ struct dma_interleaved_template {
-> >   *  operation it continues the calculation with new sources
-> >   * @DMA_PREP_FENCE - tell the driver that subsequent operations depend
-> >   *  on the result of this operation
-> > + * @DMA_PREP_PQ_MULT - tell the driver that this is a mult request
-> > + * @DMA_PREP_PQ_SUM_PRODUCT - tell the driver that this is a sum product request
-> >   */
-> >  enum dma_ctrl_flags {
-> >  	DMA_PREP_INTERRUPT = (1 << 0),
-> > @@ -182,6 +184,8 @@ enum dma_ctrl_flags {
-> >  	DMA_PREP_PQ_DISABLE_Q = (1 << 3),
-> >  	DMA_PREP_CONTINUE = (1 << 4),
-> >  	DMA_PREP_FENCE = (1 << 5),
-> > +	DMA_PREP_PQ_MULT = (1 << 10),
-> > +	DMA_PREP_PQ_SUM_PRODUCT = (1 << 11),
+On Tue, 05 May 2015, Eric Anholt wrote:
 
-None. I just forgot to change this. Thanks!
+> Stephen Warren <swarren@wwwdotorg.org> writes:
+> 
+> > On 05/04/2015 01:33 PM, Eric Anholt wrote:
+> >> There exists a tiny MMU, configurable only by the VC (running the
+> >> closed firmware), which maps from the ARM's physical addresses to bus
+> >> addresses.  These bus addresses determine the caching behavior in the
+> >> VC's L1/L2 (note: separate from the ARM's L1/L2) according to the top
+> >> 2 bits.  The bits in the bus address mean:
+> >>
+> >>  From the VideoCore processor:
+> >> 0x0... L1 and L2 cache allocating and coherent
+> >> 0x4... L1 non-allocating, but coherent. L2 allocating and coherent
+> >> 0x8... L1 non-allocating, but coherent. L2 non-allocating, but coherent
+> >> 0xc... SDRAM alias. Cache is bypassed. Not L1 or L2 allocating or coherent
+> >>
+> >>  From the GPU peripherals (note: all peripherals bypass the L1
+> >> cache. The ARM will see this view once through the VC MMU):
+> >> 0x0... Do not use
+> >> 0x4... L1 non-allocating, and incoherent. L2 allocating and coherent.
+> >> 0x8... L1 non-allocating, and incoherent. L2 non-allocating, but coherent
+> >> 0xc... SDRAM alias. Cache is bypassed. Not L1 or L2 allocating or coherent
+> >>
+> >> The 2835 firmware always configures the MMU to turn ARM physical
+> >> addresses with 0x0 top bits to 0x4, meaning present in L2 but
+> >> incoherent with L1.  However, any bus addresses we were generating in
+> >> the kernel to be passed to a device had 0x0 bits.  That would be a
+> >> reserved (possibly totally incoherent) value if sent to a GPU
+> >> peripheral like USB, or L1 allocating if sent to the VC (like a
+> >> firmware property request).  By setting dma-ranges, all of the devices
+> >> below it get a dev->dma_pfn_offset, so that dma_alloc_coherent() and
+> >> friends return addresses with 0x4 bits and avoid cache incoherency.
+> >>
+> >> This matches the behavior in the downstream 2708 kernel (see
+> >> BUS_OFFSET in arch/arm/mach-bcm2708/include/mach/memory.h).
+> >
+> >> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+> >
+> >>   		#address-cells = <1>;
+> >>   		#size-cells = <1>;
+> >>   		ranges = <0x7e000000 0x20000000 0x02000000>;
+> >> +		dma-ranges = <0x40000000 0x00000000 0x1f000000>;
+> >
+> > Oh well that's a nice and simple patch; I had been avoiding looking into 
+> > fixing the kernel for this since I was worried it'd be rather complex!
+> >
+> > I'm puzzled why the length cell of ranges and dma-ranges differs though? 
+> > Assuming there's a good explanation for that,
+> 
+> Nope, you're right, it should be 0x20000000.  '0x1f' came from going
+> back from the '0x3f' on the pi2, but pi2 just has a chunk lost to the
+> bus mapping.
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150513/a6f788ef/attachment-0001.sig>
+So are you going to fix this and send another patch?
