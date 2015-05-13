@@ -1,61 +1,64 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 13 May 2015 19:29:19 +0200 (CEST)
-Subject: [PATCH v2 1/3] input: keyboad: imx: add snvs power key driver
-In-Reply-To: <1431528462-21591-1-git-send-email-Frank.Li@freescale.com>
-References: <1431528462-21591-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <953071056.79336.1431538159562.JavaMail.open-xchange@oxbsltgw06.schlund.de>
+From: robert.richter@caviumnetworks.com (Robert Richter)
+Date: Wed, 13 May 2015 19:28:28 +0200
+Subject: [PATCH v2] AHCI: Add generic MSI-X interrupt support to SATA PCI
+ driver
+In-Reply-To: <20150513143353.GU11388@htj.duckdns.org>
+ <20150513143906.GV11388@htj.duckdns.org>
+Message-ID: <20150513172828.GA8449@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Frank,
+Tejun,
 
-looks like a typo in your subject line. keyboard?
+On 13.05.15 10:39:06, Tejun Heo wrote:
+> On Tue, May 12, 2015 at 01:46:47PM +0200, Robert Richter wrote:
+> > I don't think this is worth the effort as all internal and external
+> > drivers need to be changed basically from:
+> > 
+> >  ahci_host_activate(host, irq, &ahci_sht);
+> > 
+> > to:
+> > 
+> >  host->irq = irq;
+> >  ahci_host_activate(host, &ahci_sht);
+> >
+> > This looks not very useful to do. Since irq is used only a single
+> > time, there is no reason to store it in the host's data structure. It
+> 
+> Doesn't really matter tho.
 
-> Frank.Li at freescale.com hat am 13. Mai 2015 um 16:47 geschrieben:
->
-> [...]
-> diff --git a/drivers/input/keyboard/snvs_pwrkey.c
-> b/drivers/input/keyboard/snvs_pwrkey.c
-> new file mode 100644
-> index 0000000..e4c2de3
-> --- /dev/null
-> +++ b/drivers/input/keyboard/snvs_pwrkey.c
-> @@ -0,0 +1,239 @@
-> +/*
+Since ahci_host_activate() is EXPORT_SYMBOL_GPL I really have concerns
+changing the i/f. But I will send you a patch for this.
 
-a small driver description here would be nice.
+> > also makes the interface more error prone since host->irq might not be
+> > setup. Apart from that there is an abi change.
+> 
+> But large part of @host needs to be initialized before activation.  I
+> don't think moving irq to that pool changes much if anything.
+> 
+> > I agree that we will need the implemention of host->ports[i]->irq for
+> > the case there irqs are no longer in sequential order as this might be
+> > the case for per-port msi-x interrupts. But this is not the focus of
+> > my implementation and as long there is no hardware for this available,
+> > it wouldn't make sense to implement this at all.
+> 
+> Why are we doing msix at all?  I don't get it.
 
-> + * Copyright (C) 2015 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> [...]
-> +static int imx_snvs_pwrkey_probe(struct platform_device *pdev)
-> +{
-> [...]
-> +
-> + pdata->wakeup = !!of_get_property(np, "linux,wakeup", NULL);
+See below.
 
-of_property_read_bool() ?
+> > So how to proceed? I could send you patches that implement host->irq
+> > for a single per-host interrupt, and also one that reworks multi-port
+> > interrupts to use host->ports[i]->irq. But I don't see any benefit
+> > here. That said, I would better keep my patch here as it is. That do
+> > you think?
+> 
+> Let's start with why we're doing this in the first place.
 
-> +
-> [...]
-> +
-> + ret = input_register_device(input);
-> + if (ret < 0) {
-> + dev_err(&pdev->dev, "failed to register input device\n");
-> + input_free_device(input);
+Right, the sata controller is connected to a pci ecam controller, both
+are on an SoC together with the processor. There are no external pci
+ports for the connection of external devices. Since all pci devices on
+the chip support msi-x, the controller is only capable to handle this
+and not INTx nor MSI. So for enabling of the sata hc we need msix
+support.
 
-input_free_device() shouldn't be necessary since you are using
-devm_input_allocate_device().
-
-Thanks
-
-Best regards
-Stefan
+-Robert
