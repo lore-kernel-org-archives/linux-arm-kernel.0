@@ -1,138 +1,127 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 13 May 2015 16:13:13 +0200
-Subject: [PATCH 1/6] clk: add CLK_RECALC_NEW_RATES clock flag for Exynos
- cpu clock support
-In-Reply-To: <1428079429-4252-2-git-send-email-b.zolnierkie@samsung.com>
-References: <'@samsung.com>
- <1428079429-4252-1-git-send-email-b.zolnierkie@samsung.com>
- <1428079429-4252-2-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <55535BF9.60609@samsung.com>
+From: sjg@chromium.org (Simon Glass)
+Date: Wed, 13 May 2015 08:13:47 -0600
+Subject: [PATCH] ARM: tegra: Enable TPM on tegra124 nyan boards
+Message-ID: <1431526427-13340-1-git-send-email-sjg@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/15 18:43, Bartlomiej Zolnierkiewicz wrote:
-> This flag is needed to fix the issue with wrong dividers being setup
-> by Common Clock Framework when using the new Exynos cpu clock support.
-> 
-> The issue happens because clk_core_set_rate_nolock()  calls
-> clk_calc_new_rates(clk, rate) before both pre/post clock notifiers have
-> a chance to run.  In case of Exynos cpu clock support pre/post clock
-> notifiers are registered for mout_apll clock which is a parent of armclk
-> cpu clock and dividers are modified in both pre and post clock notifier.
-> This results in wrong dividers values being later programmed by
-> clk_change_rate(top).  To workaround the problem CLK_RECALC_NEW_RATES
-> flag is added and it is set for mout_apll clock later so the correct
-> divider values are re-calculated after both pre and post clock notifiers
-> had run.
-> 
-> For example when using "performance" governor on Exynos4210 Origen board
-> the cpufreq-dt driver requests to change the frequency from 1000MHz to
-> 1200MHz and after the change state of the relevant clocks is following:
-> 
-> Without use of CLK_GET_RATE_NOCACHE flag:
-> 
->  fout_apll rate: 1200000000
->          fout_apll_div_2 rate: 600000000
->                  mout_clkout_cpu rate: 600000000
->                          div_clkout_cpu rate: 600000000
->                                  clkout_cpu rate: 600000000
->          mout_apll rate: 1200000000
->                  armclk rate: 1200000000
->                  mout_hpm rate: 1200000000
->                          div_copy rate: 300000000
->                                  div_hpm rate: 300000000
->                  mout_core rate: 1200000000
->                          div_core rate: 1200000000
->                                  div_core2 rate: 1200000000
->                                          arm_clk_div_2 rate: 600000000
->                                          div_corem0 rate: 300000000
->                                          div_corem1 rate: 150000000
->                                          div_periph rate: 300000000
->                          div_atb rate: 300000000
->                                  div_pclk_dbg rate: 150000000
->                  sclk_apll rate: 1200000000
->                          sclk_apll_div_2 rate: 600000000
-> 
-> 
-> With use of CLK_GET_RATE_NOCACHE flag:
-> 
->  fout_apll rate: 1200000000
->          fout_apll_div_2 rate: 600000000
->                  mout_clkout_cpu rate: 600000000
->                          div_clkout_cpu rate: 600000000
->                                  clkout_cpu rate: 600000000
->          mout_apll rate: 1200000000
->                  armclk rate: 1200000000
->                  mout_hpm rate: 1200000000
->                          div_copy rate: 200000000
->                                  div_hpm rate: 200000000
->                  mout_core rate: 1200000000
->                          div_core rate: 1200000000
->                                  div_core2 rate: 1200000000
->                                          arm_clk_div_2 rate: 600000000
->                                          div_corem0 rate: 300000000
->                                          div_corem1 rate: 150000000
->                                          div_periph rate: 300000000
->                          div_atb rate: 240000000
->                                  div_pclk_dbg rate: 120000000
->                  sclk_apll rate: 150000000
->                          sclk_apll_div_2 rate: 75000000
-> 
-> Without this change cpufreq-dt driver showed ~10 mA larger energy
-> consumption when compared to cpufreq-exynos one when "performance"
-> cpufreq governor was used on Exynos4210 SoC based Origen board.
-> 
-> This issue was probably meant to be workarounded by use of
-> CLK_GET_RATE_NOCACHE and CLK_DIVIDER_READ_ONLY clock flags in
-> the original Exynos cpu clock patchset (in "[PATCH v12 6/6] clk:
-> samsung: remove unused clock aliases and update clock flags" patch)
-> but usage of these flags is not sufficient to fix the issue observed.
-> 
-> Cc: Thomas Abraham <thomas.ab@samsung.com>
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
->  drivers/clk/clk.c            |    3 +++
->  include/linux/clk-provider.h |    1 +
->  2 files changed, 4 insertions(+)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index f85c8e2..97cc73e 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -1771,6 +1771,9 @@ static void clk_change_rate(struct clk_core *clk)
->  	if (clk->notifier_count && old_rate != clk->rate)
->  		__clk_notify(clk, POST_RATE_CHANGE, old_rate, clk->rate);
->  
-> +	if (clk->flags & CLK_RECALC_NEW_RATES)
-> +		(void)clk_calc_new_rates(clk, clk->new_rate);
-> +
->  	/*
->  	 * Use safe iteration, as change_rate can actually swap parents
->  	 * for certain clock types.
-> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-> index 28abf1b..8d1aebe 100644
-> --- a/include/linux/clk-provider.h
-> +++ b/include/linux/clk-provider.h
-> @@ -31,6 +31,7 @@
->  #define CLK_GET_RATE_NOCACHE	BIT(6) /* do not use the cached clk rate */
->  #define CLK_SET_RATE_NO_REPARENT BIT(7) /* don't re-parent on rate change */
->  #define CLK_GET_ACCURACY_NOCACHE BIT(8) /* do not use the cached clk accuracy */
-> +#define CLK_RECALC_NEW_RATES	BIT(9) /* recalc rates after notifications */
+Regenerate the pinmux from the latest tegra-pinmux-scripts.
 
-Mike, Stephen, what do you think about this? I'm rather resistant to
-this new flag approach, it looks like a hack. I don't seem to have better
-ideas to address the missing rate recalculation issue though.
-I thought about making the cpu clk notifier callback returning a specific
-error value, which would then trigger rate recalculation after
-__clk_notify() call in clk_change_rate() function. This way the trigger
-of the repeated rate recalculation would come from a notifier callback,
-rather than from a clock definition. But in general it would be difficult
-to handle multiple notification callbacks, each of which would attempt
-to trigger the rate recalculation.
+Signed-off-by: Simon Glass <sjg@chromium.org>
+---
 
+ arch/arm/boot/dts/tegra124-nyan-big.dts   | 22 +++++++++++-----------
+ arch/arm/boot/dts/tegra124-nyan-blaze.dts | 30 +++++++++++++++---------------
+ 2 files changed, 26 insertions(+), 26 deletions(-)
+
+diff --git a/arch/arm/boot/dts/tegra124-nyan-big.dts b/arch/arm/boot/dts/tegra124-nyan-big.dts
+index 2d21253..0eb2b0f 100644
+--- a/arch/arm/boot/dts/tegra124-nyan-big.dts
++++ b/arch/arm/boot/dts/tegra124-nyan-big.dts
+@@ -30,7 +30,7 @@
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinmux_default>;
+ 
+-		pinmux_default: common {
++		state_default: pinmux {
+ 			clk_32k_out_pa0 {
+ 				nvidia,pins = "clk_32k_out_pa0";
+ 				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+@@ -1098,19 +1098,19 @@
+ 			};
+ 			cam_i2c_scl_pbb1 {
+ 				nvidia,pins = "cam_i2c_scl_pbb1";
+-				nvidia,function = "rsvd3";
+-				nvidia,pull = <TEGRA_PIN_PULL_DOWN>;
+-				nvidia,tristate = <TEGRA_PIN_ENABLE>;
+-				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
+-				nvidia,open-drain = <TEGRA_PIN_DISABLE>;
++				nvidia,function = "i2c3";
++				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
++				nvidia,tristate = <TEGRA_PIN_DISABLE>;
++				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
++				nvidia,open-drain = <TEGRA_PIN_ENABLE>;
+ 			};
+ 			cam_i2c_sda_pbb2 {
+ 				nvidia,pins = "cam_i2c_sda_pbb2";
+-				nvidia,function = "rsvd3";
+-				nvidia,pull = <TEGRA_PIN_PULL_DOWN>;
+-				nvidia,tristate = <TEGRA_PIN_ENABLE>;
+-				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
+-				nvidia,open-drain = <TEGRA_PIN_DISABLE>;
++				nvidia,function = "i2c3";
++				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
++				nvidia,tristate = <TEGRA_PIN_DISABLE>;
++				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
++				nvidia,open-drain = <TEGRA_PIN_ENABLE>;
+ 			};
+ 			pbb3 {
+ 				nvidia,pins = "pbb3";
+diff --git a/arch/arm/boot/dts/tegra124-nyan-blaze.dts b/arch/arm/boot/dts/tegra124-nyan-blaze.dts
+index 0d30c51..1fc0da9 100644
+--- a/arch/arm/boot/dts/tegra124-nyan-blaze.dts
++++ b/arch/arm/boot/dts/tegra124-nyan-blaze.dts
+@@ -26,7 +26,7 @@
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinmux_default>;
+ 
+-		pinmux_default: common {
++		state_default: pinmux {
+ 			clk_32k_out_pa0 {
+ 				nvidia,pins = "clk_32k_out_pa0";
+ 				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+@@ -437,18 +437,18 @@
+ 			usb_vbus_en0_pn4 {
+ 				nvidia,pins = "usb_vbus_en0_pn4";
+ 				nvidia,function = "usb";
+-				nvidia,pull = <TEGRA_PIN_PULL_UP>;
++				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+ 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+ 				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
+-				nvidia,open-drain = <TEGRA_PIN_DISABLE>;
++				nvidia,open-drain = <TEGRA_PIN_ENABLE>;
+ 			};
+ 			usb_vbus_en1_pn5 {
+ 				nvidia,pins = "usb_vbus_en1_pn5";
+ 				nvidia,function = "usb";
+-				nvidia,pull = <TEGRA_PIN_PULL_UP>;
++				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+ 				nvidia,tristate = <TEGRA_PIN_DISABLE>;
+ 				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
+-				nvidia,open-drain = <TEGRA_PIN_DISABLE>;
++				nvidia,open-drain = <TEGRA_PIN_ENABLE>;
+ 			};
+ 			hdmi_int_pn7 {
+ 				nvidia,pins = "hdmi_int_pn7";
+@@ -1094,19 +1094,19 @@
+ 			};
+ 			cam_i2c_scl_pbb1 {
+ 				nvidia,pins = "cam_i2c_scl_pbb1";
+-				nvidia,function = "rsvd3";
+-				nvidia,pull = <TEGRA_PIN_PULL_DOWN>;
+-				nvidia,tristate = <TEGRA_PIN_ENABLE>;
+-				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
+-				nvidia,open-drain = <TEGRA_PIN_DISABLE>;
++				nvidia,function = "i2c3";
++				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
++				nvidia,tristate = <TEGRA_PIN_DISABLE>;
++				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
++				nvidia,open-drain = <TEGRA_PIN_ENABLE>;
+ 			};
+ 			cam_i2c_sda_pbb2 {
+ 				nvidia,pins = "cam_i2c_sda_pbb2";
+-				nvidia,function = "rsvd3";
+-				nvidia,pull = <TEGRA_PIN_PULL_DOWN>;
+-				nvidia,tristate = <TEGRA_PIN_ENABLE>;
+-				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
+-				nvidia,open-drain = <TEGRA_PIN_DISABLE>;
++				nvidia,function = "i2c3";
++				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
++				nvidia,tristate = <TEGRA_PIN_DISABLE>;
++				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
++				nvidia,open-drain = <TEGRA_PIN_ENABLE>;
+ 			};
+ 			pbb3 {
+ 				nvidia,pins = "pbb3";
 -- 
-Regards,
-Sylwester
+2.2.0.rc0.207.ga3a616c
