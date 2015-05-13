@@ -1,49 +1,56 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 13 May 2015 15:34:13 -0700
-Subject: [GIT PULL] Broadcom SoC changes for 4.2
-In-Reply-To: <1431556453-11633-1-git-send-email-f.fainelli@gmail.com>
-References: <1431556453-11633-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1431556453-11633-3-git-send-email-f.fainelli@gmail.com>
+From: dgreid@chromium.org (Dylan Reid)
+Date: Wed, 13 May 2015 16:11:14 -0700
+Subject: [PATCH 1/4] ASoC: rockchip: add rockchip machine driver
+In-Reply-To: <CAEUnVG5+PqhkZ4TBMnfdbUr66-EaLVGDEewJ_=XZnfbvBEn13w@mail.gmail.com>
+References: <1431422797-31903-1-git-send-email-zhengxing@rock-chips.com>
+ <1431422797-31903-2-git-send-email-zhengxing@rock-chips.com>
+ <20150512192215.GZ3066@sirena.org.uk> <55535035.5070608@rock-chips.com>
+ <20150513164250.GB2761@sirena.org.uk>
+ <CAEUnVG5+PqhkZ4TBMnfdbUr66-EaLVGDEewJ_=XZnfbvBEn13w@mail.gmail.com>
+Message-ID: <CAEUnVG5nkagx7CZC3t=-oOAyXOBaxxVynBxaGMf0NJpfr9ZVbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+On Wed, May 13, 2015 at 10:21 AM, Dylan Reid <dgreid@chromium.org> wrote:
+> On Wed, May 13, 2015 at 9:42 AM, Mark Brown <broonie@kernel.org> wrote:
+>> On Wed, May 13, 2015 at 09:23:01PM +0800, zhengxing wrote:
+>>> On 2015?05?13? 03:22, Mark Brown wrote:
+>>
+>>> >Is it not possible to extend simple card to handle your use cases?
+>>> >Given the very generic naming and the fact that things like jack
+>>> >detection and so on should depend on the CODEC and board usually rather
+>>> >than on the SoC it doesn't sound like this is Rockchip specific.
+>>
+>>> >This also looks like you're reimplementing some device model enumeration
+>>> >stuff which probably shouldn't be happening but let's understand the
+>>> >problem you're trying to solve here before going too far into the code.
+>>
+>>> Because we are trying to bring rt5650 in the project, so we intend to
+>>> describe supported codecs with DTS via only a rockchip machine driver file,
+>>> others remain pre-implement(like max98090 / rt5645 that vendor machine
+>>> driver).
+>>
+>> I don't undertand what you're saying here, sorry - why is this not just
+>> a case of writing multiple machine drivers?
+>
+> I don't understand this either.  I'd think the best solution is
+> simple-card, configured through DTS for each device.
+>
+>>
+>>> I communicated with Dylan, and he told me that the jack detection is an
+>>> issue in the simple-card, and suggested we are better to send them at
+>>> present.
+>>
+>> But what are these issues?
+>
+> The issue I was referring to when I spoke with rock chip was the need
+> to pass the jack simple-card creates to the headset chip or codec.  We
+> need a way to specify a device like a tsa227e or rt5650 to pass the
+> jack to, which events are supported by the jack, and a generic API for
+> passing the jack.
 
-  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
-
-are available in the git repository at:
-
-  http://github.com/broadcom/stblinux tags/arm-soc/for-4.2/soc
-
-for you to fetch changes up to d044ce725eea4d7b74bcb6e9e7b33996aae77f04:
-
-  ARM: BCM63xx: Add SMP support for BCM63138 (2015-05-13 09:59:07 -0700)
-
-----------------------------------------------------------------
-This pull request contains the following changes:
-
-- BCM63138 SMP support which pulls in code to control the PMB bus, secondary CPU initialization
-  sequence and small changes suggested by Russell King to allow platforms to disable VFP
-
-----------------------------------------------------------------
-Florian Fainelli (5):
-      ARM: BCM63xx: Add Broadcom BCM63xx PMB controller helpers
-      ARM: BCM63xx: Add secondary CPU PMB initialization sequence
-      ARM: vfp: Add include guards
-      ARM: vfp: Add vfp_disable for problematic platforms
-      ARM: BCM63xx: Add SMP support for BCM63138
-
- arch/arm/include/asm/vfp.h          |   9 ++
- arch/arm/mach-bcm/Makefile          |   7 +-
- arch/arm/mach-bcm/bcm63xx_headsmp.S |  23 ++++
- arch/arm/mach-bcm/bcm63xx_pmb.c     | 221 ++++++++++++++++++++++++++++++++++++
- arch/arm/mach-bcm/bcm63xx_smp.c     | 170 +++++++++++++++++++++++++++
- arch/arm/mach-bcm/bcm63xx_smp.h     |   9 ++
- arch/arm/vfp/vfpmodule.c            |  13 +++
- include/linux/bcm63xx_pmb.h         |  76 +++++++++++++
- 8 files changed, 527 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-bcm/bcm63xx_headsmp.S
- create mode 100644 arch/arm/mach-bcm/bcm63xx_pmb.c
- create mode 100644 arch/arm/mach-bcm/bcm63xx_smp.c
- create mode 100644 arch/arm/mach-bcm/bcm63xx_smp.h
- create mode 100644 include/linux/bcm63xx_pmb.h
+I'm having some trouble envisioning how to pass the jack to the
+headset chip in a generic way.  A callback could be added to
+snd_soc_component_driver, or a snd_soc_headset_driver could be added.
+The headset_drive would fit the ts3a227e well, but not the rt5645
+which is also a full blown codec.
