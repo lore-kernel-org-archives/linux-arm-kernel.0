@@ -1,206 +1,151 @@
 From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
-Date: Wed, 13 May 2015 17:58:41 +0300
-Subject: [PATCH v9 07/17] clk: tegra: Add Tegra124 DFLL clocksource platform
- driver
+Date: Wed, 13 May 2015 17:58:40 +0300
+Subject: [PATCH v9 06/17] clk: tegra: Add DFLL DVCO reset control for Tegra124
 In-Reply-To: <1431529131-16710-1-git-send-email-mikko.perttunen@kapsi.fi>
 References: <1431529131-16710-1-git-send-email-mikko.perttunen@kapsi.fi>
-Message-ID: <1431529131-16710-8-git-send-email-mikko.perttunen@kapsi.fi>
+Message-ID: <1431529131-16710-7-git-send-email-mikko.perttunen@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+From: Paul Walmsley <pwalmsley@nvidia.com>
 
-Add basic platform driver support for the fast CPU cluster DFLL
-clocksource found on Tegra124 SoCs. This small driver selects the
-appropriate Tegra124-specific characterization data and integration
-code. It relies on the DFLL common code to do most of the work.
+The DVCO present in the DFLL IP block has a separate reset line,
+exposed via the CAR IP block.  This reset line is asserted upon SoC
+reset.  Unless something (such as the DFLL driver) deasserts this
+line, the DVCO will not oscillate, although reads and writes to the
+DFLL IP block will complete.
 
+Thanks to Aleksandr Frid <afrid@nvidia.com> for identifying this and
+saving hours of debugging time.
+
+Signed-off-by: Paul Walmsley <pwalmsley@nvidia.com>
+[ttynkkynen: ported to tegra124 from tegra114]
 Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+[mikko.perttunen: ported to special reset callback]
 Signed-off-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
 Acked-by: Michael Turquette <mturquette@linaro.org>
 ---
- drivers/clk/tegra/Makefile                 |   2 +
- drivers/clk/tegra/clk-tegra124-dfll-fcpu.c | 161 +++++++++++++++++++++++++++++
- 2 files changed, 163 insertions(+)
- create mode 100644 drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
+ drivers/clk/tegra/clk-tegra124.c         | 68 ++++++++++++++++++++++++++++++++
+ include/dt-bindings/reset/tegra124-car.h | 11 ++++++
+ 2 files changed, 79 insertions(+)
+ create mode 100644 include/dt-bindings/reset/tegra124-car.h
 
-diff --git a/drivers/clk/tegra/Makefile b/drivers/clk/tegra/Makefile
-index ec2e516..826c325 100644
---- a/drivers/clk/tegra/Makefile
-+++ b/drivers/clk/tegra/Makefile
-@@ -17,4 +17,6 @@ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += clk-tegra20.o
- obj-$(CONFIG_ARCH_TEGRA_3x_SOC)         += clk-tegra30.o
- obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= clk-tegra114.o
- obj-$(CONFIG_ARCH_TEGRA_124_SOC)	+= clk-tegra124.o
-+obj-$(CONFIG_ARCH_TEGRA_124_SOC)	+= clk-tegra124-dfll-fcpu.o
- obj-$(CONFIG_ARCH_TEGRA_132_SOC)	+= clk-tegra124.o
-+obj-y					+= cvb.o
-diff --git a/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c b/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
+diff --git a/drivers/clk/tegra/clk-tegra124.c b/drivers/clk/tegra/clk-tegra124.c
+index e8cca3e..42ba3d9 100644
+--- a/drivers/clk/tegra/clk-tegra124.c
++++ b/drivers/clk/tegra/clk-tegra124.c
+@@ -24,6 +24,7 @@
+ #include <linux/export.h>
+ #include <linux/clk/tegra.h>
+ #include <dt-bindings/clock/tegra124-car.h>
++#include <dt-bindings/reset/tegra124-car.h>
+ 
+ #include "clk.h"
+ #include "clk-id.h"
+@@ -39,6 +40,9 @@
+ #define CLK_SOURCE_CSITE 0x1d4
+ #define CLK_SOURCE_EMC 0x19c
+ 
++#define RST_DFLL_DVCO			0x2f4
++#define DVFS_DFLL_RESET_SHIFT		0
++
+ #define PLLC_BASE 0x80
+ #define PLLC_OUT 0x84
+ #define PLLC_MISC2 0x88
+@@ -1415,6 +1419,68 @@ static void __init tegra124_clock_apply_init_table(void)
+ }
+ 
+ /**
++ * tegra124_car_barrier - wait for pending writes to the CAR to complete
++ *
++ * Wait for any outstanding writes to the CAR MMIO space from this CPU
++ * to complete before continuing execution.  No return value.
++ */
++static void tegra124_car_barrier(void)
++{
++	readl_relaxed(clk_base + RST_DFLL_DVCO);
++}
++
++/**
++ * tegra124_clock_assert_dfll_dvco_reset - assert the DFLL's DVCO reset
++ *
++ * Assert the reset line of the DFLL's DVCO.  No return value.
++ */
++void tegra124_clock_assert_dfll_dvco_reset(void)
++{
++	u32 v;
++
++	v = readl_relaxed(clk_base + RST_DFLL_DVCO);
++	v |= (1 << DVFS_DFLL_RESET_SHIFT);
++	writel_relaxed(v, clk_base + RST_DFLL_DVCO);
++	tegra124_car_barrier();
++}
++
++/**
++ * tegra124_clock_deassert_dfll_dvco_reset - deassert the DFLL's DVCO reset
++ *
++ * Deassert the reset line of the DFLL's DVCO, allowing the DVCO to
++ * operate.  No return value.
++ */
++void tegra124_clock_deassert_dfll_dvco_reset(void)
++{
++	u32 v;
++
++	v = readl_relaxed(clk_base + RST_DFLL_DVCO);
++	v &= ~(1 << DVFS_DFLL_RESET_SHIFT);
++	writel_relaxed(v, clk_base + RST_DFLL_DVCO);
++	tegra124_car_barrier();
++}
++
++int tegra124_reset_assert(unsigned long id)
++{
++	if (id == TEGRA124_RST_DFLL_DVCO)
++		tegra124_clock_assert_dfll_dvco_reset();
++	else
++		return -EINVAL;
++
++	return 0;
++}
++
++int tegra124_reset_deassert(unsigned long id)
++{
++	if (id == TEGRA124_RST_DFLL_DVCO)
++		tegra124_clock_deassert_dfll_dvco_reset();
++	else
++		return -EINVAL;
++
++	return 0;
++}
++
++/**
+  * tegra132_clock_apply_init_table - initialize clocks on Tegra132 SoCs
+  *
+  * Program an initial clock rate and enable or disable clocks needed
+@@ -1499,6 +1565,8 @@ static void __init tegra124_132_clock_init_post(struct device_node *np)
+ {
+ 	tegra_super_clk_gen4_init(clk_base, pmc_base, tegra124_clks,
+ 				  &pll_x_params);
++	tegra_init_special_resets(tegra124_reset_assert,
++				  tegra124_reset_deassert);
+ 	tegra_add_of_provider(np);
+ 
+ 	clks[TEGRA124_CLK_EMC] = tegra_clk_register_emc(clk_base, np,
+diff --git a/include/dt-bindings/reset/tegra124-car.h b/include/dt-bindings/reset/tegra124-car.h
 new file mode 100644
-index 0000000..b10a501
+index 0000000..1cc771f
 --- /dev/null
-+++ b/drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
-@@ -0,0 +1,161 @@
++++ b/include/dt-bindings/reset/tegra124-car.h
+@@ -0,0 +1,11 @@
 +/*
-+ * Tegra124 DFLL FCPU clock source driver
-+ *
-+ * Copyright (C) 2012-2014 NVIDIA Corporation.  All rights reserved.
-+ *
-+ * Aleksandr Frid <afrid@nvidia.com>
-+ * Paul Walmsley <pwalmsley@nvidia.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
++ * This header provides Tegra124-specific constants for binding
++ * nvidia,tegra124-car.
 + */
 +
-+#include <linux/cpu.h>
-+#include <linux/err.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <soc/tegra/fuse.h>
++#ifndef _DT_BINDINGS_RESET_TEGRA124_CAR_H
++#define _DT_BINDINGS_RESET_TEGRA124_CAR_H
 +
-+#include "clk.h"
-+#include "clk-dfll.h"
-+#include "cvb.h"
++#define TEGRA124_RST_DFLL_DVCO      0x40000000
 +
-+/* Maximum CPU frequency, indexed by CPU speedo id */
-+static const unsigned long cpu_max_freq_table[] = {
-+	[0] = 2014500000UL,
-+	[1] = 2320500000UL,
-+	[2] = 2116500000UL,
-+	[3] = 2524500000UL,
-+};
-+
-+static const struct cvb_table tegra124_cpu_cvb_tables[] = {
-+	{
-+		.speedo_id = -1,
-+		.process_id = -1,
-+		.min_millivolts = 900,
-+		.max_millivolts = 1260,
-+		.alignment = {
-+			.step_uv = 10000, /* 10mV */
-+		},
-+		.speedo_scale = 100,
-+		.voltage_scale = 1000,
-+		.cvb_table = {
-+			{204000000UL,   {1112619, -29295, 402} },
-+			{306000000UL,	{1150460, -30585, 402} },
-+			{408000000UL,	{1190122, -31865, 402} },
-+			{510000000UL,	{1231606, -33155, 402} },
-+			{612000000UL,	{1274912, -34435, 402} },
-+			{714000000UL,	{1320040, -35725, 402} },
-+			{816000000UL,	{1366990, -37005, 402} },
-+			{918000000UL,	{1415762, -38295, 402} },
-+			{1020000000UL,	{1466355, -39575, 402} },
-+			{1122000000UL,	{1518771, -40865, 402} },
-+			{1224000000UL,	{1573009, -42145, 402} },
-+			{1326000000UL,	{1629068, -43435, 402} },
-+			{1428000000UL,	{1686950, -44715, 402} },
-+			{1530000000UL,	{1746653, -46005, 402} },
-+			{1632000000UL,	{1808179, -47285, 402} },
-+			{1734000000UL,	{1871526, -48575, 402} },
-+			{1836000000UL,	{1936696, -49855, 402} },
-+			{1938000000UL,	{2003687, -51145, 402} },
-+			{2014500000UL,	{2054787, -52095, 402} },
-+			{2116500000UL,	{2124957, -53385, 402} },
-+			{2218500000UL,	{2196950, -54665, 402} },
-+			{2320500000UL,	{2270765, -55955, 402} },
-+			{2422500000UL,	{2346401, -57235, 402} },
-+			{2524500000UL,	{2437299, -58535, 402} },
-+			{0,		{      0,      0,   0} },
-+		},
-+		.cpu_dfll_data = {
-+			.tune0_low = 0x005020ff,
-+			.tune0_high = 0x005040ff,
-+			.tune1 = 0x00000060,
-+		}
-+	},
-+};
-+
-+static struct tegra_dfll_soc_data soc;
-+
-+static int tegra124_dfll_fcpu_probe(struct platform_device *pdev)
-+{
-+	return tegra_dfll_register(pdev, &soc);
-+}
-+
-+static const struct of_device_id tegra124_dfll_fcpu_of_match[] = {
-+	{ .compatible = "nvidia,tegra124-dfll", },
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(of, tegra124_dfll_fcpu_of_match);
-+
-+static const struct dev_pm_ops tegra124_dfll_pm_ops = {
-+	SET_RUNTIME_PM_OPS(tegra_dfll_runtime_suspend,
-+			   tegra_dfll_runtime_resume, NULL)
-+};
-+
-+static struct platform_driver tegra124_dfll_fcpu_driver = {
-+	.probe		= tegra124_dfll_fcpu_probe,
-+	.remove		= tegra_dfll_unregister,
-+	.driver		= {
-+		.name		= "tegra124-dfll",
-+		.of_match_table = tegra124_dfll_fcpu_of_match,
-+		.pm		= &tegra124_dfll_pm_ops,
-+	},
-+};
-+
-+static int __init tegra124_dfll_fcpu_init(void)
-+{
-+	int process_id, speedo_id, speedo_value;
-+	const struct cvb_table *cvb;
-+
-+	process_id = tegra_sku_info.cpu_process_id;
-+	speedo_id = tegra_sku_info.cpu_speedo_id;
-+	speedo_value = tegra_sku_info.cpu_speedo_value;
-+
-+	if (speedo_id >= ARRAY_SIZE(cpu_max_freq_table)) {
-+		pr_err("unknown max CPU freq for speedo_id=%d\n", speedo_id);
-+		return -ENODEV;
-+	}
-+
-+	soc.opp_dev = get_cpu_device(0);
-+	if (!soc.opp_dev) {
-+		pr_err("no CPU0 device\n");
-+		return -ENODEV;
-+	}
-+
-+	cvb = tegra_cvb_build_opp_table(tegra124_cpu_cvb_tables,
-+					ARRAY_SIZE(tegra124_cpu_cvb_tables),
-+					process_id, speedo_id, speedo_value,
-+					cpu_max_freq_table[speedo_id],
-+					soc.opp_dev);
-+	if (IS_ERR(cvb)) {
-+		pr_err("couldn't build OPP table: %ld\n", PTR_ERR(cvb));
-+		return PTR_ERR(cvb);
-+	}
-+
-+	soc.min_millivolts = cvb->min_millivolts;
-+	soc.tune0_low = cvb->cpu_dfll_data.tune0_low;
-+	soc.tune0_high = cvb->cpu_dfll_data.tune0_high;
-+	soc.tune1 = cvb->cpu_dfll_data.tune1;
-+
-+	return platform_driver_register(&tegra124_dfll_fcpu_driver);
-+}
-+module_init(tegra124_dfll_fcpu_init);
-+
-+static void __exit tegra124_dfll_fcpu_exit(void)
-+{
-+	platform_driver_unregister(&tegra124_dfll_fcpu_driver);
-+}
-+module_exit(tegra124_dfll_fcpu_exit);
-+
-+MODULE_DESCRIPTION("Tegra124 DFLL clock source driver");
-+MODULE_LICENSE("GPL v2");
-+MODULE_AUTHOR("Aleksandr Frid <afrid@nvidia.com>");
-+MODULE_AUTHOR("Paul Walmsley <pwalmsley@nvidia.com>");
++#endif	/* _DT_BINDINGS_RESET_TEGRA124_CAR_H */
 -- 
 2.3.0
