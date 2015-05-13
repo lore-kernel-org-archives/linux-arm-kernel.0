@@ -1,77 +1,86 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Wed, 13 May 2015 23:19:50 +0100
-Subject: [GIT PULL]Hisilicon hip04 soc and D01 board DT updates for v4.2
-In-Reply-To: <2178083.0uhiGDS5Eh@wuerfel>
-References: <554CC781.9010705@hisilicon.com> <555217BA.4090109@hisilicon.com>
- <CANMBJr5JQF1D43bCmV-w9hxemmMQJkvTG+gD98r_H=F6g=9Bqw@mail.gmail.com>
- <2178083.0uhiGDS5Eh@wuerfel>
-Message-ID: <5553CE06.1000605@hisilicon.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 13 May 2015 15:34:11 -0700
+Subject: [GIT PULL] Broadcom Device Tree changes for 4.2
+Message-ID: <1431556453-11633-1-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
 
+  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
 
-On 5/13/2015 8:31 PM, Arnd Bergmann wrote:
-> On Wednesday 13 May 2015 12:20:28 Tyler Baker wrote:
->> On 12 May 2015 at 08:09, Wei Xu <xuwei5@hisilicon.com> wrote:
->>> On 5/12/2015 4:06 PM, Arnd Bergmann wrote:
->>>> On Friday 08 May 2015 15:26:09 Wei Xu wrote:
->>>>> ARM: DT: Hisilicon hip04 soc and D01 board updates for 4.2
->>>>>
->>>>> - Add hip04 GPIO nodes
->>>>> - Add NANDC nodes for hip04 and D01 board
->>>>> - Add hip04 ethernet related nodes
->>>>>
->>
->> When this was pulled into arm-soc, the kernelci.org bot reported
->> hip04-d01 boot failures[1]. Before bisecting, I decided to wait a day
->> and double check the status of -next in case there were needed
->> dependencies from other trees. However, now there are the same
->> hip04-d01 boot failures in next-20150513[2]. My robot has bisected[3]
->> these boot failures down to...
->>
->> 828fcfe3c84ade68ecc3f1ba78baebc1654977f3 is the first bad commit
->> commit 828fcfe3c84ade68ecc3f1ba78baebc1654977f3
->> Author: Zhou Wang <wangzhou.bry@gmail.com>
->> Date:   Wed Mar 25 14:57:45 2015 +0800
->>
->>     ARM: dts: hip04: add GPIO pieces
->>
->>     Hisilicon Soc hip04 has four GPIO controllers, each one has 32
->>     GPIOs and can be configured to be an interrupt controller.The GPIO
->>     controllers are compatible with the snps,dw-apb-gpio driver.
->>     This patch add the corresponding device tree nodes.
->>
->>     Acked-by: Linus Walleij <linus.walleij@linaro.org>
->>     Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
->>     Signed-off-by: Wei Xu <xuwei5@hisilicon.com>
->>
->> This commit does not revert cleanly from -next, so I reverted all
->> three commits in this pull request on top of next-20150513 and this
->> get the hip04-d01 booting again.
->>
-> 
-> Ok, thanks for the report!
+are available in the git repository at:
 
-Hi Tyler,
+  http://github.com/broadcom/stblinux tags/arm-soc/for-4.2/dts
 
-Thanks for the report!
-I will reconfirm it again.
+for you to fetch changes up to 16dc3bac722252a10e396546f44135ae1b6a7ff3:
 
-Hi Arnd,
+  ARM: BCM5301X: Add DT for Asus RT-AC56U (2015-05-13 11:32:24 -0700)
 
-> Wei, can you send a bug fix, or should I revert that branch for now?
+----------------------------------------------------------------
+This pull request contains the following Device Tree changes:
 
-I will try to resolve it tomorrow.
-If I could not resolve it by the end of tomorrow,
-I will send a mail to you to ask for reverting.
-Do you think is it OK?
-Thanks!
+New devices:
 
-Best Regards,
-Wei
+- Felix adds support for the Buffalo WXR-1900DHP and adds the USB led on Buffalo
+  WZR-1750DHP
 
-> 	Arnd
-> 
-> .
-> 
+- Rafal adds support for the SmartRG SR400ac, Asus RT-AC68U and RT-AC56U
+
+New peripheral support:
+
+- Brian adds Device Tree nodes for the Broadcom NAND controller found on
+  BCM7xxx, BCM63138 and Cygnus SoCs
+
+- Brian adds Device Tree nodes for the SATA AHCI and PHY controller found on
+  BCM7xxx
+
+- I add the Device Tree nodes and bindings documents for bringing-up secondary
+  CPUs and timer/syscon-reboot on BCM63138
+
+----------------------------------------------------------------
+Brian Norris (3):
+      ARM: bcm7445: add NAND to DTS
+      ARM: bcm63138: add NAND DT support
+      ARM: dts: brcmstb: add nodes for SATA controller and PHY
+
+Felix Fietkau (2):
+      ARM: BCM5301X: Add USB LED for Buffalo WZR-1750DHP
+      ARM: BCM5301X: Add DT for Buffalo WXR-1900DHP
+
+Florian Fainelli (6):
+      Documentation: DT: Add Broadcom BCM63138 PMB binding
+      ARM: dts: BCM63xx: Add PMB busses nodes
+      Documentation: DT: Document SMP DT nodes and properties for BCM63138
+      ARM: dts: BCM63xx: Add SMP nodes and required properties
+      dt-bindings: Add documentation for the BCM63138 timer and syscon-reboot
+      ARM: dts: BCM63xx: Add timer and syscon-reboot nodes
+
+Rafa? Mi?ecki (3):
+      ARM: BCM5301X: Add DT for SmartRG SR400ac
+      ARM: BCM5301X: Add DT for Asus RT-AC68U
+      ARM: BCM5301X: Add DT for Asus RT-AC56U
+
+Ray Jui (1):
+      ARM: dts: cygnus: Enable NAND support for Cygnus
+
+ .../devicetree/bindings/arm/bcm/brcm,bcm63138.txt  |  76 ++++++++++++
+ .../bindings/reset/brcm,bcm63138-pmb.txt           |  19 +++
+ arch/arm/boot/dts/Makefile                         |   4 +
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  |  12 ++
+ arch/arm/boot/dts/bcm4708-asus-rt-ac56u.dts        |  96 ++++++++++++++++
+ arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts        |  83 ++++++++++++++
+ arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts  |   6 +
+ arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts      | 119 +++++++++++++++++++
+ arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts  | 127 +++++++++++++++++++++
+ arch/arm/boot/dts/bcm63138.dtsi                    |  43 +++++++
+ arch/arm/boot/dts/bcm7445-bcm97445svmb.dts         |  23 ++++
+ arch/arm/boot/dts/bcm7445.dtsi                     |  59 ++++++++++
+ arch/arm/boot/dts/bcm958300k.dts                   |  16 +++
+ arch/arm/boot/dts/bcm963138dvt.dts                 |  12 ++
+ 14 files changed, 695 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reset/brcm,bcm63138-pmb.txt
+ create mode 100644 arch/arm/boot/dts/bcm4708-asus-rt-ac56u.dts
+ create mode 100644 arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts
+ create mode 100644 arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
+ create mode 100644 arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts
