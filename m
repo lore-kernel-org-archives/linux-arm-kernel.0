@@ -1,41 +1,83 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Wed, 13 May 2015 19:37:49 +0200
-Subject: [PATCH] ARM: BCM5301X: Fix chip typo in ARCH_BCM_5301X help
- message
-In-Reply-To: <1431501645-3887-1-git-send-email-zajec5@gmail.com>
-References: <1431501645-3887-1-git-send-email-zajec5@gmail.com>
-Message-ID: <55538BED.4070504@hauke-m.de>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 13 May 2015 10:41:50 -0700
+Subject: [PATCH] ARM: bcm2835: Use 0x4 prefix for DMA bus addresses to
+ SDRAM.
+In-Reply-To: <20150513085119.GD3394@x1>
+References: <1430768034-12734-1-git-send-email-eric@anholt.net>
+ <55491A12.3070608@wwwdotorg.org> <87wq0mol7e.fsf@eliezer.anholt.net>
+ <20150513085119.GD3394@x1>
+Message-ID: <87zj584boh.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/13/2015 09:20 AM, Rafa? Mi?ecki wrote:
-> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
-> ---
->  arch/arm/mach-bcm/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-> index 8b11f44..7fec7e8 100644
-> --- a/arch/arm/mach-bcm/Kconfig
-> +++ b/arch/arm/mach-bcm/Kconfig
-> @@ -47,7 +47,7 @@ config ARCH_BCM_5301X
->  	  BCM53014, BCM53015, BCM53016, BCM53017, BCM53018, BCM4707,
->  	  BCM4708 and BCM4709.
->  
-> -	  Do not confuse this with the BCM4760 which is a totally
-> +	  Do not confuse this with the BCM4706 which is a totally
->  	  different SoC or with the older BCM47XX and BCM53XX based
->  	  network SoC using a MIPS CPU, they are supported by arch/mips/bcm47xx
->  
-> 
-Nack
+Lee Jones <lee@kernel.org> writes:
 
-Like Florian said this is not a typo. There is a BCM4760 SoC and it was
-or is supported by Linux.
+> On Tue, 05 May 2015, Eric Anholt wrote:
+>
+>> Stephen Warren <swarren@wwwdotorg.org> writes:
+>> 
+>> > On 05/04/2015 01:33 PM, Eric Anholt wrote:
+>> >> There exists a tiny MMU, configurable only by the VC (running the
+>> >> closed firmware), which maps from the ARM's physical addresses to bus
+>> >> addresses.  These bus addresses determine the caching behavior in the
+>> >> VC's L1/L2 (note: separate from the ARM's L1/L2) according to the top
+>> >> 2 bits.  The bits in the bus address mean:
+>> >>
+>> >>  From the VideoCore processor:
+>> >> 0x0... L1 and L2 cache allocating and coherent
+>> >> 0x4... L1 non-allocating, but coherent. L2 allocating and coherent
+>> >> 0x8... L1 non-allocating, but coherent. L2 non-allocating, but coherent
+>> >> 0xc... SDRAM alias. Cache is bypassed. Not L1 or L2 allocating or coherent
+>> >>
+>> >>  From the GPU peripherals (note: all peripherals bypass the L1
+>> >> cache. The ARM will see this view once through the VC MMU):
+>> >> 0x0... Do not use
+>> >> 0x4... L1 non-allocating, and incoherent. L2 allocating and coherent.
+>> >> 0x8... L1 non-allocating, and incoherent. L2 non-allocating, but coherent
+>> >> 0xc... SDRAM alias. Cache is bypassed. Not L1 or L2 allocating or coherent
+>> >>
+>> >> The 2835 firmware always configures the MMU to turn ARM physical
+>> >> addresses with 0x0 top bits to 0x4, meaning present in L2 but
+>> >> incoherent with L1.  However, any bus addresses we were generating in
+>> >> the kernel to be passed to a device had 0x0 bits.  That would be a
+>> >> reserved (possibly totally incoherent) value if sent to a GPU
+>> >> peripheral like USB, or L1 allocating if sent to the VC (like a
+>> >> firmware property request).  By setting dma-ranges, all of the devices
+>> >> below it get a dev->dma_pfn_offset, so that dma_alloc_coherent() and
+>> >> friends return addresses with 0x4 bits and avoid cache incoherency.
+>> >>
+>> >> This matches the behavior in the downstream 2708 kernel (see
+>> >> BUS_OFFSET in arch/arm/mach-bcm2708/include/mach/memory.h).
+>> >
+>> >> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+>> >
+>> >>   		#address-cells = <1>;
+>> >>   		#size-cells = <1>;
+>> >>   		ranges = <0x7e000000 0x20000000 0x02000000>;
+>> >> +		dma-ranges = <0x40000000 0x00000000 0x1f000000>;
+>> >
+>> > Oh well that's a nice and simple patch; I had been avoiding looking into 
+>> > fixing the kernel for this since I was worried it'd be rather complex!
+>> >
+>> > I'm puzzled why the length cell of ranges and dma-ranges differs though? 
+>> > Assuming there's a good explanation for that,
+>> 
+>> Nope, you're right, it should be 0x20000000.  '0x1f' came from going
+>> back from the '0x3f' on the pi2, but pi2 just has a chunk lost to the
+>> bus mapping.
+>
+> So are you going to fix this and send another patch?
 
-See this for BCM4760: https://lwn.net/Articles/563957/
+I see it having hit the list:
 
-I forgot about this at first too. Nice naming Broadcom. (the other
-companies are not better).  ;-)
+http://lists.infradead.org/pipermail/linux-rpi-kernel/2015-May/001699.html
 
-Hauke
+but I'm missing both versions in my inbox, so I'm not sure what
+happened.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150513/1cfb7877/attachment.sig>
