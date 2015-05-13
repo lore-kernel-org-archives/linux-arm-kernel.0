@@ -1,38 +1,53 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 13 May 2015 17:05:27 +0900
-Subject: [PATCHv5 4/5] ARM: dts: exynos5420 update the cooling cells for
- core cpu0
-In-Reply-To: <CANAwSgTa=7rjcocYocxn+yv6AdH1PVtNu2NTZV6BWgBK3RXCDw@mail.gmail.com>
-References: <1431499020-3912-1-git-send-email-linux.amoon@gmail.com>
- <1431499020-3912-5-git-send-email-linux.amoon@gmail.com>
- <CAJKOXPdKtMO3f8YzHXtuZ042jkFRL4wa978=TggSQk8FahubRg@mail.gmail.com>
- <CANAwSgTa=7rjcocYocxn+yv6AdH1PVtNu2NTZV6BWgBK3RXCDw@mail.gmail.com>
-Message-ID: <CAJKOXPcxrdkwZmHKfw+YWJ4=XDBTTutK_5-d6SmZ8QQGKyvfCA@mail.gmail.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Wed, 13 May 2015 10:09:18 +0200
+Subject: [PATCH v2 3/4] clk: add lpc18xx ccu clk driver
+In-Reply-To: <20150512223241.16410.79958@quantum>
+References: <1430170693-28303-1-git-send-email-manabian@gmail.com>
+ <1430170693-28303-4-git-send-email-manabian@gmail.com>
+ <20150512223241.16410.79958@quantum>
+Message-ID: <CAGhQ9VzvvBCWu2+8zrAvpFRTWr3o9uhOeuucHB39s91fOPk8Mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-13 16:58 GMT+09:00 Anand Moon <linux.amoon@gmail.com>:
-> Hi Krzysztof,
+On 13 May 2015 at 00:32, Michael Turquette <mturquette@linaro.org> wrote:
+> Quoting Joachim Eastwood (2015-04-27 14:38:12)
+>> +static int of_clk_get_parent_arg(struct device_node *np, int index)
+>> +{
+>> +       struct of_phandle_args clkspec;
+>> +       int rc;
+>> +
+>> +       if (index < 0)
+>> +               return -EINVAL;
+>> +
+>> +       rc = of_parse_phandle_with_args(np, "clocks", "#clock-cells", index,
+>> +                                       &clkspec);
+>> +       if (rc)
+>> +               return -EINVAL;
+>> +
+>> +       return clkspec.args_count ? clkspec.args[0] : -EINVAL;
+>> +}
 >
-> You are correct.
+> Hi Joachim,
 >
-> #cooling-cells property are required by the thermal-zone.
->
-> http://lxr.free-electrons.com/source/drivers/thermal/of-thermal.c#L607
->
-> So I picked this values from earlier series of CPU frequency by Thomas.
->
-> Hope this explains the changes. I will update the commit log.
+> I'm not sure why you need this. I guess it is related to my question in
+> patch #2 about using clock-indices?
 
-I still don't get it. I do not ask about cooling-cells but levels.
+Yes. I basically need the clock id without grabbing the clock using a
+clk_get function. See below.
 
->>> +
->>> +                       cooling-min-level = <10>;
->>> +                       cooling-max-level = <7>;
->>> +                       #cooling-cells = <2>; /* min followed by max */
+>Can you explain why this function is required?
 
-Which cooling levels are referenced here? Where are they defined?
+Since the CCU doesn't act like a normal clock consumer using clk_get
+type functions I use this function to retrieve the CGU clock id. This
+drivers is used on two CCUs blocks and I need to match the id with one
+in the clk_branches array so that the driver itself can be generic.
 
-Please, don't top-post.
+> Anyways if returning the clock index is something that is really needed
+> then why not rename it to "of_clk_get_index" and put it in
+> drivers/clk/clk.c?
 
-Krzysztof
+Okey, I'll do that in the next version if we agree that the function
+is still needed.
+
+regards,
+Joachim Eastwood
