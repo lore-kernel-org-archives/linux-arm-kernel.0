@@ -1,9 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 13 May 2015 15:49:38 +0200
-Subject: [GIT PULL 6/8] ARM: tegra: Core SoC changes for v4.2-rc1
+Date: Wed, 13 May 2015 15:49:39 +0200
+Subject: [GIT PULL 7/8] ARM: tegra: Devicetree changes for v4.2-rc1
 In-Reply-To: <1431524980-13599-1-git-send-email-thierry.reding@gmail.com>
 References: <1431524980-13599-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1431524980-13599-7-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1431524980-13599-8-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,39 +15,46 @@ The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.2-soc
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.2-dt
 
-for you to fetch changes up to 7892158a96629c46c46dfae52eaf951f51222cf5:
+for you to fetch changes up to 869bd180b8e6a81525acab21a5ee4428685bda2a:
 
-  soc/tegra: pmc: move to using a restart handler (2015-05-04 14:21:45 +0200)
+  ARM: tegra: Fix hda2codec_2x clock and reset names (2015-05-05 14:09:02 +0200)
 
 Thanks,
 Thierry
 
 ----------------------------------------------------------------
-ARM: tegra: Core SoC changes for v4.2-rc1
+ARM: tegra: Devicetree changes for v4.2-rc1
 
-A couple of changes to the core SoC support code. Perhaps the most
-important part is a fix for a regression in LP1 suspend/resume code that
-was introduced a while back.
+Contains a couple of fixes and additions to device tree files. The most
+notable change is a fix for a misapplied patch that was only exposed by
+a recent change in the regulator subsystem that caused USB to break on
+Tegra124 recently.
+
+Other than that there are a more or less random assortment of additions
+to enable various features on a couple of boards.
 
 ----------------------------------------------------------------
-David Riley (1):
-      soc/tegra: pmc: move to using a restart handler
+Marcel Ziswiler (3):
+      ARM: tegra: Cardhu device-tree comment spelling fix
+      ARM: tegra: Add Tegra30 HDA support
+      ARM: tegra: Fix hda2codec_2x clock and reset names
 
-Dmitry Osipenko (1):
-      ARM: tegra20: Store CPU "resettable" status in IRAM
+Thierry Reding (5):
+      ARM: tegra: cardhu: Add power and volume keys
+      ARM: tegra: Add missing HDMI +5V regulator
+      ARM: tegra: jetson-tk1: Enable HDA support
+      ARM: tegra: venice2: Mark eMMC as non-removable
+      ARM: tegra: venice2: Set min-/max-microvolt for VDD_LED supply
 
-Nicholas Mc Guire (1):
-      soc/tegra: Watch wait_for_completion_timeout() return type
+Tomeu Vizoso (1):
+      ARM: tegra: Correct which USB controller has the UTMI pad registers
 
- arch/arm/mach-tegra/cpuidle-tegra20.c |  5 ++---
- arch/arm/mach-tegra/reset-handler.S   | 10 +++++++---
- arch/arm/mach-tegra/reset.h           |  4 ++++
- arch/arm/mach-tegra/sleep-tegra20.S   | 37 ++++++++++++++++++++---------------
- arch/arm/mach-tegra/sleep.h           |  4 ++++
- arch/arm/mach-tegra/tegra.c           |  1 -
- drivers/soc/tegra/fuse/fuse-tegra20.c |  6 ++++--
- drivers/soc/tegra/pmc.c               | 23 ++++++++++++++++------
- include/soc/tegra/pmc.h               |  2 --
- 9 files changed, 59 insertions(+), 33 deletions(-)
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts |  4 ++++
+ arch/arm/boot/dts/tegra124-venice2.dts    |  3 +++
+ arch/arm/boot/dts/tegra124.dtsi           | 12 ++++++------
+ arch/arm/boot/dts/tegra20-seaboard.dts    | 12 ++++++++++++
+ arch/arm/boot/dts/tegra30-cardhu.dtsi     | 30 +++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/tegra30.dtsi            | 15 +++++++++++++++
+ 6 files changed, 69 insertions(+), 7 deletions(-)
