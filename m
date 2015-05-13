@@ -1,103 +1,96 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 13 May 2015 17:50:14 +0100
-Subject: [PATCH v8 4/9] mfd: Add binding document for NVIDIA Tegra XUSB
-In-Reply-To: <CAL1qeaF-7aAx0gqPe-_D4ZaZET0Kejr801KrbvuQ_2w6c8mcnA@mail.gmail.com>
-References: <1430761002-9327-1-git-send-email-abrestic@chromium.org>
- <1430761002-9327-5-git-send-email-abrestic@chromium.org>
- <20150513143954.GA3394@x1>
- <CAL1qeaF-7aAx0gqPe-_D4ZaZET0Kejr801KrbvuQ_2w6c8mcnA@mail.gmail.com>
-Message-ID: <20150513165014.GC19543@x1>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 13 May 2015 18:51:04 +0200
+Subject: schedule_timeout sleeps too long after dividing CPU frequency
+In-Reply-To: <20150512155004.GP2067@n2100.arm.linux.org.uk>
+References: <55520F0F.5010906@free.fr>
+ <CAKohpo=eMA6L9=jK=bAnbFuDxcdtpQNub0WFnSy6MOqB3jOdjA@mail.gmail.com>
+ <555218C7.5050602@free.fr> <20150512155004.GP2067@n2100.arm.linux.org.uk>
+Message-ID: <555380F8.5050306@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 May 2015, Andrew Bresticker wrote:
-
-> Lee,
+On 12/05/2015 17:50, Russell King - ARM Linux wrote:
+> On Tue, May 12, 2015 at 05:14:15PM +0200, Mason wrote:
+>> This ties in to another thread I started in LAKML:
+>> ("High-resolution timers not supported when using smp_twd on Cortex A9")
+>>
+>> $ git show 5388a6b2 arch/arm/kernel/smp_twd.c
+>> commit 5388a6b266e9c3357353332ba0cd5549082887f1
+>> Author: Russell King <rmk+kernel@arm.linux.org.uk>
+>> Date:   Mon Jul 26 13:19:43 2010 +0100
+>>
+>>     ARM: SMP: Always enable clock event broadcast support
+>>     
+>>     The TWD local timers are unable to wake up the CPU when it is placed
+>>     into a low power mode, eg. C3.  Therefore, we need to adapt things
+>>     such that the TWD code can cope with this.
+>>     
+>>     We do this by always providing a broadcast tick function, and marking
+>>     the fact that the TWD local timer will stop in low power modes.  This
+>>     means that when the CPU is placed into a low power mode, the core
+>>     timer code marks this fact, and allows an IPI to be given to the core.
+>>
+>> This mentions a "broadcast tick function" (of which I know nothing).
+>> Is this what you're referring to?
 > 
-> On Wed, May 13, 2015 at 7:39 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> > On Mon, 04 May 2015, Andrew Bresticker wrote:
-> >
-> >> Add a binding document for the XUSB host complex on NVIDIA Tegra124
-> >> and later SoCs.  The XUSB host complex includes a mailbox for
-> >> communication with the XUSB micro-controller and an xHCI host-controller.
-> >>
-> >> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
-> >> Cc: Rob Herring <robh+dt@kernel.org>
-> >> Cc: Pawel Moll <pawel.moll@arm.com>
-> >> Cc: Mark Rutland <mark.rutland@arm.com>
-> >> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> >> Cc: Kumar Gala <galak@codeaurora.org>
-> >> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> >> Cc: Lee Jones <lee.jones@linaro.org>
-> >> ---
-> >> Changes from v7:
-> >>  - Move non-shared resources into child nodes.
-> >> New for v7.
-> >> ---
-> >>  .../bindings/mfd/nvidia,tegra124-xusb.txt          | 37 ++++++++++++++++++++++
-> >>  1 file changed, 37 insertions(+)
-> >>  create mode 100644 Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt b/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
-> >> new file mode 100644
-> >> index 0000000..bc50110
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
-> >> @@ -0,0 +1,37 @@
-> >> +NVIDIA Tegra XUSB host copmlex
-> >> +==============================
-> >> +
-> >> +The XUSB host complex on Tegra124 and later SoCs contains an xHCI host
-> >> +controller and a mailbox for communication with the XUSB micro-controller.
-> >> +
-> >> +Required properties:
-> >> +--------------------
-> >> + - compatible: For Tegra124, must contain "nvidia,tegra124-xusb".
-> >> +   Otherwise, must contain '"nvidia,<chip>-xusb", "nvidia,tegra124-xusb"'
-> >> +   where <chip> is tegra132.
-> >> + - reg: Must contain the base and length of the XUSB FPCI registers.
-> >> + - ranges: Bus address mapping for the XUSB block.  Can be empty since the
-> >> +   mapping is 1:1.
-> >> + - #address-cells: Must be 2.
-> >> + - #size-cells: Must be 2.
-> >> +
-> >> +Example:
-> >> +--------
-> >> +     usb at 0,70098000 {
-> >> +             compatible = "nvidia,tegra124-xusb";
-> >> +             reg = <0x0 0x70098000 0x0 0x1000>;
-> >> +             ranges;
-> >> +
-> >> +             #address-cells = <2>;
-> >> +             #size-cells = <2>;
-> >> +
-> >> +             usb-host at 0,70090000 {
-> >> +                     compatible = "nvidia,tegra124-xhci";
-> >> +                     ...
-> >> +             };
-> >> +
-> >> +             mailbox {
-> >> +                     compatible = "nvidia,tegra124-xusb-mbox";
-> >> +                     ...
-> >> +             };
-> >
-> > This doesn't appear to be a proper MFD.  I would have the USB and
-> > Mailbox devices probe seperately and use a phandle to point the USB
-> > device to its Mailbox.
-> >
-> > usb at xyz {
-> >         mboxes = <&xusb-mailbox, [chan]>;
-> > };
+> No.  This has nothing to do with low power modes.
 > 
-> Then what will set up the shared regmap?  The point of using an MFD
-> here was to share a register set with both the mailbox and xHCI
-> drivers and avoid having to map the same register set twice in two
-> separate drivers.
+> How this works depends on how your kernel is configured, but essentially
+> it's something like this:
+> 
+> * The CPU which will be idling sets its local timer to wake up after N
+>   counter cycles, where N is calculated from the timer frequency.
+> 
+> * When the local timer fires, the CPU is kicked out of the idle loop, and
+>   it reads the current system time.  If the current system time indicates
+>   that the software timer set in schedule_timeout() has fired, that
+>   software timer fires.
+> 
+> If the local timer changes frequency without the idling CPU being woken
+> up, then the problem you're referring to can happen.
+> 
+> As you're not giving much information about your system (including
+> indicating where we might see some source code) we're not able to help
+> more than providing above descriptions.  Maybe if you posted your
+> patches so far to support the project you're working on, we could
+> provide better answers.
 
-Can you share the mapping please?
+$ git diff v3.14.41 HEAD >tango.patch && xz tango.patch
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+I don't understand the IRQ-related part yet
+( arch/arm/mach-tangox/irq.c and drivers/irqchip/irq-gic.c )
+
+If anyone spots the problem, that would make my day.
+
+I tested with a loadable module whose init function is
+
+static int __init ts_init(void)
+{
+	long res;
+	printk("ABOUT TO SLEEP\n");
+	set_current_state(TASK_INTERRUPTIBLE);
+	res = schedule_timeout(HZ);
+	printk("WAKE UP res=%ld\n", res);
+	return 0;
+}
+
+Loading the module, with cpufreq divided by 9, prints:
+[ 1738.962982] ABOUT TO SLEEP
+[ 1747.956191] WAKE UP res=0
+
+Regards.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: tango.patch.xz
+Type: application/force-download
+Size: 30112 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150513/bcc44c93/attachment-0002.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: dot.config.xz
+Type: application/force-download
+Size: 7924 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150513/bcc44c93/attachment-0003.bin>
