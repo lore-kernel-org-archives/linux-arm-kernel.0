@@ -1,256 +1,178 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 13 May 2015 10:34:18 -0600
-Subject: [PATCH v4 10/13] coresight-etm4x: Controls pertaining to the context
- ID functions
+Date: Wed, 13 May 2015 10:34:21 -0600
+Subject: [PATCH v4 13/13] coresight-etm4x: Read only access to the tracer's ID
+ registers
 In-Reply-To: <1431534861-24986-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1431534861-24986-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1431534861-24986-11-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1431534861-24986-14-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pratik Patel <pratikp@codeaurora.org>
+ETM ID registers contain valuable information about the capabilities
+of the implementation and are very useful when configuring the device for
+various trace scenarios.
 
-Adding sysfs entries to access and configure specifics about the
-context ID comparator functions.
-
-Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- .../ABI/testing/sysfs-bus-coresight-devices-etm4x  |  19 +++
- drivers/hwtracing/coresight/coresight-etm4x.c      | 187 +++++++++++++++++++++
- 2 files changed, 206 insertions(+)
+ .../ABI/testing/sysfs-bus-coresight-devices-etm4x  | 90 ++++++++++++++++++++++
+ drivers/hwtracing/coresight/coresight-etm4x.c      | 37 +++++++++
+ 2 files changed, 127 insertions(+)
 
 diff --git a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
-index 5c7391d4e33a..f251b2c17f5b 100644
+index bde788dfd3f7..2fe2e3dae487 100644
 --- a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
 +++ b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
-@@ -242,3 +242,22 @@ Date:		April 2015
- KernelVersion:	4.01
+@@ -358,3 +358,93 @@ KernelVersion:	4.01
  Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
- Description: 	(RW) Controls the selection of the resources in the trace unit.
+ Description:	(R) Print the content of the Peripheral ID3 Register
+ 		(0xFEC).  The value is taken directly from the HW.
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/ctxid_idx
++What:		/sys/bus/coresight/devices/<memory_map>.etm/trcidr/trcidr0
 +Date:		April 2015
 +KernelVersion:	4.01
 +Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(RW) Select which context ID comparator to work with.
++Description:	(R) Returns the tracing capabilities of the trace unit (0x1E0).
++		The value is taken directly from the HW.
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/ctxid_val
++What:		/sys/bus/coresight/devices/<memory_map>.etm/trcidr/trcidr1
 +Date:		April 2015
 +KernelVersion:	4.01
 +Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(RW) Get/Set the context ID comparator value to trigger on.
++Description:	(R) Returns the tracing capabilities of the trace unit (0x1E4).
++		The value is taken directly from the HW.
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/ctxid_masks
++What:		/sys/bus/coresight/devices/<memory_map>.etm/trcidr/trcidr2
 +Date:		April 2015
 +KernelVersion:	4.01
 +Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(RW) Mask for all 8 context ID comparator value
-+		registers (if implemented).
++Description:	(R) Returns the maximum size of the data value, data address,
++		VMID, context ID and instuction address in the trace unit
++		(0x1E8).  The value is taken directly from the HW.
++
++What:		/sys/bus/coresight/devices/<memory_map>.etm/trcidr/trcidr3
++Date:		April 2015
++KernelVersion:	4.01
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description:	(R) Returns the value associated with various resources
++		available to the trace unit.  See the Trace Macrocell
++		architecture specification for more details (0x1E8).
++		The value is taken directly from the HW.
++
++What:		/sys/bus/coresight/devices/<memory_map>.etm/trcidr/trcidr4
++Date:		April 2015
++KernelVersion:	4.01
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description:	(R) Returns how many resources the trace unit supports (0x1F0).
++		The value is taken directly from the HW.
++
++What:		/sys/bus/coresight/devices/<memory_map>.etm/trcidr/trcidr5
++Date:		April 2015
++KernelVersion:	4.01
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description:	(R) Returns how many resources the trace unit supports (0x1F4).
++		The value is taken directly from the HW.
++
++What:		/sys/bus/coresight/devices/<memory_map>.etm/trcidr/trcidr8
++Date:		April 2015
++KernelVersion:	4.01
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description:	(R) Returns the maximum speculation depth of the instruction
++		trace stream. (0x180).  The value is taken directly from the HW.
++
++What:		/sys/bus/coresight/devices/<memory_map>.etm/trcidr/trcidr9
++Date:		April 2015
++KernelVersion:	4.01
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description:	(R) Returns the number of P0 right-hand keys that the trace unit
++		can use (0x184).  The value is taken directly from the HW.
++
++What:		/sys/bus/coresight/devices/<memory_map>.etm/trcidr/trcidr10
++Date:		April 2015
++KernelVersion:	4.01
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description:	(R) Returns the number of P1 right-hand keys that the trace unit
++		can use (0x188).  The value is taken directly from the HW.
++
++What:		/sys/bus/coresight/devices/<memory_map>.etm/trcidr/trcidr11
++Date:		April 2015
++KernelVersion:	4.01
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description:	(R) Returns the number of special P1 right-hand keys that the
++		trace unit can use (0x18C).  The value is taken directly from
++		the HW.
++
++What:		/sys/bus/coresight/devices/<memory_map>.etm/trcidr/trcidr12
++Date:		April 2015
++KernelVersion:	4.01
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description:	(R) Returns the number of conditional P1 right-hand keys that
++		the trace unit can use (0x190).  The value is taken directly
++		from the HW.
++
++What:		/sys/bus/coresight/devices/<memory_map>.etm/trcidr/trcidr13
++Date:		April 2015
++KernelVersion:	4.01
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description:	(R) Returns the number of special conditional P1 right-hand keys
++		that the trace unit can use (0x194).  The value is taken
++		directly from the HW.
 diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index 308a48df4338..e94784fe68c4 100644
+index 0568e4413411..f0b50af4fc30 100644
 --- a/drivers/hwtracing/coresight/coresight-etm4x.c
 +++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -1780,6 +1780,190 @@ static ssize_t res_ctrl_store(struct device *dev,
- }
- static DEVICE_ATTR_RW(res_ctrl);
- 
-+static ssize_t ctxid_idx_show(struct device *dev,
-+			      struct device_attribute *attr,
-+			      char *buf)
-+{
-+	unsigned long val;
-+	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
-+
-+	val = drvdata->ctxid_idx;
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
-+}
-+
-+static ssize_t ctxid_idx_store(struct device *dev,
-+			       struct device_attribute *attr,
-+			       const char *buf, size_t size)
-+{
-+	unsigned long val;
-+	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
-+
-+	if (kstrtoul(buf, 16, &val))
-+		return -EINVAL;
-+	if (val >= drvdata->numcidc)
-+		return -EINVAL;
-+
-+	/*
-+	 * Use spinlock to ensure index doesn't change while it gets
-+	 * dereferenced multiple times within a spinlock block elsewhere.
-+	 */
-+	spin_lock(&drvdata->spinlock);
-+	drvdata->ctxid_idx = val;
-+	spin_unlock(&drvdata->spinlock);
-+	return size;
-+}
-+static DEVICE_ATTR_RW(ctxid_idx);
-+
-+static ssize_t ctxid_val_show(struct device *dev,
-+			      struct device_attribute *attr,
-+			      char *buf)
-+{
-+	u8 idx;
-+	unsigned long val;
-+	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
-+
-+	spin_lock(&drvdata->spinlock);
-+	idx = drvdata->ctxid_idx;
-+	val = (unsigned long)drvdata->ctxid_val[idx];
-+	spin_unlock(&drvdata->spinlock);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
-+}
-+
-+static ssize_t ctxid_val_store(struct device *dev,
-+			       struct device_attribute *attr,
-+			       const char *buf, size_t size)
-+{
-+	u8 idx;
-+	unsigned long val;
-+	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
-+
-+	/*
-+	 * only implemented when ctxid tracing is enabled, i.e. at least one
-+	 * ctxid comparator is implemented and ctxid is greater than 0 bits
-+	 * in length
-+	 */
-+	if (!drvdata->ctxid_size || !drvdata->numcidc)
-+		return -EINVAL;
-+	if (kstrtoul(buf, 16, &val))
-+		return -EINVAL;
-+
-+	spin_lock(&drvdata->spinlock);
-+	idx = drvdata->ctxid_idx;
-+	drvdata->ctxid_val[idx] = (u64)val;
-+	spin_unlock(&drvdata->spinlock);
-+	return size;
-+}
-+static DEVICE_ATTR_RW(ctxid_val);
-+
-+static ssize_t ctxid_masks_show(struct device *dev,
-+				struct device_attribute *attr,
-+				char *buf)
-+{
-+	unsigned long val1, val2;
-+	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
-+
-+	spin_lock(&drvdata->spinlock);
-+	val1 = drvdata->ctxid_mask0;
-+	val2 = drvdata->ctxid_mask1;
-+	spin_unlock(&drvdata->spinlock);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx %#lx\n", val1, val2);
-+}
-+
-+static ssize_t ctxid_masks_store(struct device *dev,
-+				struct device_attribute *attr,
-+				const char *buf, size_t size)
-+{
-+	u8 i, j, maskbyte;
-+	unsigned long val1, val2, mask;
-+	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
-+
-+	/*
-+	 * only implemented when ctxid tracing is enabled, i.e. at least one
-+	 * ctxid comparator is implemented and ctxid is greater than 0 bits
-+	 * in length
-+	 */
-+	if (!drvdata->ctxid_size || !drvdata->numcidc)
-+		return -EINVAL;
-+	if (sscanf(buf, "%lx %lx", &val1, &val2) != 2)
-+		return -EINVAL;
-+
-+	spin_lock(&drvdata->spinlock);
-+	/*
-+	 * each byte[0..3] controls mask value applied to ctxid
-+	 * comparator[0..3]
-+	 */
-+	switch (drvdata->numcidc) {
-+	case 0x1:
-+		/* COMP0, bits[7:0] */
-+		drvdata->ctxid_mask0 = val1 & 0xFF;
-+		break;
-+	case 0x2:
-+		/* COMP1, bits[15:8] */
-+		drvdata->ctxid_mask0 = val1 & 0xFFFF;
-+		break;
-+	case 0x3:
-+		/* COMP2, bits[23:16] */
-+		drvdata->ctxid_mask0 = val1 & 0xFFFFFF;
-+		break;
-+	case 0x4:
-+		 /* COMP3, bits[31:24] */
-+		drvdata->ctxid_mask0 = val1;
-+		break;
-+	case 0x5:
-+		/* COMP4, bits[7:0] */
-+		drvdata->ctxid_mask0 = val1;
-+		drvdata->ctxid_mask1 = val2 & 0xFF;
-+		break;
-+	case 0x6:
-+		/* COMP5, bits[15:8] */
-+		drvdata->ctxid_mask0 = val1;
-+		drvdata->ctxid_mask1 = val2 & 0xFFFF;
-+		break;
-+	case 0x7:
-+		/* COMP6, bits[23:16] */
-+		drvdata->ctxid_mask0 = val1;
-+		drvdata->ctxid_mask1 = val2 & 0xFFFFFF;
-+		break;
-+	case 0x8:
-+		/* COMP7, bits[31:24] */
-+		drvdata->ctxid_mask0 = val1;
-+		drvdata->ctxid_mask1 = val2;
-+		break;
-+	default:
-+		break;
-+	}
-+	/*
-+	 * If software sets a mask bit to 1, it must program relevant byte
-+	 * of ctxid comparator value 0x0, otherwise behavior is unpredictable.
-+	 * For example, if bit[3] of ctxid_mask0 is 1, we must clear bits[31:24]
-+	 * of ctxid comparator0 value (corresponding to byte 0) register.
-+	 */
-+	mask = drvdata->ctxid_mask0;
-+	for (i = 0; i < drvdata->numcidc; i++) {
-+		/* mask value of corresponding ctxid comparator */
-+		maskbyte = mask & ETMv4_EVENT_MASK;
-+		/*
-+		 * each bit corresponds to a byte of respective ctxid comparator
-+		 * value register
-+		 */
-+		for (j = 0; j < 8; j++) {
-+			if (maskbyte & 1)
-+				drvdata->ctxid_val[i] &= ~(0xFF << (j * 8));
-+			maskbyte >>= 1;
-+		}
-+		/* Select the next ctxid comparator mask value */
-+		if (i == 3)
-+			/* ctxid comparators[4-7] */
-+			mask = drvdata->ctxid_mask1;
-+		else
-+			mask >>= 0x8;
-+	}
-+
-+	spin_unlock(&drvdata->spinlock);
-+	return size;
-+}
-+static DEVICE_ATTR_RW(ctxid_masks);
-+
- static ssize_t cpu_show(struct device *dev,
- 			struct device_attribute *attr, char *buf)
- {
-@@ -1832,6 +2016,9 @@ static struct attribute *coresight_etmv4_attrs[] = {
- 	&dev_attr_cntr_ctrl.attr,
- 	&dev_attr_res_idx.attr,
- 	&dev_attr_res_ctrl.attr,
-+	&dev_attr_ctxid_idx.attr,
-+	&dev_attr_ctxid_val.attr,
-+	&dev_attr_ctxid_masks.attr,
- 	&dev_attr_cpu.attr,
+@@ -2238,6 +2238,37 @@ static struct attribute *coresight_etmv4_mgmt_attrs[] = {
  	NULL,
  };
+ 
++coresight_simple_func(trcidr0, TRCIDR0);
++coresight_simple_func(trcidr1, TRCIDR1);
++coresight_simple_func(trcidr2, TRCIDR2);
++coresight_simple_func(trcidr3, TRCIDR3);
++coresight_simple_func(trcidr4, TRCIDR4);
++coresight_simple_func(trcidr5, TRCIDR5);
++/* trcidr[6,7] are reserved */
++coresight_simple_func(trcidr8, TRCIDR8);
++coresight_simple_func(trcidr9, TRCIDR9);
++coresight_simple_func(trcidr10, TRCIDR10);
++coresight_simple_func(trcidr11, TRCIDR11);
++coresight_simple_func(trcidr12, TRCIDR12);
++coresight_simple_func(trcidr13, TRCIDR13);
++
++static struct attribute *coresight_etmv4_trcidr_attrs[] = {
++	&dev_attr_trcidr0.attr,
++	&dev_attr_trcidr1.attr,
++	&dev_attr_trcidr2.attr,
++	&dev_attr_trcidr3.attr,
++	&dev_attr_trcidr4.attr,
++	&dev_attr_trcidr5.attr,
++	/* trcidr[6,7] are reserved */
++	&dev_attr_trcidr8.attr,
++	&dev_attr_trcidr9.attr,
++	&dev_attr_trcidr10.attr,
++	&dev_attr_trcidr11.attr,
++	&dev_attr_trcidr12.attr,
++	&dev_attr_trcidr13.attr,
++	NULL,
++};
++
+ static const struct attribute_group coresight_etmv4_group = {
+ 	.attrs = coresight_etmv4_attrs,
+ };
+@@ -2247,9 +2278,15 @@ static const struct attribute_group coresight_etmv4_mgmt_group = {
+ 	.name = "mgmt",
+ };
+ 
++static const struct attribute_group coresight_etmv4_trcidr_group = {
++	.attrs = coresight_etmv4_trcidr_attrs,
++	.name = "trcidr",
++};
++
+ static const struct attribute_group *coresight_etmv4_groups[] = {
+ 	&coresight_etmv4_group,
+ 	&coresight_etmv4_mgmt_group,
++	&coresight_etmv4_trcidr_group,
+ 	NULL,
+ };
+ 
 -- 
 1.9.1
