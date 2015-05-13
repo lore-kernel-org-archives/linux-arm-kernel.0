@@ -1,315 +1,597 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 13 May 2015 14:12:46 +0100
-Subject: [PATCH v2 1/2] ARM64: kernel: make cpu_ops hooks DT agnostic
+Date: Wed, 13 May 2015 14:12:47 +0100
+Subject: [PATCH v2 2/2] ARM64: kernel: unify ACPI and DT cpus initialization
 In-Reply-To: <1431522769-11276-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1431522769-11276-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1431522769-11276-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1431522769-11276-3-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM64 CPU operations such as cpu_init and cpu_init_idle take
-a struct device_node pointer as a parameter, which corresponds to
-the device tree node of the logical cpu on which the operation
-has to be applied.
+The code that initializes cpus on arm64 is currently split in two
+different code paths that carry out DT and ACPI cpus initialization.
 
-With the advent of ACPI on arm64, where MADT static table entries
-are used to initialize cpus, the device tree node parameter
-in cpu_ops hooks become useless when booting with ACPI, since
-in that case cpu device tree nodes are not present and can not be
-used for cpu initialization.
+Most of the code executing SMP initialization is common and should
+be merged to reduce discrepancies between ACPI and DT initialization
+and to have code initializing cpus in a single common place in the
+kernel.
 
-The current cpu_init hook requires a struct device_node pointer
-parameter because it is called while parsing the device tree to
-initialize CPUs, when the cpu_logical_map (that is used to match
-a cpu node reg property to a device tree node) for a given logical
-cpu id is not set up yet. This means that the cpu_init hook cannot
-rely on the of_get_cpu_node function to retrieve the device tree
-node corresponding to the logical cpu id passed in as parameter,
-so the cpu device tree node must be passed in as a parameter to fix
-this catch-22 dependency cycle.
+This patch refactors arm64 SMP cpus initialization code to merge
+ACPI and DT boot paths in a common file and to create sanity
+checks that can be reused by both boot methods.
 
-This patch reshuffles the cpu_logical_map initialization code so
-that the cpu_init cpu_ops hook can safely use the of_get_cpu_node
-function to retrieve the cpu device tree node, removing the need for
-the device tree node pointer parameter.
+Current code assumes PSCI is the only available boot method
+when arm64 boots with ACPI; this can be easily extended if/when
+the ACPI parking protocol is merged into the kernel.
 
-In the process, the patch removes device tree node parameters
-from all cpu_ops hooks, in preparation for SMP DT/ACPI cpus
-initialization consolidation.
-
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
 Acked-by: Mark Rutland <mark.rutland@arm.com>
 Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
 Tested-by: Mark Rutland <mark.rutland@arm.com> [DT]
 Cc: Will Deacon <will.deacon@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/cpu_ops.h   | 26 ++++++++++++++-----------
- arch/arm64/kernel/acpi.c           |  2 +-
- arch/arm64/kernel/cpu_ops.c        | 23 +++++++++++-----------
- arch/arm64/kernel/cpuidle.c        |  7 +------
- arch/arm64/kernel/psci.c           | 11 +++++++----
- arch/arm64/kernel/smp.c            | 39 +++++++++++++++++++++++++++-----------
- arch/arm64/kernel/smp_spin_table.c |  8 +++++++-
- 7 files changed, 70 insertions(+), 46 deletions(-)
+ arch/arm64/include/asm/acpi.h    |   4 +
+ arch/arm64/include/asm/cpu_ops.h |   1 -
+ arch/arm64/include/asm/smp.h     |   2 +-
+ arch/arm64/kernel/acpi.c         | 124 -------------------------
+ arch/arm64/kernel/cpu_ops.c      |  65 ++++++++-----
+ arch/arm64/kernel/setup.c        |   7 +-
+ arch/arm64/kernel/smp.c          | 191 ++++++++++++++++++++++++++++++---------
+ 7 files changed, 196 insertions(+), 198 deletions(-)
 
+diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+index 59c05d8..1240b86 100644
+--- a/arch/arm64/include/asm/acpi.h
++++ b/arch/arm64/include/asm/acpi.h
+@@ -93,4 +93,8 @@ static inline bool acpi_psci_use_hvc(void) { return false; }
+ static inline void acpi_init_cpus(void) { }
+ #endif /* CONFIG_ACPI */
+ 
++static inline const char *acpi_get_enable_method(int cpu)
++{
++	return acpi_psci_present() ? "psci" : NULL;
++}
+ #endif /*_ASM_ACPI_H*/
 diff --git a/arch/arm64/include/asm/cpu_ops.h b/arch/arm64/include/asm/cpu_ops.h
-index 5a31d67..7d8b999 100644
+index 7d8b999..8f03446 100644
 --- a/arch/arm64/include/asm/cpu_ops.h
 +++ b/arch/arm64/include/asm/cpu_ops.h
-@@ -19,15 +19,15 @@
- #include <linux/init.h>
- #include <linux/threads.h>
- 
--struct device_node;
--
- /**
-  * struct cpu_operations - Callback operations for hotplugging CPUs.
-  *
-  * @name:	Name of the property as appears in a devicetree cpu node's
-- *		enable-method property.
-- * @cpu_init:	Reads any data necessary for a specific enable-method from the
-- *		devicetree, for a given cpu node and proposed logical id.
-+ *		enable-method property. On systems booting with ACPI, @name
-+ *		identifies the struct cpu_operations entry corresponding to
-+ *		the boot protocol specified in the ACPI MADT table.
-+ * @cpu_init:	Reads any data necessary for a specific enable-method for a
-+ *		proposed logical id.
-  * @cpu_prepare: Early one-time preparation step for a cpu. If there is a
-  *		mechanism for doing so, tests whether it is possible to boot
-  *		the given CPU.
-@@ -40,15 +40,15 @@ struct device_node;
-  * @cpu_die:	Makes a cpu leave the kernel. Must not fail. Called from the
-  *		cpu being killed.
-  * @cpu_kill:  Ensures a cpu has left the kernel. Called from another cpu.
-- * @cpu_init_idle: Reads any data necessary to initialize CPU idle states from
-- *		devicetree, for a given cpu node and proposed logical id.
-+ * @cpu_init_idle: Reads any data necessary to initialize CPU idle states for
-+ *		   a proposed logical id.
-  * @cpu_suspend: Suspends a cpu and saves the required context. May fail owing
-  *               to wrong parameters or error conditions. Called from the
-  *               CPU being suspended. Must be called with IRQs disabled.
-  */
- struct cpu_operations {
- 	const char	*name;
--	int		(*cpu_init)(struct device_node *, unsigned int);
-+	int		(*cpu_init)(unsigned int);
- 	int		(*cpu_prepare)(unsigned int);
- 	int		(*cpu_boot)(unsigned int);
- 	void		(*cpu_postboot)(void);
-@@ -58,14 +58,18 @@ struct cpu_operations {
- 	int		(*cpu_kill)(unsigned int cpu);
- #endif
- #ifdef CONFIG_CPU_IDLE
--	int		(*cpu_init_idle)(struct device_node *, unsigned int);
-+	int		(*cpu_init_idle)(unsigned int);
- 	int		(*cpu_suspend)(unsigned long);
- #endif
- };
+@@ -65,7 +65,6 @@ struct cpu_operations {
  
  extern const struct cpu_operations *cpu_ops[NR_CPUS];
--int __init cpu_read_ops(struct device_node *dn, int cpu);
--void __init cpu_read_bootcpu_ops(void);
-+int __init cpu_read_ops(int cpu);
- const struct cpu_operations *cpu_get_ops(const char *name);
+ int __init cpu_read_ops(int cpu);
+-const struct cpu_operations *cpu_get_ops(const char *name);
  
-+static inline void __init cpu_read_bootcpu_ops(void)
-+{
-+	cpu_read_ops(0);
-+}
-+
- #endif /* ifndef __ASM_CPU_OPS_H */
+ static inline void __init cpu_read_bootcpu_ops(void)
+ {
+diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
+index bf22650..db02be8 100644
+--- a/arch/arm64/include/asm/smp.h
++++ b/arch/arm64/include/asm/smp.h
+@@ -42,7 +42,7 @@ extern void handle_IPI(int ipinr, struct pt_regs *regs);
+  * Discover the set of possible CPUs and determine their
+  * SMP operations.
+  */
+-extern void of_smp_init_cpus(void);
++extern void smp_init_cpus(void);
+ 
+ /*
+  * Provide a function to raise an IPI cross call on CPUs in callmap.
 diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index 8b83955..945cc1f 100644
+index 945cc1f..732f57b 100644
 --- a/arch/arm64/kernel/acpi.c
 +++ b/arch/arm64/kernel/acpi.c
-@@ -154,7 +154,7 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
- 		if (!cpu_ops[enabled_cpus])
- 			return;
+@@ -36,12 +36,6 @@ EXPORT_SYMBOL(acpi_disabled);
+ int acpi_pci_disabled = 1;	/* skip ACPI PCI scan and IRQ initialization */
+ EXPORT_SYMBOL(acpi_pci_disabled);
  
--		if (cpu_ops[enabled_cpus]->cpu_init(NULL, enabled_cpus))
-+		if (cpu_ops[enabled_cpus]->cpu_init(enabled_cpus))
- 			return;
- 
- 		/* map the logical cpu id to cpu MPIDR */
-diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
-index fb8ff9b..bbda2d2 100644
---- a/arch/arm64/kernel/cpu_ops.c
-+++ b/arch/arm64/kernel/cpu_ops.c
-@@ -52,9 +52,18 @@ const struct cpu_operations * __init cpu_get_ops(const char *name)
- /*
-  * Read a cpu's enable method from the device tree and record it in cpu_ops.
-  */
--int __init cpu_read_ops(struct device_node *dn, int cpu)
-+int __init cpu_read_ops(int cpu)
- {
--	const char *enable_method = of_get_property(dn, "enable-method", NULL);
-+	const char *enable_method;
-+	struct device_node *dn = of_get_cpu_node(cpu, NULL);
-+
-+	if (!dn) {
-+		if (!cpu)
-+			pr_err("Failed to find device node for boot cpu\n");
-+		return -ENODEV;
-+	}
-+
-+	enable_method = of_get_property(dn, "enable-method", NULL);
- 	if (!enable_method) {
- 		/*
- 		 * The boot CPU may not have an enable method (e.g. when
-@@ -75,13 +84,3 @@ int __init cpu_read_ops(struct device_node *dn, int cpu)
- 
- 	return 0;
- }
+-/* Processors with enabled flag and sane MPIDR */
+-static int enabled_cpus;
 -
--void __init cpu_read_bootcpu_ops(void)
+-/* Boot CPU is valid or not in MADT */
+-static bool bootcpu_valid  __initdata;
+-
+ static bool param_acpi_off __initdata;
+ static bool param_acpi_force __initdata;
+ 
+@@ -95,124 +89,6 @@ void __init __acpi_unmap_table(char *map, unsigned long size)
+ 	early_memunmap(map, size);
+ }
+ 
+-/**
+- * acpi_map_gic_cpu_interface - generates a logical cpu number
+- * and map to MPIDR represented by GICC structure
+- */
+-static void __init
+-acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
 -{
--	struct device_node *dn = of_get_cpu_node(0, NULL);
--	if (!dn) {
--		pr_err("Failed to find device node for boot cpu\n");
+-	int i;
+-	u64 mpidr = processor->arm_mpidr & MPIDR_HWID_BITMASK;
+-	bool enabled = !!(processor->flags & ACPI_MADT_ENABLED);
+-
+-	if (mpidr == INVALID_HWID) {
+-		pr_info("Skip MADT cpu entry with invalid MPIDR\n");
 -		return;
 -	}
--	cpu_read_ops(dn, 0);
--}
-diff --git a/arch/arm64/kernel/cpuidle.c b/arch/arm64/kernel/cpuidle.c
-index a78143a..f8aa169 100644
---- a/arch/arm64/kernel/cpuidle.c
-+++ b/arch/arm64/kernel/cpuidle.c
-@@ -18,15 +18,10 @@
- int arm_cpuidle_init(unsigned int cpu)
- {
- 	int ret = -EOPNOTSUPP;
--	struct device_node *cpu_node = of_cpu_device_node_get(cpu);
 -
--	if (!cpu_node)
--		return -ENODEV;
+-	total_cpus++;
+-	if (!enabled)
+-		return;
+-
+-	if (enabled_cpus >=  NR_CPUS) {
+-		pr_warn("NR_CPUS limit of %d reached, Processor %d/0x%llx ignored.\n",
+-			NR_CPUS, total_cpus, mpidr);
+-		return;
+-	}
+-
+-	/* Check if GICC structure of boot CPU is available in the MADT */
+-	if (cpu_logical_map(0) == mpidr) {
+-		if (bootcpu_valid) {
+-			pr_err("Firmware bug, duplicate CPU MPIDR: 0x%llx in MADT\n",
+-			       mpidr);
+-			return;
+-		}
+-
+-		bootcpu_valid = true;
+-	}
+-
+-	/*
+-	 * Duplicate MPIDRs are a recipe for disaster. Scan
+-	 * all initialized entries and check for
+-	 * duplicates. If any is found just ignore the CPU.
+-	 */
+-	for (i = 1; i < enabled_cpus; i++) {
+-		if (cpu_logical_map(i) == mpidr) {
+-			pr_err("Firmware bug, duplicate CPU MPIDR: 0x%llx in MADT\n",
+-			       mpidr);
+-			return;
+-		}
+-	}
+-
+-	if (!acpi_psci_present())
+-		return;
+-
+-	cpu_ops[enabled_cpus] = cpu_get_ops("psci");
+-	/* CPU 0 was already initialized */
+-	if (enabled_cpus) {
+-		if (!cpu_ops[enabled_cpus])
+-			return;
+-
+-		if (cpu_ops[enabled_cpus]->cpu_init(enabled_cpus))
+-			return;
+-
+-		/* map the logical cpu id to cpu MPIDR */
+-		cpu_logical_map(enabled_cpus) = mpidr;
+-	}
+-
+-	enabled_cpus++;
+-}
+-
+-static int __init
+-acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
+-				const unsigned long end)
+-{
+-	struct acpi_madt_generic_interrupt *processor;
+-
+-	processor = (struct acpi_madt_generic_interrupt *)header;
+-
+-	if (BAD_MADT_ENTRY(processor, end))
+-		return -EINVAL;
+-
+-	acpi_table_print_madt_entry(header);
+-	acpi_map_gic_cpu_interface(processor);
+-	return 0;
+-}
+-
+-/* Parse GIC cpu interface entries in MADT for SMP init */
+-void __init acpi_init_cpus(void)
+-{
+-	int count, i;
+-
+-	/*
+-	 * do a partial walk of MADT to determine how many CPUs
+-	 * we have including disabled CPUs, and get information
+-	 * we need for SMP init
+-	 */
+-	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
+-			acpi_parse_gic_cpu_interface, 0);
+-
+-	if (!count) {
+-		pr_err("No GIC CPU interface entries present\n");
+-		return;
+-	} else if (count < 0) {
+-		pr_err("Error parsing GIC CPU interface entry\n");
+-		return;
+-	}
+-
+-	if (!bootcpu_valid) {
+-		pr_err("MADT missing boot CPU MPIDR, not enabling secondaries\n");
+-		return;
+-	}
+-
+-	for (i = 0; i < enabled_cpus; i++)
+-		set_cpu_possible(i, true);
+-
+-	/* Make boot-up look pretty */
+-	pr_info("%d CPUs enabled, %d CPUs total\n", enabled_cpus, total_cpus);
+-}
+-
+ /*
+  * acpi_fadt_sanity_check() - Check FADT presence and carry out sanity
+  *			      checks on it
+diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
+index bbda2d2..5ea337d 100644
+--- a/arch/arm64/kernel/cpu_ops.c
++++ b/arch/arm64/kernel/cpu_ops.c
+@@ -16,11 +16,13 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
  
- 	if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_init_idle)
--		ret = cpu_ops[cpu]->cpu_init_idle(cpu_node, cpu);
-+		ret = cpu_ops[cpu]->cpu_init_idle(cpu);
+-#include <asm/cpu_ops.h>
+-#include <asm/smp_plat.h>
++#include <linux/acpi.h>
+ #include <linux/errno.h>
+ #include <linux/of.h>
+ #include <linux/string.h>
++#include <asm/acpi.h>
++#include <asm/cpu_ops.h>
++#include <asm/smp_plat.h>
  
--	of_node_put(cpu_node);
- 	return ret;
- }
+ extern const struct cpu_operations smp_spin_table_ops;
+ extern const struct cpu_operations cpu_psci_ops;
+@@ -35,7 +37,7 @@ static const struct cpu_operations *supported_cpu_ops[] __initconst = {
+ 	NULL,
+ };
  
-diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-index ea18cb5..efe3480 100644
---- a/arch/arm64/kernel/psci.c
-+++ b/arch/arm64/kernel/psci.c
-@@ -186,12 +186,15 @@ static int psci_migrate_info_type(void)
- 	return err;
- }
- 
--static int __maybe_unused cpu_psci_cpu_init_idle(struct device_node *cpu_node,
--						 unsigned int cpu)
-+static int __maybe_unused cpu_psci_cpu_init_idle(unsigned int cpu)
+-const struct cpu_operations * __init cpu_get_ops(const char *name)
++static const struct cpu_operations * __init cpu_get_ops(const char *name)
  {
- 	int i, ret, count = 0;
- 	struct psci_power_state *psci_states;
--	struct device_node *state_node;
-+	struct device_node *state_node, *cpu_node;
+ 	const struct cpu_operations **ops = supported_cpu_ops;
+ 
+@@ -49,36 +51,51 @@ const struct cpu_operations * __init cpu_get_ops(const char *name)
+ 	return NULL;
+ }
+ 
++static const char *__init cpu_read_enable_method(int cpu)
++{
++	const char *enable_method;
 +
-+	cpu_node = of_get_cpu_node(cpu, NULL);
-+	if (!cpu_node)
-+		return -ENODEV;
- 
- 	/*
- 	 * If the PSCI cpu_suspend function hook has not been initialized
-@@ -444,7 +447,7 @@ int __init psci_acpi_init(void)
- 
- #ifdef CONFIG_SMP
- 
--static int __init cpu_psci_cpu_init(struct device_node *dn, unsigned int cpu)
-+static int __init cpu_psci_cpu_init(unsigned int cpu)
++	if (acpi_disabled) {
++		struct device_node *dn = of_get_cpu_node(cpu, NULL);
++
++		if (!dn) {
++			if (!cpu)
++				pr_err("Failed to find device node for boot cpu\n");
++			return NULL;
++		}
++
++		enable_method = of_get_property(dn, "enable-method", NULL);
++		if (!enable_method) {
++			/*
++			 * The boot CPU may not have an enable method (e.g.
++			 * when spin-table is used for secondaries).
++			 * Don't warn spuriously.
++			 */
++			if (cpu != 0)
++				pr_err("%s: missing enable-method property\n",
++					dn->full_name);
++		}
++	} else {
++		enable_method = acpi_get_enable_method(cpu);
++		if (!enable_method)
++			pr_err("Unsupported ACPI enable-method\n");
++	}
++
++	return enable_method;
++}
+ /*
+- * Read a cpu's enable method from the device tree and record it in cpu_ops.
++ * Read a cpu's enable method and record it in cpu_ops.
+  */
+ int __init cpu_read_ops(int cpu)
  {
- 	return 0;
- }
+-	const char *enable_method;
+-	struct device_node *dn = of_get_cpu_node(cpu, NULL);
++	const char *enable_method = cpu_read_enable_method(cpu);
+ 
+-	if (!dn) {
+-		if (!cpu)
+-			pr_err("Failed to find device node for boot cpu\n");
++	if (!enable_method)
+ 		return -ENODEV;
+-	}
+-
+-	enable_method = of_get_property(dn, "enable-method", NULL);
+-	if (!enable_method) {
+-		/*
+-		 * The boot CPU may not have an enable method (e.g. when
+-		 * spin-table is used for secondaries). Don't warn spuriously.
+-		 */
+-		if (cpu != 0)
+-			pr_err("%s: missing enable-method property\n",
+-				dn->full_name);
+-		return -ENOENT;
+-	}
+ 
+ 	cpu_ops[cpu] = cpu_get_ops(enable_method);
+ 	if (!cpu_ops[cpu]) {
+-		pr_warn("%s: unsupported enable-method property: %s\n",
+-			dn->full_name, enable_method);
++		pr_warn("Unsupported enable-method: %s\n", enable_method);
+ 		return -EOPNOTSUPP;
+ 	}
+ 
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 7475313..508cca1 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -408,16 +408,13 @@ void __init setup_arch(char **cmdline_p)
+ 	if (acpi_disabled) {
+ 		unflatten_device_tree();
+ 		psci_dt_init();
+-		cpu_read_bootcpu_ops();
+-#ifdef CONFIG_SMP
+-		of_smp_init_cpus();
+-#endif
+ 	} else {
+ 		psci_acpi_init();
+-		acpi_init_cpus();
+ 	}
+ 
++	cpu_read_bootcpu_ops();
+ #ifdef CONFIG_SMP
++	smp_init_cpus();
+ 	smp_build_mpidr_hash();
+ #endif
+ 
 diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 2cb0081..98eb68b 100644
+index 98eb68b..b698208 100644
 --- a/arch/arm64/kernel/smp.c
 +++ b/arch/arm64/kernel/smp.c
-@@ -319,6 +319,23 @@ void __init smp_prepare_boot_cpu(void)
+@@ -17,6 +17,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
++#include <linux/acpi.h>
+ #include <linux/delay.h>
+ #include <linux/init.h>
+ #include <linux/spinlock.h>
+@@ -318,6 +319,49 @@ void __init smp_prepare_boot_cpu(void)
+ 	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
  }
  
- /*
-+ * Initialize cpu operations for a logical cpu and
-+ * set it in the possible mask on success
-+ */
-+static int __init smp_cpu_setup(int cpu)
++static u64 __init of_get_cpu_mpidr(struct device_node *dn)
 +{
-+	if (cpu_read_ops(cpu))
-+		return -ENODEV;
++	const __be32 *cell;
++	u64 hwid;
 +
-+	if (cpu_ops[cpu]->cpu_init(cpu))
-+		return -ENODEV;
++	/*
++	 * A cpu node with missing "reg" property is
++	 * considered invalid to build a cpu_logical_map
++	 * entry.
++	 */
++	cell = of_get_property(dn, "reg", NULL);
++	if (!cell) {
++		pr_err("%s: missing reg property\n", dn->full_name);
++		return INVALID_HWID;
++	}
 +
-+	set_cpu_possible(cpu, true);
-+
-+	return 0;
++	hwid = of_read_number(cell, of_n_addr_cells(dn));
++	/*
++	 * Non affinity bits must be set to 0 in the DT
++	 */
++	if (hwid & ~MPIDR_HWID_BITMASK) {
++		pr_err("%s: invalid reg property\n", dn->full_name);
++		return INVALID_HWID;
++	}
++	return hwid;
 +}
 +
 +/*
++ * Duplicate MPIDRs are a recipe for disaster. Scan all initialized
++ * entries and check for duplicates. If any is found just ignore the
++ * cpu. cpu_logical_map was initialized to INVALID_HWID to avoid
++ * matching valid MPIDR values.
++ */
++static bool __init is_mpidr_duplicate(unsigned int cpu, u64 hwid)
++{
++	unsigned int i;
++
++	for (i = 1; (i < cpu) && (i < NR_CPUS); i++)
++		if (cpu_logical_map(i) == hwid)
++			return true;
++	return false;
++}
++
+ /*
+  * Initialize cpu operations for a logical cpu and
+  * set it in the possible mask on success
+@@ -335,57 +379,98 @@ static int __init smp_cpu_setup(int cpu)
+ 	return 0;
+ }
+ 
++static bool bootcpu_valid __initdata;
++static unsigned int cpu_count = 1;
++
++#ifdef CONFIG_ACPI
++/*
++ * acpi_map_gic_cpu_interface - parse processor MADT entry
++ *
++ * Carry out sanity checks on MADT processor entry and initialize
++ * cpu_logical_map on success
++ */
++static void __init
++acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
++{
++	u64 hwid = processor->arm_mpidr;
++
++	if (hwid & ~MPIDR_HWID_BITMASK || hwid == INVALID_HWID) {
++		pr_err("skipping CPU entry with invalid MPIDR 0x%llx\n", hwid);
++		return;
++	}
++
++	if (!(processor->flags & ACPI_MADT_ENABLED)) {
++		pr_err("skipping disabled CPU entry with 0x%llx MPIDR\n", hwid);
++		return;
++	}
++
++	if (is_mpidr_duplicate(cpu_count, hwid)) {
++		pr_err("duplicate CPU MPIDR 0x%llx in MADT\n", hwid);
++		return;
++	}
++
++	/* Check if GICC structure of boot CPU is available in the MADT */
++	if (cpu_logical_map(0) == hwid) {
++		if (bootcpu_valid) {
++			pr_err("duplicate boot CPU MPIDR: 0x%llx in MADT\n",
++			       hwid);
++			return;
++		}
++		bootcpu_valid = true;
++		return;
++	}
++
++	if (cpu_count >= NR_CPUS)
++		return;
++
++	/* map the logical cpu id to cpu MPIDR */
++	cpu_logical_map(cpu_count) = hwid;
++
++	cpu_count++;
++}
++
++static int __init
++acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
++			     const unsigned long end)
++{
++	struct acpi_madt_generic_interrupt *processor;
++
++	processor = (struct acpi_madt_generic_interrupt *)header;
++	if (BAD_MADT_ENTRY(processor, end))
++		return -EINVAL;
++
++	acpi_table_print_madt_entry(header);
++
++	acpi_map_gic_cpu_interface(processor);
++
++	return 0;
++}
++#else
++#define acpi_table_parse_madt(...)	do { } while (0)
++#endif
++
+ /*
   * Enumerate the possible CPU set from the device tree and build the
   * cpu logical map array containing MPIDR values related to logical
   * cpus. Assumes that cpu_logical_map(0) has already been initialized.
-@@ -395,12 +412,6 @@ void __init of_smp_init_cpus(void)
- 		if (cpu >= NR_CPUS)
+  */
+-void __init of_smp_init_cpus(void)
++void __init of_parse_and_init_cpus(void)
+ {
+ 	struct device_node *dn = NULL;
+-	unsigned int i, cpu = 1;
+-	bool bootcpu_valid = false;
+ 
+ 	while ((dn = of_find_node_by_type(dn, "cpu"))) {
+-		const u32 *cell;
+-		u64 hwid;
++		u64 hwid = of_get_cpu_mpidr(dn);
+ 
+-		/*
+-		 * A cpu node with missing "reg" property is
+-		 * considered invalid to build a cpu_logical_map
+-		 * entry.
+-		 */
+-		cell = of_get_property(dn, "reg", NULL);
+-		if (!cell) {
+-			pr_err("%s: missing reg property\n", dn->full_name);
++		if (hwid == INVALID_HWID)
+ 			goto next;
+-		}
+-		hwid = of_read_number(cell, of_n_addr_cells(dn));
+ 
+-		/*
+-		 * Non affinity bits must be set to 0 in the DT
+-		 */
+-		if (hwid & ~MPIDR_HWID_BITMASK) {
+-			pr_err("%s: invalid reg property\n", dn->full_name);
++		if (is_mpidr_duplicate(cpu_count, hwid)) {
++			pr_err("%s: duplicate cpu reg properties in the DT\n",
++				dn->full_name);
+ 			goto next;
+ 		}
+ 
+ 		/*
+-		 * Duplicate MPIDRs are a recipe for disaster. Scan
+-		 * all initialized entries and check for
+-		 * duplicates. If any is found just ignore the cpu.
+-		 * cpu_logical_map was initialized to INVALID_HWID to
+-		 * avoid matching valid MPIDR values.
+-		 */
+-		for (i = 1; (i < cpu) && (i < NR_CPUS); i++) {
+-			if (cpu_logical_map(i) == hwid) {
+-				pr_err("%s: duplicate cpu reg properties in the DT\n",
+-					dn->full_name);
+-				goto next;
+-			}
+-		}
+-
+-		/*
+ 		 * The numbering scheme requires that the boot CPU
+ 		 * must be assigned logical id 0. Record it so that
+ 		 * the logical map built from DT is validated and can
+@@ -409,22 +494,42 @@ void __init of_smp_init_cpus(void)
+ 			continue;
+ 		}
+ 
+-		if (cpu >= NR_CPUS)
++		if (cpu_count >= NR_CPUS)
  			goto next;
  
--		if (cpu_read_ops(dn, cpu) != 0)
--			goto next;
--
--		if (cpu_ops[cpu]->cpu_init(dn, cpu))
--			goto next;
--
  		pr_debug("cpu logical map 0x%llx\n", hwid);
- 		cpu_logical_map(cpu) = hwid;
+-		cpu_logical_map(cpu) = hwid;
++		cpu_logical_map(cpu_count) = hwid;
  next:
-@@ -418,12 +429,18 @@ next:
+-		cpu++;
++		cpu_count++;
+ 	}
++}
++
++/*
++ * Enumerate the possible CPU set from the device tree or ACPI and build the
++ * cpu logical map array containing MPIDR values related to logical
++ * cpus. Assumes that cpu_logical_map(0) has already been initialized.
++ */
++void __init smp_init_cpus(void)
++{
++	int i;
++
++	if (acpi_disabled)
++		of_parse_and_init_cpus();
++	else
++		/*
++		 * do a walk of MADT to determine how many CPUs
++		 * we have including disabled CPUs, and get information
++		 * we need for SMP init
++		 */
++		acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
++				      acpi_parse_gic_cpu_interface, 0);
+ 
+-	/* sanity check */
+-	if (cpu > NR_CPUS)
+-		pr_warning("no. of cores (%d) greater than configured maximum of %d - clipping\n",
+-			   cpu, NR_CPUS);
++	if (cpu_count > NR_CPUS)
++		pr_warn("no. of cores (%d) greater than configured maximum of %d - clipping\n",
++			cpu_count, NR_CPUS);
+ 
+ 	if (!bootcpu_valid) {
+-		pr_err("DT missing boot CPU MPIDR, not enabling secondaries\n");
++		pr_err("missing boot CPU MPIDR, not enabling secondaries\n");
+ 		return;
  	}
  
- 	/*
--	 * All the cpus that made it to the cpu_logical_map have been
--	 * validated so set them as possible cpus.
-+	 * We need to set the cpu_logical_map entries before enabling
-+	 * the cpus so that cpu processor description entries (DT cpu nodes
-+	 * and ACPI MADT entries) can be retrieved by matching the cpu hwid
-+	 * with entries in cpu_logical_map while initializing the cpus.
-+	 * If the cpu set-up fails, invalidate the cpu_logical_map entry.
- 	 */
--	for (i = 0; i < NR_CPUS; i++)
--		if (cpu_logical_map(i) != INVALID_HWID)
--			set_cpu_possible(i, true);
-+	for (i = 1; i < NR_CPUS; i++) {
-+		if (cpu_logical_map(i) != INVALID_HWID) {
-+			if (smp_cpu_setup(i))
-+				cpu_logical_map(i) = INVALID_HWID;
-+		}
-+	}
- }
- 
- void __init smp_prepare_cpus(unsigned int max_cpus)
-diff --git a/arch/arm64/kernel/smp_spin_table.c b/arch/arm64/kernel/smp_spin_table.c
-index 14944e5..aef3605 100644
---- a/arch/arm64/kernel/smp_spin_table.c
-+++ b/arch/arm64/kernel/smp_spin_table.c
-@@ -49,8 +49,14 @@ static void write_pen_release(u64 val)
- }
- 
- 
--static int smp_spin_table_cpu_init(struct device_node *dn, unsigned int cpu)
-+static int smp_spin_table_cpu_init(unsigned int cpu)
- {
-+	struct device_node *dn;
-+
-+	dn = of_get_cpu_node(cpu, NULL);
-+	if (!dn)
-+		return -ENODEV;
-+
- 	/*
- 	 * Determine the address from which the CPU is polling.
- 	 */
 -- 
 2.2.1
