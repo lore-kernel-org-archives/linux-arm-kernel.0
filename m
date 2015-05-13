@@ -1,33 +1,119 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 13 May 2015 12:29:22 +0200
-Subject: [PATCH 1/2] ARM: ux500: add PERF_EVENTS to defconfig
-Message-ID: <1431512962-24943-1-git-send-email-linus.walleij@linaro.org>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Wed, 13 May 2015 11:32:52 +0100
+Subject: [PATCH v5 0/6] arm64,hi6220: Enable Hisilicon Hi6220 SoC
+In-Reply-To: <55532730.4080503@huawei.com>
+References: <1431007225-8513-1-git-send-email-bintian.wang@huawei.com>
+ <55532730.4080503@huawei.com>
+Message-ID: <55532854.1050908@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Ux500 has a perfectly working PMU so let's put the perf
-events into the defconfig. This will activate HW_PERF_EVENTS
-by default.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ARM SoC people: please apply this directly to the ARM SoC
-tree in an appropriate place.
----
- arch/arm/configs/u8500_defconfig | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
-index 6a1c9898fd03..b4c6d34ef946 100644
---- a/arch/arm/configs/u8500_defconfig
-+++ b/arch/arm/configs/u8500_defconfig
-@@ -4,6 +4,7 @@ CONFIG_NO_HZ_IDLE=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_BLK_DEV_INITRD=y
- CONFIG_KALLSYMS_ALL=y
-+CONFIG_PERF_EVENTS=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
--- 
-1.9.3
+On 5/13/2015 11:28 AM, Bintian wrote:
+> Hello Wei,
+> 
+>>To be more specific here, I expect the patches to be picked up by Wei >Xu
+>>and forwarded to arm at kernel.org when he's made sure that everybody
+>>including himself is happy with the outcome.
+>>
+>>    Arnd
+
+Hi Bintian,
+
+> Could you help review and do those works based on Arnd's suggestion?
+
+I will prepare the pull request.
+Thanks!
+
+Best Regards,
+Wei
+
+> Thanks,
+> 
+> Also thanks to all engineers who help review/test this patch set.
+> 
+> Bintian
+> 
+> 
+> On 2015/5/7 22:00, Bintian Wang wrote:
+>> Hi6220 is one mobile solution of Hisilicon, this patchset contains
+>> initial support for Hi6220 SoC and HiKey development board, which
+>> supports octal ARM Cortex A53 cores. Initial support is minimal and
+>> includes just the arch configuration, clock driver, device tree
+>> configuration.
+>>
+>> PSCI is enabled in device tree and there is no problem to boot all the
+>> octal cores, and the CPU hotplug is also working now, you can download
+>> and compile the latest firmware based on the following link to run this
+>> patch set:
+>> https://github.com/96boards/documentation/wiki/UEFI
+>>
+>> Changes v5:
+>> * Rebase to kernel 4.1-rc2
+>> * Add compatible string "hisilicon,hi6220-pl011" for Hisilicon designed
+>>    UART
+>> * clk-hi6220.c: use __initdata for non-const arrays based on the commit
+>>    692d8328e8c039f9497eb862c6cf835de922c061
+>>
+>> Changes v4:
+>> * Rebase to kernel 4.1-rc1
+>> * Delete "arm,cortex-a15-gic" from the gic node in dts
+>>
+>> Changes v3:
+>> * Verified the CPU hotplug based on the new released firmware
+>> * Redefined the compatible strings of four system controllers in dts
+>> * Setting COMMON_CLK_HI6220 to a bool symbol
+>> * Keep CONFGI_ARCH_HISI sorted alphabetically
+>>
+>> Changes v2:
+>> * Split the DT bindings documents into earlier patches
+>> * Change SMP enable method from spin-table to PSCI in device tree
+>> * Remove "clock-frequency" from armv8-timer device node in device tree
+>> * Add more description about Hisilicon designed system controllers
+>>    in DT bindings document
+>> * Enable high speed clock on UART1 mux
+>> * Other changes based on the discussion in the mailing list:
+>>    https://lkml.org/lkml/2015/2/5/147
+>>
+>> Bintian Wang (6):
+>>    arm64: Enable Hisilicon ARMv8 SoC family in Kconfig and defconfig
+>>    arm64: hi6220: Document devicetree bindings for Hisilicon hi6220 SoC
+>>    clk: hi6220: Document devicetree bindings for hi6220 clock
+>>    Documentation: DT: PL011: hi6220: add compatible string for Hisilicon
+>>          designed UART
+>>    clk: hi6220: Clock driver support for Hisilicon hi6220 SoC
+>>    arm64: dts: Add dts files for Hisilicon Hi6220 SoC
+>>
+>>   .../bindings/arm/hisilicon/hisilicon.txt           |   87 ++++++
+>>   .../devicetree/bindings/clock/hi6220-clock.txt     |   34 +++
+>>   Documentation/devicetree/bindings/serial/pl011.txt |    4 +-
+>>   arch/arm64/Kconfig                                 |    5 +
+>>   arch/arm64/boot/dts/Makefile                       |    1 +
+>>   arch/arm64/boot/dts/hisilicon/Makefile             |    5 +
+>>   arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |   31 +++
+>>   arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  172 ++++++++++++
+>>   arch/arm64/configs/defconfig                       |    1 +
+>>   drivers/clk/Kconfig                                |    2 +
+>>   drivers/clk/Makefile                               |    4 +-
+>>   drivers/clk/hisilicon/Kconfig                      |    6 +
+>>   drivers/clk/hisilicon/Makefile                     |    3 +-
+>>   drivers/clk/hisilicon/clk-hi6220.c                 |  292 ++++++++++++++++++++
+>>   drivers/clk/hisilicon/clk.c                        |   29 ++
+>>   drivers/clk/hisilicon/clk.h                        |   17 ++
+>>   drivers/clk/hisilicon/clkdivider-hi6220.c          |  273 ++++++++++++++++++
+>>   include/dt-bindings/clock/hi6220-clock.h           |  173 ++++++++++++
+>>   18 files changed, 1134 insertions(+), 5 deletions(-)
+>>   create mode 100644 Documentation/devicetree/bindings/clock/hi6220-clock.txt
+>>   create mode 100644 arch/arm64/boot/dts/hisilicon/Makefile
+>>   create mode 100644 arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+>>   create mode 100644 arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+>>   create mode 100644 drivers/clk/hisilicon/Kconfig
+>>   create mode 100644 drivers/clk/hisilicon/clk-hi6220.c
+>>   create mode 100644 drivers/clk/hisilicon/clkdivider-hi6220.c
+>>   create mode 100644 include/dt-bindings/clock/hi6220-clock.h
+>>
+> 
+> 
+> .
+> 
