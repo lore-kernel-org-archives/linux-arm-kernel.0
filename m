@@ -1,25 +1,41 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 13 May 2015 10:24:13 +0200
-Subject: [PATCH v3 4/4] mtd: mxc_nand: generate nand_ecclayout for 8 bit
- ECC
-In-Reply-To: <95e2a17d74da5a0415ab93e060f6efc681216313.1431504091.git.baruch@tkos.co.il>
-References: <cover.1431504091.git.baruch@tkos.co.il>
- <95e2a17d74da5a0415ab93e060f6efc681216313.1431504091.git.baruch@tkos.co.il>
-Message-ID: <20150513082413.GL28888@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 13 May 2015 10:23:55 +0200
+Subject: [PATCH 2/8] dmaengine: mv_xor: add support for a38x command in
+ descriptor mode
+In-Reply-To: <20150512180539.4ea5d158@free-electrons.com>
+References: <1431445063-20226-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1431445063-20226-3-git-send-email-maxime.ripard@free-electrons.com>
+ <20150512174936.284783d4@free-electrons.com>
+ <20150512155824.GJ19927@lunn.ch>
+ <20150512180539.4ea5d158@free-electrons.com>
+Message-ID: <20150513082355.GT10961@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 13, 2015 at 11:17:39AM +0300, Baruch Siach wrote:
-> Hardware 8 bit ECC requires a different nand_ecclayout. Instead of adding yet
-> another static struct nand_ecclayout, generate it in code.
+On Tue, May 12, 2015 at 06:05:39PM +0200, Thomas Petazzoni wrote:
+> Andrew,
 > 
-> Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> On Tue, 12 May 2015 17:58:24 +0200, Andrew Lunn wrote:
+> 
+> > A quick grep for marvell,orion, marvell,kirkwood and marvell,dove
+> > suggests it should have the - if we want to be consistent with older
+> > Marvell devices. As you said, starting with marvell,armanda it gets
+> > pretty inconsistent :-(
+> 
+> Yes, with the "-" would be better IMO.
 
-Thanks
-Uwe
+changed to armada-380-xor, thanks!
+
+Maxime
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150513/2d994dfe/attachment-0001.sig>
