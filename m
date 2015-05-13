@@ -1,80 +1,110 @@
-From: btw@mail.itp.ac.cn (Bintian Wang)
-Date: Wed, 13 May 2015 15:12:07 +0800 (GMT+08:00)
-Subject: [PATCH v4 5/5] arm64: dts: Add dts files for Hisilicon
- Hi6220 SoC
-In-Reply-To: <20150506104856.GC707@leverpostej>
-References: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>
- <1430827599-11560-6-git-send-email-bintian.wang@huawei.com>
- <20150505171349.GA30215@leverpostej> <5549877C.10408@huawei.com>
- <5549B9CC.1040709@huawei.com> <20150506093022.GB31001@leverpostej>
- <5549EE97.3020801@huawei.com> <20150506104856.GC707@leverpostej>
-Message-ID: <cf6ae9.68c7.14d4c1dc0f6.Coremail.btw@mail.itp.ac.cn>
+From: alior@marvell.com (Lior Amsalem)
+Date: Wed, 13 May 2015 07:16:34 +0000
+Subject: [PATCH 8/8] ARM: mvebu: a38x: Enable A38x XOR engine features
+In-Reply-To: <20150512161314.GL19927@lunn.ch>
+References: <1431445063-20226-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1431445063-20226-9-git-send-email-maxime.ripard@free-electrons.com>
+ <20150512161314.GL19927@lunn.ch>
+Message-ID: <14c9a6d3ba4c46f89880e4c1b4494dbb@IL-EXCH02.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-> Hi,
+> From: Andrew Lunn [mailto:andrew at lunn.ch]
+> Sent: Tuesday, May 12, 2015 7:13 PM
 > 
-> > > I think that given that we know the UART is not quite a PL011 we should
-> > > add an additional compatible string just in case some difference crops
-> > > up later that is problematic.
-> > >
-> > > So we'd have something like:
-> > >
-> > > 	compatible = "hisilicon,hi6220-uart", "arm,pl011", "arm,primecell";
-> > >
-> > > That way we can add any optimisations or workarounds later as required.
-> > I understand and thanks for your suggestion.
-> > 
-> > Can I do not do this work in this patch set? Because I got the
-> > information UART0 is PL011 compatible. Hisilicon uart engineer can do
-> > this work in the future, maybe for UART1/UART2.
+> On Tue, May 12, 2015 at 05:37:43PM +0200, Maxime Ripard wrote:
+> > From: Lior Amsalem <alior@marvell.com>
+> >
+> > The new XOR engine has a new compatible of its own, together with new
+> > channel capabilities.
+> >
+> > Use that new compatible now that we have a driver that can handle it.
+> >
+> > Signed-off-by: Lior Amsalem <alior@marvell.com>
+> > Reviewed-by: Ofer Heifetz <oferh@marvell.com>
+> > Reviewed-by: Nadav Haklai <nadavh@marvell.com>
+> > Tested-by: Nadav Haklai <nadavh@marvell.com>
+> > ---
+> >  arch/arm/boot/dts/armada-38x.dtsi | 20 ++++++--------------
+> >  1 file changed, 6 insertions(+), 14 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/armada-38x.dtsi
+> > b/arch/arm/boot/dts/armada-38x.dtsi
+> > index ed2dd8ba4080..6d07b7389415 100644
+> > --- a/arch/arm/boot/dts/armada-38x.dtsi
+> > +++ b/arch/arm/boot/dts/armada-38x.dtsi
+> > @@ -448,7 +448,7 @@
+> >  			};
+> >
+> >  			xor at 60800 {
+> > -				compatible = "marvell,orion-xor";
+> > +				compatible = "marvell,a38x-xor";
+> >  				reg = <0x60800 0x100
+> >  				       0x60a00 0x100>;
+> >  				clocks = <&gateclk 22>;
+> > @@ -458,17 +458,13 @@
+> >  					interrupts = <GIC_SPI 22
+> IRQ_TYPE_LEVEL_HIGH>;
+> >  					dmacap,memcpy;
+> >  					dmacap,xor;
+> > -				};
+> > -				xor01 {
+> > -					interrupts = <GIC_SPI 23
+> IRQ_TYPE_LEVEL_HIGH>;
+> > -					dmacap,memcpy;
+> > -					dmacap,xor;
+> > -					dmacap,memset;
+> > +					dmacap,pq;
+> > +					dmacap,interrupt;
 > 
-> I am not asking you to do any driver work for this -- the current driver
-> should ignore the "hisilicon,hi6220-uart" string and recognise
-> "arm,pl011".
+> Does this mean the hardware only has one channel?
+> And memset is no longer supported?
 > 
-> I am only asking you to add the additional string to the DTS, and to
-> update the binding document to list the new string. That way if and when
-> we need the kernel to distinguish between a regular PL011 and the
-> hi6220-specific variant, the DTB does not need to be updated in order to
-> do so.
-How about add the following binding rule to the 2/5 patch:
----------------------------
-*Hisilicon Enhanced ARM AMBA Primecell PL011 serial UART
 
-Required properties:
-- compatible: must be "hisilicon,hi6220-uart", "arm,primecell", "arm,pl011"
-- reg: exactly one register range with length 0x1000
-- interrupts: exactly one interrupt specifier
+The hardware has two channels per engine and two engines.
+However, both on HW side (both channels are on the same "bus port")
+and SW (the dma subsystem will assign one channel per CPU).
+we found it's better (performance wise) to use only one channel on each engine
+and let the framework assign one per CPU.
+This way, descriptors chaining was better (cause of the depended descriptors
+problem) and overall interrupt number reduced.
 
-See also bindings/serial/pl011.txt
+Yes, since memset is a problematic one. It can only be done via registers
+(and not on descriptors level) plus no one really needs it...
 
-Example:
-
-uart0: uart at f8015000 { 
-        compatible = "hisilicon,hi6220-uart", "arm,pl011", "arm,primecell";
-        reg = <0x0 0xf8015000 0x0 0x1000>;
-        interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
-        clocks = <&ao_ctrl HI6220_UART0_PCLK>, <&ao_ctrl HI6220_UART0_PCLK>;
-        clock-names = "uartclk", "apb_pclk";
-};
----------------------------
- 
-> Is UART 0 different from UART1 and UART2?
-Yes,  but my patch just includes UART0, we do some changements for UART1/2
-to improve performance.  
-
-Thanks,
-
-Bintian
-
+>     Andrew
 > 
-> Thanks,
-> Mark.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >  				};
+> >  			};
+> >
+> >  			xor at 60900 {
+> > -				compatible = "marvell,orion-xor";
+> > +				compatible = "marvell,a38x-xor";
+> >  				reg = <0x60900 0x100
+> >  				       0x60b00 0x100>;
+> >  				clocks = <&gateclk 28>;
+> > @@ -478,12 +474,8 @@
+> >  					interrupts = <GIC_SPI 65
+> IRQ_TYPE_LEVEL_HIGH>;
+> >  					dmacap,memcpy;
+> >  					dmacap,xor;
+> > -				};
+> > -				xor11 {
+> > -					interrupts = <GIC_SPI 66
+> IRQ_TYPE_LEVEL_HIGH>;
+> > -					dmacap,memcpy;
+> > -					dmacap,xor;
+> > -					dmacap,memset;
+> > +					dmacap,pq;
+> > +					dmacap,interrupt;
+> >  				};
+> >  			};
+> >
+> > --
+> > 2.4.0
+> >
+
+
+Regards,
+Lior Amsalem
