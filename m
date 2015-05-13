@@ -1,116 +1,288 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Wed, 13 May 2015 20:43:47 +0200
-Subject: [PATCH 2/2] PCI: iproc: add bcma pcie driver
-In-Reply-To: <55537C43.4050606@broadcom.com>
-References: <1431465781-10753-1-git-send-email-hauke@hauke-m.de>	<1431465781-10753-3-git-send-email-hauke@hauke-m.de>	<CACna6rxVpJ-4b_5jG91JN62jQHh8u=QaLpO+_7J9mFr+_ScPaA@mail.gmail.com>	<5553742E.7070204@broadcom.com>
- <CACna6rzT=218pQk9M6NJWH51wszn=p0LmHrizrvV9Xkn-=Om3Q@mail.gmail.com>
- <55537C43.4050606@broadcom.com>
-Message-ID: <55539B63.2060203@hauke-m.de>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 13 May 2015 11:49:21 -0700
+Subject: [PATCH v3 4/5] phy: add Broadcom SATA3 PHY driver for Broadcom
+ STB SoCs
+In-Reply-To: <55533059.6050705@ti.com>
+References: <1431473303-18873-1-git-send-email-computersforpeace@gmail.com>
+ <1431473303-18873-5-git-send-email-computersforpeace@gmail.com>
+ <55533059.6050705@ti.com>
+Message-ID: <20150513184921.GE11598@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/13/2015 06:30 PM, Ray Jui wrote:
-> Hi Rafal,
+On Wed, May 13, 2015 at 04:37:05PM +0530, Kishon Vijay Abraham I wrote:
+> Hi,
 > 
-> On 5/13/2015 9:19 AM, Rafa? Mi?ecki wrote:
->> On 13 May 2015 at 17:56, Ray Jui <rjui@broadcom.com> wrote:
->>> On 5/12/2015 11:27 PM, Rafa? Mi?ecki wrote:
->>>> On 12 May 2015 at 23:23, Hauke Mehrtens <hauke@hauke-m.de> wrote:
->>>>> This driver adds support for the PCIe 2.0 controller found on the bcma
->>>>> bus. This controller can be found on (mostly) all Broadcom BCM470X /
->>>>> BCM5301X ARM SoCs.
->>>>>
->>>>> The driver found in the Broadcom SDK does some more stuff, like setting
->>>>> up some DMA memory areas, chaining MPS and MRRS to 512 and also some
->>>>> PHY changes like "improving" the PCIe jitter and doing some special
->>>>> initializations for the 3rd PCIe port.
->>>>>
->>>>> This was tested on a bcm4708 board with 2 PCIe ports and wireless cards
->>>>> connected to them.
->>>>>
->>>>> PCI_DOMAINS is needed by this driver, because normally there is more
->>>>> than one PCIe controller and without PCI_DOMAINS only the first
->>>>> controller gets registered.
->>>>> This controller gets 6 IRQs, the last one is trigged by all IRQ events.
->>>>>
->>>>> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
->>>>
->>>> Acked-by: Rafa? Mi?ecki <zajec5@gmail.com>
->>>>
->>>>
->>>>> +static int iproc_pcie_bcma_probe(struct bcma_device *bdev)
->>>>> +{
->>>>> +       struct iproc_pcie *pcie;
->>>>> +       LIST_HEAD(res);
->>>>> +       struct resource res_mem;
->>>>> +       int ret;
->>>>> +
->>>>> +       pcie = devm_kzalloc(&bdev->dev, sizeof(*pcie), GFP_KERNEL);
->>>>> +       if (!pcie)
->>>>> +               return -ENOMEM;
->>>>> +
->>>>> +       pcie->dev = &bdev->dev;
->>>>> +       bcma_set_drvdata(bdev, pcie);
->>>>> +
->>>>> +       pcie->base = bdev->io_addr;
->>>>> +
->>>>> +       res_mem.start = bdev->addr_s[0];
->>>>> +       res_mem.end = bdev->addr_s[0] + SZ_128M - 1;
->>>>> +       res_mem.name = "PCIe MEM space";
->>>>> +       res_mem.flags = IORESOURCE_MEM;
->>>>> +       pci_add_resource(&res, &res_mem);
->>>>> +
->>>>> +       pcie->resources = &res;
->>>>> +
->>>>> +       pcie->map_irq = iproc_pcie_bcma_map_irq;
->>>>> +
->>>>> +       ret = iproc_pcie_setup(pcie);
->>>>
->>>> I think I don't like this part of iproc design. It lefts
->>>> pcie->resources pointing to some random memory after the setup/probe
->>>> are done. Guess it should be a separated parameter or sth.
->>>>
->>>> The patch is still OK, I just refer to generic iproc possible issue.
->>>>
->>> Sorry Rafal, but could you please be more specific on this?
->>
->> iproc_pcie_pltfm_probe (and iproc_pcie_bcma_probe) have local "res"
->> variable (each its own). They do:
->> pcie->resources = &res;
->> and then they call
->> iproc_pcie_setup(pcie);
->>
->> After iproc_pcie_pltfm_probe / iproc_pcie_bcma_probe returns, the
->> pointer pcie->resources is not valid anymore, yet pcie struct is still
->> in use. Of course pcie->resources isn't used anymore, but still, it's
->> some in-struct pointer (to the random memory since local variable is
->> not accessible anymore).
->>
->> I think you should drop
->> struct list_head *resources;
->> from the struct iproc_pcie and use
->> iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *resources)
->>
+> On Wednesday 13 May 2015 04:58 AM, Brian Norris wrote:
+> >Supports up to two ports which can each be powered on/off and configured
+> >independently.
+> >
+> >Signed-off-by: Brian Norris <computersforpeace@gmail.com>
 > 
-> Okay thanks. That makes sense.
+> couple of minor comments below
+> >---
+> >v3: no change
+> >
+> >v2:
+> >   - stop sharing SATA_TOP_CTRL registers with SATA driver
+> >   - kill custom xlate function
+> >
+> >  drivers/phy/Kconfig            |   9 ++
+> >  drivers/phy/Makefile           |   1 +
+> >  drivers/phy/phy-brcmstb-sata.c | 216 +++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 226 insertions(+)
+> >  create mode 100644 drivers/phy/phy-brcmstb-sata.c
+> >
+> >diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> >index a53bd5b52df9..36788b6f0220 100644
+> >--- a/drivers/phy/Kconfig
+> >+++ b/drivers/phy/Kconfig
+> >@@ -309,4 +309,13 @@ config PHY_QCOM_UFS
+> >  	help
+> >  	  Support for UFS PHY on QCOM chipsets.
+> >
+> >+config PHY_BRCMSTB_SATA
+> >+	tristate "Broadcom STB SATA PHY driver"
+> >+	depends on ARCH_BRCMSTB
+> >+	depends on OF
+> >+	select GENERIC_PHY
+> >+	help
+> >+	  Enable this to support the SATA3 PHY on 28nm Broadcom STB SoCs.
+> >+	  Likely useful only with CONFIG_SATA_BRCMSTB enabled.
+> >+
+> >  endmenu
+> >diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+> >index f12625178780..c61f3fdd191e 100644
+> >--- a/drivers/phy/Makefile
+> >+++ b/drivers/phy/Makefile
+> >@@ -40,3 +40,4 @@ obj-$(CONFIG_PHY_STIH41X_USB)		+= phy-stih41x-usb.o
+> >  obj-$(CONFIG_PHY_QCOM_UFS) 	+= phy-qcom-ufs.o
+> >  obj-$(CONFIG_PHY_QCOM_UFS) 	+= phy-qcom-ufs-qmp-20nm.o
+> >  obj-$(CONFIG_PHY_QCOM_UFS) 	+= phy-qcom-ufs-qmp-14nm.o
+> >+obj-$(CONFIG_PHY_BRCMSTB_SATA)		+= phy-brcmstb-sata.o
+> >diff --git a/drivers/phy/phy-brcmstb-sata.c b/drivers/phy/phy-brcmstb-sata.c
+> >new file mode 100644
+> >index 000000000000..8387c8cbea8c
+> >--- /dev/null
+> >+++ b/drivers/phy/phy-brcmstb-sata.c
+> >@@ -0,0 +1,216 @@
+> >+/*
+> >+ * Broadcom SATA3 AHCI Controller PHY Driver
+> >+ *
+> >+ * Copyright ? 2009-2015 Broadcom Corporation
+> >+ *
+> >+ * This program is free software; you can redistribute it and/or modify
+> >+ * it under the terms of the GNU General Public License as published by
+> >+ * the Free Software Foundation; either version 2, or (at your option)
+> >+ * any later version.
+> >+ *
+> >+ * This program is distributed in the hope that it will be useful,
+> >+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >+ * GNU General Public License for more details.
+> >+ */
+> >+
+> >+#include <linux/device.h>
+> >+#include <linux/init.h>
+> >+#include <linux/interrupt.h>
+> >+#include <linux/io.h>
+> >+#include <linux/kernel.h>
+> >+#include <linux/module.h>
+> >+#include <linux/of.h>
+> >+#include <linux/phy/phy.h>
+> >+#include <linux/platform_device.h>
+> >+
+> >+#define SATA_MDIO_BANK_OFFSET				0x23c
+> >+#define SATA_MDIO_REG_OFFSET(ofs)			((ofs) * 4)
+> >+#define SATA_MDIO_REG_SPACE_SIZE			0x1000
+> >+#define SATA_MDIO_REG_LENGTH				0x1f00
+> >+
+> >+#define MAX_PORTS					2
+> >+
+> >+/* Register offset between PHYs in PCB space */
+> >+#define SATA_MDIO_REG_SPACE_SIZE			0x1000
+> >+
+> >+struct brcm_sata_port {
+> >+	int portnum;
+> >+	struct phy *phy;
+> >+	struct brcm_sata_phy *phy_priv;
+> >+	bool ssc_en;
+> >+};
+> >+
+> >+struct brcm_sata_phy {
+> >+	struct device *dev;
+> >+	void __iomem *phy_base;
+> >+
+> >+	struct brcm_sata_port phys[MAX_PORTS];
+> >+};
+> >+
+> >+enum sata_mdio_phy_regs_28nm {
 > 
-> Or I should keep a copy of the resources under pcie->resources. In the
-> current pcie-iproc.c, the resource is not used anywhere else except when
-> creating the root bus under iproc_pcie_setup. But in the future, I might
-> need to add more code to explicitly program the outbound/inbound windows
-> so this driver can work with some other iProc SoCs where the desired
-> windows do not match power-on-reset values.
-> 
-> I plan to change this along with the window programming patch in the
-> future. I also think Hauke's current patch is fine.
-> 
-> Thanks,
-> 
-> Ray
-> 
-I think parts of this resources are allocated and never freed.
+> Why should these defines be in enum?
 
-pci_add_resource() allocates some bytes, but I do not see where they are
-freed, this also applies to the platform driver.
+Why not? They're logically grouped this way, and IMO, they look nicer.
+You can see drivers/ata/ahci.h for a similar example.
 
-Hauke
+> >+	PLL_REG_BANK_0				= 0x50,
+> >+	PLL_REG_BANK_0_PLLCONTROL_0		= 0x81,
+> >+
+> >+	TXPMD_REG_BANK				= 0x1a0,
+> >+	TXPMD_CONTROL1				= 0x81,
+> >+	TXPMD_CONTROL1_TX_SSC_EN_FRC		= BIT(0),
+> >+	TXPMD_CONTROL1_TX_SSC_EN_FRC_VAL	= BIT(1),
+> >+	TXPMD_TX_FREQ_CTRL_CONTROL1		= 0x82,
+> >+	TXPMD_TX_FREQ_CTRL_CONTROL2		= 0x83,
+> >+	TXPMD_TX_FREQ_CTRL_CONTROL2_FMIN_MASK	= 0x3ff,
+> >+	TXPMD_TX_FREQ_CTRL_CONTROL3		= 0x84,
+> >+	TXPMD_TX_FREQ_CTRL_CONTROL3_FMAX_MASK	= 0x3ff,
+> >+};
+> >+
+> >+static inline void __iomem *brcm_sata_phy_base(struct brcm_sata_port *port)
+> >+{
+> >+	struct brcm_sata_phy *priv = port->phy_priv;
+> >+
+> >+	return priv->phy_base + (port->portnum * SATA_MDIO_REG_SPACE_SIZE);
+> >+}
+> >+
+> >+static void brcm_sata_mdio_wr(void __iomem *addr, u32 bank, u32 ofs,
+> >+			      u32 msk, u32 value)
+> >+{
+> >+	u32 tmp;
+> >+
+> >+	writel(bank, addr + SATA_MDIO_BANK_OFFSET);
+> >+	tmp = readl(addr + SATA_MDIO_REG_OFFSET(ofs));
+> >+	tmp = (tmp & msk) | value;
+> >+	writel(tmp, addr + SATA_MDIO_REG_OFFSET(ofs));
+> >+}
+> >+
+> >+/* These defaults were characterized by H/W group */
+> >+#define FMIN_VAL_DEFAULT	0x3df
+> >+#define FMAX_VAL_DEFAULT	0x3df
+> >+#define FMAX_VAL_SSC		0x83
+> >+
+> >+static void cfg_ssc_28nm(struct brcm_sata_port *port)
+> 
+> brcm_sata_cfg_ssc_28nm to make it similar to other functions.
+
+OK.
+
+> >+{
+> >+	void __iomem *base = brcm_sata_phy_base(port);
+> >+	struct brcm_sata_phy *priv = port->phy_priv;
+> >+	u32 tmp;
+> >+
+> >+	/* override the TX spread spectrum setting */
+> >+	tmp = TXPMD_CONTROL1_TX_SSC_EN_FRC_VAL | TXPMD_CONTROL1_TX_SSC_EN_FRC;
+> >+	brcm_sata_mdio_wr(base, TXPMD_REG_BANK, TXPMD_CONTROL1, ~tmp, tmp);
+> >+
+> >+	/* set fixed min freq */
+> >+	brcm_sata_mdio_wr(base, TXPMD_REG_BANK, TXPMD_TX_FREQ_CTRL_CONTROL2,
+> >+			  ~TXPMD_TX_FREQ_CTRL_CONTROL2_FMIN_MASK,
+> >+			  FMIN_VAL_DEFAULT);
+> >+
+> >+	/* set fixed max freq depending on SSC config */
+> >+	if (port->ssc_en) {
+> >+		dev_info(priv->dev, "enabling SSC on port %d\n", port->portnum);
+> >+		tmp = FMAX_VAL_SSC;
+> >+	} else {
+> >+		tmp = FMAX_VAL_DEFAULT;
+> >+	}
+> >+
+> >+	brcm_sata_mdio_wr(base, TXPMD_REG_BANK, TXPMD_TX_FREQ_CTRL_CONTROL3,
+> >+			  ~TXPMD_TX_FREQ_CTRL_CONTROL3_FMAX_MASK, tmp);
+> >+}
+> >+
+> >+static int brcm_sata_phy_init(struct phy *phy)
+> >+{
+> >+	struct brcm_sata_port *port = phy_get_drvdata(phy);
+> >+
+> >+	cfg_ssc_28nm(port);
+> >+
+> >+	return 0;
+> >+}
+> >+
+> >+static struct phy_ops phy_ops_28nm = {
+> >+	.init		= brcm_sata_phy_init,
+> >+	.owner		= THIS_MODULE,
+> >+};
+> >+
+> >+static const struct of_device_id brcm_sata_phy_of_match[] = {
+> >+	{ .compatible	= "brcm,bcm7445-sata-phy" },
+> >+	{},
+> >+};
+> >+MODULE_DEVICE_TABLE(of, brcm_sata_phy_of_match);
+> >+
+> >+static int brcm_sata_phy_probe(struct platform_device *pdev)
+> >+{
+> >+	struct device *dev = &pdev->dev;
+> >+	struct device_node *dn = dev->of_node, *child;
+> >+	struct brcm_sata_phy *priv;
+> >+	struct resource *res;
+> >+	struct phy_provider *provider;
+> >+	int count = 0;
+> >+
+> >+	if (of_get_child_count(dn) == 0)
+> >+		return -ENODEV;
+> >+
+> >+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> >+	if (!priv)
+> >+		return -ENOMEM;
+> >+	dev_set_drvdata(dev, priv);
+> >+	priv->dev = dev;
+> >+
+> >+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phy");
+> >+	priv->phy_base = devm_ioremap_resource(dev, res);
+> >+	if (IS_ERR(priv->phy_base))
+> >+		return PTR_ERR(priv->phy_base);
+> >+
+> >+	for_each_available_child_of_node(dn, child) {
+> >+		unsigned int id;
+> >+		struct brcm_sata_port *port;
+> >+
+> >+		if (of_property_read_u32(child, "reg", &id)) {
+> >+			dev_err(dev, "missing reg property in node %s\n",
+> >+					child->name);
+> >+			return -EINVAL;
+> >+		}
+> >+
+> >+		if (id >= MAX_PORTS) {
+> >+			dev_err(dev, "invalid reg: %u\n", id);
+> >+			return -EINVAL;
+> >+		}
+> >+		if (priv->phys[id].phy) {
+> >+			dev_err(dev, "already registered port %u\n", id);
+> >+			return -EINVAL;
+> >+		}
+> >+
+> >+		port = &priv->phys[id];
+> >+		port->portnum = id;
+> >+		port->phy_priv = priv;
+> >+		port->phy = devm_phy_create(dev, child, &phy_ops_28nm);
+> >+		port->ssc_en = of_property_read_bool(child, "brcm,enable-ssc");
+> >+		if (IS_ERR(port->phy)) {
+> >+			dev_err(dev, "failed to create PHY\n");
+> >+			return PTR_ERR(port->phy);
+> >+		}
+> >+
+> >+		phy_set_drvdata(port->phy, port);
+> >+		count++;
+> >+	}
+> >+
+> >+	provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
+> >+	if (IS_ERR(provider)) {
+> >+		dev_err(dev, "could not register PHY provider\n");
+> >+		return PTR_ERR(provider);
+> >+	}
+> >+
+> >+	dev_info(dev, "registered %d port(s)\n", count);
+> 
+> lets not make the boot noisy. Change to dev_dbg?
+
+Why? What's the harm? And I thought we discussed this already. "Noisy"
+depends on your point of view; IMO, this is important information. If
+for some reason this driver wasn't loaded or probed, we'd want to know.
+Besides, dev_dbg() requires you to fiddle with both the log level and
+the dynamic debug boot parameters just to get these informational
+messages.
+
+Brian
