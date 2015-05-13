@@ -1,96 +1,80 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 13 May 2015 18:51:04 +0200
-Subject: schedule_timeout sleeps too long after dividing CPU frequency
-In-Reply-To: <20150512155004.GP2067@n2100.arm.linux.org.uk>
-References: <55520F0F.5010906@free.fr>
- <CAKohpo=eMA6L9=jK=bAnbFuDxcdtpQNub0WFnSy6MOqB3jOdjA@mail.gmail.com>
- <555218C7.5050602@free.fr> <20150512155004.GP2067@n2100.arm.linux.org.uk>
-Message-ID: <555380F8.5050306@free.fr>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Wed, 13 May 2015 18:54:10 +0200
+Subject: [PATCH v8 14/16] ARM: dts: Introduce STM32F429 MCU
+In-Reply-To: <2282066.NWoIT9ZyLc@wuerfel>
+References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <11310179.epfRucfQKB@wuerfel>
+ <CALszF6DHazhN6+hGShyrmqtMrPod0hdb8mHAwK-GWfRxXzy7wQ@mail.gmail.com>
+ <2282066.NWoIT9ZyLc@wuerfel>
+Message-ID: <CALszF6CaO_yuNiSDuDV+4d2NRe_+32j=zcSE1HPhB1UH59cW9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/2015 17:50, Russell King - ARM Linux wrote:
-> On Tue, May 12, 2015 at 05:14:15PM +0200, Mason wrote:
->> This ties in to another thread I started in LAKML:
->> ("High-resolution timers not supported when using smp_twd on Cortex A9")
+2015-05-13 18:37 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
+> On Wednesday 13 May 2015 18:29:05 Maxime Coquelin wrote:
+>> 2015-05-13 17:28 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
+>> > On Wednesday 13 May 2015 16:20:34 Daniel Thompson wrote:
+>> >>
+>> >> That would suit me very well (although is the 0x20/0x40 not the 8 that
+>> >> we would need in the middle column).
+>> >
+>> > We don't normally use register offsets in DT. The number 8 here instead
+>> > would indicate block 8, where each block is four bytes wide. Using the
+>> > same index here for reset and clock would also help readability.
 >>
->> $ git show 5388a6b2 arch/arm/kernel/smp_twd.c
->> commit 5388a6b266e9c3357353332ba0cd5549082887f1
->> Author: Russell King <rmk+kernel@arm.linux.org.uk>
->> Date:   Mon Jul 26 13:19:43 2010 +0100
+>> My view is that it makes the bindings usage very complex.
+>> Also, it implies we have a specific compatible for stm32f429, whereas
+>> we didn't need with my earlier proposals.
+>> Indeed, the reset driver will need to know the offset of every reset
+>> registers, because:
+>>   1. The AHB registers start at RCC offset 0x10 (up to 0x18)
+>>   2. The APB registers start at RCC offset 0x20 (up to 0x24).
+>> We have a gap between AHB and APB registers, so how do we map the
+>> index for the block you propose?
+>> Should the gap be considered as a block, or we should skip it?
 >>
->>     ARM: SMP: Always enable clock event broadcast support
->>     
->>     The TWD local timers are unable to wake up the CPU when it is placed
->>     into a low power mode, eg. C3.  Therefore, we need to adapt things
->>     such that the TWD code can cope with this.
->>     
->>     We do this by always providing a broadcast tick function, and marking
->>     the fact that the TWD local timer will stop in low power modes.  This
->>     means that when the CPU is placed into a low power mode, the core
->>     timer code marks this fact, and allows an IPI to be given to the core.
+>> I'm afraid it will not be straightforward for a reset user to
+>> understand how to use this bindings.
 >>
->> This mentions a "broadcast tick function" (of which I know nothing).
->> Is this what you're referring to?
-> 
-> No.  This has nothing to do with low power modes.
-> 
-> How this works depends on how your kernel is configured, but essentially
-> it's something like this:
-> 
-> * The CPU which will be idling sets its local timer to wake up after N
->   counter cycles, where N is calculated from the timer frequency.
-> 
-> * When the local timer fires, the CPU is kicked out of the idle loop, and
->   it reads the current system time.  If the current system time indicates
->   that the software timer set in schedule_timeout() has fired, that
->   software timer fires.
-> 
-> If the local timer changes frequency without the idling CPU being woken
-> up, then the problem you're referring to can happen.
-> 
-> As you're not giving much information about your system (including
-> indicating where we might see some source code) we're not able to help
-> more than providing above descriptions.  Maybe if you posted your
-> patches so far to support the project you're working on, we could
-> provide better answers.
+>> Either my v7 or v8 versions would have made possible to use a single
+>> compatible for STM32 series.
+>> If we stick with one of these, we could even think to have a "generic"
+>> reset driver, as it could be compatible with sunxi driver bindings.
+>
+> We should definitely try to use the same compatible string for all of
+> them, and make a binding that is easy to use.
+>
+> I haven't fully understood the requirements for the various parts that
+> are involved here. My understanding so far was that the driver could
+> use the index from the first cell and compute
+>
+>         void __iomem *reset_reg = rcc_base + 0x10 + 4 * index;
+>         void __iomem *clock_reg = rcc_base + 0x30 + 4 * index;
 
-$ git diff v3.14.41 HEAD >tango.patch && xz tango.patch
+This calculation is true, but we have to take into account there is a
+hole in the middle, between AHB3, and APB1 register:
 
-I don't understand the IRQ-related part yet
-( arch/arm/mach-tangox/irq.c and drivers/irqchip/irq-gic.c )
+AHB1RSTR : offset = 0x10, index = 0
+AHB2RSTR : offset = 0x14, index = 1
+AHB3RSTR : offset = 0x18, index = 2
+<HOLE >     : offset = 0x1c, index = 3
+APB1RSTR : offset = 0x20, index = 4
+APB2RSTR : offset = 0x24, index = 5
 
-If anyone spots the problem, that would make my day.
+So we have to carefully document this hole in the bindings, maybe by
+listing indexes in the documentation?
 
-I tested with a loadable module whose init function is
+>
+> Are there parts that need something else? If the 0x10 offset is
+> different, we probably want a different compatible string, and I'd
+> consider it a different part at that point. If there are chips
+> that do not spread the clock from the reset by exactly 256 bits,
+> we could add a DT property in the rcc node for that.
 
-static int __init ts_init(void)
-{
-	long res;
-	printk("ABOUT TO SLEEP\n");
-	set_current_state(TASK_INTERRUPTIBLE);
-	res = schedule_timeout(HZ);
-	printk("WAKE UP res=%ld\n", res);
-	return 0;
-}
+I will check other chips, to see if this is valid generally.
 
-Loading the module, with cpufreq divided by 9, prints:
-[ 1738.962982] ABOUT TO SLEEP
-[ 1747.956191] WAKE UP res=0
+Thanks for your feedback,
+Maxime
 
-Regards.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: tango.patch.xz
-Type: application/force-download
-Size: 30112 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150513/bcc44c93/attachment-0002.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: dot.config.xz
-Type: application/force-download
-Size: 7924 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150513/bcc44c93/attachment-0003.bin>
+>
+>         Arnd
