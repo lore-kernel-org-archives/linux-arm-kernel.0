@@ -1,80 +1,362 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Wed, 13 May 2015 23:23:44 +0800
-Subject: [RFC][PATCH 0/2] MT8173 DRM support
-Message-ID: <1431530626-31493-1-git-send-email-ck.hu@mediatek.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 13 May 2015 16:30:04 +0100
+Subject: [PATCH RESEND v6 1/6] mfd: axp20x: add AXP22x PMIC support
+In-Reply-To: <1428638946-24890-2-git-send-email-wens@csie.org>
+References: <1428638946-24890-1-git-send-email-wens@csie.org>
+ <1428638946-24890-2-git-send-email-wens@csie.org>
+Message-ID: <20150513153004.GC3394@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MT8173 DRM include one master drm device and three sub device: dsi device,
-crtc main device, and ddp device.
+On Fri, 10 Apr 2015, Chen-Yu Tsai wrote:
 
-Master drm device control the drm sub device and memory management.
-dsi device is a drm connector/encoder device which control MIPI/DSI hw block.
-crtc main is a drm crtc device which control hw components in the display data
-path.
-ddp is a device which control display data path.
+> From: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> 
+> Add support for the AXP22x PMIC devices to the existing AXP20x driver.
+> This includes the AXP221 and AXP223, which are identical except for
+> the external data bus. Only AXP221 is added for now. AXP223 will be
+> added after it's Reduced Serial Bus (RSB) interface is supported.
+> 
+> AXP22x defines a new set of registers, power supplies and regulators,
+> but most of the API is similar to the AXP20x ones.
+> 
+> A new irq chip definition is used, even though the available interrupts
+> on AXP22x is a subset of those on AXP20x. This is done so the interrupt
+> numbers match those on the datasheet.
+> 
+> This patch only enables the interrupts, system power-off function, and PEK
+> sub-device. The regulator driver must first support different variants
+> before we enable it from the mfd driver.
+> 
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> [wens at csie.org: fix interrupts and move regulators to separate patch]
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+> ---
+> 
+> Hi Lee,
+> 
+> I've asked Mark about merging the regulator patches through the mfd tree
+> (in the 4th patch). If he agrees, could you take the whole series?
+> 
+> Thanks.
+> 
+> ChenYu
+> 
+> ---
+>  drivers/mfd/axp20x.c       | 98 ++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/mfd/axp20x.h | 86 ++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 184 insertions(+)
 
-Display data path of crtc main is:
-[OVL0] -> [COLOR0] -> [AAL] -> [OD] -> [UFOE] -> [RDMA0]
+Applied, thanks.
 
-This patch depends on the other patches:
-1. MT8173 IOMMU support
-	http://lists.infradead.org/pipermail/linux-mediatek/2015-March/000058.html
-2. add IOMMU dma_ops
-	cherry picked from git://linux-arm.org/linux-rm iommu/dma
-		commit d76a1911b02185bdc5f8b5525f9228cf266725c5
-
-CK Hu (2):
-  dt-bindings: drm/mediatek: Add Mediatek DRM dts binding
-  drm/mediatek: Add DRM Driver for Mediatek SoC MT8173.
-
- .../bindings/drm/mediatek/mediatek,crtc-main.txt   |   38 +
- .../bindings/drm/mediatek/mediatek,ddp.txt         |   22 +
- .../bindings/drm/mediatek/mediatek,drm.txt         |   27 +
- .../bindings/drm/mediatek/mediatek,dsi.txt         |   20 +
- drivers/gpu/drm/Kconfig                            |    2 +
- drivers/gpu/drm/Makefile                           |    1 +
- drivers/gpu/drm/mediatek/Kconfig                   |   28 +
- drivers/gpu/drm/mediatek/Makefile                  |   13 +
- drivers/gpu/drm/mediatek/mediatek_drm_crtc.c       |  246 ++++
- drivers/gpu/drm/mediatek/mediatek_drm_crtc.h       |   80 ++
- drivers/gpu/drm/mediatek/mediatek_drm_crtc_main.c  |  420 ++++++
- drivers/gpu/drm/mediatek/mediatek_drm_ddp.c        |  202 +++
- drivers/gpu/drm/mediatek/mediatek_drm_ddp.h        |   23 +
- drivers/gpu/drm/mediatek/mediatek_drm_ddp_comp.c   |  346 +++++
- drivers/gpu/drm/mediatek/mediatek_drm_ddp_comp.h   |   33 +
- drivers/gpu/drm/mediatek/mediatek_drm_drv.c        |  369 ++++++
- drivers/gpu/drm/mediatek/mediatek_drm_drv.h        |   37 +
- drivers/gpu/drm/mediatek/mediatek_drm_dsi.c        | 1333 ++++++++++++++++++++
- drivers/gpu/drm/mediatek/mediatek_drm_dsi.h        |   71 ++
- drivers/gpu/drm/mediatek/mediatek_drm_fb.c         |  339 +++++
- drivers/gpu/drm/mediatek/mediatek_drm_fb.h         |   43 +
- drivers/gpu/drm/mediatek/mediatek_drm_gem.c        |  315 +++++
- drivers/gpu/drm/mediatek/mediatek_drm_gem.h        |   94 ++
- include/uapi/drm/mediatek_drm.h                    |   59 +
- 24 files changed, 4161 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/drm/mediatek/mediatek,crtc-main.txt
- create mode 100644 Documentation/devicetree/bindings/drm/mediatek/mediatek,ddp.txt
- create mode 100644 Documentation/devicetree/bindings/drm/mediatek/mediatek,drm.txt
- create mode 100644 Documentation/devicetree/bindings/drm/mediatek/mediatek,dsi.txt
- create mode 100644 drivers/gpu/drm/mediatek/Kconfig
- create mode 100644 drivers/gpu/drm/mediatek/Makefile
- create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_crtc.c
- create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_crtc.h
- create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_crtc_main.c
- create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_ddp.c
- create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_ddp.h
- create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_ddp_comp.c
- create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_ddp_comp.h
- create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_drv.c
- create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_drv.h
- create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_dsi.c
- create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_dsi.h
- create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_fb.c
- create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_fb.h
- create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_gem.c
- create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_gem.h
- create mode 100644 include/uapi/drm/mediatek_drm.h
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index d18029be6a78..cfbb7d7aead6 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -32,6 +32,7 @@
+>  static const char * const axp20x_model_names[] = {
+>  	"AXP202",
+>  	"AXP209",
+> +	"AXP221",
+>  	"AXP288",
+>  };
+>  
+> @@ -54,6 +55,25 @@ static const struct regmap_access_table axp20x_volatile_table = {
+>  	.n_yes_ranges	= ARRAY_SIZE(axp20x_volatile_ranges),
+>  };
+>  
+> +static const struct regmap_range axp22x_writeable_ranges[] = {
+> +	regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ5_STATE),
+> +	regmap_reg_range(AXP20X_DCDC_MODE, AXP22X_BATLOW_THRES1),
+> +};
+> +
+> +static const struct regmap_range axp22x_volatile_ranges[] = {
+> +	regmap_reg_range(AXP20X_IRQ1_EN, AXP20X_IRQ5_STATE),
+> +};
+> +
+> +static const struct regmap_access_table axp22x_writeable_table = {
+> +	.yes_ranges	= axp22x_writeable_ranges,
+> +	.n_yes_ranges	= ARRAY_SIZE(axp22x_writeable_ranges),
+> +};
+> +
+> +static const struct regmap_access_table axp22x_volatile_table = {
+> +	.yes_ranges	= axp22x_volatile_ranges,
+> +	.n_yes_ranges	= ARRAY_SIZE(axp22x_volatile_ranges),
+> +};
+> +
+>  static const struct regmap_range axp288_writeable_ranges[] = {
+>  	regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ6_STATE),
+>  	regmap_reg_range(AXP20X_DCDC_MODE, AXP288_FG_TUNE5),
+> @@ -87,6 +107,20 @@ static struct resource axp20x_pek_resources[] = {
+>  	},
+>  };
+>  
+> +static struct resource axp22x_pek_resources[] = {
+> +	{
+> +		.name   = "PEK_DBR",
+> +		.start  = AXP22X_IRQ_PEK_RIS_EDGE,
+> +		.end    = AXP22X_IRQ_PEK_RIS_EDGE,
+> +		.flags  = IORESOURCE_IRQ,
+> +	}, {
+> +		.name   = "PEK_DBF",
+> +		.start  = AXP22X_IRQ_PEK_FAL_EDGE,
+> +		.end    = AXP22X_IRQ_PEK_FAL_EDGE,
+> +		.flags  = IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+>  static struct resource axp288_fuel_gauge_resources[] = {
+>  	{
+>  		.start = AXP288_IRQ_QWBTU,
+> @@ -129,6 +163,15 @@ static const struct regmap_config axp20x_regmap_config = {
+>  	.cache_type	= REGCACHE_RBTREE,
+>  };
+>  
+> +static const struct regmap_config axp22x_regmap_config = {
+> +	.reg_bits	= 8,
+> +	.val_bits	= 8,
+> +	.wr_table	= &axp22x_writeable_table,
+> +	.volatile_table	= &axp22x_volatile_table,
+> +	.max_register	= AXP22X_BATLOW_THRES1,
+> +	.cache_type	= REGCACHE_RBTREE,
+> +};
+> +
+>  static const struct regmap_config axp288_regmap_config = {
+>  	.reg_bits	= 8,
+>  	.val_bits	= 8,
+> @@ -181,6 +224,34 @@ static const struct regmap_irq axp20x_regmap_irqs[] = {
+>  	INIT_REGMAP_IRQ(AXP20X, GPIO0_INPUT,		4, 0),
+>  };
+>  
+> +static const struct regmap_irq axp22x_regmap_irqs[] = {
+> +	INIT_REGMAP_IRQ(AXP22X, ACIN_OVER_V,		0, 7),
+> +	INIT_REGMAP_IRQ(AXP22X, ACIN_PLUGIN,		0, 6),
+> +	INIT_REGMAP_IRQ(AXP22X, ACIN_REMOVAL,	        0, 5),
+> +	INIT_REGMAP_IRQ(AXP22X, VBUS_OVER_V,		0, 4),
+> +	INIT_REGMAP_IRQ(AXP22X, VBUS_PLUGIN,		0, 3),
+> +	INIT_REGMAP_IRQ(AXP22X, VBUS_REMOVAL,	        0, 2),
+> +	INIT_REGMAP_IRQ(AXP22X, VBUS_V_LOW,		0, 1),
+> +	INIT_REGMAP_IRQ(AXP22X, BATT_PLUGIN,		1, 7),
+> +	INIT_REGMAP_IRQ(AXP22X, BATT_REMOVAL,	        1, 6),
+> +	INIT_REGMAP_IRQ(AXP22X, BATT_ENT_ACT_MODE,	1, 5),
+> +	INIT_REGMAP_IRQ(AXP22X, BATT_EXIT_ACT_MODE,	1, 4),
+> +	INIT_REGMAP_IRQ(AXP22X, CHARG,		        1, 3),
+> +	INIT_REGMAP_IRQ(AXP22X, CHARG_DONE,		1, 2),
+> +	INIT_REGMAP_IRQ(AXP22X, BATT_TEMP_HIGH,	        1, 1),
+> +	INIT_REGMAP_IRQ(AXP22X, BATT_TEMP_LOW,	        1, 0),
+> +	INIT_REGMAP_IRQ(AXP22X, DIE_TEMP_HIGH,	        2, 7),
+> +	INIT_REGMAP_IRQ(AXP22X, PEK_SHORT,		2, 1),
+> +	INIT_REGMAP_IRQ(AXP22X, PEK_LONG,		2, 0),
+> +	INIT_REGMAP_IRQ(AXP22X, LOW_PWR_LVL1,	        3, 1),
+> +	INIT_REGMAP_IRQ(AXP22X, LOW_PWR_LVL2,	        3, 0),
+> +	INIT_REGMAP_IRQ(AXP22X, TIMER,		        4, 7),
+> +	INIT_REGMAP_IRQ(AXP22X, PEK_RIS_EDGE,	        4, 6),
+> +	INIT_REGMAP_IRQ(AXP22X, PEK_FAL_EDGE,	        4, 5),
+> +	INIT_REGMAP_IRQ(AXP22X, GPIO1_INPUT,		4, 1),
+> +	INIT_REGMAP_IRQ(AXP22X, GPIO0_INPUT,		4, 0),
+> +};
+> +
+>  /* some IRQs are compatible with axp20x models */
+>  static const struct regmap_irq axp288_regmap_irqs[] = {
+>  	INIT_REGMAP_IRQ(AXP288, VBUS_FALL,              0, 2),
+> @@ -224,6 +295,7 @@ static const struct regmap_irq axp288_regmap_irqs[] = {
+>  static const struct of_device_id axp20x_of_match[] = {
+>  	{ .compatible = "x-powers,axp202", .data = (void *) AXP202_ID },
+>  	{ .compatible = "x-powers,axp209", .data = (void *) AXP209_ID },
+> +	{ .compatible = "x-powers,axp221", .data = (void *) AXP221_ID },
+>  	{ },
+>  };
+>  MODULE_DEVICE_TABLE(of, axp20x_of_match);
+> @@ -258,6 +330,18 @@ static const struct regmap_irq_chip axp20x_regmap_irq_chip = {
+>  
+>  };
+>  
+> +static const struct regmap_irq_chip axp22x_regmap_irq_chip = {
+> +	.name			= "axp22x_irq_chip",
+> +	.status_base		= AXP20X_IRQ1_STATE,
+> +	.ack_base		= AXP20X_IRQ1_STATE,
+> +	.mask_base		= AXP20X_IRQ1_EN,
+> +	.mask_invert		= true,
+> +	.init_ack_masked	= true,
+> +	.irqs			= axp22x_regmap_irqs,
+> +	.num_irqs		= ARRAY_SIZE(axp22x_regmap_irqs),
+> +	.num_regs		= 5,
+> +};
+> +
+>  static const struct regmap_irq_chip axp288_regmap_irq_chip = {
+>  	.name			= "axp288_irq_chip",
+>  	.status_base		= AXP20X_IRQ1_STATE,
+> @@ -281,6 +365,14 @@ static struct mfd_cell axp20x_cells[] = {
+>  	},
+>  };
+>  
+> +static struct mfd_cell axp22x_cells[] = {
+> +	{
+> +		.name			= "axp20x-pek",
+> +		.num_resources		= ARRAY_SIZE(axp22x_pek_resources),
+> +		.resources		= axp22x_pek_resources,
+> +	},
+> +};
+> +
+>  static struct resource axp288_adc_resources[] = {
+>  	{
+>  		.name  = "GPADC",
+> @@ -426,6 +518,12 @@ static int axp20x_match_device(struct axp20x_dev *axp20x, struct device *dev)
+>  		axp20x->regmap_cfg = &axp20x_regmap_config;
+>  		axp20x->regmap_irq_chip = &axp20x_regmap_irq_chip;
+>  		break;
+> +	case AXP221_ID:
+> +		axp20x->nr_cells = ARRAY_SIZE(axp22x_cells);
+> +		axp20x->cells = axp22x_cells;
+> +		axp20x->regmap_cfg = &axp22x_regmap_config;
+> +		axp20x->regmap_irq_chip = &axp22x_regmap_irq_chip;
+> +		break;
+>  	case AXP288_ID:
+>  		axp20x->cells = axp288_cells;
+>  		axp20x->nr_cells = ARRAY_SIZE(axp288_cells);
+> diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
+> index dfabd6db7ddf..95568eb798c3 100644
+> --- a/include/linux/mfd/axp20x.h
+> +++ b/include/linux/mfd/axp20x.h
+> @@ -14,6 +14,7 @@
+>  enum {
+>  	AXP202_ID = 0,
+>  	AXP209_ID,
+> +	AXP221_ID,
+>  	AXP288_ID,
+>  	NR_AXP20X_VARIANTS,
+>  };
+> @@ -45,6 +46,28 @@ enum {
+>  #define AXP20X_V_LTF_DISCHRG		0x3c
+>  #define AXP20X_V_HTF_DISCHRG		0x3d
+>  
+> +#define AXP22X_PWR_OUT_CTRL1		0x10
+> +#define AXP22X_PWR_OUT_CTRL2		0x12
+> +#define AXP22X_PWR_OUT_CTRL3		0x13
+> +#define AXP22X_DLDO1_V_OUT		0x15
+> +#define AXP22X_DLDO2_V_OUT		0x16
+> +#define AXP22X_DLDO3_V_OUT		0x17
+> +#define AXP22X_DLDO4_V_OUT		0x18
+> +#define AXP22X_ELDO1_V_OUT		0x19
+> +#define AXP22X_ELDO2_V_OUT		0x1a
+> +#define AXP22X_ELDO3_V_OUT		0x1b
+> +#define AXP22X_DC5LDO_V_OUT		0x1c
+> +#define AXP22X_DCDC1_V_OUT		0x21
+> +#define AXP22X_DCDC2_V_OUT		0x22
+> +#define AXP22X_DCDC3_V_OUT		0x23
+> +#define AXP22X_DCDC4_V_OUT		0x24
+> +#define AXP22X_DCDC5_V_OUT		0x25
+> +#define AXP22X_DCDC23_V_RAMP_CTRL	0x27
+> +#define AXP22X_ALDO1_V_OUT		0x28
+> +#define AXP22X_ALDO2_V_OUT		0x29
+> +#define AXP22X_ALDO3_V_OUT		0x2a
+> +#define AXP22X_CHRG_CTRL3		0x35
+> +
+>  /* Interrupt */
+>  #define AXP20X_IRQ1_EN			0x40
+>  #define AXP20X_IRQ2_EN			0x41
+> @@ -100,6 +123,9 @@ enum {
+>  #define AXP20X_VBUS_MON			0x8b
+>  #define AXP20X_OVER_TMP			0x8f
+>  
+> +#define AXP22X_PWREN_CTRL1		0x8c
+> +#define AXP22X_PWREN_CTRL2		0x8d
+> +
+>  /* GPIO */
+>  #define AXP20X_GPIO0_CTRL		0x90
+>  #define AXP20X_LDO5_V_OUT		0x91
+> @@ -108,6 +134,11 @@ enum {
+>  #define AXP20X_GPIO20_SS		0x94
+>  #define AXP20X_GPIO3_CTRL		0x95
+>  
+> +#define AXP22X_LDO_IO0_V_OUT		0x91
+> +#define AXP22X_LDO_IO1_V_OUT		0x93
+> +#define AXP22X_GPIO_STATE		0x94
+> +#define AXP22X_GPIO_PULL_DOWN		0x95
+> +
+>  /* Battery */
+>  #define AXP20X_CHRG_CC_31_24		0xb0
+>  #define AXP20X_CHRG_CC_23_16		0xb1
+> @@ -120,6 +151,9 @@ enum {
+>  #define AXP20X_CC_CTRL			0xb8
+>  #define AXP20X_FG_RES			0xb9
+>  
+> +/* AXP22X specific registers */
+> +#define AXP22X_BATLOW_THRES1		0xe6
+> +
+>  /* AXP288 specific registers */
+>  #define AXP288_PMIC_ADC_H               0x56
+>  #define AXP288_PMIC_ADC_L               0x57
+> @@ -158,6 +192,30 @@ enum {
+>  	AXP20X_REG_ID_MAX,
+>  };
+>  
+> +enum {
+> +	AXP22X_DCDC1 = 0,
+> +	AXP22X_DCDC2,
+> +	AXP22X_DCDC3,
+> +	AXP22X_DCDC4,
+> +	AXP22X_DCDC5,
+> +	AXP22X_DC1SW,
+> +	AXP22X_DC5LDO,
+> +	AXP22X_ALDO1,
+> +	AXP22X_ALDO2,
+> +	AXP22X_ALDO3,
+> +	AXP22X_ELDO1,
+> +	AXP22X_ELDO2,
+> +	AXP22X_ELDO3,
+> +	AXP22X_DLDO1,
+> +	AXP22X_DLDO2,
+> +	AXP22X_DLDO3,
+> +	AXP22X_DLDO4,
+> +	AXP22X_RTC_LDO,
+> +	AXP22X_LDO_IO0,
+> +	AXP22X_LDO_IO1,
+> +	AXP22X_REG_ID_MAX,
+> +};
+> +
+>  /* IRQs */
+>  enum {
+>  	AXP20X_IRQ_ACIN_OVER_V = 1,
+> @@ -199,6 +257,34 @@ enum {
+>  	AXP20X_IRQ_GPIO0_INPUT,
+>  };
+>  
+> +enum axp22x_irqs {
+> +	AXP22X_IRQ_ACIN_OVER_V = 1,
+> +	AXP22X_IRQ_ACIN_PLUGIN,
+> +	AXP22X_IRQ_ACIN_REMOVAL,
+> +	AXP22X_IRQ_VBUS_OVER_V,
+> +	AXP22X_IRQ_VBUS_PLUGIN,
+> +	AXP22X_IRQ_VBUS_REMOVAL,
+> +	AXP22X_IRQ_VBUS_V_LOW,
+> +	AXP22X_IRQ_BATT_PLUGIN,
+> +	AXP22X_IRQ_BATT_REMOVAL,
+> +	AXP22X_IRQ_BATT_ENT_ACT_MODE,
+> +	AXP22X_IRQ_BATT_EXIT_ACT_MODE,
+> +	AXP22X_IRQ_CHARG,
+> +	AXP22X_IRQ_CHARG_DONE,
+> +	AXP22X_IRQ_BATT_TEMP_HIGH,
+> +	AXP22X_IRQ_BATT_TEMP_LOW,
+> +	AXP22X_IRQ_DIE_TEMP_HIGH,
+> +	AXP22X_IRQ_PEK_SHORT,
+> +	AXP22X_IRQ_PEK_LONG,
+> +	AXP22X_IRQ_LOW_PWR_LVL1,
+> +	AXP22X_IRQ_LOW_PWR_LVL2,
+> +	AXP22X_IRQ_TIMER,
+> +	AXP22X_IRQ_PEK_RIS_EDGE,
+> +	AXP22X_IRQ_PEK_FAL_EDGE,
+> +	AXP22X_IRQ_GPIO1_INPUT,
+> +	AXP22X_IRQ_GPIO0_INPUT,
+> +};
+> +
+>  enum axp288_irqs {
+>  	AXP288_IRQ_VBUS_FALL     = 2,
+>  	AXP288_IRQ_VBUS_RISE,
 
 -- 
-1.8.1.1.dirty
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
