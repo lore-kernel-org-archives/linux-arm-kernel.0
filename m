@@ -1,30 +1,59 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 13 May 2015 14:35:51 -0700
-Subject: [net-next PATCH] net: Reserve skb headroom and set skb->dev even
- if using __alloc_skb
-In-Reply-To: <20150513203413.8252.98057.stgit@ahduyck-vm-fedora22> (Alexander
- Duyck's message of "Wed, 13 May 2015 13:34:13 -0700")
-References: <20150513182738.GA28201@saruman.tx.rr.com>
- <20150513203413.8252.98057.stgit@ahduyck-vm-fedora22>
-Message-ID: <7h8ucs6tzc.fsf@deeprootsystems.com>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Wed, 13 May 2015 15:41:47 -0600
+Subject: [PATCH 2/2] selftests/breakpoints: only set TEST_PROGS when built
+In-Reply-To: <1431467947-29847-3-git-send-email-tyler.baker@linaro.org>
+References: <1431467947-29847-1-git-send-email-tyler.baker@linaro.org>
+ <1431467947-29847-3-git-send-email-tyler.baker@linaro.org>
+Message-ID: <5553C51B.6080504@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alexander Duyck <alexander.h.duyck@redhat.com> writes:
+On 05/12/2015 03:59 PM, tyler.baker at linaro.org wrote:
+> From: Tyler Baker <tyler.baker@linaro.org>
+> 
+> Set TEST_PROGS only when a build has occurred.
+> 
+> Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
+> ---
+>  tools/testing/selftests/breakpoints/Makefile | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/tools/testing/selftests/breakpoints/Makefile b/tools/testing/selftests/breakpoints/Makefile
+> index 1822356..54cc3e7 100644
+> --- a/tools/testing/selftests/breakpoints/Makefile
+> +++ b/tools/testing/selftests/breakpoints/Makefile
+> @@ -12,12 +12,11 @@ endif
+>  all:
+>  ifeq ($(ARCH),x86)
+>  	gcc breakpoint_test.c -o breakpoint_test
+> +	TEST_PROGS := breakpoint_test
+>  else
+>  	echo "Not an x86 target, can't build breakpoints selftests"
+>  endif
+>  
+> -TEST_PROGS := breakpoint_test
+> -
+>  include ../lib.mk
+>  
+>  clean:
+> 
 
-> When I had inlined __alloc_rx_skb into __netdev_alloc_skb and
-> __napi_alloc_skb I had overlooked the fact that there was a return in the
-> __alloc_rx_skb.  As a result we weren't reserving headroom or setting the
-> skb->dev in certain cases.  This change corrects that by adding a couple of
-> jump labels to jump to depending on __alloc_skb either succeeding or failing.
->
-> Fixes: 9451980a6646 ("net: Use cached copy of pfmemalloc to avoid accessing page")
-> Reported-by: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Alexander Duyck <alexander.h.duyck@redhat.com>
+Hmm. With this change install fails to copy breakpoint_test all
+together. Remember setting TEST_PROGS in compile step makes it
+not stick around when install target is called. A better approach
+would be the following:
 
-Tested this on top of next-20150513 on an ARM/OMAP
-(am335x-boneblack.dts) an it fixes the boot problem for me.
+if [ -f breakpoint_test ]
+    TEST_PROGS := breakpoint_test
+fi
 
-Tested-by: Kevin Hilman <khilman@linaro.org>
+include ../lib.mk
 
-Kevin
+-- Shuah
+
+-- 
+Shuah Khan
+Sr. Linux Kernel Developer
+Open Source Innovation Group
+Samsung Research America (Silicon Valley)
+shuahkh at osg.samsung.com | (970) 217-8978
