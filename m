@@ -1,54 +1,25 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Wed, 13 May 2015 13:51:30 +0530
-Subject: [PATCHv5 2/5] ARM: dts: Odroid-XU3 Enable TMU at Exynos5422 base
-In-Reply-To: <CAJKOXPca-2qdYOoMQOnu0jigOYwUvMTWZwdM2kRTkBXw-ws4yw@mail.gmail.com>
-References: <1431499020-3912-1-git-send-email-linux.amoon@gmail.com>
- <1431499020-3912-3-git-send-email-linux.amoon@gmail.com>
- <CAJKOXPca-2qdYOoMQOnu0jigOYwUvMTWZwdM2kRTkBXw-ws4yw@mail.gmail.com>
-Message-ID: <CANAwSgQ=30j4A_nCd26kzxi=rdsh32+Srwuc5EaJigLhJ2r4jA@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 13 May 2015 10:24:13 +0200
+Subject: [PATCH v3 4/4] mtd: mxc_nand: generate nand_ecclayout for 8 bit
+ ECC
+In-Reply-To: <95e2a17d74da5a0415ab93e060f6efc681216313.1431504091.git.baruch@tkos.co.il>
+References: <cover.1431504091.git.baruch@tkos.co.il>
+ <95e2a17d74da5a0415ab93e060f6efc681216313.1431504091.git.baruch@tkos.co.il>
+Message-ID: <20150513082413.GL28888@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 May 2015 at 12:51, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
-> 2015-05-13 15:36 GMT+09:00 Anand Moon <linux.amoon@gmail.com>:
->> This changes enables TMU IP block on the Exynos5422 Odroid-XU3
->> device.
->>
->> Tested-by: Markus Reichl <m.reichl@fivetechno.de>
->> Acked-by: Lukasz Majewski <l.majewski@samsung.com>
->> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
->> ---
->>  arch/arm/boot/dts/exynos5422-odroidxu3.dts | 25 +++++++++++++++++++++++++
->>  1 file changed, 25 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
->> index 9446e28..cd78816 100644
->> --- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
->> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
->> @@ -319,6 +319,31 @@
->>                 #cooling-cells = <2>;
->>                 cooling-levels = <0 130 170 230>;
->>         };
->> +
->> +       tmu at 10060000 {
->
-> Here and for other overrides please use label notation, like:
->
-> &tmu_cpu0 {
->               ...
-> };
->
->> +               vtmu-supply = <&ldo10_reg>;
->
-> I am curious, how did you find that LDO10 supplies TMU unit?
->
-> Best regards,
-> Krzysztof
+On Wed, May 13, 2015 at 11:17:39AM +0300, Baruch Siach wrote:
+> Hardware 8 bit ECC requires a different nand_ecclayout. Instead of adding yet
+> another static struct nand_ecclayout, generate it in code.
+> 
+> Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Hi Krzysztof,
+Thanks
+Uwe
 
-I have re-base my work on earlier Lukasz Majewski patches.
-
-https://patchwork.kernel.org/patch/5693201/
-
--Anand Moon
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
