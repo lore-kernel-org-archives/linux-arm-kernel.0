@@ -1,66 +1,39 @@
-From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
-Date: Wed, 13 May 2015 17:58:44 +0300
-Subject: [PATCH v9 10/17] ARM: tegra: Add the DFLL to Tegra124 device tree
-In-Reply-To: <1431529131-16710-1-git-send-email-mikko.perttunen@kapsi.fi>
-References: <1431529131-16710-1-git-send-email-mikko.perttunen@kapsi.fi>
-Message-ID: <1431529131-16710-11-git-send-email-mikko.perttunen@kapsi.fi>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 13 May 2015 10:00:41 -0500
+Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <20150513050559.GE28858@linux>
+References: <cover.1430394884.git.viresh.kumar@linaro.org>
+ <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
+ <554FFFA3.1060801@ti.com> <20150512051633.GB32300@linux>
+ <555224A2.7000308@ti.com> <20150513050559.GE28858@linux>
+Message-ID: <55536719.5050208@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+On 05/13/2015 12:05 AM, Viresh Kumar wrote:
+> On 12-05-15, 11:04, Nishanth Menon wrote:
+>> Just curious -> is'nt it better to just have min<->max range? binding
+>> as it stands right now is open to interpretation as to what will be
+>> attempted and in what sequence? with a valid min, target or max -
+>> is'nt it more power efficient always to go for a "min" than a target?
+>>
+>> Further, min<->max implies anywhere in that range and is more
+>> consistent with "regulator like" description.
+> 
+> It came out after some discussions on the list, you may want to go
+> through that.
+> 
+> https://lists.linaro.org/pipermail/linaro-kernel/2015-January/019844.html
 
-The DFLL clocksource is a separate IP block from the usual
-clock-and-reset controller, so it gets its own device tree node.
+I see the thread saying that voltage-tolerance is a crappy idea -> I
+agree to that.
 
-Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
-Signed-off-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
-Acked-by: Michael Turquette <mturquette@linaro.org>
----
- arch/arm/boot/dts/tegra124.dtsi | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+What I dont see in the thread, and the point I raised here, why have
+nominal/typical voltage at all? min<->max should be sufficient,
+correct? If the device cannot function at min, then it should not be
+documented as part of valid range at all.
 
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index 01a9f74..5b8177a 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -4,6 +4,7 @@
- #include <dt-bindings/pinctrl/pinctrl-tegra.h>
- #include <dt-bindings/pinctrl/pinctrl-tegra-xusb.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/reset/tegra124-car.h>
- #include <dt-bindings/thermal/tegra124-soctherm.h>
- 
- #include "skeleton.dtsi"
-@@ -702,6 +703,30 @@
- 		#thermal-sensor-cells = <1>;
- 	};
- 
-+	dfll: clock at 0,70110000 {
-+		compatible = "nvidia,tegra124-dfll";
-+		reg = <0 0x70110000 0 0x100>, /* DFLL control */
-+		      <0 0x70110000 0 0x100>, /* I2C output control */
-+		      <0 0x70110100 0 0x100>, /* Integrated I2C controller */
-+		      <0 0x70110200 0 0x100>; /* Look-up table RAM */
-+		interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&tegra_car TEGRA124_CLK_DFLL_SOC>,
-+			 <&tegra_car TEGRA124_CLK_DFLL_REF>,
-+			 <&tegra_car TEGRA124_CLK_I2C5>;
-+		clock-names = "soc", "ref", "i2c";
-+		resets = <&tegra_car TEGRA124_RST_DFLL_DVCO>;
-+		reset-names = "dvco";
-+		#clock-cells = <0>;
-+		clock-output-names = "dfllCPU_out";
-+		nvidia,sample-rate = <12500>;
-+		nvidia,droop-ctrl = <0x00000f00>;
-+		nvidia,force-mode = <1>;
-+		nvidia,cf = <10>;
-+		nvidia,ci = <0>;
-+		nvidia,cg = <2>;
-+		status = "disabled";
-+	};
-+
- 	ahub at 0,70300000 {
- 		compatible = "nvidia,tegra124-ahub";
- 		reg = <0x0 0x70300000 0x0 0x200>,
+
 -- 
-2.3.0
+Regards,
+Nishanth Menon
