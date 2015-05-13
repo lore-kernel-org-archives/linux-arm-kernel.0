@@ -1,38 +1,24 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Wed, 13 May 2015 16:16:58 +0200
-Subject: [PATCH] ARM: dts: am335x-bone* enable pmic-shutdown-controller
-In-Reply-To: <1431525001-5747-1-git-send-email-robertcnelson@gmail.com>
-References: <1431525001-5747-1-git-send-email-robertcnelson@gmail.com>
-Message-ID: <20150513141658.GB6605@localhost>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 May 2015 16:18:18 +0200
+Subject: [GIT PULL] ARM: rockchip: fixup duplicate suspend fix
+In-Reply-To: <4262241.MKs4C65R3h@phil>
+References: <4262241.MKs4C65R3h@phil>
+Message-ID: <41527875.jtmyBXaoXQ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 13, 2015 at 08:50:01AM -0500, Robert Nelson wrote:
-> Fixes: http://bugs.elinux.org/issues/143
+On Wednesday 13 May 2015 16:17:24 Heiko Stuebner wrote:
+> Hi Arnd, Olof,
 > 
-> Commit 672e2b147 which introduced proper shutdown chose to let the PMIC go into sleep-state (aka "RTC-only mode") rather than off-state. This was fine for rev A5 on which that patch was tested, but since then two changes have been made to the power supply scheme:
+> it looks like I got confused when going through the patches fixing suspend
+> issues and from the two of them only one is actually necessary, as both fix
+> the same symptom. Thankfully Chris pointed out this issue and also
+> confirmed which patch should actually be kept. So this pull-req reverts the
+> other (obsolete) one.
 > 
-> (rev A6) enable of the 3v3b regulator moved from LDO2 to LDO4 (3v3a)
-> side-effect: 3v3b rail remains on in sleep-mode (also in off-mode when battery-powered)
+> Sorry for the mess-up.
 > 
-> (rev A6A) am335x vdds supply moved from LDO3 to LDO1
-> side-effect: vdds remains supplied in sleep-mode
-> 
-> As a result heavy leakage occurs from vdds (directly) and 3v3b (via i/o pins) to the 3v3a. The amount of current depends on external connections, but for example leaving a serial console cable connected in this state resulted in serious violation of am335x absolute maximum ratings, with potential for hardware damage.
-> 
-> Reported-by: Matthijs van Duin <matthijsvanduin@gmail.com>
-> Tested-by: Matthijs van Duin <matthijsvanduin@gmail.com>
-> Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Johan Hovold <johan@kernel.org>
 
-This should go into stable as well:
+Pulled into the fixes branch, thanks!
 
-Fixes: 672e2b147413 ("ARM: dts: am335x-boneblack: enable power off and
-rtc wake up")
-Cc: stable <stable@vger.kernel.org>	# 3.19
-Acked-by: Johan Hovold <johan@kernel.org>
-
-Thanks,
-Johan
+	Arnd
