@@ -1,54 +1,52 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 13 May 2015 10:38:08 +0200
-Subject: [PATCH v2 03/10] reset: berlin: convert to a platform driver
-In-Reply-To: <20150512144313.GD32171@kwain>
-References: <1425654328-26298-1-git-send-email-antoine.tenart@free-electrons.com>
- <1425654328-26298-4-git-send-email-antoine.tenart@free-electrons.com>
- <1425896186.3152.25.camel@pengutronix.de> <20150310095713.GD23469@kwain>
- <20150512144313.GD32171@kwain>
-Message-ID: <1431506288.3157.11.camel@pengutronix.de>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Wed, 13 May 2015 14:09:43 +0530
+Subject: [PATCHv5 5/5] ARM: dts: Enable thermal_zone for
+ exynos5422-odroidxu3
+In-Reply-To: <CAJKOXPeNB=BXoY6CAxE8MNZ90cchhbdbUg3Xgef3qAgBR2UWJA@mail.gmail.com>
+References: <1431499020-3912-1-git-send-email-linux.amoon@gmail.com>
+ <1431499020-3912-6-git-send-email-linux.amoon@gmail.com>
+ <CAJKOXPeNB=BXoY6CAxE8MNZ90cchhbdbUg3Xgef3qAgBR2UWJA@mail.gmail.com>
+Message-ID: <CANAwSgTaM+Fthmu=bVjsg-5-iojWRS+om32APY=NDG5nK2iPQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Antoine, Sebastian,
+On 13 May 2015 at 13:10, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
+> 2015-05-13 15:37 GMT+09:00 Anand Moon <linux.amoon@gmail.com>:
+>> Include exynos5-cpu-thermal.dtsi to enable thermal_zone support.
+>
+> I am a little confused because you named this file as
+> exynos5-cpu-thermal, meaning it is common for all Exynos5 boards. But:
+> 1. It references some specific phandles like &fan0 (cooling-device =
+> <&fan0 2 3>).
+> 2. You include it only here.
+>
+> So the question: is "exynos5-cpu-thermal.dtsi" a generic thermal DTSI?
+> What is your intention?
+>
+> Lukasz, you acked the patchset, is it fine?
+>
+> Best regards,
+> Krzysztof
 
-Am Dienstag, den 12.05.2015, 16:43 +0200 schrieb Antoine Tenart:
-> On Tue, Mar 10, 2015 at 10:57:13AM +0100, Antoine Tenart wrote:
-> > On Mon, Mar 09, 2015 at 11:16:26AM +0100, Philipp Zabel wrote:
-> > > 
-> > > Am Freitag, den 06.03.2015, 16:05 +0100 schrieb Antoine Tenart:
-> > > > The Berlin reset controller was introduced without being a platform
-> > > > driver because of a needed DT rework: the node describing the reset
-> > > > controller also describes the pinctrl and clk controllers...
-> > > > 
-> > > > The DT issue being solved thanks to the addition of the Berlin
-> > > > controller mfd driver, it is now possible to convert the Berlin reset
-> > > > driver to a plaftorm driver.
-> > > > 
-> > > > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> > > 
-> > > Looks good to me. Do you want to merge this together with the rest of
-> > > the series, or should I queue the reset patch?
-> > 
-> > I think we better wait for the simple-mfd patch to make it to ARM SoC
-> > first.
-> 
-> simple-mfd just got pulled into next/drivers.
-> 
-> > Once this is done, you can queue the reset patch (unless Sebastian wants
-> > to take it alongside the series).
-> 
-> Antoine
+Hi Krysxtof,
 
-I just noticed that we'll create a small merge conflict in
-Documentation/devicetree/bindings/arm/marvell,berlin.txt if I were to
-merge patches 3 and 4.
-It would be nice to have the reset driver patch merged in the vicinity
-of this documentation change. Since there won't be any conflicting
-changes in drivers/reset/reset-berlin.c, I'd be in favor of keeping the
-series together. So patches 3 and 4
+This file almost similar to below patch
 
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+https://patchwork.kernel.org/patch/5693321/
 
-best regards
-Philipp
+I had to create this new file as I was not able to register
+#thermal-sensors to tmu_cpu0.
+
++       thermal-zones {
++               cpu0_thermal: cpu0-thermal {
++                       thermal-sensors = <&tmu_cpu0 0>;
++                       polling-delay-passive = <0>;
++                       polling-delay = <0>;
+
+Earlier the DTS sensor's were not getting registers to the tmu_cpu0 sensors.
+
+I am not aware If this file will be common to Exynos5 series.
+I could not include any common dts file as I would through me
+compilation error hence .dtsi  extension,
+
+-Anand Moon
