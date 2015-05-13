@@ -1,43 +1,108 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Wed, 13 May 2015 15:16:24 +0200
-Subject: [PATCHv5 3/5] ARM: dts: define default thermal-zones for
- exynos5422
-In-Reply-To: <CAJKOXPeTvB2J0KjTc-YGqgaptXAyNM3Gv7Xsm5F74NmUwALQbQ@mail.gmail.com>
-References: <1431499020-3912-1-git-send-email-linux.amoon@gmail.com>
- <1431499020-3912-4-git-send-email-linux.amoon@gmail.com>
- <CAJKOXPerF9xgGzFuU+HC_9QaOAAMkoQo2DxH0Y=NwLJ7TMWH0A@mail.gmail.com>
- <CAJKOXPeTvB2J0KjTc-YGqgaptXAyNM3Gv7Xsm5F74NmUwALQbQ@mail.gmail.com>
-Message-ID: <20150513151624.688cf12b@amdc2363>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 13 May 2015 21:25:06 +0800
+Subject: [RFC v2 5/7] PCI/ACPI: Consolidate common PCI host bridge code
+ into ACPI core
+In-Reply-To: <55534275.2040404@linux.intel.com>
+References: <1430793970-11159-1-git-send-email-jiang.liu@linux.intel.com>
+ <1430793970-11159-6-git-send-email-jiang.liu@linux.intel.com>
+ <55531967.70507@linaro.org> <55534275.2040404@linux.intel.com>
+Message-ID: <555350B2.8050301@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+On 2015?05?13? 20:24, Jiang Liu wrote:
+> On 2015/5/13 17:29, Hanjun Guo wrote:
+>> Hi Jiang,
+>>
+>> On 2015?05?05? 10:46, Jiang Liu wrote:
+>>> Introduce common interface acpi_pci_root_create() and related data
+>>> structures to create PCI root bus for ACPI PCI host bridges. It will
+>>> be used to kill duplicated arch specific code for IA64 and x86. It may
+>>> also help ARM64 in future.
+>>>
+>> [...]
+>>> diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
+>>> index a965efa52152..a292ee33d74b 100644
+>>> --- a/include/linux/pci-acpi.h
+>>> +++ b/include/linux/pci-acpi.h
+>>> @@ -52,6 +52,30 @@ static inline acpi_handle
+>>> acpi_pci_get_bridge_handle(struct pci_bus *pbus)
+>>>        return ACPI_HANDLE(dev);
+>>>    }
+>>>
+>>> +struct acpi_pci_root;
+>>> +struct acpi_pci_root_ops;
+>>> +
+>>> +struct acpi_pci_root_info_common {
+>>> +    struct pci_controller        controller;
+>>
+>> There is another problem that this patch will lead to
+>> compile error on ARM64 since ARM64 has basic ACPI support
+>> in 4.1.
+>>
+>> struct pci_controller        controller is not available
+>> on ARM64, that's the reason why compile errors happens on ARM64.
+>>
+>> How about move struct pci_controller to this head file?
+>>
+>> because all the related file you changed in this patch set
+>> are only compiled when CONFI_ACPI=y, so for x86,
+>>
+>> struct pci_controller {
+>> #ifdef CONFIG_ACPI
+>>          struct acpi_device *companion;  /* ACPI companion device */
+>> #endif
+>> #ifdef CONFIG_X86_64
+>>          void            *iommu;         /* IOMMU private data */
+>> #endif
+>>          int             segment;        /* PCI domain */
+>>          int             node;           /* NUMA node */
+>> };
+>>
+>> I'm sure #ifdef CONFIG_ACPI .. #endif can be removed
+>> with no harm, and for *iommu, we can remove the #ifdef CONFIG_X86_64
+>> with introducing little more memory on x86_32, after
+>> that, the struct pci_controller is almost the same as ia64:
+>
+> On x86, struct pci_controller may be used when CONFIG_ACPI is disabled.
+> So we can't move it into pci-acpi.h
 
-> 2015-05-13 16:23 GMT+09:00 Krzysztof Kozlowski
-> <k.kozlowski@samsung.com>:
-> > 2015-05-13 15:36 GMT+09:00 Anand Moon <linux.amoon@gmail.com>:
-> >> Trip points corresponding to the one defined in the
-> >> exynos_tmu_data.c for Exynos5 have been included.
-> >> This thermal-zones attribute is afterwards reused for Exynos5422.
-> >>
-> >> Tested-by: Markus Reichl <m.reichl@fivetechno.de>
-> >> Acked-by: Lukasz Majewski <l.majewski@samsung.com>
-> 
-> I cannot find email with Lukasz's acked-by. Could you point me to it?
-> 
-> Lukasz, is the file OK?
+Ah, ok, I missed this part.
 
-Yes, it is OK.
+>
+>>
+>> struct pci_controller {
+>>          struct acpi_device *companion;
+>>          void *iommu;
+>>          int segment;
+>>          int node;               /* nearest node with memory or
+>> NUMA_NO_NODE for global allocation */
+>>
+>>          void *platform_data;
+>> };
+>>
+>> except void *platform_data;
+>>
+>> On ARM64, the structure is almost the same, so how about
+>> introduce
+>>
+>> struct pci_controller {
+>>          struct acpi_device *companion;  /* ACPI companion device */
+>>          void            *iommu;         /* IOMMU private data */
+>>          int             segment;        /* PCI domain */
+>>          int             node;           /* NUMA node */
+>> #ifdef CONFIG_IA64
+>>      void *platform_data;
+>> #endif
+>> };
+>>
+>> in this file, then can be used for all architectures?
+> Current mode is that architecture defines its own version of
+> struct pci_controller. It would be better to keep this pattern.
 
-> 
-> Best regards,
-> Krzysztof
+OK, thanks for the clarify :) So how about add my basic
+PCI support patch for ARM64 on top of you patch set to fix
+this problem?
 
-
-
--- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+Thanks
+Hanjun
