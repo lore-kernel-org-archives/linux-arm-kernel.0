@@ -1,38 +1,44 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 13 May 2015 15:49:40 +0200
-Subject: [GIT PULL 8/8] ARM: tegra: Default configuration updates for v4.2-rc1
-In-Reply-To: <1431524980-13599-1-git-send-email-thierry.reding@gmail.com>
-References: <1431524980-13599-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1431524980-13599-9-git-send-email-thierry.reding@gmail.com>
+From: robertcnelson@gmail.com (Robert Nelson)
+Date: Wed, 13 May 2015 08:50:01 -0500
+Subject: [PATCH] ARM: dts: am335x-bone* enable pmic-shutdown-controller
+Message-ID: <1431525001-5747-1-git-send-email-robertcnelson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+Fixes: http://bugs.elinux.org/issues/143
 
-The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+Commit 672e2b147 which introduced proper shutdown chose to let the PMIC go into sleep-state (aka "RTC-only mode") rather than off-state. This was fine for rev A5 on which that patch was tested, but since then two changes have been made to the power supply scheme:
 
-  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+(rev A6) enable of the 3v3b regulator moved from LDO2 to LDO4 (3v3a)
+side-effect: 3v3b rail remains on in sleep-mode (also in off-mode when battery-powered)
 
-are available in the git repository at:
+(rev A6A) am335x vdds supply moved from LDO3 to LDO1
+side-effect: vdds remains supplied in sleep-mode
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.2-defconfig
+As a result heavy leakage occurs from vdds (directly) and 3v3b (via i/o pins) to the 3v3a. The amount of current depends on external connections, but for example leaving a serial console cable connected in this state resulted in serious violation of am335x absolute maximum ratings, with potential for hardware damage.
 
-for you to fetch changes up to 5f9c2187d6cfac15b44b584c403e187321a4c062:
+Reported-by: Matthijs van Duin <matthijsvanduin@gmail.com>
+Tested-by: Matthijs van Duin <matthijsvanduin@gmail.com>
+Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Johan Hovold <johan@kernel.org>
+---
+ arch/arm/boot/dts/am335x-bone-common.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-  ARM: tegra: Update default configuration (2015-05-05 14:20:16 +0200)
-
-Thanks,
-Thierry
-
-----------------------------------------------------------------
-ARM: tegra: Default configuration updates for v4.2-rc1
-
-This is a set of changes to the Tegra default configuration that enable
-various new features (HDMI audio, watchdog) on Toradex Apalis T30.
-
-----------------------------------------------------------------
-Thierry Reding (1):
-      ARM: tegra: Update default configuration
-
- arch/arm/configs/tegra_defconfig | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
+index c3255e0..7198b81 100644
+--- a/arch/arm/boot/dts/am335x-bone-common.dtsi
++++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
+@@ -223,6 +223,8 @@
+ /include/ "tps65217.dtsi"
+ 
+ &tps {
++	ti,pmic-shutdown-controller;
++
+ 	regulators {
+ 		dcdc1_reg: regulator at 0 {
+ 			regulator-name = "vdds_dpr";
+-- 
+2.1.4
