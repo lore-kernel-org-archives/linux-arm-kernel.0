@@ -1,155 +1,53 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Wed, 13 May 2015 09:10:53 +0200
-Subject: [PATCH 3/3] ARM: BCM5301X: Add DT for SmartRG SR400ac
-In-Reply-To: <1431501053-1517-1-git-send-email-zajec5@gmail.com>
-References: <1431501053-1517-1-git-send-email-zajec5@gmail.com>
-Message-ID: <1431501053-1517-3-git-send-email-zajec5@gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 13 May 2015 10:12:01 +0300
+Subject: [PATCH v2 3/4] mtd: mxc_nand: fix truncate of unaligned oob
+ copying
+In-Reply-To: <20150513070140.GH28888@pengutronix.de>
+References: <cover.1430636819.git.baruch@tkos.co.il>
+ <ff526c6b889682e36e7d086dd5e6dec8936f86d9.1430636819.git.baruch@tkos.co.il>
+ <20150508072432.GJ12671@pengutronix.de>
+ <20150513051202.GI2558@tarshish>
+ <20150513063903.GC28888@pengutronix.de>
+ <20150513064404.GM2558@tarshish>
+ <20150513064734.GF28888@pengutronix.de>
+ <20150513065922.GN2558@tarshish>
+ <20150513070140.GH28888@pengutronix.de>
+Message-ID: <20150513071201.GO2558@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
----
- arch/arm/boot/dts/Makefile                    |   1 +
- arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts | 119 ++++++++++++++++++++++++++
- 2 files changed, 120 insertions(+)
- create mode 100644 arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
+Hi Uwe,
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 37385b3..dc0f748 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -64,6 +64,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
- 	bcm4708-luxul-xwc-1000.dtb \
- 	bcm4708-netgear-r6250.dtb \
- 	bcm4708-netgear-r6300-v2.dtb \
-+	bcm4708-smartrg-sr400ac.dtb \
- 	bcm47081-asus-rt-n18u.dtb \
- 	bcm47081-buffalo-wzr-600dhp2.dtb \
- 	bcm47081-buffalo-wzr-900dhp.dtb \
-diff --git a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
-new file mode 100644
-index 0000000..66dfb53
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
-@@ -0,0 +1,119 @@
-+/*
-+ * Broadcom BCM470X / BCM5301X arm platform code.
-+ * DTS for SmartRG SR400ac
-+ *
-+ * Copyright (C) 2015 Rafa? Mi?ecki <zajec5@gmail.com>
-+ *
-+ * Licensed under the GNU/GPL. See COPYING for details.
-+ */
-+
-+/dts-v1/;
-+
-+#include "bcm4708.dtsi"
-+
-+/ {
-+	compatible = "smartrg,sr400ac", "brcm,bcm4708";
-+	model = "SmartRG SR400ac";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200";
-+	};
-+
-+	memory {
-+		reg = <0x00000000 0x08000000>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		power-white {
-+			label = "bcm53xx:white:power";
-+			gpios = <&chipcommon 1 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-on";
-+		};
-+
-+		power-amber {
-+			label = "bcm53xx:amber:power";
-+			gpios = <&chipcommon 2 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		usb2 {
-+			label = "bcm53xx:white:usb2";
-+			gpios = <&chipcommon 3 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		usb3-white {
-+			label = "bcm53xx:white:usb3";
-+			gpios = <&chipcommon 4 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		usb3-green {
-+			label = "bcm53xx:green:usb3";
-+			gpios = <&chipcommon 5 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		wps {
-+			label = "bcm53xx:white:wps";
-+			gpios = <&chipcommon 6 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		status-red {
-+			label = "bcm53xx:red:status";
-+			gpios = <&chipcommon 8 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		status-green {
-+			label = "bcm53xx:green:status";
-+			gpios = <&chipcommon 9 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		status-blue {
-+			label = "bcm53xx:blue:status";
-+			gpios = <&chipcommon 10 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		wan-white {
-+			label = "bcm53xx:white:wan";
-+			gpios = <&chipcommon 12 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		wan-red {
-+			label = "bcm53xx:red:wan";
-+			gpios = <&chipcommon 13 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-off";
-+		};
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		rfkill {
-+			label = "WiFi";
-+			linux,code = <KEY_RFKILL>;
-+			gpios = <&chipcommon 0 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		wps {
-+			label = "WPS";
-+			linux,code = <KEY_WPS_BUTTON>;
-+			gpios = <&chipcommon 7 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		restart {
-+			label = "Reset";
-+			linux,code = <KEY_RESTART>;
-+			gpios = <&chipcommon 11 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+};
+On Wed, May 13, 2015 at 09:01:40AM +0200, Uwe Kleine-K?nig wrote:
+> On Wed, May 13, 2015 at 09:59:22AM +0300, Baruch Siach wrote:
+> > On Wed, May 13, 2015 at 08:47:34AM +0200, Uwe Kleine-K?nig wrote:
+> > > On Wed, May 13, 2015 at 09:44:04AM +0300, Baruch Siach wrote:
+> > > > > I thought we could get rid of the memcpy32 variants. Where do we need
+> > > > > memcpy32_* where memcpy16 wouldn't work?
+> > > > 
+> > > > memcpy16 should work, but would take twice as much IO/memory accesses. That 
+> > > > would definitely affect performance, as this is the flash data read/write hot 
+> > > > path. I didn't test, though.
+> > > > 
+> > > > Are you sure we want to do that?
+> > > no, I'm not sure. But I think it's worth to test how much performance
+> > > degrades.
+> > 
+> > That will have to wait a few weeks as I don't have the hardware handy at the 
+> > moment.
+> In the hope the test will not be forgotten I consider it ok to take this
+> series without the test (with keeping the memcpy32 that is).
+
+Agreed.
+
+I'll respin this series with the ecc_8bit_layout name change as you suggested.
+
+May I have your Reviewed-by/Acked-by for the patches you are not the author 
+of?
+
+baruch
+
 -- 
-1.8.4.5
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
