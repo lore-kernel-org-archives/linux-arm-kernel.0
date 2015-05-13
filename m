@@ -1,40 +1,89 @@
-From: koro.chen@mediatek.com (Koro Chen)
-Date: Wed, 13 May 2015 22:39:03 +0800
-Subject: [RFC PATCH] ALSA: pcm: Modify double acknowledged interrupts check
- condition
-Message-ID: <1431527943-64178-1-git-send-email-koro.chen@mediatek.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 13 May 2015 15:39:54 +0100
+Subject: [PATCH v8 4/9] mfd: Add binding document for NVIDIA Tegra XUSB
+In-Reply-To: <1430761002-9327-5-git-send-email-abrestic@chromium.org>
+References: <1430761002-9327-1-git-send-email-abrestic@chromium.org>
+ <1430761002-9327-5-git-send-email-abrestic@chromium.org>
+Message-ID: <20150513143954.GA3394@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently in snd_pcm_update_hw_ptr0 during interrupt,
-we consider there were double acknowledged interrupts when:
-1. HW reported pointer is smaller than expected, and
-2. Time from last update time (hdelta) is over half a buffer time.
+On Mon, 04 May 2015, Andrew Bresticker wrote:
 
-However, when HW reported pointer is only a few bytes smaller than
-expected, and when hdelta is just a little larger than half a buffer time
-(e.g. ping-pong buffer), it wrongly treats this IRQ as double acknowledged.
+> Add a binding document for the XUSB host complex on NVIDIA Tegra124
+> and later SoCs.  The XUSB host complex includes a mailbox for
+> communication with the XUSB micro-controller and an xHCI host-controller.
+> 
+> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Cc: Lee Jones <lee.jones@linaro.org>
+> ---
+> Changes from v7:
+>  - Move non-shared resources into child nodes.
+> New for v7.
+> ---
+>  .../bindings/mfd/nvidia,tegra124-xusb.txt          | 37 ++++++++++++++++++++++
+>  1 file changed, 37 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt b/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
+> new file mode 100644
+> index 0000000..bc50110
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
+> @@ -0,0 +1,37 @@
+> +NVIDIA Tegra XUSB host copmlex
+> +==============================
+> +
+> +The XUSB host complex on Tegra124 and later SoCs contains an xHCI host
+> +controller and a mailbox for communication with the XUSB micro-controller.
+> +
+> +Required properties:
+> +--------------------
+> + - compatible: For Tegra124, must contain "nvidia,tegra124-xusb".
+> +   Otherwise, must contain '"nvidia,<chip>-xusb", "nvidia,tegra124-xusb"'
+> +   where <chip> is tegra132.
+> + - reg: Must contain the base and length of the XUSB FPCI registers.
+> + - ranges: Bus address mapping for the XUSB block.  Can be empty since the
+> +   mapping is 1:1.
+> + - #address-cells: Must be 2.
+> + - #size-cells: Must be 2.
+> +
+> +Example:
+> +--------
+> +	usb at 0,70098000 {
+> +		compatible = "nvidia,tegra124-xusb";
+> +		reg = <0x0 0x70098000 0x0 0x1000>;
+> +		ranges;
+> +
+> +		#address-cells = <2>;
+> +		#size-cells = <2>;
+> +
+> +		usb-host at 0,70090000 {
+> +			compatible = "nvidia,tegra124-xhci";
+> +			...
+> +		};
+> +
+> +		mailbox {
+> +			compatible = "nvidia,tegra124-xusb-mbox";
+> +			...
+> +		};
 
-The condition #2 uses jiffies, but jiffies is not high resolution
-since it is integer. We should consider jiffies inaccuracy.
+This doesn't appear to be a proper MFD.  I would have the USB and
+Mailbox devices probe seperately and use a phandle to point the USB
+device to its Mailbox.
 
-Signed-off-by: Koro Chen <koro.chen@mediatek.com>
----
- sound/core/pcm_lib.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+usb at xyz {
+	mboxes = <&xusb-mailbox, [chan]>;
+};
 
-diff --git a/sound/core/pcm_lib.c b/sound/core/pcm_lib.c
-index ac6b33f..7d45645 100644
---- a/sound/core/pcm_lib.c
-+++ b/sound/core/pcm_lib.c
-@@ -339,7 +339,7 @@ static int snd_pcm_update_hw_ptr0(struct snd_pcm_substream *substream,
- 		if (delta > new_hw_ptr) {
- 			/* check for double acknowledged interrupts */
- 			hdelta = curr_jiffies - runtime->hw_ptr_jiffies;
--			if (hdelta > runtime->hw_ptr_buffer_jiffies/2) {
-+			if (hdelta > runtime->hw_ptr_buffer_jiffies/2 + 1) {
- 				hw_base += runtime->buffer_size;
- 				if (hw_base >= runtime->boundary) {
- 					hw_base = 0;
 -- 
-1.8.1.1.dirty
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
