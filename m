@@ -1,83 +1,81 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Wed, 13 May 2015 22:27:16 +0200
-Subject: [PATCH 2/2] misc: Add initial Digital Timing Engine (DTE) driver
- for cygnus
-In-Reply-To: <5553AAEA.30503@broadcom.com>
-References: <1429744923-2007-1-git-send-email-jonathar@broadcom.com>
- <5543CD73.2030902@broadcom.com>
- <20150501203004.3add2c95@lxorguk.ukuu.org.uk>
- <9193036.7UYD2OGJHk@wuerfel> <554D1649.2030106@broadcom.com>
- <20150513153544.GC2065@localhost.localdomain>
- <5553AAEA.30503@broadcom.com>
-Message-ID: <20150513202716.GA15878@localhost.localdomain>
+From: alexander.h.duyck@redhat.com (Alexander Duyck)
+Date: Wed, 13 May 2015 13:34:13 -0700
+Subject: [net-next PATCH] net: Reserve skb headroom and set skb->dev even if
+ using __alloc_skb
+In-Reply-To: <20150513182738.GA28201@saruman.tx.rr.com>
+References: <20150513182738.GA28201@saruman.tx.rr.com>
+Message-ID: <20150513203413.8252.98057.stgit@ahduyck-vm-fedora22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 13, 2015 at 12:50:02PM -0700, Jonathan Richardson wrote:
-> ptp_clock_adjtime() casts it to an unsigned and returns an error:
-> 
->    if ((unsigned long) ts.tv_nsec >= NSEC_PER_SEC)
->        return -EINVAL;
+When I had inlined __alloc_rx_skb into __netdev_alloc_skb and
+__napi_alloc_skb I had overlooked the fact that there was a return in the
+__alloc_rx_skb.  As a result we weren't reserving headroom or setting the
+skb->dev in certain cases.  This change corrects that by adding a couple of
+jump labels to jump to depending on __alloc_skb either succeeding or failing.
 
-The value of a timeval is the sum of its fields, but the field tv_usec
-must always be non-negative.  The tv_sec field can be negative.  So,
-your application simply needs to do this:
+Fixes: 9451980a6646 ("net: Use cached copy of pfmemalloc to avoid accessing page")
+Reported-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Alexander Duyck <alexander.h.duyck@redhat.com>
+---
+ net/core/skbuff.c |   20 ++++++++++++++++----
+ 1 file changed, 16 insertions(+), 4 deletions(-)
 
-	if (tx.time.tv_usec < 0) {
-		tx.time.tv_sec  -= 1;
-		tx.time.tv_usec += 1000000000;
-	}
-
-> >> IRQ interval: I mentioned before that we may be able to calculate the
-> >> isochronous interrupt rate automatically but this isn't possible because
-> >> the DTE doesn't know the frequency of the clients. One solution is to
-> >> use the 'PTP_PEROUT_REQUEST' ioctl to set a periodic timer frequency.
-> >> Not really a timer but good enough for our purposes.
-> > 
-> > As I said in my other reply, I don't understand what the problem is.
-> 
-> See reply to previous email. We can use this ioctl or add a new one as
-> Arnd suggested. It doesn't matter to me.
-
-Still makes no sense.  Why should the interrupt rate depend on the
-clock frequency?
-
-If the ISR is delivering batches of time stamps, then the interrupt
-rate aught to be the highest rate that the system can support.
-
-> >> Set divider: There is no ability to set a frequency or do anything to a
-> >> channel. We could re-use the PTP_EXTTS_REQUEST ioctl but extend 'struct
-> >> ptp_extts_request' by using the reserved field rsv to allow setting an
-> >> integer value representing either a frequency or divider value in our
-> >> case - some value to configure a channel. A new flag would have to be
-> >> added to the existing PTP_ENABLE_FEATURE, RISING and FALLING EDGE.
-> > 
-> > I don't get this, either.
-> 
-> See reply to previous email.
-
-Didn't help me too much :(
-
-> > The PTP interface supports poll/read just fine already.
-> 
-> Yes that's why I wanted to re-use it. As it currently is, it's not going
-> to work for reasons I explained in previous follow up yesterday:
-> 
-> http://marc.info/?l=linux-kernel&m=143147907431947&w=2
-
-You said:
-
-   one user space process would have to read timestamps for all
-   channels/clients and then leave it up to user space IPC to get them
-   to other processes, which isn't great.
-
-I disagree.  I think having tons of fifos isn't great.
-
-Ideally, there will be kernel consumers for most of the channels, and
-they will forward the time stamps in a way appropriate to their
-subsystem.  For example, network devices will use so_timestamping. 
-Any "leftover" channels can go through the generic PTP interface.
-
-
-Thanks,
-Richard
+diff --git a/net/core/skbuff.c b/net/core/skbuff.c
+index d67e612bf0ef..f3fe9bd9e672 100644
+--- a/net/core/skbuff.c
++++ b/net/core/skbuff.c
+@@ -414,8 +414,12 @@ struct sk_buff *__netdev_alloc_skb(struct net_device *dev, unsigned int len,
+ 	len += NET_SKB_PAD;
+ 
+ 	if ((len > SKB_WITH_OVERHEAD(PAGE_SIZE)) ||
+-	    (gfp_mask & (__GFP_WAIT | GFP_DMA)))
+-		return __alloc_skb(len, gfp_mask, SKB_ALLOC_RX, NUMA_NO_NODE);
++	    (gfp_mask & (__GFP_WAIT | GFP_DMA))) {
++		skb = __alloc_skb(len, gfp_mask, SKB_ALLOC_RX, NUMA_NO_NODE);
++		if (!skb)
++			goto skb_fail;
++		goto skb_success;
++	}
+ 
+ 	len += SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
+ 	len = SKB_DATA_ALIGN(len);
+@@ -445,9 +449,11 @@ struct sk_buff *__netdev_alloc_skb(struct net_device *dev, unsigned int len,
+ 		skb->pfmemalloc = 1;
+ 	skb->head_frag = 1;
+ 
++skb_success:
+ 	skb_reserve(skb, NET_SKB_PAD);
+ 	skb->dev = dev;
+ 
++skb_fail:
+ 	return skb;
+ }
+ EXPORT_SYMBOL(__netdev_alloc_skb);
+@@ -475,8 +481,12 @@ struct sk_buff *__napi_alloc_skb(struct napi_struct *napi, unsigned int len,
+ 	len += NET_SKB_PAD + NET_IP_ALIGN;
+ 
+ 	if ((len > SKB_WITH_OVERHEAD(PAGE_SIZE)) ||
+-	    (gfp_mask & (__GFP_WAIT | GFP_DMA)))
+-		return __alloc_skb(len, gfp_mask, SKB_ALLOC_RX, NUMA_NO_NODE);
++	    (gfp_mask & (__GFP_WAIT | GFP_DMA))) {
++		skb = __alloc_skb(len, gfp_mask, SKB_ALLOC_RX, NUMA_NO_NODE);
++		if (!skb)
++			goto skb_fail;
++		goto skb_success;
++	}
+ 
+ 	len += SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
+ 	len = SKB_DATA_ALIGN(len);
+@@ -499,9 +509,11 @@ struct sk_buff *__napi_alloc_skb(struct napi_struct *napi, unsigned int len,
+ 		skb->pfmemalloc = 1;
+ 	skb->head_frag = 1;
+ 
++skb_success:
+ 	skb_reserve(skb, NET_SKB_PAD + NET_IP_ALIGN);
+ 	skb->dev = napi->dev;
+ 
++skb_fail:
+ 	return skb;
+ }
+ EXPORT_SYMBOL(__napi_alloc_skb);
