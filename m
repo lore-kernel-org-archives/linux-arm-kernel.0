@@ -1,39 +1,75 @@
-From: Frank.Li@freescale.com (Frank.Li at freescale.com)
-Date: Wed, 13 May 2015 22:47:42 +0800
-Subject: [PATCH v2 3/3] arm: dts: imx6sx: enable snvs power key
-In-Reply-To: <1431528462-21591-1-git-send-email-Frank.Li@freescale.com>
-References: <1431528462-21591-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <1431528462-21591-3-git-send-email-Frank.Li@freescale.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Wed, 13 May 2015 08:56:30 -0700
+Subject: [PATCH 2/2] PCI: iproc: add bcma pcie driver
+In-Reply-To: <CACna6rxVpJ-4b_5jG91JN62jQHh8u=QaLpO+_7J9mFr+_ScPaA@mail.gmail.com>
+References: <1431465781-10753-1-git-send-email-hauke@hauke-m.de>	<1431465781-10753-3-git-send-email-hauke@hauke-m.de>
+ <CACna6rxVpJ-4b_5jG91JN62jQHh8u=QaLpO+_7J9mFr+_ScPaA@mail.gmail.com>
+Message-ID: <5553742E.7070204@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Li <Frank.Li@freescale.com>
+Hi Rafal,
 
-enable snvs ONOFF power key support
+On 5/12/2015 11:27 PM, Rafa? Mi?ecki wrote:
+> On 12 May 2015 at 23:23, Hauke Mehrtens <hauke@hauke-m.de> wrote:
+>> This driver adds support for the PCIe 2.0 controller found on the bcma
+>> bus. This controller can be found on (mostly) all Broadcom BCM470X /
+>> BCM5301X ARM SoCs.
+>>
+>> The driver found in the Broadcom SDK does some more stuff, like setting
+>> up some DMA memory areas, chaining MPS and MRRS to 512 and also some
+>> PHY changes like "improving" the PCIe jitter and doing some special
+>> initializations for the 3rd PCIe port.
+>>
+>> This was tested on a bcm4708 board with 2 PCIe ports and wireless cards
+>> connected to them.
+>>
+>> PCI_DOMAINS is needed by this driver, because normally there is more
+>> than one PCIe controller and without PCI_DOMAINS only the first
+>> controller gets registered.
+>> This controller gets 6 IRQs, the last one is trigged by all IRQ events.
+>>
+>> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+> 
+> Acked-by: Rafa? Mi?ecki <zajec5@gmail.com>
+> 
+> 
+>> +static int iproc_pcie_bcma_probe(struct bcma_device *bdev)
+>> +{
+>> +       struct iproc_pcie *pcie;
+>> +       LIST_HEAD(res);
+>> +       struct resource res_mem;
+>> +       int ret;
+>> +
+>> +       pcie = devm_kzalloc(&bdev->dev, sizeof(*pcie), GFP_KERNEL);
+>> +       if (!pcie)
+>> +               return -ENOMEM;
+>> +
+>> +       pcie->dev = &bdev->dev;
+>> +       bcma_set_drvdata(bdev, pcie);
+>> +
+>> +       pcie->base = bdev->io_addr;
+>> +
+>> +       res_mem.start = bdev->addr_s[0];
+>> +       res_mem.end = bdev->addr_s[0] + SZ_128M - 1;
+>> +       res_mem.name = "PCIe MEM space";
+>> +       res_mem.flags = IORESOURCE_MEM;
+>> +       pci_add_resource(&res, &res_mem);
+>> +
+>> +       pcie->resources = &res;
+>> +
+>> +       pcie->map_irq = iproc_pcie_bcma_map_irq;
+>> +
+>> +       ret = iproc_pcie_setup(pcie);
+> 
+> I think I don't like this part of iproc design. It lefts
+> pcie->resources pointing to some random memory after the setup/probe
+> are done. Guess it should be a separated parameter or sth.
+> 
+> The patch is still OK, I just refer to generic iproc possible issue.
+> 
+Sorry Rafal, but could you please be more specific on this?
 
-Signed-off-by: Frank Li <Frank.Li@freescale.com>
----
- arch/arm/boot/dts/imx6sx.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Thanks,
 
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index 708175d..f531d18 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -680,6 +680,14 @@
- 				};
- 			};
- 
-+			snvs-pwrkey at 0x020cc000 {
-+				compatible = "fsl,imx6sx-snvs-pwrkey";
-+				reg = <0x020cc000 0x4000>;
-+				interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+				linux,keycode = <116>; /* KEY_POWER */
-+				linux,wakeup;
-+			};
-+
- 			epit1: epit at 020d0000 {
- 				reg = <0x020d0000 0x4000>;
- 				interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
--- 
-1.9.1
+Ray
