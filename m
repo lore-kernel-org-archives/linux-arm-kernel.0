@@ -1,104 +1,53 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Thu, 14 May 2015 06:43:56 +0900
-Subject: [PATCH 7/8] ARM: dts: rockchip: relicense rk3188-radxarock.dts
- under GPLv2/X11
-In-Reply-To: <CABgxDoJk0N9+pAFH0Do4_yBtCABSnppJudQ8EGGN9kiGpmxVOw@mail.gmail.com>
-References: <1425665046-22927-1-git-send-email-heiko@sntech.de>
- <1425665046-22927-8-git-send-email-heiko@sntech.de>
- <CABgxDoJk0N9+pAFH0Do4_yBtCABSnppJudQ8EGGN9kiGpmxVOw@mail.gmail.com>
-Message-ID: <5553C59C.20205@samsung.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 13 May 2015 23:45:01 +0200
+Subject: [GIT PULL] pxa-dt for v4.2
+Message-ID: <87y4ksjgo2.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arnd, Kevin, and Olof,
 
-Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
+This is the pxa pull request for 4.2 device-tree. It is the same than the
+former 4.1 one.
 
-On 03/13/2015 10:32 PM, Romain Perier wrote:
-> Acked-by: Romain Perier <romain.perier@gmail.com>
-> 
-> 2015-03-06 19:04 GMT+01:00 Heiko Stuebner <heiko@sntech.de>:
->> GPLv2-only devicetrees make reuse difficult for software components licensed
->> under a different license.
->>
->> The consensus is that a GPL/X11 dual-license should allow all necessary uses,
->> so relicense the rk3188-radxarock.dts to this combination.
->>
->> CCs were aquired by git shortlog -sne so it should've hopefully catched
->> every contributor.
->>
->> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
->> Cc: Beniamino Galvani <b.galvani@gmail.com>
->> Cc: Romain Perier <romain.perier@gmail.com>
->> Cc: Jaehoon Chung <jh80.chung@samsung.com>
->> Cc: Julien CHAUVEAU <julien.chauveau@neo-technologies.fr>
->> ---
->> I'm hoping to get Acked-by tags from the people in the Cc-list.
->>
->>  arch/arm/boot/dts/rk3188-radxarock.dts | 44 +++++++++++++++++++++++++++-------
->>  1 file changed, 36 insertions(+), 8 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-radxarock.dts
->> index 9a09579..1eca953 100644
->> --- a/arch/arm/boot/dts/rk3188-radxarock.dts
->> +++ b/arch/arm/boot/dts/rk3188-radxarock.dts
->> @@ -1,15 +1,43 @@
->>  /*
->>   * Copyright (c) 2013 Heiko Stuebner <heiko@sntech.de>
->>   *
->> - * This program is free software; you can redistribute it and/or modify
->> - * it under the terms of the GNU General Public License as published by
->> - * the Free Software Foundation; either version 2 of the License, or
->> - * (at your option) any later version.
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
->>   *
->> - * This program is distributed in the hope that it will be useful,
->> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> - * GNU General Public License for more details.
->> + *  a) This file is free software; you can redistribute it and/or
->> + *     modify it under the terms of the GNU General Public License as
->> + *     published by the Free Software Foundation; either version 2 of the
->> + *     License, or (at your option) any later version.
->> + *
->> + *     This file is distributed in the hope that it will be useful,
->> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + *     GNU General Public License for more details.
->> + *
->> + * Or, alternatively,
->> + *
->> + *  b) Permission is hereby granted, free of charge, to any person
->> + *     obtaining a copy of this software and associated documentation
->> + *     files (the "Software"), to deal in the Software without
->> + *     restriction, including without limitation the rights to use,
->> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> + *     sell copies of the Software, and to permit persons to whom the
->> + *     Software is furnished to do so, subject to the following
->> + *     conditions:
->> + *
->> + *     The above copyright notice and this permission notice shall be
->> + *     included in all copies or substantial portions of the Software.
->> + *
->> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> + *     OTHER DEALINGS IN THE SOFTWARE.
->>   */
->>
->>  /dts-v1/;
->> --
->> 2.1.4
->>
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+
+  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+
+are available in the git repository at:
+
+  https://github.com/rjarzmik/linux.git tags/pxa-dt-4.2
+
+for you to fetch changes up to 8dd3075c489ba19a8f2795199352334e52f34bed:
+
+  ARM: dts: pxa: add pxa-timer to pxa27x and pxa3xx (2015-05-12 23:14:26 +0200)
+
+----------------------------------------------------------------
+This device-tree pxa update brings :
+ - clocks descriptions (pxa27x, pxa3xx)
+ - timer descriptions (pxa27x, pxa3xx)
+ - IPs which are embedded on the SoC
+   - keypad
+   - udc (USB client)
+   - power I2C
+
+These are amongst the building blocks for future pxa device-tree board
+description.
+
+----------------------------------------------------------------
+Robert Jarzmik (5):
+      ARM: dts: pxa: add pwri2c to pxa device-tree
+      ARM: dts: pxa: add clocks
+      ARM: dts: pxa: add pxa27x-udc to pxa27x
+      ARM: dts: pxa: add pxa27x-keypad to pxa27x
+      ARM: dts: pxa: add pxa-timer to pxa27x and pxa3xx
+
+ arch/arm/boot/dts/pxa27x.dtsi | 46 ++++++++++++++++++++++++++++++++++++++++---
+ arch/arm/boot/dts/pxa2xx.dtsi |  7 ++++++-
+ arch/arm/boot/dts/pxa3xx.dtsi | 29 ++++++++++++++++++++++++++-
+ 3 files changed, 77 insertions(+), 5 deletions(-)
+
+Cheers.
+
+-- 
+Robert
