@@ -1,70 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 13 May 2015 17:04:42 +0100
-Subject: [EDT] [PATCH 1/1] Fix: hw watchpoint continually triggers callback
-In-Reply-To: <1680595986.99931431494070231.JavaMail.weblogic@ep2mlwas08c>
-References: <1680595986.99931431494070231.JavaMail.weblogic@ep2mlwas08c>
-Message-ID: <20150513160442.GF3343@arm.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 13 May 2015 11:14:07 -0500
+Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <20150513151652.GX2761@sirena.org.uk>
+References: <cover.1430394884.git.viresh.kumar@linaro.org>
+ <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
+ <554FFFA3.1060801@ti.com> <20150512051633.GB32300@linux>
+ <555224A2.7000308@ti.com> <20150513050559.GE28858@linux>
+ <55536719.5050208@ti.com> <20150513151652.GX2761@sirena.org.uk>
+Message-ID: <5553784F.7040905@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 13, 2015 at 06:14:30AM +0100, Vaneet Narang wrote:
-> EP-2DAD0AFA905A4ACB804C4F82A001242F
-
-Ok, I have to ask: what on Earth is this number and what does [EDT] mean?
-
-> >On Tue, May 12, 2015 at 02:12:54PM +0100, Vaneet Narang wrote:
-> >> On Tue, May 12, 2015 at 12:48:13PM +0100, Maninder Singh wrote:
-> >> This fix is given for kernel developers who wants to use perf interface by
-> >> registering callback using register_wide_hw_breakpoint API.  On every
-> >> callback trigger they have to unregister watchpoints otherwise callback
-> >> gets called in a loop and now issue is "when to register watch point back
-> >> ?". 
+On 05/13/2015 10:16 AM, Mark Brown wrote:
+> On Wed, May 13, 2015 at 10:00:41AM -0500, Nishanth Menon wrote:
 > 
-> >If you want to solve this, I think we need a better way to expose software
-> >single-step/emulation to the overflow handler. If we try to do this in
-> >the hw_breakpoint code itself, we run into problems:
+>> What I dont see in the thread, and the point I raised here, why have
+>> nominal/typical voltage at all? min<->max should be sufficient,
+>> correct? If the device cannot function at min, then it should not be
+>> documented as part of valid range at all.
 > 
-> >  - What if another thread hits the same instruction whilst we are trying
-> >   to step it?
-> 
-> >  - What if there are two breakpoints or a breakpoint + watchpoint
-> >   triggered by the same instruction?
-> 
-> Thanks for you input. I am not sure, issues which you have mentioned with
-> this implementation will actually come.
-> To address the issues you have raised, I need to brief about kprobe.
-> Kprobe follows 3 steps for breakpoint (BP) handling.
-> 1. Decode BP instruction.
-> 2. Replace BP instruction with new instruction that will generate SWI.
-> 3. Execute instruction & move PC to next instruction.
-> Kprobe follows step 1 & step 2 on addition of BP and 3rd step is followed
-> when SWI gets triggered.
-> 
-> For this fix we have used step 1 & step 3, we have skipped step 2. As we
-> don't know the caller of watch point & also HW generates interrupt so step
-> 2 is not required. The only difference is since we don't know the caller
-> we can't decode instruction in advance. We have to follow step 1 and step
-> 3 when HWI gets triggered.  Since we are not replacing instruction from
-> memory and I assume kprobe implementation for execution of instruction in
-> interrupt context is tested and stable, so it shouldn't  produce any of
-> the above race condition issues.
+> Going for the minimum specified voltage is asking for trouble with
+> regard to tolerances and so on, see also your concern about process
+> corners.  If the electrical engineers specify things as X +/- Y the
+> most conservative thing to do is to try to hit X rather than going
+> straight for the limits.
 
-Ok, so my first point shouldn't be a problem if we're just emulating the
-instruction. However, I still think there are corner cases. For example,
-imagine hitting a breakpoint on a ldr pc, [&foo] instruction where we've
-also got a watchpoint on foo. Even with emulation, it's going to be
-difficult to ensure that watchpoint is safely delivered.
 
-As I say, I'd really rather have a kprobes-agnostic way of stepping an
-instruction and let the debugger decide whether it wants to use that or
-not.
+I've had the same debate with my company's SoC designers as well on
+various occasions as well. At least for the SoCs I deal with, X +/- Y
+range specification involves PMIC/Board variations, where X is the
+least voltage that is attempted to be set on PMIC, X-Y is the min
+voltage allowed at the SoC ball, due to SMPS noise/IRDrop and other
+board specific behavior.
 
-> >  - What if the debugger didn't want to execute the instruction at all?
-> 
-> if debugger doesn't want to execute instruction then debugger should use
-> single step implementation without overflow handler. 
+I am not saying all SoC vendors do specifications the same way, but
+our interest from device tree description is the operating voltage
+range for the device that we can control on the PMIC. if setting (X-Y)
+is not stable voltage for the device, then it should not be stated in
+the description.
 
-But the debugger might want to use the overflow handler to regain control
-on the exception (like ptrace does for userspace).
+To illustrate: What does it mean for a driver using regulator API?
+Attempt X <-> (X+Y), if that fails (example PMIC SMPS max < X), try
+(X-Y)<->(X)? If yes, then we do expect (X-Y)<->(X+Y) should be stable
+for all operating conditions for the device, correct? If this is is
+not stable at (X-Y), then we have a wrong specification for the device
+for claiming X +/- Y is a valid range for the device.
 
-Will
+-- 
+Regards,
+Nishanth Menon
