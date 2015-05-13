@@ -1,13 +1,13 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 13 May 2015 15:49:36 +0200
-Subject: [GIT PULL 4/8] clk: tegra: Changes for v4.2-rc1
+Date: Wed, 13 May 2015 15:49:37 +0200
+Subject: [GIT PULL 5/8] ARM: tegra: Add EMC driver for v4.2-rc1
 In-Reply-To: <1431524980-13599-1-git-send-email-thierry.reding@gmail.com>
 References: <1431524980-13599-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1431524980-13599-5-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1431524980-13599-6-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike, Stephen,
+Hi ARM SoC maintainers,
 
 The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
 
@@ -15,11 +15,11 @@ The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.2-clk
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.2-emc
 
-for you to fetch changes up to 36b7be6d3ea8f434f1e0723f3fb0e85c3e00ebc2:
+for you to fetch changes up to 9c77a81f215bfeee8f96c50c8ab27dbebffec80d:
 
-  clk: tegra: Fix hda2codec_2x clock name for Tegra30 (2015-05-13 15:17:14 +0200)
+  memory: tegra: Add EMC frequency debugfs entry (2015-05-05 11:39:48 +0200)
 
 I've based this pull request on top of the tegra-for-4.2-ramcode pull
 request, so pulling only this one should be sufficient to resolve the
@@ -29,48 +29,39 @@ Thanks,
 Thierry
 
 ----------------------------------------------------------------
-clk: tegra: Changes for v4.2-rc1
+ARM: tegra: Add EMC driver for v4.2-rc1
 
-This contains the EMC clock driver that's been exhaustively reviewed and
-tested. It also includes a change to the clock core that allows a clock
-provider to perform low-level reparenting of clocks. This is required by
-the EMC clock driver because the reparenting needs to be done at a very
-specific point in time during the EMC frequency switch.
+This introduces the EMC driver that's required to scale the external
+memory frequency.
 
 ----------------------------------------------------------------
-Marcel Ziswiler (1):
-      clk: tegra: Fix hda2codec_2x clock name for Tegra30
-
-Mikko Perttunen (3):
+Mikko Perttunen (5):
       soc/tegra: fuse: Add RAM code reader helper
-      clk: tegra: Remove old Tegra124 EMC clock
-      clk: tegra: Add EMC clock driver
+      of: Add Tegra124 EMC bindings
+      memory: tegra: Add API needed by the EMC driver
+      memory: tegra: Add EMC (external memory controller) driver
+      memory: tegra: Add EMC frequency debugfs entry
 
-Thierry Reding (2):
-      Merge branch 'for-4.2/ramcode' into for-4.2/clk
-      clk: tegra: EMC clock driver depends on EMC driver
+Thierry Reding (1):
+      Merge branch 'for-4.2/ramcode' into for-4.2/emc
 
-Tomeu Vizoso (6):
+Tomeu Vizoso (2):
       of: Document long-ram-code property in nvidia,tegra20-apbmisc
-      clk: Expose clk_hw_reparent() to providers
-      of: document new emc-timings subnode in nvidia,tegra124-car
-      of: document external-memory-controller property in tegra124-car
-      clk: tegra: Set the EMC clock as the parent of the MC clock
-      clk: tegra: Have EMC clock implement determine_rate()
+      of: Document timings subnode of nvidia,tegra-mc
 
- .../bindings/clock/nvidia,tegra124-car.txt         |  44 +-
- .../bindings/misc/nvidia,tegra20-apbmisc.txt       |   2 +
- drivers/clk/Kconfig                                |   1 +
- drivers/clk/clk.c                                  |   8 +
- drivers/clk/tegra/Kconfig                          |   3 +
- drivers/clk/tegra/Makefile                         |   1 +
- drivers/clk/tegra/clk-emc.c                        | 538 +++++++++++++++++++++
- drivers/clk/tegra/clk-tegra124.c                   |  19 +-
- drivers/clk/tegra/clk-tegra30.c                    |   2 +-
- drivers/clk/tegra/clk.h                            |  12 +
- drivers/soc/tegra/fuse/tegra-apbmisc.c             |  21 +
- include/linux/clk-provider.h                       |   1 +
- include/soc/tegra/fuse.h                           |   1 +
- 13 files changed, 637 insertions(+), 16 deletions(-)
- create mode 100644 drivers/clk/tegra/Kconfig
- create mode 100644 drivers/clk/tegra/clk-emc.c
+ .../memory-controllers/nvidia,tegra-mc.txt         |   84 +-
+ .../bindings/memory-controllers/tegra-emc.txt      |  374 +++++++
+ .../bindings/misc/nvidia,tegra20-apbmisc.txt       |    2 +
+ drivers/memory/tegra/Kconfig                       |   10 +
+ drivers/memory/tegra/Makefile                      |    2 +
+ drivers/memory/tegra/mc.c                          |  136 +++
+ drivers/memory/tegra/tegra124-emc.c                | 1140 ++++++++++++++++++++
+ drivers/memory/tegra/tegra124.c                    |   44 +
+ drivers/soc/tegra/fuse/tegra-apbmisc.c             |   21 +
+ include/soc/tegra/emc.h                            |   19 +
+ include/soc/tegra/fuse.h                           |    1 +
+ include/soc/tegra/mc.h                             |   14 +-
+ 12 files changed, 1844 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/tegra-emc.txt
+ create mode 100644 drivers/memory/tegra/tegra124-emc.c
+ create mode 100644 include/soc/tegra/emc.h
