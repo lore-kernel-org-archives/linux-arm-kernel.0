@@ -1,73 +1,469 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 13 May 2015 10:59:30 +0200
-Subject: [PATCH 0/3] GPIO support for BRCMSTB
-In-Reply-To: <CADtm3G45-u82Rp_0dHf2EfdMokf8E4FaQ84PHnocpvXxU+5_+g@mail.gmail.com>
-References: <1430901477-10678-1-git-send-email-gregory.0xf0@gmail.com>
- <CACRpkda3EDa7YdzeT6FQ=cQw1RrDath7pQsCos-JeB2y4r18gw@mail.gmail.com>
- <CADtm3G45-u82Rp_0dHf2EfdMokf8E4FaQ84PHnocpvXxU+5_+g@mail.gmail.com>
-Message-ID: <CACRpkdaTYAr-7K5_QZh1CyeyA1224obqEB2Sz8UHZmrWcfv+ow@mail.gmail.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Wed, 13 May 2015 18:11:18 +0900
+Subject: [PATCH v4 03/13] ARM: dts: exynos4: Use labels for overriding
+ nodes in Exynos4210 Origen
+In-Reply-To: <1431351773-2031-4-git-send-email-k.kozlowski.k@gmail.com>
+References: <1431351773-2031-1-git-send-email-k.kozlowski.k@gmail.com>
+ <1431351773-2031-4-git-send-email-k.kozlowski.k@gmail.com>
+Message-ID: <55531536.4040608@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 12, 2015 at 9:38 PM, Gregory Fong <gregory.0xf0@gmail.com> wrote:
-> On Tue, May 12, 2015 at 3:59 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Wed, May 6, 2015 at 10:37 AM, Gregory Fong <gregory.0xf0@gmail.com> wrote:
->>
->>> There is only one IRQ for each GIO IP block (i.e. several register banks share
->>> an IRQ).  After briefly looking into the generic IRQ chip implementation, it
->>> seemed like in this case that using it would result in the driver being more
->>> complex than necessary because AFAICT it expects a 1:1 mapping of
->>> irq_chip_generic to gpio_chip.  It seemed like less of a pain to have a single
->>> irq_chip since we have a single IRQ for all register banks (multiple
->>> gpio_chips).  I might be missing something, maybe using a shared IRQ across
->>> multiple irq_chips is easier than I think?  Suggestions welcome.
->>
->> What is needed is a 1:1 mapping between GPIO offsets and IRQ
->> offsets.
->>
->> If you just number your GPIOs 0...n and your IRQs 0...n
->> it should work just fine with one irqchip for all banks.
->>
->> What screws things up is likely that the hardware supports
->> 32 lines per bank and not all are used.
->>
->> I suggest you enable 32 line and 32 IRQs per bank,
->> so that hwirq maps nicely 1:1 on the GPIO offsets,
->> then just use the width thing to NACK operations on
->> GPIO lines you are not using. This way you can also
->> decode and warn on spurious IRQs on the unused lines.
->
-> For having 32 lines per bank, the big problem here is the upper limit
-> of 256 GPIOs.
+On 05/11/15 22:42, Krzysztof Kozlowski wrote:
+> Usage of labels instead of full paths reduces possible mistakes when
+> overriding nodes.
+> 
 
-Which arch is this?
-Usually this limit comes from
-arch/*/include/asm/gpio.h
+In case of this changes, I have no objection.
+But I can't see the 'codec' node you deleted in this patch?
 
-For ARM that was bumped to 512 a while back. It is also possible
-to define a custom value for your system by defining
-ARCH_NR_GPIOS
+And if possible, can you please put the labels in alphabetically when
+you create this patch again? so that we could find the labels easily...
 
-> Anyway, I don't think I understand IRQ domains and irq_chip_generic
-> very well.  One possibility _might_ be to use multiple irq_chips.
+- Kukjin
 
-That is probably not possible if there is just one IRQ for all
-banks.
-
-The task of the irqdomain is a 1-to-1 translation from one
-hardware numberspace to the Linux IRQ number space.
-
-In your case the hardware IRQ (hwirq) numberspace
-should be:
-
-bank0: 0..31
-bank1: 32..63
-....
-bankn: 32*n..32*n+31
-
-I think the gpiolib irqchip code can translate that properly
-as it is just a simple 0...x mapping, the irq handler need
-some magic to loop over all banks from 0..n though.
-
-Yours,
-Linus Walleij
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+> ---
+>  arch/arm/boot/dts/exynos4210-origen.dts | 418 ++++++++++++++++----------------
+>  1 file changed, 209 insertions(+), 209 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4210-origen.dts b/arch/arm/boot/dts/exynos4210-origen.dts
+> index b81146141402..e0abfc3324d1 100644
+> --- a/arch/arm/boot/dts/exynos4210-origen.dts
+> +++ b/arch/arm/boot/dts/exynos4210-origen.dts
+> @@ -50,209 +50,6 @@
+>  		};
+>  	};
+>  
+> -	watchdog at 10060000 {
+> -		status = "okay";
+> -	};
+> -
+> -	rtc at 10070000 {
+> -		status = "okay";
+> -	};
+> -
+> -	tmu at 100C0000 {
+> -		status = "okay";
+> -	};
+> -
+> -	sdhci at 12530000 {
+> -		bus-width = <4>;
+> -		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_bus4 &sd2_cd>;
+> -		pinctrl-names = "default";
+> -		vmmc-supply = <&mmc_reg>;
+> -		status = "okay";
+> -	};
+> -
+> -	sdhci at 12510000 {
+> -		bus-width = <4>;
+> -		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_cd>;
+> -		pinctrl-names = "default";
+> -		vmmc-supply = <&mmc_reg>;
+> -		status = "okay";
+> -	};
+> -
+> -	g2d at 12800000 {
+> -		status = "okay";
+> -	};
+> -
+> -	codec at 13400000 {
+> -		samsung,mfc-r = <0x43000000 0x800000>;
+> -		samsung,mfc-l = <0x51000000 0x800000>;
+> -		status = "okay";
+> -	};
+> -
+> -	serial at 13800000 {
+> -		status = "okay";
+> -	};
+> -
+> -	serial at 13810000 {
+> -		status = "okay";
+> -	};
+> -
+> -	serial at 13820000 {
+> -		status = "okay";
+> -	};
+> -
+> -	serial at 13830000 {
+> -		status = "okay";
+> -	};
+> -
+> -	i2c at 13860000 {
+> -		status = "okay";
+> -		samsung,i2c-sda-delay = <100>;
+> -		samsung,i2c-max-bus-freq = <20000>;
+> -		pinctrl-0 = <&i2c0_bus>;
+> -		pinctrl-names = "default";
+> -
+> -		max8997_pmic at 66 {
+> -			compatible = "maxim,max8997-pmic";
+> -			reg = <0x66>;
+> -			interrupt-parent = <&gpx0>;
+> -			interrupts = <4 0>, <3 0>;
+> -
+> -			max8997,pmic-buck1-dvs-voltage = <1350000>;
+> -			max8997,pmic-buck2-dvs-voltage = <1100000>;
+> -			max8997,pmic-buck5-dvs-voltage = <1200000>;
+> -
+> -			regulators {
+> -				ldo1_reg: LDO1 {
+> -					regulator-name = "VDD_ABB_3.3V";
+> -					regulator-min-microvolt = <3300000>;
+> -					regulator-max-microvolt = <3300000>;
+> -				};
+> -
+> -				ldo2_reg: LDO2 {
+> -					regulator-name = "VDD_ALIVE_1.1V";
+> -					regulator-min-microvolt = <1100000>;
+> -					regulator-max-microvolt = <1100000>;
+> -					regulator-always-on;
+> -				};
+> -
+> -				ldo3_reg: LDO3 {
+> -					regulator-name = "VMIPI_1.1V";
+> -					regulator-min-microvolt = <1100000>;
+> -					regulator-max-microvolt = <1100000>;
+> -				};
+> -
+> -				ldo4_reg: LDO4 {
+> -					regulator-name = "VDD_RTC_1.8V";
+> -					regulator-min-microvolt = <1800000>;
+> -					regulator-max-microvolt	= <1800000>;
+> -					regulator-always-on;
+> -				};
+> -
+> -				ldo6_reg: LDO6 {
+> -					regulator-name = "VMIPI_1.8V";
+> -					regulator-min-microvolt = <1800000>;
+> -					regulator-max-microvolt	= <1800000>;
+> -					regulator-always-on;
+> -				};
+> -
+> -				ldo7_reg: LDO7 {
+> -					regulator-name = "VDD_AUD_1.8V";
+> -					regulator-min-microvolt = <1800000>;
+> -					regulator-max-microvolt	= <1800000>;
+> -				};
+> -
+> -				ldo8_reg: LDO8 {
+> -					regulator-name = "VADC_3.3V";
+> -					regulator-min-microvolt = <3300000>;
+> -					regulator-max-microvolt	= <3300000>;
+> -				};
+> -
+> -				ldo9_reg: LDO9 {
+> -					regulator-name = "DVDD_SWB_2.8V";
+> -					regulator-min-microvolt = <2800000>;
+> -					regulator-max-microvolt	= <2800000>;
+> -					regulator-always-on;
+> -				};
+> -
+> -				ldo10_reg: LDO10 {
+> -					regulator-name = "VDD_PLL_1.1V";
+> -					regulator-min-microvolt = <1100000>;
+> -					regulator-max-microvolt	= <1100000>;
+> -					regulator-always-on;
+> -				};
+> -
+> -				ldo11_reg: LDO11 {
+> -					regulator-name = "VDD_AUD_3V";
+> -					regulator-min-microvolt = <3000000>;
+> -					regulator-max-microvolt	= <3000000>;
+> -				};
+> -
+> -				ldo14_reg: LDO14 {
+> -					regulator-name = "AVDD18_SWB_1.8V";
+> -					regulator-min-microvolt = <1800000>;
+> -					regulator-max-microvolt	= <1800000>;
+> -					regulator-always-on;
+> -				};
+> -
+> -				ldo17_reg: LDO17 {
+> -					regulator-name = "VDD_SWB_3.3V";
+> -					regulator-min-microvolt = <3300000>;
+> -					regulator-max-microvolt	= <3300000>;
+> -					regulator-always-on;
+> -				};
+> -
+> -				ldo21_reg: LDO21 {
+> -					regulator-name = "VDD_MIF_1.2V";
+> -					regulator-min-microvolt = <1200000>;
+> -					regulator-max-microvolt	= <1200000>;
+> -					regulator-always-on;
+> -				};
+> -
+> -				buck1_reg: BUCK1 {
+> -					/*
+> -					* HACK: The real name is VDD_ARM_1.2V,
+> -					* but exynos-cpufreq does not support
+> -					* DT-based regulator lookup yet.
+> -					*/
+> -					regulator-name = "vdd_arm";
+> -					regulator-min-microvolt = <950000>;
+> -					regulator-max-microvolt	= <1350000>;
+> -					regulator-always-on;
+> -					regulator-boot-on;
+> -				};
+> -
+> -				buck2_reg: BUCK2 {
+> -					regulator-name = "VDD_INT_1.1V";
+> -					regulator-min-microvolt = <900000>;
+> -					regulator-max-microvolt	= <1100000>;
+> -					regulator-always-on;
+> -					regulator-boot-on;
+> -				};
+> -
+> -				buck3_reg: BUCK3 {
+> -					regulator-name = "VDD_G3D_1.1V";
+> -					regulator-min-microvolt = <900000>;
+> -					regulator-max-microvolt = <1100000>;
+> -				};
+> -
+> -				buck5_reg: BUCK5 {
+> -					regulator-name = "VDDQ_M1M2_1.2V";
+> -					regulator-min-microvolt = <1200000>;
+> -					regulator-max-microvolt = <1200000>;
+> -					regulator-always-on;
+> -				};
+> -
+> -				buck7_reg: BUCK7 {
+> -					regulator-name = "VDD_LCD_3.3V";
+> -					regulator-min-microvolt = <3300000>;
+> -					regulator-max-microvolt = <3300000>;
+> -					regulator-boot-on;
+> -					regulator-always-on;
+> -				};
+> -			};
+> -		};
+> -	};
+> -
+>  	gpio_keys {
+>  		compatible = "gpio-keys";
+>  		#address-cells = <1>;
+> @@ -314,12 +111,6 @@
+>  		};
+>  	};
+>  
+> -	fimd at 11c00000 {
+> -		pinctrl-0 = <&lcd_en &lcd_clk &lcd_data24 &pwm0_out>;
+> -		pinctrl-names = "default";
+> -		status = "okay";
+> -	};
+> -
+>  	display-timings {
+>  		native-mode = <&timing0>;
+>  		timing0: timing {
+> @@ -335,3 +126,212 @@
+>  		};
+>  	};
+>  };
+> +
+> +&fimd {
+> +	pinctrl-0 = <&lcd_en &lcd_clk &lcd_data24 &pwm0_out>;
+> +	pinctrl-names = "default";
+> +	status = "okay";
+> +};
+> +
+> +&g2d {
+> +	status = "okay";
+> +};
+> +
+> +&i2c_0 {
+> +	status = "okay";
+> +	samsung,i2c-sda-delay = <100>;
+> +	samsung,i2c-max-bus-freq = <20000>;
+> +	pinctrl-0 = <&i2c0_bus>;
+> +	pinctrl-names = "default";
+> +
+> +	max8997_pmic at 66 {
+> +		compatible = "maxim,max8997-pmic";
+> +		reg = <0x66>;
+> +		interrupt-parent = <&gpx0>;
+> +		interrupts = <4 0>, <3 0>;
+> +
+> +		max8997,pmic-buck1-dvs-voltage = <1350000>;
+> +		max8997,pmic-buck2-dvs-voltage = <1100000>;
+> +		max8997,pmic-buck5-dvs-voltage = <1200000>;
+> +
+> +		regulators {
+> +			ldo1_reg: LDO1 {
+> +				regulator-name = "VDD_ABB_3.3V";
+> +				regulator-min-microvolt = <3300000>;
+> +				regulator-max-microvolt = <3300000>;
+> +			};
+> +
+> +			ldo2_reg: LDO2 {
+> +				regulator-name = "VDD_ALIVE_1.1V";
+> +				regulator-min-microvolt = <1100000>;
+> +				regulator-max-microvolt = <1100000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo3_reg: LDO3 {
+> +				regulator-name = "VMIPI_1.1V";
+> +				regulator-min-microvolt = <1100000>;
+> +				regulator-max-microvolt = <1100000>;
+> +			};
+> +
+> +			ldo4_reg: LDO4 {
+> +				regulator-name = "VDD_RTC_1.8V";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt	= <1800000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo6_reg: LDO6 {
+> +				regulator-name = "VMIPI_1.8V";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt	= <1800000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo7_reg: LDO7 {
+> +				regulator-name = "VDD_AUD_1.8V";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt	= <1800000>;
+> +			};
+> +
+> +			ldo8_reg: LDO8 {
+> +				regulator-name = "VADC_3.3V";
+> +				regulator-min-microvolt = <3300000>;
+> +				regulator-max-microvolt	= <3300000>;
+> +			};
+> +
+> +			ldo9_reg: LDO9 {
+> +				regulator-name = "DVDD_SWB_2.8V";
+> +				regulator-min-microvolt = <2800000>;
+> +				regulator-max-microvolt	= <2800000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo10_reg: LDO10 {
+> +				regulator-name = "VDD_PLL_1.1V";
+> +				regulator-min-microvolt = <1100000>;
+> +				regulator-max-microvolt	= <1100000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo11_reg: LDO11 {
+> +				regulator-name = "VDD_AUD_3V";
+> +				regulator-min-microvolt = <3000000>;
+> +				regulator-max-microvolt	= <3000000>;
+> +			};
+> +
+> +			ldo14_reg: LDO14 {
+> +				regulator-name = "AVDD18_SWB_1.8V";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt	= <1800000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo17_reg: LDO17 {
+> +				regulator-name = "VDD_SWB_3.3V";
+> +				regulator-min-microvolt = <3300000>;
+> +				regulator-max-microvolt	= <3300000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			ldo21_reg: LDO21 {
+> +				regulator-name = "VDD_MIF_1.2V";
+> +				regulator-min-microvolt = <1200000>;
+> +				regulator-max-microvolt	= <1200000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			buck1_reg: BUCK1 {
+> +				/*
+> +				* HACK: The real name is VDD_ARM_1.2V,
+> +				* but exynos-cpufreq does not support
+> +				* DT-based regulator lookup yet.
+> +				*/
+> +				regulator-name = "vdd_arm";
+> +				regulator-min-microvolt = <950000>;
+> +				regulator-max-microvolt	= <1350000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			buck2_reg: BUCK2 {
+> +				regulator-name = "VDD_INT_1.1V";
+> +				regulator-min-microvolt = <900000>;
+> +				regulator-max-microvolt	= <1100000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			buck3_reg: BUCK3 {
+> +				regulator-name = "VDD_G3D_1.1V";
+> +				regulator-min-microvolt = <900000>;
+> +				regulator-max-microvolt = <1100000>;
+> +			};
+> +
+> +			buck5_reg: BUCK5 {
+> +				regulator-name = "VDDQ_M1M2_1.2V";
+> +				regulator-min-microvolt = <1200000>;
+> +				regulator-max-microvolt = <1200000>;
+> +				regulator-always-on;
+> +			};
+> +
+> +			buck7_reg: BUCK7 {
+> +				regulator-name = "VDD_LCD_3.3V";
+> +				regulator-min-microvolt = <3300000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +&mfc {
+> +	samsung,mfc-r = <0x43000000 0x800000>;
+> +	samsung,mfc-l = <0x51000000 0x800000>;
+> +	status = "okay";
+> +};
+> +
+> +&sdhci_0 {
+> +	bus-width = <4>;
+> +	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_cd>;
+> +	pinctrl-names = "default";
+> +	vmmc-supply = <&mmc_reg>;
+> +	status = "okay";
+> +};
+> +
+> +&sdhci_2 {
+> +	bus-width = <4>;
+> +	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_bus4 &sd2_cd>;
+> +	pinctrl-names = "default";
+> +	vmmc-supply = <&mmc_reg>;
+> +	status = "okay";
+> +};
+> +
+> +&serial_0 {
+> +	status = "okay";
+> +};
+> +
+> +&serial_1 {
+> +	status = "okay";
+> +};
+> +
+> +&serial_2 {
+> +	status = "okay";
+> +};
+> +
+> +&serial_3 {
+> +	status = "okay";
+> +};
+> +
+> +&rtc {
+> +	status = "okay";
+> +};
+> +
+> +&tmu {
+> +	status = "okay";
+> +};
+> +
+> +&watchdog {
+> +	status = "okay";
+> +};
