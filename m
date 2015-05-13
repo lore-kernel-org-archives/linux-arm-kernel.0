@@ -1,53 +1,80 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 13 May 2015 10:12:01 +0300
-Subject: [PATCH v2 3/4] mtd: mxc_nand: fix truncate of unaligned oob
- copying
-In-Reply-To: <20150513070140.GH28888@pengutronix.de>
-References: <cover.1430636819.git.baruch@tkos.co.il>
- <ff526c6b889682e36e7d086dd5e6dec8936f86d9.1430636819.git.baruch@tkos.co.il>
- <20150508072432.GJ12671@pengutronix.de>
- <20150513051202.GI2558@tarshish>
- <20150513063903.GC28888@pengutronix.de>
- <20150513064404.GM2558@tarshish>
- <20150513064734.GF28888@pengutronix.de>
- <20150513065922.GN2558@tarshish>
- <20150513070140.GH28888@pengutronix.de>
-Message-ID: <20150513071201.GO2558@tarshish>
+From: btw@mail.itp.ac.cn (Bintian Wang)
+Date: Wed, 13 May 2015 15:12:07 +0800 (GMT+08:00)
+Subject: [PATCH v4 5/5] arm64: dts: Add dts files for Hisilicon
+ Hi6220 SoC
+In-Reply-To: <20150506104856.GC707@leverpostej>
+References: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>
+ <1430827599-11560-6-git-send-email-bintian.wang@huawei.com>
+ <20150505171349.GA30215@leverpostej> <5549877C.10408@huawei.com>
+ <5549B9CC.1040709@huawei.com> <20150506093022.GB31001@leverpostej>
+ <5549EE97.3020801@huawei.com> <20150506104856.GC707@leverpostej>
+Message-ID: <cf6ae9.68c7.14d4c1dc0f6.Coremail.btw@mail.itp.ac.cn>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Hi Mark,
 
-On Wed, May 13, 2015 at 09:01:40AM +0200, Uwe Kleine-K?nig wrote:
-> On Wed, May 13, 2015 at 09:59:22AM +0300, Baruch Siach wrote:
-> > On Wed, May 13, 2015 at 08:47:34AM +0200, Uwe Kleine-K?nig wrote:
-> > > On Wed, May 13, 2015 at 09:44:04AM +0300, Baruch Siach wrote:
-> > > > > I thought we could get rid of the memcpy32 variants. Where do we need
-> > > > > memcpy32_* where memcpy16 wouldn't work?
-> > > > 
-> > > > memcpy16 should work, but would take twice as much IO/memory accesses. That 
-> > > > would definitely affect performance, as this is the flash data read/write hot 
-> > > > path. I didn't test, though.
-> > > > 
-> > > > Are you sure we want to do that?
-> > > no, I'm not sure. But I think it's worth to test how much performance
-> > > degrades.
+> Hi,
+> 
+> > > I think that given that we know the UART is not quite a PL011 we should
+> > > add an additional compatible string just in case some difference crops
+> > > up later that is problematic.
+> > >
+> > > So we'd have something like:
+> > >
+> > > 	compatible = "hisilicon,hi6220-uart", "arm,pl011", "arm,primecell";
+> > >
+> > > That way we can add any optimisations or workarounds later as required.
+> > I understand and thanks for your suggestion.
 > > 
-> > That will have to wait a few weeks as I don't have the hardware handy at the 
-> > moment.
-> In the hope the test will not be forgotten I consider it ok to take this
-> series without the test (with keeping the memcpy32 that is).
+> > Can I do not do this work in this patch set? Because I got the
+> > information UART0 is PL011 compatible. Hisilicon uart engineer can do
+> > this work in the future, maybe for UART1/UART2.
+> 
+> I am not asking you to do any driver work for this -- the current driver
+> should ignore the "hisilicon,hi6220-uart" string and recognise
+> "arm,pl011".
+> 
+> I am only asking you to add the additional string to the DTS, and to
+> update the binding document to list the new string. That way if and when
+> we need the kernel to distinguish between a regular PL011 and the
+> hi6220-specific variant, the DTB does not need to be updated in order to
+> do so.
+How about add the following binding rule to the 2/5 patch:
+---------------------------
+*Hisilicon Enhanced ARM AMBA Primecell PL011 serial UART
 
-Agreed.
+Required properties:
+- compatible: must be "hisilicon,hi6220-uart", "arm,primecell", "arm,pl011"
+- reg: exactly one register range with length 0x1000
+- interrupts: exactly one interrupt specifier
 
-I'll respin this series with the ecc_8bit_layout name change as you suggested.
+See also bindings/serial/pl011.txt
 
-May I have your Reviewed-by/Acked-by for the patches you are not the author 
-of?
+Example:
 
-baruch
+uart0: uart at f8015000 { 
+        compatible = "hisilicon,hi6220-uart", "arm,pl011", "arm,primecell";
+        reg = <0x0 0xf8015000 0x0 0x1000>;
+        interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+        clocks = <&ao_ctrl HI6220_UART0_PCLK>, <&ao_ctrl HI6220_UART0_PCLK>;
+        clock-names = "uartclk", "apb_pclk";
+};
+---------------------------
+ 
+> Is UART 0 different from UART1 and UART2?
+Yes,  but my patch just includes UART0, we do some changements for UART1/2
+to improve performance.  
 
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Thanks,
+
+Bintian
+
+> 
+> Thanks,
+> Mark.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
