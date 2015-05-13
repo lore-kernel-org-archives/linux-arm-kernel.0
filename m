@@ -1,283 +1,71 @@
 From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
-Date: Wed, 13 May 2015 17:58:48 +0300
-Subject: [PATCH v9 14/17] cpufreq: Add cpufreq driver for Tegra124
+Date: Wed, 13 May 2015 17:58:42 +0300
+Subject: [PATCH v9 08/17] clk: tegra: Save/restore CCLKG_BURST_POLICY on
+ suspend
 In-Reply-To: <1431529131-16710-1-git-send-email-mikko.perttunen@kapsi.fi>
 References: <1431529131-16710-1-git-send-email-mikko.perttunen@kapsi.fi>
-Message-ID: <1431529131-16710-15-git-send-email-mikko.perttunen@kapsi.fi>
+Message-ID: <1431529131-16710-9-git-send-email-mikko.perttunen@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
 
-Add a new cpufreq driver for Tegra124. Instead of using the PLLX as
-the CPU clocksource, switch immediately to the DFLL. It allows the use
-of higher clock rates, and will automatically scale the CPU voltage as
-well. Besides the CPU clocksource switch, we let the cpufreq-dt driver
-for all the cpufreq operations.
-
-This driver also relies on the DFLL driver to fill the OPP table for the
-CPU0 device, so that the cpufreq-dt driver knows what frequencies to
-use.
+Save and restore this register since the LP1 restore assembly routines
+fiddle with it. Otherwise the CPU would keep running on PLLX after
+resume from suspend even when DFLL was the original clocksource.
 
 Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 Signed-off-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
+Acked-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+Acked-by: Michael Turquette <mturquette@linaro.org>
 ---
- drivers/cpufreq/Kconfig.arm        |   7 ++
- drivers/cpufreq/Makefile           |   1 +
- drivers/cpufreq/tegra124-cpufreq.c | 214 +++++++++++++++++++++++++++++++++++++
- 3 files changed, 222 insertions(+)
- create mode 100644 drivers/cpufreq/tegra124-cpufreq.c
+ drivers/clk/tegra/clk-tegra124.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index 4674299..4428ebd 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -265,6 +265,13 @@ config ARM_TEGRA20_CPUFREQ
- 	help
- 	  This adds the CPUFreq driver support for Tegra20 SOCs.
+diff --git a/drivers/clk/tegra/clk-tegra124.c b/drivers/clk/tegra/clk-tegra124.c
+index 42ba3d9..ef9c161 100644
+--- a/drivers/clk/tegra/clk-tegra124.c
++++ b/drivers/clk/tegra/clk-tegra124.c
+@@ -98,6 +98,8 @@
+ #define PMC_PLLM_WB0_OVERRIDE 0x1dc
+ #define PMC_PLLM_WB0_OVERRIDE_2 0x2b0
  
-+config ARM_TEGRA124_CPUFREQ
-+	tristate "Tegra124 CPUFreq support"
-+	depends on ARCH_TEGRA && CPUFREQ_DT
-+	default y
-+	help
-+	  This adds the CPUFreq driver support for Tegra124 SOCs.
++#define CCLKG_BURST_POLICY 0x368
 +
- config ARM_PXA2xx_CPUFREQ
- 	tristate "Intel PXA2xx CPUfreq driver"
- 	depends on PXA27x || PXA25x
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index 92391c0..5e9fa41 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -78,6 +78,7 @@ obj-$(CONFIG_ARM_SA1100_CPUFREQ)	+= sa1100-cpufreq.o
- obj-$(CONFIG_ARM_SA1110_CPUFREQ)	+= sa1110-cpufreq.o
- obj-$(CONFIG_ARM_SPEAR_CPUFREQ)		+= spear-cpufreq.o
- obj-$(CONFIG_ARM_TEGRA20_CPUFREQ)	+= tegra20-cpufreq.o
-+obj-$(CONFIG_ARM_TEGRA124_CPUFREQ)	+= tegra124-cpufreq.o
- obj-$(CONFIG_ARM_VEXPRESS_SPC_CPUFREQ)	+= vexpress-spc-cpufreq.o
+ #define UTMIP_PLL_CFG2 0x488
+ #define UTMIP_PLL_CFG2_STABLE_COUNT(x) (((x) & 0xffff) << 6)
+ #define UTMIP_PLL_CFG2_ACTIVE_DLY_COUNT(x) (((x) & 0x3f) << 18)
+@@ -130,6 +132,8 @@
+ #ifdef CONFIG_PM_SLEEP
+ static struct cpu_clk_suspend_context {
+ 	u32 clk_csite_src;
++	u32 cclkg_burst;
++	u32 cclkg_divider;
+ } tegra124_cpu_clk_sctx;
+ #endif
  
- ##################################################################################
-diff --git a/drivers/cpufreq/tegra124-cpufreq.c b/drivers/cpufreq/tegra124-cpufreq.c
-new file mode 100644
-index 0000000..20bcceb
---- /dev/null
-+++ b/drivers/cpufreq/tegra124-cpufreq.c
-@@ -0,0 +1,214 @@
-+/*
-+ * Tegra 124 cpufreq driver
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
+@@ -1323,12 +1327,22 @@ static void tegra124_cpu_clock_suspend(void)
+ 	tegra124_cpu_clk_sctx.clk_csite_src =
+ 				readl(clk_base + CLK_SOURCE_CSITE);
+ 	writel(3 << 30, clk_base + CLK_SOURCE_CSITE);
 +
-+#define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
++	tegra124_cpu_clk_sctx.cclkg_burst =
++				readl(clk_base + CCLKG_BURST_POLICY);
++	tegra124_cpu_clk_sctx.cclkg_divider =
++				readl(clk_base + CCLKG_BURST_POLICY + 4);
+ }
+ 
+ static void tegra124_cpu_clock_resume(void)
+ {
+ 	writel(tegra124_cpu_clk_sctx.clk_csite_src,
+ 				clk_base + CLK_SOURCE_CSITE);
 +
-+#include <linux/clk.h>
-+#include <linux/cpufreq-dt.h>
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of_device.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm_opp.h>
-+#include <linux/regulator/consumer.h>
-+#include <linux/types.h>
-+
-+struct tegra124_cpufreq_priv {
-+	struct regulator *vdd_cpu_reg;
-+	struct clk *cpu_clk;
-+	struct clk *pllp_clk;
-+	struct clk *pllx_clk;
-+	struct clk *dfll_clk;
-+	struct platform_device *cpufreq_dt_pdev;
-+};
-+
-+static int tegra124_cpu_switch_to_dfll(struct tegra124_cpufreq_priv *priv)
-+{
-+	struct clk *orig_parent;
-+	int ret;
-+
-+	ret = clk_set_rate(priv->dfll_clk, clk_get_rate(priv->cpu_clk));
-+	if (ret)
-+		return ret;
-+
-+	orig_parent = clk_get_parent(priv->cpu_clk);
-+	clk_set_parent(priv->cpu_clk, priv->pllp_clk);
-+
-+	ret = clk_prepare_enable(priv->dfll_clk);
-+	if (ret)
-+		goto out;
-+
-+	clk_set_parent(priv->cpu_clk, priv->dfll_clk);
-+
-+	return 0;
-+
-+out:
-+	clk_set_parent(priv->cpu_clk, orig_parent);
-+
-+	return ret;
-+}
-+
-+static void tegra124_cpu_switch_to_pllx(struct tegra124_cpufreq_priv *priv)
-+{
-+	clk_set_parent(priv->cpu_clk, priv->pllp_clk);
-+	clk_disable_unprepare(priv->dfll_clk);
-+	regulator_sync_voltage(priv->vdd_cpu_reg);
-+	clk_set_parent(priv->cpu_clk, priv->pllx_clk);
-+}
-+
-+static struct cpufreq_dt_platform_data cpufreq_dt_pd = {
-+	.independent_clocks = false,
-+};
-+
-+static int tegra124_cpufreq_probe(struct platform_device *pdev)
-+{
-+	struct tegra124_cpufreq_priv *priv;
-+	struct device_node *np;
-+	struct device *cpu_dev;
-+	struct platform_device_info cpufreq_dt_devinfo = {};
-+	int ret;
-+
-+	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	cpu_dev = get_cpu_device(0);
-+	if (!cpu_dev)
-+		return -ENODEV;
-+
-+	np = of_cpu_device_node_get(0);
-+	if (!np)
-+		return -ENODEV;
-+
-+	priv->vdd_cpu_reg = regulator_get(cpu_dev, "vdd-cpu");
-+	if (IS_ERR(priv->vdd_cpu_reg)) {
-+		ret = PTR_ERR(priv->vdd_cpu_reg);
-+		goto out_put_np;
-+	}
-+
-+	priv->cpu_clk = of_clk_get_by_name(np, "cpu_g");
-+	if (IS_ERR(priv->cpu_clk)) {
-+		ret = PTR_ERR(priv->cpu_clk);
-+		goto out_put_vdd_cpu_reg;
-+	}
-+
-+	priv->dfll_clk = of_clk_get_by_name(np, "dfll");
-+	if (IS_ERR(priv->dfll_clk)) {
-+		ret = PTR_ERR(priv->dfll_clk);
-+		goto out_put_cpu_clk;
-+	}
-+
-+	priv->pllx_clk = of_clk_get_by_name(np, "pll_x");
-+	if (IS_ERR(priv->pllx_clk)) {
-+		ret = PTR_ERR(priv->pllx_clk);
-+		goto out_put_dfll_clk;
-+	}
-+
-+	priv->pllp_clk = of_clk_get_by_name(np, "pll_p");
-+	if (IS_ERR(priv->pllp_clk)) {
-+		ret = PTR_ERR(priv->pllp_clk);
-+		goto out_put_pllx_clk;
-+	}
-+
-+	ret = tegra124_cpu_switch_to_dfll(priv);
-+	if (ret)
-+		goto out_put_pllp_clk;
-+
-+	cpufreq_dt_devinfo.name = "cpufreq-dt";
-+	cpufreq_dt_devinfo.parent = &pdev->dev;
-+	cpufreq_dt_devinfo.data = &cpufreq_dt_pd;
-+	cpufreq_dt_devinfo.size_data = sizeof(cpufreq_dt_pd);
-+
-+	priv->cpufreq_dt_pdev =
-+		platform_device_register_full(&cpufreq_dt_devinfo);
-+	if (IS_ERR(priv->cpufreq_dt_pdev)) {
-+		ret = PTR_ERR(priv->cpufreq_dt_pdev);
-+		goto out_switch_to_pllx;
-+	}
-+
-+	platform_set_drvdata(pdev, priv);
-+
-+	return 0;
-+
-+out_switch_to_pllx:
-+	tegra124_cpu_switch_to_pllx(priv);
-+out_put_pllp_clk:
-+	clk_put(priv->pllp_clk);
-+out_put_pllx_clk:
-+	clk_put(priv->pllx_clk);
-+out_put_dfll_clk:
-+	clk_put(priv->dfll_clk);
-+out_put_cpu_clk:
-+	clk_put(priv->cpu_clk);
-+out_put_vdd_cpu_reg:
-+	regulator_put(priv->vdd_cpu_reg);
-+out_put_np:
-+	of_node_put(np);
-+
-+	return ret;
-+}
-+
-+static int tegra124_cpufreq_remove(struct platform_device *pdev)
-+{
-+	struct tegra124_cpufreq_priv *priv = platform_get_drvdata(pdev);
-+
-+	platform_device_unregister(priv->cpufreq_dt_pdev);
-+	tegra124_cpu_switch_to_pllx(priv);
-+
-+	clk_put(priv->pllp_clk);
-+	clk_put(priv->pllx_clk);
-+	clk_put(priv->dfll_clk);
-+	clk_put(priv->cpu_clk);
-+	regulator_put(priv->vdd_cpu_reg);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver tegra124_cpufreq_platdrv = {
-+	.driver.name	= "cpufreq-tegra124",
-+	.probe		= tegra124_cpufreq_probe,
-+	.remove		= tegra124_cpufreq_remove,
-+};
-+
-+static int __init tegra_cpufreq_init(void)
-+{
-+	int ret;
-+	struct platform_device *pdev;
-+
-+	if (!of_machine_is_compatible("nvidia,tegra124"))
-+		return -ENODEV;
-+
-+	/*
-+	 * Platform driver+device required for handling EPROBE_DEFER with
-+	 * the regulator and the DFLL clock
-+	 */
-+	ret = platform_driver_register(&tegra124_cpufreq_platdrv);
-+	if (ret)
-+		return ret;
-+
-+	pdev = platform_device_register_simple("cpufreq-tegra124", -1, NULL, 0);
-+	if (IS_ERR(pdev)) {
-+		platform_driver_unregister(&tegra124_cpufreq_platdrv);
-+		return PTR_ERR(pdev);
-+	}
-+
-+	return 0;
-+}
-+module_init(tegra_cpufreq_init);
-+
-+MODULE_AUTHOR("Tuomas Tynkkynen <ttynkkynen@nvidia.com>");
-+MODULE_DESCRIPTION("cpufreq driver for NVIDIA Tegra124");
-+MODULE_LICENSE("GPL v2");
++	writel(tegra124_cpu_clk_sctx.cclkg_burst,
++					clk_base + CCLKG_BURST_POLICY);
++	writel(tegra124_cpu_clk_sctx.cclkg_divider,
++					clk_base + CCLKG_BURST_POLICY + 4);
+ }
+ #endif
+ 
 -- 
 2.3.0
