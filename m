@@ -1,91 +1,68 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Wed, 13 May 2015 18:02:05 +0900
-Subject: [PATCH v4 02/13] ARM: dts: exynos4: Use labels for overriding
- nodesin Exynos4210
-In-Reply-To: <1431351773-2031-3-git-send-email-k.kozlowski.k@gmail.com>
-References: <1431351773-2031-1-git-send-email-k.kozlowski.k@gmail.com>
- <1431351773-2031-3-git-send-email-k.kozlowski.k@gmail.com>
-Message-ID: <5553130D.3010909@kernel.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 13 May 2015 10:52:40 +0200
+Subject: [PATCH 12/15] thermal: of: implement .set_trips for device tree
+ thermal zones
+In-Reply-To: <1431507163-19933-1-git-send-email-s.hauer@pengutronix.de>
+References: <1431507163-19933-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1431507163-19933-13-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/15 22:42, Krzysztof Kozlowski wrote:
-> Usage of labels instead of full paths reduces possible mistakes when
-> overriding nodes.
-> 
-Well, I'm not sure what kind of the possible mistakes you mentioned...?
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/thermal/of-thermal.c | 12 ++++++++++++
+ include/linux/thermal.h      |  3 +++
+ 2 files changed, 15 insertions(+)
 
-I don't think we need to use the label for gic, combiner.
-
-- Kukjin
-
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
-> ---
->  arch/arm/boot/dts/exynos4210.dtsi | 43 +++++++++++++++++++--------------------
->  1 file changed, 21 insertions(+), 22 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-> index 76b84852f29c..a9a55304e31a 100644
-> --- a/arch/arm/boot/dts/exynos4210.dtsi
-> +++ b/arch/arm/boot/dts/exynos4210.dtsi
-> @@ -52,16 +52,6 @@
->  		};
->  	};
->  
-> -	pmu_system_controller: system-controller at 10020000 {
-> -		clock-names = "clkout0", "clkout1", "clkout2", "clkout3",
-> -				"clkout4", "clkout8", "clkout9";
-> -		clocks = <&clock CLK_OUT_DMC>, <&clock CLK_OUT_TOP>,
-> -			<&clock CLK_OUT_LEFTBUS>, <&clock CLK_OUT_RIGHTBUS>,
-> -			<&clock CLK_OUT_CPU>, <&clock CLK_XXTI>,
-> -			<&clock CLK_XUSBXTI>;
-> -		#clock-cells = <1>;
-> -	};
-> -
->  	sysram: sysram at 02020000 {
->  		compatible = "mmio-sram";
->  		reg = <0x02020000 0x20000>;
-> @@ -95,18 +85,6 @@
->  		arm,data-latency = <2 2 1>;
->  	};
->  
-> -	gic: interrupt-controller at 10490000 {
-> -		cpu-offset = <0x8000>;
-> -	};
-> -
-> -	combiner: interrupt-controller at 10440000 {
-> -		samsung,combiner-nr = <16>;
-> -		interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
-> -			     <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
-> -			     <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
-> -			     <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>;
-> -	};
-> -
->  	mct: mct at 10050000 {
->  		compatible = "samsung,exynos4210-mct";
->  		reg = <0x10050000 0x800>;
-> @@ -245,3 +223,24 @@
->  		status = "disabled";
->  	};
->  };
-> +
-> +&gic {
-> +	cpu-offset = <0x8000>;
-> +};
-> +
-> +&combiner {
-> +	samsung,combiner-nr = <16>;
-> +	interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
-> +		     <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
-> +		     <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
-> +		     <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>;
-> +};
-> +
-> +&pmu_system_controller {
-> +	clock-names = "clkout0", "clkout1", "clkout2", "clkout3",
-> +			"clkout4", "clkout8", "clkout9";
-> +	clocks = <&clock CLK_OUT_DMC>, <&clock CLK_OUT_TOP>,
-> +		<&clock CLK_OUT_LEFTBUS>, <&clock CLK_OUT_RIGHTBUS>,
-> +		<&clock CLK_OUT_CPU>, <&clock CLK_XXTI>, <&clock CLK_XUSBXTI>;
-> +	#clock-cells = <1>;
-> +};
+diff --git a/drivers/thermal/of-thermal.c b/drivers/thermal/of-thermal.c
+index bd3185e..f8dd847 100644
+--- a/drivers/thermal/of-thermal.c
++++ b/drivers/thermal/of-thermal.c
+@@ -97,6 +97,17 @@ static int of_thermal_get_temp(struct thermal_zone_device *tz,
+ 	return data->ops->get_temp(data->sensor_data, temp);
+ }
+ 
++static int of_thermal_set_trips(struct thermal_zone_device *tz,
++			       int low, int high)
++{
++	struct __thermal_zone *data = tz->devdata;
++
++	if (!data->ops || !data->ops->set_trips)
++		return -ENOSYS;
++
++	return data->ops->set_trips(data->sensor_data, low, high);
++}
++
+ /**
+  * of_thermal_get_ntrips - function to export number of available trip
+  *			   points.
+@@ -367,6 +378,7 @@ static int of_thermal_get_crit_temp(struct thermal_zone_device *tz,
+ 
+ static const struct thermal_zone_device_ops of_thermal_ops = {
+ 	.get_temp = of_thermal_get_temp,
++	.set_trips = of_thermal_set_trips,
+ 	.get_trend = of_thermal_get_trend,
+ 	.set_emul_temp = of_thermal_set_emul_temp,
+ 
+diff --git a/include/linux/thermal.h b/include/linux/thermal.h
+index aef6e13..b751f6b 100644
+--- a/include/linux/thermal.h
++++ b/include/linux/thermal.h
+@@ -267,12 +267,15 @@ struct thermal_genl_event {
+  *
+  * Optional:
+  * @get_trend: a pointer to a function that reads the sensor temperature trend.
++ * @set_trips: a pointer to a function that sets a temperature window which shall
++ *             trigger an interrupt when it is left.
+  * @set_emul_temp: a pointer to a function that sets sensor emulated
+  *		   temperature.
+  */
+ struct thermal_zone_of_device_ops {
+ 	int (*get_temp)(void *, int *);
+ 	int (*get_trend)(void *, int, enum thermal_trend *);
++	int (*set_trips)(void *, int, int);
+ 	int (*set_emul_temp)(void *, int);
+ };
+ 
+-- 
+2.1.4
