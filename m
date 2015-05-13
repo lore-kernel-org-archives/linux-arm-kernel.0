@@ -1,52 +1,102 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 13 May 2015 08:22:45 +0300
-Subject: [PATCH v2 0/4] mtd: mxc_nand: fix 8 bit ECC and large oob
-In-Reply-To: <20150508051538.GW6325@pengutronix.de>
-References: <cover.1430636819.git.baruch@tkos.co.il>
- <20150508051538.GW6325@pengutronix.de>
-Message-ID: <20150513052245.GJ2558@tarshish>
+From: maninder1.s@samsung.com (Maninder Singh)
+Date: Wed, 13 May 2015 05:24:07 +0000 (GMT)
+Subject: [EDT][PATCH 1/1] hw_breakpoint.c :cpu hotplug handling
+Message-ID: <556690501.99511431494646065.JavaMail.weblogic@ep2mlwas05a>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+EP-2DAD0AFA905A4ACB804C4F82A001242F
 
-On Fri, May 08, 2015 at 07:15:38AM +0200, Sascha Hauer wrote:
-> On Sun, May 03, 2015 at 10:18:50AM +0300, Baruch Siach wrote:
-> > This patch series fixes mxc_nand bugs that I encountered while trying to use 8
-> > bit ECC mode on i.MX25 with the Micron MT29F8G08ABABA flash chip.
-> > 
-> > Many thanks to Uwe Kleine-K?nig for guiding me through the process of
-> > debugging and fixing, and for contributing a clean-up patch to this series.
-> > 
-> > This series applies and tested on v4.1-rc1.
-> > 
-> > This is version 2 of the patch series, addressing the comments and suggestion
-> > of Uwe Kleine-K?nig on the first series
-> > (http://thread.gmane.org/gmane.linux.ports.arm.kernel/408635). See each patch
-> > for detailed per-patch changelog.
-> > 
-> > Baruch Siach (3):
-> >   mtd: mxc_nand: limit the size of used oob
-> >   mtd: mxc_nand: fix truncate of unaligned oob copying
-> >   mtd: mxc_nand: generate nand_ecclayout for 8 bit ECC
-> > 
-> > Uwe Kleine-K?nig (1):
-> >   mtd: nand: mxc_nand: cleanup copy_spare function
-> 
-> I looked at this version and have only found some minor coding style
-> violations (spaces missing on both sides of operators).
+Subject: [PATCH 1/1] hw_breakpoint.c :cpu hotplug handling
 
-Documentation/CodingStyle mentions it but checkpatch.pl doesn't warn. I find 
-it more readable to omit spaces around the * operator when mixing with +. 
+This patch adds support for CPU hotplug, It re-installl all installed watchpoints and breakpoints
+back on H/W in case of cpu-hot plug.
 
-	layout->eccpos[i*18 + j] = i*26 + j + 7;
+Signed-off-by: Vaneet Narang <v.narang@samsung.com>
+Signed-off-by: Maninder Singh <maninder1.s@samsung.com>
+Reviewed-by: Amit Arora <amit.arora@samsung.com>
+Reviewed-by: Ajeet Yadav <ajeet.y@samsung.com>
+---
+ arch/arm/kernel/hw_breakpoint.c |   56 +++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 56 insertions(+), 0 deletions(-)
 
-> Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
-
-Thanks for reviewing,
-baruch
-
+diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+index dc7d0a9..172bfa8 100644
+--- a/arch/arm/kernel/hw_breakpoint.c
++++ b/arch/arm/kernel/hw_breakpoint.c
+@@ -388,6 +388,56 @@ int arch_install_hw_breakpoint(struct perf_event *bp)
+ 	return 0;
+ }
+ 
++/*
++ * reInstall a perf counter breakpoint.
++ */
++void arch_reinstall_hw_breakpoint(int index, int type)
++{
++	struct arch_hw_breakpoint *info;
++	struct perf_event **slots;
++	int ctrl_base, val_base;
++	u32 addr, ctrl;
++	struct perf_event *bp;
++
++	if (type == ARM_ENTRY_BREAKPOINT) {
++		/* Breakpoint */
++		ctrl_base = ARM_BASE_BCR;
++		val_base = ARM_BASE_BVR;
++		slots = (struct perf_event **)__get_cpu_var(bp_on_reg);
++	} else {
++		/* Watchpoint */
++		ctrl_base = ARM_BASE_WCR;
++		val_base = ARM_BASE_WVR;
++		slots = (struct perf_event **)__get_cpu_var(wp_on_reg);
++	}
++
++	bp = slots[index];
++	if (!bp)
++		return;
++
++	info = counter_arch_bp(bp);
++	addr = info->address;
++	ctrl = encode_ctrl_reg(info->ctrl) | 0x1;
++
++
++	/* Override the breakpoint data with the step data. */
++	if (info->step_ctrl.enabled) {
++		addr = info->trigger & ~0x3;
++		ctrl = encode_ctrl_reg(info->step_ctrl);
++		if (info->ctrl.type != ARM_BREAKPOINT_EXECUTE) {
++			index = 0;
++			ctrl_base = ARM_BASE_BCR + core_num_brps;
++			val_base = ARM_BASE_BVR + core_num_brps;
++		}
++	}
++
++	/* Setup the address register. */
++	write_wb_reg(val_base + index, addr);
++
++	/* Setup the control register. */
++	write_wb_reg(ctrl_base + index, ctrl);
++}
++
+ void arch_uninstall_hw_breakpoint(struct perf_event *bp)
+ {
+ 	struct arch_hw_breakpoint *info = counter_arch_bp(bp);
+@@ -1019,6 +1069,12 @@ clear_vcr:
+ out_mdbgen:
+ 	if (enable_monitor_mode())
+ 		cpumask_or(&debug_err_mask, &debug_err_mask, cpumask_of(cpu));
++
++	for (i = 0; i < core_num_brps; ++i)
++		arch_reinstall_hw_breakpoint(i, ARM_ENTRY_BREAKPOINT);
++	for (i = 0; i < core_num_wrps; ++i)
++		arch_reinstall_hw_breakpoint(i, ARM_ENTRY_SYNC_WATCHPOINT);
++
+ }
+ 
+ static int dbg_reset_notify(struct notifier_block *self,
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+1.7.1
+
+
+Thanks 
+Maninder Singh
