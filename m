@@ -1,67 +1,39 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 13 May 2015 11:17:39 +0300
-Subject: [PATCH v3 4/4] mtd: mxc_nand: generate nand_ecclayout for 8 bit ECC
-In-Reply-To: <cover.1431504091.git.baruch@tkos.co.il>
-References: <cover.1431504091.git.baruch@tkos.co.il>
-Message-ID: <95e2a17d74da5a0415ab93e060f6efc681216313.1431504091.git.baruch@tkos.co.il>
+Date: Wed, 13 May 2015 11:17:35 +0300
+Subject: [PATCH v3 0/4] mtd: mxc_nand: fix 8 bit ECC and large oob
+Message-ID: <cover.1431504091.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hardware 8 bit ECC requires a different nand_ecclayout. Instead of adding yet
-another static struct nand_ecclayout, generate it in code.
+This patch series fixes mxc_nand bugs that I encountered while trying to use 8
+bit ECC mode on i.MX25 with the Micron MT29F8G08ABABA flash chip.
 
-Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
-v3:
-   Rename ecc_8bit_layout to ecc_8bit_layout_4k (Uwe Kleine-K?nig)
+Many thanks to Uwe Kleine-K?nig for guiding me through the process of
+debugging and fixing, for contributing a clean-up patch to this series, and
+for reviewing the rest.
 
-v2:
-   Initialize eccbytes
----
- drivers/mtd/nand/mxc_nand.c | 22 +++++++++++++++++++++-
- 1 file changed, 21 insertions(+), 1 deletion(-)
+This series applies on v4.1-rc1.
 
-diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-index 010be8aa41d4..25759563bf11 100644
---- a/drivers/mtd/nand/mxc_nand.c
-+++ b/drivers/mtd/nand/mxc_nand.c
-@@ -960,6 +960,23 @@ static int get_eccsize(struct mtd_info *mtd)
- 		return 8;
- }
- 
-+static void ecc_8bit_layout_4k(struct nand_ecclayout *layout)
-+{
-+	int i, j;
-+
-+	layout->eccbytes = 8*18;
-+	for (i = 0; i < 8; i++)
-+		for (j = 0; j < 18; j++)
-+			layout->eccpos[i*18 + j] = i*26 + j + 7;
-+
-+	layout->oobfree[0].offset = 2;
-+	layout->oobfree[0].length = 4;
-+	for (i = 1; i < 8; i++) {
-+		layout->oobfree[i].offset = i*26;
-+		layout->oobfree[i].length = 7;
-+	}
-+}
-+
- static void preset_v1(struct mtd_info *mtd)
- {
- 	struct nand_chip *nand_chip = mtd->priv;
-@@ -1636,8 +1653,11 @@ static int mxcnd_probe(struct platform_device *pdev)
- 
- 	if (mtd->writesize == 2048)
- 		this->ecc.layout = host->devtype_data->ecclayout_2k;
--	else if (mtd->writesize == 4096)
-+	else if (mtd->writesize == 4096) {
- 		this->ecc.layout = host->devtype_data->ecclayout_4k;
-+		if (get_eccsize(mtd) == 8)
-+			ecc_8bit_layout_4k(this->ecc.layout);
-+	}
- 
- 	/*
- 	 * Experimentation shows that i.MX NFC can only handle up to 218 oob
+This is version 3 of the patch series, adding Reviewed-by and Acked-by tags
+from Sascha Hauer and Uwe Kleine-K?nig. Patch 4/4 renamed a function as
+suggested by Uwe Kleine-K?nig.
+
+Version 2 of the patch series
+(http://thread.gmane.org/gmane.linux.drivers.mtd/58687), addressed the
+comments and suggestion of Uwe Kleine-K?nig on the first series
+(http://thread.gmane.org/gmane.linux.ports.arm.kernel/408635). See each patch
+for detailed per-patch changelog.
+
+Baruch Siach (3):
+  mtd: mxc_nand: limit the size of used oob
+  mtd: mxc_nand: fix truncate of unaligned oob copying
+  mtd: mxc_nand: generate nand_ecclayout for 8 bit ECC
+
+Uwe Kleine-K?nig (1):
+  mtd: nand: mxc_nand: cleanup copy_spare function
+
+ drivers/mtd/nand/mxc_nand.c | 110 +++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 94 insertions(+), 16 deletions(-)
+
 -- 
 2.1.4
