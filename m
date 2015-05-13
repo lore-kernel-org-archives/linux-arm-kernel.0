@@ -1,89 +1,90 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 13 May 2015 15:39:54 +0100
-Subject: [PATCH v8 4/9] mfd: Add binding document for NVIDIA Tegra XUSB
-In-Reply-To: <1430761002-9327-5-git-send-email-abrestic@chromium.org>
-References: <1430761002-9327-1-git-send-email-abrestic@chromium.org>
- <1430761002-9327-5-git-send-email-abrestic@chromium.org>
-Message-ID: <20150513143954.GA3394@x1>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 13 May 2015 16:42:51 +0200
+Subject: [GIT PULL] Allwinner drivers changes for 4.2
+In-Reply-To: <3302855.7BhJdLtyJZ@wuerfel>
+References: <20150511193527.GA29690@lukather>
+ <20150513115455.GZ10961@lukather> <3302855.7BhJdLtyJZ@wuerfel>
+Message-ID: <7268386.7h5UbnZJi7@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 04 May 2015, Andrew Bresticker wrote:
-
-> Add a binding document for the XUSB host complex on NVIDIA Tegra124
-> and later SoCs.  The XUSB host complex includes a mailbox for
-> communication with the XUSB micro-controller and an xHCI host-controller.
+Am Mittwoch, 13. Mai 2015, 15:03:04 schrieb Arnd Bergmann:
+> On Wednesday 13 May 2015 13:54:55 Maxime Ripard wrote:
+> > On Wed, May 13, 2015 at 12:30:39PM +0200, Arnd Bergmann wrote:
+> > > > > Sorry I hadn't looked at the new driver before, but I did now and
+> > > > > need a little clarification. It seems to me that the device should
+> > > > > be compatible with the generic DT binding we have in
+> > > > > Documentation/devicetree/bindings/misc/sram.txt, and use more
+> > > > > generic code. At least I can't see much in here that is really
+> > > > > sunxi specific.
+> > > > > 
+> > > > > Were you not aware of that generic binding, or did you have a good
+> > > > > reason
+> > > > > not to use it?
+> > > > 
+> > > > I asked myself the same question, and I don't really think that this
+> > > > would be wise, since that in order to be accessible by the CPU it has
+> > > > to be mapped to it through this driver.
+> > > > 
+> > > > I felt like this alone justify a new compatible, even though we might
+> > > > end up using the same driver.
+> > > 
+> > > Have you discussed this with Heiko?
+> > 
+> > No, I didn't.
+> > 
+> > We don't need to use his driver, there was no point about discussing
+> > with him about anything.
 > 
-> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> ---
-> Changes from v7:
->  - Move non-shared resources into child nodes.
-> New for v7.
-> ---
->  .../bindings/mfd/nvidia,tegra124-xusb.txt          | 37 ++++++++++++++++++++++
->  1 file changed, 37 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
+> The point is that you add a new binding for an SRAM. We already have
+> a binding for that, so you should try to make your device fit in with
+> the existing design.
 > 
-> diff --git a/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt b/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
-> new file mode 100644
-> index 0000000..bc50110
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
-> @@ -0,0 +1,37 @@
-> +NVIDIA Tegra XUSB host copmlex
-> +==============================
-> +
-> +The XUSB host complex on Tegra124 and later SoCs contains an xHCI host
-> +controller and a mailbox for communication with the XUSB micro-controller.
-> +
-> +Required properties:
-> +--------------------
-> + - compatible: For Tegra124, must contain "nvidia,tegra124-xusb".
-> +   Otherwise, must contain '"nvidia,<chip>-xusb", "nvidia,tegra124-xusb"'
-> +   where <chip> is tegra132.
-> + - reg: Must contain the base and length of the XUSB FPCI registers.
-> + - ranges: Bus address mapping for the XUSB block.  Can be empty since the
-> +   mapping is 1:1.
-> + - #address-cells: Must be 2.
-> + - #size-cells: Must be 2.
-> +
-> +Example:
-> +--------
-> +	usb at 0,70098000 {
-> +		compatible = "nvidia,tegra124-xusb";
-> +		reg = <0x0 0x70098000 0x0 0x1000>;
-> +		ranges;
-> +
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +
-> +		usb-host at 0,70090000 {
-> +			compatible = "nvidia,tegra124-xhci";
-> +			...
-> +		};
-> +
-> +		mailbox {
-> +			compatible = "nvidia,tegra124-xusb-mbox";
-> +			...
-> +		};
+> > > but I now think I was misreading it, and the problem is different:
+> > > Rather than having separate devices for parts of the SRAM, you
+> > > are actually missing a node for the SRAM physical window. I think
+> > > the individual SRAM pieces should be nodes below one that describes
+> > > all of the SRAM, as we do in
+> > > Documentation/devicetree/bindings/misc/sram.txt
+> > 
+> > These are physically separate SRAM, used for different purposes, by
+> > different devices.
+> > 
+> > Since when in the DT different instances of the same IP should be
+> > represented in a single node?
+> > 
+> > And again, this patch is really not about "Simple IO memory regions to
+> > be managed by the genalloc API". We have no use for these SRAMs, and
+> > just want them to be mapped to the device, so the CPU won't even have
+> > access to them for most of them.
+> 
+> I believe that is the case for a lot of the other SRAMs as well,
+> and that is why I think we need Heiko to review your binding and
+> say if it makes sense separately from the generic driver, or if
+> we should extend the existing binding.
+> 
+> We can still have separate drivers if necessary, but I really don't
+> want to see multiple incompatible ways of describing something this
+> fundamental in DT.
 
-This doesn't appear to be a proper MFD.  I would have the USB and
-Mailbox devices probe seperately and use a phandle to point the USB
-device to its Mailbox.
+Preface: I only did the reserved sections so I could claim parts of my 
+Rockchip sram for the smp code that needed to reside at a specific place in it, 
+so I guess I don't necessarily feel qualified to judge one against the other 
+:-), but anyway
 
-usb at xyz {
-	mboxes = <&xusb-mailbox, [chan]>;
-};
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+The commit message for the driver contains
+
+"We could also imagine changing this at runtime for example to change the
+mapping of these SRAMs to use them for suspend/resume or runtime memory rate
+change, if that ever happens."
+
+which sounds to me a lot like the generic use case for the current sram driver 
+- for example in conjuction with the PIE stuff if it ever resurfaces.
+
+
+But from my short glance I also don't see how this quite custom mapping thing 
+(device vs. cpu) would be able to fit into the generic description.
+
+
+Heiko
