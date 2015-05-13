@@ -1,126 +1,138 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 13 May 2015 15:11:52 +0100
-Subject: [PATCH] ARM: mm: handle non-pmd-aligned end of RAM
-In-Reply-To: <55535440.1090808@redhat.com>
-References: <a865bd68d706f8c4c9e82a374ff6adc4@agner.ch>
- <20150511103130.GA3490@leverpostej>
- <5dec6ce1e05fd20c214d9e0ab41dcc0d@agner.ch>
- <55535440.1090808@redhat.com>
-Message-ID: <20150513141152.GD6169@leverpostej>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 13 May 2015 16:13:13 +0200
+Subject: [PATCH 1/6] clk: add CLK_RECALC_NEW_RATES clock flag for Exynos
+ cpu clock support
+In-Reply-To: <1428079429-4252-2-git-send-email-b.zolnierkie@samsung.com>
+References: <'@samsung.com>
+ <1428079429-4252-1-git-send-email-b.zolnierkie@samsung.com>
+ <1428079429-4252-2-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <55535BF9.60609@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 13, 2015 at 02:40:16PM +0100, Hans de Goede wrote:
-> Hi,
+On 03/04/15 18:43, Bartlomiej Zolnierkiewicz wrote:
+> This flag is needed to fix the issue with wrong dividers being setup
+> by Common Clock Framework when using the new Exynos cpu clock support.
 > 
-> On 11-05-15 13:43, Stefan Agner wrote:
-> > On 2015-05-11 12:31, Mark Rutland wrote:
-> >> At boot time we round the memblock limit down to section size in an
-> >> attempt to ensure that we will have mapped this RAM with section
-> >> mappings prior to allocating from it. When mapping RAM we iterate over
-> >> PMD-sized chunks, creating these section mappings.
-> >>
-> >> Section mappings are only created when the end of a chunk is aligned to
-> >> section size. Unfortunately, with classic page tables (where PMD_SIZE is
-> >> 2 * SECTION_SIZE) this means that if a chunk is between 1M and 2M in
-> >> size the first 1M will not be mapped despite having been accounted for
-> >> in the memblock limit. This has been observed to result in page tables
-> >> being allocated from unmapped memory, causing boot-time hangs.
-> >>
-> >> This patch modifies the memblock limit rounding to always round down to
-> >> PMD_SIZE instead of SECTION_SIZE. For classic MMU this means that we
-> >> will round the memblock limit down to a 2M boundary, matching the limits
-> >> on section mappings, and preventing allocations from unmapped memory.
-> >> For LPAE there should be no change as PMD_SIZE == SECTION_SIZE.
-> >
-> > Thanks Mark, just tested that patch on the hardware I had the issue,
-> > looks good.
-> >
-> > Tested-by: Stefan Agner <stefan@agner.ch>
+> The issue happens because clk_core_set_rate_nolock()  calls
+> clk_calc_new_rates(clk, rate) before both pre/post clock notifiers have
+> a chance to run.  In case of Exynos cpu clock support pre/post clock
+> notifiers are registered for mout_apll clock which is a parent of armclk
+> cpu clock and dividers are modified in both pre and post clock notifier.
+> This results in wrong dividers values being later programmed by
+> clk_change_rate(top).  To workaround the problem CLK_RECALC_NEW_RATES
+> flag is added and it is set for mout_apll clock later so the correct
+> divider values are re-calculated after both pre and post clock notifiers
+> had run.
 > 
-> Same for me, this also fixes the issue I was seeing no an Allwinner A33
-> tablet with 1024z600 lcd screen.
+> For example when using "performance" governor on Exynos4210 Origen board
+> the cpufreq-dt driver requests to change the frequency from 1000MHz to
+> 1200MHz and after the change state of the relevant clocks is following:
 > 
-> Tested-by: Hans de Goede <hdegoede@redhat.com>
+> Without use of CLK_GET_RATE_NOCACHE flag:
+> 
+>  fout_apll rate: 1200000000
+>          fout_apll_div_2 rate: 600000000
+>                  mout_clkout_cpu rate: 600000000
+>                          div_clkout_cpu rate: 600000000
+>                                  clkout_cpu rate: 600000000
+>          mout_apll rate: 1200000000
+>                  armclk rate: 1200000000
+>                  mout_hpm rate: 1200000000
+>                          div_copy rate: 300000000
+>                                  div_hpm rate: 300000000
+>                  mout_core rate: 1200000000
+>                          div_core rate: 1200000000
+>                                  div_core2 rate: 1200000000
+>                                          arm_clk_div_2 rate: 600000000
+>                                          div_corem0 rate: 300000000
+>                                          div_corem1 rate: 150000000
+>                                          div_periph rate: 300000000
+>                          div_atb rate: 300000000
+>                                  div_pclk_dbg rate: 150000000
+>                  sclk_apll rate: 1200000000
+>                          sclk_apll_div_2 rate: 600000000
+> 
+> 
+> With use of CLK_GET_RATE_NOCACHE flag:
+> 
+>  fout_apll rate: 1200000000
+>          fout_apll_div_2 rate: 600000000
+>                  mout_clkout_cpu rate: 600000000
+>                          div_clkout_cpu rate: 600000000
+>                                  clkout_cpu rate: 600000000
+>          mout_apll rate: 1200000000
+>                  armclk rate: 1200000000
+>                  mout_hpm rate: 1200000000
+>                          div_copy rate: 200000000
+>                                  div_hpm rate: 200000000
+>                  mout_core rate: 1200000000
+>                          div_core rate: 1200000000
+>                                  div_core2 rate: 1200000000
+>                                          arm_clk_div_2 rate: 600000000
+>                                          div_corem0 rate: 300000000
+>                                          div_corem1 rate: 150000000
+>                                          div_periph rate: 300000000
+>                          div_atb rate: 240000000
+>                                  div_pclk_dbg rate: 120000000
+>                  sclk_apll rate: 150000000
+>                          sclk_apll_div_2 rate: 75000000
+> 
+> Without this change cpufreq-dt driver showed ~10 mA larger energy
+> consumption when compared to cpufreq-exynos one when "performance"
+> cpufreq governor was used on Exynos4210 SoC based Origen board.
+> 
+> This issue was probably meant to be workarounded by use of
+> CLK_GET_RATE_NOCACHE and CLK_DIVIDER_READ_ONLY clock flags in
+> the original Exynos cpu clock patchset (in "[PATCH v12 6/6] clk:
+> samsung: remove unused clock aliases and update clock flags" patch)
+> but usage of these flags is not sufficient to fix the issue observed.
+> 
+> Cc: Thomas Abraham <thomas.ab@samsung.com>
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> ---
+>  drivers/clk/clk.c            |    3 +++
+>  include/linux/clk-provider.h |    1 +
+>  2 files changed, 4 insertions(+)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index f85c8e2..97cc73e 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -1771,6 +1771,9 @@ static void clk_change_rate(struct clk_core *clk)
+>  	if (clk->notifier_count && old_rate != clk->rate)
+>  		__clk_notify(clk, POST_RATE_CHANGE, old_rate, clk->rate);
+>  
+> +	if (clk->flags & CLK_RECALC_NEW_RATES)
+> +		(void)clk_calc_new_rates(clk, clk->new_rate);
+> +
+>  	/*
+>  	 * Use safe iteration, as change_rate can actually swap parents
+>  	 * for certain clock types.
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 28abf1b..8d1aebe 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -31,6 +31,7 @@
+>  #define CLK_GET_RATE_NOCACHE	BIT(6) /* do not use the cached clk rate */
+>  #define CLK_SET_RATE_NO_REPARENT BIT(7) /* don't re-parent on rate change */
+>  #define CLK_GET_ACCURACY_NOCACHE BIT(8) /* do not use the cached clk accuracy */
+> +#define CLK_RECALC_NEW_RATES	BIT(9) /* recalc rates after notifications */
 
-Great. Thanks for testing!
+Mike, Stephen, what do you think about this? I'm rather resistant to
+this new flag approach, it looks like a hack. I don't seem to have better
+ideas to address the missing rate recalculation issue though.
+I thought about making the cpu clk notifier callback returning a specific
+error value, which would then trigger rate recalculation after
+__clk_notify() call in clk_change_rate() function. This way the trigger
+of the repeated rate recalculation would come from a notifier callback,
+rather than from a clock definition. But in general it would be difficult
+to handle multiple notification callbacks, each of which would attempt
+to trigger the rate recalculation.
 
-> Can we get this Cc-ed to stable at vger.kernel.org please? At least for 4.0 ?
-
-Sure, done.
-
-Russell, on the assumption you're ok with the patch I've submitted it to
-the patch system as 8356/1.
-
-Thanks,
-Mark.
-
-> Regards,
-> 
-> Hans
-> 
-> 
-> >
-> >>
-> >> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> >> Reported-by: Stefan Agner <stefan@agner.ch>
-> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> >> Cc: Hans de Goede <hdegoede@redhat.com>
-> >> Cc: Laura Abbott <labbott@redhat.com>
-> >> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> >> Cc: Steve Capper <steve.capper@linaro.org>
-> >> ---
-> >>   arch/arm/mm/mmu.c | 20 ++++++++++----------
-> >>   1 file changed, 10 insertions(+), 10 deletions(-)
-> >>
-> >> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> >> index 4e6ef89..7186382 100644
-> >> --- a/arch/arm/mm/mmu.c
-> >> +++ b/arch/arm/mm/mmu.c
-> >> @@ -1112,22 +1112,22 @@ void __init sanity_check_meminfo(void)
-> >>   			}
-> >>
-> >>   			/*
-> >> -			 * Find the first non-section-aligned page, and point
-> >> +			 * Find the first non-pmd-aligned page, and point
-> >>   			 * memblock_limit at it. This relies on rounding the
-> >> -			 * limit down to be section-aligned, which happens at
-> >> -			 * the end of this function.
-> >> +			 * limit down to be pmd-aligned, which happens at the
-> >> +			 * end of this function.
-> >>   			 *
-> >>   			 * With this algorithm, the start or end of almost any
-> >> -			 * bank can be non-section-aligned. The only exception
-> >> -			 * is that the start of the bank 0 must be section-
-> >> +			 * bank can be non-pmd-aligned. The only exception is
-> >> +			 * that the start of the bank 0 must be section-
-> >>   			 * aligned, since otherwise memory would need to be
-> >>   			 * allocated when mapping the start of bank 0, which
-> >>   			 * occurs before any free memory is mapped.
-> >>   			 */
-> >>   			if (!memblock_limit) {
-> >> -				if (!IS_ALIGNED(block_start, SECTION_SIZE))
-> >> +				if (!IS_ALIGNED(block_start, PMD_SIZE))
-> >>   					memblock_limit = block_start;
-> >> -				else if (!IS_ALIGNED(block_end, SECTION_SIZE))
-> >> +				else if (!IS_ALIGNED(block_end, PMD_SIZE))
-> >>   					memblock_limit = arm_lowmem_limit;
-> >>   			}
-> >>
-> >> @@ -1137,12 +1137,12 @@ void __init sanity_check_meminfo(void)
-> >>   	high_memory = __va(arm_lowmem_limit - 1) + 1;
-> >>
-> >>   	/*
-> >> -	 * Round the memblock limit down to a section size.  This
-> >> +	 * Round the memblock limit down to a pmd size.  This
-> >>   	 * helps to ensure that we will allocate memory from the
-> >> -	 * last full section, which should be mapped.
-> >> +	 * last full pmd, which should be mapped.
-> >>   	 */
-> >>   	if (memblock_limit)
-> >> -		memblock_limit = round_down(memblock_limit, SECTION_SIZE);
-> >> +		memblock_limit = round_down(memblock_limit, PMD_SIZE);
-> >>   	if (!memblock_limit)
-> >>   		memblock_limit = arm_lowmem_limit;
-> >
-> 
+-- 
+Regards,
+Sylwester
