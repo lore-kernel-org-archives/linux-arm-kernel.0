@@ -1,75 +1,29 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Wed, 13 May 2015 08:56:30 -0700
-Subject: [PATCH 2/2] PCI: iproc: add bcma pcie driver
-In-Reply-To: <CACna6rxVpJ-4b_5jG91JN62jQHh8u=QaLpO+_7J9mFr+_ScPaA@mail.gmail.com>
-References: <1431465781-10753-1-git-send-email-hauke@hauke-m.de>	<1431465781-10753-3-git-send-email-hauke@hauke-m.de>
- <CACna6rxVpJ-4b_5jG91JN62jQHh8u=QaLpO+_7J9mFr+_ScPaA@mail.gmail.com>
-Message-ID: <5553742E.7070204@broadcom.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 May 2015 17:58:38 +0200
+Subject: [GIT PULL 3/8] ARM: tegra: RAM code access for v4.2-rc1
+In-Reply-To: <1431524980-13599-4-git-send-email-thierry.reding@gmail.com>
+References: <1431524980-13599-1-git-send-email-thierry.reding@gmail.com>
+ <1431524980-13599-4-git-send-email-thierry.reding@gmail.com>
+Message-ID: <2345639.Sj7e0cAmhK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafal,
+On Wednesday 13 May 2015 15:49:35 Thierry Reding wrote:
+> Note that this is a shared dependency for the tegra-for-4.2-clk and the
+> tegra-for-4.2-emc pull requests and they are already based on this, so
+> it's sufficient if you pull those in individually.
+> 
+> Thanks,
+> Thierry
+> 
+> ----------------------------------------------------------------
+> ARM: tegra: RAM code access for v4.2-rc1
+> 
+> The RAM code is used by the memory and external memory controllers to
+> determine which set of timings to use for memory frequency scaling.
+> 
 
-On 5/12/2015 11:27 PM, Rafa? Mi?ecki wrote:
-> On 12 May 2015 at 23:23, Hauke Mehrtens <hauke@hauke-m.de> wrote:
->> This driver adds support for the PCIe 2.0 controller found on the bcma
->> bus. This controller can be found on (mostly) all Broadcom BCM470X /
->> BCM5301X ARM SoCs.
->>
->> The driver found in the Broadcom SDK does some more stuff, like setting
->> up some DMA memory areas, chaining MPS and MRRS to 512 and also some
->> PHY changes like "improving" the PCIe jitter and doing some special
->> initializations for the 3rd PCIe port.
->>
->> This was tested on a bcm4708 board with 2 PCIe ports and wireless cards
->> connected to them.
->>
->> PCI_DOMAINS is needed by this driver, because normally there is more
->> than one PCIe controller and without PCI_DOMAINS only the first
->> controller gets registered.
->> This controller gets 6 IRQs, the last one is trigged by all IRQ events.
->>
->> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
-> 
-> Acked-by: Rafa? Mi?ecki <zajec5@gmail.com>
-> 
-> 
->> +static int iproc_pcie_bcma_probe(struct bcma_device *bdev)
->> +{
->> +       struct iproc_pcie *pcie;
->> +       LIST_HEAD(res);
->> +       struct resource res_mem;
->> +       int ret;
->> +
->> +       pcie = devm_kzalloc(&bdev->dev, sizeof(*pcie), GFP_KERNEL);
->> +       if (!pcie)
->> +               return -ENOMEM;
->> +
->> +       pcie->dev = &bdev->dev;
->> +       bcma_set_drvdata(bdev, pcie);
->> +
->> +       pcie->base = bdev->io_addr;
->> +
->> +       res_mem.start = bdev->addr_s[0];
->> +       res_mem.end = bdev->addr_s[0] + SZ_128M - 1;
->> +       res_mem.name = "PCIe MEM space";
->> +       res_mem.flags = IORESOURCE_MEM;
->> +       pci_add_resource(&res, &res_mem);
->> +
->> +       pcie->resources = &res;
->> +
->> +       pcie->map_irq = iproc_pcie_bcma_map_irq;
->> +
->> +       ret = iproc_pcie_setup(pcie);
-> 
-> I think I don't like this part of iproc design. It lefts
-> pcie->resources pointing to some random memory after the setup/probe
-> are done. Guess it should be a separated parameter or sth.
-> 
-> The patch is still OK, I just refer to generic iproc possible issue.
-> 
-Sorry Rafal, but could you please be more specific on this?
+I've pulled it into next/drivers separately for documentation purposes,
+even if it's not strictly necessary as you say. Thanks!
 
-Thanks,
-
-Ray
+	Arnd
