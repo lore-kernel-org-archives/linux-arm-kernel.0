@@ -1,103 +1,93 @@
-From: bintian.wang@huawei.com (Bintian)
-Date: Wed, 13 May 2015 18:28:00 +0800
-Subject: [PATCH v5 0/6] arm64,hi6220: Enable Hisilicon Hi6220 SoC
-In-Reply-To: <1431007225-8513-1-git-send-email-bintian.wang@huawei.com>
-References: <1431007225-8513-1-git-send-email-bintian.wang@huawei.com>
-Message-ID: <55532730.4080503@huawei.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 May 2015 12:30:39 +0200
+Subject: [GIT PULL] Allwinner drivers changes for 4.2
+In-Reply-To: <20150513094348.GX10961@lukather>
+References: <20150511193527.GA29690@lukather> <2615254.66Y5XGdzL1@wuerfel>
+ <20150513094348.GX10961@lukather>
+Message-ID: <2423239.y1LCAVXsLT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Wei,
+On Wednesday 13 May 2015 11:43:48 Maxime Ripard wrote:
+> Hi Arnd,
+> 
+> On Tue, May 12, 2015 at 10:15:20PM +0200, Arnd Bergmann wrote:
+> > On Monday 11 May 2015 21:35:27 Maxime Ripard wrote:
+> > > Hi Arnd, Kevin, Olof,
+> > > 
+> > > Here is the first batch of drivers changes for the 4.2 merge window.
+> > > 
+> > > Thanks!
+> > > Maxime
+> > > 
+> > > The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+> > > 
+> > >   Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+> > > 
+> > > are available in the git repository at:
+> > > 
+> > >   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-drivers-for-4.2
+> > > 
+> > > for you to fetch changes up to 44bb362ff9f2e6f9ab285e66ce92f55aee71808a:
+> > > 
+> > >   drivers: soc: sunxi: Introduce SoC driver to map SRAMs (2015-05-05 20:47:08 +0200)
+> > > 
+> > > ----------------------------------------------------------------
+> > > Allwinner drivers patches for 4.2
+> > > 
+> > > This pull request contain a single driver to handle the SRAM mapping
+> > > between the CPU and devices.
+> > > 
+> > 
+> > Hi Maxime,
+> > 
+> > Sorry I hadn't looked at the new driver before, but I did now and need a little
+> > clarification. It seems to me that the device should be compatible with the
+> > generic DT binding we have in Documentation/devicetree/bindings/misc/sram.txt,
+> > and use more generic code. At least I can't see much in here that is really sunxi
+> > specific.
+> >
+> > Were you not aware of that generic binding, or did you have a good reason
+> > not to use it?
+> 
+> I asked myself the same question, and I don't really think that this
+> would be wise, since that in order to be accessible by the CPU it has
+> to be mapped to it through this driver.
+> 
+> I felt like this alone justify a new compatible, even though we might
+> end up using the same driver.
 
- >To be more specific here, I expect the patches to be picked up by Wei >Xu
- >and forwarded to arm at kernel.org when he's made sure that everybody
- >including himself is happy with the outcome.
- >
- >	Arnd
+Have you discussed this with Heiko?
 
-Could you help review and do those works based on Arnd's suggestion?
+> > In the latter case, please document that in the patch description
+> > (after replying here).
+> 
+> Ok.
+> 
+> > One small bug I found in the DT binding: the main DT node is lacking
+> > a "ranges" property.
+> 
+> Which DT node are you talking about ?
 
-Thanks,
+I was referring to the ranges in this:
 
-Also thanks to all engineers who help review/test this patch set.
++soc at 01c00000 {
++       compatible = "simple-bus";
++       #address-cells = <1>;
++       #size-cells = <1>;
++       ranges;
++
++       sram at 00000000 {
++               compatible = "allwinner,sun4i-a10-sram";
++               reg = <0x00000000 0x4000>;
++               allwinner,sram-name = "A1";
++       };
 
-Bintian
+but I now think I was misreading it, and the problem is different:
+Rather than having separate devices for parts of the SRAM, you
+are actually missing a node for the SRAM physical window. I think
+the individual SRAM pieces should be nodes below one that describes
+all of the SRAM, as we do in 
+Documentation/devicetree/bindings/misc/sram.txt
 
-
-On 2015/5/7 22:00, Bintian Wang wrote:
-> Hi6220 is one mobile solution of Hisilicon, this patchset contains
-> initial support for Hi6220 SoC and HiKey development board, which
-> supports octal ARM Cortex A53 cores. Initial support is minimal and
-> includes just the arch configuration, clock driver, device tree
-> configuration.
->
-> PSCI is enabled in device tree and there is no problem to boot all the
-> octal cores, and the CPU hotplug is also working now, you can download
-> and compile the latest firmware based on the following link to run this
-> patch set:
-> https://github.com/96boards/documentation/wiki/UEFI
->
-> Changes v5:
-> * Rebase to kernel 4.1-rc2
-> * Add compatible string "hisilicon,hi6220-pl011" for Hisilicon designed
->    UART
-> * clk-hi6220.c: use __initdata for non-const arrays based on the commit
->    692d8328e8c039f9497eb862c6cf835de922c061
->
-> Changes v4:
-> * Rebase to kernel 4.1-rc1
-> * Delete "arm,cortex-a15-gic" from the gic node in dts
->
-> Changes v3:
-> * Verified the CPU hotplug based on the new released firmware
-> * Redefined the compatible strings of four system controllers in dts
-> * Setting COMMON_CLK_HI6220 to a bool symbol
-> * Keep CONFGI_ARCH_HISI sorted alphabetically
->
-> Changes v2:
-> * Split the DT bindings documents into earlier patches
-> * Change SMP enable method from spin-table to PSCI in device tree
-> * Remove "clock-frequency" from armv8-timer device node in device tree
-> * Add more description about Hisilicon designed system controllers
->    in DT bindings document
-> * Enable high speed clock on UART1 mux
-> * Other changes based on the discussion in the mailing list:
->    https://lkml.org/lkml/2015/2/5/147
->
-> Bintian Wang (6):
->    arm64: Enable Hisilicon ARMv8 SoC family in Kconfig and defconfig
->    arm64: hi6220: Document devicetree bindings for Hisilicon hi6220 SoC
->    clk: hi6220: Document devicetree bindings for hi6220 clock
->    Documentation: DT: PL011: hi6220: add compatible string for Hisilicon
->          designed UART
->    clk: hi6220: Clock driver support for Hisilicon hi6220 SoC
->    arm64: dts: Add dts files for Hisilicon Hi6220 SoC
->
->   .../bindings/arm/hisilicon/hisilicon.txt           |   87 ++++++
->   .../devicetree/bindings/clock/hi6220-clock.txt     |   34 +++
->   Documentation/devicetree/bindings/serial/pl011.txt |    4 +-
->   arch/arm64/Kconfig                                 |    5 +
->   arch/arm64/boot/dts/Makefile                       |    1 +
->   arch/arm64/boot/dts/hisilicon/Makefile             |    5 +
->   arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |   31 +++
->   arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  172 ++++++++++++
->   arch/arm64/configs/defconfig                       |    1 +
->   drivers/clk/Kconfig                                |    2 +
->   drivers/clk/Makefile                               |    4 +-
->   drivers/clk/hisilicon/Kconfig                      |    6 +
->   drivers/clk/hisilicon/Makefile                     |    3 +-
->   drivers/clk/hisilicon/clk-hi6220.c                 |  292 ++++++++++++++++++++
->   drivers/clk/hisilicon/clk.c                        |   29 ++
->   drivers/clk/hisilicon/clk.h                        |   17 ++
->   drivers/clk/hisilicon/clkdivider-hi6220.c          |  273 ++++++++++++++++++
->   include/dt-bindings/clock/hi6220-clock.h           |  173 ++++++++++++
->   18 files changed, 1134 insertions(+), 5 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/clock/hi6220-clock.txt
->   create mode 100644 arch/arm64/boot/dts/hisilicon/Makefile
->   create mode 100644 arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
->   create mode 100644 arch/arm64/boot/dts/hisilicon/hi6220.dtsi
->   create mode 100644 drivers/clk/hisilicon/Kconfig
->   create mode 100644 drivers/clk/hisilicon/clk-hi6220.c
->   create mode 100644 drivers/clk/hisilicon/clkdivider-hi6220.c
->   create mode 100644 include/dt-bindings/clock/hi6220-clock.h
->
+	Arnd
