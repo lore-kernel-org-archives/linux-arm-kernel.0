@@ -1,54 +1,69 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Thu, 14 May 2015 01:42:00 +0200
-Subject: [PATCH] ARM: l2c: add options to overwrite prefetching behavior
-Message-ID: <1431560520-12544-1-git-send-email-hauke@hauke-m.de>
+From: ddstreet@ieee.org (Dan Streetman)
+Date: Wed, 13 May 2015 19:52:24 -0400
+Subject: [PATCH] lib: fix 842 build on 32-bit architectures
+In-Reply-To: <2802721.Q9KnE9eNH4@wuerfel>
+Message-ID: <1431561144-29931-1-git-send-email-ddstreet@ieee.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These options make it possible to overwrites the data and instruction
-prefetching behavior of the arm pl310 cache controller.
+> Building the 842 code on 32-bit ARM currently results in this link
+> error:
+> 
+> ERROR: "__aeabi_uldivmod" [lib/842/842_decompress.ko] undefined!
 
-Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
----
- Documentation/devicetree/bindings/arm/l2cc.txt |  4 ++++
- arch/arm/mm/cache-l2x0.c                       | 10 ++++++++++
- 2 files changed, 14 insertions(+)
+Oops!  Guess I should build/test on 32 bit more.
 
-diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
-index 0dbabe9..528821a 100644
---- a/Documentation/devicetree/bindings/arm/l2cc.txt
-+++ b/Documentation/devicetree/bindings/arm/l2cc.txt
-@@ -67,6 +67,10 @@ Optional properties:
-   disable if zero.
- - arm,prefetch-offset : Override prefetch offset value. Valid values are
-   0-7, 15, 23, and 31.
-+- arm,prefetch-data : Enable data prefetch. Enabling prefetching
-+  can improve performance.
-+- arm,prefetch-instr : Enable instruction prefetch. Enabling prefetching
-+  can improve performance.
+> 
+> The reason is that the __do_index function performs a 64-bit
+> division by a power-of-two number, but it has no insight into
+> the function arguments.
+> 
+> By marking that function inline, the fsize argument is always
+> known at the time that do_index is called, and the compiler is
+> able to replace the extremely expensive 64-bit division with
+> a cheap constant shift operation.
+
+alternately, we know that fsize will always be less than 64 bits,
+at most it's 4<<9 or 8<<8 (both == 1<<11).  So we could just change
+its type to u16.
+
+diff --git a/lib/842/842_decompress.c b/lib/842/842_decompress.c
+index 6b2b45aecde3..285bf6b6959c 100644
+--- a/lib/842/842_decompress.c
++++ b/lib/842/842_decompress.c
+@@ -169,7 +169,7 @@ static int do_data(struct sw842_param *p, u8 n)
+ 	return 0;
+ }
  
- Example:
- 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index e309c8f..f919548 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -1149,6 +1149,16 @@ static void __init l2c310_of_parse(const struct device_node *np,
- 		}
- 	}
- 
-+	if (of_property_read_bool(np, "arm,prefetch-data")) {
-+		*aux_val |= L310_AUX_CTRL_DATA_PREFETCH;
-+		*aux_mask &= ~L310_AUX_CTRL_DATA_PREFETCH;
-+	}
-+
-+	if (of_property_read_bool(np, "arm,prefetch-instr")) {
-+		*aux_val |= L310_AUX_CTRL_INSTR_PREFETCH;
-+		*aux_mask &= ~L310_AUX_CTRL_INSTR_PREFETCH;
-+	}
-+
- 	prefetch = l2x0_saved_regs.prefetch_ctrl;
- 
- 	ret = of_property_read_u32(np, "arm,double-linefill", &val);
--- 
-2.1.4
+-static int __do_index(struct sw842_param *p, u8 size, u8 bits, u64 fsize)
++static int __do_index(struct sw842_param *p, u8 size, u8 bits, u16 fsize)
+ {
+ 	u64 index, offset, total = round_down(p->out - p->ostart, 8);
+ 	int ret;
+
+Or, we could inline it and change the type to u16.  In any case,
+
+Acked-by: Dan Streetman <ddstreet@ieee.org>
+
+> 
+> Aside from fixing that link error, this approach should also improve
+> both code size and performance on 32-bit architectures significantly.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> Found while building arm32 allmodconfig with gcc-5.0
+> 
+> diff --git a/lib/842/842_decompress.c b/lib/842/842_decompress.c
+> index 6b2b45aecde3..285bf6b6959c 100644
+> --- a/lib/842/842_decompress.c
+> +++ b/lib/842/842_decompress.c
+> @@ -169,7 +169,7 @@ static int do_data(struct sw842_param *p, u8 n)
+>  	return 0;
+>  }
+>  
+> -static int __do_index(struct sw842_param *p, u8 size, u8 bits, u64 fsize)
+> +static inline int __do_index(struct sw842_param *p, u8 size, u8 bits, u64 fsize)
+>  {
+>  	u64 index, offset, total = round_down(p->out - p->ostart, 8);
+>  	int ret;
+> 
