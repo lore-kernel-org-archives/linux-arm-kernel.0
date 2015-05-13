@@ -1,59 +1,43 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 13 May 2015 10:46:24 -0700
-Subject: BCM2836 (Raspberry Pi 2) port
-In-Reply-To: <555278BA.50903@wwwdotorg.org>
-References: <1429639796-2169-1-git-send-email-eric@anholt.net>
- <4137213.WVJY1et48u@kongar> <55516738.306@wwwdotorg.org>
- <1701192.WcfjCoBWQN@kongar> <55522468.3050606@wwwdotorg.org>
- <87d2254s6y.fsf@eliezer.anholt.net> <555278BA.50903@wwwdotorg.org>
-Message-ID: <87wq0c4bgv.fsf@eliezer.anholt.net>
+From: tj@kernel.org (Tejun Heo)
+Date: Wed, 13 May 2015 13:46:40 -0400
+Subject: [PATCH v2] AHCI: Add generic MSI-X interrupt support to SATA PCI
+ driver
+In-Reply-To: <20150513172828.GA8449@rric.localhost>
+References: <20150513143353.GU11388@htj.duckdns.org>
+ <20150513143906.GV11388@htj.duckdns.org>
+ <20150513172828.GA8449@rric.localhost>
+Message-ID: <20150513174640.GZ11388@htj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> writes:
+Hello, Robert.
 
-> On 05/12/2015 11:32 AM, Eric Anholt wrote:
->> Stephen Warren <swarren@wwwdotorg.org> writes:
->>
->>> On 05/12/2015 09:39 AM, Alexander Stein wrote:
->>>> On Monday 11 May 2015, 20:36:40 wrote Stephen Warren:
->>>>> On 05/08/2015 10:14 AM, Alexander Stein wrote:
->>>>>> On Thursday 23 April 2015, 22:25:08 wrote Stephen Warren:
->>>>>>>> Hit any key to stop autoboot:  0
->>>>>>>> U-Boot> setenv fdt_high fffffff
->>>>>>
->>>>>> Any specific reason to set fdt_high to fffffff?
->>>>>
->>>>> Yes, it prevents U-Boot's annoying habit of moving the DTB from where it
->>>>> was loaded to some other place. This was especially important in this
->>>>> case since I was trying to find out exactly which piece of RAM being
->>>>> over-written caused the issues I was seeing.
->>>>
->>>> Shouldn't this then be part of the default raspberry (2 only?) environment?
->>>
->>> Eventually yes. So far, nobody seems to know which areas of RAM are
->>> off-limits (presumably since the RAM is used as a CPU1..3 pen), so I was
->>> experimenting to try and find that out.
->>
->> If I'm reading this right, the CPU1-3 pen is in the bottom 8k of memory
->> (actually much less than 8k).
->
-> Hmm. I wondered if that was the case. I don't think anything I was doing 
-> in U-Boot /should/ touch those pages, but there have been bugs before 
-> where some pointer was left at NULL, and some DM (U-Boot Device Model) 
-> code ended up putting structures in page 0 by mistake. Perhaps something 
-> like that has resurfaced. I'll try to find time to diff page 0 
-> before/after various U-Boot operations, and see if it's getting modified...
+On Wed, May 13, 2015 at 07:28:28PM +0200, Robert Richter wrote:
+> > > This looks not very useful to do. Since irq is used only a single
+> > > time, there is no reason to store it in the host's data structure. It
+> > 
+> > Doesn't really matter tho.
+> 
+> Since ahci_host_activate() is EXPORT_SYMBOL_GPL I really have concerns
+> changing the i/f. But I will send you a patch for this.
 
-How about on the Linux side?  What's reserving that memory for us, if
-anything?  Weird things happen if I put "ARM: bcm2836: Add a DT binding
-for the ARM local registers." and "ARM: bcm2835: Use a syscon regmap to
-set up timer frequency." before the SMP support in the bcm2836-smp tree
-(init crashes).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150513/fde762c7/attachment.sig>
+It doesn't matter.  Please go ahead and change it.
+
+> > Let's start with why we're doing this in the first place.
+> 
+> Right, the sata controller is connected to a pci ecam controller, both
+> are on an SoC together with the processor. There are no external pci
+> ports for the connection of external devices. Since all pci devices on
+> the chip support msi-x, the controller is only capable to handle this
+> and not INTx nor MSI. So for enabling of the sata hc we need msix
+> support.
+
+I see.  If you can get hold of an ahci controller which actually can
+do multi-irq msix, it'd be the best.  If not, let's make it super
+clear that this is a special case and use it as the last resort (which
+also clers up the warning issue).
+
+Thanks.
+
+-- 
+tejun
