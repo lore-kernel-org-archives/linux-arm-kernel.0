@@ -1,79 +1,99 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 May 2015 21:37:25 +0200
-Subject: [PATCH v8 14/16] ARM: dts: Introduce STM32F429 MCU
-In-Reply-To: <5553A608.9080402@linaro.org>
-References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
- <CALszF6CaO_yuNiSDuDV+4d2NRe_+32j=zcSE1HPhB1UH59cW9w@mail.gmail.com>
- <5553A608.9080402@linaro.org>
-Message-ID: <2672178.pv4FEQMD9D@wuerfel>
+From: jonathar@broadcom.com (Jonathan Richardson)
+Date: Wed, 13 May 2015 12:39:31 -0700
+Subject: [PATCH 2/2] misc: Add initial Digital Timing Engine (DTE) driver
+ for cygnus
+In-Reply-To: <20150513152130.GB2065@localhost.localdomain>
+References: <1429744923-2007-1-git-send-email-jonathar@broadcom.com>
+ <1429744923-2007-3-git-send-email-jonathar@broadcom.com>
+ <6346218.3x3hbSlxMs@wuerfel> <5543CD73.2030902@broadcom.com>
+ <20150513152130.GB2065@localhost.localdomain>
+Message-ID: <5553A873.1010803@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 May 2015 20:29:12 Daniel Thompson wrote:
-> On 13/05/15 17:54, Maxime Coquelin wrote:
-> > 2015-05-13 18:37 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
-> >>
-> >> We should definitely try to use the same compatible string for all of
-> >> them, and make a binding that is easy to use.
-> >>
-> >> I haven't fully understood the requirements for the various parts that
-> >> are involved here. My understanding so far was that the driver could
-> >> use the index from the first cell and compute
-> >>
-> >>          void __iomem *reset_reg = rcc_base + 0x10 + 4 * index;
-> >>          void __iomem *clock_reg = rcc_base + 0x30 + 4 * index;
-> >
-> > This calculation is true, but we have to take into account there is a
-> > hole in the middle, between AHB3, and APB1 register:
-> 
-> ... and equally importantly, only allows us to use hardware mappings for 
-> the gated clocks.
-> 
-> > AHB1RSTR : offset = 0x10, index = 0
-> > AHB2RSTR : offset = 0x14, index = 1
-> > AHB3RSTR : offset = 0x18, index = 2
-> > <HOLE >     : offset = 0x1c, index = 3
-> > APB1RSTR : offset = 0x20, index = 4
-> > APB2RSTR : offset = 0x24, index = 5
-> >
-> > So we have to carefully document this hole in the bindings, maybe by
-> > listing indexes in the documentation?
-> 
-> The register set has PLL, mux and dividers in the registers at 0x00, 
-> 0x04 and 0x08.
-> 
-> Many of these clocks can be kept out of DT entirely because they are 
-> only there to feed other parts of the clock tree. However some of the 
-> dividers flow directly into cells that appear in device tree (such as 
-> the systick) and so we need to be able to reference them.
-> 
-> In other words the proposed mapping cannot allow us to express the 
-> dividers properly (because the index would have to be negative):
->    void __iomem *clock_reg = rcc_base + 0x30 + 4 * index;
-> 
-> Thus I'd favour using different indexes for reset and clock bindings, 
-> both using the naive mapping function:
->    void __iomem *reg =  rcc_base + 4 * index
-> 
-> I think that its so much easier to check against the datasheet like 
-> that. Admittedly is we follow the block-of-4-bytes idiom we have to 
-> divide a hex number by four but thats not so hard and we end up with:
-> 
-> 		resets = <&rcc  8 0>;
-> 		clocks = <&rcc 16 0>;
-> 
-> At the end of the day if we say we want to follow the datasheet, lets be 
-> do it in the most direct way properly.
-> 
-> 
-> PS
-> I've written a custom lookup function to to get from the DT index to an 
-> offset into the struct clk *array I'm using. That means I don't care 
-> much about any big holes in the register space.
+Richard, glad you retrieved our driver. Comments below.
 
-How about using the first cell to indicate the type (pll, mux, div, gate)
-and the second cell for the number (between 0 and 256)? That way, the
-gates numbers would match the reset numbers, and your internal mapping
-function would look a bit nicer.
+On 15-05-13 08:21 AM, Richard Cochran wrote:
+> On Fri, May 01, 2015 at 12:01:07PM -0700, Jonathan Richardson wrote:
+>> The DTE creates timestamps of hardware based events such as GPIO, I2S
+>> signals for audio, etc. It was also intended to provide 802.1AS / PTP
+>> timestamps for network packets. The h/w has up to 32 "clients" -- the
+>> hardware inputs into a timestamping engine. These clients are specific
+>> to the chip the DTE is used on. For Cygnus you can see what they are in
+>> our 'enum dte_client' from bcm_cygnus_dte.h.
+> 
+> These 32 channels should either go to kernel consumers (i2s audio) or,
+> if there aren't any, to the generic PTP ioctl.
+> 
+>> The DTE timestamper creates timestamps based on the current clock wall
+>> time.
+> 
+> What do you mean by "wall time"?  CLOCK_REALTIME?
 
-	Arnd
+It's just the incrementing local NCO time. Whatever the value of it is
+is the timestamp time. When we add the timestamp to the s/w FIFO we
+adjust the time to a reference time.
+
+> 
+>> When an event occurs it stores the timestamp in a h/w FIFO. Each
+>> client also has a divider that can be set to control the rate that
+>> timestamps are generated at by the timestamper and these are adjustable
+>> at run time.
+> 
+> This does not make sense.  If you time stamp events, then the rate is
+> determined by the events themselves.
+
+The input events may occur at a rate greater than we want to generate
+timestamps at. Maybe we need a better term than divider. The h/w sees x
+input signals over x period of time and then samples the input signal at
+a divided down period of time to limit the timestamp rate. Timestamp
+input sample rate?
+
+>  
+>> It's a bit more than a PTP hardware clock on a NIC. It's a clock for PTP
+>> plus timestamping 32 other hardware inputs that can be enabled at any
+>> time with timestamps being generated at varying frequencies. As clients
+>> are enabled that generate timestamps at higher frequencies, the
+>> isochronous interrupt frequency needs to be increased so that overflows
+>> in the the h/w and s/w FIFO's don't occur (this frequency could possibly
+>> be automated instead of changing it manually as we currently do).
+> 
+> Yes, the driver should configure an appropriate rate automatically.
+
+I was wrong. It can't. The DTE doesn't know anything about the inputs
+hooked up to it nor the frequency of the input events. It needs to be
+set by user space and the value can change at run time whenever we want
+to change it.
+
+> 
+>> It looks like the driver could almost be a PTP driver instead of a char
+>> driver controlled with ioctls. PTP does this already using
+>> clock_gettime(), clock_settime(), clock_adjtime(). But we want to set
+>> the frequency as well as adjust the clock and I don't see how that is
+>> possible with the stripped down timex data passed to the driver from
+>> ptp_clock_adjtime().
+> 
+> You can convert ppb into your time base using simple math.
+
+Yes, this isn't a problem.
+
+>  
+>> We have the additional requirement of controlling multiple clients and
+>> retrieving the timestamps, etc. The PTP driver allows for some control
+>> of external time stamp channels already using 'n_ext_ts' in struct
+>> ptp_clock_info. We could use that to enable clients and get timestamps,
+>> but we also need to be able to change dividers for the clients at run
+>> time if desired. It doesn't look like additional ioctls could be passed
+>> to a PTP driver because ptp_ioctl() is the ioctl handler.
+> 
+> I don't see any need for use space to set dividers.  Let the driver do
+> that.
+
+See above.
+
+Thanks.
+
+> 
+> Thanks,
+> Richard
+> 
