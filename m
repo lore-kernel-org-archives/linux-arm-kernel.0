@@ -1,57 +1,40 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Wed, 13 May 2015 10:39:06 -0400
-Subject: [PATCH v2] AHCI: Add generic MSI-X interrupt support to SATA PCI
- driver
-In-Reply-To: <20150512114647.GN10428@rric.localhost>
-References: <1430725538-22162-1-git-send-email-rric@kernel.org>
- <20150504160652.GB1971@htj.duckdns.org>
- <20150511171810.GB29499@rric.localhost>
- <20150512114647.GN10428@rric.localhost>
-Message-ID: <20150513143906.GV11388@htj.duckdns.org>
+From: koro.chen@mediatek.com (Koro Chen)
+Date: Wed, 13 May 2015 22:39:03 +0800
+Subject: [RFC PATCH] ALSA: pcm: Modify double acknowledged interrupts check
+ condition
+Message-ID: <1431527943-64178-1-git-send-email-koro.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Currently in snd_pcm_update_hw_ptr0 during interrupt,
+we consider there were double acknowledged interrupts when:
+1. HW reported pointer is smaller than expected, and
+2. Time from last update time (hdelta) is over half a buffer time.
 
-On Tue, May 12, 2015 at 01:46:47PM +0200, Robert Richter wrote:
-> I don't think this is worth the effort as all internal and external
-> drivers need to be changed basically from:
-> 
->  ahci_host_activate(host, irq, &ahci_sht);
-> 
-> to:
-> 
->  host->irq = irq;
->  ahci_host_activate(host, &ahci_sht);
->
-> This looks not very useful to do. Since irq is used only a single
-> time, there is no reason to store it in the host's data structure. It
+However, when HW reported pointer is only a few bytes smaller than
+expected, and when hdelta is just a little larger than half a buffer time
+(e.g. ping-pong buffer), it wrongly treats this IRQ as double acknowledged.
 
-Doesn't really matter tho.
+The condition #2 uses jiffies, but jiffies is not high resolution
+since it is integer. We should consider jiffies inaccuracy.
 
-> also makes the interface more error prone since host->irq might not be
-> setup. Apart from that there is an abi change.
+Signed-off-by: Koro Chen <koro.chen@mediatek.com>
+---
+ sound/core/pcm_lib.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-But large part of @host needs to be initialized before activation.  I
-don't think moving irq to that pool changes much if anything.
-
-> I agree that we will need the implemention of host->ports[i]->irq for
-> the case there irqs are no longer in sequential order as this might be
-> the case for per-port msi-x interrupts. But this is not the focus of
-> my implementation and as long there is no hardware for this available,
-> it wouldn't make sense to implement this at all.
-
-Why are we doing msix at all?  I don't get it.
-
-> So how to proceed? I could send you patches that implement host->irq
-> for a single per-host interrupt, and also one that reworks multi-port
-> interrupts to use host->ports[i]->irq. But I don't see any benefit
-> here. That said, I would better keep my patch here as it is. That do
-> you think?
-
-Let's start with why we're doing this in the first place.
-
-Thanks.
-
+diff --git a/sound/core/pcm_lib.c b/sound/core/pcm_lib.c
+index ac6b33f..7d45645 100644
+--- a/sound/core/pcm_lib.c
++++ b/sound/core/pcm_lib.c
+@@ -339,7 +339,7 @@ static int snd_pcm_update_hw_ptr0(struct snd_pcm_substream *substream,
+ 		if (delta > new_hw_ptr) {
+ 			/* check for double acknowledged interrupts */
+ 			hdelta = curr_jiffies - runtime->hw_ptr_jiffies;
+-			if (hdelta > runtime->hw_ptr_buffer_jiffies/2) {
++			if (hdelta > runtime->hw_ptr_buffer_jiffies/2 + 1) {
+ 				hw_base += runtime->buffer_size;
+ 				if (hw_base >= runtime->boundary) {
+ 					hw_base = 0;
 -- 
-tejun
+1.8.1.1.dirty
