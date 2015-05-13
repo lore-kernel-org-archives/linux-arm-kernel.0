@@ -1,43 +1,84 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 May 2015 20:59:36 +0200
-Subject: [PATCH] nfsd: work around a gcc-5.1 warning
-In-Reply-To: <20150513181143.GD2827@fieldses.org>
-References: <2121336.tAfQfAWQ2u@wuerfel> <20150513181143.GD2827@fieldses.org>
-Message-ID: <9574260.omRer6Oeha@wuerfel>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 13 May 2015 11:59:39 -0700
+Subject: BCM2836 (Raspberry Pi 2) port
+In-Reply-To: <555398DB.8050206@wwwdotorg.org>
+References: <1429639796-2169-1-git-send-email-eric@anholt.net>
+ <4137213.WVJY1et48u@kongar> <55516738.306@wwwdotorg.org>
+ <1701192.WcfjCoBWQN@kongar> <55522468.3050606@wwwdotorg.org>
+ <87d2254s6y.fsf@eliezer.anholt.net> <555278BA.50903@wwwdotorg.org>
+ <87wq0c4bgv.fsf@eliezer.anholt.net> <555398DB.8050206@wwwdotorg.org>
+Message-ID: <87y4ks9uck.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 May 2015 14:11:43 J. Bruce Fields wrote:
-> 
-> OK, I guess.  How about simplifying slightly and doing it this way?--b
-> 
-> commit 3ae81ac291ec
-> Author: Arnd Bergmann <arnd@arndb.de>
-> Date:   Tue May 12 23:31:29 2015 +0200
-> 
->     nfsd: work around a gcc-5.1 warning
->     
->     gcc-5.0 warns about a potential uninitialized variable use in nfsd:
->     
->     fs/nfsd/nfs4state.c: In function 'nfsd4_process_open2':
->     fs/nfsd/nfs4state.c:3781:3: warning: 'old_deny_bmap' may be used uninitialized in this function [-Wmaybe-uninitialized]
->        reset_union_bmap_deny(old_deny_bmap, stp);
->        ^
->     fs/nfsd/nfs4state.c:3760:16: note: 'old_deny_bmap' was declared here
->       unsigned char old_deny_bmap;
->                     ^
->     
->     This is a false positive, the code path that is warned about cannot
->     actually be reached.
->     
->     This adds an initialization for the variable to make the warning go
->     away.
->     
->     Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->     Signed-off-by: J. Bruce Fields <bfields@redhat.com>
-> 
-> 
+Stephen Warren <swarren@wwwdotorg.org> writes:
 
-Works for me, thanks!
+> On 05/13/2015 11:46 AM, Eric Anholt wrote:
+>> Stephen Warren <swarren@wwwdotorg.org> writes:
+>>
+>>> On 05/12/2015 11:32 AM, Eric Anholt wrote:
+>>>> Stephen Warren <swarren@wwwdotorg.org> writes:
+>>>>
+>>>>> On 05/12/2015 09:39 AM, Alexander Stein wrote:
+>>>>>> On Monday 11 May 2015, 20:36:40 wrote Stephen Warren:
+>>>>>>> On 05/08/2015 10:14 AM, Alexander Stein wrote:
+>>>>>>>> On Thursday 23 April 2015, 22:25:08 wrote Stephen Warren:
+>>>>>>>>>> Hit any key to stop autoboot:  0
+>>>>>>>>>> U-Boot> setenv fdt_high fffffff
+>>>>>>>>
+>>>>>>>> Any specific reason to set fdt_high to fffffff?
+>>>>>>>
+>>>>>>> Yes, it prevents U-Boot's annoying habit of moving the DTB from where it
+>>>>>>> was loaded to some other place. This was especially important in this
+>>>>>>> case since I was trying to find out exactly which piece of RAM being
+>>>>>>> over-written caused the issues I was seeing.
+>>>>>>
+>>>>>> Shouldn't this then be part of the default raspberry (2 only?) environment?
+>>>>>
+>>>>> Eventually yes. So far, nobody seems to know which areas of RAM are
+>>>>> off-limits (presumably since the RAM is used as a CPU1..3 pen), so I was
+>>>>> experimenting to try and find that out.
+>>>>
+>>>> If I'm reading this right, the CPU1-3 pen is in the bottom 8k of memory
+>>>> (actually much less than 8k).
+>>>
+>>> Hmm. I wondered if that was the case. I don't think anything I was doing
+>>> in U-Boot /should/ touch those pages, but there have been bugs before
+>>> where some pointer was left at NULL, and some DM (U-Boot Device Model)
+>>> code ended up putting structures in page 0 by mistake. Perhaps something
+>>> like that has resurfaced. I'll try to find time to diff page 0
+>>> before/after various U-Boot operations, and see if it's getting modified...
+>>
+>> How about on the Linux side?  What's reserving that memory for us, if
+>> anything?
+>
+> Likely nothing at present. I was starting to see what looked like 
+> SMP-pen-related issues just in U-Boot, before even attempting to boot a 
+> kernel at all. So, I didn't put any though into how to communicate this 
+> to the kernel.
+>
+>>  Weird things happen if I put "ARM: bcm2836: Add a DT binding
+>> for the ARM local registers." and "ARM: bcm2835: Use a syscon regmap to
+>> set up timer frequency." before the SMP support in the bcm2836-smp tree
+>> (init crashes).
+>
+> This issue would probably explain that; if the kernel just happens to 
+> allocate a physical page of RAM that overlaps the SMP pen memory.
+>
+> A /memreserve/ in the DT would probably solve this. Adjusting the 
+> content of the /memory/reg property to remove the SMP pen would likely 
+> work too.
+>
+> Is there no way to disable CPU1..n other than using an SMP pen in 
+> memory? If the CPUs simply weren't executing anything at all, but could 
+> be unblocked/powered-up/... later, that'd simplify life.
 
-	Arnd
+Not that I can see -- looks like they all come up the same way, then 1-3
+fall into the pen and 0 continues on to do interesting things.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150513/0840e7d8/attachment.sig>
