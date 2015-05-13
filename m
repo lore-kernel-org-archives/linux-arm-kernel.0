@@ -1,128 +1,115 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 13 May 2015 14:52:29 +0530
-Subject: [linux-sunxi] Re: [PATCH 1/3] phy-sun4i-usb: Add a sunxi specific
- function for setting squelch-detect
-In-Reply-To: <5550F14F.5050906@redhat.com>
-References: <1427626248-6257-1-git-send-email-hdegoede@redhat.com>
- <1427626248-6257-2-git-send-email-hdegoede@redhat.com>
- <20150508160636.GD16571@saruman.tx.rr.com> <554F2CCE.4090906@redhat.com>
- <20150511155547.GG19476@saruman.tx.rr.com> <5550F14F.5050906@redhat.com>
-Message-ID: <555317D5.3050003@ti.com>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Wed, 13 May 2015 18:22:48 +0900
+Subject: [PATCH v6 0/6] arm64: Add kernel probes (kprobes) support
+In-Reply-To: <5551F693.8050100@redhat.com>
+References: <1429561187-3661-1-git-send-email-dave.long@linaro.org>
+ <55363791.4070706@hitachi.com> <553AB222.50609@redhat.com>
+ <553EF74D.8020706@redhat.com> <20150429102346.GK8236@arm.com>
+ <55442BFA.50101@redhat.com> <554851CB.2010909@linaro.org>
+ <20150505154830.GI1550@arm.com> <55519583.9020507@linaro.org>
+ <5551F693.8050100@redhat.com>
+Message-ID: <555317E8.2000502@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
-
-On Monday 11 May 2015 11:43 PM, Hans de Goede wrote:
-> Hi,
->
-> On 11-05-15 17:55, Felipe Balbi wrote:
->> Hi,
->>
->> On Sun, May 10, 2015 at 12:02:54PM +0200, Hans de Goede wrote:
->>> Hi,
->>>
->>> On 08-05-15 18:06, Felipe Balbi wrote:
->>>> Hi,
+On 2015/05/12 21:48, William Cohen wrote:
+> On 05/12/2015 01:54 AM, David Long wrote:
+>> On 05/05/15 11:48, Will Deacon wrote:
+>>> On Tue, May 05, 2015 at 06:14:51AM +0100, David Long wrote:
+>>>> On 05/01/15 21:44, William Cohen wrote:
+>>>>> Dave Long and I did some additional experimentation to better
+>>>>> understand what is condition causes the kernel to sometimes spew:
+>>>>>
+>>>>> Unexpected kernel single-step exception at EL1
+>>>>>
+>>>>> The functioncallcount.stp test instruments the entry and return of
+>>>>> every function in the mm files, including kfree.  In most cases the
+>>>>> arm64 trampoline_probe_handler just determines which return probe
+>>>>> instance matches the current conditions, runs the associated handler,
+>>>>> and recycles the return probe instance for another use by placing it
+>>>>> on a hlist.  However, it is possible that a return probe instance has
+>>>>> been set up on function entry and the return probe is unregistered
+>>>>> before the return probe instance fires.  In this case kfree is called
+>>>>> by the trampoline handler to remove the return probe instances related
+>>>>> to the unregistered kretprobe.  This case where the the kprobed kfree
+>>>>> is called within the arm64 trampoline_probe_handler function trigger
+>>>>> the problem.
+>>>>>
+>>>>> The kprobe breakpoint for the kfree call from within the
+>>>>> trampoline_probe_handler is encountered and started, but things go
+>>>>> wrong when attempting the single step on the instruction.
+>>>>>
+>>>>> It took a while to trigger this problem with the sytemtap testsuite.
+>>>>> Dave Long came up with steps that reproduce this more quickly with a
+>>>>> probed function that is always called within the trampoline handler.
+>>>>> Trying the same on x86_64 doesn't trigger the problem.  It appears
+>>>>> that the x86_64 code can handle a single step from within the
+>>>>> trampoline_handler.
+>>>>>
 >>>>
->>>> On Sun, Mar 29, 2015 at 12:50:46PM +0200, Hans de Goede wrote:
->>>>> The sunxi otg phy has a bug where it wrongly detects a high speed squelch
->>>>> when reset on the root port gets de-asserted with a lo-speed device.
->>>>>
->>>>> The workaround for this is to disable squelch detect before de-asserting
->>>>> reset, and re-enabling it after the reset de-assert is done. Add a sunxi
->>>>> specific phy function to allow the sunxi-musb glue to do this.
->>>>>
->>>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>>> ---
->>>>>    drivers/phy/phy-sun4i-usb.c       |  9 +++++++++
->>>>>    include/linux/phy/phy-sun4i-usb.h | 26 ++++++++++++++++++++++++++
->>>>>    2 files changed, 35 insertions(+)
->>>>>    create mode 100644 include/linux/phy/phy-sun4i-usb.h
->>>>>
->>>>> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
->>>>> index 221e8ab..01eb08d 100644
->>>>> --- a/drivers/phy/phy-sun4i-usb.c
->>>>> +++ b/drivers/phy/phy-sun4i-usb.c
->>>>> @@ -33,6 +33,7 @@
->>>>>    #include <linux/of_address.h>
->>>>>    #include <linux/of_gpio.h>
->>>>>    #include <linux/phy/phy.h>
->>>>> +#include <linux/phy/phy-sun4i-usb.h>
->>>>>    #include <linux/platform_device.h>
->>>>>    #include <linux/regulator/consumer.h>
->>>>>    #include <linux/reset.h>
->>>>> @@ -75,6 +76,7 @@
->>>>>    #define PHY_OTG_FUNC_EN			0x28
->>>>>    #define PHY_VBUS_DET_EN			0x29
->>>>>    #define PHY_DISCON_TH_SEL		0x2a
->>>>> +#define PHY_SQUELCH_DETECT		0x3c
->>>>>
->>>>>    #define MAX_PHYS			3
->>>>>
->>>>> @@ -322,6 +324,13 @@ static int sun4i_usb_phy_power_off(struct phy *_phy)
->>>>>    	return 0;
->>>>>    }
->>>>>
->>>>> +void sun4i_usb_phy_set_squelch_detect(struct phy *_phy, bool enabled)
->>>>> +{
->>>>> +	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
->>>>> +
->>>>> +	sun4i_usb_phy_write(phy, PHY_SQUELCH_DETECT, enabled ? 0 : 2, 2);
->>>>> +}
->>>>> +
->>>>>    static struct phy_ops sun4i_usb_phy_ops = {
->>>>>    	.init		= sun4i_usb_phy_init,
->>>>>    	.exit		= sun4i_usb_phy_exit,
->>>>> diff --git a/include/linux/phy/phy-sun4i-usb.h b/include/linux/phy/phy-sun4i-usb.h
->>>>> new file mode 100644
->>>>> index 0000000..50aed92
->>>>> --- /dev/null
->>>>> +++ b/include/linux/phy/phy-sun4i-usb.h
->>>>> @@ -0,0 +1,26 @@
->>>>> +/*
->>>>> + * Copyright (c) 2015 Hans de Goede <hdegoede@redhat.com>
->>>>> + *
->>>>> + * This program is free software; you can redistribute it and/or modify
->>>>> + * it under the terms of the GNU General Public License version 2 and
->>>>> + * only version 2 as published by the Free Software Foundation.
->>>>> + *
->>>>> + * This program is distributed in the hope that it will be useful,
->>>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>>>> + * GNU General Public License for more details.
->>>>> + */
->>>>> +
->>>>> +#ifndef PHY_SUN4I_USB_H_
->>>>> +#define PHY_SUN4I_USB_H_
->>>>> +
->>>>> +#include "phy.h"
->>>>> +
->>>>> +/**
->>>>> + * sun4i_usb_phy_set_squelch_detect() - Enable/disable squelch detect
->>>>> + * @phy: reference to a sun4i usb phy
->>>>> + * @enabled: wether to enable or disable squelch detect
->>>>> + */
->>>>> +void sun4i_usb_phy_set_squelch_detect(struct phy *phy, bool enabled);
->>>>
->>>> breaks build if MUSB=y and SUN41_PHY=m
+>>>> I'm assuming there are no plans for supporting software breakpoint debug
+>>>> exceptions during processing of single-step exceptions, any time soon on
+>>>> arm64.  Given that the only solution that I can come with for this is
+>>>> instead of making this orphaned kretprobe instance list exist only
+>>>> temporarily (in the scope of the kretprobe trampoline handler), make it
+>>>> always exist and kfree any items found on it as part of a periodic
+>>>> cleanup running outside of the handler context.  I think these changes
+>>>> would still all be in archiecture-specific code.  This doesn't feel to
+>>>> me like a bad solution.  Does anyone think there is a simpler way out of
+>>>> this?
 >>>
->>> Ah, good one. So I assume that it is ok to fix this by doing:
+>>> Just to clarify, is the problem here the software breakpoint exception,
+>>> or trying to step the faulting instruction whilst we were already handling
+>>> a step?
 >>>
->>> --- a/drivers/usb/musb/Kconfig
->>> +++ b/drivers/usb/musb/Kconfig
->>> @@ -66,6 +66,7 @@ config USB_MUSB_SUNXI
->>>           tristate "Allwinner (sunxi)"
->>>           depends on ARCH_SUNXI
->>>           depends on NOP_USB_XCEIV
->>> + depends on PHY_SUN4I_USB
 >>
->> I would prefer not exporting any function from phy to musb. Perhaps
->> figure out with Kishon how "set_squelch" can be added to PHY fwk ?
+>> Sorry for the delay, I got tripped up with some global optimizations that happened when I made more testing changes.  When the kprobes software breakpoint handler for kretprobes is reentered it sets up the single-step and that ends up hitting inside entry.S, apparently in el1_undef.
+>>
+>>> I think I'd be inclined to keep the code run in debug context to a minimum.
+>>> We already can't block there, and the more code we add the more black spots
+>>> we end up with in the kernel itself. The alternative would be to make your
+>>> kprobes code re-entrant, but that sounds like a nightmare.
+>>>
+>>> You say this works on x86. How do they handle it? Is the nested probe
+>>> on kfree ignored or handled?
+>>>
+>>
+>> Will Cohen's email pointing out x86 does not use a breakpoint for the trampoline handler explains a lot.  I'm experimenting starting with his proposed new trampoline code.  I can't see a reason this can't be made to work and so given everything it doesn't seem interesting to try and understand the failure in reentering the kprobe break handler in any more detail.
+>>
+>> -dave long
+>>
+>>
+> 
+> Hi Dave,
+> 
+> In some of the previous diagnostic output it looked like things would go wrong
+> in the entry.S when the D bit was cleared and the debug interrupts were 
+> unmasksed.  I wonder if some of the issue might be due to the starting the 
+> kprobe for the trampoline, but leaving things in an odd state when another
+> set of krpobe/kretporbes are hit when the trampoline is running.
 
-We don't want to be adding platform specific hooks in PHY framework. While 
-exporting a function from PHY to MUSB is not the best thing, it's still okay 
-since it is from musb sunxi glue only no?
+Hmm, does this mean we have a trouble if a user kprobe handler calls the
+function which is probed by other kprobe? Or, is this just a problem
+only for kretprobes?
 
-Thanks
-Kishon
+>  As Dave
+> mentioned the proposed trampoline patch avoids using a kprobe in the
+> trampoline and directly calls the trampoline handler.  Attached is the
+> current version of the patch which was able to run the systemtap testsuite.
+>  Systemtap does exercise the kprobe/kretprobe infrastructure, but it would
+> be good to have additional raw kprobe tests to check that kprobe reentry
+> works as expected.
+
+Actually, Will's patch looks like the same thing what I did on x86,
+as the kretprobe-booster. So I'm OK for that. But if the above problem
+is not solved, we need to fix that, since kprobes can be used from
+different sources.
+
+Thank you,
+
+-- 
+Masami HIRAMATSU
+Linux Technology Research Center, System Productivity Research Dept.
+Center for Technology Innovation - Systems Engineering
+Hitachi, Ltd., Research & Development Group
+E-mail: masami.hiramatsu.pt at hitachi.com
