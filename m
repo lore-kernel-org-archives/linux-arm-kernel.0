@@ -1,172 +1,114 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
-Date: Wed, 13 May 2015 07:47:42 -0500
-Subject: [PATCH v2 1/2] PCI: generic: remove dependency on hw_pci
-In-Reply-To: <554ADCE0.8020603@amd.com>
-References: <1430791333-26013-1-git-send-email-jchandra@broadcom.com>
- <20150505155346.GJ1550@arm.com> <20150506141859.GC26028@red-moon>
- <CAErSpo7z_Sf5QvMa8MBY0f7DQOmwhcpUnCFG=ZsmHuwT2HouQw@mail.gmail.com>
- <554ADCE0.8020603@amd.com>
-Message-ID: <555347EE.6050502@amd.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Wed, 13 May 2015 13:58:05 +0100
+Subject: [PATCH v8 14/16] ARM: dts: Introduce STM32F429 MCU
+In-Reply-To: <CALszF6CS8Q9DWX+ERtu=k=Bzr1-25N3oZQyWyxDZBF3an4nFKQ@mail.gmail.com>
+References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>	<1431158038-3813-15-git-send-email-mcoquelin.stm32@gmail.com>	<2789447.8FUTAOJOHR@wuerfel>
+ <CALszF6CS8Q9DWX+ERtu=k=Bzr1-25N3oZQyWyxDZBF3an4nFKQ@mail.gmail.com>
+Message-ID: <55534A5D.6050904@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
-
-Somehow, I didn't get your reply email from the ML. So, I've captured 
-your questions here, please see my reply below.
-
-On 5/6/2015 10:32 PM, Suravee Suthikulanit wrote:
-> Hi All,
+On 13/05/15 12:45, Maxime Coquelin wrote:
+> 2015-05-12 23:21 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
+>> On Saturday 09 May 2015 09:53:56 Maxime Coquelin wrote:
+>>> +#include  <dt-bindings/mfd/stm32f4-rcc.h>
+>>> +
+>>>
+>>
+>> Can you find a way to avoid this dependency?
+>>
+>> Maybe you can change the bindings so that the numbers you pass as
+>> arguments to the reset and clock specifiers reflect the numbers that
+>> the hardware use?
 >
-> I tested this patch series on the AMD Seattle w/o PCI_PROBE_ONLY mode
-> and that works fine. However, w/ PCI_PROBE_ONLY, I also run into the
-> resource not claimed issue (no surprise here).
+> If I understand correctly, you prefer the way I did in v7 [0]?
 >
-> So, I tried porting the pcibios_claim_one_bus() from
-> arch/alpha/kernel/pci.c as Lorenzo suggested, plus the a small change in
-> pci_claim_resource(), and it seems to work w/ PCI_PROBE_ONLY. (Please
-> see example patch below.)
+> I don't have a strong opinion on this. Either way is fine to me.
 >
-> The additional while loop is needed in the pci_claim_resource() since I
-> need to reference back to the resource in the root bus, which are
-> defined from the DT node. Does this sounds like a reasonable approach?
+> I changed the bindings in the v8 after discussions with Daniel
+> Thompson, who is implementing the clock driver part of the RCC IP.
 >
-> diff --git a/drivers/pci/host/pci-host-generic.c
-> b/drivers/pci/host/pci-host-generic.c
-> index e9cc559..0dfa23d 100644
-> --- a/drivers/pci/host/pci-host-generic.c
-> +++ b/drivers/pci/host/pci-host-generic.c
-> @@ -261,7 +261,10 @@ static int gen_pci_probe(struct platform_device *pdev)
->       if (!pci_has_flag(PCI_PROBE_ONLY)) {
->           pci_bus_size_bridges(bus);
->           pci_bus_assign_resources(bus);
-> +    } else {
-> +        pci_claim_one_bus(bus);
->       }
-> +
->       pci_bus_add_devices(bus);
+> He proposed we used common defines, because each peripheral has a
+> reset line and a clock gate.
+> Both reset and clock are represented as a single bit, with only the
+> base offset differing between clock and reset.
+> You can have a look at chapter 6 of the reference manual [1] if you
+> find some time.
 >
->       /* Configure PCI Express settings */
-> diff --git a/drivers/pci/setup-res.c b/drivers/pci/setup-res.c
-> index 232f925..d4b43b3 100644
-> --- a/drivers/pci/setup-res.c
-> +++ b/drivers/pci/setup-res.c
-> @@ -109,6 +109,7 @@ int pci_claim_resource(struct pci_dev *dev, int
-> resource)
->   {
->       struct resource *res = &dev->resource[resource];
->       struct resource *root, *conflict;
-> +    struct pci_dev *pdev = dev;
+> Having common defines between clocks and reset make sense to me, but I
+> also understand your point of avoiding dependencies.
 >
->       if (res->flags & IORESOURCE_UNSET) {
->           dev_info(&dev->dev, "can't claim BAR %d %pR: no address
-> assigned\n",
-> @@ -116,7 +117,18 @@ int pci_claim_resource(struct pci_dev *dev, int
-> resource)
->           return -EINVAL;
->       }
+> Maybe I can revert back to v7 bindings for now, and then we can
+> reconsider using common defines when Daniel will send the clock
+> patches.
+> Note that doing that won't break the DT binary compatibility, as the
+> raw reset values, or the ones from defines are the same.
 >
-> -    root = pci_find_parent_resource(dev, res);
-> +    while (pdev) {
-> +        root = pci_find_parent_resource(pdev, res);
-> +        if (root)
-> +            break;
-> +
-> +        if (pci_has_flag(PCI_PROBE_ONLY) &&
-> +            !pci_is_root_bus(pdev->bus))
-> +            pdev = pdev->bus->self;
-> +        else
-> +            break;
-> +    }
-> +
->       if (!root) {
->           dev_info(&dev->dev, "can't claim BAR %d %pR: no compatible
-> bridge window\n",
->                resource, res);
+> Daniel, could you share an example of the bindings you would use for the clocks?
+
+For the most cases, where there is a clock gate just before the 
+peripheral it looks pretty much like the reset driver and I use the bit 
+offset of the clock gating bit as the index.
+
+However there are a couple of clocks without gating just before the 
+clock reaches the peripheral:
+
+1. A hard coded /8. I think this will have to be given a synthetic
+    number.
+
+2. Ungated dividers. For these I am using the bit offset of the LSB of
+    the mux field.
+
+So I think there is only one value that is completely unrelated to the 
+hardware and will use a magic constant instead.
+
+I had planned to macros similar to the STM32F4_AxB_RESET() family of 
+macros in both clk driver and DT in order to reuse the bit layouts from 
+dt-bindings/mfd/stm32f4-rcc.h .
+
+Normal case would have looked like this:
+
+		timer3: timer at 40000000 {
+			compatible = "st,stm32-timer";
+			reg = <0x40000000 0x400>;
+			interrupts = <28>;
+			resets = <&rcc STM32F4_APB1_RESET(TIM3)>;
+			clocks = <&rcc STM32F4_APB1_CLK(TIM3)>;
+			status = "disabled";
+		};
+
+Without the macros it looks like this:
+
+		timer3: timer at 40000000 {
+			compatible = "st,stm32-timer";
+			reg = <0x40000000 0x400>;
+			interrupts = <28>;
+			resets = <&rcc 257>;
+			clocks = <&rcc 513>;
+			status = "disabled";
+		};
+
+However we could perhaps be more literate even if we don't use the macros?
+
+		timer3: timer at 40000000 {
+			compatible = "st,stm32-timer";
+			reg = <0x40000000 0x400>;
+			interrupts = <28>;
+			resets = <&rcc ((0x20*8) + 1)>;
+			clocks = <&rcc ((0x40*8) + 1)>;
+			status = "disabled";
+		};
 
 
-[From Bjorn]
-I don't understand this new loop.  Apparently you have a device BAR, and
-the upstream bridge doesn't have a window that contains the BAR?  That
-sounds like a problem with the upstream bridge resources.
+Daniel.
 
-Do you have an example that would make this more concrete, e.g., a host
-bridge, P2P bridge(s), and endpoint with their resources?
 
-[Suravee]
-Here is the information you were asking for. This information is setup 
-from the FW. In the PCI bridge (00:02.1), I see the prefetchable memory 
-behind bridge is already setup.
-
-OUTPUT from lspci -tv:
-
--[0000:00]-+-00.0  Advanced Micro Devices, Inc. [AMD] Device 1a00
-            +-02.0  Advanced Micro Devices, Inc. [AMD] Device 1a01
-            \-02.1  PCI Bridge -[01]--+-00.0  Intel Corporation 82599ES 
-10-Gigabit SFI/SFP+ Network Connection
-                         \-00.1  Intel Corporation 82599ES 10-Gigabit 
-SFI/SFP+ Network Connection
-
-OUTPUT from lspci -vvv:
-
-00:00.0 Host bridge: Advanced Micro Devices, Inc. [AMD] Device 1a00
-	Subsystem: Advanced Micro Devices, Inc. [AMD] Device 1a00
-	Control: I/O- Mem- BusMaster+ SpecCycle- MemWINV- VGASnoop- ParErr- 
-Stepping- SERR- FastB2B- DisINTx-
-	Status: Cap- 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- 
-<MAbort- >SERR- <PERR- INTx-
-	Latency: 0
-
-00:02.0 Host bridge: Advanced Micro Devices, Inc. [AMD] Device 1a01
-	Control: I/O- Mem- BusMaster- SpecCycle- MemWINV- VGASnoop- ParErr- 
-Stepping- SERR- FastB2B- DisINTx-
-	Status: Cap- 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- 
-<MAbort- >SERR- <PERR- INTx-
-
-00:02.1 PCI bridge: Advanced Micro Devices, Inc. [AMD] Device 1a02 
-(prog-if 00 [Normal decode])
-	Control: I/O+ Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop- ParErr- 
-Stepping- SERR- FastB2B- DisINTx-
-	Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- 
-<MAbort- >SERR- <PERR- INTx-
-	Latency: 0
-	Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
-	I/O behind bridge: 00fff000-00000fff
-	Memory behind bridge: fff00000-000fffff
-	Prefetchable memory behind bridge: 0000007fffe00000-0000007fffffffff
-	Secondary status: 66MHz- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- 
-<MAbort+ <SERR- <PERR-
-	BridgeCtl: Parity- SERR- NoISA- VGA- MAbort- >Reset- FastB2B-
-		PriDiscTmr- SecDiscTmr- DiscTmrStat- DiscTmrSERREn-
-.......
-
-01:00.0 Ethernet controller: Intel Corporation 82599ES 10-Gigabit 
-SFI/SFP+ Network Connection (rev 01)
-	Subsystem: Intel Corporation Ethernet Server Adapter X520-2
-	Control: I/O+ Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop- ParErr- 
-Stepping- SERR- FastB2B- DisINTx+
-	Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- 
-<MAbort- >SERR- <PERR- INTx-
-	Latency: 0
-	Interrupt: pin A routed to IRQ 46
-	Region 0: Memory at 7fffe80000 (64-bit, prefetchable) [size=512K]
-	Region 2: I/O ports at 0020 [size=32]
-	Region 4: Memory@7ffff04000 (64-bit, prefetchable) [size=16K]
-.......
-
-01:00.1 Ethernet controller: Intel Corporation 82599ES 10-Gigabit 
-SFI/SFP+ Network Connection (rev 01)
-	Subsystem: Intel Corporation Ethernet Server Adapter X520-2
-	Control: I/O+ Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop- ParErr- 
-Stepping- SERR- FastB2B- DisINTx+
-	Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- 
-<MAbort- >SERR- <PERR- INTx-
-	Latency: 0
-	Interrupt: pin B routed to IRQ 47
-	Region 0: Memory at 7fffe00000 (64-bit, prefetchable) [size=512K]
-	Region 2: I/O ports at 0000 [size=32]
-	Region 4: Memory@7ffff00000 (64-bit, prefetchable) [size=16K]
-........
-
-Thanks,
-Suravee
+> Kind regards,
+> Maxime
+>
+>>
+>>          Arnd
+>
+> [0]: http://lkml.iu.edu/hypermail/linux/kernel/1504.3/04523.html
+> [1]: http://www.st.com/web/en/resource/technical/document/reference_manual/DM00031020.pdf
+>
