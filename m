@@ -1,95 +1,86 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 13 May 2015 13:14:34 -0700
-Subject: [PATCH v2 1/3] input: keyboad: imx: add snvs power key driver
-In-Reply-To: <CAHrpEqQi8pyf3r4E0WroNroa2sQvrhfwjUgZv=iUgGxTnJWtLg@mail.gmail.com>
-References: <1431528462-21591-1-git-send-email-Frank.Li@freescale.com>
- <20150513164020.GA11891@dtor-ws>
- <CAHrpEqRKX_oqT9JKc7=m1Okbq1_30GQOwR_nGPn6aALq2D_-Sw@mail.gmail.com>
- <2698983.zamV244jo6@jclayton-pc>
- <CAHrpEqQ2a8uHZm9+eVjB=fFHrNwo6rf5G4WKA4fX_UiA=QteCw@mail.gmail.com>
- <20150513194454.GD11891@dtor-ws>
- <CAHrpEqQi8pyf3r4E0WroNroa2sQvrhfwjUgZv=iUgGxTnJWtLg@mail.gmail.com>
-Message-ID: <20150513201434.GE11891@dtor-ws>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 13 May 2015 22:14:26 +0200
+Subject: [PATCH v3 0/2] clk: improve handling of orphan clocks
+In-Reply-To: <7hiobw8s31.fsf@deeprootsystems.com>
+References: <1981330.kGUrTurMy5@diego> <5543E79F.2080400@codeaurora.org>
+ <22709390.NTAlubMgNB@diego> <55440EDA.4030905@codeaurora.org>
+ <CAMAWPa_n+59+v+x3fKkmdtW1wMJF7kqtTjLLowmv1xwGWprYJw@mail.gmail.com>
+ <554BD33D.7050907@codeaurora.org> <20150508100247.GQ11057@lukather>
+ <55528046.4030107@codeaurora.org> <20150513130304.GA4004@lukather>
+ <7hiobw8s31.fsf@deeprootsystems.com>
+Message-ID: <20150513201426.GH4004@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 13, 2015 at 02:57:00PM -0500, Zhi Li wrote:
-> On Wed, May 13, 2015 at 2:44 PM, Dmitry Torokhov
-> <dmitry.torokhov@gmail.com> wrote:
-> > On Wed, May 13, 2015 at 02:27:46PM -0500, Zhi Li wrote:
-> >> On Wed, May 13, 2015 at 2:10 PM, Joshua Clayton
-> >> <stillcompiling@gmail.com> wrote:
-> >> >
-> >> > Hi Frank.
-> >> >
-> >> > On Wednesday, May 13, 2015 01:27:39 PM Zhi Li wrote:
-> >> >> On Wed, May 13, 2015 at 11:40 AM, Dmitry Torokhov
-> >> >>
-> >> >> <dmitry.torokhov@gmail.com> wrote:
-> >> >> > Hi Frank,
-> >> >> >
-> >> >
-> >> >> >
-> >> >> >> +     pdata->ioaddr = of_iomap(np, 0);
-> >> >> >> +     if (IS_ERR(pdata->ioaddr))
-> >> >> >> +             return PTR_ERR(pdata->ioaddr);
-> >> >> >
-> >> >> > Umm, you are still leaking it on error path. Can you try doing:
-> >> >> >         res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> >> >> >         pdata->ioaddr = devm_ioremap_resource(&pdev->dev, res);
-> >> >> >         if (IS_ERR(pdata->ioaddr))
-> >> >> >
-> >> >> >                 return PTR_ERR(pdata->ioaddr);
-> >> >>
-> >> >> Thank you for comments.
-> >> >> but I don't use of_iomap here because the resource is shared with the
-> >> >> other device.
-> >> >>
-> >> >> SNVS included a rtc, a power off, ON/OFF key.
-> >> >> If I use platform_get_resource and devm_ioremap_resource, rtc driver
-> >> >> fail to probe.
-> >> >>
-> >> >> best regards
-> >> >> Frank Li
-> >> >>
-> >> >
-> >> > The fact that you cannot use of_iomap() seems a clear warning of unsafe
-> >> > access.
-> >> > Since it is a shared resource, which you are writing to as well as reading,
-> >> > perhaps you should set it up for safe access using the  regmap API like the
-> >> > GPR registers.
-> >> > /include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-> >>
-> >> I read driver again clearfully. It is safed shared with rtc driver directly.
-> >> Because pwr key driver just read a irq status register and other one
-> >> register, which used only in this driver.
-> >>
-> >> Just w1c (write 1 clear) register. it is atomic access by hardware.
-> >
-> > It does not really matter, driver has to claim resources it is using to
-> > make sure other parties are not accessing its registers. If registers
-> > are shared you need to have a 3rd party mediator.
+On Wed, May 13, 2015 at 07:33:54AM -0700, Kevin Hilman wrote:
+> Maxime Ripard <maxime.ripard@free-electrons.com> writes:
 > 
-> I can change to use syscon.
-> but other two driver(rtc and power off) need change also.
+> > On Tue, May 12, 2015 at 03:35:50PM -0700, Stephen Boyd wrote:
+> >> On 05/08/15 03:02, Maxime Ripard wrote:
+> >> > On Thu, May 07, 2015 at 02:03:57PM -0700, Stephen Boyd wrote:
+> >> >> On 05/07/15 08:17, Kevin Hilman wrote:
+> >> >>> On Fri, May 1, 2015 at 4:40 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> >> >>>> On 05/01/15 15:07, Heiko St?bner wrote:
+> >> >>>>> Am Freitag, 1. Mai 2015, 13:52:47 schrieb Stephen Boyd:
+> >> >>>>>
+> >> >>>>>>> Instead I guess we could hook it less deep into clk_get_sys, like in the
+> >> >>>>>>> following patch?
+> >> >>>>>> It looks like it will work at least, but still I'd prefer to keep the
+> >> >>>>>> orphan check contained to clk.c. How about this compile tested only patch?
+> >> >>>>> I gave this a spin on my rk3288-firefly board. It still boots, the clock tree
+> >> >>>>> looks the same and it also still defers nicely in the scenario I needed it
+> >> >>>>> for. The implementation also looks nice - and of course much more compact than
+> >> >>>>> my check in two places :-) . I don't know if you want to put this as follow-up
+> >> >>>>> on top or fold it into the original orphan-check, so in any case
+> >> >>>>>
+> >> >>>>> Tested-by: Heiko Stuebner <heiko@sntech.de>
+> >> >>>>> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> >> >>>> Thanks. I'm leaning towards tossing your patch 2/2 and replacing it with
+> >> >>>> my patch and a note that it's based on an earlier patch from you.
+> >> >>> It appears this has landed in linux-next in the form of 882667c1fcf1
+> >> >>> clk: prevent orphan clocks from being used.  A bunch of boot failures
+> >> >>> for sunxi in today's linux-next[1] were bisected down to that patch.
+> >> >>>
+> >> >>> I confirmed that reverting that commit on top of next/master gets
+> >> >>> sunxi booting again.
+> >> >>>
+> >> >>>
+> >> >> Thanks for the report. I've removed the two clk orphan patches from
+> >> >> clk-next. Would it be possible to try with next-20150507 and
+> >> >> clk_ignore_unused on the command line?
+> >> > This makes it work, but it's not really an option.
+> >> >
+> >> 
+> >> Hmm.. I thought it didn't fix it for Kevin. Confused.
+> >
+> > I'm too, but it does fix things here.
+> 
+> To be more precise on what I tested.  I used next-20150507 and tested on
+> 4 different sunxi platforms.  First test was "normal" commandline,
+> second was with clk_ignore_unused appended:
+> 
+>   - cubie: fail, fail
+>   - cubie2: fail, fail
+>   - bananpi: fail, pass
+>   - cubietruck: fail, pass
+> 
+> So it seems to have some effect, but by itself, doesn't fix the issue.
 
-Makes sense.
+It's very odd, I actually tried with a cubie2 here...
 
-> 
-> >
-> >>
-> >> PowerKey use difference irq number with RTC part.
-> >
-> > Yes and so they can run simultaneously and step on each other's feet,
-> > right?
-> 
-> Yes.
-> 
-> >
-> > Thanks.
-> >
-> > --
-> > Dmitry
+I'm booting on an initramfs and not MMC though, but I can't see how
+that can be related to our issue...
+
+Maxime
 
 -- 
-Dmitry
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150513/f7533541/attachment-0001.sig>
