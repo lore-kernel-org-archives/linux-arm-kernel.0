@@ -1,43 +1,25 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Wed, 13 May 2015 16:48:46 +0200
-Subject: [PATCH] ARM: dts: am335x-bone* enable pmic-shutdown-controller
-In-Reply-To: <20150513141658.GB6605@localhost>
-References: <1431525001-5747-1-git-send-email-robertcnelson@gmail.com>
- <20150513141658.GB6605@localhost>
-Message-ID: <20150513144846.GC6605@localhost>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Wed, 13 May 2015 16:51:19 +0200
+Subject: [PATCH 2/2] misc: Add initial Digital Timing Engine (DTE) driver
+ for cygnus
+In-Reply-To: <20150513143759.GA1602@localhost.localdomain>
+References: <1429744923-2007-1-git-send-email-jonathar@broadcom.com>
+ <9193036.7UYD2OGJHk@wuerfel> <554D1649.2030106@broadcom.com>
+ <2067273.o6GGiUQkQC@wuerfel>
+ <20150513143759.GA1602@localhost.localdomain>
+Message-ID: <20150513145119.GA2065@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 13, 2015 at 04:16:58PM +0200, Johan Hovold wrote:
-> On Wed, May 13, 2015 at 08:50:01AM -0500, Robert Nelson wrote:
-> > Fixes: http://bugs.elinux.org/issues/143
-> > 
-> > Commit 672e2b147 which introduced proper shutdown chose to let the PMIC go into sleep-state (aka "RTC-only mode") rather than off-state. This was fine for rev A5 on which that patch was tested, but since then two changes have been made to the power supply scheme:
-> > 
-> > (rev A6) enable of the 3v3b regulator moved from LDO2 to LDO4 (3v3a)
-> > side-effect: 3v3b rail remains on in sleep-mode (also in off-mode when battery-powered)
-> > 
-> > (rev A6A) am335x vdds supply moved from LDO3 to LDO1
-> > side-effect: vdds remains supplied in sleep-mode
-> > 
-> > As a result heavy leakage occurs from vdds (directly) and 3v3b (via i/o pins) to the 3v3a. The amount of current depends on external connections, but for example leaving a serial console cable connected in this state resulted in serious violation of am335x absolute maximum ratings, with potential for hardware damage.
-> > 
-> > Reported-by: Matthijs van Duin <matthijsvanduin@gmail.com>
-> > Tested-by: Matthijs van Duin <matthijsvanduin@gmail.com>
-> > Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
-> > Cc: Tony Lindgren <tony@atomide.com>
-> > Cc: Felipe Balbi <balbi@ti.com>
-> > Cc: Johan Hovold <johan@kernel.org>
+On Wed, May 13, 2015 at 04:37:59PM +0200, Richard Cochran wrote:
+> On Wed, May 13, 2015 at 02:19:53PM +0200, Arnd Bergmann wrote:
+> > Ah, very good. Extending this one function should be fairly straightforward,
+> > just discuss with the PTP maintainer how to best do it.
 > 
-> This should go into stable as well:
-> 
-> Fixes: 672e2b147413 ("ARM: dts: am335x-boneblack: enable power off and
-> rtc wake up")
-> Cc: stable <stable@vger.kernel.org>	# 3.19
-> Acked-by: Johan Hovold <johan@kernel.org>
+> Sorry, I deleted the original post, and I have zero clue what is is
+> all about.  Can you give me a link to the thread?
 
-By the way, perhaps you should add a comment in the tps node explaining
-why ti,pmic-shutdown-controller must not be disabled (on what revisions
-of hardware) as well?
-
-Johan
+I found 0/2 and 2/2 in the Gmail Trash.
+ 
+Thanks,
+Richard
