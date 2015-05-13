@@ -1,79 +1,38 @@
-From: bfields@fieldses.org (J. Bruce Fields)
-Date: Wed, 13 May 2015 14:11:43 -0400
-Subject: [PATCH] nfsd: work around a gcc-5.1 warning
-In-Reply-To: <2121336.tAfQfAWQ2u@wuerfel>
-References: <2121336.tAfQfAWQ2u@wuerfel>
-Message-ID: <20150513181143.GD2827@fieldses.org>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Wed, 13 May 2015 20:16:54 +0200
+Subject: [PATCH] ARM: BCM5301X: Fix chip typo in ARCH_BCM_5301X help
+ message
+In-Reply-To: <55538A6A.8000203@gmail.com>
+References: <1431501645-3887-1-git-send-email-zajec5@gmail.com>
+ <55538A6A.8000203@gmail.com>
+Message-ID: <CACna6rwp0mPmZJHUpyyR8aubmp9W3+8zi0J1Crgtzj9Ld0f=QQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 12, 2015 at 11:31:29PM +0200, Arnd Bergmann wrote:
-> gcc-5.0 warns about a potential uninitialized variable use in nfsd:
-> 
-> fs/nfsd/nfs4state.c: In function 'nfsd4_process_open2':
-> fs/nfsd/nfs4state.c:3781:3: warning: 'old_deny_bmap' may be used uninitialized in this function [-Wmaybe-uninitialized]
->    reset_union_bmap_deny(old_deny_bmap, stp);
->    ^
-> fs/nfsd/nfs4state.c:3760:16: note: 'old_deny_bmap' was declared here
->   unsigned char old_deny_bmap;
->                 ^
-> 
-> This is a false positive, the code path that is warned about cannot
-> actually be reached.
-> 
-> This adds an initialization for the variable to make the warning go
-> away.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> This warning shows up in some ARM defconfig builds, which we try to
-> build with no warnings to detect regressions.
+On 13 May 2015 at 19:31, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> On 13/05/15 00:20, Rafa? Mi?ecki wrote:
+>> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+>> ---
+>>  arch/arm/mach-bcm/Kconfig | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+>> index 8b11f44..7fec7e8 100644
+>> --- a/arch/arm/mach-bcm/Kconfig
+>> +++ b/arch/arm/mach-bcm/Kconfig
+>> @@ -47,7 +47,7 @@ config ARCH_BCM_5301X
+>>         BCM53014, BCM53015, BCM53016, BCM53017, BCM53018, BCM4707,
+>>         BCM4708 and BCM4709.
+>>
+>> -       Do not confuse this with the BCM4760 which is a totally
+>> +       Do not confuse this with the BCM4706 which is a totally
+>>         different SoC or with the older BCM47XX and BCM53XX based
+>>         network SoC using a MIPS CPU, they are supported by arch/mips/bcm47xx
+>
+> This is not a real typo per-se, there is a 4760 chip (GPS), do you want
+> to resubmit to include both?
 
-OK, I guess.  How about simplifying slightly and doing it this way?--b
+Oops, drop it please.
 
-commit 3ae81ac291ec
-Author: Arnd Bergmann <arnd@arndb.de>
-Date:   Tue May 12 23:31:29 2015 +0200
-
-    nfsd: work around a gcc-5.1 warning
-    
-    gcc-5.0 warns about a potential uninitialized variable use in nfsd:
-    
-    fs/nfsd/nfs4state.c: In function 'nfsd4_process_open2':
-    fs/nfsd/nfs4state.c:3781:3: warning: 'old_deny_bmap' may be used uninitialized in this function [-Wmaybe-uninitialized]
-       reset_union_bmap_deny(old_deny_bmap, stp);
-       ^
-    fs/nfsd/nfs4state.c:3760:16: note: 'old_deny_bmap' was declared here
-      unsigned char old_deny_bmap;
-                    ^
-    
-    This is a false positive, the code path that is warned about cannot
-    actually be reached.
-    
-    This adds an initialization for the variable to make the warning go
-    away.
-    
-    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-    Signed-off-by: J. Bruce Fields <bfields@redhat.com>
-
-diff --git a/fs/nfsd/nfs4state.c b/fs/nfsd/nfs4state.c
-index 86f5c273c9ec..aef7c9bb6114 100644
---- a/fs/nfsd/nfs4state.c
-+++ b/fs/nfsd/nfs4state.c
-@@ -3861,7 +3861,7 @@ static __be32
- nfs4_upgrade_open(struct svc_rqst *rqstp, struct nfs4_file *fp, struct svc_fh *cur_fh, struct nfs4_ol_stateid *stp, struct nfsd4_open *open)
- {
- 	__be32 status;
--	unsigned char old_deny_bmap;
-+	unsigned char old_deny_bmap = stp->st_deny_bmap;
- 
- 	if (!test_access(open->op_share_access, stp))
- 		return nfs4_get_vfs_file(rqstp, fp, cur_fh, stp, open);
-@@ -3870,7 +3870,6 @@ nfs4_upgrade_open(struct svc_rqst *rqstp, struct nfs4_file *fp, struct svc_fh *c
- 	spin_lock(&fp->fi_lock);
- 	status = nfs4_file_check_deny(fp, open->op_share_deny);
- 	if (status == nfs_ok) {
--		old_deny_bmap = stp->st_deny_bmap;
- 		set_deny(open->op_share_deny, stp);
- 		fp->fi_share_deny |=
- 				(open->op_share_deny & NFS4_SHARE_DENY_BOTH);
+-- 
+Rafa?
