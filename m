@@ -1,58 +1,27 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 13 May 2015 09:18:28 +0200
-Subject: [PATCH v2 3/4] mtd: mxc_nand: fix truncate of unaligned oob
- copying
-In-Reply-To: <20150513071201.GO2558@tarshish>
-References: <cover.1430636819.git.baruch@tkos.co.il>
- <ff526c6b889682e36e7d086dd5e6dec8936f86d9.1430636819.git.baruch@tkos.co.il>
- <20150508072432.GJ12671@pengutronix.de>
- <20150513051202.GI2558@tarshish>
- <20150513063903.GC28888@pengutronix.de>
- <20150513064404.GM2558@tarshish>
- <20150513064734.GF28888@pengutronix.de>
- <20150513065922.GN2558@tarshish>
- <20150513070140.GH28888@pengutronix.de>
- <20150513071201.GO2558@tarshish>
-Message-ID: <20150513071828.GI28888@pengutronix.de>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Wed, 13 May 2015 09:20:45 +0200
+Subject: [PATCH] ARM: BCM5301X: Fix chip typo in ARCH_BCM_5301X help message
+Message-ID: <1431501645-3887-1-git-send-email-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 13, 2015 at 10:12:01AM +0300, Baruch Siach wrote:
-> Hi Uwe,
-> 
-> On Wed, May 13, 2015 at 09:01:40AM +0200, Uwe Kleine-K?nig wrote:
-> > On Wed, May 13, 2015 at 09:59:22AM +0300, Baruch Siach wrote:
-> > > On Wed, May 13, 2015 at 08:47:34AM +0200, Uwe Kleine-K?nig wrote:
-> > > > On Wed, May 13, 2015 at 09:44:04AM +0300, Baruch Siach wrote:
-> > > > > > I thought we could get rid of the memcpy32 variants. Where do we need
-> > > > > > memcpy32_* where memcpy16 wouldn't work?
-> > > > > 
-> > > > > memcpy16 should work, but would take twice as much IO/memory accesses. That 
-> > > > > would definitely affect performance, as this is the flash data read/write hot 
-> > > > > path. I didn't test, though.
-> > > > > 
-> > > > > Are you sure we want to do that?
-> > > > no, I'm not sure. But I think it's worth to test how much performance
-> > > > degrades.
-> > > 
-> > > That will have to wait a few weeks as I don't have the hardware handy at the 
-> > > moment.
-> > In the hope the test will not be forgotten I consider it ok to take this
-> > series without the test (with keeping the memcpy32 that is).
-> 
-> Agreed.
-> 
-> I'll respin this series with the ecc_8bit_layout name change as you suggested.
-> 
-> May I have your Reviewed-by/Acked-by for the patches you are not the author 
-> of?
-Sure, you can add an Acked-by for patches 2 and 3 for your resent.  Note
-that I prefer to have spaces around operators, too. That shouldn't be a
-show stopper though.
+Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+---
+ arch/arm/mach-bcm/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Best regards
-Uwe
-
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index 8b11f44..7fec7e8 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -47,7 +47,7 @@ config ARCH_BCM_5301X
+ 	  BCM53014, BCM53015, BCM53016, BCM53017, BCM53018, BCM4707,
+ 	  BCM4708 and BCM4709.
+ 
+-	  Do not confuse this with the BCM4760 which is a totally
++	  Do not confuse this with the BCM4706 which is a totally
+ 	  different SoC or with the older BCM47XX and BCM53XX based
+ 	  network SoC using a MIPS CPU, they are supported by arch/mips/bcm47xx
+ 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.8.4.5
