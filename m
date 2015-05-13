@@ -1,40 +1,77 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 13 May 2015 09:59:22 +0300
-Subject: [PATCH v2 3/4] mtd: mxc_nand: fix truncate of unaligned oob
- copying
-In-Reply-To: <20150513064734.GF28888@pengutronix.de>
-References: <cover.1430636819.git.baruch@tkos.co.il>
- <ff526c6b889682e36e7d086dd5e6dec8936f86d9.1430636819.git.baruch@tkos.co.il>
- <20150508072432.GJ12671@pengutronix.de>
- <20150513051202.GI2558@tarshish>
- <20150513063903.GC28888@pengutronix.de>
- <20150513064404.GM2558@tarshish>
- <20150513064734.GF28888@pengutronix.de>
-Message-ID: <20150513065922.GN2558@tarshish>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 13 May 2015 16:00:21 +0900
+Subject: [PATCH v7 0/4] ARM: SoC: add a new platform,
+ UniPhier (arch/arm/mach-uniphier)
+In-Reply-To: <2101307.fSn8Z2ZyBq@wuerfel>
+References: <1431058034-5508-1-git-send-email-yamada.masahiro@socionext.com>
+ <2101307.fSn8Z2ZyBq@wuerfel>
+Message-ID: <CAK7LNASyJmyUcKNecdhWjXbd615=9XcMxeLxC7y_z+psO03BbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Hi Arnd,
 
-On Wed, May 13, 2015 at 08:47:34AM +0200, Uwe Kleine-K?nig wrote:
-> On Wed, May 13, 2015 at 09:44:04AM +0300, Baruch Siach wrote:
-> > > I thought we could get rid of the memcpy32 variants. Where do we need
-> > > memcpy32_* where memcpy16 wouldn't work?
-> > 
-> > memcpy16 should work, but would take twice as much IO/memory accesses. That 
-> > would definitely affect performance, as this is the flash data read/write hot 
-> > path. I didn't test, though.
-> > 
-> > Are you sure we want to do that?
-> no, I'm not sure. But I think it's worth to test how much performance
-> degrades.
 
-That will have to wait a few weeks as I don't have the hardware handy at the 
-moment.
+2015-05-13 0:00 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> On Friday 08 May 2015 13:07:10 Masahiro Yamada wrote:
+>> This is an initial series for supporting Socionext UniPhier SoCs,
+>> based on ARM Cortex-A9, mainly used for digital TVs, video recorders, etc.
+>>
+>>
+>> Masahiro Yamada (4):
+>>   ARM: UniPhier: add basic support for UniPhier architecture
+>>   ARM: multi_v7_defconfig: enable UniPhier SoC family
+>>   ARM: dts: UniPhier: add support for UniPhier SoCs and boards
+>>   MAINTAINERS: add myself as ARM/UniPhier maintainer
+>
+> Applied all four patches, to the next/soc, next/defconfig, next/dt and
+> next/soc branches respectively.
 
-baruch
+Thanks!
+I can see them.
+
+
+> Welcome as our latest new maintainer. In the future, please send
+> any follow-up patches for the architecture specific code to
+> arm at kernel.org in addition to the normal recipients, once you
+> consider them ready to be applied.
+
+
+Please teach me a little more because I am not experienced enough
+in this community.
+
+
+I checked MAINTAINERS, but I could not find arm at kernel.org.
+Is it documented somewhere?
+
+I found ARM SUB-ARCHITECTURES entry in that file, but it does not mention
+the responsible individuals.
+(I assume, you and Olof are the ones.)
+
+
+ARM SUB-ARCHITECTURES
+L:      linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+S:      Maintained
+F:      arch/arm/mach-*/
+F:      arch/arm/plat-*/
+T:      git git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
+
+
+
+I have one more question.
+
+Are you receiving pull requests from each sub-arch maintainer?
+Or should every patch be submitted to arm at kernel.org and
+applied by you (or other ARM-SoC maintainers)?
+
+I have not earned enough reputations in this ML, so I know
+it is too early for me to handle pull-reqs.
+
+I understand the general development process of Linux, but
+the maintainership of the ARM-SoC subsystem looks more hierarchized, so
+I just want to know its development process correctly.
+
 
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Best Regards
+Masahiro Yamada
