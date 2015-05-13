@@ -1,41 +1,34 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 13 May 2015 10:23:55 +0200
-Subject: [PATCH 2/8] dmaengine: mv_xor: add support for a38x command in
- descriptor mode
-In-Reply-To: <20150512180539.4ea5d158@free-electrons.com>
-References: <1431445063-20226-1-git-send-email-maxime.ripard@free-electrons.com>
- <1431445063-20226-3-git-send-email-maxime.ripard@free-electrons.com>
- <20150512174936.284783d4@free-electrons.com>
- <20150512155824.GJ19927@lunn.ch>
- <20150512180539.4ea5d158@free-electrons.com>
-Message-ID: <20150513082355.GT10961@lukather>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 13 May 2015 11:32:34 +0300
+Subject: [PATCH v7 0/4] ARM: SoC: add a new platform, UniPhier
+ (arch/arm/mach-uniphier)
+In-Reply-To: <2230140.n6kW8LSSaP@wuerfel>
+References: <1431058034-5508-1-git-send-email-yamada.masahiro@socionext.com>
+ <2101307.fSn8Z2ZyBq@wuerfel>
+ <CAK7LNASyJmyUcKNecdhWjXbd615=9XcMxeLxC7y_z+psO03BbQ@mail.gmail.com>
+ <2230140.n6kW8LSSaP@wuerfel>
+Message-ID: <20150513083234.GP2558@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 12, 2015 at 06:05:39PM +0200, Thomas Petazzoni wrote:
-> Andrew,
-> 
-> On Tue, 12 May 2015 17:58:24 +0200, Andrew Lunn wrote:
-> 
-> > A quick grep for marvell,orion, marvell,kirkwood and marvell,dove
-> > suggests it should have the - if we want to be consistent with older
-> > Marvell devices. As you said, starting with marvell,armanda it gets
-> > pretty inconsistent :-(
-> 
-> Yes, with the "-" would be better IMO.
+Hi Arnd,
 
-changed to armada-380-xor, thanks!
+On Wed, May 13, 2015 at 09:48:33AM +0200, Arnd Bergmann wrote:
+> For sending pull requests, it would be good to have a gpg key that
+> is signed by other well-known kernel developers. If you have such
+> a key, you can also request a kernel.org account to host a git tree
+> there, or you can host a git tree somewhere on your company's domain.
+> A public hosting service like github is not as good for us, but we
+> can deal with it when you are still ramping up your infrastructure.
+> Let me know if you need help finding kernel developers to sign your key.
 
-Maxime
+Is a pull request from a kernel.org repo trusted more than the key itself? In 
+other words, if I sign my pull request with a trusted key, why would the git 
+repo location make any difference?
+
+baruch
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150513/2d994dfe/attachment-0001.sig>
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
