@@ -1,27 +1,36 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 13 May 2015 16:40:36 +0900
-Subject: [PATCHv5 5/5] ARM: dts: Enable thermal_zone for
- exynos5422-odroidxu3
-In-Reply-To: <1431499020-3912-6-git-send-email-linux.amoon@gmail.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Wed, 13 May 2015 13:16:38 +0530
+Subject: [PATCHv5 1/5] ARM: dts: exynos5422-odroidxu3 Add pwm-fan node to
+ the Odroid-XU3 board
+In-Reply-To: <CAJKOXPefJwqvfZPDovQ6EjEOBfuJkidgeYDF_=KC9O+=2=_KoQ@mail.gmail.com>
 References: <1431499020-3912-1-git-send-email-linux.amoon@gmail.com>
- <1431499020-3912-6-git-send-email-linux.amoon@gmail.com>
-Message-ID: <CAJKOXPeNB=BXoY6CAxE8MNZ90cchhbdbUg3Xgef3qAgBR2UWJA@mail.gmail.com>
+ <1431499020-3912-2-git-send-email-linux.amoon@gmail.com>
+ <CAJKOXPefJwqvfZPDovQ6EjEOBfuJkidgeYDF_=KC9O+=2=_KoQ@mail.gmail.com>
+Message-ID: <CANAwSgTCaBgmBQ9HNb_2O+eUeZK2XngMkGon7x8Q4h86xP5hKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-13 15:37 GMT+09:00 Anand Moon <linux.amoon@gmail.com>:
-> Include exynos5-cpu-thermal.dtsi to enable thermal_zone support.
+Hi Krzysztof,
 
-I am a little confused because you named this file as
-exynos5-cpu-thermal, meaning it is common for all Exynos5 boards. But:
-1. It references some specific phandles like &fan0 (cooling-device =
-<&fan0 2 3>).
-2. You include it only here.
+Will make the changes.
 
-So the question: is "exynos5-cpu-thermal.dtsi" a generic thermal DTSI?
-What is your intention?
+Thanks for the review.
 
-Lukasz, you acked the patchset, is it fine?
+-Anand Moon
 
-Best regards,
-Krzysztof
+On 13 May 2015 at 12:41, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
+> 2015-05-13 15:36 GMT+09:00 Anand Moon <linux.amoon@gmail.com>:
+>> Add pwm-fan node to the Odroid-XU3 board.
+>>
+>> Tested-by: Markus Reichl <m.reichl@fivetechno.de>
+>> Acked-by: Lukasz Majewski <l.majewski@samsung.com>
+>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+>
+> Please fix the title of commit (missing colon, duplicated name of board) to:
+> "ARM: dts: exynos5422-odroidxu3: Add pwm-fan node"
+>
+> Rest looks good:
+> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>
+> Best regards,
+> Krzysztof
