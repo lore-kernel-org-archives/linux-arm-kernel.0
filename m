@@ -1,46 +1,37 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 13 May 2015 16:47:07 +0100
-Subject: [PATCH] bus: arm-ccn: Use hrtimer_start()
-In-Reply-To: <2646197.ZVRR8xztig@wuerfel>
-References: <alpine.DEB.2.11.1505131712320.4225@nanos>
- <1431530484-3389-1-git-send-email-pawel.moll@arm.com>
- <2646197.ZVRR8xztig@wuerfel>
-Message-ID: <1431532027.3285.107.camel@arm.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 13 May 2015 21:17:46 +0530
+Subject: [PATCH 1/3 v6] dt/bindings: Add binding for the BCM2835 mailbox
+ driver
+In-Reply-To: <20150513075705.GB3394@x1>
+References: <1430857666-18877-1-git-send-email-eric@anholt.net>
+ <CABb+yY3fDP_U8dz7TEJ+N6gKwhkQKdsfXDq209nQUCWu-zZYgg@mail.gmail.com>
+ <20150513075705.GB3394@x1>
+Message-ID: <CABb+yY34qTF7jMw_0uHiOvaQaG5ubNVWPLjjrLdNgo7eoSqYXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-05-13 at 16:32 +0100, Arnd Bergmann wrote:
-> On Wednesday 13 May 2015 16:21:24 Pawel Moll wrote:
-> > diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
-> > index df5f307..7d9879e 100644
-> > --- a/drivers/bus/arm-ccn.c
-> > +++ b/drivers/bus/arm-ccn.c
-> > @@ -921,9 +921,8 @@ static void arm_ccn_pmu_event_start(struct perf_event *event, int flags)
-> >          * attribute).
-> >          */
-> >         if (!ccn->irq)
-> > -               __hrtimer_start_range_ns(&ccn->dt.hrtimer,
-> > -                               arm_ccn_pmu_timer_period(), 0,
-> > -                               HRTIMER_MODE_REL_PINNED, 0);
-> > +               hrtimer_start(&ccn->dt.hrtimer, arm_ccn_pmu_timer_period(),
-> > +                               HRTIMER_MODE_REL_PINNED);
-> >  
-> >         /* Set the DT bus input, engaging the counter */
-> >         arm_ccn_pmu_xp_dt_config(event, 1);
-> 
-> Is this correct by itself, or do we need to pull in the branch that
-> contains c6eb3f70d44828 ("hrtimer: Get rid of hrtimer softirq")
-> from Thomas? The other similar patches that Thomas did contain a
-> comment about the conversion being safe after hrtimer_start()
-> no longer uses a softirq, but it is still in use in 4.1-rc3.
-
-That's why I asked who should carry this patch ;-)
-
-Now, the answer to your question is: the result will not be worse than
-the what was there before you pulled my updates, as the code was using
-normal hrtimer_start(). It's just when I realised that it should be
-pinned I looked at what x86 uncore pmu is doing and shamelessly (and
-probably a bit mindlessly) copied the "do not wakeup" version from
-there.
-
-Pawel
+On Wed, May 13, 2015 at 1:27 PM, Lee Jones <lee@kernel.org> wrote:
+> On Tue, 12 May 2015, Jassi Brar wrote:
+>> On Wed, May 6, 2015 at 1:57 AM, Eric Anholt <eric@anholt.net> wrote:
+>> > From: Lubomir Rintel <lkundrak@v3.sk>
+>> >
+>> > This patch was split out of Lubomir's original mailbox patch by Eric
+>> > Anholt, and the required properties documentation and examples have
+>> > been filled out more completely and updated for the driver being
+>> > changed to expose a single channel.
+>> >
+>> > Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+>> > Signed-off-by: Craig McGeachie <slapdau@yahoo.com.au>
+>> > Signed-off-by: Eric Anholt <eric@anholt.net>
+>> > Acked-by: Lee Jones <lee.jones@linaro.org>
+>> > Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+>> > ---
+>> Thanks to the reviewers. Applied all 3 patches.
+>
+> Jassi, can you remove patch 3/3 from your tree please?  Changes to
+> DTS(I) files should go in via ARM-SoC.  If SS Maintainers took DT
+> changes, there would be carnage.
+>
+> I'm going to apply it now.
+>
+Done. Thanks for the heads up.
