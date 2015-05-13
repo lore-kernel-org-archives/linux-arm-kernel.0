@@ -1,119 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 May 2015 17:28:57 +0200
-Subject: [PATCH v8 14/16] ARM: dts: Introduce STM32F429 MCU
-In-Reply-To: <55536BC2.30603@linaro.org>
-References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
- <3125409.QXbEmPolyh@wuerfel> <55536BC2.30603@linaro.org>
-Message-ID: <11310179.epfRucfQKB@wuerfel>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 13 May 2015 16:47:07 +0100
+Subject: [PATCH] bus: arm-ccn: Use hrtimer_start()
+In-Reply-To: <2646197.ZVRR8xztig@wuerfel>
+References: <alpine.DEB.2.11.1505131712320.4225@nanos>
+ <1431530484-3389-1-git-send-email-pawel.moll@arm.com>
+ <2646197.ZVRR8xztig@wuerfel>
+Message-ID: <1431532027.3285.107.camel@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 May 2015 16:20:34 Daniel Thompson wrote:
-> For the all reset bits:
+On Wed, 2015-05-13 at 16:32 +0100, Arnd Bergmann wrote:
+> On Wednesday 13 May 2015 16:21:24 Pawel Moll wrote:
+> > diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
+> > index df5f307..7d9879e 100644
+> > --- a/drivers/bus/arm-ccn.c
+> > +++ b/drivers/bus/arm-ccn.c
+> > @@ -921,9 +921,8 @@ static void arm_ccn_pmu_event_start(struct perf_event *event, int flags)
+> >          * attribute).
+> >          */
+> >         if (!ccn->irq)
+> > -               __hrtimer_start_range_ns(&ccn->dt.hrtimer,
+> > -                               arm_ccn_pmu_timer_period(), 0,
+> > -                               HRTIMER_MODE_REL_PINNED, 0);
+> > +               hrtimer_start(&ccn->dt.hrtimer, arm_ccn_pmu_timer_period(),
+> > +                               HRTIMER_MODE_REL_PINNED);
+> >  
+> >         /* Set the DT bus input, engaging the counter */
+> >         arm_ccn_pmu_xp_dt_config(event, 1);
 > 
->    clock idx = reset idx + 256
-> 
-> The opposite is not true; the clock bits are a superset of the reset 
-> bits (the reset bits act on cells but some cells have >1 clock).
+> Is this correct by itself, or do we need to pull in the branch that
+> contains c6eb3f70d44828 ("hrtimer: Get rid of hrtimer softirq")
+> from Thomas? The other similar patches that Thomas did contain a
+> comment about the conversion being safe after hrtimer_start()
+> no longer uses a softirq, but it is still in use in 4.1-rc3.
 
-Ok, in that case, I would strongly recommend subtracting that 256
-offset keeping the numbers the same, to remove the function-type
-macros.
+That's why I asked who should carry this patch ;-)
 
-> >> However there are a couple of clocks without gating just before the
-> >> clock reaches the peripheral:
-> >>
-> >> 1. A hard coded /8. I think this will have to be given a synthetic
-> >>      number.
-> >
-> > If this is just a divider, why not use a separate DT node for that,
-> > like this:
-> >
-> >          clock {
-> >                  compatible = "fixed-factor-clock";
-> >                  clocks = <&parentclk>;
-> >                  #clock-cells = <0>;
-> >                  clock-div = <8>;
-> >                  clock-mult = <1>;
-> >          };
-> >
-> > No need to assign a number for this.
-> 
-> I'd wondered about doing that.
-> 
-> It will certainly work but it seemed a bit odd to me to have one (really 
-> tiny) part of the RCC cell included seperately in the platform 
-> description whilst all the complicated bits end up aggregated into the 
-> RCC cell.
-> 
-> Is there much prior art that uses this type of trick to avoid having 
-> magic numbers into the bindings?
+Now, the answer to your question is: the result will not be worse than
+the what was there before you pulled my updates, as the code was using
+normal hrtimer_start(). It's just when I realised that it should be
+pinned I looked at what x86 uncore pmu is doing and shamelessly (and
+probably a bit mindlessly) copied the "do not wakeup" version from
+there.
 
-Are you sure that divider is actually part of the RCC?
-
-> >> 2. Ungated dividers. For these I am using the bit offset of the LSB of
-> >>      the mux field.
-> >
-> > Do these ones also come with resets?
-> 
-> No. They mostly run to the core and its intimate peripherals (i.e. only 
-> reset line comes from WDT).
-
-Ok.
-
-> >> So I think there is only one value that is completely unrelated to the
-> >> hardware and will use a magic constant instead.
-> >>
-> >> I had planned to macros similar to the STM32F4_AxB_RESET() family of
-> >> macros in both clk driver and DT in order to reuse the bit layouts from
-> >> dt-bindings/mfd/stm32f4-rcc.h .
-> >>
-> >> Normal case would have looked like this:
-> >>
-> >>                  timer3: timer at 40000000 {
-> >>                          compatible = "st,stm32-timer";
-> >>                          reg = <0x40000000 0x400>;
-> >>                          interrupts = <28>;
-> >>                          resets = <&rcc STM32F4_APB1_RESET(TIM3)>;
-> >>                          clocks = <&rcc STM32F4_APB1_CLK(TIM3)>;
-> >>                          status = "disabled";
-> >>                  };
-> >>
-> >> Without the macros it looks like this:
-> >>
-> >>                  timer3: timer at 40000000 {
-> >>                          compatible = "st,stm32-timer";
-> >>                          reg = <0x40000000 0x400>;
-> >>                          interrupts = <28>;
-> >>                          resets = <&rcc 257>;
-> >>                          clocks = <&rcc 513>;
-> >>                          status = "disabled";
-> >>                  };
-> >>
-> >> However we could perhaps be more literate even if we don't use the macros?
-> >>
-> >>                  timer3: timer at 40000000 {
-> >>                          compatible = "st,stm32-timer";
-> >>                          reg = <0x40000000 0x400>;
-> >>                          interrupts = <28>;
-> >>                          resets = <&rcc ((0x20*8) + 1)>;
-> >>                          clocks = <&rcc ((0x40*8) + 1)>;
-> >>                          status = "disabled";
-> >>                  };
-> >
-> > How about #address-cells = <2>, so you can do
-> >
-> > 		resets = <&rcc 8 1>;
-> > 		clocks = <&rcc 8 1>;
-> >
-> > with the first cell being an index for the block and the second cell the
-> > bit number within that block.
-> 
-> That would suit me very well (although is the 0x20/0x40 not the 8 that 
-> we would need in the middle column).
-
-We don't normally use register offsets in DT. The number 8 here instead
-would indicate block 8, where each block is four bytes wide. Using the
-same index here for reset and clock would also help readability.
-
-	Arnd
+Pawel
