@@ -1,72 +1,116 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 13 May 2015 12:32:59 -0600
-Subject: BCM2836 (Raspberry Pi 2) port
-In-Reply-To: <87wq0c4bgv.fsf@eliezer.anholt.net>
-References: <1429639796-2169-1-git-send-email-eric@anholt.net>
- <4137213.WVJY1et48u@kongar> <55516738.306@wwwdotorg.org>
- <1701192.WcfjCoBWQN@kongar> <55522468.3050606@wwwdotorg.org>
- <87d2254s6y.fsf@eliezer.anholt.net> <555278BA.50903@wwwdotorg.org>
- <87wq0c4bgv.fsf@eliezer.anholt.net>
-Message-ID: <555398DB.8050206@wwwdotorg.org>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Wed, 13 May 2015 20:43:47 +0200
+Subject: [PATCH 2/2] PCI: iproc: add bcma pcie driver
+In-Reply-To: <55537C43.4050606@broadcom.com>
+References: <1431465781-10753-1-git-send-email-hauke@hauke-m.de>	<1431465781-10753-3-git-send-email-hauke@hauke-m.de>	<CACna6rxVpJ-4b_5jG91JN62jQHh8u=QaLpO+_7J9mFr+_ScPaA@mail.gmail.com>	<5553742E.7070204@broadcom.com>
+ <CACna6rzT=218pQk9M6NJWH51wszn=p0LmHrizrvV9Xkn-=Om3Q@mail.gmail.com>
+ <55537C43.4050606@broadcom.com>
+Message-ID: <55539B63.2060203@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/13/2015 11:46 AM, Eric Anholt wrote:
-> Stephen Warren <swarren@wwwdotorg.org> writes:
->
->> On 05/12/2015 11:32 AM, Eric Anholt wrote:
->>> Stephen Warren <swarren@wwwdotorg.org> writes:
->>>
->>>> On 05/12/2015 09:39 AM, Alexander Stein wrote:
->>>>> On Monday 11 May 2015, 20:36:40 wrote Stephen Warren:
->>>>>> On 05/08/2015 10:14 AM, Alexander Stein wrote:
->>>>>>> On Thursday 23 April 2015, 22:25:08 wrote Stephen Warren:
->>>>>>>>> Hit any key to stop autoboot:  0
->>>>>>>>> U-Boot> setenv fdt_high fffffff
->>>>>>>
->>>>>>> Any specific reason to set fdt_high to fffffff?
->>>>>>
->>>>>> Yes, it prevents U-Boot's annoying habit of moving the DTB from where it
->>>>>> was loaded to some other place. This was especially important in this
->>>>>> case since I was trying to find out exactly which piece of RAM being
->>>>>> over-written caused the issues I was seeing.
+On 05/13/2015 06:30 PM, Ray Jui wrote:
+> Hi Rafal,
+> 
+> On 5/13/2015 9:19 AM, Rafa? Mi?ecki wrote:
+>> On 13 May 2015 at 17:56, Ray Jui <rjui@broadcom.com> wrote:
+>>> On 5/12/2015 11:27 PM, Rafa? Mi?ecki wrote:
+>>>> On 12 May 2015 at 23:23, Hauke Mehrtens <hauke@hauke-m.de> wrote:
+>>>>> This driver adds support for the PCIe 2.0 controller found on the bcma
+>>>>> bus. This controller can be found on (mostly) all Broadcom BCM470X /
+>>>>> BCM5301X ARM SoCs.
 >>>>>
->>>>> Shouldn't this then be part of the default raspberry (2 only?) environment?
+>>>>> The driver found in the Broadcom SDK does some more stuff, like setting
+>>>>> up some DMA memory areas, chaining MPS and MRRS to 512 and also some
+>>>>> PHY changes like "improving" the PCIe jitter and doing some special
+>>>>> initializations for the 3rd PCIe port.
+>>>>>
+>>>>> This was tested on a bcm4708 board with 2 PCIe ports and wireless cards
+>>>>> connected to them.
+>>>>>
+>>>>> PCI_DOMAINS is needed by this driver, because normally there is more
+>>>>> than one PCIe controller and without PCI_DOMAINS only the first
+>>>>> controller gets registered.
+>>>>> This controller gets 6 IRQs, the last one is trigged by all IRQ events.
+>>>>>
+>>>>> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
 >>>>
->>>> Eventually yes. So far, nobody seems to know which areas of RAM are
->>>> off-limits (presumably since the RAM is used as a CPU1..3 pen), so I was
->>>> experimenting to try and find that out.
->>>
->>> If I'm reading this right, the CPU1-3 pen is in the bottom 8k of memory
->>> (actually much less than 8k).
+>>>> Acked-by: Rafa? Mi?ecki <zajec5@gmail.com>
+>>>>
+>>>>
+>>>>> +static int iproc_pcie_bcma_probe(struct bcma_device *bdev)
+>>>>> +{
+>>>>> +       struct iproc_pcie *pcie;
+>>>>> +       LIST_HEAD(res);
+>>>>> +       struct resource res_mem;
+>>>>> +       int ret;
+>>>>> +
+>>>>> +       pcie = devm_kzalloc(&bdev->dev, sizeof(*pcie), GFP_KERNEL);
+>>>>> +       if (!pcie)
+>>>>> +               return -ENOMEM;
+>>>>> +
+>>>>> +       pcie->dev = &bdev->dev;
+>>>>> +       bcma_set_drvdata(bdev, pcie);
+>>>>> +
+>>>>> +       pcie->base = bdev->io_addr;
+>>>>> +
+>>>>> +       res_mem.start = bdev->addr_s[0];
+>>>>> +       res_mem.end = bdev->addr_s[0] + SZ_128M - 1;
+>>>>> +       res_mem.name = "PCIe MEM space";
+>>>>> +       res_mem.flags = IORESOURCE_MEM;
+>>>>> +       pci_add_resource(&res, &res_mem);
+>>>>> +
+>>>>> +       pcie->resources = &res;
+>>>>> +
+>>>>> +       pcie->map_irq = iproc_pcie_bcma_map_irq;
+>>>>> +
+>>>>> +       ret = iproc_pcie_setup(pcie);
+>>>>
+>>>> I think I don't like this part of iproc design. It lefts
+>>>> pcie->resources pointing to some random memory after the setup/probe
+>>>> are done. Guess it should be a separated parameter or sth.
+>>>>
+>>>> The patch is still OK, I just refer to generic iproc possible issue.
+>>>>
+>>> Sorry Rafal, but could you please be more specific on this?
 >>
->> Hmm. I wondered if that was the case. I don't think anything I was doing
->> in U-Boot /should/ touch those pages, but there have been bugs before
->> where some pointer was left at NULL, and some DM (U-Boot Device Model)
->> code ended up putting structures in page 0 by mistake. Perhaps something
->> like that has resurfaced. I'll try to find time to diff page 0
->> before/after various U-Boot operations, and see if it's getting modified...
->
-> How about on the Linux side?  What's reserving that memory for us, if
-> anything?
+>> iproc_pcie_pltfm_probe (and iproc_pcie_bcma_probe) have local "res"
+>> variable (each its own). They do:
+>> pcie->resources = &res;
+>> and then they call
+>> iproc_pcie_setup(pcie);
+>>
+>> After iproc_pcie_pltfm_probe / iproc_pcie_bcma_probe returns, the
+>> pointer pcie->resources is not valid anymore, yet pcie struct is still
+>> in use. Of course pcie->resources isn't used anymore, but still, it's
+>> some in-struct pointer (to the random memory since local variable is
+>> not accessible anymore).
+>>
+>> I think you should drop
+>> struct list_head *resources;
+>> from the struct iproc_pcie and use
+>> iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *resources)
+>>
+> 
+> Okay thanks. That makes sense.
+> 
+> Or I should keep a copy of the resources under pcie->resources. In the
+> current pcie-iproc.c, the resource is not used anywhere else except when
+> creating the root bus under iproc_pcie_setup. But in the future, I might
+> need to add more code to explicitly program the outbound/inbound windows
+> so this driver can work with some other iProc SoCs where the desired
+> windows do not match power-on-reset values.
+> 
+> I plan to change this along with the window programming patch in the
+> future. I also think Hauke's current patch is fine.
+> 
+> Thanks,
+> 
+> Ray
+> 
+I think parts of this resources are allocated and never freed.
 
-Likely nothing at present. I was starting to see what looked like 
-SMP-pen-related issues just in U-Boot, before even attempting to boot a 
-kernel at all. So, I didn't put any though into how to communicate this 
-to the kernel.
+pci_add_resource() allocates some bytes, but I do not see where they are
+freed, this also applies to the platform driver.
 
->  Weird things happen if I put "ARM: bcm2836: Add a DT binding
-> for the ARM local registers." and "ARM: bcm2835: Use a syscon regmap to
-> set up timer frequency." before the SMP support in the bcm2836-smp tree
-> (init crashes).
-
-This issue would probably explain that; if the kernel just happens to 
-allocate a physical page of RAM that overlaps the SMP pen memory.
-
-A /memreserve/ in the DT would probably solve this. Adjusting the 
-content of the /memory/reg property to remove the SMP pen would likely 
-work too.
-
-Is there no way to disable CPU1..n other than using an SMP pen in 
-memory? If the CPUs simply weren't executing anything at all, but could 
-be unblocked/powered-up/... later, that'd simplify life.
+Hauke
