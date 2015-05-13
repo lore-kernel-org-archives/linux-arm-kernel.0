@@ -1,322 +1,57 @@
-From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
-Date: Wed, 13 May 2015 16:49:46 -0500
-Subject: [PATCH 3/4] edac, altera: Addition of Arria10 EDAC
-In-Reply-To: <1431553787-27741-1-git-send-email-tthayer@opensource.altera.com>
-References: <1431553787-27741-1-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <1431553787-27741-4-git-send-email-tthayer@opensource.altera.com>
+From: ahs3@redhat.com (Al Stone)
+Date: Wed, 13 May 2015 16:00:58 -0600
+Subject: [PATCH v2 2/2] ARM64: kernel: unify ACPI and DT cpus
+ initialization
+In-Reply-To: <1431522769-11276-3-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1431522769-11276-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1431522769-11276-3-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <5553C99A.5020706@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thor Thayer <tthayer@opensource.altera.com>
+On 05/13/2015 07:12 AM, Lorenzo Pieralisi wrote:
+> The code that initializes cpus on arm64 is currently split in two
+> different code paths that carry out DT and ACPI cpus initialization.
+> 
+> Most of the code executing SMP initialization is common and should
+> be merged to reduce discrepancies between ACPI and DT initialization
+> and to have code initializing cpus in a single common place in the
+> kernel.
+> 
+> This patch refactors arm64 SMP cpus initialization code to merge
+> ACPI and DT boot paths in a common file and to create sanity
+> checks that can be reused by both boot methods.
+> 
+> Current code assumes PSCI is the only available boot method
+> when arm64 boots with ACPI; this can be easily extended if/when
+> the ACPI parking protocol is merged into the kernel.
+> 
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Tested-by: Mark Rutland <mark.rutland@arm.com> [DT]
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+[snip...]
 
-The Arria10 SDRAM and ECC system differs significantly from the
-Cyclone5 and Arria5 SoCs. This patch adds support for the Arria10
-SoC.
-1) IRQ handler needs to support SHARED IRQ
-2) Support sberr and dberr address reporting.
+These patches look pretty good so far, but I've only just started
+reviewing them.  This one raised the question: do we know if there
+is someone already working on parking protocol?  I've seen a form
+of it working on AMD Seattles but I don't recall seeing any patches
+being submitted -- I'll search archives again, just in case I missed
+it the first time, but if there is someone working on it, that would
+be good to know.
 
-Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
----
- drivers/edac/altera_edac.c |  132 ++++++++++++++++++++++++++++++++++++++------
- drivers/edac/altera_edac.h |   85 ++++++++++++++++++++++++++++
- 2 files changed, 201 insertions(+), 16 deletions(-)
+Thanks.
 
-diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
-index 204ad2d..735a180 100644
---- a/drivers/edac/altera_edac.c
-+++ b/drivers/edac/altera_edac.c
-@@ -42,6 +42,7 @@ const struct altr_sdram_prv_data c5_data = {
- 	.ecc_stat_ce_mask   = CV_DRAMSTS_SBEERR,
- 	.ecc_stat_ue_mask   = CV_DRAMSTS_DBEERR,
- 	.ecc_saddr_offset   = CV_ERRADDR_OFST,
-+	.ecc_daddr_offset   = CV_ERRADDR_OFST,
- 	.ecc_cecnt_offset   = CV_SBECOUNT_OFST,
- 	.ecc_uecnt_offset   = CV_DBECOUNT_OFST,
- 	.ecc_irq_en_offset  = CV_DRAMINTR_OFST,
-@@ -57,37 +58,62 @@ const struct altr_sdram_prv_data c5_data = {
- #endif
- };
- 
-+const struct altr_sdram_prv_data a10_data = {
-+	.ecc_ctrl_offset    = A10_ECCCTRL1_OFST,
-+	.ecc_ctl_en_mask    = A10_ECCCTRL1_ECC_EN,
-+	.ecc_stat_offset    = A10_INTSTAT_OFST,
-+	.ecc_stat_ce_mask   = A10_INTSTAT_SBEERR,
-+	.ecc_stat_ue_mask   = A10_INTSTAT_DBEERR,
-+	.ecc_saddr_offset   = A10_SERRADDR_OFST,
-+	.ecc_daddr_offset   = A10_DERRADDR_OFST,
-+	.ecc_irq_en_offset  = A10_ERRINTEN_OFST,
-+	.ecc_irq_en_mask    = A10_ECC_IRQ_EN_MASK,
-+	.ecc_irq_clr_offset = A10_INTSTAT_OFST,
-+	.ecc_irq_clr_mask   = (A10_INTSTAT_SBEERR | A10_INTSTAT_DBEERR),
-+	.ecc_cnt_rst_offset = A10_ECCCTRL1_OFST,
-+	.ecc_cnt_rst_mask   = A10_ECC_CNT_RESET_MASK,
-+#ifdef CONFIG_EDAC_DEBUG
-+	.ce_ue_trgr_offset  = A10_DIAGINTTEST_OFST,
-+	.ce_set_mask        = A10_DIAGINT_TSERRA_MASK,
-+	.ue_set_mask        = A10_DIAGINT_TDERRA_MASK,
-+#endif
-+};
-+
- static irqreturn_t altr_sdram_mc_err_handler(int irq, void *dev_id)
- {
- 	struct mem_ctl_info *mci = dev_id;
- 	struct altr_sdram_mc_data *drvdata = mci->pvt_info;
- 	const struct altr_sdram_prv_data *priv = drvdata->data;
--	u32 status, err_count, err_addr;
--
--	/* Error Address is shared by both SBE & DBE */
--	regmap_read(drvdata->mc_vbase, priv->ecc_saddr_offset, &err_addr);
-+	u32 status, err_count = 1, err_addr;
- 
- 	regmap_read(drvdata->mc_vbase, priv->ecc_stat_offset, &status);
- 
- 	if (status & priv->ecc_stat_ue_mask) {
--		regmap_read(drvdata->mc_vbase, priv->ecc_uecnt_offset,
--			    &err_count);
-+		regmap_read(drvdata->mc_vbase, priv->ecc_daddr_offset,
-+			    &err_addr);
-+		if (priv->ecc_uecnt_offset)
-+			regmap_read(drvdata->mc_vbase, priv->ecc_uecnt_offset,
-+				    &err_count);
- 		panic("\nEDAC: [%d Uncorrectable errors @ 0x%08X]\n",
- 		      err_count, err_addr);
- 	}
- 	if (status & priv->ecc_stat_ce_mask) {
--		regmap_read(drvdata->mc_vbase,  priv->ecc_cecnt_offset,
--			    &err_count);
-+		regmap_read(drvdata->mc_vbase, priv->ecc_saddr_offset,
-+			    &err_addr);
-+		if (priv->ecc_uecnt_offset)
-+			regmap_read(drvdata->mc_vbase,  priv->ecc_cecnt_offset,
-+				    &err_count);
- 		edac_mc_handle_error(HW_EVENT_ERR_CORRECTED, mci, err_count,
- 				     err_addr >> PAGE_SHIFT,
- 				     err_addr & ~PAGE_MASK, 0,
- 				     0, 0, -1, mci->ctl_name, "");
--	}
--
--	regmap_write(drvdata->mc_vbase,	priv->ecc_irq_clr_offset,
--		     priv->ecc_irq_clr_mask);
-+		/* Clear IRQ to resume */
-+		regmap_write(drvdata->mc_vbase,	priv->ecc_irq_clr_offset,
-+			     priv->ecc_irq_clr_mask);
- 
--	return IRQ_HANDLED;
-+		return IRQ_HANDLED;
-+	}
-+	return IRQ_NONE;
- }
- 
- #ifdef CONFIG_EDAC_DEBUG
-@@ -207,10 +233,58 @@ static unsigned long get_total_mem(void)
- 
- static const struct of_device_id altr_sdram_ctrl_of_match[] = {
- 	{ .compatible = "altr,sdram-edac", .data = (void *)&c5_data},
-+	{ .compatible = "altr,sdram-edac-a10", .data = (void *)&a10_data},
- 	{},
- };
- MODULE_DEVICE_TABLE(of, altr_sdram_ctrl_of_match);
- 
-+static int a10_init(struct regmap *mc_vbase)
-+{
-+	if (regmap_update_bits(mc_vbase, A10_INTMODE_OFST,
-+			       A10_INTMODE_SB_INT, A10_INTMODE_SB_INT)) {
-+		edac_printk(KERN_ERR, EDAC_MC,
-+			    "Error setting SB IRQ mode\n");
-+		return -ENODEV;
-+	}
-+
-+	if (regmap_write(mc_vbase, A10_SERRCNTREG_OFST, 1)) {
-+		edac_printk(KERN_ERR, EDAC_MC,
-+			    "Error setting trigger count\n");
-+		return -ENODEV;
-+	}
-+
-+	return 0;
-+}
-+
-+static int a10_unmask_irq(struct platform_device *pdev, u32 mask)
-+{
-+	void __iomem  *sm_base;
-+
-+	if (!devm_request_mem_region(&pdev->dev, A10_SYMAN_INTMASK_CLR,
-+				     sizeof(u32), dev_name(&pdev->dev))) {
-+		edac_printk(KERN_ERR, EDAC_MC,
-+			    "Unable to request mem region\n");
-+		return -EBUSY;
-+	}
-+
-+	sm_base = devm_ioremap(&pdev->dev, A10_SYMAN_INTMASK_CLR,
-+			       sizeof(u32));
-+	if (!sm_base) {
-+		edac_printk(KERN_ERR, EDAC_MC,
-+			    "Unable to ioremap device\n");
-+
-+		return -ENOMEM;
-+	}
-+
-+	iowrite32(mask, sm_base);
-+
-+	devm_iounmap(&pdev->dev, sm_base);
-+	devm_release_mem_region(&pdev->dev, A10_SYMAN_INTMASK_CLR,
-+				sizeof(u32));
-+
-+	return 0;
-+}
-+
- static int altr_sdram_probe(struct platform_device *pdev)
- {
- 	const struct of_device_id *id;
-@@ -221,8 +295,8 @@ static int altr_sdram_probe(struct platform_device *pdev)
- 	struct regmap *mc_vbase;
- 	struct dimm_info *dimm;
- 	u32 read_reg;
--	int irq, res = 0;
--	unsigned long mem_size;
-+	int irq, irq2, res = 0;
-+	unsigned long mem_size, irqflags;
- 
- 	id = of_match_device(altr_sdram_ctrl_of_match, &pdev->dev);
- 	if (!id)
-@@ -288,6 +362,9 @@ static int altr_sdram_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
- 
-+	/* Arria10 has a 2nd IRQ */
-+	irq2 = platform_get_irq(pdev, 1);
-+
- 	layers[0].type = EDAC_MC_LAYER_CHIP_SELECT;
- 	layers[0].size = 1;
- 	layers[0].is_virt_csrow = true;
-@@ -332,8 +409,31 @@ static int altr_sdram_probe(struct platform_device *pdev)
- 	if (res < 0)
- 		goto err;
- 
-+	/* Only the Arria10 has separate IRQs */
-+	if (irq2 > 0) {
-+		/* Arria10 specific initialization */
-+		res = a10_init(mc_vbase);
-+		if (res < 0)
-+			goto err2;
-+
-+		res = a10_unmask_irq(pdev, A10_DDR0_IRQ_MASK);
-+		if (res < 0)
-+			goto err2;
-+
-+		res = devm_request_irq(&pdev->dev, irq2,
-+				       altr_sdram_mc_err_handler,
-+				       IRQF_SHARED, dev_name(&pdev->dev), mci);
-+		if (res < 0) {
-+			edac_mc_printk(mci, KERN_ERR,
-+				       "Unable to request irq %d\n", irq2);
-+			res = -ENODEV;
-+			goto err2;
-+		}
-+		irqflags = IRQF_SHARED;
-+	}
-+
- 	res = devm_request_irq(&pdev->dev, irq, altr_sdram_mc_err_handler,
--			       0, dev_name(&pdev->dev), mci);
-+			       irqflags, dev_name(&pdev->dev), mci);
- 	if (res < 0) {
- 		edac_mc_printk(mci, KERN_ERR,
- 			       "Unable to request irq %d\n", irq);
-diff --git a/drivers/edac/altera_edac.h b/drivers/edac/altera_edac.h
-index b744d91..7b64dc7 100644
---- a/drivers/edac/altera_edac.h
-+++ b/drivers/edac/altera_edac.h
-@@ -80,6 +80,91 @@
- /* SDRAM Controller ECC Error Address Register */
- #define CV_ERRADDR_OFST            0x48
- 
-+/*-----------------------------------------*/
-+
-+/* SDRAM Controller EccCtrl Register */
-+#define A10_ECCCTRL1_OFST          0x00
-+
-+/* SDRAM Controller EccCtrl Register Bit Masks */
-+#define A10_ECCCTRL1_ECC_EN        0x001
-+#define A10_ECCCTRL1_CNT_RST       0x010
-+#define A10_ECCCTRL1_AWB_CNT_RST   0x100
-+#define A10_ECC_CNT_RESET_MASK     (A10_ECCCTRL1_CNT_RST | \
-+				    A10_ECCCTRL1_AWB_CNT_RST)
-+
-+/* SDRAM Controller Address Width Register */
-+#define CV_DRAMADDRW               0xFFC2502C
-+#define A10_DRAMADDRW              0xFFCFA0A8
-+
-+/* SDRAM Controller Address Widths Field Register */
-+#define DRAMADDRW_COLBIT_MASK      0x001F
-+#define DRAMADDRW_COLBIT_SHIFT     0
-+#define DRAMADDRW_ROWBIT_MASK      0x03E0
-+#define DRAMADDRW_ROWBIT_SHIFT     5
-+#define CV_DRAMADDRW_BANKBIT_MASK  0x1C00
-+#define CV_DRAMADDRW_BANKBIT_SHIFT 10
-+#define CV_DRAMADDRW_CSBIT_MASK    0xE000
-+#define CV_DRAMADDRW_CSBIT_SHIFT   13
-+
-+#define A10_DRAMADDRW_BANKBIT_MASK  0x3C00
-+#define A10_DRAMADDRW_BANKBIT_SHIFT 10
-+#define A10_DRAMADDRW_GRPBIT_MASK   0xC000
-+#define A10_DRAMADDRW_GRPBIT_SHIFT  14
-+#define A10_DRAMADDRW_CSBIT_MASK    0x70000
-+#define A10_DRAMADDRW_CSBIT_SHIFT   16
-+
-+/* SDRAM Controller Interface Data Width Register */
-+#define CV_DRAMIFWIDTH             0xFFC25030
-+#define A10_DRAMIFWIDTH            0xFFCFB008
-+
-+/* SDRAM Controller Interface Data Width Defines */
-+#define CV_DRAMIFWIDTH_16B_ECC     24
-+#define CV_DRAMIFWIDTH_32B_ECC     40
-+
-+#define A10_DRAMIFWIDTH_16B        0x0
-+#define A10_DRAMIFWIDTH_32B        0x1
-+#define A10_DRAMIFWIDTH_64B        0x2
-+
-+/* SDRAM Controller DRAM IRQ Register */
-+#define A10_ERRINTEN_OFST          0x10
-+
-+/* SDRAM Controller DRAM IRQ Register Bit Masks */
-+#define A10_ERRINTEN_SERRINTEN     0x01
-+#define A10_ERRINTEN_DERRINTEN     0x02
-+#define A10_ECC_IRQ_EN_MASK        (A10_ERRINTEN_SERRINTEN | \
-+				    A10_ERRINTEN_DERRINTEN)
-+
-+/* SDRAM Interrupt Mode Register */
-+#define A10_INTMODE_OFST           0x1C
-+#define A10_INTMODE_SB_INT         1
-+
-+/* SDRAM Controller Error Status Register */
-+#define A10_INTSTAT_OFST           0x20
-+
-+/* SDRAM Controller Error Status Register Bit Masks */
-+#define A10_INTSTAT_SBEERR         0x01
-+#define A10_INTSTAT_DBEERR         0x02
-+
-+/* SDRAM Controller ECC Error Address Register */
-+#define A10_DERRADDR_OFST          0x2C
-+#define A10_SERRADDR_OFST          0x30
-+
-+/* SDRAM Controller ECC Diagnostic Register */
-+#define A10_DIAGINTTEST_OFST       0x24
-+
-+#define A10_DIAGINT_TSERRA_MASK    0x0001
-+#define A10_DIAGINT_TDERRA_MASK    0x0100
-+
-+#define A10_SBERR_IRQ              34
-+#define A10_DBERR_IRQ              32
-+
-+/* SDRAM Single Bit Error Count Compare Set Register */
-+#define A10_SERRCNTREG_OFST        0x3C
-+
-+#define A10_SYMAN_INTMASK_CLR      0xFFD06098
-+#define A10_INTMASK_CLR_OFST       0x10
-+#define A10_DDR0_IRQ_MASK          BIT(17)
-+
- struct altr_sdram_prv_data {
- 	int ecc_ctrl_offset;
- 	int ecc_ctl_en_mask;
 -- 
-1.7.9.5
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Red Hat, Inc.
+ahs3 at redhat.com
+-----------------------------------
