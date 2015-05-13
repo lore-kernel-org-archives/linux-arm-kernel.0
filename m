@@ -1,95 +1,92 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 May 2015 18:19:06 +0200
-Subject: [PATCH] bus: arm-ccn: Use hrtimer_start()
-In-Reply-To: <1431532027.3285.107.camel@arm.com>
-References: <alpine.DEB.2.11.1505131712320.4225@nanos>
- <2646197.ZVRR8xztig@wuerfel> <1431532027.3285.107.camel@arm.com>
-Message-ID: <2471873.V16atfgj9f@wuerfel>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Wed, 13 May 2015 18:19:41 +0200
+Subject: [PATCH 2/2] PCI: iproc: add bcma pcie driver
+In-Reply-To: <5553742E.7070204@broadcom.com>
+References: <1431465781-10753-1-git-send-email-hauke@hauke-m.de>
+ <1431465781-10753-3-git-send-email-hauke@hauke-m.de>
+ <CACna6rxVpJ-4b_5jG91JN62jQHh8u=QaLpO+_7J9mFr+_ScPaA@mail.gmail.com>
+ <5553742E.7070204@broadcom.com>
+Message-ID: <CACna6rzT=218pQk9M6NJWH51wszn=p0LmHrizrvV9Xkn-=Om3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 May 2015 16:47:07 Pawel Moll wrote:
-> On Wed, 2015-05-13 at 16:32 +0100, Arnd Bergmann wrote:
-> > On Wednesday 13 May 2015 16:21:24 Pawel Moll wrote:
-> > > diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
-> > > index df5f307..7d9879e 100644
-> > > --- a/drivers/bus/arm-ccn.c
-> > > +++ b/drivers/bus/arm-ccn.c
-> > > @@ -921,9 +921,8 @@ static void arm_ccn_pmu_event_start(struct perf_event *event, int flags)
-> > >          * attribute).
-> > >          */
-> > >         if (!ccn->irq)
-> > > -               __hrtimer_start_range_ns(&ccn->dt.hrtimer,
-> > > -                               arm_ccn_pmu_timer_period(), 0,
-> > > -                               HRTIMER_MODE_REL_PINNED, 0);
-> > > +               hrtimer_start(&ccn->dt.hrtimer, arm_ccn_pmu_timer_period(),
-> > > +                               HRTIMER_MODE_REL_PINNED);
-> > >  
-> > >         /* Set the DT bus input, engaging the counter */
-> > >         arm_ccn_pmu_xp_dt_config(event, 1);
-> > 
-> > Is this correct by itself, or do we need to pull in the branch that
-> > contains c6eb3f70d44828 ("hrtimer: Get rid of hrtimer softirq")
-> > from Thomas? The other similar patches that Thomas did contain a
-> > comment about the conversion being safe after hrtimer_start()
-> > no longer uses a softirq, but it is still in use in 4.1-rc3.
-> 
-> That's why I asked who should carry this patch 
-> 
-> Now, the answer to your question is: the result will not be worse than
-> the what was there before you pulled my updates, as the code was using
-> normal hrtimer_start(). It's just when I realised that it should be
-> pinned I looked at what x86 uncore pmu is doing and shamelessly (and
-> probably a bit mindlessly) copied the "do not wakeup" version from
-> there.
+On 13 May 2015 at 17:56, Ray Jui <rjui@broadcom.com> wrote:
+> On 5/12/2015 11:27 PM, Rafa? Mi?ecki wrote:
+>> On 12 May 2015 at 23:23, Hauke Mehrtens <hauke@hauke-m.de> wrote:
+>>> This driver adds support for the PCIe 2.0 controller found on the bcma
+>>> bus. This controller can be found on (mostly) all Broadcom BCM470X /
+>>> BCM5301X ARM SoCs.
+>>>
+>>> The driver found in the Broadcom SDK does some more stuff, like setting
+>>> up some DMA memory areas, chaining MPS and MRRS to 512 and also some
+>>> PHY changes like "improving" the PCIe jitter and doing some special
+>>> initializations for the 3rd PCIe port.
+>>>
+>>> This was tested on a bcm4708 board with 2 PCIe ports and wireless cards
+>>> connected to them.
+>>>
+>>> PCI_DOMAINS is needed by this driver, because normally there is more
+>>> than one PCIe controller and without PCI_DOMAINS only the first
+>>> controller gets registered.
+>>> This controller gets 6 IRQs, the last one is trigged by all IRQ events.
+>>>
+>>> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+>>
+>> Acked-by: Rafa? Mi?ecki <zajec5@gmail.com>
+>>
+>>
+>>> +static int iproc_pcie_bcma_probe(struct bcma_device *bdev)
+>>> +{
+>>> +       struct iproc_pcie *pcie;
+>>> +       LIST_HEAD(res);
+>>> +       struct resource res_mem;
+>>> +       int ret;
+>>> +
+>>> +       pcie = devm_kzalloc(&bdev->dev, sizeof(*pcie), GFP_KERNEL);
+>>> +       if (!pcie)
+>>> +               return -ENOMEM;
+>>> +
+>>> +       pcie->dev = &bdev->dev;
+>>> +       bcma_set_drvdata(bdev, pcie);
+>>> +
+>>> +       pcie->base = bdev->io_addr;
+>>> +
+>>> +       res_mem.start = bdev->addr_s[0];
+>>> +       res_mem.end = bdev->addr_s[0] + SZ_128M - 1;
+>>> +       res_mem.name = "PCIe MEM space";
+>>> +       res_mem.flags = IORESOURCE_MEM;
+>>> +       pci_add_resource(&res, &res_mem);
+>>> +
+>>> +       pcie->resources = &res;
+>>> +
+>>> +       pcie->map_irq = iproc_pcie_bcma_map_irq;
+>>> +
+>>> +       ret = iproc_pcie_setup(pcie);
+>>
+>> I think I don't like this part of iproc design. It lefts
+>> pcie->resources pointing to some random memory after the setup/probe
+>> are done. Guess it should be a separated parameter or sth.
+>>
+>> The patch is still OK, I just refer to generic iproc possible issue.
+>>
+> Sorry Rafal, but could you please be more specific on this?
 
-Ok, got it. I've rewritten the commit message now to reflect this,
-and have applied your patch on top of the next/drivers branch.
+iproc_pcie_pltfm_probe (and iproc_pcie_bcma_probe) have local "res"
+variable (each its own). They do:
+pcie->resources = &res;
+and then they call
+iproc_pcie_setup(pcie);
 
-Thanks a lot for the fast roundtrip in fixing it. Hopefully, tomorrow's
-linux-next works better now.
+After iproc_pcie_pltfm_probe / iproc_pcie_bcma_probe returns, the
+pointer pcie->resources is not valid anymore, yet pcie struct is still
+in use. Of course pcie->resources isn't used anymore, but still, it's
+some in-struct pointer (to the random memory since local variable is
+not accessible anymore).
 
-	Arnd
+I think you should drop
+struct list_head *resources;
+from the struct iproc_pcie and use
+iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *resources)
 
-commit a78a3c8ef715b94de3ab27633866d4bde3e2226f
-Author: Pawel Moll <pawel.moll@arm.com>
-Date:   Wed May 13 16:21:24 2015 +0100
-
-    bus: arm-ccn: Use hrtimer_start() again
-    
-    hrtimer_start() will no longer defer already expired timers to the
-    softirq in 4.2, and the __hrtimer_start_range_ns() function is
-    getting removed, causing build errors when both the tip tree and
-    the arm-ccn changes are merged.
-    
-    This changes the code back to using hrtimer_start, which will
-    do the right thing after this branch gets merged with the
-    timers update from tip.
-    
-    As pointed out after a discussion on the mailing list, the result will
-    not be worse than the what was there before you pulled my updates, as
-    the code was using normal hrtimer_start(). It's just when I realised
-    that it should be pinned I looked at what x86 uncore pmu is doing and
-    shamelessly (and probably a bit mindlessly) copied the "do not wakeup"
-    version from there.
-    
-    Reported-by: Mark Brown <mark.brown@arm.com>
-    Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
-index df5f307f3244..7d9879e166cf 100644
---- a/drivers/bus/arm-ccn.c
-+++ b/drivers/bus/arm-ccn.c
-@@ -921,9 +921,8 @@ static void arm_ccn_pmu_event_start(struct perf_event *event, int flags)
- 	 * attribute).
- 	 */
- 	if (!ccn->irq)
--		__hrtimer_start_range_ns(&ccn->dt.hrtimer,
--				arm_ccn_pmu_timer_period(), 0,
--				HRTIMER_MODE_REL_PINNED, 0);
-+		hrtimer_start(&ccn->dt.hrtimer, arm_ccn_pmu_timer_period(),
-+				HRTIMER_MODE_REL_PINNED);
- 
- 	/* Set the DT bus input, engaging the counter */
- 	arm_ccn_pmu_xp_dt_config(event, 1);
+-- 
+Rafa?
