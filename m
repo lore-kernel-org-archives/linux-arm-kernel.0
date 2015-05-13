@@ -1,34 +1,34 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 13 May 2015 10:35:59 +0530
-Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
-In-Reply-To: <555224A2.7000308@ti.com>
-References: <cover.1430394884.git.viresh.kumar@linaro.org>
- <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
- <554FFFA3.1060801@ti.com> <20150512051633.GB32300@linux>
- <555224A2.7000308@ti.com>
-Message-ID: <20150513050559.GE28858@linux>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 13 May 2015 08:12:02 +0300
+Subject: [PATCH v2 3/4] mtd: mxc_nand: fix truncate of unaligned oob
+ copying
+In-Reply-To: <20150508072432.GJ12671@pengutronix.de>
+References: <cover.1430636819.git.baruch@tkos.co.il>
+ <ff526c6b889682e36e7d086dd5e6dec8936f86d9.1430636819.git.baruch@tkos.co.il>
+ <20150508072432.GJ12671@pengutronix.de>
+Message-ID: <20150513051202.GI2558@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12-05-15, 11:04, Nishanth Menon wrote:
-> Just curious -> is'nt it better to just have min<->max range? binding
-> as it stands right now is open to interpretation as to what will be
-> attempted and in what sequence? with a valid min, target or max -
-> is'nt it more power efficient always to go for a "min" than a target?
-> 
-> Further, min<->max implies anywhere in that range and is more
-> consistent with "regulator like" description.
+Hi Uwe,
 
-It came out after some discussions on the list, you may want to go
-through that.
+On Fri, May 08, 2015 at 09:24:32AM +0200, Uwe Kleine-K?nig wrote:
+> On Sun, May 03, 2015 at 10:18:53AM +0300, Baruch Siach wrote:
+> > Copy to/from oob io area might not be aligned to 4 bytes. When 8 bit ECC is
+> > used, the buffer size is 26. Add memcpy16_{to,from}io, and use them to avoid
+> > truncating the buffer. Prefer memcpy32_{to,from}io when the buffer is properly
+> > aligned for better performance.
+> Did you measure this performance difference? I doubt it's worth the
+> complexity given that we're talking about buffers with a size of up to
+> 26 bytes.
 
-https://lists.linaro.org/pipermail/linaro-kernel/2015-January/019844.html
+We'll need both memcpy16_{to,from}io and memcpy32_{to,from}io anyway. So by 
+"complexity" you refer to the additional alignment check and memcpy32 
+fallback?
 
-> True. one option might be to allow for vendor specific property
-> extensions - that will let vendors add in additional quirky data
-> custom to their SoCs as needed.
-
-Yeah, I am planning to support them.
+baruch
 
 -- 
-viresh
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
