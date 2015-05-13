@@ -1,67 +1,93 @@
-From: arnd@arndb.de (Arnd Bergmann)
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
 Date: Wed, 13 May 2015 15:03:04 +0200
-Subject: [GIT PULL] Allwinner drivers changes for 4.2
-In-Reply-To: <20150513115455.GZ10961@lukather>
-References: <20150511193527.GA29690@lukather> <2423239.y1LCAVXsLT@wuerfel>
- <20150513115455.GZ10961@lukather>
-Message-ID: <3302855.7BhJdLtyJZ@wuerfel>
+Subject: [PATCH v3 0/2] clk: improve handling of orphan clocks
+In-Reply-To: <55528046.4030107@codeaurora.org>
+References: <1429735986-18592-1-git-send-email-heiko@sntech.de>
+ <1981330.kGUrTurMy5@diego> <5543E79F.2080400@codeaurora.org>
+ <22709390.NTAlubMgNB@diego> <55440EDA.4030905@codeaurora.org>
+ <CAMAWPa_n+59+v+x3fKkmdtW1wMJF7kqtTjLLowmv1xwGWprYJw@mail.gmail.com>
+ <554BD33D.7050907@codeaurora.org> <20150508100247.GQ11057@lukather>
+ <55528046.4030107@codeaurora.org>
+Message-ID: <20150513130304.GA4004@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 May 2015 13:54:55 Maxime Ripard wrote:
-> On Wed, May 13, 2015 at 12:30:39PM +0200, Arnd Bergmann wrote:
-> > > > Sorry I hadn't looked at the new driver before, but I did now and need a little
-> > > > clarification. It seems to me that the device should be compatible with the
-> > > > generic DT binding we have in Documentation/devicetree/bindings/misc/sram.txt,
-> > > > and use more generic code. At least I can't see much in here that is really sunxi
-> > > > specific.
-> > > >
-> > > > Were you not aware of that generic binding, or did you have a good reason
-> > > > not to use it?
-> > > 
-> > > I asked myself the same question, and I don't really think that this
-> > > would be wise, since that in order to be accessible by the CPU it has
-> > > to be mapped to it through this driver.
-> > > 
-> > > I felt like this alone justify a new compatible, even though we might
-> > > end up using the same driver.
-> > 
-> > Have you discussed this with Heiko?
+On Tue, May 12, 2015 at 03:35:50PM -0700, Stephen Boyd wrote:
+> On 05/08/15 03:02, Maxime Ripard wrote:
+> > On Thu, May 07, 2015 at 02:03:57PM -0700, Stephen Boyd wrote:
+> >> On 05/07/15 08:17, Kevin Hilman wrote:
+> >>> On Fri, May 1, 2015 at 4:40 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> >>>> On 05/01/15 15:07, Heiko St?bner wrote:
+> >>>>> Am Freitag, 1. Mai 2015, 13:52:47 schrieb Stephen Boyd:
+> >>>>>
+> >>>>>>> Instead I guess we could hook it less deep into clk_get_sys, like in the
+> >>>>>>> following patch?
+> >>>>>> It looks like it will work at least, but still I'd prefer to keep the
+> >>>>>> orphan check contained to clk.c. How about this compile tested only patch?
+> >>>>> I gave this a spin on my rk3288-firefly board. It still boots, the clock tree
+> >>>>> looks the same and it also still defers nicely in the scenario I needed it
+> >>>>> for. The implementation also looks nice - and of course much more compact than
+> >>>>> my check in two places :-) . I don't know if you want to put this as follow-up
+> >>>>> on top or fold it into the original orphan-check, so in any case
+> >>>>>
+> >>>>> Tested-by: Heiko Stuebner <heiko@sntech.de>
+> >>>>> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> >>>> Thanks. I'm leaning towards tossing your patch 2/2 and replacing it with
+> >>>> my patch and a note that it's based on an earlier patch from you.
+> >>> It appears this has landed in linux-next in the form of 882667c1fcf1
+> >>> clk: prevent orphan clocks from being used.  A bunch of boot failures
+> >>> for sunxi in today's linux-next[1] were bisected down to that patch.
+> >>>
+> >>> I confirmed that reverting that commit on top of next/master gets
+> >>> sunxi booting again.
+> >>>
+> >>>
+> >> Thanks for the report. I've removed the two clk orphan patches from
+> >> clk-next. Would it be possible to try with next-20150507 and
+> >> clk_ignore_unused on the command line?
+> > This makes it work, but it's not really an option.
+> >
 > 
-> No, I didn't.
+> Hmm.. I thought it didn't fix it for Kevin. Confused.
+
+I'm too, but it does fix things here.
+
+> >> Also we can try to see if critical clocks aren't being forced on by
+> >> applying this patch and looking for clk_get() failures
+> > And that shows that the CPU and DDR clocks are not protected, which
+> > obviously is pretty mad.
+> >
+> > I've mass converted all our probing code to use OF_CLK_DECLARE, and
+> > make things work again.
+> >
+> > http://code.bulix.org/5goa5j-88345?raw
+> >
+> > Is this an acceptable solution?
+> >
+> > We were already moving to this, I'm not really fond of doing this like
+> > that, but I guess this whole debacle makes it necessary.
+> >
 > 
-> We don't need to use his driver, there was no point about discussing
-> with him about anything.
+> I wonder why we can't switch out the clk_ops on the affected platforms +
+> clocks to be read-only (at least for the enable/disable part)? That
+> would fix it just the same right? I wasn't around for the original
+> discussion regarding this always-on stuff so perhaps I've missed something.
 
-The point is that you add a new binding for an SRAM. We already have
-a binding for that, so you should try to make your device fit in with
-the existing design.
+We're using clk-gate, so that would require to recode our own
+driver. That change seemed less invasive, while fixing the issue and
+ensuring that we wouldn't have any orphan clock, which seems to be
+hunted down these days...
 
-> > but I now think I was misreading it, and the problem is different:
-> > Rather than having separate devices for parts of the SRAM, you
-> > are actually missing a node for the SRAM physical window. I think
-> > the individual SRAM pieces should be nodes below one that describes
-> > all of the SRAM, as we do in 
-> > Documentation/devicetree/bindings/misc/sram.txt
-> 
-> These are physically separate SRAM, used for different purposes, by
-> different devices.
-> 
-> Since when in the DT different instances of the same IP should be
-> represented in a single node?
-> 
-> And again, this patch is really not about "Simple IO memory regions to
-> be managed by the genalloc API". We have no use for these SRAMs, and
-> just want them to be mapped to the device, so the CPU won't even have
-> access to them for most of them.
+Maxime
 
-I believe that is the case for a lot of the other SRAMs as well,
-and that is why I think we need Heiko to review your binding and
-say if it makes sense separately from the generic driver, or if
-we should extend the existing binding.
-
-We can still have separate drivers if necessary, but I really don't
-want to see multiple incompatible ways of describing something this
-fundamental in DT.
-
-	Arnd
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150513/34503f2b/attachment-0001.sig>
