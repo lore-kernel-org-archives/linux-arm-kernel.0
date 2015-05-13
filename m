@@ -1,43 +1,49 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 13 May 2015 11:34:13 -0500
-Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
-In-Reply-To: <20150513162127.GA2761@sirena.org.uk>
-References: <cover.1430394884.git.viresh.kumar@linaro.org>
- <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
- <554FFFA3.1060801@ti.com> <20150512051633.GB32300@linux>
- <555224A2.7000308@ti.com> <20150513050559.GE28858@linux>
- <55536719.5050208@ti.com> <20150513151652.GX2761@sirena.org.uk>
- <5553784F.7040905@ti.com> <20150513162127.GA2761@sirena.org.uk>
-Message-ID: <55537D05.4080009@ti.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 13 May 2015 10:34:08 -0600
+Subject: [PATCH v4 00/13] Support for coresight ETMv4 tracer
+Message-ID: <1431534861-24986-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/13/2015 11:21 AM, Mark Brown wrote:
-> On Wed, May 13, 2015 at 11:14:07AM -0500, Nishanth Menon wrote:
-> 
->> To illustrate: What does it mean for a driver using regulator API?
->> Attempt X <-> (X+Y), if that fails (example PMIC SMPS max < X), try
->> (X-Y)<->(X)? If yes, then we do expect (X-Y)<->(X+Y) should be stable
->> for all operating conditions for the device, correct? If this is is
->> not stable at (X-Y), then we have a wrong specification for the device
->> for claiming X +/- Y is a valid range for the device.
-> 
-> We have an explicit regulator API call for setting by tolerance which
-> tries to get as close as possible to the target voltage (currently the
-> implementation is very cheap and nasty but ideally it'll get improved).
-> 
+Please find in this patchset a driver implementation that conforms
+to the coresight framework and provide support for the Embedded
+Trace Macrocell version 4.
 
-Thanks - I think the original implementation was triggered by the old
-"voltage-tolerance" mess, so wont be too surprised.
+Regards,
+Mathieu
 
-With respect to the property itself, I still am not completely
-convinced that having typ actually helps. but having it does not hurt
-either, since min could be == typ in SoC description if desired.
+---
+Changes for v4:
+  - Restored cell ID 0x0003b95d.
+  - breakdown of multi-line output in sysfs entries.   
 
-So, since I dont strongly feel either way here to reject things
-completely, and supposedly, it does help some other SoC vendors(which
-I am not convinced how), will leave the discussion alone for the moment.
+Mathieu Poirier (2):
+  coresight-etm4x: Read only access to the main management registers
+  coresight-etm4x: Read only access to the tracer's ID registers
+
+Pratik Patel (11):
+  coresight-etm4x: Adding CoreSight ETM4x driver
+  coresight-etm4x: Controls pertaining to tracer configuration
+  coresight-etm4x: Controls pertaining to the reset, mode, pe and events
+  coresight-etm4x: Controls pertaining to various configuration options
+  coresight-etm4x: Controls pertaining to the ViewInst register
+  coresight-etm4x: Controls pertaining to the address comparator
+    functions
+  coresight-etm4x: Controls pertaining to the sequencer functions
+  coresight-etm4x: Controls pertaining to the counter functions
+  coresight-etm4x: Controls pertaining to the selection of resources
+  coresight-etm4x: Controls pertaining to the context ID functions
+  coresight-etm4x: Controls pertaining to the VM ID functions
+
+ .../ABI/testing/sysfs-bus-coresight-devices-etm4x  |  450 ++++
+ drivers/hwtracing/coresight/Kconfig                |   11 +
+ drivers/hwtracing/coresight/Makefile               |    1 +
+ drivers/hwtracing/coresight/coresight-etm4x.c      | 2701 ++++++++++++++++++++
+ drivers/hwtracing/coresight/coresight-etm4x.h      |  391 +++
+ 5 files changed, 3554 insertions(+)
+ create mode 100644 Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
+ create mode 100644 drivers/hwtracing/coresight/coresight-etm4x.c
+ create mode 100644 drivers/hwtracing/coresight/coresight-etm4x.h
 
 -- 
-Regards,
-Nishanth Menon
+1.9.1
