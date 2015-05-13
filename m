@@ -1,178 +1,137 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 13 May 2015 10:34:21 -0600
-Subject: [PATCH v4 13/13] coresight-etm4x: Read only access to the tracer's ID
- registers
+Date: Wed, 13 May 2015 10:34:17 -0600
+Subject: [PATCH v4 09/13] coresight-etm4x: Controls pertaining to the
+ selection of resources
 In-Reply-To: <1431534861-24986-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1431534861-24986-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1431534861-24986-14-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1431534861-24986-10-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ETM ID registers contain valuable information about the capabilities
-of the implementation and are very useful when configuring the device for
-various trace scenarios.
+From: Pratik Patel <pratikp@codeaurora.org>
 
+Adding sysfs entries to control the selection of the resources the
+trace unit will use as triggers to perform a trace run.
+
+Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- .../ABI/testing/sysfs-bus-coresight-devices-etm4x  | 90 ++++++++++++++++++++++
- drivers/hwtracing/coresight/coresight-etm4x.c      | 37 +++++++++
- 2 files changed, 127 insertions(+)
+ .../ABI/testing/sysfs-bus-coresight-devices-etm4x  | 12 ++++
+ drivers/hwtracing/coresight/coresight-etm4x.c      | 75 ++++++++++++++++++++++
+ 2 files changed, 87 insertions(+)
 
 diff --git a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
-index bde788dfd3f7..2fe2e3dae487 100644
+index 104f3951c998..5c7391d4e33a 100644
 --- a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
 +++ b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
-@@ -358,3 +358,93 @@ KernelVersion:	4.01
+@@ -230,3 +230,15 @@ Date:		April 2015
+ KernelVersion:	4.01
  Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
- Description:	(R) Print the content of the Peripheral ID3 Register
- 		(0xFEC).  The value is taken directly from the HW.
+ Description: 	(RW) Controls the operation of the selected counter.
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/trcidr/trcidr0
++What:		/sys/bus/coresight/devices/<memory_map>.etm/res_idx
 +Date:		April 2015
 +KernelVersion:	4.01
 +Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(R) Returns the tracing capabilities of the trace unit (0x1E0).
-+		The value is taken directly from the HW.
++Description: 	(RW) Select which resource selection unit to work with.
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/trcidr/trcidr1
++What:		/sys/bus/coresight/devices/<memory_map>.etm/res_ctrl
 +Date:		April 2015
 +KernelVersion:	4.01
 +Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(R) Returns the tracing capabilities of the trace unit (0x1E4).
-+		The value is taken directly from the HW.
-+
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/trcidr/trcidr2
-+Date:		April 2015
-+KernelVersion:	4.01
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(R) Returns the maximum size of the data value, data address,
-+		VMID, context ID and instuction address in the trace unit
-+		(0x1E8).  The value is taken directly from the HW.
-+
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/trcidr/trcidr3
-+Date:		April 2015
-+KernelVersion:	4.01
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(R) Returns the value associated with various resources
-+		available to the trace unit.  See the Trace Macrocell
-+		architecture specification for more details (0x1E8).
-+		The value is taken directly from the HW.
-+
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/trcidr/trcidr4
-+Date:		April 2015
-+KernelVersion:	4.01
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(R) Returns how many resources the trace unit supports (0x1F0).
-+		The value is taken directly from the HW.
-+
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/trcidr/trcidr5
-+Date:		April 2015
-+KernelVersion:	4.01
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(R) Returns how many resources the trace unit supports (0x1F4).
-+		The value is taken directly from the HW.
-+
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/trcidr/trcidr8
-+Date:		April 2015
-+KernelVersion:	4.01
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(R) Returns the maximum speculation depth of the instruction
-+		trace stream. (0x180).  The value is taken directly from the HW.
-+
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/trcidr/trcidr9
-+Date:		April 2015
-+KernelVersion:	4.01
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(R) Returns the number of P0 right-hand keys that the trace unit
-+		can use (0x184).  The value is taken directly from the HW.
-+
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/trcidr/trcidr10
-+Date:		April 2015
-+KernelVersion:	4.01
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(R) Returns the number of P1 right-hand keys that the trace unit
-+		can use (0x188).  The value is taken directly from the HW.
-+
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/trcidr/trcidr11
-+Date:		April 2015
-+KernelVersion:	4.01
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(R) Returns the number of special P1 right-hand keys that the
-+		trace unit can use (0x18C).  The value is taken directly from
-+		the HW.
-+
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/trcidr/trcidr12
-+Date:		April 2015
-+KernelVersion:	4.01
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(R) Returns the number of conditional P1 right-hand keys that
-+		the trace unit can use (0x190).  The value is taken directly
-+		from the HW.
-+
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/trcidr/trcidr13
-+Date:		April 2015
-+KernelVersion:	4.01
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(R) Returns the number of special conditional P1 right-hand keys
-+		that the trace unit can use (0x194).  The value is taken
-+		directly from the HW.
++Description: 	(RW) Controls the selection of the resources in the trace unit.
 diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index 0568e4413411..f0b50af4fc30 100644
+index 2c394e41b0c8..308a48df4338 100644
 --- a/drivers/hwtracing/coresight/coresight-etm4x.c
 +++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -2238,6 +2238,37 @@ static struct attribute *coresight_etmv4_mgmt_attrs[] = {
+@@ -1707,6 +1707,79 @@ static ssize_t cntr_ctrl_store(struct device *dev,
+ }
+ static DEVICE_ATTR_RW(cntr_ctrl);
+ 
++static ssize_t res_idx_show(struct device *dev,
++			    struct device_attribute *attr,
++			    char *buf)
++{
++	unsigned long val;
++	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
++
++	val = drvdata->res_idx;
++	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
++}
++
++static ssize_t res_idx_store(struct device *dev,
++			     struct device_attribute *attr,
++			     const char *buf, size_t size)
++{
++	unsigned long val;
++	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
++
++	if (kstrtoul(buf, 16, &val))
++		return -EINVAL;
++	/* Resource selector pair 0 is always implemented and reserved */
++	if ((val == 0) || (val >= drvdata->nr_resource))
++		return -EINVAL;
++
++	/*
++	 * Use spinlock to ensure index doesn't change while it gets
++	 * dereferenced multiple times within a spinlock block elsewhere.
++	 */
++	spin_lock(&drvdata->spinlock);
++	drvdata->res_idx = val;
++	spin_unlock(&drvdata->spinlock);
++	return size;
++}
++static DEVICE_ATTR_RW(res_idx);
++
++static ssize_t res_ctrl_show(struct device *dev,
++			     struct device_attribute *attr,
++			     char *buf)
++{
++	u8 idx;
++	unsigned long val;
++	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
++
++	spin_lock(&drvdata->spinlock);
++	idx = drvdata->res_idx;
++	val = drvdata->res_ctrl[idx];
++	spin_unlock(&drvdata->spinlock);
++	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
++}
++
++static ssize_t res_ctrl_store(struct device *dev,
++			      struct device_attribute *attr,
++			      const char *buf, size_t size)
++{
++	u8 idx;
++	unsigned long val;
++	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
++
++	if (kstrtoul(buf, 16, &val))
++		return -EINVAL;
++
++	spin_lock(&drvdata->spinlock);
++	idx = drvdata->res_idx;
++	/* For odd idx pair inversal bit is RES0 */
++	if (idx % 2 != 0)
++		/* PAIRINV, bit[21] */
++		val &= ~BIT(21);
++	drvdata->res_ctrl[idx] = val;
++	spin_unlock(&drvdata->spinlock);
++	return size;
++}
++static DEVICE_ATTR_RW(res_ctrl);
++
+ static ssize_t cpu_show(struct device *dev,
+ 			struct device_attribute *attr, char *buf)
+ {
+@@ -1757,6 +1830,8 @@ static struct attribute *coresight_etmv4_attrs[] = {
+ 	&dev_attr_cntrldvr.attr,
+ 	&dev_attr_cntr_val.attr,
+ 	&dev_attr_cntr_ctrl.attr,
++	&dev_attr_res_idx.attr,
++	&dev_attr_res_ctrl.attr,
+ 	&dev_attr_cpu.attr,
  	NULL,
  };
- 
-+coresight_simple_func(trcidr0, TRCIDR0);
-+coresight_simple_func(trcidr1, TRCIDR1);
-+coresight_simple_func(trcidr2, TRCIDR2);
-+coresight_simple_func(trcidr3, TRCIDR3);
-+coresight_simple_func(trcidr4, TRCIDR4);
-+coresight_simple_func(trcidr5, TRCIDR5);
-+/* trcidr[6,7] are reserved */
-+coresight_simple_func(trcidr8, TRCIDR8);
-+coresight_simple_func(trcidr9, TRCIDR9);
-+coresight_simple_func(trcidr10, TRCIDR10);
-+coresight_simple_func(trcidr11, TRCIDR11);
-+coresight_simple_func(trcidr12, TRCIDR12);
-+coresight_simple_func(trcidr13, TRCIDR13);
-+
-+static struct attribute *coresight_etmv4_trcidr_attrs[] = {
-+	&dev_attr_trcidr0.attr,
-+	&dev_attr_trcidr1.attr,
-+	&dev_attr_trcidr2.attr,
-+	&dev_attr_trcidr3.attr,
-+	&dev_attr_trcidr4.attr,
-+	&dev_attr_trcidr5.attr,
-+	/* trcidr[6,7] are reserved */
-+	&dev_attr_trcidr8.attr,
-+	&dev_attr_trcidr9.attr,
-+	&dev_attr_trcidr10.attr,
-+	&dev_attr_trcidr11.attr,
-+	&dev_attr_trcidr12.attr,
-+	&dev_attr_trcidr13.attr,
-+	NULL,
-+};
-+
- static const struct attribute_group coresight_etmv4_group = {
- 	.attrs = coresight_etmv4_attrs,
- };
-@@ -2247,9 +2278,15 @@ static const struct attribute_group coresight_etmv4_mgmt_group = {
- 	.name = "mgmt",
- };
- 
-+static const struct attribute_group coresight_etmv4_trcidr_group = {
-+	.attrs = coresight_etmv4_trcidr_attrs,
-+	.name = "trcidr",
-+};
-+
- static const struct attribute_group *coresight_etmv4_groups[] = {
- 	&coresight_etmv4_group,
- 	&coresight_etmv4_mgmt_group,
-+	&coresight_etmv4_trcidr_group,
- 	NULL,
- };
- 
 -- 
 1.9.1
