@@ -1,91 +1,83 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 13 May 2015 17:12:22 +0100
-Subject: [PATCH 0/7] ARM: perf: heterogeneous PMU support
-Message-ID: <1431533549-27715-1-git-send-email-mark.rutland@arm.com>
+Date: Wed, 13 May 2015 17:12:23 +0100
+Subject: [PATCH 1/7] perf: allow for PMU-specific event filtering
+In-Reply-To: <1431533549-27715-1-git-send-email-mark.rutland@arm.com>
+References: <1431533549-27715-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1431533549-27715-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series (based on v4.1-rc2) implements multi-PMU support for 32-bit
-ARM systems, allowing all CPU PMUs to be used in big.LITTLE
-configurations. Later series will factor out the core code to drivers,
-and migrate the arm64 perf code over to this shared core.
+In certain circumstances it may not be possible to schedule particular
+events due to constraints other than a lack of hardware counters (e.g.
+on big.LITTLE systems where CPUs support different events). The core
+perf event code does not distinguish these cases and pessimistically
+assumes that any failure to schedule an event means that it is not worth
+attempting to schedule later events, even if some hardware counters are
+still unused.
 
-PMUs for different microarchitectures are different, with differing
-numbers of counters, sets of supported events, and potentially differing
-filtering features. Due to this, it is not possible to provide access to
-all PMU features through a unified interface.
+When an event a pmu cannot schedule exists in a flexible group list it
+can unnecessarily prevent event groups following it in the list from
+being scheduled (until it is rotated to the end of the list). This means
+some events are scheduled for only a portion of the time they could be,
+and for short running programs no events may be scheduled if the list is
+initially sorted in an unfortunate order.
 
-Instead, this series provides a logical PMU for each microarchitecture,
-which provides events for a subset of CPUs in the system. Events are
-allowed to migrate between CPUs of the same microarchitecture, but are
-filtered before they can be scheduled on other CPUs. Each logical PMU
-rejects CPU-bound events for CPUs of other microarchtiectures.
+This patch adds a new (optional) filter_match function pointer to struct
+pmu which a pmu driver can use to tell perf core when an event matches
+pmu-specific scheduling requirements. This plugs into the existing
+event_filter_match logic, and makes it possible to avoid the scheduling
+problem described above. When no filter is provided by the PMU, the
+existing behaviour is retained.
 
-On an example system (TC2), two CPU PMUs can be seen under sysfs:
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Paul Mackerras <paulus@samba.org>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
+---
+ include/linux/perf_event.h | 5 +++++
+ kernel/events/core.c       | 8 +++++++-
+ 2 files changed, 12 insertions(+), 1 deletion(-)
 
-$ ls /sys/bus/event_source/devices/
-armv7_cortex_a15  armv7_cortex_a7  breakpoint  software
-
-Each PMU is given a dynamic (IDR) type that userspace tools can query
-from sysfs, and events can be opened on multiple PMUs concurrently, but
-will only be scheduled on the relevant CPUs:
-
-$ perf stat -e armv7_cortex_a15/config=0x11/ -e armv7_cortex_a7/config=0x11/ ./spin
-
- Performance counter stats for './spin':
-
-        2225274713 armv7_cortex_a15/config=0x11/                                    [18.54%]
-        1780299356 armv7_cortex_a7/config=0x11/                                    [81.46%]
-
-       2.233095584 seconds time elapsed
-
-Currently events of PERF_TYPE_HARDWARE are routed to an arbitrary PMU,
-as the perf core code simply iterates over the list of registered PMUs
-until it finds some capable PMU. This means that unless the user
-explicitly asks for events on all PMUs, events will not be counted all
-of the time:
-
-$ perf stat -e cycles ./spin
-
- Performance counter stats for './spin':
-
-         763938622 cycles                    [59.12%]
-
-       0.965428917 seconds time elapsed
-
-$ perf stat -e cycles ./spin
-
- Performance counter stats for './spin':
-
-     <not counted> cycles                  
-
-       0.154772375 seconds time elapsed
-
-It should be possible for the perf tool to detect heterogeneous PMUs via
-sysfs, at which point it can open events on each logical PMU. As perf
-top opens events on individual CPUs, these are routed to the appropriate
-logical PMUs by the nature of the current logic in the core perf code.
-
-Thanks,
-Mark.
-
-Mark Rutland (7):
-  perf: allow for PMU-specific event filtering
-  arm: perf: make of_pmu_irq_cfg take arm_pmu
-  arm: perf: treat PMUs as CPU affine
-  arm: perf: filter unschedulable events
-  arm: perf: probe number of counters on affine CPUs
-  arm: perf: remove singleton PMU restriction
-  arm: dts: vexpress: describe all PMUs in TC2 dts
-
- arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts | 14 ++++++++-
- arch/arm/include/asm/pmu.h                 |  1 +
- arch/arm/kernel/perf_event.c               | 38 +++++++++++++++++++++++
- arch/arm/kernel/perf_event_cpu.c           | 49 +++++++++++++++++-------------
- arch/arm/kernel/perf_event_v7.c            | 48 ++++++++++++++---------------
- include/linux/perf_event.h                 |  5 +++
- kernel/events/core.c                       |  8 ++++-
- 7 files changed, 115 insertions(+), 48 deletions(-)
-
+diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
+index 61992cf..67c719c 100644
+--- a/include/linux/perf_event.h
++++ b/include/linux/perf_event.h
+@@ -304,6 +304,11 @@ struct pmu {
+ 	 * Free pmu-private AUX data structures
+ 	 */
+ 	void (*free_aux)		(void *aux); /* optional */
++
++	/*
++	 * Filter events for PMU-specific reasons.
++	 */
++	int (*filter_match)		(struct perf_event *event); /* optional */
+ };
+ 
+ /**
+diff --git a/kernel/events/core.c b/kernel/events/core.c
+index 81aa3a4..aaeb449 100644
+--- a/kernel/events/core.c
++++ b/kernel/events/core.c
+@@ -1506,11 +1506,17 @@ static int __init perf_workqueue_init(void)
+ 
+ core_initcall(perf_workqueue_init);
+ 
++static inline int pmu_filter_match(struct perf_event *event)
++{
++	struct pmu *pmu = event->pmu;
++	return pmu->filter_match ? pmu->filter_match(event) : 1;
++}
++
+ static inline int
+ event_filter_match(struct perf_event *event)
+ {
+ 	return (event->cpu == -1 || event->cpu == smp_processor_id())
+-	    && perf_cgroup_match(event);
++	    && perf_cgroup_match(event) && pmu_filter_match(event);
+ }
+ 
+ static void
 -- 
 1.9.1
