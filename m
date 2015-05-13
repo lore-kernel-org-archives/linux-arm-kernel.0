@@ -1,67 +1,26 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 13 May 2015 11:17:33 +0200
-Subject: [PATCH 0/8] ARM: mvebu: Add support for RAID6 PQ offloading
-In-Reply-To: <CAPcyv4gshyaji2HarAeOg3XOiNnmGwnSOMuFGWpuDu8ZTGg=jw@mail.gmail.com>
-References: <1431445063-20226-1-git-send-email-maxime.ripard@free-electrons.com>
- <CAPcyv4gshyaji2HarAeOg3XOiNnmGwnSOMuFGWpuDu8ZTGg=jw@mail.gmail.com>
-Message-ID: <20150513091733.GW10961@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 May 2015 11:19:28 +0200
+Subject: [PATCH v4 0/5] arm64,hi6220: Enable Hisilicon Hi6220 SoC
+In-Reply-To: <20150513091644.GA1564@arm.com>
+References: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>
+ <5552FE59.30505@huawei.com> <20150513091644.GA1564@arm.com>
+Message-ID: <3248923.PjrRTtAClR@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dan,
-
-On Tue, May 12, 2015 at 09:05:41AM -0700, Dan Williams wrote:
-> On Tue, May 12, 2015 at 8:37 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi,
-> >
-> > This serie refactors the mv_xor in order to support the latest Armada
-> > 38x features, including the PQ support in order to offload the RAID6
-> > PQ operations.
-> >
-> > Not all the PQ operations are supported by the XOR engine, so we had
-> > to introduce new async_tx flags in the process to identify
-> > un-supported operations.
-> >
-> > Please note that this is currently not usable because of a possible
-> > regression in the RAID stack in 4.1 that is being discussed at the
-> > moment here: https://lkml.org/lkml/2015/5/7/527
+On Wednesday 13 May 2015 10:16:44 Will Deacon wrote:
+> On Wed, May 13, 2015 at 08:33:45AM +0100, Bintian wrote:
+> > Any other suggestions for this patch set?
 > 
-> This is problematic as async_tx is a wart on the dmaengine subsystem
-> and needs to be deprecated, I just have yet to find the time to do
-> that work.  It turns out it was a mistake to hide the device details
-> from md, it should be explicitly managing the dma channels, not
-> relying on a abstraction api.  The async_tx api usage of the
-> dma-mapping api is broken in that it relies on overlapping mappings of
-> the same address.  This happens to work on x86, but on arm it needs
-> explicit non-overlapping mappings.  I started the work to reference
-> count dma-mappings in 3.13, and we need to teach md to use
-> dmaengine_unmap_data explicitly.  Yielding dma channel management to
-> md also results in a more efficient implementation as we can dma_map()
-> the stripe cache once rather than per-io.  The  "async_tx_ack()"
-> disaster can also go away when md is explicitly handling channel
-> switching.
+> You sent a v5, right, so this version (4) has been superseded?
+> The patches should all go via arm-soc once you've got the relevant acks
+> in place (I don't think you need anything from me or Catalin -- the Kconfig
+> changes are trivial).
+> 
+> 
 
-Even though I'd be very much in favor of deprecating / removing
-async_tx, is it something likely to happen soon?
+To be more specific here, I expect the patches to be picked up by Wei Xu
+and forwarded to arm at kernel.org when he's made sure that everybody
+including himself is happy with the outcome.
 
-I remember discussing this with Vinod at Plumbers back in October, but
-haven't seen anything since then.
-
-If not, I think that we shouldn't really hold back patches to
-async_tx, even though we know than in a year from now, it's going to
-be gone.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150513/925cf70b/attachment.sig>
+	Arnd
