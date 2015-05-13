@@ -1,51 +1,95 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 13 May 2015 11:14:07 -0500
-Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
-In-Reply-To: <20150513151652.GX2761@sirena.org.uk>
-References: <cover.1430394884.git.viresh.kumar@linaro.org>
- <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
- <554FFFA3.1060801@ti.com> <20150512051633.GB32300@linux>
- <555224A2.7000308@ti.com> <20150513050559.GE28858@linux>
- <55536719.5050208@ti.com> <20150513151652.GX2761@sirena.org.uk>
-Message-ID: <5553784F.7040905@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 May 2015 18:19:06 +0200
+Subject: [PATCH] bus: arm-ccn: Use hrtimer_start()
+In-Reply-To: <1431532027.3285.107.camel@arm.com>
+References: <alpine.DEB.2.11.1505131712320.4225@nanos>
+ <2646197.ZVRR8xztig@wuerfel> <1431532027.3285.107.camel@arm.com>
+Message-ID: <2471873.V16atfgj9f@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/13/2015 10:16 AM, Mark Brown wrote:
-> On Wed, May 13, 2015 at 10:00:41AM -0500, Nishanth Menon wrote:
+On Wednesday 13 May 2015 16:47:07 Pawel Moll wrote:
+> On Wed, 2015-05-13 at 16:32 +0100, Arnd Bergmann wrote:
+> > On Wednesday 13 May 2015 16:21:24 Pawel Moll wrote:
+> > > diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
+> > > index df5f307..7d9879e 100644
+> > > --- a/drivers/bus/arm-ccn.c
+> > > +++ b/drivers/bus/arm-ccn.c
+> > > @@ -921,9 +921,8 @@ static void arm_ccn_pmu_event_start(struct perf_event *event, int flags)
+> > >          * attribute).
+> > >          */
+> > >         if (!ccn->irq)
+> > > -               __hrtimer_start_range_ns(&ccn->dt.hrtimer,
+> > > -                               arm_ccn_pmu_timer_period(), 0,
+> > > -                               HRTIMER_MODE_REL_PINNED, 0);
+> > > +               hrtimer_start(&ccn->dt.hrtimer, arm_ccn_pmu_timer_period(),
+> > > +                               HRTIMER_MODE_REL_PINNED);
+> > >  
+> > >         /* Set the DT bus input, engaging the counter */
+> > >         arm_ccn_pmu_xp_dt_config(event, 1);
+> > 
+> > Is this correct by itself, or do we need to pull in the branch that
+> > contains c6eb3f70d44828 ("hrtimer: Get rid of hrtimer softirq")
+> > from Thomas? The other similar patches that Thomas did contain a
+> > comment about the conversion being safe after hrtimer_start()
+> > no longer uses a softirq, but it is still in use in 4.1-rc3.
 > 
->> What I dont see in the thread, and the point I raised here, why have
->> nominal/typical voltage at all? min<->max should be sufficient,
->> correct? If the device cannot function at min, then it should not be
->> documented as part of valid range at all.
+> That's why I asked who should carry this patch 
 > 
-> Going for the minimum specified voltage is asking for trouble with
-> regard to tolerances and so on, see also your concern about process
-> corners.  If the electrical engineers specify things as X +/- Y the
-> most conservative thing to do is to try to hit X rather than going
-> straight for the limits.
+> Now, the answer to your question is: the result will not be worse than
+> the what was there before you pulled my updates, as the code was using
+> normal hrtimer_start(). It's just when I realised that it should be
+> pinned I looked at what x86 uncore pmu is doing and shamelessly (and
+> probably a bit mindlessly) copied the "do not wakeup" version from
+> there.
 
+Ok, got it. I've rewritten the commit message now to reflect this,
+and have applied your patch on top of the next/drivers branch.
 
-I've had the same debate with my company's SoC designers as well on
-various occasions as well. At least for the SoCs I deal with, X +/- Y
-range specification involves PMIC/Board variations, where X is the
-least voltage that is attempted to be set on PMIC, X-Y is the min
-voltage allowed at the SoC ball, due to SMPS noise/IRDrop and other
-board specific behavior.
+Thanks a lot for the fast roundtrip in fixing it. Hopefully, tomorrow's
+linux-next works better now.
 
-I am not saying all SoC vendors do specifications the same way, but
-our interest from device tree description is the operating voltage
-range for the device that we can control on the PMIC. if setting (X-Y)
-is not stable voltage for the device, then it should not be stated in
-the description.
+	Arnd
 
-To illustrate: What does it mean for a driver using regulator API?
-Attempt X <-> (X+Y), if that fails (example PMIC SMPS max < X), try
-(X-Y)<->(X)? If yes, then we do expect (X-Y)<->(X+Y) should be stable
-for all operating conditions for the device, correct? If this is is
-not stable at (X-Y), then we have a wrong specification for the device
-for claiming X +/- Y is a valid range for the device.
+commit a78a3c8ef715b94de3ab27633866d4bde3e2226f
+Author: Pawel Moll <pawel.moll@arm.com>
+Date:   Wed May 13 16:21:24 2015 +0100
 
--- 
-Regards,
-Nishanth Menon
+    bus: arm-ccn: Use hrtimer_start() again
+    
+    hrtimer_start() will no longer defer already expired timers to the
+    softirq in 4.2, and the __hrtimer_start_range_ns() function is
+    getting removed, causing build errors when both the tip tree and
+    the arm-ccn changes are merged.
+    
+    This changes the code back to using hrtimer_start, which will
+    do the right thing after this branch gets merged with the
+    timers update from tip.
+    
+    As pointed out after a discussion on the mailing list, the result will
+    not be worse than the what was there before you pulled my updates, as
+    the code was using normal hrtimer_start(). It's just when I realised
+    that it should be pinned I looked at what x86 uncore pmu is doing and
+    shamelessly (and probably a bit mindlessly) copied the "do not wakeup"
+    version from there.
+    
+    Reported-by: Mark Brown <mark.brown@arm.com>
+    Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
+index df5f307f3244..7d9879e166cf 100644
+--- a/drivers/bus/arm-ccn.c
++++ b/drivers/bus/arm-ccn.c
+@@ -921,9 +921,8 @@ static void arm_ccn_pmu_event_start(struct perf_event *event, int flags)
+ 	 * attribute).
+ 	 */
+ 	if (!ccn->irq)
+-		__hrtimer_start_range_ns(&ccn->dt.hrtimer,
+-				arm_ccn_pmu_timer_period(), 0,
+-				HRTIMER_MODE_REL_PINNED, 0);
++		hrtimer_start(&ccn->dt.hrtimer, arm_ccn_pmu_timer_period(),
++				HRTIMER_MODE_REL_PINNED);
+ 
+ 	/* Set the DT bus input, engaging the counter */
+ 	arm_ccn_pmu_xp_dt_config(event, 1);
