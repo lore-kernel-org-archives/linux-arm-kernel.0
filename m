@@ -1,21 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 May 2015 18:02:23 +0200
-Subject: [GIT PULL 6/8] ARM: tegra: Core SoC changes for v4.2-rc1
-In-Reply-To: <1431524980-13599-7-git-send-email-thierry.reding@gmail.com>
-References: <1431524980-13599-1-git-send-email-thierry.reding@gmail.com>
- <1431524980-13599-7-git-send-email-thierry.reding@gmail.com>
-Message-ID: <6667336.tWxJtmKNna@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 13 May 2015 17:08:47 +0100
+Subject: [EDT][PATCH 1/1] hw_breakpoint.c :cpu hotplug handling
+In-Reply-To: <556690501.99511431494646065.JavaMail.weblogic@ep2mlwas05a>
+References: <556690501.99511431494646065.JavaMail.weblogic@ep2mlwas05a>
+Message-ID: <20150513160847.GG3343@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 May 2015 15:49:38 Thierry Reding wrote:
-> ARM: tegra: Core SoC changes for v4.2-rc1
+On Wed, May 13, 2015 at 06:24:06AM +0100, Maninder Singh wrote:
+> EP-2DAD0AFA905A4ACB804C4F82A001242F
 > 
-> A couple of changes to the core SoC support code. Perhaps the most
-> important part is a fix for a regression in LP1 suspend/resume code that
-> was introduced a while back.
+> Subject: [PATCH 1/1] hw_breakpoint.c :cpu hotplug handling
 > 
+> This patch adds support for CPU hotplug, It re-installl all installed watchpoints and breakpoints
+> back on H/W in case of cpu-hot plug.
 
-Pulled into next/soc, thanks!
+Not sure why this is needed -- the scheduler should reinstall the
+breakpoints when the debugged task gets scheduled in via
+arch_install_hw_breakpoint.
 
-	Arnd
+Will
