@@ -1,165 +1,290 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Wed, 13 May 2015 18:11:32 +0100
-Subject: [PATCH 5/5] arm64: Add DT support for Juno r1 board.
+Date: Wed, 13 May 2015 18:11:29 +0100
+Subject: [PATCH 2/5] arm64: Juno: Split juno.dts into juno-base.dtsi and
+ juno.dts.
 In-Reply-To: <1431537092-19597-1-git-send-email-Liviu.Dudau@arm.com>
 References: <1431537092-19597-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1431537092-19597-6-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1431537092-19597-3-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This board is based on Juno r0 with updated Cortex A5x revisions
-and board errata fixes. It also contains coherent ThinLinks ports
-on the expansion slot that allow for an AXI master on the daughter
-card to participate in a coherency domain.
-
-Support for SoC PCIe host bridge will be added as a separate series.
+Prepare the device tree for adding more boards based on Juno r0.
 
 Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
 ---
- arch/arm64/boot/dts/arm/Makefile    |   2 +-
- arch/arm64/boot/dts/arm/juno-r1.dts | 123 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 124 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/boot/dts/arm/juno-r1.dts
+ arch/arm64/boot/dts/arm/juno-base.dtsi | 125 +++++++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/arm/juno.dts       | 122 +-------------------------------
+ 2 files changed, 126 insertions(+), 121 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/arm/juno-base.dtsi
 
-diff --git a/arch/arm64/boot/dts/arm/Makefile b/arch/arm64/boot/dts/arm/Makefile
-index 301a0da..c5c98b9 100644
---- a/arch/arm64/boot/dts/arm/Makefile
-+++ b/arch/arm64/boot/dts/arm/Makefile
-@@ -1,5 +1,5 @@
- dtb-$(CONFIG_ARCH_VEXPRESS) += foundation-v8.dtb
--dtb-$(CONFIG_ARCH_VEXPRESS) += juno.dtb
-+dtb-$(CONFIG_ARCH_VEXPRESS) += juno.dtb juno-r1.dtb
- dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb
- 
- always		:= $(dtb-y)
-diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
+diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
 new file mode 100644
-index 0000000..f6bc073
+index 0000000..2faa68a
 --- /dev/null
-+++ b/arch/arm64/boot/dts/arm/juno-r1.dts
-@@ -0,0 +1,123 @@
-+/*
-+ * ARM Ltd. Juno Platform
-+ *
-+ * Copyright (c) 2015 ARM Ltd.
-+ *
-+ * This file is licensed under a dual GPLv2 or BSD license.
-+ */
++++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+@@ -0,0 +1,125 @@
++	/*
++	 *  Devices shared by all Juno boards
++	 */
 +
-+/dts-v1/;
-+
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	model = "ARM Juno development board (r1)";
-+	compatible = "arm,juno", "arm,vexpress";
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	aliases {
-+		serial0 = &soc_uart0;
++	gic: interrupt-controller at 2c010000 {
++		compatible = "arm,gic-400", "arm,cortex-a15-gic";
++		reg = <0x0 0x2c010000 0 0x1000>,
++		      <0x0 0x2c02f000 0 0x2000>,
++		      <0x0 0x2c04f000 0 0x2000>,
++		      <0x0 0x2c06f000 0 0x2000>;
++		#address-cells = <0>;
++		#interrupt-cells = <3>;
++		interrupt-controller;
++		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_HIGH)>;
 +	};
 +
-+	chosen {
-+		stdout-path = "serial0:115200n8";
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>;
 +	};
 +
-+	psci {
-+		compatible = "arm,psci-0.2";
-+		method = "smc";
++	/include/ "juno-clocks.dtsi"
++
++	dma at 7ff00000 {
++		compatible = "arm,pl330", "arm,primecell";
++		reg = <0x0 0x7ff00000 0 0x1000>;
++		#dma-cells = <1>;
++		#dma-channels = <8>;
++		#dma-requests = <32>;
++		interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&soc_faxiclk>;
++		clock-names = "apb_pclk";
 +	};
 +
-+	cpus {
-+		#address-cells = <2>;
++	soc_uart0: uart at 7ff80000 {
++		compatible = "arm,pl011", "arm,primecell";
++		reg = <0x0 0x7ff80000 0x0 0x1000>;
++		interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&soc_uartclk>, <&soc_refclk100mhz>;
++		clock-names = "uartclk", "apb_pclk";
++	};
++
++	i2c at 7ffa0000 {
++		compatible = "snps,designware-i2c";
++		reg = <0x0 0x7ffa0000 0x0 0x1000>;
++		#address-cells = <1>;
 +		#size-cells = <0>;
++		interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>;
++		clock-frequency = <400000>;
++		i2c-sda-hold-time-ns = <500>;
++		clocks = <&soc_smc50mhz>;
 +
-+		A57_0: cpu at 0 {
-+			compatible = "arm,cortex-a57","arm,armv8";
-+			reg = <0x0 0x0>;
-+			device_type = "cpu";
-+			enable-method = "psci";
-+			next-level-cache = <&A57_L2>;
++		dvi0: dvi-transmitter at 70 {
++			compatible = "nxp,tda998x";
++			reg = <0x70>;
 +		};
 +
-+		A57_1: cpu at 1 {
-+			compatible = "arm,cortex-a57","arm,armv8";
-+			reg = <0x0 0x1>;
-+			device_type = "cpu";
-+			enable-method = "psci";
-+			next-level-cache = <&A57_L2>;
-+		};
-+
-+		A53_0: cpu at 100 {
-+			compatible = "arm,cortex-a53","arm,armv8";
-+			reg = <0x0 0x100>;
-+			device_type = "cpu";
-+			enable-method = "psci";
-+			next-level-cache = <&A53_L2>;
-+		};
-+
-+		A53_1: cpu at 101 {
-+			compatible = "arm,cortex-a53","arm,armv8";
-+			reg = <0x0 0x101>;
-+			device_type = "cpu";
-+			enable-method = "psci";
-+			next-level-cache = <&A53_L2>;
-+		};
-+
-+		A53_2: cpu at 102 {
-+			compatible = "arm,cortex-a53","arm,armv8";
-+			reg = <0x0 0x102>;
-+			device_type = "cpu";
-+			enable-method = "psci";
-+			next-level-cache = <&A53_L2>;
-+		};
-+
-+		A53_3: cpu at 103 {
-+			compatible = "arm,cortex-a53","arm,armv8";
-+			reg = <0x0 0x103>;
-+			device_type = "cpu";
-+			enable-method = "psci";
-+			next-level-cache = <&A53_L2>;
-+		};
-+
-+		A57_L2: l2-cache0 {
-+			compatible = "cache";
-+		};
-+
-+		A53_L2: l2-cache1 {
-+			compatible = "cache";
++		dvi1: dvi-transmitter at 71 {
++			compatible = "nxp,tda998x";
++			reg = <0x71>;
 +		};
 +	};
 +
-+	memory at 80000000 {
-+		device_type = "memory";
-+		/* last 16MB of the first memory area is reserved for secure world use by firmware */
-+		reg = <0x00000000 0x80000000 0x0 0x7f000000>,
-+		      <0x00000008 0x80000000 0x1 0x80000000>;
++	ohci at 7ffb0000 {
++		compatible = "generic-ohci";
++		reg = <0x0 0x7ffb0000 0x0 0x10000>;
++		interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&soc_usb48mhz>;
 +	};
 +
-+	pmu {
-+		compatible = "arm,armv8-pmuv3";
-+		interrupts = <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-affinity = <&A57_0>,
-+				     <&A57_1>,
-+				     <&A53_0>,
-+				     <&A53_1>,
-+				     <&A53_2>,
-+				     <&A53_3>;
++	ehci at 7ffc0000 {
++		compatible = "generic-ehci";
++		reg = <0x0 0x7ffc0000 0x0 0x10000>;
++		interrupts = <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&soc_usb48mhz>;
 +	};
 +
++	memory-controller at 7ffd0000 {
++		compatible = "arm,pl354", "arm,primecell";
++		reg = <0 0x7ffd0000 0 0x1000>;
++		interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++	};
++
++	smb {
++		compatible = "simple-bus";
++		#address-cells = <2>;
++		#size-cells = <1>;
++		ranges = <0 0 0 0x08000000 0x04000000>,
++			 <1 0 0 0x14000000 0x04000000>,
++			 <2 0 0 0x18000000 0x04000000>,
++			 <3 0 0 0x1c000000 0x04000000>,
++			 <4 0 0 0x0c000000 0x04000000>,
++			 <5 0 0 0x10000000 0x04000000>;
++
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 0 15>;
++		interrupt-map = <0 0  0 &gic 0  68 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  1 &gic 0  69 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  2 &gic 0  70 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  3 &gic 0 160 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  4 &gic 0 161 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  5 &gic 0 162 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  6 &gic 0 163 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  7 &gic 0 164 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  8 &gic 0 165 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  9 &gic 0 166 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 10 &gic 0 167 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 11 &gic 0 168 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 12 &gic 0 169 IRQ_TYPE_LEVEL_HIGH>;
++
++		/include/ "juno-motherboard.dtsi"
++	};
+diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+index 7ab0713..60e8928 100644
+--- a/arch/arm64/boot/dts/arm/juno.dts
++++ b/arch/arm64/boot/dts/arm/juno.dts
+@@ -98,26 +98,6 @@
+ 		      <0x00000008 0x80000000 0x1 0x80000000>;
+ 	};
+ 
+-	gic: interrupt-controller at 2c010000 {
+-		compatible = "arm,gic-400", "arm,cortex-a15-gic";
+-		reg = <0x0 0x2c010000 0 0x1000>,
+-		      <0x0 0x2c02f000 0 0x2000>,
+-		      <0x0 0x2c04f000 0 0x2000>,
+-		      <0x0 0x2c06f000 0 0x2000>;
+-		#address-cells = <0>;
+-		#interrupt-cells = <3>;
+-		interrupt-controller;
+-		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_HIGH)>;
+-	};
+-
+-	timer {
+-		compatible = "arm,armv8-timer";
+-		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
+-			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
+-			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>,
+-			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>;
+-	};
+-
+ 	pmu {
+ 		compatible = "arm,armv8-pmuv3";
+ 		interrupts = <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>,
+@@ -134,105 +114,5 @@
+ 				     <&A53_3>;
+ 	};
+ 
+-	/include/ "juno-clocks.dtsi"
+-
+-	dma at 7ff00000 {
+-		compatible = "arm,pl330", "arm,primecell";
+-		reg = <0x0 0x7ff00000 0 0x1000>;
+-		#dma-cells = <1>;
+-		#dma-channels = <8>;
+-		#dma-requests = <32>;
+-		interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>,
+-			     <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>,
+-			     <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>,
+-			     <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>,
+-			     <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>,
+-			     <GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>,
+-			     <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>,
+-			     <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&soc_faxiclk>;
+-		clock-names = "apb_pclk";
+-	};
+-
+-	soc_uart0: uart at 7ff80000 {
+-		compatible = "arm,pl011", "arm,primecell";
+-		reg = <0x0 0x7ff80000 0x0 0x1000>;
+-		interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&soc_uartclk>, <&soc_refclk100mhz>;
+-		clock-names = "uartclk", "apb_pclk";
+-	};
+-
+-	i2c at 7ffa0000 {
+-		compatible = "snps,designware-i2c";
+-		reg = <0x0 0x7ffa0000 0x0 0x1000>;
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-		interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>;
+-		clock-frequency = <400000>;
+-		i2c-sda-hold-time-ns = <500>;
+-		clocks = <&soc_smc50mhz>;
+-
+-		dvi0: dvi-transmitter at 70 {
+-			compatible = "nxp,tda998x";
+-			reg = <0x70>;
+-		};
+-
+-		dvi1: dvi-transmitter at 71 {
+-			compatible = "nxp,tda998x";
+-			reg = <0x71>;
+-		};
+-	};
+-
+-	ohci at 7ffb0000 {
+-		compatible = "generic-ohci";
+-		reg = <0x0 0x7ffb0000 0x0 0x10000>;
+-		interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&soc_usb48mhz>;
+-	};
+-
+-	ehci at 7ffc0000 {
+-		compatible = "generic-ehci";
+-		reg = <0x0 0x7ffc0000 0x0 0x10000>;
+-		interrupts = <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&soc_usb48mhz>;
+-	};
+-
+-	memory-controller at 7ffd0000 {
+-		compatible = "arm,pl354", "arm,primecell";
+-		reg = <0 0x7ffd0000 0 0x1000>;
+-		interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>,
+-			     <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&soc_smc50mhz>;
+-		clock-names = "apb_pclk";
+-	};
+-
+-	smb {
+-		compatible = "simple-bus";
+-		#address-cells = <2>;
+-		#size-cells = <1>;
+-		ranges = <0 0 0 0x08000000 0x04000000>,
+-			 <1 0 0 0x14000000 0x04000000>,
+-			 <2 0 0 0x18000000 0x04000000>,
+-			 <3 0 0 0x1c000000 0x04000000>,
+-			 <4 0 0 0x0c000000 0x04000000>,
+-			 <5 0 0 0x10000000 0x04000000>;
+-
+-		#interrupt-cells = <1>;
+-		interrupt-map-mask = <0 0 15>;
+-		interrupt-map = <0 0  0 &gic 0  68 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  1 &gic 0  69 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  2 &gic 0  70 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  3 &gic 0 160 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  4 &gic 0 161 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  5 &gic 0 162 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  6 &gic 0 163 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  7 &gic 0 164 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  8 &gic 0 165 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  9 &gic 0 166 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0 10 &gic 0 167 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0 11 &gic 0 168 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0 12 &gic 0 169 IRQ_TYPE_LEVEL_HIGH>;
+-
+-		/include/ "juno-motherboard.dtsi"
+-	};
 +	#include "juno-base.dtsi"
-+
-+};
-+
-+&memtimer {
-+	status = "okay";
-+};
+ };
 -- 
 2.3.6
