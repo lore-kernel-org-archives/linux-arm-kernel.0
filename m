@@ -1,52 +1,85 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 13 May 2015 12:53:07 +0200
-Subject: [PATCH] ARM: ux500: get rid of static maps
-Message-ID: <1431514387-26209-1-git-send-email-linus.walleij@linaro.org>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Wed, 13 May 2015 16:31:44 +0530
+Subject: [PATCHv5 4/5] ARM: dts: exynos5420 update the cooling cells for
+ core cpu0
+In-Reply-To: <CAJKOXPcoc08Z5pspiY2twB++cvvEmawd3q27xsgDqohvgGjtRw@mail.gmail.com>
+References: <1431499020-3912-1-git-send-email-linux.amoon@gmail.com>
+ <1431499020-3912-5-git-send-email-linux.amoon@gmail.com>
+ <CAJKOXPdKtMO3f8YzHXtuZ042jkFRL4wa978=TggSQk8FahubRg@mail.gmail.com>
+ <CANAwSgTdQk6BGD4xxB6k=p=YOV+CHv_+Q_bSyrxiPsdXVps92g@mail.gmail.com>
+ <CAJKOXPcoc08Z5pspiY2twB++cvvEmawd3q27xsgDqohvgGjtRw@mail.gmail.com>
+Message-ID: <CANAwSgT6gAqGhz6kU1qh_OxyTR6TyYQiV=NR-zwfnoZQDswHng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The static mappings of the GPIO blocks, clock/reset controller
-and MTU timer are clearly superfluous. These are all probed
-exclusively from the device tree. Tested on the U8500.
+Hi Krzysztof,
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-Hi ARM SoC-guys: please apply this single clean-up patch
-directly to the ARM SoC-tree where apropriate.
----
- arch/arm/mach-ux500/cpu-db8500.c | 13 +------------
- 1 file changed, 1 insertion(+), 12 deletions(-)
+Yep these values are wrong.
 
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index 6f63954c8bde..537a7753afc1 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -48,25 +48,14 @@ static struct map_desc u8500_uart_io_desc[] __initdata = {
- 	__IO_DEV_DESC(U8500_UART0_BASE, SZ_4K),
- 	__IO_DEV_DESC(U8500_UART2_BASE, SZ_4K),
- };
-+
- /*  U8500 and U9540 common io_desc */
- static struct map_desc u8500_common_io_desc[] __initdata = {
- 	/* SCU base also covers GIC CPU BASE and TWD with its 4K page */
- 	__IO_DEV_DESC(U8500_SCU_BASE, SZ_4K),
- 	__IO_DEV_DESC(U8500_GIC_DIST_BASE, SZ_4K),
- 	__IO_DEV_DESC(U8500_L2CC_BASE, SZ_4K),
--	__IO_DEV_DESC(U8500_MTU0_BASE, SZ_4K),
- 	__IO_DEV_DESC(U8500_BACKUPRAM0_BASE, SZ_8K),
--
--	__IO_DEV_DESC(U8500_CLKRST1_BASE, SZ_4K),
--	__IO_DEV_DESC(U8500_CLKRST2_BASE, SZ_4K),
--	__IO_DEV_DESC(U8500_CLKRST3_BASE, SZ_4K),
--	__IO_DEV_DESC(U8500_CLKRST5_BASE, SZ_4K),
--	__IO_DEV_DESC(U8500_CLKRST6_BASE, SZ_4K),
--
--	__IO_DEV_DESC(U8500_GPIO0_BASE, SZ_4K),
--	__IO_DEV_DESC(U8500_GPIO1_BASE, SZ_4K),
--	__IO_DEV_DESC(U8500_GPIO2_BASE, SZ_4K),
--	__IO_DEV_DESC(U8500_GPIO3_BASE, SZ_4K),
- };
- 
- /* U8500 IO map specific description */
--- 
-1.9.3
+These cooling-max-level and cooling-min-level values come with cpufreq
+operating-points
+Which is not present in the dts right now.
+
+So I will update for now with this value.
+cooling-min-level = <0>;
+cooling-max-level = <7>;
+
+-Anand Moon
+
+On 13 May 2015 at 15:42, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
+> 2015-05-13 19:07 GMT+09:00 Anand Moon <linux.amoon@gmail.com>:
+>> On 13 May 2015 at 13:01, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
+>>> 2015-05-13 15:36 GMT+09:00 Anand Moon <linux.amoon@gmail.com>:
+>>>> update the cooling level for cpu0 to avoid following message.
+>>>
+>>> Capitalize sentence.
+>>> In commit subject add missing colon after "exynos5420".
+>>>
+>>>>
+>>>> root at odroidxu3:~# dmesg | grep ther
+>>>
+>>> This command not needed, we all know how to use dmesg and grep.
+>>>
+>>>> [    0.241511] /thermal-zones/cpu-thermal/cooling-maps/map0:
+>>>>                          could not get #cooling-cells for /cpus/cpu at 0
+>>>>
+>>>> Tested-by: Markus Reichl <m.reichl@fivetechno.de>
+>>>> Acked-by: Lukasz Majewski <l.majewski@samsung.com>
+>>>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+>>>> ---
+>>>>  arch/arm/boot/dts/exynos5420.dtsi | 4 ++++
+>>>>  1 file changed, 4 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+>>>> index 4531753..c75ed16 100644
+>>>> --- a/arch/arm/boot/dts/exynos5420.dtsi
+>>>> +++ b/arch/arm/boot/dts/exynos5420.dtsi
+>>>> @@ -61,6 +61,10 @@
+>>>>                         reg = <0x0>;
+>>>>                         clock-frequency = <1800000000>;
+>>>>                         cci-control-port = <&cci_control1>;
+>>>> +
+>>>> +                       cooling-min-level = <10>;
+>>>> +                       cooling-max-level = <7>;
+>>>> +                       #cooling-cells = <2>; /* min followed by max */
+>>>
+>>> I might be missing something but I do not understand which cooling
+>>> levels are referenced here. In my exynos5420.dtsi file there are no
+>>> frequencies for cpu0 node. Could you help me understand this?
+>>>
+>>> Best regards,
+>>> Krzysztof
+>>
+>> Hi Krzysztof,
+>>
+>> http://lxr.free-electrons.com/source/Documentation/devicetree/bindings/cpufreq/cpufreq-dt.txt
+>> http://lxr.free-electrons.com/source/Documentation/devicetree/bindings/thermal/thermal.txt#L201
+>>
+>> These two documents provide the description on cooling-min-level and
+>> cooling-max-level.
+>>
+>> I will correctly update the value in the next updated patch.
+>
+> I know these files and AFAIU your does not follow the documentation.
+> So this is why I am asking: you are referencing cooling level 7 and
+> 10, please show where are these cooling levels defined.
