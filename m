@@ -1,42 +1,39 @@
 From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
-Date: Wed, 13 May 2015 17:58:49 +0300
-Subject: [PATCH v9 15/17] ARM: tegra: Add entries for cpufreq on Tegra124
+Date: Wed, 13 May 2015 17:58:43 +0300
+Subject: [PATCH v9 09/17] clk: tegra: Add the DFLL as a possible parent of the
+ cclk_g clock
 In-Reply-To: <1431529131-16710-1-git-send-email-mikko.perttunen@kapsi.fi>
 References: <1431529131-16710-1-git-send-email-mikko.perttunen@kapsi.fi>
-Message-ID: <1431529131-16710-16-git-send-email-mikko.perttunen@kapsi.fi>
+Message-ID: <1431529131-16710-10-git-send-email-mikko.perttunen@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
 
-The Tegra124 cpufreq driver relies on certain clocks being present
-in the /cpus/cpu at 0 node.
+The DFLL clocksource was missing from the list of possible parents for
+the fast CPU cluster. Add it to the list.
 
 Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
 Signed-off-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
+Acked-by: Michael Turquette <mturquette@linaro.org>
 ---
- arch/arm/boot/dts/tegra124.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/clk/tegra/clk-tegra-super-gen4.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index 5b8177a..87318a7 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -947,6 +947,15 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a15";
- 			reg = <0>;
-+
-+			clocks = <&tegra_car TEGRA124_CLK_CCLK_G>,
-+				 <&tegra_car TEGRA124_CLK_CCLK_LP>,
-+				 <&tegra_car TEGRA124_CLK_PLL_X>,
-+				 <&tegra_car TEGRA124_CLK_PLL_P>,
-+				 <&dfll>;
-+			clock-names = "cpu_g", "cpu_lp", "pll_x", "pll_p", "dfll";
-+			/* FIXME: what's the actual transition time? */
-+			clock-latency = <300000>;
- 		};
+diff --git a/drivers/clk/tegra/clk-tegra-super-gen4.c b/drivers/clk/tegra/clk-tegra-super-gen4.c
+index feb3201..f1f4410 100644
+--- a/drivers/clk/tegra/clk-tegra-super-gen4.c
++++ b/drivers/clk/tegra/clk-tegra-super-gen4.c
+@@ -44,7 +44,9 @@ static const char *sclk_parents[] = { "clk_m", "pll_c_out1", "pll_p_out4",
  
- 		cpu at 1 {
+ static const char *cclk_g_parents[] = { "clk_m", "pll_c", "clk_32k", "pll_m",
+ 					"pll_p", "pll_p_out4", "unused",
+-					"unused", "pll_x" };
++					"unused", "pll_x", "unused", "unused",
++					"unused", "unused", "unused", "unused",
++					"dfllCPU_out" };
+ 
+ static const char *cclk_lp_parents[] = { "clk_m", "pll_c", "clk_32k", "pll_m",
+ 					 "pll_p", "pll_p_out4", "unused",
 -- 
 2.3.0
