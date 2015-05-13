@@ -1,48 +1,73 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 13 May 2015 08:33:05 +0300
-Subject: [EDT][PATCH 1/1] hw_breakpoint.c :cpu hotplug handling
-In-Reply-To: <556690501.99511431494646065.JavaMail.weblogic@ep2mlwas05a>
-References: <556690501.99511431494646065.JavaMail.weblogic@ep2mlwas05a>
-Message-ID: <20150513053305.GK2558@tarshish>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Wed, 13 May 2015 13:36:08 +0800
+Subject: [RFC v2 5/7] PCI/ACPI: Consolidate common PCI host bridge code
+ into ACPI core
+In-Reply-To: <5550B056.2080608@linaro.org>
+References: <1430793970-11159-1-git-send-email-jiang.liu@linux.intel.com>
+ <1430793970-11159-6-git-send-email-jiang.liu@linux.intel.com>
+ <5550B056.2080608@linaro.org>
+Message-ID: <5552E2C8.70307@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maninder Singh,
-
-On Wed, May 13, 2015 at 05:24:07AM +0000, Maninder Singh wrote:
-> EP-2DAD0AFA905A4ACB804C4F82A001242F
+On 2015/5/11 21:36, Hanjun Guo wrote:
+> Hi Jiang,
 > 
-> Subject: [PATCH 1/1] hw_breakpoint.c :cpu hotplug handling
+> I have comments inline.
 > 
-> This patch adds support for CPU hotplug, It re-installl all installed watchpoints and breakpoints
-> back on H/W in case of cpu-hot plug.
+> On 2015?05?05? 10:46, Jiang Liu wrote:
+>> Introduce common interface acpi_pci_root_create() and related data
+>> structures to create PCI root bus for ACPI PCI host bridges. It will
+>> be used to kill duplicated arch specific code for IA64 and x86. It may
+>> also help ARM64 in future.
+>>
+>> Tested-by: Tony Luck <tony.luck@intel.com>
+>> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+>> ---
+>> +struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
+>> +                     struct acpi_pci_root_ops *ops,
+>> +                     size_t extra_size)
+>> +{
+>> +    int ret, busnum = root->secondary.start;
+>> +    struct acpi_device *device = root->device;
+>> +    struct acpi_pci_root_info_common *info;
+>> +    struct pci_bus *bus;
+>> +
+>> +    info = kzalloc(sizeof(*info) + extra_size, GFP_KERNEL);
 > 
-> Signed-off-by: Vaneet Narang <v.narang@samsung.com>
-> Signed-off-by: Maninder Singh <maninder1.s@samsung.com>
-> Reviewed-by: Amit Arora <amit.arora@samsung.com>
-> Reviewed-by: Ajeet Yadav <ajeet.y@samsung.com>
-> ---
->  arch/arm/kernel/hw_breakpoint.c |   56 +++++++++++++++++++++++++++++++++++++++
->  1 files changed, 56 insertions(+), 0 deletions(-)
+> For x86, the memory is allocated on its local numa node if memory
+> is available by using kzalloc_node(), and if
+> node = acpi_get_node(device->handle) is NUMA_NO_NODE, the code will
+> get the numa node info by using x86_pci_root_bus_node() (which you
+> consolidate them as a function pci_acpi_root_get_node() in later
+> patch).
 > 
-> diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-> index dc7d0a9..172bfa8 100644
-> --- a/arch/arm/kernel/hw_breakpoint.c
-> +++ b/arch/arm/kernel/hw_breakpoint.c
-> @@ -388,6 +388,56 @@ int arch_install_hw_breakpoint(struct perf_event *bp)
->  	return 0;
->  }
->  
-> +/*
-> + * reInstall a perf counter breakpoint.
-> + */
-> +void arch_reinstall_hw_breakpoint(int index, int type)
+> but the code here just ignore that information, so the code
+> here has functional change for x86 code since you didn't use numa
+> information.
+> 
+> I'm not sure how frequently used for the info after init, so
+> not sure about the performance impact, but I think we should
+> keep consistence with the code behavior as before.
+Hi Hanjun,
+	Good catch, will change code to respect NUMA node
+info when allocating memory.
 
-Static?
+> 
+> Further more, there is a implicit cast for
+> struct acpi_pci_root_info_common *info to arch specific
+> struct pci_root_info *info by using extra size, it's not
+> easy to understand (at least for me :) ), so how about
+> alloc the memory in arch specific function, and pass
+> struct acpi_pci_root_info_common *info fr this function?
+Good suggestion.
+Thanks!
+Gerry
 
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+> other than that, this code is pretty good, I reworked ARM64
+> ACPI based PCI host bridge init code, and this patch simplified
+> the coed a lot, will have a test tomorrow and let you know
+> the result.
+> 
+> Thanks
+> Hanjun
