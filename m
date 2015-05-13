@@ -1,54 +1,47 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Wed, 13 May 2015 12:10:06 -0700
-Subject: [PATCH v2 1/3] input: keyboad: imx: add snvs power key driver
-In-Reply-To: <CAHrpEqRKX_oqT9JKc7=m1Okbq1_30GQOwR_nGPn6aALq2D_-Sw@mail.gmail.com>
-References: <1431528462-21591-1-git-send-email-Frank.Li@freescale.com>
- <20150513164020.GA11891@dtor-ws>
- <CAHrpEqRKX_oqT9JKc7=m1Okbq1_30GQOwR_nGPn6aALq2D_-Sw@mail.gmail.com>
-Message-ID: <2698983.zamV244jo6@jclayton-pc>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 May 2015 21:11:33 +0200
+Subject: [PATCH v8 14/16] ARM: dts: Introduce STM32F429 MCU
+In-Reply-To: <CALszF6CaO_yuNiSDuDV+4d2NRe_+32j=zcSE1HPhB1UH59cW9w@mail.gmail.com>
+References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <2282066.NWoIT9ZyLc@wuerfel>
+ <CALszF6CaO_yuNiSDuDV+4d2NRe_+32j=zcSE1HPhB1UH59cW9w@mail.gmail.com>
+Message-ID: <13641152.Yt4ZI3oT6L@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wednesday 13 May 2015 18:54:10 Maxime Coquelin wrote:
+> This calculation is true, but we have to take into account there is a
+> hole in the middle, between AHB3, and APB1 register:
+> 
+> AHB1RSTR : offset = 0x10, index = 0
+> AHB2RSTR : offset = 0x14, index = 1
+> AHB3RSTR : offset = 0x18, index = 2
+> <HOLE >     : offset = 0x1c, index = 3
+> APB1RSTR : offset = 0x20, index = 4
+> APB2RSTR : offset = 0x24, index = 5
+> 
+> So we have to carefully document this hole in the bindings, maybe by
+> listing indexes in the documentation?
 
-Hi Frank.
+I would only list the index definitions in the binding if they
+are common across all chips using that binding.
 
-On Wednesday, May 13, 2015 01:27:39 PM Zhi Li wrote:
-> On Wed, May 13, 2015 at 11:40 AM, Dmitry Torokhov
-> 
-> <dmitry.torokhov@gmail.com> wrote:
-> > Hi Frank,
-> > 
+>From what I see above, this is really regular, so it's possible
+that others follow it as well, but it's also possible that another
+chip completely screwed up that system because it didn't fit
+otherwise.
 
-> > 
-> >> +     pdata->ioaddr = of_iomap(np, 0);
-> >> +     if (IS_ERR(pdata->ioaddr))
-> >> +             return PTR_ERR(pdata->ioaddr);
-> > 
-> > Umm, you are still leaking it on error path. Can you try doing:
-> >         res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> >         pdata->ioaddr = devm_ioremap_resource(&pdev->dev, res);
-> >         if (IS_ERR(pdata->ioaddr))
-> >         
-> >                 return PTR_ERR(pdata->ioaddr);
-> 
-> Thank you for comments.
-> but I don't use of_iomap here because the resource is shared with the
-> other device.
-> 
-> SNVS included a rtc, a power off, ON/OFF key.
-> If I use platform_get_resource and devm_ioremap_resource, rtc driver
-> fail to probe.
-> 
-> best regards
-> Frank Li
-> 
+Ideally the binding should follow closely what is documented
+in the data sheet.
 
-The fact that you cannot use of_iomap() seems a clear warning of unsafe 
-access.
-Since it is a shared resource, which you are writing to as well as reading,
-perhaps you should set it up for safe access using the  regmap API like the 
-GPR registers. 
-/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
- 
--- 
-~Joshua Clayton
+> > Are there parts that need something else? If the 0x10 offset is
+> > different, we probably want a different compatible string, and I'd
+> > consider it a different part at that point. If there are chips
+> > that do not spread the clock from the reset by exactly 256 bits,
+> > we could add a DT property in the rcc node for that.
+> 
+> I will check other chips, to see if this is valid generally.
+
+Ok.
+
+	Arnd
