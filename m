@@ -1,34 +1,63 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 13 May 2015 11:32:34 +0300
-Subject: [PATCH v7 0/4] ARM: SoC: add a new platform, UniPhier
- (arch/arm/mach-uniphier)
-In-Reply-To: <2230140.n6kW8LSSaP@wuerfel>
-References: <1431058034-5508-1-git-send-email-yamada.masahiro@socionext.com>
- <2101307.fSn8Z2ZyBq@wuerfel>
- <CAK7LNASyJmyUcKNecdhWjXbd615=9XcMxeLxC7y_z+psO03BbQ@mail.gmail.com>
- <2230140.n6kW8LSSaP@wuerfel>
-Message-ID: <20150513083234.GP2558@tarshish>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 13 May 2015 17:32:43 +0900
+Subject: [PATCHv5 2/5] ARM: dts: Odroid-XU3 Enable TMU at Exynos5422 base
+In-Reply-To: <CANAwSgQ=30j4A_nCd26kzxi=rdsh32+Srwuc5EaJigLhJ2r4jA@mail.gmail.com>
+References: <1431499020-3912-1-git-send-email-linux.amoon@gmail.com>
+ <1431499020-3912-3-git-send-email-linux.amoon@gmail.com>
+ <CAJKOXPca-2qdYOoMQOnu0jigOYwUvMTWZwdM2kRTkBXw-ws4yw@mail.gmail.com>
+ <CANAwSgQ=30j4A_nCd26kzxi=rdsh32+Srwuc5EaJigLhJ2r4jA@mail.gmail.com>
+Message-ID: <CAJKOXPfC9nGEsYJ3qJ6m_iMsB=D8_6sOEpLQzEvmLry5zS5j3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+2015-05-13 17:21 GMT+09:00 Anand Moon <linux.amoon@gmail.com>:
+> On 13 May 2015 at 12:51, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
+>> 2015-05-13 15:36 GMT+09:00 Anand Moon <linux.amoon@gmail.com>:
+>>> This changes enables TMU IP block on the Exynos5422 Odroid-XU3
+>>> device.
+>>>
+>>> Tested-by: Markus Reichl <m.reichl@fivetechno.de>
+>>> Acked-by: Lukasz Majewski <l.majewski@samsung.com>
+>>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+>>> ---
+>>>  arch/arm/boot/dts/exynos5422-odroidxu3.dts | 25 +++++++++++++++++++++++++
+>>>  1 file changed, 25 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+>>> index 9446e28..cd78816 100644
+>>> --- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+>>> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+>>> @@ -319,6 +319,31 @@
+>>>                 #cooling-cells = <2>;
+>>>                 cooling-levels = <0 130 170 230>;
+>>>         };
+>>> +
+>>> +       tmu at 10060000 {
+>>
+>> Here and for other overrides please use label notation, like:
+>>
+>> &tmu_cpu0 {
+>>               ...
+>> };
+>>
+>>> +               vtmu-supply = <&ldo10_reg>;
+>>
+>> I am curious, how did you find that LDO10 supplies TMU unit?
+>>
+>> Best regards,
+>> Krzysztof
+>
+> Hi Krzysztof,
+>
+> I have re-base my work on earlier Lukasz Majewski patches.
+>
+> https://patchwork.kernel.org/patch/5693201/
 
-On Wed, May 13, 2015 at 09:48:33AM +0200, Arnd Bergmann wrote:
-> For sending pull requests, it would be good to have a gpg key that
-> is signed by other well-known kernel developers. If you have such
-> a key, you can also request a kernel.org account to host a git tree
-> there, or you can host a git tree somewhere on your company's domain.
-> A public hosting service like github is not as good for us, but we
-> can deal with it when you are still ramping up your infrastructure.
-> Let me know if you need help finding kernel developers to sign your key.
+NAK.
+I am sorry, but this is not sufficient explanation. Actually such
+explanation could mean that you did just blindly copied everything
+instead of developing it.
 
-Is a pull request from a kernel.org repo trusted more than the key itself? In 
-other words, if I sign my pull request with a trusted key, why would the git 
-repo location make any difference?
-
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+You cannot use some regulator here just because some Exynos4 boards
+use it. You have to be sure that this regulator supplies this part of
+SoC or device.
