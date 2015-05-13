@@ -1,47 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 May 2015 21:11:33 +0200
-Subject: [PATCH v8 14/16] ARM: dts: Introduce STM32F429 MCU
-In-Reply-To: <CALszF6CaO_yuNiSDuDV+4d2NRe_+32j=zcSE1HPhB1UH59cW9w@mail.gmail.com>
-References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
- <2282066.NWoIT9ZyLc@wuerfel>
- <CALszF6CaO_yuNiSDuDV+4d2NRe_+32j=zcSE1HPhB1UH59cW9w@mail.gmail.com>
-Message-ID: <13641152.Yt4ZI3oT6L@wuerfel>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Wed, 13 May 2015 14:08:06 -0500
+Subject: [GIT PULL] SoCFPGA clk update for v4.2
+Message-ID: <1431544086-11274-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 May 2015 18:54:10 Maxime Coquelin wrote:
-> This calculation is true, but we have to take into account there is a
-> hole in the middle, between AHB3, and APB1 register:
-> 
-> AHB1RSTR : offset = 0x10, index = 0
-> AHB2RSTR : offset = 0x14, index = 1
-> AHB3RSTR : offset = 0x18, index = 2
-> <HOLE >     : offset = 0x1c, index = 3
-> APB1RSTR : offset = 0x20, index = 4
-> APB2RSTR : offset = 0x24, index = 5
-> 
-> So we have to carefully document this hole in the bindings, maybe by
-> listing indexes in the documentation?
+Hi Mike/Stephen,
 
-I would only list the index definitions in the binding if they
-are common across all chips using that binding.
+Please consider pulling these 2 patches that adds the clock driver for the
+SoCFPGA Arria10 platform.
 
->From what I see above, this is really regular, so it's possible
-that others follow it as well, but it's also possible that another
-chip completely screwed up that system because it didn't fit
-otherwise.
+Thanks,
+Dinh
 
-Ideally the binding should follow closely what is documented
-in the data sheet.
+The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
 
-> > Are there parts that need something else? If the 0x10 offset is
-> > different, we probably want a different compatible string, and I'd
-> > consider it a different part at that point. If there are chips
-> > that do not spread the clock from the reset by exactly 256 bits,
-> > we could add a DT property in the rcc node for that.
-> 
-> I will check other chips, to see if this is valid generally.
+  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
 
-Ok.
+are available in the git repository at:
 
-	Arnd
+  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_clk_update_for_v4.2
+
+for you to fetch changes up to 92b449f2de5b0196429d08e2b99ccfbf6182042c:
+
+  clk: socfpga: add a clock driver for the Arria 10 platform (2015-05-13 13:51:14 -0500)
+
+----------------------------------------------------------------
+SoCFPGA update for v4.2
+- Add clock driver for Arria10 platform
+- Update socfpga/clk.h for Arria10 clock driver to use
+
+----------------------------------------------------------------
+Dinh Nguyen (2):
+      clk: socfpga: update clk.h so for Arria10 platform to use
+      clk: socfpga: add a clock driver for the Arria 10 platform
+
+ drivers/clk/socfpga/Makefile         |   1 +
+ drivers/clk/socfpga/clk-gate-a10.c   | 187 +++++++++++++++++++++++++++++++++++
+ drivers/clk/socfpga/clk-gate.c       |   4 -
+ drivers/clk/socfpga/clk-periph-a10.c | 131 ++++++++++++++++++++++++
+ drivers/clk/socfpga/clk-pll-a10.c    | 132 +++++++++++++++++++++++++
+ drivers/clk/socfpga/clk.c            |   7 +-
+ drivers/clk/socfpga/clk.h            |  10 +-
+ 7 files changed, 466 insertions(+), 6 deletions(-)
+ create mode 100644 drivers/clk/socfpga/clk-gate-a10.c
+ create mode 100644 drivers/clk/socfpga/clk-periph-a10.c
+ create mode 100644 drivers/clk/socfpga/clk-pll-a10.c
