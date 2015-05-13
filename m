@@ -1,95 +1,146 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Wed, 13 May 2015 09:26:34 -0700
-Subject: [PATCH v8 4/9] mfd: Add binding document for NVIDIA Tegra XUSB
-In-Reply-To: <20150513143954.GA3394@x1>
-References: <1430761002-9327-1-git-send-email-abrestic@chromium.org>
- <1430761002-9327-5-git-send-email-abrestic@chromium.org>
- <20150513143954.GA3394@x1>
-Message-ID: <CAL1qeaF-7aAx0gqPe-_D4ZaZET0Kejr801KrbvuQ_2w6c8mcnA@mail.gmail.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Wed, 13 May 2015 18:29:05 +0200
+Subject: [PATCH v8 14/16] ARM: dts: Introduce STM32F429 MCU
+In-Reply-To: <11310179.epfRucfQKB@wuerfel>
+References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <3125409.QXbEmPolyh@wuerfel> <55536BC2.30603@linaro.org>
+ <11310179.epfRucfQKB@wuerfel>
+Message-ID: <CALszF6DHazhN6+hGShyrmqtMrPod0hdb8mHAwK-GWfRxXzy7wQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lee,
-
-On Wed, May 13, 2015 at 7:39 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Mon, 04 May 2015, Andrew Bresticker wrote:
->
->> Add a binding document for the XUSB host complex on NVIDIA Tegra124
->> and later SoCs.  The XUSB host complex includes a mailbox for
->> communication with the XUSB micro-controller and an xHCI host-controller.
+2015-05-13 17:28 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
+> On Wednesday 13 May 2015 16:20:34 Daniel Thompson wrote:
+>> For the all reset bits:
 >>
->> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Pawel Moll <pawel.moll@arm.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
->> Cc: Kumar Gala <galak@codeaurora.org>
->> Cc: Samuel Ortiz <sameo@linux.intel.com>
->> Cc: Lee Jones <lee.jones@linaro.org>
->> ---
->> Changes from v7:
->>  - Move non-shared resources into child nodes.
->> New for v7.
->> ---
->>  .../bindings/mfd/nvidia,tegra124-xusb.txt          | 37 ++++++++++++++++++++++
->>  1 file changed, 37 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
+>>    clock idx = reset idx + 256
 >>
->> diff --git a/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt b/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
->> new file mode 100644
->> index 0000000..bc50110
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
->> @@ -0,0 +1,37 @@
->> +NVIDIA Tegra XUSB host copmlex
->> +==============================
->> +
->> +The XUSB host complex on Tegra124 and later SoCs contains an xHCI host
->> +controller and a mailbox for communication with the XUSB micro-controller.
->> +
->> +Required properties:
->> +--------------------
->> + - compatible: For Tegra124, must contain "nvidia,tegra124-xusb".
->> +   Otherwise, must contain '"nvidia,<chip>-xusb", "nvidia,tegra124-xusb"'
->> +   where <chip> is tegra132.
->> + - reg: Must contain the base and length of the XUSB FPCI registers.
->> + - ranges: Bus address mapping for the XUSB block.  Can be empty since the
->> +   mapping is 1:1.
->> + - #address-cells: Must be 2.
->> + - #size-cells: Must be 2.
->> +
->> +Example:
->> +--------
->> +     usb at 0,70098000 {
->> +             compatible = "nvidia,tegra124-xusb";
->> +             reg = <0x0 0x70098000 0x0 0x1000>;
->> +             ranges;
->> +
->> +             #address-cells = <2>;
->> +             #size-cells = <2>;
->> +
->> +             usb-host at 0,70090000 {
->> +                     compatible = "nvidia,tegra124-xhci";
->> +                     ...
->> +             };
->> +
->> +             mailbox {
->> +                     compatible = "nvidia,tegra124-xusb-mbox";
->> +                     ...
->> +             };
+>> The opposite is not true; the clock bits are a superset of the reset
+>> bits (the reset bits act on cells but some cells have >1 clock).
 >
-> This doesn't appear to be a proper MFD.  I would have the USB and
-> Mailbox devices probe seperately and use a phandle to point the USB
-> device to its Mailbox.
+> Ok, in that case, I would strongly recommend subtracting that 256
+> offset keeping the numbers the same, to remove the function-type
+> macros.
 >
-> usb at xyz {
->         mboxes = <&xusb-mailbox, [chan]>;
-> };
+>> >> However there are a couple of clocks without gating just before the
+>> >> clock reaches the peripheral:
+>> >>
+>> >> 1. A hard coded /8. I think this will have to be given a synthetic
+>> >>      number.
+>> >
+>> > If this is just a divider, why not use a separate DT node for that,
+>> > like this:
+>> >
+>> >          clock {
+>> >                  compatible = "fixed-factor-clock";
+>> >                  clocks = <&parentclk>;
+>> >                  #clock-cells = <0>;
+>> >                  clock-div = <8>;
+>> >                  clock-mult = <1>;
+>> >          };
+>> >
+>> > No need to assign a number for this.
+>>
+>> I'd wondered about doing that.
+>>
+>> It will certainly work but it seemed a bit odd to me to have one (really
+>> tiny) part of the RCC cell included seperately in the platform
+>> description whilst all the complicated bits end up aggregated into the
+>> RCC cell.
+>>
+>> Is there much prior art that uses this type of trick to avoid having
+>> magic numbers into the bindings?
+>
+> Are you sure that divider is actually part of the RCC?
+>
+>> >> 2. Ungated dividers. For these I am using the bit offset of the LSB of
+>> >>      the mux field.
+>> >
+>> > Do these ones also come with resets?
+>>
+>> No. They mostly run to the core and its intimate peripherals (i.e. only
+>> reset line comes from WDT).
+>
+> Ok.
+>
+>> >> So I think there is only one value that is completely unrelated to the
+>> >> hardware and will use a magic constant instead.
+>> >>
+>> >> I had planned to macros similar to the STM32F4_AxB_RESET() family of
+>> >> macros in both clk driver and DT in order to reuse the bit layouts from
+>> >> dt-bindings/mfd/stm32f4-rcc.h .
+>> >>
+>> >> Normal case would have looked like this:
+>> >>
+>> >>                  timer3: timer at 40000000 {
+>> >>                          compatible = "st,stm32-timer";
+>> >>                          reg = <0x40000000 0x400>;
+>> >>                          interrupts = <28>;
+>> >>                          resets = <&rcc STM32F4_APB1_RESET(TIM3)>;
+>> >>                          clocks = <&rcc STM32F4_APB1_CLK(TIM3)>;
+>> >>                          status = "disabled";
+>> >>                  };
+>> >>
+>> >> Without the macros it looks like this:
+>> >>
+>> >>                  timer3: timer at 40000000 {
+>> >>                          compatible = "st,stm32-timer";
+>> >>                          reg = <0x40000000 0x400>;
+>> >>                          interrupts = <28>;
+>> >>                          resets = <&rcc 257>;
+>> >>                          clocks = <&rcc 513>;
+>> >>                          status = "disabled";
+>> >>                  };
+>> >>
+>> >> However we could perhaps be more literate even if we don't use the macros?
+>> >>
+>> >>                  timer3: timer at 40000000 {
+>> >>                          compatible = "st,stm32-timer";
+>> >>                          reg = <0x40000000 0x400>;
+>> >>                          interrupts = <28>;
+>> >>                          resets = <&rcc ((0x20*8) + 1)>;
+>> >>                          clocks = <&rcc ((0x40*8) + 1)>;
+>> >>                          status = "disabled";
+>> >>                  };
+>> >
+>> > How about #address-cells = <2>, so you can do
+>> >
+>> >             resets = <&rcc 8 1>;
+>> >             clocks = <&rcc 8 1>;
+>> >
+>> > with the first cell being an index for the block and the second cell the
+>> > bit number within that block.
+>>
+>> That would suit me very well (although is the 0x20/0x40 not the 8 that
+>> we would need in the middle column).
+>
+> We don't normally use register offsets in DT. The number 8 here instead
+> would indicate block 8, where each block is four bytes wide. Using the
+> same index here for reset and clock would also help readability.
 
-Then what will set up the shared regmap?  The point of using an MFD
-here was to share a register set with both the mailbox and xHCI
-drivers and avoid having to map the same register set twice in two
-separate drivers.
+My view is that it makes the bindings usage very complex.
+Also, it implies we have a specific compatible for stm32f429, whereas
+we didn't need with my earlier proposals.
+Indeed, the reset driver will need to know the offset of every reset
+registers, because:
+  1. The AHB registers start at RCC offset 0x10 (up to 0x18)
+  2. The APB registers start at RCC offset 0x20 (up to 0x24).
+We have a gap between AHB and APB registers, so how do we map the
+index for the block you propose?
+Should the gap be considered as a block, or we should skip it?
 
-Thanks,
-Andrew
+I'm afraid it will not be straightforward for a reset user to
+understand how to use this bindings.
+
+Either my v7 or v8 versions would have made possible to use a single
+compatible for STM32 series.
+If we stick with one of these, we could even think to have a "generic"
+reset driver, as it could be compatible with sunxi driver bindings.
+
+What is your view?
+
+Kind regards,
+Maxime
+
+>
+>         Arnd
