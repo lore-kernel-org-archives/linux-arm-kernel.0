@@ -1,35 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 May 2015 17:32:05 +0200
-Subject: [PATCH] bus: arm-ccn: Use hrtimer_start()
-In-Reply-To: <1431530484-3389-1-git-send-email-pawel.moll@arm.com>
-References: <alpine.DEB.2.11.1505131712320.4225@nanos>
- <1431530484-3389-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <2646197.ZVRR8xztig@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 13 May 2015 16:32:46 +0100
+Subject: [PATCH] RFC: mmc: core: Increase delay for voltage to stabilize
+ from 3.3V to 1.8V
+In-Reply-To: <CAPDyKFpkLhC7k+HNCYV_U7M6B615o4RgFktJ1wCXd_SxT0xiQg@mail.gmail.com>
+References: <1431467171-12937-1-git-send-email-dianders@chromium.org>
+ <20150513110915.GG3066@sirena.org.uk>
+ <CAPDyKFpkLhC7k+HNCYV_U7M6B615o4RgFktJ1wCXd_SxT0xiQg@mail.gmail.com>
+Message-ID: <20150513153246.GY2761@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 May 2015 16:21:24 Pawel Moll wrote:
-> diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
-> index df5f307..7d9879e 100644
-> --- a/drivers/bus/arm-ccn.c
-> +++ b/drivers/bus/arm-ccn.c
-> @@ -921,9 +921,8 @@ static void arm_ccn_pmu_event_start(struct perf_event *event, int flags)
->          * attribute).
->          */
->         if (!ccn->irq)
-> -               __hrtimer_start_range_ns(&ccn->dt.hrtimer,
-> -                               arm_ccn_pmu_timer_period(), 0,
-> -                               HRTIMER_MODE_REL_PINNED, 0);
-> +               hrtimer_start(&ccn->dt.hrtimer, arm_ccn_pmu_timer_period(),
-> +                               HRTIMER_MODE_REL_PINNED);
->  
->         /* Set the DT bus input, engaging the counter */
->         arm_ccn_pmu_xp_dt_config(event, 1);
+On Wed, May 13, 2015 at 03:06:47PM +0200, Ulf Hansson wrote:
+> On 13 May 2015 at 13:09, Mark Brown <broonie@kernel.org> wrote:
 
-Is this correct by itself, or do we need to pull in the branch that
-contains c6eb3f70d44828 ("hrtimer: Get rid of hrtimer softirq")
-from Thomas? The other similar patches that Thomas did contain a
-comment about the conversion being safe after hrtimer_start()
-no longer uses a softirq, but it is still in use in 4.1-rc3.
+> > Right, and this is probably going beyond the delays that the regulator
+> > API is handling since it's not something the regulator hardware is
+> > actively managing.
 
-	Arnd
+> Thanks for elaborating from the regulator perspective. So may I apply
+> your ack for this one?
+
+I guess, yes.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150513/4d48f715/attachment.sig>
