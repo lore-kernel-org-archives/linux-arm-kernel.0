@@ -1,41 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 May 2015 22:56:39 +0200
-Subject: [PATCH] lib: fix 842 build on 32-bit architectures
-Message-ID: <2802721.Q9KnE9eNH4@wuerfel>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Wed, 13 May 2015 14:04:53 -0700
+Subject: regression with today's linux-next
+In-Reply-To: <20150513182738.GA28201@saruman.tx.rr.com>
+References: <20150513182738.GA28201@saruman.tx.rr.com>
+Message-ID: <1431551093.27831.5.camel@edumazet-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Building the 842 code on 32-bit ARM currently results in this link
-error:
+On Wed, 2015-05-13 at 13:27 -0500, Felipe Balbi wrote:
+> Hi Alexander,
+> 
+> your commit 9451980a6646 (net: Use cached copy of pfmemalloc to avoid
+> accessing page) regresses most OMAP-based boards with a NULL pointer
+> dereference.
+> 
+> Below you can find git bisect log and a serial console capture of the
+> problem.
 
-ERROR: "__aeabi_uldivmod" [lib/842/842_decompress.ko] undefined!
+Are you using jumbo frames ?
 
-The reason is that the __do_index function performs a 64-bit
-division by a power-of-two number, but it has no insight into
-the function arguments.
+Please try :
 
-By marking that function inline, the fsize argument is always
-known at the time that do_index is called, and the compiler is
-able to replace the extremely expensive 64-bit division with
-a cheap constant shift operation.
-
-Aside from fixing that link error, this approach should also improve
-both code size and performance on 32-bit architectures significantly.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-Found while building arm32 allmodconfig with gcc-5.0
-
-diff --git a/lib/842/842_decompress.c b/lib/842/842_decompress.c
-index 6b2b45aecde3..285bf6b6959c 100644
---- a/lib/842/842_decompress.c
-+++ b/lib/842/842_decompress.c
-@@ -169,7 +169,7 @@ static int do_data(struct sw842_param *p, u8 n)
- 	return 0;
- }
+diff --git a/net/core/skbuff.c b/net/core/skbuff.c
+index d67e612bf0ef..701318378142 100644
+--- a/net/core/skbuff.c
++++ b/net/core/skbuff.c
+@@ -414,9 +414,14 @@ struct sk_buff *__netdev_alloc_skb(struct net_device *dev, unsigned int len,
+ 	len += NET_SKB_PAD;
  
--static int __do_index(struct sw842_param *p, u8 size, u8 bits, u64 fsize)
-+static inline int __do_index(struct sw842_param *p, u8 size, u8 bits, u64 fsize)
- {
- 	u64 index, offset, total = round_down(p->out - p->ostart, 8);
- 	int ret;
+ 	if ((len > SKB_WITH_OVERHEAD(PAGE_SIZE)) ||
+-	    (gfp_mask & (__GFP_WAIT | GFP_DMA)))
+-		return __alloc_skb(len, gfp_mask, SKB_ALLOC_RX, NUMA_NO_NODE);
+-
++	    (gfp_mask & (__GFP_WAIT | GFP_DMA))) {
++		skb = __alloc_skb(len, gfp_mask, SKB_ALLOC_RX, NUMA_NO_NODE);
++		if (skb) {
++			skb_reserve(skb, NET_SKB_PAD);
++			skb->dev = dev;
++		}
++		return skb;
++	}
+ 	len += SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
+ 	len = SKB_DATA_ALIGN(len);
+ 
