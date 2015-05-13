@@ -1,46 +1,60 @@
-From: jonathar@broadcom.com (Jonathan Richardson)
-Date: Tue, 12 May 2015 18:03:40 -0700
-Subject: [PATCH 2/2] misc: Add initial Digital Timing Engine (DTE) driver
- for cygnus
-In-Reply-To: <554D1649.2030106@broadcom.com>
-References: <1429744923-2007-1-git-send-email-jonathar@broadcom.com>
- <5543CD73.2030902@broadcom.com> <20150501203004.3add2c95@lxorguk.ukuu.org.uk>
- <9193036.7UYD2OGJHk@wuerfel> <554D1649.2030106@broadcom.com>
-Message-ID: <5552A2EC.2060804@broadcom.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Wed, 13 May 2015 09:09:53 +0800
+Subject: [PATCH v4 11/11] drivers: PL011: add ACPI probing for SBSA UART
+In-Reply-To: <1431440095-5146-12-git-send-email-andre.przywara@arm.com>
+References: <1431440095-5146-1-git-send-email-andre.przywara@arm.com>
+ <1431440095-5146-12-git-send-email-andre.przywara@arm.com>
+Message-ID: <5552A461.4020101@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A bit more info is required here.
+On 2015/5/12 22:14, Andre Przywara wrote:
+> From: Graeme Gregory <graeme.gregory@linaro.org>
+>
+> Add the necessary driver boilerplate to let the driver be used when
+> the respective ACPI table is discovered by the ACPI subsystem.
+>
+> [Andre: change table name, add MODULE_DEVICE_TABLE entry and improve
+> 	commit message]
+>
+> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  drivers/tty/serial/amba-pl011.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+>
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index cca93d9..79f716c 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -58,6 +58,7 @@
+>  #include <linux/pinctrl/consumer.h>
+>  #include <linux/sizes.h>
+>  #include <linux/io.h>
+> +#include <linux/acpi.h>
+>  
+>  #define UART_NR			14
+>  
+> @@ -2483,12 +2484,19 @@ static const struct of_device_id sbsa_uart_of_match[] = {
+>  };
+>  MODULE_DEVICE_TABLE(of, sbsa_uart_of_match);
+>  
+> +static const struct acpi_device_id sbsa_uart_acpi_match[] = {
+> +	{ "ARMH0011", 0 },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(acpi, sbsa_uart_acpi_match);
+> +
+>  static struct platform_driver arm_sbsa_uart_platform_driver = {
+>  	.probe		= sbsa_uart_probe,
+>  	.remove		= sbsa_uart_remove,
+>  	.driver	= {
+>  		.name	= "sbsa-uart",
+>  		.of_match_table = of_match_ptr(sbsa_uart_of_match),
+> +		.acpi_match_table = ACPI_PTR(sbsa_uart_acpi_match),
+>  	},
+>  };
 
-> Get timestamp: This is a bit more complicated. Currently the PTP driver
-> does list management for timestamps from external timestamp channels.
-> Timestamps from all channels go into the same list. In our driver we
-> have a s/w FIFO for each client and it closely matches the h/w FIFO and
-> handles any overflow. We would like to keep it this way because it also
-> allows multiple user space processes to only fetch timestamps for the
-> client it's handling. We could add a new ioctl to get a timestamp from
-> the driver instead of doing it through ptp_read() but it would be nice
-> if we could let ptp_read() allow the driver to do timestamp management
-> instead of PTP. Maybe provide an option to obtain the timestamps from a
-> container in the driver instead of the one managed by PTP. I like being
-> able to use read/poll to obtain data instead of polling the kernel with
-> ioctls as we are currently doing. Also, avoiding the kmalloc in ptp_read
-> would be nice because this of the frequency it would be called at. Do
-> you have any preference on how to handle this?
-> 
-> I've tried to minimize the changes to PTP.
-
-Using read() we can't specify a channel to get the timestamp for. It
-would imply that one user space process would have to read timestamps
-for all channels/clients and then leave it up to user space IPC to get
-them to other processes, which isn't great. That means either we
-introduce an ioctl such as the DTE_GET_TIMESTAMP we had before which
-allows us to specify a channel, or we need to look at creating one dev
-node per external timestamping channel.
-
-The ioctl limitation is that it pounds the kernel polling for timestamps
-and the multiple dev nodes per channel is a big change to PTP. I will
-have to look further into this to really have a good idea of what the
-implications would be. Advice/ideas?
-
-Thanks.
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
