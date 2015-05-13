@@ -1,9 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 13 May 2015 15:49:37 +0200
-Subject: [GIT PULL 5/8] ARM: tegra: Add EMC driver for v4.2-rc1
+Date: Wed, 13 May 2015 15:49:38 +0200
+Subject: [GIT PULL 6/8] ARM: tegra: Core SoC changes for v4.2-rc1
 In-Reply-To: <1431524980-13599-1-git-send-email-thierry.reding@gmail.com>
 References: <1431524980-13599-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1431524980-13599-6-git-send-email-thierry.reding@gmail.com>
+Message-ID: <1431524980-13599-7-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,53 +15,39 @@ The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.2-emc
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.2-soc
 
-for you to fetch changes up to 9c77a81f215bfeee8f96c50c8ab27dbebffec80d:
+for you to fetch changes up to 7892158a96629c46c46dfae52eaf951f51222cf5:
 
-  memory: tegra: Add EMC frequency debugfs entry (2015-05-05 11:39:48 +0200)
-
-I've based this pull request on top of the tegra-for-4.2-ramcode pull
-request, so pulling only this one should be sufficient to resolve the
-dependency.
+  soc/tegra: pmc: move to using a restart handler (2015-05-04 14:21:45 +0200)
 
 Thanks,
 Thierry
 
 ----------------------------------------------------------------
-ARM: tegra: Add EMC driver for v4.2-rc1
+ARM: tegra: Core SoC changes for v4.2-rc1
 
-This introduces the EMC driver that's required to scale the external
-memory frequency.
+A couple of changes to the core SoC support code. Perhaps the most
+important part is a fix for a regression in LP1 suspend/resume code that
+was introduced a while back.
 
 ----------------------------------------------------------------
-Mikko Perttunen (5):
-      soc/tegra: fuse: Add RAM code reader helper
-      of: Add Tegra124 EMC bindings
-      memory: tegra: Add API needed by the EMC driver
-      memory: tegra: Add EMC (external memory controller) driver
-      memory: tegra: Add EMC frequency debugfs entry
+David Riley (1):
+      soc/tegra: pmc: move to using a restart handler
 
-Thierry Reding (1):
-      Merge branch 'for-4.2/ramcode' into for-4.2/emc
+Dmitry Osipenko (1):
+      ARM: tegra20: Store CPU "resettable" status in IRAM
 
-Tomeu Vizoso (2):
-      of: Document long-ram-code property in nvidia,tegra20-apbmisc
-      of: Document timings subnode of nvidia,tegra-mc
+Nicholas Mc Guire (1):
+      soc/tegra: Watch wait_for_completion_timeout() return type
 
- .../memory-controllers/nvidia,tegra-mc.txt         |   84 +-
- .../bindings/memory-controllers/tegra-emc.txt      |  374 +++++++
- .../bindings/misc/nvidia,tegra20-apbmisc.txt       |    2 +
- drivers/memory/tegra/Kconfig                       |   10 +
- drivers/memory/tegra/Makefile                      |    2 +
- drivers/memory/tegra/mc.c                          |  136 +++
- drivers/memory/tegra/tegra124-emc.c                | 1140 ++++++++++++++++++++
- drivers/memory/tegra/tegra124.c                    |   44 +
- drivers/soc/tegra/fuse/tegra-apbmisc.c             |   21 +
- include/soc/tegra/emc.h                            |   19 +
- include/soc/tegra/fuse.h                           |    1 +
- include/soc/tegra/mc.h                             |   14 +-
- 12 files changed, 1844 insertions(+), 3 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/memory-controllers/tegra-emc.txt
- create mode 100644 drivers/memory/tegra/tegra124-emc.c
- create mode 100644 include/soc/tegra/emc.h
+ arch/arm/mach-tegra/cpuidle-tegra20.c |  5 ++---
+ arch/arm/mach-tegra/reset-handler.S   | 10 +++++++---
+ arch/arm/mach-tegra/reset.h           |  4 ++++
+ arch/arm/mach-tegra/sleep-tegra20.S   | 37 ++++++++++++++++++++---------------
+ arch/arm/mach-tegra/sleep.h           |  4 ++++
+ arch/arm/mach-tegra/tegra.c           |  1 -
+ drivers/soc/tegra/fuse/fuse-tegra20.c |  6 ++++--
+ drivers/soc/tegra/pmc.c               | 23 ++++++++++++++++------
+ include/soc/tegra/pmc.h               |  2 --
+ 9 files changed, 59 insertions(+), 33 deletions(-)
