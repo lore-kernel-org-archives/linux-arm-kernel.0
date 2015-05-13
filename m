@@ -1,36 +1,93 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 13 May 2015 10:52:33 +0200
-Subject: [PATCH 05/15] thermal: Add comment explaining test for critical
- temperature
+Date: Wed, 13 May 2015 10:52:36 +0200
+Subject: [PATCH 08/15] thermal: Allow sensor ops to fail with -ENOSYS
 In-Reply-To: <1431507163-19933-1-git-send-email-s.hauer@pengutronix.de>
 References: <1431507163-19933-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1431507163-19933-6-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1431507163-19933-9-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code testing if a temperature should be emulated or not is
-not obvious. Add a comment explaining why this test is done.
+The thermal core uses the existence of the .get_temp, .get_trend and
+.set_emul_temp to detect whether this operation exists and should be
+used or whether it should be emulated in software. This makes problems
+for of-thermal which has to modify the struct thermal_zone_device_ops
+during runtime whenever a sensor is registered or unregistered.
+
+Let the core test for -ENOSYS from these callbacks and treat it like
+if the callbacks were not present.
+
+This allows of-thermal to always set the sensor related callbacks and
+to make struct thermal_zone_device_ops const again.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/thermal/thermal_core.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/thermal/thermal_core.c | 24 +++++++++++++++++-------
+ 1 file changed, 17 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
-index 3e0fe55..e204deb 100644
+index 19da022..3d8f9f9 100644
 --- a/drivers/thermal/thermal_core.c
 +++ b/drivers/thermal/thermal_core.c
-@@ -435,6 +435,11 @@ int thermal_zone_get_temp(struct thermal_zone_device *tz, int *temp)
- 			}
- 		}
+@@ -413,13 +413,16 @@ static void handle_thermal_trip(struct thermal_zone_device *tz, int trip)
+  */
+ int thermal_zone_get_temp(struct thermal_zone_device *tz, int *temp)
+ {
+-	int ret = -EINVAL;
++	int ret;
+ 	int count;
+ 	int crit_temp = INT_MAX;
+ 	enum thermal_trip_type type;
  
-+		/*
-+		 * Only allow emulating a temperature when the real temperature
-+		 * is below the critical temperature so that the emulation code
-+		 * cannot hide critical conditions.
-+		 */
- 		if (!ret && *temp < crit_temp)
- 			*temp = tz->emul_temperature;
+-	if (!tz || IS_ERR(tz) || !tz->ops->get_temp)
+-		goto exit;
++	if (!tz || IS_ERR(tz))
++		return -EINVAL;
++
++	if (!tz->ops->get_temp)
++		return -ENOSYS;
+ 
+ 	mutex_lock(&tz->lock);
+ 
+@@ -445,7 +448,7 @@ int thermal_zone_get_temp(struct thermal_zone_device *tz, int *temp)
+ 	}
+  
+ 	mutex_unlock(&tz->lock);
+-exit:
++
+ 	return ret;
+ }
+ EXPORT_SYMBOL_GPL(thermal_zone_get_temp);
+@@ -454,10 +457,11 @@ void thermal_zone_device_update(struct thermal_zone_device *tz)
+ {
+ 	int temp, ret, count;
+ 
+-	if (!tz->ops->get_temp)
++	ret = thermal_zone_get_temp(tz, &temp);
++
++	if (ret == -ENOSYS)
+ 		return;
+ 
+-	ret = thermal_zone_get_temp(tz, &temp);
+ 	if (ret) {
+ 		if (ret != -EAGAIN)
+ 			dev_warn(&tz->device,
+@@ -783,10 +787,16 @@ emul_temp_store(struct device *dev, struct device_attribute *attr,
+ 	if (kstrtoul(buf, 10, &temperature))
+ 		return -EINVAL;
+ 
+-	if (!tz->ops->set_emul_temp) {
++	if (tz->ops->set_emul_temp)
++		ret = tz->ops->set_emul_temp(tz, temperature);
++	else
++		ret = -ENOSYS;
++
++	if (ret == -ENOSYS) {
+ 		mutex_lock(&tz->lock);
+ 		tz->emul_temperature = temperature;
+ 		mutex_unlock(&tz->lock);
++		ret = 0;
+ 	} else {
+ 		ret = tz->ops->set_emul_temp(tz, temperature);
  	}
 -- 
 2.1.4
