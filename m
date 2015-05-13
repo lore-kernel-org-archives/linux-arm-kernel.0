@@ -1,313 +1,140 @@
-From: gg@slimlogic.co.uk (Graeme Gregory)
-Date: Wed, 13 May 2015 16:03:44 +0100
-Subject: [PATCH v4 10/11] drivers: PL011: add support for the ARM SBSA
- generic UART
-In-Reply-To: <55536096.4020008@redhat.com>
-References: <1431440095-5146-1-git-send-email-andre.przywara@arm.com>
- <1431440095-5146-11-git-send-email-andre.przywara@arm.com>
- <55536096.4020008@redhat.com>
-Message-ID: <1431529424.690869.267807025.1EB03568@webmail.messagingengine.com>
+From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
+Date: Wed, 13 May 2015 10:05:23 -0500
+Subject: [PATCH v2 1/2] PCI: generic: remove dependency on hw_pci
+In-Reply-To: <20150513135414.GA27374@google.com>
+References: <1430791333-26013-1-git-send-email-jchandra@broadcom.com>
+ <20150505155346.GJ1550@arm.com> <20150506141859.GC26028@red-moon>
+ <CAErSpo7z_Sf5QvMa8MBY0f7DQOmwhcpUnCFG=ZsmHuwT2HouQw@mail.gmail.com>
+ <554ADCE0.8020603@amd.com> <555347EE.6050502@amd.com>
+ <20150513135414.GA27374@google.com>
+Message-ID: <55536833.2090002@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 5/13/2015 8:54 AM, Bjorn Helgaas wrote:
+> Hi Suravee,
+>
+> On Wed, May 13, 2015 at 07:47:42AM -0500, Suravee Suthikulanit wrote:
+>> On 5/6/2015 10:32 PM, Suravee Suthikulanit wrote:
+>>> I tested this patch series on the AMD Seattle w/o PCI_PROBE_ONLY mode
+>>> and that works fine. However, w/ PCI_PROBE_ONLY, I also run into the
+>>> resource not claimed issue (no surprise here).
+>>>
+>>> So, I tried porting the pcibios_claim_one_bus() from
+>>> arch/alpha/kernel/pci.c as Lorenzo suggested, plus the a small change in
+>>> pci_claim_resource(), and it seems to work w/ PCI_PROBE_ONLY. (Please
+>>> see example patch below.)
+>>>
+>>> The additional while loop is needed in the pci_claim_resource() since I
+>>> need to reference back to the resource in the root bus, which are
+>>> defined from the DT node. Does this sounds like a reasonable approach?
+>>>
+>>> diff --git a/drivers/pci/host/pci-host-generic.c
+>>> b/drivers/pci/host/pci-host-generic.c
+>>> index e9cc559..0dfa23d 100644
+>>> --- a/drivers/pci/host/pci-host-generic.c
+>>> +++ b/drivers/pci/host/pci-host-generic.c
+>>> @@ -261,7 +261,10 @@ static int gen_pci_probe(struct platform_device *pdev)
+>>>       if (!pci_has_flag(PCI_PROBE_ONLY)) {
+>>>           pci_bus_size_bridges(bus);
+>>>           pci_bus_assign_resources(bus);
+>>> +    } else {
+>>> +        pci_claim_one_bus(bus);
+>>>       }
+>>> +
+>>>       pci_bus_add_devices(bus);
+>>>
+>>>       /* Configure PCI Express settings */
+>>> diff --git a/drivers/pci/setup-res.c b/drivers/pci/setup-res.c
+>>> index 232f925..d4b43b3 100644
+>>> --- a/drivers/pci/setup-res.c
+>>> +++ b/drivers/pci/setup-res.c
+>>> @@ -109,6 +109,7 @@ int pci_claim_resource(struct pci_dev *dev, int
+>>> resource)
+>>>   {
+>>>       struct resource *res = &dev->resource[resource];
+>>>       struct resource *root, *conflict;
+>>> +    struct pci_dev *pdev = dev;
+>>>
+>>>       if (res->flags & IORESOURCE_UNSET) {
+>>>           dev_info(&dev->dev, "can't claim BAR %d %pR: no address
+>>> assigned\n",
+>>> @@ -116,7 +117,18 @@ int pci_claim_resource(struct pci_dev *dev, int
+>>> resource)
+>>>           return -EINVAL;
+>>>       }
+>>>
+>>> -    root = pci_find_parent_resource(dev, res);
+>>> +    while (pdev) {
+>>> +        root = pci_find_parent_resource(pdev, res);
+>>> +        if (root)
+>>> +            break;
+>>> +
+>>> +        if (pci_has_flag(PCI_PROBE_ONLY) &&
+>>> +            !pci_is_root_bus(pdev->bus))
+>>> +            pdev = pdev->bus->self;
+>>> +        else
+>>> +            break;
+>>> +    }
+>>> +
+>>>       if (!root) {
+>>>           dev_info(&dev->dev, "can't claim BAR %d %pR: no compatible
+>>> bridge window\n",
+>>>                resource, res);
+>>
+>>
+>> [From Bjorn]
+>> I don't understand this new loop.  Apparently you have a device BAR, and
+>> the upstream bridge doesn't have a window that contains the BAR?  That
+>> sounds like a problem with the upstream bridge resources.
+>>
+>> Do you have an example that would make this more concrete, e.g., a host
+>> bridge, P2P bridge(s), and endpoint with their resources?
+>>
+>> [Suravee]
+>> Here is the information you were asking for. This information is
+>> setup from the FW. In the PCI bridge (00:02.1), I see the
+>> prefetchable memory behind bridge is already setup.
+>
+> Here's a summary:
+>
+>    00:02.1: PCI bridge to [bus 01]
+>    00:02.1:   [io window disabled]
+>    00:02.1:   [mem window disabled]
+>    00:02.1:   bridge window [mem 0x7f_ffe0_0000-0x7f_ffff_ffff 64bit pref]
+>    01:00.0: BAR 0: [mem 0x7f_ffe8_0000-0x... 64bit pref]
+>    01:00.0: BAR 2: [io  0x0020-0x3f]
+>    01:00.0: BAR 4: [mem 0x7f_fff0_4000-0x... 64bit pref]
+>
+> So I guess the new loop would be for the I/O resource because the
+> 00:02.1 I/O window is disabled?  This definitely seems like a problem --
+> we should enable that I/O window so we can claim the 01:00.0 I/O
+> resource with the 00:02.1 I/O window as the parent.  We don't want the
+> parent to be the host bridge window.  In fact, unless we enable that
+> I/O window, the 01:00.0 I/O BAR won't even work!
+>
+> It may be that the driver for 01:00.0 doesn't need the I/O BAR.  We
+> can leave the bridge I/O window disabled and let pci_claim_resource()
+> fail, which means we'll treat the 01:00.0 I/O BAR as unassigned.
+> That's all fine; we'll never turn on PCI_COMMAND_IO, and as long as
+> the driver doesn't request I/O space, everything should just work.
+> Note that the driver would have to use pci_enable_device_mem() to
+> tell us that it doesn't need I/O space.
+>
 
+I see your point on the I/O window. Let me double check the FW why this 
+is getting setup this way. My guess is that the I/O windows are not used 
+by ARM64 systems, therefore the FW disabled it at the bridge.
 
-On Wed, 13 May 2015, at 03:32 PM, Mark Langsdorf wrote:
-> On 05/12/2015 09:14 AM, Andre Przywara wrote:
-> > The ARM Server Base System Architecture[1] document describes a
-> > generic UART which is a subset of the PL011 UART.
-> > It lacks DMA support, baud rate control and modem status line
-> > control, among other things.
-> > The idea is to move the UART initialization and setup into the
-> > firmware (which does this job today already) and let the kernel just
-> > use the UART for sending and receiving characters.
-> >
-> > We use the recent refactoring to build a new struct uart_ops
-> > variable which points to some new functions avoiding access to the
-> > missing registers. We reuse as much existing PL011 code as possible.
-> >
-> > In contrast to the PL011 the SBSA UART does not define any AMBA or
-> > PrimeCell relations, so we go with a pretty generic probe function
-> > which only uses platform device functions.
-> > A DT binding is provided with this patch, ACPI support is added in a
-> > separate one.
-> >
-> > Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> > ---
-> >   .../devicetree/bindings/serial/arm_sbsa_uart.txt   |  10 ++
-> >   drivers/tty/serial/amba-pl011.c                    | 168 +++++++++++++++++++++
-> >   2 files changed, 178 insertions(+)
-> >   create mode 100644 Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
-> >
-> > diff --git a/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt b/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
-> > new file mode 100644
-> > index 0000000..4163e7e
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
-> > @@ -0,0 +1,10 @@
-> > +* ARM SBSA defined generic UART
-> > +This UART uses a subset of the PL011 registers and consequently lives
-> > +in the PL011 driver. It's baudrate and other communication parameters
-> > +cannot be adjusted at runtime, so it lacks a clock specifier here.
-> > +
-> > +Required properties:
-> > +- compatible: must be "arm,sbsa-uart"
-> > +- reg: exactly one register range
-> > +- interrupts: exactly one interrupt specifier
-> > +- current-speed: the (fixed) baud rate set by the firmware
-> > diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> > index 70e2958..cca93d9 100644
-> > --- a/drivers/tty/serial/amba-pl011.c
-> > +++ b/drivers/tty/serial/amba-pl011.c
-> > @@ -101,6 +101,14 @@ static struct vendor_data vendor_arm = {
-> >   	.get_fifosize		= get_fifosize_arm,
-> >   };
-> >
-> > +static struct vendor_data vendor_sbsa = {
-> > +	.oversampling		= false,
-> > +	.dma_threshold		= false,
-> > +	.cts_event_workaround	= false,
-> > +	.always_enabled		= true,
-> > +	.fixed_options		= true,
-> > +};
-> > +
-> >   static unsigned int get_fifosize_st(struct amba_device *dev)
-> >   {
-> >   	return 64;
-> > @@ -1641,6 +1649,28 @@ static int pl011_startup(struct uart_port *port)
-> >   	return retval;
-> >   }
-> >
-> > +static int sbsa_uart_startup(struct uart_port *port)
-> > +{
-> > +	struct uart_amba_port *uap =
-> > +		container_of(port, struct uart_amba_port, port);
-> > +	int retval;
-> > +
-> > +	retval = pl011_hwinit(port);
-> > +	if (retval)
-> > +		return retval;
-> > +
-> > +	retval = pl011_allocate_irq(uap);
-> > +	if (retval)
-> > +		return retval;
-> > +
-> > +	/* The SBSA UART does not support any modem status lines. */
-> > +	uap->old_status = 0;
-> > +
-> > +	pl011_enable_interrupts(uap);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> >   static void pl011_shutdown_channel(struct uart_amba_port *uap,
-> >   					unsigned int lcrh)
-> >   {
-> > @@ -1721,6 +1751,19 @@ static void pl011_shutdown(struct uart_port *port)
-> >   		uap->port.ops->flush_buffer(port);
-> >   }
-> >
-> > +static void sbsa_uart_shutdown(struct uart_port *port)
-> > +{
-> > +	struct uart_amba_port *uap =
-> > +		container_of(port, struct uart_amba_port, port);
-> > +
-> > +	pl011_disable_interrupts(uap);
-> > +
-> > +	free_irq(uap->port.irq, uap);
-> > +
-> > +	if (uap->port.ops->flush_buffer)
-> > +		uap->port.ops->flush_buffer(port);
-> > +}
-> > +
-> >   static void
-> >   pl011_setup_status_masks(struct uart_port *port, struct ktermios *termios)
-> >   {
-> > @@ -1872,6 +1915,24 @@ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
-> >   	spin_unlock_irqrestore(&port->lock, flags);
-> >   }
-> >
-> > +static void
-> > +sbsa_uart_set_termios(struct uart_port *port, struct ktermios *termios,
-> > +		      struct ktermios *old)
-> > +{
-> > +	struct uart_amba_port *uap =
-> > +	    container_of(port, struct uart_amba_port, port);
-> > +	unsigned long flags;
-> > +
-> > +	if (old)
-> > +		tty_termios_copy_hw(termios, old);
-> 
-> This code prevented login via the serial console on our test hardware.
-> 
-> Mark Salter suggested the following patch:
-> 
-> -       if (old)
-> +       /*
-> +        * The first call to set_termios() comes when the console is
-> +        * registered via uart_add_one_port(). The serial core will
-> +        * pass in a dummy old termios rather than NULL. Check to make
-> +        * sure the old termios has reasonable info before copying from
-> +        * it.
-> +        */
-> +       if (old && old->c_cflag)
->                  tty_termios_copy_hw(termios, old);
-> 
-> which fixed the issue.
-> 
+However, the loop is mainly to recursively search for parent resource 
+for the 64bit pref resource of device 1:00.0 when calling 
+pci_claim_one_bus() on PROBE_ONLY. It doesn't seem to find compatible 
+bridge windows in the parent bridge (0:2.1), and I was not sure if that 
+is where the device is supposed to be claiming from.
 
-This certainly fixes the problem I was seeing with Fedora on Seattle.
+Since you mentioned in a separate reply in this thread that we might not 
+want to be using pci_claim_one_bus(), I guess we probably should drop 
+this approach for now.
 
-Graeme
-
-> > +	tty_termios_encode_baud_rate(termios, uap->fixed_baud, uap->fixed_baud);
-> > +
-> > +	spin_lock_irqsave(&port->lock, flags);
-> > +	uart_update_timeout(port, CS8, uap->fixed_baud);
-> > +	pl011_setup_status_masks(port, termios);
-> > +	spin_unlock_irqrestore(&port->lock, flags);
-> > +}
-> > +
-> >   static const char *pl011_type(struct uart_port *port)
-> >   {
-> >   	struct uart_amba_port *uap =
-> > @@ -1947,6 +2008,37 @@ static struct uart_ops amba_pl011_pops = {
-> >   #endif
-> >   };
-> >
-> > +static void sbsa_uart_set_mctrl(struct uart_port *port, unsigned int mctrl)
-> > +{
-> > +}
-> > +
-> > +static unsigned int sbsa_uart_get_mctrl(struct uart_port *port)
-> > +{
-> > +	return 0;
-> > +}
-> > +
-> > +static const struct uart_ops sbsa_uart_pops = {
-> > +	.tx_empty	= pl011_tx_empty,
-> > +	.set_mctrl	= sbsa_uart_set_mctrl,
-> > +	.get_mctrl	= sbsa_uart_get_mctrl,
-> > +	.stop_tx	= pl011_stop_tx,
-> > +	.start_tx	= pl011_start_tx,
-> > +	.stop_rx	= pl011_stop_rx,
-> > +	.startup	= sbsa_uart_startup,
-> > +	.shutdown	= sbsa_uart_shutdown,
-> > +	.set_termios	= sbsa_uart_set_termios,
-> > +	.type		= pl011_type,
-> > +	.release_port	= pl011_release_port,
-> > +	.request_port	= pl011_request_port,
-> > +	.config_port	= pl011_config_port,
-> > +	.verify_port	= pl011_verify_port,
-> > +#ifdef CONFIG_CONSOLE_POLL
-> > +	.poll_init     = pl011_hwinit,
-> > +	.poll_get_char = pl011_get_poll_char,
-> > +	.poll_put_char = pl011_put_poll_char,
-> > +#endif
-> > +};
-> > +
-> >   static struct uart_amba_port *amba_ports[UART_NR];
-> >
-> >   #ifdef CONFIG_SERIAL_AMBA_PL011_CONSOLE
-> > @@ -2327,6 +2419,79 @@ static int pl011_resume(struct device *dev)
-> >
-> >   static SIMPLE_DEV_PM_OPS(pl011_dev_pm_ops, pl011_suspend, pl011_resume);
-> >
-> > +static int sbsa_uart_probe(struct platform_device *pdev)
-> > +{
-> > +	struct uart_amba_port *uap;
-> > +	struct resource *r;
-> > +	int portnr, ret;
-> > +	int baudrate;
-> > +
-> > +	/*
-> > +	 * Check the mandatory baud rate parameter in the DT node early
-> > +	 * so that we can easily exit with the error.
-> > +	 */
-> > +	if (pdev->dev.of_node) {
-> > +		struct device_node *np = pdev->dev.of_node;
-> > +
-> > +		ret = of_property_read_u32(np, "current-speed", &baudrate);
-> > +		if (ret)
-> > +			return ret;
-> > +	} else {
-> > +		baudrate = 115200;
-> > +	}
-> > +
-> > +	portnr = pl011_find_free_port();
-> > +	if (portnr < 0)
-> > +		return portnr;
-> > +
-> > +	uap = devm_kzalloc(&pdev->dev, sizeof(struct uart_amba_port),
-> > +			   GFP_KERNEL);
-> > +	if (uap == NULL)
-> > +		return -ENOMEM;
-> > +
-> > +	uap->vendor	= &vendor_sbsa;
-> > +	uap->fifosize	= 32;
-> > +	uap->port.irq	= platform_get_irq(pdev, 0);
-> > +	uap->port.ops	= &sbsa_uart_pops;
-> > +	uap->fixed_baud = baudrate;
-> > +
-> > +	snprintf(uap->type, sizeof(uap->type), "SBSA");
-> > +
-> > +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +
-> > +	ret = pl011_setup_port(&pdev->dev, uap, r, portnr);
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	platform_set_drvdata(pdev, uap);
-> > +
-> > +	return pl011_register_port(uap);
-> > +}
-> > +
-> > +static int sbsa_uart_remove(struct platform_device *pdev)
-> > +{
-> > +	struct uart_amba_port *uap = platform_get_drvdata(pdev);
-> > +
-> > +	uart_remove_one_port(&amba_reg, &uap->port);
-> > +	pl011_unregister_port(uap);
-> > +	return 0;
-> > +}
-> > +
-> > +static const struct of_device_id sbsa_uart_of_match[] = {
-> > +	{ .compatible = "arm,sbsa-uart", },
-> > +	{},
-> > +};
-> > +MODULE_DEVICE_TABLE(of, sbsa_uart_of_match);
-> > +
-> > +static struct platform_driver arm_sbsa_uart_platform_driver = {
-> > +	.probe		= sbsa_uart_probe,
-> > +	.remove		= sbsa_uart_remove,
-> > +	.driver	= {
-> > +		.name	= "sbsa-uart",
-> > +		.of_match_table = of_match_ptr(sbsa_uart_of_match),
-> > +	},
-> > +};
-> > +
-> >   static struct amba_id pl011_ids[] = {
-> >   	{
-> >   		.id	= 0x00041011,
-> > @@ -2357,11 +2522,14 @@ static int __init pl011_init(void)
-> >   {
-> >   	printk(KERN_INFO "Serial: AMBA PL011 UART driver\n");
-> >
-> > +	if (platform_driver_register(&arm_sbsa_uart_platform_driver))
-> > +		pr_warn("could not register SBSA UART platform driver\n");
-> >   	return amba_driver_register(&pl011_driver);
-> >   }
-> >
-> >   static void __exit pl011_exit(void)
-> >   {
-> > +	platform_driver_unregister(&arm_sbsa_uart_platform_driver);
-> >   	amba_driver_unregister(&pl011_driver);
-> >   }
-> 
-> --Mark Langsdorf
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks,
+Suravee
