@@ -1,248 +1,171 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 13 May 2015 10:34:19 -0600
-Subject: [PATCH v4 11/13] coresight-etm4x: Controls pertaining to the VM ID
- functions
+Date: Wed, 13 May 2015 10:34:20 -0600
+Subject: [PATCH v4 12/13] coresight-etm4x: Read only access to the main
+ management registers
 In-Reply-To: <1431534861-24986-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1431534861-24986-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1431534861-24986-12-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1431534861-24986-13-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pratik Patel <pratikp@codeaurora.org>
+Having access to the ETMv4 management registers is very useful as they
+give meaningful information on how the IP block has been configured at
+synthesis time.
 
-Adding sysfs entries to access and configure specifics about the
-virtual machine ID comparator functions.
-
-Signed-off-by: Pratik Patel <pratikp@codeaurora.org>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- .../ABI/testing/sysfs-bus-coresight-devices-etm4x  |  20 +++
- drivers/hwtracing/coresight/coresight-etm4x.c      | 178 +++++++++++++++++++++
- 2 files changed, 198 insertions(+)
+ .../ABI/testing/sysfs-bus-coresight-devices-etm4x  | 77 ++++++++++++++++++++++
+ drivers/hwtracing/coresight/coresight-etm4x.c      | 53 ++++++++++++++-
+ 2 files changed, 129 insertions(+), 1 deletion(-)
 
 diff --git a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
-index f251b2c17f5b..648f28ded226 100644
+index 648f28ded226..bde788dfd3f7 100644
 --- a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
 +++ b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
-@@ -261,3 +261,23 @@ KernelVersion:	4.01
+@@ -281,3 +281,80 @@ KernelVersion:	4.01
  Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
- Description:	(RW) Mask for all 8 context ID comparator value
+ Description:	(RW) Mask for all 8 virtual machine ID comparator value
  		registers (if implemented).
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/vmid_idx
++What:		/sys/bus/coresight/devices/<memory_map>.etm/mgmt/trcoslsr
 +Date:		April 2015
 +KernelVersion:	4.01
 +Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(RW) Select which virtual machine ID comparator to work with.
++Description:	(R) Print the content of the OS Lock Status Register (0x304).
++		The value it taken directly  from the HW.
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/vmid_val
++What:		/sys/bus/coresight/devices/<memory_map>.etm/mgmt/trcpdcr
 +Date:		April 2015
 +KernelVersion:	4.01
 +Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(RW) Get/Set the virtual machine ID comparator value to
-+		trigger on.
++Description:	(R) Print the content of the Power Down Control Register
++		(0x310).  The value is taken directly from the HW.
 +
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/vmid_masks
++What:		/sys/bus/coresight/devices/<memory_map>.etm/mgmt/trcpdsr
 +Date:		April 2015
 +KernelVersion:	4.01
 +Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(RW) Mask for all 8 virtual machine ID comparator value
-+		registers (if implemented).
++Description:	(R) Print the content of the Power Down Status Register
++		(0x314).  The value is taken directly from the HW.
++
++What:		/sys/bus/coresight/devices/<memory_map>.etm/mgmt/trclsr
++Date:		April 2015
++KernelVersion:	4.01
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description:	(R) Print the content of the SW Lock Status Register
++		(0xFB4).  The value is taken directly from the HW.
++
++What:		/sys/bus/coresight/devices/<memory_map>.etm/mgmt/trcauthstatus
++Date:		April 2015
++KernelVersion:	4.01
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description:	(R) Print the content of the Authentication Status Register
++		(0xFB8).  The value is taken directly from the HW.
++
++What:		/sys/bus/coresight/devices/<memory_map>.etm/mgmt/trcdevid
++Date:		April 2015
++KernelVersion:	4.01
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description:	(R) Print the content of the Device ID Register
++		(0xFC8).  The value is taken directly from the HW.
++
++What:		/sys/bus/coresight/devices/<memory_map>.etm/mgmt/trcdevtype
++Date:		April 2015
++KernelVersion:	4.01
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description:	(R) Print the content of the Device Type Register
++		(0xFCC).  The value is taken directly from the HW.
++
++What:		/sys/bus/coresight/devices/<memory_map>.etm/mgmt/trcpidr0
++Date:		April 2015
++KernelVersion:	4.01
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description:	(R) Print the content of the Peripheral ID0 Register
++		(0xFE0).  The value is taken directly from the HW.
++
++What:		/sys/bus/coresight/devices/<memory_map>.etm/mgmt/trcpidr1
++Date:		April 2015
++KernelVersion:	4.01
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description:	(R) Print the content of the Peripheral ID1 Register
++		(0xFE4).  The value is taken directly from the HW.
++
++What:		/sys/bus/coresight/devices/<memory_map>.etm/mgmt/trcpidr2
++Date:		April 2015
++KernelVersion:	4.01
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description:	(R) Print the content of the Peripheral ID2 Register
++		(0xFE8).  The value is taken directly from the HW.
++
++What:		/sys/bus/coresight/devices/<memory_map>.etm/mgmt/trcpidr3
++Date:		April 2015
++KernelVersion:	4.01
++Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
++Description:	(R) Print the content of the Peripheral ID3 Register
++		(0xFEC).  The value is taken directly from the HW.
 diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index e94784fe68c4..02ee6fc97ddf 100644
+index 02ee6fc97ddf..0568e4413411 100644
 --- a/drivers/hwtracing/coresight/coresight-etm4x.c
 +++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -1964,6 +1964,181 @@ static ssize_t ctxid_masks_store(struct device *dev,
- }
- static DEVICE_ATTR_RW(ctxid_masks);
- 
-+static ssize_t vmid_idx_show(struct device *dev,
-+			     struct device_attribute *attr,
-+			     char *buf)
-+{
-+	unsigned long val;
-+	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
-+
-+	val = drvdata->vmid_idx;
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
-+}
-+
-+static ssize_t vmid_idx_store(struct device *dev,
-+			      struct device_attribute *attr,
-+			      const char *buf, size_t size)
-+{
-+	unsigned long val;
-+	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
-+
-+	if (kstrtoul(buf, 16, &val))
-+		return -EINVAL;
-+	if (val >= drvdata->numvmidc)
-+		return -EINVAL;
-+
-+	/*
-+	 * Use spinlock to ensure index doesn't change while it gets
-+	 * dereferenced multiple times within a spinlock block elsewhere.
-+	 */
-+	spin_lock(&drvdata->spinlock);
-+	drvdata->vmid_idx = val;
-+	spin_unlock(&drvdata->spinlock);
-+	return size;
-+}
-+static DEVICE_ATTR_RW(vmid_idx);
-+
-+static ssize_t vmid_val_show(struct device *dev,
-+			     struct device_attribute *attr,
-+			     char *buf)
-+{
-+	unsigned long val;
-+	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
-+
-+	val = (unsigned long)drvdata->vmid_val[drvdata->vmid_idx];
-+	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
-+}
-+
-+static ssize_t vmid_val_store(struct device *dev,
-+			      struct device_attribute *attr,
-+			      const char *buf, size_t size)
-+{
-+	unsigned long val;
-+	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
-+
-+	/*
-+	 * only implemented when vmid tracing is enabled, i.e. at least one
-+	 * vmid comparator is implemented and at least 8 bit vmid size
-+	 */
-+	if (!drvdata->vmid_size || !drvdata->numvmidc)
-+		return -EINVAL;
-+	if (kstrtoul(buf, 16, &val))
-+		return -EINVAL;
-+
-+	spin_lock(&drvdata->spinlock);
-+	drvdata->vmid_val[drvdata->vmid_idx] = (u64)val;
-+	spin_unlock(&drvdata->spinlock);
-+	return size;
-+}
-+static DEVICE_ATTR_RW(vmid_val);
-+
-+static ssize_t vmid_masks_show(struct device *dev,
-+			       struct device_attribute *attr, char *buf)
-+{
-+	unsigned long val1, val2;
-+	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
-+
-+	spin_lock(&drvdata->spinlock);
-+	val1 = drvdata->vmid_mask0;
-+	val2 = drvdata->vmid_mask1;
-+	spin_unlock(&drvdata->spinlock);
-+	return scnprintf(buf, PAGE_SIZE, "%#lx %#lx\n", val1, val2);
-+}
-+
-+static ssize_t vmid_masks_store(struct device *dev,
-+				struct device_attribute *attr,
-+				const char *buf, size_t size)
-+{
-+	u8 i, j, maskbyte;
-+	unsigned long val1, val2, mask;
-+	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
-+	/*
-+	 * only implemented when vmid tracing is enabled, i.e. at least one
-+	 * vmid comparator is implemented and at least 8 bit vmid size
-+	 */
-+	if (!drvdata->vmid_size || !drvdata->numvmidc)
-+		return -EINVAL;
-+	if (sscanf(buf, "%lx %lx", &val1, &val2) != 2)
-+		return -EINVAL;
-+
-+	spin_lock(&drvdata->spinlock);
-+
-+	/*
-+	 * each byte[0..3] controls mask value applied to vmid
-+	 * comparator[0..3]
-+	 */
-+	switch (drvdata->numvmidc) {
-+	case 0x1:
-+		/* COMP0, bits[7:0] */
-+		drvdata->vmid_mask0 = val1 & 0xFF;
-+		break;
-+	case 0x2:
-+		/* COMP1, bits[15:8] */
-+		drvdata->vmid_mask0 = val1 & 0xFFFF;
-+		break;
-+	case 0x3:
-+		/* COMP2, bits[23:16] */
-+		drvdata->vmid_mask0 = val1 & 0xFFFFFF;
-+		break;
-+	case 0x4:
-+		/* COMP3, bits[31:24] */
-+		drvdata->vmid_mask0 = val1;
-+		break;
-+	case 0x5:
-+		/* COMP4, bits[7:0] */
-+		drvdata->vmid_mask0 = val1;
-+		drvdata->vmid_mask1 = val2 & 0xFF;
-+		break;
-+	case 0x6:
-+		/* COMP5, bits[15:8] */
-+		drvdata->vmid_mask0 = val1;
-+		drvdata->vmid_mask1 = val2 & 0xFFFF;
-+		break;
-+	case 0x7:
-+		/* COMP6, bits[23:16] */
-+		drvdata->vmid_mask0 = val1;
-+		drvdata->vmid_mask1 = val2 & 0xFFFFFF;
-+		break;
-+	case 0x8:
-+		/* COMP7, bits[31:24] */
-+		drvdata->vmid_mask0 = val1;
-+		drvdata->vmid_mask1 = val2;
-+		break;
-+	default:
-+		break;
-+	}
-+
-+	/*
-+	 * If software sets a mask bit to 1, it must program relevant byte
-+	 * of vmid comparator value 0x0, otherwise behavior is unpredictable.
-+	 * For example, if bit[3] of vmid_mask0 is 1, we must clear bits[31:24]
-+	 * of vmid comparator0 value (corresponding to byte 0) register.
-+	 */
-+	mask = drvdata->vmid_mask0;
-+	for (i = 0; i < drvdata->numvmidc; i++) {
-+		/* mask value of corresponding vmid comparator */
-+		maskbyte = mask & ETMv4_EVENT_MASK;
-+		/*
-+		 * each bit corresponds to a byte of respective vmid comparator
-+		 * value register
-+		 */
-+		for (j = 0; j < 8; j++) {
-+			if (maskbyte & 1)
-+				drvdata->vmid_val[i] &= ~(0xFF << (j * 8));
-+			maskbyte >>= 1;
-+		}
-+		/* Select the next vmid comparator mask value */
-+		if (i == 3)
-+			/* vmid comparators[4-7] */
-+			mask = drvdata->vmid_mask1;
-+		else
-+			mask >>= 0x8;
-+	}
-+	spin_unlock(&drvdata->spinlock);
-+	return size;
-+}
-+static DEVICE_ATTR_RW(vmid_masks);
-+
- static ssize_t cpu_show(struct device *dev,
- 			struct device_attribute *attr, char *buf)
- {
-@@ -2019,6 +2194,9 @@ static struct attribute *coresight_etmv4_attrs[] = {
- 	&dev_attr_ctxid_idx.attr,
- 	&dev_attr_ctxid_val.attr,
- 	&dev_attr_ctxid_masks.attr,
-+	&dev_attr_vmid_idx.attr,
-+	&dev_attr_vmid_val.attr,
-+	&dev_attr_vmid_masks.attr,
+@@ -2200,7 +2200,58 @@ static struct attribute *coresight_etmv4_attrs[] = {
  	&dev_attr_cpu.attr,
  	NULL,
  };
+-ATTRIBUTE_GROUPS(coresight_etmv4);
++
++#define coresight_simple_func(name, offset)				\
++static ssize_t name##_show(struct device *_dev,				\
++			   struct device_attribute *attr, char *buf)	\
++{									\
++	struct etmv4_drvdata *drvdata = dev_get_drvdata(_dev->parent);	\
++	return scnprintf(buf, PAGE_SIZE, "0x%x\n",			\
++			 readl_relaxed(drvdata->base + offset));	\
++}									\
++DEVICE_ATTR_RO(name)
++
++coresight_simple_func(trcoslsr, TRCOSLSR);
++coresight_simple_func(trcpdcr, TRCPDCR);
++coresight_simple_func(trcpdsr, TRCPDSR);
++coresight_simple_func(trclsr, TRCLSR);
++coresight_simple_func(trcauthstatus, TRCAUTHSTATUS);
++coresight_simple_func(trcdevid, TRCDEVID);
++coresight_simple_func(trcdevtype, TRCDEVTYPE);
++coresight_simple_func(trcpidr0, TRCPIDR0);
++coresight_simple_func(trcpidr1, TRCPIDR1);
++coresight_simple_func(trcpidr2, TRCPIDR2);
++coresight_simple_func(trcpidr3, TRCPIDR3);
++
++static struct attribute *coresight_etmv4_mgmt_attrs[] = {
++	&dev_attr_trcoslsr.attr,
++	&dev_attr_trcpdcr.attr,
++	&dev_attr_trcpdsr.attr,
++	&dev_attr_trclsr.attr,
++	&dev_attr_trcauthstatus.attr,
++	&dev_attr_trcdevid.attr,
++	&dev_attr_trcdevtype.attr,
++	&dev_attr_trcpidr0.attr,
++	&dev_attr_trcpidr1.attr,
++	&dev_attr_trcpidr2.attr,
++	&dev_attr_trcpidr3.attr,
++	NULL,
++};
++
++static const struct attribute_group coresight_etmv4_group = {
++	.attrs = coresight_etmv4_attrs,
++};
++
++static const struct attribute_group coresight_etmv4_mgmt_group = {
++	.attrs = coresight_etmv4_mgmt_attrs,
++	.name = "mgmt",
++};
++
++static const struct attribute_group *coresight_etmv4_groups[] = {
++	&coresight_etmv4_group,
++	&coresight_etmv4_mgmt_group,
++	NULL,
++};
+ 
+ static void etm4_init_arch_data(void *info)
+ {
 -- 
 1.9.1
