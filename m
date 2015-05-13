@@ -1,14 +1,14 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 13 May 2015 10:31:22 -0700
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Wed, 13 May 2015 19:37:49 +0200
 Subject: [PATCH] ARM: BCM5301X: Fix chip typo in ARCH_BCM_5301X help
  message
 In-Reply-To: <1431501645-3887-1-git-send-email-zajec5@gmail.com>
 References: <1431501645-3887-1-git-send-email-zajec5@gmail.com>
-Message-ID: <55538A6A.8000203@gmail.com>
+Message-ID: <55538BED.4070504@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/05/15 00:20, Rafa? Mi?ecki wrote:
+On 05/13/2015 09:20 AM, Rafa? Mi?ecki wrote:
 > Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
 > ---
 >  arch/arm/mach-bcm/Kconfig | 2 +-
@@ -26,8 +26,16 @@ On 13/05/15 00:20, Rafa? Mi?ecki wrote:
 > +	  Do not confuse this with the BCM4706 which is a totally
 >  	  different SoC or with the older BCM47XX and BCM53XX based
 >  	  network SoC using a MIPS CPU, they are supported by arch/mips/bcm47xx
+>  
+> 
+Nack
 
-This is not a real typo per-se, there is a 4760 chip (GPS), do you want
-to resubmit to include both?
--- 
-Florian
+Like Florian said this is not a typo. There is a BCM4760 SoC and it was
+or is supported by Linux.
+
+See this for BCM4760: https://lwn.net/Articles/563957/
+
+I forgot about this at first too. Nice naming Broadcom. (the other
+companies are not better).  ;-)
+
+Hauke
