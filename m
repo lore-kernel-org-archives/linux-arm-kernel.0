@@ -1,177 +1,46 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Wed, 13 May 2015 08:53:23 +0800
-Subject: [PATCH 1/2] ARM: rockchip: fix undefined instruction of
- reset_ctrl_regs
-In-Reply-To: <5486316.3HPLixSGlU@phil>
-References: <1612786.HeTW0LsLmg@diego> <5378157.9QgVi1hAmY@diego>
- <55517AC0.1030103@rock-chips.com> <5486316.3HPLixSGlU@phil>
-Message-ID: <5552A083.2060703@rock-chips.com>
+From: jonathar@broadcom.com (Jonathan Richardson)
+Date: Tue, 12 May 2015 18:03:40 -0700
+Subject: [PATCH 2/2] misc: Add initial Digital Timing Engine (DTE) driver
+ for cygnus
+In-Reply-To: <554D1649.2030106@broadcom.com>
+References: <1429744923-2007-1-git-send-email-jonathar@broadcom.com>
+ <5543CD73.2030902@broadcom.com> <20150501203004.3add2c95@lxorguk.ukuu.org.uk>
+ <9193036.7UYD2OGJHk@wuerfel> <554D1649.2030106@broadcom.com>
+Message-ID: <5552A2EC.2060804@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko
+A bit more info is required here.
 
-On 05/13/2015 06:48 AM, Heiko Stuebner wrote:
-> Hi Chris,
->
-> Am Dienstag, 12. Mai 2015, 12:00:00 schrieben Sie:
->> We do not need this patch, since we have this one:
->> <https://patchwork.kernel.org/patch/6218791/>
->>
->> these 2 patches fixed a same issue.
-> thanks for pointing that out - looks like I didn't need to resurrect the old
-> patch then. Just to make sure I don't mess up when removing the obsolete one:
->
-> both patches
-> 	b403125 ARM: rockchip: fix undefined instruction of reset_ctrl_regs
-> 	0ea001d ARM: rockchip: disable dapswjdp during suspend
-> actually fix the same issue and
-> 	b403125 ARM: rockchip: fix undefined instruction of reset_ctrl_regs
-> is the one that should be removed, right?
-Yes, this one should be removed.
->
->
-> Thanks
-> Heiko
->
-> [I've readded the lists to give this a bit publicity, so people can see why we
-> remove one of the patches again]
->
->
->> On 04/25/2015 08:13 AM, Heiko St?bner wrote:
->>> Sometimes the debug module may not work well after resume, since it has
->>> not been correctly reset when wakeup from suspend. That cause system
->>> crash during reusme, and a 'undefined instruction' is displayed on the
->>> console. Set the GRF_FORCE_JTAG bit of RK3288_GRF_SOC_CON0 can ensure
->>> that debug modul is reset. And we can change the value of
->>> RK3288_GRF_SOC_CON0 back when system resume.
->>>
->>> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
->>> Tested-by: Caesar Wang <wxt@rock-chips.com>
->>> Reviewed-by: Douglas Anderson <dianders@chromium.org>
->>>
->>> According to discussions, there does not seem a better solution available.
->>> Please also see the potential security implication described in the
->>> comment inline in the code.
->>>
->>> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
->>> ---
->>>
->>>    arch/arm/mach-rockchip/pm.c | 26 ++++++++++++++++++++++++++
->>>    arch/arm/mach-rockchip/pm.h |  4 ++++
->>>    2 files changed, 30 insertions(+)
->>>
->>> diff --git a/arch/arm/mach-rockchip/pm.c b/arch/arm/mach-rockchip/pm.c
->>> index b0dcbe2..22812fe 100644
->>> --- a/arch/arm/mach-rockchip/pm.c
->>> +++ b/arch/arm/mach-rockchip/pm.c
->>> @@ -44,9 +44,11 @@ static void __iomem *rk3288_bootram_base;
->>>
->>>    static phys_addr_t rk3288_bootram_phy;
->>>    
->>>    static struct regmap *pmu_regmap;
->>>
->>> +static struct regmap *grf_regmap;
->>>
->>>    static struct regmap *sgrf_regmap;
->>>    
->>>    static u32 rk3288_pmu_pwr_mode_con;
->>>
->>> +static u32 rk3288_grf_soc_con0;
->>>
->>>    static u32 rk3288_sgrf_soc_con0;
->>>    
->>>    static inline u32 rk3288_l2_config(void)
->>>
->>> @@ -70,12 +72,26 @@ static void rk3288_slp_mode_set(int level)
->>>
->>>    {
->>>    
->>>    	u32 mode_set, mode_set1;
->>>
->>> +	regmap_read(grf_regmap, RK3288_GRF_SOC_CON0, &rk3288_grf_soc_con0);
->>> +
->>>
->>>    	regmap_read(sgrf_regmap, RK3288_SGRF_SOC_CON0,
-> &rk3288_sgrf_soc_con0);
->>>    	
->>>    	regmap_read(pmu_regmap, RK3288_PMU_PWRMODE_CON,
->>>    	
->>>    		    &rk3288_pmu_pwr_mode_con);
->>>    	
->>>    	/*
->>>
->>> +	 * We need set this bit GRF_FORCE_JTAG here, for the debug module,
->>> +	 * otherwise, it may become inaccessible after resume.
->>> +	 * This creates a potential security issue, as the sdmmc pins may
->>> +	 * accept jtag data for a short time during resume if no card is
->>> +	 * inserted.
->>> +	 * But this is of course also true for the regular boot, before we
->>> +	 * turn of the jtag/sdmmc autodetect.
->>> +	 */
->>> +	regmap_write(grf_regmap, RK3288_GRF_SOC_CON0, GRF_FORCE_JTAG |
->>> +		     GRF_FORCE_JTAG_WRITE);
->>> +
->>> +	/*
->>>
->>>    	 * SGRF_FAST_BOOT_EN - system to boot from FAST_BOOT_ADDR
->>>    	 * PCLK_WDT_GATE - disable WDT during suspend.
->>>    	 */
->>>
->>> @@ -135,6 +151,9 @@ static void rk3288_slp_mode_set_resume(void)
->>>
->>>    	regmap_write(sgrf_regmap, RK3288_SGRF_SOC_CON0,
->>>    	
->>>    		     rk3288_sgrf_soc_con0 | SGRF_PCLK_WDT_GATE_WRITE
->>>    		
->>>    		     | SGRF_FAST_BOOT_EN_WRITE);
->>>
->>> +
->>> +	regmap_write(grf_regmap, RK3288_GRF_SOC_CON0, rk3288_grf_soc_con0 |
->>> +		     GRF_FORCE_JTAG_WRITE);
->>>
->>>    }
->>>    
->>>    static int rockchip_lpmode_enter(unsigned long arg)
->>>
->>> @@ -193,6 +212,13 @@ static int rk3288_suspend_init(struct device_node
->>> *np)
->>>
->>>    		return PTR_ERR(pmu_regmap);
->>>    	
->>>    	}
->>>
->>> +	grf_regmap = syscon_regmap_lookup_by_compatible(
->>> +				"rockchip,rk3288-grf");
->>> +	if (IS_ERR(grf_regmap)) {
->>> +		pr_err("%s: could not find grf regmap\n", __func__);
->>> +		return PTR_ERR(pmu_regmap);
->>> +	}
->>> +
->>>
->>>    	sram_np = of_find_compatible_node(NULL, NULL,
->>>    	
->>>    					  "rockchip,rk3288-pmu-sram");
->>>    	
->>>    	if (!sram_np) {
->>>
->>> diff --git a/arch/arm/mach-rockchip/pm.h b/arch/arm/mach-rockchip/pm.h
->>> index 3e8d39c..f8a747b 100644
->>> --- a/arch/arm/mach-rockchip/pm.h
->>> +++ b/arch/arm/mach-rockchip/pm.h
->>> @@ -48,6 +48,10 @@ static inline void rockchip_suspend_init(void)
->>>
->>>    #define RK3288_PMU_WAKEUP_RST_CLR_CNT	0x44
->>>    #define RK3288_PMU_PWRMODE_CON1		0x90
->>>
->>> +#define RK3288_GRF_SOC_CON0		0x244
->>> +#define GRF_FORCE_JTAG			BIT(12)
->>> +#define GRF_FORCE_JTAG_WRITE		BIT(28)
->>> +
->>>
->>>    #define RK3288_SGRF_SOC_CON0		(0x0000)
->>>    #define RK3288_SGRF_FAST_BOOT_ADDR	(0x0120)
->>>    #define SGRF_PCLK_WDT_GATE		BIT(6)
->
->
->
+> Get timestamp: This is a bit more complicated. Currently the PTP driver
+> does list management for timestamps from external timestamp channels.
+> Timestamps from all channels go into the same list. In our driver we
+> have a s/w FIFO for each client and it closely matches the h/w FIFO and
+> handles any overflow. We would like to keep it this way because it also
+> allows multiple user space processes to only fetch timestamps for the
+> client it's handling. We could add a new ioctl to get a timestamp from
+> the driver instead of doing it through ptp_read() but it would be nice
+> if we could let ptp_read() allow the driver to do timestamp management
+> instead of PTP. Maybe provide an option to obtain the timestamps from a
+> container in the driver instead of the one managed by PTP. I like being
+> able to use read/poll to obtain data instead of polling the kernel with
+> ioctls as we are currently doing. Also, avoiding the kmalloc in ptp_read
+> would be nice because this of the frequency it would be called at. Do
+> you have any preference on how to handle this?
+> 
+> I've tried to minimize the changes to PTP.
+
+Using read() we can't specify a channel to get the timestamp for. It
+would imply that one user space process would have to read timestamps
+for all channels/clients and then leave it up to user space IPC to get
+them to other processes, which isn't great. That means either we
+introduce an ioctl such as the DTE_GET_TIMESTAMP we had before which
+allows us to specify a channel, or we need to look at creating one dev
+node per external timestamping channel.
+
+The ioctl limitation is that it pounds the kernel polling for timestamps
+and the multiple dev nodes per channel is a big change to PTP. I will
+have to look further into this to really have a good idea of what the
+implications would be. Advice/ideas?
+
+Thanks.
