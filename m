@@ -1,116 +1,113 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 May 2015 15:27:31 +0200
-Subject: [PATCH v8 14/16] ARM: dts: Introduce STM32F429 MCU
-In-Reply-To: <55534A5D.6050904@linaro.org>
-References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
- <CALszF6CS8Q9DWX+ERtu=k=Bzr1-25N3oZQyWyxDZBF3an4nFKQ@mail.gmail.com>
- <55534A5D.6050904@linaro.org>
-Message-ID: <3125409.QXbEmPolyh@wuerfel>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 13 May 2015 15:40:16 +0200
+Subject: [PATCH] ARM: mm: handle non-pmd-aligned end of RAM
+In-Reply-To: <5dec6ce1e05fd20c214d9e0ab41dcc0d@agner.ch>
+References: <a865bd68d706f8c4c9e82a374ff6adc4@agner.ch>
+ <20150511103130.GA3490@leverpostej>
+ <5dec6ce1e05fd20c214d9e0ab41dcc0d@agner.ch>
+Message-ID: <55535440.1090808@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 May 2015 13:58:05 Daniel Thompson wrote:
-> On 13/05/15 12:45, Maxime Coquelin wrote:
-> > 2015-05-12 23:21 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
-> >> On Saturday 09 May 2015 09:53:56 Maxime Coquelin wrote:
-> >>> +#include  <dt-bindings/mfd/stm32f4-rcc.h>
-> >>> +
-> >>>
-> >>
-> >> Can you find a way to avoid this dependency?
-> >>
-> >> Maybe you can change the bindings so that the numbers you pass as
-> >> arguments to the reset and clock specifiers reflect the numbers that
-> >> the hardware use?
-> >
-> > If I understand correctly, you prefer the way I did in v7 [0]?
+Hi,
 
-Yes, that looks better. I would probably not list all the possible
-values in the binding though, when the intention is to use the
-hardware specific values, and being able to reuse the binding
-and driver for variations of the same chip.
+On 11-05-15 13:43, Stefan Agner wrote:
+> On 2015-05-11 12:31, Mark Rutland wrote:
+>> At boot time we round the memblock limit down to section size in an
+>> attempt to ensure that we will have mapped this RAM with section
+>> mappings prior to allocating from it. When mapping RAM we iterate over
+>> PMD-sized chunks, creating these section mappings.
+>>
+>> Section mappings are only created when the end of a chunk is aligned to
+>> section size. Unfortunately, with classic page tables (where PMD_SIZE is
+>> 2 * SECTION_SIZE) this means that if a chunk is between 1M and 2M in
+>> size the first 1M will not be mapped despite having been accounted for
+>> in the memblock limit. This has been observed to result in page tables
+>> being allocated from unmapped memory, causing boot-time hangs.
+>>
+>> This patch modifies the memblock limit rounding to always round down to
+>> PMD_SIZE instead of SECTION_SIZE. For classic MMU this means that we
+>> will round the memblock limit down to a 2M boundary, matching the limits
+>> on section mappings, and preventing allocations from unmapped memory.
+>> For LPAE there should be no change as PMD_SIZE == SECTION_SIZE.
+>
+> Thanks Mark, just tested that patch on the hardware I had the issue,
+> looks good.
+>
+> Tested-by: Stefan Agner <stefan@agner.ch>
 
-> > Note that doing that won't break the DT binary compatibility, as the
-> > raw reset values, or the ones from defines are the same.
-> >
-> > Daniel, could you share an example of the bindings you would use for the clocks?
-> 
-> For the most cases, where there is a clock gate just before the 
-> peripheral it looks pretty much like the reset driver and I use the bit 
-> offset of the clock gating bit as the index.
+Same for me, this also fixes the issue I was seeing no an Allwinner A33
+tablet with 1024z600 lcd screen.
 
-Is this bit always the same index as the one for the reset driver?
+Tested-by: Hans de Goede <hdegoede@redhat.com>
 
-> However there are a couple of clocks without gating just before the 
-> clock reaches the peripheral:
-> 
-> 1. A hard coded /8. I think this will have to be given a synthetic
->     number.
+Can we get this Cc-ed to stable at vger.kernel.org please? At least for 4.0 ?
 
-If this is just a divider, why not use a separate DT node for that,
-like this:
+Regards,
 
-        clock {
-                compatible = "fixed-factor-clock";
-                clocks = <&parentclk>;
-                #clock-cells = <0>;
-                clock-div = <8>;
-                clock-mult = <1>;
-        };
+Hans
 
-No need to assign a number for this.
 
-> 2. Ungated dividers. For these I am using the bit offset of the LSB of
->     the mux field.
-
-Do these ones also come with resets?
-
-> So I think there is only one value that is completely unrelated to the 
-> hardware and will use a magic constant instead.
-> 
-> I had planned to macros similar to the STM32F4_AxB_RESET() family of 
-> macros in both clk driver and DT in order to reuse the bit layouts from 
-> dt-bindings/mfd/stm32f4-rcc.h .
-> 
-> Normal case would have looked like this:
-> 
->                 timer3: timer at 40000000 {
->                         compatible = "st,stm32-timer";
->                         reg = <0x40000000 0x400>;
->                         interrupts = <28>;
->                         resets = <&rcc STM32F4_APB1_RESET(TIM3)>;
->                         clocks = <&rcc STM32F4_APB1_CLK(TIM3)>;
->                         status = "disabled";
->                 };
-> 
-> Without the macros it looks like this:
-> 
->                 timer3: timer at 40000000 {
->                         compatible = "st,stm32-timer";
->                         reg = <0x40000000 0x400>;
->                         interrupts = <28>;
->                         resets = <&rcc 257>;
->                         clocks = <&rcc 513>;
->                         status = "disabled";
->                 };
-> 
-> However we could perhaps be more literate even if we don't use the macros?
-> 
->                 timer3: timer at 40000000 {
->                         compatible = "st,stm32-timer";
->                         reg = <0x40000000 0x400>;
->                         interrupts = <28>;
->                         resets = <&rcc ((0x20*8) + 1)>;
->                         clocks = <&rcc ((0x40*8) + 1)>;
->                         status = "disabled";
->                 };
-
-How about #address-cells = <2>, so you can do
-
-		resets = <&rcc 8 1>;
-		clocks = <&rcc 8 1>;
-
-with the first cell being an index for the block and the second cell the
-bit number within that block.
-
-	Arnd
+>
+>>
+>> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+>> Reported-by: Stefan Agner <stefan@agner.ch>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Hans de Goede <hdegoede@redhat.com>
+>> Cc: Laura Abbott <labbott@redhat.com>
+>> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+>> Cc: Steve Capper <steve.capper@linaro.org>
+>> ---
+>>   arch/arm/mm/mmu.c | 20 ++++++++++----------
+>>   1 file changed, 10 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+>> index 4e6ef89..7186382 100644
+>> --- a/arch/arm/mm/mmu.c
+>> +++ b/arch/arm/mm/mmu.c
+>> @@ -1112,22 +1112,22 @@ void __init sanity_check_meminfo(void)
+>>   			}
+>>
+>>   			/*
+>> -			 * Find the first non-section-aligned page, and point
+>> +			 * Find the first non-pmd-aligned page, and point
+>>   			 * memblock_limit at it. This relies on rounding the
+>> -			 * limit down to be section-aligned, which happens at
+>> -			 * the end of this function.
+>> +			 * limit down to be pmd-aligned, which happens at the
+>> +			 * end of this function.
+>>   			 *
+>>   			 * With this algorithm, the start or end of almost any
+>> -			 * bank can be non-section-aligned. The only exception
+>> -			 * is that the start of the bank 0 must be section-
+>> +			 * bank can be non-pmd-aligned. The only exception is
+>> +			 * that the start of the bank 0 must be section-
+>>   			 * aligned, since otherwise memory would need to be
+>>   			 * allocated when mapping the start of bank 0, which
+>>   			 * occurs before any free memory is mapped.
+>>   			 */
+>>   			if (!memblock_limit) {
+>> -				if (!IS_ALIGNED(block_start, SECTION_SIZE))
+>> +				if (!IS_ALIGNED(block_start, PMD_SIZE))
+>>   					memblock_limit = block_start;
+>> -				else if (!IS_ALIGNED(block_end, SECTION_SIZE))
+>> +				else if (!IS_ALIGNED(block_end, PMD_SIZE))
+>>   					memblock_limit = arm_lowmem_limit;
+>>   			}
+>>
+>> @@ -1137,12 +1137,12 @@ void __init sanity_check_meminfo(void)
+>>   	high_memory = __va(arm_lowmem_limit - 1) + 1;
+>>
+>>   	/*
+>> -	 * Round the memblock limit down to a section size.  This
+>> +	 * Round the memblock limit down to a pmd size.  This
+>>   	 * helps to ensure that we will allocate memory from the
+>> -	 * last full section, which should be mapped.
+>> +	 * last full pmd, which should be mapped.
+>>   	 */
+>>   	if (memblock_limit)
+>> -		memblock_limit = round_down(memblock_limit, SECTION_SIZE);
+>> +		memblock_limit = round_down(memblock_limit, PMD_SIZE);
+>>   	if (!memblock_limit)
+>>   		memblock_limit = arm_lowmem_limit;
+>
