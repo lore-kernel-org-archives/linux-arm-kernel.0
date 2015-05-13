@@ -1,33 +1,166 @@
 From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Wed, 13 May 2015 09:10:51 +0200
-Subject: [PATCH 1/3] ARM: BCM5301X: Add USB LED for Buffalo WZR-1750DHP
-Message-ID: <1431501053-1517-1-git-send-email-zajec5@gmail.com>
+Date: Wed, 13 May 2015 09:10:52 +0200
+Subject: [PATCH 2/3] ARM: BCM5301X: Add DT for Buffalo WXR-1900DHP
+In-Reply-To: <1431501053-1517-1-git-send-email-zajec5@gmail.com>
+References: <1431501053-1517-1-git-send-email-zajec5@gmail.com>
+Message-ID: <1431501053-1517-2-git-send-email-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Felix Fietkau <nbd@openwrt.org>
 
 Signed-off-by: Felix Fietkau <nbd@openwrt.org>
+Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
 ---
- arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/Makefile                        |   1 +
+ arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts | 127 ++++++++++++++++++++++
+ 2 files changed, 128 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts
 
-diff --git a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-index b359c1e..78e95c0 100644
---- a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-+++ b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-@@ -47,6 +47,12 @@
- 	leds {
- 		compatible = "gpio-leds";
- 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 6658b39..37385b3 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -67,6 +67,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+ 	bcm47081-asus-rt-n18u.dtb \
+ 	bcm47081-buffalo-wzr-600dhp2.dtb \
+ 	bcm47081-buffalo-wzr-900dhp.dtb \
++	bcm4709-buffalo-wxr-1900dhp.dtb \
+ 	bcm4709-netgear-r8000.dtb
+ dtb-$(CONFIG_ARCH_BCM_63XX) += \
+ 	bcm963138dvt.dtb
+diff --git a/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts b/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts
+new file mode 100644
+index 0000000..548e93b
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts
+@@ -0,0 +1,127 @@
++/*
++ * Broadcom BCM470X / BCM5301X ARM platform code.
++ * DTS for Buffalo WXR-1900DHP
++ *
++ * Copyright (C) 2015 Felix Fietkau <nbd@openwrt.org>
++ *
++ * Licensed under the GNU/GPL. See COPYING for details.
++ */
++
++/dts-v1/;
++
++#include "bcm4708.dtsi"
++
++/ {
++	compatible = "buffalo,wxr-1900dhp", "brcm,bcm4709", "brcm,bcm4708";
++	model = "Buffalo WXR-1900DHP";
++
++	chosen {
++		bootargs = "console=ttyS0,115200";
++	};
++
++	memory {
++		reg = <0x00000000 0x08000000>;
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
 +		usb {
-+			label = "bcm53xx:blue:usb";
-+			gpios = <&hc595 0 GPIO_ACTIVE_HIGH>;
++			label = "bcm53xx:green:usb";
++			gpios = <&chipcommon 4 GPIO_ACTIVE_HIGH>;
 +			linux,default-trigger = "default-off";
 +		};
 +
- 		power0 {
- 			label = "bcm53xx:red:power";
- 			gpios = <&hc595 1 GPIO_ACTIVE_HIGH>;
++		power-amber {
++			label = "bcm53xx:amber:power";
++			gpios = <&chipcommon 5 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		power-white {
++			label = "bcm53xx:white:power";
++			gpios = <&chipcommon 6 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-on";
++		};
++
++		router-amber {
++			label = "bcm53xx:amber:router";
++			gpios = <&chipcommon 7 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		router-white {
++			label = "bcm53xx:white:router";
++			gpios = <&chipcommon 8 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		wan-amber {
++			label = "bcm53xx:amber:wan";
++			gpios = <&chipcommon 9 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		wan-white {
++			label = "bcm53xx:white:wan";
++			gpios = <&chipcommon 10 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		wireless-amber {
++			label = "bcm53xx:amber:wireless";
++			gpios = <&chipcommon 11 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		wireless-white {
++			label = "bcm53xx:white:wireless";
++			gpios = <&chipcommon 12 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		power {
++			label = "Power";
++			linux,code = <KEY_POWER>;
++			gpios = <&chipcommon 1 GPIO_ACTIVE_LOW>;
++		};
++
++		restart {
++			label = "Reset";
++			linux,code = <KEY_RESTART>;
++			gpios = <&chipcommon 15 GPIO_ACTIVE_LOW>;
++		};
++
++		aoss {
++			label = "AOSS";
++			linux,code = <KEY_WPS_BUTTON>;
++			gpios = <&chipcommon 16 GPIO_ACTIVE_LOW>;
++		};
++
++		/* Commit mode set by switch? */
++		mode {
++			label = "Mode";
++			linux,code = <KEY_SETUP>;
++			gpios = <&chipcommon 17 GPIO_ACTIVE_LOW>;
++		};
++
++		/* Switch: AP mode */
++		sw_ap {
++			label = "AP";
++			linux,code = <BTN_0>;
++			gpios = <&chipcommon 18 GPIO_ACTIVE_LOW>;
++		};
++
++		eject {
++			label = "USB eject";
++			linux,code = <KEY_EJECTCD>;
++			gpios = <&chipcommon 20 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
 -- 
 1.8.4.5
