@@ -1,13 +1,16 @@
 From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Wed, 13 May 2015 09:12:48 -0500
-Subject: [GIT PULL] SoCFPGA DTS updates for v4.2, part 2
-Message-ID: <1431526369-1388-1-git-send-email-dinguyen@opensource.altera.com>
+Date: Wed, 13 May 2015 09:12:49 -0500
+Subject: [GIT PULL] SoCFPGA updates for v4.2, version 2
+In-Reply-To: <1431526369-1388-1-git-send-email-dinguyen@opensource.altera.com>
+References: <1431526369-1388-1-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <1431526369-1388-2-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd, Kevin and Olof,
 
-Please pull this patch for v4.2.
+Please consider pulling in these patches for v4.2. This is version 2 that
+includes the patch to use of_iomap of the A9 SCU.
 
 Thanks,
 Dinh
@@ -18,19 +21,37 @@ The following changes since commit 5ebe6afaf0057ac3eaeb98defd5456894b446d22:
 
 are available in the git repository at:
 
-  git://git.kernel.org:pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_dts_for_v4.2_part_2
+  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_updates_for_v4.2
 
-for you to fetch changes up to 8508452e57f7d50216338c28db6d42dfe585389a:
+for you to fetch changes up to 122694a0c71281cf2b349af41309c3caf5f31d61:
 
-  ARM: socfpga: dts: add the a9-scu node (2015-05-13 08:30:03 -0500)
-
-----------------------------------------------------------------
-SoCFPGA update for v4.2 part 2
-- Add a DTS node for the A9 SCU
+  ARM: socfpga: use of_iomap to map the SCU (2015-05-13 08:41:35 -0500)
 
 ----------------------------------------------------------------
-Dinh Nguyen (1):
-      ARM: socfpga: dts: add the a9-scu node
+SoCFPGA updates for v4.2
+- Add big endian support
+- Add earlyprintk support on UART1 that is used on Arria10
+- Remove the need to map uart_io_desc
+- Use of_iomap to map the SCU
+- Remove socfpga_smp_init_cpus as arm_dt_init_cpu_maps is already doing
+  the CPU mapping.
 
- arch/arm/boot/dts/socfpga.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+----------------------------------------------------------------
+Ben Dooks (3):
+      ARM: debug: fix big endian operation for 8250 word mode
+      ARM: socfpga: enable big endian for secondary core(s)
+      ARM: socfpga: support big endian for socfpga
+
+Dinh Nguyen (3):
+      ARM: socfpga: Add support for UART1 debug uart for earlyprintk
+      ARM: socfpga: remove the need to map uart_io_desc
+      ARM: socfpga: use of_iomap to map the SCU
+
+ arch/arm/Kconfig.debug          | 26 +++++++++++++++++++-------
+ arch/arm/include/debug/8250.S   |  3 +++
+ arch/arm/mach-socfpga/Kconfig   |  1 +
+ arch/arm/mach-socfpga/core.h    |  1 -
+ arch/arm/mach-socfpga/headsmp.S |  5 ++++-
+ arch/arm/mach-socfpga/platsmp.c | 33 ++++++++++-----------------------
+ arch/arm/mach-socfpga/socfpga.c | 34 ----------------------------------
+ 7 files changed, 37 insertions(+), 66 deletions(-)
