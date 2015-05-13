@@ -1,31 +1,75 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Wed, 13 May 2015 18:11:27 +0100
-Subject: [PATCH 0/5] arm64: Juno DT updates and new DT for Juno R1
-Message-ID: <1431537092-19597-1-git-send-email-Liviu.Dudau@arm.com>
+Date: Wed, 13 May 2015 18:11:31 +0100
+Subject: [PATCH 4/5] arm64: Juno: Add GICv2m support in device tree.
+In-Reply-To: <1431537092-19597-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1431537092-19597-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1431537092-19597-5-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series restructures the Juno DT files and introduces the DT
-for the new Juno R1. The board is an update of the Juno R0 with
-support for PCIe, but the current series only brings the board to
-parity with Juno R0. The series that enable the PCIe Generic Host
-Bridge to be used on Juno R1 will be posted separately.
+Juno contains a GICv2m extension for handling PCIe MSI messages.
+Add a node declaring the first frame of the extension.
 
-Liviu Dudau (5):
-  arm64: Juno: Fix the GIC node address label and the frequency of FAXI clock.
-  arm64: Juno: Split juno.dts into juno-base.dtsi and juno.dts.
-  arm64: Juno: Add memory mapped timer node
-  arm64: Juno: Add GICv2m support in device tree.
-  arm64: Add DT support for Juno r1 board.
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+---
+ arch/arm64/boot/dts/arm/juno-base.dtsi | 35 ++++++++++++++++++++--------------
+ 1 file changed, 21 insertions(+), 14 deletions(-)
 
- arch/arm64/boot/dts/arm/Makefile         |   2 +-
- arch/arm64/boot/dts/arm/juno-base.dtsi   | 147 +++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/arm/juno-clocks.dtsi |   4 +-
- arch/arm64/boot/dts/arm/juno-r1.dts      | 123 ++++++++++++++++++++++++++
- arch/arm64/boot/dts/arm/juno.dts         | 122 +------------------------
- 5 files changed, 274 insertions(+), 124 deletions(-)
- create mode 100644 arch/arm64/boot/dts/arm/juno-base.dtsi
- create mode 100644 arch/arm64/boot/dts/arm/juno-r1.dts
-
+diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+index 78f8a07..e6a4e99 100644
+--- a/arch/arm64/boot/dts/arm/juno-base.dtsi
++++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+@@ -23,10 +23,17 @@
+ 		      <0x0 0x2c02f000 0 0x2000>,
+ 		      <0x0 0x2c04f000 0 0x2000>,
+ 		      <0x0 0x2c06f000 0 0x2000>;
+-		#address-cells = <0>;
++		#address-cells = <2>;
+ 		#interrupt-cells = <3>;
++		#size-cells = <2>;
+ 		interrupt-controller;
+ 		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_HIGH)>;
++		ranges = <0 0 0 0x2c1c0000 0 0x40000>;
++		v2m_0: v2m at 0 {
++			compatible = "arm,gic-v2m-frame";
++			msi-controller;
++			reg = <0 0 0 0x1000>;
++		};
+ 	};
+ 
+ 	timer {
+@@ -122,19 +129,19 @@
+ 
+ 		#interrupt-cells = <1>;
+ 		interrupt-map-mask = <0 0 15>;
+-		interrupt-map = <0 0  0 &gic 0  68 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  1 &gic 0  69 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  2 &gic 0  70 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  3 &gic 0 160 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  4 &gic 0 161 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  5 &gic 0 162 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  6 &gic 0 163 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  7 &gic 0 164 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  8 &gic 0 165 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  9 &gic 0 166 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0 10 &gic 0 167 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0 11 &gic 0 168 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0 12 &gic 0 169 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-map = <0 0  0 &gic 0 0 0  68 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  1 &gic 0 0 0  69 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  2 &gic 0 0 0  70 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  3 &gic 0 0 0 160 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  4 &gic 0 0 0 161 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  5 &gic 0 0 0 162 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  6 &gic 0 0 0 163 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  7 &gic 0 0 0 164 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  8 &gic 0 0 0 165 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  9 &gic 0 0 0 166 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 10 &gic 0 0 0 167 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 11 &gic 0 0 0 168 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 12 &gic 0 0 0 169 IRQ_TYPE_LEVEL_HIGH>;
+ 
+ 		/include/ "juno-motherboard.dtsi"
+ 	};
 -- 
 2.3.6
