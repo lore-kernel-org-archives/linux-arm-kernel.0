@@ -1,37 +1,103 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 13 May 2015 17:47:38 +0100
-Subject: [PATCH 2/4] ASoC: rockchip: add rockchip machine driver for
- max98090
-In-Reply-To: <55535048.4030703@rock-chips.com>
-References: <1431422797-31903-1-git-send-email-zhengxing@rock-chips.com>
- <1431422797-31903-3-git-send-email-zhengxing@rock-chips.com>
- <20150512192636.GA3066@sirena.org.uk>
- <55535048.4030703@rock-chips.com>
-Message-ID: <20150513164738.GC2761@sirena.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 13 May 2015 17:50:14 +0100
+Subject: [PATCH v8 4/9] mfd: Add binding document for NVIDIA Tegra XUSB
+In-Reply-To: <CAL1qeaF-7aAx0gqPe-_D4ZaZET0Kejr801KrbvuQ_2w6c8mcnA@mail.gmail.com>
+References: <1430761002-9327-1-git-send-email-abrestic@chromium.org>
+ <1430761002-9327-5-git-send-email-abrestic@chromium.org>
+ <20150513143954.GA3394@x1>
+ <CAL1qeaF-7aAx0gqPe-_D4ZaZET0Kejr801KrbvuQ_2w6c8mcnA@mail.gmail.com>
+Message-ID: <20150513165014.GC19543@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 13, 2015 at 09:23:20PM +0800, zhengxing wrote:
-> On 2015?05?13? 03:26, Mark Brown wrote:
+On Wed, 13 May 2015, Andrew Bresticker wrote:
 
-> >This looks more like a normal and reasonable machine driver but then why
-> >have you created the generic rockchip machine driver?  It seems like
-> >this should just be a regular machine driver like other platforms have,
-> >were it not for that this would be mostly fine apart from a couple of
-> >nitpicks below.
+> Lee,
+> 
+> On Wed, May 13, 2015 at 7:39 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Mon, 04 May 2015, Andrew Bresticker wrote:
+> >
+> >> Add a binding document for the XUSB host complex on NVIDIA Tegra124
+> >> and later SoCs.  The XUSB host complex includes a mailbox for
+> >> communication with the XUSB micro-controller and an xHCI host-controller.
+> >>
+> >> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+> >> Cc: Rob Herring <robh+dt@kernel.org>
+> >> Cc: Pawel Moll <pawel.moll@arm.com>
+> >> Cc: Mark Rutland <mark.rutland@arm.com>
+> >> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> >> Cc: Kumar Gala <galak@codeaurora.org>
+> >> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> >> Cc: Lee Jones <lee.jones@linaro.org>
+> >> ---
+> >> Changes from v7:
+> >>  - Move non-shared resources into child nodes.
+> >> New for v7.
+> >> ---
+> >>  .../bindings/mfd/nvidia,tegra124-xusb.txt          | 37 ++++++++++++++++++++++
+> >>  1 file changed, 37 insertions(+)
+> >>  create mode 100644 Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt b/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
+> >> new file mode 100644
+> >> index 0000000..bc50110
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
+> >> @@ -0,0 +1,37 @@
+> >> +NVIDIA Tegra XUSB host copmlex
+> >> +==============================
+> >> +
+> >> +The XUSB host complex on Tegra124 and later SoCs contains an xHCI host
+> >> +controller and a mailbox for communication with the XUSB micro-controller.
+> >> +
+> >> +Required properties:
+> >> +--------------------
+> >> + - compatible: For Tegra124, must contain "nvidia,tegra124-xusb".
+> >> +   Otherwise, must contain '"nvidia,<chip>-xusb", "nvidia,tegra124-xusb"'
+> >> +   where <chip> is tegra132.
+> >> + - reg: Must contain the base and length of the XUSB FPCI registers.
+> >> + - ranges: Bus address mapping for the XUSB block.  Can be empty since the
+> >> +   mapping is 1:1.
+> >> + - #address-cells: Must be 2.
+> >> + - #size-cells: Must be 2.
+> >> +
+> >> +Example:
+> >> +--------
+> >> +     usb at 0,70098000 {
+> >> +             compatible = "nvidia,tegra124-xusb";
+> >> +             reg = <0x0 0x70098000 0x0 0x1000>;
+> >> +             ranges;
+> >> +
+> >> +             #address-cells = <2>;
+> >> +             #size-cells = <2>;
+> >> +
+> >> +             usb-host at 0,70090000 {
+> >> +                     compatible = "nvidia,tegra124-xhci";
+> >> +                     ...
+> >> +             };
+> >> +
+> >> +             mailbox {
+> >> +                     compatible = "nvidia,tegra124-xusb-mbox";
+> >> +                     ...
+> >> +             };
+> >
+> > This doesn't appear to be a proper MFD.  I would have the USB and
+> > Mailbox devices probe seperately and use a phandle to point the USB
+> > device to its Mailbox.
+> >
+> > usb at xyz {
+> >         mboxes = <&xusb-mailbox, [chan]>;
+> > };
+> 
+> Then what will set up the shared regmap?  The point of using an MFD
+> here was to share a register set with both the mailbox and xHCI
+> drivers and avoid having to map the same register set twice in two
+> separate drivers.
 
-> We just use rockchip_machine_driver to describe the supported codecs base on
-> origianl way, vendor machine driver(rockchip_max98090) will achieve
-> functions.
+Can you share the mapping please?
 
-Like I said in reply to the other message I just don't understand what
-you're saying here - take a look at the various Tegra machine drivers
-for example, they also have per-CODEC handling but they just use normal
-machine drivers to do it.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150513/2a285668/attachment.sig>
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
