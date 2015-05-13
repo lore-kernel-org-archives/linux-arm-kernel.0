@@ -1,121 +1,72 @@
-From: j.anaszewski@samsung.com (Jacek Anaszewski)
-Date: Wed, 13 May 2015 16:53:03 +0200
-Subject: [PATCH v2 02/17] leds: port locomo leds driver to new locomo core
-In-Reply-To: <CALT56yOJyZvWF9neC2A09Y_w1Ej41uwWvU=aOOM0idbzUkBiFQ@mail.gmail.com>
-References: <1430178954-11138-1-git-send-email-dbaryshkov@gmail.com>
- <1430178954-11138-3-git-send-email-dbaryshkov@gmail.com>
- <554A2DB4.3020000@samsung.com>
- <CALT56yNJWapNw1XLrzfbUDUz1LF_BB9DfF94H6GhbnBUEP80_w@mail.gmail.com>
- <555327EA.5060402@samsung.com>
- <CALT56yOJyZvWF9neC2A09Y_w1Ej41uwWvU=aOOM0idbzUkBiFQ@mail.gmail.com>
-Message-ID: <5553654F.4010608@samsung.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 13 May 2015 14:55:03 +0000 (UTC)
+Subject: [PATCHv2 00/27] ARM: OMAP2+: clock code migration to
+ drivers/clk/ti
+In-Reply-To: <5552F32C.7060606@ti.com>
+References: <1431334493-24455-1-git-send-email-t-kristo@ti.com>
+ <alpine.DEB.2.02.1505111747460.19833@utopia.booyaka.com>
+ <5551D178.3000904@ti.com>
+ <alpine.DEB.2.02.1505122019220.21747@utopia.booyaka.com>
+ <5552F32C.7060606@ti.com>
+Message-ID: <alpine.DEB.2.02.1505131438430.7921@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/13/2015 04:14 PM, Dmitry Eremin-Solenikov wrote:
-> 2015-05-13 13:31 GMT+03:00 Jacek Anaszewski <j.anaszewski@samsung.com>:
->> On 05/12/2015 05:35 PM, Dmitry Eremin-Solenikov wrote:
->>>
->>> 2015-05-06 18:05 GMT+03:00 Jacek Anaszewski <j.anaszewski@samsung.com>:
->>>>
->>>> On 04/28/2015 01:55 AM, Dmitry Eremin-Solenikov wrote:
->>>>>
->>>>>
->>>>> Adapt locomo leds driver to new locomo core setup.
->>>>>
->>>>> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
->>>>> ---
->>>>>     drivers/leds/Kconfig       |   1 -
->>>>>     drivers/leds/leds-locomo.c | 119
->>>>> +++++++++++++++++++++++----------------------
->>>>>     2 files changed, 61 insertions(+), 59 deletions(-)
->>>>>
->>>>> diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
->>>>> index 966b960..4b4650b 100644
->>>>> --- a/drivers/leds/Kconfig
->>>>> +++ b/drivers/leds/Kconfig
->>>>> @@ -79,7 +79,6 @@ config LEDS_LM3642
->>>>>     config LEDS_LOCOMO
->>>>>           tristate "LED Support for Locomo device"
->>>>>           depends on LEDS_CLASS
->>>>> -       depends on SHARP_LOCOMO
->>>>
->>>>
->>>>
->>>> Why do you remove this dependency?
->>>
->>>
->>> Because SHARP_LOCOMO is a Kconfig symbol for the old driver. New driver
->>> uses MFD_LOCOMO Kconfig entry. Also the driver now uses generic platform
->>> device and regmap interfaces, so there is no direct dependency on main
->>> LoCoMo driver. And the policy (IIRC) was not to have such dependencies.
->>
->>
->> Ack. Shouldn't you also need "select REGMAP_MMIO" ?
->
-> No. Maybe I should add "select REGMAP" instead.
+On Wed, 13 May 2015, Tero Kristo wrote:
 
-REGMAP is enabled by default if REGMAP_MMIO is enabled. Having
-REGMAP_MMIO selected would also allow to notice at first glance which
-regmap backend is used. This would in turn provide a straightforward
-explanation on why brightness_set op is not delegated to work queue.
+> I clipped the boot-loader traces as they contain lots of noise from the
+> test-automation system.
+> 
+> Looking at the farm traces, I see this on the omap3 boards:
+> 
+> beagleboard-vanilla.txt:ver=U-Boot 2014.04-00071-g8543283 (Apr 22 2014 -
+> 15:49:50)
+> 
+> beagle-xm.txt:U-Boot 2014.10-00004-g9ade0ab-dirty (Dec 16 2014 - 13:40:24)
+> 
+> craneboard.txt:U-Boot 2009.11-00005-ge83d2db (Dec 07 2010 - 11:55:34)
+> 
+> ldp.txt:U-Boot 2014.04-00071-g8543283-dirty (Apr 25 2014 - 14:59:48)
+> 
+> n900.txt:U-Boot 2014.04-00073-g4fa5b9e (Apr 22 2014 - 14:37:10)
+> 
+> sdp3430.txt:U-Boot 2009.11-rc1-00485-g7d1e865 (Nov 09 2009 - 11:21:55)
+> 
+> Maybe some DTB issues? When did you update your DTB files?
 
->>>>>    static void locomoled_brightness_set(struct led_classdev *led_cdev,
->>>>> -                               enum led_brightness value, int offset)
->>>>> +                               enum led_brightness value)
->>>>>     {
->>>>> -       struct locomo_dev *locomo_dev =
->>>>> LOCOMO_DEV(led_cdev->dev->parent);
->>>>> -       unsigned long flags;
->>>>> +       struct locomo_led *led = container_of(led_cdev, struct
->>>>> locomo_led,
->>>>> led);
->>>>>
->>>>> -       local_irq_save(flags);
->>>>> -       if (value)
->>>>> -               locomo_writel(LOCOMO_LPT_TOFH, locomo_dev->mapbase +
->>>>> offset);
->>>>> -       else
->>>>> -               locomo_writel(LOCOMO_LPT_TOFL, locomo_dev->mapbase +
->>>>> offset);
->>>>> -       local_irq_restore(flags);
->>>>> +       regmap_write(led->regmap, led->reg,
->>>>> +                       value ? LOCOMO_LPT_TOFH : LOCOMO_LPT_TOFL);
->>>>>     }
->>>>
->>>>
->>>>
->>>> Please use work queue for setting brightness. This is required for the
->>>> driver to be compatible with led triggers. You can refer to the
->>>> existing LED drivers on how to implement this.
->>>
->>>
->>> Hmm. Why? The regmap here uses MMIO access, so it is atomic operation
->>> and doesn't need to be wrapped into work queue, does it?
->>
->>
->> Triggers can call brightness_set op in the interrupt context, so it
->> cannot sleep. I see "map->lock(map->lock_arg)" in regmap_write, thus
->> I am inferring that it can sleep.
->>
->> I am not sure if regmap implements its 'lock' op when using MMIO.
->>
->> The best way to figure this out is turning "LED Timer Trigger" on
->> in the config and execute:
->>
->> echo "timer" > trigger
->
-> It works without any "might sleep/sleeping in atomic context" warnings.
->
-> Technically I'd agree with you. If I'm using regmaps, ideally I should not
-> depend on the exact backend and put working with it to the work queue.
-> However as this is a driver for quite old IP block, it is not used with
-> regmap backends other than MMIO, I'd deduce, it's ok to do things
-> in a more relaxed way and to call regmap_write even from atomic
-> contexts.
+For all of the uImage+DTB boots, the DTB files in use follow the kernel 
+version:
 
-Ack.
+http://www.pwsan.com/omap/testlogs/test_v4.1-rc1/20150426200156/dtbs/
 
--- 
-Best Regards,
-Jacek Anaszewski
+which are then subsequently combined to produce:
+
+http://www.pwsan.com/omap/testlogs/test_v4.1-rc1/20150426200156/dtcat/
+
+So, using the OMAP35xx Beagle as an example, you can prove to yourself 
+that the current DTB is in use by observing that U-boot is loading a 
+combined uImage+DTB file of 3495180 bytes from here:
+
+http://www.pwsan.com/omap/testlogs/test_v4.1-rc1/20150426200156/boot/3530es3beagle/3530es3beagle_log.txt
+
+and comparing that with the size of this file (3495180 bytes):
+
+http://www.pwsan.com/omap/testlogs/test_v4.1-rc1/20150426200156/dtcat/omap2plus_defconfig/uImage-dtb.omap3-beagle
+
+and observing that this file size is the sum of the DTB file size (63180 
+bytes):
+
+http://www.pwsan.com/omap/testlogs/test_v4.1-rc1/20150426200156/dtbs/omap3-beagle.dtb
+
+and the zImage file size (3431936 bytes):
+
+http://www.pwsan.com/omap/testlogs/test_v4.1-rc1/20150426200156/build_z/omap2plus_defconfig/zImage
+
+and the 64 byte uImage header.
+
+
+The only board that I suspect may be using an old DTB is the 4460 
+VAR-SOM-OM.
+
+
+- Paul
