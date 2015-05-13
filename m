@@ -1,21 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 May 2015 10:12:34 +0200
-Subject: [PATCH 1/2] ARM: socfpga: dts: add the a9-scu node
-In-Reply-To: <1431470950-29492-1-git-send-email-dinguyen@opensource.altera.com>
-References: <1431470950-29492-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <2138733.7f0kSNWZyb@wuerfel>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Wed, 13 May 2015 17:17:42 +0900
+Subject: [PATCHv5 1/5] ARM: dts: exynos5422-odroidxu3 Add pwm-fan node
+ tothe Odroid-XU3 board
+In-Reply-To: <CAJKOXPefJwqvfZPDovQ6EjEOBfuJkidgeYDF_=KC9O+=2=_KoQ@mail.gmail.com>
+References: <1431499020-3912-1-git-send-email-linux.amoon@gmail.com>
+ <1431499020-3912-2-git-send-email-linux.amoon@gmail.com>
+ <CAJKOXPefJwqvfZPDovQ6EjEOBfuJkidgeYDF_=KC9O+=2=_KoQ@mail.gmail.com>
+Message-ID: <555308A6.308@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 May 2015 17:49:09 dinguyen at opensource.altera.com wrote:
-> From: Dinh Nguyen <dinguyen@opensource.altera.com>
+On 05/13/15 16:11, Krzysztof Kozlowski wrote:
+> 2015-05-13 15:36 GMT+09:00 Anand Moon <linux.amoon@gmail.com>:
+>> Add pwm-fan node to the Odroid-XU3 board.
+>>
+>> Tested-by: Markus Reichl <m.reichl@fivetechno.de>
+>> Acked-by: Lukasz Majewski <l.majewski@samsung.com>
+>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
 > 
-> Add the dts node for the A9 SCU.
+> Please fix the title of commit (missing colon, duplicated name of board) to:
+> "ARM: dts: exynos5422-odroidxu3: Add pwm-fan node"
 > 
-> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
-> 
+Well, I'd preferred to use the following format:
+"ARM: dts: add pwm-fan node for exynos5422-odroidxu3"
 
-Both patches look good to me, please send a new pull request with these
-integrated in the series you had sent earlier.
+But I can change it when I apply it ;-)
 
-	Arnd
+> Rest looks good:
+> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> 
+Thanks,
+Kukjin
