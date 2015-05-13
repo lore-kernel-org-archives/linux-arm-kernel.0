@@ -1,28 +1,30 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 13 May 2015 23:23:15 +0200
-Subject: [PATCH 0/8] ARM: dts: rockchip: the big relicensing
-In-Reply-To: <1425665046-22927-1-git-send-email-heiko@sntech.de>
-References: <1425665046-22927-1-git-send-email-heiko@sntech.de>
-Message-ID: <2129595.I0LkhbAxWZ@phil>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 13 May 2015 14:35:51 -0700
+Subject: [net-next PATCH] net: Reserve skb headroom and set skb->dev even
+ if using __alloc_skb
+In-Reply-To: <20150513203413.8252.98057.stgit@ahduyck-vm-fedora22> (Alexander
+ Duyck's message of "Wed, 13 May 2015 13:34:13 -0700")
+References: <20150513182738.GA28201@saruman.tx.rr.com>
+ <20150513203413.8252.98057.stgit@ahduyck-vm-fedora22>
+Message-ID: <7h8ucs6tzc.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 6. M?rz 2015, 19:03:58 schrieb Heiko Stuebner:
-> GPL2/X11 seems to be the consensus to go for devicetree files, as shown for
-> examply by armada, meson and sunxi.
-> 
-> We already have the new board-files licensed under this combination, so
-> complete the transition for the older files.
-> 
-> Heiko Stuebner (8):
->   ARM: dts: rockchip: relicense rk3xxx.dtsi under GPLv2/X11
->   ARM: dts: rockchip: relicense rk3066a.dtsi under GPLv2/X11
->   ARM: dts: rockchip: relicense rk3188.dtsi under GPLv2/X11
->   ARM: dts: rockchip: relicense rk3288.dtsi under GPLv2/X11
->   ARM: dts: rockchip: relicense rk3288-thermal.dtsi under GPLv2/X11
->   ARM: dts: rockchip: relicense rk3066a-bqcurie2.dts under GPLv2/X11
->   ARM: dts: rockchip: relicense rk3188-radxarock.dts under GPLv2/X11
->   ARM: dts: rockchip: relicense rk3288-evb* under GPLv2/X11
+Alexander Duyck <alexander.h.duyck@redhat.com> writes:
 
-just for me to keep track, I've now applied patches 1,2,3 and 5 that got all 
-necessary ACKs so far.
+> When I had inlined __alloc_rx_skb into __netdev_alloc_skb and
+> __napi_alloc_skb I had overlooked the fact that there was a return in the
+> __alloc_rx_skb.  As a result we weren't reserving headroom or setting the
+> skb->dev in certain cases.  This change corrects that by adding a couple of
+> jump labels to jump to depending on __alloc_skb either succeeding or failing.
+>
+> Fixes: 9451980a6646 ("net: Use cached copy of pfmemalloc to avoid accessing page")
+> Reported-by: Felipe Balbi <balbi@ti.com>
+> Signed-off-by: Alexander Duyck <alexander.h.duyck@redhat.com>
+
+Tested this on top of next-20150513 on an ARM/OMAP
+(am335x-boneblack.dts) an it fixes the boot problem for me.
+
+Tested-by: Kevin Hilman <khilman@linaro.org>
+
+Kevin
