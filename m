@@ -1,31 +1,87 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 May 2015 10:46:45 +0200
-Subject: [PATCH 2/8] dmaengine: mv_xor: add support for a38x command in
- descriptor mode
-In-Reply-To: <20150513081535.GS10961@lukather>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 13 May 2015 10:45:27 +0200
+Subject: [PATCH 6/8] async_tx: adding mult and sum_product flags
+In-Reply-To: <20150512160535.GK19927@lunn.ch>
 References: <1431445063-20226-1-git-send-email-maxime.ripard@free-electrons.com>
- <4862159.g8Sk9nOiS2@wuerfel> <20150513081535.GS10961@lukather>
-Message-ID: <2913865.DiE4h2cH6J@wuerfel>
+ <1431445063-20226-7-git-send-email-maxime.ripard@free-electrons.com>
+ <20150512160535.GK19927@lunn.ch>
+Message-ID: <20150513084527.GV10961@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 May 2015 10:15:35 Maxime Ripard wrote:
-> > Alternatively, you could leave the XOR_DESCRIPTOR_SWAP flag disabled
-> > and just swap the descriptors manually like a lot of other drivers
-> > do. You have to swap the mmio accesses anywya.
-> 
-> That won't be easily doable however.
-> 
-> Not only the endianness of the individual fields in the descriptor
-> changes, but changing the endianness also swaps the fields themselves
-> by pair of u32.
-> 
-> You can see that here:
-> http://lxr.free-electrons.com/source/drivers/dma/mv_xor.h#L159
-> 
-> So I'm guessing that leaving it like it is was the more readable
-> solution.
+On Tue, May 12, 2015 at 06:05:35PM +0200, Andrew Lunn wrote:
+> On Tue, May 12, 2015 at 05:37:41PM +0200, Maxime Ripard wrote:
+> > From: Lior Amsalem <alior@marvell.com>
+> > 
+> > Some engines (like Marvell mv_xor) do not support mult and sum_product
+> > operations as part of the pq support.
+> > 
+> > This patch adds new flags: DMA_PREP_PQ_MULT & DMA_PREP_PQ_SUM_PRODUCT these
+> > flags helps the driver identify such operations.
+> > 
+> > Signed-off-by: Lior Amsalem <alior@marvell.com>
+> > Reviewed-by: Ofer Heifetz <oferh@marvell.com>
+> > Reviewed-by: Nadav Haklai <nadavh@marvell.com>
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  crypto/async_tx/async_raid6_recov.c | 4 ++--
+> >  include/linux/dmaengine.h           | 4 ++++
+> >  2 files changed, 6 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/crypto/async_tx/async_raid6_recov.c b/crypto/async_tx/async_raid6_recov.c
+> > index 934a84981495..2db5486fd873 100644
+> > --- a/crypto/async_tx/async_raid6_recov.c
+> > +++ b/crypto/async_tx/async_raid6_recov.c
+> > @@ -47,7 +47,7 @@ async_sum_product(struct page *dest, struct page **srcs, unsigned char *coef,
+> >  		struct device *dev = dma->dev;
+> >  		dma_addr_t pq[2];
+> >  		struct dma_async_tx_descriptor *tx;
+> > -		enum dma_ctrl_flags dma_flags = DMA_PREP_PQ_DISABLE_P;
+> > +		enum dma_ctrl_flags dma_flags = DMA_PREP_PQ_DISABLE_P | DMA_PREP_PQ_SUM_PRODUCT;
+> >  
+> >  		if (submit->flags & ASYNC_TX_FENCE)
+> >  			dma_flags |= DMA_PREP_FENCE;
+> > @@ -111,7 +111,7 @@ async_mult(struct page *dest, struct page *src, u8 coef, size_t len,
+> >  		dma_addr_t dma_dest[2];
+> >  		struct device *dev = dma->dev;
+> >  		struct dma_async_tx_descriptor *tx;
+> > -		enum dma_ctrl_flags dma_flags = DMA_PREP_PQ_DISABLE_P;
+> > +		enum dma_ctrl_flags dma_flags = DMA_PREP_PQ_DISABLE_P | DMA_PREP_PQ_MULT;
+> >  
+> >  		if (submit->flags & ASYNC_TX_FENCE)
+> >  			dma_flags |= DMA_PREP_FENCE;
+> > diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+> > index ad419757241f..f19ecebb4d3f 100644
+> > --- a/include/linux/dmaengine.h
+> > +++ b/include/linux/dmaengine.h
+> > @@ -174,6 +174,8 @@ struct dma_interleaved_template {
+> >   *  operation it continues the calculation with new sources
+> >   * @DMA_PREP_FENCE - tell the driver that subsequent operations depend
+> >   *  on the result of this operation
+> > + * @DMA_PREP_PQ_MULT - tell the driver that this is a mult request
+> > + * @DMA_PREP_PQ_SUM_PRODUCT - tell the driver that this is a sum product request
+> >   */
+> >  enum dma_ctrl_flags {
+> >  	DMA_PREP_INTERRUPT = (1 << 0),
+> > @@ -182,6 +184,8 @@ enum dma_ctrl_flags {
+> >  	DMA_PREP_PQ_DISABLE_Q = (1 << 3),
+> >  	DMA_PREP_CONTINUE = (1 << 4),
+> >  	DMA_PREP_FENCE = (1 << 5),
+> > +	DMA_PREP_PQ_MULT = (1 << 10),
+> > +	DMA_PREP_PQ_SUM_PRODUCT = (1 << 11),
 
-I see, yes that would get a bit ugly.
+None. I just forgot to change this. Thanks!
 
-	Arnd
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150513/a6f788ef/attachment-0001.sig>
