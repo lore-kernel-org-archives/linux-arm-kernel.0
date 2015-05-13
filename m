@@ -1,49 +1,116 @@
-From: zhengxing@rock-chips.com (zhengxing)
-Date: Wed, 13 May 2015 21:23:20 +0800
-Subject: [PATCH 2/4] ASoC: rockchip: add rockchip machine driver for
- max98090
-In-Reply-To: <20150512192636.GA3066@sirena.org.uk>
-References: <1431422797-31903-1-git-send-email-zhengxing@rock-chips.com>
- <1431422797-31903-3-git-send-email-zhengxing@rock-chips.com>
- <20150512192636.GA3066@sirena.org.uk>
-Message-ID: <55535048.4030703@rock-chips.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 May 2015 15:27:31 +0200
+Subject: [PATCH v8 14/16] ARM: dts: Introduce STM32F429 MCU
+In-Reply-To: <55534A5D.6050904@linaro.org>
+References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <CALszF6CS8Q9DWX+ERtu=k=Bzr1-25N3oZQyWyxDZBF3an4nFKQ@mail.gmail.com>
+ <55534A5D.6050904@linaro.org>
+Message-ID: <3125409.QXbEmPolyh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?05?13? 03:26, Mark Brown wrote:
-> On Tue, May 12, 2015 at 05:26:35PM +0800, Xing Zheng wrote:
->
->>   sound/soc/rockchip/Kconfig                   |   10 ++
->>   sound/soc/rockchip/Makefile                  |    2 +
->>   sound/soc/rockchip/rockchip_machine_driver.c |    6 +
->>   sound/soc/rockchip/rockchip_machine_driver.h |    6 +
->>   sound/soc/rockchip/rockchip_max98090.c       |  185 ++++++++++++++++++++++++++
-> This looks more like a normal and reasonable machine driver but then why
-> have you created the generic rockchip machine driver?  It seems like
-> this should just be a regular machine driver like other platforms have,
-> were it not for that this would be mostly fine apart from a couple of
-> nitpicks below.
-We just use rockchip_machine_driver to describe the supported codecs base on
-origianl way, vendor machine driver(rockchip_max98090) will achieve 
-functions.
->> +config SND_SOC_ROCKCHIP_MAX98090
->> +	tristate "ASoC support for Rockchip boards using a MAX98090 codec"
->> +	depends on SND_SOC_ROCKCHIP&&  I2C&&  GPIOLIB
->> +	select SND_SOC_ROCKCHIP_I2S
->> +	select SND_SOC_MAX98090
->> +	select SND_SOC_TS3A227E
-> This looks like it's a driver specific to Chromebooks (possibly even
-> specific Chromeooks) and so should be named as such.
->
->> +	card->dapm.idle_bias_off = true;
-> Just set this when declaring the card, don't do it at runtime.
-Thanks, I got it.
->> +	snd_soc_dapm_enable_pin(dapm, "Headset Mic");
->> +	snd_soc_dapm_enable_pin(dapm, "Headphone");
->> +	snd_soc_dapm_enable_pin(dapm, "Speaker");
->> +	snd_soc_dapm_enable_pin(dapm, "Int Mic");
-> No need to do this, all pins are enabled by default.
-Yes, I got it.
->> +	snd_soc_dapm_sync(dapm);
-> This has no effect during initialization.
-Yes, I got it.
+On Wednesday 13 May 2015 13:58:05 Daniel Thompson wrote:
+> On 13/05/15 12:45, Maxime Coquelin wrote:
+> > 2015-05-12 23:21 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
+> >> On Saturday 09 May 2015 09:53:56 Maxime Coquelin wrote:
+> >>> +#include  <dt-bindings/mfd/stm32f4-rcc.h>
+> >>> +
+> >>>
+> >>
+> >> Can you find a way to avoid this dependency?
+> >>
+> >> Maybe you can change the bindings so that the numbers you pass as
+> >> arguments to the reset and clock specifiers reflect the numbers that
+> >> the hardware use?
+> >
+> > If I understand correctly, you prefer the way I did in v7 [0]?
+
+Yes, that looks better. I would probably not list all the possible
+values in the binding though, when the intention is to use the
+hardware specific values, and being able to reuse the binding
+and driver for variations of the same chip.
+
+> > Note that doing that won't break the DT binary compatibility, as the
+> > raw reset values, or the ones from defines are the same.
+> >
+> > Daniel, could you share an example of the bindings you would use for the clocks?
+> 
+> For the most cases, where there is a clock gate just before the 
+> peripheral it looks pretty much like the reset driver and I use the bit 
+> offset of the clock gating bit as the index.
+
+Is this bit always the same index as the one for the reset driver?
+
+> However there are a couple of clocks without gating just before the 
+> clock reaches the peripheral:
+> 
+> 1. A hard coded /8. I think this will have to be given a synthetic
+>     number.
+
+If this is just a divider, why not use a separate DT node for that,
+like this:
+
+        clock {
+                compatible = "fixed-factor-clock";
+                clocks = <&parentclk>;
+                #clock-cells = <0>;
+                clock-div = <8>;
+                clock-mult = <1>;
+        };
+
+No need to assign a number for this.
+
+> 2. Ungated dividers. For these I am using the bit offset of the LSB of
+>     the mux field.
+
+Do these ones also come with resets?
+
+> So I think there is only one value that is completely unrelated to the 
+> hardware and will use a magic constant instead.
+> 
+> I had planned to macros similar to the STM32F4_AxB_RESET() family of 
+> macros in both clk driver and DT in order to reuse the bit layouts from 
+> dt-bindings/mfd/stm32f4-rcc.h .
+> 
+> Normal case would have looked like this:
+> 
+>                 timer3: timer at 40000000 {
+>                         compatible = "st,stm32-timer";
+>                         reg = <0x40000000 0x400>;
+>                         interrupts = <28>;
+>                         resets = <&rcc STM32F4_APB1_RESET(TIM3)>;
+>                         clocks = <&rcc STM32F4_APB1_CLK(TIM3)>;
+>                         status = "disabled";
+>                 };
+> 
+> Without the macros it looks like this:
+> 
+>                 timer3: timer at 40000000 {
+>                         compatible = "st,stm32-timer";
+>                         reg = <0x40000000 0x400>;
+>                         interrupts = <28>;
+>                         resets = <&rcc 257>;
+>                         clocks = <&rcc 513>;
+>                         status = "disabled";
+>                 };
+> 
+> However we could perhaps be more literate even if we don't use the macros?
+> 
+>                 timer3: timer at 40000000 {
+>                         compatible = "st,stm32-timer";
+>                         reg = <0x40000000 0x400>;
+>                         interrupts = <28>;
+>                         resets = <&rcc ((0x20*8) + 1)>;
+>                         clocks = <&rcc ((0x40*8) + 1)>;
+>                         status = "disabled";
+>                 };
+
+How about #address-cells = <2>, so you can do
+
+		resets = <&rcc 8 1>;
+		clocks = <&rcc 8 1>;
+
+with the first cell being an index for the block and the second cell the
+bit number within that block.
+
+	Arnd
