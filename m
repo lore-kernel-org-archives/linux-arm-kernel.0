@@ -1,77 +1,41 @@
-From: dave.long@linaro.org (David Long)
-Date: Wed, 13 May 2015 15:58:42 -0400
-Subject: [PATCH v6 0/6] arm64: Add kernel probes (kprobes) support
-In-Reply-To: <555370B9.2070203@redhat.com>
-References: <1429561187-3661-1-git-send-email-dave.long@linaro.org>
- <55363791.4070706@hitachi.com> <553AB222.50609@redhat.com>
- <553EF74D.8020706@redhat.com> <20150429102346.GK8236@arm.com>
- <55442BFA.50101@redhat.com> <554851CB.2010909@linaro.org>
- <20150505154830.GI1550@arm.com> <55519583.9020507@linaro.org>
- <5551F693.8050100@redhat.com> <555317E8.2000502@hitachi.com>
- <555370B9.2070203@redhat.com>
-Message-ID: <5553ACF2.2080802@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 13 May 2015 21:12:30 +0100
+Subject: Automatic clock disabling on clk_put()
+In-Reply-To: <5553A9C8.2070701@codeaurora.org>
+References: <20150511060129.GG6325@pengutronix.de>
+ <55528B84.5050700@codeaurora.org>
+ <20150513064550.GE28888@pengutronix.de>
+ <5553A9C8.2070701@codeaurora.org>
+Message-ID: <20150513201230.GT2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/13/15 11:41, William Cohen wrote:
-> On 05/13/2015 05:22 AM, Masami Hiramatsu wrote:
->> On 2015/05/12 21:48, William Cohen wrote:
->
->>> Hi Dave,
->>>
->>> In some of the previous diagnostic output it looked like things would go wrong
->>> in the entry.S when the D bit was cleared and the debug interrupts were
->>> unmasksed.  I wonder if some of the issue might be due to the starting the
->>> kprobe for the trampoline, but leaving things in an odd state when another
->>> set of krpobe/kretporbes are hit when the trampoline is running.
->>
->> Hmm, does this mean we have a trouble if a user kprobe handler calls the
->> function which is probed by other kprobe? Or, is this just a problem
->> only for kretprobes?
->
-> Hi Masami,
->
-> I wrote an example based off of sample/kprobes/kprobes_sample.c to force the reentry issue for kprobes (the attached kprobe_rentry_example.c). That seemed to run fine.  I think the reason that the trampoline handler got into trouble is because of the reset_current_kprobe() before the possible call to kfree, but I haven't verified it. It seems like that should be at the end of trampoline handler just before the return.  Other architectures have similar trampoline handlers, so I am surprised that the other architectures haven't encountered this issue with kretprobes.  Maybe this is due to specific of arm64 exception handling.
->
-> # modprobe kprobe_reentry_example
-> [  909.617295] Planted kprobe at fffffe00000b7b34
-> [  909.623873] Planted kprobe at fffffe000032d34c
-> # rmmod kprobe_reentry_example
-> [ 1482.647504] kprobe at fffffe00000b7b34 unregistered
-> [ 1482.687506] kprobe at fffffe000032d34c unregistered
-> [ 1482.692361] y = 42
-> [ 1482.694361] z = 0
-> # grep \ int_sqrt$ /proc/kallsyms
-> fffffe000032d34c T int_sqrt
-> # grep \ do_fork$ /proc/kallsyms
-> fffffe00000b7b34 T do_fork
->
+On Wed, May 13, 2015 at 12:45:12PM -0700, Stephen Boyd wrote:
+> On 05/12/15 23:45, Uwe Kleine-K?nig wrote:
+> >
+> >> that hard to call clk_disable_unprepare() on a clock at the end of an
+> >> error path? Maybe you could add a devm_clk_get_prepare_enable() that
+> >> does what you want and then call clk_disable_unprepare on the exit path?
+> > You mean clk_disable_unprepare is called in the same function that calls
+> > clk_put I assume such that you don't have to do anything in the exit
+> > path.
+> >
+> 
+> Yes that's what I mean.
 
-I actually have been doing exactly the same thing.  I was not able to 
-provoke a failure in either the pre or post handler when having them 
-call to another kprobe'd (dummy) function.  However it does look to me 
-like it's reentering the exception handler firstly at the second 
-software breakpoint and then (shortly after returning from that) with a 
-single-step.   That's what you would expect but I *thought* neither of 
-those cases was allowed.  It does not call either the pre or post 
-handler in the dummy function.  I would expect this to be an issue for a 
-kretprobe pre handler too, although I've yet to test this.
+In terms of stopping people doing:
 
->>
->>>   As Dave
->>> mentioned the proposed trampoline patch avoids using a kprobe in the
->>> trampoline and directly calls the trampoline handler.  Attached is the
->>> current version of the patch which was able to run the systemtap testsuite.
->>>   Systemtap does exercise the kprobe/kretprobe infrastructure, but it would
->>> be good to have additional raw kprobe tests to check that kprobe reentry
->>> works as expected.
->>
->> Actually, Will's patch looks like the same thing what I did on x86,
->> as the kretprobe-booster. So I'm OK for that. But if the above problem
->> is not solved, we need to fix that, since kprobes can be used from
->> different sources.
->
-> The patch should look similar to the x86 code. The x86 code was used as a model.
->
-> -Will
->
+	clk = clk_get(...);
+	clk_prepare_enable(clk);
+	clk_put(clk);
+
+I think this is a good thing, because it ensures that people can't do
+this anymore.
+
+I think you need to audit the code properly first, and fix any instances
+of that _before_ posting patches with your idea - let's try to avoid as
+much as possible any breakage resulting from this.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
