@@ -1,92 +1,33 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Wed, 13 May 2015 18:19:41 +0200
-Subject: [PATCH 2/2] PCI: iproc: add bcma pcie driver
-In-Reply-To: <5553742E.7070204@broadcom.com>
-References: <1431465781-10753-1-git-send-email-hauke@hauke-m.de>
- <1431465781-10753-3-git-send-email-hauke@hauke-m.de>
- <CACna6rxVpJ-4b_5jG91JN62jQHh8u=QaLpO+_7J9mFr+_ScPaA@mail.gmail.com>
- <5553742E.7070204@broadcom.com>
-Message-ID: <CACna6rzT=218pQk9M6NJWH51wszn=p0LmHrizrvV9Xkn-=Om3Q@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 13 May 2015 17:21:27 +0100
+Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <5553784F.7040905@ti.com>
+References: <cover.1430394884.git.viresh.kumar@linaro.org>
+ <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
+ <554FFFA3.1060801@ti.com> <20150512051633.GB32300@linux>
+ <555224A2.7000308@ti.com> <20150513050559.GE28858@linux>
+ <55536719.5050208@ti.com> <20150513151652.GX2761@sirena.org.uk>
+ <5553784F.7040905@ti.com>
+Message-ID: <20150513162127.GA2761@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 May 2015 at 17:56, Ray Jui <rjui@broadcom.com> wrote:
-> On 5/12/2015 11:27 PM, Rafa? Mi?ecki wrote:
->> On 12 May 2015 at 23:23, Hauke Mehrtens <hauke@hauke-m.de> wrote:
->>> This driver adds support for the PCIe 2.0 controller found on the bcma
->>> bus. This controller can be found on (mostly) all Broadcom BCM470X /
->>> BCM5301X ARM SoCs.
->>>
->>> The driver found in the Broadcom SDK does some more stuff, like setting
->>> up some DMA memory areas, chaining MPS and MRRS to 512 and also some
->>> PHY changes like "improving" the PCIe jitter and doing some special
->>> initializations for the 3rd PCIe port.
->>>
->>> This was tested on a bcm4708 board with 2 PCIe ports and wireless cards
->>> connected to them.
->>>
->>> PCI_DOMAINS is needed by this driver, because normally there is more
->>> than one PCIe controller and without PCI_DOMAINS only the first
->>> controller gets registered.
->>> This controller gets 6 IRQs, the last one is trigged by all IRQ events.
->>>
->>> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
->>
->> Acked-by: Rafa? Mi?ecki <zajec5@gmail.com>
->>
->>
->>> +static int iproc_pcie_bcma_probe(struct bcma_device *bdev)
->>> +{
->>> +       struct iproc_pcie *pcie;
->>> +       LIST_HEAD(res);
->>> +       struct resource res_mem;
->>> +       int ret;
->>> +
->>> +       pcie = devm_kzalloc(&bdev->dev, sizeof(*pcie), GFP_KERNEL);
->>> +       if (!pcie)
->>> +               return -ENOMEM;
->>> +
->>> +       pcie->dev = &bdev->dev;
->>> +       bcma_set_drvdata(bdev, pcie);
->>> +
->>> +       pcie->base = bdev->io_addr;
->>> +
->>> +       res_mem.start = bdev->addr_s[0];
->>> +       res_mem.end = bdev->addr_s[0] + SZ_128M - 1;
->>> +       res_mem.name = "PCIe MEM space";
->>> +       res_mem.flags = IORESOURCE_MEM;
->>> +       pci_add_resource(&res, &res_mem);
->>> +
->>> +       pcie->resources = &res;
->>> +
->>> +       pcie->map_irq = iproc_pcie_bcma_map_irq;
->>> +
->>> +       ret = iproc_pcie_setup(pcie);
->>
->> I think I don't like this part of iproc design. It lefts
->> pcie->resources pointing to some random memory after the setup/probe
->> are done. Guess it should be a separated parameter or sth.
->>
->> The patch is still OK, I just refer to generic iproc possible issue.
->>
-> Sorry Rafal, but could you please be more specific on this?
+On Wed, May 13, 2015 at 11:14:07AM -0500, Nishanth Menon wrote:
 
-iproc_pcie_pltfm_probe (and iproc_pcie_bcma_probe) have local "res"
-variable (each its own). They do:
-pcie->resources = &res;
-and then they call
-iproc_pcie_setup(pcie);
+> To illustrate: What does it mean for a driver using regulator API?
+> Attempt X <-> (X+Y), if that fails (example PMIC SMPS max < X), try
+> (X-Y)<->(X)? If yes, then we do expect (X-Y)<->(X+Y) should be stable
+> for all operating conditions for the device, correct? If this is is
+> not stable at (X-Y), then we have a wrong specification for the device
+> for claiming X +/- Y is a valid range for the device.
 
-After iproc_pcie_pltfm_probe / iproc_pcie_bcma_probe returns, the
-pointer pcie->resources is not valid anymore, yet pcie struct is still
-in use. Of course pcie->resources isn't used anymore, but still, it's
-some in-struct pointer (to the random memory since local variable is
-not accessible anymore).
-
-I think you should drop
-struct list_head *resources;
-from the struct iproc_pcie and use
-iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *resources)
-
--- 
-Rafa?
+We have an explicit regulator API call for setting by tolerance which
+tries to get as close as possible to the target voltage (currently the
+implementation is very cheap and nasty but ideally it'll get improved).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150513/351d2a9e/attachment.sig>
