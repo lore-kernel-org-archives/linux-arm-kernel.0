@@ -1,62 +1,298 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 13 May 2015 09:24:57 -0500
-Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
-In-Reply-To: <20150513115422.GQ3066@sirena.org.uk>
-References: <20150507110233.GR15510@sirena.org.uk>
- <20150507211855.GA2455@codeaurora.org>
- <20150507221842.GW22845@sirena.org.uk>
- <CAKohpomU8wm0T=A7EkosdOjXbP8q2Cb726Hsjh08KTKYjoz3-A@mail.gmail.com>
- <555000B6.2010107@ti.com> <20150512052033.GC32300@linux>
- <20150512190134.16410.89041@quantum> <5552510B.9010306@ti.com>
- <20150512194134.GC3066@sirena.org.uk> <55525B29.2080307@ti.com>
- <20150513115422.GQ3066@sirena.org.uk>
-Message-ID: <CAGo_u6o5nw8C3uwLGmP+kbCOG5twmXgC2ATb5Gv-dL3G-grDSg@mail.gmail.com>
+From: mlangsdo@redhat.com (Mark Langsdorf)
+Date: Wed, 13 May 2015 09:32:54 -0500
+Subject: [PATCH v4 10/11] drivers: PL011: add support for the ARM SBSA
+ generic UART
+In-Reply-To: <1431440095-5146-11-git-send-email-andre.przywara@arm.com>
+References: <1431440095-5146-1-git-send-email-andre.przywara@arm.com>
+ <1431440095-5146-11-git-send-email-andre.przywara@arm.com>
+Message-ID: <55536096.4020008@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 13, 2015 at 6:54 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Tue, May 12, 2015 at 02:57:29PM -0500, Nishanth Menon wrote:
->> On 05/12/2015 02:41 PM, Mark Brown wrote:
->> > On Tue, May 12, 2015 at 02:14:19PM -0500, Nishanth Menon wrote:
+On 05/12/2015 09:14 AM, Andre Przywara wrote:
+> The ARM Server Base System Architecture[1] document describes a
+> generic UART which is a subset of the PL011 UART.
+> It lacks DMA support, baud rate control and modem status line
+> control, among other things.
+> The idea is to move the UART initialization and setup into the
+> firmware (which does this job today already) and let the kernel just
+> use the UART for sending and receiving characters.
 >
->> > specifying the currents involved.  For plausible applications these are
->> > likely to be ballpark figures rather than anything too accurate - if
->> > nothing else the instantaneous current draw normally varies very
->> > substantially so realistically you're talking about a maximum here.  If
->> > the corners vary that dramatically then I'd expect you'd see different
->> > OPP tables being used anyway.
+> We use the recent refactoring to build a new struct uart_ops
+> variable which points to some new functions avoiding access to the
+> missing registers. We reuse as much existing PL011 code as possible.
 >
->> OK - If we state "worst case", then it is quantifiable (if SoC vendors
->> would like to expose such information - I doubt mine ever will ;) ).
->> - We might be able to quantify it better by stating worst case(under
->> maximum load) steady state current (to avoid including transient
->> spikes which are never representative) at ambient temperature(25C).
+> In contrast to the PL011 the SBSA UART does not define any AMBA or
+> PrimeCell relations, so we go with a pretty generic probe function
+> which only uses platform device functions.
+> A DT binding is provided with this patch, ACPI support is added in a
+> separate one.
 >
-> Qualcomm do.  It kind of depends on the system how worst case it needs
-> to be - it'll depend on the expected performance of both the system and
-> potentially the regulator.  For some systems it may be important to have
-> some accounting for transients.  Equally systems would only need to be
-> as accurate as the underlying hardware was able to make use of.
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>   .../devicetree/bindings/serial/arm_sbsa_uart.txt   |  10 ++
+>   drivers/tty/serial/amba-pl011.c                    | 168 +++++++++++++++++++++
+>   2 files changed, 178 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+>
+> diff --git a/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt b/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+> new file mode 100644
+> index 0000000..4163e7e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+> @@ -0,0 +1,10 @@
+> +* ARM SBSA defined generic UART
+> +This UART uses a subset of the PL011 registers and consequently lives
+> +in the PL011 driver. It's baudrate and other communication parameters
+> +cannot be adjusted at runtime, so it lacks a clock specifier here.
+> +
+> +Required properties:
+> +- compatible: must be "arm,sbsa-uart"
+> +- reg: exactly one register range
+> +- interrupts: exactly one interrupt specifier
+> +- current-speed: the (fixed) baud rate set by the firmware
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index 70e2958..cca93d9 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -101,6 +101,14 @@ static struct vendor_data vendor_arm = {
+>   	.get_fifosize		= get_fifosize_arm,
+>   };
+>
+> +static struct vendor_data vendor_sbsa = {
+> +	.oversampling		= false,
+> +	.dma_threshold		= false,
+> +	.cts_event_workaround	= false,
+> +	.always_enabled		= true,
+> +	.fixed_options		= true,
+> +};
+> +
+>   static unsigned int get_fifosize_st(struct amba_device *dev)
+>   {
+>   	return 64;
+> @@ -1641,6 +1649,28 @@ static int pl011_startup(struct uart_port *port)
+>   	return retval;
+>   }
+>
+> +static int sbsa_uart_startup(struct uart_port *port)
+> +{
+> +	struct uart_amba_port *uap =
+> +		container_of(port, struct uart_amba_port, port);
+> +	int retval;
+> +
+> +	retval = pl011_hwinit(port);
+> +	if (retval)
+> +		return retval;
+> +
+> +	retval = pl011_allocate_irq(uap);
+> +	if (retval)
+> +		return retval;
+> +
+> +	/* The SBSA UART does not support any modem status lines. */
+> +	uap->old_status = 0;
+> +
+> +	pl011_enable_interrupts(uap);
+> +
+> +	return 0;
+> +}
+> +
+>   static void pl011_shutdown_channel(struct uart_amba_port *uap,
+>   					unsigned int lcrh)
+>   {
+> @@ -1721,6 +1751,19 @@ static void pl011_shutdown(struct uart_port *port)
+>   		uap->port.ops->flush_buffer(port);
+>   }
+>
+> +static void sbsa_uart_shutdown(struct uart_port *port)
+> +{
+> +	struct uart_amba_port *uap =
+> +		container_of(port, struct uart_amba_port, port);
+> +
+> +	pl011_disable_interrupts(uap);
+> +
+> +	free_irq(uap->port.irq, uap);
+> +
+> +	if (uap->port.ops->flush_buffer)
+> +		uap->port.ops->flush_buffer(port);
+> +}
+> +
+>   static void
+>   pl011_setup_status_masks(struct uart_port *port, struct ktermios *termios)
+>   {
+> @@ -1872,6 +1915,24 @@ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
+>   	spin_unlock_irqrestore(&port->lock, flags);
+>   }
+>
+> +static void
+> +sbsa_uart_set_termios(struct uart_port *port, struct ktermios *termios,
+> +		      struct ktermios *old)
+> +{
+> +	struct uart_amba_port *uap =
+> +	    container_of(port, struct uart_amba_port, port);
+> +	unsigned long flags;
+> +
+> +	if (old)
+> +		tty_termios_copy_hw(termios, old);
 
-True, some parts of the system like choice in regulator sizing has to account
-for transients.
+This code prevented login via the serial console on our test hardware.
 
-How about rephrasing as following:
+Mark Salter suggested the following patch:
 
-- opp-microamp: The maximum current drawn by the device in microamperes
-  considering system specific parameters (such as transients, process,
-aging, etc.)
-  as necessary,  at an  ambient temperature of 25C. This may be used to set
-  the most efficient regulator operating mode.
+-       if (old)
++       /*
++        * The first call to set_termios() comes when the console is
++        * registered via uart_add_one_port(). The serial core will
++        * pass in a dummy old termios rather than NULL. Check to make
++        * sure the old termios has reasonable info before copying from
++        * it.
++        */
++       if (old && old->c_cflag)
+                 tty_termios_copy_hw(termios, old);
 
-  Valid only if opp-microvolt is set for the OPP.
+which fixed the issue.
 
-  Entries for multiple regulators must be present in the same order as
-  regulators are specified in device's DT node. If this property isn't required
-  for few regulators, then this should be marked as zero for them. If it isn't
-  required for any regulator, then this property need not be present.
+> +	tty_termios_encode_baud_rate(termios, uap->fixed_baud, uap->fixed_baud);
+> +
+> +	spin_lock_irqsave(&port->lock, flags);
+> +	uart_update_timeout(port, CS8, uap->fixed_baud);
+> +	pl011_setup_status_masks(port, termios);
+> +	spin_unlock_irqrestore(&port->lock, flags);
+> +}
+> +
+>   static const char *pl011_type(struct uart_port *port)
+>   {
+>   	struct uart_amba_port *uap =
+> @@ -1947,6 +2008,37 @@ static struct uart_ops amba_pl011_pops = {
+>   #endif
+>   };
+>
+> +static void sbsa_uart_set_mctrl(struct uart_port *port, unsigned int mctrl)
+> +{
+> +}
+> +
+> +static unsigned int sbsa_uart_get_mctrl(struct uart_port *port)
+> +{
+> +	return 0;
+> +}
+> +
+> +static const struct uart_ops sbsa_uart_pops = {
+> +	.tx_empty	= pl011_tx_empty,
+> +	.set_mctrl	= sbsa_uart_set_mctrl,
+> +	.get_mctrl	= sbsa_uart_get_mctrl,
+> +	.stop_tx	= pl011_stop_tx,
+> +	.start_tx	= pl011_start_tx,
+> +	.stop_rx	= pl011_stop_rx,
+> +	.startup	= sbsa_uart_startup,
+> +	.shutdown	= sbsa_uart_shutdown,
+> +	.set_termios	= sbsa_uart_set_termios,
+> +	.type		= pl011_type,
+> +	.release_port	= pl011_release_port,
+> +	.request_port	= pl011_request_port,
+> +	.config_port	= pl011_config_port,
+> +	.verify_port	= pl011_verify_port,
+> +#ifdef CONFIG_CONSOLE_POLL
+> +	.poll_init     = pl011_hwinit,
+> +	.poll_get_char = pl011_get_poll_char,
+> +	.poll_put_char = pl011_put_poll_char,
+> +#endif
+> +};
+> +
+>   static struct uart_amba_port *amba_ports[UART_NR];
+>
+>   #ifdef CONFIG_SERIAL_AMBA_PL011_CONSOLE
+> @@ -2327,6 +2419,79 @@ static int pl011_resume(struct device *dev)
+>
+>   static SIMPLE_DEV_PM_OPS(pl011_dev_pm_ops, pl011_suspend, pl011_resume);
+>
+> +static int sbsa_uart_probe(struct platform_device *pdev)
+> +{
+> +	struct uart_amba_port *uap;
+> +	struct resource *r;
+> +	int portnr, ret;
+> +	int baudrate;
+> +
+> +	/*
+> +	 * Check the mandatory baud rate parameter in the DT node early
+> +	 * so that we can easily exit with the error.
+> +	 */
+> +	if (pdev->dev.of_node) {
+> +		struct device_node *np = pdev->dev.of_node;
+> +
+> +		ret = of_property_read_u32(np, "current-speed", &baudrate);
+> +		if (ret)
+> +			return ret;
+> +	} else {
+> +		baudrate = 115200;
+> +	}
+> +
+> +	portnr = pl011_find_free_port();
+> +	if (portnr < 0)
+> +		return portnr;
+> +
+> +	uap = devm_kzalloc(&pdev->dev, sizeof(struct uart_amba_port),
+> +			   GFP_KERNEL);
+> +	if (uap == NULL)
+> +		return -ENOMEM;
+> +
+> +	uap->vendor	= &vendor_sbsa;
+> +	uap->fifosize	= 32;
+> +	uap->port.irq	= platform_get_irq(pdev, 0);
+> +	uap->port.ops	= &sbsa_uart_pops;
+> +	uap->fixed_baud = baudrate;
+> +
+> +	snprintf(uap->type, sizeof(uap->type), "SBSA");
+> +
+> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +
+> +	ret = pl011_setup_port(&pdev->dev, uap, r, portnr);
+> +	if (ret)
+> +		return ret;
+> +
+> +	platform_set_drvdata(pdev, uap);
+> +
+> +	return pl011_register_port(uap);
+> +}
+> +
+> +static int sbsa_uart_remove(struct platform_device *pdev)
+> +{
+> +	struct uart_amba_port *uap = platform_get_drvdata(pdev);
+> +
+> +	uart_remove_one_port(&amba_reg, &uap->port);
+> +	pl011_unregister_port(uap);
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id sbsa_uart_of_match[] = {
+> +	{ .compatible = "arm,sbsa-uart", },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, sbsa_uart_of_match);
+> +
+> +static struct platform_driver arm_sbsa_uart_platform_driver = {
+> +	.probe		= sbsa_uart_probe,
+> +	.remove		= sbsa_uart_remove,
+> +	.driver	= {
+> +		.name	= "sbsa-uart",
+> +		.of_match_table = of_match_ptr(sbsa_uart_of_match),
+> +	},
+> +};
+> +
+>   static struct amba_id pl011_ids[] = {
+>   	{
+>   		.id	= 0x00041011,
+> @@ -2357,11 +2522,14 @@ static int __init pl011_init(void)
+>   {
+>   	printk(KERN_INFO "Serial: AMBA PL011 UART driver\n");
+>
+> +	if (platform_driver_register(&arm_sbsa_uart_platform_driver))
+> +		pr_warn("could not register SBSA UART platform driver\n");
+>   	return amba_driver_register(&pl011_driver);
+>   }
+>
+>   static void __exit pl011_exit(void)
+>   {
+> +	platform_driver_unregister(&arm_sbsa_uart_platform_driver);
+>   	amba_driver_unregister(&pl011_driver);
+>   }
 
-
----
-Regards,
-Nishanth Menon
+--Mark Langsdorf
