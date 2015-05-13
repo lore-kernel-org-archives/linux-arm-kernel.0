@@ -1,57 +1,112 @@
-From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Wed, 13 May 2015 09:12:49 -0500
-Subject: [GIT PULL] SoCFPGA updates for v4.2, version 2
-In-Reply-To: <1431526369-1388-1-git-send-email-dinguyen@opensource.altera.com>
-References: <1431526369-1388-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <1431526369-1388-2-git-send-email-dinguyen@opensource.altera.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 13 May 2015 15:22:55 +0100
+Subject: [PATCH 06/12] arm64: psci: account for Trusted OS instances
+In-Reply-To: <1431085004-32743-7-git-send-email-mark.rutland@arm.com>
+References: <1431085004-32743-1-git-send-email-mark.rutland@arm.com>
+ <1431085004-32743-7-git-send-email-mark.rutland@arm.com>
+Message-ID: <20150513142255.GB11331@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin and Olof,
+On Fri, May 08, 2015 at 12:36:38PM +0100, Mark Rutland wrote:
+> Software resident in the secure world (a "Trusted OS") may cause CPU_OFF
+> calls for the CPU it is resident on to be denied. Such a denial would be
+> fatal for the kernel, and so we must detect when this can happen before
+> the point of no return.
+> 
+> This patch implements Trusted OS detection for PSCI 0.2+ systems, using
+> MIGRATE_INFO_TYPE and MIGRATE_INFO_UP_CPU. When a trusted OS is detected
+> as resident on a particular CPU, attempts to hot unplug that CPU will be
+> denied early, before they can prove fatal.
+> 
+> Trusted OS migration is not implemented by this patch. Implementation of
+> migratable UP trusted OSs seems unlikely, and the right policy for
+> migration is unclear (and will likely differ across implementations). As
+> such, it is likely that migration will require cooperation with Trusted
+> OS drivers.
+> 
+> PSCI implementations prior to 0.1 do not provide the facility to detect
+> the presence of a Trusted OS, nor the CPU any such OS is resident on, so
+> without additional information it is not possible to handle Trusted OSs
+> with PSCI 0.1.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/kernel/psci.c | 61 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 61 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+> index 7324db9..25e2610 100644
+> --- a/arch/arm64/kernel/psci.c
+> +++ b/arch/arm64/kernel/psci.c
+> @@ -43,6 +43,19 @@ struct psci_power_state {
+>  	u8	affinity_level;
+>  };
+>  
+> +/*
+> + * The CPU any Trusted OS is resident on. The trusted OS may reject CPU_OFF
+> + * calls to its resident CPU, so we must avoid issuing those. We never migrate
+> + * a Trusted OS even if it claims to be capable of migration -- doing so will
+> + * require cooperation with a Trusted OS driver.
+> + */
+> +static int resident_cpu = -1;
+> +
+> +static bool psci_tos_resident_on(int cpu)
+> +{
+> +	return cpu == resident_cpu;
+> +}
+> +
+>  struct psci_operations {
+>  	int (*cpu_suspend)(struct psci_power_state state,
+>  			   unsigned long entry_point);
+> @@ -52,6 +65,7 @@ struct psci_operations {
+>  	int (*affinity_info)(unsigned long target_affinity,
+>  			unsigned long lowest_affinity_level);
+>  	int (*migrate_info_type)(void);
+> +	unsigned long (*migrate_info_up_cpu)(void);
 
-Please consider pulling in these patches for v4.2. This is version 2 that
-includes the patch to use of_iomap of the A9 SCU.
+Do we really need to keep a pointer in the ops for this function ? I think
+we can just call it once for all at boot and be done with that.
 
-Thanks,
-Dinh
+Actually the same comment applies to migrate_info_type.
 
-The following changes since commit 5ebe6afaf0057ac3eaeb98defd5456894b446d22:
+>  };
+>  
+>  static struct psci_operations psci_ops;
+> @@ -172,6 +186,11 @@ static int psci_migrate_info_type(void)
+>  	return invoke_psci_fn(PSCI_0_2_FN_MIGRATE_INFO_TYPE, 0, 0, 0);
+>  }
+>  
+> +static unsigned long psci_migrate_info_up_cpu(void)
+> +{
+> +	return invoke_psci_fn(PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU, 0, 0, 0);
+> +}
 
-  Linux 4.1-rc2 (2015-05-03 19:22:23 -0700)
+See above, why can't we just invoke the function at probe time (we do
+not support migration hence I do not see why we want to keep the
+function after boot, it will never be called IIUC) ?
 
-are available in the git repository at:
+>  static int __maybe_unused cpu_psci_cpu_init_idle(struct device_node *cpu_node,
+>  						 unsigned int cpu)
+>  {
+> @@ -261,6 +280,40 @@ static void psci_sys_poweroff(void)
+>  	invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
+>  }
+>  
+> +/*
+> + * Detect the presence of a resident Trusted OS which may cause CPU_OFF to
+> + * return DENIED (which would be fatal).
+> + */
+> +static void __init psci_init_migrate(void)
+> +{
+> +	unsigned long cpuid;
+> +	int type, cpu = -1;
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_updates_for_v4.2
+Nit: cpu variable initialization is useless.
 
-for you to fetch changes up to 122694a0c71281cf2b349af41309c3caf5f31d61:
+Apart from these minor comments patch is fine.
 
-  ARM: socfpga: use of_iomap to map the SCU (2015-05-13 08:41:35 -0500)
-
-----------------------------------------------------------------
-SoCFPGA updates for v4.2
-- Add big endian support
-- Add earlyprintk support on UART1 that is used on Arria10
-- Remove the need to map uart_io_desc
-- Use of_iomap to map the SCU
-- Remove socfpga_smp_init_cpus as arm_dt_init_cpu_maps is already doing
-  the CPU mapping.
-
-----------------------------------------------------------------
-Ben Dooks (3):
-      ARM: debug: fix big endian operation for 8250 word mode
-      ARM: socfpga: enable big endian for secondary core(s)
-      ARM: socfpga: support big endian for socfpga
-
-Dinh Nguyen (3):
-      ARM: socfpga: Add support for UART1 debug uart for earlyprintk
-      ARM: socfpga: remove the need to map uart_io_desc
-      ARM: socfpga: use of_iomap to map the SCU
-
- arch/arm/Kconfig.debug          | 26 +++++++++++++++++++-------
- arch/arm/include/debug/8250.S   |  3 +++
- arch/arm/mach-socfpga/Kconfig   |  1 +
- arch/arm/mach-socfpga/core.h    |  1 -
- arch/arm/mach-socfpga/headsmp.S |  5 ++++-
- arch/arm/mach-socfpga/platsmp.c | 33 ++++++++++-----------------------
- arch/arm/mach-socfpga/socfpga.c | 34 ----------------------------------
- 7 files changed, 37 insertions(+), 66 deletions(-)
+Lorenzo
