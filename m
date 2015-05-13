@@ -1,30 +1,80 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 13 May 2015 16:32:46 +0100
-Subject: [PATCH] RFC: mmc: core: Increase delay for voltage to stabilize
- from 3.3V to 1.8V
-In-Reply-To: <CAPDyKFpkLhC7k+HNCYV_U7M6B615o4RgFktJ1wCXd_SxT0xiQg@mail.gmail.com>
-References: <1431467171-12937-1-git-send-email-dianders@chromium.org>
- <20150513110915.GG3066@sirena.org.uk>
- <CAPDyKFpkLhC7k+HNCYV_U7M6B615o4RgFktJ1wCXd_SxT0xiQg@mail.gmail.com>
-Message-ID: <20150513153246.GY2761@sirena.org.uk>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Wed, 13 May 2015 17:35:44 +0200
+Subject: [PATCH 2/2] misc: Add initial Digital Timing Engine (DTE) driver
+ for cygnus
+In-Reply-To: <554D1649.2030106@broadcom.com>
+References: <1429744923-2007-1-git-send-email-jonathar@broadcom.com>
+ <5543CD73.2030902@broadcom.com>
+ <20150501203004.3add2c95@lxorguk.ukuu.org.uk>
+ <9193036.7UYD2OGJHk@wuerfel> <554D1649.2030106@broadcom.com>
+Message-ID: <20150513153544.GC2065@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 13, 2015 at 03:06:47PM +0200, Ulf Hansson wrote:
-> On 13 May 2015 at 13:09, Mark Brown <broonie@kernel.org> wrote:
+On Fri, May 08, 2015 at 01:02:17PM -0700, Jonathan Richardson wrote:
+> For the clock functions I think we can use the existing framework
+> unchanged with one exception: ptp_clock_adjtime() doesn't allow negative
+> time adjustments and we would like to allow this.
 
-> > Right, and this is probably going beyond the delays that the regulator
-> > API is handling since it's not something the regulator hardware is
-> > actively managing.
+???
 
-> Thanks for elaborating from the regulator perspective. So may I apply
-> your ack for this one?
+/**
+ * struct ptp_clock_info - decribes a PTP hardware clock
+   ...
 
-I guess, yes.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150513/4d48f715/attachment.sig>
+ * @adjtime:  Shifts the time of the hardware clock.
+ *            parameter delta: Desired change in nanoseconds.
+   ...
+
+	int (*adjtime)(struct ptp_clock_info *ptp, s64 delta);
+
+That s64 is 's' as in "signed".
+ 
+> IRQ interval: I mentioned before that we may be able to calculate the
+> isochronous interrupt rate automatically but this isn't possible because
+> the DTE doesn't know the frequency of the clients. One solution is to
+> use the 'PTP_PEROUT_REQUEST' ioctl to set a periodic timer frequency.
+> Not really a timer but good enough for our purposes.
+
+As I said in my other reply, I don't understand what the problem is.
+ 
+> Set divider: There is no ability to set a frequency or do anything to a
+> channel. We could re-use the PTP_EXTTS_REQUEST ioctl but extend 'struct
+> ptp_extts_request' by using the reserved field rsv to allow setting an
+> integer value representing either a frequency or divider value in our
+> case - some value to configure a channel. A new flag would have to be
+> added to the existing PTP_ENABLE_FEATURE, RISING and FALLING EDGE.
+
+I don't get this, either.
+ 
+> Get timestamp: This is a bit more complicated. Currently the PTP driver
+> does list management for timestamps from external timestamp channels.
+> Timestamps from all channels go into the same list. In our driver we
+> have a s/w FIFO for each client and it closely matches the h/w FIFO and
+> handles any overflow. We would like to keep it this way because it also
+> allows multiple user space processes to only fetch timestamps for the
+> client it's handling. 
+
+But having many readers is less efficient and more complex.
+
+Also, we can adjust the buffer if needed to prevent HW FIFO overflows.
+
+> We could add a new ioctl to get a timestamp from
+> the driver instead of doing it through ptp_read() but it would be nice
+> if we could let ptp_read() allow the driver to do timestamp management
+> instead of PTP. Maybe provide an option to obtain the timestamps from a
+> container in the driver instead of the one managed by PTP. I like being
+> able to use read/poll to obtain data instead of polling the kernel with
+> ioctls as we are currently doing.
+
+The PTP interface supports poll/read just fine already.
+
+> Also, avoiding the kmalloc in ptp_read
+> would be nice because this of the frequency it would be called at. Do
+> you have any preference on how to handle this?
+
+Originally I had the buffer on the stack, but DaveM didn't like it,
+saying performance is no excuse for not doing it "the right way".
+
+Thanks,
+Richard
