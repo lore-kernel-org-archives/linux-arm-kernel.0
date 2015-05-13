@@ -1,68 +1,60 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 13 May 2015 10:52:40 +0200
-Subject: [PATCH 12/15] thermal: of: implement .set_trips for device tree
- thermal zones
+Date: Wed, 13 May 2015 10:52:41 +0200
+Subject: [PATCH 13/15] dt-bindings: thermal: Add binding document for Mediatek
+ thermal controller
 In-Reply-To: <1431507163-19933-1-git-send-email-s.hauer@pengutronix.de>
 References: <1431507163-19933-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1431507163-19933-13-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1431507163-19933-14-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/thermal/of-thermal.c | 12 ++++++++++++
- include/linux/thermal.h      |  3 +++
- 2 files changed, 15 insertions(+)
+ .../bindings/thermal/mediatek-thermal.txt          | 36 ++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
 
-diff --git a/drivers/thermal/of-thermal.c b/drivers/thermal/of-thermal.c
-index bd3185e..f8dd847 100644
---- a/drivers/thermal/of-thermal.c
-+++ b/drivers/thermal/of-thermal.c
-@@ -97,6 +97,17 @@ static int of_thermal_get_temp(struct thermal_zone_device *tz,
- 	return data->ops->get_temp(data->sensor_data, temp);
- }
- 
-+static int of_thermal_set_trips(struct thermal_zone_device *tz,
-+			       int low, int high)
-+{
-+	struct __thermal_zone *data = tz->devdata;
+diff --git a/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+new file mode 100644
+index 0000000..adf5d2c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+@@ -0,0 +1,36 @@
++* Mediatek Thermal
 +
-+	if (!data->ops || !data->ops->set_trips)
-+		return -ENOSYS;
++This describes the device tree binding for the Mediatek thermal controller
++which measures the on-SoC temperatures. This device does not have its own ADC,
++instead it directly controls the AUXADC via AHB bus accesses. For this reason
++this device needs phandles to the AUXADC.
 +
-+	return data->ops->set_trips(data->sensor_data, low, high);
-+}
++Required properties:
++- compatible: "mediatek,mt8173-thermal"
++- reg: Address range of the thermal controller
++- interrupts: IRQ for the thermal controller
++- clocks, clock-names: Clocks needed for the thermal controller. required
++                       clocks are:
++		"therm":	Main clock needed for register access
++		"auxadc":	The AUXADC clock
++- resets, reset-names: Reference to the reset controller controlling the thermal
++                       controller. Required reset-names:
++		"therm":	The main reset line
++- auxadc: A phandle to the AUXADC which the thermal controller uses
++- apmixedsys: A phandle to the APMIXEDSYS controller.
++- #thermal-sensor-cells : Should be 1. See ./thermal.txt for a description
 +
- /**
-  * of_thermal_get_ntrips - function to export number of available trip
-  *			   points.
-@@ -367,6 +378,7 @@ static int of_thermal_get_crit_temp(struct thermal_zone_device *tz,
- 
- static const struct thermal_zone_device_ops of_thermal_ops = {
- 	.get_temp = of_thermal_get_temp,
-+	.set_trips = of_thermal_set_trips,
- 	.get_trend = of_thermal_get_trend,
- 	.set_emul_temp = of_thermal_set_emul_temp,
- 
-diff --git a/include/linux/thermal.h b/include/linux/thermal.h
-index aef6e13..b751f6b 100644
---- a/include/linux/thermal.h
-+++ b/include/linux/thermal.h
-@@ -267,12 +267,15 @@ struct thermal_genl_event {
-  *
-  * Optional:
-  * @get_trend: a pointer to a function that reads the sensor temperature trend.
-+ * @set_trips: a pointer to a function that sets a temperature window which shall
-+ *             trigger an interrupt when it is left.
-  * @set_emul_temp: a pointer to a function that sets sensor emulated
-  *		   temperature.
-  */
- struct thermal_zone_of_device_ops {
- 	int (*get_temp)(void *, int *);
- 	int (*get_trend)(void *, int, enum thermal_trend *);
-+	int (*set_trips)(void *, int, int);
- 	int (*set_emul_temp)(void *, int);
- };
- 
++Example:
++
++	thermal: thermal at 1100b000 {
++		#thermal-sensor-cells = <1>;
++		compatible = "mediatek,mt8173-thermal";
++		reg = <0 0x1100b000 0 0x1000>;
++		interrupts = <0 70 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&pericfg CLK_PERI_THERM>, <&pericfg CLK_PERI_AUXADC>;
++		clock-names = "therm", "auxadc";
++		resets = <&pericfg MT8173_PERI_THERM_SW_RST>;
++		reset-names = "therm";
++		auxadc = <&auxadc>;
++		apmixedsys = <&apmixedsys>;
++	};
 -- 
 2.1.4
