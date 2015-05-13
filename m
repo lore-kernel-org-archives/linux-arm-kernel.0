@@ -1,132 +1,55 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 13 May 2015 10:52:37 +0200
-Subject: [PATCH 09/15] thermal: of: always set sensor related callbacks
+Date: Wed, 13 May 2015 10:52:34 +0200
+Subject: [PATCH 06/15] thermal: inline only once used function
 In-Reply-To: <1431507163-19933-1-git-send-email-s.hauer@pengutronix.de>
 References: <1431507163-19933-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1431507163-19933-10-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1431507163-19933-7-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the thermal core treats -ENOSYS like the callbacks were
-not present at all we no longer have to overwrite the ops during
-runtime but instead can always set them and return -ENOSYS if no
-sensor is registered.
+Inline update_temperature into its only caller to make the code
+more readable.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/thermal/of-thermal.c | 33 +++++++++++++--------------------
- 1 file changed, 13 insertions(+), 20 deletions(-)
+ drivers/thermal/thermal_core.c | 17 +++++------------
+ 1 file changed, 5 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/thermal/of-thermal.c b/drivers/thermal/of-thermal.c
-index c84404d..b9c35bd 100644
---- a/drivers/thermal/of-thermal.c
-+++ b/drivers/thermal/of-thermal.c
-@@ -91,7 +91,7 @@ static int of_thermal_get_temp(struct thermal_zone_device *tz,
- {
- 	struct __thermal_zone *data = tz->devdata;
- 
--	if (!data->ops->get_temp)
-+	if (!data->ops)
- 		return -EINVAL;
- 
- 	return data->ops->get_temp(data->sensor_data, temp);
-@@ -178,7 +178,7 @@ static int of_thermal_set_emul_temp(struct thermal_zone_device *tz,
- 	struct __thermal_zone *data = tz->devdata;
- 
- 	if (!data->ops || !data->ops->set_emul_temp)
--		return -EINVAL;
-+		return -ENOSYS;
- 
- 	return data->ops->set_emul_temp(data->sensor_data, temp);
+diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
+index e204deb..19da022 100644
+--- a/drivers/thermal/thermal_core.c
++++ b/drivers/thermal/thermal_core.c
+@@ -450,9 +450,12 @@ exit:
  }
-@@ -189,8 +189,8 @@ static int of_thermal_get_trend(struct thermal_zone_device *tz, int trip,
- 	struct __thermal_zone *data = tz->devdata;
- 	int r;
+ EXPORT_SYMBOL_GPL(thermal_zone_get_temp);
  
--	if (!data->ops->get_trend)
--		return -EINVAL;
-+	if (!data->ops || !data->ops->get_trend)
-+		return -ENOSYS;
- 
- 	r = data->ops->get_trend(data->sensor_data, trip, trend);
- 	if (r)
-@@ -366,6 +366,10 @@ static int of_thermal_get_crit_temp(struct thermal_zone_device *tz,
- }
- 
- static struct thermal_zone_device_ops of_thermal_ops = {
-+	.get_temp = of_thermal_get_temp,
-+	.get_trend = of_thermal_get_trend,
-+	.set_emul_temp = of_thermal_set_emul_temp,
-+
- 	.get_mode = of_thermal_get_mode,
- 	.set_mode = of_thermal_set_mode,
- 
-@@ -399,13 +403,13 @@ thermal_zone_of_add_sensor(struct device_node *zone,
- 	if (!ops)
- 		return ERR_PTR(-EINVAL);
- 
-+	if (!ops->get_temp)
-+		return ERR_PTR(-EINVAL);
-+
- 	mutex_lock(&tzd->lock);
- 	tz->ops = ops;
- 	tz->sensor_data = data;
- 
--	tzd->ops->get_temp = of_thermal_get_temp;
--	tzd->ops->get_trend = of_thermal_get_trend;
--	tzd->ops->set_emul_temp = of_thermal_set_emul_temp;
- 	mutex_unlock(&tzd->lock);
- 
- 	return tzd;
-@@ -535,9 +539,6 @@ void thermal_zone_of_sensor_unregister(struct device *dev,
- 		return;
- 
- 	mutex_lock(&tzd->lock);
--	tzd->ops->get_temp = NULL;
--	tzd->ops->get_trend = NULL;
--	tzd->ops->set_emul_temp = NULL;
- 
- 	tz->ops = NULL;
- 	tz->sensor_data = NULL;
-@@ -845,7 +846,6 @@ int __init of_parse_thermal_zones(void)
+-static void update_temperature(struct thermal_zone_device *tz)
++void thermal_zone_device_update(struct thermal_zone_device *tz)
  {
- 	struct device_node *np, *child;
- 	struct __thermal_zone *tz;
--	struct thermal_zone_device_ops *ops;
+-	int temp, ret;
++	int temp, ret, count;
++
++	if (!tz->ops->get_temp)
++		return;
  
- 	np = of_find_node_by_name(NULL, "thermal-zones");
- 	if (!np) {
-@@ -869,29 +869,22 @@ int __init of_parse_thermal_zones(void)
- 			continue;
- 		}
- 
--		ops = kmemdup(&of_thermal_ops, sizeof(*ops), GFP_KERNEL);
--		if (!ops)
--			goto exit_free;
+ 	ret = thermal_zone_get_temp(tz, &temp);
+ 	if (ret) {
+@@ -471,16 +474,6 @@ static void update_temperature(struct thermal_zone_device *tz)
+ 	trace_thermal_temperature(tz);
+ 	dev_dbg(&tz->device, "last_temperature=%d, current_temperature=%d\n",
+ 				tz->last_temperature, tz->temperature);
+-}
 -
- 		tzp = kzalloc(sizeof(*tzp), GFP_KERNEL);
--		if (!tzp) {
--			kfree(ops);
-+		if (!tzp)
- 			goto exit_free;
--		}
+-void thermal_zone_device_update(struct thermal_zone_device *tz)
+-{
+-	int count;
+-
+-	if (!tz->ops->get_temp)
+-		return;
+-
+-	update_temperature(tz);
  
- 		/* No hwmon because there might be hwmon drivers registering */
- 		tzp->no_hwmon = true;
- 
- 		zone = thermal_zone_device_register(child->name, tz->ntrips,
- 						    0, tz,
--						    ops, tzp,
-+						    &of_thermal_ops, tzp,
- 						    tz->passive_delay,
- 						    tz->polling_delay);
- 		if (IS_ERR(zone)) {
- 			pr_err("Failed to build %s zone %ld\n", child->name,
- 			       PTR_ERR(zone));
- 			kfree(tzp);
--			kfree(ops);
- 			of_thermal_free_zone(tz);
- 			/* attempting to build remaining zones still */
- 		}
+ 	for (count = 0; count < tz->trips; count++)
+ 		handle_thermal_trip(tz, count);
 -- 
 2.1.4
