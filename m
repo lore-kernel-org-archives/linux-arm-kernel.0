@@ -1,171 +1,58 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 13 May 2015 10:34:20 -0600
-Subject: [PATCH v4 12/13] coresight-etm4x: Read only access to the main
- management registers
-In-Reply-To: <1431534861-24986-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1431534861-24986-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1431534861-24986-13-git-send-email-mathieu.poirier@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 13 May 2015 18:37:46 +0200
+Subject: [PATCH v8 14/16] ARM: dts: Introduce STM32F429 MCU
+In-Reply-To: <CALszF6DHazhN6+hGShyrmqtMrPod0hdb8mHAwK-GWfRxXzy7wQ@mail.gmail.com>
+References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <11310179.epfRucfQKB@wuerfel>
+ <CALszF6DHazhN6+hGShyrmqtMrPod0hdb8mHAwK-GWfRxXzy7wQ@mail.gmail.com>
+Message-ID: <2282066.NWoIT9ZyLc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Having access to the ETMv4 management registers is very useful as they
-give meaningful information on how the IP block has been configured at
-synthesis time.
+On Wednesday 13 May 2015 18:29:05 Maxime Coquelin wrote:
+> 2015-05-13 17:28 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
+> > On Wednesday 13 May 2015 16:20:34 Daniel Thompson wrote:
+> >>
+> >> That would suit me very well (although is the 0x20/0x40 not the 8 that
+> >> we would need in the middle column).
+> >
+> > We don't normally use register offsets in DT. The number 8 here instead
+> > would indicate block 8, where each block is four bytes wide. Using the
+> > same index here for reset and clock would also help readability.
+> 
+> My view is that it makes the bindings usage very complex.
+> Also, it implies we have a specific compatible for stm32f429, whereas
+> we didn't need with my earlier proposals.
+> Indeed, the reset driver will need to know the offset of every reset
+> registers, because:
+>   1. The AHB registers start at RCC offset 0x10 (up to 0x18)
+>   2. The APB registers start at RCC offset 0x20 (up to 0x24).
+> We have a gap between AHB and APB registers, so how do we map the
+> index for the block you propose?
+> Should the gap be considered as a block, or we should skip it?
+>
+> I'm afraid it will not be straightforward for a reset user to
+> understand how to use this bindings.
+> 
+> Either my v7 or v8 versions would have made possible to use a single
+> compatible for STM32 series.
+> If we stick with one of these, we could even think to have a "generic"
+> reset driver, as it could be compatible with sunxi driver bindings.
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- .../ABI/testing/sysfs-bus-coresight-devices-etm4x  | 77 ++++++++++++++++++++++
- drivers/hwtracing/coresight/coresight-etm4x.c      | 53 ++++++++++++++-
- 2 files changed, 129 insertions(+), 1 deletion(-)
+We should definitely try to use the same compatible string for all of
+them, and make a binding that is easy to use.
 
-diff --git a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
-index 648f28ded226..bde788dfd3f7 100644
---- a/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
-+++ b/Documentation/ABI/testing/sysfs-bus-coresight-devices-etm4x
-@@ -281,3 +281,80 @@ KernelVersion:	4.01
- Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
- Description:	(RW) Mask for all 8 virtual machine ID comparator value
- 		registers (if implemented).
-+
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/mgmt/trcoslsr
-+Date:		April 2015
-+KernelVersion:	4.01
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(R) Print the content of the OS Lock Status Register (0x304).
-+		The value it taken directly  from the HW.
-+
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/mgmt/trcpdcr
-+Date:		April 2015
-+KernelVersion:	4.01
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(R) Print the content of the Power Down Control Register
-+		(0x310).  The value is taken directly from the HW.
-+
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/mgmt/trcpdsr
-+Date:		April 2015
-+KernelVersion:	4.01
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(R) Print the content of the Power Down Status Register
-+		(0x314).  The value is taken directly from the HW.
-+
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/mgmt/trclsr
-+Date:		April 2015
-+KernelVersion:	4.01
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(R) Print the content of the SW Lock Status Register
-+		(0xFB4).  The value is taken directly from the HW.
-+
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/mgmt/trcauthstatus
-+Date:		April 2015
-+KernelVersion:	4.01
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(R) Print the content of the Authentication Status Register
-+		(0xFB8).  The value is taken directly from the HW.
-+
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/mgmt/trcdevid
-+Date:		April 2015
-+KernelVersion:	4.01
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(R) Print the content of the Device ID Register
-+		(0xFC8).  The value is taken directly from the HW.
-+
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/mgmt/trcdevtype
-+Date:		April 2015
-+KernelVersion:	4.01
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(R) Print the content of the Device Type Register
-+		(0xFCC).  The value is taken directly from the HW.
-+
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/mgmt/trcpidr0
-+Date:		April 2015
-+KernelVersion:	4.01
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(R) Print the content of the Peripheral ID0 Register
-+		(0xFE0).  The value is taken directly from the HW.
-+
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/mgmt/trcpidr1
-+Date:		April 2015
-+KernelVersion:	4.01
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(R) Print the content of the Peripheral ID1 Register
-+		(0xFE4).  The value is taken directly from the HW.
-+
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/mgmt/trcpidr2
-+Date:		April 2015
-+KernelVersion:	4.01
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(R) Print the content of the Peripheral ID2 Register
-+		(0xFE8).  The value is taken directly from the HW.
-+
-+What:		/sys/bus/coresight/devices/<memory_map>.etm/mgmt/trcpidr3
-+Date:		April 2015
-+KernelVersion:	4.01
-+Contact:	Mathieu Poirier <mathieu.poirier@linaro.org>
-+Description:	(R) Print the content of the Peripheral ID3 Register
-+		(0xFEC).  The value is taken directly from the HW.
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index 02ee6fc97ddf..0568e4413411 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -2200,7 +2200,58 @@ static struct attribute *coresight_etmv4_attrs[] = {
- 	&dev_attr_cpu.attr,
- 	NULL,
- };
--ATTRIBUTE_GROUPS(coresight_etmv4);
-+
-+#define coresight_simple_func(name, offset)				\
-+static ssize_t name##_show(struct device *_dev,				\
-+			   struct device_attribute *attr, char *buf)	\
-+{									\
-+	struct etmv4_drvdata *drvdata = dev_get_drvdata(_dev->parent);	\
-+	return scnprintf(buf, PAGE_SIZE, "0x%x\n",			\
-+			 readl_relaxed(drvdata->base + offset));	\
-+}									\
-+DEVICE_ATTR_RO(name)
-+
-+coresight_simple_func(trcoslsr, TRCOSLSR);
-+coresight_simple_func(trcpdcr, TRCPDCR);
-+coresight_simple_func(trcpdsr, TRCPDSR);
-+coresight_simple_func(trclsr, TRCLSR);
-+coresight_simple_func(trcauthstatus, TRCAUTHSTATUS);
-+coresight_simple_func(trcdevid, TRCDEVID);
-+coresight_simple_func(trcdevtype, TRCDEVTYPE);
-+coresight_simple_func(trcpidr0, TRCPIDR0);
-+coresight_simple_func(trcpidr1, TRCPIDR1);
-+coresight_simple_func(trcpidr2, TRCPIDR2);
-+coresight_simple_func(trcpidr3, TRCPIDR3);
-+
-+static struct attribute *coresight_etmv4_mgmt_attrs[] = {
-+	&dev_attr_trcoslsr.attr,
-+	&dev_attr_trcpdcr.attr,
-+	&dev_attr_trcpdsr.attr,
-+	&dev_attr_trclsr.attr,
-+	&dev_attr_trcauthstatus.attr,
-+	&dev_attr_trcdevid.attr,
-+	&dev_attr_trcdevtype.attr,
-+	&dev_attr_trcpidr0.attr,
-+	&dev_attr_trcpidr1.attr,
-+	&dev_attr_trcpidr2.attr,
-+	&dev_attr_trcpidr3.attr,
-+	NULL,
-+};
-+
-+static const struct attribute_group coresight_etmv4_group = {
-+	.attrs = coresight_etmv4_attrs,
-+};
-+
-+static const struct attribute_group coresight_etmv4_mgmt_group = {
-+	.attrs = coresight_etmv4_mgmt_attrs,
-+	.name = "mgmt",
-+};
-+
-+static const struct attribute_group *coresight_etmv4_groups[] = {
-+	&coresight_etmv4_group,
-+	&coresight_etmv4_mgmt_group,
-+	NULL,
-+};
- 
- static void etm4_init_arch_data(void *info)
- {
--- 
-1.9.1
+I haven't fully understood the requirements for the various parts that
+are involved here. My understanding so far was that the driver could
+use the index from the first cell and compute
+
+	void __iomem *reset_reg = rcc_base + 0x10 + 4 * index;
+	void __iomem *clock_reg = rcc_base + 0x30 + 4 * index;
+
+Are there parts that need something else? If the 0x10 offset is
+different, we probably want a different compatible string, and I'd
+consider it a different part at that point. If there are chips
+that do not spread the clock from the reset by exactly 256 bits,
+we could add a DT property in the rcc node for that.
+
+	Arnd
