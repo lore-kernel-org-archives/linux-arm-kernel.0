@@ -1,37 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 May 2015 17:49:54 +0200
-Subject: [GIT PULL] SoCFPGA DTS updates for v4.2, part 2
-In-Reply-To: <1431526369-1388-1-git-send-email-dinguyen@opensource.altera.com>
-References: <1431526369-1388-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <3278098.k90frfhGrX@wuerfel>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 13 May 2015 08:50:12 -0700
+Subject: [PATCH] arm: boot: dts: add DTS for Baltos IR5221
+In-Reply-To: <20150513152904.GC4201@saruman.tx.rr.com>
+References: <1431468917-27697-1-git-send-email-balbi@ti.com>
+ <20150513074002.0b7b8dda@ipc1.ka-ro>
+ <20150513152904.GC4201@saruman.tx.rr.com>
+Message-ID: <20150513155012.GI15563@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 May 2015 09:12:48 dinguyen at opensource.altera.com wrote:
-> Hi Arnd, Kevin and Olof,
+* Felipe Balbi <balbi@ti.com> [150513 08:32]:
+> On Wed, May 13, 2015 at 07:40:02AM +0200, Lothar Wa?mann wrote:
+> > >
+> > Should these be ordered alphabetically?
 > 
-> Please pull this patch for v4.2.
-> 
-> Thanks,
-> Dinh
-> 
-> The following changes since commit 5ebe6afaf0057ac3eaeb98defd5456894b446d22:
-> 
->   Linux 4.1-rc2 (2015-05-03 19:22:23 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org:pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_dts_for_v4.2_part_2
-> 
-> for you to fetch changes up to 8508452e57f7d50216338c28db6d42dfe585389a:
-> 
->   ARM: socfpga: dts: add the a9-scu node (2015-05-13 08:30:03 -0500)
-> 
-> ----------------------------------------------------------------
-> SoCFPGA update for v4.2 part 2
-> - Add a DTS node for the A9 SCU
-> 
+> why ?
 
-Pulled into next/dt, thanks!
+In general the alphabetical ordering helps to avoid merge
+conflicts when new things are added later on as they are
+not all added to the end. So yeah I have a slight sorting
+preference there too to make my life easier in the future :)
 
-	Arnd
+Regards,
+
+Tony
