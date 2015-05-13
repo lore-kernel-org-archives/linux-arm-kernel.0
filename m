@@ -1,43 +1,38 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 13 May 2015 16:17:24 +0200
-Subject: [GIT PULL] ARM: rockchip: fixup duplicate suspend fix
-Message-ID: <4262241.MKs4C65R3h@phil>
+From: johan@kernel.org (Johan Hovold)
+Date: Wed, 13 May 2015 16:16:58 +0200
+Subject: [PATCH] ARM: dts: am335x-bone* enable pmic-shutdown-controller
+In-Reply-To: <1431525001-5747-1-git-send-email-robertcnelson@gmail.com>
+References: <1431525001-5747-1-git-send-email-robertcnelson@gmail.com>
+Message-ID: <20150513141658.GB6605@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On Wed, May 13, 2015 at 08:50:01AM -0500, Robert Nelson wrote:
+> Fixes: http://bugs.elinux.org/issues/143
+> 
+> Commit 672e2b147 which introduced proper shutdown chose to let the PMIC go into sleep-state (aka "RTC-only mode") rather than off-state. This was fine for rev A5 on which that patch was tested, but since then two changes have been made to the power supply scheme:
+> 
+> (rev A6) enable of the 3v3b regulator moved from LDO2 to LDO4 (3v3a)
+> side-effect: 3v3b rail remains on in sleep-mode (also in off-mode when battery-powered)
+> 
+> (rev A6A) am335x vdds supply moved from LDO3 to LDO1
+> side-effect: vdds remains supplied in sleep-mode
+> 
+> As a result heavy leakage occurs from vdds (directly) and 3v3b (via i/o pins) to the 3v3a. The amount of current depends on external connections, but for example leaving a serial console cable connected in this state resulted in serious violation of am335x absolute maximum ratings, with potential for hardware damage.
+> 
+> Reported-by: Matthijs van Duin <matthijsvanduin@gmail.com>
+> Tested-by: Matthijs van Duin <matthijsvanduin@gmail.com>
+> Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Johan Hovold <johan@kernel.org>
 
-it looks like I got confused when going through the patches fixing suspend
-issues and from the two of them only one is actually necessary, as both fix
-the same symptom. Thankfully Chris pointed out this issue and also
-confirmed which patch should actually be kept. So this pull-req reverts the
-other (obsolete) one.
+This should go into stable as well:
 
-Sorry for the mess-up.
+Fixes: 672e2b147413 ("ARM: dts: am335x-boneblack: enable power off and
+rtc wake up")
+Cc: stable <stable@vger.kernel.org>	# 3.19
+Acked-by: Johan Hovold <johan@kernel.org>
 
-Heiko
-
-
-The following changes since commit 2a9fe3ca84afff6259820c4f62e579f41476becc:
-
-  rockchip: make sure timer7 is enabled on rk3288 platforms (2015-04-16 21:22:17 +0200)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.1-rockchip-socfixes2
-
-for you to fetch changes up to 3f937cf3db466093c533efbcd601952509727a9d:
-
-  Revert "ARM: rockchip: fix undefined instruction of reset_ctrl_regs" (2015-05-13 15:47:03 +0200)
-
-----------------------------------------------------------------
-The previous two suspend related fixes both fix the same issue
-so only one of them (the newer one) is actually needed.
-
-----------------------------------------------------------------
-Heiko Stuebner (1):
-      Revert "ARM: rockchip: fix undefined instruction of reset_ctrl_regs"
-
- arch/arm/mach-rockchip/pm.c | 26 --------------------------
- arch/arm/mach-rockchip/pm.h |  4 ----
- 2 files changed, 30 deletions(-)
+Thanks,
+Johan
