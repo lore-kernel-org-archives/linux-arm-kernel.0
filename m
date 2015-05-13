@@ -1,104 +1,55 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 13 May 2015 17:12:28 +0100
-Subject: [PATCH 6/7] arm: perf: remove singleton PMU restriction
+Date: Wed, 13 May 2015 17:12:29 +0100
+Subject: [PATCH 7/7] arm: dts: vexpress: describe all PMUs in TC2 dts
 In-Reply-To: <1431533549-27715-1-git-send-email-mark.rutland@arm.com>
 References: <1431533549-27715-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1431533549-27715-7-git-send-email-mark.rutland@arm.com>
+Message-ID: <1431533549-27715-8-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we can describe PMUs in heterogeneous systems, the only item in
-the way of perf support for big.LITTLE is the singleton cpu_pmu variable
-used for OProfile compatibility.
+The dts for the CoreTile Express A15x2 A7x3 (TC2) only describes the
+PMUs of the Cortex-A15 CPUs, and not the Cortex-A7 CPUs.
+
+Now that we have a mechanism for describing disparate PMUs and their
+interrupts in device tree, this patch makes use of these to describe the
+PMUs for all CPUs in the system.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Acked-by: Will Deacon <will.deacon@arm.com>
+Cc: Liviu Dudau <liviu.dudau@arm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
 ---
- arch/arm/kernel/perf_event_cpu.c | 27 ++++++++++++---------------
- 1 file changed, 12 insertions(+), 15 deletions(-)
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-index 9602d31..50f245b 100644
---- a/arch/arm/kernel/perf_event_cpu.c
-+++ b/arch/arm/kernel/perf_event_cpu.c
-@@ -33,7 +33,7 @@
- #include <asm/pmu.h>
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+index 7a2aeac..038e30e 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+@@ -187,10 +187,22 @@
+ 			     <1 10 0xf08>;
+ 	};
  
- /* Set at runtime when we know what CPU type we are. */
--static struct arm_pmu *cpu_pmu;
-+static struct arm_pmu *__oprofile_cpu_pmu;
- 
- /*
-  * Despite the names, these two functions are CPU-specific and are used
-@@ -41,10 +41,10 @@ static struct arm_pmu *cpu_pmu;
-  */
- const char *perf_pmu_name(void)
- {
--	if (!cpu_pmu)
-+	if (!__oprofile_cpu_pmu)
- 		return NULL;
- 
--	return cpu_pmu->name;
-+	return __oprofile_cpu_pmu->name;
- }
- EXPORT_SYMBOL_GPL(perf_pmu_name);
- 
-@@ -52,8 +52,8 @@ int perf_num_counters(void)
- {
- 	int max_events = 0;
- 
--	if (cpu_pmu != NULL)
--		max_events = cpu_pmu->num_events;
-+	if (__oprofile_cpu_pmu != NULL)
-+		max_events = __oprofile_cpu_pmu->num_events;
- 
- 	return max_events;
- }
-@@ -360,19 +360,16 @@ static int cpu_pmu_device_probe(struct platform_device *pdev)
- 	struct arm_pmu *pmu;
- 	int ret = -ENODEV;
- 
--	if (cpu_pmu) {
--		pr_info("attempt to register multiple PMU devices!\n");
--		return -ENOSPC;
--	}
--
- 	pmu = kzalloc(sizeof(struct arm_pmu), GFP_KERNEL);
- 	if (!pmu) {
- 		pr_info("failed to allocate PMU device!\n");
- 		return -ENOMEM;
- 	}
- 
--	cpu_pmu = pmu;
--	cpu_pmu->plat_device = pdev;
-+	if (!__oprofile_cpu_pmu)
-+		__oprofile_cpu_pmu = pmu;
+-	pmu {
++	pmu_a15 {
+ 		compatible = "arm,cortex-a15-pmu";
+ 		interrupts = <0 68 4>,
+ 			     <0 69 4>;
++		interrupt-affinity = <&cpu0>,
++				     <&cpu1>;
++	};
 +
-+	pmu->plat_device = pdev;
++	pmu_a7 {
++		compatible = "arm,cortex-a7-pmu";
++		interrupts = <0 128 4>,
++			     <0 129 4>,
++			     <0 130 4>;
++		interrupt-affinity = <&cpu2>,
++				     <&cpu3>,
++				     <&cpu4>;
+ 	};
  
- 	if (node && (of_id = of_match_node(cpu_pmu_of_device_ids, pdev->dev.of_node))) {
- 		init_fn = of_id->data;
-@@ -390,18 +387,18 @@ static int cpu_pmu_device_probe(struct platform_device *pdev)
- 		goto out_free;
- 	}
- 
--	ret = cpu_pmu_init(cpu_pmu);
-+	ret = cpu_pmu_init(pmu);
- 	if (ret)
- 		goto out_free;
- 
--	ret = armpmu_register(cpu_pmu, -1);
-+	ret = armpmu_register(pmu, -1);
- 	if (ret)
- 		goto out_destroy;
- 
- 	return 0;
- 
- out_destroy:
--	cpu_pmu_destroy(cpu_pmu);
-+	cpu_pmu_destroy(pmu);
- out_free:
- 	pr_info("failed to register PMU devices!\n");
- 	kfree(pmu);
+ 	oscclk6a: oscclk6a {
 -- 
 1.9.1
