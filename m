@@ -1,82 +1,113 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 13 May 2015 11:17:37 +0300
-Subject: [PATCH v3 2/4] mtd: mxc_nand: limit the size of used oob
-In-Reply-To: <cover.1431504091.git.baruch@tkos.co.il>
-References: <cover.1431504091.git.baruch@tkos.co.il>
-Message-ID: <6edf6c3df2371522cb43ab864272e560176b0d5b.1431504091.git.baruch@tkos.co.il>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 13 May 2015 10:15:35 +0200
+Subject: [PATCH 2/8] dmaengine: mv_xor: add support for a38x command in
+ descriptor mode
+In-Reply-To: <4862159.g8Sk9nOiS2@wuerfel>
+References: <1431445063-20226-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1431445063-20226-3-git-send-email-maxime.ripard@free-electrons.com>
+ <4862159.g8Sk9nOiS2@wuerfel>
+Message-ID: <20150513081535.GS10961@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For 4k pages the i.MX NFC hardware uses no more than 218 bytes for 8bit ECC
-data. Larger oobsize confuses the logic of copy_spare(). Limit the size of used
-oob size to avoid that.
+Hi Arnd,
 
-Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
-v2:
-   * Move used_oobsize into struct mxc_nand_host, and initialize it from
-     _probe() (Uwe Kleine-K?nig)
-   * Add a more details to in-code comment
----
- drivers/mtd/nand/mxc_nand.c | 16 +++++++++++++---
- 1 file changed, 13 insertions(+), 3 deletions(-)
+On Tue, May 12, 2015 at 05:49:08PM +0200, Arnd Bergmann wrote:
+> On Tuesday 12 May 2015 17:37:37 Maxime Ripard wrote:
+> > From: Lior Amsalem <alior@marvell.com>
+> > 
+> > The Marvell Armada 38x SoC introduce new features to the XOR engine,
+> > especially the fact that the engine mode (MEMCPY/XOR/PQ/etc) can be part of
+> > the descriptor and not set through the controller registers.
+> > 
+> > This new feature allows mixing of different commands (even PQ) on the same
+> > channel/chain without the need to stop the engine to reconfigure the engine
+> > mode.
+> > 
+> > Refactor the driver to be able to use that new feature on the Armada 38x,
+> > while keeping the old behaviour on the older SoCs.
+> > 
+> > Signed-off-by: Lior Amsalem <alior@marvell.com>
+> > Reviewed-by: Ofer Heifetz <oferh@marvell.com>
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> Two minimal style comments:
+> 
+> > +static void mv_chan_set_mode_to_desc(struct mv_xor_chan *chan)
+> > +{
+> > +	u32 op_mode;
+> > +	u32 config = readl_relaxed(XOR_CONFIG(chan));
+> > +
+> > +	op_mode = XOR_OPERATION_MODE_IN_DESC;
+> > +
+> > +	config &= ~0x7;
+> > +	config |= op_mode;
+> > +
+> > +#if defined(__BIG_ENDIAN)
+> > +	config |= XOR_DESCRIPTOR_SWAP;
+> > +#else
+> > +	config &= ~XOR_DESCRIPTOR_SWAP;
+> > +#endif
+> > +
+> > +	writel_relaxed(config, XOR_CONFIG(chan));
+> > +}
+> 
+> Using 
+> 
+> 	if (IS_ENABLED(__BIG_ENDIAN))
+> 
+> here would make it more readable by avoiding the #if.
 
-diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
-index 33b22b9c0b30..51c1600d7eb9 100644
---- a/drivers/mtd/nand/mxc_nand.c
-+++ b/drivers/mtd/nand/mxc_nand.c
-@@ -189,6 +189,7 @@ struct mxc_nand_host {
- 	int			clk_act;
- 	int			irq;
- 	int			eccsize;
-+	int			used_oobsize;
- 	int			active_cs;
- 
- 	struct completion	op_completion;
-@@ -827,7 +828,7 @@ static void copy_spare(struct mtd_info *mtd, bool bfrom)
- 	u16 sparebuf_size = host->devtype_data->spare_len;
- 
- 	/* size of oob chunk for all but possibly the last one */
--	oob_chunk_size = (mtd->oobsize / num_chunks) & ~1;
-+	oob_chunk_size = (host->used_oobsize / num_chunks) & ~1;
- 
- 	if (bfrom) {
- 		for (i = 0; i < num_chunks - 1; i++)
-@@ -838,7 +839,7 @@ static void copy_spare(struct mtd_info *mtd, bool bfrom)
- 		/* the last chunk */
- 		memcpy32_fromio(d + i * oob_chunk_size,
- 				s + i * sparebuf_size,
--				mtd->oobsize - i * oob_chunk_size);
-+				host->used_oobsize - i * oob_chunk_size);
- 	} else {
- 		for (i = 0; i < num_chunks - 1; i++)
- 			memcpy32_toio(&s[i * sparebuf_size],
-@@ -848,7 +849,7 @@ static void copy_spare(struct mtd_info *mtd, bool bfrom)
- 		/* the last chunk */
- 		memcpy32_toio(&s[oob_chunk_size * sparebuf_size],
- 			      &d[i * oob_chunk_size],
--			      mtd->oobsize - i * oob_chunk_size);
-+			      host->used_oobsize - i * oob_chunk_size);
- 	}
- }
- 
-@@ -1606,6 +1607,15 @@ static int mxcnd_probe(struct platform_device *pdev)
- 	else if (mtd->writesize == 4096)
- 		this->ecc.layout = host->devtype_data->ecclayout_4k;
- 
-+	/*
-+	 * Experimentation shows that i.MX NFC can only handle up to 218 oob
-+	 * bytes. Limit used_oobsize to 218 so as to not confuse copy_spare()
-+	 * into copying invalid data to/from the spare IO buffer, as this
-+	 * might cause ECC data corruption when doing sub-page write to a
-+	 * partially written page.
-+	 */
-+	host->used_oobsize = min(mtd->oobsize, 218U);
-+
- 	if (this->ecc.mode == NAND_ECC_HW) {
- 		if (is_imx21_nfc(host) || is_imx27_nfc(host))
- 			this->ecc.strength = 1;
+Indeed. I'll change that.
+
+> Alternatively, you could leave the XOR_DESCRIPTOR_SWAP flag disabled
+> and just swap the descriptors manually like a lot of other drivers
+> do. You have to swap the mmio accesses anywya.
+
+That won't be easily doable however.
+
+Not only the endianness of the individual fields in the descriptor
+changes, but changing the endianness also swaps the fields themselves
+by pair of u32.
+
+You can see that here:
+http://lxr.free-electrons.com/source/drivers/dma/mv_xor.h#L159
+
+So I'm guessing that leaving it like it is was the more readable
+solution.
+
+> >  }
+> >  
+> > +#ifdef CONFIG_OF
+> > +static const struct of_device_id mv_xor_dt_ids[] = {
+> > +	{ .compatible = "marvell,orion-xor", .data = (void *)XOR_MODE_IN_REG },
+> > +	{ .compatible = "marvell,a38x-xor", .data = (void *)XOR_MODE_IN_DESC },
+> > +	{},
+> > +};
+> > +MODULE_DEVICE_TABLE(of, mv_xor_dt_ids);
+> > +#endif
+> > +
+> 
+> Just leave out the #ifdef here. Almost all the mvebu machines use DT now,
+> so it's not worth the size benefit of leaving it out on the few machines
+> that don't.
+> 
+> You'll have to remove the of_match_ptr() invocation as well if you do that,
+> to avoid a warning about an unused symbol.
+
+Will do.
+
+Thanks!
+Maxime
+
 -- 
-2.1.4
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150513/4d57f15b/attachment.sig>
