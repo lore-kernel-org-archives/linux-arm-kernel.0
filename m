@@ -1,33 +1,95 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 13 May 2015 17:21:27 +0100
-Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
-In-Reply-To: <5553784F.7040905@ti.com>
-References: <cover.1430394884.git.viresh.kumar@linaro.org>
- <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
- <554FFFA3.1060801@ti.com> <20150512051633.GB32300@linux>
- <555224A2.7000308@ti.com> <20150513050559.GE28858@linux>
- <55536719.5050208@ti.com> <20150513151652.GX2761@sirena.org.uk>
- <5553784F.7040905@ti.com>
-Message-ID: <20150513162127.GA2761@sirena.org.uk>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Wed, 13 May 2015 09:26:34 -0700
+Subject: [PATCH v8 4/9] mfd: Add binding document for NVIDIA Tegra XUSB
+In-Reply-To: <20150513143954.GA3394@x1>
+References: <1430761002-9327-1-git-send-email-abrestic@chromium.org>
+ <1430761002-9327-5-git-send-email-abrestic@chromium.org>
+ <20150513143954.GA3394@x1>
+Message-ID: <CAL1qeaF-7aAx0gqPe-_D4ZaZET0Kejr801KrbvuQ_2w6c8mcnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 13, 2015 at 11:14:07AM -0500, Nishanth Menon wrote:
+Lee,
 
-> To illustrate: What does it mean for a driver using regulator API?
-> Attempt X <-> (X+Y), if that fails (example PMIC SMPS max < X), try
-> (X-Y)<->(X)? If yes, then we do expect (X-Y)<->(X+Y) should be stable
-> for all operating conditions for the device, correct? If this is is
-> not stable at (X-Y), then we have a wrong specification for the device
-> for claiming X +/- Y is a valid range for the device.
+On Wed, May 13, 2015 at 7:39 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Mon, 04 May 2015, Andrew Bresticker wrote:
+>
+>> Add a binding document for the XUSB host complex on NVIDIA Tegra124
+>> and later SoCs.  The XUSB host complex includes a mailbox for
+>> communication with the XUSB micro-controller and an xHCI host-controller.
+>>
+>> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Pawel Moll <pawel.moll@arm.com>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+>> Cc: Kumar Gala <galak@codeaurora.org>
+>> Cc: Samuel Ortiz <sameo@linux.intel.com>
+>> Cc: Lee Jones <lee.jones@linaro.org>
+>> ---
+>> Changes from v7:
+>>  - Move non-shared resources into child nodes.
+>> New for v7.
+>> ---
+>>  .../bindings/mfd/nvidia,tegra124-xusb.txt          | 37 ++++++++++++++++++++++
+>>  1 file changed, 37 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt b/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
+>> new file mode 100644
+>> index 0000000..bc50110
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
+>> @@ -0,0 +1,37 @@
+>> +NVIDIA Tegra XUSB host copmlex
+>> +==============================
+>> +
+>> +The XUSB host complex on Tegra124 and later SoCs contains an xHCI host
+>> +controller and a mailbox for communication with the XUSB micro-controller.
+>> +
+>> +Required properties:
+>> +--------------------
+>> + - compatible: For Tegra124, must contain "nvidia,tegra124-xusb".
+>> +   Otherwise, must contain '"nvidia,<chip>-xusb", "nvidia,tegra124-xusb"'
+>> +   where <chip> is tegra132.
+>> + - reg: Must contain the base and length of the XUSB FPCI registers.
+>> + - ranges: Bus address mapping for the XUSB block.  Can be empty since the
+>> +   mapping is 1:1.
+>> + - #address-cells: Must be 2.
+>> + - #size-cells: Must be 2.
+>> +
+>> +Example:
+>> +--------
+>> +     usb at 0,70098000 {
+>> +             compatible = "nvidia,tegra124-xusb";
+>> +             reg = <0x0 0x70098000 0x0 0x1000>;
+>> +             ranges;
+>> +
+>> +             #address-cells = <2>;
+>> +             #size-cells = <2>;
+>> +
+>> +             usb-host at 0,70090000 {
+>> +                     compatible = "nvidia,tegra124-xhci";
+>> +                     ...
+>> +             };
+>> +
+>> +             mailbox {
+>> +                     compatible = "nvidia,tegra124-xusb-mbox";
+>> +                     ...
+>> +             };
+>
+> This doesn't appear to be a proper MFD.  I would have the USB and
+> Mailbox devices probe seperately and use a phandle to point the USB
+> device to its Mailbox.
+>
+> usb at xyz {
+>         mboxes = <&xusb-mailbox, [chan]>;
+> };
 
-We have an explicit regulator API call for setting by tolerance which
-tries to get as close as possible to the target voltage (currently the
-implementation is very cheap and nasty but ideally it'll get improved).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150513/351d2a9e/attachment.sig>
+Then what will set up the shared regmap?  The point of using an MFD
+here was to share a register set with both the mailbox and xHCI
+drivers and avoid having to map the same register set twice in two
+separate drivers.
+
+Thanks,
+Andrew
