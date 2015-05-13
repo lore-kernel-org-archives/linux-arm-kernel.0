@@ -1,52 +1,21 @@
-From: jorge.ramirez-ortiz@linaro.org (Jorge Ramirez-Ortiz)
-Date: Wed, 13 May 2015 16:38:23 -0400
-Subject: [PATCH] arm: topology: fix capacity calculation on SMP SoCs
-Message-ID: <1431549503-11799-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 13 May 2015 13:39:44 -0700
+Subject: regression with today's linux-next
+In-Reply-To: <20150513182738.GA28201@saruman.tx.rr.com>
+References: <20150513182738.GA28201@saruman.tx.rr.com>
+Message-ID: <CAMAWPa8U_ESvBUV5fvoFcRLtP5nK0qkVEtA+x7Xa_xUTG1ho_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit sets the capacity of the average CPU in SMP systems to
-SCHED_CAPACITY_SCALE.
+On Wed, May 13, 2015 at 11:27 AM, Felipe Balbi <balbi@ti.com> wrote:
 
-Ignoring the condition "min_capacity==max_capacity" causes the function
-update_cpu_capacity( .. ) to generate out of range values [1]. This is
-because the default value of middle_capacity is used in the final
-calculation instead of a valid scaling factor.
+> your commit 9451980a6646 (net: Use cached copy of pfmemalloc to avoid
+> accessing page) regresses most OMAP-based boards with a NULL pointer
+> dereference.
+>
+> Below you can find git bisect log and a serial console capture of the
+> problem.
 
-Incidentally, when out of range values are generated and if
-SCHED_FEAT(ARCH_POWER, true), the load balancing algorithm makes the
-wrong decisions typically overallocating work on one of the cores
-while leaving the others unused.
+FWIW, I can confirm the boot failure and had bisected down to the same commit.
 
-[1] val > SCHED_CAPACITY_SCALE
-
-Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
----
- arch/arm/kernel/topology.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-index 08b7847..509bc9b 100644
---- a/arch/arm/kernel/topology.c
-+++ b/arch/arm/kernel/topology.c
-@@ -137,14 +137,14 @@ static void __init parse_dt_topology(void)
- 		cpu_capacity(cpu) = capacity;
- 	}
- 
--	/* If min and max capacities are equals, we bypass the update of the
--	 * cpu_scale because all CPUs have the same capacity. Otherwise, we
--	 * compute a middle_capacity factor that will ensure that the capacity
-+	/* Compute a middle_capacity factor that will ensure that the capacity
- 	 * of an 'average' CPU of the system will be as close as possible to
- 	 * SCHED_CAPACITY_SCALE, which is the default value, but with the
- 	 * constraint explained near table_efficiency[].
- 	 */
--	if (4*max_capacity < (3*(max_capacity + min_capacity)))
-+	if (min_capacity == max_capacity)
-+		middle_capacity = min_capacity >> SCHED_CAPACITY_SHIFT;
-+	else if (4*max_capacity < (3*(max_capacity + min_capacity)))
- 		middle_capacity = (min_capacity + max_capacity)
- 				>> (SCHED_CAPACITY_SHIFT+1);
- 	else
--- 
-2.1.4
+Kevin
