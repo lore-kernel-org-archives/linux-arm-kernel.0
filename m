@@ -1,45 +1,42 @@
 From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Wed, 13 May 2015 09:10:52 +0200
-Subject: [PATCH 2/3] ARM: BCM5301X: Add DT for Buffalo WXR-1900DHP
+Date: Wed, 13 May 2015 09:10:53 +0200
+Subject: [PATCH 3/3] ARM: BCM5301X: Add DT for SmartRG SR400ac
 In-Reply-To: <1431501053-1517-1-git-send-email-zajec5@gmail.com>
 References: <1431501053-1517-1-git-send-email-zajec5@gmail.com>
-Message-ID: <1431501053-1517-2-git-send-email-zajec5@gmail.com>
+Message-ID: <1431501053-1517-3-git-send-email-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Felix Fietkau <nbd@openwrt.org>
-
-Signed-off-by: Felix Fietkau <nbd@openwrt.org>
 Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
 ---
- arch/arm/boot/dts/Makefile                        |   1 +
- arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts | 127 ++++++++++++++++++++++
- 2 files changed, 128 insertions(+)
- create mode 100644 arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts
+ arch/arm/boot/dts/Makefile                    |   1 +
+ arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts | 119 ++++++++++++++++++++++++++
+ 2 files changed, 120 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 6658b39..37385b3 100644
+index 37385b3..dc0f748 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -67,6 +67,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+@@ -64,6 +64,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+ 	bcm4708-luxul-xwc-1000.dtb \
+ 	bcm4708-netgear-r6250.dtb \
+ 	bcm4708-netgear-r6300-v2.dtb \
++	bcm4708-smartrg-sr400ac.dtb \
  	bcm47081-asus-rt-n18u.dtb \
  	bcm47081-buffalo-wzr-600dhp2.dtb \
  	bcm47081-buffalo-wzr-900dhp.dtb \
-+	bcm4709-buffalo-wxr-1900dhp.dtb \
- 	bcm4709-netgear-r8000.dtb
- dtb-$(CONFIG_ARCH_BCM_63XX) += \
- 	bcm963138dvt.dtb
-diff --git a/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts b/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts
+diff --git a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
 new file mode 100644
-index 0000000..548e93b
+index 0000000..66dfb53
 --- /dev/null
-+++ b/arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts
-@@ -0,0 +1,127 @@
++++ b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
+@@ -0,0 +1,119 @@
 +/*
-+ * Broadcom BCM470X / BCM5301X ARM platform code.
-+ * DTS for Buffalo WXR-1900DHP
++ * Broadcom BCM470X / BCM5301X arm platform code.
++ * DTS for SmartRG SR400ac
 + *
-+ * Copyright (C) 2015 Felix Fietkau <nbd@openwrt.org>
++ * Copyright (C) 2015 Rafa? Mi?ecki <zajec5@gmail.com>
 + *
 + * Licensed under the GNU/GPL. See COPYING for details.
 + */
@@ -49,8 +46,8 @@ index 0000000..548e93b
 +#include "bcm4708.dtsi"
 +
 +/ {
-+	compatible = "buffalo,wxr-1900dhp", "brcm,bcm4709", "brcm,bcm4708";
-+	model = "Buffalo WXR-1900DHP";
++	compatible = "smartrg,sr400ac", "brcm,bcm4708";
++	model = "SmartRG SR400ac";
 +
 +	chosen {
 +		bootargs = "console=ttyS0,115200";
@@ -63,57 +60,69 @@ index 0000000..548e93b
 +	leds {
 +		compatible = "gpio-leds";
 +
-+		usb {
-+			label = "bcm53xx:green:usb";
-+			gpios = <&chipcommon 4 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-off";
++		power-white {
++			label = "bcm53xx:white:power";
++			gpios = <&chipcommon 1 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-on";
 +		};
 +
 +		power-amber {
 +			label = "bcm53xx:amber:power";
++			gpios = <&chipcommon 2 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		usb2 {
++			label = "bcm53xx:white:usb2";
++			gpios = <&chipcommon 3 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		usb3-white {
++			label = "bcm53xx:white:usb3";
++			gpios = <&chipcommon 4 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		usb3-green {
++			label = "bcm53xx:green:usb3";
 +			gpios = <&chipcommon 5 GPIO_ACTIVE_HIGH>;
 +			linux,default-trigger = "default-off";
 +		};
 +
-+		power-white {
-+			label = "bcm53xx:white:power";
++		wps {
++			label = "bcm53xx:white:wps";
 +			gpios = <&chipcommon 6 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-on";
-+		};
-+
-+		router-amber {
-+			label = "bcm53xx:amber:router";
-+			gpios = <&chipcommon 7 GPIO_ACTIVE_HIGH>;
 +			linux,default-trigger = "default-off";
 +		};
 +
-+		router-white {
-+			label = "bcm53xx:white:router";
++		status-red {
++			label = "bcm53xx:red:status";
 +			gpios = <&chipcommon 8 GPIO_ACTIVE_HIGH>;
 +			linux,default-trigger = "default-off";
 +		};
 +
-+		wan-amber {
-+			label = "bcm53xx:amber:wan";
++		status-green {
++			label = "bcm53xx:green:status";
 +			gpios = <&chipcommon 9 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		status-blue {
++			label = "bcm53xx:blue:status";
++			gpios = <&chipcommon 10 GPIO_ACTIVE_HIGH>;
 +			linux,default-trigger = "default-off";
 +		};
 +
 +		wan-white {
 +			label = "bcm53xx:white:wan";
-+			gpios = <&chipcommon 10 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		wireless-amber {
-+			label = "bcm53xx:amber:wireless";
-+			gpios = <&chipcommon 11 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		wireless-white {
-+			label = "bcm53xx:white:wireless";
 +			gpios = <&chipcommon 12 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		wan-red {
++			label = "bcm53xx:red:wan";
++			gpios = <&chipcommon 13 GPIO_ACTIVE_HIGH>;
 +			linux,default-trigger = "default-off";
 +		};
 +	};
@@ -123,42 +132,22 @@ index 0000000..548e93b
 +		#address-cells = <1>;
 +		#size-cells = <0>;
 +
-+		power {
-+			label = "Power";
-+			linux,code = <KEY_POWER>;
-+			gpios = <&chipcommon 1 GPIO_ACTIVE_LOW>;
++		rfkill {
++			label = "WiFi";
++			linux,code = <KEY_RFKILL>;
++			gpios = <&chipcommon 0 GPIO_ACTIVE_LOW>;
++		};
++
++		wps {
++			label = "WPS";
++			linux,code = <KEY_WPS_BUTTON>;
++			gpios = <&chipcommon 7 GPIO_ACTIVE_LOW>;
 +		};
 +
 +		restart {
 +			label = "Reset";
 +			linux,code = <KEY_RESTART>;
-+			gpios = <&chipcommon 15 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		aoss {
-+			label = "AOSS";
-+			linux,code = <KEY_WPS_BUTTON>;
-+			gpios = <&chipcommon 16 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		/* Commit mode set by switch? */
-+		mode {
-+			label = "Mode";
-+			linux,code = <KEY_SETUP>;
-+			gpios = <&chipcommon 17 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		/* Switch: AP mode */
-+		sw_ap {
-+			label = "AP";
-+			linux,code = <BTN_0>;
-+			gpios = <&chipcommon 18 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		eject {
-+			label = "USB eject";
-+			linux,code = <KEY_EJECTCD>;
-+			gpios = <&chipcommon 20 GPIO_ACTIVE_LOW>;
++			gpios = <&chipcommon 11 GPIO_ACTIVE_LOW>;
 +		};
 +	};
 +};
