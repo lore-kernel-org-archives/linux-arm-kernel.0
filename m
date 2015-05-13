@@ -1,39 +1,37 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 13 May 2015 10:00:41 -0500
-Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
-In-Reply-To: <20150513050559.GE28858@linux>
-References: <cover.1430394884.git.viresh.kumar@linaro.org>
- <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
- <554FFFA3.1060801@ti.com> <20150512051633.GB32300@linux>
- <555224A2.7000308@ti.com> <20150513050559.GE28858@linux>
-Message-ID: <55536719.5050208@ti.com>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Wed, 13 May 2015 10:00:46 -0500
+Subject: [PATCHv2] ARM: socfpga: dts: Add a clock node for sdmmc CIU
+In-Reply-To: <20150513075438.GE15988@codeaurora.org>
+References: <1429027519-22209-1-git-send-email-dinguyen@opensource.altera.com>
+ <20150513075438.GE15988@codeaurora.org>
+Message-ID: <5553671E.3070301@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/13/2015 12:05 AM, Viresh Kumar wrote:
-> On 12-05-15, 11:04, Nishanth Menon wrote:
->> Just curious -> is'nt it better to just have min<->max range? binding
->> as it stands right now is open to interpretation as to what will be
->> attempted and in what sequence? with a valid min, target or max -
->> is'nt it more power efficient always to go for a "min" than a target?
+
+
+On 5/13/15 2:54 AM, Stephen Boyd wrote:
+> On 04/14, dinguyen at opensource.altera.com wrote:
+>> From: Dinh Nguyen <dinguyen@opensource.altera.com>
 >>
->> Further, min<->max implies anywhere in that range and is more
->> consistent with "regulator like" description.
+>> The CIU(Card Interface Unit) get its clock from the sdmmc_clk_divided clock
+>> which is used to clock the card. The sdmmc_clk_divided clock is the sdmmc_clk
+>> passed through a fixed divider of 4. This patch adds the sdmmc_clk_divided
+>> node and makes the sdmmc_clk it's parent.
+>>
+>> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+>> ---
 > 
-> It came out after some discussions on the list, you may want to go
-> through that.
+> Is this a fix of some sort? I'm confused why this was sent to the
+> clk maintainers when it seems to be more appropriate to go
+> through the arm-soc tree.
 > 
-> https://lists.linaro.org/pipermail/linaro-kernel/2015-January/019844.html
 
-I see the thread saying that voltage-tolerance is a crappy idea -> I
-agree to that.
+Ok, sorry about that. I thought since it was clock nodes, it would
+appropriate to CC clk maintainers.
 
-What I dont see in the thread, and the point I raised here, why have
-nominal/typical voltage at all? min<->max should be sufficient,
-correct? If the device cannot function at min, then it should not be
-documented as part of valid range at all.
+BTW, can I take patches from drivers/clk/socfpga/* through the arm-soc
+tree or would that go through you guys?
 
-
--- 
-Regards,
-Nishanth Menon
+Thanks,
+Dinh
