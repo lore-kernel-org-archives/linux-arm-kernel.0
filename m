@@ -1,26 +1,33 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 13 May 2015 16:11:26 +0900
-Subject: [PATCHv5 1/5] ARM: dts: exynos5422-odroidxu3 Add pwm-fan node to
- the Odroid-XU3 board
-In-Reply-To: <1431499020-3912-2-git-send-email-linux.amoon@gmail.com>
-References: <1431499020-3912-1-git-send-email-linux.amoon@gmail.com>
- <1431499020-3912-2-git-send-email-linux.amoon@gmail.com>
-Message-ID: <CAJKOXPefJwqvfZPDovQ6EjEOBfuJkidgeYDF_=KC9O+=2=_KoQ@mail.gmail.com>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Wed, 13 May 2015 09:10:51 +0200
+Subject: [PATCH 1/3] ARM: BCM5301X: Add USB LED for Buffalo WZR-1750DHP
+Message-ID: <1431501053-1517-1-git-send-email-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-13 15:36 GMT+09:00 Anand Moon <linux.amoon@gmail.com>:
-> Add pwm-fan node to the Odroid-XU3 board.
->
-> Tested-by: Markus Reichl <m.reichl@fivetechno.de>
-> Acked-by: Lukasz Majewski <l.majewski@samsung.com>
-> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+From: Felix Fietkau <nbd@openwrt.org>
 
-Please fix the title of commit (missing colon, duplicated name of board) to:
-"ARM: dts: exynos5422-odroidxu3: Add pwm-fan node"
+Signed-off-by: Felix Fietkau <nbd@openwrt.org>
+---
+ arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Rest looks good:
-Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-Best regards,
-Krzysztof
+diff --git a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
+index b359c1e..78e95c0 100644
+--- a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
++++ b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
+@@ -47,6 +47,12 @@
+ 	leds {
+ 		compatible = "gpio-leds";
+ 
++		usb {
++			label = "bcm53xx:blue:usb";
++			gpios = <&hc595 0 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
+ 		power0 {
+ 			label = "bcm53xx:red:power";
+ 			gpios = <&hc595 1 GPIO_ACTIVE_HIGH>;
+-- 
+1.8.4.5
