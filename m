@@ -1,132 +1,100 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Wed, 13 May 2015 12:33:16 -0600
-Subject: [PATCH 4/5] VFIO: platform: populate reset function according
- to compat
-In-Reply-To: <1431008843-28411-5-git-send-email-eric.auger@linaro.org>
-References: <1431008843-28411-1-git-send-email-eric.auger@linaro.org>
- <1431008843-28411-5-git-send-email-eric.auger@linaro.org>
-Message-ID: <1431541996.3625.55.camel@redhat.com>
+From: jonathar@broadcom.com (Jonathan Richardson)
+Date: Wed, 13 May 2015 12:50:02 -0700
+Subject: [PATCH 2/2] misc: Add initial Digital Timing Engine (DTE) driver
+ for cygnus
+In-Reply-To: <20150513153544.GC2065@localhost.localdomain>
+References: <1429744923-2007-1-git-send-email-jonathar@broadcom.com>
+ <5543CD73.2030902@broadcom.com> <20150501203004.3add2c95@lxorguk.ukuu.org.uk>
+ <9193036.7UYD2OGJHk@wuerfel> <554D1649.2030106@broadcom.com>
+ <20150513153544.GC2065@localhost.localdomain>
+Message-ID: <5553AAEA.30503@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-05-07 at 16:27 +0200, Eric Auger wrote:
-> Add the reset function lookup according to the device compat
-> string. This lookup is added at different places:
-> - on VFIO_DEVICE_GET_INFO
-> - on VFIO_DEVICE_RESET
-> - on device release
+On 15-05-13 08:35 AM, Richard Cochran wrote:
+> On Fri, May 08, 2015 at 01:02:17PM -0700, Jonathan Richardson wrote:
+>> For the clock functions I think we can use the existing framework
+>> unchanged with one exception: ptp_clock_adjtime() doesn't allow negative
+>> time adjustments and we would like to allow this.
 > 
-> A reference to the module implementing the reset function is taken
-> on first reset function lookup and released on vfio platform device
-> release.
+> ???
 > 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> ---
->  drivers/vfio/platform/vfio_platform_common.c | 50 ++++++++++++++++++++++++++++
->  1 file changed, 50 insertions(+)
+> /**
+>  * struct ptp_clock_info - decribes a PTP hardware clock
+>    ...
 > 
-> diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-> index 0d10018..bd7e44c 100644
-> --- a/drivers/vfio/platform/vfio_platform_common.c
-> +++ b/drivers/vfio/platform/vfio_platform_common.c
-> @@ -28,6 +28,52 @@ LIST_HEAD(reset_list);
+>  * @adjtime:  Shifts the time of the hardware clock.
+>  *            parameter delta: Desired change in nanoseconds.
+>    ...
+> 
+> 	int (*adjtime)(struct ptp_clock_info *ptp, s64 delta);
+> 
+> That s64 is 's' as in "signed".
+
+ptp_clock_adjtime() casts it to an unsigned and returns an error:
+
+   if ((unsigned long) ts.tv_nsec >= NSEC_PER_SEC)
+       return -EINVAL;
 >  
->  static DEFINE_MUTEX(driver_lock);
+>> IRQ interval: I mentioned before that we may be able to calculate the
+>> isochronous interrupt rate automatically but this isn't possible because
+>> the DTE doesn't know the frequency of the clients. One solution is to
+>> use the 'PTP_PEROUT_REQUEST' ioctl to set a periodic timer frequency.
+>> Not really a timer but good enough for our purposes.
+> 
+> As I said in my other reply, I don't understand what the problem is.
+
+See reply to previous email. We can use this ioctl or add a new one as
+Arnd suggested. It doesn't matter to me.
+
 >  
-> +static vfio_platform_reset_fn_t vfio_platform_lookup_reset(const char *compat)
-> +{
-> +	struct vfio_platform_reset_node *iter;
-> +
-> +	list_for_each_entry(iter, &reset_list, link) {
+>> Set divider: There is no ability to set a frequency or do anything to a
+>> channel. We could re-use the PTP_EXTTS_REQUEST ioctl but extend 'struct
+>> ptp_extts_request' by using the reserved field rsv to allow setting an
+>> integer value representing either a frequency or divider value in our
+>> case - some value to configure a channel. A new flag would have to be
+>> added to the existing PTP_ENABLE_FEATURE, RISING and FALLING EDGE.
+> 
+> I don't get this, either.
 
-Racy
+See reply to previous email.
 
-> +		if (!strcmp(iter->compat, compat) &&
-> +			try_module_get(iter->owner))
-> +			return iter->reset;
-> +	}
-> +
-> +	return ERR_PTR(-ENODEV);
-
-return NULL imo
-
-> +}
-> +
-> +static vfio_platform_reset_fn_t vfio_platform_get_reset(
-> +					struct vfio_platform_device *vdev)
-> +{
-> +	struct device *dev = vdev->get_device(vdev);
-> +	const char *compat_str_array[2];
-> +	vfio_platform_reset_fn_t reset;
-> +	int ret;
-> +
-> +	if (!IS_ERR_OR_NULL(vdev->reset))
-> +		return vdev->reset;
-> +
-> +	ret = device_property_read_string_array(dev, "compatible",
-> +						compat_str_array, 2);
-> +	if (!ret)
-> +		return ERR_PTR(ret);
-> +
-> +	reset = vfio_platform_lookup_reset(compat_str_array[0]);
-> +	return reset;
-
-Something got allocated into compat_str_array and gets leaked here.
-
-> +}
-> +
-> +static void vfio_platform_put_reset(struct vfio_platform_device *vdev)
-> +{
-> +	struct vfio_platform_reset_node *iter;
-> +
-> +	list_for_each_entry(iter, &reset_list, link) {
-
-Racy
-
-> +		if (iter->reset == vdev->reset) {
-> +			module_put(iter->owner);
-> +			vdev->reset = NULL;
-> +			return;
-> +		}
-> +	}
-> +}
-> +
->  static int vfio_platform_regions_init(struct vfio_platform_device *vdev)
->  {
->  	int cnt = 0, i;
-> @@ -103,10 +149,12 @@ static void vfio_platform_release(void *device_data)
->  	mutex_lock(&driver_lock);
 >  
->  	if (!(--vdev->refcnt)) {
-> +		vdev->reset = vfio_platform_get_reset(vdev);
->  		if (!IS_ERR_OR_NULL(vdev->reset))
->  			vdev->reset(vdev);
->  		vfio_platform_regions_cleanup(vdev);
->  		vfio_platform_irq_cleanup(vdev);
-> +		vfio_platform_put_reset(vdev);
->  	}
->  
->  	mutex_unlock(&driver_lock);
-> @@ -164,6 +212,7 @@ static long vfio_platform_ioctl(void *device_data,
->  		if (info.argsz < minsz)
->  			return -EINVAL;
->  
-> +		vdev->reset = vfio_platform_get_reset(vdev);
->  		if (!IS_ERR_OR_NULL(vdev->reset))
->  			vdev->flags |= VFIO_DEVICE_FLAGS_RESET;
->  		info.flags = vdev->flags;
-> @@ -260,6 +309,7 @@ static long vfio_platform_ioctl(void *device_data,
->  		return ret;
->  
->  	} else if (cmd == VFIO_DEVICE_RESET) {
-> +		vdev->reset = vfio_platform_get_reset(vdev);
->  		if (!IS_ERR_OR_NULL(vdev->reset))
->  			return vdev->reset(vdev);
->  		else
+>> Get timestamp: This is a bit more complicated. Currently the PTP driver
+>> does list management for timestamps from external timestamp channels.
+>> Timestamps from all channels go into the same list. In our driver we
+>> have a s/w FIFO for each client and it closely matches the h/w FIFO and
+>> handles any overflow. We would like to keep it this way because it also
+>> allows multiple user space processes to only fetch timestamps for the
+>> client it's handling. 
+> 
+> But having many readers is less efficient and more complex.
+> 
+> Also, we can adjust the buffer if needed to prevent HW FIFO overflows.
+> 
+>> We could add a new ioctl to get a timestamp from
+>> the driver instead of doing it through ptp_read() but it would be nice
+>> if we could let ptp_read() allow the driver to do timestamp management
+>> instead of PTP. Maybe provide an option to obtain the timestamps from a
+>> container in the driver instead of the one managed by PTP. I like being
+>> able to use read/poll to obtain data instead of polling the kernel with
+>> ioctls as we are currently doing.
+> 
+> The PTP interface supports poll/read just fine already.
 
-I count 3 gets and 1 put, isn't the module reference count increase
-showing that?  This looks like it hasn't been tested.  Why would we do a
-get every time we want to do a reset?  Do one get when the device is
-registered or opened and one put when the device is unregistered or
-closed.  We don't want erratic userspace behavior that the reset
-property of a device can come and go.
+Yes that's why I wanted to re-use it. As it currently is, it's not going
+to work for reasons I explained in previous follow up yesterday:
+
+http://marc.info/?l=linux-kernel&m=143147907431947&w=2
+
+> 
+>> Also, avoiding the kmalloc in ptp_read
+>> would be nice because this of the frequency it would be called at. Do
+>> you have any preference on how to handle this?
+> 
+> Originally I had the buffer on the stack, but DaveM didn't like it,
+> saying performance is no excuse for not doing it "the right way".
+> 
+> Thanks,
+> Richard
+> 
