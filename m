@@ -1,165 +1,80 @@
 From: ck.hu@mediatek.com (CK Hu)
-Date: Wed, 13 May 2015 23:23:45 +0800
-Subject: [RFC][PATCH 1/2] dt-bindings: drm/mediatek: Add Mediatek DRM dts
- binding
-In-Reply-To: <1431530626-31493-1-git-send-email-ck.hu@mediatek.com>
-References: <1431530626-31493-1-git-send-email-ck.hu@mediatek.com>
-Message-ID: <1431530626-31493-2-git-send-email-ck.hu@mediatek.com>
+Date: Wed, 13 May 2015 23:23:44 +0800
+Subject: [RFC][PATCH 0/2] MT8173 DRM support
+Message-ID: <1431530626-31493-1-git-send-email-ck.hu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch includes
-1. Mediatek DRM Device binding
-2. Mediatek DSI Device binding
-3. Mediatek CRTC Main Device binding
-4. Mediatek DDP Device binding
+MT8173 DRM include one master drm device and three sub device: dsi device,
+crtc main device, and ddp device.
 
-Signed-off-by: CK Hu <ck.hu@mediatek.com>
----
- .../bindings/drm/mediatek/mediatek,crtc-main.txt   | 38 ++++++++++++++++++++++
- .../bindings/drm/mediatek/mediatek,ddp.txt         | 22 +++++++++++++
- .../bindings/drm/mediatek/mediatek,drm.txt         | 27 +++++++++++++++
- .../bindings/drm/mediatek/mediatek,dsi.txt         | 20 ++++++++++++
- 4 files changed, 107 insertions(+)
+Master drm device control the drm sub device and memory management.
+dsi device is a drm connector/encoder device which control MIPI/DSI hw block.
+crtc main is a drm crtc device which control hw components in the display data
+path.
+ddp is a device which control display data path.
+
+Display data path of crtc main is:
+[OVL0] -> [COLOR0] -> [AAL] -> [OD] -> [UFOE] -> [RDMA0]
+
+This patch depends on the other patches:
+1. MT8173 IOMMU support
+	http://lists.infradead.org/pipermail/linux-mediatek/2015-March/000058.html
+2. add IOMMU dma_ops
+	cherry picked from git://linux-arm.org/linux-rm iommu/dma
+		commit d76a1911b02185bdc5f8b5525f9228cf266725c5
+
+CK Hu (2):
+  dt-bindings: drm/mediatek: Add Mediatek DRM dts binding
+  drm/mediatek: Add DRM Driver for Mediatek SoC MT8173.
+
+ .../bindings/drm/mediatek/mediatek,crtc-main.txt   |   38 +
+ .../bindings/drm/mediatek/mediatek,ddp.txt         |   22 +
+ .../bindings/drm/mediatek/mediatek,drm.txt         |   27 +
+ .../bindings/drm/mediatek/mediatek,dsi.txt         |   20 +
+ drivers/gpu/drm/Kconfig                            |    2 +
+ drivers/gpu/drm/Makefile                           |    1 +
+ drivers/gpu/drm/mediatek/Kconfig                   |   28 +
+ drivers/gpu/drm/mediatek/Makefile                  |   13 +
+ drivers/gpu/drm/mediatek/mediatek_drm_crtc.c       |  246 ++++
+ drivers/gpu/drm/mediatek/mediatek_drm_crtc.h       |   80 ++
+ drivers/gpu/drm/mediatek/mediatek_drm_crtc_main.c  |  420 ++++++
+ drivers/gpu/drm/mediatek/mediatek_drm_ddp.c        |  202 +++
+ drivers/gpu/drm/mediatek/mediatek_drm_ddp.h        |   23 +
+ drivers/gpu/drm/mediatek/mediatek_drm_ddp_comp.c   |  346 +++++
+ drivers/gpu/drm/mediatek/mediatek_drm_ddp_comp.h   |   33 +
+ drivers/gpu/drm/mediatek/mediatek_drm_drv.c        |  369 ++++++
+ drivers/gpu/drm/mediatek/mediatek_drm_drv.h        |   37 +
+ drivers/gpu/drm/mediatek/mediatek_drm_dsi.c        | 1333 ++++++++++++++++++++
+ drivers/gpu/drm/mediatek/mediatek_drm_dsi.h        |   71 ++
+ drivers/gpu/drm/mediatek/mediatek_drm_fb.c         |  339 +++++
+ drivers/gpu/drm/mediatek/mediatek_drm_fb.h         |   43 +
+ drivers/gpu/drm/mediatek/mediatek_drm_gem.c        |  315 +++++
+ drivers/gpu/drm/mediatek/mediatek_drm_gem.h        |   94 ++
+ include/uapi/drm/mediatek_drm.h                    |   59 +
+ 24 files changed, 4161 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/drm/mediatek/mediatek,crtc-main.txt
  create mode 100644 Documentation/devicetree/bindings/drm/mediatek/mediatek,ddp.txt
  create mode 100644 Documentation/devicetree/bindings/drm/mediatek/mediatek,drm.txt
  create mode 100644 Documentation/devicetree/bindings/drm/mediatek/mediatek,dsi.txt
+ create mode 100644 drivers/gpu/drm/mediatek/Kconfig
+ create mode 100644 drivers/gpu/drm/mediatek/Makefile
+ create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_crtc.c
+ create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_crtc.h
+ create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_crtc_main.c
+ create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_ddp.c
+ create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_ddp.h
+ create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_ddp_comp.c
+ create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_ddp_comp.h
+ create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_drv.c
+ create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_drv.h
+ create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_dsi.c
+ create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_dsi.h
+ create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_fb.c
+ create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_fb.h
+ create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_gem.c
+ create mode 100644 drivers/gpu/drm/mediatek/mediatek_drm_gem.h
+ create mode 100644 include/uapi/drm/mediatek_drm.h
 
-diff --git a/Documentation/devicetree/bindings/drm/mediatek/mediatek,crtc-main.txt b/Documentation/devicetree/bindings/drm/mediatek/mediatek,crtc-main.txt
-new file mode 100644
-index 0000000..5c6c420
---- /dev/null
-+++ b/Documentation/devicetree/bindings/drm/mediatek/mediatek,crtc-main.txt
-@@ -0,0 +1,38 @@
-+Mediatek CRTC Main Device
-+================================
-+
-+The Mediatek CRTC Main device is a crtc device of DRM system.
-+
-+Required properties:
-+- compatible: "mediatek,<chip>-crtc-main"
-+- interrupts: The interrupt signal from the CRTC Main block.
-+- reg: Physical base address and length of the controller's registers
-+- clocks: device clocks
-+  See Documentation/devicetree/bindings/clock/clock-bindings.txt for details.
-+- ddp: phandle of ddp device which control display data path.
-+
-+Example:
-+
-+crtc_main: crtc at 1400c000 {
-+	compatible = "mediatek,mt8173-crtc-main";
-+	interrupts = <GIC_SPI 196 IRQ_TYPE_LEVEL_LOW>;
-+	reg = <0 0x1400c000 0 0x1000>,	/* OVL0 */
-+	      <0 0x1400e000 0 0x1000>,	/* RDMA0 */
-+	      <0 0x14013000 0 0x1000>,	/* COLOR0 */
-+	      <0 0x14015000 0 0x1000>,	/* AAL */
-+	      <0 0x1401a000 0 0x1000>,	/* UFOE */
-+	      <0 0x14023000 0 0x1000>;	/* OD */
-+	clocks = <&mmsys MM_DISP_OVL0>,
-+		 <&mmsys MM_DISP_RDMA0>,
-+		 <&mmsys MM_DISP_COLOR0>,
-+		 <&mmsys MM_DISP_AAL>,
-+		 <&mmsys MM_DISP_UFOE>,
-+		 <&mmsys MM_DISP_OD>;
-+	clock-names = "ovl0_disp",
-+		      "rdma0_disp",
-+		      "color0_disp",
-+		      "aal_disp",
-+		      "ufoe_disp",
-+		      "od_disp";
-+	ddp = <&ddp>;
-+};
-\ No newline at end of file
-diff --git a/Documentation/devicetree/bindings/drm/mediatek/mediatek,ddp.txt b/Documentation/devicetree/bindings/drm/mediatek/mediatek,ddp.txt
-new file mode 100644
-index 0000000..77cf630
---- /dev/null
-+++ b/Documentation/devicetree/bindings/drm/mediatek/mediatek,ddp.txt
-@@ -0,0 +1,22 @@
-+Mediatek DDP Device
-+================================
-+
-+The Mediatek DDP device control the display data path.
-+
-+Required properties:
-+- compatible: "mediatek,<chip>-ddp"
-+- reg: Physical base address and length of the controller's registers
-+- power-domains: a phandle to DDP power domain node.
-+- clocks: device clocks
-+  See Documentation/devicetree/bindings/clock/clock-bindings.txt for details.
-+
-+Example:
-+
-+ddp: ddp at 14000000 {
-+	compatible = "mediatek,mt8173-ddp";
-+	reg = <0 0x14000000 0 0x100>,	/* CONFIG */
-+	      <0 0x14020000 0 0x1000>;	/* MUTEX */
-+	power-domains = <&scpsys MT8173_POWER_DOMAIN_DIS>;
-+	clocks = <&mmsys MM_MUTEX_32K>;
-+	clock-names = "mutex_disp";
-+};
-\ No newline at end of file
-diff --git a/Documentation/devicetree/bindings/drm/mediatek/mediatek,drm.txt b/Documentation/devicetree/bindings/drm/mediatek/mediatek,drm.txt
-new file mode 100644
-index 0000000..c4a5702
---- /dev/null
-+++ b/Documentation/devicetree/bindings/drm/mediatek/mediatek,drm.txt
-@@ -0,0 +1,27 @@
-+Mediatek DRM Device
-+================================
-+
-+The Mediatek DRM device is a device needed to list all
-+display component nodes that comprise the display subsystem.
-+And it list the memory-related interface.
-+
-+Required properties:
-+- compatible: "mediatek,<chip>-drm"
-+- larb: Should contain a list of phandles pointing to larb device.
-+  larb definitions as defined in
-+  Documentation/devicetree/bindings/soc/mediatek/mediatek,smi-larb.txt
-+- iommus: required a iommu node
-+- connectors: Should contain a list of phandles pointing to connector device.
-+  connector device should be one component of this master.
-+- crtcs: Should contain a list of phandles pointing to crtc device.
-+  crtc device should be one component of this master.
-+
-+Example:
-+
-+drm0: drm {
-+	compatible = "mediatek,mt8173-drm";
-+	larb = <&larb0>;
-+	iommus = <&iommu M4U_PORT_DISP_OVL0>;
-+	connectors = <&dsi>;
-+	crtcs = <&crtc_main>;
-+};
-\ No newline at end of file
-diff --git a/Documentation/devicetree/bindings/drm/mediatek/mediatek,dsi.txt b/Documentation/devicetree/bindings/drm/mediatek/mediatek,dsi.txt
-new file mode 100644
-index 0000000..16e3eb3
---- /dev/null
-+++ b/Documentation/devicetree/bindings/drm/mediatek/mediatek,dsi.txt
-@@ -0,0 +1,20 @@
-+Mediatek DSI Device
-+================================
-+
-+The Mediatek DSI device is a connector device of DRM system.
-+
-+Required properties:
-+- compatible: "mediatek,<chip>-dsi"
-+- reg: Physical base address and length of the controller's registers
-+- clocks: device clocks
-+  See Documentation/devicetree/bindings/clock/clock-bindings.txt for details.
-+
-+Example:
-+
-+dsi: dsi at 10215000 {
-+	compatible = "mediatek,mt8173-dsi";
-+	reg = <0 0x1401B000 0 0x1000>,	/* DSI0 */
-+	      <0 0x10215000 0 0x1000>;  /* MIPITX */
-+	clocks = <&mmsys MM_DSI0_ENGINE>,	<&mmsys MM_DSI0_DIGITAL>;
-+	clock-names = "dsi0_engine_disp_ck", "dsi0_digital_disp_ck";
-+};
-\ No newline at end of file
 -- 
 1.8.1.1.dirty
