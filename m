@@ -1,73 +1,69 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Wed, 13 May 2015 10:33:53 -0400
-Subject: [PATCH v2] AHCI: Add generic MSI-X interrupt support to SATA PCI
- driver
-In-Reply-To: <20150511171810.GB29499@rric.localhost>
-References: <1430725538-22162-1-git-send-email-rric@kernel.org>
- <20150504160652.GB1971@htj.duckdns.org>
- <20150511171810.GB29499@rric.localhost>
-Message-ID: <20150513143353.GU11388@htj.duckdns.org>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 13 May 2015 07:33:54 -0700
+Subject: [PATCH v3 0/2] clk: improve handling of orphan clocks
+In-Reply-To: <20150513130304.GA4004@lukather> (Maxime Ripard's message of
+ "Wed, 13 May 2015 15:03:04 +0200")
+References: <1429735986-18592-1-git-send-email-heiko@sntech.de>
+ <1981330.kGUrTurMy5@diego> <5543E79F.2080400@codeaurora.org>
+ <22709390.NTAlubMgNB@diego> <55440EDA.4030905@codeaurora.org>
+ <CAMAWPa_n+59+v+x3fKkmdtW1wMJF7kqtTjLLowmv1xwGWprYJw@mail.gmail.com>
+ <554BD33D.7050907@codeaurora.org> <20150508100247.GQ11057@lukather>
+ <55528046.4030107@codeaurora.org> <20150513130304.GA4004@lukather>
+Message-ID: <7hiobw8s31.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Robert.
+Maxime Ripard <maxime.ripard@free-electrons.com> writes:
 
-On Mon, May 11, 2015 at 07:18:10PM +0200, Robert Richter wrote:
-> static int ahci_init_msix(struct pci_dev *pdev, unsigned int n_ports,
-> 			  struct ahci_host_priv *hpriv)
-> {
-> 	int rc, nvec;
-> 	struct msix_entry entry = {};
-> 
-> 	/* check if msix is supported */
-> 	nvec = pci_msix_vec_count(pdev);
-> 	if (nvec <= 0)
-> 		return 0;
-> 
-> 	/*
-> 	 * Per-port msix interrupts are not supported. Assume single
-> 	 * port interrupts for:
-> 	 *
-> 	 *  n_ports == 1, or
-> 	 *  nvec < n_ports.
-> 	 *
-> 	 * We also need to check for n_ports != 0 which is implicitly
-> 	 * covered here since nvec > 0.
-> 	 */
-> 	if (n_ports != 1 && nvec >= n_ports)
-> 		return -ENOSYS;
+> On Tue, May 12, 2015 at 03:35:50PM -0700, Stephen Boyd wrote:
+>> On 05/08/15 03:02, Maxime Ripard wrote:
+>> > On Thu, May 07, 2015 at 02:03:57PM -0700, Stephen Boyd wrote:
+>> >> On 05/07/15 08:17, Kevin Hilman wrote:
+>> >>> On Fri, May 1, 2015 at 4:40 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>> >>>> On 05/01/15 15:07, Heiko St?bner wrote:
+>> >>>>> Am Freitag, 1. Mai 2015, 13:52:47 schrieb Stephen Boyd:
+>> >>>>>
+>> >>>>>>> Instead I guess we could hook it less deep into clk_get_sys, like in the
+>> >>>>>>> following patch?
+>> >>>>>> It looks like it will work at least, but still I'd prefer to keep the
+>> >>>>>> orphan check contained to clk.c. How about this compile tested only patch?
+>> >>>>> I gave this a spin on my rk3288-firefly board. It still boots, the clock tree
+>> >>>>> looks the same and it also still defers nicely in the scenario I needed it
+>> >>>>> for. The implementation also looks nice - and of course much more compact than
+>> >>>>> my check in two places :-) . I don't know if you want to put this as follow-up
+>> >>>>> on top or fold it into the original orphan-check, so in any case
+>> >>>>>
+>> >>>>> Tested-by: Heiko Stuebner <heiko@sntech.de>
+>> >>>>> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+>> >>>> Thanks. I'm leaning towards tossing your patch 2/2 and replacing it with
+>> >>>> my patch and a note that it's based on an earlier patch from you.
+>> >>> It appears this has landed in linux-next in the form of 882667c1fcf1
+>> >>> clk: prevent orphan clocks from being used.  A bunch of boot failures
+>> >>> for sunxi in today's linux-next[1] were bisected down to that patch.
+>> >>>
+>> >>> I confirmed that reverting that commit on top of next/master gets
+>> >>> sunxi booting again.
+>> >>>
+>> >>>
+>> >> Thanks for the report. I've removed the two clk orphan patches from
+>> >> clk-next. Would it be possible to try with next-20150507 and
+>> >> clk_ignore_unused on the command line?
+>> > This makes it work, but it's not really an option.
+>> >
+>> 
+>> Hmm.. I thought it didn't fix it for Kevin. Confused.
+>
+> I'm too, but it does fix things here.
 
-Why are failing the whole thing when nvec >= n_ports?  Can't we just
-print some warning and configure it for single interrupt mode?
+To be more precise on what I tested.  I used next-20150507 and tested on
+4 different sunxi platforms.  First test was "normal" commandline,
+second was with clk_ignore_unused appended:
 
-> > Also, shouldn't we be printing a warning message here explaining why
-> > probing is failing?
-> 
-> I didn't want to print a warning in case -ENOSYS for backward
-> compatability. Only if msi-x code fails there is a message, see
-> __ahci_init_interrupts(). In any other case the behaviour is as
-> before, thus no message is printed.
+  - cubie: fail, fail
+  - cubie2: fail, fail
+  - bananpi: fail, pass
+  - cubietruck: fail, pass
 
-I'm confused here.  Why are we implementing msix support at all if it
-only support single interrupt mode?  I kinda assumed that that was
-because you're trying to support a controller which does only msix,
-no?  At any rate, I don't think it's wrong to print an informational /
-warning message when a controller declares msix support but has wacko
-parameters.
+So it seems to have some effect, but by itself, doesn't fix the issue.
 
-> > > +
-> > > +   /* only enable the first entry (entry.entry = 0) */
-> > > +   rc = pci_enable_msix_exact(pdev, &entry, 1);
-> >
-> > So, enabling the first msix works if nvec > 1 && nvec < n_ports but
-> > not if nvec >= n_ports?
-> 
-> For n_ports > 1 && nvec >= n_ports we need to assume per-port
-> interrupts. There are enough vectors for all ports then.
-
-Again, and we fail irq init in that case?
-
-Thanks.
-
--- 
-tejun
+Kevin
