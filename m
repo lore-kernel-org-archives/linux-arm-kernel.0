@@ -1,45 +1,32 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 13 May 2015 17:13:45 +0200 (CEST)
-Subject: Build failures in -next due to use of __hrtimer_start_range_ns
- arm-ccn.c
-In-Reply-To: <1431529683.3285.101.camel@arm.com>
-References: <E1YsUw4-0002i4-Do@optimist> <20150513145101.GU2761@sirena.org.uk>
- <1431529683.3285.101.camel@arm.com>
-Message-ID: <alpine.DEB.2.11.1505131712320.4225@nanos>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 13 May 2015 16:16:52 +0100
+Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <55536719.5050208@ti.com>
+References: <cover.1430394884.git.viresh.kumar@linaro.org>
+ <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
+ <554FFFA3.1060801@ti.com> <20150512051633.GB32300@linux>
+ <555224A2.7000308@ti.com> <20150513050559.GE28858@linux>
+ <55536719.5050208@ti.com>
+Message-ID: <20150513151652.GX2761@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 May 2015, Pawel Moll wrote:
-> On Wed, 2015-05-13 at 15:51 +0100, Mark Brown wrote:
-> > On Wed, May 13, 2015 at 12:34:48PM +0100, Build bot for Mark Brown wrote:
-> > 
-> > > 	arm64-allmodconfig
-> > > ../drivers/bus/arm-ccn.c:924:3: error: implicit declaration of function '__hrtimer_start_range_ns' [-Werror=implicit-function-declaration]
-> > > 
-> > > 	arm-allmodconfig
-> > > ../drivers/bus/arm-ccn.c:924:3: error: implicit declaration of function '__hrtimer_start_range_ns' [-Werror=implicit-function-declaration]
-> > 
-> > Today's -next fails to build both arm and arm64 allmodconfig due to the
-> > above errors, introduced in commit ffa415245b8666c44d (bus: arm-ccn:
-> > cpumask attribute).  Judging from the name of the symbol it appears that
-> > the code is peering into hrtimer implementation details and indeed it
-> > was removed in commit 58f1f803f1d6ef9 (hrtimer: Get rid of
-> > __hrtimer_start_range_ns()) which has a commit message suggsting that
-> > this has indeed been explicitly removed and no new references should be
-> > added.
-> 
-> Right, the fix will be equivalent to
-> 576b0704c9def6d54b3ae9e13b0b7567c713f568 "x86: perf: uncore: Use
-> hrtimer_start()"
-> 
-> http://marc.info/?l=linux-kernel&m=142904610220085
-> 
-> Will post it in a second, but not sure who should take it? The arm-soc
-> guys, as an additional ccn patch, or Thomas as part of his series?
+On Wed, May 13, 2015 at 10:00:41AM -0500, Nishanth Menon wrote:
 
-Route it through the same tree as the commit which introduces the
-__hrtimer_start_range_ns usage
+> What I dont see in the thread, and the point I raised here, why have
+> nominal/typical voltage at all? min<->max should be sufficient,
+> correct? If the device cannot function at min, then it should not be
+> documented as part of valid range at all.
 
-Thanks,
-
-	tglx
+Going for the minimum specified voltage is asking for trouble with
+regard to tolerances and so on, see also your concern about process
+corners.  If the electrical engineers specify things as X +/- Y the
+most conservative thing to do is to try to hit X rather than going
+straight for the limits.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150513/e496afd3/attachment.sig>
