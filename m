@@ -1,110 +1,58 @@
-From: alior@marvell.com (Lior Amsalem)
-Date: Wed, 13 May 2015 07:16:34 +0000
-Subject: [PATCH 8/8] ARM: mvebu: a38x: Enable A38x XOR engine features
-In-Reply-To: <20150512161314.GL19927@lunn.ch>
-References: <1431445063-20226-1-git-send-email-maxime.ripard@free-electrons.com>
- <1431445063-20226-9-git-send-email-maxime.ripard@free-electrons.com>
- <20150512161314.GL19927@lunn.ch>
-Message-ID: <14c9a6d3ba4c46f89880e4c1b4494dbb@IL-EXCH02.marvell.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 13 May 2015 09:18:28 +0200
+Subject: [PATCH v2 3/4] mtd: mxc_nand: fix truncate of unaligned oob
+ copying
+In-Reply-To: <20150513071201.GO2558@tarshish>
+References: <cover.1430636819.git.baruch@tkos.co.il>
+ <ff526c6b889682e36e7d086dd5e6dec8936f86d9.1430636819.git.baruch@tkos.co.il>
+ <20150508072432.GJ12671@pengutronix.de>
+ <20150513051202.GI2558@tarshish>
+ <20150513063903.GC28888@pengutronix.de>
+ <20150513064404.GM2558@tarshish>
+ <20150513064734.GF28888@pengutronix.de>
+ <20150513065922.GN2558@tarshish>
+ <20150513070140.GH28888@pengutronix.de>
+ <20150513071201.GO2558@tarshish>
+Message-ID: <20150513071828.GI28888@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Andrew Lunn [mailto:andrew at lunn.ch]
-> Sent: Tuesday, May 12, 2015 7:13 PM
+On Wed, May 13, 2015 at 10:12:01AM +0300, Baruch Siach wrote:
+> Hi Uwe,
 > 
-> On Tue, May 12, 2015 at 05:37:43PM +0200, Maxime Ripard wrote:
-> > From: Lior Amsalem <alior@marvell.com>
-> >
-> > The new XOR engine has a new compatible of its own, together with new
-> > channel capabilities.
-> >
-> > Use that new compatible now that we have a driver that can handle it.
-> >
-> > Signed-off-by: Lior Amsalem <alior@marvell.com>
-> > Reviewed-by: Ofer Heifetz <oferh@marvell.com>
-> > Reviewed-by: Nadav Haklai <nadavh@marvell.com>
-> > Tested-by: Nadav Haklai <nadavh@marvell.com>
-> > ---
-> >  arch/arm/boot/dts/armada-38x.dtsi | 20 ++++++--------------
-> >  1 file changed, 6 insertions(+), 14 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/armada-38x.dtsi
-> > b/arch/arm/boot/dts/armada-38x.dtsi
-> > index ed2dd8ba4080..6d07b7389415 100644
-> > --- a/arch/arm/boot/dts/armada-38x.dtsi
-> > +++ b/arch/arm/boot/dts/armada-38x.dtsi
-> > @@ -448,7 +448,7 @@
-> >  			};
-> >
-> >  			xor at 60800 {
-> > -				compatible = "marvell,orion-xor";
-> > +				compatible = "marvell,a38x-xor";
-> >  				reg = <0x60800 0x100
-> >  				       0x60a00 0x100>;
-> >  				clocks = <&gateclk 22>;
-> > @@ -458,17 +458,13 @@
-> >  					interrupts = <GIC_SPI 22
-> IRQ_TYPE_LEVEL_HIGH>;
-> >  					dmacap,memcpy;
-> >  					dmacap,xor;
-> > -				};
-> > -				xor01 {
-> > -					interrupts = <GIC_SPI 23
-> IRQ_TYPE_LEVEL_HIGH>;
-> > -					dmacap,memcpy;
-> > -					dmacap,xor;
-> > -					dmacap,memset;
-> > +					dmacap,pq;
-> > +					dmacap,interrupt;
+> On Wed, May 13, 2015 at 09:01:40AM +0200, Uwe Kleine-K?nig wrote:
+> > On Wed, May 13, 2015 at 09:59:22AM +0300, Baruch Siach wrote:
+> > > On Wed, May 13, 2015 at 08:47:34AM +0200, Uwe Kleine-K?nig wrote:
+> > > > On Wed, May 13, 2015 at 09:44:04AM +0300, Baruch Siach wrote:
+> > > > > > I thought we could get rid of the memcpy32 variants. Where do we need
+> > > > > > memcpy32_* where memcpy16 wouldn't work?
+> > > > > 
+> > > > > memcpy16 should work, but would take twice as much IO/memory accesses. That 
+> > > > > would definitely affect performance, as this is the flash data read/write hot 
+> > > > > path. I didn't test, though.
+> > > > > 
+> > > > > Are you sure we want to do that?
+> > > > no, I'm not sure. But I think it's worth to test how much performance
+> > > > degrades.
+> > > 
+> > > That will have to wait a few weeks as I don't have the hardware handy at the 
+> > > moment.
+> > In the hope the test will not be forgotten I consider it ok to take this
+> > series without the test (with keeping the memcpy32 that is).
 > 
-> Does this mean the hardware only has one channel?
-> And memset is no longer supported?
+> Agreed.
 > 
-
-The hardware has two channels per engine and two engines.
-However, both on HW side (both channels are on the same "bus port")
-and SW (the dma subsystem will assign one channel per CPU).
-we found it's better (performance wise) to use only one channel on each engine
-and let the framework assign one per CPU.
-This way, descriptors chaining was better (cause of the depended descriptors
-problem) and overall interrupt number reduced.
-
-Yes, since memset is a problematic one. It can only be done via registers
-(and not on descriptors level) plus no one really needs it...
-
->     Andrew
+> I'll respin this series with the ecc_8bit_layout name change as you suggested.
 > 
-> 
-> >  				};
-> >  			};
-> >
-> >  			xor at 60900 {
-> > -				compatible = "marvell,orion-xor";
-> > +				compatible = "marvell,a38x-xor";
-> >  				reg = <0x60900 0x100
-> >  				       0x60b00 0x100>;
-> >  				clocks = <&gateclk 28>;
-> > @@ -478,12 +474,8 @@
-> >  					interrupts = <GIC_SPI 65
-> IRQ_TYPE_LEVEL_HIGH>;
-> >  					dmacap,memcpy;
-> >  					dmacap,xor;
-> > -				};
-> > -				xor11 {
-> > -					interrupts = <GIC_SPI 66
-> IRQ_TYPE_LEVEL_HIGH>;
-> > -					dmacap,memcpy;
-> > -					dmacap,xor;
-> > -					dmacap,memset;
-> > +					dmacap,pq;
-> > +					dmacap,interrupt;
-> >  				};
-> >  			};
-> >
-> > --
-> > 2.4.0
-> >
+> May I have your Reviewed-by/Acked-by for the patches you are not the author 
+> of?
+Sure, you can add an Acked-by for patches 2 and 3 for your resent.  Note
+that I prefer to have spaces around operators, too. That shouldn't be a
+show stopper though.
 
+Best regards
+Uwe
 
-Regards,
-Lior Amsalem
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
