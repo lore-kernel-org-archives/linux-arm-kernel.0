@@ -1,69 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 13 May 2015 14:00:05 +0200
-Subject: [PATCH] ARM: ux500: get rid of static maps
-In-Reply-To: <1431514387-26209-1-git-send-email-linus.walleij@linaro.org>
-References: <1431514387-26209-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <3099510.cFvmYp6QHQ@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 13 May 2015 12:09:15 +0100
+Subject: [PATCH] RFC: mmc: core: Increase delay for voltage to stabilize
+ from 3.3V to 1.8V
+In-Reply-To: <1431467171-12937-1-git-send-email-dianders@chromium.org>
+References: <1431467171-12937-1-git-send-email-dianders@chromium.org>
+Message-ID: <20150513110915.GG3066@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 May 2015 12:53:07 Linus Walleij wrote:
-> The static mappings of the GPIO blocks, clock/reset controller
-> and MTU timer are clearly superfluous. These are all probed
-> exclusively from the device tree. Tested on the U8500.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Hi ARM SoC-guys: please apply this single clean-up patch
-> directly to the ARM SoC-tree where apropriate.
+On Tue, May 12, 2015 at 02:46:11PM -0700, Doug Anderson wrote:
+> Since the regulator used for the SDMMC IO voltage is not expected to
+> draw a lot of current, most systems will probably use an inexpensive
+> LDO for it.  LDO regulators apparently have the feature that they
+> don't actively drive the voltage down--they wait for other components
+> in the system to drag the voltage down.  Thus they will transition
+> faster under heavy loads and slower under light loads.
 
-Applied to next/cleanup, very nice!
+What a LDO is doing is basically just charging up a capacitor - the
+regulation consists of monitoring the voltage on the capacitor and
+opening a transistor to charge the capacitor when the voltage droops too
+much.
 
->  arch/arm/mach-ux500/cpu-db8500.c | 13 +------------
->  1 file changed, 1 insertion(+), 12 deletions(-)
-> 
-> diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-> index 6f63954c8bde..537a7753afc1 100644
-> --- a/arch/arm/mach-ux500/cpu-db8500.c
-> +++ b/arch/arm/mach-ux500/cpu-db8500.c
-> @@ -48,25 +48,14 @@ static struct map_desc u8500_uart_io_desc[] __initdata = {
->         __IO_DEV_DESC(U8500_UART0_BASE, SZ_4K),
->         __IO_DEV_DESC(U8500_UART2_BASE, SZ_4K),
->  };
-> +
->  /*  U8500 and U9540 common io_desc */
->  static struct map_desc u8500_common_io_desc[] __initdata = {
->         /* SCU base also covers GIC CPU BASE and TWD with its 4K page */
->         __IO_DEV_DESC(U8500_SCU_BASE, SZ_4K),
->         __IO_DEV_DESC(U8500_GIC_DIST_BASE, SZ_4K),
->         __IO_DEV_DESC(U8500_L2CC_BASE, SZ_4K),
-> -       __IO_DEV_DESC(U8500_MTU0_BASE, SZ_4K),
->         __IO_DEV_DESC(U8500_BACKUPRAM0_BASE, SZ_8K),
+> From experimental evidence, we've seen the voltage change fail if the
+> card doesn't detect that the voltage fell to less than about 2.3V when
+> we turn on the clock.  On one device (that admittedly had a 47K CMD
+> pullup instead of a 10K CMD pullup) we saw that the voltage was just
+> about 2.3V after 5ms and thus the voltage change would sometimes fail.
+> Doubling the delay gave margin and made the voltage change work 100%
+> of the time, despite the slightly weaker CMD pull.
 
-Could you have a look at removing the other ones as well? I think
-that would be a nice cleanup. I think it can be done like this:
+> At the moment submitting this as an RFC patch since my problem _could_
+> be fixed by increasing the pull strength (or using a smaller
+> capacitor).  However being a little bit more lenient to strange
+> hardware could also be a good thing.
 
-U8500_UART?_BASE: obsolete if you call debug_ll_io_init() or have an empty
-  map_io function
-
-U8500_SCU_BASE: add a local variable in platsmp.c and use of_iomap, or
-  ioremap with a fixed physical address if the DT node is missing
-
-U8500_GIC_DIST_BASE: I don't really understand what's going on. We could
-  just move the two users into local functions of the cpuidle driver and
-  use ioremap of the GIC, but there might be a proper solution.
-
-U8500_L2CC_BASE: it looks like ux500_l2x0_unlock() can be deleted, the
-  l2x0_of_init() function already does this in l2c_unlock
-
-U8500_BACKUPRAM0_BASE: the right solution is probably to use the generic
-  sram, but ioremap() of the physical address in wakeup_secondary would
-  also work
-
-U8500_PRCMU_BASE: use a local variable in ux500_init_irq, and do an
-  of_iomap() to pass a virtual address. Currently the callee already 
-  does an ioremap, so it's probably not needed.
-
-U8500_PRCMU_TCDM_BASE: unused?
-
-	Arnd
+Right, and this is probably going beyond the delays that the regulator
+API is handling since it's not something the regulator hardware is
+actively managing.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150513/1f30bf2b/attachment.sig>
