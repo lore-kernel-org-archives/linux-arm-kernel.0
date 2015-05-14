@@ -1,124 +1,126 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Thu, 14 May 2015 12:10:59 +0200
-Subject: [PATCH net-next 04/11] stmmac: add a generic dwmac driver
+Date: Thu, 14 May 2015 12:11:01 +0200
+Subject: [PATCH net-next 06/11] stmmac: convert dwmac-meson to platform driver
 In-Reply-To: <1431598266-25736-1-git-send-email-manabian@gmail.com>
 References: <1431598266-25736-1-git-send-email-manabian@gmail.com>
-Message-ID: <1431598266-25736-5-git-send-email-manabian@gmail.com>
+Message-ID: <1431598266-25736-7-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create a new driver around the generic device tree match strings
-in the stmmac platform code. This driver is intended to be used
-by all platforms that doesn't require any platform specific code
-to function or is using platform data.
+Convert platform glue layer into a proper platform
+driver and add it to the build system.
 
 Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 ---
- drivers/net/ethernet/stmicro/stmmac/Kconfig        | 12 +++++++
- drivers/net/ethernet/stmicro/stmmac/Makefile       |  4 ++-
- .../net/ethernet/stmicro/stmmac/dwmac-generic.c    | 39 ++++++++++++++++++++++
- .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |  5 ---
- 4 files changed, 54 insertions(+), 6 deletions(-)
- create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-generic.c
+ drivers/net/ethernet/stmicro/stmmac/Kconfig        | 11 ++++++++++
+ drivers/net/ethernet/stmicro/stmmac/Makefile       |  3 ++-
+ drivers/net/ethernet/stmicro/stmmac/dwmac-meson.c  | 24 +++++++++++++++++++++-
+ .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |  1 -
+ .../net/ethernet/stmicro/stmmac/stmmac_platform.h  |  1 -
+ 5 files changed, 36 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/net/ethernet/stmicro/stmmac/Kconfig b/drivers/net/ethernet/stmicro/stmmac/Kconfig
-index 7d3af190be55..d4ed2ac3829b 100644
+index aa03e26437e2..a5a56217a845 100644
 --- a/drivers/net/ethernet/stmicro/stmmac/Kconfig
 +++ b/drivers/net/ethernet/stmicro/stmmac/Kconfig
-@@ -26,6 +26,18 @@ config STMMAC_PLATFORM
+@@ -44,6 +44,17 @@ config DWMAC_LPC18XX
+ 	---help---
+ 	  Support for NXP LPC18xx/43xx DWMAC Ethernet.
  
- 	  If unsure, say N.
++config DWMAC_MESON
++	tristate "Amlogic Meson dwmac support"
++	default ARCH_MESON
++	depends on OF
++	help
++	  Support for Ethernet controller on Amlogic Meson SoCs.
++
++	  This selects the Amlogic Meson SoC glue layer support for
++	  the stmmac device driver. This driver is used for Meson6 and
++	  Meson8 SoCs.
++
+ endif
  
-+if STMMAC_PLATFORM
-+
-+config DWMAC_GENERIC
-+	tristate "Generic driver for DWMAC"
-+	default STMMAC_PLATFORM
-+	---help---
-+	  Generic DWMAC driver for platforms that don't require any
-+	  platform specific code to function or is using platform
-+	  data for setup.
-+
-+endif
-+
  config STMMAC_PCI
- 	tristate "STMMAC PCI bus support"
- 	depends on STMMAC_ETH && PCI
 diff --git a/drivers/net/ethernet/stmicro/stmmac/Makefile b/drivers/net/ethernet/stmicro/stmmac/Makefile
-index 5c165d8d7004..89a353450182 100644
+index 96a3abfc15bb..69cc046afd8c 100644
 --- a/drivers/net/ethernet/stmicro/stmmac/Makefile
 +++ b/drivers/net/ethernet/stmicro/stmmac/Makefile
-@@ -4,7 +4,9 @@ stmmac-objs:= stmmac_main.o stmmac_ethtool.o stmmac_mdio.o ring_mode.o	\
- 	      dwmac100_core.o dwmac100_dma.o enh_desc.o norm_desc.o	\
- 	      mmc_core.o stmmac_hwtstamp.o stmmac_ptp.o $(stmmac-y)
- 
--obj-$(CONFIG_STMMAC_PLATFORM) += stmmac-platform.o
-+# Ordering matters. Generic driver must be last.
-+obj-$(CONFIG_STMMAC_PLATFORM)	+= stmmac-platform.o
-+obj-$(CONFIG_DWMAC_GENERIC)	+= dwmac-generic.o
- stmmac-platform-objs:= stmmac_platform.o dwmac-meson.o dwmac-sunxi.o	\
+@@ -7,8 +7,9 @@ stmmac-objs:= stmmac_main.o stmmac_ethtool.o stmmac_mdio.o ring_mode.o	\
+ # Ordering matters. Generic driver must be last.
+ obj-$(CONFIG_STMMAC_PLATFORM)	+= stmmac-platform.o
+ obj-$(CONFIG_DWMAC_LPC18XX)	+= dwmac-lpc18xx.o
++obj-$(CONFIG_DWMAC_MESON)	+= dwmac-meson.o
+ obj-$(CONFIG_DWMAC_GENERIC)	+= dwmac-generic.o
+-stmmac-platform-objs:= stmmac_platform.o dwmac-meson.o dwmac-sunxi.o	\
++stmmac-platform-objs:= stmmac_platform.o dwmac-sunxi.o \
  		       dwmac-sti.o dwmac-socfpga.o dwmac-rk.o		\
- 		       dwmac-lpc18xx.o
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-generic.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-generic.c
-new file mode 100644
-index 000000000000..fb9623744e41
---- /dev/null
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-generic.c
-@@ -0,0 +1,39 @@
-+/*
-+ * Generic DWMAC platform driver
-+ *
-+ * Copyright (C) 2015 Joachim Eastwood <manabian@gmail.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
+ 
+ obj-$(CONFIG_STMMAC_PCI) += stmmac-pci.o
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-meson.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-meson.c
+index cca028d632f6..61a324a87d09 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac-meson.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-meson.c
+@@ -15,6 +15,7 @@
+ #include <linux/ethtool.h>
+ #include <linux/io.h>
+ #include <linux/ioport.h>
 +#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
+ #include <linux/platform_device.h>
+ #include <linux/stmmac.h>
+ 
+@@ -63,7 +64,28 @@ static void *meson6_dwmac_setup(struct platform_device *pdev)
+ 	return dwmac;
+ }
+ 
+-const struct stmmac_of_data meson6_dwmac_data = {
++static const struct stmmac_of_data meson6_dwmac_data = {
+ 	.setup		= meson6_dwmac_setup,
+ 	.fix_mac_speed	= meson6_dwmac_fix_mac_speed,
+ };
 +
-+#include "stmmac_platform.h"
-+
-+static const struct of_device_id dwmac_generic_match[] = {
-+	{ .compatible = "st,spear600-gmac"},
-+	{ .compatible = "snps,dwmac-3.610"},
-+	{ .compatible = "snps,dwmac-3.70a"},
-+	{ .compatible = "snps,dwmac-3.710"},
-+	{ .compatible = "snps,dwmac"},
++static const struct of_device_id meson6_dwmac_match[] = {
++	{ .compatible = "amlogic,meson6-dwmac", .data = &meson6_dwmac_data},
 +	{ }
 +};
-+MODULE_DEVICE_TABLE(of, dwmac_generic_match);
++MODULE_DEVICE_TABLE(of, meson6_dwmac_match);
 +
-+static struct platform_driver dwmac_generic_driver = {
++static struct platform_driver meson6_dwmac_driver = {
 +	.probe  = stmmac_pltfr_probe,
 +	.remove = stmmac_pltfr_remove,
 +	.driver = {
-+		.name           = "dwmac-generic",
++		.name           = "meson6-dwmac",
 +		.pm		= &stmmac_pltfr_pm_ops,
-+		.of_match_table = of_match_ptr(dwmac_generic_match),
++		.of_match_table = meson6_dwmac_match,
 +	},
 +};
-+module_platform_driver(dwmac_generic_driver);
++module_platform_driver(meson6_dwmac_driver);
 +
-+MODULE_DESCRIPTION("Generic dwmac driver");
++MODULE_AUTHOR("Beniamino Galvani <b.galvani@gmail.com>");
++MODULE_DESCRIPTION("Amlogic Meson DWMAC glue layer");
 +MODULE_LICENSE("GPL v2");
 diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-index 0d1f1ec96bc0..1777e7124d3e 100644
+index 1fd65e780a05..bed31e4db7e3 100644
 --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
 +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-@@ -43,11 +43,6 @@ static const struct of_device_id stmmac_dt_ids[] = {
- 	{ .compatible = "st,stid127-dwmac", .data = &stid127_dwmac_data},
- 	{ .compatible = "st,stih407-dwmac", .data = &stih4xx_dwmac_data},
- 	{ .compatible = "altr,socfpga-stmmac", .data = &socfpga_gmac_data },
--	{ .compatible = "st,spear600-gmac"},
--	{ .compatible = "snps,dwmac-3.610"},
--	{ .compatible = "snps,dwmac-3.70a"},
--	{ .compatible = "snps,dwmac-3.710"},
--	{ .compatible = "snps,dwmac"},
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, stmmac_dt_ids);
+@@ -35,7 +35,6 @@
+ static const struct of_device_id stmmac_dt_ids[] = {
+ 	/* SoC specific glue layers should come before generic bindings */
+ 	{ .compatible = "rockchip,rk3288-gmac", .data = &rk3288_gmac_data},
+-	{ .compatible = "amlogic,meson6-dwmac", .data = &meson6_dwmac_data},
+ 	{ .compatible = "allwinner,sun7i-a20-gmac", .data = &sun7i_gmac_data},
+ 	{ .compatible = "st,stih415-dwmac", .data = &stih4xx_dwmac_data},
+ 	{ .compatible = "st,stih416-dwmac", .data = &stih4xx_dwmac_data},
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.h b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.h
+index 23d10f6e8846..be3e137efc55 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.h
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.h
+@@ -23,7 +23,6 @@ int stmmac_pltfr_probe(struct platform_device *pdev);
+ int stmmac_pltfr_remove(struct platform_device *pdev);
+ extern const struct dev_pm_ops stmmac_pltfr_pm_ops;
+ 
+-extern const struct stmmac_of_data meson6_dwmac_data;
+ extern const struct stmmac_of_data sun7i_gmac_data;
+ extern const struct stmmac_of_data stih4xx_dwmac_data;
+ extern const struct stmmac_of_data stid127_dwmac_data;
 -- 
 1.8.0
