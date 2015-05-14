@@ -1,96 +1,65 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 14 May 2015 10:06:56 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.2
-Message-ID: <cover.1431565427.git.horms+renesas@verge.net.au>
+Date: Thu, 14 May 2015 10:06:30 +0900
+Subject: [PATCH 01/31] ARM: shmobile: r8a7790: Remove MSIOF address from
+ device tree
+In-Reply-To: <cover.1431565427.git.horms+renesas@verge.net.au>
+References: <cover.1431565427.git.horms+renesas@verge.net.au>
+Message-ID: <c7d1f08a0c91ad9796d6d1fac8eb913e8a6d4288.1431565427.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
 
-Please consider these Renesas ARM based SoC DT updates for v4.2.
+MSIOF Base Address H'E6xx can be accessed by CPU and DMAC.
+MSIOF Base Address H'E7xx for DMAC was removed from H/W manual.
 
+Signed-off-by: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
+Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7790.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
-
-  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-for-v4.2
-
-for you to fetch changes up to 7706993e2deb75022dbcfc3043890aa1a0020189:
-
-  ARM: shmobile: r8a7791: Enable DMA for HSUSB (2015-05-12 08:55:16 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC DT Updates for v4.2
-
-* Enable DMA for HSUSB on r8a7790 and r8a7791 SoCs
-* Configure the HOME key as wake-up source on kzm9g board
-* Use generic names for device nodes on SH Mobile SoCs and boards
-* Add "nor-jedec" compatible value to SH Mobile boards
-* Add IRQC clock to r8a73a4, r8a779* SoCs
-* Remove MSIOF address from r8a7790 and r8a7791 SoCs
-
-----------------------------------------------------------------
-Geert Uytterhoeven (25):
-      ARM: shmobile: r8a7740 dtsi: Fix SCIFB naming
-      ARM: shmobile: sh73a0 dtsi: Fix SCIFB naming
-      ARM: shmobile: r8a73a4: Add IRQC clock to device tree
-      ARM: shmobile: r8a7790: Add IRQC clock to device tree
-      ARM: shmobile: r8a7791: Add IRQC clock to device tree
-      ARM: shmobile: r8a7794: Add IRQC clock to device tree
-      ARM: shmobile: r8a7740 dtsi: Use generic names for device nodes
-      ARM: shmobile: r8a7778 dtsi: Use generic names for device nodes
-      ARM: shmobile: r8a7779 dtsi: Use generic names for device nodes
-      ARM: shmobile: r8a7790 dtsi: Use generic names for device nodes
-      ARM: shmobile: r8a7791 dtsi: Use generic names for device nodes
-      ARM: shmobile: sh73a0 dtsi: Use generic names for device nodes
-      ARM: shmobile: ape6evm dts: Use generic names for device nodes
-      ARM: shmobile: kzm9d dts: Use generic names for device nodes
-      ARM: shmobile: marzen dts: Use generic names for device nodes
-      ARM: shmobile: armadillo800eva dts: Use generic names for device nodes
-      ARM: shmobile: henninger dts: Add "nor-jedec" compatible value
-      ARM: shmobile: bockw-reference dts: Add "nor-jedec" compatible value
-      ARM: shmobile: lager dts: Add "nor-jedec" compatible value
-      ARM: shmobile: bockw dts: Add "nor-jedec" compatible value
-      ARM: shmobile: koelsch dts: Add "nor-jedec" compatible value
-      ARM: shmobile: bockw dts: Use generic names for device nodes
-      ARM: shmobile: lager dts: Use generic names for device nodes
-      ARM: shmobile: koelsch dts: Use generic names for device nodes
-      ARM: shmobile: kzm9g dts: Configure the HOME key as wake-up source
-
-Ryo Kataoka (2):
-      ARM: shmobile: r8a7790: Remove MSIOF address from device tree
-      ARM: shmobile: r8a7791: Remove MSIOF address from device tree
-
-Yoshihiro Shimoda (4):
-      ARM: shmobile: r8a7790: add USB-DMAC device nodes
-      ARM: shmobile: r8a7790: Enable DMA for HSUSB
-      ARM: shmobile: r8a7791: add USB-DMAC device nodes
-      ARM: shmobile: r8a7791: Enable DMA for HSUSB
-
- Documentation/devicetree/bindings/spi/sh-msiof.txt |  2 +-
- arch/arm/boot/dts/emev2-kzm9d.dts                  |  4 +-
- arch/arm/boot/dts/r8a73a4-ape6evm.dts              |  2 +-
- arch/arm/boot/dts/r8a73a4.dtsi                     | 11 ++++--
- arch/arm/boot/dts/r8a7740-armadillo800eva.dts      |  2 +-
- arch/arm/boot/dts/r8a7740.dtsi                     | 10 ++---
- arch/arm/boot/dts/r8a7778-bockw-reference.dts      |  2 +-
- arch/arm/boot/dts/r8a7778-bockw.dts                |  4 +-
- arch/arm/boot/dts/r8a7778.dtsi                     |  2 +-
- arch/arm/boot/dts/r8a7779-marzen.dts               |  6 +--
- arch/arm/boot/dts/r8a7779.dtsi                     |  2 +-
- arch/arm/boot/dts/r8a7790-lager.dts                |  4 +-
- arch/arm/boot/dts/r8a7790.dtsi                     | 44 +++++++++++++++++++---
- arch/arm/boot/dts/r8a7791-henninger.dts            |  2 +-
- arch/arm/boot/dts/r8a7791-koelsch.dts              |  4 +-
- arch/arm/boot/dts/r8a7791.dtsi                     | 42 +++++++++++++++++++--
- arch/arm/boot/dts/r8a7794.dtsi                     |  9 +++++
- arch/arm/boot/dts/sh73a0-kzm9g.dts                 |  1 +
- arch/arm/boot/dts/sh73a0.dtsi                      | 10 ++---
- include/dt-bindings/clock/r8a73a4-clock.h          |  1 +
- include/dt-bindings/clock/r8a7790-clock.h          |  3 ++
- include/dt-bindings/clock/r8a7791-clock.h          |  3 ++
- include/dt-bindings/clock/r8a7794-clock.h          |  3 ++
- 23 files changed, 132 insertions(+), 41 deletions(-)
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 4bb2f4c17321..f3b8430070b6 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -1273,7 +1273,7 @@
+ 
+ 	msiof0: spi at e6e20000 {
+ 		compatible = "renesas,msiof-r8a7790";
+-		reg = <0 0xe6e20000 0 0x0064>, <0 0xe7e20000 0 0x0064>;
++		reg = <0 0xe6e20000 0 0x0064>;
+ 		interrupts = <0 156 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp0_clks R8A7790_CLK_MSIOF0>;
+ 		dmas = <&dmac0 0x51>, <&dmac0 0x52>;
+@@ -1285,7 +1285,7 @@
+ 
+ 	msiof1: spi at e6e10000 {
+ 		compatible = "renesas,msiof-r8a7790";
+-		reg = <0 0xe6e10000 0 0x0064>, <0 0xe7e10000 0 0x0064>;
++		reg = <0 0xe6e10000 0 0x0064>;
+ 		interrupts = <0 157 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7790_CLK_MSIOF1>;
+ 		dmas = <&dmac0 0x55>, <&dmac0 0x56>;
+@@ -1297,7 +1297,7 @@
+ 
+ 	msiof2: spi at e6e00000 {
+ 		compatible = "renesas,msiof-r8a7790";
+-		reg = <0 0xe6e00000 0 0x0064>, <0 0xe7e00000 0 0x0064>;
++		reg = <0 0xe6e00000 0 0x0064>;
+ 		interrupts = <0 158 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7790_CLK_MSIOF2>;
+ 		dmas = <&dmac0 0x41>, <&dmac0 0x42>;
+@@ -1309,7 +1309,7 @@
+ 
+ 	msiof3: spi at e6c90000 {
+ 		compatible = "renesas,msiof-r8a7790";
+-		reg = <0 0xe6c90000 0 0x0064>, <0 0xe7c90000 0 0x0064>;
++		reg = <0 0xe6c90000 0 0x0064>;
+ 		interrupts = <0 159 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7790_CLK_MSIOF3>;
+ 		dmas = <&dmac0 0x45>, <&dmac0 0x46>;
+-- 
+2.1.4
