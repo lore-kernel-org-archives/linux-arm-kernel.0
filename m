@@ -1,42 +1,31 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Thu, 14 May 2015 18:00:48 +0100
-Subject: [RFC 08/23] net/xen-netback: Remove unused code in xenvif_rx_action
+Date: Thu, 14 May 2015 18:00:49 +0100
+Subject: [RFC 09/23] arm/xen: Drop duplicate define mfn_to_virt
 In-Reply-To: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
 References: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1431622863-28575-9-git-send-email-julien.grall@citrix.com>
+Message-ID: <1431622863-28575-10-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The variables old_req_cons and ring_slots_used are assigned but never
-used since commit 1650d5455bd2dc6b5ee134bd6fc1a3236c266b5b "xen-netback:
-always fully coalesce guest Rx packets".
+From: Julien Grall <julien.grall@linaro.org>
 
 Signed-off-by: Julien Grall <julien.grall@citrix.com>
-Cc: Ian Campbell <ian.campbell@citrix.com>
-Cc: Wei Liu <wei.liu2@citrix.com>
-Cc: netdev at vger.kernel.org
+Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- drivers/net/xen-netback/netback.c | 5 -----
- 1 file changed, 5 deletions(-)
+ arch/arm/include/asm/xen/page.h | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/net/xen-netback/netback.c b/drivers/net/xen-netback/netback.c
-index 9c6a504..9ae1d43 100644
---- a/drivers/net/xen-netback/netback.c
-+++ b/drivers/net/xen-netback/netback.c
-@@ -515,14 +515,9 @@ static void xenvif_rx_action(struct xenvif_queue *queue)
+diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
+index 0b579b2..1bee8ca 100644
+--- a/arch/arm/include/asm/xen/page.h
++++ b/arch/arm/include/asm/xen/page.h
+@@ -12,7 +12,6 @@
+ #include <xen/interface/grant_table.h>
  
- 	while (xenvif_rx_ring_slots_available(queue, XEN_NETBK_RX_SLOTS_MAX)
- 	       && (skb = xenvif_rx_dequeue(queue)) != NULL) {
--		RING_IDX old_req_cons;
--		RING_IDX ring_slots_used;
--
- 		queue->last_rx_time = jiffies;
+ #define phys_to_machine_mapping_valid(pfn) (1)
+-#define mfn_to_virt(m)			(__va(mfn_to_pfn(m) << PAGE_SHIFT))
  
--		old_req_cons = queue->rx.req_cons;
- 		XENVIF_RX_CB(skb)->meta_slots_used = xenvif_gop_skb(skb, &npo, queue);
--		ring_slots_used = queue->rx.req_cons - old_req_cons;
- 
- 		__skb_queue_tail(&rxq, skb);
- 	}
+ #define pte_mfn	    pte_pfn
+ #define mfn_pte	    pfn_pte
 -- 
 2.1.4
