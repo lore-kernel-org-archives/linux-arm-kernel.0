@@ -1,46 +1,34 @@
 From: clabbe.montjoie@gmail.com (LABBE Corentin)
-Date: Thu, 14 May 2015 14:58:59 +0200
-Subject: [PATCH v9 2/4] ARM: sun4i: dt: Add DT bindings documentation for
- SUN4I Security System
+Date: Thu, 14 May 2015 14:59:00 +0200
+Subject: [PATCH v9 3/4] MAINTAINERS: Add myself as maintainer of Allwinner
+ Security System
 In-Reply-To: <1431608341-10936-1-git-send-email-clabbe.montjoie@gmail.com>
 References: <1431608341-10936-1-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <1431608341-10936-3-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <1431608341-10936-4-git-send-email-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation for Device-Tree bindings for the Security System
-cryptographic accelerator driver.
-
 Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
 ---
- Documentation/devicetree/bindings/crypto/sun4i-ss.txt | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/crypto/sun4i-ss.txt
+ MAINTAINERS | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/crypto/sun4i-ss.txt b/Documentation/devicetree/bindings/crypto/sun4i-ss.txt
-new file mode 100644
-index 0000000..f2192d4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/crypto/sun4i-ss.txt
-@@ -0,0 +1,19 @@
-+* Allwinner Security System found on A20 SoC
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 5d87ccb..f2518d8 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -555,6 +555,12 @@ S:	Maintained
+ F:	Documentation/i2c/busses/i2c-ali1563
+ F:	drivers/i2c/busses/i2c-ali1563.c
+ 
++ALLWINNER SECURITY SYSTEM
++M:	Corentin Labbe <clabbe.montjoie@gmail.com>
++L:	linux-crypto at vger.kernel.org
++S:	Maintained
++F:	drivers/crypto/sunxi-ss/
 +
-+Required properties:
-+- compatible : Should be "allwinner,sun4i-a20-crypto".
-+- reg: Should contain the Security System register location and length.
-+- interrupts: Should contain the IRQ line for the Security System.
-+- clocks : List of clock specifiers, corresponding to ahb and ss.
-+- clock-names : Name of the functional clock, should be
-+	* "ahb" : AHB gating clock
-+	* "mod" : SS controller clock
-+
-+Example:
-+	crypto: crypto-engine at 01c15000 {
-+		compatible = "allwinner,sun4i-a20-crypto";
-+		reg = <0x01c15000 0x1000>;
-+		interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&ahb_gates 5>, <&ss_clk>;
-+		clock-names = "ahb", "mod";
-+	};
+ ALPHA PORT
+ M:	Richard Henderson <rth@twiddle.net>
+ M:	Ivan Kokshaysky <ink@jurassic.park.msu.ru>
 -- 
 2.3.6
