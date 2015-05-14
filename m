@@ -1,42 +1,79 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 14 May 2015 18:13:53 +0200
-Subject: [PATCH 10/10] ARM: ux500: delete static resource defines
-Message-ID: <1431620033-15214-1-git-send-email-linus.walleij@linaro.org>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Thu, 14 May 2015 18:13:55 +0200
+Subject: [PATCH v2] ARM: l2c: add options to overwrite prefetching behavior
+Message-ID: <1431620035-7183-1-git-send-email-hauke@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These macros were used in the past to define static resources,
-but are not used anymore and have no future, delete them.
+These options make it possible to overwrites the data and instruction
+prefetching behavior of the arm pl310 cache controller.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+We have to set these values in the aux and the prefetch register,
+because these two bits in the aux registers are mapped to the prefetch
+register. If only the prefetch register is changed there is an
+inconsistence in the state in this driver.
+
+Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
 ---
- arch/arm/mach-ux500/setup.h | 14 --------------
- 1 file changed, 14 deletions(-)
+ Documentation/devicetree/bindings/arm/l2cc.txt |  4 ++++
+ arch/arm/mm/cache-l2x0.c                       | 30 ++++++++++++++++++++++++++
+ 2 files changed, 34 insertions(+)
 
-diff --git a/arch/arm/mach-ux500/setup.h b/arch/arm/mach-ux500/setup.h
-index cf5a8736ea9d..1fb6ad2789f1 100644
---- a/arch/arm/mach-ux500/setup.h
-+++ b/arch/arm/mach-ux500/setup.h
-@@ -26,20 +26,6 @@ extern struct device *ux500_soc_device_init(const char *soc_id);
+diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
+index 0dbabe9..528821a 100644
+--- a/Documentation/devicetree/bindings/arm/l2cc.txt
++++ b/Documentation/devicetree/bindings/arm/l2cc.txt
+@@ -67,6 +67,10 @@ Optional properties:
+   disable if zero.
+ - arm,prefetch-offset : Override prefetch offset value. Valid values are
+   0-7, 15, 23, and 31.
++- arm,prefetch-data : Enable data prefetch. Enabling prefetching
++  can improve performance.
++- arm,prefetch-instr : Enable instruction prefetch. Enabling prefetching
++  can improve performance.
  
- extern void ux500_timer_init(void);
+ Example:
  
--#define __IO_DEV_DESC(x, sz)	{		\
--	.virtual	= IO_ADDRESS(x),	\
--	.pfn		= __phys_to_pfn(x),	\
--	.length		= sz,			\
--	.type		= MT_DEVICE,		\
--}
--
--#define __MEM_DEV_DESC(x, sz)	{		\
--	.virtual	= IO_ADDRESS(x),	\
--	.pfn		= __phys_to_pfn(x),	\
--	.length		= sz,			\
--	.type		= MT_MEMORY_RWX,		\
--}
--
- extern struct smp_operations ux500_smp_ops;
- extern void ux500_cpu_die(unsigned int cpu);
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index e309c8f..088b5ad 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -1199,6 +1199,36 @@ static void __init l2c310_of_parse(const struct device_node *np,
+ 		pr_err("L2C-310 OF arm,prefetch-offset property value is missing\n");
+ 	}
+ 
++	ret = of_property_read_u32(np, "arm,prefetch-data", &val);
++	if (ret == 0) {
++		if (val) {
++			prefetch |= L310_PREFETCH_CTRL_DATA_PREFETCH;
++			*aux_val |= L310_AUX_CTRL_DATA_PREFETCH;
++			*aux_mask &= ~L310_AUX_CTRL_DATA_PREFETCH;
++		} else {
++			prefetch &= ~L310_PREFETCH_CTRL_DATA_PREFETCH;
++			*aux_val &= ~L310_AUX_CTRL_DATA_PREFETCH;
++			*aux_mask |= L310_AUX_CTRL_DATA_PREFETCH;
++		}
++	} else if (ret != -EINVAL) {
++		pr_err("L2C-310 OF arm,prefetch-data property value is missing\n");
++	}
++
++	ret = of_property_read_u32(np, "arm,prefetch-instr", &val);
++	if (ret == 0) {
++		if (val) {
++			prefetch |= L310_PREFETCH_CTRL_INSTR_PREFETCH;
++			*aux_val |= L310_AUX_CTRL_INSTR_PREFETCH;
++			*aux_mask &= ~L310_AUX_CTRL_INSTR_PREFETCH;
++		} else {
++			prefetch &= ~L310_PREFETCH_CTRL_INSTR_PREFETCH;
++			*aux_val &= ~L310_AUX_CTRL_INSTR_PREFETCH;
++			*aux_mask |= L310_AUX_CTRL_INSTR_PREFETCH;
++		}
++	} else if (ret != -EINVAL) {
++		pr_err("L2C-310 OF arm,prefetch-instr property value is missing\n");
++	}
++
+ 	l2x0_saved_regs.prefetch_ctrl = prefetch;
+ }
  
 -- 
-1.9.3
+2.1.4
