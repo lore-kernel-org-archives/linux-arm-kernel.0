@@ -1,61 +1,52 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 14 May 2015 11:16:54 +0200
-Subject: [RFC][PATCH 2/2] drm/mediatek: Add DRM Driver for Mediatek SoC
- MT8173.
-In-Reply-To: <1431530626-31493-3-git-send-email-ck.hu@mediatek.com>
-References: <1431530626-31493-1-git-send-email-ck.hu@mediatek.com>
- <1431530626-31493-3-git-send-email-ck.hu@mediatek.com>
-Message-ID: <1431595014.2650.50.camel@x220>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 14 May 2015 11:22:34 +0200
+Subject: [PATCH] ARM: ux500: add SCU and WD to device tree
+Message-ID: <1431595354-2101-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A naive question and a nit follow. That's probably not what you'd like
-to see for an RFC, but the patch got tangled up in my mail filter
-anyhow.
+The Ux500 like other Cortex-A9 SoC's has a Snoop Control
+Unit (SCU) and a Watchdog in the same address range as
+the local timers. Add these to the SoC device tree.
 
-On Wed, 2015-05-13 at 23:23 +0800, CK Hu wrote:
-> --- /dev/null
-> +++ b/drivers/gpu/drm/mediatek/Kconfig
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ARM SoC folks: if it looks OK, please apply this directly to
+the DT branch with other ux500 DT changes, this is needed
+for cleanups when we want to remap the SCU from the DT.
+---
+ arch/arm/boot/dts/ste-dbx5x0.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-> +config DRM_MEDIATEK_FBDEV
-> +	bool "Enable legacy fbdev support for Mediatek DRM"
-> +	depends on DRM_MEDIATEK
-> +	select FB_SYS_FILLRECT
-> +	select FB_SYS_COPYAREA
-> +	select FB_SYS_IMAGEBLIT
-> +	select DRM_KMS_FB_HELPER
-> +	help
-> +	  Choose this option if you have a need for the legacy
-> +	  fbdev support.  Note that this support also provides
-> +	  the Linux console on top of the Mediatek DRM mode
-> +	  setting driver.
-
-Naive question, as I know next to nothing about drivers/gpu/drm.
-DRM_MEDIATEK_FBDEV isn't used anywhere, as far as I can see. So all that
-setting this Kconfig symbol does is selecting four other Kconfig
-symbols. Is selecting those four symbols enough to get fbdev support?
-Taking the Cargo Cult approach of looking at similar symbols
-(DRM_I915_FBDEV, DRM_MSM_FBDEV, DRM_STI_FBDEV, and DRM_TEGRA_FBDEV) I
-noticed that they all do a bit more than just selecting other symbols.
-
-> --- /dev/null
-> +++ b/drivers/gpu/drm/mediatek/mediatek_drm_drv.c
-
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-
-This states the license of this driver is GPL v2. (Identical comments
-seem to be part of all files added in this patch.)
-
-> +MODULE_LICENSE("GPL");
-
-And, according to include/linux/module.h, this states the license is GPL
-v2 or later. So I think that either the comment at the top of these
-files or the ident used in the MODULE_LICENSE() macro needs to be
-changed.
-
-Thanks,
-
-
-Paul Bolle
+diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+index 5b876f263af4..f024a1c0de8b 100644
+--- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
++++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+@@ -185,6 +185,11 @@
+ 			      <0xa0410100 0x100>;
+ 		};
+ 
++		scu at a04100000 {
++			compatible = "arm,cortex-a9-scu";
++			reg = <0xa0410000 0x100>;
++		};
++
+ 		L2: l2-cache {
+ 			compatible = "arm,pl310-cache";
+ 			reg = <0xa0412000 0x1000>;
+@@ -245,6 +250,13 @@
+ 			clocks = <&smp_twd_clk>;
+ 		};
+ 
++		watchdog at a0410620 {
++			compatible = "arm,cortex-a9-twd-wdt";
++			reg = <0xa0410620 0x20>;
++			interrupts = <1 14 0x304>;
++			clocks = <&smp_twd_clk>;
++		};
++
+ 		rtc at 80154000 {
+ 			compatible = "arm,rtc-pl031", "arm,primecell";
+ 			reg = <0x80154000 0x1000>;
+-- 
+1.9.3
