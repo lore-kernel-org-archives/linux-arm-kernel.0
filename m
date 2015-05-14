@@ -1,74 +1,65 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 14 May 2015 12:53:14 +0200
-Subject: [PATCH 0/6] cpufreq: use generic cpufreq drivers for
- Exynos4210platform
-In-Reply-To: <20150514051046.GB9887@linux>
-References: <'@samsung.com> <55541F92.4020404@kernel.org>
- <20150514051046.GB9887@linux>
-Message-ID: <3051718.I09JWVi0Gb@amdc1976>
+From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
+Date: Thu, 14 May 2015 19:53:45 +0900
+Subject: [PATCH v3 0/8] ARM: dts: exynos5: labels for overriding nodes
+Message-ID: <1431600833-3361-1-git-send-email-k.kozlowski.k@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, May 14, 2015 10:40:46 AM Viresh Kumar wrote:
-> On 14-05-15, 13:07, Kukjin Kim wrote:
-> > On 05/13/15 23:08, Bartlomiej Zolnierkiewicz wrote:
-> > > 
-> > > Hi,
-> > > 
-> > Hi Bart,
-> > 
-> > > On Friday, April 03, 2015 06:43:43 PM Bartlomiej Zolnierkiewicz wrote:
-> > >> Hi,
-> > >>
-> > >> This patch series removes the use of Exynos4210 specific support
-> > >> from cpufreq-exynos driver and enables the use of cpufreq-dt driver
-> > >> for this platform.
-> > > 
-> > > Gentle Ping.  Mike/Kukjin/Viresh could you please review/ack relevant
-> > > patches (patches #1-3 are for clock subsystem, patches #4-5 for Exynos
-> > > mach/dts and patch #6 is for cpufreq subsystem)?
-> 
-> Sorry I thought I already Acked an older version of this set and so
-> didn't went for it again. Done now.
+Hi,
 
-Thanks!
 
-> > Yes, I totally agreed with this patches for arch side changes and this
-> > approach when Thomas posted.
-> > 
-> > > Also what is your
-> > > preferred way to upstream them (patches are not independent so it would
-> > > be best to merge them through one tree, otherwise synchronization of
-> > > git pulls between different subsystem trees will be needed)?
-> > > 
-> > I can provide topic branch for arch side changes even it is small. I
-> > think once Viresh and Mike make each topic branch based on -rc or the
-> > smallest changes from each subsystem then I could handle this series or
-> > Viresh or Mike need to handle this series with merging each topic
-> > branches in subsystem. I'm fine either way.
-> > 
-> > Viresh and Mike, how do you think about that?
-> 
-> For cpufreq subsystem changes, you can take them in your tree.
-> 
-> > > I'm still hoping that this patchset will make it into v4.2 as there are
-> > > no known issues with it (except minor coding nit for patch #5)...
-> > > 
-> > Sure, why not :-)
-> 
-> One thing that looked wrong to me is the email id of Thomas..
-> I believe he has already left Samsung and his id wouldn't exist
-> anymore. Right ?
+Changes since v2
+================
+1. New patch 8/8: ARM: dts: Use labels for overriding nodes
+   in exynos5422-odroidxu3
+2. To avoid conflicts rebased on my "for-next" branch of
+   https://github.com/krzk/linux
+   The branch above contains some patches for Exynos5 boards
+   applied from LKML.
 
-This doesn't seem to be a case.  His email doesn't bounce and his
-id exists (I've just checked this).  I think that he is just very
-busy with some other work.
+Changes since v1
+================
+1. Re-phrased the description (phandle->label). Suggested by Arnd.
 
-> Then I wouldn't recommend something that doesn't exist to get merged
-> now. Probably use another email id of his.
+
+Description
+===========
+The label-based notation reduces possible mistakes when overriding
+nodes by child DTSI and board files and reduces duplication
+of addresses.
+
+The patchset refactors Exynos5 boards to use labels for overriding nodes.
+
+Tested by comparison of decompiled DTB for each commit.
+
 
 Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Krzysztof
+
+
+Krzysztof Kozlowski (8):
+  ARM: dts: Add labels to exynos5 nodes
+  ARM: dts: Use labels for overriding nodes in exynos5250
+  ARM: dts: Remove duplicated I2C7 nodes in exynos5250-snow
+  ARM: dts: Use labels for overriding nodes in exynos5420-arndale-octa
+  ARM: dts: Use labels for overriding nodes in exynos542x
+  ARM: dts: Use labels for overriding nodes in exynos5420-smdk5420
+  ARM: dts: Use labels for overriding nodes in exynos5440 boards
+  ARM: dts: Use labels for overriding nodes in exynos5422-odroidxu3
+
+ arch/arm/boot/dts/exynos5.dtsi                |   6 +-
+ arch/arm/boot/dts/exynos5250-snow.dts         |  46 +-
+ arch/arm/boot/dts/exynos5250.dtsi             |  82 ++--
+ arch/arm/boot/dts/exynos5420-arndale-octa.dts | 634 ++++++++++++-------------
+ arch/arm/boot/dts/exynos5420-peach-pit.dts    |   2 +-
+ arch/arm/boot/dts/exynos5420-smdk5420.dts     | 645 +++++++++++++-------------
+ arch/arm/boot/dts/exynos5420.dtsi             |  82 ++--
+ arch/arm/boot/dts/exynos5422-odroidxu3.dts    | 573 +++++++++++------------
+ arch/arm/boot/dts/exynos5440-sd5v1.dts        |  10 +-
+ arch/arm/boot/dts/exynos5440-ssdk5440.dts     |  85 ++--
+ arch/arm/boot/dts/exynos5440.dtsi             |   4 +-
+ arch/arm/boot/dts/exynos5800-peach-pi.dts     |   2 +-
+ 12 files changed, 1085 insertions(+), 1086 deletions(-)
+
+-- 
+2.1.4
