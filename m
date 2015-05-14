@@ -1,109 +1,178 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 14 May 2015 19:53:25 +0200
-Subject: [PATCH v3 5/6] dmaengine: pxa_dma: add support for legacy transition
-In-Reply-To: <1431626006-1708-1-git-send-email-robert.jarzmik@free.fr>
-References: <1431626006-1708-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1431626006-1708-5-git-send-email-robert.jarzmik@free.fr>
+Date: Thu, 14 May 2015 19:53:21 +0200
+Subject: [PATCH v3 1/6] Documentation: dmaengine: pxa-dma design
+Message-ID: <1431626006-1708-1-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to achieve smooth transition of pxa drivers from old legacy dma
-handling to new dmaengine, introduce a function to "hide" dma physical
-channels from dmaengine.
-
-This is temporary situation where pxa dma will be handled in 2 places :
- - arch/arm/plat-pxa/dma.c
- - drivers/dma/pxa_dma.c
-
-The resources, ie. dma channels, will be controlled by pxa_dma. The
-legacy code will request or release a channel with
-pxad_toggle_reserved_channel().
-
-This is not very pretty, but it ensures both legacy and dmaengine
-consumers can live in the same kernel until the conversion is done.
+Document the new design of the pxa dma driver.
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- drivers/dma/pxa_dma.c | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+Since v2: Vinod's review
+---
+ Documentation/dmaengine/pxa_dma.txt | 153 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 153 insertions(+)
+ create mode 100644 Documentation/dmaengine/pxa_dma.txt
 
-diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
-index f0912a2..08abb51 100644
---- a/drivers/dma/pxa_dma.c
-+++ b/drivers/dma/pxa_dma.c
-@@ -408,6 +408,15 @@ static inline void pxad_init_debugfs(struct pxad_device *pdev) {}
- static inline void pxad_cleanup_debugfs(struct pxad_device *pdev) {}
- #endif
- 
-+/*
-+ * In the transition phase where legacy pxa handling is done at the same time as
-+ * mmp_dma, the DMA physical channel split between the 2 DMA providers is done
-+ * through legacy_reserved. Legacy code reserves DMA channels by settings
-+ * corresponding bits in legacy_reserved.
-+ */
-+static u32 legacy_reserved;
-+static u32 legacy_unavailable;
+diff --git a/Documentation/dmaengine/pxa_dma.txt b/Documentation/dmaengine/pxa_dma.txt
+new file mode 100644
+index 0000000..413ef9c
+--- /dev/null
++++ b/Documentation/dmaengine/pxa_dma.txt
+@@ -0,0 +1,153 @@
++PXA/MMP - DMA Slave controller
++==============================
 +
- static struct pxad_phy *lookup_phy(struct pxad_chan *pchan)
- {
- 	int prio, i;
-@@ -428,10 +437,14 @@ static struct pxad_phy *lookup_phy(struct pxad_chan *pchan)
- 		for (i = 0; i < pdev->nr_chans; i++) {
- 			if (prio != (i & 0xf) >> 2)
- 				continue;
-+			if ((i < 32) && (legacy_reserved & BIT(i)))
-+				continue;
- 			phy = &pdev->phys[i];
- 			if (!phy->vchan) {
- 				phy->vchan = pchan;
- 				found = phy;
-+				if (i < 32)
-+					legacy_unavailable |= BIT(i);
- 				goto out_unlock;
- 			}
- 		}
-@@ -451,6 +464,7 @@ static void pxad_free_phy(struct pxad_chan *chan)
- 	struct pxad_device *pdev = to_pxad_dev(chan->vc.chan.device);
- 	unsigned long flags;
- 	u32 reg;
-+	int i;
- 
- 	dev_dbg(&chan->vc.chan.dev->device,
- 		"%s(): freeing\n", __func__);
-@@ -462,6 +476,9 @@ static void pxad_free_phy(struct pxad_chan *chan)
- 	writel_relaxed(0, chan->phy->base + reg);
- 
- 	spin_lock_irqsave(&pdev->phy_lock, flags);
-+	for (i = 0; i < 32; i++)
-+		if (chan->phy == &pdev->phys[i])
-+			legacy_unavailable &= ~BIT(i);
- 	chan->phy->vchan = NULL;
- 	chan->phy = NULL;
- 	spin_unlock_irqrestore(&pdev->phy_lock, flags);
-@@ -691,6 +708,8 @@ static irqreturn_t pxad_int_handler(int irq, void *dev_id)
- 		i = __ffs(dint);
- 		dint &= (dint - 1);
- 		phy = &pdev->phys[i];
-+		if ((i < 32) && (legacy_reserved & BIT(i)))
-+			continue;
- 		if (pxad_chan_handler(irq, phy) == IRQ_HANDLED)
- 			ret = IRQ_HANDLED;
- 	}
-@@ -1429,6 +1448,15 @@ bool pxad_filter_fn(struct dma_chan *chan, void *param)
- }
- EXPORT_SYMBOL_GPL(pxad_filter_fn);
- 
-+int pxad_toggle_reserved_channel(int legacy_channel)
-+{
-+	if (legacy_unavailable & (BIT(legacy_channel)))
-+		return -EBUSY;
-+	legacy_reserved ^= BIT(legacy_channel);
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(pxad_toggle_reserved_channel);
++Constraints
++-----------
++  a) Transfers hot queuing
++     A driver submitting a transfer and issuing it should be granted the transfer
++     is queued even on a running DMA channel.
++     This implies that the queuing doesn't wait for the previous transfer end,
++     and that the descriptor chaining is not only done in the irq/tasklet code
++     triggered by the end of the transfer.
++     A transfer which is submitted and issued on a phy doesn't wait for a phy to
++     stop and restart, but is submitted on a "running channel". The other
++     drivers, especially mmp_pdma waited for the phy to stop before relaunching
++     a new transfer.
 +
- module_platform_driver(pxad_driver);
- 
- MODULE_DESCRIPTION("Marvell PXA Peripheral DMA Driver");
++  b) All transfers having asked for confirmation should be signaled
++     Any issued transfer with DMA_PREP_INTERRUPT should trigger a callback call.
++     This implies that even if an irq/tasklet is triggered by end of tx1, but
++     at the time of irq/dma tx2 is already finished, tx1->complete() and
++     tx2->complete() should be called.
++
++  c) Channel running state
++     A driver should be able to query if a channel is running or not. For the
++     multimedia case, such as video capture, if a transfer is submitted and then
++     a check of the DMA channel reports a "stopped channel", the transfer should
++     not be issued until the next "start of frame interrupt", hence the need to
++     know if a channel is in running or stopped state.
++
++  d) Bandwidth guarantee
++     The PXA architecture has 4 levels of DMAs priorities : high, normal, low.
++     The high prorities get twice as much bandwidth as the normal, which get twice
++     as much as the low priorities.
++     A driver should be able to request a priority, especially the real-time
++     ones such as pxa_camera with (big) throughputs.
++
++Design
++------
++  a) Virtual channels
++     Same concept as in sa11x0 driver, ie. a driver was assigned a "virtual
++     channel" linked to the requestor line, and the physical DMA channel is
++     assigned on the fly when the transfer is issued.
++
++  b) Transfer anatomy for a scatter-gather transfer
++     +------------+-----+---------------+----------------+-----------------+
++     | desc-sg[0] | ... | desc-sg[last] | status updater | finisher/linker |
++     +------------+-----+---------------+----------------+-----------------+
++
++     This structure is pointed by dma->sg_cpu.
++     The descriptors are used as follows :
++      - desc-sg[i]: i-th descriptor, transferring the i-th sg
++        element to the video buffer scatter gather
++      - status updater
++        Transfers a single u32 to a well known dma coherent memory to leave
++        a trace that this transfer is done. The "well known" is unique per
++        physical channel, meaning that a read of this value will tell which
++        is the last finished transfer at that point in time.
++      - finisher: has ddadr=DADDR_STOP, dcmd=ENDIRQEN
++      - linker: has ddadr= desc-sg[0] of next transfer, dcmd=0
++
++  c) Transfers hot-chaining
++     Suppose the running chain is :
++         Buffer 1         Buffer 2
++     +---------+----+---+  +----+----+----+---+
++     | d0 | .. | dN | l |  | d0 | .. | dN | f |
++     +---------+----+-|-+  ^----+----+----+---+
++                      |    |
++                      +----+
++
++     After a call to dmaengine_submit(b3), the chain will look like :
++          Buffer 1              Buffer 2             Buffer 3
++     +---------+----+---+  +----+----+----+---+  +----+----+----+---+
++     | d0 | .. | dN | l |  | d0 | .. | dN | l |  | d0 | .. | dN | f |
++     +---------+----+-|-+  ^----+----+----+-|-+  ^----+----+----+---+
++                      |    |                |    |
++                      +----+                +----+
++                                           new_link
++
++     If while new_link was created the DMA channel stopped, it is _not_
++     restarted. Hot-chaining doesn't break the assumption that
++     dma_async_issue_pending() is to be used to ensure the transfer is actually started.
++
++     One exception to this rule :
++       - if Buffer1 and Buffer2 had all their addresses 8 bytes aligned
++       - and if Buffer3 has at least one address not 4 bytes aligned
++       - then hot-chaining cannot happen, as the channel must be stopped, the
++         "align bit" must be set, and the channel restarted As a consequence,
++         such a transfer tx_submit() will be queued on the submitted queue, and
++         this specific case if the DMA is already running in aligned mode.
++
++  d) Transfers completion updater
++     Each time a transfer is completed on a channel, an interrupt might be
++     generated or not, up to the client's request. But in each case, the last
++     descriptor of a transfer, the "status updater", will write the latest
++     transfer being completed into the physical channel's completion mark.
++
++     This will speed up residue calculation, for large transfers such as video
++     buffers which hold around 6k descriptors or more. This also allows without
++     any lock to find out what is the latest completed transfer in a running
++     DMA chain.
++
++  e) Transfers completion, irq and tasklet
++     When a transfer flagged as "DMA_PREP_INTERRUPT" is finished, the dma irq
++     is raised. Upon this interrupt, a tasklet is scheduled for the physical
++     channel.
++     The tasklet is responsible for :
++      - reading the physical channel last updater mark
++      - calling all the transfer callbacks of finished transfers, based on
++        that mark, and each transfer flags.
++     If a transfer is completed while this handling is done, a dma irq will
++     be raised, and the tasklet will be scheduled once again, having a new
++     updater mark.
++
++  f) Residue
++     Residue granularity will be descriptor based. The issued but not completed
++     transfers will be scanned for all of their descriptors against the
++     currently running descriptor.
++
++  g) Most complicated case of driver's tx queues
++     The most tricky situation is when :
++       - there are not "acked" transfers (tx0)
++       - a driver submitted an aligned tx1, not chained
++       - a driver submitted an aligned tx2 => tx2 is cold chained to tx1
++       - a driver issued tx1+tx2 => channel is running in aligned mode
++       - a driver submitted an aligned tx3 => tx3 is hot-chained
++       - a driver submitted an unaligned tx4 => tx4 is put in submitted queue,
++         not chained
++       - a driver issued tx4 => tx4 is put in issued queue, not chained
++       - a driver submitted an aligned tx5 => tx5 is put in submitted queue, not
++         chained
++       - a driver submitted an aligned tx6 => tx6 is put in submitted queue,
++         cold chained to tx5
++
++     This translates into (after tx4 is issued) :
++       - issued queue
++     +-----+ +-----+ +-----+ +-----+
++     | tx1 | | tx2 | | tx3 | | tx4 |
++     +---|-+ ^---|-+ ^-----+ +-----+
++         |   |   |   |
++         +---+   +---+
++       - submitted queue
++     +-----+ +-----+
++     | tx5 | | tx6 |
++     +---|-+ ^-----+
++         |   |
++         +---+
++       - completed queue : empty
++       - allocated queue : tx0
++
++     It should be noted that after tx3 is completed, the channel is stopped, and
++     restarted in "unaligned mode" to handle tx4.
++
++Author: Robert Jarzmik <robert.jarzmik@free.fr>
 -- 
 2.1.4
