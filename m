@@ -1,90 +1,68 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 14 May 2015 15:09:57 +0200
-Subject: [PATCH] ARM: tegra: Enable TPM on tegra124 nyan boards
-In-Reply-To: <5553637C.5010506@wwwdotorg.org>
-References: <1431526427-13340-1-git-send-email-sjg@chromium.org>
- <5553637C.5010506@wwwdotorg.org>
-Message-ID: <CAAObsKCxFJA=6kyHM5rtpJMVRZRDbBO3KSn+QdNoOQz1rXCWTQ@mail.gmail.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Thu, 14 May 2015 14:11:12 +0100
+Subject: [PATCH 2/5] arm64: Juno: Split juno.dts into juno-base.dtsi and
+ juno.dts.
+In-Reply-To: <1431601471.2881.36.camel@linaro.org>
+References: <1431537092-19597-1-git-send-email-Liviu.Dudau@arm.com>
+ <1431537092-19597-3-git-send-email-Liviu.Dudau@arm.com>
+ <1431596142.2881.13.camel@linaro.org>
+ <20150514103040.GN2345@e106497-lin.cambridge.arm.com>
+ <1431601471.2881.36.camel@linaro.org>
+Message-ID: <20150514131112.GQ2345@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 May 2015 at 16:45, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 05/13/2015 08:13 AM, Simon Glass wrote:
->>
->> Regenerate the pinmux from the latest tegra-pinmux-scripts.
->
->
-> (Dropping most CCs; DT maintainers and lists generally don't get CC'd on
-> simple DT content changes but rather on schema adds/changes and perhaps
-> major DT content changes depending on context)
->
->> diff --git a/arch/arm/boot/dts/tegra124-nyan-big.dts
->> b/arch/arm/boot/dts/tegra124-nyan-big.dts
->
->
->>                 pinctrl-names = "default";
->>                 pinctrl-0 = <&pinmux_default>;
->>
->> -               pinmux_default: common {
->> +               state_default: pinmux {
->
->
-> This change will break compilation, since it changes the label name, yet the
-> old name is still referenced in pinctrl-0 above. Same applies in the other
-> file too.
->
->> diff --git a/arch/arm/boot/dts/tegra124-nyan-blaze.dts
->> b/arch/arm/boot/dts/tegra124-nyan-blaze.dts
->
->
->> @@ -437,18 +437,18 @@
->>                         usb_vbus_en0_pn4 {
->>                                 nvidia,pins = "usb_vbus_en0_pn4";
->>                                 nvidia,function = "usb";
->> -                               nvidia,pull = <TEGRA_PIN_PULL_UP>;
->> +                               nvidia,pull = <TEGRA_PIN_PULL_NONE>;
->>                                 nvidia,tristate = <TEGRA_PIN_DISABLE>;
->>                                 nvidia,enable-input = <TEGRA_PIN_ENABLE>;
->> -                               nvidia,open-drain = <TEGRA_PIN_DISABLE>;
->> +                               nvidia,open-drain = <TEGRA_PIN_ENABLE>;
->>                         };
->>                         usb_vbus_en1_pn5 {
->>                                 nvidia,pins = "usb_vbus_en1_pn5";
->>                                 nvidia,function = "usb";
->> -                               nvidia,pull = <TEGRA_PIN_PULL_UP>;
->> +                               nvidia,pull = <TEGRA_PIN_PULL_NONE>;
->>                                 nvidia,tristate = <TEGRA_PIN_DISABLE>;
->>                                 nvidia,enable-input = <TEGRA_PIN_ENABLE>;
->> -                               nvidia,open-drain = <TEGRA_PIN_DISABLE>;
->> +                               nvidia,open-drain = <TEGRA_PIN_ENABLE>;
->>                         };
->
->
-> Tomeu, can you comment on those changes? Evidently the pinmux configuration
-> that's you added to the kernel doesn't exactly match the pinmux
-> configuration that you added to tegra-pinmux-scripts.
+On Thu, May 14, 2015 at 12:04:31PM +0100, Jon Medhurst (Tixy) wrote:
+> On Thu, 2015-05-14 at 11:30 +0100, Liviu Dudau wrote:
+> > On Thu, May 14, 2015 at 10:35:42AM +0100, Jon Medhurst (Tixy) wrote:
+> [...]
+> > > 
+> > > What criteria were used to select the contents of juno-base.dtsi?
+> > > From what I can see, the stuff left out of base is still the same for r0
+> > > and r1 (cpu, pmu, memory, psci!).
+> [...]
+> > 
+> > There are potential differences. Cortex-A53 cluster in r1 has limited
+> > CPUfreq functionality due to a chip errata and there were talks internally
+> > to actually disable it, hence the reason for keeping CPUs outside the
+> > juno-base.dtsi. r2 will have a different set of big CPUs as well, so this
+> > is preparing for the future as well.
+> > 
+> > PMU are linked to the CPUs, hence the reason they stayed. As for the
+> > memory and psci nodes the thinking behind it was mostly to allow for
+> > ACPI to make changes there, but it does look now like retrofitting an
+> > explanation to something that I did not give too much thought at that
+> > moment.
+> 
+> I guess my concern was motivated by the selfish aspect of having to
+> maintain a bunch of out-of-tree Juno patches (like cpuidle and cpufreq
+> related DT updates) and having to duplicate those in more than one DT,
+> and also having backport DT reorgs like this patch. Of course, none of
+> that should be a consideration in deciding what goes into mainline, I
+> just wanted to make sure there was a reason for the patch.
 
-Are you sure? Just checked and what tegra-pinmux-scripts currently
-generates matches what is currently in the kernel, for both nyans.
+You are probably the best placed engineer to offer feedback on these patches,
+as it will affect you in the downstream.
 
-> Is the change above
-> correct, or do we need to propagate this change from the kernel DT into
-> tegra-pinmux-scripts, and hence also into the U-Boot pinmux setup table?
->
-> My understanding of how these pins are generally used is that open-drain is
-> likely correct. I have no idea whether Tegra should supply the pullup for
-> these pins, or whether the board has a pullup resistor in which case Tegra
-> doesn't need to pull up.
+Given that cpufreq will have limited ranges for Juno r1 (~200MHz spread) and
+that HMP/EAS will not be working optimally on R1, do you still want to see
+the CPUs nodes moved into juno-base.dtsi?
 
->From what Andrew (added to CC) said when these changes were discussed,
-it shouldn't matter as a fixed regulator is used to drive those pins
-high.
+Best regards,
+Liviu
 
-Regards,
+> 
+> -- 
+> Tixy
+> 
+> 
 
-Tomeu
-
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
