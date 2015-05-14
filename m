@@ -1,71 +1,28 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 14 May 2015 12:10:37 +0900
-Subject: [GIT PULL] Samsung 2nd fixes for v4.1
-Message-ID: <5554122D.6090601@kernel.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 14 May 2015 11:11:00 +0800
+Subject: [PATCH] ARM: dts: imx: add "nor-jedec" flash compatible binding
+In-Reply-To: <CACna6ryDk2TTsXnVMbaica2T8-4Xo2tU40Ov6sq3FVkx_p=zhw@mail.gmail.com>
+References: <1431066065-19644-1-git-send-email-zajec5@gmail.com>
+ <20150511132052.GH9347@dragon>
+ <CACna6ryDk2TTsXnVMbaica2T8-4Xo2tU40Ov6sq3FVkx_p=zhw@mail.gmail.com>
+Message-ID: <20150514031059.GB6850@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, May 12, 2015 at 06:54:22AM +0200, Rafa? Mi?ecki wrote:
+> On 11 May 2015 at 15:20, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > On Fri, May 08, 2015 at 08:21:05AM +0200, Rafa? Mi?ecki wrote:
+> >> Starting with commits
+> >> 8ff16cf ("Documentation: devicetree: m25p80: add "nor-jedec" binding")
+> >> 1103b85 ("mtd: m25p80: bind to "nor-jedec" ID, for auto-detection")
+> >> we have "nor-jedec" binding indicating support for JEDEC identification.
+> >>
+> >> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+> >
+> > Applied, thanks.
+> 
+> Thanks, unfortunately after some discussion started by tegra patch, it
+> may happen we will rename it to jedec,spi-nor :( If that happens, I'll
+> care to provide another patch. Sorry for the problem.
 
-Here is Samsung 2nd fixes for v4.1 and mostly it is for S2R(Suspend to
-RAM). Please pull and if any problems, kindly let me know. Thanks!
-
-Note that it is based on v4.1-rc3 because keep-power-in-suspend related
-changes have been applied in v4.1-rc3.
-
-- Kukjin
-
-
-The following changes since commit 030bbdbf4c833bc69f502eae58498bc5572db736:
-
-  Linux 4.1-rc3 (2015-05-10 15:12:29 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-tags/samsung-fixes-2
-
-for you to fetch changes up to c1f0ecff492ea7c804fe543267f673eaac12259c:
-
-  ARM: EXYNOS: Use of_machine_is_compatible instead of soc_is_exynos4
-(2015-05-14 11:43:59 +0900)
-
-----------------------------------------------------------------
-Samsung 2nd fixes for v4.1
-
-- fix second S2R on exynos4412 based Trats2, Odroid U3 boards which
-  happened after enabling L2$ and caused by commit 13cfa6c4f7fa ("ARM:
-  EXYNOS: Fix CPU idle clock down after CPU off")
-  And replace the soc_is_exynosxxx() macro with of_compatible_xxx
-
-- fix dereference of ERR_PTR of of_genpd_get_from_provider()
-
-- fix suspend problem on old DT machines to skip the initialization
-  suspend and caused by commit 8b283c025443 ("ARM: exynos4/5: convert
-  pmu wakeup to stacked domains")
-
-- add keep-power-in-suspend for Peach Boards to support S2R and has
-  been missed in previous pull-request for fixes
-
-----------------------------------------------------------------
-Javier Martinez Canillas (1):
-      ARM: dts: Add keep-power-in-suspend to WiFi SDIO node for Peach Boards
-
-Julien Grall (1):
-      ARM: EXYNOS: Don't try to initialize suspend on old DT
-
-Krzysztof Kozlowski (3):
-      ARM: EXYNOS: Fix dereference of ERR_PTR returned by
-of_genpd_get_from_provider
-      ARM: EXYNOS: Fix failed second suspend on Exynos4
-      ARM: EXYNOS: Use of_machine_is_compatible instead of soc_is_exynos4
-
- arch/arm/boot/dts/exynos5420-peach-pit.dts |  1 +
- arch/arm/boot/dts/exynos5800-peach-pi.dts  |  1 +
- arch/arm/mach-exynos/common.h              |  2 ++
- arch/arm/mach-exynos/exynos.c              | 27 +++++++++++++++++++++
- arch/arm/mach-exynos/platsmp.c             | 39
-++----------------------------
- arch/arm/mach-exynos/pm_domains.c          |  4 +--
- arch/arm/mach-exynos/suspend.c             |  7 +++++-
- 7 files changed, 41 insertions(+), 40 deletions(-)
+Patch dropped.
