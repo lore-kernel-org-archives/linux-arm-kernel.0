@@ -1,54 +1,71 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 14 May 2015 14:28:12 -0400
-Subject: [PATCH 0/4] ARM: keystone: Enable Netcp driver on K2 EVMs
-In-Reply-To: <20150511160026.GH2067@n2100.arm.linux.org.uk>
-References: <1429817852-27938-1-git-send-email-m-karicheri2@ti.com>
- <55395981.8050902@oracle.com> <553A5E12.9040202@ti.com>
- <553A630F.4060008@oracle.com> <5550D0FD.7060903@ti.com>
- <20150511160026.GH2067@n2100.arm.linux.org.uk>
-Message-ID: <5554E93C.1080102@ti.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Thu, 14 May 2015 20:35:35 +0200
+Subject: [PATCH 1/2] rtc: add rtc-lpc24xx driver
+In-Reply-To: <20150514181953.GC23600@jcartwri.amer.corp.natinst.com>
+References: <1431624875-20990-1-git-send-email-manabian@gmail.com>
+ <1431624875-20990-2-git-send-email-manabian@gmail.com>
+ <20150514181953.GC23600@jcartwri.amer.corp.natinst.com>
+Message-ID: <CAGhQ9Vxsgka_qWCN053JoT_PrbSrjsMzE7X0enTxJdmRvaJg=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2015 12:00 PM, Russell King - ARM Linux wrote:
-> On Mon, May 11, 2015 at 11:55:41AM -0400, Murali Karicheri wrote:
->> On 04/24/2015 11:36 AM, santosh shilimkar wrote:
->>> On 4/24/2015 8:15 AM, Murali Karicheri wrote:
->>>> On 04/23/2015 04:43 PM, santosh shilimkar wrote:
->>>>> On 4/23/2015 12:37 PM, Murali Karicheri wrote:
->>>>>> NetCP driver support patches are already merged to v4.0.nd v4.1.
->>>>>> This series introduce patches to update the DTS bindings and
->>>>>> defconfig so that the network driver is fully functional on K2
->>>>>> EVMs :- K2HK, K2L and K2E.
->>>>>>
->>>>> Nice and Thanks Murali for sending these up.
->>>>>
->>>>>> It will be great if this can be merged to v4.1.
->>>>>>
->>>>> Its too late for the 4.1 now. For the same reason, we also
->>>>> couldn't get the MMU switching fixes in this merge window.
->>>>
->>>> For my reference, can you point me to the MMU switching fixes you are
->>>> referring to?
->>>>
->>> http://www.spinics.net/lists/arm-kernel/msg411178.html
->>>
->>> Regards,
->>> Santosh
->> Santosh,
+On 14 May 2015 at 20:19, Josh Cartwright <joshc@ni.com> wrote:
+> Hello Joachim,
+>
+> Just a quick comment/question below.
+>
+> On Thu, May 14, 2015 at 07:34:34PM +0200, Joachim Eastwood wrote:
+>> Add driver for the RTC found on NXP LPC24xx/178x/18xx/43xx devices.
+>> The RTC provides calendar and clock functionality together with
+>> periodic tick and alarm interrupt support.
 >>
->> Is MMU switching series applied to a sub system branch already that I can
->> pull to do some testing on K2 devices?
+>> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+>> ---
+> [..]
+>> +
+>> +static const struct of_device_id lpc24xx_rtc_match[] = {
+>> +     { .compatible = "nxp,lpc1788-rtc", .data = (void *)HAVE_CALIBRATION},
+>> +     { }
+>> +};
+>> +MODULE_DEVICE_TABLE(of, lpc24xx_rtc_match);
+>> +
+>> +static int lpc24xx_rtc_probe(struct platform_device *pdev)
+>> +{
+>> +     const struct of_device_id *match;
+>> +     struct lpc24xx_rtc *rtc;
+>> +     struct resource *res;
+>> +     u32 rtc_ccr = 0;
+>> +     int irq, ret;
+>> +
+> [..]
+>> +
+>> +     /* Clear the counter increment state */
+>> +     rtc_writel(rtc, LPC24XX_ILR, LPC24XX_RTCCIF);
+>> +
+>> +     if (rtc->features & HAVE_PRESCALER) {
+>> +             /* Clock source is 32k oscillator */
+>> +             rtc_ccr = LPC24XX_CLKSRC;
+>> +             rtc_writel(rtc, LPC24XX_CCR, rtc_ccr);
+>> +
+>> +             /* Set prescaler to divide by 1 */
+>> +             rtc_writel(rtc, LPC24XX_PREINT, 0);
+>> +             rtc_writel(rtc, LPC24XX_PREFRAC, 0);
+>> +     }
+>> +
+>> +     if (rtc->features & HAVE_SUBSECOND) {
+>> +             /* Disable sub-second interrupt */
+>> +             rtc_writel(rtc, LPC24XX_CISS, 0);
+>> +     }
 >
-> Shall I send you the patches directly?
->
-Russell,
+> Neither HAVE_PRESCALER, nor HAVE_SUBSECOND are used for the claimed
+> supported RTC, so this is effectively dead code.  Was this something you
+> intended to add later?  Some remnant of the rework?
 
-Could you send me the patch set? I haven't seen anything in my inbox 
-from you. So just want to check. If you have it on a branch, please 
-provide the details, I can pull and test.
+The features are only available on the old LPC24xx-series which isn't
+in mainline so, yeah, this can be removed. I'll send out a new version
+in a couple of days removing all of the LPC24xx support.
 
-Regards,
--- 
-Murali Karicheri
-Linux Kernel, Keystone
+Thanks for looking.
+
+regards,
+Joachim Eastwood
