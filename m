@@ -1,98 +1,109 @@
-From: binmlist@gmail.com (Bin Liu)
-Date: Thu, 14 May 2015 14:19:28 -0500
-Subject: MUSB dual-role on AM335x behaving weirdly
-In-Reply-To: <20150514190429.GT24269@saruman.tx.rr.com>
-References: <20150205132142.GD2079@lukather> <20150224103911.GR25269@lukather>
- <20150224145401.GH29829@saruman.tx.rr.com>
- <20150224165050.GX25269@lukather>
- <20150224173357.GB25042@saruman.tx.rr.com>
- <20150225111129.GA5062@lukather>
- <54EDBBEA.8030509@visionsystems.de>
- <20150514170700.GN24269@saruman.tx.rr.com>
- <20150514174031.GP24269@saruman.tx.rr.com>
- <20150514174907.GQ24269@saruman.tx.rr.com>
- <20150514190429.GT24269@saruman.tx.rr.com>
-Message-ID: <CADYTM3Zso8bV_8yFyx1-ATbL5AgkKBjvWWR4AsoZUNuLvFe1bQ@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 14 May 2015 20:20:18 +0100
+Subject: [PATCH] regulator: Add SPMI regulator driver
+In-Reply-To: <5553F434.4020102@codeaurora.org>
+References: <1431466787-32247-1-git-send-email-sboyd@codeaurora.org>
+ <20150513114118.GJ3066@sirena.org.uk>
+ <5553F434.4020102@codeaurora.org>
+Message-ID: <20150514192018.GU2761@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Felipe,
+On Wed, May 13, 2015 at 06:02:44PM -0700, Stephen Boyd wrote:
 
-On Thu, May 14, 2015 at 2:04 PM, Felipe Balbi <balbi@ti.com> wrote:
-> On Thu, May 14, 2015 at 12:49:07PM -0500, Felipe Balbi wrote:
->> On Thu, May 14, 2015 at 12:40:31PM -0500, Felipe Balbi wrote:
->> > On Thu, May 14, 2015 at 12:07:00PM -0500, Felipe Balbi wrote:
->> > > Hi,
->> > >
->> > > On Wed, Feb 25, 2015 at 01:11:22PM +0100, Yegor Yefremov wrote:
->> > > > On 25.02.2015 12:11, Maxime Ripard wrote:
->> > > > > On Tue, Feb 24, 2015 at 11:33:57AM -0600, Felipe Balbi wrote:
->> > > > >> Hi,
->> > > > >>
->> > > > >> On Tue, Feb 24, 2015 at 05:50:50PM +0100, Maxime Ripard wrote:
->> > > > >>> Hi Felipe,
->> > > > >>>
->> > > > >>> On Tue, Feb 24, 2015 at 08:54:01AM -0600, Felipe Balbi wrote:
->> > > > >>>> Hi,
->> > > > >>>>
->> > > > >>>> On Tue, Feb 24, 2015 at 11:39:11AM +0100, Maxime Ripard wrote:
->> > > > >>>>> On Thu, Feb 05, 2015 at 02:21:42PM +0100, Maxime Ripard wrote:
->> > > > >>>>>> Hi,
->> > > > >>>>>>
->> > > > >>>>>> On Thu, Jan 22, 2015 at 08:37:45AM +0100, Yegor Yefremov wrote:
->> > > > >>>>>>> I have the same experience with 3.15. The switching is working when
->> > > > >>>>>>> CONFIG_USB_MUSB_DUAL_ROLE is set and dr_mode = "otg". But since 3.16
->> > > > >>
->> > > > >> since 3.16 ?
->> > > > >
->> > > > > That's what Yegor said. I never saw it working with 3.15 either.
->> > > >
->> > > > I've used 3.15.1 and 3.15.2 with this set of patches:
->> > > > https://github.com/visionsystemsgmbh/onrisc_br_bsp/tree/master/board/vscom/kernel-patches/linux-3.15
->> > > >
->> > > > And it worked so far. The system:
->> > > > http://www.visionsystems.de/produkte/baltos-ir-5221.html
->> > >
->> > > I've had more time to look into this (thanks Yegor for sponsoring a
->> > > test/dev platform) what I noticed is that Connect IRQ takes seconds to
->> > > fire up.  Below a tiny log snippet after pluging USB OTG adapter cable
->> > > that came with IR5521:
->> > >
->> > > | [ 1227.200514] musb-hdrc musb-hdrc.1.auto: usbintr (100) epintr(0)
->> > >
->> > > Cable connected. ID is grounded. 0x100 == DRVVBUS IRQ
->> > >
->> > > | [ 1227.206788] musb-hdrc musb-hdrc.1.auto: VBUS on (a_wait_vrise), devctl 19
->> > >
->> > > MUSB starts to wait for VBUS to reach Session valid threshold
->> > >
->> > > | [ 1230.281159] musb-hdrc musb-hdrc.1.auto: usbintr (10) epintr(0)
->> > >
->> > > 3 seconds later connect interrupt happens. Looking at VBUS charge time
->> > > with a scope, it's quite ok. VBUS charges in about 1.77ms. I'll dig
->> > > further into this.
->> >
->> > even more weird. If I disconnect device from OTG adapter, rather than
->> > OTG adapter from IR5521, this leave ID pin grounded, which means DRVVBUS
->> > is still asserted and VBUS remains above session valid threshold.
->> >
->> > Even in this case, when I connect the device on the other end of the
->> > cable, I still see some 3 seconds delay from the time device is
->> > connected, to the time connect IRQ fires up.
->>
->> seems to be a problem with the USB stick I'm using. Tested two other
->> devices and they connect right away.
->
-> ok, fixing DRD on AM335x will take longer than I originally expected,
-> probably won't be ready for v4.2 :-(
+> This is about configuring the regulator to switch mode between HPM and
+> LPM automatically based on current. You're right that it's not about
+> pulse skipping, but it isn't about letting other processors control
+> things either. I think you're thinking about pin control?
 
-Are you able replicate the issue with TI AM335x GP EVM? I am wondering
-if the is custom board design problem? have you checked the custom
-board schematics?
+Possibly, this stuff is all system jargon heavy and I've not context
+switched that in recently.  The above sounds like it pretty much *is*
+the equivalent of pulse skipping in which case it's much more like the
+normal modes (that we were going to abandon...).
 
-Regards,
--Bin.
+> The register field is called AUTO_MODE, so I'm finding it hard to come
+> up with a better name. Perhaps qcom,auto-efficient-mode-enable?
+> qcom,auto-current-mode-enable?
 
->
-> --
-> balbi
+This definitely sounds like traditional regulator modes.
+
+> >> +- qcom,bypass-mode-enable:
+> >> +	Usage: optional
+> >> +	Value type: <u32>
+> >> +	Description: 1 = Enable bypass mode for an LDO type regulator so that
+> >> +		     it acts like a switch and simply outputs its input
+> >> +		     voltage. 0 = Do not enable bypass mode.
+
+> > We have generic regulator API support for this, we should have a generic
+> > DT binding for it.
+
+> Given that regulator_allow_bypass() is a consumer facing API should I
+> just change this to regulator-allow-bypass and then add a set_bypass() op?
+
+Yes.
+
+> >> +- qcom,soft-start-enable:
+> >> +	Usage: optional
+> >> +	Value type: <u32>
+> >> +	Description: 1 = Enable soft start for LDO and voltage switch type
+> >> +		     regulators so that output voltage slowly ramps up when the
+> >> +		     regulator is enabled. 0 = Disable soft start
+
+> > These also seem like generic properties (we don't currently have generic
+> > APIs for them but these are by no means the only regulators I've seen
+> > with these features).
+
+> So for these sorts of generic properties how do I get them all the way
+> into the driver? Are you suggesting adding new ops for setting pull-down
+> and soft-start-enable and then parsing DT properties, setting those in
+> the regulation_constraints structure, and then calling the ops when we
+> apply constraints in set_machine_constraints()?
+
+Yeah, if it's becoming something that does need setting from DT (which
+it seems to) then we probably need to go through all that.  With helpers
+and so on.
+
+> >> +- qcom,boost-current-limit:
+> >> +	Usage: optional
+> >> +	Value type: <u32>
+> >> +	Description: This property sets the current limit of boost type
+> >> +		     regulators; supported values are:
+> >> +					0 =  300 mA
+
+> > Again seems generic - there seems like overlap with your own OCP
+> > properties further above.
+
+> Yes it's generic. This property only applies to boost regulators on this
+> PMIC whereas OCP is only used for voltage switch type regulators. I
+> wonder if this should be done via regulator-min-microamp and
+> regulator-max-microamp being set to the same value and then implementing
+> a .set_current_limit() function?
+
+Yes, that was what I was thinking.  Perhaps a current-limit or something
+property rather than the min and max thing for clarity (to avoid
+confusion with actual current regulators).
+
+> >> +#define VOLTAGE_RANGE(_range_sel, _min_uV, _set_point_min_uV, \
+> >> +			_set_point_max_uV, _max_uV, _step_uV) \
+> >> +	{ \
+
+> > A lot of these macros have very generic names.  Also I have to say I'm a
+> > bit confused about what a set point is and how it's used, "allowed
+> > voltage" doesn't mean a huge amount in comparison with "programmable
+> > voltage".
+
+> These regulators have two registers. The first register says what range
+> (or row in the *_ranges arrays) we should use. The second register is a
+> selector that's used in the linear range calculation min_uV + sel *
+> step. The complication is here because we want to try and keep using the
+
+Hardware engineers are truly innovative and creative people sometimes.
+That all makes sense, but the thing about the generic names still
+applies - at least namespace them please.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150514/42fa2013/attachment-0001.sig>
