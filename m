@@ -1,330 +1,84 @@
-From: bhupesh.sharma@freescale.com (Bhupesh Sharma)
-Date: Thu, 14 May 2015 17:03:35 +0530
-Subject: [PATCH v2 5/5] can: flexcan: Add support for non RX-FIFO mode
-In-Reply-To: <1431603215-25546-1-git-send-email-bhupesh.sharma@freescale.com>
-References: <1431603215-25546-1-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <1431603215-25546-6-git-send-email-bhupesh.sharma@freescale.com>
+From: jorge.ramirez-ortiz@linaro.org (Jorge Ramirez-Ortiz)
+Date: Thu, 14 May 2015 07:48:30 -0400
+Subject: [PATCH] arm: topology: fix capacity calculation on SMP SoCs
+In-Reply-To: <CAKfTPtDONGLyMO_4qmzmj2Q4AVHyvy2HJb4uuGnueYVPsM213A@mail.gmail.com>
+References: <1431549503-11799-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
+ <CAKfTPtDONGLyMO_4qmzmj2Q4AVHyvy2HJb4uuGnueYVPsM213A@mail.gmail.com>
+Message-ID: <55548B8E.6050708@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for non RX-FIFO (legacy) mode in
-the flexcan driver.
+On 05/14/2015 07:31 AM, Vincent Guittot wrote:
+> Hi Jorge,
+>
+> On 13 May 2015 at 22:38, Jorge Ramirez-Ortiz
+> <jorge.ramirez-ortiz@linaro.org> wrote:
+>> This commit sets the capacity of the average CPU in SMP systems to
+>> SCHED_CAPACITY_SCALE.
+>>
+>> Ignoring the condition "min_capacity==max_capacity" causes the function
+>> update_cpu_capacity( .. ) to generate out of range values [1]. This is
+>> because the default value of middle_capacity is used in the final
+>> calculation instead of a valid scaling factor.
+>>
+>> Incidentally, when out of range values are generated and if
+>> SCHED_FEAT(ARCH_POWER, true), the load balancing algorithm makes the
+>> wrong decisions typically overallocating work on one of the cores
+>> while leaving the others unused.
+> Have you got an example ?
 
-On certain SoCs, the RX-FIFO support might be broken, as
-a result we need to fall-back on the legacy (non RX-FIFO)
-mode to receive CAN frames.
+This was tested on lsk 3.10 which was slightly different (see my comments below).
+I can get you the test source code.
 
-Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-Signed-off-by: Sakar Arora <Sakar.Arora@freescale.com>
----
- drivers/net/can/flexcan.c |  188 +++++++++++++++++++++++++++++++++------------
- 1 file changed, 138 insertions(+), 50 deletions(-)
 
-diff --git a/drivers/net/can/flexcan.c b/drivers/net/can/flexcan.c
-index b0222ae..3240472 100644
---- a/drivers/net/can/flexcan.c
-+++ b/drivers/net/can/flexcan.c
-@@ -156,6 +156,9 @@
- #define FLEXCAN_IFLAG_DEFAULT \
- 	(FLEXCAN_IFLAG_RX_FIFO_OVERFLOW | FLEXCAN_IFLAG_RX_FIFO_AVAILABLE | \
- 	 FLEXCAN_IFLAG_BUF(FLEXCAN_TX_BUF_ID))
-+#define FLEXCAN_IFLAG_DEFAULT_RX_MB_MODE \
-+	 (FLEXCAN_IFLAG_BUF(FLEXCAN_TX_BUF_ID))
-+#define FLEXCAN_IFLAG_RX_MB_RXMASK	((1 << FLEXCAN_TX_BUF_RESERVED) - 1)
- 
- /* FLEXCAN message buffers */
- #define FLEXCAN_MB_CNT_CODE(x)		(((x) & 0xf) << 24)
-@@ -198,6 +201,8 @@
- #define FLEXCAN_HAS_V10_FEATURES	BIT(1) /* For core version >= 10 */
- #define FLEXCAN_HAS_BROKEN_ERR_STATE	BIT(2) /* [TR]WRN_INT not connected */
- #define FLEXCAN_HAS_MECR_FEATURES	BIT(3) /* Memory error detection */
-+#define FLEXCAN_HAS_ONLY_LEGACY_RX_SUPPORT \
-+	 BIT(4) /* No RX FIFO mode support */
- 
- /* Structure of the message buffer */
- struct flexcan_mb {
-@@ -252,6 +257,7 @@ struct flexcan_priv {
- 	void __iomem *base;
- 	u32 reg_esr;
- 	u32 reg_ctrl_default;
-+	u32 rx_msg_buf;
- 
- 	struct clk *clk_ipg;
- 	struct clk *clk_per;
-@@ -303,8 +309,7 @@ static const struct can_bittiming_const flexcan_bittiming_const = {
- 	.brp_inc = 1,
- };
- 
--/*
-- * FlexCAN module is essentially modelled as a little-endian IP in most
-+/* FlexCAN module is essentially modelled as a little-endian IP in most
-  * SoCs, i.e the registers as well as the message buffer areas are
-  * implemented in a little-endian fashion.
-  *
-@@ -646,12 +651,10 @@ static int flexcan_poll_state(struct net_device *dev, u32 reg_esr)
- 	return 1;
- }
- 
--static void flexcan_read_fifo(const struct net_device *dev,
--			      struct can_frame *cf)
-+static void flexcan_read_can_frame(const struct flexcan_priv *priv,
-+				   struct flexcan_mb __iomem *mb,
-+				   struct can_frame *cf)
- {
--	const struct flexcan_priv *priv = netdev_priv(dev);
--	struct flexcan_regs __iomem *regs = priv->base;
--	struct flexcan_mb __iomem *mb = &regs->cantxfg[0];
- 	u32 reg_ctrl, reg_id;
- 
- 	reg_ctrl = priv->read(&mb->can_ctrl);
-@@ -667,14 +670,39 @@ static void flexcan_read_fifo(const struct net_device *dev,
- 
- 	*(__be32 *)(cf->data + 0) = cpu_to_be32(priv->read(&mb->data[0]));
- 	*(__be32 *)(cf->data + 4) = cpu_to_be32(priv->read(&mb->data[1]));
-+}
-+
-+static void flexcan_read_fifo(const struct net_device *dev,
-+			      struct can_frame *cf)
-+{
-+	const struct flexcan_priv *priv = netdev_priv(dev);
-+	struct flexcan_regs __iomem *regs = priv->base;
-+	struct flexcan_mb __iomem *mb = &regs->cantxfg[0];
-+
-+	flexcan_read_can_frame(priv, mb, cf);
- 
- 	/* mark as read */
- 	priv->write(FLEXCAN_IFLAG_RX_FIFO_AVAILABLE, &regs->iflag1);
- 	priv->read(&regs->timer);
- }
- 
-+static void flexcan_read_msg_buf(const struct net_device *dev,
-+				 struct can_frame *cf, u32 msg_buf)
-+{
-+	const struct flexcan_priv *priv = netdev_priv(dev);
-+	struct flexcan_regs __iomem *regs = priv->base;
-+	struct flexcan_mb __iomem *mb = &regs->cantxfg[msg_buf];
-+
-+	flexcan_read_can_frame(priv, mb, cf);
-+
-+	/* mark as read */
-+	priv->write(BIT(msg_buf), &regs->iflag1);
-+	priv->read(&regs->timer);
-+}
-+
- static int flexcan_read_frame(struct net_device *dev)
- {
-+	const struct flexcan_priv *priv = netdev_priv(dev);
- 	struct net_device_stats *stats = &dev->stats;
- 	struct can_frame *cf;
- 	struct sk_buff *skb;
-@@ -685,7 +713,11 @@ static int flexcan_read_frame(struct net_device *dev)
- 		return 0;
- 	}
- 
--	flexcan_read_fifo(dev, cf);
-+	if (priv->devtype_data->features & FLEXCAN_HAS_ONLY_LEGACY_RX_SUPPORT)
-+		flexcan_read_msg_buf(dev, cf, priv->rx_msg_buf);
-+	else
-+		flexcan_read_fifo(dev, cf);
-+
- 	netif_receive_skb(skb);
- 
- 	stats->rx_packets++;
-@@ -699,9 +731,10 @@ static int flexcan_read_frame(struct net_device *dev)
- static int flexcan_poll(struct napi_struct *napi, int quota)
- {
- 	struct net_device *dev = napi->dev;
--	const struct flexcan_priv *priv = netdev_priv(dev);
-+	struct flexcan_priv *priv = netdev_priv(dev);
- 	struct flexcan_regs __iomem *regs = priv->base;
- 	u32 reg_iflag1, reg_esr;
-+	unsigned long iflag1;
- 	int work_done = 0;
- 
- 	/*
-@@ -713,12 +746,25 @@ static int flexcan_poll(struct napi_struct *napi, int quota)
- 	/* handle state changes */
- 	work_done += flexcan_poll_state(dev, reg_esr);
- 
--	/* handle RX-FIFO */
- 	reg_iflag1 = priv->read(&regs->iflag1);
--	while (reg_iflag1 & FLEXCAN_IFLAG_RX_FIFO_AVAILABLE &&
--	       work_done < quota) {
--		work_done += flexcan_read_frame(dev);
--		reg_iflag1 = priv->read(&regs->iflag1);
-+
-+	if (priv->devtype_data->features & FLEXCAN_HAS_ONLY_LEGACY_RX_SUPPORT) {
-+		/* handle legacy RX mode */
-+		iflag1 = reg_iflag1 & FLEXCAN_IFLAG_RX_MB_RXMASK;
-+		while ((reg_iflag1 & FLEXCAN_IFLAG_RX_MB_RXMASK) &&
-+		       work_done < quota) {
-+			priv->rx_msg_buf = find_first_bit(&iflag1,
-+						(FLEXCAN_TX_BUF_ID - 1));
-+			work_done += flexcan_read_frame(dev);
-+			reg_iflag1 = priv->read(&regs->iflag1);
-+		}
-+	} else {
-+		/* handle RX-FIFO */
-+		while (reg_iflag1 & FLEXCAN_IFLAG_RX_FIFO_AVAILABLE &&
-+		       work_done < quota) {
-+			work_done += flexcan_read_frame(dev);
-+			reg_iflag1 = priv->read(&regs->iflag1);
-+		}
- 	}
- 
- 	/* report bus errors */
-@@ -728,7 +774,13 @@ static int flexcan_poll(struct napi_struct *napi, int quota)
- 	if (work_done < quota) {
- 		napi_complete(napi);
- 		/* enable IRQs */
--		priv->write(FLEXCAN_IFLAG_DEFAULT, &regs->imask1);
-+		if (priv->devtype_data->features &
-+		    FLEXCAN_HAS_ONLY_LEGACY_RX_SUPPORT)
-+			priv->write(FLEXCAN_IFLAG_DEFAULT_RX_MB_MODE |
-+				    FLEXCAN_IFLAG_RX_MB_RXMASK, &regs->imask1);
-+		else
-+			priv->write(FLEXCAN_IFLAG_DEFAULT, &regs->imask1);
-+
- 		priv->write(priv->reg_ctrl_default, &regs->ctrl);
- 	}
- 
-@@ -755,26 +807,45 @@ static irqreturn_t flexcan_irq(int irq, void *dev_id)
- 	 * - state change IRQ
- 	 * - bus error IRQ and bus error reporting is activated
- 	 */
--	if ((reg_iflag1 & FLEXCAN_IFLAG_RX_FIFO_AVAILABLE) ||
--	    (reg_esr & FLEXCAN_ESR_ERR_STATE) ||
--	    flexcan_has_and_handle_berr(priv, reg_esr)) {
--		/*
--		 * The error bits are cleared on read,
--		 * save them for later use.
--		 */
--		priv->reg_esr = reg_esr & FLEXCAN_ESR_ERR_BUS;
--		priv->write(FLEXCAN_IFLAG_DEFAULT &
--			~FLEXCAN_IFLAG_RX_FIFO_AVAILABLE, &regs->imask1);
--		priv->write(priv->reg_ctrl_default & ~FLEXCAN_CTRL_ERR_ALL,
--		       &regs->ctrl);
--		napi_schedule(&priv->napi);
--	}
-+	if (priv->devtype_data->features & FLEXCAN_HAS_ONLY_LEGACY_RX_SUPPORT) {
-+		if ((reg_iflag1 & FLEXCAN_IFLAG_RX_MB_RXMASK) ||
-+		    (reg_esr & FLEXCAN_ESR_ERR_STATE) ||
-+		    flexcan_has_and_handle_berr(priv, reg_esr)) {
-+			/* The error bits are cleared on read,
-+			 * save them for later use.
-+			 */
-+			priv->reg_esr = reg_esr & FLEXCAN_ESR_ERR_BUS;
-+			priv->write(FLEXCAN_IFLAG_DEFAULT_RX_MB_MODE &
-+				    ~FLEXCAN_IFLAG_RX_MB_RXMASK, &regs->imask1);
-+			priv->write(priv->reg_ctrl_default &
-+				    ~FLEXCAN_CTRL_ERR_ALL, &regs->ctrl);
-+
-+			napi_schedule(&priv->napi);
-+		}
-+	} else {
-+		if ((reg_iflag1 & FLEXCAN_IFLAG_RX_FIFO_AVAILABLE) ||
-+		    (reg_esr & FLEXCAN_ESR_ERR_STATE) ||
-+		    flexcan_has_and_handle_berr(priv, reg_esr)) {
-+			/*
-+			 * The error bits are cleared on read,
-+			 * save them for later use.
-+			 */
-+			priv->reg_esr = reg_esr & FLEXCAN_ESR_ERR_BUS;
-+			priv->write(FLEXCAN_IFLAG_DEFAULT &
-+				    ~FLEXCAN_IFLAG_RX_FIFO_AVAILABLE,
-+				    &regs->imask1);
-+			priv->write(priv->reg_ctrl_default &
-+				    ~FLEXCAN_CTRL_ERR_ALL, &regs->ctrl);
-+			napi_schedule(&priv->napi);
-+		}
- 
--	/* FIFO overflow */
--	if (reg_iflag1 & FLEXCAN_IFLAG_RX_FIFO_OVERFLOW) {
--		priv->write(FLEXCAN_IFLAG_RX_FIFO_OVERFLOW, &regs->iflag1);
--		dev->stats.rx_over_errors++;
--		dev->stats.rx_errors++;
-+		/* FIFO overflow */
-+		if (reg_iflag1 & FLEXCAN_IFLAG_RX_FIFO_OVERFLOW) {
-+			priv->write(FLEXCAN_IFLAG_RX_FIFO_OVERFLOW,
-+				    &regs->iflag1);
-+			dev->stats.rx_over_errors++;
-+			dev->stats.rx_errors++;
-+		}
- 	}
- 
- 	/* transmission complete interrupt */
-@@ -869,7 +940,12 @@ static int flexcan_chip_start(struct net_device *dev)
- 	 */
- 	reg_mcr = priv->read(&regs->mcr);
- 	reg_mcr &= ~FLEXCAN_MCR_MAXMB(0xff);
--	reg_mcr |= FLEXCAN_MCR_FRZ | FLEXCAN_MCR_FEN | FLEXCAN_MCR_HALT |
-+	if (priv->devtype_data->features & FLEXCAN_HAS_ONLY_LEGACY_RX_SUPPORT)
-+		reg_mcr &= ~FLEXCAN_MCR_FEN;
-+	else
-+		reg_mcr |= FLEXCAN_MCR_FEN;
-+
-+	reg_mcr |= FLEXCAN_MCR_FRZ | FLEXCAN_MCR_HALT |
- 		FLEXCAN_MCR_SUPV | FLEXCAN_MCR_WRN_EN |
- 		FLEXCAN_MCR_IDAM_C | FLEXCAN_MCR_SRX_DIS |
- 		FLEXCAN_MCR_MAXMB(FLEXCAN_TX_BUF_ID);
-@@ -966,8 +1042,13 @@ static int flexcan_chip_start(struct net_device *dev)
- 
- 	priv->can.state = CAN_STATE_ERROR_ACTIVE;
- 
--	/* enable FIFO interrupts */
--	priv->write(FLEXCAN_IFLAG_DEFAULT, &regs->imask1);
-+	if (priv->devtype_data->features & FLEXCAN_HAS_ONLY_LEGACY_RX_SUPPORT)
-+		/* enable mb interrupts */
-+		priv->write(FLEXCAN_IFLAG_DEFAULT_RX_MB_MODE |
-+			    FLEXCAN_IFLAG_RX_MB_RXMASK, &regs->imask1);
-+	else
-+		/* enable FIFO interrupts */
-+		priv->write(FLEXCAN_IFLAG_DEFAULT, &regs->imask1);
- 
- 	/* print chip status */
- 	netdev_dbg(dev, "%s: reading mcr=0x%08x ctrl=0x%08x\n", __func__,
-@@ -1125,22 +1206,29 @@ static int register_flexcandev(struct net_device *dev)
- 	if (err)
- 		goto out_chip_disable;
- 
--	/* set freeze, halt and activate FIFO, restrict register access */
-+	/* set freeze, halt and activate FIFO/legacy mode, restrict
-+	 * register access
-+	 */
- 	reg = priv->read(&regs->mcr);
--	reg |= FLEXCAN_MCR_FRZ | FLEXCAN_MCR_HALT |
--		FLEXCAN_MCR_FEN | FLEXCAN_MCR_SUPV;
-+	if (priv->devtype_data->features & FLEXCAN_HAS_ONLY_LEGACY_RX_SUPPORT)
-+		reg &= ~FLEXCAN_MCR_FEN;
-+	else
-+		reg |= FLEXCAN_MCR_FEN;
-+
-+	reg |= FLEXCAN_MCR_FRZ | FLEXCAN_MCR_HALT | FLEXCAN_MCR_SUPV;
- 	priv->write(reg, &regs->mcr);
- 
--	/*
--	 * Currently we only support newer versions of this core
--	 * featuring a RX FIFO. Older cores found on some Coldfire
--	 * derivates are not yet supported.
--	 */
--	reg = priv->read(&regs->mcr);
--	if (!(reg & FLEXCAN_MCR_FEN)) {
--		netdev_err(dev, "Could not enable RX FIFO, unsupported core\n");
--		err = -ENODEV;
--		goto out_chip_disable;
-+	if (priv->devtype_data->features & FLEXCAN_HAS_ONLY_LEGACY_RX_SUPPORT) {
-+		/* Legacy RX mode*/
-+		netdev_info(dev, "Legacy mode (non RX-FIFO) enabled\n");
-+	} else {
-+		/* RX FIFO mode */
-+		reg = priv->read(&regs->mcr);
-+		if (!(reg & FLEXCAN_MCR_FEN)) {
-+			netdev_err(dev, "Could not enable RX FIFO, unsupported core\n");
-+			err = -ENODEV;
-+			goto out_chip_disable;
-+		}
- 	}
- 
- 	err = register_candev(dev);
--- 
-1.7.9.5
+>
+>> [1] val > SCHED_CAPACITY_SCALE
+>>
+>> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
+>> ---
+>>  arch/arm/kernel/topology.c | 8 ++++----
+>>  1 file changed, 4 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+>> index 08b7847..509bc9b 100644
+>> --- a/arch/arm/kernel/topology.c
+>> +++ b/arch/arm/kernel/topology.c
+>> @@ -137,14 +137,14 @@ static void __init parse_dt_topology(void)
+>>                 cpu_capacity(cpu) = capacity;
+>>         }
+>>
+>> -       /* If min and max capacities are equals, we bypass the update of the
+>> -        * cpu_scale because all CPUs have the same capacity. Otherwise, we
+>> -        * compute a middle_capacity factor that will ensure that the capacity
+>> +       /* Compute a middle_capacity factor that will ensure that the capacity
+>>          * of an 'average' CPU of the system will be as close as possible to
+>>          * SCHED_CAPACITY_SCALE, which is the default value, but with the
+>>          * constraint explained near table_efficiency[].
+>>          */
+>> -       if (4*max_capacity < (3*(max_capacity + min_capacity)))
+>> +       if (min_capacity == max_capacity)
+>> +               middle_capacity = min_capacity >> SCHED_CAPACITY_SHIFT;
+>> +       else if (4*max_capacity < (3*(max_capacity + min_capacity)))
+> if min_capacity == max_capacity then the condition 4*max_capacity <
+> (3*(max_capacity + min_capacity)) is true and
+> middle_capacity = (min_capacity + max_capacity) >>
+> (SCHED_CAPACITY_SHIFT+1) = 2*min_capacity >> (SCHED_CAPACITY_SHIFT+1)
+> so middle capacity = min_capacity >> SCHED_CAPACITY_SHIFT
+>
+> I don't see what your change does that is not already done by current code
+
+ah you are right! I didn't even consider it would be handled under that condition.
+My mistake.
+
+It seem the problem is only present in lsk 3.10 then [1]
+
+btw the comments above the condition should still be edited (cpu_scale is always
+updated)
+
+ok ignore this patch and let's only fix it on the lsk in the same way it is done
+here.
+
+thanks
+
+[1]
+https://git.linaro.org/kernel/linux-linaro-stable.git/blob/refs/heads/linux-linaro-lsk:/arch/arm64/kernel/topology.c#l327
