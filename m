@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 14 May 2015 10:06:35 +0900
-Subject: [PATCH 06/31] ARM: shmobile: r8a7790: Add IRQC clock to device tree
+Date: Thu, 14 May 2015 10:06:37 +0900
+Subject: [PATCH 08/31] ARM: shmobile: r8a7794: Add IRQC clock to device tree
 In-Reply-To: <cover.1431565427.git.horms+renesas@verge.net.au>
 References: <cover.1431565427.git.horms+renesas@verge.net.au>
-Message-ID: <61624caf2479732beb42ea88a6b6ca3c7ae59cd7.1431565427.git.horms+renesas@verge.net.au>
+Message-ID: <1c5ca5db11edd7ff27ad8a98ffb2ac61bfd520b6.1431565427.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,50 +15,50 @@ can be power managed using that clock.
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790.dtsi            | 9 +++++++++
- include/dt-bindings/clock/r8a7790-clock.h | 3 +++
+ arch/arm/boot/dts/r8a7794.dtsi            | 9 +++++++++
+ include/dt-bindings/clock/r8a7794-clock.h | 3 +++
  2 files changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index f3b8430070b6..22e73906ec88 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -252,6 +252,7 @@
- 			     <0 1 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 2 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 3 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp4_clks R8A7790_CLK_IRQC>;
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 7a3ffa51a8bf..01cf54f70501 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -105,6 +105,7 @@
+ 			     <0 15 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 16 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 17 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp4_clks R8A7794_CLK_IRQC>;
  	};
  
  	dmac0: dma-controller at e6700000 {
-@@ -1158,6 +1159,14 @@
- 				"iic0", "pciec", "iic1", "ssusb", "cmt1",
- 				"usbdmac0", "usbdmac1";
+@@ -625,6 +626,14 @@
+ 			        "sdhi2", "sdhi1", "sdhi0",
+ 				"mmcif0", "cmt1", "usbdmac0", "usbdmac1";
  		};
 +		mstp4_clks: mstp4_clks at e6150140 {
-+			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
++			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
 +			reg = <0 0xe6150140 0 4>, <0 0xe615004c 0 4>;
 +			clocks = <&cp_clk>;
 +			#clock-cells = <1>;
-+			clock-indices = <R8A7790_CLK_IRQC>;
++			clock-indices = <R8A7794_CLK_IRQC>;
 +			clock-output-names = "irqc";
 +		};
- 		mstp5_clks: mstp5_clks at e6150144 {
- 			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe6150144 0 4>, <0 0xe615003c 0 4>;
-diff --git a/include/dt-bindings/clock/r8a7790-clock.h b/include/dt-bindings/clock/r8a7790-clock.h
-index 3f2c6b198d4a..ff7ca3584e16 100644
---- a/include/dt-bindings/clock/r8a7790-clock.h
-+++ b/include/dt-bindings/clock/r8a7790-clock.h
-@@ -79,6 +79,9 @@
- #define R8A7790_CLK_USBDMAC0		30
- #define R8A7790_CLK_USBDMAC1		31
+ 		mstp7_clks: mstp7_clks at e615014c {
+ 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
+diff --git a/include/dt-bindings/clock/r8a7794-clock.h b/include/dt-bindings/clock/r8a7794-clock.h
+index d63323032d6e..09da38a58776 100644
+--- a/include/dt-bindings/clock/r8a7794-clock.h
++++ b/include/dt-bindings/clock/r8a7794-clock.h
+@@ -60,6 +60,9 @@
+ #define R8A7794_CLK_USBDMAC0		30
+ #define R8A7794_CLK_USBDMAC1		31
  
 +/* MSTP4 */
-+#define R8A7790_CLK_IRQC		7
++#define R8A7794_CLK_IRQC		7
 +
  /* MSTP5 */
- #define R8A7790_CLK_AUDIO_DMAC1		1
- #define R8A7790_CLK_AUDIO_DMAC0		2
+ #define R8A7794_CLK_THERMAL		22
+ #define R8A7794_CLK_PWM			23
 -- 
 2.1.4
