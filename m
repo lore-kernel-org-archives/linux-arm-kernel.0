@@ -1,248 +1,87 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Thu, 14 May 2015 09:14:12 -0600
-Subject: [PATCH 5/5] VFIO: platform: VFIO platform Calxeda xgmac reset
- module
-In-Reply-To: <5554659E.3010205@linaro.org>
-References: <1431008843-28411-1-git-send-email-eric.auger@linaro.org>
- <1431008843-28411-6-git-send-email-eric.auger@linaro.org>
- <1431542017.3625.56.camel@redhat.com> <5554659E.3010205@linaro.org>
-Message-ID: <1431616452.3625.107.camel@redhat.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Thu, 14 May 2015 16:14:25 +0100
+Subject: [PATCH 5/5] arm64: Add DT support for Juno r1 board.
+In-Reply-To: <20150514141817.GF494@leverpostej>
+References: <1431537092-19597-1-git-send-email-Liviu.Dudau@arm.com>
+ <1431537092-19597-6-git-send-email-Liviu.Dudau@arm.com>
+ <1431612451.2881.54.camel@linaro.org> <20150514141817.GF494@leverpostej>
+Message-ID: <1431616465.2881.61.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-05-14 at 11:06 +0200, Eric Auger wrote:
-> Alex,
-> On 05/13/2015 08:33 PM, Alex Williamson wrote:
-> > On Thu, 2015-05-07 at 16:27 +0200, Eric Auger wrote:
-> >> This patch introduces a module that registers and implements a basic
-> >> reset function for the Calxeda xgmac device. This latter basically disables
-> >> interrupts and stops DMA transfers.
-> >>
-> >> The reset function code is inherited from the native calxeda xgmac driver.
-> >>
-> >> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> >> ---
-> >>  drivers/vfio/platform/Kconfig                      |   2 +
-> >>  drivers/vfio/platform/Makefile                     |   2 +
-> >>  drivers/vfio/platform/reset/Kconfig                |   7 ++
-> >>  drivers/vfio/platform/reset/Makefile               |   5 +
-> >>  .../platform/reset/vfio_platform_calxedaxgmac.c    | 121 +++++++++++++++++++++
-> >>  5 files changed, 137 insertions(+)
-> >>  create mode 100644 drivers/vfio/platform/reset/Kconfig
-> >>  create mode 100644 drivers/vfio/platform/reset/Makefile
-> >>  create mode 100644 drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
-> >>
-> >> diff --git a/drivers/vfio/platform/Kconfig b/drivers/vfio/platform/Kconfig
-> >> index 9a4403e..1df7477 100644
-> >> --- a/drivers/vfio/platform/Kconfig
-> >> +++ b/drivers/vfio/platform/Kconfig
-> >> @@ -18,3 +18,5 @@ config VFIO_AMBA
-> >>  	  framework.
-> >>  
-> >>  	  If you don't know what to do here, say N.
-> >> +
-> >> +source "drivers/vfio/platform/reset/Kconfig"
-> >> diff --git a/drivers/vfio/platform/Makefile b/drivers/vfio/platform/Makefile
-> >> index 81de144..9ce8afe 100644
-> >> --- a/drivers/vfio/platform/Makefile
-> >> +++ b/drivers/vfio/platform/Makefile
-> >> @@ -2,7 +2,9 @@
-> >>  vfio-platform-y := vfio_platform.o vfio_platform_common.o vfio_platform_irq.o
-> >>  
-> >>  obj-$(CONFIG_VFIO_PLATFORM) += vfio-platform.o
-> >> +obj-$(CONFIG_VFIO_PLATFORM) += reset/
-> >>  
-> >>  vfio-amba-y := vfio_amba.o
-> >>  
-> >>  obj-$(CONFIG_VFIO_AMBA) += vfio-amba.o
-> >> +obj-$(CONFIG_VFIO_AMBA) += reset/
-> >> diff --git a/drivers/vfio/platform/reset/Kconfig b/drivers/vfio/platform/reset/Kconfig
-> >> new file mode 100644
-> >> index 0000000..746b96b
-> >> --- /dev/null
-> >> +++ b/drivers/vfio/platform/reset/Kconfig
-> >> @@ -0,0 +1,7 @@
-> >> +config VFIO_PLATFORM_CALXEDAXGMAC_RESET
-> >> +	tristate "VFIO support for calxeda xgmac reset"
-> >> +	depends on VFIO_PLATFORM
-> >> +	help
-> >> +	  Enables the VFIO platform driver to handle reset for Calxeda xgmac
-> >> +
-> >> +	  If you don't know what to do here, say N.
-> >> diff --git a/drivers/vfio/platform/reset/Makefile b/drivers/vfio/platform/reset/Makefile
-> >> new file mode 100644
-> >> index 0000000..2a486af
-> >> --- /dev/null
-> >> +++ b/drivers/vfio/platform/reset/Makefile
-> >> @@ -0,0 +1,5 @@
-> >> +vfio-platform-calxedaxgmac-y := vfio_platform_calxedaxgmac.o
-> >> +
-> >> +ccflags-y += -Idrivers/vfio/platform
-> >> +
-> >> +obj-$(CONFIG_VFIO_PLATFORM_CALXEDAXGMAC_RESET) += vfio-platform-calxedaxgmac.o
-> >> diff --git a/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c b/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
-> >> new file mode 100644
-> >> index 0000000..3c6e428
-> >> --- /dev/null
-> >> +++ b/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
-> >> @@ -0,0 +1,121 @@
-> >> +/*
-> >> + * VFIO platform driver specialized for Calxeda xgmac reset
-> >> + * reset code is inherited from calxeda xgmac native driver
-> >> + *
-> >> + * Copyright 2010-2011 Calxeda, Inc.
-> >> + * Copyright (c) 2015 Linaro Ltd.
-> >> + *              www.linaro.org
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or modify it
-> >> + * under the terms and conditions of the GNU General Public License,
-> >> + * version 2, as published by the Free Software Foundation.
-> >> + *
-> >> + * This program is distributed in the hope it will be useful, but WITHOUT
-> >> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> >> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> >> + * more details.
-> >> + *
-> >> + * You should have received a copy of the GNU General Public License along with
-> >> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> >> + */
-> >> +
-> >> +#include <linux/module.h>
-> >> +#include <linux/kernel.h>
-> >> +#include <linux/init.h>
-> >> +#include <linux/io.h>
-> >> +
-> >> +#include "vfio_platform_private.h"
-> >> +
-> >> +#define DRIVER_VERSION  "0.1"
-> >> +#define DRIVER_AUTHOR   "Eric Auger <eric.auger@linaro.org>"
-> >> +#define DRIVER_DESC     "Reset support for Calxeda xgmac vfio platform device"
-> >> +
-> >> +#define CALXEDAXGMAC_COMPAT "calxeda,hb-xgmac"
-> >> +
-> >> +/* XGMAC Register definitions */
-> >> +#define XGMAC_CONTROL           0x00000000      /* MAC Configuration */
-> >> +
-> >> +/* DMA Control and Status Registers */
-> >> +#define XGMAC_DMA_CONTROL       0x00000f18      /* Ctrl (Operational Mode) */
-> >> +#define XGMAC_DMA_INTR_ENA      0x00000f1c      /* Interrupt Enable */
-> >> +
-> >> +/* DMA Control registe defines */
-> >> +#define DMA_CONTROL_ST          0x00002000      /* Start/Stop Transmission */
-> >> +#define DMA_CONTROL_SR          0x00000002      /* Start/Stop Receive */
-> >> +
-> >> +/* Common MAC defines */
-> >> +#define MAC_ENABLE_TX           0x00000008      /* Transmitter Enable */
-> >> +#define MAC_ENABLE_RX           0x00000004      /* Receiver Enable */
-> >> +
-> >> +static inline void xgmac_mac_disable(void __iomem *ioaddr)
-> >> +{
-> >> +	u32 value = readl(ioaddr + XGMAC_DMA_CONTROL);
-> >> +
-> >> +	value &= ~(DMA_CONTROL_ST | DMA_CONTROL_SR);
-> >> +	writel(value, ioaddr + XGMAC_DMA_CONTROL);
-> >> +
-> >> +	value = readl(ioaddr + XGMAC_CONTROL);
-> >> +	value &= ~(MAC_ENABLE_TX | MAC_ENABLE_RX);
-> >> +	writel(value, ioaddr + XGMAC_CONTROL);
-> >> +}
-> >> +
-> >> +int vfio_platform_calxedaxgmac_reset(struct vfio_platform_device *vdev)
-> >> +{
-> >> +	struct vfio_platform_region reg = vdev->regions[0];
-> >> +
-> >> +	if (!reg.ioaddr) {
-> >> +		reg.ioaddr =
-> >> +			ioremap_nocache(reg.addr, reg.size);
-> >> +		if (!reg.ioaddr)
-> >> +			return -ENOMEM;
-> >> +	}
-> >> +
-> >> +	/* disable IRQ */
-> >> +	writel(0, reg.ioaddr + XGMAC_DMA_INTR_ENA);
-> >> +
-> >> +	/* Disable the MAC core */
-> >> +	xgmac_mac_disable(reg.ioaddr);
-> >> +
-> >> +	return 0;
-> >> +}
-> >> +EXPORT_SYMBOL_GPL(vfio_platform_calxedaxgmac_reset);
-> >> +
-> >> +static int __init vfio_platform_calxedaxgmac_init(void)
-> >> +{
-> >> +	int (*register_reset)(char *, struct module *,
-> >> +				vfio_platform_reset_fn_t);
-> >> +	int ret;
-> >> +
-> >> +	register_reset = symbol_get(vfio_platform_register_reset);
-> >> +	if (!register_reset)
-> >> +		return -EINVAL;
-> >> +
-> >> +	ret = register_reset(CALXEDAXGMAC_COMPAT, THIS_MODULE,
-> >> +			     vfio_platform_calxedaxgmac_reset);
-> >> +
-> >> +	symbol_put(vfio_platform_register_reset);
-> >> +
-> >> +	return ret;
-> >> +}
-> >> +
-> >> +static void __exit vfio_platform_calxedaxgmac_exit(void)
-> >> +{
-> >> +	int (*unregister_reset)(char *);
-> >> +	int ret;
-> >> +
-> >> +	unregister_reset = symbol_get(vfio_platform_unregister_reset);
+On Thu, 2015-05-14 at 15:18 +0100, Mark Rutland wrote:
+> On Thu, May 14, 2015 at 03:07:31PM +0100, Jon Medhurst (Tixy) wrote:
+> > On Wed, 2015-05-13 at 18:11 +0100, Liviu Dudau wrote:
+> > > This board is based on Juno r0 with updated Cortex A5x revisions
+> > > and board errata fixes. It also contains coherent ThinLinks ports
+> > > on the expansion slot that allow for an AXI master on the daughter
+> > > card to participate in a coherency domain.
+> > > 
+> > > Support for SoC PCIe host bridge will be added as a separate series.
+> > > 
+> > > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > > ---
+> > >  arch/arm64/boot/dts/arm/Makefile    |   2 +-
+> > >  arch/arm64/boot/dts/arm/juno-r1.dts | 123 ++++++++++++++++++++++++++++++++++++
+> > >  2 files changed, 124 insertions(+), 1 deletion(-)
+> > >  create mode 100644 arch/arm64/boot/dts/arm/juno-r1.dts
+> > > 
+> > > diff --git a/arch/arm64/boot/dts/arm/Makefile b/arch/arm64/boot/dts/arm/Makefile
+> > > index 301a0da..c5c98b9 100644
+> > > --- a/arch/arm64/boot/dts/arm/Makefile
+> > > +++ b/arch/arm64/boot/dts/arm/Makefile
+> > > @@ -1,5 +1,5 @@
+> > >  dtb-$(CONFIG_ARCH_VEXPRESS) += foundation-v8.dtb
+> > > -dtb-$(CONFIG_ARCH_VEXPRESS) += juno.dtb
+> > > +dtb-$(CONFIG_ARCH_VEXPRESS) += juno.dtb juno-r1.dtb
+> > >  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb
+> > >  
+> > >  always		:= $(dtb-y)
+> > > diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
+> > > new file mode 100644
+> > > index 0000000..f6bc073
+> > > --- /dev/null
+> > > +++ b/arch/arm64/boot/dts/arm/juno-r1.dts
+> > > @@ -0,0 +1,123 @@
+> > > +/*
+> > > + * ARM Ltd. Juno Platform
+> > > + *
+> > > + * Copyright (c) 2015 ARM Ltd.
+> > > + *
+> > > + * This file is licensed under a dual GPLv2 or BSD license.
+> > > + */
+> > > +
+> > > +/dts-v1/;
+> > > +
+> > > +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> > > +
+> > > +/ {
+> > > +	model = "ARM Juno development board (r1)";
+> > > +	compatible = "arm,juno", "arm,vexpress";
 > > 
-> > Shouldn't we have gotten the symbol during the module init so that this
-> > cannot fail?
-> yes makes sense
-> > 
-> >> +	if (!unregister_reset)
-> >> +		return;
-> >> +
-> >> +	ret = unregister_reset(CALXEDAXGMAC_COMPAT);
-> > 
-> > unregister_reset() should just return void
-> ok
-> > 
-> >> +
-> >> +	symbol_put(vfio_platform_unregister_reset);
-> >> +}
-> >> +
-> >> +module_init(vfio_platform_calxedaxgmac_init);
-> >> +module_exit(vfio_platform_calxedaxgmac_exit);
-> >> +
-> >> +MODULE_VERSION(DRIVER_VERSION);
-> >> +MODULE_LICENSE("GPL v2");
-> >> +MODULE_AUTHOR(DRIVER_AUTHOR);
-> >> +MODULE_DESCRIPTION(DRIVER_DESC);
-> > 
-> > 
-> > So a user needs to manually load this module to get a working reset for
-> > this device?  That's never going to happen.
-> The reset module is devised to be in-kernel or external. There is always
-> the choice to include all reset modules as soon as vfio-platform /amba
-> is chosen. What would be your preferred approach then? Do you consider
-> this approach using separate reset modules is not sensible? Do you think
-> we should put everything in the vfio-platform driver?
+> > Is there scope for adding "arm,juno-r1" to the front of that list?
+> > Reason I ask, is that I can't help but think [1] that userside code
+> > (like Android) which wants to select device-specific configuration,
+> > should use something like the devices compatible string rather than what
+> > they currently propose [2].
+> 
+> > [1] https://lists.linaro.org/pipermail/linaro-android/2015-April/002743.html
+> > [2] https://lists.linaro.org/pipermail/linaro-android/2015-April/002742.html
+> 
+> Ideally, userspace shouldn't need to know what specific device they're
+> running on (though obviously there will always be cases...). To that
+> end, it would be interesting to know what this data would be used for.
+> If it's just a string for some "About device" menu, the model string
+> should be ok.
 
-I respect your attempt to keep the code slim and modular by making the
-reset functionality loadable, but we can't expect users to figure out
-what module they need to load to make their device work.  It needs to be
-automatic.  One way we could achieve that and still keep your premise of
-loadable reset modules would be a lookup table in vfio-platform to
-translate a device compatibility ID to a reset module name.  We could
-then do a request_module() to auto-load the reset module if one exists.
-Maybe the ID table could even live in the reset driver, much like PCI
-IDs live in those drivers.  We also have the complication that there's
-no direct module dependency for the reset module(s), so they would need
-to be explicitly listed to install them into an initramfs.
+The 'hardware name' is used to selected the correct init scripts, fstab,
+userside graphics/audio drivers for the device.
 
-If we take that approach, we're quickly building infrastructure that
-gets more bloated than a few reset functions buried directly into
-vfio-platform.  Then we may wonder how many reset functions are we
-reasonably going to get.  If you don't have more than a couple in mind,
-maybe we should just embed them into vfio-platform and worry about
-creating something more dynamic when the need presents itself.  Thanks,
+> I'm a bit lost with the suggestion in [2]. It doesn't seem to have
+> anything to do with firmware, though perhaps I'm missing something?
 
-Alex
+That was my reaction. Before they were parsing /proc/cpuinfo to get the
+device name. But that information got removed.
+
+-- 
+Tixy
