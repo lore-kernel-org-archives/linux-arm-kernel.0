@@ -1,104 +1,124 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Thu, 14 May 2015 12:10:58 +0200
-Subject: [PATCH net-next 03/11] stmmac: prepare stmmac platform to support
- stand alone drivers
+Date: Thu, 14 May 2015 12:10:59 +0200
+Subject: [PATCH net-next 04/11] stmmac: add a generic dwmac driver
 In-Reply-To: <1431598266-25736-1-git-send-email-manabian@gmail.com>
 References: <1431598266-25736-1-git-send-email-manabian@gmail.com>
-Message-ID: <1431598266-25736-4-git-send-email-manabian@gmail.com>
+Message-ID: <1431598266-25736-5-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prepare the stmmac platform code to support standalone drivers
-by exporting the need functions and having of_match_device use
-the match table reference already present in the driver struct.
-
-This will allow us to reuse the platform driver functions from
-this code easily in other stand alone platform drivers.
+Create a new driver around the generic device tree match strings
+in the stmmac platform code. This driver is intended to be used
+by all platforms that doesn't require any platform specific code
+to function or is using platform data.
 
 Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 ---
- drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c | 14 +++++++++-----
- drivers/net/ethernet/stmicro/stmmac/stmmac_platform.h |  4 ++++
- 2 files changed, 13 insertions(+), 5 deletions(-)
+ drivers/net/ethernet/stmicro/stmmac/Kconfig        | 12 +++++++
+ drivers/net/ethernet/stmicro/stmmac/Makefile       |  4 ++-
+ .../net/ethernet/stmicro/stmmac/dwmac-generic.c    | 39 ++++++++++++++++++++++
+ .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |  5 ---
+ 4 files changed, 54 insertions(+), 6 deletions(-)
+ create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-generic.c
 
+diff --git a/drivers/net/ethernet/stmicro/stmmac/Kconfig b/drivers/net/ethernet/stmicro/stmmac/Kconfig
+index 7d3af190be55..d4ed2ac3829b 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/Kconfig
++++ b/drivers/net/ethernet/stmicro/stmmac/Kconfig
+@@ -26,6 +26,18 @@ config STMMAC_PLATFORM
+ 
+ 	  If unsure, say N.
+ 
++if STMMAC_PLATFORM
++
++config DWMAC_GENERIC
++	tristate "Generic driver for DWMAC"
++	default STMMAC_PLATFORM
++	---help---
++	  Generic DWMAC driver for platforms that don't require any
++	  platform specific code to function or is using platform
++	  data for setup.
++
++endif
++
+ config STMMAC_PCI
+ 	tristate "STMMAC PCI bus support"
+ 	depends on STMMAC_ETH && PCI
+diff --git a/drivers/net/ethernet/stmicro/stmmac/Makefile b/drivers/net/ethernet/stmicro/stmmac/Makefile
+index 5c165d8d7004..89a353450182 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/Makefile
++++ b/drivers/net/ethernet/stmicro/stmmac/Makefile
+@@ -4,7 +4,9 @@ stmmac-objs:= stmmac_main.o stmmac_ethtool.o stmmac_mdio.o ring_mode.o	\
+ 	      dwmac100_core.o dwmac100_dma.o enh_desc.o norm_desc.o	\
+ 	      mmc_core.o stmmac_hwtstamp.o stmmac_ptp.o $(stmmac-y)
+ 
+-obj-$(CONFIG_STMMAC_PLATFORM) += stmmac-platform.o
++# Ordering matters. Generic driver must be last.
++obj-$(CONFIG_STMMAC_PLATFORM)	+= stmmac-platform.o
++obj-$(CONFIG_DWMAC_GENERIC)	+= dwmac-generic.o
+ stmmac-platform-objs:= stmmac_platform.o dwmac-meson.o dwmac-sunxi.o	\
+ 		       dwmac-sti.o dwmac-socfpga.o dwmac-rk.o		\
+ 		       dwmac-lpc18xx.o
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-generic.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-generic.c
+new file mode 100644
+index 000000000000..fb9623744e41
+--- /dev/null
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-generic.c
+@@ -0,0 +1,39 @@
++/*
++ * Generic DWMAC platform driver
++ *
++ * Copyright (C) 2015 Joachim Eastwood <manabian@gmail.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++
++#include "stmmac_platform.h"
++
++static const struct of_device_id dwmac_generic_match[] = {
++	{ .compatible = "st,spear600-gmac"},
++	{ .compatible = "snps,dwmac-3.610"},
++	{ .compatible = "snps,dwmac-3.70a"},
++	{ .compatible = "snps,dwmac-3.710"},
++	{ .compatible = "snps,dwmac"},
++	{ }
++};
++MODULE_DEVICE_TABLE(of, dwmac_generic_match);
++
++static struct platform_driver dwmac_generic_driver = {
++	.probe  = stmmac_pltfr_probe,
++	.remove = stmmac_pltfr_remove,
++	.driver = {
++		.name           = "dwmac-generic",
++		.pm		= &stmmac_pltfr_pm_ops,
++		.of_match_table = of_match_ptr(dwmac_generic_match),
++	},
++};
++module_platform_driver(dwmac_generic_driver);
++
++MODULE_DESCRIPTION("Generic dwmac driver");
++MODULE_LICENSE("GPL v2");
 diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-index 1ac7c8a2c631..0d1f1ec96bc0 100644
+index 0d1f1ec96bc0..1777e7124d3e 100644
 --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
 +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-@@ -130,11 +130,12 @@ static int stmmac_probe_config_dt(struct platform_device *pdev,
- 	struct device_node *np = pdev->dev.of_node;
- 	struct stmmac_dma_cfg *dma_cfg;
- 	const struct of_device_id *device;
-+	struct device *dev = &pdev->dev;
- 
- 	if (!np)
- 		return -ENODEV;
- 
--	device = of_match_device(stmmac_dt_ids, &pdev->dev);
-+	device = of_match_device(dev->driver->of_match_table, dev);
- 	if (!device)
- 		return -ENODEV;
- 
-@@ -269,7 +270,7 @@ static int stmmac_probe_config_dt(struct platform_device *pdev,
-  * the necessary platform resources, invoke custom helper (if required) and
-  * invoke the main probe function.
-  */
--static int stmmac_pltfr_probe(struct platform_device *pdev)
-+int stmmac_pltfr_probe(struct platform_device *pdev)
- {
- 	int ret = 0;
- 	struct resource *res;
-@@ -375,6 +376,7 @@ static int stmmac_pltfr_probe(struct platform_device *pdev)
- 
- 	return 0;
- }
-+EXPORT_SYMBOL_GPL(stmmac_pltfr_probe);
- 
- /**
-  * stmmac_pltfr_remove
-@@ -382,7 +384,7 @@ static int stmmac_pltfr_probe(struct platform_device *pdev)
-  * Description: this function calls the main to free the net resources
-  * and calls the platforms hook and release the resources (e.g. mem).
-  */
--static int stmmac_pltfr_remove(struct platform_device *pdev)
-+int stmmac_pltfr_remove(struct platform_device *pdev)
- {
- 	struct net_device *ndev = platform_get_drvdata(pdev);
- 	struct stmmac_priv *priv = netdev_priv(ndev);
-@@ -396,6 +398,7 @@ static int stmmac_pltfr_remove(struct platform_device *pdev)
- 
- 	return ret;
- }
-+EXPORT_SYMBOL_GPL(stmmac_pltfr_remove);
- 
- #ifdef CONFIG_PM_SLEEP
- /**
-@@ -439,8 +442,9 @@ static int stmmac_pltfr_resume(struct device *dev)
- }
- #endif /* CONFIG_PM_SLEEP */
- 
--static SIMPLE_DEV_PM_OPS(stmmac_pltfr_pm_ops,
--			 stmmac_pltfr_suspend, stmmac_pltfr_resume);
-+SIMPLE_DEV_PM_OPS(stmmac_pltfr_pm_ops, stmmac_pltfr_suspend,
-+				       stmmac_pltfr_resume);
-+EXPORT_SYMBOL_GPL(stmmac_pltfr_pm_ops);
- 
- static struct platform_driver stmmac_pltfr_driver = {
- 	.probe = stmmac_pltfr_probe,
-diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.h b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.h
-index 59fe8fb46a48..5be0b101bffd 100644
---- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.h
-+++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.h
-@@ -19,6 +19,10 @@
- #ifndef __STMMAC_PLATFORM_H__
- #define __STMMAC_PLATFORM_H__
- 
-+int stmmac_pltfr_probe(struct platform_device *pdev);
-+int stmmac_pltfr_remove(struct platform_device *pdev);
-+extern const struct dev_pm_ops stmmac_pltfr_pm_ops;
-+
- extern const struct stmmac_of_data lpc18xx_dwmac_data;
- extern const struct stmmac_of_data meson6_dwmac_data;
- extern const struct stmmac_of_data sun7i_gmac_data;
+@@ -43,11 +43,6 @@ static const struct of_device_id stmmac_dt_ids[] = {
+ 	{ .compatible = "st,stid127-dwmac", .data = &stid127_dwmac_data},
+ 	{ .compatible = "st,stih407-dwmac", .data = &stih4xx_dwmac_data},
+ 	{ .compatible = "altr,socfpga-stmmac", .data = &socfpga_gmac_data },
+-	{ .compatible = "st,spear600-gmac"},
+-	{ .compatible = "snps,dwmac-3.610"},
+-	{ .compatible = "snps,dwmac-3.70a"},
+-	{ .compatible = "snps,dwmac-3.710"},
+-	{ .compatible = "snps,dwmac"},
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, stmmac_dt_ids);
 -- 
 1.8.0
