@@ -1,42 +1,51 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 14 May 2015 11:41:19 +0900
-Subject: [PATCH v3 2/2] ARM: EXYNOS: Use of_machine_is_compatible instead
- ofsoc_is_exynos4
-In-Reply-To: <1431307646-10779-2-git-send-email-k.kozlowski@samsung.com>
-References: <1431307646-10779-1-git-send-email-k.kozlowski@samsung.com>
- <1431307646-10779-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <55540B4F.6060607@kernel.org>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Thu, 14 May 2015 11:06:36 +0800
+Subject: [PATCH] lib: fix 842 build on 32-bit architectures
+In-Reply-To: <2802721.Q9KnE9eNH4@wuerfel>
+References: <2802721.Q9KnE9eNH4@wuerfel>
+Message-ID: <20150514030636.GE3853@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/15 10:27, Krzysztof Kozlowski wrote:
-> of_machine_is_compatible() seems to be preferred over soc_is_exynos4().
+On Wed, May 13, 2015 at 10:56:39PM +0200, Arnd Bergmann wrote:
+> Building the 842 code on 32-bit ARM currently results in this link
+> error:
 > 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ERROR: "__aeabi_uldivmod" [lib/842/842_decompress.ko] undefined!
 > 
+> The reason is that the __do_index function performs a 64-bit
+> division by a power-of-two number, but it has no insight into
+> the function arguments.
+> 
+> By marking that function inline, the fsize argument is always
+> known at the time that do_index is called, and the compiler is
+> able to replace the extremely expensive 64-bit division with
+> a cheap constant shift operation.
+> 
+> Aside from fixing that link error, this approach should also improve
+> both code size and performance on 32-bit architectures significantly.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
-> Changes since v2:
-> 1. New patch, requested by Kukjin Kim.
-> ---
->  arch/arm/mach-exynos/exynos.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Found while building arm32 allmodconfig with gcc-5.0
 > 
-> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-> index c3bfbba3006d..5917a30eee33 100644
-> --- a/arch/arm/mach-exynos/exynos.c
-> +++ b/arch/arm/mach-exynos/exynos.c
-> @@ -179,7 +179,7 @@ static void __init exynos_init_io(void)
->   */
->  void exynos_set_delayed_reset_assertion(bool enable)
->  {
-> -	if (soc_is_exynos4()) {
-> +	if (of_machine_is_compatible("samsung,exynos4")) {
->  		unsigned int tmp, core_id;
+> diff --git a/lib/842/842_decompress.c b/lib/842/842_decompress.c
+> index 6b2b45aecde3..285bf6b6959c 100644
+> --- a/lib/842/842_decompress.c
+> +++ b/lib/842/842_decompress.c
+> @@ -169,7 +169,7 @@ static int do_data(struct sw842_param *p, u8 n)
+>  	return 0;
+>  }
 >  
->  		for (core_id = 0; core_id < num_possible_cpus(); core_id++) {
+> -static int __do_index(struct sw842_param *p, u8 size, u8 bits, u64 fsize)
+> +static inline int __do_index(struct sw842_param *p, u8 size, u8 bits, u64 fsize)
 
-Maybe we need to change the compatible for exynos4415.dtsi? because no
-exynos4 in the compatible...Applied, anyway.
+Ugh, relying on inlining to work is fragile.  I'm not against
+making this inline but please make it work even when it is out-
+of-line.
 
 Thanks,
-Kukjin
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
