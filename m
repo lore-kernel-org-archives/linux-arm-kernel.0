@@ -1,187 +1,161 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 14 May 2015 17:12:07 +0800
-Subject: [PATCH 1/8] clk: sunxi: factors: Add m_start parameters
-In-Reply-To: <1430565879-28113-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1430565879-28113-1-git-send-email-maxime.ripard@free-electrons.com>
- <1430565879-28113-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v669fsz_pA+B0r8efp0BMxY-D86qfLuGQCqK1POuu9PmxQ@mail.gmail.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 14 May 2015 10:14:15 +0100
+Subject: [PATCH v8 4/9] mfd: Add binding document for NVIDIA Tegra XUSB
+In-Reply-To: <20150514074058.GA22418@x1>
+References: <1430761002-9327-1-git-send-email-abrestic@chromium.org>
+ <1430761002-9327-5-git-send-email-abrestic@chromium.org>
+ <20150513143954.GA3394@x1> <55544CC5.9050001@nvidia.com>
+ <20150514074058.GA22418@x1>
+Message-ID: <55546767.90501@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 2, 2015 at 7:24 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Some clocks start incrementing the m factor at 0. Add a parameter to handle
-> it just like we did for the N factor.
->
-> Since the behaviour until now was to assume that the m factor was starting
-> at 1, we also need to fix the other users.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/clk/sunxi/clk-factors.c    | 11 ++++++++++-
->  drivers/clk/sunxi/clk-factors.h    |  2 ++
->  drivers/clk/sunxi/clk-mod0.c       |  2 ++
->  drivers/clk/sunxi/clk-sun8i-mbus.c |  2 ++
->  drivers/clk/sunxi/clk-sun9i-core.c |  6 ++++++
->  drivers/clk/sunxi/clk-sunxi.c      | 10 ++++++++++
->  6 files changed, 32 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
-> index 8c20190a3e9f..100a711c3e3d 100644
-> --- a/drivers/clk/sunxi/clk-factors.c
-> +++ b/drivers/clk/sunxi/clk-factors.c
-> @@ -56,15 +56,24 @@ static unsigned long clk_factors_recalc_rate(struct clk_hw *hw,
->         /* Get each individual factor if applicable */
->         if (config->nwidth != SUNXI_FACTORS_NOT_APPLICABLE)
->                 n = FACTOR_GET(config->nshift, config->nwidth, reg);
-> +
->         if (config->kwidth != SUNXI_FACTORS_NOT_APPLICABLE)
->                 k = FACTOR_GET(config->kshift, config->kwidth, reg);
-> +
->         if (config->mwidth != SUNXI_FACTORS_NOT_APPLICABLE)
->                 m = FACTOR_GET(config->mshift, config->mwidth, reg);
-> +       else
-> +               /* Make sure we don't get a division by zero */
-> +               m = 1;
 
-What happens when mwidth is valid, m_start = 0, and m = 0?
+On 14/05/15 08:40, Lee Jones wrote:
+> On Thu, 14 May 2015, Jon Hunter wrote:
+> 
+>> Hi Lee,
+>>
+>> On 13/05/15 15:39, Lee Jones wrote:
+>>> On Mon, 04 May 2015, Andrew Bresticker wrote:
+>>>
+>>>> Add a binding document for the XUSB host complex on NVIDIA Tegra124
+>>>> and later SoCs.  The XUSB host complex includes a mailbox for
+>>>> communication with the XUSB micro-controller and an xHCI host-controller.
+>>>>
+>>>> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+>>>> Cc: Rob Herring <robh+dt@kernel.org>
+>>>> Cc: Pawel Moll <pawel.moll@arm.com>
+>>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>>> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+>>>> Cc: Kumar Gala <galak@codeaurora.org>
+>>>> Cc: Samuel Ortiz <sameo@linux.intel.com>
+>>>> Cc: Lee Jones <lee.jones@linaro.org>
+>>>> ---
+>>>> Changes from v7:
+>>>>  - Move non-shared resources into child nodes.
+>>>> New for v7.
+>>>> ---
+>>>>  .../bindings/mfd/nvidia,tegra124-xusb.txt          | 37 ++++++++++++++++++++++
+>>>>  1 file changed, 37 insertions(+)
+>>>>  create mode 100644 Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt b/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
+>>>> new file mode 100644
+>>>> index 0000000..bc50110
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
+>>>> @@ -0,0 +1,37 @@
+>>>> +NVIDIA Tegra XUSB host copmlex
+>>>> +==============================
+>>>> +
+>>>> +The XUSB host complex on Tegra124 and later SoCs contains an xHCI host
+>>>> +controller and a mailbox for communication with the XUSB micro-controller.
+>>>> +
+>>>> +Required properties:
+>>>> +--------------------
+>>>> + - compatible: For Tegra124, must contain "nvidia,tegra124-xusb".
+>>>> +   Otherwise, must contain '"nvidia,<chip>-xusb", "nvidia,tegra124-xusb"'
+>>>> +   where <chip> is tegra132.
+>>>> + - reg: Must contain the base and length of the XUSB FPCI registers.
+>>>> + - ranges: Bus address mapping for the XUSB block.  Can be empty since the
+>>>> +   mapping is 1:1.
+>>>> + - #address-cells: Must be 2.
+>>>> + - #size-cells: Must be 2.
+>>>> +
+>>>> +Example:
+>>>> +--------
+>>>> +	usb at 0,70098000 {
+>>>> +		compatible = "nvidia,tegra124-xusb";
+>>>> +		reg = <0x0 0x70098000 0x0 0x1000>;
+>>>> +		ranges;
+>>>> +
+>>>> +		#address-cells = <2>;
+>>>> +		#size-cells = <2>;
+>>>> +
+>>>> +		usb-host at 0,70090000 {
+>>>> +			compatible = "nvidia,tegra124-xhci";
+>>>> +			...
+>>>> +		};
+>>>> +
+>>>> +		mailbox {
+>>>> +			compatible = "nvidia,tegra124-xusb-mbox";
+>>>> +			...
+>>>> +		};
+>>>
+>>> This doesn't appear to be a proper MFD.  I would have the USB and
+>>> Mailbox devices probe seperately and use a phandle to point the USB
+>>> device to its Mailbox.
+>>>
+>>> usb at xyz {
+>>> 	mboxes = <&xusb-mailbox, [chan]>;
+>>> };
+>>>
+>>
+>> I am assuming that Andrew had laid it out like this to reflect the hw
+>> structure. The mailbox and xhci controller are part of the xusb
+>> sub-system and hence appear as child nodes. My understanding is that for
+>> device-tree we want the device-tree structure to reflect the actual hw.
+>> Is this not the case?
+> 
+> Yes, the DT files should reflect h/w.  I have requested to see what
+> the memory map looks like, so I might provide a more appropriate
+> solution to accepting a pretty pointless MFD.
 
-Other than that, this one looks good.
+For the xusb-host has memory from 0x7009000 - 0x7009ffff.
 
-ChenYu
+Within this range, we have this fpci range which is defined as 0x7009800
+- 0x70098fff. This range is being shared between the mailbox and xhci
+drivers. Looking at the drivers, we have ...
 
-> +
->         if (config->pwidth != SUNXI_FACTORS_NOT_APPLICABLE)
->                 p = FACTOR_GET(config->pshift, config->pwidth, reg);
->
->         /* Calculate the rate */
-> -       rate = (parent_rate * (n + config->n_start) * (k + 1) >> p) / (m + 1);
-> +       rate = parent_rate * (n + config->n_start);
-> +       rate *= k + 1;
-> +       rate >>= p;
-> +       rate /= m + config->m_start;
->
->         return rate;
->  }
-> diff --git a/drivers/clk/sunxi/clk-factors.h b/drivers/clk/sunxi/clk-factors.h
-> index 171085ab5513..735d756d2923 100644
-> --- a/drivers/clk/sunxi/clk-factors.h
-> +++ b/drivers/clk/sunxi/clk-factors.h
-> @@ -16,6 +16,8 @@ struct clk_factors_config {
->         u8 mwidth;
->         u8 pshift;
->         u8 pwidth;
-> +
-> +       u8 m_start;
->         u8 n_start;
->  };
->
-> diff --git a/drivers/clk/sunxi/clk-mod0.c b/drivers/clk/sunxi/clk-mod0.c
-> index ec8f5a1fca09..eefa9be4078b 100644
-> --- a/drivers/clk/sunxi/clk-mod0.c
-> +++ b/drivers/clk/sunxi/clk-mod0.c
-> @@ -66,6 +66,8 @@ static struct clk_factors_config sun4i_a10_mod0_config = {
->         .mwidth = 4,
->         .pshift = 16,
->         .pwidth = 2,
-> +
-> +       .m_start = 1,
->  };
->
->  static const struct factors_data sun4i_a10_mod0_data = {
-> diff --git a/drivers/clk/sunxi/clk-sun8i-mbus.c b/drivers/clk/sunxi/clk-sun8i-mbus.c
-> index 14cd026064bf..66fbf14a0f8a 100644
-> --- a/drivers/clk/sunxi/clk-sun8i-mbus.c
-> +++ b/drivers/clk/sunxi/clk-sun8i-mbus.c
-> @@ -55,6 +55,8 @@ static void sun8i_a23_get_mbus_factors(u32 *freq, u32 parent_rate,
->  static struct clk_factors_config sun8i_a23_mbus_config = {
->         .mshift = 0,
->         .mwidth = 3,
-> +
-> +       .m_start = 1,
->  };
->
->  static const struct factors_data sun8i_a23_mbus_data __initconst = {
-> diff --git a/drivers/clk/sunxi/clk-sun9i-core.c b/drivers/clk/sunxi/clk-sun9i-core.c
-> index d8da77d72861..97e87ca4a8fc 100644
-> --- a/drivers/clk/sunxi/clk-sun9i-core.c
-> +++ b/drivers/clk/sunxi/clk-sun9i-core.c
-> @@ -78,6 +78,8 @@ static struct clk_factors_config sun9i_a80_pll4_config = {
->         .nwidth = 8,
->         .pshift = 16,
->         .pwidth = 1,
-> +
-> +       .m_start = 1,
->  };
->
->  static const struct factors_data sun9i_a80_pll4_data __initconst = {
-> @@ -137,6 +139,8 @@ static void sun9i_a80_get_gt_factors(u32 *freq, u32 parent_rate,
->  static struct clk_factors_config sun9i_a80_gt_config = {
->         .mshift = 0,
->         .mwidth = 2,
-> +
-> +       .m_start = 1,
->  };
->
->  static const struct factors_data sun9i_a80_gt_data __initconst = {
-> @@ -294,6 +298,8 @@ static struct clk_factors_config sun9i_a80_apb1_config = {
->         .mwidth = 5,
->         .pshift = 16,
->         .pwidth = 2,
-> +
-> +       .m_start = 1,
->  };
->
->  static const struct factors_data sun9i_a80_apb1_data __initconst = {
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index 7e1e2bd189b6..6df869050986 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -616,6 +616,8 @@ static struct clk_factors_config sun4i_pll1_config = {
->         .mwidth = 2,
->         .pshift = 16,
->         .pwidth = 2,
-> +
-> +       .m_start = 1,
->  };
->
->  static struct clk_factors_config sun6i_a31_pll1_config = {
-> @@ -625,6 +627,8 @@ static struct clk_factors_config sun6i_a31_pll1_config = {
->         .kwidth = 2,
->         .mshift = 0,
->         .mwidth = 2,
-> +
-> +       .m_start = 1,
->         .n_start = 1,
->  };
->
-> @@ -637,6 +641,8 @@ static struct clk_factors_config sun8i_a23_pll1_config = {
->         .mwidth = 2,
->         .pshift = 16,
->         .pwidth = 2,
-> +
-> +       .m_start = 1,
->         .n_start = 1,
->  };
->
-> @@ -665,6 +671,8 @@ static struct clk_factors_config sun4i_apb1_config = {
->         .mwidth = 5,
->         .pshift = 16,
->         .pwidth = 2,
-> +
-> +       .m_start = 1,
->  };
->
->  /* user manual says "n" but it's really "p" */
-> @@ -673,6 +681,8 @@ static struct clk_factors_config sun7i_a20_out_config = {
->         .mwidth = 5,
->         .pshift = 20,
->         .pwidth = 2,
-> +
-> +       .m_start = 1,
->  };
->
->  static const struct factors_data sun4i_pll1_data __initconst = {
-> --
-> 2.3.6
->
+mailbox uses: 0x700980e0 - 0x700980f3 and 0x70098428 - 0x7009842b.
+xhci uses:    0x70098000 - 0x700980cf and 0x70098800 - 0x70098803.
+
+So it is a bit messy as they overlap. However, we could have ...
+
+	xusb_mbox: mailbox {
+		compatible = "nvidia,tegra124-xusb-mbox";
+		reg = <0x0 0x700980e0 0x0 0x14>,
+		      <0x0 0x70098428 0x0 0x4>;
+		...
+	};
+	usb-host at 0,70090000 {
+		compatible = "nvidia,tegra124-xhci";
+		reg = <0x0 0x70090000 0x0 0x8000>,		      	
+		      <0x0 0x70098000 0x0 0x00d0>;
+		      <0x0 0x70098800 0x0 0x0004>;
+		      <0x0 0x70099000 0x0 0x1000>;
+		...
+	};
+
+I believe that Thierry and Stephen said that they wished to avoid
+multiple devices sharing the same memory ranges, and so we would need to
+divvy up the memory map as above. However, I am not sure if this is an
+ok thing to do.
+	
+> Two solutions spring to mind.  You can either call
+> of_platform_populate() from the USB driver, as some already do:
+> 
+>   drivers/usb/dwc3/dwc3-exynos.c:
+>     ret = of_platform_populate(node, NULL, NULL, dev);
+>   drivers/usb/dwc3/dwc3-keystone.c:
+>     error = of_platform_populate(node, NULL, NULL, dev);
+>   drivers/usb/dwc3/dwc3-omap.c:
+>     ret = of_platform_populate(node, NULL, NULL, dev);
+>   drivers/usb/dwc3/dwc3-qcom.c:
+>     ret = of_platform_populate(node, NULL, NULL, qdwc->dev);
+>   drivers/usb/dwc3/dwc3-st.c:
+>     ret = of_platform_populate(node, NULL, NULL, dev);
+>   drivers/usb/musb/musb_am335x.c:
+>     ret = of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
+> 
+> Or use the "simple-mfd", which is currently in -next:
+> 
+>   git show next/master:Documentation/devicetree/bindings/mfd/mfd.txt
+
+That is nice. Sounds like the "simple-bus" style of device but for an
+mfd. Based upon the above, let me know if you think we could use the
+"simple-mfd"?
+
+Cheers
+Jon
