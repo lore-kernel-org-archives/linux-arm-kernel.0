@@ -1,43 +1,18 @@
-From: xander.huff@ni.com (Xander Huff)
-Date: Thu, 14 May 2015 17:45:04 -0500
-Subject: [PATCH] iio: adc: xilinx-xadc: Convert to raw spinlock
-In-Reply-To: <20150514171038.GG13442@linutronix.de>
-References: <1431013090-18996-1-git-send-email-xander.huff@ni.com>
- <20150514171038.GG13442@linutronix.de>
-Message-ID: <55552570.5050407@ni.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Fri, 15 May 2015 01:51:42 +0300
+Subject: GCC 5.1 bug affecting ARM kernels
+Message-ID: <20150514225142.GE609@fuloong-minipc.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/14/2015 12:10 PM, Sebastian Andrzej Siewior wrote:
->
-> Do you have any cyclictest numbers how much the latency increases on
-> heavy iio usage? Traditionally the primary handler should be very quick
-> / short.
->
-> Sebastian
->
-With no other processes running, I got the following results after a couple of 
-hours on one of our devices:
+Hi,
 
-admin at Xander-roboRIO:~# cyclictest -S -m -p 98
-# /dev/cpu_dma_latency set to 0us
-policy: fifo: loadavg: 0.01 0.07 0.12 1/176 1473
+There is a code generation bug in GCC 5.1 that affects some ARM kernels:
 
-T: 0 ( 1373) P:98 I:1000 C:6503872 Min:      9 Act:   13 Avg:   13 Max:      51
-T: 1 ( 1374) P:98 I:1500 C:4335914 Min:      9 Act:   12 Avg:   13 Max:      49
+	https://gcc.gnu.org/bugzilla/show_bug.cgi?id=65932
 
-With a VI reading all default handles (raw, offset, scale, sampling_frequency) 
-in /sys/bus/iio/devices/iio:device0 constantly in a while loop, I got the 
-following results after a couple hours on the same device:
+The bug report mentions arm926ej-s, and also some OMAP1 and 2 kernels
+fail to boot (there is a crash after warnings about some bogus duplicate
+sysfs files) unless they are compiled with -fno-ipa-sra.
 
-admin at Xander-roboRIO:~# cyclictest -S -m -p 98
-# /dev/cpu_dma_latency set to 0us
-policy: fifo: loadavg: 6.93 7.30 7.47 3/182 1530
-
-T: 0 ( 1487) P:98 I:1000 C:4497008 Min:     11 Act:   20 Avg:   21 Max:      69
-T: 1 ( 1488) P:98 I:1500 C:2998005 Min:     11 Act:   20 Avg:   22 Max:      59
-
--- 
-Xander Huff
-Staff Software Engineer
-National Instruments
+A.
