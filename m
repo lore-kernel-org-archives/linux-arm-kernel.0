@@ -1,42 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 14 May 2015 12:49:13 +0200
-Subject: [PATCH] lib: fix 842 build on 32-bit architectures
-In-Reply-To: <CALZtONC5Fc-Dsw_aob7zyycYdS6rP6ckT-wdyxF1WJTNsSLp7g@mail.gmail.com>
-References: <2802721.Q9KnE9eNH4@wuerfel>
- <1431561144-29931-1-git-send-email-ddstreet@ieee.org>
- <CALZtONC5Fc-Dsw_aob7zyycYdS6rP6ckT-wdyxF1WJTNsSLp7g@mail.gmail.com>
-Message-ID: <9630890.oRRRs96DG8@wuerfel>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Thu, 14 May 2015 11:50:24 +0100
+Subject: [PATCH] bus: arm-ccn: Handle correctly no-more-cpus case
+In-Reply-To: <20150514101344.GA20531@mwanda>
+References: <20150514101344.GA20531@mwanda>
+Message-ID: <1431600624-10965-1-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 May 2015 04:54:07 Dan Streetman wrote:
-> On Wed, May 13, 2015 at 7:52 PM, Dan Streetman <ddstreet@ieee.org> wrote:
-> >> Building the 842 code on 32-bit ARM currently results in this link
-> >> error:
-> >>
-> >> ERROR: "__aeabi_uldivmod" [lib/842/842_decompress.ko] undefined!
-> >
-> > Oops!  Guess I should build/test on 32 bit more.
-> >
-> >>
-> >> The reason is that the __do_index function performs a 64-bit
-> >> division by a power-of-two number, but it has no insight into
-> >> the function arguments.
-> 
-> wait, do you mean the 64 bit mod, total % fsize?  That should already
-> be fixed in Herbert's tree, I changed it to subtraction instead.
+When migrating events the driver picks another cpu using
+cpumask_any_but() function, which returns value >= nr_cpu_ids
+when there is none available, not a negative value as the code
+assumed. Fixed now.
 
-Yes, that's the one. I was looking at yesterday's linux-next which still
-had the bug, but your fix has made it into today's release, so my patch
-is no longer needed.
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+Another day, another arm-ccn.c update...
 
-> In any case, I looked at the code again and I think the fsize
-> parameter can be removed, and just simply calculated in the function,
-> it's just a shift.  I'll send a patch.
+This time Dan's static checker spotted unsigned int target
+being expected to carry negative values. Fixed now.
 
-Not necessary for this problem any more, but it could still make sense
-if you think that improves the code. You can also try to see if marking
-the function inline has any effect on code size or performance if either
-of them matters.
+Interestingly enough, cpumask_any_but() implementation (and its
+normal prototype) returns int, but version for NR_CPUS == 1 case,
+inlined in linux/cpumask.h returns unsigned int...
 
-	Arnd
+ drivers/bus/arm-ccn.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
+index 7d9879e..cc322fb 100644
+--- a/drivers/bus/arm-ccn.c
++++ b/drivers/bus/arm-ccn.c
+@@ -1184,7 +1184,7 @@ static int arm_ccn_pmu_cpu_notifier(struct notifier_block *nb,
+ 		if (!cpumask_test_and_clear_cpu(cpu, &dt->cpu))
+ 			break;
+ 		target = cpumask_any_but(cpu_online_mask, cpu);
+-		if (target < 0)
++		if (target >= nr_cpu_ids)
+ 			break;
+ 		perf_pmu_migrate_context(&dt->pmu, cpu, target);
+ 		cpumask_set_cpu(target, &dt->cpu);
+-- 
+2.1.0
