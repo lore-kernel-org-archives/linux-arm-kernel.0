@@ -1,51 +1,47 @@
 From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Thu, 14 May 2015 15:20:36 +0200
-Subject: [PATCH] MAINTAINERS: ARM: EXYNOS: Add Krzysztof Kozlowski
- asco-maintainer
-In-Reply-To: <55549C56.6050509@kernel.org>
-References: <1431605720-828-1-git-send-email-k.kozlowski@samsung.com>
- <55549C56.6050509@kernel.org>
-Message-ID: <CABxcv==2ouDFPE2sBdqCwpACYXCCGnJYQFtbOV2PuVNGnv2q=g@mail.gmail.com>
+Date: Thu, 14 May 2015 15:23:19 +0200
+Subject: [PATCH] MAINTAINERS: ARM64: EXYNOS: Extend entry for ARM64 DTS
+In-Reply-To: <1431605795-902-1-git-send-email-k.kozlowski@samsung.com>
+References: <1431605795-902-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <CABxcv=nw1bd0cjFD2Pi6kuJVV-M=M+igfuv7dxaPZzAs9UH7XA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kukjin,
+Hello Krzysztof,
 
-On Thu, May 14, 2015 at 3:00 PM, Kukjin Kim <kgene@kernel.org> wrote:
-> On 05/14/15 21:15, Krzysztof Kozlowski wrote:
->> Add Krzysztof Kozlowski as a co-maintainer of Samsung Exynos ARM
->> architecture to review the patches. Patches will go as usual - picked up
->> by Kukjin Kim.
->>
-> Hi Krzysztof,
+On Thu, May 14, 2015 at 2:16 PM, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
+> Extend the Exynos entry to ARM64 device tree sources.
 >
-> Sorry, I don't agree with this patch because you can review any exynos
-> patches without maintainer title. And I can focus on the maintainer'r
-> role more than now because of change of role ;-) Of course your review
-> would be helpful to me.
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Kevin Hilman <khilman@kernel.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  MAINTAINERS | 1 +
+>  1 file changed, 1 insertion(+)
 >
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index a3cb77c0ae23..619a95558673 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1386,6 +1386,7 @@ L:        linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
+>  S:     Maintained
+>  F:     arch/arm/boot/dts/s3c*
+>  F:     arch/arm/boot/dts/exynos*
+> +F:     arch/arm64/boot/dts/exynos/
+>  F:     arch/arm/plat-samsung/
+>  F:     arch/arm/mach-s3c24*/
+>  F:     arch/arm/mach-s3c64xx/
+> --
 
-Sorry but I disagree. Krzysztof has been very active reviewing Exynos
-patches and even picking/queuing important fixes while it seems you
-were too busy and couldn't pay close attention.
-
-It's really great that due a role change you will have more time to
-focus on the maintainership but I don't see why having more
-maintainers could be something negative. As long as you work in a
-coordinate manner, the more maintainers we have the better IMHO. It
-may be that in the future you change your role at your company again
-and then it will be good to have something else to take care of the
-posted patches ;-)
-
-It's true that Krzysztof can review any Exynos patches (like anyone
-subscribed to the lists) without a co-maintainer title, but being
-listed in MAINTAINERS will make sure that people know that he is
-willing to review and ack Exynos patches so they should add him to the
-cc list.
-
-> Thanks,
-> Kukjin
->
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
 Best regards,
 Javier
