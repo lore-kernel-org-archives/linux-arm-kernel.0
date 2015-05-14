@@ -1,89 +1,41 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 14 May 2015 12:49:07 -0500
-Subject: MUSB dual-role on AM335x behaving weirdly
-In-Reply-To: <20150514174031.GP24269@saruman.tx.rr.com>
-References: <54C0A8C9.3040201@visionsystems.de>
- <20150205132142.GD2079@lukather> <20150224103911.GR25269@lukather>
- <20150224145401.GH29829@saruman.tx.rr.com>
- <20150224165050.GX25269@lukather>
- <20150224173357.GB25042@saruman.tx.rr.com>
- <20150225111129.GA5062@lukather>
- <54EDBBEA.8030509@visionsystems.de>
- <20150514170700.GN24269@saruman.tx.rr.com>
- <20150514174031.GP24269@saruman.tx.rr.com>
-Message-ID: <20150514174907.GQ24269@saruman.tx.rr.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 14 May 2015 19:53:26 +0200
+Subject: [PATCH v3 6/6] Documentation: dmaengine: document DMA_CTRL_ACK
+In-Reply-To: <1431626006-1708-1-git-send-email-robert.jarzmik@free.fr>
+References: <1431626006-1708-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1431626006-1708-6-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 14, 2015 at 12:40:31PM -0500, Felipe Balbi wrote:
-> On Thu, May 14, 2015 at 12:07:00PM -0500, Felipe Balbi wrote:
-> > Hi,
-> > 
-> > On Wed, Feb 25, 2015 at 01:11:22PM +0100, Yegor Yefremov wrote:
-> > > On 25.02.2015 12:11, Maxime Ripard wrote:
-> > > > On Tue, Feb 24, 2015 at 11:33:57AM -0600, Felipe Balbi wrote:
-> > > >> Hi,
-> > > >>
-> > > >> On Tue, Feb 24, 2015 at 05:50:50PM +0100, Maxime Ripard wrote:
-> > > >>> Hi Felipe,
-> > > >>>
-> > > >>> On Tue, Feb 24, 2015 at 08:54:01AM -0600, Felipe Balbi wrote:
-> > > >>>> Hi,
-> > > >>>>
-> > > >>>> On Tue, Feb 24, 2015 at 11:39:11AM +0100, Maxime Ripard wrote:
-> > > >>>>> On Thu, Feb 05, 2015 at 02:21:42PM +0100, Maxime Ripard wrote:
-> > > >>>>>> Hi,
-> > > >>>>>>
-> > > >>>>>> On Thu, Jan 22, 2015 at 08:37:45AM +0100, Yegor Yefremov wrote:
-> > > >>>>>>> I have the same experience with 3.15. The switching is working when
-> > > >>>>>>> CONFIG_USB_MUSB_DUAL_ROLE is set and dr_mode = "otg". But since 3.16
-> > > >>
-> > > >> since 3.16 ?
-> > > > 
-> > > > That's what Yegor said. I never saw it working with 3.15 either.
-> > > 
-> > > I've used 3.15.1 and 3.15.2 with this set of patches:
-> > > https://github.com/visionsystemsgmbh/onrisc_br_bsp/tree/master/board/vscom/kernel-patches/linux-3.15
-> > > 
-> > > And it worked so far. The system:
-> > > http://www.visionsystems.de/produkte/baltos-ir-5221.html
-> > 
-> > I've had more time to look into this (thanks Yegor for sponsoring a
-> > test/dev platform) what I noticed is that Connect IRQ takes seconds to
-> > fire up.  Below a tiny log snippet after pluging USB OTG adapter cable
-> > that came with IR5521:
-> > 
-> > | [ 1227.200514] musb-hdrc musb-hdrc.1.auto: usbintr (100) epintr(0)
-> > 
-> > Cable connected. ID is grounded. 0x100 == DRVVBUS IRQ
-> > 
-> > | [ 1227.206788] musb-hdrc musb-hdrc.1.auto: VBUS on (a_wait_vrise), devctl 19
-> > 
-> > MUSB starts to wait for VBUS to reach Session valid threshold
-> > 
-> > | [ 1230.281159] musb-hdrc musb-hdrc.1.auto: usbintr (10) epintr(0)
-> > 
-> > 3 seconds later connect interrupt happens. Looking at VBUS charge time
-> > with a scope, it's quite ok. VBUS charges in about 1.77ms. I'll dig
-> > further into this.
-> 
-> even more weird. If I disconnect device from OTG adapter, rather than
-> OTG adapter from IR5521, this leave ID pin grounded, which means DRVVBUS
-> is still asserted and VBUS remains above session valid threshold.
-> 
-> Even in this case, when I connect the device on the other end of the
-> cable, I still see some 3 seconds delay from the time device is
-> connected, to the time connect IRQ fires up.
+Add documentation about acking the transfers, and their
+reusability.
 
-seems to be a problem with the USB stick I'm using. Tested two other
-devices and they connect right away.
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ Documentation/dmaengine/provider.txt | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
+diff --git a/Documentation/dmaengine/provider.txt b/Documentation/dmaengine/provider.txt
+index 05d2280..33a81ce 100644
+--- a/Documentation/dmaengine/provider.txt
++++ b/Documentation/dmaengine/provider.txt
+@@ -345,11 +345,12 @@ where to put them)
+       that abstracts it away.
+ 
+   * DMA_CTRL_ACK
+-    - Undocumented feature
+-    - No one really has an idea of what it's about, besides being
+-      related to reusing the DMA transaction descriptors or having
+-      additional transactions added to it in the async-tx API
+-    - Useless in the case of the slave API
++    - if set, the TX transfer can be reused after being completed.
++    - there is a guarantee the TX won't be freed until it is acked
++      by async_tx_ack()
++    - as a consequence, if a device driver wants to skip the dma_map_sg() and
++      dma_unmap_sg() because the DMA'd data wasn't used, it can resubmit the
++      transfer right after its completion.
+ 
+ General Design Notes
+ --------------------
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150514/f8328869/attachment-0001.sig>
+2.1.4
