@@ -1,113 +1,119 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 14 May 2015 20:14:43 +0530
-Subject: smp_twd fix for adapting to cpu frequency change
-In-Reply-To: <CACRpkdZzAO4hAJKyAoeqnud9LeDG4nSK7y9cLZaEBdVOnq-ocw@mail.gmail.com>
-References: <CAPub14_+XXjKyZVh3E8QQjY4sB4gVB=kaApuODptoizqfEUH_Q@mail.gmail.com>
- <CACRpkdZzAO4hAJKyAoeqnud9LeDG4nSK7y9cLZaEBdVOnq-ocw@mail.gmail.com>
-Message-ID: <CAOh2x==hn27GRh9+YmYXVruuvhP4k46itkP7WL_feOUTJ92u7A@mail.gmail.com>
+From: yh.huang@mediatek.com (YH Huang)
+Date: Thu, 14 May 2015 22:45:10 +0800
+Subject: [PATCH 2/2] pwm: add Mediatek display PWM driver support
+In-Reply-To: <CABuKBeJc3Kvdoejyi0XFbQMU2saztzV5S7jiXCg-09juYeh4pg@mail.gmail.com>
+References: <1431336382-13167-1-git-send-email-yh.huang@mediatek.com>
+ <1431336382-13167-3-git-send-email-yh.huang@mediatek.com>
+ <CABuKBeJz_=Nxcen9QU_KHds6UJwUJL0yNpYDhvT3eFoV_EY5xA@mail.gmail.com>
+ <CABuKBeJc3Kvdoejyi0XFbQMU2saztzV5S7jiXCg-09juYeh4pg@mail.gmail.com>
+Message-ID: <1431614710.15140.31.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 8, 2012 at 5:03 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Thu, May 3, 2012 at 1:15 PM, shiraz hashim
-> <shiraz.linux.kernel@gmail.com> wrote:
->
->> In your following patch,
->>
->>    commit 4fd7f9b128107034fa925b6877fae3c275f0da86
->>    Author: Linus Walleij <linus.walleij@linaro.org>
->>    Date:   Tue Dec 13 12:48:18 2011 +0100
->>
->>        ARM: 7212/1: smp_twd: reconfigure clockevents after cpufreq change
->>
->>        This break-out from Colin Cross' cpufreq-aware TWD patch
->>        will handle the case when our localtimer's clock changes with
->>        the cpu clock. A cpufreq transtion notifier will be registered
->>        only if the platform has supplied a specified clock to the TWD.
->>
->>        After a cpufreq transition, update the clockevent's frequency
->>        by fetching the new clock rate from the clock framework and
->>        reprogram the next clock event.
->>
->>        The necessary changes in the clockevents framework was done by
->>        Thomas Gleixner in kernel v3.0.
->>
->>
->> When we handle twd_cpufreq_transition and reprogram the clock event,
->> the TWD_TIMER_LOAD register still contains the old load value
->> for CLOCK_EVT_MODE_PERIODIC case.
->>
->> This results in wrong number of events generated per second.
->>
->> Shouldn't we reprogram the TWD_TIMER_LOAD register to new
->> twd_timer_rate / HZ on frequency change as well ?
->
-> Yep the clockevents_update_freq() is explicitly only for the
-> on-shot mode, so you'd either need to write the new period
-> value directly in twd_update_frequency().
->
-> I guess we didn't notice because almost noone use the
-> periodic mode on these timers...
->
-> I guess clockevents_update_freq() could just call
-> the .set_mode() function for periodic mode again, but that
-> seems a bit ugly, since the modeset code might do other things
-> than just reinitialize the timer. And it won't account for the
-> running event.
->
-> So this solution will try to do what you describe, but I'm
-> still a bit uncertain, since the currently running event will
-> probably use the old load value, then the new value won't get
-> used until the next event. Maybe that's fair enough?
->
-> I don't know it it's OK for driver code to inspect the internal
-> clockevent mode like this code does though, maybe Thomas
-> has opinions on this...
->
-> Can you test this snippet?
-> Thomas: does this look sane?
->
-> From d40c3c3302a2f89ab973b41b350153c144f6bded Mon Sep 17 00:00:00 2001
-> From: Linus Walleij <linus.walleij@linaro.org>
-> Date: Tue, 8 May 2012 13:26:43 +0200
-> Subject: [PATCH] ARM: smp_twd: reprogram loadvalue for periodic event
->
-> The code to handle frequency transitions of the TWD only
-> handle one-shot events. Let's try to account for this by
-> checking the state of the event.
->
-> Reported-by: Shiraz Hashim <shiraz.linux.kernel@gmail.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  arch/arm/kernel/smp_twd.c |   10 +++++++++-
->  1 file changed, 9 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-> index fef42b2..98b27e6 100644
-> --- a/arch/arm/kernel/smp_twd.c
-> +++ b/arch/arm/kernel/smp_twd.c
-> @@ -104,9 +104,17 @@ static void twd_timer_stop(struct clock_event_device *clk)
->   */
->  static void twd_update_frequency(void *data)
->  {
-> +       struct clock_event_device *evt = *__this_cpu_ptr(twd_evt);
-> +
->         twd_timer_rate = clk_get_rate(twd_clk);
->
-> -       clockevents_update_freq(*__this_cpu_ptr(twd_evt), twd_timer_rate);
-> +       /* If we're in periodic mode, just put in a new load value */
-> +       if (evt->mode == CLOCK_EVT_MODE_PERIODIC) {
-> +               __raw_writel(twd_timer_rate / HZ, twd_base + TWD_TIMER_LOAD);
-> +               return;
-> +       }
-> +
-> +       clockevents_update_freq(evt, twd_timer_rate);
->  }
->
->  static int twd_cpufreq_transition(struct notifier_block *nb,
+On Tue, 2015-05-12 at 14:44 +0200, Matthias Brugger wrote:
+> 2015-05-12 14:37 GMT+02:00 Matthias Brugger <matthias.bgg@gmail.com>:
+> > Hi YH,
+> >
+> > 2015-05-11 11:26 GMT+02:00 YH Huang <yh.huang@mediatek.com>:
+> >> Add display PWM driver support to modify backlight for MT8173/MT6595.
+> >>
+> >> Signed-off-by: YH Huang <yh.huang@mediatek.com>
+> >> ---
+> >>  drivers/pwm/Kconfig             |   9 ++
+> >>  drivers/pwm/Makefile            |   1 +
+> >>  drivers/pwm/pwm-disp-mediatek.c | 225 ++++++++++++++++++++++++++++++++++++++++
+> >>  3 files changed, 235 insertions(+)
+> >>  create mode 100644 drivers/pwm/pwm-disp-mediatek.c
+> >>
+> >> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+> >> index b1541f4..9edbb5a 100644
+> >> --- a/drivers/pwm/Kconfig
+> >> +++ b/drivers/pwm/Kconfig
+> >> @@ -111,6 +111,15 @@ config PWM_CLPS711X
+> >>           To compile this driver as a module, choose M here: the module
+> >>           will be called pwm-clps711x.
+> >>
+> >> +config PWM_DISP_MEDIATEK
+> >> +       tristate "MEDIATEK display PWM driver"
+> >> +       depends on OF
+> >> +       help
+> >> +         Generic PWM framework driver for mediatek disp-pwm device.
+> >> +
+> >> +         To compile this driver as a module, choose M here: the module
+> >> +         will be called pwm-disp-mediatek.
+> >> +
+> >>  config PWM_EP93XX
+> >>         tristate "Cirrus Logic EP93xx PWM support"
+> >>         depends on ARCH_EP93XX
+> >> diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
+> >> index ec50eb5..c5ff72a 100644
+> >> --- a/drivers/pwm/Makefile
+> >> +++ b/drivers/pwm/Makefile
+> >> @@ -8,6 +8,7 @@ obj-$(CONFIG_PWM_BCM_KONA)      += pwm-bcm-kona.o
+> >>  obj-$(CONFIG_PWM_BCM2835)      += pwm-bcm2835.o
+> >>  obj-$(CONFIG_PWM_BFIN)         += pwm-bfin.o
+> >>  obj-$(CONFIG_PWM_CLPS711X)     += pwm-clps711x.o
+> >> +obj-$(CONFIG_PWM_DISP_MEDIATEK)        += pwm-disp-mediatek.o
+> >>  obj-$(CONFIG_PWM_EP93XX)       += pwm-ep93xx.o
+> >>  obj-$(CONFIG_PWM_FSL_FTM)      += pwm-fsl-ftm.o
+> >>  obj-$(CONFIG_PWM_IMG)          += pwm-img.o
+> >> diff --git a/drivers/pwm/pwm-disp-mediatek.c b/drivers/pwm/pwm-disp-mediatek.c
+> >> new file mode 100644
+> >> index 0000000..38293af
+> >> --- /dev/null
+> >> +++ b/drivers/pwm/pwm-disp-mediatek.c
+> >> @@ -0,0 +1,225 @@
+> >> +/*
+> >> + * Mediatek display pulse-width-modulation controller driver.
+> >> + * Copyright (c) 2015 MediaTek Inc.
+> >> + * Author: YH Huang <yh.huang@mediatek.com>
+> >> + *
+> >> + * This program is free software; you can redistribute it and/or modify
+> >> + * it under the terms of the GNU General Public License version 2 as
+> >> + * published by the Free Software Foundation.
+> >> + *
+> >> + * This program is distributed in the hope that it will be useful,
+> >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >> + * GNU General Public License for more details.
+> >> + */
+> >> +
+> >> +#include <linux/clk.h>
+> >> +#include <linux/err.h>
+> >> +#include <linux/io.h>
+> >> +#include <linux/module.h>
+> >> +#include <linux/of.h>
+> >> +#include <linux/pwm.h>
+> >> +#include <linux/platform_device.h>
+> >> +#include <linux/slab.h>
+> >> +
+> >> +#define DISP_PWM_EN_OFF                        (0x0)
+> >> +#define PWM_ENABLE_SHIFT               (0x0)
+> >> +#define PWM_ENABLE_MASK                        (0x1 << PWM_ENABLE_SHIFT)
+> >
+> > Get rid of the _SHIFT which are actually zero, it will make the code
+> > more readable.
+> >
+> >> +
+> >> +#define DISP_PWM_COMMIT_OFF            (0x08)
+> >> +#define PWM_COMMIT_SHIFT               (0x0)
+> >> +#define PWM_COMMIT_MASK                        (0x1 << PWM_COMMIT_SHIFT)
+> >> +
+> >> +#define DISP_PWM_CON_0_OFF             (0x10)
+> >> +#define PWM_CLKDIV_SHIFT               (0x10)
+> 
+> I prefer to have the shift values in decimal instead of hex, as it
+> makes it easier to see which bits in the registers are the relevant
+> ones.
+> Sorry forgot that one.
+> 
 
-Linus,
+I think you are right.
 
-Did you ever fixed it up? I think Mason has hit this now:
+> Cheers,
+> Matthias
 
-http://www.spinics.net/lists/arm-kernel/msg417617.html
+Thank for your suggestion.
+
+Regards,
+YH Huang
