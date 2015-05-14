@@ -1,124 +1,153 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 14 May 2015 08:45:04 +0100
-Subject: [PATCH v8 4/9] mfd: Add binding document for NVIDIA Tegra XUSB
-In-Reply-To: <55544F91.4060402@nvidia.com>
-References: <1430761002-9327-1-git-send-email-abrestic@chromium.org>
- <1430761002-9327-5-git-send-email-abrestic@chromium.org>
- <20150513143954.GA3394@x1>
- <CAL1qeaF-7aAx0gqPe-_D4ZaZET0Kejr801KrbvuQ_2w6c8mcnA@mail.gmail.com>
- <20150513165014.GC19543@x1>
- <CAL1qeaE7XHmreQ_b52iop6fOY1osAhjij81c4vVr7_8wO_cYxQ@mail.gmail.com>
- <20150514072954.GD20358@x1> <55544F91.4060402@nvidia.com>
-Message-ID: <20150514074504.GB22418@x1>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 14 May 2015 16:02:15 +0800
+Subject: [PATCH 01/18] ARM: imx: Add a parameter to mxc_timer_init
+In-Reply-To: <1430405073-13106-2-git-send-email-shenwei.wang@freescale.com>
+References: <1430405073-13106-1-git-send-email-shenwei.wang@freescale.com>
+ <1430405073-13106-2-git-send-email-shenwei.wang@freescale.com>
+Message-ID: <20150514080213.GC6850@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 14 May 2015, Jon Hunter wrote:
-
+On Thu, Apr 30, 2015 at 09:44:16AM -0500, Shenwei Wang wrote:
+> A parameter of integer type is added to the function mxc_timer_init,
+> so that a user could have a way to tell the timer driver the version
+> of the timer IP block.
 > 
-> On 14/05/15 08:29, Lee Jones wrote:
-> > On Wed, 13 May 2015, Andrew Bresticker wrote:
-> > 
-> >> On Wed, May 13, 2015 at 9:50 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> >>> On Wed, 13 May 2015, Andrew Bresticker wrote:
-> >>>
-> >>>> Lee,
-> >>>>
-> >>>> On Wed, May 13, 2015 at 7:39 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> >>>>> On Mon, 04 May 2015, Andrew Bresticker wrote:
-> >>>>>
-> >>>>>> Add a binding document for the XUSB host complex on NVIDIA Tegra124
-> >>>>>> and later SoCs.  The XUSB host complex includes a mailbox for
-> >>>>>> communication with the XUSB micro-controller and an xHCI host-controller.
-> >>>>>>
-> >>>>>> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
-> >>>>>> Cc: Rob Herring <robh+dt@kernel.org>
-> >>>>>> Cc: Pawel Moll <pawel.moll@arm.com>
-> >>>>>> Cc: Mark Rutland <mark.rutland@arm.com>
-> >>>>>> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> >>>>>> Cc: Kumar Gala <galak@codeaurora.org>
-> >>>>>> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> >>>>>> Cc: Lee Jones <lee.jones@linaro.org>
-> >>>>>> ---
-> >>>>>> Changes from v7:
-> >>>>>>  - Move non-shared resources into child nodes.
-> >>>>>> New for v7.
-> >>>>>> ---
-> >>>>>>  .../bindings/mfd/nvidia,tegra124-xusb.txt          | 37 ++++++++++++++++++++++
-> >>>>>>  1 file changed, 37 insertions(+)
-> >>>>>>  create mode 100644 Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
-> >>>>>>
-> >>>>>> diff --git a/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt b/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
-> >>>>>> new file mode 100644
-> >>>>>> index 0000000..bc50110
-> >>>>>> --- /dev/null
-> >>>>>> +++ b/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
-> >>>>>> @@ -0,0 +1,37 @@
-> >>>>>> +NVIDIA Tegra XUSB host copmlex
-> >>>>>> +==============================
-> >>>>>> +
-> >>>>>> +The XUSB host complex on Tegra124 and later SoCs contains an xHCI host
-> >>>>>> +controller and a mailbox for communication with the XUSB micro-controller.
-> >>>>>> +
-> >>>>>> +Required properties:
-> >>>>>> +--------------------
-> >>>>>> + - compatible: For Tegra124, must contain "nvidia,tegra124-xusb".
-> >>>>>> +   Otherwise, must contain '"nvidia,<chip>-xusb", "nvidia,tegra124-xusb"'
-> >>>>>> +   where <chip> is tegra132.
-> >>>>>> + - reg: Must contain the base and length of the XUSB FPCI registers.
-> >>>>>> + - ranges: Bus address mapping for the XUSB block.  Can be empty since the
-> >>>>>> +   mapping is 1:1.
-> >>>>>> + - #address-cells: Must be 2.
-> >>>>>> + - #size-cells: Must be 2.
-> >>>>>> +
-> >>>>>> +Example:
-> >>>>>> +--------
-> >>>>>> +     usb at 0,70098000 {
-> >>>>>> +             compatible = "nvidia,tegra124-xusb";
-> >>>>>> +             reg = <0x0 0x70098000 0x0 0x1000>;
-> >>>>>> +             ranges;
-> >>>>>> +
-> >>>>>> +             #address-cells = <2>;
-> >>>>>> +             #size-cells = <2>;
-> >>>>>> +
-> >>>>>> +             usb-host at 0,70090000 {
-> >>>>>> +                     compatible = "nvidia,tegra124-xhci";
-> >>>>>> +                     ...
-> >>>>>> +             };
-> >>>>>> +
-> >>>>>> +             mailbox {
-> >>>>>> +                     compatible = "nvidia,tegra124-xusb-mbox";
-> >>>>>> +                     ...
-> >>>>>> +             };
-> >>>>>
-> >>>>> This doesn't appear to be a proper MFD.  I would have the USB and
-> >>>>> Mailbox devices probe seperately and use a phandle to point the USB
-> >>>>> device to its Mailbox.
-> >>>>>
-> >>>>> usb at xyz {
-> >>>>>         mboxes = <&xusb-mailbox, [chan]>;
-> >>>>> };
-> >>>>
-> >>>> Then what will set up the shared regmap?  The point of using an MFD
-> >>>> here was to share a register set with both the mailbox and xHCI
-> >>>> drivers and avoid having to map the same register set twice in two
-> >>>> separate drivers.
-> >>>
-> >>> Can you share the mapping please?
-> >>
-> >> What do you mean?  That's what the MFD is doing now by setting up an
-> >> MMIO regmap to be shared between the two devices.
-> > 
-> > I mean, can you share the documentation with me. :)
+> Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
+> ---
+>  arch/arm/mach-imx/time.c    | 2 +-
+>  drivers/clk/imx/clk-imx1.c  | 3 ++-
+>  drivers/clk/imx/clk-imx21.c | 3 ++-
+>  drivers/clk/imx/clk-imx27.c | 3 ++-
+>  drivers/clk/imx/clk-imx31.c | 3 ++-
+>  drivers/clk/imx/clk-imx35.c | 5 +++--
+>  drivers/clk/imx/clk.h       | 2 +-
+>  7 files changed, 13 insertions(+), 8 deletions(-)
 > 
-> You can download the documentation from here [1]. See chapter 19 USB
-> complex. However, I will warn you that unfortunately, you need to sign
-> up for an account :-(
+> diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
+> index b1698e1..eef6b66 100644
+> --- a/arch/arm/mach-imx/time.c
+> +++ b/arch/arm/mach-imx/time.c
+> @@ -346,7 +346,7 @@ static void __init _mxc_timer_init(int irq,
+>  	setup_irq(irq, &mxc_timer_irq);
+>  }
+>  
+> -void __init mxc_timer_init(unsigned long pbase, int irq)
+> +void __init mxc_timer_init(unsigned long pbase, int irq, int ver)
 
-I'll give that a miss for the time being.  See my other mail for now.
+I prefer to have an enum type for it.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+enum gpt_device_type {
+	GPT_TYPE_IMX1,		/* MX1/MXL */
+	GPT_TYPE_IMX21,		/* MX21, MX27 */
+	GPT_TYPE_IMX31,		/* MX25, MX31, MX35, MX37, MX51, MX6Q(Rev1.0) */
+	GPT_TYPE_IMX6DL,	/* MX6DL, MX6SX, MX6Q(Rev1.1+) */
+};
+
+>  {
+>  	struct clk *clk_per = clk_get_sys("imx-gpt.0", "per");
+>  	struct clk *clk_ipg = clk_get_sys("imx-gpt.0", "ipg");
+> diff --git a/drivers/clk/imx/clk-imx1.c b/drivers/clk/imx/clk-imx1.c
+> index c9812db..49534d8 100644
+> --- a/drivers/clk/imx/clk-imx1.c
+> +++ b/drivers/clk/imx/clk-imx1.c
+> @@ -102,7 +102,8 @@ int __init mx1_clocks_init(unsigned long fref)
+>  	clk_register_clkdev(clk[IMX1_CLK_DUMMY], "ipg", "imx1-fb.0");
+>  	clk_register_clkdev(clk[IMX1_CLK_DUMMY], "ahb", "imx1-fb.0");
+>  
+> -	mxc_timer_init(MX1_TIM1_BASE_ADDR, MX1_TIM1_INT);
+> +	/*Timer version in MX1 is V0*/
+
+There should be a space before and after '*'.
+
+> +	mxc_timer_init(MX1_TIM1_BASE_ADDR, MX1_TIM1_INT, 0);
+>  
+>  	return 0;
+>  }
+> diff --git a/drivers/clk/imx/clk-imx21.c b/drivers/clk/imx/clk-imx21.c
+> index 0ca842c..08aa048 100644
+> --- a/drivers/clk/imx/clk-imx21.c
+> +++ b/drivers/clk/imx/clk-imx21.c
+> @@ -156,7 +156,8 @@ int __init mx21_clocks_init(unsigned long lref, unsigned long href)
+>  	clk_register_clkdev(clk[IMX21_CLK_I2C_GATE], NULL, "imx21-i2c.0");
+>  	clk_register_clkdev(clk[IMX21_CLK_OWIRE_GATE], NULL, "mxc_w1.0");
+>  
+> -	mxc_timer_init(MX21_GPT1_BASE_ADDR, MX21_INT_GPT1);
+> +	/*Timer version in MX21 is v1*/
+> +	mxc_timer_init(MX21_GPT1_BASE_ADDR, MX21_INT_GPT1, 1);
+>  
+>  	return 0;
+>  }
+> diff --git a/drivers/clk/imx/clk-imx27.c b/drivers/clk/imx/clk-imx27.c
+> index df2dfc0..f00a7c0 100644
+> --- a/drivers/clk/imx/clk-imx27.c
+> +++ b/drivers/clk/imx/clk-imx27.c
+> @@ -233,7 +233,8 @@ int __init mx27_clocks_init(unsigned long fref)
+>  	clk_register_clkdev(clk[IMX27_CLK_EMMA_AHB_GATE], "ahb", "m2m-emmaprp.0");
+>  	clk_register_clkdev(clk[IMX27_CLK_EMMA_IPG_GATE], "ipg", "m2m-emmaprp.0");
+>  
+> -	mxc_timer_init(MX27_GPT1_BASE_ADDR, MX27_INT_GPT1);
+> +	/*Timer version in MX27 is v1*/
+> +	mxc_timer_init(MX27_GPT1_BASE_ADDR, MX27_INT_GPT1, 1);
+>  
+>  	return 0;
+>  }
+> diff --git a/drivers/clk/imx/clk-imx31.c b/drivers/clk/imx/clk-imx31.c
+> index a55290c..7c4a025 100644
+> --- a/drivers/clk/imx/clk-imx31.c
+> +++ b/drivers/clk/imx/clk-imx31.c
+> @@ -198,7 +198,8 @@ int __init mx31_clocks_init(unsigned long fref)
+>  	mx31_revision();
+>  	clk_disable_unprepare(clk[iim_gate]);
+>  
+> -	mxc_timer_init(MX31_GPT1_BASE_ADDR, MX31_INT_GPT);
+> +	/*Timer version in MX31 is v2*/
+> +	mxc_timer_init(MX31_GPT1_BASE_ADDR, MX31_INT_GPT, 2);
+>  
+>  	return 0;
+>  }
+> diff --git a/drivers/clk/imx/clk-imx35.c b/drivers/clk/imx/clk-imx35.c
+> index 133fda1..a796c1e 100644
+> --- a/drivers/clk/imx/clk-imx35.c
+> +++ b/drivers/clk/imx/clk-imx35.c
+> @@ -145,7 +145,7 @@ int __init mx35_clocks_init(void)
+>  	clk[esdhc3_div] = imx_clk_divider("esdhc3_div", "esdhc_sel", base + MX35_CCM_PDR3, 16, 6);
+>  
+>  	clk[spdif_sel] = imx_clk_mux("spdif_sel", base + MX35_CCM_PDR3, 22, 1, std_sel, ARRAY_SIZE(std_sel));
+> -	clk[spdif_div_pre] = imx_clk_divider("spdif_div_pre", "spdif_sel", base + MX35_CCM_PDR3, 29, 3); /* divide by 1 not allowed */ 
+> +	clk[spdif_div_pre] = imx_clk_divider("spdif_div_pre", "spdif_sel", base + MX35_CCM_PDR3, 29, 3); /* divide by 1 not allowed */
+
+Unrelated change?
+
+Shawn
+
+>  	clk[spdif_div_post] = imx_clk_divider("spdif_div_post", "spdif_div_pre", base + MX35_CCM_PDR3, 23, 6);
+>  
+>  	clk[ssi_sel] = imx_clk_mux("ssi_sel", base + MX35_CCM_PDR2, 6, 1, std_sel, ARRAY_SIZE(std_sel));
+> @@ -296,7 +296,8 @@ int __init mx35_clocks_init(void)
+>  #ifdef CONFIG_MXC_USE_EPIT
+>  	epit_timer_init(MX35_IO_ADDRESS(MX35_EPIT1_BASE_ADDR), MX35_INT_EPIT1);
+>  #else
+> -	mxc_timer_init(MX35_GPT1_BASE_ADDR, MX35_INT_GPT);
+> +	/*Timer version in MX35 is v2*/
+> +	mxc_timer_init(MX35_GPT1_BASE_ADDR, MX35_INT_GPT, 2);
+>  #endif
+>  
+>  	return 0;
+> diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
+> index 6bae537..06da84a 100644
+> --- a/drivers/clk/imx/clk.h
+> +++ b/drivers/clk/imx/clk.h
+> @@ -11,7 +11,7 @@ extern spinlock_t imx_ccm_lock;
+>   * mxc_timer_init() to initialize timer for non-DT boot.  It can be removed
+>   * when these legacy non-DT support is converted or dropped.
+>   */
+> -void mxc_timer_init(unsigned long pbase, int irq);
+> +void mxc_timer_init(unsigned long pbase, int irq, int);
+>  
+>  void imx_check_clocks(struct clk *clks[], unsigned int count);
+>  
+> -- 
+> 1.9.1
+> 
+> 
