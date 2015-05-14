@@ -1,75 +1,90 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 14 May 2015 22:07:15 +0900
-Subject: [PATCH 0/6] cpufreq: use generic cpufreq drivers
- forExynos4210platform
-In-Reply-To: <20150514051046.GB9887@linux>
-References: <'@samsung.com>
- <1428079429-4252-1-git-send-email-b.zolnierkie@samsung.com>
- <2036292.PZC6aPyUyX@amdc1976> <55541F92.4020404@kernel.org>
- <20150514051046.GB9887@linux>
-Message-ID: <55549E03.6040105@kernel.org>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu, 14 May 2015 15:09:57 +0200
+Subject: [PATCH] ARM: tegra: Enable TPM on tegra124 nyan boards
+In-Reply-To: <5553637C.5010506@wwwdotorg.org>
+References: <1431526427-13340-1-git-send-email-sjg@chromium.org>
+ <5553637C.5010506@wwwdotorg.org>
+Message-ID: <CAAObsKCxFJA=6kyHM5rtpJMVRZRDbBO3KSn+QdNoOQz1rXCWTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/15 14:10, Viresh Kumar wrote:
-> On 14-05-15, 13:07, Kukjin Kim wrote:
->> On 05/13/15 23:08, Bartlomiej Zolnierkiewicz wrote:
->>>
->>> Hi,
->>>
->> Hi Bart,
+On 13 May 2015 at 16:45, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 05/13/2015 08:13 AM, Simon Glass wrote:
 >>
->>> On Friday, April 03, 2015 06:43:43 PM Bartlomiej Zolnierkiewicz wrote:
->>>> Hi,
->>>>
->>>> This patch series removes the use of Exynos4210 specific support
->>>> from cpufreq-exynos driver and enables the use of cpufreq-dt driver
->>>> for this platform.
->>>
->>> Gentle Ping.  Mike/Kukjin/Viresh could you please review/ack relevant
->>> patches (patches #1-3 are for clock subsystem, patches #4-5 for Exynos
->>> mach/dts and patch #6 is for cpufreq subsystem)?
-> 
-> Sorry I thought I already Acked an older version of this set and so
-> didn't went for it again. Done now.
-> 
->> Yes, I totally agreed with this patches for arch side changes and this
->> approach when Thomas posted.
+>> Regenerate the pinmux from the latest tegra-pinmux-scripts.
+>
+>
+> (Dropping most CCs; DT maintainers and lists generally don't get CC'd on
+> simple DT content changes but rather on schema adds/changes and perhaps
+> major DT content changes depending on context)
+>
+>> diff --git a/arch/arm/boot/dts/tegra124-nyan-big.dts
+>> b/arch/arm/boot/dts/tegra124-nyan-big.dts
+>
+>
+>>                 pinctrl-names = "default";
+>>                 pinctrl-0 = <&pinmux_default>;
 >>
->>> Also what is your
->>> preferred way to upstream them (patches are not independent so it would
->>> be best to merge them through one tree, otherwise synchronization of
->>> git pulls between different subsystem trees will be needed)?
->>>
->> I can provide topic branch for arch side changes even it is small. I
->> think once Viresh and Mike make each topic branch based on -rc or the
->> smallest changes from each subsystem then I could handle this series or
->> Viresh or Mike need to handle this series with merging each topic
->> branches in subsystem. I'm fine either way.
->>
->> Viresh and Mike, how do you think about that?
-> 
-> For cpufreq subsystem changes, you can take them in your tree.
-> 
-Hi Viresh, OK, I will take the cpufreq changes with your ack. Thanks for
-your confirmation.
+>> -               pinmux_default: common {
+>> +               state_default: pinmux {
+>
+>
+> This change will break compilation, since it changes the label name, yet the
+> old name is still referenced in pinctrl-0 above. Same applies in the other
+> file too.
+>
+>> diff --git a/arch/arm/boot/dts/tegra124-nyan-blaze.dts
+>> b/arch/arm/boot/dts/tegra124-nyan-blaze.dts
+>
+>
+>> @@ -437,18 +437,18 @@
+>>                         usb_vbus_en0_pn4 {
+>>                                 nvidia,pins = "usb_vbus_en0_pn4";
+>>                                 nvidia,function = "usb";
+>> -                               nvidia,pull = <TEGRA_PIN_PULL_UP>;
+>> +                               nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+>>                                 nvidia,tristate = <TEGRA_PIN_DISABLE>;
+>>                                 nvidia,enable-input = <TEGRA_PIN_ENABLE>;
+>> -                               nvidia,open-drain = <TEGRA_PIN_DISABLE>;
+>> +                               nvidia,open-drain = <TEGRA_PIN_ENABLE>;
+>>                         };
+>>                         usb_vbus_en1_pn5 {
+>>                                 nvidia,pins = "usb_vbus_en1_pn5";
+>>                                 nvidia,function = "usb";
+>> -                               nvidia,pull = <TEGRA_PIN_PULL_UP>;
+>> +                               nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+>>                                 nvidia,tristate = <TEGRA_PIN_DISABLE>;
+>>                                 nvidia,enable-input = <TEGRA_PIN_ENABLE>;
+>> -                               nvidia,open-drain = <TEGRA_PIN_DISABLE>;
+>> +                               nvidia,open-drain = <TEGRA_PIN_ENABLE>;
+>>                         };
+>
+>
+> Tomeu, can you comment on those changes? Evidently the pinmux configuration
+> that's you added to the kernel doesn't exactly match the pinmux
+> configuration that you added to tegra-pinmux-scripts.
 
-Hi Mike and Sylwester,
-How can we handle this series well without any problems? hmm...
+Are you sure? Just checked and what tegra-pinmux-scripts currently
+generates matches what is currently in the kernel, for both nyans.
 
->>> I'm still hoping that this patchset will make it into v4.2 as there are
->>> no known issues with it (except minor coding nit for patch #5)...
->>>
->> Sure, why not :-)
-> 
-> One thing that looked wrong to me is the email id of Thomas..
-> I believe he has already left Samsung and his id wouldn't exist
-> anymore. Right ?
-> 
-> Then I wouldn't recommend something that doesn't exist to get merged
-> now. Probably use another email id of his.
+> Is the change above
+> correct, or do we need to propagate this change from the kernel DT into
+> tegra-pinmux-scripts, and hence also into the U-Boot pinmux setup table?
+>
+> My understanding of how these pins are generally used is that open-drain is
+> likely correct. I have no idea whether Tegra should supply the pullup for
+> these pins, or whether the board has a pullup resistor in which case Tegra
+> doesn't need to pull up.
 
-As Bart replied, Thomas is still Samsung guy, maybe you meant Tomasz? he
-moved to another company last year.
+>From what Andrew (added to CC) said when these changes were discussed,
+it shouldn't matter as a fixed regulator is used to drive those pins
+high.
 
-- Kukjin
+Regards,
+
+Tomeu
+
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
