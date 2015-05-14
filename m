@@ -1,29 +1,79 @@
-From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
-Date: Thu, 14 May 2015 09:15:11 +0300
-Subject: [PATCH v9 00/17] Tegra124 CL-DVFS / DFLL clocksource + cpufreq
-In-Reply-To: <2216026.DiZ8MPKfdF@vostro.rjw.lan>
-References: <1431529131-16710-1-git-send-email-mikko.perttunen@kapsi.fi>
- <2216026.DiZ8MPKfdF@vostro.rjw.lan>
-Message-ID: <55543D6F.2040704@kapsi.fi>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Thu, 14 May 2015 08:35:01 +0200
+Subject: [PATCH v2 02/17] leds: port locomo leds driver to new locomo core
+In-Reply-To: <20150513164248.GB11891@dtor-ws>
+References: <1430178954-11138-1-git-send-email-dbaryshkov@gmail.com>
+ <1430178954-11138-3-git-send-email-dbaryshkov@gmail.com>
+ <554A2DB4.3020000@samsung.com>
+ <CALT56yNJWapNw1XLrzfbUDUz1LF_BB9DfF94H6GhbnBUEP80_w@mail.gmail.com>
+ <555327EA.5060402@samsung.com>
+ <CALT56yOJyZvWF9neC2A09Y_w1Ej41uwWvU=aOOM0idbzUkBiFQ@mail.gmail.com>
+ <5553654F.4010608@samsung.com> <20150513164248.GB11891@dtor-ws>
+Message-ID: <55544215.3010401@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2015 01:47 AM, Rafael J. Wysocki wrote:
- > ...
+On 05/13/2015 06:42 PM, Dmitry Torokhov wrote:
+> On Wed, May 13, 2015 at 04:53:03PM +0200, Jacek Anaszewski wrote:
+>> On 05/13/2015 04:14 PM, Dmitry Eremin-Solenikov wrote:
+>>> 2015-05-13 13:31 GMT+03:00 Jacek Anaszewski <j.anaszewski@samsung.com>:
+>>>> On 05/12/2015 05:35 PM, Dmitry Eremin-Solenikov wrote:
+>>>>>
+>>>>> 2015-05-06 18:05 GMT+03:00 Jacek Anaszewski <j.anaszewski@samsung.com>:
+>>>>>>
+>>>>>> On 04/28/2015 01:55 AM, Dmitry Eremin-Solenikov wrote:
+>>>>>>>
+>>>>>>>
+>>>>>>> Adapt locomo leds driver to new locomo core setup.
+>>>>>>>
+>>>>>>> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+>>>>>>> ---
+>>>>>>>     drivers/leds/Kconfig       |   1 -
+>>>>>>>     drivers/leds/leds-locomo.c | 119
+>>>>>>> +++++++++++++++++++++++----------------------
+>>>>>>>     2 files changed, 61 insertions(+), 59 deletions(-)
+>>>>>>>
+>>>>>>> diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
+>>>>>>> index 966b960..4b4650b 100644
+>>>>>>> --- a/drivers/leds/Kconfig
+>>>>>>> +++ b/drivers/leds/Kconfig
+>>>>>>> @@ -79,7 +79,6 @@ config LEDS_LM3642
+>>>>>>>     config LEDS_LOCOMO
+>>>>>>>           tristate "LED Support for Locomo device"
+>>>>>>>           depends on LEDS_CLASS
+>>>>>>> -       depends on SHARP_LOCOMO
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> Why do you remove this dependency?
+>>>>>
+>>>>>
+>>>>> Because SHARP_LOCOMO is a Kconfig symbol for the old driver. New driver
+>>>>> uses MFD_LOCOMO Kconfig entry. Also the driver now uses generic platform
+>>>>> device and regmap interfaces, so there is no direct dependency on main
+>>>>> LoCoMo driver. And the policy (IIRC) was not to have such dependencies.
+>>>>
+>>>>
+>>>> Ack. Shouldn't you also need "select REGMAP_MMIO" ?
+>>>
+>>> No. Maybe I should add "select REGMAP" instead.
+>>
+>> REGMAP is enabled by default if REGMAP_MMIO is enabled. Having
 >
-> If I'm supposed to apply this, I need ACKs from the appropriate people on
-> all the patches where they are still missing.  Thanks!
->
->
+> That is unfortunately not how select works: it does not automatically
+> select parents for the selected symbol.
 
-I believe Thierry Reding will apply the series; your ACK as cpufreq 
-maintainer for patch 13, and maybe also 12, would be welcome, though :)
+Please look at config REGMAP declaration in the file
+drivers/base/regmap/Kconfig:
 
-Patch 13 just renames the old tegra-cpufreq driver that only applies to 
-Tegra20 chips to tegra20-cpufreq.
+config REGMAP
+         default y if (REGMAP_I2C || REGMAP_SPI || REGMAP_SPMI || 
+REGMAP_AC97 || REGMAP_MMIO || REGMAP_IRQ)
+         select LZO_COMPRESS
+         select LZO_DECOMPRESS
+         select IRQ_DOMAIN if REGMAP_IRQ
+         bool
 
-Patch 12 adds device tree bindings. Maybe these can also be acked by 
-Thierry? I'm not completely sure what's the convention.
-
-Thanks,
-Mikko.
+-- 
+Best Regards,
+Jacek Anaszewski
