@@ -1,75 +1,41 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Thu, 14 May 2015 11:30:40 +0100
-Subject: [PATCH 2/5] arm64: Juno: Split juno.dts into juno-base.dtsi and
- juno.dts.
-In-Reply-To: <1431596142.2881.13.camel@linaro.org>
-References: <1431537092-19597-1-git-send-email-Liviu.Dudau@arm.com>
- <1431537092-19597-3-git-send-email-Liviu.Dudau@arm.com>
- <1431596142.2881.13.camel@linaro.org>
-Message-ID: <20150514103040.GN2345@e106497-lin.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 14 May 2015 12:32:38 +0200
+Subject: [PATCH v4 2/3] irqchip: GIC: Add support for irq_{get,
+ set}_irqchip_state
+In-Reply-To: <CAL85gmC4ovR99wQQYoKs=oo24So80jZ_guxDDFhi-1MXXj0uSw@mail.gmail.com>
+References: <1426676484-21812-1-git-send-email-marc.zyngier@arm.com>
+ <1426676484-21812-3-git-send-email-marc.zyngier@arm.com>
+ <CAL85gmBrkonMcKdUVGmYx6zT3wSe-e2jPhnL_+Tkf3s4jsAiWg@mail.gmail.com>
+ <CACRpkdYffHJEzksc5mg7JZdwTzShGaQofAmbmn65=_V3ot04Rg@mail.gmail.com>
+ <CAL85gmC4ovR99wQQYoKs=oo24So80jZ_guxDDFhi-1MXXj0uSw@mail.gmail.com>
+Message-ID: <CACRpkdZkBLrhFpZiYk4fiM3ND+UwnVJhNKs=+rL5iZY4fS7zCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 14, 2015 at 10:35:42AM +0100, Jon Medhurst (Tixy) wrote:
-> On Wed, 2015-05-13 at 18:11 +0100, Liviu Dudau wrote:
-> > Prepare the device tree for adding more boards based on Juno r0.
-> > 
-> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > ---
-> >  arch/arm64/boot/dts/arm/juno-base.dtsi | 125 +++++++++++++++++++++++++++++++++
-> >  arch/arm64/boot/dts/arm/juno.dts       | 122 +-------------------------------
-> 
-> 
-> What criteria were used to select the contents of juno-base.dtsi?
-> From what I can see, the stuff left out of base is still the same for r0
-> and r1 (cpu, pmu, memory, psci!). And so juno-r1.dts could just be
-> 
-> -------------------------------------------------------------------------
-> #include "juno.dts"
-> 
-> / {
-> 	model = "ARM Juno development board (r1)";
-> 
-> };
-> 
-> &memtimer {
-> 	status = "okay";
-> };
-> -------------------------------------------------------------------------
-> 
-> Yes, it's a bit hacky, but avoids duplication of source code.
-> 
-> I can only assume there are come non-public differences between r0 and
-> r1?
+On Wed, May 13, 2015 at 5:44 PM, Feng Kan <fkan@apm.com> wrote:
 
-Hi Tixy,
+> We are using the gpio driver with gpio_key for power button. The gpio
+> status can only be retrieved from the GIC register when the gpio is
+> acting as a interrupt.
 
-There are potential differences. Cortex-A53 cluster in r1 has limited
-CPUfreq functionality due to a chip errata and there were talks internally
-to actually disable it, hence the reason for keeping CPUs outside the
-juno-base.dtsi. r2 will have a different set of big CPUs as well, so this
-is preparing for the future as well.
+OK I understand so much. SPISR is a status register of the state
+of the IRQ lines of shared peripherals.
 
-PMU are linked to the CPUs, hence the reason they stayed. As for the
-memory and psci nodes the thinking behind it was mostly to allow for
-ACPI to make changes there, but it does look now like retrofitting an
-explanation to something that I did not give too much thought at that
-moment.
+But surely the GPIO block has its own status register, so are
+you saying that this register is unreliable?
 
-Best regards,
-Liviu
+I can think of a few reasons, like transient IRQs etc but
+what is actually causing this?
 
-> 
-> -- 
-> Tixy
-> 
+Techically the GIC would normally be higher up the food
+chain, i.e. one IRQ on the GIC is cascaded to sub-IRQs on
+the GPIO chip by virtue of its own struct irq_chip and
+irqdomain. The exception is typically only systems where
+the GPIO block is fused with the IRQ controller so that each
+GPIO line has its own unique IRQ line on the primary,
+top-level interrupt controller.
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Which GPIO driver is this? Is it upstream?
+
+Yours,
+Linus Walleij
