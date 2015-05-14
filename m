@@ -1,41 +1,32 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 14 May 2015 10:09:23 -0700
-Subject: [PATCHv2 1/3] arm64: Mark PMU interrupt IRQF_NO_THREAD
-In-Reply-To: <20150514154215.GE18984@arm.com>
-References: <1430167990-12333-1-git-send-email-anders.roxell@linaro.org>
- <1430167990-12333-2-git-send-email-anders.roxell@linaro.org>
- <20150514153937.GB13442@linutronix.de>
- <20150514154215.GE18984@arm.com>
-Message-ID: <CAMAWPa_UA3GgHGkcYkgUJUB8Y6KJS38z-2-=E6PKmGT=tGWh3A@mail.gmail.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Thu, 14 May 2015 19:10:38 +0200
+Subject: [PATCH] iio: adc: xilinx-xadc: Convert to raw spinlock
+In-Reply-To: <1431013090-18996-1-git-send-email-xander.huff@ni.com>
+References: <1431013090-18996-1-git-send-email-xander.huff@ni.com>
+Message-ID: <20150514171038.GG13442@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 14, 2015 at 8:42 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Thu, May 14, 2015 at 04:39:37PM +0100, Sebastian Andrzej Siewior wrote:
->> * Anders Roxell | 2015-04-27 22:53:08 [+0200]:
->>
->> >Mark the PMU interrupts as non-threadable, as is the case with
->> >arch/arm: d9c3365 ARM: 7813/1: Mark pmu interupt IRQF_NO_THREAD
->> >
->> >Suggested-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
->> >Signed-off-by: Anders Roxell <anders.roxell@linaro.org>
->> Acked-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
->>
->> Could this please go via the arm64 tree?
+* Xander Huff | 2015-05-07 10:38:10 [-0500]:
+
+>The driver currently registers a pair of irq handlers using
+>request_threaded_irq(), however the synchronization mechanism
+>between the hardirq and the threadedirq handler is a regular spinlock.
 >
-> I already acked it:
+>Unfortunately, this breaks PREEMPT_RT builds, where a spinlock can
+>sleep, and is thus not able to be acquired from a hardirq handler.
+>Because the set of operations performed under the spinlock is already
+>minimal and bounded, it is a suitable candidate for being a raw_spinlock.
 >
->   https://lkml.org/lkml/2015/4/23/161
+>This patch should not impact behavior on !PREEMPT_RT builds.
 >
-> so it will be picked up for 4.2.
+>Signed-off-by: Xander Huff <xander.huff@ni.com>
+>Reviewed-by: Joe Hershberger <joe.hershberger@ni.com>
+>Reviewed-by: Ben Shelton <ben.shelton@ni.com>
+>Reviewed-by: Josh Cartwright <joshc@ni.com>
 
-Which tree is at applied to?  I'm not seeing it in -next, and couldn't
-find it in any branches of the arm64 tree[1].  Sorry to pester, I'm
-just looking to cherry-pick it from it's proper upstream for testing
-with a stable/3.18 based kernel.
+Do you have any cyclictest numbers how much the latency increases on
+heavy iio usage? Traditionally the primary handler should be very quick
+/ short.
 
-Thanks,
-
-Kevin
-
-[1] https://git.kernel.org/cgit/linux/kernel/git/arm64/linux.git/
+Sebastian
