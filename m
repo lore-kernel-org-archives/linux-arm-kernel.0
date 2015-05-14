@@ -1,45 +1,38 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 14 May 2015 17:24:56 +0530
-Subject: schedule_timeout sleeps too long after dividing CPU frequency
-In-Reply-To: <5554858A.9010207@free.fr>
-References: <55520F0F.5010906@free.fr>
- <CAKohpo=eMA6L9=jK=bAnbFuDxcdtpQNub0WFnSy6MOqB3jOdjA@mail.gmail.com>
- <555218C7.5050602@free.fr>
- <20150512155004.GP2067@n2100.arm.linux.org.uk>
- <555380F8.5050306@free.fr>
- <CAOh2x==aCLxCWX9K57hOFVEP1eLo_OYZPe0YvbFvpkXcoSp_hQ@mail.gmail.com>
- <5554858A.9010207@free.fr>
-Message-ID: <20150514115456.GB23999@linux>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 14 May 2015 21:15:20 +0900
+Subject: [PATCH] MAINTAINERS: ARM: EXYNOS: Add Krzysztof Kozlowski as
+ co-maintainer
+Message-ID: <1431605720-828-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14-05-15, 13:22, Mason wrote:
-> I didn't /literally/ take a stop-watch to verify it was EXACTLY
-> 9 seconds, but I was staring at the prompt, and it /felt/ like
-> 9 seconds. And the 54 second case felt like a minute.
+Add Krzysztof Kozlowski as a co-maintainer of Samsung Exynos ARM
+architecture to review the patches. Patches will go as usual - picked up
+by Kukjin Kim.
 
-:)
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Kevin Hilman <khilman@kernel.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: linux-samsung-soc at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
 
-> I'm using a 27 MHz crystal as clocksource. This is independent
-> of the CPU frequency. However, I'm using the ARM TWD as the
-> system's clockevent source, and the TWD's clock is tied to
-> the CPU clock (PERIPHCLK = CPUCLK / 2 on this SoC).
-
-The only (very straight forward) problem is that we aren't propagating
-the freq update to clockevents core and you need to debug a bit there.
-
-Also I wanted to see the source of your print message:
-[   19.650454] NEW RATE=9250000
-[   19.653644] NEW RATE=9250000
-
-What's this rate ? Old/new ? Because you are atleast printing the old
-rate here, and the function by default gets the new rate.
-
-> I'm wondering if there's another standard clockevent source
-> I could try (it would be great if it supported high-resolution
-> timers).
-
-I hope you have some platform general-purpose-timers.
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 2dc517cd4835..a3cb77c0ae23 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1380,6 +1380,7 @@ N:	rockchip
+ 
+ ARM/SAMSUNG EXYNOS ARM ARCHITECTURES
+ M:	Kukjin Kim <kgene@kernel.org>
++M:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
+ S:	Maintained
 -- 
-viresh
+2.1.4
