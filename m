@@ -1,119 +1,76 @@
-From: lho@apm.com (Loc Ho)
-Date: Thu, 14 May 2015 11:05:47 -0600
-Subject: [PATCH v9 5/5] arm64: Add APM X-Gene SoC EDAC DTS entries
-In-Reply-To: <1431623147-4950-5-git-send-email-lho@apm.com>
-References: <1431623147-4950-1-git-send-email-lho@apm.com>
- <1431623147-4950-2-git-send-email-lho@apm.com>
- <1431623147-4950-3-git-send-email-lho@apm.com>
- <1431623147-4950-4-git-send-email-lho@apm.com>
- <1431623147-4950-5-git-send-email-lho@apm.com>
-Message-ID: <1431623147-4950-6-git-send-email-lho@apm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 14 May 2015 12:07:00 -0500
+Subject: MUSB dual-role on AM335x behaving weirdly
+In-Reply-To: <54EDBBEA.8030509@visionsystems.de>
+References: <20150121160631.GH4367@lukather>
+ <CADYTM3b40_u4Twt27PBVH4dC9ErDnFEi0AUzs_aJRM3mMHaBCQ@mail.gmail.com>
+ <54C0A8C9.3040201@visionsystems.de>
+ <20150205132142.GD2079@lukather> <20150224103911.GR25269@lukather>
+ <20150224145401.GH29829@saruman.tx.rr.com>
+ <20150224165050.GX25269@lukather>
+ <20150224173357.GB25042@saruman.tx.rr.com>
+ <20150225111129.GA5062@lukather>
+ <54EDBBEA.8030509@visionsystems.de>
+Message-ID: <20150514170700.GN24269@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds APM X-Gene SoC EDAC DTS entries.
+Hi,
 
-Signed-off-by: Loc Ho <lho@apm.com>
----
- arch/arm64/boot/dts/apm/apm-storm.dtsi |   86 ++++++++++++++++++++++++++++++++
- 1 files changed, 86 insertions(+), 0 deletions(-)
+On Wed, Feb 25, 2015 at 01:11:22PM +0100, Yegor Yefremov wrote:
+> On 25.02.2015 12:11, Maxime Ripard wrote:
+> > On Tue, Feb 24, 2015 at 11:33:57AM -0600, Felipe Balbi wrote:
+> >> Hi,
+> >>
+> >> On Tue, Feb 24, 2015 at 05:50:50PM +0100, Maxime Ripard wrote:
+> >>> Hi Felipe,
+> >>>
+> >>> On Tue, Feb 24, 2015 at 08:54:01AM -0600, Felipe Balbi wrote:
+> >>>> Hi,
+> >>>>
+> >>>> On Tue, Feb 24, 2015 at 11:39:11AM +0100, Maxime Ripard wrote:
+> >>>>> On Thu, Feb 05, 2015 at 02:21:42PM +0100, Maxime Ripard wrote:
+> >>>>>> Hi,
+> >>>>>>
+> >>>>>> On Thu, Jan 22, 2015 at 08:37:45AM +0100, Yegor Yefremov wrote:
+> >>>>>>> I have the same experience with 3.15. The switching is working when
+> >>>>>>> CONFIG_USB_MUSB_DUAL_ROLE is set and dr_mode = "otg". But since 3.16
+> >>
+> >> since 3.16 ?
+> > 
+> > That's what Yegor said. I never saw it working with 3.15 either.
+> 
+> I've used 3.15.1 and 3.15.2 with this set of patches:
+> https://github.com/visionsystemsgmbh/onrisc_br_bsp/tree/master/board/vscom/kernel-patches/linux-3.15
+> 
+> And it worked so far. The system:
+> http://www.visionsystems.de/produkte/baltos-ir-5221.html
 
-diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-index c8d3e0e..0a12589 100644
---- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-@@ -374,6 +374,92 @@
- 			};
- 		};
- 
-+		csw: csw at 7e200000 {
-+			compatible = "syscon";
-+			reg = <0x0 0x7e200000 0x0 0x1000>;
-+		};
-+
-+		mcba: mcba at 7e700000 {
-+			compatible = "syscon";
-+			reg = <0x0 0x7e700000 0x0 0x1000>;
-+		};
-+
-+		mcbb: mcbb at 7e720000 {
-+			compatible = "syscon";
-+			reg = <0x0 0x7e720000 0x0 0x1000>;
-+		};
-+
-+		efuse: efuse at 1054a000 {
-+			compatible = "syscon";
-+			reg = <0x0 0x1054a000 0x0 0x20>;
-+		};
-+
-+		edac: edac at 78800000 {
-+			compatible = "apm,xgene-edac";
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			reg = <0x0 0x78800000 0x0 0x100>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>,
-+				     <0x0 0x27 0x4>;
-+
-+			edacmc0: edacmc0 at 7e800000 {
-+				compatible = "apm,xgene-edac-mc";
-+				regmap-csw = <&csw>;
-+				regmap-mcba = <&mcba>;
-+				regmap-mcbb = <&mcbb>;
-+				reg = <0x0 0x7e800000 0x0 0x1000>;
-+			};
-+
-+			edacmc1: edacmc1 at 7e840000 {
-+				compatible = "apm,xgene-edac-mc";
-+				regmap-csw = <&csw>;
-+				regmap-mcba = <&mcba>;
-+				regmap-mcbb = <&mcbb>;
-+				reg = <0x0 0x7e840000 0x0 0x1000>;
-+			};
-+
-+			edacmc2: edacmc2 at 7e880000 {
-+				compatible = "apm,xgene-edac-mc";
-+				regmap-csw = <&csw>;
-+				regmap-mcba = <&mcba>;
-+				regmap-mcbb = <&mcbb>;
-+				reg = <0x0 0x7e880000 0x0 0x1000>;
-+			};
-+
-+			edacmc3: edacmc3 at 7e8c0000 {
-+				compatible = "apm,xgene-edac-mc";
-+				regmap-csw = <&csw>;
-+				regmap-mcba = <&mcba>;
-+				regmap-mcbb = <&mcbb>;
-+				reg = <0x0 0x7e8c0000 0x0 0x1000>;
-+			};
-+
-+			edacpmd0: edacpmd0 at 7c000000 {
-+				compatible = "apm,xgene-edac-pmd";
-+				regmap-efuse = <&efuse>;
-+				reg = <0x0 0x7c000000 0x0 0x200000>;
-+			};
-+
-+			edacpmd1: edacpmd1 at 7c200000 {
-+				compatible = "apm,xgene-edac-pmd";
-+				regmap-efuse = <&efuse>;
-+				reg = <0x0 0x7c200000 0x0 0x200000>;
-+			};
-+
-+			edacpmd2: edacpmd2 at 7c400000 {
-+				compatible = "apm,xgene-edac-pmd";
-+				regmap-efuse = <&efuse>;
-+				reg = <0x0 0x7c400000 0x0 0x200000>;
-+			};
-+
-+			edacpmd3: edacpmd3 at 7c600000 {
-+				compatible = "apm,xgene-edac-pmd";
-+				regmap-efuse = <&efuse>;
-+				reg = <0x0 0x7c600000 0x0 0x200000>;
-+			};
-+		};
-+
- 		pcie0: pcie at 1f2b0000 {
- 			status = "disabled";
- 			device_type = "pci";
+I've had more time to look into this (thanks Yegor for sponsoring a
+test/dev platform) what I noticed is that Connect IRQ takes seconds to
+fire up.  Below a tiny log snippet after pluging USB OTG adapter cable
+that came with IR5521:
+
+| [ 1227.200514] musb-hdrc musb-hdrc.1.auto: usbintr (100) epintr(0)
+
+Cable connected. ID is grounded. 0x100 == DRVVBUS IRQ
+
+| [ 1227.206788] musb-hdrc musb-hdrc.1.auto: VBUS on (a_wait_vrise), devctl 19
+
+MUSB starts to wait for VBUS to reach Session valid threshold
+
+| [ 1230.281159] musb-hdrc musb-hdrc.1.auto: usbintr (10) epintr(0)
+
+3 seconds later connect interrupt happens. Looking at VBUS charge time
+with a scope, it's quite ok. VBUS charges in about 1.77ms. I'll dig
+further into this.
+
 -- 
-1.7.1
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150514/6f32602a/attachment.sig>
