@@ -1,39 +1,50 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 14 May 2015 18:11:07 +0200
-Subject: [PATCH 4/4] ARM: ux500: define the backupram in the device tree
-In-Reply-To: <1431619867-14700-1-git-send-email-linus.walleij@linaro.org>
-References: <1431619867-14700-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1431619867-14700-5-git-send-email-linus.walleij@linaro.org>
+Date: Thu, 14 May 2015 18:12:27 +0200
+Subject: [PATCH 01/10] ARM: ux500: delete UART static map
+Message-ID: <1431619947-14850-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Ux500 SOCs have a special backup RAM that needs to be
-defined in the device tree.
+Delete the static maps for the Ux500 UARTs and rely
+on debug_ll_io_init() to do the trick.
+commit f87b95dd2e4a8832b1d6034f15a5324db42608a0
+"ARM: ux500: move debugmacro to debug includes"
+defined the necessary addruart macro two years ago.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/ste-dbx5x0.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/mach-ux500/cpu-db8500.c | 12 +-----------
+ 1 file changed, 1 insertion(+), 11 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-index f024a1c0de8b..853684ad7773 100644
---- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-@@ -190,6 +190,15 @@
- 			reg = <0xa0410000 0x100>;
- 		};
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index 537a7753afc1..391d329a7e88 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -43,12 +43,6 @@ static struct prcmu_pdata db8500_prcmu_pdata = {
+ 	.legacy_offset	= DB8500_PRCMU_LEGACY_OFFSET,
+ };
  
-+		/*
-+		 * The backup RAM is used for retention during sleep
-+		 * and various things like spin tables
-+		 */
-+		backupram at 80150000 {
-+			compatible = "ste,dbx500-backupram";
-+			reg = <0x80150000 0x2000>;
-+		};
-+
- 		L2: l2-cache {
- 			compatible = "arm,pl310-cache";
- 			reg = <0xa0412000 0x1000>;
+-/* minimum static i/o mapping required to boot U8500 platforms */
+-static struct map_desc u8500_uart_io_desc[] __initdata = {
+-	__IO_DEV_DESC(U8500_UART0_BASE, SZ_4K),
+-	__IO_DEV_DESC(U8500_UART2_BASE, SZ_4K),
+-};
+-
+ /*  U8500 and U9540 common io_desc */
+ static struct map_desc u8500_common_io_desc[] __initdata = {
+ 	/* SCU base also covers GIC CPU BASE and TWD with its 4K page */
+@@ -73,11 +67,7 @@ static struct map_desc u9540_io_desc[] __initdata = {
+ 
+ static void __init u8500_map_io(void)
+ {
+-	/*
+-	 * Map the UARTs early so that the DEBUG_LL stuff continues to work.
+-	 */
+-	iotable_init(u8500_uart_io_desc, ARRAY_SIZE(u8500_uart_io_desc));
+-
++	debug_ll_io_init();
+ 	ux500_map_io();
+ 
+ 	iotable_init(u8500_common_io_desc, ARRAY_SIZE(u8500_common_io_desc));
 -- 
 1.9.3
