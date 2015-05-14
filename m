@@ -1,30 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 14 May 2015 16:42:15 +0100
-Subject: [PATCHv2 1/3] arm64: Mark PMU interrupt IRQF_NO_THREAD
-In-Reply-To: <20150514153937.GB13442@linutronix.de>
-References: <1430167990-12333-1-git-send-email-anders.roxell@linaro.org>
- <1430167990-12333-2-git-send-email-anders.roxell@linaro.org>
- <20150514153937.GB13442@linutronix.de>
-Message-ID: <20150514154215.GE18984@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 14 May 2015 16:42:30 +0100
+Subject: [PATCH v2 0/5] ARM64: juno: add SCPI mailbox protocol,
+ clock and CPUFreq support
+Message-ID: <1431618155-3132-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 14, 2015 at 04:39:37PM +0100, Sebastian Andrzej Siewior wrote:
-> * Anders Roxell | 2015-04-27 22:53:08 [+0200]:
-> 
-> >Mark the PMU interrupts as non-threadable, as is the case with
-> >arch/arm: d9c3365 ARM: 7813/1: Mark pmu interupt IRQF_NO_THREAD
-> >
-> >Suggested-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> >Signed-off-by: Anders Roxell <anders.roxell@linaro.org>
-> Acked-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> 
-> Could this please go via the arm64 tree?
+Hi,
 
-I already acked it:
+This patch series adds support for:
+  1. SCPI(System Control and Power Interface) mailbox protocol driver.
+     It uses ARM MHU mailbox controller driver on Juno but can work with
+     any mailbox controllers using standard mailbox APIs
+  2. Add support for clocks provided by SCP firmware through the SCPI
+     interface
+  3. Using the existing arm_big_little cpufreq driver and the newly
+     added SCPI clock driver, it also adds support for CPU DVFS on
+     ARM64 JUNO development platforms.
 
-  https://lkml.org/lkml/2015/4/23/161
+The SCPI protocol document is available @[1],[2]
 
-so it will be picked up for 4.2.
+Changes v1->v2:
+	- Updated the token handling in scpi driver as per Tixy's
+	  suggestion along with other review comments
+	- Removed multiple drivers in scpi clock as Lorenzo suggested
+	- Added free_opp_table in scpi-cpufreq as Viresh suggested
+	- Separated the DT binding document
+	- Moved SCPI protocol driver to drivers/firmware
 
-Will
+Regards,
+Sudeep
+
+[1] http://community.arm.com/servlet/JiveServlet/download/8401-45-18326/DUI0922B_scp_message_interface.pdf
+[2] https://wiki.linaro.org/ARM/Juno?action=AttachFile&do=get&target=DUI0922B_scp_message_interface.pdf
+
+
+Sudeep Holla (5):
+  Documentation: add DT binding for ARM System Control and Power
+    Interface(SCPI) protocol
+  firmware: add support for ARM System Control and Power Interface(SCPI)
+    protocol
+  clk: add support for clocks provided by SCP(System Control Processor)
+  clk: scpi: add support for cpufreq virtual device
+  cpufreq: arm_big_little: add SCPI interface driver
+
+ Documentation/devicetree/bindings/arm/arm,scpi.txt | 121 ++++
+ drivers/clk/Kconfig                                |  10 +
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/clk-scpi.c                             | 305 +++++++++
+ drivers/cpufreq/Kconfig.arm                        |   9 +
+ drivers/cpufreq/Makefile                           |   1 +
+ drivers/cpufreq/scpi-cpufreq.c                     | 124 ++++
+ drivers/firmware/Kconfig                           |  19 +
+ drivers/firmware/Makefile                          |   1 +
+ drivers/firmware/arm_scpi.c                        | 713 +++++++++++++++++++++
+ include/linux/scpi_protocol.h                      |  57 ++
+ 11 files changed, 1361 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/arm,scpi.txt
+ create mode 100644 drivers/clk/clk-scpi.c
+ create mode 100644 drivers/cpufreq/scpi-cpufreq.c
+ create mode 100644 drivers/firmware/arm_scpi.c
+ create mode 100644 include/linux/scpi_protocol.h
+
+-- 
+1.9.1
