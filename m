@@ -1,54 +1,67 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 14 May 2015 16:48:28 +0100
-Subject: [GIT PULL] arm64: fixes for -rc4
-Message-ID: <20150514154828.GF18984@arm.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 14 May 2015 08:52:07 -0700
+Subject: [PATCH] MAINTAINERS: ARM: EXYNOS: Add Krzysztof Kozlowski
+ asco-maintainer
+In-Reply-To: <5554ABF4.80002@gmx.net> (Tobias Jakobi's message of "Thu, 14 May
+ 2015 16:06:44 +0200")
+References: <1431605720-828-1-git-send-email-k.kozlowski@samsung.com>
+ <55549C56.6050509@kernel.org>
+ <CABxcv==2ouDFPE2sBdqCwpACYXCCGnJYQFtbOV2PuVNGnv2q=g@mail.gmail.com>
+ <5554ABF4.80002@gmx.net>
+Message-ID: <7hfv6z17iw.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Tobias Jakobi <liquid.acid@gmx.net> writes:
 
-Please pull the following arm64 fixes for 4.1. The main change is actually
-a revert, after some (currently unused) branch patching code introduced
-during the merge window was found to have some problems.
+> Javier Martinez Canillas wrote:
+>> Hello Kukjin,
+>> 
+>> On Thu, May 14, 2015 at 3:00 PM, Kukjin Kim <kgene@kernel.org> wrote:
+>>> On 05/14/15 21:15, Krzysztof Kozlowski wrote:
+>>>> Add Krzysztof Kozlowski as a co-maintainer of Samsung Exynos ARM
+>>>> architecture to review the patches. Patches will go as usual - picked up
+>>>> by Kukjin Kim.
+>>>>
+>>> Hi Krzysztof,
+>>>
+>>> Sorry, I don't agree with this patch because you can review any exynos
+>>> patches without maintainer title. And I can focus on the maintainer'r
+>>> role more than now because of change of role ;-) Of course your review
+>>> would be helpful to me.
+>>>
+>> 
+>> Sorry but I disagree. Krzysztof has been very active reviewing Exynos
+>> patches and even picking/queuing important fixes while it seems you
+>> were too busy and couldn't pay close attention.
+> I would even go further than that. We're in this situation because the
+> current maintainer didn't do his job properly.
+>
+> I want to point out what gregkh once said about this matter:
+> https://youtu.be/iiED1K98lnw?t=1745
+>
+>
+>
+>> It's really great that due a role change you will have more time to
+>> focus on the maintainership but I don't see why having more
+>> maintainers could be something negative. As long as you work in a
+>> coordinate manner, the more maintainers we have the better IMHO. It
+>> may be that in the future you change your role at your company again
+>> and then it will be good to have something else to take care of the
+>> posted patches ;-)
+> I very much agree with Javier here. Krzysztof promptly responds to
+> patches and usually provides detailed feedback when things need changes.
+> It would be stupid not to accept him as an additional maintainer.
 
-Cheers,
+I'll take this as an Acked-by then.
 
-Will
+FWIW, I agree with Tobias and Javier, extra help for exynos has been
+sorely needed for a long time, and I am very happy to see someone
+stepping up to help.  Thank you Krzysztof!  (and I apologize in advance
+for the many times I'm likely to misspell your name ;)
 
---->8
+I'll be applying this to the arm-soc tree,
 
-The following changes since commit 5ebe6afaf0057ac3eaeb98defd5456894b446d22:
+Thanks,
 
-  Linux 4.1-rc2 (2015-05-03 19:22:23 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
-
-for you to fetch changes up to 4801ba338acad2e69e905e0c537e8ba2682c4e65:
-
-  arm64: perf: fix memory leak when probing PMU PPIs (2015-05-12 16:50:21 +0100)
-
-----------------------------------------------------------------
-arm64 fixes:
-- Fix potential memory leak in perf PMU probing
-- BPF sign extension fix for 64-bit immediates
-- Fix build failure with unusual configuration
-- Revert unused and broken branch patching from alternative code
-
-----------------------------------------------------------------
-Jungseung Lee (1):
-      arm64: mm: Fix build error with CONFIG_SPARSEMEM_VMEMMAP disabled
-
-Will Deacon (2):
-      Revert "arm64: alternative: Allow immediate branch as alternative instruction"
-      arm64: perf: fix memory leak when probing PMU PPIs
-
-Xi Wang (1):
-      arm64: bpf: fix signedness bug in loading 64-bit immediate
-
- arch/arm64/kernel/alternative.c | 53 +----------------------------------------
- arch/arm64/kernel/perf_event.c  |  8 +++----
- arch/arm64/mm/dump.c            |  2 ++
- arch/arm64/net/bpf_jit_comp.c   |  2 +-
- 4 files changed, 8 insertions(+), 57 deletions(-)
+Kevin
