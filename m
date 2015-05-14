@@ -1,10 +1,10 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Thu, 14 May 2015 12:11:00 +0200
-Subject: [PATCH net-next 05/11] stmmac: convert dwmac-lpc18xx to a platform
+Date: Thu, 14 May 2015 12:11:03 +0200
+Subject: [PATCH net-next 08/11] stmmac: convert dwmac-socfpga to platform
  driver
 In-Reply-To: <1431598266-25736-1-git-send-email-manabian@gmail.com>
 References: <1431598266-25736-1-git-send-email-manabian@gmail.com>
-Message-ID: <1431598266-25736-6-git-send-email-manabian@gmail.com>
+Message-ID: <1431598266-25736-9-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,123 +13,108 @@ driver and add it to the build system.
 
 Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 ---
- drivers/net/ethernet/stmicro/stmmac/Kconfig        |  8 +++++++
- drivers/net/ethernet/stmicro/stmmac/Makefile       |  2 +-
- .../net/ethernet/stmicro/stmmac/dwmac-lpc18xx.c    | 27 +++++++++++++++++++++-
- .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |  1 -
- .../net/ethernet/stmicro/stmmac/stmmac_platform.h  |  1 -
- 5 files changed, 35 insertions(+), 4 deletions(-)
+ drivers/net/ethernet/stmicro/stmmac/Kconfig         | 12 ++++++++++++
+ drivers/net/ethernet/stmicro/stmmac/Makefile        |  3 ++-
+ drivers/net/ethernet/stmicro/stmmac/dwmac-socfpga.c | 21 ++++++++++++++++++++-
+ .../net/ethernet/stmicro/stmmac/stmmac_platform.c   |  1 -
+ .../net/ethernet/stmicro/stmmac/stmmac_platform.h   |  1 -
+ 5 files changed, 34 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/net/ethernet/stmicro/stmmac/Kconfig b/drivers/net/ethernet/stmicro/stmmac/Kconfig
-index d4ed2ac3829b..aa03e26437e2 100644
+index cb984606a819..f103e57e3ac0 100644
 --- a/drivers/net/ethernet/stmicro/stmmac/Kconfig
 +++ b/drivers/net/ethernet/stmicro/stmmac/Kconfig
-@@ -36,6 +36,14 @@ config DWMAC_GENERIC
- 	  platform specific code to function or is using platform
- 	  data for setup.
+@@ -66,6 +66,18 @@ config DWMAC_ROCKCHIP
+ 	  This selects the Rockchip RK3288 SoC glue layer support for
+ 	  the stmmac device driver.
  
-+config DWMAC_LPC18XX
-+	tristate "NXP LPC18xx/43xx DWMAC support"
-+	default ARCH_LPC18XX
++config DWMAC_SOCFPGA
++	tristate "SOCFPGA dwmac support"
++	default ARCH_SOCFPGA
 +	depends on OF
 +	select MFD_SYSCON
-+	---help---
-+	  Support for NXP LPC18xx/43xx DWMAC Ethernet.
++	help
++	  Support for ethernet controller on Altera SOCFPGA
++
++	  This selects the Altera SOCFPGA SoC glue layer support
++	  for the stmmac device driver. This driver is used for
++	  arria5 and cyclone5 FPGA SoCs.
 +
  endif
  
  config STMMAC_PCI
 diff --git a/drivers/net/ethernet/stmicro/stmmac/Makefile b/drivers/net/ethernet/stmicro/stmmac/Makefile
-index 89a353450182..96a3abfc15bb 100644
+index e67dea423324..690741d6fc10 100644
 --- a/drivers/net/ethernet/stmicro/stmmac/Makefile
 +++ b/drivers/net/ethernet/stmicro/stmmac/Makefile
-@@ -6,10 +6,10 @@ stmmac-objs:= stmmac_main.o stmmac_ethtool.o stmmac_mdio.o ring_mode.o	\
- 
- # Ordering matters. Generic driver must be last.
- obj-$(CONFIG_STMMAC_PLATFORM)	+= stmmac-platform.o
-+obj-$(CONFIG_DWMAC_LPC18XX)	+= dwmac-lpc18xx.o
+@@ -9,9 +9,10 @@ obj-$(CONFIG_STMMAC_PLATFORM)	+= stmmac-platform.o
+ obj-$(CONFIG_DWMAC_LPC18XX)	+= dwmac-lpc18xx.o
+ obj-$(CONFIG_DWMAC_MESON)	+= dwmac-meson.o
+ obj-$(CONFIG_DWMAC_ROCKCHIP)	+= dwmac-rk.o
++obj-$(CONFIG_DWMAC_SOCFPGA)	+= dwmac-socfpga.o
  obj-$(CONFIG_DWMAC_GENERIC)	+= dwmac-generic.o
- stmmac-platform-objs:= stmmac_platform.o dwmac-meson.o dwmac-sunxi.o	\
- 		       dwmac-sti.o dwmac-socfpga.o dwmac-rk.o		\
--		       dwmac-lpc18xx.o
+ stmmac-platform-objs:= stmmac_platform.o dwmac-sunxi.o \
+-		       dwmac-sti.o dwmac-socfpga.o
++		       dwmac-sti.o
  
  obj-$(CONFIG_STMMAC_PCI) += stmmac-pci.o
  stmmac-pci-objs:= stmmac_pci.o
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-lpc18xx.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-lpc18xx.c
-index be02b6a1475f..cb888d3ebbdc 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-lpc18xx.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-lpc18xx.c
-@@ -9,12 +9,16 @@
-  */
- 
- #include <linux/mfd/syscon.h>
-+#include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_net.h>
- #include <linux/phy.h>
-+#include <linux/platform_device.h>
- #include <linux/regmap.h>
- #include <linux/stmmac.h>
- 
-+#include "stmmac_platform.h"
-+
- /* Register defines for CREG syscon */
- #define LPC18XX_CREG_CREG6			0x12c
- # define LPC18XX_CREG_CREG6_ETHMODE_MASK	0x7
-@@ -67,8 +71,29 @@ static int lpc18xx_dwmac_init(struct platform_device *pdev, void *priv)
- 	return 0;
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-socfpga.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-socfpga.c
+index 5a36bd2c7837..8141c5b844ae 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac-socfpga.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-socfpga.c
+@@ -257,9 +257,28 @@ static int socfpga_dwmac_init(struct platform_device *pdev, void *priv)
+ 	return ret;
  }
  
--const struct stmmac_of_data lpc18xx_dwmac_data = {
-+static const struct stmmac_of_data lpc18xx_dwmac_data = {
- 	.has_gmac = 1,
- 	.setup = lpc18xx_dwmac_setup,
- 	.init = lpc18xx_dwmac_init,
+-const struct stmmac_of_data socfpga_gmac_data = {
++static const struct stmmac_of_data socfpga_gmac_data = {
+ 	.setup = socfpga_dwmac_probe,
+ 	.init = socfpga_dwmac_init,
+ 	.exit = socfpga_dwmac_exit,
+ 	.fix_mac_speed = socfpga_dwmac_fix_mac_speed,
  };
 +
-+static const struct of_device_id lpc18xx_dwmac_match[] = {
-+	{ .compatible = "nxp,lpc1850-dwmac", .data = &lpc18xx_dwmac_data },
++static const struct of_device_id socfpga_dwmac_match[] = {
++	{ .compatible = "altr,socfpga-stmmac", .data = &socfpga_gmac_data },
 +	{ }
 +};
-+MODULE_DEVICE_TABLE(of, lpc18xx_dwmac_match);
++MODULE_DEVICE_TABLE(of, socfpga_dwmac_match);
 +
-+static struct platform_driver lpc18xx_dwmac_driver = {
++static struct platform_driver socfpga_dwmac_driver = {
 +	.probe  = stmmac_pltfr_probe,
 +	.remove = stmmac_pltfr_remove,
 +	.driver = {
-+		.name           = "lpc18xx-dwmac",
++		.name           = "socfpga-dwmac",
 +		.pm		= &stmmac_pltfr_pm_ops,
-+		.of_match_table = lpc18xx_dwmac_match,
++		.of_match_table = socfpga_dwmac_match,
 +	},
 +};
-+module_platform_driver(lpc18xx_dwmac_driver);
++module_platform_driver(socfpga_dwmac_driver);
 +
-+MODULE_AUTHOR("Joachim Eastwood <manabian@gmail.com>");
-+MODULE_DESCRIPTION("DWMAC glue for LPC18xx/43xx Ethernet");
 +MODULE_LICENSE("GPL v2");
 diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-index 1777e7124d3e..1fd65e780a05 100644
+index 674f7bd1641a..4553b50833ea 100644
 --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
 +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-@@ -37,7 +37,6 @@ static const struct of_device_id stmmac_dt_ids[] = {
- 	{ .compatible = "rockchip,rk3288-gmac", .data = &rk3288_gmac_data},
- 	{ .compatible = "amlogic,meson6-dwmac", .data = &meson6_dwmac_data},
- 	{ .compatible = "allwinner,sun7i-a20-gmac", .data = &sun7i_gmac_data},
--	{ .compatible = "nxp,lpc1850-dwmac", .data = &lpc18xx_dwmac_data},
- 	{ .compatible = "st,stih415-dwmac", .data = &stih4xx_dwmac_data},
+@@ -39,7 +39,6 @@ static const struct of_device_id stmmac_dt_ids[] = {
  	{ .compatible = "st,stih416-dwmac", .data = &stih4xx_dwmac_data},
  	{ .compatible = "st,stid127-dwmac", .data = &stid127_dwmac_data},
+ 	{ .compatible = "st,stih407-dwmac", .data = &stih4xx_dwmac_data},
+-	{ .compatible = "altr,socfpga-stmmac", .data = &socfpga_gmac_data },
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, stmmac_dt_ids);
 diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.h b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.h
-index 5be0b101bffd..23d10f6e8846 100644
+index fff2a885ffd8..3c8d7088361f 100644
 --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.h
 +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.h
-@@ -23,7 +23,6 @@ int stmmac_pltfr_probe(struct platform_device *pdev);
- int stmmac_pltfr_remove(struct platform_device *pdev);
- extern const struct dev_pm_ops stmmac_pltfr_pm_ops;
- 
--extern const struct stmmac_of_data lpc18xx_dwmac_data;
- extern const struct stmmac_of_data meson6_dwmac_data;
+@@ -26,6 +26,5 @@ extern const struct dev_pm_ops stmmac_pltfr_pm_ops;
  extern const struct stmmac_of_data sun7i_gmac_data;
  extern const struct stmmac_of_data stih4xx_dwmac_data;
+ extern const struct stmmac_of_data stid127_dwmac_data;
+-extern const struct stmmac_of_data socfpga_gmac_data;
+ 
+ #endif /* __STMMAC_PLATFORM_H__ */
 -- 
 1.8.0
