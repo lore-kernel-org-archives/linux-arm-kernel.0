@@ -1,62 +1,64 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 14 May 2015 10:06:38 +0900
-Subject: [PATCH 09/31] ARM: shmobile: r8a7740 dtsi: Use generic names for
- device nodes
+Date: Thu, 14 May 2015 10:06:35 +0900
+Subject: [PATCH 06/31] ARM: shmobile: r8a7790: Add IRQC clock to device tree
 In-Reply-To: <cover.1431565427.git.horms+renesas@verge.net.au>
 References: <cover.1431565427.git.horms+renesas@verge.net.au>
-Message-ID: <32e4094238f10dce95bf9f8eacdf84a880182db5.1431565427.git.horms+renesas@verge.net.au>
+Message-ID: <61624caf2479732beb42ea88a6b6ca3c7ae59cd7.1431565427.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-irqpin -> interrupt-controller
+Link the external IRQ controller irqc0 to the IRQC module clock, so it
+can be power managed using that clock.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7740.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/r8a7790.dtsi            | 9 +++++++++
+ include/dt-bindings/clock/r8a7790-clock.h | 3 +++
+ 2 files changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-index 413590d6c316..d84714468cce 100644
---- a/arch/arm/boot/dts/r8a7740.dtsi
-+++ b/arch/arm/boot/dts/r8a7740.dtsi
-@@ -67,7 +67,7 @@
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index f3b8430070b6..22e73906ec88 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -252,6 +252,7 @@
+ 			     <0 1 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 2 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 3 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp4_clks R8A7790_CLK_IRQC>;
  	};
  
- 	/* irqpin0: IRQ0 - IRQ7 */
--	irqpin0: irqpin at e6900000 {
-+	irqpin0: interrupt-controller at e6900000 {
- 		compatible = "renesas,intc-irqpin-r8a7740", "renesas,intc-irqpin";
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
-@@ -89,7 +89,7 @@
- 	};
+ 	dmac0: dma-controller at e6700000 {
+@@ -1158,6 +1159,14 @@
+ 				"iic0", "pciec", "iic1", "ssusb", "cmt1",
+ 				"usbdmac0", "usbdmac1";
+ 		};
++		mstp4_clks: mstp4_clks at e6150140 {
++			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
++			reg = <0 0xe6150140 0 4>, <0 0xe615004c 0 4>;
++			clocks = <&cp_clk>;
++			#clock-cells = <1>;
++			clock-indices = <R8A7790_CLK_IRQC>;
++			clock-output-names = "irqc";
++		};
+ 		mstp5_clks: mstp5_clks at e6150144 {
+ 			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe6150144 0 4>, <0 0xe615003c 0 4>;
+diff --git a/include/dt-bindings/clock/r8a7790-clock.h b/include/dt-bindings/clock/r8a7790-clock.h
+index 3f2c6b198d4a..ff7ca3584e16 100644
+--- a/include/dt-bindings/clock/r8a7790-clock.h
++++ b/include/dt-bindings/clock/r8a7790-clock.h
+@@ -79,6 +79,9 @@
+ #define R8A7790_CLK_USBDMAC0		30
+ #define R8A7790_CLK_USBDMAC1		31
  
- 	/* irqpin1: IRQ8 - IRQ15 */
--	irqpin1: irqpin at e6900004 {
-+	irqpin1: interrupt-controller at e6900004 {
- 		compatible = "renesas,intc-irqpin-r8a7740", "renesas,intc-irqpin";
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
-@@ -111,7 +111,7 @@
- 	};
- 
- 	/* irqpin2: IRQ16 - IRQ23 */
--	irqpin2: irqpin at e6900008 {
-+	irqpin2: interrupt-controller at e6900008 {
- 		compatible = "renesas,intc-irqpin-r8a7740", "renesas,intc-irqpin";
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
-@@ -133,7 +133,7 @@
- 	};
- 
- 	/* irqpin3: IRQ24 - IRQ31 */
--	irqpin3: irqpin at e690000c {
-+	irqpin3: interrupt-controller at e690000c {
- 		compatible = "renesas,intc-irqpin-r8a7740", "renesas,intc-irqpin";
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
++/* MSTP4 */
++#define R8A7790_CLK_IRQC		7
++
+ /* MSTP5 */
+ #define R8A7790_CLK_AUDIO_DMAC1		1
+ #define R8A7790_CLK_AUDIO_DMAC0		2
 -- 
 2.1.4
