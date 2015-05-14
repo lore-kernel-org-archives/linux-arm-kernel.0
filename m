@@ -1,88 +1,79 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Thu, 14 May 2015 15:14:40 +0100
-Subject: [PATCH 5/5] arm64: Add DT support for Juno r1 board.
-In-Reply-To: <1431612451.2881.54.camel@linaro.org>
-References: <1431537092-19597-1-git-send-email-Liviu.Dudau@arm.com>
- <1431537092-19597-6-git-send-email-Liviu.Dudau@arm.com>
- <1431612451.2881.54.camel@linaro.org>
-Message-ID: <20150514141440.GT2345@e106497-lin.cambridge.arm.com>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Thu, 14 May 2015 07:15:48 -0700
+Subject: [PATCH 2/2] selftests/breakpoints: only set TEST_PROGS when built
+In-Reply-To: <5553C51B.6080504@osg.samsung.com>
+References: <1431467947-29847-1-git-send-email-tyler.baker@linaro.org>
+ <1431467947-29847-3-git-send-email-tyler.baker@linaro.org>
+ <5553C51B.6080504@osg.samsung.com>
+Message-ID: <CANMBJr5Y5LaGHbdSqUL=Xj01-s20TAawRKaj0uDbkdMZZoUoYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 14, 2015 at 03:07:31PM +0100, Jon Medhurst (Tixy) wrote:
-> On Wed, 2015-05-13 at 18:11 +0100, Liviu Dudau wrote:
-> > This board is based on Juno r0 with updated Cortex A5x revisions
-> > and board errata fixes. It also contains coherent ThinLinks ports
-> > on the expansion slot that allow for an AXI master on the daughter
-> > card to participate in a coherency domain.
-> > 
-> > Support for SoC PCIe host bridge will be added as a separate series.
-> > 
-> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > ---
-> >  arch/arm64/boot/dts/arm/Makefile    |   2 +-
-> >  arch/arm64/boot/dts/arm/juno-r1.dts | 123 ++++++++++++++++++++++++++++++++++++
-> >  2 files changed, 124 insertions(+), 1 deletion(-)
-> >  create mode 100644 arch/arm64/boot/dts/arm/juno-r1.dts
-> > 
-> > diff --git a/arch/arm64/boot/dts/arm/Makefile b/arch/arm64/boot/dts/arm/Makefile
-> > index 301a0da..c5c98b9 100644
-> > --- a/arch/arm64/boot/dts/arm/Makefile
-> > +++ b/arch/arm64/boot/dts/arm/Makefile
-> > @@ -1,5 +1,5 @@
-> >  dtb-$(CONFIG_ARCH_VEXPRESS) += foundation-v8.dtb
-> > -dtb-$(CONFIG_ARCH_VEXPRESS) += juno.dtb
-> > +dtb-$(CONFIG_ARCH_VEXPRESS) += juno.dtb juno-r1.dtb
-> >  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb
-> >  
-> >  always		:= $(dtb-y)
-> > diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
-> > new file mode 100644
-> > index 0000000..f6bc073
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/arm/juno-r1.dts
-> > @@ -0,0 +1,123 @@
-> > +/*
-> > + * ARM Ltd. Juno Platform
-> > + *
-> > + * Copyright (c) 2015 ARM Ltd.
-> > + *
-> > + * This file is licensed under a dual GPLv2 or BSD license.
-> > + */
-> > +
-> > +/dts-v1/;
-> > +
-> > +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> > +
-> > +/ {
-> > +	model = "ARM Juno development board (r1)";
-> > +	compatible = "arm,juno", "arm,vexpress";
-> 
-> Is there scope for adding "arm,juno-r1" to the front of that list?
-> Reason I ask, is that I can't help but think [1] that userside code
-> (like Android) which wants to select device-specific configuration,
-> should use something like the devices compatible string rather than what
-> they currently propose [2].
+On 13 May 2015 at 14:41, Shuah Khan <shuahkh@osg.samsung.com> wrote:
+> On 05/12/2015 03:59 PM, tyler.baker at linaro.org wrote:
+>> From: Tyler Baker <tyler.baker@linaro.org>
+>>
+>> Set TEST_PROGS only when a build has occurred.
+>>
+>> Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
+>> ---
+>>  tools/testing/selftests/breakpoints/Makefile | 3 +--
+>>  1 file changed, 1 insertion(+), 2 deletions(-)
+>>
+>> diff --git a/tools/testing/selftests/breakpoints/Makefile b/tools/testing/selftests/breakpoints/Makefile
+>> index 1822356..54cc3e7 100644
+>> --- a/tools/testing/selftests/breakpoints/Makefile
+>> +++ b/tools/testing/selftests/breakpoints/Makefile
+>> @@ -12,12 +12,11 @@ endif
+>>  all:
+>>  ifeq ($(ARCH),x86)
+>>       gcc breakpoint_test.c -o breakpoint_test
+>> +     TEST_PROGS := breakpoint_test
+>>  else
+>>       echo "Not an x86 target, can't build breakpoints selftests"
+>>  endif
+>>
+>> -TEST_PROGS := breakpoint_test
+>> -
+>>  include ../lib.mk
+>>
+>>  clean:
+>>
+>
+> Hmm. With this change install fails to copy breakpoint_test all
+> together. Remember setting TEST_PROGS in compile step makes it
+> not stick around when install target is called. A better approach
+> would be the following:
+>
+> if [ -f breakpoint_test ]
+>     TEST_PROGS := breakpoint_test
+> fi
 
-Sure, I can do that for the next revision of the patch.
+Thanks for pointing this out, this is a good catch. We will also need
+to do this for the x86 tests IIRC. Would it make more sense to have
+this check performed in the INSTALL_RULE so that we don't have to have
+a bunch of IF statements in the various Makefiles?
 
-Best regards,
-Liviu
+Something like...
 
->  
-> [1] https://lists.linaro.org/pipermail/linaro-android/2015-April/002743.html
-> [2] https://lists.linaro.org/pipermail/linaro-android/2015-April/002742.html
-> 
-> -- 
-> Tixy
-> 
+       @for ARTIFACT in $(TEST_PROGS) $(TEST_PROGS_EXTENDED) $(TEST_FILES); do \
+               if [ -f $$ARTIFACT ]; then \
+                    install -t $(INSTALL_PATH) $$ARTIFACT; \
+               fi; \
+       done;
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+>
+> include ../lib.mk
+>
+> -- Shuah
+>
+> --
+> Shuah Khan
+> Sr. Linux Kernel Developer
+> Open Source Innovation Group
+> Samsung Research America (Silicon Valley)
+> shuahkh at osg.samsung.com | (970) 217-8978
+
+Cheers,
+
+Tyler
