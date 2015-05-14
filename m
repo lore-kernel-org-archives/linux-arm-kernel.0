@@ -1,65 +1,84 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Thu, 14 May 2015 18:00:51 +0100
-Subject: [RFC 11/23] xen: Add Xen specific page definition
+Date: Thu, 14 May 2015 18:01:03 +0100
+Subject: [RFC 23/23] arm/xen: Add support for 64KB page granularity
 In-Reply-To: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
 References: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1431622863-28575-12-git-send-email-julien.grall@citrix.com>
+Message-ID: <1431622863-28575-24-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Xen hypercall interface is always using 4K page granularity on ARM
-and x86 architecture.
+The hypercall interface is always using 4KB page granularity. This is
+requiring to use xen page definition macro when we deal with hypercall.
 
-With the incoming support of 64K page granularity for ARM64 guest, it
-won't be possible to re-use the Linux page definition in Xen drivers.
+Note that pfn_to_mfn is working with a Xen pfn (i.e 4KB). We may want to
+rename pfn_mfn to make this explicit.
 
-Introduce Xen page definition helpers based on the Linux page
-definition. They have exactly the same name but prefixed with
-XEN_/xen_ prefix.
-
-Also modify page_to_pfn to use new Xen page definition.
+We also allocate a 64KB page for the shared page even though only the
+first 4KB is used. I don't think this is really important for now as it
+helps to have the pointer 4KB aligned (XENMEM_add_to_physmap is taking a
+Xen PFN).
 
 Signed-off-by: Julien Grall <julien.grall@citrix.com>
-Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-Cc: David Vrabel <david.vrabel@citrix.com>
+Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 ---
- include/xen/page.h | 19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/xen/page.h | 12 ++++++------
+ arch/arm/xen/enlighten.c        |  6 +++---
+ 2 files changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/include/xen/page.h b/include/xen/page.h
-index c5ed20b..89ae01c 100644
---- a/include/xen/page.h
-+++ b/include/xen/page.h
-@@ -1,11 +1,28 @@
- #ifndef _XEN_PAGE_H
- #define _XEN_PAGE_H
+diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
+index 1bee8ca..ab6eb9a 100644
+--- a/arch/arm/include/asm/xen/page.h
++++ b/arch/arm/include/asm/xen/page.h
+@@ -56,19 +56,19 @@ static inline unsigned long mfn_to_pfn(unsigned long mfn)
  
-+#include <asm/page.h>
-+
-+/* The hypercall interface supports only 4KB page */
-+#define XEN_PAGE_SHIFT	12
-+#define XEN_PAGE_SIZE	(_AC(1,UL) << XEN_PAGE_SHIFT)
-+#define XEN_PAGE_MASK	(~(XEN_PAGE_SIZE-1))
-+#define xen_offset_in_page(p)	((unsigned long)(p) & ~XEN_PAGE_MASK)
-+#define xen_pfn_to_page(pfn)	\
-+	((pfn_to_page(((unsigned long)(pfn) << XEN_PAGE_SHIFT) >> PAGE_SHIFT)))
-+#define xen_page_to_pfn(page)	\
-+	(((page_to_pfn(page)) << PAGE_SHIFT) >> XEN_PAGE_SHIFT)
-+
-+#define XEN_PFN_PER_PAGE	(PAGE_SIZE / XEN_PAGE_SIZE)
-+
-+#define XEN_PFN_DOWN(x)	((x) >> XEN_PAGE_SHIFT)
-+#define XEN_PFN_PHYS(x)	((phys_addr_t)(x) << XEN_PAGE_SHIFT)
-+
- #include <asm/xen/page.h>
- 
- static inline unsigned long page_to_mfn(struct page *page)
+ static inline xmaddr_t phys_to_machine(xpaddr_t phys)
  {
--	return pfn_to_mfn(page_to_pfn(page));
-+	return pfn_to_mfn(xen_page_to_pfn(page));
+-	unsigned offset = phys.paddr & ~PAGE_MASK;
+-	return XMADDR(PFN_PHYS(pfn_to_mfn(PFN_DOWN(phys.paddr))) | offset);
++	unsigned offset = phys.paddr & ~XEN_PAGE_MASK;
++	return XMADDR(XEN_PFN_PHYS(pfn_to_mfn(XEN_PFN_DOWN(phys.paddr))) | offset);
  }
  
- struct xen_memory_region {
+ static inline xpaddr_t machine_to_phys(xmaddr_t machine)
+ {
+-	unsigned offset = machine.maddr & ~PAGE_MASK;
+-	return XPADDR(PFN_PHYS(mfn_to_pfn(PFN_DOWN(machine.maddr))) | offset);
++	unsigned offset = machine.maddr & ~XEN_PAGE_MASK;
++	return XPADDR(XEN_PFN_PHYS(mfn_to_pfn(XEN_PFN_DOWN(machine.maddr))) | offset);
+ }
+ /* VIRT <-> MACHINE conversion */
+ #define virt_to_machine(v)	(phys_to_machine(XPADDR(__pa(v))))
+-#define virt_to_mfn(v)		(pfn_to_mfn(virt_to_pfn(v)))
+-#define mfn_to_virt(m)		(__va(mfn_to_pfn(m) << PAGE_SHIFT))
++#define virt_to_mfn(v)		(pfn_to_mfn(virt_to_phys(v) >> XEN_PAGE_SHIFT))
++#define mfn_to_virt(m)		(__va(mfn_to_pfn(m) << XEN_PAGE_SHIFT))
+ 
+ static inline xmaddr_t arbitrary_virt_to_machine(void *vaddr)
+ {
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index 224081c..dcfe251 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -93,8 +93,8 @@ static void xen_percpu_init(void)
+ 	pr_info("Xen: initializing cpu%d\n", cpu);
+ 	vcpup = per_cpu_ptr(xen_vcpu_info, cpu);
+ 
+-	info.mfn = __pa(vcpup) >> PAGE_SHIFT;
+-	info.offset = offset_in_page(vcpup);
++	info.mfn = __pa(vcpup) >> XEN_PAGE_SHIFT;
++	info.offset = xen_offset_in_page(vcpup);
+ 
+ 	err = HYPERVISOR_vcpu_op(VCPUOP_register_vcpu_info, cpu, &info);
+ 	BUG_ON(err);
+@@ -204,7 +204,7 @@ static int __init xen_guest_init(void)
+ 	xatp.domid = DOMID_SELF;
+ 	xatp.idx = 0;
+ 	xatp.space = XENMAPSPACE_shared_info;
+-	xatp.gpfn = __pa(shared_info_page) >> PAGE_SHIFT;
++	xatp.gpfn = __pa(shared_info_page) >> XEN_PAGE_SHIFT;
+ 	if (HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp))
+ 		BUG();
+ 
 -- 
 2.1.4
