@@ -1,43 +1,50 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Thu, 14 May 2015 21:28:59 +0800
-Subject: [PATCH v2 1/5] clk: remove duplicated code with __clk_set_parent_after
-In-Reply-To: <1431610143-21853-1-git-send-email-aisheng.dong@freescale.com>
-References: <1431610143-21853-1-git-send-email-aisheng.dong@freescale.com>
-Message-ID: <1431610143-21853-2-git-send-email-aisheng.dong@freescale.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 14 May 2015 20:08:03 +0530
+Subject: schedule_timeout sleeps too long after dividing CPU frequency
+In-Reply-To: <CAKohpon4AV-7nq=Qm7PpDbbW9ti98avY9zz82htzyHWi5_K7fA@mail.gmail.com>
+References: <55520F0F.5010906@free.fr>
+ <CAKohpo=eMA6L9=jK=bAnbFuDxcdtpQNub0WFnSy6MOqB3jOdjA@mail.gmail.com>
+ <555218C7.5050602@free.fr>
+ <20150512155004.GP2067@n2100.arm.linux.org.uk>
+ <555380F8.5050306@free.fr>
+ <CAOh2x==aCLxCWX9K57hOFVEP1eLo_OYZPe0YvbFvpkXcoSp_hQ@mail.gmail.com>
+ <5554858A.9010207@free.fr> <20150514115456.GB23999@linux>
+ <55549DEE.6010202@free.fr>
+ <CAKohpon4AV-7nq=Qm7PpDbbW9ti98avY9zz82htzyHWi5_K7fA@mail.gmail.com>
+Message-ID: <CAKohpomfSUFGmNgpUWAoNeDOgisw5kRYk+t5uDOOdShH=hvHGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-__clk_set_parent_after() actually used the second argument then we
-could put this duplicate logic in there and call it with a different
-order of arguments in the success vs. error paths in this function.
+On 14 May 2015 at 19:29, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 14 May 2015 at 18:36, Mason <slash.tmp@free.fr> wrote:
+>> When I execute "echo 18500 > scaling_max_freq"
+>> the system is supposed to change the CPU frequency to 18.5 MHz
+>> (I might have a bug lurking there) and PERIPHCLK is 1/2 of that,
+>> i.e 9.25 MHz.
+>
+> So at least we are on the right path. But it looks to me that this
+> call is not getting propagated well.
+>
+> From the attachment you gave initially, the event handler for
+> twd-timers is: tick_handle_periodic(). i.e. you are running in
+> periodic mode and not onshot...
+>
+> why ?
+>
+>> Yes, I do, but I was trying to use as much generic code as
+>> possible to limit the chances of introducing bugs.
+>
+> Hmm..
+>
+>> I'll take a fresh look at the ARM GLOBAL TIMER, but last I
+>> checked, it didn't seem to handle frequency scaling.
+>
+> why is that required? Why will you change its freq ?
+> The same timer is probably used for SPEAr (the platform
+> I used to work on):
+>
+> http://lxr.free-electrons.com/source/arch/arm/mach-spear/time.c?v=3.14
 
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
-Signed-off-by: Dong Aisheng <aisheng.dong@freescale.com>
----
- drivers/clk/clk.c | 8 +-------
- 1 file changed, 1 insertion(+), 7 deletions(-)
+And this might be the problem you are facing:
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 659f2b0..0e813ea 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1159,14 +1159,8 @@ static int __clk_set_parent(struct clk_core *core, struct clk_core *parent,
- 		flags = clk_enable_lock();
- 		clk_reparent(core, old_parent);
- 		clk_enable_unlock(flags);
-+		__clk_set_parent_after(core, old_parent, parent);
- 
--		if (core->prepare_count) {
--			flags = clk_enable_lock();
--			clk_core_disable(core);
--			clk_core_disable(parent);
--			clk_enable_unlock(flags);
--			clk_core_unprepare(parent);
--		}
- 		return ret;
- 	}
- 
--- 
-1.9.1
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-May/098564.html
