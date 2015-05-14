@@ -1,81 +1,52 @@
-From: ddstreet@ieee.org (Dan Streetman)
-Date: Thu, 14 May 2015 04:54:07 -0400
-Subject: [PATCH] lib: fix 842 build on 32-bit architectures
-In-Reply-To: <1431561144-29931-1-git-send-email-ddstreet@ieee.org>
-References: <2802721.Q9KnE9eNH4@wuerfel>
- <1431561144-29931-1-git-send-email-ddstreet@ieee.org>
-Message-ID: <CALZtONC5Fc-Dsw_aob7zyycYdS6rP6ckT-wdyxF1WJTNsSLp7g@mail.gmail.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Thu, 14 May 2015 16:56:36 +0800
+Subject: [Patch v3 0/7] Consolidate ACPI PCI root common code into ACPI core
+Message-ID: <1431593803-5213-1-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 13, 2015 at 7:52 PM, Dan Streetman <ddstreet@ieee.org> wrote:
->> Building the 842 code on 32-bit ARM currently results in this link
->> error:
->>
->> ERROR: "__aeabi_uldivmod" [lib/842/842_decompress.ko] undefined!
->
-> Oops!  Guess I should build/test on 32 bit more.
->
->>
->> The reason is that the __do_index function performs a 64-bit
->> division by a power-of-two number, but it has no insight into
->> the function arguments.
+This patch set consolidates common code to support ACPI PCI root on x86
+and IA64 platforms into ACPI core, to reproduce duplicated code and
+simplify maintenance. The common code should also used to support PCI
+host bridge on ARM64 too, but I'm lacking of knowledge about PCIe host
+bridge implementation details on ARM64, so please help to review whether
+this is suitable for ARM64 too.
 
-wait, do you mean the 64 bit mod, total % fsize?  That should already
-be fixed in Herbert's tree, I changed it to subtraction instead.
+It passes Fengguang's 0day test suite and has been tested on two IA64
+platforms and one x86 platform.
 
-In any case, I looked at the code again and I think the fsize
-parameter can be removed, and just simply calculated in the function,
-it's just a shift.  I'll send a patch.
+It's based on latest mainstream kernel and available at:
+https://github.com/jiangliu/linux.git acpi_pci_root_v3
 
+V2->V3:
+1. Move memory allocation/free from ACPI core into arch
+2. Kill the field 'segment' in struct pci_root_info on x86
 
->>
->> By marking that function inline, the fsize argument is always
->> known at the time that do_index is called, and the compiler is
->> able to replace the extremely expensive 64-bit division with
->> a cheap constant shift operation.
->
-> alternately, we know that fsize will always be less than 64 bits,
-> at most it's 4<<9 or 8<<8 (both == 1<<11).  So we could just change
-> its type to u16.
->
-> diff --git a/lib/842/842_decompress.c b/lib/842/842_decompress.c
-> index 6b2b45aecde3..285bf6b6959c 100644
-> --- a/lib/842/842_decompress.c
-> +++ b/lib/842/842_decompress.c
-> @@ -169,7 +169,7 @@ static int do_data(struct sw842_param *p, u8 n)
->         return 0;
->  }
->
-> -static int __do_index(struct sw842_param *p, u8 size, u8 bits, u64 fsize)
-> +static int __do_index(struct sw842_param *p, u8 size, u8 bits, u16 fsize)
->  {
->         u64 index, offset, total = round_down(p->out - p->ostart, 8);
->         int ret;
->
-> Or, we could inline it and change the type to u16.  In any case,
->
-> Acked-by: Dan Streetman <ddstreet@ieee.org>
->
->>
->> Aside from fixing that link error, this approach should also improve
->> both code size and performance on 32-bit architectures significantly.
->>
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->> ---
->> Found while building arm32 allmodconfig with gcc-5.0
->>
->> diff --git a/lib/842/842_decompress.c b/lib/842/842_decompress.c
->> index 6b2b45aecde3..285bf6b6959c 100644
->> --- a/lib/842/842_decompress.c
->> +++ b/lib/842/842_decompress.c
->> @@ -169,7 +169,7 @@ static int do_data(struct sw842_param *p, u8 n)
->>       return 0;
->>  }
->>
->> -static int __do_index(struct sw842_param *p, u8 size, u8 bits, u64 fsize)
->> +static inline int __do_index(struct sw842_param *p, u8 size, u8 bits, u64 fsize)
->>  {
->>       u64 index, offset, total = round_down(p->out - p->ostart, 8);
->>       int ret;
->>
+Thanks!
+Gerry
+
+Jiang Liu (7):
+  ACPI/PCI: Enhance ACPI core to support sparse IO space
+  ia64/PCI/ACPI: Use common ACPI resource parsing interface for host
+    bridge
+  ia64/PCI: Use common struct resource_entry to replace struct
+    iospace_resource
+  x86/PCI: Rename struct pci_sysdata as struct pci_controller
+  PCI/ACPI: Consolidate common PCI host bridge code into ACPI core
+  x86/PCI/ACPI: Use common interface to support PCI host bridge
+  ia64/PCI/ACPI: Use common interface to support PCI host bridge
+
+ arch/ia64/include/asm/pci.h   |    5 -
+ arch/ia64/pci/pci.c           |  364 +++++++++++------------------------------
+ arch/x86/include/asm/pci.h    |   13 +-
+ arch/x86/include/asm/pci_64.h |    4 +-
+ arch/x86/pci/acpi.c           |  294 ++++++++++-----------------------
+ arch/x86/pci/common.c         |    2 +-
+ drivers/acpi/pci_root.c       |  200 ++++++++++++++++++++++
+ drivers/acpi/resource.c       |    9 +-
+ include/linux/ioport.h        |    1 +
+ include/linux/pci-acpi.h      |   23 +++
+ 10 files changed, 421 insertions(+), 494 deletions(-)
+
+-- 
+1.7.10.4
