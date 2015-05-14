@@ -1,7 +1,7 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 14 May 2015 18:10:24 +0200
+Date: Thu, 14 May 2015 18:11:03 +0200
 Subject: [PATCH 0/4] Ux500 Device Tree docs and additions
-Message-ID: <1431619828-14604-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1431619867-14700-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
