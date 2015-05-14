@@ -1,56 +1,50 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 14 May 2015 18:11:04 +0200
-Subject: [PATCH 1/4] ARM: scu: document Snoop Control Unit DT bindings
+Date: Thu, 14 May 2015 18:11:06 +0200
+Subject: [PATCH 3/4] ARM: ux500: add SCU and WD to device tree
 In-Reply-To: <1431619867-14700-1-git-send-email-linus.walleij@linaro.org>
 References: <1431619867-14700-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1431619867-14700-2-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1431619867-14700-4-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds device tree bindings for the ARM Cortex-A5 and
-Cortex-A9 Snoop Control Units.
+The Ux500 like other Cortex-A9 SoC's has a Snoop Control
+Unit (SCU) and a Watchdog in the same address range as
+the local timers. Add these to the SoC device tree.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-Several device trees already contain DT nodes for the Cortex-A9
-and Cortex-A5 Snoop Control Units, this documents the already
-existing and used bindings.
----
----
- Documentation/devicetree/bindings/arm/scu.txt | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/scu.txt
+ arch/arm/boot/dts/ste-dbx5x0.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/scu.txt b/Documentation/devicetree/bindings/arm/scu.txt
-new file mode 100644
-index 000000000000..c447680519bb
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/scu.txt
-@@ -0,0 +1,25 @@
-+* ARM Snoop Control Unit (SCU)
+diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+index 5b876f263af4..f024a1c0de8b 100644
+--- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
++++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+@@ -185,6 +185,11 @@
+ 			      <0xa0410100 0x100>;
+ 		};
+ 
++		scu at a04100000 {
++			compatible = "arm,cortex-a9-scu";
++			reg = <0xa0410000 0x100>;
++		};
 +
-+As part of the MPCore complex, Cortex-A5 and Cortex-A9 are provided
-+with a Snoop Control Unit. The register range is usually 256 (0x100)
-+bytes.
+ 		L2: l2-cache {
+ 			compatible = "arm,pl310-cache";
+ 			reg = <0xa0412000 0x1000>;
+@@ -245,6 +250,13 @@
+ 			clocks = <&smp_twd_clk>;
+ 		};
+ 
++		watchdog at a0410620 {
++			compatible = "arm,cortex-a9-twd-wdt";
++			reg = <0xa0410620 0x20>;
++			interrupts = <1 14 0x304>;
++			clocks = <&smp_twd_clk>;
++		};
 +
-+References:
-+
-+- Cortex-A9: see DDI0407E Cortex-A9 MPCore Technical Reference Manual
-+  Revision r2p0
-+- Cortex-A5: see DDI0434B Cortex-A5 MPCore Technical Reference Manual
-+  Revision r0p1
-+
-+- compatible : Should be:
-+	"arm,cortex-a9-scu"
-+	"arm,cortex-a5-scu"
-+
-+- reg : Specify the base address and the size of the SCU register window.
-+
-+Example:
-+
-+scu at a04100000 {
-+	compatible = "arm,cortex-a9-scu";
-+	reg = <0xa0410000 0x100>;
-+};
+ 		rtc at 80154000 {
+ 			compatible = "arm,rtc-pl031", "arm,primecell";
+ 			reg = <0x80154000 0x1000>;
 -- 
 1.9.3
