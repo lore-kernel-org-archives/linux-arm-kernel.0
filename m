@@ -1,143 +1,83 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Thu, 14 May 2015 12:11:04 +0200
-Subject: [PATCH net-next 09/11] stmmac: convert dwmac-sti to platform driver
-In-Reply-To: <1431598266-25736-1-git-send-email-manabian@gmail.com>
-References: <1431598266-25736-1-git-send-email-manabian@gmail.com>
-Message-ID: <1431598266-25736-10-git-send-email-manabian@gmail.com>
+From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
+Date: Thu, 14 May 2015 19:12:07 +0900
+Subject: [PATCH v5 00/13] ARM: dts: exynos4: labels for overriding nodes
+Message-ID: <1431598340-3319-1-git-send-email-k.kozlowski.k@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert platform glue layer into a proper platform
-driver and add it to the build system.
 
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
----
- drivers/net/ethernet/stmicro/stmmac/Kconfig        | 12 +++++++++
- drivers/net/ethernet/stmicro/stmmac/Makefile       |  2 +-
- drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c    | 29 ++++++++++++++++++++--
- .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |  4 ---
- .../net/ethernet/stmicro/stmmac/stmmac_platform.h  |  2 --
- 5 files changed, 40 insertions(+), 9 deletions(-)
+Hi,
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/Kconfig b/drivers/net/ethernet/stmicro/stmmac/Kconfig
-index f103e57e3ac0..f5b9f051337d 100644
---- a/drivers/net/ethernet/stmicro/stmmac/Kconfig
-+++ b/drivers/net/ethernet/stmicro/stmmac/Kconfig
-@@ -78,6 +78,18 @@ config DWMAC_SOCFPGA
- 	  for the stmmac device driver. This driver is used for
- 	  arria5 and cyclone5 FPGA SoCs.
- 
-+config DWMAC_STI
-+	tristate "STi GMAC support"
-+	default ARCH_STI
-+	depends on OF
-+	select MFD_SYSCON
-+	---help---
-+	  Support for ethernet controller on STi SOCs.
-+
-+	  This selects STi SoC glue layer support for the stmmac
-+	  device driver. This driver is used on for the STi series
-+	  SOCs GMAC ethernet controller.
-+
- endif
- 
- config STMMAC_PCI
-diff --git a/drivers/net/ethernet/stmicro/stmmac/Makefile b/drivers/net/ethernet/stmicro/stmmac/Makefile
-index 690741d6fc10..f8e5ddba7fd2 100644
---- a/drivers/net/ethernet/stmicro/stmmac/Makefile
-+++ b/drivers/net/ethernet/stmicro/stmmac/Makefile
-@@ -10,9 +10,9 @@ obj-$(CONFIG_DWMAC_LPC18XX)	+= dwmac-lpc18xx.o
- obj-$(CONFIG_DWMAC_MESON)	+= dwmac-meson.o
- obj-$(CONFIG_DWMAC_ROCKCHIP)	+= dwmac-rk.o
- obj-$(CONFIG_DWMAC_SOCFPGA)	+= dwmac-socfpga.o
-+obj-$(CONFIG_DWMAC_STI)		+= dwmac-sti.o
- obj-$(CONFIG_DWMAC_GENERIC)	+= dwmac-generic.o
- stmmac-platform-objs:= stmmac_platform.o dwmac-sunxi.o \
--		       dwmac-sti.o
- 
- obj-$(CONFIG_STMMAC_PCI) += stmmac-pci.o
- stmmac-pci-objs:= stmmac_pci.o
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c
-index bb6e2dc61bec..a2e8111c5d14 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c
-@@ -17,6 +17,7 @@
- #include <linux/stmmac.h>
- #include <linux/phy.h>
- #include <linux/mfd/syscon.h>
-+#include <linux/module.h>
- #include <linux/regmap.h>
- #include <linux/clk.h>
- #include <linux/of.h>
-@@ -351,16 +352,40 @@ static void *sti_dwmac_setup(struct platform_device *pdev)
- 	return dwmac;
- }
- 
--const struct stmmac_of_data stih4xx_dwmac_data = {
-+static const struct stmmac_of_data stih4xx_dwmac_data = {
- 	.fix_mac_speed = stih4xx_fix_retime_src,
- 	.setup = sti_dwmac_setup,
- 	.init = stix4xx_init,
- 	.exit = sti_dwmac_exit,
- };
- 
--const struct stmmac_of_data stid127_dwmac_data = {
-+static const struct stmmac_of_data stid127_dwmac_data = {
- 	.fix_mac_speed = stid127_fix_retime_src,
- 	.setup = sti_dwmac_setup,
- 	.init = stid127_init,
- 	.exit = sti_dwmac_exit,
- };
-+
-+static const struct of_device_id sti_dwmac_match[] = {
-+	{ .compatible = "st,stih415-dwmac", .data = &stih4xx_dwmac_data},
-+	{ .compatible = "st,stih416-dwmac", .data = &stih4xx_dwmac_data},
-+	{ .compatible = "st,stid127-dwmac", .data = &stid127_dwmac_data},
-+	{ .compatible = "st,stih407-dwmac", .data = &stih4xx_dwmac_data},
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, sti_dwmac_match);
-+
-+static struct platform_driver sti_dwmac_driver = {
-+	.probe  = stmmac_pltfr_probe,
-+	.remove = stmmac_pltfr_remove,
-+	.driver = {
-+		.name           = "sti-dwmac",
-+		.pm		= &stmmac_pltfr_pm_ops,
-+		.of_match_table = sti_dwmac_match,
-+	},
-+};
-+module_platform_driver(sti_dwmac_driver);
-+
-+MODULE_AUTHOR("Srinivas Kandagatla <srinivas.kandagatla@st.com>");
-+MODULE_DESCRIPTION("STMicroelectronics DWMAC Specific Glue layer");
-+MODULE_LICENSE("GPL");
-diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-index 4553b50833ea..21a3a2c05740 100644
---- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-@@ -35,10 +35,6 @@
- static const struct of_device_id stmmac_dt_ids[] = {
- 	/* SoC specific glue layers should come before generic bindings */
- 	{ .compatible = "allwinner,sun7i-a20-gmac", .data = &sun7i_gmac_data},
--	{ .compatible = "st,stih415-dwmac", .data = &stih4xx_dwmac_data},
--	{ .compatible = "st,stih416-dwmac", .data = &stih4xx_dwmac_data},
--	{ .compatible = "st,stid127-dwmac", .data = &stid127_dwmac_data},
--	{ .compatible = "st,stih407-dwmac", .data = &stih4xx_dwmac_data},
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, stmmac_dt_ids);
-diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.h b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.h
-index 3c8d7088361f..7eb2fa8d97f3 100644
---- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.h
-+++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.h
-@@ -24,7 +24,5 @@ int stmmac_pltfr_remove(struct platform_device *pdev);
- extern const struct dev_pm_ops stmmac_pltfr_pm_ops;
- 
- extern const struct stmmac_of_data sun7i_gmac_data;
--extern const struct stmmac_of_data stih4xx_dwmac_data;
--extern const struct stmmac_of_data stid127_dwmac_data;
- 
- #endif /* __STMMAC_PLATFORM_H__ */
+
+Changes since v4
+================
+1. Patch 1: Don't add labels in exynos4210-pinctrl.dtsi because
+   these are already defined in exynos4210.dtsi.
+2. Patch 9: Add ack from Eduardo Valentin.
+
+Changes since v3
+================
+1. New patches (12 and 13) for Exynos4412 Origen and Tiny4412.
+2. Rebased on top of my DTS-for-next branch:
+   repo: https://github.com/krzk/linux/
+   tag: samsung-dt-for-next-4.2-2
+
+Changes since v2
+================
+1. Fix typo in commit msg (lablels -> labels).
+
+Changes since v1
+================
+1. Re-phrased the description (phandle->label). Suggested by Arnd.
+
+Description
+===========
+
+The label-based notation reduces possible mistakes when overriding
+nodes by child DTSI and board files and reduces duplication
+of addresses.
+
+The patchset refactors Exynos4 boards to use labels for overriding nodes.
+
+Tested by comparison of decompiled DTB for each commit. The output DTB
+is the same.
+
+
+Best regards,
+Krzysztof
+
+
+Krzysztof Kozlowski (13):
+  ARM: dts: Add labels to exynos4 nodes
+  ARM: dts: Use labels for overriding nodes in exynos4210
+  ARM: dts: Use labels for overriding nodes in exynos4210-origen
+  ARM: dts: Use labels for overriding nodes in exynos4210-smdkv310
+  ARM: dts: Use labels for overriding nodes in exynos4210-trats
+  ARM: dts: Use labels for overriding nodes in exynos4212
+  ARM: dts: Use labels for overriding nodes in exynos4x12
+  ARM: dts: Use labels for overriding nodes in exynos4412
+  ARM: dts: Use labels for overriding nodes in exynos4412-odroid
+  ARM: dts: Use labels for overriding nodes in exynos4412-smdk4412
+  ARM: dts: Use labels for overriding nodes in exynos4412-trats2
+  ARM: dts: Use labels for overriding nodes in exynos4412-origen
+  ARM: dts: Use labels for overriding nodes in exynos4412-tiny4412
+
+ arch/arm/boot/dts/exynos4.dtsi                  |   22 +-
+ arch/arm/boot/dts/exynos4210-origen.dts         |  418 +++----
+ arch/arm/boot/dts/exynos4210-smdkv310.dts       |  280 ++---
+ arch/arm/boot/dts/exynos4210-trats.dts          |  592 +++++-----
+ arch/arm/boot/dts/exynos4210.dtsi               |   49 +-
+ arch/arm/boot/dts/exynos4212.dtsi               |   12 +-
+ arch/arm/boot/dts/exynos4412-odroid-common.dtsi |  732 ++++++-------
+ arch/arm/boot/dts/exynos4412-odroidx.dts        |   16 +-
+ arch/arm/boot/dts/exynos4412-origen.dts         |  892 +++++++--------
+ arch/arm/boot/dts/exynos4412-smdk4412.dts       |  210 ++--
+ arch/arm/boot/dts/exynos4412-tiny4412.dts       |   54 +-
+ arch/arm/boot/dts/exynos4412-trats2.dts         | 1332 ++++++++++++-----------
+ arch/arm/boot/dts/exynos4412.dtsi               |   20 +-
+ arch/arm/boot/dts/exynos4x12-pinctrl.dtsi       |    8 +-
+ arch/arm/boot/dts/exynos4x12.dtsi               |  218 ++--
+ 15 files changed, 2428 insertions(+), 2427 deletions(-)
+
 -- 
-1.8.0
+2.1.4
