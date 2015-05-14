@@ -1,31 +1,18 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Thu, 14 May 2015 18:00:49 +0100
-Subject: [RFC 09/23] arm/xen: Drop duplicate define mfn_to_virt
-In-Reply-To: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
-References: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1431622863-28575-10-git-send-email-julien.grall@citrix.com>
+From: john.stultz@linaro.org (John Stultz)
+Date: Thu, 14 May 2015 10:02:18 -0700
+Subject: [PATCH] time: Remove nonexistent function prototype.
+In-Reply-To: <1428674150-1780-1-git-send-email-yingjoe.chen@mediatek.com>
+References: <1428674150-1780-1-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <CALAqxLW0He0JLs1K7fB+QAsjZRaYaJKXTbqVY0+ORa8MOMhqvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julien Grall <julien.grall@linaro.org>
+On Fri, Apr 10, 2015 at 6:55 AM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
+> The function clocksource_get_next() was removed in commit 75c5158f70
+> (timekeeping: Update clocksource with stop_machine), but the
+> prototype is not removed with it. Remove the prototype.
+>
+> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
 
-Signed-off-by: Julien Grall <julien.grall@citrix.com>
-Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
----
- arch/arm/include/asm/xen/page.h | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
-index 0b579b2..1bee8ca 100644
---- a/arch/arm/include/asm/xen/page.h
-+++ b/arch/arm/include/asm/xen/page.h
-@@ -12,7 +12,6 @@
- #include <xen/interface/grant_table.h>
- 
- #define phys_to_machine_mapping_valid(pfn) (1)
--#define mfn_to_virt(m)			(__va(mfn_to_pfn(m) << PAGE_SHIFT))
- 
- #define pte_mfn	    pte_pfn
- #define mfn_pte	    pfn_pte
--- 
-2.1.4
+Queued for 4.2. Thanks for sending this in!
+-john
