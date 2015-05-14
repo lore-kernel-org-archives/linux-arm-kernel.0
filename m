@@ -1,66 +1,37 @@
 From: lho@apm.com (Loc Ho)
-Date: Thu, 14 May 2015 11:05:43 -0600
-Subject: [PATCH v9 1/5] arm64: Enable EDAC on ARM64
-In-Reply-To: <1431623147-4950-1-git-send-email-lho@apm.com>
+Date: Thu, 14 May 2015 11:05:44 -0600
+Subject: [PATCH v9 2/5] MAINTAINERS: Add entry for APM X-Gene SoC EDAC driver
+In-Reply-To: <1431623147-4950-2-git-send-email-lho@apm.com>
 References: <1431623147-4950-1-git-send-email-lho@apm.com>
-Message-ID: <1431623147-4950-2-git-send-email-lho@apm.com>
+ <1431623147-4950-2-git-send-email-lho@apm.com>
+Message-ID: <1431623147-4950-3-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an stub atomic_scrub function and enable EDAC for arm64.
+This patch adds a MAINTAINERS entry for APM X-Gene SoC EDAC driver.
 
 Signed-off-by: Loc Ho <lho@apm.com>
 ---
- arch/arm64/Kconfig            |    1 +
- arch/arm64/include/asm/edac.h |   28 ++++++++++++++++++++++++++++
- 2 files changed, 29 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm64/include/asm/edac.h
+ MAINTAINERS |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 4269dba..577078f 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -22,6 +22,7 @@ config ARM64
- 	select BUILDTIME_EXTABLE_SORT
- 	select CLONE_BACKWARDS
- 	select COMMON_CLK
-+	select EDAC_SUPPORT
- 	select CPU_PM if (SUSPEND || CPU_IDLE)
- 	select DCACHE_WORD_ACCESS
- 	select GENERIC_ALLOCATOR
-diff --git a/arch/arm64/include/asm/edac.h b/arch/arm64/include/asm/edac.h
-new file mode 100644
-index 0000000..683495b
---- /dev/null
-+++ b/arch/arm64/include/asm/edac.h
-@@ -0,0 +1,28 @@
-+/*
-+ * ARM64 EDAC Header File
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_EDAC_H
-+#define __ASM_EDAC_H
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 00a586b..0134fee 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -3735,6 +3735,13 @@ W:	bluesmoke.sourceforge.net
+ S:	Maintained
+ F:	drivers/edac/sb_edac.c
+ 
++EDAC-XGENE
++APPLIED MICRO (APM) X-GENE SOC EDAC
++M:     Loc Ho <lho@apm.com>
++S:     Supported
++F:     drivers/edac/xgene_edac.c
++F:     Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
 +
-+/*
-+ * ECC atomic, DMA, SMP and interrupt safe scrub function.
-+ */
-+static inline void atomic_scrub(void *va, u32 size)
-+{
-+	/* Stub function for now until an ARM64 HW has a way to test it. */
-+	WARN_ONCE(1, "not implemented");
-+}
-+
-+#endif
+ EDIROL UA-101/UA-1000 DRIVER
+ M:	Clemens Ladisch <clemens@ladisch.de>
+ L:	alsa-devel at alsa-project.org (moderated for non-subscribers)
 -- 
 1.7.1
