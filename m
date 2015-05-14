@@ -1,153 +1,183 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 14 May 2015 16:02:15 +0800
-Subject: [PATCH 01/18] ARM: imx: Add a parameter to mxc_timer_init
-In-Reply-To: <1430405073-13106-2-git-send-email-shenwei.wang@freescale.com>
-References: <1430405073-13106-1-git-send-email-shenwei.wang@freescale.com>
- <1430405073-13106-2-git-send-email-shenwei.wang@freescale.com>
-Message-ID: <20150514080213.GC6850@dragon>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 14 May 2015 10:25:24 +0200
+Subject: [PATCH 1/5] VFIO: platform: add reset_list and register/unregister
+ functions
+In-Reply-To: <1431541925.3625.52.camel@redhat.com>
+References: <1431008843-28411-1-git-send-email-eric.auger@linaro.org>	
+ <1431008843-28411-2-git-send-email-eric.auger@linaro.org>
+ <1431541925.3625.52.camel@redhat.com>
+Message-ID: <55545BF4.805@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 30, 2015 at 09:44:16AM -0500, Shenwei Wang wrote:
-> A parameter of integer type is added to the function mxc_timer_init,
-> so that a user could have a way to tell the timer driver the version
-> of the timer IP block.
+Hi Alex,
+On 05/13/2015 08:32 PM, Alex Williamson wrote:
+> On Thu, 2015-05-07 at 16:27 +0200, Eric Auger wrote:
+>> vfio_platform_common now stores a lists of available reset functions.
+>> Two functions are exposed to register/unregister a reset function. A
+>> reset function is paired with a compat string.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>> ---
+>>  drivers/vfio/platform/vfio_platform_common.c  | 63 +++++++++++++++++++++++++++
+>>  drivers/vfio/platform/vfio_platform_private.h | 13 ++++++
+>>  2 files changed, 76 insertions(+)
+>>
+>> diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
+>> index abcff7a..edbf24c 100644
+>> --- a/drivers/vfio/platform/vfio_platform_common.c
+>> +++ b/drivers/vfio/platform/vfio_platform_common.c
+>> @@ -23,6 +23,9 @@
+>>  
+>>  #include "vfio_platform_private.h"
+>>  
+>> +struct list_head reset_list;
+>> +LIST_HEAD(reset_list);
+>> +
 > 
-> Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
-> ---
->  arch/arm/mach-imx/time.c    | 2 +-
->  drivers/clk/imx/clk-imx1.c  | 3 ++-
->  drivers/clk/imx/clk-imx21.c | 3 ++-
->  drivers/clk/imx/clk-imx27.c | 3 ++-
->  drivers/clk/imx/clk-imx31.c | 3 ++-
->  drivers/clk/imx/clk-imx35.c | 5 +++--
->  drivers/clk/imx/clk.h       | 2 +-
->  7 files changed, 13 insertions(+), 8 deletions(-)
+> Redundant?  Static?
+static, yes
 > 
-> diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
-> index b1698e1..eef6b66 100644
-> --- a/arch/arm/mach-imx/time.c
-> +++ b/arch/arm/mach-imx/time.c
-> @@ -346,7 +346,7 @@ static void __init _mxc_timer_init(int irq,
->  	setup_irq(irq, &mxc_timer_irq);
->  }
->  
-> -void __init mxc_timer_init(unsigned long pbase, int irq)
-> +void __init mxc_timer_init(unsigned long pbase, int irq, int ver)
+>>  static DEFINE_MUTEX(driver_lock);
+>>  
+>>  static int vfio_platform_regions_init(struct vfio_platform_device *vdev)
+>> @@ -511,6 +514,13 @@ EXPORT_SYMBOL_GPL(vfio_platform_probe_common);
+>>  struct vfio_platform_device *vfio_platform_remove_common(struct device *dev)
+>>  {
+>>  	struct vfio_platform_device *vdev;
+>> +	struct vfio_platform_reset_node *iter, *tmp;
+>> +
+>> +	list_for_each_entry_safe(iter, tmp, &reset_list, link) {
+>> +		list_del(&iter->link);
+>> +		kfree(iter->compat);
+>> +		kfree(iter);
+>> +	}
+> 
+> 
+> This doesn't make sense.  We allow reset functions to be registered and
+> unregistered, but we forget them all when any device is released?!
+I acknowledge indeed. Can I rely on the reset module exit and associated
+unregister_reset or shall I take this action in the vfio driver itself,
+core?
+> 
+>>  
+>>  	vdev = vfio_del_group_dev(dev);
+>>  	if (vdev)
+>> @@ -519,3 +529,56 @@ struct vfio_platform_device *vfio_platform_remove_common(struct device *dev)
+>>  	return vdev;
+>>  }
+>>  EXPORT_SYMBOL_GPL(vfio_platform_remove_common);
+>> +
+>> +int vfio_platform_register_reset(char *compat, struct module *reset_owner,
+>> +				 vfio_platform_reset_fn_t reset)
+>> +{
+>> +	struct vfio_platform_reset_node *node, *iter;
+>> +	bool found = false;
+>> +
+>> +	list_for_each_entry(iter, &reset_list, link) {
+>> +		if (!strcmp(iter->compat, compat)) {
+>> +			found = true;
+> 
+> Just return errno here
+ok
+> 
+>> +			break;
+>> +		}
+>> +	}
+>> +	if (found)
+>> +		return -EINVAL;
+>> +
+>> +	node = kmalloc(sizeof(*node), GFP_KERNEL);
+>> +	if (!node)
+>> +		return -ENOMEM;
+>> +
+>> +	node->compat = kstrdup(compat, GFP_KERNEL);
+>> +	if (!node->compat)
+> 
+> Leaking node
+ok
+> 
+>> +		return -ENOMEM;
+>> +
+>> +	node->owner = reset_owner;
+>> +	node->reset = reset;
+>> +
+>> +	list_add(&node->link, &reset_list);
+> 
+> Isn't this racy?  Don't we need some locks around the list?
+I will add a lock to protect access to the list.
+> 
+>> +	return 0;
+>> +}
+>> +EXPORT_SYMBOL_GPL(vfio_platform_register_reset);
+>> +
+>> +int vfio_platform_unregister_reset(char *compat)
+>> +{
+>> +	struct vfio_platform_reset_node *iter;
+>> +	bool found = false;
+>> +
+>> +	list_for_each_entry(iter, &reset_list, link) {
+>> +		if (!strcmp(iter->compat, compat)) {
+> 
+> Return errno here
+ok
+> 
+>> +			found = true;
+>> +			break;
+>> +		}
+>> +	}
+>> +	if (!found)
+>> +		return -EINVAL;
+>> +
+>> +	list_del(&iter->link);
+> 
+> Racy
+> 
+>> +	kfree(iter->compat);
+>> +	kfree(iter);
+>> +	return 0;
+>> +}
+>> +EXPORT_SYMBOL_GPL(vfio_platform_unregister_reset);
+>> +
+>> diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
+>> index 5d31e04..da2d60b 100644
+>> --- a/drivers/vfio/platform/vfio_platform_private.h
+>> +++ b/drivers/vfio/platform/vfio_platform_private.h
+>> @@ -69,6 +69,15 @@ struct vfio_platform_device {
+>>  	int	(*get_irq)(struct vfio_platform_device *vdev, int i);
+>>  };
+>>  
+>> +typedef int (*vfio_platform_reset_fn_t)(struct vfio_platform_device *vdev);
+> 
+> Seems like this ought to be in a non-private header if we're exporting
+> the [un]register functions.
+I considered the vfio reset modules were internal to the vfio subsystem
+but if you prefer I can expose that in vfio.h. I guess
+register/unregister should become an external API then?
 
-I prefer to have an enum type for it.
+Thanks
 
-enum gpt_device_type {
-	GPT_TYPE_IMX1,		/* MX1/MXL */
-	GPT_TYPE_IMX21,		/* MX21, MX27 */
-	GPT_TYPE_IMX31,		/* MX25, MX31, MX35, MX37, MX51, MX6Q(Rev1.0) */
-	GPT_TYPE_IMX6DL,	/* MX6DL, MX6SX, MX6Q(Rev1.1+) */
-};
-
->  {
->  	struct clk *clk_per = clk_get_sys("imx-gpt.0", "per");
->  	struct clk *clk_ipg = clk_get_sys("imx-gpt.0", "ipg");
-> diff --git a/drivers/clk/imx/clk-imx1.c b/drivers/clk/imx/clk-imx1.c
-> index c9812db..49534d8 100644
-> --- a/drivers/clk/imx/clk-imx1.c
-> +++ b/drivers/clk/imx/clk-imx1.c
-> @@ -102,7 +102,8 @@ int __init mx1_clocks_init(unsigned long fref)
->  	clk_register_clkdev(clk[IMX1_CLK_DUMMY], "ipg", "imx1-fb.0");
->  	clk_register_clkdev(clk[IMX1_CLK_DUMMY], "ahb", "imx1-fb.0");
->  
-> -	mxc_timer_init(MX1_TIM1_BASE_ADDR, MX1_TIM1_INT);
-> +	/*Timer version in MX1 is V0*/
-
-There should be a space before and after '*'.
-
-> +	mxc_timer_init(MX1_TIM1_BASE_ADDR, MX1_TIM1_INT, 0);
->  
->  	return 0;
->  }
-> diff --git a/drivers/clk/imx/clk-imx21.c b/drivers/clk/imx/clk-imx21.c
-> index 0ca842c..08aa048 100644
-> --- a/drivers/clk/imx/clk-imx21.c
-> +++ b/drivers/clk/imx/clk-imx21.c
-> @@ -156,7 +156,8 @@ int __init mx21_clocks_init(unsigned long lref, unsigned long href)
->  	clk_register_clkdev(clk[IMX21_CLK_I2C_GATE], NULL, "imx21-i2c.0");
->  	clk_register_clkdev(clk[IMX21_CLK_OWIRE_GATE], NULL, "mxc_w1.0");
->  
-> -	mxc_timer_init(MX21_GPT1_BASE_ADDR, MX21_INT_GPT1);
-> +	/*Timer version in MX21 is v1*/
-> +	mxc_timer_init(MX21_GPT1_BASE_ADDR, MX21_INT_GPT1, 1);
->  
->  	return 0;
->  }
-> diff --git a/drivers/clk/imx/clk-imx27.c b/drivers/clk/imx/clk-imx27.c
-> index df2dfc0..f00a7c0 100644
-> --- a/drivers/clk/imx/clk-imx27.c
-> +++ b/drivers/clk/imx/clk-imx27.c
-> @@ -233,7 +233,8 @@ int __init mx27_clocks_init(unsigned long fref)
->  	clk_register_clkdev(clk[IMX27_CLK_EMMA_AHB_GATE], "ahb", "m2m-emmaprp.0");
->  	clk_register_clkdev(clk[IMX27_CLK_EMMA_IPG_GATE], "ipg", "m2m-emmaprp.0");
->  
-> -	mxc_timer_init(MX27_GPT1_BASE_ADDR, MX27_INT_GPT1);
-> +	/*Timer version in MX27 is v1*/
-> +	mxc_timer_init(MX27_GPT1_BASE_ADDR, MX27_INT_GPT1, 1);
->  
->  	return 0;
->  }
-> diff --git a/drivers/clk/imx/clk-imx31.c b/drivers/clk/imx/clk-imx31.c
-> index a55290c..7c4a025 100644
-> --- a/drivers/clk/imx/clk-imx31.c
-> +++ b/drivers/clk/imx/clk-imx31.c
-> @@ -198,7 +198,8 @@ int __init mx31_clocks_init(unsigned long fref)
->  	mx31_revision();
->  	clk_disable_unprepare(clk[iim_gate]);
->  
-> -	mxc_timer_init(MX31_GPT1_BASE_ADDR, MX31_INT_GPT);
-> +	/*Timer version in MX31 is v2*/
-> +	mxc_timer_init(MX31_GPT1_BASE_ADDR, MX31_INT_GPT, 2);
->  
->  	return 0;
->  }
-> diff --git a/drivers/clk/imx/clk-imx35.c b/drivers/clk/imx/clk-imx35.c
-> index 133fda1..a796c1e 100644
-> --- a/drivers/clk/imx/clk-imx35.c
-> +++ b/drivers/clk/imx/clk-imx35.c
-> @@ -145,7 +145,7 @@ int __init mx35_clocks_init(void)
->  	clk[esdhc3_div] = imx_clk_divider("esdhc3_div", "esdhc_sel", base + MX35_CCM_PDR3, 16, 6);
->  
->  	clk[spdif_sel] = imx_clk_mux("spdif_sel", base + MX35_CCM_PDR3, 22, 1, std_sel, ARRAY_SIZE(std_sel));
-> -	clk[spdif_div_pre] = imx_clk_divider("spdif_div_pre", "spdif_sel", base + MX35_CCM_PDR3, 29, 3); /* divide by 1 not allowed */ 
-> +	clk[spdif_div_pre] = imx_clk_divider("spdif_div_pre", "spdif_sel", base + MX35_CCM_PDR3, 29, 3); /* divide by 1 not allowed */
-
-Unrelated change?
-
-Shawn
-
->  	clk[spdif_div_post] = imx_clk_divider("spdif_div_post", "spdif_div_pre", base + MX35_CCM_PDR3, 23, 6);
->  
->  	clk[ssi_sel] = imx_clk_mux("ssi_sel", base + MX35_CCM_PDR2, 6, 1, std_sel, ARRAY_SIZE(std_sel));
-> @@ -296,7 +296,8 @@ int __init mx35_clocks_init(void)
->  #ifdef CONFIG_MXC_USE_EPIT
->  	epit_timer_init(MX35_IO_ADDRESS(MX35_EPIT1_BASE_ADDR), MX35_INT_EPIT1);
->  #else
-> -	mxc_timer_init(MX35_GPT1_BASE_ADDR, MX35_INT_GPT);
-> +	/*Timer version in MX35 is v2*/
-> +	mxc_timer_init(MX35_GPT1_BASE_ADDR, MX35_INT_GPT, 2);
->  #endif
->  
->  	return 0;
-> diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
-> index 6bae537..06da84a 100644
-> --- a/drivers/clk/imx/clk.h
-> +++ b/drivers/clk/imx/clk.h
-> @@ -11,7 +11,7 @@ extern spinlock_t imx_ccm_lock;
->   * mxc_timer_init() to initialize timer for non-DT boot.  It can be removed
->   * when these legacy non-DT support is converted or dropped.
->   */
-> -void mxc_timer_init(unsigned long pbase, int irq);
-> +void mxc_timer_init(unsigned long pbase, int irq, int);
->  
->  void imx_check_clocks(struct clk *clks[], unsigned int count);
->  
-> -- 
-> 1.9.1
+Eric
+>> +
+>> +struct vfio_platform_reset_node {
+>> +	struct list_head link;
+>> +	char *compat;
+>> +	struct module *owner;
+>> +	vfio_platform_reset_fn_t reset;
+>> +};
+>> +
+>>  extern int vfio_platform_probe_common(struct vfio_platform_device *vdev,
+>>  				      struct device *dev);
+>>  extern struct vfio_platform_device *vfio_platform_remove_common
+>> @@ -82,4 +91,8 @@ extern int vfio_platform_set_irqs_ioctl(struct vfio_platform_device *vdev,
+>>  					unsigned start, unsigned count,
+>>  					void *data);
+>>  
+>> +extern int vfio_platform_register_reset(char *compat, struct module *owner,
+>> +					vfio_platform_reset_fn_t reset);
+>> +extern int vfio_platform_unregister_reset(char *compat);
+>> +
+>>  #endif /* VFIO_PLATFORM_PRIVATE_H */
+> 
 > 
 > 
