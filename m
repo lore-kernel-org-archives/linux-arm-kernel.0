@@ -1,133 +1,94 @@
-From: sjg@chromium.org (Simon Glass)
-Date: Thu, 14 May 2015 10:30:44 -0600
-Subject: [PATCH] ARM: tegra: Enable TPM on tegra124 nyan boards
-In-Reply-To: <5554C399.4060807@wwwdotorg.org>
-References: <1431526427-13340-1-git-send-email-sjg@chromium.org>
- <5553637C.5010506@wwwdotorg.org>
- <CAAObsKCxFJA=6kyHM5rtpJMVRZRDbBO3KSn+QdNoOQz1rXCWTQ@mail.gmail.com>
- <5554AD0B.1060106@wwwdotorg.org>
- <CAPnjgZ2QrTu=D_AapTded+_NR1waZTbNoN8rCtHnTdd0OdnwLA@mail.gmail.com>
- <5554C399.4060807@wwwdotorg.org>
-Message-ID: <CAPnjgZ1o-DvWjJqkEjwbxKxx_0L7p1k8Mc58boqjHQEGh=yj3A@mail.gmail.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Thu, 14 May 2015 18:34:15 +0200
+Subject: [PATCH v8 14/16] ARM: dts: Introduce STM32F429 MCU
+In-Reply-To: <2672178.pv4FEQMD9D@wuerfel>
+References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <CALszF6CaO_yuNiSDuDV+4d2NRe_+32j=zcSE1HPhB1UH59cW9w@mail.gmail.com>
+ <5553A608.9080402@linaro.org> <2672178.pv4FEQMD9D@wuerfel>
+Message-ID: <CALszF6AhwtYMfhpZjGJeHznteG0mG0_2qo1TcWw-z7anH3Lj4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+2015-05-13 21:37 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
+> On Wednesday 13 May 2015 20:29:12 Daniel Thompson wrote:
+>> On 13/05/15 17:54, Maxime Coquelin wrote:
+>> > 2015-05-13 18:37 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
+>> >>
+>> >> We should definitely try to use the same compatible string for all of
+>> >> them, and make a binding that is easy to use.
+>> >>
+>> >> I haven't fully understood the requirements for the various parts that
+>> >> are involved here. My understanding so far was that the driver could
+>> >> use the index from the first cell and compute
+>> >>
+>> >>          void __iomem *reset_reg = rcc_base + 0x10 + 4 * index;
+>> >>          void __iomem *clock_reg = rcc_base + 0x30 + 4 * index;
+>> >
+>> > This calculation is true, but we have to take into account there is a
+>> > hole in the middle, between AHB3, and APB1 register:
+>>
+>> ... and equally importantly, only allows us to use hardware mappings for
+>> the gated clocks.
+>>
+>> > AHB1RSTR : offset = 0x10, index = 0
+>> > AHB2RSTR : offset = 0x14, index = 1
+>> > AHB3RSTR : offset = 0x18, index = 2
+>> > <HOLE >     : offset = 0x1c, index = 3
+>> > APB1RSTR : offset = 0x20, index = 4
+>> > APB2RSTR : offset = 0x24, index = 5
+>> >
+>> > So we have to carefully document this hole in the bindings, maybe by
+>> > listing indexes in the documentation?
+>>
+>> The register set has PLL, mux and dividers in the registers at 0x00,
+>> 0x04 and 0x08.
+>>
+>> Many of these clocks can be kept out of DT entirely because they are
+>> only there to feed other parts of the clock tree. However some of the
+>> dividers flow directly into cells that appear in device tree (such as
+>> the systick) and so we need to be able to reference them.
+>>
+>> In other words the proposed mapping cannot allow us to express the
+>> dividers properly (because the index would have to be negative):
+>>    void __iomem *clock_reg = rcc_base + 0x30 + 4 * index;
+>>
+>> Thus I'd favour using different indexes for reset and clock bindings,
+>> both using the naive mapping function:
+>>    void __iomem *reg =  rcc_base + 4 * index
+>>
+>> I think that its so much easier to check against the datasheet like
+>> that. Admittedly is we follow the block-of-4-bytes idiom we have to
+>> divide a hex number by four but thats not so hard and we end up with:
+>>
+>>               resets = <&rcc  8 0>;
+>>               clocks = <&rcc 16 0>;
+>>
+>> At the end of the day if we say we want to follow the datasheet, lets be
+>> do it in the most direct way properly.
 
-On 14 May 2015 at 09:47, Stephen Warren <swarren@wwwdotorg.org> wrote:
->
-> On 05/14/2015 08:28 AM, Simon Glass wrote:
->>
->> Hi Stephen,
->>
->> On 14 May 2015 at 08:11, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>>
->>> On 05/14/2015 07:09 AM, Tomeu Vizoso wrote:
->>>>
->>>>
->>>> On 13 May 2015 at 16:45, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>>>>
->>>>>
->>>>> On 05/13/2015 08:13 AM, Simon Glass wrote:
->>>>>>
->>>>>>
->>>>>>
->>>>>> Regenerate the pinmux from the latest tegra-pinmux-scripts.
->>>>>
->>>>>
->>>>>
->>>>>
->>>>> (Dropping most CCs; DT maintainers and lists generally don't get CC'd on
->>>>> simple DT content changes but rather on schema adds/changes and perhaps
->>>>> major DT content changes depending on context)
->>>>>
->>>>>> diff --git a/arch/arm/boot/dts/tegra124-nyan-big.dts
->>>>>> b/arch/arm/boot/dts/tegra124-nyan-big.dts
->>>>>
->>>>>
->>>>>
->>>>>
->>>>>>                   pinctrl-names = "default";
->>>>>>                   pinctrl-0 = <&pinmux_default>;
->>>>>>
->>>>>> -               pinmux_default: common {
->>>>>> +               state_default: pinmux {
->>>>>
->>>>>
->>>>>
->>>>>
->>>>> This change will break compilation, since it changes the label name, yet
->>>>> the
->>>>> old name is still referenced in pinctrl-0 above. Same applies in the
->>>>> other
->>>>> file too.
->>>>>
->>>>>> diff --git a/arch/arm/boot/dts/tegra124-nyan-blaze.dts
->>>>>> b/arch/arm/boot/dts/tegra124-nyan-blaze.dts
->>>>>
->>>>>
->>>>>
->>>>>
->>>>>> @@ -437,18 +437,18 @@
->>>>>>                           usb_vbus_en0_pn4 {
->>>>>>                                   nvidia,pins = "usb_vbus_en0_pn4";
->>>>>>                                   nvidia,function = "usb";
->>>>>> -                               nvidia,pull = <TEGRA_PIN_PULL_UP>;
->>>>>> +                               nvidia,pull = <TEGRA_PIN_PULL_NONE>;
->>>>>>                                   nvidia,tristate = <TEGRA_PIN_DISABLE>;
->>>>>>                                   nvidia,enable-input =
->>>>>> <TEGRA_PIN_ENABLE>;
->>>>>> -                               nvidia,open-drain = <TEGRA_PIN_DISABLE>;
->>>>>> +                               nvidia,open-drain = <TEGRA_PIN_ENABLE>;
->>>>>>                           };
->>>>>>                           usb_vbus_en1_pn5 {
->>>>>>                                   nvidia,pins = "usb_vbus_en1_pn5";
->>>>>>                                   nvidia,function = "usb";
->>>>>> -                               nvidia,pull = <TEGRA_PIN_PULL_UP>;
->>>>>> +                               nvidia,pull = <TEGRA_PIN_PULL_NONE>;
->>>>>>                                   nvidia,tristate = <TEGRA_PIN_DISABLE>;
->>>>>>                                   nvidia,enable-input =
->>>>>> <TEGRA_PIN_ENABLE>;
->>>>>> -                               nvidia,open-drain = <TEGRA_PIN_DISABLE>;
->>>>>> +                               nvidia,open-drain = <TEGRA_PIN_ENABLE>;
->>>>>>                           };
->>>>>
->>>>>
->>>>>
->>>>>
->>>>> Tomeu, can you comment on those changes? Evidently the pinmux
->>>>> configuration
->>>>> that's you added to the kernel doesn't exactly match the pinmux
->>>>> configuration that you added to tegra-pinmux-scripts.
->>>>
->>>>
->>>>
->>>> Are you sure? Just checked and what tegra-pinmux-scripts currently
->>>> generates matches what is currently in the kernel, for both nyans.
->>>
->>>
->>>
->>> My apologies; you're correct.
->>>
->>> This patch to the kernel DTs includes changes that aren't generated by
->>> either current tegra-pinmux-scripts, nor by tegra-pinmux-scripts with
->>> Simon's "[pinmux scripts PATCH] Support TPM on nyan boards" applied. Simon,
->>> can you double-check you didn't have any local patches to
->>> tegra-pinmux-scripts applied when you generated the DT content for this
->>> patch?
+Daniel, I'm fine with your proposal.
+Doing that, we can have a single compatible string for stm32 family,
+even if the reset start offset change between two chips.
+
 >>
 >>
->> Yes. Apart from my patch the top commit is 39af.
+>> PS
+>> I've written a custom lookup function to to get from the DT index to an
+>> offset into the struct clk *array I'm using. That means I don't care
+>> much about any big holes in the register space.
 >
->
-> OK, did you paste the same DT content into both DTs then, instead of generating each DT separately?
->
+> How about using the first cell to indicate the type (pll, mux, div, gate)
+> and the second cell for the number (between 0 and 256)? That way, the
+> gates numbers would match the reset numbers, and your internal mapping
+> function would look a bit nicer.
 
-Not intentionally, but I wonder if I failed to change the board parameter?
-
-> When I re-generate the DT using commit 39af, I don't get any changes to usb_vbus_en*.
-
-I can't explain that. I'll try it again when I get a chance.
+That's another option.
+In this case, for reset, we will only need one cell, right?
 
 Regards,
-Simon
+Maxime
+
+
+
+>
+>         Arnd
