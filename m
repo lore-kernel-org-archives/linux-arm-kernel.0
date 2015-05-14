@@ -1,225 +1,102 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Fri, 15 May 2015 00:56:34 +0200
-Subject: [rtc-linux] [PATCH 1/2] rtc: add rtc-lpc24xx driver
-In-Reply-To: <20150514221531.GG3338@piout.net>
-References: <1431624875-20990-1-git-send-email-manabian@gmail.com>
- <1431624875-20990-2-git-send-email-manabian@gmail.com>
- <20150514221531.GG3338@piout.net>
-Message-ID: <CAGhQ9Vy31h5pesO8ZRfpXnPF2t2PpKM8Jz5gqpp9RuvGb8PMSA@mail.gmail.com>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 15 May 2015 02:00:01 +0300
+Subject: [RFC/PATCH 0/9] IOMMU probe deferral support
+Message-ID: <1431644410-2997-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 May 2015 at 00:15, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
-> Hi,
->
-> On 14/05/2015 at 19:34:34 +0200, Joachim Eastwood wrote :
->> Add driver for the RTC found on NXP LPC24xx/178x/18xx/43xx devices.
->> The RTC provides calendar and clock functionality together with
->> periodic tick and alarm interrupt support.
->>
->> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
->> ---
->>  drivers/rtc/Kconfig       |  11 ++
->>  drivers/rtc/Makefile      |   1 +
->>  drivers/rtc/rtc-lpc24xx.c | 379 ++++++++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 391 insertions(+)
->>  create mode 100644 drivers/rtc/rtc-lpc24xx.c
->>
->> diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
->> index 6149ae01e11f..42b890716b1c 100644
->> --- a/drivers/rtc/Kconfig
->> +++ b/drivers/rtc/Kconfig
->> @@ -1427,6 +1427,17 @@ config RTC_DRV_JZ4740
->>         This driver can also be buillt as a module. If so, the module
->>         will be called rtc-jz4740.
->>
->> +config RTC_DRV_LPC24XX
->> +     depends on OF && (ARCH_LPC18XX || TEST_COMPILE)
->
-> You probably meant COMPILE_TEST
+Hello,
 
-ops, yes :)
+This patch series attempts to implement support for deferring probe of both
+IOMMU drivers and bus master drivers.
 
->and it probably needs to depend on HAS_IOMEM
+The relationship between bus masters and IOMMUs creates a strong ordering
+during initialization of devices. As in the general case IOMMUs are hidden
+behind the DMA mapping API, IOMMU support relies on the automatic setup of DMA
+operations without any direct intervention of bus master drivers.
 
-Indeed.
+DMA operations are set up when platform devices are added to the system. This
+requires IOMMUs to be available at that time. On systems where ordering of
+device add and probe can't be guaranteed (such as, but not limited to,
+DT-based systems) this caused incorrect DMA operation setup. This has been
+addressed by a patches series [1] that introduced a DT-based early
+registration mechanism for IOMMUs.
 
->> +     tristate "NXP LPC2K RTC"
->
-> I'm not sure about LPC2K, you use LPC24XX for the config symbol and the
-> filename also, just below the string is LPC32XX. But maybe that is fine
-> if this is the most commonly used denomination.
+However, that mechanism fails to address all issues. Various dependencies
+exist between IOMMU devices and other devices, in particular on clocks and on
+power domains (as mentioned by Marek in [2]). While there are mechanisms to
+handle some of them without probe deferral (for instance by using the
+OF_DECLARE macros to register clock drivers), generalizing those mechanisms
+would essentially recreate a probe ordering mechanism similar to link order
+probe ordering and couldn't really scale.
 
-I left the name used in the original driver. But I agree, using
-LPC24XX everywhere would be more consistent. I'll change it in the
-next version.
+Additionally, IOMMUs could also be present hot-pluggable devices and depend on 
+resources that are thus hot-plugged. OF_DECLARE wouldn't help in that case. 
+For all those reasons probe deferral for IOMMUs has been considered as desired
+if it can be implemented cleanly. For more in-depth information see [3].
 
->> +     help
->> +       This enables support for the NXP RTC found which can be found on
->> +       LPC24xx/178x/18xx/43xx devices.
->> +
->> +       If you have one of the devices above enable this driver to use
->> +       the hardware RTC. This driver can also be buillt as a module. If
->> +       so, the module will be called rtc-lpc24xx.
->> +
->>  config RTC_DRV_LPC32XX
->>       depends on ARCH_LPC32XX
->>       tristate "NXP LPC32XX RTC"
+This RFC series is a first attempt at implementing IOMMU probe deferral
+support cleanly.
 
-<snip>
+The core idea is to move setup of DMA operations from device add time to
+device probe time, implemented in patch 6/9. It could be possible to move
+setup of other DMA parameters (namely masks and offset) to probe time as well,
+but that change would be more intrusive and has a higher risk of introducing
+regressions. For that reason I've decided to keep DMA masks and offset setup
+at device add time and thus split DMA configuration in masks and operations
+(patch 5/9). This can be revisited if we decide that the DMA mapping API
+shouldn't require masks and offset to be set before probe time.
 
->> +static int lpc24xx_rtc_probe(struct platform_device *pdev)
->> +{
->> +     const struct of_device_id *match;
->> +     struct lpc24xx_rtc *rtc;
->> +     struct resource *res;
->> +     u32 rtc_ccr = 0;
->> +     int irq, ret;
->> +
->> +     match = of_match_device(lpc24xx_rtc_match, &pdev->dev);
->> +     if (!match) {
->
-> Because you are only using DT, this will never happen. Else the
-> lpc24xx_rtc_probe would not be called
+Patch 8/9 then defers probe of bus master drivers when required IOMMUs are not
+available yet. This requires knowing when a failed IOMMU lookup should be
+considered as permanent or temporary. I've reused the OF_DECLARE_IOMMU for
+this purpose, considering that the presence of a driver compatible with the
+IOMMU DT node indicates that the failure is temporary and probing of the bus
+master device should be deferred.
 
-This will go away in the next version since I'll be removing support
-for the older versions of this ip block and thus no need for the match
-data.
+Note that only IOMMU drivers using the recent .of_xlate() mechanism for
+DT-based IOMMU reference can cause probe deferral of bus master devices. The
+.add_device() mechanism isn't supported in this case.
 
->> +             dev_err(&pdev->dev, "no device match found\n");
->> +             return -ENODEV;
->> +     }
->> +
->> +     rtc = devm_kzalloc(&pdev->dev, sizeof(*rtc), GFP_KERNEL);
->> +     if (!rtc)
->> +             return -ENOMEM;
->> +
->> +     rtc->features = (u32)match->data;
->> +
->> +     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +     rtc->rtc_base = devm_ioremap_resource(&pdev->dev, res);
->> +     if (IS_ERR(rtc->rtc_base))
->> +             return PTR_ERR(rtc->rtc_base);
->> +
->> +     irq = platform_get_irq(pdev, 0);
->> +     if (irq < 0) {
->> +             dev_warn(&pdev->dev, "can't get interrupt resource\n");
->> +             return irq;
->> +     }
->> +
->> +     rtc->clk_rtc = devm_clk_get(&pdev->dev, "rtc");
->> +     if (IS_ERR(rtc->clk_rtc)) {
->> +             dev_err(&pdev->dev, "error getting rtc clock\n");
->> +             return PTR_ERR(rtc->clk_rtc);
->> +     }
->> +
->> +     rtc->clk_reg = devm_clk_get(&pdev->dev, "reg");
->> +     if (IS_ERR(rtc->clk_reg)) {
->> +             dev_err(&pdev->dev, "error getting reg clock\n");
->> +             return PTR_ERR(rtc->clk_reg);
->> +     }
->> +
->> +     ret = clk_prepare_enable(rtc->clk_rtc);
->> +     if (ret) {
->> +             dev_err(&pdev->dev, "unable to enable rtc clock\n");
->> +             return ret;
->> +     }
->> +
->> +     ret = clk_prepare_enable(rtc->clk_reg);
->> +     if (ret) {
->> +             dev_err(&pdev->dev, "unable to enable reg clock\n");
->> +             goto disable_rtc_clk;
->> +     }
->> +
->> +     platform_set_drvdata(pdev, rtc);
->> +
->> +     /* Clear the counter increment state */
->> +     rtc_writel(rtc, LPC24XX_ILR, LPC24XX_RTCCIF);
->> +
->> +     if (rtc->features & HAVE_PRESCALER) {
->> +             /* Clock source is 32k oscillator */
->> +             rtc_ccr = LPC24XX_CLKSRC;
->> +             rtc_writel(rtc, LPC24XX_CCR, rtc_ccr);
->> +
->> +             /* Set prescaler to divide by 1 */
->> +             rtc_writel(rtc, LPC24XX_PREINT, 0);
->> +             rtc_writel(rtc, LPC24XX_PREFRAC, 0);
->> +     }
->> +
->> +     if (rtc->features & HAVE_SUBSECOND) {
->> +             /* Disable sub-second interrupt */
->> +             rtc_writel(rtc, LPC24XX_CISS, 0);
->> +     }
->> +
->> +     /* Only 1-second interrupt will generate interrupt */
->> +     rtc_writel(rtc, LPC24XX_CIIR, LPC24XX_IMSEC);
->> +
->> +     /* Enable RTC count */
->> +     rtc_writel(rtc, LPC24XX_CCR, rtc_ccr | LPC24XX_CLKEN);
->> +
->> +     ret = devm_request_irq(&pdev->dev, irq, lpc24xx_rtc_interrupt, 0,
->> +                            pdev->name, rtc);
->> +     if (ret < 0) {
->> +             dev_warn(&pdev->dev, "can't request interrupt\n");
->> +             goto disable_clks;
->> +     }
->> +
->> +     rtc->rtc = devm_rtc_device_register(&pdev->dev, "lpc2k-rtc",
->
-> Same comment regarding the lpc2k name, also applies below.
+As an example I've converted the ipmmu-vmsa driver to the new API in patch 9/9.
 
-Yeah, I'll change it.
+At this point many enhancements are possible, but I'd like to receive feedback
+on the proposed approach before basing more patches on this series. One
+particular point I would like to address (or see being addressed) in the
+future is the use of struct iommu_ops with of_iommu_get_ops() and
+of_iommu_set_ops(). I believe we should introduct a struct iommu and register
+IOMMU instances instead of IOMMU operations. That should bring us one step
+closer to removing bus_set_iommu().
 
->> +                                         &lpc24xx_rtc_ops, THIS_MODULE);
->> +     if (IS_ERR(rtc->rtc)) {
->> +             dev_err(&pdev->dev, "can't register rtc device\n");
->> +             ret = PTR_ERR(rtc->rtc);
->> +             goto disable_clks;
->> +     }
->> +
->> +     return 0;
->> +
->> +disable_clks:
->> +     clk_disable_unprepare(rtc->clk_reg);
->> +disable_rtc_clk:
->> +     clk_disable_unprepare(rtc->clk_rtc);
->> +     return ret;
->> +}
->> +
->> +static int lpc24xx_rtc_remove(struct platform_device *pdev)
->> +{
->> +     struct lpc24xx_rtc *rtc = platform_get_drvdata(pdev);
->> +
->> +     /*
->> +      * Disable alarm, but leave RTC enabled so it
->> +      * remains valid across reset cycles.
->> +      */
->> +     rtc_writel(rtc, LPC24XX_AMR, LPC24XX_ALARM_DISABLE);
->> +     rtc_writel(rtc, LPC24XX_CCR, 0);
->> +
->> +     clk_disable_unprepare(rtc->clk_rtc);
->> +     clk_disable_unprepare(rtc->clk_reg);
->> +
->> +     return 0;
->> +}
->> +
->> +static struct platform_driver lpc24xx_rtc_driver = {
->> +     .probe  = lpc24xx_rtc_probe,
->> +     .remove = lpc24xx_rtc_remove,
->> +     .driver = {
->> +             .name = "lpc2k-rtc",
->> +             .of_match_table = lpc24xx_rtc_match,
->> +     },
->> +};
->> +module_platform_driver(lpc24xx_rtc_driver);
->> +
->> +MODULE_AUTHOR("Kevin Wells <wellsk40@gmail.com");
->> +MODULE_DESCRIPTION("RTC driver for the LPC24xx SoC");
->> +MODULE_LICENSE("GPL");
->> +MODULE_ALIAS("platform:lpc2k-rtc");
+[1] http://www.spinics.net/lists/arm-kernel/msg382787.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/323238.html
+[3] https://lkml.org/lkml/2015/2/16/345
 
-Thanks for looking and commenting.
+Laurent Pinchart (9):
+  arm: dma-mapping: Don't override dma_ops in arch_setup_dma_ops()
+  arm: dma-mapping: Support IOMMU mappings spanning the full 32 bits
+    range
+  of: dma: Move range size workaround to of_dma_get_range()
+  of: dma: Make of_dma_deconfigure() public
+  of: dma: Split of_configure_dma() into mask and ops configuration
+  drivers: platform: Configure dma operations at probe time
+  iommu: of: Document the of_iommu_configure() function
+  iommu: of: Handle IOMMU lookup failure with deferred probing or error
+  iommu/ipmmu-vmsa: Use DT-based instantiation
 
-regards,
-Joachim Eastwood
+ arch/arm/include/asm/dma-iommu.h |   2 +-
+ arch/arm/mm/dma-mapping.c        |  21 +++--
+ drivers/base/platform.c          |   9 ++
+ drivers/iommu/ipmmu-vmsa.c       | 189 +++++++++++++--------------------------
+ drivers/iommu/of_iommu.c         |  29 +++++-
+ drivers/of/address.c             |  20 ++++-
+ drivers/of/device.c              |  77 ++++++++++------
+ drivers/of/of_pci.c              |   3 +-
+ drivers/of/platform.c            |  16 ++--
+ include/linux/of_device.h        |  14 ++-
+ 10 files changed, 195 insertions(+), 185 deletions(-)
+
+-- 
+Regards,
+
+Laurent Pinchart
