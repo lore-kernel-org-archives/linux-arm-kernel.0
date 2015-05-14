@@ -1,33 +1,36 @@
 From: bhupesh.sharma@freescale.com (Bhupesh Sharma)
-Date: Thu, 14 May 2015 17:03:30 +0530
-Subject: [PATCH v2 0/5] Add flexcan support for LS1021A SoCs
-Message-ID: <1431603215-25546-1-git-send-email-bhupesh.sharma@freescale.com>
+Date: Thu, 14 May 2015 17:03:31 +0530
+Subject: [PATCH v2 1/5] doc/bindings: Add 'endianess' optional-property for
+ FlexCAN controller
+In-Reply-To: <1431603215-25546-1-git-send-email-bhupesh.sharma@freescale.com>
+References: <1431603215-25546-1-git-send-email-bhupesh.sharma@freescale.com>
+Message-ID: <1431603215-25546-2-git-send-email-bhupesh.sharma@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset add the support for FlexCAN module present
-on LS1021A SoCs.
+This patch adds 'endianess' as the optional-property for
+describing the FlexCAN controller present on various FSL platforms.
 
-LS1021A-Rev1 SoC has a broken RX FIFO mode, thereby mandating
-the use of message buffers for frame reception.
+Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
+Signed-off-by: Sakar Arora <Sakar.Arora@freescale.com>
+---
+ .../devicetree/bindings/net/can/fsl-flexcan.txt    |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-LS1021A-Rev2 SoC has this issue fixed.
-
-Bhupesh Sharma (3):
-  doc/bindings: Add 'endianess' optional-property for FlexCAN
-    controller
-  can: flexcan: Add ls1021a flexcan device entry
-  can: flexcan: Add support for non RX-FIFO mode
-
-Sakar Arora (2):
-  arm/dts: Add nodes for flexcan devices present on LS1021A SoC
-  can: flexcan: Remodel FlexCAN register r/w APIs for BE instances
-
- .../devicetree/bindings/net/can/fsl-flexcan.txt    |    4 +
- arch/arm/boot/dts/ls1021a-qds.dts                  |    8 +
- arch/arm/boot/dts/ls1021a.dtsi                     |   18 +
- drivers/net/can/flexcan.c                          |  400 +++++++++++++-------
- 4 files changed, 299 insertions(+), 131 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt b/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt
+index 56d6cc3..0d5e668 100644
+--- a/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt
++++ b/Documentation/devicetree/bindings/net/can/fsl-flexcan.txt
+@@ -18,6 +18,10 @@ Optional properties:
+ 
+ - xceiver-supply: Regulator that powers the CAN transceiver
+ 
++- little-endian: If the FlexCAN IP on this SoC is little-endian, use
++                 this property. By default it is assumed that the IP
++                 is big-endian
++
+ Example:
+ 
+ 	can at 1c000 {
 -- 
 1.7.9.5
