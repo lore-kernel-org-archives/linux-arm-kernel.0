@@ -1,32 +1,55 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 14 May 2015 14:23:06 -0400
-Subject: [v4.0: PATCH 0/3] ARM: dts: keystone: dt fixes for netcp driver
-In-Reply-To: <555100FC.5070901@oracle.com>
-References: <1431367530-4924-1-git-send-email-m-karicheri2@ti.com>
- <555100FC.5070901@oracle.com>
-Message-ID: <5554E80A.5030409@ti.com>
+From: Frank.Li@freescale.com (Frank.Li at freescale.com)
+Date: Fri, 15 May 2015 01:18:46 +0800
+Subject: [PATCH 0/7] Change snvs rtc and poweroff to use syscon add pwrkey
+ driver
+Message-ID: <1431623933-3473-1-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2015 03:20 PM, santosh shilimkar wrote:
-> On 5/11/2015 11:05 AM, Murali Karicheri wrote:
->> There are few fixes required in the dt bindings for netcp driver to
->> make the reg and range sizes to match with data sheet. Also fix the
->> typical size error (last bit 1 instead of 0). Please apply this for
->> to next branch for v4.2.
->>
-> Applied... It should show up in linux-next soon.
+From: Frank Li <Frank.Li@freescale.com>
 
-Thanks.
+SNVS is MPF module.
+include rtc, power off, ON/OFF power key
+  
+  arm: imx: power-off: change to syscon to access register
+  rtc: arm: imx: snvs: change use syscon to access register
+Above two patch change existed power-off and rtc use syscon
 
-Murali
->
-> Regards,
-> Santosh
->
->
+  Document: dt: fsl: snvs: change support syscon
+  arm: dts: imx: update snvs to use syscon access register
+Update dt file and document
 
+  input: keyboard: imx: add snvs power key driver
+  document: devicetree: input: imx: i.mx snvs power device tree bindings
+  arm: dts: imx6sx: enable snvs power key
+Added on/off key driver
+
+Frank Li (6):
+  arm: imx: power-off: change to syscon to access register
+  rtc: arm: imx: snvs: change use syscon to access register
+  Document: dt: fsl: snvs: change support syscon
+  arm: dts: imx: update snvs to use syscon access register
+  document: devicetree: input: imx: i.mx snvs power device tree bindings
+  arm: dts: imx6sx: enable snvs power key
+
+Robin Gong (1):
+  input: keyboard: imx: add snvs power key driver
+
+ .../devicetree/bindings/crypto/fsl-sec4.txt        |  93 +++++++--
+ .../devicetree/bindings/input/snvs-pwrkey.txt      |   1 +
+ .../bindings/power_supply/imx-snvs-poweroff.txt    |  24 +--
+ arch/arm/boot/dts/imx6qdl.dtsi                     |  12 +-
+ arch/arm/boot/dts/imx6sl.dtsi                      |  12 +-
+ arch/arm/boot/dts/imx6sx.dtsi                      |  19 +-
+ arch/arm/boot/dts/vfxxx.dtsi                       |   9 +-
+ drivers/input/keyboard/Kconfig                     |  11 +
+ drivers/input/keyboard/Makefile                    |   1 +
+ drivers/input/keyboard/snvs_pwrkey.c               | 232 +++++++++++++++++++++
+ drivers/power/reset/imx-snvs-poweroff.c            |  21 +-
+ drivers/rtc/rtc-snvs.c                             | 124 +++++------
+ 12 files changed, 417 insertions(+), 142 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/input/snvs-pwrkey.txt
+ create mode 100644 drivers/input/keyboard/snvs_pwrkey.c
 
 -- 
-Murali Karicheri
-Linux Kernel, Keystone
+1.9.1
