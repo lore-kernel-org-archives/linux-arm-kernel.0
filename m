@@ -1,41 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 14 May 2015 12:32:38 +0200
-Subject: [PATCH v4 2/3] irqchip: GIC: Add support for irq_{get,
- set}_irqchip_state
-In-Reply-To: <CAL85gmC4ovR99wQQYoKs=oo24So80jZ_guxDDFhi-1MXXj0uSw@mail.gmail.com>
-References: <1426676484-21812-1-git-send-email-marc.zyngier@arm.com>
- <1426676484-21812-3-git-send-email-marc.zyngier@arm.com>
- <CAL85gmBrkonMcKdUVGmYx6zT3wSe-e2jPhnL_+Tkf3s4jsAiWg@mail.gmail.com>
- <CACRpkdYffHJEzksc5mg7JZdwTzShGaQofAmbmn65=_V3ot04Rg@mail.gmail.com>
- <CAL85gmC4ovR99wQQYoKs=oo24So80jZ_guxDDFhi-1MXXj0uSw@mail.gmail.com>
-Message-ID: <CACRpkdZkBLrhFpZiYk4fiM3ND+UwnVJhNKs=+rL5iZY4fS7zCg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 14 May 2015 12:49:13 +0200
+Subject: [PATCH] lib: fix 842 build on 32-bit architectures
+In-Reply-To: <CALZtONC5Fc-Dsw_aob7zyycYdS6rP6ckT-wdyxF1WJTNsSLp7g@mail.gmail.com>
+References: <2802721.Q9KnE9eNH4@wuerfel>
+ <1431561144-29931-1-git-send-email-ddstreet@ieee.org>
+ <CALZtONC5Fc-Dsw_aob7zyycYdS6rP6ckT-wdyxF1WJTNsSLp7g@mail.gmail.com>
+Message-ID: <9630890.oRRRs96DG8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 13, 2015 at 5:44 PM, Feng Kan <fkan@apm.com> wrote:
+On Thursday 14 May 2015 04:54:07 Dan Streetman wrote:
+> On Wed, May 13, 2015 at 7:52 PM, Dan Streetman <ddstreet@ieee.org> wrote:
+> >> Building the 842 code on 32-bit ARM currently results in this link
+> >> error:
+> >>
+> >> ERROR: "__aeabi_uldivmod" [lib/842/842_decompress.ko] undefined!
+> >
+> > Oops!  Guess I should build/test on 32 bit more.
+> >
+> >>
+> >> The reason is that the __do_index function performs a 64-bit
+> >> division by a power-of-two number, but it has no insight into
+> >> the function arguments.
+> 
+> wait, do you mean the 64 bit mod, total % fsize?  That should already
+> be fixed in Herbert's tree, I changed it to subtraction instead.
 
-> We are using the gpio driver with gpio_key for power button. The gpio
-> status can only be retrieved from the GIC register when the gpio is
-> acting as a interrupt.
+Yes, that's the one. I was looking at yesterday's linux-next which still
+had the bug, but your fix has made it into today's release, so my patch
+is no longer needed.
 
-OK I understand so much. SPISR is a status register of the state
-of the IRQ lines of shared peripherals.
+> In any case, I looked at the code again and I think the fsize
+> parameter can be removed, and just simply calculated in the function,
+> it's just a shift.  I'll send a patch.
 
-But surely the GPIO block has its own status register, so are
-you saying that this register is unreliable?
+Not necessary for this problem any more, but it could still make sense
+if you think that improves the code. You can also try to see if marking
+the function inline has any effect on code size or performance if either
+of them matters.
 
-I can think of a few reasons, like transient IRQs etc but
-what is actually causing this?
-
-Techically the GIC would normally be higher up the food
-chain, i.e. one IRQ on the GIC is cascaded to sub-IRQs on
-the GPIO chip by virtue of its own struct irq_chip and
-irqdomain. The exception is typically only systems where
-the GPIO block is fused with the IRQ controller so that each
-GPIO line has its own unique IRQ line on the primary,
-top-level interrupt controller.
-
-Which GPIO driver is this? Is it upstream?
-
-Yours,
-Linus Walleij
+	Arnd
