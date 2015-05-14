@@ -1,77 +1,64 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 14 May 2015 10:06:34 +0900
-Subject: [PATCH 05/31] ARM: shmobile: r8a73a4: Add IRQC clock to device tree
+Date: Thu, 14 May 2015 10:06:36 +0900
+Subject: [PATCH 07/31] ARM: shmobile: r8a7791: Add IRQC clock to device tree
 In-Reply-To: <cover.1431565427.git.horms+renesas@verge.net.au>
 References: <cover.1431565427.git.horms+renesas@verge.net.au>
-Message-ID: <1c2a7eb7169b855f6c3e9db036c6767052528ffe.1431565427.git.horms+renesas@verge.net.au>
+Message-ID: <62d386c04b1cb9df430c955b309406175d26b6b3.1431565427.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Link the external IRQ controllers irqc0 and irqc1 to the IRQC module
-clock, so they can be power managed using that clock.
+Link the external IRQ controller irqc0 to the IRQC module clock, so it
+can be power managed using that clock.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-[horms: corrected typo in changelog to refer to r8a73a4]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a73a4.dtsi            | 11 +++++++----
- include/dt-bindings/clock/r8a73a4-clock.h |  1 +
- 2 files changed, 8 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/r8a7791.dtsi            | 9 +++++++++
+ include/dt-bindings/clock/r8a7791-clock.h | 3 +++
+ 2 files changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
-index 0fd889f88109..7ee22a41c6c9 100644
---- a/arch/arm/boot/dts/r8a73a4.dtsi
-+++ b/arch/arm/boot/dts/r8a73a4.dtsi
-@@ -163,6 +163,7 @@
- 			     <0 29 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 30 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 31 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp4_clks R8A73A4_CLK_IRQC>;
- 		power-domains = <&pd_c4>;
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 3e9f824797e7..d2c41ad701cc 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -239,6 +239,7 @@
+ 			     <0 15 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 16 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 17 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp4_clks R8A7791_CLK_IRQC>;
  	};
  
-@@ -197,6 +198,7 @@
- 			     <0 55 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 56 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 57 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp4_clks R8A73A4_CLK_IRQC>;
- 		power-domains = <&pd_c4>;
- 	};
- 
-@@ -724,15 +726,16 @@
- 		mstp4_clks: mstp4_clks at e6150140 {
- 			compatible = "renesas,r8a73a4-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe6150140 0 4>, <0 0xe615004c 0 4>;
--			clocks = <&main_div2_clk>, <&cpg_clocks R8A73A4_CLK_HP>,
-+			clocks = <&main_div2_clk>, <&main_div2_clk>,
-+				 <&cpg_clocks R8A73A4_CLK_HP>,
- 				 <&cpg_clocks R8A73A4_CLK_HP>;
- 			#clock-cells = <1>;
- 			clock-indices = <
--				R8A73A4_CLK_IIC5 R8A73A4_CLK_IIC4
--				R8A73A4_CLK_IIC3
-+				R8A73A4_CLK_IRQC R8A73A4_CLK_IIC5
-+				R8A73A4_CLK_IIC4 R8A73A4_CLK_IIC3
- 			>;
- 			clock-output-names =
--				"iic5", "iic4", "iic3";
-+				"irqc", "iic5", "iic4", "iic3";
+ 	dmac0: dma-controller at e6700000 {
+@@ -1160,6 +1161,14 @@
+ 				"mmcif0", "i2c7", "pciec", "i2c8", "ssusb", "cmt1",
+ 				"usbdmac0", "usbdmac1";
  		};
++		mstp4_clks: mstp4_clks at e6150140 {
++			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
++			reg = <0 0xe6150140 0 4>, <0 0xe615004c 0 4>;
++			clocks = <&cp_clk>;
++			#clock-cells = <1>;
++			clock-indices = <R8A7791_CLK_IRQC>;
++			clock-output-names = "irqc";
++		};
  		mstp5_clks: mstp5_clks at e6150144 {
- 			compatible = "renesas,r8a73a4-mstp-clocks", "renesas,cpg-mstp-clocks";
-diff --git a/include/dt-bindings/clock/r8a73a4-clock.h b/include/dt-bindings/clock/r8a73a4-clock.h
-index 9a4b4c9ca44a..dd11ecdf837e 100644
---- a/include/dt-bindings/clock/r8a73a4-clock.h
-+++ b/include/dt-bindings/clock/r8a73a4-clock.h
-@@ -54,6 +54,7 @@
- #define R8A73A4_CLK_IIC3	11
- #define R8A73A4_CLK_IIC4	10
- #define R8A73A4_CLK_IIC5	9
-+#define R8A73A4_CLK_IRQC	7
+ 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe6150144 0 4>, <0 0xe615003c 0 4>;
+diff --git a/include/dt-bindings/clock/r8a7791-clock.h b/include/dt-bindings/clock/r8a7791-clock.h
+index 8fc5dc8faeea..402268384b99 100644
+--- a/include/dt-bindings/clock/r8a7791-clock.h
++++ b/include/dt-bindings/clock/r8a7791-clock.h
+@@ -70,6 +70,9 @@
+ #define R8A7791_CLK_USBDMAC0		30
+ #define R8A7791_CLK_USBDMAC1		31
  
++/* MSTP4 */
++#define R8A7791_CLK_IRQC		7
++
  /* MSTP5 */
- #define R8A73A4_CLK_THERMAL	22
+ #define R8A7791_CLK_AUDIO_DMAC1		1
+ #define R8A7791_CLK_AUDIO_DMAC0		2
 -- 
 2.1.4
