@@ -1,56 +1,170 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 14 May 2015 14:44:44 +0100
-Subject: [PATCH 2/5] arm64: Juno: Split juno.dts into juno-base.dtsi and
- juno.dts.
-In-Reply-To: <1431601471.2881.36.camel@linaro.org>
-References: <1431537092-19597-1-git-send-email-Liviu.Dudau@arm.com>	
- <1431537092-19597-3-git-send-email-Liviu.Dudau@arm.com>	
- <1431596142.2881.13.camel@linaro.org>	
- <20150514103040.GN2345@e106497-lin.cambridge.arm.com>
- <1431601471.2881.36.camel@linaro.org>
-Message-ID: <5554A6CC.7050903@arm.com>
+From: Shenwei.Wang@freescale.com (Shenwei Wang)
+Date: Thu, 14 May 2015 13:48:27 +0000
+Subject: [PATCH 01/18] ARM: imx: Add a parameter to mxc_timer_init
+In-Reply-To: <20150514080213.GC6850@dragon>
+References: <1430405073-13106-1-git-send-email-shenwei.wang@freescale.com>
+ <1430405073-13106-2-git-send-email-shenwei.wang@freescale.com>
+ <20150514080213.GC6850@dragon>
+Message-ID: <BL2PR03MB3701DF2CF0791FDBEFF380683D80@BL2PR03MB370.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Shawn Guo,
+
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawn.guo at linaro.org]
+> Sent: 2015?5?14? 3:02
+> To: Wang Shenwei-B38339
+> Cc: linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 01/18] ARM: imx: Add a parameter to mxc_timer_init
+> 
+> > b1698e1..eef6b66 100644
+> > --- a/arch/arm/mach-imx/time.c
+> > +++ b/arch/arm/mach-imx/time.c
+> > @@ -346,7 +346,7 @@ static void __init _mxc_timer_init(int irq,
+> >  	setup_irq(irq, &mxc_timer_irq);
+> >  }
+> >
+> > -void __init mxc_timer_init(unsigned long pbase, int irq)
+> > +void __init mxc_timer_init(unsigned long pbase, int irq, int ver)
+> 
+> I prefer to have an enum type for it.
+> 
+> enum gpt_device_type {
+> 	GPT_TYPE_IMX1,		/* MX1/MXL */
+> 	GPT_TYPE_IMX21,		/* MX21, MX27 */
+> 	GPT_TYPE_IMX31,		/* MX25, MX31, MX35, MX37, MX51, MX6Q(Rev1.0)
+> */
+> 	GPT_TYPE_IMX6DL,	/* MX6DL, MX6SX, MX6Q(Rev1.1+) */
+> };
+> 
+I just wanted to make the changes as simple as possible. Since the mxc_timer_init function 
+is for legacy implementation only, I don't want to introduce any more changes in the 
+legacy codes like imx1 and imx21. If an enum is defined here, it will have to be included
+somewhere in legacy codes. So I prefer to keep the current implementation. I think this
+part of codes will at last be removed as long as we redesigned all legacy codes based on 
+device tree implementation.
 
 
-On 14/05/15 12:04, Jon Medhurst (Tixy) wrote:
-> On Thu, 2015-05-14 at 11:30 +0100, Liviu Dudau wrote:
->> On Thu, May 14, 2015 at 10:35:42AM +0100, Jon Medhurst (Tixy) wrote:
-> [...]
->>>
->>> What criteria were used to select the contents of juno-base.dtsi?
->>>  From what I can see, the stuff left out of base is still the same for r0
->>> and r1 (cpu, pmu, memory, psci!).
-> [...]
->>
->> There are potential differences. Cortex-A53 cluster in r1 has limited
->> CPUfreq functionality due to a chip errata and there were talks internally
->> to actually disable it, hence the reason for keeping CPUs outside the
->> juno-base.dtsi. r2 will have a different set of big CPUs as well, so this
->> is preparing for the future as well.
->>
->> PMU are linked to the CPUs, hence the reason they stayed. As for the
->> memory and psci nodes the thinking behind it was mostly to allow for
->> ACPI to make changes there, but it does look now like retrofitting an
->> explanation to something that I did not give too much thought at that
->> moment.
->
-> I guess my concern was motivated by the selfish aspect of having to
-> maintain a bunch of out-of-tree Juno patches (like cpuidle and cpufreq
+> >  {
+> >  	struct clk *clk_per = clk_get_sys("imx-gpt.0", "per");
+> >  	struct clk *clk_ipg = clk_get_sys("imx-gpt.0", "ipg"); diff --git
+> > a/drivers/clk/imx/clk-imx1.c b/drivers/clk/imx/clk-imx1.c index
+> > c9812db..49534d8 100644
+> > --- a/drivers/clk/imx/clk-imx1.c
+> > +++ b/drivers/clk/imx/clk-imx1.c
+> > @@ -102,7 +102,8 @@ int __init mx1_clocks_init(unsigned long fref)
+> >  	clk_register_clkdev(clk[IMX1_CLK_DUMMY], "ipg", "imx1-fb.0");
+> >  	clk_register_clkdev(clk[IMX1_CLK_DUMMY], "ahb", "imx1-fb.0");
+> >
+> > -	mxc_timer_init(MX1_TIM1_BASE_ADDR, MX1_TIM1_INT);
+> > +	/*Timer version in MX1 is V0*/
+> 
+> There should be a space before and after '*'.
 
-Hopefully not too long :)
+Yes, I will update the patch.
+> 
+> > +	mxc_timer_init(MX1_TIM1_BASE_ADDR, MX1_TIM1_INT, 0);
+> >
+> >  	return 0;
+> >  }
+> > diff --git a/drivers/clk/imx/clk-imx21.c b/drivers/clk/imx/clk-imx21.c
+> > index 0ca842c..08aa048 100644
+> > --- a/drivers/clk/imx/clk-imx21.c
+> > +++ b/drivers/clk/imx/clk-imx21.c
+> > @@ -156,7 +156,8 @@ int __init mx21_clocks_init(unsigned long lref, unsigned
+> long href)
+> >  	clk_register_clkdev(clk[IMX21_CLK_I2C_GATE], NULL, "imx21-i2c.0");
+> >  	clk_register_clkdev(clk[IMX21_CLK_OWIRE_GATE], NULL, "mxc_w1.0");
+> >
+> > -	mxc_timer_init(MX21_GPT1_BASE_ADDR, MX21_INT_GPT1);
+> > +	/*Timer version in MX21 is v1*/
+> > +	mxc_timer_init(MX21_GPT1_BASE_ADDR, MX21_INT_GPT1, 1);
+> >
+> >  	return 0;
+> >  }
+> > diff --git a/drivers/clk/imx/clk-imx27.c b/drivers/clk/imx/clk-imx27.c
+> > index df2dfc0..f00a7c0 100644
+> > --- a/drivers/clk/imx/clk-imx27.c
+> > +++ b/drivers/clk/imx/clk-imx27.c
+> > @@ -233,7 +233,8 @@ int __init mx27_clocks_init(unsigned long fref)
+> >  	clk_register_clkdev(clk[IMX27_CLK_EMMA_AHB_GATE], "ahb",
+> "m2m-emmaprp.0");
+> >  	clk_register_clkdev(clk[IMX27_CLK_EMMA_IPG_GATE], "ipg",
+> > "m2m-emmaprp.0");
+> >
+> > -	mxc_timer_init(MX27_GPT1_BASE_ADDR, MX27_INT_GPT1);
+> > +	/*Timer version in MX27 is v1*/
+> > +	mxc_timer_init(MX27_GPT1_BASE_ADDR, MX27_INT_GPT1, 1);
+> >
+> >  	return 0;
+> >  }
+> > diff --git a/drivers/clk/imx/clk-imx31.c b/drivers/clk/imx/clk-imx31.c
+> > index a55290c..7c4a025 100644
+> > --- a/drivers/clk/imx/clk-imx31.c
+> > +++ b/drivers/clk/imx/clk-imx31.c
+> > @@ -198,7 +198,8 @@ int __init mx31_clocks_init(unsigned long fref)
+> >  	mx31_revision();
+> >  	clk_disable_unprepare(clk[iim_gate]);
+> >
+> > -	mxc_timer_init(MX31_GPT1_BASE_ADDR, MX31_INT_GPT);
+> > +	/*Timer version in MX31 is v2*/
+> > +	mxc_timer_init(MX31_GPT1_BASE_ADDR, MX31_INT_GPT, 2);
+> >
+> >  	return 0;
+> >  }
+> > diff --git a/drivers/clk/imx/clk-imx35.c b/drivers/clk/imx/clk-imx35.c
+> > index 133fda1..a796c1e 100644
+> > --- a/drivers/clk/imx/clk-imx35.c
+> > +++ b/drivers/clk/imx/clk-imx35.c
+> > @@ -145,7 +145,7 @@ int __init mx35_clocks_init(void)
+> >  	clk[esdhc3_div] = imx_clk_divider("esdhc3_div", "esdhc_sel", base +
+> > MX35_CCM_PDR3, 16, 6);
+> >
+> >  	clk[spdif_sel] = imx_clk_mux("spdif_sel", base + MX35_CCM_PDR3, 22, 1,
+> std_sel, ARRAY_SIZE(std_sel));
+> > -	clk[spdif_div_pre] = imx_clk_divider("spdif_div_pre", "spdif_sel", base +
+> MX35_CCM_PDR3, 29, 3); /* divide by 1 not allowed */
+> > +	clk[spdif_div_pre] = imx_clk_divider("spdif_div_pre", "spdif_sel",
+> > +base + MX35_CCM_PDR3, 29, 3); /* divide by 1 not allowed */
+> 
+> Unrelated change?
+> 
+Right, it is unrelated. It was changed by the editor automatically.
 
-> related DT updates) and having to duplicate those in more than one DT,
-> and also having backport DT reorgs like this patch. Of course, none of
-> that should be a consideration in deciding what goes into mainline, I
-> just wanted to make sure there was a reason for the patch.
->
+Thanks,
+Shenwei
 
-But I agree with you to remove duplicates as much as possible. Since
-it's not possible to speculate how things will be in future platform,
-IMO we can have all the device nodes that are common to both r0 and r1
-in juno-base.dtsi for now and move them out as and when required.
-
-Regards,
-Sudeep
+> Shawn
+> 
+> >  	clk[spdif_div_post] = imx_clk_divider("spdif_div_post",
+> > "spdif_div_pre", base + MX35_CCM_PDR3, 23, 6);
+> >
+> >  	clk[ssi_sel] = imx_clk_mux("ssi_sel", base + MX35_CCM_PDR2, 6, 1,
+> > std_sel, ARRAY_SIZE(std_sel)); @@ -296,7 +296,8 @@ int __init
+> > mx35_clocks_init(void)  #ifdef CONFIG_MXC_USE_EPIT
+> >  	epit_timer_init(MX35_IO_ADDRESS(MX35_EPIT1_BASE_ADDR),
+> > MX35_INT_EPIT1);  #else
+> > -	mxc_timer_init(MX35_GPT1_BASE_ADDR, MX35_INT_GPT);
+> > +	/*Timer version in MX35 is v2*/
+> > +	mxc_timer_init(MX35_GPT1_BASE_ADDR, MX35_INT_GPT, 2);
+> >  #endif
+> >
+> >  	return 0;
+> > diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h index
+> > 6bae537..06da84a 100644
+> > --- a/drivers/clk/imx/clk.h
+> > +++ b/drivers/clk/imx/clk.h
+> > @@ -11,7 +11,7 @@ extern spinlock_t imx_ccm_lock;
+> >   * mxc_timer_init() to initialize timer for non-DT boot.  It can be removed
+> >   * when these legacy non-DT support is converted or dropped.
+> >   */
+> > -void mxc_timer_init(unsigned long pbase, int irq);
+> > +void mxc_timer_init(unsigned long pbase, int irq, int);
+> >
+> >  void imx_check_clocks(struct clk *clks[], unsigned int count);
+> >
+> > --
+> > 1.9.1
+> >
+> >
