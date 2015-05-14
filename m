@@ -1,90 +1,46 @@
 From: clabbe.montjoie@gmail.com (LABBE Corentin)
-Date: Thu, 14 May 2015 14:58:57 +0200
-Subject: [PATCH v9] crypto: Add Allwinner Security System crypto accelerator
-Message-ID: <1431608341-10936-1-git-send-email-clabbe.montjoie@gmail.com>
+Date: Thu, 14 May 2015 14:58:59 +0200
+Subject: [PATCH v9 2/4] ARM: sun4i: dt: Add DT bindings documentation for
+ SUN4I Security System
+In-Reply-To: <1431608341-10936-1-git-send-email-clabbe.montjoie@gmail.com>
+References: <1431608341-10936-1-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <1431608341-10936-3-git-send-email-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds documentation for Device-Tree bindings for the Security System
+cryptographic accelerator driver.
 
-Hello
+Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
+---
+ Documentation/devicetree/bindings/crypto/sun4i-ss.txt | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/crypto/sun4i-ss.txt
 
-This is the driver for the Security System included in Allwinner SoC A20.
-The Security System (SS for short) is a hardware cryptographic accelerator that
-support AES/MD5/SHA1/DES/3DES/PRNG algorithms.
-It could be found on others Allwinner SoC: 
-- A10, A10s, A13, A31 and A33 manual give the same datasheet for SS than A20
-- A23 speak about a security system but without precisions
-- A80 and A83T datasheet speak about a security system with more functions
-  (SHA224/SHA256/RSA/CRC), they will be supported in a separate driver
-But I do not have access on any of those hardware, tests are welcome.
-
-This driver currently supports:
-- MD5 and SHA1 hash algorithms
-- AES block cipher in CBC/ECB mode with 128/196/256bits keys.
-- DES and 3DES block cipher in CBC/ECB mode
-The driver exposes all those algorithms through the kernel cryptographic API.
-
-The driver support only CPU driven (aka poll mode) transfer mode,
-since the DMA engine of the A20 does not have a mainline driver yet.
-
-Changes since v8
-- use sg_miter in cipher functions, this clean all kmap stuff (thanks to bbrezillon)
-- use GIC in dt interupts
-- rename all references (files/dtcompatible) from sunxi to sun4i in prevision of futur A80/A83 driver
-
-Changes since v7
-- Add ECB block mode
-- split the sunxi_ss_cipher_init in two
-- remove sunxi_ss_cipher_encrypt/sunxi_ss_cipher_decrypt
-- use now sunxi_ss_block_method_encrypt and sunxi_ss_block_method_decrypt
-- Add weak DES key test needed by ECB tests
-
-Changes since v6:
-- Use alphabetic ordering for new sections in MAINTAINERS
-- Clean remaining PRNG driver header
-
-Changes since v5:
-- Hash functions now keep partial hash states in sunxi_ss structures
-- Use of spinlock instead of mutex
-- Remove the static sunxi_ss structures by using container of
-- Add export/import functions
-- replace lots of writel by writesl
-- replace lots of readl by readsl
-
-Changes since v4:
-- Rework all mutex path
-- Use ahash_request_ctx() in hash functions
-- Major rework of hash functions for solving mutex problems
-- Split sunxi_req_ctx in two since ciphers now use struct sunxi_tfm_ctx
-- Hash functions now test FIFO space register
-
-Changes since v3:
-- Remove all algorithms options from Kconfig, so now only one module is used
-- Add the sunxi_ss_cipher function to unify mode calculation
-- Remove the sunxi_cipher_exit empty function
-- Add some missing mutex_unlock()
-- Drop PRNG support, I wait for more comment on its results before re-enabling it.
-
-Changes since v2:
-- Fix Makefile and Kconfig for static kernel.
-
-Changes since v1:
-- annotate ss->base as __iomem
-- regroup all mutex in the ss_ctx structure
-- splited driver in 7 modules (core md5 sha1 aes des 3des prng) in sunxi-ss directory
-- use dev_exit_p() for .remove
-- added missing CRYPTO_BLKCIPHER dep in Kconfig
-- use ahash instead of shash
-- use ablkcipher instead of blkcipher
-- use crypto_rng_ctx instead of crypto_tfm_ctx
-- set seed as an u32
-- drop useless comment decoration
-- drop useless debug
-- ss_ctx is now a static pointer and whole structure being allocated
-- fix the platform_get_resource/devm_ioremap_resource pattern
-- invert getting die id and configuring clock
-- set clock value as a const unsigned long
-- add MODULE_ALIAS
-- use define names more consistency (SS_xxx)
-- fix PRNG errors
-- respell SS to Security System in DT documentation
+diff --git a/Documentation/devicetree/bindings/crypto/sun4i-ss.txt b/Documentation/devicetree/bindings/crypto/sun4i-ss.txt
+new file mode 100644
+index 0000000..f2192d4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/crypto/sun4i-ss.txt
+@@ -0,0 +1,19 @@
++* Allwinner Security System found on A20 SoC
++
++Required properties:
++- compatible : Should be "allwinner,sun4i-a20-crypto".
++- reg: Should contain the Security System register location and length.
++- interrupts: Should contain the IRQ line for the Security System.
++- clocks : List of clock specifiers, corresponding to ahb and ss.
++- clock-names : Name of the functional clock, should be
++	* "ahb" : AHB gating clock
++	* "mod" : SS controller clock
++
++Example:
++	crypto: crypto-engine at 01c15000 {
++		compatible = "allwinner,sun4i-a20-crypto";
++		reg = <0x01c15000 0x1000>;
++		interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&ahb_gates 5>, <&ss_clk>;
++		clock-names = "ahb", "mod";
++	};
+-- 
+2.3.6
