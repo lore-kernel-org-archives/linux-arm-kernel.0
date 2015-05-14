@@ -1,85 +1,28 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 14 May 2015 12:40:31 -0500
-Subject: MUSB dual-role on AM335x behaving weirdly
-In-Reply-To: <20150514170700.GN24269@saruman.tx.rr.com>
-References: <CADYTM3b40_u4Twt27PBVH4dC9ErDnFEi0AUzs_aJRM3mMHaBCQ@mail.gmail.com>
- <54C0A8C9.3040201@visionsystems.de>
- <20150205132142.GD2079@lukather> <20150224103911.GR25269@lukather>
- <20150224145401.GH29829@saruman.tx.rr.com>
- <20150224165050.GX25269@lukather>
- <20150224173357.GB25042@saruman.tx.rr.com>
- <20150225111129.GA5062@lukather>
- <54EDBBEA.8030509@visionsystems.de>
- <20150514170700.GN24269@saruman.tx.rr.com>
-Message-ID: <20150514174031.GP24269@saruman.tx.rr.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 14 May 2015 10:42:30 -0700
+Subject: [PATCH v3 4/5] phy: add Broadcom SATA3 PHY driver for Broadcom
+ STB SoCs
+In-Reply-To: <20150514173902.GK11598@ld-irv-0074>
+References: <1431473303-18873-1-git-send-email-computersforpeace@gmail.com>
+ <1431473303-18873-5-git-send-email-computersforpeace@gmail.com>
+ <55533059.6050705@ti.com> <20150513184921.GE11598@ld-irv-0074>
+ <55543837.5030100@ti.com> <20150514173902.GK11598@ld-irv-0074>
+Message-ID: <5554DE86.8020005@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 14, 2015 at 12:07:00PM -0500, Felipe Balbi wrote:
-> Hi,
+On 14/05/15 10:39, Brian Norris wrote:
+> On Thu, May 14, 2015 at 11:22:55AM +0530, Kishon Vijay Abraham I wrote:
+>> While sending the next version please also add a
+>> MAINTAINERs entry for this driver.
 > 
-> On Wed, Feb 25, 2015 at 01:11:22PM +0100, Yegor Yefremov wrote:
-> > On 25.02.2015 12:11, Maxime Ripard wrote:
-> > > On Tue, Feb 24, 2015 at 11:33:57AM -0600, Felipe Balbi wrote:
-> > >> Hi,
-> > >>
-> > >> On Tue, Feb 24, 2015 at 05:50:50PM +0100, Maxime Ripard wrote:
-> > >>> Hi Felipe,
-> > >>>
-> > >>> On Tue, Feb 24, 2015 at 08:54:01AM -0600, Felipe Balbi wrote:
-> > >>>> Hi,
-> > >>>>
-> > >>>> On Tue, Feb 24, 2015 at 11:39:11AM +0100, Maxime Ripard wrote:
-> > >>>>> On Thu, Feb 05, 2015 at 02:21:42PM +0100, Maxime Ripard wrote:
-> > >>>>>> Hi,
-> > >>>>>>
-> > >>>>>> On Thu, Jan 22, 2015 at 08:37:45AM +0100, Yegor Yefremov wrote:
-> > >>>>>>> I have the same experience with 3.15. The switching is working when
-> > >>>>>>> CONFIG_USB_MUSB_DUAL_ROLE is set and dr_mode = "otg". But since 3.16
-> > >>
-> > >> since 3.16 ?
-> > > 
-> > > That's what Yegor said. I never saw it working with 3.15 either.
-> > 
-> > I've used 3.15.1 and 3.15.2 with this set of patches:
-> > https://github.com/visionsystemsgmbh/onrisc_br_bsp/tree/master/board/vscom/kernel-patches/linux-3.15
-> > 
-> > And it worked so far. The system:
-> > http://www.visionsystems.de/produkte/baltos-ir-5221.html
+> I think this has it covered, right?
 > 
-> I've had more time to look into this (thanks Yegor for sponsoring a
-> test/dev platform) what I noticed is that Connect IRQ takes seconds to
-> fire up.  Below a tiny log snippet after pluging USB OTG adapter cable
-> that came with IR5521:
-> 
-> | [ 1227.200514] musb-hdrc musb-hdrc.1.auto: usbintr (100) epintr(0)
-> 
-> Cable connected. ID is grounded. 0x100 == DRVVBUS IRQ
-> 
-> | [ 1227.206788] musb-hdrc musb-hdrc.1.auto: VBUS on (a_wait_vrise), devctl 19
-> 
-> MUSB starts to wait for VBUS to reach Session valid threshold
-> 
-> | [ 1230.281159] musb-hdrc musb-hdrc.1.auto: usbintr (10) epintr(0)
-> 
-> 3 seconds later connect interrupt happens. Looking at VBUS charge time
-> with a scope, it's quite ok. VBUS charges in about 1.77ms. I'll dig
-> further into this.
+> https://lkml.org/lkml/2015/3/18/932
 
-even more weird. If I disconnect device from OTG adapter, rather than
-OTG adapter from IR5521, this leave ID pin grounded, which means DRVVBUS
-is still asserted and VBUS remains above session valid threshold.
+Kishon, this patch is on its way to arm-soc via a pull request:
+http://www.spinics.net/lists/arm-kernel/msg418276.html
 
-Even in this case, when I connect the device on the other end of the
-cable, I still see some 3 seconds delay from the time device is
-connected, to the time connect IRQ fires up.
-
+this should address your concern. Thanks!
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150514/3ef6f526/attachment.sig>
+Florian
