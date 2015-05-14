@@ -1,74 +1,92 @@
-From: cory.tusar@pid1solutions.com (Cory Tusar)
-Date: Wed, 13 May 2015 23:11:38 -0400
-Subject: [PATCH] vf610: dt: Nomenclature fixup for PTC12 pin used in RMII mode.
-Message-ID: <1431573098-23809-1-git-send-email-cory.tusar@pid1solutions.com>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Wed, 13 May 2015 22:25:29 -0500
+Subject: [PATCH 1/4] edac, altera: Generalize driver to use DT Memory size
+In-Reply-To: <1431553787-27741-2-git-send-email-tthayer@opensource.altera.com>
+References: <1431553787-27741-1-git-send-email-tthayer@opensource.altera.com>
+ <1431553787-27741-2-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <555415A9.8030408@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit includes a minor nomenclature fixup for boards based on the
-Freescale VF610 SoC and which make use of the alternate "RMII1_RXD1"
-functionality for pin PTC12.  This brings the macro name in-line with
-both the datasheet and other similar macros.
 
-Signed-off-by: Cory Tusar <cory.tusar@pid1solutions.com>
----
- arch/arm/boot/dts/vf-colibri.dtsi  | 2 +-
- arch/arm/boot/dts/vf610-cosmic.dts | 2 +-
- arch/arm/boot/dts/vf610-pinfunc.h  | 2 +-
- arch/arm/boot/dts/vf610-twr.dts    | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/vf-colibri.dtsi b/arch/arm/boot/dts/vf-colibri.dtsi
-index fbef082..68ca125 100644
---- a/arch/arm/boot/dts/vf-colibri.dtsi
-+++ b/arch/arm/boot/dts/vf-colibri.dtsi
-@@ -140,7 +140,7 @@
- 				VF610_PAD_PTC9__ENET_RMII1_MDC		0x30d2
- 				VF610_PAD_PTC10__ENET_RMII1_MDIO	0x30d3
- 				VF610_PAD_PTC11__ENET_RMII1_CRS		0x30d1
--				VF610_PAD_PTC12__ENET_RMII_RXD1		0x30d1
-+				VF610_PAD_PTC12__ENET_RMII1_RXD1	0x30d1
- 				VF610_PAD_PTC13__ENET_RMII1_RXD0	0x30d1
- 				VF610_PAD_PTC14__ENET_RMII1_RXER	0x30d1
- 				VF610_PAD_PTC15__ENET_RMII1_TXD1	0x30d2
-diff --git a/arch/arm/boot/dts/vf610-cosmic.dts b/arch/arm/boot/dts/vf610-cosmic.dts
-index fd8758b..5447f25 100644
---- a/arch/arm/boot/dts/vf610-cosmic.dts
-+++ b/arch/arm/boot/dts/vf610-cosmic.dts
-@@ -68,7 +68,7 @@
- 				VF610_PAD_PTC9__ENET_RMII1_MDC		0x30d2
- 				VF610_PAD_PTC10__ENET_RMII1_MDIO	0x30d3
- 				VF610_PAD_PTC11__ENET_RMII1_CRS		0x30d1
--				VF610_PAD_PTC12__ENET_RMII_RXD1		0x30d1
-+				VF610_PAD_PTC12__ENET_RMII1_RXD1	0x30d1
- 				VF610_PAD_PTC13__ENET_RMII1_RXD0	0x30d1
- 				VF610_PAD_PTC14__ENET_RMII1_RXER	0x30d1
- 				VF610_PAD_PTC15__ENET_RMII1_TXD1	0x30d2
-diff --git a/arch/arm/boot/dts/vf610-pinfunc.h b/arch/arm/boot/dts/vf610-pinfunc.h
-index 1ee681f..fcad713 100644
---- a/arch/arm/boot/dts/vf610-pinfunc.h
-+++ b/arch/arm/boot/dts/vf610-pinfunc.h
-@@ -369,7 +369,7 @@
- #define VF610_PAD_PTC11__MLB_DATA		0x0E0 0x358 ALT6 0x1
- #define VF610_PAD_PTC11__DEBUG_OUT		0x0E0 0x000 ALT7 0x0
- #define VF610_PAD_PTC12__GPIO_57		0x0E4 0x000 ALT0 0x0
--#define VF610_PAD_PTC12__ENET_RMII_RXD1		0x0E4 0x000 ALT1 0x0
-+#define VF610_PAD_PTC12__ENET_RMII1_RXD1	0x0E4 0x000 ALT1 0x0
- #define VF610_PAD_PTC12__ESAI_SDO1		0x0E4 0x318 ALT3 0x1
- #define VF610_PAD_PTC12__SAI2_TX_BCLK		0x0E4 0x370 ALT5 0x1
- #define VF610_PAD_PTC12__DEBUG_OUT3		0x0E4 0x000 ALT7 0x0
-diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-index f64fddc..375ab23 100644
---- a/arch/arm/boot/dts/vf610-twr.dts
-+++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -221,7 +221,7 @@
- 				VF610_PAD_PTC9__ENET_RMII1_MDC		0x30d2
- 				VF610_PAD_PTC10__ENET_RMII1_MDIO	0x30d3
- 				VF610_PAD_PTC11__ENET_RMII1_CRS		0x30d1
--				VF610_PAD_PTC12__ENET_RMII_RXD1		0x30d1
-+				VF610_PAD_PTC12__ENET_RMII1_RXD1	0x30d1
- 				VF610_PAD_PTC13__ENET_RMII1_RXD0	0x30d1
- 				VF610_PAD_PTC14__ENET_RMII1_RXER	0x30d1
- 				VF610_PAD_PTC15__ENET_RMII1_TXD1	0x30d2
--- 
-2.3.6
+On 5/13/15 4:49 PM, tthayer at opensource.altera.com wrote:
+> From: Thor Thayer <tthayer@opensource.altera.com>
+> 
+> The Arria10 SOC uses a completely different SDRAM controller from the
+> earlier CycloneV and ArriaV SoCs. The memory size is calculated in
+> the bootloader and passed via the device tree. Using this device
+> tree size is more generic than using the register fields to
+> calculate the memory size for different SDRAM controllers.
+> 
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> ---
+>  drivers/edac/altera_edac.c |   53 ++++++++++++++++++++++----------------------
+>  1 file changed, 26 insertions(+), 27 deletions(-)
+> 
+> diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
+> index 3c4929f..e18a205 100644
+> --- a/drivers/edac/altera_edac.c
+> +++ b/drivers/edac/altera_edac.c
+> @@ -219,36 +219,35 @@ static void altr_sdr_mc_create_debugfs_nodes(struct mem_ctl_info *mci)
+>  {}
+>  #endif
+>  
+> -/* Get total memory size in bytes */
+> -static u32 altr_sdram_get_total_mem_size(struct regmap *mc_vbase)
+> +/* Get total memory size from Open Firmware DTB */
+> +static unsigned long get_total_mem(void)
+>  {
+> -	u32 size, read_reg, row, bank, col, cs, width;
+> +	struct device_node *np = NULL;
+> +	const unsigned int *reg, *reg_end;
+> +	int len, sw, aw;
+> +	unsigned long start, size, total_mem;
+>  
+> -	if (regmap_read(mc_vbase, DRAMADDRW_OFST, &read_reg) < 0)
+> +	np = of_find_node_by_type(NULL, "memory");
+> +	if (!np)
+>  		return 0;
+>  
+> -	if (regmap_read(mc_vbase, DRAMIFWIDTH_OFST, &width) < 0)
+> -		return 0;
+> -
+> -	col = (read_reg & DRAMADDRW_COLBIT_MASK) >>
+> -		DRAMADDRW_COLBIT_SHIFT;
+> -	row = (read_reg & DRAMADDRW_ROWBIT_MASK) >>
+> -		DRAMADDRW_ROWBIT_SHIFT;
+> -	bank = (read_reg & DRAMADDRW_BANKBIT_MASK) >>
+> -		DRAMADDRW_BANKBIT_SHIFT;
+> -	cs = (read_reg & DRAMADDRW_CSBIT_MASK) >>
+> -		DRAMADDRW_CSBIT_SHIFT;
+> -
+> -	/* Correct for ECC as its not addressible */
+> -	if (width == DRAMIFWIDTH_32B_ECC)
+> -		width = 32;
+> -	if (width == DRAMIFWIDTH_16B_ECC)
+> -		width = 16;
+> -
+> -	/* calculate the SDRAM size base on this info */
+> -	size = 1 << (row + bank + col);
+> -	size = size * cs * (width / 8);
+> -	return size;
+> +	aw = of_n_addr_cells(np);
+> +	sw = of_n_size_cells(np);
+> +	reg = (const unsigned int *)of_get_property(np, "reg", &len);
+> +	reg_end = reg + (len / sizeof(u32));
+> +
+> +	total_mem = 0;
+> +	do {
+> +		start = of_read_number(reg, aw);
+> +		reg += aw;
+> +		size = of_read_number(reg, sw);
+> +		reg += sw;
+> +		total_mem += size;
+> +	} while (reg < reg_end);
+> +
+> +	of_node_put(np);
+> +	edac_printk(KERN_ERR, EDAC_MC, "total_mem 0x%lx\n", total_mem);
+
+Use edac_dbg() here.
+
+Dinh
