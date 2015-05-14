@@ -1,134 +1,90 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Thu, 14 May 2015 10:11:52 -0700
-Subject: [PATCH 2/2] selftests/breakpoints: only set TEST_PROGS when built
-In-Reply-To: <5554BED4.9040204@osg.samsung.com>
-References: <1431467947-29847-1-git-send-email-tyler.baker@linaro.org>
- <1431467947-29847-3-git-send-email-tyler.baker@linaro.org>
- <5553C51B.6080504@osg.samsung.com>
- <CANMBJr5Y5LaGHbdSqUL=Xj01-s20TAawRKaj0uDbkdMZZoUoYg@mail.gmail.com>
- <5554BED4.9040204@osg.samsung.com>
-Message-ID: <CANMBJr5jpTq08eWZRcbD72-3QC7uGuavYqZWMZLNDOm_2KGbEA@mail.gmail.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Thu, 14 May 2015 18:00:57 +0100
+Subject: [RFC 17/23] xen/grant-table: Make it running on 64KB granularity
+In-Reply-To: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
+References: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
+Message-ID: <1431622863-28575-18-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 May 2015 at 08:27, Shuah Khan <shuahkh@osg.samsung.com> wrote:
-> On 05/14/2015 08:15 AM, Tyler Baker wrote:
->> On 13 May 2015 at 14:41, Shuah Khan <shuahkh@osg.samsung.com> wrote:
->>> On 05/12/2015 03:59 PM, tyler.baker at linaro.org wrote:
->>>> From: Tyler Baker <tyler.baker@linaro.org>
->>>>
->>>> Set TEST_PROGS only when a build has occurred.
->>>>
->>>> Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
->>>> ---
->>>>  tools/testing/selftests/breakpoints/Makefile | 3 +--
->>>>  1 file changed, 1 insertion(+), 2 deletions(-)
->>>>
->>>> diff --git a/tools/testing/selftests/breakpoints/Makefile b/tools/testing/selftests/breakpoints/Makefile
->>>> index 1822356..54cc3e7 100644
->>>> --- a/tools/testing/selftests/breakpoints/Makefile
->>>> +++ b/tools/testing/selftests/breakpoints/Makefile
->>>> @@ -12,12 +12,11 @@ endif
->>>>  all:
->>>>  ifeq ($(ARCH),x86)
->>>>       gcc breakpoint_test.c -o breakpoint_test
->>>> +     TEST_PROGS := breakpoint_test
->>>>  else
->>>>       echo "Not an x86 target, can't build breakpoints selftests"
->>>>  endif
->>>>
->>>> -TEST_PROGS := breakpoint_test
->>>> -
->>>>  include ../lib.mk
->>>>
->>>>  clean:
->>>>
->>>
->>> Hmm. With this change install fails to copy breakpoint_test all
->>> together. Remember setting TEST_PROGS in compile step makes it
->>> not stick around when install target is called. A better approach
->>> would be the following:
->>>
->>> if [ -f breakpoint_test ]
->>>     TEST_PROGS := breakpoint_test
->>> fi
->>
->> Thanks for pointing this out, this is a good catch. We will also need
->> to do this for the x86 tests IIRC. Would it make more sense to have
->> this check performed in the INSTALL_RULE so that we don't have to have
->> a bunch of IF statements in the various Makefiles?
->
-> Right. x86 will need this type of logic for 32-bit execs when they
-> aren't not built on a 64-bit system, and for 64-bit execs when they
-> aren't built on a 32-bit system.
+The Xen interface is using 4KB page granularity. This means that each
+grant is 4KB.
 
-Considering the change below we can now simplify this case for x86 to:
+The current implementation allocates a Linux page per grant. On Linux
+using 64KB page granularity, only the first 4KB of the page will be
+used.
 
-diff --git a/tools/testing/selftests/x86/Makefile
-b/tools/testing/selftests/x86/Makefile
-index 12d8e76..3e238d0 100644
---- a/tools/testing/selftests/x86/Makefile
-+++ b/tools/testing/selftests/x86/Makefile
-@@ -14,13 +14,9 @@ UNAME_M := $(shell uname -m)
- ifeq ($(CROSS_COMPILE),)
- # Always build 32-bit tests
- all: all_32
--# Install 32-bit tests
--TEST_PROGS += $(BINARIES_32) run_x86_tests.sh
- # If we're on a 64-bit host, build 64-bit tests as well
- ifeq ($(UNAME_M),x86_64)
- all: all_64
--# Install 64-bit tests
--TEST_PROGS += $(BINARIES_64)
- endif
- endif
+We could decrease the memory wasted by sharing the page with multiple
+grant. It will require some care with the {Set,Clear}ForeignPage macro.
 
-@@ -28,6 +24,9 @@ all_32: check_build32 $(BINARIES_32)
+Note that no changes has been made in the x86 code because both Linux
+and Xen will only use 4KB page granularity.
 
- all_64: $(BINARIES_64)
+Signed-off-by: Julien Grall <julien.grall@citrix.com>
+Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+Cc: David Vrabel <david.vrabel@citrix.com>
+---
+ arch/arm/xen/p2m.c        | 6 +++---
+ drivers/xen/grant-table.c | 6 +++---
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-+# Install the tests
-+TEST_PROGS := $(BINARIES_32) $(BINARIES_64) run_x86_tests.sh
-+
- include ../lib.mk
-
- clean:
-
-If the binaries do not exist, they will be not be installed. If you
-and Andy are ok with this, I'll add a patch to this series.
-
->
->>
->> Something like...
->>
->>        @for ARTIFACT in $(TEST_PROGS) $(TEST_PROGS_EXTENDED) $(TEST_FILES); do \
->>                if [ -f $$ARTIFACT ]; then \
->>                     install -t $(INSTALL_PATH) $$ARTIFACT; \
->>                fi; \
->>        done;
->>
->
-> I think it makes perfect sense to do this in INSTALL_RULE.
-> As you said, this will avoid changes to test individual
-> Makefiles and new test writers don't have to worry about
-> adding this.
->
-> Would you like make the necessary changes?
-
-Sure, I'll add this in the next revision.
-
->
-> thanks,
-> -- Shuah
->
->
-> --
-> Shuah Khan
-> Sr. Linux Kernel Developer
-> Open Source Innovation Group
-> Samsung Research America (Silicon Valley)
-> shuahkh at osg.samsung.com | (970) 217-8978
-
-Cheers,
-
-Tyler
+diff --git a/arch/arm/xen/p2m.c b/arch/arm/xen/p2m.c
+index 887596c..0ed01f2 100644
+--- a/arch/arm/xen/p2m.c
++++ b/arch/arm/xen/p2m.c
+@@ -93,8 +93,8 @@ int set_foreign_p2m_mapping(struct gnttab_map_grant_ref *map_ops,
+ 	for (i = 0; i < count; i++) {
+ 		if (map_ops[i].status)
+ 			continue;
+-		set_phys_to_machine(map_ops[i].host_addr >> PAGE_SHIFT,
+-				    map_ops[i].dev_bus_addr >> PAGE_SHIFT);
++		set_phys_to_machine(map_ops[i].host_addr >> XEN_PAGE_SHIFT,
++				    map_ops[i].dev_bus_addr >> XEN_PAGE_SHIFT);
+ 	}
+ 
+ 	return 0;
+@@ -108,7 +108,7 @@ int clear_foreign_p2m_mapping(struct gnttab_unmap_grant_ref *unmap_ops,
+ 	int i;
+ 
+ 	for (i = 0; i < count; i++) {
+-		set_phys_to_machine(unmap_ops[i].host_addr >> PAGE_SHIFT,
++		set_phys_to_machine(unmap_ops[i].host_addr >> XEN_PAGE_SHIFT,
+ 				    INVALID_P2M_ENTRY);
+ 	}
+ 
+diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
+index 62f591f..dc0a787 100644
+--- a/drivers/xen/grant-table.c
++++ b/drivers/xen/grant-table.c
+@@ -642,7 +642,7 @@ int gnttab_setup_auto_xlat_frames(phys_addr_t addr)
+ 	if (xen_auto_xlat_grant_frames.count)
+ 		return -EINVAL;
+ 
+-	vaddr = xen_remap(addr, PAGE_SIZE * max_nr_gframes);
++	vaddr = xen_remap(addr, XEN_PAGE_SIZE * max_nr_gframes);
+ 	if (vaddr == NULL) {
+ 		pr_warn("Failed to ioremap gnttab share frames (addr=%pa)!\n",
+ 			&addr);
+@@ -654,7 +654,7 @@ int gnttab_setup_auto_xlat_frames(phys_addr_t addr)
+ 		return -ENOMEM;
+ 	}
+ 	for (i = 0; i < max_nr_gframes; i++)
+-		pfn[i] = PFN_DOWN(addr) + i;
++		pfn[i] = XEN_PFN_DOWN(addr) + i;
+ 
+ 	xen_auto_xlat_grant_frames.vaddr = vaddr;
+ 	xen_auto_xlat_grant_frames.pfn = pfn;
+@@ -978,7 +978,7 @@ static void gnttab_request_version(void)
+ {
+ 	/* Only version 1 is used, which will always be available. */
+ 	grant_table_version = 1;
+-	grefs_per_grant_frame = PAGE_SIZE / sizeof(struct grant_entry_v1);
++	grefs_per_grant_frame = XEN_PAGE_SIZE / sizeof(struct grant_entry_v1);
+ 	gnttab_interface = &gnttab_v1_ops;
+ 
+ 	pr_info("Grant tables using version %d layout\n", grant_table_version);
+-- 
+2.1.4
