@@ -1,35 +1,35 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 14 May 2015 10:07:00 +0900
-Subject: [PATCH 31/31] ARM: shmobile: r8a7791: Enable DMA for HSUSB
-In-Reply-To: <cover.1431565427.git.horms+renesas@verge.net.au>
-References: <cover.1431565427.git.horms+renesas@verge.net.au>
-Message-ID: <7706993e2deb75022dbcfc3043890aa1a0020189.1431565427.git.horms+renesas@verge.net.au>
+Date: Thu, 14 May 2015 10:07:16 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v4.2
+Message-ID: <cover.1431565572.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-This patch adds DMA properties to the HSUSB node.
+Please consider these Renesas ARM based SoC defconfig updates for v4.2.
 
-Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7791.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 754c3f20f224..7613abea13d7 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -723,6 +723,9 @@
- 		renesas,buswait = <4>;
- 		phys = <&usb0 1>;
- 		phy-names = "usb";
-+		dmas = <&usb_dmac0 0>, <&usb_dmac0 1>,
-+		       <&usb_dmac1 0>, <&usb_dmac1 1>;
-+		dma-names = "ch0", "ch1", "ch2", "ch3";
- 		status = "disabled";
- 	};
- 
--- 
-2.1.4
+The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+
+  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v4.2
+
+for you to fetch changes up to 90037558d5ed25a63499c3973cc1af25da02f673:
+
+  ARM: shmobile: defconfig: Replace USB_RCAR_GEN2_PHY by PHY_RCAR_GEN2 (2015-05-01 21:25:43 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Defconfig Updates for v4.2
+
+* Replace legacy-only USB_RCAR_GEN2_PHY with DT-only PHY_RCAR_GEN2
+
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      ARM: shmobile: defconfig: Replace USB_RCAR_GEN2_PHY by PHY_RCAR_GEN2
+
+ arch/arm/configs/shmobile_defconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
