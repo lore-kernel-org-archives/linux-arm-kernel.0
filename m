@@ -1,130 +1,87 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Thu, 14 May 2015 12:11:05 +0200
-Subject: [PATCH net-next 10/11] stmmac: convert dwmac-sunxi to platform driver
+Date: Thu, 14 May 2015 12:11:06 +0200
+Subject: [PATCH net-next 11/11] stmmac: drop driver from stmmac platform code
 In-Reply-To: <1431598266-25736-1-git-send-email-manabian@gmail.com>
 References: <1431598266-25736-1-git-send-email-manabian@gmail.com>
-Message-ID: <1431598266-25736-11-git-send-email-manabian@gmail.com>
+Message-ID: <1431598266-25736-12-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert platform glue layer into a proper platform
-driver and add it to the build system.
+The dwmac-generic replaces the driver inside the stmmac
+platform code. This turns stmmac platform into a library
+used by drivers for common platform driver functions.
 
 Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 ---
- drivers/net/ethernet/stmicro/stmmac/Kconfig        | 10 +++++++++
- drivers/net/ethernet/stmicro/stmmac/Makefile       |  3 ++-
- drivers/net/ethernet/stmicro/stmmac/dwmac-sunxi.c  | 25 +++++++++++++++++++++-
- .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |  1 -
- .../net/ethernet/stmicro/stmmac/stmmac_platform.h  |  2 --
- 5 files changed, 36 insertions(+), 5 deletions(-)
+ .../net/ethernet/stmicro/stmmac/dwmac-generic.c    |  4 +++-
+ .../net/ethernet/stmicro/stmmac/stmmac_platform.c  | 22 ----------------------
+ 2 files changed, 3 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/Kconfig b/drivers/net/ethernet/stmicro/stmmac/Kconfig
-index f5b9f051337d..731e0453a7d4 100644
---- a/drivers/net/ethernet/stmicro/stmmac/Kconfig
-+++ b/drivers/net/ethernet/stmicro/stmmac/Kconfig
-@@ -90,6 +90,16 @@ config DWMAC_STI
- 	  device driver. This driver is used on for the STi series
- 	  SOCs GMAC ethernet controller.
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-generic.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-generic.c
+index fb9623744e41..e817a1a44379 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac-generic.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-generic.c
+@@ -1,6 +1,7 @@
+ /*
+  * Generic DWMAC platform driver
+  *
++ * Copyright (C) 2007-2011  STMicroelectronics Ltd
+  * Copyright (C) 2015 Joachim Eastwood <manabian@gmail.com>
+  *
+  * This file is licensed under the terms of the GNU General Public
+@@ -12,6 +13,7 @@
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
  
-+config DWMAC_SUNXI
-+	tristate "Allwinner GMAC support"
-+	default ARCH_SUNXI
-+	depends on OF
-+	---help---
-+	  Support for Allwinner A20/A31 GMAC ethernet controllers.
-+
-+	  This selects Allwinner SoC glue layer support for the
-+	  stmmac device driver. This driver is used for A20/A31
-+	  GMAC ethernet controller.
- endif
++#include "stmmac.h"
+ #include "stmmac_platform.h"
  
- config STMMAC_PCI
-diff --git a/drivers/net/ethernet/stmicro/stmmac/Makefile b/drivers/net/ethernet/stmicro/stmmac/Makefile
-index f8e5ddba7fd2..92e714a48367 100644
---- a/drivers/net/ethernet/stmicro/stmmac/Makefile
-+++ b/drivers/net/ethernet/stmicro/stmmac/Makefile
-@@ -11,8 +11,9 @@ obj-$(CONFIG_DWMAC_MESON)	+= dwmac-meson.o
- obj-$(CONFIG_DWMAC_ROCKCHIP)	+= dwmac-rk.o
- obj-$(CONFIG_DWMAC_SOCFPGA)	+= dwmac-socfpga.o
- obj-$(CONFIG_DWMAC_STI)		+= dwmac-sti.o
-+obj-$(CONFIG_DWMAC_SUNXI)	+= dwmac-sunxi.o
- obj-$(CONFIG_DWMAC_GENERIC)	+= dwmac-generic.o
--stmmac-platform-objs:= stmmac_platform.o dwmac-sunxi.o \
-+stmmac-platform-objs:= stmmac_platform.o
- 
- obj-$(CONFIG_STMMAC_PCI) += stmmac-pci.o
- stmmac-pci-objs:= stmmac_pci.o
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sunxi.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sunxi.c
-index c5ea9ab75b03..15048ca39759 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sunxi.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sunxi.c
-@@ -18,7 +18,9 @@
- 
- #include <linux/stmmac.h>
- #include <linux/clk.h>
-+#include <linux/module.h>
- #include <linux/phy.h>
-+#include <linux/platform_device.h>
- #include <linux/of_net.h>
- #include <linux/regulator/consumer.h>
- 
-@@ -132,7 +134,7 @@ static void sun7i_fix_speed(void *priv, unsigned int speed)
- 
- /* of_data specifying hardware features and callbacks.
-  * hardware features were copied from Allwinner drivers. */
--const struct stmmac_of_data sun7i_gmac_data = {
-+static const struct stmmac_of_data sun7i_gmac_data = {
- 	.has_gmac = 1,
- 	.tx_coe = 1,
- 	.fix_mac_speed = sun7i_fix_speed,
-@@ -140,3 +142,24 @@ const struct stmmac_of_data sun7i_gmac_data = {
- 	.init = sun7i_gmac_init,
- 	.exit = sun7i_gmac_exit,
- };
-+
-+static const struct of_device_id sun7i_dwmac_match[] = {
-+	{ .compatible = "allwinner,sun7i-a20-gmac", .data = &sun7i_gmac_data},
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, sun7i_dwmac_match);
-+
-+static struct platform_driver sun7i_dwmac_driver = {
-+	.probe  = stmmac_pltfr_probe,
-+	.remove = stmmac_pltfr_remove,
-+	.driver = {
-+		.name           = "sun7i-dwmac",
-+		.pm		= &stmmac_pltfr_pm_ops,
-+		.of_match_table = sun7i_dwmac_match,
-+	},
-+};
-+module_platform_driver(sun7i_dwmac_driver);
-+
-+MODULE_AUTHOR("Chen-Yu Tsai <wens@csie.org>");
-+MODULE_DESCRIPTION("Allwinner sunxi DWMAC specific glue layer");
-+MODULE_LICENSE("GPL");
+ static const struct of_device_id dwmac_generic_match[] = {
+@@ -28,7 +30,7 @@ static struct platform_driver dwmac_generic_driver = {
+ 	.probe  = stmmac_pltfr_probe,
+ 	.remove = stmmac_pltfr_remove,
+ 	.driver = {
+-		.name           = "dwmac-generic",
++		.name           = STMMAC_RESOURCE_NAME,
+ 		.pm		= &stmmac_pltfr_pm_ops,
+ 		.of_match_table = of_match_ptr(dwmac_generic_match),
+ 	},
 diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-index 21a3a2c05740..e3a3c2bff86e 100644
+index e3a3c2bff86e..3e194c3ca297 100644
 --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
 +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-@@ -34,7 +34,6 @@
+@@ -32,12 +32,6 @@
+ #include "stmmac.h"
+ #include "stmmac_platform.h"
  
- static const struct of_device_id stmmac_dt_ids[] = {
- 	/* SoC specific glue layers should come before generic bindings */
--	{ .compatible = "allwinner,sun7i-a20-gmac", .data = &sun7i_gmac_data},
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, stmmac_dt_ids);
-diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.h b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.h
-index 7eb2fa8d97f3..71da86d7bd00 100644
---- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.h
-+++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.h
-@@ -23,6 +23,4 @@ int stmmac_pltfr_probe(struct platform_device *pdev);
- int stmmac_pltfr_remove(struct platform_device *pdev);
- extern const struct dev_pm_ops stmmac_pltfr_pm_ops;
- 
--extern const struct stmmac_of_data sun7i_gmac_data;
+-static const struct of_device_id stmmac_dt_ids[] = {
+-	/* SoC specific glue layers should come before generic bindings */
+-	{ /* sentinel */ }
+-};
+-MODULE_DEVICE_TABLE(of, stmmac_dt_ids);
 -
- #endif /* __STMMAC_PLATFORM_H__ */
+ #ifdef CONFIG_OF
+ 
+ /**
+@@ -431,19 +425,3 @@ static int stmmac_pltfr_resume(struct device *dev)
+ SIMPLE_DEV_PM_OPS(stmmac_pltfr_pm_ops, stmmac_pltfr_suspend,
+ 				       stmmac_pltfr_resume);
+ EXPORT_SYMBOL_GPL(stmmac_pltfr_pm_ops);
+-
+-static struct platform_driver stmmac_pltfr_driver = {
+-	.probe = stmmac_pltfr_probe,
+-	.remove = stmmac_pltfr_remove,
+-	.driver = {
+-		   .name = STMMAC_RESOURCE_NAME,
+-		   .pm = &stmmac_pltfr_pm_ops,
+-		   .of_match_table = of_match_ptr(stmmac_dt_ids),
+-	},
+-};
+-
+-module_platform_driver(stmmac_pltfr_driver);
+-
+-MODULE_DESCRIPTION("STMMAC 10/100/1000 Ethernet PLATFORM driver");
+-MODULE_AUTHOR("Giuseppe Cavallaro <peppe.cavallaro@st.com>");
+-MODULE_LICENSE("GPL");
 -- 
 1.8.0
