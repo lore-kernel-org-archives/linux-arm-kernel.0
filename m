@@ -1,51 +1,42 @@
-From: zhengxing@rock-chips.com (zhengxing)
-Date: Thu, 14 May 2015 10:22:18 +0800
-Subject: [PATCH 1/4] ASoC: rockchip: add rockchip machine driver
-In-Reply-To: <CAEUnVG5nkagx7CZC3t=-oOAyXOBaxxVynBxaGMf0NJpfr9ZVbA@mail.gmail.com>
-References: <1431422797-31903-1-git-send-email-zhengxing@rock-chips.com>
- <1431422797-31903-2-git-send-email-zhengxing@rock-chips.com>
- <20150512192215.GZ3066@sirena.org.uk> <55535035.5070608@rock-chips.com>
- <20150513164250.GB2761@sirena.org.uk>
- <CAEUnVG5+PqhkZ4TBMnfdbUr66-EaLVGDEewJ_=XZnfbvBEn13w@mail.gmail.com>
- <CAEUnVG5nkagx7CZC3t=-oOAyXOBaxxVynBxaGMf0NJpfr9ZVbA@mail.gmail.com>
-Message-ID: <555406DA.8040709@rock-chips.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Thu, 14 May 2015 11:41:19 +0900
+Subject: [PATCH v3 2/2] ARM: EXYNOS: Use of_machine_is_compatible instead
+ ofsoc_is_exynos4
+In-Reply-To: <1431307646-10779-2-git-send-email-k.kozlowski@samsung.com>
+References: <1431307646-10779-1-git-send-email-k.kozlowski@samsung.com>
+ <1431307646-10779-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <55540B4F.6060607@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?05?14? 07:11, Dylan Reid wrote:
-> On Wed, May 13, 2015 at 10:21 AM, Dylan Reid<dgreid@chromium.org>  wrote:
->> On Wed, May 13, 2015 at 9:42 AM, Mark Brown<broonie@kernel.org>  wrote:
->>> On Wed, May 13, 2015 at 09:23:01PM +0800, zhengxing wrote:
->>>> On 2015?05?13? 03:22, Mark Brown wrote:
->>>>> Is it not possible to extend simple card to handle your use cases?
->>>>> Given the very generic naming and the fact that things like jack
->>>>> detection and so on should depend on the CODEC and board usually rather
->>>>> than on the SoC it doesn't sound like this is Rockchip specific.
->>>>> This also looks like you're reimplementing some device model enumeration
->>>>> stuff which probably shouldn't be happening but let's understand the
->>>>> problem you're trying to solve here before going too far into the code.
->>>> Because we are trying to bring rt5650 in the project, so we intend to
->>>> describe supported codecs with DTS via only a rockchip machine driver file,
->>>> others remain pre-implement(like max98090 / rt5645 that vendor machine
->>>> driver).
->>> I don't undertand what you're saying here, sorry - why is this not just
->>> a case of writing multiple machine drivers?
->> I don't understand this either.  I'd think the best solution is
->> simple-card, configured through DTS for each device.
+On 05/11/15 10:27, Krzysztof Kozlowski wrote:
+> of_machine_is_compatible() seems to be preferred over soc_is_exynos4().
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> 
+> ---
+> Changes since v2:
+> 1. New patch, requested by Kukjin Kim.
+> ---
+>  arch/arm/mach-exynos/exynos.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+> index c3bfbba3006d..5917a30eee33 100644
+> --- a/arch/arm/mach-exynos/exynos.c
+> +++ b/arch/arm/mach-exynos/exynos.c
+> @@ -179,7 +179,7 @@ static void __init exynos_init_io(void)
+>   */
+>  void exynos_set_delayed_reset_assertion(bool enable)
+>  {
+> -	if (soc_is_exynos4()) {
+> +	if (of_machine_is_compatible("samsung,exynos4")) {
+>  		unsigned int tmp, core_id;
+>  
+>  		for (core_id = 0; core_id < num_possible_cpus(); core_id++) {
 
-Hi Mark, Dylan,
-I tried to use simple-card and had some trouble that jack detection. So 
-my idea is simply:
-                                                   /-- rockchip_max98090 
-(to configure max98090, and no need to via DTS)
-    rockchip_machine_driver  |-- rockchip_rt5645 (to configure 
-rt5650/rt5645, and no need to via DTS)
-(supported codecs via DTS)   \-- rockchip_(maybe other codecs)
+Maybe we need to change the compatible for exynos4415.dtsi? because no
+exynos4 in the compatible...Applied, anyway.
 
-It is right that it is base on original rockchip_max98090, but the old 
-rockchip_max98090 used DTS.
-
-I tried to explain my ideas. Your kind suggestions will be highly 
-appreciated.
-
-Thanks.
+Thanks,
+Kukjin
