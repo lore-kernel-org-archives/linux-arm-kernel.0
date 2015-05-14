@@ -1,53 +1,72 @@
 From: lee@kernel.org (Lee Jones)
-Date: Thu, 14 May 2015 09:40:39 +0100
-Subject: [PATCH 1/3 v2] dt/bindings: Add binding for the Raspberry Pi
- firmware driver
-In-Reply-To: <1431543609-19646-2-git-send-email-eric@anholt.net>
-References: <1431543609-19646-1-git-send-email-eric@anholt.net>
- <1431543609-19646-2-git-send-email-eric@anholt.net>
-Message-ID: <20150514084039.GC22418@x1>
+Date: Thu, 14 May 2015 09:43:07 +0100
+Subject: [PATCH v2] ARM: bcm2835: Use 0x4 prefix for DMA bus addresses to
+ SDRAM.
+In-Reply-To: <1430856611-10487-1-git-send-email-eric@anholt.net>
+References: <1430768034-12734-1-git-send-email-eric@anholt.net>
+ <1430856611-10487-1-git-send-email-eric@anholt.net>
+Message-ID: <20150514084307.GD22418@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 13 May 2015, Eric Anholt wrote:
+On Tue, 05 May 2015, Eric Anholt wrote:
 
-> This driver will provide support for calls into the firmware that will
-> be used by other drivers like cpufreq and vc4.
+> There exists a tiny MMU, configurable only by the VC (running the
+> closed firmware), which maps from the ARM's physical addresses to bus
+> addresses.  These bus addresses determine the caching behavior in the
+> VC's L1/L2 (note: separate from the ARM's L1/L2) according to the top
+> 2 bits.  The bits in the bus address mean:
+> 
+> From the VideoCore processor:
+> 0x0... L1 and L2 cache allocating and coherent
+> 0x4... L1 non-allocating, but coherent. L2 allocating and coherent
+> 0x8... L1 non-allocating, but coherent. L2 non-allocating, but coherent
+> 0xc... SDRAM alias. Cache is bypassed. Not L1 or L2 allocating or coherent
+> 
+> From the GPU peripherals (note: all peripherals bypass the L1
+> cache. The ARM will see this view once through the VC MMU):
+> 0x0... Do not use
+> 0x4... L1 non-allocating, and incoherent. L2 allocating and coherent.
+> 0x8... L1 non-allocating, and incoherent. L2 non-allocating, but coherent
+> 0xc... SDRAM alias. Cache is bypassed. Not L1 or L2 allocating or coherent
+> 
+> The 2835 firmware always configures the MMU to turn ARM physical
+> addresses with 0x0 top bits to 0x4, meaning present in L2 but
+> incoherent with L1.  However, any bus addresses we were generating in
+> the kernel to be passed to a device had 0x0 bits.  That would be a
+> reserved (possibly totally incoherent) value if sent to a GPU
+> peripheral like USB, or L1 allocating if sent to the VC (like a
+> firmware property request).  By setting dma-ranges, all of the devices
+> below it get a dev->dma_pfn_offset, so that dma_alloc_coherent() and
+> friends return addresses with 0x4 bits and avoid cache incoherency.
+> 
+> This matches the behavior in the downstream 2708 kernel (see
+> BUS_OFFSET in arch/arm/mach-bcm2708/include/mach/memory.h).
 > 
 > Signed-off-by: Eric Anholt <eric@anholt.net>
+> Tested-by: Noralf Tr?nnes <noralf@tronnes.org>
+> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: popcornmix at gmail.com
+
+Applied, thanks.
+
 > ---
 > 
-> v2: Improve commit message, point to mailbox.txt for how mboxes work.
+> v2: Fix length of the range from 0x1f000000 to 0x20000000, fixing the
+>     translation for the last 16MB.
 > 
->  .../devicetree/bindings/arm/bcm/raspberrypi,firmware.txt | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/bcm/raspberrypi,firmware.txt
+>  arch/arm/boot/dts/bcm2835.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/bcm/raspberrypi,firmware.txt b/Documentation/devicetree/bindings/arm/bcm/raspberrypi,firmware.txt
-> new file mode 100644
-> index 0000000..33b0043
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/bcm/raspberrypi,firmware.txt
-> @@ -0,0 +1,16 @@
-> +Raspberry Pi VideoCore firmware driver
-> +
-> +Required properties:
-> +
-> +- compatible:		Should be "rasbperrypi,firmware"
-> +- mboxes:		Single-entry list which specifies which mailbox
-> +			  controller and channel is used.  See
-> +			  Documentation/devicetree/bindings/mailbox/mailbox.txt
-> +			  for the semantics of this property
-
-That's not what it looks like to me.  There is no mention of channels
-in a 0 cell property.  Keep it simple.  How about:
-
-Phandle to the firmware device's Mailbox.
-(See: ../mailbox/mailbox.txt for more information)
-
-> +Example:
-> +
-> +firmware {
-> +	compatible = "rasbperrypi,firmware";
-> +	mboxes = <&mailbox>;
-> +};
+> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+> index eb33a8c..3c899b3 100644
+> --- a/arch/arm/boot/dts/bcm2835.dtsi
+> +++ b/arch/arm/boot/dts/bcm2835.dtsi
+> @@ -15,6 +15,7 @@
+>  		#address-cells = <1>;
+>  		#size-cells = <1>;
+>  		ranges = <0x7e000000 0x20000000 0x02000000>;
+> +		dma-ranges = <0x40000000 0x00000000 0x20000000>;
+>  
+>  		timer at 7e003000 {
+>  			compatible = "brcm,bcm2835-system-timer";
