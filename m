@@ -1,35 +1,54 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 14 May 2015 10:07:16 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v4.2
-Message-ID: <cover.1431565572.git.horms+renesas@verge.net.au>
+Date: Thu, 14 May 2015 10:07:17 +0900
+Subject: [PATCH] ARM: shmobile: defconfig: Replace USB_RCAR_GEN2_PHY by
+ PHY_RCAR_GEN2
+In-Reply-To: <cover.1431565572.git.horms+renesas@verge.net.au>
+References: <cover.1431565572.git.horms+renesas@verge.net.au>
+Message-ID: <90037558d5ed25a63499c3973cc1af25da02f673.1431565572.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these Renesas ARM based SoC defconfig updates for v4.2.
+The legacy-only USB_RCAR_GEN2_PHY driver was replaced by the DT-only
+PHY_RCAR_GEN2 driver.
 
+Refresh the defconfig using "make savedefconfig" while we're at it.
 
-The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
-
-  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v4.2
-
-for you to fetch changes up to 90037558d5ed25a63499c3973cc1af25da02f673:
-
-  ARM: shmobile: defconfig: Replace USB_RCAR_GEN2_PHY by PHY_RCAR_GEN2 (2015-05-01 21:25:43 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Defconfig Updates for v4.2
-
-* Replace legacy-only USB_RCAR_GEN2_PHY with DT-only PHY_RCAR_GEN2
-
-----------------------------------------------------------------
-Geert Uytterhoeven (1):
-      ARM: shmobile: defconfig: Replace USB_RCAR_GEN2_PHY by PHY_RCAR_GEN2
-
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/configs/shmobile_defconfig | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index b58618e2d13c..9961fbd633f8 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -121,7 +121,6 @@ CONFIG_WATCHDOG=y
+ CONFIG_DA9063_WATCHDOG=y
+ CONFIG_MFD_AS3711=y
+ CONFIG_MFD_DA9063=y
+-CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_AS3711=y
+ CONFIG_REGULATOR_DA9210=y
+ CONFIG_REGULATOR_GPIO=y
+@@ -160,7 +159,6 @@ CONFIG_USB_OHCI_HCD=y
+ CONFIG_USB_R8A66597_HCD=y
+ CONFIG_USB_RENESAS_USBHS=y
+ CONFIG_USB_RCAR_PHY=y
+-CONFIG_USB_RCAR_GEN2_PHY=y
+ CONFIG_USB_GADGET=y
+ CONFIG_USB_RENESAS_USBHS_UDC=y
+ CONFIG_USB_ETH=y
+@@ -182,6 +180,8 @@ CONFIG_IIO=y
+ CONFIG_AK8975=y
+ CONFIG_PWM=y
+ CONFIG_PWM_RENESAS_TPU=y
++CONFIG_GENERIC_PHY=y
++CONFIG_PHY_RCAR_GEN2=y
+ # CONFIG_DNOTIFY is not set
+ CONFIG_MSDOS_FS=y
+ CONFIG_VFAT_FS=y
+-- 
+2.1.4
