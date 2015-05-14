@@ -1,30 +1,52 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 14 May 2015 09:03:06 +0900
-Subject: [PATCH] drm/exynos: dp: Lower level of EDID read success message
-Message-ID: <1431561786-12413-1-git-send-email-k.kozlowski@samsung.com>
+From: jaegeuk@kernel.org (Jaegeuk Kim)
+Date: Wed, 13 May 2015 17:23:09 -0700
+Subject: [PATCH] f2fs: fix building on 32-bit architectures
+In-Reply-To: <2179770.3R5P5nr1c7@wuerfel>
+References: <2179770.3R5P5nr1c7@wuerfel>
+Message-ID: <20150514002309.GB68412@jaegeuk-mac02>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Don't pollute the dmesg with EDID read success message as an error.
-Printing as debug should be fine.
+Hi Arnd,
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- drivers/gpu/drm/exynos/exynos_dp_core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Thank you for the patch.
+Merged and pushed to -next. :)
 
-diff --git a/drivers/gpu/drm/exynos/exynos_dp_core.c b/drivers/gpu/drm/exynos/exynos_dp_core.c
-index 441ef06b8894..30feb7d06624 100644
---- a/drivers/gpu/drm/exynos/exynos_dp_core.c
-+++ b/drivers/gpu/drm/exynos/exynos_dp_core.c
-@@ -195,7 +195,7 @@ static int exynos_dp_read_edid(struct exynos_dp_device *dp)
- 		}
- 	}
- 
--	dev_err(dp->dev, "EDID Read success!\n");
-+	dev_dbg(dp->dev, "EDID Read success!\n");
- 	return 0;
- }
- 
--- 
-1.9.1
+Thanks,
+
+On Wed, May 13, 2015 at 10:49:58PM +0200, Arnd Bergmann wrote:
+> A bug fix to the debug output extended the type of some local
+> variables to 64-bit, which now causes the kernel to fail building
+> because of missing 64-bit division functions:
+> 
+> ERROR: "__aeabi_uldivmod" [fs/f2fs/f2fs.ko] undefined!
+> 
+> In the kernel, we have to use div_u64 or do_div to do this,
+> in order to annotate that this is an expensive operation.
+> 
+> As the function is only called for debug out, we know this
+> is not performance critical, so it is safe to use div_u64.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: d1f85bd38db19 ("f2fs: avoid value overflow in showing current status")
+> ---
+> This patch is required for ARM allmodconfig builds.
+> 
+> diff --git a/fs/f2fs/debug.c b/fs/f2fs/debug.c
+> index efbc83f07305..75176e0dd6c8 100644
+> --- a/fs/f2fs/debug.c
+> +++ b/fs/f2fs/debug.c
+> @@ -113,10 +113,10 @@ static void update_sit_info(struct f2fs_sb_info *sbi)
+>  			ndirty++;
+>  		}
+>  	}
+> -	dist = MAIN_SECS(sbi) * hblks_per_sec * hblks_per_sec / 100;
+> -	si->bimodal = bimodal / dist;
+> +	dist = div_u64(MAIN_SECS(sbi) * hblks_per_sec * hblks_per_sec, 100);
+> +	si->bimodal = div_u64(bimodal, dist);
+>  	if (si->dirty_count)
+> -		si->avg_vblocks = total_vblocks / ndirty;
+> +		si->avg_vblocks = div_u64(total_vblocks, ndirty);
+>  	else
+>  		si->avg_vblocks = 0;
+>  }
