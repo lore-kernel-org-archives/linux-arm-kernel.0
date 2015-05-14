@@ -1,50 +1,86 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 14 May 2015 18:12:27 +0200
-Subject: [PATCH 01/10] ARM: ux500: delete UART static map
-Message-ID: <1431619947-14850-1-git-send-email-linus.walleij@linaro.org>
+Date: Thu, 14 May 2015 18:12:38 +0200
+Subject: [PATCH 02/10] ARM: ux500: remove static maps from platsmp
+Message-ID: <1431619958-14890-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Delete the static maps for the Ux500 UARTs and rely
-on debug_ll_io_init() to do the trick.
-commit f87b95dd2e4a8832b1d6034f15a5324db42608a0
-"ARM: ux500: move debugmacro to debug includes"
-defined the necessary addruart macro two years ago.
+This removes the reliance on static maps for SCU and backupram
+for the SMP startup of the Ux500 SoC.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-ux500/cpu-db8500.c | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+ arch/arm/mach-ux500/platsmp.c | 28 +++++++---------------------
+ 1 file changed, 7 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index 537a7753afc1..391d329a7e88 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -43,12 +43,6 @@ static struct prcmu_pdata db8500_prcmu_pdata = {
- 	.legacy_offset	= DB8500_PRCMU_LEGACY_OFFSET,
- };
+diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
+index a44967f3168c..1e13d0a8ad77 100644
+--- a/arch/arm/mach-ux500/platsmp.c
++++ b/arch/arm/mach-ux500/platsmp.c
+@@ -26,6 +26,9 @@
+ #include "db8500-regs.h"
+ #include "id.h"
  
--/* minimum static i/o mapping required to boot U8500 platforms */
--static struct map_desc u8500_uart_io_desc[] __initdata = {
--	__IO_DEV_DESC(U8500_UART0_BASE, SZ_4K),
--	__IO_DEV_DESC(U8500_UART2_BASE, SZ_4K),
--};
++static void __iomem *scu_base;
++static void __iomem *backupram;
++
+ /* This is called from headsmp.S to wakeup the secondary core */
+ extern void u8500_secondary_startup(void);
+ 
+@@ -41,16 +44,6 @@ static void write_pen_release(int val)
+ 	sync_cache_w(&pen_release);
+ }
+ 
+-static void __iomem *scu_base_addr(void)
+-{
+-	if (cpu_is_u8500_family() || cpu_is_ux540_family())
+-		return __io_address(U8500_SCU_BASE);
+-	else
+-		ux500_unknown_soc();
 -
- /*  U8500 and U9540 common io_desc */
- static struct map_desc u8500_common_io_desc[] __initdata = {
- 	/* SCU base also covers GIC CPU BASE and TWD with its 4K page */
-@@ -73,11 +67,7 @@ static struct map_desc u9540_io_desc[] __initdata = {
+-	return NULL;
+-}
+-
+ static DEFINE_SPINLOCK(boot_lock);
  
- static void __init u8500_map_io(void)
+ static void ux500_secondary_init(unsigned int cpu)
+@@ -104,13 +97,6 @@ static int ux500_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 
+ static void __init wakeup_secondary(void)
  {
--	/*
--	 * Map the UARTs early so that the DEBUG_LL stuff continues to work.
--	 */
--	iotable_init(u8500_uart_io_desc, ARRAY_SIZE(u8500_uart_io_desc));
+-	void __iomem *backupram;
 -
-+	debug_ll_io_init();
- 	ux500_map_io();
+-	if (cpu_is_u8500_family() || cpu_is_ux540_family())
+-		backupram = __io_address(U8500_BACKUPRAM0_BASE);
+-	else
+-		ux500_unknown_soc();
+-
+ 	/*
+ 	 * write the address of secondary startup into the backup ram register
+ 	 * at offset 0x1FF4, then write the magic number 0xA1FEED01 to the
+@@ -135,10 +121,11 @@ static void __init wakeup_secondary(void)
+  */
+ static void __init ux500_smp_init_cpus(void)
+ {
+-	void __iomem *scu_base = scu_base_addr();
+ 	unsigned int i, ncores;
  
- 	iotable_init(u8500_common_io_desc, ARRAY_SIZE(u8500_common_io_desc));
+-	ncores = scu_base ? scu_get_core_count(scu_base) : 1;
++	scu_base = ioremap(U8500_SCU_BASE, 0x100);
++	backupram = ioremap(U8500_BACKUPRAM0_BASE, SZ_8K);
++	ncores = scu_get_core_count(scu_base);
+ 
+ 	/* sanity check */
+ 	if (ncores > nr_cpu_ids) {
+@@ -153,8 +140,7 @@ static void __init ux500_smp_init_cpus(void)
+ 
+ static void __init ux500_smp_prepare_cpus(unsigned int max_cpus)
+ {
+-
+-	scu_enable(scu_base_addr());
++	scu_enable(scu_base);
+ 	wakeup_secondary();
+ }
+ 
 -- 
 1.9.3
