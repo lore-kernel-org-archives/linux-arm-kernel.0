@@ -1,103 +1,88 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 14 May 2015 08:11:23 -0600
-Subject: [PATCH] ARM: tegra: Enable TPM on tegra124 nyan boards
-In-Reply-To: <CAAObsKCxFJA=6kyHM5rtpJMVRZRDbBO3KSn+QdNoOQz1rXCWTQ@mail.gmail.com>
-References: <1431526427-13340-1-git-send-email-sjg@chromium.org>
- <5553637C.5010506@wwwdotorg.org>
- <CAAObsKCxFJA=6kyHM5rtpJMVRZRDbBO3KSn+QdNoOQz1rXCWTQ@mail.gmail.com>
-Message-ID: <5554AD0B.1060106@wwwdotorg.org>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Thu, 14 May 2015 15:14:40 +0100
+Subject: [PATCH 5/5] arm64: Add DT support for Juno r1 board.
+In-Reply-To: <1431612451.2881.54.camel@linaro.org>
+References: <1431537092-19597-1-git-send-email-Liviu.Dudau@arm.com>
+ <1431537092-19597-6-git-send-email-Liviu.Dudau@arm.com>
+ <1431612451.2881.54.camel@linaro.org>
+Message-ID: <20150514141440.GT2345@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2015 07:09 AM, Tomeu Vizoso wrote:
-> On 13 May 2015 at 16:45, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 05/13/2015 08:13 AM, Simon Glass wrote:
->>>
->>> Regenerate the pinmux from the latest tegra-pinmux-scripts.
->>
->>
->> (Dropping most CCs; DT maintainers and lists generally don't get CC'd on
->> simple DT content changes but rather on schema adds/changes and perhaps
->> major DT content changes depending on context)
->>
->>> diff --git a/arch/arm/boot/dts/tegra124-nyan-big.dts
->>> b/arch/arm/boot/dts/tegra124-nyan-big.dts
->>
->>
->>>                  pinctrl-names = "default";
->>>                  pinctrl-0 = <&pinmux_default>;
->>>
->>> -               pinmux_default: common {
->>> +               state_default: pinmux {
->>
->>
->> This change will break compilation, since it changes the label name, yet the
->> old name is still referenced in pinctrl-0 above. Same applies in the other
->> file too.
->>
->>> diff --git a/arch/arm/boot/dts/tegra124-nyan-blaze.dts
->>> b/arch/arm/boot/dts/tegra124-nyan-blaze.dts
->>
->>
->>> @@ -437,18 +437,18 @@
->>>                          usb_vbus_en0_pn4 {
->>>                                  nvidia,pins = "usb_vbus_en0_pn4";
->>>                                  nvidia,function = "usb";
->>> -                               nvidia,pull = <TEGRA_PIN_PULL_UP>;
->>> +                               nvidia,pull = <TEGRA_PIN_PULL_NONE>;
->>>                                  nvidia,tristate = <TEGRA_PIN_DISABLE>;
->>>                                  nvidia,enable-input = <TEGRA_PIN_ENABLE>;
->>> -                               nvidia,open-drain = <TEGRA_PIN_DISABLE>;
->>> +                               nvidia,open-drain = <TEGRA_PIN_ENABLE>;
->>>                          };
->>>                          usb_vbus_en1_pn5 {
->>>                                  nvidia,pins = "usb_vbus_en1_pn5";
->>>                                  nvidia,function = "usb";
->>> -                               nvidia,pull = <TEGRA_PIN_PULL_UP>;
->>> +                               nvidia,pull = <TEGRA_PIN_PULL_NONE>;
->>>                                  nvidia,tristate = <TEGRA_PIN_DISABLE>;
->>>                                  nvidia,enable-input = <TEGRA_PIN_ENABLE>;
->>> -                               nvidia,open-drain = <TEGRA_PIN_DISABLE>;
->>> +                               nvidia,open-drain = <TEGRA_PIN_ENABLE>;
->>>                          };
->>
->>
->> Tomeu, can you comment on those changes? Evidently the pinmux configuration
->> that's you added to the kernel doesn't exactly match the pinmux
->> configuration that you added to tegra-pinmux-scripts.
->
-> Are you sure? Just checked and what tegra-pinmux-scripts currently
-> generates matches what is currently in the kernel, for both nyans.
+On Thu, May 14, 2015 at 03:07:31PM +0100, Jon Medhurst (Tixy) wrote:
+> On Wed, 2015-05-13 at 18:11 +0100, Liviu Dudau wrote:
+> > This board is based on Juno r0 with updated Cortex A5x revisions
+> > and board errata fixes. It also contains coherent ThinLinks ports
+> > on the expansion slot that allow for an AXI master on the daughter
+> > card to participate in a coherency domain.
+> > 
+> > Support for SoC PCIe host bridge will be added as a separate series.
+> > 
+> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > ---
+> >  arch/arm64/boot/dts/arm/Makefile    |   2 +-
+> >  arch/arm64/boot/dts/arm/juno-r1.dts | 123 ++++++++++++++++++++++++++++++++++++
+> >  2 files changed, 124 insertions(+), 1 deletion(-)
+> >  create mode 100644 arch/arm64/boot/dts/arm/juno-r1.dts
+> > 
+> > diff --git a/arch/arm64/boot/dts/arm/Makefile b/arch/arm64/boot/dts/arm/Makefile
+> > index 301a0da..c5c98b9 100644
+> > --- a/arch/arm64/boot/dts/arm/Makefile
+> > +++ b/arch/arm64/boot/dts/arm/Makefile
+> > @@ -1,5 +1,5 @@
+> >  dtb-$(CONFIG_ARCH_VEXPRESS) += foundation-v8.dtb
+> > -dtb-$(CONFIG_ARCH_VEXPRESS) += juno.dtb
+> > +dtb-$(CONFIG_ARCH_VEXPRESS) += juno.dtb juno-r1.dtb
+> >  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb
+> >  
+> >  always		:= $(dtb-y)
+> > diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
+> > new file mode 100644
+> > index 0000000..f6bc073
+> > --- /dev/null
+> > +++ b/arch/arm64/boot/dts/arm/juno-r1.dts
+> > @@ -0,0 +1,123 @@
+> > +/*
+> > + * ARM Ltd. Juno Platform
+> > + *
+> > + * Copyright (c) 2015 ARM Ltd.
+> > + *
+> > + * This file is licensed under a dual GPLv2 or BSD license.
+> > + */
+> > +
+> > +/dts-v1/;
+> > +
+> > +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> > +
+> > +/ {
+> > +	model = "ARM Juno development board (r1)";
+> > +	compatible = "arm,juno", "arm,vexpress";
+> 
+> Is there scope for adding "arm,juno-r1" to the front of that list?
+> Reason I ask, is that I can't help but think [1] that userside code
+> (like Android) which wants to select device-specific configuration,
+> should use something like the devices compatible string rather than what
+> they currently propose [2].
 
-My apologies; you're correct.
+Sure, I can do that for the next revision of the patch.
 
-This patch to the kernel DTs includes changes that aren't generated by 
-either current tegra-pinmux-scripts, nor by tegra-pinmux-scripts with 
-Simon's "[pinmux scripts PATCH] Support TPM on nyan boards" applied. 
-Simon, can you double-check you didn't have any local patches to 
-tegra-pinmux-scripts applied when you generated the DT content for this 
-patch?
+Best regards,
+Liviu
 
->> Is the change above
->> correct, or do we need to propagate this change from the kernel DT into
->> tegra-pinmux-scripts, and hence also into the U-Boot pinmux setup table?
->>
->> My understanding of how these pins are generally used is that open-drain is
->> likely correct. I have no idea whether Tegra should supply the pullup for
->> these pins, or whether the board has a pullup resistor in which case Tegra
->> doesn't need to pull up.
->
->  From what Andrew (added to CC) said when these changes were discussed,
-> it shouldn't matter as a fixed regulator is used to drive those pins
-> high.
+>  
+> [1] https://lists.linaro.org/pipermail/linaro-android/2015-April/002743.html
+> [2] https://lists.linaro.org/pipermail/linaro-android/2015-April/002742.html
+> 
+> -- 
+> Tixy
+> 
 
-It looks like nyan-big and nyan-blaze configure these pins differently, 
-which may be incorrect if the boards are truly almost identical. Is that 
-expected? Nyan-big sets them both to open-drain but Nyan-blaze sets them 
-to push-pull. The pull-up enable is different too. Typically these pins 
-are open-drain, because there's often a current sensor chip on the USB 
-port power rail which asserts (pulls low in open-drain mode) these 
-signals to turn off the power when an over-current condition is 
-detected. Not all boards do this though, so the difference may be 
-perfectly expected; someone with access to the schematics would have to 
-check.
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
