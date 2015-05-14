@@ -1,147 +1,57 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Thu, 14 May 2015 18:01:02 +0100
-Subject: [RFC 22/23] xen/privcmd: Add support for Linux 64KB page granularity
+Date: Thu, 14 May 2015 18:00:52 +0100
+Subject: [RFC 12/23] xen: Extend page_to_mfn to take an offset in the page
 In-Reply-To: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
 References: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1431622863-28575-23-git-send-email-julien.grall@citrix.com>
+Message-ID: <1431622863-28575-13-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The hypercall interface (as well as the toolstack) is always using 4KB
-page granularity. When the toolstack is asking for mapping a series of
-guest PFN in a batch, it expects to have the page map contiguously in
-its virtual memory.
+With 64KB page granularity support in Linux, a page will be split accross
+multiple MFN (Xen is using 4KB page granularity). Thoses MFNs may not be
+contiguous.
 
-When Linux is using 64KB page granularity, the privcmd driver will have
-to map multiple Xen PFN in a single Linux page.
-
-Note that this solution works on page granularity which is a multiple of
-4KB.
+With the offset in the page, the helper will be able to know which MFN
+the driver needs to retrieve.
 
 Signed-off-by: Julien Grall <julien.grall@citrix.com>
 Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
 Cc: David Vrabel <david.vrabel@citrix.com>
+Cc: netdev at vger.kernel.org
 ---
- drivers/xen/privcmd.c   |  8 +++++---
- drivers/xen/xlate_mmu.c | 31 ++++++++++++++++++++-----------
- 2 files changed, 25 insertions(+), 14 deletions(-)
+ drivers/net/xen-netfront.c | 2 +-
+ include/xen/page.h         | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/xen/privcmd.c b/drivers/xen/privcmd.c
-index 5a29616..e8714b4 100644
---- a/drivers/xen/privcmd.c
-+++ b/drivers/xen/privcmd.c
-@@ -446,7 +446,7 @@ static long privcmd_ioctl_mmap_batch(void __user *udata, int version)
- 		return -EINVAL;
- 	}
+diff --git a/drivers/net/xen-netfront.c b/drivers/net/xen-netfront.c
+index 381d38f..6a0e329 100644
+--- a/drivers/net/xen-netfront.c
++++ b/drivers/net/xen-netfront.c
+@@ -431,7 +431,7 @@ static struct xen_netif_tx_request *xennet_make_one_txreq(
+ 	BUG_ON((signed short)ref < 0);
  
--	nr_pages = m.num;
-+	nr_pages = DIV_ROUND_UP_ULL(m.num, PAGE_SIZE / XEN_PAGE_SIZE);
- 	if ((m.num <= 0) || (nr_pages > (LONG_MAX >> PAGE_SHIFT)))
- 		return -EINVAL;
+ 	gnttab_grant_foreign_access_ref(ref, queue->info->xbdev->otherend_id,
+-					page_to_mfn(page), GNTMAP_readonly);
++					page_to_mfn(page, 0), GNTMAP_readonly);
  
-@@ -494,7 +494,7 @@ static long privcmd_ioctl_mmap_batch(void __user *udata, int version)
- 			goto out_unlock;
- 		}
- 		if (xen_feature(XENFEAT_auto_translated_physmap)) {
--			ret = alloc_empty_pages(vma, m.num);
-+			ret = alloc_empty_pages(vma, nr_pages);
- 			if (ret < 0)
- 				goto out_unlock;
- 		} else
-@@ -518,6 +518,7 @@ static long privcmd_ioctl_mmap_batch(void __user *udata, int version)
- 	state.global_error  = 0;
- 	state.version       = version;
+ 	queue->tx_skbs[id].skb = skb;
+ 	queue->grant_tx_page[id] = page;
+diff --git a/include/xen/page.h b/include/xen/page.h
+index 89ae01c..8848da1 100644
+--- a/include/xen/page.h
++++ b/include/xen/page.h
+@@ -20,9 +20,9 @@
  
-+	BUILD_BUG_ON(((PAGE_SIZE / sizeof(xen_pfn_t)) % XEN_PFN_PER_PAGE) != 0);
- 	/* mmap_batch_fn guarantees ret == 0 */
- 	BUG_ON(traverse_pages_block(m.num, sizeof(xen_pfn_t),
- 				    &pagelist, mmap_batch_fn, &state));
-@@ -582,12 +583,13 @@ static void privcmd_close(struct vm_area_struct *vma)
+ #include <asm/xen/page.h>
+ 
+-static inline unsigned long page_to_mfn(struct page *page)
++static inline unsigned long page_to_mfn(struct page *page, unsigned int offset)
  {
- 	struct page **pages = vma->vm_private_data;
- 	int numpgs = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
-+	int nr_pfn = (vma->vm_end - vma->vm_start) >> XEN_PAGE_SHIFT;
- 	int rc;
- 
- 	if (!xen_feature(XENFEAT_auto_translated_physmap) || !numpgs || !pages)
- 		return;
- 
--	rc = xen_unmap_domain_mfn_range(vma, numpgs, pages);
-+	rc = xen_unmap_domain_mfn_range(vma, nr_pfn, pages);
- 	if (rc == 0)
- 		free_xenballooned_pages(numpgs, pages);
- 	else
-diff --git a/drivers/xen/xlate_mmu.c b/drivers/xen/xlate_mmu.c
-index 58a5389..b9dfe1b 100644
---- a/drivers/xen/xlate_mmu.c
-+++ b/drivers/xen/xlate_mmu.c
-@@ -63,6 +63,7 @@ static int map_foreign_page(unsigned long lpfn, unsigned long fgmfn,
- 
- struct remap_data {
- 	xen_pfn_t *fgmfn; /* foreign domain's gmfn */
-+	xen_pfn_t *egmfn; /* end foreign domain's gmfn */
- 	pgprot_t prot;
- 	domid_t  domid;
- 	struct vm_area_struct *vma;
-@@ -78,17 +79,23 @@ static int remap_pte_fn(pte_t *ptep, pgtable_t token, unsigned long addr,
- {
- 	struct remap_data *info = data;
- 	struct page *page = info->pages[info->index++];
--	unsigned long pfn = page_to_pfn(page);
--	pte_t pte = pte_mkspecial(pfn_pte(pfn, info->prot));
-+	unsigned long pfn = xen_page_to_pfn(page);
-+	pte_t pte = pte_mkspecial(pfn_pte(page_to_pfn(page), info->prot));
- 	int rc;
--
--	rc = map_foreign_page(pfn, *info->fgmfn, info->domid);
--	*info->err_ptr++ = rc;
--	if (!rc) {
--		set_pte_at(info->vma->vm_mm, addr, ptep, pte);
--		info->mapped++;
-+	uint32_t i;
-+
-+	for (i = 0; i < XEN_PFN_PER_PAGE; i++) {
-+		if (info->fgmfn == info->egmfn)
-+			break;
-+
-+		rc = map_foreign_page(pfn++, *info->fgmfn, info->domid);
-+		*info->err_ptr++ = rc;
-+		if (!rc) {
-+			set_pte_at(info->vma->vm_mm, addr, ptep, pte);
-+			info->mapped++;
-+		}
-+		info->fgmfn++;
- 	}
--	info->fgmfn++;
- 
- 	return 0;
+-	return pfn_to_mfn(xen_page_to_pfn(page));
++	return pfn_to_mfn(xen_page_to_pfn(page) + (offset >> XEN_PAGE_SHIFT));
  }
-@@ -102,13 +109,14 @@ int xen_xlate_remap_gfn_array(struct vm_area_struct *vma,
- {
- 	int err;
- 	struct remap_data data;
--	unsigned long range = nr << PAGE_SHIFT;
-+	unsigned long range = round_up(nr, XEN_PFN_PER_PAGE) << XEN_PAGE_SHIFT;
  
- 	/* Kept here for the purpose of making sure code doesn't break
- 	   x86 PVOPS */
- 	BUG_ON(!((vma->vm_flags & (VM_PFNMAP | VM_IO)) == (VM_PFNMAP | VM_IO)));
- 
- 	data.fgmfn = mfn;
-+	data.egmfn = mfn + nr;
- 	data.prot  = prot;
- 	data.domid = domid;
- 	data.vma   = vma;
-@@ -132,7 +140,8 @@ int xen_xlate_unmap_gfn_range(struct vm_area_struct *vma,
- 		struct xen_remove_from_physmap xrp;
- 		unsigned long pfn;
- 
--		pfn = page_to_pfn(pages[i]);
-+		pfn = xen_page_to_pfn(pages[i / XEN_PFN_PER_PAGE]) +
-+			(i % XEN_PFN_PER_PAGE);
- 
- 		xrp.domid = DOMID_SELF;
- 		xrp.gpfn = pfn;
+ struct xen_memory_region {
 -- 
 2.1.4
