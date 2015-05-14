@@ -1,42 +1,47 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 14 May 2015 10:58:56 +0100
-Subject: [PATCH] ARM: l2c: add options to overwrite prefetching behavior
-In-Reply-To: <1431560520-12544-1-git-send-email-hauke@hauke-m.de>
-References: <1431560520-12544-1-git-send-email-hauke@hauke-m.de>
-Message-ID: <20150514095856.GU2067@n2100.arm.linux.org.uk>
+Date: Thu, 14 May 2015 11:03:30 +0100
+Subject: [PATCH] lib: fix 842 build on 32-bit architectures
+In-Reply-To: <2802721.Q9KnE9eNH4@wuerfel>
+References: <2802721.Q9KnE9eNH4@wuerfel>
+Message-ID: <20150514100330.GV2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 14, 2015 at 01:42:00AM +0200, Hauke Mehrtens wrote:
-> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> index e309c8f..f919548 100644
-> --- a/arch/arm/mm/cache-l2x0.c
-> +++ b/arch/arm/mm/cache-l2x0.c
-> @@ -1149,6 +1149,16 @@ static void __init l2c310_of_parse(const struct device_node *np,
->  		}
->  	}
+On Wed, May 13, 2015 at 10:56:39PM +0200, Arnd Bergmann wrote:
+> Building the 842 code on 32-bit ARM currently results in this link
+> error:
+> 
+> ERROR: "__aeabi_uldivmod" [lib/842/842_decompress.ko] undefined!
+> 
+> The reason is that the __do_index function performs a 64-bit
+> division by a power-of-two number, but it has no insight into
+> the function arguments.
+> 
+> By marking that function inline, the fsize argument is always
+> known at the time that do_index is called, and the compiler is
+> able to replace the extremely expensive 64-bit division with
+> a cheap constant shift operation.
+> 
+> Aside from fixing that link error, this approach should also improve
+> both code size and performance on 32-bit architectures significantly.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> Found while building arm32 allmodconfig with gcc-5.0
+> 
+> diff --git a/lib/842/842_decompress.c b/lib/842/842_decompress.c
+> index 6b2b45aecde3..285bf6b6959c 100644
+> --- a/lib/842/842_decompress.c
+> +++ b/lib/842/842_decompress.c
+> @@ -169,7 +169,7 @@ static int do_data(struct sw842_param *p, u8 n)
+>  	return 0;
+>  }
 >  
-> +	if (of_property_read_bool(np, "arm,prefetch-data")) {
-> +		*aux_val |= L310_AUX_CTRL_DATA_PREFETCH;
-> +		*aux_mask &= ~L310_AUX_CTRL_DATA_PREFETCH;
-> +	}
-> +
-> +	if (of_property_read_bool(np, "arm,prefetch-instr")) {
-> +		*aux_val |= L310_AUX_CTRL_INSTR_PREFETCH;
-> +		*aux_mask &= ~L310_AUX_CTRL_INSTR_PREFETCH;
-> +	}
-> +
->  	prefetch = l2x0_saved_regs.prefetch_ctrl;
->  
->  	ret = of_property_read_u32(np, "arm,double-linefill", &val);
+> -static int __do_index(struct sw842_param *p, u8 size, u8 bits, u64 fsize)
+> +static inline int __do_index(struct sw842_param *p, u8 size, u8 bits, u64 fsize)
 
-Please move these down along-side the "arm,prefetch-offset" property
-parsing, and please update the prefetch value using
-L310_PREFETCH_CTRL_DATA_PREFETCH and L310_PREFETCH_CTRL_INSTR_PREFETCH
-instead.
-
-These are in fact the same bit, but let's try to keep the prefetch
-configuration all in one place and via the same method.
+This had better get a comment to say why this is done, to stop the
+"don't do static inline in a .c" brigade reverting this change.
 
 -- 
 FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
