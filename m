@@ -1,202 +1,40 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 15 May 2015 00:03:12 +0200
-Subject: [PATCH v2 5/5] cpufreq: arm_big_little: add SCPI interface driver
-In-Reply-To: <1431618155-3132-6-git-send-email-sudeep.holla@arm.com>
-References: <1431618155-3132-1-git-send-email-sudeep.holla@arm.com>
- <1431618155-3132-6-git-send-email-sudeep.holla@arm.com>
-Message-ID: <4255582.h4bFD3eA9g@vostro.rjw.lan>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 14 May 2015 23:50:47 +0200
+Subject: [PATCH] rtc: pfc8563: fix uninitialized variable warning
+In-Reply-To: <2293546.ekQV1ek12O@wuerfel>
+References: <2293546.ekQV1ek12O@wuerfel>
+Message-ID: <20150514215047.GE3338@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, May 14, 2015 04:42:35 PM Sudeep Holla wrote:
-> On some ARM based systems, a separate Cortex-M based System Control
-> Processor(SCP) provides the overall power, clock, reset and system
-> control including CPU DVFS. SCPI Message Protocol is used to
-> communicate with the SCPI.
-> 
-> This patch adds a interface driver for adding OPPs and registering
-> the arm_big_little cpufreq driver for such systems.
-> 
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> Cc: linux-pm at vger.kernel.org
-> ---
->  drivers/cpufreq/Kconfig.arm    |   9 +++
->  drivers/cpufreq/Makefile       |   1 +
->  drivers/cpufreq/scpi-cpufreq.c | 124 +++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 134 insertions(+)
->  create mode 100644 drivers/cpufreq/scpi-cpufreq.c
-> 
-> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> index 611cb09239eb..6419b17b89dd 100644
-> --- a/drivers/cpufreq/Kconfig.arm
-> +++ b/drivers/cpufreq/Kconfig.arm
-> @@ -24,6 +24,15 @@ config ARM_VEXPRESS_SPC_CPUFREQ
->            This add the CPUfreq driver support for Versatile Express
->  	  big.LITTLE platforms using SPC for power management.
->  
-> +config ARM_SCPI_CPUFREQ
-> +        tristate "SCPI based CPUfreq driver"
-> +	depends on ARM_BIG_LITTLE_CPUFREQ && ARM_SCPI_PROTOCOL
-> +        help
-> +	  This adds the CPUfreq driver support for ARM big.LITTLE platforms
-> +	  using SCPI protocol for CPU power management.
-> +
-> +	  This driver uses SCPI Message Protocol driver to interact with the
-> +	  firmware providing the CPU DVFS functionality.
->  
->  config ARM_EXYNOS_CPUFREQ
->  	tristate "SAMSUNG EXYNOS CPUfreq Driver"
-> diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-> index cdce92ae2e8b..02fc9f849d4b 100644
-> --- a/drivers/cpufreq/Makefile
-> +++ b/drivers/cpufreq/Makefile
-> @@ -79,6 +79,7 @@ obj-$(CONFIG_ARM_SA1110_CPUFREQ)	+= sa1110-cpufreq.o
->  obj-$(CONFIG_ARM_SPEAR_CPUFREQ)		+= spear-cpufreq.o
->  obj-$(CONFIG_ARM_TEGRA_CPUFREQ)		+= tegra-cpufreq.o
->  obj-$(CONFIG_ARM_VEXPRESS_SPC_CPUFREQ)	+= vexpress-spc-cpufreq.o
-> +obj-$(CONFIG_ARM_SCPI_CPUFREQ)		+= scpi-cpufreq.o
->  
->  ##################################################################################
->  # PowerPC platform drivers
-> diff --git a/drivers/cpufreq/scpi-cpufreq.c b/drivers/cpufreq/scpi-cpufreq.c
-> new file mode 100644
-> index 000000000000..443570801229
-> --- /dev/null
-> +++ b/drivers/cpufreq/scpi-cpufreq.c
-> @@ -0,0 +1,124 @@
-> +/*
-> + * SCPI CPUFreq Interface driver
+Hi Andrew,
 
-It would be good to expand the TLA here IMO.
-
-The rest I'm leaving to Viresh. :-)
-
-> + *
-> + * It provides necessary ops to arm_big_little cpufreq driver.
-> + *
-> + * Copyright (C) 2015 ARM Ltd.
-> + * Sudeep Holla <sudeep.holla@arm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-> + * kind, whether express or implied; without even the implied warranty
-> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-> +
-> +#include <linux/cpufreq.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/pm_opp.h>
-> +#include <linux/scpi_protocol.h>
-> +#include <linux/types.h>
-> +
-> +#include "arm_big_little.h"
-> +
-> +static struct scpi_ops *scpi_ops;
-> +
-> +static struct scpi_dvfs_info *scpi_get_dvfs_info(struct device *cpu_dev)
-> +{
-> +	u8 domain = topology_physical_package_id(cpu_dev->id);
-> +
-> +	if (domain < 0)
-> +		return ERR_PTR(-EINVAL);
-> +	return scpi_ops->dvfs_get_info(domain);
-> +}
-> +
-> +static int scpi_opp_table_ops(struct device *cpu_dev, bool remove)
-> +{
-> +	int idx, ret = 0;
-> +	struct scpi_opp *opp;
-> +	struct scpi_dvfs_info *info = scpi_get_dvfs_info(cpu_dev);
-> +
-> +	if (IS_ERR(info))
-> +		return PTR_ERR(info);
-> +
-> +	if (!info->opps)
-> +		return -EIO;
-> +
-> +	for (opp = info->opps, idx = 0; idx < info->count; idx++, opp++) {
-> +		if (remove)
-> +			dev_pm_opp_remove(cpu_dev, opp->freq);
-> +		else
-> +			ret = dev_pm_opp_add(cpu_dev, opp->freq,
-> +					     opp->m_volt * 1000);
-> +		if (ret) {
-> +			dev_warn(cpu_dev, "failed to add opp %uHz %umV\n",
-> +				 opp->freq, opp->m_volt);
-> +			while (idx-- > 0)
-> +				dev_pm_opp_remove(cpu_dev, (--opp)->freq);
-> +			return ret;
-> +		}
-> +	}
-> +	return ret;
-> +}
-> +
-> +static int scpi_get_transition_latency(struct device *cpu_dev)
-> +{
-> +	struct scpi_dvfs_info *info = scpi_get_dvfs_info(cpu_dev);
-> +
-> +	if (IS_ERR(info))
-> +		return PTR_ERR(info);
-> +	return info->latency;
-> +}
-> +
-> +static int scpi_init_opp_table(struct device *cpu_dev)
-> +{
-> +	return scpi_opp_table_ops(cpu_dev, false);
-> +}
-> +
-> +static void scpi_free_opp_table(struct device *cpu_dev)
-> +{
-> +	scpi_opp_table_ops(cpu_dev, true);
-> +}
-> +
-> +static struct cpufreq_arm_bL_ops scpi_cpufreq_ops = {
-> +	.name	= "scpi",
-> +	.get_transition_latency = scpi_get_transition_latency,
-> +	.init_opp_table = scpi_init_opp_table,
-> +	.free_opp_table = scpi_free_opp_table,
-> +};
-> +
-> +static int scpi_cpufreq_probe(struct platform_device *pdev)
-> +{
-> +	scpi_ops = get_scpi_ops();
-> +	if (!scpi_ops)
-> +		return -EIO;
-> +
-> +	return bL_cpufreq_register(&scpi_cpufreq_ops);
-> +}
-> +
-> +static int scpi_cpufreq_remove(struct platform_device *pdev)
-> +{
-> +	bL_cpufreq_unregister(&scpi_cpufreq_ops);
-> +	scpi_ops = NULL;
-> +	return 0;
-> +}
-> +
-> +static struct platform_driver scpi_cpufreq_platdrv = {
-> +	.driver = {
-> +		.name	= "scpi-cpufreq",
-> +		.owner	= THIS_MODULE,
-> +	},
-> +	.probe		= scpi_cpufreq_probe,
-> +	.remove		= scpi_cpufreq_remove,
-> +};
-> +module_platform_driver(scpi_cpufreq_platdrv);
-> +
-> +MODULE_AUTHOR("Sudeep Holla <sudeep.holla@arm.com>");
-> +MODULE_DESCRIPTION("ARM SCPI CPUFreq interface driver");
-> +MODULE_LICENSE("GPL v2");
+On 12/05/2015 at 23:27:02 +0200, Arnd Bergmann wrote :
+> Gcc is unable to prove that alm_pending is always initialized
+> when it is used, so it prints a harmless warning:
 > 
+> drivers/rtc/rtc-pcf8563.c: In function 'pcf8563_probe':
+> drivers/rtc/rtc-pcf8563.c:449:5: warning: 'alm_pending' may be used uninitialized in this function [-Wmaybe-uninitialized]
+> 
+> This uses the same conditional expression that is used inside of
+> the pcf8563_get_alarm_mode() function, to help gcc figure it out
+> and shut up that warning, and make the ARM defconfigs build again
+> with no warnings.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: a45d528aab8b ("rtc: pcf8563: clear expired alarm at boot time")
+> 
+
+Can you send that fix to Linus for the next 4.1 rc?
+
+You can add my
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+
+I hope that will be the last one :)
+
+Thanks!
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
