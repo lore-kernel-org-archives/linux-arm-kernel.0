@@ -1,54 +1,58 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 14 May 2015 15:42:16 +0100
-Subject: [RFC/RFT PATCH 2/2] ARM64: kernel: pci: implement PCI device
- resources claiming
-In-Reply-To: <1431614537-16136-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1431614537-16136-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1431614537-16136-2-git-send-email-lorenzo.pieralisi@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 14 May 2015 15:42:39 +0100
+Subject: schedule_timeout sleeps too long after dividing CPU frequency
+In-Reply-To: <CAKohpon4AV-7nq=Qm7PpDbbW9ti98avY9zz82htzyHWi5_K7fA@mail.gmail.com>
+References: <55520F0F.5010906@free.fr>
+ <CAKohpo=eMA6L9=jK=bAnbFuDxcdtpQNub0WFnSy6MOqB3jOdjA@mail.gmail.com>
+ <555218C7.5050602@free.fr>
+ <20150512155004.GP2067@n2100.arm.linux.org.uk>
+ <555380F8.5050306@free.fr>
+ <CAOh2x==aCLxCWX9K57hOFVEP1eLo_OYZPe0YvbFvpkXcoSp_hQ@mail.gmail.com>
+ <5554858A.9010207@free.fr> <20150514115456.GB23999@linux>
+ <55549DEE.6010202@free.fr>
+ <CAKohpon4AV-7nq=Qm7PpDbbW9ti98avY9zz82htzyHWi5_K7fA@mail.gmail.com>
+Message-ID: <20150514144239.GZ2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a device is scanned and added to the PCI bus, its resources
-should be claimed to validate the BARs configuration and to assign
-them a parent resource so that the resource hierarchy can be sanity
-checked.
+On Thu, May 14, 2015 at 07:29:38PM +0530, Viresh Kumar wrote:
+> On 14 May 2015 at 18:36, Mason <slash.tmp@free.fr> wrote:
+> > When I execute "echo 18500 > scaling_max_freq"
+> > the system is supposed to change the CPU frequency to 18.5 MHz
+> > (I might have a bug lurking there) and PERIPHCLK is 1/2 of that,
+> > i.e 9.25 MHz.
+> 
+> So at least we are on the right path. But it looks to me that this
+> call is not getting propagated well.
+> 
+> >From the attachment you gave initially, the event handler for
+> twd-timers is: tick_handle_periodic(). i.e. you are running in
+> periodic mode and not onshot...
+> 
+> why ?
 
-This patch adds code that carries out PCI device resources claiming to
-the ARM64 pcibios_add_device implementation so that device resources
-are claimed by the core PCI layer upon PCI device initialization on
-ARM64 systems.
+If it's in periodic mode, the update should still be propagated to the
+hardware, assuming the generic time keeping code doesn't produce an
+error.
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Liviu Dudau <liviu.dudau@arm.com>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
----
- arch/arm64/kernel/pci.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+twd_update_frequency
+`-clockevents_update_freq
+  `-__clockevents_update_freq
+    `-__clockevents_set_state(, CLOCK_EVT_STATE_PERIODIC)
+      `-dev->set_mode (twd_set_mode)
 
-diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-index 4095379..c0a88ca 100644
---- a/arch/arm64/kernel/pci.c
-+++ b/arch/arm64/kernel/pci.c
-@@ -43,8 +43,18 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
-  */
- int pcibios_add_device(struct pci_dev *dev)
- {
-+	struct resource *res;
-+	int i;
-+
- 	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
- 
-+	for (i = 0; i < PCI_NUM_RESOURCES; i++) {
-+		res = &dev->resource[i];
-+		if (res->parent || !res->flags)
-+			continue;
-+		pci_claim_resource(dev, i);
-+	}
-+
- 	return 0;
- }
- 
+That re-writes the TWD_TIMER_LOAD register based on twd_timer_rate,
+which would have been updated by twd_update_frequency().
+
+The question I posed earlier remains: is clockevents_update_freq()
+failing?  We don't know, because we never check its return value.
+
+Another thing to look at is whether we reach twd_set_mode().
+
+Lastly, printing the values of the TWD_TIMER_LOAD and TWD_TIMER_COUNTER
+after twd_set_mode() has written TWD_TIMER_LOAD might provide some
+hints as to what's going on.
+
 -- 
-2.2.1
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
