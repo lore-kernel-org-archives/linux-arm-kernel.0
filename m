@@ -1,224 +1,131 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Thu, 14 May 2015 10:22:53 -0400
-Subject: [PATCH] arm64: support ACPI tables outside of kernel RAM
-Message-ID: <1431613373-10928-1-git-send-email-msalter@redhat.com>
+From: sjg@chromium.org (Simon Glass)
+Date: Thu, 14 May 2015 08:28:59 -0600
+Subject: [PATCH] ARM: tegra: Enable TPM on tegra124 nyan boards
+In-Reply-To: <5554AD0B.1060106@wwwdotorg.org>
+References: <1431526427-13340-1-git-send-email-sjg@chromium.org>
+ <5553637C.5010506@wwwdotorg.org>
+ <CAAObsKCxFJA=6kyHM5rtpJMVRZRDbBO3KSn+QdNoOQz1rXCWTQ@mail.gmail.com>
+ <5554AD0B.1060106@wwwdotorg.org>
+Message-ID: <CAPnjgZ2QrTu=D_AapTded+_NR1waZTbNoN8rCtHnTdd0OdnwLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no guarantee that ACPI tables will be located in RAM linearly
-mapped by the kernel. This could be because UEFI placed them below the
-kernel image or because mem= places them beyond the reach of the linear
-kernel mapping. Even though these tables are outside the linear mapped
-RAM, they still need to be accessed as normal memory in order to support
-unaligned accesses from ACPI code. In this case, the page_is_ram() test
-in acpi_os_ioremap() is not sufficient. Additionally, if the table spans
-multiple pages, it may fall partially within the linear map and partially
-without. If the table overlaps the end of the linear map, the test for
-whether or not to use the existing mapping in ioremap_cache() could lead
-to a panic when ACPI code tries to access the part beyond the end of the
-linear map. This patch attempts to address these problems.
+Hi Stephen,
 
-Cc: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Matt Fleming <matt.fleming@intel.com>
-Signed-off-by: Mark Salter <msalter@redhat.com>
----
- arch/arm64/include/asm/acpi.h |  6 ++-
- arch/arm64/include/asm/efi.h  |  2 +
- arch/arm64/kernel/acpi.c      | 13 ++++++
- arch/arm64/kernel/efi.c       | 95 +++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/setup.c     |  1 +
- arch/arm64/mm/ioremap.c       |  3 +-
- 6 files changed, 118 insertions(+), 2 deletions(-)
+On 14 May 2015 at 08:11, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 05/14/2015 07:09 AM, Tomeu Vizoso wrote:
+>>
+>> On 13 May 2015 at 16:45, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>>
+>>> On 05/13/2015 08:13 AM, Simon Glass wrote:
+>>>>
+>>>>
+>>>> Regenerate the pinmux from the latest tegra-pinmux-scripts.
+>>>
+>>>
+>>>
+>>> (Dropping most CCs; DT maintainers and lists generally don't get CC'd on
+>>> simple DT content changes but rather on schema adds/changes and perhaps
+>>> major DT content changes depending on context)
+>>>
+>>>> diff --git a/arch/arm/boot/dts/tegra124-nyan-big.dts
+>>>> b/arch/arm/boot/dts/tegra124-nyan-big.dts
+>>>
+>>>
+>>>
+>>>>                  pinctrl-names = "default";
+>>>>                  pinctrl-0 = <&pinmux_default>;
+>>>>
+>>>> -               pinmux_default: common {
+>>>> +               state_default: pinmux {
+>>>
+>>>
+>>>
+>>> This change will break compilation, since it changes the label name, yet
+>>> the
+>>> old name is still referenced in pinctrl-0 above. Same applies in the
+>>> other
+>>> file too.
+>>>
+>>>> diff --git a/arch/arm/boot/dts/tegra124-nyan-blaze.dts
+>>>> b/arch/arm/boot/dts/tegra124-nyan-blaze.dts
+>>>
+>>>
+>>>
+>>>> @@ -437,18 +437,18 @@
+>>>>                          usb_vbus_en0_pn4 {
+>>>>                                  nvidia,pins = "usb_vbus_en0_pn4";
+>>>>                                  nvidia,function = "usb";
+>>>> -                               nvidia,pull = <TEGRA_PIN_PULL_UP>;
+>>>> +                               nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+>>>>                                  nvidia,tristate = <TEGRA_PIN_DISABLE>;
+>>>>                                  nvidia,enable-input =
+>>>> <TEGRA_PIN_ENABLE>;
+>>>> -                               nvidia,open-drain = <TEGRA_PIN_DISABLE>;
+>>>> +                               nvidia,open-drain = <TEGRA_PIN_ENABLE>;
+>>>>                          };
+>>>>                          usb_vbus_en1_pn5 {
+>>>>                                  nvidia,pins = "usb_vbus_en1_pn5";
+>>>>                                  nvidia,function = "usb";
+>>>> -                               nvidia,pull = <TEGRA_PIN_PULL_UP>;
+>>>> +                               nvidia,pull = <TEGRA_PIN_PULL_NONE>;
+>>>>                                  nvidia,tristate = <TEGRA_PIN_DISABLE>;
+>>>>                                  nvidia,enable-input =
+>>>> <TEGRA_PIN_ENABLE>;
+>>>> -                               nvidia,open-drain = <TEGRA_PIN_DISABLE>;
+>>>> +                               nvidia,open-drain = <TEGRA_PIN_ENABLE>;
+>>>>                          };
+>>>
+>>>
+>>>
+>>> Tomeu, can you comment on those changes? Evidently the pinmux
+>>> configuration
+>>> that's you added to the kernel doesn't exactly match the pinmux
+>>> configuration that you added to tegra-pinmux-scripts.
+>>
+>>
+>> Are you sure? Just checked and what tegra-pinmux-scripts currently
+>> generates matches what is currently in the kernel, for both nyans.
+>
+>
+> My apologies; you're correct.
+>
+> This patch to the kernel DTs includes changes that aren't generated by
+> either current tegra-pinmux-scripts, nor by tegra-pinmux-scripts with
+> Simon's "[pinmux scripts PATCH] Support TPM on nyan boards" applied. Simon,
+> can you double-check you didn't have any local patches to
+> tegra-pinmux-scripts applied when you generated the DT content for this
+> patch?
 
-diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index 59c05d8..0849533 100644
---- a/arch/arm64/include/asm/acpi.h
-+++ b/arch/arm64/include/asm/acpi.h
-@@ -20,11 +20,15 @@
- 
- /* Basic configuration for ACPI */
- #ifdef	CONFIG_ACPI
-+extern int page_is_acpi_ram(unsigned long pfn);
-+
- /* ACPI table mapping after acpi_gbl_permanent_mmap is set */
- static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
- 					    acpi_size size)
- {
--	if (!page_is_ram(phys >> PAGE_SHIFT))
-+	unsigned long pfn = phys >> PAGE_SHIFT;
-+
-+	if (!page_is_ram(pfn) && !page_is_acpi_ram(pfn))
- 		return ioremap(phys, size);
- 
- 	return ioremap_cache(phys, size);
-diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-index ef57220..3d5c12a 100644
---- a/arch/arm64/include/asm/efi.h
-+++ b/arch/arm64/include/asm/efi.h
-@@ -6,8 +6,10 @@
- 
- #ifdef CONFIG_EFI
- extern void efi_init(void);
-+extern void efi_request_acpi_resources(void);
- #else
- #define efi_init()
-+#define efi_request_acpi_resources()
- #endif
- 
- #define efi_call_virt(f, ...)						\
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index 8b83955..2c85ca0 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -343,3 +343,16 @@ void __init acpi_gic_init(void)
- 
- 	early_acpi_os_unmap_memory((char *)table, tbl_size);
- }
-+
-+static int __is_acpi_ram(u64 start, u64 end, void *arg)
-+{
-+	return 1;
-+}
-+
-+int page_is_acpi_ram(unsigned long pfn)
-+{
-+	u64 addr = (u64) pfn << PAGE_SHIFT;
-+
-+	return walk_iomem_res("ACPI RAM", IORESOURCE_MEM | IORESOURCE_BUSY,
-+			      addr, addr, NULL, __is_acpi_ram) == 1;
-+}
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index ab21e0d..2d914d7 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -204,6 +204,101 @@ static __init void reserve_regions(void)
- 	set_bit(EFI_MEMMAP, &efi.flags);
- }
- 
-+#ifdef CONFIG_ACPI
-+static void __init __insert_resource(struct resource *res)
-+{
-+	struct resource *r, *conflict;
-+
-+	r = alloc_bootmem_low(sizeof(*r));
-+	*r = *res;
-+
-+	/*
-+	 * When inserting a resource, there will be a conflict
-+	 * only if the resource being inserted partially overlaps
-+	 * an existing resource. If the resource being inserted
-+	 * is entirely within an existing resource, it becomes
-+	 * a child of that resource with no conflict. So if we
-+	 * do get a conflict, split the one resource into two
-+	 * resources: one inside the conflict and one outside.
-+	 */
-+	conflict = insert_resource_conflict(&iomem_resource, r);
-+	if (conflict) {
-+		struct resource *tmp;
-+
-+		tmp = alloc_bootmem_low(sizeof(*tmp));
-+		*tmp = *r;
-+
-+		if (r->start >= conflict->start) {
-+			r->start = conflict->end + 1;
-+			tmp->end = conflict->end;
-+		} else {
-+			r->end = conflict->start - 1;
-+			tmp->start = conflict->start;
-+		}
-+		insert_resource(&iomem_resource, tmp);
-+		insert_resource(&iomem_resource, r);
-+	}
-+}
-+
-+/*
-+ * Create /proc/iomem resources for any ACPI regions in RAM.
-+ */
-+void __init efi_request_acpi_resources(void)
-+{
-+	struct resource res;
-+	efi_memory_desc_t *md;
-+	u64 start, end, npages;
-+	unsigned long mapsize = memmap.map_end - memmap.map;
-+	void *map;
-+
-+	map = early_memremap((resource_size_t)memmap.phys_map, mapsize);
-+	if (map == NULL)
-+		return;
-+	memmap.map = map;
-+	memmap.map_end = map + mapsize;
-+
-+	memset(&res, 0, sizeof(res));
-+	res.name  = "ACPI RAM";
-+	res.flags = IORESOURCE_MEM | IORESOURCE_BUSY;
-+
-+	for_each_efi_memory_desc(&memmap, md) {
-+		if (!is_normal_ram(md) ||
-+		    !(md->type == EFI_ACPI_RECLAIM_MEMORY ||
-+		      md->type == EFI_ACPI_MEMORY_NVS))
-+			continue;
-+
-+		start = md->phys_addr;
-+		npages = md->num_pages;
-+		memrange_efi_to_native(&start, &npages);
-+		end = start + (npages << PAGE_SHIFT) - 1;
-+
-+		if (res.end == 0) {
-+			res.start = start;
-+			res.end = end;
-+			continue;
-+		}
-+
-+		if (start >= res.start && (start - 1) <= res.end) {
-+			/* overlaps (or adjacent to) end of old region */
-+			if (end > res.end)
-+				res.end = end;
-+		} else if (end >= (res.start - 1) && end <= res.end) {
-+			/* overlaps (or adjacent to) start of old region */
-+			if (start  < res.start)
-+				res.start = start;
-+		} else {
-+			__insert_resource(&res);
-+			res.start = start;
-+			res.end = end;
-+		}
-+	}
-+	if (res.end)
-+		__insert_resource(&res);
-+
-+	early_memunmap(memmap.map, mapsize);
-+}
-+#endif
-+
- void __init efi_init(void)
- {
- 	struct efi_fdt_params params;
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 7475313..a438a0c 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -413,6 +413,7 @@ void __init setup_arch(char **cmdline_p)
- 		of_smp_init_cpus();
- #endif
- 	} else {
-+		efi_request_acpi_resources();
- 		psci_acpi_init();
- 		acpi_init_cpus();
- 	}
-diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
-index 01e88c8..d62e701 100644
---- a/arch/arm64/mm/ioremap.c
-+++ b/arch/arm64/mm/ioremap.c
-@@ -96,7 +96,8 @@ EXPORT_SYMBOL(__iounmap);
- void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size)
- {
- 	/* For normal memory we already have a cacheable mapping. */
--	if (pfn_valid(__phys_to_pfn(phys_addr)))
-+	if (pfn_valid(__phys_to_pfn(phys_addr)) &&
-+	    pfn_valid(__phys_to_pfn(phys_addr + size - 1)))
- 		return (void __iomem *)__phys_to_virt(phys_addr);
- 
- 	return __ioremap_caller(phys_addr, size, __pgprot(PROT_NORMAL),
--- 
-1.9.3
+Yes. Apart from my patch the top commit is 39af.
+
+>
+>>> Is the change above
+>>> correct, or do we need to propagate this change from the kernel DT into
+>>> tegra-pinmux-scripts, and hence also into the U-Boot pinmux setup table?
+>>>
+>>> My understanding of how these pins are generally used is that open-drain
+>>> is
+>>> likely correct. I have no idea whether Tegra should supply the pullup for
+>>> these pins, or whether the board has a pullup resistor in which case
+>>> Tegra
+>>> doesn't need to pull up.
+>>
+>>
+>>  From what Andrew (added to CC) said when these changes were discussed,
+>> it shouldn't matter as a fixed regulator is used to drive those pins
+>> high.
+>
+>
+> It looks like nyan-big and nyan-blaze configure these pins differently,
+> which may be incorrect if the boards are truly almost identical. Is that
+> expected? Nyan-big sets them both to open-drain but Nyan-blaze sets them to
+> push-pull. The pull-up enable is different too. Typically these pins are
+> open-drain, because there's often a current sensor chip on the USB port
+> power rail which asserts (pulls low in open-drain mode) these signals to
+> turn off the power when an over-current condition is detected. Not all
+> boards do this though, so the difference may be perfectly expected; someone
+> with access to the schematics would have to check.
+
+Regards,
+Simon
