@@ -1,48 +1,73 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 14 May 2015 13:37:35 +0900
-Subject: [PATCH v3 2/2] ARM: EXYNOS: Use of_machine_is_compatible instead
- ofsoc_is_exynos4
-In-Reply-To: <55540B4F.6060607@kernel.org>
-References: <1431307646-10779-1-git-send-email-k.kozlowski@samsung.com>
- <1431307646-10779-2-git-send-email-k.kozlowski@samsung.com>
- <55540B4F.6060607@kernel.org>
-Message-ID: <CAJKOXPe4cfcWOQjpwnoR56wOGwH6ezuQzWjsfYkXiMdgkd7gxQ@mail.gmail.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Thu, 14 May 2015 12:42:26 +0800
+Subject: [RFC v2 5/7] PCI/ACPI: Consolidate common PCI host bridge code
+ into ACPI core
+In-Reply-To: <55541F17.5060005@linaro.org>
+References: <1430793970-11159-1-git-send-email-jiang.liu@linux.intel.com>
+ <1430793970-11159-6-git-send-email-jiang.liu@linux.intel.com>
+ <55531967.70507@linaro.org> <55534275.2040404@linux.intel.com>
+ <555350B2.8050301@linaro.org> <5553F5BF.2080802@linux.intel.com>
+ <55541F17.5060005@linaro.org>
+Message-ID: <555427B2.4040204@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-14 11:41 GMT+09:00 Kukjin Kim <kgene@kernel.org>:
-> On 05/11/15 10:27, Krzysztof Kozlowski wrote:
->> of_machine_is_compatible() seems to be preferred over soc_is_exynos4().
+On 2015/5/14 12:05, Hanjun Guo wrote:
+> On 2015?05?14? 09:09, Jiang Liu wrote:
+>> On 2015/5/13 21:25, Hanjun Guo wrote:
+>>> On 2015?05?13? 20:24, Jiang Liu wrote:
+>>>> On 2015/5/13 17:29, Hanjun Guo wrote:
+>>>>> Hi Jiang,
+>>>>>
+>>>>> On 2015?05?05? 10:46, Jiang Liu wrote:
+>>>>>
+>>>>> struct pci_controller {
+>>>>>           struct acpi_device *companion;
+>>>>>           void *iommu;
+>>>>>           int segment;
+>>>>>           int node;               /* nearest node with memory or
+>>>>> NUMA_NO_NODE for global allocation */
+>>>>>
+>>>>>           void *platform_data;
+>>>>> };
+>>>>>
+>>>>> except void *platform_data;
+>>>>>
+>>>>> On ARM64, the structure is almost the same, so how about
+>>>>> introduce
+>>>>>
+>>>>> struct pci_controller {
+>>>>>           struct acpi_device *companion;  /* ACPI companion device */
+>>>>>           void            *iommu;         /* IOMMU private data */
+>>>>>           int             segment;        /* PCI domain */
+>>>>>           int             node;           /* NUMA node */
+>>>>> #ifdef CONFIG_IA64
+>>>>>       void *platform_data;
+>>>>> #endif
+>>>>> };
+>>>>>
+>>>>> in this file, then can be used for all architectures?
+>>>> Current mode is that architecture defines its own version of
+>>>> struct pci_controller. It would be better to keep this pattern.
+>>>
+>>> OK, thanks for the clarify :) So how about add my basic
+>>> PCI support patch for ARM64 on top of you patch set to fix
+>>> this problem?
 >>
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>
->> ---
->> Changes since v2:
->> 1. New patch, requested by Kukjin Kim.
->> ---
->>  arch/arm/mach-exynos/exynos.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
->> index c3bfbba3006d..5917a30eee33 100644
->> --- a/arch/arm/mach-exynos/exynos.c
->> +++ b/arch/arm/mach-exynos/exynos.c
->> @@ -179,7 +179,7 @@ static void __init exynos_init_io(void)
->>   */
->>  void exynos_set_delayed_reset_assertion(bool enable)
->>  {
->> -     if (soc_is_exynos4()) {
->> +     if (of_machine_is_compatible("samsung,exynos4")) {
->>               unsigned int tmp, core_id;
->>
->>               for (core_id = 0; core_id < num_possible_cpus(); core_id++) {
->
-> Maybe we need to change the compatible for exynos4415.dtsi? because no
-> exynos4 in the compatible...Applied, anyway.
-
-It could be quite significant change and each path checking for
-compatibility with exynos4 should be tested. There is no board DTS for
-Exynos4415 so I am not quite convinced that we should care about it.
-
-Best regards,
-Krzysztof
+>> Sure, please send me the patches and I will send out v3 to
+>> cover your review comments.
+> 
+> OK, I need to rework my patches because my patch set is dependent
+> on top of another MMCFG refactor patch set [1], so I need to remove
+> MMCONFIG first then will speed up the upstream process of your patch
+> set, will send you the patches soon.
+Hi Hanjun,
+	I will send out v3 soon , so you could rebase onto v3.
+There are changes which will affect your rebase.
+Thanks!
+Gerry
+> 
+> [1]: https://lkml.org/lkml/2015/4/17/29
+> 
+> Thanks
+> Hanjun
