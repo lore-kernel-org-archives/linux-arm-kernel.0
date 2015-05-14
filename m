@@ -1,48 +1,52 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Thu, 14 May 2015 18:49:29 +0200
-Subject: [PATCH v2] ARM: l2c: add options to overwrite prefetching behavior
-In-Reply-To: <20150514163027.GC2067@n2100.arm.linux.org.uk>
-References: <1431620035-7183-1-git-send-email-hauke@hauke-m.de>
- <20150514161526.GB2067@n2100.arm.linux.org.uk>
- <20150514163027.GC2067@n2100.arm.linux.org.uk>
-Message-ID: <5554D219.5020807@hauke-m.de>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Thu, 14 May 2015 18:00:42 +0100
+Subject: [RFC 02/23] xen/xenbus: client: Fix call of virt_to_mfn in
+ xenbus_grant_ring
+In-Reply-To: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
+References: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
+Message-ID: <1431622863-28575-3-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2015 06:30 PM, Russell King - ARM Linux wrote:
-> On Thu, May 14, 2015 at 05:15:26PM +0100, Russell King - ARM Linux wrote:
->> On Thu, May 14, 2015 at 06:13:55PM +0200, Hauke Mehrtens wrote:
->>> These options make it possible to overwrites the data and instruction
->>> prefetching behavior of the arm pl310 cache controller.
->>>
->>> We have to set these values in the aux and the prefetch register,
->>> because these two bits in the aux registers are mapped to the prefetch
->>> register. If only the prefetch register is changed there is an
->>> inconsistence in the state in this driver.
->>
->> No there isn't.  Just set the bits in the prefetch register.
->>
->> Writing to the prefetch register changes the state of the bits in the
->> auxiliary control register at the same time.
-> 
-> I see what you're getting at now.  I think we ought to fix that in the
-> driver, so that the auxiliary control register is always written first,
-> before the prefetch control register.  This also makes l2c_configure()
-> reflect the structure of the rest of the driver.
-> 
->  arch/arm/mm/cache-l2x0.c | 23 ++++++++++++++---------
->  1 file changed, 14 insertions(+), 9 deletions(-)
+virt_to_mfn should take a void* rather an unsigned long. While it
+doesn't really matter now, it would throw a compiler warning later when
+virt_to_mfn will enforce the type.
 
-Tested-by: Hauke Mehrtens <hauke@hauke-m.de>
+At the same time, avoid to compute new virtual address every time in the
+loop and directly increment the parameter as we don't use it later.
 
-Yes this fixes my problem. I did not meant that the state of the
-hardware registers would be inconsistent, but the state of the driver.
-I saw the problem you fixed, but was not closely following the control
-flow in the driver to see the problem before.
+Signed-off-by: Julien Grall <julien.grall@citrix.com>
+Cc: Wei Liu <wei.liu2@citrix.com>
+Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+Cc: David Vrabel <david.vrabel@citrix.com>
+---
+ drivers/xen/xenbus/xenbus_client.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Is it save enough to relay on the aux register not being written after
-the prefetch register is written?
-To make it more secure you could call l2x0_data->save(base) directly
-after l2x0_data->configure(base)
-
-Hauke
+diff --git a/drivers/xen/xenbus/xenbus_client.c b/drivers/xen/xenbus/xenbus_client.c
+index a014016..d204562 100644
+--- a/drivers/xen/xenbus/xenbus_client.c
++++ b/drivers/xen/xenbus/xenbus_client.c
+@@ -379,16 +379,16 @@ int xenbus_grant_ring(struct xenbus_device *dev, void *vaddr,
+ 	int i, j;
+ 
+ 	for (i = 0; i < nr_pages; i++) {
+-		unsigned long addr = (unsigned long)vaddr +
+-			(PAGE_SIZE * i);
+ 		err = gnttab_grant_foreign_access(dev->otherend_id,
+-						  virt_to_mfn(addr), 0);
++						  virt_to_mfn(vaddr), 0);
+ 		if (err < 0) {
+ 			xenbus_dev_fatal(dev, err,
+ 					 "granting access to ring page");
+ 			goto fail;
+ 		}
+ 		grefs[i] = err;
++
++		vaddr = (char *)vaddr + PAGE_SIZE;
+ 	}
+ 
+ 	return 0;
+-- 
+2.1.4
