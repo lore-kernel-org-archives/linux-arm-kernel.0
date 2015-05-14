@@ -1,88 +1,98 @@
-From: mniewoeh@stud.hs-offenburg.de (=?iso-8859-1?Q?Michael_Niew=F6hner?=)
-Date: Thu, 14 May 2015 21:17:08 +0200
-Subject: [PATCH 1/2] regulator: act8865: add restart handler for act8846
-In-Reply-To: <2204003.IdqJV6LE2e@phil>
-References: <A1C80CFB-CDCA-4F88-BA5F-371918CECD97@stud.hs-offenburg.de>
- <2204003.IdqJV6LE2e@phil>
-Message-ID: <D1089B7C-607E-48E2-B349-47B80A0596DA@stud.hs-offenburg.de>
+From: binmlist@gmail.com (Bin Liu)
+Date: Thu, 14 May 2015 14:19:28 -0500
+Subject: MUSB dual-role on AM335x behaving weirdly
+In-Reply-To: <20150514190429.GT24269@saruman.tx.rr.com>
+References: <20150205132142.GD2079@lukather> <20150224103911.GR25269@lukather>
+ <20150224145401.GH29829@saruman.tx.rr.com>
+ <20150224165050.GX25269@lukather>
+ <20150224173357.GB25042@saruman.tx.rr.com>
+ <20150225111129.GA5062@lukather>
+ <54EDBBEA.8030509@visionsystems.de>
+ <20150514170700.GN24269@saruman.tx.rr.com>
+ <20150514174031.GP24269@saruman.tx.rr.com>
+ <20150514174907.GQ24269@saruman.tx.rr.com>
+ <20150514190429.GT24269@saruman.tx.rr.com>
+Message-ID: <CADYTM3Zso8bV_8yFyx1-ATbL5AgkKBjvWWR4AsoZUNuLvFe1bQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I reworked the patch and here it is ;-)
+Felipe,
 
+On Thu, May 14, 2015 at 2:04 PM, Felipe Balbi <balbi@ti.com> wrote:
+> On Thu, May 14, 2015 at 12:49:07PM -0500, Felipe Balbi wrote:
+>> On Thu, May 14, 2015 at 12:40:31PM -0500, Felipe Balbi wrote:
+>> > On Thu, May 14, 2015 at 12:07:00PM -0500, Felipe Balbi wrote:
+>> > > Hi,
+>> > >
+>> > > On Wed, Feb 25, 2015 at 01:11:22PM +0100, Yegor Yefremov wrote:
+>> > > > On 25.02.2015 12:11, Maxime Ripard wrote:
+>> > > > > On Tue, Feb 24, 2015 at 11:33:57AM -0600, Felipe Balbi wrote:
+>> > > > >> Hi,
+>> > > > >>
+>> > > > >> On Tue, Feb 24, 2015 at 05:50:50PM +0100, Maxime Ripard wrote:
+>> > > > >>> Hi Felipe,
+>> > > > >>>
+>> > > > >>> On Tue, Feb 24, 2015 at 08:54:01AM -0600, Felipe Balbi wrote:
+>> > > > >>>> Hi,
+>> > > > >>>>
+>> > > > >>>> On Tue, Feb 24, 2015 at 11:39:11AM +0100, Maxime Ripard wrote:
+>> > > > >>>>> On Thu, Feb 05, 2015 at 02:21:42PM +0100, Maxime Ripard wrote:
+>> > > > >>>>>> Hi,
+>> > > > >>>>>>
+>> > > > >>>>>> On Thu, Jan 22, 2015 at 08:37:45AM +0100, Yegor Yefremov wrote:
+>> > > > >>>>>>> I have the same experience with 3.15. The switching is working when
+>> > > > >>>>>>> CONFIG_USB_MUSB_DUAL_ROLE is set and dr_mode = "otg". But since 3.16
+>> > > > >>
+>> > > > >> since 3.16 ?
+>> > > > >
+>> > > > > That's what Yegor said. I never saw it working with 3.15 either.
+>> > > >
+>> > > > I've used 3.15.1 and 3.15.2 with this set of patches:
+>> > > > https://github.com/visionsystemsgmbh/onrisc_br_bsp/tree/master/board/vscom/kernel-patches/linux-3.15
+>> > > >
+>> > > > And it worked so far. The system:
+>> > > > http://www.visionsystems.de/produkte/baltos-ir-5221.html
+>> > >
+>> > > I've had more time to look into this (thanks Yegor for sponsoring a
+>> > > test/dev platform) what I noticed is that Connect IRQ takes seconds to
+>> > > fire up.  Below a tiny log snippet after pluging USB OTG adapter cable
+>> > > that came with IR5521:
+>> > >
+>> > > | [ 1227.200514] musb-hdrc musb-hdrc.1.auto: usbintr (100) epintr(0)
+>> > >
+>> > > Cable connected. ID is grounded. 0x100 == DRVVBUS IRQ
+>> > >
+>> > > | [ 1227.206788] musb-hdrc musb-hdrc.1.auto: VBUS on (a_wait_vrise), devctl 19
+>> > >
+>> > > MUSB starts to wait for VBUS to reach Session valid threshold
+>> > >
+>> > > | [ 1230.281159] musb-hdrc musb-hdrc.1.auto: usbintr (10) epintr(0)
+>> > >
+>> > > 3 seconds later connect interrupt happens. Looking at VBUS charge time
+>> > > with a scope, it's quite ok. VBUS charges in about 1.77ms. I'll dig
+>> > > further into this.
+>> >
+>> > even more weird. If I disconnect device from OTG adapter, rather than
+>> > OTG adapter from IR5521, this leave ID pin grounded, which means DRVVBUS
+>> > is still asserted and VBUS remains above session valid threshold.
+>> >
+>> > Even in this case, when I connect the device on the other end of the
+>> > cable, I still see some 3 seconds delay from the time device is
+>> > connected, to the time connect IRQ fires up.
+>>
+>> seems to be a problem with the USB stick I'm using. Tested two other
+>> devices and they connect right away.
+>
+> ok, fixing DRD on AM335x will take longer than I originally expected,
+> probably won't be ready for v4.2 :-(
 
-The act8846 provides means to reset the system when used as main pmic.
-This patch adds a restart handler for power cycling the regulator thus resetting
-the board / soc when system-power-controller in dts is set.
-This can be useful for example if there is no other means of reset.
+Are you able replicate the issue with TI AM335x GP EVM? I am wondering
+if the is custom board design problem? have you checked the custom
+board schematics?
 
-Signed-off-by: Michael Niewoehner <mniewoeh@stud.hs-offenburg.de>
----
-diff --git a/drivers/regulator/act8865-regulator.c b/drivers/regulator/act8865-regulator.c
-index 2ff73d7..836d10b 100644
---- a/drivers/regulator/act8865-regulator.c
-+++ b/drivers/regulator/act8865-regulator.c
-@@ -27,6 +27,7 @@
- #include <linux/of_device.h>
- #include <linux/regulator/of_regulator.h>
- #include <linux/regmap.h>
-+#include <linux/reboot.h>
- 
- /*
-  * ACT8600 Global Register Map.
-@@ -133,6 +134,8 @@
- #define	ACT8865_VOLTAGE_NUM	64
- #define ACT8600_SUDCDC_VOLTAGE_NUM	255
- 
-+#define ACT8846_SIPC_MASK 0x01
-+
- struct act8865 {
- 	struct regmap *regmap;
- 	int off_reg;
-@@ -402,6 +405,22 @@ static void act8865_power_off(void)
- 	while (1);
- }
- 
-+static int act8846_power_cycle(struct notifier_block *this,
-+	unsigned long code, void *unused)
-+{
-+	struct act8865 *act8846;
-+
-+	act8846 = i2c_get_clientdata(act8865_i2c_client);
-+	regmap_write(act8846->regmap, ACT8846_GLB_OFF_CTRL, ACT8846_SIPC_MASK);
-+
-+	return NOTIFY_DONE;
-+}
-+
-+static struct notifier_block act8846_restart_handler = {
-+	.notifier_call = act8846_power_cycle,
-+	.priority = 129,
-+};
-+
- static int act8865_pmic_probe(struct i2c_client *client,
- 			      const struct i2c_device_id *i2c_id)
- {
-@@ -484,6 +503,8 @@ static int act8865_pmic_probe(struct i2c_client *client,
- 	}
- 
- 	if (of_device_is_system_power_controller(dev->of_node)) {
-+		int ret;
-+
- 		if (!pm_power_off && (off_reg > 0)) {
- 			act8865_i2c_client = client;
- 			act8865->off_reg = off_reg;
-@@ -492,6 +513,14 @@ static int act8865_pmic_probe(struct i2c_client *client,
- 		} else {
- 			dev_err(dev, "Failed to set poweroff capability, already defined\n");
- 		}
-+
-+		if (type == ACT8846) {
-+			act8865_i2c_client = client;
-+			ret = register_restart_handler(&act8846_restart_handler);
-+			if (ret)
-+				pr_err("%s: cannot register restart handler, %d\n",
-+					__func__, ret);
-+		}
- 	}
- 
- 	/* Finally register devices */
+Regards,
+-Bin.
+
+>
+> --
+> balbi
