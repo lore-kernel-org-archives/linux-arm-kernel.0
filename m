@@ -1,73 +1,37 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Thu, 14 May 2015 12:42:26 +0800
-Subject: [RFC v2 5/7] PCI/ACPI: Consolidate common PCI host bridge code
- into ACPI core
-In-Reply-To: <55541F17.5060005@linaro.org>
-References: <1430793970-11159-1-git-send-email-jiang.liu@linux.intel.com>
- <1430793970-11159-6-git-send-email-jiang.liu@linux.intel.com>
- <55531967.70507@linaro.org> <55534275.2040404@linux.intel.com>
- <555350B2.8050301@linaro.org> <5553F5BF.2080802@linux.intel.com>
- <55541F17.5060005@linaro.org>
-Message-ID: <555427B2.4040204@linux.intel.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 14 May 2015 10:33:12 +0530
+Subject: [PATCH 6/6] cpufreq: exynos: remove Exynos4210 specific cpufreq
+ driver support
+In-Reply-To: <1428079429-4252-7-git-send-email-b.zolnierkie@samsung.com>
+References: <'@samsung.com>
+ <1428079429-4252-1-git-send-email-b.zolnierkie@samsung.com>
+ <1428079429-4252-7-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <20150514050312.GA26341@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/5/14 12:05, Hanjun Guo wrote:
-> On 2015?05?14? 09:09, Jiang Liu wrote:
->> On 2015/5/13 21:25, Hanjun Guo wrote:
->>> On 2015?05?13? 20:24, Jiang Liu wrote:
->>>> On 2015/5/13 17:29, Hanjun Guo wrote:
->>>>> Hi Jiang,
->>>>>
->>>>> On 2015?05?05? 10:46, Jiang Liu wrote:
->>>>>
->>>>> struct pci_controller {
->>>>>           struct acpi_device *companion;
->>>>>           void *iommu;
->>>>>           int segment;
->>>>>           int node;               /* nearest node with memory or
->>>>> NUMA_NO_NODE for global allocation */
->>>>>
->>>>>           void *platform_data;
->>>>> };
->>>>>
->>>>> except void *platform_data;
->>>>>
->>>>> On ARM64, the structure is almost the same, so how about
->>>>> introduce
->>>>>
->>>>> struct pci_controller {
->>>>>           struct acpi_device *companion;  /* ACPI companion device */
->>>>>           void            *iommu;         /* IOMMU private data */
->>>>>           int             segment;        /* PCI domain */
->>>>>           int             node;           /* NUMA node */
->>>>> #ifdef CONFIG_IA64
->>>>>       void *platform_data;
->>>>> #endif
->>>>> };
->>>>>
->>>>> in this file, then can be used for all architectures?
->>>> Current mode is that architecture defines its own version of
->>>> struct pci_controller. It would be better to keep this pattern.
->>>
->>> OK, thanks for the clarify :) So how about add my basic
->>> PCI support patch for ARM64 on top of you patch set to fix
->>> this problem?
->>
->> Sure, please send me the patches and I will send out v3 to
->> cover your review comments.
+On 03-04-15, 18:43, Bartlomiej Zolnierkiewicz wrote:
+> From: Thomas Abraham <thomas.ab@samsung.com>
 > 
-> OK, I need to rework my patches because my patch set is dependent
-> on top of another MMCFG refactor patch set [1], so I need to remove
-> MMCONFIG first then will speed up the upstream process of your patch
-> set, will send you the patches soon.
-Hi Hanjun,
-	I will send out v3 soon , so you could rebase onto v3.
-There are changes which will affect your rebase.
-Thanks!
-Gerry
+> Exynos4210 based platforms have switched over to use generic
+> cpufreq driver for cpufreq functionality. So the Exynos
+> specific cpufreq support for these platforms can be removed.
 > 
-> [1]: https://lkml.org/lkml/2015/4/17/29
+> Changes by Bartlomiej:
+> - dropped Exynos5250 support removal for now
+> - updated exynos-cpufreq.[c,h]
 > 
-> Thanks
-> Hanjun
+> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> ---
+>  drivers/cpufreq/Kconfig.arm          |   11 --
+>  drivers/cpufreq/Makefile             |    1 -
+>  drivers/cpufreq/exynos-cpufreq.c     |    5 +-
+>  drivers/cpufreq/exynos-cpufreq.h     |    9 --
+>  drivers/cpufreq/exynos4210-cpufreq.c |  184 ----------------------------------
+>  5 files changed, 1 insertion(+), 209 deletions(-)
+>  delete mode 100644 drivers/cpufreq/exynos4210-cpufreq.c
+
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
