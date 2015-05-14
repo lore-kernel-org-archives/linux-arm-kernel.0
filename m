@@ -1,162 +1,106 @@
-From: binmlist@gmail.com (Bin Liu)
-Date: Thu, 14 May 2015 16:16:12 -0500
-Subject: MUSB dual-role on AM335x behaving weirdly
-In-Reply-To: <CADYTM3Zk2iD8YMj75CoLJn=4kpoXoXEKUWj2QzdXKGCJjtfG2A@mail.gmail.com>
-References: <20150224173357.GB25042@saruman.tx.rr.com>
- <20150225111129.GA5062@lukather>
- <54EDBBEA.8030509@visionsystems.de>
- <20150514170700.GN24269@saruman.tx.rr.com>
- <20150514174031.GP24269@saruman.tx.rr.com>
- <20150514174907.GQ24269@saruman.tx.rr.com>
- <20150514190429.GT24269@saruman.tx.rr.com>
- <CADYTM3Zso8bV_8yFyx1-ATbL5AgkKBjvWWR4AsoZUNuLvFe1bQ@mail.gmail.com>
- <20150514192125.GU24269@saruman.tx.rr.com>
- <CADYTM3bbEAVefFZtivJf5Z+2Q+1zDZEvNhqE5ytsOxDX7hjbdA@mail.gmail.com>
- <20150514192946.GV24269@saruman.tx.rr.com>
- <CADYTM3Zk2iD8YMj75CoLJn=4kpoXoXEKUWj2QzdXKGCJjtfG2A@mail.gmail.com>
-Message-ID: <CADYTM3a1QWnec1D=wT=fgZ-RCXAx_qZYYoFg5gWOy0yT4vovHA@mail.gmail.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Thu, 14 May 2015 14:23:21 -0700
+Subject: [PATCH] ARM: module: Add ".ref.text" to arm unwind tables
+In-Reply-To: <1431530457-19909-1-git-send-email-vigneshr@codeaurora.org>
+References: <1431530457-19909-1-git-send-email-vigneshr@codeaurora.org>
+Message-ID: <55551249.6020904@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Felipe,
-
-On Thu, May 14, 2015 at 4:04 PM, Bin Liu <binmlist@gmail.com> wrote:
-> Felipe,
+On 05/13/2015 08:20 AM, Vignesh Radhakrishnan wrote:
+> Functions inside kernel modules that use __ref
+> will end up being placed in .ARM.exidx.ref.text
+> section by gcc.
 >
-> On Thu, May 14, 2015 at 2:29 PM, Felipe Balbi <balbi@ti.com> wrote:
->> On Thu, May 14, 2015 at 02:29:20PM -0500, Bin Liu wrote:
->>> On Thu, May 14, 2015 at 2:21 PM, Felipe Balbi <balbi@ti.com> wrote:
->>> > On Thu, May 14, 2015 at 02:19:28PM -0500, Bin Liu wrote:
->>> >> Felipe,
->>> >>
->>> >> On Thu, May 14, 2015 at 2:04 PM, Felipe Balbi <balbi@ti.com> wrote:
->>> >> > On Thu, May 14, 2015 at 12:49:07PM -0500, Felipe Balbi wrote:
->>> >> >> On Thu, May 14, 2015 at 12:40:31PM -0500, Felipe Balbi wrote:
->>> >> >> > On Thu, May 14, 2015 at 12:07:00PM -0500, Felipe Balbi wrote:
->>> >> >> > > Hi,
->>> >> >> > >
->>> >> >> > > On Wed, Feb 25, 2015 at 01:11:22PM +0100, Yegor Yefremov wrote:
->>> >> >> > > > On 25.02.2015 12:11, Maxime Ripard wrote:
->>> >> >> > > > > On Tue, Feb 24, 2015 at 11:33:57AM -0600, Felipe Balbi wrote:
->>> >> >> > > > >> Hi,
->>> >> >> > > > >>
->>> >> >> > > > >> On Tue, Feb 24, 2015 at 05:50:50PM +0100, Maxime Ripard wrote:
->>> >> >> > > > >>> Hi Felipe,
->>> >> >> > > > >>>
->>> >> >> > > > >>> On Tue, Feb 24, 2015 at 08:54:01AM -0600, Felipe Balbi wrote:
->>> >> >> > > > >>>> Hi,
->>> >> >> > > > >>>>
->>> >> >> > > > >>>> On Tue, Feb 24, 2015 at 11:39:11AM +0100, Maxime Ripard wrote:
->>> >> >> > > > >>>>> On Thu, Feb 05, 2015 at 02:21:42PM +0100, Maxime Ripard wrote:
->>> >> >> > > > >>>>>> Hi,
->>> >> >> > > > >>>>>>
->>> >> >> > > > >>>>>> On Thu, Jan 22, 2015 at 08:37:45AM +0100, Yegor Yefremov wrote:
->>> >> >> > > > >>>>>>> I have the same experience with 3.15. The switching is working when
->>> >> >> > > > >>>>>>> CONFIG_USB_MUSB_DUAL_ROLE is set and dr_mode = "otg". But since 3.16
->>> >> >> > > > >>
->>> >> >> > > > >> since 3.16 ?
->>> >> >> > > > >
->>> >> >> > > > > That's what Yegor said. I never saw it working with 3.15 either.
->>> >> >> > > >
->>> >> >> > > > I've used 3.15.1 and 3.15.2 with this set of patches:
->>> >> >> > > > https://github.com/visionsystemsgmbh/onrisc_br_bsp/tree/master/board/vscom/kernel-patches/linux-3.15
->>> >> >> > > >
->>> >> >> > > > And it worked so far. The system:
->>> >> >> > > > http://www.visionsystems.de/produkte/baltos-ir-5221.html
->>> >> >> > >
->>> >> >> > > I've had more time to look into this (thanks Yegor for sponsoring a
->>> >> >> > > test/dev platform) what I noticed is that Connect IRQ takes seconds to
->>> >> >> > > fire up.  Below a tiny log snippet after pluging USB OTG adapter cable
->>> >> >> > > that came with IR5521:
->>> >> >> > >
->>> >> >> > > | [ 1227.200514] musb-hdrc musb-hdrc.1.auto: usbintr (100) epintr(0)
->>> >> >> > >
->>> >> >> > > Cable connected. ID is grounded. 0x100 == DRVVBUS IRQ
->>> >> >> > >
->>> >> >> > > | [ 1227.206788] musb-hdrc musb-hdrc.1.auto: VBUS on (a_wait_vrise), devctl 19
->>> >> >> > >
->>> >> >> > > MUSB starts to wait for VBUS to reach Session valid threshold
->>> >> >> > >
->>> >> >> > > | [ 1230.281159] musb-hdrc musb-hdrc.1.auto: usbintr (10) epintr(0)
->>> >> >> > >
->>> >> >> > > 3 seconds later connect interrupt happens. Looking at VBUS charge time
->>> >> >> > > with a scope, it's quite ok. VBUS charges in about 1.77ms. I'll dig
->>> >> >> > > further into this.
->>> >> >> >
->>> >> >> > even more weird. If I disconnect device from OTG adapter, rather than
->>> >> >> > OTG adapter from IR5521, this leave ID pin grounded, which means DRVVBUS
->>> >> >> > is still asserted and VBUS remains above session valid threshold.
->>> >> >> >
->>> >> >> > Even in this case, when I connect the device on the other end of the
->>> >> >> > cable, I still see some 3 seconds delay from the time device is
->>> >> >> > connected, to the time connect IRQ fires up.
->>> >> >>
->>> >> >> seems to be a problem with the USB stick I'm using. Tested two other
->>> >> >> devices and they connect right away.
->>> >> >
->>> >> > ok, fixing DRD on AM335x will take longer than I originally expected,
->>> >> > probably won't be ready for v4.2 :-(
->>> >>
->>> >> Are you able replicate the issue with TI AM335x GP EVM? I am wondering
->>> >> if the is custom board design problem? have you checked the custom
->>> >> board schematics?
->>> >
->>> > don't have either AM335x GP EVM nor schematics for this board. But it's
->>> > certainly not a problem with the board. It's very easy to replicate the
->>> > problem:
->>> >
->>> > Set dr-mode to otg, load g_zero, connect to PC and as quickly as you
->>> > can, remove cable and attach otg cable with a mouse or whatever on the
->>> > other end.
->>> >
->>> > First time, mouse won't enumerate (no IRQs fire) remove and connect
->>> > again. You should see a Babble IRQ.
->>>
->>> And this only happens with 3.16+, not older kernels? I have a GP EVM,
->>> and can try to take a look.
->>
->> yeah, if you can try with v4.1-rc3, that'd be great. I also see that
->> disconnect IRQ takes a while to fire, but VBUS drops rather fast on this
->> board (< 10ms to discharge VBUS).
+> Currently we don't consider adding these functions
+> to arm unwind tables.
 >
-> How low is VBUS after 10ms? I don't have a scope with me right now,
-> but I see Diconnect IRQ happened right away if I short VBUS to ground
-> right after disconnected from the host. So I suspect is that VBUS
-> discharge takes ~20sec on my board, which is the time taken for MUSB
-> from b_peripheral to b_idle.
+> Hence, if we turn slub debug on by default we end up
+> with the messages of this sort:
 >
-> BTY, it seems Disconnect IRQ is expected for MUSB in device mode. I
-> never pay attention on this.
-
-I think I found the root cause of the problem: board design issue - I
-bet the custom board has too much cap on VBUS line. It should be <
-10uF.
-
-I just noticed I have the Jumper 36 on on my EVM, which adds 154.7uF
-cap on VBUS causing discharge takes ~20sec. After removed the jumper,
-which leaves only 4.7uF cap on VBUS, now it only takes ~0.4sec to
-generate Disconnect IRQ. Here is the log.
-
-root@:~# [ 2504.893123] musb-hdrc musb-hdrc.0.auto: usbintr (1) epintr(0)
-[ 2504.899198] musb-hdrc musb-hdrc.0.auto: <== DevCtl=99, int_usb=0x1
-[ 2504.912751] zero gadget: suspend
-[ 2504.916145] zero gadget: zero_suspend
-[ 2505.303937] musb-hdrc musb-hdrc.0.auto: usbintr (20) epintr(0)
-[ 2505.310072] musb-hdrc musb-hdrc.0.auto: <== DevCtl=88, int_usb=0x20
-[ 2505.325355] zero gadget: reset config
-[ 2507.303288] musb-hdrc musb-hdrc.0.auto: Poll devctl 80 (b_idle)
-
-Regards,
--Bin.
-
+> 	unwind: Index not found bf0011e0
 >
-> Regards,
-> -Bin.
+> This is because slub debug saves stack trace of
+> allocation's and free's. Therefore, we end up seeing
+> a flood of these messages in dmesg since its not
+> able to locate these functions.
 >
->>
->>> /me just figured out the modem issue, and in a very good mood now ;)
->>
->> hey, congrats :-)
->>
->> --
->> balbi
+> Fix this by adding .ref.text section to arm unwind tables.
+>
+
+With this patch, I go from
+
+  ------------[ cut here ]------------
+WARNING: CPU: 0 PID: 63 at drivers/misc/test.c:12 that_function+0x10/0x2c [test]()
+Modules linked in: test(P+)
+CPU: 0 PID: 63 Comm: insmod Tainted: P                4.1.0-rc2+ #28
+Hardware name: ARM-Versatile PB
+[<c001a590>] (unwind_backtrace) from [<c0017b84>] (show_stack+0x10/0x14)
+[<c0017b84>] (show_stack) from [<c0022370>] (warn_slowpath_common+0x78/0xb0)
+[<c0022370>] (warn_slowpath_common) from [<c0022444>] (warn_slowpath_null+0x1c/0x24)
+[<c0022444>] (warn_slowpath_null) from [<bf000048>] (that_function+0x10/0x2c [test])
+unwind: Index not found bf000048
+---[ end trace 3e24f8edd90f3b27 ]---
+
+to
+
+------------[ cut here ]------------
+WARNING: CPU: 0 PID: 63 at drivers/misc/test.c:12 that_function+0x10/0x2c [test]()
+Modules linked in: test(P+)
+CPU: 0 PID: 63 Comm: insmod Tainted: P                4.1.0-rc2+ #30
+Hardware name: ARM-Versatile PB
+[<c001a5d0>] (unwind_backtrace) from [<c0017b84>] (show_stack+0x10/0x14)
+[<c0017b84>] (show_stack) from [<c0022770>] (warn_slowpath_common+0x78/0xb0)
+[<c0022770>] (warn_slowpath_common) from [<c0022844>] (warn_slowpath_null+0x1c/0x24)
+[<c0022844>] (warn_slowpath_null) from [<bf000048>] (that_function+0x10/0x2c [test])
+[<bf000048>] (that_function [test]) from [<bf002010>] (awesome_module+0x10/0x1c [test])
+[<bf002010>] (awesome_module [test]) from [<c0009710>] (do_one_initcall+0x80/0x1dc)
+[<c0009710>] (do_one_initcall) from [<c02d14e0>] (do_init_module+0x58/0x1a8)
+[<c02d14e0>] (do_init_module) from [<c0063940>] (load_module+0x170c/0x1c38)
+[<c0063940>] (load_module) from [<c0063f38>] (SyS_init_module+0xcc/0x124)
+[<c0063f38>] (SyS_init_module) from [<c0014900>] (ret_fast_syscall+0x0/0x30)
+---[ end trace 554c9ff461eb2505 ]---
+
+Tested-by: Laura Abbott <labbott@redhat.com>
+
+> Signed-off-by: Vignesh Radhakrishnan <vigneshr@codeaurora.org>
+> ---
+>   arch/arm/include/asm/module.h | 1 +
+>   arch/arm/kernel/module.c      | 4 ++++
+>   2 files changed, 5 insertions(+)
+>
+> diff --git a/arch/arm/include/asm/module.h b/arch/arm/include/asm/module.h
+> index ed690c4..17640c9 100644
+> --- a/arch/arm/include/asm/module.h
+> +++ b/arch/arm/include/asm/module.h
+> @@ -14,6 +14,7 @@ enum {
+>   	ARM_SEC_DEVEXIT,
+>   	ARM_SEC_HOT,
+>   	ARM_SEC_UNLIKELY,
+> +	ARM_SEC_REF,
+>   	ARM_SEC_MAX,
+>   };
+>
+> diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+> index 2e11961..846b888 100644
+> --- a/arch/arm/kernel/module.c
+> +++ b/arch/arm/kernel/module.c
+> @@ -308,6 +308,8 @@ int module_finalize(const Elf32_Ehdr *hdr, const Elf_Shdr *sechdrs,
+>   			maps[ARM_SEC_UNLIKELY].unw_sec = s;
+>   		else if (strcmp(".ARM.exidx.text.hot", secname) == 0)
+>   			maps[ARM_SEC_HOT].unw_sec = s;
+> +		else if (strcmp(".ARM.exidx.ref.text", secname) == 0)
+> +			maps[ARM_SEC_REF].unw_sec = s;
+>   		else if (strcmp(".init.text", secname) == 0)
+>   			maps[ARM_SEC_INIT].txt_sec = s;
+>   		else if (strcmp(".text", secname) == 0)
+> @@ -318,6 +320,8 @@ int module_finalize(const Elf32_Ehdr *hdr, const Elf_Shdr *sechdrs,
+>   			maps[ARM_SEC_UNLIKELY].txt_sec = s;
+>   		else if (strcmp(".text.hot", secname) == 0)
+>   			maps[ARM_SEC_HOT].txt_sec = s;
+> +		else if (strcmp(".ref.text", secname) == 0)
+> +			maps[ARM_SEC_REF].txt_sec = s;
+>   	}
+>
+>   	for (i = 0; i < ARM_SEC_MAX; i++)
+>
