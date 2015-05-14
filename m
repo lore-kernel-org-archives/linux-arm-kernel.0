@@ -1,51 +1,20 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 14 May 2015 11:06:36 +0800
-Subject: [PATCH] lib: fix 842 build on 32-bit architectures
-In-Reply-To: <2802721.Q9KnE9eNH4@wuerfel>
-References: <2802721.Q9KnE9eNH4@wuerfel>
-Message-ID: <20150514030636.GE3853@gondor.apana.org.au>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 14 May 2015 11:09:50 +0800
+Subject: [PATCH v3] imx27: dt: only map 4 Kbyte for fec registers
+In-Reply-To: <1431469106-27666-1-git-send-email-tremyfr@gmail.com>
+References: <1431469106-27666-1-git-send-email-tremyfr@gmail.com>
+Message-ID: <20150514030948.GA6850@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 13, 2015 at 10:56:39PM +0200, Arnd Bergmann wrote:
-> Building the 842 code on 32-bit ARM currently results in this link
-> error:
+On Wed, May 13, 2015 at 12:18:26AM +0200, Philippe Reynes wrote:
+> According to the imx27 documentation, fec has a 4 Kbyte
+> memory space map. Moreover, the actual 16 Kbyte mapping
+> overlaps the SCC (Security Controller) memory register
+> space. So, we reduce the memory register space to 4 Kbyte.
 > 
-> ERROR: "__aeabi_uldivmod" [lib/842/842_decompress.ko] undefined!
-> 
-> The reason is that the __do_index function performs a 64-bit
-> division by a power-of-two number, but it has no insight into
-> the function arguments.
-> 
-> By marking that function inline, the fsize argument is always
-> known at the time that do_index is called, and the compiler is
-> able to replace the extremely expensive 64-bit division with
-> a cheap constant shift operation.
-> 
-> Aside from fixing that link error, this approach should also improve
-> both code size and performance on 32-bit architectures significantly.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> Found while building arm32 allmodconfig with gcc-5.0
-> 
-> diff --git a/lib/842/842_decompress.c b/lib/842/842_decompress.c
-> index 6b2b45aecde3..285bf6b6959c 100644
-> --- a/lib/842/842_decompress.c
-> +++ b/lib/842/842_decompress.c
-> @@ -169,7 +169,7 @@ static int do_data(struct sw842_param *p, u8 n)
->  	return 0;
->  }
->  
-> -static int __do_index(struct sw842_param *p, u8 size, u8 bits, u64 fsize)
-> +static inline int __do_index(struct sw842_param *p, u8 size, u8 bits, u64 fsize)
+> Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
 
-Ugh, relying on inlining to work is fragile.  I'm not against
-making this inline but please make it work even when it is out-
-of-line.
+Updated the patch prefix as "ARM: dts: imx27: ", and applied.  Thanks.
 
-Thanks,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Shawn
