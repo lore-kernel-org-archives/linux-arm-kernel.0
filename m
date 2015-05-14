@@ -1,34 +1,77 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 14 May 2015 10:06:32 +0900
-Subject: [PATCH 03/31] ARM: shmobile: r8a7740 dtsi: Fix SCIFB naming
+Date: Thu, 14 May 2015 10:06:34 +0900
+Subject: [PATCH 05/31] ARM: shmobile: r8a73a4: Add IRQC clock to device tree
 In-Reply-To: <cover.1431565427.git.horms+renesas@verge.net.au>
 References: <cover.1431565427.git.horms+renesas@verge.net.au>
-Message-ID: <50663822618670a1e6ea1dd9912790fd7ed3be0b.1431565427.git.horms+renesas@verge.net.au>
+Message-ID: <1c2a7eb7169b855f6c3e9db036c6767052528ffe.1431565427.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-The single SCIFB on R-Mobile A1 is called "scifb", not "scifb8".
+Link the external IRQ controllers irqc0 and irqc1 to the IRQC module
+clock, so they can be power managed using that clock.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+[horms: corrected typo in changelog to refer to r8a73a4]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7740.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a73a4.dtsi            | 11 +++++++----
+ include/dt-bindings/clock/r8a73a4-clock.h |  1 +
+ 2 files changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-index 83c1c3ca1b8f..413590d6c316 100644
---- a/arch/arm/boot/dts/r8a7740.dtsi
-+++ b/arch/arm/boot/dts/r8a7740.dtsi
-@@ -275,7 +275,7 @@
- 		status = "disabled";
+diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+index 0fd889f88109..7ee22a41c6c9 100644
+--- a/arch/arm/boot/dts/r8a73a4.dtsi
++++ b/arch/arm/boot/dts/r8a73a4.dtsi
+@@ -163,6 +163,7 @@
+ 			     <0 29 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 30 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 31 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp4_clks R8A73A4_CLK_IRQC>;
+ 		power-domains = <&pd_c4>;
  	};
  
--	scifb8: serial at e6c30000 {
-+	scifb: serial at e6c30000 {
- 		compatible = "renesas,scifb-r8a7740", "renesas,scifb";
- 		reg = <0xe6c30000 0x100>;
- 		interrupts = <0 108 IRQ_TYPE_LEVEL_HIGH>;
+@@ -197,6 +198,7 @@
+ 			     <0 55 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 56 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <0 57 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp4_clks R8A73A4_CLK_IRQC>;
+ 		power-domains = <&pd_c4>;
+ 	};
+ 
+@@ -724,15 +726,16 @@
+ 		mstp4_clks: mstp4_clks at e6150140 {
+ 			compatible = "renesas,r8a73a4-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe6150140 0 4>, <0 0xe615004c 0 4>;
+-			clocks = <&main_div2_clk>, <&cpg_clocks R8A73A4_CLK_HP>,
++			clocks = <&main_div2_clk>, <&main_div2_clk>,
++				 <&cpg_clocks R8A73A4_CLK_HP>,
+ 				 <&cpg_clocks R8A73A4_CLK_HP>;
+ 			#clock-cells = <1>;
+ 			clock-indices = <
+-				R8A73A4_CLK_IIC5 R8A73A4_CLK_IIC4
+-				R8A73A4_CLK_IIC3
++				R8A73A4_CLK_IRQC R8A73A4_CLK_IIC5
++				R8A73A4_CLK_IIC4 R8A73A4_CLK_IIC3
+ 			>;
+ 			clock-output-names =
+-				"iic5", "iic4", "iic3";
++				"irqc", "iic5", "iic4", "iic3";
+ 		};
+ 		mstp5_clks: mstp5_clks at e6150144 {
+ 			compatible = "renesas,r8a73a4-mstp-clocks", "renesas,cpg-mstp-clocks";
+diff --git a/include/dt-bindings/clock/r8a73a4-clock.h b/include/dt-bindings/clock/r8a73a4-clock.h
+index 9a4b4c9ca44a..dd11ecdf837e 100644
+--- a/include/dt-bindings/clock/r8a73a4-clock.h
++++ b/include/dt-bindings/clock/r8a73a4-clock.h
+@@ -54,6 +54,7 @@
+ #define R8A73A4_CLK_IIC3	11
+ #define R8A73A4_CLK_IIC4	10
+ #define R8A73A4_CLK_IIC5	9
++#define R8A73A4_CLK_IRQC	7
+ 
+ /* MSTP5 */
+ #define R8A73A4_CLK_THERMAL	22
 -- 
 2.1.4
