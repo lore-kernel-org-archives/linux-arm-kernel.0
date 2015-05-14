@@ -1,58 +1,42 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 14 May 2015 18:13:45 +0200
-Subject: [PATCH 09/10] ARM: ux500: rename ux500_map_io
-Message-ID: <1431620025-15174-1-git-send-email-linus.walleij@linaro.org>
+Date: Thu, 14 May 2015 18:13:53 +0200
+Subject: [PATCH 10/10] ARM: ux500: delete static resource defines
+Message-ID: <1431620033-15214-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function is not mapping any I/O other than for probing
-the chip ID. Rename it to make the function graspable.
+These macros were used in the past to define static resources,
+but are not used anymore and have no future, delete them.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-ux500/cpu-db8500.c | 2 +-
- arch/arm/mach-ux500/id.c         | 2 +-
- arch/arm/mach-ux500/setup.h      | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-ux500/setup.h | 14 --------------
+ 1 file changed, 14 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index d9359d7b80d7..16913800bbf9 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -46,7 +46,7 @@ static struct prcmu_pdata db8500_prcmu_pdata = {
- static void __init u8500_map_io(void)
- {
- 	debug_ll_io_init();
--	ux500_map_io();
-+	ux500_setup_id();
- }
- 
- /*
-diff --git a/arch/arm/mach-ux500/id.c b/arch/arm/mach-ux500/id.c
-index 392f2fdb37d0..1e81e990044b 100644
---- a/arch/arm/mach-ux500/id.c
-+++ b/arch/arm/mach-ux500/id.c
-@@ -72,7 +72,7 @@ static unsigned int partnumber(unsigned int asicid)
-  * DB9540	0x413fc090	0xFFFFDBF4		0x009540xx
-  */
- 
--void __init ux500_map_io(void)
-+void __init ux500_setup_id(void)
- {
- 	unsigned int cpuid = read_cpuid_id();
- 	unsigned int asicid = 0;
 diff --git a/arch/arm/mach-ux500/setup.h b/arch/arm/mach-ux500/setup.h
-index 2dea8b59d222..cf5a8736ea9d 100644
+index cf5a8736ea9d..1fb6ad2789f1 100644
 --- a/arch/arm/mach-ux500/setup.h
 +++ b/arch/arm/mach-ux500/setup.h
-@@ -18,7 +18,7 @@
+@@ -26,20 +26,6 @@ extern struct device *ux500_soc_device_init(const char *soc_id);
  
- void ux500_restart(enum reboot_mode mode, const char *cmd);
+ extern void ux500_timer_init(void);
  
--void __init ux500_map_io(void);
-+void __init ux500_setup_id(void);
- 
- extern void __init ux500_init_irq(void);
+-#define __IO_DEV_DESC(x, sz)	{		\
+-	.virtual	= IO_ADDRESS(x),	\
+-	.pfn		= __phys_to_pfn(x),	\
+-	.length		= sz,			\
+-	.type		= MT_DEVICE,		\
+-}
+-
+-#define __MEM_DEV_DESC(x, sz)	{		\
+-	.virtual	= IO_ADDRESS(x),	\
+-	.pfn		= __phys_to_pfn(x),	\
+-	.length		= sz,			\
+-	.type		= MT_MEMORY_RWX,		\
+-}
+-
+ extern struct smp_operations ux500_smp_ops;
+ extern void ux500_cpu_die(unsigned int cpu);
  
 -- 
 1.9.3
