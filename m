@@ -1,36 +1,42 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Thu, 14 May 2015 18:00:44 +0100
-Subject: [RFC 04/23] block/xen-blkfront: Remove unused macro
- MAXIMUM_OUTSTANDING_BLOCK_REQS
+Date: Thu, 14 May 2015 18:00:48 +0100
+Subject: [RFC 08/23] net/xen-netback: Remove unused code in xenvif_rx_action
 In-Reply-To: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
 References: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1431622863-28575-5-git-send-email-julien.grall@citrix.com>
+Message-ID: <1431622863-28575-9-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julien Grall <julien.grall@linaro.org>
+The variables old_req_cons and ring_slots_used are assigned but never
+used since commit 1650d5455bd2dc6b5ee134bd6fc1a3236c266b5b "xen-netback:
+always fully coalesce guest Rx packets".
 
 Signed-off-by: Julien Grall <julien.grall@citrix.com>
-Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-Cc: Roger Pau Monn? <roger.pau@citrix.com>
-Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-Cc: David Vrabel <david.vrabel@citrix.com>
+Cc: Ian Campbell <ian.campbell@citrix.com>
+Cc: Wei Liu <wei.liu2@citrix.com>
+Cc: netdev at vger.kernel.org
 ---
- drivers/block/xen-blkfront.c | 2 --
- 1 file changed, 2 deletions(-)
+ drivers/net/xen-netback/netback.c | 5 -----
+ 1 file changed, 5 deletions(-)
 
-diff --git a/drivers/block/xen-blkfront.c b/drivers/block/xen-blkfront.c
-index 2c61cf8..5c72c25 100644
---- a/drivers/block/xen-blkfront.c
-+++ b/drivers/block/xen-blkfront.c
-@@ -139,8 +139,6 @@ static unsigned int nr_minors;
- static unsigned long *minors;
- static DEFINE_SPINLOCK(minor_lock);
+diff --git a/drivers/net/xen-netback/netback.c b/drivers/net/xen-netback/netback.c
+index 9c6a504..9ae1d43 100644
+--- a/drivers/net/xen-netback/netback.c
++++ b/drivers/net/xen-netback/netback.c
+@@ -515,14 +515,9 @@ static void xenvif_rx_action(struct xenvif_queue *queue)
  
--#define MAXIMUM_OUTSTANDING_BLOCK_REQS \
--	(BLKIF_MAX_SEGMENTS_PER_REQUEST * BLK_RING_SIZE)
- #define GRANT_INVALID_REF	0
+ 	while (xenvif_rx_ring_slots_available(queue, XEN_NETBK_RX_SLOTS_MAX)
+ 	       && (skb = xenvif_rx_dequeue(queue)) != NULL) {
+-		RING_IDX old_req_cons;
+-		RING_IDX ring_slots_used;
+-
+ 		queue->last_rx_time = jiffies;
  
- #define PARTS_PER_DISK		16
+-		old_req_cons = queue->rx.req_cons;
+ 		XENVIF_RX_CB(skb)->meta_slots_used = xenvif_gop_skb(skb, &npo, queue);
+-		ring_slots_used = queue->rx.req_cons - old_req_cons;
+ 
+ 		__skb_queue_tail(&rxq, skb);
+ 	}
 -- 
 2.1.4
