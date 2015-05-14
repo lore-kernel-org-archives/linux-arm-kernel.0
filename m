@@ -1,73 +1,69 @@
-From: liquid.acid@gmx.net (Tobias Jakobi)
-Date: Thu, 14 May 2015 16:06:44 +0200
-Subject: [PATCH] MAINTAINERS: ARM: EXYNOS: Add Krzysztof Kozlowski
- asco-maintainer
-In-Reply-To: <CABxcv==2ouDFPE2sBdqCwpACYXCCGnJYQFtbOV2PuVNGnv2q=g@mail.gmail.com>
-References: <1431605720-828-1-git-send-email-k.kozlowski@samsung.com>	<55549C56.6050509@kernel.org>
- <CABxcv==2ouDFPE2sBdqCwpACYXCCGnJYQFtbOV2PuVNGnv2q=g@mail.gmail.com>
-Message-ID: <5554ABF4.80002@gmx.net>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Thu, 14 May 2015 15:07:31 +0100
+Subject: [PATCH 5/5] arm64: Add DT support for Juno r1 board.
+In-Reply-To: <1431537092-19597-6-git-send-email-Liviu.Dudau@arm.com>
+References: <1431537092-19597-1-git-send-email-Liviu.Dudau@arm.com>
+ <1431537092-19597-6-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1431612451.2881.54.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier Martinez Canillas wrote:
-> Hello Kukjin,
+On Wed, 2015-05-13 at 18:11 +0100, Liviu Dudau wrote:
+> This board is based on Juno r0 with updated Cortex A5x revisions
+> and board errata fixes. It also contains coherent ThinLinks ports
+> on the expansion slot that allow for an AXI master on the daughter
+> card to participate in a coherency domain.
 > 
-> On Thu, May 14, 2015 at 3:00 PM, Kukjin Kim <kgene@kernel.org> wrote:
->> On 05/14/15 21:15, Krzysztof Kozlowski wrote:
->>> Add Krzysztof Kozlowski as a co-maintainer of Samsung Exynos ARM
->>> architecture to review the patches. Patches will go as usual - picked up
->>> by Kukjin Kim.
->>>
->> Hi Krzysztof,
->>
->> Sorry, I don't agree with this patch because you can review any exynos
->> patches without maintainer title. And I can focus on the maintainer'r
->> role more than now because of change of role ;-) Of course your review
->> would be helpful to me.
->>
+> Support for SoC PCIe host bridge will be added as a separate series.
 > 
-> Sorry but I disagree. Krzysztof has been very active reviewing Exynos
-> patches and even picking/queuing important fixes while it seems you
-> were too busy and couldn't pay close attention.
-I would even go further than that. We're in this situation because the
-current maintainer didn't do his job properly.
-
-I want to point out what gregkh once said about this matter:
-https://youtu.be/iiED1K98lnw?t=1745
-
-
-
-> It's really great that due a role change you will have more time to
-> focus on the maintainership but I don't see why having more
-> maintainers could be something negative. As long as you work in a
-> coordinate manner, the more maintainers we have the better IMHO. It
-> may be that in the future you change your role at your company again
-> and then it will be good to have something else to take care of the
-> posted patches ;-)
-I very much agree with Javier here. Krzysztof promptly responds to
-patches and usually provides detailed feedback when things need changes.
-It would be stupid not to accept him as an additional maintainer.
-
-
-
-With best wishes,
-Tobias
-
-
-> It's true that Krzysztof can review any Exynos patches (like anyone
-> subscribed to the lists) without a co-maintainer title, but being
-> listed in MAINTAINERS will make sure that people know that he is
-> willing to review and ack Exynos patches so they should add him to the
-> cc list.
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> ---
+>  arch/arm64/boot/dts/arm/Makefile    |   2 +-
+>  arch/arm64/boot/dts/arm/juno-r1.dts | 123 ++++++++++++++++++++++++++++++++++++
+>  2 files changed, 124 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm64/boot/dts/arm/juno-r1.dts
 > 
->> Thanks,
->> Kukjin
->>
-> 
-> Best regards,
-> Javier
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> diff --git a/arch/arm64/boot/dts/arm/Makefile b/arch/arm64/boot/dts/arm/Makefile
+> index 301a0da..c5c98b9 100644
+> --- a/arch/arm64/boot/dts/arm/Makefile
+> +++ b/arch/arm64/boot/dts/arm/Makefile
+> @@ -1,5 +1,5 @@
+>  dtb-$(CONFIG_ARCH_VEXPRESS) += foundation-v8.dtb
+> -dtb-$(CONFIG_ARCH_VEXPRESS) += juno.dtb
+> +dtb-$(CONFIG_ARCH_VEXPRESS) += juno.dtb juno-r1.dtb
+>  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb
+>  
+>  always		:= $(dtb-y)
+> diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
+> new file mode 100644
+> index 0000000..f6bc073
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/arm/juno-r1.dts
+> @@ -0,0 +1,123 @@
+> +/*
+> + * ARM Ltd. Juno Platform
+> + *
+> + * Copyright (c) 2015 ARM Ltd.
+> + *
+> + * This file is licensed under a dual GPLv2 or BSD license.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +
+> +/ {
+> +	model = "ARM Juno development board (r1)";
+> +	compatible = "arm,juno", "arm,vexpress";
+
+Is there scope for adding "arm,juno-r1" to the front of that list?
+Reason I ask, is that I can't help but think [1] that userside code
+(like Android) which wants to select device-specific configuration,
+should use something like the devices compatible string rather than what
+they currently propose [2].
+ 
+[1] https://lists.linaro.org/pipermail/linaro-android/2015-April/002743.html
+[2] https://lists.linaro.org/pipermail/linaro-android/2015-April/002742.html
+
+-- 
+Tixy
