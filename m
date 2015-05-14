@@ -1,130 +1,85 @@
 From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Thu, 14 May 2015 19:53:47 +0900
-Subject: [PATCH v3 2/8] ARM: dts: Use labels for overriding nodes in exynos5250
+Date: Thu, 14 May 2015 19:53:48 +0900
+Subject: [PATCH v3 3/8] ARM: dts: Remove duplicated I2C7 nodes in
+ exynos5250-snow
 In-Reply-To: <1431600833-3361-1-git-send-email-k.kozlowski.k@gmail.com>
 References: <1431600833-3361-1-git-send-email-k.kozlowski.k@gmail.com>
-Message-ID: <1431600833-3361-3-git-send-email-k.kozlowski.k@gmail.com>
+Message-ID: <1431600833-3361-4-git-send-email-k.kozlowski.k@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Usage of labels instead of full paths reduces possible mistakes when
-overriding nodes.
+The i2c_7 node (i2c at 12CD0000) with LVDS bridge child node was put in
+Exynos5250 Snow DTS file twice. Move the LVDS bridge to proper existing
+i2c_7 node.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
 ---
- arch/arm/boot/dts/exynos5250.dtsi | 82 +++++++++++++++++++--------------------
- 1 file changed, 41 insertions(+), 41 deletions(-)
+ arch/arm/boot/dts/exynos5250-snow.dts | 46 +++++++++++++++++------------------
+ 1 file changed, 22 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 257e2f10525d..916871bb3f05 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -241,13 +241,6 @@
- 		clock-names = "mfc";
- 	};
- 
--	rtc: rtc at 101E0000 {
--		clocks = <&clock CLK_RTC>;
--		clock-names = "rtc";
--		interrupt-parent = <&pmu_system_controller>;
--		status = "disabled";
--	};
--
- 	tmu: tmu at 10060000 {
- 		compatible = "samsung,exynos5250-tmu";
- 		reg = <0x10060000 0x100>;
-@@ -276,26 +269,6 @@
+diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+index 1eca97ee4bd6..b7f4122df456 100644
+--- a/arch/arm/boot/dts/exynos5250-snow.dts
++++ b/arch/arm/boot/dts/exynos5250-snow.dts
+@@ -177,30 +177,6 @@
  		};
  	};
  
--	serial at 12C00000 {
--		clocks = <&clock CLK_UART0>, <&clock CLK_SCLK_UART0>;
--		clock-names = "uart", "clk_uart_baud0";
+-	i2c at 12CD0000 {
+-		ptn3460: lvds-bridge at 20 {
+-			compatible = "nxp,ptn3460";
+-			reg = <0x20>;
+-			powerdown-gpios = <&gpy2 5 GPIO_ACTIVE_HIGH>;
+-			reset-gpios = <&gpx1 5 GPIO_ACTIVE_HIGH>;
+-			edid-emulation = <5>;
+-
+-			ports {
+-				port at 0 {
+-					bridge_out: endpoint {
+-						remote-endpoint = <&panel_in>;
+-					};
+-				};
+-
+-				port at 1 {
+-					bridge_in: endpoint {
+-						remote-endpoint = <&dp_out>;
+-					};
+-				};
+-			};
+-		};
 -	};
 -
--	serial at 12C10000 {
--		clocks = <&clock CLK_UART1>, <&clock CLK_SCLK_UART1>;
--		clock-names = "uart", "clk_uart_baud0";
--	};
--
--	serial at 12C20000 {
--		clocks = <&clock CLK_UART2>, <&clock CLK_SCLK_UART2>;
--		clock-names = "uart", "clk_uart_baud0";
--	};
--
--	serial at 12C30000 {
--		clocks = <&clock CLK_UART3>, <&clock CLK_SCLK_UART3>;
--		clock-names = "uart", "clk_uart_baud0";
--	};
--
- 	sata: sata at 122F0000 {
- 		compatible = "snps,dwc-ahci";
- 		samsung,sata-freq = <66>;
-@@ -778,20 +751,6 @@
- 		#phy-cells = <0>;
- 	};
+ 	sound {
+ 		compatible = "google,snow-audio-max98095";
  
--	dp: dp-controller at 145B0000 {
--		power-domains = <&pd_disp1>;
--		clocks = <&clock CLK_DP>;
--		clock-names = "dp";
--		phys = <&dp_phy>;
--		phy-names = "dp";
--	};
--
--	fimd: fimd at 14400000 {
--		power-domains = <&pd_disp1>;
--		clocks = <&clock CLK_SCLK_FIMD1>, <&clock CLK_FIMD1>;
--		clock-names = "sclk_fimd", "fimd";
--	};
--
- 	adc: adc at 12D10000 {
- 		compatible = "samsung,exynos-adc-v1";
- 		reg = <0x12D10000 0x100>;
-@@ -812,3 +771,44 @@
- 		clock-names = "secss";
- 	};
- };
+@@ -507,6 +483,28 @@
+ 	samsung,i2c-sda-delay = <100>;
+ 	samsung,i2c-max-bus-freq = <66000>;
+ 
++	ptn3460: lvds-bridge at 20 {
++		compatible = "nxp,ptn3460";
++		reg = <0x20>;
++		powerdown-gpios = <&gpy2 5 GPIO_ACTIVE_HIGH>;
++		reset-gpios = <&gpx1 5 GPIO_ACTIVE_HIGH>;
++		edid-emulation = <5>;
 +
-+&dp {
-+	power-domains = <&pd_disp1>;
-+	clocks = <&clock CLK_DP>;
-+	clock-names = "dp";
-+	phys = <&dp_phy>;
-+	phy-names = "dp";
-+};
++		ports {
++			port at 0 {
++				bridge_out: endpoint {
++					remote-endpoint = <&panel_in>;
++				};
++			};
 +
-+&fimd {
-+	power-domains = <&pd_disp1>;
-+	clocks = <&clock CLK_SCLK_FIMD1>, <&clock CLK_FIMD1>;
-+	clock-names = "sclk_fimd", "fimd";
-+};
++			port at 1 {
++				bridge_in: endpoint {
++					remote-endpoint = <&dp_out>;
++				};
++			};
++		};
++	};
 +
-+&rtc {
-+	clocks = <&clock CLK_RTC>;
-+	clock-names = "rtc";
-+	interrupt-parent = <&pmu_system_controller>;
-+	status = "disabled";
-+};
-+
-+&serial_0 {
-+	clocks = <&clock CLK_UART0>, <&clock CLK_SCLK_UART0>;
-+	clock-names = "uart", "clk_uart_baud0";
-+};
-+
-+&serial_1 {
-+	clocks = <&clock CLK_UART1>, <&clock CLK_SCLK_UART1>;
-+	clock-names = "uart", "clk_uart_baud0";
-+};
-+
-+&serial_2 {
-+	clocks = <&clock CLK_UART2>, <&clock CLK_SCLK_UART2>;
-+	clock-names = "uart", "clk_uart_baud0";
-+};
-+
-+&serial_3 {
-+	clocks = <&clock CLK_UART3>, <&clock CLK_SCLK_UART3>;
-+	clock-names = "uart", "clk_uart_baud0";
-+};
+ 	max98095: codec at 11 {
+ 		compatible = "maxim,max98095";
+ 		reg = <0x11>;
 -- 
 2.1.4
