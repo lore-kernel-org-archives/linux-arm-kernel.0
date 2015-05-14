@@ -1,84 +1,27 @@
-From: jorge.ramirez-ortiz@linaro.org (Jorge Ramirez-Ortiz)
-Date: Thu, 14 May 2015 07:48:30 -0400
-Subject: [PATCH] arm: topology: fix capacity calculation on SMP SoCs
-In-Reply-To: <CAKfTPtDONGLyMO_4qmzmj2Q4AVHyvy2HJb4uuGnueYVPsM213A@mail.gmail.com>
-References: <1431549503-11799-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
- <CAKfTPtDONGLyMO_4qmzmj2Q4AVHyvy2HJb4uuGnueYVPsM213A@mail.gmail.com>
-Message-ID: <55548B8E.6050708@linaro.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 14 May 2015 13:53:55 +0200
+Subject: [PATCH v3 5/5] arm64: KVM: Switch vgic save/restore to
+ alternative_insn
+In-Reply-To: <1427461765-14462-6-git-send-email-marc.zyngier@arm.com>
+References: <1427461765-14462-1-git-send-email-marc.zyngier@arm.com>
+ <1427461765-14462-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20150514115355.GT32765@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2015 07:31 AM, Vincent Guittot wrote:
-> Hi Jorge,
->
-> On 13 May 2015 at 22:38, Jorge Ramirez-Ortiz
-> <jorge.ramirez-ortiz@linaro.org> wrote:
->> This commit sets the capacity of the average CPU in SMP systems to
->> SCHED_CAPACITY_SCALE.
->>
->> Ignoring the condition "min_capacity==max_capacity" causes the function
->> update_cpu_capacity( .. ) to generate out of range values [1]. This is
->> because the default value of middle_capacity is used in the final
->> calculation instead of a valid scaling factor.
->>
->> Incidentally, when out of range values are generated and if
->> SCHED_FEAT(ARCH_POWER, true), the load balancing algorithm makes the
->> wrong decisions typically overallocating work on one of the cores
->> while leaving the others unused.
-> Have you got an example ?
+On Fri, Mar 27, 2015 at 01:09:25PM +0000, Marc Zyngier wrote:
+> So far, we configured the world-switch by having a small array
+> of pointers to the save and restore functions, depending on the
+> GIC used on the platform.
+> 
+> Loading these values each time is a bit silly (they never change),
+> and it makes sense to rely on the instruction patching instead.
+> 
+> This leads to a nice cleanup of the code.
+> 
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-This was tested on lsk 3.10 which was slightly different (see my comments below).
-I can get you the test source code.
+I gave this a quick spin on Juno as well and works as expected:
 
-
->
->> [1] val > SCHED_CAPACITY_SCALE
->>
->> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
->> ---
->>  arch/arm/kernel/topology.c | 8 ++++----
->>  1 file changed, 4 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
->> index 08b7847..509bc9b 100644
->> --- a/arch/arm/kernel/topology.c
->> +++ b/arch/arm/kernel/topology.c
->> @@ -137,14 +137,14 @@ static void __init parse_dt_topology(void)
->>                 cpu_capacity(cpu) = capacity;
->>         }
->>
->> -       /* If min and max capacities are equals, we bypass the update of the
->> -        * cpu_scale because all CPUs have the same capacity. Otherwise, we
->> -        * compute a middle_capacity factor that will ensure that the capacity
->> +       /* Compute a middle_capacity factor that will ensure that the capacity
->>          * of an 'average' CPU of the system will be as close as possible to
->>          * SCHED_CAPACITY_SCALE, which is the default value, but with the
->>          * constraint explained near table_efficiency[].
->>          */
->> -       if (4*max_capacity < (3*(max_capacity + min_capacity)))
->> +       if (min_capacity == max_capacity)
->> +               middle_capacity = min_capacity >> SCHED_CAPACITY_SHIFT;
->> +       else if (4*max_capacity < (3*(max_capacity + min_capacity)))
-> if min_capacity == max_capacity then the condition 4*max_capacity <
-> (3*(max_capacity + min_capacity)) is true and
-> middle_capacity = (min_capacity + max_capacity) >>
-> (SCHED_CAPACITY_SHIFT+1) = 2*min_capacity >> (SCHED_CAPACITY_SHIFT+1)
-> so middle capacity = min_capacity >> SCHED_CAPACITY_SHIFT
->
-> I don't see what your change does that is not already done by current code
-
-ah you are right! I didn't even consider it would be handled under that condition.
-My mistake.
-
-It seem the problem is only present in lsk 3.10 then [1]
-
-btw the comments above the condition should still be edited (cpu_scale is always
-updated)
-
-ok ignore this patch and let's only fix it on the lsk in the same way it is done
-here.
-
-thanks
-
-[1]
-https://git.linaro.org/kernel/linux-linaro-stable.git/blob/refs/heads/linux-linaro-lsk:/arch/arm64/kernel/topology.c#l327
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
