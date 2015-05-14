@@ -1,44 +1,73 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 14 May 2015 19:29:38 +0530
-Subject: schedule_timeout sleeps too long after dividing CPU frequency
-In-Reply-To: <55549DEE.6010202@free.fr>
-References: <55520F0F.5010906@free.fr>
- <CAKohpo=eMA6L9=jK=bAnbFuDxcdtpQNub0WFnSy6MOqB3jOdjA@mail.gmail.com>
- <555218C7.5050602@free.fr>
- <20150512155004.GP2067@n2100.arm.linux.org.uk>
- <555380F8.5050306@free.fr>
- <CAOh2x==aCLxCWX9K57hOFVEP1eLo_OYZPe0YvbFvpkXcoSp_hQ@mail.gmail.com>
- <5554858A.9010207@free.fr> <20150514115456.GB23999@linux>
- <55549DEE.6010202@free.fr>
-Message-ID: <CAKohpon4AV-7nq=Qm7PpDbbW9ti98avY9zz82htzyHWi5_K7fA@mail.gmail.com>
+From: liquid.acid@gmx.net (Tobias Jakobi)
+Date: Thu, 14 May 2015 16:06:44 +0200
+Subject: [PATCH] MAINTAINERS: ARM: EXYNOS: Add Krzysztof Kozlowski
+ asco-maintainer
+In-Reply-To: <CABxcv==2ouDFPE2sBdqCwpACYXCCGnJYQFtbOV2PuVNGnv2q=g@mail.gmail.com>
+References: <1431605720-828-1-git-send-email-k.kozlowski@samsung.com>	<55549C56.6050509@kernel.org>
+ <CABxcv==2ouDFPE2sBdqCwpACYXCCGnJYQFtbOV2PuVNGnv2q=g@mail.gmail.com>
+Message-ID: <5554ABF4.80002@gmx.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 May 2015 at 18:36, Mason <slash.tmp@free.fr> wrote:
-> When I execute "echo 18500 > scaling_max_freq"
-> the system is supposed to change the CPU frequency to 18.5 MHz
-> (I might have a bug lurking there) and PERIPHCLK is 1/2 of that,
-> i.e 9.25 MHz.
+Javier Martinez Canillas wrote:
+> Hello Kukjin,
+> 
+> On Thu, May 14, 2015 at 3:00 PM, Kukjin Kim <kgene@kernel.org> wrote:
+>> On 05/14/15 21:15, Krzysztof Kozlowski wrote:
+>>> Add Krzysztof Kozlowski as a co-maintainer of Samsung Exynos ARM
+>>> architecture to review the patches. Patches will go as usual - picked up
+>>> by Kukjin Kim.
+>>>
+>> Hi Krzysztof,
+>>
+>> Sorry, I don't agree with this patch because you can review any exynos
+>> patches without maintainer title. And I can focus on the maintainer'r
+>> role more than now because of change of role ;-) Of course your review
+>> would be helpful to me.
+>>
+> 
+> Sorry but I disagree. Krzysztof has been very active reviewing Exynos
+> patches and even picking/queuing important fixes while it seems you
+> were too busy and couldn't pay close attention.
+I would even go further than that. We're in this situation because the
+current maintainer didn't do his job properly.
 
-So at least we are on the right path. But it looks to me that this
-call is not getting propagated well.
+I want to point out what gregkh once said about this matter:
+https://youtu.be/iiED1K98lnw?t=1745
 
->From the attachment you gave initially, the event handler for
-twd-timers is: tick_handle_periodic(). i.e. you are running in
-periodic mode and not onshot...
 
-why ?
 
-> Yes, I do, but I was trying to use as much generic code as
-> possible to limit the chances of introducing bugs.
+> It's really great that due a role change you will have more time to
+> focus on the maintainership but I don't see why having more
+> maintainers could be something negative. As long as you work in a
+> coordinate manner, the more maintainers we have the better IMHO. It
+> may be that in the future you change your role at your company again
+> and then it will be good to have something else to take care of the
+> posted patches ;-)
+I very much agree with Javier here. Krzysztof promptly responds to
+patches and usually provides detailed feedback when things need changes.
+It would be stupid not to accept him as an additional maintainer.
 
-Hmm..
 
-> I'll take a fresh look at the ARM GLOBAL TIMER, but last I
-> checked, it didn't seem to handle frequency scaling.
 
-why is that required? Why will you change its freq ?
-The same timer is probably used for SPEAr (the platform
-I used to work on):
+With best wishes,
+Tobias
 
-http://lxr.free-electrons.com/source/arch/arm/mach-spear/time.c?v=3.14
+
+> It's true that Krzysztof can review any Exynos patches (like anyone
+> subscribed to the lists) without a co-maintainer title, but being
+> listed in MAINTAINERS will make sure that people know that he is
+> willing to review and ack Exynos patches so they should add him to the
+> cc list.
+> 
+>> Thanks,
+>> Kukjin
+>>
+> 
+> Best regards,
+> Javier
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
