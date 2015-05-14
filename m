@@ -1,87 +1,143 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Thu, 14 May 2015 12:11:06 +0200
-Subject: [PATCH net-next 11/11] stmmac: drop driver from stmmac platform code
+Date: Thu, 14 May 2015 12:11:04 +0200
+Subject: [PATCH net-next 09/11] stmmac: convert dwmac-sti to platform driver
 In-Reply-To: <1431598266-25736-1-git-send-email-manabian@gmail.com>
 References: <1431598266-25736-1-git-send-email-manabian@gmail.com>
-Message-ID: <1431598266-25736-12-git-send-email-manabian@gmail.com>
+Message-ID: <1431598266-25736-10-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dwmac-generic replaces the driver inside the stmmac
-platform code. This turns stmmac platform into a library
-used by drivers for common platform driver functions.
+Convert platform glue layer into a proper platform
+driver and add it to the build system.
 
 Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 ---
- .../net/ethernet/stmicro/stmmac/dwmac-generic.c    |  4 +++-
- .../net/ethernet/stmicro/stmmac/stmmac_platform.c  | 22 ----------------------
- 2 files changed, 3 insertions(+), 23 deletions(-)
+ drivers/net/ethernet/stmicro/stmmac/Kconfig        | 12 +++++++++
+ drivers/net/ethernet/stmicro/stmmac/Makefile       |  2 +-
+ drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c    | 29 ++++++++++++++++++++--
+ .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |  4 ---
+ .../net/ethernet/stmicro/stmmac/stmmac_platform.h  |  2 --
+ 5 files changed, 40 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-generic.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-generic.c
-index fb9623744e41..e817a1a44379 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-generic.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-generic.c
-@@ -1,6 +1,7 @@
- /*
-  * Generic DWMAC platform driver
-  *
-+ * Copyright (C) 2007-2011  STMicroelectronics Ltd
-  * Copyright (C) 2015 Joachim Eastwood <manabian@gmail.com>
-  *
-  * This file is licensed under the terms of the GNU General Public
-@@ -12,6 +13,7 @@
+diff --git a/drivers/net/ethernet/stmicro/stmmac/Kconfig b/drivers/net/ethernet/stmicro/stmmac/Kconfig
+index f103e57e3ac0..f5b9f051337d 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/Kconfig
++++ b/drivers/net/ethernet/stmicro/stmmac/Kconfig
+@@ -78,6 +78,18 @@ config DWMAC_SOCFPGA
+ 	  for the stmmac device driver. This driver is used for
+ 	  arria5 and cyclone5 FPGA SoCs.
+ 
++config DWMAC_STI
++	tristate "STi GMAC support"
++	default ARCH_STI
++	depends on OF
++	select MFD_SYSCON
++	---help---
++	  Support for ethernet controller on STi SOCs.
++
++	  This selects STi SoC glue layer support for the stmmac
++	  device driver. This driver is used on for the STi series
++	  SOCs GMAC ethernet controller.
++
+ endif
+ 
+ config STMMAC_PCI
+diff --git a/drivers/net/ethernet/stmicro/stmmac/Makefile b/drivers/net/ethernet/stmicro/stmmac/Makefile
+index 690741d6fc10..f8e5ddba7fd2 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/Makefile
++++ b/drivers/net/ethernet/stmicro/stmmac/Makefile
+@@ -10,9 +10,9 @@ obj-$(CONFIG_DWMAC_LPC18XX)	+= dwmac-lpc18xx.o
+ obj-$(CONFIG_DWMAC_MESON)	+= dwmac-meson.o
+ obj-$(CONFIG_DWMAC_ROCKCHIP)	+= dwmac-rk.o
+ obj-$(CONFIG_DWMAC_SOCFPGA)	+= dwmac-socfpga.o
++obj-$(CONFIG_DWMAC_STI)		+= dwmac-sti.o
+ obj-$(CONFIG_DWMAC_GENERIC)	+= dwmac-generic.o
+ stmmac-platform-objs:= stmmac_platform.o dwmac-sunxi.o \
+-		       dwmac-sti.o
+ 
+ obj-$(CONFIG_STMMAC_PCI) += stmmac-pci.o
+ stmmac-pci-objs:= stmmac_pci.o
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c
+index bb6e2dc61bec..a2e8111c5d14 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c
+@@ -17,6 +17,7 @@
+ #include <linux/stmmac.h>
+ #include <linux/phy.h>
+ #include <linux/mfd/syscon.h>
++#include <linux/module.h>
+ #include <linux/regmap.h>
+ #include <linux/clk.h>
  #include <linux/of.h>
- #include <linux/platform_device.h>
+@@ -351,16 +352,40 @@ static void *sti_dwmac_setup(struct platform_device *pdev)
+ 	return dwmac;
+ }
  
-+#include "stmmac.h"
- #include "stmmac_platform.h"
+-const struct stmmac_of_data stih4xx_dwmac_data = {
++static const struct stmmac_of_data stih4xx_dwmac_data = {
+ 	.fix_mac_speed = stih4xx_fix_retime_src,
+ 	.setup = sti_dwmac_setup,
+ 	.init = stix4xx_init,
+ 	.exit = sti_dwmac_exit,
+ };
  
- static const struct of_device_id dwmac_generic_match[] = {
-@@ -28,7 +30,7 @@ static struct platform_driver dwmac_generic_driver = {
- 	.probe  = stmmac_pltfr_probe,
- 	.remove = stmmac_pltfr_remove,
- 	.driver = {
--		.name           = "dwmac-generic",
-+		.name           = STMMAC_RESOURCE_NAME,
- 		.pm		= &stmmac_pltfr_pm_ops,
- 		.of_match_table = of_match_ptr(dwmac_generic_match),
- 	},
+-const struct stmmac_of_data stid127_dwmac_data = {
++static const struct stmmac_of_data stid127_dwmac_data = {
+ 	.fix_mac_speed = stid127_fix_retime_src,
+ 	.setup = sti_dwmac_setup,
+ 	.init = stid127_init,
+ 	.exit = sti_dwmac_exit,
+ };
++
++static const struct of_device_id sti_dwmac_match[] = {
++	{ .compatible = "st,stih415-dwmac", .data = &stih4xx_dwmac_data},
++	{ .compatible = "st,stih416-dwmac", .data = &stih4xx_dwmac_data},
++	{ .compatible = "st,stid127-dwmac", .data = &stid127_dwmac_data},
++	{ .compatible = "st,stih407-dwmac", .data = &stih4xx_dwmac_data},
++	{ }
++};
++MODULE_DEVICE_TABLE(of, sti_dwmac_match);
++
++static struct platform_driver sti_dwmac_driver = {
++	.probe  = stmmac_pltfr_probe,
++	.remove = stmmac_pltfr_remove,
++	.driver = {
++		.name           = "sti-dwmac",
++		.pm		= &stmmac_pltfr_pm_ops,
++		.of_match_table = sti_dwmac_match,
++	},
++};
++module_platform_driver(sti_dwmac_driver);
++
++MODULE_AUTHOR("Srinivas Kandagatla <srinivas.kandagatla@st.com>");
++MODULE_DESCRIPTION("STMicroelectronics DWMAC Specific Glue layer");
++MODULE_LICENSE("GPL");
 diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-index e3a3c2bff86e..3e194c3ca297 100644
+index 4553b50833ea..21a3a2c05740 100644
 --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
 +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-@@ -32,12 +32,6 @@
- #include "stmmac.h"
- #include "stmmac_platform.h"
+@@ -35,10 +35,6 @@
+ static const struct of_device_id stmmac_dt_ids[] = {
+ 	/* SoC specific glue layers should come before generic bindings */
+ 	{ .compatible = "allwinner,sun7i-a20-gmac", .data = &sun7i_gmac_data},
+-	{ .compatible = "st,stih415-dwmac", .data = &stih4xx_dwmac_data},
+-	{ .compatible = "st,stih416-dwmac", .data = &stih4xx_dwmac_data},
+-	{ .compatible = "st,stid127-dwmac", .data = &stid127_dwmac_data},
+-	{ .compatible = "st,stih407-dwmac", .data = &stih4xx_dwmac_data},
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, stmmac_dt_ids);
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.h b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.h
+index 3c8d7088361f..7eb2fa8d97f3 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.h
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.h
+@@ -24,7 +24,5 @@ int stmmac_pltfr_remove(struct platform_device *pdev);
+ extern const struct dev_pm_ops stmmac_pltfr_pm_ops;
  
--static const struct of_device_id stmmac_dt_ids[] = {
--	/* SoC specific glue layers should come before generic bindings */
--	{ /* sentinel */ }
--};
--MODULE_DEVICE_TABLE(of, stmmac_dt_ids);
--
- #ifdef CONFIG_OF
+ extern const struct stmmac_of_data sun7i_gmac_data;
+-extern const struct stmmac_of_data stih4xx_dwmac_data;
+-extern const struct stmmac_of_data stid127_dwmac_data;
  
- /**
-@@ -431,19 +425,3 @@ static int stmmac_pltfr_resume(struct device *dev)
- SIMPLE_DEV_PM_OPS(stmmac_pltfr_pm_ops, stmmac_pltfr_suspend,
- 				       stmmac_pltfr_resume);
- EXPORT_SYMBOL_GPL(stmmac_pltfr_pm_ops);
--
--static struct platform_driver stmmac_pltfr_driver = {
--	.probe = stmmac_pltfr_probe,
--	.remove = stmmac_pltfr_remove,
--	.driver = {
--		   .name = STMMAC_RESOURCE_NAME,
--		   .pm = &stmmac_pltfr_pm_ops,
--		   .of_match_table = of_match_ptr(stmmac_dt_ids),
--	},
--};
--
--module_platform_driver(stmmac_pltfr_driver);
--
--MODULE_DESCRIPTION("STMMAC 10/100/1000 Ethernet PLATFORM driver");
--MODULE_AUTHOR("Giuseppe Cavallaro <peppe.cavallaro@st.com>");
--MODULE_LICENSE("GPL");
+ #endif /* __STMMAC_PLATFORM_H__ */
 -- 
 1.8.0
