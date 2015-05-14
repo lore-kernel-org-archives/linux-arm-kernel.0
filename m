@@ -1,37 +1,40 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 14 May 2015 21:16:35 +0900
-Subject: [PATCH] MAINTAINERS: ARM64: EXYNOS: Extend entry for ARM64 DTS
-Message-ID: <1431605795-902-1-git-send-email-k.kozlowski@samsung.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu, 14 May 2015 14:40:40 +0200
+Subject: [PATCH v2] ARM: dts: Add syscon property to the MIPI phy in exynos5420
+Message-ID: <1431607240-14549-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Extend the Exynos entry to ARM64 device tree sources.
+Since e4b3d38088df6f3acd40 ("phy: exynos-video-mipi: Fix regression by
+adding support for PMU regmap") the syscon property is required in
+samsung,s5pv210-mipi-video-phy nodes, but this DTS hadn't been updated
+yet.
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Kevin Hilman <khilman@kernel.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: linux-samsung-soc at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Cc: Krzysztof Koz?owski <k.kozlowski@samsung.com>
+
+--
+
+v2:	* Remove reg property as suggested by Javier
+	* Added his Reviewed-by
 ---
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/exynos5420.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index a3cb77c0ae23..619a95558673 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1386,6 +1386,7 @@ L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/boot/dts/s3c*
- F:	arch/arm/boot/dts/exynos*
-+F:	arch/arm64/boot/dts/exynos/
- F:	arch/arm/plat-samsung/
- F:	arch/arm/mach-s3c24*/
- F:	arch/arm/mach-s3c64xx/
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index 4531753..78bcbc0 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -541,7 +541,7 @@
+ 
+ 	mipi_phy: video-phy at 10040714 {
+ 		compatible = "samsung,s5pv210-mipi-video-phy";
+-		reg = <0x10040714 12>;
++		syscon = <&pmu_system_controller>;
+ 		#phy-cells = <1>;
+ 	};
+ 
 -- 
-2.1.4
+2.4.0
