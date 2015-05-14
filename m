@@ -1,73 +1,83 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 15 May 2015 02:00:03 +0300
-Subject: [RFC/PATCH 2/9] arm: dma-mapping: Support IOMMU mappings spanning the
- full 32 bits range
+Date: Fri, 15 May 2015 02:00:05 +0300
+Subject: [RFC/PATCH 4/9] of: dma: Make of_dma_deconfigure() public
 In-Reply-To: <1431644410-2997-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1431644410-2997-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1431644410-2997-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1431644410-2997-5-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm_iommu_create_mapping() function takes the IOMMU mapping size as
-a size_t, limiting the size to 4GB - 1 on 32 bit platforms while most
-bus masters would support the full 32 bits range. Fix this by passing
-the size as a 64 bits integer, and limiting it to 4GB for now.
+As part of moving DMA initializing to probe time the
+of_dma_deconfigure() function will need to be called from different
+source files. Make it public and move it to drivers/of/device.c where
+the of_dma_configure() function is.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- arch/arm/include/asm/dma-iommu.h |  2 +-
- arch/arm/mm/dma-mapping.c        | 12 +++---------
- 2 files changed, 4 insertions(+), 10 deletions(-)
+ drivers/of/device.c       | 12 ++++++++++++
+ drivers/of/platform.c     |  5 -----
+ include/linux/of_device.h |  3 +++
+ 3 files changed, 15 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/include/asm/dma-iommu.h b/arch/arm/include/asm/dma-iommu.h
-index 8e3fcb924db6..2ef282f96651 100644
---- a/arch/arm/include/asm/dma-iommu.h
-+++ b/arch/arm/include/asm/dma-iommu.h
-@@ -25,7 +25,7 @@ struct dma_iommu_mapping {
- };
+diff --git a/drivers/of/device.c b/drivers/of/device.c
+index 530aa1ed3e1b..f1b84f464fe1 100644
+--- a/drivers/of/device.c
++++ b/drivers/of/device.c
+@@ -135,6 +135,18 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+ }
+ EXPORT_SYMBOL_GPL(of_dma_configure);
  
- struct dma_iommu_mapping *
--arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size);
-+arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, u64 size);
- 
- void arm_iommu_release_mapping(struct dma_iommu_mapping *mapping);
- 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 7aa5e339a596..c69e216a0cf9 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1878,7 +1878,7 @@ struct dma_map_ops iommu_coherent_ops = {
-  * arm_iommu_attach_device function.
-  */
- struct dma_iommu_mapping *
--arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size)
-+arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, u64 size)
++/**
++ * of_dma_deconfigure - Clean up DMA configuration
++ * @dev:	Device for which to clean up DMA configuration
++ *
++ * Clean up all configuration performed by of_dma_configure_ops() and free all
++ * resources that have been allocated.
++ */
++void of_dma_deconfigure(struct device *dev)
++{
++	arch_teardown_dma_ops(dev);
++}
++
+ int of_device_register(struct platform_device *pdev)
  {
- 	unsigned int bits = size >> PAGE_SHIFT;
- 	unsigned int bitmap_size = BITS_TO_LONGS(bits) * sizeof(long);
-@@ -1886,7 +1886,8 @@ arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size)
- 	int extensions = 1;
- 	int err = -ENOMEM;
+ 	device_initialize(&pdev->dev);
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index a01f57c9e34e..7a660c79ff84 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -149,11 +149,6 @@ struct platform_device *of_device_alloc(struct device_node *np,
+ }
+ EXPORT_SYMBOL(of_device_alloc);
  
--	if (!bitmap_size)
-+	/* Limit the size to 4GB for now. */
-+	if (!size || size > (1ULL << 32))
- 		return ERR_PTR(-EINVAL);
- 
- 	if (bitmap_size > PAGE_SIZE) {
-@@ -2057,13 +2058,6 @@ static bool arm_setup_iommu_dma_ops(struct device *dev, u64 dma_base, u64 size,
- 	if (!iommu)
- 		return false;
- 
--	/*
--	 * currently arm_iommu_create_mapping() takes a max of size_t
--	 * for size param. So check this limit for now.
--	 */
--	if (size > SIZE_MAX)
--		return false;
+-static void of_dma_deconfigure(struct device *dev)
+-{
+-	arch_teardown_dma_ops(dev);
+-}
 -
- 	mapping = arm_iommu_create_mapping(dev->bus, dma_base, size);
- 	if (IS_ERR(mapping)) {
- 		pr_warn("Failed to create %llu-byte IOMMU mapping for device %s\n",
+ /**
+  * of_platform_device_create_pdata - Alloc, initialize and register an of_device
+  * @np: pointer to node to create device for
+diff --git a/include/linux/of_device.h b/include/linux/of_device.h
+index 22801b10cef5..6710807b0653 100644
+--- a/include/linux/of_device.h
++++ b/include/linux/of_device.h
+@@ -54,6 +54,7 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
+ }
+ 
+ void of_dma_configure(struct device *dev, struct device_node *np);
++void of_dma_deconfigure(struct device *dev);
+ #else /* CONFIG_OF */
+ 
+ static inline int of_driver_match_device(struct device *dev,
+@@ -93,6 +94,8 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
+ }
+ static inline void of_dma_configure(struct device *dev, struct device_node *np)
+ {}
++static inline void of_dma_deconfigure(struct device *dev)
++{}
+ #endif /* CONFIG_OF */
+ 
+ #endif /* _LINUX_OF_DEVICE_H */
 -- 
 2.3.6
