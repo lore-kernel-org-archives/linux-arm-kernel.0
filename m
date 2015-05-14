@@ -1,119 +1,55 @@
-From: yh.huang@mediatek.com (YH Huang)
-Date: Thu, 14 May 2015 22:45:10 +0800
-Subject: [PATCH 2/2] pwm: add Mediatek display PWM driver support
-In-Reply-To: <CABuKBeJc3Kvdoejyi0XFbQMU2saztzV5S7jiXCg-09juYeh4pg@mail.gmail.com>
-References: <1431336382-13167-1-git-send-email-yh.huang@mediatek.com>
- <1431336382-13167-3-git-send-email-yh.huang@mediatek.com>
- <CABuKBeJz_=Nxcen9QU_KHds6UJwUJL0yNpYDhvT3eFoV_EY5xA@mail.gmail.com>
- <CABuKBeJc3Kvdoejyi0XFbQMU2saztzV5S7jiXCg-09juYeh4pg@mail.gmail.com>
-Message-ID: <1431614710.15140.31.camel@mtksdaap41>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 14 May 2015 16:48:33 +0200
+Subject: schedule_timeout sleeps too long after dividing CPU frequency
+In-Reply-To: <CAKohpon4AV-7nq=Qm7PpDbbW9ti98avY9zz82htzyHWi5_K7fA@mail.gmail.com>
+References: <55520F0F.5010906@free.fr>	<CAKohpo=eMA6L9=jK=bAnbFuDxcdtpQNub0WFnSy6MOqB3jOdjA@mail.gmail.com>	<555218C7.5050602@free.fr>	<20150512155004.GP2067@n2100.arm.linux.org.uk>	<555380F8.5050306@free.fr>	<CAOh2x==aCLxCWX9K57hOFVEP1eLo_OYZPe0YvbFvpkXcoSp_hQ@mail.gmail.com>	<5554858A.9010207@free.fr>	<20150514115456.GB23999@linux>	<55549DEE.6010202@free.fr>
+ <CAKohpon4AV-7nq=Qm7PpDbbW9ti98avY9zz82htzyHWi5_K7fA@mail.gmail.com>
+Message-ID: <5554B5C1.2070402@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-05-12 at 14:44 +0200, Matthias Brugger wrote:
-> 2015-05-12 14:37 GMT+02:00 Matthias Brugger <matthias.bgg@gmail.com>:
-> > Hi YH,
-> >
-> > 2015-05-11 11:26 GMT+02:00 YH Huang <yh.huang@mediatek.com>:
-> >> Add display PWM driver support to modify backlight for MT8173/MT6595.
-> >>
-> >> Signed-off-by: YH Huang <yh.huang@mediatek.com>
-> >> ---
-> >>  drivers/pwm/Kconfig             |   9 ++
-> >>  drivers/pwm/Makefile            |   1 +
-> >>  drivers/pwm/pwm-disp-mediatek.c | 225 ++++++++++++++++++++++++++++++++++++++++
-> >>  3 files changed, 235 insertions(+)
-> >>  create mode 100644 drivers/pwm/pwm-disp-mediatek.c
-> >>
-> >> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-> >> index b1541f4..9edbb5a 100644
-> >> --- a/drivers/pwm/Kconfig
-> >> +++ b/drivers/pwm/Kconfig
-> >> @@ -111,6 +111,15 @@ config PWM_CLPS711X
-> >>           To compile this driver as a module, choose M here: the module
-> >>           will be called pwm-clps711x.
-> >>
-> >> +config PWM_DISP_MEDIATEK
-> >> +       tristate "MEDIATEK display PWM driver"
-> >> +       depends on OF
-> >> +       help
-> >> +         Generic PWM framework driver for mediatek disp-pwm device.
-> >> +
-> >> +         To compile this driver as a module, choose M here: the module
-> >> +         will be called pwm-disp-mediatek.
-> >> +
-> >>  config PWM_EP93XX
-> >>         tristate "Cirrus Logic EP93xx PWM support"
-> >>         depends on ARCH_EP93XX
-> >> diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-> >> index ec50eb5..c5ff72a 100644
-> >> --- a/drivers/pwm/Makefile
-> >> +++ b/drivers/pwm/Makefile
-> >> @@ -8,6 +8,7 @@ obj-$(CONFIG_PWM_BCM_KONA)      += pwm-bcm-kona.o
-> >>  obj-$(CONFIG_PWM_BCM2835)      += pwm-bcm2835.o
-> >>  obj-$(CONFIG_PWM_BFIN)         += pwm-bfin.o
-> >>  obj-$(CONFIG_PWM_CLPS711X)     += pwm-clps711x.o
-> >> +obj-$(CONFIG_PWM_DISP_MEDIATEK)        += pwm-disp-mediatek.o
-> >>  obj-$(CONFIG_PWM_EP93XX)       += pwm-ep93xx.o
-> >>  obj-$(CONFIG_PWM_FSL_FTM)      += pwm-fsl-ftm.o
-> >>  obj-$(CONFIG_PWM_IMG)          += pwm-img.o
-> >> diff --git a/drivers/pwm/pwm-disp-mediatek.c b/drivers/pwm/pwm-disp-mediatek.c
-> >> new file mode 100644
-> >> index 0000000..38293af
-> >> --- /dev/null
-> >> +++ b/drivers/pwm/pwm-disp-mediatek.c
-> >> @@ -0,0 +1,225 @@
-> >> +/*
-> >> + * Mediatek display pulse-width-modulation controller driver.
-> >> + * Copyright (c) 2015 MediaTek Inc.
-> >> + * Author: YH Huang <yh.huang@mediatek.com>
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or modify
-> >> + * it under the terms of the GNU General Public License version 2 as
-> >> + * published by the Free Software Foundation.
-> >> + *
-> >> + * This program is distributed in the hope that it will be useful,
-> >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >> + * GNU General Public License for more details.
-> >> + */
-> >> +
-> >> +#include <linux/clk.h>
-> >> +#include <linux/err.h>
-> >> +#include <linux/io.h>
-> >> +#include <linux/module.h>
-> >> +#include <linux/of.h>
-> >> +#include <linux/pwm.h>
-> >> +#include <linux/platform_device.h>
-> >> +#include <linux/slab.h>
-> >> +
-> >> +#define DISP_PWM_EN_OFF                        (0x0)
-> >> +#define PWM_ENABLE_SHIFT               (0x0)
-> >> +#define PWM_ENABLE_MASK                        (0x1 << PWM_ENABLE_SHIFT)
-> >
-> > Get rid of the _SHIFT which are actually zero, it will make the code
-> > more readable.
-> >
-> >> +
-> >> +#define DISP_PWM_COMMIT_OFF            (0x08)
-> >> +#define PWM_COMMIT_SHIFT               (0x0)
-> >> +#define PWM_COMMIT_MASK                        (0x1 << PWM_COMMIT_SHIFT)
-> >> +
-> >> +#define DISP_PWM_CON_0_OFF             (0x10)
-> >> +#define PWM_CLKDIV_SHIFT               (0x10)
+On 14/05/2015 15:59, Viresh Kumar wrote:
+> On 14 May 2015 at 18:36, Mason wrote:
+>> When I execute "echo 18500 > scaling_max_freq"
+>> the system is supposed to change the CPU frequency to 18.5 MHz
+>> (I might have a bug lurking there) and PERIPHCLK is 1/2 of that,
+>> i.e 9.25 MHz.
 > 
-> I prefer to have the shift values in decimal instead of hex, as it
-> makes it easier to see which bits in the registers are the relevant
-> ones.
-> Sorry forgot that one.
+> So at least we are on the right path. But it looks to me that this
+> call is not getting propagated well.
 > 
+> From the attachment you gave initially, the event handler for
+> twd-timers is: tick_handle_periodic(). i.e. you are running in
+> periodic mode and not one-shot... why ?
 
-I think you are right.
+I don't know. Is it not obvious (to someone who knows what to
+look for) from reading the smp_twd.c source?
 
-> Cheers,
-> Matthias
+How do I run the TWD in one-shot mode?
 
-Thank for your suggestion.
+>> Yes, I do, but I was trying to use as much generic code as
+>> possible to limit the chances of introducing bugs.
+> 
+> Hmm..
+> 
+>> I'll take a fresh look at the ARM GLOBAL TIMER, but last I
+>> checked, it didn't seem to handle frequency scaling.
+> 
+> why is that required? Why will you change its freq ?
 
-Regards,
-YH Huang
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0407g/CIHGECHJ.html
+
+"The global timer is clocked by PERIPHCLK."
+
+PERIPHCLK = CPUCLK/2
+
+Change the CPUCLK, change the PERIPHCLK.
+
+> The same timer is probably used for SPEAr (the platform
+> I used to work on):
+> 
+> http://lxr.free-electrons.com/source/arch/arm/mach-spear/time.c?v=3.14
+
+Did that platform use cpufreq DFS?
+
+Regards.
