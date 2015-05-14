@@ -1,90 +1,54 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 14 May 2015 15:42:15 +0100
-Subject: [RFC/RFT PATCH 1/2] ARM: kernel: bios32: implement PCI device
+Date: Thu, 14 May 2015 15:42:16 +0100
+Subject: [RFC/RFT PATCH 2/2] ARM64: kernel: pci: implement PCI device
  resources claiming
-Message-ID: <1431614537-16136-1-git-send-email-lorenzo.pieralisi@arm.com>
+In-Reply-To: <1431614537-16136-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1431614537-16136-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1431614537-16136-2-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current ARM pcibios layer prevents PCI devices resources enablement
-if the PCI_PROBE_ONLY global flag is set, since on systems that require
-immutable PCI BARs set-up (ie probe only) the arm PCI bios layer does
-not assign resources, hence resources are not really checked (ie claimed)
-and they do not get assigned a parent, which causes pci_enable_resources
-to fail in turn.
+When a device is scanned and added to the PCI bus, its resources
+should be claimed to validate the BARs configuration and to assign
+them a parent resource so that the resource hierarchy can be sanity
+checked.
 
-If the kernel tries to enable the resources for a PCI device through
-pci_enable_resources, it would fail on PCI_PROBE_ONLY systems since the
-device resources are not claimed (ie they are not assigned) on those
-systems and the resource parent is left uninitialized (ie they have a
-dangling parent pointer).
-
-This behaviour does not conform with the expected kernel behaviour.
-
-When a PCI device and its resources are scanned, the detected PCI
-resources should be claimed in order to validate their values read
-from the BARs set-up and should be assigned a parent resource so that the
-resource hierarchy is initialized.
-
-Resource claiming must be carried out on PCI_PROBE_ONLY systems
-too, since it is a method for validating resources and it has nothing
-to do with PCI_PROBE_ONLY flag.
-
-This patch removes the pcibios_enable_device call from the arm bios32
-implementation (which means that arm falls back to the generic weak
-version for its implementation, that correctly enables a device resources)
-and replaces it with an arm pcibios_add_device implementation, that claims
-resources for a device, so that the behaviour becomes compliant with the
-expected PCI device kernel initialization flow.
-
-This way, resources are claimed and enabled on PCI_PROBE_ONLY systems
-too improving the BAR set-up validation and making the arm kernel PCI
-behaviour closer to other architectures.
+This patch adds code that carries out PCI device resources claiming to
+the ARM64 pcibios_add_device implementation so that device resources
+are claimed by the core PCI layer upon PCI device initialization on
+ARM64 systems.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Will Deacon <will.deacon@arm.com>
+Cc: Liviu Dudau <liviu.dudau@arm.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Russell King <linux@arm.linux.org.uk>
 ---
- arch/arm/kernel/bios32.c | 22 ++++++++++++++++------
- 1 file changed, 16 insertions(+), 6 deletions(-)
+ arch/arm64/kernel/pci.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index fcbbbb1..aace9ca 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -604,15 +604,25 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
- }
- 
- /**
-- * pcibios_enable_device - Enable I/O and memory.
-- * @dev: PCI device to be enabled
-+ * pcibios_add_device - Initialize device before adding it to PCI bus
-+ * @dev: PCI device to be added
+diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+index 4095379..c0a88ca 100644
+--- a/arch/arm64/kernel/pci.c
++++ b/arch/arm64/kernel/pci.c
+@@ -43,8 +43,18 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
   */
--int pcibios_enable_device(struct pci_dev *dev, int mask)
-+int pcibios_add_device(struct pci_dev *dev)
+ int pcibios_add_device(struct pci_dev *dev)
  {
--	if (pci_has_flag(PCI_PROBE_ONLY))
--		return 0;
 +	struct resource *res;
 +	int i;
-+	/*
-+	 * Device resources are claimed to validate
-+	 * them and initialize their hierarchy structure
-+	 */
++
+ 	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+ 
 +	for (i = 0; i < PCI_NUM_RESOURCES; i++) {
 +		res = &dev->resource[i];
 +		if (res->parent || !res->flags)
 +			continue;
 +		pci_claim_resource(dev, i);
 +	}
- 
--	return pci_enable_resources(dev, mask);
-+	return 0;
++
+ 	return 0;
  }
  
- int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
 -- 
 2.2.1
