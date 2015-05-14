@@ -1,64 +1,35 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 14 May 2015 10:06:37 +0900
-Subject: [PATCH 08/31] ARM: shmobile: r8a7794: Add IRQC clock to device tree
+Date: Thu, 14 May 2015 10:06:39 +0900
+Subject: [PATCH 10/31] ARM: shmobile: r8a7778 dtsi: Use generic names for
+ device nodes
 In-Reply-To: <cover.1431565427.git.horms+renesas@verge.net.au>
 References: <cover.1431565427.git.horms+renesas@verge.net.au>
-Message-ID: <1c5ca5db11edd7ff27ad8a98ffb2ac61bfd520b6.1431565427.git.horms+renesas@verge.net.au>
+Message-ID: <b38150fae0164d363c852d6b782ab7083697c6d2.1431565427.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Link the external IRQ controller irqc0 to the IRQC module clock, so it
-can be power managed using that clock.
+irqpin -> interrupt-controller
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794.dtsi            | 9 +++++++++
- include/dt-bindings/clock/r8a7794-clock.h | 3 +++
- 2 files changed, 12 insertions(+)
+ arch/arm/boot/dts/r8a7778.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index 7a3ffa51a8bf..01cf54f70501 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -105,6 +105,7 @@
- 			     <0 15 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 16 IRQ_TYPE_LEVEL_HIGH>,
- 			     <0 17 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp4_clks R8A7794_CLK_IRQC>;
+diff --git a/arch/arm/boot/dts/r8a7778.dtsi b/arch/arm/boot/dts/r8a7778.dtsi
+index 868f97309533..7ce9f5fd5865 100644
+--- a/arch/arm/boot/dts/r8a7778.dtsi
++++ b/arch/arm/boot/dts/r8a7778.dtsi
+@@ -68,7 +68,7 @@
  	};
  
- 	dmac0: dma-controller at e6700000 {
-@@ -625,6 +626,14 @@
- 			        "sdhi2", "sdhi1", "sdhi0",
- 				"mmcif0", "cmt1", "usbdmac0", "usbdmac1";
- 		};
-+		mstp4_clks: mstp4_clks at e6150140 {
-+			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
-+			reg = <0 0xe6150140 0 4>, <0 0xe615004c 0 4>;
-+			clocks = <&cp_clk>;
-+			#clock-cells = <1>;
-+			clock-indices = <R8A7794_CLK_IRQC>;
-+			clock-output-names = "irqc";
-+		};
- 		mstp7_clks: mstp7_clks at e615014c {
- 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
-diff --git a/include/dt-bindings/clock/r8a7794-clock.h b/include/dt-bindings/clock/r8a7794-clock.h
-index d63323032d6e..09da38a58776 100644
---- a/include/dt-bindings/clock/r8a7794-clock.h
-+++ b/include/dt-bindings/clock/r8a7794-clock.h
-@@ -60,6 +60,9 @@
- #define R8A7794_CLK_USBDMAC0		30
- #define R8A7794_CLK_USBDMAC1		31
- 
-+/* MSTP4 */
-+#define R8A7794_CLK_IRQC		7
-+
- /* MSTP5 */
- #define R8A7794_CLK_THERMAL		22
- #define R8A7794_CLK_PWM			23
+ 	/* irqpin: IRQ0 - IRQ3 */
+-	irqpin: irqpin at fe78001c {
++	irqpin: interrupt-controller at fe78001c {
+ 		compatible = "renesas,intc-irqpin-r8a7778", "renesas,intc-irqpin";
+ 		#interrupt-cells = <2>;
+ 		interrupt-controller;
 -- 
 2.1.4
