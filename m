@@ -1,50 +1,63 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 14 May 2015 22:00:06 +0900
-Subject: [PATCH] MAINTAINERS: ARM: EXYNOS: Add Krzysztof Kozlowski
- asco-maintainer
-In-Reply-To: <1431605720-828-1-git-send-email-k.kozlowski@samsung.com>
-References: <1431605720-828-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <55549C56.6050509@kernel.org>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 14 May 2015 15:06:54 +0200
+Subject: schedule_timeout sleeps too long after dividing CPU frequency
+In-Reply-To: <20150514115456.GB23999@linux>
+References: <55520F0F.5010906@free.fr>
+ <CAKohpo=eMA6L9=jK=bAnbFuDxcdtpQNub0WFnSy6MOqB3jOdjA@mail.gmail.com>
+ <555218C7.5050602@free.fr> <20150512155004.GP2067@n2100.arm.linux.org.uk>
+ <555380F8.5050306@free.fr>
+ <CAOh2x==aCLxCWX9K57hOFVEP1eLo_OYZPe0YvbFvpkXcoSp_hQ@mail.gmail.com>
+ <5554858A.9010207@free.fr> <20150514115456.GB23999@linux>
+Message-ID: <55549DEE.6010202@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/15 21:15, Krzysztof Kozlowski wrote:
-> Add Krzysztof Kozlowski as a co-maintainer of Samsung Exynos ARM
-> architecture to review the patches. Patches will go as usual - picked up
-> by Kukjin Kim.
+On 14/05/2015 13:54, Viresh Kumar wrote:
+
+> Mason wrote:
 > 
-Hi Krzysztof,
-
-Sorry, I don't agree with this patch because you can review any exynos
-patches without maintainer title. And I can focus on the maintainer'r
-role more than now because of change of role ;-) Of course your review
-would be helpful to me.
-
-Thanks,
-Kukjin
-
-
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Kevin Hilman <khilman@kernel.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: linux-samsung-soc at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  MAINTAINERS | 1 +
->  1 file changed, 1 insertion(+)
+>> I'm using a 27 MHz crystal as clocksource. This is independent
+>> of the CPU frequency. However, I'm using the ARM TWD as the
+>> system's clockevent source, and the TWD's clock is tied to
+>> the CPU clock (PERIPHCLK = CPUCLK / 2 on this SoC).
 > 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 2dc517cd4835..a3cb77c0ae23 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1380,6 +1380,7 @@ N:	rockchip
->  
->  ARM/SAMSUNG EXYNOS ARM ARCHITECTURES
->  M:	Kukjin Kim <kgene@kernel.org>
-> +M:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
->  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->  L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
->  S:	Maintained
+> The only (very straight forward) problem is that we aren't propagating
+> the freq update to clockevents core and you need to debug a bit there.
+
+I had the same thought, which is why I added the "NEW RATE" trace.
+
+> Also I wanted to see the source of your print message:
+> [   19.650454] NEW RATE=9250000
+> [   19.653644] NEW RATE=9250000
+> 
+> What's this rate ? Old/new ? Because you are at least printing the old
+> rate here, and the function by default gets the new rate.
+
+I added a printk inside twd_update_frequency().
+
+http://lxr.free-electrons.com/source/arch/arm/kernel/smp_twd.c?v=3.14#L107
+
+I inserted printk("NEW RATE=%lu\n", twd_timer_rate);
+right before the call to clockevents_update_freq().
+
+When I execute "echo 18500 > scaling_max_freq"
+the system is supposed to change the CPU frequency to 18.5 MHz
+(I might have a bug lurking there) and PERIPHCLK is 1/2 of that,
+i.e 9.25 MHz.
+
+twd_update_frequency() is called twice: once for each CPU.
+(The timers are local to each CPU.)
+
+>> I'm wondering if there's another standard clockevent source
+>> I could try (it would be great if it supported high-resolution
+>> timers).
+> 
+> I hope you have some platform general-purpose-timers.
+
+Yes, I do, but I was trying to use as much generic code as
+possible to limit the chances of introducing bugs.
+
+I'll take a fresh look at the ARM GLOBAL TIMER, but last I
+checked, it didn't seem to handle frequency scaling.
+
+Regards.
