@@ -1,43 +1,65 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Thu, 14 May 2015 12:04:31 +0100
-Subject: [PATCH 2/5] arm64: Juno: Split juno.dts into juno-base.dtsi and
- juno.dts.
-In-Reply-To: <20150514103040.GN2345@e106497-lin.cambridge.arm.com>
-References: <1431537092-19597-1-git-send-email-Liviu.Dudau@arm.com>
- <1431537092-19597-3-git-send-email-Liviu.Dudau@arm.com>
- <1431596142.2881.13.camel@linaro.org>
- <20150514103040.GN2345@e106497-lin.cambridge.arm.com>
-Message-ID: <1431601471.2881.36.camel@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 14 May 2015 12:04:28 +0100
+Subject: [PATCH] bus: arm-ccn: Handle correctly no-more-cpus case
+In-Reply-To: <1431600624-10965-1-git-send-email-pawel.moll@arm.com>
+References: <20150514101344.GA20531@mwanda>
+ <1431600624-10965-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <20150514110428.GA494@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-05-14 at 11:30 +0100, Liviu Dudau wrote:
-> On Thu, May 14, 2015 at 10:35:42AM +0100, Jon Medhurst (Tixy) wrote:
-[...]
-> > 
-> > What criteria were used to select the contents of juno-base.dtsi?
-> > From what I can see, the stuff left out of base is still the same for r0
-> > and r1 (cpu, pmu, memory, psci!).
-[...]
-> 
-> There are potential differences. Cortex-A53 cluster in r1 has limited
-> CPUfreq functionality due to a chip errata and there were talks internally
-> to actually disable it, hence the reason for keeping CPUs outside the
-> juno-base.dtsi. r2 will have a different set of big CPUs as well, so this
-> is preparing for the future as well.
-> 
-> PMU are linked to the CPUs, hence the reason they stayed. As for the
-> memory and psci nodes the thinking behind it was mostly to allow for
-> ACPI to make changes there, but it does look now like retrofitting an
-> explanation to something that I did not give too much thought at that
-> moment.
+On Thu, May 14, 2015 at 11:50:24AM +0100, Pawel Moll wrote:
+> When migrating events the driver picks another cpu using
+> cpumask_any_but() function, which returns value >= nr_cpu_ids
+> when there is none available, not a negative value as the code
+> assumed. Fixed now.
 
-I guess my concern was motivated by the selfish aspect of having to
-maintain a bunch of out-of-tree Juno patches (like cpuidle and cpufreq
-related DT updates) and having to duplicate those in more than one DT,
-and also having backport DT reorgs like this patch. Of course, none of
-that should be a consideration in deciding what goes into mainline, I
-just wanted to make sure there was a reason for the patch.
+The fix looks good to me:
 
--- 
-Tixy
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Does this need to be CC'd to stable? What does perf_pmu_migrate_context
+do when passed a target >= nr_cpus?
+
+The original bug seems to have been copied over from arm-cci.c, which
+will need the same fix. That appears to be my fault -- I'd mostly been
+following the x86 uncore PMU drivers, but they figure out the target CPU
+in a different way for which -1 is a sane error case.
+
+I'll spin a patch for arm-cci.c momentarily.
+
+Thanks,
+Mark.
+
+> 
+> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> ---
+> Another day, another arm-ccn.c update...
+> 
+> This time Dan's static checker spotted unsigned int target
+> being expected to carry negative values. Fixed now.
+> 
+> Interestingly enough, cpumask_any_but() implementation (and its
+> normal prototype) returns int, but version for NR_CPUS == 1 case,
+> inlined in linux/cpumask.h returns unsigned int...
+> 
+>  drivers/bus/arm-ccn.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
+> index 7d9879e..cc322fb 100644
+> --- a/drivers/bus/arm-ccn.c
+> +++ b/drivers/bus/arm-ccn.c
+> @@ -1184,7 +1184,7 @@ static int arm_ccn_pmu_cpu_notifier(struct notifier_block *nb,
+>  		if (!cpumask_test_and_clear_cpu(cpu, &dt->cpu))
+>  			break;
+>  		target = cpumask_any_but(cpu_online_mask, cpu);
+> -		if (target < 0)
+> +		if (target >= nr_cpu_ids)
+>  			break;
+>  		perf_pmu_migrate_context(&dt->pmu, cpu, target);
+>  		cpumask_set_cpu(target, &dt->cpu);
+> -- 
+> 2.1.0
+> 
