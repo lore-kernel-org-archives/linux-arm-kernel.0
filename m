@@ -1,35 +1,53 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 14 May 2015 10:06:53 +0900
-Subject: [PATCH 24/31] ARM: shmobile: bockw dts: Use generic names for device
- nodes
+Date: Thu, 14 May 2015 10:06:57 +0900
+Subject: [PATCH 28/31] ARM: shmobile: r8a7790: add USB-DMAC device nodes
 In-Reply-To: <cover.1431565427.git.horms+renesas@verge.net.au>
 References: <cover.1431565427.git.horms+renesas@verge.net.au>
-Message-ID: <61ffb5ca6c8e5246c7b257a733c33b94b19de3da.1431565427.git.horms+renesas@verge.net.au>
+Message-ID: <a3ff2090dc2a358bfe9e3d4c50f3921a732feb30.1431565427.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 
-sound-codec -> codec
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7778-bockw.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7790.dtsi | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7778-bockw.dts b/arch/arm/boot/dts/r8a7778-bockw.dts
-index 7ebc4a4f4608..dfbb12e4fef4 100644
---- a/arch/arm/boot/dts/r8a7778-bockw.dts
-+++ b/arch/arm/boot/dts/r8a7778-bockw.dts
-@@ -85,7 +85,7 @@
- &i2c0 {
- 	status = "okay";
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index c9055e39b8bb..c03a91506c2e 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -371,6 +371,28 @@
+ 		dma-channels = <13>;
+ 	};
  
--	ak4643: sound-codec at 12 {
-+	ak4643: codec at 12 {
- 		compatible = "asahi-kasei,ak4643";
- 		#sound-dai-cells = <0>;
- 		reg = <0x12>;
++	usb_dmac0: dma-controller at e65a0000 {
++		compatible = "renesas,usb-dmac";
++		reg = <0 0xe65a0000 0 0x100>;
++		interrupts = <0 109 IRQ_TYPE_LEVEL_HIGH
++			      0 109 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "ch0", "ch1";
++		clocks = <&mstp3_clks R8A7790_CLK_USBDMAC0>;
++		#dma-cells = <1>;
++		dma-channels = <2>;
++	};
++
++	usb_dmac1: dma-controller at e65b0000 {
++		compatible = "renesas,usb-dmac";
++		reg = <0 0xe65b0000 0 0x100>;
++		interrupts = <0 110 IRQ_TYPE_LEVEL_HIGH
++			      0 110 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "ch0", "ch1";
++		clocks = <&mstp3_clks R8A7790_CLK_USBDMAC1>;
++		#dma-cells = <1>;
++		dma-channels = <2>;
++	};
++
+ 	i2c0: i2c at e6508000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
 -- 
 2.1.4
