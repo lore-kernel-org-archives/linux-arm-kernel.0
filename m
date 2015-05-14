@@ -1,44 +1,74 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 14 May 2015 11:50:24 +0100
-Subject: [PATCH] bus: arm-ccn: Handle correctly no-more-cpus case
-In-Reply-To: <20150514101344.GA20531@mwanda>
-References: <20150514101344.GA20531@mwanda>
-Message-ID: <1431600624-10965-1-git-send-email-pawel.moll@arm.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Thu, 14 May 2015 12:53:14 +0200
+Subject: [PATCH 0/6] cpufreq: use generic cpufreq drivers for
+ Exynos4210platform
+In-Reply-To: <20150514051046.GB9887@linux>
+References: <'@samsung.com> <55541F92.4020404@kernel.org>
+ <20150514051046.GB9887@linux>
+Message-ID: <3051718.I09JWVi0Gb@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When migrating events the driver picks another cpu using
-cpumask_any_but() function, which returns value >= nr_cpu_ids
-when there is none available, not a negative value as the code
-assumed. Fixed now.
+On Thursday, May 14, 2015 10:40:46 AM Viresh Kumar wrote:
+> On 14-05-15, 13:07, Kukjin Kim wrote:
+> > On 05/13/15 23:08, Bartlomiej Zolnierkiewicz wrote:
+> > > 
+> > > Hi,
+> > > 
+> > Hi Bart,
+> > 
+> > > On Friday, April 03, 2015 06:43:43 PM Bartlomiej Zolnierkiewicz wrote:
+> > >> Hi,
+> > >>
+> > >> This patch series removes the use of Exynos4210 specific support
+> > >> from cpufreq-exynos driver and enables the use of cpufreq-dt driver
+> > >> for this platform.
+> > > 
+> > > Gentle Ping.  Mike/Kukjin/Viresh could you please review/ack relevant
+> > > patches (patches #1-3 are for clock subsystem, patches #4-5 for Exynos
+> > > mach/dts and patch #6 is for cpufreq subsystem)?
+> 
+> Sorry I thought I already Acked an older version of this set and so
+> didn't went for it again. Done now.
 
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
----
-Another day, another arm-ccn.c update...
+Thanks!
 
-This time Dan's static checker spotted unsigned int target
-being expected to carry negative values. Fixed now.
+> > Yes, I totally agreed with this patches for arch side changes and this
+> > approach when Thomas posted.
+> > 
+> > > Also what is your
+> > > preferred way to upstream them (patches are not independent so it would
+> > > be best to merge them through one tree, otherwise synchronization of
+> > > git pulls between different subsystem trees will be needed)?
+> > > 
+> > I can provide topic branch for arch side changes even it is small. I
+> > think once Viresh and Mike make each topic branch based on -rc or the
+> > smallest changes from each subsystem then I could handle this series or
+> > Viresh or Mike need to handle this series with merging each topic
+> > branches in subsystem. I'm fine either way.
+> > 
+> > Viresh and Mike, how do you think about that?
+> 
+> For cpufreq subsystem changes, you can take them in your tree.
+> 
+> > > I'm still hoping that this patchset will make it into v4.2 as there are
+> > > no known issues with it (except minor coding nit for patch #5)...
+> > > 
+> > Sure, why not :-)
+> 
+> One thing that looked wrong to me is the email id of Thomas..
+> I believe he has already left Samsung and his id wouldn't exist
+> anymore. Right ?
 
-Interestingly enough, cpumask_any_but() implementation (and its
-normal prototype) returns int, but version for NR_CPUS == 1 case,
-inlined in linux/cpumask.h returns unsigned int...
+This doesn't seem to be a case.  His email doesn't bounce and his
+id exists (I've just checked this).  I think that he is just very
+busy with some other work.
 
- drivers/bus/arm-ccn.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> Then I wouldn't recommend something that doesn't exist to get merged
+> now. Probably use another email id of his.
 
-diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
-index 7d9879e..cc322fb 100644
---- a/drivers/bus/arm-ccn.c
-+++ b/drivers/bus/arm-ccn.c
-@@ -1184,7 +1184,7 @@ static int arm_ccn_pmu_cpu_notifier(struct notifier_block *nb,
- 		if (!cpumask_test_and_clear_cpu(cpu, &dt->cpu))
- 			break;
- 		target = cpumask_any_but(cpu_online_mask, cpu);
--		if (target < 0)
-+		if (target >= nr_cpu_ids)
- 			break;
- 		perf_pmu_migrate_context(&dt->pmu, cpu, target);
- 		cpumask_set_cpu(target, &dt->cpu);
--- 
-2.1.0
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
