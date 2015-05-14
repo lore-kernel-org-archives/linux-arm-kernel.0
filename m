@@ -1,33 +1,25 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Thu, 14 May 2015 18:07:33 +0200
-Subject: [PATCH] arch/arm64 :Cyclic Test fix in ARM64 fpsimd
-In-Reply-To: <CAPyr0yLq7PsMW45G+oJzJLbQ-be6Xx9n2S2SU2CiV+AMH9jJ8Q@mail.gmail.com>
-References: <CAPyr0yJSGqvxkUWLtNKe0q5mNanBczAfAVx0tPKuzYeDG+eJ=Q@mail.gmail.com>
- <20150506193803.GC32577@8074w.roxell.se>
- <CAPyr0y+OYikc2Euh++2nTWnVb-aZ4i-tifLLk3XUiRahtHKjCA@mail.gmail.com>
- <20150508000929.GE31914@8074w.roxell.se>
- <CAPyr0yLq7PsMW45G+oJzJLbQ-be6Xx9n2S2SU2CiV+AMH9jJ8Q@mail.gmail.com>
-Message-ID: <20150514160733.GE13442@linutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 14 May 2015 18:10:24 +0200
+Subject: [PATCH 0/4] Ux500 Device Tree docs and additions
+Message-ID: <1431619828-14604-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ayyappa Ch | 2015-05-11 11:02:56 [+0530]:
+This series of patches is orthogonal to the other Ux500 cleanups
+in that it only hits the device tree files and bindings.
 
->Hello Anders Roxell,
->
->Many thanks for your inputs.
->
->But as per my observation after this change , Cyclic test did not failed.
->
->As logs are huge size , sent only to you.
->
->Can you please check the logs and let us know your view ?
+Linus Walleij (4):
+  ARM: scu: document Snoop Control Unit DT bindings
+  ARM: ux500: add board documentation
+  ARM: ux500: add SCU and WD to device tree
+  ARM: ux500: define the backupram in the device tree
 
-fpsimd_save_state() is almost the fpsimd_save macro which saves 32
-16byte registers. And *this* takes really that long? You max says 100116
-which means 100ms.
+ Documentation/devicetree/bindings/arm/scu.txt      | 25 +++++++
+ .../devicetree/bindings/arm/ux500/boards.txt       | 83 ++++++++++++++++++++++
+ arch/arm/boot/dts/ste-dbx5x0.dtsi                  | 21 ++++++
+ 3 files changed, 129 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/scu.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/ux500/boards.txt
 
->Thanks and regards,
->Ayyappa.Ch
-
-Sebastian
+-- 
+1.9.3
