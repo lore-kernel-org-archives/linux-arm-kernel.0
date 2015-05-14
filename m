@@ -1,97 +1,61 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Thu, 14 May 2015 08:20:37 +0100
-Subject: [PATCH v8 4/9] mfd: Add binding document for NVIDIA Tegra XUSB
-In-Reply-To: <20150513143954.GA3394@x1>
-References: <1430761002-9327-1-git-send-email-abrestic@chromium.org>
- <1430761002-9327-5-git-send-email-abrestic@chromium.org>
- <20150513143954.GA3394@x1>
-Message-ID: <55544CC5.9050001@nvidia.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 14 May 2015 08:22:28 +0100
+Subject: [PATCH 05/10] pinctrl: mediatek: Add Pinctrl/GPIO driver for
+ mt6397.
+In-Reply-To: <1431567346-33780-6-git-send-email-hongzhou.yang@mediatek.com>
+References: <1431567346-33780-1-git-send-email-hongzhou.yang@mediatek.com>
+ <1431567346-33780-6-git-send-email-hongzhou.yang@mediatek.com>
+Message-ID: <20150514072228.GB20358@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+On Wed, 13 May 2015, Hongzhou Yang wrote:
 
-On 13/05/15 15:39, Lee Jones wrote:
-> On Mon, 04 May 2015, Andrew Bresticker wrote:
+> Add mt6397 support using mediatek common pinctrl driver.
 > 
->> Add a binding document for the XUSB host complex on NVIDIA Tegra124
->> and later SoCs.  The XUSB host complex includes a mailbox for
->> communication with the XUSB micro-controller and an xHCI host-controller.
->>
->> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Pawel Moll <pawel.moll@arm.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
->> Cc: Kumar Gala <galak@codeaurora.org>
->> Cc: Samuel Ortiz <sameo@linux.intel.com>
->> Cc: Lee Jones <lee.jones@linaro.org>
->> ---
->> Changes from v7:
->>  - Move non-shared resources into child nodes.
->> New for v7.
->> ---
->>  .../bindings/mfd/nvidia,tegra124-xusb.txt          | 37 ++++++++++++++++++++++
->>  1 file changed, 37 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
->>
->> diff --git a/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt b/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
->> new file mode 100644
->> index 0000000..bc50110
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
->> @@ -0,0 +1,37 @@
->> +NVIDIA Tegra XUSB host copmlex
->> +==============================
->> +
->> +The XUSB host complex on Tegra124 and later SoCs contains an xHCI host
->> +controller and a mailbox for communication with the XUSB micro-controller.
->> +
->> +Required properties:
->> +--------------------
->> + - compatible: For Tegra124, must contain "nvidia,tegra124-xusb".
->> +   Otherwise, must contain '"nvidia,<chip>-xusb", "nvidia,tegra124-xusb"'
->> +   where <chip> is tegra132.
->> + - reg: Must contain the base and length of the XUSB FPCI registers.
->> + - ranges: Bus address mapping for the XUSB block.  Can be empty since the
->> +   mapping is 1:1.
->> + - #address-cells: Must be 2.
->> + - #size-cells: Must be 2.
->> +
->> +Example:
->> +--------
->> +	usb at 0,70098000 {
->> +		compatible = "nvidia,tegra124-xusb";
->> +		reg = <0x0 0x70098000 0x0 0x1000>;
->> +		ranges;
->> +
->> +		#address-cells = <2>;
->> +		#size-cells = <2>;
->> +
->> +		usb-host at 0,70090000 {
->> +			compatible = "nvidia,tegra124-xhci";
->> +			...
->> +		};
->> +
->> +		mailbox {
->> +			compatible = "nvidia,tegra124-xusb-mbox";
->> +			...
->> +		};
+> mt6397 is a PMIC, and pinctrl/GPIO is part of 6397 chip.
+> Pinctrl/GPIO driver should obtain regmap from PMIC,
+> so adding this support to common code.
 > 
-> This doesn't appear to be a proper MFD.  I would have the USB and
-> Mailbox devices probe seperately and use a phandle to point the USB
-> device to its Mailbox.
+> Also, mt6397 is no need to support interrupt controller,
+> so changing common code to skip it.
 > 
-> usb at xyz {
-> 	mboxes = <&xusb-mailbox, [chan]>;
-> };
-> 
+> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+> ---
+>  drivers/mfd/mt6397-core.c                     |    3 +
 
-I am assuming that Andrew had laid it out like this to reflect the hw
-structure. The mailbox and xhci controller are part of the xusb
-sub-system and hence appear as child nodes. My understanding is that for
-device-tree we want the device-tree structure to reflect the actual hw.
-Is this not the case?
+Please break this out into a separate patch that I can take through my
+tree.  There is no need for you to bind up changes in multiple
+subsystems here.
 
-Cheers
-Jon
+>  drivers/pinctrl/mediatek/Kconfig              |    6 +
+>  drivers/pinctrl/mediatek/Makefile             |    1 +
+>  drivers/pinctrl/mediatek/pinctrl-mt6397.c     |   78 +++++
+>  drivers/pinctrl/mediatek/pinctrl-mt8135.c     |    2 +-
+>  drivers/pinctrl/mediatek/pinctrl-mt8173.c     |    2 +-
+>  drivers/pinctrl/mediatek/pinctrl-mtk-common.c |   13 +-
+>  drivers/pinctrl/mediatek/pinctrl-mtk-common.h |    3 +-
+>  drivers/pinctrl/mediatek/pinctrl-mtk-mt6397.h |  424 +++++++++++++++++++++++++
+>  9 files changed, 527 insertions(+), 5 deletions(-)
+>  create mode 100644 drivers/pinctrl/mediatek/pinctrl-mt6397.c
+>  create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-mt6397.h
+> 
+> diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
+> index 09bc780..012c620 100644
+> --- a/drivers/mfd/mt6397-core.c
+> +++ b/drivers/mfd/mt6397-core.c
+> @@ -34,6 +34,9 @@ static const struct mfd_cell mt6397_devs[] = {
+>  	}, {
+>  		.name = "mt6397-clk",
+>  		.of_compatible = "mediatek,mt6397-clk",
+> +	}, {
+> +		.name = "mediatek-mt6397-pinctrl",
+> +		.of_compatible = "mediatek,mt6397-pinctrl",
+>  	},
+>  };
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
