@@ -1,83 +1,163 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 15 May 2015 16:21:28 +0200
-Subject: [PATCH 1/8] clk: sunxi: factors: Add m_start parameters
-In-Reply-To: <CAGb2v67jruYamgHpM1NRm_fvm+SnDgQy4BEvZBxPEFByQsRsrg@mail.gmail.com>
-References: <1430565879-28113-1-git-send-email-maxime.ripard@free-electrons.com>
- <1430565879-28113-2-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v669fsz_pA+B0r8efp0BMxY-D86qfLuGQCqK1POuu9PmxQ@mail.gmail.com>
- <20150515074314.GQ4004@lukather>
- <CAGb2v66jRX09k48ciR-bwMZRAioRpHKZ3D2+wVYWannjtF+G3w@mail.gmail.com>
- <20150515080546.GT4004@lukather>
- <CAGb2v67jruYamgHpM1NRm_fvm+SnDgQy4BEvZBxPEFByQsRsrg@mail.gmail.com>
-Message-ID: <20150515142128.GY4004@lukather>
+Date: Fri, 15 May 2015 14:49:34 +0200
+Subject: [PATCH 2/6] clk: sunxi: Add H3 clocks support
+In-Reply-To: <CAGb2v663+LrYo0Ke7kDwUnKpyfyxCR6+F2ws2gRaV1D6KFnAyA@mail.gmail.com>
+References: <1430904693-1404-1-git-send-email-jenskuske@gmail.com>
+ <1430904693-1404-3-git-send-email-jenskuske@gmail.com>
+ <20150509112718.GT11057@lukather> <554F38FA.2030005@gmail.com>
+ <20150512144428.GL10961@lukather>
+ <CAGb2v663+LrYo0Ke7kDwUnKpyfyxCR6+F2ws2gRaV1D6KFnAyA@mail.gmail.com>
+Message-ID: <20150515124934.GV4004@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 15, 2015 at 05:11:16PM +0800, Chen-Yu Tsai wrote:
-> On Fri, May 15, 2015 at 4:05 PM, Maxime Ripard
+On Thu, May 14, 2015 at 01:14:25PM +0800, Chen-Yu Tsai wrote:
+> On Tue, May 12, 2015 at 10:44 PM, Maxime Ripard
 > <maxime.ripard@free-electrons.com> wrote:
-> > On Fri, May 15, 2015 at 03:48:38PM +0800, Chen-Yu Tsai wrote:
-> >> On Fri, May 15, 2015 at 3:43 PM, Maxime Ripard
-> >> <maxime.ripard@free-electrons.com> wrote:
-> >> > On Thu, May 14, 2015 at 05:12:07PM +0800, Chen-Yu Tsai wrote:
-> >> >> On Sat, May 2, 2015 at 7:24 PM, Maxime Ripard
-> >> >> <maxime.ripard@free-electrons.com> wrote:
-> >> >> > Some clocks start incrementing the m factor at 0. Add a parameter to handle
-> >> >> > it just like we did for the N factor.
-> >> >> >
-> >> >> > Since the behaviour until now was to assume that the m factor was starting
-> >> >> > at 1, we also need to fix the other users.
-> >> >> >
-> >> >> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> >> >> > ---
-> >> >> >  drivers/clk/sunxi/clk-factors.c    | 11 ++++++++++-
-> >> >> >  drivers/clk/sunxi/clk-factors.h    |  2 ++
-> >> >> >  drivers/clk/sunxi/clk-mod0.c       |  2 ++
-> >> >> >  drivers/clk/sunxi/clk-sun8i-mbus.c |  2 ++
-> >> >> >  drivers/clk/sunxi/clk-sun9i-core.c |  6 ++++++
-> >> >> >  drivers/clk/sunxi/clk-sunxi.c      | 10 ++++++++++
-> >> >> >  6 files changed, 32 insertions(+), 1 deletion(-)
-> >> >> >
-> >> >> > diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
-> >> >> > index 8c20190a3e9f..100a711c3e3d 100644
-> >> >> > --- a/drivers/clk/sunxi/clk-factors.c
-> >> >> > +++ b/drivers/clk/sunxi/clk-factors.c
-> >> >> > @@ -56,15 +56,24 @@ static unsigned long clk_factors_recalc_rate(struct clk_hw *hw,
-> >> >> >         /* Get each individual factor if applicable */
-> >> >> >         if (config->nwidth != SUNXI_FACTORS_NOT_APPLICABLE)
-> >> >> >                 n = FACTOR_GET(config->nshift, config->nwidth, reg);
-> >> >> > +
-> >> >> >         if (config->kwidth != SUNXI_FACTORS_NOT_APPLICABLE)
-> >> >> >                 k = FACTOR_GET(config->kshift, config->kwidth, reg);
-> >> >> > +
-> >> >> >         if (config->mwidth != SUNXI_FACTORS_NOT_APPLICABLE)
-> >> >> >                 m = FACTOR_GET(config->mshift, config->mwidth, reg);
-> >> >> > +       else
-> >> >> > +               /* Make sure we don't get a division by zero */
-> >> >> > +               m = 1;
-> >> >>
-> >> >> What happens when mwidth is valid, m_start = 0, and m = 0?
-> >> >
-> >> > That's a very good question. A division by zero in the kernel, I'd
-> >> > say.
-> >> >
-> >> > But I don't think we can end up in such a case today, and it's
-> >> > somewhat expected that it will happen, and no clock have looked at can
-> >> > actually end up in such a case.
-> >>
-> >> It's possible if the bootloader left the clock in an invalid state.
-> >> How about just returning 0, indicating an invalid rate, early?
+> > Hi,
 > >
-> > The value set in the register might be zero, but that will always
-> > really mean 1, either through m_start or m_zero. That would be a bug
-> > in the driver itself.
+> > On Sun, May 10, 2015 at 12:54:50PM +0200, Jens Kuske wrote:
+> >> On 09/05/15 13:27, Maxime Ripard wrote:
+> >> > On Wed, May 06, 2015 at 11:31:29AM +0200, Jens Kuske wrote:
+> >> >> The H3 clock control unit is similar to the those of other sun8i family
+> >> >> members like the A23.
+> >> >>
+> >> >> The AHB1 gates got split up into AHB1 and AHB2, with AHB2 clock source
+> >> >> being muxable between AHB1 and PLL6/2, but still sharing gate registers.
+> >> >> The documentation isn't totally clear about which devices belong to
+> >> >> AHB2 now, especially USB EHIC/OHIC, so it is mostly based on Allwinner
+> >> >> kernel source code.
+> >> >>
+> >> >> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
+> >> >> ---
+> >> >>  Documentation/devicetree/bindings/clock/sunxi.txt |  7 ++++
+> >> >>  drivers/clk/sunxi/clk-sunxi.c                     | 46 ++++++++++++++++++++++-
+> >> >>  2 files changed, 52 insertions(+), 1 deletion(-)
+> >> >>
+> >> >> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+> >> >> index 4fa11af..4eeb893 100644
+> >> >> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> >> >> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> >> >> @@ -14,6 +14,8 @@ Required properties:
+> >> >>    "allwinner,sun4i-a10-pll5-clk" - for the PLL5 clock
+> >> >>    "allwinner,sun4i-a10-pll6-clk" - for the PLL6 clock
+> >> >>    "allwinner,sun6i-a31-pll6-clk" - for the PLL6 clock on A31
+> >> >> +  "allwinner,sun8i-h3-pll6-clk" - for the PLL6 clock on H3
+> >> >> +  "allwinner,sun8i-h3-pll8-clk" - for the PLL8 clock on H3
+> >> >>    "allwinner,sun9i-a80-gt-clk" - for the GT bus clock on A80
+> >> >>    "allwinner,sun4i-a10-cpu-clk" - for the CPU multiplexer clock
+> >> >>    "allwinner,sun4i-a10-axi-clk" - for the AXI clock
+> >> >> @@ -28,8 +30,11 @@ Required properties:
+> >> >>    "allwinner,sun7i-a20-ahb-gates-clk" - for the AHB gates on A20
+> >> >>    "allwinner,sun6i-a31-ar100-clk" - for the AR100 on A31
+> >> >>    "allwinner,sun6i-a31-ahb1-clk" - for the AHB1 clock on A31
+> >> >> +  "allwinner,sun8i-h3-ahb2-clk" - for the AHB2 clock on H3
+> >> >>    "allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
+> >> >>    "allwinner,sun8i-a23-ahb1-gates-clk" - for the AHB1 gates on A23
+> >> >> +  "allwinner,sun8i-h3-ahb1-gates-clk" - for the AHB1 gates on H3
+> >> >> +  "allwinner,sun8i-h3-ahb2-gates-clk" - for the AHB2 gates on H3
+> >> >>    "allwinner,sun9i-a80-ahb0-gates-clk" - for the AHB0 gates on A80
+> >> >>    "allwinner,sun9i-a80-ahb1-gates-clk" - for the AHB1 gates on A80
+> >> >>    "allwinner,sun9i-a80-ahb2-gates-clk" - for the AHB2 gates on A80
+> >> >> @@ -52,8 +57,10 @@ Required properties:
+> >> >>    "allwinner,sun6i-a31-apb1-gates-clk" - for the APB1 gates on A31
+> >> >>    "allwinner,sun7i-a20-apb1-gates-clk" - for the APB1 gates on A20
+> >> >>    "allwinner,sun8i-a23-apb1-gates-clk" - for the APB1 gates on A23
+> >> >> +  "allwinner,sun8i-h3-apb1-gates-clk" - for the APB1 gates on H3
+> >> >>    "allwinner,sun9i-a80-apb1-gates-clk" - for the APB1 gates on A80
+> >> >>    "allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
+> >> >> +  "allwinner,sun8i-h3-apb2-gates-clk" - for the APB2 gates on H3
+> >> >>    "allwinner,sun8i-a23-apb2-gates-clk" - for the APB2 gates on A23
+> >> >>    "allwinner,sun5i-a13-mbus-clk" - for the MBUS clock on A13
+> >> >>    "allwinner,sun4i-a10-mmc-clk" - for the MMC clock
+> >> >> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+> >> >> index 7e1e2bd..152a1f7 100644
+> >> >> --- a/drivers/clk/sunxi/clk-sunxi.c
+> >> >> +++ b/drivers/clk/sunxi/clk-sunxi.c
+> >> >> @@ -727,6 +727,12 @@ static const struct factors_data sun5i_a13_ahb_data __initconst = {
+> >> >>    .getter = sun5i_a13_get_ahb_factors,
+> >> >>  };
+> >> >>
+> >> >> +static const struct factors_data sun8i_h3_pll8_data __initconst = {
+> >> >> +  .enable = 31,
+> >> >> +  .table = &sun6i_a31_pll6_config,
+> >> >> +  .getter = sun6i_a31_get_pll6_factors,
+> >> >> +};
+> >> >
+> >> > This looks like it's just another instance of the A31 pll6.
+> >> >
+> >> > In such a case, we don't need to declare a new driver, just reuse the
+> >> > same compatible.
+> >>
+> >> If I reuse pll6 for pll8 I get errors because of the .name = "pll6x2"
+> >> field, already existing clock or something like that.
+> >
+> > Damn. You're obviously right...
 > 
-> Maybe you should switch the order of these 2 patches to make it clear?
-> Or maybe squash them? As it currently is, m_start = 0 and m = 0 with
-> this patch only is a bug.
+> I think I have a solution for this.
+> 
+> The current divs clock setup just passes the factors_data directly to
+> sunxi_factors_register(). What if it did a copy, read the _correct_
+> name from the DT (since it knows the index) and put it in the copy.
+> 
+> How does that sound?
 
-We don't have any clock with m_start = 0 at this point. All the clocks
-have m_start = 1, which is safe.
+That sounds great, but what name would you take from the DT? The first
+of clock-output-names? the last one? a random one?
+
+> 
+> > Could you add a TODO comment on top then? just so that we know that we
+> > need to merge this clock with pll6?
+> >
+> >> (And pll8 doesn't even have a x2 version)
+> >
+> > Judging by the H3 datasheet, it does.
+> >
+> >> >>  static const struct factors_data sun4i_apb1_data __initconst = {
+> >> >>    .mux = 24,
+> >> >>    .muxmask = BIT(1) | BIT(0),
+> >> >> @@ -777,6 +783,10 @@ static const struct mux_data sun6i_a31_ahb1_mux_data __initconst = {
+> >> >>    .shift = 12,
+> >> >>  };
+> >> >>
+> >> >> +static const struct mux_data sun8i_h3_ahb2_mux_data __initconst = {
+> >> >> +  .shift = 0,
+> >> >> +};
+> >> >> +
+> >> >>  static void __init sunxi_mux_clk_setup(struct device_node *node,
+> >> >>                                   struct mux_data *data)
+> >> >>  {
+> >> >> @@ -892,7 +902,7 @@ static void __init sunxi_divider_clk_setup(struct device_node *node,
+> >> >>   * sunxi_gates_clk_setup() - Setup function for leaf gates on clocks
+> >> >>   */
+> >> >>
+> >> >> -#define SUNXI_GATES_MAX_SIZE      64
+> >> >> +#define SUNXI_GATES_MAX_SIZE      160
+> >> >>
+> >> >>  struct gates_data {
+> >> >>    DECLARE_BITMAP(mask, SUNXI_GATES_MAX_SIZE);
+> >> >> @@ -926,6 +936,10 @@ static const struct gates_data sun8i_a23_ahb1_gates_data __initconst = {
+> >> >>    .mask = {0x25386742, 0x2505111},
+> >> >>  };
+> >> >>
+> >> >> +static const struct gates_data sun8i_h3_ahb1_gates_data __initconst = {
+> >> >> +  .mask = {0x1fbc6760, 0x00701b39, 0x00000000, 0x00000000, 0x00000081},
+> >> >> +};
+> >> >> +
+> >> >
+> >> > Judging from the user manual, there's a few gates in those 0
+> >> > registers, is this normal that you don't support them?
+> >>
+> >> They are holes for apb1 and apb2. Which is actually pretty ugly.
+> >
+> > Ah, right.
+> >
+> > So I guess it's completely related to the discussion below.
+> 
+> If the holes are really big, I guess you could split ahb and apb?
+
+It's actually already split. The holes in the ahb1 registers are for
+the apb clocks.
 
 Maxime
 
@@ -91,4 +171,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150515/69274997/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150515/f6fae41b/attachment.sig>
