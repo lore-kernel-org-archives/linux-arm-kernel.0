@@ -1,39 +1,141 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 15 May 2015 17:16:40 -0500
-Subject: [PATCH V2] ARM: dts: omap5-uevm: Add Uart wakeup interrupt
-Message-ID: <1431728200-25486-1-git-send-email-nm@ti.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sat, 16 May 2015 00:28:43 +0200
+Subject: [PATCH] serial: 8250_uniphier: add UniPhier serial driver
+In-Reply-To: <1431692764-17576-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1431692764-17576-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAGhQ9VweeoE8WtBH_M1oJi106rXRThDRBGr0E6K5rMTtNRrzaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-UART3 wakeup takes place with iodaisy chain. enable the wakeup pin.
+On 15 May 2015 at 14:26, Masahiro Yamada <yamada.masahiro@socionext.com> wrote:
+> Add the driver for on-chip UART used on UniPhier SoCs.
+> The register map of this hardware is similar to that of 8250
+> (but the address for FCR, LCR is different), so it should go
+> into drivers/tty/serial/8250 directory.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+>
+>  drivers/tty/serial/8250/8250_uniphier.c | 243 ++++++++++++++++++++++++++++++++
+>  drivers/tty/serial/8250/Kconfig         |   7 +
+>  drivers/tty/serial/8250/Makefile        |   1 +
+>  3 files changed, 251 insertions(+)
+>  create mode 100644 drivers/tty/serial/8250/8250_uniphier.c
+>
+> diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
+> new file mode 100644
+> index 0000000..f108d81
+> --- /dev/null
+> +++ b/drivers/tty/serial/8250/8250_uniphier.c
+> @@ -0,0 +1,243 @@
+> +/*
+> + * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/init.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/clk.h>
+> +#include <linux/of.h>
+> +#include <linux/io.h>
+> +#include <linux/serial_core.h>
+> +#include <linux/serial_reg.h>
+> +#include <linux/serial_8250.h>
 
-Reported-by: Suman Anna <s-anna@ti.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
+Please put the includes in alphabetic order.
 
-Test on linus master (f0897f4cc0fc) with 8250  driver: http://pastebin.ubuntu.com/11154663/
-Applies on next-20150515 and linus master (f0897f4cc0fc)
+Do you really need init.h?
 
-Changes in V2:
-	- switched over to wakeupgen instead of GIC.
-	- retested.
-V1: https://patchwork.kernel.org/patch/6416981/
+> +#include "8250.h"
+> +
+> +/*
+> + * Most (but not all) of UniPhier UART devices have 64-depth FIFO.
+> + * Set this value if "fifo-size" property is missing from the device tree node.
+> + */
+> +#define UNIPHIER_UART_DEFAULT_FIFO_SIZE        64
+> +
+> +#define UNIPHIER_UART_CHAR_FCR 3       /* Character / FIFO Control Register */
+> +#define UNIPHIER_UART_LCR_MCR  4       /* Line/Modem Control Register */
+> +#define UNIPHIER_UART_DLR      9       /* Divisor Latch Register */
+> +
+> +/*
+> + * The register map is slightly different from that of 8250.
+> + * IO callbacks must be overridden for correct access to FCR, LCR, and MCR.
+> + */
 
- arch/arm/boot/dts/omap5-uevm.dts |    2 ++
- 1 file changed, 2 insertions(+)
+<snip>
 
-diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
-index 74777a6e200a..c4dc487832ea 100644
---- a/arch/arm/boot/dts/omap5-uevm.dts
-+++ b/arch/arm/boot/dts/omap5-uevm.dts
-@@ -604,6 +604,8 @@
- &uart3 {
-         pinctrl-names = "default";
-         pinctrl-0 = <&uart3_pins>;
-+	interrupts-extended = <&wakeupgen GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>,
-+			      <&omap5_pmx_core 0x19c>;
- };
- 
- &uart5 {
--- 
-1.7.9.5
+> +static int uniphier_of_serial_setup(struct platform_device *pdev,
+> +                                   struct uart_port *port,
+> +                                   struct uniphier8250_priv *priv)
+> +{
+> +       int ret;
+> +       u32 prop;
+> +       struct device_node *np = pdev->dev.of_node;
+> +
+> +       ret = of_alias_get_id(np, "serial");
+> +       if (ret < 0) {
+> +               dev_err(&pdev->dev, "failed to get alias id\n");
+> +               return ret;
+> +       }
+> +       port->line = priv->line = ret;
+> +
+> +       /* Get clk rate through clk driver */
+> +       priv->clk = of_clk_get(np, 0);
+> +       if (IS_ERR(priv->clk)) {
+> +               dev_err(&pdev->dev, "failed to get clock\n");
+> +               return PTR_ERR(priv->clk);
+> +       }
+
+Use devm_clk_get() if possible.
+
+> +
+> +       ret = clk_prepare_enable(priv->clk);
+> +       if (ret < 0)
+> +               return ret;
+> +
+> +       port->uartclk = clk_get_rate(priv->clk);
+> +
+> +       /* Check for fifo size */
+> +       if (of_property_read_u32(np, "fifo-size", &prop) == 0)
+> +               port->fifosize = prop;
+> +       else
+> +               port->fifosize = UNIPHIER_UART_DEFAULT_FIFO_SIZE;
+> +
+> +       return 0;
+> +}
+
+<snip>
+
+> +static int uniphier_uart_remove(struct platform_device *pdev)
+> +{
+> +       struct uniphier8250_priv *priv = platform_get_drvdata(pdev);
+> +
+> +       serial8250_unregister_port(priv->line);
+> +       if (!IS_ERR_OR_NULL(priv->clk)) {
+> +               clk_disable_unprepare(priv->clk);
+> +               clk_put(priv->clk);
+> +       }
+
+If you use devm_clk_get() in uniphier_of_serial_setup() you only need
+to call clk_disable_unprepare() here.
+
+Calling clk_disable_unprepare() with NULL is allowed and you already
+check for IS_ERR in your setup function.
+
+> +       return 0;
+> +}
+
+
+regards,
+Joachim Eastwood
