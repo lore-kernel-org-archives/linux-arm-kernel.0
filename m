@@ -1,38 +1,36 @@
-From: davem@redhat.com (David Miller)
-Date: Fri, 15 May 2015 12:44:46 -0400 (EDT)
-Subject: [PATCH net-next 00/11] convert stmmac glue layers into
- platform drivers
-In-Reply-To: <1431598266-25736-1-git-send-email-manabian@gmail.com>
-References: <1431598266-25736-1-git-send-email-manabian@gmail.com>
-Message-ID: <20150515.124446.727849098381931716.davem@redhat.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 15 May 2015 09:47:28 -0700
+Subject: [PATCH v2] clk: sirf: add CSR atlas7 clk and reset support
+In-Reply-To: <CAGsJ_4xJrCX5Bk=Ry1QhDvQO6jM8VhDvCmFG73HqxM6ZiXq0RA@mail.gmail.com>
+References: <1428848090-14638-1-git-send-email-21cnbao@gmail.com>
+ <20150514234131.GB31753@codeaurora.org>
+ <CAGsJ_4xJrCX5Bk=Ry1QhDvQO6jM8VhDvCmFG73HqxM6ZiXq0RA@mail.gmail.com>
+Message-ID: <55562320.9060402@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joachim Eastwood <manabian@gmail.com>
-Date: Thu, 14 May 2015 12:10:55 +0200
+On 05/15/15 00:39, Barry Song wrote:
+>
+>>> +static struct atlas7_reset_desc atlas7_reset_unit[] = {
+>>> +     {"PWM", 0x0244, 0, 0x0320, 0, &leaf0_gate_lock}, /*0-5*/
+>> Style nitpick: Please put some space around the braces here.
+>>
+>>> +     {"THCGUM", 0x0244, 3, 0x0320, 1, &leaf0_gate_lock},
+>>> +     {"CVD", 0x04A0, 0, 0x032C, 0, &leaf1_gate_lock},
+>>> +     {"TIMER", 0x04A0, 1, 0x032C, 1, &leaf1_gate_lock},
+>>> +     {"PULSEC", 0x04A0, 2, 0x032C, 2, &leaf1_gate_lock},
+>> [...]
+>>> +
+>
+> all other issues have been cleared in v3 i sent minutes ago. for this
+> one, where do you want the spaces added?
+>
 
-> This patch set aims to convert the current dwmac glue layers into
-> proper platform drivers as request by Arnd[1]. These changes start
-> from patch 3 and onwards.
-> 
-> Overview:
-> Platform driver functions like probe and remove are exported from
-> the stmmac platform and then used in subsequent glue later
-> conversions. The conversion involes adding the platform driver
-> boiler plate code and adding it to the build system. The last patch
-> removes the driver from the stmmac platform code thus making it into
-> a library for common platform driver functions.
-> 
-> The two first patches adds glue layer for my platform. I chose to
-> first add old style glue layer and then convert it. The churn this
-> creates is just 3 lines.
-> 
-> I would be very nice if people could test this patch set on their
-> respective platform. My testing has been limited to compiling and
-> testing on my (LPC18xx) platform. Thanks!
-> 
-> Next I will look into cleaning up the stmmac platform code.
-> 
-> [1] http://marc.info/?l=linux-arm-kernel&m=143059524606459&w=2
+I'd prefer it look like:
 
-Series applied, thanks Joachim.
+ { "THCGUM", 0x0244, ..., &leaf0_gate_lock },
+
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
