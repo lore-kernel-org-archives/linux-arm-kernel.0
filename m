@@ -1,31 +1,61 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 May 2015 10:35:51 +0200
-Subject: [PATCH 4/9] ARM: imx: setup tctl register in device specific
- function
-In-Reply-To: <1431677507-27420-5-git-send-email-shawnguo@kernel.org>
-References: <1431677507-27420-1-git-send-email-shawnguo@kernel.org>
- <1431677507-27420-5-git-send-email-shawnguo@kernel.org>
-Message-ID: <3390971.xfPD4sbn1V@wuerfel>
+Date: Fri, 15 May 2015 10:44:06 +0200
+Subject: [PATCH net-next 00/11] convert stmmac glue layers into platform
+ drivers
+In-Reply-To: <5555A42B.3040205@st.com>
+References: <1431598266-25736-1-git-send-email-manabian@gmail.com>
+ <CAGb2v663efjkwgRjPdxV4CQxeesiu7jxkMf9j_oPU_bSHbNNiA@mail.gmail.com>
+ <5555A42B.3040205@st.com>
+Message-ID: <5463867.jjPLKQomlR@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 May 2015 16:11:42 shawnguo at kernel.org wrote:
->  }
->  
-> +static void imx1_gpt_setup_tctl(void)
-> +{
-> +       u32 tctl_val;
-> +
-> +       tctl_val = MX1_2_TCTL_FRR | MX1_2_TCTL_CLK_PCLK1 | MXC_TCTL_TEN;
-> +       __raw_writel(tctl_val, imxtm.base + MXC_TCTL);
-> +}
+On Friday 15 May 2015 09:45:47 Giuseppe CAVALLARO wrote:
+> Hello
 > 
+> On 5/14/2015 5:24 PM, Chen-Yu Tsai wrote:
+> > On Thu, May 14, 2015 at 6:10 PM, Joachim Eastwood <manabian@gmail.com> wrote:
+> >> This patch set aims to convert the current dwmac glue layers into
+> >> proper platform drivers as request by Arnd[1]. These changes start
+> >> from patch 3 and onwards.
+> >>
+> >> Overview:
+> >> Platform driver functions like probe and remove are exported from
+> >> the stmmac platform and then used in subsequent glue later
+> >> conversions. The conversion involes adding the platform driver
+> >> boiler plate code and adding it to the build system. The last patch
+> >> removes the driver from the stmmac platform code thus making it into
+> >> a library for common platform driver functions.
+> >>
+> >> The two first patches adds glue layer for my platform. I chose to
+> >> first add old style glue layer and then convert it. The churn this
+> >> creates is just 3 lines.
+> >>
+> >> I would be very nice if people could test this patch set on their
+> >> respective platform. My testing has been limited to compiling and
+> >> testing on my (LPC18xx) platform. Thanks!
+> 
+> I wonder if this will make the compatibility with old
+> platforms (like SH4) not based on DT, where there was not used
+> any glue-logic around the driver and just the platform was the
+> reference.
 
-Could you add another upfront patch to convert all the __raw_readl/__raw_writel
-to readl_relaxed/writel_relaxed?
+With patch 11, this gets handled by the dwmac-generic driver.
 
-It would be nice if the driver was endian-safe by the time it gets moved to
-drivers/clocksource, and you don't add any unsafe accesses for the changed
-code.
+> To be honest, I prefer to not have the Kconfig options.
+> The device-tree compatibility will select the glue-logic
+> needed and we will just pay some bytes when compile.
+>
+> In my opinion, the Koption(s) introduce a problem when touch
+> the driver and we want to guarantee that, at least,
+> all its parts build fine on all the platforms.
+
+The current model is not scalable and requires modifying the base
+driver for each variation, and the change brings the driver
+in line with how we do things for other platform drivers.
+
+We should always be able to build all soc-specific glue drivers
+with 'allmodconfig' for build testing, and a lot of us run that
+frequently to find regressions.
 
 	Arnd
