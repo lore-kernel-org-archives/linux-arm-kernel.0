@@ -1,42 +1,52 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 15 May 2015 12:43:34 +0200
-Subject: [GIT PULL 7/8] ARM: tegra: Devicetree changes for v4.2-rc1
-In-Reply-To: <3095273.etWfHSyyvC@wuerfel>
-References: <1431524980-13599-1-git-send-email-thierry.reding@gmail.com>
- <1431524980-13599-8-git-send-email-thierry.reding@gmail.com>
- <3095273.etWfHSyyvC@wuerfel>
-Message-ID: <20150515104332.GB20474@ulmo.nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 15 May 2015 12:44:44 +0200
+Subject: [PATCH v9 3/5] Documentation: Add documentation for the APM
+ X-Gene SoC EDAC DTS binding
+In-Reply-To: <1431623147-4950-4-git-send-email-lho@apm.com>
+References: <1431623147-4950-1-git-send-email-lho@apm.com>
+ <1431623147-4950-3-git-send-email-lho@apm.com>
+ <1431623147-4950-4-git-send-email-lho@apm.com>
+Message-ID: <2623886.1GmlYtlSK2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 13, 2015 at 06:09:20PM +0200, Arnd Bergmann wrote:
-> On Wednesday 13 May 2015 15:49:39 Thierry Reding wrote:
-> > ARM: tegra: Devicetree changes for v4.2-rc1
-> > 
-> > Contains a couple of fixes and additions to device tree files. The most
-> > notable change is a fix for a misapplied patch that was only exposed by
-> > a recent change in the regulator subsystem that caused USB to break on
-> > Tegra124 recently.
-> 
-> It sounds like I should merge commit a4b6916cb35 ("ARM: tegra: Correct
-> which USB controller has the UTMI pad registers") into the 4.1 fixes
-> branch as well. Please confirm.
+On Thursday 14 May 2015 11:05:45 Loc Ho wrote:
+> +       edac: edac at 78800000 {
+> +               compatible = "apm,xgene-edac";
+> +               #address-cells = <2>;
+> +               #size-cells = <2>;
+> +               reg = <0x0 0x78800000 0x0 0x100>;
 
-I think you already did. I sent out a pull request for that not very
-long ago and I must have forgotten to drop this patch from the Tegra
-tree after it got applied to arm-soc. The merge commit for this in
-the fixes branch is here:
+This seens a 'ranges' property to make the address resolution
+work. An empty property should be fine.
 
-	https://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git/commit/?h=fixes&id=155171274d1dd9d9e5a012bd912c592402aa31d2
+> +               interrupts = <0x0 0x20 0x4>,
+> +                            <0x0 0x21 0x4>,
+> +                            <0x0 0x27 0x4>;
+> +
+> +               edacmc0: edacmc0 at 7e800000 {
+> +                       compatible = "apm,xgene-edac-mc";
+> +                       regmap-csw = <&csw>;
+> +                       regmap-mcba = <&mcba>;
+> +                       regmap-mcbb = <&mcbb>;
+> +                       reg = <0x0 0x7e800000 0x0 0x1000>;
+> +               };
+> +
+> +               edacpmd0: edacpmd0 at 7c000000 {
+> +                       compatible = "apm,xgene-edac-pmd";
+> +                       regmap-efuse = <&efuse>;
+> +                       reg = <0x0 0x7c000000 0x0 0x200000>;
+> +               };
 
-Hopefully git will be able to merge these together without conflicts.
-Sorry about the dupe.
+Why do you have labels for each one? If nothing references
+these nodes, just remove the labels.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150515/7e58b364/attachment.sig>
+Regarding the names, remove the numbers for the nodes that are
+uniquely identified by the register location, e.g. replace
+edacmc0 at 7e800000 with edacmc at 7e800000.
+
+If you have multiple edac-mc devices, would they point to the
+same syscon nodes, or different ones for each? If they are the
+same, just move the references to the main node.
+
+	Arnd
