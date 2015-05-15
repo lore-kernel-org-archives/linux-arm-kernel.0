@@ -1,26 +1,59 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Fri, 15 May 2015 18:09:03 +0100
-Subject: [PATCH v4 10/12] KVM: arm64: guest debug,
- HW assisted debug support
-In-Reply-To: <87y4kpke91.fsf@linaro.org>
-References: <1431700035-23479-1-git-send-email-alex.bennee@linaro.org>
- <1431700035-23479-11-git-send-email-alex.bennee@linaro.org>
- <20150515152346.GB23652@leverpostej> <87y4kpke91.fsf@linaro.org>
-Message-ID: <CAFEAcA8Z1Na9LY3m-DvGXpjUtCkc_H3+uAKWVRB4EBZWP6enJg@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 15 May 2015 12:27:13 -0500
+Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <20150514003201.20636.83883@quantum>
+References: <cover.1430394884.git.viresh.kumar@linaro.org>
+ <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
+ <20150512214224.16410.15922@quantum> <20150513085528.GA6994@linux>
+ <20150513110357.GD3066@sirena.org.uk> <20150514003201.20636.83883@quantum>
+Message-ID: <CAL_JsqL2CpRu51=t_kacMxb1AfpJnep8vnkzF2YQuCXSCvJFFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 May 2015 at 17:16, Alex Benn?e <alex.bennee@linaro.org> wrote:
-> Mark Rutland <mark.rutland@arm.com> writes:
->> This gets more fun when you consider the context-aware breakpoints are
->> the highest numbered. So the set of (context-aware) breakpoints might
->> not intersect across all CPUs.
+On Wed, May 13, 2015 at 7:32 PM, Michael Turquette
+<mike.turquette@linaro.org> wrote:
+> Quoting Mark Brown (2015-05-13 04:03:57)
+>> On Wed, May 13, 2015 at 02:25:28PM +0530, Viresh Kumar wrote:
+>> > On 12-05-15, 14:42, Michael Turquette wrote:
+>> > > Quoting Viresh Kumar (2015-04-30 05:07:59)
+>> >
+>> > > Why should this new binding exist?
+>>
+>> > The answer to this particular query is perhaps simple, i.e. we have
+>> > unsolved problems that we wanted to solve in a generic way.
+>>
+>> > But probably the bigger question is "Should we really put the OPPs
+>> > (new or old bindings) in DT".
+>>
+>> And also is trying to do this in a completely generic manner the right
+>> way of going about things - do we really understand the problem area
+>> well enough to create a completely generic solution for all cases,
+>> bearing in mind that once things go into a DT binding they become an ABI?
 >
-> I didn't see a reference to that in the ARM ARM. It seemed to imply any
-> breakpoint could be context aware is .BT was appropriately set and
-> linked to the VR.
+> No, we don't understand the problem space well enough to form an ABI.
+> And even if we did understand it perfectly today, the constraints and
+> expressions will change tomorrow.
+>
+> Putting this stuff in C without any philosophical constraints on whether
+> or not we can change it later is the way to go.
 
-No; see D2.9.2; there must be at least one context-aware
-breakpoint, but no requirement for more than that.
+Having a binding does not preclude you from doing your own thing in C.
+You can choose to ignore it (or parts of it). It also doesn't mean you
+have to use a generic driver with a generic binding.
 
--- PMM
+While yes, we could do the same thing in C, the reality is that we
+often don't force common data into common structures. This leads to
+obfuscating what are the real h/w differences because everyone does
+things their own way. Conveniently, struct dev_pm_opp is a perfect
+example here. We already know that just freq and volt alone are not
+enough, yet that is all the kernel structure has.
+
+The way you avoid the ABI issue is you create a new one which is what
+we've done here. I'm not saying we want 10 different OPP bindings. If
+we are back here in a year with v3, then yes you are probably right.
+But I believe v2 is a framework that can last. Most of the review
+issues have resulted in simply dropping properties (until needed)
+without otherwise changing the binding. I think that demonstrates this
+bindiing is flexible and extendable.
+
+Rob
