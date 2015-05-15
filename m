@@ -1,29 +1,151 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 15 May 2015 11:37:07 -0700
-Subject: [PATCH] clk: mediatek: Initialize clk flags
-In-Reply-To: <1431670969-1996-1-git-send-email-jcliang@chromium.org>
-References: <1431670969-1996-1-git-send-email-jcliang@chromium.org>
-Message-ID: <20150515183707.GM31753@codeaurora.org>
+Date: Fri, 15 May 2015 12:00:58 -0700
+Subject: [PATCH v2] clk: mediatek: Export CPU mux clocks for CPU
+ frequency control
+In-Reply-To: <1429521950-16431-1-git-send-email-pi-cheng.chen@linaro.org>
+References: <1429521950-16431-1-git-send-email-pi-cheng.chen@linaro.org>
+Message-ID: <20150515190058.GN31753@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15, Ricky Liang wrote:
-> diff --git a/drivers/clk/mediatek/clk-pll.c b/drivers/clk/mediatek/clk-pll.c
-> index 66154ca..72fe307 100644
-> --- a/drivers/clk/mediatek/clk-pll.c
-> +++ b/drivers/clk/mediatek/clk-pll.c
-> @@ -289,6 +289,7 @@ static struct clk *mtk_clk_register_pll(const struct mtk_pll_data *data,
->  	init.ops = &mtk_pll_ops;
->  	init.parent_names = &parent_name;
->  	init.num_parents = 1;
-> +	init.flags = data->flags;
+On 04/20, pi-cheng.chen wrote:
+> Signed-off-by: pi-cheng.chen <pi-cheng.chen@linaro.org>
+> diff --git a/drivers/clk/mediatek/clk-cpumux.c b/drivers/clk/mediatek/clk-cpumux.c
+> new file mode 100644
+> index 0000000..dc14074
+> --- /dev/null
+> +++ b/drivers/clk/mediatek/clk-cpumux.c
+> @@ -0,0 +1,122 @@
+> +/*
+> + * Copyright (c) 2015 Linaro Ltd.
+> + * Author: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk.h>
 
-Wrong? It looks like plls[] in drivers/clk/mediatek/clk-mt8135.c
-is putting mtk specific clock flags in this structure member.
+Do you need this include for some reason?
 
-How about initializing the structure to { } instead? That way if
-we ever add more structure members we don't have to detect the
-landmine laid here.
+> +#include <linux/clk-provider.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/slab.h>
+> +
+> +#include "clk-mtk.h"
+> +#include "clk-cpumux.h"
+> +
+[...]
+> +
+> +static struct clk_ops clk_cpumux_ops = {
+
+const?
+
+> +	.get_parent = clk_cpumux_get_parent,
+> +	.set_parent = clk_cpumux_set_parent,
+> +};
+> +
+> +static struct clk *mtk_clk_register_cpumux(const struct mtk_composite *mux,
+> +					   struct regmap *regmap)
+> +{
+> +	struct mtk_clk_cpumux *cpumux;
+> +	struct clk *clk;
+> +	struct clk_init_data init;
+> +
+> +	cpumux = kzalloc(sizeof(*cpumux), GFP_KERNEL);
+> +	if (!cpumux)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	init.name = mux->name;
+> +	init.ops = &clk_cpumux_ops;
+> +	init.parent_names = mux->parent_names;
+> +	init.num_parents = mux->num_parents;
+> +
+> +	cpumux->reg = mux->mux_reg;
+> +	cpumux->shift = mux->mux_shift;
+> +	cpumux->mask = (BIT(mux->mux_width) - 1);
+
+Unnecessary parenthesis.
+
+> +	cpumux->regmap = regmap;
+> +	cpumux->hw.init = &init;
+> +
+> +	clk = clk_register(NULL, &cpumux->hw);
+> +	if (IS_ERR(clk))
+> +		kfree(cpumux);
+> +
+> +	return clk;
+> +}
+> +
+> +int mtk_clk_register_cpumuxes(struct device_node *node,
+> +			      const struct mtk_composite *clks, int num,
+> +			      struct clk_onecell_data *clk_data)
+> +{
+> +	int i;
+> +	struct clk *clk;
+> +	struct regmap *regmap;
+> +
+> +	if (!clk_data)
+> +		return -ENOMEM;
+
+Why would we call the function with NULL clk_data? Please remove
+this check.
+
+> +
+> +	regmap = syscon_node_to_regmap(node);
+> +	if (IS_ERR(regmap)) {
+> +		pr_err("Cannot find regmap for %s: %ld\n", node->full_name,
+> +		       PTR_ERR(regmap));
+> +		return PTR_ERR(regmap);
+> +	}
+> +
+> diff --git a/drivers/clk/mediatek/clk-cpumux.h b/drivers/clk/mediatek/clk-cpumux.h
+> new file mode 100644
+> index 0000000..b82ad20
+> --- /dev/null
+> +++ b/drivers/clk/mediatek/clk-cpumux.h
+> @@ -0,0 +1,31 @@
+> +/*
+> + * Copyright (c) 2015 Linaro Ltd.
+> + * Author: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#ifndef __DRV_CLK_CPUMUX_H
+> +#define __DRV_CLK_CPUMUX_H
+> +
+> +#include <linux/regmap.h>
+
+Looks unnecessary. Just forward declare the type you need, struct
+regmap.
+
+> +
+> +struct mtk_clk_cpumux {
+> +	struct clk_hw	hw;
+> +	struct regmap	*regmap;
+> +	u32		reg;
+> +	u32		mask;
+> +	u8		shift;
+> +};
+> +
+> +int mtk_clk_register_cpumuxes(struct device_node *node,
+> +			      const struct mtk_composite *clks, int num,
+> +			      struct clk_onecell_data *clk_data);
+> +#endif /* __DRV_CLK_CPUMUX_H */
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
