@@ -1,39 +1,35 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 15 May 2015 23:55:48 +0200
-Subject: [GIT PULL] ARM: berlin: DT changes for v4.2 (round 1)
-In-Reply-To: <2418982.DaY2mGZ7YN@wuerfel>
-References: <1431687246-31039-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1431687246-31039-3-git-send-email-sebastian.hesselbarth@gmail.com>
- <2418982.DaY2mGZ7YN@wuerfel>
-Message-ID: <55566B64.1080908@gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 15 May 2015 16:59:21 -0500
+Subject: [PATCH] ARM: dts: omap5-uevm: Add Uart wakeup interrupt
+Message-ID: <1431727161-16870-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.05.2015 17:33, Arnd Bergmann wrote:
-> On Friday 15 May 2015 12:54:06 Sebastian Hesselbarth wrote:
->> this is Marvell Berlin SoC DT for v4.2 including:
->> - GPLv2/X11 dual-licensing of DT files,
->> - a note about currently unstable DT bindings as we struggle to get
->>    DT bindings right in the first place with limited documentation available,
->> - Rework of System/Chip Controller binding documentation and nodes to
->>    simple-mfd.
->>
->
-> I'm a bit confused by this. Are you sure that it's ok to apply this branch
-> by itself without introducing regressions or bisection problems?
+UART3 wakeup takes place with iodaisy chain. enable the wakeup pin.
 
-Ach, dammit. You are right, the patches reworking chip/sys ctrl nodes
-are currently un-bisectable. I do have Acked-by's from subsystem
-maintainers, so I guess I'll have to squash the DT changes with the
-driver changes.
+Reported-by: Suman Anna <s-anna@ti.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
 
-> It's fine to have unstable bindings for a while as you are ramping up,
-> but that requires a lot more care on your side regarding the order in
-> which you send the patches. I have received three pull requests from
-> you that are all based on -rc1, and from a brief look it seems like
-> they are interdependent, which would not be ok.
+Test on linus master (f0897f4cc0fc) with 8250  driver: http://pastebin.ubuntu.com/11154446/
 
-Yes, the rework of the drivers and the corresponding DT changes
-depend on each other. Sorry for the confusion.
+Applies on next-20150515 and linus master (f0897f4cc0fc)
 
-Sebastian
+ arch/arm/boot/dts/omap5-uevm.dts |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
+index 74777a6e200a..214190796143 100644
+--- a/arch/arm/boot/dts/omap5-uevm.dts
++++ b/arch/arm/boot/dts/omap5-uevm.dts
+@@ -604,6 +604,8 @@
+ &uart3 {
+         pinctrl-names = "default";
+         pinctrl-0 = <&uart3_pins>;
++	interrupts-extended = <&gic GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>,
++			      <&omap5_pmx_core 0x19c>;
+ };
+ 
+ &uart5 {
+-- 
+1.7.9.5
