@@ -1,52 +1,48 @@
-From: leilk.liu@mediatek.com (leilk liu)
-Date: Fri, 15 May 2015 15:38:42 +0800
-Subject: [PATCH 2/3] spi: mediatek: Add spi bus for Mediatek MT8173
-In-Reply-To: <20150512160540.GB3066@sirena.org.uk>
-References: <1431075343-7887-1-git-send-email-leilk.liu@mediatek.com>
- <1431075343-7887-3-git-send-email-leilk.liu@mediatek.com>
- <20150508175306.GG2761@sirena.org.uk> <1431434356.2128.9.camel@mhfsdcap03>
- <20150512160540.GB3066@sirena.org.uk>
-Message-ID: <1431675522.2128.13.camel@mhfsdcap03>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 15 May 2015 15:39:43 +0800
+Subject: [PATCH v2] clk: sirf: add CSR atlas7 clk and reset support
+In-Reply-To: <20150514234131.GB31753@codeaurora.org>
+References: <1428848090-14638-1-git-send-email-21cnbao@gmail.com>
+ <20150514234131.GB31753@codeaurora.org>
+Message-ID: <CAGsJ_4xJrCX5Bk=Ry1QhDvQO6jM8VhDvCmFG73HqxM6ZiXq0RA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mark,
+2015-05-15 7:41 GMT+08:00 Stephen Boyd <sboyd@codeaurora.org>:
+>
+> On 04/12, Barry Song wrote:
+> > From: Zhiwu Song <Zhiwu.Song@csr.com>
+> >
+> > the hardware node includes both clock and reset support, so it
+> > is named as "car".
+> > this patch implements Flexible clocks(mux, divider, gate), Selectable
+> > clock(mux, divider, gate), root clock(gate),leaf clock(gate), others.
+> > it also implements the reset controller functionality.
+> >
+> > Signed-off-by: Zhiwu Song <Zhiwu.Song@csr.com>
+> > Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> > ---
+>
+> Sorry for late review. I wasn't Cc'ed on the patch.
+>
 
-Thanks for your reply.
+Stephen, thanks for very careful and high-quality review. i realized i
+missed you after i sent this one. sorry.
 
-On Tue, 2015-05-12 at 17:05 +0100, Mark Brown wrote:
-> On Tue, May 12, 2015 at 08:39:16PM +0800, leilk liu wrote:
-> > On Fri, 2015-05-08 at 18:53 +0100, Mark Brown wrote:
-> > > On Fri, May 08, 2015 at 04:55:42PM +0800, leilk.liu at mediatek.com wrote:
-> 
-> > Could you tell me more details about "You should also be using the core
-> > helpers for DMA mapping"?
-> 
-> Implement can_dma() - look for drivers providing that for examples.
-> 
+> > +static struct atlas7_reset_desc atlas7_reset_unit[] = {
+> > +     {"PWM", 0x0244, 0, 0x0320, 0, &leaf0_gate_lock}, /*0-5*/
+>
+> Style nitpick: Please put some space around the braces here.
+>
+> > +     {"THCGUM", 0x0244, 3, 0x0320, 1, &leaf0_gate_lock},
+> > +     {"CVD", 0x04A0, 0, 0x032C, 0, &leaf1_gate_lock},
+> > +     {"TIMER", 0x04A0, 1, 0x032C, 1, &leaf1_gate_lock},
+> > +     {"PULSEC", 0x04A0, 2, 0x032C, 2, &leaf1_gate_lock},
+> [...]
+> > +
 
-MTK spi hardware uses the dmaengine in spi controller. According to
-datasheet, spi driver just need to enable dma register bit and write a
-physical address to relevant dma address register, so I think it may be
-complex while the driver supports can_dma.
 
-> > > > +static const struct of_device_id mtk_spi_of_match[] = {
-> > > > +	{ .compatible = "mediatek,mt6589-spi", .data = (void *)COMPAT_MT6589},
-> > > > +	{ .compatible = "mediatek,mt8173-spi", .data = (void *)COMPAT_MT8173},
-> > > > +	{}
-> > > > +};
-> > > > +MODULE_DEVICE_TABLE(of, mtk_spi_of_match);
-> 
-> > > There were three compatible strings listed in the DT binding but only
-> > > two here.
-> 
-> > MT6589 and MT8135 is compatible; 
-> > For MT8135 IC, it can use the follow way in dts to probe:
-> >   compatible = "mediatek,mt8135-spi", 
-> > 	       "mediatek,mt6589-spi";
-> 
-> > And I test it's ok on MT8135 platform. So I add struct of_device_id
-> > mtk_spi_of_match like this in spi driver code.
-> 
-> You should list all the compatibles documented in the binding here, if
-> some of them are the same just have them map to a single constant.
+all other issues have been cleared in v3 i sent minutes ago. for this
+one, where do you want the spaces added?
+
+-barry
