@@ -1,48 +1,91 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 15 May 2015 11:29:34 +0200
-Subject: schedule_timeout sleeps too long after dividing CPU frequency
-In-Reply-To: <20150514144239.GZ2067@n2100.arm.linux.org.uk>
-References: <55520F0F.5010906@free.fr>
- <CAKohpo=eMA6L9=jK=bAnbFuDxcdtpQNub0WFnSy6MOqB3jOdjA@mail.gmail.com>
- <555218C7.5050602@free.fr> <20150512155004.GP2067@n2100.arm.linux.org.uk>
- <555380F8.5050306@free.fr>
- <CAOh2x==aCLxCWX9K57hOFVEP1eLo_OYZPe0YvbFvpkXcoSp_hQ@mail.gmail.com>
- <5554858A.9010207@free.fr> <20150514115456.GB23999@linux>
- <55549DEE.6010202@free.fr>
- <CAKohpon4AV-7nq=Qm7PpDbbW9ti98avY9zz82htzyHWi5_K7fA@mail.gmail.com>
- <20150514144239.GZ2067@n2100.arm.linux.org.uk>
-Message-ID: <5555BC7E.7010601@free.fr>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Fri, 15 May 2015 17:43:23 +0800
+Subject: [RFC v2 PATCH 0/6] MT8173 IOMMU SUPPORT 
+Message-ID: <1431683009-18158-1-git-send-email-yong.wu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/05/2015 16:42, Russell King - ARM Linux wrote:
+  This patch adds support for m4u(Multimedia Memory Management Unit),
+Currently it only support the m4u with 2 levels of page table on mt8173.
 
-> If it's in periodic mode, the update should still be propagated to the
-> hardware, assuming the generic time keeping code doesn't produce an
-> error.
-> 
-> twd_update_frequency
-> `-clockevents_update_freq
->   `-__clockevents_update_freq
->     `-__clockevents_set_state(, CLOCK_EVT_STATE_PERIODIC)
->       `-dev->set_mode (twd_set_mode)
-> 
-> That re-writes the TWD_TIMER_LOAD register based on twd_timer_rate,
-> which would have been updated by twd_update_frequency().
-> 
-> The question I posed earlier remains: is clockevents_update_freq()
-> failing?  We don't know, because we never check its return value.
-> 
-> Another thing to look at is whether we reach twd_set_mode().
-> 
-> Lastly, printing the values of the TWD_TIMER_LOAD and TWD_TIMER_COUNTER
-> after twd_set_mode() has written TWD_TIMER_LOAD might provide some
-> hints as to what's going on.
+  It is based on Robin Murphy's arm64: IOMMU-backed DMA mapping[1]. 
+ 
+  Please check the hardware block diagram of Mediatek IOMMU.
+ 
+              EMI (External Memory Interface)
+               |
+              m4u (Multimedia Memory Management Unit)
+               |
+              smi (Smart Multimedia Interface)
+               |
+        +---------------+-------
+        |               |
+        |               |
+    vdec larb       disp larb      ... SoCs have different local arbiter(larb).
+        |               |
+        |               |
+   +----+----+    +-----+-----+
+   |    |    |    |     |     |    ...
+   |    |    |    |     |     |    ...
+   |    |    |    |     |     |    ...
+  MC   PP   VLD  OVL0 RDMA0 WDMA0  ... There are different ports in each larb.
+  
+  Normally we specify a local arbiter(larb) for each multimedia hardware like
+display, video decode, video encode and camera. And there are different ports in
+each larb. Take a example, there are some ports like MC, PP, UFO, VLD, AVC_MV,
+PRED_RD, PRED_WR in video larb, all the ports are according to the video hardware.
+ 
+  From the diagram, all the multimedia module connect with m4u via smi.
+SMI is responsible to enable/disable iommu and control the clocks for each local
+arbiter. If we should enable the iommu of video decode, it should config the 
+video's ports. And if the video hardware work wether enable/disable iommu, 
+it should enable the clock of its larb's clock. So we add a special driver for smi.
+ 
+[1] http://lists.linuxfoundation.org/pipermail/iommu/2015-February/012236.html
 
-I'll have access to the board on Monday.
+v2:
+-add arm short descriptor support.
+-seperate smi common from smi and change the clock-names according
+ to smi HW.
+-delete the hardcode of the port-names in mt8173.
+ replace this with larb-portes-nr in dtsi.
+-fix some coding style issues.
 
-I'll add printk in strategic places, and report back ASAP.
+v1:
+http://lists.infradead.org/pipermail/linux-mediatek/2015-March/000058.html
 
-(I'm considering dropping TWD, and using platform timers.)
+Yong Wu (6):
+  dt-bindings: iommu: Add binding for mediatek IOMMU
+  dt-bindings: mediatek: Add smi dts binding
+  iommu: add ARM short descriptor page table allocator.
+  iommu/mediatek: Add mt8173 IOMMU driver
+  soc: mediatek: Add SMI driver
+  dts: mt8173: Add iommu/smi nodes for mt8173
 
-Regards.
+ .../devicetree/bindings/iommu/mediatek,iommu.txt   |  51 ++
+ .../bindings/soc/mediatek/mediatek,smi-larb.txt    |  24 +
+ .../bindings/soc/mediatek/mediatek,smi.txt         |  22 +
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  79 +++
+ drivers/iommu/Kconfig                              |  18 +
+ drivers/iommu/Makefile                             |   2 +
+ drivers/iommu/io-pgtable-arm-short.c               | 490 +++++++++++++++
+ drivers/iommu/io-pgtable.c                         |   4 +
+ drivers/iommu/io-pgtable.h                         |   6 +
+ drivers/iommu/mtk_iommu.c                          | 657 +++++++++++++++++++++
+ drivers/soc/mediatek/Kconfig                       |   6 +
+ drivers/soc/mediatek/Makefile                      |   1 +
+ drivers/soc/mediatek/mt8173-smi.c                  | 298 ++++++++++
+ include/dt-bindings/iommu/mt8173-iommu-port.h      | 112 ++++
+ include/linux/mtk-smi.h                            |  39 ++
+ 15 files changed, 1809 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
+ create mode 100644 Documentation/devicetree/bindings/soc/mediatek/mediatek,smi-larb.txt
+ create mode 100644 Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt
+ create mode 100644 drivers/iommu/io-pgtable-arm-short.c
+ create mode 100644 drivers/iommu/mtk_iommu.c
+ create mode 100644 drivers/soc/mediatek/mt8173-smi.c
+ create mode 100644 include/dt-bindings/iommu/mt8173-iommu-port.h
+ create mode 100644 include/linux/mtk-smi.h
+
+-- 
+1.8.1.1.dirty
