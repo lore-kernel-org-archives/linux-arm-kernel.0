@@ -1,97 +1,125 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Fri, 15 May 2015 21:52:39 +0200
-Subject: [PATCH 0/3] Drop more omap3 legacy board-*.c files for v4.2
-In-Reply-To: <20150506144239.GH21061@atomide.com>
-References: <1430769717-4088-1-git-send-email-tony@atomide.com>
- <20150506085204.GE30910@pali> <20150506144239.GH21061@atomide.com>
-Message-ID: <201505152152.39471@pali>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 15 May 2015 21:57:33 +0200
+Subject: [PATCH v4 1/7] ARM: zx: add basic support for ZTE ZX296702
+In-Reply-To: <1430212691-16009-2-git-send-email-jun.nie@linaro.org>
+References: <1430212691-16009-1-git-send-email-jun.nie@linaro.org>
+ <1430212691-16009-2-git-send-email-jun.nie@linaro.org>
+Message-ID: <2493762.Sr0FmX9rRB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 06 May 2015 16:42:39 Tony Lindgren wrote:
-> * Pali Roh?r <pali.rohar@gmail.com> [150506 01:53]:
-> > On Tuesday 05 May 2015 10:00:21 Tony Lindgren wrote:
-> > > * Pali Roh?r <pali.rohar@gmail.com> [150505 09:41]:
-> > > > On Tuesday 05 May 2015 17:06:38 Tony Lindgren wrote:
-> > > > > * Pali Roh?r <pali.rohar@gmail.com> [150505 07:55]:
-> > > > > > On Tuesday 05 May 2015 07:43:08 Tony Lindgren wrote:
-> > > > > > > * Arnd Bergmann <arnd@arndb.de> [150505 03:56]:
-> > > > > > > > On Monday 04 May 2015 13:01:54 Tony Lindgren wrote:
-> > > > > > > > > For dropping the remaining omap3 legacy boot support,
-> > > > > > > > > we still have the following board-*.c files:
-> > > > > > > > > 
-> > > > > > > > > BOARD                   REASON NEEDED
-> > > > > > > > > board-ldp.c             Still used in RMKs boot test
-> > > > > > > > > system board-omap3logic.c      Getting a .dts file
-> > > > > > > > > for v4.2 board-omap3pandora.c    Got a .dts file for
-> > > > > > > > > v4.1 board-rx51-*.c          Needs /proc/atags
-> > > > > > > > > support for user space
-> > > > > > > > > 
-> > > > > > > > > I'm hoping we can drop those for v4.3 merge window,
-> > > > > > > > > then keep the platform data around for one more merge
-> > > > > > > > > window in case of reverting needed, then drop the
-> > > > > > > > > platform data too for v4.4 if no issues needing
-> > > > > > > > > reverting are found.
-> > > > > > > > 
-> > > > > > > > Sounds great. Has there been a conclusion about what to
-> > > > > > > > do for the rx51 /proc/atags support?
-> > > > > > > 
-> > > > > > > I believe we just need to enable /proc/atags also for
-> > > > > > > device tree based booting if CONFIG_ARM_ATAG_DTB_COMPAT.
-> > > > > > > Pali may have more info on that.
-> > > > > > > 
-> > > > > > > Then looks like Pali's two patches for showing the
-> > > > > > > revision are still pending in thread "[PATCH v2 0/2] ARM:
-> > > > > > > /proc/cpuinfo: DT: Add support for Revision":
-> > > > > > > 
-> > > > > > > http://www.spinics.net/lists/arm-kernel/msg401535.html
-> > > > > > 
-> > > > > > I think I already sent all need patches to ML. But I did
-> > > > > > not check if you merged them or not. I did not get any new
-> > > > > > comments for them for a while and right now I do not have
-> > > > > > time for looking at it again.
-> > > > > 
-> > > > > Oh OK, do you have link to the /proc/atags patch somewhere?
-> > > > > 
-> > > > > Maybe Arnd and Nico can pick them up and sort out how we
-> > > > > should queue them with Russell?
-> > > > 
-> > > > https://lkml.org/lkml/2015/1/26/648
-> > > 
-> > > Hmm looks like you should resend all your pending four patches
-> > > properly with the people mentioned above in Cc to the LAKML
-> > > and linux-omap.. Assuming something will happen to them when
-> > > the patches are buried into a middle of some old threads does
-> > > not work well.. Best to just follow das protokoll und whine and
-> > > follow up until the patches get merged :)
-> > > 
-> > > Regards,
-> > > 
-> > > Tony
-> > 
-> > Now I resent "ARM: /proc/cpuinfo: DT: Add support for Revision"
-> > patches to MLs again without in-reply-to header.
+On Tuesday 28 April 2015 17:18:05 Jun Nie wrote:
+> Add basic code for ZTE ZX296702 platform.
 > 
-> OK thanks.
-> 
-> > Patches for /proc/atags I do not have currently in git format-patch
-> > mbox format, so cannot resent it right now...
-> 
-> Well presumably you'll resend those once you find them then :)
-> 
-> Regards,
-> 
-> Tony
+> Signed-off-by: Jun Nie <jun.nie@linaro.org>
 
-Now I sent them. Now you (or anybody else) can review all 4 patches :-)
+Hi Jun,
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150515/d9fa3d0d/attachment.sig>
+I've applied patches 1, 2, 3 and 6 to the next/soc branch now, but 
+ended up modifying the first patch slightly, see the new version
+version below. Let's find a way to get the cache controller settings
+right without the override please.
+
+	Arnd
+
+commit acede515b3a5997becc5736657e11f4f410a8235
+Author: Jun Nie <jun.nie@linaro.org>
+Date:   Tue Apr 28 17:18:05 2015 +0800
+
+    ARM: zx: add basic support for ZTE ZX296702
+    
+    Add basic code for ZTE ZX296702 platform.
+    
+    [arnd: removed unused zx296702_init_machine function, and changed
+           l2c aux val to default]
+    
+    Signed-off-by: Jun Nie <jun.nie@linaro.org>
+    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 16b47afb60f1..80a2a14df604 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -989,6 +989,8 @@ source "arch/arm/mach-vt8500/Kconfig"
+ 
+ source "arch/arm/mach-w90x900/Kconfig"
+ 
++source "arch/arm/mach-zx/Kconfig"
++
+ source "arch/arm/mach-zynq/Kconfig"
+ 
+ # Definitions to make life easier
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 16bfd585585c..2a4fae7e9c44 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -207,6 +207,7 @@ machine-$(CONFIG_ARCH_VERSATILE)	+= versatile
+ machine-$(CONFIG_ARCH_VEXPRESS)		+= vexpress
+ machine-$(CONFIG_ARCH_VT8500)		+= vt8500
+ machine-$(CONFIG_ARCH_W90X900)		+= w90x900
++machine-$(CONFIG_ARCH_ZX)		+= zx
+ machine-$(CONFIG_ARCH_ZYNQ)		+= zynq
+ machine-$(CONFIG_PLAT_SPEAR)		+= spear
+ 
+diff --git a/arch/arm/mach-zx/Kconfig b/arch/arm/mach-zx/Kconfig
+new file mode 100644
+index 000000000000..2a910dc0d15e
+--- /dev/null
++++ b/arch/arm/mach-zx/Kconfig
+@@ -0,0 +1,18 @@
++menuconfig ARCH_ZX
++	bool "ZTE ZX family" if ARCH_MULTI_V7
++	help
++	  Support for ZTE ZX-based family of processors. TV
++	  set-top-box processor is supported. More will be
++	  added soon.
++
++if ARCH_ZX
++
++config SOC_ZX296702
++	def_bool y
++	select ARM_GIC
++	select ARM_GLOBAL_TIMER
++	select HAVE_ARM_SCU if SMP
++	select HAVE_ARM_TWD if SMP
++	help
++	  Support for ZTE ZX296702 SoC which is a dual core CortexA9MP
++endif
+diff --git a/arch/arm/mach-zx/Makefile b/arch/arm/mach-zx/Makefile
+new file mode 100644
+index 000000000000..7a541c78f695
+--- /dev/null
++++ b/arch/arm/mach-zx/Makefile
+@@ -0,0 +1 @@
++obj-$(CONFIG_SOC_ZX296702) += zx296702.o
+diff --git a/arch/arm/mach-zx/zx296702.c b/arch/arm/mach-zx/zx296702.c
+new file mode 100644
+index 000000000000..60bb1a8e1bf1
+--- /dev/null
++++ b/arch/arm/mach-zx/zx296702.c
+@@ -0,0 +1,25 @@
++/*
++ * Copyright 2014 Linaro Ltd.
++ * Copyright (C) 2014 ZTE Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++
++#include <linux/of_address.h>
++#include <linux/of_platform.h>
++
++static const char *zx296702_dt_compat[] __initconst = {
++	"zte,zx296702",
++	NULL,
++};
++
++DT_MACHINE_START(ZX, "ZTE ZX296702 (Device Tree)")
++	.dt_compat	= zx296702_dt_compat,
++	.l2c_aux_val    = 0,
++	.l2c_aux_mask   = ~0,
++MACHINE_END
