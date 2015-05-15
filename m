@@ -1,58 +1,25 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 15 May 2015 09:58:18 +0100
-Subject: [PATCH v2 2/2] ARM64: kernel: unify ACPI and DT cpus
- initialization
-In-Reply-To: <5553C99A.5020706@redhat.com>
-References: <1431522769-11276-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1431522769-11276-3-git-send-email-lorenzo.pieralisi@arm.com>
- <5553C99A.5020706@redhat.com>
-Message-ID: <20150515085817.GA14206@red-moon>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 May 2015 10:00:13 +0100
+Subject: schedule_timeout sleeps too long after dividing CPU frequency
+In-Reply-To: <20150515041632.GG6348@linux>
+References: <555218C7.5050602@free.fr>
+ <20150512155004.GP2067@n2100.arm.linux.org.uk>
+ <555380F8.5050306@free.fr>
+ <CAOh2x==aCLxCWX9K57hOFVEP1eLo_OYZPe0YvbFvpkXcoSp_hQ@mail.gmail.com>
+ <5554858A.9010207@free.fr> <20150514115456.GB23999@linux>
+ <55549DEE.6010202@free.fr>
+ <CAKohpon4AV-7nq=Qm7PpDbbW9ti98avY9zz82htzyHWi5_K7fA@mail.gmail.com>
+ <5554B5C1.2070402@free.fr> <20150515041632.GG6348@linux>
+Message-ID: <20150515090013.GE2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[restored CC list]
+On Fri, May 15, 2015 at 09:46:32AM +0530, Viresh Kumar wrote:
+> What core does your platform has? Cortex A9? Doesn't that uses this
+> timer instead: drivers/clocksource/arm_arch_timer.c ?
 
-On Wed, May 13, 2015 at 11:00:58PM +0100, Al Stone wrote:
-> On 05/13/2015 07:12 AM, Lorenzo Pieralisi wrote:
-> > The code that initializes cpus on arm64 is currently split in two
-> > different code paths that carry out DT and ACPI cpus initialization.
-> > 
-> > Most of the code executing SMP initialization is common and should
-> > be merged to reduce discrepancies between ACPI and DT initialization
-> > and to have code initializing cpus in a single common place in the
-> > kernel.
-> > 
-> > This patch refactors arm64 SMP cpus initialization code to merge
-> > ACPI and DT boot paths in a common file and to create sanity
-> > checks that can be reused by both boot methods.
-> > 
-> > Current code assumes PSCI is the only available boot method
-> > when arm64 boots with ACPI; this can be easily extended if/when
-> > the ACPI parking protocol is merged into the kernel.
-> > 
-> > Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
-> > Acked-by: Mark Rutland <mark.rutland@arm.com>
-> > Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-> > Tested-by: Mark Rutland <mark.rutland@arm.com> [DT]
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> [snip...]
-> 
-> These patches look pretty good so far, but I've only just started
-> reviewing them.  This one raised the question: do we know if there
-> is someone already working on parking protocol?  I've seen a form
-> of it working on AMD Seattles but I don't recall seeing any patches
-> being submitted -- I'll search archives again, just in case I missed
-> it the first time, but if there is someone working on it, that would
-> be good to know.
+Cortex A9 doesn't always have the architected timer.
 
-I have seen patches for the ACPI parking protocol but nothing posted
-publicly. This patch consolidates what exists today, honestly
-I do not think that putting together a patch to enable the ACPI parking
-protocol is a big deal on top of this set, keeping in mind that it
-should be used as a fallback solution if PSCI can't be implemented
-(ie AMD Seattle must boot with PSCI).
-
-Lorenzo
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
