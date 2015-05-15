@@ -1,26 +1,23 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 May 2015 22:03:23 +0200
-Subject: [PATCH v4 7/7] ARM: zx: Add basic defconfig support for ZX296702
-In-Reply-To: <1430212691-16009-8-git-send-email-jun.nie@linaro.org>
-References: <1430212691-16009-1-git-send-email-jun.nie@linaro.org>
- <1430212691-16009-8-git-send-email-jun.nie@linaro.org>
-Message-ID: <8162482.vKSVHxgVUp@wuerfel>
+Date: Fri, 15 May 2015 22:03:51 +0200
+Subject: [PATCH v4 7/7] ARM: lpc18xx: add kernel config
+In-Reply-To: <1431381653-25356-8-git-send-email-manabian@gmail.com>
+References: <1431381653-25356-1-git-send-email-manabian@gmail.com>
+ <1431381653-25356-8-git-send-email-manabian@gmail.com>
+Message-ID: <3134503.DxLm2cOWKc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 28 April 2015 17:18:11 Jun Nie wrote:
-> Add basic defconfig support to zx SOC, including uart, mmc
->  and other common config
+On Tuesday 12 May 2015 00:00:53 Joachim Eastwood wrote:
+> Kernel configuration for NXP LPC18xx and LPC43xx devices.
 > 
-> Signed-off-by: Jun Nie <jun.nie@linaro.org>
+> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+> ---
+>  arch/arm/configs/lpc18xx_defconfig | 151 +++++++++++++++++++++++++++++++++++++
+>  1 file changed, 151 insertions(+)
+>  create mode 100644 arch/arm/configs/lpc18xx_defconfig
 > 
 
-Applied to next/defconfig. Please follow up with a patch to enable this
-platform in multi_v7_defconfig as well. You should enable all drivers
-for devices that are used on this platform, but preferrably use =m
-instead of =y in the multi_v7_defconfig (in zx_defconfig, it's up
-to your personal preference).
-
-Thanks,
+Applied to next/defconfig, thanks!
 
 	Arnd
