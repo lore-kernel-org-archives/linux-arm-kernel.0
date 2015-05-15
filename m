@@ -1,41 +1,97 @@
-From: colin.king@canonical.com (Colin King)
-Date: Fri, 15 May 2015 13:43:09 +0100
-Subject: [PATCH] ARM: 8351/1: perf: fix memory leak on return
-Message-ID: <1431693789-9679-1-git-send-email-colin.king@canonical.com>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 15 May 2015 14:45:28 +0200
+Subject: schedule_timeout sleeps too long after dividing CPU frequency
+In-Reply-To: <20150515115852.GJ2067@n2100.arm.linux.org.uk>
+References: <555380F8.5050306@free.fr>
+ <CAOh2x==aCLxCWX9K57hOFVEP1eLo_OYZPe0YvbFvpkXcoSp_hQ@mail.gmail.com>
+ <5554858A.9010207@free.fr> <20150514115456.GB23999@linux>
+ <55549DEE.6010202@free.fr>
+ <CAKohpon4AV-7nq=Qm7PpDbbW9ti98avY9zz82htzyHWi5_K7fA@mail.gmail.com>
+ <20150514144239.GZ2067@n2100.arm.linux.org.uk> <5555BC7E.7010601@free.fr>
+ <20150515095159.GF2067@n2100.arm.linux.org.uk> <5555CC1A.5040604@free.fr>
+ <20150515115852.GJ2067@n2100.arm.linux.org.uk>
+Message-ID: <5555EA68.7030006@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+On 15/05/2015 13:58, Russell King - ARM Linux wrote:
+> On Fri, May 15, 2015 at 12:36:10PM +0200, Mason wrote:
+>> On 15/05/2015 11:51, Russell King - ARM Linux wrote:
+>>
+>>> As you don't say which kernel version you're using,
+>>
+>> Sorry about that, I thought the patch-generating command
+>> I posted conveyed the information.
+>>
+>> $ git diff v3.14.41 HEAD >tango.patch && xz tango.patch
+>>
+>> I'm using the 3.14.y branch from linux-stable.
+> 
+> So you're using a kernel over a year old...
 
-Recent commit 3b8786ff7a1b31645ae2c26a2ec32dbd42ac1094
-("ARM: 8352/1: perf: Fix the pmu node name in warning message")
-introduced a memory leak of irqs on the "Don't bother with PPIs"
-return path. This was picked up by static analysis by cppcheck:
+The sad part is: I'm working on the "new" kernel.
+The current "official" kernel is 3.4 (and I'm afraid
+there's a 2.6.32 still kicking around somewhere).
 
-[arch/arm/kernel/perf_event_cpu.c:315]: (error) Memory leak: irqs
+I'm trying to convince management that one of the advantages
+of mainlining the port is that it is easier to switch to newer
+kernels. Do you agree with this assertion?
 
-simpele fix is to free irqs when returning.
+>>> for all we know, you might be using a version which omits some fixes
+>>> in this area, such as this one which you really must have if your
+>>> timer is operating in period mode:
+>>>
+>>> fe79a9ba1196 clockevents: Adjust timer interval when frequency changes
+>>
+>> Hmmm, according to git log, this patch was accepted during
+>> the 3.14-rc2 merge window. Why didn't it make it for 3.14?
+> 
+> No it wasn't:
+> 
+> $ git describe --contains fe79a9ba1196
+> v3.15-rc1~123^2~12
+> 
+> It was merged during the merge window immediately preceding v3.15-rc1.
+> 
+>> By any chance, is there a patch that would allow the platform
+>> to get high-resolution timers when using smp_twd?
+> 
+> I think you'll have to do the research for that yourself... what
+> I can say is that TWD is capable of one-shot mode,
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- arch/arm/kernel/perf_event_cpu.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+Is one-shot mode preferred over periodic mode?
+(Seems counter-intuitive, as one-shot mode needs to be
+periodically reprogrammed, whereas periodic mode just
+keeps firing.)
 
-diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-index 213919b..9e5b2a5 100644
---- a/arch/arm/kernel/perf_event_cpu.c
-+++ b/arch/arm/kernel/perf_event_cpu.c
-@@ -311,8 +311,10 @@ static int of_pmu_irq_cfg(struct platform_device *pdev)
- 
- 	/* Don't bother with PPIs; they're already affine */
- 	irq = platform_get_irq(pdev, 0);
--	if (irq >= 0 && irq_is_percpu(irq))
-+	if (irq >= 0 && irq_is_percpu(irq)) {
-+		kfree(irqs);
- 		return 0;
-+	}
- 
- 	for (i = 0; i < pdev->num_resources; ++i) {
- 		struct device_node *dn;
--- 
-2.1.4
+> and is capable of running as a high-res timer:
+> 
+> Per CPU device: 0
+> Clock Event Device: local_timer
+>  max_delta_ns:   21691754031
+>  min_delta_ns:   1000
+>  mult:           425201762
+>  shift:          31
+>  mode:           3			<== CLOCK_EVT_MODE_ONESHOT
+>  next_event:     595603944000000 nsecs
+>  set_next_event: twd_set_next_event
+>  set_mode:       twd_set_mode
+>  event_handler:  hrtimer_interrupt	<== indicates that it's switched
+> 					to high-res mode
+>  retries:        0
+
+I'm confused.
+
+In the "High-resolution timers not supported when using
+smp_twd on Cortex A9" thread, you seemed to agree that
+TWD could not be used as a hrtimer...
+
+> Yes - because the TWD stops in low power modes, which makes it
+> unsuitable as a high-resolution timer.  These kinds of issues
+> are annoying, but it's the way things are.
+
+So it looks like TWD can be used as a hrtimer, but something
+on my platform is making it choose otherwise, and it is not
+the CLOCK_EVT_FEAT_C3STOP flag?
+
+Regards.
