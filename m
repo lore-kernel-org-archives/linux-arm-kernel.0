@@ -1,71 +1,79 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 May 2015 12:58:53 +0100
-Subject: schedule_timeout sleeps too long after dividing CPU frequency
-In-Reply-To: <5555CC1A.5040604@free.fr>
-References: <555380F8.5050306@free.fr>
- <CAOh2x==aCLxCWX9K57hOFVEP1eLo_OYZPe0YvbFvpkXcoSp_hQ@mail.gmail.com>
- <5554858A.9010207@free.fr> <20150514115456.GB23999@linux>
- <55549DEE.6010202@free.fr>
- <CAKohpon4AV-7nq=Qm7PpDbbW9ti98avY9zz82htzyHWi5_K7fA@mail.gmail.com>
- <20150514144239.GZ2067@n2100.arm.linux.org.uk>
- <5555BC7E.7010601@free.fr>
- <20150515095159.GF2067@n2100.arm.linux.org.uk>
- <5555CC1A.5040604@free.fr>
-Message-ID: <20150515115852.GJ2067@n2100.arm.linux.org.uk>
+From: yalin.wang2010@gmail.com (yalin wang)
+Date: Fri, 15 May 2015 20:03:29 +0800
+Subject: [PATCH] drm/ttm: dma: Don't crash on memory in the vmalloc range
+In-Reply-To: <1431673794-16169-1-git-send-email-acourbot@nvidia.com>
+References: <1431673794-16169-1-git-send-email-acourbot@nvidia.com>
+Message-ID: <CAFP4FLrdOj0vs5ufNNcmA-pio14VUO3z_w73Q-+QNCmOAdTrWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 15, 2015 at 12:36:10PM +0200, Mason wrote:
-> On 15/05/2015 11:51, Russell King - ARM Linux wrote:
-> 
-> > As you don't say which kernel version you're using,
-> 
-> Sorry about that, I thought the patch-generating command
-> I posted conveyed the information.
-> 
-> $ git diff v3.14.41 HEAD >tango.patch && xz tango.patch
-> 
-> I'm using the 3.14.y branch from linux-stable.
+2015-05-15 15:09 GMT+08:00 Alexandre Courbot <acourbot@nvidia.com>:
+> dma_alloc_coherent() can return memory in the vmalloc range.
+> virt_to_page() cannot handle such addresses and crashes. This
+> patch detects such cases and obtains the struct page * using
+> vmalloc_to_page() instead.
+>
+> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+> ---
+> This patch is a follow-up of the following discussion:
+>
+> https://www.marc.info/?l=dri-devel&m=141579595431254&w=3
+>
+> It works for me on both 32-bit and 64-bit Tegra, so I am not convinced
+> that Thierry's initial change from virt_to_page() to phys_to_page() is
+> still required - Thierry, can you confirm whether your patch is still
+> relevant after this one?
+>
+>  drivers/gpu/drm/ttm/ttm_page_alloc_dma.c | 9 ++++++---
+>  1 file changed, 6 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/ttm/ttm_page_alloc_dma.c b/drivers/gpu/drm/ttm/ttm_page_alloc_dma.c
+> index 01e1d27eb078..3077f1554099 100644
+> --- a/drivers/gpu/drm/ttm/ttm_page_alloc_dma.c
+> +++ b/drivers/gpu/drm/ttm/ttm_page_alloc_dma.c
+> @@ -342,9 +342,12 @@ static struct dma_page *__ttm_dma_alloc_page(struct dma_pool *pool)
+>         d_page->vaddr = dma_alloc_coherent(pool->dev, pool->size,
+>                                            &d_page->dma,
+>                                            pool->gfp_flags);
+> -       if (d_page->vaddr)
+> -               d_page->p = virt_to_page(d_page->vaddr);
+> -       else {
+> +       if (d_page->vaddr) {
+> +               if (is_vmalloc_addr(d_page->vaddr))
+> +                       d_page->p = vmalloc_to_page(d_page->vaddr);
+> +               else
+> +                       d_page->p = virt_to_page(d_page->vaddr);
+> +       } else {
+>                 kfree(d_page);
+>                 d_page = NULL;
+>         }
+> --
+> 2.4.0
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 
-So you're using a kernel over a year old...
+for  safe , i think we can add this patch:
 
-> > for all we know, you might be using a version which omits some fixes
-> > in this area, such as this one which you really must have if your
-> > timer is operating in period mode:
-> > 
-> > fe79a9ba1196 clockevents: Adjust timer interval when frequency changes
-> 
-> Hmmm, according to git log, this patch was accepted during
-> the 3.14-rc2 merge window. Why didn't it make it for 3.14?
 
-No it wasn't:
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index f800d45..3463f4f 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -77,7 +77,8 @@
+  * private definitions which should NOT be used outside memory.h
+  * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
+  */
+-#define __virt_to_phys(x) (((phys_addr_t)(x) - PAGE_OFFSET + PHYS_OFFSET))
++#define __virt_to_phys(x) ({BUG_ON(x < PAGE_OFFSET);\
++ (phys_addr_t)(x) - PAGE_OFFSET + PHYS_OFFSET;})
+ #define __phys_to_virt(x) ((unsigned long)((x) - PHYS_OFFSET + PAGE_OFFSET))
 
-$ git describe --contains fe79a9ba1196
-v3.15-rc1~123^2~12
+ /*
 
-It was merged during the merge window immediately preceding v3.15-rc1.
 
-> By any chance, is there a patch that would allow the platform
-> to get high-resolution timers when using smp_twd?
-
-I think you'll have to do the research for that yourself... what
-I can say is that TWD is capable of one-shot mode, and is capable
-of running as a high-res timer:
-
-Per CPU device: 0
-Clock Event Device: local_timer
- max_delta_ns:   21691754031
- min_delta_ns:   1000
- mult:           425201762
- shift:          31
- mode:           3			<== CLOCK_EVT_MODE_ONESHOT
- next_event:     595603944000000 nsecs
- set_next_event: twd_set_next_event
- set_mode:       twd_set_mode
- event_handler:  hrtimer_interrupt	<== indicates that it's switched
-					to high-res mode
- retries:        0
-
--- 
-FTTC broadband for 0.8mile line: currently@10.5Mbps down 400kbps up
-according to speedtest.net.
+BRs
+Yalin
