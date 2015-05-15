@@ -1,31 +1,46 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Fri, 15 May 2015 20:29:13 +0200
-Subject: [PATCH 0/2] 8250 UART driver for NXP LPC18xx family
-Message-ID: <1431714555-7063-1-git-send-email-manabian@gmail.com>
+Date: Fri, 15 May 2015 20:29:15 +0200
+Subject: [PATCH 2/2] doc: dt: add documentation for nxp,lpc1850-uart
+In-Reply-To: <1431714555-7063-1-git-send-email-manabian@gmail.com>
+References: <1431714555-7063-1-git-send-email-manabian@gmail.com>
+Message-ID: <1431714555-7063-3-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set adds a serial port driver for the 8250-
-based UART found on LPC18xx/43xx devices. The UART is
-16550A compatible with additional features like RS485
-support, synchronous mode, IrDA, and DMA.
+Add device tree binding documentation for nxp,lpc1850-uart.
 
-For now only basic UART and RS485 operation is supported.
-
-The plan is add additional features like DMA support once
-the PL080 DMA controller gets device tree bindings.
-
-Joachim Eastwood (2):
-  serial: 8250: add LPC18xx/43xx UART driver
-  doc: dt: add documentation for nxp,lpc1850-uart
-
- .../bindings/serial/nxp,lpc1850-uart.txt           |  21 +++
- drivers/tty/serial/8250/8250_lpc18xx.c             | 204 +++++++++++++++++++++
- drivers/tty/serial/8250/Kconfig                    |   8 +
- drivers/tty/serial/8250/Makefile                   |   1 +
- 4 files changed, 234 insertions(+)
+Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+---
+ .../devicetree/bindings/serial/nxp,lpc1850-uart.txt | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/serial/nxp,lpc1850-uart.txt
- create mode 100644 drivers/tty/serial/8250/8250_lpc18xx.c
 
+diff --git a/Documentation/devicetree/bindings/serial/nxp,lpc1850-uart.txt b/Documentation/devicetree/bindings/serial/nxp,lpc1850-uart.txt
+new file mode 100644
+index 000000000000..68d1f3292585
+--- /dev/null
++++ b/Documentation/devicetree/bindings/serial/nxp,lpc1850-uart.txt
+@@ -0,0 +1,21 @@
++* NXP LPC1850 UART
++
++Required properties:
++- compatible	: "nxp,lpc1850-uart", "ns16550a".
++- reg		: offset and length of the register set for the device.
++- interrupts	: should contain uart interrupt.
++- clocks	: phandle to the input clocks.
++- clock-names	: required elements: "uartclk", "reg".
++
++Since it's also possible to also use the of_serial.c driver all
++parameters from 8250.txt also apply but are optional.
++
++Example:
++uart0: serial at 40081000 {
++	compatible = "nxp,lpc1850-uart", "ns16550a";
++	reg = <0x40081000 0x1000>;
++	reg-shift = <2>;
++	interrupts = <24>;
++	clocks = <&ccu2 CLK_APB0_UART0>, <&ccu1 CLK_CPU_UART0>;
++	clock-names = "uartclk", "reg";
++};
 -- 
 1.8.0
