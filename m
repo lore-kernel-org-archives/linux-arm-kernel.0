@@ -1,92 +1,42 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 15 May 2015 08:50:07 +0900
-Subject: [PATCH] MAINTAINERS: ARM: EXYNOS: Add Krzysztof Kozlowski
- asco-maintainer
-In-Reply-To: <CAOesGMg6vETz1dCgHE1WYUJZ3XdHjdku9YCauYPS-a-avk89HQ@mail.gmail.com>
-References: <1431605720-828-1-git-send-email-k.kozlowski@samsung.com>
- <55549C56.6050509@kernel.org>
- <CABxcv==2ouDFPE2sBdqCwpACYXCCGnJYQFtbOV2PuVNGnv2q=g@mail.gmail.com>
- <5554ABF4.80002@gmx.net> <7hfv6z17iw.fsf@deeprootsystems.com>
- <CAOesGMg6vETz1dCgHE1WYUJZ3XdHjdku9YCauYPS-a-avk89HQ@mail.gmail.com>
-Message-ID: <CAJKOXPcsAuv0XgTOYQMo1VVReH8U+g1g+VzcCKg+kN2vhBKWVA@mail.gmail.com>
+From: tom_usenet@optusnet.com.au (Tom Evans)
+Date: Fri, 15 May 2015 10:09:52 +1000
+Subject: [PATCH v2 5/5] can: flexcan: Add support for non RX-FIFO mode
+In-Reply-To: <5554C244.80809@pengutronix.de>
+References: <1431603215-25546-1-git-send-email-bhupesh.sharma@freescale.com>
+ <1431603215-25546-6-git-send-email-bhupesh.sharma@freescale.com>
+ <5554C244.80809@pengutronix.de>
+Message-ID: <55553950.3050709@optusnet.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-15 1:45 GMT+09:00 Olof Johansson <olof@lixom.net>:
-> On Thu, May 14, 2015 at 8:52 AM, Kevin Hilman <khilman@kernel.org> wrote:
->> Tobias Jakobi <liquid.acid@gmx.net> writes:
+On 15/05/15 01:41, Marc Kleine-Budde wrote:
+> On 05/14/2015 01:33 PM, Bhupesh Sharma wrote:
+>> This patch adds support for non RX-FIFO (legacy) mode in
+>> the flexcan driver.
 >>
->>> Javier Martinez Canillas wrote:
->>>> Hello Kukjin,
->>>>
->>>> On Thu, May 14, 2015 at 3:00 PM, Kukjin Kim <kgene@kernel.org> wrote:
->>>>> On 05/14/15 21:15, Krzysztof Kozlowski wrote:
->>>>>> Add Krzysztof Kozlowski as a co-maintainer of Samsung Exynos ARM
->>>>>> architecture to review the patches. Patches will go as usual - picked up
->>>>>> by Kukjin Kim.
->>>>>>
->>>>> Hi Krzysztof,
->>>>>
->>>>> Sorry, I don't agree with this patch because you can review any exynos
->>>>> patches without maintainer title. And I can focus on the maintainer'r
->>>>> role more than now because of change of role ;-) Of course your review
->>>>> would be helpful to me.
->>>>>
->>>>
->>>> Sorry but I disagree. Krzysztof has been very active reviewing Exynos
->>>> patches and even picking/queuing important fixes while it seems you
->>>> were too busy and couldn't pay close attention.
->>> I would even go further than that. We're in this situation because the
->>> current maintainer didn't do his job properly.
->>>
->>> I want to point out what gregkh once said about this matter:
->>> https://youtu.be/iiED1K98lnw?t=1745
->>>
->>>
->>>
->>>> It's really great that due a role change you will have more time to
->>>> focus on the maintainership but I don't see why having more
->>>> maintainers could be something negative. As long as you work in a
->>>> coordinate manner, the more maintainers we have the better IMHO. It
->>>> may be that in the future you change your role at your company again
->>>> and then it will be good to have something else to take care of the
->>>> posted patches ;-)
->>> I very much agree with Javier here. Krzysztof promptly responds to
->>> patches and usually provides detailed feedback when things need changes.
->>> It would be stupid not to accept him as an additional maintainer.
+>> On certain SoCs, the RX-FIFO support might be broken, as
+>> a result we need to fall-back on the legacy (non RX-FIFO)
+>> mode to receive CAN frames.
 >>
->> I'll take this as an Acked-by then.
->>
->> FWIW, I agree with Tobias and Javier, extra help for exynos has been
->> sorely needed for a long time, and I am very happy to see someone
->> stepping up to help.  Thank you Krzysztof!  (and I apologize in advance
->> for the many times I'm likely to misspell your name ;)
->>
->> I'll be applying this to the arm-soc tree,
+>> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
+>> Signed-off-by: Sakar Arora <Sakar.Arora@freescale.com>
 >
-> I agree, I think it's a great improvement to get another official
-> maintainer of Samsung's platforms that can share the load and send us
-> code.
+> The non FIFO mode doesn't guarantee the order of the incoming frames,
+> not does not even try to...this is not acceptable. I'm currently working
+> on a patch by David Jander that brings in non FIFO mode, but tries to
+> keep the order of the frames.
 >
-> While I often also use the argument that anyone can help review code
-> without being named a maintainer, in the particular case of Exynos
-> platforms there's a dire need for more close attention: They're
-> frequently broken for long periods of time and there's been high
-> latency for fixes, which has made bisecting hard or impossible for new
-> failures. Naming Krzysztof as co-maintainer makes it more clear that
-> we're happy to merge code from him directly as appropriate for latency
-> reasons and so on.
->
-> So:
->
-> Acked-by: Olof Johansson <olof@lixom.net>
+> Marc
 
-Thank you Javier, Tobias, Kevin and Olof for your support.
-Receiving patches directly to the mailbox should help in smooth review
-although my gmail filters work quite good to grab them from the lists.
+In case it is of any help as a reference, here's a thread on the problems of 
+receiving messages in order on another non-FIFO chip. This applies to the 
+normal Microchip CAN controllers, in this case the very-hard-to-program 
+on-the-end-of-an-SPI-bus MCP2515:
 
-P.S. Kevin, the hardest part would be to pronounce my name, but
-fortunately there is a nice English version of it - Christopher. :)
+http://www.microchip.com/forums/tm.aspx?m=620741
 
-Best regards,
-Krzysztof
+It has two receive buffers, and a "rollover" setting. This does not make the 
+registers operate as a FIFO and it needs a state machine to keep track of 
+which buffer holds which sequence message.
+
+Tom
