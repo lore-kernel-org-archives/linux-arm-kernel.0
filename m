@@ -1,69 +1,57 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 15 May 2015 14:55:13 +0100
-Subject: [PATCH v2] ARM: l2c: Add support for the "arm, shared-override"
- property
-In-Reply-To: <20150515101028.GH2067@n2100.arm.linux.org.uk>
-References: <1430990831-23825-1-git-send-email-geert+renesas@glider.be>
- <20150507160257.GA11067@e104818-lin.cambridge.arm.com>
- <20150515101028.GH2067@n2100.arm.linux.org.uk>
-Message-ID: <20150515135513.GH19345@e104818-lin.cambridge.arm.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Fri, 15 May 2015 09:58:04 -0400
+Subject: [PATCH] arm64: support ACPI tables outside of kernel RAM
+In-Reply-To: <CAKv+Gu8nEs9e2XMJJooZMNbHysOxmzb25JZqr=COH9TW9OJTpA@mail.gmail.com>
+References: <1431613373-10928-1-git-send-email-msalter@redhat.com>
+ <CAKv+Gu8nEs9e2XMJJooZMNbHysOxmzb25JZqr=COH9TW9OJTpA@mail.gmail.com>
+Message-ID: <1431698284.21896.25.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 15, 2015 at 11:10:28AM +0100, Russell King - ARM Linux wrote:
-> On Thu, May 07, 2015 at 05:02:57PM +0100, Catalin Marinas wrote:
-> > On Thu, May 07, 2015 at 11:27:11AM +0200, Geert Uytterhoeven wrote:
-> > > diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
-> > > index 0dbabe9a6b0abb91..2484aed78c86546d 100644
-> > > --- a/Documentation/devicetree/bindings/arm/l2cc.txt
-> > > +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
-> > > @@ -67,6 +67,12 @@ Optional properties:
-> > >    disable if zero.
-> > >  - arm,prefetch-offset : Override prefetch offset value. Valid values are
-> > >    0-7, 15, 23, and 31.
-> > > +- arm,shared-override : The default behavior of the pl310 cache controller with
-> > > +  respect to the shareable attribute is to transform "normal memory
-> > > +  non-cacheable transactions" into "cacheable no allocate" (for reads) or
-> > > +  "write through no write allocate" (for writes).
-> > > +  On systems where this may cause DMA buffer corruption, this property must be
-> > > +  specified to indicate that such transforms are precluded.
-> > >  
-> > >  Example:
-> > >  
-> > > diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> > > index e309c8f35af5af61..86d0e7461e5b0b18 100644
-> > > --- a/arch/arm/mm/cache-l2x0.c
-> > > +++ b/arch/arm/mm/cache-l2x0.c
-> > > @@ -1149,6 +1149,11 @@ static void __init l2c310_of_parse(const struct device_node *np,
-> > >  		}
-> > >  	}
-> > >  
-> > > +	if (of_property_read_bool(np, "arm,shared-override")) {
-> > > +		*aux_val |= L2C_AUX_CTRL_SHARED_OVERRIDE;
-> > > +		*aux_mask &= ~L2C_AUX_CTRL_SHARED_OVERRIDE;
-> > > +	}
-> > > +
-> > >  	prefetch = l2x0_saved_regs.prefetch_ctrl;
-> > >  
-> > >  	ret = of_property_read_u32(np, "arm,double-linefill", &val);
-> > 
-> > It looks fine to me.
-> > 
-> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> > 
-> > (even better if a subsequent patch adds this property to all the dts
-> > files containing "arm,pl310" ;))
+On Thu, 2015-05-14 at 16:50 +0200, Ard Biesheuvel wrote:
+> On 14 May 2015 at 16:22, Mark Salter <msalter@redhat.com> wrote:
+> > There is no guarantee that ACPI tables will be located in RAM linearly
+> > mapped by the kernel. This could be because UEFI placed them below the
+> > kernel image or because mem= places them beyond the reach of the linear
+> > kernel mapping. Even though these tables are outside the linear mapped
+> > RAM, they still need to be accessed as normal memory in order to support
+> > unaligned accesses from ACPI code. In this case, the page_is_ram() test
+> > in acpi_os_ioremap() is not sufficient. Additionally, if the table spans
+> > multiple pages, it may fall partially within the linear map and partially
+> > without. If the table overlaps the end of the linear map, the test for
+> > whether or not to use the existing mapping in ioremap_cache() could lead
+> > to a panic when ACPI code tries to access the part beyond the end of the
+> > linear map. This patch attempts to address these problems.
+> >
 > 
-> Even better would be for the boot loader/firmware to set the bit.
+> I would strongly prefer memblock_remove()'ing all UEFI reserved
+> regions entirely, and keeping track of which areas are backed my RAM
+> using a table rather than string matching on the iomem resource table.
 
-In an ideal world, I agree. But, arguably, we already set other bits in
-the PL310 AUXCTRL register (and related cache controllers, just look at
-the l2cc.txt bindings).
+Why? It isn't a performance issue is it? ACPI caches mappings and out of
+the two systems I checked, one called acpi_os_ioremap() 11 times, and
+the other only once.
 
-If you want to rely on firmware, can we at least check this bit and
-print a warning? Or go a step further and refuse to enable PL310 when
-this bit is clear? Otherwise coherent (non-cacheable) DMA operations are
-not safe.
+> When I looked into this a while ago [1], I ended up with a separate
+> physmem memblock table (borrowed from another arch) that tracks the
+> regions which are memory while removing all the EFI reserved region
+> from the 'memory' memblock table. That way, page_is_ram() could be
+> reimplemented as memblock_is_physmem(), and ioremap_cache() would
+> always do the right thing automagically.
+> 
+> I kind of held off with this series until the ACPI stuff had landed,
+> which is obviously the case now. Would you mind having a look at these
+> patches and sharing your opinion?
+> [1] http://thread.gmane.org/gmane.linux.kernel.efi/5133
+> 
 
--- 
-Catalin
+Thanks for reminding me of this. I went back and took a look. Using
+memblock physmem would simplify this patch but the problem I see is
+that physmem only has 4 regions. I don't think that would be enough,
+so how many is enough?
+
+Right now, I'd like to fix the real problem of mem= breaking ACPI
+boots ASAP. Some more thought needs to go into using memblock physmem
+and if it does turn out to be better or needed for other things like
+removing reserved regions from memory, then that patch can clean up
+the use of the iomem table.
