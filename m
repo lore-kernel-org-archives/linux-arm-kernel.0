@@ -1,74 +1,82 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 15 May 2015 15:54:06 +0800
-Subject: [PATCH 00/18] ARM: imx: make the imx timer driver implementation
- independent of SoCs.
-In-Reply-To: <1430405073-13106-1-git-send-email-shenwei.wang@freescale.com>
-References: <1430405073-13106-1-git-send-email-shenwei.wang@freescale.com>
-Message-ID: <20150515075406.GE10411@tiger>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 15 May 2015 10:05:46 +0200
+Subject: [PATCH 1/8] clk: sunxi: factors: Add m_start parameters
+In-Reply-To: <CAGb2v66jRX09k48ciR-bwMZRAioRpHKZ3D2+wVYWannjtF+G3w@mail.gmail.com>
+References: <1430565879-28113-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1430565879-28113-2-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v669fsz_pA+B0r8efp0BMxY-D86qfLuGQCqK1POuu9PmxQ@mail.gmail.com>
+ <20150515074314.GQ4004@lukather>
+ <CAGb2v66jRX09k48ciR-bwMZRAioRpHKZ3D2+wVYWannjtF+G3w@mail.gmail.com>
+Message-ID: <20150515080546.GT4004@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 30, 2015 at 09:44:15AM -0500, Shenwei Wang wrote:
-> There are 4 versions of the timer hardware on Freescale MXC hardware.
-> --Version 0: MX1/MXL
-> --Version 1: MX21, MX27.
-> --Version 2: MX25, MX31, MX35, MX37, MX51, MX6Q(Rev1.0)
-> --Version 3: MX6DL, MX6SX, MX6Q(Rev1.1+)
+On Fri, May 15, 2015 at 03:48:38PM +0800, Chen-Yu Tsai wrote:
+> On Fri, May 15, 2015 at 3:43 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Thu, May 14, 2015 at 05:12:07PM +0800, Chen-Yu Tsai wrote:
+> >> On Sat, May 2, 2015 at 7:24 PM, Maxime Ripard
+> >> <maxime.ripard@free-electrons.com> wrote:
+> >> > Some clocks start incrementing the m factor at 0. Add a parameter to handle
+> >> > it just like we did for the N factor.
+> >> >
+> >> > Since the behaviour until now was to assume that the m factor was starting
+> >> > at 1, we also need to fix the other users.
+> >> >
+> >> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> >> > ---
+> >> >  drivers/clk/sunxi/clk-factors.c    | 11 ++++++++++-
+> >> >  drivers/clk/sunxi/clk-factors.h    |  2 ++
+> >> >  drivers/clk/sunxi/clk-mod0.c       |  2 ++
+> >> >  drivers/clk/sunxi/clk-sun8i-mbus.c |  2 ++
+> >> >  drivers/clk/sunxi/clk-sun9i-core.c |  6 ++++++
+> >> >  drivers/clk/sunxi/clk-sunxi.c      | 10 ++++++++++
+> >> >  6 files changed, 32 insertions(+), 1 deletion(-)
+> >> >
+> >> > diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
+> >> > index 8c20190a3e9f..100a711c3e3d 100644
+> >> > --- a/drivers/clk/sunxi/clk-factors.c
+> >> > +++ b/drivers/clk/sunxi/clk-factors.c
+> >> > @@ -56,15 +56,24 @@ static unsigned long clk_factors_recalc_rate(struct clk_hw *hw,
+> >> >         /* Get each individual factor if applicable */
+> >> >         if (config->nwidth != SUNXI_FACTORS_NOT_APPLICABLE)
+> >> >                 n = FACTOR_GET(config->nshift, config->nwidth, reg);
+> >> > +
+> >> >         if (config->kwidth != SUNXI_FACTORS_NOT_APPLICABLE)
+> >> >                 k = FACTOR_GET(config->kshift, config->kwidth, reg);
+> >> > +
+> >> >         if (config->mwidth != SUNXI_FACTORS_NOT_APPLICABLE)
+> >> >                 m = FACTOR_GET(config->mshift, config->mwidth, reg);
+> >> > +       else
+> >> > +               /* Make sure we don't get a division by zero */
+> >> > +               m = 1;
+> >>
+> >> What happens when mwidth is valid, m_start = 0, and m = 0?
+> >
+> > That's a very good question. A division by zero in the kernel, I'd
+> > say.
+> >
+> > But I don't think we can end up in such a case today, and it's
+> > somewhat expected that it will happen, and no clock have looked at can
+> > actually end up in such a case.
 > 
-> This patch has removed the SoC related codes, and implemented the driver directly upon
-> the hardware timer IP version. The new timer driver has redesigned the
-> internal APIs, and limited the use of global variables as well.
-> 
-> As the new driver has become independent of the SoCs, it has
-> been moved from the directory arch/arm/mach-imx into the
-> directory drivers/clocksources.
+> It's possible if the bootloader left the clock in an invalid state.
+> How about just returning 0, indicating an invalid rate, early?
 
-Overall, I do not like how things get done here, the software version
-numbering, the patch splitting, invasive changes than necessary.  So I
-just worked out my version and will post for review shortly.
+The value set in the register might be zero, but that will always
+really mean 1, either through m_start or m_zero. That would be a bug
+in the driver itself.
 
-Shawn
+Maxime
 
-> Shenwei Wang (18):
->   ARM: imx: Add a parameter to mxc_timer_init
->   ARM: imx: Add the definitions for imx_timer and its versions
->   ARM: imx: Add an array of timer IP block versions
->   ARM: imx: Added one more parameter for mxc_clockevent_init
->   ARM: imx: Added one more parameter for mxc_clocksource_init
->   ARM: imx: New timer driver APIs based on IP block
->   ARM: imx: Initialize the imx_timer structure
->   ARM: imx: Reimplemented the _mxc_timer_init based on IP version
->   ARM: imx: Removed the SoC relating codes in mxc_timer_interrupt
->   ARM: imx: Removed the SoC relating codes in mxc_set_mode
->   ARM: imx: Enabled the unused parameter
->   ARM: imx: Remove one global variable in mxc_clocksource_init
->   ARM: imx: Removed the unused functions and variables
->   ARM: imx: Removed the global variable "timer_base"
->   ARM: imx: Remove the SoC relating codes in mxc_clockevent_init
->   ARM: imx: Move the  variable clockevent_mode into mxc_set_mode
->   ARM: imx: Codes clean up
->   ARM: imx: Move time.c into drivers/clocksources
-> 
->  arch/arm/mach-imx/Makefile      |   2 +-
->  arch/arm/mach-imx/time.c        | 388 ---------------------------
->  drivers/clk/imx/clk-imx1.c      |   3 +-
->  drivers/clk/imx/clk-imx21.c     |   3 +-
->  drivers/clk/imx/clk-imx27.c     |   3 +-
->  drivers/clk/imx/clk-imx31.c     |   3 +-
->  drivers/clk/imx/clk-imx35.c     |   5 +-
->  drivers/clk/imx/clk.h           |   2 +-
->  drivers/clocksource/Makefile    |   1 +
->  drivers/clocksource/timer-gpt.c | 572 ++++++++++++++++++++++++++++++++++++++++
->  10 files changed, 586 insertions(+), 396 deletions(-)
->  delete mode 100644 arch/arm/mach-imx/time.c
->  create mode 100644 drivers/clocksource/timer-gpt.c
-> 
-> --
-> 1.9.1
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150515/66fe4a44/attachment.sig>
