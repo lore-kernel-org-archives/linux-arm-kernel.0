@@ -1,48 +1,22 @@
-From: wei.liu2@citrix.com (Wei Liu)
-Date: Fri, 15 May 2015 01:26:37 +0100
-Subject: [RFC 08/23] net/xen-netback: Remove unused code in
- xenvif_rx_action
-In-Reply-To: <1431622863-28575-9-git-send-email-julien.grall@citrix.com>
-References: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
- <1431622863-28575-9-git-send-email-julien.grall@citrix.com>
-Message-ID: <20150515002637.GD19352@zion.uk.xensource.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 14 May 2015 17:27:39 -0700
+Subject: [PATCH v4 2/5] arm64: hi6220: Document devicetree bindings for
+ Hisilicon hi6220 SoC
+In-Reply-To: <1430827599-11560-3-git-send-email-bintian.wang@huawei.com>
+References: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>
+ <1430827599-11560-3-git-send-email-bintian.wang@huawei.com>
+Message-ID: <20150515002739.GF31753@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 14, 2015 at 06:00:48PM +0100, Julien Grall wrote:
-> The variables old_req_cons and ring_slots_used are assigned but never
-> used since commit 1650d5455bd2dc6b5ee134bd6fc1a3236c266b5b "xen-netback:
-> always fully coalesce guest Rx packets".
+On 05/05, Bintian Wang wrote:
+> This patch adds documentation for the devicetree bindings used by the
+> DT files of Hisilicon hi6220 SoC mobile platform.
 > 
-> Signed-off-by: Julien Grall <julien.grall@citrix.com>
-> Cc: Ian Campbell <ian.campbell@citrix.com>
-> Cc: Wei Liu <wei.liu2@citrix.com>
-> Cc: netdev at vger.kernel.org
+> Signed-off-by: Bintian Wang <bintian.wang@huawei.com>
 
-Acked-by: Wei Liu <wei.liu2@citrix.com>
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
-> ---
->  drivers/net/xen-netback/netback.c | 5 -----
->  1 file changed, 5 deletions(-)
-> 
-> diff --git a/drivers/net/xen-netback/netback.c b/drivers/net/xen-netback/netback.c
-> index 9c6a504..9ae1d43 100644
-> --- a/drivers/net/xen-netback/netback.c
-> +++ b/drivers/net/xen-netback/netback.c
-> @@ -515,14 +515,9 @@ static void xenvif_rx_action(struct xenvif_queue *queue)
->  
->  	while (xenvif_rx_ring_slots_available(queue, XEN_NETBK_RX_SLOTS_MAX)
->  	       && (skb = xenvif_rx_dequeue(queue)) != NULL) {
-> -		RING_IDX old_req_cons;
-> -		RING_IDX ring_slots_used;
-> -
->  		queue->last_rx_time = jiffies;
->  
-> -		old_req_cons = queue->rx.req_cons;
->  		XENVIF_RX_CB(skb)->meta_slots_used = xenvif_gop_skb(skb, &npo, queue);
-> -		ring_slots_used = queue->rx.req_cons - old_req_cons;
->  
->  		__skb_queue_tail(&rxq, skb);
->  	}
-> -- 
-> 2.1.4
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
