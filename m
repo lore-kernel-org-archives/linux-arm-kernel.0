@@ -1,110 +1,208 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 15 May 2015 20:31:39 +0800
-Subject: [PATCH] i2c: designware: separate ops for system_sleep_pm and
- runtime_pm
-Message-ID: <1431693099-2292-1-git-send-email-jszhang@marvell.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Fri, 15 May 2015 13:35:42 +0100
+Subject: [Xen-devel] [RFC 21/23] net/xen-netback: Make it running on 64KB
+ page granularity
+In-Reply-To: <20150515023534.GE19352@zion.uk.xensource.com>
+References: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
+ <1431622863-28575-22-git-send-email-julien.grall@citrix.com>
+ <20150515023534.GE19352@zion.uk.xensource.com>
+Message-ID: <5555E81E.8070803@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 1fc2fe204cb9 ("i2c: designware: Add runtime PM hooks") adds
-runtime pm support using the same ops for system sleep and runtime pm.
-When suspend to ram, the i2c host may have been runtime suspended, thus
-i2c_dw_disable() hangs.
+Hi Wei,
 
-This patch fixes this issue by separating ops for system sleep pm and
-runtime pm, and in the system suspend/resume path, runtime pm apis are
-used to ensure the device is at correct state.
+Thanks you for the review.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- drivers/i2c/busses/i2c-designware-platdrv.c | 48 ++++++++++++++++++++++++++---
- 1 file changed, 43 insertions(+), 5 deletions(-)
+On 15/05/15 03:35, Wei Liu wrote:
+> On Thu, May 14, 2015 at 06:01:01PM +0100, Julien Grall wrote:
+>> The PV network protocol is using 4KB page granularity. The goal of this
+>> patch is to allow a Linux using 64KB page granularity working as a
+>> network backend on a non-modified Xen.
+>>
+>> It's only necessary to adapt the ring size and break skb data in small
+>> chunk of 4KB. The rest of the code is relying on the grant table code.
+>>
+>> Although only simple workload is working (dhcp request, ping). If I try
+>> to use wget in the guest, it will stall until a tcpdump is started on
+>> the vif interface in DOM0. I wasn't able to find why.
+>>
+> 
+> I think in wget workload you're more likely to break down 64K pages to
+> 4K pages. Some of your calculation of mfn, offset might be wrong.
 
-diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
-index 0a80e4a..d306397 100644
---- a/drivers/i2c/busses/i2c-designware-platdrv.c
-+++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-@@ -298,14 +298,16 @@ static const struct of_device_id dw_i2c_of_match[] = {
- MODULE_DEVICE_TABLE(of, dw_i2c_of_match);
- #endif
- 
--#ifdef CONFIG_PM
-+#ifdef CONFIG_PM_SLEEP
- static int dw_i2c_suspend(struct device *dev)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct dw_i2c_dev *i_dev = platform_get_drvdata(pdev);
- 
-+	pm_runtime_get_sync(dev);
- 	i2c_dw_disable(i_dev);
--	clk_disable_unprepare(i_dev->clk);
-+	pm_runtime_mark_last_busy(dev);
-+	pm_runtime_put_autosuspend(dev);
- 
- 	return 0;
- }
-@@ -315,6 +317,32 @@ static int dw_i2c_resume(struct device *dev)
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct dw_i2c_dev *i_dev = platform_get_drvdata(pdev);
- 
-+	pm_runtime_get_sync(dev);
-+	i2c_dw_init(i_dev);
-+	pm_runtime_mark_last_busy(dev);
-+	pm_runtime_put_autosuspend(dev);
-+
-+	return 0;
-+}
-+#endif
-+
-+#ifdef CONFIG_PM
-+static int dw_i2c_runtime_suspend(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct dw_i2c_dev *i_dev = platform_get_drvdata(pdev);
-+
-+	i2c_dw_disable(i_dev);
-+	clk_disable_unprepare(i_dev->clk);
-+
-+	return 0;
-+}
-+
-+static int dw_i2c_runtime_resume(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct dw_i2c_dev *i_dev = platform_get_drvdata(pdev);
-+
- 	clk_prepare_enable(i_dev->clk);
- 
- 	if (!i_dev->pm_runtime_disabled)
-@@ -324,8 +352,18 @@ static int dw_i2c_resume(struct device *dev)
- }
- #endif
- 
--static UNIVERSAL_DEV_PM_OPS(dw_i2c_dev_pm_ops, dw_i2c_suspend,
--			    dw_i2c_resume, NULL);
-+#ifdef CONFIG_PM
-+static const struct dev_pm_ops dw_i2c_dev_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(dw_i2c_suspend, dw_i2c_resume)
-+	SET_RUNTIME_PM_OPS(dw_i2c_runtime_suspend,
-+		dw_i2c_runtime_resume, NULL)
-+};
-+
-+#define DW_I2C_DEV_PM_OPS (&dw_i2c_dev_pm_ops)
-+
-+#else
-+#define DW_I2C_DEV_PM_OPS NULL
-+#endif
- 
- /* work with hotplug and coldplug */
- MODULE_ALIAS("platform:i2c_designware");
-@@ -337,7 +375,7 @@ static struct platform_driver dw_i2c_driver = {
- 		.name	= "i2c_designware",
- 		.of_match_table = of_match_ptr(dw_i2c_of_match),
- 		.acpi_match_table = ACPI_PTR(dw_i2c_acpi_match),
--		.pm	= &dw_i2c_dev_pm_ops,
-+		.pm	= DW_I2C_DEV_PM_OPS,
- 	},
- };
- 
+If so, why tcpdump on the vif interface would make wget suddenly
+working? Does it make netback use a different path?
+
+>> I have not modified XEN_NETBK_RX_SLOTS_MAX because I wasn't sure what
+>> it's used for (I have limited knowledge on the network driver).
+>>
+> 
+> This is the maximum slots a guest packet can use. AIUI the protocol
+> still works on 4K granularity (you break 64K page to a bunch of 4K
+> pages), you don't need to change this.
+
+1 slot = 1 grant right? If so, XEN_NETBK_RX_SLOTS_MAX is based on the
+number of Linux page. So we would have to get the number for Xen page.
+
+Although, I gave a try to multiple by XEN_PFN_PER_PAGE (4KB/64KB = 16)
+but it get stuck in the loop.
+
+>> ---
+>>  drivers/net/xen-netback/common.h  |  7 ++++---
+>>  drivers/net/xen-netback/netback.c | 27 ++++++++++++++-------------
+>>  2 files changed, 18 insertions(+), 16 deletions(-)
+>>
+>> diff --git a/drivers/net/xen-netback/common.h b/drivers/net/xen-netback/common.h
+>> index 8a495b3..0eda6e9 100644
+>> --- a/drivers/net/xen-netback/common.h
+>> +++ b/drivers/net/xen-netback/common.h
+>> @@ -44,6 +44,7 @@
+>>  #include <xen/interface/grant_table.h>
+>>  #include <xen/grant_table.h>
+>>  #include <xen/xenbus.h>
+>> +#include <xen/page.h>
+>>  #include <linux/debugfs.h>
+>>  
+>>  typedef unsigned int pending_ring_idx_t;
+>> @@ -64,8 +65,8 @@ struct pending_tx_info {
+>>  	struct ubuf_info callback_struct;
+>>  };
+>>  
+>> -#define XEN_NETIF_TX_RING_SIZE __CONST_RING_SIZE(xen_netif_tx, PAGE_SIZE)
+>> -#define XEN_NETIF_RX_RING_SIZE __CONST_RING_SIZE(xen_netif_rx, PAGE_SIZE)
+>> +#define XEN_NETIF_TX_RING_SIZE __CONST_RING_SIZE(xen_netif_tx, XEN_PAGE_SIZE)
+>> +#define XEN_NETIF_RX_RING_SIZE __CONST_RING_SIZE(xen_netif_rx, XEN_PAGE_SIZE)
+>>  
+>>  struct xenvif_rx_meta {
+>>  	int id;
+>> @@ -80,7 +81,7 @@ struct xenvif_rx_meta {
+>>  /* Discriminate from any valid pending_idx value. */
+>>  #define INVALID_PENDING_IDX 0xFFFF
+>>  
+>> -#define MAX_BUFFER_OFFSET PAGE_SIZE
+>> +#define MAX_BUFFER_OFFSET XEN_PAGE_SIZE
+>>  
+>>  #define MAX_PENDING_REQS XEN_NETIF_TX_RING_SIZE
+>>  
+>> diff --git a/drivers/net/xen-netback/netback.c b/drivers/net/xen-netback/netback.c
+>> index 9ae1d43..ea5ce84 100644
+>> --- a/drivers/net/xen-netback/netback.c
+>> +++ b/drivers/net/xen-netback/netback.c
+>> @@ -274,7 +274,7 @@ static void xenvif_gop_frag_copy(struct xenvif_queue *queue, struct sk_buff *skb
+>>  {
+>>  	struct gnttab_copy *copy_gop;
+>>  	struct xenvif_rx_meta *meta;
+>> -	unsigned long bytes;
+>> +	unsigned long bytes, off_grant;
+>>  	int gso_type = XEN_NETIF_GSO_TYPE_NONE;
+>>  
+>>  	/* Data must not cross a page boundary. */
+>> @@ -295,7 +295,8 @@ static void xenvif_gop_frag_copy(struct xenvif_queue *queue, struct sk_buff *skb
+>>  		if (npo->copy_off == MAX_BUFFER_OFFSET)
+>>  			meta = get_next_rx_buffer(queue, npo);
+>>  
+>> -		bytes = PAGE_SIZE - offset;
+>> +		off_grant = offset & ~XEN_PAGE_MASK;
+>> +		bytes = XEN_PAGE_SIZE - off_grant;
+>>  		if (bytes > size)
+>>  			bytes = size;
+>>  
+>> @@ -314,9 +315,9 @@ static void xenvif_gop_frag_copy(struct xenvif_queue *queue, struct sk_buff *skb
+>>  		} else {
+>>  			copy_gop->source.domid = DOMID_SELF;
+>>  			copy_gop->source.u.gmfn =
+>> -				virt_to_mfn(page_address(page));
+>> +				virt_to_mfn(page_address(page) + offset);
+>>  		}
+>> -		copy_gop->source.offset = offset;
+>> +		copy_gop->source.offset = off_grant;
+>>  
+>>  		copy_gop->dest.domid = queue->vif->domid;
+>>  		copy_gop->dest.offset = npo->copy_off;
+>> @@ -747,7 +748,7 @@ static int xenvif_count_requests(struct xenvif_queue *queue,
+>>  		first->size -= txp->size;
+>>  		slots++;
+>>  
+>> -		if (unlikely((txp->offset + txp->size) > PAGE_SIZE)) {
+>> +		if (unlikely((txp->offset + txp->size) > XEN_PAGE_SIZE)) {
+>>  			netdev_err(queue->vif->dev, "Cross page boundary, txp->offset: %x, size: %u\n",
+>>  				 txp->offset, txp->size);
+>>  			xenvif_fatal_tx_err(queue->vif);
+>> @@ -1241,11 +1242,11 @@ static void xenvif_tx_build_gops(struct xenvif_queue *queue,
+>>  		}
+>>  
+>>  		/* No crossing a page as the payload mustn't fragment. */
+>> -		if (unlikely((txreq.offset + txreq.size) > PAGE_SIZE)) {
+>> +		if (unlikely((txreq.offset + txreq.size) > XEN_PAGE_SIZE)) {
+>>  			netdev_err(queue->vif->dev,
+>>  				   "txreq.offset: %x, size: %u, end: %lu\n",
+>>  				   txreq.offset, txreq.size,
+>> -				   (txreq.offset&~PAGE_MASK) + txreq.size);
+>> +				   (txreq.offset&~XEN_PAGE_MASK) + txreq.size);
+>>  			xenvif_fatal_tx_err(queue->vif);
+>>  			break;
+>>  		}
+>> @@ -1287,7 +1288,7 @@ static void xenvif_tx_build_gops(struct xenvif_queue *queue,
+>>  			virt_to_mfn(skb->data);
+> 
+> You didn't change the calculation of MFN here. I think it returns the
+> MFN of the first 4K sub-page of that 64K page.  Do I miss anything?
+
+There is no change required. On ARM virt_to_mfn is implemented with:
+
+pfn_to_mfn(virt_to_phys(v) >> XEN_PAGE_SHIFT)
+
+which will return a 4KB PFN (see patch #23).
+
+> 
+>>  		queue->tx_copy_ops[*copy_ops].dest.domid = DOMID_SELF;
+>>  		queue->tx_copy_ops[*copy_ops].dest.offset =
+>> -			offset_in_page(skb->data);
+>> +			offset_in_page(skb->data) & ~XEN_PAGE_MASK;
+>>  
+>>  		queue->tx_copy_ops[*copy_ops].len = data_len;
+>>  		queue->tx_copy_ops[*copy_ops].flags = GNTCOPY_source_gref;
+>> @@ -1366,8 +1367,8 @@ static int xenvif_handle_frag_list(struct xenvif_queue *queue, struct sk_buff *s
+> 
+> This function is to coalesce frag_list to a new SKB. It's completely
+> fine to use the natural granularity of backend domain. The way you
+> modified it can lead to waste of memory, i.e. you only use first 4K of a
+> 64K page.
+
+Thanks for explaining. I wasn't sure how the function works so I change
+it for safety. I will redo the change.
+
+FWIW, I'm sure there is other place in netback where we waste memory
+with 64KB page granularity (such as grant table). I need to track them.
+
+Let me know if you have some place in mind where the memory usage can be
+improved.
+
+>>  			return -ENOMEM;
+>>  		}
+>>  
+>> -		if (offset + PAGE_SIZE < skb->len)
+>> -			len = PAGE_SIZE;
+>> +		if (offset + XEN_PAGE_SIZE < skb->len)
+>> +			len = XEN_PAGE_SIZE;
+>>  		else
+>>  			len = skb->len - offset;
+>>  		if (skb_copy_bits(skb, offset, page_address(page), len))
+>> @@ -1396,7 +1397,7 @@ static int xenvif_handle_frag_list(struct xenvif_queue *queue, struct sk_buff *s
+>>  	/* Fill the skb with the new (local) frags. */
+>>  	memcpy(skb_shinfo(skb)->frags, frags, i * sizeof(skb_frag_t));
+>>  	skb_shinfo(skb)->nr_frags = i;
+>> -	skb->truesize += i * PAGE_SIZE;
+>> +	skb->truesize += i * XEN_PAGE_SIZE;
+> 
+> The true size accounts for the actual memory occupied by this SKB. Since
+> the page is allocated with alloc_page, the granularity should be
+> PAGE_SIZE not XEN_PAGE_SIZE.
+
+Ok. I will replace with PAGE_SIZE.
+
+Regards,
+
 -- 
-2.1.4
+Julien Grall
