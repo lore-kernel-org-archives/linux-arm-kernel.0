@@ -1,127 +1,213 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 May 2015 23:13:39 +0200
-Subject: [GIT PULL] ARM: SoC fixes for 4.1-rc3
-Message-ID: <2561875.CIr2FDrpsL@wuerfel>
+From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Fri, 15 May 2015 16:23:09 -0500
+Subject: [V4 PATCH 1/6] ACPI / scan: Parse _CCA and setup device coherency
+In-Reply-To: <1431724994-21601-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+References: <1431724994-21601-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <1431724994-21601-2-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 030bbdbf4c833bc69f502eae58498bc5572db736:
+This patch implements support for ACPI _CCA object, which is introduced in
+ACPIv5.1, can be used for specifying device DMA coherency attribute.
 
-  Linux 4.1-rc3 (2015-05-10 15:12:29 -0700)
+The parsing logic traverses device namespace to parse coherency
+information, and stores it in acpi_device_flags. Then uses it to call
+arch_setup_dma_ops() when creating each device enumerated in DSDT
+during ACPI scan.
 
-are available in the git repository at:
+This patch also introduces acpi_dma_is_coherent(), which provides
+an interface for device drivers to check the coherency information
+similarly to the of_dma_is_coherent().
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+Signed-off-by: Mark Salter <msalter@redhat.com>
+Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+CC: Rafael J. Wysocki <rjw@rjwysocki.net>
+CC: Arnd Bergmann <arnd@arndb.de>
+CC: Will Deacon <will.deacon@arm.com>
+CC: Catalin Marinas <catalin.marinas@arm.com>
+---
+ drivers/acpi/Kconfig         |  3 +++
+ drivers/acpi/acpi_platform.c | 10 +++++++---
+ drivers/acpi/scan.c          | 40 ++++++++++++++++++++++++++++++++++++++++
+ include/acpi/acpi_bus.h      | 32 +++++++++++++++++++++++++++++++-
+ include/linux/acpi.h         | 10 ++++++++++
+ 5 files changed, 91 insertions(+), 4 deletions(-)
 
-for you to fetch changes up to 56523eefaa13e567ccae83dc0cab635aa8221eed:
-
-  Merge tag 'samsung-fixes-2' of git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung into fixes (2015-05-15 17:14:48 +0200)
-
-----------------------------------------------------------------
-ARM: SoC fixes for 4.1-rc3
-
-Nothing frightening this time, just smaller fixes in a number of places.
-
-The other changes contained here are:
-
-MAINTAINERS file updates:
-- The mach-gemini maintainer is back in action and has a new git tree
-- Krzysztof Kozlowski has volunteered to be a new co-maintainer
-  for the samsung platforms
-- updates to the files that belong to Marvell mvebu
-
-Bug fixes:
-- The largest changes are on omap2, but are only to avoid some
-  harmless warnings and to fix reset on omap4
-- a small regression fix on tegra
-- multiple fixes for incorrect IRQ affinity on vexpress
-- the missing system controller on arm64 juno is added
-- one revert of a patch that was accidentally applied
-  twice for mach-rockchip
-- two clock related DT fixes for mvebu
-- a workaround for suspend with old DT binaries on new
-  exynos kernels
-- Another fix for suspend on exynos, needs to be backported.
-
-----------------------------------------------------------------
-Arnd Bergmann (5):
-      Merge tag 'tegra-for-4.1-fixes-for-rc3' of git://git.kernel.org/.../tegra/linux into fixes
-      Merge tag 'omap-for-v4.1/fixes-rc2' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-      Merge tag 'v4.1-rockchip-socfixes2' of git://git.kernel.org/.../mmind/linux-rockchip into fixes
-      Merge tag 'mvebu-fixes-4.1-2' of git://git.infradead.org/linux-mvebu into fixes
-      Merge tag 'samsung-fixes-2' of git://git.kernel.org/.../kgene/linux-samsung into fixes
-
-Benoit Parrot (1):
-      ARM: AM43xx: hwmod: add VPFE hwmod entries
-
-Gregory CLEMENT (2):
-      ARM: mvebu: Fix the main PLL frequency on Armada 375, 38x and 39x SoCs
-      MAINTAINERS: Add dts entries for some of the Marvell SoCs
-
-Hans Ulli Kroll (2):
-      ARM: Gemini: Maintainers update
-      ARM: gemini: fix compiler warning due wrong data type
-
-Heiko Stuebner (1):
-      Revert "ARM: rockchip: fix undefined instruction of reset_ctrl_regs"
-
-Javier Martinez Canillas (1):
-      ARM: dts: Add keep-power-in-suspend to WiFi SDIO node for Peach Boards
-
-Julien Grall (1):
-      ARM: EXYNOS: Don't try to initialize suspend on old DT
-
-Krzysztof Kozlowski (4):
-      ARM: EXYNOS: Fix dereference of ERR_PTR returned by of_genpd_get_from_provider
-      ARM: EXYNOS: Fix failed second suspend on Exynos4
-      ARM: EXYNOS: Use of_machine_is_compatible instead of soc_is_exynos4
-      MAINTAINERS: ARM: EXYNOS: Add Krzysztof Kozlowski as co-maintainer
-
-Robert Schwebel (2):
-      ARM: vexpress/ca9: Add unified-cache property to l2 cache node
-      ARM: vexpress/ca9: Add interrupt-affinity to the PMU node
-
-Sebastian Hesselbarth (1):
-      ARM: dove: Add clock-names to CuBox Si5351 clk generator
-
-Sudeep Holla (2):
-      ARM64: juno: add sp810 support and fix sp804 clock frequency
-      ARM: vexpress/tc2: Add interrupt-affinity to the PMU node
-
-Tero Kristo (2):
-      ARM: OMAP4+: PRM: add support for passing status register/bit info to reset
-      ARM: AM33xx+: hwmod: re-use omap4 implementations for reset functionality
-
-Tomeu Vizoso (1):
-      ARM: tegra: Correct which USB controller has the UTMI pad registers
-
-Tony Lindgren (2):
-      ARM: OMAP2+: Remove bogus struct clk comparison for timer clock
-      Merge tag 'for-v4.1-rc/omap-fixes-a' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v4.1/fixes
-
- MAINTAINERS                                   | 13 ++++-
- arch/arm/boot/dts/armada-375.dtsi             |  2 +-
- arch/arm/boot/dts/armada-38x.dtsi             |  2 +-
- arch/arm/boot/dts/armada-39x.dtsi             |  2 +-
- arch/arm/boot/dts/dove-cubox.dts              |  1 +
- arch/arm/boot/dts/exynos5420-peach-pit.dts    |  1 +
- arch/arm/boot/dts/exynos5800-peach-pi.dts     |  1 +
- arch/arm/boot/dts/tegra124.dtsi               |  8 +--
- arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts    |  1 +
- arch/arm/boot/dts/vexpress-v2p-ca9.dts        | 11 +++--
- arch/arm/mach-exynos/common.h                 |  2 +
- arch/arm/mach-exynos/exynos.c                 | 27 +++++++++++
- arch/arm/mach-exynos/platsmp.c                | 39 +--------------
- arch/arm/mach-exynos/pm_domains.c             |  4 +-
- arch/arm/mach-exynos/suspend.c                |  7 ++-
- arch/arm/mach-gemini/common.h                 |  4 +-
- arch/arm/mach-gemini/reset.c                  |  4 +-
- arch/arm/mach-omap2/omap_hwmod.c              | 68 ++++++--------------------
- arch/arm/mach-omap2/omap_hwmod_43xx_data.c    | 70 +++++++++++++++++++++++++++
- arch/arm/mach-omap2/prcm43xx.h                |  3 +-
- arch/arm/mach-omap2/prminst44xx.c             | 20 +++-----
- arch/arm/mach-omap2/timer.c                   | 13 ++---
- arch/arm/mach-rockchip/pm.c                   | 26 ----------
- arch/arm/mach-rockchip/pm.h                   |  4 --
- arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 31 ++++++++++--
- 25 files changed, 199 insertions(+), 165 deletions(-)
+diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+index ab2cbb5..212735f 100644
+--- a/drivers/acpi/Kconfig
++++ b/drivers/acpi/Kconfig
+@@ -54,6 +54,9 @@ config ACPI_GENERIC_GSI
+ config ACPI_SYSTEM_POWER_STATES_SUPPORT
+ 	bool
+ 
++config ACPI_CCA_REQUIRED
++	bool
++
+ config ACPI_SLEEP
+ 	bool
+ 	depends on SUSPEND || HIBERNATION
+diff --git a/drivers/acpi/acpi_platform.c b/drivers/acpi/acpi_platform.c
+index 4bf7559..f6bc438 100644
+--- a/drivers/acpi/acpi_platform.c
++++ b/drivers/acpi/acpi_platform.c
+@@ -103,14 +103,18 @@ struct platform_device *acpi_create_platform_device(struct acpi_device *adev)
+ 	pdevinfo.res = resources;
+ 	pdevinfo.num_res = count;
+ 	pdevinfo.fwnode = acpi_fwnode_handle(adev);
+-	pdevinfo.dma_mask = DMA_BIT_MASK(32);
++	pdevinfo.dma_mask = acpi_dma_is_supported(adev) ? DMA_BIT_MASK(32) : 0;
+ 	pdev = platform_device_register_full(&pdevinfo);
+-	if (IS_ERR(pdev))
++	if (IS_ERR(pdev)) {
+ 		dev_err(&adev->dev, "platform device creation failed: %ld\n",
+ 			PTR_ERR(pdev));
+-	else
++	} else {
++		if (acpi_dma_is_supported(adev))
++			arch_setup_dma_ops(&pdev->dev, 0, 0, NULL,
++					   acpi_dma_is_coherent(adev));
+ 		dev_dbg(&adev->dev, "created platform device %s\n",
+ 			dev_name(&pdev->dev));
++	}
+ 
+ 	kfree(resources);
+ 	return pdev;
+diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+index 849b699..c56e66a 100644
+--- a/drivers/acpi/scan.c
++++ b/drivers/acpi/scan.c
+@@ -11,6 +11,7 @@
+ #include <linux/kthread.h>
+ #include <linux/dmi.h>
+ #include <linux/nls.h>
++#include <linux/dma-mapping.h>
+ 
+ #include <asm/pgtable.h>
+ 
+@@ -2137,6 +2138,44 @@ void acpi_free_pnp_ids(struct acpi_device_pnp *pnp)
+ 	kfree(pnp->unique_id);
+ }
+ 
++static void acpi_init_coherency(struct acpi_device *adev)
++{
++	unsigned long long cca = 0;
++	acpi_status status;
++	struct acpi_device *parent = adev->parent;
++	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
++
++	if (parent && parent->flags.cca_seen) {
++		/*
++		 * From ACPI spec, OSPM will ignore _CCA if an ancestor
++		 * already saw one.
++		 */
++		adev->flags.cca_seen = 1;
++		cca = acpi_dma_is_coherent(parent);
++	} else {
++		status = acpi_evaluate_integer(adev->handle, "_CCA",
++					       NULL, &cca);
++		if (ACPI_SUCCESS(status)) {
++			adev->flags.cca_seen = 1;
++		} else if (!IS_ENABLED(CONFIG_ACPI_CCA_REQUIRED)) {
++			/*
++			 * If architecture does not specify that _CCA is
++			 * required for DMA-able devices (e.g. x86),
++			 * we default to _CCA=1.
++			 */
++			cca = 1;
++		} else {
++			acpi_get_name(adev->handle, ACPI_FULL_PATHNAME,
++				      &buffer);
++			pr_debug("ACPI device %s is missing _CCA.\n",
++				(char *) buffer.pointer);
++			kfree(buffer.pointer);
++		}
++	}
++
++	adev->flags.is_coherent = cca;
++}
++
+ void acpi_init_device_object(struct acpi_device *device, acpi_handle handle,
+ 			     int type, unsigned long long sta)
+ {
+@@ -2155,6 +2194,7 @@ void acpi_init_device_object(struct acpi_device *device, acpi_handle handle,
+ 	device->flags.visited = false;
+ 	device_initialize(&device->dev);
+ 	dev_set_uevent_suppress(&device->dev, true);
++	acpi_init_coherency(device);
+ }
+ 
+ void acpi_device_add_finalize(struct acpi_device *device)
+diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
+index 8de4fa9..2a05ffb 100644
+--- a/include/acpi/acpi_bus.h
++++ b/include/acpi/acpi_bus.h
+@@ -208,7 +208,9 @@ struct acpi_device_flags {
+ 	u32 visited:1;
+ 	u32 hotplug_notify:1;
+ 	u32 is_dock_station:1;
+-	u32 reserved:23;
++	u32 is_coherent:1;
++	u32 cca_seen:1;
++	u32 reserved:21;
+ };
+ 
+ /* File System */
+@@ -380,6 +382,34 @@ struct acpi_device {
+ 	void (*remove)(struct acpi_device *);
+ };
+ 
++static inline bool acpi_dma_is_supported(struct acpi_device *adev)
++{
++	/**
++	 * Currently, we mainly support _CCA=1 (i.e. is_coherent=1)
++	 * This should be equivalent to specifyig dma-coherent for
++	 * a device in OF.
++	 *
++	 * For the case when _CCA=0 (i.e. is_coherent=0 && cca_seen=1),
++	 * There are two approaches:
++	 * 1. Do not support and disable DMA.
++	 * 2. Support but rely on arch-specific cache maintenance for
++	 * non-coherence DMA operations. ARM64 is one example.
++	 *
++	 * For the case when _CCA is missing (i.e. cca_seen=0) but
++	 * platform specifies ACPI_CCA_REQUIRED, we do not support DMA,
++	 * and fallback to arch-specific default handling.
++	 *
++	 * See acpi_init_coherency() for more info.
++	 */
++	return adev && (adev->flags.is_coherent ||
++			(adev->flags.cca_seen && IS_ENABLED(CONFIG_ARM64)));
++}
++
++static inline bool acpi_dma_is_coherent(struct acpi_device *adev)
++{
++	return adev && adev->flags.is_coherent;
++}
++
+ static inline bool is_acpi_node(struct fwnode_handle *fwnode)
+ {
+ 	return fwnode && fwnode->type == FWNODE_ACPI;
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index b10c4a6..baccf3b 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -583,6 +583,16 @@ static inline int acpi_device_modalias(struct device *dev,
+ 	return -ENODEV;
+ }
+ 
++static inline bool acpi_dma_is_supported(struct acpi_device *adev)
++{
++	return false;
++}
++
++static inline bool acpi_dma_is_coherent(struct acpi_device *adev)
++{
++	return false;
++}
++
+ #define ACPI_PTR(_ptr)	(NULL)
+ 
+ #endif	/* !CONFIG_ACPI */
+-- 
+2.1.0
