@@ -1,208 +1,41 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Fri, 15 May 2015 13:35:42 +0100
-Subject: [Xen-devel] [RFC 21/23] net/xen-netback: Make it running on 64KB
- page granularity
-In-Reply-To: <20150515023534.GE19352@zion.uk.xensource.com>
-References: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
- <1431622863-28575-22-git-send-email-julien.grall@citrix.com>
- <20150515023534.GE19352@zion.uk.xensource.com>
-Message-ID: <5555E81E.8070803@citrix.com>
+From: colin.king@canonical.com (Colin King)
+Date: Fri, 15 May 2015 13:43:09 +0100
+Subject: [PATCH] ARM: 8351/1: perf: fix memory leak on return
+Message-ID: <1431693789-9679-1-git-send-email-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wei,
+From: Colin Ian King <colin.king@canonical.com>
 
-Thanks you for the review.
+Recent commit 3b8786ff7a1b31645ae2c26a2ec32dbd42ac1094
+("ARM: 8352/1: perf: Fix the pmu node name in warning message")
+introduced a memory leak of irqs on the "Don't bother with PPIs"
+return path. This was picked up by static analysis by cppcheck:
 
-On 15/05/15 03:35, Wei Liu wrote:
-> On Thu, May 14, 2015 at 06:01:01PM +0100, Julien Grall wrote:
->> The PV network protocol is using 4KB page granularity. The goal of this
->> patch is to allow a Linux using 64KB page granularity working as a
->> network backend on a non-modified Xen.
->>
->> It's only necessary to adapt the ring size and break skb data in small
->> chunk of 4KB. The rest of the code is relying on the grant table code.
->>
->> Although only simple workload is working (dhcp request, ping). If I try
->> to use wget in the guest, it will stall until a tcpdump is started on
->> the vif interface in DOM0. I wasn't able to find why.
->>
-> 
-> I think in wget workload you're more likely to break down 64K pages to
-> 4K pages. Some of your calculation of mfn, offset might be wrong.
+[arch/arm/kernel/perf_event_cpu.c:315]: (error) Memory leak: irqs
 
-If so, why tcpdump on the vif interface would make wget suddenly
-working? Does it make netback use a different path?
+simpele fix is to free irqs when returning.
 
->> I have not modified XEN_NETBK_RX_SLOTS_MAX because I wasn't sure what
->> it's used for (I have limited knowledge on the network driver).
->>
-> 
-> This is the maximum slots a guest packet can use. AIUI the protocol
-> still works on 4K granularity (you break 64K page to a bunch of 4K
-> pages), you don't need to change this.
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ arch/arm/kernel/perf_event_cpu.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-1 slot = 1 grant right? If so, XEN_NETBK_RX_SLOTS_MAX is based on the
-number of Linux page. So we would have to get the number for Xen page.
-
-Although, I gave a try to multiple by XEN_PFN_PER_PAGE (4KB/64KB = 16)
-but it get stuck in the loop.
-
->> ---
->>  drivers/net/xen-netback/common.h  |  7 ++++---
->>  drivers/net/xen-netback/netback.c | 27 ++++++++++++++-------------
->>  2 files changed, 18 insertions(+), 16 deletions(-)
->>
->> diff --git a/drivers/net/xen-netback/common.h b/drivers/net/xen-netback/common.h
->> index 8a495b3..0eda6e9 100644
->> --- a/drivers/net/xen-netback/common.h
->> +++ b/drivers/net/xen-netback/common.h
->> @@ -44,6 +44,7 @@
->>  #include <xen/interface/grant_table.h>
->>  #include <xen/grant_table.h>
->>  #include <xen/xenbus.h>
->> +#include <xen/page.h>
->>  #include <linux/debugfs.h>
->>  
->>  typedef unsigned int pending_ring_idx_t;
->> @@ -64,8 +65,8 @@ struct pending_tx_info {
->>  	struct ubuf_info callback_struct;
->>  };
->>  
->> -#define XEN_NETIF_TX_RING_SIZE __CONST_RING_SIZE(xen_netif_tx, PAGE_SIZE)
->> -#define XEN_NETIF_RX_RING_SIZE __CONST_RING_SIZE(xen_netif_rx, PAGE_SIZE)
->> +#define XEN_NETIF_TX_RING_SIZE __CONST_RING_SIZE(xen_netif_tx, XEN_PAGE_SIZE)
->> +#define XEN_NETIF_RX_RING_SIZE __CONST_RING_SIZE(xen_netif_rx, XEN_PAGE_SIZE)
->>  
->>  struct xenvif_rx_meta {
->>  	int id;
->> @@ -80,7 +81,7 @@ struct xenvif_rx_meta {
->>  /* Discriminate from any valid pending_idx value. */
->>  #define INVALID_PENDING_IDX 0xFFFF
->>  
->> -#define MAX_BUFFER_OFFSET PAGE_SIZE
->> +#define MAX_BUFFER_OFFSET XEN_PAGE_SIZE
->>  
->>  #define MAX_PENDING_REQS XEN_NETIF_TX_RING_SIZE
->>  
->> diff --git a/drivers/net/xen-netback/netback.c b/drivers/net/xen-netback/netback.c
->> index 9ae1d43..ea5ce84 100644
->> --- a/drivers/net/xen-netback/netback.c
->> +++ b/drivers/net/xen-netback/netback.c
->> @@ -274,7 +274,7 @@ static void xenvif_gop_frag_copy(struct xenvif_queue *queue, struct sk_buff *skb
->>  {
->>  	struct gnttab_copy *copy_gop;
->>  	struct xenvif_rx_meta *meta;
->> -	unsigned long bytes;
->> +	unsigned long bytes, off_grant;
->>  	int gso_type = XEN_NETIF_GSO_TYPE_NONE;
->>  
->>  	/* Data must not cross a page boundary. */
->> @@ -295,7 +295,8 @@ static void xenvif_gop_frag_copy(struct xenvif_queue *queue, struct sk_buff *skb
->>  		if (npo->copy_off == MAX_BUFFER_OFFSET)
->>  			meta = get_next_rx_buffer(queue, npo);
->>  
->> -		bytes = PAGE_SIZE - offset;
->> +		off_grant = offset & ~XEN_PAGE_MASK;
->> +		bytes = XEN_PAGE_SIZE - off_grant;
->>  		if (bytes > size)
->>  			bytes = size;
->>  
->> @@ -314,9 +315,9 @@ static void xenvif_gop_frag_copy(struct xenvif_queue *queue, struct sk_buff *skb
->>  		} else {
->>  			copy_gop->source.domid = DOMID_SELF;
->>  			copy_gop->source.u.gmfn =
->> -				virt_to_mfn(page_address(page));
->> +				virt_to_mfn(page_address(page) + offset);
->>  		}
->> -		copy_gop->source.offset = offset;
->> +		copy_gop->source.offset = off_grant;
->>  
->>  		copy_gop->dest.domid = queue->vif->domid;
->>  		copy_gop->dest.offset = npo->copy_off;
->> @@ -747,7 +748,7 @@ static int xenvif_count_requests(struct xenvif_queue *queue,
->>  		first->size -= txp->size;
->>  		slots++;
->>  
->> -		if (unlikely((txp->offset + txp->size) > PAGE_SIZE)) {
->> +		if (unlikely((txp->offset + txp->size) > XEN_PAGE_SIZE)) {
->>  			netdev_err(queue->vif->dev, "Cross page boundary, txp->offset: %x, size: %u\n",
->>  				 txp->offset, txp->size);
->>  			xenvif_fatal_tx_err(queue->vif);
->> @@ -1241,11 +1242,11 @@ static void xenvif_tx_build_gops(struct xenvif_queue *queue,
->>  		}
->>  
->>  		/* No crossing a page as the payload mustn't fragment. */
->> -		if (unlikely((txreq.offset + txreq.size) > PAGE_SIZE)) {
->> +		if (unlikely((txreq.offset + txreq.size) > XEN_PAGE_SIZE)) {
->>  			netdev_err(queue->vif->dev,
->>  				   "txreq.offset: %x, size: %u, end: %lu\n",
->>  				   txreq.offset, txreq.size,
->> -				   (txreq.offset&~PAGE_MASK) + txreq.size);
->> +				   (txreq.offset&~XEN_PAGE_MASK) + txreq.size);
->>  			xenvif_fatal_tx_err(queue->vif);
->>  			break;
->>  		}
->> @@ -1287,7 +1288,7 @@ static void xenvif_tx_build_gops(struct xenvif_queue *queue,
->>  			virt_to_mfn(skb->data);
-> 
-> You didn't change the calculation of MFN here. I think it returns the
-> MFN of the first 4K sub-page of that 64K page.  Do I miss anything?
-
-There is no change required. On ARM virt_to_mfn is implemented with:
-
-pfn_to_mfn(virt_to_phys(v) >> XEN_PAGE_SHIFT)
-
-which will return a 4KB PFN (see patch #23).
-
-> 
->>  		queue->tx_copy_ops[*copy_ops].dest.domid = DOMID_SELF;
->>  		queue->tx_copy_ops[*copy_ops].dest.offset =
->> -			offset_in_page(skb->data);
->> +			offset_in_page(skb->data) & ~XEN_PAGE_MASK;
->>  
->>  		queue->tx_copy_ops[*copy_ops].len = data_len;
->>  		queue->tx_copy_ops[*copy_ops].flags = GNTCOPY_source_gref;
->> @@ -1366,8 +1367,8 @@ static int xenvif_handle_frag_list(struct xenvif_queue *queue, struct sk_buff *s
-> 
-> This function is to coalesce frag_list to a new SKB. It's completely
-> fine to use the natural granularity of backend domain. The way you
-> modified it can lead to waste of memory, i.e. you only use first 4K of a
-> 64K page.
-
-Thanks for explaining. I wasn't sure how the function works so I change
-it for safety. I will redo the change.
-
-FWIW, I'm sure there is other place in netback where we waste memory
-with 64KB page granularity (such as grant table). I need to track them.
-
-Let me know if you have some place in mind where the memory usage can be
-improved.
-
->>  			return -ENOMEM;
->>  		}
->>  
->> -		if (offset + PAGE_SIZE < skb->len)
->> -			len = PAGE_SIZE;
->> +		if (offset + XEN_PAGE_SIZE < skb->len)
->> +			len = XEN_PAGE_SIZE;
->>  		else
->>  			len = skb->len - offset;
->>  		if (skb_copy_bits(skb, offset, page_address(page), len))
->> @@ -1396,7 +1397,7 @@ static int xenvif_handle_frag_list(struct xenvif_queue *queue, struct sk_buff *s
->>  	/* Fill the skb with the new (local) frags. */
->>  	memcpy(skb_shinfo(skb)->frags, frags, i * sizeof(skb_frag_t));
->>  	skb_shinfo(skb)->nr_frags = i;
->> -	skb->truesize += i * PAGE_SIZE;
->> +	skb->truesize += i * XEN_PAGE_SIZE;
-> 
-> The true size accounts for the actual memory occupied by this SKB. Since
-> the page is allocated with alloc_page, the granularity should be
-> PAGE_SIZE not XEN_PAGE_SIZE.
-
-Ok. I will replace with PAGE_SIZE.
-
-Regards,
-
+diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
+index 213919b..9e5b2a5 100644
+--- a/arch/arm/kernel/perf_event_cpu.c
++++ b/arch/arm/kernel/perf_event_cpu.c
+@@ -311,8 +311,10 @@ static int of_pmu_irq_cfg(struct platform_device *pdev)
+ 
+ 	/* Don't bother with PPIs; they're already affine */
+ 	irq = platform_get_irq(pdev, 0);
+-	if (irq >= 0 && irq_is_percpu(irq))
++	if (irq >= 0 && irq_is_percpu(irq)) {
++		kfree(irqs);
+ 		return 0;
++	}
+ 
+ 	for (i = 0; i < pdev->num_resources; ++i) {
+ 		struct device_node *dn;
 -- 
-Julien Grall
+2.1.4
