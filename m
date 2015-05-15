@@ -1,19 +1,42 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 May 2015 21:59:06 +0200
-Subject: [PATCH v4 4/7] ARM: dts: zx: add an initial zx296702 dts and doc
-In-Reply-To: <1430212691-16009-5-git-send-email-jun.nie@linaro.org>
-References: <1430212691-16009-1-git-send-email-jun.nie@linaro.org>
- <1430212691-16009-5-git-send-email-jun.nie@linaro.org>
-Message-ID: <2168253.ZrhOUFeSpY@wuerfel>
+Date: Fri, 15 May 2015 21:58:47 +0200
+Subject: [PATCH v8 16/16] MAINTAINERS: Add entry for STM32 MCUs
+In-Reply-To: <1431158038-3813-17-git-send-email-mcoquelin.stm32@gmail.com>
+References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1431158038-3813-17-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <2293841.j2iIvBlO19@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 28 April 2015 17:18:08 Jun Nie wrote:
-> Add initial dts file and document for ZX296702 and board ZX296702-AD1.
-> More peripherals will be added later.
+On Saturday 09 May 2015 09:53:58 Maxime Coquelin wrote:
+> Add a MAINTAINER entry covering all STM32 machine and drivers files.
 > 
-> Signed-off-by: Jun Nie <jun.nie@linaro.org>
+> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> ---
+>  MAINTAINERS | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 2e5bbc0..858d821 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1479,6 +1479,14 @@ F:	drivers/usb/host/ehci-st.c
+>  F:	drivers/usb/host/ohci-st.c
+>  F:	drivers/ata/ahci_st.c
+>  
+> +ARM/STM32 ARCHITECTURE
+> +M:	Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> +S:	Maintained
+> +T:	git git://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/stm32.git
+> +N:	stm32
+> +F:	drivers/clocksource/armv7m_systick.c
+> +
+>  ARM/TECHNOLOGIC SYSTEMS TS7250 MACHINE SUPPORT
+>  M:	Lennert Buytenhek <kernel@wantstofly.org>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> 
 
-Applied to next/dt, thanks!
+Applied to next/soc, thanks!
 
 	Arnd
