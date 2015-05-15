@@ -1,84 +1,67 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Fri, 15 May 2015 16:23:14 -0500
-Subject: [V4 PATCH 6/6] amd-xgbe: Unify coherency checking logic with
- device_dma_is_coherent()
-In-Reply-To: <1431724994-21601-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1431724994-21601-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <1431724994-21601-7-git-send-email-Suravee.Suthikulpanit@amd.com>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Fri, 15 May 2015 23:52:31 +0200
+Subject: [PATCH v3] ARM: l2c: add options to overwrite prefetching behavior
+Message-ID: <1431726751-9169-1-git-send-email-hauke@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, amd-xgbe driver has separate logic to determine device
-coherency for DT vs. ACPI. This patch simplifies the code with
-a call to device_dma_is_coherent().
+These options make it possible to overwrites the data and instruction
+prefetching behavior of the arm pl310 cache controller.
 
-Signed-off-by: Tom Lendacky <thomas.lendacky@amd.com>
-Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-CC: David S. Miller <davem@davemloft.net>
+Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
 ---
- drivers/net/ethernet/amd/xgbe/xgbe-main.c | 27 +--------------------------
- 1 file changed, 1 insertion(+), 26 deletions(-)
+v2: only set prefetch
+v1: set prefetch and aux
 
-diff --git a/drivers/net/ethernet/amd/xgbe/xgbe-main.c b/drivers/net/ethernet/amd/xgbe/xgbe-main.c
-index 7149053..6d2c702 100644
---- a/drivers/net/ethernet/amd/xgbe/xgbe-main.c
-+++ b/drivers/net/ethernet/amd/xgbe/xgbe-main.c
-@@ -168,13 +168,8 @@ static void xgbe_init_all_fptrs(struct xgbe_prv_data *pdata)
- #ifdef CONFIG_ACPI
- static int xgbe_acpi_support(struct xgbe_prv_data *pdata)
- {
--	struct acpi_device *adev = pdata->adev;
- 	struct device *dev = pdata->dev;
- 	u32 property;
--	acpi_handle handle;
--	acpi_status status;
--	unsigned long long data;
--	int cca;
- 	int ret;
+ Documentation/devicetree/bindings/arm/l2cc.txt |  4 ++++
+ arch/arm/mm/cache-l2x0.c                       | 20 ++++++++++++++++++++
+ 2 files changed, 24 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
+index 0dbabe9..528821a 100644
+--- a/Documentation/devicetree/bindings/arm/l2cc.txt
++++ b/Documentation/devicetree/bindings/arm/l2cc.txt
+@@ -67,6 +67,10 @@ Optional properties:
+   disable if zero.
+ - arm,prefetch-offset : Override prefetch offset value. Valid values are
+   0-7, 15, 23, and 31.
++- arm,prefetch-data : Enable data prefetch. Enabling prefetching
++  can improve performance.
++- arm,prefetch-instr : Enable instruction prefetch. Enabling prefetching
++  can improve performance.
  
- 	/* Obtain the system clock setting */
-@@ -195,24 +190,6 @@ static int xgbe_acpi_support(struct xgbe_prv_data *pdata)
+ Example:
+ 
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index e309c8f..1aa970a 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -1199,6 +1199,26 @@ static void __init l2c310_of_parse(const struct device_node *np,
+ 		pr_err("L2C-310 OF arm,prefetch-offset property value is missing\n");
  	}
- 	pdata->ptpclk_rate = property;
  
--	/* Retrieve the device cache coherency value */
--	handle = adev->handle;
--	do {
--		status = acpi_evaluate_integer(handle, "_CCA", NULL, &data);
--		if (!ACPI_FAILURE(status)) {
--			cca = data;
--			break;
--		}
--
--		status = acpi_get_parent(handle, &handle);
--	} while (!ACPI_FAILURE(status));
--
--	if (ACPI_FAILURE(status)) {
--		dev_err(dev, "error obtaining acpi coherency value\n");
--		return -EINVAL;
--	}
--	pdata->coherent = !!cca;
--
- 	return 0;
++	ret = of_property_read_u32(np, "arm,prefetch-data", &val);
++	if (ret == 0) {
++		if (val)
++			prefetch |= L310_PREFETCH_CTRL_DATA_PREFETCH;
++		else
++			prefetch &= ~L310_PREFETCH_CTRL_DATA_PREFETCH;
++	} else if (ret != -EINVAL) {
++		pr_err("L2C-310 OF arm,prefetch-data property value is missing\n");
++	}
++
++	ret = of_property_read_u32(np, "arm,prefetch-instr", &val);
++	if (ret == 0) {
++		if (val)
++			prefetch |= L310_PREFETCH_CTRL_INSTR_PREFETCH;
++		else
++			prefetch &= ~L310_PREFETCH_CTRL_INSTR_PREFETCH;
++	} else if (ret != -EINVAL) {
++		pr_err("L2C-310 OF arm,prefetch-instr property value is missing\n");
++	}
++
+ 	l2x0_saved_regs.prefetch_ctrl = prefetch;
  }
- #else   /* CONFIG_ACPI */
-@@ -243,9 +220,6 @@ static int xgbe_of_support(struct xgbe_prv_data *pdata)
- 	}
- 	pdata->ptpclk_rate = clk_get_rate(pdata->ptpclk);
  
--	/* Retrieve the device cache coherency value */
--	pdata->coherent = of_dma_is_coherent(dev->of_node);
--
- 	return 0;
- }
- #else   /* CONFIG_OF */
-@@ -364,6 +338,7 @@ static int xgbe_probe(struct platform_device *pdev)
- 		goto err_io;
- 
- 	/* Set the DMA coherency values */
-+	pdata->coherent = device_dma_is_coherent(pdata->dev);
- 	if (pdata->coherent) {
- 		pdata->axdomain = XGBE_DMA_OS_AXDOMAIN;
- 		pdata->arcache = XGBE_DMA_OS_ARCACHE;
 -- 
-2.1.0
+2.1.4
