@@ -1,67 +1,39 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Fri, 15 May 2015 23:52:31 +0200
-Subject: [PATCH v3] ARM: l2c: add options to overwrite prefetching behavior
-Message-ID: <1431726751-9169-1-git-send-email-hauke@hauke-m.de>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 15 May 2015 23:55:48 +0200
+Subject: [GIT PULL] ARM: berlin: DT changes for v4.2 (round 1)
+In-Reply-To: <2418982.DaY2mGZ7YN@wuerfel>
+References: <1431687246-31039-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1431687246-31039-3-git-send-email-sebastian.hesselbarth@gmail.com>
+ <2418982.DaY2mGZ7YN@wuerfel>
+Message-ID: <55566B64.1080908@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These options make it possible to overwrites the data and instruction
-prefetching behavior of the arm pl310 cache controller.
+On 15.05.2015 17:33, Arnd Bergmann wrote:
+> On Friday 15 May 2015 12:54:06 Sebastian Hesselbarth wrote:
+>> this is Marvell Berlin SoC DT for v4.2 including:
+>> - GPLv2/X11 dual-licensing of DT files,
+>> - a note about currently unstable DT bindings as we struggle to get
+>>    DT bindings right in the first place with limited documentation available,
+>> - Rework of System/Chip Controller binding documentation and nodes to
+>>    simple-mfd.
+>>
+>
+> I'm a bit confused by this. Are you sure that it's ok to apply this branch
+> by itself without introducing regressions or bisection problems?
 
-Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
----
-v2: only set prefetch
-v1: set prefetch and aux
+Ach, dammit. You are right, the patches reworking chip/sys ctrl nodes
+are currently un-bisectable. I do have Acked-by's from subsystem
+maintainers, so I guess I'll have to squash the DT changes with the
+driver changes.
 
- Documentation/devicetree/bindings/arm/l2cc.txt |  4 ++++
- arch/arm/mm/cache-l2x0.c                       | 20 ++++++++++++++++++++
- 2 files changed, 24 insertions(+)
+> It's fine to have unstable bindings for a while as you are ramping up,
+> but that requires a lot more care on your side regarding the order in
+> which you send the patches. I have received three pull requests from
+> you that are all based on -rc1, and from a brief look it seems like
+> they are interdependent, which would not be ok.
 
-diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
-index 0dbabe9..528821a 100644
---- a/Documentation/devicetree/bindings/arm/l2cc.txt
-+++ b/Documentation/devicetree/bindings/arm/l2cc.txt
-@@ -67,6 +67,10 @@ Optional properties:
-   disable if zero.
- - arm,prefetch-offset : Override prefetch offset value. Valid values are
-   0-7, 15, 23, and 31.
-+- arm,prefetch-data : Enable data prefetch. Enabling prefetching
-+  can improve performance.
-+- arm,prefetch-instr : Enable instruction prefetch. Enabling prefetching
-+  can improve performance.
- 
- Example:
- 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index e309c8f..1aa970a 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -1199,6 +1199,26 @@ static void __init l2c310_of_parse(const struct device_node *np,
- 		pr_err("L2C-310 OF arm,prefetch-offset property value is missing\n");
- 	}
- 
-+	ret = of_property_read_u32(np, "arm,prefetch-data", &val);
-+	if (ret == 0) {
-+		if (val)
-+			prefetch |= L310_PREFETCH_CTRL_DATA_PREFETCH;
-+		else
-+			prefetch &= ~L310_PREFETCH_CTRL_DATA_PREFETCH;
-+	} else if (ret != -EINVAL) {
-+		pr_err("L2C-310 OF arm,prefetch-data property value is missing\n");
-+	}
-+
-+	ret = of_property_read_u32(np, "arm,prefetch-instr", &val);
-+	if (ret == 0) {
-+		if (val)
-+			prefetch |= L310_PREFETCH_CTRL_INSTR_PREFETCH;
-+		else
-+			prefetch &= ~L310_PREFETCH_CTRL_INSTR_PREFETCH;
-+	} else if (ret != -EINVAL) {
-+		pr_err("L2C-310 OF arm,prefetch-instr property value is missing\n");
-+	}
-+
- 	l2x0_saved_regs.prefetch_ctrl = prefetch;
- }
- 
--- 
-2.1.4
+Yes, the rework of the drivers and the corresponding DT changes
+depend on each other. Sorry for the confusion.
+
+Sebastian
