@@ -1,21 +1,19 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 May 2015 22:03:51 +0200
-Subject: [PATCH v4 7/7] ARM: lpc18xx: add kernel config
-In-Reply-To: <1431381653-25356-8-git-send-email-manabian@gmail.com>
-References: <1431381653-25356-1-git-send-email-manabian@gmail.com>
- <1431381653-25356-8-git-send-email-manabian@gmail.com>
-Message-ID: <3134503.DxLm2cOWKc@wuerfel>
+Date: Fri, 15 May 2015 22:03:37 +0200
+Subject: [PATCH v8 15/16] ARM: configs: Add STM32 defconfig
+In-Reply-To: <1431158038-3813-16-git-send-email-mcoquelin.stm32@gmail.com>
+References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1431158038-3813-16-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <37337887.OlERAXq6R2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 May 2015 00:00:53 Joachim Eastwood wrote:
-> Kernel configuration for NXP LPC18xx and LPC43xx devices.
+On Saturday 09 May 2015 09:53:57 Maxime Coquelin wrote:
+> This patch adds a new config for STM32 MCUs.
+> STM32F429 Discovery board boots successfully with this config applied.
 > 
-> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
-> ---
->  arch/arm/configs/lpc18xx_defconfig | 151 +++++++++++++++++++++++++++++++++++++
->  1 file changed, 151 insertions(+)
->  create mode 100644 arch/arm/configs/lpc18xx_defconfig
+> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 > 
 
 Applied to next/defconfig, thanks!
