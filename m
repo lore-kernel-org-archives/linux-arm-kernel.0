@@ -1,33 +1,32 @@
-From: borntraeger@de.ibm.com (Christian Borntraeger)
-Date: Fri, 15 May 2015 17:58:38 +0200
-Subject: [PATCH v4 02/12] KVM: define common KVM_GUESTDBG_USE_SW/HW_BP bits
-In-Reply-To: <1431700035-23479-3-git-send-email-alex.bennee@linaro.org>
-References: <1431700035-23479-1-git-send-email-alex.bennee@linaro.org>
- <1431700035-23479-3-git-send-email-alex.bennee@linaro.org>
-Message-ID: <555617AE.9030508@de.ibm.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 15 May 2015 18:01:19 +0200
+Subject: [PATCH v6 04/12] irqchip: vf610-mscm: support NVIC parent
+In-Reply-To: <alpine.DEB.2.11.1505151237531.4225@nanos>
+References: <1431203982-13217-1-git-send-email-stefan@agner.ch>
+ <1431203982-13217-5-git-send-email-stefan@agner.ch>
+ <alpine.DEB.2.11.1505151237531.4225@nanos>
+Message-ID: <6af49d55159182668c21480e0fbaa85c@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 15.05.2015 um 16:27 schrieb Alex Benn?e:
-> index ef1a5fc..aca4f86 100644
-> --- a/arch/s390/include/uapi/asm/kvm.h
-> +++ b/arch/s390/include/uapi/asm/kvm.h
-> @@ -114,8 +114,6 @@ struct kvm_fpu {
->  	__u64 fprs[16];
->  };
+On 2015-05-15 12:39, Thomas Gleixner wrote:
+> On Sat, 9 May 2015, Stefan Agner wrote:
+>> -	irq_chip_unmask_parent(data);
+>> +	if (parent->chip->irq_enable)
+>> +		parent->chip->irq_enable(parent);
+>> +	else
+>> +		parent->chip->irq_unmask(parent);
 > 
-> -#define KVM_GUESTDBG_USE_HW_BP		0x00010000
-> -
+> Why are you not creating irq_chip_enable_parent() which would have
+> been the proper function anyway?
+> 
 
+Will add that...
 
-> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-> index 70ac641..7c5dd11 100644
-> --- a/include/uapi/linux/kvm.h
-> +++ b/include/uapi/linux/kvm.h
-[...]
-> +#define KVM_GUESTDBG_USE_SW_BP		(1 << 16)
-> +#define KVM_GUESTDBG_USE_HW_BP		(1 << 17)
+Btw, have you had a chance to look at 1/12? I added a helper there too
+to allow make use of generic chip with IRQ domain hierarchy. In case you
+are fine with that general appraoch I will send an updated version of
+the patchset with the irq_chip_enable_parent helper soon. 
 
-This is a abi break for s390, no?
-
-David do you remember why we did not use SW_BP?
+--
+Stefan
