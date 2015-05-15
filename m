@@ -1,81 +1,59 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Fri, 15 May 2015 18:02:17 +0800
-Subject: [PATCH v2 2/6] dt-bindings: mediatek: Add smi dts binding
-In-Reply-To: <1431683009-18158-3-git-send-email-yong.wu@mediatek.com>
-References: <1431683009-18158-1-git-send-email-yong.wu@mediatek.com>
- <1431683009-18158-3-git-send-email-yong.wu@mediatek.com>
-Message-ID: <1431684137.4799.4.camel@mhfsdcap03>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 May 2015 11:10:28 +0100
+Subject: [PATCH v2] ARM: l2c: Add support for the "arm, shared-override"
+ property
+In-Reply-To: <20150507160257.GA11067@e104818-lin.cambridge.arm.com>
+References: <1430990831-23825-1-git-send-email-geert+renesas@glider.be>
+ <20150507160257.GA11067@e104818-lin.cambridge.arm.com>
+Message-ID: <20150515101028.GH2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-05-15 at 17:43 +0800, Yong Wu wrote:
-> This patch add smi binding document.
+On Thu, May 07, 2015 at 05:02:57PM +0100, Catalin Marinas wrote:
+> On Thu, May 07, 2015 at 11:27:11AM +0200, Geert Uytterhoeven wrote:
+> > diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
+> > index 0dbabe9a6b0abb91..2484aed78c86546d 100644
+> > --- a/Documentation/devicetree/bindings/arm/l2cc.txt
+> > +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
+> > @@ -67,6 +67,12 @@ Optional properties:
+> >    disable if zero.
+> >  - arm,prefetch-offset : Override prefetch offset value. Valid values are
+> >    0-7, 15, 23, and 31.
+> > +- arm,shared-override : The default behavior of the pl310 cache controller with
+> > +  respect to the shareable attribute is to transform "normal memory
+> > +  non-cacheable transactions" into "cacheable no allocate" (for reads) or
+> > +  "write through no write allocate" (for writes).
+> > +  On systems where this may cause DMA buffer corruption, this property must be
+> > +  specified to indicate that such transforms are precluded.
+> >  
+> >  Example:
+> >  
+> > diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> > index e309c8f35af5af61..86d0e7461e5b0b18 100644
+> > --- a/arch/arm/mm/cache-l2x0.c
+> > +++ b/arch/arm/mm/cache-l2x0.c
+> > @@ -1149,6 +1149,11 @@ static void __init l2c310_of_parse(const struct device_node *np,
+> >  		}
+> >  	}
+> >  
+> > +	if (of_property_read_bool(np, "arm,shared-override")) {
+> > +		*aux_val |= L2C_AUX_CTRL_SHARED_OVERRIDE;
+> > +		*aux_mask &= ~L2C_AUX_CTRL_SHARED_OVERRIDE;
+> > +	}
+> > +
+> >  	prefetch = l2x0_saved_regs.prefetch_ctrl;
+> >  
+> >  	ret = of_property_read_u32(np, "arm,double-linefill", &val);
 > 
-> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> ---
->  .../bindings/soc/mediatek/mediatek,smi-larb.txt    | 24 ++++++++++++++++++++++
->  .../bindings/soc/mediatek/mediatek,smi.txt         | 22 ++++++++++++++++++++
->  2 files changed, 46 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/mediatek/mediatek,smi-larb.txt
->  create mode 100644 Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt
+> It looks fine to me.
 > 
-> diff --git a/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi-larb.txt b/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi-larb.txt
-> new file mode 100644
-> index 0000000..c06c5b6
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi-larb.txt
-> @@ -0,0 +1,24 @@
-> +SMI(Smart Multimedia Interface) Local Arbiter
-> +
-> +The hardware block diagram please check bindings/iommu/mediatek,iommu.txt
-> +
-> +Required properties:
-> +- compatible : must be "mediatek,mt8173-smi-larb"
-> +- reg : the register and size of each local arbiter.
-> +- smi : must be "&smi_common". Refer to bindings/soc/mediatek,smi.txt.
-> +- clocks : must contain one entry for each clock-names.
-> +	There are 2 clockes:
-> +	APB clock : Advanced Peripheral Bus clock, It's the clock for setting
-> +		the register.
-> +	SMI clock : It's the clock for transfer data and command.
-> +- clock-name: must be "apb" and "smi".
-Sorry, Here should be clock-names. I will fix the next version.
-> +
-> +Example:
-> +	larb0:larb at 14021000 {
-> +		compatible = "mediatek,mt8173-smi-larb";
-> +		reg = <0 0x14021000 0 0x1000>;
-> +		smi = <&smi_common>;
-> +		clocks = <&mmsys MM_SMI_LARB0>,
-> +			 <&mmsys MM_SMI_LARB0>;
-> +		clock-names = "apb", "smi";
-> +	};
-> diff --git a/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt b/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt
-> new file mode 100644
-> index 0000000..c2389b4
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt
-> @@ -0,0 +1,22 @@
-> +SMI(Smart Multimedia Interface)
-> +
-> +The hardware block diagram please check bindings/iommu/mediatek,iommu.txt
-> +
-> +Required properties:
-> +- compatible : must be "mediatek,mt8173-smi"
-> +- reg : the register and size of the smi.
-> +- clocks : must contain one entry for each clock-names.
-> +	There are 2 clockes:
-> +	APB clock : Advanced Peripheral Bus clock, It's the clock for setting
-> +		the register.
-> +	SMI clock : It's the clock for transfer data and command.
-> +- clock-name: must be "apb" and "smi".
-the same. should be clock-names.
-> +
-> +Example:
-> +	smi_common:smi at 14022000 {
-> +		compatible = "mediatek,mt8173-smi";
-> +		reg = <0 0x14022000 0 0x1000>;
-> +		clocks = <&mmsys MM_SMI_COMMON>,
-> +			 <&mmsys MM_SMI_COMMON>;
-> +		clock-names = "apb", "smi";
-> +	};
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> 
+> (even better if a subsequent patch adds this property to all the dts
+> files containing "arm,pl310" ;))
+
+Even better would be for the boot loader/firmware to set the bit.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
