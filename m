@@ -1,68 +1,31 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 15 May 2015 08:12:35 -0700
-Subject: [RFC] ARM/ARM64: KVM: Implement KVM_FLUSH_DCACHE_GPA ioctl
-In-Reply-To: <5555DBFD.4080503@redhat.com>
-References: <1430817191-6231-1-git-send-email-j.fanguede@virtualopensystems.com>
- <20150506141249.GA6796@cbox>
- <CAGE1QJrabWWs0O1V-MpOxT_=1472TXb5rvJzJAJNfWH70x9pcg@mail.gmail.com>
- <20150507112027.GC25885@cbox>
- <CAGE1QJoyaGpuf=6Msa=xpm0pPGRkYWctcXGf=rwnha5o9Gm4bw@mail.gmail.com>
- <CAMJs5B9i9q8gJU93B09-uLMF6w1bTft-40DWPFUP6ky=SketSQ@mail.gmail.com>
- <CAGE1QJoEAg9tAM63MEbpLuqvY_ZwGrHPU1sqo=L_iByKrERUow@mail.gmail.com>
- <554B9A70.6020309@redhat.com> <5555DBFD.4080503@redhat.com>
-Message-ID: <20150515151235.GD14144@lvm>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Fri, 15 May 2015 23:13:16 +0800
+Subject: [PATCH] arm64: dts: mt8173-evb: fix model name
+Message-ID: <1431702796-6023-1-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 15, 2015 at 01:43:57PM +0200, Laszlo Ersek wrote:
-> On 05/07/15 19:01, Paolo Bonzini wrote:
-> > 
-> > 
-> > On 07/05/2015 18:56, J?r?my Fangu?de wrote:
-> >> USB devices fail with a timeout error, as if the communication between
-> >> the kernel and the devices fail at a certain point:
-> >> usb 1-1: device not accepting address 5, error -110
-> >> usb usb1-port1: unable to enumerate USB device
-> 
-> This is consistent with what I saw in my earlier testing.
-> 
-> >> e1000 fails when the userspace tries to use it, with these type of
-> >> kernel messages:
-> >> e1000 0000:00:02.0 eth0: Detected Tx Unit Hang
-> >>   Tx Queue             <0>
-> >>   TDH                  <d>
-> >>   TDT                  <d>
-> >>   next_to_use          <d>
-> >>   next_to_clean        <9>
-> >> buffer_info[next_to_clean]
-> >>   time_stamp           <ffff9311>
-> >>   next_to_watch        <a>
-> >>   jiffies              <ffff956a>
-> >>   next_to_watch.status <0>
-> > 
-> > Can you find out what memory attributes the guest is using for the
-> > memory---and if it's uncached, why?
-> 
-> For USB, see "drivers/usb/core/hcd-pci.c", function usb_hcd_pci_probe():
-> it uses ioremap_nocache().
-> 
-> On the "why", that ioremap_nocache() call can be tracked to
-> 
-> http://git.kernel.org/cgit/linux/kernel/git/tglx/history.git/commit/?id=a914dd8b
-> 
-> (Feb 2002), which predates the kernel's move to git. I guess
-> ioremap_nocache() is used simply because USB host controllers are
-> supposed to programmed like that.
-> 
-> And, from "arch/arm64/include/asm/io.h":
-> 
-> #define ioremap_nocache(addr, size)     __ioremap((addr), (size),
-> __pgprot(PROT_DEVICE_nGnRE))
-> 
-So this just means that these devices should be mapped as device memory
-(like the VGA case before) right?  And therefore should work with Drew's
-patches (assuming they are actually correct and you add the right QEMU
-annotations to set the memory regions and non-cacheable), correct?
+Model name in mt8173-evb.dtsi doesn't follow dts convention(it should
+be human readable model name). Fix it.
 
-Thanks,
--Christoffer
+Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+---
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+index 43d5401..d0ab012 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
++++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+@@ -16,7 +16,8 @@
+ #include "mt8173.dtsi"
+ 
+ / {
+-	model = "mediatek,mt8173-evb";
++	model = "MediaTek MT8173 evaluation board";
++	compatible = "mediatek,mt8173-evb", "mediatek,mt8173";
+ 
+ 	aliases {
+ 		serial0 = &uart0;
+-- 
+1.8.1.1.dirty
