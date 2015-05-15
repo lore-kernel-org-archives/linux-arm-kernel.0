@@ -1,25 +1,26 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 May 2015 22:01:49 +0200
-Subject: [PATCH v4 2/7] clocksource: add lpc32xx timer driver
-In-Reply-To: <1431381653-25356-3-git-send-email-manabian@gmail.com>
-References: <1431381653-25356-1-git-send-email-manabian@gmail.com>
- <1431381653-25356-3-git-send-email-manabian@gmail.com>
-Message-ID: <2239410.eaKNvGFUP4@wuerfel>
+Date: Fri, 15 May 2015 22:03:23 +0200
+Subject: [PATCH v4 7/7] ARM: zx: Add basic defconfig support for ZX296702
+In-Reply-To: <1430212691-16009-8-git-send-email-jun.nie@linaro.org>
+References: <1430212691-16009-1-git-send-email-jun.nie@linaro.org>
+ <1430212691-16009-8-git-send-email-jun.nie@linaro.org>
+Message-ID: <8162482.vKSVHxgVUp@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 May 2015 00:00:48 Joachim Eastwood wrote:
-> Add support for using the NXP LPC timer as clocksource and clock
-> event. These timers are present on many NXP devices including
-> LPC32xx, LPC17xx, LPC18xx and LPC43xx.
+On Tuesday 28 April 2015 17:18:11 Jun Nie wrote:
+> Add basic defconfig support to zx SOC, including uart, mmc
+>  and other common config
 > 
-> The timer has a 32-bit timer counter register with a programmable
-> 32-bit prescaler. It supports up to 4 compare match values with
-> interrupt generation and reset/stop timer counter action.
-> 
-> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+> Signed-off-by: Jun Nie <jun.nie@linaro.org>
 > 
 
-Looks ok to me, please merge this and patch 3 through the clocksource tree.
+Applied to next/defconfig. Please follow up with a patch to enable this
+platform in multi_v7_defconfig as well. You should enable all drivers
+for devices that are used on this platform, but preferrably use =m
+instead of =y in the multi_v7_defconfig (in zx_defconfig, it's up
+to your personal preference).
+
+Thanks,
 
 	Arnd
