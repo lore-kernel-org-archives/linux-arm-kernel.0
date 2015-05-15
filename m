@@ -1,94 +1,229 @@
-From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
-Date: Fri, 15 May 2015 09:45:47 +0200
-Subject: [PATCH net-next 00/11] convert stmmac glue layers into platform
- drivers
-In-Reply-To: <CAGb2v663efjkwgRjPdxV4CQxeesiu7jxkMf9j_oPU_bSHbNNiA@mail.gmail.com>
-References: <1431598266-25736-1-git-send-email-manabian@gmail.com>
- <CAGb2v663efjkwgRjPdxV4CQxeesiu7jxkMf9j_oPU_bSHbNNiA@mail.gmail.com>
-Message-ID: <5555A42B.3040205@st.com>
+From: bintian.wang@huawei.com (Bintian)
+Date: Fri, 15 May 2015 15:42:51 +0800
+Subject: [PATCH v4 4/5] clk: hi6220: Clock driver support for Hisilicon
+ hi6220 SoC
+In-Reply-To: <20150515002527.GD31753@codeaurora.org>
+References: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>
+ <1430827599-11560-5-git-send-email-bintian.wang@huawei.com>
+ <20150515002527.GD31753@codeaurora.org>
+Message-ID: <5555A37B.1090105@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello
+Hello Stephen,
 
-On 5/14/2015 5:24 PM, Chen-Yu Tsai wrote:
-> On Thu, May 14, 2015 at 6:10 PM, Joachim Eastwood <manabian@gmail.com> wrote:
->> This patch set aims to convert the current dwmac glue layers into
->> proper platform drivers as request by Arnd[1]. These changes start
->> from patch 3 and onwards.
+On 2015/5/15 8:25, Stephen Boyd wrote:
+> On 05/05, Bintian Wang wrote:
+>> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+>> index 9897f35..935c44b 100644
+>> --- a/drivers/clk/Kconfig
+>> +++ b/drivers/clk/Kconfig
+>> @@ -152,6 +152,8 @@ config COMMON_CLK_CDCE706
 >>
->> Overview:
->> Platform driver functions like probe and remove are exported from
->> the stmmac platform and then used in subsequent glue later
->> conversions. The conversion involes adding the platform driver
->> boiler plate code and adding it to the build system. The last patch
->> removes the driver from the stmmac platform code thus making it into
->> a library for common platform driver functions.
+>>   source "drivers/clk/qcom/Kconfig"
 >>
->> The two first patches adds glue layer for my platform. I chose to
->> first add old style glue layer and then convert it. The churn this
->> creates is just 3 lines.
->>
->> I would be very nice if people could test this patch set on their
->> respective platform. My testing has been limited to compiling and
->> testing on my (LPC18xx) platform. Thanks!
-
-I wonder if this will make the compatibility with old
-platforms (like SH4) not based on DT, where there was not used
-any glue-logic around the driver and just the platform was the
-reference.
-
-To be honest, I prefer to not have the Kconfig options.
-The device-tree compatibility will select the glue-logic
-needed and we will just pay some bytes when compile.
-
-In my opinion, the Koption(s) introduce a problem when touch
-the driver and we want to guarantee that, at least,
-all its parts build fine on all the platforms.
-
-Regards,
-Peppe
+>> +source "drivers/clk/hisilicon/Kconfig"
+>> +
+>
+> Please move this above qcom to maintain alphabet sort.
+OK, fix in next version.
 
 >
-> Tested-by: Chen-Yu Tsai <wens@csie.org>
+>>   endmenu
+>>
+>>   source "drivers/clk/bcm/Kconfig"
+>> diff --git a/drivers/clk/hisilicon/Kconfig b/drivers/clk/hisilicon/Kconfig
+>> new file mode 100644
+>> index 0000000..8034739
+>> --- /dev/null
+>> +++ b/drivers/clk/hisilicon/Kconfig
+>> @@ -0,0 +1,6 @@
+>> +config COMMON_CLK_HI6220
+>> +	bool "Hi6220 Clock Driver"
+>> +	depends on OF && ARCH_HISI
+>> +	default y
 >
-> on sunxi boards Cubietruck and Hummingbird A31.
+> Can this be
 >
->> Next I will look into cleaning up the stmmac platform code.
->>
->> [1] http://marc.info/?l=linux-arm-kernel&m=143059524606459&w=2
->>
->> Joachim Eastwood (11):
->>    stmmac: add dwmac glue for NXP 18xx/43xx family
->>    doc: dt: add documentation for nxp,lpc1850-dwmac
->>    stmmac: prepare stmmac platform to support stand alone drivers
->>    stmmac: add a generic dwmac driver
->>    stmmac: convert dwmac-lpc18xx to a platform driver
->>    stmmac: convert dwmac-meson to platform driver
->>    stmmac: convert dwmac-rk to platform driver
->>    stmmac: convert dwmac-socfpga to platform driver
->>    stmmac: convert dwmac-sti to platform driver
->>    stmmac: convert dwmac-sunxi to platform driver
->>    stmmac: drop driver from stmmac platform code
->>
->>   .../devicetree/bindings/net/nxp,lpc1850-dwmac.txt  | 20 +++++
->>   drivers/net/ethernet/stmicro/stmmac/Kconfig        | 76 +++++++++++++++++
->>   drivers/net/ethernet/stmicro/stmmac/Makefile       | 13 ++-
->>   .../net/ethernet/stmicro/stmmac/dwmac-generic.c    | 41 +++++++++
->>   .../net/ethernet/stmicro/stmmac/dwmac-lpc18xx.c    | 99 ++++++++++++++++++++++
->>   drivers/net/ethernet/stmicro/stmmac/dwmac-meson.c  | 24 +++++-
->>   drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c     | 27 +++++-
->>   .../net/ethernet/stmicro/stmmac/dwmac-socfpga.c    | 21 ++++-
->>   drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c    | 29 ++++++-
->>   drivers/net/ethernet/stmicro/stmmac/dwmac-sunxi.c  | 25 +++++-
->>   .../net/ethernet/stmicro/stmmac/stmmac_platform.c  | 49 ++---------
->>   .../net/ethernet/stmicro/stmmac/stmmac_platform.h  |  9 +-
->>   12 files changed, 378 insertions(+), 55 deletions(-)
->>   create mode 100644 Documentation/devicetree/bindings/net/nxp,lpc1850-dwmac.txt
->>   create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-generic.c
->>   create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-lpc18xx.c
->>
->> --
->> 1.8.0
->>
+> 	depends on ARCH_HISI || COMPILE_TEST
+> 	default ARCH_HISI
+>
+> instead? I'd like to increase build coverage.
+No problem, will fix in next version.
+
+>
+>> +	help
+>> +	  Build the Hisilicon Hi6220 clock driver based on the common clock framework.
+>> diff --git a/drivers/clk/hisilicon/clk-hi6220.c b/drivers/clk/hisilicon/clk-hi6220.c
+>> new file mode 100644
+>> index 0000000..91b1cd7
+>> --- /dev/null
+>> +++ b/drivers/clk/hisilicon/clk-hi6220.c
+>> @@ -0,0 +1,292 @@
+>> +/*
+>> + * Hisilicon Hi6220 clock driver
+>> + *
+>> + * Copyright (c) 2015 Hisilicon Limited.
+>> + *
+>> + * Author: Bintian Wang <bintian.wang@huawei.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +#include <linux/kernel.h>
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/clkdev.h>
+>> +#include <linux/io.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/of_device.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/clk.h>
+>
+> Do we need to include linux/clk.h? I don't see any consumer
+> usage here.
+You are right, remove in next version.
+
+>
+>> +
+>> +#include <dt-bindings/clock/hi6220-clock.h>
+>> +
+>> +#include "clk.h"
+>> +
+>> diff --git a/drivers/clk/hisilicon/clk.c b/drivers/clk/hisilicon/clk.c
+>> index a078e84..5d2305c 100644
+>> --- a/drivers/clk/hisilicon/clk.c
+>> +++ b/drivers/clk/hisilicon/clk.c
+>> @@ -108,4 +123,6 @@ void __init hisi_clk_register_gate(struct hisi_gate_clock *,
+>>   					int, struct hisi_clock_data *);
+>>   void __init hisi_clk_register_gate_sep(struct hisi_gate_clock *,
+>>   					int, struct hisi_clock_data *);
+>> +void __init hi6220_clk_register_divider(struct hi6220_divider_clock *,
+>> +					int, struct hisi_clock_data *);
+>
+> __init markings on function prototypes are useless. Please remove them.
+OK
+
+>
+>>   #endif	/* __HISI_CLK_H */
+>> diff --git a/drivers/clk/hisilicon/clkdivider-hi6220.c b/drivers/clk/hisilicon/clkdivider-hi6220.c
+>> +
+>> +/**
+>> + * struct hi6220_clk_divider - divider clock for hi6220
+>> + *
+>> + * @hw:		handle between common and hardware-specific interfaces
+>> + * @reg:	register containing divider
+>> + * @shift:	shift to the divider bit field
+>> + * @width:	width of the divider bit field
+>> + * @mask:	mask for setting divider rate
+>> + * @table:	the div table that the divider supports
+>> + * @lock:	register lock
+>> + */
+>> +struct hi6220_clk_divider {
+>> +	struct clk_hw	hw;
+>> +	void __iomem	*reg;
+>> +	u8		shift;
+>> +	u8		width;
+>> +	u32		mask;
+>> +	const struct clk_div_table *table;
+>> +	spinlock_t	*lock;
+>> +};
+>
+> The clk-divider.c code has been made "reusable". Can you please
+> try to use the functions that it now exposes instead of
+> copy/pasting it and modifying it to suit your needs? A lot of
+> this code looks the same.
+In fact, I discussed this problem with Rob Herring and Mike Turquette
+in the 96boards internal mail list before.
+
+The divider in hi6220 has a mask bit to guarantee writing the correct
+bits in register when setting rate, but the index of this mask bit has
+no rules to get (e.g. by left shift some fixed bits), so I add this
+divider clock to handle it, we can regard hi6220_clk_divider as a
+special case of generic divider clock.
+
+If I don't add this divider clock for hi6220 chip, then I should change
+the core APIs "clk_register_divider" and "clk_register_divider_table",
+and then many other drivers will be updated.
+So I think just add this divider clock is a good solution now.
+
+>
+>> +
+>> +#define to_hi6220_clk_divider(_hw)	\
+> [..]
+>> +
+>> +static struct clk_ops hi6220_clkdiv_ops = {
+>
+> const?
+Add in next version.
+
+>
+>> +	.recalc_rate = hi6220_clkdiv_recalc_rate,
+>> +	.round_rate = hi6220_clkdiv_round_rate,
+>> +	.set_rate = hi6220_clkdiv_set_rate,
+>> +};
+>> +
+>> +struct clk *hi6220_register_clkdiv(struct device *dev, const char *name,
+>> +	const char *parent_name, unsigned long flags, void __iomem *reg,
+>> +	u8 shift, u8 width, u32 mask_bit, spinlock_t *lock)
+>> +{
+>> +	struct hi6220_clk_divider *div;
+>> +	struct clk *clk;
+>> +	struct clk_init_data init;
+>> +	struct clk_div_table *table;
+>> +	u32 max_div, min_div;
+>> +	int i;
+>> +
+>> +	/* allocate the divider */
+>> +	div = kzalloc(sizeof(struct hi6220_clk_divider), GFP_KERNEL);
+>> +	if (!div) {
+>> +		pr_err("%s: could not allocate divider clk\n", __func__);
+>
+> Useless error message on allocation failure. Please run
+> checkpatch. I've sent a patch to remove these from basic clock
+> types.
+Remove in next version.
+>
+>> +		return ERR_PTR(-ENOMEM);
+>> +	}
+>> +
+>> +	/* Init the divider table */
+>> +	max_div = div_mask(width) + 1;
+>> +	min_div = 1;
+>> +
+>> +	table = kzalloc(sizeof(struct clk_div_table) * (max_div + 1), GFP_KERNEL);
+>> +	if (!table) {
+>> +		kfree(div);
+>> +		pr_err("%s: failed to alloc divider table!\n", __func__);
+>
+> ditto.
+Will remove in next version.
+>
+>> +		return ERR_PTR(-ENOMEM);
+>> +	}
+>> +
+>> +	for (i = 0; i < max_div; i++) {
+>> +		table[i].div = min_div + i;
+>> +		table[i].val = table[i].div - 1;
+>> +	}
+>> +
+>> +	init.name = name;
+>> +	init.ops = &hi6220_clkdiv_ops;
+>> +	init.flags = flags | CLK_IS_BASIC;
+>
+> It's basic?
+I rechecked this flag, it's really useless to us, so I can remove it.
+But can you tell me which case I should use it?
+
+How about just send this patch for review not the whole patch set in 
+next version?
+
+Thanks,
+
+Bintian
+>
+>> +	init.parent_names = parent_name ? &parent_name : NULL;
+>> +	init.num_parents = parent_name ? 1 : 0;
 >
