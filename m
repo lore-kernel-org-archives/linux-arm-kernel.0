@@ -1,61 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 May 2015 10:44:06 +0200
-Subject: [PATCH net-next 00/11] convert stmmac glue layers into platform
- drivers
-In-Reply-To: <5555A42B.3040205@st.com>
-References: <1431598266-25736-1-git-send-email-manabian@gmail.com>
- <CAGb2v663efjkwgRjPdxV4CQxeesiu7jxkMf9j_oPU_bSHbNNiA@mail.gmail.com>
- <5555A42B.3040205@st.com>
-Message-ID: <5463867.jjPLKQomlR@wuerfel>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 15 May 2015 09:58:18 +0100
+Subject: [PATCH v2 2/2] ARM64: kernel: unify ACPI and DT cpus
+ initialization
+In-Reply-To: <5553C99A.5020706@redhat.com>
+References: <1431522769-11276-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1431522769-11276-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <5553C99A.5020706@redhat.com>
+Message-ID: <20150515085817.GA14206@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 May 2015 09:45:47 Giuseppe CAVALLARO wrote:
-> Hello
+[restored CC list]
+
+On Wed, May 13, 2015 at 11:00:58PM +0100, Al Stone wrote:
+> On 05/13/2015 07:12 AM, Lorenzo Pieralisi wrote:
+> > The code that initializes cpus on arm64 is currently split in two
+> > different code paths that carry out DT and ACPI cpus initialization.
+> > 
+> > Most of the code executing SMP initialization is common and should
+> > be merged to reduce discrepancies between ACPI and DT initialization
+> > and to have code initializing cpus in a single common place in the
+> > kernel.
+> > 
+> > This patch refactors arm64 SMP cpus initialization code to merge
+> > ACPI and DT boot paths in a common file and to create sanity
+> > checks that can be reused by both boot methods.
+> > 
+> > Current code assumes PSCI is the only available boot method
+> > when arm64 boots with ACPI; this can be easily extended if/when
+> > the ACPI parking protocol is merged into the kernel.
+> > 
+> > Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
+> > Acked-by: Mark Rutland <mark.rutland@arm.com>
+> > Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+> > Tested-by: Mark Rutland <mark.rutland@arm.com> [DT]
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> [snip...]
 > 
-> On 5/14/2015 5:24 PM, Chen-Yu Tsai wrote:
-> > On Thu, May 14, 2015 at 6:10 PM, Joachim Eastwood <manabian@gmail.com> wrote:
-> >> This patch set aims to convert the current dwmac glue layers into
-> >> proper platform drivers as request by Arnd[1]. These changes start
-> >> from patch 3 and onwards.
-> >>
-> >> Overview:
-> >> Platform driver functions like probe and remove are exported from
-> >> the stmmac platform and then used in subsequent glue later
-> >> conversions. The conversion involes adding the platform driver
-> >> boiler plate code and adding it to the build system. The last patch
-> >> removes the driver from the stmmac platform code thus making it into
-> >> a library for common platform driver functions.
-> >>
-> >> The two first patches adds glue layer for my platform. I chose to
-> >> first add old style glue layer and then convert it. The churn this
-> >> creates is just 3 lines.
-> >>
-> >> I would be very nice if people could test this patch set on their
-> >> respective platform. My testing has been limited to compiling and
-> >> testing on my (LPC18xx) platform. Thanks!
-> 
-> I wonder if this will make the compatibility with old
-> platforms (like SH4) not based on DT, where there was not used
-> any glue-logic around the driver and just the platform was the
-> reference.
+> These patches look pretty good so far, but I've only just started
+> reviewing them.  This one raised the question: do we know if there
+> is someone already working on parking protocol?  I've seen a form
+> of it working on AMD Seattles but I don't recall seeing any patches
+> being submitted -- I'll search archives again, just in case I missed
+> it the first time, but if there is someone working on it, that would
+> be good to know.
 
-With patch 11, this gets handled by the dwmac-generic driver.
+I have seen patches for the ACPI parking protocol but nothing posted
+publicly. This patch consolidates what exists today, honestly
+I do not think that putting together a patch to enable the ACPI parking
+protocol is a big deal on top of this set, keeping in mind that it
+should be used as a fallback solution if PSCI can't be implemented
+(ie AMD Seattle must boot with PSCI).
 
-> To be honest, I prefer to not have the Kconfig options.
-> The device-tree compatibility will select the glue-logic
-> needed and we will just pay some bytes when compile.
->
-> In my opinion, the Koption(s) introduce a problem when touch
-> the driver and we want to guarantee that, at least,
-> all its parts build fine on all the platforms.
-
-The current model is not scalable and requires modifying the base
-driver for each variation, and the change brings the driver
-in line with how we do things for other platform drivers.
-
-We should always be able to build all soc-specific glue drivers
-with 'allmodconfig' for build testing, and a lot of us run that
-frequently to find regressions.
-
-	Arnd
+Lorenzo
