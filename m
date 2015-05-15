@@ -1,96 +1,62 @@
 From: jenskuske@gmail.com (Jens Kuske)
-Date: Fri, 15 May 2015 18:38:54 +0200
-Subject: [PATCH v2 04/10] pinctrl: sunxi: Prepare for building SoC specific
- drivers as modules
+Date: Fri, 15 May 2015 18:38:55 +0200
+Subject: [PATCH v2 05/10] ARM: sunxi: Introduce Allwinner H3 support
 In-Reply-To: <1431707940-19372-1-git-send-email-jenskuske@gmail.com>
 References: <1431707940-19372-1-git-send-email-jenskuske@gmail.com>
-Message-ID: <1431707940-19372-5-git-send-email-jenskuske@gmail.com>
+Message-ID: <1431707940-19372-6-git-send-email-jenskuske@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a remove function and export the init and remove function
-to allow us to build the SoC specific drivers as modules.
+The Allwinner H3 is a quad-core Cortex-A7-based SoC. It is very similar
+to other sun8i family SoCs like the A23.
 
 Signed-off-by: Jens Kuske <jenskuske@gmail.com>
 ---
- drivers/pinctrl/sunxi/pinctrl-sunxi.c | 25 +++++++++++++++++++------
- drivers/pinctrl/sunxi/pinctrl-sunxi.h |  2 ++
- 2 files changed, 21 insertions(+), 6 deletions(-)
+ Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
+ arch/arm/mach-sunxi/Kconfig                     | 2 +-
+ arch/arm/mach-sunxi/sunxi.c                     | 4 +++-
+ 3 files changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-index f8e171b..4ef6b3d 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-@@ -856,7 +856,6 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
- 	struct sunxi_pinctrl *pctl;
- 	struct resource *res;
- 	int i, ret, last_pin;
--	struct clk *clk;
+diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
+index 42941fd..3cb4b94 100644
+--- a/Documentation/devicetree/bindings/arm/sunxi.txt
++++ b/Documentation/devicetree/bindings/arm/sunxi.txt
+@@ -9,4 +9,5 @@ using one of the following compatible strings:
+   allwinner,sun6i-a31
+   allwinner,sun7i-a20
+   allwinner,sun8i-a23
++  allwinner,sun8i-h3
+   allwinner,sun9i-a80
+diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+index 81502b9..4efe2d4 100644
+--- a/arch/arm/mach-sunxi/Kconfig
++++ b/arch/arm/mach-sunxi/Kconfig
+@@ -35,7 +35,7 @@ config MACH_SUN7I
+ 	select SUN5I_HSTIMER
  
- 	pctl = devm_kzalloc(&pdev->dev, sizeof(*pctl), GFP_KERNEL);
- 	if (!pctl)
-@@ -954,13 +953,13 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
- 			goto gpiochip_error;
- 	}
+ config MACH_SUN8I
+-	bool "Allwinner A23 (sun8i) SoCs support"
++	bool "Allwinner sun8i Family SoCs support"
+ 	default ARCH_SUNXI
+ 	select ARM_GIC
+ 	select MFD_SUN6I_PRCM
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index 1bc811a..8270902 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -67,10 +67,12 @@ MACHINE_END
  
--	clk = devm_clk_get(&pdev->dev, NULL);
--	if (IS_ERR(clk)) {
--		ret = PTR_ERR(clk);
-+	pctl->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(pctl->clk)) {
-+		ret = PTR_ERR(pctl->clk);
- 		goto gpiochip_error;
- 	}
- 
--	ret = clk_prepare_enable(clk);
-+	ret = clk_prepare_enable(pctl->clk);
- 	if (ret)
- 		goto gpiochip_error;
- 
-@@ -1015,10 +1014,24 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
- 	return 0;
- 
- clk_error:
--	clk_disable_unprepare(clk);
-+	clk_disable_unprepare(pctl->clk);
- gpiochip_error:
- 	gpiochip_remove(pctl->chip);
- pinctrl_error:
- 	pinctrl_unregister(pctl->pctl_dev);
- 	return ret;
- }
-+EXPORT_SYMBOL(sunxi_pinctrl_init);
-+
-+int sunxi_pinctrl_remove(struct platform_device *pdev)
-+{
-+	struct sunxi_pinctrl *pctl = platform_get_drvdata(pdev);
-+
-+	gpiochip_remove(pctl->chip);
-+	pinctrl_unregister(pctl->pctl_dev);
-+
-+	clk_disable_unprepare(pctl->clk);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(sunxi_pinctrl_remove);
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.h b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
-index e248e81..4442676 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sunxi.h
-+++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
-@@ -126,6 +126,7 @@ struct sunxi_pinctrl {
- 	unsigned			*irq_array;
- 	spinlock_t			lock;
- 	struct pinctrl_dev		*pctl_dev;
-+	struct clk			*clk;
+ static const char * const sun8i_board_dt_compat[] = {
+ 	"allwinner,sun8i-a23",
++	"allwinner,sun8i-h3",
+ 	NULL,
  };
  
- #define SUNXI_PIN(_pin, ...)					\
-@@ -285,5 +286,6 @@ static inline u32 sunxi_irq_status_offset(u16 irq)
- 
- int sunxi_pinctrl_init(struct platform_device *pdev,
- 		       const struct sunxi_pinctrl_desc *desc);
-+int sunxi_pinctrl_remove(struct platform_device *pdev);
- 
- #endif /* __PINCTRL_SUNXI_H */
+-DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i (A23) Family")
++DT_MACHINE_START(SUN8I_DT, "Allwinner sun8i Family")
++	.init_time	= sun6i_timer_init,
+ 	.dt_compat	= sun8i_board_dt_compat,
+ 	.init_late	= sunxi_dt_cpufreq_init,
+ MACHINE_END
 -- 
 2.4.0
