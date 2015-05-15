@@ -1,66 +1,58 @@
 From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Fri, 15 May 2015 17:16:26 +0100
-Subject: [PATCH v4 10/12] KVM: arm64: guest debug,
- HW assisted debug support
-In-Reply-To: <20150515152346.GB23652@leverpostej>
+Date: Fri, 15 May 2015 17:19:03 +0100
+Subject: [PATCH v4 03/12] KVM: arm64: guest debug, define API headers
+In-Reply-To: <20150515154324.GC23652@leverpostej>
 References: <1431700035-23479-1-git-send-email-alex.bennee@linaro.org>
- <1431700035-23479-11-git-send-email-alex.bennee@linaro.org>
- <20150515152346.GB23652@leverpostej>
-Message-ID: <87y4kpke91.fsf@linaro.org>
+ <1431700035-23479-4-git-send-email-alex.bennee@linaro.org>
+ <20150515144423.GA23652@leverpostej> <874mndlvny.fsf@linaro.org>
+ <CAFEAcA8ZpndRyT84ta2r4bPTE1uGTN1XTfMpUn8qW022ben3BQ@mail.gmail.com>
+ <20150515154324.GC23652@leverpostej>
+Message-ID: <87wq09ke4o.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 Mark Rutland <mark.rutland@arm.com> writes:
 
-> Hi Alex,
->
-> On Fri, May 15, 2015 at 03:27:13PM +0100, Alex Benn?e wrote:
->> This adds support for userspace to control the HW debug registers for
->> guest debug. In the debug ioctl we copy the IMPDEF defined number of
->> registers into a new register set called host_debug_state. There is now
->> a new vcpu parameter called debug_ptr which selects which register set
->> is to copied into the real registers when world switch occurs.
+> On Fri, May 15, 2015 at 04:17:46PM +0100, Peter Maydell wrote:
+>> On 15 May 2015 at 16:14, Alex Benn?e <alex.bennee@linaro.org> wrote:
+>> >
+>> > Mark Rutland <mark.rutland@arm.com> writes:
+>> >
+>> >> On Fri, May 15, 2015 at 03:27:06PM +0100, Alex Benn?e wrote:
+>> >>> +/*
+>> >>> + * See v8 ARM ARM D7.3: Debug Registers
+>> >>> + *
+>> >>> + * The control registers are architecturally defined as 32 bits but are
+>> >>> + * stored as 64 bit values alongside the value registers. This is done
+>> >>
+>> >> Stale comment? They're stored as __u32 below.
+>> >
+>> > Gah yes it is.
+>> >
+>> >> It's possible that the registers could grow in future as happened in the
+>> >> case of CLIDR_EL1, so it might be worth treating system registers
+>> >> generally as u64 values.
+>> >
+>> > Really? I mean the existing debug *control* registers have reserved bits
+>> > 24-31 so there is space for expansion.
 >> 
->> I've moved some helper functions into the hw_breakpoint.h header for
->> re-use.
->> 
->> As with single step we need to tweak the guest registers to enable the
->> exceptions so we need to save and restore those bits.
->> 
->> Two new capabilities have been added to the KVM_EXTENSION ioctl to allow
->> userspace to query the number of hardware break and watch points
->> available on the host hardware.
+>> Other places in the userspace ABI which deal with sysregs (notably
+>> ONE_REG) consistently define them all as 64-bit
 >
-> There's the unfortunate possibility that these could vary across cores
-> in a big.LITTLE system (though we haven't seen that thus far). The
-> kernel sanity checks should currently explode if such a case is
-> encountered, but I don't know what we'd do were that to happen.
+> Also for pt_regs.pstate.
+>
+> I just spotted that in user_hwdebug_state in ptrace.h we seem to expose
+> the debug control regsiters as __u32 already, aalong with some other
+> registers.
 
-I suspect we would have to disable HW assisted breakpoints or return the
-lowest common denominator if we can tell which cores we shall every be
-scheduled on.
+I thought those where ptrace specific fields which then get munged into
+the final values inside the kernel?
 
 >
-> This gets more fun when you consider the context-aware breakpoints are
-> the highest numbered. So the set of (context-aware) breakpoints might
-> not intersect across all CPUs.
-
-I didn't see a reference to that in the ARM ARM. It seemed to imply any
-breakpoint could be context aware is .BT was appropriately set and
-linked to the VR.  
-
-As it happens the gdb stub interface in QEMU is fairly limited so while
-I expose the full debug registers I don't think there is currently a way
-to expose any of the fancy linking/context stuff to the userspace
-debugger. However I did make the ABI pass full raw values in so this
-could become a possibility later without having to expand the ABI.
-
-
-> I'm not sure what the best thing to do is w.r.t. exposing that to
-> userspace.
+> So we're already inconsistent w.r.t. how we expose those registers, and
+> I'm not sure what we'd do elsewhere if any registers got expanded. :/
 >
-> Thanks,
 > Mark.
 
 -- 
