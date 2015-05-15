@@ -1,48 +1,31 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 17 May 2015 12:40:24 +0100
-Subject: [PATCH v4 3/3] ARM: berlin: add an ADC node for the BG2Q
-In-Reply-To: <1431339531-11938-4-git-send-email-antoine.tenart@free-electrons.com>
-References: <1431339531-11938-1-git-send-email-antoine.tenart@free-electrons.com>
- <1431339531-11938-4-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <55587E28.7070504@kernel.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 15 May 2015 16:47:39 +0200
+Subject: [PATCH] ARM: sun8i: Introduce Evaluation Board Support
+In-Reply-To: <1431031613-26085-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1431031613-26085-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20150515144739.GA4004@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/15 11:18, Antoine Tenart wrote:
-> This patch adds the ADC node for the Berlin BG2Q, using the newly added
-> Berlin IIO ADC driver.
+On Thu, May 07, 2015 at 10:46:53PM +0200, Maxime Ripard wrote:
+> The A23 Evaluation Board has an MMC slot, two UARTs, NAND, a few display
+> connectors (RGB, MIPI, LVDS), a mini-PCIE slot, USB host and OTG and a
+> bunch of embedded sensors.
 > 
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-The driver support will be working it's way through to mainline in the
-next merge window.  Obviously I 'could' take this through IIO, but not
-without an appropriate Ack.
+Applied.
 
-Hence I'll assume it's going through the arm-soc tree.
+Maxime
 
-Thanks,
-
-Jonathan
-> ---
->  arch/arm/boot/dts/berlin2q.dtsi | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-> index 187d056f7ad2..97c7e19e3ec6 100644
-> --- a/arch/arm/boot/dts/berlin2q.dtsi
-> +++ b/arch/arm/boot/dts/berlin2q.dtsi
-> @@ -565,6 +565,13 @@
->  						function = "twsi3";
->  					};
->  				};
-> +
-> +				adc: adc {
-> +					compatible = "marvell,berlin2-adc";
-> +					interrupt-parent = <&sic>;
-> +					interrupts = <12>, <14>;
-> +					interrupt-names = "adc", "tsen";
-> +				};
->  			};
->  
->  			sic: interrupt-controller at e000 {
-> 
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150515/cfc1900d/attachment.sig>
