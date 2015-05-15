@@ -1,77 +1,61 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 15 May 2015 17:11:16 +0800
-Subject: [PATCH 1/8] clk: sunxi: factors: Add m_start parameters
-In-Reply-To: <20150515080546.GT4004@lukather>
-References: <1430565879-28113-1-git-send-email-maxime.ripard@free-electrons.com>
- <1430565879-28113-2-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v669fsz_pA+B0r8efp0BMxY-D86qfLuGQCqK1POuu9PmxQ@mail.gmail.com>
- <20150515074314.GQ4004@lukather>
- <CAGb2v66jRX09k48ciR-bwMZRAioRpHKZ3D2+wVYWannjtF+G3w@mail.gmail.com>
- <20150515080546.GT4004@lukather>
-Message-ID: <CAGb2v67jruYamgHpM1NRm_fvm+SnDgQy4BEvZBxPEFByQsRsrg@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 15 May 2015 11:14:43 +0200
+Subject: [PATCH v2 03/10] reset: berlin: convert to a platform driver
+In-Reply-To: <1431506288.3157.11.camel@pengutronix.de>
+References: <1425654328-26298-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1425654328-26298-4-git-send-email-antoine.tenart@free-electrons.com>
+ <1425896186.3152.25.camel@pengutronix.de> <20150310095713.GD23469@kwain>
+ <20150512144313.GD32171@kwain> <1431506288.3157.11.camel@pengutronix.de>
+Message-ID: <5555B903.1020008@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 15, 2015 at 4:05 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Fri, May 15, 2015 at 03:48:38PM +0800, Chen-Yu Tsai wrote:
->> On Fri, May 15, 2015 at 3:43 PM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > On Thu, May 14, 2015 at 05:12:07PM +0800, Chen-Yu Tsai wrote:
->> >> On Sat, May 2, 2015 at 7:24 PM, Maxime Ripard
->> >> <maxime.ripard@free-electrons.com> wrote:
->> >> > Some clocks start incrementing the m factor at 0. Add a parameter to handle
->> >> > it just like we did for the N factor.
->> >> >
->> >> > Since the behaviour until now was to assume that the m factor was starting
->> >> > at 1, we also need to fix the other users.
->> >> >
->> >> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> >> > ---
->> >> >  drivers/clk/sunxi/clk-factors.c    | 11 ++++++++++-
->> >> >  drivers/clk/sunxi/clk-factors.h    |  2 ++
->> >> >  drivers/clk/sunxi/clk-mod0.c       |  2 ++
->> >> >  drivers/clk/sunxi/clk-sun8i-mbus.c |  2 ++
->> >> >  drivers/clk/sunxi/clk-sun9i-core.c |  6 ++++++
->> >> >  drivers/clk/sunxi/clk-sunxi.c      | 10 ++++++++++
->> >> >  6 files changed, 32 insertions(+), 1 deletion(-)
->> >> >
->> >> > diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
->> >> > index 8c20190a3e9f..100a711c3e3d 100644
->> >> > --- a/drivers/clk/sunxi/clk-factors.c
->> >> > +++ b/drivers/clk/sunxi/clk-factors.c
->> >> > @@ -56,15 +56,24 @@ static unsigned long clk_factors_recalc_rate(struct clk_hw *hw,
->> >> >         /* Get each individual factor if applicable */
->> >> >         if (config->nwidth != SUNXI_FACTORS_NOT_APPLICABLE)
->> >> >                 n = FACTOR_GET(config->nshift, config->nwidth, reg);
->> >> > +
->> >> >         if (config->kwidth != SUNXI_FACTORS_NOT_APPLICABLE)
->> >> >                 k = FACTOR_GET(config->kshift, config->kwidth, reg);
->> >> > +
->> >> >         if (config->mwidth != SUNXI_FACTORS_NOT_APPLICABLE)
->> >> >                 m = FACTOR_GET(config->mshift, config->mwidth, reg);
->> >> > +       else
->> >> > +               /* Make sure we don't get a division by zero */
->> >> > +               m = 1;
->> >>
->> >> What happens when mwidth is valid, m_start = 0, and m = 0?
->> >
->> > That's a very good question. A division by zero in the kernel, I'd
->> > say.
->> >
->> > But I don't think we can end up in such a case today, and it's
->> > somewhat expected that it will happen, and no clock have looked at can
->> > actually end up in such a case.
->>
->> It's possible if the bootloader left the clock in an invalid state.
->> How about just returning 0, indicating an invalid rate, early?
+On 13.05.2015 10:38, Philipp Zabel wrote:
+> Hi Antoine, Sebastian,
 >
-> The value set in the register might be zero, but that will always
-> really mean 1, either through m_start or m_zero. That would be a bug
-> in the driver itself.
+> Am Dienstag, den 12.05.2015, 16:43 +0200 schrieb Antoine Tenart:
+>> On Tue, Mar 10, 2015 at 10:57:13AM +0100, Antoine Tenart wrote:
+>>> On Mon, Mar 09, 2015 at 11:16:26AM +0100, Philipp Zabel wrote:
+>>>>
+>>>> Am Freitag, den 06.03.2015, 16:05 +0100 schrieb Antoine Tenart:
+>>>>> The Berlin reset controller was introduced without being a platform
+>>>>> driver because of a needed DT rework: the node describing the reset
+>>>>> controller also describes the pinctrl and clk controllers...
+>>>>>
+>>>>> The DT issue being solved thanks to the addition of the Berlin
+>>>>> controller mfd driver, it is now possible to convert the Berlin reset
+>>>>> driver to a plaftorm driver.
+>>>>>
+>>>>> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+>>>>
+>>>> Looks good to me. Do you want to merge this together with the rest of
+>>>> the series, or should I queue the reset patch?
+>>>
+>>> I think we better wait for the simple-mfd patch to make it to ARM SoC
+>>> first.
+>>
+>> simple-mfd just got pulled into next/drivers.
+>>
+>>> Once this is done, you can queue the reset patch (unless Sebastian wants
+>>> to take it alongside the series).
+>>
+>> Antoine
+>
+> I just noticed that we'll create a small merge conflict in
+> Documentation/devicetree/bindings/arm/marvell,berlin.txt if I were to
+> merge patches 3 and 4.
+> It would be nice to have the reset driver patch merged in the vicinity
+> of this documentation change. Since there won't be any conflicting
+> changes in drivers/reset/reset-berlin.c, I'd be in favor of keeping the
+> series together. So patches 3 and 4
+>
+> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-Maybe you should switch the order of these 2 patches to make it clear?
-Or maybe squash them? As it currently is, m_start = 0 and m = 0 with
-this patch only is a bug.
+Philipp,
 
-ChenYu
+you already Acked that patch two months ago, so I was assuming to take
+it though berlin tree anyway. But thanks for the Ack again ;)
+
+Applied the series to berlin now.
+
+Sebastian
