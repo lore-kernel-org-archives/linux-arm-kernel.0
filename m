@@ -1,93 +1,83 @@
-From: Frank.Li@freescale.com (Frank.Li at freescale.com)
-Date: Fri, 15 May 2015 21:36:29 +0800
-Subject: [PATCH 6/7] document: devicetree: input: imx: i.mx snvs power device
- tree bindings
-In-Reply-To: <1431696990-23078-1-git-send-email-Frank.Li@freescale.com>
-References: <1431696990-23078-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <1431696990-23078-7-git-send-email-Frank.Li@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 May 2015 15:50:14 +0100
+Subject: NFS client broken in 4.1.0-rc2
+In-Reply-To: <F423EE93-1A93-42F8-8593-9D2E4F85CB3B@oracle.com>
+References: <20150515142403.GL2067@n2100.arm.linux.org.uk>
+ <F423EE93-1A93-42F8-8593-9D2E4F85CB3B@oracle.com>
+Message-ID: <20150515145013.GM2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Li <Frank.Li@freescale.com>
+On Fri, May 15, 2015 at 10:26:48AM -0400, Chuck Lever wrote:
+> 
+> On May 15, 2015, at 10:24 AM, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> 
+> > While trying to update a kernel and modules on one of my test systems,
+> > I was greeted by these errors:
+> > 
+> > tar: lib/modules/4.1.0-rc2+/kernel/drivers/media/platform/coda/coda.ko: Cannot utime
+> > tar: lib/modules/4.1.0-rc2+/kernel/drivers/media/dvb-frontends/drx39xyj/drx39xyj.ko: Cannot utime
+> > tar: lib/modules/4.1.0-rc2+/kernel/drivers/media/usb/em28xx/em28xx.ko: Cannot utime
+> > tar: lib/modules/4.1.0-rc2+/kernel/drivers/usb/serial/option.ko: Cannot utime
+> > tar: lib/modules/4.1.0-rc2+/kernel/drivers/usb/serial/ftdi_sio.ko: Cannot utime
+> > tar: lib/modules/4.1.0-rc2+/kernel/drivers/net/wireless/brcm80211/brcmfmac/brcmfmac.ko: Cannot utime
+> > tar: lib/modules/4.1.0-rc2+/kernel/drivers/input/mouse/psmouse.ko: Cannot utime
+> > tar: lib/modules/4.1.0-rc2+/kernel/fs/udf/udf.ko: Cannot utime
+> > tar: lib/modules/4.1.0-rc2+/kernel/fs/fuse/fuse.ko: Cannot utime
+> > tar: lib/modules/4.1.0-rc2+/kernel/fs/nfsd/nfsd.ko: Cannot utime
+> > tar: lib/modules/4.1.0-rc2+/kernel/sound/soc/codecs/snd-soc-wm8962.ko: Cannot utime
+> > tar: lib/modules/4.1.0-rc2+/kernel/net/bluetooth/bluetooth.ko: Cannot utime
+> > tar: lib/modules/4.1.0-rc2+/modules.alias.bin: Cannot utime
+> > tar: lib/modules/4.1.0-rc2+/modules.alias: Cannot utime
+> > tar: Exiting with failure status due to previous errors
+> > 
+> > Searching google wasn't helpful, as all the "Cannot utime" errors that
+> > google could find are followed by an errno string.
+> > 
+> > stracing at first sight didn't seem to be helpful, as no syscalls (apart
+> > from openat() with a pre-existing file) were failing.
+> > 
+> > Having recently updated to fc21 tar generating the archive, I thought
+> > maybe it was a tar format bug between fc21 tar and the target's tar.
+> > That was until I tried to "apt-get source tar" on the target, and was
+> > greeted by the same error.
+> > 
+> > So I then tried untaring the tar source archive onto a ramfs, which
+> > worked without complaint.  The difference being that it's a root NFS
+> > box, and so I was untaring onto NFS.
+> > 
+> > Here's the entry from /proc/mounts:
+> > 
+> > x.y.z.221:/var/boot/ci on / type nfs (rw,nolock,vers=4,addr=x.y.z.221,clientaddr=a.b.c.55)
+> > 
+> > Looking closer at the strace reveals this:
+> > 
+> > openat(AT_FDCWD, "lib/modules/4.1.0-rc2+/kernel/drivers/media/platform/coda/coda.ko", O_WRONLY|O_CREAT|O_EXCL|O_NOCTTY|O_NONBLOCK|O_LARGEFILE|O_CLOEXEC, 0600) = -1 EEXIST (File exists)
+> > unlinkat(AT_FDCWD, "lib/modules/4.1.0-rc2+/kernel/drivers/media/platform/coda/coda.ko", 0) = 0
+> > openat(AT_FDCWD, "lib/modules/4.1.0-rc2+/kernel/drivers/media/platform/coda/coda.ko", O_WRONLY|O_CREAT|O_EXCL|O_NOCTTY|O_NONBLOCK|O_LARGEFILE|O_CLOEXEC, 0600) = 4
+> > write(4, "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\1\0(\0\1\0\0\0\0\0\0\0\0\0\0\0"..., 4096) = 4096
+> > ...
+> > write(4, "\300H\0\0\34\345\1\0\314H\0\0\34\345\1\0\330H\0\0\34\345\1\0<I\0\0\34\370\1\0"..., 7312) = 7312
+> > dup2(4, 4)                              = 4
+> > fstat64(4, {st_mode=0757221, st_size=13181880119170311768, ...}) = 21
+> > write(2, "tar: ", 5)                    = 5
+> > write(2, "lib/modules/4.1.0-rc2+/kernel/dr"..., 79) = 79
+> > write(2, "\n", 1)                       = 1
+> > fchown32(4, 0, 0)                       = 0
+> > fchmod(4, 0664)                         = 0
+> > close(4)                                = 0
+> > 
+> > Look closely at that fstat64, and you'll notice that it's returning crap.
+> 
+> This is likely fixed by:
+> 
+>   http://marc.info/?l=linux-nfs&m=143095122604344&w=2
 
-The snvs-pwrkey is designed to enable POWER key function which controlled
-by SNVS ONOFF. the driver can report the status of POWER key and wakeup
-system if pressed after system suspend.
+Yes, it appears to be fixed by that change.  I'll add it to my tree so
+my test systems work.
 
-Signed-off-by: Frank Li <Frank.Li@freescale.com>
-Signed-off-by: Robin Gong <b38343@freescale.com>
----
- .../devicetree/bindings/crypto/fsl-sec4.txt        | 42 ++++++++++++++++++++++
- .../devicetree/bindings/input/snvs-pwrkey.txt      |  1 +
- 2 files changed, 43 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/input/snvs-pwrkey.txt
+Many thanks.
 
-diff --git a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
-index ca04206..99a57b7 100644
---- a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
-+++ b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
-@@ -394,6 +394,41 @@ EXAMPLE
- };
- 
- =====================================================================
-+System ON/OFF key driver
-+
-+  The snvs-pwrkey is designed to enable POWER key function which controlled
-+  by SNVS ONOFF, the driver can report the status of POWER key and wakeup
-+  system if pressed after system suspend.
-+
-+  - compatible:
-+      Usage: required
-+      Value type: <string>
-+      Definition: Mush include "fsl,sec-v4.0-pwrkey".
-+
-+  - interrupts:
-+      Usage: required
-+      Value type: <prop_encoded-array>
-+      Definition: The SNVS ON/OFF interrupt number to the CPU(s).
-+
-+  - linux,keycode:
-+      Usage: option
-+      Value type: <int>
-+      Definition: Keycode to emit, KEY_POWER by default.
-+
-+  - wakeup:
-+      Usage: option
-+      Value type: <boo>
-+      Definition: Button can wake-up the system
-+
-+EXAMPLE:
-+	snvs-pwrkey at 0x020cc000 {
-+		compatible = "fsl,sec-v4.0-pwrkey";
-+		interrupts = <0 4 0x4>
-+	        linux,keycode = <116>; /* KEY_POWER */
-+		wakeup;
-+	};
-+
-+=====================================================================
- FULL EXAMPLE
- 
- 	crypto: crypto at 300000 {
-@@ -475,6 +510,13 @@ FULL EXAMPLE
- 		snvs_poweroff: snvs-poweroff at 38 {
-                         compatible = "fsl,sec-v4.0-poweroff";
-                 };
-+
-+		snvs-pwrkey at 0x020cc000 {
-+			compatible = "fsl,sec-v4.0-pwrkey";
-+			interrupts = <0 4 0x4>;
-+			linux,keycode = <116>; /* KEY_POWER */
-+			wakeup;
-+		};
- 	};
- 
- =====================================================================
-diff --git a/Documentation/devicetree/bindings/input/snvs-pwrkey.txt b/Documentation/devicetree/bindings/input/snvs-pwrkey.txt
-new file mode 100644
-index 0000000..70c1425
---- /dev/null
-+++ b/Documentation/devicetree/bindings/input/snvs-pwrkey.txt
-@@ -0,0 +1 @@
-+See Documentation/devicetree/bindings/crypto/fsl-sec4.txt
 -- 
-1.9.1
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
