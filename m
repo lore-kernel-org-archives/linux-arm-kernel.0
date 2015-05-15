@@ -1,74 +1,74 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Fri, 15 May 2015 11:03:35 +0200
-Subject: [PATCH] ARM: tegra: cpuidle: implement
- cpuidle_state.enter_freeze()
-In-Reply-To: <20150417140819.GB2347@red-moon>
-References: <1428490480-10144-1-git-send-email-tomeu.vizoso@collabora.com>
- <20150408115546.GA24271@red-moon> <552643E1.3060200@collabora.com>
- <285738930.THBQOWvsah@vostro.rjw.lan> <20150410100844.GC23730@red-moon>
- <CAAObsKAihF1k1yzZxQEs_jpPnCdV3HQbLaYHWu1QNsNd5zqiOg@mail.gmail.com>
- <20150417140819.GB2347@red-moon>
-Message-ID: <CAAObsKBLHqf1+KUE89Orr7ZwzY3-WEW1CHokSOxSD9pEOmTkhg@mail.gmail.com>
+From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
+Date: Fri, 15 May 2015 11:11:14 +0200
+Subject: [PATCH net-next 00/11] convert stmmac glue layers into platform
+ drivers
+In-Reply-To: <5463867.jjPLKQomlR@wuerfel>
+References: <1431598266-25736-1-git-send-email-manabian@gmail.com>
+ <CAGb2v663efjkwgRjPdxV4CQxeesiu7jxkMf9j_oPU_bSHbNNiA@mail.gmail.com>
+ <5555A42B.3040205@st.com> <5463867.jjPLKQomlR@wuerfel>
+Message-ID: <5555B832.3080708@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 April 2015 at 16:08, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> On Thu, Apr 16, 2015 at 03:37:19PM +0100, Tomeu Vizoso wrote:
->
-> [...]
->
->> >> I don't know what FIQs are. :-)
->> >
->> > In short, fast IRQs, it is a separate IRQ line handled as a separate
->> > exception source with some private (banked) registers that minimize registers
->> > saving/restoring. They are not identical to NMI on x86, since
->> > their behaviour (handling) may be overriden by platforms and they
->> > can be masked.
->> >
->> >> ->enter_freeze is entered with interrupts disabled on the local CPU.  It is
->> >> not supposed to re-enable them.  That is, while in the ->enter_freeze callback
->> >> routine, the CPU must not be interrupted aby anything other than NMI.
->> >
->> > It boils down to what FIQs handlers are allowed to do with tick frozen
->> > and what they are (may be) currently used for.
->> >
->> > Russell has more insights on this than I do, in particular what FIQs are
->> > currently used for on ARM and if we can leave them enabled safely with tick
->> > frozen.
+Hi Arnd
+
+On 5/15/2015 10:44 AM, Arnd Bergmann wrote:
+> On Friday 15 May 2015 09:45:47 Giuseppe CAVALLARO wrote:
+>> Hello
 >>
->> But even if it's currently safe to leave them enabled, is there any
->> reason for not disabling them?
+>> On 5/14/2015 5:24 PM, Chen-Yu Tsai wrote:
+>>> On Thu, May 14, 2015 at 6:10 PM, Joachim Eastwood <manabian@gmail.com> wrote:
+>>>> This patch set aims to convert the current dwmac glue layers into
+>>>> proper platform drivers as request by Arnd[1]. These changes start
+>>>> from patch 3 and onwards.
+>>>>
+>>>> Overview:
+>>>> Platform driver functions like probe and remove are exported from
+>>>> the stmmac platform and then used in subsequent glue later
+>>>> conversions. The conversion involes adding the platform driver
+>>>> boiler plate code and adding it to the build system. The last patch
+>>>> removes the driver from the stmmac platform code thus making it into
+>>>> a library for common platform driver functions.
+>>>>
+>>>> The two first patches adds glue layer for my platform. I chose to
+>>>> first add old style glue layer and then convert it. The churn this
+>>>> creates is just 3 lines.
+>>>>
+>>>> I would be very nice if people could test this patch set on their
+>>>> respective platform. My testing has been limited to compiling and
+>>>> testing on my (LPC18xx) platform. Thanks!
+>>
+>> I wonder if this will make the compatibility with old
+>> platforms (like SH4) not based on DT, where there was not used
+>> any glue-logic around the driver and just the platform was the
+>> reference.
 >
-> Ok, the point here is: either it is safe, and you leave them enabled,
-> or it is not and we must disable them *before* enter_freeze() is entered.
+> With patch 11, this gets handled by the dwmac-generic driver.
+
+ok
+
 >
-> Disabling them in the platform enter_freeze() hook does not make sense,
-> because this means we run with FIQs enabled with tick frozen, either
-> it is safe or it is not, it can't be both.
-
-I have been looking and asking around, and seems like we should
-actually leave FIQs enabled when the tick is frozen and only disable
-them within enter_freeze.
-
-My understanding is that FIQ handlers are extremely limited in what
-they can do, with the main use being NMI-like functionality. There are
-a handful of other FIQ handlers in mainline, but they don't call into
-any other kernel code and limit themselves to doing some basic I/O.
-
-The only reason why they should be disabled in enter_freeze is that
-the context of the CPU that is going to a lower power state could
-become corrupted if a FIQ gets fired during a save or restore
-operation.
-
-Regards,
-
-Tomeu
-
-> I would ask Russell opinion on this, before making any decision.
+>> To be honest, I prefer to not have the Kconfig options.
+>> The device-tree compatibility will select the glue-logic
+>> needed and we will just pay some bytes when compile.
+>>
+>> In my opinion, the Koption(s) introduce a problem when touch
+>> the driver and we want to guarantee that, at least,
+>> all its parts build fine on all the platforms.
 >
-> Lorenzo
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> The current model is not scalable and requires modifying the base
+> driver for each variation, and the change brings the driver
+> in line with how we do things for other platform drivers.
+>
+> We should always be able to build all soc-specific glue drivers
+> with 'allmodconfig' for build testing, and a lot of us run that
+> frequently to find regressions.
+
+thx for your prompt feedback
+
+Peppe
+
+>
+> 	Arnd
+>
+>
