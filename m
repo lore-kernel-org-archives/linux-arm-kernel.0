@@ -1,24 +1,46 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 May 2015 22:30:48 +0200
-Subject: [PATCH v4 4/7] ARM: dts: Add base DT for NXP LPC18xx
-In-Reply-To: <1431381653-25356-5-git-send-email-manabian@gmail.com>
-References: <1431381653-25356-1-git-send-email-manabian@gmail.com>
- <1431381653-25356-5-git-send-email-manabian@gmail.com>
-Message-ID: <3308240.GYIY1gTjZ3@wuerfel>
+Date: Fri, 15 May 2015 22:32:14 +0200
+Subject: [PATCH v4 5/7] clk: zx: add clock support to zx296702
+In-Reply-To: <1430212691-16009-6-git-send-email-jun.nie@linaro.org>
+References: <1430212691-16009-1-git-send-email-jun.nie@linaro.org>
+ <1430212691-16009-6-git-send-email-jun.nie@linaro.org>
+Message-ID: <6693731.YF8XsCYmbE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 May 2015 00:00:50 Joachim Eastwood wrote:
-> NXP LPC18xx/43xx SoCs are very similar devices and should be able to
-> share a common base (lpc18xx.dtsi). Diffences between the devices are
-> put in a dtsi which is specific to that device.
+On Tuesday 28 April 2015 17:18:09 Jun Nie wrote:
+> diff --git a/include/dt-bindings/clock/zx296702-clock.h b/include/dt-bindings/clock/zx296702-clock.h
+> new file mode 100644
+> index 0000000..c5e7ec2
+> --- /dev/null
+> +++ b/include/dt-bindings/clock/zx296702-clock.h
+> @@ -0,0 +1,162 @@
+> +/*
+> + * Copyright 2014 Linaro Ltd.
+> + * Copyright (C) 2014 ZTE Corporation.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef __DT_BINDINGS_CLOCK_ZX296702_H
+> +#define __DT_BINDINGS_CLOCK_ZX296702_H
+> +
+> +#define ZX296702_OSC                           0
+> +#define ZX296702_PLL_A9                                1
+> +#define ZX296702_PLL_A9_350M                   2
+> +#define ZX296702_PLL_MAC_1000M                 3
+> +#define ZX296702_PLL_MAC_333M                  4
+> +#define ZX296702_PLL_MM0_1188M                 5
+> +#define ZX296702_PLL_MM0_396M                  6
+> +#define ZX296702_PLL_MM0_198M                  7
+> +#define ZX296702_PLL_MM1_108M                  8
+> +#define ZX296702_PLL_MM1_72M                   9
 > 
-> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
-> ---
->  arch/arm/boot/dts/lpc18xx.dtsi | 114 +++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 114 insertions(+)
->  create mode 100644 arch/arm/boot/dts/lpc18xx.dtsi
 
-Applied patches 4 though 7 to next/dt, thanks!
+No objections for this driver going through Mike's tree, but as I said
+if you want the dts file to be merged in the same merge window, it would
+be best to avoid the header file.
 
 	Arnd
