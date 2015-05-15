@@ -1,97 +1,192 @@
 From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Fri, 15 May 2015 16:23:08 -0500
-Subject: [V4 PATCH 0/6] ACPI: Introduce support for _CCA object
-Message-ID: <1431724994-21601-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+Date: Fri, 15 May 2015 16:23:10 -0500
+Subject: [V4 PATCH 2/6] arm64 : Introduce support for ACPI _CCA object
+In-Reply-To: <1431724994-21601-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+References: <1431724994-21601-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <1431724994-21601-3-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series introduce support for _CCA object, which is currently
-used mainly by ARM64 platform to specify DMA coherency attribute for
-devices when booting with ACPI.
+>From http://www.uefi.org/sites/default/files/resources/ACPI_6.0.pdf,
+section 6.2.17 _CCA states that ARM platforms require ACPI _CCA
+object to be specified for DMA-cabpable devices. This patch introduces
+ACPI_MUST_HAVE_CCA in arm64 Kconfig to specify such requirement.
 
-A copy of ACPIv6 can be found here:
-    http://www.uefi.org/sites/default/files/resources/ACPI_6.0.pdf
+In case _CCA is missing, arm64 would assign dummy_dma_ops
+to disable DMA capability of the device.
 
-This patch also introduces 2 new APIS:
-    1. acpi_dma_is_coherent() as part of ACPI API.
-    2. device_dma_is_coherent() as part of unified device property API.
+Signed-off-by: Mark Salter <msalter@redhat.com>
+Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+CC: Catalin Marinas <catalin.marinas@arm.com>
+CC: Will Deacon <will.deacon@arm.com>
+CC: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm64/Kconfig                   |  1 +
+ arch/arm64/include/asm/dma-mapping.h | 18 ++++++-
+ arch/arm64/mm/dma-mapping.c          | 92 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 109 insertions(+), 2 deletions(-)
 
-This simplifies the logic in device drivers to determine device coherency
-attribute regardless of booting with DT vs ACPI.
-
-This has been tested on AMD-Seattle platform, which implements _CCA 
-object as described in the AMD Opteron A1100 Series Processor ACPI Porting Guide:
-
-http://amd-dev.wpengine.netdna-cdn.com/wordpress/media/2012/10/Seattle_ACPI_Guide.pdf
-
-Changes from V3 (https://lkml.org/lkml/2015/5/7/1004):
-    * Remove ARCH64_SUPPORT_ACPI_CCA_ZERO and just use CONFIG_ARM64.
-      (per Catalin and Rafael)
-    * Do not need to call arch_setup_dma_ops() for acpi_device->dev.
-      (per Rafael)
-    * [3/6] (New) We also need to call arch_setup_dma_ops() for pci
-      devices and check the CCA of the host bridge. Similar logic
-      exists for OF. So, I refactor of_pci_dma_configure() to
-      the more generic version pci_dma_configure(), and add support
-      for ACPI.
-
-Changes from V2 (https://lkml.org/lkml/2015/5/5/510):
-    * Reword ACPI_MUST_HAVE_CCA to ACPI_CCA_REQUIRED (per Rafael)
-    * Reword ACPI_SUPPORT_CCA_ZERO to ARCH64_SUPPORT_ACPI_CCA_ZERO
-      (per Rafael and Arnd)
-    * Misc code styling clean up (per Rafael)
-    * Only print missing _CCA warning message in debug mode.
-    * Refactor logic in acpi_setup_device_dma() into
-      if acpi_dma_is_supported() then call arch_setup_dma_ops().
-    * Do not allocate device dma_mask if !acpi_dma_is_supported()
-      (per Arnd).
-    * Re-use the dummy functions with the same signature.
-
-Changes from V1 (https://lkml.org/lkml/2015/4/29/290):
-    * Remove supports for 32-bit ARM since doesn't currently
-      supporting ACPI (Per Catalin suggestions.)
-    * Do not call arch_setup_dma_ops() and when _CCA is missing.
-      (per Arnd suggestion)
-    * Add CONFIG_ACPI_SUPPORT_CCA_ZERO kernel config flag to
-      allow architectures to specify the behavior when _CCA=0.
-    * Add dummy_dma_ops for ARM64 (per Catalin suggestions).
-    * Fixed build error when ACPI is not configured by defining
-      acpi_dma_is_coherent() for when CONFIG_ACPI is not set.
-    * Introduce device_dma_is_coherent().
-    * Use device_dma_is_coherent in crypto/ccp and amd-xgbe driver.
-
-Changes from RFC: (https://lkml.org/lkml/2015/4/1/389)
-    * New logic for deriving and propagating coherent attribute from
-      parent devices. (by Mark)
-    * Introducing acpi_dma_is_coherent() API (Per Tom suggestion)
-    * Introducing CONFIG_ACPI_MUST_HAVE_CCA kernel configuration.
-    * Rebased to linux-4.1-rc1
-
-Suravee Suthikulpanit (6):
-  ACPI / scan: Parse _CCA and setup device coherency
-  arm64 : Introduce support for ACPI _CCA object
-  pci: Generic function for setting up PCI device DMA coherency
-  device property: Introduces device_dma_is_coherent()
-  crypto: ccp - Unify coherency checking logic with
-    device_dma_is_coherent()
-  amd-xgbe: Unify coherency checking logic with device_dma_is_coherent()
-
- arch/arm64/Kconfig                        |  1 +
- arch/arm64/include/asm/dma-mapping.h      | 18 +++++-
- arch/arm64/mm/dma-mapping.c               | 92 +++++++++++++++++++++++++++++++
- drivers/acpi/Kconfig                      |  3 +
- drivers/acpi/acpi_platform.c              | 10 +++-
- drivers/acpi/scan.c                       | 40 ++++++++++++++
- drivers/base/property.c                   | 12 ++++
- drivers/crypto/ccp/ccp-platform.c         | 60 +-------------------
- drivers/net/ethernet/amd/xgbe/xgbe-main.c | 27 +--------
- drivers/of/of_pci.c                       | 20 -------
- drivers/pci/probe.c                       | 35 +++++++++++-
- include/acpi/acpi_bus.h                   | 32 ++++++++++-
- include/linux/acpi.h                      | 10 ++++
- include/linux/of_pci.h                    |  3 -
- include/linux/property.h                  |  2 +
- 15 files changed, 249 insertions(+), 116 deletions(-)
-
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 4269dba..95307b4 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -1,5 +1,6 @@
+ config ARM64
+ 	def_bool y
++	select ACPI_CCA_REQUIRED if ACPI
+ 	select ACPI_GENERIC_GSI if ACPI
+ 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
+ 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
+index 9437e3d..f0d6d0b 100644
+--- a/arch/arm64/include/asm/dma-mapping.h
++++ b/arch/arm64/include/asm/dma-mapping.h
+@@ -18,6 +18,7 @@
+ 
+ #ifdef __KERNEL__
+ 
++#include <linux/acpi.h>
+ #include <linux/types.h>
+ #include <linux/vmalloc.h>
+ 
+@@ -28,13 +29,23 @@
+ 
+ #define DMA_ERROR_CODE	(~(dma_addr_t)0)
+ extern struct dma_map_ops *dma_ops;
++extern struct dma_map_ops dummy_dma_ops;
+ 
+ static inline struct dma_map_ops *__generic_dma_ops(struct device *dev)
+ {
+-	if (unlikely(!dev) || !dev->archdata.dma_ops)
++	if (unlikely(!dev))
+ 		return dma_ops;
+-	else
++	else if (dev->archdata.dma_ops)
+ 		return dev->archdata.dma_ops;
++	else if (acpi_disabled)
++		return dma_ops;
++
++	/*
++	 * When ACPI is enabled, if arch_set_dma_ops is not called,
++	 * we will disable device DMA capability by setting it
++	 * to dummy_dma_ops.
++	 */
++	return &dummy_dma_ops;
+ }
+ 
+ static inline struct dma_map_ops *get_dma_ops(struct device *dev)
+@@ -48,6 +59,9 @@ static inline struct dma_map_ops *get_dma_ops(struct device *dev)
+ static inline void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+ 				      struct iommu_ops *iommu, bool coherent)
+ {
++	if (!acpi_disabled && !dev->archdata.dma_ops)
++		dev->archdata.dma_ops = dma_ops;
++
+ 	dev->archdata.dma_coherent = coherent;
+ }
+ #define arch_setup_dma_ops	arch_setup_dma_ops
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index ef7d112..6e6d6ad 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -415,6 +415,98 @@ out:
+ 	return -ENOMEM;
+ }
+ 
++/********************************************
++ * The following APIs are for dummy DMA ops *
++ ********************************************/
++
++static void *__dummy_alloc(struct device *dev, size_t size,
++			   dma_addr_t *dma_handle, gfp_t flags,
++			   struct dma_attrs *attrs)
++{
++	return NULL;
++}
++
++static void __dummy_free(struct device *dev, size_t size,
++			 void *vaddr, dma_addr_t dma_handle,
++			 struct dma_attrs *attrs)
++{
++}
++
++static int __dummy_mmap(struct device *dev,
++			struct vm_area_struct *vma,
++			void *cpu_addr, dma_addr_t dma_addr, size_t size,
++			struct dma_attrs *attrs)
++{
++	return -ENXIO;
++}
++
++static dma_addr_t __dummy_map_page(struct device *dev, struct page *page,
++				   unsigned long offset, size_t size,
++				   enum dma_data_direction dir,
++				   struct dma_attrs *attrs)
++{
++	return DMA_ERROR_CODE;
++}
++
++static void __dummy_unmap_page(struct device *dev, dma_addr_t dev_addr,
++			       size_t size, enum dma_data_direction dir,
++			       struct dma_attrs *attrs)
++{
++}
++
++static int __dummy_map_sg(struct device *dev, struct scatterlist *sgl,
++			  int nelems, enum dma_data_direction dir,
++			  struct dma_attrs *attrs)
++{
++	return 0;
++}
++
++static void __dummy_unmap_sg(struct device *dev,
++			     struct scatterlist *sgl, int nelems,
++			     enum dma_data_direction dir,
++			     struct dma_attrs *attrs)
++{
++}
++
++static void __dummy_sync_single(struct device *dev,
++				dma_addr_t dev_addr, size_t size,
++				enum dma_data_direction dir)
++{
++}
++
++static void __dummy_sync_sg(struct device *dev,
++			    struct scatterlist *sgl, int nelems,
++			    enum dma_data_direction dir)
++{
++}
++
++static int __dummy_mapping_error(struct device *hwdev, dma_addr_t dma_addr)
++{
++	return 1;
++}
++
++static int __dummy_dma_supported(struct device *hwdev, u64 mask)
++{
++	return 0;
++}
++
++struct dma_map_ops dummy_dma_ops = {
++	.alloc                  = __dummy_alloc,
++	.free                   = __dummy_free,
++	.mmap                   = __dummy_mmap,
++	.map_page               = __dummy_map_page,
++	.unmap_page             = __dummy_unmap_page,
++	.map_sg                 = __dummy_map_sg,
++	.unmap_sg               = __dummy_unmap_sg,
++	.sync_single_for_cpu    = __dummy_sync_single,
++	.sync_single_for_device = __dummy_sync_single,
++	.sync_sg_for_cpu        = __dummy_sync_sg,
++	.sync_sg_for_device     = __dummy_sync_sg,
++	.mapping_error          = __dummy_mapping_error,
++	.dma_supported          = __dummy_dma_supported,
++};
++EXPORT_SYMBOL(dummy_dma_ops);
++
+ static int __init arm64_dma_init(void)
+ {
+ 	int ret;
 -- 
 2.1.0
