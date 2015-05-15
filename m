@@ -1,61 +1,62 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Fri, 15 May 2015 11:50:37 +0200
-Subject: [PATCH v3 0/6] Add dwc3 usb3 DT node and various phy cleanup
-In-Reply-To: <1430400652-3366-1-git-send-email-peter.griffin@linaro.org>
-References: <1430400652-3366-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <5555C16D.9020906@st.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 May 2015 10:51:59 +0100
+Subject: schedule_timeout sleeps too long after dividing CPU frequency
+In-Reply-To: <5555BC7E.7010601@free.fr>
+References: <555218C7.5050602@free.fr>
+ <20150512155004.GP2067@n2100.arm.linux.org.uk>
+ <555380F8.5050306@free.fr>
+ <CAOh2x==aCLxCWX9K57hOFVEP1eLo_OYZPe0YvbFvpkXcoSp_hQ@mail.gmail.com>
+ <5554858A.9010207@free.fr> <20150514115456.GB23999@linux>
+ <55549DEE.6010202@free.fr>
+ <CAKohpon4AV-7nq=Qm7PpDbbW9ti98avY9zz82htzyHWi5_K7fA@mail.gmail.com>
+ <20150514144239.GZ2067@n2100.arm.linux.org.uk>
+ <5555BC7E.7010601@free.fr>
+Message-ID: <20150515095159.GF2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On Fri, May 15, 2015 at 11:29:34AM +0200, Mason wrote:
+> On 14/05/2015 16:42, Russell King - ARM Linux wrote:
+> 
+> > If it's in periodic mode, the update should still be propagated to the
+> > hardware, assuming the generic time keeping code doesn't produce an
+> > error.
+> > 
+> > twd_update_frequency
+> > `-clockevents_update_freq
+> >   `-__clockevents_update_freq
+> >     `-__clockevents_set_state(, CLOCK_EVT_STATE_PERIODIC)
+> >       `-dev->set_mode (twd_set_mode)
+> > 
+> > That re-writes the TWD_TIMER_LOAD register based on twd_timer_rate,
+> > which would have been updated by twd_update_frequency().
+> > 
+> > The question I posed earlier remains: is clockevents_update_freq()
+> > failing?  We don't know, because we never check its return value.
+> > 
+> > Another thing to look at is whether we reach twd_set_mode().
+> > 
+> > Lastly, printing the values of the TWD_TIMER_LOAD and TWD_TIMER_COUNTER
+> > after twd_set_mode() has written TWD_TIMER_LOAD might provide some
+> > hints as to what's going on.
+> 
+> I'll have access to the board on Monday.
+> 
+> I'll add printk in strategic places, and report back ASAP.
 
-On 04/30/2015 03:30 PM, Peter Griffin wrote:
-> Hi Maxime,
->
-> This series primarily adds the dwc3 DT node which activates the usb3 controller on
-> the stih407-b2120, stih410-b2120 and stih418-b2199 platforms.
->
-> As part of getting this working I noticed an error with the picophyreset which
-> stops the controller working which I've also fixed.
->
-> regards,
->
-> Peter.
->
-> Changes in v3:
-> - Add miphys8lp options properties for stih418 (Pete)
-> - Add support for stih418-b2199 (Max)
-> - Only enable usb3 controller in the board file (Max)
-> - Fix superflous '\n' (Lee)
-> - Rebase series on v4.1-rc1 (Pete)
->
-> NB: Since v2 some patches were taken into the phy and ahci trees which I've now
-> removed from the series.
->
-> Changes in v2:
-> - Update commit to explicitly say no ABI breakage (Rob)
-> - Rebase series on v4.0-rc6 (Pete)
-> - Collect up Acks (Pete)
->
-> Peter Griffin (6):
->    ARM: DT: STi: STiH407: Update picophyreset for the usb3 controllers
->      usb2 phy
->    ARM: DT: STi: STiH407: Add dwc3 usb3 DT node.
->    usb: dwc3: dwc3-st: Update the incorrect DT dwc3 example.
->    ARM: DT: STi: stihxxx-b2120: Enable USB3 port on stih407-b2120 and
->      stih410-b2120
->    ARM: DT: STi: STiH418: Add miphy28lp optional oscillator clock
->      properties
->    ARM: DT: STi: STiH418: Enable USB3 port on stih418-b2199.
->
->   Documentation/devicetree/bindings/usb/dwc3-st.txt |  7 +++---
->   arch/arm/boot/dts/stih407-family.dtsi             | 30 ++++++++++++++++++++++-
->   arch/arm/boot/dts/stih418-b2199.dts               | 15 ++++++++++++
->   arch/arm/boot/dts/stihxxx-b2120.dtsi              |  5 ++++
->   4 files changed, 52 insertions(+), 5 deletions(-)
->
+That would be good.
 
-All DT patches of the series applied to STi DT branch for v4.2.
+> (I'm considering dropping TWD, and using platform timers.)
 
-Thanks!
-Maxime
+As you don't say which kernel version you're using, for all we know, you
+might be using a version which omits some fixes in this area, such as
+this one which you really must have if your timer is operating in
+period mode:
+
+fe79a9ba1196 clockevents: Adjust timer interval when frequency changes
+
+
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
