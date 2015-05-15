@@ -1,26 +1,27 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 15 May 2015 10:37:31 +0530
-Subject: schedule_timeout sleeps too long after dividing CPU frequency
-In-Reply-To: <20150515041632.GG6348@linux>
-References: <555218C7.5050602@free.fr>
- <20150512155004.GP2067@n2100.arm.linux.org.uk>
- <555380F8.5050306@free.fr>
- <CAOh2x==aCLxCWX9K57hOFVEP1eLo_OYZPe0YvbFvpkXcoSp_hQ@mail.gmail.com>
- <5554858A.9010207@free.fr> <20150514115456.GB23999@linux>
- <55549DEE.6010202@free.fr>
- <CAKohpon4AV-7nq=Qm7PpDbbW9ti98avY9zz82htzyHWi5_K7fA@mail.gmail.com>
- <5554B5C1.2070402@free.fr> <20150515041632.GG6348@linux>
-Message-ID: <20150515050731.GH6348@linux>
+From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
+Date: Fri, 15 May 2015 08:16:13 +0300
+Subject: [PATCH v9 00/17] Tegra124 CL-DVFS / DFLL clocksource + cpufreq
+In-Reply-To: <CAKohpo=0j3wqNhn3jtdYVzL0Kxi30TTivSttnUe4gpdGtHk2tw@mail.gmail.com>
+References: <1431529131-16710-1-git-send-email-mikko.perttunen@kapsi.fi>	<2216026.DiZ8MPKfdF@vostro.rjw.lan>	<55543D6F.2040704@kapsi.fi>	<3099473.H5qjMpDQKF@vostro.rjw.lan>
+ <CAKohpo=0j3wqNhn3jtdYVzL0Kxi30TTivSttnUe4gpdGtHk2tw@mail.gmail.com>
+Message-ID: <5555811D.4070109@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15-05-15, 09:46, Viresh Kumar wrote:
-> The logic is this:
-> - Oneshot mode is only useful if we are going to support NO_HZ mode.
->   i.e. we can disable the clkevt device during CPU idle ..
+On 05/15/2015 05:09 AM, Viresh Kumar wrote:
+> On 15 May 2015 at 01:45, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+>> You need ACKs from Viresh for those two, then.  He's officially responsible
+>> for ARM cpufreq drivers.
+>
+> I thought an Ack for 14th is enough :)
+>
+> For: 12/13/14.
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+>
 
-Minor correction. The last line talks about NO_HZ_IDLE instead. NO_HZ
-is about disabling to tick when not required.
+Thanks! :)
 
--- 
-viresh
+It probably was, but after almost one year of this series, I'm not sure 
+about anything anymore ;)
+
+Mikko
