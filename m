@@ -1,79 +1,506 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Fri, 15 May 2015 15:27:04 +0100
-Subject: [PATCH v4 01/12] KVM: add comments for kvm_debug_exit_arch struct
+Date: Fri, 15 May 2015 15:27:12 +0100
+Subject: [PATCH v4 09/12] KVM: arm64: introduce vcpu->arch.debug_ptr
 In-Reply-To: <1431700035-23479-1-git-send-email-alex.bennee@linaro.org>
 References: <1431700035-23479-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1431700035-23479-2-git-send-email-alex.bennee@linaro.org>
+Message-ID: <1431700035-23479-10-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bring into line with the comments for the other structures and their
-KVM_EXIT_* cases. Also update api.txt to reflect use in kvm_run
-documentation.
+This introduces a level of indirection for the debug registers. Instead
+of using the sys_regs[] directly we store registers in a structure in
+the vcpu. As we are no longer tied to the layout of the sys_regs[] we
+can make the copies size appropriate for control and value registers.
+
+This also entails updating the sys_regs code to access this new
+structure. Instead of passing a register index we now pass an offset
+into the kvm_guest_debug_arch structure.
+
+We also need to ensure the GET/SET_ONE_REG ioctl operations store the
+registers in their correct location.
 
 Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-Reviewed-by: David Hildenbrand <dahi@linux.vnet.ibm.com>
-Reviewed-by: Andrew Jones <drjones@redhat.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
----
-
-v2
-  - add comments for other exit types
-v3
-  - s/commentary/comments/
-  - add rb tags
-  - update api.txt kvm_run to include KVM_EXIT_DEBUG desc
-v4
-  - sp fixes
-  - add a-b
-
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 9fa2bf8..c34c32d 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -3070,11 +3070,13 @@ data_offset describes where the data is located (KVM_EXIT_IO_OUT) or
- where kvm expects application code to place the data for the next
- KVM_RUN invocation (KVM_EXIT_IO_IN).  Data format is a packed array.
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 9b3ed6d..0d17c7b 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -279,6 +279,9 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
+ 	/* Set up the timer */
+ 	kvm_timer_vcpu_init(vcpu);
  
-+		/* KVM_EXIT_DEBUG */
- 		struct {
- 			struct kvm_debug_exit_arch arch;
- 		} debug;
++	/* Set the debug registers to be the guests */
++	vcpu->arch.debug_ptr = &vcpu->arch.vcpu_debug_state;
++
+ 	return 0;
+ }
  
--Unused.
-+If the exit_reason is KVM_EXIT_DEBUG, then a vcpu is processing a debug event
-+for which architecture specific information is returned.
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+index d6b507e..e997404 100644
+--- a/arch/arm64/include/asm/kvm_asm.h
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -46,24 +46,16 @@
+ #define	CNTKCTL_EL1	20	/* Timer Control Register (EL1) */
+ #define	PAR_EL1		21	/* Physical Address Register */
+ #define MDSCR_EL1	22	/* Monitor Debug System Control Register */
+-#define DBGBCR0_EL1	23	/* Debug Breakpoint Control Registers (0-15) */
+-#define DBGBCR15_EL1	38
+-#define DBGBVR0_EL1	39	/* Debug Breakpoint Value Registers (0-15) */
+-#define DBGBVR15_EL1	54
+-#define DBGWCR0_EL1	55	/* Debug Watchpoint Control Registers (0-15) */
+-#define DBGWCR15_EL1	70
+-#define DBGWVR0_EL1	71	/* Debug Watchpoint Value Registers (0-15) */
+-#define DBGWVR15_EL1	86
+-#define MDCCINT_EL1	87	/* Monitor Debug Comms Channel Interrupt Enable Reg */
++#define MDCCINT_EL1	23	/* Monitor Debug Comms Channel Interrupt Enable Reg */
  
- 		/* KVM_EXIT_MMIO */
- 		struct {
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index 4b60056..70ac641 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -237,6 +237,7 @@ struct kvm_run {
- 			__u32 count;
- 			__u64 data_offset; /* relative to kvm_run start */
- 		} io;
-+		/* KVM_EXIT_DEBUG */
- 		struct {
- 			struct kvm_debug_exit_arch arch;
- 		} debug;
-@@ -285,6 +286,7 @@ struct kvm_run {
- 			__u32 data;
- 			__u8  is_write;
- 		} dcr;
-+		/* KVM_EXIT_INTERNAL_ERROR */
- 		struct {
- 			__u32 suberror;
- 			/* Available with KVM_CAP_INTERNAL_ERROR_DATA: */
-@@ -295,6 +297,7 @@ struct kvm_run {
- 		struct {
- 			__u64 gprs[32];
- 		} osi;
-+		/* KVM_EXIT_PAPR_HCALL */
- 		struct {
- 			__u64 nr;
- 			__u64 ret;
+ /* 32bit specific registers. Keep them at the end of the range */
+-#define	DACR32_EL2	88	/* Domain Access Control Register */
+-#define	IFSR32_EL2	89	/* Instruction Fault Status Register */
+-#define	FPEXC32_EL2	90	/* Floating-Point Exception Control Register */
+-#define	DBGVCR32_EL2	91	/* Debug Vector Catch Register */
+-#define	TEECR32_EL1	92	/* ThumbEE Configuration Register */
+-#define	TEEHBR32_EL1	93	/* ThumbEE Handler Base Register */
+-#define	NR_SYS_REGS	94
++#define	DACR32_EL2	24	/* Domain Access Control Register */
++#define	IFSR32_EL2	25	/* Instruction Fault Status Register */
++#define	FPEXC32_EL2	26	/* Floating-Point Exception Control Register */
++#define	DBGVCR32_EL2	27	/* Debug Vector Catch Register */
++#define	TEECR32_EL1	28	/* ThumbEE Configuration Register */
++#define	TEEHBR32_EL1	29	/* ThumbEE Handler Base Register */
++#define	NR_SYS_REGS	30
+ 
+ /* 32bit mapping */
+ #define c0_MPIDR	(MPIDR_EL1 * 2)	/* MultiProcessor ID Register */
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 3ab31d7..ad792cb 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -108,11 +108,21 @@ struct kvm_vcpu_arch {
+ 	/* Exception Information */
+ 	struct kvm_vcpu_fault_info fault;
+ 
+-	/* Debug state */
++	/* Guest debug state */
+ 	u64 debug_flags;
+ 
++	/*
++	 * For debugging the guest we need to keep a set of debug
++	 * registers which can override the guests own debug state
++	 * while being used. These are set via the KVM_SET_GUEST_DEBUG
++	 * ioctl.
++	 */
++	struct kvm_guest_debug_arch *debug_ptr;
++	struct kvm_guest_debug_arch vcpu_debug_state;
++
+ 	/* Pointer to host CPU context */
+ 	kvm_cpu_context_t *host_cpu_context;
++	struct kvm_guest_debug_arch host_debug_state;
+ 
+ 	/* VGIC state */
+ 	struct vgic_cpu vgic_cpu;
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index dfb25a2..1a8e97c 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -116,10 +116,16 @@ int main(void)
+   DEFINE(VCPU_FAR_EL2,		offsetof(struct kvm_vcpu, arch.fault.far_el2));
+   DEFINE(VCPU_HPFAR_EL2,	offsetof(struct kvm_vcpu, arch.fault.hpfar_el2));
+   DEFINE(VCPU_DEBUG_FLAGS,	offsetof(struct kvm_vcpu, arch.debug_flags));
++  DEFINE(VCPU_DEBUG_PTR,	offsetof(struct kvm_vcpu, arch.debug_ptr));
++  DEFINE(DEBUG_BCR, 		offsetof(struct kvm_guest_debug_arch, dbg_bcr));
++  DEFINE(DEBUG_BVR, 		offsetof(struct kvm_guest_debug_arch, dbg_bvr));
++  DEFINE(DEBUG_WCR, 		offsetof(struct kvm_guest_debug_arch, dbg_wcr));
++  DEFINE(DEBUG_WVR, 		offsetof(struct kvm_guest_debug_arch, dbg_wvr));
+   DEFINE(VCPU_HCR_EL2,		offsetof(struct kvm_vcpu, arch.hcr_el2));
+   DEFINE(VCPU_MDCR_EL2,	offsetof(struct kvm_vcpu, arch.mdcr_el2));
+   DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
+   DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
++  DEFINE(VCPU_HOST_DEBUG_STATE, offsetof(struct kvm_vcpu, arch.host_debug_state));
+   DEFINE(VCPU_TIMER_CNTV_CTL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_ctl));
+   DEFINE(VCPU_TIMER_CNTV_CVAL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_cval));
+   DEFINE(KVM_TIMER_CNTVOFF,	offsetof(struct kvm, arch.timer.cntvoff));
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index 335723e..d755922 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -228,7 +228,7 @@
+ 	stp	x24, x25, [x3, #160]
+ .endm
+ 
+-.macro save_debug type
++.macro save_debug type regsz offsz
+ 	// x4: pointer to register set
+ 	// x5: number of registers to skip
+ 	// x6..x22 trashed
+@@ -258,22 +258,22 @@
+ 	add	x22, x22, x5, lsl #2
+ 	br	x22
+ 1:
+-	str	x21, [x4, #(15 * 8)]
+-	str	x20, [x4, #(14 * 8)]
+-	str	x19, [x4, #(13 * 8)]
+-	str	x18, [x4, #(12 * 8)]
+-	str	x17, [x4, #(11 * 8)]
+-	str	x16, [x4, #(10 * 8)]
+-	str	x15, [x4, #(9 * 8)]
+-	str	x14, [x4, #(8 * 8)]
+-	str	x13, [x4, #(7 * 8)]
+-	str	x12, [x4, #(6 * 8)]
+-	str	x11, [x4, #(5 * 8)]
+-	str	x10, [x4, #(4 * 8)]
+-	str	x9, [x4, #(3 * 8)]
+-	str	x8, [x4, #(2 * 8)]
+-	str	x7, [x4, #(1 * 8)]
+-	str	x6, [x4, #(0 * 8)]
++	str	\regsz\()21, [x4, #(15 * \offsz)]
++	str	\regsz\()20, [x4, #(14 * \offsz)]
++	str	\regsz\()19, [x4, #(13 * \offsz)]
++	str	\regsz\()18, [x4, #(12 * \offsz)]
++	str	\regsz\()17, [x4, #(11 * \offsz)]
++	str	\regsz\()16, [x4, #(10 * \offsz)]
++	str	\regsz\()15, [x4, #(9 * \offsz)]
++	str	\regsz\()14, [x4, #(8 * \offsz)]
++	str	\regsz\()13, [x4, #(7 * \offsz)]
++	str	\regsz\()12, [x4, #(6 * \offsz)]
++	str	\regsz\()11, [x4, #(5 * \offsz)]
++	str	\regsz\()10, [x4, #(4 * \offsz)]
++	str	\regsz\()9, [x4, #(3 * \offsz)]
++	str	\regsz\()8, [x4, #(2 * \offsz)]
++	str	\regsz\()7, [x4, #(1 * \offsz)]
++	str	\regsz\()6, [x4, #(0 * \offsz)]
+ .endm
+ 
+ .macro restore_sysregs
+@@ -318,7 +318,7 @@
+ 	msr	mdscr_el1,	x25
+ .endm
+ 
+-.macro restore_debug type
++.macro restore_debug type regsz offsz
+         // x4: pointer to register set
+         // x5: number of registers to skip
+ 	// x6..x22 trashed
+@@ -327,22 +327,22 @@
+ 	add	x22, x22, x5, lsl #2
+ 	br	x22
+ 1:
+-	ldr	x21, [x4, #(15 * 8)]
+-	ldr	x20, [x4, #(14 * 8)]
+-	ldr	x19, [x4, #(13 * 8)]
+-	ldr	x18, [x4, #(12 * 8)]
+-	ldr	x17, [x4, #(11 * 8)]
+-	ldr	x16, [x4, #(10 * 8)]
+-	ldr	x15, [x4, #(9 * 8)]
+-	ldr	x14, [x4, #(8 * 8)]
+-	ldr	x13, [x4, #(7 * 8)]
+-	ldr	x12, [x4, #(6 * 8)]
+-	ldr	x11, [x4, #(5 * 8)]
+-	ldr	x10, [x4, #(4 * 8)]
+-	ldr	x9, [x4, #(3 * 8)]
+-	ldr	x8, [x4, #(2 * 8)]
+-	ldr	x7, [x4, #(1 * 8)]
+-	ldr	x6, [x4, #(0 * 8)]
++	ldr	\regsz\()21, [x4, #(15 * \offsz)]
++	ldr	\regsz\()20, [x4, #(14 * \offsz)]
++	ldr	\regsz\()19, [x4, #(13 * \offsz)]
++	ldr	\regsz\()18, [x4, #(12 * \offsz)]
++	ldr	\regsz\()17, [x4, #(11 * \offsz)]
++	ldr	\regsz\()16, [x4, #(10 * \offsz)]
++	ldr	\regsz\()15, [x4, #(9 * \offsz)]
++	ldr	\regsz\()14, [x4, #(8 * \offsz)]
++	ldr	\regsz\()13, [x4, #(7 * \offsz)]
++	ldr	\regsz\()12, [x4, #(6 * \offsz)]
++	ldr	\regsz\()11, [x4, #(5 * \offsz)]
++	ldr	\regsz\()10, [x4, #(4 * \offsz)]
++	ldr	\regsz\()9, [x4, #(3 * \offsz)]
++	ldr	\regsz\()8, [x4, #(2 * \offsz)]
++	ldr	\regsz\()7, [x4, #(1 * \offsz)]
++	ldr	\regsz\()6, [x4, #(0 * \offsz)]
+ 
+ 	adr	x22, 1f
+ 	add	x22, x22, x5, lsl #2
+@@ -601,6 +601,7 @@ __restore_sysregs:
+ __save_debug:
+ 	// x0: base address for vcpu context
+ 	// x2: ptr to current CPU context
++	// x3: ptr to debug reg struct
+ 	// x4/x5: trashed
+ 
+ 	mrs	x26, id_aa64dfr0_el1
+@@ -611,16 +612,16 @@ __save_debug:
+ 	sub	w25, w26, w25		// How many WPs to skip
+ 
+ 	mov     x5, x24
+-	add	x4, x2, #CPU_SYSREG_OFFSET(DBGBCR0_EL1)
+-	save_debug dbgbcr
+-	add	x4, x2, #CPU_SYSREG_OFFSET(DBGBVR0_EL1)
+-	save_debug dbgbvr
++	add	x4, x3, #DEBUG_BCR
++	save_debug dbgbcr w 4
++	add	x4, x3, #DEBUG_BVR
++	save_debug dbgbvr x 8
+ 
+ 	mov     x5, x25
+-	add	x4, x2, #CPU_SYSREG_OFFSET(DBGWCR0_EL1)
+-	save_debug dbgwcr
+-	add	x4, x2, #CPU_SYSREG_OFFSET(DBGWVR0_EL1)
+-	save_debug dbgwvr
++	add	x4, x3, #DEBUG_WCR
++	save_debug dbgwcr w 4
++	add	x4, x3, #DEBUG_WVR
++	save_debug dbgwvr x 8
+ 
+ 	mrs	x21, mdccint_el1
+ 	str	x21, [x2, #CPU_SYSREG_OFFSET(MDCCINT_EL1)]
+@@ -640,16 +641,16 @@ __restore_debug:
+ 	sub	w25, w26, w25		// How many WPs to skip
+ 
+ 	mov     x5, x24
+-	add	x4, x2, #CPU_SYSREG_OFFSET(DBGBCR0_EL1)
+-	restore_debug dbgbcr
+-	add	x4, x2, #CPU_SYSREG_OFFSET(DBGBVR0_EL1)
+-	restore_debug dbgbvr
++	add	x4, x3, #DEBUG_BCR
++	restore_debug dbgbcr w 4
++	add	x4, x3, #DEBUG_BVR
++	restore_debug dbgbvr x 8
+ 
+ 	mov     x5, x25
+-	add	x4, x2, #CPU_SYSREG_OFFSET(DBGWCR0_EL1)
+-	restore_debug dbgwcr
+-	add	x4, x2, #CPU_SYSREG_OFFSET(DBGWVR0_EL1)
+-	restore_debug dbgwvr
++	add	x4, x3, #DEBUG_WCR
++	restore_debug dbgwcr w 4
++	add	x4, x3, #DEBUG_WVR
++	restore_debug dbgwvr x 8
+ 
+ 	ldr	x21, [x2, #CPU_SYSREG_OFFSET(MDCCINT_EL1)]
+ 	msr	mdccint_el1, x21
+@@ -688,6 +689,7 @@ ENTRY(__kvm_vcpu_run)
+ 	bl __save_sysregs
+ 
+ 	compute_debug_state 1f
++	add	x3, x0, #VCPU_HOST_DEBUG_STATE
+ 	bl	__save_debug
+ 1:
+ 	activate_traps
+@@ -703,6 +705,8 @@ ENTRY(__kvm_vcpu_run)
+ 	bl __restore_fpsimd
+ 
+ 	skip_debug_state x3, 1f
++	ldr	x3, [x0, #VCPU_DEBUG_PTR]
++	kern_hyp_va x3
+ 	bl	__restore_debug
+ 1:
+ 	restore_guest_32bit_state
+@@ -723,6 +727,8 @@ __kvm_vcpu_return:
+ 	bl __save_sysregs
+ 
+ 	skip_debug_state x3, 1f
++	ldr	x3, [x0, #VCPU_DEBUG_PTR]
++	kern_hyp_va x3
+ 	bl	__save_debug
+ 1:
+ 	save_guest_32bit_state
+@@ -745,6 +751,7 @@ __kvm_vcpu_return:
+ 	// already been saved. Note that we nuke the whole 64bit word.
+ 	// If we ever add more flags, we'll have to be more careful...
+ 	str	xzr, [x0, #VCPU_DEBUG_FLAGS]
++	add	x3, x0, #VCPU_HOST_DEBUG_STATE
+ 	bl	__restore_debug
+ 1:
+ 	restore_host_regs
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index c370b40..405403e 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -211,6 +211,48 @@ static bool trap_debug_regs(struct kvm_vcpu *vcpu,
+ 	return true;
+ }
+ 
++static inline bool trap_debug32(struct kvm_vcpu *vcpu,
++				const struct sys_reg_params *p,
++				const struct sys_reg_desc *rd)
++{
++	__u32 *r = (__u32 *) ((void * )&vcpu->arch.vcpu_debug_state + rd->reg);
++	if (p->is_write) {
++		*r = *vcpu_reg(vcpu, p->Rt);
++		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
++	} else {
++		*vcpu_reg(vcpu, p->Rt) = *r;
++	}
++
++	return true;
++}
++
++static inline bool trap_debug64(struct kvm_vcpu *vcpu,
++				const struct sys_reg_params *p,
++				const struct sys_reg_desc *rd)
++{
++	__u64 *r = (__u64 *) ((void * )&vcpu->arch.vcpu_debug_state + rd->reg);
++	if (p->is_write) {
++		*r = *vcpu_reg(vcpu, p->Rt);
++		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
++	} else {
++		*vcpu_reg(vcpu, p->Rt) = *r;
++	}
++
++	return true;
++}
++
++static inline void reset_debug32(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd)
++{
++	__u32 *r = (__u32 *) ((void * )&vcpu->arch.vcpu_debug_state + rd->reg);
++	*r = rd->val;
++}
++
++static inline void reset_debug64(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd)
++{
++	__u64 *r = (__u64 *) ((void * )&vcpu->arch.vcpu_debug_state + rd->reg);
++	*r = rd->val;
++}
++
+ static void reset_amair_el1(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+ {
+ 	u64 amair;
+@@ -240,16 +282,20 @@ static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+ #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
+ 	/* DBGBVRn_EL1 */						\
+ 	{ Op0(0b10), Op1(0b000), CRn(0b0000), CRm((n)), Op2(0b100),	\
+-	  trap_debug_regs, reset_val, (DBGBVR0_EL1 + (n)), 0 },		\
++	  trap_debug64, reset_debug64,					\
++	  offsetof(struct kvm_guest_debug_arch, dbg_bvr[(n)]), 0 },	\
+ 	/* DBGBCRn_EL1 */						\
+ 	{ Op0(0b10), Op1(0b000), CRn(0b0000), CRm((n)), Op2(0b101),	\
+-	  trap_debug_regs, reset_val, (DBGBCR0_EL1 + (n)), 0 },		\
++	  trap_debug32, reset_debug32,					\
++	  offsetof(struct kvm_guest_debug_arch, dbg_bcr[(n)]), 0},	\
+ 	/* DBGWVRn_EL1 */						\
+ 	{ Op0(0b10), Op1(0b000), CRn(0b0000), CRm((n)), Op2(0b110),	\
+-	  trap_debug_regs, reset_val, (DBGWVR0_EL1 + (n)), 0 },		\
++	  trap_debug64, reset_debug64,					\
++	  offsetof(struct kvm_guest_debug_arch, dbg_wvr[(n)]), 0 },	\
+ 	/* DBGWCRn_EL1 */						\
+ 	{ Op0(0b10), Op1(0b000), CRn(0b0000), CRm((n)), Op2(0b111),	\
+-	  trap_debug_regs, reset_val, (DBGWCR0_EL1 + (n)), 0 }
++	  trap_debug32, reset_debug32,					\
++	  offsetof(struct kvm_guest_debug_arch, dbg_wcr[(n)]), 0}
+ 
+ /*
+  * Architected system registers.
+@@ -502,37 +548,23 @@ static bool trap_dbgidr(struct kvm_vcpu *vcpu,
+ 	}
+ }
+ 
+-static bool trap_debug32(struct kvm_vcpu *vcpu,
+-			 const struct sys_reg_params *p,
+-			 const struct sys_reg_desc *r)
+-{
+-	if (p->is_write) {
+-		vcpu_cp14(vcpu, r->reg) = *vcpu_reg(vcpu, p->Rt);
+-		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
+-	} else {
+-		*vcpu_reg(vcpu, p->Rt) = vcpu_cp14(vcpu, r->reg);
+-	}
+-
+-	return true;
+-}
+-
+ #define DBG_BCR_BVR_WCR_WVR(n)					\
+ 	/* DBGBVRn */						\
+ 	{ Op1( 0), CRn( 0), CRm((n)), Op2( 4), trap_debug32,	\
+-	  NULL, (cp14_DBGBVR0 + (n) * 2) },			\
++	  NULL, offsetof(struct kvm_guest_debug_arch, dbg_bvr[(n)]) },	\
+ 	/* DBGBCRn */						\
+ 	{ Op1( 0), CRn( 0), CRm((n)), Op2( 5), trap_debug32,	\
+-	  NULL, (cp14_DBGBCR0 + (n) * 2) },			\
++	  NULL, offsetof(struct kvm_guest_debug_arch, dbg_bcr[(n)]) },			\
+ 	/* DBGWVRn */						\
+ 	{ Op1( 0), CRn( 0), CRm((n)), Op2( 6), trap_debug32,	\
+-	  NULL, (cp14_DBGWVR0 + (n) * 2) },			\
++	  NULL, offsetof(struct kvm_guest_debug_arch, dbg_wvr[(n)]) },			\
+ 	/* DBGWCRn */						\
+ 	{ Op1( 0), CRn( 0), CRm((n)), Op2( 7), trap_debug32,	\
+-	  NULL, (cp14_DBGWCR0 + (n) * 2) }
++	  NULL, offsetof(struct kvm_guest_debug_arch, dbg_wcr[(n)]) }
+ 
+ #define DBGBXVR(n)						\
+ 	{ Op1( 0), CRn( 1), CRm((n)), Op2( 1), trap_debug32,	\
+-	  NULL, cp14_DBGBXVR0 + n * 2 }
++	  NULL, offsetof(struct kvm_guest_debug_arch, dbg_bvr[(n)])+sizeof(__u32) }
+ 
+ /*
+  * Trapped cp14 registers. We generally ignore most of the external
+@@ -1288,6 +1320,42 @@ static int demux_c15_set(u64 id, void __user *uaddr)
+ 	}
+ }
+ 
++static int debug_set32(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
++		const struct kvm_one_reg *reg, void __user *uaddr)
++{
++	__u32 *r = (__u32 *) ((void * )&vcpu->arch.vcpu_debug_state + rd->reg);
++	if (copy_from_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
++		return -EFAULT;
++	return 0;
++}
++
++static int debug_set64(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
++		const struct kvm_one_reg *reg, void __user *uaddr)
++{
++	__u64 *r = (__u64 *) ((void * )&vcpu->arch.vcpu_debug_state + rd->reg);
++	if (copy_from_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
++		return -EFAULT;
++	return 0;
++}
++
++static int debug_get32(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
++		const struct kvm_one_reg *reg, void __user *uaddr)
++{
++	__u32 *r = (__u32 *) ((void * )&vcpu->arch.vcpu_debug_state + rd->reg);
++	if (copy_to_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
++		return -EFAULT;
++	return 0;
++}
++
++static int debug_get64(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
++	const struct kvm_one_reg *reg, void __user *uaddr)
++{
++	__u64 *r = (__u64 *) ((void * )&vcpu->arch.vcpu_debug_state + rd->reg);
++	if (copy_to_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
++		return -EFAULT;
++	return 0;
++}
++
+ int kvm_arm_sys_reg_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ {
+ 	const struct sys_reg_desc *r;
+@@ -1303,6 +1371,12 @@ int kvm_arm_sys_reg_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg
+ 	if (!r)
+ 		return get_invariant_sys_reg(reg->id, uaddr);
+ 
++	if (r->access == trap_debug64)
++		return debug_get64(vcpu, r, reg, uaddr);
++
++	if (r->access == trap_debug32)
++		return debug_get32(vcpu, r, reg, uaddr);
++
+ 	return reg_to_user(uaddr, &vcpu_sys_reg(vcpu, r->reg), reg->id);
+ }
+ 
+@@ -1321,6 +1395,12 @@ int kvm_arm_sys_reg_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg
+ 	if (!r)
+ 		return set_invariant_sys_reg(reg->id, uaddr);
+ 
++	if (r->access == trap_debug64)
++		return debug_set64(vcpu, r, reg, uaddr);
++
++	if (r->access == trap_debug32)
++		return debug_set32(vcpu, r, reg, uaddr);
++
+ 	return reg_from_user(&vcpu_sys_reg(vcpu, r->reg), uaddr, reg->id);
+ }
+ 
 -- 
 2.3.5
