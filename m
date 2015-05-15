@@ -1,104 +1,83 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 15 May 2015 16:12:16 +0200
-Subject: [PATCH v6 4/4] clk: dt: Introduce binding for always-on clock
- support
-In-Reply-To: <20150508072246.GH16220@x1>
-References: <20150408155705.GF26727@lukather> <20150408172344.GH5162@x1>
- <20150422093446.GA28007@lukather> <20150429141751.GR9169@x1>
- <20150429202332.GG6062@lukather> <20150430095722.GB1815@x1>
- <20150501053406.GI4946@pengutronix.de> <20150501064405.GB4047@x1>
- <20150507212052.GM11057@lukather> <20150508072246.GH16220@x1>
-Message-ID: <20150515141216.GW4004@lukather>
+Date: Fri, 15 May 2015 16:21:28 +0200
+Subject: [PATCH 1/8] clk: sunxi: factors: Add m_start parameters
+In-Reply-To: <CAGb2v67jruYamgHpM1NRm_fvm+SnDgQy4BEvZBxPEFByQsRsrg@mail.gmail.com>
+References: <1430565879-28113-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1430565879-28113-2-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v669fsz_pA+B0r8efp0BMxY-D86qfLuGQCqK1POuu9PmxQ@mail.gmail.com>
+ <20150515074314.GQ4004@lukather>
+ <CAGb2v66jRX09k48ciR-bwMZRAioRpHKZ3D2+wVYWannjtF+G3w@mail.gmail.com>
+ <20150515080546.GT4004@lukather>
+ <CAGb2v67jruYamgHpM1NRm_fvm+SnDgQy4BEvZBxPEFByQsRsrg@mail.gmail.com>
+Message-ID: <20150515142128.GY4004@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 08, 2015 at 08:22:46AM +0100, Lee Jones wrote:
-> On Thu, 07 May 2015, Maxime Ripard wrote:
+On Fri, May 15, 2015 at 05:11:16PM +0800, Chen-Yu Tsai wrote:
+> On Fri, May 15, 2015 at 4:05 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Fri, May 15, 2015 at 03:48:38PM +0800, Chen-Yu Tsai wrote:
+> >> On Fri, May 15, 2015 at 3:43 PM, Maxime Ripard
+> >> <maxime.ripard@free-electrons.com> wrote:
+> >> > On Thu, May 14, 2015 at 05:12:07PM +0800, Chen-Yu Tsai wrote:
+> >> >> On Sat, May 2, 2015 at 7:24 PM, Maxime Ripard
+> >> >> <maxime.ripard@free-electrons.com> wrote:
+> >> >> > Some clocks start incrementing the m factor at 0. Add a parameter to handle
+> >> >> > it just like we did for the N factor.
+> >> >> >
+> >> >> > Since the behaviour until now was to assume that the m factor was starting
+> >> >> > at 1, we also need to fix the other users.
+> >> >> >
+> >> >> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> >> >> > ---
+> >> >> >  drivers/clk/sunxi/clk-factors.c    | 11 ++++++++++-
+> >> >> >  drivers/clk/sunxi/clk-factors.h    |  2 ++
+> >> >> >  drivers/clk/sunxi/clk-mod0.c       |  2 ++
+> >> >> >  drivers/clk/sunxi/clk-sun8i-mbus.c |  2 ++
+> >> >> >  drivers/clk/sunxi/clk-sun9i-core.c |  6 ++++++
+> >> >> >  drivers/clk/sunxi/clk-sunxi.c      | 10 ++++++++++
+> >> >> >  6 files changed, 32 insertions(+), 1 deletion(-)
+> >> >> >
+> >> >> > diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
+> >> >> > index 8c20190a3e9f..100a711c3e3d 100644
+> >> >> > --- a/drivers/clk/sunxi/clk-factors.c
+> >> >> > +++ b/drivers/clk/sunxi/clk-factors.c
+> >> >> > @@ -56,15 +56,24 @@ static unsigned long clk_factors_recalc_rate(struct clk_hw *hw,
+> >> >> >         /* Get each individual factor if applicable */
+> >> >> >         if (config->nwidth != SUNXI_FACTORS_NOT_APPLICABLE)
+> >> >> >                 n = FACTOR_GET(config->nshift, config->nwidth, reg);
+> >> >> > +
+> >> >> >         if (config->kwidth != SUNXI_FACTORS_NOT_APPLICABLE)
+> >> >> >                 k = FACTOR_GET(config->kshift, config->kwidth, reg);
+> >> >> > +
+> >> >> >         if (config->mwidth != SUNXI_FACTORS_NOT_APPLICABLE)
+> >> >> >                 m = FACTOR_GET(config->mshift, config->mwidth, reg);
+> >> >> > +       else
+> >> >> > +               /* Make sure we don't get a division by zero */
+> >> >> > +               m = 1;
+> >> >>
+> >> >> What happens when mwidth is valid, m_start = 0, and m = 0?
+> >> >
+> >> > That's a very good question. A division by zero in the kernel, I'd
+> >> > say.
+> >> >
+> >> > But I don't think we can end up in such a case today, and it's
+> >> > somewhat expected that it will happen, and no clock have looked at can
+> >> > actually end up in such a case.
+> >>
+> >> It's possible if the bootloader left the clock in an invalid state.
+> >> How about just returning 0, indicating an invalid rate, early?
+> >
+> > The value set in the register might be zero, but that will always
+> > really mean 1, either through m_start or m_zero. That would be a bug
+> > in the driver itself.
 > 
-> > On Fri, May 01, 2015 at 07:44:05AM +0100, Lee Jones wrote:
-> > > > > Does Sascha's antidote patch change your opinion?  We can use DT to
-> > > > > declare critical clocks, and in the rare case of the introduction of a
-> > > > > new DDRFreq-like feature, which doesn't adapt the DT will still be
-> > > > > able to unlock the criticalness of the clock and use it as expected?
-> > > > 
-> > > > Honestly I'm not very fond of declaring these in the device tree, but
-> > > 
-> > > I know why you guys are saying that, but I'd like you to understand
-> > > the reasons for me pushing for this.  Rather than be being deliberately
-> > > obtuse, I'm thinking of the mess that not having this stuff in DT will
-> > > cause for clock implementations like ours, which describe more of a
-> > > framework than a description.
-> > 
-> > The DT should dictate our implementation, not the other way around. I
-> > know that we are pretty bad at doing this, and that there's some clear
-> > abstraction violations already widely used, but really, using this
-> > kind of argument is pretty bad.
-> 
-> I guess then you haven't correctly understood my argument, as that's
-> exactly what's happened.  We have a DT implementation which accurately
-> describes the clock architecture on each of our platforms. The
-> associated C code in drivers/clk/ is written to extract the
-> information from it, the hardware description and register the clocks
-> properly.
-> 
-> What makes you think differently?
-> 
-> > The DT can (and is) shared between several OS and bootloaders, what if
-> > the *BSDs or barebox, or whatever, guys come up with the exact same
-> > argument to make a completely different binding?
-> > 
-> > We'd end up either in a deadlock, or forcing our solution down the
-> > throat to some other system. I'm not sure any of these outcomes is
-> > something we want.
-> 
-> Not sure I understand why this is different from any other binding?
+> Maybe you should switch the order of these 2 patches to make it clear?
+> Or maybe squash them? As it currently is, m_start = 0 and m = 0 with
+> this patch only is a bug.
 
-The other bindings don't dictate the OS behaviour, this one does.
-
-> > > The providers in drivers/clock/st are blissfully ignorant of platform
-> > > specifics.  Per-platform configuration is described in DT.
-> > 
-> > Maybe they just need a small amount of education then.
-> 
-> Easy to say (and implement), but that means duplicating the hardware
-> description in DT, which is not a design win.
-
-Except that clock-always-on isn't an hardware information, it's what
-you expect the OS to do with this clock. The fact that it's a critical
-clock, would be way better, as it gives the OS the information that
-this clock should be treated with care, and *possibly* never disable
-it, but still leaves the option open to do whatever it needs to do
-with it if it knows what it's doing.
-
-> > > So we'd have 2 options to use a C-only based API; 1) duplicate
-> > > platform information in drivers/clk/st, or 2) supply a vendor
-> > > specific st,critical-clocks binding, pull out those references then
-> > > run them though the aforementioned framework.  It is my opinion that
-> > > neither of those methods are desirable.
-> > 
-> > 3) have a generic solution for this in the clock framework, like Mike
-> > suggested.
-> 
-> Did you actually read and understand the points here?  If not, just
-> say so and I'll figure out a way to explain the issues better.  3) is
-> not an alternative to 1) and 2).  Instead 1) and 2) imply 3).
-
-Ok, I misunderstood what you meant then, my bad.
-
-> I *want* to have a generic solution, and have made several passes at
-> writing one.  The question here is; what does that look like?  Some
-> people don't like the idea of having it in DT due to possible abuse of
-> the property.  But we can't have anything only in C because our clock
-> implementation (rightly) doesn't know or (shouldn't have to) care
-> about platform specifics.
-
-This is exactly the point I was using in my previous argument. You're
-using the state of your code and implementation ("our clock
-implementation doesn't know about platform specifics") to push for a
-DT binding ("I want to use clock-always-on or st,critical-clocks").
-
-And you *can* have such a description in your code. You just don't
-want to.
+We don't have any clock with m_start = 0 at this point. All the clocks
+have m_start = 1, which is safe.
 
 Maxime
 
@@ -112,4 +91,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150515/a7ecc55c/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150515/69274997/attachment-0001.sig>
