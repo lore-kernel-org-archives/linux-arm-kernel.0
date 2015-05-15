@@ -1,51 +1,45 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 15 May 2015 09:31:14 +0200
-Subject: [PATCH v9 1/4] ARM: sun7i: dt: Add Security System to A20 SoC DTS
-In-Reply-To: <1431608341-10936-2-git-send-email-clabbe.montjoie@gmail.com>
-References: <1431608341-10936-1-git-send-email-clabbe.montjoie@gmail.com>
- <1431608341-10936-2-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <20150515073114.GO4004@lukather>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 15 May 2015 07:39:47 +0000
+Subject: [PATCH 2/2 V3] ARM: dts: atlas7: add fixed frequency clocks in car
+ node
+In-Reply-To: <1431675587-8637-1-git-send-email-21cnbao@gmail.com>
+References: <1431675587-8637-1-git-send-email-21cnbao@gmail.com>
+Message-ID: <1431675587-8637-2-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 14, 2015 at 02:58:58PM +0200, LABBE Corentin wrote:
-> The Security System is a hardware cryptographic accelerator that support
-> AES/MD5/SHA1/DES/3DES/PRNG algorithms.
-> It could be found on many Allwinner SoC.
-> 
-> This patch enable the Security System on the Allwinner A20 SoC Device-tree.
-> 
-> Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
-> ---
->  arch/arm/boot/dts/sun7i-a20.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-> index fdd1817..9a823ce 100644
-> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
-> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-> @@ -679,6 +679,14 @@
->  			status = "disabled";
->  		};
->  
-> +		crypto: crypto-engine at 01c15000 {
-> +			compatible = "allwinner,sun4i-a20-crypto";
+From: Guo Zeng <Guo.Zeng@csr.com>
 
-This looks wrong. It's either sun4i-a10 or sun7i-a20.
+This patch adds the fixed clocks of external crystal oscillators.
 
-It looks good otherwise.
+Signed-off-by: Guo Zeng <Guo.Zeng@csr.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ arch/arm/boot/dts/atlas7.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-Thanks!
-Maxime
-
+diff --git a/arch/arm/boot/dts/atlas7.dtsi b/arch/arm/boot/dts/atlas7.dtsi
+index a753178..7dad617 100644
+--- a/arch/arm/boot/dts/atlas7.dtsi
++++ b/arch/arm/boot/dts/atlas7.dtsi
+@@ -183,6 +183,18 @@
+ 				reg = <0x18620000 0x1000>;
+ 				#clock-cells = <1>;
+ 				#reset-cells = <1>;
++				xinw {
++					compatible = "fixed-clock";
++					#clock-cells = <0>;
++					clock-frequency = <32768>;
++					clock-output-names = "xinw";
++				};
++				xin {
++					compatible = "fixed-clock";
++					#clock-cells = <0>;
++					clock-frequency = <26000000>;
++					clock-output-names = "xin";
++				};
+ 			};
+ 		};
+ 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150515/e7197bdc/attachment.sig>
+2.3.5
