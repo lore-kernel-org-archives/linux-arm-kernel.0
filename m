@@ -1,76 +1,44 @@
-From: joshc@ni.com (Josh Cartwright)
-Date: Fri, 15 May 2015 12:53:30 -0500
-Subject: [PATCH v2 1/2] rtc: add rtc-lpc24xx driver
-In-Reply-To: <CAGhQ9VxpN-dSgWS0tJMeik7o_DsRdRo=Mf=Ap1L3j988abcHfQ@mail.gmail.com>
-References: <1431696306-19093-1-git-send-email-manabian@gmail.com>
- <1431696306-19093-2-git-send-email-manabian@gmail.com>
- <20150515152312.GG23600@jcartwri.amer.corp.natinst.com>
- <CAGhQ9VxpN-dSgWS0tJMeik7o_DsRdRo=Mf=Ap1L3j988abcHfQ@mail.gmail.com>
-Message-ID: <20150515175330.GL23600@jcartwri.amer.corp.natinst.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 15 May 2015 19:03:34 +0100
+Subject: [PATCH 1/2] ARM: simplify timer initialisation and remove
+ arm_timer.h inclusion
+In-Reply-To: <554239D5.4080301@arm.com>
+References: <1430390662-18246-1-git-send-email-sudeep.holla@arm.com>
+ <1430390662-18246-2-git-send-email-sudeep.holla@arm.com>
+ <CAL_JsqK8pPLCkrVFHaWr-RhOkPzaF+D_kZ5h9BahvN7CoYZO0w@mail.gmail.com>
+ <554239D5.4080301@arm.com>
+Message-ID: <555634F6.9060008@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 15, 2015 at 06:31:53PM +0200, Joachim Eastwood wrote:
-> On 15 May 2015 at 17:23, Josh Cartwright <joshc@ni.com> wrote:
-> > Hello again,
-> >
-> > On Fri, May 15, 2015 at 03:25:05PM +0200, Joachim Eastwood wrote:
-> >> Add driver for the RTC found on NXP LPC24xx/178x/18xx/43xx devices.
-> >> The RTC provides calendar and clock functionality together with
-> >> periodic tick and alarm interrupt support.
-> >>
-> >> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
-> >> ---
-[..]
-> >> +static int lpc24xx_rtc_read_time(struct device *dev, struct rtc_time *tm)
-> >> +{
-> >> +     struct lpc24xx_rtc *rtc = dev_get_drvdata(dev);
-> >> +     u32 ct0, ct1, ct2;
-> >> +
-> >> +     ct0 = rtc_readl(rtc, LPC24XX_CTIME0);
-> >> +     ct1 = rtc_readl(rtc, LPC24XX_CTIME1);
-> >> +     ct2 = rtc_readl(rtc, LPC24XX_CTIME2);
-> >> +
-> >> +     tm->tm_sec  = CT0_SECS(ct0);
-> >> +     tm->tm_min  = CT0_MINS(ct0);
-> >> +     tm->tm_hour = CT0_HOURS(ct0);
-> >> +     tm->tm_wday = CT0_DOW(ct0);
-> >> +     tm->tm_mon  = CT1_MONTH(ct1);
-> >> +     tm->tm_mday = CT1_DOM(ct1);
-> >> +     tm->tm_year = CT1_YEAR(ct1);
-> >> +     tm->tm_yday = CT2_DOY(ct2);
-> >> +
-> >> +     if (rtc_valid_tm(tm) < 0) {
-> >> +             dev_warn(dev, "retrieved date and time is invalid\n");
-> >> +             rtc_time64_to_tm(0, tm);
-> >> +             lpc24xx_rtc_set_time(dev, tm);
-> >> +     }
-> >> +
-> >> +     return 0;
-> >
-> > Forcing the read time to be the epoch on failure seems like a pretty
-> > poor way to handle errors, in my opinion.
-> 
-> When the device doesn't have battery the CTIME registers contains an
-> invalid value. So if you don't set them to something valid you will
-> get a warning each time you try to read the RTC. To "fix" that problem
-> I set the time at epoch which make the CTIME registers to contain a
-> valid value. Since the value is already useless I think setting it to
-> epoch is an improvement in this case.
+Hi Russell,
 
-I see.  I think doing this setting in your read_time callback is the
-wrong place to do this check.  I'm thinking a better place for it would
-be in your driver's probe().
+On 30/04/15 15:19, Sudeep Holla wrote:
+>
+>
+> On 30/04/15 15:09, Rob Herring wrote:
+>> On Thu, Apr 30, 2015 at 5:44 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>> The header asm/hardware/arm_timer.h is included in various machine
+>>> specific files to access TIMER_CTRL and initialise to a known state.
+>>> However that's not required as the clock{source,event} driver timer-sp
+>>> initialises all the timer being used.
+>>
+>> I believe the idea is not to initialize the timers being used, but the
+>> ones not being used and perhaps left running by the bootloader. Cases
+>> where the interrupt is shared could cause a problem.
+>>
 
-> I guess it deserves a comment in the driver.
+Russell, can you confirm if that's the case ?
 
-Yes, I agree.
+>
+> Ah OK, makes sense. I will wait for Russell to confirm. The main idea
+> was to keep the header file having offsets local to driver/clocksource
+> and avoid sharing it in include/linux but looks like that's not possible.
+>
 
-  Josh
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150515/ab41cd33/attachment.sig>
+Since we need this driver on ARM64, we might have to end up sharing the
+header file with offsets if required for ARM platforms(though it would
+be good to avoid it if there's any better alternative solution than that)
+
+Regards,
+Sudeep
