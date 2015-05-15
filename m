@@ -1,123 +1,103 @@
-From: hl@rock-chips.com (hl)
-Date: Fri, 15 May 2015 08:50:33 +0800
-Subject: [PATCH 4/8] ARM: dts: rockchip: relicense rk3288.dtsi under
- GPLv2/X11
-In-Reply-To: <1425665046-22927-5-git-send-email-heiko@sntech.de>
-References: <1425665046-22927-1-git-send-email-heiko@sntech.de>
- <1425665046-22927-5-git-send-email-heiko@sntech.de>
-Message-ID: <555542D9.3030909@rock-chips.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 14 May 2015 19:52:10 -0500
+Subject: [PATCHv3 1/4] phy: phy-core: Make GENERIC_PHY an invisible option
+In-Reply-To: <1429743853-10254-2-git-send-email-arun.ramamurthy@broadcom.com>
+References: <1429743853-10254-1-git-send-email-arun.ramamurthy@broadcom.com>
+ <1429743853-10254-2-git-send-email-arun.ramamurthy@broadcom.com>
+Message-ID: <20150515005210.GA31534@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-On 2015?03?07? 02:04, Heiko Stuebner wrote:
-> GPLv2-only devicetrees make reuse difficult for software components licensed
-> under a different license.
->
-> The consensus is that a GPL/X11 dual-license should allow all necessary uses,
-> so relicense the rk3288.dtsi to this combination.
->
-> CCs were aquired by git shortlog -sne so it should've hopefully catched
-> every contributor.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> Cc: Kever Yang <kever.yang@rock-chips.com>
-> Cc: Doug Anderson <dianders@chromium.org>
-> Cc: Addy Ke <addy.ke@rock-chips.com>
-> Cc: Daniel Kurtz <djkurtz@chromium.org>
-> Cc: Andy Yan <andy.yan@rock-chips.com>
-> Cc: Caesar Wang <caesar.wang@rock-chips.com>
-> Cc: Chris Zhong <zyw@rock-chips.com>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Jianqun Xu<jay.xu@rock-chips.com>
-> Cc: Roger Chen <roger.chen@rock-chips.com>
-> Cc: Sonny Rao <sonnyrao@chromium.org>
-> Cc: Yunzhi Li <lyz@rock-chips.com>
-> Cc: huang lin <hl@rock-chips.com>
->
-> Not sure if an Ack for a simple revert is necessary, but included anyway
-> Cc: Olof Johansson <olof@lixom.net>
+On Wed, Apr 22, 2015 at 04:04:10PM -0700, Arun Ramamurthy wrote:
+> Most of the phy providers use "select" to enable GENERIC_PHY. Since select
+> is only recommended when the config is not visible, GENERIC_PHY is changed
+> an invisible option. To maintain consistency, all phy providers are changed
+> to "select" GENERIC_PHY and all non-phy drivers use "depends on" when the
+> phy framework is explicity required. USB_MUSB_OMAP2PLUS has a cyclic
+> dependency, so it is left as "select".
+> 
+> Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
 > ---
-> I'm hoping to get Acked-by tags from the people in the Cc-list.
->
->   arch/arm/boot/dts/rk3288.dtsi | 44 +++++++++++++++++++++++++++++++++++--------
->   1 file changed, 36 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-> index 2c29a3e..35a06a5 100644
-> --- a/arch/arm/boot/dts/rk3288.dtsi
-> +++ b/arch/arm/boot/dts/rk3288.dtsi
-> @@ -1,13 +1,41 @@
->   /*
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License as published by
-> - * the Free Software Foundation; either version 2 of the License, or
-> - * (at your option) any later version.
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
->    *
-> - * This program is distributed in the hope that it will be useful,
-> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> - * GNU General Public License for more details.
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
->    */
->   
->   #include <dt-bindings/gpio/gpio.h>
-Acked-by: Lin Huang <hl@rock-chips.com>
+>  drivers/ata/Kconfig                       | 1 -
+>  drivers/media/platform/exynos4-is/Kconfig | 2 +-
+>  drivers/phy/Kconfig                       | 4 ++--
+>  drivers/usb/host/Kconfig                  | 4 ++--
+>  drivers/video/fbdev/exynos/Kconfig        | 2 +-
+>  5 files changed, 6 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+> index 5f60155..6d2e881 100644
+> --- a/drivers/ata/Kconfig
+> +++ b/drivers/ata/Kconfig
+> @@ -301,7 +301,6 @@ config SATA_MV
+>  	tristate "Marvell SATA support"
+>  	depends on PCI || ARCH_DOVE || ARCH_MV78XX0 || \
+>  		   ARCH_MVEBU || ARCH_ORION5X || COMPILE_TEST
+> -	select GENERIC_PHY
+>  	help
+>  	  This option enables support for the Marvell Serial ATA family.
+>  	  Currently supports 88SX[56]0[48][01] PCI(-X) chips,
+> diff --git a/drivers/media/platform/exynos4-is/Kconfig b/drivers/media/platform/exynos4-is/Kconfig
+> index b7b2e47..b6f3eaa 100644
+> --- a/drivers/media/platform/exynos4-is/Kconfig
+> +++ b/drivers/media/platform/exynos4-is/Kconfig
+> @@ -31,7 +31,7 @@ config VIDEO_S5P_FIMC
+>  config VIDEO_S5P_MIPI_CSIS
+>  	tristate "S5P/EXYNOS MIPI-CSI2 receiver (MIPI-CSIS) driver"
+>  	depends on REGULATOR
+> -	select GENERIC_PHY
+> +	depends on GENERIC_PHY
+>  	help
+>  	  This is a V4L2 driver for Samsung S5P and EXYNOS4 SoC MIPI-CSI2
+>  	  receiver (MIPI-CSIS) devices.
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index 2962de2..edecdb1 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -5,7 +5,7 @@
+>  menu "PHY Subsystem"
+>  
+>  config GENERIC_PHY
+> -	bool "PHY Core"
+> +	bool
+>  	help
+>  	  Generic PHY support.
+>  
+> @@ -72,7 +72,7 @@ config PHY_MIPHY365X
+>  config PHY_RCAR_GEN2
+>  	tristate "Renesas R-Car generation 2 USB PHY driver"
+>  	depends on ARCH_SHMOBILE
+> -	depends on GENERIC_PHY
+> +	select GENERIC_PHY
+
+so some you changed from depends to select...
+
+>  	help
+>  	  Support for USB PHY found on Renesas R-Car generation 2 SoCs.
+>  
+> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+> index 5ad60e4..e2197e2 100644
+> --- a/drivers/usb/host/Kconfig
+> +++ b/drivers/usb/host/Kconfig
+> @@ -182,7 +182,7 @@ config USB_EHCI_HCD_SPEAR
+>  config USB_EHCI_HCD_STI
+>  	tristate "Support for ST STiHxxx on-chip EHCI USB controller"
+>  	depends on ARCH_STI && OF
+> -	select GENERIC_PHY
+> +	depends on GENERIC_PHY
+
+while others you changed from select to depends.
+
+NAK.
 
 -- 
-??
-???????????
-Fuzhou Rockchip Electronics Co.Ltd
-?????????????89????A?21??(350003)
-Addr:No.21 Building, A District, No.89, software Boulevard Fuzhou, Fujian,PRC
-Email:hl at rock-chips.com
-Tel:+86-591-83991906/07
-  
-****************************************************************************************
-????????????????????????????????????????????
-???? ????????????????????????????????????????
-????????????????????????????????????????????
-??????????????????
-  
-IMPORTANT NOTICE: This email is from Fuzhou Rockchip Electronics Co., Ltd .The contents
-of this email and any attachments may contain information that is privileged, confidential
-and/or exempt from disclosure under applicable law and relevant NDA. If you are not the
-intended recipient, you are hereby notified that any disclosure, copying, distribution,
-or use of the information is STRICTLY PROHIBITED. Please immediately contact the sender
-as soon as possible and destroy the material in its entirety in any format. Thank you.
-********************************************************************************
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150514/740be2a5/attachment-0001.sig>
