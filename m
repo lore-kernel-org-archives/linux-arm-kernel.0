@@ -1,59 +1,51 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 15 May 2015 12:27:13 -0500
-Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
-In-Reply-To: <20150514003201.20636.83883@quantum>
-References: <cover.1430394884.git.viresh.kumar@linaro.org>
- <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
- <20150512214224.16410.15922@quantum> <20150513085528.GA6994@linux>
- <20150513110357.GD3066@sirena.org.uk> <20150514003201.20636.83883@quantum>
-Message-ID: <CAL_JsqL2CpRu51=t_kacMxb1AfpJnep8vnkzF2YQuCXSCvJFFg@mail.gmail.com>
+From: dahi@linux.vnet.ibm.com (David Hildenbrand)
+Date: Fri, 15 May 2015 19:33:15 +0200
+Subject: [PATCH v4 02/12] KVM: define common KVM_GUESTDBG_USE_SW/HW_BP bits
+In-Reply-To: <555613F2.9060204@de.ibm.com>
+References: <1431700035-23479-1-git-send-email-alex.bennee@linaro.org>
+ <1431700035-23479-3-git-send-email-alex.bennee@linaro.org>
+ <555613F2.9060204@de.ibm.com>
+Message-ID: <20150515193315.6d3e82d2@thinkpad-w530>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 13, 2015 at 7:32 PM, Michael Turquette
-<mike.turquette@linaro.org> wrote:
-> Quoting Mark Brown (2015-05-13 04:03:57)
->> On Wed, May 13, 2015 at 02:25:28PM +0530, Viresh Kumar wrote:
->> > On 12-05-15, 14:42, Michael Turquette wrote:
->> > > Quoting Viresh Kumar (2015-04-30 05:07:59)
->> >
->> > > Why should this new binding exist?
->>
->> > The answer to this particular query is perhaps simple, i.e. we have
->> > unsolved problems that we wanted to solve in a generic way.
->>
->> > But probably the bigger question is "Should we really put the OPPs
->> > (new or old bindings) in DT".
->>
->> And also is trying to do this in a completely generic manner the right
->> way of going about things - do we really understand the problem area
->> well enough to create a completely generic solution for all cases,
->> bearing in mind that once things go into a DT binding they become an ABI?
->
-> No, we don't understand the problem space well enough to form an ABI.
-> And even if we did understand it perfectly today, the constraints and
-> expressions will change tomorrow.
->
-> Putting this stuff in C without any philosophical constraints on whether
-> or not we can change it later is the way to go.
+> Am 15.05.2015 um 16:27 schrieb Alex Benn?e:
+> > +++ b/arch/s390/include/uapi/asm/kvm.h
+> > @@ -114,8 +114,6 @@ struct kvm_fpu {
+> >  	__u64 fprs[16];
+> >  };
+> > 
+> > -#define KVM_GUESTDBG_USE_HW_BP		0x00010000
+> [...]
+> > +++ b/include/uapi/linux/kvm.h
+> [...]
+> > +#define KVM_GUESTDBG_USE_SW_BP		(1 << 16)
+> > +#define KVM_GUESTDBG_USE_HW_BP		(1 << 17)
+> 
+> This is an ABI break for s390, no?
+> 
+> David, do you remember why we do not use KVM_GUESTDBG_USE_SW_BP?
+> 
 
-Having a binding does not preclude you from doing your own thing in C.
-You can choose to ignore it (or parts of it). It also doesn't mean you
-have to use a generic driver with a generic binding.
+We never had to tell the kernel about software breakpoints as this is all
+handled via 4 byte DIAG instructions until now. We don't have to turn this
+mechanism on. QEMU can directly insert the desired DIAG instructions and gets
+notified when they are about to get executed.
 
-While yes, we could do the same thing in C, the reality is that we
-often don't force common data into common structures. This leads to
-obfuscating what are the real h/w differences because everyone does
-things their own way. Conveniently, struct dev_pm_opp is a perfect
-example here. We already know that just freq and volt alone are not
-enough, yet that is all the kernel structure has.
+(But we still have 2 byte breakpoint support todo - still tbd how exactly this
+will be realized - could be turned on via such a mechanism)
 
-The way you avoid the ABI issue is you create a new one which is what
-we've done here. I'm not saying we want 10 different OPP bindings. If
-we are back here in a year with v3, then yes you are probably right.
-But I believe v2 is a framework that can last. Most of the review
-issues have resulted in simply dropping properties (until needed)
-without otherwise changing the binding. I think that demonstrates this
-bindiing is flexible and extendable.
+The problem is, that these bits are arch specific, now Alex wants to unify
+them for all archs.
 
-Rob
+So yes, this is an ABI break for us and breaks hardware breakpoints.(I think
+the first version of this patch didn't contain this ABI break when I had a look)
+
+I wonder if it wouldn't make more sense to
+
+- introduce new bits in the arch-unspecific section
+- rework the existing implementers to accept both bits
+
+Or to simply leave stuff as it is and handle it via arch specific bits.
+
+David
