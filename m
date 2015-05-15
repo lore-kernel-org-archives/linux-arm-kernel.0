@@ -1,92 +1,44 @@
-From: joshc@ni.com (Josh Cartwright)
-Date: Fri, 15 May 2015 10:23:12 -0500
-Subject: [PATCH v2 1/2] rtc: add rtc-lpc24xx driver
-In-Reply-To: <1431696306-19093-2-git-send-email-manabian@gmail.com>
-References: <1431696306-19093-1-git-send-email-manabian@gmail.com>
- <1431696306-19093-2-git-send-email-manabian@gmail.com>
-Message-ID: <20150515152312.GG23600@jcartwri.amer.corp.natinst.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 15 May 2015 16:23:46 +0100
+Subject: [PATCH v4 10/12] KVM: arm64: guest debug, HW assisted debug
+ support
+In-Reply-To: <1431700035-23479-11-git-send-email-alex.bennee@linaro.org>
+References: <1431700035-23479-1-git-send-email-alex.bennee@linaro.org>
+ <1431700035-23479-11-git-send-email-alex.bennee@linaro.org>
+Message-ID: <20150515152346.GB23652@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello again,
+Hi Alex,
 
-On Fri, May 15, 2015 at 03:25:05PM +0200, Joachim Eastwood wrote:
-> Add driver for the RTC found on NXP LPC24xx/178x/18xx/43xx devices.
-> The RTC provides calendar and clock functionality together with
-> periodic tick and alarm interrupt support.
+On Fri, May 15, 2015 at 03:27:13PM +0100, Alex Benn?e wrote:
+> This adds support for userspace to control the HW debug registers for
+> guest debug. In the debug ioctl we copy the IMPDEF defined number of
+> registers into a new register set called host_debug_state. There is now
+> a new vcpu parameter called debug_ptr which selects which register set
+> is to copied into the real registers when world switch occurs.
 > 
-> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
-> ---
-[..]
-> +++ b/drivers/rtc/Kconfig
-> @@ -1427,6 +1427,19 @@ config RTC_DRV_JZ4740
->  	  This driver can also be buillt as a module. If so, the module
->  	  will be called rtc-jz4740.
->  
-> +config RTC_DRV_LPC24XX
-> +	depends on ARCH_LPC18XX || COMPILE_TEST
-> +	depends on HAS_IOMEM
-> +	depends on OF
-> +	tristate "NXP LPC24xx RTC"
-> +	help
-> +	  This enables support for the NXP RTC found which can be found on
-> +	  LPC24xx/178x/18xx/43xx devices.
+> I've moved some helper functions into the hw_breakpoint.h header for
+> re-use.
+> 
+> As with single step we need to tweak the guest registers to enable the
+> exceptions so we need to save and restore those bits.
+> 
+> Two new capabilities have been added to the KVM_EXTENSION ioctl to allow
+> userspace to query the number of hardware break and watch points
+> available on the host hardware.
 
-Is this still true?
+There's the unfortunate possibility that these could vary across cores
+in a big.LITTLE system (though we haven't seen that thus far). The
+kernel sanity checks should currently explode if such a case is
+encountered, but I don't know what we'd do were that to happen.
 
-> +
-> +	  If you have one of the devices above enable this driver to use
-> +	  the hardware RTC. This driver can also be buillt as a module. If
-> +	  so, the module will be called rtc-lpc24xx.
-> +
->  config RTC_DRV_LPC32XX
->  	depends on ARCH_LPC32XX
->  	tristate "NXP LPC32XX RTC"
-> diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
-> index c31731c29762..8687a2e13247 100644
-> --- a/drivers/rtc/Makefile
-[..]
-> +static int lpc24xx_rtc_read_time(struct device *dev, struct rtc_time *tm)
-> +{
-> +	struct lpc24xx_rtc *rtc = dev_get_drvdata(dev);
-> +	u32 ct0, ct1, ct2;
-> +
-> +	ct0 = rtc_readl(rtc, LPC24XX_CTIME0);
-> +	ct1 = rtc_readl(rtc, LPC24XX_CTIME1);
-> +	ct2 = rtc_readl(rtc, LPC24XX_CTIME2);
-> +
-> +	tm->tm_sec  = CT0_SECS(ct0);
-> +	tm->tm_min  = CT0_MINS(ct0);
-> +	tm->tm_hour = CT0_HOURS(ct0);
-> +	tm->tm_wday = CT0_DOW(ct0);
-> +	tm->tm_mon  = CT1_MONTH(ct1);
-> +	tm->tm_mday = CT1_DOM(ct1);
-> +	tm->tm_year = CT1_YEAR(ct1);
-> +	tm->tm_yday = CT2_DOY(ct2);
-> +
-> +	if (rtc_valid_tm(tm) < 0) {
-> +		dev_warn(dev, "retrieved date and time is invalid\n");
-> +		rtc_time64_to_tm(0, tm);
-> +		lpc24xx_rtc_set_time(dev, tm);
-> +	}
-> +
-> +	return 0;
+This gets more fun when you consider the context-aware breakpoints are
+the highest numbered. So the set of (context-aware) breakpoints might
+not intersect across all CPUs.
 
-Forcing the read time to be the epoch on failure seems like a pretty
-poor way to handle errors, in my opinion.
+I'm not sure what the best thing to do is w.r.t. exposing that to
+userspace.
 
-Why not trickle an error up to the rtc class driver?
-
-Actually, the class driver is already doing a rtc_valid_tm() check, so
-that shouldn't even be necessary.  Just read your time here, and let the
-upper layer take care of handling an invalid time (and properly
-propagating an error up the stack).
-
-  Josh
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150515/7f3b602d/attachment.sig>
+Thanks,
+Mark.
