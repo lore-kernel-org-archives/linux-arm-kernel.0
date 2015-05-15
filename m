@@ -1,396 +1,64 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Fri, 15 May 2015 16:59:03 +0300
-Subject: [PATCH v2 4/5] kasan, x86: move populate_zero_shadow() out of arch
- directory
-In-Reply-To: <1431698344-28054-1-git-send-email-a.ryabinin@samsung.com>
-References: <1431698344-28054-1-git-send-email-a.ryabinin@samsung.com>
-Message-ID: <1431698344-28054-5-git-send-email-a.ryabinin@samsung.com>
+From: bevenson@melinkcorp.com (Bryan Evenson)
+Date: Fri, 15 May 2015 13:59:23 +0000
+Subject: at91sam9: watchdog: period
+In-Reply-To: <55559D55.6020703@aksignal.cz>
+References: <55559D55.6020703@aksignal.cz>
+Message-ID: <BN3PR0501MB109030A3B29685D9188F6B71BBC70@BN3PR0501MB1090.namprd05.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-populate_zero_shadow() is cross-platform now.
-Rename it to kasan_populate_zero_shadow() and move to
-the generic code.
-No functional changes here.
+Jiri,
 
-Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
----
- arch/x86/include/asm/kasan.h |  10 ++--
- arch/x86/mm/kasan_init_64.c  | 137 ++-----------------------------------------
- include/linux/kasan.h        |   8 +++
- mm/kasan/Makefile            |   2 +-
- mm/kasan/kasan_init.c        | 136 ++++++++++++++++++++++++++++++++++++++++++
- 5 files changed, 154 insertions(+), 139 deletions(-)
- create mode 100644 mm/kasan/kasan_init.c
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Jir? Prchal
+> Sent: Friday, May 15, 2015 3:17 AM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Boris Brezillon; Jean-Christophe Plagniol-Villard; Nicolas Ferre
+> Subject: at91sam9: watchdog: period
+> 
+> Hi all,
+> I'm trying to discover what's wrong with watchdog on my board. I didn't find
+> anything about it on internet so I would ask you for help.
+> I have a board with sam9g25 and slow clock xtal 32768Hz with 10p capacitors
+> to GND. Frequency seems to be good since hwclock (RTC) runs pretty
+> precisely powered from backup and main power too (no NTP). But watchdog
+> time to reset is still 61s regardless default (16s) or 4s heartbeat setting. No
+> change to WDT_MR in bootstrap, so in Linux should work.
 
-diff --git a/arch/x86/include/asm/kasan.h b/arch/x86/include/asm/kasan.h
-index b766c55..fa80b13 100644
---- a/arch/x86/include/asm/kasan.h
-+++ b/arch/x86/include/asm/kasan.h
-@@ -14,13 +14,11 @@
- 
- #ifndef __ASSEMBLY__
- 
--extern pte_t kasan_zero_pte[];
--extern pmd_t kasan_zero_pmd[];
--extern pud_t kasan_zero_pud[];
--
- #ifdef CONFIG_KASAN
--void __init kasan_map_early_shadow(pgd_t *pgd);
--void __init kasan_init(void);
-+#include <asm/pgtable_types.h>
-+
-+void kasan_map_early_shadow(pgd_t *pgd);
-+void kasan_init(void);
- #else
- static inline void kasan_map_early_shadow(pgd_t *pgd) { }
- static inline void kasan_init(void) { }
-diff --git a/arch/x86/mm/kasan_init_64.c b/arch/x86/mm/kasan_init_64.c
-index 853dab4..21342fd 100644
---- a/arch/x86/mm/kasan_init_64.c
-+++ b/arch/x86/mm/kasan_init_64.c
-@@ -2,7 +2,6 @@
- #include <linux/kasan.h>
- #include <linux/kdebug.h>
- #include <linux/mm.h>
--#include <linux/pfn.h>
- #include <linux/sched.h>
- #include <linux/vmalloc.h>
- 
-@@ -51,133 +50,6 @@ void __init kasan_map_early_shadow(pgd_t *pgd)
- 	}
- }
- 
--static __init void *early_alloc(size_t size, int node)
--{
--	return memblock_virt_alloc_try_nid(size, size, __pa(MAX_DMA_ADDRESS),
--					BOOTMEM_ALLOC_ACCESSIBLE, node);
--}
--
--static int __init zero_pte_populate(pmd_t *pmd, unsigned long addr,
--				unsigned long end)
--{
--	pte_t *pte = pte_offset_kernel(pmd, addr);
--	pte_t zero_pte;
--
--	zero_pte = pfn_pte(PFN_DOWN(__pa(kasan_zero_page)), PAGE_KERNEL);
--	zero_pte = pte_wrprotect(zero_pte);
--
--	while (addr + PAGE_SIZE <= end) {
--		set_pte_at(&init_mm, addr, pte, zero_pte);
--		addr += PAGE_SIZE;
--		pte = pte_offset_kernel(pmd, addr);
--	}
--	return 0;
--}
--
--static int __init zero_pmd_populate(pud_t *pud, unsigned long addr,
--				unsigned long end)
--{
--	int ret = 0;
--	pmd_t *pmd = pmd_offset(pud, addr);
--	unsigned long next;
--
--	do {
--		next = pmd_addr_end(addr, end);
--
--		if (IS_ALIGNED(addr, PMD_SIZE) && end - addr >= PMD_SIZE) {
--			pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
--			continue;
--		}
--
--		if (pmd_none(*pmd)) {
--			void *p = early_alloc(PAGE_SIZE, NUMA_NO_NODE);
--			if (!p)
--				return -ENOMEM;
--			pmd_populate_kernel(&init_mm, pmd, p);
--		}
--		zero_pte_populate(pmd, addr, pmd_addr_end(addr, end));
--	} while (pmd++, addr = next, addr != end);
--
--	return ret;
--}
--
--static int __init zero_pud_populate(pgd_t *pgd, unsigned long addr,
--				unsigned long end)
--{
--	int ret = 0;
--	pud_t *pud = pud_offset(pgd, addr);
--	unsigned long next;
--
--	do {
--		next = pud_addr_end(addr, end);
--		if (IS_ALIGNED(addr, PUD_SIZE) && end - addr >= PUD_SIZE) {
--			pmd_t *pmd;
--
--			pud_populate(&init_mm, pud, kasan_zero_pmd);
--			pmd = pmd_offset(pud, addr);
--			pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
--			continue;
--		}
--
--		if (pud_none(*pud)) {
--			void *p = early_alloc(PAGE_SIZE, NUMA_NO_NODE);
--			if (!p)
--				return -ENOMEM;
--			pud_populate(&init_mm, pud, p);
--		}
--		zero_pmd_populate(pud, addr, pud_addr_end(addr, end));
--	} while (pud++, addr = next, addr != end);
--
--	return ret;
--}
--
--static int __init zero_pgd_populate(unsigned long addr, unsigned long end)
--{
--	int ret = 0;
--	pgd_t *pgd = pgd_offset_k(addr);
--	unsigned long next;
--
--	do {
--		next = pgd_addr_end(addr, end);
--
--		if (IS_ALIGNED(addr, PGDIR_SIZE) && end - addr >= PGDIR_SIZE) {
--			pud_t *pud;
--			pmd_t *pmd;
--
--			/*
--			 * kasan_zero_pud should be populated with pmds
--			 * at this moment.
--			 * [pud,pmd]_populate*() bellow needed only for
--			 * 3,2 - level page tables where we don't have
--			 * puds,pmds, so pgd_populate(), pud_populate()
--			 * is noops.
--			 */
--			pgd_populate(&init_mm, pgd, kasan_zero_pud);
--			pud = pud_offset(pgd, addr);
--			pud_populate(&init_mm, pud, kasan_zero_pmd);
--			pmd = pmd_offset(pud, addr);
--			pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
--			continue;
--		}
--
--		if (pgd_none(*pgd)) {
--			void *p = early_alloc(PAGE_SIZE, NUMA_NO_NODE);
--			if (!p)
--				return -ENOMEM;
--			pgd_populate(&init_mm, pgd, p);
--		}
--		zero_pud_populate(pgd, addr, next);
--	} while (pgd++, addr = next, addr != end);
--
--	return ret;
--}
--
--static void __init populate_zero_shadow(const void *start, const void *end)
--{
--	if (zero_pgd_populate((unsigned long)start, (unsigned long)end))
--		panic("kasan: unable to map zero shadow!");
--}
--
- #ifdef CONFIG_KASAN_INLINE
- static int kasan_die_handler(struct notifier_block *self,
- 			     unsigned long val,
-@@ -208,7 +80,7 @@ void __init kasan_init(void)
- 
- 	clear_pgds(KASAN_SHADOW_START, KASAN_SHADOW_END);
- 
--	populate_zero_shadow((void *)KASAN_SHADOW_START,
-+	kasan_populate_zero_shadow((void *)KASAN_SHADOW_START,
- 			kasan_mem_to_shadow((void *)PAGE_OFFSET));
- 
- 	for (i = 0; i < E820_X_MAX; i++) {
-@@ -218,14 +90,15 @@ void __init kasan_init(void)
- 		if (map_range(&pfn_mapped[i]))
- 			panic("kasan: unable to allocate shadow!");
- 	}
--	populate_zero_shadow(kasan_mem_to_shadow((void *)PAGE_OFFSET + MAXMEM),
--			kasan_mem_to_shadow((void *)__START_KERNEL_map));
-+	kasan_populate_zero_shadow(
-+		kasan_mem_to_shadow((void *)PAGE_OFFSET + MAXMEM),
-+		kasan_mem_to_shadow((void *)__START_KERNEL_map));
- 
- 	vmemmap_populate((unsigned long)kasan_mem_to_shadow(_stext),
- 			(unsigned long)kasan_mem_to_shadow(_end),
- 			NUMA_NO_NODE);
- 
--	populate_zero_shadow(kasan_mem_to_shadow((void *)MODULES_END),
-+	kasan_populate_zero_shadow(kasan_mem_to_shadow((void *)MODULES_END),
- 			(void *)KASAN_SHADOW_END);
- 
- 	memset(kasan_zero_page, 0, PAGE_SIZE);
-diff --git a/include/linux/kasan.h b/include/linux/kasan.h
-index 5486d77..5ef3925 100644
---- a/include/linux/kasan.h
-+++ b/include/linux/kasan.h
-@@ -13,8 +13,16 @@ struct vm_struct;
- #define KASAN_SHADOW_OFFSET _AC(CONFIG_KASAN_SHADOW_OFFSET, UL)
- 
- #include <asm/kasan.h>
-+#include <asm/pgtable.h>
- #include <linux/sched.h>
- 
-+extern unsigned char kasan_zero_page[PAGE_SIZE];
-+extern pte_t kasan_zero_pte[PTRS_PER_PTE];
-+extern pmd_t kasan_zero_pmd[PTRS_PER_PMD];
-+extern pud_t kasan_zero_pud[PTRS_PER_PUD];
-+
-+void kasan_populate_zero_shadow(const void *start, const void *end);
-+
- static inline void *kasan_mem_to_shadow(const void *addr)
- {
- 	return (void *)((unsigned long)addr >> KASAN_SHADOW_SCALE_SHIFT)
-diff --git a/mm/kasan/Makefile b/mm/kasan/Makefile
-index bd837b8..6471014 100644
---- a/mm/kasan/Makefile
-+++ b/mm/kasan/Makefile
-@@ -5,4 +5,4 @@ CFLAGS_REMOVE_kasan.o = -pg
- # see: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=63533
- CFLAGS_kasan.o := $(call cc-option, -fno-conserve-stack -fno-stack-protector)
- 
--obj-y := kasan.o report.o
-+obj-y := kasan.o report.o kasan_init.o
-diff --git a/mm/kasan/kasan_init.c b/mm/kasan/kasan_init.c
-new file mode 100644
-index 0000000..5136383
---- /dev/null
-+++ b/mm/kasan/kasan_init.c
-@@ -0,0 +1,136 @@
-+#include <linux/bootmem.h>
-+#include <linux/init.h>
-+#include <linux/kasan.h>
-+#include <linux/kernel.h>
-+#include <linux/memblock.h>
-+#include <linux/pfn.h>
-+
-+#include <asm/page.h>
-+#include <asm/pgalloc.h>
-+
-+static __init void *early_alloc(size_t size, int node)
-+{
-+	return memblock_virt_alloc_try_nid(size, size, __pa(MAX_DMA_ADDRESS),
-+					BOOTMEM_ALLOC_ACCESSIBLE, node);
-+}
-+
-+static int __init zero_pte_populate(pmd_t *pmd, unsigned long addr,
-+				unsigned long end)
-+{
-+	pte_t *pte = pte_offset_kernel(pmd, addr);
-+	pte_t zero_pte;
-+
-+	zero_pte = pfn_pte(PFN_DOWN(__pa(kasan_zero_page)), PAGE_KERNEL);
-+	zero_pte = pte_wrprotect(zero_pte);
-+
-+	while (addr + PAGE_SIZE <= end) {
-+		set_pte_at(&init_mm, addr, pte, zero_pte);
-+		addr += PAGE_SIZE;
-+		pte = pte_offset_kernel(pmd, addr);
-+	}
-+	return 0;
-+}
-+
-+static int __init zero_pmd_populate(pud_t *pud, unsigned long addr,
-+				unsigned long end)
-+{
-+	int ret = 0;
-+	pmd_t *pmd = pmd_offset(pud, addr);
-+	unsigned long next;
-+
-+	do {
-+		next = pmd_addr_end(addr, end);
-+
-+		if (IS_ALIGNED(addr, PMD_SIZE) && end - addr >= PMD_SIZE) {
-+			pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
-+			continue;
-+		}
-+
-+		if (pmd_none(*pmd)) {
-+			void *p = early_alloc(PAGE_SIZE, NUMA_NO_NODE);
-+			if (!p)
-+				return -ENOMEM;
-+			pmd_populate_kernel(&init_mm, pmd, p);
-+		}
-+		zero_pte_populate(pmd, addr, pmd_addr_end(addr, end));
-+	} while (pmd++, addr = next, addr != end);
-+
-+	return ret;
-+}
-+
-+static int __init zero_pud_populate(pgd_t *pgd, unsigned long addr,
-+				unsigned long end)
-+{
-+	int ret = 0;
-+	pud_t *pud = pud_offset(pgd, addr);
-+	unsigned long next;
-+
-+	do {
-+		next = pud_addr_end(addr, end);
-+		if (IS_ALIGNED(addr, PUD_SIZE) && end - addr >= PUD_SIZE) {
-+			pmd_t *pmd;
-+
-+			pud_populate(&init_mm, pud, kasan_zero_pmd);
-+			pmd = pmd_offset(pud, addr);
-+			pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
-+			continue;
-+		}
-+
-+		if (pud_none(*pud)) {
-+			void *p = early_alloc(PAGE_SIZE, NUMA_NO_NODE);
-+			if (!p)
-+				return -ENOMEM;
-+			pud_populate(&init_mm, pud, p);
-+		}
-+		zero_pmd_populate(pud, addr, pud_addr_end(addr, end));
-+	} while (pud++, addr = next, addr != end);
-+
-+	return ret;
-+}
-+
-+static int __init zero_pgd_populate(unsigned long addr, unsigned long end)
-+{
-+	int ret = 0;
-+	pgd_t *pgd = pgd_offset_k(addr);
-+	unsigned long next;
-+
-+	do {
-+		next = pgd_addr_end(addr, end);
-+
-+		if (IS_ALIGNED(addr, PGDIR_SIZE) && end - addr >= PGDIR_SIZE) {
-+			pud_t *pud;
-+			pmd_t *pmd;
-+
-+			/*
-+			 * kasan_zero_pud should be populated with pmds
-+			 * at this moment.
-+			 * [pud,pmd]_populate*() bellow needed only for
-+			 * 3,2 - level page tables where we don't have
-+			 * puds,pmds, so pgd_populate(), pud_populate()
-+			 * is noops.
-+			 */
-+			pgd_populate(&init_mm, pgd, kasan_zero_pud);
-+			pud = pud_offset(pgd, addr);
-+			pud_populate(&init_mm, pud, kasan_zero_pmd);
-+			pmd = pmd_offset(pud, addr);
-+			pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
-+			continue;
-+		}
-+
-+		if (pgd_none(*pgd)) {
-+			void *p = early_alloc(PAGE_SIZE, NUMA_NO_NODE);
-+			if (!p)
-+				return -ENOMEM;
-+			pgd_populate(&init_mm, pgd, p);
-+		}
-+		zero_pud_populate(pgd, addr, next);
-+	} while (pgd++, addr = next, addr != end);
-+
-+	return ret;
-+}
-+
-+void __init kasan_populate_zero_shadow(const void *start, const void *end)
-+{
-+	if (zero_pgd_populate((unsigned long)start, (unsigned long)end))
-+		panic("kasan: unable to map zero shadow!");
-+}
--- 
-2.4.0
+I have the same hardware setup and the watchdog timeout is 15 seconds for me.  For my kernel, I am using the Atmel fork at github.com/linux4sam/linux-at91, master branch at commit 5d5b332821753d616e65da6237f0a3330e59b98f.  Even though this is based upon the 3.10 kernel, there isn't much that has changed with regard to the RTC or watchdog between 3.10 and 4.03; Atmel has been good on backporting their changes to their fork.  Maybe try an older kernel and see if the problem goes away?
+
+
+Regards,
+Bryan
+
+> Here is dump:
+> [    0.000000] Booting Linux on physical CPU 0x0
+> [    0.000000] Linux version 4.0.2_cpm9g25 (prchal at prchal) (gcc version 4.7.3
+> (Ubuntu/Linaro 4.7.3-12ubuntu1) ) #10
+> PREEMPT Thu May 14 15:20:24 CEST 2015
+> [    0.000000] CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ),
+> cr=0005317f
+> [    0.000000] CPU: VIVT data cache, VIVT instruction cache
+> [    0.000000] Machine model: AKsignal CDU9G25_v6
+> [    0.000000] Memory policy: Data cache writeback
+> [    0.000000] AT91: Detected soc type: at91sam9x5
+> [    0.000000] AT91: Detected soc subtype: at91sam9g25
+> ...
+> [    4.669669] AT91: Starting after watchdog reset
+> [    4.675675] at91sam9_wdt: enabled (heartbeat=4 sec, nowayout=1)
+> ...
+> 
+> / # killall watchdog
+> [ 1821.114114] watchdog watchdog0: nowayout prevents watchdog being
+> stopped!
+> / # [ 1821.123123] watchdog watchdog0: watchdog did not stop!
+> [ 1882.294294] at91sam9_wdt: I will reset your machine !
+> 
+> Thanks for any help.
+> Jiri
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
