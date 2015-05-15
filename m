@@ -1,48 +1,38 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 15 May 2015 14:45:46 +0200
-Subject: [PATCH] ARM: dts: kirkwood: add "nor-jedec" flash compatible
- binding
-In-Reply-To: <CACna6rzSPzdCYLPBGYNZB4QKoU_kgPan7aS9p0KWwj0e78JcKg@mail.gmail.com>
-References: <1431066079-19725-1-git-send-email-zajec5@gmail.com>	<5550AA08.5060001@free-electrons.com>
- <CACna6rzSPzdCYLPBGYNZB4QKoU_kgPan7aS9p0KWwj0e78JcKg@mail.gmail.com>
-Message-ID: <5555EA7A.6090809@free-electrons.com>
+From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
+Date: Fri, 15 May 2015 21:48:58 +0900
+Subject: [PATCH 0/4] ARM: multi_v7_defconfig: Stuff for Exynos
+Message-ID: <1431694142-32141-1-git-send-email-k.kozlowski.k@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafa?,
+Dear Kukjin,
 
-On 12/05/2015 07:07, Rafa? Mi?ecki wrote:
-> On 11 May 2015 at 15:09, Gregory CLEMENT
-> <gregory.clement@free-electrons.com> wrote:
->> On 08/05/2015 08:21, Rafa? Mi?ecki wrote:
->>> Starting with commits
->>> 8ff16cf ("Documentation: devicetree: m25p80: add "nor-jedec" binding")
->>> 1103b85 ("mtd: m25p80: bind to "nor-jedec" ID, for auto-detection")
->>> we have "nor-jedec" binding indicating support for JEDEC identification.
->>
->> I have the same question that for mvebu: did you actually check that all
->> the NOR flash referenced in the dts supports the JEDEC identification?
-> 
-> Yes, I checked *all* of them.
-> 
-> 
->> Then again, if it id the case I will add it in mvebu/dt soon, unless Andrew,
->> Jason or any other developer who has submitted the dts is aware of a restriction
->> about applying it.
-> 
-> Please wait to see if the binding will be changed or not (tegre patch
-> thread discussion).
-> 
-OK I won't take them, and I am waiting for a v2.
+The patchset enables various config options on multi_v7 config
+for Exynos boards. The first two patches are actually resend.
+
+Arnd suggested [0] that this can go through your tree.
+
+Patchset is rebased on next-20150515 and Javier's patchset [1]
+(to avoid conflicts around regulators and clocks).
+
+Please let me know if this should be rebased on other commit.
+
+[0] http://www.spinics.net/lists/kernel/msg1991518.html
+[1] http://www.spinics.net/lists/kernel/msg1990767.html
+
+Best regards,
+Krzysztof
 
 
-Thanks,
+Krzysztof Kozlowski (4):
+  ARM: multi_v7_defconfig: Enable CPU idle for Exynos
+  ARM: multi_v7_defconfig: Enable PMIC and MUIC drivers for Exynos
+    boards
+  ARM: multi_v7_defconfig: Enable TMU for Exynos
+  ARM: multi_v7_defconfig: Enable OHCI on Exynos
 
-Gregory
-
+ arch/arm/configs/multi_v7_defconfig | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.1.4
