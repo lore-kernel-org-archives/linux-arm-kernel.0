@@ -1,87 +1,151 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 15 May 2015 16:19:25 +0200
-Subject: at91sam9: watchdog: period
-In-Reply-To: <BN3PR0501MB109030A3B29685D9188F6B71BBC70@BN3PR0501MB1090.namprd05.prod.outlook.com>
-References: <55559D55.6020703@aksignal.cz>
- <BN3PR0501MB109030A3B29685D9188F6B71BBC70@BN3PR0501MB1090.namprd05.prod.outlook.com>
-Message-ID: <5556006D.30306@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 May 2015 15:24:03 +0100
+Subject: NFS client broken in 4.1.0-rc2
+Message-ID: <20150515142403.GL2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 15/05/2015 15:59, Bryan Evenson a ?crit :
-> Jiri,
-> 
->> -----Original Message-----
->> From: linux-arm-kernel [mailto:linux-arm-kernel-
->> bounces at lists.infradead.org] On Behalf Of Jir? Prchal
->> Sent: Friday, May 15, 2015 3:17 AM
->> To: linux-arm-kernel at lists.infradead.org
->> Cc: Boris Brezillon; Jean-Christophe Plagniol-Villard; Nicolas Ferre
->> Subject: at91sam9: watchdog: period
->>
->> Hi all,
->> I'm trying to discover what's wrong with watchdog on my board. I didn't find
->> anything about it on internet so I would ask you for help.
->> I have a board with sam9g25 and slow clock xtal 32768Hz with 10p capacitors
->> to GND. Frequency seems to be good since hwclock (RTC) runs pretty
->> precisely powered from backup and main power too (no NTP). But watchdog
->> time to reset is still 61s regardless default (16s) or 4s heartbeat setting. No
->> change to WDT_MR in bootstrap, so in Linux should work.
-> 
-> I have the same hardware setup and the watchdog timeout is 15
-> seconds for me. For my kernel, I am using the Atmel fork at
-> github.com/linux4sam/linux-at91, master branch at commit
-> 5d5b332821753d616e65da6237f0a3330e59b98f.
+While trying to update a kernel and modules on one of my test systems,
+I was greeted by these errors:
 
-FYI, I've just moved the master branch of our github to the newer
-3.18-based branch: linux-3.18-at91.
+tar: lib/modules/4.1.0-rc2+/kernel/drivers/media/platform/coda/coda.ko: Cannot utime
+tar: lib/modules/4.1.0-rc2+/kernel/drivers/media/dvb-frontends/drx39xyj/drx39xyj.ko: Cannot utime
+tar: lib/modules/4.1.0-rc2+/kernel/drivers/media/usb/em28xx/em28xx.ko: Cannot utime
+tar: lib/modules/4.1.0-rc2+/kernel/drivers/usb/serial/option.ko: Cannot utime
+tar: lib/modules/4.1.0-rc2+/kernel/drivers/usb/serial/ftdi_sio.ko: Cannot utime
+tar: lib/modules/4.1.0-rc2+/kernel/drivers/net/wireless/brcm80211/brcmfmac/brcmfmac.ko: Cannot utime
+tar: lib/modules/4.1.0-rc2+/kernel/drivers/input/mouse/psmouse.ko: Cannot utime
+tar: lib/modules/4.1.0-rc2+/kernel/fs/udf/udf.ko: Cannot utime
+tar: lib/modules/4.1.0-rc2+/kernel/fs/fuse/fuse.ko: Cannot utime
+tar: lib/modules/4.1.0-rc2+/kernel/fs/nfsd/nfsd.ko: Cannot utime
+tar: lib/modules/4.1.0-rc2+/kernel/sound/soc/codecs/snd-soc-wm8962.ko: Cannot utime
+tar: lib/modules/4.1.0-rc2+/kernel/net/bluetooth/bluetooth.ko: Cannot utime
+tar: lib/modules/4.1.0-rc2+/modules.alias.bin: Cannot utime
+tar: lib/modules/4.1.0-rc2+/modules.alias: Cannot utime
+tar: Exiting with failure status due to previous errors
 
-Bye,
+Searching google wasn't helpful, as all the "Cannot utime" errors that
+google could find are followed by an errno string.
 
+stracing at first sight didn't seem to be helpful, as no syscalls (apart
+from openat() with a pre-existing file) were failing.
 
-> Even though this is based upon
-> the 3.10 kernel, there isn't much that has changed with regard to the
-> RTC or watchdog between 3.10 and 4.03; Atmel has been good on
-> backporting their changes to their fork. Maybe try an older kernel and
-> see if the problem goes away?
-> 
-> 
-> Regards,
-> Bryan
-> 
->> Here is dump:
->> [    0.000000] Booting Linux on physical CPU 0x0
->> [    0.000000] Linux version 4.0.2_cpm9g25 (prchal at prchal) (gcc version 4.7.3
->> (Ubuntu/Linaro 4.7.3-12ubuntu1) ) #10
->> PREEMPT Thu May 14 15:20:24 CEST 2015
->> [    0.000000] CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ),
->> cr=0005317f
->> [    0.000000] CPU: VIVT data cache, VIVT instruction cache
->> [    0.000000] Machine model: AKsignal CDU9G25_v6
->> [    0.000000] Memory policy: Data cache writeback
->> [    0.000000] AT91: Detected soc type: at91sam9x5
->> [    0.000000] AT91: Detected soc subtype: at91sam9g25
->> ...
->> [    4.669669] AT91: Starting after watchdog reset
->> [    4.675675] at91sam9_wdt: enabled (heartbeat=4 sec, nowayout=1)
->> ...
->>
->> / # killall watchdog
->> [ 1821.114114] watchdog watchdog0: nowayout prevents watchdog being
->> stopped!
->> / # [ 1821.123123] watchdog watchdog0: watchdog did not stop!
->> [ 1882.294294] at91sam9_wdt: I will reset your machine !
->>
->> Thanks for any help.
->> Jiri
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
+Having recently updated to fc21 tar generating the archive, I thought
+maybe it was a tar format bug between fc21 tar and the target's tar.
+That was until I tried to "apt-get source tar" on the target, and was
+greeted by the same error.
 
+So I then tried untaring the tar source archive onto a ramfs, which
+worked without complaint.  The difference being that it's a root NFS
+box, and so I was untaring onto NFS.
+
+Here's the entry from /proc/mounts:
+
+x.y.z.221:/var/boot/ci on / type nfs (rw,nolock,vers=4,addr=x.y.z.221,clientaddr=a.b.c.55)
+
+Looking closer at the strace reveals this:
+
+openat(AT_FDCWD, "lib/modules/4.1.0-rc2+/kernel/drivers/media/platform/coda/coda.ko", O_WRONLY|O_CREAT|O_EXCL|O_NOCTTY|O_NONBLOCK|O_LARGEFILE|O_CLOEXEC, 0600) = -1 EEXIST (File exists)
+unlinkat(AT_FDCWD, "lib/modules/4.1.0-rc2+/kernel/drivers/media/platform/coda/coda.ko", 0) = 0
+openat(AT_FDCWD, "lib/modules/4.1.0-rc2+/kernel/drivers/media/platform/coda/coda.ko", O_WRONLY|O_CREAT|O_EXCL|O_NOCTTY|O_NONBLOCK|O_LARGEFILE|O_CLOEXEC, 0600) = 4
+write(4, "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\1\0(\0\1\0\0\0\0\0\0\0\0\0\0\0"..., 4096) = 4096
+...
+write(4, "\300H\0\0\34\345\1\0\314H\0\0\34\345\1\0\330H\0\0\34\345\1\0<I\0\0\34\370\1\0"..., 7312) = 7312
+dup2(4, 4)                              = 4
+fstat64(4, {st_mode=0757221, st_size=13181880119170311768, ...}) = 21
+write(2, "tar: ", 5)                    = 5
+write(2, "lib/modules/4.1.0-rc2+/kernel/dr"..., 79) = 79
+write(2, "\n", 1)                       = 1
+fchown32(4, 0, 0)                       = 0
+fchmod(4, 0664)                         = 0
+close(4)                                = 0
+
+Look closely at that fstat64, and you'll notice that it's returning crap.
+The file is not 11 exabytes, and it definitely would not have an octal
+mode of 0757221 at this point, having only just been created by the
+kernel.
+
+For comparison, untaring onto a ramfs filesystem gives this:
+
+openat(AT_FDCWD, "lib/modules/4.1.0-rc2+/kernel/drivers/media/platform/coda/coda.ko", O_WRONLY|O_CREAT|O_EXCL|O_NOCTTY|O_NONBLOCK|O_LARGEFILE|O_CLOEXEC, 0600) = 4
+write(4, "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\1\0(\0\1\0\0\0\0\0\0\0\0\0\0\0"..., 4096) = 4096
+...
+write(4, "\300H\0\0\34\345\1\0\314H\0\0\34\345\1\0\330H\0\0\34\345\1\0<I\0\0\34\370\1\0"..., 7312) = 7312
+dup2(4, 4)                              = 4
+fstat64(4, {st_mode=S_IFREG|0600, st_size=83088, ...}) = 0
+utimensat(4, NULL, {{1431698625, 21832730}, {1431694673, 0}}, 0) = 0
+fchown32(4, 0, 0)                       = 0
+fchmod(4, 0664)                         = 0
+close(4)                                = 0
+
+The reason for the strange dup2() above is this code in tar:
+
+  /* Require that at least one of FD or FILE are valid.  Works around
+     a Linux bug where futimens (AT_FDCWD, NULL) changes "." rather
+     than failing.  */
+  if (!file)
+    {
+      if (fd < 0)
+        {
+          errno = EBADF;
+          return -1;
+        }
+      if (dup2 (fd, fd) != fd)
+        return -1;
+    }
+
+The call path in tar is:
+
+fdutimensat (fd, dir, file, ts, atflag)
+`-futimens (fd, ts)
+  `-fdutimens (fd, NULL, ts);
+
+I'm assuming that the reason for this fstat() call is:
+
+# if __linux__
+      /* As recently as Linux kernel 2.6.32 (Dec 2009), several file
+         systems (xfs, ntfs-3g) have bugs with a single UTIME_OMIT,
+         but work if both times are either explicitly specified or
+         UTIME_NOW.  Work around it with a preparatory [f]stat prior
+         to calling futimens/utimensat; fortunately, there is not much
+         timing impact due to the extra syscall even on file systems
+         where UTIME_OMIT would have worked.  FIXME: Simplify this in
+         2012, when file system bugs are no longer common.  */
+      if (adjustment_needed == 2)
+        {
+          if (fd < 0 ? stat (file, &st) : fstat (fd, &st))
+            return -1;
+          if (ts[0].tv_nsec == UTIME_OMIT)
+            ts[0] = get_stat_atime (&st);
+          else if (ts[1].tv_nsec == UTIME_OMIT)
+            ts[1] = get_stat_mtime (&st);
+          /* Note that st is good, in case utimensat gives ENOSYS.  */
+          adjustment_needed++;
+        }
+# endif /* __linux__ */
+# if HAVE_UTIMENSAT
+      if (fd < 0)
+        {
+          result = utimensat (AT_FDCWD, file, ts, 0);
+#  ifdef __linux__
+          /* Work around a kernel bug:
+             http://bugzilla.redhat.com/442352
+             http://bugzilla.redhat.com/449910
+             It appears that utimensat can mistakenly return 280 rather
+             than -1 upon ENOSYS failure.
+             FIXME: remove in 2010 or whenever the offending kernels
+             are no longer in common use.  */
+          if (0 < result)
+            errno = ENOSYS;
+#  endif /* __linux__ */
+          if (result == 0 || errno != ENOSYS)
+            {
+              utimensat_works_really = 1;
+              return result;
+            }
+        }
+# endif /* HAVE_UTIMENSAT */
 
 -- 
-Nicolas Ferre
+FTTC broadband for 0.8mile line: currently@10.5Mbps down 400kbps up
+according to speedtest.net.
