@@ -1,23 +1,92 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 May 2015 17:22:56 +0200
-Subject: [PATCH] ARM: ux500: add SCU and WD to device tree
-In-Reply-To: <1431595354-2101-1-git-send-email-linus.walleij@linaro.org>
-References: <1431595354-2101-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <14007518.4fLGbUSe3l@wuerfel>
+From: joshc@ni.com (Josh Cartwright)
+Date: Fri, 15 May 2015 10:23:12 -0500
+Subject: [PATCH v2 1/2] rtc: add rtc-lpc24xx driver
+In-Reply-To: <1431696306-19093-2-git-send-email-manabian@gmail.com>
+References: <1431696306-19093-1-git-send-email-manabian@gmail.com>
+ <1431696306-19093-2-git-send-email-manabian@gmail.com>
+Message-ID: <20150515152312.GG23600@jcartwri.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 May 2015 11:22:34 Linus Walleij wrote:
-> The Ux500 like other Cortex-A9 SoC's has a Snoop Control
-> Unit (SCU) and a Watchdog in the same address range as
-> the local timers. Add these to the SoC device tree.
+Hello again,
+
+On Fri, May 15, 2015 at 03:25:05PM +0200, Joachim Eastwood wrote:
+> Add driver for the RTC found on NXP LPC24xx/178x/18xx/43xx devices.
+> The RTC provides calendar and clock functionality together with
+> periodic tick and alarm interrupt support.
 > 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 > ---
-> ARM SoC folks: if it looks OK, please apply this directly to
-> the DT branch with other ux500 DT changes, this is needed
-> for cleanups when we want to remap the SCU from the DT.
+[..]
+> +++ b/drivers/rtc/Kconfig
+> @@ -1427,6 +1427,19 @@ config RTC_DRV_JZ4740
+>  	  This driver can also be buillt as a module. If so, the module
+>  	  will be called rtc-jz4740.
+>  
+> +config RTC_DRV_LPC24XX
+> +	depends on ARCH_LPC18XX || COMPILE_TEST
+> +	depends on HAS_IOMEM
+> +	depends on OF
+> +	tristate "NXP LPC24xx RTC"
+> +	help
+> +	  This enables support for the NXP RTC found which can be found on
+> +	  LPC24xx/178x/18xx/43xx devices.
 
-Applied to next/dt, thanks!
+Is this still true?
 
-	Arnd
+> +
+> +	  If you have one of the devices above enable this driver to use
+> +	  the hardware RTC. This driver can also be buillt as a module. If
+> +	  so, the module will be called rtc-lpc24xx.
+> +
+>  config RTC_DRV_LPC32XX
+>  	depends on ARCH_LPC32XX
+>  	tristate "NXP LPC32XX RTC"
+> diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
+> index c31731c29762..8687a2e13247 100644
+> --- a/drivers/rtc/Makefile
+[..]
+> +static int lpc24xx_rtc_read_time(struct device *dev, struct rtc_time *tm)
+> +{
+> +	struct lpc24xx_rtc *rtc = dev_get_drvdata(dev);
+> +	u32 ct0, ct1, ct2;
+> +
+> +	ct0 = rtc_readl(rtc, LPC24XX_CTIME0);
+> +	ct1 = rtc_readl(rtc, LPC24XX_CTIME1);
+> +	ct2 = rtc_readl(rtc, LPC24XX_CTIME2);
+> +
+> +	tm->tm_sec  = CT0_SECS(ct0);
+> +	tm->tm_min  = CT0_MINS(ct0);
+> +	tm->tm_hour = CT0_HOURS(ct0);
+> +	tm->tm_wday = CT0_DOW(ct0);
+> +	tm->tm_mon  = CT1_MONTH(ct1);
+> +	tm->tm_mday = CT1_DOM(ct1);
+> +	tm->tm_year = CT1_YEAR(ct1);
+> +	tm->tm_yday = CT2_DOY(ct2);
+> +
+> +	if (rtc_valid_tm(tm) < 0) {
+> +		dev_warn(dev, "retrieved date and time is invalid\n");
+> +		rtc_time64_to_tm(0, tm);
+> +		lpc24xx_rtc_set_time(dev, tm);
+> +	}
+> +
+> +	return 0;
+
+Forcing the read time to be the epoch on failure seems like a pretty
+poor way to handle errors, in my opinion.
+
+Why not trickle an error up to the rtc class driver?
+
+Actually, the class driver is already doing a rtc_valid_tm() check, so
+that shouldn't even be necessary.  Just read your time here, and let the
+upper layer take care of handling an invalid time (and properly
+propagating an error up the stack).
+
+  Josh
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150515/7f3b602d/attachment.sig>
