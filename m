@@ -1,63 +1,101 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 15 May 2015 09:18:55 +0800
-Subject: [PATCH 02/18] ARM: imx: Add the definitions for imx_timer and
- its versions
-In-Reply-To: <1430405073-13106-3-git-send-email-shenwei.wang@freescale.com>
-References: <1430405073-13106-1-git-send-email-shenwei.wang@freescale.com>
- <1430405073-13106-3-git-send-email-shenwei.wang@freescale.com>
-Message-ID: <20150515011855.GA10411@tiger>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Fri, 15 May 2015 09:21:59 +0800
+Subject: [PATCH 4/8] ARM: dts: rockchip: relicense rk3288.dtsi under
+ GPLv2/X11
+In-Reply-To: <1425665046-22927-5-git-send-email-heiko@sntech.de>
+References: <1425665046-22927-1-git-send-email-heiko@sntech.de>
+ <1425665046-22927-5-git-send-email-heiko@sntech.de>
+Message-ID: <55554A37.6060800@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 30, 2015 at 09:44:17AM -0500, Shenwei Wang wrote:
-> A struct was added to describe the imx hardware timers.
-> Added four macros to define the imx timer version.
-> 
-> Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
+
+Acked-by: Chris Zhong <zyw@rock-chips.com>
+
+On 03/07/2015 02:04 AM, Heiko Stuebner wrote:
+> GPLv2-only devicetrees make reuse difficult for software components licensed
+> under a different license.
+>
+> The consensus is that a GPL/X11 dual-license should allow all necessary uses,
+> so relicense the rk3288.dtsi to this combination.
+>
+> CCs were aquired by git shortlog -sne so it should've hopefully catched
+> every contributor.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Cc: Kever Yang <kever.yang@rock-chips.com>
+> Cc: Doug Anderson <dianders@chromium.org>
+> Cc: Addy Ke <addy.ke@rock-chips.com>
+> Cc: Daniel Kurtz <djkurtz@chromium.org>
+> Cc: Andy Yan <andy.yan@rock-chips.com>
+> Cc: Caesar Wang <caesar.wang@rock-chips.com>
+> Cc: Chris Zhong <zyw@rock-chips.com>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Jianqun Xu<jay.xu@rock-chips.com>
+> Cc: Roger Chen <roger.chen@rock-chips.com>
+> Cc: Sonny Rao <sonnyrao@chromium.org>
+> Cc: Yunzhi Li <lyz@rock-chips.com>
+> Cc: huang lin <hl@rock-chips.com>
+>
+> Not sure if an Ack for a simple revert is necessary, but included anyway
+> Cc: Olof Johansson <olof@lixom.net>
 > ---
->  arch/arm/mach-imx/time.c | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
-> index eef6b66..5df3c53 100644
-> --- a/arch/arm/mach-imx/time.c
-> +++ b/arch/arm/mach-imx/time.c
-> @@ -81,6 +81,21 @@
->  #define timer_is_v1()	(cpu_is_mx1() || cpu_is_mx21() || cpu_is_mx27())
->  #define timer_is_v2()	(!timer_is_v1())
->  
-> +#define IMX_TIMER_V0         (0)
-> +#define IMX_TIMER_V1         (1)
-> +#define IMX_TIMER_V2         (2)
-> +#define IMX_TIMER_V3         (3)
-
-I prefer to use an enum type instead of macros. Also I do not like the
-versions which are numbered by software arbitrarily.  Instead, I'd like
-to use SoC name that firstly integrates the version to code the
-type/version.
-
-Shawn
-
-> +
-> +struct imx_timer {
-> +	void __iomem *timer_base;
-> +	int version;
-> +	struct clock_event_device evt;
-> +	struct irqaction act;
-> +	void (*gpt_irq_enable)(struct imx_timer *);
-> +	void (*gpt_irq_disable)(struct imx_timer *);
-> +	void (*gpt_irq_acknowledge)(struct imx_timer *);
-> +};
-> +
->  static struct clock_event_device clockevent_mxc;
->  static enum clock_event_mode clockevent_mode = CLOCK_EVT_MODE_UNUSED;
->  
-> -- 
-> 1.9.1
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> I'm hoping to get Acked-by tags from the people in the Cc-list.
+>
+>   arch/arm/boot/dts/rk3288.dtsi | 44 +++++++++++++++++++++++++++++++++++--------
+>   1 file changed, 36 insertions(+), 8 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+> index 2c29a3e..35a06a5 100644
+> --- a/arch/arm/boot/dts/rk3288.dtsi
+> +++ b/arch/arm/boot/dts/rk3288.dtsi
+> @@ -1,13 +1,41 @@
+>   /*
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License as published by
+> - * the Free Software Foundation; either version 2 of the License, or
+> - * (at your option) any later version.
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+>    *
+> - * This program is distributed in the hope that it will be useful,
+> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> - * GNU General Public License for more details.
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+>    */
+>   
+>   #include <dt-bindings/gpio/gpio.h>
