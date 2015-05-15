@@ -1,44 +1,48 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 15 May 2015 16:23:46 +0100
-Subject: [PATCH v4 10/12] KVM: arm64: guest debug, HW assisted debug
- support
-In-Reply-To: <1431700035-23479-11-git-send-email-alex.bennee@linaro.org>
-References: <1431700035-23479-1-git-send-email-alex.bennee@linaro.org>
- <1431700035-23479-11-git-send-email-alex.bennee@linaro.org>
-Message-ID: <20150515152346.GB23652@leverpostej>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Fri, 15 May 2015 17:24:55 +0200
+Subject: [RFC] ARM/ARM64: KVM: Implement KVM_FLUSH_DCACHE_GPA ioctl
+In-Reply-To: <20150515151235.GD14144@lvm>
+References: <1430817191-6231-1-git-send-email-j.fanguede@virtualopensystems.com>
+ <20150506141249.GA6796@cbox>
+ <CAGE1QJrabWWs0O1V-MpOxT_=1472TXb5rvJzJAJNfWH70x9pcg@mail.gmail.com>
+ <20150507112027.GC25885@cbox>
+ <CAGE1QJoyaGpuf=6Msa=xpm0pPGRkYWctcXGf=rwnha5o9Gm4bw@mail.gmail.com>
+ <CAMJs5B9i9q8gJU93B09-uLMF6w1bTft-40DWPFUP6ky=SketSQ@mail.gmail.com>
+ <CAGE1QJoEAg9tAM63MEbpLuqvY_ZwGrHPU1sqo=L_iByKrERUow@mail.gmail.com>
+ <554B9A70.6020309@redhat.com> <5555DBFD.4080503@redhat.com>
+ <20150515151235.GD14144@lvm>
+Message-ID: <55560FC7.30108@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
 
-On Fri, May 15, 2015 at 03:27:13PM +0100, Alex Benn?e wrote:
-> This adds support for userspace to control the HW debug registers for
-> guest debug. In the debug ioctl we copy the IMPDEF defined number of
-> registers into a new register set called host_debug_state. There is now
-> a new vcpu parameter called debug_ptr which selects which register set
-> is to copied into the real registers when world switch occurs.
-> 
-> I've moved some helper functions into the hw_breakpoint.h header for
-> re-use.
-> 
-> As with single step we need to tweak the guest registers to enable the
-> exceptions so we need to save and restore those bits.
-> 
-> Two new capabilities have been added to the KVM_EXTENSION ioctl to allow
-> userspace to query the number of hardware break and watch points
-> available on the host hardware.
 
-There's the unfortunate possibility that these could vary across cores
-in a big.LITTLE system (though we haven't seen that thus far). The
-kernel sanity checks should currently explode if such a case is
-encountered, but I don't know what we'd do were that to happen.
+On 15/05/2015 17:12, Christoffer Dall wrote:
+>>> > > Can you find out what memory attributes the guest is using for the
+>>> > > memory---and if it's uncached, why?
+>> > 
+>> > For USB, see "drivers/usb/core/hcd-pci.c", function usb_hcd_pci_probe():
+>> > it uses ioremap_nocache().
+>> > 
+>> > On the "why", that ioremap_nocache() call can be tracked to
+>> > 
+>> > http://git.kernel.org/cgit/linux/kernel/git/tglx/history.git/commit/?id=a914dd8b
+>> > 
+>> > (Feb 2002), which predates the kernel's move to git. I guess
+>> > ioremap_nocache() is used simply because USB host controllers are
+>> > supposed to programmed like that.
+>> > 
+>> > And, from "arch/arm64/include/asm/io.h":
+>> > 
+>> > #define ioremap_nocache(addr, size)     __ioremap((addr), (size),
+>> > __pgprot(PROT_DEVICE_nGnRE))
+>> > 
+> So this just means that these devices should be mapped as device memory
+> (like the VGA case before) right?  And therefore should work with Drew's
+> patches (assuming they are actually correct and you add the right QEMU
+> annotations to set the memory regions and non-cacheable), correct?
 
-This gets more fun when you consider the context-aware breakpoints are
-the highest numbered. So the set of (context-aware) breakpoints might
-not intersect across all CPUs.
+As far as I understand ioremap_nocache() is used on a MMIO BAR.  QEMU
+does not back those with RAM at all, each access causes a userspace exit.
 
-I'm not sure what the best thing to do is w.r.t. exposing that to
-userspace.
-
-Thanks,
-Mark.
+Paolo
