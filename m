@@ -1,306 +1,154 @@
-From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Fri, 15 May 2015 15:27:13 +0100
-Subject: [PATCH v4 10/12] KVM: arm64: guest debug, HW assisted debug support
-In-Reply-To: <1431700035-23479-1-git-send-email-alex.bennee@linaro.org>
-References: <1431700035-23479-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1431700035-23479-11-git-send-email-alex.bennee@linaro.org>
+From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
+Date: Fri, 15 May 2015 11:06:39 -0400
+Subject: [PATCH 06/12] arm64: psci: account for Trusted OS instances
+In-Reply-To: <1431085004-32743-7-git-send-email-mark.rutland@arm.com>
+References: <1431085004-32743-1-git-send-email-mark.rutland@arm.com>
+ <1431085004-32743-7-git-send-email-mark.rutland@arm.com>
+Message-ID: <CAJ5Y-ea=adURPf+kQC4QfROdk7ZiWwuM78qnHfBi7CV1L6BbRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for userspace to control the HW debug registers for
-guest debug. In the debug ioctl we copy the IMPDEF defined number of
-registers into a new register set called host_debug_state. There is now
-a new vcpu parameter called debug_ptr which selects which register set
-is to copied into the real registers when world switch occurs.
+On 8 May 2015 at 07:36, Mark Rutland <mark.rutland@arm.com> wrote:
+> Software resident in the secure world (a "Trusted OS") may cause CPU_OFF
+> calls for the CPU it is resident on to be denied. Such a denial would be
+> fatal for the kernel, and so we must detect when this can happen before
+> the point of no return.
+>
+> This patch implements Trusted OS detection for PSCI 0.2+ systems, using
+> MIGRATE_INFO_TYPE and MIGRATE_INFO_UP_CPU. When a trusted OS is detected
+> as resident on a particular CPU, attempts to hot unplug that CPU will be
+> denied early, before they can prove fatal.
+>
+> Trusted OS migration is not implemented by this patch. Implementation of
+> migratable UP trusted OSs seems unlikely, and the right policy for
+> migration is unclear (and will likely differ across implementations). As
+> such, it is likely that migration will require cooperation with Trusted
+> OS drivers.
+>
+> PSCI implementations prior to 0.1 do not provide the facility to detect
+> the presence of a Trusted OS, nor the CPU any such OS is resident on, so
+> without additional information it is not possible to handle Trusted OSs
+> with PSCI 0.1.
+>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/kernel/psci.c | 61 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 61 insertions(+)
+>
+> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+> index 7324db9..25e2610 100644
+> --- a/arch/arm64/kernel/psci.c
+> +++ b/arch/arm64/kernel/psci.c
+> @@ -43,6 +43,19 @@ struct psci_power_state {
+>         u8      affinity_level;
+>  };
+>
+> +/*
+> + * The CPU any Trusted OS is resident on. The trusted OS may reject CPU_OFF
+> + * calls to its resident CPU, so we must avoid issuing those. We never migrate
+> + * a Trusted OS even if it claims to be capable of migration -- doing so will
+> + * require cooperation with a Trusted OS driver.
+> + */
+> +static int resident_cpu = -1;
+> +
+> +static bool psci_tos_resident_on(int cpu)
+> +{
+> +       return cpu == resident_cpu;
+> +}
+> +
+>  struct psci_operations {
+>         int (*cpu_suspend)(struct psci_power_state state,
+>                            unsigned long entry_point);
+> @@ -52,6 +65,7 @@ struct psci_operations {
+>         int (*affinity_info)(unsigned long target_affinity,
+>                         unsigned long lowest_affinity_level);
+>         int (*migrate_info_type)(void);
+> +       unsigned long (*migrate_info_up_cpu)(void);
+>  };
+>
+>  static struct psci_operations psci_ops;
+> @@ -172,6 +186,11 @@ static int psci_migrate_info_type(void)
+>         return invoke_psci_fn(PSCI_0_2_FN_MIGRATE_INFO_TYPE, 0, 0, 0);
+>  }
+>
+> +static unsigned long psci_migrate_info_up_cpu(void)
+> +{
+> +       return invoke_psci_fn(PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU, 0, 0, 0);
+> +}
+> +
+>  static int __maybe_unused cpu_psci_cpu_init_idle(struct device_node *cpu_node,
+>                                                  unsigned int cpu)
+>  {
+> @@ -261,6 +280,40 @@ static void psci_sys_poweroff(void)
+>         invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
+>  }
+>
+> +/*
+> + * Detect the presence of a resident Trusted OS which may cause CPU_OFF to
+> + * return DENIED (which would be fatal).
+> + */
+> +static void __init psci_init_migrate(void)
+> +{
+> +       unsigned long cpuid;
+> +       int type, cpu = -1;
+> +
+> +       type = psci_ops.migrate_info_type();
+> +
+> +       if (type == PSCI_0_2_TOS_MP) {
+> +               pr_info("Trusted OS migration not required\n");
+> +               return;
+> +       }
+> +
+> +       if (type == PSCI_RET_NOT_SUPPORTED) {
+> +               pr_info("MIGRATE_INFO_TYPE not supported.\n");
+> +               return;
+> +       }
+> +
+> +       if (type != PSCI_0_2_TOS_UP_MIGRATE &&
+> +           type != PSCI_0_2_TOS_UP_NO_MIGRATE) {
+> +               pr_err("MIGRATE_INFO_TYPE returned unknown type (%d)\n", type);
+> +               return;
+> +       }
+> +
+> +       cpuid = psci_ops.migrate_info_up_cpu();
 
-I've moved some helper functions into the hw_breakpoint.h header for
-re-use.
+[..]
 
-As with single step we need to tweak the guest registers to enable the
-exceptions so we need to save and restore those bits.
+> +       cpu = get_logical_index(cpuid);
+> +       resident_cpu = cpu >= 0 ? cpu : -1;
+> +
+> +       pr_info("Trusted OS resident on physical CPU 0x%lx\n", cpuid);
+> +}
+> +
+>  static void __init psci_0_2_set_functions(void)
+>  {
+>         pr_info("Using standard PSCI v0.2 function IDs\n");
+> @@ -279,6 +332,7 @@ static void __init psci_0_2_set_functions(void)
+>         psci_ops.affinity_info = psci_affinity_info;
+>
+>         psci_ops.migrate_info_type = psci_migrate_info_type;
+> +       psci_ops.migrate_info_up_cpu = psci_migrate_info_up_cpu;
+>
+>         arm_pm_restart = psci_sys_reset;
+>
+> @@ -303,6 +357,8 @@ static int __init psci_probe(void)
+>
+>         psci_0_2_set_functions();
+>
+> +       psci_init_migrate();
+> +
+>         return 0;
+>  }
+>
+> @@ -449,6 +505,11 @@ static int cpu_psci_cpu_disable(unsigned int cpu)
+>         /* Fail early if we don't have CPU_OFF support */
+>         if (!psci_ops.cpu_off)
+>                 return -EOPNOTSUPP;
+> +
+> +       /* Trusted OS will deny CPU_OFF */
+> +       if (psci_tos_resident_on(cpu))
 
-Two new capabilities have been added to the KVM_EXTENSION ioctl to allow
-userspace to query the number of hardware break and watch points
-available on the host hardware.
-
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-
----
-v2
-   - switched to C setup
-   - replace host debug registers directly into context
-   - minor tweak to api docs
-   - setup right register for debug
-   - add FAR_EL2 to debug exit structure
-   - add support for trapping debug register access
-v3
-   - remove stray trace statement
-   - fix spacing around operators (various)
-   - clean-up usage of trap_debug
-   - introduce debug_ptr, replace excessive memcpy stuff
-   - don't use memcpy in ioctl, just assign
-   - update cap ioctl documentation
-   - reword a number comments
-   - rename host_debug_state->external_debug_state
-v4
-   - use the new u32/u64 split debug_ptr approach
-   - fix some wording/comments
-
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 33c8143..ada57df 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -2668,7 +2668,7 @@ The top 16 bits of the control field are architecture specific control
- flags which can include the following:
- 
-   - KVM_GUESTDBG_USE_SW_BP:     using software breakpoints [x86, arm64]
--  - KVM_GUESTDBG_USE_HW_BP:     using hardware breakpoints [x86, s390]
-+  - KVM_GUESTDBG_USE_HW_BP:     using hardware breakpoints [x86, s390, arm64]
-   - KVM_GUESTDBG_INJECT_DB:     inject DB type exception [x86]
-   - KVM_GUESTDBG_INJECT_BP:     inject BP type exception [x86]
-   - KVM_GUESTDBG_EXIT_PENDING:  trigger an immediate guest exit [s390]
-@@ -2683,6 +2683,11 @@ updated to the correct (supplied) values.
- The second part of the structure is architecture specific and
- typically contains a set of debug registers.
- 
-+For arm64 the number of debug registers is implementation defined and
-+can be determined by querying the KVM_CAP_GUEST_DEBUG_HW_BPS and
-+KVM_CAP_GUEST_DEBUG_HW_WPS capabilities which return a positive number
-+indicating the number of supported registers.
-+
- When debug events exit the main run loop with the reason
- KVM_EXIT_DEBUG with the kvm_debug_exit_arch part of the kvm_run
- structure containing architecture specific debug information.
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 0d17c7b..6df47c1 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -307,6 +307,7 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
- 
- #define KVM_GUESTDBG_VALID_MASK (KVM_GUESTDBG_ENABLE |    \
- 			    KVM_GUESTDBG_USE_SW_BP | \
-+			    KVM_GUESTDBG_USE_HW_BP | \
- 			    KVM_GUESTDBG_SINGLESTEP)
- 
- /**
-@@ -327,6 +328,12 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
- 
- 	if (dbg->control & KVM_GUESTDBG_ENABLE) {
- 		vcpu->guest_debug = dbg->control;
-+
-+		/* Hardware assisted Break and Watch points */
-+		if (vcpu->guest_debug & KVM_GUESTDBG_USE_HW_BP) {
-+			vcpu->arch.external_debug_state = dbg->arch;
-+		}
-+
- 	} else {
- 		/* If not enabled clear all flags */
- 		vcpu->guest_debug = 0;
-diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
-index 52b484b..c450552 100644
---- a/arch/arm64/include/asm/hw_breakpoint.h
-+++ b/arch/arm64/include/asm/hw_breakpoint.h
-@@ -130,6 +130,18 @@ static inline void ptrace_hw_copy_thread(struct task_struct *task)
- }
- #endif
- 
-+/* Determine number of BRP registers available. */
-+static inline int get_num_brps(void)
-+{
-+	return ((read_cpuid(ID_AA64DFR0_EL1) >> 12) & 0xf) + 1;
-+}
-+
-+/* Determine number of WRP registers available. */
-+static inline int get_num_wrps(void)
-+{
-+	return ((read_cpuid(ID_AA64DFR0_EL1) >> 20) & 0xf) + 1;
-+}
-+
- extern struct pmu perf_ops_bp;
- 
- #endif	/* __KERNEL__ */
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index ad792cb..ba3a1c5 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -113,12 +113,13 @@ struct kvm_vcpu_arch {
- 
- 	/*
- 	 * For debugging the guest we need to keep a set of debug
--	 * registers which can override the guests own debug state
-+	 * registers which can override the guest's own debug state
- 	 * while being used. These are set via the KVM_SET_GUEST_DEBUG
- 	 * ioctl.
- 	 */
- 	struct kvm_guest_debug_arch *debug_ptr;
- 	struct kvm_guest_debug_arch vcpu_debug_state;
-+	struct kvm_guest_debug_arch external_debug_state;
- 
- 	/* Pointer to host CPU context */
- 	kvm_cpu_context_t *host_cpu_context;
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index 8796610..144edee 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -121,7 +121,7 @@ struct kvm_guest_debug_arch {
- 
- struct kvm_debug_exit_arch {
- 	__u32 hsr;
--	__u64 far;
-+	__u64 far;	/* used for watchpoints */
- };
- 
- struct kvm_sync_regs {
-diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
-index e7d934d..3a41bbf 100644
---- a/arch/arm64/kernel/hw_breakpoint.c
-+++ b/arch/arm64/kernel/hw_breakpoint.c
-@@ -49,18 +49,6 @@ static DEFINE_PER_CPU(int, stepping_kernel_bp);
- static int core_num_brps;
- static int core_num_wrps;
- 
--/* Determine number of BRP registers available. */
--static int get_num_brps(void)
--{
--	return ((read_cpuid(ID_AA64DFR0_EL1) >> 12) & 0xf) + 1;
--}
--
--/* Determine number of WRP registers available. */
--static int get_num_wrps(void)
--{
--	return ((read_cpuid(ID_AA64DFR0_EL1) >> 20) & 0xf) + 1;
--}
--
- int hw_breakpoint_slots(int type)
- {
- 	/*
-diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
-index f630f4d..7cfcb53 100644
---- a/arch/arm64/kvm/debug.c
-+++ b/arch/arm64/kvm/debug.c
-@@ -103,10 +103,6 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
- 				MDCR_EL2_TDRA |
- 				MDCR_EL2_TDOSA);
- 
--	/* Trap on access to debug registers? */
--	if (trap_debug)
--		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDA;
--
- 	/* Is Guest debugging in effect? */
- 	if (vcpu->guest_debug) {
- 		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDE;
-@@ -129,11 +125,43 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
- 			*vcpu_cpsr(vcpu) &= ~DBG_SPSR_SS;
- 			vcpu_sys_reg(vcpu, MDSCR_EL1) &= ~DBG_MDSCR_SS;
- 		}
-+
-+		/*
-+		 * HW Break/Watch points
-+		 *
-+		 * We simply switch the debug_ptr to point to our new
-+		 * external_debug_state which has been populated by the
-+		 * debug ioctl. The existing KVM_ARM64_DEBUG_DIRTY
-+		 * mechanism ensures the registers are updated on the
-+		 * world switch.
-+		 */
-+		if (vcpu->guest_debug & KVM_GUESTDBG_USE_HW_BP) {
-+			/* Enable debug exceptions for all EL0/EL1 */
-+			vcpu_sys_reg(vcpu, MDSCR_EL1) |=
-+				(DBG_MDSCR_KDE | DBG_MDSCR_MDE);
-+
-+			vcpu->arch.debug_ptr = &vcpu->arch.external_debug_state;
-+			vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
-+			trap_debug = true;
-+		}
- 	}
-+
-+	/* Trap debug register access */
-+	if (trap_debug)
-+		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDA;
- }
- 
- void kvm_arm_clear_debug(struct kvm_vcpu *vcpu)
- {
--	if (vcpu->guest_debug)
-+	if (vcpu->guest_debug) {
- 		restore_guest_debug_regs(vcpu);
-+
-+		/*
-+		 * If we were using HW debug we need to restore the
-+		 * debug_ptr to the guest debug state.
-+		 */
-+		if (vcpu->guest_debug & KVM_GUESTDBG_USE_HW_BP)
-+			vcpu->arch.debug_ptr = &vcpu->arch.vcpu_debug_state;
-+
-+	}
- }
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index e9de13e..68a0759 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -103,7 +103,11 @@ static int kvm_handle_guest_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	run->debug.arch.hsr = hsr;
- 
- 	switch (hsr >> ESR_ELx_EC_SHIFT) {
-+	case ESR_ELx_EC_WATCHPT_LOW:
-+		run->debug.arch.far = vcpu->arch.fault.far_el2;
-+		/* fall through */
- 	case ESR_ELx_EC_SOFTSTP_LOW:
-+	case ESR_ELx_EC_BREAKPT_LOW:
- 	case ESR_ELx_EC_BKPT32:
- 	case ESR_ELx_EC_BRK64:
- 		break;
-@@ -132,6 +136,8 @@ static exit_handle_fn arm_exit_handlers[] = {
- 	[ESR_ELx_EC_IABT_LOW]	= kvm_handle_guest_abort,
- 	[ESR_ELx_EC_DABT_LOW]	= kvm_handle_guest_abort,
- 	[ESR_ELx_EC_SOFTSTP_LOW]= kvm_handle_guest_debug,
-+	[ESR_ELx_EC_WATCHPT_LOW]= kvm_handle_guest_debug,
-+	[ESR_ELx_EC_BREAKPT_LOW]= kvm_handle_guest_debug,
- 	[ESR_ELx_EC_BKPT32]	= kvm_handle_guest_debug,
- 	[ESR_ELx_EC_BRK64]	= kvm_handle_guest_debug,
- };
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index 0b43265..21d5a62 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -56,6 +56,12 @@ static bool cpu_has_32bit_el1(void)
- 	return !!(pfr0 & 0x20);
- }
- 
-+/**
-+ * kvm_arch_dev_ioctl_check_extension
-+ *
-+ * We currently assume that the number of HW registers is uniform
-+ * across all CPUs (see cpuinfo_sanity_check).
-+ */
- int kvm_arch_dev_ioctl_check_extension(long ext)
- {
- 	int r;
-@@ -64,6 +70,12 @@ int kvm_arch_dev_ioctl_check_extension(long ext)
- 	case KVM_CAP_ARM_EL1_32BIT:
- 		r = cpu_has_32bit_el1();
- 		break;
-+	case KVM_CAP_GUEST_DEBUG_HW_BPS:
-+		r = get_num_brps();
-+		break;
-+	case KVM_CAP_GUEST_DEBUG_HW_WPS:
-+		r  = get_num_wrps();
-+		break;
- 	default:
- 		r = 0;
- 	}
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index 7c5dd11..d3e661d 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -819,6 +819,8 @@ struct kvm_ppc_smmu_info {
- #define KVM_CAP_S390_INJECT_IRQ 113
- #define KVM_CAP_S390_IRQ_STATE 114
- #define KVM_CAP_PPC_HWRNG 115
-+#define KVM_CAP_GUEST_DEBUG_HW_BPS 116
-+#define KVM_CAP_GUEST_DEBUG_HW_WPS 117
- 
- #ifdef KVM_CAP_IRQ_ROUTING
- 
--- 
-2.3.5
+IIUC, you're denying CPU_OFF even if MIGRATE_INFO_TYPE = 2. Is that correct?
