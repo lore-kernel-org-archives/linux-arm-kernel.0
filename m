@@ -1,43 +1,26 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 15 May 2015 13:13:28 +0200
-Subject: [PATCH v4 0/6] SA1100/PXA RTC clean-up
-In-Reply-To: <1431529350-4597-1-git-send-email-robh@kernel.org> (Rob Herring's
- message of "Wed, 13 May 2015 10:02:24 -0500")
-References: <1431529350-4597-1-git-send-email-robh@kernel.org>
-Message-ID: <87pp62jdpj.fsf@belgarion.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 May 2015 12:34:48 +0100
+Subject: [PATCH 1/2] ARM: cache-l2c: Detect whether it's safe to unlock
+In-Reply-To: <1431416355-7693-2-git-send-email-sjoerd.simons@collabora.co.uk>
+References: <1431416355-7693-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <1431416355-7693-2-git-send-email-sjoerd.simons@collabora.co.uk>
+Message-ID: <20150515113448.GI2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob Herring <robh@kernel.org> writes:
+On Tue, May 12, 2015 at 09:39:14AM +0200, Sjoerd Simons wrote:
+> The L2C cache should only be unlocked when the cache is setup to allow
+> that. In the common case the l2x0 driver sets up the cache for that to
+> be the case (e.g. setting L310_AUX_CTRL_NS_LOCKDOWN on L2C-310), making
+> unlock safe. However when a secure firmware is in use, it may not be
+> possible for the L2c to be configured that way making unlocking unsafe.
+> 
+> To handle that, for caches where special configuration is needed to allow
+> unlocking, check whether this has been setup before unlocking.
 
-> A git branch is here[4]. I've tested sa1100-rtc on PXA1928. I need help
-> testing on PXA27x/3xx.
-Hi Rob,
+I've come up with a different solution to this, which of course I prefer.
+I'll post the patches later today, thanks.
 
-I tested on PXA27x. It works for the boards which used pxa-rtc.
-For the others, their defconfig become broken, because the pxa boards with
-sa1100-rtc do not work anymore. And of course no .config manipulation will fix
-this, because PXA architecture is denied the sa1100-rtc driver.
-
-As a consequence, these boards should transition from sa1100-rtc to pxa-rtc to
-get back a working rtc, amongst which :
-	cm_x2xx_defconfig
-	em_x270_defconfig
-	h5000_defconfig
-	jornada720_defconfig
-	magician_defconfig
-	palmz72_defconfig
-	pcm027_defconfig
-	trizeps4_defconfig
-	viper_defconfig
-	xcep_defconfig
-
-I think you should at least Cc the maintainers of these boards to see their
-reaction. They should be aware of the impacts and comment.
-
-I'll make a test for pxa3xx in the next week.
-
-Cheers.
-
---
-Robert
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
