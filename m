@@ -1,85 +1,140 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Fri, 15 May 2015 15:27:03 +0100
-Subject: [PATCH v4 00/12] KVM Guest Debug support for arm64
-Message-ID: <1431700035-23479-1-git-send-email-alex.bennee@linaro.org>
+Date: Fri, 15 May 2015 15:27:09 +0100
+Subject: [PATCH v4 06/12] KVM: arm64: guest debug, add SW break point support
+In-Reply-To: <1431700035-23479-1-git-send-email-alex.bennee@linaro.org>
+References: <1431700035-23479-1-git-send-email-alex.bennee@linaro.org>
+Message-ID: <1431700035-23479-7-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This adds support for SW breakpoints inserted by userspace.
 
-Here is V4 of the KVM Guest Debug support for arm64.
+We do this by trapping all guest software debug exceptions to the
+hypervisor (MDCR_EL2.TDE). The exit handler sets an exit reason of
+KVM_EXIT_DEBUG with the kvm_debug_exit_arch structure holding the
+exception syndrome information.
 
-The changes are all due to Christoffer's review of v3 and sees a few
-tweaks. The main change to the debug register code means we no longer
-overlay the registers in sys_reg[] context but have specific areas for
-the vcpu_debug_state and external_debug_state. As a result the need to
-__u64 align the registers has been removed and we now have:
+It will be up to userspace to extract the PC (via GET_ONE_REG) and
+determine if the debug event was for a breakpoint it inserted. If not
+userspace will need to re-inject the correct exception restart the
+hypervisor to deliver the debug exception to the guest.
 
-#define KVM_ARM_MAX_DBG_REGS 16
-struct kvm_guest_debug_arch {
-        __u32 dbg_bcr[KVM_ARM_MAX_DBG_REGS];
-        __u64 dbg_bvr[KVM_ARM_MAX_DBG_REGS];
-        __u32 dbg_wcr[KVM_ARM_MAX_DBG_REGS];
-        __u64 dbg_wvr[KVM_ARM_MAX_DBG_REGS];
-};
+Any other guest software debug exception (e.g. single step or HW
+assisted breakpoints) will cause an error and the VM to be killed. This
+is addressed by later patches which add support for the other debug
+types.
 
-There are additional comments to clarify how we handle trapping and
-preserving registers.
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-For full details see the changelog on each of the patches.
+---
+v2
+  - update to use new exit struct
+  - tweak for C setup
+  - do our setup in debug_setup/clear code
+  - fixed up comments
+v3:
+  - fix spacing in KVM_GUESTDBG_VALID_MASK
+  - fix and clarify wording on kvm_handle_guest_debug
+  - handle error case in kvm_handle_guest_debug
+  - re-word the commit message
+v4
+  - rm else leg
+  - add r-b-tag
 
-GIT Repos:
-
-The patches for this series are based off v4.1-rc3 and can be found
-at:
-
-https://git.linaro.org/people/alex.bennee/linux.git
-branch: guest-debug/4.1-rc3-v4
-
-I'm still in the process of going through the QEMU comments and adding
-the re-injection support. However the current working state can be
-seen at:
-
-https://github.com/stsquad/qemu
-branch: kvm/guest-debug-v4
-
-Alex Benn?e (12):
-  KVM: add comments for kvm_debug_exit_arch struct
-  KVM: define common KVM_GUESTDBG_USE_SW/HW_BP bits
-  KVM: arm64: guest debug, define API headers
-  KVM: arm: guest debug, add stub KVM_SET_GUEST_DEBUG ioctl
-  KVM: arm: introduce kvm_arm_init/setup/clear_debug
-  KVM: arm64: guest debug, add SW break point support
-  KVM: arm64: guest debug, add support for single-step
-  KVM: arm64: re-factor hyp.S debug register code
-  KVM: arm64: introduce vcpu->arch.debug_ptr
-  KVM: arm64: guest debug, HW assisted debug support
-  KVM: arm64: enable KVM_CAP_SET_GUEST_DEBUG
-  KVM: arm64: add trace points for guest_debug debug
-
- Documentation/virtual/kvm/api.txt      |  15 +-
- arch/arm/include/asm/kvm_host.h        |   4 +
- arch/arm/kvm/arm.c                     |  46 ++-
- arch/arm/kvm/trace.h                   |  17 +
- arch/arm64/include/asm/hw_breakpoint.h |  12 +
- arch/arm64/include/asm/kvm_asm.h       |  26 +-
- arch/arm64/include/asm/kvm_host.h      |  30 +-
- arch/arm64/include/uapi/asm/kvm.h      |  18 ++
- arch/arm64/kernel/asm-offsets.c        |   7 +
- arch/arm64/kernel/hw_breakpoint.c      |  12 -
- arch/arm64/kvm/Makefile                |   2 +-
- arch/arm64/kvm/debug.c                 | 203 ++++++++++++
- arch/arm64/kvm/handle_exit.c           |  44 +++
- arch/arm64/kvm/hyp.S                   | 545 ++++++++++-----------------------
- arch/arm64/kvm/reset.c                 |  15 +
- arch/arm64/kvm/sys_regs.c              | 136 ++++++--
- arch/arm64/kvm/trace.h                 | 105 +++++++
- arch/powerpc/include/uapi/asm/kvm.h    |   4 +-
- arch/s390/include/uapi/asm/kvm.h       |   2 -
- arch/x86/include/uapi/asm/kvm.h        |   2 -
- include/uapi/linux/kvm.h               |  11 +-
- 21 files changed, 798 insertions(+), 458 deletions(-)
- create mode 100644 arch/arm64/kvm/debug.c
-
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index ba635c7..33c8143 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -2667,7 +2667,7 @@ when running. Common control bits are:
+ The top 16 bits of the control field are architecture specific control
+ flags which can include the following:
+ 
+-  - KVM_GUESTDBG_USE_SW_BP:     using software breakpoints [x86]
++  - KVM_GUESTDBG_USE_SW_BP:     using software breakpoints [x86, arm64]
+   - KVM_GUESTDBG_USE_HW_BP:     using hardware breakpoints [x86, s390]
+   - KVM_GUESTDBG_INJECT_DB:     inject DB type exception [x86]
+   - KVM_GUESTDBG_INJECT_BP:     inject BP type exception [x86]
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 4a274e1..064c105 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -302,7 +302,7 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+ 	kvm_arm_set_running_vcpu(NULL);
+ }
+ 
+-#define KVM_GUESTDBG_VALID_MASK (KVM_GUESTDBG_ENABLE)
++#define KVM_GUESTDBG_VALID_MASK (KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_USE_SW_BP)
+ 
+ /**
+  * kvm_arch_vcpu_ioctl_set_guest_debug - set up guest debugging
+diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
+index faf0e1f..8d1bfa4 100644
+--- a/arch/arm64/kvm/debug.c
++++ b/arch/arm64/kvm/debug.c
+@@ -73,6 +73,9 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
+ 	if (trap_debug)
+ 		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDA;
+ 
++	/* Trap breakpoints? */
++	if (vcpu->guest_debug & KVM_GUESTDBG_USE_SW_BP)
++		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDE;
+ }
+ 
+ void kvm_arm_clear_debug(struct kvm_vcpu *vcpu)
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index 524fa25..27f38a9 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -82,6 +82,40 @@ static int kvm_handle_wfx(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	return 1;
+ }
+ 
++/**
++ * kvm_handle_guest_debug - handle a debug exception instruction
++ *
++ * @vcpu:	the vcpu pointer
++ * @run:	access to the kvm_run structure for results
++ *
++ * We route all debug exceptions through the same handler. If both the
++ * guest and host are using the same debug facilities it will be up to
++ * userspace to re-inject the correct exception for guest delivery.
++ *
++ * @return: 0 (while setting run->exit_reason), -1 for error
++ */
++static int kvm_handle_guest_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	u32 hsr = kvm_vcpu_get_hsr(vcpu);
++	int ret = 0;
++
++	run->exit_reason = KVM_EXIT_DEBUG;
++	run->debug.arch.hsr = hsr;
++
++	switch (hsr >> ESR_ELx_EC_SHIFT) {
++	case ESR_ELx_EC_BKPT32:
++	case ESR_ELx_EC_BRK64:
++		break;
++	default:
++		kvm_err("%s: un-handled case hsr: %#08x\n",
++			__func__, (unsigned int) hsr);
++		ret = -1;
++		break;
++	}
++
++	return ret;
++}
++
+ static exit_handle_fn arm_exit_handlers[] = {
+ 	[ESR_ELx_EC_WFx]	= kvm_handle_wfx,
+ 	[ESR_ELx_EC_CP15_32]	= kvm_handle_cp15_32,
+@@ -96,6 +130,8 @@ static exit_handle_fn arm_exit_handlers[] = {
+ 	[ESR_ELx_EC_SYS64]	= kvm_handle_sys_reg,
+ 	[ESR_ELx_EC_IABT_LOW]	= kvm_handle_guest_abort,
+ 	[ESR_ELx_EC_DABT_LOW]	= kvm_handle_guest_abort,
++	[ESR_ELx_EC_BKPT32]	= kvm_handle_guest_debug,
++	[ESR_ELx_EC_BRK64]	= kvm_handle_guest_debug,
+ };
+ 
+ static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
 -- 
 2.3.5
