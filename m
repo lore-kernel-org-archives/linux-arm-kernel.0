@@ -1,83 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 15 May 2015 15:50:14 +0100
-Subject: NFS client broken in 4.1.0-rc2
-In-Reply-To: <F423EE93-1A93-42F8-8593-9D2E4F85CB3B@oracle.com>
-References: <20150515142403.GL2067@n2100.arm.linux.org.uk>
- <F423EE93-1A93-42F8-8593-9D2E4F85CB3B@oracle.com>
-Message-ID: <20150515145013.GM2067@n2100.arm.linux.org.uk>
+From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
+Date: Fri, 15 May 2015 15:27:14 +0100
+Subject: [PATCH v4 11/12] KVM: arm64: enable KVM_CAP_SET_GUEST_DEBUG
+In-Reply-To: <1431700035-23479-1-git-send-email-alex.bennee@linaro.org>
+References: <1431700035-23479-1-git-send-email-alex.bennee@linaro.org>
+Message-ID: <1431700035-23479-12-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 15, 2015 at 10:26:48AM -0400, Chuck Lever wrote:
-> 
-> On May 15, 2015, at 10:24 AM, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> 
-> > While trying to update a kernel and modules on one of my test systems,
-> > I was greeted by these errors:
-> > 
-> > tar: lib/modules/4.1.0-rc2+/kernel/drivers/media/platform/coda/coda.ko: Cannot utime
-> > tar: lib/modules/4.1.0-rc2+/kernel/drivers/media/dvb-frontends/drx39xyj/drx39xyj.ko: Cannot utime
-> > tar: lib/modules/4.1.0-rc2+/kernel/drivers/media/usb/em28xx/em28xx.ko: Cannot utime
-> > tar: lib/modules/4.1.0-rc2+/kernel/drivers/usb/serial/option.ko: Cannot utime
-> > tar: lib/modules/4.1.0-rc2+/kernel/drivers/usb/serial/ftdi_sio.ko: Cannot utime
-> > tar: lib/modules/4.1.0-rc2+/kernel/drivers/net/wireless/brcm80211/brcmfmac/brcmfmac.ko: Cannot utime
-> > tar: lib/modules/4.1.0-rc2+/kernel/drivers/input/mouse/psmouse.ko: Cannot utime
-> > tar: lib/modules/4.1.0-rc2+/kernel/fs/udf/udf.ko: Cannot utime
-> > tar: lib/modules/4.1.0-rc2+/kernel/fs/fuse/fuse.ko: Cannot utime
-> > tar: lib/modules/4.1.0-rc2+/kernel/fs/nfsd/nfsd.ko: Cannot utime
-> > tar: lib/modules/4.1.0-rc2+/kernel/sound/soc/codecs/snd-soc-wm8962.ko: Cannot utime
-> > tar: lib/modules/4.1.0-rc2+/kernel/net/bluetooth/bluetooth.ko: Cannot utime
-> > tar: lib/modules/4.1.0-rc2+/modules.alias.bin: Cannot utime
-> > tar: lib/modules/4.1.0-rc2+/modules.alias: Cannot utime
-> > tar: Exiting with failure status due to previous errors
-> > 
-> > Searching google wasn't helpful, as all the "Cannot utime" errors that
-> > google could find are followed by an errno string.
-> > 
-> > stracing at first sight didn't seem to be helpful, as no syscalls (apart
-> > from openat() with a pre-existing file) were failing.
-> > 
-> > Having recently updated to fc21 tar generating the archive, I thought
-> > maybe it was a tar format bug between fc21 tar and the target's tar.
-> > That was until I tried to "apt-get source tar" on the target, and was
-> > greeted by the same error.
-> > 
-> > So I then tried untaring the tar source archive onto a ramfs, which
-> > worked without complaint.  The difference being that it's a root NFS
-> > box, and so I was untaring onto NFS.
-> > 
-> > Here's the entry from /proc/mounts:
-> > 
-> > x.y.z.221:/var/boot/ci on / type nfs (rw,nolock,vers=4,addr=x.y.z.221,clientaddr=a.b.c.55)
-> > 
-> > Looking closer at the strace reveals this:
-> > 
-> > openat(AT_FDCWD, "lib/modules/4.1.0-rc2+/kernel/drivers/media/platform/coda/coda.ko", O_WRONLY|O_CREAT|O_EXCL|O_NOCTTY|O_NONBLOCK|O_LARGEFILE|O_CLOEXEC, 0600) = -1 EEXIST (File exists)
-> > unlinkat(AT_FDCWD, "lib/modules/4.1.0-rc2+/kernel/drivers/media/platform/coda/coda.ko", 0) = 0
-> > openat(AT_FDCWD, "lib/modules/4.1.0-rc2+/kernel/drivers/media/platform/coda/coda.ko", O_WRONLY|O_CREAT|O_EXCL|O_NOCTTY|O_NONBLOCK|O_LARGEFILE|O_CLOEXEC, 0600) = 4
-> > write(4, "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\1\0(\0\1\0\0\0\0\0\0\0\0\0\0\0"..., 4096) = 4096
-> > ...
-> > write(4, "\300H\0\0\34\345\1\0\314H\0\0\34\345\1\0\330H\0\0\34\345\1\0<I\0\0\34\370\1\0"..., 7312) = 7312
-> > dup2(4, 4)                              = 4
-> > fstat64(4, {st_mode=0757221, st_size=13181880119170311768, ...}) = 21
-> > write(2, "tar: ", 5)                    = 5
-> > write(2, "lib/modules/4.1.0-rc2+/kernel/dr"..., 79) = 79
-> > write(2, "\n", 1)                       = 1
-> > fchown32(4, 0, 0)                       = 0
-> > fchmod(4, 0664)                         = 0
-> > close(4)                                = 0
-> > 
-> > Look closely at that fstat64, and you'll notice that it's returning crap.
-> 
-> This is likely fixed by:
-> 
->   http://marc.info/?l=linux-nfs&m=143095122604344&w=2
+Finally advertise the KVM capability for SET_GUEST_DEBUG. Once arm
+support is added this check can be moved to the common
+kvm_vm_ioctl_check_extension() code.
 
-Yes, it appears to be fixed by that change.  I'll add it to my tree so
-my test systems work.
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Many thanks.
+---
 
+v3:
+ - separated capability check from previous patches
+ - moved into arm64 specific ioctl handler.
+v4:
+ - add a-b-tag
+
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index 21d5a62..88e5331 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -76,6 +76,9 @@ int kvm_arch_dev_ioctl_check_extension(long ext)
+ 	case KVM_CAP_GUEST_DEBUG_HW_WPS:
+ 		r  = get_num_wrps();
+ 		break;
++	case KVM_CAP_SET_GUEST_DEBUG:
++		r = 1;
++		break;
+ 	default:
+ 		r = 0;
+ 	}
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.3.5
