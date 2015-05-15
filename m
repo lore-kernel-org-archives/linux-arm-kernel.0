@@ -1,91 +1,197 @@
 From: yong.wu@mediatek.com (Yong Wu)
-Date: Fri, 15 May 2015 17:43:23 +0800
-Subject: [RFC v2 PATCH 0/6] MT8173 IOMMU SUPPORT 
-Message-ID: <1431683009-18158-1-git-send-email-yong.wu@mediatek.com>
+Date: Fri, 15 May 2015 17:43:24 +0800
+Subject: [PATCH v2 1/6] dt-bindings: iommu: Add binding for mediatek IOMMU
+In-Reply-To: <1431683009-18158-1-git-send-email-yong.wu@mediatek.com>
+References: <1431683009-18158-1-git-send-email-yong.wu@mediatek.com>
+Message-ID: <1431683009-18158-2-git-send-email-yong.wu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  This patch adds support for m4u(Multimedia Memory Management Unit),
-Currently it only support the m4u with 2 levels of page table on mt8173.
+This patch add mediatek iommu dts binding document.
 
-  It is based on Robin Murphy's arm64: IOMMU-backed DMA mapping[1]. 
- 
-  Please check the hardware block diagram of Mediatek IOMMU.
- 
-              EMI (External Memory Interface)
-               |
-              m4u (Multimedia Memory Management Unit)
-               |
-              smi (Smart Multimedia Interface)
-               |
-        +---------------+-------
-        |               |
-        |               |
-    vdec larb       disp larb      ... SoCs have different local arbiter(larb).
-        |               |
-        |               |
-   +----+----+    +-----+-----+
-   |    |    |    |     |     |    ...
-   |    |    |    |     |     |    ...
-   |    |    |    |     |     |    ...
-  MC   PP   VLD  OVL0 RDMA0 WDMA0  ... There are different ports in each larb.
-  
-  Normally we specify a local arbiter(larb) for each multimedia hardware like
-display, video decode, video encode and camera. And there are different ports in
-each larb. Take a example, there are some ports like MC, PP, UFO, VLD, AVC_MV,
-PRED_RD, PRED_WR in video larb, all the ports are according to the video hardware.
- 
-  From the diagram, all the multimedia module connect with m4u via smi.
-SMI is responsible to enable/disable iommu and control the clocks for each local
-arbiter. If we should enable the iommu of video decode, it should config the 
-video's ports. And if the video hardware work wether enable/disable iommu, 
-it should enable the clock of its larb's clock. So we add a special driver for smi.
- 
-[1] http://lists.linuxfoundation.org/pipermail/iommu/2015-February/012236.html
-
-v2:
--add arm short descriptor support.
--seperate smi common from smi and change the clock-names according
- to smi HW.
--delete the hardcode of the port-names in mt8173.
- replace this with larb-portes-nr in dtsi.
--fix some coding style issues.
-
-v1:
-http://lists.infradead.org/pipermail/linux-mediatek/2015-March/000058.html
-
-Yong Wu (6):
-  dt-bindings: iommu: Add binding for mediatek IOMMU
-  dt-bindings: mediatek: Add smi dts binding
-  iommu: add ARM short descriptor page table allocator.
-  iommu/mediatek: Add mt8173 IOMMU driver
-  soc: mediatek: Add SMI driver
-  dts: mt8173: Add iommu/smi nodes for mt8173
-
- .../devicetree/bindings/iommu/mediatek,iommu.txt   |  51 ++
- .../bindings/soc/mediatek/mediatek,smi-larb.txt    |  24 +
- .../bindings/soc/mediatek/mediatek,smi.txt         |  22 +
- arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  79 +++
- drivers/iommu/Kconfig                              |  18 +
- drivers/iommu/Makefile                             |   2 +
- drivers/iommu/io-pgtable-arm-short.c               | 490 +++++++++++++++
- drivers/iommu/io-pgtable.c                         |   4 +
- drivers/iommu/io-pgtable.h                         |   6 +
- drivers/iommu/mtk_iommu.c                          | 657 +++++++++++++++++++++
- drivers/soc/mediatek/Kconfig                       |   6 +
- drivers/soc/mediatek/Makefile                      |   1 +
- drivers/soc/mediatek/mt8173-smi.c                  | 298 ++++++++++
- include/dt-bindings/iommu/mt8173-iommu-port.h      | 112 ++++
- include/linux/mtk-smi.h                            |  39 ++
- 15 files changed, 1809 insertions(+)
+Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+---
+ .../devicetree/bindings/iommu/mediatek,iommu.txt   |  51 ++++++++++
+ include/dt-bindings/iommu/mt8173-iommu-port.h      | 112 +++++++++++++++++++++
+ 2 files changed, 163 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
- create mode 100644 Documentation/devicetree/bindings/soc/mediatek/mediatek,smi-larb.txt
- create mode 100644 Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt
- create mode 100644 drivers/iommu/io-pgtable-arm-short.c
- create mode 100644 drivers/iommu/mtk_iommu.c
- create mode 100644 drivers/soc/mediatek/mt8173-smi.c
  create mode 100644 include/dt-bindings/iommu/mt8173-iommu-port.h
- create mode 100644 include/linux/mtk-smi.h
 
+diff --git a/Documentation/devicetree/bindings/iommu/mediatek,iommu.txt b/Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
+new file mode 100644
+index 0000000..f2cc7c0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
+@@ -0,0 +1,51 @@
++/******************************************************/
++/*    Mediatek IOMMU Hardware Block Diagram           */
++/******************************************************/
++              EMI (External Memory Interface)
++               |
++              m4u (Multimedia Memory Management Unit)
++               |
++              smi (Smart Multimedia Interface)
++               |
++        +---------------+-------
++        |               |
++        |               |
++    vdec larb       disp larb      ... SoCs have different local arbiter(larb).
++        |               |
++        |               |
++   +----+----+    +-----+-----+
++   |    |    |    |     |     |    ...
++   |    |    |    |     |     |    ...
++   |    |    |    |     |     |    ...
++  MC   PP   VLD  OVL0 RDMA0 WDMA0  ... There are different ports in each larb.
++
++Required properties:
++- compatible : must be "mediatek,mt8173-m4u".
++- reg : m4u register base and size.
++- interrupts : the interrupt of m4u.
++- clocks : must contain one entry for each clock-names.
++- clock-names : must be "bclk", It is the block clock of m4u.
++- larb-portes-nr : must contain the number of the portes for each larb(local
++	arbiter). The number is defined in dt-binding/iommu/mt8173-iommu-port.h.
++- larb : must contain the local arbiters of the current platform. Refer to
++	bindings/soc/mediatek/mediatek,smi.txt. It must sort according to the
++	local arbiter index, like larb0, larb1, larb2...
++- iommu-cells : must be 1. Specifies the client PortID as defined in
++	dt-binding/iommu/mt8173-iommu-port.h
++
++Example:
++		iommu: mmsys_iommu at 10205000 {
++			compatible = "mediatek,mt8173-m4u";
++			reg = <0 0x10205000 0 0x1000>;
++			interrupts = <GIC_SPI 139 IRQ_TYPE_LEVEL_LOW>;
++			clocks = <&infrasys INFRA_M4U>;
++			clock-names = "bclk";
++			larb-portes-nr = <M4U_LARB0_PORT_NR
++					  M4U_LARB1_PORT_NR
++					  M4U_LARB2_PORT_NR
++					  M4U_LARB3_PORT_NR
++					  M4U_LARB4_PORT_NR
++					  M4U_LARB5_PORT_NR>;
++			larb = <&larb0 &larb1 &larb2 &larb3 &larb4 &larb5>;
++			#iommu-cells = <1>;
++		};
+\ No newline at end of file
+diff --git a/include/dt-bindings/iommu/mt8173-iommu-port.h b/include/dt-bindings/iommu/mt8173-iommu-port.h
+new file mode 100644
+index 0000000..09bac4f
+--- /dev/null
++++ b/include/dt-bindings/iommu/mt8173-iommu-port.h
+@@ -0,0 +1,112 @@
++/*
++ * Copyright (c) 2014-2015 MediaTek Inc.
++ * Author: Yong Wu <yong.wu@mediatek.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++#ifndef __DTS_IOMMU_PORT_MT8173_H
++#define __DTS_IOMMU_PORT_MT8173_H
++
++#define M4U_LARB0_PORT_NR	8
++#define M4U_LARB1_PORT_NR	10
++#define M4U_LARB2_PORT_NR	21
++#define M4U_LARB3_PORT_NR	15
++#define M4U_LARB4_PORT_NR	6
++#define M4U_LARB5_PORT_NR	9
++
++#define M4U_LARB0_PORT(n)	(n)
++#define M4U_LARB1_PORT(n)	((n) + M4U_LARB0_PORT_NR + M4U_LARB0_PORT(0))
++#define M4U_LARB2_PORT(n)	((n) + M4U_LARB1_PORT_NR + M4U_LARB1_PORT(0))
++#define M4U_LARB3_PORT(n)	((n) + M4U_LARB2_PORT_NR + M4U_LARB2_PORT(0))
++#define M4U_LARB4_PORT(n)	((n) + M4U_LARB3_PORT_NR + M4U_LARB3_PORT(0))
++#define M4U_LARB5_PORT(n)	((n) + M4U_LARB4_PORT_NR + M4U_LARB4_PORT(0))
++
++/* larb0 */
++#define	M4U_PORT_DISP_OVL0		M4U_LARB0_PORT(0)
++#define	M4U_PORT_DISP_RDMA0		M4U_LARB0_PORT(1)
++#define	M4U_PORT_DISP_WDMA0		M4U_LARB0_PORT(2)
++#define	M4U_PORT_DISP_OD_R		M4U_LARB0_PORT(3)
++#define	M4U_PORT_DISP_OD_W		M4U_LARB0_PORT(4)
++#define	M4U_PORT_MDP_RDMA0		M4U_LARB0_PORT(5)
++#define	M4U_PORT_MDP_WDMA		M4U_LARB0_PORT(6)
++#define	M4U_PORT_MDP_WROT0		M4U_LARB0_PORT(7)
++
++/* larb1 */
++#define	M4U_PORT_HW_VDEC_MC_EXT		M4U_LARB1_PORT(0)
++#define	M4U_PORT_HW_VDEC_PP_EXT		M4U_LARB1_PORT(1)
++#define	M4U_PORT_HW_VDEC_UFO_EXT	M4U_LARB1_PORT(2)
++#define	M4U_PORT_HW_VDEC_VLD_EXT	M4U_LARB1_PORT(3)
++#define	M4U_PORT_HW_VDEC_VLD2_EXT	M4U_LARB1_PORT(4)
++#define	M4U_PORT_HW_VDEC_AVC_MV_EXT	M4U_LARB1_PORT(5)
++#define	M4U_PORT_HW_VDEC_PRED_RD_EXT	M4U_LARB1_PORT(6)
++#define	M4U_PORT_HW_VDEC_PRED_WR_EXT	M4U_LARB1_PORT(7)
++#define	M4U_PORT_HW_VDEC_PPWRAP_EXT	M4U_LARB1_PORT(8)
++#define	M4U_PORT_HW_VDEC_TILE		M4U_LARB1_PORT(9)
++
++/* larb2 */
++#define	M4U_PORT_IMGO			M4U_LARB2_PORT(0)
++#define	M4U_PORT_RRZO			M4U_LARB2_PORT(1)
++#define	M4U_PORT_AAO			M4U_LARB2_PORT(2)
++#define	M4U_PORT_LCSO			M4U_LARB2_PORT(3)
++#define	M4U_PORT_ESFKO			M4U_LARB2_PORT(4)
++#define	M4U_PORT_IMGO_D			M4U_LARB2_PORT(5)
++#define	M4U_PORT_LSCI			M4U_LARB2_PORT(6)
++#define	M4U_PORT_LSCI_D			M4U_LARB2_PORT(7)
++#define	M4U_PORT_BPCI			M4U_LARB2_PORT(8)
++#define	M4U_PORT_BPCI_D			M4U_LARB2_PORT(9)
++#define	M4U_PORT_UFDI			M4U_LARB2_PORT(10)
++#define	M4U_PORT_IMGI			M4U_LARB2_PORT(11)
++#define	M4U_PORT_IMG2O			M4U_LARB2_PORT(12)
++#define	M4U_PORT_IMG3O			M4U_LARB2_PORT(13)
++#define	M4U_PORT_VIPI			M4U_LARB2_PORT(14)
++#define	M4U_PORT_VIP2I			M4U_LARB2_PORT(15)
++#define	M4U_PORT_VIP3I			M4U_LARB2_PORT(16)
++#define	M4U_PORT_LCEI			M4U_LARB2_PORT(17)
++#define	M4U_PORT_RB			M4U_LARB2_PORT(18)
++#define	M4U_PORT_RP			M4U_LARB2_PORT(19)
++#define	M4U_PORT_WR			M4U_LARB2_PORT(20)
++
++/* larb3 */
++#define	M4U_PORT_VENC_RCPU		M4U_LARB3_PORT(0)
++#define	M4U_PORT_VENC_REC		M4U_LARB3_PORT(1)
++#define	M4U_PORT_VENC_BSDMA		M4U_LARB3_PORT(2)
++#define	M4U_PORT_VENC_SV_COMV		M4U_LARB3_PORT(3)
++#define	M4U_PORT_VENC_RD_COMV		M4U_LARB3_PORT(4)
++#define	M4U_PORT_JPGENC_RDMA		M4U_LARB3_PORT(5)
++#define	M4U_PORT_JPGENC_BSDMA		M4U_LARB3_PORT(6)
++#define	M4U_PORT_JPGDEC_WDMA		M4U_LARB3_PORT(7)
++#define	M4U_PORT_JPGDEC_BSDMA		M4U_LARB3_PORT(8)
++#define	M4U_PORT_VENC_CUR_LUMA		M4U_LARB3_PORT(9)
++#define	M4U_PORT_VENC_CUR_CHROMA	M4U_LARB3_PORT(10)
++#define	M4U_PORT_VENC_REF_LUMA		M4U_LARB3_PORT(11)
++#define	M4U_PORT_VENC_REF_CHROMA	M4U_LARB3_PORT(12)
++#define	M4U_PORT_VENC_NBM_RDMA		M4U_LARB3_PORT(13)
++#define	M4U_PORT_VENC_NBM_WDMA		M4U_LARB3_PORT(14)
++
++/* larb4 */
++#define	M4U_PORT_DISP_OVL1		M4U_LARB4_PORT(0)
++#define	M4U_PORT_DISP_RDMA1		M4U_LARB4_PORT(1)
++#define	M4U_PORT_DISP_RDMA2		M4U_LARB4_PORT(2)
++#define	M4U_PORT_DISP_WDMA1		M4U_LARB4_PORT(3)
++#define	M4U_PORT_MDP_RDMA1		M4U_LARB4_PORT(4)
++#define	M4U_PORT_MDP_WROT1		M4U_LARB4_PORT(5)
++
++/* larb5 */
++#define	M4U_PORT_VENC_RCPU_SET2		M4U_LARB5_PORT(0)
++#define	M4U_PORT_VENC_REC_FRM_SET2	M4U_LARB5_PORT(1)
++#define	M4U_PORT_VENC_REF_LUMA_SET2	M4U_LARB5_PORT(2)
++#define	M4U_PORT_VENC_REC_CHROMA_SET2	M4U_LARB5_PORT(3)
++#define	M4U_PORT_VENC_BSDMA_SET2	M4U_LARB5_PORT(4)
++#define	M4U_PORT_VENC_CUR_LUMA_SET2	M4U_LARB5_PORT(5)
++#define	M4U_PORT_VENC_CUR_CHROMA_SET2	M4U_LARB5_PORT(6)
++#define	M4U_PORT_VENC_RD_COMA_SET2	M4U_LARB5_PORT(7)
++#define	M4U_PORT_VENC_SV_COMA_SET2	M4U_LARB5_PORT(8)
++
++#endif
 -- 
 1.8.1.1.dirty
