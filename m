@@ -1,154 +1,55 @@
-From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Fri, 15 May 2015 11:06:39 -0400
-Subject: [PATCH 06/12] arm64: psci: account for Trusted OS instances
-In-Reply-To: <1431085004-32743-7-git-send-email-mark.rutland@arm.com>
-References: <1431085004-32743-1-git-send-email-mark.rutland@arm.com>
- <1431085004-32743-7-git-send-email-mark.rutland@arm.com>
-Message-ID: <CAJ5Y-ea=adURPf+kQC4QfROdk7ZiWwuM78qnHfBi7CV1L6BbRw@mail.gmail.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Fri, 15 May 2015 23:09:13 +0800
+Subject: Mediatek pinctrl driver optimize and add Mediatek SoC
+ Pinctrl/GPIO/EINT driver for mt6397/mt8127.
+In-Reply-To: <1431567346-33780-1-git-send-email-hongzhou.yang@mediatek.com>
+References: <1431567346-33780-1-git-send-email-hongzhou.yang@mediatek.com>
+Message-ID: <1431702553.21788.9.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 May 2015 at 07:36, Mark Rutland <mark.rutland@arm.com> wrote:
-> Software resident in the secure world (a "Trusted OS") may cause CPU_OFF
-> calls for the CPU it is resident on to be denied. Such a denial would be
-> fatal for the kernel, and so we must detect when this can happen before
-> the point of no return.
->
-> This patch implements Trusted OS detection for PSCI 0.2+ systems, using
-> MIGRATE_INFO_TYPE and MIGRATE_INFO_UP_CPU. When a trusted OS is detected
-> as resident on a particular CPU, attempts to hot unplug that CPU will be
-> denied early, before they can prove fatal.
->
-> Trusted OS migration is not implemented by this patch. Implementation of
-> migratable UP trusted OSs seems unlikely, and the right policy for
-> migration is unclear (and will likely differ across implementations). As
-> such, it is likely that migration will require cooperation with Trusted
-> OS drivers.
->
-> PSCI implementations prior to 0.1 do not provide the facility to detect
-> the presence of a Trusted OS, nor the CPU any such OS is resident on, so
-> without additional information it is not possible to handle Trusted OSs
-> with PSCI 0.1.
->
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/kernel/psci.c | 61 ++++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 61 insertions(+)
->
-> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-> index 7324db9..25e2610 100644
-> --- a/arch/arm64/kernel/psci.c
-> +++ b/arch/arm64/kernel/psci.c
-> @@ -43,6 +43,19 @@ struct psci_power_state {
->         u8      affinity_level;
->  };
->
-> +/*
-> + * The CPU any Trusted OS is resident on. The trusted OS may reject CPU_OFF
-> + * calls to its resident CPU, so we must avoid issuing those. We never migrate
-> + * a Trusted OS even if it claims to be capable of migration -- doing so will
-> + * require cooperation with a Trusted OS driver.
-> + */
-> +static int resident_cpu = -1;
-> +
-> +static bool psci_tos_resident_on(int cpu)
-> +{
-> +       return cpu == resident_cpu;
-> +}
-> +
->  struct psci_operations {
->         int (*cpu_suspend)(struct psci_power_state state,
->                            unsigned long entry_point);
-> @@ -52,6 +65,7 @@ struct psci_operations {
->         int (*affinity_info)(unsigned long target_affinity,
->                         unsigned long lowest_affinity_level);
->         int (*migrate_info_type)(void);
-> +       unsigned long (*migrate_info_up_cpu)(void);
->  };
->
->  static struct psci_operations psci_ops;
-> @@ -172,6 +186,11 @@ static int psci_migrate_info_type(void)
->         return invoke_psci_fn(PSCI_0_2_FN_MIGRATE_INFO_TYPE, 0, 0, 0);
->  }
->
-> +static unsigned long psci_migrate_info_up_cpu(void)
-> +{
-> +       return invoke_psci_fn(PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU, 0, 0, 0);
-> +}
-> +
->  static int __maybe_unused cpu_psci_cpu_init_idle(struct device_node *cpu_node,
->                                                  unsigned int cpu)
->  {
-> @@ -261,6 +280,40 @@ static void psci_sys_poweroff(void)
->         invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
->  }
->
-> +/*
-> + * Detect the presence of a resident Trusted OS which may cause CPU_OFF to
-> + * return DENIED (which would be fatal).
-> + */
-> +static void __init psci_init_migrate(void)
-> +{
-> +       unsigned long cpuid;
-> +       int type, cpu = -1;
-> +
-> +       type = psci_ops.migrate_info_type();
-> +
-> +       if (type == PSCI_0_2_TOS_MP) {
-> +               pr_info("Trusted OS migration not required\n");
-> +               return;
-> +       }
-> +
-> +       if (type == PSCI_RET_NOT_SUPPORTED) {
-> +               pr_info("MIGRATE_INFO_TYPE not supported.\n");
-> +               return;
-> +       }
-> +
-> +       if (type != PSCI_0_2_TOS_UP_MIGRATE &&
-> +           type != PSCI_0_2_TOS_UP_NO_MIGRATE) {
-> +               pr_err("MIGRATE_INFO_TYPE returned unknown type (%d)\n", type);
-> +               return;
-> +       }
-> +
-> +       cpuid = psci_ops.migrate_info_up_cpu();
+On Wed, 2015-05-13 at 18:35 -0700, Hongzhou Yang wrote:
+> This series patches include below changes:
+>   - Data struct optimize and remove unused member.
+>   - Since several mediatek soc use similiar input enable/smt/pull setting, add those settings into common code.
+>   - The first version of adding Mediatek SoC Pinctrl/GPIO driver for mt6397, mt6397 has 41 pins.
+>   - The first version of adding Mediatek SoC Pinctrl/GPIO/EINT driver for mt8127, mt8127 has 143 pins.
+> 
+> 
+> Hongzhou Yang (6):
+>   pinctrl: mediatek: add ies/smt control to common code.
+>   dt-bindings: mediatek: Modify pinctrl bindings for mt6397.
+>   pinctrl: mediatek: Add Pinctrl/GPIO driver for mt6397.
+>   pinctrl: dt bindings: mt6397: Add pinfunc header file for mt6397.
+>   arm64: dts: mt8173-evb: Add pinctrl/GPIO node for mt6397.
+>   ARM: dts: mt8135-evbp1: Add pinctrl/GPIO node for mt6397.
+> 
+> Yingjoe Chen (4):
+>   pinctrl: mediatek: data struct optimize and remove unused member
+>   pinctrl: mediatek: add mtk_pctrl_spec_pull_set_samereg common code
+>   pinctrl: mediatek: add pinctrl/GPIO/EINT driver for mt8127
+>   ARM: dts: mt8127: add pinctrl/GPIO/EINT node for mt8127
 
-[..]
 
-> +       cpu = get_logical_index(cpuid);
-> +       resident_cpu = cpu >= 0 ? cpu : -1;
-> +
-> +       pr_info("Trusted OS resident on physical CPU 0x%lx\n", cpuid);
-> +}
-> +
->  static void __init psci_0_2_set_functions(void)
->  {
->         pr_info("Using standard PSCI v0.2 function IDs\n");
-> @@ -279,6 +332,7 @@ static void __init psci_0_2_set_functions(void)
->         psci_ops.affinity_info = psci_affinity_info;
->
->         psci_ops.migrate_info_type = psci_migrate_info_type;
-> +       psci_ops.migrate_info_up_cpu = psci_migrate_info_up_cpu;
->
->         arm_pm_restart = psci_sys_reset;
->
-> @@ -303,6 +357,8 @@ static int __init psci_probe(void)
->
->         psci_0_2_set_functions();
->
-> +       psci_init_migrate();
-> +
->         return 0;
->  }
->
-> @@ -449,6 +505,11 @@ static int cpu_psci_cpu_disable(unsigned int cpu)
->         /* Fail early if we don't have CPU_OFF support */
->         if (!psci_ops.cpu_off)
->                 return -EOPNOTSUPP;
-> +
-> +       /* Trusted OS will deny CPU_OFF */
-> +       if (psci_tos_resident_on(cpu))
+Hi,
 
-IIUC, you're denying CPU_OFF even if MIGRATE_INFO_TYPE = 2. Is that correct?
+There are several patches in this series, and they should go to
+different trees. Will it be easier for maintainers if we rearrange
+patches in the following order?
+
+  dt-bindings: mediatek: Modify pinctrl bindings for mt6397.
+  pinctrl: dt bindings: mt6397: Add pinfunc header file for mt6397.
+  pinctrl: mediatek: data struct optimize and remove unused member
+  pinctrl: mediatek: add mtk_pctrl_spec_pull_set_samereg common code
+  pinctrl: mediatek: add ies/smt control to common code.
+  pinctrl: mediatek: add Pinctrl/GPIO driver for mt6397.
+  pinctrl: mediatek: add pinctrl/GPIO/EINT driver for mt8127
+  mfd: mediatek: add GPIO sub module support into mfd.
+  ARM: dts: mt8127: add pinctrl/GPIO/EINT node for mt8127
+  arm64: dts: mt8173-evb: add pinctrl/GPIO node for mt6397.
+  ARM: dts: mt8135-evbp1: add pinctrl/GPIO node for mt6397.
+
+To avoid build fail, the last 2 should not be merged until the second
+one is merged into mainline.
+
+Joe.C
