@@ -1,23 +1,42 @@
 From: pali.rohar@gmail.com (=?UTF-8?q?Pali=20Roh=C3=A1r?=)
-Date: Fri, 15 May 2015 21:50:05 +0200
-Subject: [PATCH 0/2] ARM: /proc/atags: Export also for DT
-In-Reply-To: <1430902142-17035-1-git-send-email-pali.rohar@gmail.com>
+Date: Fri, 15 May 2015 21:50:06 +0200
+Subject: [PATCH 1/2] arm: devtree: Save atags if are in DT atags field
+In-Reply-To: <1431719407-18230-1-git-send-email-pali.rohar@gmail.com>
 References: <1430902142-17035-1-git-send-email-pali.rohar@gmail.com>
-Message-ID: <1431719407-18230-1-git-send-email-pali.rohar@gmail.com>
+ <1431719407-18230-1-git-send-email-pali.rohar@gmail.com>
+Message-ID: <1431719407-18230-2-git-send-email-pali.rohar@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for DT "/atags" and stores ATAG structure to DT.
+This patch creates /proc/atags from DT /atags field.
 
-It depends on "ARM: /proc/cpuinfo: DT: Add support for Revision" patches.
+Signed-off-by: Pali Roh?r <pali.rohar@gmail.com>
+---
+ arch/arm/kernel/devtree.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Pali Roh?r (2):
-  arm: devtree: Save atags if are in DT atags field
-  arm: boot: store ATAG structure into DT atag field
-
- arch/arm/boot/compressed/atags_to_fdt.c |    6 +++++-
- arch/arm/kernel/devtree.c               |    6 ++++++
- 2 files changed, 11 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+index 7e13e27..dd98322 100644
+--- a/arch/arm/kernel/devtree.c
++++ b/arch/arm/kernel/devtree.c
+@@ -29,6 +29,7 @@
+ #include <asm/mach-types.h>
+ #include <asm/system_info.h>
+ 
++#include "atags.h"
+ 
+ #ifdef CONFIG_SMP
+ extern struct of_cpu_method __cpu_method_of_table[];
+@@ -256,5 +257,10 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+ 			system_rev = 0;
+ 	}
+ 
++	/* Save atags */
++	prop = of_get_flat_dt_prop(dt_root, "atags", NULL);
++	if (prop)
++		save_atags((void *)prop);
++
+ 	return mdesc;
+ }
 -- 
 1.7.9.5
