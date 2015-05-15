@@ -1,163 +1,213 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 15 May 2015 14:49:34 +0200
-Subject: [PATCH 2/6] clk: sunxi: Add H3 clocks support
-In-Reply-To: <CAGb2v663+LrYo0Ke7kDwUnKpyfyxCR6+F2ws2gRaV1D6KFnAyA@mail.gmail.com>
-References: <1430904693-1404-1-git-send-email-jenskuske@gmail.com>
- <1430904693-1404-3-git-send-email-jenskuske@gmail.com>
- <20150509112718.GT11057@lukather> <554F38FA.2030005@gmail.com>
- <20150512144428.GL10961@lukather>
- <CAGb2v663+LrYo0Ke7kDwUnKpyfyxCR6+F2ws2gRaV1D6KFnAyA@mail.gmail.com>
-Message-ID: <20150515124934.GV4004@lukather>
+Date: Fri, 15 May 2015 16:44:39 +0200
+Subject: [PATCH 3/8] clk: sunxi: Add a driver for the PLL2
+In-Reply-To: <CAGb2v64gbY1n4kVBc55hm=jwC3N-eKjWXCgEJr-+J6tYsD7sQA@mail.gmail.com>
+References: <1430565879-28113-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1430565879-28113-4-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v64jVksA5rapnAPn9yefEeXnfFw5FwdnXPP0G9FvzWnVBg@mail.gmail.com>
+ <20150515074520.GR4004@lukather>
+ <CAGb2v64gbY1n4kVBc55hm=jwC3N-eKjWXCgEJr-+J6tYsD7sQA@mail.gmail.com>
+Message-ID: <20150515144439.GZ4004@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 14, 2015 at 01:14:25PM +0800, Chen-Yu Tsai wrote:
-> On Tue, May 12, 2015 at 10:44 PM, Maxime Ripard
+On Fri, May 15, 2015 at 05:15:32PM +0800, Chen-Yu Tsai wrote:
+> On Fri, May 15, 2015 at 3:45 PM, Maxime Ripard
 > <maxime.ripard@free-electrons.com> wrote:
-> > Hi,
-> >
-> > On Sun, May 10, 2015 at 12:54:50PM +0200, Jens Kuske wrote:
-> >> On 09/05/15 13:27, Maxime Ripard wrote:
-> >> > On Wed, May 06, 2015 at 11:31:29AM +0200, Jens Kuske wrote:
-> >> >> The H3 clock control unit is similar to the those of other sun8i family
-> >> >> members like the A23.
-> >> >>
-> >> >> The AHB1 gates got split up into AHB1 and AHB2, with AHB2 clock source
-> >> >> being muxable between AHB1 and PLL6/2, but still sharing gate registers.
-> >> >> The documentation isn't totally clear about which devices belong to
-> >> >> AHB2 now, especially USB EHIC/OHIC, so it is mostly based on Allwinner
-> >> >> kernel source code.
-> >> >>
-> >> >> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
-> >> >> ---
-> >> >>  Documentation/devicetree/bindings/clock/sunxi.txt |  7 ++++
-> >> >>  drivers/clk/sunxi/clk-sunxi.c                     | 46 ++++++++++++++++++++++-
-> >> >>  2 files changed, 52 insertions(+), 1 deletion(-)
-> >> >>
-> >> >> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-> >> >> index 4fa11af..4eeb893 100644
-> >> >> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
-> >> >> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-> >> >> @@ -14,6 +14,8 @@ Required properties:
-> >> >>    "allwinner,sun4i-a10-pll5-clk" - for the PLL5 clock
-> >> >>    "allwinner,sun4i-a10-pll6-clk" - for the PLL6 clock
-> >> >>    "allwinner,sun6i-a31-pll6-clk" - for the PLL6 clock on A31
-> >> >> +  "allwinner,sun8i-h3-pll6-clk" - for the PLL6 clock on H3
-> >> >> +  "allwinner,sun8i-h3-pll8-clk" - for the PLL8 clock on H3
-> >> >>    "allwinner,sun9i-a80-gt-clk" - for the GT bus clock on A80
-> >> >>    "allwinner,sun4i-a10-cpu-clk" - for the CPU multiplexer clock
-> >> >>    "allwinner,sun4i-a10-axi-clk" - for the AXI clock
-> >> >> @@ -28,8 +30,11 @@ Required properties:
-> >> >>    "allwinner,sun7i-a20-ahb-gates-clk" - for the AHB gates on A20
-> >> >>    "allwinner,sun6i-a31-ar100-clk" - for the AR100 on A31
-> >> >>    "allwinner,sun6i-a31-ahb1-clk" - for the AHB1 clock on A31
-> >> >> +  "allwinner,sun8i-h3-ahb2-clk" - for the AHB2 clock on H3
-> >> >>    "allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
-> >> >>    "allwinner,sun8i-a23-ahb1-gates-clk" - for the AHB1 gates on A23
-> >> >> +  "allwinner,sun8i-h3-ahb1-gates-clk" - for the AHB1 gates on H3
-> >> >> +  "allwinner,sun8i-h3-ahb2-gates-clk" - for the AHB2 gates on H3
-> >> >>    "allwinner,sun9i-a80-ahb0-gates-clk" - for the AHB0 gates on A80
-> >> >>    "allwinner,sun9i-a80-ahb1-gates-clk" - for the AHB1 gates on A80
-> >> >>    "allwinner,sun9i-a80-ahb2-gates-clk" - for the AHB2 gates on A80
-> >> >> @@ -52,8 +57,10 @@ Required properties:
-> >> >>    "allwinner,sun6i-a31-apb1-gates-clk" - for the APB1 gates on A31
-> >> >>    "allwinner,sun7i-a20-apb1-gates-clk" - for the APB1 gates on A20
-> >> >>    "allwinner,sun8i-a23-apb1-gates-clk" - for the APB1 gates on A23
-> >> >> +  "allwinner,sun8i-h3-apb1-gates-clk" - for the APB1 gates on H3
-> >> >>    "allwinner,sun9i-a80-apb1-gates-clk" - for the APB1 gates on A80
-> >> >>    "allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
-> >> >> +  "allwinner,sun8i-h3-apb2-gates-clk" - for the APB2 gates on H3
-> >> >>    "allwinner,sun8i-a23-apb2-gates-clk" - for the APB2 gates on A23
-> >> >>    "allwinner,sun5i-a13-mbus-clk" - for the MBUS clock on A13
-> >> >>    "allwinner,sun4i-a10-mmc-clk" - for the MMC clock
-> >> >> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> >> >> index 7e1e2bd..152a1f7 100644
-> >> >> --- a/drivers/clk/sunxi/clk-sunxi.c
-> >> >> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> >> >> @@ -727,6 +727,12 @@ static const struct factors_data sun5i_a13_ahb_data __initconst = {
-> >> >>    .getter = sun5i_a13_get_ahb_factors,
-> >> >>  };
-> >> >>
-> >> >> +static const struct factors_data sun8i_h3_pll8_data __initconst = {
-> >> >> +  .enable = 31,
-> >> >> +  .table = &sun6i_a31_pll6_config,
-> >> >> +  .getter = sun6i_a31_get_pll6_factors,
-> >> >> +};
-> >> >
-> >> > This looks like it's just another instance of the A31 pll6.
-> >> >
-> >> > In such a case, we don't need to declare a new driver, just reuse the
-> >> > same compatible.
+> > On Thu, May 14, 2015 at 05:43:51PM +0800, Chen-Yu Tsai wrote:
+> >> Hi,
 > >>
-> >> If I reuse pll6 for pll8 I get errors because of the .name = "pll6x2"
-> >> field, already existing clock or something like that.
-> >
-> > Damn. You're obviously right...
-> 
-> I think I have a solution for this.
-> 
-> The current divs clock setup just passes the factors_data directly to
-> sunxi_factors_register(). What if it did a copy, read the _correct_
-> name from the DT (since it knows the index) and put it in the copy.
-> 
-> How does that sound?
-
-That sounds great, but what name would you take from the DT? The first
-of clock-output-names? the last one? a random one?
-
-> 
-> > Could you add a TODO comment on top then? just so that we know that we
-> > need to merge this clock with pll6?
-> >
-> >> (And pll8 doesn't even have a x2 version)
-> >
-> > Judging by the H3 datasheet, it does.
-> >
-> >> >>  static const struct factors_data sun4i_apb1_data __initconst = {
-> >> >>    .mux = 24,
-> >> >>    .muxmask = BIT(1) | BIT(0),
-> >> >> @@ -777,6 +783,10 @@ static const struct mux_data sun6i_a31_ahb1_mux_data __initconst = {
-> >> >>    .shift = 12,
-> >> >>  };
-> >> >>
-> >> >> +static const struct mux_data sun8i_h3_ahb2_mux_data __initconst = {
-> >> >> +  .shift = 0,
-> >> >> +};
-> >> >> +
-> >> >>  static void __init sunxi_mux_clk_setup(struct device_node *node,
-> >> >>                                   struct mux_data *data)
-> >> >>  {
-> >> >> @@ -892,7 +902,7 @@ static void __init sunxi_divider_clk_setup(struct device_node *node,
-> >> >>   * sunxi_gates_clk_setup() - Setup function for leaf gates on clocks
-> >> >>   */
-> >> >>
-> >> >> -#define SUNXI_GATES_MAX_SIZE      64
-> >> >> +#define SUNXI_GATES_MAX_SIZE      160
-> >> >>
-> >> >>  struct gates_data {
-> >> >>    DECLARE_BITMAP(mask, SUNXI_GATES_MAX_SIZE);
-> >> >> @@ -926,6 +936,10 @@ static const struct gates_data sun8i_a23_ahb1_gates_data __initconst = {
-> >> >>    .mask = {0x25386742, 0x2505111},
-> >> >>  };
-> >> >>
-> >> >> +static const struct gates_data sun8i_h3_ahb1_gates_data __initconst = {
-> >> >> +  .mask = {0x1fbc6760, 0x00701b39, 0x00000000, 0x00000000, 0x00000081},
-> >> >> +};
-> >> >> +
+> >> On Sat, May 2, 2015 at 7:24 PM, Maxime Ripard
+> >> <maxime.ripard@free-electrons.com> wrote:
+> >> > The PLL2 on the A10 and later SoCs is the clock used for all the audio
+> >> > related operations.
 > >> >
-> >> > Judging from the user manual, there's a few gates in those 0
-> >> > registers, is this normal that you don't support them?
-> >>
-> >> They are holes for apb1 and apb2. Which is actually pretty ugly.
-> >
-> > Ah, right.
-> >
-> > So I guess it's completely related to the discussion below.
+> >> > This clock has a somewhat complex output tree, with three outputs (2X, 4X
+> >> > and 8X) with a fixed divider from the base clock, and an output (1X) with a
+> >> > post divider.
+> >> >
+> >> > However, we can simplify things since the 1X divider can be fixed, and we
+> >> > end up by having a base clock not exposed to any device (or at least
+> >> > directly, since the 4X output doesn't have any divider), and 4 fixed
+> >> > divider clocks that will be exposed.
+> >> >
+> >> > This clock seems to have been introduced, at least in this form, in the
+> >> > revision B of the A10, but we don't have any information on the clock used
+> >> > on the revision A.
+> >> >
+> >> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> >> > ---
+> >> >  drivers/clk/sunxi/Makefile                 |   1 +
+> >> >  drivers/clk/sunxi/clk-a10-pll2.c           | 176 +++++++++++++++++++++++++++++
+> >> >  include/dt-bindings/clock/sun4i-a10-pll2.h |  53 +++++++++
+> >> >  3 files changed, 230 insertions(+)
+> >> >  create mode 100644 drivers/clk/sunxi/clk-a10-pll2.c
+> >> >  create mode 100644 include/dt-bindings/clock/sun4i-a10-pll2.h
+> >> >
+> >> > diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
+> >> > index 058f273d6154..eb36c38d4120 100644
+> >> > --- a/drivers/clk/sunxi/Makefile
+> >> > +++ b/drivers/clk/sunxi/Makefile
+> >> > @@ -4,6 +4,7 @@
+> >> >
+> >> >  obj-y += clk-sunxi.o clk-factors.o
+> >> >  obj-y += clk-a10-hosc.o
+> >> > +obj-y += clk-a10-pll2.o
+> >> >  obj-y += clk-a20-gmac.o
+> >> >  obj-y += clk-mod0.o
+> >> >  obj-y += clk-sun8i-mbus.o
+> >> > diff --git a/drivers/clk/sunxi/clk-a10-pll2.c b/drivers/clk/sunxi/clk-a10-pll2.c
+> >> > new file mode 100644
+> >> > index 000000000000..4d0369626dba
+> >> > --- /dev/null
+> >> > +++ b/drivers/clk/sunxi/clk-a10-pll2.c
+> >> > @@ -0,0 +1,176 @@
+> >> > +/*
+> >> > + * Copyright 2013 Emilio L?pez
+> >> > + * Emilio L?pez <emilio@elopez.com.ar>
+> >> > + *
+> >> > + * Copyright 2015 Maxime Ripard
+> >> > + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> >> > + *
+> >> > + * This program is free software; you can redistribute it and/or modify
+> >> > + * it under the terms of the GNU General Public License as published by
+> >> > + * the Free Software Foundation; either version 2 of the License, or
+> >> > + * (at your option) any later version.
+> >> > + *
+> >> > + * This program is distributed in the hope that it will be useful,
+> >> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >> > + * GNU General Public License for more details.
+> >> > + */
+> >> > +
+> >> > +#include <linux/clk-provider.h>
+> >> > +#include <linux/of.h>
+> >> > +#include <linux/of_address.h>
+> >> > +#include <linux/slab.h>
+> >> > +
+> >> > +#include <dt-bindings/clock/sun4i-a10-pll2.h>
+> >> > +
+> >> > +#include "clk-factors.h"
+> >> > +
+> >> > +#define SUN4I_PLL2_ENABLE              31
+> >> > +#define SUN4I_PLL2_POST_DIV            26
+> >> > +#define SUN4I_PLL2_POST_DIV_MASK       0xF
+> >> > +#define SUN4I_PLL2_N                   8
+> >> > +#define SUN4I_PLL2_N_MASK              0x7F
+> >> > +#define SUN4I_PLL2_PRE_DIV             0
+> >> > +#define SUN4I_PLL2_PRE_DIV_MASK                0x1F
+> >> > +
+> >> > +#define SUN4I_PLL2_POST_DIV_VALUE      21
 > 
-> If the holes are really big, I guess you could split ahb and apb?
+> Another thing:
+> 
+> This says 21, which obviously exceeds the mask defined above,
+> but the comment in the section below (in the original code)
+> says 4. I assume the comment was right, based on the user
+> manual?
+> 
+> Maybe it should be swapped with SUN4I_PLL2_PRE_DIV_VALUE?
+> I get PRE_DIV = 21 for generating a clock close to 22.5792 MHz.
 
-It's actually already split. The holes in the ahb1 registers are for
-the apb clocks.
+You're right. POST_DIV_VALUE and PRE_DIV_VALUE are inverted....
+
+I wonder how that was even working...
+
+> Seems AC97 might need another frequency, but the manual isn't
+> clear, and we can handle it when we add AC97 anyway.
+
+I'm not even sure there's a board out there with an AC97 codec...
+
+> 
+> >> > +#define SUN4I_PLL2_PRE_DIV_VALUE       4
+> >> > +
+> >> > +#define SUN4I_PLL2_OUTPUTS             4
+> >> > +
+> >> > +static void sun4i_a10_get_pll2_base_factors(u32 *freq, u32 parent_rate,
+> >> > +                                           u8 *n, u8 *k, u8 *m, u8 *p)
+> >> > +{
+> >> > +       /*
+> >> > +        * Normalize the frequency to a multiple of (24 MHz / Fixed
+> >> > +        * PRE-DIV)
+> >> > +        */
+> >> > +       *freq = round_down(*freq, parent_rate / SUN4I_PLL2_PRE_DIV_VALUE);
+> >> > +
+> >> > +       /* We were called to round the frequency, we can return */
+> >> > +       if (!n)
+> >> > +               return;
+> >> > +
+> >> > +       *n = *freq * SUN4I_PLL2_PRE_DIV_VALUE / parent_rate;
+> >> > +
+> >> > +       /*
+> >> > +        * Even though the pre-divider can be changed, we don't really
+> >> > +        * care and we can just fix it to 4.
+> >> > +        */
+> >> > +       *m = SUN4I_PLL2_PRE_DIV_VALUE;
+> >> > +}
+> >> > +
+> >> > +static struct clk_factors_config sun4i_a10_pll2_base_config = {
+> >> > +       .mshift = SUN4I_PLL2_PRE_DIV,
+> >> > +       .mwidth = 5,
+> >> > +       .nshift = SUN4I_PLL2_N,
+> >> > +       .nwidth = 7,
+> >> > +
+> >> > +       .m_zero = 1,
+> >> > +       .n_zero = 1,
+> >> > +};
+> >> > +
+> >> > +static const struct factors_data sun4i_a10_pll2_base_data __initconst = {
+> >> > +       .enable = SUN4I_PLL2_ENABLE,
+> >> > +       .table = &sun4i_a10_pll2_base_config,
+> >> > +       .getter = sun4i_a10_get_pll2_base_factors,
+> >> > +       .name = "pll2-base",
+> >> > +};
+> >> > +
+> >> > +static DEFINE_SPINLOCK(sun4i_a10_pll2_lock);
+> >> > +
+> >> > +static void __init sun4i_pll2_setup(struct device_node *node)
+> >> > +{
+> >> > +       const char *clk_name = node->name, *parent;
+> >> > +       struct clk_onecell_data *clk_data;
+> >> > +       struct clk **clks, *base_clk;
+> >> > +       void __iomem *reg;
+> >> > +       u32 val;
+> >> > +
+> >> > +       reg = of_io_request_and_map(node, 0, of_node_full_name(node));
+> >> > +       if (IS_ERR(reg))
+> >> > +               return;
+> >> > +
+> >> > +       clk_data = kzalloc(sizeof(*clk_data), GFP_KERNEL);
+> >> > +       if (!clk_data)
+> >> > +               goto err_unmap;
+> >> > +
+> >> > +       clks = kcalloc(SUN4I_PLL2_OUTPUTS, sizeof(struct clk *), GFP_KERNEL);
+> >> > +       if (!clks)
+> >> > +               goto err_free_data;
+> >> > +
+> >> > +       base_clk = sunxi_factors_register(node, &sun4i_a10_pll2_base_data,
+> >> > +                                         &sun4i_a10_pll2_lock, reg);
+> >>
+> >> Why aren't you using divs_clk for this? It seems right for the job.
+> >
+> > As far as I know, divs_clk can only handle a single divider, and not
+> > two subsequent dividers like this one uses.
+> 
+> I thought we were setting the post divider to 4 so the outputs match
+> the names? Maybe we could get it in as is (with the above comment
+> addressed), and refactor it later. I'm still stuck on factors_clk
+> stuff....
+
+We are, but the pre-div is considered as the M factor, and the N
+factor as N, so we can't really consider it as a single divider.
+
+Thinking a bit more about this, what we could do though, is splitting
+the pll2-base clock in half, one that would expose a single divider
+using clk-divider for the pre-divider, then a factor clock for the N
+factor, and then multiple dividers for the post-divider and other
+outputs.
+
+I wonder if that could not even be made that way for all the factors
+clock. That would reduce the needed logic in the drivers a lot.
 
 Maxime
 
@@ -171,4 +221,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150515/f6fae41b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150515/b700b123/attachment.sig>
