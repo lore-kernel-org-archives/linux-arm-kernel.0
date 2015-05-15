@@ -1,31 +1,24 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 15 May 2015 22:29:50 +0200 (CEST)
-Subject: [PATCH v6 04/12] irqchip: vf610-mscm: support NVIC parent
-In-Reply-To: <6af49d55159182668c21480e0fbaa85c@agner.ch>
-References: <1431203982-13217-1-git-send-email-stefan@agner.ch>
- <1431203982-13217-5-git-send-email-stefan@agner.ch>
- <alpine.DEB.2.11.1505151237531.4225@nanos>
- <6af49d55159182668c21480e0fbaa85c@agner.ch>
-Message-ID: <alpine.DEB.2.11.1505152229360.4225@nanos>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 15 May 2015 22:30:48 +0200
+Subject: [PATCH v4 4/7] ARM: dts: Add base DT for NXP LPC18xx
+In-Reply-To: <1431381653-25356-5-git-send-email-manabian@gmail.com>
+References: <1431381653-25356-1-git-send-email-manabian@gmail.com>
+ <1431381653-25356-5-git-send-email-manabian@gmail.com>
+Message-ID: <3308240.GYIY1gTjZ3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 15 May 2015, Stefan Agner wrote:
-
-> On 2015-05-15 12:39, Thomas Gleixner wrote:
-> > On Sat, 9 May 2015, Stefan Agner wrote:
-> >> -	irq_chip_unmask_parent(data);
-> >> +	if (parent->chip->irq_enable)
-> >> +		parent->chip->irq_enable(parent);
-> >> +	else
-> >> +		parent->chip->irq_unmask(parent);
-> > 
-> > Why are you not creating irq_chip_enable_parent() which would have
-> > been the proper function anyway?
-> > 
+On Tuesday 12 May 2015 00:00:50 Joachim Eastwood wrote:
+> NXP LPC18xx/43xx SoCs are very similar devices and should be able to
+> share a common base (lpc18xx.dtsi). Diffences between the devices are
+> put in a dtsi which is specific to that device.
 > 
-> Will add that...
-> 
-> Btw, have you had a chance to look at 1/12? I added a helper there too
+> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+> ---
+>  arch/arm/boot/dts/lpc18xx.dtsi | 114 +++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 114 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/lpc18xx.dtsi
 
-Yes 1/12 is fine ...
+Applied patches 4 though 7 to next/dt, thanks!
+
+	Arnd
