@@ -1,59 +1,107 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 15 May 2015 15:09:09 +0200
-Subject: [GIT PULL] ARM: mvebu: dt changes for v4.2
-Message-ID: <5555EFF5.1050709@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 May 2015 14:15:21 +0100
+Subject: schedule_timeout sleeps too long after dividing CPU frequency
+In-Reply-To: <5555EA68.7030006@free.fr>
+References: <5554858A.9010207@free.fr> <20150514115456.GB23999@linux>
+ <55549DEE.6010202@free.fr>
+ <CAKohpon4AV-7nq=Qm7PpDbbW9ti98avY9zz82htzyHWi5_K7fA@mail.gmail.com>
+ <20150514144239.GZ2067@n2100.arm.linux.org.uk>
+ <5555BC7E.7010601@free.fr>
+ <20150515095159.GF2067@n2100.arm.linux.org.uk>
+ <5555CC1A.5040604@free.fr>
+ <20150515115852.GJ2067@n2100.arm.linux.org.uk>
+ <5555EA68.7030006@free.fr>
+Message-ID: <20150515131521.GK2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, May 15, 2015 at 02:45:28PM +0200, Mason wrote:
+> The sad part is: I'm working on the "new" kernel.
+> The current "official" kernel is 3.4 (and I'm afraid
+> there's a 2.6.32 still kicking around somewhere).
+> 
+> I'm trying to convince management that one of the advantages
+> of mainlining the port is that it is easier to switch to newer
+> kernels. Do you agree with this assertion?
 
-Here is the first pull request for dt for mvebu for v4.2
+Yes and no.  If you can get stuff upstream, it should make things
+easier.
 
-Gregory
+The difficult bit - and time consuming bit - is getting code upstream.
+Even in my position, I'd suggest allowing about five years for that
+activity, and even then don't have expectations of getting everything
+upstream.
 
-The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+Frankly now, my advice to people would be to just not bother, it's
+*way* too much effort to get everything to an acceptable state,
+especially if the SoC has no support what so ever.
 
-  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+For example, we're still banging on over the iMX6 SoCs - just getting
+the display stuff sorted took more than a year.  Ethernet keeps becoming
+unstable (people keep reporting problems with it) and it became far too
+difficult for me to get my patch set for that upstream, so I dumped it.
 
-are available in the git repository at:
+> > I think you'll have to do the research for that yourself... what
+> > I can say is that TWD is capable of one-shot mode,
+> 
+> Is one-shot mode preferred over periodic mode?
+> (Seems counter-intuitive, as one-shot mode needs to be
+> periodically reprogrammed, whereas periodic mode just
+> keeps firing.)
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.2
+Think about it in terms of high-resolution timers.  How can something
+that's programmed to fire HZ times a second provide you with a high
+resolution timer?  Something that you can program for an arbitary
+period depending on your needs obviously allows higher resolution
+intervals, up to the minimum timer count interval.  It can also provide
+a longer interval, up to the maximum timer count interval.
 
-for you to fetch changes up to 973ed08377f6d61dd4e9fd62207737c8ec0d49e9:
+> > and is capable of running as a high-res timer:
+> > 
+> > Per CPU device: 0
+> > Clock Event Device: local_timer
+> >  max_delta_ns:   21691754031
+> >  min_delta_ns:   1000
+> >  mult:           425201762
+> >  shift:          31
+> >  mode:           3			<== CLOCK_EVT_MODE_ONESHOT
+> >  next_event:     595603944000000 nsecs
+> >  set_next_event: twd_set_next_event
+> >  set_mode:       twd_set_mode
+> >  event_handler:  hrtimer_interrupt	<== indicates that it's switched
+> > 					to high-res mode
+> >  retries:        0
+> 
+> I'm confused.
+> 
+> In the "High-resolution timers not supported when using
+> smp_twd on Cortex A9" thread, you seemed to agree that
+> TWD could not be used as a hrtimer...
 
-  ARM: mvebu: add alias for mdio on Armada 38x (2015-05-11 15:15:26 +0200)
+I guess I was wrong.  I'm no expert on the kernel's time code.  That's
+why I've suggested to you several times that you do the research
+yourself, rather than me having to do that research for you and then
+write an email about it.  It's kind of wasting my time, and you're not
+paying me for this kind of support service...
 
-----------------------------------------------------------------
-mvebu dt changes for v4.2 (part #1)
+> > Yes - because the TWD stops in low power modes, which makes it
+> > unsuitable as a high-resolution timer.  These kinds of issues
+> > are annoying, but it's the way things are.
+> 
+> So it looks like TWD can be used as a hrtimer, but something
+> on my platform is making it choose otherwise, and it is not
+> the CLOCK_EVT_FEAT_C3STOP flag?
 
-- A series adding support for the Compulab CM-A510
-- Add alias for mdio on Armada 38x
+I've no idea.  I don't have the 3.14 code in front of me to research.
+I _could_ wind my tree back to 3.14, and read that code, but I don't
+see why I should go to all that effort... especially as I have other
+things I need to be getting on with, and other problems to be taking
+care of.
 
-----------------------------------------------------------------
-Imre Kaloz (1):
-      ARM: mvebu: add alias for mdio on Armada 38x
-
-Sebastian Hesselbarth (4):
-      ARM: dts: dove: Add internal i2c multiplexer node
-      ARM: dts: dove: Remove Compulab CM-A510 from Makefile
-      ARM: dts: dove: Add proper support for Compulab CM-A510/SBC-A510
-      ARM: dts: dove: Add Compulab SBC-A510 to Makefile
-
- arch/arm/boot/dts/Makefile          |   4 ++--
- arch/arm/boot/dts/armada-38x.dtsi   |   2 +-
- arch/arm/boot/dts/dove-cm-a510.dts  |  38 -----------------------------------
- arch/arm/boot/dts/dove-cm-a510.dtsi | 195
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/dove-sbc-a510.dts | 182
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/dove.dtsi         |  40 ++++++++++++++++++++++++++++++++++--
- 6 files changed, 418 insertions(+), 43 deletions(-)
- delete mode 100644 arch/arm/boot/dts/dove-cm-a510.dts
- create mode 100644 arch/arm/boot/dts/dove-cm-a510.dtsi
- create mode 100644 arch/arm/boot/dts/dove-sbc-a510.dts
+What I'm saying is that I have a platform here running a modern kernel
+which _does_ use the TWD, and it _does_ appear to be running in high-res
+mode.
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
