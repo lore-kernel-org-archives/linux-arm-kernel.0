@@ -1,82 +1,42 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 15 May 2015 10:05:46 +0200
-Subject: [PATCH 1/8] clk: sunxi: factors: Add m_start parameters
-In-Reply-To: <CAGb2v66jRX09k48ciR-bwMZRAioRpHKZ3D2+wVYWannjtF+G3w@mail.gmail.com>
-References: <1430565879-28113-1-git-send-email-maxime.ripard@free-electrons.com>
- <1430565879-28113-2-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v669fsz_pA+B0r8efp0BMxY-D86qfLuGQCqK1POuu9PmxQ@mail.gmail.com>
- <20150515074314.GQ4004@lukather>
- <CAGb2v66jRX09k48ciR-bwMZRAioRpHKZ3D2+wVYWannjtF+G3w@mail.gmail.com>
-Message-ID: <20150515080546.GT4004@lukather>
+From: shawnguo@kernel.org (shawnguo at kernel.org)
+Date: Fri, 15 May 2015 16:11:38 +0800
+Subject: [PATCH 0/9] ARM: imx: move timer driver into drivers/clocksource
+Message-ID: <1431677507-27420-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 15, 2015 at 03:48:38PM +0800, Chen-Yu Tsai wrote:
-> On Fri, May 15, 2015 at 3:43 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Thu, May 14, 2015 at 05:12:07PM +0800, Chen-Yu Tsai wrote:
-> >> On Sat, May 2, 2015 at 7:24 PM, Maxime Ripard
-> >> <maxime.ripard@free-electrons.com> wrote:
-> >> > Some clocks start incrementing the m factor at 0. Add a parameter to handle
-> >> > it just like we did for the N factor.
-> >> >
-> >> > Since the behaviour until now was to assume that the m factor was starting
-> >> > at 1, we also need to fix the other users.
-> >> >
-> >> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> >> > ---
-> >> >  drivers/clk/sunxi/clk-factors.c    | 11 ++++++++++-
-> >> >  drivers/clk/sunxi/clk-factors.h    |  2 ++
-> >> >  drivers/clk/sunxi/clk-mod0.c       |  2 ++
-> >> >  drivers/clk/sunxi/clk-sun8i-mbus.c |  2 ++
-> >> >  drivers/clk/sunxi/clk-sun9i-core.c |  6 ++++++
-> >> >  drivers/clk/sunxi/clk-sunxi.c      | 10 ++++++++++
-> >> >  6 files changed, 32 insertions(+), 1 deletion(-)
-> >> >
-> >> > diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
-> >> > index 8c20190a3e9f..100a711c3e3d 100644
-> >> > --- a/drivers/clk/sunxi/clk-factors.c
-> >> > +++ b/drivers/clk/sunxi/clk-factors.c
-> >> > @@ -56,15 +56,24 @@ static unsigned long clk_factors_recalc_rate(struct clk_hw *hw,
-> >> >         /* Get each individual factor if applicable */
-> >> >         if (config->nwidth != SUNXI_FACTORS_NOT_APPLICABLE)
-> >> >                 n = FACTOR_GET(config->nshift, config->nwidth, reg);
-> >> > +
-> >> >         if (config->kwidth != SUNXI_FACTORS_NOT_APPLICABLE)
-> >> >                 k = FACTOR_GET(config->kshift, config->kwidth, reg);
-> >> > +
-> >> >         if (config->mwidth != SUNXI_FACTORS_NOT_APPLICABLE)
-> >> >                 m = FACTOR_GET(config->mshift, config->mwidth, reg);
-> >> > +       else
-> >> > +               /* Make sure we don't get a division by zero */
-> >> > +               m = 1;
-> >>
-> >> What happens when mwidth is valid, m_start = 0, and m = 0?
-> >
-> > That's a very good question. A division by zero in the kernel, I'd
-> > say.
-> >
-> > But I don't think we can end up in such a case today, and it's
-> > somewhat expected that it will happen, and no clock have looked at can
-> > actually end up in such a case.
-> 
-> It's possible if the bootloader left the clock in an invalid state.
-> How about just returning 0, indicating an invalid rate, early?
+From: Shawn Guo <shawn.guo@linaro.org>
 
-The value set in the register might be zero, but that will always
-really mean 1, either through m_start or m_zero. That would be a bug
-in the driver itself.
+The series cleans up i.MX timer driver regarding those cpu_is_xxx()
+usage by introducing gpt device type, and then moves the driver into
+drivers/clocksource.
 
-Maxime
+Shawn Guo (9):
+  ARM: imx: move timer resources into a structure
+  ARM: imx: define an enum for gpt timer device type
+  ARM: imx: initialize gpt device type for DT boot
+  ARM: imx: setup tctl register in device specific function
+  ARM: imx: set up set_next_event hook in imx_timer_data_init()
+  ARM: imx: define gpt register offset per device type
+  ARM: imx: provide gpt device specific irq functions
+  ARM: imx: remove platform headers from timer driver
+  ARM: imx: move timer driver into drivers/clocksource
+
+ arch/arm/mach-imx/Makefile      |   2 +-
+ arch/arm/mach-imx/time.c        | 388 -------------------------------
+ drivers/clk/imx/clk-imx1.c      |   3 +-
+ drivers/clk/imx/clk-imx21.c     |   3 +-
+ drivers/clk/imx/clk-imx27.c     |   3 +-
+ drivers/clk/imx/clk-imx31.c     |   3 +-
+ drivers/clk/imx/clk-imx35.c     |   3 +-
+ drivers/clk/imx/clk.h           |   7 -
+ drivers/clocksource/Makefile    |   1 +
+ drivers/clocksource/timer-imx.c | 493 ++++++++++++++++++++++++++++++++++++++++
+ include/soc/imx/timer.h         |  26 +++
+ 11 files changed, 531 insertions(+), 401 deletions(-)
+ delete mode 100644 arch/arm/mach-imx/time.c
+ create mode 100644 drivers/clocksource/timer-imx.c
+ create mode 100644 include/soc/imx/timer.h
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150515/66fe4a44/attachment.sig>
+1.9.1
