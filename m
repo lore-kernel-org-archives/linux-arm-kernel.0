@@ -1,87 +1,96 @@
 From: jenskuske@gmail.com (Jens Kuske)
-Date: Fri, 15 May 2015 18:38:53 +0200
-Subject: [PATCH v2 03/10] clk: sunxi: Let divs clocks read the base factor
- clock name from devicetree
+Date: Fri, 15 May 2015 18:38:54 +0200
+Subject: [PATCH v2 04/10] pinctrl: sunxi: Prepare for building SoC specific
+ drivers as modules
 In-Reply-To: <1431707940-19372-1-git-send-email-jenskuske@gmail.com>
 References: <1431707940-19372-1-git-send-email-jenskuske@gmail.com>
-Message-ID: <1431707940-19372-4-git-send-email-jenskuske@gmail.com>
+Message-ID: <1431707940-19372-5-git-send-email-jenskuske@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the sunxi clock driver gets the name for the base factor clock
-of divs clocks from the name field in factors_data. This prevents reusing
-of the factor clock for clocks with same properties, but different name.
-
-This commit makes the divs setup function try to get a name from
-clock-output-names in the devicetree. It also removes the name field where
-possible and merges the sun4i PLL5 and PLL6 clocks.
-
-The sun4i PLL5 clock doesn't have a output for the base factor clock,
-so we still have to use the name field there.
+Add a remove function and export the init and remove function
+to allow us to build the SoC specific drivers as modules.
 
 Signed-off-by: Jens Kuske <jenskuske@gmail.com>
 ---
- drivers/clk/sunxi/clk-sunxi.c | 22 ++++++++++++----------
- 1 file changed, 12 insertions(+), 10 deletions(-)
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c | 25 +++++++++++++++++++------
+ drivers/pinctrl/sunxi/pinctrl-sunxi.h |  2 ++
+ 2 files changed, 21 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 17cba4d..afe560c 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -708,18 +708,10 @@ static const struct factors_data sun4i_pll5_data __initconst = {
- 	.name = "pll5",
- };
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+index f8e171b..4ef6b3d 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+@@ -856,7 +856,6 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
+ 	struct sunxi_pinctrl *pctl;
+ 	struct resource *res;
+ 	int i, ret, last_pin;
+-	struct clk *clk;
  
--static const struct factors_data sun4i_pll6_data __initconst = {
--	.enable = 31,
--	.table = &sun4i_pll5_config,
--	.getter = sun4i_get_pll5_factors,
--	.name = "pll6",
--};
--
- static const struct factors_data sun6i_a31_pll6_data __initconst = {
- 	.enable = 31,
- 	.table = &sun6i_a31_pll6_config,
- 	.getter = sun6i_a31_get_pll6_factors,
--	.name = "pll6x2",
- };
+ 	pctl = devm_kzalloc(&pdev->dev, sizeof(*pctl), GFP_KERNEL);
+ 	if (!pctl)
+@@ -954,13 +953,13 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
+ 			goto gpiochip_error;
+ 	}
  
- static const struct factors_data sun5i_a13_ahb_data __initconst = {
-@@ -1099,7 +1091,7 @@ static const struct divs_data pll5_divs_data __initconst = {
- };
+-	clk = devm_clk_get(&pdev->dev, NULL);
+-	if (IS_ERR(clk)) {
+-		ret = PTR_ERR(clk);
++	pctl->clk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(pctl->clk)) {
++		ret = PTR_ERR(pctl->clk);
+ 		goto gpiochip_error;
+ 	}
  
- static const struct divs_data pll6_divs_data __initconst = {
--	.factors = &sun4i_pll6_data,
-+	.factors = &sun4i_pll5_data,
- 	.ndivs = 4,
- 	.div = {
- 		{ .shift = 0, .table = pll6_sata_tbl, .gate = 14 }, /* M, SATA */
-@@ -1141,6 +1133,7 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
- 	struct clk_gate *gate = NULL;
- 	struct clk_fixed_factor *fix_factor;
- 	struct clk_divider *divider;
-+	struct factors_data factors = *data->factors;
- 	void __iomem *reg;
- 	int ndivs = SUNXI_DIVS_MAX_QTY, i = 0;
- 	int flags, clkflags;
-@@ -1149,8 +1142,17 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
- 	if (data->ndivs)
- 		ndivs = data->ndivs;
+-	ret = clk_prepare_enable(clk);
++	ret = clk_prepare_enable(pctl->clk);
+ 	if (ret)
+ 		goto gpiochip_error;
  
-+	/* Try to find a name for base factor clock */
-+	for (i = 0; i < ndivs; i++) {
-+		if (data->div[i].self) {
-+			of_property_read_string_index(node, "clock-output-names",
-+						      i, &factors.name);
-+			break;
-+		}
-+	}
+@@ -1015,10 +1014,24 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
+ 	return 0;
+ 
+ clk_error:
+-	clk_disable_unprepare(clk);
++	clk_disable_unprepare(pctl->clk);
+ gpiochip_error:
+ 	gpiochip_remove(pctl->chip);
+ pinctrl_error:
+ 	pinctrl_unregister(pctl->pctl_dev);
+ 	return ret;
+ }
++EXPORT_SYMBOL(sunxi_pinctrl_init);
 +
- 	/* Set up factor clock that we will be dividing */
--	pclk = sunxi_factors_clk_setup(node, data->factors);
-+	pclk = sunxi_factors_clk_setup(node, &factors);
- 	parent = __clk_get_name(pclk);
++int sunxi_pinctrl_remove(struct platform_device *pdev)
++{
++	struct sunxi_pinctrl *pctl = platform_get_drvdata(pdev);
++
++	gpiochip_remove(pctl->chip);
++	pinctrl_unregister(pctl->pctl_dev);
++
++	clk_disable_unprepare(pctl->clk);
++
++	return 0;
++}
++EXPORT_SYMBOL(sunxi_pinctrl_remove);
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.h b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+index e248e81..4442676 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.h
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.h
+@@ -126,6 +126,7 @@ struct sunxi_pinctrl {
+ 	unsigned			*irq_array;
+ 	spinlock_t			lock;
+ 	struct pinctrl_dev		*pctl_dev;
++	struct clk			*clk;
+ };
  
- 	reg = of_iomap(node, 0);
+ #define SUNXI_PIN(_pin, ...)					\
+@@ -285,5 +286,6 @@ static inline u32 sunxi_irq_status_offset(u16 irq)
+ 
+ int sunxi_pinctrl_init(struct platform_device *pdev,
+ 		       const struct sunxi_pinctrl_desc *desc);
++int sunxi_pinctrl_remove(struct platform_device *pdev);
+ 
+ #endif /* __PINCTRL_SUNXI_H */
 -- 
 2.4.0
