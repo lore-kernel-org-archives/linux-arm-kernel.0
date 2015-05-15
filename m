@@ -1,62 +1,71 @@
-From: lersek@redhat.com (Laszlo Ersek)
-Date: Fri, 15 May 2015 13:43:57 +0200
-Subject: [RFC] ARM/ARM64: KVM: Implement KVM_FLUSH_DCACHE_GPA ioctl
-In-Reply-To: <554B9A70.6020309@redhat.com>
-References: <1430817191-6231-1-git-send-email-j.fanguede@virtualopensystems.com>
- <20150506141249.GA6796@cbox>
- <CAGE1QJrabWWs0O1V-MpOxT_=1472TXb5rvJzJAJNfWH70x9pcg@mail.gmail.com>
- <20150507112027.GC25885@cbox>
- <CAGE1QJoyaGpuf=6Msa=xpm0pPGRkYWctcXGf=rwnha5o9Gm4bw@mail.gmail.com>
- <CAMJs5B9i9q8gJU93B09-uLMF6w1bTft-40DWPFUP6ky=SketSQ@mail.gmail.com>
- <CAGE1QJoEAg9tAM63MEbpLuqvY_ZwGrHPU1sqo=L_iByKrERUow@mail.gmail.com>
- <554B9A70.6020309@redhat.com>
-Message-ID: <5555DBFD.4080503@redhat.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 15 May 2015 12:58:53 +0100
+Subject: schedule_timeout sleeps too long after dividing CPU frequency
+In-Reply-To: <5555CC1A.5040604@free.fr>
+References: <555380F8.5050306@free.fr>
+ <CAOh2x==aCLxCWX9K57hOFVEP1eLo_OYZPe0YvbFvpkXcoSp_hQ@mail.gmail.com>
+ <5554858A.9010207@free.fr> <20150514115456.GB23999@linux>
+ <55549DEE.6010202@free.fr>
+ <CAKohpon4AV-7nq=Qm7PpDbbW9ti98avY9zz82htzyHWi5_K7fA@mail.gmail.com>
+ <20150514144239.GZ2067@n2100.arm.linux.org.uk>
+ <5555BC7E.7010601@free.fr>
+ <20150515095159.GF2067@n2100.arm.linux.org.uk>
+ <5555CC1A.5040604@free.fr>
+Message-ID: <20150515115852.GJ2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/15 19:01, Paolo Bonzini wrote:
+On Fri, May 15, 2015 at 12:36:10PM +0200, Mason wrote:
+> On 15/05/2015 11:51, Russell King - ARM Linux wrote:
 > 
+> > As you don't say which kernel version you're using,
 > 
-> On 07/05/2015 18:56, J?r?my Fangu?de wrote:
->> USB devices fail with a timeout error, as if the communication between
->> the kernel and the devices fail at a certain point:
->> usb 1-1: device not accepting address 5, error -110
->> usb usb1-port1: unable to enumerate USB device
-
-This is consistent with what I saw in my earlier testing.
-
->> e1000 fails when the userspace tries to use it, with these type of
->> kernel messages:
->> e1000 0000:00:02.0 eth0: Detected Tx Unit Hang
->>   Tx Queue             <0>
->>   TDH                  <d>
->>   TDT                  <d>
->>   next_to_use          <d>
->>   next_to_clean        <9>
->> buffer_info[next_to_clean]
->>   time_stamp           <ffff9311>
->>   next_to_watch        <a>
->>   jiffies              <ffff956a>
->>   next_to_watch.status <0>
+> Sorry about that, I thought the patch-generating command
+> I posted conveyed the information.
 > 
-> Can you find out what memory attributes the guest is using for the
-> memory---and if it's uncached, why?
+> $ git diff v3.14.41 HEAD >tango.patch && xz tango.patch
+> 
+> I'm using the 3.14.y branch from linux-stable.
 
-For USB, see "drivers/usb/core/hcd-pci.c", function usb_hcd_pci_probe():
-it uses ioremap_nocache().
+So you're using a kernel over a year old...
 
-On the "why", that ioremap_nocache() call can be tracked to
+> > for all we know, you might be using a version which omits some fixes
+> > in this area, such as this one which you really must have if your
+> > timer is operating in period mode:
+> > 
+> > fe79a9ba1196 clockevents: Adjust timer interval when frequency changes
+> 
+> Hmmm, according to git log, this patch was accepted during
+> the 3.14-rc2 merge window. Why didn't it make it for 3.14?
 
-http://git.kernel.org/cgit/linux/kernel/git/tglx/history.git/commit/?id=a914dd8b
+No it wasn't:
 
-(Feb 2002), which predates the kernel's move to git. I guess
-ioremap_nocache() is used simply because USB host controllers are
-supposed to programmed like that.
+$ git describe --contains fe79a9ba1196
+v3.15-rc1~123^2~12
 
-And, from "arch/arm64/include/asm/io.h":
+It was merged during the merge window immediately preceding v3.15-rc1.
 
-#define ioremap_nocache(addr, size)     __ioremap((addr), (size),
-__pgprot(PROT_DEVICE_nGnRE))
+> By any chance, is there a patch that would allow the platform
+> to get high-resolution timers when using smp_twd?
 
-Thanks
-Laszlo
+I think you'll have to do the research for that yourself... what
+I can say is that TWD is capable of one-shot mode, and is capable
+of running as a high-res timer:
+
+Per CPU device: 0
+Clock Event Device: local_timer
+ max_delta_ns:   21691754031
+ min_delta_ns:   1000
+ mult:           425201762
+ shift:          31
+ mode:           3			<== CLOCK_EVT_MODE_ONESHOT
+ next_event:     595603944000000 nsecs
+ set_next_event: twd_set_next_event
+ set_mode:       twd_set_mode
+ event_handler:  hrtimer_interrupt	<== indicates that it's switched
+					to high-res mode
+ retries:        0
+
+-- 
+FTTC broadband for 0.8mile line: currently@10.5Mbps down 400kbps up
+according to speedtest.net.
