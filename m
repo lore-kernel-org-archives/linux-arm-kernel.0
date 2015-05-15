@@ -1,24 +1,33 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Fri, 15 May 2015 14:49:33 +0800
+Date: Fri, 15 May 2015 14:52:22 +0800
 Subject: [PATCH v9 4/4] crypto: Add Allwinner Security System crypto
  accelerator
 In-Reply-To: <1431608341-10936-5-git-send-email-clabbe.montjoie@gmail.com>
 References: <1431608341-10936-1-git-send-email-clabbe.montjoie@gmail.com>
  <1431608341-10936-5-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <20150515064932.GB16704@gondor.apana.org.au>
+Message-ID: <20150515065222.GA16808@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, May 14, 2015 at 02:59:01PM +0200, LABBE Corentin wrote:
 >
-> +	err = crypto_ablkcipher_setkey(op->fallback, kkey, op->keylen);
-> +	if (err != 0) {
-> +		dev_err(ss->dev, "Cannot set key on fallback\n");
-> +		return -EINVAL;
-> +	}
+> +int sun4i_hash_export(struct ahash_request *areq, void *out)
+> +{
+> +	struct sun4i_req_ctx *op = ahash_request_ctx(areq);
+> +
+> +	memcpy(out, op, sizeof(struct sun4i_req_ctx));
+> +	return 0;
+> +}
+> +
+> +int sun4i_hash_import(struct ahash_request *areq, const void *in)
+> +{
+> +	struct sun4i_req_ctx *op = ahash_request_ctx(areq);
+> +
+> +	memcpy(op, in, sizeof(struct sun4i_req_ctx));
 
-You cannot call setkey from an atomic context.  The easiest solution
-is to call setkey in your setkey function instead.
+This is very wrong.  You're importing an arbitrary ss pointer.  The
+whole point of having an import function instead of just a simple
+memcpy is to deal with such problems.
 
 Cheers,
 -- 
