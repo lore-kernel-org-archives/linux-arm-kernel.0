@@ -1,51 +1,31 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri, 15 May 2015 16:12:20 +0200
-Subject: [PATCH 0/4] ARM: multi_v7_defconfig: Stuff for Exynos
-In-Reply-To: <1431694142-32141-1-git-send-email-k.kozlowski.k@gmail.com>
-References: <1431694142-32141-1-git-send-email-k.kozlowski.k@gmail.com>
-Message-ID: <5555FEC4.6050204@collabora.co.uk>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 15 May 2015 19:45:25 +0530
+Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <CAKohpokeKtcJdrBcPZBBPR2zfJgpvuM_=wRaX5q1Uto2qx1oHQ@mail.gmail.com>
+References: <cover.1430394884.git.viresh.kumar@linaro.org>
+ <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
+ <20150512214224.16410.15922@quantum> <20150513085528.GA6994@linux>
+ <20150513110357.GD3066@sirena.org.uk>
+ <20150514003201.20636.83883@quantum>
+ <CAKohpokeKtcJdrBcPZBBPR2zfJgpvuM_=wRaX5q1Uto2qx1oHQ@mail.gmail.com>
+Message-ID: <20150515141525.GK6348@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+On 14-05-15, 03:25, Michael Turquette wrote:
+> No, we don't understand the problem space well enough to form an ABI.
 
-On 05/15/2015 02:48 PM, Krzysztof Kozlowski wrote:
-> Dear Kukjin,
-> 
-> The patchset enables various config options on multi_v7 config
-> for Exynos boards. The first two patches are actually resend.
-> 
-> Arnd suggested [0] that this can go through your tree.
-> 
-> Patchset is rebased on next-20150515 and Javier's patchset [1]
-> (to avoid conflicts around regulators and clocks).
-> 
-> Please let me know if this should be rebased on other commit.
-> 
-> [0] http://www.spinics.net/lists/kernel/msg1991518.html
-> [1] http://www.spinics.net/lists/kernel/msg1990767.html
-> 
-> Best regards,
-> Krzysztof
-> 
-> 
-> Krzysztof Kozlowski (4):
->   ARM: multi_v7_defconfig: Enable CPU idle for Exynos
->   ARM: multi_v7_defconfig: Enable PMIC and MUIC drivers for Exynos
->     boards
->   ARM: multi_v7_defconfig: Enable TMU for Exynos
->   ARM: multi_v7_defconfig: Enable OHCI on Exynos
-> 
->  arch/arm/configs/multi_v7_defconfig | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
-> 
+And why do you think so? We have been facing many problems since a
+long time which we are trying to solve here.
 
-On a first look, I agree with all the Kconfig symbols but I noticed that
-you are adding them to be built-in while the current policy for multi_v7
-is to build as much as possible as a module.
+I agree that it might not be right to try too many things which may
+not be required later, but most of the things we have now in new
+bindings are actually required.
 
-Could you please add as =m for all the tristate symbols that can be build
-as a module?
+> Putting this stuff in C without any philosophical constraints on whether
+> or not we can change it later is the way to go.
 
-Best regards,
-Javier
+I don't agree to that :)
+
+-- 
+viresh
