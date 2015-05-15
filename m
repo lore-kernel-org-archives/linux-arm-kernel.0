@@ -1,103 +1,57 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Fri, 15 May 2015 16:14:57 +0100
-Subject: [PATCH v4 03/12] KVM: arm64: guest debug, define API headers
-In-Reply-To: <20150515144423.GA23652@leverpostej>
-References: <1431700035-23479-1-git-send-email-alex.bennee@linaro.org>
- <1431700035-23479-4-git-send-email-alex.bennee@linaro.org>
- <20150515144423.GA23652@leverpostej>
-Message-ID: <874mndlvny.fsf@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 15 May 2015 17:14:22 +0200
+Subject: [GIT PULL] ARM: mvebu: fixes for v4.1 #2
+In-Reply-To: <5555EF50.3030206@free-electrons.com>
+References: <5555EF50.3030206@free-electrons.com>
+Message-ID: <2203878.yJO43gjIyk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Friday 15 May 2015 15:06:24 Gregory CLEMENT wrote:
+> Hi,
+> 
+> Here is the second pull request for fixes for mvebu for v4.2.
+> Beside the usual fixes I also included an update on the MAINTAINER
+> file which was sent a few months ago but which had never been merged.
+> 
+> Gregory
+> 
+> The following changes since commit 750e30d4076ae5e02ad13a376e96c95a2627742c:
+> 
+>   ARM: mvebu: armada-xp-openblocks-ax3-4: Disable internal RTC (2015-04-27 09:27:18 +0200)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.1-2
+> 
+> for you to fetch changes up to 31c17ac98fc005c0998f890094eb8fe17061e667:
+> 
+>   MAINTAINERS: Add dts entries for some of the Marvell SoCs (2015-05-15 14:25:43 +0200)
+> 
+> ----------------------------------------------------------------
+> mvebu fixes for 4.1 (part 2)
+> 
+> Fix the main PLL frequency on Armada 375, 38x and 39x SoCs
+> Add clock-names to CuBox Si5351 clk generator
+> Add dts entries in the MAINTAINERS file
+> 
+> ----------------------------------------------------------------
+> Gregory CLEMENT (2):
+>       ARM: mvebu: Fix the main PLL frequency on Armada 375, 38x and 39x SoCs
+>       MAINTAINERS: Add dts entries for some of the Marvell SoCs
+> 
+> Sebastian Hesselbarth (1):
+>       ARM: dove: Add clock-names to CuBox Si5351 clk generator
+> 
+>  MAINTAINERS                       | 10 +++++++++-
+>  arch/arm/boot/dts/armada-375.dtsi |  2 +-
+>  arch/arm/boot/dts/armada-38x.dtsi |  2 +-
+>  arch/arm/boot/dts/armada-39x.dtsi |  2 +-
+>  arch/arm/boot/dts/dove-cubox.dts  |  1 +
+>  5 files changed, 13 insertions(+), 4 deletions(-)
+> 
+> 
 
-Mark Rutland <mark.rutland@arm.com> writes:
+Pulled into fixes, thanks!
 
-> On Fri, May 15, 2015 at 03:27:06PM +0100, Alex Benn?e wrote:
->> This commit defines the API headers for guest debugging. There are two
->> architecture specific debug structures:
->> 
->>   - kvm_guest_debug_arch, allows us to pass in HW debug registers
->>   - kvm_debug_exit_arch, signals exception and possible faulting address
->> 
->> The type of debugging being used is controlled by the architecture
->> specific control bits of the kvm_guest_debug->control flags in the ioctl
->> structure.
->> 
->> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->> Reviewed-by: David Hildenbrand <dahi@linux.vnet.ibm.com>
->> Reviewed-by: Andrew Jones <drjones@redhat.com>
->> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
->> 
->> ---
->> v2
->>    - expose hsr and pc directly to user-space
->> v3
->>    - s/control/controlled/ in commit message
->>    - add v8 to ARM ARM comment (ARM Architecture Reference Manual)
->>    - add rb tag
->>    - rm pc, add far
->>    - re-word comments on alignment
->>    - rename KVM_ARM_NDBG_REGS -> KVM_ARM_MAX_DBG_REGS
->> v4
->>    - now uses common HW/SW BP define
->>    - add a-b-tag
->>    - use u32 for control regs
->> 
->> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
->> index d268320..8796610 100644
->> --- a/arch/arm64/include/uapi/asm/kvm.h
->> +++ b/arch/arm64/include/uapi/asm/kvm.h
->> @@ -100,10 +100,28 @@ struct kvm_sregs {
->>  struct kvm_fpu {
->>  };
->>  
->> +/*
->> + * See v8 ARM ARM D7.3: Debug Registers
->> + *
->> + * The control registers are architecturally defined as 32 bits but are
->> + * stored as 64 bit values alongside the value registers. This is done
->
-> Stale comment? They're stored as __u32 below.
-
-Gah yes it is. 
-
-> It's possible that the registers could grow in future as happened in the
-> case of CLIDR_EL1, so it might be worth treating system registers
-> generally as u64 values.
-
-Really? I mean the existing debug *control* registers have reserved bits
-24-31 so there is space for expansion. 
-
->
-> Mark.
->
->> + * to keep the copying of these values into the vcpu context simple as
->> + * everything is 64 bit aligned (see DBGBCR0_EL1 onwards in kvm_asm.h).
->> + *
->> + * The architectural limit is 16 debug registers of each type although
->> + * in practice there are usually less (see ID_AA64DFR0_EL1).
->> + */
->> +#define KVM_ARM_MAX_DBG_REGS 16
->>  struct kvm_guest_debug_arch {
->> +	__u32 dbg_bcr[KVM_ARM_MAX_DBG_REGS];
->> +	__u64 dbg_bvr[KVM_ARM_MAX_DBG_REGS];
->> +	__u32 dbg_wcr[KVM_ARM_MAX_DBG_REGS];
->> +	__u64 dbg_wvr[KVM_ARM_MAX_DBG_REGS];
->>  };
->>  
->>  struct kvm_debug_exit_arch {
->> +	__u32 hsr;
->> +	__u64 far;
->>  };
->>  
->>  struct kvm_sync_regs {
->> -- 
->> 2.3.5
->> 
->> _______________________________________________
->> kvmarm mailing list
->> kvmarm at lists.cs.columbia.edu
->> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
-
--- 
-Alex Benn?e
+	Arnd
