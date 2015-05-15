@@ -1,102 +1,193 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 15 May 2015 09:12:11 +0900
-Subject: [PATCHv5 2/5] ARM: dts: Odroid-XU3 Enable TMU at Exynos5422 base
-In-Reply-To: <CANAwSgTOaz+mMhFZTeXYoXF+xPR2qon2Tkfsw5aqO42AK1m1-Q@mail.gmail.com>
-References: <1431499020-3912-1-git-send-email-linux.amoon@gmail.com>
- <1431499020-3912-3-git-send-email-linux.amoon@gmail.com>
- <CAJKOXPca-2qdYOoMQOnu0jigOYwUvMTWZwdM2kRTkBXw-ws4yw@mail.gmail.com>
- <CANAwSgQ=30j4A_nCd26kzxi=rdsh32+Srwuc5EaJigLhJ2r4jA@mail.gmail.com>
- <CAJKOXPfC9nGEsYJ3qJ6m_iMsB=D8_6sOEpLQzEvmLry5zS5j3g@mail.gmail.com>
- <CANAwSgTOaz+mMhFZTeXYoXF+xPR2qon2Tkfsw5aqO42AK1m1-Q@mail.gmail.com>
-Message-ID: <CAJKOXPd_1rTZZCz66nQKidUOOEBmgUD+05fHUBvXN-VuD5mTCw@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 14 May 2015 17:25:27 -0700
+Subject: [PATCH v4 4/5] clk: hi6220: Clock driver support for Hisilicon
+ hi6220 SoC
+In-Reply-To: <1430827599-11560-5-git-send-email-bintian.wang@huawei.com>
+References: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>
+ <1430827599-11560-5-git-send-email-bintian.wang@huawei.com>
+Message-ID: <20150515002527.GD31753@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-15 1:16 GMT+09:00 Anand Moon <linux.amoon@gmail.com>:
-> On 13 May 2015 at 14:02, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
->> 2015-05-13 17:21 GMT+09:00 Anand Moon <linux.amoon@gmail.com>:
->>> On 13 May 2015 at 12:51, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
->>>> 2015-05-13 15:36 GMT+09:00 Anand Moon <linux.amoon@gmail.com>:
->>>>> This changes enables TMU IP block on the Exynos5422 Odroid-XU3
->>>>> device.
->>>>>
->>>>> Tested-by: Markus Reichl <m.reichl@fivetechno.de>
->>>>> Acked-by: Lukasz Majewski <l.majewski@samsung.com>
->>>>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
->>>>> ---
->>>>>  arch/arm/boot/dts/exynos5422-odroidxu3.dts | 25 +++++++++++++++++++++++++
->>>>>  1 file changed, 25 insertions(+)
->>>>>
->>>>> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
->>>>> index 9446e28..cd78816 100644
->>>>> --- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
->>>>> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
->>>>> @@ -319,6 +319,31 @@
->>>>>                 #cooling-cells = <2>;
->>>>>                 cooling-levels = <0 130 170 230>;
->>>>>         };
->>>>> +
->>>>> +       tmu at 10060000 {
->>>>
->>>> Here and for other overrides please use label notation, like:
->>>>
->>>> &tmu_cpu0 {
->>>>               ...
->>>> };
->>>>
->>>>> +               vtmu-supply = <&ldo10_reg>;
->>>>
->>>> I am curious, how did you find that LDO10 supplies TMU unit?
->>>>
->>>> Best regards,
->>>> Krzysztof
->>>
->>> Hi Krzysztof,
->>>
->>> I have re-base my work on earlier Lukasz Majewski patches.
->>>
->>> https://patchwork.kernel.org/patch/5693201/
->>
->> NAK.
->> I am sorry, but this is not sufficient explanation. Actually such
->> explanation could mean that you did just blindly copied everything
->> instead of developing it.
->>
->> You cannot use some regulator here just because some Exynos4 boards
->> use it. You have to be sure that this regulator supplies this part of
->> SoC or device.
->
-> Hi Krzysztof,
->
-> After going through the schematics, I came to understanding that their is
-> missing regulator related to TEMP SE in the exynos5422-odroidxu3.dts.
->
-> Below is the schematic of the board.
->
-> http://dn.odroid.com/5422/ODROID-XU3/Schematics/XU3_MAIN_REV0.2.PDF
->
->   ldo18_reg: LDO18 {
->                                          regulator-name = "vdd_ldo18";
->                                          regulator-min-microvolt = <1800000>;
->                                          regulator-max-microvolt = <1800000>;
->                                          regulator-always-on;
->                                };
+On 05/05, Bintian Wang wrote:
+> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+> index 9897f35..935c44b 100644
+> --- a/drivers/clk/Kconfig
+> +++ b/drivers/clk/Kconfig
+> @@ -152,6 +152,8 @@ config COMMON_CLK_CDCE706
+>  
+>  source "drivers/clk/qcom/Kconfig"
+>  
+> +source "drivers/clk/hisilicon/Kconfig"
+> +
 
-The output of LDO18 goes to VDD_EMMC_1V8. This is not regulator for TMU.
+Please move this above qcom to maintain alphabet sort.
 
-I think the schematics are missing some of details but it can be deducted that:
-1. TEMP SE is supplied by VDD18_TS power domain. It consists of 5
-pairs of pins (XTSTEST_OUT[0-4], XTSEXT_RES[0-4]).
-2. The VDD18_TS01, VDD18_TS23 and VDD18_TS4 are wired to the LDO7 of
-S2MPS11 PMIC.
-3. I confirmed with the Exynos5422 datasheet that these
-VDD18_TS{01,23,4} supply the XTSTEST pins (OUT and RES).
+>  endmenu
+>  
+>  source "drivers/clk/bcm/Kconfig"
+> diff --git a/drivers/clk/hisilicon/Kconfig b/drivers/clk/hisilicon/Kconfig
+> new file mode 100644
+> index 0000000..8034739
+> --- /dev/null
+> +++ b/drivers/clk/hisilicon/Kconfig
+> @@ -0,0 +1,6 @@
+> +config COMMON_CLK_HI6220
+> +	bool "Hi6220 Clock Driver"
+> +	depends on OF && ARCH_HISI
+> +	default y
 
-So the LDO7 it is... but before using it there is a caveat. The LDO7
-is also connected to VDD of MIPI, HDMI and few more. So when you use
-this regulator in TMU it may be turned off by TMU driver (e.g. during
-unbind). In such case these other blocks also should be tested and
-checked whether they take this regulator and enable it.
+Can this be
 
-Best regards,
-Krzysztof
+	depends on ARCH_HISI || COMPILE_TEST
+	default ARCH_HISI
+
+instead? I'd like to increase build coverage.
+
+> +	help
+> +	  Build the Hisilicon Hi6220 clock driver based on the common clock framework.
+> diff --git a/drivers/clk/hisilicon/clk-hi6220.c b/drivers/clk/hisilicon/clk-hi6220.c
+> new file mode 100644
+> index 0000000..91b1cd7
+> --- /dev/null
+> +++ b/drivers/clk/hisilicon/clk-hi6220.c
+> @@ -0,0 +1,292 @@
+> +/*
+> + * Hisilicon Hi6220 clock driver
+> + *
+> + * Copyright (c) 2015 Hisilicon Limited.
+> + *
+> + * Author: Bintian Wang <bintian.wang@huawei.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/clkdev.h>
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_device.h>
+> +#include <linux/slab.h>
+> +#include <linux/clk.h>
+
+Do we need to include linux/clk.h? I don't see any consumer
+usage here.
+
+> +
+> +#include <dt-bindings/clock/hi6220-clock.h>
+> +
+> +#include "clk.h"
+> +
+> diff --git a/drivers/clk/hisilicon/clk.c b/drivers/clk/hisilicon/clk.c
+> index a078e84..5d2305c 100644
+> --- a/drivers/clk/hisilicon/clk.c
+> +++ b/drivers/clk/hisilicon/clk.c
+> @@ -108,4 +123,6 @@ void __init hisi_clk_register_gate(struct hisi_gate_clock *,
+>  					int, struct hisi_clock_data *);
+>  void __init hisi_clk_register_gate_sep(struct hisi_gate_clock *,
+>  					int, struct hisi_clock_data *);
+> +void __init hi6220_clk_register_divider(struct hi6220_divider_clock *,
+> +					int, struct hisi_clock_data *);
+
+__init markings on function prototypes are useless. Please remove them.
+
+>  #endif	/* __HISI_CLK_H */
+> diff --git a/drivers/clk/hisilicon/clkdivider-hi6220.c b/drivers/clk/hisilicon/clkdivider-hi6220.c
+> +
+> +/**
+> + * struct hi6220_clk_divider - divider clock for hi6220
+> + *
+> + * @hw:		handle between common and hardware-specific interfaces
+> + * @reg:	register containing divider
+> + * @shift:	shift to the divider bit field
+> + * @width:	width of the divider bit field
+> + * @mask:	mask for setting divider rate
+> + * @table:	the div table that the divider supports
+> + * @lock:	register lock
+> + */
+> +struct hi6220_clk_divider {
+> +	struct clk_hw	hw;
+> +	void __iomem	*reg;
+> +	u8		shift;
+> +	u8		width;
+> +	u32		mask;
+> +	const struct clk_div_table *table;
+> +	spinlock_t	*lock;
+> +};
+
+The clk-divider.c code has been made "reusable". Can you please
+try to use the functions that it now exposes instead of
+copy/pasting it and modifying it to suit your needs? A lot of
+this code looks the same.
+
+> +
+> +#define to_hi6220_clk_divider(_hw)	\
+[..]
+> +
+> +static struct clk_ops hi6220_clkdiv_ops = {
+
+const?
+
+> +	.recalc_rate = hi6220_clkdiv_recalc_rate,
+> +	.round_rate = hi6220_clkdiv_round_rate,
+> +	.set_rate = hi6220_clkdiv_set_rate,
+> +};
+> +
+> +struct clk *hi6220_register_clkdiv(struct device *dev, const char *name,
+> +	const char *parent_name, unsigned long flags, void __iomem *reg,
+> +	u8 shift, u8 width, u32 mask_bit, spinlock_t *lock)
+> +{
+> +	struct hi6220_clk_divider *div;
+> +	struct clk *clk;
+> +	struct clk_init_data init;
+> +	struct clk_div_table *table;
+> +	u32 max_div, min_div;
+> +	int i;
+> +
+> +	/* allocate the divider */
+> +	div = kzalloc(sizeof(struct hi6220_clk_divider), GFP_KERNEL);
+> +	if (!div) {
+> +		pr_err("%s: could not allocate divider clk\n", __func__);
+
+Useless error message on allocation failure. Please run
+checkpatch. I've sent a patch to remove these from basic clock
+types.
+
+> +		return ERR_PTR(-ENOMEM);
+> +	}
+> +
+> +	/* Init the divider table */
+> +	max_div = div_mask(width) + 1;
+> +	min_div = 1;
+> +
+> +	table = kzalloc(sizeof(struct clk_div_table) * (max_div + 1), GFP_KERNEL);
+> +	if (!table) {
+> +		kfree(div);
+> +		pr_err("%s: failed to alloc divider table!\n", __func__);
+
+ditto.
+
+> +		return ERR_PTR(-ENOMEM);
+> +	}
+> +
+> +	for (i = 0; i < max_div; i++) {
+> +		table[i].div = min_div + i;
+> +		table[i].val = table[i].div - 1;
+> +	}
+> +
+> +	init.name = name;
+> +	init.ops = &hi6220_clkdiv_ops;
+> +	init.flags = flags | CLK_IS_BASIC;
+
+It's basic?
+
+> +	init.parent_names = parent_name ? &parent_name : NULL;
+> +	init.num_parents = parent_name ? 1 : 0;
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
