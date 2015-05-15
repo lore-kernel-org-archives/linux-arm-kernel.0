@@ -1,57 +1,61 @@
 From: Frank.Li@freescale.com (Frank.Li at freescale.com)
-Date: Fri, 15 May 2015 21:36:23 +0800
-Subject: [PATCH resend 0/7] Change snvs rtc and poweroff to use syscon add
- pwrkey driver
-Message-ID: <1431696990-23078-1-git-send-email-Frank.Li@freescale.com>
+Date: Fri, 15 May 2015 21:36:24 +0800
+Subject: [PATCH 1/7] arm: imx: power-off: change to syscon to access register
+In-Reply-To: <1431696990-23078-1-git-send-email-Frank.Li@freescale.com>
+References: <1431696990-23078-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <1431696990-23078-2-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Frank Li <Frank.Li@freescale.com>
 
-Resend to add rtc and reset  maintainer.
+snvs is MFP device, which included rtc, ON/OFF key, power off
 
-SNVS is MPF module.
-include rtc, power off, ON/OFF power key
-  
-  arm: imx: power-off: change to syscon to access register
-  rtc: arm: imx: snvs: change use syscon to access register
-Above two patch change existed power-off and rtc use syscon
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
+---
+ drivers/power/reset/imx-snvs-poweroff.c | 21 +++++++++++++++------
+ 1 file changed, 15 insertions(+), 6 deletions(-)
 
-  Document: dt: fsl: snvs: change support syscon
-  arm: dts: imx: update snvs to use syscon access register
-Update dt file and document
-
-  input: keyboard: imx: add snvs power key driver
-  document: devicetree: input: imx: i.mx snvs power device tree bindings
-  arm: dts: imx6sx: enable snvs power key
-Added on/off key driver
-
-Frank Li (6):
-  arm: imx: power-off: change to syscon to access register
-  rtc: arm: imx: snvs: change use syscon to access register
-  Document: dt: fsl: snvs: change support syscon
-  arm: dts: imx: update snvs to use syscon access register
-  document: devicetree: input: imx: i.mx snvs power device tree bindings
-  arm: dts: imx6sx: enable snvs power key
-
-Robin Gong (1):
-  input: keyboard: imx: add snvs power key driver
-
- .../devicetree/bindings/crypto/fsl-sec4.txt        |  93 +++++++--
- .../devicetree/bindings/input/snvs-pwrkey.txt      |   1 +
- .../bindings/power_supply/imx-snvs-poweroff.txt    |  24 +--
- arch/arm/boot/dts/imx6qdl.dtsi                     |  12 +-
- arch/arm/boot/dts/imx6sl.dtsi                      |  12 +-
- arch/arm/boot/dts/imx6sx.dtsi                      |  19 +-
- arch/arm/boot/dts/vfxxx.dtsi                       |   9 +-
- drivers/input/keyboard/Kconfig                     |  11 +
- drivers/input/keyboard/Makefile                    |   1 +
- drivers/input/keyboard/snvs_pwrkey.c               | 232 +++++++++++++++++++++
- drivers/power/reset/imx-snvs-poweroff.c            |  21 +-
- drivers/rtc/rtc-snvs.c                             | 124 +++++------
- 12 files changed, 417 insertions(+), 142 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/input/snvs-pwrkey.txt
- create mode 100644 drivers/input/keyboard/snvs_pwrkey.c
-
+diff --git a/drivers/power/reset/imx-snvs-poweroff.c b/drivers/power/reset/imx-snvs-poweroff.c
+index ad6ce50..b4881d7 100644
+--- a/drivers/power/reset/imx-snvs-poweroff.c
++++ b/drivers/power/reset/imx-snvs-poweroff.c
+@@ -22,21 +22,30 @@
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/platform_device.h>
++#include <linux/mfd/syscon.h>
++#include <linux/regmap.h>
+ 
+-static void __iomem *snvs_base;
++static struct regmap *snvs;
++
++#define SNVS_LPCR 0x38
+ 
+ static void do_imx_poweroff(void)
+ {
+-	u32 value = readl(snvs_base);
+-
+ 	/* set TOP and DP_EN bit */
+-	writel(value | 0x60, snvs_base);
++	regmap_update_bits(snvs, SNVS_LPCR, 0x60, 0x60);
+ }
+ 
+ static int imx_poweroff_probe(struct platform_device *pdev)
+ {
+-	snvs_base = of_iomap(pdev->dev.of_node, 0);
+-	if (!snvs_base) {
++	struct device_node *nd;
++
++	nd = of_get_parent(pdev->dev.of_node);
++	if (!nd)
++		return -ENODEV;
++	snvs = syscon_node_to_regmap (nd);
++	of_node_put(nd);
++
++	if (!snvs) {
+ 		dev_err(&pdev->dev, "failed to get memory\n");
+ 		return -ENODEV;
+ 	}
 -- 
 1.9.1
