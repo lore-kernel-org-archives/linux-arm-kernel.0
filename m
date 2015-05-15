@@ -1,406 +1,263 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Fri, 15 May 2015 15:25:05 +0200
-Subject: [PATCH v2 1/2] rtc: add rtc-lpc24xx driver
-In-Reply-To: <1431696306-19093-1-git-send-email-manabian@gmail.com>
-References: <1431696306-19093-1-git-send-email-manabian@gmail.com>
-Message-ID: <1431696306-19093-2-git-send-email-manabian@gmail.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Fri, 15 May 2015 15:35:46 +0200
+Subject: [PATCH 5/5] VFIO: platform: VFIO platform Calxeda xgmac reset
+ module
+In-Reply-To: <1431616452.3625.107.camel@redhat.com>
+References: <1431008843-28411-1-git-send-email-eric.auger@linaro.org>		
+ <1431008843-28411-6-git-send-email-eric.auger@linaro.org>	
+ <1431542017.3625.56.camel@redhat.com> <5554659E.3010205@linaro.org>
+ <1431616452.3625.107.camel@redhat.com>
+Message-ID: <5555F632.1050309@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add driver for the RTC found on NXP LPC24xx/178x/18xx/43xx devices.
-The RTC provides calendar and clock functionality together with
-periodic tick and alarm interrupt support.
+On 05/14/2015 05:14 PM, Alex Williamson wrote:
+> On Thu, 2015-05-14 at 11:06 +0200, Eric Auger wrote:
+>> Alex,
+>> On 05/13/2015 08:33 PM, Alex Williamson wrote:
+>>> On Thu, 2015-05-07 at 16:27 +0200, Eric Auger wrote:
+>>>> This patch introduces a module that registers and implements a basic
+>>>> reset function for the Calxeda xgmac device. This latter basically disables
+>>>> interrupts and stops DMA transfers.
+>>>>
+>>>> The reset function code is inherited from the native calxeda xgmac driver.
+>>>>
+>>>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>>> ---
+>>>>  drivers/vfio/platform/Kconfig                      |   2 +
+>>>>  drivers/vfio/platform/Makefile                     |   2 +
+>>>>  drivers/vfio/platform/reset/Kconfig                |   7 ++
+>>>>  drivers/vfio/platform/reset/Makefile               |   5 +
+>>>>  .../platform/reset/vfio_platform_calxedaxgmac.c    | 121 +++++++++++++++++++++
+>>>>  5 files changed, 137 insertions(+)
+>>>>  create mode 100644 drivers/vfio/platform/reset/Kconfig
+>>>>  create mode 100644 drivers/vfio/platform/reset/Makefile
+>>>>  create mode 100644 drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
+>>>>
+>>>> diff --git a/drivers/vfio/platform/Kconfig b/drivers/vfio/platform/Kconfig
+>>>> index 9a4403e..1df7477 100644
+>>>> --- a/drivers/vfio/platform/Kconfig
+>>>> +++ b/drivers/vfio/platform/Kconfig
+>>>> @@ -18,3 +18,5 @@ config VFIO_AMBA
+>>>>  	  framework.
+>>>>  
+>>>>  	  If you don't know what to do here, say N.
+>>>> +
+>>>> +source "drivers/vfio/platform/reset/Kconfig"
+>>>> diff --git a/drivers/vfio/platform/Makefile b/drivers/vfio/platform/Makefile
+>>>> index 81de144..9ce8afe 100644
+>>>> --- a/drivers/vfio/platform/Makefile
+>>>> +++ b/drivers/vfio/platform/Makefile
+>>>> @@ -2,7 +2,9 @@
+>>>>  vfio-platform-y := vfio_platform.o vfio_platform_common.o vfio_platform_irq.o
+>>>>  
+>>>>  obj-$(CONFIG_VFIO_PLATFORM) += vfio-platform.o
+>>>> +obj-$(CONFIG_VFIO_PLATFORM) += reset/
+>>>>  
+>>>>  vfio-amba-y := vfio_amba.o
+>>>>  
+>>>>  obj-$(CONFIG_VFIO_AMBA) += vfio-amba.o
+>>>> +obj-$(CONFIG_VFIO_AMBA) += reset/
+>>>> diff --git a/drivers/vfio/platform/reset/Kconfig b/drivers/vfio/platform/reset/Kconfig
+>>>> new file mode 100644
+>>>> index 0000000..746b96b
+>>>> --- /dev/null
+>>>> +++ b/drivers/vfio/platform/reset/Kconfig
+>>>> @@ -0,0 +1,7 @@
+>>>> +config VFIO_PLATFORM_CALXEDAXGMAC_RESET
+>>>> +	tristate "VFIO support for calxeda xgmac reset"
+>>>> +	depends on VFIO_PLATFORM
+>>>> +	help
+>>>> +	  Enables the VFIO platform driver to handle reset for Calxeda xgmac
+>>>> +
+>>>> +	  If you don't know what to do here, say N.
+>>>> diff --git a/drivers/vfio/platform/reset/Makefile b/drivers/vfio/platform/reset/Makefile
+>>>> new file mode 100644
+>>>> index 0000000..2a486af
+>>>> --- /dev/null
+>>>> +++ b/drivers/vfio/platform/reset/Makefile
+>>>> @@ -0,0 +1,5 @@
+>>>> +vfio-platform-calxedaxgmac-y := vfio_platform_calxedaxgmac.o
+>>>> +
+>>>> +ccflags-y += -Idrivers/vfio/platform
+>>>> +
+>>>> +obj-$(CONFIG_VFIO_PLATFORM_CALXEDAXGMAC_RESET) += vfio-platform-calxedaxgmac.o
+>>>> diff --git a/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c b/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
+>>>> new file mode 100644
+>>>> index 0000000..3c6e428
+>>>> --- /dev/null
+>>>> +++ b/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
+>>>> @@ -0,0 +1,121 @@
+>>>> +/*
+>>>> + * VFIO platform driver specialized for Calxeda xgmac reset
+>>>> + * reset code is inherited from calxeda xgmac native driver
+>>>> + *
+>>>> + * Copyright 2010-2011 Calxeda, Inc.
+>>>> + * Copyright (c) 2015 Linaro Ltd.
+>>>> + *              www.linaro.org
+>>>> + *
+>>>> + * This program is free software; you can redistribute it and/or modify it
+>>>> + * under the terms and conditions of the GNU General Public License,
+>>>> + * version 2, as published by the Free Software Foundation.
+>>>> + *
+>>>> + * This program is distributed in the hope it will be useful, but WITHOUT
+>>>> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+>>>> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+>>>> + * more details.
+>>>> + *
+>>>> + * You should have received a copy of the GNU General Public License along with
+>>>> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+>>>> + */
+>>>> +
+>>>> +#include <linux/module.h>
+>>>> +#include <linux/kernel.h>
+>>>> +#include <linux/init.h>
+>>>> +#include <linux/io.h>
+>>>> +
+>>>> +#include "vfio_platform_private.h"
+>>>> +
+>>>> +#define DRIVER_VERSION  "0.1"
+>>>> +#define DRIVER_AUTHOR   "Eric Auger <eric.auger@linaro.org>"
+>>>> +#define DRIVER_DESC     "Reset support for Calxeda xgmac vfio platform device"
+>>>> +
+>>>> +#define CALXEDAXGMAC_COMPAT "calxeda,hb-xgmac"
+>>>> +
+>>>> +/* XGMAC Register definitions */
+>>>> +#define XGMAC_CONTROL           0x00000000      /* MAC Configuration */
+>>>> +
+>>>> +/* DMA Control and Status Registers */
+>>>> +#define XGMAC_DMA_CONTROL       0x00000f18      /* Ctrl (Operational Mode) */
+>>>> +#define XGMAC_DMA_INTR_ENA      0x00000f1c      /* Interrupt Enable */
+>>>> +
+>>>> +/* DMA Control registe defines */
+>>>> +#define DMA_CONTROL_ST          0x00002000      /* Start/Stop Transmission */
+>>>> +#define DMA_CONTROL_SR          0x00000002      /* Start/Stop Receive */
+>>>> +
+>>>> +/* Common MAC defines */
+>>>> +#define MAC_ENABLE_TX           0x00000008      /* Transmitter Enable */
+>>>> +#define MAC_ENABLE_RX           0x00000004      /* Receiver Enable */
+>>>> +
+>>>> +static inline void xgmac_mac_disable(void __iomem *ioaddr)
+>>>> +{
+>>>> +	u32 value = readl(ioaddr + XGMAC_DMA_CONTROL);
+>>>> +
+>>>> +	value &= ~(DMA_CONTROL_ST | DMA_CONTROL_SR);
+>>>> +	writel(value, ioaddr + XGMAC_DMA_CONTROL);
+>>>> +
+>>>> +	value = readl(ioaddr + XGMAC_CONTROL);
+>>>> +	value &= ~(MAC_ENABLE_TX | MAC_ENABLE_RX);
+>>>> +	writel(value, ioaddr + XGMAC_CONTROL);
+>>>> +}
+>>>> +
+>>>> +int vfio_platform_calxedaxgmac_reset(struct vfio_platform_device *vdev)
+>>>> +{
+>>>> +	struct vfio_platform_region reg = vdev->regions[0];
+>>>> +
+>>>> +	if (!reg.ioaddr) {
+>>>> +		reg.ioaddr =
+>>>> +			ioremap_nocache(reg.addr, reg.size);
+>>>> +		if (!reg.ioaddr)
+>>>> +			return -ENOMEM;
+>>>> +	}
+>>>> +
+>>>> +	/* disable IRQ */
+>>>> +	writel(0, reg.ioaddr + XGMAC_DMA_INTR_ENA);
+>>>> +
+>>>> +	/* Disable the MAC core */
+>>>> +	xgmac_mac_disable(reg.ioaddr);
+>>>> +
+>>>> +	return 0;
+>>>> +}
+>>>> +EXPORT_SYMBOL_GPL(vfio_platform_calxedaxgmac_reset);
+>>>> +
+>>>> +static int __init vfio_platform_calxedaxgmac_init(void)
+>>>> +{
+>>>> +	int (*register_reset)(char *, struct module *,
+>>>> +				vfio_platform_reset_fn_t);
+>>>> +	int ret;
+>>>> +
+>>>> +	register_reset = symbol_get(vfio_platform_register_reset);
+>>>> +	if (!register_reset)
+>>>> +		return -EINVAL;
+>>>> +
+>>>> +	ret = register_reset(CALXEDAXGMAC_COMPAT, THIS_MODULE,
+>>>> +			     vfio_platform_calxedaxgmac_reset);
+>>>> +
+>>>> +	symbol_put(vfio_platform_register_reset);
+>>>> +
+>>>> +	return ret;
+>>>> +}
+>>>> +
+>>>> +static void __exit vfio_platform_calxedaxgmac_exit(void)
+>>>> +{
+>>>> +	int (*unregister_reset)(char *);
+>>>> +	int ret;
+>>>> +
+>>>> +	unregister_reset = symbol_get(vfio_platform_unregister_reset);
+>>>
+>>> Shouldn't we have gotten the symbol during the module init so that this
+>>> cannot fail?
+>> yes makes sense
+>>>
+>>>> +	if (!unregister_reset)
+>>>> +		return;
+>>>> +
+>>>> +	ret = unregister_reset(CALXEDAXGMAC_COMPAT);
+>>>
+>>> unregister_reset() should just return void
+>> ok
+>>>
+>>>> +
+>>>> +	symbol_put(vfio_platform_unregister_reset);
+>>>> +}
+>>>> +
+>>>> +module_init(vfio_platform_calxedaxgmac_init);
+>>>> +module_exit(vfio_platform_calxedaxgmac_exit);
+>>>> +
+>>>> +MODULE_VERSION(DRIVER_VERSION);
+>>>> +MODULE_LICENSE("GPL v2");
+>>>> +MODULE_AUTHOR(DRIVER_AUTHOR);
+>>>> +MODULE_DESCRIPTION(DRIVER_DESC);
+>>>
+>>>
+>>> So a user needs to manually load this module to get a working reset for
+>>> this device?  That's never going to happen.
+>> The reset module is devised to be in-kernel or external. There is always
+>> the choice to include all reset modules as soon as vfio-platform /amba
+>> is chosen. What would be your preferred approach then? Do you consider
+>> this approach using separate reset modules is not sensible? Do you think
+>> we should put everything in the vfio-platform driver?
+> 
+> I respect your attempt to keep the code slim and modular by making the
+> reset functionality loadable, but we can't expect users to figure out
+> what module they need to load to make their device work.  It needs to be
+> automatic.  One way we could achieve that and still keep your premise of
+> loadable reset modules would be a lookup table in vfio-platform to
+> translate a device compatibility ID to a reset module name.  We could
+> then do a request_module() to auto-load the reset module if one exists.
+> Maybe the ID table could even live in the reset driver, much like PCI
+> IDs live in those drivers.  We also have the complication that there's
+> no direct module dependency for the reset module(s), so they would need
+> to be explicitly listed to install them into an initramfs.
+> 
+> If we take that approach, we're quickly building infrastructure that
+> gets more bloated than a few reset functions buried directly into
+> vfio-platform.  Then we may wonder how many reset functions are we
+> reasonably going to get.  If you don't have more than a couple in mind,
+> maybe we should just embed them into vfio-platform and worry about
+> creating something more dynamic when the need presents itself.  Thanks,
 
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
----
- drivers/rtc/Kconfig       |  13 ++
- drivers/rtc/Makefile      |   1 +
- drivers/rtc/rtc-lpc24xx.c | 341 ++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 355 insertions(+)
- create mode 100644 drivers/rtc/rtc-lpc24xx.c
+Hi Alex,
 
-diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-index 6149ae01e11f..279342e8168b 100644
---- a/drivers/rtc/Kconfig
-+++ b/drivers/rtc/Kconfig
-@@ -1427,6 +1427,19 @@ config RTC_DRV_JZ4740
- 	  This driver can also be buillt as a module. If so, the module
- 	  will be called rtc-jz4740.
- 
-+config RTC_DRV_LPC24XX
-+	depends on ARCH_LPC18XX || COMPILE_TEST
-+	depends on HAS_IOMEM
-+	depends on OF
-+	tristate "NXP LPC24xx RTC"
-+	help
-+	  This enables support for the NXP RTC found which can be found on
-+	  LPC24xx/178x/18xx/43xx devices.
-+
-+	  If you have one of the devices above enable this driver to use
-+	  the hardware RTC. This driver can also be buillt as a module. If
-+	  so, the module will be called rtc-lpc24xx.
-+
- config RTC_DRV_LPC32XX
- 	depends on ARCH_LPC32XX
- 	tristate "NXP LPC32XX RTC"
-diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
-index c31731c29762..8687a2e13247 100644
---- a/drivers/rtc/Makefile
-+++ b/drivers/rtc/Makefile
-@@ -73,6 +73,7 @@ obj-$(CONFIG_RTC_DRV_ISL12022)	+= rtc-isl12022.o
- obj-$(CONFIG_RTC_DRV_ISL12057)	+= rtc-isl12057.o
- obj-$(CONFIG_RTC_DRV_JZ4740)	+= rtc-jz4740.o
- obj-$(CONFIG_RTC_DRV_LP8788)	+= rtc-lp8788.o
-+obj-$(CONFIG_RTC_DRV_LPC24XX)	+= rtc-lpc24xx.o
- obj-$(CONFIG_RTC_DRV_LPC32XX)	+= rtc-lpc32xx.o
- obj-$(CONFIG_RTC_DRV_LOONGSON1)	+= rtc-ls1x.o
- obj-$(CONFIG_RTC_DRV_M41T80)	+= rtc-m41t80.o
-diff --git a/drivers/rtc/rtc-lpc24xx.c b/drivers/rtc/rtc-lpc24xx.c
-new file mode 100644
-index 000000000000..33caa00fd44f
---- /dev/null
-+++ b/drivers/rtc/rtc-lpc24xx.c
-@@ -0,0 +1,341 @@
-+/*
-+ * Driver for NXP LPC24xx/178x/18xx/43xx Real-Time Clock (RTC)
-+ *
-+ * Copyright (C) 2011 NXP Semiconductors
-+ * Copyright (C) 2015 Joachim Eastwood <manabian@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/rtc.h>
-+
-+/* LPC24xx RTC register offsets */
-+#define LPC24XX_ILR		0x00
-+#define LPC24XX_CTC		0x04
-+#define LPC24XX_CCR		0x08
-+#define LPC24XX_CIIR		0x0c
-+#define LPC24XX_AMR		0x10
-+#define LPC24XX_CTIME0		0x14
-+#define LPC24XX_CTIME1		0x18
-+#define LPC24XX_CTIME2		0x1c
-+#define LPC24XX_SEC		0x20
-+#define LPC24XX_MIN		0x24
-+#define LPC24XX_HOUR		0x28
-+#define LPC24XX_DOM		0x2c
-+#define LPC24XX_DOW		0x30
-+#define LPC24XX_DOY		0x34
-+#define LPC24XX_MONTH		0x38
-+#define LPC24XX_YEAR		0x3c
-+#define LPC24XX_ALSEC		0x60
-+#define LPC24XX_ALMIN		0x64
-+#define LPC24XX_ALHOUR		0x68
-+#define LPC24XX_ALDOM		0x6c
-+#define LPC24XX_ALDOW		0x70
-+#define LPC24XX_ALDOY		0x74
-+#define LPC24XX_ALMON		0x78
-+#define LPC24XX_ALYEAR		0x7c
-+
-+#define LPC24XX_RTCCIF		BIT(0)
-+#define LPC24XX_RTCALF		BIT(1)
-+
-+#define LPC24XX_CLKEN		BIT(0)
-+#define LPC24XX_CTCRST		BIT(1)
-+
-+#define LPC24XX_IMSEC		BIT(0)
-+#define LPC24XX_IMMIN		BIT(1)
-+#define LPC24XX_IMHOUR		BIT(2)
-+#define LPC24XX_IMDOM		BIT(3)
-+#define LPC24XX_IMDOW		BIT(4)
-+#define LPC24XX_IMDOY		BIT(5)
-+#define LPC24XX_IMMON		BIT(6)
-+#define LPC24XX_IMYEAR		BIT(7)
-+
-+#define LPC24XX_ALARM_DISABLE	0xff
-+
-+#define CT0_SECS(x)		(((x) >> 0)  & 0x3f)
-+#define CT0_MINS(x)		(((x) >> 8)  & 0x3f)
-+#define CT0_HOURS(x)		(((x) >> 16) & 0x1f)
-+#define CT0_DOW(x)		(((x) >> 24) & 0x07)
-+#define CT1_DOM(x)		(((x) >> 0)  & 0x1f)
-+#define CT1_MONTH(x)		(((x) >> 8)  & 0x0f)
-+#define CT1_YEAR(x)		(((x) >> 16) & 0xfff)
-+#define CT2_DOY(x)		(((x) >> 0)  & 0xfff)
-+
-+#define rtc_readl(dev, reg)		readl((dev)->rtc_base + (reg))
-+#define rtc_writel(dev, reg, val)	writel((val), (dev)->rtc_base + (reg))
-+
-+struct lpc24xx_rtc {
-+	void __iomem *rtc_base;
-+	struct rtc_device *rtc;
-+	struct clk *clk_rtc;
-+	struct clk *clk_reg;
-+};
-+
-+static int lpc24xx_rtc_set_time(struct device *dev, struct rtc_time *tm)
-+{
-+	struct lpc24xx_rtc *rtc = dev_get_drvdata(dev);
-+	u32 rtc_ctrl;
-+
-+	/* Disable RTC during update */
-+	rtc_ctrl = rtc_readl(rtc, LPC24XX_CCR);
-+	rtc_writel(rtc, LPC24XX_CCR, rtc_ctrl & ~LPC24XX_CLKEN);
-+
-+	rtc_writel(rtc, LPC24XX_SEC,	tm->tm_sec);
-+	rtc_writel(rtc, LPC24XX_MIN,	tm->tm_min);
-+	rtc_writel(rtc, LPC24XX_HOUR,	tm->tm_hour);
-+	rtc_writel(rtc, LPC24XX_DOW,	tm->tm_wday);
-+	rtc_writel(rtc, LPC24XX_DOM,	tm->tm_mday);
-+	rtc_writel(rtc, LPC24XX_DOY,	tm->tm_yday);
-+	rtc_writel(rtc, LPC24XX_MONTH,	tm->tm_mon);
-+	rtc_writel(rtc, LPC24XX_YEAR,	tm->tm_year);
-+
-+	rtc_writel(rtc, LPC24XX_CCR, rtc_ctrl | LPC24XX_CLKEN);
-+
-+	return 0;
-+}
-+
-+static int lpc24xx_rtc_read_time(struct device *dev, struct rtc_time *tm)
-+{
-+	struct lpc24xx_rtc *rtc = dev_get_drvdata(dev);
-+	u32 ct0, ct1, ct2;
-+
-+	ct0 = rtc_readl(rtc, LPC24XX_CTIME0);
-+	ct1 = rtc_readl(rtc, LPC24XX_CTIME1);
-+	ct2 = rtc_readl(rtc, LPC24XX_CTIME2);
-+
-+	tm->tm_sec  = CT0_SECS(ct0);
-+	tm->tm_min  = CT0_MINS(ct0);
-+	tm->tm_hour = CT0_HOURS(ct0);
-+	tm->tm_wday = CT0_DOW(ct0);
-+	tm->tm_mon  = CT1_MONTH(ct1);
-+	tm->tm_mday = CT1_DOM(ct1);
-+	tm->tm_year = CT1_YEAR(ct1);
-+	tm->tm_yday = CT2_DOY(ct2);
-+
-+	if (rtc_valid_tm(tm) < 0) {
-+		dev_warn(dev, "retrieved date and time is invalid\n");
-+		rtc_time64_to_tm(0, tm);
-+		lpc24xx_rtc_set_time(dev, tm);
-+	}
-+
-+	return 0;
-+}
-+
-+static int lpc24xx_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *wkalrm)
-+{
-+	struct lpc24xx_rtc *rtc = dev_get_drvdata(dev);
-+	struct rtc_time *tm = &wkalrm->time;
-+
-+	tm->tm_sec  = rtc_readl(rtc, LPC24XX_ALSEC);
-+	tm->tm_min  = rtc_readl(rtc, LPC24XX_ALMIN);
-+	tm->tm_hour = rtc_readl(rtc, LPC24XX_ALHOUR);
-+	tm->tm_mday = rtc_readl(rtc, LPC24XX_ALDOM);
-+	tm->tm_wday = rtc_readl(rtc, LPC24XX_ALDOW);
-+	tm->tm_yday = rtc_readl(rtc, LPC24XX_ALDOY);
-+	tm->tm_mon  = rtc_readl(rtc, LPC24XX_ALMON);
-+	tm->tm_year = rtc_readl(rtc, LPC24XX_ALYEAR);
-+
-+	wkalrm->enabled = rtc_readl(rtc, LPC24XX_AMR) == 0;
-+	wkalrm->pending = !!(rtc_readl(rtc, LPC24XX_ILR) & LPC24XX_RTCCIF);
-+
-+	return rtc_valid_tm(&wkalrm->time);
-+}
-+
-+static int lpc24xx_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *wkalrm)
-+{
-+	struct lpc24xx_rtc *rtc = dev_get_drvdata(dev);
-+	struct rtc_time *tm = &wkalrm->time;
-+
-+	/* Disable alarm IRQs during update */
-+	rtc_writel(rtc, LPC24XX_AMR, LPC24XX_ALARM_DISABLE);
-+
-+	rtc_writel(rtc, LPC24XX_ALSEC,  tm->tm_sec);
-+	rtc_writel(rtc, LPC24XX_ALMIN,  tm->tm_min);
-+	rtc_writel(rtc, LPC24XX_ALHOUR, tm->tm_hour);
-+	rtc_writel(rtc, LPC24XX_ALDOM,  tm->tm_mday);
-+	rtc_writel(rtc, LPC24XX_ALDOW,  tm->tm_wday);
-+	rtc_writel(rtc, LPC24XX_ALDOY,  tm->tm_yday);
-+	rtc_writel(rtc, LPC24XX_ALMON,  tm->tm_mon);
-+	rtc_writel(rtc, LPC24XX_ALYEAR, tm->tm_year);
-+
-+	if (wkalrm->enabled)
-+		rtc_writel(rtc, LPC24XX_AMR, 0);
-+
-+	return 0;
-+}
-+
-+static int lpc24xx_rtc_alarm_irq_enable(struct device *dev,
-+					unsigned int enabled)
-+{
-+	struct lpc24xx_rtc *rtc = dev_get_drvdata(dev);
-+
-+	if (enabled)
-+		rtc_writel(rtc, LPC24XX_AMR, 0);
-+	else
-+		rtc_writel(rtc, LPC24XX_AMR, LPC24XX_ALARM_DISABLE);
-+
-+	return 0;
-+}
-+
-+static irqreturn_t lpc24xx_rtc_interrupt(int irq, void *dev)
-+{
-+	unsigned long events = RTC_IRQF;
-+	struct lpc24xx_rtc *rtc = dev;
-+	u32 rtc_iir;
-+
-+	/* Check interrupt cause */
-+	rtc_iir = rtc_readl(rtc, LPC24XX_ILR);
-+
-+	/* 1s tick */
-+	if (rtc_iir & LPC24XX_RTCCIF)
-+		events |= RTC_UF;
-+
-+	/* Alarm */
-+	if (rtc_iir & LPC24XX_RTCALF) {
-+		events |= RTC_AF;
-+		rtc_writel(rtc, LPC24XX_AMR, LPC24XX_ALARM_DISABLE);
-+	}
-+
-+	/* Clear interrupt status and report event */
-+	rtc_writel(rtc, LPC24XX_ILR, rtc_iir);
-+	rtc_update_irq(rtc->rtc, 1, events);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static const struct rtc_class_ops lpc24xx_rtc_ops = {
-+	.read_time		= lpc24xx_rtc_read_time,
-+	.set_time		= lpc24xx_rtc_set_time,
-+	.read_alarm		= lpc24xx_rtc_read_alarm,
-+	.set_alarm		= lpc24xx_rtc_set_alarm,
-+	.alarm_irq_enable	= lpc24xx_rtc_alarm_irq_enable,
-+};
-+
-+static const struct of_device_id lpc24xx_rtc_match[] = {
-+	{ .compatible = "nxp,lpc1788-rtc" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, lpc24xx_rtc_match);
-+
-+static int lpc24xx_rtc_probe(struct platform_device *pdev)
-+{
-+	struct lpc24xx_rtc *rtc;
-+	struct resource *res;
-+	int irq, ret;
-+
-+	rtc = devm_kzalloc(&pdev->dev, sizeof(*rtc), GFP_KERNEL);
-+	if (!rtc)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	rtc->rtc_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(rtc->rtc_base))
-+		return PTR_ERR(rtc->rtc_base);
-+
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq < 0) {
-+		dev_warn(&pdev->dev, "can't get interrupt resource\n");
-+		return irq;
-+	}
-+
-+	rtc->clk_rtc = devm_clk_get(&pdev->dev, "rtc");
-+	if (IS_ERR(rtc->clk_rtc)) {
-+		dev_err(&pdev->dev, "error getting rtc clock\n");
-+		return PTR_ERR(rtc->clk_rtc);
-+	}
-+
-+	rtc->clk_reg = devm_clk_get(&pdev->dev, "reg");
-+	if (IS_ERR(rtc->clk_reg)) {
-+		dev_err(&pdev->dev, "error getting reg clock\n");
-+		return PTR_ERR(rtc->clk_reg);
-+	}
-+
-+	ret = clk_prepare_enable(rtc->clk_rtc);
-+	if (ret) {
-+		dev_err(&pdev->dev, "unable to enable rtc clock\n");
-+		return ret;
-+	}
-+
-+	ret = clk_prepare_enable(rtc->clk_reg);
-+	if (ret) {
-+		dev_err(&pdev->dev, "unable to enable reg clock\n");
-+		goto disable_rtc_clk;
-+	}
-+
-+	platform_set_drvdata(pdev, rtc);
-+
-+	/* Clear the counter increment state */
-+	rtc_writel(rtc, LPC24XX_ILR, LPC24XX_RTCCIF);
-+
-+	/* Only 1-second interrupt will generate interrupt */
-+	rtc_writel(rtc, LPC24XX_CIIR, LPC24XX_IMSEC);
-+
-+	/* Enable RTC count */
-+	rtc_writel(rtc, LPC24XX_CCR, LPC24XX_CLKEN);
-+
-+	ret = devm_request_irq(&pdev->dev, irq, lpc24xx_rtc_interrupt, 0,
-+			       pdev->name, rtc);
-+	if (ret < 0) {
-+		dev_warn(&pdev->dev, "can't request interrupt\n");
-+		goto disable_clks;
-+	}
-+
-+	rtc->rtc = devm_rtc_device_register(&pdev->dev, "lpc24xx-rtc",
-+					    &lpc24xx_rtc_ops, THIS_MODULE);
-+	if (IS_ERR(rtc->rtc)) {
-+		dev_err(&pdev->dev, "can't register rtc device\n");
-+		ret = PTR_ERR(rtc->rtc);
-+		goto disable_clks;
-+	}
-+
-+	return 0;
-+
-+disable_clks:
-+	clk_disable_unprepare(rtc->clk_reg);
-+disable_rtc_clk:
-+	clk_disable_unprepare(rtc->clk_rtc);
-+	return ret;
-+}
-+
-+static int lpc24xx_rtc_remove(struct platform_device *pdev)
-+{
-+	struct lpc24xx_rtc *rtc = platform_get_drvdata(pdev);
-+
-+	/*
-+	 * Disable alarm, but leave RTC enabled so it
-+	 * remains valid across reset cycles.
-+	 */
-+	rtc_writel(rtc, LPC24XX_AMR, LPC24XX_ALARM_DISABLE);
-+	rtc_writel(rtc, LPC24XX_CCR, 0);
-+
-+	clk_disable_unprepare(rtc->clk_rtc);
-+	clk_disable_unprepare(rtc->clk_reg);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver lpc24xx_rtc_driver = {
-+	.probe	= lpc24xx_rtc_probe,
-+	.remove	= lpc24xx_rtc_remove,
-+	.driver	= {
-+		.name = "lpc24xx-rtc",
-+		.of_match_table	= lpc24xx_rtc_match,
-+	},
-+};
-+module_platform_driver(lpc24xx_rtc_driver);
-+
-+MODULE_AUTHOR("Kevin Wells <wellsk40@gmail.com");
-+MODULE_DESCRIPTION("RTC driver for the LPC24xx SoC");
-+MODULE_LICENSE("GPL");
-+MODULE_ALIAS("platform:lpc24xx-rtc");
--- 
-1.8.0
+I will explore the approach you described above, based on
+request_module(). Logically the number of reset functions should grow
+rapidly as vfio-platform drivers get used.
+
+Thanks for exchanging on this!
+
+Best Regards
+
+Eric
+> 
+> Alex
+> 
