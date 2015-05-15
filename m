@@ -1,35 +1,42 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 15 May 2015 09:47:28 -0700
-Subject: [PATCH v2] clk: sirf: add CSR atlas7 clk and reset support
-In-Reply-To: <CAGsJ_4xJrCX5Bk=Ry1QhDvQO6jM8VhDvCmFG73HqxM6ZiXq0RA@mail.gmail.com>
-References: <1428848090-14638-1-git-send-email-21cnbao@gmail.com>
- <20150514234131.GB31753@codeaurora.org>
- <CAGsJ_4xJrCX5Bk=Ry1QhDvQO6jM8VhDvCmFG73HqxM6ZiXq0RA@mail.gmail.com>
-Message-ID: <55562320.9060402@codeaurora.org>
+Date: Fri, 15 May 2015 10:00:33 -0700
+Subject: [PATCH 2/2 V3] ARM: dts: atlas7: add fixed frequency clocks in
+ car node
+In-Reply-To: <1431675587-8637-2-git-send-email-21cnbao@gmail.com>
+References: <1431675587-8637-1-git-send-email-21cnbao@gmail.com>
+ <1431675587-8637-2-git-send-email-21cnbao@gmail.com>
+Message-ID: <20150515170033.GK31753@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15/15 00:39, Barry Song wrote:
->
->>> +static struct atlas7_reset_desc atlas7_reset_unit[] = {
->>> +     {"PWM", 0x0244, 0, 0x0320, 0, &leaf0_gate_lock}, /*0-5*/
->> Style nitpick: Please put some space around the braces here.
->>
->>> +     {"THCGUM", 0x0244, 3, 0x0320, 1, &leaf0_gate_lock},
->>> +     {"CVD", 0x04A0, 0, 0x032C, 0, &leaf1_gate_lock},
->>> +     {"TIMER", 0x04A0, 1, 0x032C, 1, &leaf1_gate_lock},
->>> +     {"PULSEC", 0x04A0, 2, 0x032C, 2, &leaf1_gate_lock},
->> [...]
->>> +
->
-> all other issues have been cleared in v3 i sent minutes ago. for this
-> one, where do you want the spaces added?
->
+On 05/15, Barry Song wrote:
+> diff --git a/arch/arm/boot/dts/atlas7.dtsi b/arch/arm/boot/dts/atlas7.dtsi
+> index a753178..7dad617 100644
+> --- a/arch/arm/boot/dts/atlas7.dtsi
+> +++ b/arch/arm/boot/dts/atlas7.dtsi
+> @@ -183,6 +183,18 @@
+>  				reg = <0x18620000 0x1000>;
+>  				#clock-cells = <1>;
+>  				#reset-cells = <1>;
+> +				xinw {
+> +					compatible = "fixed-clock";
+> +					#clock-cells = <0>;
+> +					clock-frequency = <32768>;
+> +					clock-output-names = "xinw";
+> +				};
+> +				xin {
+> +					compatible = "fixed-clock";
+> +					#clock-cells = <0>;
+> +					clock-frequency = <26000000>;
+> +					clock-output-names = "xin";
+> +				};
+>  			};
+>  		};
+>  
 
-I'd prefer it look like:
-
- { "THCGUM", 0x0244, ..., &leaf0_gate_lock },
-
+Sorry I should have been clearer. I was suggesting putting these
+nodes in DT at the root node "/" because they're part of the
+board and not part of the SoC.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
