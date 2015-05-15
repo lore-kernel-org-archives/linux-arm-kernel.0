@@ -1,50 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 May 2015 10:34:03 +0200
-Subject: [PATCH 6/9] ARM: imx: define gpt register offset per device type
-In-Reply-To: <1431677507-27420-7-git-send-email-shawnguo@kernel.org>
+Date: Fri, 15 May 2015 10:35:51 +0200
+Subject: [PATCH 4/9] ARM: imx: setup tctl register in device specific
+ function
+In-Reply-To: <1431677507-27420-5-git-send-email-shawnguo@kernel.org>
 References: <1431677507-27420-1-git-send-email-shawnguo@kernel.org>
- <1431677507-27420-7-git-send-email-shawnguo@kernel.org>
-Message-ID: <2146941.M15MKfMlJf@wuerfel>
+ <1431677507-27420-5-git-send-email-shawnguo@kernel.org>
+Message-ID: <3390971.xfPD4sbn1V@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 May 2015 16:11:44 shawnguo at kernel.org wrote:
->  {
->         switch (imxtm.type) {
->         case GPT_TYPE_IMX1:
-> +               imxtm.reg_tstat = MX1_2_TSTAT;
-> +               imxtm.reg_tcn = MX1_2_TCN;
-> +               imxtm.reg_tcmp = MX1_2_TCMP;
->                 imxtm.gpt_setup_tctl = imx1_gpt_setup_tctl;
->                 clockevent_mxc.set_next_event = mx1_2_set_next_event;
->                 break;
->         case GPT_TYPE_IMX21:
-> +               imxtm.reg_tstat = MX1_2_TSTAT;
-> +               imxtm.reg_tcn = MX1_2_TCN;
-> +               imxtm.reg_tcmp = MX1_2_TCMP;
->                 imxtm.gpt_setup_tctl = imx21_gpt_setup_tctl;
->                 clockevent_mxc.set_next_event = mx1_2_set_next_event;
->                 break;
->         case GPT_TYPE_IMX31:
-> +               imxtm.reg_tstat = V2_TSTAT;
-> +               imxtm.reg_tcn = V2_TCN;
-> +               imxtm.reg_tcmp = V2_TCMP;
->                 imxtm.gpt_setup_tctl = imx31_gpt_setup_tctl;
->                 clockevent_mxc.set_next_event = v2_set_next_event;
->                 break;
->         case GPT_TYPE_IMX6DL:
-> +               imxtm.reg_tstat = V2_TSTAT;
-> +               imxtm.reg_tcn = V2_TCN;
-> +               imxtm.reg_tcmp = V2_TCMP;
->                 imxtm.gpt_setup_tctl = imx6dl_gpt_setup_tctl;
->                 clockevent_mxc.set_next_event = v2_set_next_event;
->                 break;
+On Friday 15 May 2015 16:11:42 shawnguo at kernel.org wrote:
+>  }
+>  
+> +static void imx1_gpt_setup_tctl(void)
+> +{
+> +       u32 tctl_val;
+> +
+> +       tctl_val = MX1_2_TCTL_FRR | MX1_2_TCTL_CLK_PCLK1 | MXC_TCTL_TEN;
+> +       __raw_writel(tctl_val, imxtm.base + MXC_TCTL);
+> +}
 > 
 
-Hi Shawn,
+Could you add another upfront patch to convert all the __raw_readl/__raw_writel
+to readl_relaxed/writel_relaxed?
 
-I think this could be expressed in a nicer way by defining a structure
-that contains all the settings you derive from the type here, and then
-setting a pointer to that structure based on the compatible string.
+It would be nice if the driver was endian-safe by the time it gets moved to
+drivers/clocksource, and you don't add any unsafe accesses for the changed
+code.
 
 	Arnd
