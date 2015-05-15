@@ -1,43 +1,70 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 15 May 2015 08:54:36 +0530
-Subject: smp_twd fix for adapting to cpu frequency change
-In-Reply-To: <20150514144856.GA2067@n2100.arm.linux.org.uk>
-References: <CAPub14_+XXjKyZVh3E8QQjY4sB4gVB=kaApuODptoizqfEUH_Q@mail.gmail.com>
- <CACRpkdZzAO4hAJKyAoeqnud9LeDG4nSK7y9cLZaEBdVOnq-ocw@mail.gmail.com>
- <CAOh2x==hn27GRh9+YmYXVruuvhP4k46itkP7WL_feOUTJ92u7A@mail.gmail.com>
- <20150514144856.GA2067@n2100.arm.linux.org.uk>
-Message-ID: <20150515032436.GF6348@linux>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 15 May 2015 11:31:12 +0800
+Subject: [PATCH v4 00/11] drivers: PL011: add ARM SBSA Generic UART support
+In-Reply-To: <1431440095-5146-1-git-send-email-andre.przywara@arm.com>
+References: <1431440095-5146-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <55556880.2010207@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14-05-15, 15:48, Russell King - ARM Linux wrote:
-> This is not correct.
-> 
-> int __clockevents_update_freq(struct clock_event_device *dev, u32 freq)
-> {
->         clockevents_config(dev, freq);
-> 
->         if (dev->state == CLOCK_EVT_STATE_ONESHOT)
->                 return clockevents_program_event(dev, dev->next_event, false);
-> 
->         if (dev->state == CLOCK_EVT_STATE_PERIODIC)
->                 return __clockevents_set_state(dev, CLOCK_EVT_STATE_PERIODIC);
-> 
-> The last two lines re-set the mode to periodic, which cause the ->set_mode
-> (or its replacement) to be called.  When the driver's ->set_mode method is
-> called, it is supposed to write the periodic timeout to the hardware.
-> 
-> So, this has the side effect of updating the hardware with the new timeout
-> value.
-> 
-> The downside to this is that if you keep changing the clock rate before
-> the TWD expires, you'll never see an interrupt from it, as you'll always
-> re-start a new period from the beginning on every clock frequency change.
+On 2015?05?12? 22:14, Andre Przywara wrote:
+> This is the fourth revision of the SBSA UART support series, now
+> based on the current tty-next branch.
+> Compared to v3 I addressed some comments Jakub had on v3 (thanks for
+> the review!). Also since some basic ACPI support for ARM64 is now
+> upstream, I include the necessary ACPI binding as a new patch 11
+> on top.
+> ----
+>
+> The ARM Server Base System Architecture[1] document describes a
+> generic UART which is a subset of the ARM PL011 UART.
+> It lacks DMA support, baud rate control and modem status line
+> control, among other things.
+> The idea is to move the UART initialization and setup into the
+> firmware (which does this job today already) and let the kernel just
+> use the UART for sending and receiving characters.
+>
+> This patchset integrates support for this UART subset into the
+> existing PL011 driver - basically by refactoring some
+> functions and providing a new uart_ops structure for it. It also has
+> a separate probe function to be not dependent on AMBA/PrimeCell.
+> It provides a device tree and an ACPI binding.
+> Beside the obvious effect of code sharing reusing most of the PL011
+> code has the advantage of not introducing another serial device
+> prefix, so it can go with ttyAMA, which seems to be pretty common.
+> As changing the baudrate and other communication parameters is not
+> specified for the SBSA UART, any userland attempt will be denied by
+> the kernel. The device-tree provided fixed baud rate will be
+> reported, so stty for instance prints the right value.
+>
+> This series is based on Greg's tty-next branch, a git repo can
+> be found at [2] (branch sbsa-uart/v4).
+>
+> Patch 1/11 contains a bug fix which applies to the PL011 part also,
+> it should be considered regardless of the rest of the series.
+> According to Russell this is still racy, but still better than the
+> current solution.
+> Patch 2-7 refactor some PL011 functions by splitting them up into
+> smaller pieces, so that most of the code can be reused later by the
+> SBSA part.
+> Patch 8 and 9 introduce two new properties for the vendor structure,
+> this is for SBSA functionality which cannot be controlled by
+> separate uart_ops members only.
+> Patch 10 then finally drops in the SBSA specific code, by providing
+> a new uart_ops, vendor struct and probe function for it. Also the new
+> device tree binding is documented.
+> Patch 11 adds the necessary ACPI boilerplate.
+>
+> For testing you should be able to take any hardware which has a PL011
+> and change the DT to use a "arm,sbsa-uart" compatible string and the
+> baud rate with the "current-speed" property.
+> Of course testing with a real SBSA Generic UART is welcomed - as well
+> as regression testing with any PL011 implementation.
+> I tested this on a FastModel, a Juno and a Midway machine, both in
+> PL011 and in (DT-emulated) SBSA mode.
 
-Ahh, this was correct when it was discussed earlier.
+Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-Commit fe79a9ba1196 ("clockevents: Adjust timer interval when
-frequency changes"), fixed this in clockevents core.
+in ACPI case with device HID of ARMH0011 in DSDT.
 
--- 
-viresh
+Hanjun
