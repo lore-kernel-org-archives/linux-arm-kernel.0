@@ -1,181 +1,74 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 15 May 2015 09:45:20 +0200
-Subject: [PATCH 3/8] clk: sunxi: Add a driver for the PLL2
-In-Reply-To: <CAGb2v64jVksA5rapnAPn9yefEeXnfFw5FwdnXPP0G9FvzWnVBg@mail.gmail.com>
-References: <1430565879-28113-1-git-send-email-maxime.ripard@free-electrons.com>
- <1430565879-28113-4-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v64jVksA5rapnAPn9yefEeXnfFw5FwdnXPP0G9FvzWnVBg@mail.gmail.com>
-Message-ID: <20150515074520.GR4004@lukather>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 15 May 2015 15:54:06 +0800
+Subject: [PATCH 00/18] ARM: imx: make the imx timer driver implementation
+ independent of SoCs.
+In-Reply-To: <1430405073-13106-1-git-send-email-shenwei.wang@freescale.com>
+References: <1430405073-13106-1-git-send-email-shenwei.wang@freescale.com>
+Message-ID: <20150515075406.GE10411@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 14, 2015 at 05:43:51PM +0800, Chen-Yu Tsai wrote:
-> Hi,
+On Thu, Apr 30, 2015 at 09:44:15AM -0500, Shenwei Wang wrote:
+> There are 4 versions of the timer hardware on Freescale MXC hardware.
+> --Version 0: MX1/MXL
+> --Version 1: MX21, MX27.
+> --Version 2: MX25, MX31, MX35, MX37, MX51, MX6Q(Rev1.0)
+> --Version 3: MX6DL, MX6SX, MX6Q(Rev1.1+)
 > 
-> On Sat, May 2, 2015 at 7:24 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > The PLL2 on the A10 and later SoCs is the clock used for all the audio
-> > related operations.
-> >
-> > This clock has a somewhat complex output tree, with three outputs (2X, 4X
-> > and 8X) with a fixed divider from the base clock, and an output (1X) with a
-> > post divider.
-> >
-> > However, we can simplify things since the 1X divider can be fixed, and we
-> > end up by having a base clock not exposed to any device (or at least
-> > directly, since the 4X output doesn't have any divider), and 4 fixed
-> > divider clocks that will be exposed.
-> >
-> > This clock seems to have been introduced, at least in this form, in the
-> > revision B of the A10, but we don't have any information on the clock used
-> > on the revision A.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  drivers/clk/sunxi/Makefile                 |   1 +
-> >  drivers/clk/sunxi/clk-a10-pll2.c           | 176 +++++++++++++++++++++++++++++
-> >  include/dt-bindings/clock/sun4i-a10-pll2.h |  53 +++++++++
-> >  3 files changed, 230 insertions(+)
-> >  create mode 100644 drivers/clk/sunxi/clk-a10-pll2.c
-> >  create mode 100644 include/dt-bindings/clock/sun4i-a10-pll2.h
-> >
-> > diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-> > index 058f273d6154..eb36c38d4120 100644
-> > --- a/drivers/clk/sunxi/Makefile
-> > +++ b/drivers/clk/sunxi/Makefile
-> > @@ -4,6 +4,7 @@
-> >
-> >  obj-y += clk-sunxi.o clk-factors.o
-> >  obj-y += clk-a10-hosc.o
-> > +obj-y += clk-a10-pll2.o
-> >  obj-y += clk-a20-gmac.o
-> >  obj-y += clk-mod0.o
-> >  obj-y += clk-sun8i-mbus.o
-> > diff --git a/drivers/clk/sunxi/clk-a10-pll2.c b/drivers/clk/sunxi/clk-a10-pll2.c
-> > new file mode 100644
-> > index 000000000000..4d0369626dba
-> > --- /dev/null
-> > +++ b/drivers/clk/sunxi/clk-a10-pll2.c
-> > @@ -0,0 +1,176 @@
-> > +/*
-> > + * Copyright 2013 Emilio L?pez
-> > + * Emilio L?pez <emilio@elopez.com.ar>
-> > + *
-> > + * Copyright 2015 Maxime Ripard
-> > + * Maxime Ripard <maxime.ripard@free-electrons.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License as published by
-> > + * the Free Software Foundation; either version 2 of the License, or
-> > + * (at your option) any later version.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +
-> > +#include <linux/clk-provider.h>
-> > +#include <linux/of.h>
-> > +#include <linux/of_address.h>
-> > +#include <linux/slab.h>
-> > +
-> > +#include <dt-bindings/clock/sun4i-a10-pll2.h>
-> > +
-> > +#include "clk-factors.h"
-> > +
-> > +#define SUN4I_PLL2_ENABLE              31
-> > +#define SUN4I_PLL2_POST_DIV            26
-> > +#define SUN4I_PLL2_POST_DIV_MASK       0xF
-> > +#define SUN4I_PLL2_N                   8
-> > +#define SUN4I_PLL2_N_MASK              0x7F
-> > +#define SUN4I_PLL2_PRE_DIV             0
-> > +#define SUN4I_PLL2_PRE_DIV_MASK                0x1F
-> > +
-> > +#define SUN4I_PLL2_POST_DIV_VALUE      21
-> > +#define SUN4I_PLL2_PRE_DIV_VALUE       4
-> > +
-> > +#define SUN4I_PLL2_OUTPUTS             4
-> > +
-> > +static void sun4i_a10_get_pll2_base_factors(u32 *freq, u32 parent_rate,
-> > +                                           u8 *n, u8 *k, u8 *m, u8 *p)
-> > +{
-> > +       /*
-> > +        * Normalize the frequency to a multiple of (24 MHz / Fixed
-> > +        * PRE-DIV)
-> > +        */
-> > +       *freq = round_down(*freq, parent_rate / SUN4I_PLL2_PRE_DIV_VALUE);
-> > +
-> > +       /* We were called to round the frequency, we can return */
-> > +       if (!n)
-> > +               return;
-> > +
-> > +       *n = *freq * SUN4I_PLL2_PRE_DIV_VALUE / parent_rate;
-> > +
-> > +       /*
-> > +        * Even though the pre-divider can be changed, we don't really
-> > +        * care and we can just fix it to 4.
-> > +        */
-> > +       *m = SUN4I_PLL2_PRE_DIV_VALUE;
-> > +}
-> > +
-> > +static struct clk_factors_config sun4i_a10_pll2_base_config = {
-> > +       .mshift = SUN4I_PLL2_PRE_DIV,
-> > +       .mwidth = 5,
-> > +       .nshift = SUN4I_PLL2_N,
-> > +       .nwidth = 7,
-> > +
-> > +       .m_zero = 1,
-> > +       .n_zero = 1,
-> > +};
-> > +
-> > +static const struct factors_data sun4i_a10_pll2_base_data __initconst = {
-> > +       .enable = SUN4I_PLL2_ENABLE,
-> > +       .table = &sun4i_a10_pll2_base_config,
-> > +       .getter = sun4i_a10_get_pll2_base_factors,
-> > +       .name = "pll2-base",
-> > +};
-> > +
-> > +static DEFINE_SPINLOCK(sun4i_a10_pll2_lock);
-> > +
-> > +static void __init sun4i_pll2_setup(struct device_node *node)
-> > +{
-> > +       const char *clk_name = node->name, *parent;
-> > +       struct clk_onecell_data *clk_data;
-> > +       struct clk **clks, *base_clk;
-> > +       void __iomem *reg;
-> > +       u32 val;
-> > +
-> > +       reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-> > +       if (IS_ERR(reg))
-> > +               return;
-> > +
-> > +       clk_data = kzalloc(sizeof(*clk_data), GFP_KERNEL);
-> > +       if (!clk_data)
-> > +               goto err_unmap;
-> > +
-> > +       clks = kcalloc(SUN4I_PLL2_OUTPUTS, sizeof(struct clk *), GFP_KERNEL);
-> > +       if (!clks)
-> > +               goto err_free_data;
-> > +
-> > +       base_clk = sunxi_factors_register(node, &sun4i_a10_pll2_base_data,
-> > +                                         &sun4i_a10_pll2_lock, reg);
+> This patch has removed the SoC related codes, and implemented the driver directly upon
+> the hardware timer IP version. The new timer driver has redesigned the
+> internal APIs, and limited the use of global variables as well.
 > 
-> Why aren't you using divs_clk for this? It seems right for the job.
+> As the new driver has become independent of the SoCs, it has
+> been moved from the directory arch/arm/mach-imx into the
+> directory drivers/clocksources.
 
-As far as I know, divs_clk can only handle a single divider, and not
-two subsequent dividers like this one uses.
+Overall, I do not like how things get done here, the software version
+numbering, the patch splitting, invasive changes than necessary.  So I
+just worked out my version and will post for review shortly.
 
-Maxime
+Shawn
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150515/2f099d3d/attachment-0001.sig>
+> Shenwei Wang (18):
+>   ARM: imx: Add a parameter to mxc_timer_init
+>   ARM: imx: Add the definitions for imx_timer and its versions
+>   ARM: imx: Add an array of timer IP block versions
+>   ARM: imx: Added one more parameter for mxc_clockevent_init
+>   ARM: imx: Added one more parameter for mxc_clocksource_init
+>   ARM: imx: New timer driver APIs based on IP block
+>   ARM: imx: Initialize the imx_timer structure
+>   ARM: imx: Reimplemented the _mxc_timer_init based on IP version
+>   ARM: imx: Removed the SoC relating codes in mxc_timer_interrupt
+>   ARM: imx: Removed the SoC relating codes in mxc_set_mode
+>   ARM: imx: Enabled the unused parameter
+>   ARM: imx: Remove one global variable in mxc_clocksource_init
+>   ARM: imx: Removed the unused functions and variables
+>   ARM: imx: Removed the global variable "timer_base"
+>   ARM: imx: Remove the SoC relating codes in mxc_clockevent_init
+>   ARM: imx: Move the  variable clockevent_mode into mxc_set_mode
+>   ARM: imx: Codes clean up
+>   ARM: imx: Move time.c into drivers/clocksources
+> 
+>  arch/arm/mach-imx/Makefile      |   2 +-
+>  arch/arm/mach-imx/time.c        | 388 ---------------------------
+>  drivers/clk/imx/clk-imx1.c      |   3 +-
+>  drivers/clk/imx/clk-imx21.c     |   3 +-
+>  drivers/clk/imx/clk-imx27.c     |   3 +-
+>  drivers/clk/imx/clk-imx31.c     |   3 +-
+>  drivers/clk/imx/clk-imx35.c     |   5 +-
+>  drivers/clk/imx/clk.h           |   2 +-
+>  drivers/clocksource/Makefile    |   1 +
+>  drivers/clocksource/timer-gpt.c | 572 ++++++++++++++++++++++++++++++++++++++++
+>  10 files changed, 586 insertions(+), 396 deletions(-)
+>  delete mode 100644 arch/arm/mach-imx/time.c
+>  create mode 100644 drivers/clocksource/timer-gpt.c
+> 
+> --
+> 1.9.1
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
