@@ -1,52 +1,33 @@
-From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
-Date: Fri, 15 May 2015 11:54:59 -0400
-Subject: [RFC 10/23] xen/biomerge: WORKAROUND always says the biovec are
- not mergeable
-In-Reply-To: <1431622863-28575-11-git-send-email-julien.grall@citrix.com>
-References: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
- <1431622863-28575-11-git-send-email-julien.grall@citrix.com>
-Message-ID: <555616D3.7060603@oracle.com>
+From: borntraeger@de.ibm.com (Christian Borntraeger)
+Date: Fri, 15 May 2015 17:58:38 +0200
+Subject: [PATCH v4 02/12] KVM: define common KVM_GUESTDBG_USE_SW/HW_BP bits
+In-Reply-To: <1431700035-23479-3-git-send-email-alex.bennee@linaro.org>
+References: <1431700035-23479-1-git-send-email-alex.bennee@linaro.org>
+ <1431700035-23479-3-git-send-email-alex.bennee@linaro.org>
+Message-ID: <555617AE.9030508@de.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2015 01:00 PM, Julien Grall wrote:
-> When Linux is using 64K page granularity, every page will be slipt in
-> multiple non-contiguous 4K MFN.
->
-> I'm not sure how to handle efficiently the check to know whether we can
-> merge 2 biovec with a such case. So for now, always says that biovec are
-> not mergeable.
->
-> Signed-off-by: Julien Grall <julien.grall@citrix.com>
-> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-> Cc: David Vrabel <david.vrabel@citrix.com>
-> ---
->   drivers/xen/biomerge.c | 3 +++
->   1 file changed, 3 insertions(+)
->
-> diff --git a/drivers/xen/biomerge.c b/drivers/xen/biomerge.c
-> index 0edb91c..20387c2 100644
-> --- a/drivers/xen/biomerge.c
-> +++ b/drivers/xen/biomerge.c
-> @@ -9,6 +9,9 @@ bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
->   	unsigned long mfn1 = pfn_to_mfn(page_to_pfn(vec1->bv_page));
->   	unsigned long mfn2 = pfn_to_mfn(page_to_pfn(vec2->bv_page));
->   
-> +	/* TODO: Implement it correctly */
-> +	return 0;
-> +
->   	return __BIOVEC_PHYS_MERGEABLE(vec1, vec2) &&
->   		((mfn1 == mfn2) || ((mfn1+1) == mfn2));
->   }
+Am 15.05.2015 um 16:27 schrieb Alex Benn?e:
+> index ef1a5fc..aca4f86 100644
+> --- a/arch/s390/include/uapi/asm/kvm.h
+> +++ b/arch/s390/include/uapi/asm/kvm.h
+> @@ -114,8 +114,6 @@ struct kvm_fpu {
+>  	__u64 fprs[16];
+>  };
+> 
+> -#define KVM_GUESTDBG_USE_HW_BP		0x00010000
+> -
 
 
-I think this is a bit too blunt.  Perhaps check first whether page sizes 
-are different in the hypervisor and the guest?
+> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+> index 70ac641..7c5dd11 100644
+> --- a/include/uapi/linux/kvm.h
+> +++ b/include/uapi/linux/kvm.h
+[...]
+> +#define KVM_GUESTDBG_USE_SW_BP		(1 << 16)
+> +#define KVM_GUESTDBG_USE_HW_BP		(1 << 17)
 
-(And I am not sure we need __BIOVEC_PHYS_MERGEABLE() test here as it is 
-already checked by BIOVEC_PHYS_MERGEABLE() which appears to be the only 
-user of xen_biovec_phys_mergeable())
+This is a abi break for s390, no?
 
-
--boris
+David do you remember why we did not use SW_BP?
