@@ -1,30 +1,44 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 15 May 2015 22:22:39 +0900
-Subject: [PATCH v2] ARM: dts: Add syscon property to the MIPI phy in
- exynos5420
-In-Reply-To: <1431607240-14549-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1431607240-14549-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <CAJKOXPd7=wnjCd6Xz9ZNuvbxWi=cSr+eRj9YdPWA0PHR+AOTeA@mail.gmail.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Fri, 15 May 2015 15:25:04 +0200
+Subject: [PATCH v2 0/2] RTC support for NXP LPC18xx family
+Message-ID: <1431696306-19093-1-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-14 21:40 GMT+09:00 Tomeu Vizoso <tomeu.vizoso@collabora.com>:
-> Since e4b3d38088df6f3acd40 ("phy: exynos-video-mipi: Fix regression by
-> adding support for PMU regmap") the syscon property is required in
-> samsung,s5pv210-mipi-video-phy nodes, but this DTS hadn't been updated
-> yet.
->
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Cc: Krzysztof Koz?owski <k.kozlowski@samsung.com>
->
-> --
+This patch set adds support for the RTC found on many NXP devices
+including LPC24xx/178x/18xx/43xx. The RTC provides calendar and
+clock functionality together with periodic tick and alarm interrupt
+support.
 
-Triple-dash please, because this won't be cut by "git am".
+The driver is a rework of an old driver by Kevin Wells. It has been
+modified to support modern resource allocation, device tree and
+generally cleaned up.
 
-Everything else looks fine, thank you.
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+This version address the comments from Josh Cartwright and Alexandre
+Belloni.
 
-Best regards,
-Krzysztof
+changes since v1:
+ - s/lpc2k/lpc24xx for better consistency
+ - fix Kconfig entry
+ - drop support for old versions for the ip block
+
+Patch set is based on Linux v4.1-rc1.
+
+Base support for the NXP LPC18xx family can be found here:
+http://marc.info/?l=linux-arm-kernel&m=143016894704253&w=2
+
+
+Joachim Eastwood (2):
+  rtc: add rtc-lpc24xx driver
+  doc: dt: add documentation for nxp,lpc1788-rtc
+
+ .../devicetree/bindings/rtc/nxp,lpc1788-rtc.txt    |  21 ++
+ drivers/rtc/Kconfig                                |  13 +
+ drivers/rtc/Makefile                               |   1 +
+ drivers/rtc/rtc-lpc24xx.c                          | 341 +++++++++++++++++++++
+ 4 files changed, 376 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/rtc/nxp,lpc1788-rtc.txt
+ create mode 100644 drivers/rtc/rtc-lpc24xx.c
+
+-- 
+1.8.0
