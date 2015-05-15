@@ -1,50 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 May 2015 12:49:09 +0200
-Subject: [PATCH v9 4/5] edac: Add APM X-Gene SoC EDAC driver
-In-Reply-To: <1431623147-4950-5-git-send-email-lho@apm.com>
-References: <1431623147-4950-1-git-send-email-lho@apm.com>
- <1431623147-4950-4-git-send-email-lho@apm.com>
- <1431623147-4950-5-git-send-email-lho@apm.com>
-Message-ID: <4813332.ncdNtLvLzH@wuerfel>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 15 May 2015 12:54:04 +0200
+Subject: [GIT PULL] ARM: berlin: Driver changes for v4.2 (round 1)
+Message-ID: <1431687246-31039-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 May 2015 11:05:46 Loc Ho wrote:
-> This patch adds support for the APM X-Gene SoC EDAC driver.
-> 
-> Signed-off-by: Loc Ho <lho@apm.com>
+Hi Arnd, Kevin, Olof,
 
-Looks much better than before.
+this is Marvell Berlin driver changes for v4.2 which finally includes
+Antoine's rework of System/Chip Controller sub-drivers to simple-mfd
+regmaps.
 
->  
-> +config EDAC_XGENE
-> +	tristate "APM X-Gene SoC"
-> +	depends on EDAC_MM_EDAC && ARM64
-> +	help
-> +	  Support for error detection and correction on the
-> +	  APM X-Gene family of SOCs.
-> +
->  endif # EDAC
+Please pull.
 
-Maybe 'ARM64 || COMPILE_TEST', so we get build coverage on x86 with allmodconfig?
+The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
 
-> +	rc = of_property_read_u32_array(np, "reg", addr_res, 4);
-> +	if (rc < 0) {
-> +		dev_err(edac->dev, "no MCU resource address\n");
-> +		goto err_group;
-> +	}
-> +	tmp_ctx.mcu_csr = devm_ioremap(edac->dev,
-> +				       MAKEU64(addr_res[0], addr_res[1]),
-> +				       MAKEU64(addr_res[2], addr_res[3]));
-> +	if (IS_ERR(tmp_ctx.mcu_csr)) {
-> +		dev_err(edac->dev, "unable to map MCU resource\n");
-> +		rc = PTR_ERR(tmp_ctx.mcu_csr);
-> +		goto err_group;
-> +	}
+  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
 
-This is incorrect, you have to use of_get_address() or of_address_to_resource()
-to compute the CPU-relative address: The address that is used within the
-node may not be the same, depending on the parent's ranges properties.
-See also my comment about the missing ranges in the DT example.
+are available in the git repository at:
 
-	Arnd
+  git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin-driver-4.2-1
+
+for you to fetch changes up to 3c65330675eb60f133fd2098ae92e0a2690b8f18:
+
+  clk: berlin: move to a dedicated sub-node (2015-05-15 11:11:43 +0200)
+
+----------------------------------------------------------------
+berlin/driver for v4.2:
+- rework of reset/pinctrl/clk driver
+
+----------------------------------------------------------------
+Antoine Tenart (4):
+      reset: berlin: convert to a platform driver
+      pinctrl: berlin: use the regmap provided by syscon
+      pinctrl: berlin: use proper compatibles
+      clk: berlin: move to a dedicated sub-node
+
+ drivers/clk/berlin/bg2.c              |  7 ++--
+ drivers/clk/berlin/bg2q.c             |  7 ++--
+ drivers/pinctrl/berlin/berlin-bg2.c   | 26 +------------
+ drivers/pinctrl/berlin/berlin-bg2cd.c | 26 +------------
+ drivers/pinctrl/berlin/berlin-bg2q.c  | 26 +------------
+ drivers/pinctrl/berlin/berlin.c       |  9 +++--
+ drivers/reset/reset-berlin.c          | 71 +++++++++++++----------------------
+ 7 files changed, 46 insertions(+), 126 deletions(-)
