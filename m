@@ -1,61 +1,192 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 15 May 2015 11:14:43 +0200
-Subject: [PATCH v2 03/10] reset: berlin: convert to a platform driver
-In-Reply-To: <1431506288.3157.11.camel@pengutronix.de>
-References: <1425654328-26298-1-git-send-email-antoine.tenart@free-electrons.com>
- <1425654328-26298-4-git-send-email-antoine.tenart@free-electrons.com>
- <1425896186.3152.25.camel@pengutronix.de> <20150310095713.GD23469@kwain>
- <20150512144313.GD32171@kwain> <1431506288.3157.11.camel@pengutronix.de>
-Message-ID: <5555B903.1020008@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 15 May 2015 17:15:32 +0800
+Subject: [PATCH 3/8] clk: sunxi: Add a driver for the PLL2
+In-Reply-To: <20150515074520.GR4004@lukather>
+References: <1430565879-28113-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1430565879-28113-4-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v64jVksA5rapnAPn9yefEeXnfFw5FwdnXPP0G9FvzWnVBg@mail.gmail.com>
+ <20150515074520.GR4004@lukather>
+Message-ID: <CAGb2v64gbY1n4kVBc55hm=jwC3N-eKjWXCgEJr-+J6tYsD7sQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13.05.2015 10:38, Philipp Zabel wrote:
-> Hi Antoine, Sebastian,
->
-> Am Dienstag, den 12.05.2015, 16:43 +0200 schrieb Antoine Tenart:
->> On Tue, Mar 10, 2015 at 10:57:13AM +0100, Antoine Tenart wrote:
->>> On Mon, Mar 09, 2015 at 11:16:26AM +0100, Philipp Zabel wrote:
->>>>
->>>> Am Freitag, den 06.03.2015, 16:05 +0100 schrieb Antoine Tenart:
->>>>> The Berlin reset controller was introduced without being a platform
->>>>> driver because of a needed DT rework: the node describing the reset
->>>>> controller also describes the pinctrl and clk controllers...
->>>>>
->>>>> The DT issue being solved thanks to the addition of the Berlin
->>>>> controller mfd driver, it is now possible to convert the Berlin reset
->>>>> driver to a plaftorm driver.
->>>>>
->>>>> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
->>>>
->>>> Looks good to me. Do you want to merge this together with the rest of
->>>> the series, or should I queue the reset patch?
->>>
->>> I think we better wait for the simple-mfd patch to make it to ARM SoC
->>> first.
+On Fri, May 15, 2015 at 3:45 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Thu, May 14, 2015 at 05:43:51PM +0800, Chen-Yu Tsai wrote:
+>> Hi,
 >>
->> simple-mfd just got pulled into next/drivers.
+>> On Sat, May 2, 2015 at 7:24 PM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>> > The PLL2 on the A10 and later SoCs is the clock used for all the audio
+>> > related operations.
+>> >
+>> > This clock has a somewhat complex output tree, with three outputs (2X, 4X
+>> > and 8X) with a fixed divider from the base clock, and an output (1X) with a
+>> > post divider.
+>> >
+>> > However, we can simplify things since the 1X divider can be fixed, and we
+>> > end up by having a base clock not exposed to any device (or at least
+>> > directly, since the 4X output doesn't have any divider), and 4 fixed
+>> > divider clocks that will be exposed.
+>> >
+>> > This clock seems to have been introduced, at least in this form, in the
+>> > revision B of the A10, but we don't have any information on the clock used
+>> > on the revision A.
+>> >
+>> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> > ---
+>> >  drivers/clk/sunxi/Makefile                 |   1 +
+>> >  drivers/clk/sunxi/clk-a10-pll2.c           | 176 +++++++++++++++++++++++++++++
+>> >  include/dt-bindings/clock/sun4i-a10-pll2.h |  53 +++++++++
+>> >  3 files changed, 230 insertions(+)
+>> >  create mode 100644 drivers/clk/sunxi/clk-a10-pll2.c
+>> >  create mode 100644 include/dt-bindings/clock/sun4i-a10-pll2.h
+>> >
+>> > diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
+>> > index 058f273d6154..eb36c38d4120 100644
+>> > --- a/drivers/clk/sunxi/Makefile
+>> > +++ b/drivers/clk/sunxi/Makefile
+>> > @@ -4,6 +4,7 @@
+>> >
+>> >  obj-y += clk-sunxi.o clk-factors.o
+>> >  obj-y += clk-a10-hosc.o
+>> > +obj-y += clk-a10-pll2.o
+>> >  obj-y += clk-a20-gmac.o
+>> >  obj-y += clk-mod0.o
+>> >  obj-y += clk-sun8i-mbus.o
+>> > diff --git a/drivers/clk/sunxi/clk-a10-pll2.c b/drivers/clk/sunxi/clk-a10-pll2.c
+>> > new file mode 100644
+>> > index 000000000000..4d0369626dba
+>> > --- /dev/null
+>> > +++ b/drivers/clk/sunxi/clk-a10-pll2.c
+>> > @@ -0,0 +1,176 @@
+>> > +/*
+>> > + * Copyright 2013 Emilio L?pez
+>> > + * Emilio L?pez <emilio@elopez.com.ar>
+>> > + *
+>> > + * Copyright 2015 Maxime Ripard
+>> > + * Maxime Ripard <maxime.ripard@free-electrons.com>
+>> > + *
+>> > + * This program is free software; you can redistribute it and/or modify
+>> > + * it under the terms of the GNU General Public License as published by
+>> > + * the Free Software Foundation; either version 2 of the License, or
+>> > + * (at your option) any later version.
+>> > + *
+>> > + * This program is distributed in the hope that it will be useful,
+>> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> > + * GNU General Public License for more details.
+>> > + */
+>> > +
+>> > +#include <linux/clk-provider.h>
+>> > +#include <linux/of.h>
+>> > +#include <linux/of_address.h>
+>> > +#include <linux/slab.h>
+>> > +
+>> > +#include <dt-bindings/clock/sun4i-a10-pll2.h>
+>> > +
+>> > +#include "clk-factors.h"
+>> > +
+>> > +#define SUN4I_PLL2_ENABLE              31
+>> > +#define SUN4I_PLL2_POST_DIV            26
+>> > +#define SUN4I_PLL2_POST_DIV_MASK       0xF
+>> > +#define SUN4I_PLL2_N                   8
+>> > +#define SUN4I_PLL2_N_MASK              0x7F
+>> > +#define SUN4I_PLL2_PRE_DIV             0
+>> > +#define SUN4I_PLL2_PRE_DIV_MASK                0x1F
+>> > +
+>> > +#define SUN4I_PLL2_POST_DIV_VALUE      21
+
+Another thing:
+
+This says 21, which obviously exceeds the mask defined above,
+but the comment in the section below (in the original code)
+says 4. I assume the comment was right, based on the user
+manual?
+
+Maybe it should be swapped with SUN4I_PLL2_PRE_DIV_VALUE?
+I get PRE_DIV = 21 for generating a clock close to 22.5792 MHz.
+
+Seems AC97 might need another frequency, but the manual isn't
+clear, and we can handle it when we add AC97 anyway.
+
+>> > +#define SUN4I_PLL2_PRE_DIV_VALUE       4
+>> > +
+>> > +#define SUN4I_PLL2_OUTPUTS             4
+>> > +
+>> > +static void sun4i_a10_get_pll2_base_factors(u32 *freq, u32 parent_rate,
+>> > +                                           u8 *n, u8 *k, u8 *m, u8 *p)
+>> > +{
+>> > +       /*
+>> > +        * Normalize the frequency to a multiple of (24 MHz / Fixed
+>> > +        * PRE-DIV)
+>> > +        */
+>> > +       *freq = round_down(*freq, parent_rate / SUN4I_PLL2_PRE_DIV_VALUE);
+>> > +
+>> > +       /* We were called to round the frequency, we can return */
+>> > +       if (!n)
+>> > +               return;
+>> > +
+>> > +       *n = *freq * SUN4I_PLL2_PRE_DIV_VALUE / parent_rate;
+>> > +
+>> > +       /*
+>> > +        * Even though the pre-divider can be changed, we don't really
+>> > +        * care and we can just fix it to 4.
+>> > +        */
+>> > +       *m = SUN4I_PLL2_PRE_DIV_VALUE;
+>> > +}
+>> > +
+>> > +static struct clk_factors_config sun4i_a10_pll2_base_config = {
+>> > +       .mshift = SUN4I_PLL2_PRE_DIV,
+>> > +       .mwidth = 5,
+>> > +       .nshift = SUN4I_PLL2_N,
+>> > +       .nwidth = 7,
+>> > +
+>> > +       .m_zero = 1,
+>> > +       .n_zero = 1,
+>> > +};
+>> > +
+>> > +static const struct factors_data sun4i_a10_pll2_base_data __initconst = {
+>> > +       .enable = SUN4I_PLL2_ENABLE,
+>> > +       .table = &sun4i_a10_pll2_base_config,
+>> > +       .getter = sun4i_a10_get_pll2_base_factors,
+>> > +       .name = "pll2-base",
+>> > +};
+>> > +
+>> > +static DEFINE_SPINLOCK(sun4i_a10_pll2_lock);
+>> > +
+>> > +static void __init sun4i_pll2_setup(struct device_node *node)
+>> > +{
+>> > +       const char *clk_name = node->name, *parent;
+>> > +       struct clk_onecell_data *clk_data;
+>> > +       struct clk **clks, *base_clk;
+>> > +       void __iomem *reg;
+>> > +       u32 val;
+>> > +
+>> > +       reg = of_io_request_and_map(node, 0, of_node_full_name(node));
+>> > +       if (IS_ERR(reg))
+>> > +               return;
+>> > +
+>> > +       clk_data = kzalloc(sizeof(*clk_data), GFP_KERNEL);
+>> > +       if (!clk_data)
+>> > +               goto err_unmap;
+>> > +
+>> > +       clks = kcalloc(SUN4I_PLL2_OUTPUTS, sizeof(struct clk *), GFP_KERNEL);
+>> > +       if (!clks)
+>> > +               goto err_free_data;
+>> > +
+>> > +       base_clk = sunxi_factors_register(node, &sun4i_a10_pll2_base_data,
+>> > +                                         &sun4i_a10_pll2_lock, reg);
 >>
->>> Once this is done, you can queue the reset patch (unless Sebastian wants
->>> to take it alongside the series).
->>
->> Antoine
+>> Why aren't you using divs_clk for this? It seems right for the job.
 >
-> I just noticed that we'll create a small merge conflict in
-> Documentation/devicetree/bindings/arm/marvell,berlin.txt if I were to
-> merge patches 3 and 4.
-> It would be nice to have the reset driver patch merged in the vicinity
-> of this documentation change. Since there won't be any conflicting
-> changes in drivers/reset/reset-berlin.c, I'd be in favor of keeping the
-> series together. So patches 3 and 4
->
-> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+> As far as I know, divs_clk can only handle a single divider, and not
+> two subsequent dividers like this one uses.
 
-Philipp,
+I thought we were setting the post divider to 4 so the outputs match
+the names? Maybe we could get it in as is (with the above comment
+addressed), and refactor it later. I'm still stuck on factors_clk
+stuff....
 
-you already Acked that patch two months ago, so I was assuming to take
-it though berlin tree anyway. But thanks for the Ack again ;)
 
-Applied the series to berlin now.
-
-Sebastian
+ChenYu
