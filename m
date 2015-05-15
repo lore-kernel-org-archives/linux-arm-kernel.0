@@ -1,37 +1,52 @@
 From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
-Date: Fri, 15 May 2015 11:51:33 -0400
-Subject: [Xen-devel] [RFC 00/23] arm64: Add support for 64KB page
- granularity in Xen guest
-In-Reply-To: <555614AB.9000006@citrix.com>
+Date: Fri, 15 May 2015 11:54:59 -0400
+Subject: [RFC 10/23] xen/biomerge: WORKAROUND always says the biovec are
+ not mergeable
+In-Reply-To: <1431622863-28575-11-git-send-email-julien.grall@citrix.com>
 References: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
- <555614AB.9000006@citrix.com>
-Message-ID: <55561605.4020805@oracle.com>
+ <1431622863-28575-11-git-send-email-julien.grall@citrix.com>
+Message-ID: <555616D3.7060603@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15/2015 11:45 AM, David Vrabel wrote:
-> On 14/05/15 18:00, Julien Grall wrote:
->> Hi all,
->>
->> ARM64 Linux is supporting both 4KB and 64KB page granularity. Although, Xen
->> hypercall interface and PV protocol are always based on 4KB page granularity.
->>
->> Any attempt to boot a Linux guest with 64KB pages enabled will result to a
->> guest crash.
->>
->> This series is a first attempt to allow those Linux running with the current
->> hypercall interface and PV protocol.
->>
->> This solution has been chosen because we want to run Linux 64KB in released
->> Xen ARM version or/and platform using an old version of Linux DOM0.
-> The key problem I see with this approach is the confusion between guest
-> page size and Xen page size.  This is going to be particularly
-> problematic since the majority of development/usage will remain on x86
-> where PAGE_SIZE == XEN_PAGE_SIZE.
+On 05/14/2015 01:00 PM, Julien Grall wrote:
+> When Linux is using 64K page granularity, every page will be slipt in
+> multiple non-contiguous 4K MFN.
 >
-> I think it would be nice to keep XEN_PAGE_SIZE etc out of front and
-> backend drivers.  Perhaps with a suitable set of helper functions?
+> I'm not sure how to handle efficiently the check to know whether we can
+> merge 2 biovec with a such case. So for now, always says that biovec are
+> not mergeable.
+>
+> Signed-off-by: Julien Grall <julien.grall@citrix.com>
+> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+> Cc: David Vrabel <david.vrabel@citrix.com>
+> ---
+>   drivers/xen/biomerge.c | 3 +++
+>   1 file changed, 3 insertions(+)
+>
+> diff --git a/drivers/xen/biomerge.c b/drivers/xen/biomerge.c
+> index 0edb91c..20387c2 100644
+> --- a/drivers/xen/biomerge.c
+> +++ b/drivers/xen/biomerge.c
+> @@ -9,6 +9,9 @@ bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
+>   	unsigned long mfn1 = pfn_to_mfn(page_to_pfn(vec1->bv_page));
+>   	unsigned long mfn2 = pfn_to_mfn(page_to_pfn(vec2->bv_page));
+>   
+> +	/* TODO: Implement it correctly */
+> +	return 0;
+> +
+>   	return __BIOVEC_PHYS_MERGEABLE(vec1, vec2) &&
+>   		((mfn1 == mfn2) || ((mfn1+1) == mfn2));
+>   }
 
-I am thinking exactly the same thing as I am going over these patches.
+
+I think this is a bit too blunt.  Perhaps check first whether page sizes 
+are different in the hypervisor and the guest?
+
+(And I am not sure we need __BIOVEC_PHYS_MERGEABLE() test here as it is 
+already checked by BIOVEC_PHYS_MERGEABLE() which appears to be the only 
+user of xen_biovec_phys_mergeable())
+
 
 -boris
