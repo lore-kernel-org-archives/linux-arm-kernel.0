@@ -1,68 +1,31 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 15 May 2015 11:28:46 -0700
-Subject: [PATCH resend 0/7] Change snvs rtc and poweroff to use syscon
- add pwrkey driver
-In-Reply-To: <1431696990-23078-1-git-send-email-Frank.Li@freescale.com>
-References: <1431696990-23078-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20150515182846.GB696@dtor-ws>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Fri, 15 May 2015 20:29:13 +0200
+Subject: [PATCH 0/2] 8250 UART driver for NXP LPC18xx family
+Message-ID: <1431714555-7063-1-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 15, 2015 at 09:36:23PM +0800, Frank.Li at freescale.com wrote:
-> From: Frank Li <Frank.Li@freescale.com>
-> 
-> Resend to add rtc and reset  maintainer.
-> 
-> SNVS is MPF module.
-> include rtc, power off, ON/OFF power key
->   
->   arm: imx: power-off: change to syscon to access register
->   rtc: arm: imx: snvs: change use syscon to access register
-> Above two patch change existed power-off and rtc use syscon
-> 
->   Document: dt: fsl: snvs: change support syscon
->   arm: dts: imx: update snvs to use syscon access register
-> Update dt file and document
-> 
->   input: keyboard: imx: add snvs power key driver
->   document: devicetree: input: imx: i.mx snvs power device tree bindings
->   arm: dts: imx6sx: enable snvs power key
-> Added on/off key driver
-> 
-> Frank Li (6):
->   arm: imx: power-off: change to syscon to access register
->   rtc: arm: imx: snvs: change use syscon to access register
->   Document: dt: fsl: snvs: change support syscon
->   arm: dts: imx: update snvs to use syscon access register
->   document: devicetree: input: imx: i.mx snvs power device tree bindings
->   arm: dts: imx6sx: enable snvs power key
-> 
-> Robin Gong (1):
->   input: keyboard: imx: add snvs power key driver
+This patch set adds a serial port driver for the 8250-
+based UART found on LPC18xx/43xx devices. The UART is
+16550A compatible with additional features like RS485
+support, synchronous mode, IrDA, and DMA.
 
-OK, I am now happy with the input part, but we span several subsystems
-now. How do we want to merge this?
+For now only basic UART and RS485 operation is supported.
 
-> 
->  .../devicetree/bindings/crypto/fsl-sec4.txt        |  93 +++++++--
->  .../devicetree/bindings/input/snvs-pwrkey.txt      |   1 +
->  .../bindings/power_supply/imx-snvs-poweroff.txt    |  24 +--
->  arch/arm/boot/dts/imx6qdl.dtsi                     |  12 +-
->  arch/arm/boot/dts/imx6sl.dtsi                      |  12 +-
->  arch/arm/boot/dts/imx6sx.dtsi                      |  19 +-
->  arch/arm/boot/dts/vfxxx.dtsi                       |   9 +-
->  drivers/input/keyboard/Kconfig                     |  11 +
->  drivers/input/keyboard/Makefile                    |   1 +
->  drivers/input/keyboard/snvs_pwrkey.c               | 232 +++++++++++++++++++++
->  drivers/power/reset/imx-snvs-poweroff.c            |  21 +-
->  drivers/rtc/rtc-snvs.c                             | 124 +++++------
->  12 files changed, 417 insertions(+), 142 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/input/snvs-pwrkey.txt
->  create mode 100644 drivers/input/keyboard/snvs_pwrkey.c
-> 
-> -- 
-> 1.9.1
-> 
+The plan is add additional features like DMA support once
+the PL080 DMA controller gets device tree bindings.
+
+Joachim Eastwood (2):
+  serial: 8250: add LPC18xx/43xx UART driver
+  doc: dt: add documentation for nxp,lpc1850-uart
+
+ .../bindings/serial/nxp,lpc1850-uart.txt           |  21 +++
+ drivers/tty/serial/8250/8250_lpc18xx.c             | 204 +++++++++++++++++++++
+ drivers/tty/serial/8250/Kconfig                    |   8 +
+ drivers/tty/serial/8250/Makefile                   |   1 +
+ 4 files changed, 234 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/serial/nxp,lpc1850-uart.txt
+ create mode 100644 drivers/tty/serial/8250/8250_lpc18xx.c
 
 -- 
-Dmitry
+1.8.0
