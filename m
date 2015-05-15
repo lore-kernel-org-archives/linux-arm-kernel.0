@@ -1,70 +1,87 @@
 From: jenskuske@gmail.com (Jens Kuske)
-Date: Fri, 15 May 2015 18:38:52 +0200
-Subject: [PATCH v2 02/10] clk: sunxi: Add support for multiple parents to gates
+Date: Fri, 15 May 2015 18:38:53 +0200
+Subject: [PATCH v2 03/10] clk: sunxi: Let divs clocks read the base factor
+ clock name from devicetree
 In-Reply-To: <1431707940-19372-1-git-send-email-jenskuske@gmail.com>
 References: <1431707940-19372-1-git-send-email-jenskuske@gmail.com>
-Message-ID: <1431707940-19372-3-git-send-email-jenskuske@gmail.com>
+Message-ID: <1431707940-19372-4-git-send-email-jenskuske@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some newer sunxi SoCs (A83T, H3) don't have individual registers for
-AHB1, APB1 and APB2 gates anymore, but one big bus gates area where each
-gate can have a different parent.
+Currently, the sunxi clock driver gets the name for the base factor clock
+of divs clocks from the name field in factors_data. This prevents reusing
+of the factor clock for clocks with same properties, but different name.
 
-The current clock driver sets the same parent for all gates in a group.
-This commit adds a new parents field to the gates_data structure, which
-allows us to specify an array of parent indices for every single gate.
+This commit makes the divs setup function try to get a name from
+clock-output-names in the devicetree. It also removes the name field where
+possible and merges the sun4i PLL5 and PLL6 clocks.
+
+The sun4i PLL5 clock doesn't have a output for the base factor clock,
+so we still have to use the name field there.
 
 Signed-off-by: Jens Kuske <jenskuske@gmail.com>
 ---
- drivers/clk/sunxi/clk-sunxi.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ drivers/clk/sunxi/clk-sunxi.c | 22 ++++++++++++----------
+ 1 file changed, 12 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 9a82f17..17cba4d 100644
+index 17cba4d..afe560c 100644
 --- a/drivers/clk/sunxi/clk-sunxi.c
 +++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -898,6 +898,8 @@ static void __init sunxi_divider_clk_setup(struct device_node *node,
- 
- struct gates_data {
- 	DECLARE_BITMAP(mask, SUNXI_GATES_MAX_SIZE);
-+	/* If used, ARRAY_SIZE(parents) has to be >= bitmap_weight(mask) */
-+	const u8 *parents;
+@@ -708,18 +708,10 @@ static const struct factors_data sun4i_pll5_data __initconst = {
+ 	.name = "pll5",
  };
  
- static const struct gates_data sun4i_axi_gates_data __initconst = {
-@@ -1000,16 +1002,21 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
- 					 struct gates_data *data)
- {
- 	struct clk_onecell_data *clk_data;
-+	const char *parents[SUNXI_MAX_PARENTS];
- 	const char *clk_parent;
- 	const char *clk_name;
+-static const struct factors_data sun4i_pll6_data __initconst = {
+-	.enable = 31,
+-	.table = &sun4i_pll5_config,
+-	.getter = sun4i_get_pll5_factors,
+-	.name = "pll6",
+-};
+-
+ static const struct factors_data sun6i_a31_pll6_data __initconst = {
+ 	.enable = 31,
+ 	.table = &sun6i_a31_pll6_config,
+ 	.getter = sun6i_a31_get_pll6_factors,
+-	.name = "pll6x2",
+ };
+ 
+ static const struct factors_data sun5i_a13_ahb_data __initconst = {
+@@ -1099,7 +1091,7 @@ static const struct divs_data pll5_divs_data __initconst = {
+ };
+ 
+ static const struct divs_data pll6_divs_data __initconst = {
+-	.factors = &sun4i_pll6_data,
++	.factors = &sun4i_pll5_data,
+ 	.ndivs = 4,
+ 	.div = {
+ 		{ .shift = 0, .table = pll6_sata_tbl, .gate = 14 }, /* M, SATA */
+@@ -1141,6 +1133,7 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
+ 	struct clk_gate *gate = NULL;
+ 	struct clk_fixed_factor *fix_factor;
+ 	struct clk_divider *divider;
++	struct factors_data factors = *data->factors;
  	void __iomem *reg;
-+	int npar = 0;
- 	int qty;
- 	int i = 0;
- 	int j = 0;
+ 	int ndivs = SUNXI_DIVS_MAX_QTY, i = 0;
+ 	int flags, clkflags;
+@@ -1149,8 +1142,17 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
+ 	if (data->ndivs)
+ 		ndivs = data->ndivs;
+ 
++	/* Try to find a name for base factor clock */
++	for (i = 0; i < ndivs; i++) {
++		if (data->div[i].self) {
++			of_property_read_string_index(node, "clock-output-names",
++						      i, &factors.name);
++			break;
++		}
++	}
++
+ 	/* Set up factor clock that we will be dividing */
+-	pclk = sunxi_factors_clk_setup(node, data->factors);
++	pclk = sunxi_factors_clk_setup(node, &factors);
+ 	parent = __clk_get_name(pclk);
  
  	reg = of_iomap(node, 0);
- 
--	clk_parent = of_clk_get_parent_name(node, 0);
-+	while (npar < SUNXI_MAX_PARENTS &&
-+	       (parents[npar] = of_clk_get_parent_name(node, npar)) != NULL)
-+		npar++;
-+	clk_parent = parents[0];
- 
- 	/* Worst-case size approximation and memory allocation */
- 	qty = find_last_bit(data->mask, SUNXI_GATES_MAX_SIZE);
-@@ -1026,6 +1033,9 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
- 		of_property_read_string_index(node, "clock-output-names",
- 					      j, &clk_name);
- 
-+		if (data->parents && !WARN_ON(data->parents[j] >= npar))
-+			clk_parent = parents[data->parents[j]];
-+
- 		clk_data->clks[i] = clk_register_gate(NULL, clk_name,
- 						      clk_parent, 0,
- 						      reg + 4 * (i/32), i % 32,
 -- 
 2.4.0
