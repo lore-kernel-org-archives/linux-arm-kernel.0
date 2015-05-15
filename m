@@ -1,109 +1,63 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 15 May 2015 09:41:07 +0200
-Subject: [PATCH 5/8] clk: sunxi: mod1 clock support
-In-Reply-To: <CAGb2v65RTFcKAYOsgJo0A8jPKRfuSvHyiX-7KG_qvjMy0uBbZQ@mail.gmail.com>
+Date: Fri, 15 May 2015 09:43:14 +0200
+Subject: [PATCH 1/8] clk: sunxi: factors: Add m_start parameters
+In-Reply-To: <CAGb2v669fsz_pA+B0r8efp0BMxY-D86qfLuGQCqK1POuu9PmxQ@mail.gmail.com>
 References: <1430565879-28113-1-git-send-email-maxime.ripard@free-electrons.com>
- <1430565879-28113-6-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v65RTFcKAYOsgJo0A8jPKRfuSvHyiX-7KG_qvjMy0uBbZQ@mail.gmail.com>
-Message-ID: <20150515074107.GP4004@lukather>
+ <1430565879-28113-2-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v669fsz_pA+B0r8efp0BMxY-D86qfLuGQCqK1POuu9PmxQ@mail.gmail.com>
+Message-ID: <20150515074314.GQ4004@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 14, 2015 at 09:43:19PM +0800, Chen-Yu Tsai wrote:
+On Thu, May 14, 2015 at 05:12:07PM +0800, Chen-Yu Tsai wrote:
 > On Sat, May 2, 2015 at 7:24 PM, Maxime Ripard
 > <maxime.ripard@free-electrons.com> wrote:
-> > From: Emilio L?pez <emilio@elopez.com.ar>
+> > Some clocks start incrementing the m factor at 0. Add a parameter to handle
+> > it just like we did for the N factor.
 > >
-> > The module 1 type of clocks consist of a gate and a mux and are used on
-> > the audio blocks to mux and gate the PLL2 outputs for AC97, IIS or
-> > SPDIF. This commit adds support for them on the sunxi clock driver.
+> > Since the behaviour until now was to assume that the m factor was starting
+> > at 1, we also need to fix the other users.
 > >
-> > Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-> > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > > ---
-> >  drivers/clk/sunxi/Makefile       |  1 +
-> >  drivers/clk/sunxi/clk-a10-mod1.c | 85 ++++++++++++++++++++++++++++++++++++++++
-> >  2 files changed, 86 insertions(+)
-> >  create mode 100644 drivers/clk/sunxi/clk-a10-mod1.c
+> >  drivers/clk/sunxi/clk-factors.c    | 11 ++++++++++-
+> >  drivers/clk/sunxi/clk-factors.h    |  2 ++
+> >  drivers/clk/sunxi/clk-mod0.c       |  2 ++
+> >  drivers/clk/sunxi/clk-sun8i-mbus.c |  2 ++
+> >  drivers/clk/sunxi/clk-sun9i-core.c |  6 ++++++
+> >  drivers/clk/sunxi/clk-sunxi.c      | 10 ++++++++++
+> >  6 files changed, 32 insertions(+), 1 deletion(-)
 > >
-> > diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-> > index 6fa845e13067..960eeabc375f 100644
-> > --- a/drivers/clk/sunxi/Makefile
-> > +++ b/drivers/clk/sunxi/Makefile
-> > @@ -5,6 +5,7 @@
-> >  obj-y += clk-sunxi.o clk-factors.o
-> >  obj-y += clk-a10-codec.o
-> >  obj-y += clk-a10-hosc.o
-> > +obj-y += clk-a10-mod1.o
-> >  obj-y += clk-a10-pll2.o
-> >  obj-y += clk-a20-gmac.o
-> >  obj-y += clk-mod0.o
-> > diff --git a/drivers/clk/sunxi/clk-a10-mod1.c b/drivers/clk/sunxi/clk-a10-mod1.c
-> > new file mode 100644
-> > index 000000000000..6fc1b7a6de00
-> > --- /dev/null
-> > +++ b/drivers/clk/sunxi/clk-a10-mod1.c
-> > @@ -0,0 +1,85 @@
-> > +/*
-> > + * Copyright 2013 Emilio L?pez
-> > + *
-> > + * Emilio L?pez <emilio@elopez.com.ar>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License as published by
-> > + * the Free Software Foundation; either version 2 of the License, or
-> > + * (at your option) any later version.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
+> > diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
+> > index 8c20190a3e9f..100a711c3e3d 100644
+> > --- a/drivers/clk/sunxi/clk-factors.c
+> > +++ b/drivers/clk/sunxi/clk-factors.c
+> > @@ -56,15 +56,24 @@ static unsigned long clk_factors_recalc_rate(struct clk_hw *hw,
+> >         /* Get each individual factor if applicable */
+> >         if (config->nwidth != SUNXI_FACTORS_NOT_APPLICABLE)
+> >                 n = FACTOR_GET(config->nshift, config->nwidth, reg);
 > > +
-> > +#include <linux/clk-provider.h>
-> > +#include <linux/clkdev.h>
-> > +#include <linux/of.h>
-> > +#include <linux/of_address.h>
+> >         if (config->kwidth != SUNXI_FACTORS_NOT_APPLICABLE)
+> >                 k = FACTOR_GET(config->kshift, config->kwidth, reg);
 > > +
-> > +static DEFINE_SPINLOCK(mod1_lock);
-> > +
-> > +#define SUN4I_MOD1_ENABLE      31
-> > +#define SUN4I_MOD1_MUX         16
-> > +#define SUN4I_MOD1_MUX_WIDTH   2
-> > +#define SUN4I_MOD1_MAX_PARENTS 4
-> > +
-> > +static void __init sun4i_mod1_clk_setup(struct device_node *node)
-> > +{
-> > +       struct clk *clk;
-> > +       struct clk_mux *mux;
-> > +       struct clk_gate *gate;
-> > +       const char *parents[4];
-> > +       const char *clk_name = node->name;
-> > +       void __iomem *reg;
-> > +       int i = 0;
-> > +
-> > +       reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-> > +       if (IS_ERR(reg))
-> > +               return;
-> > +
-> > +       mux = kzalloc(sizeof(*mux), GFP_KERNEL);
-> > +       if (!mux)
-> > +               goto err_unmap;
-> > +
-> > +       gate = kzalloc(sizeof(*gate), GFP_KERNEL);
-> > +       if (!gate)
-> > +               goto err_free_mux;
-> > +
-> > +       of_property_read_string(node, "clock-output-names", &clk_name);
-> > +       reg = of_iomap(node, 0);
+> >         if (config->mwidth != SUNXI_FACTORS_NOT_APPLICABLE)
+> >                 m = FACTOR_GET(config->mshift, config->mwidth, reg);
+> > +       else
+> > +               /* Make sure we don't get a division by zero */
+> > +               m = 1;
 > 
-> Is this left over from some change?
+> What happens when mwidth is valid, m_start = 0, and m = 0?
 
-Yes :/
+That's a very good question. A division by zero in the kernel, I'd
+say.
+
+But I don't think we can end up in such a case today, and it's
+somewhat expected that it will happen, and no clock have looked at can
+actually end up in such a case.
+
+> Other than that, this one looks good.
 
 Thanks!
-Maxime
 
 -- 
 Maxime Ripard, Free Electrons
@@ -115,4 +69,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150515/e2024d88/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150515/d7510e57/attachment.sig>
