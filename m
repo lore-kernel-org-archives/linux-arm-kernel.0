@@ -1,39 +1,22 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 15 May 2015 12:54:05 +0200
-Subject: [GIT PULL] ARM: berlin: SoC changes for v4.2 (round 1)
-In-Reply-To: <1431687246-31039-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1431687246-31039-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1431687246-31039-2-git-send-email-sebastian.hesselbarth@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 15 May 2015 12:55:09 +0200
+Subject: [PATCH 4/4] dts, altera: Arria10 SDRAM EDAC DTS additions.
+In-Reply-To: <1431553787-27741-5-git-send-email-tthayer@opensource.altera.com>
+References: <1431553787-27741-1-git-send-email-tthayer@opensource.altera.com>
+ <1431553787-27741-5-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <5383549.sAl5szqT14@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof,
+On Wednesday 13 May 2015 16:49:47 tthayer at opensource.altera.com wrote:
+> +               sdr: sdr at ffc25000 {
+> +                       compatible = "syscon";
+> +                       reg = <0xffcfb100 0x80>;
+> +               };
+> +
+> 
 
-this is Marvell Berlin SoC changes for v4.2 selecting MFD_SYSCON by
-default for Berlin SoCs as now vital System/Chip controller drivers
-depend on it.
-	
-Please pull.
+A syscon node with just 128 bytes seems very odd. Can you check the
+hardware manual to see if this is part of some bigger unit?
 
-The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
-
-  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
-
-are available in the git repository at:
-
-  git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin-soc-4.2-1
-
-for you to fetch changes up to 64e4bb2b769352a0a7b1ca20a7f2b48add826f0f:
-
-  ARM: berlin: select MFD_SYSCON by default (2015-04-27 21:40:35 +0200)
-
-----------------------------------------------------------------
-berlin/soc for v4.2:
-- add MFD_SYSCON by default
-
-----------------------------------------------------------------
-Antoine Tenart (1):
-      ARM: berlin: select MFD_SYSCON by default
-
- arch/arm/mach-berlin/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+	Arnd
