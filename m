@@ -1,72 +1,94 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 15 May 2015 09:43:14 +0200
-Subject: [PATCH 1/8] clk: sunxi: factors: Add m_start parameters
-In-Reply-To: <CAGb2v669fsz_pA+B0r8efp0BMxY-D86qfLuGQCqK1POuu9PmxQ@mail.gmail.com>
-References: <1430565879-28113-1-git-send-email-maxime.ripard@free-electrons.com>
- <1430565879-28113-2-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v669fsz_pA+B0r8efp0BMxY-D86qfLuGQCqK1POuu9PmxQ@mail.gmail.com>
-Message-ID: <20150515074314.GQ4004@lukather>
+From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
+Date: Fri, 15 May 2015 09:45:47 +0200
+Subject: [PATCH net-next 00/11] convert stmmac glue layers into platform
+ drivers
+In-Reply-To: <CAGb2v663efjkwgRjPdxV4CQxeesiu7jxkMf9j_oPU_bSHbNNiA@mail.gmail.com>
+References: <1431598266-25736-1-git-send-email-manabian@gmail.com>
+ <CAGb2v663efjkwgRjPdxV4CQxeesiu7jxkMf9j_oPU_bSHbNNiA@mail.gmail.com>
+Message-ID: <5555A42B.3040205@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 14, 2015 at 05:12:07PM +0800, Chen-Yu Tsai wrote:
-> On Sat, May 2, 2015 at 7:24 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Some clocks start incrementing the m factor at 0. Add a parameter to handle
-> > it just like we did for the N factor.
-> >
-> > Since the behaviour until now was to assume that the m factor was starting
-> > at 1, we also need to fix the other users.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  drivers/clk/sunxi/clk-factors.c    | 11 ++++++++++-
-> >  drivers/clk/sunxi/clk-factors.h    |  2 ++
-> >  drivers/clk/sunxi/clk-mod0.c       |  2 ++
-> >  drivers/clk/sunxi/clk-sun8i-mbus.c |  2 ++
-> >  drivers/clk/sunxi/clk-sun9i-core.c |  6 ++++++
-> >  drivers/clk/sunxi/clk-sunxi.c      | 10 ++++++++++
-> >  6 files changed, 32 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
-> > index 8c20190a3e9f..100a711c3e3d 100644
-> > --- a/drivers/clk/sunxi/clk-factors.c
-> > +++ b/drivers/clk/sunxi/clk-factors.c
-> > @@ -56,15 +56,24 @@ static unsigned long clk_factors_recalc_rate(struct clk_hw *hw,
-> >         /* Get each individual factor if applicable */
-> >         if (config->nwidth != SUNXI_FACTORS_NOT_APPLICABLE)
-> >                 n = FACTOR_GET(config->nshift, config->nwidth, reg);
-> > +
-> >         if (config->kwidth != SUNXI_FACTORS_NOT_APPLICABLE)
-> >                 k = FACTOR_GET(config->kshift, config->kwidth, reg);
-> > +
-> >         if (config->mwidth != SUNXI_FACTORS_NOT_APPLICABLE)
-> >                 m = FACTOR_GET(config->mshift, config->mwidth, reg);
-> > +       else
-> > +               /* Make sure we don't get a division by zero */
-> > +               m = 1;
-> 
-> What happens when mwidth is valid, m_start = 0, and m = 0?
+Hello
 
-That's a very good question. A division by zero in the kernel, I'd
-say.
+On 5/14/2015 5:24 PM, Chen-Yu Tsai wrote:
+> On Thu, May 14, 2015 at 6:10 PM, Joachim Eastwood <manabian@gmail.com> wrote:
+>> This patch set aims to convert the current dwmac glue layers into
+>> proper platform drivers as request by Arnd[1]. These changes start
+>> from patch 3 and onwards.
+>>
+>> Overview:
+>> Platform driver functions like probe and remove are exported from
+>> the stmmac platform and then used in subsequent glue later
+>> conversions. The conversion involes adding the platform driver
+>> boiler plate code and adding it to the build system. The last patch
+>> removes the driver from the stmmac platform code thus making it into
+>> a library for common platform driver functions.
+>>
+>> The two first patches adds glue layer for my platform. I chose to
+>> first add old style glue layer and then convert it. The churn this
+>> creates is just 3 lines.
+>>
+>> I would be very nice if people could test this patch set on their
+>> respective platform. My testing has been limited to compiling and
+>> testing on my (LPC18xx) platform. Thanks!
 
-But I don't think we can end up in such a case today, and it's
-somewhat expected that it will happen, and no clock have looked at can
-actually end up in such a case.
+I wonder if this will make the compatibility with old
+platforms (like SH4) not based on DT, where there was not used
+any glue-logic around the driver and just the platform was the
+reference.
 
-> Other than that, this one looks good.
+To be honest, I prefer to not have the Kconfig options.
+The device-tree compatibility will select the glue-logic
+needed and we will just pay some bytes when compile.
 
-Thanks!
+In my opinion, the Koption(s) introduce a problem when touch
+the driver and we want to guarantee that, at least,
+all its parts build fine on all the platforms.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150515/d7510e57/attachment.sig>
+Regards,
+Peppe
+
+>
+> Tested-by: Chen-Yu Tsai <wens@csie.org>
+>
+> on sunxi boards Cubietruck and Hummingbird A31.
+>
+>> Next I will look into cleaning up the stmmac platform code.
+>>
+>> [1] http://marc.info/?l=linux-arm-kernel&m=143059524606459&w=2
+>>
+>> Joachim Eastwood (11):
+>>    stmmac: add dwmac glue for NXP 18xx/43xx family
+>>    doc: dt: add documentation for nxp,lpc1850-dwmac
+>>    stmmac: prepare stmmac platform to support stand alone drivers
+>>    stmmac: add a generic dwmac driver
+>>    stmmac: convert dwmac-lpc18xx to a platform driver
+>>    stmmac: convert dwmac-meson to platform driver
+>>    stmmac: convert dwmac-rk to platform driver
+>>    stmmac: convert dwmac-socfpga to platform driver
+>>    stmmac: convert dwmac-sti to platform driver
+>>    stmmac: convert dwmac-sunxi to platform driver
+>>    stmmac: drop driver from stmmac platform code
+>>
+>>   .../devicetree/bindings/net/nxp,lpc1850-dwmac.txt  | 20 +++++
+>>   drivers/net/ethernet/stmicro/stmmac/Kconfig        | 76 +++++++++++++++++
+>>   drivers/net/ethernet/stmicro/stmmac/Makefile       | 13 ++-
+>>   .../net/ethernet/stmicro/stmmac/dwmac-generic.c    | 41 +++++++++
+>>   .../net/ethernet/stmicro/stmmac/dwmac-lpc18xx.c    | 99 ++++++++++++++++++++++
+>>   drivers/net/ethernet/stmicro/stmmac/dwmac-meson.c  | 24 +++++-
+>>   drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c     | 27 +++++-
+>>   .../net/ethernet/stmicro/stmmac/dwmac-socfpga.c    | 21 ++++-
+>>   drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c    | 29 ++++++-
+>>   drivers/net/ethernet/stmicro/stmmac/dwmac-sunxi.c  | 25 +++++-
+>>   .../net/ethernet/stmicro/stmmac/stmmac_platform.c  | 49 ++---------
+>>   .../net/ethernet/stmicro/stmmac/stmmac_platform.h  |  9 +-
+>>   12 files changed, 378 insertions(+), 55 deletions(-)
+>>   create mode 100644 Documentation/devicetree/bindings/net/nxp,lpc1850-dwmac.txt
+>>   create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-generic.c
+>>   create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-lpc18xx.c
+>>
+>> --
+>> 1.8.0
+>>
+>
