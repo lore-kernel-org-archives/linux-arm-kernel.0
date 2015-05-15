@@ -1,25 +1,18 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 May 2015 17:36:30 +0200
-Subject: [GIT PULL] STi defconfig changes for v4.2, round 2
-In-Reply-To: <5554C747.6070604@st.com>
-References: <5554C747.6070604@st.com>
-Message-ID: <3099831.yDqamYD4m9@wuerfel>
+Date: Fri, 15 May 2015 17:37:19 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v4.2
+In-Reply-To: <cover.1431565572.git.horms+renesas@verge.net.au>
+References: <cover.1431565572.git.horms+renesas@verge.net.au>
+Message-ID: <6133667.cFbk22zIzs@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 May 2015 18:03:19 Maxime Coquelin wrote:
-> ----------------------------------------------------------------
-> STi defconfig for v4.2, round 2.
+On Thursday 14 May 2015 10:07:16 Simon Horman wrote:
+> Renesas ARM Based SoC Defconfig Updates for v4.2
 > 
-> Highlights:
-> -----------
->   - Enable STi PWM driver in multi_v7_defconfig
->   - Enable STi Power & Reset driver in multi_v7_defconfig
-> 
+> * Replace legacy-only USB_RCAR_GEN2_PHY with DT-only PHY_RCAR_GEN2
 
-The patches are both trivial, but please reconsider if you can make the
-drivers loadable modules instead. We have in the past enabled all drivers
-as built-in in multi_v7_defconfig, which has led to considerable growth,
-so we'd prefer as much as possible to be modules now.
+
+Pulled into next/defconfig, thanks!
 
 	Arnd
