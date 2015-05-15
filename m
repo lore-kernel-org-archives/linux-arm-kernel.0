@@ -1,36 +1,49 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 15 May 2015 22:19:54 +0200
-Subject: [PATCH v4 4/7] ARM: dts: zx: add an initial zx296702 dts and doc
-In-Reply-To: <2168253.ZrhOUFeSpY@wuerfel>
-References: <1430212691-16009-1-git-send-email-jun.nie@linaro.org>
- <1430212691-16009-5-git-send-email-jun.nie@linaro.org>
- <2168253.ZrhOUFeSpY@wuerfel>
-Message-ID: <15088943.GUMZUHMVfp@wuerfel>
+Date: Fri, 15 May 2015 22:21:13 +0200
+Subject: [PATCH 2/2] arm: boot: store ATAG structure into DT atags field
+In-Reply-To: <201505152216.24622@pali>
+References: <1430902142-17035-1-git-send-email-pali.rohar@gmail.com>
+ <3513646.XX80DTTJbc@wuerfel> <201505152216.24622@pali>
+Message-ID: <46811670.AspmkHD9JS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 May 2015 21:59:06 Arnd Bergmann wrote:
-> On Tuesday 28 April 2015 17:18:08 Jun Nie wrote:
-> > Add initial dts file and document for ZX296702 and board ZX296702-AD1.
-> > More peripherals will be added later.
+On Friday 15 May 2015 22:16:24 Pali Roh?r wrote:
+> On Friday 15 May 2015 22:12:41 Arnd Bergmann wrote:
+> > On Friday 15 May 2015 21:50:07 Pali Roh?r wrote:
+> > >                 }
+> > >         
+> > >         }
+> > > 
+> > > +       /* include the terminating ATAG_NONE */
+> > > +       atag_size = (char *)atag - (char *)atag_list +
+> > > sizeof(struct tag_header); +       setprop(fdt, "/", "atags",
+> > > atag_list, atag_size);
+> > > +
+> > > 
+> > >         if (memcount) {
+> > >         
+> > >                 setprop(fdt, "/memory", "reg", mem_reg_property,
+> > >                 
+> > >                         4 * memcount * memsize);
 > > 
-> > Signed-off-by: Jun Nie <jun.nie@linaro.org>
+> > The property should probably have a DT binding, and be named
+> > "linux,atags".
+> > 
+> > It may also help to check if the "linux,atags" property already
+> > exists and not create it otherwise. That way we can put it into the
+> > n900 dts file and have it updated by the compat code, but not expose
+> > the atags on other platforms unless they opt in.
+> > 
+> >       Arnd
 > 
-> Applied to next/dt, thanks!
+> Maybe what would help: Is there a way to tell decompressor/kernel to not 
+> touch atag memory and then after kernel/board-code starts it save copy 
+> of atags? I think it is not possible right now, but correct me if I'm 
+> wrong...
 > 
-> 
 
-And removed again. I hadn't pushed it out to a public tree yet and
-found a build error in this.
-
-Unfortunately, you are using a header file here that is only introduced
-by a patch that belongs to another subsystem maintainer.
-
-Please try to get rid of that dependency, or submit this patch again
-for the following merge window once that driver has been merged upstream.
-
-In a lot of cases, you can just use hardware numbers as identifiers
-instead of making up your own, to avoid having to use ugly header files
-that make life hard for us.
+I don't think that is possible without an incompatible change to the
+boot protocol.
 
 	Arnd
