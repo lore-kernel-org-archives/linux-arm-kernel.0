@@ -1,50 +1,32 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Sat, 16 May 2015 17:17:40 +0200
-Subject: [PATCH] USB: ehci-platform: support EHCIs with transaction translator
-Message-ID: <1431789460-26831-1-git-send-email-manabian@gmail.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Sat, 16 May 2015 17:32:25 +0200
+Subject: [PATCH v2 07/10] pinctrl: sunxi: Add H3 PIO controller support
+In-Reply-To: <1431707940-19372-8-git-send-email-jenskuske@gmail.com>
+References: <1431707940-19372-1-git-send-email-jenskuske@gmail.com>
+ <1431707940-19372-8-git-send-email-jenskuske@gmail.com>
+Message-ID: <1431790345.2341.37.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some EHCI controllers have a Transaction Translator built into
-the root hub. Support this feature in device tree when using
-the ehci-platform driver by adding a feature flag for it.
+Just a nit: a license mismatch.
 
-This is needed to get USB working on NXP LPC18xx/43xx platforms.
+(I didn't bring this up in v1. Perhaps I should have.)
 
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
----
+On Fri, 2015-05-15 at 18:38 +0200, Jens Kuske wrote:
+> --- /dev/null
+> +++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c
 
- Documentation/devicetree/bindings/usb/usb-ehci.txt | 2 ++
- drivers/usb/host/ehci-platform.c                   | 4 ++++
- 2 files changed, 6 insertions(+)
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
 
-diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
-index 0b04fdff9d5a..a12d6012a40f 100644
---- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
-+++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
-@@ -13,6 +13,8 @@ Optional properties:
-  - big-endian-desc : boolean, set this for hcds with big-endian descriptors
-  - big-endian : boolean, for hcds with big-endian-regs + big-endian-desc
-  - needs-reset-on-resume : boolean, set this to force EHCI reset after resume
-+ - has-transaction-translator : boolean, set this if EHCI have a Transaction
-+				Translator built into the root hub.
-  - clocks : a list of phandle + clock specifier pairs
-  - phys : phandle + phy specifier pair
-  - phy-names : "usb"
-diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-index d8a75a51d6d4..ba07f16b13e0 100644
---- a/drivers/usb/host/ehci-platform.c
-+++ b/drivers/usb/host/ehci-platform.c
-@@ -202,6 +202,10 @@ static int ehci_platform_probe(struct platform_device *dev)
- 					  "needs-reset-on-resume"))
- 			pdata->reset_on_resume = 1;
- 
-+		if (of_property_read_bool(dev->dev.of_node,
-+					  "has-transaction-translator"))
-+			pdata->has_tt = 1;
-+
- 		priv->num_phys = of_count_phandle_with_args(dev->dev.of_node,
- 				"phys", "#phy-cells");
- 		priv->num_phys = priv->num_phys > 0 ? priv->num_phys : 1;
--- 
-1.8.0
+This states the license is GPL v2.
+
+> +MODULE_LICENSE("GPL");
+
+According to include/linux/module.h this states the license is GPL v2 or
+later. So I think that either the comment at the top of this file or the
+ident used in the MODULE_LICENSE() macro needs to change.
+
+
+Paul Bolle
