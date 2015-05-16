@@ -1,39 +1,29 @@
 From: pebolle@tiscali.nl (Paul Bolle)
-Date: Sat, 16 May 2015 13:27:36 +0200
-Subject: [PATCH v2 1/5] kasan, x86: move KASAN_SHADOW_OFFSET to the arch
- Kconfig
-In-Reply-To: <1431698344-28054-2-git-send-email-a.ryabinin@samsung.com>
-References: <1431698344-28054-1-git-send-email-a.ryabinin@samsung.com>
- <1431698344-28054-2-git-send-email-a.ryabinin@samsung.com>
-Message-ID: <1431775656.2341.10.camel@x220>
+Date: Sat, 16 May 2015 13:48:07 +0200
+Subject: [V4 PATCH 2/6] arm64 : Introduce support for ACPI _CCA object
+In-Reply-To: <1431724994-21601-3-git-send-email-Suravee.Suthikulpanit@amd.com>
+References: <1431724994-21601-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1431724994-21601-3-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <1431776887.2341.17.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-05-15 at 16:59 +0300, Andrey Ryabinin wrote:
-> --- a/arch/x86/Kconfig
-> +++ b/arch/x86/Kconfig
+Just a nit regarding the commit explanation.
 
-> +config KASAN_SHADOW_OFFSET
-> +	hex
-> +	default 0xdffffc0000000000
+On Fri, 2015-05-15 at 16:23 -0500, Suravee Suthikulpanit wrote:
+> From http://www.uefi.org/sites/default/files/resources/ACPI_6.0.pdf,
+> section 6.2.17 _CCA states that ARM platforms require ACPI _CCA
+> object to be specified for DMA-cabpable devices. This patch introduces
+> ACPI_MUST_HAVE_CCA in arm64 Kconfig to specify such requirement.
 
-This sets CONFIG_KASAN_SHADOW_OFFSET for _all_ X86 configurations,
-doesn't it?
+s/ACPI_MUST_HAVE_CCA/ACPI_CCA_REQUIRED/.
 
-> --- a/lib/Kconfig.kasan
-> +++ b/lib/Kconfig.kasan
- 
-> -config KASAN_SHADOW_OFFSET
-> -	hex
-> -	default 0xdffffc0000000000 if X86_64
+Ie, update the commit explanation to match the change introduced in V2.
 
-While here it used to depend, at least, on HAVE_ARCH_KASAN. But grepping
-the tree shows the two places where CONFIG_KASAN_SHADOW_OFFSET is
-currently used are guarded by #ifdef CONFIG_KASAN. So perhaps the
-default line should actually read
-	default 0xdffffc0000000000 if KASAN
+> In case _CCA is missing, arm64 would assign dummy_dma_ops
+> to disable DMA capability of the device.
 
-after the move. Would that work?
+Thanks,
 
 
 Paul Bolle
