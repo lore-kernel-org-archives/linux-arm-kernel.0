@@ -1,20 +1,46 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Sat, 16 May 2015 11:08:46 +0100
-Subject: [linux-sunxi] [RFC 0/7] ARM: sun9i: SMP support with
- Multi-Cluster Power Management
-In-Reply-To: <1431583811-25780-1-git-send-email-wens@csie.org>
-References: <1431583811-25780-1-git-send-email-wens@csie.org>
-Message-ID: <1431770926.5748.41.camel@hellion.org.uk>
+From: carlo@caione.org (Carlo Caione)
+Date: Sat, 16 May 2015 12:48:50 +0200
+Subject: [PATCH v2 0/3] clk: meson: Add clock controller
+Message-ID: <1431773333-23567-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-05-14 at 14:10 +0800, Chen-Yu Tsai wrote:
-> This is my attempt to support SMP and CPU hot plugging on the Allwinner
-> A80 SoC. The A80 is a big.Little processor with 2 clusters of 4x Cortex-A7
-> and 4x Cortex-A15 cores.
+From: Carlo Caione <carlo@endlessm.com>
 
-I thought there was a preference these days to support this sort of
-thing via support PSCI in the firmware, which allows for other things
-such as non-secure-world etc.
+This patchset introduces preliminary support for the clock controller
+found on Amlogic MesonX SoCs and enables it for the Meson8b.
 
-Ian.
+DTS patches with support for Meson8b SoCs will follow.
+
+Changelog:
+
+v1->v2:
+   * fix double CLK_IGNORE_UNUSED in clk-pll.c
+   * fix comment in meson8b-clkc.h
+
+Carlo Caione (3):
+  clk: meson: Add support for Meson clock controller
+  clk: meson: Document bindings for Meson8b clock controller
+  clk: meson8b: Add support for Meson8b clocks
+
+ .../bindings/clock/amlogic,meson8b-clkc.txt        |  40 +++
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/meson/Makefile                         |   6 +
+ drivers/clk/meson/clk-cpu.c                        | 291 +++++++++++++++++++++
+ drivers/clk/meson/clk-pll.c                        | 231 ++++++++++++++++
+ drivers/clk/meson/clkc.c                           | 234 +++++++++++++++++
+ drivers/clk/meson/clkc.h                           | 187 +++++++++++++
+ drivers/clk/meson/meson8b-clkc.c                   | 182 +++++++++++++
+ include/dt-bindings/clock/meson8b-clkc.h           |  20 ++
+ 9 files changed, 1192 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt
+ create mode 100644 drivers/clk/meson/Makefile
+ create mode 100644 drivers/clk/meson/clk-cpu.c
+ create mode 100644 drivers/clk/meson/clk-pll.c
+ create mode 100644 drivers/clk/meson/clkc.c
+ create mode 100644 drivers/clk/meson/clkc.h
+ create mode 100644 drivers/clk/meson/meson8b-clkc.c
+ create mode 100644 include/dt-bindings/clock/meson8b-clkc.h
+
+-- 
+1.9.1
