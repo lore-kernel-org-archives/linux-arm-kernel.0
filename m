@@ -1,32 +1,34 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Sat, 16 May 2015 11:43:26 +0300
-Subject: [PATCH v3 4/4] remoteproc/wkup_m3: add a remoteproc driver for TI
- Wakeup M3
-In-Reply-To: <5550C43F.3070507@ti.com>
-References: <1427917039-43206-1-git-send-email-d-gerlach@ti.com>
- <1427917039-43206-5-git-send-email-d-gerlach@ti.com>
- <CAK=WgbaQPK1x6k8iq8DDCSRpna4HRyDJ-MTU+DTAst6VZy13_Q@mail.gmail.com>
- <5550C43F.3070507@ti.com>
-Message-ID: <CAK=WgbaooxQyTYJ8rTP5ss9_hMuWbvYjeAJTKq5kVqYuXaweuA@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Sat, 16 May 2015 11:02:40 +0200
+Subject: [PATCH v2 2/9] ARM: add secondary_startup_arm prototype in header
+ file
+In-Reply-To: <1431763110-443-3-git-send-email-yingjoe.chen@mediatek.com>
+References: <1431763110-443-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1431763110-443-3-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <CABuKBe+8VHnHbMA4gMzzReUNUf3LiL6JnPhehkxWtzrYAhBBZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
+2015-05-16 9:58 GMT+02:00 Yingjoe Chen <yingjoe.chen@mediatek.com>:
+> Put secondary_startup_arm() prototype in arch/arm/include/asm/smp.h
+> so users doesn't have to add extern prototype in their code.
+>
+> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+> ---
+>  arch/arm/include/asm/smp.h | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+> index 18f5a55..f5cffb7 100644
+> --- a/arch/arm/include/asm/smp.h
+> +++ b/arch/arm/include/asm/smp.h
+> @@ -69,6 +69,7 @@ struct secondary_data {
+>  extern struct secondary_data secondary_data;
+>  extern volatile int pen_release;
+>  extern void secondary_startup(void);
+> +extern void secondary_startup_arm(void);
 
-On Mon, May 11, 2015 at 6:01 PM, Suman Anna <s-anna@ti.com> wrote:
-> We don't have any carveouts or usage of any external DDR, as this
-> processor is used during Power Management, like cpuidle or suspend path,
-> and is used to control the MPU and DDR states. The resource table is
-> very simple and straight-forward [1].
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
 
-Ok thanks.
-
-Could you please document in the patch how the WkupM3 memory is
-managed? Perhaps add to this latter explanation of yours also what
-stands behind the umem/dmem names, justify usage of '__force' and
-document the code around the l4_offset math (which I suspect may not
-always be correct, as it seems the value of l4_offset depends on the
-order of mem resources returned by platform_get_resource_byname).
-
-Thanks,
-Ohad.
+-- 
+motzblog.wordpress.com
