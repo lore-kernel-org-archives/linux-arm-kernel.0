@@ -1,57 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 16 May 2015 21:13:28 +0200
-Subject: [PATCH v4 5/7] clk: zx: add clock support to zx296702
-In-Reply-To: <20150516130756.GF10411@tiger>
-References: <1430212691-16009-1-git-send-email-jun.nie@linaro.org>
- <6693731.YF8XsCYmbE@wuerfel> <20150516130756.GF10411@tiger>
-Message-ID: <12864750.VWIHuvOnir@wuerfel>
+From: eric.nelson@boundarydevices.com (Eric Nelson)
+Date: Sat, 16 May 2015 12:23:20 -0700
+Subject: [PATCH 0/2] ARM: dts: use simple-panel for nitrogen6x and sabrelite
+Message-ID: <1431804202-11067-1-git-send-email-eric.nelson@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 16 May 2015 21:07:57 Shawn Guo wrote:
-> On Fri, May 15, 2015 at 10:32:14PM +0200, Arnd Bergmann wrote:
-> > On Tuesday 28 April 2015 17:18:09 Jun Nie wrote:
-> > > diff --git a/include/dt-bindings/clock/zx296702-clock.h b/include/dt-bindings/clock/zx296702-clock.h
-> > > new file mode 100644
-> > > index 0000000..c5e7ec2
-> > > --- /dev/null
-> > > +++ b/include/dt-bindings/clock/zx296702-clock.h
-> > > @@ -0,0 +1,162 @@
-> > > +/*
-> > > + * Copyright 2014 Linaro Ltd.
-> > > + * Copyright (C) 2014 ZTE Corporation.
-> > > + *
-> > > + * This program is free software; you can redistribute it and/or modify
-> > > + * it under the terms of the GNU General Public License version 2 as
-> > > + * published by the Free Software Foundation.
-> > > + */
-> > > +
-> > > +#ifndef __DT_BINDINGS_CLOCK_ZX296702_H
-> > > +#define __DT_BINDINGS_CLOCK_ZX296702_H
-> > > +
-> > > +#define ZX296702_OSC                           0
-> > > +#define ZX296702_PLL_A9                                1
-> > > +#define ZX296702_PLL_A9_350M                   2
-> > > +#define ZX296702_PLL_MAC_1000M                 3
-> > > +#define ZX296702_PLL_MAC_333M                  4
-> > > +#define ZX296702_PLL_MM0_1188M                 5
-> > > +#define ZX296702_PLL_MM0_396M                  6
-> > > +#define ZX296702_PLL_MM0_198M                  7
-> > > +#define ZX296702_PLL_MM1_108M                  8
-> > > +#define ZX296702_PLL_MM1_72M                   9
-> > > 
-> > 
-> > No objections for this driver going through Mike's tree, but as I said
-> > if you want the dts file to be merged in the same merge window, it would
-> > be best to avoid the header file.
-> 
-> Alternatively, we can ask an ACK from Mike or Stephen on this patch, so
-> that we can merge the whole series through arm-soc tree.  As this patch
-> adds a SoC specific clock driver and it's quite self-contained and
-> shouldn't cause non-trivial merge conflicts, Mike/Stephen may be happy
-> to give an ACK on it.
-> 
+Patch originated with informal submission by Philipp Zabel:
+	http://lists.infradead.org/pipermail/linux-arm-kernel/2015-April/337115.html
 
-Yes, that would work too.
+Update the LVDS0 configuration for imx6qdl-nitrogen6x and imx6qdl-sabrelite
+to use simple panel to allow the connection of backlights and simplify the
+process of (re)configuring displays.
 
-	Arnd
+A U-Boot script to configure the displays based on detection of the
+touch controller is available for reference here:
+
+	https://github.com/boundarydevices/u-boot-imx6/blob/staging/board/boundary/nitrogen6x/6x_bootscript-mainline.txt
+
+Addition of panel hannstar,hsd100pxn1 is queued for 4.2:
+	https://patchwork.kernel.org/patch/6212451/
+
+Eric Nelson (2):
+  ARM: dts: nitrogen6x: use simple-panel instead of display-timings for
+    LVDS0
+  ARM: dts: sabrelite: use simple-panel instead of display-timings for
+    LVDS0
+
+ arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 30 +++++++++++++++++-------------
+ arch/arm/boot/dts/imx6qdl-sabrelite.dtsi  | 30 +++++++++++++++++-------------
+ 2 files changed, 34 insertions(+), 26 deletions(-)
+
+-- 
+2.1.4
