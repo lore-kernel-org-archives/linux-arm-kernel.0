@@ -1,209 +1,45 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Sat, 16 May 2015 19:27:56 +0200
-Subject: [PATCH 1/2] phy: add lpc18xx usb otg phy driver
+Date: Sat, 16 May 2015 19:27:57 +0200
+Subject: [PATCH 2/2] doc: dt: add documentation for nxp,lpc1850-usb-otg-phy
 In-Reply-To: <1431797277-4906-1-git-send-email-manabian@gmail.com>
 References: <1431797277-4906-1-git-send-email-manabian@gmail.com>
-Message-ID: <1431797277-4906-2-git-send-email-manabian@gmail.com>
+Message-ID: <1431797277-4906-3-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add PHY driver for the internal USB OTG PHY found on NXP
-LPC18xx and LPC43xx devices. This driver takes care of
-enabling the PHY in CREG (syscon) and setting the required
-clock frequency.
+Add binding documentation for nxp,lpc1850-usb-otg-phy. This PHY
+can found on NXP LPC18xx and LPC43xx devices.
 
 Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 ---
- drivers/phy/Kconfig               |  11 +++
- drivers/phy/Makefile              |   1 +
- drivers/phy/phy-lpc18xx-usb-otg.c | 145 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 157 insertions(+)
- create mode 100644 drivers/phy/phy-lpc18xx-usb-otg.c
+ .../bindings/phy/nxp,lpc1850-usb-otg-phy.txt          | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/nxp,lpc1850-usb-otg-phy.txt
 
-diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index a53bd5b52df9..e11fb9e3c760 100644
---- a/drivers/phy/Kconfig
-+++ b/drivers/phy/Kconfig
-@@ -52,6 +52,17 @@ config PHY_EXYNOS_MIPI_VIDEO
- 	  Support for MIPI CSI-2 and MIPI DSI DPHY found on Samsung S5P
- 	  and EXYNOS SoCs.
- 
-+config PHY_LPC18XX_USB_OTG
-+	tristate "NXP LPC18xx/43xx SoC USB OTG PHY driver"
-+	depends on OF && (ARCH_LPC18XX || COMPILE_TEST)
-+	select GENERIC_PHY
-+	select MFD_SYSCON
-+	help
-+	  Enable this to support NXP LPC18xx/43xx internal USB OTG PHY.
-+
-+	  This driver is need for USB0 support on LPC18xx/43xx and takes
-+	  care of enabling and clock setup.
-+
- config PHY_MVEBU_SATA
- 	def_bool y
- 	depends on ARCH_DOVE || MACH_DOVE || MACH_KIRKWOOD
-diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-index f12625178780..b7251f3b9ef7 100644
---- a/drivers/phy/Makefile
-+++ b/drivers/phy/Makefile
-@@ -10,6 +10,7 @@ obj-$(CONFIG_ARMADA375_USBCLUSTER_PHY)	+= phy-armada375-usb2.o
- obj-$(CONFIG_BCM_KONA_USB2_PHY)		+= phy-bcm-kona-usb2.o
- obj-$(CONFIG_PHY_EXYNOS_DP_VIDEO)	+= phy-exynos-dp-video.o
- obj-$(CONFIG_PHY_EXYNOS_MIPI_VIDEO)	+= phy-exynos-mipi-video.o
-+obj-$(CONFIG_PHY_LPC18XX_USB_OTG)	+= phy-lpc18xx-usb-otg.o
- obj-$(CONFIG_PHY_MVEBU_SATA)		+= phy-mvebu-sata.o
- obj-$(CONFIG_PHY_MIPHY28LP) 		+= phy-miphy28lp.o
- obj-$(CONFIG_PHY_MIPHY365X)		+= phy-miphy365x.o
-diff --git a/drivers/phy/phy-lpc18xx-usb-otg.c b/drivers/phy/phy-lpc18xx-usb-otg.c
+diff --git a/Documentation/devicetree/bindings/phy/nxp,lpc1850-usb-otg-phy.txt b/Documentation/devicetree/bindings/phy/nxp,lpc1850-usb-otg-phy.txt
 new file mode 100644
-index 000000000000..3a86e8f75e7e
+index 000000000000..3da60ca04a42
 --- /dev/null
-+++ b/drivers/phy/phy-lpc18xx-usb-otg.c
-@@ -0,0 +1,145 @@
-+/*
-+ * PHY driver for NXP LPC18xx/43xx internal USB OTG PHY
-+ *
-+ * Copyright (C) 2015 Joachim Eastwood <manabian@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
++++ b/Documentation/devicetree/bindings/phy/nxp,lpc1850-usb-otg-phy.txt
+@@ -0,0 +1,19 @@
++NXP LPC18xx/43xx internal USB OTG PHY binding
++---------------------------------------------
 +
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/phy/phy.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
++This file contains documentation for the internal USB OTG PHY found
++in NXP LPC18xx and LPC43xx SoCs.
 +
-+/* USB OTG PHY register offset and bit in CREG */
-+#define LPC18XX_CREG_CREG0		0x004
-+# define LPC18XX_CREG_CREG0_USB0PHY	BIT(5)
++Required properties:
++- compatible	: must be "nxp,lpc1850-usb-otg-phy"
++- clocks	: must be exactly one entry
++See: Documentation/devicetree/bindings/clock/clock-bindings.txt
++- #phy-cells	: must be 0 for this phy
++See: Documentation/devicetree/bindings/phy/phy-bindings.txt
 +
-+struct lpc18xx_usb_otg_phy {
-+	struct phy *phy;
-+	struct clk *clk;
-+	struct regmap *reg;
++Example:
++usb0_otg_phy: usb0-otg-phy {
++	compatible = "nxp,lpc1850-usb-otg-phy";
++	clocks = <&ccu1 CLK_USB0>;
++	#phy-cells = <0>;
 +};
-+
-+static int lpc18xx_usb_otg_phy_init(struct phy *phy)
-+{
-+	struct lpc18xx_usb_otg_phy *lpc = phy_get_drvdata(phy);
-+	int ret;
-+
-+	ret = clk_prepare(lpc->clk);
-+	if (ret)
-+		return ret;
-+
-+	/* The PHY must be clocked at 480 MHz */
-+	return clk_set_rate(lpc->clk, 480000000);
-+}
-+
-+static int lpc18xx_usb_otg_phy_exit(struct phy *phy)
-+{
-+	struct lpc18xx_usb_otg_phy *lpc = phy_get_drvdata(phy);
-+
-+	clk_unprepare(lpc->clk);
-+
-+	return 0;
-+}
-+
-+static int lpc18xx_usb_otg_phy_power_on(struct phy *phy)
-+{
-+	struct lpc18xx_usb_otg_phy *lpc = phy_get_drvdata(phy);
-+	int ret;
-+
-+	ret = clk_enable(lpc->clk);
-+	if (ret)
-+		return ret;
-+
-+	/* The bit in CREG is cleared to enable the PHY */
-+	return regmap_update_bits(lpc->reg, LPC18XX_CREG_CREG0,
-+				  LPC18XX_CREG_CREG0_USB0PHY, 0);
-+}
-+
-+static int lpc18xx_usb_otg_phy_power_off(struct phy *phy)
-+{
-+	struct lpc18xx_usb_otg_phy *lpc = phy_get_drvdata(phy);
-+	int ret;
-+
-+	ret = regmap_update_bits(lpc->reg, LPC18XX_CREG_CREG0,
-+				 LPC18XX_CREG_CREG0_USB0PHY,
-+				 LPC18XX_CREG_CREG0_USB0PHY);
-+	if (ret)
-+		return ret;
-+
-+	clk_disable(lpc->clk);
-+
-+	return 0;
-+}
-+
-+static const struct phy_ops lpc18xx_usb_otg_phy_ops = {
-+	.init		= lpc18xx_usb_otg_phy_init,
-+	.exit		= lpc18xx_usb_otg_phy_exit,
-+	.power_on	= lpc18xx_usb_otg_phy_power_on,
-+	.power_off	= lpc18xx_usb_otg_phy_power_off,
-+	.owner		= THIS_MODULE,
-+};
-+
-+static int lpc18xx_usb_otg_phy_probe(struct platform_device *pdev)
-+{
-+	struct phy_provider *phy_provider;
-+	struct lpc18xx_usb_otg_phy *lpc;
-+
-+	lpc = devm_kzalloc(&pdev->dev, sizeof(*lpc), GFP_KERNEL);
-+	if (!lpc)
-+		return -ENOMEM;
-+
-+	lpc->reg = syscon_regmap_lookup_by_compatible("nxp,lpc1850-creg");
-+	if (IS_ERR(lpc->reg)) {
-+		dev_err(&pdev->dev, "failed to get syscon\n");
-+		return PTR_ERR(lpc->reg);
-+	}
-+
-+	lpc->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(lpc->clk)) {
-+		dev_err(&pdev->dev, "failed to get clock\n");
-+		return PTR_ERR(lpc->clk);
-+	}
-+
-+	lpc->phy = devm_phy_create(&pdev->dev, NULL, &lpc18xx_usb_otg_phy_ops);
-+	if (IS_ERR(lpc->phy)) {
-+		dev_err(&pdev->dev, "failed to create PHY\n");
-+		return PTR_ERR(lpc->phy);
-+	}
-+
-+	phy_set_drvdata(lpc->phy, lpc);
-+
-+	phy_provider = devm_of_phy_provider_register(&pdev->dev,
-+						     of_phy_simple_xlate);
-+	if (IS_ERR(phy_provider))
-+		return PTR_ERR(phy_provider);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id lpc18xx_usb_otg_phy_match[] = {
-+	{ .compatible = "nxp,lpc1850-usb-otg-phy" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, lpc18xx_usb_otg_phy_match);
-+
-+static struct platform_driver lpc18xx_usb_otg_phy_driver = {
-+	.probe		= lpc18xx_usb_otg_phy_probe,
-+	.driver		= {
-+		.name	= "lpc18xx-usb-otg-phy",
-+		.of_match_table = lpc18xx_usb_otg_phy_match,
-+	},
-+};
-+module_platform_driver(lpc18xx_usb_otg_phy_driver);
-+
-+MODULE_AUTHOR("Joachim Eastwood <manabian@gmail.com>");
-+MODULE_DESCRIPTION("NXP LPC18xx/43xx USB OTG PHY driver");
-+MODULE_LICENSE("GPL v2");
 -- 
 1.8.0
