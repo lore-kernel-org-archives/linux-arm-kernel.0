@@ -1,64 +1,247 @@
 From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Sat, 16 May 2015 18:37:51 -0300
-Subject: [PATCH v5 00/12] ARM: berlin: add nand support
-In-Reply-To: <1431356341-31640-1-git-send-email-antoine.tenart@free-electrons.com>
+Date: Sat, 16 May 2015 19:02:45 -0300
+Subject: [PATCH v5 05/12] mtd: pxa3xx_nand: rework flash detection and
+ timing setup
+In-Reply-To: <1431356341-31640-6-git-send-email-antoine.tenart@free-electrons.com>
 References: <1431356341-31640-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <5557B8AF.9090703@vanguardiasur.com.ar>
+ <1431356341-31640-6-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <5557BE85.4050208@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Antoine,
-
-This is a long patchset, which involves some very invasive changes
-to the driver. So, I think it'll be better to split it in different
-patchsets.
+Antoine,
 
 On 05/11/2015 11:58 AM, Antoine Tenart wrote:
-[..]
+> Rework the pxa3xx_nand driver to allow using functions exported by the
+> nand framework to detect the flash and the timings. Then setup the
+> timings using the helpers previously added.
 > 
-> Antoine Tenart (12):
-
-These two clock patches are related to Berlin support only.
-
->   mtd: pxa3xx_nand: add a non mandatory ECC clock
->   Documentation: bindings: document the clocks for pxa3xx-nand
-
-The next four patches rework the timing setup and remove the legacy
-device detection. I think we should try to get them merged in first place.
-
->   mtd: pxa3xx_nand: add a default chunk size
->   mtd: pxa3xx_nand: add helpers to setup the timings
->   mtd: pxa3xx_nand: rework flash detection and timing setup
->   mtd: pxa3xx_nand: clean up the pxa3xx timings
-
-Next one just adds support for a new device. It has little to do with
-the series. I already replied about using JEDEC ID; once we solve that,
-I suggest that you submit this patch alone.
-
->   mtd: nand: add Samsung K9GBG08U0A-M to nand_ids table
-
-And finally, once we solve the timing rework, we can go through Berlin
-support.
-
->   mtd: pxa3xx_nand: add support for the Marvell Berlin nand controller
->   Documentation: bindings: add the Berlin nand controller compatible
->   mtd: nand: let Marvell Berlin SoCs select the pxa3xx driver
->   ARM: berlin: add BG2Q node for the nand
->   ARM: berlin: enable flash on the BG2Q DMP
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> ---
+>  drivers/mtd/nand/pxa3xx_nand.c | 114 ++++++++++-------------------------------
+>  1 file changed, 26 insertions(+), 88 deletions(-)
 > 
+> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+> index b5aad4c46115..6d8d191ee05b 100644
+> --- a/drivers/mtd/nand/pxa3xx_nand.c
+> +++ b/drivers/mtd/nand/pxa3xx_nand.c
+> @@ -1322,48 +1322,25 @@ static int pxa3xx_nand_waitfunc(struct mtd_info *mtd, struct nand_chip *this)
+>  	return NAND_STATUS_READY;
+>  }
+>  
+> -static int pxa3xx_nand_config_flash(struct pxa3xx_nand_info *info,
+> -				    const struct pxa3xx_nand_flash *f)
+> +static int pxa3xx_nand_config_flash(struct pxa3xx_nand_info *info)
+>  {
+>  	struct platform_device *pdev = info->pdev;
+>  	struct pxa3xx_nand_platform_data *pdata = dev_get_platdata(&pdev->dev);
+>  	struct pxa3xx_nand_host *host = info->host[info->cs];
+> +	struct mtd_info *mtd = host->mtd;
+> +	struct nand_chip *chip = mtd->priv;
+>  	uint32_t ndcr = 0x0; /* enable all interrupts */
+>  
+> -	if (f->page_size != 2048 && f->page_size != 512) {
+> -		dev_err(&pdev->dev, "Current only support 2048 and 512 size\n");
+> -		return -EINVAL;
+> -	}
+> -
+> -	if (f->flash_width != 16 && f->flash_width != 8) {
+> -		dev_err(&pdev->dev, "Only support 8bit and 16 bit!\n");
+> -		return -EINVAL;
+> -	}
+> -
+> -	/* calculate flash information */
+> -	host->read_id_bytes = (f->page_size == 2048) ? 4 : 2;
+> -
+> -	/* calculate addressing information */
+> -	host->col_addr_cycles = (f->page_size == 2048) ? 2 : 1;
+> -
+> -	if (f->num_blocks * f->page_per_block > 65536)
+> -		host->row_addr_cycles = 3;
+> -	else
+> -		host->row_addr_cycles = 2;
+> -
+>  	ndcr |= (pdata->enable_arbiter) ? NDCR_ND_ARB_EN : 0;
+>  	ndcr |= (host->col_addr_cycles == 2) ? NDCR_RA_START : 0;
+> -	ndcr |= (f->page_per_block == 64) ? NDCR_PG_PER_BLK : 0;
+> -	ndcr |= (f->page_size == 2048) ? NDCR_PAGE_SZ : 0;
+> -	ndcr |= (f->flash_width == 16) ? NDCR_DWIDTH_M : 0;
+> -	ndcr |= (f->dfc_width == 16) ? NDCR_DWIDTH_C : 0;
+> +	ndcr |= (chip->page_shift == 6) ? NDCR_PG_PER_BLK : 0;
+> +	ndcr |= (mtd->writesize == 2048) ? NDCR_PAGE_SZ : 0;
 
-What do you think?
+By the time you call this, there's no detected flash, so there's
+no geometry information such as mtd->writesize, chip->page_shift, etc.
 
->  .../devicetree/bindings/mtd/pxa3xx-nand.txt        |   5 +
->  arch/arm/boot/dts/berlin2q-marvell-dmp.dts         |  25 ++
->  arch/arm/boot/dts/berlin2q.dtsi                    |  13 +
->  drivers/mtd/nand/Kconfig                           |   4 +-
->  drivers/mtd/nand/nand_ids.c                        |   4 +
->  drivers/mtd/nand/pxa3xx_nand.c                     | 440 +++++++++++++++------
->  include/linux/platform_data/mtd-nand-pxa3xx.h      |  11 +-
->  7 files changed, 374 insertions(+), 128 deletions(-)
-> 
+>  
+>  	ndcr |= NDCR_RD_ID_CNT(host->read_id_bytes);
+>  	ndcr |= NDCR_SPARE_EN; /* enable spare by default */
+>  
+>  	info->reg_ndcr = ndcr;
+>  
+> -	pxa3xx_nand_set_timing(host, f->timing);
+>  	return 0;
+>  }
+>  
+> @@ -1458,20 +1435,28 @@ static void pxa3xx_nand_free_buff(struct pxa3xx_nand_info *info)
+>  }
+>  #endif
+>  
+> -static int pxa3xx_nand_sensing(struct pxa3xx_nand_info *info)
+> +static int pxa3xx_nand_sensing(struct pxa3xx_nand_host *host)
+>  {
+> +	struct pxa3xx_nand_info *info = host->info_data;
+>  	struct mtd_info *mtd;
+>  	struct nand_chip *chip;
+> +	const struct nand_sdr_timings *timings;
+>  	int ret;
+>  
+>  	mtd = info->host[info->cs]->mtd;
+>  	chip = mtd->priv;
+>  
+> -	/* use the common timing to make a try */
+> -	ret = pxa3xx_nand_config_flash(info, &builtin_flash_types[0]);
+> +	ret = pxa3xx_nand_config_flash(info);
+>  	if (ret)
+>  		return ret;
+>  
+> +	/* use the common timing to make a try */
+> +	timings = onfi_async_timing_mode_to_sdr_timings(0);
+> +	if (IS_ERR(timings))
+> +		return PTR_ERR(timings);
+> +
+> +	pxa3xx_nand_set_sdr_timing(host, timings);
+> +
+>  	chip->cmdfunc(mtd, NAND_CMD_RESET, 0, 0);
+>  	ret = chip->waitfunc(mtd, chip);
+>  	if (ret & NAND_STATUS_FAIL)
+> @@ -1555,12 +1540,8 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
+>  	struct pxa3xx_nand_info *info = host->info_data;
+>  	struct platform_device *pdev = info->pdev;
+>  	struct pxa3xx_nand_platform_data *pdata = dev_get_platdata(&pdev->dev);
+> -	struct nand_flash_dev pxa3xx_flash_ids[2], *def = NULL;
+> -	const struct pxa3xx_nand_flash *f = NULL;
+>  	struct nand_chip *chip = mtd->priv;
+> -	uint32_t id = -1;
+> -	uint64_t chipsize;
+> -	int i, ret, num;
+> +	int ret;
+>  	uint16_t ecc_strength, ecc_step;
+>  
+>  	if (pdata->keep_config && !pxa3xx_nand_detect_config(info))
+> @@ -1569,7 +1550,7 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
+>  	/* Set a default chunk size */
+>  	info->chunk_size = 512;
+>  
+> -	ret = pxa3xx_nand_sensing(info);
+> +	ret = pxa3xx_nand_sensing(host);
+>  	if (ret) {
+>  		dev_info(&info->pdev->dev, "There is no chip on cs %d!\n",
+>  			 info->cs);
+> @@ -1577,64 +1558,20 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
+>  		return ret;
+>  	}
+>  
+> -	chip->cmdfunc(mtd, NAND_CMD_READID, 0, 0);
+> -	id = *((uint16_t *)(info->data_buff));
+> -	if (id != 0)
+> -		dev_info(&info->pdev->dev, "Detect a flash id %x\n", id);
+> -	else {
+> -		dev_warn(&info->pdev->dev,
+> -			 "Read out ID 0, potential timing set wrong!!\n");
+> -
+> -		return -EINVAL;
+> -	}
+> -
+> -	num = ARRAY_SIZE(builtin_flash_types) + pdata->num_flash - 1;
+> -	for (i = 0; i < num; i++) {
+> -		if (i < pdata->num_flash)
+> -			f = pdata->flash + i;
+> -		else
+> -			f = &builtin_flash_types[i - pdata->num_flash + 1];
+> -
+> -		/* find the chip in default list */
+> -		if (f->chip_id == id)
+> -			break;
+> -	}
+> -
+> -	if (i >= (ARRAY_SIZE(builtin_flash_types) + pdata->num_flash - 1)) {
+> -		dev_err(&info->pdev->dev, "ERROR!! flash not defined!!!\n");
+> -
+> -		return -EINVAL;
+> -	}
+> -
+> -	ret = pxa3xx_nand_config_flash(info, f);
 
+This second call to pxa3xx_nand_config_flash was in charge of re-configuring
+the device after proper identification.
+
+I'd say a proper approach is to configure default parameters,
+call nand_scan_ident, and finally re-configure using the detected values.
+
+READ_ID should only needs a few parameters to work (e.g. read_id_bytes),
+and those are the ones that need an initial default. The rest can remain
+null until the device is known.
+
+Regarding read_id_bytes default value, using '4' makes sense and should
+work in all cases.
+
+> -	if (ret) {
+> -		dev_err(&info->pdev->dev, "ERROR! Configure failed\n");
+> -		return ret;
+> -	}
+> -
+> -	memset(pxa3xx_flash_ids, 0, sizeof(pxa3xx_flash_ids));
+> -
+> -	pxa3xx_flash_ids[0].name = f->name;
+> -	pxa3xx_flash_ids[0].dev_id = (f->chip_id >> 8) & 0xffff;
+> -	pxa3xx_flash_ids[0].pagesize = f->page_size;
+> -	chipsize = (uint64_t)f->num_blocks * f->page_per_block * f->page_size;
+> -	pxa3xx_flash_ids[0].chipsize = chipsize >> 20;
+> -	pxa3xx_flash_ids[0].erasesize = f->page_size * f->page_per_block;
+> -	if (f->flash_width == 16)
+> -		pxa3xx_flash_ids[0].options = NAND_BUSWIDTH_16;
+> -	pxa3xx_flash_ids[1].name = NULL;
+> -	def = pxa3xx_flash_ids;
+>  KEEP_CONFIG:
+> -	if (info->reg_ndcr & NDCR_DWIDTH_M)
+> -		chip->options |= NAND_BUSWIDTH_16;
+> -
+>  	/* Device detection must be done with ECC disabled */
+>  	if (info->variant == PXA3XX_NAND_VARIANT_ARMADA370)
+>  		nand_writel(info, NDECCCTRL, 0x0);
+>  
+> -	if (nand_scan_ident(mtd, 1, def))
+> +	if (nand_scan_ident(mtd, 1, NULL))
+>  		return -ENODEV;
+>  
+
+We only want to configure timings if keep_config is false. Otherwise,
+this breaks on platforms that don't have timings and don't support ONFI.
+
+> +	ret = pxa3xx_nand_init_timings(host);
+> +	if (ret) {
+> +		dev_err(&info->pdev->dev, "Failed to set timings: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+>  	if (pdata->flash_bbt) {
+>  		/*
+>  		 * We'll use a bad block table stored in-flash and don't
+> @@ -1732,6 +1669,7 @@ static int alloc_nand_resource(struct platform_device *pdev)
+>  		host->mtd = mtd;
+>  		host->cs = cs;
+>  		host->info_data = info;
+> +		host->read_id_bytes = 4;
+>  		mtd->priv = host;
+>  		mtd->owner = THIS_MODULE;
+>  
+
+Aside from this comments, I really like this four patches. They clean most of
+the mess and introduce proper timing configuration. In fact, this cleanup
+might help removing the keep_config property on mvebu boards.
+
+Thanks for the work,
 -- 
 Ezequiel Garcia, VanguardiaSur
 www.vanguardiasur.com.ar
