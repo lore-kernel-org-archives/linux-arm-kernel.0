@@ -1,91 +1,86 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Sat, 16 May 2015 11:11:20 +0200
-Subject: [PATCH 0/7] Add SMP bringup support for mt65xx socs
-In-Reply-To: <1431763769.23098.2.camel@mtksdaap41>
-References: <1430466210-22963-1-git-send-email-yingjoe.chen@mediatek.com>
- <CABuKBeJ406DUFoVs2p3-u6sW58Dm7XDd6uxCc==Mkq3dMhhd5Q@mail.gmail.com>
- <1430896766.15346.13.camel@mtksdaap41>
- <1430899182.4930.2.camel@mtksdaap41>
- <CABuKBeLT8-sjPY6ZQXacMZZ_3iKX-g82AB0gPhsi7VW=WdjTTw@mail.gmail.com>
- <CABuKBeKLtgs56PDO3tEftWNv58-RwtDR2cyxzs4FLX1AFZSKbg@mail.gmail.com>
- <1431763769.23098.2.camel@mtksdaap41>
-Message-ID: <CABuKBeL-=3Q98eMJsyJ3cDwTQfz6SR2cjtXpk-H4B-jCigF3RQ@mail.gmail.com>
+Date: Sat, 16 May 2015 11:17:31 +0200
+Subject: [PATCH] serial: 8250_uniphier: add UniPhier serial driver
+In-Reply-To: <1431692764-17576-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1431692764-17576-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CABuKBeJnMcyH7TGtYcUToRhLnu_qcxHtwEedS2JgGjX8EiX1Gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-16 10:09 GMT+02:00 Yingjoe Chen <yingjoe.chen@mediatek.com>:
-> On Wed, 2015-05-06 at 13:04 +0200, Matthias Brugger wrote:
->> Hi Joe,
->>
->> 2015-05-06 10:29 GMT+02:00 Matthias Brugger <matthias.bgg@gmail.com>:
->> > 2015-05-06 9:59 GMT+02:00 Yingjoe Chen <yingjoe.chen@mediatek.com>:
->> >> On Wed, 2015-05-06 at 15:19 +0800, Yingjoe Chen wrote:
->> >>> Hi Matthias,
->> >> <...>
->> >>> > I tried on the mt8135 eval board but it fails to bring up the CPU.
->> >>> >
->> >>> > When booting:
->> >>> > [    1.048588] CPU1: failed to come online
->> >>> > [    2.049914] CPU2: failed to come online
->> >>> > [    3.051245] CPU3: failed to come online
->> >>>
->> >>>
->> >>> Thanks for testing, and the config file you provided.
->> >>> It seems you are running THUMB2 kernel, unfortunately mt8135 trustzone
->> >>> firmware doesn't support jump to THUMB2 code directly.
->> >>>
->> >>> I can workaround this with the following patch. I'll include it in my
->> >>> next round.
->> >>>
->> >>> Joe.C
->> >>>
->> >>> -----8<----------------
->> >>> diff --git a/arch/arm/mach-mediatek/platsmp.c
->> >>> b/arch/arm/mach-mediatek/platsmp.c
->> >>> index e266b3d..5dea55a 100644
->> >>> --- a/arch/arm/mach-mediatek/platsmp.c
->> >>> +++ b/arch/arm/mach-mediatek/platsmp.c
->> >>> @@ -57,6 +57,18 @@ static const struct of_device_id mtk_smp_boot_infos[]
->> >>> __initconst = {
->> >>>  static void __iomem *mtk_smp_base;
->> >>>  static const struct mtk_smp_boot_info *mtk_smp_info;
->> >>>
->> >>> +#ifdef CONFIG_THUMB2_KERNEL
->> >>> +__asm__(
->> >>> +     ".arm\n"
->> >>> +     "mtk_secondary_startup_fixup:\n"
->> >>> +     "       b secondary_startup\n"
->> >>> +     ".thumb\n"
->> >>> +);
->> >>> +
->> >>> +void mtk_secondary_startup_fixup(void);
->> >>> +#define secondary_startup mtk_secondary_startup_fixup
->> >>> +#endif
->> >>
->> >>
->> >> Replying myself.
->> >>
->> >> It seems kernel already have secondary_startup_arm which support this
->> >> usage. I'll use that in my next version instead.
->> >
->> > With this I was able to get the board up and running. I will try mt6589 ASAP.
->>
->> I just realized, that your aforementioned patch for the THUMB2 kernel
->> breaks SMP on mt6589. Strangely without this patch it works fine.
->>
+2015-05-15 14:26 GMT+02:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> Add the driver for on-chip UART used on UniPhier SoCs.
+> The register map of this hardware is similar to that of 8250
+> (but the address for FCR, LCR is different), so it should go
+> into drivers/tty/serial/8250 directory.
 >
-> Hi Matthias,
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
 >
-> Unfortunately I can't reproduce or figure out why this could happen.
-> I change to use common kernel code secondary_startup_arm in new series,
-> could you that a try?
-> Thanks.
+>  drivers/tty/serial/8250/8250_uniphier.c | 243 ++++++++++++++++++++++++++++++++
+>  drivers/tty/serial/8250/Kconfig         |   7 +
+>  drivers/tty/serial/8250/Makefile        |   1 +
+>  3 files changed, 251 insertions(+)
+>  create mode 100644 drivers/tty/serial/8250/8250_uniphier.c
+>
+> diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
+> new file mode 100644
+> index 0000000..f108d81
+> --- /dev/null
+> +++ b/drivers/tty/serial/8250/8250_uniphier.c
+> @@ -0,0 +1,243 @@
+> +/*
+> + * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/init.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/clk.h>
+> +#include <linux/of.h>
+> +#include <linux/io.h>
+> +#include <linux/serial_core.h>
+> +#include <linux/serial_reg.h>
+> +#include <linux/serial_8250.h>
+> +#include "8250.h"
+> +
+> +/*
+> + * Most (but not all) of UniPhier UART devices have 64-depth FIFO.
+> + * Set this value if "fifo-size" property is missing from the device tree node.
+> + */
+> +#define UNIPHIER_UART_DEFAULT_FIFO_SIZE        64
+> +
+> +#define UNIPHIER_UART_CHAR_FCR 3       /* Character / FIFO Control Register */
+> +#define UNIPHIER_UART_LCR_MCR  4       /* Line/Modem Control Register */
+> +#define UNIPHIER_UART_DLR      9       /* Divisor Latch Register */
+> +
+> +/*
+> + * The register map is slightly different from that of 8250.
+> + * IO callbacks must be overridden for correct access to FCR, LCR, and MCR.
+> + */
+> +static unsigned int uniphier_serial_in(struct uart_port *p, int offset)
+> +{
+> +       int valshift = 0;
+> +
+> +       switch (offset) {
+> +       case UART_LCR:
+> +               valshift = 8;
 
-I just tried it on mt6589 and mt8135 and its works on both.
-Actually if you revert patch 1/9 SMP on mt6589 stops working.
+Please use a define for the value. Something like UNIPHIER_UART_LCR_SHIFT maybe.
 
-Thanks,
+Cheers,
 Matthias
+
+
 
 -- 
 motzblog.wordpress.com
