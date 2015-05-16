@@ -1,63 +1,43 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Sat, 16 May 2015 09:09:55 +0200
-Subject: [PATCH] ARM: 8351/1: perf: fix memory leak on return
-In-Reply-To: <1431693789-9679-1-git-send-email-colin.king@canonical.com>
-References: <1431693789-9679-1-git-send-email-colin.king@canonical.com>
-Message-ID: <20150516070955.GA2429@gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Sat, 16 May 2015 10:18:08 +0300
+Subject: [PATCH v3 1/4] remoteproc: introduce rproc_get_by_phandle API
+In-Reply-To: <5550C644.4040005@ti.com>
+References: <1427917039-43206-1-git-send-email-d-gerlach@ti.com>
+ <1427917039-43206-2-git-send-email-d-gerlach@ti.com>
+ <CAK=WgbZCqnMPEnU2992gkOp07BaCP5NJNRO-hLCAdOtUXZGRnQ@mail.gmail.com>
+ <5550C644.4040005@ti.com>
+Message-ID: <CAK=WgbZGYa-xWE_cxPA1aq50kK2NBdQfhQHX+sPyowky6Syekg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Suman,
 
-* Colin King <colin.king@canonical.com> wrote:
+On Mon, May 11, 2015 at 6:09 PM, Suman Anna <s-anna@ti.com> wrote:
+> On 05/09/2015 02:39 AM, Ohad Ben-Cohen wrote:
+> > On Wed, Apr 1, 2015 at 10:37 PM, Dave Gerlach <d-gerlach@ti.com> wrote:
+> >> This patch uses the code removed by commit 40e575b1d0b3 ("remoteproc:
+> >> remove the get_by_name/put API") for the ref counting a rproc klist
+> >> code but has rproc_get_by_name replaced with an rproc_get_by_phandle API.
+> >
+> > The general idea makes sense to me, but I'm not sure we really do need
+> > a klist here, since the usage profile of this list is expected to be
+> > super simple: very small number of accessors, looking for small number
+> > of list members a small number of times, and probably never do need to
+> > modify the list while accessing it.
+> >
+> > I suspect that the code would be simpler to maintain, debug and
+> > understand if we just use a simple list with a simple locking
+> > methodology here.
+>
+> The klist usage is something that we restored from previous remoteproc
+> core code as used by the rproc_get_by_name() API. This was removed in
+> commit 40e575b1d0b3 ("remoteproc: remove the get_by_name/put API"). We
+> chose to use the code that had been present before rather than inventing
+> something new all over again. If you feel that a regular list is the way
+> to go forward, we can make the switch.
 
-> From: Colin Ian King <colin.king@canonical.com>
-> 
-> Recent commit 3b8786ff7a1b31645ae2c26a2ec32dbd42ac1094
-> ("ARM: 8352/1: perf: Fix the pmu node name in warning message")
-> introduced a memory leak of irqs on the "Don't bother with PPIs"
-> return path. This was picked up by static analysis by cppcheck:
-> 
-> [arch/arm/kernel/perf_event_cpu.c:315]: (error) Memory leak: irqs
-> 
-> simpele fix is to free irqs when returning.
-> 
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
-> ---
->  arch/arm/kernel/perf_event_cpu.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-> index 213919b..9e5b2a5 100644
-> --- a/arch/arm/kernel/perf_event_cpu.c
-> +++ b/arch/arm/kernel/perf_event_cpu.c
-> @@ -311,8 +311,10 @@ static int of_pmu_irq_cfg(struct platform_device *pdev)
->  
->  	/* Don't bother with PPIs; they're already affine */
->  	irq = platform_get_irq(pdev, 0);
-> -	if (irq >= 0 && irq_is_percpu(irq))
-> +	if (irq >= 0 && irq_is_percpu(irq)) {
-> +		kfree(irqs);
->  		return 0;
-> +	}
->  
->  	for (i = 0; i < pdev->num_resources; ++i) {
->  		struct device_node *dn;
-
-So returning from the middle of a function isn't very clean.
-
-Also, why do we return 0 in an error case?
-
-Furthermore, this function already has a (partially hidden) error 
-cleanup path:
-
-        if (i == pdev->num_resources)
-                cpu_pmu->irq_affinity = irqs;
-        else
-                kfree(irqs);
-
-So this code should use proper goto driven cleanup. That's faster and 
-cleaner, and is less likely to result in bugs like the above.
+Yes, please. Using a regular list with a simple locking methodology
+should make the code easier to understand and debug.
 
 Thanks,
-
-	Ingo
+Ohad.
