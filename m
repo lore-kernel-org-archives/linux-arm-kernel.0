@@ -1,31 +1,26 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Sat, 16 May 2015 12:39:21 +0900
-Subject: [GIT PULL 4/5] Samsung arm64 DT updates for v4.1
-In-Reply-To: <CAGTfZH3bzjvVLH2HALDTLUf0MzibeH7sfFJh1n=dyuitYmUw_A@mail.gmail.com>
-References: <555248E5.6010709@kernel.org>
- <CAGTfZH3bzjvVLH2HALDTLUf0MzibeH7sfFJh1n=dyuitYmUw_A@mail.gmail.com>
-Message-ID: <5556BBE9.6030007@kernel.org>
+Date: Sat, 16 May 2015 12:45:30 +0900
+Subject: [PATCH] arm/mach-exynos: suspend: Don't try to
+ initializesuspend/suspend on old DT
+In-Reply-To: <1431593413.13579.9.camel@citrix.com>
+References: <1431438307-25410-1-git-send-email-julien.grall@citrix.com>
+ <555235FB.3040804@kernel.org> <1431593413.13579.9.camel@citrix.com>
+Message-ID: <5556BD5A.5010701@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/15 22:56, Chanwoo Choi wrote:
-> Hi Kukjin,
-
-[...]
-
->> As you know, the arm64-exynos5433 couldn't be sent to upstream during
->> previous merge window because it cannot be built without other stuff
->> such as board DT file. I think, you need to post its regarding board DT
->> file, I could test the exynos5433 series in my side with smdk5433 dt
->> file though. Maybe as you know, I have no plan to upstream the smdk5433
->> DT file because it will not be used outside of Samsung S.LSI.
+On 05/14/15 17:50, Ian Campbell wrote:
+> On Wed, 2015-05-13 at 02:18 +0900, Kukjin Kim wrote:
+>> On 05/12/15 22:45, Julien Grall wrote:
+>>> Since commit 8b283c0 "ARM: exynos4/5: convert pmu wakeup to stacked domains",
+>>> a suspend/resume is not supported on old DT.
+> [...]
+>> I'm fine on this, applied.
 > 
-> Thanks for your test about Exynos5433 patch-set.
-> But, I cannot send the DTS file for Exynos5433 right now.
-> On the next, I'll send the Exynos5433's patchset and board dts file.
+> Thanks. Do you also plan to send it to Linus (or to whomeever you feed
+> things through) for 4.1-rc$NEXT?
 > 
-OK, I see. I think, maybe you can make a patch for board DT file based
-on v4.2-next/dt64-samsung branch in samsung tree.
+Already it has been sent to Linus via arm-soc. I think, it should be
+fine after v4.1-rc4?
 
-Thanks,
-Kukjin
+- Kukjin
