@@ -1,79 +1,83 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Sat, 16 May 2015 11:44:25 +0200
-Subject: [PATCH v7 13/13] ARM: vf610m4: add defconfig for Linux on Vybrids
- Cortex-M4
+Date: Sat, 16 May 2015 11:44:17 +0200
+Subject: [PATCH v7 05/13] irqchip: vf610-mscm: support NVIC parent
 In-Reply-To: <1431769465-26867-1-git-send-email-stefan@agner.ch>
 References: <1431769465-26867-1-git-send-email-stefan@agner.ch>
-Message-ID: <1431769465-26867-14-git-send-email-stefan@agner.ch>
+Message-ID: <1431769465-26867-6-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add defconfig for Linux on Vybrid (vf610) on the secondary Cortex-
-M4 CPU. The use of a XIP image has been tested which needs to be
-loaded (e.g. using the custom m4boot loader) to the end of the
-available RAM at address 0x8f000000. The Cortex-M4 has a code-alias
-which makes sure that the instructions get fetched through the code
-bus (alias starts at 0x00800000 => 0x80800000 in system address).
-Hence, to get optimal performance, use 0x0f000000 as XIP_PHYS_ADDR.
-This address is additionally shifted by the length of the minimal
-loader which is inserted by m4boot. Currently, this offset is 0x80.
-
-The standard DRAM base address is configured to 0x8C000000, which
-gives the Cortex-M4 48MiB of RAM.
+Support the NVIC interrupt controller as node parent of the MSCM
+interrupt router. On the dual-core variants of Vybird (VF6xx), the
+NVIC interrupt controller is used by the Cortex-M4. To support
+running Linux on this core too, MSCM needs NVIC parent support too.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/configs/vf610m4_defconfig | 42 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
- create mode 100644 arch/arm/configs/vf610m4_defconfig
+ drivers/irqchip/irq-vf610-mscm-ir.c | 23 +++++++++++++++++------
+ 1 file changed, 17 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/configs/vf610m4_defconfig b/arch/arm/configs/vf610m4_defconfig
-new file mode 100644
-index 0000000..aeb2482
---- /dev/null
-+++ b/arch/arm/configs/vf610m4_defconfig
-@@ -0,0 +1,42 @@
-+CONFIG_NAMESPACES=y
-+CONFIG_BLK_DEV_INITRD=y
-+# CONFIG_RD_BZIP2 is not set
-+# CONFIG_RD_LZMA is not set
-+# CONFIG_RD_XZ is not set
-+# CONFIG_RD_LZ4 is not set
-+CONFIG_KALLSYMS_ALL=y
-+CONFIG_EMBEDDED=y
-+# CONFIG_MMU is not set
-+CONFIG_ARM_SINGLE_ARMV7M=y
-+CONFIG_ARCH_MXC=y
-+CONFIG_SOC_VF610=y
-+CONFIG_SET_MEM_PARAM=y
-+CONFIG_DRAM_BASE=0x8c000000
-+CONFIG_FLASH_MEM_BASE=0x8f000000
-+CONFIG_FLASH_SIZE=0x01000000
-+CONFIG_CMDLINE="console=/dev/ttyLP2"
-+CONFIG_XIP_KERNEL=y
-+CONFIG_XIP_PHYS_ADDR=0x0f000080
-+CONFIG_BINFMT_FLAT=y
-+CONFIG_BINFMT_ZFLAT=y
-+CONFIG_BINFMT_SHARED_FLAT=y
-+# CONFIG_SUSPEND is not set
-+# CONFIG_UEVENT_HELPER is not set
-+# CONFIG_STANDALONE is not set
-+# CONFIG_PREVENT_FIRMWARE_BUILD is not set
-+# CONFIG_FIRMWARE_IN_KERNEL is not set
-+# CONFIG_ALLOW_DEV_COREDUMP is not set
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_BLK_DEV_RAM_COUNT=4
-+# CONFIG_INPUT_MOUSEDEV is not set
-+# CONFIG_KEYBOARD_ATKBD is not set
-+# CONFIG_INPUT_MOUSE is not set
-+# CONFIG_SERIO is not set
-+CONFIG_SERIAL_FSL_LPUART=y
-+CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
-+# CONFIG_HW_RANDOM is not set
-+CONFIG_MFD_SYSCON=y
-+# CONFIG_HID is not set
-+# CONFIG_USB_SUPPORT is not set
-+# CONFIG_MISC_FILESYSTEMS is not set
-+# CONFIG_FTRACE is not set
+diff --git a/drivers/irqchip/irq-vf610-mscm-ir.c b/drivers/irqchip/irq-vf610-mscm-ir.c
+index 9521057..b932ecb 100644
+--- a/drivers/irqchip/irq-vf610-mscm-ir.c
++++ b/drivers/irqchip/irq-vf610-mscm-ir.c
+@@ -47,6 +47,7 @@ struct vf610_mscm_ir_chip_data {
+ 	void __iomem *mscm_ir_base;
+ 	u16 cpu_mask;
+ 	u16 saved_irsprc[MSCM_IRSPRC_NUM];
++	bool is_nvic;
+ };
+ 
+ static struct vf610_mscm_ir_chip_data *mscm_ir_data;
+@@ -101,7 +102,7 @@ static void vf610_mscm_ir_enable(struct irq_data *data)
+ 	writew_relaxed(chip_data->cpu_mask,
+ 		       chip_data->mscm_ir_base + MSCM_IRSPRC(hwirq));
+ 
+-	irq_chip_unmask_parent(data);
++	irq_chip_enable_parent(data);
+ }
+ 
+ static void vf610_mscm_ir_disable(struct irq_data *data)
+@@ -111,7 +112,7 @@ static void vf610_mscm_ir_disable(struct irq_data *data)
+ 
+ 	writew_relaxed(0x0, chip_data->mscm_ir_base + MSCM_IRSPRC(hwirq));
+ 
+-	irq_chip_mask_parent(data);
++	irq_chip_disable_parent(data);
+ }
+ 
+ static struct irq_chip vf610_mscm_ir_irq_chip = {
+@@ -143,10 +144,17 @@ static int vf610_mscm_ir_domain_alloc(struct irq_domain *domain, unsigned int vi
+ 					      domain->host_data);
+ 
+ 	gic_data.np = domain->parent->of_node;
+-	gic_data.args_count = 3;
+-	gic_data.args[0] = GIC_SPI;
+-	gic_data.args[1] = irq_data->args[0];
+-	gic_data.args[2] = irq_data->args[1];
++
++	if (mscm_ir_data->is_nvic) {
++		gic_data.args_count = 1;
++		gic_data.args[0] = irq_data->args[0];
++	} else {
++		gic_data.args_count = 3;
++		gic_data.args[0] = GIC_SPI;
++		gic_data.args[1] = irq_data->args[0];
++		gic_data.args[2] = irq_data->args[1];
++	}
++
+ 	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, &gic_data);
+ }
+ 
+@@ -199,6 +207,9 @@ static int __init vf610_mscm_ir_of_init(struct device_node *node,
+ 		goto out_unmap;
+ 	}
+ 
++	if (of_device_is_compatible(domain->parent->of_node, "arm,armv7m-nvic"))
++		mscm_ir_data->is_nvic = true;
++
+ 	cpu_pm_register_notifier(&mscm_ir_notifier_block);
+ 
+ 	return 0;
 -- 
 2.4.1
