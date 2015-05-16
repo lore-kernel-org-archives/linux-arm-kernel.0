@@ -1,54 +1,67 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 16 May 2015 21:07:57 +0800
-Subject: [PATCH v4 5/7] clk: zx: add clock support to zx296702
-In-Reply-To: <6693731.YF8XsCYmbE@wuerfel>
+Date: Sat, 16 May 2015 21:14:22 +0800
+Subject: [PATCH v4 4/7] ARM: dts: zx: add an initial zx296702 dts and doc
+In-Reply-To: <CABymUCOVumKXbV8MU3oKVBBrXJA_m8fsr8GGtWHZevQichCG-Q@mail.gmail.com>
 References: <1430212691-16009-1-git-send-email-jun.nie@linaro.org>
- <1430212691-16009-6-git-send-email-jun.nie@linaro.org>
- <6693731.YF8XsCYmbE@wuerfel>
-Message-ID: <20150516130756.GF10411@tiger>
+ <1430212691-16009-5-git-send-email-jun.nie@linaro.org>
+ <2168253.ZrhOUFeSpY@wuerfel> <15088943.GUMZUHMVfp@wuerfel>
+ <CABymUCOVumKXbV8MU3oKVBBrXJA_m8fsr8GGtWHZevQichCG-Q@mail.gmail.com>
+Message-ID: <20150516131422.GG10411@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 15, 2015 at 10:32:14PM +0200, Arnd Bergmann wrote:
-> On Tuesday 28 April 2015 17:18:09 Jun Nie wrote:
-> > diff --git a/include/dt-bindings/clock/zx296702-clock.h b/include/dt-bindings/clock/zx296702-clock.h
-> > new file mode 100644
-> > index 0000000..c5e7ec2
-> > --- /dev/null
-> > +++ b/include/dt-bindings/clock/zx296702-clock.h
-> > @@ -0,0 +1,162 @@
-> > +/*
-> > + * Copyright 2014 Linaro Ltd.
-> > + * Copyright (C) 2014 ZTE Corporation.
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + */
-> > +
-> > +#ifndef __DT_BINDINGS_CLOCK_ZX296702_H
-> > +#define __DT_BINDINGS_CLOCK_ZX296702_H
-> > +
-> > +#define ZX296702_OSC                           0
-> > +#define ZX296702_PLL_A9                                1
-> > +#define ZX296702_PLL_A9_350M                   2
-> > +#define ZX296702_PLL_MAC_1000M                 3
-> > +#define ZX296702_PLL_MAC_333M                  4
-> > +#define ZX296702_PLL_MM0_1188M                 5
-> > +#define ZX296702_PLL_MM0_396M                  6
-> > +#define ZX296702_PLL_MM0_198M                  7
-> > +#define ZX296702_PLL_MM1_108M                  8
-> > +#define ZX296702_PLL_MM1_72M                   9
-> > 
+On Sat, May 16, 2015 at 03:05:11PM +0800, Jun Nie wrote:
+> B.R.
+> Jun
 > 
-> No objections for this driver going through Mike's tree, but as I said
-> if you want the dts file to be merged in the same merge window, it would
-> be best to avoid the header file.
+> 
+> 2015-05-16 4:19 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
+> > On Friday 15 May 2015 21:59:06 Arnd Bergmann wrote:
+> >> On Tuesday 28 April 2015 17:18:08 Jun Nie wrote:
+> >> > Add initial dts file and document for ZX296702 and board ZX296702-AD1.
+> >> > More peripherals will be added later.
+> >> >
+> >> > Signed-off-by: Jun Nie <jun.nie@linaro.org>
+> >>
+> >> Applied to next/dt, thanks!
+> >>
+> >>
+> >
+> > And removed again. I hadn't pushed it out to a public tree yet and
+> > found a build error in this.
+> >
+> > Unfortunately, you are using a header file here that is only introduced
+> > by a patch that belongs to another subsystem maintainer.
+> >
+> > Please try to get rid of that dependency, or submit this patch again
+> > for the following merge window once that driver has been merged upstream.
+> >
+> > In a lot of cases, you can just use hardware numbers as identifiers
+> > instead of making up your own, to avoid having to use ugly header files
+> > that make life hard for us.
+> >
+> >         Arnd
+> 
+> Hi Arnd,
+> 
+> I have to use macro in file
+> "include/dt-bindings/clock/zx296702-clock.h" for clock id. Because it
+> is hard to maintain the id as it is has nothing to do with hardware
 
-Alternatively, we can ask an ACK from Mike or Stephen on this patch, so
-that we can merge the whole series through arm-soc tree.  As this patch
-adds a SoC specific clock driver and it's quite self-contained and
-shouldn't cause non-trivial merge conflicts, Mike/Stephen may be happy
-to give an ACK on it.
+It's not true.  The number has something to do with hardware.  Ideally,
+the clock ID should be numbered according clock tree from root to leaf.
+The problem with zx296702 is that the reference manual doesn't give a
+full picture of the whole clock tree.  And we have to number the clocks
+as much as we can at some level mapping the hardware clock tree.
 
 Shawn
+
+> and I may add more clock later. I will post patch 4/5/7 after the dts
+> patch merged. Thanks!
+> 
+> Jun
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
