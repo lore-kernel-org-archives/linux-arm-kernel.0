@@ -1,62 +1,79 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Sat, 16 May 2015 11:44:21 +0200
-Subject: [PATCH v7 09/13] ARM: introduce ARM_SINGLE_ARMV7M for ARMv7-M
- platforms
+Date: Sat, 16 May 2015 11:44:25 +0200
+Subject: [PATCH v7 13/13] ARM: vf610m4: add defconfig for Linux on Vybrids
+ Cortex-M4
 In-Reply-To: <1431769465-26867-1-git-send-email-stefan@agner.ch>
 References: <1431769465-26867-1-git-send-email-stefan@agner.ch>
-Message-ID: <1431769465-26867-10-git-send-email-stefan@agner.ch>
+Message-ID: <1431769465-26867-14-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This introduces a new top level config symbol ARM_SINGLE_ARMV7M
-for non-MMU, ARMv7-M platforms. It also support multiple ARMv7-M
-platforms in one kernel image since the cores share the same
-basic memory layout and interrupt controller. However, this works
-only if the combined platforms also have a similar (main) memory
-layout.
+Add defconfig for Linux on Vybrid (vf610) on the secondary Cortex-
+M4 CPU. The use of a XIP image has been tested which needs to be
+loaded (e.g. using the custom m4boot loader) to the end of the
+available RAM at address 0x8f000000. The Cortex-M4 has a code-alias
+which makes sure that the instructions get fetched through the code
+bus (alias starts at 0x00800000 => 0x80800000 in system address).
+Hence, to get optimal performance, use 0x0f000000 as XIP_PHYS_ADDR.
+This address is additionally shifted by the length of the minimal
+loader which is inserted by m4boot. Currently, this offset is 0x80.
+
+The standard DRAM base address is configured to 0x8C000000, which
+gives the Cortex-M4 48MiB of RAM.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/Kconfig       | 13 +++++++++++++
- arch/arm/Kconfig.debug |  2 +-
- 2 files changed, 14 insertions(+), 1 deletion(-)
+ arch/arm/configs/vf610m4_defconfig | 42 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
+ create mode 100644 arch/arm/configs/vf610m4_defconfig
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 45df48b..2361efc 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -329,6 +329,19 @@ config ARCH_MULTIPLATFORM
- 	select SPARSE_IRQ
- 	select USE_OF
- 
-+config ARM_SINGLE_ARMV7M
-+	bool "ARMv7-M based platforms (Cortex-M0/M3/M4)"
-+	depends on !MMU
-+	select ARCH_WANT_OPTIONAL_GPIOLIB
-+	select ARM_NVIC
-+	select CLKSRC_OF
-+	select COMMON_CLK
-+	select CPU_V7M
-+	select GENERIC_CLOCKEVENTS
-+	select NO_IOPORT_MAP
-+	select SPARSE_IRQ
-+	select USE_OF
-+
- config ARCH_REALVIEW
- 	bool "ARM Ltd. RealView family"
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 0c12ffb..e4441de 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1544,7 +1544,7 @@ config DEBUG_UART_8250_FLOW_CONTROL
- 
- config DEBUG_UNCOMPRESS
- 	bool
--	depends on ARCH_MULTIPLATFORM || PLAT_SAMSUNG
-+	depends on ARCH_MULTIPLATFORM || PLAT_SAMSUNG || ARM_SINGLE_ARMV7M
- 	default y if DEBUG_LL && !DEBUG_OMAP2PLUS_UART && \
- 		     (!DEBUG_TEGRA_UART || !ZBOOT_ROM)
- 	help
+diff --git a/arch/arm/configs/vf610m4_defconfig b/arch/arm/configs/vf610m4_defconfig
+new file mode 100644
+index 0000000..aeb2482
+--- /dev/null
++++ b/arch/arm/configs/vf610m4_defconfig
+@@ -0,0 +1,42 @@
++CONFIG_NAMESPACES=y
++CONFIG_BLK_DEV_INITRD=y
++# CONFIG_RD_BZIP2 is not set
++# CONFIG_RD_LZMA is not set
++# CONFIG_RD_XZ is not set
++# CONFIG_RD_LZ4 is not set
++CONFIG_KALLSYMS_ALL=y
++CONFIG_EMBEDDED=y
++# CONFIG_MMU is not set
++CONFIG_ARM_SINGLE_ARMV7M=y
++CONFIG_ARCH_MXC=y
++CONFIG_SOC_VF610=y
++CONFIG_SET_MEM_PARAM=y
++CONFIG_DRAM_BASE=0x8c000000
++CONFIG_FLASH_MEM_BASE=0x8f000000
++CONFIG_FLASH_SIZE=0x01000000
++CONFIG_CMDLINE="console=/dev/ttyLP2"
++CONFIG_XIP_KERNEL=y
++CONFIG_XIP_PHYS_ADDR=0x0f000080
++CONFIG_BINFMT_FLAT=y
++CONFIG_BINFMT_ZFLAT=y
++CONFIG_BINFMT_SHARED_FLAT=y
++# CONFIG_SUSPEND is not set
++# CONFIG_UEVENT_HELPER is not set
++# CONFIG_STANDALONE is not set
++# CONFIG_PREVENT_FIRMWARE_BUILD is not set
++# CONFIG_FIRMWARE_IN_KERNEL is not set
++# CONFIG_ALLOW_DEV_COREDUMP is not set
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_COUNT=4
++# CONFIG_INPUT_MOUSEDEV is not set
++# CONFIG_KEYBOARD_ATKBD is not set
++# CONFIG_INPUT_MOUSE is not set
++# CONFIG_SERIO is not set
++CONFIG_SERIAL_FSL_LPUART=y
++CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
++# CONFIG_HW_RANDOM is not set
++CONFIG_MFD_SYSCON=y
++# CONFIG_HID is not set
++# CONFIG_USB_SUPPORT is not set
++# CONFIG_MISC_FILESYSTEMS is not set
++# CONFIG_FTRACE is not set
 -- 
 2.4.1
