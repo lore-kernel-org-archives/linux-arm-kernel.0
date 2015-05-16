@@ -1,45 +1,44 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Sat, 16 May 2015 19:27:57 +0200
-Subject: [PATCH 2/2] doc: dt: add documentation for nxp,lpc1850-usb-otg-phy
-In-Reply-To: <1431797277-4906-1-git-send-email-manabian@gmail.com>
-References: <1431797277-4906-1-git-send-email-manabian@gmail.com>
-Message-ID: <1431797277-4906-3-git-send-email-manabian@gmail.com>
+From: clabbe.montjoie@gmail.com (Corentin LABBE)
+Date: Sat, 16 May 2015 20:09:27 +0200
+Subject: [linux-sunxi] Re: [PATCH v9 4/4] crypto: Add Allwinner Security
+ System crypto accelerator
+In-Reply-To: <20150515065222.GA16808@gondor.apana.org.au>
+References: <1431608341-10936-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1431608341-10936-5-git-send-email-clabbe.montjoie@gmail.com>
+ <20150515065222.GA16808@gondor.apana.org.au>
+Message-ID: <555787D7.80708@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add binding documentation for nxp,lpc1850-usb-otg-phy. This PHY
-can found on NXP LPC18xx and LPC43xx devices.
+Le 15/05/2015 08:52, Herbert Xu a ?crit :
+> On Thu, May 14, 2015 at 02:59:01PM +0200, LABBE Corentin wrote:
+>>
+>> +int sun4i_hash_export(struct ahash_request *areq, void *out)
+>> +{
+>> +	struct sun4i_req_ctx *op = ahash_request_ctx(areq);
+>> +
+>> +	memcpy(out, op, sizeof(struct sun4i_req_ctx));
+>> +	return 0;
+>> +}
+>> +
+>> +int sun4i_hash_import(struct ahash_request *areq, const void *in)
+>> +{
+>> +	struct sun4i_req_ctx *op = ahash_request_ctx(areq);
+>> +
+>> +	memcpy(op, in, sizeof(struct sun4i_req_ctx));
+> 
+> This is very wrong.  You're importing an arbitrary ss pointer.  The
+> whole point of having an import function instead of just a simple
+> memcpy is to deal with such problems.
+> 
+> Cheers,
+> 
 
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
----
- .../bindings/phy/nxp,lpc1850-usb-otg-phy.txt          | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/nxp,lpc1850-usb-otg-phy.txt
+Hello
 
-diff --git a/Documentation/devicetree/bindings/phy/nxp,lpc1850-usb-otg-phy.txt b/Documentation/devicetree/bindings/phy/nxp,lpc1850-usb-otg-phy.txt
-new file mode 100644
-index 000000000000..3da60ca04a42
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/nxp,lpc1850-usb-otg-phy.txt
-@@ -0,0 +1,19 @@
-+NXP LPC18xx/43xx internal USB OTG PHY binding
-+---------------------------------------------
-+
-+This file contains documentation for the internal USB OTG PHY found
-+in NXP LPC18xx and LPC43xx SoCs.
-+
-+Required properties:
-+- compatible	: must be "nxp,lpc1850-usb-otg-phy"
-+- clocks	: must be exactly one entry
-+See: Documentation/devicetree/bindings/clock/clock-bindings.txt
-+- #phy-cells	: must be 0 for this phy
-+See: Documentation/devicetree/bindings/phy/phy-bindings.txt
-+
-+Example:
-+usb0_otg_phy: usb0-otg-phy {
-+	compatible = "nxp,lpc1850-usb-otg-phy";
-+	clocks = <&ccu1 CLK_USB0>;
-+	#phy-cells = <0>;
-+};
--- 
-1.8.0
+You are right, I have totally mis-understood the export/import functions by just reading them from crypto/md5.c.
+Reading them from drivers/crypto/* is better.
+
+Incidental question, I need to use the MD5 IV for export_md5 function, but they are not defined anywhere (unlike SHAxx ones), does this is voluntary or do you will accept a patch for adding them.
+
+Regards
