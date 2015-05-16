@@ -1,32 +1,29 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Sat, 16 May 2015 17:32:25 +0200
-Subject: [PATCH v2 07/10] pinctrl: sunxi: Add H3 PIO controller support
-In-Reply-To: <1431707940-19372-8-git-send-email-jenskuske@gmail.com>
-References: <1431707940-19372-1-git-send-email-jenskuske@gmail.com>
- <1431707940-19372-8-git-send-email-jenskuske@gmail.com>
-Message-ID: <1431790345.2341.37.camel@x220>
+From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Sat, 16 May 2015 11:50:09 -0500
+Subject: [V4 PATCH 2/6] arm64 : Introduce support for ACPI _CCA object
+In-Reply-To: <1431776887.2341.17.camel@x220>
+References: <1431724994-21601-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1431724994-21601-3-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1431776887.2341.17.camel@x220>
+Message-ID: <55577541.1040400@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just a nit: a license mismatch.
+Hi Paul,
 
-(I didn't bring this up in v1. Perhaps I should have.)
+On 5/16/15 06:48, Paul Bolle wrote:
+> Just a nit regarding the commit explanation.
+>
+> On Fri, 2015-05-15 at 16:23 -0500, Suravee Suthikulpanit wrote:
+>>  From http://www.uefi.org/sites/default/files/resources/ACPI_6.0.pdf,
+>> section 6.2.17 _CCA states that ARM platforms require ACPI _CCA
+>> object to be specified for DMA-cabpable devices. This patch introduces
+>> ACPI_MUST_HAVE_CCA in arm64 Kconfig to specify such requirement.
+>
+> s/ACPI_MUST_HAVE_CCA/ACPI_CCA_REQUIRED/.
+>
+> Ie, update the commit explanation to match the change introduced in V2.
 
-On Fri, 2015-05-15 at 18:38 +0200, Jens Kuske wrote:
-> --- /dev/null
-> +++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-h3.c
+Ahh ... thanks :)
 
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-
-This states the license is GPL v2.
-
-> +MODULE_LICENSE("GPL");
-
-According to include/linux/module.h this states the license is GPL v2 or
-later. So I think that either the comment at the top of this file or the
-ident used in the MODULE_LICENSE() macro needs to change.
-
-
-Paul Bolle
+Suravee
