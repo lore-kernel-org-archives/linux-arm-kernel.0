@@ -1,44 +1,53 @@
-From: clabbe.montjoie@gmail.com (Corentin LABBE)
-Date: Sat, 16 May 2015 20:09:27 +0200
-Subject: [linux-sunxi] Re: [PATCH v9 4/4] crypto: Add Allwinner Security
- System crypto accelerator
-In-Reply-To: <20150515065222.GA16808@gondor.apana.org.au>
-References: <1431608341-10936-1-git-send-email-clabbe.montjoie@gmail.com>
- <1431608341-10936-5-git-send-email-clabbe.montjoie@gmail.com>
- <20150515065222.GA16808@gondor.apana.org.au>
-Message-ID: <555787D7.80708@gmail.com>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Sat, 16 May 2015 15:57:00 -0300
+Subject: [PATCH v5 07/12] mtd: nand: add Samsung K9GBG08U0A-M to nand_ids
+ table
+In-Reply-To: <1431356341-31640-8-git-send-email-antoine.tenart@free-electrons.com>
+References: <1431356341-31640-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1431356341-31640-8-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <555792FC.8030407@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 15/05/2015 08:52, Herbert Xu a ?crit :
-> On Thu, May 14, 2015 at 02:59:01PM +0200, LABBE Corentin wrote:
->>
->> +int sun4i_hash_export(struct ahash_request *areq, void *out)
->> +{
->> +	struct sun4i_req_ctx *op = ahash_request_ctx(areq);
->> +
->> +	memcpy(out, op, sizeof(struct sun4i_req_ctx));
->> +	return 0;
->> +}
->> +
->> +int sun4i_hash_import(struct ahash_request *areq, const void *in)
->> +{
->> +	struct sun4i_req_ctx *op = ahash_request_ctx(areq);
->> +
->> +	memcpy(op, in, sizeof(struct sun4i_req_ctx));
+Sorry for the huge delay.
+
+On 05/11/2015 11:58 AM, Antoine Tenart wrote:
+> Add the full description of the Samsung K9GBG08U0A-M nand chip in the
+> nand_ids table.
 > 
-> This is very wrong.  You're importing an arbitrary ss pointer.  The
-> whole point of having an import function instead of just a simple
-> memcpy is to deal with such problems.
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> ---
+>  drivers/mtd/nand/nand_ids.c | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
-> Cheers,
+> diff --git a/drivers/mtd/nand/nand_ids.c b/drivers/mtd/nand/nand_ids.c
+> index dd620c19c619..500c33e1db06 100644
+> --- a/drivers/mtd/nand/nand_ids.c
+> +++ b/drivers/mtd/nand/nand_ids.c
+> @@ -50,6 +50,10 @@ struct nand_flash_dev nand_flash_ids[] = {
+>  		{ .id = {0xad, 0xde, 0x94, 0xda, 0x74, 0xc4} },
+>  		  SZ_8K, SZ_8K, SZ_2M, 0, 6, 640, NAND_ECC_INFO(40, SZ_1K),
+>  		  4 },
+> +	{"NAND 4GiB 3,3V 8-bit",
+> +		{ .id = {0xec, 0xd7, 0x94, 0x76, 0x64, 0x43}, },
+> +		  8192, 4096, SZ_1M, LP_OPTIONS, 0, 0, NAND_ECC_INFO(40, SZ_1K),
+
+You should stick to SZ_8K and SZ_4K here.
+
+> +		  4 },
+>  
+>  	LEGACY_ID_NAND("NAND 4MiB 5V 8-bit",   0x6B, 4, SZ_8K, SP_OPTIONS),
+>  	LEGACY_ID_NAND("NAND 4MiB 3,3V 8-bit", 0xE3, 4, SZ_8K, SP_OPTIONS),
 > 
 
-Hello
+I found a datasheet here for K9GBG08U0A that claims to support JEDEC
+device identification (i.e. 0x90 0x40 and 0xEC 0x40 commands). Have you
+tested it? Any reason you are adding full ID instead?
 
-You are right, I have totally mis-understood the export/import functions by just reading them from crypto/md5.c.
-Reading them from drivers/crypto/* is better.
+How about you separate this patch from this series (so we can discuss
+and apply it separatedly)?
 
-Incidental question, I need to use the MD5 IV for export_md5 function, but they are not defined anywhere (unlike SHAxx ones), does this is voluntary or do you will accept a patch for adding them.
-
-Regards
+Thanks,
+-- 
+Ezequiel Garcia, VanguardiaSur
+www.vanguardiasur.com.ar
