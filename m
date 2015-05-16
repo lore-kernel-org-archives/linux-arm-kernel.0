@@ -1,67 +1,41 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 16 May 2015 21:14:22 +0800
-Subject: [PATCH v4 4/7] ARM: dts: zx: add an initial zx296702 dts and doc
-In-Reply-To: <CABymUCOVumKXbV8MU3oKVBBrXJA_m8fsr8GGtWHZevQichCG-Q@mail.gmail.com>
-References: <1430212691-16009-1-git-send-email-jun.nie@linaro.org>
- <1430212691-16009-5-git-send-email-jun.nie@linaro.org>
- <2168253.ZrhOUFeSpY@wuerfel> <15088943.GUMZUHMVfp@wuerfel>
- <CABymUCOVumKXbV8MU3oKVBBrXJA_m8fsr8GGtWHZevQichCG-Q@mail.gmail.com>
-Message-ID: <20150516131422.GG10411@tiger>
+From: shawnguo@kernel.org (shawnguo at kernel.org)
+Date: Sat, 16 May 2015 21:32:35 +0800
+Subject: [PATCH] MAINTAINERS: update Shawn's email to use kernel.org one
+Message-ID: <1431783155-30384-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 16, 2015 at 03:05:11PM +0800, Jun Nie wrote:
-> B.R.
-> Jun
-> 
-> 
-> 2015-05-16 4:19 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
-> > On Friday 15 May 2015 21:59:06 Arnd Bergmann wrote:
-> >> On Tuesday 28 April 2015 17:18:08 Jun Nie wrote:
-> >> > Add initial dts file and document for ZX296702 and board ZX296702-AD1.
-> >> > More peripherals will be added later.
-> >> >
-> >> > Signed-off-by: Jun Nie <jun.nie@linaro.org>
-> >>
-> >> Applied to next/dt, thanks!
-> >>
-> >>
-> >
-> > And removed again. I hadn't pushed it out to a public tree yet and
-> > found a build error in this.
-> >
-> > Unfortunately, you are using a header file here that is only introduced
-> > by a patch that belongs to another subsystem maintainer.
-> >
-> > Please try to get rid of that dependency, or submit this patch again
-> > for the following merge window once that driver has been merged upstream.
-> >
-> > In a lot of cases, you can just use hardware numbers as identifiers
-> > instead of making up your own, to avoid having to use ugly header files
-> > that make life hard for us.
-> >
-> >         Arnd
-> 
-> Hi Arnd,
-> 
-> I have to use macro in file
-> "include/dt-bindings/clock/zx296702-clock.h" for clock id. Because it
-> is hard to maintain the id as it is has nothing to do with hardware
+From: Shawn Guo <shawn.guo@linaro.org>
 
-It's not true.  The number has something to do with hardware.  Ideally,
-the clock ID should be numbered according clock tree from root to leaf.
-The problem with zx296702 is that the reference manual doesn't give a
-full picture of the whole clock tree.  And we have to number the clocks
-as much as we can at some level mapping the hardware clock tree.
+Update my email address to use kernel.org mailbox, so that emails
+between kernel community and company can be separated.
 
-Shawn
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ MAINTAINERS | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> and I may add more clock later. I will post patch 4/5/7 after the dts
-> patch merged. Thanks!
-> 
-> Jun
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 2e5bbc0d68b2..a53e42fcba84 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1030,7 +1030,7 @@ F:	arch/arm/include/asm/hardware/dec21285.h
+ F:	arch/arm/mach-footbridge/
+ 
+ ARM/FREESCALE IMX / MXC ARM ARCHITECTURE
+-M:	Shawn Guo <shawn.guo@linaro.org>
++M:	Shawn Guo <shawnguo@kernel.org>
+ M:	Sascha Hauer <kernel@pengutronix.de>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+@@ -1041,7 +1041,7 @@ F:	arch/arm/boot/dts/imx*
+ F:	arch/arm/configs/imx*_defconfig
+ 
+ ARM/FREESCALE VYBRID ARM ARCHITECTURE
+-M:	Shawn Guo <shawn.guo@linaro.org>
++M:	Shawn Guo <shawnguo@kernel.org>
+ M:	Sascha Hauer <kernel@pengutronix.de>
+ R:	Stefan Agner <stefan@agner.ch>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-- 
+1.9.1
