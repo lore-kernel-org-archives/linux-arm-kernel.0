@@ -1,25 +1,25 @@
 From: eric.nelson@boundarydevices.com (Eric Nelson)
-Date: Sat, 16 May 2015 12:23:21 -0700
-Subject: [PATCH 1/2] ARM: dts: nitrogen6x: use simple-panel instead of
+Date: Sat, 16 May 2015 12:23:22 -0700
+Subject: [PATCH 2/2] ARM: dts: sabrelite: use simple-panel instead of
  display-timings for LVDS0
 In-Reply-To: <1431804202-11067-1-git-send-email-eric.nelson@boundarydevices.com>
 References: <1431804202-11067-1-git-send-email-eric.nelson@boundarydevices.com>
-Message-ID: <1431804202-11067-2-git-send-email-eric.nelson@boundarydevices.com>
+Message-ID: <1431804202-11067-3-git-send-email-eric.nelson@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also add alias for backlight_lvds and connect it to the display.
+Also add alias for backlight_lvds and connect it to the LVDS display.
 
 Signed-off-by: Eric Nelson <eric.nelson@boundarydevices.com>
 ---
- arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 30 +++++++++++++++++-------------
+ arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 30 +++++++++++++++++-------------
  1 file changed, 17 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-index fd096dc..712c5ec 100644
---- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-@@ -122,7 +122,7 @@
+diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+index 483856e2..6ed80b8 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+@@ -121,7 +121,7 @@
  		status = "okay";
  	};
  
@@ -28,7 +28,7 @@ index fd096dc..712c5ec 100644
  		compatible = "pwm-backlight";
  		pwms = <&pwm4 0 5000000>;
  		brightness-levels = <0 4 8 16 32 64 128 255>;
-@@ -130,6 +130,17 @@
+@@ -129,6 +129,17 @@
  		power-supply = <&reg_3p3v>;
  		status = "okay";
  	};
@@ -46,7 +46,7 @@ index fd096dc..712c5ec 100644
  };
  
  &audmux {
-@@ -379,18 +390,11 @@
+@@ -374,18 +385,11 @@
  		fsl,data-width = <18>;
  		status = "okay";
  
