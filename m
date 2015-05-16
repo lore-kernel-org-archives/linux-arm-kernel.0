@@ -1,51 +1,119 @@
-From: jun.nie@linaro.org (Jun Nie)
-Date: Sat, 16 May 2015 15:05:11 +0800
-Subject: [PATCH v4 4/7] ARM: dts: zx: add an initial zx296702 dts and doc
-In-Reply-To: <15088943.GUMZUHMVfp@wuerfel>
-References: <1430212691-16009-1-git-send-email-jun.nie@linaro.org>
- <1430212691-16009-5-git-send-email-jun.nie@linaro.org>
- <2168253.ZrhOUFeSpY@wuerfel> <15088943.GUMZUHMVfp@wuerfel>
-Message-ID: <CABymUCOVumKXbV8MU3oKVBBrXJA_m8fsr8GGtWHZevQichCG-Q@mail.gmail.com>
+From: djkurtz@google.com (Daniel Kurtz)
+Date: Sat, 16 May 2015 15:08:49 +0800
+Subject: [RFC v2 PATCH 0/6] MT8173 IOMMU SUPPORT
+In-Reply-To: <1431683009-18158-1-git-send-email-yong.wu@mediatek.com>
+References: <1431683009-18158-1-git-send-email-yong.wu@mediatek.com>
+Message-ID: <CAGS+omASN0GWiXYFg9kn7grWoKywqUiSwLZdW9BKc+S-Dnp+Cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-B.R.
-Jun
+On Fri, May 15, 2015 at 5:43 PM, Yong Wu <yong.wu@mediatek.com> wrote:
+>   This patch adds support for m4u(Multimedia Memory Management Unit),
+> Currently it only support the m4u with 2 levels of page table on mt8173.
+>
+>   It is based on Robin Murphy's arm64: IOMMU-backed DMA mapping[1].
 
 
-2015-05-16 4:19 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
-> On Friday 15 May 2015 21:59:06 Arnd Bergmann wrote:
->> On Tuesday 28 April 2015 17:18:08 Jun Nie wrote:
->> > Add initial dts file and document for ZX296702 and board ZX296702-AD1.
->> > More peripherals will be added later.
->> >
->> > Signed-off-by: Jun Nie <jun.nie@linaro.org>
->>
->> Applied to next/dt, thanks!
->>
->>
->
-> And removed again. I hadn't pushed it out to a public tree yet and
-> found a build error in this.
->
-> Unfortunately, you are using a header file here that is only introduced
-> by a patch that belongs to another subsystem maintainer.
->
-> Please try to get rid of that dependency, or submit this patch again
-> for the following merge window once that driver has been merged upstream.
->
-> In a lot of cases, you can just use hardware numbers as identifiers
-> instead of making up your own, to avoid having to use ugly header files
-> that make life hard for us.
->
->         Arnd
+Hi Yong, Robin,
 
-Hi Arnd,
+The quoted "arm64 iommu-backed DMA mapping" patch set is from 2015-February.
+That was over 3 months ago.
+What is the status of this work?
 
-I have to use macro in file
-"include/dt-bindings/clock/zx296702-clock.h" for clock id. Because it
-is hard to maintain the id as it is has nothing to do with hardware
-and I may add more clock later. I will post patch 4/5/7 after the dts
-patch merged. Thanks!
+Is that still the most recent version of these patches?
+If so, is there a plan when an update will be posted?
+Or, is there an updated public git repo with a more recent version of
+these patches?
 
-Jun
+My apologies if these questions have been asked and answered before
+and/or elsewhere.
+
+Thanks,
+-Dan
+
+>
+>   Please check the hardware block diagram of Mediatek IOMMU.
+>
+>               EMI (External Memory Interface)
+>                |
+>               m4u (Multimedia Memory Management Unit)
+>                |
+>               smi (Smart Multimedia Interface)
+>                |
+>         +---------------+-------
+>         |               |
+>         |               |
+>     vdec larb       disp larb      ... SoCs have different local arbiter(larb).
+>         |               |
+>         |               |
+>    +----+----+    +-----+-----+
+>    |    |    |    |     |     |    ...
+>    |    |    |    |     |     |    ...
+>    |    |    |    |     |     |    ...
+>   MC   PP   VLD  OVL0 RDMA0 WDMA0  ... There are different ports in each larb.
+>
+>   Normally we specify a local arbiter(larb) for each multimedia hardware like
+> display, video decode, video encode and camera. And there are different ports in
+> each larb. Take a example, there are some ports like MC, PP, UFO, VLD, AVC_MV,
+> PRED_RD, PRED_WR in video larb, all the ports are according to the video hardware.
+>
+>   From the diagram, all the multimedia module connect with m4u via smi.
+> SMI is responsible to enable/disable iommu and control the clocks for each local
+> arbiter. If we should enable the iommu of video decode, it should config the
+> video's ports. And if the video hardware work wether enable/disable iommu,
+> it should enable the clock of its larb's clock. So we add a special driver for smi.
+>
+> [1] http://lists.linuxfoundation.org/pipermail/iommu/2015-February/012236.html
+>
+> v2:
+> -add arm short descriptor support.
+> -seperate smi common from smi and change the clock-names according
+>  to smi HW.
+> -delete the hardcode of the port-names in mt8173.
+>  replace this with larb-portes-nr in dtsi.
+> -fix some coding style issues.
+>
+> v1:
+> http://lists.infradead.org/pipermail/linux-mediatek/2015-March/000058.html
+>
+> Yong Wu (6):
+>   dt-bindings: iommu: Add binding for mediatek IOMMU
+>   dt-bindings: mediatek: Add smi dts binding
+>   iommu: add ARM short descriptor page table allocator.
+>   iommu/mediatek: Add mt8173 IOMMU driver
+>   soc: mediatek: Add SMI driver
+>   dts: mt8173: Add iommu/smi nodes for mt8173
+>
+>  .../devicetree/bindings/iommu/mediatek,iommu.txt   |  51 ++
+>  .../bindings/soc/mediatek/mediatek,smi-larb.txt    |  24 +
+>  .../bindings/soc/mediatek/mediatek,smi.txt         |  22 +
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  79 +++
+>  drivers/iommu/Kconfig                              |  18 +
+>  drivers/iommu/Makefile                             |   2 +
+>  drivers/iommu/io-pgtable-arm-short.c               | 490 +++++++++++++++
+>  drivers/iommu/io-pgtable.c                         |   4 +
+>  drivers/iommu/io-pgtable.h                         |   6 +
+>  drivers/iommu/mtk_iommu.c                          | 657 +++++++++++++++++++++
+>  drivers/soc/mediatek/Kconfig                       |   6 +
+>  drivers/soc/mediatek/Makefile                      |   1 +
+>  drivers/soc/mediatek/mt8173-smi.c                  | 298 ++++++++++
+>  include/dt-bindings/iommu/mt8173-iommu-port.h      | 112 ++++
+>  include/linux/mtk-smi.h                            |  39 ++
+>  15 files changed, 1809 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
+>  create mode 100644 Documentation/devicetree/bindings/soc/mediatek/mediatek,smi-larb.txt
+>  create mode 100644 Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt
+>  create mode 100644 drivers/iommu/io-pgtable-arm-short.c
+>  create mode 100644 drivers/iommu/mtk_iommu.c
+>  create mode 100644 drivers/soc/mediatek/mt8173-smi.c
+>  create mode 100644 include/dt-bindings/iommu/mt8173-iommu-port.h
+>  create mode 100644 include/linux/mtk-smi.h
+>
+> --
+> 1.8.1.1.dirty
+>
+
+
+
+-- 
+Daniel Kurtz | Software Engineer | djkurtz at google.com | 650.204.0722
