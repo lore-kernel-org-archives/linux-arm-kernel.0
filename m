@@ -1,74 +1,79 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Sat, 16 May 2015 11:44:14 +0200
-Subject: [PATCH v7 02/13] genirq: Add irq_chip_(enable|disable)_parent
+Date: Sat, 16 May 2015 11:44:16 +0200
+Subject: [PATCH v7 04/13] irqchip: nvic: support hierarchy irq domain
 In-Reply-To: <1431769465-26867-1-git-send-email-stefan@agner.ch>
 References: <1431769465-26867-1-git-send-email-stefan@agner.ch>
-Message-ID: <1431769465-26867-3-git-send-email-stefan@agner.ch>
+Message-ID: <1431769465-26867-5-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add helper irq_chip_enable_parent and irq_chip_disable_parent. The
-helper implement the default behavior in case irq_enable or irq_disable
-is not implemented for the parent interrupt chip, which is calling the
-irq_mask or irq_unmask respectively.
+Add support for hierarchy irq domains. This is required to stack
+the MSCM interrupt router and the NVIC controller found in Vybrid
+SoC.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- include/linux/irq.h |  2 ++
- kernel/irq/chip.c   | 28 ++++++++++++++++++++++++++++
- 2 files changed, 30 insertions(+)
+ drivers/irqchip/Kconfig    |  1 +
+ drivers/irqchip/irq-nvic.c | 28 +++++++++++++++++++++++++++-
+ 2 files changed, 28 insertions(+), 1 deletion(-)
 
-diff --git a/include/linux/irq.h b/include/linux/irq.h
-index 62c6901..2633061 100644
---- a/include/linux/irq.h
-+++ b/include/linux/irq.h
-@@ -458,6 +458,8 @@ extern void handle_nested_irq(unsigned int irq);
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index 6de62a9..99b9a97 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -30,6 +30,7 @@ config ARM_GIC_V3_ITS
+ config ARM_NVIC
+ 	bool
+ 	select IRQ_DOMAIN
++	select IRQ_DOMAIN_HIERARCHY
+ 	select GENERIC_IRQ_CHIP
  
- extern int irq_chip_compose_msi_msg(struct irq_data *data, struct msi_msg *msg);
- #ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
-+extern void irq_chip_enable_parent(struct irq_data *data);
-+extern void irq_chip_disable_parent(struct irq_data *data);
- extern void irq_chip_ack_parent(struct irq_data *data);
- extern int irq_chip_retrigger_hierarchy(struct irq_data *data);
- extern void irq_chip_mask_parent(struct irq_data *data);
-diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
-index eb9a4ea..2456fe8 100644
---- a/kernel/irq/chip.c
-+++ b/kernel/irq/chip.c
-@@ -876,6 +876,34 @@ void irq_cpu_offline(void)
+ config ARM_VIC
+diff --git a/drivers/irqchip/irq-nvic.c b/drivers/irqchip/irq-nvic.c
+index 4ff0805..5fac910 100644
+--- a/drivers/irqchip/irq-nvic.c
++++ b/drivers/irqchip/irq-nvic.c
+@@ -49,6 +49,31 @@ nvic_handle_irq(irq_hw_number_t hwirq, struct pt_regs *regs)
+ 	handle_IRQ(irq, regs);
+ }
  
- #ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
- /**
-+ * irq_chip_enable_parent - Enable the parent interrupt (defaults to unmask if
-+ * NULL)
-+ * @data:	Pointer to interrupt specific data
-+ */
-+void irq_chip_enable_parent(struct irq_data *data)
++static int nvic_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
++				unsigned int nr_irqs, void *arg)
 +{
-+	data = data->parent_data;
-+	if (data->chip->irq_enable)
-+		data->chip->irq_enable(data);
-+	else
-+		data->chip->irq_unmask(data);
++	int i, ret;
++	irq_hw_number_t hwirq;
++	unsigned int type = IRQ_TYPE_NONE;
++	struct of_phandle_args *irq_data = arg;
++
++	ret = irq_domain_xlate_onecell(domain, irq_data->np, irq_data->args,
++				   irq_data->args_count, &hwirq, &type);
++	if (ret)
++		return ret;
++
++	for (i = 0; i < nr_irqs; i++)
++		irq_map_generic_chip(domain, virq + i, hwirq + i);
++
++	return 0;
 +}
 +
-+/**
-+ * irq_chip_disable_parent - Disable the parent interrupt (defaults to mask if
-+ * NULL)
-+ * @data:	Pointer to interrupt specific data
-+ */
-+void irq_chip_disable_parent(struct irq_data *data)
-+{
-+	data = data->parent_data;
-+	if (data->chip->irq_disable)
-+		data->chip->irq_disable(data);
-+	else
-+		data->chip->irq_mask(data);
-+}
++static const struct irq_domain_ops nvic_irq_domain_ops = {
++	.xlate = irq_domain_xlate_onecell,
++	.alloc = nvic_irq_domain_alloc,
++	.free = irq_domain_free_irqs_top,
++};
 +
-+/**
-  * irq_chip_ack_parent - Acknowledge the parent interrupt
-  * @data:	Pointer to interrupt specific data
-  */
+ static int __init nvic_of_init(struct device_node *node,
+ 			       struct device_node *parent)
+ {
+@@ -70,7 +95,8 @@ static int __init nvic_of_init(struct device_node *node,
+ 		irqs = NVIC_MAX_IRQ;
+ 
+ 	nvic_irq_domain =
+-		irq_domain_add_linear(node, irqs, &irq_generic_chip_ops, NULL);
++		irq_domain_add_linear(node, irqs, &nvic_irq_domain_ops, NULL);
++
+ 	if (!nvic_irq_domain) {
+ 		pr_warn("Failed to allocate irq domain\n");
+ 		return -ENOMEM;
 -- 
 2.4.1
