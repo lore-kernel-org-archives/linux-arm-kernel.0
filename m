@@ -1,40 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 16 May 2015 22:19:53 +0100
-Subject: [PATCH v2 2/9] ARM: add secondary_startup_arm prototype in
- header file
-In-Reply-To: <CABuKBe+8VHnHbMA4gMzzReUNUf3LiL6JnPhehkxWtzrYAhBBZg@mail.gmail.com>
-References: <1431763110-443-1-git-send-email-yingjoe.chen@mediatek.com>
- <1431763110-443-3-git-send-email-yingjoe.chen@mediatek.com>
- <CABuKBe+8VHnHbMA4gMzzReUNUf3LiL6JnPhehkxWtzrYAhBBZg@mail.gmail.com>
-Message-ID: <20150516211953.GQ2067@n2100.arm.linux.org.uk>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Sat, 16 May 2015 18:23:23 -0300
+Subject: [PATCH v5 05/12] mtd: pxa3xx_nand: rework flash detection and
+ timing setup
+In-Reply-To: <20150512143943.GC32171@kwain>
+References: <1431356341-31640-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1431356341-31640-6-git-send-email-antoine.tenart@free-electrons.com>
+ <555128F0.30702@vanguardiasur.com.ar> <20150512143943.GC32171@kwain>
+Message-ID: <5557B54B.9010307@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 16, 2015 at 11:02:40AM +0200, Matthias Brugger wrote:
-> 2015-05-16 9:58 GMT+02:00 Yingjoe Chen <yingjoe.chen@mediatek.com>:
-> > Put secondary_startup_arm() prototype in arch/arm/include/asm/smp.h
-> > so users doesn't have to add extern prototype in their code.
-> >
-> > Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> > ---
-> >  arch/arm/include/asm/smp.h | 1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> > diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
-> > index 18f5a55..f5cffb7 100644
-> > --- a/arch/arm/include/asm/smp.h
-> > +++ b/arch/arm/include/asm/smp.h
-> > @@ -69,6 +69,7 @@ struct secondary_data {
-> >  extern struct secondary_data secondary_data;
-> >  extern volatile int pen_release;
-> >  extern void secondary_startup(void);
-> > +extern void secondary_startup_arm(void);
-> 
-> Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
 
-This change should also end up in the patch system as its core ARM stuff,
-especially if it's not scheduled for merging through arm-soc.
+
+On 05/12/2015 11:39 AM, Antoine Tenart wrote:
+> Ezequiel,
+> 
+> On Mon, May 11, 2015 at 07:10:56PM -0300, Ezequiel Garcia wrote:
+>>
+>> On 05/11/2015 11:58 AM, Antoine Tenart wrote:
+>> [..]
+>>> -
+>>> -	/* calculate flash information */
+>>> -	host->read_id_bytes = (f->page_size == 2048) ? 4 : 2;
+>>> -
+>>
+>> [..]
+>>> @@ -1732,6 +1669,7 @@ static int alloc_nand_resource(struct platform_device *pdev)
+>>>  		host->mtd = mtd;
+>>>  		host->cs = cs;
+>>>  		host->info_data = info;
+>>> +		host->read_id_bytes = 4;
+>>
+>> Are you sure this is correct? The value is set according to the page
+>> size before this patch.
+> 
+> Before reading the ID, the pxa3xx driver uses a default configuration,
+> builtin_flash_types[0], which defines a page size of 2048 leading to set
+> host->read_id_bytes to 4.
+> 
+> I'm using this default value here.
+> 
+> There might be an issue, as host->read_id_bytes isn't updated after
+> reading the ID (and getting the actual page size). I don't know if this
+> can be a problem. I can modify pxa3xx_nand_config_flash() to update
+> host->read_id_bytes if needed. What do you think?
+> 
+
+Well, once the device is detected, READ_ID shouldn't be used, so I'm not
+sure what's the point of that.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Ezequiel Garcia, VanguardiaSur
+www.vanguardiasur.com.ar
