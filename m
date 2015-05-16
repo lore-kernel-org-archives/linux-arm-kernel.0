@@ -1,33 +1,31 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Sat, 16 May 2015 12:27:27 +0900
-Subject: [PATCH v2] ARM: dts: Add syscon property to the MIPI phy in
- exynos5420
-In-Reply-To: <CAJKOXPd7=wnjCd6Xz9ZNuvbxWi=cSr+eRj9YdPWA0PHR+AOTeA@mail.gmail.com>
-References: <1431607240-14549-1-git-send-email-tomeu.vizoso@collabora.com>
- <CAJKOXPd7=wnjCd6Xz9ZNuvbxWi=cSr+eRj9YdPWA0PHR+AOTeA@mail.gmail.com>
-Message-ID: <5556B91F.20103@kernel.org>
+Date: Sat, 16 May 2015 12:39:21 +0900
+Subject: [GIT PULL 4/5] Samsung arm64 DT updates for v4.1
+In-Reply-To: <CAGTfZH3bzjvVLH2HALDTLUf0MzibeH7sfFJh1n=dyuitYmUw_A@mail.gmail.com>
+References: <555248E5.6010709@kernel.org>
+ <CAGTfZH3bzjvVLH2HALDTLUf0MzibeH7sfFJh1n=dyuitYmUw_A@mail.gmail.com>
+Message-ID: <5556BBE9.6030007@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15/15 22:22, Krzysztof Kozlowski wrote:
-> 2015-05-14 21:40 GMT+09:00 Tomeu Vizoso <tomeu.vizoso@collabora.com>:
->> Since e4b3d38088df6f3acd40 ("phy: exynos-video-mipi: Fix regression by
->> adding support for PMU regmap") the syscon property is required in
->> samsung,s5pv210-mipi-video-phy nodes, but this DTS hadn't been updated
->> yet.
->>
->> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> Cc: Krzysztof Koz?owski <k.kozlowski@samsung.com>
->>
->> --
-> 
-> Triple-dash please, because this won't be cut by "git am".
-> 
-> Everything else looks fine, thank you.
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
-Applied, thanks for you guys' effort.
+On 05/14/15 22:56, Chanwoo Choi wrote:
+> Hi Kukjin,
 
-- Kukjin
+[...]
+
+>> As you know, the arm64-exynos5433 couldn't be sent to upstream during
+>> previous merge window because it cannot be built without other stuff
+>> such as board DT file. I think, you need to post its regarding board DT
+>> file, I could test the exynos5433 series in my side with smdk5433 dt
+>> file though. Maybe as you know, I have no plan to upstream the smdk5433
+>> DT file because it will not be used outside of Samsung S.LSI.
+> 
+> Thanks for your test about Exynos5433 patch-set.
+> But, I cannot send the DTS file for Exynos5433 right now.
+> On the next, I'll send the Exynos5433's patchset and board dts file.
+> 
+OK, I see. I think, maybe you can make a patch for board DT file based
+on v4.2-next/dt64-samsung branch in samsung tree.
+
+Thanks,
+Kukjin
