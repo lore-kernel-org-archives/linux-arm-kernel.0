@@ -1,68 +1,180 @@
 From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Sat, 16 May 2015 15:58:24 +0800
-Subject: [PATCH v2 3/9] clocksource: mediatek: do not enable GPT_CLK_EVT when
- setup
+Date: Sat, 16 May 2015 15:58:28 +0800
+Subject: [PATCH v2 7/9] ARM: mediatek: add smp bringup code
 In-Reply-To: <1431763110-443-1-git-send-email-yingjoe.chen@mediatek.com>
 References: <1431763110-443-1-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <1431763110-443-4-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <1431763110-443-8-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Spurious mtk timer interrupt is noticed at boot and cause kernel
-crash. It seems if GPT is enabled, it will latch irq status even
-when its IRQ is disabled. When irq is enabled afterward, we see
-spurious interrupt.
-Change init flow to only enable GPT_CLK_SRC at mtk_timer_init.
+Add support for booting secondary CPUs on mt6589, mt8127
+and mt8135.
 
 Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
 ---
- drivers/clocksource/mtk_timer.c | 15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
+ arch/arm/mach-mediatek/Makefile  |   3 +
+ arch/arm/mach-mediatek/platsmp.c | 144 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 147 insertions(+)
+ create mode 100644 arch/arm/mach-mediatek/platsmp.c
 
-diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
-index 68ab423..91206f9 100644
---- a/drivers/clocksource/mtk_timer.c
-+++ b/drivers/clocksource/mtk_timer.c
-@@ -157,8 +157,11 @@ static void mtk_timer_global_reset(struct mtk_clock_event_device *evt)
- }
- 
- static void
--mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
-+mtk_timer_setup(struct mtk_clock_event_device *evt,
-+		u8 timer, u8 option, u8 enable)
- {
-+	u32 val;
+diff --git a/arch/arm/mach-mediatek/Makefile b/arch/arm/mach-mediatek/Makefile
+index 43e619f..2116460 100644
+--- a/arch/arm/mach-mediatek/Makefile
++++ b/arch/arm/mach-mediatek/Makefile
+@@ -1 +1,4 @@
++ifeq ($(CONFIG_SMP),y)
++obj-$(CONFIG_ARCH_MEDIATEK) += platsmp.o
++endif
+ obj-$(CONFIG_ARCH_MEDIATEK) += mediatek.o
+diff --git a/arch/arm/mach-mediatek/platsmp.c b/arch/arm/mach-mediatek/platsmp.c
+new file mode 100644
+index 0000000..b3cf75f
+--- /dev/null
++++ b/arch/arm/mach-mediatek/platsmp.c
+@@ -0,0 +1,144 @@
++/*
++ * arch/arm/mach-mediatek/platsmp.c
++ *
++ * Copyright (c) 2014 Mediatek Inc.
++ * Author: Shunli Wang <shunli.wang@mediatek.com>
++ *         Yingjoe Chen <yingjoe.chen@mediatek.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++#include <linux/io.h>
++#include <linux/memblock.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/string.h>
++#include <linux/threads.h>
 +
- 	writel(TIMER_CTRL_CLEAR | TIMER_CTRL_DISABLE,
- 		evt->gpt_base + TIMER_CTRL_REG(timer));
- 
-@@ -167,8 +170,10 @@ mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
- 
- 	writel(0x0, evt->gpt_base + TIMER_CMP_REG(timer));
- 
--	writel(TIMER_CTRL_OP(option) | TIMER_CTRL_ENABLE,
--			evt->gpt_base + TIMER_CTRL_REG(timer));
-+	val = TIMER_CTRL_OP(option);
-+	if (enable)
-+		val |= TIMER_CTRL_ENABLE;
-+	writel(val, evt->gpt_base + TIMER_CTRL_REG(timer));
- }
- 
- static void mtk_timer_enable_irq(struct mtk_clock_event_device *evt, u8 timer)
-@@ -235,12 +240,12 @@ static void __init mtk_timer_init(struct device_node *node)
- 	evt->ticks_per_jiffy = DIV_ROUND_UP(rate, HZ);
- 
- 	/* Configure clock source */
--	mtk_timer_setup(evt, GPT_CLK_SRC, TIMER_CTRL_OP_FREERUN);
-+	mtk_timer_setup(evt, GPT_CLK_SRC, TIMER_CTRL_OP_FREERUN, 1);
- 	clocksource_mmio_init(evt->gpt_base + TIMER_CNT_REG(GPT_CLK_SRC),
- 			node->name, rate, 300, 32, clocksource_mmio_readl_up);
- 
- 	/* Configure clock event */
--	mtk_timer_setup(evt, GPT_CLK_EVT, TIMER_CTRL_OP_REPEAT);
-+	mtk_timer_setup(evt, GPT_CLK_EVT, TIMER_CTRL_OP_REPEAT, 0);
- 	clockevents_config_and_register(&evt->dev, rate, 0x3,
- 					0xffffffff);
- 
++#define MTK_MAX_CPU		8
++#define MTK_SMP_REG_SIZE	0x1000
++
++struct mtk_smp_boot_info {
++	unsigned long smp_base;
++	unsigned int jump_reg;
++	unsigned int core_keys[MTK_MAX_CPU - 1];
++	unsigned int core_regs[MTK_MAX_CPU - 1];
++};
++
++static const struct mtk_smp_boot_info mtk_mt8135_tz_boot = {
++	0x80002000, 0x3fc,
++	{ 0x534c4131, 0x4c415332, 0x41534c33 },
++	{ 0x3f8, 0x3f8, 0x3f8 },
++};
++
++static const struct mtk_smp_boot_info mtk_mt6589_boot = {
++	0x10002000, 0x34,
++	{ 0x534c4131, 0x4c415332, 0x41534c33 },
++	{ 0x38, 0x3c, 0x40 },
++};
++
++static const struct of_device_id mtk_tz_smp_boot_infos[] __initconst = {
++	{ .compatible   = "mediatek,mt8135", .data = &mtk_mt8135_tz_boot },
++	{ .compatible   = "mediatek,mt8127", .data = &mtk_mt8135_tz_boot },
++};
++
++static const struct of_device_id mtk_smp_boot_infos[] __initconst = {
++	{ .compatible   = "mediatek,mt6589", .data = &mtk_mt6589_boot },
++};
++
++static void __iomem *mtk_smp_base;
++static const struct mtk_smp_boot_info *mtk_smp_info;
++
++static int mtk_boot_secondary(unsigned int cpu, struct task_struct *idle)
++{
++	if (!mtk_smp_base)
++		return -EINVAL;
++
++	if (!mtk_smp_info->core_keys[cpu-1])
++		return -EINVAL;
++
++	writel_relaxed(mtk_smp_info->core_keys[cpu-1],
++		mtk_smp_base + mtk_smp_info->core_regs[cpu-1]);
++
++	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
++
++	return 0;
++}
++
++static void __init __mtk_smp_prepare_cpus(unsigned int max_cpus, int trustzone)
++{
++	int i, num;
++	const struct of_device_id *infos;
++
++	if (trustzone) {
++		num = ARRAY_SIZE(mtk_tz_smp_boot_infos);
++		infos = mtk_tz_smp_boot_infos;
++	} else {
++		num = ARRAY_SIZE(mtk_smp_boot_infos);
++		infos = mtk_smp_boot_infos;
++	}
++
++	/* Find smp boot info for this SoC */
++	for (i = 0; i < num; i++) {
++		if (of_machine_is_compatible(infos[i].compatible)) {
++			mtk_smp_info = infos[i].data;
++			break;
++		}
++	}
++
++	if (!mtk_smp_info) {
++		pr_err("%s: Device is not supported\n", __func__);
++		return;
++	}
++
++	if (trustzone) {
++		if (memblock_reserve(mtk_smp_info->smp_base, MTK_SMP_REG_SIZE)) {
++			pr_err("%s: Can't reserve smp memory\n", __func__);
++			return;
++		}
++		mtk_smp_base = phys_to_virt(mtk_smp_info->smp_base);
++	} else {
++		mtk_smp_base = ioremap(mtk_smp_info->smp_base, MTK_SMP_REG_SIZE);
++		if (!mtk_smp_base) {
++			pr_err("%s: Can't remap %lx\n", __func__,
++				mtk_smp_info->smp_base);
++			return;
++		}
++	}
++
++	/*
++	 * write the address of slave startup address into the system-wide
++	 * jump register
++	 */
++	writel_relaxed(virt_to_phys(secondary_startup_arm),
++			mtk_smp_base + mtk_smp_info->jump_reg);
++}
++
++static void __init mtk_tz_smp_prepare_cpus(unsigned int max_cpus)
++{
++	__mtk_smp_prepare_cpus(max_cpus, 1);
++}
++
++static void __init mtk_smp_prepare_cpus(unsigned int max_cpus)
++{
++	__mtk_smp_prepare_cpus(max_cpus, 0);
++}
++
++static struct smp_operations mt81xx_tz_smp_ops __initdata = {
++	.smp_prepare_cpus = mtk_tz_smp_prepare_cpus,
++	.smp_boot_secondary = mtk_boot_secondary,
++};
++CPU_METHOD_OF_DECLARE(mt81xx_tz_smp, "mediatek,mt81xx-tz-smp", &mt81xx_tz_smp_ops);
++
++static struct smp_operations mt65xx_smp_ops __initdata = {
++	.smp_prepare_cpus = mtk_smp_prepare_cpus,
++	.smp_boot_secondary = mtk_boot_secondary,
++};
++CPU_METHOD_OF_DECLARE(mt65xx_smp, "mediatek,mt65xx-smp", &mt65xx_smp_ops);
 -- 
 1.8.1.1.dirty
