@@ -1,74 +1,41 @@
-From: eric.nelson@boundarydevices.com (Eric Nelson)
-Date: Sat, 16 May 2015 12:23:22 -0700
-Subject: [PATCH 2/2] ARM: dts: sabrelite: use simple-panel instead of
- display-timings for LVDS0
-In-Reply-To: <1431804202-11067-1-git-send-email-eric.nelson@boundarydevices.com>
-References: <1431804202-11067-1-git-send-email-eric.nelson@boundarydevices.com>
-Message-ID: <1431804202-11067-3-git-send-email-eric.nelson@boundarydevices.com>
+From: r.schwebel@pengutronix.de (Robert Schwebel)
+Date: Sat, 16 May 2015 22:13:01 +0200
+Subject: [PATCH v2] ARM: vexpress: Add unified-cache Device Tree property
+In-Reply-To: <55426A26.9060704@arm.com>
+References: <5509437E.6060806@arm.com>
+ <1426671298-2012-1-git-send-email-r.schwebel@pengutronix.de>
+ <20150429191228.GO15254@pengutronix.de>
+ <20150430110853.GN7440@e106497-lin.cambridge.arm.com>
+ <20150430133011.GE15254@pengutronix.de> <55426A26.9060704@arm.com>
+Message-ID: <20150516201301.GT14416@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also add alias for backlight_lvds and connect it to the LVDS display.
+Hi Sudeep,
 
-Signed-off-by: Eric Nelson <eric.nelson@boundarydevices.com>
----
- arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 30 +++++++++++++++++-------------
- 1 file changed, 17 insertions(+), 13 deletions(-)
+On Thu, Apr 30, 2015 at 06:45:10PM +0100, Sudeep Holla wrote:
+> >I still see these errors with 4.1-rc1:
+> >
+> >[    0.000000] L2C: platform modifies aux control register: 0x02020000 -> 0x02420000
+> >[    0.000000] L2C: DT/platform modifies aux control register: 0x02020000 -> 0x02420000
+> >[    0.268626] platform 10000000.sysreg: Error -2 creating of_node link
+> >[    0.271997] platform basic-mmio-gpio.1.auto: Error -2 creating of_node link
+> >[    0.272266] platform basic-mmio-gpio.2.auto: Error -2 creating of_node link
+> >[    0.272681] platform basic-mmio-gpio.3.auto: Error -2 creating of_node link
+> 
+> OK, I was able to debug this, it boils down to initcall ordering.
+> Both of_init where the firmware sysfs is initialized and
+> vexpress_sysreg_init are at same core_initcall level. Needs some
+> thinking and more time to fix this.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-index 483856e2..6ed80b8 100644
---- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
-@@ -121,7 +121,7 @@
- 		status = "okay";
- 	};
- 
--	backlight_lvds {
-+	backlight_lvds: backlight_lvds {
- 		compatible = "pwm-backlight";
- 		pwms = <&pwm4 0 5000000>;
- 		brightness-levels = <0 4 8 16 32 64 128 255>;
-@@ -129,6 +129,17 @@
- 		power-supply = <&reg_3p3v>;
- 		status = "okay";
- 	};
-+
-+	panel {
-+		compatible = "hannstar,hsd100pxn1";
-+		backlight = <&backlight_lvds>;
-+
-+		port {
-+			panel_in: endpoint {
-+				remote-endpoint = <&lvds0_out>;
-+			};
-+		};
-+	};
- };
- 
- &audmux {
-@@ -374,18 +385,11 @@
- 		fsl,data-width = <18>;
- 		status = "okay";
- 
--		display-timings {
--			native-mode = <&timing0>;
--			timing0: hsd100pxn1 {
--				clock-frequency = <65000000>;
--				hactive = <1024>;
--				vactive = <768>;
--				hback-porch = <220>;
--				hfront-porch = <40>;
--				vback-porch = <21>;
--				vfront-porch = <7>;
--				hsync-len = <60>;
--				vsync-len = <10>;
-+		port at 4 {
-+			reg = <4>;
-+
-+			lvds0_out: endpoint {
-+				remote-endpoint = <&panel_in>;
- 			};
- 		};
- 	};
+Did you find out something in the meantime?
+I just tested 4.1-rc3 and the issues are still confirmed.
+
+Thanks,
+
+rsc
 -- 
-2.1.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
