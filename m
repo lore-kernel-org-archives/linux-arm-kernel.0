@@ -1,80 +1,70 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Sat, 16 May 2015 09:02:30 -0500
-Subject: [PATCH v1] ARM: pci: add call to pcie_bus_configure_settings()
-In-Reply-To: <1401297293-3950-1-git-send-email-m-karicheri2@ti.com>
-References: <1401297293-3950-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <20150516140230.GF31666@google.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sat, 16 May 2015 16:04:22 +0200
+Subject: [PATCH 2/7] rtc: arm: imx: snvs: change use syscon to access
+ register
+In-Reply-To: <1431696990-23078-3-git-send-email-Frank.Li@freescale.com>
+References: <1431696990-23078-1-git-send-email-Frank.Li@freescale.com>
+ <1431696990-23078-3-git-send-email-Frank.Li@freescale.com>
+Message-ID: <20150516140422.GL3338@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 28, 2014 at 01:14:53PM -0400, Murali Karicheri wrote:
-> Call pcie_bus_configure_settings on ARM, like for other platforms.
-> pcie_bus_configure_settings makes sure the MPS across the bus is
-> uniform and provides the ability to tune the MRSS and MPS to higher
-> performance values. This is particularly important for embedded where
-> there is no firmware to program these PCI-E settings for the OS.
+Hi,
+
+On 15/05/2015 at 21:36:25 +0800, Frank.Li at freescale.com wrote :
+> From: Frank Li <Frank.Li@freescale.com>
 > 
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> snvs included rtc, on/off key, power-off module
+> change to syscon to access register
 > 
-> CC: Russell King <linux@arm.linux.org.uk>
-> CC: Bjorn Helgaas <bhelgaas@google.com>
-> CC: Arnd Bergmann <arnd@arndb.de>
-> CC: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Signed-off-by: Frank Li <Frank.Li@freescale.com>
 > ---
->  - Fixed comments against initial version
->  arch/arm/kernel/bios32.c |   12 ++++++++++++
->  1 file changed, 12 insertions(+)
+>  drivers/rtc/rtc-snvs.c | 124 +++++++++++++++++++++----------------------------
+>  1 file changed, 54 insertions(+), 70 deletions(-)
 > 
-> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> index 16d43cd..17a26c1 100644
-> --- a/arch/arm/kernel/bios32.c
-> +++ b/arch/arm/kernel/bios32.c
-> @@ -545,6 +545,18 @@ void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
->  		 */
->  		pci_bus_add_devices(bus);
->  	}
-> +
-> +	list_for_each_entry(sys, &head, node) {
-> +		struct pci_bus *bus = sys->bus;
-> +
-> +		/* Configure PCI Express settings */
-> +		if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
-> +			struct pci_bus *child;
-> +
-> +			list_for_each_entry(child, &bus->children, node)
-> +				pcie_bus_configure_settings(child);
-
-This patch (8b5742ad156d ("ARM/PCI: Call pcie_bus_configure_settings() to
-set MPS")) has been upstream since v3.16-rc1, but I think we goofed.
-
-The MPS configuration should be done *before* pci_bus_add_devices().  After
-pci_bus_add_devices(), drivers may be bound to devices, and the PCI core
-shouldn't touch device configuration while a driver owns the device.
-
-Looking at the code, it seems like it would have been simpler to do this in
-the existing loop:
-
-  list_for_each_entry(sys, &head, node) {
-    struct pci_bus *bus = sys->bus;
-
-    if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
-      pci_bus_size_bridges(bus);
-      pci_bus_assign_resources(bus);
-      list_for_each_entry(child, &bus->children, node)
-        pcie_bus_configure_settings(child);
-    }
-
-    pci_bus_add_devices(bus);
-  }
-
-so maybe there's some reason I'm not aware of for not doing it that way?
-
-> +		}
-> +	}
->  }
+> diff --git a/drivers/rtc/rtc-snvs.c b/drivers/rtc/rtc-snvs.c
+> index 0479e80..4e85fbe 100644
+> --- a/drivers/rtc/rtc-snvs.c
+> +++ b/drivers/rtc/rtc-snvs.c
+> @@ -18,14 +18,16 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/rtc.h>
+>  #include <linux/clk.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/regmap.h>
 >  
->  #ifndef CONFIG_PCI_HOST_ITE8152
-> -- 
-> 1.7.9.5
-> 
+>  /* These register offsets are relative to LP (Low Power) range */
+Shouldn't you remove that comment ?
+
+> -#define SNVS_LPCR		0x04
+> -#define SNVS_LPSR		0x18
+> -#define SNVS_LPSRTCMR		0x1c
+> -#define SNVS_LPSRTCLR		0x20
+> -#define SNVS_LPTAR		0x24
+> -#define SNVS_LPPGDR		0x30
+> +#define SNVS_LPCR		0x38
+> +#define SNVS_LPSR		0x4c
+> +#define SNVS_LPSRTCMR		0x50
+> +#define SNVS_LPSRTCLR		0x54
+> +#define SNVS_LPTAR		0x58
+> +#define SNVS_LPPGDR		0x64
+>  
+>  #define SNVS_LPCR_SRTC_ENV	(1 << 0)
+>  #define SNVS_LPCR_LPTA_EN	(1 << 1)
+> @@ -37,31 +39,35 @@
+>  
+>  struct snvs_rtc_data {
+>  	struct rtc_device *rtc;
+> -	void __iomem *ioaddr;
+> +	struct regmap *snvs;
+>  	int irq;
+>  	spinlock_t lock;
+
+This lock can probably be removed, if I'm not mistaken the only use left
+is its initialization.
+
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
