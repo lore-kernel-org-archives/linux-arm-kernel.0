@@ -1,41 +1,39 @@
-From: shawnguo@kernel.org (shawnguo at kernel.org)
-Date: Sat, 16 May 2015 21:32:35 +0800
-Subject: [PATCH] MAINTAINERS: update Shawn's email to use kernel.org one
-Message-ID: <1431783155-30384-1-git-send-email-shawnguo@kernel.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sat, 16 May 2015 15:38:24 +0200
+Subject: [PATCH 0/8] ARM: dts: rockchip: the big relicensing
+In-Reply-To: <53032611.N4jZEQVE2a@phil>
+References: <1425665046-22927-1-git-send-email-heiko@sntech.de>
+ <2129595.I0LkhbAxWZ@phil> <53032611.N4jZEQVE2a@phil>
+Message-ID: <2044231.xmFc0BVZtm@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shawn Guo <shawn.guo@linaro.org>
+Am Donnerstag, 14. Mai 2015, 01:13:14 schrieb Heiko Stuebner:
+> Am Mittwoch, 13. Mai 2015, 23:23:15 schrieb Heiko Stuebner:
+> > Am Freitag, 6. M?rz 2015, 19:03:58 schrieb Heiko Stuebner:
+> > > GPL2/X11 seems to be the consensus to go for devicetree files, as shown
+> > > for
+> > > examply by armada, meson and sunxi.
+> > > 
+> > > We already have the new board-files licensed under this combination, so
+> > > complete the transition for the older files.
+> > > 
+> > > Heiko Stuebner (8):
+> > >   ARM: dts: rockchip: relicense rk3xxx.dtsi under GPLv2/X11
+> > >   ARM: dts: rockchip: relicense rk3066a.dtsi under GPLv2/X11
+> > >   ARM: dts: rockchip: relicense rk3188.dtsi under GPLv2/X11
+> > >   ARM: dts: rockchip: relicense rk3288.dtsi under GPLv2/X11
+> > >   ARM: dts: rockchip: relicense rk3288-thermal.dtsi under GPLv2/X11
+> > >   ARM: dts: rockchip: relicense rk3066a-bqcurie2.dts under GPLv2/X11
+> > >   ARM: dts: rockchip: relicense rk3188-radxarock.dts under GPLv2/X11
+> > >   ARM: dts: rockchip: relicense rk3288-evb* under GPLv2/X11
+> > 
+> > just for me to keep track, I've now applied patches 1,2,3 and 5 that got
+> > all necessary ACKs so far.
+> 
+> and now also patches 6 and 7.
+> 
+> That leaves patches 4 and 8 in this series that still need some acks.
 
-Update my email address to use kernel.org mailbox, so that emails
-between kernel community and company can be separated.
-
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- MAINTAINERS | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 2e5bbc0d68b2..a53e42fcba84 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1030,7 +1030,7 @@ F:	arch/arm/include/asm/hardware/dec21285.h
- F:	arch/arm/mach-footbridge/
- 
- ARM/FREESCALE IMX / MXC ARM ARCHITECTURE
--M:	Shawn Guo <shawn.guo@linaro.org>
-+M:	Shawn Guo <shawnguo@kernel.org>
- M:	Sascha Hauer <kernel@pengutronix.de>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
-@@ -1041,7 +1041,7 @@ F:	arch/arm/boot/dts/imx*
- F:	arch/arm/configs/imx*_defconfig
- 
- ARM/FREESCALE VYBRID ARM ARCHITECTURE
--M:	Shawn Guo <shawn.guo@linaro.org>
-+M:	Shawn Guo <shawnguo@kernel.org>
- M:	Sascha Hauer <kernel@pengutronix.de>
- R:	Stefan Agner <stefan@agner.ch>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--- 
-1.9.1
+and for completeness sake, patches 4 and 8 now also have all the necessary 
+ACKs
