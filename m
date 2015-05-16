@@ -1,29 +1,28 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Sat, 16 May 2015 13:48:07 +0200
-Subject: [V4 PATCH 2/6] arm64 : Introduce support for ACPI _CCA object
-In-Reply-To: <1431724994-21601-3-git-send-email-Suravee.Suthikulpanit@amd.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Sat, 16 May 2015 07:41:14 -0500
+Subject: [V4 PATCH 3/6] pci: Generic function for setting up PCI device
+ DMA coherency
+In-Reply-To: <1431724994-21601-4-git-send-email-Suravee.Suthikulpanit@amd.com>
 References: <1431724994-21601-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1431724994-21601-3-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <1431776887.2341.17.camel@x220>
+ <1431724994-21601-4-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <CAErSpo7NkeXvtFH7jDNeYm6HTZO_G=r77EuJ8vOL4WUKSpQxAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just a nit regarding the commit explanation.
+On Fri, May 15, 2015 at 4:23 PM, Suravee Suthikulpanit
+<Suravee.Suthikulpanit@amd.com> wrote:
+> This patch refactors of_pci_dma_configure() into a more generic
+> pci_dma_configure(), which can be reused by non-OF code.
+> Then, it adds support for setting up PCI device DMA coherency from
+> ACPI _CCA object that should normally be specified in the DSDT node
+> of its PCI host bridge..
 
-On Fri, 2015-05-15 at 16:23 -0500, Suravee Suthikulpanit wrote:
-> From http://www.uefi.org/sites/default/files/resources/ACPI_6.0.pdf,
-> section 6.2.17 _CCA states that ARM platforms require ACPI _CCA
-> object to be specified for DMA-cabpable devices. This patch introduces
-> ACPI_MUST_HAVE_CCA in arm64 Kconfig to specify such requirement.
+>From the changelog, it sounds like you might be able to split this
+into two patches:
 
-s/ACPI_MUST_HAVE_CCA/ACPI_CCA_REQUIRED/.
+1) Refactor of_pci_dma_configure(), with no functional change
+2) Add support for using _CCA
 
-Ie, update the commit explanation to match the change introduced in V2.
+If that's possible, please do so to make this easier to review.
 
-> In case _CCA is missing, arm64 would assign dummy_dma_ops
-> to disable DMA capability of the device.
-
-Thanks,
-
-
-Paul Bolle
+Bjorn
