@@ -1,79 +1,80 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Sat, 16 May 2015 11:44:16 +0200
-Subject: [PATCH v7 04/13] irqchip: nvic: support hierarchy irq domain
+Date: Sat, 16 May 2015 11:44:13 +0200
+Subject: [PATCH v7 01/13] irqdomain: Add non-hierarchy helper
+ irq_domain_set_info
 In-Reply-To: <1431769465-26867-1-git-send-email-stefan@agner.ch>
 References: <1431769465-26867-1-git-send-email-stefan@agner.ch>
-Message-ID: <1431769465-26867-5-git-send-email-stefan@agner.ch>
+Message-ID: <1431769465-26867-2-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for hierarchy irq domains. This is required to stack
-the MSCM interrupt router and the NVIC controller found in Vybrid
-SoC.
+This adds the helper irq_domain_set_info() in a non-domain hierarchy
+variant. This allows to use the helper for generic chip since not
+all chips using generic chip support domain hierarchy.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- drivers/irqchip/Kconfig    |  1 +
- drivers/irqchip/irq-nvic.c | 28 +++++++++++++++++++++++++++-
- 2 files changed, 28 insertions(+), 1 deletion(-)
+ include/linux/irqdomain.h |  8 ++++----
+ kernel/irq/irqdomain.c    | 21 +++++++++++++++++++++
+ 2 files changed, 25 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index 6de62a9..99b9a97 100644
---- a/drivers/irqchip/Kconfig
-+++ b/drivers/irqchip/Kconfig
-@@ -30,6 +30,7 @@ config ARM_GIC_V3_ITS
- config ARM_NVIC
- 	bool
- 	select IRQ_DOMAIN
-+	select IRQ_DOMAIN_HIERARCHY
- 	select GENERIC_IRQ_CHIP
- 
- config ARM_VIC
-diff --git a/drivers/irqchip/irq-nvic.c b/drivers/irqchip/irq-nvic.c
-index 4ff0805..5fac910 100644
---- a/drivers/irqchip/irq-nvic.c
-+++ b/drivers/irqchip/irq-nvic.c
-@@ -49,6 +49,31 @@ nvic_handle_irq(irq_hw_number_t hwirq, struct pt_regs *regs)
- 	handle_IRQ(irq, regs);
+diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+index 676d730..744ac0e 100644
+--- a/include/linux/irqdomain.h
++++ b/include/linux/irqdomain.h
+@@ -258,6 +258,10 @@ int irq_domain_xlate_onetwocell(struct irq_domain *d, struct device_node *ctrlr,
+ /* V2 interfaces to support hierarchy IRQ domains. */
+ extern struct irq_data *irq_domain_get_irq_data(struct irq_domain *domain,
+ 						unsigned int virq);
++extern void irq_domain_set_info(struct irq_domain *domain, unsigned int virq,
++				irq_hw_number_t hwirq, struct irq_chip *chip,
++				void *chip_data, irq_flow_handler_t handler,
++				void *handler_data, const char *handler_name);
+ #ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
+ extern struct irq_domain *irq_domain_add_hierarchy(struct irq_domain *parent,
+ 			unsigned int flags, unsigned int size,
+@@ -281,10 +285,6 @@ extern int irq_domain_set_hwirq_and_chip(struct irq_domain *domain,
+ 					 irq_hw_number_t hwirq,
+ 					 struct irq_chip *chip,
+ 					 void *chip_data);
+-extern void irq_domain_set_info(struct irq_domain *domain, unsigned int virq,
+-				irq_hw_number_t hwirq, struct irq_chip *chip,
+-				void *chip_data, irq_flow_handler_t handler,
+-				void *handler_data, const char *handler_name);
+ extern void irq_domain_reset_irq_data(struct irq_data *irq_data);
+ extern void irq_domain_free_irqs_common(struct irq_domain *domain,
+ 					unsigned int virq,
+diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+index 7fac311..41bf6dc 100644
+--- a/kernel/irq/irqdomain.c
++++ b/kernel/irq/irqdomain.c
+@@ -1232,6 +1232,27 @@ struct irq_data *irq_domain_get_irq_data(struct irq_domain *domain,
+ 	return (irq_data && irq_data->domain == domain) ? irq_data : NULL;
  }
  
-+static int nvic_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
-+				unsigned int nr_irqs, void *arg)
++/**
++ * irq_domain_set_info - Set the complete data for a @virq in @domain
++ * @domain:		Interrupt domain to match
++ * @virq:		IRQ number
++ * @hwirq:		The hardware interrupt number
++ * @chip:		The associated interrupt chip
++ * @chip_data:		The associated interrupt chip data
++ * @handler:		The interrupt flow handler
++ * @handler_data:	The interrupt flow handler data
++ * @handler_name:	The interrupt handler name
++ */
++void irq_domain_set_info(struct irq_domain *domain, unsigned int virq,
++			 irq_hw_number_t hwirq, struct irq_chip *chip,
++			 void *chip_data, irq_flow_handler_t handler,
++			 void *handler_data, const char *handler_name)
 +{
-+	int i, ret;
-+	irq_hw_number_t hwirq;
-+	unsigned int type = IRQ_TYPE_NONE;
-+	struct of_phandle_args *irq_data = arg;
-+
-+	ret = irq_domain_xlate_onecell(domain, irq_data->np, irq_data->args,
-+				   irq_data->args_count, &hwirq, &type);
-+	if (ret)
-+		return ret;
-+
-+	for (i = 0; i < nr_irqs; i++)
-+		irq_map_generic_chip(domain, virq + i, hwirq + i);
-+
-+	return 0;
++	irq_set_chip_and_handler_name(virq, chip, handler, handler_name);
++	irq_set_chip_data(virq, chip_data);
++	irq_set_handler_data(virq, handler_data);
 +}
 +
-+static const struct irq_domain_ops nvic_irq_domain_ops = {
-+	.xlate = irq_domain_xlate_onecell,
-+	.alloc = nvic_irq_domain_alloc,
-+	.free = irq_domain_free_irqs_top,
-+};
-+
- static int __init nvic_of_init(struct device_node *node,
- 			       struct device_node *parent)
+ static void irq_domain_check_hierarchy(struct irq_domain *domain)
  {
-@@ -70,7 +95,8 @@ static int __init nvic_of_init(struct device_node *node,
- 		irqs = NVIC_MAX_IRQ;
- 
- 	nvic_irq_domain =
--		irq_domain_add_linear(node, irqs, &irq_generic_chip_ops, NULL);
-+		irq_domain_add_linear(node, irqs, &nvic_irq_domain_ops, NULL);
-+
- 	if (!nvic_irq_domain) {
- 		pr_warn("Failed to allocate irq domain\n");
- 		return -ENOMEM;
+ }
 -- 
 2.4.1
