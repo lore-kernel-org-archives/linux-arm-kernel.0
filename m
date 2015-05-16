@@ -1,31 +1,34 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Sat, 16 May 2015 11:44:18 +0200
-Subject: [PATCH v7 06/13] ARM: ARMv7M: define size of vector table for Vybrid
+Date: Sat, 16 May 2015 11:44:19 +0200
+Subject: [PATCH v7 07/13] clocksource: add dependencies for Vybrid pit
+ clocksource
 In-Reply-To: <1431769465-26867-1-git-send-email-stefan@agner.ch>
 References: <1431769465-26867-1-git-send-email-stefan@agner.ch>
-Message-ID: <1431769465-26867-7-git-send-email-stefan@agner.ch>
+Message-ID: <1431769465-26867-8-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vybrids has 112 peripherial interrupts which can be routed to the
-Cortex-M4's NVIC interrupt controller.
+Add the minimal dependencies required to use the Vybrid PIT
+clocksource driver. Those are not part of the SoC dependencies.
 
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/mm/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/clocksource/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 3937af0..527ea03 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -609,6 +609,7 @@ config CPUV7M_NUM_IRQ
- 	depends on CPU_V7M
- 	default 90 if ARCH_STM32
- 	default 38 if ARCH_EFM32
-+	default 112 if SOC_VF610
- 	default 240
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 51d7865f..9626c40 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -174,6 +174,8 @@ config FSL_FTM_TIMER
+ 
+ config VF_PIT_TIMER
+ 	bool
++	select CLKSRC_MMIO
++	select CLKSRC_OF
  	help
- 	  This option indicates the number of interrupts connected to the NVIC.
+ 	  Support for Period Interrupt Timer on Freescale Vybrid Family SoCs.
+ 
 -- 
 2.4.1
