@@ -1,24 +1,43 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Sun, 17 May 2015 09:32:03 +0800
-Subject: [linux-sunxi] Re: [PATCH v9 4/4] crypto: Add Allwinner Security
- System crypto accelerator
-In-Reply-To: <555787D7.80708@gmail.com>
-References: <1431608341-10936-1-git-send-email-clabbe.montjoie@gmail.com>
- <1431608341-10936-5-git-send-email-clabbe.montjoie@gmail.com>
- <20150515065222.GA16808@gondor.apana.org.au>
- <555787D7.80708@gmail.com>
-Message-ID: <20150517013203.GA5161@gondor.apana.org.au>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Sun, 17 May 2015 11:05:53 +0900
+Subject: [GIT PULL] ARM: EXYNOS: dts: Improvements for 4.2, second try
+In-Reply-To: <1431314022-17062-1-git-send-email-k.kozlowski@samsung.com>
+References: <1431314022-17062-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <5557F781.3060405@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 16, 2015 at 08:09:27PM +0200, Corentin LABBE wrote:
->
-> Incidental question, I need to use the MD5 IV for export_md5 function, but they are not defined anywhere (unlike SHAxx ones), does this is voluntary or do you will accept a patch for adding them.
+On 05/11/15 12:13, Krzysztof Kozlowski wrote:
+> Dear Kukjin,
+> 
+> I gathered various improvements for upcoming 4.2 merge window.
+> Description along with a tag.
+> 
+> Best regards,
+> Krzysztof
+> 
+> 
+> The following changes since commit 2495ae559826c60e3ccde9850e3b38815725b9c9:
+> 
+>   ARM: dts: Add keep-power-in-suspend to WiFi SDIO node for Peach Boards (2015-05-11 11:00:00 +0900)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/krzk/linux.git tags/samsung-dt-for-next-4.2-2
+> 
+> for you to fetch changes up to c5f41228c9fad4c7343df8547b870766163b76dc:
+> 
+>   ARM: dts: exynos3250-rinato: add support for JPEG codec (2015-05-11 11:01:57 +0900)
+> 
+Hi,
 
-Please send a patch to add them.
+I've applied all of changes you requested with sorting them out.
+
+Thanks and please test on your own boards with samsung's for-next then
+if anything, let us know.
+
+Note, I think re-post to use lables in dt would be better based on
+current for-next.
 
 Thanks,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Kukjin
