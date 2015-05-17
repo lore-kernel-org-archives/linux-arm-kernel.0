@@ -1,96 +1,460 @@
 From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Sun, 17 May 2015 17:09:46 +0900
-Subject: [PATCH 2/4] ARM: multi_v7_defconfig: Enable PMIC and MUIC drivers for
- Exynos boards
+Date: Sun, 17 May 2015 17:09:47 +0900
+Subject: [PATCH v6 03/13] ARM: dts: Use labels for overriding nodes in
+ exynos4210-origen
 In-Reply-To: <1431850195-9558-1-git-send-email-k.kozlowski.k@gmail.com>
 References: <1431850195-9558-1-git-send-email-k.kozlowski.k@gmail.com>
-Message-ID: <1431850195-9558-5-git-send-email-k.kozlowski.k@gmail.com>
+Message-ID: <1431850195-9558-6-git-send-email-k.kozlowski.k@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Usage of labels instead of full paths reduces possible mistakes when
+overriding nodes.
 
-Enable drivers for PMICs and MUICs present on Exynos-based devices:
- - max14577: charger, fuel gauge (max17040), regulator,
-   used on: Gear 1, Gear 2,
- - max7693: charger, fuel gauge (max17042),
-   used on: Trats2,
- - s5m/s2mps: RTC, clock,
-   used on: Arndale, Arndale Octa, Gear 1, Gear 2
-
-This allows full usage of charging stack on these devices along with RTC
-and 32 kHz clocks.
-
-The I2C_GPIO is necessary for MAX77693 on Trats2 because the device is
-wired to Exynos4412 over GPIO.
-
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
 ---
- arch/arm/configs/multi_v7_defconfig | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/boot/dts/exynos4210-origen.dts | 418 ++++++++++++++++----------------
+ 1 file changed, 209 insertions(+), 209 deletions(-)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index d524d2e9633c..6a6a292c5bf8 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -280,6 +280,7 @@ CONFIG_I2C_DESIGNWARE_PLATFORM=y
- CONFIG_I2C_DIGICOLOR=m
- CONFIG_I2C_GPIO=m
- CONFIG_I2C_EXYNOS5=y
-+CONFIG_I2C_GPIO=y
- CONFIG_I2C_MV64XXX=y
- CONFIG_I2C_RIIC=y
- CONFIG_I2C_S3C2410=y
-@@ -328,7 +329,11 @@ CONFIG_GPIO_SYSCON=y
- CONFIG_GPIO_TPS6586X=y
- CONFIG_GPIO_TPS65910=y
- CONFIG_BATTERY_SBS=y
-+CONFIG_BATTERY_MAX17040=y
-+CONFIG_BATTERY_MAX17042=y
-+CONFIG_CHARGER_MAX14577=y
- CONFIG_CHARGER_TPS65090=y
-+CONFIG_CHARGER_MAX77693=y
- CONFIG_POWER_RESET_AS3722=y
- CONFIG_POWER_RESET_GPIO=y
- CONFIG_POWER_RESET_GPIO_RESTART=y
-@@ -357,8 +362,10 @@ CONFIG_MFD_AXP20X=y
- CONFIG_MFD_CROS_EC=y
- CONFIG_MFD_CROS_EC_I2C=m
- CONFIG_MFD_CROS_EC_SPI=y
-+CONFIG_MFD_MAX14577=y
- CONFIG_MFD_MAX77686=y
- CONFIG_MFD_MAX8907=y
-+CONFIG_MFD_MAX77693=y
- CONFIG_MFD_SEC_CORE=y
- CONFIG_MFD_STMPE=y
- CONFIG_MFD_PALMAS=y
-@@ -374,9 +381,11 @@ CONFIG_REGULATOR_DA9210=y
- CONFIG_REGULATOR_GPIO=y
- CONFIG_MFD_SYSCON=y
- CONFIG_POWER_RESET_SYSCON=y
-+CONFIG_REGULATOR_MAX14577=y
- CONFIG_REGULATOR_MAX8907=y
- CONFIG_REGULATOR_MAX8973=y
- CONFIG_REGULATOR_MAX77686=y
-+CONFIG_REGULATOR_MAX77693=y
- CONFIG_REGULATOR_MAX77802=m
- CONFIG_REGULATOR_PALMAS=y
- CONFIG_REGULATOR_S2MPS11=y
-@@ -529,6 +538,7 @@ CONFIG_RTC_DRV_SUN6I=y
- CONFIG_RTC_DRV_SUNXI=y
- CONFIG_RTC_DRV_MV=y
- CONFIG_RTC_DRV_TEGRA=y
-+CONFIG_RTC_DRV_S5M=y
- CONFIG_DMADEVICES=y
- CONFIG_DW_DMAC=y
- CONFIG_MV_XOR=y
-@@ -558,6 +568,7 @@ CONFIG_QCOM_GSBI=y
- CONFIG_COMMON_CLK_QCOM=y
- CONFIG_COMMON_CLK_MAX77686=y
- CONFIG_COMMON_CLK_MAX77802=m
-+CONFIG_COMMON_CLK_S2MPS11=y
- CONFIG_APQ_MMCC_8084=y
- CONFIG_MSM_GCC_8660=y
- CONFIG_MSM_MMCC_8960=y
+diff --git a/arch/arm/boot/dts/exynos4210-origen.dts b/arch/arm/boot/dts/exynos4210-origen.dts
+index b81146141402..e0abfc3324d1 100644
+--- a/arch/arm/boot/dts/exynos4210-origen.dts
++++ b/arch/arm/boot/dts/exynos4210-origen.dts
+@@ -50,209 +50,6 @@
+ 		};
+ 	};
+ 
+-	watchdog at 10060000 {
+-		status = "okay";
+-	};
+-
+-	rtc at 10070000 {
+-		status = "okay";
+-	};
+-
+-	tmu at 100C0000 {
+-		status = "okay";
+-	};
+-
+-	sdhci at 12530000 {
+-		bus-width = <4>;
+-		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_bus4 &sd2_cd>;
+-		pinctrl-names = "default";
+-		vmmc-supply = <&mmc_reg>;
+-		status = "okay";
+-	};
+-
+-	sdhci at 12510000 {
+-		bus-width = <4>;
+-		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_cd>;
+-		pinctrl-names = "default";
+-		vmmc-supply = <&mmc_reg>;
+-		status = "okay";
+-	};
+-
+-	g2d at 12800000 {
+-		status = "okay";
+-	};
+-
+-	codec at 13400000 {
+-		samsung,mfc-r = <0x43000000 0x800000>;
+-		samsung,mfc-l = <0x51000000 0x800000>;
+-		status = "okay";
+-	};
+-
+-	serial at 13800000 {
+-		status = "okay";
+-	};
+-
+-	serial at 13810000 {
+-		status = "okay";
+-	};
+-
+-	serial at 13820000 {
+-		status = "okay";
+-	};
+-
+-	serial at 13830000 {
+-		status = "okay";
+-	};
+-
+-	i2c at 13860000 {
+-		status = "okay";
+-		samsung,i2c-sda-delay = <100>;
+-		samsung,i2c-max-bus-freq = <20000>;
+-		pinctrl-0 = <&i2c0_bus>;
+-		pinctrl-names = "default";
+-
+-		max8997_pmic at 66 {
+-			compatible = "maxim,max8997-pmic";
+-			reg = <0x66>;
+-			interrupt-parent = <&gpx0>;
+-			interrupts = <4 0>, <3 0>;
+-
+-			max8997,pmic-buck1-dvs-voltage = <1350000>;
+-			max8997,pmic-buck2-dvs-voltage = <1100000>;
+-			max8997,pmic-buck5-dvs-voltage = <1200000>;
+-
+-			regulators {
+-				ldo1_reg: LDO1 {
+-					regulator-name = "VDD_ABB_3.3V";
+-					regulator-min-microvolt = <3300000>;
+-					regulator-max-microvolt = <3300000>;
+-				};
+-
+-				ldo2_reg: LDO2 {
+-					regulator-name = "VDD_ALIVE_1.1V";
+-					regulator-min-microvolt = <1100000>;
+-					regulator-max-microvolt = <1100000>;
+-					regulator-always-on;
+-				};
+-
+-				ldo3_reg: LDO3 {
+-					regulator-name = "VMIPI_1.1V";
+-					regulator-min-microvolt = <1100000>;
+-					regulator-max-microvolt = <1100000>;
+-				};
+-
+-				ldo4_reg: LDO4 {
+-					regulator-name = "VDD_RTC_1.8V";
+-					regulator-min-microvolt = <1800000>;
+-					regulator-max-microvolt	= <1800000>;
+-					regulator-always-on;
+-				};
+-
+-				ldo6_reg: LDO6 {
+-					regulator-name = "VMIPI_1.8V";
+-					regulator-min-microvolt = <1800000>;
+-					regulator-max-microvolt	= <1800000>;
+-					regulator-always-on;
+-				};
+-
+-				ldo7_reg: LDO7 {
+-					regulator-name = "VDD_AUD_1.8V";
+-					regulator-min-microvolt = <1800000>;
+-					regulator-max-microvolt	= <1800000>;
+-				};
+-
+-				ldo8_reg: LDO8 {
+-					regulator-name = "VADC_3.3V";
+-					regulator-min-microvolt = <3300000>;
+-					regulator-max-microvolt	= <3300000>;
+-				};
+-
+-				ldo9_reg: LDO9 {
+-					regulator-name = "DVDD_SWB_2.8V";
+-					regulator-min-microvolt = <2800000>;
+-					regulator-max-microvolt	= <2800000>;
+-					regulator-always-on;
+-				};
+-
+-				ldo10_reg: LDO10 {
+-					regulator-name = "VDD_PLL_1.1V";
+-					regulator-min-microvolt = <1100000>;
+-					regulator-max-microvolt	= <1100000>;
+-					regulator-always-on;
+-				};
+-
+-				ldo11_reg: LDO11 {
+-					regulator-name = "VDD_AUD_3V";
+-					regulator-min-microvolt = <3000000>;
+-					regulator-max-microvolt	= <3000000>;
+-				};
+-
+-				ldo14_reg: LDO14 {
+-					regulator-name = "AVDD18_SWB_1.8V";
+-					regulator-min-microvolt = <1800000>;
+-					regulator-max-microvolt	= <1800000>;
+-					regulator-always-on;
+-				};
+-
+-				ldo17_reg: LDO17 {
+-					regulator-name = "VDD_SWB_3.3V";
+-					regulator-min-microvolt = <3300000>;
+-					regulator-max-microvolt	= <3300000>;
+-					regulator-always-on;
+-				};
+-
+-				ldo21_reg: LDO21 {
+-					regulator-name = "VDD_MIF_1.2V";
+-					regulator-min-microvolt = <1200000>;
+-					regulator-max-microvolt	= <1200000>;
+-					regulator-always-on;
+-				};
+-
+-				buck1_reg: BUCK1 {
+-					/*
+-					* HACK: The real name is VDD_ARM_1.2V,
+-					* but exynos-cpufreq does not support
+-					* DT-based regulator lookup yet.
+-					*/
+-					regulator-name = "vdd_arm";
+-					regulator-min-microvolt = <950000>;
+-					regulator-max-microvolt	= <1350000>;
+-					regulator-always-on;
+-					regulator-boot-on;
+-				};
+-
+-				buck2_reg: BUCK2 {
+-					regulator-name = "VDD_INT_1.1V";
+-					regulator-min-microvolt = <900000>;
+-					regulator-max-microvolt	= <1100000>;
+-					regulator-always-on;
+-					regulator-boot-on;
+-				};
+-
+-				buck3_reg: BUCK3 {
+-					regulator-name = "VDD_G3D_1.1V";
+-					regulator-min-microvolt = <900000>;
+-					regulator-max-microvolt = <1100000>;
+-				};
+-
+-				buck5_reg: BUCK5 {
+-					regulator-name = "VDDQ_M1M2_1.2V";
+-					regulator-min-microvolt = <1200000>;
+-					regulator-max-microvolt = <1200000>;
+-					regulator-always-on;
+-				};
+-
+-				buck7_reg: BUCK7 {
+-					regulator-name = "VDD_LCD_3.3V";
+-					regulator-min-microvolt = <3300000>;
+-					regulator-max-microvolt = <3300000>;
+-					regulator-boot-on;
+-					regulator-always-on;
+-				};
+-			};
+-		};
+-	};
+-
+ 	gpio_keys {
+ 		compatible = "gpio-keys";
+ 		#address-cells = <1>;
+@@ -314,12 +111,6 @@
+ 		};
+ 	};
+ 
+-	fimd at 11c00000 {
+-		pinctrl-0 = <&lcd_en &lcd_clk &lcd_data24 &pwm0_out>;
+-		pinctrl-names = "default";
+-		status = "okay";
+-	};
+-
+ 	display-timings {
+ 		native-mode = <&timing0>;
+ 		timing0: timing {
+@@ -335,3 +126,212 @@
+ 		};
+ 	};
+ };
++
++&fimd {
++	pinctrl-0 = <&lcd_en &lcd_clk &lcd_data24 &pwm0_out>;
++	pinctrl-names = "default";
++	status = "okay";
++};
++
++&g2d {
++	status = "okay";
++};
++
++&i2c_0 {
++	status = "okay";
++	samsung,i2c-sda-delay = <100>;
++	samsung,i2c-max-bus-freq = <20000>;
++	pinctrl-0 = <&i2c0_bus>;
++	pinctrl-names = "default";
++
++	max8997_pmic at 66 {
++		compatible = "maxim,max8997-pmic";
++		reg = <0x66>;
++		interrupt-parent = <&gpx0>;
++		interrupts = <4 0>, <3 0>;
++
++		max8997,pmic-buck1-dvs-voltage = <1350000>;
++		max8997,pmic-buck2-dvs-voltage = <1100000>;
++		max8997,pmic-buck5-dvs-voltage = <1200000>;
++
++		regulators {
++			ldo1_reg: LDO1 {
++				regulator-name = "VDD_ABB_3.3V";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++			};
++
++			ldo2_reg: LDO2 {
++				regulator-name = "VDD_ALIVE_1.1V";
++				regulator-min-microvolt = <1100000>;
++				regulator-max-microvolt = <1100000>;
++				regulator-always-on;
++			};
++
++			ldo3_reg: LDO3 {
++				regulator-name = "VMIPI_1.1V";
++				regulator-min-microvolt = <1100000>;
++				regulator-max-microvolt = <1100000>;
++			};
++
++			ldo4_reg: LDO4 {
++				regulator-name = "VDD_RTC_1.8V";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt	= <1800000>;
++				regulator-always-on;
++			};
++
++			ldo6_reg: LDO6 {
++				regulator-name = "VMIPI_1.8V";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt	= <1800000>;
++				regulator-always-on;
++			};
++
++			ldo7_reg: LDO7 {
++				regulator-name = "VDD_AUD_1.8V";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt	= <1800000>;
++			};
++
++			ldo8_reg: LDO8 {
++				regulator-name = "VADC_3.3V";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt	= <3300000>;
++			};
++
++			ldo9_reg: LDO9 {
++				regulator-name = "DVDD_SWB_2.8V";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt	= <2800000>;
++				regulator-always-on;
++			};
++
++			ldo10_reg: LDO10 {
++				regulator-name = "VDD_PLL_1.1V";
++				regulator-min-microvolt = <1100000>;
++				regulator-max-microvolt	= <1100000>;
++				regulator-always-on;
++			};
++
++			ldo11_reg: LDO11 {
++				regulator-name = "VDD_AUD_3V";
++				regulator-min-microvolt = <3000000>;
++				regulator-max-microvolt	= <3000000>;
++			};
++
++			ldo14_reg: LDO14 {
++				regulator-name = "AVDD18_SWB_1.8V";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt	= <1800000>;
++				regulator-always-on;
++			};
++
++			ldo17_reg: LDO17 {
++				regulator-name = "VDD_SWB_3.3V";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt	= <3300000>;
++				regulator-always-on;
++			};
++
++			ldo21_reg: LDO21 {
++				regulator-name = "VDD_MIF_1.2V";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt	= <1200000>;
++				regulator-always-on;
++			};
++
++			buck1_reg: BUCK1 {
++				/*
++				* HACK: The real name is VDD_ARM_1.2V,
++				* but exynos-cpufreq does not support
++				* DT-based regulator lookup yet.
++				*/
++				regulator-name = "vdd_arm";
++				regulator-min-microvolt = <950000>;
++				regulator-max-microvolt	= <1350000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			buck2_reg: BUCK2 {
++				regulator-name = "VDD_INT_1.1V";
++				regulator-min-microvolt = <900000>;
++				regulator-max-microvolt	= <1100000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			buck3_reg: BUCK3 {
++				regulator-name = "VDD_G3D_1.1V";
++				regulator-min-microvolt = <900000>;
++				regulator-max-microvolt = <1100000>;
++			};
++
++			buck5_reg: BUCK5 {
++				regulator-name = "VDDQ_M1M2_1.2V";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1200000>;
++				regulator-always-on;
++			};
++
++			buck7_reg: BUCK7 {
++				regulator-name = "VDD_LCD_3.3V";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++		};
++	};
++};
++
++&mfc {
++	samsung,mfc-r = <0x43000000 0x800000>;
++	samsung,mfc-l = <0x51000000 0x800000>;
++	status = "okay";
++};
++
++&sdhci_0 {
++	bus-width = <4>;
++	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_cd>;
++	pinctrl-names = "default";
++	vmmc-supply = <&mmc_reg>;
++	status = "okay";
++};
++
++&sdhci_2 {
++	bus-width = <4>;
++	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_bus4 &sd2_cd>;
++	pinctrl-names = "default";
++	vmmc-supply = <&mmc_reg>;
++	status = "okay";
++};
++
++&serial_0 {
++	status = "okay";
++};
++
++&serial_1 {
++	status = "okay";
++};
++
++&serial_2 {
++	status = "okay";
++};
++
++&serial_3 {
++	status = "okay";
++};
++
++&rtc {
++	status = "okay";
++};
++
++&tmu {
++	status = "okay";
++};
++
++&watchdog {
++	status = "okay";
++};
 -- 
 2.1.4
