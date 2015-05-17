@@ -1,42 +1,33 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sun, 17 May 2015 09:45:53 +0200
-Subject: [PATCH v9] crypto: Add Allwinner Security System crypto
- accelerator
-In-Reply-To: <1431608341-10936-1-git-send-email-clabbe.montjoie@gmail.com>
-References: <1431608341-10936-1-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <20150517094553.7fd8d8a0@bbrezillon>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Sun, 17 May 2015 09:53:32 +0200 (CEST)
+Subject: [PATCH v7 08/13] ARM: unify MMU/!MMU addruart calls
+In-Reply-To: <20150516205103.GO2067@n2100.arm.linux.org.uk>
+References: <1431769465-26867-1-git-send-email-stefan@agner.ch>
+ <1431769465-26867-9-git-send-email-stefan@agner.ch>
+ <20150516205103.GO2067@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.11.1505170952060.4225@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Corentin,
+On Sat, 16 May 2015, Russell King - ARM Linux wrote:
 
-On Thu, 14 May 2015 14:58:57 +0200
-LABBE Corentin <clabbe.montjoie@gmail.com> wrote:
-
+> On Sat, May 16, 2015 at 11:44:20AM +0200, Stefan Agner wrote:
+> > Remove the needless differences between MMU/!MMU addruart calls.
+> > This allows to use the same addruart macro on SoC level. Useful
+> > for SoC consisting of multiple CPUs with and without MMU such as
+> > Freescale Vybrid.
+> > 
+> > Signed-off-by: Stefan Agner <stefan@agner.ch>
 > 
-> Hello
-> 
-> This is the driver for the Security System included in Allwinner SoC A20.
-> The Security System (SS for short) is a hardware cryptographic accelerator that
-> support AES/MD5/SHA1/DES/3DES/PRNG algorithms.
-> It could be found on others Allwinner SoC: 
-> - A10, A10s, A13, A31 and A33 manual give the same datasheet for SS than A20
-> - A23 speak about a security system but without precisions
-> - A80 and A83T datasheet speak about a security system with more functions
->   (SHA224/SHA256/RSA/CRC), they will be supported in a separate driver
-> But I do not have access on any of those hardware, tests are welcome.
-> 
+> Depending on the merge plan for the remainder (has tglx reviewed the IRQ
+> changes yet?  I think he needs to before this can be merged)... if it's
+> not going to go in for the next merge window, this should find its way
+> into the patch system so it can be applied anyway.
 
-Maybe this is just a nitpick, but I would reverse the ordering of
-patches in this series. The biggest inconsistency is the fact that
-you're adding yourself as a maintainer of something that does not even
-exist.
+I'm going to apply the irq core and chip driver modifications to a
+separate branch later today, so you or ARM-SOC folks can pull that
+in. Will send you a mail where it can be found.
 
-Best Regards,
+Thanks,
 
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+	tglx
