@@ -1,83 +1,60 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 17 May 2015 16:51:46 +0200
-Subject: [RFC 2/7] ARM: dts: sun9i: Add CCI-400 device nodes for A80
-In-Reply-To: <1431583811-25780-3-git-send-email-wens@csie.org>
-References: <1431583811-25780-1-git-send-email-wens@csie.org>
- <1431583811-25780-3-git-send-email-wens@csie.org>
-Message-ID: <20150517145146.GK4004@lukather>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 18 May 2015 00:13:33 +0200
+Subject: [PATCH] ARM: imx: clk-vf610: enable debug access port by default
+Message-ID: <1431900813-5466-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 14, 2015 at 02:10:06PM +0800, Chen-Yu Tsai wrote:
-> The A80 includes an ARM CCI-400 interconnect to support multi-cluster
-> CPU caches.
-> 
-> Also add the default clock frequency for the CPUs.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  arch/arm/boot/dts/sun9i-a80.dtsi | 46 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 46 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
-> index ca272e92b85d..200e712fbf0e 100644
-> --- a/arch/arm/boot/dts/sun9i-a80.dtsi
-> +++ b/arch/arm/boot/dts/sun9i-a80.dtsi
-> @@ -58,48 +58,64 @@
->  		cpu0: cpu at 0 {
->  			compatible = "arm,cortex-a7";
->  			device_type = "cpu";
-> +			cci-control-port = <&cci_control0>;
-> +			clock-frequency = <12000000>;
->  			reg = <0x0>;
->  		};
->  
->  		cpu1: cpu at 1 {
->  			compatible = "arm,cortex-a7";
->  			device_type = "cpu";
-> +			cci-control-port = <&cci_control0>;
-> +			clock-frequency = <12000000>;
->  			reg = <0x1>;
->  		};
->  
->  		cpu2: cpu at 2 {
->  			compatible = "arm,cortex-a7";
->  			device_type = "cpu";
-> +			cci-control-port = <&cci_control0>;
-> +			clock-frequency = <12000000>;
->  			reg = <0x2>;
->  		};
->  
->  		cpu3: cpu at 3 {
->  			compatible = "arm,cortex-a7";
->  			device_type = "cpu";
-> +			cci-control-port = <&cci_control0>;
-> +			clock-frequency = <12000000>;
->  			reg = <0x3>;
->  		};
->  
->  		cpu4: cpu at 100 {
->  			compatible = "arm,cortex-a15";
->  			device_type = "cpu";
-> +			cci-control-port = <&cci_control1>;
-> +			clock-frequency = <9000000>;
+Enabled DAP (debug access port) by default. This enables the hw-
+breakpoint framework to make use of the breakpoints and watchpoints
+supported by hardware.
 
-Isn't the clock frequency property is supposed to be the maximum
-frequency of that CPU in Linux?
+[    0.215805] hw-breakpoint: found 2 (+1 reserved) breakpoint and 1 watchpoint registers.
+[    0.224624] hw-breakpoint: maximum watchpoint size is 4 bytes.
 
-It looks odd that the A15 are clocked at a lower frequency than the
-A7...
+Without this clock, the hw-breakpoint driver claims an undefined
+instruction during initialization:
+[    0.227380] hw-breakpoint: Debug register access (0xee003e17) caused undefined instruction on CPU 0
+[    0.227519] hw-breakpoint: CPU 0 failed to disable vector catch
 
-Maxime
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ drivers/clk/imx/clk-vf610.c             | 2 ++
+ include/dt-bindings/clock/vf610-clock.h | 3 ++-
+ 2 files changed, 4 insertions(+), 1 deletion(-)
 
+diff --git a/drivers/clk/imx/clk-vf610.c b/drivers/clk/imx/clk-vf610.c
+index 61876ed..1c2d324 100644
+--- a/drivers/clk/imx/clk-vf610.c
++++ b/drivers/clk/imx/clk-vf610.c
+@@ -118,6 +118,7 @@ static struct clk_onecell_data clk_data;
+ static unsigned int const clks_init_on[] __initconst = {
+ 	VF610_CLK_SYS_BUS,
+ 	VF610_CLK_DDR_SEL,
++	VF610_CLK_DAP,
+ };
+ 
+ static struct clk * __init vf610_get_fixed_clock(
+@@ -383,6 +384,7 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
+ 	clk[VF610_CLK_DMAMUX3] = imx_clk_gate2("dmamux3", "platform_bus", CCM_CCGR6, CCM_CCGRx_CGn(2));
+ 
+ 	clk[VF610_CLK_SNVS] = imx_clk_gate2("snvs-rtc", "ipg_bus", CCM_CCGR6, CCM_CCGRx_CGn(7));
++	clk[VF610_CLK_DAP] = imx_clk_gate("dap", "platform_bus", CCM_CCSR, 24);
+ 
+ 	imx_check_clocks(clk, ARRAY_SIZE(clk));
+ 
+diff --git a/include/dt-bindings/clock/vf610-clock.h b/include/dt-bindings/clock/vf610-clock.h
+index 979d24a..d197634 100644
+--- a/include/dt-bindings/clock/vf610-clock.h
++++ b/include/dt-bindings/clock/vf610-clock.h
+@@ -193,6 +193,7 @@
+ #define VF610_PLL6_BYPASS		180
+ #define VF610_PLL7_BYPASS		181
+ #define VF610_CLK_SNVS			182
+-#define VF610_CLK_END			183
++#define VF610_CLK_DAP			183
++#define VF610_CLK_END			184
+ 
+ #endif /* __DT_BINDINGS_CLOCK_VF610_H */
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150517/155dd034/attachment.sig>
+2.4.1
