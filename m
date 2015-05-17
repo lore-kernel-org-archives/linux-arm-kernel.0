@@ -1,85 +1,31 @@
 From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Sun, 17 May 2015 17:09:45 +0900
-Subject: [PATCH v6 02/13] ARM: dts: Use labels for overriding nodes in
- exynos4210
+Date: Sun, 17 May 2015 17:09:48 +0900
+Subject: [PATCH 3/4] ARM: multi_v7_defconfig: Enable TMU for Exynos
 In-Reply-To: <1431850195-9558-1-git-send-email-k.kozlowski.k@gmail.com>
 References: <1431850195-9558-1-git-send-email-k.kozlowski.k@gmail.com>
-Message-ID: <1431850195-9558-4-git-send-email-k.kozlowski.k@gmail.com>
+Message-ID: <1431850195-9558-7-git-send-email-k.kozlowski.k@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Usage of labels instead of full paths reduces possible mistakes when
-overriding nodes.
+Enable support for Thermal Monitoring Unit present on Exynos SoCs. This
+allows detection of overheat and handling this gracefully.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
 ---
- arch/arm/boot/dts/exynos4210.dtsi | 43 +++++++++++++++++++--------------------
- 1 file changed, 21 insertions(+), 22 deletions(-)
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-index 76b84852f29c..a9a55304e31a 100644
---- a/arch/arm/boot/dts/exynos4210.dtsi
-+++ b/arch/arm/boot/dts/exynos4210.dtsi
-@@ -52,16 +52,6 @@
- 		};
- 	};
- 
--	pmu_system_controller: system-controller at 10020000 {
--		clock-names = "clkout0", "clkout1", "clkout2", "clkout3",
--				"clkout4", "clkout8", "clkout9";
--		clocks = <&clock CLK_OUT_DMC>, <&clock CLK_OUT_TOP>,
--			<&clock CLK_OUT_LEFTBUS>, <&clock CLK_OUT_RIGHTBUS>,
--			<&clock CLK_OUT_CPU>, <&clock CLK_XXTI>,
--			<&clock CLK_XUSBXTI>;
--		#clock-cells = <1>;
--	};
--
- 	sysram: sysram at 02020000 {
- 		compatible = "mmio-sram";
- 		reg = <0x02020000 0x20000>;
-@@ -95,18 +85,6 @@
- 		arm,data-latency = <2 2 1>;
- 	};
- 
--	gic: interrupt-controller at 10490000 {
--		cpu-offset = <0x8000>;
--	};
--
--	combiner: interrupt-controller at 10440000 {
--		samsung,combiner-nr = <16>;
--		interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
--			     <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
--			     <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
--			     <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>;
--	};
--
- 	mct: mct at 10050000 {
- 		compatible = "samsung,exynos4210-mct";
- 		reg = <0x10050000 0x800>;
-@@ -245,3 +223,24 @@
- 		status = "disabled";
- 	};
- };
-+
-+&gic {
-+	cpu-offset = <0x8000>;
-+};
-+
-+&combiner {
-+	samsung,combiner-nr = <16>;
-+	interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
-+		     <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
-+		     <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
-+		     <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>;
-+};
-+
-+&pmu_system_controller {
-+	clock-names = "clkout0", "clkout1", "clkout2", "clkout3",
-+			"clkout4", "clkout8", "clkout9";
-+	clocks = <&clock CLK_OUT_DMC>, <&clock CLK_OUT_TOP>,
-+		<&clock CLK_OUT_LEFTBUS>, <&clock CLK_OUT_RIGHTBUS>,
-+		<&clock CLK_OUT_CPU>, <&clock CLK_XXTI>, <&clock CLK_XUSBXTI>;
-+	#clock-cells = <1>;
-+};
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 6a6a292c5bf8..6ee2c24dfbc7 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -343,6 +343,7 @@ CONFIG_SENSORS_LM90=y
+ CONFIG_SENSORS_LM95245=y
+ CONFIG_THERMAL=y
+ CONFIG_CPU_THERMAL=y
++CONFIG_EXYNOS_THERMAL=y
+ CONFIG_RCAR_THERMAL=y
+ CONFIG_ARMADA_THERMAL=y
+ CONFIG_DAVINCI_WATCHDOG
 -- 
 2.1.4
