@@ -1,70 +1,31 @@
-From: noralf@tronnes.org (=?UTF-8?B?Tm9yYWxmIFRyw7hubmVz?=)
-Date: Sun, 17 May 2015 20:26:08 +0200
-Subject: [PATCH 2/3 v2] ARM: bcm2835: Add the Raspberry Pi firmware driver
-In-Reply-To: <1431543609-19646-3-git-send-email-eric@anholt.net>
-References: <1431543609-19646-1-git-send-email-eric@anholt.net>
- <1431543609-19646-3-git-send-email-eric@anholt.net>
-Message-ID: <5558DD40.4070701@tronnes.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 17 May 2015 16:21:34 +0200
+Subject: [PATCH v2 05/10] ARM: sunxi: Introduce Allwinner H3 support
+In-Reply-To: <1431707940-19372-6-git-send-email-jenskuske@gmail.com>
+References: <1431707940-19372-1-git-send-email-jenskuske@gmail.com>
+ <1431707940-19372-6-git-send-email-jenskuske@gmail.com>
+Message-ID: <20150517142134.GF4004@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, May 15, 2015 at 06:38:55PM +0200, Jens Kuske wrote:
+> The Allwinner H3 is a quad-core Cortex-A7-based SoC. It is very similar
+> to other sun8i family SoCs like the A23.
+> 
+> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
 
-Den 13.05.2015 21:00, skrev Eric Anholt:
-> This gives us a function for making mailbox property channel requests
-> of the firmware, which is most notable in that it will let us get and
-> set clock rates.
->
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> ---
+Applied, thanks!
 
-[...]
+Maxime
 
-> +/*
-> + * Submits a single tag to the VPU firmware through the mailbox
-> + * property interface.
-> + *
-> + * This is a convenience wrapper around
-> + * rpi_firmware_property_list() to avoid some of the
-> + * boilerplate in property calls.
-> + */
-> +int rpi_firmware_property(struct device_node *of_node,
-> +			  u32 tag, void *tag_data, size_t buf_size)
-
-To use the firmware property functions, I need a DT node pointer.
-Since Device Tree is dynamic now, should I fetch the firmware node
-each time, or should I do that in probe and store the node pointer?
-
-Device Tree:
-         firmware: firmware {
-             compatible = "raspberrypi,firmware";
-         };
-
-         thermal {
-             compatible = "brcm,bcm2835-thermal";
-             firmware = <&firmware>;
-         };
-
-Rewritten (not tested) function from downstream bcm2835-thermal driver:
-
-static int bcm2835_get_temp_or_max(struct thermal_zone_device *thermal_dev,
-                                    unsigned long *temp, unsigned tag_id)
-{
-     struct device *dev = <get device somehow>;
-     struct device_node *np;
-     struct {
-         u32 id;
-         u32 val;
-     } tag_buf;
-
-     np = of_parse_phandle(dev->of_node, "firmware", 0);
-     if (!np)
-         return -EINVAL;
-
-     ret = rpi_firmware_property(np, tag_id, &tag_buf, sizeof(tag_buf));
-     if (ret)
-         return ret;
-
-     *temp = val;
-
-     return 0;
-}
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150517/96de9597/attachment.sig>
