@@ -1,48 +1,86 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Sun, 17 May 2015 16:58:51 +0900
-Subject: [GIT PULL] ARM: EXYNOS: dts: Improvements for 4.2, second try
-In-Reply-To: <5557F781.3060405@kernel.org>
-References: <1431314022-17062-1-git-send-email-k.kozlowski@samsung.com>
- <5557F781.3060405@kernel.org>
-Message-ID: <CAJKOXPebdSvR+2q+Ab_GyfgndOpARdN79R9fvi+KMSGzo1oTGw@mail.gmail.com>
+From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
+Date: Sun, 17 May 2015 17:09:42 +0900
+Subject: [PATCH v6 00/13] ARM: dts: exynos4: labels for overriding nodes
+Message-ID: <1431850195-9558-1-git-send-email-k.kozlowski.k@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-17 11:05 GMT+09:00 Kukjin Kim <kgene@kernel.org>:
-> On 05/11/15 12:13, Krzysztof Kozlowski wrote:
->> Dear Kukjin,
->>
->> I gathered various improvements for upcoming 4.2 merge window.
->> Description along with a tag.
->>
->> Best regards,
->> Krzysztof
->>
->>
->> The following changes since commit 2495ae559826c60e3ccde9850e3b38815725b9c9:
->>
->>   ARM: dts: Add keep-power-in-suspend to WiFi SDIO node for Peach Boards (2015-05-11 11:00:00 +0900)
->>
->> are available in the git repository at:
->>
->>   https://github.com/krzk/linux.git tags/samsung-dt-for-next-4.2-2
->>
->> for you to fetch changes up to c5f41228c9fad4c7343df8547b870766163b76dc:
->>
->>   ARM: dts: exynos3250-rinato: add support for JPEG codec (2015-05-11 11:01:57 +0900)
->>
-> Hi,
->
-> I've applied all of changes you requested with sorting them out.
->
-> Thanks and please test on your own boards with samsung's for-next then
-> if anything, let us know.
->
-> Note, I think re-post to use lables in dt would be better based on
-> current for-next.
+Hi,
 
 
-Thanks, I'll rebase and resend.
+Changes since v5
+================
+1. Rebased on current Kukjin's for-next branch:
+   v4.1-rc3-34-gfcfae6b049cf
+
+Changes since v4
+================
+1. Patch 1: Don't add labels in exynos4210-pinctrl.dtsi because
+   these are already defined in exynos4210.dtsi.
+2. Patch 9: Add ack from Eduardo Valentin.
+
+Changes since v3
+================
+1. New patches (12 and 13) for Exynos4412 Origen and Tiny4412.
+2. Rebased on top of my DTS-for-next branch:
+   repo: https://github.com/krzk/linux/
+   tag: samsung-dt-for-next-4.2-2
+
+Changes since v2
+================
+1. Fix typo in commit msg (lablels -> labels).
+
+Changes since v1
+================
+1. Re-phrased the description (phandle->label). Suggested by Arnd.
+
+Description
+===========
+
+The label-based notation reduces possible mistakes when overriding
+nodes by child DTSI and board files and reduces duplication
+of addresses.
+
+The patchset refactors Exynos4 boards to use labels for overriding nodes.
+
+Tested by comparison of decompiled DTB for each commit. The output DTB
+is the same.
+
 
 Best regards,
 Krzysztof
+
+Krzysztof Kozlowski (13):
+  ARM: dts: Add labels to exynos4 nodes
+  ARM: dts: Use labels for overriding nodes in exynos4210
+  ARM: dts: Use labels for overriding nodes in exynos4210-origen
+  ARM: dts: Use labels for overriding nodes in exynos4210-smdkv310
+  ARM: dts: Use labels for overriding nodes in exynos4210-trats
+  ARM: dts: Use labels for overriding nodes in exynos4212
+  ARM: dts: Use labels for overriding nodes in exynos4x12
+  ARM: dts: Use labels for overriding nodes in exynos4412
+  ARM: dts: Use labels for overriding nodes in exynos4412-odroid
+  ARM: dts: Use labels for overriding nodes in exynos4412-smdk4412
+  ARM: dts: Use labels for overriding nodes in exynos4412-trats2
+  ARM: dts: Use labels for overriding nodes in exynos4412-origen
+  ARM: dts: Use labels for overriding nodes in exynos4412-tiny4412
+
+ arch/arm/boot/dts/exynos4.dtsi                  |   22 +-
+ arch/arm/boot/dts/exynos4210-origen.dts         |  418 +++----
+ arch/arm/boot/dts/exynos4210-smdkv310.dts       |  280 ++---
+ arch/arm/boot/dts/exynos4210-trats.dts          |  592 +++++-----
+ arch/arm/boot/dts/exynos4210.dtsi               |   49 +-
+ arch/arm/boot/dts/exynos4212.dtsi               |   12 +-
+ arch/arm/boot/dts/exynos4412-odroid-common.dtsi |  732 ++++++-------
+ arch/arm/boot/dts/exynos4412-odroidx.dts        |   16 +-
+ arch/arm/boot/dts/exynos4412-origen.dts         |  892 +++++++--------
+ arch/arm/boot/dts/exynos4412-smdk4412.dts       |  210 ++--
+ arch/arm/boot/dts/exynos4412-tiny4412.dts       |   54 +-
+ arch/arm/boot/dts/exynos4412-trats2.dts         | 1332 ++++++++++++-----------
+ arch/arm/boot/dts/exynos4412.dtsi               |   20 +-
+ arch/arm/boot/dts/exynos4x12-pinctrl.dtsi       |    8 +-
+ arch/arm/boot/dts/exynos4x12.dtsi               |  218 ++--
+ 15 files changed, 2428 insertions(+), 2427 deletions(-)
+
+-- 
+2.1.4
