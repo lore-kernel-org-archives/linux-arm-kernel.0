@@ -1,30 +1,72 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 17 May 2015 16:38:16 +0200
-Subject: [linux-sunxi] [RFC 0/7] ARM: sun9i: SMP support with
- Multi-Cluster Power Management
-In-Reply-To: <1431770926.5748.41.camel@hellion.org.uk>
+Date: Sun, 17 May 2015 16:51:46 +0200
+Subject: [RFC 2/7] ARM: dts: sun9i: Add CCI-400 device nodes for A80
+In-Reply-To: <1431583811-25780-3-git-send-email-wens@csie.org>
 References: <1431583811-25780-1-git-send-email-wens@csie.org>
- <1431770926.5748.41.camel@hellion.org.uk>
-Message-ID: <20150517143816.GJ4004@lukather>
+ <1431583811-25780-3-git-send-email-wens@csie.org>
+Message-ID: <20150517145146.GK4004@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ian,
-
-On Sat, May 16, 2015 at 11:08:46AM +0100, Ian Campbell wrote:
-> On Thu, 2015-05-14 at 14:10 +0800, Chen-Yu Tsai wrote:
-> > This is my attempt to support SMP and CPU hot plugging on the Allwinner
-> > A80 SoC. The A80 is a big.Little processor with 2 clusters of 4x Cortex-A7
-> > and 4x Cortex-A15 cores.
+On Thu, May 14, 2015 at 02:10:06PM +0800, Chen-Yu Tsai wrote:
+> The A80 includes an ARM CCI-400 interconnect to support multi-cluster
+> CPU caches.
 > 
-> I thought there was a preference these days to support this sort of
-> thing via support PSCI in the firmware, which allows for other things
-> such as non-secure-world etc.
+> Also add the default clock frequency for the CPUs.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  arch/arm/boot/dts/sun9i-a80.dtsi | 46 ++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 46 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+> index ca272e92b85d..200e712fbf0e 100644
+> --- a/arch/arm/boot/dts/sun9i-a80.dtsi
+> +++ b/arch/arm/boot/dts/sun9i-a80.dtsi
+> @@ -58,48 +58,64 @@
+>  		cpu0: cpu at 0 {
+>  			compatible = "arm,cortex-a7";
+>  			device_type = "cpu";
+> +			cci-control-port = <&cci_control0>;
+> +			clock-frequency = <12000000>;
+>  			reg = <0x0>;
+>  		};
+>  
+>  		cpu1: cpu at 1 {
+>  			compatible = "arm,cortex-a7";
+>  			device_type = "cpu";
+> +			cci-control-port = <&cci_control0>;
+> +			clock-frequency = <12000000>;
+>  			reg = <0x1>;
+>  		};
+>  
+>  		cpu2: cpu at 2 {
+>  			compatible = "arm,cortex-a7";
+>  			device_type = "cpu";
+> +			cci-control-port = <&cci_control0>;
+> +			clock-frequency = <12000000>;
+>  			reg = <0x2>;
+>  		};
+>  
+>  		cpu3: cpu at 3 {
+>  			compatible = "arm,cortex-a7";
+>  			device_type = "cpu";
+> +			cci-control-port = <&cci_control0>;
+> +			clock-frequency = <12000000>;
+>  			reg = <0x3>;
+>  		};
+>  
+>  		cpu4: cpu at 100 {
+>  			compatible = "arm,cortex-a15";
+>  			device_type = "cpu";
+> +			cci-control-port = <&cci_control1>;
+> +			clock-frequency = <9000000>;
 
-Yes, it is the preferred way. Meaning that if someone wants to do that
-work, he's very much welcome and encouraged to do so. But if no one's
-doing it, then we still have to have a way to bringup the secondary
-CPUs.
+Isn't the clock frequency property is supposed to be the maximum
+frequency of that CPU in Linux?
+
+It looks odd that the A15 are clocked at a lower frequency than the
+A7...
 
 Maxime
 
@@ -38,4 +80,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150517/8157c4af/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150517/155dd034/attachment.sig>
