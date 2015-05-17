@@ -1,94 +1,54 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 17 May 2015 15:06:57 +0200
-Subject: [PATCH v2 03/10] clk: sunxi: Let divs clocks read the base
- factor clock name from devicetree
-In-Reply-To: <1431707940-19372-4-git-send-email-jenskuske@gmail.com>
-References: <1431707940-19372-1-git-send-email-jenskuske@gmail.com>
- <1431707940-19372-4-git-send-email-jenskuske@gmail.com>
-Message-ID: <20150517130657.GD4004@lukather>
+From: carlo@caione.org (Carlo Caione)
+Date: Sun, 17 May 2015 17:57:38 +0200
+Subject: [PATCH] pinctrl: Fix gpio/pin mapping for Meson8b
+Message-ID: <1431878258-10229-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 15, 2015 at 06:38:53PM +0200, Jens Kuske wrote:
-> Currently, the sunxi clock driver gets the name for the base factor clock
-> of divs clocks from the name field in factors_data. This prevents reusing
-> of the factor clock for clocks with same properties, but different name.
-> 
-> This commit makes the divs setup function try to get a name from
-> clock-output-names in the devicetree. It also removes the name field where
-> possible and merges the sun4i PLL5 and PLL6 clocks.
-> 
-> The sun4i PLL5 clock doesn't have a output for the base factor clock,
-> so we still have to use the name field there.
-> 
-> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
-> ---
->  drivers/clk/sunxi/clk-sunxi.c | 22 ++++++++++++----------
->  1 file changed, 12 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index 17cba4d..afe560c 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -708,18 +708,10 @@ static const struct factors_data sun4i_pll5_data __initconst = {
->  	.name = "pll5",
->  };
->  
-> -static const struct factors_data sun4i_pll6_data __initconst = {
-> -	.enable = 31,
-> -	.table = &sun4i_pll5_config,
-> -	.getter = sun4i_get_pll5_factors,
-> -	.name = "pll6",
-> -};
-> -
->  static const struct factors_data sun6i_a31_pll6_data __initconst = {
->  	.enable = 31,
->  	.table = &sun6i_a31_pll6_config,
->  	.getter = sun6i_a31_get_pll6_factors,
-> -	.name = "pll6x2",
->  };
->  
->  static const struct factors_data sun5i_a13_ahb_data __initconst = {
-> @@ -1099,7 +1091,7 @@ static const struct divs_data pll5_divs_data __initconst = {
->  };
->  
->  static const struct divs_data pll6_divs_data __initconst = {
-> -	.factors = &sun4i_pll6_data,
-> +	.factors = &sun4i_pll5_data,
->  	.ndivs = 4,
->  	.div = {
->  		{ .shift = 0, .table = pll6_sata_tbl, .gate = 14 }, /* M, SATA */
-> @@ -1141,6 +1133,7 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
->  	struct clk_gate *gate = NULL;
->  	struct clk_fixed_factor *fix_factor;
->  	struct clk_divider *divider;
-> +	struct factors_data factors = *data->factors;
->  	void __iomem *reg;
->  	int ndivs = SUNXI_DIVS_MAX_QTY, i = 0;
->  	int flags, clkflags;
-> @@ -1149,8 +1142,17 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
->  	if (data->ndivs)
->  		ndivs = data->ndivs;
->  
-> +	/* Try to find a name for base factor clock */
-> +	for (i = 0; i < ndivs; i++) {
-> +		if (data->div[i].self) {
+From: Carlo Caione <carlo@endlessm.com>
 
-I'm not sure we should expect the factor clock to have a self factor.
+The num_pins field in the struct meson_domain_data must include also the
+missing pins in the Meson8b SoC, otherwise the GPIO <-> pin mapping is
+broken on this platform. Avoid also the dinamic allocation for GPIOs.
 
-what about taking the first output and taking the substring up to the
-first "_" ?
+Signed-off-by: Carlo Caione <carlo@endlessm.com>
+---
+ drivers/pinctrl/meson/pinctrl-meson.c   | 2 +-
+ drivers/pinctrl/meson/pinctrl-meson8b.c | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-Maxime
-
+diff --git a/drivers/pinctrl/meson/pinctrl-meson.c b/drivers/pinctrl/meson/pinctrl-meson.c
+index edcd140..a70a5fe 100644
+--- a/drivers/pinctrl/meson/pinctrl-meson.c
++++ b/drivers/pinctrl/meson/pinctrl-meson.c
+@@ -569,7 +569,7 @@ static int meson_gpiolib_register(struct meson_pinctrl *pc)
+ 		domain->chip.direction_output = meson_gpio_direction_output;
+ 		domain->chip.get = meson_gpio_get;
+ 		domain->chip.set = meson_gpio_set;
+-		domain->chip.base = -1;
++		domain->chip.base = domain->data->pin_base;
+ 		domain->chip.ngpio = domain->data->num_pins;
+ 		domain->chip.can_sleep = false;
+ 		domain->chip.of_node = domain->of_node;
+diff --git a/drivers/pinctrl/meson/pinctrl-meson8b.c b/drivers/pinctrl/meson/pinctrl-meson8b.c
+index 2f7ea62..9677807 100644
+--- a/drivers/pinctrl/meson/pinctrl-meson8b.c
++++ b/drivers/pinctrl/meson/pinctrl-meson8b.c
+@@ -876,13 +876,13 @@ static struct meson_domain_data meson8b_domain_data[] = {
+ 		.banks		= meson8b_banks,
+ 		.num_banks	= ARRAY_SIZE(meson8b_banks),
+ 		.pin_base	= 0,
+-		.num_pins	= 83,
++		.num_pins	= 130,
+ 	},
+ 	{
+ 		.name		= "ao-bank",
+ 		.banks		= meson8b_ao_banks,
+ 		.num_banks	= ARRAY_SIZE(meson8b_ao_banks),
+-		.pin_base	= 83,
++		.pin_base	= 130,
+ 		.num_pins	= 16,
+ 	},
+ };
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150517/73c9b689/attachment.sig>
+1.9.1
