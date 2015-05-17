@@ -1,104 +1,26 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Sun, 17 May 2015 17:40:54 +0800
-Subject: [PATCH v3 2/7] mmc: mediatek: Add Mediatek MMC driver
-In-Reply-To: <CAPDyKFqeAzjpbZsyfcwb_WarC=dzoCsEeLTmxAbtvOo3Y4cYyg@mail.gmail.com>
-References: <1430214525-19198-1-git-send-email-chaotian.jing@mediatek.com>
- <1430214525-19198-3-git-send-email-chaotian.jing@mediatek.com>
- <CAPDyKFq=R9B6ZHHgmDcSg-TNSfqQKAUKc2NjACvpwxFpmk954g@mail.gmail.com>
- <1430895299.15154.9.camel@mhfsdcap03>
- <CAPDyKFr+FTXAzYVn3F41dmw2zW01pSbSHPfGJHXbUFLJfvQ5CA@mail.gmail.com>
- <1430962956.15154.48.camel@mhfsdcap03>
- <CAPDyKFr5N_08HbLuY=4Wfv1BoVQLVR-VW+NKh_umL1hzi_KozA@mail.gmail.com>
- <1431335885.26820.7.camel@mhfsdcap03>
- <CAPDyKFqeAzjpbZsyfcwb_WarC=dzoCsEeLTmxAbtvOo3Y4cYyg@mail.gmail.com>
-Message-ID: <1431855654.26820.11.camel@mhfsdcap03>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Sun, 17 May 2015 18:34:40 +0800
+Subject: [PATCH v9 4/4] crypto: Add Allwinner Security System crypto
+ accelerator
+In-Reply-To: <20150517104508.468b032f@bbrezillon>
+References: <1431608341-10936-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1431608341-10936-5-git-send-email-clabbe.montjoie@gmail.com>
+ <20150517104508.468b032f@bbrezillon>
+Message-ID: <20150517103440.GA7800@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-05-11 at 12:29 +0200, Ulf Hansson wrote:
-> On 11 May 2015 at 11:18, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> > On Fri, 2015-05-08 at 14:12 +0200, Ulf Hansson wrote:
-> >> On 7 May 2015 at 03:42, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> >> > Dear Ulf,
-> >> >
-> >> > Thanks!
-> >> > Below is my comment:
-> >> >
-> >> > On Wed, 2015-05-06 at 18:31 +0200, Ulf Hansson wrote:
-> >> >> On 6 May 2015 at 08:54, chaotian.jing <chaotian.jing@mediatek.com> wrote:
-> >> >> > Dear Ulf,
-> >> >> >
-> >> >> > Thanks for your review.
-> >> >> > I must do a explain of our MMC host:
-> >> >> > Source clock is source clock of the MMC bus, MMC host has a divider to
-> >> >> > get different bus clock frequency. now the runtime suspend is gating
-> >> >> > this clock.
-> >> >> >
-> >> >> > Hclk is the power domain of the MMC host, if Hclk is gated, the MMC host
-> >> >> > cannot work(all registers readout is zero). and, all registers would be
-> >> >> > reset to default value if Hclk is gated/ungated.
-> >> >> > At MT8173, MSDC0 and MSDC2 has independent Hclk, MSDC1 and MSDC3's Hclk
-> >> >> > was controlled by "Infra module".
-> >> > Sorry for mistake, MSDC0 and MSDC3 has independent Hclk, MSDC1 and
-> >> > MSDC2's Hclk was controlled by "Infra module". the Infra module is a
-> >> > "power saving module", when the system go to sleep, Infra module will be
-> >> > set and MSDC1 & MSDC2's Hclk will be gated automatically.
-> >> >>
-> >> >> Thanks for clarifying!
-> >> >>
-> >> >> I don't have enough knowledge about your SoC to understand the detail,
-> >> >> but it seems like we are mixing clocks and power domains. I would
-> >> >> rather keep this separate - if the HW allows it.
-> >> >>
-> >> >> I guess the key question I have is the following:
-> >> >> 1) Is it hardware wise possible to gate the hclk, but without gating
-> >> >> the power domain?
-> >> >> 2) At what level is the reference counting done for each device in the
-> >> >> power domain? In HW or in sofftware?
-> >> >>
-> >> >
-> >> > Actually, Our MMC host do not have power domain, all the control of the
-> >> > host is the Hclk.
-> >>
-> >> Okay, but I am not sure that fully answered my question.
-> >>
-> >> You said that hclk will be gated when the power domain gets gated. And
-> >> the power domain (infra module, right?) will be gated at system PM
-> >> sleep. And when that happens the mmc controller loses register
-> >> context.
-> >>
-> >> But, again, can hclk be gated without gating the power domain?
-> >>
-> >> No matter what, it seems like a good idea to gate the power domain
-> >> when all clients of it are idle. Yes we would need to manage register
-> >> save/restore context, but on the other hand allow you to save more
-> >> power, right?
-> >>
-> > For MSDC0 & MSDC3, it has independent HCLK, do not have power domain.
-> > For MSDC1 & MSDC2, its HCLK was controlled by Infra module(This is a big
-> > power domain for many modules).
-> > So, for msdc0 & msdc3, we can control its Hclk, for msdc1 & msdc2, we
-> > cannot control it.
-> 
-> Okay, thanks for the clarification!
-> 
-> >
-> > Yes, I will do gate/ungate HCLK & source clock in PM.
-> > In addition, Since the gate/ungate HCLK is done by runtime PM, and all
-> > register operation should work at HCLK is on, so the msdc_init_hw() only
-> > can be called at set_ios(), because in probe(), the HCLK may have not
-> > been enabled.
-> 
-> I suggest you to enable HCLK in ->probe() and thus you may also call
-> msdc_init_hw() from there.
-> 
-> This should simplify for you, when adding the runtime PM support.
+On Sun, May 17, 2015 at 10:45:08AM +0200, Boris Brezillon wrote:
+>
+> From my POV this is not asynchronous at all (see my comments inline),
+> but maybe Herbert can confirm that.
 
-Yes, I will enable HCLK in ->probe(), but still need call msdc_init_hw()
-in set_ios(), because SD hot plug need it when inserted.
-In addition, it seems that still need sclk_enabled and hclk_enabled to
-judge if clock already enabled, because not only the runtime PM will
-call it.
-> 
-> Kind regards
-> Uffe
+Well we don't actually require drivers to be asynchronous.  It is
+obviously the preferred method but some hardware may not be capable
+of that.
+
+Cheers,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
