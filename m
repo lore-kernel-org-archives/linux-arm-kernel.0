@@ -1,1409 +1,274 @@
-From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Sun, 17 May 2015 17:30:30 +0900
-Subject: [PATCH v6 11/13] ARM: dts: Use labels for overriding nodes in
- exynos4412-trats2
-In-Reply-To: <1431851432-413-1-git-send-email-k.kozlowski.k@gmail.com>
-References: <1431850195-9558-1-git-send-email-k.kozlowski.k@gmail.com>
- <1431851432-413-1-git-send-email-k.kozlowski.k@gmail.com>
-Message-ID: <1431851432-413-2-git-send-email-k.kozlowski.k@gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Sun, 17 May 2015 10:45:08 +0200
+Subject: [PATCH v9 4/4] crypto: Add Allwinner Security System crypto
+ accelerator
+In-Reply-To: <1431608341-10936-5-git-send-email-clabbe.montjoie@gmail.com>
+References: <1431608341-10936-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1431608341-10936-5-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <20150517104508.468b032f@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Usage of labels instead of full paths reduces possible mistakes when
-overriding nodes.
+Hi Corentin,
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
----
- arch/arm/boot/dts/exynos4412-trats2.dts | 1332 ++++++++++++++++---------------
- 1 file changed, 667 insertions(+), 665 deletions(-)
+I started to review this new version, and I still think there's
+something wrong with the way your processing crypto requests.
+>From my POV this is not asynchronous at all (see my comments inline),
+but maybe Herbert can confirm that.
+I haven't reviewed the hash part yet, but I guess it has the same
+problem.
 
-diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-index c032cde11d5c..4d0cf22acea3 100644
---- a/arch/arm/boot/dts/exynos4412-trats2.dts
-+++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-@@ -131,411 +131,6 @@
- 		};
- 	};
- 
--	adc: adc at 126C0000 {
--		vdd-supply = <&ldo3_reg>;
--		status = "okay";
--	};
--
--	i2c at 13890000 {
--		samsung,i2c-sda-delay = <100>;
--		samsung,i2c-slave-addr = <0x10>;
--		samsung,i2c-max-bus-freq = <400000>;
--		pinctrl-0 = <&i2c3_bus>;
--		pinctrl-names = "default";
--		status = "okay";
--
--		mms114-touchscreen at 48 {
--			compatible = "melfas,mms114";
--			reg = <0x48>;
--			interrupt-parent = <&gpm2>;
--			interrupts = <3 2>;
--			x-size = <720>;
--			y-size = <1280>;
--			avdd-supply = <&ldo23_reg>;
--			vdd-supply = <&ldo24_reg>;
--		};
--	};
--
--	i2c_0: i2c at 13860000 {
--		samsung,i2c-sda-delay = <100>;
--		samsung,i2c-slave-addr = <0x10>;
--		samsung,i2c-max-bus-freq = <400000>;
--		pinctrl-0 = <&i2c0_bus>;
--		pinctrl-names = "default";
--		status = "okay";
--
--		s5c73m3 at 3c {
--			compatible = "samsung,s5c73m3";
--			reg = <0x3c>;
--			standby-gpios = <&gpm0 1 1>;   /* ISP_STANDBY */
--			xshutdown-gpios = <&gpf1 3 1>; /* ISP_RESET */
--			vdd-int-supply = <&buck9_reg>;
--			vddio-cis-supply = <&ldo9_reg>;
--			vdda-supply = <&ldo17_reg>;
--			vddio-host-supply = <&ldo18_reg>;
--			vdd-af-supply = <&cam_af_reg>;
--			vdd-reg-supply = <&cam_io_reg>;
--			clock-frequency = <24000000>;
--			/* CAM_A_CLKOUT */
--			clocks = <&camera 0>;
--			clock-names = "cis_extclk";
--			port {
--				s5c73m3_ep: endpoint {
--					remote-endpoint = <&csis0_ep>;
--					data-lanes = <1 2 3 4>;
--				};
--			};
--		};
--	};
--
--	i2c at 138A0000 {
--		samsung,i2c-sda-delay = <100>;
--		samsung,i2c-slave-addr = <0x10>;
--		samsung,i2c-max-bus-freq = <100000>;
--		pinctrl-0 = <&i2c4_bus>;
--		pinctrl-names = "default";
--		status = "okay";
--
--		wm1811: wm1811 at 1a {
--			compatible = "wlf,wm1811";
--			reg = <0x1a>;
--			clocks = <&pmu_system_controller 0>;
--			clock-names = "MCLK1";
--			DCVDD-supply = <&ldo3_reg>;
--			DBVDD1-supply = <&ldo3_reg>;
--			wlf,ldo1ena = <&gpj0 4 0>;
--		};
--	};
--
--	i2c at 138D0000 {
--		samsung,i2c-sda-delay = <100>;
--		samsung,i2c-slave-addr = <0x10>;
--		samsung,i2c-max-bus-freq = <100000>;
--		pinctrl-0 = <&i2c7_bus>;
--		pinctrl-names = "default";
--		status = "okay";
--
--		max77686: max77686_pmic at 09 {
--			compatible = "maxim,max77686";
--			interrupt-parent = <&gpx0>;
--			interrupts = <7 0>;
--			reg = <0x09>;
--			#clock-cells = <1>;
--
--			voltage-regulators {
--				ldo1_reg: ldo1 {
--					regulator-compatible = "LDO1";
--					regulator-name = "VALIVE_1.0V_AP";
--					regulator-min-microvolt = <1000000>;
--					regulator-max-microvolt = <1000000>;
--					regulator-always-on;
--				};
--
--				ldo2_reg: ldo2 {
--					regulator-compatible = "LDO2";
--					regulator-name = "VM1M2_1.2V_AP";
--					regulator-min-microvolt = <1200000>;
--					regulator-max-microvolt = <1200000>;
--					regulator-always-on;
--					regulator-state-mem {
--						regulator-on-in-suspend;
--					};
--				};
--
--				ldo3_reg: ldo3 {
--					regulator-compatible = "LDO3";
--					regulator-name = "VCC_1.8V_AP";
--					regulator-min-microvolt = <1800000>;
--					regulator-max-microvolt = <1800000>;
--					regulator-always-on;
--				};
--
--				ldo4_reg: ldo4 {
--					regulator-compatible = "LDO4";
--					regulator-name = "VCC_2.8V_AP";
--					regulator-min-microvolt = <2800000>;
--					regulator-max-microvolt = <2800000>;
--					regulator-always-on;
--				};
--
--				ldo5_reg: ldo5 {
--					regulator-compatible = "LDO5";
--					regulator-name = "VCC_1.8V_IO";
--					regulator-min-microvolt = <1800000>;
--					regulator-max-microvolt = <1800000>;
--					regulator-always-on;
--				};
--
--				ldo6_reg: ldo6 {
--					regulator-compatible = "LDO6";
--					regulator-name = "VMPLL_1.0V_AP";
--					regulator-min-microvolt = <1000000>;
--					regulator-max-microvolt = <1000000>;
--					regulator-always-on;
--					regulator-state-mem {
--						regulator-on-in-suspend;
--					};
--				};
--
--				ldo7_reg: ldo7 {
--					regulator-compatible = "LDO7";
--					regulator-name = "VPLL_1.0V_AP";
--					regulator-min-microvolt = <1000000>;
--					regulator-max-microvolt = <1000000>;
--					regulator-always-on;
--					regulator-state-mem {
--						regulator-on-in-suspend;
--					};
--				};
--
--				ldo8_reg: ldo8 {
--					regulator-compatible = "LDO8";
--					regulator-name = "VMIPI_1.0V";
--					regulator-min-microvolt = <1000000>;
--					regulator-max-microvolt = <1000000>;
--					regulator-state-mem {
--						regulator-off-in-suspend;
--					};
--				};
--
--				ldo9_reg: ldo9 {
--					regulator-compatible = "LDO9";
--					regulator-name = "CAM_ISP_MIPI_1.2V";
--					regulator-min-microvolt = <1200000>;
--					regulator-max-microvolt = <1200000>;
--				};
--
--				ldo10_reg: ldo10 {
--					regulator-compatible = "LDO10";
--					regulator-name = "VMIPI_1.8V";
--					regulator-min-microvolt = <1800000>;
--					regulator-max-microvolt = <1800000>;
--					regulator-state-mem {
--						regulator-off-in-suspend;
--					};
--				};
--
--				ldo11_reg: ldo11 {
--					regulator-compatible = "LDO11";
--					regulator-name = "VABB1_1.95V";
--					regulator-min-microvolt = <1950000>;
--					regulator-max-microvolt = <1950000>;
--					regulator-always-on;
--					regulator-state-mem {
--						regulator-off-in-suspend;
--					};
--				};
--
--				ldo12_reg: ldo12 {
--					regulator-compatible = "LDO12";
--					regulator-name = "VUOTG_3.0V";
--					regulator-min-microvolt = <3000000>;
--					regulator-max-microvolt = <3000000>;
--					regulator-state-mem {
--						regulator-off-in-suspend;
--					};
--				};
--
--				ldo13_reg: ldo13 {
--					regulator-compatible = "LDO13";
--					regulator-name = "NFC_AVDD_1.8V";
--					regulator-min-microvolt = <1800000>;
--					regulator-max-microvolt = <1800000>;
--				};
--
--				ldo14_reg: ldo14 {
--					regulator-compatible = "LDO14";
--					regulator-name = "VABB2_1.95V";
--					regulator-min-microvolt = <1950000>;
--					regulator-max-microvolt = <1950000>;
--					regulator-always-on;
--					regulator-state-mem {
--						regulator-off-in-suspend;
--					};
--				};
--
--				ldo15_reg: ldo15 {
--					regulator-compatible = "LDO15";
--					regulator-name = "VHSIC_1.0V";
--					regulator-min-microvolt = <1000000>;
--					regulator-max-microvolt = <1000000>;
--					regulator-state-mem {
--						regulator-on-in-suspend;
--					};
--				};
--
--				ldo16_reg: ldo16 {
--					regulator-compatible = "LDO16";
--					regulator-name = "VHSIC_1.8V";
--					regulator-min-microvolt = <1800000>;
--					regulator-max-microvolt = <1800000>;
--					regulator-state-mem {
--						regulator-on-in-suspend;
--					};
--				};
--
--				ldo17_reg: ldo17 {
--					regulator-compatible = "LDO17";
--					regulator-name = "CAM_SENSOR_CORE_1.2V";
--					regulator-min-microvolt = <1200000>;
--					regulator-max-microvolt = <1200000>;
--				};
--
--				ldo18_reg: ldo18 {
--					regulator-compatible = "LDO18";
--					regulator-name = "CAM_ISP_SEN_IO_1.8V";
--					regulator-min-microvolt = <1800000>;
--					regulator-max-microvolt = <1800000>;
--				};
--
--				ldo19_reg: ldo19 {
--					regulator-compatible = "LDO19";
--					regulator-name = "VT_CAM_1.8V";
--					regulator-min-microvolt = <1800000>;
--					regulator-max-microvolt = <1800000>;
--				};
--
--				ldo20_reg: ldo20 {
--					regulator-compatible = "LDO20";
--					regulator-name = "VDDQ_PRE_1.8V";
--					regulator-min-microvolt = <1800000>;
--					regulator-max-microvolt = <1800000>;
--				};
--
--				ldo21_reg: ldo21 {
--					regulator-compatible = "LDO21";
--					regulator-name = "VTF_2.8V";
--					regulator-min-microvolt = <2800000>;
--					regulator-max-microvolt = <2800000>;
--					maxim,ena-gpios = <&gpy2 0 GPIO_ACTIVE_HIGH>;
--				};
--
--				ldo22_reg: ldo22 {
--					regulator-compatible = "LDO22";
--					regulator-name = "VMEM_VDD_2.8V";
--					regulator-min-microvolt = <2800000>;
--					regulator-max-microvolt = <2800000>;
--					maxim,ena-gpios = <&gpk0 2 GPIO_ACTIVE_HIGH>;
--				};
--
--				ldo23_reg: ldo23 {
--					regulator-compatible = "LDO23";
--					regulator-name = "TSP_AVDD_3.3V";
--					regulator-min-microvolt = <3300000>;
--					regulator-max-microvolt = <3300000>;
--				};
--
--				ldo24_reg: ldo24 {
--					regulator-compatible = "LDO24";
--					regulator-name = "TSP_VDD_1.8V";
--					regulator-min-microvolt = <1800000>;
--					regulator-max-microvolt = <1800000>;
--				};
--
--				ldo25_reg: ldo25 {
--					regulator-compatible = "LDO25";
--					regulator-name = "LCD_VCC_3.3V";
--					regulator-min-microvolt = <2800000>;
--					regulator-max-microvolt = <2800000>;
--				};
--
--				ldo26_reg: ldo26 {
--					regulator-compatible = "LDO26";
--					regulator-name = "MOTOR_VCC_3.0V";
--					regulator-min-microvolt = <3000000>;
--					regulator-max-microvolt = <3000000>;
--				};
--
--				buck1_reg: buck1 {
--					regulator-compatible = "BUCK1";
--					regulator-name = "vdd_mif";
--					regulator-min-microvolt = <850000>;
--					regulator-max-microvolt = <1100000>;
--					regulator-always-on;
--					regulator-boot-on;
--					regulator-state-mem {
--						regulator-off-in-suspend;
--					};
--				};
--
--				buck2_reg: buck2 {
--					regulator-compatible = "BUCK2";
--					regulator-name = "vdd_arm";
--					regulator-min-microvolt = <850000>;
--					regulator-max-microvolt = <1500000>;
--					regulator-always-on;
--					regulator-boot-on;
--					regulator-state-mem {
--						regulator-on-in-suspend;
--					};
--				};
--
--				buck3_reg: buck3 {
--					regulator-compatible = "BUCK3";
--					regulator-name = "vdd_int";
--					regulator-min-microvolt = <850000>;
--					regulator-max-microvolt = <1150000>;
--					regulator-always-on;
--					regulator-boot-on;
--					regulator-state-mem {
--						regulator-off-in-suspend;
--					};
--				};
--
--				buck4_reg: buck4 {
--					regulator-compatible = "BUCK4";
--					regulator-name = "vdd_g3d";
--					regulator-min-microvolt = <850000>;
--					regulator-max-microvolt = <1150000>;
--					regulator-boot-on;
--					regulator-state-mem {
--						regulator-off-in-suspend;
--					};
--				};
--
--				buck5_reg: buck5 {
--					regulator-compatible = "BUCK5";
--					regulator-name = "VMEM_1.2V_AP";
--					regulator-min-microvolt = <1200000>;
--					regulator-max-microvolt = <1200000>;
--					regulator-always-on;
--				};
--
--				buck6_reg: buck6 {
--					regulator-compatible = "BUCK6";
--					regulator-name = "VCC_SUB_1.35V";
--					regulator-min-microvolt = <1350000>;
--					regulator-max-microvolt = <1350000>;
--					regulator-always-on;
--				};
--
--				buck7_reg: buck7 {
--					regulator-compatible = "BUCK7";
--					regulator-name = "VCC_SUB_2.0V";
--					regulator-min-microvolt = <2000000>;
--					regulator-max-microvolt = <2000000>;
--					regulator-always-on;
--				};
--
--				buck8_reg: buck8 {
--					regulator-compatible = "BUCK8";
--					regulator-name = "VMEM_VDDF_3.0V";
--					regulator-min-microvolt = <2850000>;
--					regulator-max-microvolt = <2850000>;
--					maxim,ena-gpios = <&gpk0 2 GPIO_ACTIVE_HIGH>;
--				};
--
--				buck9_reg: buck9 {
--					regulator-compatible = "BUCK9";
--					regulator-name = "CAM_ISP_CORE_1.2V";
--					regulator-min-microvolt = <1000000>;
--					regulator-max-microvolt = <1200000>;
--					maxim,ena-gpios = <&gpm0 3 GPIO_ACTIVE_HIGH>;
--				};
--			};
--		};
--	};
--
- 	i2c_max77693: i2c-gpio-1 {
- 		compatible = "i2c-gpio";
- 		gpios = <&gpm2 0 GPIO_ACTIVE_HIGH>, <&gpm2 1 GPIO_ACTIVE_HIGH>;
-@@ -598,54 +193,6 @@
- 		};
- 	};
- 
--	mmc at 12550000 {
--		num-slots = <1>;
--		broken-cd;
--		non-removable;
--		card-detect-delay = <200>;
--		vmmc-supply = <&ldo22_reg>;
--		clock-frequency = <400000000>;
--		samsung,dw-mshc-ciu-div = <0>;
--		samsung,dw-mshc-sdr-timing = <2 3>;
--		samsung,dw-mshc-ddr-timing = <1 2>;
--		pinctrl-0 = <&sd4_clk &sd4_cmd &sd4_bus4 &sd4_bus8>;
--		pinctrl-names = "default";
--		status = "okay";
--		bus-width = <8>;
--		cap-mmc-highspeed;
--	};
--
--	sdhci at 12530000 {
--		bus-width = <4>;
--		cd-gpios = <&gpx3 4 0>;
--		cd-inverted;
--		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_bus4>;
--		pinctrl-names = "default";
--		vmmc-supply = <&ldo21_reg>;
--		status = "okay";
--	};
--
--	serial at 13800000 {
--		status = "okay";
--	};
--
--	serial at 13810000 {
--		status = "okay";
--	};
--
--	serial at 13820000 {
--		status = "okay";
--	};
--
--	serial at 13830000 {
--		status = "okay";
--	};
--
--	tmu at 100C0000 {
--		vtmu-supply = <&ldo10_reg>;
--		status = "okay";
--	};
--
- 	i2c_ak8975: i2c-gpio-0 {
- 		compatible = "i2c-gpio";
- 		gpios = <&gpy2 4 0>, <&gpy2 5 0>;
-@@ -677,90 +224,6 @@
- 		};
- 	};
- 
--	spi_1: spi at 13930000 {
--		pinctrl-names = "default";
--		pinctrl-0 = <&spi1_bus>;
--		cs-gpios = <&gpb 5 0>;
--		status = "okay";
--
--		s5c73m3_spi: s5c73m3 {
--			compatible = "samsung,s5c73m3";
--			spi-max-frequency = <50000000>;
--			reg = <0>;
--			controller-data {
--				samsung,spi-feedback-delay = <2>;
--			};
--		};
--	};
--
--	pwm: pwm at 139D0000 {
--		pinctrl-0 = <&pwm0_out>;
--		pinctrl-names = "default";
--		samsung,pwm-outputs = <0>;
--		status = "okay";
--	};
--
--	dsi_0: dsi at 11C80000 {
--		vddcore-supply = <&ldo8_reg>;
--		vddio-supply = <&ldo10_reg>;
--		samsung,pll-clock-frequency = <24000000>;
--		status = "okay";
--
--		ports {
--			#address-cells = <1>;
--			#size-cells = <0>;
--
--			port at 1 {
--				reg = <1>;
--
--				dsi_out: endpoint {
--					remote-endpoint = <&dsi_in>;
--					samsung,burst-clock-frequency = <500000000>;
--					samsung,esc-clock-frequency = <20000000>;
--				};
--			};
--		};
--
--		panel at 0 {
--			compatible = "samsung,s6e8aa0";
--			reg = <0>;
--			vdd3-supply = <&lcd_vdd3_reg>;
--			vci-supply = <&ldo25_reg>;
--			reset-gpios = <&gpy4 5 0>;
--			power-on-delay= <50>;
--			reset-delay = <100>;
--			init-delay = <100>;
--			flip-horizontal;
--			flip-vertical;
--			panel-width-mm = <58>;
--			panel-height-mm = <103>;
--
--			display-timings {
--				timing-0 {
--					clock-frequency = <0>;
--					hactive = <720>;
--					vactive = <1280>;
--					hfront-porch = <5>;
--					hback-porch = <5>;
--					hsync-len = <5>;
--					vfront-porch = <13>;
--					vback-porch = <1>;
--					vsync-len = <2>;
--				};
--			};
--
--			port {
--				dsi_in: endpoint {
--					remote-endpoint = <&dsi_out>;
--				};
--			};
--		};
--	};
--
--	fimd at 11c00000 {
--		status = "okay";
--	};
--
- 	camera: camera {
- 		pinctrl-0 = <&cam_port_a_clk_active &cam_port_b_clk_active>;
- 		pinctrl-names = "default";
-@@ -770,124 +233,7 @@
- 		assigned-clock-parents = <&clock CLK_XUSBXTI>,
- 					 <&clock CLK_XUSBXTI>;
- 
--		fimc_0: fimc at 11800000 {
--			status = "okay";
--			assigned-clocks = <&clock CLK_MOUT_FIMC0>,
--					<&clock CLK_SCLK_FIMC0>;
--			assigned-clock-parents = <&clock CLK_MOUT_MPLL_USER_T>;
--			assigned-clock-rates = <0>, <176000000>;
--		};
--
--		fimc_1: fimc at 11810000 {
--			status = "okay";
--			assigned-clocks = <&clock CLK_MOUT_FIMC1>,
--					<&clock CLK_SCLK_FIMC1>;
--			assigned-clock-parents = <&clock CLK_MOUT_MPLL_USER_T>;
--			assigned-clock-rates = <0>, <176000000>;
--		};
--
--		fimc_2: fimc at 11820000 {
--			status = "okay";
--			assigned-clocks = <&clock CLK_MOUT_FIMC2>,
--					<&clock CLK_SCLK_FIMC2>;
--			assigned-clock-parents = <&clock CLK_MOUT_MPLL_USER_T>;
--			assigned-clock-rates = <0>, <176000000>;
--		};
--
--		fimc_3: fimc at 11830000 {
--			status = "okay";
--			assigned-clocks = <&clock CLK_MOUT_FIMC3>,
--					<&clock CLK_SCLK_FIMC3>;
--			assigned-clock-parents = <&clock CLK_MOUT_MPLL_USER_T>;
--			assigned-clock-rates = <0>, <176000000>;
--		};
--
--		csis_0: csis at 11880000 {
--			status = "okay";
--			vddcore-supply = <&ldo8_reg>;
--			vddio-supply = <&ldo10_reg>;
--			assigned-clocks = <&clock CLK_MOUT_CSIS0>,
--					<&clock CLK_SCLK_CSIS0>;
--			assigned-clock-parents = <&clock CLK_MOUT_MPLL_USER_T>;
--			assigned-clock-rates = <0>, <176000000>;
--
--			/* Camera C (3) MIPI CSI-2 (CSIS0) */
--			port at 3 {
--				reg = <3>;
--				csis0_ep: endpoint {
--					remote-endpoint = <&s5c73m3_ep>;
--					data-lanes = <1 2 3 4>;
--					samsung,csis-hs-settle = <12>;
--				};
--			};
--		};
--
--		csis_1: csis at 11890000 {
--			status = "okay";
--			vddcore-supply = <&ldo8_reg>;
--			vddio-supply = <&ldo10_reg>;
--			assigned-clocks = <&clock CLK_MOUT_CSIS1>,
--					<&clock CLK_SCLK_CSIS1>;
--			assigned-clock-parents = <&clock CLK_MOUT_MPLL_USER_T>;
--			assigned-clock-rates = <0>, <176000000>;
--
--			/* Camera D (4) MIPI CSI-2 (CSIS1) */
--			port at 4 {
--				reg = <4>;
--				csis1_ep: endpoint {
--					remote-endpoint = <&is_s5k6a3_ep>;
--					data-lanes = <1>;
--					samsung,csis-hs-settle = <18>;
--					samsung,csis-wclk;
--				};
--			};
--		};
--
--		fimc_lite_0: fimc-lite at 12390000 {
--			status = "okay";
--		};
- 
--		fimc_lite_1: fimc-lite at 123A0000 {
--			status = "okay";
--		};
--
--		fimc-is at 12000000 {
--			pinctrl-0 = <&fimc_is_uart>;
--			pinctrl-names = "default";
--			status = "okay";
--
--			i2c1_isp: i2c-isp at 12140000 {
--				pinctrl-0 = <&fimc_is_i2c1>;
--				pinctrl-names = "default";
--
--				s5k6a3 at 10 {
--					compatible = "samsung,s5k6a3";
--					reg = <0x10>;
--					svdda-supply = <&cam_io_reg>;
--					svddio-supply = <&ldo19_reg>;
--					afvdd-supply = <&ldo19_reg>;
--					clock-frequency = <24000000>;
--					/* CAM_B_CLKOUT */
--					clocks = <&camera 1>;
--					clock-names = "extclk";
--					samsung,camclk-out = <1>;
--					gpios = <&gpm1 6 0>;
--
--					port {
--						is_s5k6a3_ep: endpoint {
--							remote-endpoint = <&csis1_ep>;
--							data-lanes = <1>;
--						};
--					};
--				};
--			};
--		};
--	};
--
--	i2s0: i2s at 03830000 {
--		pinctrl-0 = <&i2s0_bus>;
--		pinctrl-names = "default";
--		status = "okay";
- 	};
- 
- 	sound {
-@@ -902,17 +248,6 @@
- 			"SPK", "SPKOUTRP";
- 	};
- 
--	exynos-usbphy at 125B0000 {
--		status = "okay";
--	};
--
--	hsotg at 12480000 {
--		vusb_d-supply = <&ldo15_reg>;
--		vusb_a-supply = <&ldo12_reg>;
--		dr_mode = "peripheral";
--		status = "okay";
--	};
--
- 	thermistor-ap at 0 {
- 		compatible = "ntc,ncp15wb473";
- 		pullup-uv = <1800000>;	 /* VCC_1.8V_AP */
-@@ -945,6 +280,619 @@
- 	};
- };
- 
-+&adc {
-+	vdd-supply = <&ldo3_reg>;
-+	status = "okay";
-+};
-+
-+&csis_0 {
-+	status = "okay";
-+	vddcore-supply = <&ldo8_reg>;
-+	vddio-supply = <&ldo10_reg>;
-+	assigned-clocks = <&clock CLK_MOUT_CSIS0>,
-+			<&clock CLK_SCLK_CSIS0>;
-+	assigned-clock-parents = <&clock CLK_MOUT_MPLL_USER_T>;
-+	assigned-clock-rates = <0>, <176000000>;
-+
-+	/* Camera C (3) MIPI CSI-2 (CSIS0) */
-+	port at 3 {
-+		reg = <3>;
-+		csis0_ep: endpoint {
-+			remote-endpoint = <&s5c73m3_ep>;
-+			data-lanes = <1 2 3 4>;
-+			samsung,csis-hs-settle = <12>;
-+		};
-+	};
-+};
-+
-+&csis_1 {
-+	status = "okay";
-+	vddcore-supply = <&ldo8_reg>;
-+	vddio-supply = <&ldo10_reg>;
-+	assigned-clocks = <&clock CLK_MOUT_CSIS1>,
-+			<&clock CLK_SCLK_CSIS1>;
-+	assigned-clock-parents = <&clock CLK_MOUT_MPLL_USER_T>;
-+	assigned-clock-rates = <0>, <176000000>;
-+
-+	/* Camera D (4) MIPI CSI-2 (CSIS1) */
-+	port at 4 {
-+		reg = <4>;
-+		csis1_ep: endpoint {
-+			remote-endpoint = <&is_s5k6a3_ep>;
-+			data-lanes = <1>;
-+			samsung,csis-hs-settle = <18>;
-+			samsung,csis-wclk;
-+		};
-+	};
-+};
-+
-+&dsi_0 {
-+	vddcore-supply = <&ldo8_reg>;
-+	vddio-supply = <&ldo10_reg>;
-+	samsung,pll-clock-frequency = <24000000>;
-+	status = "okay";
-+
-+	ports {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		port at 1 {
-+			reg = <1>;
-+
-+			dsi_out: endpoint {
-+				remote-endpoint = <&dsi_in>;
-+				samsung,burst-clock-frequency = <500000000>;
-+				samsung,esc-clock-frequency = <20000000>;
-+			};
-+		};
-+	};
-+
-+	panel at 0 {
-+		compatible = "samsung,s6e8aa0";
-+		reg = <0>;
-+		vdd3-supply = <&lcd_vdd3_reg>;
-+		vci-supply = <&ldo25_reg>;
-+		reset-gpios = <&gpy4 5 0>;
-+		power-on-delay= <50>;
-+		reset-delay = <100>;
-+		init-delay = <100>;
-+		flip-horizontal;
-+		flip-vertical;
-+		panel-width-mm = <58>;
-+		panel-height-mm = <103>;
-+
-+		display-timings {
-+			timing-0 {
-+				clock-frequency = <0>;
-+				hactive = <720>;
-+				vactive = <1280>;
-+				hfront-porch = <5>;
-+				hback-porch = <5>;
-+				hsync-len = <5>;
-+				vfront-porch = <13>;
-+				vback-porch = <1>;
-+				vsync-len = <2>;
-+			};
-+		};
-+
-+		port {
-+			dsi_in: endpoint {
-+				remote-endpoint = <&dsi_out>;
-+			};
-+		};
-+	};
-+};
-+
-+&exynos_usbphy {
-+	status = "okay";
-+};
-+
-+&fimc_0 {
-+	status = "okay";
-+	assigned-clocks = <&clock CLK_MOUT_FIMC0>,
-+			<&clock CLK_SCLK_FIMC0>;
-+	assigned-clock-parents = <&clock CLK_MOUT_MPLL_USER_T>;
-+	assigned-clock-rates = <0>, <176000000>;
-+};
-+
-+&fimc_1 {
-+	status = "okay";
-+	assigned-clocks = <&clock CLK_MOUT_FIMC1>,
-+			<&clock CLK_SCLK_FIMC1>;
-+	assigned-clock-parents = <&clock CLK_MOUT_MPLL_USER_T>;
-+	assigned-clock-rates = <0>, <176000000>;
-+};
-+
-+&fimc_2 {
-+	status = "okay";
-+	assigned-clocks = <&clock CLK_MOUT_FIMC2>,
-+			<&clock CLK_SCLK_FIMC2>;
-+	assigned-clock-parents = <&clock CLK_MOUT_MPLL_USER_T>;
-+	assigned-clock-rates = <0>, <176000000>;
-+};
-+
-+&fimc_3 {
-+	status = "okay";
-+	assigned-clocks = <&clock CLK_MOUT_FIMC3>,
-+			<&clock CLK_SCLK_FIMC3>;
-+	assigned-clock-parents = <&clock CLK_MOUT_MPLL_USER_T>;
-+	assigned-clock-rates = <0>, <176000000>;
-+};
-+
-+&fimc_is {
-+	pinctrl-0 = <&fimc_is_uart>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+
-+	i2c1_isp: i2c-isp at 12140000 {
-+		pinctrl-0 = <&fimc_is_i2c1>;
-+		pinctrl-names = "default";
-+
-+		s5k6a3 at 10 {
-+			compatible = "samsung,s5k6a3";
-+			reg = <0x10>;
-+			svdda-supply = <&cam_io_reg>;
-+			svddio-supply = <&ldo19_reg>;
-+			afvdd-supply = <&ldo19_reg>;
-+			clock-frequency = <24000000>;
-+			/* CAM_B_CLKOUT */
-+			clocks = <&camera 1>;
-+			clock-names = "extclk";
-+			samsung,camclk-out = <1>;
-+			gpios = <&gpm1 6 0>;
-+
-+			port {
-+				is_s5k6a3_ep: endpoint {
-+					remote-endpoint = <&csis1_ep>;
-+					data-lanes = <1>;
-+				};
-+			};
-+		};
-+	};
-+};
-+
-+&fimc_lite_0 {
-+	status = "okay";
-+};
-+
-+&fimc_lite_1 {
-+	status = "okay";
-+};
-+
-+&fimd {
-+	status = "okay";
-+};
-+
-+&hsotg {
-+	vusb_d-supply = <&ldo15_reg>;
-+	vusb_a-supply = <&ldo12_reg>;
-+	dr_mode = "peripheral";
-+	status = "okay";
-+};
-+
-+&i2c_0 {
-+	samsung,i2c-sda-delay = <100>;
-+	samsung,i2c-slave-addr = <0x10>;
-+	samsung,i2c-max-bus-freq = <400000>;
-+	pinctrl-0 = <&i2c0_bus>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+
-+	s5c73m3 at 3c {
-+		compatible = "samsung,s5c73m3";
-+		reg = <0x3c>;
-+		standby-gpios = <&gpm0 1 1>;   /* ISP_STANDBY */
-+		xshutdown-gpios = <&gpf1 3 1>; /* ISP_RESET */
-+		vdd-int-supply = <&buck9_reg>;
-+		vddio-cis-supply = <&ldo9_reg>;
-+		vdda-supply = <&ldo17_reg>;
-+		vddio-host-supply = <&ldo18_reg>;
-+		vdd-af-supply = <&cam_af_reg>;
-+		vdd-reg-supply = <&cam_io_reg>;
-+		clock-frequency = <24000000>;
-+		/* CAM_A_CLKOUT */
-+		clocks = <&camera 0>;
-+		clock-names = "cis_extclk";
-+		port {
-+			s5c73m3_ep: endpoint {
-+				remote-endpoint = <&csis0_ep>;
-+				data-lanes = <1 2 3 4>;
-+			};
-+		};
-+	};
-+};
-+
-+&i2c_3 {
-+	samsung,i2c-sda-delay = <100>;
-+	samsung,i2c-slave-addr = <0x10>;
-+	samsung,i2c-max-bus-freq = <400000>;
-+	pinctrl-0 = <&i2c3_bus>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+
-+	mms114-touchscreen at 48 {
-+		compatible = "melfas,mms114";
-+		reg = <0x48>;
-+		interrupt-parent = <&gpm2>;
-+		interrupts = <3 2>;
-+		x-size = <720>;
-+		y-size = <1280>;
-+		avdd-supply = <&ldo23_reg>;
-+		vdd-supply = <&ldo24_reg>;
-+	};
-+};
-+
-+&i2c_4 {
-+	samsung,i2c-sda-delay = <100>;
-+	samsung,i2c-slave-addr = <0x10>;
-+	samsung,i2c-max-bus-freq = <100000>;
-+	pinctrl-0 = <&i2c4_bus>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+
-+	wm1811: wm1811 at 1a {
-+		compatible = "wlf,wm1811";
-+		reg = <0x1a>;
-+		clocks = <&pmu_system_controller 0>;
-+		clock-names = "MCLK1";
-+		DCVDD-supply = <&ldo3_reg>;
-+		DBVDD1-supply = <&ldo3_reg>;
-+		wlf,ldo1ena = <&gpj0 4 0>;
-+	};
-+};
-+
-+&i2c_7 {
-+	samsung,i2c-sda-delay = <100>;
-+	samsung,i2c-slave-addr = <0x10>;
-+	samsung,i2c-max-bus-freq = <100000>;
-+	pinctrl-0 = <&i2c7_bus>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+
-+	max77686: max77686_pmic at 09 {
-+		compatible = "maxim,max77686";
-+		interrupt-parent = <&gpx0>;
-+		interrupts = <7 0>;
-+		reg = <0x09>;
-+		#clock-cells = <1>;
-+
-+		voltage-regulators {
-+			ldo1_reg: ldo1 {
-+				regulator-compatible = "LDO1";
-+				regulator-name = "VALIVE_1.0V_AP";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-always-on;
-+			};
-+
-+			ldo2_reg: ldo2 {
-+				regulator-compatible = "LDO2";
-+				regulator-name = "VM1M2_1.2V_AP";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1200000>;
-+				regulator-always-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
-+			};
-+
-+			ldo3_reg: ldo3 {
-+				regulator-compatible = "LDO3";
-+				regulator-name = "VCC_1.8V_AP";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+			};
-+
-+			ldo4_reg: ldo4 {
-+				regulator-compatible = "LDO4";
-+				regulator-name = "VCC_2.8V_AP";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-always-on;
-+			};
-+
-+			ldo5_reg: ldo5 {
-+				regulator-compatible = "LDO5";
-+				regulator-name = "VCC_1.8V_IO";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+			};
-+
-+			ldo6_reg: ldo6 {
-+				regulator-compatible = "LDO6";
-+				regulator-name = "VMPLL_1.0V_AP";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-always-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
-+			};
-+
-+			ldo7_reg: ldo7 {
-+				regulator-compatible = "LDO7";
-+				regulator-name = "VPLL_1.0V_AP";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-always-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
-+			};
-+
-+			ldo8_reg: ldo8 {
-+				regulator-compatible = "LDO8";
-+				regulator-name = "VMIPI_1.0V";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
-+			};
-+
-+			ldo9_reg: ldo9 {
-+				regulator-compatible = "LDO9";
-+				regulator-name = "CAM_ISP_MIPI_1.2V";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1200000>;
-+			};
-+
-+			ldo10_reg: ldo10 {
-+				regulator-compatible = "LDO10";
-+				regulator-name = "VMIPI_1.8V";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
-+			};
-+
-+			ldo11_reg: ldo11 {
-+				regulator-compatible = "LDO11";
-+				regulator-name = "VABB1_1.95V";
-+				regulator-min-microvolt = <1950000>;
-+				regulator-max-microvolt = <1950000>;
-+				regulator-always-on;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
-+			};
-+
-+			ldo12_reg: ldo12 {
-+				regulator-compatible = "LDO12";
-+				regulator-name = "VUOTG_3.0V";
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
-+			};
-+
-+			ldo13_reg: ldo13 {
-+				regulator-compatible = "LDO13";
-+				regulator-name = "NFC_AVDD_1.8V";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+			};
-+
-+			ldo14_reg: ldo14 {
-+				regulator-compatible = "LDO14";
-+				regulator-name = "VABB2_1.95V";
-+				regulator-min-microvolt = <1950000>;
-+				regulator-max-microvolt = <1950000>;
-+				regulator-always-on;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
-+			};
-+
-+			ldo15_reg: ldo15 {
-+				regulator-compatible = "LDO15";
-+				regulator-name = "VHSIC_1.0V";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
-+			};
-+
-+			ldo16_reg: ldo16 {
-+				regulator-compatible = "LDO16";
-+				regulator-name = "VHSIC_1.8V";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
-+			};
-+
-+			ldo17_reg: ldo17 {
-+				regulator-compatible = "LDO17";
-+				regulator-name = "CAM_SENSOR_CORE_1.2V";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1200000>;
-+			};
-+
-+			ldo18_reg: ldo18 {
-+				regulator-compatible = "LDO18";
-+				regulator-name = "CAM_ISP_SEN_IO_1.8V";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+			};
-+
-+			ldo19_reg: ldo19 {
-+				regulator-compatible = "LDO19";
-+				regulator-name = "VT_CAM_1.8V";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+			};
-+
-+			ldo20_reg: ldo20 {
-+				regulator-compatible = "LDO20";
-+				regulator-name = "VDDQ_PRE_1.8V";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+			};
-+
-+			ldo21_reg: ldo21 {
-+				regulator-compatible = "LDO21";
-+				regulator-name = "VTF_2.8V";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				maxim,ena-gpios = <&gpy2 0 GPIO_ACTIVE_HIGH>;
-+			};
-+
-+			ldo22_reg: ldo22 {
-+				regulator-compatible = "LDO22";
-+				regulator-name = "VMEM_VDD_2.8V";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				maxim,ena-gpios = <&gpk0 2 GPIO_ACTIVE_HIGH>;
-+			};
-+
-+			ldo23_reg: ldo23 {
-+				regulator-compatible = "LDO23";
-+				regulator-name = "TSP_AVDD_3.3V";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			ldo24_reg: ldo24 {
-+				regulator-compatible = "LDO24";
-+				regulator-name = "TSP_VDD_1.8V";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+			};
-+
-+			ldo25_reg: ldo25 {
-+				regulator-compatible = "LDO25";
-+				regulator-name = "LCD_VCC_3.3V";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+			};
-+
-+			ldo26_reg: ldo26 {
-+				regulator-compatible = "LDO26";
-+				regulator-name = "MOTOR_VCC_3.0V";
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3000000>;
-+			};
-+
-+			buck1_reg: buck1 {
-+				regulator-compatible = "BUCK1";
-+				regulator-name = "vdd_mif";
-+				regulator-min-microvolt = <850000>;
-+				regulator-max-microvolt = <1100000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
-+			};
-+
-+			buck2_reg: buck2 {
-+				regulator-compatible = "BUCK2";
-+				regulator-name = "vdd_arm";
-+				regulator-min-microvolt = <850000>;
-+				regulator-max-microvolt = <1500000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
-+			};
-+
-+			buck3_reg: buck3 {
-+				regulator-compatible = "BUCK3";
-+				regulator-name = "vdd_int";
-+				regulator-min-microvolt = <850000>;
-+				regulator-max-microvolt = <1150000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
-+			};
-+
-+			buck4_reg: buck4 {
-+				regulator-compatible = "BUCK4";
-+				regulator-name = "vdd_g3d";
-+				regulator-min-microvolt = <850000>;
-+				regulator-max-microvolt = <1150000>;
-+				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
-+			};
-+
-+			buck5_reg: buck5 {
-+				regulator-compatible = "BUCK5";
-+				regulator-name = "VMEM_1.2V_AP";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1200000>;
-+				regulator-always-on;
-+			};
-+
-+			buck6_reg: buck6 {
-+				regulator-compatible = "BUCK6";
-+				regulator-name = "VCC_SUB_1.35V";
-+				regulator-min-microvolt = <1350000>;
-+				regulator-max-microvolt = <1350000>;
-+				regulator-always-on;
-+			};
-+
-+			buck7_reg: buck7 {
-+				regulator-compatible = "BUCK7";
-+				regulator-name = "VCC_SUB_2.0V";
-+				regulator-min-microvolt = <2000000>;
-+				regulator-max-microvolt = <2000000>;
-+				regulator-always-on;
-+			};
-+
-+			buck8_reg: buck8 {
-+				regulator-compatible = "BUCK8";
-+				regulator-name = "VMEM_VDDF_3.0V";
-+				regulator-min-microvolt = <2850000>;
-+				regulator-max-microvolt = <2850000>;
-+				maxim,ena-gpios = <&gpk0 2 GPIO_ACTIVE_HIGH>;
-+			};
-+
-+			buck9_reg: buck9 {
-+				regulator-compatible = "BUCK9";
-+				regulator-name = "CAM_ISP_CORE_1.2V";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1200000>;
-+				maxim,ena-gpios = <&gpm0 3 GPIO_ACTIVE_HIGH>;
-+			};
-+		};
-+	};
-+};
-+
-+&i2s0 {
-+	pinctrl-0 = <&i2s0_bus>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+};
-+
-+&mshc_0 {
-+	num-slots = <1>;
-+	broken-cd;
-+	non-removable;
-+	card-detect-delay = <200>;
-+	vmmc-supply = <&ldo22_reg>;
-+	clock-frequency = <400000000>;
-+	samsung,dw-mshc-ciu-div = <0>;
-+	samsung,dw-mshc-sdr-timing = <2 3>;
-+	samsung,dw-mshc-ddr-timing = <1 2>;
-+	pinctrl-0 = <&sd4_clk &sd4_cmd &sd4_bus4 &sd4_bus8>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+	bus-width = <8>;
-+	cap-mmc-highspeed;
-+};
-+
- &pmu_system_controller {
- 	assigned-clocks = <&pmu_system_controller 0>;
- 	assigned-clock-parents =  <&clock CLK_XUSBXTI>;
-@@ -1306,8 +1254,62 @@
- 	};
- };
- 
-+&pwm {
-+	pinctrl-0 = <&pwm0_out>;
-+	pinctrl-names = "default";
-+	samsung,pwm-outputs = <0>;
-+	status = "okay";
-+};
-+
- &rtc {
- 	status = "okay";
- 	clocks = <&clock CLK_RTC>, <&max77686 MAX77686_CLK_AP>;
- 	clock-names = "rtc", "rtc_src";
- };
-+
-+&sdhci_2 {
-+	bus-width = <4>;
-+	cd-gpios = <&gpx3 4 0>;
-+	cd-inverted;
-+	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_bus4>;
-+	pinctrl-names = "default";
-+	vmmc-supply = <&ldo21_reg>;
-+	status = "okay";
-+};
-+
-+&serial_0 {
-+	status = "okay";
-+};
-+
-+&serial_1 {
-+	status = "okay";
-+};
-+
-+&serial_2 {
-+	status = "okay";
-+};
-+
-+&serial_3 {
-+	status = "okay";
-+};
-+
-+&spi_1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spi1_bus>;
-+	cs-gpios = <&gpb 5 0>;
-+	status = "okay";
-+
-+	s5c73m3_spi: s5c73m3 {
-+		compatible = "samsung,s5c73m3";
-+		spi-max-frequency = <50000000>;
-+		reg = <0>;
-+		controller-data {
-+			samsung,spi-feedback-delay = <2>;
-+		};
-+	};
-+};
-+
-+&tmu {
-+	vtmu-supply = <&ldo10_reg>;
-+	status = "okay";
-+};
+Best Regards,
+
+Boris
+
+On Thu, 14 May 2015 14:59:01 +0200
+LABBE Corentin <clabbe.montjoie@gmail.com> wrote:
+
+> Add support for the Security System included in Allwinner SoC A20.
+> The Security System is a hardware cryptographic accelerator that support:
+> - MD5 and SHA1 hash algorithms
+> - AES block cipher in CBC/ECB mode with 128/196/256bits keys.
+> - DES and 3DES block cipher in CBC/ECB mode
+> 
+> Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
+> ---
+
+[...]
+
+> +
+> +int sun4i_ss_aes_poll(struct ablkcipher_request *areq, u32 mode)
+> +{
+> +	u32 spaces;
+> +	struct crypto_ablkcipher *tfm = crypto_ablkcipher_reqtfm(areq);
+> +	struct sun4i_tfm_ctx *op = crypto_ablkcipher_ctx(tfm);
+> +	struct sun4i_ss_ctx *ss = op->ss;
+> +	unsigned int ivsize = crypto_ablkcipher_ivsize(tfm);
+> +	/* when activating SS, the default FIFO space is 32 */
+> +	u32 rx_cnt = 32;
+> +	u32 tx_cnt = 0;
+> +	u32 v;
+> +	int i, sgnum, err = 0;
+> +	unsigned int ileft = areq->nbytes;
+> +	unsigned int oleft = areq->nbytes;
+> +	unsigned int todo, miter_flag;
+> +	unsigned long flags;
+> +	struct sg_mapping_iter mi, mo;
+> +	unsigned int oi, oo; /* offset for in and out */
+> +
+> +	if (areq->nbytes == 0)
+> +		return 0;
+> +
+> +	if (areq->info == NULL) {
+> +		dev_err(ss->dev, "ERROR: Empty IV\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	if (areq->src == NULL || areq->dst == NULL) {
+> +		dev_err(ss->dev, "ERROR: Some SGs are NULL\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	spin_lock_irqsave(&ss->slock, flags);
+
+Do you really need to take this lock so early ?
+BTW, what is this lock protecting ?
+
+IMHO, taking a spinlock and disabling irqs for the whole time you're
+executing a crypto request is not a good idea (it will prevent all
+other irqs from running, and potentially introduce latencies in other
+parts of the kernel).
+
+What you can do though is declare the following fields in your crypto
+engine struct (sun4i_ss_ctx):
+- a crypto request queue (struct crypto_queue [1])
+- a crypto_async_request variable storing the request being processed
+- a lock protecting the queue and the current request variable
+
+This way you'll only have to take the lock when queuing or dequeuing a
+request.
+
+Another comment, your implementation does not seem to be asynchronous at
+all: you're blocking the caller until its crypto request is complete.
+
+
+> +
+> +	for (i = 0; i < op->keylen; i += 4)
+> +		writel(*(op->key + i / 4), ss->base + SS_KEY0 + i);
+> +
+> +	if (areq->info != NULL) {
+> +		for (i = 0; i < 4 && i < ivsize / 4; i++) {
+> +			v = *(u32 *)(areq->info + i * 4);
+> +			writel(v, ss->base + SS_IV0 + i * 4);
+> +		}
+> +	}
+> +	writel(mode, ss->base + SS_CTL);
+> +
+> +	sgnum = sg_nents(areq->src);
+> +	if (sgnum == 1)
+> +		miter_flag = SG_MITER_FROM_SG | SG_MITER_ATOMIC;
+> +	else
+> +		miter_flag = SG_MITER_FROM_SG;
+
+
+Why is the ATOMIC flag depending on the number of sg elements.
+IMO it should only depends on the context you're currently in, and in
+your specific case, you're always in atomic context since you've taken
+a spinlock (and disabled irqs) a few lines above.
+
+Note that with the approach I previously proposed, you can even get rid
+of this ATMIC flag (or always set it depending on the context you're in
+when dequeuing the crypto requests).
+
+
+> +	sg_miter_start(&mi, areq->src, sgnum, miter_flag);
+> +	sgnum = sg_nents(areq->dst);
+> +	if (sgnum == 1)
+> +		miter_flag = SG_MITER_TO_SG | SG_MITER_ATOMIC;
+> +	else
+> +		miter_flag = SG_MITER_TO_SG;
+
+Ditto
+
+> +	sg_miter_start(&mo, areq->dst, sgnum, miter_flag);
+> +	sg_miter_next(&mi);
+> +	sg_miter_next(&mo);
+> +	if (mi.addr == NULL || mo.addr == NULL) {
+> +		err = -EINVAL;
+> +		goto release_ss;
+> +	}
+> +
+> +	ileft = areq->nbytes / 4;
+> +	oleft = areq->nbytes / 4;
+> +	oi = 0;
+> +	oo = 0;
+> +	do {
+> +		todo = min3(rx_cnt, ileft, (mi.length - oi) / 4);
+> +		if (todo > 0) {
+> +			ileft -= todo;
+> +			writesl(ss->base + SS_RXFIFO, mi.addr + oi, todo);
+
+Is there anything guaranteeing that your pointer is aligned on a 4 byte
+boundary ? If that's not the case, I guess you should copy it in a
+temporary variable before using writesl.
+
+> +			oi += todo * 4;
+> +		}
+> +		if (oi == mi.length) {
+> +			sg_miter_next(&mi);
+> +			oi = 0;
+> +		}
+> +
+> +		ispaces = readl_relaxed(ss->base + SS_FCSR);
+
+Is there a good reason for using the _relaxed version of readl/writel
+(the same comment applies a few lines below) ?
+
+> +		rx_cnt = SS_RXFIFO_SPACES(spaces);
+> +		tx_cnt = SS_TXFIFO_SPACES(spaces);
+> +
+> +		todo = min3(tx_cnt, oleft, (mo.length - oo) / 4);
+> +		if (todo > 0) {
+> +			oleft -= todo;
+> +			readsl(ss->base + SS_TXFIFO, mo.addr + oo, todo);
+> +			oo += todo * 4;
+> +		}
+> +		if (oo == mo.length) {
+> +			sg_miter_next(&mo);
+> +			oo = 0;
+> +		}
+> +	} while (mo.length > 0);
+> +
+> +release_ss:
+> +	sg_miter_stop(&mi);
+> +	sg_miter_stop(&mo);
+> +	writel_relaxed(0, ss->base + SS_CTL);
+
+Ditto.
+
+> +	spin_unlock_irqrestore(&ss->slock, flags);
+> +	return err;
+> +}
+> +
+> +/* Pure CPU driven way of doing DES/3DES with SS */
+> +int sun4i_ss_des_poll(struct ablkcipher_request *areq, u32 mode)
+> +{
+> +	struct crypto_ablkcipher *tfm = crypto_ablkcipher_reqtfm(areq);
+> +	struct sun4i_tfm_ctx *op = crypto_ablkcipher_ctx(tfm);
+> +	struct sun4i_ss_ctx *ss = op->ss;
+> +	int i, err = 0;
+> +	int no_chunk = 1;
+> +	struct scatterlist *in_sg = areq->src;
+> +	struct scatterlist *out_sg = areq->dst;
+> +	u8 kkey[256 / 8];
+> +
+> +	if (areq->nbytes == 0)
+> +		return 0;
+> +
+> +	if (areq->info == NULL) {
+> +		dev_err(ss->dev, "ERROR: Empty IV\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	if (areq->src == NULL || areq->dst == NULL) {
+> +		dev_err(ss->dev, "ERROR: Some SGs are NULL\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	/*
+> +	 * if we have only SGs with size multiple of 4,
+> +	 * we can use the SS AES function
+> +	 */
+> +	while (in_sg != NULL && no_chunk == 1) {
+> +		if ((in_sg->length % 4) != 0)
+> +			no_chunk = 0;
+> +		in_sg = sg_next(in_sg);
+> +	}
+> +	while (out_sg != NULL && no_chunk == 1) {
+> +		if ((out_sg->length % 4) != 0)
+> +			no_chunk = 0;
+> +		out_sg = sg_next(out_sg);
+> +	}
+> +
+> +	if (no_chunk == 1)
+> +		return sun4i_ss_aes_poll(areq, mode);
+> +
+> +	/*
+> +	 * if some SG are not multiple of 4bytes use a fallback
+> +	 * it is much easy and clean
+> +	 */
+
+Hm, is this really the best solution. I mean, you can easily pack
+values from non aligned sg buffers so that you have only a 4 byte
+aligned buffers.
+Moreover, by doing this you'll end up with a single
+sun4i_ss_ablkcipher_poll function.
+
+BTW, I wonder if there's anything preventing an AES crypto request to be
+forged the same way DES/3DES requests are (sg entries not aligned on 4
+bytes boundary).
+
+> +	ablkcipher_request_set_tfm(areq, op->fallback);
+> +	for (i = 0; i < op->keylen; i++)
+> +		*(u32 *)(kkey + i * 4) = op->key[i];
+> +
+> +	err = crypto_ablkcipher_setkey(op->fallback, kkey, op->keylen);
+> +	if (err != 0) {
+> +		dev_err(ss->dev, "Cannot set key on fallback\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	if ((mode & SS_DECRYPTION) == SS_DECRYPTION)
+> +		err = crypto_ablkcipher_decrypt(areq);
+> +	else
+> +		err = crypto_ablkcipher_encrypt(areq);
+> +	ablkcipher_request_set_tfm(areq, tfm);
+> +	return err;
+> +}
+
+[1]http://lxr.free-electrons.com/source/include/crypto/algapi.h#L68
+
 -- 
-2.1.4
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
