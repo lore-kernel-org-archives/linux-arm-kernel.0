@@ -1,54 +1,102 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Sun, 17 May 2015 17:57:38 +0200
-Subject: [PATCH] pinctrl: Fix gpio/pin mapping for Meson8b
-Message-ID: <1431878258-10229-1-git-send-email-carlo@caione.org>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Sun, 17 May 2015 19:27:40 +0300
+Subject: [PATCH v3 00/17] new LoCoMo driver set
+Message-ID: <1431880077-26321-1-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Carlo Caione <carlo@endlessm.com>
+Sharp Zaurus SL-5500 and SL-5600 use special companion Gate Array.
+With this patchset I tried to modernise and restructure the LoCoMo drivers.
 
-The num_pins field in the struct meson_domain_data must include also the
-missing pins in the Meson8b SoC, otherwise the GPIO <-> pin mapping is
-broken on this platform. Avoid also the dinamic allocation for GPIOs.
+* Use platform bus and mfd core code
+* Use GPIO API instead of custom locomo GPIO code
+* Use irqdomains to manage IRQs
+* Split mixed locomolcd driver to lcd and backlight parts
+* Implement IRQ handling in GPIO driver
+* Implement SPI driver used as a host for mmc_spi device to control SD cards
 
-Signed-off-by: Carlo Caione <carlo@endlessm.com>
----
- drivers/pinctrl/meson/pinctrl-meson.c   | 2 +-
- drivers/pinctrl/meson/pinctrl-meson8b.c | 4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
+Changes since V2:
+* Implemented most of review findings (lots of small changes)
+* Added comments where the review feedback was ignored
 
-diff --git a/drivers/pinctrl/meson/pinctrl-meson.c b/drivers/pinctrl/meson/pinctrl-meson.c
-index edcd140..a70a5fe 100644
---- a/drivers/pinctrl/meson/pinctrl-meson.c
-+++ b/drivers/pinctrl/meson/pinctrl-meson.c
-@@ -569,7 +569,7 @@ static int meson_gpiolib_register(struct meson_pinctrl *pc)
- 		domain->chip.direction_output = meson_gpio_direction_output;
- 		domain->chip.get = meson_gpio_get;
- 		domain->chip.set = meson_gpio_set;
--		domain->chip.base = -1;
-+		domain->chip.base = domain->data->pin_base;
- 		domain->chip.ngpio = domain->data->num_pins;
- 		domain->chip.can_sleep = false;
- 		domain->chip.of_node = domain->of_node;
-diff --git a/drivers/pinctrl/meson/pinctrl-meson8b.c b/drivers/pinctrl/meson/pinctrl-meson8b.c
-index 2f7ea62..9677807 100644
---- a/drivers/pinctrl/meson/pinctrl-meson8b.c
-+++ b/drivers/pinctrl/meson/pinctrl-meson8b.c
-@@ -876,13 +876,13 @@ static struct meson_domain_data meson8b_domain_data[] = {
- 		.banks		= meson8b_banks,
- 		.num_banks	= ARRAY_SIZE(meson8b_banks),
- 		.pin_base	= 0,
--		.num_pins	= 83,
-+		.num_pins	= 130,
- 	},
- 	{
- 		.name		= "ao-bank",
- 		.banks		= meson8b_ao_banks,
- 		.num_banks	= ARRAY_SIZE(meson8b_ao_banks),
--		.pin_base	= 83,
-+		.pin_base	= 130,
- 		.num_pins	= 16,
- 	},
- };
+The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+
+  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+
+are available in the git repository at:
+
+  git://git.infradead.org/users/dbaryshkov/zaurus.git locomo-v3
+
+for you to fetch changes up to c7405f110836863287c505650ac2133fecabea7b:
+
+  ARM: drop old LoCoMo driver (2015-05-17 19:23:20 +0300)
+
+----------------------------------------------------------------
+Dmitry Eremin-Solenikov (17):
+      mfd: add new driver for Sharp LoCoMo
+      leds: port locomo leds driver to new locomo core
+      input: convert LoCoMo keyboard driver to use new locomo core
+      input: make LoCoMo keyboard driver support both poodle and collie
+      video: backlight: add new locomo backlight driver
+      video: lcd: add LoCoMo LCD driver
+      gpio: port LoCoMo gpio support from old driver
+      gpio: locomo: implement per-pin irq handling
+      spi: add locomo SPI driver
+      i2c: add locomo i2c driver
+      ARM: sa1100: make collie use new locomo drivers
+      ARM: sa1100: don't preallocate IRQ space for locomo
+      ASoC: pxa: poodle: make use of new locomo GPIO interface
+      ARM: pxa: poodle: use new LoCoMo driver
+      ARM: pxa: poodle: don't preallocate IRQ space for locomo
+      video: backlight: drop old locomo bl/lcd driver
+      ARM: drop old LoCoMo driver
+
+ arch/arm/common/Kconfig                    |   3 -
+ arch/arm/common/Makefile                   |   1 -
+ arch/arm/common/locomo.c                   | 914 -----------------------------
+ arch/arm/include/asm/hardware/locomo.h     | 221 -------
+ arch/arm/mach-pxa/Kconfig                  |   1 -
+ arch/arm/mach-pxa/include/mach/poodle.h    |   8 +-
+ arch/arm/mach-pxa/poodle.c                 |  58 +-
+ arch/arm/mach-sa1100/Kconfig               |   1 -
+ arch/arm/mach-sa1100/collie.c              | 213 +++++--
+ arch/arm/mach-sa1100/include/mach/collie.h |  16 +-
+ arch/arm/mach-sa1100/include/mach/irqs.h   |  19 +-
+ drivers/gpio/Kconfig                       |  13 +
+ drivers/gpio/Makefile                      |   1 +
+ drivers/gpio/gpio-locomo.c                 | 285 +++++++++
+ drivers/i2c/busses/Kconfig                 |  12 +
+ drivers/i2c/busses/Makefile                |   1 +
+ drivers/i2c/busses/i2c-locomo.c            | 135 +++++
+ drivers/input/keyboard/Kconfig             |   2 +-
+ drivers/input/keyboard/locomokbd.c         | 264 ++++-----
+ drivers/leds/Kconfig                       |   2 +-
+ drivers/leds/leds-locomo.c                 | 117 ++--
+ drivers/mfd/Kconfig                        |  10 +
+ drivers/mfd/Makefile                       |   1 +
+ drivers/mfd/locomo.c                       | 346 +++++++++++
+ drivers/spi/Kconfig                        |  10 +
+ drivers/spi/Makefile                       |   1 +
+ drivers/spi/spi-locomo.c                   | 332 +++++++++++
+ drivers/video/backlight/Kconfig            |  16 +-
+ drivers/video/backlight/Makefile           |   3 +-
+ drivers/video/backlight/locomo_bl.c        | 153 +++++
+ drivers/video/backlight/locomo_lcd.c       | 285 +++++++++
+ drivers/video/backlight/locomolcd.c        | 255 --------
+ include/linux/mfd/locomo.h                 | 167 ++++++
+ sound/soc/pxa/poodle.c                     |  52 +-
+ 34 files changed, 2216 insertions(+), 1702 deletions(-)
+ delete mode 100644 arch/arm/common/locomo.c
+ delete mode 100644 arch/arm/include/asm/hardware/locomo.h
+ create mode 100644 drivers/gpio/gpio-locomo.c
+ create mode 100644 drivers/i2c/busses/i2c-locomo.c
+ create mode 100644 drivers/mfd/locomo.c
+ create mode 100644 drivers/spi/spi-locomo.c
+ create mode 100644 drivers/video/backlight/locomo_bl.c
+ create mode 100644 drivers/video/backlight/locomo_lcd.c
+ delete mode 100644 drivers/video/backlight/locomolcd.c
+ create mode 100644 include/linux/mfd/locomo.h
+
 -- 
-1.9.1
+With best wishes
+Dmitry
