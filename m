@@ -1,57 +1,104 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Sun, 17 May 2015 17:52:14 +0900
-Subject: [GIT PULL] ARM: EXYNOS: Improvements for 4.2, second try
-In-Reply-To: <1431314064-17118-1-git-send-email-k.kozlowski@samsung.com>
-References: <1431314064-17118-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <CAJKOXPdyvQoEdxh6QPYA4r5GXq5LSGFu4=4kTasDmFMVf10S=A@mail.gmail.com>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Sun, 17 May 2015 17:40:54 +0800
+Subject: [PATCH v3 2/7] mmc: mediatek: Add Mediatek MMC driver
+In-Reply-To: <CAPDyKFqeAzjpbZsyfcwb_WarC=dzoCsEeLTmxAbtvOo3Y4cYyg@mail.gmail.com>
+References: <1430214525-19198-1-git-send-email-chaotian.jing@mediatek.com>
+ <1430214525-19198-3-git-send-email-chaotian.jing@mediatek.com>
+ <CAPDyKFq=R9B6ZHHgmDcSg-TNSfqQKAUKc2NjACvpwxFpmk954g@mail.gmail.com>
+ <1430895299.15154.9.camel@mhfsdcap03>
+ <CAPDyKFr+FTXAzYVn3F41dmw2zW01pSbSHPfGJHXbUFLJfvQ5CA@mail.gmail.com>
+ <1430962956.15154.48.camel@mhfsdcap03>
+ <CAPDyKFr5N_08HbLuY=4Wfv1BoVQLVR-VW+NKh_umL1hzi_KozA@mail.gmail.com>
+ <1431335885.26820.7.camel@mhfsdcap03>
+ <CAPDyKFqeAzjpbZsyfcwb_WarC=dzoCsEeLTmxAbtvOo3Y4cYyg@mail.gmail.com>
+Message-ID: <1431855654.26820.11.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-11 12:14 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
-> Dear Kukjin,
->
-> Updated pull request, replacing also the usage of soc_is_exynos4()
-> with of_machine_is_compatible(). You requested this in comments
-> for "ARM: EXYNOS: Fix failed second suspend on Exynos4".
->
-> This adds coupled cpuidle for Exynos3250 and improves the Exynos
-> code in few places. Everything for upcoming 4.2 merge window.
-> Description along with a tag.
->
-> Best regards,
-> Krzysztof
->
->
-> The following changes since commit b82f3a05ff0b5eaf2c9900eeb34e58a6624db8d9:
->
->   ARM: EXYNOS: Fix failed second suspend on Exynos4 (2015-05-11 11:03:09 +0900)
->
-> are available in the git repository at:
->
->   https://github.com/krzk/linux.git tags/samsung-for-next-4.2-2
->
-> for you to fetch changes up to c91889378098ff0bb5fe6f422a3c0eb554b34930:
->
->   ARM: plat-samsung: Constify platform_device_id (2015-05-11 11:05:31 +0900)
->
-> ----------------------------------------------------------------
-> Extending cpuidle driver and improvements for Exynos based boards:
-> 1. Replace soc_is_exynos4() with of_machine_is_compatible().
-> 2. Add missing return-value checks and of_node_put() for power domain
->    driver.
-> 3. Fix missing clk_prepare in S3C24XX ADC driver.
-> 4. Rework clock handling when switching power domains on/off. Instead
->    of settting fixed parent in DTS we grab the parent clock before
->    turning the domain off.
-> 5. Add coupled cpuidle support for Exynos3250 to an existing
->    cpuidle-exynos driver. As a result it enables AFTR mode
->    (ARM-Off Top-Running) to be used by default on Exynos3250
->    without the need to hot unplug CPU1 first.
-> 6. Constify irq_domain_ops and platform_device_id.
+On Mon, 2015-05-11 at 12:29 +0200, Ulf Hansson wrote:
+> On 11 May 2015 at 11:18, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> > On Fri, 2015-05-08 at 14:12 +0200, Ulf Hansson wrote:
+> >> On 7 May 2015 at 03:42, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> >> > Dear Ulf,
+> >> >
+> >> > Thanks!
+> >> > Below is my comment:
+> >> >
+> >> > On Wed, 2015-05-06 at 18:31 +0200, Ulf Hansson wrote:
+> >> >> On 6 May 2015 at 08:54, chaotian.jing <chaotian.jing@mediatek.com> wrote:
+> >> >> > Dear Ulf,
+> >> >> >
+> >> >> > Thanks for your review.
+> >> >> > I must do a explain of our MMC host:
+> >> >> > Source clock is source clock of the MMC bus, MMC host has a divider to
+> >> >> > get different bus clock frequency. now the runtime suspend is gating
+> >> >> > this clock.
+> >> >> >
+> >> >> > Hclk is the power domain of the MMC host, if Hclk is gated, the MMC host
+> >> >> > cannot work(all registers readout is zero). and, all registers would be
+> >> >> > reset to default value if Hclk is gated/ungated.
+> >> >> > At MT8173, MSDC0 and MSDC2 has independent Hclk, MSDC1 and MSDC3's Hclk
+> >> >> > was controlled by "Infra module".
+> >> > Sorry for mistake, MSDC0 and MSDC3 has independent Hclk, MSDC1 and
+> >> > MSDC2's Hclk was controlled by "Infra module". the Infra module is a
+> >> > "power saving module", when the system go to sleep, Infra module will be
+> >> > set and MSDC1 & MSDC2's Hclk will be gated automatically.
+> >> >>
+> >> >> Thanks for clarifying!
+> >> >>
+> >> >> I don't have enough knowledge about your SoC to understand the detail,
+> >> >> but it seems like we are mixing clocks and power domains. I would
+> >> >> rather keep this separate - if the HW allows it.
+> >> >>
+> >> >> I guess the key question I have is the following:
+> >> >> 1) Is it hardware wise possible to gate the hclk, but without gating
+> >> >> the power domain?
+> >> >> 2) At what level is the reference counting done for each device in the
+> >> >> power domain? In HW or in sofftware?
+> >> >>
+> >> >
+> >> > Actually, Our MMC host do not have power domain, all the control of the
+> >> > host is the Hclk.
+> >>
+> >> Okay, but I am not sure that fully answered my question.
+> >>
+> >> You said that hclk will be gated when the power domain gets gated. And
+> >> the power domain (infra module, right?) will be gated at system PM
+> >> sleep. And when that happens the mmc controller loses register
+> >> context.
+> >>
+> >> But, again, can hclk be gated without gating the power domain?
+> >>
+> >> No matter what, it seems like a good idea to gate the power domain
+> >> when all clients of it are idle. Yes we would need to manage register
+> >> save/restore context, but on the other hand allow you to save more
+> >> power, right?
+> >>
+> > For MSDC0 & MSDC3, it has independent HCLK, do not have power domain.
+> > For MSDC1 & MSDC2, its HCLK was controlled by Infra module(This is a big
+> > power domain for many modules).
+> > So, for msdc0 & msdc3, we can control its Hclk, for msdc1 & msdc2, we
+> > cannot control it.
+> 
+> Okay, thanks for the clarification!
+> 
+> >
+> > Yes, I will do gate/ungate HCLK & source clock in PM.
+> > In addition, Since the gate/ungate HCLK is done by runtime PM, and all
+> > register operation should work at HCLK is on, so the msdc_init_hw() only
+> > can be called at set_ios(), because in probe(), the HCLK may have not
+> > been enabled.
+> 
+> I suggest you to enable HCLK in ->probe() and thus you may also call
+> msdc_init_hw() from there.
+> 
+> This should simplify for you, when adding the runtime PM support.
 
-Dear Kukjin,
-
-Just humbly reminding - this stuff still waits for you :).
-
-Best regards,
-Krzysztof
+Yes, I will enable HCLK in ->probe(), but still need call msdc_init_hw()
+in set_ios(), because SD hot plug need it when inserted.
+In addition, it seems that still need sclk_enabled and hclk_enabled to
+judge if clock already enabled, because not only the runtime PM will
+call it.
+> 
+> Kind regards
+> Uffe
