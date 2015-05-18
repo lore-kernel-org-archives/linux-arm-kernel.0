@@ -1,108 +1,29 @@
-From: lho@apm.com (Loc Ho)
-Date: Mon, 18 May 2015 17:24:41 -0600
-Subject: [PATCH v10 5/5] arm64: Add APM X-Gene SoC EDAC DTS entries
-In-Reply-To: <1431991481-25684-5-git-send-email-lho@apm.com>
-References: <1431991481-25684-1-git-send-email-lho@apm.com>
- <1431991481-25684-2-git-send-email-lho@apm.com>
- <1431991481-25684-3-git-send-email-lho@apm.com>
- <1431991481-25684-4-git-send-email-lho@apm.com>
- <1431991481-25684-5-git-send-email-lho@apm.com>
-Message-ID: <1431991481-25684-6-git-send-email-lho@apm.com>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 18 May 2015 19:52:30 -0400 (EDT)
+Subject: [PATCH net-next v3 2/2] net: Adding support for Cavium
+ ThunderX network controller
+In-Reply-To: <555A5F1E.1010509@caviumnetworks.com>
+References: <1431747401-20847-3-git-send-email-aleksey.makarov@auriga.com>
+ <20150518.160931.2235555994068443513.davem@davemloft.net>
+ <555A5F1E.1010509@caviumnetworks.com>
+Message-ID: <20150518.195230.2247842502863025488.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds APM X-Gene SoC EDAC DTS entries.
+From: David Daney <ddaney@caviumnetworks.com>
+Date: Mon, 18 May 2015 14:52:30 -0700
 
-Signed-off-by: Loc Ho <lho@apm.com>
----
- arch/arm64/boot/dts/apm/apm-storm.dtsi |   75 ++++++++++++++++++++++++++++++++
- 1 files changed, 75 insertions(+), 0 deletions(-)
+> As I see it there are two options:
+> 
+> 1) Keep the writeq_relaxed()/readq_relaxed(), but add a comment about
+> why they are safe.
+> 
+> 2) Change the patch so that we are using writeq()/readq() and suffer a
+> decrease in performance.
 
-diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-index c8d3e0e..51aa174 100644
---- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-@@ -374,6 +374,81 @@
- 			};
- 		};
- 
-+		csw: csw at 7e200000 {
-+			compatible = "syscon";
-+			reg = <0x0 0x7e200000 0x0 0x1000>;
-+		};
-+
-+		mcba: mcba at 7e700000 {
-+			compatible = "syscon";
-+			reg = <0x0 0x7e700000 0x0 0x1000>;
-+		};
-+
-+		mcbb: mcbb at 7e720000 {
-+			compatible = "syscon";
-+			reg = <0x0 0x7e720000 0x0 0x1000>;
-+		};
-+
-+		efuse: efuse at 1054a000 {
-+			compatible = "syscon";
-+			reg = <0x0 0x1054a000 0x0 0x20>;
-+		};
-+
-+		edac at 78800000 {
-+			compatible = "apm,xgene-edac";
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges;
-+			regmap-csw = <&csw>;
-+			regmap-mcba = <&mcba>;
-+			regmap-mcbb = <&mcbb>;
-+			regmap-efuse = <&efuse>;
-+			reg = <0x0 0x78800000 0x0 0x100>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>,
-+				     <0x0 0x27 0x4>;
-+
-+			edacmc at 7e800000 {
-+				compatible = "apm,xgene-edac-mc";
-+				reg = <0x0 0x7e800000 0x0 0x1000>;
-+			};
-+
-+			edacmc at 7e840000 {
-+				compatible = "apm,xgene-edac-mc";
-+				reg = <0x0 0x7e840000 0x0 0x1000>;
-+			};
-+
-+			edacmc at 7e880000 {
-+				compatible = "apm,xgene-edac-mc";
-+				reg = <0x0 0x7e880000 0x0 0x1000>;
-+			};
-+
-+			edacmc at 7e8c0000 {
-+				compatible = "apm,xgene-edac-mc";
-+				reg = <0x0 0x7e8c0000 0x0 0x1000>;
-+			};
-+
-+			edacpmd at 7c000000 {
-+				compatible = "apm,xgene-edac-pmd";
-+				reg = <0x0 0x7c000000 0x0 0x200000>;
-+			};
-+
-+			edacpmd at 7c200000 {
-+				compatible = "apm,xgene-edac-pmd";
-+				reg = <0x0 0x7c200000 0x0 0x200000>;
-+			};
-+
-+			edacpmd at 7c400000 {
-+				compatible = "apm,xgene-edac-pmd";
-+				reg = <0x0 0x7c400000 0x0 0x200000>;
-+			};
-+
-+			edacpmd at 7c600000 {
-+				compatible = "apm,xgene-edac-pmd";
-+				reg = <0x0 0x7c600000 0x0 0x200000>;
-+			};
-+		};
-+
- 		pcie0: pcie at 1f2b0000 {
- 			status = "disabled";
- 			device_type = "pci";
--- 
-1.7.1
+I want a detailed comment added, so #1 would be my choice.
+
+There are more than one set of register accessors, so make sure you
+annotate them all.
+
+Thanks.
