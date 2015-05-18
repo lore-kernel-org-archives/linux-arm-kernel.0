@@ -1,37 +1,57 @@
-From: jcliang@chromium.org (Ricky Liang)
-Date: Mon, 18 May 2015 21:57:11 +0800
-Subject: [PATCH v2] clk: mediatek: Initialize clk_init_data
-In-Reply-To: <20150518055421.GL6325@pengutronix.de>
-References: <1431920513-1491-1-git-send-email-jcliang@chromium.org>
- <20150518055421.GL6325@pengutronix.de>
-Message-ID: <CAAJzSMdFJZwx5E7d9jC2VFeujfsoTNy4SieUQjiWYLUrKajKgA@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 18 May 2015 21:57:17 +0800
+Subject: [PATCH] MAINTAINERS: update Shawn's email to use kernel.org one
+In-Reply-To: <1431783155-30384-1-git-send-email-shawnguo@kernel.org>
+References: <1431783155-30384-1-git-send-email-shawnguo@kernel.org>
+Message-ID: <20150518135717.GH1071@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Sat, May 16, 2015 at 09:32:35PM +0800, shawnguo at kernel.org wrote:
+> From: Shawn Guo <shawn.guo@linaro.org>
+> 
+> Update my email address to use kernel.org mailbox, so that emails
+> between kernel community and company can be separated.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Sure. I can fix clk-gate.c as well. New patch on the way...
+Arnd, Olof,
 
--Ricky
+Please disregard this patch, and I will send an updated version.
 
-On Mon, May 18, 2015 at 1:54 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> Hi Ricky,
->
-> On Mon, May 18, 2015 at 11:41:49AM +0800, Ricky Liang wrote:
->> The variable init (struct clk_init_data) is allocated on the stack.
->> We weren't initializing the .flags field, so it contains random junk,
->> which can cause all kinds of interesting issues when the flags are
->> parsed by clk_register.
->
-> It seems we have the same problem in clk-gate.c aswell. We do initialize
-> do .flags field there, so this is no urgent problem, but we might get a
-> real problem when additional fields are added to struct clk_init_data.
-> Care to fix that aswell along with this patch?
->
-> Sascha
->
-> --
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Shawn
+
+> ---
+>  MAINTAINERS | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 2e5bbc0d68b2..a53e42fcba84 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1030,7 +1030,7 @@ F:	arch/arm/include/asm/hardware/dec21285.h
+>  F:	arch/arm/mach-footbridge/
+>  
+>  ARM/FREESCALE IMX / MXC ARM ARCHITECTURE
+> -M:	Shawn Guo <shawn.guo@linaro.org>
+> +M:	Shawn Guo <shawnguo@kernel.org>
+>  M:	Sascha Hauer <kernel@pengutronix.de>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  S:	Maintained
+> @@ -1041,7 +1041,7 @@ F:	arch/arm/boot/dts/imx*
+>  F:	arch/arm/configs/imx*_defconfig
+>  
+>  ARM/FREESCALE VYBRID ARM ARCHITECTURE
+> -M:	Shawn Guo <shawn.guo@linaro.org>
+> +M:	Shawn Guo <shawnguo@kernel.org>
+>  M:	Sascha Hauer <kernel@pengutronix.de>
+>  R:	Stefan Agner <stefan@agner.ch>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
