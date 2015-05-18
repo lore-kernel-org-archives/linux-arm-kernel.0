@@ -1,35 +1,35 @@
-From: raghumag@gmail.com (raghu MG)
-Date: Tue, 19 May 2015 01:32:23 +0530
-Subject: ARMADA XP MV78260
-Message-ID: <CAG1O52X9XOMjHrBLYXcCuDnN9_3V8awUWGSBysS7JFFG8a=Nxg@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 18 May 2015 16:09:31 -0400 (EDT)
+Subject: [PATCH net-next v3 2/2] net: Adding support for Cavium
+ ThunderX network controller
+In-Reply-To: <1431747401-20847-3-git-send-email-aleksey.makarov@auriga.com>
+References: <1431747401-20847-1-git-send-email-aleksey.makarov@auriga.com>
+ <1431747401-20847-3-git-send-email-aleksey.makarov@auriga.com>
+Message-ID: <20150518.160931.2235555994068443513.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-.Hi,
-This mail is regarding Linux smp boot on ARMADA-XP MV2860.
+From: Aleksey Makarov <aleksey.makarov@auriga.com>
+Date: Fri, 15 May 2015 20:36:39 -0700
 
-CPU-1 doesnt boot/go through the boot sequence & it fails to come
-online & dumps this message
+> +/* Register read/write APIs */
+> +static void nic_reg_write(struct nicpf *nic, u64 offset, u64 val)
+> +{
+> +	writeq_relaxed(val, nic->reg_base + offset);
+> +}
+> +
+> +static u64 nic_reg_read(struct nicpf *nic, u64 offset)
+> +{
+> +	return readq_relaxed(nic->reg_base + offset);
+> +}
 
-CPU1:failed to come online .
+Are you really sure it's OK to used relaxed ordering for all register
+accesses like this?
 
-The CPU-1 boot register is programmed with physical address of
--->armada_xp_secondary_startup function & then cpu-0 deasserts the CPU-1.
+Personally, I think it's asking for trouble.
 
-I am using armada-xp-gp.dts with armada-xp-mv78260.dts included in it.
+Maybe in _extremely_ specific situations in the packet processing
+fast path where you can clearly define the ordering needs when
+programming the mailbox registers, I'd say it's OK.
 
-Any help would be appreciated.
-Regards
-
-CPU-1 doesnt boot/go through the boot sequence & it fails to come
-online & dumps this message
-
-CPU1:failed to come online .
-
-The CPU-1 boot register is programmed with physical address of
--->armada_xp_secondary_startup function & then cpu-0 deasserts the CPU-1.
-
-I am using armada-xp-gp.dts with armada-xp-mv78260.dts included in it.
-
-Any help would be appreciated.
-Regards
+But universally across the entire driver?  No way, no way at all.
