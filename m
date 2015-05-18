@@ -1,45 +1,77 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Mon, 18 May 2015 07:58:44 +0200
-Subject: [PATCH 1/2] ARM: dts: nitrogen6x: use simple-panel instead of
- display-timings for LVDS0
-In-Reply-To: <1431804202-11067-2-git-send-email-eric.nelson@boundarydevices.com>
-References: <1431804202-11067-1-git-send-email-eric.nelson@boundarydevices.com>
- <1431804202-11067-2-git-send-email-eric.nelson@boundarydevices.com>
-Message-ID: <20150518075844.7e1b5916@ipc1.ka-ro>
+From: maitysanchayan@gmail.com (Sanchayan Maity)
+Date: Mon, 18 May 2015 11:50:05 +0530
+Subject: [PATCH v1 0/2] Implement SoC bus support for Vybrid
+Message-ID: <cover.1431928866.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-> Also add alias for backlight_lvds and connect it to the display.
-> 
-> Signed-off-by: Eric Nelson <eric.nelson@boundarydevices.com>
-> ---
->  arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 30 +++++++++++++++++-------------
->  1 file changed, 17 insertions(+), 13 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-> index fd096dc..712c5ec 100644
-> --- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-> @@ -122,7 +122,7 @@
->  		status = "okay";
->  	};
->  
-> -	backlight_lvds {
-> +	backlight_lvds: backlight_lvds {
->
-The patch does not add an 'alias', but a 'label'.
+This patchset implements SoC bus support for Freescale Vybrid platform, 
+implementing the following
+https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-devices-soc
 
+The RFC version can be found here
+https://lkml.org/lkml/2015/5/11/13
 
-Lothar Wa?mann
+Currently the required information is more or less read across the whole
+SoC, but I guess we cannot change that since these are the locations
+with the required information.
+
+There seem to be three options for the revision field:
+- ROM revision (see https://community.freescale.com/docs/DOC-94802)
+- ANADIG revision (ANADIG_DIGIPROC, as used for the i.MX SoC's)
+- OCOTP revision
+
+Some numbers:
+
+Colibri VF61 1.1A (2N02G)
+- 0x00000013
+- 0x00610000
+- 0x01000000
+- 0x410000c8
+
+Colibri VF61 V1.0B (1N02G)
+- 0x00000011
+- 0x00610000
+- 0x01000000
+- 0x410000c8
+
+Colibri VF61 V1.0A (which is actually a VF600 SoC, no L2 cache, since
+that was the only one we could buy back then, 1N02G printed on it)
+- 0x00000011
+- 0x00610000
+- 0x01000000
+- none...
+
+Colibri VF50 V1.0A (1N02G)
+- 0x00000011
+- 0x00610000
+- 0x01000000
+- none...
+
+Vybrid Tower Rev J (1N02G)
+- 0x00000011
+- 0x00610000
+- 0x01000000
+- 0x410000c8
+
+The ROM revision differs the most, so we would like to go with the 
+revision information from the ROM register 0x80.
+
+Changes since RFC:
+- Use a DT entry for the ROM area while specifying it as syscon.
+
+Thanks & Regards,
+Sanchayan Maity.
+
+Sanchayan Maity (2):
+  ARM: dts: vfxxx: Add OCOTP and OCROM nodes
+  ARM: vf610: Add SoC bus support for Vybrid
+
+ arch/arm/boot/dts/vfxxx.dtsi   | 10 ++++++
+ arch/arm/mach-imx/mach-vf610.c | 81 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 91 insertions(+)
+
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+2.4.1
