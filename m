@@ -1,89 +1,45 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Mon, 18 May 2015 11:38:51 +0200
-Subject: [PATCH v2] ARM: tegra: cpuidle: implement cpuidle_state.enter_freeze()
-Message-ID: <1431941933-18574-1-git-send-email-tomeu.vizoso@collabora.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 18 May 2015 10:40:32 +0100
+Subject: [RFC V2] arm:consider THUMB and BE endian kernel build
+In-Reply-To: <5559966A.5010006@gmail.com>
+References: <5559527F.9090300@gmail.com>
+ <5559966A.5010006@gmail.com>
+Message-ID: <20150518094032.GR2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This callback is expected to do the same as enter() only that won't
-re-enable interrupts on exit.
+On Mon, May 18, 2015 at 03:36:10PM +0800, yalin wang wrote:
+> this patch fix the function in kernel_thread(),
+> when kernel is build as THUMB2 or BE8 endian, we should
+> also set the correct bit in CPSR, so that kernel can return to
+> the correct state to execute.
 
-It will be called when the system goes to suspend-to-idle and will
-reduce power usage because CPUs won't be awaken for unnecessary IRQs.
+Why do you think any of this is needed?
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+When a kernel thread is created via kernel_thread(), copy_thread() is
+called with the function pointer in stack_start, and the functions
+argument in stk_size.
 
----
+When the scheduler switches to the thread, it reads the register state
+from thread->cpu_context, thereby loading r4 and r5 with the function
+argument and function pointer, and directing the PC to ret_from_fork.
+(For normal user clones and forks, r4 and r5 in kernel space will be
+zero.)
 
-v2:	* Disable FIQs also when suspending-to-idle
----
- arch/arm/mach-tegra/cpuidle-tegra114.c | 27 +++++++++++++++++++--------
- 1 file changed, 19 insertions(+), 8 deletions(-)
+The scheduler switch preserves the CPSR from the previous task, so if
+we're running a T2 BE8 kernel, the new thread will have its ret_from_fork
+called in T2 BE8 mode.
 
-diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
-index 155807f..e7c4359 100644
---- a/arch/arm/mach-tegra/cpuidle-tegra114.c
-+++ b/arch/arm/mach-tegra/cpuidle-tegra114.c
-@@ -35,32 +35,42 @@
- #endif
- 
- #ifdef CONFIG_PM_SLEEP
--static int tegra114_idle_power_down(struct cpuidle_device *dev,
--				    struct cpuidle_driver *drv,
--				    int index)
-+static void tegra114_idle_power_down(void)
- {
- 	local_fiq_disable();
- 
- 	tegra_set_cpu_in_lp2();
- 	cpu_pm_enter();
- 
--	tick_broadcast_enter();
--
- 	call_firmware_op(prepare_idle);
- 
- 	/* Do suspend by ourselves if the firmware does not implement it */
- 	if (call_firmware_op(do_idle, 0) == -ENOSYS)
- 		cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
- 
--	tick_broadcast_exit();
--
- 	cpu_pm_exit();
- 	tegra_clear_cpu_in_lp2();
- 
- 	local_fiq_enable();
-+}
-+
-+static int tegra114_idle_enter(struct cpuidle_device *dev,
-+			       struct cpuidle_driver *drv,
-+			       int index)
-+{
-+	tick_broadcast_enter();
-+	tegra114_idle_power_down();
-+	tick_broadcast_exit();
- 
- 	return index;
- }
-+
-+static void tegra114_idle_enter_freeze(struct cpuidle_device *dev,
-+				       struct cpuidle_driver *drv,
-+				       int index)
-+{
-+	tegra114_idle_power_down();
-+}
- #endif
- 
- static struct cpuidle_driver tegra_idle_driver = {
-@@ -71,7 +81,8 @@ static struct cpuidle_driver tegra_idle_driver = {
- 		[0] = ARM_CPUIDLE_WFI_STATE_PWR(600),
- #ifdef CONFIG_PM_SLEEP
- 		[1] = {
--			.enter			= tegra114_idle_power_down,
-+			.enter			= tegra114_idle_enter,
-+			.enter_freeze		= tegra114_idle_enter_freeze,
- 			.exit_latency		= 500,
- 			.target_residency	= 1000,
- 			.power_usage		= 0,
+ret_from_fork checks for a non-zero r5, and if so, calls that function,
+which will also see the CPSR set appropriately for the kernel mode.
+
+Functions called from kernel_thread() are not permitted to return, so
+we will never read the "childregs" off the top of the kernel stack.
+Childregs are initialised because we expect them to be at the top of
+every kernel stack.
+
+Ergo, this patch is not needed at all.
+
 -- 
-2.4.0
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
