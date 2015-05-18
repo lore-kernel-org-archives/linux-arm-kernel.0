@@ -1,27 +1,15 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Mon, 18 May 2015 08:41:21 +0800
-Subject: [PATCH v9 4/4] crypto: Add Allwinner Security System crypto
- accelerator
-In-Reply-To: <20150517124811.797fab32@bbrezillon>
-References: <1431608341-10936-1-git-send-email-clabbe.montjoie@gmail.com>
- <1431608341-10936-5-git-send-email-clabbe.montjoie@gmail.com>
- <20150517104508.468b032f@bbrezillon>
- <20150517103440.GA7800@gondor.apana.org.au>
- <20150517124811.797fab32@bbrezillon>
-Message-ID: <20150518004121.GA11910@gondor.apana.org.au>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 18 May 2015 08:55:47 +0800
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select LS1021A
+In-Reply-To: <1431019878-32311-1-git-send-email-fabio.estevam@freescale.com>
+References: <1431019878-32311-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20150518005547.GA1071@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 17, 2015 at 12:48:11PM +0200, Boris Brezillon wrote:
+On Thu, May 07, 2015 at 02:31:18PM -0300, Fabio Estevam wrote:
+> Enable CONFIG_SOC_LS1021A by default.
 > 
-> Yep, but then they shouldn't be declared with CRYPTO_ALG_ASYNC and as an
-> ablkcipher algorithm (*Asynchronous* Block Cipher), right ?
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Right.  They can still use ablkcipher but should clear the ASYNC
-bit.
-
-Cheers,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Applied, thanks.
