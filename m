@@ -1,42 +1,85 @@
-From: jon.nettleton@gmail.com (Jon Nettleton)
-Date: Mon, 18 May 2015 14:47:32 +0200
-Subject: [PATCH v3] ARM: dts: cubox-i: add support for Broadcom
- Wifi/Bluetooth devices
-In-Reply-To: <CALHpu36rJuRWum+TGrM4cchKLxSVVup0cB58dFxANF=mAzLA0Q@mail.gmail.com>
-References: <1431358713-12379-1-git-send-email-fabio.estevam@freescale.com>
- <20150518113400.GE1071@dragon>
- <20150518115520.GW2067@n2100.arm.linux.org.uk>
- <20150518121017.GB1418@dragon>
- <CALHpu36rJuRWum+TGrM4cchKLxSVVup0cB58dFxANF=mAzLA0Q@mail.gmail.com>
-Message-ID: <CALHpu35HB4NgtSwc8zJBffrfsD0Kk9++_5kw4K_j2FuUf9sCzQ@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 18 May 2015 14:47:27 +0200
+Subject: [PATCH] vf610: dt: Nomenclature fixup for PTC12 pin used in
+ RMII mode.
+In-Reply-To: <1431573098-23809-1-git-send-email-cory.tusar@pid1solutions.com>
+References: <1431573098-23809-1-git-send-email-cory.tusar@pid1solutions.com>
+Message-ID: <348facdd175a944356f046708b9a1e06@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-okay tested.  Looks good on both the 4330 and 4329.
+On 2015-05-14 05:11, Cory Tusar wrote:
+> This commit includes a minor nomenclature fixup for boards based on the
+> Freescale VF610 SoC and which make use of the alternate "RMII1_RXD1"
+> functionality for pin PTC12.  This brings the macro name in-line with
+> both the datasheet and other similar macros.
 
-Signed-off-by: Jon Nettleton <jon@solid-run.com>
+Thanks, stumbled upon this a while ago too, never came around creating a
+patch.
 
-On Mon, May 18, 2015 at 2:14 PM, Jon Nettleton <jon.nettleton@gmail.com> wrote:
->
-> On May 18, 2015 2:11 PM, "Shawn Guo" <shawnguo@kernel.org> wrote:
->>
->> On Mon, May 18, 2015 at 12:55:20PM +0100, Russell King - ARM Linux wrote:
->> > On Mon, May 18, 2015 at 07:34:00PM +0800, Shawn Guo wrote:
->> > > On Mon, May 11, 2015 at 12:38:33PM -0300, Fabio Estevam wrote:
->> > > > Add DT support for the Broadcom Wifi/Bluetooth devices found on the
->> > > > microsom board.
->> > > >
->> > > > [Modified original Russell King's patch to use mmc-pwrseq]
->> > > >
->> > > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->> > > > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
->> > >
->> > > Applied, thanks.
->> >
->> > I would have wanted to verify that this does actually work before it was
->> > applied.
->>
->> Okay, dropped it, and waiting for your confirmation.
->>
->
-> I will test momentarily.
+Acked-by: Stefan Agner <stefan@agner.ch>
+
+> 
+> Signed-off-by: Cory Tusar <cory.tusar@pid1solutions.com>
+> ---
+>  arch/arm/boot/dts/vf-colibri.dtsi  | 2 +-
+>  arch/arm/boot/dts/vf610-cosmic.dts | 2 +-
+>  arch/arm/boot/dts/vf610-pinfunc.h  | 2 +-
+>  arch/arm/boot/dts/vf610-twr.dts    | 2 +-
+>  4 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/vf-colibri.dtsi
+> b/arch/arm/boot/dts/vf-colibri.dtsi
+> index fbef082..68ca125 100644
+> --- a/arch/arm/boot/dts/vf-colibri.dtsi
+> +++ b/arch/arm/boot/dts/vf-colibri.dtsi
+> @@ -140,7 +140,7 @@
+>  				VF610_PAD_PTC9__ENET_RMII1_MDC		0x30d2
+>  				VF610_PAD_PTC10__ENET_RMII1_MDIO	0x30d3
+>  				VF610_PAD_PTC11__ENET_RMII1_CRS		0x30d1
+> -				VF610_PAD_PTC12__ENET_RMII_RXD1		0x30d1
+> +				VF610_PAD_PTC12__ENET_RMII1_RXD1	0x30d1
+>  				VF610_PAD_PTC13__ENET_RMII1_RXD0	0x30d1
+>  				VF610_PAD_PTC14__ENET_RMII1_RXER	0x30d1
+>  				VF610_PAD_PTC15__ENET_RMII1_TXD1	0x30d2
+> diff --git a/arch/arm/boot/dts/vf610-cosmic.dts
+> b/arch/arm/boot/dts/vf610-cosmic.dts
+> index fd8758b..5447f25 100644
+> --- a/arch/arm/boot/dts/vf610-cosmic.dts
+> +++ b/arch/arm/boot/dts/vf610-cosmic.dts
+> @@ -68,7 +68,7 @@
+>  				VF610_PAD_PTC9__ENET_RMII1_MDC		0x30d2
+>  				VF610_PAD_PTC10__ENET_RMII1_MDIO	0x30d3
+>  				VF610_PAD_PTC11__ENET_RMII1_CRS		0x30d1
+> -				VF610_PAD_PTC12__ENET_RMII_RXD1		0x30d1
+> +				VF610_PAD_PTC12__ENET_RMII1_RXD1	0x30d1
+>  				VF610_PAD_PTC13__ENET_RMII1_RXD0	0x30d1
+>  				VF610_PAD_PTC14__ENET_RMII1_RXER	0x30d1
+>  				VF610_PAD_PTC15__ENET_RMII1_TXD1	0x30d2
+> diff --git a/arch/arm/boot/dts/vf610-pinfunc.h
+> b/arch/arm/boot/dts/vf610-pinfunc.h
+> index 1ee681f..fcad713 100644
+> --- a/arch/arm/boot/dts/vf610-pinfunc.h
+> +++ b/arch/arm/boot/dts/vf610-pinfunc.h
+> @@ -369,7 +369,7 @@
+>  #define VF610_PAD_PTC11__MLB_DATA		0x0E0 0x358 ALT6 0x1
+>  #define VF610_PAD_PTC11__DEBUG_OUT		0x0E0 0x000 ALT7 0x0
+>  #define VF610_PAD_PTC12__GPIO_57		0x0E4 0x000 ALT0 0x0
+> -#define VF610_PAD_PTC12__ENET_RMII_RXD1		0x0E4 0x000 ALT1 0x0
+> +#define VF610_PAD_PTC12__ENET_RMII1_RXD1	0x0E4 0x000 ALT1 0x0
+>  #define VF610_PAD_PTC12__ESAI_SDO1		0x0E4 0x318 ALT3 0x1
+>  #define VF610_PAD_PTC12__SAI2_TX_BCLK		0x0E4 0x370 ALT5 0x1
+>  #define VF610_PAD_PTC12__DEBUG_OUT3		0x0E4 0x000 ALT7 0x0
+> diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
+> index f64fddc..375ab23 100644
+> --- a/arch/arm/boot/dts/vf610-twr.dts
+> +++ b/arch/arm/boot/dts/vf610-twr.dts
+> @@ -221,7 +221,7 @@
+>  				VF610_PAD_PTC9__ENET_RMII1_MDC		0x30d2
+>  				VF610_PAD_PTC10__ENET_RMII1_MDIO	0x30d3
+>  				VF610_PAD_PTC11__ENET_RMII1_CRS		0x30d1
+> -				VF610_PAD_PTC12__ENET_RMII_RXD1		0x30d1
+> +				VF610_PAD_PTC12__ENET_RMII1_RXD1	0x30d1
+>  				VF610_PAD_PTC13__ENET_RMII1_RXD0	0x30d1
+>  				VF610_PAD_PTC14__ENET_RMII1_RXER	0x30d1
+>  				VF610_PAD_PTC15__ENET_RMII1_TXD1	0x30d2
