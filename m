@@ -1,34 +1,29 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Mon, 18 May 2015 16:33:08 +0800
-Subject: [PATCH v9 4/4] crypto: Add Allwinner Security System crypto
- accelerator
-In-Reply-To: <20150518092449.2364d21e@bbrezillon>
-References: <1431608341-10936-1-git-send-email-clabbe.montjoie@gmail.com>
- <1431608341-10936-5-git-send-email-clabbe.montjoie@gmail.com>
- <20150517104508.468b032f@bbrezillon>
- <20150517103440.GA7800@gondor.apana.org.au>
- <20150517124811.797fab32@bbrezillon>
- <20150518004121.GA11910@gondor.apana.org.au>
- <20150518092449.2364d21e@bbrezillon>
-Message-ID: <20150518083308.GB18195@gondor.apana.org.au>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 18 May 2015 10:34:33 +0200
+Subject: [PATCH v2 1/5] kasan, x86: move KASAN_SHADOW_OFFSET to the arch
+ Kconfig
+In-Reply-To: <55599821.40409@samsung.com>
+References: <1431698344-28054-1-git-send-email-a.ryabinin@samsung.com>
+ <1431698344-28054-2-git-send-email-a.ryabinin@samsung.com>
+ <1431775656.2341.10.camel@x220> <55599821.40409@samsung.com>
+Message-ID: <1431938073.2204.3.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 18, 2015 at 09:24:49AM +0200, Boris Brezillon wrote:
+On Mon, 2015-05-18 at 10:43 +0300, Andrey Ryabinin wrote:
+> On 05/16/2015 02:27 PM, Paul Bolle wrote:
+> > So perhaps the
+> > default line should actually read
+> > 	default 0xdffffc0000000000 if KASAN
+> > 
+> > after the move. Would that work?
 > 
-> Okay, just to be sure, what does "Asynchronous" mean in ablkcipher or
-> ahash ?
-> Is it related to the fact that crypto operations can be done in
-> multiple steps (e.g.: one set_key + several encrypt chunk operations),
-> or is this something else ?
+> Yes, but I would rather add "depends on KASAN".
 
-It gives you the ability to postpone the processing.  However
-it doesn't mean that you have to postpone the processing.  For
-instance, all of our sync software algorithms are also available
-through the async interface for obvious reasons.
+That would have the same effect, as far as I can see, so if adding
+"depends on KASAN" works for you that's fine with me too.
 
-Cheers,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Thanks,
+
+
+Paul Bolle
