@@ -1,88 +1,183 @@
 From: jenskuske@gmail.com (Jens Kuske)
-Date: Mon, 18 May 2015 11:32:31 +0200
-Subject: [PATCH v2 04/10] pinctrl: sunxi: Prepare for building SoC specific
- drivers as modules
-In-Reply-To: <20150517141922.GE4004@lukather>
+Date: Mon, 18 May 2015 11:45:50 +0200
+Subject: [PATCH v2 06/10] clk: sunxi: Add H3 clocks support
+In-Reply-To: <20150517142749.GG4004@lukather>
 References: <1431707940-19372-1-git-send-email-jenskuske@gmail.com>
- <1431707940-19372-5-git-send-email-jenskuske@gmail.com>
- <20150517141922.GE4004@lukather>
-Message-ID: <5559B1AF.2010200@gmail.com>
+ <1431707940-19372-7-git-send-email-jenskuske@gmail.com>
+ <20150517142749.GG4004@lukather>
+Message-ID: <5559B4CE.2050703@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 05/17/15 16:19, Maxime Ripard wrote:
-> On Fri, May 15, 2015 at 06:38:54PM +0200, Jens Kuske wrote:
->> Add a remove function and export the init and remove function
->> to allow us to build the SoC specific drivers as modules.
+On 05/17/15 16:27, Maxime Ripard wrote:
+> On Fri, May 15, 2015 at 06:38:56PM +0200, Jens Kuske wrote:
+>> The H3 clock control unit is similar to the those of other sun8i family
+>> members like the A23.
+>>
+>> It makes use of the new multiple parents option for the bus gates.
+>> Some of the gates use the new AHB2 clock as parent, whose clock source
+>> is muxable between AHB1 and PLL6/2. The documentation isn't totally clear
+>> about which devices belong to AHB2 now, especially USB EHIC/OHIC, so it
+>> is mostly based on Allwinner kernel source code.
 >>
 >> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
 >> ---
->>  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 25 +++++++++++++++++++------
->>  drivers/pinctrl/sunxi/pinctrl-sunxi.h |  2 ++
->>  2 files changed, 21 insertions(+), 6 deletions(-)
+>>  Documentation/devicetree/bindings/clock/sunxi.txt |  6 +++
+>>  drivers/clk/sunxi/clk-sunxi.c                     | 50 ++++++++++++++++++++++-
+>>  2 files changed, 55 insertions(+), 1 deletion(-)
 >>
->> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
->> index f8e171b..4ef6b3d 100644
->> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
->> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
->> @@ -856,7 +856,6 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
->>  	struct sunxi_pinctrl *pctl;
->>  	struct resource *res;
->>  	int i, ret, last_pin;
->> -	struct clk *clk;
+>> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+>> index 4fa11af..e367963 100644
+>> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+>> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+>> @@ -14,6 +14,7 @@ Required properties:
+>>  	"allwinner,sun4i-a10-pll5-clk" - for the PLL5 clock
+>>  	"allwinner,sun4i-a10-pll6-clk" - for the PLL6 clock
+>>  	"allwinner,sun6i-a31-pll6-clk" - for the PLL6 clock on A31
+>> +	"allwinner,sun8i-h3-pll6-clk" - for the PLL6 clock on H3
+>>  	"allwinner,sun9i-a80-gt-clk" - for the GT bus clock on A80
+>>  	"allwinner,sun4i-a10-cpu-clk" - for the CPU multiplexer clock
+>>  	"allwinner,sun4i-a10-axi-clk" - for the AXI clock
+>> @@ -28,6 +29,7 @@ Required properties:
+>>  	"allwinner,sun7i-a20-ahb-gates-clk" - for the AHB gates on A20
+>>  	"allwinner,sun6i-a31-ar100-clk" - for the AR100 on A31
+>>  	"allwinner,sun6i-a31-ahb1-clk" - for the AHB1 clock on A31
+>> +	"allwinner,sun8i-h3-ahb2-clk" - for the AHB2 clock on H3
+>>  	"allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
+>>  	"allwinner,sun8i-a23-ahb1-gates-clk" - for the AHB1 gates on A23
+>>  	"allwinner,sun9i-a80-ahb0-gates-clk" - for the AHB0 gates on A80
+>> @@ -55,6 +57,7 @@ Required properties:
+>>  	"allwinner,sun9i-a80-apb1-gates-clk" - for the APB1 gates on A80
+>>  	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
+>>  	"allwinner,sun8i-a23-apb2-gates-clk" - for the APB2 gates on A23
+>> +	"allwinner,sun8i-h3-bus-gates-clk" - for the bus gates on H3
+>>  	"allwinner,sun5i-a13-mbus-clk" - for the MBUS clock on A13
+>>  	"allwinner,sun4i-a10-mmc-clk" - for the MMC clock
+>>  	"allwinner,sun9i-a80-mmc-clk" - for mmc module clocks on A80
+>> @@ -95,6 +98,9 @@ The "allwinner,sun9i-a80-mmc-config-clk" clock also requires:
+>>  For "allwinner,sun7i-a20-gmac-clk", the parent clocks shall be fixed rate
+>>  dummy clocks at 25 MHz and 125 MHz, respectively. See example.
 >>  
->>  	pctl = devm_kzalloc(&pdev->dev, sizeof(*pctl), GFP_KERNEL);
->>  	if (!pctl)
->> @@ -954,13 +953,13 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
->>  			goto gpiochip_error;
->>  	}
->>  
->> -	clk = devm_clk_get(&pdev->dev, NULL);
->> -	if (IS_ERR(clk)) {
->> -		ret = PTR_ERR(clk);
->> +	pctl->clk = devm_clk_get(&pdev->dev, NULL);
->> +	if (IS_ERR(pctl->clk)) {
->> +		ret = PTR_ERR(pctl->clk);
->>  		goto gpiochip_error;
->>  	}
->>  
->> -	ret = clk_prepare_enable(clk);
->> +	ret = clk_prepare_enable(pctl->clk);
->>  	if (ret)
->>  		goto gpiochip_error;
->>  
->> @@ -1015,10 +1014,24 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
->>  	return 0;
->>  
->>  clk_error:
->> -	clk_disable_unprepare(clk);
->> +	clk_disable_unprepare(pctl->clk);
->>  gpiochip_error:
->>  	gpiochip_remove(pctl->chip);
->>  pinctrl_error:
->>  	pinctrl_unregister(pctl->pctl_dev);
->>  	return ret;
->>  }
->> +EXPORT_SYMBOL(sunxi_pinctrl_init);
+>> +For "allwinner,sun8i-h3-bus-gates-clk", the parent clocks shall be
+>> +AHB1, AHB2, APB1 and APB2, in that order.
 >> +
->> +int sunxi_pinctrl_remove(struct platform_device *pdev)
->> +{
->> +	struct sunxi_pinctrl *pctl = platform_get_drvdata(pdev);
+>>  Clock consumers should specify the desired clocks they use with a
+>>  "clocks" phandle cell. Consumers that are using a gated clock should
+>>  provide an additional ID in their clock property. This ID is the
+>> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+>> index afe560c..79364be 100644
+>> --- a/drivers/clk/sunxi/clk-sunxi.c
+>> +++ b/drivers/clk/sunxi/clk-sunxi.c
+>> @@ -771,6 +771,10 @@ static const struct mux_data sun6i_a31_ahb1_mux_data __initconst = {
+>>  	.shift = 12,
+>>  };
+>>  
+>> +static const struct mux_data sun8i_h3_ahb2_mux_data __initconst = {
+>> +	.shift = 0,
+>> +};
 >> +
->> +	gpiochip_remove(pctl->chip);
->> +	pinctrl_unregister(pctl->pctl_dev);
+>>  static void __init sunxi_mux_clk_setup(struct device_node *node,
+>>  				       struct mux_data *data)
+>>  {
+>> @@ -886,7 +890,7 @@ static void __init sunxi_divider_clk_setup(struct device_node *node,
+>>   * sunxi_gates_clk_setup() - Setup function for leaf gates on clocks
+>>   */
+>>  
+>> -#define SUNXI_GATES_MAX_SIZE	64
+>> +#define SUNXI_GATES_MAX_SIZE	160
+>>  
+>>  struct gates_data {
+>>  	DECLARE_BITMAP(mask, SUNXI_GATES_MAX_SIZE);
+>> @@ -990,6 +994,36 @@ static const struct gates_data sun8i_a23_apb2_gates_data __initconst = {
+>>  	.mask = {0x1F0007},
+>>  };
+>>  
+>> +#define BUS_GATE_PARENT_AHB1	0
+>> +#define BUS_GATE_PARENT_AHB2	1
+>> +#define BUS_GATE_PARENT_APB1	2
+>> +#define BUS_GATE_PARENT_APB2	3
 >> +
->> +	clk_disable_unprepare(pctl->clk);
+>> +static const u8 sun8i_h3_bus_gates_parents[] __initconst = {
+>> +	BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1,
+>> +	BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1,
+>> +	BUS_GATE_PARENT_AHB1,
 > 
-> We should also remove the domain and the interrupt mapping here.
+>> BUS_GATE_PARENT_AHB2,
+>> BUS_GATE_PARENT_AHB1,
+>> +	BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1,
+>> +	BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1,
+>> +	BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1,
+> 
+>> +	BUS_GATE_PARENT_AHB2, BUS_GATE_PARENT_AHB2, BUS_GATE_PARENT_AHB2,
+> 
+>> +	BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1,
+>> +	BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1,
+>> +	BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1,
+>> +	BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1,
+> 
+>> BUS_GATE_PARENT_APB1,
+>> +	BUS_GATE_PARENT_APB1, BUS_GATE_PARENT_APB1, BUS_GATE_PARENT_APB1,
+>> +	BUS_GATE_PARENT_APB1, BUS_GATE_PARENT_APB1, BUS_GATE_PARENT_APB1,
+> 
+>> +	BUS_GATE_PARENT_APB2, BUS_GATE_PARENT_APB2, BUS_GATE_PARENT_APB2,
+>> +	BUS_GATE_PARENT_APB2, BUS_GATE_PARENT_APB2, BUS_GATE_PARENT_APB2,
+>> +	BUS_GATE_PARENT_APB2, BUS_GATE_PARENT_APB2,
+> 
+>> BUS_GATE_PARENT_AHB1,
+>> +	BUS_GATE_PARENT_AHB1
+>> +}
+> 
+> I think something like this:
+> 
+> if (index < .. || index > ..)
+>     clk_parent = "ahb1"
+> if (index == .. || index < ...)
+>     clk_parent = "ahb2"
+> etc...
+> 
+> Would be both easier to maintain and to read.
 
-Ouch, I missed that. Only looked at the *_error: labels.
+At least as long as there aren't too many disjunct groups.
+But it would mean duplicate setup functions for each SoC (or something
+like sun8i_h3_bus_gate_get_parent(int index))
 
-Apart from that, currently the kernel panics some seconds after removing
-the pinctrl module because mmc wants to access a gpio. Can this be
-prevented somehow? I think pinctrl must not be removed once other
-devices use any pin-related things.
+But since you want to rework the gate setup anyway I think I'll wait
+until then. Currently I can't see how this should look like.
 
+> 
+>> +
+>> +static const struct gates_data sun8i_h3_bus_gates_data __initconst = {
+>> +	.mask = {0xffbe6760, 0x00701b39, 0x00007123, 0x001f0007, 0x00000081},
+>> +	.parents = sun8i_h3_bus_gates_parents,
+>> +};
+>> +
+>>  static void __init sunxi_gates_clk_setup(struct device_node *node,
+>>  					 struct gates_data *data)
+>>  {
+>> @@ -1110,6 +1144,16 @@ static const struct divs_data sun6i_a31_pll6_divs_data __initconst = {
+>>  	}
+>>  };
+>>  
+>> +static const struct divs_data sun8i_h3_pll6_divs_data __initconst = {
+>> +	.factors = &sun6i_a31_pll6_data,
+>> +	.ndivs = 3,
+>> +	.div = {
+>> +		{ .fixed = 2 }, /* normal output, pll6 */
+>> +		{ .self = 1 }, /* base factor clock, pll6 x2 */
+>> +		{ .fixed = 4 }, /* divided output, pll6 /2 */
+>> +	}
+>> +};
+> 
+> This is exactly the same clock as A31's PLL6, it shouldn't be declared
+> as a different one.
+
+Um, sorry, but I can't see the /2 output at A31's pll6.
+
+Or shall we add the /2 output to A31's PLL6 and simply ignore it on A31?
+I don't think this is a good idea, what happens if we need to add an
+additional output on A31 later.
+
+Regards,
 Jens
