@@ -1,48 +1,65 @@
-From: xerofoify@gmail.com (Nicholas Krause)
-Date: Mon, 18 May 2015 10:07:59 -0400
-Subject: [PATCH RESEND] mach-omap2:Remove calls to deprecacted marco,
- PTR_RET in the files, fb.c and pmu.c
-Message-ID: <1431958079-486-1-git-send-email-xerofoify@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 18 May 2015 15:09:24 +0100
+Subject: [PATCH] irqchip: GICv3: ITS: don't assume 64K page size in
+ its_alloc_tables
+In-Reply-To: <CY1PR0301MB074884E252ADE216BD8C472887C40@CY1PR0301MB0748.namprd03.prod.outlook.com>
+References: <1431644545-31904-1-git-send-email-stuart.yoder@freescale.com>
+ <5559E7CE.1050003@arm.com>
+ <CY1PR0301MB074884E252ADE216BD8C472887C40@CY1PR0301MB0748.namprd03.prod.outlook.com>
+Message-ID: <5559F294.5070701@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This removes two calls to the deprecated marco,PTR_RET in
-the files,fb.c and pmu.c for the functions,omap_init_vrfb
-and omap_init_pmu respectfully. Furthermore these are now
-replaced by calling the correctly non deprecacted function,
-PTR_ERR_OR_ZERO in both functions.
+On 18/05/15 14:38, Stuart Yoder wrote:
+> 
+> 
+>> -----Original Message-----
+>> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
+>> Sent: Monday, May 18, 2015 8:23 AM
+>> To: Yoder Stuart-B08248; tglx at linutronix.de
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Subject: Re: [PATCH] irqchip: GICv3: ITS: don't assume 64K page size in its_alloc_tables
+>>
+>> Hi Stuart,
+>>
+>> On 15/05/15 00:02, Stuart Yoder wrote:
+>>> its_alloc_tables() needs to account for page sizes other than
+>>> 64KB.  Without this change, when PAGE_SIZE=4KB its_alloc_tables()
+>>> gets stuck in an infinite loop.
+>>>
+>>> Signed-off-by: Stuart Yoder <stuart.yoder@freescale.com>
+>>> ---
+>>>
+>>> think this should go into 4.1 if at all possible...without it I am
+>>> unable to boot a 4.1 kernel on the LS2085 SoC
+>>
+>> What you are suggesting here is a effectively a revert of commit
+>> 790b57a, which would break other implementations.
+>>
+>> Can you please explain the actual issue? I'm failing to see how you end
+>> up in an infinite loop here (the system page size and the ITS base
+>> granule should be completely unrelated...).
+> 
+> Here is the problem line:
+> 
+>       val |= (alloc_size / psz) - 1;
+> 
+> In our case:
+>    alloc_size=16K
+>    psz=64K
+> 
+> ...so (alloc_size / psz) = 0, and thus val becomes -1, and everything
+> is screwed up.  We get stuck in a loop to retry_baser:
 
-Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
----
- arch/arm/mach-omap2/fb.c  | 2 +-
- arch/arm/mach-omap2/pmu.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+If alloc_size is 16k, you have an order of 2, and I have to assume this
+is an allocation for a device table (otherwise order would be 4). So
+things fail because we've computed an alloc_size smaller than what we
+want to allocate as a minimum.
 
-diff --git a/arch/arm/mach-omap2/fb.c b/arch/arm/mach-omap2/fb.c
-index 26e28e9..1f1ecf8 100644
---- a/arch/arm/mach-omap2/fb.c
-+++ b/arch/arm/mach-omap2/fb.c
-@@ -84,7 +84,7 @@ int __init omap_init_vrfb(void)
- 	pdev = platform_device_register_resndata(NULL, "omapvrfb", -1,
- 			res, num_res, NULL, 0);
- 
--	return PTR_RET(pdev);
-+	return PTR_ERR_OR_ZERO(pdev);
- }
- #else
- int __init omap_init_vrfb(void) { return 0; }
-diff --git a/arch/arm/mach-omap2/pmu.c b/arch/arm/mach-omap2/pmu.c
-index a69e9a3..d2adfeb 100644
---- a/arch/arm/mach-omap2/pmu.c
-+++ b/arch/arm/mach-omap2/pmu.c
-@@ -55,7 +55,7 @@ static int __init omap2_init_pmu(unsigned oh_num, char *oh_names[])
- 	WARN(IS_ERR(omap_pmu_dev), "Can't build omap_device for %s.\n",
- 	     dev_name);
- 
--	return PTR_RET(omap_pmu_dev);
-+	return PTR_ERR_OR_ZERO(omap_pmu_dev);
- }
- 
- static int __init omap_init_pmu(void)
+Isn't that exactly what Minghuan's patch fixes?
+
+Thanks,
+
+	M.
 -- 
-2.1.4
+Jazz is not dead. It just smells funny...
