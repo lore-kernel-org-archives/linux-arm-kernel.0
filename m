@@ -1,40 +1,33 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 18 May 2015 22:37:35 +0300
-Subject: [PATCH v6 10/25] iommu: exynos: remove useless device_add/remove
- callbacks
-In-Reply-To: <20150518170430.GK20611@8bytes.org>
-References: <1430727380-10912-1-git-send-email-m.szyprowski@samsung.com>
- <5559D66A.5070406@samsung.com> <20150518170430.GK20611@8bytes.org>
-Message-ID: <3790451.FWdEsNZUcL@avalon>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 18 May 2015 12:43:35 -0700
+Subject: [PATCH 3/7] ARM: bcm2835: Add DT for the firmware clocks driver.
+In-Reply-To: <1431978219-14226-1-git-send-email-eric@anholt.net>
+References: <1431978219-14226-1-git-send-email-eric@anholt.net>
+Message-ID: <1431978219-14226-4-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+Signed-off-by: Eric Anholt <eric@anholt.net>
+---
+ arch/arm/boot/dts/bcm2835-rpi.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-On Monday 18 May 2015 19:04:30 Joerg Roedel wrote:
-> On Mon, May 18, 2015 at 02:09:14PM +0200, Marek Szyprowski wrote:
-> > > Hmm, will this remove support for iommu-groups in the exynos driver? I
-> > > am still working on the default-domain patch-set which makes iommu-group
-> > > support mandatory for iommu-drivers.
-> > 
-> > I you wish, I can leave this code. iommu-groups were not used at all
-> > on Exynos, so I thought that there is no point keeping useless code.
-> 
-> Yes, please keep the iommu-goups support, it will be required at some
-> point.
-
-I think the concept of iommu groups isn't very well understood, hence the 
-little love it receives from developers who conclude it's useless. I can't 
-blame anyone, I don't do any better. Could I convince you to include 
-documentation in your next patch series that touches iommu groups ?
-
-Could you please have a look at my "[RFC/PATCH 0/9] IOMMU probe deferral 
-support" patch series in the context of iommu groups ? The series pretty much 
-drops groups support from the ipmmu-vmsa driver, not because of a real desire 
-to do so, but because I wasn't sure how to keep them. Tips would be 
-appreciated.
-
+diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+index ace33f6..ac5f84c 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
++++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+@@ -20,6 +20,12 @@
+ 			compatible = "raspberrypi,firmware";
+ 			mboxes = <&mailbox>;
+ 		};
++
++		firmware_clocks: firmware-clocks {
++			compatible = "raspberrypi,firmware-clocks";
++			#clock-cells = <1>;
++			firmware = <&firmware>;
++		};
+ 	};
+ };
+ 
 -- 
-Regards,
-
-Laurent Pinchart
+2.1.4
