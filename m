@@ -1,46 +1,57 @@
-From: jcliang@chromium.org (Ricky Liang)
-Date: Mon, 18 May 2015 22:00:26 +0800
-Subject: [PATCH v3] clk: mediatek: Initialize clk_init_data
-Message-ID: <1431957632-2182-1-git-send-email-jcliang@chromium.org>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Mon, 18 May 2015 16:03:49 +0200
+Subject: [PATCH v8 09/16] clockevents/drivers: Add STM32 Timer driver
+In-Reply-To: <5559E4B0.70506@linaro.org>
+References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1431158038-3813-10-git-send-email-mcoquelin.stm32@gmail.com>
+ <5559E4B0.70506@linaro.org>
+Message-ID: <CALszF6CK7axU0qrWNf38aqrt2R2126ZACn7wx5jNY_1KE+4H+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The variable init (struct clk_init_data) is allocated on the stack.
-We weren't initializing the .flags field, so it contains random junk,
-which can cause all kinds of interesting issues when the flags are
-parsed by clk_register.
+2015-05-18 15:10 GMT+02:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
+> On 05/09/2015 09:53 AM, Maxime Coquelin wrote:
+>>
+>> STM32 MCUs feature 16 and 32 bits general purpose timers with prescalers.
+>> The drivers detects whether the time is 16 or 32 bits, and applies a
+>> 1024 prescaler value if it is 16 bits.
+>>
+>> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+>> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>> ---
+>>   drivers/clocksource/Kconfig       |   8 ++
+>>   drivers/clocksource/Makefile      |   1 +
+>>   drivers/clocksource/timer-stm32.c | 184
+>> ++++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 193 insertions(+)
+>>   create mode 100644 drivers/clocksource/timer-stm32.c
+>>
+>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+>> index bf9364c..2443520 100644
+>> --- a/drivers/clocksource/Kconfig
+>> +++ b/drivers/clocksource/Kconfig
+>> @@ -106,6 +106,14 @@ config CLKSRC_EFM32
+>>           Support to use the timers of EFM32 SoCs as clock source and
+>> clock
+>>           event device.
+>>
+>> +config CLKSRC_STM32
+>> +       bool "Clocksource for STM32 SoCs" if !ARCH_STM32
+>> +       depends on OF && ARM && (ARCH_STM32 || COMPILE_TEST)
+>
+>
+> Are the interactive bool and the 'COMPILE_TEST' necessary ?
+>
 
-Signed-off-by: Ricky Liang <jcliang@chromium.org>
----
- drivers/clk/mediatek/clk-gate.c | 2 +-
- drivers/clk/mediatek/clk-pll.c  | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+The interactive bool is necessary if we want to be able to
+select/deselect it in COMPILE_TEST configuration.
+And personnaly, I think COMPILE_TEST use makes sense.
 
-diff --git a/drivers/clk/mediatek/clk-gate.c b/drivers/clk/mediatek/clk-gate.c
-index 9d77ee3..5702036 100644
---- a/drivers/clk/mediatek/clk-gate.c
-+++ b/drivers/clk/mediatek/clk-gate.c
-@@ -109,7 +109,7 @@ struct clk *mtk_clk_register_gate(
- {
- 	struct mtk_clk_gate *cg;
- 	struct clk *clk;
--	struct clk_init_data init;
-+	struct clk_init_data init = {};
- 
- 	cg = kzalloc(sizeof(*cg), GFP_KERNEL);
- 	if (!cg)
-diff --git a/drivers/clk/mediatek/clk-pll.c b/drivers/clk/mediatek/clk-pll.c
-index 66154ca..44409e9 100644
---- a/drivers/clk/mediatek/clk-pll.c
-+++ b/drivers/clk/mediatek/clk-pll.c
-@@ -268,7 +268,7 @@ static struct clk *mtk_clk_register_pll(const struct mtk_pll_data *data,
- 		void __iomem *base)
- {
- 	struct mtk_clk_pll *pll;
--	struct clk_init_data init;
-+	struct clk_init_data init = {};
- 	struct clk *clk;
- 	const char *parent_name = "clk26m";
- 
--- 
-2.1.2
+Note that other timer drivers are doing the same thing today
+(CLKSRC_EFM32, SH_TIMER_CMT, EM_TIMER_STI...).
+
+Do you have a specific concern regarding COMPILE_TEST?
+
+Kind regards,
+Maxime
