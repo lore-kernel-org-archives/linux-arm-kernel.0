@@ -1,48 +1,67 @@
-From: yalin.wang2010@gmail.com (yalin wang)
-Date: Mon, 18 May 2015 17:52:04 +0800
-Subject: [RFC V2] arm:consider THUMB and BE endian kernel build
-In-Reply-To: <20150518094032.GR2067@n2100.arm.linux.org.uk>
-References: <5559527F.9090300@gmail.com> <5559966A.5010006@gmail.com>
- <20150518094032.GR2067@n2100.arm.linux.org.uk>
-Message-ID: <CAFP4FLo3=2J4pwn5nFCtbHon6ZSh+W1JUrgrGXNCpWG6=R+AuQ@mail.gmail.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Mon, 18 May 2015 02:55:17 -0700
+Subject: [PATCH v7 0/4] PCI: X-Gene: Add APM X-Gene v1 MSI/MSIX termination
+ driver
+In-Reply-To: <20150422135002.1b407b98@why.wild-wind.fr.eu.org>
+References: <20150422135002.1b407b98@why.wild-wind.fr.eu.org>
+Message-ID: <cover.1431940313.git.dhdang@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-18 17:40 GMT+08:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Mon, May 18, 2015 at 03:36:10PM +0800, yalin wang wrote:
->> this patch fix the function in kernel_thread(),
->> when kernel is build as THUMB2 or BE8 endian, we should
->> also set the correct bit in CPSR, so that kernel can return to
->> the correct state to execute.
->
-> Why do you think any of this is needed?
->
-> When a kernel thread is created via kernel_thread(), copy_thread() is
-> called with the function pointer in stack_start, and the functions
-> argument in stk_size.
->
-> When the scheduler switches to the thread, it reads the register state
-> from thread->cpu_context, thereby loading r4 and r5 with the function
-> argument and function pointer, and directing the PC to ret_from_fork.
-> (For normal user clones and forks, r4 and r5 in kernel space will be
-> zero.)
->
-> The scheduler switch preserves the CPSR from the previous task, so if
-> we're running a T2 BE8 kernel, the new thread will have its ret_from_fork
-> called in T2 BE8 mode.
->
-> ret_from_fork checks for a non-zero r5, and if so, calls that function,
-> which will also see the CPSR set appropriately for the kernel mode.
->
-> Functions called from kernel_thread() are not permitted to return, so
-> we will never read the "childregs" off the top of the kernel stack.
-> Childregs are initialised because we expect them to be at the top of
-> every kernel stack.
->
-> Ergo, this patch is not needed at all.
-Genius explanation,
-i see your idea,
-i really make a mistake about user thread / kernel thread return method .
-it is really a trick for kernel thread return implemented like this.  :)
+This patch set adds MSI/MSIX termination driver support for APM X-Gene v1 SoC.
+APM X-Gene v1 SoC supports its own implementation of MSI, which is not compliant
+to GIC V2M specification for MSI Termination.
 
-Thank you !
+There is single MSI block in X-Gene v1 SOC which serves all 5 PCIe ports. This MSI
+block supports 2048 MSI termination ports coalesced into 16 physical HW IRQ lines
+and shared across all 5 PCIe ports. As the version 5 of this patch, the total MSI
+vectors this driver supports is reduced to 256 to maintain the correct set_affinity
+behavior for each MSI.
+
+v7 changes:
+	1. Add more error handling cases
+	2. Clear spurious interrupts that may happen during driver probe
+	3. Not using free_irq for chained irqs
+	4. Improve GIC IRQ number look up in chained handler
+
+v6 changes:
+        1. Correctly allocate MSI with bitmap_find_next_zero_area
+        2. Add notifier for CPU hotplug case
+        3. Driver clean up
+        4. Add more detailed information into device tree binding document
+           and move the device tree binding patch before the driver/dts patch
+
+v5 changes:
+        1. Implement set_affinity for each MSI by statically allocating 2 MSI GIC IRQs
+        for each X-Gene CPU core and moving MSI vectors around these GIC IRQs to steer
+        them to target CPU core. As a consequence, the total MSI vectors that X-Gene v1
+        supports is reduced to 256.
+
+v4 changes:
+        1. Remove affinity setting for each MSI
+        2. Add description about register layout, MSI termination address and data
+        3. Correct total number of MSI vectors to 2048
+        4. Clean up error messages
+        5. Remove unused module code
+
+v3 changes:
+        1. Implement MSI support using PCI MSI IRQ domain
+        2. Only use msi_controller to store IRQ domain
+v2 changes:
+        1. Use msi_controller structure
+        2. Remove arch hooks arch_teardown_msi_irqs and arch_setup_msi_irqs
+ 
+
+ .../devicetree/bindings/pci/xgene-pci-msi.txt      |  68 +++
+ MAINTAINERS                                        |   8 +
+ arch/arm64/boot/dts/apm/apm-storm.dtsi             |  27 +
+ drivers/pci/host/Kconfig                           |  10 +
+ drivers/pci/host/Makefile                          |   1 +
+ drivers/pci/host/pci-xgene-msi.c                   | 550 +++++++++++++++++++++
+ drivers/pci/host/pci-xgene.c                       |  21 +
+ 7 files changed, 685 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/xgene-pci-msi.txt
+ create mode 100644 drivers/pci/host/pci-xgene-msi.c
+
+-- 
+1.9.1
