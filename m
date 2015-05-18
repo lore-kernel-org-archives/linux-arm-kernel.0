@@ -1,133 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 18 May 2015 19:56:45 +0100
-Subject: 3.18: lockdep problems in cpufreq
-In-Reply-To: <CAKohponhkk9BK6-7ScHeZa4R43iooWQFV8YoPLv6LjO40GNq=A@mail.gmail.com>
-References: <20141214213655.GA11285@n2100.arm.linux.org.uk>
- <003501d01876$fbc53f80$f34fbe80$%brar@samsung.com>
- <20141215174336.GJ11285@n2100.arm.linux.org.uk>
- <3353119.0CuA8fKaup@vostro.rjw.lan>
- <20141215230922.GL11285@n2100.arm.linux.org.uk>
- <CAKohponhkk9BK6-7ScHeZa4R43iooWQFV8YoPLv6LjO40GNq=A@mail.gmail.com>
-Message-ID: <20150518185645.GA28053@n2100.arm.linux.org.uk>
+From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
+Date: Mon, 18 May 2015 15:14:51 -0400
+Subject: [PATCH 11/12] ARM: migrate to common PSCI client code
+In-Reply-To: <20150518094630.GB3551@leverpostej>
+References: <1431085004-32743-1-git-send-email-mark.rutland@arm.com>
+ <1431085004-32743-12-git-send-email-mark.rutland@arm.com>
+ <CAJ5Y-eb4m1X3DDBujGV+OkZM-6JzNdK6YrwaFTXEG3z_POBJig@mail.gmail.com>
+ <CAJ5Y-eYYUr6xUTGRvr_K-Cj0dPXhickk01o9oWQVJC0EXEHLNA@mail.gmail.com>
+ <20150518094630.GB3551@leverpostej>
+Message-ID: <CAJ5Y-eZd7e6mN3ryL5OCYmwY24yhFHyJp5dVBvxK5O=88JWX_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 16, 2014 at 09:11:53AM +0530, Viresh Kumar wrote:
-> On 16 December 2014 at 04:39, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > Well, here's a patch which I'm running on top of 3.18 at the moment,
-> > which is basically what I described in my email, and I'm running with it
-> > and it is without any lockdep complaint.
-> 
-> We need two separate patches now, one for 3.18 and other one for 3.19-rc.
-> 3.19 has see lots of changes in this particular file and so we need to
-> change few things here.
+On 18 May 2015 at 05:46, Mark Rutland <mark.rutland@arm.com> wrote:
+>> >> +int psci_cpu_disable(unsigned int cpu)
+>> >> +{
+>> >> +       /* Fail early if we don't have CPU_OFF support */
+>> >> +       if (!psci_ops.cpu_off)
+>> >> +               return 0;
+>> >> +
+>> >> +       /* Trusted OS will deny CPU_OFF */
+>> >> +       if (psci_tos_resident_on(cpu))
+>> >> +               return 0;
+>> >> +
+>> >
+>> > Same question here. Seems like if MIGRATE_INFO_TYPE = 2 ( TOS is
+>> > present or does not require migration), you should be able to call
+>> > CPU_OFF. Otherwise the patch looks fine to me.
+>>
+>> err. Make that TOS is not present.
+>
+> In the cases where migration is not required, resident_cpu == -1, and
+> psci_tos_resident_on(cpu) will return false for any valid CPU. So I
+> don't see that we would deny migration here.
+>
 
-What happened with this?  I'm still carrying the patch.
+Hm. Perhaps I was confused by the "return -EPERM" in the arm64 version
+and "return 0" here. :)
 
-> > 8<===
-> > From: Russell King <rmk+kernel@arm.linux.org.uk>
-> > thermal: cpu_cooling: fix lockdep problems in cpu_cooling
-> >
-> > A recent change to the cpu_cooling code introduced a AB-BA deadlock
-> > scenario between the cpufreq_policy_notifier_list rwsem and the
-> > cooling_cpufreq_lock.  This is caused by cooling_cpufreq_lock being held
-> > before the registration/removal of the notifier block (an operation
-> > which takes the rwsem), and the notifier code itself which takes the
-> > locks in the reverse order.
-> >
-> > Solve this by moving to finer grained locking - use one mutex to protect
-> > the cpufreq_dev_list as a whole, and a separate lock to ensure correct
-> > ordering of cpufreq notifier registration and removal.
-> >
-> > I considered taking the cooling_list_lock within cooling_cpufreq_lock to
-> > protect the registration sequence as a whole, but that adds a dependency
-> > between these two locks which is best avoided (lest someone tries to
-> > take those two new locks in the reverse order.)  In any case, it's safer
-> > to have an empty cpufreq_dev_list than to have unnecessary dependencies
-> > between locks.
-> >
-> > Fixes: 2dcd851fe4b4 ("thermal: cpu_cooling: Update always cpufreq policy with thermal constraints")
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> >
-> >  drivers/thermal/cpu_cooling.c | 16 ++++++++++++----
-> >  1 file changed, 12 insertions(+), 4 deletions(-)
-> >
-> > diff --git a/drivers/thermal/cpu_cooling.c b/drivers/thermal/cpu_cooling.c
-> > index ad09e51ffae4..9e42c6f30785 100644
-> > --- a/drivers/thermal/cpu_cooling.c
-> > +++ b/drivers/thermal/cpu_cooling.c
-> > @@ -57,6 +57,7 @@ static DEFINE_MUTEX(cooling_cpufreq_lock);
-> >
-> >  static unsigned int cpufreq_dev_count;
-> >
-> > +static DEFINE_MUTEX(cooling_list_lock);
-> >  static LIST_HEAD(cpufreq_dev_list);
-> >
-> >  /**
-> > @@ -317,7 +318,7 @@ static int cpufreq_thermal_notifier(struct notifier_block *nb,
-> >         if (event != CPUFREQ_ADJUST)
-> >                 return 0;
-> >
-> > -       mutex_lock(&cooling_cpufreq_lock);
-> > +       mutex_lock(&cooling_list_lock);
-> >         list_for_each_entry(cpufreq_dev, &cpufreq_dev_list, node) {
-> >                 if (!cpumask_test_cpu(policy->cpu,
-> >                                         &cpufreq_dev->allowed_cpus))
-> > @@ -333,7 +334,7 @@ static int cpufreq_thermal_notifier(struct notifier_block *nb,
-> >                 if (policy->max != max_freq)
-> >                         cpufreq_verify_within_limits(policy, 0, max_freq);
-> >         }
-> > -       mutex_unlock(&cooling_cpufreq_lock);
-> > +       mutex_unlock(&cooling_list_lock);
-> >
-> >         return 0;
-> >  }
-> > @@ -482,6 +483,11 @@ __cpufreq_cooling_register(struct device_node *np,
-> >         }
-> >         cpufreq_dev->cool_dev = cool_dev;
-> >         cpufreq_dev->cpufreq_state = 0;
-> > +
-> > +       mutex_lock(&cooling_list_lock);
-> > +       list_add(&cpufreq_dev->node, &cpufreq_dev_list);
-> > +       mutex_unlock(&cooling_list_lock);
-> > +
-> >         mutex_lock(&cooling_cpufreq_lock);
-> >
-> >         /* Register the notifier for first cpufreq cooling device */
-> > @@ -489,7 +495,6 @@ __cpufreq_cooling_register(struct device_node *np,
-> >                 cpufreq_register_notifier(&thermal_cpufreq_notifier_block,
-> >                                           CPUFREQ_POLICY_NOTIFIER);
-> >         cpufreq_dev_count++;
-> > -       list_add(&cpufreq_dev->node, &cpufreq_dev_list);
-> >
-> >         mutex_unlock(&cooling_cpufreq_lock);
-> >
-> > @@ -553,7 +558,6 @@ void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev)
-> >
-> >         cpufreq_dev = cdev->devdata;
-> >         mutex_lock(&cooling_cpufreq_lock);
-> > -       list_del(&cpufreq_dev->node);
-> >         cpufreq_dev_count--;
-> >
-> >         /* Unregister the notifier for the last cpufreq cooling device */
-> > @@ -562,6 +566,10 @@ void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev)
-> >                                             CPUFREQ_POLICY_NOTIFIER);
-> >         mutex_unlock(&cooling_cpufreq_lock);
-> >
-> > +       mutex_lock(&cooling_list_lock);
-> > +       list_del(&cpufreq_dev->node);
-> > +       mutex_unlock(&cooling_list_lock);
-> > +
-> >         thermal_cooling_device_unregister(cpufreq_dev->cool_dev);
-> >         release_idr(&cpufreq_idr, cpufreq_dev->id);
-> >         kfree(cpufreq_dev);
-> 
-> For 3.18
-> 
-> Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Ashwin
