@@ -1,82 +1,52 @@
 From: jenskuske@gmail.com (Jens Kuske)
-Date: Mon, 18 May 2015 11:11:34 +0200
-Subject: [PATCH v2 02/10] clk: sunxi: Add support for multiple parents
- to gates
-In-Reply-To: <20150517125014.GB4004@lukather>
-References: <1431707940-19372-1-git-send-email-jenskuske@gmail.com>
- <1431707940-19372-3-git-send-email-jenskuske@gmail.com>
- <20150517125014.GB4004@lukather>
-Message-ID: <5559ACC6.6050202@gmail.com>
+Date: Mon, 18 May 2015 11:15:42 +0200
+Subject: [PATCH v2 03/10] clk: sunxi: Let divs clocks read the base factor
+ clock name from devicetree
+In-Reply-To: <CAGb2v64y8+bdya3N=gK-YEie3A9nVM5nuxRZTVPXYSaN6WzPoQ@mail.gmail.com>
+References: <1431707940-19372-1-git-send-email-jenskuske@gmail.com>	<1431707940-19372-4-git-send-email-jenskuske@gmail.com>
+ <CAGb2v64y8+bdya3N=gK-YEie3A9nVM5nuxRZTVPXYSaN6WzPoQ@mail.gmail.com>
+Message-ID: <5559ADBE.7060506@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 05/17/15 14:50, Maxime Ripard wrote:
-> Hi Jens,
-> 
-> On Fri, May 15, 2015 at 06:38:52PM +0200, Jens Kuske wrote:
->> Some newer sunxi SoCs (A83T, H3) don't have individual registers for
->> AHB1, APB1 and APB2 gates anymore, but one big bus gates area where each
->> gate can have a different parent.
->>
->> The current clock driver sets the same parent for all gates in a group.
->> This commit adds a new parents field to the gates_data structure, which
->> allows us to specify an array of parent indices for every single gate.
->>
->> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
->> ---
->>  drivers/clk/sunxi/clk-sunxi.c | 12 +++++++++++-
->>  1 file changed, 11 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
->> index 9a82f17..17cba4d 100644
->> --- a/drivers/clk/sunxi/clk-sunxi.c
->> +++ b/drivers/clk/sunxi/clk-sunxi.c
->> @@ -898,6 +898,8 @@ static void __init sunxi_divider_clk_setup(struct device_node *node,
->>  
->>  struct gates_data {
->>  	DECLARE_BITMAP(mask, SUNXI_GATES_MAX_SIZE);
->> +	/* If used, ARRAY_SIZE(parents) has to be >= bitmap_weight(mask) */
->> +	const u8 *parents;
->>  };
->>  
->>  static const struct gates_data sun4i_axi_gates_data __initconst = {
->> @@ -1000,16 +1002,21 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
->>  					 struct gates_data *data)
->>  {
->>  	struct clk_onecell_data *clk_data;
->> +	const char *parents[SUNXI_MAX_PARENTS];
->>  	const char *clk_parent;
->>  	const char *clk_name;
->>  	void __iomem *reg;
->> +	int npar = 0;
->>  	int qty;
->>  	int i = 0;
->>  	int j = 0;
->>  
->>  	reg = of_iomap(node, 0);
->>  
->> -	clk_parent = of_clk_get_parent_name(node, 0);
->> +	while (npar < SUNXI_MAX_PARENTS &&
->> +	       (parents[npar] = of_clk_get_parent_name(node, npar)) != NULL)
->> +		npar++;
->> +	clk_parent = parents[0];
->>  
->>  	/* Worst-case size approximation and memory allocation */
->>  	qty = find_last_bit(data->mask, SUNXI_GATES_MAX_SIZE);
->> @@ -1026,6 +1033,9 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
->>  		of_property_read_string_index(node, "clock-output-names",
->>  					      j, &clk_name);
->>  
->> +		if (data->parents && !WARN_ON(data->parents[j] >= npar))
->> +			clk_parent = parents[data->parents[j]];
->> +
-> 
-> I'm currently removing that code, so I was more expecting a new
-> standalone driver for that clock.
+On 05/16/15 04:10, Chen-Yu Tsai wrote:
+> 2015?5?16? ??12:39? "Jens Kuske" <jenskuske@gmail.com>???
+[..]
+>> @@ -1141,6 +1133,7 @@ static void __init sunxi_divs_clk_setup(struct
+> device_node *node,
+>>         struct clk_gate *gate = NULL;
+>>         struct clk_fixed_factor *fix_factor;
+>>         struct clk_divider *divider;
+>> +       struct factors_data factors = *data->factors;
 
-How do you want to replace that code? To me this looks like a good way
-to set up all the different gates sunxi has.
+Isn't this a copy?
+
+>>         void __iomem *reg;
+>>         int ndivs = SUNXI_DIVS_MAX_QTY, i = 0;
+>>         int flags, clkflags;
+>> @@ -1149,8 +1142,17 @@ static void __init sunxi_divs_clk_setup(struct
+> device_node *node,
+>>         if (data->ndivs)
+>>                 ndivs = data->ndivs;
+>>
+>> +       /* Try to find a name for base factor clock */
+>> +       for (i = 0; i < ndivs; i++) {
+>> +               if (data->div[i].self) {
+>> +                       of_property_read_string_index(node,
+> "clock-output-names",
+>> +                                                     i, &factors.name);
+> 
+> Please excuse the bad formatting.
+> I'm at the airport without my laptop.
+> 
+> This will not work. All the static factors_data structs are const.
+> You should make a copy of it, maybe on the stack,
+> update the .name field, and pass that to sunxi_factors_clk_setup().
+> 
+
+If I didn't miss anything, or misunderstood what you want to copy, this
+should be working fine.
 
 Jens
