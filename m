@@ -1,11 +1,11 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 18 May 2015 14:22:12 +0100
-Subject: [PATCH 5/7] arm-cci: Sanitise CCI400 PMU driver specific code
-In-Reply-To: <1430826548-29960-6-git-send-email-suzuki.poulose@arm.com>
- (Suzuki K. Poulose's message of "Tue, 5 May 2015 12:49:06 +0100")
+Date: Mon, 18 May 2015 14:22:36 +0100
+Subject: [PATCH 6/7] arm-cci: Add CCI-500 PMU support
+In-Reply-To: <1430826548-29960-7-git-send-email-suzuki.poulose@arm.com>
+ (Suzuki K. Poulose's message of "Tue, 5 May 2015 12:49:07 +0100")
 References: <1430826548-29960-1-git-send-email-suzuki.poulose@arm.com>
- <1430826548-29960-6-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <9hhtwvavx4r.fsf@e105922-lin.cambridge.arm.com>
+ <1430826548-29960-7-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <9hhpp5yvx43.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,349 +13,258 @@ List-Id: linux-arm-kernel.lists.infradead.org
 
 > From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 >
-> Rename CCI400 specific defintions from CCI_xxx to CCI400_xxx.
+> CCI-500 provides 8 event counters which can count any of the
+> supported events independently. The PMU event id is a 9-bit
+> value made of two parts.
+> 	bits [8:5] - Source port
+> 			0x0-0x6 Slave Ports
+> 			0x8-0xD Master Ports
+> 			0xf     Global Events to CCI
+> 			0x7,0xe Reserved
+> 	bits [0:4] - Event code (specific to each type of port)
 >
-> Introduce generic ARM_CCI_PMU to cover common code for handling
-> the CCI PMU.
+> The generic CCI-500 controlling interface remains the same with CCI-400.
+> However there are some differences in the PMU event counters.
+>  - No cycle counter
+>  - Upto 8 counters(4 in CCI-400)
+>  - Each counter area is 64K(4K in CCI400)
+>  - The counter0 starts at offset 0x10000 from the base of CCI
 >
+> Cc: Punit Agrawal <punit.agrawal@arm.com>
 > Cc: Mark Rutland <mark.rutland@arm.com>
 > Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Punit Agrawal <punit.agrawal@arm.com>
+> Cc: devicetree at vger.kernel.org
 > Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 
 Acked-by: Punit Agrawal <punit.agrawal@arm.com>
 
 > ---
->  drivers/bus/Kconfig   |    5 ++
->  drivers/bus/arm-cci.c |  157 +++++++++++++++++++++++++++++--------------------
->  2 files changed, 97 insertions(+), 65 deletions(-)
+>  Documentation/devicetree/bindings/arm/cci.txt |    4 +-
+>  drivers/bus/Kconfig                           |   12 +++
+>  drivers/bus/arm-cci.c                         |  133 +++++++++++++++++++++++++
+>  3 files changed, 148 insertions(+), 1 deletion(-)
 >
+> diff --git a/Documentation/devicetree/bindings/arm/cci.txt b/Documentation/devicetree/bindings/arm/cci.txt
+> index 3c5c631..aef1d20 100644
+> --- a/Documentation/devicetree/bindings/arm/cci.txt
+> +++ b/Documentation/devicetree/bindings/arm/cci.txt
+> @@ -31,8 +31,9 @@ specific to ARM.
+>  	- compatible
+>  		Usage: required
+>  		Value type: <string>
+> -		Definition: must be set to
+> +		Definition: must contain one of the following:
+>  			    "arm,cci-400"
+> +			    "arm,cci-500"
+>  
+>  	- reg
+>  		Usage: required
+> @@ -99,6 +100,7 @@ specific to ARM.
+>  				 "arm,cci-400-pmu,r1"
+>  				 "arm,cci-400-pmu"  - DEPRECATED, permitted only where OS has
+>  						      secure acces to CCI registers
+> +				 "arm,cci-500-pmu,r0"
+>  		- reg:
+>  			Usage: required
+>  			Value type: Integer cells. A register entry, expressed
 > diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-> index a1d4af6..be66b7c 100644
+> index be66b7c..5fb3150 100644
 > --- a/drivers/bus/Kconfig
 > +++ b/drivers/bus/Kconfig
-> @@ -7,6 +7,10 @@ menu "Bus devices"
->  config ARM_CCI
->  	bool
+> @@ -36,6 +36,18 @@ config ARM_CCI400_PORT_CTRL
+>  	  Low level power management driver for CCI400 cache coherent
+>  	  interconnect for ARM platforms.
 >  
-> +config ARM_CCI_PMU
-> +	bool
-> +	select ARM_CCI
-> +
->  config ARM_CCI400_COMMON
->  	bool
->  	select ARM_CCI
-> @@ -17,6 +21,7 @@ config ARM_CCI400_PMU
->  	depends on ARM || ARM64
->  	depends on HW_PERF_EVENTS
->  	select ARM_CCI400_COMMON
+> +config ARM_CCI500_PMU
+> +	bool "ARM CCI500 PMU support"
+> +	default y
+> +	depends on ARM || ARM64
+> +	depends on HW_PERF_EVENTS
 > +	select ARM_CCI_PMU
->  	help
->  	  Support for PMU events monitoring on the ARM CCI cache coherent
->  	  interconnect.
+> +	help
+> +	  Support for PMU events monitoring on the ARM CCI-500 cache coherent
+> +	  interconnect.
+> +
+> +	  If unsure, say Y
+> +
+>  config ARM_CCN
+>  	bool "ARM CCN driver support"
+>  	depends on ARM || ARM64
 > diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-> index 4b9a8d3..2b43cea 100644
+> index 2b43cea..e12ddba 100644
 > --- a/drivers/bus/arm-cci.c
 > +++ b/drivers/bus/arm-cci.c
-> @@ -55,9 +55,9 @@ static const struct of_device_id arm_cci_matches[] = {
+> @@ -52,6 +52,9 @@ static const struct of_device_id arm_cci_matches[] = {
+>  #ifdef CONFIG_ARM_CCI400_COMMON
+>  	{.compatible = "arm,cci-400", .data = CCI400_PORTS_DATA },
+>  #endif
+> +#ifdef CONFIG_ARM_CCI500_PMU
+> +	{ .compatible = "arm,cci-500", },
+> +#endif
 >  	{},
 >  };
 >  
-> -#ifdef CONFIG_ARM_CCI400_PMU
-> +#ifdef CONFIG_ARM_CCI_PMU
->  
-> -#define DRIVER_NAME		"CCI-400"
-> +#define DRIVER_NAME		"ARM-CCI"
->  #define DRIVER_NAME_PMU		DRIVER_NAME " PMU"
->  
->  #define CCI_PMCR		0x0100
-> @@ -82,10 +82,6 @@ static const struct of_device_id arm_cci_matches[] = {
->  #define CCI_PMU_CNTR_MASK		((1ULL << 32) -1)
->  #define CCI_PMU_CNTR_LAST(cci_pmu)	(cci_pmu->num_cntrs - 1)
->  
-> -#define CCI_PMU_EVENT_MASK		0xffUL
-> -#define CCI_PMU_EVENT_SOURCE(event)	((event >> 5) & 0x7)
-> -#define CCI_PMU_EVENT_CODE(event)	(event & 0x1f)
-> -
->  #define CCI_PMU_MAX_HW_CNTRS(model) \
->  	((model)->num_hw_cntrs + (model)->fixed_hw_cntrs)
->  
-> @@ -144,19 +140,29 @@ struct cci_pmu {
->  
->  #define to_cci_pmu(c)	(container_of(c, struct cci_pmu, pmu))
->  
-> +enum cci_models {
-> +#ifdef CONFIG_ARM_CCI400_PMU
-> +	CCI400_R0,
-> +	CCI400_R1,
+> @@ -89,6 +92,9 @@ static const struct of_device_id arm_cci_matches[] = {
+>  enum {
+>  	CCI_IF_SLAVE,
+>  	CCI_IF_MASTER,
+> +#ifdef CONFIG_ARM_CCI500_PMU
+> +	CCI_IF_GLOBAL,
 > +#endif
-> +	CCI_MODEL_MAX
-> +};
-> +
-> +/* CCI400 PMU Specific definitions */
-> +
-> +#ifdef CONFIG_ARM_CCI400_PMU
-> +
->  /* Port ids */
-> -#define CCI_PORT_S0	0
-> -#define CCI_PORT_S1	1
-> -#define CCI_PORT_S2	2
-> -#define CCI_PORT_S3	3
-> -#define CCI_PORT_S4	4
-> -#define CCI_PORT_M0	5
-> -#define CCI_PORT_M1	6
-> -#define CCI_PORT_M2	7
-> -
-> -#define CCI_REV_R0		0
-> -#define CCI_REV_R1		1
-> -#define CCI_REV_R1_PX		5
-> +#define CCI400_PORT_S0		0
-> +#define CCI400_PORT_S1		1
-> +#define CCI400_PORT_S2		2
-> +#define CCI400_PORT_S3		3
-> +#define CCI400_PORT_S4		4
-> +#define CCI400_PORT_M0		5
-> +#define CCI400_PORT_M1		6
-> +#define CCI400_PORT_M2		7
-> +
-> +#define CCI400_R1_PX		5
->  
->  /*
->   * Instead of an event id to monitor CCI cycles, a dedicated counter is
-> @@ -164,11 +170,11 @@ struct cci_pmu {
->   * make use of this event in hardware.
->   */
->  enum cci400_perf_events {
-> -	CCI_PMU_CYCLES = 0xff
-> +	CCI400_PMU_CYCLES = 0xff
+>  	CCI_IF_MAX,
 >  };
 >  
-> -#define CCI_PMU_CYCLE_CNTR_IDX		0
-> -#define CCI_PMU_CNTR0_IDX		1
-> +#define CCI400_PMU_CYCLE_CNTR_IDX	0
-> +#define CCI400_PMU_CNTR0_IDX		1
+> @@ -145,6 +151,9 @@ enum cci_models {
+>  	CCI400_R0,
+>  	CCI400_R1,
+>  #endif
+> +#ifdef CONFIG_ARM_CCI500_PMU
+> +	CCI500_R0,
+> +#endif
+>  	CCI_MODEL_MAX
+>  };
 >  
->  /*
->   * CCI PMU event id is an 8-bit value made of two parts - bits 7:5 for one of 8
-> @@ -182,15 +188,26 @@ enum cci400_perf_events {
->   * the different revisions and are used to validate the event to be monitored.
->   */
->  
-> -#define CCI_REV_R0_SLAVE_PORT_MIN_EV	0x00
-> -#define CCI_REV_R0_SLAVE_PORT_MAX_EV	0x13
-> -#define CCI_REV_R0_MASTER_PORT_MIN_EV	0x14
-> -#define CCI_REV_R0_MASTER_PORT_MAX_EV	0x1a
-> -
-> -#define CCI_REV_R1_SLAVE_PORT_MIN_EV	0x00
-> -#define CCI_REV_R1_SLAVE_PORT_MAX_EV	0x14
-> -#define CCI_REV_R1_MASTER_PORT_MIN_EV	0x00
-> -#define CCI_REV_R1_MASTER_PORT_MAX_EV	0x11
-> +#define CCI400_PMU_EVENT_MASK		0xffUL
-> +#define CCI400_PMU_EVENT_SOURCE_SHIFT	5
-> +#define CCI400_PMU_EVENT_SOURCE_MASK	0x7
-> +#define CCI400_PMU_EVENT_CODE_SHIFT	0
-> +#define CCI400_PMU_EVENT_CODE_MASK	0x1f
-> +#define CCI400_PMU_EVENT_SOURCE(event) \
-> +	((event >> CCI400_PMU_EVENT_SOURCE_SHIFT) & \
-> +			CCI400_PMU_EVENT_SOURCE_MASK)
-> +#define CCI400_PMU_EVENT_CODE(event) \
-> +	((event >> CCI400_PMU_EVENT_CODE_SHIFT) & CCI400_PMU_EVENT_CODE_MASK)
-> +
-> +#define CCI400_R0_SLAVE_PORT_MIN_EV	0x00
-> +#define CCI400_R0_SLAVE_PORT_MAX_EV	0x13
-> +#define CCI400_R0_MASTER_PORT_MIN_EV	0x14
-> +#define CCI400_R0_MASTER_PORT_MAX_EV	0x1a
-> +
-> +#define CCI400_R1_SLAVE_PORT_MIN_EV	0x00
-> +#define CCI400_R1_SLAVE_PORT_MAX_EV	0x14
-> +#define CCI400_R1_MASTER_PORT_MIN_EV	0x00
-> +#define CCI400_R1_MASTER_PORT_MAX_EV	0x11
->  
->  static int cci400_get_event_idx(struct cci_pmu *cci_pmu,
->  				struct cci_pmu_hw_events *hw,
-> @@ -199,14 +216,14 @@ static int cci400_get_event_idx(struct cci_pmu *cci_pmu,
->  	int idx;
->  
->  	/* cycles event idx is fixed */
-> -	if (cci_event == CCI_PMU_CYCLES) {
-> -		if (test_and_set_bit(CCI_PMU_CYCLE_CNTR_IDX, hw->used_mask))
-> +	if (cci_event == CCI400_PMU_CYCLES) {
-> +		if (test_and_set_bit(CCI400_PMU_CYCLE_CNTR_IDX, hw->used_mask))
->  			return -EAGAIN;
->  
-> -		return CCI_PMU_CYCLE_CNTR_IDX;
-> +		return CCI400_PMU_CYCLE_CNTR_IDX;
->  	}
->  
-> -	for (idx = CCI_PMU_CNTR0_IDX; idx <= CCI_PMU_CNTR_LAST(cci_pmu); ++idx)
-> +	for (idx = CCI400_PMU_CNTR0_IDX; idx <= CCI_PMU_CNTR_LAST(cci_pmu); ++idx)
->  		if (!test_and_set_bit(idx, hw->used_mask))
->  			return idx;
->  
-> @@ -216,28 +233,28 @@ static int cci400_get_event_idx(struct cci_pmu *cci_pmu,
->  
->  static int cci400_validate_hw_event(struct cci_pmu *cci_pmu, unsigned long hw_event)
->  {
-> -	u8 ev_source = CCI_PMU_EVENT_SOURCE(hw_event);
-> -	u8 ev_code = CCI_PMU_EVENT_CODE(hw_event);
-> +	u8 ev_source = CCI400_PMU_EVENT_SOURCE(hw_event);
-> +	u8 ev_code = CCI400_PMU_EVENT_CODE(hw_event);
->  	int if_type;
->  
-> -	if (hw_event & ~CCI_PMU_EVENT_MASK)
-> +	if (hw_event & ~CCI400_PMU_EVENT_MASK)
->  		return -ENOENT;
->  
-> -	if (hw_event == CCI_PMU_CYCLES)
-> +	if (hw_event == CCI400_PMU_CYCLES)
->  		return hw_event;
->  
->  	switch (ev_source) {
-> -	case CCI_PORT_S0:
-> -	case CCI_PORT_S1:
-> -	case CCI_PORT_S2:
-> -	case CCI_PORT_S3:
-> -	case CCI_PORT_S4:
-> +	case CCI400_PORT_S0:
-> +	case CCI400_PORT_S1:
-> +	case CCI400_PORT_S2:
-> +	case CCI400_PORT_S3:
-> +	case CCI400_PORT_S4:
->  		/* Slave Interface */
->  		if_type = CCI_IF_SLAVE;
->  		break;
-> -	case CCI_PORT_M0:
-> -	case CCI_PORT_M1:
-> -	case CCI_PORT_M2:
-> +	case CCI400_PORT_M0:
-> +	case CCI400_PORT_M1:
-> +	case CCI400_PORT_M2:
->  		/* Master Interface */
->  		if_type = CCI_IF_MASTER;
->  		break;
-> @@ -252,24 +269,30 @@ static int cci400_validate_hw_event(struct cci_pmu *cci_pmu, unsigned long hw_ev
->  	return -ENOENT;
+> @@ -294,6 +303,101 @@ static inline struct cci_pmu_model *probe_cci_model(struct platform_device *pdev
 >  }
+>  #endif	/* CONFIG_ARM_CCI400_PMU */
 >  
-> -static int probe_cci_revision(void)
-> +static int probe_cci400_revision(void)
->  {
->  	int rev;
->  	rev = readl_relaxed(cci_ctrl_base + CCI_PID2) & CCI_PID2_REV_MASK;
->  	rev >>= CCI_PID2_REV_SHIFT;
->  
-> -	if (rev < CCI_REV_R1_PX)
-> -		return CCI_REV_R0;
-> +	if (rev < CCI400_R1_PX)
-> +		return CCI400_R0;
->  	else
-> -		return CCI_REV_R1;
-> +		return CCI400_R1;
->  }
->  
->  static const struct cci_pmu_model *probe_cci_model(struct platform_device *pdev)
->  {
->  	if (platform_has_secure_cci_access())
-> -		return &cci_pmu_models[probe_cci_revision()];
-> +		return &cci_pmu_models[probe_cci400_revision()];
-> +	return NULL;
-> +}
-> +#else	/* !CONFIG_ARM_CCI400_PMU */
-> +static inline struct cci_pmu_model *probe_cci_model(struct platform_device *pdev)
+> +#ifdef CONFIG_ARM_CCI500_PMU
+> +
+> +/*
+> + * CCI500 provides 8 independent event counters that can count
+> + * any of the events available.
+> + *
+> + * CCI500 PMU event id is an 9-bit value made of two parts.
+> + *	 bits [8:5] - Source for the event
+> + *		      0x0-0x6 - Slave interfaces
+> + *		      0x8-0xD - Master interfaces
+> + *		      0xf     - Global Events
+> + *		      0x7,0xe - Reserved
+> + *
+> + *	 bits [4:0] - Event code (specific to type of interface)
+> + */
+> +
+> +/* Port ids */
+> +#define CCI500_PORT_S0			0x0
+> +#define CCI500_PORT_S1			0x1
+> +#define CCI500_PORT_S2			0x2
+> +#define CCI500_PORT_S3			0x3
+> +#define CCI500_PORT_S4			0x4
+> +#define CCI500_PORT_S5			0x5
+> +#define CCI500_PORT_S6			0x6
+> +
+> +#define CCI500_PORT_M0			0x8
+> +#define CCI500_PORT_M1			0x9
+> +#define CCI500_PORT_M2			0xa
+> +#define CCI500_PORT_M3			0xb
+> +#define CCI500_PORT_M4			0xc
+> +#define CCI500_PORT_M5			0xd
+> +
+> +#define CCI500_PORT_GLOBAL 		0xf
+> +
+> +#define CCI500_PMU_EVENT_MASK		0x1ffUL
+> +#define CCI500_PMU_EVENT_SOURCE_SHIFT	0x5
+> +#define CCI500_PMU_EVENT_SOURCE_MASK	0xf
+> +#define CCI500_PMU_EVENT_CODE_SHIFT	0x0
+> +#define CCI500_PMU_EVENT_CODE_MASK	0x1f
+> +
+> +#define CCI500_PMU_EVENT_SOURCE(event)	\
+> +	((event >> CCI500_PMU_EVENT_SOURCE_SHIFT) & CCI500_PMU_EVENT_SOURCE_MASK)
+> +#define CCI500_PMU_EVENT_CODE(event)	\
+> +	((event >> CCI500_PMU_EVENT_CODE_SHIFT) & CCI500_PMU_EVENT_CODE_MASK)
+> +
+> +#define CCI500_SLAVE_PORT_MIN_EV	0x00
+> +#define CCI500_SLAVE_PORT_MAX_EV	0x1f
+> +#define CCI500_MASTER_PORT_MIN_EV	0x00
+> +#define CCI500_MASTER_PORT_MAX_EV	0x06
+> +#define CCI500_GLOBAL_PORT_MIN_EV	0x00
+> +#define CCI500_GLOBAL_PORT_MAX_EV	0x0f
+> +
+> +static int cci500_validate_hw_event(struct cci_pmu *cci_pmu,
+> +					unsigned long hw_event)
 > +{
->  	return NULL;
->  }
-> +#endif	/* CONFIG_ARM_CCI400_PMU */
->  
+> +	u32 ev_source = CCI500_PMU_EVENT_SOURCE(hw_event);
+> +	u32 ev_code = CCI500_PMU_EVENT_CODE(hw_event);
+> +	int if_type;
+> +
+> +	if (hw_event & ~CCI500_PMU_EVENT_MASK)
+> +		return -ENOENT;
+> +
+> +	switch (ev_source) {
+> +	case CCI500_PORT_S0:
+> +	case CCI500_PORT_S1:
+> +	case CCI500_PORT_S2:
+> +	case CCI500_PORT_S3:
+> +	case CCI500_PORT_S4:
+> +	case CCI500_PORT_S5:
+> +	case CCI500_PORT_S6:
+> +		if_type = CCI_IF_SLAVE;
+> +		break;
+> +	case CCI500_PORT_M0:
+> +	case CCI500_PORT_M1:
+> +	case CCI500_PORT_M2:
+> +	case CCI500_PORT_M3:
+> +	case CCI500_PORT_M4:
+> +	case CCI500_PORT_M5:
+> +		if_type = CCI_IF_MASTER;
+> +		break;
+> +	case CCI500_PORT_GLOBAL:
+> +		if_type = CCI_IF_GLOBAL;
+> +		break;
+> +	default:
+> +		return -ENOENT;
+> +	}
+> +
+> +	if (ev_code >= cci_pmu->model->event_ranges[if_type].min &&
+> +		ev_code <= cci_pmu->model->event_ranges[if_type].max)
+> +		return hw_event;
+> +
+> +	return -ENOENT;
+> +}
+> +#endif	/* CONFIG_ARM_CCI500_PMU */
+> +
 >  static int pmu_is_valid_counter(struct cci_pmu *cci_pmu, int idx)
 >  {
-> @@ -920,57 +943,61 @@ static int cci_pmu_cpu_notifier(struct notifier_block *self,
->  }
->  
->  static struct cci_pmu_model cci_pmu_models[] = {
-> -	[CCI_REV_R0] = {
-> +#ifdef CONFIG_ARM_CCI400_PMU
-> +	[CCI400_R0] = {
->  		.name = "CCI_400",
->  		.fixed_hw_cntrs = 1,	/* Cycle counter */
->  		.num_hw_cntrs = 4,
->  		.cntr_size = SZ_4K,
->  		.event_ranges = {
->  			[CCI_IF_SLAVE] = {
-> -				CCI_REV_R0_SLAVE_PORT_MIN_EV,
-> -				CCI_REV_R0_SLAVE_PORT_MAX_EV,
-> +				CCI400_R0_SLAVE_PORT_MIN_EV,
-> +				CCI400_R0_SLAVE_PORT_MAX_EV,
->  			},
->  			[CCI_IF_MASTER] = {
-> -				CCI_REV_R0_MASTER_PORT_MIN_EV,
-> -				CCI_REV_R0_MASTER_PORT_MAX_EV,
-> +				CCI400_R0_MASTER_PORT_MIN_EV,
-> +				CCI400_R0_MASTER_PORT_MAX_EV,
->  			},
->  		},
->  		.validate_hw_event = cci400_validate_hw_event,
+>  	return 0 <= idx && idx <= CCI_PMU_CNTR_LAST(cci_pmu);
+> @@ -981,6 +1085,29 @@ static struct cci_pmu_model cci_pmu_models[] = {
 >  		.get_event_idx = cci400_get_event_idx,
 >  	},
-> -	[CCI_REV_R1] = {
-> +	[CCI400_R1] = {
->  		.name = "CCI_400_r1",
->  		.fixed_hw_cntrs = 1,	/* Cycle counter */
->  		.num_hw_cntrs = 4,
->  		.cntr_size = SZ_4K,
->  		.event_ranges = {
->  			[CCI_IF_SLAVE] = {
-> -				CCI_REV_R1_SLAVE_PORT_MIN_EV,
-> -				CCI_REV_R1_SLAVE_PORT_MAX_EV,
-> +				CCI400_R1_SLAVE_PORT_MIN_EV,
-> +				CCI400_R1_SLAVE_PORT_MAX_EV,
->  			},
->  			[CCI_IF_MASTER] = {
-> -				CCI_REV_R1_MASTER_PORT_MIN_EV,
-> -				CCI_REV_R1_MASTER_PORT_MAX_EV,
-> +				CCI400_R1_MASTER_PORT_MIN_EV,
-> +				CCI400_R1_MASTER_PORT_MAX_EV,
->  			},
->  		},
->  		.validate_hw_event = cci400_validate_hw_event,
->  		.get_event_idx = cci400_get_event_idx,
->  	},
+>  #endif
+> +#ifdef CONFIG_ARM_CCI500_PMU
+> +	[CCI500_R0] = {
+> +		.name = "CCI_500",
+> +		.fixed_hw_cntrs = 0,
+> +		.num_hw_cntrs = 8,
+> +		.cntr_size = SZ_64K,
+> +		.event_ranges = {
+> +			[CCI_IF_SLAVE] = {
+> +				CCI500_SLAVE_PORT_MIN_EV,
+> +				CCI500_SLAVE_PORT_MAX_EV,
+> +			},
+> +			[CCI_IF_MASTER] = {
+> +				CCI500_MASTER_PORT_MIN_EV,
+> +				CCI500_MASTER_PORT_MAX_EV,
+> +			},
+> +			[CCI_IF_GLOBAL] = {
+> +				CCI500_GLOBAL_PORT_MIN_EV,
+> +				CCI500_GLOBAL_PORT_MAX_EV,
+> +			},
+> +		},
+> +		.validate_hw_event = cci500_validate_hw_event,
+> +	},
 > +#endif
 >  };
 >  
 >  static const struct of_device_id arm_cci_pmu_matches[] = {
-> +#ifdef CONFIG_ARM_CCI400_PMU
->  	{
->  		.compatible = "arm,cci-400-pmu",
->  		.data	= NULL,
+> @@ -998,6 +1125,12 @@ static const struct of_device_id arm_cci_pmu_matches[] = {
+>  		.data	= &cci_pmu_models[CCI400_R1],
 >  	},
->  	{
->  		.compatible = "arm,cci-400-pmu,r0",
-> -		.data	= &cci_pmu_models[CCI_REV_R0],
-> +		.data	= &cci_pmu_models[CCI400_R0],
->  	},
->  	{
->  		.compatible = "arm,cci-400-pmu,r1",
-> -		.data	= &cci_pmu_models[CCI_REV_R1],
-> +		.data	= &cci_pmu_models[CCI400_R1],
->  	},
+>  #endif
+> +#ifdef CONFIG_ARM_CCI500_PMU
+> +	{
+> +		.compatible = "arm,cci-500-pmu,r0",
+> +		.data = &cci_pmu_models[CCI500_R0],
+> +	},
 > +#endif
 >  	{},
 >  };
->  
-> @@ -1145,14 +1172,14 @@ static int __init cci_platform_init(void)
->  	return platform_driver_register(&cci_platform_driver);
->  }
->  
-> -#else /* !CONFIG_ARM_CCI400_PMU */
-> +#else /* !CONFIG_ARM_CCI_PMU */
->  
->  static int __init cci_platform_init(void)
->  {
->  	return 0;
->  }
->  
-> -#endif /* CONFIG_ARM_CCI400_PMU */
-> +#endif /* CONFIG_ARM_CCI_PMU */
->  
->  #ifdef CONFIG_ARM_CCI400_PORT_CTRL
