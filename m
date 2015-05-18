@@ -1,29 +1,57 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 18 May 2015 18:28:09 +0100
-Subject: [PATCHv2 04/12] arm64: psci: remove unnecessary id indirection
-In-Reply-To: <1431945503-6939-5-git-send-email-mark.rutland@arm.com>
-References: <1431945503-6939-1-git-send-email-mark.rutland@arm.com>
- <1431945503-6939-5-git-send-email-mark.rutland@arm.com>
-Message-ID: <20150518172809.GK21251@e104818-lin.cambridge.arm.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon, 18 May 2015 18:28:25 +0100
+Subject: [PATCH v2 1/5] arm64: Juno: Fix the GIC node address label and the
+ frequency of FAXI clock.
+In-Reply-To: <1431970109-8902-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1431970109-8902-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1431970109-8902-2-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 18, 2015 at 11:38:15AM +0100, Mark Rutland wrote:
-> PSCI 0.1 did not define canonical IDs for CPU_ON, CPU_OFF, CPU_SUSPEND,
-> or MIGRATE, and so these need to be provided when using firmware
-> compliant to PSCI 0.1.
-> 
-> However, functions introduced in 0.2 or later have canonical IDs, and
-> these cannot be provided via DT. There's no need to indirect the IDs via
-> a table; they can be used directly at callsites (and already are for
-> SYSTEM_OFF and SYSTEM_RESET).
-> 
-> This patch removes the unnecessary function ID indirection for
-> AFFINITY_INFO and MIGRATE_INFO_TYPE.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+During the review of the Juno DT files I've noticed that the GIC
+node label had two digits swapped leading to a different address
+being shown in the /sys/devices fs.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Sudeep also pointed that public revisions of the Juno documentation
+list a different frequency for the FAXI system than what the one
+I've been using when creating the DT file. Verified with the firmware
+people to be the correct value in the shipped systems.
+
+Reported-by: Sudeep Holla <sudeep.holla@arm.com>
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+---
+ arch/arm64/boot/dts/arm/juno-clocks.dtsi | 4 ++--
+ arch/arm64/boot/dts/arm/juno.dts         | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/arm/juno-clocks.dtsi b/arch/arm64/boot/dts/arm/juno-clocks.dtsi
+index c9b89ef..25352ed 100644
+--- a/arch/arm64/boot/dts/arm/juno-clocks.dtsi
++++ b/arch/arm64/boot/dts/arm/juno-clocks.dtsi
+@@ -36,9 +36,9 @@
+ 		clock-output-names = "apb_pclk";
+ 	};
+ 
+-	soc_faxiclk: refclk533mhz {
++	soc_faxiclk: refclk400mhz {
+ 		compatible = "fixed-clock";
+ 		#clock-cells = <0>;
+-		clock-frequency = <533000000>;
++		clock-frequency = <400000000>;
+ 		clock-output-names = "faxi_clk";
+ 	};
+diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+index 5e9110a..7ab0713 100644
+--- a/arch/arm64/boot/dts/arm/juno.dts
++++ b/arch/arm64/boot/dts/arm/juno.dts
+@@ -98,7 +98,7 @@
+ 		      <0x00000008 0x80000000 0x1 0x80000000>;
+ 	};
+ 
+-	gic: interrupt-controller at 2c001000 {
++	gic: interrupt-controller at 2c010000 {
+ 		compatible = "arm,gic-400", "arm,cortex-a15-gic";
+ 		reg = <0x0 0x2c010000 0 0x1000>,
+ 		      <0x0 0x2c02f000 0 0x2000>,
+-- 
+2.4.0
