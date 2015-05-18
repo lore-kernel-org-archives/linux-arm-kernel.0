@@ -1,75 +1,86 @@
-From: stuart.yoder@freescale.com (Stuart Yoder)
-Date: Mon, 18 May 2015 15:33:01 +0000
-Subject: [PATCH] irqchip: GICv3: ITS: don't assume 64K page size in
- its_alloc_tables
-In-Reply-To: <5559F294.5070701@arm.com>
-References: <1431644545-31904-1-git-send-email-stuart.yoder@freescale.com>
- <5559E7CE.1050003@arm.com>
- <CY1PR0301MB074884E252ADE216BD8C472887C40@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <5559F294.5070701@arm.com>
-Message-ID: <CY1PR0301MB0748DC844073225FDBCD4DC387C40@CY1PR0301MB0748.namprd03.prod.outlook.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 18 May 2015 17:35:30 +0200
+Subject: [PATCH] memory: tegra: Expose supported rates via debugfs
+Message-ID: <1431963330-25708-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Thierry Reding <treding@nvidia.com>
 
+In order to ease testing, expose the list of supported EMC frequencies
+via debugfs.
 
-> -----Original Message-----
-> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
-> Sent: Monday, May 18, 2015 9:09 AM
-> To: Yoder Stuart-B08248; tglx at linutronix.de
-> Cc: linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH] irqchip: GICv3: ITS: don't assume 64K page size in its_alloc_tables
-> 
-> On 18/05/15 14:38, Stuart Yoder wrote:
-> >
-> >
-> >> -----Original Message-----
-> >> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
-> >> Sent: Monday, May 18, 2015 8:23 AM
-> >> To: Yoder Stuart-B08248; tglx at linutronix.de
-> >> Cc: linux-arm-kernel at lists.infradead.org
-> >> Subject: Re: [PATCH] irqchip: GICv3: ITS: don't assume 64K page size in its_alloc_tables
-> >>
-> >> Hi Stuart,
-> >>
-> >> On 15/05/15 00:02, Stuart Yoder wrote:
-> >>> its_alloc_tables() needs to account for page sizes other than
-> >>> 64KB.  Without this change, when PAGE_SIZE=4KB its_alloc_tables()
-> >>> gets stuck in an infinite loop.
-> >>>
-> >>> Signed-off-by: Stuart Yoder <stuart.yoder@freescale.com>
-> >>> ---
-> >>>
-> >>> think this should go into 4.1 if at all possible...without it I am
-> >>> unable to boot a 4.1 kernel on the LS2085 SoC
-> >>
-> >> What you are suggesting here is a effectively a revert of commit
-> >> 790b57a, which would break other implementations.
-> >>
-> >> Can you please explain the actual issue? I'm failing to see how you end
-> >> up in an infinite loop here (the system page size and the ITS base
-> >> granule should be completely unrelated...).
-> >
-> > Here is the problem line:
-> >
-> >       val |= (alloc_size / psz) - 1;
-> >
-> > In our case:
-> >    alloc_size=16K
-> >    psz=64K
-> >
-> > ...so (alloc_size / psz) = 0, and thus val becomes -1, and everything
-> > is screwed up.  We get stuck in a loop to retry_baser:
-> 
-> If alloc_size is 16k, you have an order of 2, and I have to assume this
-> is an allocation for a device table (otherwise order would be 4). So
-> things fail because we've computed an alloc_size smaller than what we
-> want to allocate as a minimum.
-> 
-> Isn't that exactly what Minghuan's patch fixes?
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+ drivers/memory/tegra/tegra124-emc.c | 42 +++++++++++++++++++++++++++++++++++--
+ 1 file changed, 40 insertions(+), 2 deletions(-)
 
-Yes.  I'll get with Minghuan and between the 2 of us we'll get a properly
-commented version of his patch sent out.
-
-Thanks,
-Stuart
+diff --git a/drivers/memory/tegra/tegra124-emc.c b/drivers/memory/tegra/tegra124-emc.c
+index 8620355776fe..3dac7be39654 100644
+--- a/drivers/memory/tegra/tegra124-emc.c
++++ b/drivers/memory/tegra/tegra124-emc.c
+@@ -1027,7 +1027,40 @@ static int emc_debug_rate_set(void *data, u64 rate)
+ DEFINE_SIMPLE_ATTRIBUTE(emc_debug_rate_fops, emc_debug_rate_get,
+ 			emc_debug_rate_set, "%lld\n");
+ 
+-static void emc_debugfs_init(struct device *dev)
++static int emc_debug_supported_rates_show(struct seq_file *s, void *data)
++{
++	struct tegra_emc *emc = s->private;
++	const char *prefix = "";
++	unsigned int i;
++
++	for (i = 0; i < emc->num_timings; i++) {
++		struct emc_timing *timing = &emc->timings[i];
++
++		seq_printf(s, "%s%lu", prefix, timing->rate);
++
++		prefix = " ";
++	}
++
++	seq_puts(s, "\n");
++
++	return 0;
++}
++
++static int emc_debug_supported_rates_open(struct inode *inode,
++					  struct file *file)
++{
++	return single_open(file, emc_debug_supported_rates_show,
++			   inode->i_private);
++}
++
++static const struct file_operations emc_debug_supported_rates_fops = {
++	.open = emc_debug_supported_rates_open,
++	.read = seq_read,
++	.llseek = seq_lseek,
++	.release = single_release,
++};
++
++static void emc_debugfs_init(struct device *dev, struct tegra_emc *emc)
+ {
+ 	struct dentry *root, *file;
+ 	struct clk *clk;
+@@ -1048,6 +1081,11 @@ static void emc_debugfs_init(struct device *dev)
+ 				   &emc_debug_rate_fops);
+ 	if (!file)
+ 		dev_err(dev, "failed to create debugfs entry\n");
++
++	file = debugfs_create_file("supported_rates", S_IRUGO, root, emc,
++				   &emc_debug_supported_rates_fops);
++	if (!file)
++		dev_err(dev, "failed to create debugfs entry\n");
+ }
+ 
+ static int tegra_emc_probe(struct platform_device *pdev)
+@@ -1119,7 +1157,7 @@ static int tegra_emc_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, emc);
+ 
+ 	if (IS_ENABLED(CONFIG_DEBUG_FS))
+-		emc_debugfs_init(&pdev->dev);
++		emc_debugfs_init(&pdev->dev, emc);
+ 
+ 	return 0;
+ };
+-- 
+2.3.5
