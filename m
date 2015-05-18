@@ -1,30 +1,31 @@
-From: mika.westerberg@linux.intel.com (Mika Westerberg)
-Date: Mon, 18 May 2015 11:28:23 +0300
-Subject: [PATCH] i2c: designware: separate ops for system_sleep_pm and
- runtime_pm
-In-Reply-To: <1431693099-2292-1-git-send-email-jszhang@marvell.com>
-References: <1431693099-2292-1-git-send-email-jszhang@marvell.com>
-Message-ID: <20150518082823.GH1490@lahna.fi.intel.com>
+From: Thomas.Betker@rohde-schwarz.com (Thomas.Betker at rohde-schwarz.com)
+Date: Mon, 18 May 2015 10:31:32 +0200
+Subject: [PATCH] ARM: zynq: Set bit 22 in PL310 AuxCtrl register (6395/1)
+In-Reply-To: <20150514164048.GF19345@e104818-lin.cambridge.arm.com>
+References: <812979c5a158a3306d8036e7f9731947c58a3ab7.1431411716.git.michal.simek@xilinx.com>
+ <55519E47.7040008@de.bosch.com>
+ <20150514164048.GF19345@e104818-lin.cambridge.arm.com>
+Message-ID: <OF7A86E645.4041AF2E-ONC1257E49.002DA5ED-C1257E49.002ED72C@rohde-schwarz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 15, 2015 at 08:31:39PM +0800, Jisheng Zhang wrote:
-> Commit 1fc2fe204cb9 ("i2c: designware: Add runtime PM hooks") adds
-> runtime pm support using the same ops for system sleep and runtime pm.
-> When suspend to ram, the i2c host may have been runtime suspended, thus
-> i2c_dw_disable() hangs.
+Hello Catalin:
 
-It hangs because it has already been powered off, right?
+> > I've been under the impression that this shouldn't be done in the 
+kernel,
+> > but in the boot loader/firmware:
+> > 
+> > https://lkml.org/lkml/2015/2/20/199
+> > 
+> > http://lists.denx.de/pipermail/u-boot/2015-March/207803.html
+> 
+> If you can fix it in the boot loader or firmware even better. If it's
+> not doable, this patch will help (if Russell takes it):
+> 
+> http://article.gmane.org/gmane.linux.ports.sh.devel/45685
 
-> This patch fixes this issue by separating ops for system sleep pm and
-> runtime pm, and in the system suspend/resume path, runtime pm apis are
-> used to ensure the device is at correct state.
+Thanks for the info! Geert's patch looks good to me, and I sure hope it 
+will be accepted.
 
-I can see that this fixes the issue with the platform driver (as the
-platform bus core doesn't power on the device automatically as opposed
-to other buses, like PCI). However, I'm thinking that can we do better
-here.
-
-Instead of powering the device on again, can't we leave it in low power
-state? Recently added 'dev->power.direct_complete' may be used to
-achieve that, I think.
+Best regards,
+Thomas Betker
