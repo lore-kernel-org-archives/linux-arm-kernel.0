@@ -1,92 +1,147 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 18 May 2015 17:08:16 +0900
-Subject: [v2 0/5] arm64: add kdump support
-In-Reply-To: <20150512054304.GA29874@localhost.localdomain>
-References: <1429861989-8417-1-git-send-email-takahiro.akashi@linaro.org>
- <20150424095312.GD29183@leverpostej> <55504956.9020007@linaro.org>
- <20150512054304.GA29874@localhost.localdomain>
-Message-ID: <55599DF0.7010507@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 18 May 2015 10:16:25 +0200
+Subject: [PATCH 1/5] soc: mediatek: Add infracfg misc driver support
+In-Reply-To: <CAGS+omADXpnBnLvuH+xNmatL+89kLBELz6KqMFid7SOx=veiAg@mail.gmail.com>
+References: <1431372206-1237-1-git-send-email-s.hauer@pengutronix.de>
+ <1431372206-1237-2-git-send-email-s.hauer@pengutronix.de>
+ <CAGS+omADXpnBnLvuH+xNmatL+89kLBELz6KqMFid7SOx=veiAg@mail.gmail.com>
+Message-ID: <20150518081625.GO6325@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
+Hi Daniel,
 
-On 05/12/2015 02:43 PM, Dave Young wrote:
-> On 05/11/15 at 03:16pm, AKASHI Takahiro wrote:
->> Hi
->>
->> Sorry for late response. I was on vacation.
->>
->> On 04/24/2015 06:53 PM, Mark Rutland wrote:
->>> Hi,
->>>
->>> On Fri, Apr 24, 2015 at 08:53:03AM +0100, AKASHI Takahiro wrote:
->>>> This patch set enables kdump (crash dump kernel) support on arm64 on top of
->>>> Geoff's kexec patchset.
->>>>
->>>> In this version, there are some arm64-specific usage/constraints:
->>>> 1) "mem=" boot parameter must be specified on crash dump kernel
->>>>     if the system starts on uefi.
->>>
->>> This sounds very painful. Why is this the case, and how do x86 and/or
->>> ia64 get around that?
->>
->> As Dave (Young) said, x86 uses "memmap=XX" kernel commandline parameters
->> to specify usable memory for crash dump kernel.
->
-> Originally x86 use memmap=exactmap memmap=XX to specify each section of
-> memories for 2nd kernel. But later because a lot of reserved type ranges
-> need to be passed ie. for pci mmconfig, and kernel cmdline buffer is
-> limited so kexec-tools later switch to passing these in x86 boot params as
-> E820 memory ranges directly.
->
->> On my arm64 implementation, "linux,usable-memory" property is added
->> to device tree blob by kexec-tools for this purpose.
->> This is because, when I first implemented kdump on arm64, ppc is the only
->> architecture that supports kdump AND utilizes device trees.
->> Since kexec-tools as well as the kernel already has this framework,
->> I believed that device-tree approach was smarter than a commandline
->> parameter.
->>
->> However, uefi-based kernel ignores all the memory-related properties
->> in a device tree and so this "mem=" workaround
-> Kdump kernel reuses the memmap info getting from firmware during 1st kernel
-> boot, I do not think the memmap info can be cooked for crash kernel usable
-> memory. But it might be a better way to use a special fdt node for crash
-> kernel memory even for UEFI..
+On Fri, May 15, 2015 at 10:17:33PM +0800, Daniel Kurtz wrote:
+> Hi Sascha,
+> 
+> On Tue, May 12, 2015 at 3:23 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > This adds support for some miscellaneous bits of the infracfg controller.
+> > The mtk_infracfg_set/clear_bus_protection functions are necessary for
+> > the scpsys power domain driver to handle the bus protection bits which
+> > are contained in the infacfg register space.
+> >
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > ---
+> >  drivers/soc/mediatek/Kconfig        |  9 +++++
+> >  drivers/soc/mediatek/Makefile       |  1 +
+> >  drivers/soc/mediatek/mtk-infracfg.c | 80 +++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 90 insertions(+)
+> >  create mode 100644 drivers/soc/mediatek/mtk-infracfg.c
+> >
+> > diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
+> > index bcdb22d..6fae66f 100644
+> > --- a/drivers/soc/mediatek/Kconfig
+> > +++ b/drivers/soc/mediatek/Kconfig
+> > @@ -9,3 +9,12 @@ config MTK_PMIC_WRAP
+> >           Say yes here to add support for MediaTek PMIC Wrapper found
+> >           on different MediaTek SoCs. The PMIC wrapper is a proprietary
+> >           hardware to connect the PMIC.
+> > +
+> > +config MTK_INFRACFG
+> 
+> nit: Could you alphabetize these config options - so this one before
+> MTK_PMIC_WRAP
+> 
+> > +       tristate "MediaTek INFRACFG Support"
+> > +       depends on ARCH_MEDIATEK
+> 
+> I've seen several drivers like this now:
+> 
+>   depends on ARCH_MEDIATEK || COMPILE_TEST
+> 
+> 
+> > +       select REGMAP
+> > +       help
+> > +         Say yes here to add support for the MediaTek INFRACFG controller. The
+> > +         INFRACFG controller contains various infrastructure registers not
+> > +         directly associated to any device.
+> > diff --git a/drivers/soc/mediatek/Makefile b/drivers/soc/mediatek/Makefile
+> > index ecaf4de..ce39119 100644
+> > --- a/drivers/soc/mediatek/Makefile
+> > +++ b/drivers/soc/mediatek/Makefile
+> > @@ -1 +1,2 @@
+> >  obj-$(CONFIG_MTK_PMIC_WRAP) += mtk-pmic-wrap.o
+> > +obj-$(CONFIG_MTK_INFRACFG) += mtk-infracfg.o
+> 
+> alphabetize here, too.
+> 
+> > diff --git a/drivers/soc/mediatek/mtk-infracfg.c b/drivers/soc/mediatek/mtk-infracfg.c
+> > new file mode 100644
+> > index 0000000..b3ebfae
+> > --- /dev/null
+> > +++ b/drivers/soc/mediatek/mtk-infracfg.c
+> > @@ -0,0 +1,80 @@
+> > +#include <linux/regmap.h>
+> > +#include <linux/export.h>
+> > +#include <linux/jiffies.h>
+> > +#include <linux/soc/mediatek/infracfg.h>
+> > +#include <asm/processor.h>
+> 
+> and... alphabetize headers here.
+> 
+> I'm not sure if people care, but I find it makes it much easier to
+> merge/add things later if these lists are already sorted.
+> Same "please alphabetize" comments for the mtk-scpsys patch, so I
+> won't repeat them.
+> 
+> > +
+> > +#define INFRA_TOPAXI_PROTECTEN         0x0220
+> > +#define INFRA_TOPAXI_PROTECTSTA1       0x0228
+> > +
+> > +/**
+> > + * mtk_infracfg_set_bus_protection - enable bus protection
+> > + * @regmap: The infracfg regmap
+> > + * @mask: The mask containing the protection bits to be enabled.
+> > + *
+> > + * This function enables the bus protection bits for disabled power
+> > + * domains so that the system does not hanf when some unit accesses the
+> > + * bus while in power down.
+> > + */
+> > +int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask)
+> > +{
+> > +       unsigned long expired;
+> > +       u32 val;
+> > +       int ret;
+> > +
+> > +       regmap_update_bits(infracfg, INFRA_TOPAXI_PROTECTEN, mask, mask);
+> > +
+> > +       expired = jiffies + HZ;
+> > +
+> > +       while (1) {
+> > +               ret = regmap_read(infracfg, INFRA_TOPAXI_PROTECTSTA1, &val);
+> > +               if (ret)
+> > +                       return ret;
+> > +
+> > +               if ((val & mask) == mask)
+> > +                       break;
+> > +
+> > +               cpu_relax();
+> > +               if (time_after(jiffies, expired))
+> > +                       return -EIO;
+> 
+> I think we should check for timeout first, and then cpu_relax() if
+> there is still time left (here and in
+> mtk_infracfg_clear_bus_protection()).  Otherwise we end up doing one
+> final cpu_relax() without rechecking the register we are polling
+> (again, I have the same comment for the timeout loops in mtk-scpsys).
 
-Do you still prefer "memmap=" approach?
+I think cpu_relax() delays execution in the order of microseconds (I
+don't actually know, just a guess), so if the timeout is a second the
+order doesn't really matter. What can happen though is an interrupt
+after the (val & mask) test but before the timeout check. So to be
+truly correct we have to repeat the (val & mask) test after the
+time_after() check. Is that what you want?
 
-Just FYI,
+> 
+> Also, shouldn't we return -ETIMEOUT if we timeout?
 
-       x86                     arm            arm64            powerpc{,64}
+I dunno. Probably the operation operation timed out because of an IO
+error. I'll change it to -ETIMEDOUT.
 
-(a)   cmdline(crashkernel=)   cmdline        cmdline          cmdline
-(b)   iomem                   iomem          iomem            dev tree
-(c)   cmdline(memmap=)        cmdline(mem=)  dev tree         dev tree
-                                              & cmdline(mem=)
+Sascha
 
-(a) how we specify/reserve crash dump kernel's memory on 1st kernel
-(b) how we inform userspace tool of crash dump kernel's memory on 1st kernel
-     - iomem: add "Crash kernel" entry in /proc/iomem
-     - dev tree: add /chosen/linux,crashkernel-base (and crashkernel-size)
-(c) how we specify usable memory on crash dump kernel
-     - dev tree: add /chosen/memory/linux,usable-memory
-
-
-As you see, arm64, and arm as well, does things in a *hybrid* way of x86 and ppc.
-I think we should go for a uniform way with device tree as ppc does.
-(Even for (a), we can use a device tree.)
-
-> Another way is introducing a similar memmap=, but maybe consider only
-> system_ram type ranges. For other memory areas still use UEFI memmap.
-
-Yeah, I don't know whether we need additional formats of memmap=, like
-memmap=XX$YY or memmap=XX#YY, for ACPI stuffs.
-
-Thanks,
--Takahiro AKASHI
-
-> Thanks
-> Dave
->
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
