@@ -1,35 +1,48 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 18 May 2015 15:05:53 +0100
-Subject: [PATCH v2 0/2] ARM: move Dual-Timer SP804 driver to
- drivers/clocksource
-In-Reply-To: <20150518134702.GY2067@n2100.arm.linux.org.uk>
-References: <1430390662-18246-1-git-send-email-sudeep.holla@arm.com>
- <1431953084-15700-1-git-send-email-sudeep.holla@arm.com>
- <20150518134702.GY2067@n2100.arm.linux.org.uk>
-Message-ID: <5559F1C1.7080206@arm.com>
+From: xerofoify@gmail.com (Nicholas Krause)
+Date: Mon, 18 May 2015 10:07:59 -0400
+Subject: [PATCH RESEND] mach-omap2:Remove calls to deprecacted marco,
+ PTR_RET in the files, fb.c and pmu.c
+Message-ID: <1431958079-486-1-git-send-email-xerofoify@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This removes two calls to the deprecated marco,PTR_RET in
+the files,fb.c and pmu.c for the functions,omap_init_vrfb
+and omap_init_pmu respectfully. Furthermore these are now
+replaced by calling the correctly non deprecacted function,
+PTR_ERR_OR_ZERO in both functions.
 
+Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+---
+ arch/arm/mach-omap2/fb.c  | 2 +-
+ arch/arm/mach-omap2/pmu.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-On 18/05/15 14:47, Russell King - ARM Linux wrote:
-> On Mon, May 18, 2015 at 01:44:42PM +0100, Sudeep Holla wrote:
->> Since there are ARM64 platforms(e.g. Juno) with SP804 timers, we need
->> to move the driver out of arch/arm so that the code can be shared.
->>
->> Changes v1->v2:
->> 	- introduces sp804_timer_disable and retained the integrator
->> 	  and realview timer initialisation code as suggested by Russell
->>
->> v1: https://lkml.org/lkml/2015/4/30/225
->
-> This looks fine to me, thanks.
->
-> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
->
-
-Thanks Russell, I assume you are fine if it goes via clocksource(i.e.
-Daniel) tree.
-
-Regards,
-Sudeep
+diff --git a/arch/arm/mach-omap2/fb.c b/arch/arm/mach-omap2/fb.c
+index 26e28e9..1f1ecf8 100644
+--- a/arch/arm/mach-omap2/fb.c
++++ b/arch/arm/mach-omap2/fb.c
+@@ -84,7 +84,7 @@ int __init omap_init_vrfb(void)
+ 	pdev = platform_device_register_resndata(NULL, "omapvrfb", -1,
+ 			res, num_res, NULL, 0);
+ 
+-	return PTR_RET(pdev);
++	return PTR_ERR_OR_ZERO(pdev);
+ }
+ #else
+ int __init omap_init_vrfb(void) { return 0; }
+diff --git a/arch/arm/mach-omap2/pmu.c b/arch/arm/mach-omap2/pmu.c
+index a69e9a3..d2adfeb 100644
+--- a/arch/arm/mach-omap2/pmu.c
++++ b/arch/arm/mach-omap2/pmu.c
+@@ -55,7 +55,7 @@ static int __init omap2_init_pmu(unsigned oh_num, char *oh_names[])
+ 	WARN(IS_ERR(omap_pmu_dev), "Can't build omap_device for %s.\n",
+ 	     dev_name);
+ 
+-	return PTR_RET(omap_pmu_dev);
++	return PTR_ERR_OR_ZERO(omap_pmu_dev);
+ }
+ 
+ static int __init omap_init_pmu(void)
+-- 
+2.1.4
