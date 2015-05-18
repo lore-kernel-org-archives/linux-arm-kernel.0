@@ -1,75 +1,31 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 18 May 2015 18:28:28 +0100
-Subject: [PATCH v2 4/5] arm64: Juno: Add GICv2m support in device tree.
-In-Reply-To: <1431970109-8902-1-git-send-email-Liviu.Dudau@arm.com>
-References: <1431970109-8902-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1431970109-8902-5-git-send-email-Liviu.Dudau@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 18 May 2015 18:29:32 +0100
+Subject: [PATCHv2 05/12] arm64: psci: support unsigned return values
+In-Reply-To: <1431945503-6939-6-git-send-email-mark.rutland@arm.com>
+References: <1431945503-6939-1-git-send-email-mark.rutland@arm.com>
+ <1431945503-6939-6-git-send-email-mark.rutland@arm.com>
+Message-ID: <20150518172932.GL21251@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Juno contains a GICv2m extension for handling PCIe MSI messages.
-Add a node declaring the first frame of the extension.
+On Mon, May 18, 2015 at 11:38:16AM +0100, Mark Rutland wrote:
+> PSCI_VERSION and MIGRATE_INFO_TYPE_UP_CPU return unsigned values, with
+> the latter returning a 64-bit value. However, the PSCI invocation
+> functions have prototypes returning int.
+> 
+> This patch upgrades the invocation functions to return unsigned long,
+> with a new typedef to keep things legible. As PSCI_VERSION cannot return
+> a negative value, the erroneous check against PSCI_RET_NOT_SUPPORTED is
+> also removed. The unrelated psci_initcall_t typedef is moved closer to
+> its first user, to avoid confusion with the invocation functions.
+> 
+> In preparation for sharing the code with ARM, unsigned long is used in
+> preference of u64. In the SMC32 calling convention, the relevant fields
+> will be 32 bits wide.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
 
-Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
----
- arch/arm64/boot/dts/arm/juno-base.dtsi | 35 ++++++++++++++++++++--------------
- 1 file changed, 21 insertions(+), 14 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-index b7e862f..e3ee960 100644
---- a/arch/arm64/boot/dts/arm/juno-base.dtsi
-+++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-@@ -23,10 +23,17 @@
- 		      <0x0 0x2c02f000 0 0x2000>,
- 		      <0x0 0x2c04f000 0 0x2000>,
- 		      <0x0 0x2c06f000 0 0x2000>;
--		#address-cells = <0>;
-+		#address-cells = <2>;
- 		#interrupt-cells = <3>;
-+		#size-cells = <2>;
- 		interrupt-controller;
- 		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_HIGH)>;
-+		ranges = <0 0 0 0x2c1c0000 0 0x40000>;
-+		v2m_0: v2m at 0 {
-+			compatible = "arm,gic-v2m-frame";
-+			msi-controller;
-+			reg = <0 0 0 0x1000>;
-+		};
- 	};
- 
- 	timer {
-@@ -129,19 +136,19 @@
- 
- 		#interrupt-cells = <1>;
- 		interrupt-map-mask = <0 0 15>;
--		interrupt-map = <0 0  0 &gic 0  68 IRQ_TYPE_LEVEL_HIGH>,
--				<0 0  1 &gic 0  69 IRQ_TYPE_LEVEL_HIGH>,
--				<0 0  2 &gic 0  70 IRQ_TYPE_LEVEL_HIGH>,
--				<0 0  3 &gic 0 160 IRQ_TYPE_LEVEL_HIGH>,
--				<0 0  4 &gic 0 161 IRQ_TYPE_LEVEL_HIGH>,
--				<0 0  5 &gic 0 162 IRQ_TYPE_LEVEL_HIGH>,
--				<0 0  6 &gic 0 163 IRQ_TYPE_LEVEL_HIGH>,
--				<0 0  7 &gic 0 164 IRQ_TYPE_LEVEL_HIGH>,
--				<0 0  8 &gic 0 165 IRQ_TYPE_LEVEL_HIGH>,
--				<0 0  9 &gic 0 166 IRQ_TYPE_LEVEL_HIGH>,
--				<0 0 10 &gic 0 167 IRQ_TYPE_LEVEL_HIGH>,
--				<0 0 11 &gic 0 168 IRQ_TYPE_LEVEL_HIGH>,
--				<0 0 12 &gic 0 169 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-map = <0 0  0 &gic 0 0 0  68 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0  1 &gic 0 0 0  69 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0  2 &gic 0 0 0  70 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0  3 &gic 0 0 0 160 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0  4 &gic 0 0 0 161 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0  5 &gic 0 0 0 162 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0  6 &gic 0 0 0 163 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0  7 &gic 0 0 0 164 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0  8 &gic 0 0 0 165 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0  9 &gic 0 0 0 166 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 10 &gic 0 0 0 167 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 11 &gic 0 0 0 168 IRQ_TYPE_LEVEL_HIGH>,
-+				<0 0 12 &gic 0 0 0 169 IRQ_TYPE_LEVEL_HIGH>;
- 
- 		/include/ "juno-motherboard.dtsi"
- 	};
--- 
-2.4.0
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
