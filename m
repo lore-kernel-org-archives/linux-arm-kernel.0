@@ -1,38 +1,57 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 18 May 2015 18:33:29 +0100
-Subject: [PATCHv2 06/12] arm64: psci: account for Trusted OS instances
-In-Reply-To: <1431945503-6939-7-git-send-email-mark.rutland@arm.com>
-References: <1431945503-6939-1-git-send-email-mark.rutland@arm.com>
- <1431945503-6939-7-git-send-email-mark.rutland@arm.com>
-Message-ID: <20150518173329.GM21251@e104818-lin.cambridge.arm.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 18 May 2015 10:34:08 -0700
+Subject: [PATCH 2/3 v2] ARM: bcm2835: Add the Raspberry Pi firmware driver
+In-Reply-To: <5558DD40.4070701@tronnes.org>
+References: <1431543609-19646-1-git-send-email-eric@anholt.net>
+ <1431543609-19646-3-git-send-email-eric@anholt.net>
+ <5558DD40.4070701@tronnes.org>
+Message-ID: <87pp5xokmn.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 18, 2015 at 11:38:17AM +0100, Mark Rutland wrote:
-> Software resident in the secure world (a "Trusted OS") may cause CPU_OFF
-> calls for the CPU it is resident on to be denied. Such a denial would be
-> fatal for the kernel, and so we must detect when this can happen before
-> the point of no return.
-> 
-> This patch implements Trusted OS detection for PSCI 0.2+ systems, using
-> MIGRATE_INFO_TYPE and MIGRATE_INFO_UP_CPU. When a trusted OS is detected
-> as resident on a particular CPU, attempts to hot unplug that CPU will be
-> denied early, before they can prove fatal.
-> 
-> Trusted OS migration is not implemented by this patch. Implementation of
-> migratable UP trusted OSs seems unlikely, and the right policy for
-> migration is unclear (and will likely differ across implementations). As
-> such, it is likely that migration will require cooperation with Trusted
-> OS drivers.
-> 
-> PSCI implementations prior to 0.1 do not provide the facility to detect
-> the presence of a Trusted OS, nor the CPU any such OS is resident on, so
-> without additional information it is not possible to handle Trusted OSs
-> with PSCI 0.1.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+Noralf Tr?nnes <noralf@tronnes.org> writes:
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Den 13.05.2015 21:00, skrev Eric Anholt:
+>> This gives us a function for making mailbox property channel requests
+>> of the firmware, which is most notable in that it will let us get and
+>> set clock rates.
+>>
+>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>> ---
+>
+> [...]
+>
+>> +/*
+>> + * Submits a single tag to the VPU firmware through the mailbox
+>> + * property interface.
+>> + *
+>> + * This is a convenience wrapper around
+>> + * rpi_firmware_property_list() to avoid some of the
+>> + * boilerplate in property calls.
+>> + */
+>> +int rpi_firmware_property(struct device_node *of_node,
+>> +			  u32 tag, void *tag_data, size_t buf_size)
+>
+> To use the firmware property functions, I need a DT node pointer.
+> Since Device Tree is dynamic now, should I fetch the firmware node
+> each time, or should I do that in probe and store the node pointer?
+>
+> Device Tree:
+>          firmware: firmware {
+>              compatible = "raspberrypi,firmware";
+>          };
+>
+>          thermal {
+>              compatible = "brcm,bcm2835-thermal";
+>              firmware = <&firmware>;
+>          };
+
+I'm doing it in probe in my clients -- I don't see why the firmware
+device's node would change.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150518/8519ace7/attachment.sig>
