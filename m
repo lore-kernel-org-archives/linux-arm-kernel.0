@@ -1,41 +1,124 @@
-From: colin.king@canonical.com (Colin Ian King)
-Date: Mon, 18 May 2015 14:26:01 +0100
-Subject: [PATCH][V3] ARM: pmu: fix memory leak due to early return not
- freeing irqs
-In-Reply-To: <5559E8AA.5080609@arm.com>
-References: <1431953873-12283-1-git-send-email-colin.king@canonical.com>
- <5559E8AA.5080609@arm.com>
-Message-ID: <5559E869.7050301@canonical.com>
+From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
+Date: Mon, 18 May 2015 21:29:37 +0800
+Subject: [PATCH 2/2] ARM64: mt8173: dts Add MT8173 cpufreq driver support
+In-Reply-To: <CALx668UiU73HAwGdezrXDxTm_4_N0HUJQFYa1E_Guv_j3NG00g@mail.gmail.com>
+References: <1429522047-16675-1-git-send-email-pi-cheng.chen@linaro.org>
+ <1429522047-16675-3-git-send-email-pi-cheng.chen@linaro.org>
+ <20150423125358.GA29702@leverpostej>
+ <CALx668UiU73HAwGdezrXDxTm_4_N0HUJQFYa1E_Guv_j3NG00g@mail.gmail.com>
+Message-ID: <CALx668WZwdTao4o-u4JPLLM3F9nQh0_HpG0es3JNAQBcapOa9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/05/15 14:27, Sudeep Holla wrote:
-> 
-> 
-> On 18/05/15 13:57, Colin King wrote:
->> From: Colin Ian King <colin.king@canonical.com>
+On Fri, Apr 24, 2015 at 3:09 PM, Pi-Cheng Chen <pi-cheng.chen@linaro.org> wrote:
+> Hi Mark,
+>
+> Thanks for reviewing.
+>
+> On Thu, Apr 23, 2015 at 8:53 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> On Mon, Apr 20, 2015 at 10:27:27AM +0100, pi-cheng.chen wrote:
+>>> This patch adds voltage supplies and clocks used by MT8173 cpufreq driver.
+>>>
+>>> Signed-off-by: pi-cheng.chen <pi-cheng.chen@linaro.org>
 >>
->> Recent commit 338d9dd3e2ae ("ARM: 8351/1: perf: don't warn about
->> missing interrupt-affinity property for PPIs") introduced a memory
->> leak of irqs on the "Don't bother with PPIs" return path. This issue
->> was picked up by static analysis by cppcheck:
+>> This series has no bindings for these properties.
+>
+> Will add documents for these.
+>
 >>
->> [arch/arm/kernel/perf_event_cpu.c:315]: (error) Memory leak: irqs
+>>> ---
+>>>  arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 9 +++++++++
+>>>  arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 6 ++++++
+>>>  2 files changed, 15 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+>>> index 96e141c..7a00cfe 100644
+>>> --- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+>>> +++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+>>> @@ -330,3 +330,12 @@
+>>>       status = "okay";
+>>>       clock-frequency = <100000>;
+>>>  };
+>>> +
+>>> +&cpu0 {
+>>> +     proc-supply = <&mt6397_vpca15_reg>;
+>>> +};
+>>> +
+>>> +&cpu2 {
+>>> +     proc-supply = <&da9211_vcpu_reg>;
+>>> +     sram-supply = <&mt6397_vsramca7_reg>;
+>>> +};
 >>
->> Instead, perform allocation of irqs after getting the irq hence
->> removing need to clean up an allocation on the PPI affine return path.
 >>
->> Fixes: 338d9dd3e2ae ("ARM: 8351/1: perf: don't warn about missing
->> interrupt-affinity property for PPIs")
-> 
-> Will Deacon has similar patch[1] in Russell's patch tracker(8357/1)
-> 
-> Regards,
-> Sudeep
+>> Why do only two CPUs have these properties, and why does one need an
+>> sram-supply?
+>
+> For better description of hardware, I think putting these properties in all CPUs
+> share the same supplies is logical.
+>
+> For each cluster of MT8173, we have both PROC and SRAM supplies. But only
+> on one cluster (cpu2 and cpu3) we need to control both voltage supplies. The
+> SRAM supply on cpu0 cluster is controlled by hardware automatically. Therefore
+> I put sram-supply only on cpu2. For better description of hardware, it
+> might be a
+> good idea to put the SRAM supply in cpu0 also though we don't use it in the
+> driver, right?
+>
+>>
+>>> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>>> index d9cc84e..b8a5454 100644
+>>> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>>> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>>> @@ -51,6 +51,9 @@
+>>>                       device_type = "cpu";
+>>>                       compatible = "arm,cortex-a53";
+>>>                       reg = <0x000>;
+>>> +                     clocks = <&infracfg INFRA_CA53SEL>,
+>>> +                              <&apmixedsys APMIXED_MAINPLL>;
+>>> +                     clock-names = "cpu", "intermediate";
+>>>               };
+>>>
+>>>               cpu1: cpu at 1 {
+>>> @@ -65,6 +68,9 @@
+>>>                       compatible = "arm,cortex-a57";
+>>>                       reg = <0x100>;
+>>>                       enable-method = "psci";
+>>> +                     clocks = <&infracfg INFRA_CA57SEL>,
+>>> +                              <&apmixedsys APMIXED_MAINPLL>;
+>>> +                     clock-names = "cpu", "intermediate";
+>>>               };
+>>
+>> We should really describe this information per-cpu rather than assuming
+>> that it's the same for siblings. Arbitrarily making one CPU in each
+>> cluster (or other arbitrary grouping) special for the binding is silly.
 
-OK, sorry for the dup and noise.
+Hi Mark,
 
-> 
-> [1]
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/342367.html
-> [2] http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8357/1
+Thanks for Viresh's clarification.
+
+>From a private conversation with Viresh:
+"This is because of a shortcoming in OPP bindings that we can't link
+them today to all CPUs using them and there is WIP there.
+All other platforms are passing it only for one CPU today,
+in order not to replicate them..."
+
+Our driver will be using those information for these CPUs only so I didn't
+replicate them for all CPUs.
+
+Would you please kindly give me some suggestion about what to do?
+Should I replicate those clock and regulator supply information for all CPUs?
+And OPP table as well?
+
+Thanks.
+
+>
+> Yes, I agree with you and same above. I did these because most of the
+> platforms in kernel did these. So should I do it the way you suggest?
+>
+> Thanks.
+>
+> Best Regards,
+> Pi-Cheng
+>
+>>
+>> Mark.
