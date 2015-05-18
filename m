@@ -1,37 +1,29 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 18 May 2015 01:19:18 -0400 (EDT)
-Subject: [linux-sunxi] [RFC 0/7] ARM: sun9i: SMP support with Multi-Cluster
- Power Management
-In-Reply-To: <20150517143816.GJ4004@lukather>
-References: <1431583811-25780-1-git-send-email-wens@csie.org>
- <1431770926.5748.41.camel@hellion.org.uk> <20150517143816.GJ4004@lukather>
-Message-ID: <alpine.LFD.2.11.1505180112570.4843@knanqh.ubzr>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 18 May 2015 07:54:21 +0200
+Subject: [PATCH v2] clk: mediatek: Initialize clk_init_data
+In-Reply-To: <1431920513-1491-1-git-send-email-jcliang@chromium.org>
+References: <1431920513-1491-1-git-send-email-jcliang@chromium.org>
+Message-ID: <20150518055421.GL6325@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 17 May 2015, Maxime Ripard wrote:
+Hi Ricky,
 
-> Hi Ian,
-> 
-> On Sat, May 16, 2015 at 11:08:46AM +0100, Ian Campbell wrote:
-> > On Thu, 2015-05-14 at 14:10 +0800, Chen-Yu Tsai wrote:
-> > > This is my attempt to support SMP and CPU hot plugging on the Allwinner
-> > > A80 SoC. The A80 is a big.Little processor with 2 clusters of 4x Cortex-A7
-> > > and 4x Cortex-A15 cores.
-> > 
-> > I thought there was a preference these days to support this sort of
-> > thing via support PSCI in the firmware, which allows for other things
-> > such as non-secure-world etc.
-> 
-> Yes, it is the preferred way. Meaning that if someone wants to do that
-> work, he's very much welcome and encouraged to do so. But if no one's
-> doing it, then we still have to have a way to bringup the secondary
-> CPUs.
+On Mon, May 18, 2015 at 11:41:49AM +0800, Ricky Liang wrote:
+> The variable init (struct clk_init_data) is allocated on the stack.
+> We weren't initializing the .flags field, so it contains random junk,
+> which can cause all kinds of interesting issues when the flags are
+> parsed by clk_register.
 
-And doing so in the kernel (at least initially) is simpler, and so much 
-easier to fix when it is broken.  We've seen a few systems already where 
-power management is crippled because no one is able/allowed/willing to 
-fix the broken firmware.
+It seems we have the same problem in clk-gate.c aswell. We do initialize
+do .flags field there, so this is no urgent problem, but we might get a
+real problem when additional fields are added to struct clk_init_data.
+Care to fix that aswell along with this patch?
 
+Sascha
 
-Nicolas
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
