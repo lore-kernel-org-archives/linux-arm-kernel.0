@@ -1,37 +1,46 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Mon, 18 May 2015 11:19:20 +0200
-Subject: [PATCH v5 3/3] ARM: berlin: add an ADC node for the BG2Q
+Date: Mon, 18 May 2015 11:19:19 +0200
+Subject: [PATCH v5 2/3] Documentation: bindings: document the Berlin ADC driver
 In-Reply-To: <1431940760-23896-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1431940760-23896-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1431940760-23896-4-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1431940760-23896-3-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the ADC node for the Berlin BG2Q, using the newly added
-Berlin IIO ADC driver.
+Following the addition of a Berlin ADC driver, this patch adds the
+corresponding bindings documentation.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+Acked-by: Jonathan Cameron <jic23@kernel.org>
 ---
- arch/arm/boot/dts/berlin2q.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ .../devicetree/bindings/iio/adc/berlin2_adc.txt       | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/berlin2_adc.txt
 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index 187d056f7ad2..97c7e19e3ec6 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -565,6 +565,13 @@
- 						function = "twsi3";
- 					};
- 				};
+diff --git a/Documentation/devicetree/bindings/iio/adc/berlin2_adc.txt b/Documentation/devicetree/bindings/iio/adc/berlin2_adc.txt
+new file mode 100644
+index 000000000000..908334c6b07f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/iio/adc/berlin2_adc.txt
+@@ -0,0 +1,19 @@
++* Berlin Analog to Digital Converter (ADC)
 +
-+				adc: adc {
-+					compatible = "marvell,berlin2-adc";
-+					interrupt-parent = <&sic>;
-+					interrupts = <12>, <14>;
-+					interrupt-names = "adc", "tsen";
-+				};
- 			};
- 
- 			sic: interrupt-controller at e000 {
++The Berlin ADC has 8 channels, with one connected to a temperature sensor.
++It is part of the system controller register set. The ADC node should be a
++sub-node of the system controller node.
++
++Required properties:
++- compatible: must be "marvell,berlin2-adc"
++- interrupts: the interrupts for the ADC and the temperature sensor
++- interrupt-names: should be "adc" and "tsen"
++
++Example:
++
++adc: adc {
++	compatible = "marvell,berlin2-adc";
++	interrupt-parent = <&sic>;
++	interrupts = <12>, <14>;
++	interrupt-names = "adc", "tsen";
++};
 -- 
 2.4.0
