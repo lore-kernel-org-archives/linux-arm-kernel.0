@@ -1,85 +1,43 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 18 May 2015 14:47:27 +0200
-Subject: [PATCH] vf610: dt: Nomenclature fixup for PTC12 pin used in
- RMII mode.
-In-Reply-To: <1431573098-23809-1-git-send-email-cory.tusar@pid1solutions.com>
-References: <1431573098-23809-1-git-send-email-cory.tusar@pid1solutions.com>
-Message-ID: <348facdd175a944356f046708b9a1e06@agner.ch>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 18 May 2015 14:49:26 +0200
+Subject: [PATCH v8 04/16] clocksource/drivers: Add ARM System timer driver
+In-Reply-To: <CALszF6BiKwDKejfpVgs6ojTxC4LSRfLSEaszXTGVy7xfbHLHZg@mail.gmail.com>
+References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>	<1431158038-3813-5-git-send-email-mcoquelin.stm32@gmail.com>
+ <CALszF6BiKwDKejfpVgs6ojTxC4LSRfLSEaszXTGVy7xfbHLHZg@mail.gmail.com>
+Message-ID: <5559DFD6.3050603@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-05-14 05:11, Cory Tusar wrote:
-> This commit includes a minor nomenclature fixup for boards based on the
-> Freescale VF610 SoC and which make use of the alternate "RMII1_RXD1"
-> functionality for pin PTC12.  This brings the macro name in-line with
-> both the datasheet and other similar macros.
+On 05/18/2015 01:55 PM, Maxime Coquelin wrote:
+> Hi Daniel,
+>
+> 2015-05-09 9:53 GMT+02:00 Maxime Coquelin <mcoquelin.stm32@gmail.com>:
+>> This patch adds clocksource support for ARMv7-M's System timer,
+>> also known as SysTick.
+>>
+>> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>> ---
+>>   drivers/clocksource/Kconfig          |  7 ++++
+>>   drivers/clocksource/Makefile         |  1 +
+>>   drivers/clocksource/armv7m_systick.c | 79 ++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 87 insertions(+)
+>>   create mode 100644 drivers/clocksource/armv7m_systick.c
+>>
+>
+> Could you consider applying this patch and its dt-bindings
+> documentation (patch 3/16) on your tree for v4.2?
 
-Thanks, stumbled upon this a while ago too, never came around creating a
-patch.
+Patches applied for 4.2.
 
-Acked-by: Stefan Agner <stefan@agner.ch>
+Thanks
 
-> 
-> Signed-off-by: Cory Tusar <cory.tusar@pid1solutions.com>
-> ---
->  arch/arm/boot/dts/vf-colibri.dtsi  | 2 +-
->  arch/arm/boot/dts/vf610-cosmic.dts | 2 +-
->  arch/arm/boot/dts/vf610-pinfunc.h  | 2 +-
->  arch/arm/boot/dts/vf610-twr.dts    | 2 +-
->  4 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/vf-colibri.dtsi
-> b/arch/arm/boot/dts/vf-colibri.dtsi
-> index fbef082..68ca125 100644
-> --- a/arch/arm/boot/dts/vf-colibri.dtsi
-> +++ b/arch/arm/boot/dts/vf-colibri.dtsi
-> @@ -140,7 +140,7 @@
->  				VF610_PAD_PTC9__ENET_RMII1_MDC		0x30d2
->  				VF610_PAD_PTC10__ENET_RMII1_MDIO	0x30d3
->  				VF610_PAD_PTC11__ENET_RMII1_CRS		0x30d1
-> -				VF610_PAD_PTC12__ENET_RMII_RXD1		0x30d1
-> +				VF610_PAD_PTC12__ENET_RMII1_RXD1	0x30d1
->  				VF610_PAD_PTC13__ENET_RMII1_RXD0	0x30d1
->  				VF610_PAD_PTC14__ENET_RMII1_RXER	0x30d1
->  				VF610_PAD_PTC15__ENET_RMII1_TXD1	0x30d2
-> diff --git a/arch/arm/boot/dts/vf610-cosmic.dts
-> b/arch/arm/boot/dts/vf610-cosmic.dts
-> index fd8758b..5447f25 100644
-> --- a/arch/arm/boot/dts/vf610-cosmic.dts
-> +++ b/arch/arm/boot/dts/vf610-cosmic.dts
-> @@ -68,7 +68,7 @@
->  				VF610_PAD_PTC9__ENET_RMII1_MDC		0x30d2
->  				VF610_PAD_PTC10__ENET_RMII1_MDIO	0x30d3
->  				VF610_PAD_PTC11__ENET_RMII1_CRS		0x30d1
-> -				VF610_PAD_PTC12__ENET_RMII_RXD1		0x30d1
-> +				VF610_PAD_PTC12__ENET_RMII1_RXD1	0x30d1
->  				VF610_PAD_PTC13__ENET_RMII1_RXD0	0x30d1
->  				VF610_PAD_PTC14__ENET_RMII1_RXER	0x30d1
->  				VF610_PAD_PTC15__ENET_RMII1_TXD1	0x30d2
-> diff --git a/arch/arm/boot/dts/vf610-pinfunc.h
-> b/arch/arm/boot/dts/vf610-pinfunc.h
-> index 1ee681f..fcad713 100644
-> --- a/arch/arm/boot/dts/vf610-pinfunc.h
-> +++ b/arch/arm/boot/dts/vf610-pinfunc.h
-> @@ -369,7 +369,7 @@
->  #define VF610_PAD_PTC11__MLB_DATA		0x0E0 0x358 ALT6 0x1
->  #define VF610_PAD_PTC11__DEBUG_OUT		0x0E0 0x000 ALT7 0x0
->  #define VF610_PAD_PTC12__GPIO_57		0x0E4 0x000 ALT0 0x0
-> -#define VF610_PAD_PTC12__ENET_RMII_RXD1		0x0E4 0x000 ALT1 0x0
-> +#define VF610_PAD_PTC12__ENET_RMII1_RXD1	0x0E4 0x000 ALT1 0x0
->  #define VF610_PAD_PTC12__ESAI_SDO1		0x0E4 0x318 ALT3 0x1
->  #define VF610_PAD_PTC12__SAI2_TX_BCLK		0x0E4 0x370 ALT5 0x1
->  #define VF610_PAD_PTC12__DEBUG_OUT3		0x0E4 0x000 ALT7 0x0
-> diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-> index f64fddc..375ab23 100644
-> --- a/arch/arm/boot/dts/vf610-twr.dts
-> +++ b/arch/arm/boot/dts/vf610-twr.dts
-> @@ -221,7 +221,7 @@
->  				VF610_PAD_PTC9__ENET_RMII1_MDC		0x30d2
->  				VF610_PAD_PTC10__ENET_RMII1_MDIO	0x30d3
->  				VF610_PAD_PTC11__ENET_RMII1_CRS		0x30d1
-> -				VF610_PAD_PTC12__ENET_RMII_RXD1		0x30d1
-> +				VF610_PAD_PTC12__ENET_RMII1_RXD1	0x30d1
->  				VF610_PAD_PTC13__ENET_RMII1_RXD0	0x30d1
->  				VF610_PAD_PTC14__ENET_RMII1_RXER	0x30d1
->  				VF610_PAD_PTC15__ENET_RMII1_TXD1	0x30d2
+   -- Daniel
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
