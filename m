@@ -1,86 +1,92 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 May 2015 22:26:33 +0200
-Subject: [PATCH] ARM: uniphier: only select TWD for SMP
-In-Reply-To: <CAK7LNATdibWyVuMMyw2h5MMVJFdEu4TWrDoGpGC9cPj068FXiQ@mail.gmail.com>
-References: <2227073.rylFc5jIqu@wuerfel>
- <CAK7LNATdibWyVuMMyw2h5MMVJFdEu4TWrDoGpGC9cPj068FXiQ@mail.gmail.com>
-Message-ID: <2076486.2f0MnouCnx@wuerfel>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 18 May 2015 13:28:48 -0700
+Subject: [PATCH 11/15] thermal: thermal: Add support for hardware-tracked
+ trip points
+In-Reply-To: <555A39EA.1060608@kapsi.fi>
+References: <1431507163-19933-1-git-send-email-s.hauer@pengutronix.de>
+ <1431507163-19933-12-git-send-email-s.hauer@pengutronix.de>
+ <5559ABAA.6040001@kapsi.fi> <20150518120944.GQ6325@pengutronix.de>
+ <20150518184433.GS11598@ld-irv-0074> <555A39EA.1060608@kapsi.fi>
+Message-ID: <20150518202848.GT11598@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 May 2015 02:18:53 Masahiro Yamada wrote:
-> Hi Arnd,
-> 
-> 2015-05-19 0:55 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
-> > This makes uniphier behave like all the other platforms that
-> > support TWD, and only select this driver when SMP is enabled.
-> > Without this, we get a compile error on UP builds:
+On Mon, May 18, 2015 at 10:13:46PM +0300, Mikko Perttunen wrote:
+> On 05/18/2015 09:44 PM, Brian Norris wrote:
+> >On Mon, May 18, 2015 at 02:09:44PM +0200, Sascha Hauer wrote:
+> >>On Mon, May 18, 2015 at 12:06:50PM +0300, Mikko Perttunen wrote:
+> >>>One interesting thing I noticed was that at least the bang-bang
+> >>>governor only acts if the temperature is properly smaller than (trip
+> >>>temp - hysteresis). So perhaps we should specify the non-tripping
+> >>>range as [low, high)? Or we could change bang-bang.
+> >>
+> >>I wonder how we can protect against such off-by-one errors anyway.
+> >>Generally a hardware might operate on raw values rather than directly
+> >>in temperature values in ?C. This means a driver for this must have
+> >>celsius_to_raw and raw_to_celsius conversion functions. Now it can
+> >>happen that due to rounding errors celsius_to_raw(Tcrit) returns a raw
+> >>value that when converted back to celsius is different from the
+> >>original value in ?C. This would mean the hardware triggers an interrupt
+> >>for a trip point and the thermal core does not react because get_temp
+> >>actually returns a different temperature than previously programmed as
+> >>interrupt trigger. This way we would lose hot (or cold) events.
 > >
-> > arch/arm/kernel/smp_twd.c: In function 'twd_local_timer_of_register':
-> > arch/arm/kernel/smp_twd.c:391:20: error: 'setup_max_cpus' undeclared (first use in this function)
-> >
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > ---
-> > I'd like to apply this directly to the next/soc branch
-> >
-> > diff --git a/arch/arm/mach-uniphier/Kconfig b/arch/arm/mach-uniphier/Kconfig
-> > index a017b1dd9c78..b640458fd757 100644
-> > --- a/arch/arm/mach-uniphier/Kconfig
-> > +++ b/arch/arm/mach-uniphier/Kconfig
-> > @@ -5,7 +5,7 @@ config ARCH_UNIPHIER
-> >         select ARM_GLOBAL_TIMER
-> >         select ARM_GIC
-> >         select HAVE_ARM_SCU
-> > -       select HAVE_ARM_TWD
-> > +       select HAVE_ARM_TWD if SMP
-> >         help
-> >           Support for UniPhier SoC family developed by Socionext Inc.
-> >           (formerly, System LSI Business Division of Panasonic Corporation)
+> >This also highlights another fact: there's a race between interrupt
+> >generation and temperature reading (->get_temp()). I would expect any
+> >hardware interrupt thermal sensor would also have a latched temperature
+> >reading to correspond with it, and there would be no guarantee that this
+> >latched temperature will match the polled reading seen once you reach
+> >thermal_zone_device_update(). So a hardware driver might report a
+> >thermal update, but the temperature reported to the core won't
+> >necessarily match what interrupt was meant for.
 > 
+> Does this actually matter? The thermal core will reset trips and
+> apply cooling using the new - most recent - value. Using bang bang
+> as example, if the temperature has risen since the interrupt fired,
+> the cooling device will correctly not be switched off. If the
+> temperature has fallen, it will again be correctly switched off. The
+> only issue is then if the temperature is exactly 'trip temp - trip
+> hyst' which will cause set_trips to load the trip points below, but
+> not cause bang bang to turn off the cooling device, and the next
+> chance it will have will only be at the next below trip point. Well,
+> this is still safe (at least until you replace "cooling device" with
+> "heating device"), so maybe it isn't that big of an issue.
 > 
-> 
-> I am not familiar with smp_twd.c, but I think
-> the local timer and watchdog still exist in the ARM mpcore
-> even if it is a uni-processor implementation.
-> 
-> That is why I simply selected HAVE_ARM_TWD.
-> Am I doing something wrong?
+> Please point out if there's a problem with my line of reasoning.
 
-I was wondering about this too. Everybody else has the 'if SMP' dependency
-here, and if I leave it out, I get the build error. We could probably
-fix that build error easily, but I don't know what the exact reason is
-we can't have use the code when there is only one CPU.
+I'm not sure I followed exactly the reason for the low-temp/hyst corner
+case, but otherwise I guess that makes sense. The only problem IMO, is
+that you're encouraging the generation of spurious notifications; if the
+temperature is constantly changing right around 'trip temp', but it
+never settles above 'trip temp' long enough for the core to re-capture
+the high temperature scenario, you'll just keep making useless calls to
+thermal_zone_device_update(). This kind of defeats the purpose of the
+hysteresis, right?
 
-This was introduced as part of 904464b91eca8 ("ARM: 7655/1: smp_twd: make
-twd_local_timer_of_register() no-op for nosmp"), before that, we would
-just try to use the driver, but fail in one of these calls:
+I'd really rather have a high temperature interrupt generate exactly one
+notification to the core framework, and that the sensor driver can rely
+on that one interrupt being handled as a high temperature situation,
+allowing it to disable the high-temp interrupt.
 
-        twd_evt = alloc_percpu(struct clock_event_device);
-        err = request_percpu_irq(twd_ppi, twd_handler, "twd", twd_evt);
-        err = register_cpu_notifier(&twd_timer_cpu_nb);
+One of my biggest problems with the thermal subsystem so far is that
+thermal_zone_device_update() doesn't actually seem to have any specific
+semantic meaning. It just means that there was some reason to update
+something. So then, you have to reason about a particular thermal
+governor (bang bang) in order to make something sensible. If I want to
+use a different sort of user-space governor, then I have to reevaluate
+all these same assumptions, and it seems like I end up with a sub-par
+solution.
 
-which in turn causes a run-time warning. If we could fix that code
-to just work on non-SMP, we can probably use that driver on all
-machines that have the hardware.
+As a side note: I have patches to extend some of the uevent information
+passed by the user-space governor too, to accomplish what I'm suggesting
+above. Perhaps that would be a better way to discuss what I'm thinking.
 
-> Is it reasonable to have something depends on HAVE_ARM_TWD?
-> 
-> 
-> config SMP_ARM_TWD
->       depends on SMP && HAVE_ARM_TWD
-> 
-> 
-> 
-> obj-$(SMP_ARM_TWD)       +=   smp_twd.o
-> 
-> 
-> 
-> I am not sure...
+> FWIW - at least Tegra doesn't have a latched register like this.
+> There's just a bit indicating that an interrupt was raised and a
+> temperature register that updates according to the sensor's input
+> clock.
 
-This would probably work, but I'd like to understand the problem
-more thoroughly before we change the behavior.
+A sensor for Broadcom's BCM7xxx has a latched register. If I get the
+time, I'll post my driver soon.
 
-[adding Russell and Will to Cc, maybe they remember better why we
-do things the way we do here]
-
-	Arnd
+Brian
