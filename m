@@ -1,29 +1,26 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 18 May 2015 10:34:33 +0200
-Subject: [PATCH v2 1/5] kasan, x86: move KASAN_SHADOW_OFFSET to the arch
- Kconfig
-In-Reply-To: <55599821.40409@samsung.com>
-References: <1431698344-28054-1-git-send-email-a.ryabinin@samsung.com>
- <1431698344-28054-2-git-send-email-a.ryabinin@samsung.com>
- <1431775656.2341.10.camel@x220> <55599821.40409@samsung.com>
-Message-ID: <1431938073.2204.3.camel@x220>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Mon, 18 May 2015 10:37:51 +0200
+Subject: [PATCH v3 02/17] leds: port locomo leds driver to new locomo core
+In-Reply-To: <1431880077-26321-3-git-send-email-dbaryshkov@gmail.com>
+References: <1431880077-26321-1-git-send-email-dbaryshkov@gmail.com>
+ <1431880077-26321-3-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <5559A4DF.3010101@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-05-18 at 10:43 +0300, Andrey Ryabinin wrote:
-> On 05/16/2015 02:27 PM, Paul Bolle wrote:
-> > So perhaps the
-> > default line should actually read
-> > 	default 0xdffffc0000000000 if KASAN
-> > 
-> > after the move. Would that work?
-> 
-> Yes, but I would rather add "depends on KASAN".
+Hi Dmitry,
 
-That would have the same effect, as far as I can see, so if adding
-"depends on KASAN" works for you that's fine with me too.
+On 05/17/2015 06:27 PM, Dmitry Eremin-Solenikov wrote:
+> Adapt locomo leds driver to new locomo core setup.
+>
+> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> ---
+>   drivers/leds/Kconfig       |   2 +-
+>   drivers/leds/leds-locomo.c | 117 +++++++++++++++++++++++----------------------
+>   2 files changed, 61 insertions(+), 58 deletions(-)
 
-Thanks,
+Acked-by: Jacek Anaszewski <j.anaszewski@samsung.com>
 
-
-Paul Bolle
+-- 
+Best Regards,
+Jacek Anaszewski
