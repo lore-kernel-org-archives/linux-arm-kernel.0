@@ -1,61 +1,66 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 18 May 2015 18:09:13 +0100
-Subject: [PATCHv2 02/12] arm64: smp_plat: add get_logical_index
-In-Reply-To: <1431945503-6939-3-git-send-email-mark.rutland@arm.com>
-References: <1431945503-6939-1-git-send-email-mark.rutland@arm.com>
- <1431945503-6939-3-git-send-email-mark.rutland@arm.com>
-Message-ID: <20150518170912.GI21251@e104818-lin.cambridge.arm.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 19 May 2015 02:18:53 +0900
+Subject: [PATCH] ARM: uniphier: only select TWD for SMP
+In-Reply-To: <2227073.rylFc5jIqu@wuerfel>
+References: <2227073.rylFc5jIqu@wuerfel>
+Message-ID: <CAK7LNATdibWyVuMMyw2h5MMVJFdEu4TWrDoGpGC9cPj068FXiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 18, 2015 at 11:38:13AM +0100, Mark Rutland wrote:
-> The PSCI MIGRATE_INFO_UP_CPU call returns a physical ID, which we will
-> need to map back to a Linux logical ID.
-> 
-> Implement a reusable get_logical_index to map from a physical ID to a
-> logical ID.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+Hi Arnd,
+
+2015-05-19 0:55 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> This makes uniphier behave like all the other platforms that
+> support TWD, and only select this driver when SMP is enabled.
+> Without this, we get a compile error on UP builds:
+>
+> arch/arm/kernel/smp_twd.c: In function 'twd_local_timer_of_register':
+> arch/arm/kernel/smp_twd.c:391:20: error: 'setup_max_cpus' undeclared (first use in this function)
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->  arch/arm64/include/asm/smp_plat.h | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/smp_plat.h b/arch/arm64/include/asm/smp_plat.h
-> index 8dcd61e..7abf757 100644
-> --- a/arch/arm64/include/asm/smp_plat.h
-> +++ b/arch/arm64/include/asm/smp_plat.h
-> @@ -19,6 +19,8 @@
->  #ifndef __ASM_SMP_PLAT_H
->  #define __ASM_SMP_PLAT_H
->  
-> +#include <linux/cpumask.h>
-> +
->  #include <asm/types.h>
->  
->  struct mpidr_hash {
-> @@ -39,6 +41,20 @@ static inline u32 mpidr_hash_size(void)
->   */
->  extern u64 __cpu_logical_map[NR_CPUS];
->  #define cpu_logical_map(cpu)    __cpu_logical_map[cpu]
-> +/*
-> + * Retrieve logical cpu index corresponding to a given MPIDR.Aff*
-> + *  - mpidr: MPIDR.Aff* bits to be used for the look-up
-> + *
-> + * Returns the cpu logical index or -EINVAL on look-up error
-> + */
-> +static inline int get_logical_index(u64 mpidr)
-> +{
-> +	int cpu;
-> +	for (cpu = 0; cpu < nr_cpu_ids; cpu++)
-> +		if (cpu_logical_map(cpu) == mpidr)
-> +			return cpu;
-> +	return -EINVAL;
-> +}
+> I'd like to apply this directly to the next/soc branch
+>
+> diff --git a/arch/arm/mach-uniphier/Kconfig b/arch/arm/mach-uniphier/Kconfig
+> index a017b1dd9c78..b640458fd757 100644
+> --- a/arch/arm/mach-uniphier/Kconfig
+> +++ b/arch/arm/mach-uniphier/Kconfig
+> @@ -5,7 +5,7 @@ config ARCH_UNIPHIER
+>         select ARM_GLOBAL_TIMER
+>         select ARM_GIC
+>         select HAVE_ARM_SCU
+> -       select HAVE_ARM_TWD
+> +       select HAVE_ARM_TWD if SMP
+>         help
+>           Support for UniPhier SoC family developed by Socionext Inc.
+>           (formerly, System LSI Business Division of Panasonic Corporation)
 
-Do we guarantee that mpidr here only contains the affinity bits (i.e. no
-masking)? If yes:
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+
+I am not familiar with smp_twd.c, but I think
+the local timer and watchdog still exist in the ARM mpcore
+even if it is a uni-processor implementation.
+
+That is why I simply selected HAVE_ARM_TWD.
+Am I doing something wrong?
+
+
+
+Is it reasonable to have something depends on HAVE_ARM_TWD?
+
+
+config SMP_ARM_TWD
+      depends on SMP && HAVE_ARM_TWD
+
+
+
+obj-$(SMP_ARM_TWD)       +=   smp_twd.o
+
+
+
+I am not sure...
+
+
+-- 
+Best Regards
+Masahiro Yamada
