@@ -1,81 +1,70 @@
 From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Tue, 19 May 2015 00:40:06 +0800
-Subject: [PATCH v8 0/3] ARM: mediatek: Add driver for Mediatek I2C 
-Message-ID: <1431967209-5261-1-git-send-email-eddie.huang@mediatek.com>
+Date: Tue, 19 May 2015 00:40:07 +0800
+Subject: [PATCH v8 1/3] dt-bindings: Add I2C bindings for mt65xx/mt81xx.
+In-Reply-To: <1431967209-5261-1-git-send-email-eddie.huang@mediatek.com>
+References: <1431967209-5261-1-git-send-email-eddie.huang@mediatek.com>
+Message-ID: <1431967209-5261-2-git-send-email-eddie.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is for Mediatek SoCs I2C controller common bus driver.
+From: Xudong Chen <xudong.chen@mediatek.com>
 
-Earlier MTK SoC (for example, MT6589, MT8135) I2C HW has some limitations.
-New generation SoC like MT8173 fix following limitations:
+Add devicetree bindings for Mediatek Soc I2C driver.
 
-1. Only support one i2c_msg number. One exception is WRRD (write then read)
-mode. WRRD can have two i2c_msg numbers.
-
-2. Mediatek I2C controller support WRRD(write then read) mode, in WRRD
-mode the Repeat Start will be issued between 2 messages.
-In this driver if 2 messages is first write then read, the driver will
-combine 2 messages using Write-Read mode so the RS will be issued between
-the 2 messages.
-
-3. The max transfer data length is 255 in one message. In WRRD mode, the
-max data length of second msg is 31.
-
-MT8135 and MT6589 can control I2C pins on PMIC(MT6397) by setting the i2c
-registers in MT8135 side. In this case, driver should set OFFSET_PATH_DIR
-bit first, the operation on other registers are still the same.
-For now MT6589/MT8135 support this, MT6577/MT6595/MT8127 do not support.
-For example, If want to use I2C4/5/6 pins on MT8135 just need to enable
-the pinmux, else if want to use I2C pins on PMIC(MT6397) need to add
-"mediatek,have-pmic" property in the .dts file of each platform.
-
-This driver is based on 4.1-rc1.
-
-Change in v8:
-Fix Wolfram's review comments like sort include file order, remove thin
-wrapper functions, remove define number that only use once, and revise
-error return value.
-
-Change in v7:
-Fix mtk_i2c_of_match in wrong patch bug.
-
-Change in v6:
-1. Update binding document not use default clock-frequency as example.
-2. Add mtk_i2c_compatible struct and pass hardware capabilities
-   through of_device_id
-3. Remove some hardware setting in mtk_i2c_do_transfer to mtk_i2c_init_hw
-   so just init one time.
-4. Correct mtk_i2c_parse_dt don't set default clock bug.
-
-Change in v5:
-Apply new i2c_adapter_quirks patch [2]. Change to use dam_map_single to map
-dma buffer. Add spinlock to fix race condition. Check of_property_read_u32
-return value. Remove I2C_FUNC_10BIT_ADDR capability due to driver not implement.
-Add MT8173 I2C driver.
-
-Change in v4:
-Modify to support i2c_adapter_quirks base on Wolfram's patch [1].
-Remove check transfer size and WRRD combine code. Instead, fill quirk
-property and let i2c_check_for_quirks to do the filter.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/314804.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/325744.html
-
-Eddie Huang (1):
-  I2C: mediatek: Add driver for MediaTek MT8173 I2C controller
-
-Xudong Chen (2):
-  dt-bindings: Add I2C bindings for mt65xx/mt81xx.
-  I2C: mediatek: Add driver for MediaTek I2C controller
-
- .../devicetree/bindings/i2c/i2c-mt6577.txt         |  41 ++
- drivers/i2c/busses/Kconfig                         |   9 +
- drivers/i2c/busses/Makefile                        |   1 +
- drivers/i2c/busses/i2c-mt65xx.c                    | 715 +++++++++++++++++++++
- 4 files changed, 766 insertions(+)
+Signed-off-by: Xudong Chen <xudong.chen@mediatek.com>
+Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ .../devicetree/bindings/i2c/i2c-mt6577.txt         | 41 ++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
- create mode 100644 drivers/i2c/busses/i2c-mt65xx.c
 
---
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+new file mode 100644
+index 0000000..0ce6fa3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+@@ -0,0 +1,41 @@
++* Mediatek's I2C controller
++
++The Mediatek's I2C controller is used to interface with I2C devices.
++
++Required properties:
++  - compatible: value should be either of the following.
++      (a) "mediatek,mt6577-i2c", for i2c compatible with mt6577 i2c.
++      (b) "mediatek,mt6589-i2c", for i2c compatible with mt6589 i2c.
++      (c) "mediatek,mt8127-i2c", for i2c compatible with mt8127 i2c.
++      (d) "mediatek,mt8135-i2c", for i2c compatible with mt8135 i2c.
++      (e) "mediatek,mt8173-i2c", for i2c compatible with mt8173 i2c.
++  - reg: physical base address of the controller and dma base, length of memory
++    mapped region.
++  - interrupts: interrupt number to the cpu.
++  - clock-div: the fixed value for frequency divider of clock source in i2c
++    module. Each IC may be different.
++  - clocks: clock name from clock manager
++  - clock-names: Must include "main" and "dma", if enable have-pmic need include
++    "pmic" extra.
++
++Optional properties:
++  - clock-frequency: Frequency in Hz of the bus when transfer, the default value
++    is 100000.
++  - mediatek,have-pmic: platform can control i2c form special pmic side.
++    Only mt6589 and mt8135 support this feature.
++  - mediatek,use-push-pull: IO config use push-pull mode.
++
++Example:
++
++	i2c0: i2c at 1100d000 {
++			compatible = "mediatek,mt6577-i2c";
++			reg = <0x1100d000 0x70>,
++			      <0x11000300 0x80>;
++			interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_LOW>;
++			clock-frequency = <400000>;
++			mediatek,have-pmic;
++			clock-div = <16>;
++			clocks = <&i2c0_ck>, <&ap_dma_ck>;
++			clock-names = "main", "dma";
++	};
++
+-- 
 1.8.1.1.dirty
