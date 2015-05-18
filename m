@@ -1,53 +1,71 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 18 May 2015 18:49:57 +0100
-Subject: [PATCHv2 00/12] arm/arm64: Unify PSCI client support
-In-Reply-To: <1431945503-6939-1-git-send-email-mark.rutland@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 18 May 2015 18:55:32 +0100
+Subject: [PATCHv2 02/12] arm64: smp_plat: add get_logical_index
+In-Reply-To: <20150518170912.GI21251@e104818-lin.cambridge.arm.com>
 References: <1431945503-6939-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20150518174957.GT21251@e104818-lin.cambridge.arm.com>
+ <1431945503-6939-3-git-send-email-mark.rutland@arm.com>
+ <20150518170912.GI21251@e104818-lin.cambridge.arm.com>
+Message-ID: <20150518175532.GC7064@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 18, 2015 at 11:38:11AM +0100, Mark Rutland wrote:
-> This series unifies the 32-bit and 64-bit PSCI client code, moving the bulk of
-> the FW invocation and probing out to a common locaiton in drivers/firmware.
-> As part of this, the remaining edge cases for PSCI 0.2 (Trusted OSs rejecting
-> CPU_OFF) are accounted for, maknig both 32-bit adn 64-bit clients more robust.
+On Mon, May 18, 2015 at 06:09:13PM +0100, Catalin Marinas wrote:
+> On Mon, May 18, 2015 at 11:38:13AM +0100, Mark Rutland wrote:
+> > The PSCI MIGRATE_INFO_UP_CPU call returns a physical ID, which we will
+> > need to map back to a Linux logical ID.
+> > 
+> > Implement a reusable get_logical_index to map from a physical ID to a
+> > logical ID.
+> > 
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm64/include/asm/smp_plat.h | 16 ++++++++++++++++
+> >  1 file changed, 16 insertions(+)
+> > 
+> > diff --git a/arch/arm64/include/asm/smp_plat.h b/arch/arm64/include/asm/smp_plat.h
+> > index 8dcd61e..7abf757 100644
+> > --- a/arch/arm64/include/asm/smp_plat.h
+> > +++ b/arch/arm64/include/asm/smp_plat.h
+> > @@ -19,6 +19,8 @@
+> >  #ifndef __ASM_SMP_PLAT_H
+> >  #define __ASM_SMP_PLAT_H
+> >  
+> > +#include <linux/cpumask.h>
+> > +
+> >  #include <asm/types.h>
+> >  
+> >  struct mpidr_hash {
+> > @@ -39,6 +41,20 @@ static inline u32 mpidr_hash_size(void)
+> >   */
+> >  extern u64 __cpu_logical_map[NR_CPUS];
+> >  #define cpu_logical_map(cpu)    __cpu_logical_map[cpu]
+> > +/*
+> > + * Retrieve logical cpu index corresponding to a given MPIDR.Aff*
+> > + *  - mpidr: MPIDR.Aff* bits to be used for the look-up
+> > + *
+> > + * Returns the cpu logical index or -EINVAL on look-up error
+> > + */
+> > +static inline int get_logical_index(u64 mpidr)
+> > +{
+> > +	int cpu;
+> > +	for (cpu = 0; cpu < nr_cpu_ids; cpu++)
+> > +		if (cpu_logical_map(cpu) == mpidr)
+> > +			return cpu;
+> > +	return -EINVAL;
+> > +}
 > 
-> This results in a reasonable saving in terms of lines of code, and will allow
-> for PSCI 1.0 support to be unified form the beginning, avoiding further
-> duplication.
-> 
-> The series is based on v4.1-rc3.
-> 
-> Since v1 [1]:
-> * Fix build when PSCI isn't selected
-> * Don't indirect migrate_info_up_cpu
-> * Fix ver to u32 in psci_get_version
-> 
-> Thanks,
-> Mark.
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/341770.html
-> 
-> Mark Rutland (12):
->   arm/arm64: kvm: add missing PSCI include
->   arm64: smp_plat: add get_logical_index
->   arm64: smp: consistently use error codes
->   arm64: psci: remove unnecessary id indirection
->   arm64: psci: support unsigned return values
->   arm64: psci: account for Trusted OS instances
->   arm64: psci: kill psci_power_state
->   arm64: psci: remove ACPI coupling
->   arm64: psci: factor invocation code to drivers
->   drivers: psci: support native SMC{32,64} calls
->   ARM: migrate to common PSCI client code
->   MAINTAINERS: add PSCI entry
+> Do we guarantee that mpidr here only contains the affinity bits (i.e. no
+> masking)?
 
-So, apart from some comments I had, the series looks fine.
+In the DT and ACPI probe paths we reject IDs with bits other than the
+aff bits set.
 
-How do you plan to merge this? I'm happy for it to go through the
-arm-soc tree (hopefully there are no conflicts with some of Lorenzo's
-patches for the unification of ACPI/DT CPU initialisation).
+I don't currently have a sanity check in the code handling
+MIGRATE_INFO_UP_CPU, but I should add one.
 
--- 
-Catalin
+Would you like a warning here too?
+
+Mark.
