@@ -1,44 +1,53 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 18 May 2015 11:44:24 +0100
-Subject: [PATCH 1/2] ARM: simplify timer initialisation and remove
- arm_timer.h inclusion
-In-Reply-To: <20150518104223.GT2067@n2100.arm.linux.org.uk>
-References: <1430390662-18246-1-git-send-email-sudeep.holla@arm.com>
- <1430390662-18246-2-git-send-email-sudeep.holla@arm.com>
- <CAL_JsqK8pPLCkrVFHaWr-RhOkPzaF+D_kZ5h9BahvN7CoYZO0w@mail.gmail.com>
- <554239D5.4080301@arm.com> <20150518104223.GT2067@n2100.arm.linux.org.uk>
-Message-ID: <5559C288.7020703@arm.com>
+From: colin.king@canonical.com (Colin King)
+Date: Mon, 18 May 2015 12:00:36 +0100
+Subject: [PATCH][V2] ARM: 8351/1: perf: fix memory leak on return
+Message-ID: <1431946836-11243-1-git-send-email-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Colin Ian King <colin.king@canonical.com>
 
-On 18/05/15 11:42, Russell King - ARM Linux wrote:
-> On Thu, Apr 30, 2015 at 03:19:01PM +0100, Sudeep Holla wrote:
->>
->>
->> On 30/04/15 15:09, Rob Herring wrote:
->>> On Thu, Apr 30, 2015 at 5:44 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>>> The header asm/hardware/arm_timer.h is included in various machine
->>>> specific files to access TIMER_CTRL and initialise to a known state.
->>>> However that's not required as the clock{source,event} driver timer-sp
->>>> initialises all the timer being used.
->>>
->>> I believe the idea is not to initialize the timers being used, but the
->>> ones not being used and perhaps left running by the bootloader. Cases
->>> where the interrupt is shared could cause a problem.
->>>
->>
->> Ah OK, makes sense. I will wait for Russell to confirm. The main idea
->> was to keep the header file having offsets local to driver/clocksource
->> and avoid sharing it in include/linux but looks like that's not possible.
->
-> An alternative would be to have a new function, something like
-> sp804_disable() which takes the virtual address of the timer.
-> That'd still allow the platforms to disable all timers, but
-> without exposing the register stuff to them.
->
+Recent commit 3b8786ff7a1b31645ae2c26a2ec32dbd42ac1094
+("ARM: 8352/1: perf: Fix the pmu node name in warning message")
+introduced a memory leak of irqs on the "Don't bother with PPIs"
+return path. This was picked up by static analysis by cppcheck:
 
-Yes that's much better, will re-spin the patch accordingly.
+[arch/arm/kernel/perf_event_cpu.c:315]: (error) Memory leak: irqs
 
-Regards,
-Sudeep
+Perform allocation of irqs after getting the irq hence removing need to
+clean up an allocation on the PPI affine return path.
+
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ arch/arm/kernel/perf_event_cpu.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
+index 213919b..a7099ee 100644
+--- a/arch/arm/kernel/perf_event_cpu.c
++++ b/arch/arm/kernel/perf_event_cpu.c
+@@ -303,17 +303,17 @@ static int probe_current_pmu(struct arm_pmu *pmu)
+ 
+ static int of_pmu_irq_cfg(struct platform_device *pdev)
+ {
+-	int i, irq;
+-	int *irqs = kcalloc(pdev->num_resources, sizeof(*irqs), GFP_KERNEL);
+-
+-	if (!irqs)
+-		return -ENOMEM;
++	int i, irq, *irqs;
+ 
+ 	/* Don't bother with PPIs; they're already affine */
+ 	irq = platform_get_irq(pdev, 0);
+ 	if (irq >= 0 && irq_is_percpu(irq))
+ 		return 0;
+ 
++	irqs = kcalloc(pdev->num_resources, sizeof(*irqs), GFP_KERNEL);
++	if (!irqs)
++		return -ENOMEM;
++
+ 	for (i = 0; i < pdev->num_resources; ++i) {
+ 		struct device_node *dn;
+ 		int cpu;
+-- 
+2.1.4
