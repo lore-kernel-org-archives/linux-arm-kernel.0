@@ -1,57 +1,46 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 18 May 2015 21:57:17 +0800
-Subject: [PATCH] MAINTAINERS: update Shawn's email to use kernel.org one
-In-Reply-To: <1431783155-30384-1-git-send-email-shawnguo@kernel.org>
-References: <1431783155-30384-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <20150518135717.GH1071@dragon>
+From: msalter@redhat.com (Mark Salter)
+Date: Mon, 18 May 2015 09:58:45 -0400
+Subject: [PATCH] arm64: support ACPI tables outside of kernel RAM
+In-Reply-To: <20150518111143.GC21251@e104818-lin.cambridge.arm.com>
+References: <1431613373-10928-1-git-send-email-msalter@redhat.com>
+ <20150518111143.GC21251@e104818-lin.cambridge.arm.com>
+Message-ID: <1431957525.9933.4.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 16, 2015 at 09:32:35PM +0800, shawnguo at kernel.org wrote:
-> From: Shawn Guo <shawn.guo@linaro.org>
+On Mon, 2015-05-18 at 12:11 +0100, Catalin Marinas wrote:
+> On Thu, May 14, 2015 at 10:22:53AM -0400, Mark Salter wrote:
+> > There is no guarantee that ACPI tables will be located in RAM linearly
+> > mapped by the kernel. This could be because UEFI placed them below the
+> > kernel image or because mem= places them beyond the reach of the linear
+> > kernel mapping. Even though these tables are outside the linear mapped
+> > RAM, they still need to be accessed as normal memory in order to support
+> > unaligned accesses from ACPI code. In this case, the page_is_ram() test
+> > in acpi_os_ioremap() is not sufficient.
 > 
-> Update my email address to use kernel.org mailbox, so that emails
-> between kernel community and company can be separated.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> And can we not simply add the rest of the RAM to the resource list as
+> "System RAM" without being part of memblock?
 
-Arnd, Olof,
+If it is in "System RAM", then it needs a valid pfn and struct page.
+Parts of the kernel expect that (page_is_ram(), memory hotplug, etc).
 
-Please disregard this patch, and I will send an updated version.
+> 
+> > Additionally, if the table spans multiple pages, it may fall partially
+> > within the linear map and partially without. If the table overlaps the
+> > end of the linear map, the test for whether or not to use the existing
+> > mapping in ioremap_cache() could lead to a panic when ACPI code tries
+> > to access the part beyond the end of the linear map. This patch
+> > attempts to address these problems.
+> 
+> That's a problem with ioremap_cache() that should be fixed independently.
 
-Shawn
+I can submit that separately if you prefer.
 
-> ---
->  MAINTAINERS | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 2e5bbc0d68b2..a53e42fcba84 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1030,7 +1030,7 @@ F:	arch/arm/include/asm/hardware/dec21285.h
->  F:	arch/arm/mach-footbridge/
->  
->  ARM/FREESCALE IMX / MXC ARM ARCHITECTURE
-> -M:	Shawn Guo <shawn.guo@linaro.org>
-> +M:	Shawn Guo <shawnguo@kernel.org>
->  M:	Sascha Hauer <kernel@pengutronix.de>
->  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->  S:	Maintained
-> @@ -1041,7 +1041,7 @@ F:	arch/arm/boot/dts/imx*
->  F:	arch/arm/configs/imx*_defconfig
->  
->  ARM/FREESCALE VYBRID ARM ARCHITECTURE
-> -M:	Shawn Guo <shawn.guo@linaro.org>
-> +M:	Shawn Guo <shawnguo@kernel.org>
->  M:	Sascha Hauer <kernel@pengutronix.de>
->  R:	Stefan Agner <stefan@agner.ch>
->  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> -- 
-> 1.9.1
+> Ideally, I'd like to see the ACPI code use different APIs to distinguish
+> between table access in RAM and device access, so that we don't have to
+> guess whether the page is RAM or not.
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+I don't think the ACPI code has enough info to make that decision, but
+I'm not sure honestly.
