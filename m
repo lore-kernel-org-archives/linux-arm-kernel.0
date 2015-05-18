@@ -1,29 +1,54 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 18 May 2015 09:56:50 -0300
-Subject: [PATCH v3] ARM: dts: cubox-i: add support for Broadcom
- Wifi/Bluetooth devices
-In-Reply-To: <CALHpu35HB4NgtSwc8zJBffrfsD0Kk9++_5kw4K_j2FuUf9sCzQ@mail.gmail.com>
-References: <1431358713-12379-1-git-send-email-fabio.estevam@freescale.com>
- <20150518113400.GE1071@dragon>
- <20150518115520.GW2067@n2100.arm.linux.org.uk>
- <20150518121017.GB1418@dragon>
- <CALHpu36rJuRWum+TGrM4cchKLxSVVup0cB58dFxANF=mAzLA0Q@mail.gmail.com>
- <CALHpu35HB4NgtSwc8zJBffrfsD0Kk9++_5kw4K_j2FuUf9sCzQ@mail.gmail.com>
-Message-ID: <CAOMZO5B6eO6OoaBB59=vbwpH+=p+hDqTDQfcN_=hg4j0nQq7Vw@mail.gmail.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Mon, 18 May 2015 14:57:08 +0200
+Subject: [PATCH v8 04/16] clocksource/drivers: Add ARM System timer driver
+In-Reply-To: <5559DFD6.3050603@linaro.org>
+References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1431158038-3813-5-git-send-email-mcoquelin.stm32@gmail.com>
+ <CALszF6BiKwDKejfpVgs6ojTxC4LSRfLSEaszXTGVy7xfbHLHZg@mail.gmail.com>
+ <5559DFD6.3050603@linaro.org>
+Message-ID: <CALszF6A5Z0wDpBOFveVjL19sMPAuqfnQJ+CwSgfXygmx46s7tQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
-
-On Mon, May 18, 2015 at 9:47 AM, Jon Nettleton <jon.nettleton@gmail.com> wrote:
-> okay tested.  Looks good on both the 4330 and 4329.
+2015-05-18 14:49 GMT+02:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
+> On 05/18/2015 01:55 PM, Maxime Coquelin wrote:
+>>
+>> Hi Daniel,
+>>
+>> 2015-05-09 9:53 GMT+02:00 Maxime Coquelin <mcoquelin.stm32@gmail.com>:
+>>>
+>>> This patch adds clocksource support for ARMv7-M's System timer,
+>>> also known as SysTick.
+>>>
+>>> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>>> ---
+>>>   drivers/clocksource/Kconfig          |  7 ++++
+>>>   drivers/clocksource/Makefile         |  1 +
+>>>   drivers/clocksource/armv7m_systick.c | 79
+>>> ++++++++++++++++++++++++++++++++++++
+>>>   3 files changed, 87 insertions(+)
+>>>   create mode 100644 drivers/clocksource/armv7m_systick.c
+>>>
+>>
+>> Could you consider applying this patch and its dt-bindings
+>> documentation (patch 3/16) on your tree for v4.2?
 >
-> Signed-off-by: Jon Nettleton <jon@solid-run.com>
+>
+> Patches applied for 4.2.
 
-Thanks for testing it.
+Thanks Daniel!
 
-Just to clarify: do you mean 'Tested-by' instead of 'Signed-off-by'?
-
-Regards,
-
-Fabio Estevam
+>
+> Thanks
+>
+>   -- Daniel
+>
+> --
+>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>
+> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+> <http://twitter.com/#!/linaroorg> Twitter |
+> <http://www.linaro.org/linaro-blog/> Blog
+>
