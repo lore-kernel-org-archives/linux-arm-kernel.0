@@ -1,113 +1,94 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 18 May 2015 11:38:16 +0100
-Subject: [PATCHv2 05/12] arm64: psci: support unsigned return values
+Date: Mon, 18 May 2015 11:38:14 +0100
+Subject: [PATCHv2 03/12] arm64: smp: consistently use error codes
 In-Reply-To: <1431945503-6939-1-git-send-email-mark.rutland@arm.com>
 References: <1431945503-6939-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1431945503-6939-6-git-send-email-mark.rutland@arm.com>
+Message-ID: <1431945503-6939-4-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PSCI_VERSION and MIGRATE_INFO_TYPE_UP_CPU return unsigned values, with
-the latter returning a 64-bit value. However, the PSCI invocation
-functions have prototypes returning int.
+cpu_kill currently returns one for success and zero for failure, which
+is unlike all the other cpu_operations, which return zero for success
+and an error code upon failure. This difference is unnecessarily
+confusing.
 
-This patch upgrades the invocation functions to return unsigned long,
-with a new typedef to keep things legible. As PSCI_VERSION cannot return
-a negative value, the erroneous check against PSCI_RET_NOT_SUPPORTED is
-also removed. The unrelated psci_initcall_t typedef is moved closer to
-its first user, to avoid confusion with the invocation functions.
-
-In preparation for sharing the code with ARM, unsigned long is used in
-preference of u64. In the SMC32 calling convention, the relevant fields
-will be 32 bits wide.
+Make cpu_kill consistent with the other cpu_operations.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/psci.c | 47 ++++++++++++++++++-----------------------------
- 1 file changed, 18 insertions(+), 29 deletions(-)
+ arch/arm64/kernel/psci.c |  7 +++----
+ arch/arm64/kernel/smp.c  | 10 +++++++---
+ 2 files changed, 10 insertions(+), 7 deletions(-)
 
 diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-index 66b5b75..9c4de4b 100644
+index ea18cb5..10fa25e 100644
 --- a/arch/arm64/kernel/psci.c
 +++ b/arch/arm64/kernel/psci.c
-@@ -56,11 +56,11 @@ struct psci_operations {
+@@ -498,7 +498,7 @@ static int cpu_psci_cpu_kill(unsigned int cpu)
+ 	int err, i;
  
- static struct psci_operations psci_ops;
+ 	if (!psci_ops.affinity_info)
+-		return 1;
++		return 0;
+ 	/*
+ 	 * cpu_kill could race with cpu_die and we can
+ 	 * potentially end up declaring this cpu undead
+@@ -509,7 +509,7 @@ static int cpu_psci_cpu_kill(unsigned int cpu)
+ 		err = psci_ops.affinity_info(cpu_logical_map(cpu), 0);
+ 		if (err == PSCI_0_2_AFFINITY_LEVEL_OFF) {
+ 			pr_info("CPU%d killed.\n", cpu);
+-			return 1;
++			return 0;
+ 		}
  
--static int (*invoke_psci_fn)(u64, u64, u64, u64);
--typedef int (*psci_initcall_t)(const struct device_node *);
--
--asmlinkage int __invoke_psci_fn_hvc(u64, u64, u64, u64);
--asmlinkage int __invoke_psci_fn_smc(u64, u64, u64, u64);
-+typedef unsigned long (psci_fn)(unsigned long, unsigned long,
-+				unsigned long, unsigned long);
-+asmlinkage psci_fn __invoke_psci_fn_hvc;
-+asmlinkage psci_fn __invoke_psci_fn_smc;
-+static psci_fn *invoke_psci_fn;
+ 		msleep(10);
+@@ -518,8 +518,7 @@ static int cpu_psci_cpu_kill(unsigned int cpu)
  
- enum psci_function {
- 	PSCI_FN_CPU_SUSPEND,
-@@ -112,12 +112,9 @@ static void psci_power_state_unpack(u32 power_state,
- 			PSCI_0_2_POWER_STATE_AFFL_SHIFT;
+ 	pr_warn("CPU%d may not have shut down cleanly (AFFINITY_INFO reports %d)\n",
+ 			cpu, err);
+-	/* Make op_cpu_kill() fail. */
+-	return 0;
++	return -ETIMEDOUT;
  }
+ #endif
+ #endif
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 2cb0081..3799df2 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -248,7 +248,7 @@ static int op_cpu_kill(unsigned int cpu)
+ 	 * time and hope that it's dead, so let's skip the wait and just hope.
+ 	 */
+ 	if (!cpu_ops[cpu]->cpu_kill)
+-		return 1;
++		return 0;
  
--static int psci_get_version(void)
-+static u32 psci_get_version(void)
- {
--	int err;
--
--	err = invoke_psci_fn(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
--	return err;
-+	return invoke_psci_fn(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
+ 	return cpu_ops[cpu]->cpu_kill(cpu);
  }
- 
- static int psci_cpu_suspend(struct psci_power_state state,
-@@ -293,25 +290,15 @@ static void __init psci_0_2_set_functions(void)
+@@ -261,6 +261,8 @@ static DECLARE_COMPLETION(cpu_died);
   */
- static int __init psci_probe(void)
+ void __cpu_die(unsigned int cpu)
  {
--	int ver = psci_get_version();
--
--	if (ver == PSCI_RET_NOT_SUPPORTED) {
--		/*
--		 * PSCI versions >=0.2 mandates implementation of
--		 * PSCI_VERSION.
--		 */
--		pr_err("PSCI firmware does not comply with the v0.2 spec.\n");
--		return -EOPNOTSUPP;
--	} else {
--		pr_info("PSCIv%d.%d detected in firmware.\n",
--				PSCI_VERSION_MAJOR(ver),
--				PSCI_VERSION_MINOR(ver));
--
--		if (PSCI_VERSION_MAJOR(ver) == 0 &&
--				PSCI_VERSION_MINOR(ver) < 2) {
--			pr_err("Conflicting PSCI version detected.\n");
--			return -EINVAL;
--		}
-+	u32 ver = psci_get_version();
++	int err;
 +
-+	pr_info("PSCIv%d.%d detected in firmware.\n",
-+			PSCI_VERSION_MAJOR(ver),
-+			PSCI_VERSION_MINOR(ver));
-+
-+	if (PSCI_VERSION_MAJOR(ver) == 0 && PSCI_VERSION_MINOR(ver) < 2) {
-+		pr_err("Conflicting PSCI version detected.\n");
-+		return -EINVAL;
- 	}
- 
- 	psci_0_2_set_functions();
-@@ -319,6 +306,8 @@ static int __init psci_probe(void)
- 	return 0;
+ 	if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(5000))) {
+ 		pr_crit("CPU%u: cpu didn't die\n", cpu);
+ 		return;
+@@ -273,8 +275,10 @@ void __cpu_die(unsigned int cpu)
+ 	 * verify that it has really left the kernel before we consider
+ 	 * clobbering anything it might still be using.
+ 	 */
+-	if (!op_cpu_kill(cpu))
+-		pr_warn("CPU%d may not have shut down cleanly\n", cpu);
++	err = op_cpu_kill(cpu);
++	if (err)
++		pr_warn("CPU%d may not have shut down cleanly: %d\n",
++			cpu, err);
  }
  
-+typedef int (*psci_initcall_t)(const struct device_node *);
-+
  /*
-  * PSCI init function for PSCI versions >=0.2
-  *
 -- 
 1.9.1
