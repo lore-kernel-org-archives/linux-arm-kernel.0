@@ -1,65 +1,26 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 18 May 2015 15:09:24 +0100
-Subject: [PATCH] irqchip: GICv3: ITS: don't assume 64K page size in
- its_alloc_tables
-In-Reply-To: <CY1PR0301MB074884E252ADE216BD8C472887C40@CY1PR0301MB0748.namprd03.prod.outlook.com>
-References: <1431644545-31904-1-git-send-email-stuart.yoder@freescale.com>
- <5559E7CE.1050003@arm.com>
- <CY1PR0301MB074884E252ADE216BD8C472887C40@CY1PR0301MB0748.namprd03.prod.outlook.com>
-Message-ID: <5559F294.5070701@arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 18 May 2015 16:11:20 +0200
+Subject: [PATCH v3] clk: mediatek: Initialize clk_init_data
+In-Reply-To: <1431957632-2182-1-git-send-email-jcliang@chromium.org>
+References: <1431957632-2182-1-git-send-email-jcliang@chromium.org>
+Message-ID: <20150518141120.GU6325@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/05/15 14:38, Stuart Yoder wrote:
+On Mon, May 18, 2015 at 10:00:26PM +0800, Ricky Liang wrote:
+> The variable init (struct clk_init_data) is allocated on the stack.
+> We weren't initializing the .flags field, so it contains random junk,
+> which can cause all kinds of interesting issues when the flags are
+> parsed by clk_register.
 > 
-> 
->> -----Original Message-----
->> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
->> Sent: Monday, May 18, 2015 8:23 AM
->> To: Yoder Stuart-B08248; tglx at linutronix.de
->> Cc: linux-arm-kernel at lists.infradead.org
->> Subject: Re: [PATCH] irqchip: GICv3: ITS: don't assume 64K page size in its_alloc_tables
->>
->> Hi Stuart,
->>
->> On 15/05/15 00:02, Stuart Yoder wrote:
->>> its_alloc_tables() needs to account for page sizes other than
->>> 64KB.  Without this change, when PAGE_SIZE=4KB its_alloc_tables()
->>> gets stuck in an infinite loop.
->>>
->>> Signed-off-by: Stuart Yoder <stuart.yoder@freescale.com>
->>> ---
->>>
->>> think this should go into 4.1 if at all possible...without it I am
->>> unable to boot a 4.1 kernel on the LS2085 SoC
->>
->> What you are suggesting here is a effectively a revert of commit
->> 790b57a, which would break other implementations.
->>
->> Can you please explain the actual issue? I'm failing to see how you end
->> up in an infinite loop here (the system page size and the ITS base
->> granule should be completely unrelated...).
-> 
-> Here is the problem line:
-> 
->       val |= (alloc_size / psz) - 1;
-> 
-> In our case:
->    alloc_size=16K
->    psz=64K
-> 
-> ...so (alloc_size / psz) = 0, and thus val becomes -1, and everything
-> is screwed up.  We get stuck in a loop to retry_baser:
+> Signed-off-by: Ricky Liang <jcliang@chromium.org>
 
-If alloc_size is 16k, you have an order of 2, and I have to assume this
-is an allocation for a device table (otherwise order would be 4). So
-things fail because we've computed an alloc_size smaller than what we
-want to allocate as a minimum.
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-Isn't that exactly what Minghuan's patch fixes?
+Sascha
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
