@@ -1,33 +1,47 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 18 May 2015 10:47:15 +0900
-Subject: [PATCH v2 3/4] ARM: multi_v7_defconfig: Enable TMU for Exynos
-In-Reply-To: <1431913636-31854-1-git-send-email-k.kozlowski@samsung.com>
-References: <1431913636-31854-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1431913636-31854-4-git-send-email-k.kozlowski@samsung.com>
+From: parkch98@gmail.com (Chanho Park)
+Date: Mon, 18 May 2015 10:52:14 +0900
+Subject: [PATCH v1 1/1] ARM: EXYNOS: fix DEBUG_LL on Cortex-A7.
+In-Reply-To: <1431844923-4654-2-git-send-email-t.dakhran@gmail.com>
+References: <1431844923-4654-1-git-send-email-t.dakhran@gmail.com>
+ <1431844923-4654-2-git-send-email-t.dakhran@gmail.com>
+Message-ID: <CAPTzV17YWyTiFU4wGs=Wy9quC_NzguXuqrheY_JoqAWN=VRniA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+Hi Tarek,
 
-Enable support for Thermal Monitoring Unit present on Exynos SoCs. This
-allows detection of overheat and handling this gracefully.
+On Sun, May 17, 2015 at 3:42 PM, Tarek Dakhran <t.dakhran@gmail.com> wrote:
+> Cortex-A7 has EXYNOS5_PA_UART base address for UART.
+> If system boots from Cortex-A7 CPU addruart loads wrong
+> address. This patch fixex this.
+>
+> Signed-off-by: Tarek Dakhran <t.dakhran@gmail.com>
+> ---
+>  arch/arm/include/debug/exynos.S | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/include/debug/exynos.S b/arch/arm/include/debug/exynos.S
+> index b17fdb7..a61b3ea 100644
+> --- a/arch/arm/include/debug/exynos.S
+> +++ b/arch/arm/include/debug/exynos.S
+> @@ -24,6 +24,7 @@
+>                 mrc     p15, 0, \tmp, c0, c0, 0
+>                 and     \tmp, \tmp, #0xf0
+>                 teq     \tmp, #0xf0             @@ A15
+> +               teqne   \tmp, #0x70             @@ A7
+>                 ldreq   \rp, =EXYNOS5_PA_UART
+>                 movne   \rp, #EXYNOS4_PA_UART   @@ EXYNOS4
+>                 ldr     \rv, =S3C_VA_UART
+> --
+> 1.9.1
+>
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Please see previous Joonyoung's patch. Your patch could break
+exynos3250 because it has not only two cortex-a7 cpus but also uses
+EXYOS4_PA_UART.
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index f09ae2089284..8fa7171b12f3 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -342,6 +342,7 @@ CONFIG_SENSORS_LM90=y
- CONFIG_SENSORS_LM95245=y
- CONFIG_THERMAL=y
- CONFIG_CPU_THERMAL=y
-+CONFIG_EXYNOS_THERMAL=m
- CONFIG_RCAR_THERMAL=y
- CONFIG_ARMADA_THERMAL=y
- CONFIG_DAVINCI_WATCHDOG
+http://www.spinics.net/lists/linux-samsung-soc/msg37318.html
+
 -- 
-1.9.1
+Best Regards,
+Chanho Park
