@@ -1,71 +1,50 @@
-From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
-Date: Mon, 18 May 2015 22:13:46 +0300
-Subject: [PATCH 11/15] thermal: thermal: Add support for hardware-tracked
- trip points
-In-Reply-To: <20150518184433.GS11598@ld-irv-0074>
-References: <1431507163-19933-1-git-send-email-s.hauer@pengutronix.de>
- <1431507163-19933-12-git-send-email-s.hauer@pengutronix.de>
- <5559ABAA.6040001@kapsi.fi> <20150518120944.GQ6325@pengutronix.de>
- <20150518184433.GS11598@ld-irv-0074>
-Message-ID: <555A39EA.1060608@kapsi.fi>
+From: lznuaa@gmail.com (Zhi Li)
+Date: Mon, 18 May 2015 14:30:50 -0500
+Subject: [PATCH 4/7] arm: dts: imx: update snvs to use syscon access
+ register
+In-Reply-To: <1431938725.3209.15.camel@pengutronix.de>
+References: <1431696990-23078-1-git-send-email-Frank.Li@freescale.com>
+ <1431696990-23078-5-git-send-email-Frank.Li@freescale.com>
+ <1431938725.3209.15.camel@pengutronix.de>
+Message-ID: <CAHrpEqSxgqUSWFkAh+R4K1oShsWfErE4nndxkYGGktMdkb3=xw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/18/2015 09:44 PM, Brian Norris wrote:
-> On Mon, May 18, 2015 at 02:09:44PM +0200, Sascha Hauer wrote:
->> On Mon, May 18, 2015 at 12:06:50PM +0300, Mikko Perttunen wrote:
->>> One interesting thing I noticed was that at least the bang-bang
->>> governor only acts if the temperature is properly smaller than (trip
->>> temp - hysteresis). So perhaps we should specify the non-tripping
->>> range as [low, high)? Or we could change bang-bang.
+On Mon, May 18, 2015 at 3:45 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> Hi Frank,
+>
+> Am Freitag, den 15.05.2015, 21:36 +0800 schrieb Frank.Li at freescale.com:
+>> From: Frank Li <Frank.Li@freescale.com>
 >>
->> I wonder how we can protect against such off-by-one errors anyway.
->> Generally a hardware might operate on raw values rather than directly
->> in temperature values in ?C. This means a driver for this must have
->> celsius_to_raw and raw_to_celsius conversion functions. Now it can
->> happen that due to rounding errors celsius_to_raw(Tcrit) returns a raw
->> value that when converted back to celsius is different from the
->> original value in ?C. This would mean the hardware triggers an interrupt
->> for a trip point and the thermal core does not react because get_temp
->> actually returns a different temperature than previously programmed as
->> interrupt trigger. This way we would lose hot (or cold) events.
+>> snvs is MFP device. Change dts to use syscon to allocate register resource.
+>>
+>> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+>> ---
+>>  arch/arm/boot/dts/imx6qdl.dtsi | 12 ++++--------
+>>  arch/arm/boot/dts/imx6sl.dtsi  | 12 ++++--------
+>>  arch/arm/boot/dts/imx6sx.dtsi  | 12 ++++--------
+>>  arch/arm/boot/dts/vfxxx.dtsi   |  9 +++------
+>>  4 files changed, 15 insertions(+), 30 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+>> index 0482a66..6d8161d 100644
+>> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+>> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+>> @@ -687,21 +687,17 @@
+>>                       };
+>>
+>>                       snvs at 020cc000 {
+>> -                             compatible = "fsl,sec-v4.0-mon", "simple-bus";
+>> -                             #address-cells = <1>;
+>> -                             #size-cells = <1>;
+>> -                             ranges = <0 0x020cc000 0x4000>;
+>> +                             compatible = "fsl,sec-v4.0-mon", "syscon",  "simple-bus";
 >
-> This also highlights another fact: there's a race between interrupt
-> generation and temperature reading (->get_temp()). I would expect any
-> hardware interrupt thermal sensor would also have a latched temperature
-> reading to correspond with it, and there would be no guarantee that this
-> latched temperature will match the polled reading seen once you reach
-> thermal_zone_device_update(). So a hardware driver might report a
-> thermal update, but the temperature reported to the core won't
-> necessarily match what interrupt was meant for.
+> The compatible should change from "simple-bus" to "simple-mfd", then.
 
-Does this actually matter? The thermal core will reset trips and apply 
-cooling using the new - most recent - value. Using bang bang as example, 
-if the temperature has risen since the interrupt fired, the cooling 
-device will correctly not be switched off. If the temperature has 
-fallen, it will again be correctly switched off. The only issue is then 
-if the temperature is exactly 'trip temp - trip hyst' which will cause 
-set_trips to load the trip points below, but not cause bang bang to turn 
-off the cooling device, and the next chance it will have will only be at 
-the next below trip point. Well, this is still safe (at least until you 
-replace "cooling device" with "heating device"), so maybe it isn't that 
-big of an issue.
-
-Please point out if there's a problem with my line of reasoning.
-
-FWIW - at least Tegra doesn't have a latched register like this. There's 
-just a bit indicating that an interrupt was raised and a temperature 
-register that updates according to the sensor's input clock.
+After change to simple-mfd,  driver can't been probed. Anything missed?
 
 >
-> I have a patch that adds a thermal_zone_device_update_temp() API, so
-> drivers can report the temperature along with the interrupt
-> notification. (Such a patch also helps so that the driver can choose to
-> round down on cold events and up on hot events, resolving your rounding
-> issue too.)
+> regards
+> Philipp
 >
-> Brian
->
-
-Cheers,
-Mikko
