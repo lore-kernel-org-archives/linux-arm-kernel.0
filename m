@@ -1,42 +1,40 @@
-From: lorenx4@gmail.com (Lorenzo Nava)
-Date: Mon, 18 May 2015 22:56:06 +0200
-Subject: [RFC] arm: DMA-API contiguous cacheable memory
-Message-ID: <CAE=W-e24oDH5RZfPftRg_xYBiG+b9Sj09vpyay9EwqOo9cVX1w@mail.gmail.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Mon, 18 May 2015 23:17:28 +0200
+Subject: [PATCH] iio: adc: xilinx-xadc: Convert to raw spinlock
+In-Reply-To: <55552570.5050407@ni.com>
+References: <1431013090-18996-1-git-send-email-xander.huff@ni.com>
+ <20150514171038.GG13442@linutronix.de> <55552570.5050407@ni.com>
+Message-ID: <20150518211728.GC4275@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+* Xander Huff | 2015-05-14 17:45:04 [-0500]:
 
-it's been a while since I've started working with DMA on ARM processor
-for a smart camera project. Typically the requirements is to have a
-large memory area which can be accessed by both DMA and user. I've
-already noticed that many people wonder about which would be the best
-way to have data received from DMA mapped in user space and, more
-important, mapped in a cacheable area of memory. Having a memory
-mapped region which is cacheable is very important if the user must
-access the data and make some sort of processing on that.
-My question is: why don't we introduce a function in the DMA-API
-interface for ARM processors which allows to allocate a contiguous and
-cacheable area of memory (> 4MB)?
-This new function can take advantage of the CMA mechanism as
-dma_alloc_coherent() function does, but using different PTE attribute
-for the allocated pages. Basically making a function similar to
-arm_dma_alloc() and set the attributes differently would do the trick:
+>With no other processes running, I got the following results after a
+>couple of hours on one of our devices:
+>
+>admin at Xander-roboRIO:~# cyclictest -S -m -p 98
+># /dev/cpu_dma_latency set to 0us
+>policy: fifo: loadavg: 0.01 0.07 0.12 1/176 1473
+>
+>T: 0 ( 1373) P:98 I:1000 C:6503872 Min:      9 Act:   13 Avg:   13 Max:      51
+>T: 1 ( 1374) P:98 I:1500 C:4335914 Min:      9 Act:   12 Avg:   13 Max:      49
+>
+>With a VI reading all default handles (raw, offset, scale,
+>sampling_frequency) in /sys/bus/iio/devices/iio:device0 constantly in
+>a while loop, I got the following results after a couple hours on the
+>same device:
+>
+>admin at Xander-roboRIO:~# cyclictest -S -m -p 98
+># /dev/cpu_dma_latency set to 0us
+>policy: fifo: loadavg: 6.93 7.30 7.47 3/182 1530
+>
+>T: 0 ( 1487) P:98 I:1000 C:4497008 Min:     11 Act:   20 Avg:   21 Max:      69
+>T: 1 ( 1488) P:98 I:1500 C:2998005 Min:     11 Act:   20 Avg:   22 Max:      59
 
-pgprot_t prot = __pgprot_modify(prot, L_PTE_MT_MASK,
-        L_PTE_MT_WRITEALLOC | L_PTE_XN)
+So there is an increase. And there is even a for-loop and I don't know
+how deep it is nested. Anyway, do you think it is worth it or would it
+be better to get rid of the raw-locks and simply push everything into
+threaded context?
 
-Of course this is very important for ARM processors as the pages
-attributes must be coherent among different addressing of the same
-physical memory, so this modification should eventually affect only
-contiguous cacheable memory areas.
-
-This will also make an improvement in the V4L2 interface which, for
-buffers which is larger then 4MB, is forced to use non-cacheable
-memory at the moment (with vb2_dma_contig_memops). The performance are
-very poor if users deal with non cacheable memory while performing
-image processing.
-
-Any comment will be very appreciated.
-Thanks.
-Cheers.
+Sebastian
