@@ -1,24 +1,47 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 18 May 2015 09:29:52 +0800
-Subject: [PATCH] ARM: imx: gpc: Remove .owner field
-In-Reply-To: <1431172283-30853-1-git-send-email-festevam@gmail.com>
-References: <1431172283-30853-1-git-send-email-festevam@gmail.com>
-Message-ID: <20150518012952.GB1071@dragon>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 18 May 2015 10:47:12 +0900
+Subject: [PATCH v2 0/4] ARM: multi_v7_defconfig: Stuff for Exynos
+Message-ID: <1431913636-31854-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 09, 2015 at 08:51:23AM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> This platform_driver does not need to set an owner as it will be 
-> populated by the driver core.
-> 
-> The semantic patch that makes this change is available
-> in scripts/coccinelle/api/platform_no_drv_owner.cocci.
-> 
-> More information about semantic patching is available at
-> http://coccinelle.lip6.fr/
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Dear Kukjin,
 
-Applied, thanks.
+
+Changes since v1:
+=================
+1. Select drivers as modules, whenever possible. Suggested by Javier.
+2. Patch 2: The I2C_GPIO is already enabled as module.
+
+
+Description
+===========
+The patchset enables various config options on multi_v7 config
+for Exynos boards.
+
+Arnd suggested [0] that this can go through your tree.
+
+Patchset is rebased on next-20150515 and Javier's patchset [1]
+(to avoid conflicts around regulators and clocks).
+
+Please let me know if this should be rebased on other commit.
+
+[0] http://www.spinics.net/lists/kernel/msg1991518.html
+[1] http://www.spinics.net/lists/kernel/msg1990767.html
+
+
+Best regards,
+Krzysztof
+
+Krzysztof Kozlowski (4):
+  ARM: multi_v7_defconfig: Enable CPU idle for Exynos
+  ARM: multi_v7_defconfig: Enable PMIC and MUIC drivers for Exynos
+    boards
+  ARM: multi_v7_defconfig: Enable TMU for Exynos
+  ARM: multi_v7_defconfig: Enable OHCI on Exynos
+
+ arch/arm/configs/multi_v7_defconfig | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+-- 
+1.9.1
