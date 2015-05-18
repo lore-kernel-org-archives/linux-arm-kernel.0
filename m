@@ -1,54 +1,48 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 18 May 2015 15:01:45 +0200
-Subject: [PATCH] ARM: fix BE8 module loading
-In-Reply-To: <2205892.6d8Sa1bONm@wuerfel>
-References: <2205892.6d8Sa1bONm@wuerfel>
-Message-ID: <CAKv+Gu_kD2GsFDk_gQDttOK5qwWML_3C+kfYisAwF0KXoNow6w@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 18 May 2015 15:03:33 +0200
+Subject: [PATCH v6 11/25] iommu: exynos: add support for binding more than
+ one sysmmu to master device
+In-Reply-To: <20150510223437.b651f6d2f3f0ead49eb72488@samsung.com>
+References: <1430727380-10912-1-git-send-email-m.szyprowski@samsung.com>
+ <1430727380-10912-12-git-send-email-m.szyprowski@samsung.com>
+ <20150510223437.b651f6d2f3f0ead49eb72488@samsung.com>
+Message-ID: <5559E325.2060106@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 May 2015 at 14:36, Arnd Bergmann <arnd@arndb.de> wrote:
-> The new veneer support for loadable modules on ARM uses the
-> __opcode_to_mem_thumb32() function to count R_ARM_THM_CALL
-> and R_ARM_THM_JUMP24 relocations.
->
-> However, this function is not defined for big-endian kernels
-> on ARMv5 or before, causing a compile-time error:
->
-> arch/arm/kernel/module-plts.c: In function 'count_plts':
-> arch/arm/kernel/module-plts.c:124:9: error: implicit declaration of function '__opcode_to_mem_thumb32' [-Werror=implicit-function-declaration]
->          __opcode_to_mem_thumb32(0x07ff2fff)))
->          ^
->
-> As we know that this part of the function is only needed for
-> Thumb2 kernels, and that those can never happen with BE8,
-> we can avoid the error by enclosing the code in an #ifdef.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 7d485f647c1 ("ARM: 8220/1: allow modules outside of bl range")
-> ---
-> Found with the randconfig builder on linux-next.
->
+Hello,
 
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-
-> diff --git a/arch/arm/kernel/module-plts.c b/arch/arm/kernel/module-plts.c
-> index 71a65c49871d..097e2e201b9f 100644
-> --- a/arch/arm/kernel/module-plts.c
-> +++ b/arch/arm/kernel/module-plts.c
-> @@ -118,11 +118,13 @@ static unsigned int count_plts(Elf32_Addr base, const Elf32_Rel *rel, int num)
->                                            __opcode_to_mem_arm(0x00ffffff)))
->                                 ret++;
->                         break;
-> +#ifdef CONFIG_THUMB2_KERNEL
->                 case R_ARM_THM_CALL:
->                 case R_ARM_THM_JUMP24:
->                         if (!duplicate_rel(base, rel, i,
->                                            __opcode_to_mem_thumb32(0x07ff2fff)))
->                                 ret++;
-> +#endif
->                 }
->         return ret;
->  }
+On 2015-05-10 15:34, Cho KyongHo wrote:
+> On Mon, 04 May 2015 10:16:06 +0200 Marek Szyprowski <m.szyprowski@samsung.com> wrote:
 >
+>> This patch adds support for assigning more than one SYSMMU controller to
+>> the master device. This has been achieved simply by chaning the struct
+>> device pointer in struct exynos_iommu_owner into the list of struct
+>> sysmmu_drvdata of all controllers assigned to the given master device.
+>>
+>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> ---
+>>   drivers/iommu/exynos-iommu.c | 11 +++++------
+>>   1 file changed, 5 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+>> index f2eceb6605c5..598660c87410 100644
+>> --- a/drivers/iommu/exynos-iommu.c
+>> +++ b/drivers/iommu/exynos-iommu.c
+>> @@ -186,7 +186,7 @@ static char *sysmmu_fault_name[SYSMMU_FAULTS_NUM] = {
+>>   
+>>   /* attached to dev.archdata.iommu of the master device */
+>>   struct exynos_iommu_owner {
+>> -	struct device *sysmmu;
+>> +	struct list_head clients;
+> 'clients' is the list of System MMUs that are assigned to the same iommu
+> domain. I don't think clients is not a good list name for exynos_iommu_owner
+> even though the elements are the same because they are used in different
+> contexts.
+
+Okay, I will rename it to 'controllers' then.
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
