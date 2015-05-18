@@ -1,27 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 May 2015 22:14:23 +0200
-Subject: [PATCH v2 0/5]  arm64: Juno DT updates and new DT for Juno R1
-In-Reply-To: <1431970109-8902-1-git-send-email-Liviu.Dudau@arm.com>
-References: <1431970109-8902-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <4136868.8yCICAPH00@wuerfel>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 18 May 2015 17:20:24 -0300
+Subject: [PATCH] ARM: dts: imx6dl-wandboard: Do not hardcode memory size
+Message-ID: <1431980424-11929-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 May 2015 18:28:24 Liviu Dudau wrote:
-> This series restructures the Juno DT files and introduces the DT
-> for the new Juno R1. The board is an update of the Juno R0 with
-> support for PCIe, but the current series only brings the board to
-> parity with Juno R0. The series that enable the PCIe Generic Host
-> Bridge to be used on Juno R1 will be posted separately.
-> 
-> Changes from v1:
->  - Moved memory node inside juno-base.dtsi as this is common between
->    boards and unlikely to change soon.
->  - Added "arm,juno-r1" as compatible string in juno-r1.dts at Jon Medhurst's
->    suggestion.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Are you planning to send a pull request to arm at kernel.org for this when
-you're happy with the state, or should we pick up the patches from the
-list?
+imx6dl-wandboard.dtb works for wandboard dual-lite and solo boards.
 
-	Arnd
+Wandboard dual-lite has 1 GB of RAM and wandboard solo has 512 MB, so
+do not hardcode the memory size in the dts file and let the bootloader
+pass the correct memory size instead.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx6dl-wandboard.dts | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6dl-wandboard.dts b/arch/arm/boot/dts/imx6dl-wandboard.dts
+index bbb6167..dcde3f6 100644
+--- a/arch/arm/boot/dts/imx6dl-wandboard.dts
++++ b/arch/arm/boot/dts/imx6dl-wandboard.dts
+@@ -15,8 +15,4 @@
+ / {
+ 	model = "Wandboard i.MX6 Dual Lite Board";
+ 	compatible = "wand,imx6dl-wandboard", "fsl,imx6dl";
+-
+-	memory {
+-		reg = <0x10000000 0x40000000>;
+-	};
+ };
+-- 
+1.9.1
