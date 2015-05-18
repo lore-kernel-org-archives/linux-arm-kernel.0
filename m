@@ -1,48 +1,32 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Mon, 18 May 2015 17:29:09 +0200
-Subject: [PATCH] ARM: stm32: do not try to use a ramdisk in defconfig
-In-Reply-To: <2564815.ICm4KsbZzD@wuerfel>
-References: <2564815.ICm4KsbZzD@wuerfel>
-Message-ID: <555A0545.1050505@st.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 18 May 2015 16:32:45 +0100
+Subject: [PATCH v2 0/2] ARM: move Dual-Timer SP804 driver to
+ drivers/clocksource
+In-Reply-To: <alpine.DEB.2.11.1505181633470.4225@nanos>
+References: <1430390662-18246-1-git-send-email-sudeep.holla@arm.com>
+ <1431953084-15700-1-git-send-email-sudeep.holla@arm.com>
+ <alpine.DEB.2.11.1505181633470.4225@nanos>
+Message-ID: <555A061D.6030401@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Russell,
 
-On 05/18/2015 05:19 PM, Arnd Bergmann wrote:
-> The original stm32 defconfig file looks for a ./rootfs.cpio file,
-> but that breaks with
+On 18/05/15 15:34, Thomas Gleixner wrote:
+> On Mon, 18 May 2015, Sudeep Holla wrote:
 >
->    ../scripts/gen_initramfs_list.sh: Cannot open './rootfs.cpio'
+>> Since there are ARM64 platforms(e.g. Juno) with SP804 timers, we need
+>> to move the driver out of arch/arm so that the code can be shared.
+>>
+>> Changes v1->v2:
+>> 	- introduces sp804_timer_disable and retained the integrator
+>> 	  and realview timer initialisation code as suggested by Russell
 >
-> when trying to build this kernel. Anybody who relies on the
-> current behavior should change their build scripts to append
-> the initramfs manually, as this patch removes that default
-> in order to help autmatic testing.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> I'm applying this to the next/defconfig branch directly, to get the
-> kernelci builder to succeed on this config.
->
-> diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
-> index af757925d0ae..fab9cf9bff02 100644
-> --- a/arch/arm/configs/stm32_defconfig
-> +++ b/arch/arm/configs/stm32_defconfig
-> @@ -2,7 +2,6 @@ CONFIG_NO_HZ_IDLE=y
->   CONFIG_HIGH_RES_TIMERS=y
->   CONFIG_LOG_BUF_SHIFT=16
->   CONFIG_BLK_DEV_INITRD=y
-> -CONFIG_INITRAMFS_SOURCE="./rootfs.cpio"
->   CONFIG_CC_OPTIMIZE_FOR_SIZE=y
->   # CONFIG_UID16 is not set
->   # CONFIG_BASE_FULL is not set
+> Please route this through ARM with my ACK.
 >
 
-Sorry, I forgot to remove it.
+I have put the patches in your patch system with tglx ack
+(8365/1 & 8366/1)
 
-Thanks for fixing the issue:
-Acked-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-
-Kind regards,
-Maxime
+Regards,
+Sudeep
