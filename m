@@ -1,26 +1,38 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 18 May 2015 16:11:20 +0200
-Subject: [PATCH v3] clk: mediatek: Initialize clk_init_data
-In-Reply-To: <1431957632-2182-1-git-send-email-jcliang@chromium.org>
-References: <1431957632-2182-1-git-send-email-jcliang@chromium.org>
-Message-ID: <20150518141120.GU6325@pengutronix.de>
+From: eric.nelson@boundarydevices.com (Eric Nelson)
+Date: Mon, 18 May 2015 07:12:29 -0700
+Subject: [PATCH 1/2] ARM: dts: nitrogen6x: use simple-panel instead of
+ display-timings for LVDS0
+In-Reply-To: <20150518075844.7e1b5916@ipc1.ka-ro>
+References: <1431804202-11067-1-git-send-email-eric.nelson@boundarydevices.com>	<1431804202-11067-2-git-send-email-eric.nelson@boundarydevices.com>
+ <20150518075844.7e1b5916@ipc1.ka-ro>
+Message-ID: <5559F34D.5090308@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 18, 2015 at 10:00:26PM +0800, Ricky Liang wrote:
-> The variable init (struct clk_init_data) is allocated on the stack.
-> We weren't initializing the .flags field, so it contains random junk,
-> which can cause all kinds of interesting issues when the flags are
-> parsed by clk_register.
+On 05/17/2015 10:58 PM, Lothar Wa?mann wrote:
+> Hi,
 > 
-> Signed-off-by: Ricky Liang <jcliang@chromium.org>
+>> Also add alias for backlight_lvds and connect it to the display.
+>>
+>> Signed-off-by: Eric Nelson <eric.nelson@boundarydevices.com>
+>> ---
+>>  arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 30 +++++++++++++++++-------------
+>>  1 file changed, 17 insertions(+), 13 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+>> index fd096dc..712c5ec 100644
+>> --- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+>> +++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+>> @@ -122,7 +122,7 @@
+>>  		status = "okay";
+>>  	};
+>>  
+>> -	backlight_lvds {
+>> +	backlight_lvds: backlight_lvds {
+>>
+> The patch does not add an 'alias', but a 'label'.
+> 
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Good catch.
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks for the clarification.
