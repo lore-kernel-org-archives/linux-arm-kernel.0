@@ -1,62 +1,36 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 18 May 2015 13:10:48 +0200
-Subject: [PATCH] arm64: Rename temp variable in read*_relaxed()
-Message-ID: <4f9792c7d10ca30a9b6ba5e2860b56814a41309c.1431947444.git.michal.simek@xilinx.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 18 May 2015 12:11:44 +0100
+Subject: [PATCH] arm64: support ACPI tables outside of kernel RAM
+In-Reply-To: <1431613373-10928-1-git-send-email-msalter@redhat.com>
+References: <1431613373-10928-1-git-send-email-msalter@redhat.com>
+Message-ID: <20150518111143.GC21251@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This resolves the following sparse warning from readl() and other
-macros, which ends up embedding readl_relaxed() using the same
-variable.
+On Thu, May 14, 2015 at 10:22:53AM -0400, Mark Salter wrote:
+> There is no guarantee that ACPI tables will be located in RAM linearly
+> mapped by the kernel. This could be because UEFI placed them below the
+> kernel image or because mem= places them beyond the reach of the linear
+> kernel mapping. Even though these tables are outside the linear mapped
+> RAM, they still need to be accessed as normal memory in order to support
+> unaligned accesses from ACPI code. In this case, the page_is_ram() test
+> in acpi_os_ioremap() is not sufficient.
 
-Warning log:
-include/asm-generic/io.h:364:16: warning: symbol '__v' shadows an
-earlier one
-include/asm-generic/io.h:364:16: originally declared here
-include/asm-generic/io.h:372:16: warning: symbol '__v' shadows an
-earlier one
-include/asm-generic/io.h:372:16: originally declared here
-include/asm-generic/io.h:380:16: warning: symbol '__v' shadows an
-earlier one
-include/asm-generic/io.h:380:16: originally declared here
-include/asm-generic/io.h:568:16: warning: symbol '__v' shadows an
-earlier one
-include/asm-generic/io.h:568:16: originally declared here
-include/asm-generic/io.h:576:16: warning: symbol '__v' shadows an
-earlier one
-include/asm-generic/io.h:576:16: originally declared here
-include/asm-generic/io.h:584:16: warning: symbol '__v' shadows an
-earlier one
-include/asm-generic/io.h:584:16: originally declared here
+And can we not simply add the rest of the RAM to the resource list as
+"System RAM" without being part of memblock?
 
-The same patch was already applied to arm32 as
-"ARM: 7118/1: rename temp variable in read*_relaxed()"
-(sha1: b0c1264f534a1cb3c52036a23a04d238434a0df6)
+> Additionally, if the table spans multiple pages, it may fall partially
+> within the linear map and partially without. If the table overlaps the
+> end of the linear map, the test for whether or not to use the existing
+> mapping in ioremap_cache() could lead to a panic when ACPI code tries
+> to access the part beyond the end of the linear map. This patch
+> attempts to address these problems.
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+That's a problem with ioremap_cache() that should be fixed independently.
 
- arch/arm64/include/asm/io.h | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+Ideally, I'd like to see the ACPI code use different APIs to distinguish
+between table access in RAM and device access, so that we don't have to
+guess whether the page is RAM or not.
 
-diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-index 540f7c0aea82..cb18715cc60f 100644
---- a/arch/arm64/include/asm/io.h
-+++ b/arch/arm64/include/asm/io.h
-@@ -117,10 +117,10 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
-  * ordering rules but do not guarantee any ordering relative to Normal memory
-  * accesses.
-  */
--#define readb_relaxed(c)	({ u8  __v = __raw_readb(c); __v; })
--#define readw_relaxed(c)	({ u16 __v = le16_to_cpu((__force __le16)__raw_readw(c)); __v; })
--#define readl_relaxed(c)	({ u32 __v = le32_to_cpu((__force __le32)__raw_readl(c)); __v; })
--#define readq_relaxed(c)	({ u64 __v = le64_to_cpu((__force __le64)__raw_readq(c)); __v; })
-+#define readb_relaxed(c)	({ u8  __r = __raw_readb(c); __r; })
-+#define readw_relaxed(c)	({ u16 __r = le16_to_cpu((__force __le16)__raw_readw(c)); __r; })
-+#define readl_relaxed(c)	({ u32 __r = le32_to_cpu((__force __le32)__raw_readl(c)); __r; })
-+#define readq_relaxed(c)	({ u64 __r = le64_to_cpu((__force __le64)__raw_readq(c)); __r; })
- 
- #define writeb_relaxed(v,c)	((void)__raw_writeb((v),(c)))
- #define writew_relaxed(v,c)	((void)__raw_writew((__force u16)cpu_to_le16(v),(c)))
 -- 
-2.3.5
+Catalin
