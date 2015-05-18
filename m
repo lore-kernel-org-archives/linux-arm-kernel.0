@@ -1,133 +1,59 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Mon, 18 May 2015 17:44:07 +0300
-Subject: [RESEND][PATCH 5/5] ARM: sa1100: properly split irqchip driver
-In-Reply-To: <1431960247-32646-1-git-send-email-dbaryshkov@gmail.com>
-References: <1431960247-32646-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1431960247-32646-5-git-send-email-dbaryshkov@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 18 May 2015 22:45:29 +0800
+Subject: [PATCH v2 03/10] clk: sunxi: Let divs clocks read the base factor
+ clock name from devicetree
+In-Reply-To: <5559ADBE.7060506@gmail.com>
+References: <1431707940-19372-1-git-send-email-jenskuske@gmail.com>
+ <1431707940-19372-4-git-send-email-jenskuske@gmail.com>
+ <CAGb2v64y8+bdya3N=gK-YEie3A9nVM5nuxRZTVPXYSaN6WzPoQ@mail.gmail.com>
+ <5559ADBE.7060506@gmail.com>
+Message-ID: <CAGb2v64SQZ74E5zn3XwgLtBh_PN=24bQ8RJ4oj8C+Gy0qAgtHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Finally properly split the irq driver into generic init code and irqchip
-driver.
+On Mon, May 18, 2015 at 5:15 PM, Jens Kuske <jenskuske@gmail.com> wrote:
+> Hi,
+>
+> On 05/16/15 04:10, Chen-Yu Tsai wrote:
+>> 2015?5?16? ??12:39? "Jens Kuske" <jenskuske@gmail.com>???
+> [..]
+>>> @@ -1141,6 +1133,7 @@ static void __init sunxi_divs_clk_setup(struct
+>> device_node *node,
+>>>         struct clk_gate *gate = NULL;
+>>>         struct clk_fixed_factor *fix_factor;
+>>>         struct clk_divider *divider;
+>>> +       struct factors_data factors = *data->factors;
+>
+> Isn't this a copy?
 
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
----
- arch/arm/mach-sa1100/generic.c     | 13 +++++++++++++
- drivers/irqchip/irq-sa11x0.c       | 18 ++++--------------
- include/linux/irqchip/irq-sa11x0.h | 16 ++++++++++++++++
- 3 files changed, 33 insertions(+), 14 deletions(-)
- create mode 100644 include/linux/irqchip/irq-sa11x0.h
+You're right. Sorry for the noise.
 
-diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
-index c651f6e..345e63f 100644
---- a/arch/arm/mach-sa1100/generic.c
-+++ b/arch/arm/mach-sa1100/generic.c
-@@ -20,6 +20,7 @@
- #include <linux/ioport.h>
- #include <linux/platform_device.h>
- #include <linux/reboot.h>
-+#include <linux/irqchip/irq-sa11x0.h>
- 
- #include <video/sa1100fb.h>
- 
-@@ -377,6 +378,18 @@ void __init sa1100_timer_init(void)
- 	pxa_timer_nodt_init(IRQ_OST0, io_p2v(0x90000000), 3686400);
- }
- 
-+static struct resource irq_resource =
-+	DEFINE_RES_MEM_NAMED(0x90050000, SZ_64K, "irqs");
-+
-+void __init sa1100_init_irq(void)
-+{
-+	request_resource(&iomem_resource, &irq_resource);
-+
-+	sa11x0_init_irq_nodt(IRQ_GPIO0_SC, irq_resource.start);
-+
-+	sa1100_init_gpio();
-+}
-+
- /*
-  * Disable the memory bus request/grant signals on the SA1110 to
-  * ensure that we don't receive spurious memory requests.  We set
-diff --git a/drivers/irqchip/irq-sa11x0.c b/drivers/irqchip/irq-sa11x0.c
-index a5e1a54..76b8c1d 100644
---- a/drivers/irqchip/irq-sa11x0.c
-+++ b/drivers/irqchip/irq-sa11x0.c
-@@ -15,16 +15,13 @@
- #include <linux/io.h>
- #include <linux/irq.h>
- #include <linux/irqdomain.h>
--#include <linux/ioport.h>
- #include <linux/syscore_ops.h>
-+#include <linux/irqchip/irq-sa11x0.h>
- 
- #include <soc/sa1100/pwer.h>
- 
--#include <mach/irqs.h>
- #include <asm/exception.h>
- 
--#include "../../arch/arm/mach-sa1100/generic.h"
--
- #define ICIP	0x00  /* IC IRQ Pending reg. */
- #define ICMR	0x04  /* IC Mask Reg.        */
- #define ICLR	0x08  /* IC Level Reg.       */
-@@ -86,9 +83,6 @@ static struct irq_domain_ops sa1100_normal_irqdomain_ops = {
- 
- static struct irq_domain *sa1100_normal_irqdomain;
- 
--static struct resource irq_resource =
--	DEFINE_RES_MEM_NAMED(0x90050000, SZ_64K, "irqs");
--
- static struct sa1100irq_state {
- 	unsigned int	saved;
- 	unsigned int	icmr;
-@@ -156,11 +150,9 @@ sa1100_handle_irq(struct pt_regs *regs)
- 	} while (1);
- }
- 
--void __init sa1100_init_irq(void)
-+void __init sa11x0_init_irq_nodt(int irq_start, resource_size_t io_start)
- {
--	request_resource(&iomem_resource, &irq_resource);
--
--	iobase = ioremap(irq_resource.start, SZ_64K);
-+	iobase = ioremap(io_start, SZ_64K);
- 	if (WARN_ON(!iobase))
- 		return;
- 
-@@ -177,10 +169,8 @@ void __init sa1100_init_irq(void)
- 	writel_relaxed(1, iobase + ICCR);
- 
- 	sa1100_normal_irqdomain = irq_domain_add_simple(NULL,
--			32, IRQ_GPIO0_SC,
-+			32, irq_start,
- 			&sa1100_normal_irqdomain_ops, NULL);
- 
- 	set_handle_irq(sa1100_handle_irq);
--
--	sa1100_init_gpio();
- }
-diff --git a/include/linux/irqchip/irq-sa11x0.h b/include/linux/irqchip/irq-sa11x0.h
-new file mode 100644
-index 0000000..2f66eca
---- /dev/null
-+++ b/include/linux/irqchip/irq-sa11x0.h
-@@ -0,0 +1,16 @@
-+/*
-+ * Generic IRQ handling for the SA11x0.
-+ *
-+ * Copyright (C) 1999-2001 Nicolas Pitre
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __INCLUDE_LINUX_IRQCHIP_IRQ_SA11x0_H
-+#define __INCLUDE_LINUX_IRQCHIP_IRQ_SA11x0_H
-+
-+void __init sa11x0_init_irq_nodt(int irq_start, resource_size_t io_start);
-+
-+#endif
--- 
-2.1.4
+>
+>>>         void __iomem *reg;
+>>>         int ndivs = SUNXI_DIVS_MAX_QTY, i = 0;
+>>>         int flags, clkflags;
+>>> @@ -1149,8 +1142,17 @@ static void __init sunxi_divs_clk_setup(struct
+>> device_node *node,
+>>>         if (data->ndivs)
+>>>                 ndivs = data->ndivs;
+>>>
+>>> +       /* Try to find a name for base factor clock */
+>>> +       for (i = 0; i < ndivs; i++) {
+>>> +               if (data->div[i].self) {
+>>> +                       of_property_read_string_index(node,
+>> "clock-output-names",
+>>> +                                                     i, &factors.name);
+>>
+>> Please excuse the bad formatting.
+>> I'm at the airport without my laptop.
+>>
+>> This will not work. All the static factors_data structs are const.
+>> You should make a copy of it, maybe on the stack,
+>> update the .name field, and pass that to sunxi_factors_clk_setup().
+>>
+>
+> If I didn't miss anything, or misunderstood what you want to copy, this
+> should be working fine.
+>
+> Jens
+>
