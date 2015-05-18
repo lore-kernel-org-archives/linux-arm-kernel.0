@@ -1,58 +1,59 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 18 May 2015 11:38:49 +0100
-Subject: [PATCH 1/2] ARM: simplify timer initialisation and remove
- arm_timer.h inclusion
-In-Reply-To: <20150518103302.GB21251@e104818-lin.cambridge.arm.com>
-References: <1430390662-18246-1-git-send-email-sudeep.holla@arm.com>
- <1430390662-18246-2-git-send-email-sudeep.holla@arm.com>
- <CAL_JsqK8pPLCkrVFHaWr-RhOkPzaF+D_kZ5h9BahvN7CoYZO0w@mail.gmail.com>
- <554239D5.4080301@arm.com> <555634F6.9060008@arm.com>
- <20150518103302.GB21251@e104818-lin.cambridge.arm.com>
-Message-ID: <5559C139.9030103@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 18 May 2015 11:38:13 +0100
+Subject: [PATCHv2 02/12] arm64: smp_plat: add get_logical_index
+In-Reply-To: <1431945503-6939-1-git-send-email-mark.rutland@arm.com>
+References: <1431945503-6939-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1431945503-6939-3-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The PSCI MIGRATE_INFO_UP_CPU call returns a physical ID, which we will
+need to map back to a Linux logical ID.
 
+Implement a reusable get_logical_index to map from a physical ID to a
+logical ID.
 
-On 18/05/15 11:33, Catalin Marinas wrote:
-> On Fri, May 15, 2015 at 07:03:34PM +0100, Sudeep Holla wrote:
->> On 30/04/15 15:19, Sudeep Holla wrote:
->>> On 30/04/15 15:09, Rob Herring wrote:
->>>> On Thu, Apr 30, 2015 at 5:44 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>>>> The header asm/hardware/arm_timer.h is included in various machine
->>>>> specific files to access TIMER_CTRL and initialise to a known state.
->>>>> However that's not required as the clock{source,event} driver timer-sp
->>>>> initialises all the timer being used.
->>>>
->>>> I believe the idea is not to initialize the timers being used, but the
->>>> ones not being used and perhaps left running by the bootloader. Cases
->>>> where the interrupt is shared could cause a problem.
->>
->> Russell, can you confirm if that's the case ?
->
-> Unless you want to test all these platforms, I would suggest we assume
-> this is the case. The comments even state "Initialise to a known state
-> (all timers off)".
->
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/smp_plat.h | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-OK makes sense.
-
->>> Ah OK, makes sense. I will wait for Russell to confirm. The main idea
->>> was to keep the header file having offsets local to driver/clocksource
->>> and avoid sharing it in include/linux but looks like that's not possible.
->>
->> Since we need this driver on ARM64, we might have to end up sharing the
->> header file with offsets if required for ARM platforms(though it would
->> be good to avoid it if there's any better alternative solution than that)
->
-> Can you not just move the definitions to
-> include/clocksource/timer-sp804.h and add some SP804_ prefix to avoid
-> name collisions?
->
-
-Yes I can do that and that's the alternate plan, wanted to avoid having
-SP804 timer internal register offsets in that header file hoping to
-contain those in the driver files if possible.
-
-Regards,
-Sudeep
+diff --git a/arch/arm64/include/asm/smp_plat.h b/arch/arm64/include/asm/smp_plat.h
+index 8dcd61e..7abf757 100644
+--- a/arch/arm64/include/asm/smp_plat.h
++++ b/arch/arm64/include/asm/smp_plat.h
+@@ -19,6 +19,8 @@
+ #ifndef __ASM_SMP_PLAT_H
+ #define __ASM_SMP_PLAT_H
+ 
++#include <linux/cpumask.h>
++
+ #include <asm/types.h>
+ 
+ struct mpidr_hash {
+@@ -39,6 +41,20 @@ static inline u32 mpidr_hash_size(void)
+  */
+ extern u64 __cpu_logical_map[NR_CPUS];
+ #define cpu_logical_map(cpu)    __cpu_logical_map[cpu]
++/*
++ * Retrieve logical cpu index corresponding to a given MPIDR.Aff*
++ *  - mpidr: MPIDR.Aff* bits to be used for the look-up
++ *
++ * Returns the cpu logical index or -EINVAL on look-up error
++ */
++static inline int get_logical_index(u64 mpidr)
++{
++	int cpu;
++	for (cpu = 0; cpu < nr_cpu_ids; cpu++)
++		if (cpu_logical_map(cpu) == mpidr)
++			return cpu;
++	return -EINVAL;
++}
+ 
+ void __init do_post_cpus_up_work(void);
+ 
+-- 
+1.9.1
