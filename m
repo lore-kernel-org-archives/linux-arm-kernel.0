@@ -1,38 +1,45 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 18 May 2015 18:28:24 +0100
-Subject: [PATCH v2 0/5]  arm64: Juno DT updates and new DT for Juno R1
-Message-ID: <1431970109-8902-1-git-send-email-Liviu.Dudau@arm.com>
+Date: Mon, 18 May 2015 18:28:27 +0100
+Subject: [PATCH v2 3/5] arm64: Juno: Add memory mapped timer node
+In-Reply-To: <1431970109-8902-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1431970109-8902-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1431970109-8902-4-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series restructures the Juno DT files and introduces the DT
-for the new Juno R1. The board is an update of the Juno R0 with
-support for PCIe, but the current series only brings the board to
-parity with Juno R0. The series that enable the PCIe Generic Host
-Bridge to be used on Juno R1 will be posted separately.
+Juno based boards have a memory mapped timer @ 0x2a810000. This
+is disabled on r0 version of the board due to an SoC errata.
 
-Changes from v1:
- - Moved memory node inside juno-base.dtsi as this is common between
-   boards and unlikely to change soon.
- - Added "arm,juno-r1" as compatible string in juno-r1.dts at Jon Medhurst's
-   suggestion.
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+---
+ arch/arm64/boot/dts/arm/juno-base.dtsi | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-Liviu Dudau (5):
-  arm64: Juno: Fix the GIC node address label and the frequency of FAXI
-    clock.
-  arm64: Juno: Split juno.dts into juno-base.dtsi and juno.dts.
-  arm64: Juno: Add memory mapped timer node
-  arm64: Juno: Add GICv2m support in device tree.
-  arm64: Add DT support for Juno r1 board.
-
- arch/arm64/boot/dts/arm/Makefile         |   2 +-
- arch/arm64/boot/dts/arm/juno-base.dtsi   | 154 +++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/arm/juno-clocks.dtsi |   4 +-
- arch/arm64/boot/dts/arm/juno-r1.dts      | 116 +++++++++++++++++++++++
- arch/arm64/boot/dts/arm/juno.dts         | 129 +-------------------------
- 5 files changed, 274 insertions(+), 131 deletions(-)
- create mode 100644 arch/arm64/boot/dts/arm/juno-base.dtsi
- create mode 100644 arch/arm64/boot/dts/arm/juno-r1.dts
-
+diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+index 5c4c035..b7e862f 100644
+--- a/arch/arm64/boot/dts/arm/juno-base.dtsi
++++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+@@ -2,6 +2,21 @@
+ 	 *  Devices shared by all Juno boards
+ 	 */
+ 
++	memtimer: timer at 2a810000 {
++		compatible = "arm,armv7-timer-mem";
++		reg = <0x0 0x2a810000 0x0 0x10000>;
++		clock-frequency = <50000000>;
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++		status = "disabled";
++		frame at 2a830000 {
++			frame-number = <1>;
++			interrupts = <0 60 4>;
++			reg = <0x0 0x2a830000 0x0 0x10000>;
++		};
++	};
++
+ 	gic: interrupt-controller at 2c010000 {
+ 		compatible = "arm,gic-400", "arm,cortex-a15-gic";
+ 		reg = <0x0 0x2c010000 0 0x1000>,
 -- 
 2.4.0
