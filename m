@@ -1,21 +1,45 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Mon, 18 May 2015 13:39:24 +0100
-Subject: [Xen-devel] [PATCH] xen/arm: Define xen_arch_suspend()
-In-Reply-To: <1431017723-27194-1-git-send-email-boris.ostrovsky@oracle.com>
-References: <1431017723-27194-1-git-send-email-boris.ostrovsky@oracle.com>
-Message-ID: <5559DD7C.1000508@citrix.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 18 May 2015 13:44:42 +0100
+Subject: [PATCH v2 0/2] ARM: move Dual-Timer SP804 driver to
+ drivers/clocksource
+In-Reply-To: <1430390662-18246-1-git-send-email-sudeep.holla@arm.com>
+References: <1430390662-18246-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1431953084-15700-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/15 17:55, Boris Ostrovsky wrote:
-> Commit 2b953a5e994c ("xen: Suspend ticks on all CPUs during suspend")
-> introduced xen_arch_suspend() routine but did so only for x86, breaking
-> ARM builds.
-> 
-> We need to add it to ARM as well.
+Since there are ARM64 platforms(e.g. Juno) with SP804 timers, we need
+to move the driver out of arch/arm so that the code can be shared.
 
-Applied to for-linus-4.1b, thanks.
+Changes v1->v2:
+	- introduces sp804_timer_disable and retained the integrator
+	  and realview timer initialisation code as suggested by Russell
 
-Sorry for the delay, I assumed that Stefano would have picked this up.
+v1: https://lkml.org/lkml/2015/4/30/225
 
-David
+Regards,
+Sudeep
+
+Sudeep Holla (2):
+  ARM: introduce sp804_timer_disable and remove arm_timer.h inclusion
+  ARM: move Dual-Timer SP804 driver to drivers/clocksource
+
+ arch/arm/Kconfig                                            |  5 -----
+ arch/arm/common/Makefile                                    |  1 -
+ arch/arm/mach-integrator/integrator_ap.c                    |  1 -
+ arch/arm/mach-nspire/nspire.c                               |  2 --
+ arch/arm/mach-realview/core.c                               | 13 ++++++-------
+ arch/arm/mach-versatile/core.c                              | 12 ++++++------
+ drivers/clocksource/Kconfig                                 |  5 +++++
+ drivers/clocksource/Makefile                                |  1 +
+ drivers/clocksource/timer-integrator-ap.c                   |  3 ++-
+ .../hardware/arm_timer.h => drivers/clocksource/timer-sp.h  |  5 -----
+ .../common/timer-sp.c => drivers/clocksource/timer-sp804.c  | 12 +++++++++---
+ .../timer-sp.h => include/clocksource/timer-sp804.h         |  5 +++++
+ 12 files changed, 34 insertions(+), 31 deletions(-)
+ rename arch/arm/include/asm/hardware/arm_timer.h => drivers/clocksource/timer-sp.h (93%)
+ rename arch/arm/common/timer-sp.c => drivers/clocksource/timer-sp804.c (97%)
+ rename arch/arm/include/asm/hardware/timer-sp.h => include/clocksource/timer-sp804.h (85%)
+
+--
+1.9.1
