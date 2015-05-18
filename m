@@ -1,35 +1,27 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 18 May 2015 16:09:31 -0400 (EDT)
-Subject: [PATCH net-next v3 2/2] net: Adding support for Cavium
- ThunderX network controller
-In-Reply-To: <1431747401-20847-3-git-send-email-aleksey.makarov@auriga.com>
-References: <1431747401-20847-1-git-send-email-aleksey.makarov@auriga.com>
- <1431747401-20847-3-git-send-email-aleksey.makarov@auriga.com>
-Message-ID: <20150518.160931.2235555994068443513.davem@davemloft.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 18 May 2015 22:14:23 +0200
+Subject: [PATCH v2 0/5]  arm64: Juno DT updates and new DT for Juno R1
+In-Reply-To: <1431970109-8902-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1431970109-8902-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <4136868.8yCICAPH00@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Aleksey Makarov <aleksey.makarov@auriga.com>
-Date: Fri, 15 May 2015 20:36:39 -0700
+On Monday 18 May 2015 18:28:24 Liviu Dudau wrote:
+> This series restructures the Juno DT files and introduces the DT
+> for the new Juno R1. The board is an update of the Juno R0 with
+> support for PCIe, but the current series only brings the board to
+> parity with Juno R0. The series that enable the PCIe Generic Host
+> Bridge to be used on Juno R1 will be posted separately.
+> 
+> Changes from v1:
+>  - Moved memory node inside juno-base.dtsi as this is common between
+>    boards and unlikely to change soon.
+>  - Added "arm,juno-r1" as compatible string in juno-r1.dts at Jon Medhurst's
+>    suggestion.
 
-> +/* Register read/write APIs */
-> +static void nic_reg_write(struct nicpf *nic, u64 offset, u64 val)
-> +{
-> +	writeq_relaxed(val, nic->reg_base + offset);
-> +}
-> +
-> +static u64 nic_reg_read(struct nicpf *nic, u64 offset)
-> +{
-> +	return readq_relaxed(nic->reg_base + offset);
-> +}
+Are you planning to send a pull request to arm at kernel.org for this when
+you're happy with the state, or should we pick up the patches from the
+list?
 
-Are you really sure it's OK to used relaxed ordering for all register
-accesses like this?
-
-Personally, I think it's asking for trouble.
-
-Maybe in _extremely_ specific situations in the packet processing
-fast path where you can clearly define the ordering needs when
-programming the mailbox registers, I'd say it's OK.
-
-But universally across the entire driver?  No way, no way at all.
+	Arnd
