@@ -1,33 +1,45 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Mon, 18 May 2015 09:18:26 +0200
-Subject: [PATCHv2 3/3] arch/arm64: Enable PREEMPT_RT_FULL
-In-Reply-To: <20150515120810.GA10988@8074w.roxell.se>
-References: <1430167990-12333-1-git-send-email-anders.roxell@linaro.org>
- <1430167990-12333-4-git-send-email-anders.roxell@linaro.org>
- <20150514155723.GD13442@linutronix.de>
- <20150515120810.GA10988@8074w.roxell.se>
-Message-ID: <55599242.4020803@linutronix.de>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 18 May 2015 09:24:49 +0200
+Subject: [PATCH v9 4/4] crypto: Add Allwinner Security System crypto
+ accelerator
+In-Reply-To: <20150518004121.GA11910@gondor.apana.org.au>
+References: <1431608341-10936-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1431608341-10936-5-git-send-email-clabbe.montjoie@gmail.com>
+ <20150517104508.468b032f@bbrezillon>
+ <20150517103440.GA7800@gondor.apana.org.au>
+ <20150517124811.797fab32@bbrezillon>
+ <20150518004121.GA11910@gondor.apana.org.au>
+Message-ID: <20150518092449.2364d21e@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15/2015 02:08 PM, Anders Roxell wrote:
-> On 2015-05-14 17:57, Sebastian Andrzej Siewior wrote:
->> * Anders Roxell | 2015-04-27 22:53:10 [+0200]:
->>
->>> arm64 is missing support for PREEMPT_RT. The main feature which is
->>> lacking is support for lazy preemption. The arch-specific entry code,
->>
->> I'm taking this but I am renaming the subject. Lazy preempt is not
->> required by -RT but supporting it benefits it. That means you could run
->> arm64 without it.
+Hi Herbert,
+
+On Mon, 18 May 2015 08:41:21 +0800
+Herbert Xu <herbert@gondor.apana.org.au> wrote:
+
+> On Sun, May 17, 2015 at 12:48:11PM +0200, Boris Brezillon wrote:
+> > 
+> > Yep, but then they shouldn't be declared with CRYPTO_ALG_ASYNC and as an
+
+                                                                  not ^
+
+> > ablkcipher algorithm (*Asynchronous* Block Cipher), right ?
 > 
-> Thanks for picking up the patch and fixing the subject,
-> though I was surprised to see the ownership changed.
+> Right.  They can still use ablkcipher but should clear the ASYNC
+> bit.
 
-Oh. The ownership ship changed only in #3 by mistake. I will fix it,
-sorry for that.
+Okay, just to be sure, what does "Asynchronous" mean in ablkcipher or
+ahash ?
+Is it related to the fact that crypto operations can be done in
+multiple steps (e.g.: one set_key + several encrypt chunk operations),
+or is this something else ?
 
-> Cheers,
-> Anders
+Best Regards,
 
-Sebastian
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
