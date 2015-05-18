@@ -1,72 +1,166 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 18 May 2015 14:25:27 +0200
-Subject: [PATCH v6 12/25] iommu: exynos: add support for runtime_pm
-In-Reply-To: <20150510223811.e9ea24574e67a6a55b0b1cd4@samsung.com>
-References: <1430727380-10912-1-git-send-email-m.szyprowski@samsung.com>
- <1430727380-10912-13-git-send-email-m.szyprowski@samsung.com>
- <20150510223811.e9ea24574e67a6a55b0b1cd4@samsung.com>
-Message-ID: <5559DA37.8090307@samsung.com>
+From: haikun.wang@freescale.com (Haikun Wang)
+Date: Mon, 18 May 2015 20:22:06 +0800
+Subject: [PATCH v1] arm: configs: Add Freescale LS1021A defconfig
+Message-ID: <1431951726-10992-1-git-send-email-haikun.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Add Freescale LS1021A initial defconfig file.
+Enable I2C, LPUART, eDMA, WDT default.
+LS1021AQDS and LS1021ATWR boot successfully with patch.
+Above IPs also been verified successfully.
 
-On 2015-05-10 15:38, Cho KyongHo wrote:
-> On Mon, 04 May 2015 10:16:07 +0200 Marek Szyprowski <m.szyprowski@samsung.com> wrote:
->
->> This patch fixes support for runtime power management for SYSMMU
->> controllers, so they are enabled when master device is attached.
->>
-> You should later think that this style of runtime PM support
-> will increase the leakage current because some devices may
-> enable System MMUs during they are not working.
-> If a device driver of a master device attaches its iommu domain
-> in probe, its local power will be never gated.
+Signed-off-by: Haikun Wang <haikun.wang@freescale.com>
+---
+ arch/arm/configs/ls1021a_defconfig | 140 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 140 insertions(+)
+ create mode 100644 arch/arm/configs/ls1021a_defconfig
 
-Yes, true, but let's merge something that WORKS first and add more 
-fine-grained
-runtime-pm later as a separate patch. Some time ago I've posted a 
-fully-blown
-patchset for Exynos IOMMU will all features 
-(https://lkml.org/lkml/2014/8/5/183)
-- but it turned out that it will be to hard to agree on all needed 
-features and
-dependencies, so I simplified the code as much as possible. All 
-remaining features
-(like fine-grained power management and access for more than one iommu 
-controller
-per device) will be posted separately.
-
->
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> ---
->>   drivers/iommu/exynos-iommu.c | 2 ++
->>   1 file changed, 2 insertions(+)
->>
->> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
->> index 598660c87410..734107ec78fa 100644
->> --- a/drivers/iommu/exynos-iommu.c
->> +++ b/drivers/iommu/exynos-iommu.c
->> @@ -702,6 +702,7 @@ static int exynos_iommu_attach_device(struct iommu_domain *domain,
->>   		return -ENODEV;
->>   
->>   	list_for_each_entry(data, &owner->clients, owner_node) {
->> +		pm_runtime_get_sync(data->sysmmu);
->>   		ret = __sysmmu_enable(data, pagetable, domain);
->>   		if (ret >= 0) {
->>   			data->master = dev;
->> @@ -743,6 +744,7 @@ static void exynos_iommu_detach_device(struct iommu_domain *domain,
->>   				data->master = NULL;
->>   				list_del_init(&data->domain_node);
->>   			}
->> +			pm_runtime_put(data->sysmmu);
->>   			found = true;
->>   		}
->>   	}
->> -- 
->> 1.9.2
-
-Best regards
+diff --git a/arch/arm/configs/ls1021a_defconfig b/arch/arm/configs/ls1021a_defconfig
+new file mode 100644
+index 0000000..3c893c8
+--- /dev/null
++++ b/arch/arm/configs/ls1021a_defconfig
+@@ -0,0 +1,140 @@
++CONFIG_SYSVIPC=y
++CONFIG_POSIX_MQUEUE=y
++CONFIG_NO_HZ_IDLE=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_LOG_BUF_SHIFT=16
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_SYSCTL_SYSCALL=y
++CONFIG_KALLSYMS_ALL=y
++CONFIG_EMBEDDED=y
++CONFIG_PROFILING=y
++CONFIG_OPROFILE=y
++CONFIG_KPROBES=y
++CONFIG_JUMP_LABEL=y
++CONFIG_MODULES=y
++CONFIG_MODULE_FORCE_LOAD=y
++CONFIG_MODULE_UNLOAD=y
++CONFIG_BLK_CMDLINE_PARSER=y
++CONFIG_ARCH_MXC=y
++CONFIG_SOC_LS1021A=y
++CONFIG_ARM_LPAE=y
++CONFIG_SMP=y
++CONFIG_VMSPLIT_2G=y
++CONFIG_PREEMPT_VOLUNTARY=y
++CONFIG_THUMB2_KERNEL=y
++CONFIG_HIGHMEM=y
++CONFIG_CLEANCACHE=y
++CONFIG_FRONTSWAP=y
++CONFIG_CMDLINE="console=ttyS0,115200"
++CONFIG_VFP=y
++CONFIG_NEON=y
++CONFIG_KERNEL_MODE_NEON=y
++CONFIG_BINFMT_MISC=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_UNIX_DIAG=y
++CONFIG_XFRM_USER=y
++CONFIG_NET_KEY=y
++CONFIG_INET=y
++CONFIG_IP_MULTICAST=y
++CONFIG_IP_ADVANCED_ROUTER=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_IP_MROUTE=y
++CONFIG_INET_AH=y
++CONFIG_INET_ESP=y
++CONFIG_INET_IPCOMP=y
++CONFIG_INET_UDP_DIAG=y
++CONFIG_NETFILTER=y
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_MTD=y
++CONFIG_MTD_CMDLINE_PARTS=y
++CONFIG_MTD_BLOCK=y
++CONFIG_MTD_CFI=y
++CONFIG_MTD_CFI_ADV_OPTIONS=y
++CONFIG_MTD_CFI_BE_BYTE_SWAP=y
++CONFIG_MTD_CFI_GEOMETRY=y
++CONFIG_MTD_CFI_INTELEXT=y
++CONFIG_MTD_CFI_AMDSTD=y
++CONFIG_MTD_CFI_STAA=y
++CONFIG_MTD_PHYSMAP_OF=y
++CONFIG_MTD_SST25L=y
++CONFIG_MTD_NAND=y
++CONFIG_BLK_DEV_LOOP=y
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_SIZE=256000
++CONFIG_SRAM=y
++CONFIG_BLK_DEV_SD=y
++CONFIG_CHR_DEV_SG=y
++CONFIG_ATA=y
++CONFIG_NETDEVICES=y
++CONFIG_VITESSE_PHY=y
++CONFIG_BROADCOM_PHY=y
++CONFIG_REALTEK_PHY=y
++CONFIG_NATIONAL_PHY=y
++CONFIG_MICREL_PHY=y
++CONFIG_MDIO_BUS_MUX_MMIOREG=y
++CONFIG_INPUT_EVDEV=y
++CONFIG_SERIO_SERPORT=m
++CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_8250_EXTENDED=y
++CONFIG_SERIAL_8250_SHARE_IRQ=y
++CONFIG_SERIAL_OF_PLATFORM=y
++CONFIG_SERIAL_FSL_LPUART=y
++CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
++CONFIG_HW_RANDOM=y
++CONFIG_I2C=y
++CONFIG_I2C_CHARDEV=y
++CONFIG_I2C_MUX=y
++CONFIG_I2C_MUX_PCA954x=y
++CONFIG_I2C_IMX=y
++CONFIG_GPIO_SYSFS=y
++CONFIG_SENSORS_LM90=y
++CONFIG_SENSORS_INA2XX=y
++CONFIG_WATCHDOG=y
++CONFIG_IMX2_WDT=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_TRIGGERS=y
++CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_DS3232=y
++CONFIG_DMADEVICES=y
++CONFIG_FSL_EDMA=y
++CONFIG_CLK_QORIQ=y
++CONFIG_MEMORY=y
++CONFIG_EXT2_FS=y
++CONFIG_EXT2_FS_XATTR=y
++CONFIG_EXT3_FS=y
++CONFIG_EXT4_FS=y
++CONFIG_FANOTIFY=y
++CONFIG_ISO9660_FS=m
++CONFIG_JOLIET=y
++CONFIG_ZISOFS=y
++CONFIG_UDF_FS=m
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
++CONFIG_NTFS_FS=m
++CONFIG_TMPFS=y
++CONFIG_TMPFS_POSIX_ACL=y
++CONFIG_JFFS2_FS=y
++CONFIG_NFS_FS=y
++CONFIG_NFS_V4=y
++CONFIG_ROOT_NFS=y
++CONFIG_NLS_DEFAULT="cp437"
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_ASCII=y
++CONFIG_NLS_ISO8859_1=y
++CONFIG_NLS_ISO8859_2=y
++CONFIG_NLS_ISO8859_15=y
++CONFIG_NLS_UTF8=y
++CONFIG_DEBUG_SECTION_MISMATCH=y
++CONFIG_MAGIC_SYSRQ=y
++CONFIG_CRYPTO_LZO=y
++CONFIG_CRC_CCITT=m
++CONFIG_CRC_T10DIF=y
++CONFIG_CRC7=m
++CONFIG_LIBCRC32C=m
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+2.1.0.27.g96db324
