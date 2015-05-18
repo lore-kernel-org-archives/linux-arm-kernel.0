@@ -1,133 +1,118 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 18 May 2015 15:37:50 -0700
-Subject: [PATCH 1/2] ARM: OMAP3: Add support for configuring MMC pins as
- GPIO pins
-In-Reply-To: <1430528752-316-2-git-send-email-tony@atomide.com>
-References: <1430528752-316-1-git-send-email-tony@atomide.com>
- <1430528752-316-2-git-send-email-tony@atomide.com>
-Message-ID: <20150518223749.GL10274@atomide.com>
+From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
+Date: Mon, 18 May 2015 17:38:17 -0500
+Subject: [V4 PATCH 1/6] ACPI / scan: Parse _CCA and setup device coherency
+In-Reply-To: <1880793.yBqSWvxoqF@vostro.rjw.lan>
+References: <1431724994-21601-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1431724994-21601-2-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1880793.yBqSWvxoqF@vostro.rjw.lan>
+Message-ID: <555A69D9.7080508@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [150501 18:07]:
-> +/*
-> + * Configures GPIOs 126 to 129 to 1.8V mode instead of 3.0V
-> + * mode for MMC1 in case bootloader did not configure things.
-> + * Note that if the pins are used for MMC1, pbias-regulator
-> + * manages the IO voltage.
-> + */
-> +static void __init omap3_gpio126_129(void)
-> +{
-> +	u32 reg;
-> +
-> +	reg = omap_ctrl_readl(OMAP343X_CONTROL_PBIAS_LITE);
-> +	reg &= ~OMAP343X_PBIASLITEVMODE1;
-> +	reg |= OMAP343X_PBIASLITEPWRDNZ1;
-> +	omap_ctrl_writel(reg, OMAP343X_CONTROL_PBIAS_LITE);
-> +	if (cpu_is_omap3630()) {
-> +		reg = omap_ctrl_readl(OMAP34XX_CONTROL_WKUP_CTRL);
-> +		reg |= OMAP36XX_GPIO_IO_PWRDNZ;
-> +		omap_ctrl_writel(reg, OMAP34XX_CONTROL_WKUP_CTRL);
-> +	}
-> +}
-> +
+Hi Rafael,
 
-This seems to not include GPIO 128 as pointed out by Tim Nordell,
-so patch with updated naming below.
+On 5/15/2015 6:53 PM, Rafael J. Wysocki wrote:
+> On Friday, May 15, 2015 04:23:09 PM Suravee Suthikulpanit wrote:
+>> [...]
+>> diff --git a/drivers/acpi/acpi_platform.c b/drivers/acpi/acpi_platform.c
+>> index 4bf7559..f6bc438 100644
+>> --- a/drivers/acpi/acpi_platform.c
+>> +++ b/drivers/acpi/acpi_platform.c
+>> @@ -103,14 +103,18 @@ struct platform_device *acpi_create_platform_device(struct acpi_device *adev)
+>>   	pdevinfo.res = resources;
+>>   	pdevinfo.num_res = count;
+>>   	pdevinfo.fwnode = acpi_fwnode_handle(adev);
+>> -	pdevinfo.dma_mask = DMA_BIT_MASK(32);
+>> +	pdevinfo.dma_mask = acpi_dma_is_supported(adev) ? DMA_BIT_MASK(32) : 0;
+>>   	pdev = platform_device_register_full(&pdevinfo);
+>> -	if (IS_ERR(pdev))
+>> +	if (IS_ERR(pdev)) {
+>>   		dev_err(&adev->dev, "platform device creation failed: %ld\n",
+>>   			PTR_ERR(pdev));
+>> -	else
+>> +	} else {
+>> +		if (acpi_dma_is_supported(adev))
+>> +			arch_setup_dma_ops(&pdev->dev, 0, 0, NULL,
+>> +					   acpi_dma_is_coherent(adev));
+>
+> Shouldn't we generally do that in acpi_bind_one() for all bus types
+> that don't have specific handling rather than here?
 
-Regards,
+I think that would also work, and makes sense. However, I'm not sure if 
+this would help in the case when we are creating PCI end-point devices, 
+since the CCA is specified at the host bridge node, and there is no ACPI 
+companion for the end-point devices. It seems that patch 3/6 of this 
+series is still needed.
 
-Tony
 
-8< ------------------
-From: Tony Lindgren <tony@atomide.com>
-Date: Wed, 13 May 2015 11:42:59 -0700
-Subject: [PATCH] ARM: OMAP3: Add support for configuring MMC pins as GPIO pins
+>> diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+>> index 849b699..c56e66a 100644
+>> --- a/drivers/acpi/scan.c
+>> +++ b/drivers/acpi/scan.c
+>> @@ -11,6 +11,7 @@
+>>   #include <linux/kthread.h>
+>>   #include <linux/dmi.h>
+>>   #include <linux/nls.h>
+>> +#include <linux/dma-mapping.h>
+>>
+>>   #include <asm/pgtable.h>
+>>
+>> @@ -2137,6 +2138,44 @@ void acpi_free_pnp_ids(struct acpi_device_pnp *pnp)
+>>   	kfree(pnp->unique_id);
+>>   }
+>>
+>> +static void acpi_init_coherency(struct acpi_device *adev)
+>> +{
+>> +	unsigned long long cca = 0;
+>> +	acpi_status status;
+>> +	struct acpi_device *parent = adev->parent;
+>> +	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
+>> +
+>> +	if (parent && parent->flags.cca_seen) {
+>> +		/*
+>> +		 * From ACPI spec, OSPM will ignore _CCA if an ancestor
+>> +		 * already saw one.
+>> +		 */
+>> +		adev->flags.cca_seen = 1;
+>> +		cca = acpi_dma_is_coherent(parent);
+>
+> Shouldn't the device's own _CCA take precedence?
+According to the ACPI specification, the parent's _CCA take precedence.
 
-Some devices are using the MMC1 pins 4..8 as GPIO pins, and in
-this case they need to be configured for 1.8V IO voltage if not
-done by the bootloader as otherwise some devices like smsc911x
-won't work properly.
+>
+>> +	} else {
+>> +		status = acpi_evaluate_integer(adev->handle, "_CCA",
+>> +					       NULL, &cca);
+>> +		if (ACPI_SUCCESS(status)) {
+>> +			adev->flags.cca_seen = 1;
+>> +		} else if (!IS_ENABLED(CONFIG_ACPI_CCA_REQUIRED)) {
+>> +			/*
+>> +			 * If architecture does not specify that _CCA is
+>> +			 * required for DMA-able devices (e.g. x86),
+>> +			 * we default to _CCA=1.
+>> +			 */
+>> +			cca = 1;
+>> +		} else {
+>
+> What about using acpi_handle_debug() here?
+Ok I can do that.
 
-Let's also make sure this register is saved and restored for
-idle.
+>> [...]
+>> diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
+>> index 8de4fa9..2a05ffb 100644
+>> --- a/include/acpi/acpi_bus.h
+>> +++ b/include/acpi/acpi_bus.h
+>> @@ -208,7 +208,9 @@ struct acpi_device_flags {
+>>   	u32 visited:1;
+>>   	u32 hotplug_notify:1;
+>>   	u32 is_dock_station:1;
+>> -	u32 reserved:23;
+>> +	u32 is_coherent:1;
+>
+> I'd prefer to call this 'coherent_dma'.
 
-Cc: Tim Nordell <tim.nordell@logicpd.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+OK.
 
---- a/arch/arm/mach-omap2/control.c
-+++ b/arch/arm/mach-omap2/control.c
-@@ -112,6 +112,7 @@ struct omap3_control_regs {
- 	u32 csirxfe;
- 	u32 iva2_bootaddr;
- 	u32 iva2_bootmod;
-+	u32 wkup_ctrl;
- 	u32 debobs_0;
- 	u32 debobs_1;
- 	u32 debobs_2;
-@@ -455,6 +456,7 @@ void omap3_control_save_context(void)
- 			omap_ctrl_readl(OMAP343X_CONTROL_IVA2_BOOTADDR);
- 	control_context.iva2_bootmod =
- 			omap_ctrl_readl(OMAP343X_CONTROL_IVA2_BOOTMOD);
-+	control_context.wkup_ctrl = omap_ctrl_readl(OMAP34XX_CONTROL_WKUP_CTRL);
- 	control_context.debobs_0 = omap_ctrl_readl(OMAP343X_CONTROL_DEBOBS(0));
- 	control_context.debobs_1 = omap_ctrl_readl(OMAP343X_CONTROL_DEBOBS(1));
- 	control_context.debobs_2 = omap_ctrl_readl(OMAP343X_CONTROL_DEBOBS(2));
-@@ -512,6 +514,7 @@ void omap3_control_restore_context(void)
- 					OMAP343X_CONTROL_IVA2_BOOTADDR);
- 	omap_ctrl_writel(control_context.iva2_bootmod,
- 					OMAP343X_CONTROL_IVA2_BOOTMOD);
-+	omap_ctrl_writel(control_context.wkup_ctrl, OMAP34XX_CONTROL_WKUP_CTRL);
- 	omap_ctrl_writel(control_context.debobs_0, OMAP343X_CONTROL_DEBOBS(0));
- 	omap_ctrl_writel(control_context.debobs_1, OMAP343X_CONTROL_DEBOBS(1));
- 	omap_ctrl_writel(control_context.debobs_2, OMAP343X_CONTROL_DEBOBS(2));
---- a/arch/arm/mach-omap2/control.h
-+++ b/arch/arm/mach-omap2/control.h
-@@ -231,6 +231,9 @@
- #define OMAP343X_PADCONF_ETK_D15	OMAP343X_PADCONF_ETK(17)
- 
- /* 34xx GENERAL_WKUP register offsets */
-+#define OMAP34XX_CONTROL_WKUP_CTRL	(OMAP343X_CONTROL_GENERAL_WKUP - 0x4)
-+#define OMAP36XX_GPIO_IO_PWRDNZ		BIT(6)
-+
- #define OMAP343X_CONTROL_WKUP_DEBOBSMUX(i) (OMAP343X_CONTROL_GENERAL_WKUP + \
- 						0x008 + (i))
- #define OMAP343X_CONTROL_WKUP_DEBOBS0 (OMAP343X_CONTROL_GENERAL_WKUP + 0x008)
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -44,6 +44,27 @@ static void __init omap2420_n8x0_legacy_init(void)
- #endif
- 
- #ifdef CONFIG_ARCH_OMAP3
-+/*
-+ * Configures GPIOs 126, 127 and 129 to 1.8V mode instead of 3.0V
-+ * mode for MMC1 in case bootloader did not configure things.
-+ * Note that if the pins are used for MMC1, pbias-regulator
-+ * manages the IO voltage.
-+ */
-+static void __init omap3_gpio126_127_129(void)
-+{
-+	u32 reg;
-+
-+	reg = omap_ctrl_readl(OMAP343X_CONTROL_PBIAS_LITE);
-+	reg &= ~OMAP343X_PBIASLITEVMODE1;
-+	reg |= OMAP343X_PBIASLITEPWRDNZ1;
-+	omap_ctrl_writel(reg, OMAP343X_CONTROL_PBIAS_LITE);
-+	if (cpu_is_omap3630()) {
-+		reg = omap_ctrl_readl(OMAP34XX_CONTROL_WKUP_CTRL);
-+		reg |= OMAP36XX_GPIO_IO_PWRDNZ;
-+		omap_ctrl_writel(reg, OMAP34XX_CONTROL_WKUP_CTRL);
-+	}
-+}
-+
- static void __init hsmmc2_internal_input_clk(void)
- {
- 	u32 reg;
-@@ -356,6 +377,7 @@ static struct pdata_init pdata_quirks[] __initdata = {
- 	{ "nokia,omap3-n950", hsmmc2_internal_input_clk, },
- 	{ "isee,omap3-igep0020-rev-f", omap3_igep0020_rev_f_legacy_init, },
- 	{ "isee,omap3-igep0030-rev-g", omap3_igep0030_rev_g_legacy_init, },
-+	{ "logicpd,dm3730-torpedo-devkit", omap3_gpio126_127_129, },
- 	{ "ti,omap3-evm-37xx", omap3_evm_legacy_init, },
- 	{ "ti,am3517-evm", am3517_evm_legacy_init, },
- 	{ "technexion,omap3-tao3530", omap3_tao3530_legacy_init, },
+Thanks,
+
+Suravee
