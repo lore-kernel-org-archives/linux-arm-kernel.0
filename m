@@ -1,46 +1,58 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 18 May 2015 09:58:40 +0100
-Subject: [PATCH v2] ARM: vexpress: Add unified-cache Device Tree property
-In-Reply-To: <20150516201301.GT14416@pengutronix.de>
-References: <5509437E.6060806@arm.com>
- <1426671298-2012-1-git-send-email-r.schwebel@pengutronix.de>
- <20150429191228.GO15254@pengutronix.de>
- <20150430110853.GN7440@e106497-lin.cambridge.arm.com>
- <20150430133011.GE15254@pengutronix.de> <55426A26.9060704@arm.com>
- <20150516201301.GT14416@pengutronix.de>
-Message-ID: <5559A9C0.1020307@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 18 May 2015 11:04:17 +0200
+Subject: [linux-sunxi] [RFC 0/7] ARM: sun9i: SMP support with
+ Multi-Cluster Power Management
+In-Reply-To: <alpine.LFD.2.11.1505180112570.4843@knanqh.ubzr>
+References: <1431583811-25780-1-git-send-email-wens@csie.org>
+ <1431770926.5748.41.camel@hellion.org.uk>
+ <20150517143816.GJ4004@lukather>
+ <alpine.LFD.2.11.1505180112570.4843@knanqh.ubzr>
+Message-ID: <20150518090417.GO4004@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Nicolas,
 
+On Mon, May 18, 2015 at 01:19:18AM -0400, Nicolas Pitre wrote:
+> On Sun, 17 May 2015, Maxime Ripard wrote:
+> 
+> > Hi Ian,
+> > 
+> > On Sat, May 16, 2015 at 11:08:46AM +0100, Ian Campbell wrote:
+> > > On Thu, 2015-05-14 at 14:10 +0800, Chen-Yu Tsai wrote:
+> > > > This is my attempt to support SMP and CPU hot plugging on the Allwinner
+> > > > A80 SoC. The A80 is a big.Little processor with 2 clusters of 4x Cortex-A7
+> > > > and 4x Cortex-A15 cores.
+> > > 
+> > > I thought there was a preference these days to support this sort of
+> > > thing via support PSCI in the firmware, which allows for other things
+> > > such as non-secure-world etc.
+> > 
+> > Yes, it is the preferred way. Meaning that if someone wants to do that
+> > work, he's very much welcome and encouraged to do so. But if no one's
+> > doing it, then we still have to have a way to bringup the secondary
+> > CPUs.
+> 
+> And doing so in the kernel (at least initially) is simpler, and so much 
+> easier to fix when it is broken.  We've seen a few systems already where 
+> power management is crippled because no one is able/allowed/willing to 
+> fix the broken firmware.
 
-On 16/05/15 21:13, Robert Schwebel wrote:
-> Hi Sudeep,
->
-> On Thu, Apr 30, 2015 at 06:45:10PM +0100, Sudeep Holla wrote:
->>> I still see these errors with 4.1-rc1:
->>>
->>> [    0.000000] L2C: platform modifies aux control register: 0x02020000 -> 0x02420000
->>> [    0.000000] L2C: DT/platform modifies aux control register: 0x02020000 -> 0x02420000
->>> [    0.268626] platform 10000000.sysreg: Error -2 creating of_node link
->>> [    0.271997] platform basic-mmio-gpio.1.auto: Error -2 creating of_node link
->>> [    0.272266] platform basic-mmio-gpio.2.auto: Error -2 creating of_node link
->>> [    0.272681] platform basic-mmio-gpio.3.auto: Error -2 creating of_node link
->>
->> OK, I was able to debug this, it boils down to initcall ordering.
->> Both of_init where the firmware sysfs is initialized and
->> vexpress_sysreg_init are at same core_initcall level. Needs some
->> thinking and more time to fix this.
->
-> Did you find out something in the meantime?
-> I just tested 4.1-rc3 and the issues are still confirmed.
->
+To be fair, our platform support is done by hobbyist, and our only
+implementation of PSCI is done through mainline u-boot, which means we
+have an easy way to fix any issue we might have, and that it's
+possible, otherwise we wouldn't have it at all.
 
-Ah sorry, forgot to include you or your Reported-by(will
-fix that if/when I have to repost a newer version)
-I posted the patch but not yet pulled in mainline yet [1]
+Maxime
 
-Regards,
-Sudeep
-
-[1] https://lkml.org/lkml/2015/5/14/360
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150518/e094d38c/attachment-0001.sig>
