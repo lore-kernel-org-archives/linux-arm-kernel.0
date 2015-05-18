@@ -1,53 +1,62 @@
-From: colin.king@canonical.com (Colin King)
-Date: Mon, 18 May 2015 12:00:36 +0100
-Subject: [PATCH][V2] ARM: 8351/1: perf: fix memory leak on return
-Message-ID: <1431946836-11243-1-git-send-email-colin.king@canonical.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 18 May 2015 13:10:48 +0200
+Subject: [PATCH] arm64: Rename temp variable in read*_relaxed()
+Message-ID: <4f9792c7d10ca30a9b6ba5e2860b56814a41309c.1431947444.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+This resolves the following sparse warning from readl() and other
+macros, which ends up embedding readl_relaxed() using the same
+variable.
 
-Recent commit 3b8786ff7a1b31645ae2c26a2ec32dbd42ac1094
-("ARM: 8352/1: perf: Fix the pmu node name in warning message")
-introduced a memory leak of irqs on the "Don't bother with PPIs"
-return path. This was picked up by static analysis by cppcheck:
+Warning log:
+include/asm-generic/io.h:364:16: warning: symbol '__v' shadows an
+earlier one
+include/asm-generic/io.h:364:16: originally declared here
+include/asm-generic/io.h:372:16: warning: symbol '__v' shadows an
+earlier one
+include/asm-generic/io.h:372:16: originally declared here
+include/asm-generic/io.h:380:16: warning: symbol '__v' shadows an
+earlier one
+include/asm-generic/io.h:380:16: originally declared here
+include/asm-generic/io.h:568:16: warning: symbol '__v' shadows an
+earlier one
+include/asm-generic/io.h:568:16: originally declared here
+include/asm-generic/io.h:576:16: warning: symbol '__v' shadows an
+earlier one
+include/asm-generic/io.h:576:16: originally declared here
+include/asm-generic/io.h:584:16: warning: symbol '__v' shadows an
+earlier one
+include/asm-generic/io.h:584:16: originally declared here
 
-[arch/arm/kernel/perf_event_cpu.c:315]: (error) Memory leak: irqs
+The same patch was already applied to arm32 as
+"ARM: 7118/1: rename temp variable in read*_relaxed()"
+(sha1: b0c1264f534a1cb3c52036a23a04d238434a0df6)
 
-Perform allocation of irqs after getting the irq hence removing need to
-clean up an allocation on the PPI affine return path.
-
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
- arch/arm/kernel/perf_event_cpu.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-index 213919b..a7099ee 100644
---- a/arch/arm/kernel/perf_event_cpu.c
-+++ b/arch/arm/kernel/perf_event_cpu.c
-@@ -303,17 +303,17 @@ static int probe_current_pmu(struct arm_pmu *pmu)
+ arch/arm64/include/asm/io.h | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+index 540f7c0aea82..cb18715cc60f 100644
+--- a/arch/arm64/include/asm/io.h
++++ b/arch/arm64/include/asm/io.h
+@@ -117,10 +117,10 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
+  * ordering rules but do not guarantee any ordering relative to Normal memory
+  * accesses.
+  */
+-#define readb_relaxed(c)	({ u8  __v = __raw_readb(c); __v; })
+-#define readw_relaxed(c)	({ u16 __v = le16_to_cpu((__force __le16)__raw_readw(c)); __v; })
+-#define readl_relaxed(c)	({ u32 __v = le32_to_cpu((__force __le32)__raw_readl(c)); __v; })
+-#define readq_relaxed(c)	({ u64 __v = le64_to_cpu((__force __le64)__raw_readq(c)); __v; })
++#define readb_relaxed(c)	({ u8  __r = __raw_readb(c); __r; })
++#define readw_relaxed(c)	({ u16 __r = le16_to_cpu((__force __le16)__raw_readw(c)); __r; })
++#define readl_relaxed(c)	({ u32 __r = le32_to_cpu((__force __le32)__raw_readl(c)); __r; })
++#define readq_relaxed(c)	({ u64 __r = le64_to_cpu((__force __le64)__raw_readq(c)); __r; })
  
- static int of_pmu_irq_cfg(struct platform_device *pdev)
- {
--	int i, irq;
--	int *irqs = kcalloc(pdev->num_resources, sizeof(*irqs), GFP_KERNEL);
--
--	if (!irqs)
--		return -ENOMEM;
-+	int i, irq, *irqs;
- 
- 	/* Don't bother with PPIs; they're already affine */
- 	irq = platform_get_irq(pdev, 0);
- 	if (irq >= 0 && irq_is_percpu(irq))
- 		return 0;
- 
-+	irqs = kcalloc(pdev->num_resources, sizeof(*irqs), GFP_KERNEL);
-+	if (!irqs)
-+		return -ENOMEM;
-+
- 	for (i = 0; i < pdev->num_resources; ++i) {
- 		struct device_node *dn;
- 		int cpu;
+ #define writeb_relaxed(v,c)	((void)__raw_writeb((v),(c)))
+ #define writew_relaxed(v,c)	((void)__raw_writew((__force u16)cpu_to_le16(v),(c)))
 -- 
-2.1.4
+2.3.5
