@@ -1,71 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 18 May 2015 18:55:32 +0100
-Subject: [PATCHv2 02/12] arm64: smp_plat: add get_logical_index
-In-Reply-To: <20150518170912.GI21251@e104818-lin.cambridge.arm.com>
-References: <1431945503-6939-1-git-send-email-mark.rutland@arm.com>
- <1431945503-6939-3-git-send-email-mark.rutland@arm.com>
- <20150518170912.GI21251@e104818-lin.cambridge.arm.com>
-Message-ID: <20150518175532.GC7064@leverpostej>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 18 May 2015 10:59:34 -0700
+Subject: [PATCH 1/3 v3] dt/bindings: Add binding for the Raspberry Pi firmware
+ driver
+In-Reply-To: <1431543609-19646-2-git-send-email-eric@anholt.net>
+References: <1431543609-19646-2-git-send-email-eric@anholt.net>
+Message-ID: <1431971974-26798-1-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 18, 2015 at 06:09:13PM +0100, Catalin Marinas wrote:
-> On Mon, May 18, 2015 at 11:38:13AM +0100, Mark Rutland wrote:
-> > The PSCI MIGRATE_INFO_UP_CPU call returns a physical ID, which we will
-> > need to map back to a Linux logical ID.
-> > 
-> > Implement a reusable get_logical_index to map from a physical ID to a
-> > logical ID.
-> > 
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm64/include/asm/smp_plat.h | 16 ++++++++++++++++
-> >  1 file changed, 16 insertions(+)
-> > 
-> > diff --git a/arch/arm64/include/asm/smp_plat.h b/arch/arm64/include/asm/smp_plat.h
-> > index 8dcd61e..7abf757 100644
-> > --- a/arch/arm64/include/asm/smp_plat.h
-> > +++ b/arch/arm64/include/asm/smp_plat.h
-> > @@ -19,6 +19,8 @@
-> >  #ifndef __ASM_SMP_PLAT_H
-> >  #define __ASM_SMP_PLAT_H
-> >  
-> > +#include <linux/cpumask.h>
-> > +
-> >  #include <asm/types.h>
-> >  
-> >  struct mpidr_hash {
-> > @@ -39,6 +41,20 @@ static inline u32 mpidr_hash_size(void)
-> >   */
-> >  extern u64 __cpu_logical_map[NR_CPUS];
-> >  #define cpu_logical_map(cpu)    __cpu_logical_map[cpu]
-> > +/*
-> > + * Retrieve logical cpu index corresponding to a given MPIDR.Aff*
-> > + *  - mpidr: MPIDR.Aff* bits to be used for the look-up
-> > + *
-> > + * Returns the cpu logical index or -EINVAL on look-up error
-> > + */
-> > +static inline int get_logical_index(u64 mpidr)
-> > +{
-> > +	int cpu;
-> > +	for (cpu = 0; cpu < nr_cpu_ids; cpu++)
-> > +		if (cpu_logical_map(cpu) == mpidr)
-> > +			return cpu;
-> > +	return -EINVAL;
-> > +}
-> 
-> Do we guarantee that mpidr here only contains the affinity bits (i.e. no
-> masking)?
+This driver will provide support for calls into the firmware that will
+be used by other drivers like cpufreq and vc4.
+---
 
-In the DT and ACPI probe paths we reject IDs with bits other than the
-aff bits set.
+v2: Improve commit message, point to mailbox.txt for how mboxes work.
+v3: Use Lee's suggestion for mailbox phandle docs, fix spelling of
+    "raspberry".
 
-I don't currently have a sanity check in the code handling
-MIGRATE_INFO_UP_CPU, but I should add one.
+ .../devicetree/bindings/arm/bcm/raspberrypi,firmware.txt   | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/raspberrypi,firmware.txt
 
-Would you like a warning here too?
-
-Mark.
+diff --git a/Documentation/devicetree/bindings/arm/bcm/raspberrypi,firmware.txt b/Documentation/devicetree/bindings/arm/bcm/raspberrypi,firmware.txt
+new file mode 100644
+index 0000000..dbf60f9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/bcm/raspberrypi,firmware.txt
+@@ -0,0 +1,14 @@
++Raspberry Pi VideoCore firmware driver
++
++Required properties:
++
++- compatible:		Should be "rasbperrypi,firmware"
++- mboxes:		Phandle to the firmware device's Mailbox.
++			  (See: ../mailbox/mailbox.txt for more information)
++
++Example:
++
++firmware {
++	compatible = "raspberrypi,firmware";
++	mboxes = <&mailbox>;
++};
+-- 
+2.1.4
