@@ -1,52 +1,72 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Mon, 18 May 2015 13:23:34 +0100
-Subject: [Xen-devel] [RFC 00/23] arm64: Add support for 64KB page
- granularity in Xen guest
-In-Reply-To: <555614AB.9000006@citrix.com>
-References: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
- <555614AB.9000006@citrix.com>
-Message-ID: <5559D9C6.5010807@citrix.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 18 May 2015 14:25:27 +0200
+Subject: [PATCH v6 12/25] iommu: exynos: add support for runtime_pm
+In-Reply-To: <20150510223811.e9ea24574e67a6a55b0b1cd4@samsung.com>
+References: <1430727380-10912-1-git-send-email-m.szyprowski@samsung.com>
+ <1430727380-10912-13-git-send-email-m.szyprowski@samsung.com>
+ <20150510223811.e9ea24574e67a6a55b0b1cd4@samsung.com>
+Message-ID: <5559DA37.8090307@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Hello,
 
-On 15/05/15 16:45, David Vrabel wrote:
-> On 14/05/15 18:00, Julien Grall wrote:
->> Hi all,
+On 2015-05-10 15:38, Cho KyongHo wrote:
+> On Mon, 04 May 2015 10:16:07 +0200 Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+>
+>> This patch fixes support for runtime power management for SYSMMU
+>> controllers, so they are enabled when master device is attached.
 >>
->> ARM64 Linux is supporting both 4KB and 64KB page granularity. Although, Xen
->> hypercall interface and PV protocol are always based on 4KB page granularity.
+> You should later think that this style of runtime PM support
+> will increase the leakage current because some devices may
+> enable System MMUs during they are not working.
+> If a device driver of a master device attaches its iommu domain
+> in probe, its local power will be never gated.
+
+Yes, true, but let's merge something that WORKS first and add more 
+fine-grained
+runtime-pm later as a separate patch. Some time ago I've posted a 
+fully-blown
+patchset for Exynos IOMMU will all features 
+(https://lkml.org/lkml/2014/8/5/183)
+- but it turned out that it will be to hard to agree on all needed 
+features and
+dependencies, so I simplified the code as much as possible. All 
+remaining features
+(like fine-grained power management and access for more than one iommu 
+controller
+per device) will be posted separately.
+
+>
+>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> ---
+>>   drivers/iommu/exynos-iommu.c | 2 ++
+>>   1 file changed, 2 insertions(+)
 >>
->> Any attempt to boot a Linux guest with 64KB pages enabled will result to a
->> guest crash.
->>
->> This series is a first attempt to allow those Linux running with the current
->> hypercall interface and PV protocol.
->>
->> This solution has been chosen because we want to run Linux 64KB in released
->> Xen ARM version or/and platform using an old version of Linux DOM0.
-> 
-> The key problem I see with this approach is the confusion between guest
-> page size and Xen page size.  This is going to be particularly
-> problematic since the majority of development/usage will remain on x86
-> where PAGE_SIZE == XEN_PAGE_SIZE.
-> 
-> I think it would be nice to keep XEN_PAGE_SIZE etc out of front and
-> backend drivers.  Perhaps with a suitable set of helper functions?
+>> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+>> index 598660c87410..734107ec78fa 100644
+>> --- a/drivers/iommu/exynos-iommu.c
+>> +++ b/drivers/iommu/exynos-iommu.c
+>> @@ -702,6 +702,7 @@ static int exynos_iommu_attach_device(struct iommu_domain *domain,
+>>   		return -ENODEV;
+>>   
+>>   	list_for_each_entry(data, &owner->clients, owner_node) {
+>> +		pm_runtime_get_sync(data->sysmmu);
+>>   		ret = __sysmmu_enable(data, pagetable, domain);
+>>   		if (ret >= 0) {
+>>   			data->master = dev;
+>> @@ -743,6 +744,7 @@ static void exynos_iommu_detach_device(struct iommu_domain *domain,
+>>   				data->master = NULL;
+>>   				list_del_init(&data->domain_node);
+>>   			}
+>> +			pm_runtime_put(data->sysmmu);
+>>   			found = true;
+>>   		}
+>>   	}
+>> -- 
+>> 1.9.2
 
-Even with the helpers, we are not protected from any change in the
-frontend/backend that will impact 64K. It won't be possible to remove
-all the XEN_PAGE_* usage (there is a lots of places where adding helpers
-would not be possible) and we would still have to carefully review any
-changes.
-
-I think it may be possible to move the grant table splitting in helpers
-which would be helpful to support different grant size.
-
-Although, it would require a big amount of work at least in blkfront.
-
-Regards,
-
+Best regards
 -- 
-Julien Grall
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
