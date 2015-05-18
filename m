@@ -1,46 +1,21 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 May 2015 14:36:06 +0200
-Subject: [PATCH] ARM: fix BE8 module loading
-Message-ID: <2205892.6d8Sa1bONm@wuerfel>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Mon, 18 May 2015 13:39:24 +0100
+Subject: [Xen-devel] [PATCH] xen/arm: Define xen_arch_suspend()
+In-Reply-To: <1431017723-27194-1-git-send-email-boris.ostrovsky@oracle.com>
+References: <1431017723-27194-1-git-send-email-boris.ostrovsky@oracle.com>
+Message-ID: <5559DD7C.1000508@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new veneer support for loadable modules on ARM uses the
-__opcode_to_mem_thumb32() function to count R_ARM_THM_CALL
-and R_ARM_THM_JUMP24 relocations.
+On 07/05/15 17:55, Boris Ostrovsky wrote:
+> Commit 2b953a5e994c ("xen: Suspend ticks on all CPUs during suspend")
+> introduced xen_arch_suspend() routine but did so only for x86, breaking
+> ARM builds.
+> 
+> We need to add it to ARM as well.
 
-However, this function is not defined for big-endian kernels
-on ARMv5 or before, causing a compile-time error:
+Applied to for-linus-4.1b, thanks.
 
-arch/arm/kernel/module-plts.c: In function 'count_plts':
-arch/arm/kernel/module-plts.c:124:9: error: implicit declaration of function '__opcode_to_mem_thumb32' [-Werror=implicit-function-declaration]
-         __opcode_to_mem_thumb32(0x07ff2fff)))
-         ^
+Sorry for the delay, I assumed that Stefano would have picked this up.
 
-As we know that this part of the function is only needed for
-Thumb2 kernels, and that those can never happen with BE8,
-we can avoid the error by enclosing the code in an #ifdef.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 7d485f647c1 ("ARM: 8220/1: allow modules outside of bl range")
----
-Found with the randconfig builder on linux-next.
-
-diff --git a/arch/arm/kernel/module-plts.c b/arch/arm/kernel/module-plts.c
-index 71a65c49871d..097e2e201b9f 100644
---- a/arch/arm/kernel/module-plts.c
-+++ b/arch/arm/kernel/module-plts.c
-@@ -118,11 +118,13 @@ static unsigned int count_plts(Elf32_Addr base, const Elf32_Rel *rel, int num)
- 					   __opcode_to_mem_arm(0x00ffffff)))
- 				ret++;
- 			break;
-+#ifdef CONFIG_THUMB2_KERNEL
- 		case R_ARM_THM_CALL:
- 		case R_ARM_THM_JUMP24:
- 			if (!duplicate_rel(base, rel, i,
- 					   __opcode_to_mem_thumb32(0x07ff2fff)))
- 				ret++;
-+#endif
- 		}
- 	return ret;
- }
+David
