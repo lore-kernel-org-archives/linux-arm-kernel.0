@@ -1,66 +1,65 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 18 May 2015 09:50:58 -0700
-Subject: [PATCH v3 04/17] input: make LoCoMo keyboard driver support both
- poodle and collie
-In-Reply-To: <1431880077-26321-5-git-send-email-dbaryshkov@gmail.com>
-References: <1431880077-26321-1-git-send-email-dbaryshkov@gmail.com>
- <1431880077-26321-5-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <20150518165058.GB19708@dtor-ws>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 18 May 2015 10:03:55 -0700
+Subject: [PATCH] ARM: dts: am335x-bone* enable pmic-shutdown-controller
+In-Reply-To: <CAOCHtYjtziBwfSMGPRrQ7rfDEf_dC=7rPytQUxVXy8bSp-8NNw@mail.gmail.com>
+References: <1431525001-5747-1-git-send-email-robertcnelson@gmail.com>
+ <20150513141658.GB6605@localhost> <20150513144846.GC6605@localhost>
+ <CAALWOA-hkgrMi+OeNrmwaVpdEfNadFn0R-QbpXi9LU-4sbakJQ@mail.gmail.com>
+ <20150518152108.GE10274@atomide.com>
+ <CAOCHtYgwyQy+hQE2PeUd+7U9wNygVOUuAb-VSh_9K5y7zFHEWA@mail.gmail.com>
+ <20150518162936.GF10274@atomide.com>
+ <CAOCHtYjtziBwfSMGPRrQ7rfDEf_dC=7rPytQUxVXy8bSp-8NNw@mail.gmail.com>
+Message-ID: <20150518170354.GG10274@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 17, 2015 at 07:27:44PM +0300, Dmitry Eremin-Solenikov wrote:
-> Keyboards on collie and poodle differ only in wiring of 'Home' key.
-> Instead of complicating the driver with platform data, just check for
-> the machine for the time being. This will be converted to DTS property
-> sometime in the future.
+* Robert Nelson <robertcnelson@gmail.com> [150518 09:51]:
+> On Mon, May 18, 2015 at 11:29 AM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Robert Nelson <robertcnelson@gmail.com> [150518 09:15]:
+> >> On Mon, May 18, 2015 at 10:21 AM, Tony Lindgren <tony@atomide.com> wrote:
+> >>
+> >> All the rev information is in the board's eeprom:
+> >>
+> >> hexdump -e '8/1 "%c"' /sys/bus/i2c/devices/0-0050/eeprom -s 12 -n 4
+> >>
+> >> Rev A5B
+> >> 0A5B
+> >>
+> >> Rev C
+> >> 000C
+> >>
+> >> Just another default qwerk to add to Pantelis' bone_capemgr. ;)
+> >
+> > It seems we should not even instantiate some devices on BBB
+> > until the EEPROM is parsed.. So maybe something like this:
+> >
+> > 1. The problem devices are initially set with status = "disabled"
+> >    in the dts
+> >
+> > 2. We set up drivers/*/bbb-eeprom.c that parses the board
+> >    revision at module_init time, and then flips the selected
+> >    devices to have status = "enabled" and populates the revision
+> >    info based on the eeprom and SoC revision passed in pdata.
+> >    Then those devices get their struct device created and
+> >    probed, but at a much later time.
+> >
+> > So rather than trying to init all that early, let's just
+> > init them much later when we have the proper I2C driver
+> > running?
 > 
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> I see that working just fine.  We (beagleboard.org) enforce the eeprom
+> data, as all the official images require a proper baseboard eeprom.
 
-Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+OK
+ 
+> We just have to be very careful to limit the scope, otherwise we will
+> end up with Pantelis' rejected capebus from the v3.2.x days...
 
-> ---
->  drivers/input/keyboard/locomokbd.c | 10 +++++++++-
->  1 file changed, 9 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/input/keyboard/locomokbd.c b/drivers/input/keyboard/locomokbd.c
-> index 1657bc0..b422608 100644
-> --- a/drivers/input/keyboard/locomokbd.c
-> +++ b/drivers/input/keyboard/locomokbd.c
-> @@ -33,6 +33,9 @@
->  #include <linux/slab.h>
->  #include <linux/mfd/locomo.h>
->  
-> +/* There is one minor difference between mappings on poodle and collie */
-> +#include <asm/mach-types.h>
-> +
->  #define KEY_ACTIVITY		KEY_F16
->  #define KEY_CONTACT		KEY_F18
->  #define KEY_CENTER		KEY_F15
-> @@ -45,7 +48,7 @@
->  static const unsigned char
->  locomokbd_keycode[LOCOMOKBD_NUMKEYS] = {
->  	0, KEY_ESC, KEY_ACTIVITY, 0, 0, 0, 0, 0, 0, 0,				/* 0 - 9 */
-> -	0, 0, 0, 0, 0, 0, 0, KEY_MENU, KEY_HOME, KEY_CONTACT,			/* 10 - 19 */
-> +	0, 0, 0, 0, 0, 0, 0, KEY_MENU, 0, KEY_CONTACT,				/* 10 - 19 */
->  	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,						/* 20 - 29 */
->  	0, 0, 0, KEY_CENTER, 0, KEY_MAIL, 0, 0, 0, 0,				/* 30 - 39 */
->  	0, 0, 0, 0, 0, 0, 0, 0, 0, KEY_RIGHT,					/* 40 - 49 */
-> @@ -278,6 +281,11 @@ static int locomokbd_probe(struct platform_device *dev)
->  			locomokbd_keycode,
->  			sizeof(locomokbd->keycode));
->  
-> +	if (machine_is_collie())
-> +		locomokbd->keycode[18] = KEY_HOME;
-> +	else
-> +		locomokbd->keycode[3] = KEY_HOME;
-> +
->  	for (i = 0; i < LOCOMOKBD_NUMKEYS; i++)
->  		input_set_capability(input_dev, EV_KEY, locomokbd->keycode[i]);
->  	input_set_capability(input_dev, EV_PWR, KEY_SUSPEND);
-> -- 
-> 2.1.4
-> 
+Naturally I was thinking #2 above would use Pantelis' code for
+CONFIG_OF_OVERLAY in mainline. But instead of the earlier patches,
+we can make things happen much later on to avoid the detect of
+EEPROM early on.
 
--- 
-Dmitry
+Regards,
+
+Tony
