@@ -1,47 +1,35 @@
-From: parkch98@gmail.com (Chanho Park)
-Date: Mon, 18 May 2015 10:52:14 +0900
-Subject: [PATCH v1 1/1] ARM: EXYNOS: fix DEBUG_LL on Cortex-A7.
-In-Reply-To: <1431844923-4654-2-git-send-email-t.dakhran@gmail.com>
-References: <1431844923-4654-1-git-send-email-t.dakhran@gmail.com>
- <1431844923-4654-2-git-send-email-t.dakhran@gmail.com>
-Message-ID: <CAPTzV17YWyTiFU4wGs=Wy9quC_NzguXuqrheY_JoqAWN=VRniA@mail.gmail.com>
+From: yalin.wang2010@gmail.com (yalin wang)
+Date: Mon, 18 May 2015 10:46:23 +0800
+Subject: [RFC] arm:consider THUMB and BE endian kernel build
+Message-ID: <5559527F.9090300@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tarek,
+this patch fix the function in kernel_thread(),
+when kernel is build as THUMB2 or BE8 endian, we should
+also set the correct bit in CPSR, so that kernel can return to
+the correct state to execute.
+---
+  arch/arm/kernel/process.c | 6 ++++++
+  1 file changed, 6 insertions(+)
 
-On Sun, May 17, 2015 at 3:42 PM, Tarek Dakhran <t.dakhran@gmail.com> wrote:
-> Cortex-A7 has EXYNOS5_PA_UART base address for UART.
-> If system boots from Cortex-A7 CPU addruart loads wrong
-> address. This patch fixex this.
->
-> Signed-off-by: Tarek Dakhran <t.dakhran@gmail.com>
-> ---
->  arch/arm/include/debug/exynos.S | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/include/debug/exynos.S b/arch/arm/include/debug/exynos.S
-> index b17fdb7..a61b3ea 100644
-> --- a/arch/arm/include/debug/exynos.S
-> +++ b/arch/arm/include/debug/exynos.S
-> @@ -24,6 +24,7 @@
->                 mrc     p15, 0, \tmp, c0, c0, 0
->                 and     \tmp, \tmp, #0xf0
->                 teq     \tmp, #0xf0             @@ A15
-> +               teqne   \tmp, #0x70             @@ A7
->                 ldreq   \rp, =EXYNOS5_PA_UART
->                 movne   \rp, #EXYNOS4_PA_UART   @@ EXYNOS4
->                 ldr     \rv, =S3C_VA_UART
-> --
-> 1.9.1
->
-
-Please see previous Joonyoung's patch. Your patch could break
-exynos3250 because it has not only two cortex-a7 cpus but also uses
-EXYOS4_PA_UART.
-
-http://www.spinics.net/lists/linux-samsung-soc/msg37318.html
-
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index f192a2a..9a7ab32 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -220,6 +220,12 @@ copy_thread(unsigned long clone_flags, unsigned 
+long stack_start,
+  		thread->cpu_context.r4 = stk_sz;
+  		thread->cpu_context.r5 = stack_start;
+  		childregs->ARM_cpsr = SVC_MODE;
++#ifdef CONFIG_THUMB2_KERNEL
++		childregs->ARM_cpsr |= PSR_T_BIT;
++#endif
++#ifdef CONFIG_CPU_ENDIAN_BE8
++		childregs->ARM_cpsr |= PSR_E_BIT;
++#endif
+  	}
+  	thread->cpu_context.pc = (unsigned long)ret_from_fork;
+  	thread->cpu_context.sp = (unsigned long)childregs;
 -- 
-Best Regards,
-Chanho Park
+1.9.1
