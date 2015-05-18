@@ -1,30 +1,33 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 18 May 2015 16:09:35 +0900
-Subject: [PATCH] ARM: multi_v7_defconfig: make savedefconfig for removing
- useless configs
-In-Reply-To: <55598A56.7020006@kernel.org>
-References: <55598A56.7020006@kernel.org>
-Message-ID: <5559902F.7040506@samsung.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Mon, 18 May 2015 09:18:26 +0200
+Subject: [PATCHv2 3/3] arch/arm64: Enable PREEMPT_RT_FULL
+In-Reply-To: <20150515120810.GA10988@8074w.roxell.se>
+References: <1430167990-12333-1-git-send-email-anders.roxell@linaro.org>
+ <1430167990-12333-4-git-send-email-anders.roxell@linaro.org>
+ <20150514155723.GD13442@linutronix.de>
+ <20150515120810.GA10988@8074w.roxell.se>
+Message-ID: <55599242.4020803@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.05.2015 15:44, Kukjin Kim wrote:
-> This patch removes useless configs which can be seleted according to
-> the dependencies in defconfig with using 'make savedefconfig' because
-> we don't need to keep them in defconfig file.
+On 05/15/2015 02:08 PM, Anders Roxell wrote:
+> On 2015-05-14 17:57, Sebastian Andrzej Siewior wrote:
+>> * Anders Roxell | 2015-04-27 22:53:10 [+0200]:
+>>
+>>> arm64 is missing support for PREEMPT_RT. The main feature which is
+>>> lacking is support for lazy preemption. The arch-specific entry code,
+>>
+>> I'm taking this but I am renaming the subject. Lazy preempt is not
+>> required by -RT but supporting it benefits it. That means you could run
+>> arm64 without it.
 > 
-> Signed-off-by: Kukjin Kim <kgene@kernel.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Kevin Hilman <khilman@linaro.org>
-> ---
-> When I tried to sort out exynos related configs for multi_v7_defconfig,
-> I found there are many useless configs in there so sending this. If you
-> guys OK with this, I'll sort them out including this.
+> Thanks for picking up the patch and fixing the subject,
+> though I was surprised to see the ownership changed.
 
-On which tree and commit this is rebased on? I tried next
-(next-20150515) and your for-next (v4.1-rc3-34-gfcfae6b049cf) branches
-but I does not apply to any of them. Can you point me to base branch?
+Oh. The ownership ship changed only in #3 by mistake. I will fix it,
+sorry for that.
 
-Best regards,
-Krzysztof
+> Cheers,
+> Anders
+
+Sebastian
