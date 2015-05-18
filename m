@@ -1,351 +1,54 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon, 18 May 2015 20:59:21 +0800
-Subject: [PATCH 11/11] irqchip / GICv3 / ACPI: Consolidate GICv3 ACPI related
- init code
-In-Reply-To: <1431953961-22706-1-git-send-email-hanjun.guo@linaro.org>
-References: <1431953961-22706-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1431953961-22706-12-git-send-email-hanjun.guo@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 18 May 2015 15:01:45 +0200
+Subject: [PATCH] ARM: fix BE8 module loading
+In-Reply-To: <2205892.6d8Sa1bONm@wuerfel>
+References: <2205892.6d8Sa1bONm@wuerfel>
+Message-ID: <CAKv+Gu_kD2GsFDk_gQDttOK5qwWML_3C+kfYisAwF0KXoNow6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move GICv3 ACPI related init code in irq-gic.c to irq-gic-acpi.c,
-this can make the ACPI related GIC init code slef-contained as GICV2
-did.
+On 18 May 2015 at 14:36, Arnd Bergmann <arnd@arndb.de> wrote:
+> The new veneer support for loadable modules on ARM uses the
+> __opcode_to_mem_thumb32() function to count R_ARM_THM_CALL
+> and R_ARM_THM_JUMP24 relocations.
+>
+> However, this function is not defined for big-endian kernels
+> on ARMv5 or before, causing a compile-time error:
+>
+> arch/arm/kernel/module-plts.c: In function 'count_plts':
+> arch/arm/kernel/module-plts.c:124:9: error: implicit declaration of function '__opcode_to_mem_thumb32' [-Werror=implicit-function-declaration]
+>          __opcode_to_mem_thumb32(0x07ff2fff)))
+>          ^
+>
+> As we know that this part of the function is only needed for
+> Thumb2 kernels, and that those can never happen with BE8,
+> we can avoid the error by enclosing the code in an #ifdef.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 7d485f647c1 ("ARM: 8220/1: allow modules outside of bl range")
+> ---
+> Found with the randconfig builder on linux-next.
+>
 
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- drivers/irqchip/irq-gic-acpi.c     | 109 +++++++++++++++++++++++++++++
- drivers/irqchip/irq-gic-v3.c       | 140 ++-----------------------------------
- include/linux/irqchip/arm-gic-v3.h |  10 +++
- 3 files changed, 123 insertions(+), 136 deletions(-)
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-diff --git a/drivers/irqchip/irq-gic-acpi.c b/drivers/irqchip/irq-gic-acpi.c
-index 8463e48..75c4893 100644
---- a/drivers/irqchip/irq-gic-acpi.c
-+++ b/drivers/irqchip/irq-gic-acpi.c
-@@ -207,3 +207,112 @@ gic_v2_acpi_init(struct acpi_table_header *table)
- 	return 0;
- }
- IRQCHIP_ACPI_DECLARE(gic_v2, ACPI_SIG_MADT, gic_v2_acpi_init);
-+
-+static struct redist_region *redist_regs __initdata;
-+static u32 nr_redist_regions __initdata;
-+
-+static int __init
-+gic_acpi_register_redist(u64 phys_base, u64 size)
-+{
-+	struct redist_region *redist_regs_new;
-+	void __iomem *redist_base;
-+
-+	redist_regs_new = krealloc(redist_regs,
-+				   sizeof(*redist_regs) * (nr_redist_regions + 1),
-+				   GFP_KERNEL);
-+	if (!redist_regs_new) {
-+		pr_err("Couldn't allocate resource for GICR region\n");
-+		return -ENOMEM;
-+	}
-+
-+	redist_regs = redist_regs_new;
-+
-+	redist_base = ioremap(phys_base, size);
-+	if (!redist_base) {
-+		pr_err("Couldn't map GICR region @%llx\n", phys_base);
-+		return -ENOMEM;
-+	}
-+
-+	redist_regs[nr_redist_regions].phys_base = phys_base;
-+	redist_regs[nr_redist_regions].redist_base = redist_base;
-+	nr_redist_regions++;
-+	return 0;
-+}
-+
-+static int __init
-+gic_acpi_parse_madt_redist(struct acpi_subtable_header *header,
-+			const unsigned long end)
-+{
-+	struct acpi_madt_generic_redistributor *redist;
-+
-+	if (BAD_MADT_ENTRY(header, end))
-+		return -EINVAL;
-+
-+	redist = (struct acpi_madt_generic_redistributor *)header;
-+	if (!redist->base_address)
-+		return -EINVAL;
-+
-+	return gic_acpi_register_redist(redist->base_address, redist->length);
-+}
-+
-+static int __init
-+gic_v3_acpi_init(struct acpi_table_header *table)
-+{
-+	int count, i, err = 0;
-+	void __iomem *dist_base;
-+
-+	if (acpi_gic_version() < ACPI_MADT_GIC_VER_V3)
-+		return -ENODEV;
-+
-+	/* Get distributor base address */
-+	count = acpi_parse_entries(ACPI_SIG_MADT,
-+				sizeof(struct acpi_table_madt),
-+				acpi_gic_parse_distributor, table,
-+				ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR, 0);
-+	if (count <= 0) {
-+		pr_err("No valid GICD entry exist\n");
-+		return -EINVAL;
-+	} else if (count > 1) {
-+		pr_err("More than one GICD entry detected\n");
-+		return -EINVAL;
-+	}
-+
-+	dist_base = ioremap(dist_phy_base, ACPI_GICV3_DIST_MEM_SIZE);
-+	if (!dist_base) {
-+		pr_err("Unable to map GICD registers\n");
-+		return -ENOMEM;
-+	}
-+
-+	err = detect_distributor(dist_base);
-+	if (err) {
-+		pr_err("No distributor detected at @%p, giving up", dist_base);
-+		goto out_dist_unmap;
-+	}
-+
-+	/* Collect redistributor base addresses */
-+	count = acpi_parse_entries(ACPI_SIG_MADT,
-+			sizeof(struct acpi_table_madt),
-+			gic_acpi_parse_madt_redist, table,
-+			ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR, 0);
-+	if (count <= 0) {
-+		pr_info("No valid GICR entries exist\n");
-+		err = -EINVAL;
-+		goto out_redist_unmap;
-+	}
-+
-+	err = gicv3_init_bases(dist_base, redist_regs, nr_redist_regions, 0, NULL);
-+	if (err)
-+		goto out_redist_unmap;
-+
-+	return 0;
-+
-+out_redist_unmap:
-+	for (i = 0; i < nr_redist_regions; i++)
-+		if (redist_regs[i].redist_base)
-+			iounmap(redist_regs[i].redist_base);
-+	kfree(redist_regs);
-+out_dist_unmap:
-+	iounmap(dist_base);
-+	return err;
-+}
-+IRQCHIP_ACPI_DECLARE(gic_v3, ACPI_SIG_MADT, gic_v3_acpi_init);
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index e7f134e..a8382f4 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -36,11 +36,6 @@
- #include "irq-gic-common.h"
- #include "irqchip.h"
- 
--struct redist_region {
--	void __iomem		*redist_base;
--	phys_addr_t		phys_base;
--};
--
- struct gic_chip_data {
- 	void __iomem		*dist_base;
- 	struct redist_region	*redist_regions;
-@@ -773,7 +768,7 @@ static const struct irq_domain_ops gic_irq_domain_ops = {
- 	.free = gic_irq_domain_free,
- };
- 
--static int __init gic_init_bases(void __iomem *dist_base,
-+int __init gicv3_init_bases(void __iomem *dist_base,
- 			    struct redist_region *rdist_regs,
- 			    u32 nr_redist_regions,
- 			    u64 redist_stride,
-@@ -808,6 +803,7 @@ static int __init gic_init_bases(void __iomem *dist_base,
- 		goto out_free;
- 	}
- 
-+	set_acpi_core_irqdomain(gic_data.domain);
- 	set_handle_irq(gic_handle_irq);
- 
- 	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
-@@ -827,7 +823,7 @@ out_free:
- 	return err;
- }
- 
--static int __init detect_distributor(void __iomem *dist_base)
-+int __init detect_distributor(void __iomem *dist_base)
- {
- 	u32 reg = readl_relaxed(dist_base + GICD_PIDR2) & GIC_PIDR2_ARCH_MASK;
- 
-@@ -887,7 +883,7 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
- 	if (of_property_read_u64(node, "redistributor-stride", &redist_stride))
- 		redist_stride = 0;
- 
--	err = gic_init_bases(dist_base, rdist_regs, nr_redist_regions,
-+	err = gicv3_init_bases(dist_base, rdist_regs, nr_redist_regions,
- 			     redist_stride, node);
- 	if (!err)
- 		return 0;
-@@ -904,131 +900,3 @@ out_unmap_dist:
- 
- IRQCHIP_DECLARE(gic_v3, "arm,gic-v3", gic_of_init);
- #endif
--
--#ifdef CONFIG_ACPI
--static struct redist_region *redist_regs __initdata;
--static u32 nr_redist_regions __initdata;
--static phys_addr_t dist_phy_base __initdata;
--
--static int __init
--gic_acpi_register_redist(u64 phys_base, u64 size)
--{
--	struct redist_region *redist_regs_new;
--	void __iomem *redist_base;
--
--	redist_regs_new = krealloc(redist_regs,
--				   sizeof(*redist_regs) * (nr_redist_regions + 1),
--				   GFP_KERNEL);
--	if (!redist_regs_new) {
--		pr_err("Couldn't allocate resource for GICR region\n");
--		return -ENOMEM;
--	}
--
--	redist_regs = redist_regs_new;
--
--	redist_base = ioremap(phys_base, size);
--	if (!redist_base) {
--		pr_err("Couldn't map GICR region @%llx\n", phys_base);
--		return -ENOMEM;
--	}
--
--	redist_regs[nr_redist_regions].phys_base = phys_base;
--	redist_regs[nr_redist_regions].redist_base = redist_base;
--	nr_redist_regions++;
--	return 0;
--}
--
--static int __init
--gic_acpi_parse_madt_redist(struct acpi_subtable_header *header,
--			const unsigned long end)
--{
--	struct acpi_madt_generic_redistributor *redist;
--
--	if (BAD_MADT_ENTRY(header, end))
--		return -EINVAL;
--
--	redist = (struct acpi_madt_generic_redistributor *)header;
--	if (!redist->base_address)
--		return -EINVAL;
--
--	return gic_acpi_register_redist(redist->base_address, redist->length);
--}
--
--static int __init
--gic_acpi_parse_madt_distributor(struct acpi_subtable_header *header,
--				const unsigned long end)
--{
--	struct acpi_madt_generic_distributor *dist;
--
--	dist = (struct acpi_madt_generic_distributor *)header;
--
--	if (BAD_MADT_ENTRY(dist, end))
--		return -EINVAL;
--
--	dist_phy_base = dist->base_address;
--	return 0;
--}
--
--static int __init
--gic_v3_acpi_init(struct acpi_table_header *table)
--{
--	int count, i, err = 0;
--	void __iomem *dist_base;
--
--	if (acpi_gic_version() < ACPI_MADT_GIC_VER_V3)
--		return -ENODEV;
--
--	/* Get distributor base address */
--	count = acpi_parse_entries(ACPI_SIG_MADT,
--				sizeof(struct acpi_table_madt),
--				gic_acpi_parse_madt_distributor, table,
--				ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR, 0);
--	if (count <= 0) {
--		pr_err("No valid GICD entry exist\n");
--		return -EINVAL;
--	} else if (count > 1) {
--		pr_err("More than one GICD entry detected\n");
--		return -EINVAL;
--	}
--
--	dist_base = ioremap(dist_phy_base, ACPI_GICV3_DIST_MEM_SIZE);
--	if (!dist_base) {
--		pr_err("Unable to map GICD registers\n");
--		return -ENOMEM;
--	}
--
--	err = detect_distributor(dist_base);
--	if (err) {
--		pr_err("No distributor detected at @%p, giving up", dist_base);
--		goto out_dist_unmap;
--	}
--
--	/* Collect redistributor base addresses */
--	count = acpi_parse_entries(ACPI_SIG_MADT,
--			sizeof(struct acpi_table_madt),
--			gic_acpi_parse_madt_redist, table,
--			ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR, 0);
--	if (count <= 0) {
--		pr_info("No valid GICR entries exist\n");
--		err = -EINVAL;
--		goto out_redist_unmap;
--	}
--
--	err = gic_init_bases(dist_base, redist_regs, nr_redist_regions, 0, NULL);
--	if (err)
--		goto out_redist_unmap;
--
--	acpi_irq_domain = gic_data.domain;
--	return 0;
--
--out_redist_unmap:
--	for (i = 0; i < nr_redist_regions; i++)
--		if (redist_regs[i].redist_base)
--			iounmap(redist_regs[i].redist_base);
--	kfree(redist_regs);
--out_dist_unmap:
--	iounmap(dist_base);
--	return err;
--}
--IRQCHIP_ACPI_DECLARE(gic_v3, ACPI_SIG_MADT, gic_v3_acpi_init);
--#endif
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index ffbc034..37ef420 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -378,6 +378,11 @@ struct rdists {
- 	u64			flags;
- };
- 
-+struct redist_region {
-+	void __iomem            *redist_base;
-+	phys_addr_t             phys_base;
-+};
-+
- static inline void gic_write_eoir(u64 irq)
- {
- 	asm volatile("msr_s " __stringify(ICC_EOIR1_EL1) ", %0" : : "r" (irq));
-@@ -389,6 +394,11 @@ int its_cpu_init(void);
- int its_init(struct device_node *node, struct rdists *rdists,
- 	     struct irq_domain *domain);
- 
-+int gicv3_init_bases(void __iomem *dist_base, struct redist_region *rdist_regs,
-+		     u32 nr_redist_regions, u64 redist_stride,
-+		     struct device_node *node);
-+
-+int detect_distributor(void __iomem *dist_base);
- #endif
- 
- #endif
--- 
-1.9.1
+
+> diff --git a/arch/arm/kernel/module-plts.c b/arch/arm/kernel/module-plts.c
+> index 71a65c49871d..097e2e201b9f 100644
+> --- a/arch/arm/kernel/module-plts.c
+> +++ b/arch/arm/kernel/module-plts.c
+> @@ -118,11 +118,13 @@ static unsigned int count_plts(Elf32_Addr base, const Elf32_Rel *rel, int num)
+>                                            __opcode_to_mem_arm(0x00ffffff)))
+>                                 ret++;
+>                         break;
+> +#ifdef CONFIG_THUMB2_KERNEL
+>                 case R_ARM_THM_CALL:
+>                 case R_ARM_THM_JUMP24:
+>                         if (!duplicate_rel(base, rel, i,
+>                                            __opcode_to_mem_thumb32(0x07ff2fff)))
+>                                 ret++;
+> +#endif
+>                 }
+>         return ret;
+>  }
+>
