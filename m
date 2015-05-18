@@ -1,67 +1,48 @@
-From: nathan_lynch@mentor.com (Nathan Lynch)
-Date: Mon, 18 May 2015 12:43:46 -0500
-Subject: [PATCH 2/2] ARM: VDSO: force use of BFD linker
-In-Reply-To: <1431971026-18317-1-git-send-email-nathan_lynch@mentor.com>
-References: <1431971026-18317-1-git-send-email-nathan_lynch@mentor.com>
-Message-ID: <1431971026-18317-3-git-send-email-nathan_lynch@mentor.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 18 May 2015 18:45:17 +0100
+Subject: [PATCHv2 11/12] ARM: migrate to common PSCI client code
+In-Reply-To: <1431945503-6939-12-git-send-email-mark.rutland@arm.com>
+References: <1431945503-6939-1-git-send-email-mark.rutland@arm.com>
+ <1431945503-6939-12-git-send-email-mark.rutland@arm.com>
+Message-ID: <20150518174517.GR21251@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using a toolchain with gold as the default linker, the VDSO build
-fails:
+On Mon, May 18, 2015 at 11:38:22AM +0100, Mark Rutland wrote:
+> Now that the common PSCI client code has been factored out to
+> drivers/firmware, and made safe for 32-bit use, move the 32-bit ARM code
+> over to it. This results in a moderate reduction of duplicated lines,
+> and will prevent further duplication as the PSCI client code is updated
+> for PSCI 1.0 and beyond.
+> 
+> The two legacy platform users of the PSCI invocation code are updated to
+> account for interface changes. In both cases the power state parameter
+> is changed to an opaque u32 token in preparation for PSCI 1.0 power
+> state changes.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/Kconfig                  |   1 +
+>  arch/arm/include/asm/psci.h       |  23 ---
+>  arch/arm/kernel/Makefile          |   2 +-
+>  arch/arm/kernel/psci.c            | 299 --------------------------------------
+>  arch/arm/kernel/psci_smp.c        |  29 +++-
+>  arch/arm/kernel/setup.c           |   3 +-
+>  arch/arm/mach-highbank/highbank.c |   2 +-
+>  arch/arm/mach-highbank/pm.c       |   8 +-
+>  drivers/cpuidle/cpuidle-calxeda.c |   7 +-
+>  9 files changed, 32 insertions(+), 342 deletions(-)
+>  delete mode 100644 arch/arm/kernel/psci.c
 
-  VDSO    arch/arm/vdso/vdso.so.raw
-  HOSTCC  arch/arm/vdso/vdsomunge
-  MUNGE   arch/arm/vdso/vdso.so.dbg
-  OBJCOPY arch/arm/vdso/vdso.so
-BFD: arch/arm/vdso/vdso.so: Not enough room for program headers, try
-linking with -N
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-For whatever reason, ld.gold is omitting an exidx program header that
-ld.bfd emits, and even when I work around that, I don't get a working
-VDSO.
+However, you need to get an ack from Russell. I assume you'll post this
+again cc'ing the arm-soc guys as well.
 
-For now, instead of supporting gold (which will fail to link the
-kernel anyway since it does not implement --pic-veneer), direct the
-compiler to use the traditional bfd linker.  This is accomplished by
-using -fuse-ld, which is implemented in GCC 4.8 and later.
-
-Note: one limitation of this is that if the toolchain is configured
-to use gold by default, and the bfd linker is not in $PATH, the VDSO
-build will fail:
-
-  VDSO    arch/arm/vdso/vdso.so.raw
-collect2: fatal error: cannot find 'ld'
-
-This will happen if CROSS_COMPILE begins with a path such as
-/opt/bin/arm-linux-gnu- but /opt/bin is not in $PATH.  This is
-considered an acceptable corner-case limitation and is easily worked
-around.
-
-Additonal note: we use cc-option instead of cc-ldoption so that
--fuse-ld=bfd is placed in the command line if the compiler recognizes
-the option.  Using cc-ldoption results in an attempt to link, which
-fails in the situation just described, causing -fuse-ld=bfd to be
-omitted and gold to be used for the VDSO link, which is what we're
-trying to prevent.
-
-Reported-by: Stefan Agner <stefan@agner.ch>
-Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
----
- arch/arm/vdso/Makefile | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/vdso/Makefile b/arch/arm/vdso/Makefile
-index 89182ad44ee8..9d259d94e429 100644
---- a/arch/arm/vdso/Makefile
-+++ b/arch/arm/vdso/Makefile
-@@ -14,6 +14,7 @@ VDSO_LDFLAGS += -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096
- VDSO_LDFLAGS += -nostdlib -shared
- VDSO_LDFLAGS += $(call cc-ldoption, -Wl$(comma)--hash-style=sysv)
- VDSO_LDFLAGS += $(call cc-ldoption, -Wl$(comma)--build-id)
-+VDSO_LDFLAGS += $(call cc-option, -fuse-ld=bfd)
- 
- obj-$(CONFIG_VDSO) += vdso.o
- extra-$(CONFIG_VDSO) += vdso.lds
 -- 
-2.1.0
+Catalin
