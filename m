@@ -1,27 +1,34 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 18 May 2015 18:29:32 +0100
-Subject: [PATCHv2 05/12] arm64: psci: support unsigned return values
-In-Reply-To: <1431945503-6939-6-git-send-email-mark.rutland@arm.com>
+Date: Mon, 18 May 2015 18:33:29 +0100
+Subject: [PATCHv2 06/12] arm64: psci: account for Trusted OS instances
+In-Reply-To: <1431945503-6939-7-git-send-email-mark.rutland@arm.com>
 References: <1431945503-6939-1-git-send-email-mark.rutland@arm.com>
- <1431945503-6939-6-git-send-email-mark.rutland@arm.com>
-Message-ID: <20150518172932.GL21251@e104818-lin.cambridge.arm.com>
+ <1431945503-6939-7-git-send-email-mark.rutland@arm.com>
+Message-ID: <20150518173329.GM21251@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 18, 2015 at 11:38:16AM +0100, Mark Rutland wrote:
-> PSCI_VERSION and MIGRATE_INFO_TYPE_UP_CPU return unsigned values, with
-> the latter returning a 64-bit value. However, the PSCI invocation
-> functions have prototypes returning int.
+On Mon, May 18, 2015 at 11:38:17AM +0100, Mark Rutland wrote:
+> Software resident in the secure world (a "Trusted OS") may cause CPU_OFF
+> calls for the CPU it is resident on to be denied. Such a denial would be
+> fatal for the kernel, and so we must detect when this can happen before
+> the point of no return.
 > 
-> This patch upgrades the invocation functions to return unsigned long,
-> with a new typedef to keep things legible. As PSCI_VERSION cannot return
-> a negative value, the erroneous check against PSCI_RET_NOT_SUPPORTED is
-> also removed. The unrelated psci_initcall_t typedef is moved closer to
-> its first user, to avoid confusion with the invocation functions.
+> This patch implements Trusted OS detection for PSCI 0.2+ systems, using
+> MIGRATE_INFO_TYPE and MIGRATE_INFO_UP_CPU. When a trusted OS is detected
+> as resident on a particular CPU, attempts to hot unplug that CPU will be
+> denied early, before they can prove fatal.
 > 
-> In preparation for sharing the code with ARM, unsigned long is used in
-> preference of u64. In the SMC32 calling convention, the relevant fields
-> will be 32 bits wide.
+> Trusted OS migration is not implemented by this patch. Implementation of
+> migratable UP trusted OSs seems unlikely, and the right policy for
+> migration is unclear (and will likely differ across implementations). As
+> such, it is likely that migration will require cooperation with Trusted
+> OS drivers.
+> 
+> PSCI implementations prior to 0.1 do not provide the facility to detect
+> the presence of a Trusted OS, nor the CPU any such OS is resident on, so
+> without additional information it is not possible to handle Trusted OSs
+> with PSCI 0.1.
 > 
 > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 > Cc: Catalin Marinas <catalin.marinas@arm.com>
