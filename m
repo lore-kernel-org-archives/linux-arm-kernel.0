@@ -1,22 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 May 2015 16:24:37 +0200
-Subject: [PATCH] ARM: fix BE8 module loading
-In-Reply-To: <5559F5B4.9060401@arm.com>
-References: <2205892.6d8Sa1bONm@wuerfel> <5559F5B4.9060401@arm.com>
-Message-ID: <3386186.XWmJAAGsrg@wuerfel>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Mon, 18 May 2015 09:33:28 -0500
+Subject: [PATCH v3 1/4] remoteproc: introduce rproc_get_by_phandle API
+In-Reply-To: <CAK=WgbZGYa-xWE_cxPA1aq50kK2NBdQfhQHX+sPyowky6Syekg@mail.gmail.com>
+References: <1427917039-43206-1-git-send-email-d-gerlach@ti.com>
+ <1427917039-43206-2-git-send-email-d-gerlach@ti.com>
+ <CAK=WgbZCqnMPEnU2992gkOp07BaCP5NJNRO-hLCAdOtUXZGRnQ@mail.gmail.com>
+ <5550C644.4040005@ti.com>
+ <CAK=WgbZGYa-xWE_cxPA1aq50kK2NBdQfhQHX+sPyowky6Syekg@mail.gmail.com>
+Message-ID: <5559F838.4010003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 May 2015 15:22:44 Robin Murphy wrote:
+Ohad,
+On 05/16/2015 02:18 AM, Ohad Ben-Cohen wrote:
+> Hi Suman,
 > 
-> Do you mean BE-32 here (and in the title)? That's the obsolete wacky 
-> word-invariant one, BE-8 is the sensible* one that modern CPUs support.
+> On Mon, May 11, 2015 at 6:09 PM, Suman Anna <s-anna@ti.com> wrote:
+>> On 05/09/2015 02:39 AM, Ohad Ben-Cohen wrote:
+>>> On Wed, Apr 1, 2015 at 10:37 PM, Dave Gerlach <d-gerlach@ti.com> wrote:
+>>>> This patch uses the code removed by commit 40e575b1d0b3 ("remoteproc:
+>>>> remove the get_by_name/put API") for the ref counting a rproc klist
+>>>> code but has rproc_get_by_name replaced with an rproc_get_by_phandle API.
+>>>
+>>> The general idea makes sense to me, but I'm not sure we really do need
+>>> a klist here, since the usage profile of this list is expected to be
+>>> super simple: very small number of accessors, looking for small number
+>>> of list members a small number of times, and probably never do need to
+>>> modify the list while accessing it.
+>>>
+>>> I suspect that the code would be simpler to maintain, debug and
+>>> understand if we just use a simple list with a simple locking
+>>> methodology here.
+>>
+>> The klist usage is something that we restored from previous remoteproc
+>> core code as used by the rproc_get_by_name() API. This was removed in
+>> commit 40e575b1d0b3 ("remoteproc: remove the get_by_name/put API"). We
+>> chose to use the code that had been present before rather than inventing
+>> something new all over again. If you feel that a regular list is the way
+>> to go forward, we can make the switch.
 > 
-> Robin.
-> 
-> *as sensible as big-endian could ever be, at any rate 
-> 
+> Yes, please. Using a regular list with a simple locking methodology
+> should make the code easier to understand and debug.
 
-You are absolutely right, I've fixed  up the changelog accordingly now.
+Ok, that makes sense, we can change this. Thanks for your input.
 
-	Arnd
+Regards,
+Dave
+
+> 
+> Thanks,
+> Ohad.
+> 
