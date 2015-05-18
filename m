@@ -1,80 +1,82 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 18 May 2015 16:36:59 +0100
-Subject: [PATCH] irqchip: GICv3: ITS: don't assume 64K page size in
- its_alloc_tables
-In-Reply-To: <CY1PR0301MB0748DC844073225FDBCD4DC387C40@CY1PR0301MB0748.namprd03.prod.outlook.com>
-References: <1431644545-31904-1-git-send-email-stuart.yoder@freescale.com>
- <5559E7CE.1050003@arm.com>
- <CY1PR0301MB074884E252ADE216BD8C472887C40@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <5559F294.5070701@arm.com>
- <CY1PR0301MB0748DC844073225FDBCD4DC387C40@CY1PR0301MB0748.namprd03.prod.outlook.com>
-Message-ID: <555A071B.1040309@arm.com>
+From: o.mandel@menlosystems.com (Olaf Mandel)
+Date: Mon, 18 May 2015 17:50:43 +0200
+Subject: [PATCH] arm: add CONFIG_ARM_VERBOSE_BOOTUP
+Message-ID: <1431964243-9995-1-git-send-email-o.mandel@menlosystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/05/15 16:33, Stuart Yoder wrote:
-> 
-> 
->> -----Original Message-----
->> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
->> Sent: Monday, May 18, 2015 9:09 AM
->> To: Yoder Stuart-B08248; tglx at linutronix.de
->> Cc: linux-arm-kernel at lists.infradead.org
->> Subject: Re: [PATCH] irqchip: GICv3: ITS: don't assume 64K page size in its_alloc_tables
->>
->> On 18/05/15 14:38, Stuart Yoder wrote:
->>>
->>>
->>>> -----Original Message-----
->>>> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
->>>> Sent: Monday, May 18, 2015 8:23 AM
->>>> To: Yoder Stuart-B08248; tglx at linutronix.de
->>>> Cc: linux-arm-kernel at lists.infradead.org
->>>> Subject: Re: [PATCH] irqchip: GICv3: ITS: don't assume 64K page size in its_alloc_tables
->>>>
->>>> Hi Stuart,
->>>>
->>>> On 15/05/15 00:02, Stuart Yoder wrote:
->>>>> its_alloc_tables() needs to account for page sizes other than
->>>>> 64KB.  Without this change, when PAGE_SIZE=4KB its_alloc_tables()
->>>>> gets stuck in an infinite loop.
->>>>>
->>>>> Signed-off-by: Stuart Yoder <stuart.yoder@freescale.com>
->>>>> ---
->>>>>
->>>>> think this should go into 4.1 if at all possible...without it I am
->>>>> unable to boot a 4.1 kernel on the LS2085 SoC
->>>>
->>>> What you are suggesting here is a effectively a revert of commit
->>>> 790b57a, which would break other implementations.
->>>>
->>>> Can you please explain the actual issue? I'm failing to see how you end
->>>> up in an infinite loop here (the system page size and the ITS base
->>>> granule should be completely unrelated...).
->>>
->>> Here is the problem line:
->>>
->>>       val |= (alloc_size / psz) - 1;
->>>
->>> In our case:
->>>    alloc_size=16K
->>>    psz=64K
->>>
->>> ...so (alloc_size / psz) = 0, and thus val becomes -1, and everything
->>> is screwed up.  We get stuck in a loop to retry_baser:
->>
->> If alloc_size is 16k, you have an order of 2, and I have to assume this
->> is an allocation for a device table (otherwise order would be 4). So
->> things fail because we've computed an alloc_size smaller than what we
->> want to allocate as a minimum.
->>
->> Isn't that exactly what Minghuan's patch fixes?
-> 
-> Yes.  I'll get with Minghuan and between the 2 of us we'll get a properly
-> commented version of his patch sent out.
+The new option copies the behaviour of CONFIG_X86_VERBOSE_BOOTUP
+to the arm architecture, allowing to completely silence the
+serial port. The default value is y, which is the original
+behaviour.
 
-Thanks Stuart.
+Signed-off-by: Olaf Mandel <o.mandel@menlosystems.com>
+CC: Marek Vasut <marex@denx.de>
+---
+ arch/arm/Kconfig.debug          |  9 +++++++++
+ arch/arm/boot/compressed/misc.c | 16 +++++++++++-----
+ 2 files changed, 20 insertions(+), 5 deletions(-)
 
-	M.
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 0c12ffb..644f585 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -1565,6 +1565,15 @@ config UNCOMPRESS_INCLUDE
+ 					ARCH_SHMOBILE_LEGACY
+ 	default "mach/uncompress.h"
+ 
++config ARM_VERBOSE_BOOTUP
++        bool "Enable verbose arm bootup info messages"
++        default y
++        ---help---
++          Enables the informational output from the decompression stage
++          (e.g. bzImage) of the boot. Disable this if you want silent
++          bootup. Error messages from the compression stage are shown
++          even if this option is disabled.
++
+ config EARLY_PRINTK
+ 	bool "Early printk"
+ 	depends on DEBUG_LL
+diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
+index d4f891f..4873708 100644
+--- a/arch/arm/boot/compressed/misc.c
++++ b/arch/arm/boot/compressed/misc.c
+@@ -22,7 +22,13 @@ unsigned int __machine_arch_type;
+ #include <linux/types.h>
+ #include <linux/linkage.h>
+ 
+-static void putstr(const char *ptr);
++static void __putstr(const char *ptr);
++#ifdef CONFIG_ARM_VERBOSE_BOOTUP
++#define putstr(__x)	__putstr(__x)
++#else
++static inline void putstr(const char *ptr)
++{ }
++#endif
+ extern void error(char *x);
+ 
+ #include CONFIG_UNCOMPRESS_INCLUDE
+@@ -83,7 +89,7 @@ static void icedcc_putc(int ch)
+ #define putc(ch)	icedcc_putc(ch)
+ #endif
+ 
+-static void putstr(const char *ptr)
++static void __putstr(const char *ptr)
+ {
+ 	char c;
+ 
+@@ -115,9 +121,9 @@ void error(char *x)
+ {
+ 	arch_error(x);
+ 
+-	putstr("\n\n");
+-	putstr(x);
+-	putstr("\n\n -- System halted");
++	__putstr("\n\n");
++	__putstr(x);
++	__putstr("\n\n -- System halted");
+ 
+ 	while(1);	/* Halt */
+ }
 -- 
-Jazz is not dead. It just smells funny...
+2.1.4
