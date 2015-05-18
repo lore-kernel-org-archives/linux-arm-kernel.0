@@ -1,46 +1,46 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Mon, 18 May 2015 09:58:45 -0400
-Subject: [PATCH] arm64: support ACPI tables outside of kernel RAM
-In-Reply-To: <20150518111143.GC21251@e104818-lin.cambridge.arm.com>
-References: <1431613373-10928-1-git-send-email-msalter@redhat.com>
- <20150518111143.GC21251@e104818-lin.cambridge.arm.com>
-Message-ID: <1431957525.9933.4.camel@deneb.redhat.com>
+From: jcliang@chromium.org (Ricky Liang)
+Date: Mon, 18 May 2015 22:00:26 +0800
+Subject: [PATCH v3] clk: mediatek: Initialize clk_init_data
+Message-ID: <1431957632-2182-1-git-send-email-jcliang@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-05-18 at 12:11 +0100, Catalin Marinas wrote:
-> On Thu, May 14, 2015 at 10:22:53AM -0400, Mark Salter wrote:
-> > There is no guarantee that ACPI tables will be located in RAM linearly
-> > mapped by the kernel. This could be because UEFI placed them below the
-> > kernel image or because mem= places them beyond the reach of the linear
-> > kernel mapping. Even though these tables are outside the linear mapped
-> > RAM, they still need to be accessed as normal memory in order to support
-> > unaligned accesses from ACPI code. In this case, the page_is_ram() test
-> > in acpi_os_ioremap() is not sufficient.
-> 
-> And can we not simply add the rest of the RAM to the resource list as
-> "System RAM" without being part of memblock?
+The variable init (struct clk_init_data) is allocated on the stack.
+We weren't initializing the .flags field, so it contains random junk,
+which can cause all kinds of interesting issues when the flags are
+parsed by clk_register.
 
-If it is in "System RAM", then it needs a valid pfn and struct page.
-Parts of the kernel expect that (page_is_ram(), memory hotplug, etc).
+Signed-off-by: Ricky Liang <jcliang@chromium.org>
+---
+ drivers/clk/mediatek/clk-gate.c | 2 +-
+ drivers/clk/mediatek/clk-pll.c  | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-> 
-> > Additionally, if the table spans multiple pages, it may fall partially
-> > within the linear map and partially without. If the table overlaps the
-> > end of the linear map, the test for whether or not to use the existing
-> > mapping in ioremap_cache() could lead to a panic when ACPI code tries
-> > to access the part beyond the end of the linear map. This patch
-> > attempts to address these problems.
-> 
-> That's a problem with ioremap_cache() that should be fixed independently.
-
-I can submit that separately if you prefer.
-
-> 
-> Ideally, I'd like to see the ACPI code use different APIs to distinguish
-> between table access in RAM and device access, so that we don't have to
-> guess whether the page is RAM or not.
-> 
-
-I don't think the ACPI code has enough info to make that decision, but
-I'm not sure honestly.
+diff --git a/drivers/clk/mediatek/clk-gate.c b/drivers/clk/mediatek/clk-gate.c
+index 9d77ee3..5702036 100644
+--- a/drivers/clk/mediatek/clk-gate.c
++++ b/drivers/clk/mediatek/clk-gate.c
+@@ -109,7 +109,7 @@ struct clk *mtk_clk_register_gate(
+ {
+ 	struct mtk_clk_gate *cg;
+ 	struct clk *clk;
+-	struct clk_init_data init;
++	struct clk_init_data init = {};
+ 
+ 	cg = kzalloc(sizeof(*cg), GFP_KERNEL);
+ 	if (!cg)
+diff --git a/drivers/clk/mediatek/clk-pll.c b/drivers/clk/mediatek/clk-pll.c
+index 66154ca..44409e9 100644
+--- a/drivers/clk/mediatek/clk-pll.c
++++ b/drivers/clk/mediatek/clk-pll.c
+@@ -268,7 +268,7 @@ static struct clk *mtk_clk_register_pll(const struct mtk_pll_data *data,
+ 		void __iomem *base)
+ {
+ 	struct mtk_clk_pll *pll;
+-	struct clk_init_data init;
++	struct clk_init_data init = {};
+ 	struct clk *clk;
+ 	const char *parent_name = "clk26m";
+ 
+-- 
+2.1.2
