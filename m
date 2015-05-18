@@ -1,124 +1,93 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 18 May 2015 12:15:38 +0100
-Subject: [PATCH][V2] ARM: 8351/1: perf: fix memory leak on return
-In-Reply-To: <1431946836-11243-1-git-send-email-colin.king@canonical.com>
-References: <1431946836-11243-1-git-send-email-colin.king@canonical.com>
-Message-ID: <20150518111538.GU2067@n2100.arm.linux.org.uk>
+From: slash.tmp@free.fr (Mason)
+Date: Mon, 18 May 2015 13:24:49 +0200
+Subject: schedule_timeout sleeps too long after dividing CPU frequency
+In-Reply-To: <55563C63.8090504@free.fr>
+References: <5554858A.9010207@free.fr> <20150514115456.GB23999@linux>
+ <55549DEE.6010202@free.fr>
+ <CAKohpon4AV-7nq=Qm7PpDbbW9ti98avY9zz82htzyHWi5_K7fA@mail.gmail.com>
+ <20150514144239.GZ2067@n2100.arm.linux.org.uk> <5555BC7E.7010601@free.fr>
+ <20150515095159.GF2067@n2100.arm.linux.org.uk> <5555CC1A.5040604@free.fr>
+ <20150515115852.GJ2067@n2100.arm.linux.org.uk> <5555EA68.7030006@free.fr>
+ <20150515131521.GK2067@n2100.arm.linux.org.uk> <5555FB7F.901@free.fr>
+ <55563C63.8090504@free.fr>
+Message-ID: <5559CC01.9040306@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 18, 2015 at 12:00:36PM +0100, Colin King wrote:
-> From: Colin Ian King <colin.king@canonical.com>
+On 15/05/2015 20:35, Mason wrote:
+
+> On 15/05/2015 15:58, Mason wrote:
 > 
-> Recent commit 3b8786ff7a1b31645ae2c26a2ec32dbd42ac1094
-> ("ARM: 8352/1: perf: Fix the pmu node name in warning message")
-> introduced a memory leak of irqs on the "Don't bother with PPIs"
-> return path. This was picked up by static analysis by cppcheck:
+>> Thanks for providing evidence that it does work. I am
+>> now hopeful to get it working. I'll start by applying
+>> my patch to a more recent kernel.
 > 
-> [arch/arm/kernel/perf_event_cpu.c:315]: (error) Memory leak: irqs
+> Could you provide the full output of /proc/timer_list for
+> the platform where TWD is running in one-shot mode?
 > 
-> Perform allocation of irqs after getting the irq hence removing need to
-> clean up an allocation on the PPI affine return path.
-> 
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+> Also what kernel version is that platform running?
 
-Your subject line refers to patch 8351/1 in a form which is the standard
-format for patches applied by my patch system.  However, what you're
-including is not that patch.  You go on to talk about 8352/1 in your
-commit message, but I don't see the relevance of 8352/1 to the patch
-you've included.
+Hello Russell,
 
-I think you mean to refer to the 8351/1 commit ID and its summary line
-in your commit body.  Please fix this as at the moment it's misleading.
-Also, please drop the reference to 8351/1 in your subject line, and
-update the summary line to be a little more relevant and specific.
+On your platform, where TWD works in one-shot mode with hrtimers
+enabled, I assume you registered a tick broadcast device?
 
-Lastly, please include a Fixes: tag so that tools can parse the
-referred commit.  The Fixes: tag has the format:
+(AFAIU, one is required since TWD is tagged CLOCK_EVT_FEAT_C3STOP.)
+https://lwn.net/Articles/574962/
 
-Fixes: 12-character-git-id ("commit-summary-line")
+I didn't register a tick broadcast device, and this may be the root
+of my problems.
 
-So that would be:
+Here's the relevant part of /proc/timer_list
 
-Fixes: 338d9dd3e2ae ("ARM: 8351/1: perf: don't warn about missing interrupt-affinity property for PPIs")
+Tick Device: mode:     0
+Broadcast device
+Clock Event Device: <NULL>
+tick_broadcast_mask: 00000000
+tick_broadcast_oneshot_mask: 00000000
 
-with no text wrapping.  Thanks.
+What does your timer_list show?
 
-For reference, 8351/1 was:
 
-commit 338d9dd3e2aee00a9198e8bf6e7d535d3feeaf32
-Author: Will Deacon <will.deacon@arm.com>
-Date:   Fri May 1 17:15:23 2015 +0100
+Questions for the ARM devs:
 
-    ARM: 8351/1: perf: don't warn about missing interrupt-affinity property for PPIs
+Is there an architected / standard tick broadcast device on ARM,
+equivalent to x86's HPET?
 
-    PPIs are affine by nature, so the interrupt-affinity property is not
-    used and therefore we shouldn't print a warning in its absence.
+Russell's 2010 patch (5388a6b266) states
 
-    Reported-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-    Reviewed-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-    Signed-off-by: Will Deacon <will.deacon@arm.com>
-    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+  The TWD local timers are unable to wake up the CPU when it is placed
+  into a low power mode, eg. C3.  Therefore, we need to adapt things
+  such that the TWD code can cope with this.
 
-and 8352/1 was:
+What exactly is meant by "low power modes".
+Does the idle loop calling WFI send the system into low power mode?
+Are there several low power modes?
+How are these modes entered and exited?
+Is this documented in the ARM reference manual?
+or in the Cortex A9 technical manual?
 
-commit 3b8786ff7a1b31645ae2c26a2ec32dbd42ac1094
-Author: Will Deacon <will.deacon@arm.com>
-Date:   Fri May 1 17:16:01 2015 +0100
+The technical manual states
 
-    ARM: 8352/1: perf: Fix the pmu node name in warning message
+5.3.1  Individual Cortex-A9 processor power management
+[...]
+Each Cortex-A9 processor can be in one of the following modes:
+Run mode     = Everything is clocked and powered-up
+Standby mode = The CPU clock is stopped. Only logic required for wake-up is still active.
+Dormant mode = Everything is powered off except RAM arrays that are in retention mode.
+Shutdown     = Everything is powered-off.
+[...]
+Standby modes
+WFI and WFE Standby modes disable most of the clocks in a processor, while keeping its logic
+powered up. This reduces the power drawn to the static leakage current, leaving a tiny clock
+power overhead requirement to enable the device to wake up.
+[...]
+Dormant mode
+Dormant mode is designed to enable the Cortex-A9 processor to be powered down, while
+leaving the caches powered up and maintaining their state.
 
-    With commit 9fd85eb502a7 ("ARM: pmu: add support for interrupt-affinity
-    property"), we print a warning when we find a PMU SPI with a missing
-    missing interrupt-affinity property in a pmu node. Unfortunately, we
-    pass the wrong (NULL) device node to of_node_full_name, resulting in
-    unhelpful messages such as:
+Does the "low power mode" in Russell's commit message refer to Dormant mode?
+Because it seems the TWD should still work in Standby mode, right?
 
-     hw perfevents: Failed to parse <no-node>/interrupt-affinity[0]
 
-    This patch fixes the name to that of the pmu node.
-
-    Fixes: 9fd85eb502a7 (ARM: pmu: add support for interrupt-affinity property)
-
-    Acked-by: Mark Rutland <mark.rutland@arm.com>
-    Signed-off-by: Will Deacon <will.deacon@arm.com>
-    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-
-> ---
->  arch/arm/kernel/perf_event_cpu.c | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-> index 213919b..a7099ee 100644
-> --- a/arch/arm/kernel/perf_event_cpu.c
-> +++ b/arch/arm/kernel/perf_event_cpu.c
-> @@ -303,17 +303,17 @@ static int probe_current_pmu(struct arm_pmu *pmu)
->  
->  static int of_pmu_irq_cfg(struct platform_device *pdev)
->  {
-> -	int i, irq;
-> -	int *irqs = kcalloc(pdev->num_resources, sizeof(*irqs), GFP_KERNEL);
-> -
-> -	if (!irqs)
-> -		return -ENOMEM;
-> +	int i, irq, *irqs;
->  
->  	/* Don't bother with PPIs; they're already affine */
->  	irq = platform_get_irq(pdev, 0);
->  	if (irq >= 0 && irq_is_percpu(irq))
->  		return 0;
->  
-> +	irqs = kcalloc(pdev->num_resources, sizeof(*irqs), GFP_KERNEL);
-> +	if (!irqs)
-> +		return -ENOMEM;
-> +
->  	for (i = 0; i < pdev->num_resources; ++i) {
->  		struct device_node *dn;
->  		int cpu;
-> -- 
-> 2.1.4
-> 
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Regards.
