@@ -1,67 +1,58 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 18 May 2015 18:49:28 +0200
-Subject: [PATCH] arm64: support ACPI tables outside of kernel RAM
-In-Reply-To: <20150518164108.GH21251@e104818-lin.cambridge.arm.com>
-References: <1431613373-10928-1-git-send-email-msalter@redhat.com>
- <20150518111143.GC21251@e104818-lin.cambridge.arm.com>
- <1431957525.9933.4.camel@deneb.redhat.com>
- <20150518164108.GH21251@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu8wXrCnnDEw2gpJ9e1qixkVvBCsUf0wLorsdLJwknZELA@mail.gmail.com>
+From: robertcnelson@gmail.com (Robert Nelson)
+Date: Mon, 18 May 2015 11:49:24 -0500
+Subject: [PATCH] ARM: dts: am335x-bone* enable pmic-shutdown-controller
+In-Reply-To: <20150518162936.GF10274@atomide.com>
+References: <1431525001-5747-1-git-send-email-robertcnelson@gmail.com>
+ <20150513141658.GB6605@localhost> <20150513144846.GC6605@localhost>
+ <CAALWOA-hkgrMi+OeNrmwaVpdEfNadFn0R-QbpXi9LU-4sbakJQ@mail.gmail.com>
+ <20150518152108.GE10274@atomide.com>
+ <CAOCHtYgwyQy+hQE2PeUd+7U9wNygVOUuAb-VSh_9K5y7zFHEWA@mail.gmail.com>
+ <20150518162936.GF10274@atomide.com>
+Message-ID: <CAOCHtYjtziBwfSMGPRrQ7rfDEf_dC=7rPytQUxVXy8bSp-8NNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 May 2015 at 18:41, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Mon, May 18, 2015 at 09:58:45AM -0400, Mark Salter wrote:
->> On Mon, 2015-05-18 at 12:11 +0100, Catalin Marinas wrote:
->> > On Thu, May 14, 2015 at 10:22:53AM -0400, Mark Salter wrote:
->> > > There is no guarantee that ACPI tables will be located in RAM linearly
->> > > mapped by the kernel. This could be because UEFI placed them below the
->> > > kernel image or because mem= places them beyond the reach of the linear
->> > > kernel mapping. Even though these tables are outside the linear mapped
->> > > RAM, they still need to be accessed as normal memory in order to support
->> > > unaligned accesses from ACPI code. In this case, the page_is_ram() test
->> > > in acpi_os_ioremap() is not sufficient.
->> >
->> > And can we not simply add the rest of the RAM to the resource list as
->> > "System RAM" without being part of memblock?
+On Mon, May 18, 2015 at 11:29 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Robert Nelson <robertcnelson@gmail.com> [150518 09:15]:
+>> On Mon, May 18, 2015 at 10:21 AM, Tony Lindgren <tony@atomide.com> wrote:
 >>
->> If it is in "System RAM", then it needs a valid pfn and struct page.
->> Parts of the kernel expect that (page_is_ram(), memory hotplug, etc).
->
-> OK, I had the impression that we could get away with this.
->
->> > > Additionally, if the table spans multiple pages, it may fall partially
->> > > within the linear map and partially without. If the table overlaps the
->> > > end of the linear map, the test for whether or not to use the existing
->> > > mapping in ioremap_cache() could lead to a panic when ACPI code tries
->> > > to access the part beyond the end of the linear map. This patch
->> > > attempts to address these problems.
->> >
->> > That's a problem with ioremap_cache() that should be fixed independently.
+>> All the rev information is in the board's eeprom:
 >>
->> I can submit that separately if you prefer.
->
-> Yes, please.
->
->> > Ideally, I'd like to see the ACPI code use different APIs to distinguish
->> > between table access in RAM and device access, so that we don't have to
->> > guess whether the page is RAM or not.
+>> hexdump -e '8/1 "%c"' /sys/bus/i2c/devices/0-0050/eeprom -s 12 -n 4
 >>
->> I don't think the ACPI code has enough info to make that decision, but
->> I'm not sure honestly.
+>> Rev A5B
+>> 0A5B
+>>
+>> Rev C
+>> 000C
+>>
+>> Just another default qwerk to add to Pantelis' bone_capemgr. ;)
 >
-> Do we have a guarantee that UEFI tells the kernel about the whole RAM?
+> It seems we should not even instantiate some devices on BBB
+> until the EEPROM is parsed.. So maybe something like this:
 >
+> 1. The problem devices are initially set with status = "disabled"
+>    in the dts
+>
+> 2. We set up drivers/*/bbb-eeprom.c that parses the board
+>    revision at module_init time, and then flips the selected
+>    devices to have status = "enabled" and populates the revision
+>    info based on the eeprom and SoC revision passed in pdata.
+>    Then those devices get their struct device created and
+>    probed, but at a much later time.
+>
+> So rather than trying to init all that early, let's just
+> init them much later when we have the proper I2C driver
+> running?
 
-Yes, the UEFI memory map must describe all of RAM, no matter how it is
-used. I may also describe some MMIO regions, but typically only
-regions that it needs itself to implement the UEFI Runtime Services
-(e.g., RTC base address, NOR flash for the variable store)
+I see that working just fine.  We (beagleboard.org) enforce the eeprom
+data, as all the official images require a proper baseboard eeprom.
 
-So we could potentially query the UEFI memory map directly to find out
-whether some otherwise unqualified region is backed by RAM or not,
-although I'd prefer some intermediate data structure (such as the
-physmem memblock table) if we go that route.
+We just have to be very careful to limit the scope, otherwise we will
+end up with Pantelis' rejected capebus from the v3.2.x days...
+
+Regards,
 
 -- 
-Ard.
+Robert Nelson
+https://rcn-ee.com/
