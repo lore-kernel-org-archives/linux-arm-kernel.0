@@ -1,54 +1,25 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 18 May 2015 10:27:30 -0400 (EDT)
-Subject: [PATCH] USB: ehci-platform: support EHCIs with transaction
- translator
-In-Reply-To: <1431789460-26831-1-git-send-email-manabian@gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1505181011080.1579-100000@iolanthe.rowland.org>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 18 May 2015 16:34:40 +0200 (CEST)
+Subject: [PATCH v2 0/2] ARM: move Dual-Timer SP804 driver to
+ drivers/clocksource
+In-Reply-To: <1431953084-15700-1-git-send-email-sudeep.holla@arm.com>
+References: <1430390662-18246-1-git-send-email-sudeep.holla@arm.com>
+ <1431953084-15700-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <alpine.DEB.2.11.1505181633470.4225@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 16 May 2015, Joachim Eastwood wrote:
+On Mon, 18 May 2015, Sudeep Holla wrote:
 
-> Some EHCI controllers have a Transaction Translator built into
-> the root hub. Support this feature in device tree when using
-> the ehci-platform driver by adding a feature flag for it.
+> Since there are ARM64 platforms(e.g. Juno) with SP804 timers, we need
+> to move the driver out of arch/arm so that the code can be shared.
 > 
-> This is needed to get USB working on NXP LPC18xx/43xx platforms.
-> 
-> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
-> ---
-> 
->  Documentation/devicetree/bindings/usb/usb-ehci.txt | 2 ++
->  drivers/usb/host/ehci-platform.c                   | 4 ++++
->  2 files changed, 6 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
-> index 0b04fdff9d5a..a12d6012a40f 100644
-> --- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
-> +++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
-> @@ -13,6 +13,8 @@ Optional properties:
->   - big-endian-desc : boolean, set this for hcds with big-endian descriptors
->   - big-endian : boolean, for hcds with big-endian-regs + big-endian-desc
->   - needs-reset-on-resume : boolean, set this to force EHCI reset after resume
-> + - has-transaction-translator : boolean, set this if EHCI have a Transaction
-> +				Translator built into the root hub.
->   - clocks : a list of phandle + clock specifier pairs
->   - phys : phandle + phy specifier pair
->   - phy-names : "usb"
-> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-> index d8a75a51d6d4..ba07f16b13e0 100644
-> --- a/drivers/usb/host/ehci-platform.c
-> +++ b/drivers/usb/host/ehci-platform.c
-> @@ -202,6 +202,10 @@ static int ehci_platform_probe(struct platform_device *dev)
->  					  "needs-reset-on-resume"))
->  			pdata->reset_on_resume = 1;
->  
-> +		if (of_property_read_bool(dev->dev.of_node,
-> +					  "has-transaction-translator"))
-> +			pdata->has_tt = 1;
-> +
->  		priv->num_phys = of_count_phandle_with_args(dev->dev.of_node,
->  				"phys", "#phy-cells");
->  		priv->num_phys = priv->num_phys > 0 ? priv->num_phys : 1;
+> Changes v1->v2:
+> 	- introduces sp804_timer_disable and retained the integrator
+> 	  and realview timer initialisation code as suggested by Russell
+ 
+Please route this through ARM with my ACK.
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+Thanks,
+
+	tglx
