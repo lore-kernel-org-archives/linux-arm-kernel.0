@@ -1,103 +1,37 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 18 May 2015 19:58:42 +0800
-Subject: [PATCH V9 1/4] ARM: clk: imx: update pllv3 to support imx7
-In-Reply-To: <1431376208-474-2-git-send-email-Frank.Li@freescale.com>
-References: <1431376208-474-1-git-send-email-Frank.Li@freescale.com>
- <1431376208-474-2-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20150518115842.GF1071@dragon>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 18 May 2015 14:09:08 +0200
+Subject: [PATCH v4 2/7] clocksource: add lpc32xx timer driver
+In-Reply-To: <2239410.eaKNvGFUP4@wuerfel>
+References: <1431381653-25356-1-git-send-email-manabian@gmail.com>
+ <1431381653-25356-3-git-send-email-manabian@gmail.com>
+ <2239410.eaKNvGFUP4@wuerfel>
+Message-ID: <5559D664.7000308@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 12, 2015 at 04:30:05AM +0800, Frank.Li at freescale.com wrote:
-> From: Frank Li <Frank.Li@freescale.com>
-> 
-> Add type IMX_PLLV3_ENET_MX7
+On 05/15/2015 10:01 PM, Arnd Bergmann wrote:
+> On Tuesday 12 May 2015 00:00:48 Joachim Eastwood wrote:
+>> Add support for using the NXP LPC timer as clocksource and clock
+>> event. These timers are present on many NXP devices including
+>> LPC32xx, LPC17xx, LPC18xx and LPC43xx.
+>>
+>> The timer has a 32-bit timer counter register with a programmable
+>> 32-bit prescaler. It supports up to 4 compare match values with
+>> interrupt generation and reset/stop timer counter action.
+>>
+>> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+>>
+>
+> Looks ok to me, please merge this and patch 3 through the clocksource tree.
+>
+> 	Arnd
+>
 
-IMX7 instead of MX7.
+Applied to my tree for 4.2.
 
-> 
-> Signed-off-by: Frank Li <Frank.Li@freescale.com>
-> ---
->  drivers/clk/imx/clk-pllv3.c | 9 ++++++++-
->  drivers/clk/imx/clk.h       | 1 +
->  2 files changed, 9 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
-> index 641ebc5..95e99dc 100644
-> --- a/drivers/clk/imx/clk-pllv3.c
-> +++ b/drivers/clk/imx/clk-pllv3.c
-> @@ -24,12 +24,14 @@
->  
->  #define BM_PLL_POWER		(0x1 << 12)
->  #define BM_PLL_LOCK		(0x1 << 31)
-> +#define ENET_PLL_POWER		(0x1 << 5)
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-IMX7_ENET_PLL_POWER for better?
-
-Shawn
-
->  
->  /**
->   * struct clk_pllv3 - IMX PLL clock version 3
->   * @clk_hw:	 clock source
->   * @base:	 base address of PLL registers
->   * @powerup_set: set POWER bit to power up the PLL
-> + * @powerdown:   pll powerdown offset bit
->   * @div_mask:	 mask of divider bits
->   * @div_shift:	 shift of divider bits
->   *
-> @@ -40,6 +42,7 @@ struct clk_pllv3 {
->  	struct clk_hw	hw;
->  	void __iomem	*base;
->  	bool		powerup_set;
-> +	u32		powerdown;
->  	u32		div_mask;
->  	u32		div_shift;
->  };
-> @@ -49,7 +52,7 @@ struct clk_pllv3 {
->  static int clk_pllv3_wait_lock(struct clk_pllv3 *pll)
->  {
->  	unsigned long timeout = jiffies + msecs_to_jiffies(10);
-> -	u32 val = readl_relaxed(pll->base) & BM_PLL_POWER;
-> +	u32 val = readl_relaxed(pll->base) & pll->powerdown;
->  
->  	/* No need to wait for lock when pll is not powered up */
->  	if ((pll->powerup_set && !val) || (!pll->powerup_set && val))
-> @@ -293,6 +296,8 @@ struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
->  	if (!pll)
->  		return ERR_PTR(-ENOMEM);
->  
-> +	pll->powerdown = BM_PLL_POWER;
-> +
->  	switch (type) {
->  	case IMX_PLLV3_SYS:
->  		ops = &clk_pllv3_sys_ops;
-> @@ -306,6 +311,8 @@ struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
->  	case IMX_PLLV3_AV:
->  		ops = &clk_pllv3_av_ops;
->  		break;
-> +	case IMX_PLLV3_ENET_MX7:
-> +		pll->powerdown = ENET_PLL_POWER;
->  	case IMX_PLLV3_ENET:
->  		ops = &clk_pllv3_enet_ops;
->  		break;
-> diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
-> index 6bae537..bc06c8e 100644
-> --- a/drivers/clk/imx/clk.h
-> +++ b/drivers/clk/imx/clk.h
-> @@ -39,6 +39,7 @@ enum imx_pllv3_type {
->  	IMX_PLLV3_USB_VF610,
->  	IMX_PLLV3_AV,
->  	IMX_PLLV3_ENET,
-> +	IMX_PLLV3_ENET_MX7,
->  };
->  
->  struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
