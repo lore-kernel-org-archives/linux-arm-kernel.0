@@ -1,53 +1,36 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 18 May 2015 18:36:55 +0100
-Subject: [PATCHv2 07/12] arm64: psci: kill psci_power_state
-In-Reply-To: <1431945503-6939-8-git-send-email-mark.rutland@arm.com>
+Date: Mon, 18 May 2015 18:38:13 +0100
+Subject: [PATCHv2 08/12] arm64: psci: remove ACPI coupling
+In-Reply-To: <1431945503-6939-9-git-send-email-mark.rutland@arm.com>
 References: <1431945503-6939-1-git-send-email-mark.rutland@arm.com>
- <1431945503-6939-8-git-send-email-mark.rutland@arm.com>
-Message-ID: <20150518173655.GN21251@e104818-lin.cambridge.arm.com>
+ <1431945503-6939-9-git-send-email-mark.rutland@arm.com>
+Message-ID: <20150518173813.GO21251@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 18, 2015 at 11:38:18AM +0100, Mark Rutland wrote:
-> A PSCI 1.0 implementation may choose to use the new extended StateID
-> format, the presence of which may be queried via the PSCI_FEATURES call.
-> The layout of this new StateID format is incompatible with the existing
-> format, and so to handle both we must abstract attempts to parse the
-> fields.
+On Mon, May 18, 2015 at 11:38:19AM +0100, Mark Rutland wrote:
+> The 32-bit ARM port doesn't have ACPI headers, and conditionally
+> including them is going to look horrendous. In preparation for sharing
+> the PSCI invocation code with 32-bit, move the acpi_psci_* function
+> declarations and definitions such that the PSCI client code need not
+> include ACPI headers.
 > 
-> In preparation for PSCI 1.0 support, this patch introduces
-> psci_power_state_loses_context and psci_power_state_is_valid functions
-> to query information from a PSCI power state, which is no longer
-> decomposed (and hence the pack/unpack functions are removed). As it is
-> no longer decomposed, it is now passed round as an opaque u32 token.
+> While it would seem like we could simply hide the ACPI includes in
+> psci.h, the ACPI headers have hilarious circular dependencies which make
+> this infeasible without reorganising most of ACPICA. So rather than
+> doing that, move the acpi_psci_* prototypes into psci.h.
+> 
+> The psci_acpi_init function is made dependent on CONFIG_ACPI (with a
+> stub implementation in asm/psci.h) such that it need not be built for
+> 32-bit ARM or kernels without ACPI support. The currently missing __init
+> annotations are added to the prototypes in the header.
 > 
 > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Reviewed-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+> Cc: Al Stone <al.stone@linaro.org>
 > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 > Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/kernel/psci.c | 89 ++++++++++++++++++++----------------------------
->  1 file changed, 37 insertions(+), 52 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-> index 3ef677e..4ef9472 100644
-> --- a/arch/arm64/kernel/psci.c
-> +++ b/arch/arm64/kernel/psci.c
-> @@ -37,11 +37,19 @@
->  #define PSCI_POWER_STATE_TYPE_STANDBY		0
->  #define PSCI_POWER_STATE_TYPE_POWER_DOWN	1
->  
-> -struct psci_power_state {
-> -	u16	id;
-> -	u8	type;
-> -	u8	affinity_level;
-> -};
-> +static bool psci_power_state_loses_context(u32 state)
-> +{
-> +	return !!(state & PSCI_0_2_POWER_STATE_TYPE_MASK);
-> +}
-
-Nitpick: I don't think you need the !! here since the default conversion
-is to bool anyway.
 
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
