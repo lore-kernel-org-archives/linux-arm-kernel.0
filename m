@@ -1,304 +1,133 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Mon, 18 May 2015 13:52:40 -0500
-Subject: [PATCH v3] arm64: dts: qcom: Add msm8916 CoreSight components
-In-Reply-To: <CANLsYkyKrtyMicsNs2CDd4=GfrQJOPJkAqSUiTB=5hRs3+d=tQ@mail.gmail.com>
-References: <1431333119-13626-1-git-send-email-ivan.ivanov@linaro.org>
- <CANLsYkyKrtyMicsNs2CDd4=GfrQJOPJkAqSUiTB=5hRs3+d=tQ@mail.gmail.com>
-Message-ID: <7F8B0480-06A8-4381-90C8-3F2A35F14FCD@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 18 May 2015 19:56:45 +0100
+Subject: 3.18: lockdep problems in cpufreq
+In-Reply-To: <CAKohponhkk9BK6-7ScHeZa4R43iooWQFV8YoPLv6LjO40GNq=A@mail.gmail.com>
+References: <20141214213655.GA11285@n2100.arm.linux.org.uk>
+ <003501d01876$fbc53f80$f34fbe80$%brar@samsung.com>
+ <20141215174336.GJ11285@n2100.arm.linux.org.uk>
+ <3353119.0CuA8fKaup@vostro.rjw.lan>
+ <20141215230922.GL11285@n2100.arm.linux.org.uk>
+ <CAKohponhkk9BK6-7ScHeZa4R43iooWQFV8YoPLv6LjO40GNq=A@mail.gmail.com>
+Message-ID: <20150518185645.GA28053@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> On May 11, 2015, at 2:21 PM, Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
+On Tue, Dec 16, 2014 at 09:11:53AM +0530, Viresh Kumar wrote:
+> On 16 December 2014 at 04:39, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > Well, here's a patch which I'm running on top of 3.18 at the moment,
+> > which is basically what I described in my email, and I'm running with it
+> > and it is without any lockdep complaint.
 > 
-> On 11 May 2015 at 02:31, Ivan T. Ivanov <ivan.ivanov@linaro.org> wrote:
->> Add initial set of CoreSight components found on Qualcomm's 8x16 chipset.
->> 
->> Signed-off-by: Ivan T. Ivanov <ivan.ivanov@linaro.org>
->> ---
->> 
->> Changes since v2 [1]:
->> * Added "1x" to "qcom,coresight-replicator" compatible string, to match what
->>  devicetree bindings documentations says.
->> 
->> [1] http://www.spinics.net/lists/devicetree/msg77768.html
->> 
->> arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi | 254 ++++++++++++++++++++++++
->> 1 file changed, 254 insertions(+)
->> create mode 100644 arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi
->> 
->> diff --git a/arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi b/arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi
->> new file mode 100644
->> index 0000000..900f1f4
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/qcom/msm8916-coresight.dtsi
->> @@ -0,0 +1,254 @@
->> +/*
->> + * Copyright (c) 2013 - 2015, The Linux Foundation. All rights reserved.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 and
->> + * only version 2 as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +&soc {
->> +
->> +       tpiu at 820000 {
->> +               compatible = "arm,coresight-tpiu", "arm,primecell";
->> +               reg = <0x820000 0x1000>;
->> +
->> +               clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
->> +               clock-names = "apb_pclk", "atclk";
->> +
->> +               port {
->> +                       tpiu_in: endpoint {
->> +                               slave-mode;
->> +                               remote-endpoint = <&replicator_out1>;
->> +                       };
->> +               };
->> +       };
->> +
->> +       funnel at 821000 {
->> +               compatible = "arm,coresight-funnel", "arm,primecell";
->> +               reg = <0x821000 0x1000>;
->> +
->> +               clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
->> +               clock-names = "apb_pclk", "atclk";
->> +
->> +               ports {
->> +                       #address-cells = <1>;
->> +                       #size-cells = <0>;
->> +
->> +                       /*
->> +                        * Not described input ports:
->> +                        * 0 - connected to Resource and Power Manger CPU ETM
->> +                        * 1 - not-connected
->> +                        * 2 - connected to Modem CPU ETM
->> +                        * 3 - not-connected
->> +                        * 5 - not-connected
->> +                        * 6 - connected trought funnel to Wireless CPU ETM
->> +                        * 7 - connected to STM component
->> +                        */
->> +                       port at 4 {
->> +                               reg = <4>;
->> +                               funnel0_in4: endpoint {
->> +                                       slave-mode;
->> +                                       remote-endpoint = <&funnel1_out>;
->> +                               };
->> +                       };
->> +                       port at 8 {
->> +                               reg = <0>;
->> +                               funnel0_out: endpoint {
->> +                                       remote-endpoint = <&etf_in>;
->> +                               };
->> +                       };
->> +               };
->> +       };
->> +
->> +       replicator at 824000 {
->> +               compatible = "qcom,coresight-replicator1x", "arm,primecell";
->> +               reg = <0x824000 0x1000>;
->> +
->> +               clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
->> +               clock-names = "apb_pclk", "atclk";
->> +
->> +               ports {
->> +                       #address-cells = <1>;
->> +                       #size-cells = <0>;
->> +
->> +                       port at 0 {
->> +                               reg = <0>;
->> +                               replicator_out0: endpoint {
->> +                                       remote-endpoint = <&etr_in>;
->> +                               };
->> +                       };
->> +                       port at 1 {
->> +                               reg = <1>;
->> +                               replicator_out1: endpoint {
->> +                                       remote-endpoint = <&tpiu_in>;
->> +                               };
->> +                       };
->> +                       port at 2 {
->> +                               reg = <0>;
->> +                               replicator_in: endpoint {
->> +                                       slave-mode;
->> +                                       remote-endpoint = <&etf_out>;
->> +                               };
->> +                       };
->> +               };
->> +       };
->> +
->> +       etf at 825000 {
->> +               compatible = "arm,coresight-tmc", "arm,primecell";
->> +               reg = <0x825000 0x1000>;
->> +
->> +               clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
->> +               clock-names = "apb_pclk", "atclk";
->> +
->> +               ports {
->> +                       #address-cells = <1>;
->> +                       #size-cells = <0>;
->> +
->> +                       port at 0 {
->> +                               reg = <0>;
->> +                               etf_out: endpoint {
->> +                                       slave-mode;
->> +                                       remote-endpoint = <&funnel0_out>;
->> +                               };
->> +                       };
->> +                       port at 1 {
->> +                               reg = <0>;
->> +                               etf_in: endpoint {
->> +                                       remote-endpoint = <&replicator_in>;
->> +                               };
->> +                       };
->> +               };
->> +       };
->> +
->> +       etr at 826000 {
->> +               compatible = "arm,coresight-tmc", "arm,primecell";
->> +               reg = <0x826000 0x1000>;
->> +
->> +               clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
->> +               clock-names = "apb_pclk", "atclk";
->> +
->> +               port {
->> +                       etr_in: endpoint {
->> +                               slave-mode;
->> +                               remote-endpoint = <&replicator_out0>;
->> +                       };
->> +               };
->> +       };
->> +
->> +       funnel at 841000 { /* APSS funnel only 4 inputs are used */
->> +               compatible = "arm,coresight-funnel", "arm,primecell";
->> +               reg = <0x841000 0x1000>;
->> +
->> +               clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
->> +               clock-names = "apb_pclk", "atclk";
->> +
->> +               ports {
->> +                       #address-cells = <1>;
->> +                       #size-cells = <0>;
->> +
->> +                       port at 0 {
->> +                               reg = <0>;
->> +                               funnel1_in0: endpoint {
->> +                                       slave-mode;
->> +                                       remote-endpoint = <&etm0_out>;
->> +                               };
->> +                       };
->> +                       port at 1 {
->> +                               reg = <1>;
->> +                               funnel1_in1: endpoint {
->> +                                       slave-mode;
->> +                                       remote-endpoint = <&etm1_out>;
->> +                               };
->> +                       };
->> +                       port at 2 {
->> +                               reg = <2>;
->> +                               funnel1_in2: endpoint {
->> +                                       slave-mode;
->> +                                       remote-endpoint = <&etm2_out>;
->> +                               };
->> +                       };
->> +                       port at 3 {
->> +                               reg = <3>;
->> +                               funnel1_in3: endpoint {
->> +                                       slave-mode;
->> +                                       remote-endpoint = <&etm3_out>;
->> +                               };
->> +                       };
->> +                       port at 4 {
->> +                               reg = <0>;
->> +                               funnel1_out: endpoint {
->> +                                       remote-endpoint = <&funnel0_in4>;
->> +                               };
->> +                       };
->> +               };
->> +       };
->> +
->> +       etm at 85c000 {
->> +               compatible = "arm,coresight-etm4x", "arm,primecell";
->> +               reg = <0x85c000 0x1000>;
->> +
->> +               clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
->> +               clock-names = "apb_pclk", "atclk";
->> +
->> +               cpu = <&CPU0>;
->> +
->> +               port {
->> +                       etm0_out: endpoint {
->> +                               remote-endpoint = <&funnel1_in0>;
->> +                       };
->> +               };
->> +       };
->> +
->> +       etm at 85d000 {
->> +               compatible = "arm,coresight-etm4x", "arm,primecell";
->> +               reg = <0x85d000 0x1000>;
->> +
->> +               clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
->> +               clock-names = "apb_pclk", "atclk";
->> +
->> +               cpu = <&CPU1>;
->> +
->> +               port {
->> +                       etm1_out: endpoint {
->> +                               remote-endpoint = <&funnel1_in1>;
->> +                       };
->> +               };
->> +       };
->> +
->> +       etm at 85e000 {
->> +               compatible = "arm,coresight-etm4x", "arm,primecell";
->> +               reg = <0x85e000 0x1000>;
->> +
->> +               clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
->> +               clock-names = "apb_pclk", "atclk";
->> +
->> +               cpu = <&CPU2>;
->> +
->> +               port {
->> +                       etm2_out: endpoint {
->> +                               remote-endpoint = <&funnel1_in2>;
->> +                       };
->> +               };
->> +       };
->> +
->> +       etm at 85f000 {
->> +               compatible = "arm,coresight-etm4x", "arm,primecell";
->> +               reg = <0x85f000 0x1000>;
->> +
->> +               clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
->> +               clock-names = "apb_pclk", "atclk";
->> +
->> +               cpu = <&CPU3>;
->> +
->> +               port {
->> +                       etm3_out: endpoint {
->> +                               remote-endpoint = <&funnel1_in3>;
->> +                       };
->> +               };
->> +       };
->> +};
->> --
->> 1.9.1
->> 
+> We need two separate patches now, one for 3.18 and other one for 3.19-rc.
+> 3.19 has see lots of changes in this particular file and so we need to
+> change few things here.
+
+What happened with this?  I'm still carrying the patch.
+
+> > 8<===
+> > From: Russell King <rmk+kernel@arm.linux.org.uk>
+> > thermal: cpu_cooling: fix lockdep problems in cpu_cooling
+> >
+> > A recent change to the cpu_cooling code introduced a AB-BA deadlock
+> > scenario between the cpufreq_policy_notifier_list rwsem and the
+> > cooling_cpufreq_lock.  This is caused by cooling_cpufreq_lock being held
+> > before the registration/removal of the notifier block (an operation
+> > which takes the rwsem), and the notifier code itself which takes the
+> > locks in the reverse order.
+> >
+> > Solve this by moving to finer grained locking - use one mutex to protect
+> > the cpufreq_dev_list as a whole, and a separate lock to ensure correct
+> > ordering of cpufreq notifier registration and removal.
+> >
+> > I considered taking the cooling_list_lock within cooling_cpufreq_lock to
+> > protect the registration sequence as a whole, but that adds a dependency
+> > between these two locks which is best avoided (lest someone tries to
+> > take those two new locks in the reverse order.)  In any case, it's safer
+> > to have an empty cpufreq_dev_list than to have unnecessary dependencies
+> > between locks.
+> >
+> > Fixes: 2dcd851fe4b4 ("thermal: cpu_cooling: Update always cpufreq policy with thermal constraints")
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > ---
+> >
+> >  drivers/thermal/cpu_cooling.c | 16 ++++++++++++----
+> >  1 file changed, 12 insertions(+), 4 deletions(-)
+> >
+> > diff --git a/drivers/thermal/cpu_cooling.c b/drivers/thermal/cpu_cooling.c
+> > index ad09e51ffae4..9e42c6f30785 100644
+> > --- a/drivers/thermal/cpu_cooling.c
+> > +++ b/drivers/thermal/cpu_cooling.c
+> > @@ -57,6 +57,7 @@ static DEFINE_MUTEX(cooling_cpufreq_lock);
+> >
+> >  static unsigned int cpufreq_dev_count;
+> >
+> > +static DEFINE_MUTEX(cooling_list_lock);
+> >  static LIST_HEAD(cpufreq_dev_list);
+> >
+> >  /**
+> > @@ -317,7 +318,7 @@ static int cpufreq_thermal_notifier(struct notifier_block *nb,
+> >         if (event != CPUFREQ_ADJUST)
+> >                 return 0;
+> >
+> > -       mutex_lock(&cooling_cpufreq_lock);
+> > +       mutex_lock(&cooling_list_lock);
+> >         list_for_each_entry(cpufreq_dev, &cpufreq_dev_list, node) {
+> >                 if (!cpumask_test_cpu(policy->cpu,
+> >                                         &cpufreq_dev->allowed_cpus))
+> > @@ -333,7 +334,7 @@ static int cpufreq_thermal_notifier(struct notifier_block *nb,
+> >                 if (policy->max != max_freq)
+> >                         cpufreq_verify_within_limits(policy, 0, max_freq);
+> >         }
+> > -       mutex_unlock(&cooling_cpufreq_lock);
+> > +       mutex_unlock(&cooling_list_lock);
+> >
+> >         return 0;
+> >  }
+> > @@ -482,6 +483,11 @@ __cpufreq_cooling_register(struct device_node *np,
+> >         }
+> >         cpufreq_dev->cool_dev = cool_dev;
+> >         cpufreq_dev->cpufreq_state = 0;
+> > +
+> > +       mutex_lock(&cooling_list_lock);
+> > +       list_add(&cpufreq_dev->node, &cpufreq_dev_list);
+> > +       mutex_unlock(&cooling_list_lock);
+> > +
+> >         mutex_lock(&cooling_cpufreq_lock);
+> >
+> >         /* Register the notifier for first cpufreq cooling device */
+> > @@ -489,7 +495,6 @@ __cpufreq_cooling_register(struct device_node *np,
+> >                 cpufreq_register_notifier(&thermal_cpufreq_notifier_block,
+> >                                           CPUFREQ_POLICY_NOTIFIER);
+> >         cpufreq_dev_count++;
+> > -       list_add(&cpufreq_dev->node, &cpufreq_dev_list);
+> >
+> >         mutex_unlock(&cooling_cpufreq_lock);
+> >
+> > @@ -553,7 +558,6 @@ void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev)
+> >
+> >         cpufreq_dev = cdev->devdata;
+> >         mutex_lock(&cooling_cpufreq_lock);
+> > -       list_del(&cpufreq_dev->node);
+> >         cpufreq_dev_count--;
+> >
+> >         /* Unregister the notifier for the last cpufreq cooling device */
+> > @@ -562,6 +566,10 @@ void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev)
+> >                                             CPUFREQ_POLICY_NOTIFIER);
+> >         mutex_unlock(&cooling_cpufreq_lock);
+> >
+> > +       mutex_lock(&cooling_list_lock);
+> > +       list_del(&cpufreq_dev->node);
+> > +       mutex_unlock(&cooling_list_lock);
+> > +
+> >         thermal_cooling_device_unregister(cpufreq_dev->cool_dev);
+> >         release_idr(&cpufreq_idr, cpufreq_dev->id);
+> >         kfree(cpufreq_dev);
 > 
-> Kumar, I'm happy with this DT specification for Coresight.  Since I'm
-> taking the driver it would likely make more sense for this to go
-> through my tree.  Could you please have a look and give me your ack?
+> For 3.18
+> 
+> Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-It looks ok, however I don?t see us including this file anywhere, so that?s my only concern.
-
-- k
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
