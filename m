@@ -1,209 +1,244 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon, 18 May 2015 20:59:20 +0800
-Subject: [PATCH 10/11] irqchip / GICv2 / ACPI: Consolidate GICv2 ACPI related
+Date: Mon, 18 May 2015 20:59:21 +0800
+Subject: [PATCH 11/11] irqchip / GICv3 / ACPI: Consolidate GICv3 ACPI related
  init code
 In-Reply-To: <1431953961-22706-1-git-send-email-hanjun.guo@linaro.org>
 References: <1431953961-22706-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1431953961-22706-11-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1431953961-22706-12-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move GICv2 ACPI related init code in irq-gic.c to irq-gic-acpi.c,
-this can make the ACPI related GIC init code slef-contained.
-
-Introduce set_acpi_core_irqdomain() to set acpi_irqdomain then
-it will be no need to make gic_data[] as a global value, and
-it will save the confilcts with GICv3's gic_data in the later
-patch.
-
-acpi_gic_parse_distributor() have the same function as
-gic_acpi_parse_madt_distributor() to get the GIC distributor
-physical base address, so just remove the duplicate one, and
-only get the GIC version when it is unknown.
+Move GICv3 ACPI related init code in irq-gic.c to irq-gic-acpi.c,
+this can make the ACPI related GIC init code slef-contained as GICV2
+did.
 
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- drivers/irqchip/irq-gic-acpi.c       |  95 +++++++++++++++++++++++++++++++-
- drivers/irqchip/irq-gic.c            | 103 +----------------------------------
- include/linux/irqchip/arm-gic-acpi.h |   5 ++
- 3 files changed, 101 insertions(+), 102 deletions(-)
+ drivers/irqchip/irq-gic-acpi.c     | 109 +++++++++++++++++++++++++++++
+ drivers/irqchip/irq-gic-v3.c       | 140 ++-----------------------------------
+ include/linux/irqchip/arm-gic-v3.h |  10 +++
+ 3 files changed, 123 insertions(+), 136 deletions(-)
 
 diff --git a/drivers/irqchip/irq-gic-acpi.c b/drivers/irqchip/irq-gic-acpi.c
-index 1388d9e..8463e48 100644
+index 8463e48..75c4893 100644
 --- a/drivers/irqchip/irq-gic-acpi.c
 +++ b/drivers/irqchip/irq-gic-acpi.c
-@@ -13,12 +13,16 @@
- 
- #include <linux/acpi.h>
- #include <linux/init.h>
-+#include <linux/irqchip/arm-gic.h>
- #include <linux/irqchip/arm-gic-acpi.h>
- #include <linux/irqchip/arm-gic-v3.h>
- 
-+#include "irqchip.h"
-+
- /* GIC version presented in MADT GIC distributor structure */
- static u8 gic_version __initdata = ACPI_MADT_GIC_VER_UNKNOWN;
- 
-+/* GIC distributor physical base address, which is needed for both GICv2/3 */
- static phys_addr_t dist_phy_base __initdata;
- 
- u8 __init acpi_gic_version(void)
-@@ -26,6 +30,11 @@ u8 __init acpi_gic_version(void)
- 	return gic_version;
- }
- 
-+void __init set_acpi_core_irqdomain(struct irq_domain *domain)
-+{
-+	acpi_irq_domain = domain;
-+}
-+
- static int __init
- acpi_gic_parse_distributor(struct acpi_subtable_header *header,
- 				const unsigned long end)
-@@ -37,8 +46,9 @@ acpi_gic_parse_distributor(struct acpi_subtable_header *header,
- 	if (BAD_MADT_ENTRY(dist, end))
- 		return -EINVAL;
- 
--	gic_version = dist->gic_version;
- 	dist_phy_base = dist->base_address;
-+	if (gic_version == ACPI_MADT_GIC_VER_UNKNOWN)
-+		gic_version = dist->gic_version;
+@@ -207,3 +207,112 @@ gic_v2_acpi_init(struct acpi_table_header *table)
  	return 0;
  }
- 
-@@ -114,3 +124,86 @@ int __init acpi_gic_version_init(void)
- 
- 	return 0;
- }
+ IRQCHIP_ACPI_DECLARE(gic_v2, ACPI_SIG_MADT, gic_v2_acpi_init);
 +
-+static phys_addr_t cpu_phy_base __initdata;
++static struct redist_region *redist_regs __initdata;
++static u32 nr_redist_regions __initdata;
 +
 +static int __init
-+gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
-+			const unsigned long end)
++gic_acpi_register_redist(u64 phys_base, u64 size)
 +{
-+	struct acpi_madt_generic_interrupt *processor;
-+	phys_addr_t gic_cpu_base;
-+	static int cpu_base_assigned;
++	struct redist_region *redist_regs_new;
++	void __iomem *redist_base;
 +
-+	processor = (struct acpi_madt_generic_interrupt *)header;
++	redist_regs_new = krealloc(redist_regs,
++				   sizeof(*redist_regs) * (nr_redist_regions + 1),
++				   GFP_KERNEL);
++	if (!redist_regs_new) {
++		pr_err("Couldn't allocate resource for GICR region\n");
++		return -ENOMEM;
++	}
 +
-+	if (BAD_MADT_ENTRY(processor, end))
-+		return -EINVAL;
++	redist_regs = redist_regs_new;
 +
-+	/*
-+	 * There is no support for non-banked GICv1/2 register in ACPI spec.
-+	 * All CPU interface addresses have to be the same.
-+	 */
-+	gic_cpu_base = processor->base_address;
-+	if (cpu_base_assigned && gic_cpu_base != cpu_phy_base)
-+		return -EINVAL;
++	redist_base = ioremap(phys_base, size);
++	if (!redist_base) {
++		pr_err("Couldn't map GICR region @%llx\n", phys_base);
++		return -ENOMEM;
++	}
 +
-+	cpu_phy_base = gic_cpu_base;
-+	cpu_base_assigned = 1;
++	redist_regs[nr_redist_regions].phys_base = phys_base;
++	redist_regs[nr_redist_regions].redist_base = redist_base;
++	nr_redist_regions++;
 +	return 0;
 +}
 +
 +static int __init
-+gic_v2_acpi_init(struct acpi_table_header *table)
++gic_acpi_parse_madt_redist(struct acpi_subtable_header *header,
++			const unsigned long end)
 +{
-+	void __iomem *cpu_base, *dist_base;
-+	int count;
++	struct acpi_madt_generic_redistributor *redist;
 +
-+	if (acpi_gic_version() >= ACPI_MADT_GIC_VER_V3)
++	if (BAD_MADT_ENTRY(header, end))
++		return -EINVAL;
++
++	redist = (struct acpi_madt_generic_redistributor *)header;
++	if (!redist->base_address)
++		return -EINVAL;
++
++	return gic_acpi_register_redist(redist->base_address, redist->length);
++}
++
++static int __init
++gic_v3_acpi_init(struct acpi_table_header *table)
++{
++	int count, i, err = 0;
++	void __iomem *dist_base;
++
++	if (acpi_gic_version() < ACPI_MADT_GIC_VER_V3)
 +		return -ENODEV;
 +
-+	/* Collect CPU base addresses */
++	/* Get distributor base address */
 +	count = acpi_parse_entries(ACPI_SIG_MADT,
-+				   sizeof(struct acpi_table_madt),
-+				   gic_acpi_parse_madt_cpu, table,
-+				   ACPI_MADT_TYPE_GENERIC_INTERRUPT, 0);
++				sizeof(struct acpi_table_madt),
++				acpi_gic_parse_distributor, table,
++				ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR, 0);
 +	if (count <= 0) {
-+		pr_err("No valid GICC entries exist\n");
-+		return -EINVAL;
-+	}
-+
-+	/*
-+	 * Find distributor base address. We expect one distributor entry since
-+	 * ACPI 5.1 spec neither support multi-GIC instances nor GIC cascade.
-+	 */
-+	count = acpi_parse_entries(ACPI_SIG_MADT,
-+				   sizeof(struct acpi_table_madt),
-+				   acpi_gic_parse_distributor, table,
-+				   ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR, 0);
-+	if (count <= 0) {
-+		pr_err("No valid GICD entries exist\n");
++		pr_err("No valid GICD entry exist\n");
 +		return -EINVAL;
 +	} else if (count > 1) {
 +		pr_err("More than one GICD entry detected\n");
 +		return -EINVAL;
 +	}
 +
-+	cpu_base = ioremap(cpu_phy_base, ACPI_GIC_CPU_IF_MEM_SIZE);
-+	if (!cpu_base) {
-+		pr_err("Unable to map GICC registers\n");
-+		return -ENOMEM;
-+	}
-+
-+	dist_base = ioremap(dist_phy_base, ACPI_GICV2_DIST_MEM_SIZE);
++	dist_base = ioremap(dist_phy_base, ACPI_GICV3_DIST_MEM_SIZE);
 +	if (!dist_base) {
 +		pr_err("Unable to map GICD registers\n");
-+		iounmap(cpu_base);
 +		return -ENOMEM;
 +	}
 +
-+	gic_init_bases(0, -1, dist_base, cpu_base, 0, NULL);
++	err = detect_distributor(dist_base);
++	if (err) {
++		pr_err("No distributor detected at @%p, giving up", dist_base);
++		goto out_dist_unmap;
++	}
 +
-+	acpi_irq_model = ACPI_IRQ_MODEL_GIC;
++	/* Collect redistributor base addresses */
++	count = acpi_parse_entries(ACPI_SIG_MADT,
++			sizeof(struct acpi_table_madt),
++			gic_acpi_parse_madt_redist, table,
++			ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR, 0);
++	if (count <= 0) {
++		pr_info("No valid GICR entries exist\n");
++		err = -EINVAL;
++		goto out_redist_unmap;
++	}
++
++	err = gicv3_init_bases(dist_base, redist_regs, nr_redist_regions, 0, NULL);
++	if (err)
++		goto out_redist_unmap;
++
 +	return 0;
-+}
-+IRQCHIP_ACPI_DECLARE(gic_v2, ACPI_SIG_MADT, gic_v2_acpi_init);
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 869a69f..2f934fe 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -986,6 +986,8 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- 	if (WARN_ON(!gic->domain))
- 		return;
- 
-+	set_acpi_core_irqdomain(gic->domain);
 +
- 	if (gic_nr == 0) {
- #ifdef CONFIG_SMP
- 		set_smp_cross_call(gic_raise_softirq);
-@@ -1047,104 +1049,3 @@ IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
- IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
++out_redist_unmap:
++	for (i = 0; i < nr_redist_regions; i++)
++		if (redist_regs[i].redist_base)
++			iounmap(redist_regs[i].redist_base);
++	kfree(redist_regs);
++out_dist_unmap:
++	iounmap(dist_base);
++	return err;
++}
++IRQCHIP_ACPI_DECLARE(gic_v3, ACPI_SIG_MADT, gic_v3_acpi_init);
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index e7f134e..a8382f4 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -36,11 +36,6 @@
+ #include "irq-gic-common.h"
+ #include "irqchip.h"
  
+-struct redist_region {
+-	void __iomem		*redist_base;
+-	phys_addr_t		phys_base;
+-};
+-
+ struct gic_chip_data {
+ 	void __iomem		*dist_base;
+ 	struct redist_region	*redist_regions;
+@@ -773,7 +768,7 @@ static const struct irq_domain_ops gic_irq_domain_ops = {
+ 	.free = gic_irq_domain_free,
+ };
+ 
+-static int __init gic_init_bases(void __iomem *dist_base,
++int __init gicv3_init_bases(void __iomem *dist_base,
+ 			    struct redist_region *rdist_regs,
+ 			    u32 nr_redist_regions,
+ 			    u64 redist_stride,
+@@ -808,6 +803,7 @@ static int __init gic_init_bases(void __iomem *dist_base,
+ 		goto out_free;
+ 	}
+ 
++	set_acpi_core_irqdomain(gic_data.domain);
+ 	set_handle_irq(gic_handle_irq);
+ 
+ 	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
+@@ -827,7 +823,7 @@ out_free:
+ 	return err;
+ }
+ 
+-static int __init detect_distributor(void __iomem *dist_base)
++int __init detect_distributor(void __iomem *dist_base)
+ {
+ 	u32 reg = readl_relaxed(dist_base + GICD_PIDR2) & GIC_PIDR2_ARCH_MASK;
+ 
+@@ -887,7 +883,7 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
+ 	if (of_property_read_u64(node, "redistributor-stride", &redist_stride))
+ 		redist_stride = 0;
+ 
+-	err = gic_init_bases(dist_base, rdist_regs, nr_redist_regions,
++	err = gicv3_init_bases(dist_base, rdist_regs, nr_redist_regions,
+ 			     redist_stride, node);
+ 	if (!err)
+ 		return 0;
+@@ -904,131 +900,3 @@ out_unmap_dist:
+ 
+ IRQCHIP_DECLARE(gic_v3, "arm,gic-v3", gic_of_init);
  #endif
 -
 -#ifdef CONFIG_ACPI
--static phys_addr_t dist_phy_base, cpu_phy_base __initdata;
+-static struct redist_region *redist_regs __initdata;
+-static u32 nr_redist_regions __initdata;
+-static phys_addr_t dist_phy_base __initdata;
 -
 -static int __init
--gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
+-gic_acpi_register_redist(u64 phys_base, u64 size)
+-{
+-	struct redist_region *redist_regs_new;
+-	void __iomem *redist_base;
+-
+-	redist_regs_new = krealloc(redist_regs,
+-				   sizeof(*redist_regs) * (nr_redist_regions + 1),
+-				   GFP_KERNEL);
+-	if (!redist_regs_new) {
+-		pr_err("Couldn't allocate resource for GICR region\n");
+-		return -ENOMEM;
+-	}
+-
+-	redist_regs = redist_regs_new;
+-
+-	redist_base = ioremap(phys_base, size);
+-	if (!redist_base) {
+-		pr_err("Couldn't map GICR region @%llx\n", phys_base);
+-		return -ENOMEM;
+-	}
+-
+-	redist_regs[nr_redist_regions].phys_base = phys_base;
+-	redist_regs[nr_redist_regions].redist_base = redist_base;
+-	nr_redist_regions++;
+-	return 0;
+-}
+-
+-static int __init
+-gic_acpi_parse_madt_redist(struct acpi_subtable_header *header,
 -			const unsigned long end)
 -{
--	struct acpi_madt_generic_interrupt *processor;
--	phys_addr_t gic_cpu_base;
--	static int cpu_base_assigned;
+-	struct acpi_madt_generic_redistributor *redist;
 -
--	processor = (struct acpi_madt_generic_interrupt *)header;
--
--	if (BAD_MADT_ENTRY(processor, end))
+-	if (BAD_MADT_ENTRY(header, end))
 -		return -EINVAL;
 -
--	/*
--	 * There is no support for non-banked GICv1/2 register in ACPI spec.
--	 * All CPU interface addresses have to be the same.
--	 */
--	gic_cpu_base = processor->base_address;
--	if (cpu_base_assigned && gic_cpu_base != cpu_phy_base)
+-	redist = (struct acpi_madt_generic_redistributor *)header;
+-	if (!redist->base_address)
 -		return -EINVAL;
 -
--	cpu_phy_base = gic_cpu_base;
--	cpu_base_assigned = 1;
--	return 0;
+-	return gic_acpi_register_redist(redist->base_address, redist->length);
 -}
 -
 -static int __init
@@ -222,75 +257,95 @@ index 869a69f..2f934fe 100644
 -}
 -
 -static int __init
--gic_v2_acpi_init(struct acpi_table_header *table)
+-gic_v3_acpi_init(struct acpi_table_header *table)
 -{
--	void __iomem *cpu_base, *dist_base;
--	int count;
+-	int count, i, err = 0;
+-	void __iomem *dist_base;
 -
--	if (acpi_gic_version() >= ACPI_MADT_GIC_VER_V3)
+-	if (acpi_gic_version() < ACPI_MADT_GIC_VER_V3)
 -		return -ENODEV;
 -
--	/* Collect CPU base addresses */
+-	/* Get distributor base address */
 -	count = acpi_parse_entries(ACPI_SIG_MADT,
--				   sizeof(struct acpi_table_madt),
--				   gic_acpi_parse_madt_cpu, table,
--				   ACPI_MADT_TYPE_GENERIC_INTERRUPT, 0);
+-				sizeof(struct acpi_table_madt),
+-				gic_acpi_parse_madt_distributor, table,
+-				ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR, 0);
 -	if (count <= 0) {
--		pr_err("No valid GICC entries exist\n");
--		return -EINVAL;
--	}
--
--	/*
--	 * Find distributor base address. We expect one distributor entry since
--	 * ACPI 5.1 spec neither support multi-GIC instances nor GIC cascade.
--	 */
--	count = acpi_parse_entries(ACPI_SIG_MADT,
--				   sizeof(struct acpi_table_madt),
--				   gic_acpi_parse_madt_distributor, table,
--				   ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR, 0);
--	if (count <= 0) {
--		pr_err("No valid GICD entries exist\n");
+-		pr_err("No valid GICD entry exist\n");
 -		return -EINVAL;
 -	} else if (count > 1) {
 -		pr_err("More than one GICD entry detected\n");
 -		return -EINVAL;
 -	}
 -
--	cpu_base = ioremap(cpu_phy_base, ACPI_GIC_CPU_IF_MEM_SIZE);
--	if (!cpu_base) {
--		pr_err("Unable to map GICC registers\n");
--		return -ENOMEM;
--	}
--
--	dist_base = ioremap(dist_phy_base, ACPI_GICV2_DIST_MEM_SIZE);
+-	dist_base = ioremap(dist_phy_base, ACPI_GICV3_DIST_MEM_SIZE);
 -	if (!dist_base) {
 -		pr_err("Unable to map GICD registers\n");
--		iounmap(cpu_base);
 -		return -ENOMEM;
 -	}
 -
--	gic_init_bases(0, -1, dist_base, cpu_base, 0, NULL);
--	acpi_irq_domain = gic_data[0].domain;
+-	err = detect_distributor(dist_base);
+-	if (err) {
+-		pr_err("No distributor detected at @%p, giving up", dist_base);
+-		goto out_dist_unmap;
+-	}
 -
--	acpi_irq_model = ACPI_IRQ_MODEL_GIC;
+-	/* Collect redistributor base addresses */
+-	count = acpi_parse_entries(ACPI_SIG_MADT,
+-			sizeof(struct acpi_table_madt),
+-			gic_acpi_parse_madt_redist, table,
+-			ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR, 0);
+-	if (count <= 0) {
+-		pr_info("No valid GICR entries exist\n");
+-		err = -EINVAL;
+-		goto out_redist_unmap;
+-	}
+-
+-	err = gic_init_bases(dist_base, redist_regs, nr_redist_regions, 0, NULL);
+-	if (err)
+-		goto out_redist_unmap;
+-
+-	acpi_irq_domain = gic_data.domain;
 -	return 0;
+-
+-out_redist_unmap:
+-	for (i = 0; i < nr_redist_regions; i++)
+-		if (redist_regs[i].redist_base)
+-			iounmap(redist_regs[i].redist_base);
+-	kfree(redist_regs);
+-out_dist_unmap:
+-	iounmap(dist_base);
+-	return err;
 -}
--IRQCHIP_ACPI_DECLARE(gic_v2, ACPI_SIG_MADT, gic_v2_acpi_init);
+-IRQCHIP_ACPI_DECLARE(gic_v3, ACPI_SIG_MADT, gic_v3_acpi_init);
 -#endif
-diff --git a/include/linux/irqchip/arm-gic-acpi.h b/include/linux/irqchip/arm-gic-acpi.h
-index 245386d..f4a17c7 100644
---- a/include/linux/irqchip/arm-gic-acpi.h
-+++ b/include/linux/irqchip/arm-gic-acpi.h
-@@ -25,5 +25,10 @@ extern struct irq_domain *acpi_irq_domain;
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index ffbc034..37ef420 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -378,6 +378,11 @@ struct rdists {
+ 	u64			flags;
+ };
  
- int acpi_gic_version_init(void);
- u8 acpi_gic_version(void);
++struct redist_region {
++	void __iomem            *redist_base;
++	phys_addr_t             phys_base;
++};
 +
-+void set_acpi_core_irqdomain(struct irq_domain *domain);
-+#else
-+#define set_acpi_core_irqdomain(domain)
- #endif /* CONFIG_ACPI */
+ static inline void gic_write_eoir(u64 irq)
+ {
+ 	asm volatile("msr_s " __stringify(ICC_EOIR1_EL1) ", %0" : : "r" (irq));
+@@ -389,6 +394,11 @@ int its_cpu_init(void);
+ int its_init(struct device_node *node, struct rdists *rdists,
+ 	     struct irq_domain *domain);
+ 
++int gicv3_init_bases(void __iomem *dist_base, struct redist_region *rdist_regs,
++		     u32 nr_redist_regions, u64 redist_stride,
++		     struct device_node *node);
 +
- #endif /* ARM_GIC_ACPI_H_ */
++int detect_distributor(void __iomem *dist_base);
+ #endif
+ 
+ #endif
 -- 
 1.9.1
