@@ -1,57 +1,44 @@
 From: Frank.Li@freescale.com (Frank.Li at freescale.com)
-Date: Tue, 19 May 2015 02:45:04 +0800
-Subject: [PATCH v10 3/4] ARM: dts: add imx7d soc dtsi file
+Date: Tue, 19 May 2015 02:45:05 +0800
+Subject: [PATCH v10 4/4] ARM: dts: add imx7d-sdb support
 In-Reply-To: <1431974705-14477-1-git-send-email-Frank.Li@freescale.com>
 References: <1431974705-14477-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <1431974705-14477-4-git-send-email-Frank.Li@freescale.com>
+Message-ID: <1431974705-14477-5-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Frank Li <Frank.Li@freescale.com>
 
-imx7d intergrates the unique display controller for EPD panel, pixel engines
-and graphics engines to make it a ideal solution for EPD based devices such
-as eReader, Signage, as well as any application rely on the bistable charactersic
-of the EPD panel.
+add imx7d sdb board support
 
-imx7d include two ARM Cortex A7 Core and one Cortex-M4 core.
-Included Main Peripheral
- - DDR3\LP-DDR2
- - GPMI\BCH\APBH DMA(NAND flash support)
- - QSPI
- - WEIM Nor
- - LCDIF\MIPI DSI
- - CSI\MIPI CSI
- - EPDC
- - PCIe RC\EP
- - USB OTG\Host
- - CAN x2
- - I2C x4
- - SIMv2 x2
- - ENET -x2
- - uSDHC x3
- - eCSPI x1
- - PWM x4
- - OCOTP (fuse)
- - GPT x4
- - WDOG x4
- - Flex Timer x2
-
-Signed-off-by: Anson Huang <b20788@freescale.com>
 Signed-off-by: Frank Li <Frank.Li@freescale.com>
 ---
- arch/arm/boot/dts/imx7d.dtsi | 486 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 486 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx7d.dtsi
+ arch/arm/boot/dts/Makefile      |   2 +
+ arch/arm/boot/dts/imx7d-sdb.dts | 408 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 410 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx7d-sdb.dts
 
-diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 86217db..c0b6737 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -313,6 +313,8 @@ dtb-$(CONFIG_SOC_IMX6SX) += \
+ 	imx6sx-sabreauto.dtb \
+ 	imx6sx-sdb-reva.dtb \
+ 	imx6sx-sdb.dtb
++dtb-$(CONFIG_SOC_IMX7D) += \
++	imx7d-sdb.dtb
+ dtb-$(CONFIG_SOC_LS1021A) += \
+ 	ls1021a-qds.dtb \
+ 	ls1021a-twr.dtb
+diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
 new file mode 100644
-index 0000000..c42cf8d
+index 0000000..4d1a4b9
 --- /dev/null
-+++ b/arch/arm/boot/dts/imx7d.dtsi
-@@ -0,0 +1,486 @@
++++ b/arch/arm/boot/dts/imx7d-sdb.dts
+@@ -0,0 +1,408 @@
 +/*
-+ * Copyright 2015 Freescale Semiconductor, Inc.
++ * Copyright (C) 2015 Freescale Semiconductor, Inc.
 + *
 + * This file is dual-licensed: you can use it either under the terms
 + * of the GPL or the X11 license, at your option. Note that this dual
@@ -92,448 +79,370 @@ index 0000000..c42cf8d
 + *     OTHER DEALINGS IN THE SOFTWARE.
 + */
 +
-+#include <dt-bindings/clock/imx7d-clock.h>
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include "imx7d-pinfunc.h"
-+#include "skeleton.dtsi"
++/dts-v1/;
++
++#include <dt-bindings/input/input.h>
++#include "imx7d.dtsi"
 +
 +/ {
-+	aliases {
-+		gpio0 = &gpio1;
-+		gpio1 = &gpio2;
-+		gpio2 = &gpio3;
-+		gpio3 = &gpio4;
-+		gpio4 = &gpio5;
-+		gpio5 = &gpio6;
-+		gpio6 = &gpio7;
-+		i2c0 = &i2c1;
-+		i2c1 = &i2c2;
-+		i2c2 = &i2c3;
-+		i2c3 = &i2c4;
-+		mmc0 = &usdhc1;
-+		mmc1 = &usdhc2;
-+		mmc2 = &usdhc3;
-+		serial0 = &uart1;
-+		serial1 = &uart2;
-+		serial2 = &uart3;
-+		serial3 = &uart4;
-+		serial4 = &uart5;
-+		serial5 = &uart6;
-+		serial6 = &uart7;
++	model = "Freescale i.MX7 SabreSD Board";
++	compatible = "fsl,imx7d-sdb", "fsl,imx7d";
++
++	memory {
++		reg = <0x80000000 0x80000000>;
 +	};
 +
-+	cpus {
++	regulators {
++		compatible = "simple-bus";
 +		#address-cells = <1>;
 +		#size-cells = <0>;
 +
-+		cpu0: cpu at 0 {
-+			compatible = "arm,cortex-a7";
-+			device_type = "cpu";
++		reg_usb_otg1_vbus: regulator at 0 {
++			compatible = "regulator-fixed";
 +			reg = <0>;
-+			operating-points = <
-+				/* KHz	uV */
-+				996000	1075000
-+				792000	975000
-+			>;
-+			clock-latency = <61036>; /* two CLK32 periods */
-+			clocks = <&clks IMX7D_ARM_A7_ROOT_CLK>, <&clks IMX7D_ARM_A7_ROOT_SRC>,
-+				 <&clks IMX7D_PLL_ARM_MAIN_CLK>, <&clks IMX7D_PLL_SYS_MAIN_CLK>;
-+			clock-names = "arm", "arm_root_src", "pll_arm", "pll_sys_main";
++			regulator-name = "usb_otg1_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio1 5 GPIO_ACTIVE_HIGH>;
++			enable-active-high;
 +		};
 +
-+		cpu1: cpu at 1 {
-+			compatible = "arm,cortex-a7";
-+			device_type = "cpu";
++		reg_usb_otg2_vbus: regulator at 1 {
++			compatible = "regulator-fixed";
 +			reg = <1>;
-+		};
-+	};
-+
-+	intc: interrupt-controller at 31001000 {
-+		compatible = "arm,cortex-a7-gic";
-+		#interrupt-cells = <3>;
-+		interrupt-controller;
-+		reg = <0x31001000 0x1000>,
-+		      <0x31002000 0x1000>,
-+		      <0x31004000 0x2000>,
-+		      <0x31006000 0x2000>;
-+	};
-+
-+	ckil: clock-cki {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <32768>;
-+		clock-output-names = "ckil";
-+	};
-+
-+	osc: clock-osc {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <24000000>;
-+		clock-output-names = "osc";
-+	};
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		interrupt-parent = <&intc>;
-+		ranges;
-+
-+		aips1: aips-bus at 30000000 {
-+			compatible = "fsl,aips-bus", "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0x30000000 0x400000>;
-+			ranges;
-+
-+			gpio1: gpio at 30200000 {
-+				compatible = "fsl,imx7d-gpio", "fsl,imx35-gpio";
-+				reg = <0x30200000 0x10000>;
-+				interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>, /* GPIO1_INT15_0 */
-+					     <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>; /* GPIO1_INT31_16 */
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+			};
-+
-+			gpio2: gpio at 30210000 {
-+				compatible = "fsl,imx7d-gpio", "fsl,imx35-gpio";
-+				reg = <0x30210000 0x10000>;
-+				interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>,
-+					     <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+			};
-+
-+			gpio3: gpio at 30220000 {
-+				compatible = "fsl,imx7d-gpio", "fsl,imx35-gpio";
-+				reg = <0x30220000 0x10000>;
-+				interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>,
-+					     <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+			};
-+
-+			gpio4: gpio at 30230000 {
-+				compatible = "fsl,imx7d-gpio", "fsl,imx35-gpio";
-+				reg = <0x30230000 0x10000>;
-+				interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>,
-+					     <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+			};
-+
-+			gpio5: gpio at 30240000 {
-+				compatible = "fsl,imx7d-gpio", "fsl,imx35-gpio";
-+				reg = <0x30240000 0x10000>;
-+				interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
-+					     <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+			};
-+
-+			gpio6: gpio at 30250000 {
-+				compatible = "fsl,imx7d-gpio", "fsl,imx35-gpio";
-+				reg = <0x30250000 0x10000>;
-+				interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>,
-+					     <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+			};
-+
-+			gpio7: gpio at 30260000 {
-+				compatible = "fsl,imx7d-gpio", "fsl,imx35-gpio";
-+				reg = <0x30260000 0x10000>;
-+				interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>,
-+					     <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+			};
-+
-+			gpt1: gpt at 302d0000 {
-+				compatible = "fsl,imx7d-gpt", "fsl,imx6sx-gpt";
-+				reg = <0x302d0000 0x10000>;
-+				interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_CLK_DUMMY>,
-+					 <&clks IMX7D_GPT1_ROOT_CLK>;
-+				clock-names = "ipg", "per";
-+			};
-+
-+			gpt2: gpt at 302e0000 {
-+				compatible = "fsl,imx7d-gpt", "fsl,imx6sx-gpt";
-+				reg = <0x302e0000 0x10000>;
-+				interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_CLK_DUMMY>,
-+					 <&clks IMX7D_GPT2_ROOT_CLK>;
-+				clock-names = "ipg", "per";
-+				status = "disabled";
-+			};
-+
-+			gpt3: gpt at 302f0000 {
-+				compatible = "fsl,imx7d-gpt", "fsl,imx6sx-gpt";
-+				reg = <0x302f0000 0x10000>;
-+				interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_CLK_DUMMY>,
-+					 <&clks IMX7D_GPT3_ROOT_CLK>;
-+				clock-names = "ipg", "per";
-+				status = "disabled";
-+			};
-+
-+			gpt4: gpt at 30300000 {
-+				compatible = "fsl,imx7d-gpt", "fsl,imx6sx-gpt";
-+				reg = <0x30300000 0x10000>;
-+				interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_CLK_DUMMY>,
-+					 <&clks IMX7D_GPT4_ROOT_CLK>;
-+				clock-names = "ipg", "per";
-+				status = "disabled";
-+			};
-+
-+			iomuxc: iomuxc at 30330000 {
-+				compatible = "fsl,imx7d-iomuxc";
-+				reg = <0x30330000 0x10000>;
-+			};
-+
-+			gpr: iomuxc-gpr at 30340000 {
-+				compatible = "fsl,imx7d-iomuxc-gpr", "syscon";
-+				reg = <0x30340000 0x10000>;
-+			};
-+
-+			ocotp: ocotp-ctrl at 30350000 {
-+				compatible = "syscon";
-+				reg = <0x30350000 0x10000>;
-+				clocks = <&clks IMX7D_CLK_DUMMY>;
-+				status = "disabled";
-+			};
-+
-+			anatop: anatop at 30360000 {
-+				compatible = "fsl,imx7d-anatop", "fsl,imx6q-anatop",
-+					"syscon", "simple-bus";
-+				reg = <0x30360000 0x10000>;
-+				interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
-+
-+				reg_1p0d: regulator-vdd1p0d at 210 {
-+					compatible = "fsl,anatop-regulator";
-+					regulator-name = "vdd1p0d";
-+					regulator-min-microvolt = <800000>;
-+					regulator-max-microvolt = <1200000>;
-+					anatop-reg-offset = <0x210>;
-+					anatop-vol-bit-shift = <8>;
-+					anatop-vol-bit-width = <5>;
-+					anatop-min-bit-val = <8>;
-+					anatop-min-voltage = <800000>;
-+					anatop-max-voltage = <1200000>;
-+					anatop-enable-bit = <31>;
-+				};
-+			};
-+
-+			snvs: snvs at 30370000 {
-+				compatible = "fsl,sec-v4.0-mon", "simple-bus";
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges = <0 0x30370000 0x10000>;
-+
-+				snvs-rtc-lp at 34 {
-+					compatible = "fsl,sec-v4.0-mon-rtc-lp";
-+					reg = <0x34 0x58>;
-+					interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>,
-+						     <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
-+				};
-+			};
-+
-+			clks: ccm at 30380000 {
-+				compatible = "fsl,imx7d-ccm";
-+				reg = <0x30380000 0x10000>;
-+				interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>,
-+					     <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
-+				#clock-cells = <1>;
-+				clocks = <&ckil>, <&osc>;
-+				clock-names = "ckil", "osc";
-+			};
-+
-+			src: src at 30390000 {
-+				compatible = "fsl,imx7d-src", "fsl,imx51-src", "syscon";
-+				reg = <0x30390000 0x10000>;
-+				interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
-+				#reset-cells = <1>;
-+			};
++			regulator-name = "usb_otg2_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio4 7 GPIO_ACTIVE_HIGH>;
++			enable-active-high;
 +		};
 +
-+		aips3: aips-bus at 30800000 {
-+			compatible = "fsl,aips-bus", "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0x30800000 0x400000>;
-+			ranges;
++		reg_can2_3v3: regulator at 2 {
++			compatible = "regulator-fixed";
++			reg = <2>;
++			regulator-name = "can2-3v3";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			gpio = <&gpio1 7 GPIO_ACTIVE_LOW>;
++		};
 +
-+			uart1: serial at 30860000 {
-+				compatible = "fsl,imx7d-uart",
-+					     "fsl,imx6q-uart";
-+				reg = <0x30860000 0x10000>;
-+				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_UART1_ROOT_CLK>,
-+					<&clks IMX7D_UART1_ROOT_CLK>;
-+				clock-names = "ipg", "per";
-+				status = "disabled";
++		reg_vref_1v8: regulator at 3 {
++			compatible = "regulator-fixed";
++			reg = <3>;
++			regulator-name = "vref-1v8";
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++		};
++	};
++};
++
++&cpu0 {
++	arm-supply = <&sw1a_reg>;
++};
++
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	status = "okay";
++
++	pmic: pfuze3000 at 08 {
++		compatible = "fsl,pfuze3000";
++		reg = <0x08>;
++
++		regulators {
++			sw1a_reg: sw1a {
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <1475000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
 +			};
 +
-+			uart2: serial at 30870000 {
-+				compatible = "fsl,imx7d-uart",
-+					     "fsl,imx6q-uart";
-+				reg = <0x30870000 0x10000>;
-+				interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_UART2_ROOT_CLK>,
-+					<&clks IMX7D_UART2_ROOT_CLK>;
-+				clock-names = "ipg", "per";
-+				status = "disabled";
++			/* use sw1c_reg to align with pfuze100/pfuze200 */
++			sw1c_reg: sw1b {
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <1475000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
 +			};
 +
-+			uart3: serial at 30880000 {
-+				compatible = "fsl,imx7d-uart",
-+					     "fsl,imx6q-uart";
-+				reg = <0x30880000 0x10000>;
-+				interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_UART3_ROOT_CLK>,
-+					<&clks IMX7D_UART3_ROOT_CLK>;
-+				clock-names = "ipg", "per";
-+				status = "disabled";
++			sw2_reg: sw2 {
++				regulator-min-microvolt = <1500000>;
++				regulator-max-microvolt = <1850000>;
++				regulator-boot-on;
++				regulator-always-on;
 +			};
 +
-+			i2c1: i2c at 30a20000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "fsl,imx7d-i2c", "fsl,imx21-i2c";
-+				reg = <0x30a20000 0x10000>;
-+				interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_I2C1_ROOT_CLK>;
-+				status = "disabled";
++			sw3a_reg: sw3 {
++				regulator-min-microvolt = <900000>;
++				regulator-max-microvolt = <1650000>;
++				regulator-boot-on;
++				regulator-always-on;
 +			};
 +
-+			i2c2: i2c at 30a30000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "fsl,imx7d-i2c", "fsl,imx21-i2c";
-+				reg = <0x30a30000 0x10000>;
-+				interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_I2C2_ROOT_CLK>;
-+				status = "disabled";
++			swbst_reg: swbst {
++				regulator-min-microvolt = <5000000>;
++				regulator-max-microvolt = <5150000>;
 +			};
 +
-+			i2c3: i2c at 30a40000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "fsl,imx7d-i2c", "fsl,imx21-i2c";
-+				reg = <0x30a40000 0x10000>;
-+				interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_I2C3_ROOT_CLK>;
-+				status = "disabled";
++			snvs_reg: vsnvs {
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-boot-on;
++				regulator-always-on;
 +			};
 +
-+			i2c4: i2c at 30a50000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "fsl,imx7d-i2c", "fsl,imx21-i2c";
-+				reg = <0x30a50000 0x10000>;
-+				interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_I2C4_ROOT_CLK>;
-+				status = "disabled";
++			vref_reg: vrefddr {
++				regulator-boot-on;
++				regulator-always-on;
 +			};
 +
-+			uart4: serial at 30a60000 {
-+				compatible = "fsl,imx7d-uart",
-+					     "fsl,imx6q-uart";
-+				reg = <0x30a60000 0x10000>;
-+				interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_UART4_ROOT_CLK>,
-+					<&clks IMX7D_UART4_ROOT_CLK>;
-+				clock-names = "ipg", "per";
-+				status = "disabled";
++			vgen1_reg: vldo1 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
 +			};
 +
-+			uart5: serial at 30a70000 {
-+				compatible = "fsl,imx7d-uart",
-+					     "fsl,imx6q-uart";
-+				reg = <0x30a70000 0x10000>;
-+				interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_UART5_ROOT_CLK>,
-+					<&clks IMX7D_UART5_ROOT_CLK>;
-+				clock-names = "ipg", "per";
-+				status = "disabled";
++			vgen2_reg: vldo2 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1550000>;
 +			};
 +
-+			uart6: serial at 30a80000 {
-+				compatible = "fsl,imx7d-uart",
-+					     "fsl,imx6q-uart";
-+				reg = <0x30a80000 0x10000>;
-+				interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_UART6_ROOT_CLK>,
-+					<&clks IMX7D_UART6_ROOT_CLK>;
-+				clock-names = "ipg", "per";
-+				status = "disabled";
++			vgen3_reg: vccsd {
++				regulator-min-microvolt = <2850000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
 +			};
 +
-+			uart7: serial at 30a90000 {
-+				compatible = "fsl,imx7d-uart",
-+					     "fsl,imx6q-uart";
-+				reg = <0x30a90000 0x10000>;
-+				interrupts = <GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_UART7_ROOT_CLK>,
-+					<&clks IMX7D_UART7_ROOT_CLK>;
-+				clock-names = "ipg", "per";
-+				status = "disabled";
++			vgen4_reg: v33 {
++				regulator-min-microvolt = <2850000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
 +			};
 +
-+			usdhc1: usdhc at 30b40000 {
-+				compatible = "fsl,imx7d-usdhc", "fsl,imx6sl-usdhc";
-+				reg = <0x30b40000 0x10000>;
-+				interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_CLK_DUMMY>,
-+					<&clks IMX7D_CLK_DUMMY>,
-+					<&clks IMX7D_USDHC1_ROOT_CLK>;
-+				clock-names = "ipg", "ahb", "per";
-+				bus-width = <4>;
-+				status = "disabled";
++			vgen5_reg: vldo3 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
 +			};
 +
-+			usdhc2: usdhc at 30b50000 {
-+				compatible = "fsl,imx7d-usdhc", "fsl,imx6sl-usdhc";
-+				reg = <0x30b50000 0x10000>;
-+				interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_CLK_DUMMY>,
-+					<&clks IMX7D_CLK_DUMMY>,
-+					<&clks IMX7D_USDHC2_ROOT_CLK>;
-+				clock-names = "ipg", "ahb", "per";
-+				bus-width = <4>;
-+				status = "disabled";
-+			};
-+
-+			usdhc3: usdhc at 30b60000 {
-+				compatible = "fsl,imx7d-usdhc", "fsl,imx6sl-usdhc";
-+				reg = <0x30b60000 0x10000>;
-+				interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX7D_CLK_DUMMY>,
-+					<&clks IMX7D_CLK_DUMMY>,
-+					<&clks IMX7D_USDHC3_ROOT_CLK>;
-+				clock-names = "ipg", "ahb", "per";
-+				bus-width = <4>;
-+				status = "disabled";
++			vgen6_reg: vldo4 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
 +			};
 +		};
++	};
++};
++
++&i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	status = "okay";
++};
++
++&i2c3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c3>;
++	status = "okay";
++};
++
++&i2c4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c4>;
++	status = "okay";
++
++	codec: wm8960 at 1a {
++		compatible = "wlf,wm8960";
++		reg = <0x1a>;
++		clocks = <&clks IMX7D_AUDIO_MCLK_ROOT_CLK>;
++		clock-names = "mclk";
++		wlf,shared-lrclk;
++	};
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1>;
++	assigned-clocks = <&clks IMX7D_UART1_ROOT_SRC>;
++	assigned-clock-parents = <&clks IMX7D_PLL_SYS_MAIN_240M_CLK>;
++	status = "okay";
++};
++
++&usdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc1>;
++	cd-gpios = <&gpio5 0 0>;
++	wp-gpios = <&gpio5 1 0>;
++	enable-sdio-wakeup;
++	keep-power-in-suspend;
++	status = "okay";
++};
++
++&iomuxc {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_hog>;
++
++	imx7d-sdb {
++		pinctrl_hog: hoggrp {
++			fsl,pins = <
++				MX7D_PAD_UART3_CTS_B__GPIO4_IO7		0x14
++				MX7D_PAD_ECSPI2_SS0__GPIO4_IO23		0x34  /* bt reg on */
++			>;
++		};
++
++		pinctrl_i2c1: i2c1grp {
++			fsl,pins = <
++				MX7D_PAD_I2C1_SDA__I2C1_SDA		0x4000007f
++				MX7D_PAD_I2C1_SCL__I2C1_SCL		0x4000007f
++			>;
++		};
++
++		pinctrl_i2c2: i2c2grp {
++			fsl,pins = <
++				MX7D_PAD_I2C2_SDA__I2C2_SDA		0x4000007f
++				MX7D_PAD_I2C2_SCL__I2C2_SCL		0x4000007f
++			>;
++		};
++
++		pinctrl_i2c3: i2c3grp {
++			fsl,pins = <
++				MX7D_PAD_I2C3_SDA__I2C3_SDA		0x4000007f
++				MX7D_PAD_I2C3_SCL__I2C3_SCL		0x4000007f
++			>;
++		};
++
++		pinctrl_i2c4: i2c4grp {
++			fsl,pins = <
++				MX7D_PAD_SAI1_RX_BCLK__I2C4_SDA		0x4000007f
++				MX7D_PAD_SAI1_RX_SYNC__I2C4_SCL		0x4000007f
++			>;
++		};
++
++
++		pinctrl_uart1: uart1grp {
++			fsl,pins = <
++				MX7D_PAD_UART1_TX_DATA__UART1_DCE_TX	0x79
++				MX7D_PAD_UART1_RX_DATA__UART1_DCE_RX	0x79
++			>;
++		};
++
++		pinctrl_uart5: uart5grp {
++			fsl,pins = <
++				MX7D_PAD_SAI1_TX_BCLK__UART5_DCE_TX	0x79
++				MX7D_PAD_SAI1_RX_DATA__UART5_DCE_RX	0x79
++				MX7D_PAD_SAI1_TX_SYNC__UART5_DCE_CTS	0x79
++				MX7D_PAD_SAI1_TX_DATA__UART5_DCE_RTS	0x79
++			>;
++		};
++
++		pinctrl_uart6: uart6grp {
++			fsl,pins = <
++				MX7D_PAD_ECSPI1_MOSI__UART6_DCE_TX	0x79
++				MX7D_PAD_ECSPI1_SCLK__UART6_DCE_RX	0x79
++				MX7D_PAD_ECSPI1_SS0__UART6_DCE_CTS	0x79
++				MX7D_PAD_ECSPI1_MISO__UART6_DCE_RTS	0x79
++			>;
++		};
++
++		pinctrl_usdhc1: usdhc1grp {
++			fsl,pins = <
++				MX7D_PAD_SD1_CMD__SD1_CMD		0x59
++				MX7D_PAD_SD1_CLK__SD1_CLK		0x19
++				MX7D_PAD_SD1_DATA0__SD1_DATA0		0x59
++				MX7D_PAD_SD1_DATA1__SD1_DATA1		0x59
++				MX7D_PAD_SD1_DATA2__SD1_DATA2		0x59
++				MX7D_PAD_SD1_DATA3__SD1_DATA3		0x59
++				MX7D_PAD_SD1_CD_B__GPIO5_IO0		0x59 /* CD */
++				MX7D_PAD_SD1_WP__GPIO5_IO1		0x59 /* WP */
++				MX7D_PAD_SD1_RESET_B__GPIO5_IO2		0x59 /* vmmc */
++			>;
++		};
++
++		pinctrl_usdhc2: usdhc2grp {
++			fsl,pins = <
++				MX7D_PAD_SD2_CMD__SD2_CMD		0x59
++				MX7D_PAD_SD2_CLK__SD2_CLK		0x19
++				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x59
++				MX7D_PAD_SD2_DATA1__SD2_DATA1		0x59
++				MX7D_PAD_SD2_DATA2__SD2_DATA2		0x59
++				MX7D_PAD_SD2_DATA3__SD2_DATA3		0x59
++				MX7D_PAD_ECSPI2_MOSI__GPIO4_IO21	0x59 /* WL_REG_ON */
++			>;
++		};
++
++		pinctrl_usdhc2_100mhz: usdhc2grp_100mhz {
++			fsl,pins = <
++				MX7D_PAD_SD2_CMD__SD2_CMD		0x5a
++				MX7D_PAD_SD2_CLK__SD2_CLK		0x1a
++				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x5a
++				MX7D_PAD_SD2_DATA1__SD2_DATA1		0x5a
++				MX7D_PAD_SD2_DATA2__SD2_DATA2		0x5a
++				MX7D_PAD_SD2_DATA3__SD2_DATA3		0x5a
++			>;
++		};
++
++		pinctrl_usdhc2_200mhz: usdhc2grp_200mhz {
++			fsl,pins = <
++				MX7D_PAD_SD2_CMD__SD2_CMD		0x5b
++				MX7D_PAD_SD2_CLK__SD2_CLK		0x1b
++				MX7D_PAD_SD2_DATA0__SD2_DATA0		0x5b
++				MX7D_PAD_SD2_DATA1__SD2_DATA1		0x5b
++				MX7D_PAD_SD2_DATA2__SD2_DATA2		0x5b
++				MX7D_PAD_SD2_DATA3__SD2_DATA3		0x5b
++			>;
++		};
++
++
++		pinctrl_usdhc3: usdhc3grp {
++			fsl,pins = <
++				MX7D_PAD_SD3_CMD__SD3_CMD		0x59
++				MX7D_PAD_SD3_CLK__SD3_CLK		0x19
++				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x59
++				MX7D_PAD_SD3_DATA1__SD3_DATA1		0x59
++				MX7D_PAD_SD3_DATA2__SD3_DATA2		0x59
++				MX7D_PAD_SD3_DATA3__SD3_DATA3		0x59
++				MX7D_PAD_SD3_DATA4__SD3_DATA4		0x59
++				MX7D_PAD_SD3_DATA5__SD3_DATA5		0x59
++				MX7D_PAD_SD3_DATA6__SD3_DATA6		0x59
++				MX7D_PAD_SD3_DATA7__SD3_DATA7		0x59
++				MX7D_PAD_SD3_STROBE__SD3_STROBE		0x19
++			>;
++		};
++
++		pinctrl_usdhc3_100mhz: usdhc3grp_100mhz {
++			fsl,pins = <
++				MX7D_PAD_SD3_CMD__SD3_CMD		0x5a
++				MX7D_PAD_SD3_CLK__SD3_CLK		0x1a
++				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x5a
++				MX7D_PAD_SD3_DATA1__SD3_DATA1		0x5a
++				MX7D_PAD_SD3_DATA2__SD3_DATA2		0x5a
++				MX7D_PAD_SD3_DATA3__SD3_DATA3		0x5a
++				MX7D_PAD_SD3_DATA4__SD3_DATA4		0x5a
++				MX7D_PAD_SD3_DATA5__SD3_DATA5		0x5a
++				MX7D_PAD_SD3_DATA6__SD3_DATA6		0x5a
++				MX7D_PAD_SD3_DATA7__SD3_DATA7		0x5a
++				MX7D_PAD_SD3_STROBE__SD3_STROBE		0x1a
++			>;
++		};
++
++		pinctrl_usdhc3_200mhz: usdhc3grp_200mhz {
++			fsl,pins = <
++				MX7D_PAD_SD3_CMD__SD3_CMD		0x5b
++				MX7D_PAD_SD3_CLK__SD3_CLK		0x1b
++				MX7D_PAD_SD3_DATA0__SD3_DATA0		0x5b
++				MX7D_PAD_SD3_DATA1__SD3_DATA1		0x5b
++				MX7D_PAD_SD3_DATA2__SD3_DATA2		0x5b
++				MX7D_PAD_SD3_DATA3__SD3_DATA3		0x5b
++				MX7D_PAD_SD3_DATA4__SD3_DATA4		0x5b
++				MX7D_PAD_SD3_DATA5__SD3_DATA5		0x5b
++				MX7D_PAD_SD3_DATA6__SD3_DATA6		0x5b
++				MX7D_PAD_SD3_DATA7__SD3_DATA7		0x5b
++				MX7D_PAD_SD3_STROBE__SD3_STROBE		0x1b
++			>;
++		};
++
 +	};
 +};
 -- 
