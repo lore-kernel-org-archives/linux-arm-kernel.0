@@ -1,158 +1,75 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 18 May 2015 18:28:29 +0100
-Subject: [PATCH v2 5/5] arm64: Add DT support for Juno r1 board.
+Date: Mon, 18 May 2015 18:28:28 +0100
+Subject: [PATCH v2 4/5] arm64: Juno: Add GICv2m support in device tree.
 In-Reply-To: <1431970109-8902-1-git-send-email-Liviu.Dudau@arm.com>
 References: <1431970109-8902-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1431970109-8902-6-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1431970109-8902-5-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This board is based on Juno r0 with updated Cortex A5x revisions
-and board errata fixes. It also contains coherent ThinLinks ports
-on the expansion slot that allow for an AXI master on the daughter
-card to participate in a coherency domain.
-
-Support for SoC PCIe host bridge will be added as a separate series.
+Juno contains a GICv2m extension for handling PCIe MSI messages.
+Add a node declaring the first frame of the extension.
 
 Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
 ---
- arch/arm64/boot/dts/arm/Makefile    |   2 +-
- arch/arm64/boot/dts/arm/juno-r1.dts | 116 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 117 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/boot/dts/arm/juno-r1.dts
+ arch/arm64/boot/dts/arm/juno-base.dtsi | 35 ++++++++++++++++++++--------------
+ 1 file changed, 21 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/arm/Makefile b/arch/arm64/boot/dts/arm/Makefile
-index 301a0da..c5c98b9 100644
---- a/arch/arm64/boot/dts/arm/Makefile
-+++ b/arch/arm64/boot/dts/arm/Makefile
-@@ -1,5 +1,5 @@
- dtb-$(CONFIG_ARCH_VEXPRESS) += foundation-v8.dtb
--dtb-$(CONFIG_ARCH_VEXPRESS) += juno.dtb
-+dtb-$(CONFIG_ARCH_VEXPRESS) += juno.dtb juno-r1.dtb
- dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb
- 
- always		:= $(dtb-y)
-diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
-new file mode 100644
-index 0000000..c627511
---- /dev/null
-+++ b/arch/arm64/boot/dts/arm/juno-r1.dts
-@@ -0,0 +1,116 @@
-+/*
-+ * ARM Ltd. Juno Platform
-+ *
-+ * Copyright (c) 2015 ARM Ltd.
-+ *
-+ * This file is licensed under a dual GPLv2 or BSD license.
-+ */
-+
-+/dts-v1/;
-+
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	model = "ARM Juno development board (r1)";
-+	compatible = "arm,juno-r1", "arm,juno", "arm,vexpress";
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	aliases {
-+		serial0 = &soc_uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	psci {
-+		compatible = "arm,psci-0.2";
-+		method = "smc";
-+	};
-+
-+	cpus {
+diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+index b7e862f..e3ee960 100644
+--- a/arch/arm64/boot/dts/arm/juno-base.dtsi
++++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+@@ -23,10 +23,17 @@
+ 		      <0x0 0x2c02f000 0 0x2000>,
+ 		      <0x0 0x2c04f000 0 0x2000>,
+ 		      <0x0 0x2c06f000 0 0x2000>;
+-		#address-cells = <0>;
 +		#address-cells = <2>;
-+		#size-cells = <0>;
-+
-+		A57_0: cpu at 0 {
-+			compatible = "arm,cortex-a57","arm,armv8";
-+			reg = <0x0 0x0>;
-+			device_type = "cpu";
-+			enable-method = "psci";
-+			next-level-cache = <&A57_L2>;
+ 		#interrupt-cells = <3>;
++		#size-cells = <2>;
+ 		interrupt-controller;
+ 		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_HIGH)>;
++		ranges = <0 0 0 0x2c1c0000 0 0x40000>;
++		v2m_0: v2m at 0 {
++			compatible = "arm,gic-v2m-frame";
++			msi-controller;
++			reg = <0 0 0 0x1000>;
 +		};
-+
-+		A57_1: cpu at 1 {
-+			compatible = "arm,cortex-a57","arm,armv8";
-+			reg = <0x0 0x1>;
-+			device_type = "cpu";
-+			enable-method = "psci";
-+			next-level-cache = <&A57_L2>;
-+		};
-+
-+		A53_0: cpu at 100 {
-+			compatible = "arm,cortex-a53","arm,armv8";
-+			reg = <0x0 0x100>;
-+			device_type = "cpu";
-+			enable-method = "psci";
-+			next-level-cache = <&A53_L2>;
-+		};
-+
-+		A53_1: cpu at 101 {
-+			compatible = "arm,cortex-a53","arm,armv8";
-+			reg = <0x0 0x101>;
-+			device_type = "cpu";
-+			enable-method = "psci";
-+			next-level-cache = <&A53_L2>;
-+		};
-+
-+		A53_2: cpu at 102 {
-+			compatible = "arm,cortex-a53","arm,armv8";
-+			reg = <0x0 0x102>;
-+			device_type = "cpu";
-+			enable-method = "psci";
-+			next-level-cache = <&A53_L2>;
-+		};
-+
-+		A53_3: cpu at 103 {
-+			compatible = "arm,cortex-a53","arm,armv8";
-+			reg = <0x0 0x103>;
-+			device_type = "cpu";
-+			enable-method = "psci";
-+			next-level-cache = <&A53_L2>;
-+		};
-+
-+		A57_L2: l2-cache0 {
-+			compatible = "cache";
-+		};
-+
-+		A53_L2: l2-cache1 {
-+			compatible = "cache";
-+		};
-+	};
-+
-+	pmu {
-+		compatible = "arm,armv8-pmuv3";
-+		interrupts = <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-affinity = <&A57_0>,
-+				     <&A57_1>,
-+				     <&A53_0>,
-+				     <&A53_1>,
-+				     <&A53_2>,
-+				     <&A53_3>;
-+	};
-+
-+	#include "juno-base.dtsi"
-+
-+};
-+
-+&memtimer {
-+	status = "okay";
-+};
+ 	};
+ 
+ 	timer {
+@@ -129,19 +136,19 @@
+ 
+ 		#interrupt-cells = <1>;
+ 		interrupt-map-mask = <0 0 15>;
+-		interrupt-map = <0 0  0 &gic 0  68 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  1 &gic 0  69 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  2 &gic 0  70 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  3 &gic 0 160 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  4 &gic 0 161 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  5 &gic 0 162 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  6 &gic 0 163 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  7 &gic 0 164 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  8 &gic 0 165 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  9 &gic 0 166 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0 10 &gic 0 167 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0 11 &gic 0 168 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0 12 &gic 0 169 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-map = <0 0  0 &gic 0 0 0  68 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  1 &gic 0 0 0  69 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  2 &gic 0 0 0  70 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  3 &gic 0 0 0 160 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  4 &gic 0 0 0 161 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  5 &gic 0 0 0 162 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  6 &gic 0 0 0 163 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  7 &gic 0 0 0 164 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  8 &gic 0 0 0 165 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  9 &gic 0 0 0 166 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 10 &gic 0 0 0 167 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 11 &gic 0 0 0 168 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 12 &gic 0 0 0 169 IRQ_TYPE_LEVEL_HIGH>;
+ 
+ 		/include/ "juno-motherboard.dtsi"
+ 	};
 -- 
 2.4.0
