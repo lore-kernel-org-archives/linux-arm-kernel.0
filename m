@@ -1,53 +1,41 @@
-From: stuart.yoder@freescale.com (Stuart Yoder)
-Date: Mon, 18 May 2015 13:38:46 +0000
-Subject: [PATCH] irqchip: GICv3: ITS: don't assume 64K page size in
- its_alloc_tables
-In-Reply-To: <5559E7CE.1050003@arm.com>
-References: <1431644545-31904-1-git-send-email-stuart.yoder@freescale.com>
- <5559E7CE.1050003@arm.com>
-Message-ID: <CY1PR0301MB074884E252ADE216BD8C472887C40@CY1PR0301MB0748.namprd03.prod.outlook.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 18 May 2015 14:38:48 +0100
+Subject: [PATCH v3] ARM: dts: cubox-i: add support for Broadcom
+ Wifi/Bluetooth devices
+In-Reply-To: <CALHpu35HB4NgtSwc8zJBffrfsD0Kk9++_5kw4K_j2FuUf9sCzQ@mail.gmail.com>
+References: <1431358713-12379-1-git-send-email-fabio.estevam@freescale.com>
+ <20150518113400.GE1071@dragon>
+ <20150518115520.GW2067@n2100.arm.linux.org.uk>
+ <20150518121017.GB1418@dragon>
+ <CALHpu36rJuRWum+TGrM4cchKLxSVVup0cB58dFxANF=mAzLA0Q@mail.gmail.com>
+ <CALHpu35HB4NgtSwc8zJBffrfsD0Kk9++_5kw4K_j2FuUf9sCzQ@mail.gmail.com>
+Message-ID: <20150518133848.GX2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
-> Sent: Monday, May 18, 2015 8:23 AM
-> To: Yoder Stuart-B08248; tglx at linutronix.de
-> Cc: linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH] irqchip: GICv3: ITS: don't assume 64K page size in its_alloc_tables
+On Mon, May 18, 2015 at 02:47:32PM +0200, Jon Nettleton wrote:
+> okay tested.  Looks good on both the 4330 and 4329.
 > 
-> Hi Stuart,
-> 
-> On 15/05/15 00:02, Stuart Yoder wrote:
-> > its_alloc_tables() needs to account for page sizes other than
-> > 64KB.  Without this change, when PAGE_SIZE=4KB its_alloc_tables()
-> > gets stuck in an infinite loop.
-> >
-> > Signed-off-by: Stuart Yoder <stuart.yoder@freescale.com>
-> > ---
-> >
-> > think this should go into 4.1 if at all possible...without it I am
-> > unable to boot a 4.1 kernel on the LS2085 SoC
-> 
-> What you are suggesting here is a effectively a revert of commit
-> 790b57a, which would break other implementations.
-> 
-> Can you please explain the actual issue? I'm failing to see how you end
-> up in an infinite loop here (the system page size and the ITS base
-> granule should be completely unrelated...).
+> Signed-off-by: Jon Nettleton <jon@solid-run.com>
 
-Here is the problem line:
+Seems to work on the 4329 on the Cubox-i4, although I see an additional
+error which didn't appear first time with my original patches:
 
-      val |= (alloc_size / psz) - 1;
+brcmfmac: brcmf_setup_wiphybands: rxchain error (-52)
 
-In our case:
-   alloc_size=16K
-   psz=64K
+It seems to be repeatable, and I'm guessing from a brief look at the code
+that "rxchain" is something that's requested from the firmware (my 4329
+firmware is v4.220.48).  Why it didn't appear first time around I've no
+idea.
 
-...so (alloc_size / psz) = 0, and thus val becomes -1, and everything
-is screwed up.  We get stuck in a loop to retry_baser:
+Apart from that, iw dev wlan0 scan appears to find my local hostap, and
+as usual none of the BTHub stuff that have flooded the area.
 
-Thanks,
-Stuart
+I'll drop my patches in favour of this one.  Shawn, please go ahead and
+merge it.
+
+Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
