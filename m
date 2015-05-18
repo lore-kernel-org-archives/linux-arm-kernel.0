@@ -1,59 +1,98 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 18 May 2015 22:45:29 +0800
-Subject: [PATCH v2 03/10] clk: sunxi: Let divs clocks read the base factor
- clock name from devicetree
-In-Reply-To: <5559ADBE.7060506@gmail.com>
-References: <1431707940-19372-1-git-send-email-jenskuske@gmail.com>
- <1431707940-19372-4-git-send-email-jenskuske@gmail.com>
- <CAGb2v64y8+bdya3N=gK-YEie3A9nVM5nuxRZTVPXYSaN6WzPoQ@mail.gmail.com>
- <5559ADBE.7060506@gmail.com>
-Message-ID: <CAGb2v64SQZ74E5zn3XwgLtBh_PN=24bQ8RJ4oj8C+Gy0qAgtHA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 18 May 2015 15:52:45 +0100
+Subject: [RESEND][PATCH 1/5] ARM: sa1100: add platform functions to
+ handle PWER settings
+In-Reply-To: <1431960247-32646-1-git-send-email-dbaryshkov@gmail.com>
+References: <1431960247-32646-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <20150518145245.GZ2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 18, 2015 at 5:15 PM, Jens Kuske <jenskuske@gmail.com> wrote:
-> Hi,
->
-> On 05/16/15 04:10, Chen-Yu Tsai wrote:
->> 2015?5?16? ??12:39? "Jens Kuske" <jenskuske@gmail.com>???
-> [..]
->>> @@ -1141,6 +1133,7 @@ static void __init sunxi_divs_clk_setup(struct
->> device_node *node,
->>>         struct clk_gate *gate = NULL;
->>>         struct clk_fixed_factor *fix_factor;
->>>         struct clk_divider *divider;
->>> +       struct factors_data factors = *data->factors;
->
-> Isn't this a copy?
+No cover letter, so I'll top-reply to the first patch, since my comments
+aren't specific to this patch.
 
-You're right. Sorry for the noise.
+Patches 1-3 look fine, no problem there.
 
->
->>>         void __iomem *reg;
->>>         int ndivs = SUNXI_DIVS_MAX_QTY, i = 0;
->>>         int flags, clkflags;
->>> @@ -1149,8 +1142,17 @@ static void __init sunxi_divs_clk_setup(struct
->> device_node *node,
->>>         if (data->ndivs)
->>>                 ndivs = data->ndivs;
->>>
->>> +       /* Try to find a name for base factor clock */
->>> +       for (i = 0; i < ndivs; i++) {
->>> +               if (data->div[i].self) {
->>> +                       of_property_read_string_index(node,
->> "clock-output-names",
->>> +                                                     i, &factors.name);
->>
->> Please excuse the bad formatting.
->> I'm at the airport without my laptop.
->>
->> This will not work. All the static factors_data structs are const.
->> You should make a copy of it, maybe on the stack,
->> update the .name field, and pass that to sunxi_factors_clk_setup().
->>
->
-> If I didn't miss anything, or misunderstood what you want to copy, this
-> should be working fine.
->
-> Jens
->
+Patches 4 and 5 I think should be in the reverse order - update the IRQ
+code first, and make it independent of things in arch/arm/mach-sa1100,
+and once that's done, move it out of there.
+
+On Mon, May 18, 2015 at 05:44:03PM +0300, Dmitry Eremin-Solenikov wrote:
+> PWER settings logically belongs neither to GPIO nor to system IRQ code.
+> Add special functions to handle PWER (for GPIO and for system IRQs)
+> from platform code.
+> 
+> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> ---
+>  arch/arm/mach-sa1100/generic.c | 24 ++++++++++++++++++++++++
+>  include/soc/sa1100/pwer.h      | 15 +++++++++++++++
+>  2 files changed, 39 insertions(+)
+>  create mode 100644 include/soc/sa1100/pwer.h
+> 
+> diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
+> index 40e0d86..c651f6e 100644
+> --- a/arch/arm/mach-sa1100/generic.c
+> +++ b/arch/arm/mach-sa1100/generic.c
+> @@ -23,6 +23,8 @@
+>  
+>  #include <video/sa1100fb.h>
+>  
+> +#include <soc/sa1100/pwer.h>
+> +
+>  #include <asm/div64.h>
+>  #include <asm/mach/map.h>
+>  #include <asm/mach/flash.h>
+> @@ -416,3 +418,25 @@ void sa1110_mb_enable(void)
+>  	local_irq_restore(flags);
+>  }
+>  
+> +int sa11x0_gpio_set_wake(unsigned int gpio, unsigned int on)
+> +{
+> +	if (on)
+> +		PWER |= BIT(gpio);
+> +	else
+> +		PWER &= ~BIT(gpio);
+> +
+> +	return 0;
+> +}
+> +
+> +int sa11x0_sc_set_wake(unsigned int irq, unsigned int on)
+> +{
+> +	if (BIT(irq) != IC_RTCAlrm)
+> +		return -EINVAL;
+> +
+> +	if (on)
+> +		PWER |= PWER_RTC;
+> +	else
+> +		PWER &= ~PWER_RTC;
+> +
+> +	return 0;
+> +}
+> diff --git a/include/soc/sa1100/pwer.h b/include/soc/sa1100/pwer.h
+> new file mode 100644
+> index 0000000..15a545b
+> --- /dev/null
+> +++ b/include/soc/sa1100/pwer.h
+> @@ -0,0 +1,15 @@
+> +#ifndef SOC_SA1100_PWER_H
+> +#define SOC_SA1100_PWER_H
+> +
+> +/*
+> + * Copyright (C) 2015, Dmitry Eremin-Solenikov
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +int sa11x0_gpio_set_wake(unsigned int gpio, unsigned int on);
+> +int sa11x0_sc_set_wake(unsigned int irq, unsigned int on);
+> +
+> +#endif
+> -- 
+> 2.1.4
+> 
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
