@@ -1,57 +1,35 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Mon, 18 May 2015 16:03:49 +0200
-Subject: [PATCH v8 09/16] clockevents/drivers: Add STM32 Timer driver
-In-Reply-To: <5559E4B0.70506@linaro.org>
-References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1431158038-3813-10-git-send-email-mcoquelin.stm32@gmail.com>
- <5559E4B0.70506@linaro.org>
-Message-ID: <CALszF6CK7axU0qrWNf38aqrt2R2126ZACn7wx5jNY_1KE+4H+g@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 18 May 2015 15:05:53 +0100
+Subject: [PATCH v2 0/2] ARM: move Dual-Timer SP804 driver to
+ drivers/clocksource
+In-Reply-To: <20150518134702.GY2067@n2100.arm.linux.org.uk>
+References: <1430390662-18246-1-git-send-email-sudeep.holla@arm.com>
+ <1431953084-15700-1-git-send-email-sudeep.holla@arm.com>
+ <20150518134702.GY2067@n2100.arm.linux.org.uk>
+Message-ID: <5559F1C1.7080206@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-18 15:10 GMT+02:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
-> On 05/09/2015 09:53 AM, Maxime Coquelin wrote:
+
+
+On 18/05/15 14:47, Russell King - ARM Linux wrote:
+> On Mon, May 18, 2015 at 01:44:42PM +0100, Sudeep Holla wrote:
+>> Since there are ARM64 platforms(e.g. Juno) with SP804 timers, we need
+>> to move the driver out of arch/arm so that the code can be shared.
 >>
->> STM32 MCUs feature 16 and 32 bits general purpose timers with prescalers.
->> The drivers detects whether the time is 16 or 32 bits, and applies a
->> 1024 prescaler value if it is 16 bits.
+>> Changes v1->v2:
+>> 	- introduces sp804_timer_disable and retained the integrator
+>> 	  and realview timer initialisation code as suggested by Russell
 >>
->> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
->> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->> ---
->>   drivers/clocksource/Kconfig       |   8 ++
->>   drivers/clocksource/Makefile      |   1 +
->>   drivers/clocksource/timer-stm32.c | 184
->> ++++++++++++++++++++++++++++++++++++++
->>   3 files changed, 193 insertions(+)
->>   create mode 100644 drivers/clocksource/timer-stm32.c
->>
->> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
->> index bf9364c..2443520 100644
->> --- a/drivers/clocksource/Kconfig
->> +++ b/drivers/clocksource/Kconfig
->> @@ -106,6 +106,14 @@ config CLKSRC_EFM32
->>           Support to use the timers of EFM32 SoCs as clock source and
->> clock
->>           event device.
->>
->> +config CLKSRC_STM32
->> +       bool "Clocksource for STM32 SoCs" if !ARCH_STM32
->> +       depends on OF && ARM && (ARCH_STM32 || COMPILE_TEST)
+>> v1: https://lkml.org/lkml/2015/4/30/225
 >
+> This looks fine to me, thanks.
 >
-> Are the interactive bool and the 'COMPILE_TEST' necessary ?
+> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 >
 
-The interactive bool is necessary if we want to be able to
-select/deselect it in COMPILE_TEST configuration.
-And personnaly, I think COMPILE_TEST use makes sense.
+Thanks Russell, I assume you are fine if it goes via clocksource(i.e.
+Daniel) tree.
 
-Note that other timer drivers are doing the same thing today
-(CLKSRC_EFM32, SH_TIMER_CMT, EM_TIMER_STI...).
-
-Do you have a specific concern regarding COMPILE_TEST?
-
-Kind regards,
-Maxime
+Regards,
+Sudeep
