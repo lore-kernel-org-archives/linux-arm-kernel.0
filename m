@@ -1,77 +1,47 @@
 From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Mon, 18 May 2015 11:50:05 +0530
-Subject: [PATCH v1 0/2] Implement SoC bus support for Vybrid
-Message-ID: <cover.1431928866.git.maitysanchayan@gmail.com>
+Date: Mon, 18 May 2015 11:50:06 +0530
+Subject: [PATCH v1 1/2] ARM: dts: vfxxx: Add OCOTP and OCROM nodes
+In-Reply-To: <cover.1431928866.git.maitysanchayan@gmail.com>
+References: <cover.1431928866.git.maitysanchayan@gmail.com>
+Message-ID: <aec8c55d387b6b4c7a0c873138fc0c0ae14c850a.1431928866.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Add a device tree node for the On-Chip One Time Programmable
+Controller (OCOTP) and the On-Chip ROM.
 
-This patchset implements SoC bus support for Freescale Vybrid platform, 
-implementing the following
-https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-devices-soc
+Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+---
+ arch/arm/boot/dts/vfxxx.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-The RFC version can be found here
-https://lkml.org/lkml/2015/5/11/13
-
-Currently the required information is more or less read across the whole
-SoC, but I guess we cannot change that since these are the locations
-with the required information.
-
-There seem to be three options for the revision field:
-- ROM revision (see https://community.freescale.com/docs/DOC-94802)
-- ANADIG revision (ANADIG_DIGIPROC, as used for the i.MX SoC's)
-- OCOTP revision
-
-Some numbers:
-
-Colibri VF61 1.1A (2N02G)
-- 0x00000013
-- 0x00610000
-- 0x01000000
-- 0x410000c8
-
-Colibri VF61 V1.0B (1N02G)
-- 0x00000011
-- 0x00610000
-- 0x01000000
-- 0x410000c8
-
-Colibri VF61 V1.0A (which is actually a VF600 SoC, no L2 cache, since
-that was the only one we could buy back then, 1N02G printed on it)
-- 0x00000011
-- 0x00610000
-- 0x01000000
-- none...
-
-Colibri VF50 V1.0A (1N02G)
-- 0x00000011
-- 0x00610000
-- 0x01000000
-- none...
-
-Vybrid Tower Rev J (1N02G)
-- 0x00000011
-- 0x00610000
-- 0x01000000
-- 0x410000c8
-
-The ROM revision differs the most, so we would like to go with the 
-revision information from the ROM register 0x80.
-
-Changes since RFC:
-- Use a DT entry for the ROM area while specifying it as syscon.
-
-Thanks & Regards,
-Sanchayan Maity.
-
-Sanchayan Maity (2):
-  ARM: dts: vfxxx: Add OCOTP and OCROM nodes
-  ARM: vf610: Add SoC bus support for Vybrid
-
- arch/arm/boot/dts/vfxxx.dtsi   | 10 ++++++
- arch/arm/mach-imx/mach-vf610.c | 81 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 91 insertions(+)
-
+diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+index 2f4b04d..66c529f 100644
+--- a/arch/arm/boot/dts/vfxxx.dtsi
++++ b/arch/arm/boot/dts/vfxxx.dtsi
+@@ -57,6 +57,11 @@
+ 		interrupt-parent = <&mscm_ir>;
+ 		ranges;
+ 
++		ocrom: ocrom {
++			compatible = "fsl,vf610-ocrom", "syscon";
++			reg = <0x00000000 0x18000>;
++		};
++
+ 		aips0: aips-bus at 40000000 {
+ 			compatible = "fsl,aips-bus", "simple-bus";
+ 			#address-cells = <1>;
+@@ -403,6 +408,11 @@
+ 				status = "disabled";
+ 			};
+ 
++			ocotp: ocotp at 400a5000 {
++				compatible = "fsl,vf610-ocotp", "syscon";
++				reg = <0x400a5000 0x1000>;
++			};
++
+ 			snvs0: snvs at 400a7000 {
+ 			    compatible = "fsl,sec-v4.0-mon", "simple-bus";
+ 				#address-cells = <1>;
 -- 
 2.4.1
