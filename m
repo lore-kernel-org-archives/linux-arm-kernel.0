@@ -1,69 +1,35 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 18 May 2015 15:26:38 +0200
-Subject: [PATCH v6 00/25] Exynos SYSMMU (IOMMU) integration with DT and
- DMA-mapping subsystem
-In-Reply-To: <CABxcv=mpCQKyuJOFsUgMdhD50yYdH+WwnEbYUNXByErMHpUuYA@mail.gmail.com>
-References: <1430727380-10912-1-git-send-email-m.szyprowski@samsung.com>
- <CABxcv=mpCQKyuJOFsUgMdhD50yYdH+WwnEbYUNXByErMHpUuYA@mail.gmail.com>
-Message-ID: <5559E88E.9050108@samsung.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 18 May 2015 14:27:06 +0100
+Subject: [PATCH][V3] ARM: pmu: fix memory leak due to early return not
+ freeing irqs
+In-Reply-To: <1431953873-12283-1-git-send-email-colin.king@canonical.com>
+References: <1431953873-12283-1-git-send-email-colin.king@canonical.com>
+Message-ID: <5559E8AA.5080609@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
 
-On 2015-05-11 18:00, Javier Martinez Canillas wrote:
-> Hello Marek,
->
-> On Mon, May 4, 2015 at 10:15 AM, Marek Szyprowski
-> <m.szyprowski@samsung.com> wrote:
->> Hello Everyone,
->>
->> This is yet another attempt to get Exynos SYSMMU driver with integrated
->> with IOMMU & DMA-mapping subsystems. The main change from previous
->> version is addition of the patches to define iommu-mapping, which need
->> to be created during system boot to avoid IOMMU fault by devices, which
->> has been left enabled by bootloader (i.e. framebuffer displaying slash
->> screen).
->>
->> Patches has been also rebased onto v4.1-rc2 with 'arm: dma-mapping: fix
->> off-by-one check in arm_setup_iommu_dma_ops' patch applied (see commit
->> 1424532b2163bf1580f4b1091a5801e12310fac5 on fixes branch in
->> git://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/linux-arm.git,
->> more information:
->> http://www.spinics.net/lists/arm-kernel/msg414722.html).
->>
->> All patches are also available in the following git repository:
->> https://git.linaro.org/people/marek.szyprowski/linux-srpol.git
->> branch v4.1-exynos-iommu.
->>
-> Thanks for the new series, this time I didn't get a system hang when I
-> enabled both CONFIG_DRM_EXYNOS_FIMD and CONFIG_DRM_EXYNOS_DP on my
-> Exynos5420 Peach Pit Chromebook.
->
-> The system finished booting and I have both a console on the HDMI and
-> eDP/LVDS displays. But if I try to start X or weston, I again have a
-> completele system hang with no output on the serial console. This
-> works correctly without your IOMMU series.
->
-> And again disabling CONFIG_DRM_EXYNOS_DP or CONFIG_DRM_EXYNOS_FIMD
-> avoids the system to hang. If I only have CONFIG_DRM_EXYNOS_HDMI
-> enabled, then I can start X with out issues and is displayed correctly
-> in the HDMI output.
->
-> So it seems your workaround for the boot-loader leaving the FIMD dma
-> engine enabled is not enough? I'm not a graphics person so I can think
-> of the top of my head what could trigger the system hang when X or
-> weston are executed so I wondered if you have any ideas.
 
-This means that there are more bugs in Exynos DRM driver. Once Exynos DRM
-driver is probed, the initial iommu domain with identity mapping is 
-destroyed
-and Exynos DRM manages it's own iommu domain, so it has nothing to my
-mentioned patch.
+On 18/05/15 13:57, Colin King wrote:
+> From: Colin Ian King <colin.king@canonical.com>
+>
+> Recent commit 338d9dd3e2ae ("ARM: 8351/1: perf: don't warn about
+> missing interrupt-affinity property for PPIs") introduced a memory
+> leak of irqs on the "Don't bother with PPIs" return path. This issue
+> was picked up by static analysis by cppcheck:
+>
+> [arch/arm/kernel/perf_event_cpu.c:315]: (error) Memory leak: irqs
+>
+> Instead, perform allocation of irqs after getting the irq hence
+> removing need to clean up an allocation on the PPI affine return path.
+>
+> Fixes: 338d9dd3e2ae ("ARM: 8351/1: perf: don't warn about missing interrupt-affinity property for PPIs")
 
-I will try to check this issue.
+Will Deacon has similar patch[1] in Russell's patch tracker(8357/1)
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Regards,
+Sudeep
+
+[1] 
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/342367.html
+[2] http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8357/1
