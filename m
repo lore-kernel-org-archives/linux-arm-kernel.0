@@ -1,35 +1,95 @@
-From: yalin.wang2010@gmail.com (yalin wang)
-Date: Mon, 18 May 2015 10:46:23 +0800
-Subject: [RFC] arm:consider THUMB and BE endian kernel build
-Message-ID: <5559527F.9090300@gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 18 May 2015 12:23:29 +0900
+Subject: [PATCH] serial: 8250_uniphier: add UniPhier serial driver
+In-Reply-To: <CAGhQ9VweeoE8WtBH_M1oJi106rXRThDRBGr0E6K5rMTtNRrzaQ@mail.gmail.com>
+References: <1431692764-17576-1-git-send-email-yamada.masahiro@socionext.com>
+ <CAGhQ9VweeoE8WtBH_M1oJi106rXRThDRBGr0E6K5rMTtNRrzaQ@mail.gmail.com>
+Message-ID: <CAK7LNARrYGQ=O4wNU7OJCEgmwYx6Y0FkkHs661a4BzB9y5kHhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this patch fix the function in kernel_thread(),
-when kernel is build as THUMB2 or BE8 endian, we should
-also set the correct bit in CPSR, so that kernel can return to
-the correct state to execute.
----
-  arch/arm/kernel/process.c | 6 ++++++
-  1 file changed, 6 insertions(+)
+Hi Joachim,
 
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index f192a2a..9a7ab32 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -220,6 +220,12 @@ copy_thread(unsigned long clone_flags, unsigned 
-long stack_start,
-  		thread->cpu_context.r4 = stk_sz;
-  		thread->cpu_context.r5 = stack_start;
-  		childregs->ARM_cpsr = SVC_MODE;
-+#ifdef CONFIG_THUMB2_KERNEL
-+		childregs->ARM_cpsr |= PSR_T_BIT;
-+#endif
-+#ifdef CONFIG_CPU_ENDIAN_BE8
-+		childregs->ARM_cpsr |= PSR_E_BIT;
-+#endif
-  	}
-  	thread->cpu_context.pc = (unsigned long)ret_from_fork;
-  	thread->cpu_context.sp = (unsigned long)childregs;
+
+
+
+2015-05-16 7:28 GMT+09:00 Joachim  Eastwood <manabian@gmail.com>:
+
+>> +
+>> +#include <linux/init.h>
+>> +#include <linux/module.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/clk.h>
+>> +#include <linux/of.h>
+>> +#include <linux/io.h>
+>> +#include <linux/serial_core.h>
+>> +#include <linux/serial_reg.h>
+>> +#include <linux/serial_8250.h>
+>
+> Please put the includes in alphabetic order.
+
+OK.
+
+
+
+> Do you really need init.h?
+
+Not really.  Will remove it.
+
+
+>> +static int uniphier_of_serial_setup(struct platform_device *pdev,
+>> +                                   struct uart_port *port,
+>> +                                   struct uniphier8250_priv *priv)
+>> +{
+>> +       int ret;
+>> +       u32 prop;
+>> +       struct device_node *np = pdev->dev.of_node;
+>> +
+>> +       ret = of_alias_get_id(np, "serial");
+>> +       if (ret < 0) {
+>> +               dev_err(&pdev->dev, "failed to get alias id\n");
+>> +               return ret;
+>> +       }
+>> +       port->line = priv->line = ret;
+>> +
+>> +       /* Get clk rate through clk driver */
+>> +       priv->clk = of_clk_get(np, 0);
+>> +       if (IS_ERR(priv->clk)) {
+>> +               dev_err(&pdev->dev, "failed to get clock\n");
+>> +               return PTR_ERR(priv->clk);
+>> +       }
+>
+> Use devm_clk_get() if possible.
+
+Sure.
+
+
+
+>
+>> +static int uniphier_uart_remove(struct platform_device *pdev)
+>> +{
+>> +       struct uniphier8250_priv *priv = platform_get_drvdata(pdev);
+>> +
+>> +       serial8250_unregister_port(priv->line);
+>> +       if (!IS_ERR_OR_NULL(priv->clk)) {
+>> +               clk_disable_unprepare(priv->clk);
+>> +               clk_put(priv->clk);
+>> +       }
+>
+> If you use devm_clk_get() in uniphier_of_serial_setup() you only need
+> to call clk_disable_unprepare() here.
+>
+> Calling clk_disable_unprepare() with NULL is allowed and you already
+> check for IS_ERR in your setup function.
+
+
+
+Yes.
+
+Thank you for your review!
+
+
+
 -- 
-1.9.1
+Best Regards
+Masahiro Yamada
