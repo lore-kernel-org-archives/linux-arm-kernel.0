@@ -1,115 +1,30 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 18 May 2015 14:09:12 +0200
-Subject: [PATCH v6 01/25] arm: dma-mapping: add support for creating
- reserved mappings in iova space
-In-Reply-To: <CAL_JsqKB4F8tspydBFrL-PH3gXcyu-pwQwBETMizJzTpAF3yzg@mail.gmail.com>
-References: <1430727380-10912-1-git-send-email-m.szyprowski@samsung.com>
- <1430727380-10912-2-git-send-email-m.szyprowski@samsung.com>
- <CAL_JsqKB4F8tspydBFrL-PH3gXcyu-pwQwBETMizJzTpAF3yzg@mail.gmail.com>
-Message-ID: <5559D668.3050308@samsung.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 18 May 2015 14:09:47 +0200
+Subject: [PATCH v4 3/7] doc: dt: add documentation for lpc3220-timer
+In-Reply-To: <1431381653-25356-4-git-send-email-manabian@gmail.com>
+References: <1431381653-25356-1-git-send-email-manabian@gmail.com>
+ <1431381653-25356-4-git-send-email-manabian@gmail.com>
+Message-ID: <5559D68B.8080300@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On 2015-05-05 00:12, Rob Herring wrote:
-> On Mon, May 4, 2015 at 3:15 AM, Marek Szyprowski
-> <m.szyprowski@samsung.com> wrote:
->> Some devices (like frame buffers) are enabled by bootloader and configured
->> to perform DMA operations automatically (like displaying boot logo or splash
->> screen). Such devices operate and perform DMA operation usually until the
->> proper driver for them is loaded and probed. However before that happens,
->> system usually loads IOMMU drivers and configures dma parameters for each
->> device. When such initial configuration is created and enabled, it usually
->> contains empty translation rules betweem IO address space and physical
->> memory, because no buffers nor memory regions have been requested by the
->> respective driver.
->>
->> This patch adds support for "iommu-reserved-mapping", which can be used
->> to provide definitions for mappings that need to be created on system
->> boot to let such devices (enabled by bootloader) to operate properly
->> until respective driver is probed.
->>
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> ---
->>   Documentation/devicetree/bindings/iommu/iommu.txt |  44 +++++++++
->>   arch/arm/mm/dma-mapping.c                         | 112 ++++++++++++++++++++++
->>   2 files changed, 156 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/iommu/iommu.txt b/Documentation/devicetree/bindings/iommu/iommu.txt
->> index 5a8b4624defc..fd54e6b597f0 100644
->> --- a/Documentation/devicetree/bindings/iommu/iommu.txt
->> +++ b/Documentation/devicetree/bindings/iommu/iommu.txt
->> @@ -86,6 +86,35 @@ have a means to turn off translation. But it is invalid in such cases to
->>   disable the IOMMU's device tree node in the first place because it would
->>   prevent any driver from properly setting up the translations.
->>
->> +Optional properties:
->> +--------------------
->> +- iommu-reserved-mapping: A list of entries describing additional
->> +  reserved mapping, that will be inserted to the default IO address space
->> +  created for given master device. Each entry consist of IO address,
->> +  physical memory address and size of the region.
->> +
->> +Some devices (like frame buffers) are enabled by bootloader and configured
->> +to perform DMA operations automatically (like displaying boot logo or splash
->> +screen). Such devices operate and perform DMA operation usually until the
->> +proper driver for them is loaded and probed. However before that happens,
->> +system usually loads IOMMU drivers and configures dma parameters for each
-> s/dma/DMA/
+On 05/12/2015 12:00 AM, Joachim Eastwood wrote:
+> Add DT bindings documentation for lpc3220-timer. This timer is
+> used as clocksource on many NXP platforms.
 >
->> +device. When such initial configuration is created and enabled, it usually
->> +contains empty translation rules betweem IO address space and physical
-> s/betweem/between/
->
->> +memory, because no buffers nor memory regions have been requested by the
->> +respective driver.
->> +
->> +To avoid IOMMU page fault, one can provide "iommu-reserved-mapping"
->> +property, which defines all memory regions which must be mapped to IO
->> +address space to boot properly when device has been enabled by the
->> +bootloader. More than one region can be defined for given master device.
->> +Each region is defined by the following triplet: first entry is IO
->> +address (encoded in "address" cells), second is base physical memory
->> +address for this regions (also encoded in "address" cells) and the last
->> +is size of the region (encoded in "size" cells). To ensure that that
->> +given master device will not trigger page fault after enabling IOMMU,
->> +one should define identity mapping between physical memory and IO
->> +address space for the range of addresses accessed by the device.
->> +
->>
->>   Notes:
->>   ======
->> @@ -113,6 +142,21 @@ Single-master IOMMU:
->>                  iommus = <&{/iommu}>;
->>          };
->>
->> +
->> +Single-master IOMMU, which has been left enabled by bootloader:
->> +---------------------------------------------------------------
->> +
->> +       iommu {
->> +               #iommu-cells = <0>;
->> +       };
->> +
->> +       master {
->> +               iommus = <&{/iommu}>;
->> +               /* bootloader configures framebuffer at 0x40000000 (32MiB)
->> +               iommu-reserved-mapping = <0x40000000 0x40000000 0x2000000>;
-> Is there not an ordering problem if kernel initializes the IOMMU
-> before parsing this for each master? I would think the IOMMU driver
-> needs to find all of these mappings and cleanly switch the page tables
-> with the new reserved mapping.
+> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+> ---
 
-The proper ordering is guaranteed by arm_get_iommu_dma_map_ops function, 
-which first
-created iommu domain for given master device, then scans for reserved 
-regions and
-adds them to the given domains. Only then it attaches such domain to the 
-iommu
-driver.
+Applied to my tree for 4.2
 
-Best regards
+Thanks!
+
+   -- Daniel
+
+
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
