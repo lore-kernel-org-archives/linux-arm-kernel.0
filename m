@@ -1,550 +1,49 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 18 May 2015 11:38:20 +0100
-Subject: [PATCHv2 09/12] arm64: psci: factor invocation code to drivers
+Date: Mon, 18 May 2015 11:38:17 +0100
+Subject: [PATCHv2 06/12] arm64: psci: account for Trusted OS instances
 In-Reply-To: <1431945503-6939-1-git-send-email-mark.rutland@arm.com>
 References: <1431945503-6939-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1431945503-6939-10-git-send-email-mark.rutland@arm.com>
+Message-ID: <1431945503-6939-7-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To enable sharing with arm, move the core PSCI framework code to
-drivers/firmware. This results in a minor gain in lines of code, but
-this will quickly be amortised by the removal of code currently
-duplicated in arch/arm.
+Software resident in the secure world (a "Trusted OS") may cause CPU_OFF
+calls for the CPU it is resident on to be denied. Such a denial would be
+fatal for the kernel, and so we must detect when this can happen before
+the point of no return.
+
+This patch implements Trusted OS detection for PSCI 0.2+ systems, using
+MIGRATE_INFO_TYPE and MIGRATE_INFO_UP_CPU. When a trusted OS is detected
+as resident on a particular CPU, attempts to hot unplug that CPU will be
+denied early, before they can prove fatal.
+
+Trusted OS migration is not implemented by this patch. Implementation of
+migratable UP trusted OSs seems unlikely, and the right policy for
+migration is unclear (and will likely differ across implementations). As
+such, it is likely that migration will require cooperation with Trusted
+OS drivers.
+
+PSCI implementations prior to 0.1 do not provide the facility to detect
+the presence of a Trusted OS, nor the CPU any such OS is resident on, so
+without additional information it is not possible to handle Trusted OSs
+with PSCI 0.1.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/Kconfig            |   1 +
- arch/arm64/include/asm/psci.h |  27 ----
- arch/arm64/kernel/psci.c      | 354 +---------------------------------------
- arch/arm64/kernel/setup.c     |   2 +-
- drivers/firmware/Kconfig      |   3 +
- drivers/firmware/Makefile     |   1 +
- drivers/firmware/psci.c       | 363 ++++++++++++++++++++++++++++++++++++++++++
- include/linux/psci.h          |  51 ++++++
- 8 files changed, 422 insertions(+), 380 deletions(-)
- delete mode 100644 arch/arm64/include/asm/psci.h
- create mode 100644 drivers/firmware/psci.c
- create mode 100644 include/linux/psci.h
+ arch/arm64/kernel/psci.c | 59 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 59 insertions(+)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 7796af4..d43ba0d 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -19,6 +19,7 @@ config ARM64
- 	select ARM_GIC_V2M if PCI_MSI
- 	select ARM_GIC_V3
- 	select ARM_GIC_V3_ITS if PCI_MSI
-+	select ARM_PSCI_FW
- 	select BUILDTIME_EXTABLE_SORT
- 	select CLONE_BACKWARDS
- 	select COMMON_CLK
-diff --git a/arch/arm64/include/asm/psci.h b/arch/arm64/include/asm/psci.h
-deleted file mode 100644
-index b5d4c1d..0000000
---- a/arch/arm64/include/asm/psci.h
-+++ /dev/null
-@@ -1,27 +0,0 @@
--/*
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * Copyright (C) 2013 ARM Limited
-- */
--
--#ifndef __ASM_PSCI_H
--#define __ASM_PSCI_H
--
--int __init psci_dt_init(void);
--
--#ifdef CONFIG_ACPI
--int __init psci_acpi_init(void);
--bool __init acpi_psci_present(void);
--bool __init acpi_psci_use_hvc(void);
--#else
--static inline int psci_acpi_init(void) { return 0; }
--#endif
--
--#endif /* __ASM_PSCI_H */
 diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-index 47fa474..8315d75 100644
+index 9c4de4b..3ef677e 100644
 --- a/arch/arm64/kernel/psci.c
 +++ b/arch/arm64/kernel/psci.c
-@@ -18,22 +18,17 @@
- #include <linux/init.h>
- #include <linux/of.h>
- #include <linux/smp.h>
--#include <linux/reboot.h>
--#include <linux/pm.h>
- #include <linux/delay.h>
-+#include <linux/psci.h>
- #include <linux/slab.h>
-+
- #include <uapi/linux/psci.h>
+@@ -43,6 +43,19 @@ struct psci_power_state {
+ 	u8	affinity_level;
+ };
  
- #include <asm/compiler.h>
- #include <asm/cpu_ops.h>
- #include <asm/errno.h>
--#include <asm/psci.h>
- #include <asm/smp_plat.h>
- #include <asm/suspend.h>
--#include <asm/system_misc.h>
--
--#define PSCI_POWER_STATE_TYPE_STANDBY		0
--#define PSCI_POWER_STATE_TYPE_POWER_DOWN	1
- 
- static bool psci_power_state_loses_context(u32 state)
- {
-@@ -49,127 +44,8 @@ static bool psci_power_state_is_valid(u32 state)
- 	return !(state & ~valid_mask);
- }
- 
--/*
-- * The CPU any Trusted OS is resident on. The trusted OS may reject CPU_OFF
-- * calls to its resident CPU, so we must avoid issuing those. We never migrate
-- * a Trusted OS even if it claims to be capable of migration -- doing so will
-- * require cooperation with a Trusted OS driver.
-- */
--static int resident_cpu = -1;
--
--static bool psci_tos_resident_on(int cpu)
--{
--	return cpu == resident_cpu;
--}
--
--struct psci_operations {
--	int (*cpu_suspend)(u32 state, unsigned long entry_point);
--	int (*cpu_off)(u32 state);
--	int (*cpu_on)(unsigned long cpuid, unsigned long entry_point);
--	int (*migrate)(unsigned long cpuid);
--	int (*affinity_info)(unsigned long target_affinity,
--			unsigned long lowest_affinity_level);
--	int (*migrate_info_type)(void);
--};
--
--static struct psci_operations psci_ops;
--
--typedef unsigned long (psci_fn)(unsigned long, unsigned long,
--				unsigned long, unsigned long);
--asmlinkage psci_fn __invoke_psci_fn_hvc;
--asmlinkage psci_fn __invoke_psci_fn_smc;
--static psci_fn *invoke_psci_fn;
--
--enum psci_function {
--	PSCI_FN_CPU_SUSPEND,
--	PSCI_FN_CPU_ON,
--	PSCI_FN_CPU_OFF,
--	PSCI_FN_MIGRATE,
--	PSCI_FN_MAX,
--};
--
- static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
- 
--static u32 psci_function_id[PSCI_FN_MAX];
--
--static int psci_to_linux_errno(int errno)
--{
--	switch (errno) {
--	case PSCI_RET_SUCCESS:
--		return 0;
--	case PSCI_RET_NOT_SUPPORTED:
--		return -EOPNOTSUPP;
--	case PSCI_RET_INVALID_PARAMS:
--		return -EINVAL;
--	case PSCI_RET_DENIED:
--		return -EPERM;
--	};
--
--	return -EINVAL;
--}
--
--static u32 psci_get_version(void)
--{
--	return invoke_psci_fn(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
--}
--
--static int psci_cpu_suspend(u32 state, unsigned long entry_point)
--{
--	int err;
--	u32 fn;
--
--	fn = psci_function_id[PSCI_FN_CPU_SUSPEND];
--	err = invoke_psci_fn(fn, state, entry_point, 0);
--	return psci_to_linux_errno(err);
--}
--
--static int psci_cpu_off(u32 state)
--{
--	int err;
--	u32 fn;
--
--	fn = psci_function_id[PSCI_FN_CPU_OFF];
--	err = invoke_psci_fn(fn, state, 0, 0);
--	return psci_to_linux_errno(err);
--}
--
--static int psci_cpu_on(unsigned long cpuid, unsigned long entry_point)
--{
--	int err;
--	u32 fn;
--
--	fn = psci_function_id[PSCI_FN_CPU_ON];
--	err = invoke_psci_fn(fn, cpuid, entry_point, 0);
--	return psci_to_linux_errno(err);
--}
--
--static int psci_migrate(unsigned long cpuid)
--{
--	int err;
--	u32 fn;
--
--	fn = psci_function_id[PSCI_FN_MIGRATE];
--	err = invoke_psci_fn(fn, cpuid, 0, 0);
--	return psci_to_linux_errno(err);
--}
--
--static int psci_affinity_info(unsigned long target_affinity,
--		unsigned long lowest_affinity_level)
--{
--	return invoke_psci_fn(PSCI_0_2_FN64_AFFINITY_INFO, target_affinity,
--			      lowest_affinity_level, 0);
--}
--
--static int psci_migrate_info_type(void)
--{
--	return invoke_psci_fn(PSCI_0_2_FN_MIGRATE_INFO_TYPE, 0, 0, 0);
--}
--
--static unsigned long psci_migrate_info_up_cpu(void)
--{
--	return invoke_psci_fn(PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU, 0, 0, 0);
--}
--
- static int __maybe_unused cpu_psci_cpu_init_idle(struct device_node *cpu_node,
- 						 unsigned int cpu)
- {
-@@ -231,232 +107,6 @@ free_mem:
- 	return ret;
- }
- 
--static int get_set_conduit_method(struct device_node *np)
--{
--	const char *method;
--
--	pr_info("probing for conduit method from DT.\n");
--
--	if (of_property_read_string(np, "method", &method)) {
--		pr_warn("missing \"method\" property\n");
--		return -ENXIO;
--	}
--
--	if (!strcmp("hvc", method)) {
--		invoke_psci_fn = __invoke_psci_fn_hvc;
--	} else if (!strcmp("smc", method)) {
--		invoke_psci_fn = __invoke_psci_fn_smc;
--	} else {
--		pr_warn("invalid \"method\" property: %s\n", method);
--		return -EINVAL;
--	}
--	return 0;
--}
--
--static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
--{
--	invoke_psci_fn(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
--}
--
--static void psci_sys_poweroff(void)
--{
--	invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
--}
--
--/*
-- * Detect the presence of a resident Trusted OS which may cause CPU_OFF to
-- * return DENIED (which would be fatal).
-- */
--static void __init psci_init_migrate(void)
--{
--	unsigned long cpuid;
--	int type, cpu;
--
--	type = psci_ops.migrate_info_type();
--
--	if (type == PSCI_0_2_TOS_MP) {
--		pr_info("Trusted OS migration not required\n");
--		return;
--	}
--
--	if (type == PSCI_RET_NOT_SUPPORTED) {
--		pr_info("MIGRATE_INFO_TYPE not supported.\n");
--		return;
--	}
--
--	if (type != PSCI_0_2_TOS_UP_MIGRATE &&
--	    type != PSCI_0_2_TOS_UP_NO_MIGRATE) {
--		pr_err("MIGRATE_INFO_TYPE returned unknown type (%d)\n", type);
--		return;
--	}
--
--	cpuid = psci_migrate_info_up_cpu();
--	cpu = get_logical_index(cpuid);
--	resident_cpu = cpu >= 0 ? cpu : -1;
--
--	pr_info("Trusted OS resident on physical CPU 0x%lx\n", cpuid);
--}
--
--static void __init psci_0_2_set_functions(void)
--{
--	pr_info("Using standard PSCI v0.2 function IDs\n");
--	psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN64_CPU_SUSPEND;
--	psci_ops.cpu_suspend = psci_cpu_suspend;
--
--	psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
--	psci_ops.cpu_off = psci_cpu_off;
--
--	psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN64_CPU_ON;
--	psci_ops.cpu_on = psci_cpu_on;
--
--	psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN64_MIGRATE;
--	psci_ops.migrate = psci_migrate;
--
--	psci_ops.affinity_info = psci_affinity_info;
--
--	psci_ops.migrate_info_type = psci_migrate_info_type;
--
--	arm_pm_restart = psci_sys_reset;
--
--	pm_power_off = psci_sys_poweroff;
--}
--
--/*
-- * Probe function for PSCI firmware versions >= 0.2
-- */
--static int __init psci_probe(void)
--{
--	u32 ver = psci_get_version();
--
--	pr_info("PSCIv%d.%d detected in firmware.\n",
--			PSCI_VERSION_MAJOR(ver),
--			PSCI_VERSION_MINOR(ver));
--
--	if (PSCI_VERSION_MAJOR(ver) == 0 && PSCI_VERSION_MINOR(ver) < 2) {
--		pr_err("Conflicting PSCI version detected.\n");
--		return -EINVAL;
--	}
--
--	psci_0_2_set_functions();
--
--	psci_init_migrate();
--
--	return 0;
--}
--
--typedef int (*psci_initcall_t)(const struct device_node *);
--
--/*
-- * PSCI init function for PSCI versions >=0.2
-- *
-- * Probe based on PSCI PSCI_VERSION function
-- */
--static int __init psci_0_2_init(struct device_node *np)
--{
--	int err;
--
--	err = get_set_conduit_method(np);
--
--	if (err)
--		goto out_put_node;
--	/*
--	 * Starting with v0.2, the PSCI specification introduced a call
--	 * (PSCI_VERSION) that allows probing the firmware version, so
--	 * that PSCI function IDs and version specific initialization
--	 * can be carried out according to the specific version reported
--	 * by firmware
--	 */
--	err = psci_probe();
--
--out_put_node:
--	of_node_put(np);
--	return err;
--}
--
--/*
-- * PSCI < v0.2 get PSCI Function IDs via DT.
-- */
--static int __init psci_0_1_init(struct device_node *np)
--{
--	u32 id;
--	int err;
--
--	err = get_set_conduit_method(np);
--
--	if (err)
--		goto out_put_node;
--
--	pr_info("Using PSCI v0.1 Function IDs from DT\n");
--
--	if (!of_property_read_u32(np, "cpu_suspend", &id)) {
--		psci_function_id[PSCI_FN_CPU_SUSPEND] = id;
--		psci_ops.cpu_suspend = psci_cpu_suspend;
--	}
--
--	if (!of_property_read_u32(np, "cpu_off", &id)) {
--		psci_function_id[PSCI_FN_CPU_OFF] = id;
--		psci_ops.cpu_off = psci_cpu_off;
--	}
--
--	if (!of_property_read_u32(np, "cpu_on", &id)) {
--		psci_function_id[PSCI_FN_CPU_ON] = id;
--		psci_ops.cpu_on = psci_cpu_on;
--	}
--
--	if (!of_property_read_u32(np, "migrate", &id)) {
--		psci_function_id[PSCI_FN_MIGRATE] = id;
--		psci_ops.migrate = psci_migrate;
--	}
--
--out_put_node:
--	of_node_put(np);
--	return err;
--}
--
--static const struct of_device_id psci_of_match[] __initconst = {
--	{ .compatible = "arm,psci",	.data = psci_0_1_init},
--	{ .compatible = "arm,psci-0.2",	.data = psci_0_2_init},
--	{},
--};
--
--int __init psci_dt_init(void)
--{
--	struct device_node *np;
--	const struct of_device_id *matched_np;
--	psci_initcall_t init_fn;
--
--	np = of_find_matching_node_and_match(NULL, psci_of_match, &matched_np);
--
--	if (!np)
--		return -ENODEV;
--
--	init_fn = (psci_initcall_t)matched_np->data;
--	return init_fn(np);
--}
--
--#ifdef CONFIG_ACPI
--/*
-- * We use PSCI 0.2+ when ACPI is deployed on ARM64 and it's
-- * explicitly clarified in SBBR
-- */
--int __init psci_acpi_init(void)
--{
--	if (!acpi_psci_present()) {
--		pr_info("is not implemented in ACPI.\n");
--		return -EOPNOTSUPP;
--	}
--
--	pr_info("probing for conduit method from ACPI.\n");
--
--	if (acpi_psci_use_hvc())
--		invoke_psci_fn = __invoke_psci_fn_hvc;
--	else
--		invoke_psci_fn = __invoke_psci_fn_smc;
--
--	return psci_probe();
--}
--#endif
--
- #ifdef CONFIG_SMP
- 
- static int __init cpu_psci_cpu_init(struct device_node *dn, unsigned int cpu)
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 7475313..be98a03 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -46,6 +46,7 @@
- #include <linux/of_platform.h>
- #include <linux/efi.h>
- #include <linux/personality.h>
-+#include <linux/psci.h>
- 
- #include <asm/acpi.h>
- #include <asm/fixmap.h>
-@@ -61,7 +62,6 @@
- #include <asm/tlbflush.h>
- #include <asm/traps.h>
- #include <asm/memblock.h>
--#include <asm/psci.h>
- #include <asm/efi.h>
- #include <asm/virt.h>
- 
-diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
-index 6517132..24be7a3 100644
---- a/drivers/firmware/Kconfig
-+++ b/drivers/firmware/Kconfig
-@@ -5,6 +5,9 @@
- 
- menu "Firmware Drivers"
- 
-+config ARM_PSCI_FW
-+	bool
-+
- config EDD
- 	tristate "BIOS Enhanced Disk Drive calls determine boot disk"
- 	depends on X86
-diff --git a/drivers/firmware/Makefile b/drivers/firmware/Makefile
-index 3fdd391..6b05129 100644
---- a/drivers/firmware/Makefile
-+++ b/drivers/firmware/Makefile
-@@ -1,6 +1,7 @@
- #
- # Makefile for the linux kernel.
- #
-+obj-$(CONFIG_ARM_PSCI_FW)	+= psci.o
- obj-$(CONFIG_DMI)		+= dmi_scan.o
- obj-$(CONFIG_DMI_SYSFS)		+= dmi-sysfs.o
- obj-$(CONFIG_EDD)		+= edd.o
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-new file mode 100644
-index 0000000..792f4a7
---- /dev/null
-+++ b/drivers/firmware/psci.c
-@@ -0,0 +1,363 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * Copyright (C) 2015 ARM Limited
-+ */
-+
-+#define pr_fmt(fmt) "psci: " fmt
-+
-+#include <linux/errno.h>
-+#include <linux/linkage.h>
-+#include <linux/of.h>
-+#include <linux/pm.h>
-+#include <linux/printk.h>
-+#include <linux/psci.h>
-+#include <linux/reboot.h>
-+
-+#include <uapi/linux/psci.h>
-+
-+#include <asm/system_misc.h>
-+#include <asm/smp_plat.h>
-+
 +/*
 + * The CPU any Trusted OS is resident on. The trusted OS may reject CPU_OFF
 + * calls to its resident CPU, so we must avoid issuing those. We never migrate
@@ -553,139 +52,30 @@ index 0000000..792f4a7
 + */
 +static int resident_cpu = -1;
 +
-+bool psci_tos_resident_on(int cpu)
++static bool psci_tos_resident_on(int cpu)
 +{
 +	return cpu == resident_cpu;
 +}
 +
-+struct psci_operations psci_ops;
-+
-+typedef unsigned long (psci_fn)(unsigned long, unsigned long,
-+				unsigned long, unsigned long);
-+asmlinkage psci_fn __invoke_psci_fn_hvc;
-+asmlinkage psci_fn __invoke_psci_fn_smc;
-+static psci_fn *invoke_psci_fn;
-+
-+enum psci_function {
-+	PSCI_FN_CPU_SUSPEND,
-+	PSCI_FN_CPU_ON,
-+	PSCI_FN_CPU_OFF,
-+	PSCI_FN_MIGRATE,
-+	PSCI_FN_MAX,
-+};
-+
-+static u32 psci_function_id[PSCI_FN_MAX];
-+
-+static int psci_to_linux_errno(int errno)
-+{
-+	switch (errno) {
-+	case PSCI_RET_SUCCESS:
-+		return 0;
-+	case PSCI_RET_NOT_SUPPORTED:
-+		return -EOPNOTSUPP;
-+	case PSCI_RET_INVALID_PARAMS:
-+		return -EINVAL;
-+	case PSCI_RET_DENIED:
-+		return -EPERM;
-+	};
-+
-+	return -EINVAL;
-+}
-+
-+static u32 psci_get_version(void)
-+{
-+	return invoke_psci_fn(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
-+}
-+
-+static int psci_cpu_suspend(u32 state, unsigned long entry_point)
-+{
-+	int err;
-+	u32 fn;
-+
-+	fn = psci_function_id[PSCI_FN_CPU_SUSPEND];
-+	err = invoke_psci_fn(fn, state, entry_point, 0);
-+	return psci_to_linux_errno(err);
-+}
-+
-+static int psci_cpu_off(u32 state)
-+{
-+	int err;
-+	u32 fn;
-+
-+	fn = psci_function_id[PSCI_FN_CPU_OFF];
-+	err = invoke_psci_fn(fn, state, 0, 0);
-+	return psci_to_linux_errno(err);
-+}
-+
-+static int psci_cpu_on(unsigned long cpuid, unsigned long entry_point)
-+{
-+	int err;
-+	u32 fn;
-+
-+	fn = psci_function_id[PSCI_FN_CPU_ON];
-+	err = invoke_psci_fn(fn, cpuid, entry_point, 0);
-+	return psci_to_linux_errno(err);
-+}
-+
-+static int psci_migrate(unsigned long cpuid)
-+{
-+	int err;
-+	u32 fn;
-+
-+	fn = psci_function_id[PSCI_FN_MIGRATE];
-+	err = invoke_psci_fn(fn, cpuid, 0, 0);
-+	return psci_to_linux_errno(err);
-+}
-+
-+static int psci_affinity_info(unsigned long target_affinity,
-+		unsigned long lowest_affinity_level)
-+{
-+	return invoke_psci_fn(PSCI_0_2_FN64_AFFINITY_INFO, target_affinity,
-+			      lowest_affinity_level, 0);
-+}
-+
-+static int psci_migrate_info_type(void)
-+{
-+	return invoke_psci_fn(PSCI_0_2_FN_MIGRATE_INFO_TYPE, 0, 0, 0);
-+}
-+
+ struct psci_operations {
+ 	int (*cpu_suspend)(struct psci_power_state state,
+ 			   unsigned long entry_point);
+@@ -172,6 +185,11 @@ static int psci_migrate_info_type(void)
+ 	return invoke_psci_fn(PSCI_0_2_FN_MIGRATE_INFO_TYPE, 0, 0, 0);
+ }
+ 
 +static unsigned long psci_migrate_info_up_cpu(void)
 +{
 +	return invoke_psci_fn(PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU, 0, 0, 0);
 +}
 +
-+static int get_set_conduit_method(struct device_node *np)
-+{
-+	const char *method;
-+
-+	pr_info("probing for conduit method from DT.\n");
-+
-+	if (of_property_read_string(np, "method", &method)) {
-+		pr_warn("missing \"method\" property\n");
-+		return -ENXIO;
-+	}
-+
-+	if (!strcmp("hvc", method)) {
-+		invoke_psci_fn = __invoke_psci_fn_hvc;
-+	} else if (!strcmp("smc", method)) {
-+		invoke_psci_fn = __invoke_psci_fn_smc;
-+	} else {
-+		pr_warn("invalid \"method\" property: %s\n", method);
-+		return -EINVAL;
-+	}
-+	return 0;
-+}
-+
-+static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
-+{
-+	invoke_psci_fn(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
-+}
-+
-+static void psci_sys_poweroff(void)
-+{
-+	invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
-+}
-+
+ static int __maybe_unused cpu_psci_cpu_init_idle(struct device_node *cpu_node,
+ 						 unsigned int cpu)
+ {
+@@ -261,6 +279,40 @@ static void psci_sys_poweroff(void)
+ 	invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
+ }
+ 
 +/*
 + * Detect the presence of a resident Trusted OS which may cause CPU_OFF to
 + * return DENIED (which would be fatal).
@@ -693,7 +83,7 @@ index 0000000..792f4a7
 +static void __init psci_init_migrate(void)
 +{
 +	unsigned long cpuid;
-+	int type, cpu = -1;
++	int type, cpu;
 +
 +	type = psci_ops.migrate_info_type();
 +
@@ -720,222 +110,29 @@ index 0000000..792f4a7
 +	pr_info("Trusted OS resident on physical CPU 0x%lx\n", cpuid);
 +}
 +
-+static void __init psci_0_2_set_functions(void)
-+{
-+	pr_info("Using standard PSCI v0.2 function IDs\n");
-+	psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN64_CPU_SUSPEND;
-+	psci_ops.cpu_suspend = psci_cpu_suspend;
-+
-+	psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
-+	psci_ops.cpu_off = psci_cpu_off;
-+
-+	psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN64_CPU_ON;
-+	psci_ops.cpu_on = psci_cpu_on;
-+
-+	psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN64_MIGRATE;
-+	psci_ops.migrate = psci_migrate;
-+
-+	psci_ops.affinity_info = psci_affinity_info;
-+
-+	psci_ops.migrate_info_type = psci_migrate_info_type;
-+
-+	arm_pm_restart = psci_sys_reset;
-+
-+	pm_power_off = psci_sys_poweroff;
-+}
-+
-+/*
-+ * Probe function for PSCI firmware versions >= 0.2
-+ */
-+static int __init psci_probe(void)
-+{
-+	u32 ver = psci_get_version();
-+
-+	pr_info("PSCIv%d.%d detected in firmware.\n",
-+			PSCI_VERSION_MAJOR(ver),
-+			PSCI_VERSION_MINOR(ver));
-+
-+	if (PSCI_VERSION_MAJOR(ver) == 0 && PSCI_VERSION_MINOR(ver) < 2) {
-+		pr_err("Conflicting PSCI version detected.\n");
-+		return -EINVAL;
-+	}
-+
-+	psci_0_2_set_functions();
-+
+ static void __init psci_0_2_set_functions(void)
+ {
+ 	pr_info("Using standard PSCI v0.2 function IDs\n");
+@@ -303,6 +355,8 @@ static int __init psci_probe(void)
+ 
+ 	psci_0_2_set_functions();
+ 
 +	psci_init_migrate();
 +
-+	return 0;
-+}
+ 	return 0;
+ }
+ 
+@@ -449,6 +503,11 @@ static int cpu_psci_cpu_disable(unsigned int cpu)
+ 	/* Fail early if we don't have CPU_OFF support */
+ 	if (!psci_ops.cpu_off)
+ 		return -EOPNOTSUPP;
 +
-+typedef int (*psci_initcall_t)(const struct device_node *);
++	/* Trusted OS will deny CPU_OFF */
++	if (psci_tos_resident_on(cpu))
++		return -EPERM;
 +
-+/*
-+ * PSCI init function for PSCI versions >=0.2
-+ *
-+ * Probe based on PSCI PSCI_VERSION function
-+ */
-+static int __init psci_0_2_init(struct device_node *np)
-+{
-+	int err;
-+
-+	err = get_set_conduit_method(np);
-+
-+	if (err)
-+		goto out_put_node;
-+	/*
-+	 * Starting with v0.2, the PSCI specification introduced a call
-+	 * (PSCI_VERSION) that allows probing the firmware version, so
-+	 * that PSCI function IDs and version specific initialization
-+	 * can be carried out according to the specific version reported
-+	 * by firmware
-+	 */
-+	err = psci_probe();
-+
-+out_put_node:
-+	of_node_put(np);
-+	return err;
-+}
-+
-+/*
-+ * PSCI < v0.2 get PSCI Function IDs via DT.
-+ */
-+static int __init psci_0_1_init(struct device_node *np)
-+{
-+	u32 id;
-+	int err;
-+
-+	err = get_set_conduit_method(np);
-+
-+	if (err)
-+		goto out_put_node;
-+
-+	pr_info("Using PSCI v0.1 Function IDs from DT\n");
-+
-+	if (!of_property_read_u32(np, "cpu_suspend", &id)) {
-+		psci_function_id[PSCI_FN_CPU_SUSPEND] = id;
-+		psci_ops.cpu_suspend = psci_cpu_suspend;
-+	}
-+
-+	if (!of_property_read_u32(np, "cpu_off", &id)) {
-+		psci_function_id[PSCI_FN_CPU_OFF] = id;
-+		psci_ops.cpu_off = psci_cpu_off;
-+	}
-+
-+	if (!of_property_read_u32(np, "cpu_on", &id)) {
-+		psci_function_id[PSCI_FN_CPU_ON] = id;
-+		psci_ops.cpu_on = psci_cpu_on;
-+	}
-+
-+	if (!of_property_read_u32(np, "migrate", &id)) {
-+		psci_function_id[PSCI_FN_MIGRATE] = id;
-+		psci_ops.migrate = psci_migrate;
-+	}
-+
-+out_put_node:
-+	of_node_put(np);
-+	return err;
-+}
-+
-+static const struct of_device_id psci_of_match[] __initconst = {
-+	{ .compatible = "arm,psci",	.data = psci_0_1_init},
-+	{ .compatible = "arm,psci-0.2",	.data = psci_0_2_init},
-+	{},
-+};
-+
-+int __init psci_dt_init(void)
-+{
-+	struct device_node *np;
-+	const struct of_device_id *matched_np;
-+	psci_initcall_t init_fn;
-+
-+	np = of_find_matching_node_and_match(NULL, psci_of_match, &matched_np);
-+
-+	if (!np)
-+		return -ENODEV;
-+
-+	init_fn = (psci_initcall_t)matched_np->data;
-+	return init_fn(np);
-+}
-+
-+#ifdef CONFIG_ACPI
-+/*
-+ * We use PSCI 0.2+ when ACPI is deployed on ARM64 and it's
-+ * explicitly clarified in SBBR
-+ */
-+int __init psci_acpi_init(void)
-+{
-+	if (!acpi_psci_present()) {
-+		pr_info("is not implemented in ACPI.\n");
-+		return -EOPNOTSUPP;
-+	}
-+
-+	pr_info("probing for conduit method from ACPI.\n");
-+
-+	if (acpi_psci_use_hvc())
-+		invoke_psci_fn = __invoke_psci_fn_hvc;
-+	else
-+		invoke_psci_fn = __invoke_psci_fn_smc;
-+
-+	return psci_probe();
-+}
-+#endif
-+
-diff --git a/include/linux/psci.h b/include/linux/psci.h
-new file mode 100644
-index 0000000..f12dec2
---- /dev/null
-+++ b/include/linux/psci.h
-@@ -0,0 +1,51 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * Copyright (C) 2015 ARM Limited
-+ */
-+
-+#ifndef __LINUX_PSCI_H
-+#define __LINUX_PSCI_H
-+
-+#include <linux/init.h>
-+#include <linux/types.h>
-+
-+#define PSCI_POWER_STATE_TYPE_STANDBY		0
-+#define PSCI_POWER_STATE_TYPE_POWER_DOWN	1
-+
-+bool psci_tos_resident_on(int cpu);
-+
-+struct psci_operations {
-+	int (*cpu_suspend)(u32 state, unsigned long entry_point);
-+	int (*cpu_off)(u32 state);
-+	int (*cpu_on)(unsigned long cpuid, unsigned long entry_point);
-+	int (*migrate)(unsigned long cpuid);
-+	int (*affinity_info)(unsigned long target_affinity,
-+			unsigned long lowest_affinity_level);
-+	int (*migrate_info_type)(void);
-+};
-+
-+extern struct psci_operations psci_ops;
-+
-+#if defined(CONFIG_ARM_PSCI_FW)
-+int __init psci_dt_init(void);
-+#else
-+static inline int psci_dt_init(void) { return 0; }
-+#endif
-+
-+#if defined(CONFIG_ARM_PSCI_FW) && defined(CONFIG_ACPI)
-+int __init psci_acpi_init(void);
-+bool __init acpi_psci_present(void);
-+bool __init acpi_psci_use_hvc(void);
-+#else
-+static inline int psci_acpi_init(void) { return 0; }
-+#endif
-+
-+#endif /* __LINUX_PSCI_H */
+ 	return 0;
+ }
+ 
 -- 
 1.9.1
