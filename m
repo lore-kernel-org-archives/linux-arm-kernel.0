@@ -1,33 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 May 2015 17:15:22 +0200
-Subject: [PATCH] ARM: stm32: fix decompressor build
-Message-ID: <3033772.rbvAY6l8ZR@wuerfel>
+Date: Mon, 18 May 2015 17:19:16 +0200
+Subject: [PATCH] ARM: stm32: do not try to use a ramdisk in defconfig
+Message-ID: <2564815.ICm4KsbZzD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The stm32 defconfig uses XIP_KERNEL, but if this is turned off
-by a user, we get this error when building the zImage decompressor:
+The original stm32 defconfig file looks for a ./rootfs.cpio file,
+but that breaks with
 
-arch/arm/boot/compressed/misc.c:28:35: fatal error: mach/uncompress.h: No such file or directory
+  ../scripts/gen_initramfs_list.sh: Cannot open './rootfs.cpio'
 
-To avoid the error, this adds stm32 to the list of platforms using
-the default DEBUG_LL based decompressor output.
+when trying to build this kernel. Anybody who relies on the
+current behavior should change their build scripts to append
+the initramfs manually, as this patch removes that default
+in order to help autmatic testing.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
-I'd like to apply this directly to next/soc
+I'm applying this to the next/defconfig branch directly, to get the
+kernelci builder to succeed on this config.
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 375a428aa733..91f0df3edbe0 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1680,7 +1680,8 @@ config UNCOMPRESS_INCLUDE
- 	string
- 	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM || \
- 					PLAT_SAMSUNG || ARCH_EFM32 || \
--					ARCH_SHMOBILE_LEGACY || ARCH_LPC18XX
-+					ARCH_SHMOBILE_LEGACY || \
-+					ARCH_LPC18XX || ARCH_STM32
- 	default "mach/uncompress.h"
- 
- config EARLY_PRINTK
+diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
+index af757925d0ae..fab9cf9bff02 100644
+--- a/arch/arm/configs/stm32_defconfig
++++ b/arch/arm/configs/stm32_defconfig
+@@ -2,7 +2,6 @@ CONFIG_NO_HZ_IDLE=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_LOG_BUF_SHIFT=16
+ CONFIG_BLK_DEV_INITRD=y
+-CONFIG_INITRAMFS_SOURCE="./rootfs.cpio"
+ CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+ # CONFIG_UID16 is not set
+ # CONFIG_BASE_FULL is not set
