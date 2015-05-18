@@ -1,407 +1,92 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 18 May 2015 11:00:58 -0700
-Subject: [PATCH 2/3 v3] ARM: bcm2835: Add the Raspberry Pi firmware driver
-In-Reply-To: <1431543609-19646-3-git-send-email-eric@anholt.net>
-References: <1431543609-19646-3-git-send-email-eric@anholt.net>
-Message-ID: <1431972058-26945-1-git-send-email-eric@anholt.net>
+From: pantelis.antoniou@konsulko.com (Pantelis Antoniou)
+Date: Mon, 18 May 2015 21:01:26 +0300
+Subject: [PATCH] ARM: dts: am335x-bone* enable pmic-shutdown-controller
+In-Reply-To: <20150518170354.GG10274@atomide.com>
+References: <1431525001-5747-1-git-send-email-robertcnelson@gmail.com>
+ <20150513141658.GB6605@localhost> <20150513144846.GC6605@localhost>
+ <CAALWOA-hkgrMi+OeNrmwaVpdEfNadFn0R-QbpXi9LU-4sbakJQ@mail.gmail.com>
+ <20150518152108.GE10274@atomide.com>
+ <CAOCHtYgwyQy+hQE2PeUd+7U9wNygVOUuAb-VSh_9K5y7zFHEWA@mail.gmail.com>
+ <20150518162936.GF10274@atomide.com>
+ <CAOCHtYjtziBwfSMGPRrQ7rfDEf_dC=7rPytQUxVXy8bSp-8NNw@mail.gmail.com>
+ <20150518170354.GG10274@atomide.com>
+Message-ID: <7ECB47C4-812D-4465-82EE-56796B987011@konsulko.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This gives us a function for making mailbox property channel requests
-of the firmware, which is most notable in that it will let us get and
-set clock rates.
+Hi Tony,
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
----
+> On May 18, 2015, at 20:03 , Tony Lindgren <tony@atomide.com> wrote:
+> 
+> * Robert Nelson <robertcnelson@gmail.com> [150518 09:51]:
+>> On Mon, May 18, 2015 at 11:29 AM, Tony Lindgren <tony@atomide.com> wrote:
+>>> * Robert Nelson <robertcnelson@gmail.com> [150518 09:15]:
+>>>> On Mon, May 18, 2015 at 10:21 AM, Tony Lindgren <tony@atomide.com> wrote:
+>>>> 
+>>>> All the rev information is in the board's eeprom:
+>>>> 
+>>>> hexdump -e '8/1 "%c"' /sys/bus/i2c/devices/0-0050/eeprom -s 12 -n 4
+>>>> 
+>>>> Rev A5B
+>>>> 0A5B
+>>>> 
+>>>> Rev C
+>>>> 000C
+>>>> 
+>>>> Just another default qwerk to add to Pantelis' bone_capemgr. ;)
+>>> 
+>>> It seems we should not even instantiate some devices on BBB
+>>> until the EEPROM is parsed.. So maybe something like this:
+>>> 
+>>> 1. The problem devices are initially set with status = "disabled"
+>>>   in the dts
+>>> 
+>>> 2. We set up drivers/*/bbb-eeprom.c that parses the board
+>>>   revision at module_init time, and then flips the selected
+>>>   devices to have status = "enabled" and populates the revision
+>>>   info based on the eeprom and SoC revision passed in pdata.
+>>>   Then those devices get their struct device created and
+>>>   probed, but at a much later time.
+>>> 
+>>> So rather than trying to init all that early, let's just
+>>> init them much later when we have the proper I2C driver
+>>> running?
+>> 
+>> I see that working just fine.  We (beagleboard.org) enforce the eeprom
+>> data, as all the official images require a proper baseboard eeprom.
+> 
+> OK
+> 
+>> We just have to be very careful to limit the scope, otherwise we will
+>> end up with Pantelis' rejected capebus from the v3.2.x days...
+> 
+> Naturally I was thinking #2 above would use Pantelis' code for
+> CONFIG_OF_OVERLAY in mainline. But instead of the earlier patches,
+> we can make things happen much later on to avoid the detect of
+> EEPROM early on.
+> 
 
-v2: Drop power-domains stuff for now since we don't have the driver
-    core support to make it useful.  Move to drivers/firmware/.
-    Capitalize the enums.  De-global the firmware variable.  Use the
-    firmware device to allocate our DMA buffer, so that the dma-ranges
-    DT property gets respected.  Simplify the property tag transaction
-    interface even more, leaving a multi-tag interface still
-    available.  For conciseness, rename "raspberrypi" to "rpi" on all
-    functions/enums/structs, and the "firmware" variable to "fw".
-    Print when the driver is probed successfully, since debugging
-    -EPROBE_DEFER handling is such a big part of bcm2835 development.
-    Drop -EBUSY mailbox handling since the mailbox core has been fixed
-    to return -EPROBE_DEFER in -next.
 
-v3: Use kernel-doc style for big comments (from Noralf), drop stale
-    comment, use "dev" when freeing DMA as well.
+Already been taken care of:
 
- drivers/firmware/Makefile                          |   1 +
- drivers/firmware/raspberrypi.c                     | 230 +++++++++++++++++++++
- .../soc/bcm2835/raspberrypi-firmware-property.h    | 112 ++++++++++
- 3 files changed, 343 insertions(+)
- create mode 100644 drivers/firmware/raspberrypi.c
- create mode 100644 include/soc/bcm2835/raspberrypi-firmware-property.h
+https://lkml.org/lkml/2015/2/18/258
 
-diff --git a/drivers/firmware/Makefile b/drivers/firmware/Makefile
-index 3fdd391..41ced28 100644
---- a/drivers/firmware/Makefile
-+++ b/drivers/firmware/Makefile
-@@ -13,6 +13,7 @@ obj-$(CONFIG_ISCSI_IBFT)	+= iscsi_ibft.o
- obj-$(CONFIG_FIRMWARE_MEMMAP)	+= memmap.o
- obj-$(CONFIG_QCOM_SCM)		+= qcom_scm.o
- CFLAGS_qcom_scm.o :=$(call as-instr,.arch_extension sec,-DREQUIRES_SEC=1)
-+obj-$(CONFIG_BCM2835_MBOX)	+= raspberrypi.o
- 
- obj-$(CONFIG_GOOGLE_FIRMWARE)	+= google/
- obj-$(CONFIG_EFI)		+= efi/
-diff --git a/drivers/firmware/raspberrypi.c b/drivers/firmware/raspberrypi.c
-new file mode 100644
-index 0000000..d612815
---- /dev/null
-+++ b/drivers/firmware/raspberrypi.c
-@@ -0,0 +1,230 @@
-+/*
-+ *  Copyright ? 2015 Broadcom
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/*
-+ * Defines interfaces for interacting wtih the Raspberry Pi firmware's
-+ * property channel.
-+ */
-+
-+#include <linux/dma-mapping.h>
-+#include <linux/mailbox_client.h>
-+#include <linux/module.h>
-+#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
-+#include <soc/bcm2835/raspberrypi-firmware-property.h>
-+
-+#define MBOX_MSG(chan, data28)		(((data28) & ~0xf) | ((chan) & 0xf))
-+#define MBOX_CHAN(msg)			((msg) & 0xf)
-+#define MBOX_DATA28(msg)		((msg) & ~0xf)
-+#define MBOX_CHAN_PROPERTY		8
-+
-+struct rpi_firmware {
-+	struct mbox_client cl;
-+	struct mbox_chan *chan; /* The property channel. */
-+	struct completion c;
-+	u32 enabled;
-+};
-+
-+static DEFINE_MUTEX(transaction_lock);
-+
-+static void response_callback(struct mbox_client *cl, void *msg)
-+{
-+	struct rpi_firmware *fw = container_of(cl, struct rpi_firmware, cl);
-+	complete(&fw->c);
-+}
-+
-+/*
-+ * Sends a request to the firmware through the BCM2835 mailbox driver,
-+ * and synchronously waits for the reply.
-+ */
-+static int
-+rpi_firmware_transaction(struct rpi_firmware *fw, u32 chan, u32 data)
-+{
-+	u32 message = MBOX_MSG(chan, data);
-+	int ret;
-+
-+	WARN_ON(data & 0xf);
-+
-+	mutex_lock(&transaction_lock);
-+	reinit_completion(&fw->c);
-+	ret = mbox_send_message(fw->chan, &message);
-+	if (ret >= 0) {
-+		wait_for_completion(&fw->c);
-+		ret = 0;
-+	} else {
-+		dev_err(fw->cl.dev, "mbox_send_message returned %d\n", ret);
-+	}
-+	mutex_unlock(&transaction_lock);
-+
-+	return ret;
-+}
-+
-+/**
-+ * rpi_firmware_property_list - Submit firmware property list
-+ * @of_node:	Pointer to the firmware Device Tree node.
-+ * @data:	Buffer holding tags.
-+ * @tag_size:	Size of tags buffer.
-+ *
-+ * Submits a set of concatenated tags to the VPU firmware through the
-+ * mailbox property interface.
-+ *
-+ * The buffer header and the ending tag are added by this function and
-+ * don't need to be supplied, just the actual tags for your operation.
-+ * See struct rpi_firmware_property_tag_header for the per-tag
-+ * structure.
-+ */
-+int rpi_firmware_property_list(struct device_node *of_node,
-+			       void *data, size_t tag_size)
-+{
-+	struct platform_device *pdev = of_find_device_by_node(of_node);
-+	struct rpi_firmware *fw = platform_get_drvdata(pdev);
-+	size_t size = tag_size + 12;
-+	u32 *buf;
-+	dma_addr_t bus_addr;
-+	int ret = 0;
-+
-+	if (!fw)
-+		return -EPROBE_DEFER;
-+
-+	/* Packets are processed a dword at a time. */
-+	if (size & 3)
-+		return -EINVAL;
-+
-+	buf = dma_alloc_coherent(fw->cl.dev, PAGE_ALIGN(size), &bus_addr,
-+				 GFP_ATOMIC);
-+	if (!buf)
-+		return -ENOMEM;
-+
-+	/* The firmware will error out without parsing in this case. */
-+	WARN_ON(size >= 1024 * 1024);
-+
-+	buf[0] = size;
-+	buf[1] = RPI_FIRMWARE_STATUS_REQUEST;
-+	memcpy(&buf[2], data, tag_size);
-+	buf[size / 4 - 1] = RPI_FIRMWARE_PROPERTY_END;
-+	wmb();
-+
-+	ret = rpi_firmware_transaction(fw, MBOX_CHAN_PROPERTY, bus_addr);
-+
-+	rmb();
-+	memcpy(data, &buf[2], tag_size);
-+	if (ret == 0 && buf[1] != RPI_FIRMWARE_STATUS_SUCCESS) {
-+		/*
-+		 * The tag name here might not be the one causing the
-+		 * error, if there were multiple tags in the request.
-+		 * But single-tag is the most common, so go with it.
-+		 */
-+		dev_err(fw->cl.dev, "Request 0x%08x returned status 0x%08x\n",
-+			buf[2], buf[1]);
-+		ret = -EINVAL;
-+	}
-+
-+	dma_free_coherent(fw->cl.dev, PAGE_ALIGN(size), buf, bus_addr);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(rpi_firmware_property_list);
-+
-+/**
-+ * rpi_firmware_property - Submit single firmware property
-+ * @of_node:	Pointer to the firmware Device Tree node.
-+ * @tag:	One of enum_mbox_property_tag.
-+ * @tag_data:	Tag data buffer.
-+ * @buf_size:	Buffer size.
-+ *
-+ * Submits a single tag to the VPU firmware through the mailbox
-+ * property interface.
-+ *
-+ * This is a convenience wrapper around
-+ * rpi_firmware_property_list() to avoid some of the
-+ * boilerplate in property calls.
-+ */
-+int rpi_firmware_property(struct device_node *of_node,
-+			  u32 tag, void *tag_data, size_t buf_size)
-+{
-+	/* Single tags are very small (generally 8 bytes), so the
-+	 * stack should be safe.
-+	 */
-+	u8 data[buf_size + sizeof(struct rpi_firmware_property_tag_header)];
-+	struct rpi_firmware_property_tag_header *header =
-+		(struct rpi_firmware_property_tag_header *)data;
-+	int ret;
-+
-+	header->tag = tag;
-+	header->buf_size = buf_size;
-+	header->req_resp_size = 0;
-+	memcpy(data + sizeof(struct rpi_firmware_property_tag_header),
-+	       tag_data, buf_size);
-+
-+	ret = rpi_firmware_property_list(of_node, &data, sizeof(data));
-+	memcpy(tag_data,
-+	       data + sizeof(struct rpi_firmware_property_tag_header),
-+	       buf_size);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(rpi_firmware_property);
-+
-+static int rpi_firmware_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct rpi_firmware *fw;
-+
-+	fw = devm_kzalloc(dev, sizeof(*fw), GFP_KERNEL);
-+	if (!fw)
-+		return -ENOMEM;
-+
-+	fw->cl.dev = dev;
-+	fw->cl.rx_callback = response_callback;
-+	fw->cl.tx_block = true;
-+
-+	fw->chan = mbox_request_channel(&fw->cl, 0);
-+	if (IS_ERR(fw->chan)) {
-+		int ret = PTR_ERR(fw->chan);
-+		if (ret != -EPROBE_DEFER)
-+			dev_err(dev, "Failed to get mbox channel: %d\n", ret);
-+		return ret;
-+	}
-+
-+	init_completion(&fw->c);
-+
-+	dev_info(dev, "Firmware driver\n");
-+	platform_set_drvdata(pdev, fw);
-+
-+	return 0;
-+}
-+
-+static int rpi_firmware_remove(struct platform_device *pdev)
-+{
-+	struct rpi_firmware *fw = platform_get_drvdata(pdev);
-+
-+	mbox_free_channel(fw->chan);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id rpi_firmware_of_match[] = {
-+	{ .compatible = "raspberrypi,firmware", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, rpi_firmware_of_match);
-+
-+static struct platform_driver rpi_firmware_driver = {
-+	.driver = {
-+		.name = "raspberrypi-firmware",
-+		.owner = THIS_MODULE,
-+		.of_match_table = rpi_firmware_of_match,
-+	},
-+	.probe		= rpi_firmware_probe,
-+	.remove		= rpi_firmware_remove,
-+};
-+module_platform_driver(rpi_firmware_driver);
-+
-+MODULE_AUTHOR("Eric Anholt <eric@anholt.net>");
-+MODULE_DESCRIPTION("Raspberry Pi firmware driver");
-+MODULE_LICENSE("GPL v2");
-diff --git a/include/soc/bcm2835/raspberrypi-firmware-property.h b/include/soc/bcm2835/raspberrypi-firmware-property.h
-new file mode 100644
-index 0000000..b007e92
---- /dev/null
-+++ b/include/soc/bcm2835/raspberrypi-firmware-property.h
-@@ -0,0 +1,112 @@
-+/*
-+ *  Copyright ? 2015 Broadcom
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/types.h>
-+#include <linux/of_device.h>
-+
-+enum rpi_firmware_property_status {
-+	RPI_FIRMWARE_STATUS_REQUEST = 0,
-+	RPI_FIRMWARE_STATUS_SUCCESS = 0x80000000,
-+	RPI_FIRMWARE_STATUS_ERROR =   0x80000001,
-+};
-+
-+/**
-+ * struct rpi_firmware_property_tag_header - Firmware property tag header
-+ * @tag:		One of enum_mbox_property_tag.
-+ * @buf_size:		The number of bytes in the value buffer following this
-+ *			struct.
-+ * @req_resp_size:	On submit, the length of the request (though it doesn't
-+ *			appear to be currently used by the firmware).  On return,
-+ *			the length of the response (always 4 byte aligned), with
-+ *			the low bit set.
-+ */
-+struct rpi_firmware_property_tag_header {
-+	u32 tag;
-+	u32 buf_size;
-+	u32 req_resp_size;
-+};
-+
-+enum rpi_firmware_property_tag {
-+	RPI_FIRMWARE_PROPERTY_END =                           0,
-+	RPI_FIRMWARE_GET_FIRMWARE_REVISION =                  0x00000001,
-+
-+	RPI_FIRMWARE_SET_CURSOR_INFO =                        0x00008010,
-+	RPI_FIRMWARE_SET_CURSOR_STATE =                       0x00008011,
-+
-+	RPI_FIRMWARE_GET_BOARD_MODEL =                        0x00010001,
-+	RPI_FIRMWARE_GET_BOARD_REVISION =                     0x00010002,
-+	RPI_FIRMWARE_GET_BOARD_MAC_ADDRESS =                  0x00010003,
-+	RPI_FIRMWARE_GET_BOARD_SERIAL =                       0x00010004,
-+	RPI_FIRMWARE_GET_ARM_MEMORY =                         0x00010005,
-+	RPI_FIRMWARE_GET_VC_MEMORY =                          0x00010006,
-+	RPI_FIRMWARE_GET_CLOCKS =                             0x00010007,
-+	RPI_FIRMWARE_GET_POWER_STATE =                        0x00020001,
-+	RPI_FIRMWARE_GET_TIMING =                             0x00020002,
-+	RPI_FIRMWARE_SET_POWER_STATE =                        0x00028001,
-+	RPI_FIRMWARE_GET_CLOCK_STATE =                        0x00030001,
-+	RPI_FIRMWARE_GET_CLOCK_RATE =                         0x00030002,
-+	RPI_FIRMWARE_GET_VOLTAGE =                            0x00030003,
-+	RPI_FIRMWARE_GET_MAX_CLOCK_RATE =                     0x00030004,
-+	RPI_FIRMWARE_GET_MAX_VOLTAGE =                        0x00030005,
-+	RPI_FIRMWARE_GET_TEMPERATURE =                        0x00030006,
-+	RPI_FIRMWARE_GET_MIN_CLOCK_RATE =                     0x00030007,
-+	RPI_FIRMWARE_GET_MIN_VOLTAGE =                        0x00030008,
-+	RPI_FIRMWARE_GET_TURBO =                              0x00030009,
-+	RPI_FIRMWARE_GET_MAX_TEMPERATURE =                    0x0003000a,
-+	RPI_FIRMWARE_ALLOCATE_MEMORY =                        0x0003000c,
-+	RPI_FIRMWARE_LOCK_MEMORY =                            0x0003000d,
-+	RPI_FIRMWARE_UNLOCK_MEMORY =                          0x0003000e,
-+	RPI_FIRMWARE_RELEASE_MEMORY =                         0x0003000f,
-+	RPI_FIRMWARE_EXECUTE_CODE =                           0x00030010,
-+	RPI_FIRMWARE_EXECUTE_QPU =                            0x00030011,
-+	RPI_FIRMWARE_SET_ENABLE_QPU =                         0x00030012,
-+	RPI_FIRMWARE_GET_DISPMANX_RESOURCE_MEM_HANDLE =       0x00030014,
-+	RPI_FIRMWARE_GET_EDID_BLOCK =                         0x00030020,
-+	RPI_FIRMWARE_SET_CLOCK_STATE =                        0x00038001,
-+	RPI_FIRMWARE_SET_CLOCK_RATE =                         0x00038002,
-+	RPI_FIRMWARE_SET_VOLTAGE =                            0x00038003,
-+	RPI_FIRMWARE_SET_TURBO =                              0x00038009,
-+
-+	/* Dispmanx TAGS */
-+	RPI_FIRMWARE_FRAMEBUFFER_ALLOCATE =                   0x00040001,
-+	RPI_FIRMWARE_FRAMEBUFFER_BLANK =                      0x00040002,
-+	RPI_FIRMWARE_FRAMEBUFFER_GET_PHYSICAL_WIDTH_HEIGHT =  0x00040003,
-+	RPI_FIRMWARE_FRAMEBUFFER_GET_VIRTUAL_WIDTH_HEIGHT =   0x00040004,
-+	RPI_FIRMWARE_FRAMEBUFFER_GET_DEPTH =                  0x00040005,
-+	RPI_FIRMWARE_FRAMEBUFFER_GET_PIXEL_ORDER =            0x00040006,
-+	RPI_FIRMWARE_FRAMEBUFFER_GET_ALPHA_MODE =             0x00040007,
-+	RPI_FIRMWARE_FRAMEBUFFER_GET_PITCH =                  0x00040008,
-+	RPI_FIRMWARE_FRAMEBUFFER_GET_VIRTUAL_OFFSET =         0x00040009,
-+	RPI_FIRMWARE_FRAMEBUFFER_GET_OVERSCAN =               0x0004000a,
-+	RPI_FIRMWARE_FRAMEBUFFER_GET_PALETTE =                0x0004000b,
-+	RPI_FIRMWARE_FRAMEBUFFER_RELEASE =                    0x00048001,
-+	RPI_FIRMWARE_FRAMEBUFFER_TEST_PHYSICAL_WIDTH_HEIGHT = 0x00044003,
-+	RPI_FIRMWARE_FRAMEBUFFER_TEST_VIRTUAL_WIDTH_HEIGHT =  0x00044004,
-+	RPI_FIRMWARE_FRAMEBUFFER_TEST_DEPTH =                 0x00044005,
-+	RPI_FIRMWARE_FRAMEBUFFER_TEST_PIXEL_ORDER =           0x00044006,
-+	RPI_FIRMWARE_FRAMEBUFFER_TEST_ALPHA_MODE =            0x00044007,
-+	RPI_FIRMWARE_FRAMEBUFFER_TEST_VIRTUAL_OFFSET =        0x00044009,
-+	RPI_FIRMWARE_FRAMEBUFFER_TEST_OVERSCAN =              0x0004400a,
-+	RPI_FIRMWARE_FRAMEBUFFER_TEST_PALETTE =               0x0004400b,
-+	RPI_FIRMWARE_FRAMEBUFFER_SET_PHYSICAL_WIDTH_HEIGHT =  0x00048003,
-+	RPI_FIRMWARE_FRAMEBUFFER_SET_VIRTUAL_WIDTH_HEIGHT =   0x00048004,
-+	RPI_FIRMWARE_FRAMEBUFFER_SET_DEPTH =                  0x00048005,
-+	RPI_FIRMWARE_FRAMEBUFFER_SET_PIXEL_ORDER =            0x00048006,
-+	RPI_FIRMWARE_FRAMEBUFFER_SET_ALPHA_MODE =             0x00048007,
-+	RPI_FIRMWARE_FRAMEBUFFER_SET_VIRTUAL_OFFSET =         0x00048009,
-+	RPI_FIRMWARE_FRAMEBUFFER_SET_OVERSCAN =               0x0004800a,
-+	RPI_FIRMWARE_FRAMEBUFFER_SET_PALETTE =                0x0004800b,
-+
-+	RPI_FIRMWARE_GET_COMMAND_LINE =                       0x00050001,
-+	RPI_FIRMWARE_GET_DMA_CHANNELS =                       0x00060001,
-+};
-+
-+int rpi_firmware_property(struct device_node *of_node,
-+			  u32 tag, void *data, size_t len);
-+int rpi_firmware_property_list(struct device_node *of_node,
-+			       void *data, size_t tag_size);
--- 
-2.1.4
+The patchset works, but it still needs some review eyeballs.
+There might be a rename to variants or something.
+
+You were part of that thread too :)
+
+I think it?s best if we go this path instead of twiddling with the
+status properties manually. Conceptually the idea is similar to
+the detection of the white/black, with the added joy of revision
+detection.
+
+Ain?t hardware designers a fun bunch or what?
+
+> Regards,
+> 
+> Tony
+
+Regards
+
+? Pantelis
