@@ -1,264 +1,70 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 18 May 2015 14:58:14 +0200
-Subject: [PATCH v6 08/25] iommu: exynos: refactor function parameters to
- simplify code
-In-Reply-To: <20150510222712.a955a6d326698ba5a09c6fe7@samsung.com>
-References: <1430727380-10912-1-git-send-email-m.szyprowski@samsung.com>
- <1430727380-10912-9-git-send-email-m.szyprowski@samsung.com>
- <20150510222712.a955a6d326698ba5a09c6fe7@samsung.com>
-Message-ID: <5559E1E6.8090407@samsung.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Mon, 18 May 2015 20:59:10 +0800
+Subject: [PATCH 00/11] Add self-probe infrastructure and stacked irqdomain
+ support for ACPI based GICv2/3 init
+Message-ID: <1431953961-22706-1-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This patch set introduce self-probe infrastructure to init IRQ
+controllers and stacked irqdomain support for ACPI based GICv2/3
+init.
 
-On 2015-05-10 15:27, Cho KyongHo wrote:
-> On Mon, 04 May 2015 10:16:03 +0200 Marek Szyprowski <m.szyprowski@samsung.com> wrote:
->
->> This patch simplifies the code by:
->> - refactoring function parameters from struct device pointer to direct
->>    pointer to struct sysmmu drvdata
->> - moving list_head enteries from struct exynos_iommu_owner directly to
->>    struct sysmmu_drvdata
->>
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> ---
->>   drivers/iommu/exynos-iommu.c | 93 ++++++++++++++++++++++----------------------
->>   1 file changed, 46 insertions(+), 47 deletions(-)
->>
->> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
->> index c307c400613c..0c23b69022cd 100644
->> --- a/drivers/iommu/exynos-iommu.c
->> +++ b/drivers/iommu/exynos-iommu.c
->> @@ -186,8 +186,6 @@ static char *sysmmu_fault_name[SYSMMU_FAULTS_NUM] = {
->>   
->>   /* attached to dev.archdata.iommu of the master device */
->>   struct exynos_iommu_owner {
->> -	struct list_head client; /* entry of exynos_iommu_domain.clients */
->> -	struct device *dev;
->>   	struct device *sysmmu;
->>   };
->>   
->> @@ -209,6 +207,7 @@ struct sysmmu_drvdata {
->>   	int activations;
->>   	spinlock_t lock;
->>   	struct iommu_domain *domain;
->> +	struct list_head domain_node;
->>   	phys_addr_t pgtable;
->>   	int version;
->>   };
->> @@ -514,12 +513,10 @@ static void __sysmmu_tlb_invalidate_flpdcache(struct sysmmu_drvdata *data,
->>   		__raw_writel(iova | 0x1, data->sfrbase + REG_MMU_FLUSH_ENTRY);
->>   }
->>   
->> -static void sysmmu_tlb_invalidate_flpdcache(struct device *dev,
->> +static void sysmmu_tlb_invalidate_flpdcache(struct sysmmu_drvdata *data,
->>   					    sysmmu_iova_t iova)
->>   {
->>   	unsigned long flags;
->> -	struct exynos_iommu_owner *owner = dev->archdata.iommu;
->> -	struct sysmmu_drvdata *data = dev_get_drvdata(owner->sysmmu);
->>   
->>   	if (!IS_ERR(data->clk_master))
->>   		clk_enable(data->clk_master);
->> @@ -533,14 +530,10 @@ static void sysmmu_tlb_invalidate_flpdcache(struct device *dev,
->>   		clk_disable(data->clk_master);
->>   }
->>   
->> -static void sysmmu_tlb_invalidate_entry(struct device *dev, sysmmu_iova_t iova,
->> -					size_t size)
->> +static void sysmmu_tlb_invalidate_entry(struct sysmmu_drvdata *data,
->> +					sysmmu_iova_t iova, size_t size)
->>   {
->> -	struct exynos_iommu_owner *owner = dev->archdata.iommu;
->>   	unsigned long flags;
->> -	struct sysmmu_drvdata *data;
->> -
->> -	data = dev_get_drvdata(owner->sysmmu);
->>   
->>   	spin_lock_irqsave(&data->lock, flags);
->>   	if (is_sysmmu_active(data)) {
->> @@ -570,8 +563,8 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, sysmmu_iova_t iova,
->>   		if (!IS_ERR(data->clk_master))
->>   			clk_disable(data->clk_master);
->>   	} else {
->> -		dev_dbg(dev, "disabled. Skipping TLB invalidation @ %#x\n",
->> -			iova);
->> +		dev_dbg(data->master,
->> +			"disabled. Skipping TLB invalidation @ %#x\n", iova);
->>   	}
->>   	spin_unlock_irqrestore(&data->lock, flags);
->>   }
->> @@ -711,7 +704,7 @@ err_pgtable:
->>   static void exynos_iommu_domain_free(struct iommu_domain *domain)
->>   {
->>   	struct exynos_iommu_domain *priv = to_exynos_domain(domain);
->> -	struct exynos_iommu_owner *owner;
->> +	struct sysmmu_drvdata *data;
->>   	unsigned long flags;
->>   	int i;
->>   
->> @@ -719,14 +712,12 @@ static void exynos_iommu_domain_free(struct iommu_domain *domain)
->>   
->>   	spin_lock_irqsave(&priv->lock, flags);
->>   
->> -	list_for_each_entry(owner, &priv->clients, client) {
->> -		while (!exynos_sysmmu_disable(owner->dev))
->> -			; /* until System MMU is actually disabled */
->> +	list_for_each_entry(data, &priv->clients, domain_node) {
-> Use list_for_each_entry_safe() or you will get panic.
+The self-probe infrastructure for ACPI GIC init is similar as
+IRQCHIP_DECLARE() and based on the GIC version support in ACPI
+MADT table.
 
-Right.
+We introduce acpi_irq_domain for GICv2/3 core domain to support
+stacked irqdomain, and pass the gsi (global system interrupt) as
+the agument (void *arg) for gic_irq_domain_alloc(), then we can
+alloc virqs via acpi_register_gsi() with stacked irqdomain.
 
->
->> +		if (__sysmmu_disable(data))
->> +			data->master = NULL;
->> +		list_del_init(&data->domain_node);
->>   	}
->>   
->> -	while (!list_empty(&priv->clients))
->> -		list_del_init(priv->clients.next);
->> -
->>   	spin_unlock_irqrestore(&priv->lock, flags);
->>   
->>   	for (i = 0; i < NUM_LV1ENTRIES; i++)
->> @@ -744,20 +735,26 @@ static int exynos_iommu_attach_device(struct iommu_domain *domain,
->>   {
->>   	struct exynos_iommu_owner *owner = dev->archdata.iommu;
->>   	struct exynos_iommu_domain *priv = to_exynos_domain(domain);
->> +	struct sysmmu_drvdata *data;
->>   	phys_addr_t pagetable = virt_to_phys(priv->pgtable);
->>   	unsigned long flags;
->> -	int ret;
->> +	int ret = -ENODEV;
->>   
->> -	spin_lock_irqsave(&priv->lock, flags);
->> +	if (!has_sysmmu(dev))
->> +		return -ENODEV;
->>   
->> -	ret = __exynos_sysmmu_enable(dev, pagetable, domain);
->> -	if (ret == 0) {
->> -		list_add_tail(&owner->client, &priv->clients);
->> -		owner->domain = domain;
->> +	data = dev_get_drvdata(owner->sysmmu);
->> +	if (data) {
-> Is there a case that a probed System MMU without driver data?
+In order to make ACPI related GIC init code slef-contained, I
+consolidated all the GIC init code into drivers/irqchip/irq-gic-acpi.c.
 
-It is better to have one more safety check than to debug strange issues 
-later in
-the future.
+update from RFC version:
+ - Consolidate all the GIC init code into drivers/irqchip/irq-gic-acpi.c
 
->
->> +		ret = __sysmmu_enable(data, pagetable, domain);
->> +		if (ret >= 0) {
->> +			data->master = dev;
->> +
->> +			spin_lock_irqsave(&priv->lock, flags);
->> +			list_add_tail(&data->domain_node, &priv->clients);
->> +			spin_unlock_irqrestore(&priv->lock, flags);
->> +		}
->>   	}
->>   
->> -	spin_unlock_irqrestore(&priv->lock, flags);
->> -
->>   	if (ret < 0) {
->>   		dev_err(dev, "%s: Failed to attach IOMMU with pgtable %pa\n",
->>   					__func__, &pagetable);
->> @@ -773,26 +770,29 @@ static int exynos_iommu_attach_device(struct iommu_domain *domain,
->>   static void exynos_iommu_detach_device(struct iommu_domain *domain,
->>   				    struct device *dev)
->>   {
->> -	struct exynos_iommu_owner *owner;
->>   	struct exynos_iommu_domain *priv = to_exynos_domain(domain);
->>   	phys_addr_t pagetable = virt_to_phys(priv->pgtable);
->> +	struct sysmmu_drvdata *data;
->>   	unsigned long flags;
->> +	bool found = false;
->>   
->> -	spin_lock_irqsave(&priv->lock, flags);
->> +	if (!has_sysmmu(dev))
->> +		return;
->>   
->> -	list_for_each_entry(owner, &priv->clients, client) {
->> -		if (owner == dev->archdata.iommu) {
->> -			if (exynos_sysmmu_disable(dev)) {
->> -				list_del_init(&owner->client);
->> -				owner->domain = NULL;
->> +	spin_lock_irqsave(&priv->lock, flags);
->> +	list_for_each_entry(data, &priv->clients, domain_node) {
->> +		if (data->master == dev) {
->> +			if (__sysmmu_disable(data)) {
->> +				data->master = NULL;
->> +				list_del_init(&data->domain_node);
->>   			}
->> +			found = true;
->>   			break;
->>   		}
->>   	}
->> -
->>   	spin_unlock_irqrestore(&priv->lock, flags);
->>   
->> -	if (owner == dev->archdata.iommu)
->> +	if (found)
->>   		dev_dbg(dev, "%s: Detached IOMMU with pgtable %pa\n",
->>   					__func__, &pagetable);
->>   	else
->> @@ -839,12 +839,11 @@ static sysmmu_pte_t *alloc_lv2entry(struct exynos_iommu_domain *priv,
->>   		 * not currently mapped.
->>   		 */
->>   		if (need_flush_flpd_cache) {
->> -			struct exynos_iommu_owner *owner;
->> +			struct sysmmu_drvdata *data;
->>   
->>   			spin_lock(&priv->lock);
->> -			list_for_each_entry(owner, &priv->clients, client)
->> -				sysmmu_tlb_invalidate_flpdcache(
->> -							owner->dev, iova);
->> +			list_for_each_entry(data, &priv->clients, domain_node)
->> +				sysmmu_tlb_invalidate_flpdcache(data, iova);
->>   			spin_unlock(&priv->lock);
->>   		}
->>   	}
->> @@ -879,13 +878,13 @@ static int lv1set_section(struct exynos_iommu_domain *priv,
->>   
->>   	spin_lock(&priv->lock);
->>   	if (lv1ent_page_zero(sent)) {
->> -		struct exynos_iommu_owner *owner;
->> +		struct sysmmu_drvdata *data;
->>   		/*
->>   		 * Flushing FLPD cache in System MMU v3.3 that may cache a FLPD
->>   		 * entry by speculative prefetch of SLPD which has no mapping.
->>   		 */
->> -		list_for_each_entry(owner, &priv->clients, client)
->> -			sysmmu_tlb_invalidate_flpdcache(owner->dev, iova);
->> +		list_for_each_entry(data, &priv->clients, domain_node)
->> +			sysmmu_tlb_invalidate_flpdcache(data, iova);
->>   	}
->>   	spin_unlock(&priv->lock);
->>   
->> @@ -990,13 +989,13 @@ static int exynos_iommu_map(struct iommu_domain *domain, unsigned long l_iova,
->>   static void exynos_iommu_tlb_invalidate_entry(struct exynos_iommu_domain *priv,
->>   						sysmmu_iova_t iova, size_t size)
->>   {
->> -	struct exynos_iommu_owner *owner;
->> +	struct sysmmu_drvdata *data;
->>   	unsigned long flags;
->>   
->>   	spin_lock_irqsave(&priv->lock, flags);
->>   
->> -	list_for_each_entry(owner, &priv->clients, client)
->> -		sysmmu_tlb_invalidate_entry(owner->dev, iova, size);
->> +	list_for_each_entry(data, &priv->clients, domain_node)
->> +		sysmmu_tlb_invalidate_entry(data, iova, size);
->>   
->>   	spin_unlock_irqrestore(&priv->lock, flags);
->>   }
->> -- 
->> 1.9.2
->>
->
+Hanjun Guo (8):
+  irqchip / GIC: Add GIC version support in ACPI MADT
+  irqchip / GIC / ACPI: Use IRQCHIP_ACPI_DECLARE to simplify GICv2 init
+    code
+  irqchip / gic: Add stacked irqdomain support for ACPI based GICv2 init
+  ACPI / gsi: Add gsi_mutex to synchronize
+    acpi_register_gsi()/acpi_unregister_gsi()
+  irqchip / GICv3: Add ACPI support for GICv3+ initialization
+  irqchip / GICv3: Add stacked irqdomain support for ACPI based init
+  irqchip / GICv2 / ACPI: Consolidate GICv2 ACPI related init code
+  irqchip / GICv3 / ACPI: Consolidate GICv3 ACPI related init code
 
-Best regards
+Tomasz Nowicki (3):
+  ACPICA: Introduce GIC version for arm based system
+  ACPI / irqchip: Add self-probe infrastructure to initialize IRQ
+    controller
+  irqchip / GICv3: Refactor gic_of_init() for GICv3 driver
+
+ arch/arm64/Kconfig                   |   1 +
+ arch/arm64/include/asm/irq.h         |  13 --
+ arch/arm64/kernel/acpi.c             |  25 ---
+ drivers/acpi/Makefile                |   1 +
+ drivers/acpi/gsi.c                   |  41 +++--
+ drivers/acpi/irq.c                   |  40 +++++
+ drivers/irqchip/Kconfig              |   3 +
+ drivers/irqchip/Makefile             |   1 +
+ drivers/irqchip/irq-gic-acpi.c       | 318 +++++++++++++++++++++++++++++++++++
+ drivers/irqchip/irq-gic-v3.c         | 149 +++++++++-------
+ drivers/irqchip/irq-gic.c            | 129 ++------------
+ drivers/irqchip/irqchip.h            |  12 ++
+ include/acpi/actbl1.h                |  17 +-
+ include/asm-generic/vmlinux.lds.h    |  13 ++
+ include/linux/acpi.h                 |  14 ++
+ include/linux/acpi_irq.h             |   4 +-
+ include/linux/irqchip/arm-gic-acpi.h |  13 +-
+ include/linux/irqchip/arm-gic-v3.h   |  10 ++
+ include/linux/mod_devicetable.h      |   7 +
+ 19 files changed, 577 insertions(+), 234 deletions(-)
+ create mode 100644 drivers/acpi/irq.c
+ create mode 100644 drivers/irqchip/irq-gic-acpi.c
+
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+1.9.1
