@@ -1,58 +1,34 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 18 May 2015 15:12:39 +0200
-Subject: [GIT PULL] Xilinx Zynq changes for v4.2
-Message-ID: <5559E547.6090109@monstr.eu>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 18 May 2015 08:18:00 -0500
+Subject: [PATCH v4 0/6] SA1100/PXA RTC clean-up
+In-Reply-To: <87pp62jdpj.fsf@belgarion.home>
+References: <1431529350-4597-1-git-send-email-robh@kernel.org>
+ <87pp62jdpj.fsf@belgarion.home>
+Message-ID: <CAL_JsqJ-VMQHXFF9Gxf5mmPjYXZ6gyktYFjgvxAHRx-Kmuoq8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, May 15, 2015 at 6:13 AM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> Rob Herring <robh@kernel.org> writes:
+>
+>> A git branch is here[4]. I've tested sa1100-rtc on PXA1928. I need help
+>> testing on PXA27x/3xx.
+> Hi Rob,
+>
+> I tested on PXA27x. It works for the boards which used pxa-rtc.
+> For the others, their defconfig become broken, because the pxa boards with
+> sa1100-rtc do not work anymore. And of course no .config manipulation will fix
+> this, because PXA architecture is denied the sa1100-rtc driver.
 
-please pull these two patches to your tree.
+Ah, I didn't realize there is a mixture of use.
 
-Thanks,
-Michal
+I could just do something like this instead of removing
+sa1100_device_rtc registration:
 
-The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+#ifndef CONFIG_RTC_DRV_PXA
+       &sa1100_device_rtc,
+#else
+        &pxa_device_rtc,
+#endif
 
-  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
-
-are available in the git repository at:
-
-  https://github.com/Xilinx/linux-xlnx.git tags/zynq-soc-for-4.2
-
-for you to fetch changes up to ef6ca1a84a3da9bf45d31399090153e00fc6cd68:
-
-  ARM: zynq: Drop use of slcr_unlock in zynq_slcr_system_restart
-(2015-05-18 14:46:37 +0200)
-
-----------------------------------------------------------------
-arm: Xilinx Zynq SoC patches for v4.2
-
-- Change SoC reset path
-- Fix SLCR unlock scheme
-
-----------------------------------------------------------------
-Josh Cartwright (2):
-      ARM: zynq: Use restart_handler mechanism for slcr reset
-      ARM: zynq: Drop use of slcr_unlock in zynq_slcr_system_restart
-
- arch/arm/mach-zynq/common.c |  6 ------
- arch/arm/mach-zynq/common.h |  1 -
- arch/arm/mach-zynq/slcr.c   | 28 +++++++++++++++++++---------
- 3 files changed, 19 insertions(+), 16 deletions(-)
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150518/a12f3ec5/attachment.sig>
+Rob
