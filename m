@@ -1,177 +1,69 @@
-From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Mon, 18 May 2015 21:07:42 +0800
-Subject: [PATCH v2] clk: mediatek: Export CPU mux clocks for CPU frequency
- control
-In-Reply-To: <20150515190058.GN31753@codeaurora.org>
-References: <1429521950-16431-1-git-send-email-pi-cheng.chen@linaro.org>
- <20150515190058.GN31753@codeaurora.org>
-Message-ID: <CALx668UqfAjf+x94qGX+LiuSDX+o+k5OAD5qPn35ykgK3hGtVQ@mail.gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Mon, 18 May 2015 21:08:27 +0800
+Subject: [Patch v3 5/7] PCI/ACPI: Consolidate common PCI host bridge code
+ into ACPI core
+In-Reply-To: <1431593803-5213-6-git-send-email-jiang.liu@linux.intel.com>
+References: <1431593803-5213-1-git-send-email-jiang.liu@linux.intel.com>
+ <1431593803-5213-6-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <5559E44B.2010702@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi Jiang,
 
-On Sat, May 16, 2015 at 3:00 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 04/20, pi-cheng.chen wrote:
->> Signed-off-by: pi-cheng.chen <pi-cheng.chen@linaro.org>
->> diff --git a/drivers/clk/mediatek/clk-cpumux.c b/drivers/clk/mediatek/clk-cpumux.c
->> new file mode 100644
->> index 0000000..dc14074
->> --- /dev/null
->> +++ b/drivers/clk/mediatek/clk-cpumux.c
->> @@ -0,0 +1,122 @@
->> +/*
->> + * Copyright (c) 2015 Linaro Ltd.
->> + * Author: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include <linux/clk.h>
->
-> Do you need this include for some reason?
+On 2015?05?14? 16:56, Jiang Liu wrote:
+> Introduce common interface acpi_pci_root_create() and related data
+> structures to create PCI root bus for ACPI PCI host bridges. It will
+> be used to kill duplicated arch specific code for IA64 and x86. It may
+> also help ARM64 in future.
 
-No. I think I forgot to remove it after adding it for some debugging purpose.
-Will remove it.
+As I commented in previous version, this patch will introduce
+compile error on ACPI enabled ARM64 kernel because struct
+pci_controller is not defined for ARM64, so how about adding
+the following patch before this patch, or squash to this one,
+does it make sense?
 
->
->> +#include <linux/clk-provider.h>
->> +#include <linux/mfd/syscon.h>
->> +#include <linux/slab.h>
->> +
->> +#include "clk-mtk.h"
->> +#include "clk-cpumux.h"
->> +
-> [...]
->> +
->> +static struct clk_ops clk_cpumux_ops = {
->
-> const?
+ From 11d0e98154e681e75936698208398cb4dcd73632 Mon Sep 17 00:00:00 2001
+From: Hanjun Guo <hanjun.guo@linaro.org>
+Date: Mon, 18 May 2015 19:41:56 +0800
+Subject: [PATCH] ARM64 / PCI: introduce struct pci_controller for ACPI
 
-Yes. Will add it.
+ARM64 ACPI based PCI host bridge init needs a arch dependent
+struct pci_controller to accommodate common PCI host bridge
+code which is introduced later, or it will lead to compile
+errors on ARM64.
 
->
->> +     .get_parent = clk_cpumux_get_parent,
->> +     .set_parent = clk_cpumux_set_parent,
->> +};
->> +
->> +static struct clk *mtk_clk_register_cpumux(const struct mtk_composite *mux,
->> +                                        struct regmap *regmap)
->> +{
->> +     struct mtk_clk_cpumux *cpumux;
->> +     struct clk *clk;
->> +     struct clk_init_data init;
->> +
->> +     cpumux = kzalloc(sizeof(*cpumux), GFP_KERNEL);
->> +     if (!cpumux)
->> +             return ERR_PTR(-ENOMEM);
->> +
->> +     init.name = mux->name;
->> +     init.ops = &clk_cpumux_ops;
->> +     init.parent_names = mux->parent_names;
->> +     init.num_parents = mux->num_parents;
->> +
->> +     cpumux->reg = mux->mux_reg;
->> +     cpumux->shift = mux->mux_shift;
->> +     cpumux->mask = (BIT(mux->mux_width) - 1);
->
-> Unnecessary parenthesis.
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+CC: Liviu Dudau <Liviu.Dudau@arm.com>
+CC: Will Deacon <will.deacon@arm.com>
+CC: Catalin Marinas <catalin.marinas@arm.com>
+CC: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
+CC: Arnd Bergmann <arnd@arndb.de>
+---
+  arch/arm64/include/asm/pci.h | 10 ++++++++++
+  1 file changed, 10 insertions(+)
 
-Will fix it.
+diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
+index b008a72..7088495 100644
+--- a/arch/arm64/include/asm/pci.h
++++ b/arch/arm64/include/asm/pci.h
+@@ -10,6 +10,16 @@
+  #include <asm-generic/pci-bridge.h>
+  #include <asm-generic/pci-dma-compat.h>
 
->
->> +     cpumux->regmap = regmap;
->> +     cpumux->hw.init = &init;
->> +
->> +     clk = clk_register(NULL, &cpumux->hw);
->> +     if (IS_ERR(clk))
->> +             kfree(cpumux);
->> +
->> +     return clk;
->> +}
->> +
->> +int mtk_clk_register_cpumuxes(struct device_node *node,
->> +                           const struct mtk_composite *clks, int num,
->> +                           struct clk_onecell_data *clk_data)
->> +{
->> +     int i;
->> +     struct clk *clk;
->> +     struct regmap *regmap;
->> +
->> +     if (!clk_data)
->> +             return -ENOMEM;
->
-> Why would we call the function with NULL clk_data? Please remove
-> this check.
++struct acpi_device;
++
++struct pci_controller {
++#ifdef CONFIG_ACPI
++       struct acpi_device *companion;  /* ACPI companion device */
++#endif
++       int             segment;        /* PCI domain */
++       int             node;           /* NUMA node */
++};
++
+  #define PCIBIOS_MIN_IO         0x1000
+  #define PCIBIOS_MIN_MEM                0
 
-Will remove it.
 
->
->> +
->> +     regmap = syscon_node_to_regmap(node);
->> +     if (IS_ERR(regmap)) {
->> +             pr_err("Cannot find regmap for %s: %ld\n", node->full_name,
->> +                    PTR_ERR(regmap));
->> +             return PTR_ERR(regmap);
->> +     }
->> +
->> diff --git a/drivers/clk/mediatek/clk-cpumux.h b/drivers/clk/mediatek/clk-cpumux.h
->> new file mode 100644
->> index 0000000..b82ad20
->> --- /dev/null
->> +++ b/drivers/clk/mediatek/clk-cpumux.h
->> @@ -0,0 +1,31 @@
->> +/*
->> + * Copyright (c) 2015 Linaro Ltd.
->> + * Author: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#ifndef __DRV_CLK_CPUMUX_H
->> +#define __DRV_CLK_CPUMUX_H
->> +
->> +#include <linux/regmap.h>
->
-> Looks unnecessary. Just forward declare the type you need, struct
-> regmap.
-
-Yes. Will fix.
-
-Thanks for reviewing.
-
-Best Regards,
-Pi-Cheng
-
->
->> +
->> +struct mtk_clk_cpumux {
->> +     struct clk_hw   hw;
->> +     struct regmap   *regmap;
->> +     u32             reg;
->> +     u32             mask;
->> +     u8              shift;
->> +};
->> +
->> +int mtk_clk_register_cpumuxes(struct device_node *node,
->> +                           const struct mtk_composite *clks, int num,
->> +                           struct clk_onecell_data *clk_data);
->> +#endif /* __DRV_CLK_CPUMUX_H */
->
-> --
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+Thanks
+Hanjun
