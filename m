@@ -1,31 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 May 2015 17:55:16 +0200
-Subject: [PATCH] ARM: uniphier: only select TWD for SMP
-Message-ID: <2227073.rylFc5jIqu@wuerfel>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 18 May 2015 18:01:54 +0200
+Subject: [PATCH v4 3/3] ARM: berlin: add an ADC node for the BG2Q
+In-Reply-To: <55587E28.7070504@kernel.org>
+References: <1431339531-11938-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1431339531-11938-4-git-send-email-antoine.tenart@free-electrons.com>
+ <55587E28.7070504@kernel.org>
+Message-ID: <555A0CF2.7040403@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This makes uniphier behave like all the other platforms that
-support TWD, and only select this driver when SMP is enabled.
-Without this, we get a compile error on UP builds:
+On 17.05.2015 13:40, Jonathan Cameron wrote:
+> On 11/05/15 11:18, Antoine Tenart wrote:
+>> This patch adds the ADC node for the Berlin BG2Q, using the newly added
+>> Berlin IIO ADC driver.
+>>
+>> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+>
+> The driver support will be working it's way through to mainline in the
+> next merge window.  Obviously I 'could' take this through IIO, but not
+> without an appropriate Ack.
+>
+> Hence I'll assume it's going through the arm-soc tree.
 
-arch/arm/kernel/smp_twd.c: In function 'twd_local_timer_of_register':
-arch/arm/kernel/smp_twd.c:391:20: error: 'setup_max_cpus' undeclared (first use in this function)
+The node patch just fits right on top of the branch that reworks
+the existing nodes of chip/system control nodes, i.e. where the
+adc belongs to.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-I'd like to apply this directly to the next/soc branch
+I'll pick the dts patch and will send it as part of the PR later
+this week. As you already applied the driver and binding doc, this
+is rather independent anyway.
 
-diff --git a/arch/arm/mach-uniphier/Kconfig b/arch/arm/mach-uniphier/Kconfig
-index a017b1dd9c78..b640458fd757 100644
---- a/arch/arm/mach-uniphier/Kconfig
-+++ b/arch/arm/mach-uniphier/Kconfig
-@@ -5,7 +5,7 @@ config ARCH_UNIPHIER
- 	select ARM_GLOBAL_TIMER
- 	select ARM_GIC
- 	select HAVE_ARM_SCU
--	select HAVE_ARM_TWD
-+	select HAVE_ARM_TWD if SMP
- 	help
- 	  Support for UniPhier SoC family developed by Socionext Inc.
- 	  (formerly, System LSI Business Division of Panasonic Corporation)
+Sebastian
+
+>> ---
+>>   arch/arm/boot/dts/berlin2q.dtsi | 7 +++++++
+>>   1 file changed, 7 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+>> index 187d056f7ad2..97c7e19e3ec6 100644
+>> --- a/arch/arm/boot/dts/berlin2q.dtsi
+>> +++ b/arch/arm/boot/dts/berlin2q.dtsi
+>> @@ -565,6 +565,13 @@
+>>   						function = "twsi3";
+>>   					};
+>>   				};
+>> +
+>> +				adc: adc {
+>> +					compatible = "marvell,berlin2-adc";
+>> +					interrupt-parent = <&sic>;
+>> +					interrupts = <12>, <14>;
+>> +					interrupt-names = "adc", "tsen";
+>> +				};
+>>   			};
+>>
+>>   			sic: interrupt-controller at e000 {
+>>
+>
