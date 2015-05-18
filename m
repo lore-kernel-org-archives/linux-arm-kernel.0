@@ -1,91 +1,156 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Tue, 19 May 2015 00:35:53 +0200
-Subject: [PATCH v3 0/6] Clk drivers for NXP LPC18xx family
-Message-ID: <1431988559-23338-1-git-send-email-manabian@gmail.com>
+Date: Tue, 19 May 2015 00:35:55 +0200
+Subject: [PATCH v3 2/6] doc: dt: add documentation for lpc1850-cgu clk driver
+In-Reply-To: <1431988559-23338-1-git-send-email-manabian@gmail.com>
+References: <1431988559-23338-1-git-send-email-manabian@gmail.com>
+Message-ID: <1431988559-23338-3-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set adds support for the two main clock peripherals in the
-LPC18xx/43xx MCU family.
+Add DT binding documentation for lpc1850-cgu driver.
 
-The Clock Generation Unit (CGU) is the base source of all clocks. It has
-five external inputs and contains PLLs, dividers and muxes. The outputs
-from the CGU are then routed to a Clock Control Unit (CCU) and a few
-peripherals directly. There are two CCUs in the MCU. The CCU is a
-collection of gates and a few dividers that sits between the CGU and
-most of the peripherals. These clock drivers are needed by the timer at
-early boot so both are using CLK_OF_DECLARE.
-
-Which clocks that are available depends on the specific device and it's
-peripherals. It's possible in DT to setup the routing between the CGU
-and the CCUs.
-
-
-The biggest change in v3 is the way parent names for CCU clocks are
-retrieved. Previous version used names from the 'clock-output-names'
-node on CGU and of_clk_get_parent_name(). In this version the clock
-names has been moved into the CGU driver and are retrieved from the
-CCU driver by of_clk_get() and __clk_get_name().
-
-The of_clk_get_index function is used to map CCU branches to to the
-base clocks by using the CGU ID retrieved with of_clk_get_index. An
-alternative approach would be to put the base clock names directly
-in the CCU driver where the CGU ID is today. See clk_branches table
-in clk-lpc18xx-ccu.c. If this is the prefered way of doing this
-please let me know and I'll quickly put out a new version.
-
-Changes since v2:
- - use 'clock-controller' as node name in doc
- - add patch with of_clk_get_index function
- - drop 'clock-indices' and 'clock-output-names' from cgu node
- - move base clock names into cgu driver
- - use of_clk_get/__clk_get_name in ccu to get parent name for
-   composite clocks.
- - other misc fixes to ccu driver and cgu doc
-
-Changes since v1:
- - reorganize cgu clk structs
- - macros to create cgu clk structs
- - move drivers to nxp subdir
- - rebase on v4.1-rc1
-
-
-The last patch (dts changes) are only included in this patch set for
-illustration purposes. DTS changes will be sent separately to the ARM
-SoC team later.
-
-Base support for LPC18xx is now in arm-soc next. Pinctrl, gpio
-and reset drivers are also upstream.
-
-
-Joachim Eastwood (6):
-  clk: add lpc18xx cgu clk driver
-  doc: dt: add documentation for lpc1850-cgu clk driver
-  clk: add function to retrieve clk id from dt
-  clk: add lpc18xx ccu clk driver
-  doc: dt: add documentation for lpc1850-ccu clk driver
-  ARM: dts: lpc18xx: add clock nodes for cgu and ccu
-
- .../devicetree/bindings/clock/lpc1850-ccu.txt      | 146 +++++
- .../devicetree/bindings/clock/lpc1850-cgu.txt      | 131 +++++
- arch/arm/boot/dts/lpc18xx.dtsi                     |  77 ++-
- arch/arm/boot/dts/lpc4350-hitex-eval.dts           |   4 -
- drivers/clk/Makefile                               |   1 +
- drivers/clk/clk.c                                  |  18 +
- drivers/clk/nxp/Makefile                           |   2 +
- drivers/clk/nxp/clk-lpc18xx-ccu.c                  | 305 ++++++++++
- drivers/clk/nxp/clk-lpc18xx-cgu.c                  | 635 +++++++++++++++++++++
- include/dt-bindings/clock/lpc18xx-ccu.h            |  74 +++
- include/dt-bindings/clock/lpc18xx-cgu.h            |  41 ++
- include/linux/clk-provider.h                       |   1 +
- 12 files changed, 1417 insertions(+), 18 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/lpc1850-ccu.txt
+Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+---
+ .../devicetree/bindings/clock/lpc1850-cgu.txt      | 131 +++++++++++++++++++++
+ 1 file changed, 131 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/clock/lpc1850-cgu.txt
- create mode 100644 drivers/clk/nxp/Makefile
- create mode 100644 drivers/clk/nxp/clk-lpc18xx-ccu.c
- create mode 100644 drivers/clk/nxp/clk-lpc18xx-cgu.c
- create mode 100644 include/dt-bindings/clock/lpc18xx-ccu.h
- create mode 100644 include/dt-bindings/clock/lpc18xx-cgu.h
 
+diff --git a/Documentation/devicetree/bindings/clock/lpc1850-cgu.txt b/Documentation/devicetree/bindings/clock/lpc1850-cgu.txt
+new file mode 100644
+index 000000000000..2cc32a9a945a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/lpc1850-cgu.txt
+@@ -0,0 +1,131 @@
++* NXP LPC1850 Clock Generation Unit (CGU)
++
++The CGU generates multiple independent clocks for the core and the
++peripheral blocks of the LPC18xx. Each independent clock is called
++a base clock and itself is one of the inputs to the two Clock
++Control Units (CCUs) which control the branch clocks to the
++individual peripherals.
++
++The CGU selects the inputs to the clock generators from multiple
++clock sources, controls the clock generation, and routes the outputs
++of the clock generators through the clock source bus to the output
++stages. Each output stage provides an independent clock source and
++corresponds to one of the base clocks for the LPC18xx.
++
++ - Above text taken from NXP LPC1850 User Manual.
++
++
++This binding uses the common clock binding:
++    Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++Required properties:
++- compatible:
++	Should be "nxp,lpc1850-cgu"
++- reg:
++	Shall define the base and range of the address space
++	containing clock control registers
++- #clock-cells:
++	Shall have value <1>.  The permitted clock-specifier values
++	are the base clock numbers defined below.
++- clocks:
++	Shall contain a list of phandles for the external input
++	sources to the CGU. The list shall be in the following
++	order: xtal, 32khz, enet_rx_clk, enet_tx_clk, gp_clkin.
++- clock-indices:
++	Shall be an ordered list of numbers defining the base clock
++	number provided by the CGU.
++- clock-output-names:
++	Shall be an ordered list of strings defining the names of
++	the clocks provided by the CGU.
++
++Which base clocks that are available on the CGU depends on the
++specific LPC part. Base clocks are numbered from 0 to 27.
++
++Number:		Name:			Description:
++ 0		BASE_SAFE_CLK		Base safe clock (always on) for WWDT
++ 1		BASE_USB0_CLK		Base clock for USB0
++ 2		BASE_PERIPH_CLK		Base clock for Cortex-M0SUB subsystem,
++					SPI, and SGPIO
++ 3		BASE_USB1_CLK		Base clock for USB1
++ 4		BASE_CPU_CLK		System base clock for ARM Cortex-M core
++					and APB peripheral blocks #0 and #2
++ 5		BASE_SPIFI_CLK		Base clock for SPIFI
++ 6		BASE_SPI_CLK		Base clock for SPI
++ 7		BASE_PHY_RX_CLK		Base clock for Ethernet PHY Receive clock
++ 8		BASE_PHY_TX_CLK		Base clock for Ethernet PHY Transmit clock
++ 9		BASE_APB1_CLK		Base clock for APB peripheral block # 1
++10		BASE_APB3_CLK		Base clock for APB peripheral block # 3
++11		BASE_LCD_CLK		Base clock for LCD
++12		BASE_ADCHS_CLK		Base clock for ADCHS
++13		BASE_SDIO_CLK		Base clock for SD/MMC
++14		BASE_SSP0_CLK		Base clock for SSP0
++15		BASE_SSP1_CLK		Base clock for SSP1
++16		BASE_UART0_CLK		Base clock for UART0
++17		BASE_UART1_CLK		Base clock for UART1
++18		BASE_UART2_CLK		Base clock for UART2
++19		BASE_UART3_CLK		Base clock for UART3
++20		BASE_OUT_CLK		Base clock for CLKOUT pin
++24-21		-			Reserved
++25		BASE_AUDIO_CLK		Base clock for audio system (I2S)
++26 		BASE_CGU_OUT0_CLK	Base clock for CGU_OUT0 clock output
++27 		BASE_CGU_OUT1_CLK	Base clock for CGU_OUT1 clock output
++
++BASE_PERIPH_CLK and BASE_SPI_CLK is only available on LPC43xx.
++BASE_ADCHS_CLK is only available on LPC4370.
++
++
++Example board file:
++
++/ {
++	clocks {
++		xtal: xtal {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <12000000>;
++		};
++
++		xtal32: xtal32 {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <32768>;
++		};
++
++		enet_rx_clk: enet_rx_clk {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <0>;
++			clock-output-names = "enet_rx_clk";
++		};
++
++		enet_tx_clk: enet_tx_clk {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <0>;
++			clock-output-names = "enet_tx_clk";
++		};
++
++		gp_clkin: gp_clkin {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <0>;
++			clock-output-names = "gp_clkin";
++		};
++	};
++
++	soc {
++		cgu: clock-controller at 40050000 {
++			compatible = "nxp,lpc1850-cgu";
++			reg = <0x40050000 0x1000>;
++			#clock-cells = <1>;
++			clocks = <&xtal>, <&creg_clk 1>, <&enet_rx_clk>, <&enet_tx_clk>, <&gp_clkin>;
++		};
++
++		/* A CGU and CCU clock consumer */
++		lcdc: lcdc at 40008000 {
++			...
++			clocks = <&cgu BASE_LCD_CLK>, <&ccu1 CLK_CPU_LCD>;
++			clock-names = "clcdclk", "apb_pclk";
++			...
++		};
++	};
++};
 -- 
 1.8.0
