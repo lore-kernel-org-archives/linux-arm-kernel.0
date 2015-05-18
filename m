@@ -1,133 +1,529 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Mon, 18 May 2015 11:13:36 -0500
-Subject: [PATCH] ARM: dts: am335x-bone* enable pmic-shutdown-controller
-In-Reply-To: <20150518152108.GE10274@atomide.com>
-References: <1431525001-5747-1-git-send-email-robertcnelson@gmail.com>
- <20150513141658.GB6605@localhost> <20150513144846.GC6605@localhost>
- <CAALWOA-hkgrMi+OeNrmwaVpdEfNadFn0R-QbpXi9LU-4sbakJQ@mail.gmail.com>
- <20150518152108.GE10274@atomide.com>
-Message-ID: <CAOCHtYgwyQy+hQE2PeUd+7U9wNygVOUuAb-VSh_9K5y7zFHEWA@mail.gmail.com>
+From: weigelt@melag.de (Enrico Weigelt, metux IT consult)
+Date: Mon, 18 May 2015 18:17:11 +0200
+Subject: [PATCH v2 4/5] can: flexcan: Remodel FlexCAN register r/w APIs
+ for BE instances
+In-Reply-To: <1431603215-25546-5-git-send-email-bhupesh.sharma@freescale.com>
+References: <1431603215-25546-1-git-send-email-bhupesh.sharma@freescale.com>
+ <1431603215-25546-5-git-send-email-bhupesh.sharma@freescale.com>
+Message-ID: <555A1087.1090600@melag.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 18, 2015 at 10:21 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Matthijs van Duin <matthijsvanduin@gmail.com> [150515 19:50]:
->> On 13 May 2015 at 16:48, Johan Hovold <johan@kernel.org> wrote:
->> > By the way, perhaps you should add a comment in the tps node explaining
->> > why ti,pmic-shutdown-controller must not be disabled (on what revisions
->> > of hardware) as well?
->>
->> There are actually three separate obstacles for RTC-only sleep (only
->> one of which actually BeagleBone-specific), so the "why" is a bit of a
->> long story. The end result can however be stated briefly:
->>
->> Only BBBs prior to rev A6 properly support RTC-only mode. The rare BBW
->> with a 2.x processor also supports it, provided nothing is connected
->> to its expansion ports that leaks significant current from 3v3exp to
->> processor I/Os while in reset.
->>
->> Any BeagleBone with an AM335x 2.x can be patched to properly support
->> RTC-only mode. (Though reconnecting vdds to LDO3 is really no fun, and
->> not a patch I could have done myself.)
->>
->>
->>
->> For reference, the details on the three problems:
->>
->>
->> 1. Most BeagleBone Whites use AM335x 1.0 which freezes the RTC when
->> vdd_core is gone or power-on reset is asserted, rendering RTC-only
->> sleep mostly useless.  The BeagleBone Black, and a few BBWs, use
->> AM335x 2.x which fixed this.
->>
->> Of all problems this is the most benign one since it merely results in
->> loss of functionality. The other two risk hardware damage.
+Am 14.05.2015 um 13:33 schrieb Bhupesh Sharma:
+
+> diff --git a/drivers/net/can/flexcan.c b/drivers/net/can/flexcan.c
+> index deaa24e..b0222ae 100644
+> --- a/drivers/net/can/flexcan.c
+> +++ b/drivers/net/can/flexcan.c
+> @@ -258,6 +258,10 @@ struct flexcan_priv {
+>       struct flexcan_platform_data *pdata;
+>       const struct flexcan_devtype_data *devtype_data;
+>       struct regulator *reg_xceiver;
+> +
+> +     /* Read and Write APIs */
+> +     u32 (*read)(void __iomem *addr);
+> +     void (*write)(u32 val, void __iomem *addr);
+
+Does it *really* need to be a far call ?
+Why not just give the existing flexcan_read()/flexcan_write() inline's
+an additional bit to decide whether to swab or not ?
+
+> -#if defined(CONFIG_PPC)
+> -static inline u32 flexcan_read(void __iomem *addr)
+> +static inline u32 flexcan_read_le(void __iomem *addr)
+
+_static inline_ as a callback ? seriously ?
+
+>   static inline int flexcan_transceiver_enable(const struct flexcan_priv *priv)
+>   {
+> @@ -356,14 +366,14 @@ static int flexcan_chip_enable(struct flexcan_priv *priv)
+>       unsigned int timeout = FLEXCAN_TIMEOUT_US / 10;
+>       u32 reg;
 >
-> If some of these depend on the SoC revision and cannot be detected
-> based on the RTC driver revision register, that information should
-> be be passed to the RTC driver in platform data. This can be done
-> with the rev == AM35XX_REV_ES* comparison that can be added to the
-> mach-omap2/pdata-quirks.c for am335x to initialize platform_data
-> for the RTC driver.
+> -     reg = flexcan_read(&regs->mcr);
+> +     reg = priv->read(&regs->mcr);
+>       reg &= ~FLEXCAN_MCR_MDIS;
+> -     flexcan_write(reg, &regs->mcr);
+> +     priv->write(reg, &regs->mcr);
 >
->> 2. TI issued a notice that the AM335x "vdds" supply must be among the
->> first to come up, and changed the official connection diagram for the
->> TPS65217C/D (used for boards with DDR3/3L memory) by moving vdds from
->> LDO3 to LDO1, and the BBB implemented this change in rev A6A.
->>
->> This change is incompatible with RTC-only sleep (a fact mentioned by
->> TI), so this rules out RTC-only sleep for any AM335x board with
->> DDR3/3L memory unless it predates (or ignored) TI's advice or uses a
->> different power supply scheme altogether. Boards with DDR2 memory
->> (TPS65217A/B) such as the BBW are not affected.
->>
->> Curiously, based on preliminary measurements, I have not observed any
->> leakage to vdds when it is powered up "late" (LDO3). In contrast,
->> during shutdown vdds begins to leak heavily (far in excess of rated
->> max current) to other rails once they drop low enough, and moving vdds
->> to LDO1 only makes this situation persist even longer (and
->> indefinitely in RTC-only sleep). I've asked TI support for some
->> clarification on this, but not yet received any response.
+> -     while (timeout-- && (flexcan_read(&regs->mcr) & FLEXCAN_MCR_LPM_ACK))
+> +     while (timeout-- && (priv->read(&regs->mcr) & FLEXCAN_MCR_LPM_ACK))
+>               udelay(10);
 >
-> This information should be passed based on the board revision in
-> platform_data to the RTC driver assuming we can detect the board
-> revision during the early boot.. Otherwise we should have revision
-> specific dts files.
+> -     if (flexcan_read(&regs->mcr) & FLEXCAN_MCR_LPM_ACK)
+> +     if (priv->read(&regs->mcr) & FLEXCAN_MCR_LPM_ACK)
+>               return -ETIMEDOUT;
 >
->> 3. All BeagleBones have a mismanaged external regulator for the
->> "3v3exp" (BBW) / "3v3b" (BBB) rail, which remains enabled longer than
->> the AM335x's 3.3V supplies ("3v3a").
->>
->> On the BBW, external hardware may end up sourcing current into
->> processor I/Os, which feeds the 3v3a through protection diodes. Since
->> the 3v3a is used as enable-signal for the regulator, if non-negligible
->> current is leaked via this path, 3v3a remains "logic high" and the
->> situation will persist indefinitely. If the currents remain modest
->> this won't necessarily violate any absolute maximum ratings, but I'd
->> still worry about the processor's long-term health.
->>
->> On BBB rev A6 and later the situation is the same, but without
->> dependency on external hardware: the current from on-board pull-up
->> resistors already suffices (3v3a remains at ~1.4V), and since rev A6A
->> the leakage from vdds would also get the job done. Worse still, since
->> the buffer for the console port is powered by the 3v3b, having a
->> serial cable attached causes a dangerous amount of current to be
->> driven into UART0_RXD (~45 mA) and I captured an event which I fear
->> may have been a brief latch-up.
->>
->> On BBBs prior to rev A6 the regulator is enabled by LDO2 (whose only
->> other use is the power led), which prevents it from staying on
->> indefinitely. It is however enabled 1ms before and disabled 1ms after
->> the processor's 3.3V supplies, so external hardware must still avoid
->> driving much current into I/O pins during those windows, e.g. by
->> keeping drivers disabled while reset is asserted. As mentioned above,
->> the console port buffer violates this rule.
->>
->> Technically this problem is also present when performing a full
->> shutdown ("OFF-mode"), but then the main supply is cut at the start of
->> the power-down sequence, which proceeds while running off rapidly
->> draining capacitors. Heavy current draw from 3v3b will drain them even
->> faster, thus making the issue self-limiting. (This however does not
->> apply when running on battery power, in which case even a full
->> shutdown is hazardous on an unpatched BBB rev A6 or later.)
+>       return 0;
+> @@ -375,14 +385,14 @@ static int flexcan_chip_disable(struct flexcan_priv *priv)
+>       unsigned int timeout = FLEXCAN_TIMEOUT_US / 10;
+>       u32 reg;
 >
-> Sounds like this should be configured based on the board revision
-> too.
+> -     reg = flexcan_read(&regs->mcr);
+> +     reg = priv->read(&regs->mcr);
+>       reg |= FLEXCAN_MCR_MDIS;
+> -     flexcan_write(reg, &regs->mcr);
+> +     priv->write(reg, &regs->mcr);
+>
+> -     while (timeout-- && !(flexcan_read(&regs->mcr) & FLEXCAN_MCR_LPM_ACK))
+> +     while (timeout-- && !(priv->read(&regs->mcr) & FLEXCAN_MCR_LPM_ACK))
+>               udelay(10);
+>
+> -     if (!(flexcan_read(&regs->mcr) & FLEXCAN_MCR_LPM_ACK))
+> +     if (!(priv->read(&regs->mcr) & FLEXCAN_MCR_LPM_ACK))
+>               return -ETIMEDOUT;
+>
+>       return 0;
+> @@ -394,14 +404,14 @@ static int flexcan_chip_freeze(struct flexcan_priv *priv)
+>       unsigned int timeout = 1000 * 1000 * 10 / priv->can.bittiming.bitrate;
+>       u32 reg;
+>
+> -     reg = flexcan_read(&regs->mcr);
+> +     reg = priv->read(&regs->mcr);
+>       reg |= FLEXCAN_MCR_HALT;
+> -     flexcan_write(reg, &regs->mcr);
+> +     priv->write(reg, &regs->mcr);
+>
+> -     while (timeout-- && !(flexcan_read(&regs->mcr) & FLEXCAN_MCR_FRZ_ACK))
+> +     while (timeout-- && !(priv->read(&regs->mcr) & FLEXCAN_MCR_FRZ_ACK))
+>               udelay(100);
+>
+> -     if (!(flexcan_read(&regs->mcr) & FLEXCAN_MCR_FRZ_ACK))
+> +     if (!(priv->read(&regs->mcr) & FLEXCAN_MCR_FRZ_ACK))
+>               return -ETIMEDOUT;
+>
+>       return 0;
+> @@ -413,14 +423,14 @@ static int flexcan_chip_unfreeze(struct flexcan_priv *priv)
+>       unsigned int timeout = FLEXCAN_TIMEOUT_US / 10;
+>       u32 reg;
+>
+> -     reg = flexcan_read(&regs->mcr);
+> +     reg = priv->read(&regs->mcr);
+>       reg &= ~FLEXCAN_MCR_HALT;
+> -     flexcan_write(reg, &regs->mcr);
+> +     priv->write(reg, &regs->mcr);
+>
+> -     while (timeout-- && (flexcan_read(&regs->mcr) & FLEXCAN_MCR_FRZ_ACK))
+> +     while (timeout-- && (priv->read(&regs->mcr) & FLEXCAN_MCR_FRZ_ACK))
+>               udelay(10);
+>
+> -     if (flexcan_read(&regs->mcr) & FLEXCAN_MCR_FRZ_ACK)
+> +     if (priv->read(&regs->mcr) & FLEXCAN_MCR_FRZ_ACK)
+>               return -ETIMEDOUT;
+>
+>       return 0;
+> @@ -431,23 +441,22 @@ static int flexcan_chip_softreset(struct flexcan_priv *priv)
+>       struct flexcan_regs __iomem *regs = priv->base;
+>       unsigned int timeout = FLEXCAN_TIMEOUT_US / 10;
+>
+> -     flexcan_write(FLEXCAN_MCR_SOFTRST, &regs->mcr);
+> -     while (timeout-- && (flexcan_read(&regs->mcr) & FLEXCAN_MCR_SOFTRST))
+> +     priv->write(FLEXCAN_MCR_SOFTRST, &regs->mcr);
+> +     while (timeout-- && (priv->read(&regs->mcr) & FLEXCAN_MCR_SOFTRST))
+>               udelay(10);
+>
+> -     if (flexcan_read(&regs->mcr) & FLEXCAN_MCR_SOFTRST)
+> +     if (priv->read(&regs->mcr) & FLEXCAN_MCR_SOFTRST)
+>               return -ETIMEDOUT;
+>
+>       return 0;
+>   }
+>
+> -
+>   static int __flexcan_get_berr_counter(const struct net_device *dev,
+>                                     struct can_berr_counter *bec)
+>   {
+>       const struct flexcan_priv *priv = netdev_priv(dev);
+>       struct flexcan_regs __iomem *regs = priv->base;
+> -     u32 reg = flexcan_read(&regs->ecr);
+> +     u32 reg = priv->read(&regs->ecr);
+>
+>       bec->txerr = (reg >> 0) & 0xff;
+>       bec->rxerr = (reg >> 8) & 0xff;
+> @@ -503,24 +512,24 @@ static int flexcan_start_xmit(struct sk_buff *skb, struct net_device *dev)
+>
+>       if (cf->can_dlc > 0) {
+>               u32 data = be32_to_cpup((__be32 *)&cf->data[0]);
+> -             flexcan_write(data, &regs->cantxfg[FLEXCAN_TX_BUF_ID].data[0]);
+> +             priv->write(data, &regs->cantxfg[FLEXCAN_TX_BUF_ID].data[0]);
+>       }
+>       if (cf->can_dlc > 3) {
+>               u32 data = be32_to_cpup((__be32 *)&cf->data[4]);
+> -             flexcan_write(data, &regs->cantxfg[FLEXCAN_TX_BUF_ID].data[1]);
+> +             priv->write(data, &regs->cantxfg[FLEXCAN_TX_BUF_ID].data[1]);
+>       }
+>
+>       can_put_echo_skb(skb, dev, 0);
+>
+> -     flexcan_write(can_id, &regs->cantxfg[FLEXCAN_TX_BUF_ID].can_id);
+> -     flexcan_write(ctrl, &regs->cantxfg[FLEXCAN_TX_BUF_ID].can_ctrl);
+> +     priv->write(can_id, &regs->cantxfg[FLEXCAN_TX_BUF_ID].can_id);
+> +     priv->write(ctrl, &regs->cantxfg[FLEXCAN_TX_BUF_ID].can_ctrl);
+>
+>       /* Errata ERR005829 step8:
+>        * Write twice INACTIVE(0x8) code to first MB.
+>        */
+> -     flexcan_write(FLEXCAN_MB_CODE_TX_INACTIVE,
+> +     priv->write(FLEXCAN_MB_CODE_TX_INACTIVE,
+>                     &regs->cantxfg[FLEXCAN_TX_BUF_RESERVED].can_ctrl);
+> -     flexcan_write(FLEXCAN_MB_CODE_TX_INACTIVE,
+> +     priv->write(FLEXCAN_MB_CODE_TX_INACTIVE,
+>                     &regs->cantxfg[FLEXCAN_TX_BUF_RESERVED].can_ctrl);
+>
+>       return NETDEV_TX_OK;
+> @@ -645,8 +654,8 @@ static void flexcan_read_fifo(const struct net_device *dev,
+>       struct flexcan_mb __iomem *mb = &regs->cantxfg[0];
+>       u32 reg_ctrl, reg_id;
+>
+> -     reg_ctrl = flexcan_read(&mb->can_ctrl);
+> -     reg_id = flexcan_read(&mb->can_id);
+> +     reg_ctrl = priv->read(&mb->can_ctrl);
+> +     reg_id = priv->read(&mb->can_id);
+>       if (reg_ctrl & FLEXCAN_MB_CNT_IDE)
+>               cf->can_id = ((reg_id >> 0) & CAN_EFF_MASK) | CAN_EFF_FLAG;
+>       else
+> @@ -656,12 +665,12 @@ static void flexcan_read_fifo(const struct net_device *dev,
+>               cf->can_id |= CAN_RTR_FLAG;
+>       cf->can_dlc = get_can_dlc((reg_ctrl >> 16) & 0xf);
+>
+> -     *(__be32 *)(cf->data + 0) = cpu_to_be32(flexcan_read(&mb->data[0]));
+> -     *(__be32 *)(cf->data + 4) = cpu_to_be32(flexcan_read(&mb->data[1]));
+> +     *(__be32 *)(cf->data + 0) = cpu_to_be32(priv->read(&mb->data[0]));
+> +     *(__be32 *)(cf->data + 4) = cpu_to_be32(priv->read(&mb->data[1]));
+>
+>       /* mark as read */
+> -     flexcan_write(FLEXCAN_IFLAG_RX_FIFO_AVAILABLE, &regs->iflag1);
+> -     flexcan_read(&regs->timer);
+> +     priv->write(FLEXCAN_IFLAG_RX_FIFO_AVAILABLE, &regs->iflag1);
+> +     priv->read(&regs->timer);
+>   }
+>
+>   static int flexcan_read_frame(struct net_device *dev)
+> @@ -699,17 +708,17 @@ static int flexcan_poll(struct napi_struct *napi, int quota)
+>        * The error bits are cleared on read,
+>        * use saved value from irq handler.
+>        */
+> -     reg_esr = flexcan_read(&regs->esr) | priv->reg_esr;
+> +     reg_esr = priv->read(&regs->esr) | priv->reg_esr;
+>
+>       /* handle state changes */
+>       work_done += flexcan_poll_state(dev, reg_esr);
+>
+>       /* handle RX-FIFO */
+> -     reg_iflag1 = flexcan_read(&regs->iflag1);
+> +     reg_iflag1 = priv->read(&regs->iflag1);
+>       while (reg_iflag1 & FLEXCAN_IFLAG_RX_FIFO_AVAILABLE &&
+>              work_done < quota) {
+>               work_done += flexcan_read_frame(dev);
+> -             reg_iflag1 = flexcan_read(&regs->iflag1);
+> +             reg_iflag1 = priv->read(&regs->iflag1);
+>       }
+>
+>       /* report bus errors */
+> @@ -719,8 +728,8 @@ static int flexcan_poll(struct napi_struct *napi, int quota)
+>       if (work_done < quota) {
+>               napi_complete(napi);
+>               /* enable IRQs */
+> -             flexcan_write(FLEXCAN_IFLAG_DEFAULT, &regs->imask1);
+> -             flexcan_write(priv->reg_ctrl_default, &regs->ctrl);
+> +             priv->write(FLEXCAN_IFLAG_DEFAULT, &regs->imask1);
+> +             priv->write(priv->reg_ctrl_default, &regs->ctrl);
+>       }
+>
+>       return work_done;
+> @@ -734,11 +743,11 @@ static irqreturn_t flexcan_irq(int irq, void *dev_id)
+>       struct flexcan_regs __iomem *regs = priv->base;
+>       u32 reg_iflag1, reg_esr;
+>
+> -     reg_iflag1 = flexcan_read(&regs->iflag1);
+> -     reg_esr = flexcan_read(&regs->esr);
+> +     reg_iflag1 = priv->read(&regs->iflag1);
+> +     reg_esr = priv->read(&regs->esr);
+>       /* ACK all bus error and state change IRQ sources */
+>       if (reg_esr & FLEXCAN_ESR_ALL_INT)
+> -             flexcan_write(reg_esr & FLEXCAN_ESR_ALL_INT, &regs->esr);
+> +             priv->write(reg_esr & FLEXCAN_ESR_ALL_INT, &regs->esr);
+>
+>       /*
+>        * schedule NAPI in case of:
+> @@ -754,16 +763,16 @@ static irqreturn_t flexcan_irq(int irq, void *dev_id)
+>                * save them for later use.
+>                */
+>               priv->reg_esr = reg_esr & FLEXCAN_ESR_ERR_BUS;
+> -             flexcan_write(FLEXCAN_IFLAG_DEFAULT &
+> +             priv->write(FLEXCAN_IFLAG_DEFAULT &
+>                       ~FLEXCAN_IFLAG_RX_FIFO_AVAILABLE, &regs->imask1);
+> -             flexcan_write(priv->reg_ctrl_default & ~FLEXCAN_CTRL_ERR_ALL,
+> +             priv->write(priv->reg_ctrl_default & ~FLEXCAN_CTRL_ERR_ALL,
+>                      &regs->ctrl);
+>               napi_schedule(&priv->napi);
+>       }
+>
+>       /* FIFO overflow */
+>       if (reg_iflag1 & FLEXCAN_IFLAG_RX_FIFO_OVERFLOW) {
+> -             flexcan_write(FLEXCAN_IFLAG_RX_FIFO_OVERFLOW, &regs->iflag1);
+> +             priv->write(FLEXCAN_IFLAG_RX_FIFO_OVERFLOW, &regs->iflag1);
+>               dev->stats.rx_over_errors++;
+>               dev->stats.rx_errors++;
+>       }
+> @@ -774,9 +783,9 @@ static irqreturn_t flexcan_irq(int irq, void *dev_id)
+>               stats->tx_packets++;
+>               can_led_event(dev, CAN_LED_EVENT_TX);
+>               /* after sending a RTR frame mailbox is in RX mode */
+> -             flexcan_write(FLEXCAN_MB_CODE_TX_INACTIVE,
+> +             priv->write(FLEXCAN_MB_CODE_TX_INACTIVE,
+>                             &regs->cantxfg[FLEXCAN_TX_BUF_ID].can_ctrl);
+> -             flexcan_write((1 << FLEXCAN_TX_BUF_ID), &regs->iflag1);
+> +             priv->write((1 << FLEXCAN_TX_BUF_ID), &regs->iflag1);
+>               netif_wake_queue(dev);
+>       }
+>
+> @@ -790,7 +799,7 @@ static void flexcan_set_bittiming(struct net_device *dev)
+>       struct flexcan_regs __iomem *regs = priv->base;
+>       u32 reg;
+>
+> -     reg = flexcan_read(&regs->ctrl);
+> +     reg = priv->read(&regs->ctrl);
+>       reg &= ~(FLEXCAN_CTRL_PRESDIV(0xff) |
+>                FLEXCAN_CTRL_RJW(0x3) |
+>                FLEXCAN_CTRL_PSEG1(0x7) |
+> @@ -814,11 +823,11 @@ static void flexcan_set_bittiming(struct net_device *dev)
+>               reg |= FLEXCAN_CTRL_SMP;
+>
+>       netdev_info(dev, "writing ctrl=0x%08x\n", reg);
+> -     flexcan_write(reg, &regs->ctrl);
+> +     priv->write(reg, &regs->ctrl);
+>
+>       /* print chip status */
+>       netdev_dbg(dev, "%s: mcr=0x%08x ctrl=0x%08x\n", __func__,
+> -                flexcan_read(&regs->mcr), flexcan_read(&regs->ctrl));
+> +                priv->read(&regs->mcr), priv->read(&regs->ctrl));
+>   }
+>
+>   /*
+> @@ -858,14 +867,14 @@ static int flexcan_chip_start(struct net_device *dev)
+>        * disable local echo
+>        *
+>        */
+> -     reg_mcr = flexcan_read(&regs->mcr);
+> +     reg_mcr = priv->read(&regs->mcr);
+>       reg_mcr &= ~FLEXCAN_MCR_MAXMB(0xff);
+>       reg_mcr |= FLEXCAN_MCR_FRZ | FLEXCAN_MCR_FEN | FLEXCAN_MCR_HALT |
+>               FLEXCAN_MCR_SUPV | FLEXCAN_MCR_WRN_EN |
+>               FLEXCAN_MCR_IDAM_C | FLEXCAN_MCR_SRX_DIS |
+>               FLEXCAN_MCR_MAXMB(FLEXCAN_TX_BUF_ID);
+>       netdev_dbg(dev, "%s: writing mcr=0x%08x", __func__, reg_mcr);
+> -     flexcan_write(reg_mcr, &regs->mcr);
+> +     priv->write(reg_mcr, &regs->mcr);
+>
+>       /*
+>        * CTRL
+> @@ -879,7 +888,7 @@ static int flexcan_chip_start(struct net_device *dev)
+>        * enable bus off interrupt
+>        * (== FLEXCAN_CTRL_ERR_STATE)
+>        */
+> -     reg_ctrl = flexcan_read(&regs->ctrl);
+> +     reg_ctrl = priv->read(&regs->ctrl);
+>       reg_ctrl &= ~FLEXCAN_CTRL_TSYN;
+>       reg_ctrl |= FLEXCAN_CTRL_BOFF_REC | FLEXCAN_CTRL_LBUF |
+>               FLEXCAN_CTRL_ERR_STATE;
+> @@ -897,29 +906,29 @@ static int flexcan_chip_start(struct net_device *dev)
+>       /* save for later use */
+>       priv->reg_ctrl_default = reg_ctrl;
+>       netdev_dbg(dev, "%s: writing ctrl=0x%08x", __func__, reg_ctrl);
+> -     flexcan_write(reg_ctrl, &regs->ctrl);
+> +     priv->write(reg_ctrl, &regs->ctrl);
+>
+>       /* clear and invalidate all mailboxes first */
+>       for (i = FLEXCAN_TX_BUF_ID; i < ARRAY_SIZE(regs->cantxfg); i++) {
+> -             flexcan_write(FLEXCAN_MB_CODE_RX_INACTIVE,
+> +             priv->write(FLEXCAN_MB_CODE_RX_INACTIVE,
+>                             &regs->cantxfg[i].can_ctrl);
+>       }
+>
+>       /* Errata ERR005829: mark first TX mailbox as INACTIVE */
+> -     flexcan_write(FLEXCAN_MB_CODE_TX_INACTIVE,
+> +     priv->write(FLEXCAN_MB_CODE_TX_INACTIVE,
+>                     &regs->cantxfg[FLEXCAN_TX_BUF_RESERVED].can_ctrl);
+>
+>       /* mark TX mailbox as INACTIVE */
+> -     flexcan_write(FLEXCAN_MB_CODE_TX_INACTIVE,
+> +     priv->write(FLEXCAN_MB_CODE_TX_INACTIVE,
+>                     &regs->cantxfg[FLEXCAN_TX_BUF_ID].can_ctrl);
+>
+>       /* acceptance mask/acceptance code (accept everything) */
+> -     flexcan_write(0x0, &regs->rxgmask);
+> -     flexcan_write(0x0, &regs->rx14mask);
+> -     flexcan_write(0x0, &regs->rx15mask);
+> +     priv->write(0x0, &regs->rxgmask);
+> +     priv->write(0x0, &regs->rx14mask);
+> +     priv->write(0x0, &regs->rx15mask);
+>
+>       if (priv->devtype_data->features & FLEXCAN_HAS_V10_FEATURES)
+> -             flexcan_write(0x0, &regs->rxfgmask);
+> +             priv->write(0x0, &regs->rxfgmask);
+>
+>       /*
+>        * On Vybrid, disable memory error detection interrupts
+> @@ -934,16 +943,16 @@ static int flexcan_chip_start(struct net_device *dev)
+>                * and Correction of Memory Errors" to write to
+>                * MECR register
+>                */
+> -             reg_crl2 = flexcan_read(&regs->crl2);
+> +             reg_crl2 = priv->read(&regs->crl2);
+>               reg_crl2 |= FLEXCAN_CRL2_ECRWRE;
+> -             flexcan_write(reg_crl2, &regs->crl2);
+> +             priv->write(reg_crl2, &regs->crl2);
+>
+> -             reg_mecr = flexcan_read(&regs->mecr);
+> +             reg_mecr = priv->read(&regs->mecr);
+>               reg_mecr &= ~FLEXCAN_MECR_ECRWRDIS;
+> -             flexcan_write(reg_mecr, &regs->mecr);
+> +             priv->write(reg_mecr, &regs->mecr);
+>               reg_mecr &= ~(FLEXCAN_MECR_NCEFAFRZ | FLEXCAN_MECR_HANCEI_MSK |
+>                               FLEXCAN_MECR_FANCEI_MSK);
+> -             flexcan_write(reg_mecr, &regs->mecr);
+> +             priv->write(reg_mecr, &regs->mecr);
+>       }
+>
+>       err = flexcan_transceiver_enable(priv);
+> @@ -958,11 +967,11 @@ static int flexcan_chip_start(struct net_device *dev)
+>       priv->can.state = CAN_STATE_ERROR_ACTIVE;
+>
+>       /* enable FIFO interrupts */
+> -     flexcan_write(FLEXCAN_IFLAG_DEFAULT, &regs->imask1);
+> +     priv->write(FLEXCAN_IFLAG_DEFAULT, &regs->imask1);
+>
+>       /* print chip status */
+>       netdev_dbg(dev, "%s: reading mcr=0x%08x ctrl=0x%08x\n", __func__,
+> -                flexcan_read(&regs->mcr), flexcan_read(&regs->ctrl));
+> +                priv->read(&regs->mcr), priv->read(&regs->ctrl));
+>
+>       return 0;
+>
+> @@ -989,8 +998,8 @@ static void flexcan_chip_stop(struct net_device *dev)
+>       flexcan_chip_disable(priv);
+>
+>       /* Disable all interrupts */
+> -     flexcan_write(0, &regs->imask1);
+> -     flexcan_write(priv->reg_ctrl_default & ~FLEXCAN_CTRL_ERR_ALL,
+> +     priv->write(0, &regs->imask1);
+> +     priv->write(priv->reg_ctrl_default & ~FLEXCAN_CTRL_ERR_ALL,
+>                     &regs->ctrl);
+>
+>       flexcan_transceiver_disable(priv);
+> @@ -1108,26 +1117,26 @@ static int register_flexcandev(struct net_device *dev)
+>       err = flexcan_chip_disable(priv);
+>       if (err)
+>               goto out_disable_per;
+> -     reg = flexcan_read(&regs->ctrl);
+> +     reg = priv->read(&regs->ctrl);
+>       reg |= FLEXCAN_CTRL_CLK_SRC;
+> -     flexcan_write(reg, &regs->ctrl);
+> +     priv->write(reg, &regs->ctrl);
+>
+>       err = flexcan_chip_enable(priv);
+>       if (err)
+>               goto out_chip_disable;
+>
+>       /* set freeze, halt and activate FIFO, restrict register access */
+> -     reg = flexcan_read(&regs->mcr);
+> +     reg = priv->read(&regs->mcr);
+>       reg |= FLEXCAN_MCR_FRZ | FLEXCAN_MCR_HALT |
+>               FLEXCAN_MCR_FEN | FLEXCAN_MCR_SUPV;
+> -     flexcan_write(reg, &regs->mcr);
+> +     priv->write(reg, &regs->mcr);
+>
+>       /*
+>        * Currently we only support newer versions of this core
+>        * featuring a RX FIFO. Older cores found on some Coldfire
+>        * derivates are not yet supported.
+>        */
+> -     reg = flexcan_read(&regs->mcr);
+> +     reg = priv->read(&regs->mcr);
+>       if (!(reg & FLEXCAN_MCR_FEN)) {
+>               netdev_err(dev, "Could not enable RX FIFO, unsupported core\n");
+>               err = -ENODEV;
+> @@ -1183,6 +1192,8 @@ static int flexcan_probe(struct platform_device *pdev)
+>       void __iomem *base;
+>       int err, irq;
+>       u32 clock_freq = 0;
+> +     /* Default case for most ARM based FSL SoC having BE FlexCAN IP */
+> +     bool core_is_little = true, module_is_little = false;
+>
+>       reg_xceiver = devm_regulator_get(&pdev->dev, "xceiver");
+>       if (PTR_ERR(reg_xceiver) == -EPROBE_DEFER)
+> @@ -1237,6 +1248,25 @@ static int flexcan_probe(struct platform_device *pdev)
+>       dev->flags |= IFF_ECHO;
+>
+>       priv = netdev_priv(dev);
+> +
+> +     if (IS_ENABLED(CONFIG_CPU_BIG_ENDIAN))
+> +             core_is_little = false;
 
-All the rev information is in the board's eeprom:
+Why not just using IS_ENABLED(CONFIG_CPU_BIG_ENDIAN) directly ?
+(anyways, cpu_is_le seems a more appropriate name)
 
-hexdump -e '8/1 "%c"' /sys/bus/i2c/devices/0-0050/eeprom -s 12 -n 4
+> +     if (of_property_read_bool(dev->dev.of_node, "little-endian"))
+> +             module_is_little = true;
 
-Rev A5B
-0A5B
+Why that misleading name, instead of, eg. "chip_is_le" ?
 
-Rev C
-000C
+Oh, and you'll expect explicitly set a new DTB attribute, if the chip
+is in LE - the default case.
 
-Just another default qwerk to add to Pantelis' bone_capemgr. ;)
+Didn't you just say, you dont wanna break anything ?
 
-Regards,
+Can you imagine that some people use DTB as a _board_ config
+(eg. in bootloader) instead of externalized kernel config ? ;-o
 
--- 
-Robert Nelson
-https://rcn-ee.com/
+> +     if ((core_is_little && module_is_little) ||
+> +         (!core_is_little && !module_is_little)) {
+> +             priv->read = flexcan_read_le;
+> +             priv->write = flexcan_write_le;
+> +     }
+> +
+> +     if ((!core_is_little && module_is_little) ||
+> +         (core_is_little && !module_is_little)) {
+> +             priv->read = flexcan_read_be;
+> +             priv->write = flexcan_write_be;
+> +     }
+
+At that point, the naming gets completely wrong - instead should
+be something like flexcan_read_swab / flexcan_write_swab.
+And the decision can easily be made on:
+
+    IS_ENABLED(CONFIG_CPU_BIG_ENDIAN) != module_is_little
+
+
+Putting these together, I'd rather:
+
+#1: add a new feature flag:
+     #define FLEXCAN_HAS_BIG_ENDIAN BIT(4)
+
+#2: add a new dts device type for the new chip variant
+     (eg. fsl,flexcan-qorliq)
+
+#2: pass the priv pointer to the *_read()/*_write() functions,
+     so they can pick up the BE flag and decide whether to
+     swab or not (based on cpu endianess)
+
+At that point, maybe we could even replace the struct flexcan_regs
+by a list of #define's.
+
+
+
+cu
+
+By the way: who had the genious idea of adding _hardware specific_
+hacks into a widget library (qt) ? Perhaps the same guy, who decided
+that _unprivileged userland_ should tell ipu/vpu/gpu which _hardware_
+addresses to use ? ;-o
+
+--
+Enrico Weigelt, metux IT consult
++49-151-27565287
+MELAG Medizintechnik oHG Sitz Berlin Registergericht AG Charlottenburg HRA 21333 B
+
+Wichtiger Hinweis: Diese Nachricht kann vertrauliche oder nur f?r einen begrenzten Personenkreis bestimmte Informationen enthalten. Sie ist ausschlie?lich f?r denjenigen bestimmt, an den sie gerichtet worden ist. Wenn Sie nicht der Adressat dieser E-Mail sind, d?rfen Sie diese nicht kopieren, weiterleiten, weitergeben oder sie ganz oder teilweise in irgendeiner Weise nutzen. Sollten Sie diese E-Mail irrt?mlich erhalten haben, so benachrichtigen Sie bitte den Absender, indem Sie auf diese Nachricht antworten. Bitte l?schen Sie in diesem Fall diese Nachricht und alle Anh?nge, ohne eine Kopie zu behalten.
+Important Notice: This message may contain confidential or privileged information. It is intended only for the person it was addressed to. If you are not the intended recipient of this email you may not copy, forward, disclose or otherwise use it or any part of it in any form whatsoever. If you received this email in error please notify the sender by replying and delete this message and any attachments without retaining a copy.
