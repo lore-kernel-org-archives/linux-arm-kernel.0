@@ -1,69 +1,79 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon, 18 May 2015 21:08:27 +0800
-Subject: [Patch v3 5/7] PCI/ACPI: Consolidate common PCI host bridge code
- into ACPI core
-In-Reply-To: <1431593803-5213-6-git-send-email-jiang.liu@linux.intel.com>
-References: <1431593803-5213-1-git-send-email-jiang.liu@linux.intel.com>
- <1431593803-5213-6-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <5559E44B.2010702@linaro.org>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon, 18 May 2015 14:09:48 +0100
+Subject: [PATCH] arm64: Rename temp variable in read*_relaxed()
+In-Reply-To: <4f9792c7d10ca30a9b6ba5e2860b56814a41309c.1431947444.git.michal.simek@xilinx.com>
+References: <4f9792c7d10ca30a9b6ba5e2860b56814a41309c.1431947444.git.michal.simek@xilinx.com>
+Message-ID: <20150518130948.GD2175@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jiang,
+On Mon, May 18, 2015 at 12:10:48PM +0100, Michal Simek wrote:
+> This resolves the following sparse warning from readl() and other
+> macros, which ends up embedding readl_relaxed() using the same
+> variable.
+> 
+> Warning log:
+> include/asm-generic/io.h:364:16: warning: symbol '__v' shadows an
+> earlier one
+> include/asm-generic/io.h:364:16: originally declared here
+> include/asm-generic/io.h:372:16: warning: symbol '__v' shadows an
+> earlier one
+> include/asm-generic/io.h:372:16: originally declared here
+> include/asm-generic/io.h:380:16: warning: symbol '__v' shadows an
+> earlier one
+> include/asm-generic/io.h:380:16: originally declared here
+> include/asm-generic/io.h:568:16: warning: symbol '__v' shadows an
+> earlier one
+> include/asm-generic/io.h:568:16: originally declared here
+> include/asm-generic/io.h:576:16: warning: symbol '__v' shadows an
+> earlier one
+> include/asm-generic/io.h:576:16: originally declared here
+> include/asm-generic/io.h:584:16: warning: symbol '__v' shadows an
+> earlier one
+> include/asm-generic/io.h:584:16: originally declared here
+> 
+> The same patch was already applied to arm32 as
+> "ARM: 7118/1: rename temp variable in read*_relaxed()"
+> (sha1: b0c1264f534a1cb3c52036a23a04d238434a0df6)
+> 
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 
-On 2015?05?14? 16:56, Jiang Liu wrote:
-> Introduce common interface acpi_pci_root_create() and related data
-> structures to create PCI root bus for ACPI PCI host bridges. It will
-> be used to kill duplicated arch specific code for IA64 and x86. It may
-> also help ARM64 in future.
+Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
 
-As I commented in previous version, this patch will introduce
-compile error on ACPI enabled ARM64 kernel because struct
-pci_controller is not defined for ARM64, so how about adding
-the following patch before this patch, or squash to this one,
-does it make sense?
+> ---
+> 
+>  arch/arm64/include/asm/io.h | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+> index 540f7c0aea82..cb18715cc60f 100644
+> --- a/arch/arm64/include/asm/io.h
+> +++ b/arch/arm64/include/asm/io.h
+> @@ -117,10 +117,10 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
+>   * ordering rules but do not guarantee any ordering relative to Normal memory
+>   * accesses.
+>   */
+> -#define readb_relaxed(c)	({ u8  __v = __raw_readb(c); __v; })
+> -#define readw_relaxed(c)	({ u16 __v = le16_to_cpu((__force __le16)__raw_readw(c)); __v; })
+> -#define readl_relaxed(c)	({ u32 __v = le32_to_cpu((__force __le32)__raw_readl(c)); __v; })
+> -#define readq_relaxed(c)	({ u64 __v = le64_to_cpu((__force __le64)__raw_readq(c)); __v; })
+> +#define readb_relaxed(c)	({ u8  __r = __raw_readb(c); __r; })
+> +#define readw_relaxed(c)	({ u16 __r = le16_to_cpu((__force __le16)__raw_readw(c)); __r; })
+> +#define readl_relaxed(c)	({ u32 __r = le32_to_cpu((__force __le32)__raw_readl(c)); __r; })
+> +#define readq_relaxed(c)	({ u64 __r = le64_to_cpu((__force __le64)__raw_readq(c)); __r; })
+>  
+>  #define writeb_relaxed(v,c)	((void)__raw_writeb((v),(c)))
+>  #define writew_relaxed(v,c)	((void)__raw_writew((__force u16)cpu_to_le16(v),(c)))
+> -- 
+> 2.3.5
+> 
 
- From 11d0e98154e681e75936698208398cb4dcd73632 Mon Sep 17 00:00:00 2001
-From: Hanjun Guo <hanjun.guo@linaro.org>
-Date: Mon, 18 May 2015 19:41:56 +0800
-Subject: [PATCH] ARM64 / PCI: introduce struct pci_controller for ACPI
-
-ARM64 ACPI based PCI host bridge init needs a arch dependent
-struct pci_controller to accommodate common PCI host bridge
-code which is introduced later, or it will lead to compile
-errors on ARM64.
-
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-CC: Liviu Dudau <Liviu.Dudau@arm.com>
-CC: Will Deacon <will.deacon@arm.com>
-CC: Catalin Marinas <catalin.marinas@arm.com>
-CC: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
-CC: Arnd Bergmann <arnd@arndb.de>
----
-  arch/arm64/include/asm/pci.h | 10 ++++++++++
-  1 file changed, 10 insertions(+)
-
-diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
-index b008a72..7088495 100644
---- a/arch/arm64/include/asm/pci.h
-+++ b/arch/arm64/include/asm/pci.h
-@@ -10,6 +10,16 @@
-  #include <asm-generic/pci-bridge.h>
-  #include <asm-generic/pci-dma-compat.h>
-
-+struct acpi_device;
-+
-+struct pci_controller {
-+#ifdef CONFIG_ACPI
-+       struct acpi_device *companion;  /* ACPI companion device */
-+#endif
-+       int             segment;        /* PCI domain */
-+       int             node;           /* NUMA node */
-+};
-+
-  #define PCIBIOS_MIN_IO         0x1000
-  #define PCIBIOS_MIN_MEM                0
-
-
-Thanks
-Hanjun
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
