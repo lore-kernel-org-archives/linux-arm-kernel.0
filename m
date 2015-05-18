@@ -1,270 +1,59 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 18 May 2015 14:22:36 +0100
-Subject: [PATCH 6/7] arm-cci: Add CCI-500 PMU support
-In-Reply-To: <1430826548-29960-7-git-send-email-suzuki.poulose@arm.com>
- (Suzuki K. Poulose's message of "Tue, 5 May 2015 12:49:07 +0100")
-References: <1430826548-29960-1-git-send-email-suzuki.poulose@arm.com>
- <1430826548-29960-7-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <9hhpp5yvx43.fsf@e105922-lin.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 18 May 2015 14:23:26 +0100
+Subject: [PATCH] irqchip: GICv3: ITS: don't assume 64K page size in
+ its_alloc_tables
+In-Reply-To: <1431644545-31904-1-git-send-email-stuart.yoder@freescale.com>
+References: <1431644545-31904-1-git-send-email-stuart.yoder@freescale.com>
+Message-ID: <5559E7CE.1050003@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Suzuki K. Poulose" <suzuki.poulose@arm.com> writes:
+Hi Stuart,
 
-> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
->
-> CCI-500 provides 8 event counters which can count any of the
-> supported events independently. The PMU event id is a 9-bit
-> value made of two parts.
-> 	bits [8:5] - Source port
-> 			0x0-0x6 Slave Ports
-> 			0x8-0xD Master Ports
-> 			0xf     Global Events to CCI
-> 			0x7,0xe Reserved
-> 	bits [0:4] - Event code (specific to each type of port)
->
-> The generic CCI-500 controlling interface remains the same with CCI-400.
-> However there are some differences in the PMU event counters.
->  - No cycle counter
->  - Upto 8 counters(4 in CCI-400)
->  - Each counter area is 64K(4K in CCI400)
->  - The counter0 starts at offset 0x10000 from the base of CCI
->
-> Cc: Punit Agrawal <punit.agrawal@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-
-Acked-by: Punit Agrawal <punit.agrawal@arm.com>
-
+On 15/05/15 00:02, Stuart Yoder wrote:
+> its_alloc_tables() needs to account for page sizes other than
+> 64KB.  Without this change, when PAGE_SIZE=4KB its_alloc_tables()
+> gets stuck in an infinite loop.
+> 
+> Signed-off-by: Stuart Yoder <stuart.yoder@freescale.com>
 > ---
->  Documentation/devicetree/bindings/arm/cci.txt |    4 +-
->  drivers/bus/Kconfig                           |   12 +++
->  drivers/bus/arm-cci.c                         |  133 +++++++++++++++++++++++++
->  3 files changed, 148 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/arm/cci.txt b/Documentation/devicetree/bindings/arm/cci.txt
-> index 3c5c631..aef1d20 100644
-> --- a/Documentation/devicetree/bindings/arm/cci.txt
-> +++ b/Documentation/devicetree/bindings/arm/cci.txt
-> @@ -31,8 +31,9 @@ specific to ARM.
->  	- compatible
->  		Usage: required
->  		Value type: <string>
-> -		Definition: must be set to
-> +		Definition: must contain one of the following:
->  			    "arm,cci-400"
-> +			    "arm,cci-500"
->  
->  	- reg
->  		Usage: required
-> @@ -99,6 +100,7 @@ specific to ARM.
->  				 "arm,cci-400-pmu,r1"
->  				 "arm,cci-400-pmu"  - DEPRECATED, permitted only where OS has
->  						      secure acces to CCI registers
-> +				 "arm,cci-500-pmu,r0"
->  		- reg:
->  			Usage: required
->  			Value type: Integer cells. A register entry, expressed
-> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-> index be66b7c..5fb3150 100644
-> --- a/drivers/bus/Kconfig
-> +++ b/drivers/bus/Kconfig
-> @@ -36,6 +36,18 @@ config ARM_CCI400_PORT_CTRL
->  	  Low level power management driver for CCI400 cache coherent
->  	  interconnect for ARM platforms.
->  
-> +config ARM_CCI500_PMU
-> +	bool "ARM CCI500 PMU support"
-> +	default y
-> +	depends on ARM || ARM64
-> +	depends on HW_PERF_EVENTS
-> +	select ARM_CCI_PMU
-> +	help
-> +	  Support for PMU events monitoring on the ARM CCI-500 cache coherent
-> +	  interconnect.
-> +
-> +	  If unsure, say Y
-> +
->  config ARM_CCN
->  	bool "ARM CCN driver support"
->  	depends on ARM || ARM64
-> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-> index 2b43cea..e12ddba 100644
-> --- a/drivers/bus/arm-cci.c
-> +++ b/drivers/bus/arm-cci.c
-> @@ -52,6 +52,9 @@ static const struct of_device_id arm_cci_matches[] = {
->  #ifdef CONFIG_ARM_CCI400_COMMON
->  	{.compatible = "arm,cci-400", .data = CCI400_PORTS_DATA },
->  #endif
-> +#ifdef CONFIG_ARM_CCI500_PMU
-> +	{ .compatible = "arm,cci-500", },
-> +#endif
->  	{},
->  };
->  
-> @@ -89,6 +92,9 @@ static const struct of_device_id arm_cci_matches[] = {
->  enum {
->  	CCI_IF_SLAVE,
->  	CCI_IF_MASTER,
-> +#ifdef CONFIG_ARM_CCI500_PMU
-> +	CCI_IF_GLOBAL,
-> +#endif
->  	CCI_IF_MAX,
->  };
->  
-> @@ -145,6 +151,9 @@ enum cci_models {
->  	CCI400_R0,
->  	CCI400_R1,
->  #endif
-> +#ifdef CONFIG_ARM_CCI500_PMU
-> +	CCI500_R0,
-> +#endif
->  	CCI_MODEL_MAX
->  };
->  
-> @@ -294,6 +303,101 @@ static inline struct cci_pmu_model *probe_cci_model(struct platform_device *pdev
->  }
->  #endif	/* CONFIG_ARM_CCI400_PMU */
->  
-> +#ifdef CONFIG_ARM_CCI500_PMU
-> +
-> +/*
-> + * CCI500 provides 8 independent event counters that can count
-> + * any of the events available.
-> + *
-> + * CCI500 PMU event id is an 9-bit value made of two parts.
-> + *	 bits [8:5] - Source for the event
-> + *		      0x0-0x6 - Slave interfaces
-> + *		      0x8-0xD - Master interfaces
-> + *		      0xf     - Global Events
-> + *		      0x7,0xe - Reserved
-> + *
-> + *	 bits [4:0] - Event code (specific to type of interface)
-> + */
-> +
-> +/* Port ids */
-> +#define CCI500_PORT_S0			0x0
-> +#define CCI500_PORT_S1			0x1
-> +#define CCI500_PORT_S2			0x2
-> +#define CCI500_PORT_S3			0x3
-> +#define CCI500_PORT_S4			0x4
-> +#define CCI500_PORT_S5			0x5
-> +#define CCI500_PORT_S6			0x6
-> +
-> +#define CCI500_PORT_M0			0x8
-> +#define CCI500_PORT_M1			0x9
-> +#define CCI500_PORT_M2			0xa
-> +#define CCI500_PORT_M3			0xb
-> +#define CCI500_PORT_M4			0xc
-> +#define CCI500_PORT_M5			0xd
-> +
-> +#define CCI500_PORT_GLOBAL 		0xf
-> +
-> +#define CCI500_PMU_EVENT_MASK		0x1ffUL
-> +#define CCI500_PMU_EVENT_SOURCE_SHIFT	0x5
-> +#define CCI500_PMU_EVENT_SOURCE_MASK	0xf
-> +#define CCI500_PMU_EVENT_CODE_SHIFT	0x0
-> +#define CCI500_PMU_EVENT_CODE_MASK	0x1f
-> +
-> +#define CCI500_PMU_EVENT_SOURCE(event)	\
-> +	((event >> CCI500_PMU_EVENT_SOURCE_SHIFT) & CCI500_PMU_EVENT_SOURCE_MASK)
-> +#define CCI500_PMU_EVENT_CODE(event)	\
-> +	((event >> CCI500_PMU_EVENT_CODE_SHIFT) & CCI500_PMU_EVENT_CODE_MASK)
-> +
-> +#define CCI500_SLAVE_PORT_MIN_EV	0x00
-> +#define CCI500_SLAVE_PORT_MAX_EV	0x1f
-> +#define CCI500_MASTER_PORT_MIN_EV	0x00
-> +#define CCI500_MASTER_PORT_MAX_EV	0x06
-> +#define CCI500_GLOBAL_PORT_MIN_EV	0x00
-> +#define CCI500_GLOBAL_PORT_MAX_EV	0x0f
-> +
-> +static int cci500_validate_hw_event(struct cci_pmu *cci_pmu,
-> +					unsigned long hw_event)
-> +{
-> +	u32 ev_source = CCI500_PMU_EVENT_SOURCE(hw_event);
-> +	u32 ev_code = CCI500_PMU_EVENT_CODE(hw_event);
-> +	int if_type;
-> +
-> +	if (hw_event & ~CCI500_PMU_EVENT_MASK)
-> +		return -ENOENT;
-> +
-> +	switch (ev_source) {
-> +	case CCI500_PORT_S0:
-> +	case CCI500_PORT_S1:
-> +	case CCI500_PORT_S2:
-> +	case CCI500_PORT_S3:
-> +	case CCI500_PORT_S4:
-> +	case CCI500_PORT_S5:
-> +	case CCI500_PORT_S6:
-> +		if_type = CCI_IF_SLAVE;
-> +		break;
-> +	case CCI500_PORT_M0:
-> +	case CCI500_PORT_M1:
-> +	case CCI500_PORT_M2:
-> +	case CCI500_PORT_M3:
-> +	case CCI500_PORT_M4:
-> +	case CCI500_PORT_M5:
-> +		if_type = CCI_IF_MASTER;
-> +		break;
-> +	case CCI500_PORT_GLOBAL:
-> +		if_type = CCI_IF_GLOBAL;
-> +		break;
-> +	default:
-> +		return -ENOENT;
-> +	}
-> +
-> +	if (ev_code >= cci_pmu->model->event_ranges[if_type].min &&
-> +		ev_code <= cci_pmu->model->event_ranges[if_type].max)
-> +		return hw_event;
-> +
-> +	return -ENOENT;
-> +}
-> +#endif	/* CONFIG_ARM_CCI500_PMU */
-> +
->  static int pmu_is_valid_counter(struct cci_pmu *cci_pmu, int idx)
+> 
+> think this should go into 4.1 if at all possible...without it I am
+> unable to boot a 4.1 kernel on the LS2085 SoC
+
+What you are suggesting here is a effectively a revert of commit
+790b57a, which would break other implementations.
+
+Can you please explain the actual issue? I'm failing to see how you end
+up in an infinite loop here (the system page size and the ITS base
+granule should be completely unrelated...).
+
+Or has it anything to do with Minghuan Lian's patch
+(https://lkml.org/lkml/2015/4/16/36), which looks more correct (if still
+massively under-documented)?
+
+Thanks,
+
+	M.
+> 
+>  drivers/irqchip/irq-gic-v3-its.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 9687f8a..58a6612 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -800,7 +800,7 @@ static int its_alloc_tables(struct its_node *its)
 >  {
->  	return 0 <= idx && idx <= CCI_PMU_CNTR_LAST(cci_pmu);
-> @@ -981,6 +1085,29 @@ static struct cci_pmu_model cci_pmu_models[] = {
->  		.get_event_idx = cci400_get_event_idx,
->  	},
->  #endif
-> +#ifdef CONFIG_ARM_CCI500_PMU
-> +	[CCI500_R0] = {
-> +		.name = "CCI_500",
-> +		.fixed_hw_cntrs = 0,
-> +		.num_hw_cntrs = 8,
-> +		.cntr_size = SZ_64K,
-> +		.event_ranges = {
-> +			[CCI_IF_SLAVE] = {
-> +				CCI500_SLAVE_PORT_MIN_EV,
-> +				CCI500_SLAVE_PORT_MAX_EV,
-> +			},
-> +			[CCI_IF_MASTER] = {
-> +				CCI500_MASTER_PORT_MIN_EV,
-> +				CCI500_MASTER_PORT_MAX_EV,
-> +			},
-> +			[CCI_IF_GLOBAL] = {
-> +				CCI500_GLOBAL_PORT_MIN_EV,
-> +				CCI500_GLOBAL_PORT_MAX_EV,
-> +			},
-> +		},
-> +		.validate_hw_event = cci500_validate_hw_event,
-> +	},
-> +#endif
->  };
+>  	int err;
+>  	int i;
+> -	int psz = SZ_64K;
+> +	int psz = PAGE_SIZE;
+>  	u64 shr = GITS_BASER_InnerShareable;
+>  	u64 cache = GITS_BASER_WaWb;
 >  
->  static const struct of_device_id arm_cci_pmu_matches[] = {
-> @@ -998,6 +1125,12 @@ static const struct of_device_id arm_cci_pmu_matches[] = {
->  		.data	= &cci_pmu_models[CCI400_R1],
->  	},
->  #endif
-> +#ifdef CONFIG_ARM_CCI500_PMU
-> +	{
-> +		.compatible = "arm,cci-500-pmu,r0",
-> +		.data = &cci_pmu_models[CCI500_R0],
-> +	},
-> +#endif
->  	{},
->  };
+> 
+
+
+-- 
+Jazz is not dead. It just smells funny...
