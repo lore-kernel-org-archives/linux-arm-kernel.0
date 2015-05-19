@@ -1,89 +1,96 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 19 May 2015 17:17:42 +0200
-Subject: [PATCH 3/6] arm64: tegra: Add Tegra210 support
-In-Reply-To: <20150519145211.GX21251@e104818-lin.cambridge.arm.com>
-References: <1431529065-20128-1-git-send-email-thierry.reding@gmail.com>
- <1431529065-20128-3-git-send-email-thierry.reding@gmail.com>
- <20150513171114.GA18655@e104818-lin.cambridge.arm.com>
- <20150515101913.GA20474@ulmo.nvidia.com>
- <20150519145211.GX21251@e104818-lin.cambridge.arm.com>
-Message-ID: <20150519151740.GA28161@ulmo.nvidia.com>
+Date: Tue, 19 May 2015 17:22:10 +0200
+Subject: [PATCH v10 05/17] clk: tegra: Introduce ability for SoC-specific
+ reset control callbacks
+In-Reply-To: <555B517F.4080506@kapsi.fi>
+References: <1431529131-16710-6-git-send-email-mikko.perttunen@kapsi.fi>
+ <1432035567-19008-1-git-send-email-mikko.perttunen@kapsi.fi>
+ <20150519145922.GA28018@ulmo> <555B517F.4080506@kapsi.fi>
+Message-ID: <20150519152208.GB28161@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 03:52:11PM +0100, Catalin Marinas wrote:
-> On Fri, May 15, 2015 at 12:19:16PM +0200, Thierry Reding wrote:
-> > On Wed, May 13, 2015 at 06:11:15PM +0100, Catalin Marinas wrote:
-> > > On Wed, May 13, 2015 at 04:57:42PM +0200, Thierry Reding wrote:
-> > > > From: Thierry Reding <treding@nvidia.com>
-> > > > 
-> > > > NVIDIA Tegra210 (also known as Tegra X1) has four Cortex-A57 and four
-> > > > Cortex-A53 CPUs. Compared to Tegra124 and Tegra132 it comes with a 256-
-> > > > core Maxwell GPU. It supports processing videos of up to 4K resolutions
-> > > > at 60 fps (H.265, VP9, H.264).
-> > > > 
-> > > > Signed-off-by: Thierry Reding <treding@nvidia.com>
-> > > > ---
-> > > >  arch/arm64/Kconfig                       |   9 +
-> > > >  arch/arm64/boot/dts/nvidia/tegra210.dtsi | 998 +++++++++++++++++++++++++++++++
-> > > >  2 files changed, 1007 insertions(+)
-> > > >  create mode 100644 arch/arm64/boot/dts/nvidia/tegra210.dtsi
-> > > > 
-> > > > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> > > > index 7796af4b1d6f..bfdf064ada66 100644
-> > > > --- a/arch/arm64/Kconfig
-> > > > +++ b/arch/arm64/Kconfig
-> > > > @@ -225,6 +225,15 @@ config ARCH_TEGRA_132_SOC
-> > > >  	  but contains an NVIDIA Denver CPU complex in place of
-> > > >  	  Tegra124's "4+1" Cortex-A15 CPU complex.
-> > > >  
-> > > > +config ARCH_TEGRA_210_SOC
-> > > > +	bool "NVIDIA Tegra210 SoC"
-> > > > +	depends on ARCH_TEGRA
-> > > > +	select PINCTRL_TEGRA210
-> > > > +	select USB_ULPI if USB_PHY
-> > > > +	select USB_ULPI_VIEWPORT if USB_PHY
-> > > > +	help
-> > > > +	  Enable support for the NVIDIA Tegra210 SoC.
-> > > > +
-> > > 
-> > > The previous ARCH_TEGRA_132_SOC escaped me. Do we need all these
-> > > ARCH_TEGRA_*_SOC entries? Can we not have per-driver Kconfig options?
-> > > For example, ARCH_TEGRA_132_SOC seems to be only used in
-> > > drivers/clk/tegra, a specific Kconfig entry in there would suffice.
-> > 
-> > There are actually a couple of other places where this will be used in
-> > subsequent patches (e.g. memory controller driver). The idea behind
-> > having these is that each one of them is used to enable the essentials
-> > out of the box, so that people don't have to go and enable a bunch of
-> > driver-specific Kconfig options just to get a kernel configuration that
-> > can actually boot.
+On Tue, May 19, 2015 at 06:06:39PM +0300, Mikko Perttunen wrote:
+> On 05/19/2015 05:59 PM, Thierry Reding wrote:
+> >On Tue, May 19, 2015 at 02:39:27PM +0300, Mikko Perttunen wrote:
+> >>This patch allows SoC-specific CAR initialization routines to register
+> >>their own reset_assert and reset_deassert callbacks with the common Tegra
+> >>CAR code. If defined, the common code will call these callbacks when a
+> >>reset control with number >= num_periph_banks * 32 is attempted to be asserted
+> >>or deasserted respectively. Numbers greater than or equal to num_periph_banks * 32
+> >>are used to avoid clashes with low numbers that are automatically mapped to
+> >>standard CAR reset lines.
+> >>
+> >>Each SoC with these special resets should specify the defined reset control
+> >>numbers in a device tree header file.
+> >
+> >This is looking pretty good, but I think we can simplify a wee bit
+> >more...
+> >
+> >>Signed-off-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
+> >>Acked-by: Michael Turquette <mturquette@linaro.org>
+> >>---
+> >>  drivers/clk/tegra/clk.c | 39 +++++++++++++++++++++++++++++++--------
+> >>  drivers/clk/tegra/clk.h |  3 +++
+> >>  2 files changed, 34 insertions(+), 8 deletions(-)
+> >>
+> >>diff --git a/drivers/clk/tegra/clk.c b/drivers/clk/tegra/clk.c
+> >>index 41cd87c..c093ed9 100644
+> >>--- a/drivers/clk/tegra/clk.c
+> >>+++ b/drivers/clk/tegra/clk.c
+> >>@@ -49,7 +49,6 @@
+> >>  #define RST_DEVICES_L			0x004
+> >>  #define RST_DEVICES_H			0x008
+> >>  #define RST_DEVICES_U			0x00C
+> >>-#define RST_DFLL_DVCO			0x2F4
+> >>  #define RST_DEVICES_V			0x358
+> >>  #define RST_DEVICES_W			0x35C
+> >>  #define RST_DEVICES_X			0x28C
+> >>@@ -79,6 +78,11 @@ static struct clk **clks;
+> >>  static int clk_num;
+> >>  static struct clk_onecell_data clk_data;
+> >>
+> >>+/* Handlers for SoC-specific reset lines */
+> >>+static int (*special_reset_assert)(unsigned long);
+> >>+static int (*special_reset_deassert)(unsigned long);
+> >>+static int special_reset_num;
+> >
+> >I think we can get rid of this if we...
+> >
+> >>+
+> >>  static struct tegra_clk_periph_regs periph_regs[] = {
+> >>  	[0] = {
+> >>  		.enb_reg = CLK_OUT_ENB_L,
+> >>@@ -152,19 +156,29 @@ static int tegra_clk_rst_assert(struct reset_controller_dev *rcdev,
+> >>  	 */
+> >>  	tegra_read_chipid();
+> >>
+> >>-	writel_relaxed(BIT(id % 32),
+> >>-			clk_base + periph_regs[id / 32].rst_set_reg);
+> >>+	if (id < periph_banks * 32) {
+> >>+		writel_relaxed(BIT(id % 32),
+> >>+			       clk_base + periph_regs[id / 32].rst_set_reg);
+> >>+		return 0;
+> >>+	} else if (id < periph_banks * 32 + special_reset_num) {
+> >>+		return special_reset_assert(id);
+> >>+	}
+> >
+> >... pass id - periph_banks * 32 into special_reset_assert(). Oh, but
+> >then...
 > 
-> We debated whether to have ARCH_* options at all on arm64 and we settled
-> for the middle ground - only add them for SoC families, not individual
-> SoCs. As for the kernel configuration that actually boots, we want the
-> arm64 defconfig to include all the supported SoCs and drivers (though
-> longer term I'd like to see more drivers built as modules by default).
-> 
-> > This is also useful for integrators since they can simply omit all SoC
-> > generations that they're not interested in. Having a per-SoC option
-> > provides an easy way of doing so.
-> 
-> The integrators could just select a SoC family and trim down unwanted
-> options, I don't think they rely on the kernel defconfig for a final
-> product. If this becomes an issue, I would rather have per-SoC
-> defconfigs than lots of Kconfig entries.
+> The reason I don't subtract periph_banks * 32 is because this way the code
+> in the SoC-specific callback can just include the dt-bindings header and use
+> the same defines used in the device tree.
 
-I understand the desire to start with a clean plate on a new
-architecture, but Tegra has worked like this for the past 5 years and
-it's worked out really well for us. So I'm reluctant to introduce these
-inconsistencies merely because 64-bit ARM now lives in a different
-directory.
+Indeed, you're right. Now if
 
-Are you concerned about arch/arm64/Kconfig growing wild? If so we could
-easily move these configuration options outside to something like
-drivers/soc/tegra/Kconfig. While at it, we could move existing options
-from arch/arm/mach-tegra over to that as well.
+	static int special_reset_num;
+
+could be turned into
+
+	static unsigned int num_special_reset;
+
+I'd be happy to take this into the Tegra clock tree.
 
 Thierry
 -------------- next part --------------
@@ -92,4 +99,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150519/dfe5be8f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150519/473ddc4c/attachment-0001.sig>
