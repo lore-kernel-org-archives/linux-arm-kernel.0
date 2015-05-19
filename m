@@ -1,209 +1,116 @@
-From: timo.kokkonen@offcode.fi (Timo Kokkonen)
-Date: Tue, 19 May 2015 11:26:07 +0300
-Subject: [PATCHv8 08/10] watchdog: at91sam9_wdt: Convert to use new watchdog
- core extensions
-In-Reply-To: <1432023969-20736-1-git-send-email-timo.kokkonen@offcode.fi>
-References: <1432023969-20736-1-git-send-email-timo.kokkonen@offcode.fi>
-Message-ID: <1432023969-20736-9-git-send-email-timo.kokkonen@offcode.fi>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 19 May 2015 10:26:35 +0200
+Subject: [PATCH v2 03/10] clk: sunxi: Let divs clocks read the base
+ factor clock name from devicetree
+In-Reply-To: <5559AF58.60508@gmail.com>
+References: <1431707940-19372-1-git-send-email-jenskuske@gmail.com>
+ <1431707940-19372-4-git-send-email-jenskuske@gmail.com>
+ <20150517130657.GD4004@lukather> <5559AF58.60508@gmail.com>
+Message-ID: <20150519082635.GW4004@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fill in the new watchdog core parameters and call
-watchdog_init_params() to let core know we are ready to support the
-new core API extensions. This allows the ad hoc timer code to be
-removed from the driver as the watchdog core takes care of petting the
-driver as needed.
+On Mon, May 18, 2015 at 11:22:32AM +0200, Jens Kuske wrote:
+> On 05/17/15 15:06, Maxime Ripard wrote:
+> > On Fri, May 15, 2015 at 06:38:53PM +0200, Jens Kuske wrote:
+> >> Currently, the sunxi clock driver gets the name for the base factor clock
+> >> of divs clocks from the name field in factors_data. This prevents reusing
+> >> of the factor clock for clocks with same properties, but different name.
+> >>
+> >> This commit makes the divs setup function try to get a name from
+> >> clock-output-names in the devicetree. It also removes the name field where
+> >> possible and merges the sun4i PLL5 and PLL6 clocks.
+> >>
+> >> The sun4i PLL5 clock doesn't have a output for the base factor clock,
+> >> so we still have to use the name field there.
+> >>
+> >> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
+> >> ---
+> >>  drivers/clk/sunxi/clk-sunxi.c | 22 ++++++++++++----------
+> >>  1 file changed, 12 insertions(+), 10 deletions(-)
+> >>
+> >> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+> >> index 17cba4d..afe560c 100644
+> >> --- a/drivers/clk/sunxi/clk-sunxi.c
+> >> +++ b/drivers/clk/sunxi/clk-sunxi.c
+> >> @@ -708,18 +708,10 @@ static const struct factors_data sun4i_pll5_data __initconst = {
+> >>  	.name = "pll5",
+> >>  };
+> >>  
+> >> -static const struct factors_data sun4i_pll6_data __initconst = {
+> >> -	.enable = 31,
+> >> -	.table = &sun4i_pll5_config,
+> >> -	.getter = sun4i_get_pll5_factors,
+> >> -	.name = "pll6",
+> >> -};
+> >> -
+> >>  static const struct factors_data sun6i_a31_pll6_data __initconst = {
+> >>  	.enable = 31,
+> >>  	.table = &sun6i_a31_pll6_config,
+> >>  	.getter = sun6i_a31_get_pll6_factors,
+> >> -	.name = "pll6x2",
+> >>  };
+> >>  
+> >>  static const struct factors_data sun5i_a13_ahb_data __initconst = {
+> >> @@ -1099,7 +1091,7 @@ static const struct divs_data pll5_divs_data __initconst = {
+> >>  };
+> >>  
+> >>  static const struct divs_data pll6_divs_data __initconst = {
+> >> -	.factors = &sun4i_pll6_data,
+> >> +	.factors = &sun4i_pll5_data,
+> >>  	.ndivs = 4,
+> >>  	.div = {
+> >>  		{ .shift = 0, .table = pll6_sata_tbl, .gate = 14 }, /* M, SATA */
+> >> @@ -1141,6 +1133,7 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
+> >>  	struct clk_gate *gate = NULL;
+> >>  	struct clk_fixed_factor *fix_factor;
+> >>  	struct clk_divider *divider;
+> >> +	struct factors_data factors = *data->factors;
+> >>  	void __iomem *reg;
+> >>  	int ndivs = SUNXI_DIVS_MAX_QTY, i = 0;
+> >>  	int flags, clkflags;
+> >> @@ -1149,8 +1142,17 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
+> >>  	if (data->ndivs)
+> >>  		ndivs = data->ndivs;
+> >>  
+> >> +	/* Try to find a name for base factor clock */
+> >> +	for (i = 0; i < ndivs; i++) {
+> >> +		if (data->div[i].self) {
+> > 
+> > I'm not sure we should expect the factor clock to have a self factor.
+> 
+> Maybe not, but in that case it would fall back to the name provided in
+> the factors_data struct, as it is the case for sun4i pll5.
 
-Tested-by: Wenyou Yang <wenyou.yang@atmel.com>
-Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
----
- drivers/watchdog/at91sam9_wdt.c | 73 +++++++++--------------------------------
- drivers/watchdog/watchdog_dev.c |  3 +-
- 2 files changed, 18 insertions(+), 58 deletions(-)
+Which doesn't really solve the underlying issue, just make it work in
+your (pll6/pll8) case.
+ 
+> > what about taking the first output and taking the substring up to the
+> > first "_" ?
+> 
+> That only works for the sun[457]i pll5 & pll6, for sun[68]i the base
+> clock name would have to be "pll6x2".
 
-diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-index 411b7a6..ef1e8d0a 100644
---- a/drivers/watchdog/at91sam9_wdt.c
-+++ b/drivers/watchdog/at91sam9_wdt.c
-@@ -29,7 +29,6 @@
- #include <linux/types.h>
- #include <linux/watchdog.h>
- #include <linux/jiffies.h>
--#include <linux/timer.h>
- #include <linux/bitops.h>
- #include <linux/uaccess.h>
- #include <linux/of.h>
-@@ -83,11 +82,8 @@ MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started "
- struct at91wdt {
- 	struct watchdog_device wdd;
- 	void __iomem *base;
--	unsigned long next_heartbeat;	/* the next_heartbeat for the timer */
--	struct timer_list timer;	/* The timer that pings the watchdog */
- 	u32 mr;
- 	u32 mr_mask;
--	unsigned long heartbeat;	/* WDT heartbeat in jiffies */
- 	bool nowayout;
- 	unsigned int irq;
- };
-@@ -115,39 +111,17 @@ static inline void at91_wdt_reset(struct at91wdt *wdt)
- 	wdt_write(wdt, AT91_WDT_CR, AT91_WDT_KEY | AT91_WDT_WDRSTT);
- }
- 
--/*
-- * Timer tick
-- */
--static void at91_ping(unsigned long data)
--{
--	struct at91wdt *wdt = (struct at91wdt *)data;
--	if (time_before(jiffies, wdt->next_heartbeat) ||
--	    !watchdog_hw_active(&wdt->wdd)) {
--		at91_wdt_reset(wdt);
--		mod_timer(&wdt->timer, jiffies + wdt->heartbeat);
--	} else {
--		pr_crit("I will reset your machine !\n");
--	}
--}
--
- static int at91_wdt_start(struct watchdog_device *wdd)
- {
- 	struct at91wdt *wdt = to_wdt(wdd);
--	/* calculate when the next userspace timeout will be */
--	wdt->next_heartbeat = jiffies + wdd->timeout * HZ;
--	return 0;
--}
- 
--static int at91_wdt_stop(struct watchdog_device *wdd)
--{
--	/* The watchdog timer hardware can not be stopped... */
-+	at91_wdt_reset(wdt);
- 	return 0;
- }
- 
--static int at91_wdt_set_timeout(struct watchdog_device *wdd, unsigned int new_timeout)
-+static int at91_wdt_stop(struct watchdog_device *wdd)
- {
--	wdd->timeout = new_timeout;
--	return at91_wdt_start(wdd);
-+	return -ENOTSUPP;
- }
- 
- static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
-@@ -196,11 +170,11 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
- 	 * it at the min_heartbeat period.
- 	 */
- 	if ((max_heartbeat / 4) >= min_heartbeat)
--		wdt->heartbeat = max_heartbeat / 4;
-+		wdt->wdd.hw_heartbeat = jiffies_to_msecs(max_heartbeat / 4);
- 	else if ((max_heartbeat / 2) >= min_heartbeat)
--		wdt->heartbeat = max_heartbeat / 2;
-+		wdt->wdd.hw_heartbeat = jiffies_to_msecs(max_heartbeat / 2);
- 	else
--		wdt->heartbeat = min_heartbeat;
-+		wdt->wdd.hw_heartbeat = jiffies_to_msecs(min_heartbeat);
- 
- 	if (max_heartbeat < min_heartbeat + 4)
- 		dev_warn(dev,
-@@ -220,47 +194,28 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
- 			 "watchdog already configured differently (mr = %x expecting %x)\n",
- 			 tmp & wdt->mr_mask, wdt->mr & wdt->mr_mask);
- 
--	setup_timer(&wdt->timer, at91_ping, (unsigned long)wdt);
--
--	/*
--	 * Use min_heartbeat the first time to avoid spurious watchdog reset:
--	 * we don't know for how long the watchdog counter is running, and
--	 *  - resetting it right now might trigger a watchdog fault reset
--	 *  - waiting for heartbeat time might lead to a watchdog timeout
--	 *    reset
--	 */
--	mod_timer(&wdt->timer, jiffies + min_heartbeat);
-+	watchdog_set_hw_active(&wdt->wdd, 1);
-+	watchdog_init_params(&wdt->wdd, dev);
- 
--	/* Try to set timeout from device tree first */
--	if (watchdog_init_timeout(&wdt->wdd, 0, dev))
--		watchdog_init_timeout(&wdt->wdd, heartbeat, dev);
- 	watchdog_set_nowayout(&wdt->wdd, wdt->nowayout);
- 	err = watchdog_register_device(&wdt->wdd);
- 	if (err)
--		goto out_stop_timer;
--
--	wdt->next_heartbeat = jiffies + wdt->wdd.timeout * HZ;
-+		return err;
- 
- 	return 0;
--
--out_stop_timer:
--	del_timer(&wdt->timer);
--	return err;
- }
- 
- /* ......................................................................... */
- 
- static const struct watchdog_info at91_wdt_info = {
- 	.identity	= DRV_NAME,
--	.options	= WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING |
--						WDIOF_MAGICCLOSE,
-+	.options	= WDIOF_KEEPALIVEPING |	WDIOF_MAGICCLOSE,
- };
- 
- static const struct watchdog_ops at91_wdt_ops = {
- 	.owner =	THIS_MODULE,
- 	.start =	at91_wdt_start,
- 	.stop =		at91_wdt_stop,
--	.set_timeout =	at91_wdt_set_timeout,
- };
- 
- #if defined(CONFIG_OF)
-@@ -287,6 +242,8 @@ static int of_at91wdt_init(struct device_node *np, struct at91wdt *wdt)
- 		}
- 	}
- 
-+	wdt->wdd.hw_max_timeout = max * 1000;
-+
- 	min = secs_to_ticks(min);
- 	max = secs_to_ticks(max);
- 
-@@ -345,7 +302,7 @@ static int __init at91wdt_probe(struct platform_device *pdev)
- 	wdt->wdd.ops = &at91_wdt_ops;
- 	wdt->wdd.timeout = WDT_HEARTBEAT;
- 	wdt->wdd.min_timeout = 1;
--	wdt->wdd.max_timeout = 0xFFFF;
-+	wdt->wdd.hw_max_timeout = WDT_COUNTER_MAX_SECS * 1000;
- 
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	wdt->base = devm_ioremap_resource(&pdev->dev, r);
-@@ -358,6 +315,9 @@ static int __init at91wdt_probe(struct platform_device *pdev)
- 			return err;
- 	}
- 
-+	if (heartbeat > 0)
-+		wdt->wdd.timeout = heartbeat;
-+
- 	err = at91_wdt_init(pdev, wdt);
- 	if (err)
- 		return err;
-@@ -376,7 +336,6 @@ static int __exit at91wdt_remove(struct platform_device *pdev)
- 	watchdog_unregister_device(&wdt->wdd);
- 
- 	pr_warn("I quit now, hardware will probably reboot!\n");
--	del_timer(&wdt->timer);
- 
- 	return 0;
- }
-diff --git a/drivers/watchdog/watchdog_dev.c b/drivers/watchdog/watchdog_dev.c
-index 0310eda..8f99020 100644
---- a/drivers/watchdog/watchdog_dev.c
-+++ b/drivers/watchdog/watchdog_dev.c
-@@ -78,7 +78,8 @@ static int watchdog_ping(struct watchdog_device *wddev)
- 	if (wddev->hw_max_timeout &&
- 		wddev->timeout * 1000 > wddev->hw_max_timeout) {
- 		wddev->expires = jiffies + wddev->timeout * HZ;
--		schedule_delayed_work(&wddev->work, wddev->hw_heartbeat);
-+		schedule_delayed_work(&wddev->work,
-+				      msecs_to_jiffies(wddev->hw_heartbeat));
- 	}
- 
- out_ping:
+Why?
+
+It's called pll6 in the datasheet, it should really be called
+pll6. The fact that there is some fixed factors or dividers on some
+children only impacts those children, and not the system as a whole.
+
+And the fact that the "base" clock is pll6x2 and not pll6 itself is
+very debatable. How do you know which clock is the base one? Most
+clocks are actually using pll6 as a reference.
+
+Maxime
+
 -- 
-2.1.0
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150519/abf28062/attachment.sig>
