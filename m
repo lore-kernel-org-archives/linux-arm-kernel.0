@@ -1,39 +1,37 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 19 May 2015 17:03:49 +0200
-Subject: [PATCH v8 09/16] clockevents/drivers: Add STM32 Timer driver
-In-Reply-To: <CALszF6A-De6dvcRNoa9ruL+y6Wt_rc7bi-O-VxHWkFF9NSt5_g@mail.gmail.com>
-References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>	<555B098A.8030202@linaro.org>	<CALszF6AJ3Zf598wYeUx=iNWHHKT24xUyfagB=+4GocwZ-Fd-0g@mail.gmail.com>	<6177628.0ZDPLeVyah@wuerfel>	<CALszF6BZKD-CPTZ6Hc85wv2Z3Y7JmUv-cMkBtbk2Ga6WeeWU=A@mail.gmail.com>	<555B3F80.8070605@linaro.org>
- <CALszF6A-De6dvcRNoa9ruL+y6Wt_rc7bi-O-VxHWkFF9NSt5_g@mail.gmail.com>
-Message-ID: <555B50D5.4010100@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 19 May 2015 17:03:09 +0200
+Subject: [PATCH v2 07/10] pinctrl: sunxi: Add H3 PIO controller support
+In-Reply-To: <CACRpkdZnWavNK_o04-mNmA0eDV+ppQJz8Kt+-OF5M=jgysuO_g@mail.gmail.com>
+References: <1431707940-19372-1-git-send-email-jenskuske@gmail.com>
+ <1431707940-19372-8-git-send-email-jenskuske@gmail.com>
+ <CACRpkdZnWavNK_o04-mNmA0eDV+ppQJz8Kt+-OF5M=jgysuO_g@mail.gmail.com>
+Message-ID: <20150519150309.GY4004@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/19/2015 04:41 PM, Maxime Coquelin wrote:
-> 2015-05-19 15:49 GMT+02:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
->>
->>
->> It is not exactly as the initial patch.
->>
->> I think Arnd is proposing:
->>
->> config CLKSRC_STM32
->>          bool "Clocksource for STM32 SoCs" if COMPILE_TEST
->>          select CLKSRC_MMIO
->>
->
-> Isn't "depends on OF" missing for COMPILE_TEST case?
+On Tue, May 19, 2015 at 04:04:58PM +0200, Linus Walleij wrote:
+> On Fri, May 15, 2015 at 6:38 PM, Jens Kuske <jenskuske@gmail.com> wrote:
+> 
+> > The H3 uses the same pin controller as previous SoC's from Allwinner.
+> > Add support for the pins controlled by the main PIO controller.
+> >
+> > Signed-off-by: Jens Kuske <jenskuske@gmail.com>
+> 
+> Waiting for Maxime's ACKs on these patches before merging.
 
-Hmm, yes. Probably.
+There's still the modules issue being debated on another patch of this
+serie, so there will probably be a v3 of these patches.
 
-> Other than that, I'm fine with the proposal.
-> Daniel, is it the case for you too?
-
-Yep.
-
+Maxime
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150519/c06b196f/attachment.sig>
