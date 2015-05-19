@@ -1,58 +1,94 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 19 May 2015 23:44:58 +0200
-Subject: [PATCH] ARM: v7 setup function should invalidate L1 cache
-In-Reply-To: <E1Yuk8W-0001tC-IK@rmk-PC.arm.linux.org.uk>
-References: <E1Yuk8W-0001tC-IK@rmk-PC.arm.linux.org.uk>
-Message-ID: <6452458.LAJUB33YSi@phil>
+From: fkan@apm.com (Feng Kan)
+Date: Tue, 19 May 2015 14:45:26 -0700
+Subject: [PATCH v4 2/3] irqchip: GIC: Add support for irq_{get,
+ set}_irqchip_state
+In-Reply-To: <20150519110131.522f9c16@arm.com>
+References: <1426676484-21812-1-git-send-email-marc.zyngier@arm.com>
+ <1426676484-21812-3-git-send-email-marc.zyngier@arm.com>
+ <CAL85gmBrkonMcKdUVGmYx6zT3wSe-e2jPhnL_+Tkf3s4jsAiWg@mail.gmail.com>
+ <CACRpkdYffHJEzksc5mg7JZdwTzShGaQofAmbmn65=_V3ot04Rg@mail.gmail.com>
+ <CAL85gmC4ovR99wQQYoKs=oo24So80jZ_guxDDFhi-1MXXj0uSw@mail.gmail.com>
+ <CACRpkdZkBLrhFpZiYk4fiM3ND+UwnVJhNKs=+rL5iZY4fS7zCg@mail.gmail.com>
+ <CAL85gmD=12u87vDAc601T=ZOgcS-jDo_=LaC5gRAZUHgp_iTbA@mail.gmail.com>
+ <CACRpkdYV1MzjW6ZMvmOhqi0qhXeeQnC62--7WBY=_hZBT8cvXg@mail.gmail.com>
+ <20150519110131.522f9c16@arm.com>
+Message-ID: <CAL85gmDugvn0Gv-Ypm0EN-3bE6JM+hWFkVV8FxCeBQ1FS7EERw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Tue, May 19, 2015 at 3:01 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On Tue, 19 May 2015 09:40:21 +0100
+> Linus Walleij <linus.walleij@linaro.org> wrote:
+>
+>> On Thu, May 14, 2015 at 10:14 PM, Feng Kan <fkan@apm.com> wrote:
+>> > On Thu, May 14, 2015 at 3:32 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>>
+>> >> But surely the GPIO block has its own status register, so are
+>> >> you saying that this register is unreliable?
+>> >
+>> > When the GPIO is used as interrupt, the gpio block does not report the
+>> > status anymore. Which leaves us stuck with SPISR.
+>> >>
+>> >> I can think of a few reasons, like transient IRQs etc but
+>> >> what is actually causing this?
+>> >
+>> > I won't say the obvious.
+>>
+>> Yeah I see your problem now :(
+>>
+>> I think it's better to fix the access functions so that you can
+>> cross-call to the GIC driver to get the SPISR flag out though.
+>> Let's see what Marc says.
+>>
+>> >> Which GPIO driver is this? Is it upstream?
+>> >
+>> > Yes, it is upstream. It is the xgene slimpro gpio driver. I am starting to
+>> > think that we ought to switch to use some gpio poll driver rather than
+>> > using gpio-key.
+>>
+>> There is both gpio_keys_polled and IRQ-driven gpio_keys so yeah
+>> that's possible. But honestly I think it's better to deal with this
+>> problem for real because IRQ is more efficient.
+>>
+>> So the way I perceive it this is the real problem:
+>>
+>> +static int gic_irq_get_irqchip_state(struct irq_data *d,
+>> +                                     enum irqchip_irq_state which, bool *val)
+>> +{
+>> +       switch (which) {
+>> (...)
+>> +       case IRQCHIP_STATE_ACTIVE:
+>> +               *val = gic_peek_irq(d, GIC_DIST_ACTIVE_SET);
+>> +               break; case: read
+>> from 0xd04 (SPISR) instead, because that makes more
+>> sense to me, or am I wrong at it?
+>>
+>> +       case IRQCHIP_STATE_LINE_LEVEL:
+>> +               *val = gic_peek_irq(d, GIC_DIST_SPISR);
+>> +               break;
+>>
+>> And then put a define into <linux/irqchip/arm-gic.h> for
+>> GIC_DIST_SPISR.
+>
+> What worries me here is that the PENDING state should already give you
+> the right level of information (this is what the GIC-400 TRM says). The
+> only reason why SPISR exists is that software can write to the PENDING
+> register, while SPISR is RO.
+>
+> If reading the pending state doesn't work, then I'd like to know
+> exactly *why*. Only then we can add support for LINE_LEVEL using SPISR
+> (which has to be GIC-400 specific, as it is not architected).
 
-Am Dienstag, 19. Mai 2015, 17:12:56 schrieb Russell King:
-> All ARMv5 and older CPUs invalidate their caches in the early assembly
-> setup function, prior to enabling the MMU.  This is because the L1
-> cache should not contain any data relevant to the execution of the
-> kernel at this point; all data should have been flushed out to memory.
-> 
-> This requirement should also be true for ARMv6 and ARMv7 CPUs - indeed,
-> these typically do not search their caches when caching is disabled (as
-> it needs to be when the MMU is disabled) so this change should be safe.
-> 
-> ARMv7 allows there to be CPUs which search their caches while caching is
-> disabled, and it's permitted that the cache is uninitialised at boot;
-> for these, the architecture reference manual requires that an
-> implementation specific code sequence is used immediately after reset
-> to ensure that the cache is placed into a sane state.  Such
-> functionality is definitely outside the remit of the Linux kernel, and
-> must be done by the SoC's firmware before _any_ CPU gets to the Linux
-> kernel.
-> 
-> Changing the data cache clean+invalidate to a mere invalidate allows us
-> to get rid of a lot of platform specific hacks around this issue for
-> their secondary CPU bringup paths - some of which were buggy.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+IS_PENDING and IS_ACTIVE works fine for the ISR context. However,
+the nature of the register is meant for IRQ handling and not to read
+the status of a GPIO. By the time the gpio_key throws a work queue
+and check the status of the PENDING register, it is no long relevant.
 
 
-Michael Niewoehner tested this on a rk3188 (Cortex-A9) and wrote in [0]
-> Tested-by: Michael Niewoehner <mniewoeh@stud.hs-offenburg.de>
-> 
-> Tested on Radxa Rock Pro with RK3188.
-> The kernel panics on reboot I had before and also a kernel BUG when running
-> "memtester 1900M" went away and the rock seems to run stable now.
 
-
-I've also tested the patch on a rk3288-based board, so both supported Rockchip 
-ARM-cores (A9 and A12/A17) seem to run fine with this change.
-
-Tested-by: Heiko Stuebner <heiko@sntech.de>
-
-Rockchip-specific changes
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-
-
-Thanks Heiko
-
-
-[0] http://lists.infradead.org/pipermail/linux-rockchip/2015-May/003046.html
+>
+> Thanks,
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny.
