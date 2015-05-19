@@ -1,35 +1,35 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 19 May 2015 08:16:19 +0200
-Subject: How to encode being an I2C slave in DT?
-In-Reply-To: <CAL_Jsq+iyeK-bV3ggcJv8Cw3EU71fkBo1wqYZnhCoh2-b_tO-Q@mail.gmail.com>
-References: <1427745615-5428-1-git-send-email-danindrey@mail.ru>
- <20150403194635.GC2016@katana> <1549160.njMIY2NVTi@fb07-iapwap2>
- <20150505105513.GA1841@katana> <554922EF.3050906@wwwdotorg.org>
- <20150506161712.GA4003@katana>
- <CAL_Jsq+iyeK-bV3ggcJv8Cw3EU71fkBo1wqYZnhCoh2-b_tO-Q@mail.gmail.com>
-Message-ID: <20150519061619.GA4448@schokonusskuchen.bad>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Tue, 19 May 2015 15:16:59 +0900
+Subject: [PATCH] ARM: multi_v7_defconfig: make savedefconfig for
+ removinguseless configs
+In-Reply-To: <5559902F.7040506@samsung.com>
+References: <55598A56.7020006@kernel.org> <5559902F.7040506@samsung.com>
+Message-ID: <555AD55B.2060405@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> > I give in to the flag idea. I also noticed that we'd need another flag
-> > anyhow to mark 10 bit addresses. I am still thinking between using two
-> > address-cells in that case (clean seperation between address and flags)
-> > or to encode the flags as MSB in the current address (all busses will
-> > have same address-cells and child description, less code paths and no
-> > overhead in dtbs).
+On 05/18/15 16:09, Krzysztof Kozlowski wrote:
+> On 18.05.2015 15:44, Kukjin Kim wrote:
+>> This patch removes useless configs which can be seleted according to
+>> the dependencies in defconfig with using 'make savedefconfig' because
+>> we don't need to keep them in defconfig file.
+>>
+>> Signed-off-by: Kukjin Kim <kgene@kernel.org>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Cc: Olof Johansson <olof@lixom.net>
+>> Cc: Kevin Hilman <khilman@linaro.org>
+>> ---
+>> When I tried to sort out exynos related configs for multi_v7_defconfig,
+>> I found there are many useless configs in there so sending this. If you
+>> guys OK with this, I'll sort them out including this.
 > 
-> Reading thru the thread, this seems good to me. I would go with adding
-> flags in the MSB of the reg cell rather than adding a cell.
+> On which tree and commit this is rebased on? I tried next
+> (next-20150515) and your for-next (v4.1-rc3-34-gfcfae6b049cf) branches
+> but I does not apply to any of them. Can you point me to base branch?
+> 
+I've applied all of changes from you and Javier and it will be sent out
+to arm-soc in a day. Please see the samsung-defconfig branch in my tree
+and if any problems, let me know.
 
-Thanks. I was leaning to the MSB idea, too, and am currently checking
-how the code would look like. Feels much better to do knowing that it is
-basically upstream compatible ;)
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150519/d60fd9fe/attachment.sig>
+Thanks,
+Kukjin
