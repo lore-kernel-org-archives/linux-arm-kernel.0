@@ -1,9 +1,9 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 19 May 2015 10:55:10 -0600
-Subject: [PATCH 05/16] coresight: tpiu: let runtime PM handle core clock
+Date: Tue, 19 May 2015 10:55:11 -0600
+Subject: [PATCH 06/16] coresight: etb: let runtime PM handle core clock
 In-Reply-To: <1432054521-24807-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1432054521-24807-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1432054521-24807-6-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1432054521-24807-7-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -27,84 +27,131 @@ Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-tpiu.c | 21 ++++-----------------
- 1 file changed, 4 insertions(+), 17 deletions(-)
+ drivers/hwtracing/coresight/coresight-etb10.c | 35 +++++++--------------------
+ 1 file changed, 9 insertions(+), 26 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
-index 88b6b0c32538..688ba937069e 100644
---- a/drivers/hwtracing/coresight/coresight-tpiu.c
-+++ b/drivers/hwtracing/coresight/coresight-tpiu.c
-@@ -17,7 +17,7 @@
- #include <linux/io.h>
- #include <linux/err.h>
+diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+index 2a77d83130e6..df306aef4360 100644
+--- a/drivers/hwtracing/coresight/coresight-etb10.c
++++ b/drivers/hwtracing/coresight/coresight-etb10.c
+@@ -22,7 +22,7 @@
+ #include <linux/uaccess.h>
  #include <linux/slab.h>
+ #include <linux/spinlock.h>
 -#include <linux/clk.h>
 +#include <linux/pm_runtime.h>
+ #include <linux/seq_file.h>
  #include <linux/coresight.h>
  #include <linux/amba/bus.h>
- 
-@@ -51,13 +51,11 @@
-  * @base:	memory mapped base address for this component.
+@@ -68,7 +68,6 @@
   * @dev:	the device entity associated to this component.
   * @csdev:	component vitals needed by the framework.
+  * @miscdev:	specifics to handle "/dev/xyz.etb" entry.
 - * @clk:	the clock this component is associated to.
-  */
- struct tpiu_drvdata {
- 	void __iomem		*base;
+  * @spinlock:	only one at a time pls.
+  * @in_use:	synchronise user space access to etb buffer.
+  * @buf:	area of memory where ETB buffer content gets sent.
+@@ -81,7 +80,6 @@ struct etb_drvdata {
  	struct device		*dev;
  	struct coresight_device	*csdev;
+ 	struct miscdevice	miscdev;
 -	struct clk		*clk;
- };
+ 	spinlock_t		spinlock;
+ 	atomic_t		in_use;
+ 	u8			*buf;
+@@ -92,17 +90,14 @@ struct etb_drvdata {
  
- static void tpiu_enable_hw(struct tpiu_drvdata *drvdata)
-@@ -72,12 +70,8 @@ static void tpiu_enable_hw(struct tpiu_drvdata *drvdata)
- static int tpiu_enable(struct coresight_device *csdev)
+ static unsigned int etb_get_buffer_depth(struct etb_drvdata *drvdata)
  {
- 	struct tpiu_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 -	int ret;
--
+ 	u32 depth = 0;
+ 
 -	ret = clk_prepare_enable(drvdata->clk);
 -	if (ret)
 -		return ret;
++	pm_runtime_get_sync(drvdata->dev);
  
-+	pm_runtime_get_sync(csdev->dev.parent);
- 	tpiu_enable_hw(drvdata);
+ 	/* RO registers don't need locking */
+ 	depth = readl_relaxed(drvdata->base + ETB_RAM_DEPTH_REG);
  
- 	dev_info(drvdata->dev, "TPIU enabled\n");
-@@ -101,8 +95,7 @@ static void tpiu_disable(struct coresight_device *csdev)
- 	struct tpiu_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
- 	tpiu_disable_hw(drvdata);
--
 -	clk_disable_unprepare(drvdata->clk);
-+	pm_runtime_put(csdev->dev.parent);
- 
- 	dev_info(drvdata->dev, "TPIU disabled\n");
++	pm_runtime_put(drvdata->dev);
+ 	return depth;
  }
-@@ -118,7 +111,6 @@ static const struct coresight_ops tpiu_cs_ops = {
  
- static int tpiu_probe(struct amba_device *adev, const struct amba_id *id)
+@@ -137,12 +132,9 @@ static void etb_enable_hw(struct etb_drvdata *drvdata)
+ static int etb_enable(struct coresight_device *csdev)
+ {
+ 	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+-	int ret;
+ 	unsigned long flags;
+ 
+-	ret = clk_prepare_enable(drvdata->clk);
+-	if (ret)
+-		return ret;
++	pm_runtime_get_sync(drvdata->dev);
+ 
+ 	spin_lock_irqsave(&drvdata->spinlock, flags);
+ 	etb_enable_hw(drvdata);
+@@ -252,7 +244,7 @@ static void etb_disable(struct coresight_device *csdev)
+ 	drvdata->enable = false;
+ 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+ 
+-	clk_disable_unprepare(drvdata->clk);
++	pm_runtime_put(drvdata->dev);
+ 
+ 	dev_info(drvdata->dev, "ETB disabled\n");
+ }
+@@ -339,16 +331,12 @@ static const struct file_operations etb_fops = {
+ static ssize_t status_show(struct device *dev,
+ 			   struct device_attribute *attr, char *buf)
  {
 -	int ret;
- 	void __iomem *base;
- 	struct device *dev = &adev->dev;
- 	struct coresight_platform_data *pdata = NULL;
-@@ -148,15 +140,10 @@ static int tpiu_probe(struct amba_device *adev, const struct amba_id *id)
+ 	unsigned long flags;
+ 	u32 etb_rdr, etb_sr, etb_rrp, etb_rwp;
+ 	u32 etb_trg, etb_cr, etb_ffsr, etb_ffcr;
+ 	struct etb_drvdata *drvdata = dev_get_drvdata(dev->parent);
  
- 	drvdata->base = base;
+-	ret = clk_prepare_enable(drvdata->clk);
+-	if (ret)
+-		goto out;
+-
++	pm_runtime_get_sync(drvdata->dev);
+ 	spin_lock_irqsave(&drvdata->spinlock, flags);
+ 	CS_UNLOCK(drvdata->base);
+ 
+@@ -364,7 +352,7 @@ static ssize_t status_show(struct device *dev,
+ 	CS_LOCK(drvdata->base);
+ 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+ 
+-	clk_disable_unprepare(drvdata->clk);
++	pm_runtime_put(drvdata->dev);
+ 
+ 	return sprintf(buf,
+ 		       "Depth:\t\t0x%x\n"
+@@ -377,7 +365,7 @@ static ssize_t status_show(struct device *dev,
+ 		       "Flush ctrl:\t0x%x\n",
+ 		       etb_rdr, etb_sr, etb_rrp, etb_rwp,
+ 		       etb_trg, etb_cr, etb_ffsr, etb_ffcr);
+-out:
++
+ 	return -EINVAL;
+ }
+ static DEVICE_ATTR_RO(status);
+@@ -449,13 +437,8 @@ static int etb_probe(struct amba_device *adev, const struct amba_id *id)
+ 
+ 	spin_lock_init(&drvdata->spinlock);
  
 -	drvdata->clk = adev->pclk;
 -	ret = clk_prepare_enable(drvdata->clk);
 -	if (ret)
 -		return ret;
 -
- 	/* Disable tpiu to support older devices */
- 	tpiu_disable_hw(drvdata);
- 
+ 	drvdata->buffer_depth = etb_get_buffer_depth(drvdata);
 -	clk_disable_unprepare(drvdata->clk);
 +	pm_runtime_put(&adev->dev);
  
- 	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
- 	if (!desc)
+ 	if (drvdata->buffer_depth & 0x80000000)
+ 		return -EINVAL;
 -- 
 1.9.1
