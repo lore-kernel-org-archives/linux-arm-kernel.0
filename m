@@ -1,38 +1,46 @@
-From: Frank.Li@freescale.com (Frank.Li at freescale.com)
-Date: Wed, 20 May 2015 01:04:42 +0800
-Subject: [PATCH v2 7/7] arm: dts: imx6sx: enable snvs power key
-In-Reply-To: <1432055082-28983-1-git-send-email-Frank.Li@freescale.com>
-References: <1432055082-28983-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <1432055082-28983-8-git-send-email-Frank.Li@freescale.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 19 May 2015 10:55:19 -0600
+Subject: [PATCH 14/16] coresight: document the bindings for the ATCLK
+In-Reply-To: <1432054521-24807-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1432054521-24807-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1432054521-24807-15-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Li <Frank.Li@freescale.com>
+From: Linus Walleij <linus.walleij@linaro.org>
 
-enable snvs ONOFF power key support
+Put in a blurb in the device tree bindings indicating that
+coresight blocks may have an optional ATCLK.
 
-Signed-off-by: Frank Li <Frank.Li@freescale.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- arch/arm/boot/dts/imx6sx.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ Documentation/devicetree/bindings/arm/coresight.txt | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index 97de407..2977015 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -674,6 +674,13 @@
- 					compatible = "fsl,sec-v4.0-poweroff";
- 					status = "disabled";
- 				};
-+
-+				snvs_pwrkey: snvs-powerkey {
-+					compatible = "fsl,sec-v4.0-pwrkey";
-+					interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+					linux,keycode = <116>; /* KEY_POWER */
-+					wakeup;
-+				};
- 			};
+diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
+index 88602b75418e..8711c1065479 100644
+--- a/Documentation/devicetree/bindings/arm/coresight.txt
++++ b/Documentation/devicetree/bindings/arm/coresight.txt
+@@ -21,11 +21,14 @@ its hardware characteristcs.
+ 	* reg: physical base address and length of the register
+ 	  set(s) of the component.
  
- 			epit1: epit at 020d0000 {
+-	* clocks: the clock associated to this component.
+-
+-	* clock-names: the name of the clock as referenced by the code.
+-	  Since we are using the AMBA framework, the name should be
+-	  "apb_pclk".
++	* clocks: the clocks associated to this component.
++
++	* clock-names: the name of the clocks referenced by the code.
++	  Since we are using the AMBA framework, the name of the clock
++	  providing the interconnect should be "apb_pclk", and some
++	  coresight blocks also have an additional clock "atclk", which
++	  clocks the core of that coresight component. The latter clock
++	  is optional.
+ 
+ 	* port or ports: The representation of the component's port
+ 	  layout using the generic DT graph presentation found in
 -- 
 1.9.1
