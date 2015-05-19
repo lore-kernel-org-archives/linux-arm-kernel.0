@@ -1,37 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 May 2015 15:56:15 +0200
-Subject: [PATCH] [RESEND] SCSI: ips: remove pointless #warning
-In-Reply-To: <1432043572.3007.14.camel@HansenPartnership.com>
-References: <3121960.dnOqT9LCth@wuerfel>
- <1432043572.3007.14.camel@HansenPartnership.com>
-Message-ID: <2850783.725LtIIUFq@wuerfel>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Tue, 19 May 2015 14:57:59 +0100
+Subject: [Xen-devel] [RFC 12/23] xen: Extend page_to_mfn to take an offset
+ in the page
+In-Reply-To: <1431622863-28575-13-git-send-email-julien.grall@citrix.com>
+References: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
+ <1431622863-28575-13-git-send-email-julien.grall@citrix.com>
+Message-ID: <555B4167.7050506@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 May 2015 06:52:52 James Bottomley wrote:
-> On Tue, 2015-05-19 at 15:33 +0200, Arnd Bergmann wrote:
-> > The ips driver contains
-> > 
-> >  #warning "This driver has only been tested on the x86/ia64/x86_64 platforms"
-> > 
-> > which gets printed by the compiler every time this driver gets
-> > build for something other than those three architectures. The same
-> > is true for most other drivers, but none of them prints a warning like
-> > this.
-> > 
-> > Let's remove the warning now to reduce the amount of clutter.
-> > 
-> > FWIW, I've reviewed the driver and found a few oddities, but nothing
-> > that needs to be fixed or that would be architecture specific.
+On 14/05/15 18:00, Julien Grall wrote:
+> With 64KB page granularity support in Linux, a page will be split accross
+> multiple MFN (Xen is using 4KB page granularity). Thoses MFNs may not be
+> contiguous.
 > 
-> In principle I don't disagree.  However this warning was a specific
-> request of the driver writers.  Since the driver is pretty much dead,
-> I'm not sure anyone is going to check or fix it for non-intel any time
-> soon.
+> With the offset in the page, the helper will be able to know which MFN
+> the driver needs to retrieve.
 
-My main interest here is to get a clean build of ARM 'allmodconfig'.
+I think a gnttab_grant_foreign_access_ref()-like helper that takes a
+page would be better.
 
-If you prefer another approach, we could also add 'depends on X86 || IA64'
-into Kconfig, which would also avoid that warning.
+You will probably want this helper able to return/fill a set of refs for
+64 KiB pages.
 
-	Arnd
+David
