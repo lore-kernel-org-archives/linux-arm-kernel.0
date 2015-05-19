@@ -1,53 +1,32 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 19 May 2015 15:02:27 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: Add Atmel SAMA5 family
-In-Reply-To: <20150519123358.GA15179@piout.net>
-References: <1428051678-20450-1-git-send-email-alexandre.belloni@free-electrons.com>
- <555AFF3F.10400@atmel.com> <9986808.t62JLgg5NJ@wuerfel>
- <20150519123358.GA15179@piout.net>
-Message-ID: <555B3463.2060700@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 19 May 2015 15:08:05 +0200
+Subject: [PATCH] input: sur40: fix v4l dependency
+Message-ID: <6880566.G7eZ6NqpSp@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 19/05/2015 14:33, Alexandre Belloni a ?crit :
-> On 19/05/2015 at 13:04:22 +0200, Arnd Bergmann wrote :
->>>> @@ -250,15 +261,18 @@ CONFIG_SERIAL_FSL_LPUART=y
->>>>  CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
->>>>  CONFIG_SERIAL_ST_ASC=y
->>>>  CONFIG_SERIAL_ST_ASC_CONSOLE=y
->>>> +CONFIG_HW_RANDOM=y
->>>>  CONFIG_I2C_CHARDEV=y
->>>>  CONFIG_I2C_DAVINCI=y
->>>>  CONFIG_I2C_MUX=y
->>
->> seems non-essential.
->>
-> 
-> That is an oversight, it should be compiled as a module.
+The recently added support for the raw video stream in the SUR40
+driver fails to link if the driver is built-in but v4l2 is not:
 
-Ok, I modify it: no need to bother sending a new revision.
+drivers/built-in.o: In function `sur40_disconnect':
+:(.text+0xf2ed2): undefined reference to `video_unregister_device'
+:(.text+0xf2eda): undefined reference to `v4l2_device_unregister'
+:(.text+0xf2ee2): undefined reference to `vb2_dma_sg_cleanup_ctx'
 
->>>> @@ -502,6 +522,8 @@ CONFIG_RTC_DRV_MV=y
->>>>  CONFIG_RTC_DRV_TEGRA=y
->>>>  CONFIG_DMADEVICES=y
->>>>  CONFIG_DW_DMAC=y
->>>> +CONFIG_AT_HDMAC=y
->>>> +CONFIG_AT_XDMAC=y
->>>>  CONFIG_MV_XOR=y
->>>>  CONFIG_TEGRA20_APB_DMA=y
->>>>  CONFIG_SH_DMAE=y
->>
->> What are these required for? I assume you need them for MMC? If so, that's
->> fine.
->>
-> 
-> That is indeed the reason.
+This adds an explicit dependency, to avoid the broken build.
 
-Yep.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: e831cd251fb ("[media] add raw video stream support for Samsung SUR40")
 
-So I simply do a s/y/m/ on the CONFIG_HW_RANDOM then included it in our
-at91-4.2-defconfig branch.
-
-Bye,
--- 
-Nicolas Ferre
+diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
+index cee8ffe4ffd9..90935f3918db 100644
+--- a/drivers/input/touchscreen/Kconfig
++++ b/drivers/input/touchscreen/Kconfig
+@@ -980,6 +980,7 @@ config TOUCHSCREEN_SUN4I
+ config TOUCHSCREEN_SUR40
+ 	tristate "Samsung SUR40 (Surface 2.0/PixelSense) touchscreen"
+ 	depends on USB && MEDIA_USB_SUPPORT && HAS_DMA
++	depends on VIDEO_V4L2
+ 	select INPUT_POLLDEV
+ 	select VIDEOBUF2_DMA_SG
+ 	help
