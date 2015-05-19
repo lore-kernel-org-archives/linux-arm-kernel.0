@@ -1,147 +1,84 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 19 May 2015 11:59:38 +0200
-Subject: [PATCH v8 09/16] clockevents/drivers: Add STM32 Timer driver
-In-Reply-To: <CALszF6Asfke0-cMQJcEQ8ya+rbPPPhUc6aXTZXQvQ8QF66cwYQ@mail.gmail.com>
-References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>	<1431158038-3813-10-git-send-email-mcoquelin.stm32@gmail.com>	<5559E4B0.70506@linaro.org>	<CALszF6CK7axU0qrWNf38aqrt2R2126ZACn7wx5jNY_1KE+4H+g@mail.gmail.com>	<555AF143.2060807@linaro.org>	<CALszF6CwGuKqgbX6gVrya1-_YOgvtrgC7pVqKTNjCRif_o532A@mail.gmail.com>	<555AFD18.2070009@linaro.org>
- <CALszF6Asfke0-cMQJcEQ8ya+rbPPPhUc6aXTZXQvQ8QF66cwYQ@mail.gmail.com>
-Message-ID: <555B098A.8030202@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 19 May 2015 11:01:31 +0100
+Subject: [PATCH v4 2/3] irqchip: GIC: Add support for
+ irq_{get,set}_irqchip_state
+In-Reply-To: <CACRpkdYV1MzjW6ZMvmOhqi0qhXeeQnC62--7WBY=_hZBT8cvXg@mail.gmail.com>
+References: <1426676484-21812-1-git-send-email-marc.zyngier@arm.com>
+ <1426676484-21812-3-git-send-email-marc.zyngier@arm.com>
+ <CAL85gmBrkonMcKdUVGmYx6zT3wSe-e2jPhnL_+Tkf3s4jsAiWg@mail.gmail.com>
+ <CACRpkdYffHJEzksc5mg7JZdwTzShGaQofAmbmn65=_V3ot04Rg@mail.gmail.com>
+ <CAL85gmC4ovR99wQQYoKs=oo24So80jZ_guxDDFhi-1MXXj0uSw@mail.gmail.com>
+ <CACRpkdZkBLrhFpZiYk4fiM3ND+UwnVJhNKs=+rL5iZY4fS7zCg@mail.gmail.com>
+ <CAL85gmD=12u87vDAc601T=ZOgcS-jDo_=LaC5gRAZUHgp_iTbA@mail.gmail.com>
+ <CACRpkdYV1MzjW6ZMvmOhqi0qhXeeQnC62--7WBY=_hZBT8cvXg@mail.gmail.com>
+Message-ID: <20150519110131.522f9c16@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/19/2015 11:44 AM, Maxime Coquelin wrote:
-> 2015-05-19 11:06 GMT+02:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
->> On 05/19/2015 10:55 AM, Maxime Coquelin wrote:
->>>
->>> 2015-05-19 10:16 GMT+02:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
->>>>
->>>> On 05/18/2015 04:03 PM, Maxime Coquelin wrote:
->>>>>
->>>>>
->>>>> 2015-05-18 15:10 GMT+02:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
->>>>>>
->>>>>>
->>>>>> On 05/09/2015 09:53 AM, Maxime Coquelin wrote:
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>> STM32 MCUs feature 16 and 32 bits general purpose timers with
->>>>>>> prescalers.
->>>>>>> The drivers detects whether the time is 16 or 32 bits, and applies a
->>>>>>> 1024 prescaler value if it is 16 bits.
->>>>>>>
->>>>>>> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
->>>>>>> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
->>>>>>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->>>>>>> ---
->>>>>>>      drivers/clocksource/Kconfig       |   8 ++
->>>>>>>      drivers/clocksource/Makefile      |   1 +
->>>>>>>      drivers/clocksource/timer-stm32.c | 184
->>>>>>> ++++++++++++++++++++++++++++++++++++++
->>>>>>>      3 files changed, 193 insertions(+)
->>>>>>>      create mode 100644 drivers/clocksource/timer-stm32.c
->>>>>>>
->>>>>>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
->>>>>>> index bf9364c..2443520 100644
->>>>>>> --- a/drivers/clocksource/Kconfig
->>>>>>> +++ b/drivers/clocksource/Kconfig
->>>>>>> @@ -106,6 +106,14 @@ config CLKSRC_EFM32
->>>>>>>              Support to use the timers of EFM32 SoCs as clock source
->>>>>>> and
->>>>>>> clock
->>>>>>>              event device.
->>>>>>>
->>>>>>> +config CLKSRC_STM32
->>>>>>> +       bool "Clocksource for STM32 SoCs" if !ARCH_STM32
->>>>>>> +       depends on OF && ARM && (ARCH_STM32 || COMPILE_TEST)
->>>>>>
->>>>>>
->>>>>>
->>>>>>
->>>>>> Are the interactive bool and the 'COMPILE_TEST' necessary ?
->>>>>>
->>>>>
->>>>> The interactive bool is necessary if we want to be able to
->>>>> select/deselect it in COMPILE_TEST configuration.
->>>>> And personnaly, I think COMPILE_TEST use makes sense.
->>>>>
->>>>> Note that other timer drivers are doing the same thing today
->>>>> (CLKSRC_EFM32, SH_TIMER_CMT, EM_TIMER_STI...).
->>>>>
->>>>> Do you have a specific concern regarding COMPILE_TEST?
->>>>
->>>>
->>>>
->>>> Actually, we try to keep the timer selection non-interactive and let the
->>>> platform's Kconfig to select the timer.
->>>
->>>
->>> Ok.
->>>
->>>>
->>>> I like when the code is consistent. The COMPILE_TEST was introduced and
->>>> created a precedence. I would like to get rid of the interactive timer
->>>> selection but I did not have time to go through this yet.
->>>
->>>
->>> Indeed, consistency is important.
->>> On my side, I don't have a strong opinion regarding the COMPILE_TEST
->>> thing.
->>> IMHO, it is more a subsystem's maintainer choice.
->>>
->>> So, if as a maintainer you don't use it and prefer not supporting it,
->>> I'm fine to provide you a new version without COMPILE_TEST.
->>> Doing that, the interactive selection will disappear too.
->>>
->>> I can provide you a new version this evenning.
->>
->>
->> Ok, great.
->
-> Is the below Kconfig entry fine for you?
->
-> config CLKSRC_STM32
->      def_bool y if ARCH_STM32
->      select CLKSRC_MMIO
+On Tue, 19 May 2015 09:40:21 +0100
+Linus Walleij <linus.walleij@linaro.org> wrote:
 
-config CLKSRC_STM32
-	bool
-	select CLKSRC_MMIO
+> On Thu, May 14, 2015 at 10:14 PM, Feng Kan <fkan@apm.com> wrote:
+> > On Thu, May 14, 2015 at 3:32 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> 
+> >> But surely the GPIO block has its own status register, so are
+> >> you saying that this register is unreliable?
+> >
+> > When the GPIO is used as interrupt, the gpio block does not report the
+> > status anymore. Which leaves us stuck with SPISR.
+> >>
+> >> I can think of a few reasons, like transient IRQs etc but
+> >> what is actually causing this?
+> >
+> > I won't say the obvious.
+> 
+> Yeah I see your problem now :(
+> 
+> I think it's better to fix the access functions so that you can
+> cross-call to the GIC driver to get the SPISR flag out though.
+> Let's see what Marc says.
+> 
+> >> Which GPIO driver is this? Is it upstream?
+> >
+> > Yes, it is upstream. It is the xgene slimpro gpio driver. I am starting to
+> > think that we ought to switch to use some gpio poll driver rather than
+> > using gpio-key.
+> 
+> There is both gpio_keys_polled and IRQ-driven gpio_keys so yeah
+> that's possible. But honestly I think it's better to deal with this
+> problem for real because IRQ is more efficient.
+> 
+> So the way I perceive it this is the real problem:
+> 
+> +static int gic_irq_get_irqchip_state(struct irq_data *d,
+> +                                     enum irqchip_irq_state which, bool *val)
+> +{
+> +       switch (which) {
+> (...)
+> +       case IRQCHIP_STATE_ACTIVE:
+> +               *val = gic_peek_irq(d, GIC_DIST_ACTIVE_SET);
+> +               break; case: read
+> from 0xd04 (SPISR) instead, because that makes more
+> sense to me, or am I wrong at it?
+> 
+> +       case IRQCHIP_STATE_LINE_LEVEL:
+> +               *val = gic_peek_irq(d, GIC_DIST_SPISR);
+> +               break;
+> 
+> And then put a define into <linux/irqchip/arm-gic.h> for
+> GIC_DIST_SPISR.
 
-and in the arch/arm/mach-stm32/Kconfig add select CLKSRC_STM32
+What worries me here is that the PENDING state should already give you
+the right level of information (this is what the GIC-400 TRM says). The
+only reason why SPISR exists is that software can write to the PENDING
+register, while SPISR is RO.
 
-> Best regards,
-> Maxime
->
->
->>
->> Thanks
->>    -- Daniel
->>
->>
->>>>
->>>>
->>>>
->>>> --
->>>>    <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
->>>>
->>>> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
->>>> <http://twitter.com/#!/linaroorg> Twitter |
->>>> <http://www.linaro.org/linaro-blog/> Blog
->>>>
->>
->>
->> --
->>   <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
->>
->> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
->> <http://twitter.com/#!/linaroorg> Twitter |
->> <http://www.linaro.org/linaro-blog/> Blog
->>
+If reading the pending state doesn't work, then I'd like to know
+exactly *why*. Only then we can add support for LINE_LEVEL using SPISR
+(which has to be GIC-400 specific, as it is not architected).
 
+Thanks,
 
+	M.
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Jazz is not dead. It just smells funny.
