@@ -1,21 +1,77 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 19 May 2015 16:48:33 +0200 (CEST)
-Subject: [PATCH 0/2] ARM: sa1100: move irq driver to irqchip subsystem
-In-Reply-To: <1431987096-16308-1-git-send-email-dbaryshkov@gmail.com>
-References: <1431987096-16308-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <alpine.DEB.2.11.1505191648200.4225@nanos>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Tue, 19 May 2015 16:49:12 +0200
+Subject: [PATCH v3] ARM: tegra: cpuidle: implement cpuidle_state.enter_freeze()
+Message-ID: <1432046953-12945-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This callback is expected to do the same as enter() but it has to
+guarantee that interrupts aren't enabled at any point in its execution,
+as the tick is frozen.
 
+It will be called when the system goes to suspend-to-idle and will
+reduce power usage because CPUs won't be awaken for unnecessary IRQs.
 
-On Tue, 19 May 2015, Dmitry Eremin-Solenikov wrote:
+By setting the CPUIDLE_FLAG_TIMER_STOP flag, we can reuse the same code
+for both the enter() and enter_freeze() callbacks.
 
-> Hello,
-> 
-> These two patches finish my work on refactoring StrongARM SA-11x0 IRQ
-> driver into sane irqchip driver. As they depend on the patches already
-> accepted by Russell, I'd ask Thomas and/or Jason to Ack merging these
-> two patches through his tree.
+Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 
-Acked-by: Thomas Gleixner <tglx@linutronix.de>
+---
+
+v3:	* Set CPUIDLE_FLAG_TIMER_STOP to simplify things as suggested by
+	Lorenzo Pieralisi
+v2:	* Disable FIQs also when suspending-to-idle
+---
+ arch/arm/mach-tegra/cpuidle-tegra114.c | 13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
+index 155807f..7e59ac0 100644
+--- a/arch/arm/mach-tegra/cpuidle-tegra114.c
++++ b/arch/arm/mach-tegra/cpuidle-tegra114.c
+@@ -44,16 +44,12 @@ static int tegra114_idle_power_down(struct cpuidle_device *dev,
+ 	tegra_set_cpu_in_lp2();
+ 	cpu_pm_enter();
+ 
+-	tick_broadcast_enter();
+-
+ 	call_firmware_op(prepare_idle);
+ 
+ 	/* Do suspend by ourselves if the firmware does not implement it */
+ 	if (call_firmware_op(do_idle, 0) == -ENOSYS)
+ 		cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
+ 
+-	tick_broadcast_exit();
+-
+ 	cpu_pm_exit();
+ 	tegra_clear_cpu_in_lp2();
+ 
+@@ -61,6 +57,13 @@ static int tegra114_idle_power_down(struct cpuidle_device *dev,
+ 
+ 	return index;
+ }
++
++static void tegra114_idle_enter_freeze(struct cpuidle_device *dev,
++				       struct cpuidle_driver *drv,
++				       int index)
++{
++       tegra114_idle_power_down(dev, drv, index);
++}
+ #endif
+ 
+ static struct cpuidle_driver tegra_idle_driver = {
+@@ -72,8 +75,10 @@ static struct cpuidle_driver tegra_idle_driver = {
+ #ifdef CONFIG_PM_SLEEP
+ 		[1] = {
+ 			.enter			= tegra114_idle_power_down,
++			.enter_freeze		= tegra114_idle_enter_freeze,
+ 			.exit_latency		= 500,
+ 			.target_residency	= 1000,
++			.flags			= CPUIDLE_FLAG_TIMER_STOP,
+ 			.power_usage		= 0,
+ 			.name			= "powered-down",
+ 			.desc			= "CPU power gated",
+-- 
+2.4.1
