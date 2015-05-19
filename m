@@ -1,50 +1,26 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 19 May 2015 13:58:56 +0800
-Subject: [PATCH] ARM: dts: imx6dl-wandboard: Do not hardcode memory size
-In-Reply-To: <1431980424-11929-1-git-send-email-festevam@gmail.com>
-References: <1431980424-11929-1-git-send-email-festevam@gmail.com>
-Message-ID: <20150519055856.GQ1071@dragon>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 19 May 2015 08:00:04 +0200
+Subject: mach-pxa/pxa_cplds_irqs.c:126: bad if test ?
+In-Reply-To: <DUB128-W342054A60A9EB2505BCA469CC40@phx.gbl> (David Binderman's
+ message of "Mon, 18 May 2015 21:44:30 +0000")
+References: <DUB128-W342054A60A9EB2505BCA469CC40@phx.gbl>
+Message-ID: <87382tjee3.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 18, 2015 at 05:20:24PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> imx6dl-wandboard.dtb works for wandboard dual-lite and solo boards.
-> 
-> Wandboard dual-lite has 1 GB of RAM and wandboard solo has 512 MB, so
-> do not hardcode the memory size in the dts file and let the bootloader
-> pass the correct memory size instead.
+David Binderman <dcb314@hotmail.com> writes:
 
-This is a configuration for dual-lite board.  If solo board wants to
-reuse it, the bootloader should just fix up things for solo board.
+> Hello there,
+>
+> [linux-4.1-rc4/arch/arm/mach-pxa/pxa_cplds_irqs.c:126]: (style) Checking if
+> unsigned variable 'base_irq' is less than zero.
+>
+> ??? base_irq = platform_get_irq(pdev, 1);
+> ??? if (base_irq < 0)
+> ??????? base_irq = 0;
+Thanks David, a patch has already been provided by Dan Carpenter.
 
-Shawn
+Cheers.
 
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/boot/dts/imx6dl-wandboard.dts | 4 ----
->  1 file changed, 4 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6dl-wandboard.dts b/arch/arm/boot/dts/imx6dl-wandboard.dts
-> index bbb6167..dcde3f6 100644
-> --- a/arch/arm/boot/dts/imx6dl-wandboard.dts
-> +++ b/arch/arm/boot/dts/imx6dl-wandboard.dts
-> @@ -15,8 +15,4 @@
->  / {
->  	model = "Wandboard i.MX6 Dual Lite Board";
->  	compatible = "wand,imx6dl-wandboard", "fsl,imx6dl";
-> -
-> -	memory {
-> -		reg = <0x10000000 0x40000000>;
-> -	};
->  };
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+--
+Robert
