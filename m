@@ -1,111 +1,81 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 19 May 2015 14:14:32 +0200
-Subject: [PATCH v7 10/13] ARM: efm32: use ARM_SINGLE_ARMV7M
-In-Reply-To: <1431769465-26867-11-git-send-email-stefan@agner.ch>
-References: <1431769465-26867-1-git-send-email-stefan@agner.ch>
- <1431769465-26867-11-git-send-email-stefan@agner.ch>
-Message-ID: <20150519121432.GE24769@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 19 May 2015 14:17:23 +0200
+Subject: [PATCH] video: exynos: fix modular build
+Message-ID: <2708563.ADEZz3igC5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 16, 2015 at 11:44:22AM +0200, Stefan Agner wrote:
-> Use the new config symbol ARM_SINGLE_ARMV7M which groups config
-> symbols used by modern ARMv7-M platforms. It also support multiple
-> ARMv7-M platforms in one kernel image. However, this only works if
-> the combined platforms share the same (main) memory layout.
-> 
-> Also use generic debug/uncompress.h for all ARMv7-M platforms.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+The s6e8ax0 driver has a dependency on BACKLIGHT_CLASS_DEVICE,
+which can be configured as a loadable module, so we have to
+make the driver a tristate symbol as well, to avoid this error:
 
-I don't have anything in the queu that would conflict with this patch,
-so merge it whereever you, Russell and Arnd see fit.
+drivers/built-in.o: In function `s6e8ax0_probe':
+:(.text+0x23a48): undefined reference to `devm_backlight_device_register'
 
-Best regards
-Uwe
-> ---
->  arch/arm/Kconfig                 | 28 ++++++++++------------------
->  arch/arm/Kconfig.debug           |  2 +-
->  arch/arm/configs/efm32_defconfig |  1 +
->  3 files changed, 12 insertions(+), 19 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 2361efc..d1c035d 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -411,24 +411,6 @@ config ARCH_EBSA110
->  	  Ethernet interface, two PCMCIA sockets, two serial ports and a
->  	  parallel port.
->  
-> -config ARCH_EFM32
-> -	bool "Energy Micro efm32"
-> -	depends on !MMU
-> -	select ARCH_REQUIRE_GPIOLIB
-> -	select ARM_NVIC
-> -	select AUTO_ZRELADDR
-> -	select CLKSRC_OF
-> -	select COMMON_CLK
-> -	select CPU_V7M
-> -	select GENERIC_CLOCKEVENTS
-> -	select NO_DMA
-> -	select NO_IOPORT_MAP
-> -	select SPARSE_IRQ
-> -	select USE_OF
-> -	help
-> -	  Support for Energy Micro's (now Silicon Labs) efm32 Giant Gecko
-> -	  processors.
-> -
->  config ARCH_EP93XX
->  	bool "EP93xx-based"
->  	select ARCH_HAS_HOLES_MEMORYMODEL
-> @@ -963,6 +945,16 @@ source "arch/arm/mach-w90x900/Kconfig"
->  
->  source "arch/arm/mach-zynq/Kconfig"
->  
-> +# ARMv7-M architecture
-> +config ARCH_EFM32
-> +	bool "Energy Micro efm32"
-> +	depends on ARM_SINGLE_ARMV7M
-> +	select ARCH_REQUIRE_GPIOLIB
-> +	select AUTO_ZRELADDR
-> +	help
-> +	  Support for Energy Micro's (now Silicon Labs) efm32 Giant Gecko
-> +	  processors.
-> +
->  # Definitions to make life easier
->  config ARCH_ACORN
->  	bool
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index e4441de..5d63c56 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -1561,7 +1561,7 @@ config DEBUG_UNCOMPRESS
->  config UNCOMPRESS_INCLUDE
->  	string
->  	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM || \
-> -					PLAT_SAMSUNG || ARCH_EFM32 || \
-> +					PLAT_SAMSUNG || ARM_SINGLE_ARMV7M || \
->  					ARCH_SHMOBILE_LEGACY
->  	default "mach/uncompress.h"
->  
-> diff --git a/arch/arm/configs/efm32_defconfig b/arch/arm/configs/efm32_defconfig
-> index c4c17e3..e969f78 100644
-> --- a/arch/arm/configs/efm32_defconfig
-> +++ b/arch/arm/configs/efm32_defconfig
-> @@ -16,6 +16,7 @@ CONFIG_EMBEDDED=y
->  # CONFIG_IOSCHED_DEADLINE is not set
->  # CONFIG_IOSCHED_CFQ is not set
->  # CONFIG_MMU is not set
-> +CONFIG_ARM_SINGLE_ARMV7M=y
->  CONFIG_ARCH_EFM32=y
->  CONFIG_SET_MEM_PARAM=y
->  CONFIG_DRAM_BASE=0x88000000
-> -- 
-> 2.4.1
-> 
-> 
+This also means we get another error from a missing export, which
+this fixes as well:
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+ERROR: "exynos_mipi_dsi_register_lcd_driver" [drivers/video/fbdev/exynos/s6e8ax0.ko] undefined!
+
+Finally, the EXYNOS_VIDEO option is turned into tristate as well
+for good measure, as all framebuffer drivers should be configurable
+as modules.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/drivers/video/fbdev/exynos/Kconfig b/drivers/video/fbdev/exynos/Kconfig
+index 1f16b4678c71..d916bef94f25 100644
+--- a/drivers/video/fbdev/exynos/Kconfig
++++ b/drivers/video/fbdev/exynos/Kconfig
+@@ -3,7 +3,7 @@
+ #
+ 
+ menuconfig EXYNOS_VIDEO
+-	bool "Exynos Video driver support"
++	tristate "Exynos Video driver support"
+ 	depends on ARCH_S5PV210 || ARCH_EXYNOS
+ 	help
+ 	  This enables support for EXYNOS Video device.
+@@ -15,13 +15,13 @@ if EXYNOS_VIDEO
+ #
+ 
+ config EXYNOS_MIPI_DSI
+-	bool "EXYNOS MIPI DSI driver support."
++	tristate "EXYNOS MIPI DSI driver support."
+ 	select GENERIC_PHY
+ 	help
+ 	  This enables support for MIPI-DSI device.
+ 
+ config EXYNOS_LCD_S6E8AX0
+-	bool "S6E8AX0 MIPI AMOLED LCD Driver"
++	tristate "S6E8AX0 MIPI AMOLED LCD Driver"
+ 	depends on EXYNOS_MIPI_DSI && BACKLIGHT_CLASS_DEVICE
+ 	depends on (LCD_CLASS_DEVICE = y)
+ 	default n
+diff --git a/drivers/video/fbdev/exynos/Makefile b/drivers/video/fbdev/exynos/Makefile
+index b5b1bd228abb..02d8dc522fea 100644
+--- a/drivers/video/fbdev/exynos/Makefile
++++ b/drivers/video/fbdev/exynos/Makefile
+@@ -2,6 +2,8 @@
+ # Makefile for the exynos video drivers.
+ #
+ 
+-obj-$(CONFIG_EXYNOS_MIPI_DSI)		+= exynos_mipi_dsi.o exynos_mipi_dsi_common.o \
+-				     	exynos_mipi_dsi_lowlevel.o
++obj-$(CONFIG_EXYNOS_MIPI_DSI)		+= exynos-mipi-dsi-mod.o
++
++exynos-mipi-dsi-mod-objs		+= exynos_mipi_dsi.o exynos_mipi_dsi_common.o \
++					   exynos_mipi_dsi_lowlevel.o
+ obj-$(CONFIG_EXYNOS_LCD_S6E8AX0)	+= s6e8ax0.o
+diff --git a/drivers/video/fbdev/exynos/exynos_mipi_dsi.c b/drivers/video/fbdev/exynos/exynos_mipi_dsi.c
+index b527fe464628..18edc724bf57 100644
+--- a/drivers/video/fbdev/exynos/exynos_mipi_dsi.c
++++ b/drivers/video/fbdev/exynos/exynos_mipi_dsi.c
+@@ -263,6 +263,7 @@ int exynos_mipi_dsi_register_lcd_driver(struct mipi_dsim_lcd_driver *lcd_drv)
+ 	return 0;
+ 
+ }
++EXPORT_SYMBOL_GPL(exynos_mipi_dsi_register_lcd_driver);
+ 
+ static struct mipi_dsim_ddi *exynos_mipi_dsi_bind_lcd_ddi(
+ 						struct mipi_dsim_device *dsim,
