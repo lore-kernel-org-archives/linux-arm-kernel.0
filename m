@@ -1,93 +1,101 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 19 May 2015 09:45:35 +0200
-Subject: [PATCH 1/5] soc: mediatek: Add infracfg misc driver support
-In-Reply-To: <CAGS+omD-0bPeQqau9mm4pTqOhtPW=ecR5ibB8==pifRMgSKrjg@mail.gmail.com>
-References: <1431372206-1237-1-git-send-email-s.hauer@pengutronix.de>
- <1431372206-1237-2-git-send-email-s.hauer@pengutronix.de>
- <CAGS+omADXpnBnLvuH+xNmatL+89kLBELz6KqMFid7SOx=veiAg@mail.gmail.com>
- <20150518081625.GO6325@pengutronix.de>
- <CAGS+omD-0bPeQqau9mm4pTqOhtPW=ecR5ibB8==pifRMgSKrjg@mail.gmail.com>
-Message-ID: <20150519074535.GY6325@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 19 May 2015 09:53:01 +0200
+Subject: [PATCH v2 02/10] clk: sunxi: Add support for multiple parents to
+ gates
+In-Reply-To: <5559ACC6.6050202@gmail.com>
+References: <1431707940-19372-1-git-send-email-jenskuske@gmail.com>
+ <1431707940-19372-3-git-send-email-jenskuske@gmail.com>
+ <20150517125014.GB4004@lukather> <5559ACC6.6050202@gmail.com>
+Message-ID: <20150519075301.GT4004@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 02:54:41PM +0800, Daniel Kurtz wrote:
-> >> > +       while (1) {
-> >> > +               ret = regmap_read(infracfg, INFRA_TOPAXI_PROTECTSTA1, &val);
-> >> > +               if (ret)
-> >> > +                       return ret;
-> >> > +
-> >> > +               if ((val & mask) == mask)
-> >> > +                       break;
-> >> > +
-> >> > +               cpu_relax();
-> >> > +               if (time_after(jiffies, expired))
-> >> > +                       return -EIO;
-> >>
-> >> I think we should check for timeout first, and then cpu_relax() if
-> >> there is still time left (here and in
-> >> mtk_infracfg_clear_bus_protection()).  Otherwise we end up doing one
-> >> final cpu_relax() without rechecking the register we are polling
-> >> (again, I have the same comment for the timeout loops in mtk-scpsys).
-> >
-> > I think cpu_relax() delays execution in the order of microseconds (I
-> > don't actually know, just a guess), so if the timeout is a second the
-> > order doesn't really matter. What can happen though is an interrupt
-> > after the (val & mask) test but before the timeout check. So to be
-> > truly correct we have to repeat the (val & mask) test after the
-> > time_after() check. Is that what you want?
+On Mon, May 18, 2015 at 11:11:34AM +0200, Jens Kuske wrote:
+> Hi,
 > 
-> I'm not following, why would you need to repeat (val & mask) test
-> after time_after?
-> What does an interrupt have to do with it?
-> Can you show a code snippet with what exactly you are proposing?
+> On 05/17/15 14:50, Maxime Ripard wrote:
+> > Hi Jens,
+> > 
+> > On Fri, May 15, 2015 at 06:38:52PM +0200, Jens Kuske wrote:
+> >> Some newer sunxi SoCs (A83T, H3) don't have individual registers for
+> >> AHB1, APB1 and APB2 gates anymore, but one big bus gates area where each
+> >> gate can have a different parent.
+> >>
+> >> The current clock driver sets the same parent for all gates in a group.
+> >> This commit adds a new parents field to the gates_data structure, which
+> >> allows us to specify an array of parent indices for every single gate.
+> >>
+> >> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
+> >> ---
+> >>  drivers/clk/sunxi/clk-sunxi.c | 12 +++++++++++-
+> >>  1 file changed, 11 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+> >> index 9a82f17..17cba4d 100644
+> >> --- a/drivers/clk/sunxi/clk-sunxi.c
+> >> +++ b/drivers/clk/sunxi/clk-sunxi.c
+> >> @@ -898,6 +898,8 @@ static void __init sunxi_divider_clk_setup(struct device_node *node,
+> >>  
+> >>  struct gates_data {
+> >>  	DECLARE_BITMAP(mask, SUNXI_GATES_MAX_SIZE);
+> >> +	/* If used, ARRAY_SIZE(parents) has to be >= bitmap_weight(mask) */
+> >> +	const u8 *parents;
+> >>  };
+> >>  
+> >>  static const struct gates_data sun4i_axi_gates_data __initconst = {
+> >> @@ -1000,16 +1002,21 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
+> >>  					 struct gates_data *data)
+> >>  {
+> >>  	struct clk_onecell_data *clk_data;
+> >> +	const char *parents[SUNXI_MAX_PARENTS];
+> >>  	const char *clk_parent;
+> >>  	const char *clk_name;
+> >>  	void __iomem *reg;
+> >> +	int npar = 0;
+> >>  	int qty;
+> >>  	int i = 0;
+> >>  	int j = 0;
+> >>  
+> >>  	reg = of_iomap(node, 0);
+> >>  
+> >> -	clk_parent = of_clk_get_parent_name(node, 0);
+> >> +	while (npar < SUNXI_MAX_PARENTS &&
+> >> +	       (parents[npar] = of_clk_get_parent_name(node, npar)) != NULL)
+> >> +		npar++;
+> >> +	clk_parent = parents[0];
+> >>  
+> >>  	/* Worst-case size approximation and memory allocation */
+> >>  	qty = find_last_bit(data->mask, SUNXI_GATES_MAX_SIZE);
+> >> @@ -1026,6 +1033,9 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
+> >>  		of_property_read_string_index(node, "clock-output-names",
+> >>  					      j, &clk_name);
+> >>  
+> >> +		if (data->parents && !WARN_ON(data->parents[j] >= npar))
+> >> +			clk_parent = parents[data->parents[j]];
+> >> +
+> > 
+> > I'm currently removing that code, so I was more expecting a new
+> > standalone driver for that clock.
+> 
+> How do you want to replace that code? To me this looks like a good way
+> to set up all the different gates sunxi has.
 
-Consider you have this timeout loop:
+By using clock-indices and moving all this gate stuff out of clk-sunxi
+and into a new driver.
 
-	while (1) {
-		if (success())
-			break;
+It's done already, I just need to make sure everything works at it
+used to on all the SoCs.
 
-		if (time_after(jiffies, expired))
-			return -ETIMEDOUT;
-	}
-
-Now when an interupt comes in between success() and time_after() then it
-can happen that the delay caused by the interrupt makes the code timeout
-even though success() might have become true in the meantime. So to be
-correct you have to:
-
-	while (1) {
-		if (success())
-			break;
-
-		if (time_after(jiffies, expired)) {
-			if (success())
-				break;
-			return -ETIMEDOUT;
-	}
-
-Or, if you don't want to repeat the termination condition:
-
-	bool timeout = false;
-
-	while (1) {
-		if (success())
-			break;
-
-		if (timeout)
-			return -ETIMEDOUT;
-
-		if (time_after(jiffies, expired))
-			timeout = true;
-	}
-
-Anyway, with the timeout of one second used here this is all academic.
-
-Sascha
+Maxime
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150519/41783623/attachment.sig>
