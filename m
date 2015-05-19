@@ -1,25 +1,20 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Tue, 19 May 2015 07:09:45 +0200
-Subject: [PATCH soc] ARM: BCM5301X: Ignore another (BCM4709 specific)
- fault code
-In-Reply-To: <55282985.6070009@gmail.com>
-References: <1423669258-27449-1-git-send-email-zajec5@gmail.com>
- <55282985.6070009@gmail.com>
-Message-ID: <CACna6rwMmm4wNaCRhi1dHCh8KwXt+-XuAejb4CuhkELhJ2=V4A@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 19 May 2015 13:20:24 +0800
+Subject: [PATCH 1/2] ARM: dts: Armadeus Systems APF6 family support (i.MX6)
+In-Reply-To: <1431697468-19363-1-git-send-email-sebastien.szymanski@armadeus.com>
+References: <1431697468-19363-1-git-send-email-sebastien.szymanski@armadeus.com>
+Message-ID: <20150519052024.GN1071@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 April 2015 at 21:50, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> On 11/02/15 07:40, Rafa? Mi?ecki wrote:
->> Broadcom ARM devices seem to generate some fault once per boot. We
->> already have an ignoring handler for BCM4707/BCM4708, but BCM4709
->> generates different code.
->>
->> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
->
-> Applied to platform/next, sorry for the lag, thanks!
+On Fri, May 15, 2015 at 03:44:27PM +0200, S?bastien Szymanski wrote:
+> Add support to the Armadeus Systems APF6 Solo / Dual / Quad SoM and
+> the Armadeus Systems APF6Dev carrier board.
+> 
+> For more details see:
+> http://www.armadeus.com/english/products-processor_boards-apf6.html
+> http://www.armadeus.com/english/products-development_boards-apf6_dev.html
+> 
+> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
 
-Could you send a pull request for platform/next, please?
-
--- 
-Rafa?
+Applied both, thanks.
