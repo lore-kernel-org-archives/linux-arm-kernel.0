@@ -1,186 +1,42 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 19 May 2015 12:49:36 +0200
-Subject: [PATCH v6 01/25] arm: dma-mapping: add support for creating
- reserved mappings in iova space
-In-Reply-To: <554A1E9C.7060101@arm.com>
-References: <1430727380-10912-1-git-send-email-m.szyprowski@samsung.com>
- <1430727380-10912-2-git-send-email-m.szyprowski@samsung.com>
- <554A1E9C.7060101@arm.com>
-Message-ID: <555B1540.4040104@samsung.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 19 May 2015 11:51:14 +0100
+Subject: [PATCH] serial/amba-pl011: Fix mismerge between v4.1-rc4 and tty-next
+Message-ID: <1432032674-22167-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+In commit 02730d3c053a9af1d402e1c8dc8bbbc5a1340406
+(Merge 4.1-rc4 into tty-next), git mismerged some lines,
+reintroducing a reference to the removed field
+uart_amba_port.tx_irq_seen.  This causes a build failure.
 
-On 2015-05-06 16:01, Robin Murphy wrote:
-> Hi Marek,
->
-> On 04/05/15 09:15, Marek Szyprowski wrote:
->> Some devices (like frame buffers) are enabled by bootloader and 
->> configured
->> to perform DMA operations automatically (like displaying boot logo or 
->> splash
->> screen). Such devices operate and perform DMA operation usually until 
->> the
->> proper driver for them is loaded and probed. However before that 
->> happens,
->> system usually loads IOMMU drivers and configures dma parameters for 
->> each
->> device. When such initial configuration is created and enabled, it 
->> usually
->> contains empty translation rules betweem IO address space and physical
->> memory, because no buffers nor memory regions have been requested by the
->> respective driver.
->>
->> This patch adds support for "iommu-reserved-mapping", which can be used
->> to provide definitions for mappings that need to be created on system
->> boot to let such devices (enabled by bootloader) to operate properly
->> until respective driver is probed.
->
-> This appears to only work if you assume the driver is going to tear 
-> down the existing domain entirely; what about drivers that don't 
-> manage IOMMUs explicitly, or if there are multiple active devices 
-> behind the same IOMMU which (in future) start out in the same default 
-> domain? If any device is happy to remain in the default domain then it 
-> would be nice to clear the reservations once they are no longer needed.
+This patch removes the mismerged lines, restoring the code to what
+was in tty-next (which was the intention).
 
-Right, this need to be somehow worked out, but frankly right now I don't 
-have
-good idea which code should do it. The only idea that comes to my mind 
-is using
-a BUS_NOTIFY_BOUND_DRIVER notifier, but I don't like this approach.
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
 
-> Could we not address the issue in a more robust way, like fleshing out 
-> an implementation of the nascent IOMMU_DOMAIN_IDENTITY type, then just 
-> flagging such devices to stipulate that their boot-time default domain 
-> must be an identity-mapped one?
+This patch is based on tty-next commit
+02730d3c053a9af1d402e1c8dc8bbbc5a1340406 (Merge 4.1-rc4 into tty-next).
 
-I'm open for any solution that will cover this case. Maybe my idea of iommu
-reserved regions is a bit over-engineered? Maybe instead of defining 
-reserved
-ranges it will be enough to add something like 
-'iommu-on-boot-identity-mapping'
-property? This way one can later use it for IOMMU_DOMAIN_IDENTITY 
-approach or
-something else what will be agreed?
+Without it, amba-pl011.c won't build.
 
->
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> ---
->>   Documentation/devicetree/bindings/iommu/iommu.txt |  44 +++++++++
->>   arch/arm/mm/dma-mapping.c                         | 112 
->> ++++++++++++++++++++++
->>   2 files changed, 156 insertions(+)
->>
-> [...]
->> @@ -2048,6 +2092,66 @@ void arm_iommu_detach_device(struct device *dev)
->>   }
->>   EXPORT_SYMBOL_GPL(arm_iommu_detach_device);
->>
->> +static int arm_iommu_add_reserved(struct device *dev,
->> +                       struct dma_iommu_mapping *domain, phys_addr_t 
->> phys,
->> +                       dma_addr_t dma, size_t size)
->> +{
->> +       int ret;
->> +
->> +       ret = __reserve_iova(domain, dma, size);
->> +       if (ret) {
->> +               dev_err(dev, "failed to reserve mapping\n");
->> +               return -EINVAL;
->> +       }
->> +
->> +       ret = iommu_map(domain->domain, dma, phys, size, IOMMU_READ);
->> +       if (ret != 0) {
->> +               dev_err(dev, "create IOMMU mapping\n");
->> +               return ret;
->> +       }
->> +
->> +       dev_info(dev, "created reserved DMA mapping (%pa -> %pad, %zu 
->> bytes)\n",
->> +                &phys, &dma, size);
->> +
->> +       return 0;
->> +}
->> +
->> +static int arm_iommu_init_reserved(struct device *dev,
->> +                                  struct dma_iommu_mapping *domain)
->> +{
->> +       const char *name = "iommu-reserved-mapping";
->> +       const __be32 *prop = NULL;
->> +       int len, naddr, nsize;
->> +       struct device_node *node = dev->of_node;
->> +       phys_addr_t phys;
->> +       dma_addr_t dma;
->> +       size_t size;
->> +
->> +       if (!node)
->> +               return 0;
->> +
->> +       naddr = of_n_addr_cells(node);
->> +       nsize = of_n_size_cells(node);
->> +
->> +       prop = of_get_property(node, name, &len);
->> +       if (!prop)
->> +               return 0;
->> +
->> +       len /= sizeof(u32);
->> +
->> +       if (len < 2 * naddr + nsize) {
->> +               dev_err(dev, "invalid length (%d cells) of %s 
->> property\n",
->> +                       len, name);
->> +               return -EINVAL;
->> +       }
->> +
->> +       phys = of_read_number(prop, naddr);
->> +       dma = of_read_number(prop + naddr, naddr);
->> +       size = of_read_number(prop + 2*naddr, nsize);
->> +
->> +       return arm_iommu_add_reserved(dev, domain, phys, dma, size);
-> > +}
->
-> I may be missing something, but I don't see how this can handle 
-> multiple ranges for the same device as the binding says.
->
+ drivers/tty/serial/amba-pl011.c |    3 ---
+ 1 file changed, 3 deletions(-)
 
-Right, loop is missing in the above calls.
-
->>   static struct dma_map_ops *arm_get_iommu_dma_map_ops(bool coherent)
->>   {
->>          return coherent ? &iommu_coherent_ops : &iommu_ops;
->> @@ -2068,6 +2172,14 @@ static bool arm_setup_iommu_dma_ops(struct 
->> device *dev, u64 dma_base, u64 size,
->>                  return false;
->>          }
->>
->> +       if (arm_iommu_init_reserved(dev, mapping) != 0) {
->> +               pr_warn("Failed to initialize reserved mapping for 
->> device %s\n",
->> +                       dev_name(dev));
->> +               __arm_iommu_detach_device(dev);
->> +               arm_iommu_release_mapping(mapping);
->> +               return false;
->> +       }
->> +
->>          if (__arm_iommu_attach_device(dev, mapping)) {
->>                  pr_warn("Failed to attached device %s to 
->> IOMMU_mapping\n",
->>                                  dev_name(dev));
->
-> I'm hoping Joerg is still working on his default domain series, 
-> because the domain creation in arch_setup_dma_ops turns out to be 
-> horrible on a number of levels (like everything happening in the wrong 
-> order for platform devices). If that doesn't negate this issue 
-> entirely, it's going to significantly break this way of hooking up the 
-> solution (depending on what the drivers do) - worth some 
-> consideration, at least.
-
-I would really like to have something working soon, it's been a lot of 
-discussion but still
-very little of code that actually implements anything...
-
-Best regards
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 6fabc05..f5bd842 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1578,9 +1578,6 @@ static int pl011_startup(struct uart_port *port)
+ 
+ 	writew(uap->vendor->ifls, uap->port.membase + UART011_IFLS);
+ 
+-	/* Assume that TX IRQ doesn't work until we see one: */
+-	uap->tx_irq_seen = 0;
+-
+ 	spin_lock_irq(&uap->port.lock);
+ 
+ 	/* restore RTS and DTR */
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+1.7.10.4
