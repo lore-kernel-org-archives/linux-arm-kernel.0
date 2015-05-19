@@ -1,27 +1,39 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 19 May 2015 13:49:45 +0800
-Subject: [PATCH] crypto: allow to assign gfp_t for __crypto_alloc_tfm
-In-Reply-To: <1432014416-39326-1-git-send-email-jaegeuk@kernel.org>
-References: <1432014416-39326-1-git-send-email-jaegeuk@kernel.org>
-Message-ID: <20150519054945.GA28060@gondor.apana.org.au>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Tue, 19 May 2015 14:57:45 +0900
+Subject: [PATCH v2 3/4] ARM: multi_v7_defconfig: Enable TMU for Exynos
+In-Reply-To: <1431913636-31854-4-git-send-email-k.kozlowski@samsung.com>
+References: <1431913636-31854-1-git-send-email-k.kozlowski@samsung.com>
+ <1431913636-31854-4-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <555AD0D9.9060502@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 18, 2015 at 10:46:56PM -0700, Jaegeuk Kim wrote:
-> This patch adds a parameter, gfp_t, for __crypto_alloc_tfm.
-> Now EXT4 and F2FS use the crypto engine to encrypt a page when writing it to the
-> disk.
-> That happens during ->writepage and it needs to allocate memory with
-> GFP_NOFS.
+On 05/18/15 10:47, Krzysztof Kozlowski wrote:
+> From: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
 > 
-> Otherwise, in the f2fs case, kernel reports such the following warning.
+> Enable support for Thermal Monitoring Unit present on Exynos SoCs. This
+> allows detection of overheat and handling this gracefully.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
 
-Normally crypto structures should only be allocated on control
-paths where sleeping or swapping is not an issue.  Why is ext4
-doing crypto allocations on the data path?
+Krzysztof, you want to use gmail account on this, you used samsung
+accoung on 1st and 2nd patches though?
 
-Cheers,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+- Kukjin
+
+> ---
+>  arch/arm/configs/multi_v7_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index f09ae2089284..8fa7171b12f3 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -342,6 +342,7 @@ CONFIG_SENSORS_LM90=y
+>  CONFIG_SENSORS_LM95245=y
+>  CONFIG_THERMAL=y
+>  CONFIG_CPU_THERMAL=y
+> +CONFIG_EXYNOS_THERMAL=m
+>  CONFIG_RCAR_THERMAL=y
+>  CONFIG_ARMADA_THERMAL=y
+>  CONFIG_DAVINCI_WATCHDOG
