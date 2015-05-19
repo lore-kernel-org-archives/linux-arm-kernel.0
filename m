@@ -1,51 +1,50 @@
-From: jaegeuk@kernel.org (Jaegeuk Kim)
-Date: Mon, 18 May 2015 23:24:30 -0700
-Subject: [PATCH] crypto: allow to assign gfp_t for __crypto_alloc_tfm
-In-Reply-To: <20150519054945.GA28060@gondor.apana.org.au>
-References: <1432014416-39326-1-git-send-email-jaegeuk@kernel.org>
- <20150519054945.GA28060@gondor.apana.org.au>
-Message-ID: <20150519062430.GA39588@jaegeuk-mac02.hsd1.ca.comcast.net>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 19 May 2015 14:24:13 +0800
+Subject: [PATCH v1 2/2] ARM: vf610: Add SoC bus support for Vybrid
+In-Reply-To: <653ed53ef933a6834c4fd3c90ee47e5fb5c78160.1431928866.git.maitysanchayan@gmail.com>
+References: <cover.1431928866.git.maitysanchayan@gmail.com>
+ <653ed53ef933a6834c4fd3c90ee47e5fb5c78160.1431928866.git.maitysanchayan@gmail.com>
+Message-ID: <20150519062413.GR1071@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 01:49:45PM +0800, Herbert Xu wrote:
-> On Mon, May 18, 2015 at 10:46:56PM -0700, Jaegeuk Kim wrote:
-> > This patch adds a parameter, gfp_t, for __crypto_alloc_tfm.
-> > Now EXT4 and F2FS use the crypto engine to encrypt a page when writing it to the
-> > disk.
-> > That happens during ->writepage and it needs to allocate memory with
-> > GFP_NOFS.
-> > 
-> > Otherwise, in the f2fs case, kernel reports such the following warning.
+On Mon, May 18, 2015 at 11:50:07AM +0530, Sanchayan Maity wrote:
+> Implements SoC bus support to export SoC specific information. Read
+> the unique SoC ID from the Vybrid On Chip One Time Programmable
+> (OCOTP) controller, SoC specific information from the Miscellaneous
+> System Control Module (MSCM), revision from the ROM revision register
+> and expose it via the SoC bus infrastructure.
 > 
-> Normally crypto structures should only be allocated on control
-> paths where sleeping or swapping is not an issue.  Why is ext4
-> doing crypto allocations on the data path?
+> Sample Output:
 > 
+> root at vf:/sys/devices/soc0# cat soc_id
+> df63c12a2e2161d4
+> root at vf:/sys/devices/soc0# cat family
+> Freescale Vybrid VF500
+> root at vf:/sys/devices/soc0# cat revision
+> 00000013
+> root at vf:/sys/devices/soc0# cat machine
+> Freescale Vybrid
+> 
+> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+> ---
+>  arch/arm/mach-imx/mach-vf610.c | 81 ++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 81 insertions(+)
+> 
+> diff --git a/arch/arm/mach-imx/mach-vf610.c b/arch/arm/mach-imx/mach-vf610.c
+> index 2e7c75b..64c78e4 100644
+> --- a/arch/arm/mach-imx/mach-vf610.c
+> +++ b/arch/arm/mach-imx/mach-vf610.c
+> @@ -11,6 +11,86 @@
+>  #include <linux/irqchip.h>
+>  #include <asm/mach/arch.h>
+>  #include <asm/hardware/cache-l2x0.h>
+> +#include <linux/slab.h>
+> +#include <linux/sys_soc.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/regmap.h>
+> +#include <linux/random.h>
 
-Recently, Ted introduced per-file encryption feature as follows.
+Please group <linux/*> headers together and sort alphabetically.
 
-https://lwn.net/Articles/639427/
-
-The call path in fs/ext4/crypto.c is:
- - writepage
-  - ext4_encrypt
-   - ext4_get_crypto_ctx
-    - crypto_alloc_ablkcipher
-
-AFAIK, this way can achieve to reduce memory footprint gracefully.
-Just before submitting bios, fs allocates the required memory, and then end_io
-will free them in pair.
-
-Thanks,
-
-> Cheers,
-> -- 
-> Email: Herbert Xu <herbert@gondor.apana.org.au>
-> Home Page: http://gondor.apana.org.au/~herbert/
-> PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Shawn
