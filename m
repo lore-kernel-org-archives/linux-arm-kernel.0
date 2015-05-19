@@ -1,23 +1,147 @@
-From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
-Date: Tue, 19 May 2015 11:52:16 +0200
-Subject: at91sam9: watchdog: period
-In-Reply-To: <20150519111402.747e8eb2@bbrezillon>
-References: <55559D55.6020703@aksignal.cz>	<20150515172516.005e3a21@bbrezillon>	<5559865F.9010502@aksignal.cz>	<20150518092750.449d6c8c@bbrezillon>	<5559A029.9060007@aksignal.cz>	<555AA8F1.80100@atmel.com>	<20150519091442.675b1a98@bbrezillon>	<555AFBFD.3010506@aksignal.cz>
- <20150519111402.747e8eb2@bbrezillon>
-Message-ID: <555B07D0.4030000@aksignal.cz>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 19 May 2015 11:59:38 +0200
+Subject: [PATCH v8 09/16] clockevents/drivers: Add STM32 Timer driver
+In-Reply-To: <CALszF6Asfke0-cMQJcEQ8ya+rbPPPhUc6aXTZXQvQ8QF66cwYQ@mail.gmail.com>
+References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>	<1431158038-3813-10-git-send-email-mcoquelin.stm32@gmail.com>	<5559E4B0.70506@linaro.org>	<CALszF6CK7axU0qrWNf38aqrt2R2126ZACn7wx5jNY_1KE+4H+g@mail.gmail.com>	<555AF143.2060807@linaro.org>	<CALszF6CwGuKqgbX6gVrya1-_YOgvtrgC7pVqKTNjCRif_o532A@mail.gmail.com>	<555AFD18.2070009@linaro.org>
+ <CALszF6Asfke0-cMQJcEQ8ya+rbPPPhUc6aXTZXQvQ8QF66cwYQ@mail.gmail.com>
+Message-ID: <555B098A.8030202@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 05/19/2015 11:44 AM, Maxime Coquelin wrote:
+> 2015-05-19 11:06 GMT+02:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
+>> On 05/19/2015 10:55 AM, Maxime Coquelin wrote:
+>>>
+>>> 2015-05-19 10:16 GMT+02:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
+>>>>
+>>>> On 05/18/2015 04:03 PM, Maxime Coquelin wrote:
+>>>>>
+>>>>>
+>>>>> 2015-05-18 15:10 GMT+02:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
+>>>>>>
+>>>>>>
+>>>>>> On 05/09/2015 09:53 AM, Maxime Coquelin wrote:
+>>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>> STM32 MCUs feature 16 and 32 bits general purpose timers with
+>>>>>>> prescalers.
+>>>>>>> The drivers detects whether the time is 16 or 32 bits, and applies a
+>>>>>>> 1024 prescaler value if it is 16 bits.
+>>>>>>>
+>>>>>>> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+>>>>>>> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>>>>>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>>>>>>> ---
+>>>>>>>      drivers/clocksource/Kconfig       |   8 ++
+>>>>>>>      drivers/clocksource/Makefile      |   1 +
+>>>>>>>      drivers/clocksource/timer-stm32.c | 184
+>>>>>>> ++++++++++++++++++++++++++++++++++++++
+>>>>>>>      3 files changed, 193 insertions(+)
+>>>>>>>      create mode 100644 drivers/clocksource/timer-stm32.c
+>>>>>>>
+>>>>>>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+>>>>>>> index bf9364c..2443520 100644
+>>>>>>> --- a/drivers/clocksource/Kconfig
+>>>>>>> +++ b/drivers/clocksource/Kconfig
+>>>>>>> @@ -106,6 +106,14 @@ config CLKSRC_EFM32
+>>>>>>>              Support to use the timers of EFM32 SoCs as clock source
+>>>>>>> and
+>>>>>>> clock
+>>>>>>>              event device.
+>>>>>>>
+>>>>>>> +config CLKSRC_STM32
+>>>>>>> +       bool "Clocksource for STM32 SoCs" if !ARCH_STM32
+>>>>>>> +       depends on OF && ARM && (ARCH_STM32 || COMPILE_TEST)
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> Are the interactive bool and the 'COMPILE_TEST' necessary ?
+>>>>>>
+>>>>>
+>>>>> The interactive bool is necessary if we want to be able to
+>>>>> select/deselect it in COMPILE_TEST configuration.
+>>>>> And personnaly, I think COMPILE_TEST use makes sense.
+>>>>>
+>>>>> Note that other timer drivers are doing the same thing today
+>>>>> (CLKSRC_EFM32, SH_TIMER_CMT, EM_TIMER_STI...).
+>>>>>
+>>>>> Do you have a specific concern regarding COMPILE_TEST?
+>>>>
+>>>>
+>>>>
+>>>> Actually, we try to keep the timer selection non-interactive and let the
+>>>> platform's Kconfig to select the timer.
+>>>
+>>>
+>>> Ok.
+>>>
+>>>>
+>>>> I like when the code is consistent. The COMPILE_TEST was introduced and
+>>>> created a precedence. I would like to get rid of the interactive timer
+>>>> selection but I did not have time to go through this yet.
+>>>
+>>>
+>>> Indeed, consistency is important.
+>>> On my side, I don't have a strong opinion regarding the COMPILE_TEST
+>>> thing.
+>>> IMHO, it is more a subsystem's maintainer choice.
+>>>
+>>> So, if as a maintainer you don't use it and prefer not supporting it,
+>>> I'm fine to provide you a new version without COMPILE_TEST.
+>>> Doing that, the interactive selection will disappear too.
+>>>
+>>> I can provide you a new version this evenning.
+>>
+>>
+>> Ok, great.
+>
+> Is the below Kconfig entry fine for you?
+>
+> config CLKSRC_STM32
+>      def_bool y if ARCH_STM32
+>      select CLKSRC_MMIO
+
+config CLKSRC_STM32
+	bool
+	select CLKSRC_MMIO
+
+and in the arch/arm/mach-stm32/Kconfig add select CLKSRC_STM32
+
+> Best regards,
+> Maxime
+>
+>
+>>
+>> Thanks
+>>    -- Daniel
+>>
+>>
+>>>>
+>>>>
+>>>>
+>>>> --
+>>>>    <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>>>>
+>>>> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+>>>> <http://twitter.com/#!/linaroorg> Twitter |
+>>>> <http://www.linaro.org/linaro-blog/> Blog
+>>>>
+>>
+>>
+>> --
+>>   <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>>
+>> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+>> <http://twitter.com/#!/linaroorg> Twitter |
+>> <http://www.linaro.org/linaro-blog/> Blog
+>>
 
 
-On 19.5.2015 11:14, Boris Brezillon wrote:
->
-> There's a difference between your heartbeat (the frequency you
-> refresh/reset your watchdog) and the watchdog expiration time (here set
-> to 16 secs).
-> We usually set the heartbeat to 1/2 or 1/4 the expiration time, so that
-> we're (almost) sure we can reset the watchdog before its expiration.
->
->
-I'm confused. Why need kernel to know the time in witch userspace process will reset watchdog?
-And how to change watchdog expiration time?
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
