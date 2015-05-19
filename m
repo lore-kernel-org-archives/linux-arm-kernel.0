@@ -1,23 +1,30 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 19 May 2015 16:56:25 +0800
-Subject: [PATCH v7 08/13] ARM: unify MMU/!MMU addruart calls
-In-Reply-To: <alpine.DEB.2.11.1505191010510.4225@nanos>
-References: <1431769465-26867-1-git-send-email-stefan@agner.ch>
- <1431769465-26867-9-git-send-email-stefan@agner.ch>
- <20150516205103.GO2067@n2100.arm.linux.org.uk>
- <alpine.DEB.2.11.1505170952060.4225@nanos>
- <alpine.DEB.2.11.1505181735230.4225@nanos>
- <20150519053503.GP1071@dragon>
- <alpine.DEB.2.11.1505191010510.4225@nanos>
-Message-ID: <20150519085625.GY1071@dragon>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 19 May 2015 10:57:02 +0200
+Subject: [PATCH 07/10] arm64: dts: mt8173-evb: Add pinctrl/GPIO node for
+ mt6397.
+In-Reply-To: <1431567346-33780-8-git-send-email-hongzhou.yang@mediatek.com>
+References: <1431567346-33780-1-git-send-email-hongzhou.yang@mediatek.com>
+ <1431567346-33780-8-git-send-email-hongzhou.yang@mediatek.com>
+Message-ID: <CACRpkdZ5kL8-g89dmBWfyeK5XM0oOKPjFvv2+=j_fVrjsKWi0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 10:11:40AM +0200, Thomas Gleixner wrote:
-> If you pull the irq stuff. Make sure that the HEAD is b5cc5cbc11697. I
-> pushed out a broken version earlier.
+On Thu, May 14, 2015 at 3:35 AM, Hongzhou Yang
+<hongzhou.yang@mediatek.com> wrote:
 
-Okay, thanks for the info, Thomas.  I will take care of it if rmk and
-Arnd agree with the approach.
+> Add pinctrl and GPIO node to mt8173-evb.dts.
+>
+> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
 
-Shawn
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+This needs to go through the ARM SoC tree, or I need an ACK from
+some ARM SoC maintainer if I should take it through the pinctrl
+tree.
+
+Since there is a build dependency on the header in pinctrl
+ARM SoC would need to pull in some immutable branch
+from my tree to take this patch.
+
+Yours,
+Linus Walleij
