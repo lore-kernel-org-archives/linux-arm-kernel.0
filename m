@@ -1,61 +1,54 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 19 May 2015 16:05:46 +0200
-Subject: [PATCH 11/15] thermal: thermal: Add support for hardware-tracked
- trip points
-In-Reply-To: <20150518184433.GS11598@ld-irv-0074>
-References: <1431507163-19933-1-git-send-email-s.hauer@pengutronix.de>
- <1431507163-19933-12-git-send-email-s.hauer@pengutronix.de>
- <5559ABAA.6040001@kapsi.fi> <20150518120944.GQ6325@pengutronix.de>
- <20150518184433.GS11598@ld-irv-0074>
-Message-ID: <20150519140546.GE26575@pengutronix.de>
+From: tytso@mit.edu (Theodore Ts'o)
+Date: Tue, 19 May 2015 10:14:30 -0400
+Subject: [PATCH] crypto: allow to assign gfp_t for __crypto_alloc_tfm
+In-Reply-To: <20150519071521.GA28862@gondor.apana.org.au>
+References: <1432014416-39326-1-git-send-email-jaegeuk@kernel.org>
+ <20150519054945.GA28060@gondor.apana.org.au>
+ <20150519062430.GA39588@jaegeuk-mac02.hsd1.ca.comcast.net>
+ <20150519063211.GA28347@gondor.apana.org.au>
+ <20150519065812.GA40012@jaegeuk-mac02.hsd1.ca.comcast.net>
+ <20150519065929.GA28610@gondor.apana.org.au>
+ <20150519071317.GB40012@jaegeuk-mac02.hsd1.ca.comcast.net>
+ <20150519071521.GA28862@gondor.apana.org.au>
+Message-ID: <20150519141430.GD20421@thunk.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 18, 2015 at 11:44:33AM -0700, Brian Norris wrote:
-> On Mon, May 18, 2015 at 02:09:44PM +0200, Sascha Hauer wrote:
-> > On Mon, May 18, 2015 at 12:06:50PM +0300, Mikko Perttunen wrote:
-> > > One interesting thing I noticed was that at least the bang-bang
-> > > governor only acts if the temperature is properly smaller than (trip
-> > > temp - hysteresis). So perhaps we should specify the non-tripping
-> > > range as [low, high)? Or we could change bang-bang.
-> > 
-> > I wonder how we can protect against such off-by-one errors anyway.
-> > Generally a hardware might operate on raw values rather than directly
-> > in temperature values in ?C. This means a driver for this must have
-> > celsius_to_raw and raw_to_celsius conversion functions. Now it can
-> > happen that due to rounding errors celsius_to_raw(Tcrit) returns a raw
-> > value that when converted back to celsius is different from the
-> > original value in ?C. This would mean the hardware triggers an interrupt
-> > for a trip point and the thermal core does not react because get_temp
-> > actually returns a different temperature than previously programmed as
-> > interrupt trigger. This way we would lose hot (or cold) events.
+On Tue, May 19, 2015 at 03:15:21PM +0800, Herbert Xu wrote:
+> On Tue, May 19, 2015 at 12:13:17AM -0700, Jaegeuk Kim wrote:
+> >
+> > The key generation is done by ext4_generate_encryption_key in
+> > fs/ext4/crypto_key.c.
+> > And, ext4_file_mmap and ext4_file_open trigger it.
 > 
-> This also highlights another fact: there's a race between interrupt
-> generation and temperature reading (->get_temp()). I would expect any
-> hardware interrupt thermal sensor would also have a latched temperature
-> reading to correspond with it, and there would be no guarantee that this
-> latched temperature will match the polled reading seen once you reach
-> thermal_zone_device_update(). So a hardware driver might report a
-> thermal update, but the temperature reported to the core won't
-> necessarily match what interrupt was meant for.
+> Well that's where you should be doing crypto_alloc_ablkcipher
+> and crypto_ablkcipher_setkey.
 > 
-> I have a patch that adds a thermal_zone_device_update_temp() API, so
-> drivers can report the temperature along with the interrupt
-> notification. (Such a patch also helps so that the driver can choose to
-> round down on cold events and up on hot events, resolving your rounding
-> issue too.)
+> The whole point of a crypto tfm is to represent a key so any time
+> you get one you should create a crypto tfm.  Carrying around a raw
+> key is just wrong.
 
-Could you send me that patch? Thinking about it this might indeed work.
-The only thing that a driver needs to make sure then is that it actually
-at least one time reports a temperature beyond the currently programmed
-thresholds. With the patch you describe a driver could simply do that by
-ignoring the current ADC values and simply reporting the previously
-desired values.
+There can be multiple reads going on in parallel, so we're currently
+creating tfm's as necessary.  In fact one of the things that we've
+talked about doing is since there are some ARM cores where their
+"hardware acceleration" is slower than optimized software (sigh), and
+there are some Android applications (such as Facebook) that read
+*vast* quantities of data from flash on startup before painting a
+single pixel, that we might want to consider in some cases,
+parallelizing the decryption across multiple ARM cores.  Figuring out
+when to do this, both in terms of the workload, how many cores to use
+to balance off against power utilization, how much (if ever) to use
+the hardware "accelerator", and just plain lack of time caused us not
+to go down that particular path.
 
-Sascha
+We do have a tfm pointer hanging off the inode (currently only used
+for directories and file name encryption, where i_mutex is serializing
+us anyway), and in theory we could use that for the data path as well.
+We'd have to serialize access to it, which could be performance
+problem, and if the tfm is significantly larger than the raw key, we'd
+need to know when we should nuke the tfm.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+After all, we don't want to have users waiting for their Facebook app
+to launch.  :-)
+
+					- Ted
