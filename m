@@ -1,188 +1,125 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Tue, 19 May 2015 13:40:16 +0200
-Subject: [PATCH] ARM: kirkwood: add "jedec,spi-nor" flash compatible binding
-Message-ID: <1432035616-14783-1-git-send-email-zajec5@gmail.com>
+From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
+Date: Tue, 19 May 2015 14:39:27 +0300
+Subject: [PATCH v10 05/17] clk: tegra: Introduce ability for SoC-specific
+ reset control callbacks
+In-Reply-To: <1431529131-16710-6-git-send-email-mikko.perttunen@kapsi.fi>
+References: <1431529131-16710-6-git-send-email-mikko.perttunen@kapsi.fi>
+Message-ID: <1432035567-19008-1-git-send-email-mikko.perttunen@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Starting with commit 8947e396a829 ("Documentation: dt: mtd: replace
-"nor-jedec" binding with "jedec, spi-nor"") we have "jedec,spi-nor"
-binding indicating support for JEDEC identification.
+This patch allows SoC-specific CAR initialization routines to register
+their own reset_assert and reset_deassert callbacks with the common Tegra
+CAR code. If defined, the common code will call these callbacks when a
+reset control with number >= num_periph_banks * 32 is attempted to be asserted 
+or deasserted respectively. Numbers greater than or equal to num_periph_banks * 32
+are used to avoid clashes with low numbers that are automatically mapped to
+standard CAR reset lines.
 
-Use it for all flashes that are supposed to support READ ID op according
-to the datasheets.
+Each SoC with these special resets should specify the defined reset control
+numbers in a device tree header file.
 
-Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+Signed-off-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
+Acked-by: Michael Turquette <mturquette@linaro.org>
 ---
- arch/arm/boot/dts/kirkwood-b3.dts              | 2 +-
- arch/arm/boot/dts/kirkwood-cloudbox.dts        | 2 +-
- arch/arm/boot/dts/kirkwood-dir665.dts          | 2 +-
- arch/arm/boot/dts/kirkwood-dreamplug.dts       | 2 +-
- arch/arm/boot/dts/kirkwood-lsxl.dtsi           | 2 +-
- arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts | 2 +-
- arch/arm/boot/dts/kirkwood-netxbig.dtsi        | 2 +-
- arch/arm/boot/dts/kirkwood-ns2-common.dtsi     | 2 +-
- arch/arm/boot/dts/kirkwood-rd88f6192.dts       | 2 +-
- arch/arm/boot/dts/kirkwood-synology.dtsi       | 2 +-
- arch/arm/boot/dts/kirkwood-t5325.dts           | 2 +-
- arch/arm/boot/dts/kirkwood-ts219.dtsi          | 2 +-
- 12 files changed, 12 insertions(+), 12 deletions(-)
+ drivers/clk/tegra/clk.c | 39 +++++++++++++++++++++++++++++++--------
+ drivers/clk/tegra/clk.h |  3 +++
+ 2 files changed, 34 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-b3.dts b/arch/arm/boot/dts/kirkwood-b3.dts
-index c9247f8..d2936ad 100644
---- a/arch/arm/boot/dts/kirkwood-b3.dts
-+++ b/arch/arm/boot/dts/kirkwood-b3.dts
-@@ -74,7 +74,7 @@
- 			m25p16 at 0 {
- 				#address-cells = <1>;
- 				#size-cells = <1>;
--				compatible = "st,m25p16";
-+				compatible = "st,m25p16", "jedec,spi-nor";
- 				reg = <0>;
- 				spi-max-frequency = <40000000>;
- 				mode = <0>;
-diff --git a/arch/arm/boot/dts/kirkwood-cloudbox.dts b/arch/arm/boot/dts/kirkwood-cloudbox.dts
-index ab6ab49..7ec7656 100644
---- a/arch/arm/boot/dts/kirkwood-cloudbox.dts
-+++ b/arch/arm/boot/dts/kirkwood-cloudbox.dts
-@@ -42,7 +42,7 @@
- 			flash at 0 {
- 				#address-cells = <1>;
- 				#size-cells = <1>;
--				compatible = "mxicy,mx25l4005a";
-+				compatible = "mxicy,mx25l4005a", "jedec,spi-nor";
- 				reg = <0>;
- 				spi-max-frequency = <20000000>;
- 				mode = <0>;
-diff --git a/arch/arm/boot/dts/kirkwood-dir665.dts b/arch/arm/boot/dts/kirkwood-dir665.dts
-index 786959e..0473fcc 100644
---- a/arch/arm/boot/dts/kirkwood-dir665.dts
-+++ b/arch/arm/boot/dts/kirkwood-dir665.dts
-@@ -93,7 +93,7 @@
- 			m25p80 at 0 {
- 				#address-cells = <1>;
- 				#size-cells = <1>;
--				compatible = "mxicy,mx25l12805d";
-+				compatible = "mxicy,mx25l12805d", "jedec,spi-nor";
- 				spi-max-frequency = <50000000>;
- 				reg = <0>;
+diff --git a/drivers/clk/tegra/clk.c b/drivers/clk/tegra/clk.c
+index 41cd87c..c093ed9 100644
+--- a/drivers/clk/tegra/clk.c
++++ b/drivers/clk/tegra/clk.c
+@@ -49,7 +49,6 @@
+ #define RST_DEVICES_L			0x004
+ #define RST_DEVICES_H			0x008
+ #define RST_DEVICES_U			0x00C
+-#define RST_DFLL_DVCO			0x2F4
+ #define RST_DEVICES_V			0x358
+ #define RST_DEVICES_W			0x35C
+ #define RST_DEVICES_X			0x28C
+@@ -79,6 +78,11 @@ static struct clk **clks;
+ static int clk_num;
+ static struct clk_onecell_data clk_data;
  
-diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-index 6467c79..e2abc82 100644
---- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
-+++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-@@ -42,7 +42,7 @@
- 			m25p40 at 0 {
- 				#address-cells = <1>;
- 				#size-cells = <1>;
--				compatible = "mxicy,mx25l1606e";
-+				compatible = "mxicy,mx25l1606e", "jedec,spi-nor";
- 				reg = <0>;
- 				spi-max-frequency = <50000000>;
- 				mode = <0>;
-diff --git a/arch/arm/boot/dts/kirkwood-lsxl.dtsi b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-index 5348447..1d6528d 100644
---- a/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-@@ -74,7 +74,7 @@
- 			m25p40 at 0 {
- 				#address-cells = <1>;
- 				#size-cells = <1>;
--				compatible = "m25p40";
-+				compatible = "m25p40", "jedec,spi-nor";
- 				reg = <0>;
- 				spi-max-frequency = <25000000>;
- 				mode = <0>;
-diff --git a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
-index f82827d..b7e7d78 100644
---- a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
-+++ b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
-@@ -65,7 +65,7 @@
- 			flash at 0 {
- 				#address-cells = <1>;
- 				#size-cells = <1>;
--				compatible = "mxicy,mx25l12805d";
-+				compatible = "mxicy,mx25l12805d", "jedec,spi-nor";
- 				reg = <0>;
- 				spi-max-frequency = <50000000>;
- 				mode = <0>;
-diff --git a/arch/arm/boot/dts/kirkwood-netxbig.dtsi b/arch/arm/boot/dts/kirkwood-netxbig.dtsi
-index b0cfb7c..1508b121 100644
---- a/arch/arm/boot/dts/kirkwood-netxbig.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-netxbig.dtsi
-@@ -33,7 +33,7 @@
- 			flash at 0 {
- 				#address-cells = <1>;
- 				#size-cells = <1>;
--				compatible = "mxicy,mx25l4005a";
-+				compatible = "mxicy,mx25l4005a", "jedec,spi-nor";
- 				reg = <0>;
- 				spi-max-frequency = <20000000>;
- 				mode = <0>;
-diff --git a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-index fe6c024..e832b63 100644
---- a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-@@ -29,7 +29,7 @@
- 			flash at 0 {
- 				#address-cells = <1>;
- 				#size-cells = <1>;
--				compatible = "mxicy,mx25l4005a";
-+				compatible = "mxicy,mx25l4005a", "jedec,spi-nor";
- 				reg = <0>;
- 				spi-max-frequency = <20000000>;
- 				mode = <0>;
-diff --git a/arch/arm/boot/dts/kirkwood-rd88f6192.dts b/arch/arm/boot/dts/kirkwood-rd88f6192.dts
-index 35a29de..e0b9593 100644
---- a/arch/arm/boot/dts/kirkwood-rd88f6192.dts
-+++ b/arch/arm/boot/dts/kirkwood-rd88f6192.dts
-@@ -61,7 +61,7 @@
- 			m25p128 at 0 {
- 				#address-cells = <1>;
- 				#size-cells = <1>;
--				compatible = "st,m25p128";
-+				compatible = "st,m25p128", "jedec,spi-nor";
- 				reg = <0>;
- 				spi-max-frequency = <20000000>;
- 				mode = <0>;
-diff --git a/arch/arm/boot/dts/kirkwood-synology.dtsi b/arch/arm/boot/dts/kirkwood-synology.dtsi
-index 8be5b2e..04015c17 100644
---- a/arch/arm/boot/dts/kirkwood-synology.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-synology.dtsi
-@@ -217,7 +217,7 @@
- 			m25p80 at 0 {
- 				#address-cells = <1>;
- 				#size-cells = <1>;
--				compatible = "st,m25p80";
-+				compatible = "st,m25p80", "jedec,spi-nor";
- 				reg = <0>;
- 				spi-max-frequency = <20000000>;
- 				mode = <0>;
-diff --git a/arch/arm/boot/dts/kirkwood-t5325.dts b/arch/arm/boot/dts/kirkwood-t5325.dts
-index 610ec0f..ed956b8 100644
---- a/arch/arm/boot/dts/kirkwood-t5325.dts
-+++ b/arch/arm/boot/dts/kirkwood-t5325.dts
-@@ -88,7 +88,7 @@
- 			flash at 0 {
- 				#address-cells = <1>;
- 				#size-cells = <1>;
--				compatible = "st,m25p80";
-+				compatible = "st,m25p80", "jedec,spi-nor";
- 				spi-max-frequency = <86000000>;
- 				reg = <0>;
- 				mode = <0>;
-diff --git a/arch/arm/boot/dts/kirkwood-ts219.dtsi b/arch/arm/boot/dts/kirkwood-ts219.dtsi
-index df7f152..c56ab6b 100644
---- a/arch/arm/boot/dts/kirkwood-ts219.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-ts219.dtsi
-@@ -49,7 +49,7 @@
- 			m25p128 at 0 {
- 				#address-cells = <1>;
- 				#size-cells = <1>;
--				compatible = "m25p128";
-+				compatible = "m25p128", "jedec,spi-nor";
- 				reg = <0>;
- 				spi-max-frequency = <20000000>;
- 				mode = <0>;
++/* Handlers for SoC-specific reset lines */
++static int (*special_reset_assert)(unsigned long);
++static int (*special_reset_deassert)(unsigned long);
++static int special_reset_num;
++
+ static struct tegra_clk_periph_regs periph_regs[] = {
+ 	[0] = {
+ 		.enb_reg = CLK_OUT_ENB_L,
+@@ -152,19 +156,29 @@ static int tegra_clk_rst_assert(struct reset_controller_dev *rcdev,
+ 	 */
+ 	tegra_read_chipid();
+ 
+-	writel_relaxed(BIT(id % 32),
+-			clk_base + periph_regs[id / 32].rst_set_reg);
++	if (id < periph_banks * 32) {
++		writel_relaxed(BIT(id % 32),
++			       clk_base + periph_regs[id / 32].rst_set_reg);
++		return 0;
++	} else if (id < periph_banks * 32 + special_reset_num) {
++		return special_reset_assert(id);
++	}
+ 
+-	return 0;
++	return -EINVAL;
+ }
+ 
+ static int tegra_clk_rst_deassert(struct reset_controller_dev *rcdev,
+ 		unsigned long id)
+ {
+-	writel_relaxed(BIT(id % 32),
+-			clk_base + periph_regs[id / 32].rst_clr_reg);
++	if (id < periph_banks * 32) {
++		writel_relaxed(BIT(id % 32),
++			       clk_base + periph_regs[id / 32].rst_clr_reg);
++		return 0;
++	} else if (id < periph_banks * 32 + special_reset_num) {
++		return special_reset_deassert(id);
++	}
+ 
+-	return 0;
++	return -EINVAL;
+ }
+ 
+ struct tegra_clk_periph_regs *get_reg_bank(int clkid)
+@@ -286,10 +300,19 @@ void __init tegra_add_of_provider(struct device_node *np)
+ 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+ 
+ 	rst_ctlr.of_node = np;
+-	rst_ctlr.nr_resets = periph_banks * 32;
++	rst_ctlr.nr_resets = periph_banks * 32 + special_reset_num;
+ 	reset_controller_register(&rst_ctlr);
+ }
+ 
++void __init tegra_init_special_resets(int num,
++				      int (*assert)(unsigned long),
++				      int (*deassert)(unsigned long))
++{
++	special_reset_num = num;
++	special_reset_assert = assert;
++	special_reset_deassert = deassert;
++}
++
+ void __init tegra_register_devclks(struct tegra_devclk *dev_clks, int num)
+ {
+ 	int i;
+diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
+index 75ddc8ff..f42cbbe 100644
+--- a/drivers/clk/tegra/clk.h
++++ b/drivers/clk/tegra/clk.h
+@@ -591,6 +591,9 @@ struct tegra_devclk {
+ 	char		*con_id;
+ };
+ 
++void tegra_init_special_resets(int num, int (*assert)(unsigned long),
++			       int (*deassert)(unsigned long));
++
+ void tegra_init_from_table(struct tegra_clk_init_table *tbl,
+ 		struct clk *clks[], int clk_max);
+ 
 -- 
-1.8.4.5
+2.3.0
