@@ -1,53 +1,30 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Tue, 19 May 2015 20:55:03 +0200
-Subject: [PATCH] ARM: lpc18xx: define low-level debug symbol for LPC18xx/43xx
-Message-ID: <1432061703-29104-1-git-send-email-manabian@gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 19 May 2015 11:58:32 -0700
+Subject: [PATCH] phy: qcom-ufs: fix platform dependency
+In-Reply-To: <4583047.eZev6xPGf6@wuerfel>
+References: <4583047.eZev6xPGf6@wuerfel>
+Message-ID: <555B87D8.2060406@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using a dedicated symbol for low-level debugging instead of the
-arch symbol will make this platform play nice when enabled on a
-kernel that supports multiple platforms.
+On 05/19/15 08:11, Arnd Bergmann wrote:
+> The UFS PHY driver is written for the QCOM platform, but
+> has an incorrect dependency pointing to the recently
+> removed MSM platform, causing a warning whenever it
+> gets selected:
+>
+> warning: (SCSI_UFS_QCOM) selects PHY_QCOM_UFS which has unmet direct dependencies (OF && ARCH_MSM)
+>
+> This fixes the dependency.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: af6f8fff446 ("ufs-qcom: Switch dependency to ARCH_QCOM")
 
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
----
-Hi Arnd,
+Hm... I guess I should have combined the two patches into one. See [1]
+for this exact patch from last month.
 
-As disscussed on the mailing list:
-http://marc.info/?l=linux-arm-kernel&m=143202771500659&w=2
+[1] https://lkml.org/lkml/2015/4/10/862
 
-Patch should apply nicely on top of next/soc.
-
- arch/arm/Kconfig.debug | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index b3b6469350c1..689b524f8428 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -433,6 +433,14 @@ choice
- 		  Say Y here if you want kernel low-level debugging support
- 		  on KS8695.
- 
-+	config DEBUG_LPC18XX_UART0
-+		bool "Kernel low-level debugging via LPC18xx/43xx UART0"
-+		depends on ARCH_LPC18XX
-+		select DEBUG_UART_8250
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on NXP LPC18xx/43xx UART0.
-+
- 	config DEBUG_MESON_UARTAO
- 		bool "Kernel low-level debugging via Meson6 UARTAO"
- 		depends on ARCH_MESON
-@@ -1359,7 +1367,7 @@ config DEBUG_UART_PHYS
- 	default 0x20201000 if DEBUG_BCM2835
- 	default 0x3e000000 if DEBUG_BCM_KONA_UART
- 	default 0x4000e400 if DEBUG_LL_UART_EFM32
--	default 0x40081000 if ARCH_LPC18XX
-+	default 0x40081000 if DEBUG_LPC18XX_UART0
- 	default 0x40090000 if ARCH_LPC32XX
- 	default 0x40100000 if DEBUG_PXA_UART1
- 	default 0x42000000 if ARCH_GEMINI
 -- 
-1.8.0
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
