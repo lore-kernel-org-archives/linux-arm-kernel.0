@@ -1,43 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 May 2015 00:18:43 +0200
-Subject: [PATCH] ARM: v7 setup function should invalidate L1 cache
-In-Reply-To: <20150519220721.GK2067@n2100.arm.linux.org.uk>
-References: <E1Yuk8W-0001tC-IK@rmk-PC.arm.linux.org.uk>
- <2080993.BUNZpO9uLL@wuerfel> <20150519220721.GK2067@n2100.arm.linux.org.uk>
-Message-ID: <8164344.VcU8v2tIF5@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 19 May 2015 23:23:21 +0100
+Subject: sdhci(imx6): misbehaves while installing debian jessie, "Got data
+ interrupt 0x00100000"
+Message-ID: <20150519222320.GM2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 May 2015 23:07:21 Russell King - ARM Linux wrote:
-> If you look carefully at this, you'll notice that it's utter crap.
-> (Sorry, but it is.)  It has two problems:
-> 
-> 1. It'll never match a Cortex-A9 CPU.  Cortex-A9 has a MIDR value of
->    0x412fc09a, not 0x00000c09.  The bit position of the part number
->    field isn't even right.
->
-> 2. If it does match, then we branch to "v7_invalidate_l1" without setting
->    the link register: we'll never return back here (we'll return to whatever
->    random value the link register contains) and so we'll never make it to
->    secondary_startup.  *Thankfully*, because of (1), this branch will
->    never be taken - this is it's saving grace.
+iMX6 with a Samsung EVO UHS-1 16GB card.
 
-Yes, I've understood both before.
- 
-> Your patch introduces a /third/ form of crapiness:
-> 
-> 3. If the PSR happens to have Z=1, the "beq" instruction will be taken,
->    thereby crashing the system because of (2).
+There's actually two problems here.
 
-Right, this was the result of sloppiness on my side when fat-fingering
-a patch for illustration.
- 
-> The /simplest/ change which would fix this problem is to just change
-> proc-v7.S.  The remainder is effectively a cleanup removing redundant
-> code.
+1. SDHCI chooses to impose a 10 second timeout on any data operation.
+   This magic value of 10 seconds is rediculous.  Consider that SD
+   cards are typically slower than ATA, and ATA has a timeout of more
+   than one minute for a stuck command...  And yes, I've had this fire
+   a good 10 seconds before I then got...
 
-Fair enough. I wasn't sure if we're confident enough about that
-change already to put it into stable backports. If the risk is low
-enough, that's fine.
+2. "Got data interrupt 0x00100000 even though no data operation was in progress."
 
-	Arnd
+   That's SDHCI_INT_DATA_TIMEOUT.
+
+   Unfortunately, I have no other information, as the registers are
+   dumped at pr_debug() level, which means that they're all compiled
+   out in normal kernel builds.  In any case, I have no way to copy
+   information off of the installing system; debian does not start up
+   a ssh daemon during the install, so remote login is not possible.
+   Nor can I photograph the rather reflective TV screen.
+
+The side-effect of this is that the entire MMC IO subsystem locks up
+and I'm left with lots of processes stuck in IO-wait state, with the
+hungtask detector spewing onto the console.
+
+This happens while installing Debian Jessie, which is an "expensive"
+operation: not only in time (it takes 45 minutes or so to reproduce,
+requiring the stupid debian installer to be babysat during that time)
+but also because it's having to download the entire distro for each
+attempt (which eats into my monthly bandwidth allowance, so I can
+_only_ do this after 8pm local time.)
+
+I've tried twice tonight (which is about the limit that I can do in an
+evening), the second time after having up-ed the stupid 10 second limit
+to 60 seconds.  However (2) still occurs.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
