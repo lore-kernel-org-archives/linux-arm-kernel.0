@@ -1,47 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 May 2015 15:40:37 +0200
-Subject: [PATCH v2] ARM: shmobile: only select sound drivers that build
-Message-ID: <2384220.GLN49TmlTT@wuerfel>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Tue, 19 May 2015 15:42:08 +0200
+Subject: [PATCH v8 09/16] clockevents/drivers: Add STM32 Timer driver
+In-Reply-To: <6177628.0ZDPLeVyah@wuerfel>
+References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <555B098A.8030202@linaro.org>
+ <CALszF6AJ3Zf598wYeUx=iNWHHKT24xUyfagB=+4GocwZ-Fd-0g@mail.gmail.com>
+ <6177628.0ZDPLeVyah@wuerfel>
+Message-ID: <CALszF6BZKD-CPTZ6Hc85wv2Z3Y7JmUv-cMkBtbk2Ga6WeeWU=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A couple of codec drivers are selected by shmobile platform code,
-but depend on I2C, which results in a build error:
+2015-05-19 12:55 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
+> Please also make it possible to select this driver on other architectures
+> with COMPILE_TEST, so we get coverage from all the x86 test infrastructure.
 
-sound/soc/codecs/ak4642.c:638:1: warning: data definition has no type or storage class
- module_i2c_driver(ak4642_i2c_driver);
- ^
-sound/soc/codecs/ak4642.c:638:1: error: type defaults to 'int' in declaration of 'module_i2c_driver' [-Werror=implicit-int]
-sound/soc/codecs/ak4642.c:638:1: warning: parameter names (without types) in function declaration
-sound/soc/codecs/ak4642.c:627:26: warning: 'ak4642_i2c_driver' defined but not used [-Wunused-variable]
+You proposal is to revert back to the original patch, except that
+ARCH_STM32 should select CLKSRC_STM32, right?
 
-This ensures that we do not enable the respective drivers when I2C
-is disabled.
+Daniel, what do you think?
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-----
-v2: removed incorrect change for SND_SOC_AK4554, as pointed out by Geert
-
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 679b866399f2..c4cb4b590d47 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -150,7 +150,7 @@ config MACH_ARMADILLO800EVA
- 	select ARCH_REQUIRE_GPIOLIB
- 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
- 	select SMSC_PHY if SH_ETH
--	select SND_SOC_WM8978 if SND_SIMPLE_CARD
-+	select SND_SOC_WM8978 if SND_SIMPLE_CARD && I2C
- 	select USE_OF
- 
- config MACH_BOCKW
-@@ -159,7 +159,7 @@ config MACH_BOCKW
- 	select ARCH_REQUIRE_GPIOLIB
- 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
- 	select SND_SOC_AK4554 if SND_SIMPLE_CARD
--	select SND_SOC_AK4642 if SND_SIMPLE_CARD
-+	select SND_SOC_AK4642 if SND_SIMPLE_CARD && I2C
- 	select USE_OF
- 
- config MACH_BOCKW_REFERENCE
+Regards,
+Maxime
