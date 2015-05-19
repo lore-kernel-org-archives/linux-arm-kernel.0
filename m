@@ -1,48 +1,53 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 19 May 2015 12:16:02 +0100
-Subject: [alsa-devel] [PATCH 1/4] ASoC: rockchip: add rockchip machine
- driver
-In-Reply-To: <555659DB.9010204@metafoo.de>
-References: <1431422797-31903-1-git-send-email-zhengxing@rock-chips.com>
- <1431422797-31903-2-git-send-email-zhengxing@rock-chips.com>
- <20150512192215.GZ3066@sirena.org.uk>
- <55535035.5070608@rock-chips.com>
- <20150513164250.GB2761@sirena.org.uk>
- <CAEUnVG5+PqhkZ4TBMnfdbUr66-EaLVGDEewJ_=XZnfbvBEn13w@mail.gmail.com>
- <CAEUnVG5nkagx7CZC3t=-oOAyXOBaxxVynBxaGMf0NJpfr9ZVbA@mail.gmail.com>
- <555659DB.9010204@metafoo.de>
-Message-ID: <20150519111602.GG2761@sirena.org.uk>
+From: ganguly.s@samsung.com (Sarbojit Ganguly)
+Date: Tue, 19 May 2015 11:20:11 +0000 (GMT)
+Subject: [RFC] arm: Add for atomic half word exchange
+Message-ID: <1795987946.405311432034410830.JavaMail.weblogic@ep2mlwas07a>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 15, 2015 at 10:40:59PM +0200, Lars-Peter Clausen wrote:
+Yes, I will try to do that. OTOH, I saw that  there was a discussion on removal of bad_xchg() altogether. Perhaps that approach be better than adding this half word exchange?
 
-> I think the proper way to support this is come up with the concept of jack
-> detection providers and consumers. A component can register a jack detection
-> provider just like it can register a DAI. And then in the board driver you'd
-> just link the jack detection logic to the jack using the usual approach,
-> which is also used for DAIs (e.g. of node or device name). The core would
-> then take care of calling a enable callback or whatever is required to setup
-> the jack detection logic in the driver.
 
-Yes, nobody has really cared about it since we started pushing things
-out of the card init into the device level.  We would also need to add a
-way to force microphone biases on for devices where that's not a part of
-the jack detection IP.
+Regards,
+Sarbojit
 
-> This would also nicely solve the issue with the GPIO jack detectors, where
-> we currently can't really handle -EPROBE_DEFER. The GPIO would be requested
-> by a jack detection provider which can request them before the card is
-> registered rather than having to do the requesting in the card's init
-> callback.
+------- Original Message -------
+Sender : Arnd Bergmann<arnd@arndb.de>
+Date : May 19, 2015 18:51 (GMT+09:00)
+Title : Re: [RFC] arm: Add for atomic half word exchange
 
-Cards should be able to do their requesting in their probe function
-prior to registering with the core even without anything else, though
-that needs a bit or refactoring too.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150519/3c2c2463/attachment.sig>
+On Tuesday 19 May 2015 09:39:33 Sarbojit Ganguly wrote:
+> Since 16 bit half word exchange was not there and MCS based qspinlock by Waiman's xchg_tail() requires an atomic exchange on a half word,
+> here is a small modification to __xchg() code.
+
+We have discussed a similar patch before, see
+https://lkml.org/lkml/2015/2/25/390
+
+>  #if __LINUX_ARM_ARCH__ >= 6
+> @@ -50,6 +52,23 @@
+>                         : "r" (x), "r" (ptr)
+>                         : "memory", "cc");
+>                 break;
+> +               /* 
+> +                * halfword exclusive exchange
+> +                * This is new implementation as qspinlock
+> +                * wants 16 bit atomic CAS.
+> +                */
+> +       case 2:
+> +               asm volatile("@ __xchg2\n"
+> +               "1:     ldrexh  %0, [%3]\n"
+> +               "       strexh  %1, %2, [%3]\n"
+> +               "       teq     %1, #0\n"
+> +               "       bne     1b"
+> +                       : "=&r" (ret), "=&r" (tmp)
+> +                       : "r" (x), "r" (ptr)
+> +                       : "memory", "cc");
+> +               break;
+>         case 4: 
+>                 asm volatile("@ __xchg4\n"
+>                 "1:     ldrex   %0, [%3]\n"
+
+Please try to find a way to make this compile when CONFIG_CPU_V6
+is set.
+
+Arnd
