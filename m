@@ -1,93 +1,108 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 19 May 2015 10:22:06 +0200
-Subject: [PATCH v3] serial: 8250_uniphier: add UniPhier serial driver
-In-Reply-To: <1431997900-18390-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1431997900-18390-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CABuKBeJwOp3Km=Vw+xn8cRtH8DC-TNB_m7s8WSdPxzKHdzrdcw@mail.gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 19 May 2015 16:25:31 +0800
+Subject: [PATCHv2 05/12] arm64: psci: support unsigned return values
+In-Reply-To: <1431945503-6939-6-git-send-email-mark.rutland@arm.com>
+References: <1431945503-6939-1-git-send-email-mark.rutland@arm.com>
+ <1431945503-6939-6-git-send-email-mark.rutland@arm.com>
+Message-ID: <555AF37B.9050300@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-19 3:11 GMT+02:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> Add the driver for on-chip UART used on UniPhier SoCs.
+On 2015?05?18? 18:38, Mark Rutland wrote:
+> PSCI_VERSION and MIGRATE_INFO_TYPE_UP_CPU return unsigned values, with
+> the latter returning a 64-bit value. However, the PSCI invocation
+> functions have prototypes returning int.
 >
-> This hardware is similar to 8250 with a slightly different register
-> mapping, so it should go into drivers/tty/serial/8250 directory.
-
-The patch is for a driver in this folder, so no need to but it in the
-commit message.
-Instead just write a short description about the difference to a
-standard 8250 device.
-
+> This patch upgrades the invocation functions to return unsigned long,
+> with a new typedef to keep things legible. As PSCI_VERSION cannot return
+> a negative value, the erroneous check against PSCI_RET_NOT_SUPPORTED is
+> also removed. The unrelated psci_initcall_t typedef is moved closer to
+> its first user, to avoid confusion with the invocation functions.
 >
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> In preparation for sharing the code with ARM, unsigned long is used in
+> preference of u64. In the SMC32 calling convention, the relevant fields
+> will be 32 bits wide.
+>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
 > ---
+>   arch/arm64/kernel/psci.c | 47 ++++++++++++++++++-----------------------------
+>   1 file changed, 18 insertions(+), 29 deletions(-)
 >
-> Changes in v3:
->   - Just add *_SHIFT macro for the special case
+> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+> index 66b5b75..9c4de4b 100644
+> --- a/arch/arm64/kernel/psci.c
+> +++ b/arch/arm64/kernel/psci.c
+> @@ -56,11 +56,11 @@ struct psci_operations {
 >
-> Changes in v2:
->   - Drop unnecessary #include <linux/init.h>
->   - Sort includes in alphabetical order
->   - Use devm_clk_get() rather than of_clk_get()
->   - Delete unneeded clk_put() from uniphier_uart_remove callback
->   - Delete unneeded IS_ERR_OR_NULL check from uniphier_uart_remove callback
->   - Use UNIPHIER_UART_*_SHIFT instead of hard-coded shift values
->   - Change the first argument type of uniphier_of_serial_setup()
->     from (struct platform_device *) to (struct device *) for code-cleanup.
+>   static struct psci_operations psci_ops;
 >
->  drivers/tty/serial/8250/8250_uniphier.c | 237 ++++++++++++++++++++++++++++++++
->  drivers/tty/serial/8250/Kconfig         |   7 +
->  drivers/tty/serial/8250/Makefile        |   1 +
->  3 files changed, 245 insertions(+)
->  create mode 100644 drivers/tty/serial/8250/8250_uniphier.c
+> -static int (*invoke_psci_fn)(u64, u64, u64, u64);
+> -typedef int (*psci_initcall_t)(const struct device_node *);
+> -
+> -asmlinkage int __invoke_psci_fn_hvc(u64, u64, u64, u64);
+> -asmlinkage int __invoke_psci_fn_smc(u64, u64, u64, u64);
+> +typedef unsigned long (psci_fn)(unsigned long, unsigned long,
+> +				unsigned long, unsigned long);
+> +asmlinkage psci_fn __invoke_psci_fn_hvc;
+> +asmlinkage psci_fn __invoke_psci_fn_smc;
+> +static psci_fn *invoke_psci_fn;
 >
-> diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
-> new file mode 100644
-> index 0000000..50349bf
-> --- /dev/null
-> +++ b/drivers/tty/serial/8250/8250_uniphier.c
-> @@ -0,0 +1,237 @@
-> +/*
-> + * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
+>   enum psci_function {
+>   	PSCI_FN_CPU_SUSPEND,
+> @@ -112,12 +112,9 @@ static void psci_power_state_unpack(u32 power_state,
+>   			PSCI_0_2_POWER_STATE_AFFL_SHIFT;
+>   }
+>
+> -static int psci_get_version(void)
+> +static u32 psci_get_version(void)
+>   {
+> -	int err;
+> -
+> -	err = invoke_psci_fn(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
+> -	return err;
+> +	return invoke_psci_fn(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
+>   }
+>
+>   static int psci_cpu_suspend(struct psci_power_state state,
+> @@ -293,25 +290,15 @@ static void __init psci_0_2_set_functions(void)
+>    */
+>   static int __init psci_probe(void)
+>   {
+> -	int ver = psci_get_version();
+> -
+> -	if (ver == PSCI_RET_NOT_SUPPORTED) {
+> -		/*
+> -		 * PSCI versions >=0.2 mandates implementation of
+> -		 * PSCI_VERSION.
+> -		 */
+> -		pr_err("PSCI firmware does not comply with the v0.2 spec.\n");
+> -		return -EOPNOTSUPP;
+> -	} else {
+> -		pr_info("PSCIv%d.%d detected in firmware.\n",
+> -				PSCI_VERSION_MAJOR(ver),
+> -				PSCI_VERSION_MINOR(ver));
+> -
+> -		if (PSCI_VERSION_MAJOR(ver) == 0 &&
+> -				PSCI_VERSION_MINOR(ver) < 2) {
+> -			pr_err("Conflicting PSCI version detected.\n");
+> -			return -EINVAL;
+> -		}
+> +	u32 ver = psci_get_version();
 > +
-> +#include <linux/clk.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/serial_8250.h>
-> +#include <linux/serial_core.h>
-> +#include <linux/serial_reg.h>
-> +#include "8250.h"
+> +	pr_info("PSCIv%d.%d detected in firmware.\n",
+> +			PSCI_VERSION_MAJOR(ver),
+> +			PSCI_VERSION_MINOR(ver));
 > +
-> +/* Most (but not all) of UniPhier UART devices have 64-depth FIFO. */
-> +#define UNIPHIER_UART_DEFAULT_FIFO_SIZE        64
-> +
-> +#define UNIPHIER_UART_CHAR_FCR 3       /* Character / FIFO Control Register */
-> +#define UNIPHIER_UART_LCR_MCR  4       /* Line/Modem Control Register */
-> +#define     UNIPHIER_UART_LCR_SHIFT    8
-> +#define UNIPHIER_UART_DLR      9       /* Divisor Latch Register */
+> +	if (PSCI_VERSION_MAJOR(ver) == 0 && PSCI_VERSION_MINOR(ver) < 2) {
+> +		pr_err("Conflicting PSCI version detected.\n");
+> +		return -EINVAL;
 
-Nit pick: Please fix identation. After "define" just put one blank.
-I personally prefer that the define values are aligned by tabs, but
-that's up tu you.
+simplified the code both for DT and ACPI,
 
-With these changes you can add:
-Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-Thanks,
-Matthias
-
--- 
-motzblog.wordpress.com
+Thanks
+Hanjun
