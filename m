@@ -1,30 +1,19 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Tue, 19 May 2015 06:52:52 -0700
-Subject: [PATCH] [RESEND] SCSI: ips: remove pointless #warning
-In-Reply-To: <3121960.dnOqT9LCth@wuerfel>
-References: <3121960.dnOqT9LCth@wuerfel>
-Message-ID: <1432043572.3007.14.camel@HansenPartnership.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 19 May 2015 07:53:05 -0600
+Subject: [RESEND PATCH 1/2] ARM: dts: tegra: Add labels to Tegra114 nodes
+In-Reply-To: <1432036279-6318-1-git-send-email-k.kozlowski.k@gmail.com>
+References: <1432036279-6318-1-git-send-email-k.kozlowski.k@gmail.com>
+Message-ID: <555B4041.5090208@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-05-19 at 15:33 +0200, Arnd Bergmann wrote:
-> The ips driver contains
-> 
->  #warning "This driver has only been tested on the x86/ia64/x86_64 platforms"
-> 
-> which gets printed by the compiler every time this driver gets
-> build for something other than those three architectures. The same
-> is true for most other drivers, but none of them prints a warning like
-> this.
-> 
-> Let's remove the warning now to reduce the amount of clutter.
-> 
-> FWIW, I've reviewed the driver and found a few oddities, but nothing
-> that needs to be fixed or that would be architecture specific.
+On 05/19/2015 05:51 AM, Krzysztof Kozlowski wrote:
+> Add new labels to certain nodes on Tegra114 so they could be easily
+> referenced by board DTS files.
+>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
 
-In principle I don't disagree.  However this warning was a specific
-request of the driver writers.  Since the driver is pretty much dead,
-I'm not sure anyone is going to check or fix it for non-intel any time
-soon.
-
-James
+As I think I mentioned last time, this would make the Tegra114 files 
+inconsistent with all other Tegra files. Either we should convert 
+everything, or none at all. I'm personally not sure the churn this will 
+introduce is worth it, but maybe.
