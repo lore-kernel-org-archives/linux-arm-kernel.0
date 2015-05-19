@@ -1,46 +1,56 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 19 May 2015 18:59:22 +0530
-Subject: [PATCH] phy: add dm816x dependency on USB_PHY
-In-Reply-To: <3934365.TiRUES6WLp@wuerfel>
-References: <3934365.TiRUES6WLp@wuerfel>
-Message-ID: <555B3AB2.6000100@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 19 May 2015 15:28:50 +0200
+Subject: [PATCH] ARM: multi_v7_defconfig: Add Atmel SAMA5 family
+In-Reply-To: <555B3463.2060700@atmel.com>
+References: <1428051678-20450-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <555AFF3F.10400@atmel.com> <9986808.t62JLgg5NJ@wuerfel>
+ <20150519123358.GA15179@piout.net> <555B3463.2060700@atmel.com>
+Message-ID: <555B3A92.7010409@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Le 19/05/2015 15:02, Nicolas Ferre a ?crit :
+> Le 19/05/2015 14:33, Alexandre Belloni a ?crit :
+>> On 19/05/2015 at 13:04:22 +0200, Arnd Bergmann wrote :
+>>>>> @@ -250,15 +261,18 @@ CONFIG_SERIAL_FSL_LPUART=y
+>>>>>  CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
+>>>>>  CONFIG_SERIAL_ST_ASC=y
+>>>>>  CONFIG_SERIAL_ST_ASC_CONSOLE=y
+>>>>> +CONFIG_HW_RANDOM=y
+>>>>>  CONFIG_I2C_CHARDEV=y
+>>>>>  CONFIG_I2C_DAVINCI=y
+>>>>>  CONFIG_I2C_MUX=y
+>>>
+>>> seems non-essential.
+>>>
+>>
+>> That is an oversight, it should be compiled as a module.
+> 
+> Ok, I modify it: no need to bother sending a new revision.
+> 
+>>>>> @@ -502,6 +522,8 @@ CONFIG_RTC_DRV_MV=y
+>>>>>  CONFIG_RTC_DRV_TEGRA=y
+>>>>>  CONFIG_DMADEVICES=y
+>>>>>  CONFIG_DW_DMAC=y
+>>>>> +CONFIG_AT_HDMAC=y
+>>>>> +CONFIG_AT_XDMAC=y
+>>>>>  CONFIG_MV_XOR=y
+>>>>>  CONFIG_TEGRA20_APB_DMA=y
+>>>>>  CONFIG_SH_DMAE=y
+>>>
+>>> What are these required for? I assume you need them for MMC? If so, that's
+>>> fine.
+>>>
+>>
+>> That is indeed the reason.
+> 
+> Yep.
+> 
+> So I simply do a s/y/m/ on the CONFIG_HW_RANDOM then included it in our
+> at91-4.2-defconfig branch.
 
-On Tuesday 19 May 2015 06:32 PM, Arnd Bergmann wrote:
-> The newly added phy-dm816x-usb driver depends on the
-> usb phy API and fails to link if that is disabled:
->
-> drivers/built-in.o: In function `dm816x_usb_phy_remove':
-> :(.text+0x3a28): undefined reference to `usb_remove_phy'
-> drivers/built-in.o: In function `dm816x_usb_phy_probe':
-> :(.text+0x3c18): undefined reference to `usb_add_phy_dev'
+In fact it's a boolean. So removing it does the trick.
 
-A patch to fix this has already been queued in the fixes branch
-https://git.kernel.org/cgit/linux/kernel/git/kishon/linux-phy.git/commit/?h=fixes&id=7f7a4d306ff87502dc26860f54e798693cf9b1e1
-
-Thanks
-Kishon
->
-> This adds an explicit dependency in Kconfig to avoid the
-> build error in randconfig tests.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 609adde838f4 ("phy: Add a driver for dm816x USB PHY")
->
-> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> index fceac96c2a31..1b5c235562c9 100644
-> --- a/drivers/phy/Kconfig
-> +++ b/drivers/phy/Kconfig
-> @@ -37,7 +37,7 @@ config ARMADA375_USBCLUSTER_PHY
->
->   config PHY_DM816X_USB
->   	tristate "TI dm816x USB PHY driver"
-> -	depends on ARCH_OMAP2PLUS
-> +	depends on ARCH_OMAP2PLUS && USB_PHY
->   	select GENERIC_PHY
->   	help
->   	  Enable this for dm816x USB to work.
->
+Bye,
+-- 
+Nicolas Ferre
