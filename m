@@ -1,562 +1,618 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 19 May 2015 12:30:10 +0200
-Subject: [PATCH 3/5] soc: Mediatek: Add SCPSYS power domain driver
-In-Reply-To: <CAGS+omDJ-7+L_46vwMyewHMkMNj69odhp=JY5i6Xj3-Loe6UNA@mail.gmail.com>
-References: <1431372206-1237-1-git-send-email-s.hauer@pengutronix.de>
- <1431372206-1237-4-git-send-email-s.hauer@pengutronix.de>
- <CAGS+omDJ-7+L_46vwMyewHMkMNj69odhp=JY5i6Xj3-Loe6UNA@mail.gmail.com>
-Message-ID: <20150519103010.GA6325@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 19 May 2015 11:38:28 +0100
+Subject: [PATCH v3 01/17] mfd: add new driver for Sharp LoCoMo
+In-Reply-To: <1431880077-26321-2-git-send-email-dbaryshkov@gmail.com>
+References: <1431880077-26321-1-git-send-email-dbaryshkov@gmail.com>
+ <1431880077-26321-2-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <20150519103828.GU22418@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 15, 2015 at 10:17:21PM +0800, Daniel Kurtz wrote:
-> On Tue, May 12, 2015 at 3:23 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > This adds a power domain driver for the Mediatek SCPSYS unit.
-> >
-> > The System Control Processor System (SCPSYS) has several power
-> > management related tasks in the system. The tasks include thermal
-> > measurement, dynamic voltage frequency scaling (DVFS), interrupt
-> > filter and lowlevel sleep control. The System Power Manager (SPM)
-> > inside the SCPSYS is for the MTCMOS power domain control.
-> >
-> > For now this driver only adds power domain support, the more
-> > advanced features are not yet supported. The driver implements
-> > the generic PM domain device tree bindings, the first user will
-> > most likely be the Mediatek AFE audio driver.
-> >
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > ---
-> >  .../devicetree/bindings/soc/mediatek/scpsys.txt    |   2 +
-> >  drivers/soc/mediatek/Kconfig                       |   8 +
-> >  drivers/soc/mediatek/Makefile                      |   1 +
-> >  drivers/soc/mediatek/mtk-scpsys.c                  | 416 +++++++++++++++++++++
-> >  include/dt-bindings/power/mt8173-power.h           |  15 +
-> >  5 files changed, 442 insertions(+)
-> >  create mode 100644 drivers/soc/mediatek/mtk-scpsys.c
-> >  create mode 100644 include/dt-bindings/power/mt8173-power.h
-> >
-> > diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-> > index 4764a03..87f2091 100644
-> > --- a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-> > +++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-> > @@ -15,6 +15,7 @@ Required properties:
-> >  - compatible: Must be "mediatek,mt8173-scpsys"
-> >  - #power-domain-cells: Must be 1
-> >  - reg: Address range of the SCPSYS unit
-> > +- infracfg: must contain a phandle to the infracfg controller
-> >
-> >  Example:
-> >
-> > @@ -22,6 +23,7 @@ Example:
-> >                 #power-domain-cells = <1>;
-> >                 compatible = "mediatek,mt8173-scpsys";
-> >                 reg = <0 0x10006000 0 0x1000>;
-> > +               infracfg = <&infracfg>;
-> >         };
-> >
-> >  Example consumer:
-> > diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
-> > index 6fae66f..1386c79 100644
-> > --- a/drivers/soc/mediatek/Kconfig
-> > +++ b/drivers/soc/mediatek/Kconfig
-> > @@ -18,3 +18,11 @@ config MTK_INFRACFG
-> >           Say yes here to add support for the MediaTek INFRACFG controller. The
-> >           INFRACFG controller contains various infrastructure registers not
-> >           directly associated to any device.
-> > +
-> > +config MTK_SCPSYS
-> > +       tristate "MediaTek SCPSYS Support"
-> > +       depends on MTK_INFRACFG
-> 
-> Should this be:
->   depends on ARCH_MEDIATEK || COMPILE_TEST
->   selects MTK_INFRACFG
-> 
-> > +       select REGMAP
-> > +       help
-> > +         Say yes here to add support for the MediaTek SCPSYS power domain
-> > +         driver.
-> > diff --git a/drivers/soc/mediatek/Makefile b/drivers/soc/mediatek/Makefile
-> > index ce39119..f8eebab 100644
-> > --- a/drivers/soc/mediatek/Makefile
-> > +++ b/drivers/soc/mediatek/Makefile
-> > @@ -1,2 +1,3 @@
-> >  obj-$(CONFIG_MTK_PMIC_WRAP) += mtk-pmic-wrap.o
-> >  obj-$(CONFIG_MTK_INFRACFG) += mtk-infracfg.o
-> > +obj-$(CONFIG_MTK_SCPSYS) += mtk-scpsys.o
-> > diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-> > new file mode 100644
-> > index 0000000..c42c7f1
-> > --- /dev/null
-> > +++ b/drivers/soc/mediatek/mtk-scpsys.c
-> > @@ -0,0 +1,416 @@
-> > +/*
-> > + * Copyright (c) 2015 Pengutronix, Sascha Hauer <kernel@pengutronix.de>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +#include <linux/clk.h>
-> > +#include <linux/io.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/module.h>
-> > +#include <linux/of_device.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/regmap.h>
-> > +#include <linux/pm_domain.h>
-> > +#include <linux/delay.h>
-> > +#include <linux/soc/mediatek/infracfg.h>
-> > +#include <dt-bindings/power/mt8173-power.h>
-> > +#include <linux/mfd/syscon.h>
-> > +
-> > +#define SPM_VDE_PWR_CON                        0x0210
-> > +#define SPM_MFG_PWR_CON                        0x0214
-> > +#define SPM_VEN_PWR_CON                        0x0230
-> > +#define SPM_ISP_PWR_CON                        0x0238
-> > +#define SPM_DIS_PWR_CON                        0x023c
-> > +#define SPM_VEN2_PWR_CON               0x0298
-> > +#define SPM_AUDIO_PWR_CON              0x029c
-> > +#define SPM_MFG_2D_PWR_CON             0x02c0
-> > +#define SPM_MFG_ASYNC_PWR_CON          0x02c4
-> > +#define SPM_USB_PWR_CON                        0x02cc
-> > +#define SPM_PWR_STATUS                 0x060c
-> > +#define SPM_PWR_STATUS_2ND             0x0610
-> > +
-> > +#define PWR_RST_B_BIT                  BIT(0)
-> > +#define PWR_ISO_BIT                    BIT(1)
-> > +#define PWR_ON_BIT                     BIT(2)
-> > +#define PWR_ON_2ND_BIT                 BIT(3)
-> > +#define PWR_CLK_DIS_BIT                        BIT(4)
-> > +
-> > +#define DIS_PWR_STA_MASK               BIT(3)
-> > +#define MFG_PWR_STA_MASK               BIT(4)
-> > +#define ISP_PWR_STA_MASK               BIT(5)
-> > +#define VDE_PWR_STA_MASK               BIT(7)
-> > +#define VEN2_PWR_STA_MASK              BIT(20)
-> > +#define VEN_PWR_STA_MASK               BIT(21)
-> > +#define MFG_2D_PWR_STA_MASK            BIT(22)
-> > +#define MFG_ASYNC_PWR_STA_MASK         BIT(23)
-> > +#define AUDIO_PWR_STA_MASK             BIT(24)
-> > +#define USB_PWR_STA_MASK               BIT(25)
-> > +
-> > +struct scp_domain_data {
-> > +       const char *name;
-> > +       u32 sta_mask;
-> > +       int ctl_offs;
-> > +       u32 sram_pdn_bits;
-> > +       u32 sram_pdn_ack_bits;
-> > +       u32 bus_prot_mask;
-> > +       int id;
-> > +       const char *clk_name;
-> > +};
-> 
-> These fields are only used at init time:
->  name (the pointer, the actual string is pointed to by genpd->name)
->  id
->  clk_name
-> 
-> You could split those off into a separate __initconst struct.
+On Sun, 17 May 2015, Dmitry Eremin-Solenikov wrote:
 
-Is this really worth it?
-
+> LoCoMo is a GA used on Sharp Zaurus SL-5x00. Current driver does has
+> several design issues (special bus instead of platform bus, doesn't use
+> mfd-core, etc).
 > 
-> > +
-> > +static const struct scp_domain_data scp_domain_data[] = {
-> > +       {
-> > +               .id = MT8173_POWER_DOMAIN_VDE,
-> > +               .name = "vde",
-> > +               .sta_mask = VDE_PWR_STA_MASK,
-> > +               .ctl_offs = SPM_VDE_PWR_CON,
-> > +               .sram_pdn_bits = GENMASK(11, 8),
-> > +               .sram_pdn_ack_bits = GENMASK(12, 12),
-> > +               .clk_name = "vdec",
-> > +       }, {
-> > +               .id = MT8173_POWER_DOMAIN_VEN,
+> Implement 'core' parts of locomo support as an mfd driver.
 > 
-> Is there any reason you do not keep these in ".id" order:
-> VDE,  MFG, VEN, ISP, DIS, VEN2, AUDIO, MFG_2D, MFG_ASYNC, USB
-
-The reason is simply that with CONFIG_PM disabled we have to turn on the
-domains in the correct order, otherwise the system hangs. I can renumber
-the defines though if you like.
-
-> > +       }, {
-> > +               .id = MT8173_POWER_DOMAIN_ISP,
-> > +               .name = "isp",
-> > +               .sta_mask = ISP_PWR_STA_MASK,
-> > +               .ctl_offs = SPM_ISP_PWR_CON,
-> > +               .sram_pdn_bits = GENMASK(11, 8),
-> > +               .sram_pdn_ack_bits = GENMASK(13, 12),
-> > +       }, {
-> > +               .id = MT8173_POWER_DOMAIN_DIS,
-> > +               .name = "disp",
+> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> ---
+>  drivers/mfd/Kconfig        |  10 ++
+>  drivers/mfd/Makefile       |   1 +
+>  drivers/mfd/locomo.c       | 346 +++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/mfd/locomo.h | 167 ++++++++++++++++++++++
+>  4 files changed, 524 insertions(+)
+>  create mode 100644 drivers/mfd/locomo.c
+>  create mode 100644 include/linux/mfd/locomo.h
 > 
-> Perhaps .id/.name/.clk should be "MM" to match the corresponding clock
-> define (CLK_TOP_MM_SEL) & prot bits.
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index d5ad04d..8c33940 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -1430,6 +1430,16 @@ config MFD_STW481X
+>  	  in various ST Microelectronics and ST-Ericsson embedded
+>  	  Nomadik series.
+>  
+> +config MFD_LOCOMO
+> +	bool "Sharp LoCoMo support"
+> +	depends on ARM
+> +	select MFD_CORE
+> +	select IRQ_DOMAIN
+> +	select REGMAP_MMIO
+> +	help
+> +	  Support for Sharp LoCoMo Grid Array found in Sharp SL-5x00
+> +          PDA family.
+> +
+>  menu "Multimedia Capabilities Port drivers"
+>  	depends on ARCH_SA1100
+>  
+> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+> index 0e5cfeb..6c23b73 100644
+> --- a/drivers/mfd/Makefile
+> +++ b/drivers/mfd/Makefile
+> @@ -181,6 +181,7 @@ obj-$(CONFIG_MFD_HI6421_PMIC)	+= hi6421-pmic-core.o
+>  obj-$(CONFIG_MFD_DLN2)		+= dln2.o
+>  obj-$(CONFIG_MFD_RT5033)	+= rt5033.o
+>  obj-$(CONFIG_MFD_SKY81452)	+= sky81452.o
+> +obj-$(CONFIG_MFD_LOCOMO)	+= locomo.o
+>  
+>  intel-soc-pmic-objs		:= intel_soc_pmic_core.o intel_soc_pmic_crc.o
+>  obj-$(CONFIG_INTEL_SOC_PMIC)	+= intel-soc-pmic.o
+> diff --git a/drivers/mfd/locomo.c b/drivers/mfd/locomo.c
+> new file mode 100644
+> index 0000000..313d12f
+> --- /dev/null
+> +++ b/drivers/mfd/locomo.c
+> @@ -0,0 +1,346 @@
+> +/*
+> + * Sharp LoCoMo support
+> + *
+> + * (C) Copyright 2015 Dmitry Eremin-Solenikov
+> + *
+> + * Based on old driver at arch/arm/common/locomo.c
+> + *
+> + * (C) Copyright 2004 John Lenz
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This file contains all generic LoCoMo support.
+> + *
+> + * All initialization functions provided here are intended to be called
+> + * from machine specific code with proper arguments when required.
+> + */
+> +
+> +#include <linux/delay.h>
+> +#include <linux/gpio.h>
+> +#include <linux/io.h>
+> +#include <linux/irq.h>
+> +#include <linux/irqdomain.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/regmap.h>
+> +#include <linux/slab.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/mfd/core.h>
+> +#include <linux/mfd/locomo.h>
 
+Alphabetical please.
 
-> 
-> > +               .sta_mask = DIS_PWR_STA_MASK,
-> > +               .ctl_offs = SPM_DIS_PWR_CON,
-> > +               .sram_pdn_bits = GENMASK(11, 8),
-> > +               .sram_pdn_ack_bits = GENMASK(12, 12),
-> > +               .clk_name = "disp",
-> > +               .bus_prot_mask = MT8173_TOP_AXI_PROT_EN_MM_M0 |
-> > +                       MT8173_TOP_AXI_PROT_EN_MM_M1,
-> > +       }, {
-> > +               .id = MT8173_POWER_DOMAIN_VEN2,
-> > +               .name = "ven2",
-> 
-> Perhaps .id/.name/.clk should be "VENC_LT"/"venc_lt" to match the
-> corresponding clock define (CLK_TOP_VENC_LT_SEL).
-> 
-> > +               .sta_mask = VEN2_PWR_STA_MASK,
-> > +               .ctl_offs = SPM_VEN2_PWR_CON,
-> > +               .sram_pdn_bits = GENMASK(11, 8),
-> > +               .sram_pdn_ack_bits = GENMASK(15, 12),
-> > +               .clk_name = "ven2",
-> > +       }, {
-> > +               .id = MT8173_POWER_DOMAIN_AUDIO,
-> > +               .name = "audio",
-> > +               .sta_mask = AUDIO_PWR_STA_MASK,
-> > +               .ctl_offs = SPM_AUDIO_PWR_CON,
-> > +               .sram_pdn_bits = GENMASK(11, 8),
-> > +               .sram_pdn_ack_bits = GENMASK(15, 12),
-> > +       },  {
-> > +               .id = MT8173_POWER_DOMAIN_MFG_ASYNC,
-> > +               .name = "mfg_async",
-> > +               .sta_mask = MFG_ASYNC_PWR_STA_MASK,
-> > +               .ctl_offs = SPM_MFG_ASYNC_PWR_CON,
-> > +               .sram_pdn_bits = GENMASK(11, 8),
-> > +               .sram_pdn_ack_bits = 0,
-> > +               .clk_name = "mfg",
-> > +       }, {
-> > +               .id = MT8173_POWER_DOMAIN_MFG_2D,
-> > +               .name = "mfg_2d",
-> > +               .sta_mask = MFG_2D_PWR_STA_MASK,
-> > +               .ctl_offs = SPM_MFG_2D_PWR_CON,
-> > +               .sram_pdn_bits = GENMASK(11, 8),
-> > +               .sram_pdn_ack_bits = GENMASK(13, 12),
-> > +               .clk_name = "mfg",
-> > +       }, {
-> > +               .id = MT8173_POWER_DOMAIN_MFG,
-> > +               .name = "mfg",
-> > +               .sta_mask = MFG_PWR_STA_MASK,
-> > +               .ctl_offs = SPM_MFG_PWR_CON,
-> > +               .sram_pdn_bits = GENMASK(13, 8),
-> > +               .sram_pdn_ack_bits = GENMASK(21, 16),
-> > +               .clk_name = "mfg",
-> > +               .bus_prot_mask = MT8173_TOP_AXI_PROT_EN_MFG_S |
-> > +                       MT8173_TOP_AXI_PROT_EN_MFG_M0 |
-> > +                       MT8173_TOP_AXI_PROT_EN_MFG_M1 |
-> > +                       MT8173_TOP_AXI_PROT_EN_MFG_SNOOP_OUT,
-> > +       }, {
-> > +               .id = MT8173_POWER_DOMAIN_USB,
-> > +               .name = "usb",
-> > +               .sta_mask = USB_PWR_STA_MASK,
-> > +               .ctl_offs = SPM_USB_PWR_CON,
-> > +               .sram_pdn_bits = GENMASK(11, 8),
-> > +               .sram_pdn_ack_bits = GENMASK(15, 12),
-> > +       },
-> > +};
-> > +
-> > +#define NUM_DOMAINS    ARRAY_SIZE(scp_domain_data)
-> > +
-> > +struct scp;
-> > +
-> > +struct scp_domain {
-> > +       struct generic_pm_domain pmd;
-> 
-> Could you name this "genpd"... that seems to be what most other drivers use.
+> +/* LoCoMo Interrupts */
+> +#define IRQ_LOCOMO_KEY		0
+> +#define IRQ_LOCOMO_GPIO		1
+> +#define IRQ_LOCOMO_LT		2
+> +#define IRQ_LOCOMO_SPI		3
+> +
+> +#define LOCOMO_NR_IRQS		4
+> +
+> +/* the following is the overall data for the locomo chip */
 
-ok
+Capitalisation, to be consistent with the other comments. 
 
-> 
-> > +       const struct scp_domain_data *data;
-> > +       struct scp *scp;
-> > +       struct clk *clk;
-> > +};
-> > +
-> > +struct scp {
-> > +       struct scp_domain domains[NUM_DOMAINS];
-> > +       struct genpd_onecell_data pd_data;
-> 
-> After probe() you don't use pd_data.
-> Why do we need it in this struct?
+> +struct locomo {
+> +	struct device *dev;
+> +	unsigned int irq;
+> +	spinlock_t lock;
+> +	struct irq_domain *domain;
+> +	struct regmap *regmap;
+> +};
+> +
+> +static struct resource locomo_kbd_resources[] = {
+> +	DEFINE_RES_IRQ(IRQ_LOCOMO_KEY),
+> +};
+> +
+> +static struct resource locomo_gpio_resources[] = {
+> +	DEFINE_RES_IRQ(IRQ_LOCOMO_GPIO),
+> +};
+> +
+> +/* Filled in locomo_probe() function, will be kmemduped by platform core */
+> +static struct locomo_gpio_platform_data locomo_gpio_pdata;
+> +
+> +static struct resource locomo_lt_resources[] = {
+> +	DEFINE_RES_IRQ(IRQ_LOCOMO_LT),
+> +};
+> +
+> +static struct resource locomo_spi_resources[] = {
+> +	DEFINE_RES_IRQ(IRQ_LOCOMO_SPI),
+> +};
+> +
+> +/* Filled in locomo_probe() function, will be kmemduped by platform core */
+> +static struct locomo_lcd_platform_data locomo_lcd_pdata;
+> +
+> +static struct mfd_cell locomo_cells[] = {
+> +	{
+> +		.name = "locomo-kbd",
+> +		.resources = locomo_kbd_resources,
+> +		.num_resources = ARRAY_SIZE(locomo_kbd_resources),
+> +	},
+> +	{
+> +		.name = "locomo-gpio",
+> +		.resources = locomo_gpio_resources,
+> +		.num_resources = ARRAY_SIZE(locomo_gpio_resources),
+> +		.platform_data = &locomo_gpio_pdata,
+> +		.pdata_size = sizeof(locomo_gpio_pdata),
+> +	},
+> +	{
+> +		.name = "locomo-lt", /* Long time timer */
+> +		.resources = locomo_lt_resources,
+> +		.num_resources = ARRAY_SIZE(locomo_lt_resources),
+> +	},
+> +	{
+> +		.name = "locomo-spi",
+> +		.resources = locomo_spi_resources,
+> +		.num_resources = ARRAY_SIZE(locomo_spi_resources),
+> +	},
+> +	{
+> +		.name = "locomo-led",
+> +	},
+> +	{
+> +		.name = "locomo-backlight",
+> +	},
 
-Just to save another extra allocation for it.
+Are these to be filled in?
 
-> 
-> > +       struct device *dev;
-> > +       void __iomem *base;
-> > +       struct regmap *infracfg;
-> > +};
-> > +
-> > +static int scpsys_power_on(struct generic_pm_domain *genpd)
-> > +{
-> > +       struct scp_domain *scpd = container_of(genpd, struct scp_domain, pmd);
-> > +       struct scp *scp = scpd->scp;
-> > +       const struct scp_domain_data *data = scpd->data;
-> > +       unsigned long expired;
-> > +       void __iomem *ctl_addr = scpd->scp->base + data->ctl_offs;
-> > +       u32 sram_pdn_ack = data->sram_pdn_ack_bits;
-> > +       u32 val;
-> > +       int ret;
-> > +
-> > +       if (scpd->clk) {
-> > +               ret = clk_prepare_enable(scpd->clk);
-> > +               if (ret)
-> > +                       return ret;
-> > +       }
-> > +
-> > +       val = readl(ctl_addr);
-> > +       val |= PWR_ON_BIT;
-> > +       writel(val, ctl_addr);
-> > +       val |= PWR_ON_2ND_BIT;
-> > +       writel(val, ctl_addr);
-> > +
-> > +       /* wait until PWR_ACK = 1 */
-> > +       expired = jiffies + HZ;
-> > +       while (!(readl(scp->base + SPM_PWR_STATUS) & data->sta_mask) ||
-> > +                       !(readl(scp->base + SPM_PWR_STATUS_2ND) & data->sta_mask)) {
-> > +               cpu_relax();
-> > +               if (time_after(jiffies, expired)) {
-> > +                       ret = -EIO;
-> > +                       goto out;
-> > +               }
-> > +       }
-> > +
-> > +       val &= ~PWR_CLK_DIS_BIT;
-> > +       writel(val, ctl_addr);
-> > +
-> > +       val &= ~PWR_ISO_BIT;
-> > +       writel(val, ctl_addr);
-> > +
-> > +       val |= PWR_RST_B_BIT;
-> > +       writel(val, ctl_addr);
-> > +
-> > +       val &= ~data->sram_pdn_bits;
-> > +       writel(val, ctl_addr);
-> > +
-> > +       /* wait until SRAM_PDN_ACK all 0 */
-> > +       expired = jiffies + HZ;
-> > +       while (sram_pdn_ack && (readl(ctl_addr) & sram_pdn_ack)) {
-> > +               cpu_relax();
-> > +               if (time_after(jiffies, expired)) {
-> > +                       ret = -EIO;
-> > +                       goto out;
-> > +               }
-> > +       }
-> > +
-> > +       if (data->bus_prot_mask) {
-> > +               ret = mtk_infracfg_clear_bus_protection(scp->infracfg,
-> > +                               data->bus_prot_mask);
-> > +               if (ret)
-> > +                       return ret;
-> > +       }
-> > +
-> > +       return 0;
-> > +out:
-> > +       dev_err(scp->dev, "Failed to power on domain %s\n", scpd->data->name);
-> 
-> genpd->name should be sufficient
+If not, make them one liners and put them at the bottom.
 
-ok
+> +	{
+> +		.name = "locomo-lcd",
+> +		.platform_data = &locomo_lcd_pdata,
+> +		.pdata_size = sizeof(locomo_lcd_pdata),
+> +	},
+> +	{
+> +		.name = "locomo-i2c",
+> +	},
+> +};
+> +
+> +/*
+> + * IRQ support
+> + *
+> + * ICR reg contains IRQ status at bits 9-12, IRQ mask at bits 4-7.
+> + * Thus 0xf00 selects all triggered IRQ sources, and decrementing
+> + * ffs result by 9 will get hardware IRQ number.
+> + */
+> +static void locomo_handler(unsigned int irq, struct irq_desc *desc)
+> +{
+> +	struct locomo *ldev = irq_get_handler_data(irq);
+> +	struct irq_chip *irqchip = irq_desc_get_chip(desc);
+> +	unsigned int req;
+> +
+> +	chained_irq_enter(irqchip, desc);
+> +
+> +	/* Check why this interrupt was generated */
+> +	while (1) {
+> +		regmap_read(ldev->regmap, LOCOMO_ICR, &req);
+> +		req &= 0x0f00;
 
-> 
-> > +
-> > +       return ret;
-> > +}
-> > +
-> > +static int scpsys_power_off(struct generic_pm_domain *genpd)
-> > +{
-> > +       struct scp_domain *scpd = container_of(genpd, struct scp_domain, pmd);
-> > +       struct scp *scp = scpd->scp;
-> > +       const struct scp_domain_data *data = scpd->data;
-> > +       unsigned long expired;
-> > +       void __iomem *ctl_addr = scpd->scp->base + data->ctl_offs;
-> > +       u32 sram_pdn_ack = data->sram_pdn_ack_bits;
-> > +       u32 val;
-> > +       int ret;
-> > +
-> > +       if (data->bus_prot_mask) {
-> > +               ret = mtk_infracfg_set_bus_protection(scp->infracfg,
-> > +                               data->bus_prot_mask);
-> > +               if (ret)
-> > +                       return ret;
-> > +       }
-> > +
-> > +       val = readl(ctl_addr);
-> > +       val |= data->sram_pdn_bits;
-> > +       writel(val, ctl_addr);
-> > +
-> > +       /* wait until SRAM_PDN_ACK all 1 */
-> > +       expired = jiffies + HZ;
-> > +       while ((readl(ctl_addr) & sram_pdn_ack) != sram_pdn_ack) {
-> > +               cpu_relax();
-> > +               if (time_after(jiffies, expired)) {
-> > +                       ret = -EIO;
-> > +                       goto out;
-> > +               }
-> > +       }
-> > +
-> > +       val |= PWR_ISO_BIT;
-> > +       writel(val, ctl_addr);
-> > +
-> > +       val &= ~PWR_RST_B_BIT;
-> > +       writel(val, ctl_addr);
-> > +
-> > +       val |= PWR_CLK_DIS_BIT;
-> > +       writel(val, ctl_addr);
-> > +
-> > +       val &= ~PWR_ON_BIT;
-> > +       writel(val, ctl_addr);
-> > +
-> > +       val &= ~PWR_ON_2ND_BIT;
-> > +       writel(val, ctl_addr);
-> > +
-> > +       /* wait until PWR_ACK = 0 */
-> > +       expired = jiffies + HZ;
-> > +       while ((readl(scp->base + SPM_PWR_STATUS) & data->sta_mask) ||
-> > +                       (readl(scp->base + SPM_PWR_STATUS_2ND) & data->sta_mask)) {
-> > +               cpu_relax();
-> > +               if (time_after(jiffies, expired)) {
-> > +                       ret = -EIO;
-> > +                       goto out;
-> > +               }
-> > +       }
-> > +
-> > +       if (scpd->clk)
-> > +               clk_disable_unprepare(scpd->clk);
-> > +
-> > +       return 0;
-> > +
-> > +out:
-> > +       dev_err(scp->dev, "Failed to power off domain %s\n", scpd->data->name);
-> > +
-> > +       return ret;
-> > +}
-> > +
-> > +static int scpsys_probe(struct platform_device *pdev)
-> > +{
-> > +       struct genpd_onecell_data *pd_data;
-> > +       struct resource *res;
-> > +       int i;
-> > +       struct scp *scp;
-> > +
-> > +       scp = devm_kzalloc(&pdev->dev, sizeof(*scp), GFP_KERNEL);
-> > +       if (!scp)
-> > +               return -ENOMEM;
-> > +
-> > +       scp->dev = &pdev->dev;
-> > +
-> > +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +       scp->base = devm_ioremap_resource(&pdev->dev, res);
-> > +       if (IS_ERR(scp->base))
-> > +               return PTR_ERR(scp->base);
-> > +
-> > +       pd_data = &scp->pd_data;
-> > +
-> > +       pd_data->domains = devm_kzalloc(&pdev->dev,
-> > +                       sizeof(*pd_data->domains) * NUM_DOMAINS, GFP_KERNEL);
-> > +       if (!pd_data->domains)
-> > +               return -ENOMEM;
-> > +
-> > +       scp->infracfg = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
-> > +                       "infracfg");
-> > +       if (IS_ERR(scp->infracfg)) {
-> > +               dev_err(&pdev->dev, "Cannot find infracfg controller: %ld\n",
-> > +                               PTR_ERR(scp->infracfg));
-> > +               return PTR_ERR(scp->infracfg);
-> > +       }
-> > +
-> > +       pd_data->num_domains = NUM_DOMAINS;
-> > +
-> > +       for (i = 0; i < NUM_DOMAINS; i++) {
-> > +               struct scp_domain *scpd = &scp->domains[i];
-> > +
-> > +               if (scp_domain_data[i].clk_name) {
-> > +                       const char *name = scp_domain_data[i].clk_name;
-> > +
-> > +                       scpd->clk = devm_clk_get(&pdev->dev, name);
-> > +                       if (IS_ERR(scpd->clk)) {
-> > +                               dev_err(&pdev->dev, "Failed to get %s clk: %ld\n",
-> > +                                               name, PTR_ERR(scpd->clk));
-> > +                               return PTR_ERR(scpd->clk);
-> > +                       }
-> > +               }
-> > +       }
-> > +
-> > +       for (i = 0; i < NUM_DOMAINS; i++) {
-> > +               struct scp_domain *scpd = &scp->domains[i];
-> > +               struct generic_pm_domain *pmd = &scpd->pmd;
-> > +
-> > +               pd_data->domains[scp_domain_data[i].id] = pmd;
-> > +               scpd->data = &scp_domain_data[i];
-> > +               scpd->scp = scp;
-> > +
-> > +               pmd->name = scp_domain_data[i].name;
-> > +               pmd->power_off = scpsys_power_off;
-> > +               pmd->power_on = scpsys_power_on;
-> > +               pmd->power_off_latency_ns = 20000;
-> > +               pmd->power_on_latency_ns = 20000;
-> 
-> Where did these latency values come from?
+I see the comment above, which is good, but it would be better to
+define these values (0x0f00 and 9).
 
->From reducing them to 0 and seeing where the end results end up being.
-The power domain code increases the times automatically when the values
-are exceeded.
+> +		if (!req)
+> +			break;
+> +
+> +		irq = ffs(req) - 9;
+> +		generic_handle_irq(irq_find_mapping(ldev->domain, irq));
+> +	}
+> +
+> +	chained_irq_exit(irqchip, desc);
+> +}
+> +
+> +static void locomo_mask_irq(struct irq_data *d)
+> +{
+> +	struct locomo *ldev = irq_data_get_irq_chip_data(d);
+> +	unsigned int mask = 0x0010 << d->hwirq;
 
-> 
-> > +
-> > +               pm_genpd_init(pmd, NULL, true);
-> 
-> I'm not sure how this works...  does this mean that all power domains
-> initially off?
+This also needs defining.
 
-Some are off, others are on. I'll change that to:
+Why not
+  BIT(d->hwirq + 1)
 
-- call scpsys_power_on for all domains so I know they are turned on
-- call pm_genpd_init(pmd, NULL, false);
-- Let the pm core disable the unused domains in the late_initcall
+> +	regmap_update_bits(ldev->regmap, LOCOMO_ICR, mask, 0);
+> +}
+> +
+> +static void locomo_unmask_irq(struct irq_data *d)
+> +{
+> +	struct locomo *ldev = irq_data_get_irq_chip_data(d);
+> +	unsigned int mask = 0x0010 << d->hwirq;
 
-That's the only way I found to properly sync the hardware state with the
-software state also with regard to the clocks.
+As above.
 
-> 
-> > +
-> > +               /*
-> > +                * If PM is disabled turn on all domains by default so that
-> > +                * consumers can work.
-> > +                */
-> > +               if (!IS_ENABLED(CONFIG_PM))
-> > +                       pmd->power_on(pmd);
-> > +       }
-> > +
-> > +       pm_genpd_add_subdomain(&scp->domains[MT8173_POWER_DOMAIN_MFG_ASYNC].pmd,
-> > +               &scp->domains[MT8173_POWER_DOMAIN_MFG_2D].pmd);
-> > +       pm_genpd_add_subdomain(&scp->domains[MT8173_POWER_DOMAIN_MFG_2D].pmd,
-> > +               &scp->domains[MT8173_POWER_DOMAIN_MFG].pmd);
-> > +
-> 
-> (1) nit: the continuation lines needs 1 more indent.
-> 
-> (2) Why aren't you checking for errors?
+> +	regmap_update_bits(ldev->regmap, LOCOMO_ICR, mask, mask);
+> +}
+> +
+> +static struct irq_chip locomo_chip = {
+> +	.name		= "locomo",
+> +	.irq_mask	= locomo_mask_irq,
+> +	.irq_unmask	= locomo_unmask_irq,
+> +};
+> +
+> +static int locomo_irq_map(struct irq_domain *d, unsigned int virq,
+> +				irq_hw_number_t hwirq)
+> +{
+> +	struct locomo *locomo = d->host_data;
+> +
+> +	irq_set_chip_data(virq, locomo);
+> +	irq_set_chip_and_handler(virq, &locomo_chip, handle_level_irq);
+> +	set_irq_flags(virq, IRQF_VALID);
+> +
+> +	return 0;
+> +}
+> +
+> +static void locomo_irq_unmap(struct irq_domain *d, unsigned int virq)
+> +{
+> +	set_irq_flags(virq, 0);
+> +	irq_set_chip_and_handler(virq, NULL, NULL);
+> +	irq_set_chip_data(virq, NULL);
+> +}
+> +
+> +static struct irq_domain_ops locomo_irq_ops = {
+> +	.map    = locomo_irq_map,
+> +	.unmap  = locomo_irq_unmap,
+> +	.xlate  = irq_domain_xlate_onecell,
+> +};
+> +
+> +static int locomo_setup_irq(struct locomo *ldev)
+> +{
+> +	ldev->domain = irq_domain_add_simple(NULL, LOCOMO_NR_IRQS, 0,
+> +			&locomo_irq_ops, ldev);
 
-I'll check for errors next round. However, I cannot bail out in this
-case since once pm_genpd_init() is called the domain cannot be
-unregistered anymore.
+Can you line-up with the '(' please?
 
-Sascha
+> +	if (!ldev->domain)
+> +		return -ENOMEM;
+> +
+> +	/*
+> +	 * Install handler for IRQ_LOCOMO_HW.
+> +	 */
+> +	irq_set_irq_type(ldev->irq, IRQ_TYPE_EDGE_FALLING);
+> +	irq_set_handler_data(ldev->irq, ldev);
+> +	irq_set_chained_handler(ldev->irq, locomo_handler);
+> +
+> +	return 0;
+> +}
+> +
+> +#ifdef CONFIG_PM_SLEEP
+> +static int locomo_suspend(struct device *dev)
+> +{
+> +	struct locomo *ldev = dev_get_drvdata(dev);
+> +
+> +	/* audio */
+
+Audio
+
+> +	regmap_write(ldev->regmap, LOCOMO_PAIF, 0x00);
+> +
+> +	/*
+> +	 * Original code disabled the clock depending on leds settings
+> +	 * However we disable leds before suspend, thus it's safe
+> +	 * to just assume this setting.
+> +	 */
+> +	/* CLK32 off */
+> +	regmap_write(ldev->regmap, LOCOMO_C32K, 0x00);
+> +
+> +	/* 22MHz/24MHz clock off */
+> +	regmap_write(ldev->regmap, LOCOMO_ACC, 0x00);
+> +
+> +	return 0;
+> +}
+> +
+> +static int locomo_resume(struct device *dev)
+> +{
+> +	struct locomo *ldev = dev_get_drvdata(dev);
+> +
+> +	regmap_write(ldev->regmap, LOCOMO_C32K, 0x00);
+> +
+> +	return 0;
+> +}
+> +#endif
+> +
+> +static SIMPLE_DEV_PM_OPS(locomo_pm, locomo_suspend, locomo_resume);
+> +
+> +static const struct regmap_config locomo_regmap_config = {
+> +	.name = "LoCoMo",
+> +	.reg_bits = 8,
+> +	.reg_stride = 4,
+> +	.val_bits = 16,
+> +	.cache_type = REGCACHE_NONE,
+> +	.max_register = 0xec,
+> +};
+> +
+> +static int locomo_probe(struct platform_device *pdev)
+> +{
+> +	struct locomo_platform_data *pdata = dev_get_platdata(&pdev->dev);
+> +	struct resource *res;
+> +	void __iomem *base;
+> +	struct locomo *ldev;
+> +	unsigned int rev;
+> +	int ret;
+> +
+> +	ldev = devm_kzalloc(&pdev->dev, sizeof(*ldev), GFP_KERNEL);
+> +	if (!ldev)
+> +		return -ENOMEM;
+> +
+> +	spin_lock_init(&ldev->lock);
+> +	ldev->dev = &pdev->dev;
+> +
+> +	ldev->irq = platform_get_irq(pdev, 0);
+> +	if (ldev->irq < 0)
+> +		return ldev->irq;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(base))
+> +		return PTR_ERR(base);
+> +
+> +	ldev->regmap = devm_regmap_init_mmio(&pdev->dev, base,
+> +					      &locomo_regmap_config);
+> +	if (IS_ERR(ldev->regmap))
+> +		return PTR_ERR(ldev->regmap);
+> +
+> +	if (pdata) {
+> +		locomo_gpio_pdata.gpio_base = pdata->gpio_base;
+> +		locomo_lcd_pdata.comadj = pdata->comadj;
+> +	} else {
+> +		locomo_gpio_pdata.gpio_base = -1;
+> +		locomo_lcd_pdata.comadj = 128;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, ldev);
+> +
+> +	regmap_read(ldev->regmap, LOCOMO_VER, &rev);
+> +	dev_info(&pdev->dev, "LoCoMo Chip: %04x\n", rev);
+> +
+> +	/* Clear IRQ status and mask */
+> +	regmap_write(ldev->regmap, LOCOMO_ICR, 0);
+> +
+> +	/* Longtime timer */
+> +	regmap_write(ldev->regmap, LOCOMO_LTINT, 0);
+> +
+> +	ret = locomo_setup_irq(ldev);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = mfd_add_devices(&pdev->dev, pdev->id,
+> +			locomo_cells, ARRAY_SIZE(locomo_cells),
+> +			res, -1, ldev->domain);
+> +	if (ret)
+> +		goto err;
+> +
+> +	return 0;
+> +
+> +err:
+> +	irq_set_chained_handler(ldev->irq, NULL);
+> +	irq_set_handler_data(ldev->irq, NULL);
+> +
+> +	irq_domain_remove(ldev->domain);
+> +
+> +	return ret;
+> +}
+> +
+> +static int locomo_remove(struct platform_device *dev)
+> +{
+> +	struct locomo *ldev = platform_get_drvdata(dev);
+> +
+> +	mfd_remove_devices(&dev->dev);
+> +
+> +	irq_set_chained_handler(ldev->irq, NULL);
+> +	irq_set_handler_data(ldev->irq, NULL);
+> +
+> +	irq_domain_remove(ldev->domain);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct platform_driver locomo_device_driver = {
+> +	.probe	= locomo_probe,
+> +	.remove	= locomo_remove,
+> +	.driver	= {
+> +		.name	= "locomo",
+> +		.pm	= &locomo_pm,
+> +	},
+> +};
+> +
+> +module_platform_driver(locomo_device_driver);
+> +
+> +MODULE_DESCRIPTION("Sharp LoCoMo core driver");
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_AUTHOR("John Lenz <lenz@cs.wisc.edu>");
+> +MODULE_ALIAS("platform:locomo");
+> diff --git a/include/linux/mfd/locomo.h b/include/linux/mfd/locomo.h
+> new file mode 100644
+> index 0000000..bbbce37
+> --- /dev/null
+> +++ b/include/linux/mfd/locomo.h
+> @@ -0,0 +1,167 @@
+> +/*
+> + * This file contains the definitions for the LoCoMo G/A Chip
+> + *
+> + * (C) Copyright 2015 Dmitry Eremin-Solenikov
+> + * (C) Copyright 2004 John Lenz
+> + *
+> + * May be copied or modified under the terms of the GNU General Public
+> + * License.  See linux/COPYING for more information.
+> + *
+> + * Based on sa1111.h
+> + */
+> +
+> +#ifndef _ASM_ARCH_LOCOMO
+> +#define _ASM_ARCH_LOCOMO
+> +
+> +/* LOCOMO chip version */
+> +#define LOCOMO_VER	0x00
+> +
+> +/* Pin status */
+> +#define LOCOMO_ST	0x04
+> +
+> +/* Pin status */
+> +#define LOCOMO_C32K	0x08
+> +
+> +/* Interrupt controller */
+> +#define LOCOMO_ICR	0x0C
+> +
+> +/* Touch panel controller */
+> +#define LOCOMO_ASD	0x20		/* AD start delay */
+> +#define LOCOMO_HSD	0x28		/* HSYS delay */
+> +#define LOCOMO_HSC	0x2c		/* HSYS period */
+> +#define LOCOMO_TADC	0x30		/* tablet ADC clock */
+> +
+> +/* Backlight controller: TFT signal */
+> +#define LOCOMO_TC	0x38		/* TFT control signal */
+> +#define LOCOMO_CPSD	0x3c		/* CPS delay */
+> +
+> +/* Keyboard controller */
+> +#define LOCOMO_KIB	0x40	/* KIB level */
+> +#define LOCOMO_KSC	0x44	/* KSTRB control */
+> +#define LOCOMO_KCMD	0x48	/* KSTRB command */
+> +#define LOCOMO_KIC	0x4c	/* Key interrupt */
+> +
+> +/* Audio clock */
+> +#define LOCOMO_ACC	0x54	/* Audio clock */
+> +#define LOCOMO_ACC_XON		0x80
+> +#define LOCOMO_ACC_XEN		0x40
+> +#define LOCOMO_ACC_XSEL0	0x00
+> +#define LOCOMO_ACC_XSEL1	0x20
+> +#define LOCOMO_ACC_MCLKEN	0x10
+> +#define LOCOMO_ACC_64FSEN	0x08
+> +#define LOCOMO_ACC_CLKSEL000	0x00	/* mclk  2 */
+> +#define LOCOMO_ACC_CLKSEL001	0x01	/* mclk  3 */
+> +#define LOCOMO_ACC_CLKSEL010	0x02	/* mclk  4 */
+> +#define LOCOMO_ACC_CLKSEL011	0x03	/* mclk  6 */
+> +#define LOCOMO_ACC_CLKSEL100	0x04	/* mclk  8 */
+> +#define LOCOMO_ACC_CLKSEL101	0x05	/* mclk 12 */
+> +
+> +/* SPI interface */
+> +#define LOCOMO_SPIMD	0x60		/* SPI mode setting */
+> +#define LOCOMO_SPIMD_LOOPBACK BIT(15)	/* loopback tx to rx */
+> +#define LOCOMO_SPIMD_MSB1ST   BIT(14)	/* send MSB first */
+> +#define LOCOMO_SPIMD_DOSTAT   BIT(13)	/* transmit line is idle high */
+> +#define LOCOMO_SPIMD_TCPOL    BIT(11)	/* transmit CPOL (maybe affects CPHA) */
+> +#define LOCOMO_SPIMD_RCPOL    BIT(10)	/* receive CPOL (maybe affects CPHA) */
+> +#define LOCOMO_SPIMD_TDINV    BIT(9)	/* invert transmit line */
+> +#define LOCOMO_SPIMD_RDINV    BIT(8)	/* invert receive line */
+> +#define LOCOMO_SPIMD_XON      BIT(7)	/* enable spi controller clock */
+> +#define LOCOMO_SPIMD_XEN      BIT(6)	/* clock bit write enable */
+> +#define LOCOMO_SPIMD_XSEL     0x0018	/* clock select */
+> +/* xon must be off when enabling xen, wait 300 us before xon -> 1 */
+> +#define CLOCK_18MHZ	      0		/* 18,432 MHz clock */
+> +#define CLOCK_22MHZ	      1		/* 22,5792 MHz clock */
+> +#define CLOCK_25MHZ	      2		/* 24,576 MHz clock */
+> +#define LOCOMO_SPIMD_CLKSEL   0x7
+> +#define DIV_1		      0		/* don't divide clock */
+> +#define DIV_2		      1		/* divide clock by two */
+> +#define DIV_4		      2		/* divide clock by four */
+> +#define DIV_8		      3		/* divide clock by eight */
+> +#define DIV_64		      4		/* divide clock by 64 */
+> +
+> +#define LOCOMO_SPICT	0x64		/* SPI mode control */
+> +#define LOCOMO_SPICT_CRC16_7_B	BIT(15)	/* 0: crc16 1: crc7 */
+> +#define LOCOMO_SPICT_CRCRX_TX_B	BIT(14)
+> +#define LOCOMO_SPICT_CRCRESET_B	BIT(13)
+> +#define LOCOMO_SPICT_CEN	BIT(7)	/* ?? enable */
+> +#define LOCOMO_SPICT_CS		BIT(6)	/* chip select */
+> +#define LOCOMO_SPICT_UNIT16	BIT(5)	/* 0: 8 bit, 1: 16 bit*/
+> +#define LOCOMO_SPICT_ALIGNEN	BIT(2)	/* align transfer enable */
+> +#define LOCOMO_SPICT_RXWEN	BIT(1)	/* continuous receive */
+> +#define LOCOMO_SPICT_RXUEN	BIT(0)	/* aligned receive */
+> +
+> +#define LOCOMO_SPIST	0x68		/* SPI status */
+> +#define LOCOMO_SPI_TEND		BIT(3)	/* Transfer end bit */
+> +#define LOCOMO_SPI_REND		BIT(2)	/* Receive end bit */
+> +#define LOCOMO_SPI_RFW		BIT(1)	/* write buffer bit */
+> +#define LOCOMO_SPI_RFR		BIT(0)		/* read buffer bit */
+> +
+> +#define LOCOMO_SPIIS	0x70		/* SPI interrupt status */
+> +#define LOCOMO_SPIWE	0x74		/* SPI interrupt status write enable */
+> +#define LOCOMO_SPIIE	0x78		/* SPI interrupt enable */
+> +#define LOCOMO_SPIIR	0x7c		/* SPI interrupt request */
+> +#define LOCOMO_SPITD	0x80		/* SPI transfer data write */
+> +#define LOCOMO_SPIRD	0x84		/* SPI receive data read */
+> +#define LOCOMO_SPITS	0x88		/* SPI transfer data shift */
+> +#define LOCOMO_SPIRS	0x8C		/* SPI receive data shift */
+> +
+> +/* GPIO */
+> +#define LOCOMO_GPD	0x90	/* GPIO direction */
+> +#define LOCOMO_GPE	0x94	/* GPIO input enable */
+> +#define LOCOMO_GPL	0x98	/* GPIO level */
+> +#define LOCOMO_GPO	0x9c	/* GPIO out data setting */
+> +#define LOCOMO_GRIE	0xa0	/* GPIO rise detection */
+> +#define LOCOMO_GFIE	0xa4	/* GPIO fall detection */
+> +#define LOCOMO_GIS	0xa8	/* GPIO edge detection status */
+> +#define LOCOMO_GWE	0xac	/* GPIO status write enable */
+> +#define LOCOMO_GIE	0xb0	/* GPIO interrupt enable */
+> +#define LOCOMO_GIR	0xb4	/* GPIO interrupt request */
+> +
+> +/* Front light adjustment controller */
+> +#define LOCOMO_ALS	0xc8	/* Adjust light cycle */
+> +#define LOCOMO_ALS_EN		0x8000
+> +#define LOCOMO_ALD	0xcc	/* Adjust light duty */
+> +
+> +/* PCM audio interface */
+> +#define LOCOMO_PAIF	0xd0	/* PCM audio interface */
+> +#define LOCOMO_PAIF_SCINV	0x20
+> +#define LOCOMO_PAIF_SCEN	0x10
+> +#define LOCOMO_PAIF_LRCRST	0x08
+> +#define LOCOMO_PAIF_LRCEVE	0x04
+> +#define LOCOMO_PAIF_LRCINV	0x02
+> +#define LOCOMO_PAIF_LRCEN	0x01
+> +
+> +/* Long time timer */
+> +#define LOCOMO_LTC	0xd8		/* LTC interrupt setting */
+> +#define LOCOMO_LTINT	0xdc		/* LTC interrupt */
+> +
+> +/* DAC control signal for LCD (COMADJ ) */
+> +#define LOCOMO_DAC	0xe0
+> +/* DAC control */
+> +#define LOCOMO_DAC_SCLOEB	0x08	/* SCL pin output data       */
+> +#define LOCOMO_DAC_TEST		0x04	/* Test bit                  */
+> +#define LOCOMO_DAC_SDA		0x02	/* SDA pin level (read-only) */
+> +#define LOCOMO_DAC_SDAOEB	0x01	/* SDA pin output data       */
+> +
+> +/* LED controller */
+> +#define LOCOMO_LPT0	0xe8
+> +#define LOCOMO_LPT1	0xec
+> +#define LOCOMO_LPT_TOFH		0x80
+> +#define LOCOMO_LPT_TOFL		0x08
+> +#define LOCOMO_LPT_TOH(TOH)	((TOH & 0x7) << 4)
+> +#define LOCOMO_LPT_TOL(TOL)	((TOL & 0x7))
+> +
+> +struct locomo_gpio_platform_data {
+> +	unsigned int gpio_base;
+> +};
+> +
+> +struct locomo_lcd_platform_data {
+> +	u8 comadj;
+> +};
+> +
+> +struct locomo_platform_data {
+> +	unsigned int gpio_base;
+> +	u8 comadj;
+> +};
+> +
+> +#endif
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
