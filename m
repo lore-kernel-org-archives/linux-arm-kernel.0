@@ -1,62 +1,93 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 19 May 2015 15:43:14 +0800
-Subject: [PATCH v2] arm, imx6, dts: add DT for aristainetos2 board
-In-Reply-To: <555AE192.8010700@denx.de>
-References: <1431334974-27531-1-git-send-email-hs@denx.de>
- <20150518113135.GD1071@dragon> <555AE192.8010700@denx.de>
-Message-ID: <20150519074314.GT1071@dragon>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 19 May 2015 09:45:35 +0200
+Subject: [PATCH 1/5] soc: mediatek: Add infracfg misc driver support
+In-Reply-To: <CAGS+omD-0bPeQqau9mm4pTqOhtPW=ecR5ibB8==pifRMgSKrjg@mail.gmail.com>
+References: <1431372206-1237-1-git-send-email-s.hauer@pengutronix.de>
+ <1431372206-1237-2-git-send-email-s.hauer@pengutronix.de>
+ <CAGS+omADXpnBnLvuH+xNmatL+89kLBELz6KqMFid7SOx=veiAg@mail.gmail.com>
+ <20150518081625.GO6325@pengutronix.de>
+ <CAGS+omD-0bPeQqau9mm4pTqOhtPW=ecR5ibB8==pifRMgSKrjg@mail.gmail.com>
+Message-ID: <20150519074535.GY6325@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 09:09:06AM +0200, Heiko Schocher wrote:
-> >>@@ -0,0 +1,124 @@
-> >>+/*
-> >>+ * support fot the imx6 based aristainetos2 board
-> >>+ *
-> >>+ * Copyright (C) 2015 Heiko Schocher <hs@denx.de>
-> >>+ *
-> >>+ * This program is free software; you can redistribute it and/or modify
-> >>+ * it under the terms of the GNU General Public License version 2 as
-> >>+ * published by the Free Software Foundation.
-> >>+ *
-> >>+ */
+On Tue, May 19, 2015 at 02:54:41PM +0800, Daniel Kurtz wrote:
+> >> > +       while (1) {
+> >> > +               ret = regmap_read(infracfg, INFRA_TOPAXI_PROTECTSTA1, &val);
+> >> > +               if (ret)
+> >> > +                       return ret;
+> >> > +
+> >> > +               if ((val & mask) == mask)
+> >> > +                       break;
+> >> > +
+> >> > +               cpu_relax();
+> >> > +               if (time_after(jiffies, expired))
+> >> > +                       return -EIO;
+> >>
+> >> I think we should check for timeout first, and then cpu_relax() if
+> >> there is still time left (here and in
+> >> mtk_infracfg_clear_bus_protection()).  Otherwise we end up doing one
+> >> final cpu_relax() without rechecking the register we are polling
+> >> (again, I have the same comment for the timeout loops in mtk-scpsys).
 > >
-> >GPL/X11 dual licence is suggested for new DTS files.  See
-> >arch/arm/boot/dts/imx6sl-warp.dts for an example.
+> > I think cpu_relax() delays execution in the order of microseconds (I
+> > don't actually know, just a guess), so if the timeout is a second the
+> > order doesn't really matter. What can happen though is an interrupt
+> > after the (val & mask) test but before the timeout check. So to be
+> > truly correct we have to repeat the (val & mask) test after the
+> > time_after() check. Is that what you want?
 > 
-> Ok, I ask the customer, if this is OK for him ...
+> I'm not following, why would you need to repeat (val & mask) test
+> after time_after?
+> What does an interrupt have to do with it?
+> Can you show a code snippet with what exactly you are proposing?
 
-The dual license get non-Linux users be able to use the DTS file.
+Consider you have this timeout loop:
 
-[...]
+	while (1) {
+		if (success())
+			break;
 
-> >>+&i2c3 {
-> >>+	atmel: atmel_mxt_ts at 4b {
-> >
-> >Node name should be generic.
-> 
-> So, what name do you prefer?
+		if (time_after(jiffies, expired))
+			return -ETIMEDOUT;
+	}
 
-The node name with the example in bindings doc
-Documentation/devicetree/bindings/input/atmel,maxtouch.txt seems
-perfectly fine to me.
+Now when an interupt comes in between success() and time_after() then it
+can happen that the delay caused by the interrupt makes the code timeout
+even though success() might have become true in the meantime. So to be
+correct you have to:
 
-[...]
+	while (1) {
+		if (success())
+			break;
 
-> >>+&i2c3 {
-> >>+	atmel: atmel_mxt_ts at 4d {
-> >>+		compatible = "atmel,maxtouch";
-> >>+		reg = <0x4d>;
-> >>+		interrupt-parent = <&gpio2>;
-> >>+		interrupts = <9 8>;
-> >>+	};
-> >
-> >It seems the touch device is identical between
-> >imx6dl-aristainetos2_4.dts and imx6dl-aristainetos2_7.dts.  Why don't
-> >you put it into imx6qdl-aristainetos2.dtsi?
-> 
-> They have different i2c addresses ...
+		if (time_after(jiffies, expired)) {
+			if (success())
+				break;
+			return -ETIMEDOUT;
+	}
 
-Okay, I missed that.
+Or, if you don't want to repeat the termination condition:
 
-Shawn
+	bool timeout = false;
+
+	while (1) {
+		if (success())
+			break;
+
+		if (timeout)
+			return -ETIMEDOUT;
+
+		if (time_after(jiffies, expired))
+			timeout = true;
+	}
+
+Anyway, with the timeout of one second used here this is all academic.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
