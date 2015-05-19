@@ -1,23 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 May 2015 20:42:34 +0200
-Subject: [PATCH] [RESEND] SCSI: ips: remove pointless #warning
-In-Reply-To: <1432060697.14737.1.camel@HansenPartnership.com>
-References: <3121960.dnOqT9LCth@wuerfel> <2850783.725LtIIUFq@wuerfel>
- <1432060697.14737.1.camel@HansenPartnership.com>
-Message-ID: <17880859.7GjlLRguJk@wuerfel>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 19 May 2015 20:51:23 +0200
+Subject: [PATCH v3 1/6] Documentation: dmaengine: pxa-dma design
+In-Reply-To: <87egmhk65w.fsf@belgarion.home> (Robert Jarzmik's message of
+ "Fri, 15 May 2015 21:11:07 +0200")
+References: <1431626006-1708-1-git-send-email-robert.jarzmik@free.fr>
+ <87egmhk65w.fsf@belgarion.home>
+Message-ID: <87y4kkieok.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 May 2015 11:38:17 James Bottomley wrote:
-> 
-> Actually, no, that would cause problems if anyone is actually using this
-> driver on non-intel.  What about this?  It captures the intent of the
-> original but gets rid of the warning.
-> 
-> 
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-Good idea, thanks!
+> Robert Jarzmik <robert.jarzmik@free.fr> writes:
+>
+> Hi Vinod,
+>
+> ... removed most of the people as this is a non-technical mail ...
+>
+> I hope to land this in the upcoming merge window. We're at -rc3, so time is
+> short. Apart from patch 6/6 where I still have Maxime's review to apply, are you
+> satisfied with the v3 of this serie which I hope addresses all your comments so
+> far ?
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Vinod, we're at -rc4 now, ping ?
 
-	Arnd
+Cheers.
+
+-- 
+Robert
