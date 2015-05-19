@@ -1,43 +1,26 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 19 May 2015 10:18:56 +0100
-Subject: [PATCHv2 08/12] arm64: psci: remove ACPI coupling
-In-Reply-To: <555AF703.4050702@linaro.org>
-References: <1431945503-6939-1-git-send-email-mark.rutland@arm.com>
- <1431945503-6939-9-git-send-email-mark.rutland@arm.com>
- <555AF703.4050702@linaro.org>
-Message-ID: <20150519091856.GA1035@leverpostej>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 19 May 2015 11:19:22 +0200
+Subject: [PATCH v2 07/11] pinctrl: mediatek: add pinctrl/GPIO/EINT driver
+ for mt8127
+In-Reply-To: <1432015882-8646-8-git-send-email-hongzhou.yang@mediatek.com>
+References: <1432015882-8646-1-git-send-email-hongzhou.yang@mediatek.com>
+ <1432015882-8646-8-git-send-email-hongzhou.yang@mediatek.com>
+Message-ID: <CACRpkdYszMpY4tXFuPyamHepL7n8hu-3YiMqUT7UXy-Lk=ad4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 09:40:35AM +0100, Hanjun Guo wrote:
-> > diff --git a/arch/arm64/include/asm/psci.h b/arch/arm64/include/asm/psci.h
-> > index 2454bc5..b5d4c1d 100644
-> > --- a/arch/arm64/include/asm/psci.h
-> > +++ b/arch/arm64/include/asm/psci.h
-> > @@ -14,7 +14,14 @@
-> >   #ifndef __ASM_PSCI_H
-> >   #define __ASM_PSCI_H
-> >
-> > -int psci_dt_init(void);
-> > -int psci_acpi_init(void);
-> > +int __init psci_dt_init(void);
-> > +
-> > +#ifdef CONFIG_ACPI
-> > +int __init psci_acpi_init(void);
-> > +bool __init acpi_psci_present(void);
-> > +bool __init acpi_psci_use_hvc(void);
-> 
-> really some nit, do we need __init for function declaration?
+On Tue, May 19, 2015 at 8:11 AM, Hongzhou Yang
+<hongzhou.yang@mediatek.com> wrote:
 
-Given that it's used for function declarations in init.h and other
-places, I believe it is best practice. Even if not strictly necessary it
-makes clear to the casual read when a function may be called.
+> From: Yingjoe Chen <yingjoe.chen@mediatek.com>
+>
+> MT8127 pinctrl/eint are similar to mt8135 and mt8173, add
+> support for mt8127 using mediatek common pinctrl driver.
+>
+> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
 
-> 
-> other than that,
-> 
-> Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
+Applied this version instead.
 
-Cheers!
-
-Mark.
+Yours,
+Linus Walleij
