@@ -1,32 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 19 May 2015 17:01:16 +0200
-Subject: [PATCH v4 2/3] irqchip: GIC: Add support for irq_{get,
- set}_irqchip_state
-In-Reply-To: <20150519110131.522f9c16@arm.com>
-References: <1426676484-21812-1-git-send-email-marc.zyngier@arm.com>
- <1426676484-21812-3-git-send-email-marc.zyngier@arm.com>
- <CAL85gmBrkonMcKdUVGmYx6zT3wSe-e2jPhnL_+Tkf3s4jsAiWg@mail.gmail.com>
- <CACRpkdYffHJEzksc5mg7JZdwTzShGaQofAmbmn65=_V3ot04Rg@mail.gmail.com>
- <CAL85gmC4ovR99wQQYoKs=oo24So80jZ_guxDDFhi-1MXXj0uSw@mail.gmail.com>
- <CACRpkdZkBLrhFpZiYk4fiM3ND+UwnVJhNKs=+rL5iZY4fS7zCg@mail.gmail.com>
- <CAL85gmD=12u87vDAc601T=ZOgcS-jDo_=LaC5gRAZUHgp_iTbA@mail.gmail.com>
- <CACRpkdYV1MzjW6ZMvmOhqi0qhXeeQnC62--7WBY=_hZBT8cvXg@mail.gmail.com>
- <20150519110131.522f9c16@arm.com>
-Message-ID: <CACRpkdaJqr87B8FTEcw93Q=oELvFJ77w=Me-Wo5SwLD8R655_w@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 19 May 2015 17:03:49 +0200
+Subject: [PATCH v8 09/16] clockevents/drivers: Add STM32 Timer driver
+In-Reply-To: <CALszF6A-De6dvcRNoa9ruL+y6Wt_rc7bi-O-VxHWkFF9NSt5_g@mail.gmail.com>
+References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>	<555B098A.8030202@linaro.org>	<CALszF6AJ3Zf598wYeUx=iNWHHKT24xUyfagB=+4GocwZ-Fd-0g@mail.gmail.com>	<6177628.0ZDPLeVyah@wuerfel>	<CALszF6BZKD-CPTZ6Hc85wv2Z3Y7JmUv-cMkBtbk2Ga6WeeWU=A@mail.gmail.com>	<555B3F80.8070605@linaro.org>
+ <CALszF6A-De6dvcRNoa9ruL+y6Wt_rc7bi-O-VxHWkFF9NSt5_g@mail.gmail.com>
+Message-ID: <555B50D5.4010100@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 12:01 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+On 05/19/2015 04:41 PM, Maxime Coquelin wrote:
+> 2015-05-19 15:49 GMT+02:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
+>>
+>>
+>> It is not exactly as the initial patch.
+>>
+>> I think Arnd is proposing:
+>>
+>> config CLKSRC_STM32
+>>          bool "Clocksource for STM32 SoCs" if COMPILE_TEST
+>>          select CLKSRC_MMIO
+>>
+>
+> Isn't "depends on OF" missing for COMPILE_TEST case?
 
-> If reading the pending state doesn't work, then I'd like to know
-> exactly *why*. Only then we can add support for LINE_LEVEL using SPISR
-> (which has to be GIC-400 specific, as it is not architected).
+Hmm, yes. Probably.
 
-That's a good point. Is it one of these usual cases of hardware
-thrown over the wall and the HW engineer mostly yawning or
-rolling his eyes if we ask things like this?
+> Other than that, I'm fine with the proposal.
+> Daniel, is it the case for you too?
 
-Or is there someone who can actually answer the call?
+Yep.
 
-Yours,
-Linus Walleij
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
