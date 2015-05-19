@@ -1,18 +1,39 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Tue, 19 May 2015 14:52:11 +0100
-Subject: [Xen-devel] [RFC 03/23] xen/grant-table: Remove unused macro SPP
-In-Reply-To: <1431622863-28575-4-git-send-email-julien.grall@citrix.com>
-References: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
- <1431622863-28575-4-git-send-email-julien.grall@citrix.com>
-Message-ID: <555B400B.8080006@citrix.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 19 May 2015 07:52:46 -0600
+Subject: [PATCH v3] arm64: dts: qcom: Add msm8916 CoreSight components
+In-Reply-To: <1432018984.29174.2.camel@linaro.org>
+References: <1431333119-13626-1-git-send-email-ivan.ivanov@linaro.org>
+ <CANLsYkyKrtyMicsNs2CDd4=GfrQJOPJkAqSUiTB=5hRs3+d=tQ@mail.gmail.com>
+ <7F8B0480-06A8-4381-90C8-3F2A35F14FCD@codeaurora.org>
+ <1432018984.29174.2.camel@linaro.org>
+Message-ID: <CANLsYkwTm+8B-ehnC-9MD19MCha_jZU1UCVCev+44eGv_nS50w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/05/15 18:00, Julien Grall wrote:
-> SPP was used by the grant table v2 code which has been removed in
-> commit 438b33c7145ca8a5131a30c36d8f59bce119a19a "xen/grant-table:
-> remove support for V2 tables".
+On 19 May 2015 at 01:03, Ivan T. Ivanov <ivan.ivanov@linaro.org> wrote:
+>
+> On Mon, 2015-05-18 at 13:52 -0500, Kumar Gala wrote:
+>> >
+>> > On May 11, 2015, at 2:21 PM, Mathieu Poirier poirier at linaro.org> wrote:
+>> >
+>> > On 11 May 2015 at 02:31, Ivan T. Ivanov ivanov at linaro.org> wrote:
+>> > > Add initial set of CoreSight components found on Qualcomm's 8x16 chipset.
+>> >
+>
+>> >
+>> > Kumar, I'm happy with this DT specification for Coresight.  Since I'm
+>> > taking the driver it would likely make more sense for this to go
+>> > through my tree.  Could you please have a look and give me your ack?
+>>
+>> It looks ok, however I don?t see us including this file anywhere, so that?s my only concern.
+>>
+>
+> True. The reason is that 'rpmcc' driver is still in testing phase
+> and it is not upstreamed. Once it is ready, I will include this file
+> where is appropriate.
+>
+> Regards,
+> Ivan
 
-Reviewed-by: David Vrabel <david.vrabel@citrix.com>
-
-David
+Very well - as such I won't take the DT patch right away.  Please
+re-submit when all the components are ready.
