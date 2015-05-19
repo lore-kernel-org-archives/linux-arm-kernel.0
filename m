@@ -1,276 +1,55 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Tue, 19 May 2015 11:29:50 -0500
-Subject: [PATCHv3 2/4] clk: socfpga: add a clock driver for the Arria
- 10 platform
-In-Reply-To: <20150516005235.GP31753@codeaurora.org>
-References: <1431011523-10049-1-git-send-email-dinguyen@opensource.altera.com>
- <1431011523-10049-3-git-send-email-dinguyen@opensource.altera.com>
- <20150516005235.GP31753@codeaurora.org>
-Message-ID: <555B64FE.40104@opensource.altera.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 19 May 2015 17:34:37 +0100
+Subject: [RFC] arm: DMA-API contiguous cacheable memory
+In-Reply-To: <CAE=W-e24oDH5RZfPftRg_xYBiG+b9Sj09vpyay9EwqOo9cVX1w@mail.gmail.com>
+References: <CAE=W-e24oDH5RZfPftRg_xYBiG+b9Sj09vpyay9EwqOo9cVX1w@mail.gmail.com>
+Message-ID: <20150519163436.GZ21251@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, May 18, 2015 at 10:56:06PM +0200, Lorenzo Nava wrote:
+> it's been a while since I've started working with DMA on ARM processor
+> for a smart camera project. Typically the requirements is to have a
+> large memory area which can be accessed by both DMA and user. I've
+> already noticed that many people wonder about which would be the best
+> way to have data received from DMA mapped in user space and, more
+> important, mapped in a cacheable area of memory. Having a memory
+> mapped region which is cacheable is very important if the user must
+> access the data and make some sort of processing on that.
+> My question is: why don't we introduce a function in the DMA-API
+> interface for ARM processors which allows to allocate a contiguous and
+> cacheable area of memory (> 4MB)?
+> This new function can take advantage of the CMA mechanism as
+> dma_alloc_coherent() function does, but using different PTE attribute
+> for the allocated pages. Basically making a function similar to
+> arm_dma_alloc() and set the attributes differently would do the trick:
+> 
+> pgprot_t prot = __pgprot_modify(prot, L_PTE_MT_MASK,
+>         L_PTE_MT_WRITEALLOC | L_PTE_XN)
 
+We already have a way to specify whether a device is coherent via the
+"dma-coherent" DT property. This allows the correct dma_map_ops to be
+set for a device. For cache coherent devices, the
+arm_coherent_dma_alloc() and __dma_alloc() should return cacheable
+memory.
 
-On 5/15/15 7:52 PM, Stephen Boyd wrote:
-> On 05/07, dinguyen at opensource.altera.com wrote:
->> diff --git a/drivers/clk/socfpga/clk-gate-a10.c b/drivers/clk/socfpga/clk-gate-a10.c
->> new file mode 100644
->> index 0000000..fadf6f7
->> --- /dev/null
->> +++ b/drivers/clk/socfpga/clk-gate-a10.c
->> @@ -0,0 +1,187 @@
-> [...]
->> +
->> +static int socfpga_clk_prepare(struct clk_hw *hwclk)
->> +{
->> +	struct socfpga_gate_clk *socfpgaclk = to_socfpga_gate_clk(hwclk);
->> +	struct regmap *sys_mgr_base_addr;
->> +	int i;
->> +	u32 hs_timing;
->> +	u32 clk_phase[2];
->> +
->> +	if (socfpgaclk->clk_phase[0] || socfpgaclk->clk_phase[1]) {
->> +		sys_mgr_base_addr = syscon_regmap_lookup_by_compatible("altr,sys-mgr");
->> +		if (IS_ERR(sys_mgr_base_addr)) {
-> 
-> Is there a reason the syscon is grabbed lazily in prepare? Why
-> not get it before registering this clock?
+However, looking at the code, it seems that __dma_alloc() does not use
+the CMA when is_coherent == true, though you would hit a limit on the
+number of pages that can be allocated.
 
-This syscon node is only associated with clocks that have a clk-phase
-property, which on the SoCFPGA platform, is the SD/MMC clocks. The way
-to implement this went through quite a few rounds of discussion for the
-Cyclone5/Arria5 platform before settling to this method.
+As for mmap'ing to user space, there is arm_dma_mmap(). This one sets
+the vm_page_prot to what __get_dma_pgprot() returns which is always
+non-cacheable.
 
-The reason why syscon is grabbed here is that the setting of the clock
-phase must be done before enabling of the clock, so it seem that prepare
-was a good place. Should this be move moved to the socfpga_gate_init()
-instead?
+I haven't checked the history cache coherent DMA support on arm but I
+think some of the above can be changed. As an example, on arm64
+__dma_alloc() allocates from CMA independent of whether the device is
+coherent or not. Also __get_dma_pgprot() returns cacheable attributes
+for coherent devices, which in turn allows cacheable user mapping of
+such buffers. You don't really need to implement additional functions,
+just tweaks to the existing ones.
 
-> 
->> +			pr_err("%s: failed to find altr,sys-mgr regmap!\n", __func__);
->> +			return -EINVAL;
->> +		}
->> +
->> +		for (i = 0; i < 2; i++) {
-> 
-> i < ARRAY_SIZE(clk_phase) ?
-> 
+Patches welcome ;)
 
-Will fix.
-
->> +			switch (socfpgaclk->clk_phase[i]) {
->> +			case 0:
->> +				clk_phase[i] = 0;
->> +				break;
->> +			case 45:
->> +				clk_phase[i] = 1;
->> +				break;
->> +			case 90:
->> +				clk_phase[i] = 2;
->> +				break;
->> +			case 135:
->> +				clk_phase[i] = 3;
->> +				break;
->> +			case 180:
->> +				clk_phase[i] = 4;
->> +				break;
->> +			case 225:
->> +				clk_phase[i] = 5;
->> +				break;
->> +			case 270:
->> +				clk_phase[i] = 6;
->> +				break;
->> +			case 315:
->> +				clk_phase[i] = 7;
->> +				break;
->> +			default:
->> +				clk_phase[i] = 0;
->> +				break;
->> +			}
->> +		}
->> +
->> +		hs_timing = SYSMGR_SDMMC_CTRL_SET(clk_phase[0], clk_phase[1]);
->> +		regmap_write(sys_mgr_base_addr, SYSMGR_SDMMCGRP_CTRL_OFFSET,
->> +			     hs_timing);
->> +	}
->> +	return 0;
->> +}
->> +
->> +static struct clk_ops gateclk_ops = {
-> 
-> const?
-> 
-
-I cannot make this a const as I am assigning the .enable/.disable to use
-the common clk_gate_ops.
-
->> +	.prepare = socfpga_clk_prepare,
->> +	.recalc_rate = socfpga_gate_clk_recalc_rate,
->> +};
->> +
->> diff --git a/drivers/clk/socfpga/clk-periph-a10.c b/drivers/clk/socfpga/clk-periph-a10.c
->> new file mode 100644
->> index 0000000..81b9274
->> --- /dev/null
->> +++ b/drivers/clk/socfpga/clk-periph-a10.c
->> @@ -0,0 +1,131 @@
-> [...]
->> + */
->> +#include <linux/clk.h>
-> 
-> Are you using this include?
-> 
->> +#include <linux/clkdev.h>
-> 
-> Are you using this include?
-> 
-> Applies to every file added in this patch.
-
-Removed...
-
-> 
->> +#include <linux/clk-provider.h>
->> +#include <linux/io.h>
->> +#include <linux/of.h>
->> +
->> +#include "clk.h"
->> +
->> +#define CLK_MGR_FREE_SHIFT		16
->> +#define CLK_MGR_FREE_MASK		0x7
->> +
->> +#define SOCFPGA_MPU_FREE_CLK		"mpu_free_clk"
->> +#define SOCFPGA_NOC_FREE_CLK		"noc_free_clk"
->> +#define SOCFPGA_SDMMC_FREE_CLK		"sdmmc_free_clk"
-> [..]
->> +
->> +static __init void __socfpga_periph_init(struct device_node *node,
->> +	const struct clk_ops *ops)
->> +{
-> [..]
->> +	init.name = clk_name;
->> +	init.ops = ops;
->> +	init.flags = 0;
->> +
->> +	parent_name = of_clk_get_parent_name(node, 0);
->> +	init.num_parents = 1;
->> +	init.parent_names = &parent_name;
->> +
->> +	periph_clk->hw.hw.init = &init;
->> +
->> +	clk = clk_register(NULL, &periph_clk->hw.hw);
->> +	if (WARN_ON(IS_ERR(clk))) {
->> +		kfree(periph_clk);
->> +		return;
->> +	}
->> +	rc = of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> 
-> Why not check the return value?
-
-Added check...
-
-> 
->> +
->> diff --git a/drivers/clk/socfpga/clk-pll-a10.c b/drivers/clk/socfpga/clk-pll-a10.c
->> new file mode 100644
->> index 0000000..2adc2f5
->> --- /dev/null
->> +++ b/drivers/clk/socfpga/clk-pll-a10.c
-> [..]
->> +
->> +static u8 clk_pll_get_parent(struct clk_hw *hwclk)
->> +{
->> +	struct socfpga_pll *socfpgaclk = to_socfpga_clk(hwclk);
->> +	u32 pll_src;
->> +
->> +	pll_src = readl(socfpgaclk->hw.reg);
->> +
->> +	return (pll_src >> CLK_MGR_PLL_CLK_SRC_SHIFT) &
->> +		CLK_MGR_PLL_CLK_SRC_MASK;
->> +}
->> +
->> +
-> 
-> Nitpick: Single newline please.
-> 
-
-Cleaned up...
->> +static struct clk_ops clk_pll_ops = {
-> 
-> const?
-> 
-
-Same comment applies here as I'm using clk_get_ops for .enable/.disable.
-
->> +	.recalc_rate = clk_pll_recalc_rate,
->> +	.get_parent = clk_pll_get_parent,
->> +};
->> +
->> +static __init struct clk *__socfpga_pll_init(struct device_node *node,
-> 
-> __init goes after the return type, doesn't it?
-> 
->> +	const struct clk_ops *ops)
->> +{
->> +	u32 reg;
->> +	struct clk *clk;
->> +	struct socfpga_pll *pll_clk;
->> +	const char *clk_name = node->name;
->> +	const char *parent_name[SOCFGPA_MAX_PARENTS];
->> +	struct clk_init_data init;
->> +	struct device_node *clkmgr_np;
->> +	int rc;
->> +	int i = 0;
->> +
->> +	of_property_read_u32(node, "reg", &reg);
->> +
->> +	pll_clk = kzalloc(sizeof(*pll_clk), GFP_KERNEL);
->> +	if (WARN_ON(!pll_clk))
->> +		return NULL;
->> +
->> +	clkmgr_np = of_find_compatible_node(NULL, NULL, "altr,clk-mgr");
-> 
-> I haven't looked at the binding, but I would expect there to be
-> some phandle to this node somewhere so that we don't have to
-> search the whole tree?
-> 
-
-I'm putting all of the clocks under the clk-mgr node as much of this
-clock driver was derived from clk-highbank.
-
->> +	clk_mgr_a10_base_addr = of_iomap(clkmgr_np, 0);
->> +	BUG_ON(!clk_mgr_a10_base_addr);
->> +	pll_clk->hw.reg = clk_mgr_a10_base_addr + reg;
->> +
->> +	of_property_read_string(node, "clock-output-names", &clk_name);
->> +
->> +	init.name = clk_name;
->> +	init.ops = ops;
-> [..]
->> diff --git a/drivers/clk/socfpga/clk.h b/drivers/clk/socfpga/clk.h
->> index b09a5d5..6989847 100644
->> --- a/drivers/clk/socfpga/clk.h
->> +++ b/drivers/clk/socfpga/clk.h
->> @@ -34,10 +34,14 @@
->>  	((((smplsel) & 0x7) << 3) | (((drvsel) & 0x7) << 0))
->>  
->>  extern void __iomem *clk_mgr_base_addr;
->> +extern void __iomem *clk_mgr_a10_base_addr;
->>  
->>  void __init socfpga_pll_init(struct device_node *node);
->>  void __init socfpga_periph_init(struct device_node *node);
->>  void __init socfpga_gate_init(struct device_node *node);
->> +void __init socfpga_a10_pll_init(struct device_node *node);
->> +void __init socfpga_a10_periph_init(struct device_node *node);
->> +void __init socfpga_a10_gate_init(struct device_node *node);
-> 
-> __init is useless on prototypes. It's not your fault for copying
-> previous code, but it would be good to avoid adding more and to
-> clean this up in some other patch.
-> 
-
-Will clean up.
-
-Thanks for reviewing this patch.
-
-Dinh
+-- 
+Catalin
