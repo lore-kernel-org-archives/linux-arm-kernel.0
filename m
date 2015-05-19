@@ -1,76 +1,95 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 19 May 2015 10:40:21 +0200
-Subject: [PATCH v4 2/3] irqchip: GIC: Add support for irq_{get,
- set}_irqchip_state
-In-Reply-To: <CAL85gmD=12u87vDAc601T=ZOgcS-jDo_=LaC5gRAZUHgp_iTbA@mail.gmail.com>
-References: <1426676484-21812-1-git-send-email-marc.zyngier@arm.com>
- <1426676484-21812-3-git-send-email-marc.zyngier@arm.com>
- <CAL85gmBrkonMcKdUVGmYx6zT3wSe-e2jPhnL_+Tkf3s4jsAiWg@mail.gmail.com>
- <CACRpkdYffHJEzksc5mg7JZdwTzShGaQofAmbmn65=_V3ot04Rg@mail.gmail.com>
- <CAL85gmC4ovR99wQQYoKs=oo24So80jZ_guxDDFhi-1MXXj0uSw@mail.gmail.com>
- <CACRpkdZkBLrhFpZiYk4fiM3ND+UwnVJhNKs=+rL5iZY4fS7zCg@mail.gmail.com>
- <CAL85gmD=12u87vDAc601T=ZOgcS-jDo_=LaC5gRAZUHgp_iTbA@mail.gmail.com>
-Message-ID: <CACRpkdYV1MzjW6ZMvmOhqi0qhXeeQnC62--7WBY=_hZBT8cvXg@mail.gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 19 May 2015 16:40:35 +0800
+Subject: [PATCHv2 08/12] arm64: psci: remove ACPI coupling
+In-Reply-To: <1431945503-6939-9-git-send-email-mark.rutland@arm.com>
+References: <1431945503-6939-1-git-send-email-mark.rutland@arm.com>
+ <1431945503-6939-9-git-send-email-mark.rutland@arm.com>
+Message-ID: <555AF703.4050702@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 14, 2015 at 10:14 PM, Feng Kan <fkan@apm.com> wrote:
-> On Thu, May 14, 2015 at 3:32 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-
->> But surely the GPIO block has its own status register, so are
->> you saying that this register is unreliable?
+On 2015?05?18? 18:38, Mark Rutland wrote:
+> The 32-bit ARM port doesn't have ACPI headers, and conditionally
+> including them is going to look horrendous. In preparation for sharing
+> the PSCI invocation code with 32-bit, move the acpi_psci_* function
+> declarations and definitions such that the PSCI client code need not
+> include ACPI headers.
 >
-> When the GPIO is used as interrupt, the gpio block does not report the
-> status anymore. Which leaves us stuck with SPISR.
->>
->> I can think of a few reasons, like transient IRQs etc but
->> what is actually causing this?
+> While it would seem like we could simply hide the ACPI includes in
+> psci.h, the ACPI headers have hilarious circular dependencies which make
+> this infeasible without reorganising most of ACPICA. So rather than
+> doing that, move the acpi_psci_* prototypes into psci.h.
 >
-> I won't say the obvious.
-
-Yeah I see your problem now :(
-
-I think it's better to fix the access functions so that you can
-cross-call to the GIC driver to get the SPISR flag out though.
-Let's see what Marc says.
-
->> Which GPIO driver is this? Is it upstream?
+> The psci_acpi_init function is made dependent on CONFIG_ACPI (with a
+> stub implementation in asm/psci.h) such that it need not be built for
+> 32-bit ARM or kernels without ACPI support. The currently missing __init
+> annotations are added to the prototypes in the header.
 >
-> Yes, it is upstream. It is the xgene slimpro gpio driver. I am starting to
-> think that we ought to switch to use some gpio poll driver rather than
-> using gpio-key.
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Reviewed-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+> Cc: Al Stone <al.stone@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>   arch/arm64/include/asm/acpi.h | 14 --------------
+>   arch/arm64/include/asm/psci.h | 11 +++++++++--
+>   arch/arm64/kernel/acpi.c      | 11 +++++++++++
+>   arch/arm64/kernel/psci.c      |  4 ++--
+>   4 files changed, 22 insertions(+), 18 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index 59c05d8..b0fecad 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -39,18 +39,6 @@ extern int acpi_disabled;
+>   extern int acpi_noirq;
+>   extern int acpi_pci_disabled;
+>
+> -/* 1 to indicate PSCI 0.2+ is implemented */
+> -static inline bool acpi_psci_present(void)
+> -{
+> -	return acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_COMPLIANT;
+> -}
+> -
+> -/* 1 to indicate HVC must be used instead of SMC as the PSCI conduit */
+> -static inline bool acpi_psci_use_hvc(void)
+> -{
+> -	return acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_USE_HVC;
+> -}
+> -
+>   static inline void disable_acpi(void)
+>   {
+>   	acpi_disabled = 1;
+> @@ -88,8 +76,6 @@ static inline void arch_fix_phys_package_id(int num, u32 slot) { }
+>   void __init acpi_init_cpus(void);
+>
+>   #else
+> -static inline bool acpi_psci_present(void) { return false; }
+> -static inline bool acpi_psci_use_hvc(void) { return false; }
+>   static inline void acpi_init_cpus(void) { }
+>   #endif /* CONFIG_ACPI */
+>
+> diff --git a/arch/arm64/include/asm/psci.h b/arch/arm64/include/asm/psci.h
+> index 2454bc5..b5d4c1d 100644
+> --- a/arch/arm64/include/asm/psci.h
+> +++ b/arch/arm64/include/asm/psci.h
+> @@ -14,7 +14,14 @@
+>   #ifndef __ASM_PSCI_H
+>   #define __ASM_PSCI_H
+>
+> -int psci_dt_init(void);
+> -int psci_acpi_init(void);
+> +int __init psci_dt_init(void);
+> +
+> +#ifdef CONFIG_ACPI
+> +int __init psci_acpi_init(void);
+> +bool __init acpi_psci_present(void);
+> +bool __init acpi_psci_use_hvc(void);
 
-There is both gpio_keys_polled and IRQ-driven gpio_keys so yeah
-that's possible. But honestly I think it's better to deal with this
-problem for real because IRQ is more efficient.
+really some nit, do we need __init for function declaration?
 
-So the way I perceive it this is the real problem:
+other than that,
 
-+static int gic_irq_get_irqchip_state(struct irq_data *d,
-+                                     enum irqchip_irq_state which, bool *val)
-+{
-+       switch (which) {
-(...)
-+       case IRQCHIP_STATE_ACTIVE:
-+               *val = gic_peek_irq(d, GIC_DIST_ACTIVE_SET);
-+               break;
-
-Here it reads the status from 0x300 where DIST_ACTIVE_SET
-is, so if you change GIC_DIST_ACTIVE_SET to
-0xd04 (SPISR), does it start working?
-
-I would *guess* that maybe you want to implement and
-ask for IRQCHIP_STATE_LINE_LEVEL instead of
-IRQCHIP_STATE_ACTIVE, and have that case: read
-from 0xd04 (SPISR) instead, because that makes more
-sense to me, or am I wrong at it?
-
-+       case IRQCHIP_STATE_LINE_LEVEL:
-+               *val = gic_peek_irq(d, GIC_DIST_SPISR);
-+               break;
-
-And then put a define into <linux/irqchip/arm-gic.h> for
-GIC_DIST_SPISR.
-
-Yours,
-Linus Walleij
+Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
