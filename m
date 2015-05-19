@@ -1,38 +1,34 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 19 May 2015 14:59:29 +0800
-Subject: [PATCH] crypto: allow to assign gfp_t for __crypto_alloc_tfm
-In-Reply-To: <20150519065812.GA40012@jaegeuk-mac02.hsd1.ca.comcast.net>
-References: <1432014416-39326-1-git-send-email-jaegeuk@kernel.org>
- <20150519054945.GA28060@gondor.apana.org.au>
- <20150519062430.GA39588@jaegeuk-mac02.hsd1.ca.comcast.net>
- <20150519063211.GA28347@gondor.apana.org.au>
- <20150519065812.GA40012@jaegeuk-mac02.hsd1.ca.comcast.net>
-Message-ID: <20150519065929.GA28610@gondor.apana.org.au>
+From: ivan.ivanov@linaro.org (Ivan T. Ivanov)
+Date: Tue, 19 May 2015 10:03:04 +0300
+Subject: [PATCH v3] arm64: dts: qcom: Add msm8916 CoreSight components
+In-Reply-To: <7F8B0480-06A8-4381-90C8-3F2A35F14FCD@codeaurora.org>
+References: <1431333119-13626-1-git-send-email-ivan.ivanov@linaro.org>
+ <CANLsYkyKrtyMicsNs2CDd4=GfrQJOPJkAqSUiTB=5hRs3+d=tQ@mail.gmail.com>
+ <7F8B0480-06A8-4381-90C8-3F2A35F14FCD@codeaurora.org>
+Message-ID: <1432018984.29174.2.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 18, 2015 at 11:58:12PM -0700, Jaegeuk Kim wrote:
->
-> > So where does the key get generated? The crypto tfm should be
-> > allocated when you generate the key.
-> 
-> In fs/ext4/crypto.c,
-> 
->  - writepage
->    - ext4_encrypt
->      - ext4_get_crypto_ctx
->        - crypto_alloc_ablkcipher
->      - ext4_page_crypto
->        - crypto_ablkcipher_setkey
->        - ablkcipher_request_alloc(GFP_NOFS)
->        - ablkcipher_request_set_crypt(PAGE_CACHE_SIZE)
->        - crypto_ablkcipher_encrypt
-> 
->  - end_io
->    - crypto_free_tfm
 
-No that's where you set the key, not where you generate the key.
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+On Mon, 2015-05-18 at 13:52 -0500, Kumar Gala wrote:
+> > 
+> > On May 11, 2015, at 2:21 PM, Mathieu Poirier poirier at linaro.org> wrote:
+> > 
+> > On 11 May 2015 at 02:31, Ivan T. Ivanov ivanov at linaro.org> wrote:
+> > > Add initial set of CoreSight components found on Qualcomm's 8x16 chipset.
+> > 
+
+> > 
+> > Kumar, I'm happy with this DT specification for Coresight.  Since I'm
+> > taking the driver it would likely make more sense for this to go
+> > through my tree.  Could you please have a look and give me your ack?
+> 
+> It looks ok, however I don?t see us including this file anywhere, so that?s my only concern.
+> 
+
+True. The reason is that 'rpmcc' driver is still in testing phase
+and it is not upstreamed. Once it is ready, I will include this file
+where is appropriate.
+
+Regards,
+Ivan
