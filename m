@@ -1,94 +1,98 @@
-From: fkan@apm.com (Feng Kan)
-Date: Tue, 19 May 2015 14:45:26 -0700
-Subject: [PATCH v4 2/3] irqchip: GIC: Add support for irq_{get,
- set}_irqchip_state
-In-Reply-To: <20150519110131.522f9c16@arm.com>
-References: <1426676484-21812-1-git-send-email-marc.zyngier@arm.com>
- <1426676484-21812-3-git-send-email-marc.zyngier@arm.com>
- <CAL85gmBrkonMcKdUVGmYx6zT3wSe-e2jPhnL_+Tkf3s4jsAiWg@mail.gmail.com>
- <CACRpkdYffHJEzksc5mg7JZdwTzShGaQofAmbmn65=_V3ot04Rg@mail.gmail.com>
- <CAL85gmC4ovR99wQQYoKs=oo24So80jZ_guxDDFhi-1MXXj0uSw@mail.gmail.com>
- <CACRpkdZkBLrhFpZiYk4fiM3ND+UwnVJhNKs=+rL5iZY4fS7zCg@mail.gmail.com>
- <CAL85gmD=12u87vDAc601T=ZOgcS-jDo_=LaC5gRAZUHgp_iTbA@mail.gmail.com>
- <CACRpkdYV1MzjW6ZMvmOhqi0qhXeeQnC62--7WBY=_hZBT8cvXg@mail.gmail.com>
- <20150519110131.522f9c16@arm.com>
-Message-ID: <CAL85gmDugvn0Gv-Ypm0EN-3bE6JM+hWFkVV8FxCeBQ1FS7EERw@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 19 May 2015 14:50:14 -0700
+Subject: [PATCHv3 2/4] clk: socfpga: add a clock driver for the Arria
+ 10 platform
+In-Reply-To: <555B64FE.40104@opensource.altera.com>
+References: <1431011523-10049-1-git-send-email-dinguyen@opensource.altera.com>
+ <1431011523-10049-3-git-send-email-dinguyen@opensource.altera.com>
+ <20150516005235.GP31753@codeaurora.org>
+ <555B64FE.40104@opensource.altera.com>
+Message-ID: <555BB016.8000506@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 3:01 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On Tue, 19 May 2015 09:40:21 +0100
-> Linus Walleij <linus.walleij@linaro.org> wrote:
+On 05/19/15 09:29, Dinh Nguyen wrote:
 >
->> On Thu, May 14, 2015 at 10:14 PM, Feng Kan <fkan@apm.com> wrote:
->> > On Thu, May 14, 2015 at 3:32 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->>
->> >> But surely the GPIO block has its own status register, so are
->> >> you saying that this register is unreliable?
->> >
->> > When the GPIO is used as interrupt, the gpio block does not report the
->> > status anymore. Which leaves us stuck with SPISR.
->> >>
->> >> I can think of a few reasons, like transient IRQs etc but
->> >> what is actually causing this?
->> >
->> > I won't say the obvious.
->>
->> Yeah I see your problem now :(
->>
->> I think it's better to fix the access functions so that you can
->> cross-call to the GIC driver to get the SPISR flag out though.
->> Let's see what Marc says.
->>
->> >> Which GPIO driver is this? Is it upstream?
->> >
->> > Yes, it is upstream. It is the xgene slimpro gpio driver. I am starting to
->> > think that we ought to switch to use some gpio poll driver rather than
->> > using gpio-key.
->>
->> There is both gpio_keys_polled and IRQ-driven gpio_keys so yeah
->> that's possible. But honestly I think it's better to deal with this
->> problem for real because IRQ is more efficient.
->>
->> So the way I perceive it this is the real problem:
->>
->> +static int gic_irq_get_irqchip_state(struct irq_data *d,
->> +                                     enum irqchip_irq_state which, bool *val)
->> +{
->> +       switch (which) {
->> (...)
->> +       case IRQCHIP_STATE_ACTIVE:
->> +               *val = gic_peek_irq(d, GIC_DIST_ACTIVE_SET);
->> +               break; case: read
->> from 0xd04 (SPISR) instead, because that makes more
->> sense to me, or am I wrong at it?
->>
->> +       case IRQCHIP_STATE_LINE_LEVEL:
->> +               *val = gic_peek_irq(d, GIC_DIST_SPISR);
->> +               break;
->>
->> And then put a define into <linux/irqchip/arm-gic.h> for
->> GIC_DIST_SPISR.
+> On 5/15/15 7:52 PM, Stephen Boyd wrote:
+>> On 05/07, dinguyen at opensource.altera.com wrote:
+>>> +
+>>> +static int socfpga_clk_prepare(struct clk_hw *hwclk)
+>>> +{
+>>> +	struct socfpga_gate_clk *socfpgaclk = to_socfpga_gate_clk(hwclk);
+>>> +	struct regmap *sys_mgr_base_addr;
+>>> +	int i;
+>>> +	u32 hs_timing;
+>>> +	u32 clk_phase[2];
+>>> +
+>>> +	if (socfpgaclk->clk_phase[0] || socfpgaclk->clk_phase[1]) {
+>>> +		sys_mgr_base_addr = syscon_regmap_lookup_by_compatible("altr,sys-mgr");
+>>> +		if (IS_ERR(sys_mgr_base_addr)) {
+>> Is there a reason the syscon is grabbed lazily in prepare? Why
+>> not get it before registering this clock?
+> This syscon node is only associated with clocks that have a clk-phase
+> property, which on the SoCFPGA platform, is the SD/MMC clocks. The way
+> to implement this went through quite a few rounds of discussion for the
+> Cyclone5/Arria5 platform before settling to this method.
 >
-> What worries me here is that the PENDING state should already give you
-> the right level of information (this is what the GIC-400 TRM says). The
-> only reason why SPISR exists is that software can write to the PENDING
-> register, while SPISR is RO.
->
-> If reading the pending state doesn't work, then I'd like to know
-> exactly *why*. Only then we can add support for LINE_LEVEL using SPISR
-> (which has to be GIC-400 specific, as it is not architected).
+> The reason why syscon is grabbed here is that the setting of the clock
+> phase must be done before enabling of the clock, so it seem that prepare
+> was a good place. Should this be move moved to the socfpga_gate_init()
+> instead?
 
-IS_PENDING and IS_ACTIVE works fine for the ISR context. However,
-the nature of the register is meant for IRQ handling and not to read
-the status of a GPIO. By the time the gpio_key throws a work queue
-and check the status of the PENDING register, it is no long relevant.
+I was expecting the regmap to be found before the clock is registered
+and stored away into the  socfpga_gate_clk structure. Getting the regmap
+during prepare is akin to ioremapping a register region during prepare,
+which doesn't sound right at all. Maybe there's some good reason in the
+earlier discussions? Any hints?
 
-
-
+>>> +			switch (socfpgaclk->clk_phase[i]) {
+>>> +			case 0:
+>>> +				clk_phase[i] = 0;
+>>> +				break;
+>>> +			case 45:
+>>> +				clk_phase[i] = 1;
+>>> +				break;
+>>> +			case 90:
+>>> +				clk_phase[i] = 2;
+>>> +				break;
+>>> +			case 135:
+>>> +				clk_phase[i] = 3;
+>>> +				break;
+>>> +			case 180:
+>>> +				clk_phase[i] = 4;
+>>> +				break;
+>>> +			case 225:
+>>> +				clk_phase[i] = 5;
+>>> +				break;
+>>> +			case 270:
+>>> +				clk_phase[i] = 6;
+>>> +				break;
+>>> +			case 315:
+>>> +				clk_phase[i] = 7;
+>>> +				break;
+>>> +			default:
+>>> +				clk_phase[i] = 0;
+>>> +				break;
+>>> +			}
+>>> +		}
+>>> +
+>>> +		hs_timing = SYSMGR_SDMMC_CTRL_SET(clk_phase[0], clk_phase[1]);
+>>> +		regmap_write(sys_mgr_base_addr, SYSMGR_SDMMCGRP_CTRL_OFFSET,
+>>> +			     hs_timing);
+>>> +	}
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +static struct clk_ops gateclk_ops = {
+>> const?
+>>
+> I cannot make this a const as I am assigning the .enable/.disable to use
+> the common clk_gate_ops.
 >
-> Thanks,
 >
->         M.
-> --
-> Jazz is not dead. It just smells funny.
+
+Hm.. ok. Maybe we should export those functions to modules.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
