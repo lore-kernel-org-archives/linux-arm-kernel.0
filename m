@@ -1,39 +1,50 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 19 May 2015 14:57:45 +0900
-Subject: [PATCH v2 3/4] ARM: multi_v7_defconfig: Enable TMU for Exynos
-In-Reply-To: <1431913636-31854-4-git-send-email-k.kozlowski@samsung.com>
-References: <1431913636-31854-1-git-send-email-k.kozlowski@samsung.com>
- <1431913636-31854-4-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <555AD0D9.9060502@kernel.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 19 May 2015 13:58:56 +0800
+Subject: [PATCH] ARM: dts: imx6dl-wandboard: Do not hardcode memory size
+In-Reply-To: <1431980424-11929-1-git-send-email-festevam@gmail.com>
+References: <1431980424-11929-1-git-send-email-festevam@gmail.com>
+Message-ID: <20150519055856.GQ1071@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/18/15 10:47, Krzysztof Kozlowski wrote:
-> From: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+On Mon, May 18, 2015 at 05:20:24PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Enable support for Thermal Monitoring Unit present on Exynos SoCs. This
-> allows detection of overheat and handling this gracefully.
+> imx6dl-wandboard.dtb works for wandboard dual-lite and solo boards.
 > 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+> Wandboard dual-lite has 1 GB of RAM and wandboard solo has 512 MB, so
+> do not hardcode the memory size in the dts file and let the bootloader
+> pass the correct memory size instead.
 
-Krzysztof, you want to use gmail account on this, you used samsung
-accoung on 1st and 2nd patches though?
+This is a configuration for dual-lite board.  If solo board wants to
+reuse it, the bootloader should just fix up things for solo board.
 
-- Kukjin
+Shawn
 
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 > ---
->  arch/arm/configs/multi_v7_defconfig | 1 +
->  1 file changed, 1 insertion(+)
+>  arch/arm/boot/dts/imx6dl-wandboard.dts | 4 ----
+>  1 file changed, 4 deletions(-)
 > 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index f09ae2089284..8fa7171b12f3 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -342,6 +342,7 @@ CONFIG_SENSORS_LM90=y
->  CONFIG_SENSORS_LM95245=y
->  CONFIG_THERMAL=y
->  CONFIG_CPU_THERMAL=y
-> +CONFIG_EXYNOS_THERMAL=m
->  CONFIG_RCAR_THERMAL=y
->  CONFIG_ARMADA_THERMAL=y
->  CONFIG_DAVINCI_WATCHDOG
+> diff --git a/arch/arm/boot/dts/imx6dl-wandboard.dts b/arch/arm/boot/dts/imx6dl-wandboard.dts
+> index bbb6167..dcde3f6 100644
+> --- a/arch/arm/boot/dts/imx6dl-wandboard.dts
+> +++ b/arch/arm/boot/dts/imx6dl-wandboard.dts
+> @@ -15,8 +15,4 @@
+>  / {
+>  	model = "Wandboard i.MX6 Dual Lite Board";
+>  	compatible = "wand,imx6dl-wandboard", "fsl,imx6dl";
+> -
+> -	memory {
+> -		reg = <0x10000000 0x40000000>;
+> -	};
+>  };
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
