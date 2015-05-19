@@ -1,41 +1,20 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 May 2015 15:50:07 +0200
-Subject: [PATCH] ARM: shmobile: only select sound drivers that build
-In-Reply-To: <CAMuHMdWDS73aA8ottgEPYgE=FHFeOwWdEcRGEyv8LbOUU1eUgQ@mail.gmail.com>
-References: <5616798.tmraH8vpuI@wuerfel>
- <CAMuHMdWDS73aA8ottgEPYgE=FHFeOwWdEcRGEyv8LbOUU1eUgQ@mail.gmail.com>
-Message-ID: <8763723.lDqvJa39j2@wuerfel>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Tue, 19 May 2015 14:50:54 +0100
+Subject: [Xen-devel] [RFC 01/23] xen: Include xen/page.h rather than
+ asm/xen/page.h
+In-Reply-To: <1431622863-28575-2-git-send-email-julien.grall@citrix.com>
+References: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
+ <1431622863-28575-2-git-send-email-julien.grall@citrix.com>
+Message-ID: <555B3FBE.8030408@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 May 2015 15:34:00 Geert Uytterhoeven wrote:
-> On Tue, May 19, 2015 at 2:49 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > A couple of codec drivers are selected by shmobile platform code,
-> > but depend on I2C, which results in a build error:
+On 14/05/15 18:00, Julien Grall wrote:
+> Using xen/page.h will be necessary later for using common xen page
+> helpers.
 > 
-> > --- a/arch/arm/mach-shmobile/Kconfig
-> > +++ b/arch/arm/mach-shmobile/Kconfig
-> 
-> > @@ -158,8 +158,8 @@ config MACH_BOCKW
-> >         depends on ARCH_R8A7778
-> >         select ARCH_REQUIRE_GPIOLIB
-> >         select REGULATOR_FIXED_VOLTAGE if REGULATOR
-> > -       select SND_SOC_AK4554 if SND_SIMPLE_CARD
-> > -       select SND_SOC_AK4642 if SND_SIMPLE_CARD
-> > +       select SND_SOC_AK4554 if SND_SIMPLE_CARD && I2C
-> 
-> AK4554 is not an i2c device, but a plain platform device.
-> 
-> > +       select SND_SOC_AK4642 if SND_SIMPLE_CARD && I2C
-> >         select USE_OF
-> 
-> The others are OK, so if you have remove AK4554, you can add my
-> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> 
-> 
+> As xen/page.h already include asm/xen/page.h, always use the later.
 
-Ah, my mistake. I've sent a fixed version 2 now.
+Reviewed-by: David Vrabel <david.vrabel@citrix.com>
 
-Thanks!
-
-	Arnd
+David
