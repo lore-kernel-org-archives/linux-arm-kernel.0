@@ -1,53 +1,78 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 19 May 2015 02:28:52 +0200
-Subject: [V4 PATCH 1/6] ACPI / scan: Parse _CCA and setup device coherency
-In-Reply-To: <555A69D9.7080508@amd.com>
-References: <1431724994-21601-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1880793.yBqSWvxoqF@vostro.rjw.lan> <555A69D9.7080508@amd.com>
-Message-ID: <1542643.dHW9Z8dPkv@vostro.rjw.lan>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 19 May 2015 02:07:52 +0200 (CEST)
+Subject: [PATCH] arch/arm64 :Cyclic Test fix in ARM64 fpsimd
+In-Reply-To: <20150518213835.GD4275@linutronix.de>
+References: <CAPyr0yJSGqvxkUWLtNKe0q5mNanBczAfAVx0tPKuzYeDG+eJ=Q@mail.gmail.com>
+ <20150506193803.GC32577@8074w.roxell.se>
+ <CAPyr0y+OYikc2Euh++2nTWnVb-aZ4i-tifLLk3XUiRahtHKjCA@mail.gmail.com>
+ <20150508000929.GE31914@8074w.roxell.se>
+ <CAPyr0yLq7PsMW45G+oJzJLbQ-be6Xx9n2S2SU2CiV+AMH9jJ8Q@mail.gmail.com>
+ <20150514160733.GE13442@linutronix.de>
+ <CAPyr0yL8xJt4bj7poLFrauR0wtfKB7nPg+uy4A+R0dTT-eM3Qw@mail.gmail.com>
+ <CAF7YWnw08YK7ogAoLTYXusOvtGCxfDPJW0H+8LyWDzNi_CbR=w@mail.gmail.com>
+ <20150518213835.GD4275@linutronix.de>
+Message-ID: <alpine.DEB.2.11.1505190207070.4225@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, May 18, 2015 05:38:17 PM Suravee Suthikulanit wrote:
-> Hi Rafael,
+On Mon, 18 May 2015, Sebastian Andrzej Siewior wrote:
+
+> * Gary Robertson | 2015-05-18 08:23:16 [-0500]:
 > 
-> On 5/15/2015 6:53 PM, Rafael J. Wysocki wrote:
-> > On Friday, May 15, 2015 04:23:09 PM Suravee Suthikulpanit wrote:
-> >> [...]
-> >> diff --git a/drivers/acpi/acpi_platform.c b/drivers/acpi/acpi_platform.c
-> >> index 4bf7559..f6bc438 100644
-> >> --- a/drivers/acpi/acpi_platform.c
-> >> +++ b/drivers/acpi/acpi_platform.c
-> >> @@ -103,14 +103,18 @@ struct platform_device *acpi_create_platform_device(struct acpi_device *adev)
-> >>   	pdevinfo.res = resources;
-> >>   	pdevinfo.num_res = count;
-> >>   	pdevinfo.fwnode = acpi_fwnode_handle(adev);
-> >> -	pdevinfo.dma_mask = DMA_BIT_MASK(32);
-> >> +	pdevinfo.dma_mask = acpi_dma_is_supported(adev) ? DMA_BIT_MASK(32) : 0;
-> >>   	pdev = platform_device_register_full(&pdevinfo);
-> >> -	if (IS_ERR(pdev))
-> >> +	if (IS_ERR(pdev)) {
-> >>   		dev_err(&adev->dev, "platform device creation failed: %ld\n",
-> >>   			PTR_ERR(pdev));
-> >> -	else
-> >> +	} else {
-> >> +		if (acpi_dma_is_supported(adev))
-> >> +			arch_setup_dma_ops(&pdev->dev, 0, 0, NULL,
-> >> +					   acpi_dma_is_coherent(adev));
-> >
-> > Shouldn't we generally do that in acpi_bind_one() for all bus types
-> > that don't have specific handling rather than here?
+> >I have been following this thread and was able to obtain a copy of the full
+> >log from Anders.
+> >My initial impression based upon the log entries is that the excessive
+> >latencies did not occur during the fpsimd calls -
+> >but the actual progress of an individual task is a bit difficult to follow
+> >through the logs, so in my spare time
+> >I started writing a parser to sort it into a format easier to follow.  I
+> >hope to have it completed shortly.
+> >This parser will sort the log first by CPU and then by thread so the cause
+> >of the delay will be easier to see.
 > 
-> I think that would also work, and makes sense. However, I'm not sure if 
-> this would help in the case when we are creating PCI end-point devices, 
-> since the CCA is specified at the host bridge node, and there is no ACPI 
-> companion for the end-point devices. It seems that patch 3/6 of this 
-> series is still needed.
+> There is a smaller version of it at 
+>     https://breakpoint.cc/arm64_simd_trace_cpu.txt
+> 
+> which contains only CPU0 around that "event. Here are a few pieces:
+> |cyclicte-964     0....1.. 511965877us : __schedule <-schedule
+> cyclictest goes away
+> 
+> |kworker/-353     0....111 511965906us : rt_spin_unlock <-process_one_work
+> kworker is now active
+> 
+> |kworker/-353     0....112 511965954us : kernel_neon_begin_partial <-virt_efi_set_time
+> |kworker/-353     0....112 511965955us : preempt_count_add <-kernel_neon_begin_partial
+> and kworker invokes virt_efi_set_time which does the neon save thingy.
+> 
+> |kworker/-353     0d...212 511966764us : __handle_domain_irq <-gic_handle_irq
+> now we have an interrupt comming.
+> 
+> |kworker/-353     0dn.h412 511966793us : task_woken_rt <-ttwu_do_wakeup
+> it might be the timer for cyclictest wakeup it might not, however we
+> have the N flag set and kworker has to go.
+> 
+> |kworker/-353     0dn..212 511966806us : rcu_sysidle_enter <-rcu_irq_exit
+> |kworker/-353     0dn..212 511967108us : __handle_domain_irq <-gic_handle_irq
+> |kworker/-353     0dn..212 511967109us : irq_enter <-__handle_domain_irq
+> so we finished handling one irq and we contiunue with the next one? This
+> goes on and on and on until finally after a while we have this:
+> 
+> |kworker/-353     0dn..212 512064373us : rcu_irq_exit <-irq_exit
+> |kworker/-353     0dn..212 512064374us : rcu_sysidle_enter <-rcu_irq_exit
+> |kworker/-353     0.n..212 512065116us : kernel_neon_end <-virt_efi_set_time
+> |kworker/-353     0.n..212 512065116us : preempt_count_sub <-kernel_neon_end
+> |kworker/-353     0.n..112 512065117us : __schedule <-preempt_schedule
+> 
+> and this time we were able to return from rcu_irq_exit and continue with
+> virt_efi_set_time and finally switch the task. So yes, preemption was
+> disabled during kernel_neon_{being|end} but we also received 81
+> interrupt ("gic_handle_irq invocation") during that time. Why is that?
 
-Yes, PCI needs its own handling, but there are multiple bus types that
-don't (SPI, I2C etc) in addition to the platform bus type.
+> |kworker/-353     0dn..212 512064373us : rcu_irq_exit <-irq_exit
+> |kworker/-353     0dn..212 512064374us : rcu_sysidle_enter <-rcu_irq_exit
 
+That's called from RCU_NONIDLE(). Go figure ...
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Thanks,
+
+	tglx
