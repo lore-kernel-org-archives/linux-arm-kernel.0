@@ -1,30 +1,29 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Tue, 19 May 2015 22:33:36 +0200
-Subject: [PATCH v10 1/5] arm64: Enable EDAC on ARM64
-In-Reply-To: <CAPw-ZT=mTpt_vz+e=rM5ywK8feNKkJQrpEWg=noRCziJ0840TQ@mail.gmail.com>
-References: <1431991481-25684-1-git-send-email-lho@apm.com>
- <1431991481-25684-2-git-send-email-lho@apm.com>
- <20150519170308.GL4641@pd.tnic>
- <CAPw-ZT=mTpt_vz+e=rM5ywK8feNKkJQrpEWg=noRCziJ0840TQ@mail.gmail.com>
-Message-ID: <20150519203336.GP4641@pd.tnic>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 19 May 2015 13:35:07 -0700
+Subject: [PATCH v4 4/5] clk: hi6220: Clock driver support for Hisilicon
+ hi6220 SoC
+In-Reply-To: <CAAS=xmjsFoQg-HgWA5-e=cF3qF+PcVNc3i_3Z5EBPNJ2HyOZKQ@mail.gmail.com>
+References: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>	<1430827599-11560-5-git-send-email-bintian.wang@huawei.com>	<20150515002527.GD31753@codeaurora.org>	<5555A37B.1090105@huawei.com>	<20150515193041.GO31753@codeaurora.org>
+ <CAAS=xmjsFoQg-HgWA5-e=cF3qF+PcVNc3i_3Z5EBPNJ2HyOZKQ@mail.gmail.com>
+Message-ID: <555B9E7B.9000809@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 12:57:32PM -0700, Loc Ho wrote:
-> This was discussed here
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/326986.html.
-> Without this, it will have compiler error as this function is called
-> by.function edac_mc_scrub_block in file drivers/edac/edac_mc.c.
+On 05/15/15 19:54, Brent Wang wrote:
+>
+>>> How about just send this patch for review not the whole patch set in
+>>> next version?
+>>>
+>> Yes a single patch is fine. I take it you want the patch to go
+>> through arm-soc with some Ack from us?
+> Yes, exactly.
+> The dts file includes the clock head file,  this patch goes through
+> arm-soc is a good choice.
 
-Argh, that's just silly. We should have a __weak atomic_scrub() in the
-edac core which arches can override but not have to supply a dummy just
-because...
-
-I'll try to hack up something later.
+One way to avoid that problem is to split the clock header file into its
+own patch and then duplicate that patch in two trees, one that goes
+through arm-soc and one that goes through clk.
 
 -- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
---
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
