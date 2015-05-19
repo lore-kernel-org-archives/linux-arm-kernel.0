@@ -1,48 +1,45 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 19 May 2015 16:33:10 +0200
-Subject: [PATCH v2] arm, imx6, dts: add DT for aristainetos2 board
-In-Reply-To: <555B3E3A.8000605@denx.de>
-References: <1431334974-27531-1-git-send-email-hs@denx.de>
- <20150518113135.GD1071@dragon> <555AE192.8010700@denx.de>
- <1432025280.3182.6.camel@pengutronix.de> <555B3E3A.8000605@denx.de>
-Message-ID: <1432045990.15181.36.camel@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 19 May 2015 16:34:05 +0200
+Subject: [PATCH] ata: hpt366: fix constant cast warning
+Message-ID: <2549322.XbiTlcDvMS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+gcc-5.x warns about a preexisting problem in the hpt36x pata driver:
 
-Am Dienstag, den 19.05.2015, 15:44 +0200 schrieb Heiko Schocher:
-> Hello Philipp,
-> 
-> Am 19.05.2015 10:48, schrieb Philipp Zabel:
-> > Hi Heiko, Shawn,
-> >
-> > Am Dienstag, den 19.05.2015, 09:09 +0200 schrieb Heiko Schocher:
-> > [...]
-> >>> What is this?  I failed to find it in Documentation/devicetree/bindings/
-> >>
-> >> Ah, this is not documentated, see commit:
-> >>
-> >> commit 628f435be4359e6ae8ecfdda9b492053be76a057
-> >> Author: Philipp Zabel <p.zabel@pengutronix.de>
-> >> Date:   Tue Feb 25 11:55:04 2014 +0100
-> >>
-> >>       imx-drm: parallel-display: Add drm_panel support
-> >>
-> >> added Philipp to cc ...
-> >
-> > This was meant to be a temporary solution to connect a drm_panel to the
-> > parallel-display when the of-graph bindings were not yet available.
-> > I'd very much prefer to switch to the common of-graph bindings similarly
-> > to the LDB driver instead. Could you check if this would work for you:
-> 
-> Yes, your patch works for me (with appropriate changes in the dts file)
-> You can add my
-> Tested-by: Heiko Schocher <hs@denx.de>
-> for this patch, thanks!
+drivers/ata/pata_hpt366.c: In function 'hpt36x_init_one':
+drivers/ata/pata_hpt366.c:376:9: warning: assignment discards 'const' qualifier from pointer target type [-Wdiscarded-array-qualifiers]
 
-Thank you, I've posted that parallel-display patch and will try to queue
-it for v4.2 when it gets accepted.
+Other ata drivers have the same problem, as ata_pci_bmdma_init_one
+takes a non-const pointer, and they solve it by using a cast to
+turn that pointer into a normal non-const pointer.
 
-regards
-Philipp
+I also tried to change the ata core code to make host->private_data
+a const pointer, but that quickly got out of hand, as some other
+drivers expect it to be writable, so I ended up using the same
+hack as the others here.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/drivers/ata/pata_hpt366.c b/drivers/ata/pata_hpt366.c
+index cbc3de793d1d..0038dc4c06c7 100644
+--- a/drivers/ata/pata_hpt366.c
++++ b/drivers/ata/pata_hpt366.c
+@@ -352,7 +352,7 @@ static int hpt36x_init_one(struct pci_dev *dev, const struct pci_device_id *id)
+ 	};
+ 	const struct ata_port_info *ppi[] = { &info_hpt366, NULL };
+ 
+-	void *hpriv = NULL;
++	const void *hpriv = NULL;
+ 	u32 reg1;
+ 	int rc;
+ 
+@@ -383,7 +383,7 @@ static int hpt36x_init_one(struct pci_dev *dev, const struct pci_device_id *id)
+ 		break;
+ 	}
+ 	/* Now kick off ATA set up */
+-	return ata_pci_bmdma_init_one(dev, ppi, &hpt36x_sht, hpriv, 0);
++	return ata_pci_bmdma_init_one(dev, ppi, &hpt36x_sht, (void *)hpriv, 0);
+ }
+ 
+ #ifdef CONFIG_PM_SLEEP
