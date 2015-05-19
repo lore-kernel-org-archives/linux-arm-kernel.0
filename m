@@ -1,27 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 May 2015 16:36:34 +0200
-Subject: [PATCH] xen: fix building on ARM with CONFIG_HIBERNATE_CALLBACKS
-In-Reply-To: <555B413F.7020509@oracle.com>
-References: <3837965.uXvcfKiP40@wuerfel> <555B413F.7020509@oracle.com>
-Message-ID: <2292282.A4UNIrHzbV@wuerfel>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 19 May 2015 16:36:39 +0200
+Subject: [PATCH] memory: tegra: Expose supported rates via debugfs
+In-Reply-To: <CAAObsKCo7x4qMdPvBb-dNoN=j7Od-eMCxw9BNoSvDR5mUZXGtA@mail.gmail.com>
+References: <1431963330-25708-1-git-send-email-thierry.reding@gmail.com>
+ <CAAObsKCo7x4qMdPvBb-dNoN=j7Od-eMCxw9BNoSvDR5mUZXGtA@mail.gmail.com>
+Message-ID: <20150519143637.GF26748@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 May 2015 09:57:19 Boris Ostrovsky wrote:
-> On 05/19/2015 08:58 AM, Arnd Bergmann wrote:
-> > A recent bug fix for x86 broke Xen on ARM for the case that
-> > CONFIG_HIBERNATE_CALLBACKS is enabled:
+On Tue, May 19, 2015 at 02:21:01PM +0200, Tomeu Vizoso wrote:
+> On 18 May 2015 at 17:35, Thierry Reding <thierry.reding@gmail.com> wrote:
+> > From: Thierry Reding <treding@nvidia.com>
 > >
-> > drivers/built-in.o: In function `do_suspend':
-> > /git/arm-soc/drivers/xen/manage.c:134: undefined reference to `xen_arch_suspend'
-> > drivers/built-in.o:(.debug_addr+0xc3f4): undefined reference to `xen_arch_suspend'
-> >
-> > It is not clear to me what needs to be done here, but this
-> > patch avoids the build error by adding a stub for the
-> > missing function.
+> > In order to ease testing, expose the list of supported EMC frequencies
+> > via debugfs.
 > 
-> This is already fixed in Xen staging tree.
+> Looks good to me, but if this is for automated testing, why not just
+> read the timings from the DT? We would be covering more code that way.
+> 
+> Reviewed-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 
-I see. Any chance to get that fix into linux-next soon?
+The idea is that by putting this into debugfs we have a single source of
+information to use in tests.
 
-	Arnd
+Now if in addition to merely testing the frequencies you want to make
+sure the driver has a consistent representation of what's in device tree
+we could always write another test that reads the device tree nodes and
+compares them to the list of supported rates from debugfs.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150519/9abd9450/attachment.sig>
