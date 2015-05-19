@@ -1,30 +1,38 @@
-From: yegorslists@googlemail.com (Yegor Yefremov)
-Date: Tue, 19 May 2015 10:33:13 +0200
-Subject: [PATCH] arm: boot: dts: add DTS for Baltos IR5221
-In-Reply-To: <20150513155012.GI15563@atomide.com>
-References: <1431468917-27697-1-git-send-email-balbi@ti.com>
- <20150513074002.0b7b8dda@ipc1.ka-ro> <20150513152904.GC4201@saruman.tx.rr.com>
- <20150513155012.GI15563@atomide.com>
-Message-ID: <CAGm1_kvc+PiK8CbpaEWR-1vGLs5F0hMoWaEGXokg97+6q5mOUg@mail.gmail.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Tue, 19 May 2015 10:39:51 +0200
+Subject: [PATCH v4 1/7] ARM: lpc18xx: add basic support for NXP
+ LPC18xx/43xx SoCs
+In-Reply-To: <CAMuHMdVfh6-Y6BuRpxXRJexXK+U-Bp0P+W-2e4ioAZ=60C_TYQ@mail.gmail.com>
+References: <1431381653-25356-1-git-send-email-manabian@gmail.com>
+ <1431381653-25356-2-git-send-email-manabian@gmail.com>
+ <CAMuHMdVfh6-Y6BuRpxXRJexXK+U-Bp0P+W-2e4ioAZ=60C_TYQ@mail.gmail.com>
+Message-ID: <CAGhQ9Vy6ByVtpbebMiSCQoQfbKMvtpyt85dShW_gav=CQ6vDWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 13, 2015 at 5:50 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Felipe Balbi <balbi@ti.com> [150513 08:32]:
->> On Wed, May 13, 2015 at 07:40:02AM +0200, Lothar Wa?mann wrote:
->> > >
->> > Should these be ordered alphabetically?
->>
->> why ?
+On 19 May 2015 at 09:26, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> On Tue, May 12, 2015 at 12:00 AM, Joachim Eastwood <manabian@gmail.com> wrote:
+>> --- a/arch/arm/Kconfig.debug
+>> +++ b/arch/arm/Kconfig.debug
+>> @@ -1359,6 +1359,7 @@ config DEBUG_UART_PHYS
+>>         default 0x20201000 if DEBUG_BCM2835
+>>         default 0x3e000000 if DEBUG_BCM_KONA_UART
+>>         default 0x4000e400 if DEBUG_LL_UART_EFM32
+>> +       default 0x40081000 if ARCH_LPC18XX
 >
-> In general the alphabetical ordering helps to avoid merge
-> conflicts when new things are added later on as they are
-> not all added to the end. So yeah I have a slight sorting
-> preference there too to make my life easier in the future :)
+> This will be used in any multi-platform kernel with DEBUG_LL=y,  possible
+> overriding a correct value, even if low-level LPC18XX debug support itself
+> (what's the config option for that, I couldn't find it?) is disabled.
 
-I've sent v2, but I left network components order as is. It was
-borrowed from am335x-evmsk and represents somehow the hierarchy of
-CPSW: at first MAC, then MDIO and then slaves with their own settings.
+Right now LPC18xx can't be a part of any multi-platform kernel.
 
-Regards,
-Yegor
+> Please make this dependent on an appropriate DEBUG_LPC18XX
+> option. Thanks!
+
+But anyways defining a DEBUG_LPC18XX symbol seems to be what most
+other platforms do. I'll send a follow up patch defining DEBUG_LPC18XX
+and then use that in DEBUG_UART_PHYS.
+
+
+regards,
+Joachim Eastwood
