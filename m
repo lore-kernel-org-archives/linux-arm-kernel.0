@@ -1,77 +1,51 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 19 May 2015 16:49:12 +0200
-Subject: [PATCH v3] ARM: tegra: cpuidle: implement cpuidle_state.enter_freeze()
-Message-ID: <1432046953-12945-1-git-send-email-tomeu.vizoso@collabora.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 19 May 2015 15:50:07 +0100
+Subject: [PATCH v8 09/16] clockevents/drivers: Add STM32 Timer driver
+In-Reply-To: <CALszF6A-De6dvcRNoa9ruL+y6Wt_rc7bi-O-VxHWkFF9NSt5_g@mail.gmail.com>
+References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <555B098A.8030202@linaro.org>
+ <CALszF6AJ3Zf598wYeUx=iNWHHKT24xUyfagB=+4GocwZ-Fd-0g@mail.gmail.com>
+ <6177628.0ZDPLeVyah@wuerfel>
+ <CALszF6BZKD-CPTZ6Hc85wv2Z3Y7JmUv-cMkBtbk2Ga6WeeWU=A@mail.gmail.com>
+ <555B3F80.8070605@linaro.org>
+ <CALszF6A-De6dvcRNoa9ruL+y6Wt_rc7bi-O-VxHWkFF9NSt5_g@mail.gmail.com>
+Message-ID: <20150519145006.GH2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This callback is expected to do the same as enter() but it has to
-guarantee that interrupts aren't enabled at any point in its execution,
-as the tick is frozen.
+On Tue, May 19, 2015 at 04:41:58PM +0200, Maxime Coquelin wrote:
+> 2015-05-19 15:49 GMT+02:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
+> >
+> >
+> > It is not exactly as the initial patch.
+> >
+> > I think Arnd is proposing:
+> >
+> > config CLKSRC_STM32
+> >         bool "Clocksource for STM32 SoCs" if COMPILE_TEST
+> >         select CLKSRC_MMIO
+> >
+> 
+> Isn't "depends on OF" missing for COMPILE_TEST case?
 
-It will be called when the system goes to suspend-to-idle and will
-reduce power usage because CPUs won't be awaken for unnecessary IRQs.
+config CLKSRC_STM32
+	bool "Clocksource for STM32 SoCs" if COMPILE_TEST
+	depends on OF
+	select CLKSRC_MMIO
 
-By setting the CPUIDLE_FLAG_TIMER_STOP flag, we can reuse the same code
-for both the enter() and enter_freeze() callbacks.
+This permits CLKSRC_STM32 to be selected by STM32 (provided OF is enabled,
+it's always going to be for that case, right?) while allowing the option
+to be visible when both OF!=n and COMPILE_TEST!=n.
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+Remember,
 
----
+	bool "string" if <condition-affects-visibility-of-string>
+	depends on <condition-affects-config-symbol-availability>
 
-v3:	* Set CPUIDLE_FLAG_TIMER_STOP to simplify things as suggested by
-	Lorenzo Pieralisi
-v2:	* Disable FIQs also when suspending-to-idle
----
- arch/arm/mach-tegra/cpuidle-tegra114.c | 13 +++++++++----
- 1 file changed, 9 insertions(+), 4 deletions(-)
+The former merely hides the option from the user _if_ the condition fails.
+The latter _disables_ the option completely (except if you try and select
+it, at which point you end up with a Kconfig warning about that.)
 
-diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
-index 155807f..7e59ac0 100644
---- a/arch/arm/mach-tegra/cpuidle-tegra114.c
-+++ b/arch/arm/mach-tegra/cpuidle-tegra114.c
-@@ -44,16 +44,12 @@ static int tegra114_idle_power_down(struct cpuidle_device *dev,
- 	tegra_set_cpu_in_lp2();
- 	cpu_pm_enter();
- 
--	tick_broadcast_enter();
--
- 	call_firmware_op(prepare_idle);
- 
- 	/* Do suspend by ourselves if the firmware does not implement it */
- 	if (call_firmware_op(do_idle, 0) == -ENOSYS)
- 		cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
- 
--	tick_broadcast_exit();
--
- 	cpu_pm_exit();
- 	tegra_clear_cpu_in_lp2();
- 
-@@ -61,6 +57,13 @@ static int tegra114_idle_power_down(struct cpuidle_device *dev,
- 
- 	return index;
- }
-+
-+static void tegra114_idle_enter_freeze(struct cpuidle_device *dev,
-+				       struct cpuidle_driver *drv,
-+				       int index)
-+{
-+       tegra114_idle_power_down(dev, drv, index);
-+}
- #endif
- 
- static struct cpuidle_driver tegra_idle_driver = {
-@@ -72,8 +75,10 @@ static struct cpuidle_driver tegra_idle_driver = {
- #ifdef CONFIG_PM_SLEEP
- 		[1] = {
- 			.enter			= tegra114_idle_power_down,
-+			.enter_freeze		= tegra114_idle_enter_freeze,
- 			.exit_latency		= 500,
- 			.target_residency	= 1000,
-+			.flags			= CPUIDLE_FLAG_TIMER_STOP,
- 			.power_usage		= 0,
- 			.name			= "powered-down",
- 			.desc			= "CPU power gated",
 -- 
-2.4.1
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
