@@ -1,67 +1,123 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Tue, 19 May 2015 18:12:18 -0500
-Subject: [PATCHv3 2/4] clk: socfpga: add a clock driver for the Arria
- 10 platform
-In-Reply-To: <555BB016.8000506@codeaurora.org>
-References: <1431011523-10049-1-git-send-email-dinguyen@opensource.altera.com>
- <1431011523-10049-3-git-send-email-dinguyen@opensource.altera.com>
- <20150516005235.GP31753@codeaurora.org>
- <555B64FE.40104@opensource.altera.com> <555BB016.8000506@codeaurora.org>
-Message-ID: <555BC352.4000302@opensource.altera.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 19 May 2015 18:14:56 -0500
+Subject: [PATCH 2/2] PCI: iproc: add bcma pcie driver
+In-Reply-To: <55539B63.2060203@hauke-m.de>
+References: <1431465781-10753-1-git-send-email-hauke@hauke-m.de>
+ <1431465781-10753-3-git-send-email-hauke@hauke-m.de>
+ <CACna6rxVpJ-4b_5jG91JN62jQHh8u=QaLpO+_7J9mFr+_ScPaA@mail.gmail.com>
+ <5553742E.7070204@broadcom.com>
+ <CACna6rzT=218pQk9M6NJWH51wszn=p0LmHrizrvV9Xkn-=Om3Q@mail.gmail.com>
+ <55537C43.4050606@broadcom.com> <55539B63.2060203@hauke-m.de>
+Message-ID: <20150519231456.GX31666@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 5/19/15 4:50 PM, Stephen Boyd wrote:
-> On 05/19/15 09:29, Dinh Nguyen wrote:
->>
->> On 5/15/15 7:52 PM, Stephen Boyd wrote:
->>> On 05/07, dinguyen at opensource.altera.com wrote:
->>>> +
->>>> +static int socfpga_clk_prepare(struct clk_hw *hwclk)
->>>> +{
->>>> +	struct socfpga_gate_clk *socfpgaclk = to_socfpga_gate_clk(hwclk);
->>>> +	struct regmap *sys_mgr_base_addr;
->>>> +	int i;
->>>> +	u32 hs_timing;
->>>> +	u32 clk_phase[2];
->>>> +
->>>> +	if (socfpgaclk->clk_phase[0] || socfpgaclk->clk_phase[1]) {
->>>> +		sys_mgr_base_addr = syscon_regmap_lookup_by_compatible("altr,sys-mgr");
->>>> +		if (IS_ERR(sys_mgr_base_addr)) {
->>> Is there a reason the syscon is grabbed lazily in prepare? Why
->>> not get it before registering this clock?
->> This syscon node is only associated with clocks that have a clk-phase
->> property, which on the SoCFPGA platform, is the SD/MMC clocks. The way
->> to implement this went through quite a few rounds of discussion for the
->> Cyclone5/Arria5 platform before settling to this method.
->>
->> The reason why syscon is grabbed here is that the setting of the clock
->> phase must be done before enabling of the clock, so it seem that prepare
->> was a good place. Should this be move moved to the socfpga_gate_init()
->> instead?
+On Wed, May 13, 2015 at 08:43:47PM +0200, Hauke Mehrtens wrote:
+> On 05/13/2015 06:30 PM, Ray Jui wrote:
+> > Hi Rafal,
+> > 
+> > On 5/13/2015 9:19 AM, Rafa? Mi?ecki wrote:
+> >> On 13 May 2015 at 17:56, Ray Jui <rjui@broadcom.com> wrote:
+> >>> On 5/12/2015 11:27 PM, Rafa? Mi?ecki wrote:
+> >>>> On 12 May 2015 at 23:23, Hauke Mehrtens <hauke@hauke-m.de> wrote:
+> >>>>> This driver adds support for the PCIe 2.0 controller found on the bcma
+> >>>>> bus. This controller can be found on (mostly) all Broadcom BCM470X /
+> >>>>> BCM5301X ARM SoCs.
+> >>>>>
+> >>>>> The driver found in the Broadcom SDK does some more stuff, like setting
+> >>>>> up some DMA memory areas, chaining MPS and MRRS to 512 and also some
+> >>>>> PHY changes like "improving" the PCIe jitter and doing some special
+> >>>>> initializations for the 3rd PCIe port.
+> >>>>>
+> >>>>> This was tested on a bcm4708 board with 2 PCIe ports and wireless cards
+> >>>>> connected to them.
+> >>>>>
+> >>>>> PCI_DOMAINS is needed by this driver, because normally there is more
+> >>>>> than one PCIe controller and without PCI_DOMAINS only the first
+> >>>>> controller gets registered.
+> >>>>> This controller gets 6 IRQs, the last one is trigged by all IRQ events.
+> >>>>>
+> >>>>> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+> >>>>
+> >>>> Acked-by: Rafa? Mi?ecki <zajec5@gmail.com>
+> >>>>
+> >>>>
+> >>>>> +static int iproc_pcie_bcma_probe(struct bcma_device *bdev)
+> >>>>> +{
+> >>>>> +       struct iproc_pcie *pcie;
+> >>>>> +       LIST_HEAD(res);
+> >>>>> +       struct resource res_mem;
+> >>>>> +       int ret;
+> >>>>> +
+> >>>>> +       pcie = devm_kzalloc(&bdev->dev, sizeof(*pcie), GFP_KERNEL);
+> >>>>> +       if (!pcie)
+> >>>>> +               return -ENOMEM;
+> >>>>> +
+> >>>>> +       pcie->dev = &bdev->dev;
+> >>>>> +       bcma_set_drvdata(bdev, pcie);
+> >>>>> +
+> >>>>> +       pcie->base = bdev->io_addr;
+> >>>>> +
+> >>>>> +       res_mem.start = bdev->addr_s[0];
+> >>>>> +       res_mem.end = bdev->addr_s[0] + SZ_128M - 1;
+> >>>>> +       res_mem.name = "PCIe MEM space";
+> >>>>> +       res_mem.flags = IORESOURCE_MEM;
+> >>>>> +       pci_add_resource(&res, &res_mem);
+> >>>>> +
+> >>>>> +       pcie->resources = &res;
+> >>>>> +
+> >>>>> +       pcie->map_irq = iproc_pcie_bcma_map_irq;
+> >>>>> +
+> >>>>> +       ret = iproc_pcie_setup(pcie);
+> >>>>
+> >>>> I think I don't like this part of iproc design. It lefts
+> >>>> pcie->resources pointing to some random memory after the setup/probe
+> >>>> are done. Guess it should be a separated parameter or sth.
+> >>>>
+> >>>> The patch is still OK, I just refer to generic iproc possible issue.
+> >>>>
+> >>> Sorry Rafal, but could you please be more specific on this?
+> >>
+> >> iproc_pcie_pltfm_probe (and iproc_pcie_bcma_probe) have local "res"
+> >> variable (each its own). They do:
+> >> pcie->resources = &res;
+> >> and then they call
+> >> iproc_pcie_setup(pcie);
+> >>
+> >> After iproc_pcie_pltfm_probe / iproc_pcie_bcma_probe returns, the
+> >> pointer pcie->resources is not valid anymore, yet pcie struct is still
+> >> in use. Of course pcie->resources isn't used anymore, but still, it's
+> >> some in-struct pointer (to the random memory since local variable is
+> >> not accessible anymore).
+> >>
+> >> I think you should drop
+> >> struct list_head *resources;
+> >> from the struct iproc_pcie and use
+> >> iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *resources)
+> >>
+> > 
+> > Okay thanks. That makes sense.
+> > 
+> > Or I should keep a copy of the resources under pcie->resources. In the
+> > current pcie-iproc.c, the resource is not used anywhere else except when
+> > creating the root bus under iproc_pcie_setup. But in the future, I might
+> > need to add more code to explicitly program the outbound/inbound windows
+> > so this driver can work with some other iProc SoCs where the desired
+> > windows do not match power-on-reset values.
+> > 
+> > I plan to change this along with the window programming patch in the
+> > future. I also think Hauke's current patch is fine.
+> > 
+> > Thanks,
+> > 
+> > Ray
+> > 
+> I think parts of this resources are allocated and never freed.
 > 
-> I was expecting the regmap to be found before the clock is registered
-> and stored away into the  socfpga_gate_clk structure. Getting the regmap
-> during prepare is akin to ioremapping a register region during prepare,
-> which doesn't sound right at all. Maybe there's some good reason in the
-> earlier discussions? Any hints?
-> 
+> pci_add_resource() allocates some bytes, but I do not see where they are
+> freed, this also applies to the platform driver.
 
-Ah okay, the earlier discussions revolve mainly around moving the regmap
-from the SD/MMC driver into the clock driver. But there weren't any
-issue raised for putting the regmap in the prepare function.
+Where are we on this patch?  I see Ray's ack for [1/2], and a "I think the
+current patch is fine"; is that an ack for [2/2] as well?
 
-If you're curious, here are the links to the discussion for adding the
-clk-phase to the driver:
-
-http://archive.arm.linux.org.uk/lurker/message/20131212.203042.d37c8ee9.en.html
-
-http://archive.arm.linux.org.uk/lurker/message/20140109.213116.1f13b27a.en.html
-
-But perhaps putting the regmap lookup in the init function is the
-correct way to do this?
-
-Thanks,
-Dinh
+Bjorn
