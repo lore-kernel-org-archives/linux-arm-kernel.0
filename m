@@ -1,35 +1,100 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 19 May 2015 16:54:56 +0800
-Subject: [PATCHv2 00/12] arm/arm64: Unify PSCI client support
-In-Reply-To: <1431945503-6939-1-git-send-email-mark.rutland@arm.com>
-References: <1431945503-6939-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <555AFA60.2070008@linaro.org>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 19 May 2015 17:54:02 +0900
+Subject: [PATCH v3] serial: 8250_uniphier: add UniPhier serial driver
+In-Reply-To: <CABuKBeJwOp3Km=Vw+xn8cRtH8DC-TNB_m7s8WSdPxzKHdzrdcw@mail.gmail.com>
+References: <1431997900-18390-1-git-send-email-yamada.masahiro@socionext.com>
+ <CABuKBeJwOp3Km=Vw+xn8cRtH8DC-TNB_m7s8WSdPxzKHdzrdcw@mail.gmail.com>
+Message-ID: <CAK7LNARrjkCcMsVJwe5hdB71QsEQAf51sNf4xYVMkNazdbdxKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?05?18? 18:38, Mark Rutland wrote:
-> This series unifies the 32-bit and 64-bit PSCI client code, moving the bulk of
-> the FW invocation and probing out to a common locaiton in drivers/firmware.
-> As part of this, the remaining edge cases for PSCI 0.2 (Trusted OSs rejecting
-> CPU_OFF) are accounted for, maknig both 32-bit adn 64-bit clients more robust.
+Hi Matthias,
+
+2015-05-19 17:22 GMT+09:00 Matthias Brugger <matthias.bgg@gmail.com>:
+> 2015-05-19 3:11 GMT+02:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+>> Add the driver for on-chip UART used on UniPhier SoCs.
+>>
+>> This hardware is similar to 8250 with a slightly different register
+>> mapping, so it should go into drivers/tty/serial/8250 directory.
 >
-> This results in a reasonable saving in terms of lines of code, and will allow
-> for PSCI 1.0 support to be unified form the beginning, avoiding further
-> duplication.
+> The patch is for a driver in this folder, so no need to but it in the
+> commit message.
+> Instead just write a short description about the difference to a
+> standard 8250 device.
 >
-> The series is based on v4.1-rc3.
+>>
+>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>> ---
+>>
+>> Changes in v3:
+>>   - Just add *_SHIFT macro for the special case
+>>
+>> Changes in v2:
+>>   - Drop unnecessary #include <linux/init.h>
+>>   - Sort includes in alphabetical order
+>>   - Use devm_clk_get() rather than of_clk_get()
+>>   - Delete unneeded clk_put() from uniphier_uart_remove callback
+>>   - Delete unneeded IS_ERR_OR_NULL check from uniphier_uart_remove callback
+>>   - Use UNIPHIER_UART_*_SHIFT instead of hard-coded shift values
+>>   - Change the first argument type of uniphier_of_serial_setup()
+>>     from (struct platform_device *) to (struct device *) for code-cleanup.
+>>
+>>  drivers/tty/serial/8250/8250_uniphier.c | 237 ++++++++++++++++++++++++++++++++
+>>  drivers/tty/serial/8250/Kconfig         |   7 +
+>>  drivers/tty/serial/8250/Makefile        |   1 +
+>>  3 files changed, 245 insertions(+)
+>>  create mode 100644 drivers/tty/serial/8250/8250_uniphier.c
+>>
+>> diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
+>> new file mode 100644
+>> index 0000000..50349bf
+>> --- /dev/null
+>> +++ b/drivers/tty/serial/8250/8250_uniphier.c
+>> @@ -0,0 +1,237 @@
+>> +/*
+>> + * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#include <linux/clk.h>
+>> +#include <linux/io.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/serial_8250.h>
+>> +#include <linux/serial_core.h>
+>> +#include <linux/serial_reg.h>
+>> +#include "8250.h"
+>> +
+>> +/* Most (but not all) of UniPhier UART devices have 64-depth FIFO. */
+>> +#define UNIPHIER_UART_DEFAULT_FIFO_SIZE        64
+>> +
+>> +#define UNIPHIER_UART_CHAR_FCR 3       /* Character / FIFO Control Register */
+>> +#define UNIPHIER_UART_LCR_MCR  4       /* Line/Modem Control Register */
+>> +#define     UNIPHIER_UART_LCR_SHIFT    8
+>> +#define UNIPHIER_UART_DLR      9       /* Divisor Latch Register */
+>
+> Nit pick: Please fix identation. After "define" just put one blank.
+> I personally prefer that the define values are aligned by tabs, but
+> that's up tu you.
+>
 
-Before I review this patch set,  I applied this patch set on
-top of v4.1-rc3 (and adding some SBSA uart patches), compiled both
-ok with ACPI=y/n on ARM64, and this patch set:
-   - booted ok with SMP with ACPI on ARM64;
-   - after boot, I do cpu hotplug operations for CPUs
-     (echo 0/1 > cpu*/online) , and it works pretty fine, so PSCI
-     CPU_ON/OFF works.
+I intentionally use deeper indentation for *_SHIFT
+because I want to clearly show  UNIPHIER_UART_LCR_SHIFT
+belongs to UNIPHIER_UART_LCR_MCR register.
 
-For this patch set:
+I also want to describe them within 80 columns including comments,
+so I cannot insert extra TABs to align the values.
 
-Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-
-Thanks
-Hanjun
+-- 
+Best Regards
+Masahiro Yamada
