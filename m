@@ -1,160 +1,173 @@
 From: timo.kokkonen@offcode.fi (Timo Kokkonen)
-Date: Tue, 19 May 2015 11:26:08 +0300
-Subject: [PATCHv8 09/10] watchdog: imx2_wdt: Convert to use new core extensions
+Date: Tue, 19 May 2015 11:26:03 +0300
+Subject: [PATCHv8 04/10] watchdog: core: Allow extending early timeout
 In-Reply-To: <1432023969-20736-1-git-send-email-timo.kokkonen@offcode.fi>
 References: <1432023969-20736-1-git-send-email-timo.kokkonen@offcode.fi>
-Message-ID: <1432023969-20736-10-git-send-email-timo.kokkonen@offcode.fi>
+Message-ID: <1432023969-20736-5-git-send-email-timo.kokkonen@offcode.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fill in the HW capabilities in watchdog_device structure and call
-watchdgog_init_params() to let watchdog core to init itself
-properly. The watchdog core can then ping stopped watchdog and the
-timer code in the driver can be removed.
+It is possible that the specified watchdog timeout value is shorter
+than the time it takes for the watchdog daemon to start up and take
+over the watchdog device. This is problem if WATCHDOG_BOOT_RUNNING is
+the desired watchdog policy.
+
+Add a new timeout value that specifies how long kernel should extend
+the timeout by pinging the watchdog hardware. This option still
+ensures a watchdog reset takes place in case watchdog daemon fails to
+open the device, but gives more freedom in case user space is slow
+starting up and watchdog might trigger prematurely.
 
 Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
 ---
- drivers/watchdog/imx2_wdt.c | 49 ++++++++++-----------------------------------
- 1 file changed, 11 insertions(+), 38 deletions(-)
+ drivers/watchdog/Kconfig         | 21 +++++++++++++++++++++
+ drivers/watchdog/watchdog_core.c | 37 +++++++++++++++++++++++++++++++++----
+ drivers/watchdog/watchdog_dev.c  |  4 ++++
+ include/linux/watchdog.h         |  1 +
+ 4 files changed, 59 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
-index 48fcce8..7af4d0f 100644
---- a/drivers/watchdog/imx2_wdt.c
-+++ b/drivers/watchdog/imx2_wdt.c
-@@ -62,7 +62,6 @@
- struct imx2_wdt_device {
- 	struct clk *clk;
- 	struct regmap *regmap;
--	struct timer_list timer;	/* Pings the watchdog when closed */
- 	struct watchdog_device wdog;
- 	struct notifier_block restart_handler;
- };
-@@ -151,21 +150,13 @@ static int imx2_wdt_ping(struct watchdog_device *wdog)
- 	return 0;
- }
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index 0066d6d..33f2f9c 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -96,6 +96,27 @@ config WATCHDOG_BOOT_NOTOUCH
  
--static void imx2_wdt_timer_ping(unsigned long arg)
--{
--	struct watchdog_device *wdog = (struct watchdog_device *)arg;
--	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
--
--	/* ping it every wdog->timeout / 2 seconds to prevent reboot */
--	imx2_wdt_ping(wdog);
--	mod_timer(&wdev->timer, jiffies + wdog->timeout * HZ / 2);
--}
--
- static int imx2_wdt_set_timeout(struct watchdog_device *wdog,
- 				unsigned int new_timeout)
+ endchoice
+ 
++config WATCHDOG_EARLY_TIMEOUT_SEC
++	int "Extend watchdog early timeout"
++	depends on WATCHDOG_BOOT_RUNNING
++	default "0"
++	help
++	  When WATCHDOG_BOOT_RUNNIN policy is selected the default
++	  behavior is to start up or keep the watchdog hardware
++	  running during boot up. In some cases the boot up time for
++	  the userspace might be too long for the watchdog daemon to
++	  take over the watchdog device in time, which might lead to
++	  premature device reset.
++
++	  This option specifies how long should the watchdog core keep
++	  the watchdog hardware running before the device is
++	  opened. Should there be a crash that prevents the daemon
++	  from starting up, a normal watchdog reset occurs once the
++	  initial timeout expires. Normal timeout limits apply once
++	  watchdog daemon opens the device.
++
++	  The timeout value is in seconds.
++
+ #
+ # General Watchdog drivers
+ #
+diff --git a/drivers/watchdog/watchdog_core.c b/drivers/watchdog/watchdog_core.c
+index 9ae5b8e..7bf0e1e 100644
+--- a/drivers/watchdog/watchdog_core.c
++++ b/drivers/watchdog/watchdog_core.c
+@@ -141,6 +141,7 @@ static void watchdog_set_default_timeout(struct watchdog_device *wdd,
+  */
+ int watchdog_init_params(struct watchdog_device *wdd, struct device *dev)
  {
- 	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
++	unsigned int t = 0;
+ 	int ret = 0;
  
-+	wdog->hw_heartbeat = new_timeout / 2 * 1000;
-+	wdog->timeout = new_timeout;
- 	regmap_update_bits(wdev->regmap, IMX2_WDT_WCR, IMX2_WDT_WCR_WT,
- 			   WDOG_SEC_TO_COUNT(new_timeout));
- 	return 0;
-@@ -176,8 +167,6 @@ static int imx2_wdt_start(struct watchdog_device *wdog)
- 	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
+ 	watchdog_set_default_timeout(wdd, dev);
+@@ -148,6 +149,13 @@ int watchdog_init_params(struct watchdog_device *wdd, struct device *dev)
+ 	if (wdd->max_timeout)
+ 		dev_err(dev, "Driver setting deprecated max_timeout, please fix\n");
  
- 	if (imx2_wdt_is_running(wdev)) {
--		/* delete the timer that pings the watchdog after close */
--		del_timer_sync(&wdev->timer);
- 		imx2_wdt_set_timeout(wdog, wdog->timeout);
- 	} else
- 		imx2_wdt_setup(wdog);
-@@ -187,12 +176,7 @@ static int imx2_wdt_start(struct watchdog_device *wdog)
++	wdd->early_timeout_sec = -1;
++#ifdef CONFIG_WATCHDOG_EARLY_TIMEOUT_SEC
++	wdd->early_timeout_sec = CONFIG_WATCHDOG_EARLY_TIMEOUT_SEC;
++#endif
++	if (!of_property_read_u32(dev->of_node, "early-timeout-sec", &t))
++		wdd->early_timeout_sec = t;
++
+ 	if (!wdd->hw_max_timeout)
+ 		return -EINVAL;
  
- static int imx2_wdt_stop(struct watchdog_device *wdog)
- {
--	/*
--	 * We don't need a clk_disable, it cannot be disabled once started.
--	 * We use a timer to ping the watchdog while /dev/watchdog is closed
--	 */
--	imx2_wdt_timer_ping((unsigned long)wdog);
--	return 0;
-+	return -ENOTSUPP;
- }
+@@ -161,12 +169,16 @@ static void watchdog_worker(struct work_struct *work)
+ 						struct watchdog_device, work);
+ 	bool stopped_keepalive;
+ 	bool extend_keepalive;
++	bool early_timeout_keepalive;
  
- static inline void imx2_wdt_ping_if_active(struct watchdog_device *wdog)
-@@ -201,7 +185,7 @@ static inline void imx2_wdt_ping_if_active(struct watchdog_device *wdog)
+ 	mutex_lock(&wdd->lock);
  
- 	if (imx2_wdt_is_running(wdev)) {
- 		imx2_wdt_set_timeout(wdog, wdog->timeout);
--		imx2_wdt_timer_ping((unsigned long)wdog);
-+		imx2_wdt_ping(wdog);
- 	}
- }
+ 	/* Watchdog device is not open but HW does not support stopping */
+ 	stopped_keepalive = watchdog_hw_active(wdd) &&
+-		!watchdog_dev_open(wdd);
++		!watchdog_dev_open(wdd) && (wdd->early_timeout_sec < 0);
++
++	early_timeout_keepalive = wdd->early_timeout_sec >= 0 &&
++		time_before(jiffies, wdd->expires);
  
-@@ -256,6 +240,8 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
- 	wdog->ops		= &imx2_wdt_ops;
- 	wdog->min_timeout	= 1;
- 	wdog->max_timeout	= IMX2_WDT_MAX_TIME;
-+	wdog->hw_max_timeout	= wdog->max_timeout * 1000;
-+	watchdog_set_hw_active(wdog, imx2_wdt_is_running(wdev));
- 
- 	clk_prepare_enable(wdev->clk);
- 
-@@ -267,12 +253,12 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
- 		dev_warn(&pdev->dev, "Initial timeout out of range! Clamped from %u to %u\n",
- 			 timeout, wdog->timeout);
- 
-+	wdog->timeout = timeout;
-+	wdog->hw_heartbeat = timeout * 1000 / 2;
- 	platform_set_drvdata(pdev, wdog);
- 	watchdog_set_drvdata(wdog, wdev);
- 	watchdog_set_nowayout(wdog, nowayout);
--	watchdog_init_timeout(wdog, timeout, &pdev->dev);
--
--	setup_timer(&wdev->timer, imx2_wdt_timer_ping, (unsigned long)wdog);
-+	watchdog_init_params(wdog, &pdev->dev);
- 
- 	imx2_wdt_ping_if_active(wdog);
- 
-@@ -311,7 +297,6 @@ static int __exit imx2_wdt_remove(struct platform_device *pdev)
- 	watchdog_unregister_device(wdog);
- 
- 	if (imx2_wdt_is_running(wdev)) {
--		del_timer_sync(&wdev->timer);
- 		imx2_wdt_ping(wdog);
- 		dev_crit(&pdev->dev, "Device removed: Expect reboot!\n");
- 	}
-@@ -325,10 +310,9 @@ static void imx2_wdt_shutdown(struct platform_device *pdev)
- 
- 	if (imx2_wdt_is_running(wdev)) {
- 		/*
--		 * We are running, we need to delete the timer but will
--		 * give max timeout before reboot will take place
-+		 * We are running, give max timeout before reboot will
-+		 * take place
- 		 */
--		del_timer_sync(&wdev->timer);
- 		imx2_wdt_set_timeout(wdog, IMX2_WDT_MAX_TIME);
- 		imx2_wdt_ping(wdog);
- 		dev_crit(&pdev->dev, "Device shutdown: Expect reboot!\n");
-@@ -346,10 +330,6 @@ static int imx2_wdt_suspend(struct device *dev)
- 	if (imx2_wdt_is_running(wdev)) {
- 		imx2_wdt_set_timeout(wdog, IMX2_WDT_MAX_TIME);
- 		imx2_wdt_ping(wdog);
--
--		/* The watchdog is not active */
--		if (!watchdog_hw_active(wdog))
--			del_timer_sync(&wdev->timer);
+ 	/* Keepalive time is longer than what hardware is capable */
+ 	extend_keepalive = watchdog_dev_open(wdd) &&
+@@ -181,7 +193,7 @@ static void watchdog_worker(struct work_struct *work)
+ 		return;
  	}
  
- 	clk_disable_unprepare(wdev->clk);
-@@ -378,13 +358,6 @@ static int imx2_wdt_resume(struct device *dev)
- 		/* Resuming from non-deep sleep state. */
- 		imx2_wdt_set_timeout(wdog, wdog->timeout);
- 		imx2_wdt_ping(wdog);
--		/*
--		 * But the watchdog is not active, then start
--		 * the timer again.
--		 */
--		if (!watchdog_hw_active(wdog))
--			mod_timer(&wdev->timer,
--				  jiffies + wdog->timeout * HZ / 2);
- 	}
+-	if (stopped_keepalive || extend_keepalive) {
++	if (stopped_keepalive || extend_keepalive || early_timeout_keepalive) {
+ 		unsigned long expires = msecs_to_jiffies(wdd->hw_heartbeat);
  
- 	return 0;
+ 		_watchdog_ping(wdd);
+@@ -206,11 +218,28 @@ static int prepare_watchdog(struct watchdog_device *wdd)
+ 	watchdog_policy_start = IS_ENABLED(CONFIG_WATCHDOG_BOOT_RUNNING);
+ 	watchdog_policy_stop = IS_ENABLED(CONFIG_WATCHDOG_BOOT_STOPPED);
+ 
++	if (wdd->early_timeout_sec >= 0)
++		watchdog_policy_start = true;
++
++	if (wdd->early_timeout_sec > 0)
++		wdd->expires = jiffies + wdd->early_timeout_sec * HZ;
++
+ 	if (!watchdog_hw_active(wdd) && watchdog_policy_stop)
+ 		return 0;
+ 
+-	if (watchdog_policy_start && !watchdog_hw_active(wdd))
+-		return watchdog_start(wdd);
++	if (watchdog_policy_start && !watchdog_hw_active(wdd)) {
++		int ret;
++
++		ret = watchdog_start(wdd);
++
++		if (wdd->early_timeout_sec > 0) {
++			wdd->expires = jiffies + wdd->early_timeout_sec * HZ;
++			schedule_delayed_work(&wdd->work,
++					msecs_to_jiffies(wdd->hw_heartbeat));
++		}
++
++		return ret;
++	}
+ 
+ 	if (watchdog_policy_stop && watchdog_hw_active(wdd))
+ 		return watchdog_stop(wdd);
+diff --git a/drivers/watchdog/watchdog_dev.c b/drivers/watchdog/watchdog_dev.c
+index ac17668..0310eda 100644
+--- a/drivers/watchdog/watchdog_dev.c
++++ b/drivers/watchdog/watchdog_dev.c
+@@ -122,6 +122,10 @@ int watchdog_start(struct watchdog_device *wddev)
+ 		set_bit(WDOG_ACTIVE, &wddev->status);
+ 
+ out_started:
++	/* Once we open the device, early timeout can be disabled */
++	if (wddev->early_timeout_sec >= 0 && watchdog_dev_open(wddev))
++		wddev->early_timeout_sec = -1;
++
+ out_no_start:
+ 	mutex_unlock(&wddev->lock);
+ 	return err;
+diff --git a/include/linux/watchdog.h b/include/linux/watchdog.h
+index 03f0553..b746f7c 100644
+--- a/include/linux/watchdog.h
++++ b/include/linux/watchdog.h
+@@ -96,6 +96,7 @@ struct watchdog_device {
+ 	struct mutex lock;
+ 	struct delayed_work work;  /* keepalive worker */
+ 	unsigned long int expires; /* for keepalive worker */
++	int early_timeout_sec;
+ 	unsigned long status;
+ /* Bit numbers for status flags */
+ #define WDOG_ACTIVE		0	/* Is the watchdog hw running/active */
 -- 
 2.1.0
