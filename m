@@ -1,69 +1,97 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 19 May 2015 10:16:03 +0200
-Subject: [PATCH v8 09/16] clockevents/drivers: Add STM32 Timer driver
-In-Reply-To: <CALszF6CK7axU0qrWNf38aqrt2R2126ZACn7wx5jNY_1KE+4H+g@mail.gmail.com>
-References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>	<1431158038-3813-10-git-send-email-mcoquelin.stm32@gmail.com>	<5559E4B0.70506@linaro.org>
- <CALszF6CK7axU0qrWNf38aqrt2R2126ZACn7wx5jNY_1KE+4H+g@mail.gmail.com>
-Message-ID: <555AF143.2060807@linaro.org>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 19 May 2015 16:17:58 +0800
+Subject: [PATCHv2 03/12] arm64: smp: consistently use error codes
+In-Reply-To: <1431945503-6939-4-git-send-email-mark.rutland@arm.com>
+References: <1431945503-6939-1-git-send-email-mark.rutland@arm.com>
+ <1431945503-6939-4-git-send-email-mark.rutland@arm.com>
+Message-ID: <555AF1B6.5040401@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/18/2015 04:03 PM, Maxime Coquelin wrote:
-> 2015-05-18 15:10 GMT+02:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
->> On 05/09/2015 09:53 AM, Maxime Coquelin wrote:
->>>
->>> STM32 MCUs feature 16 and 32 bits general purpose timers with prescalers.
->>> The drivers detects whether the time is 16 or 32 bits, and applies a
->>> 1024 prescaler value if it is 16 bits.
->>>
->>> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
->>> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
->>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->>> ---
->>>    drivers/clocksource/Kconfig       |   8 ++
->>>    drivers/clocksource/Makefile      |   1 +
->>>    drivers/clocksource/timer-stm32.c | 184
->>> ++++++++++++++++++++++++++++++++++++++
->>>    3 files changed, 193 insertions(+)
->>>    create mode 100644 drivers/clocksource/timer-stm32.c
->>>
->>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
->>> index bf9364c..2443520 100644
->>> --- a/drivers/clocksource/Kconfig
->>> +++ b/drivers/clocksource/Kconfig
->>> @@ -106,6 +106,14 @@ config CLKSRC_EFM32
->>>            Support to use the timers of EFM32 SoCs as clock source and
->>> clock
->>>            event device.
->>>
->>> +config CLKSRC_STM32
->>> +       bool "Clocksource for STM32 SoCs" if !ARCH_STM32
->>> +       depends on OF && ARM && (ARCH_STM32 || COMPILE_TEST)
->>
->>
->> Are the interactive bool and the 'COMPILE_TEST' necessary ?
->>
+On 2015?05?18? 18:38, Mark Rutland wrote:
+> cpu_kill currently returns one for success and zero for failure, which
+> is unlike all the other cpu_operations, which return zero for success
+> and an error code upon failure. This difference is unnecessarily
+> confusing.
 >
-> The interactive bool is necessary if we want to be able to
-> select/deselect it in COMPILE_TEST configuration.
-> And personnaly, I think COMPILE_TEST use makes sense.
+> Make cpu_kill consistent with the other cpu_operations.
 >
-> Note that other timer drivers are doing the same thing today
-> (CLKSRC_EFM32, SH_TIMER_CMT, EM_TIMER_STI...).
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>   arch/arm64/kernel/psci.c |  7 +++----
+>   arch/arm64/kernel/smp.c  | 10 +++++++---
+>   2 files changed, 10 insertions(+), 7 deletions(-)
 >
-> Do you have a specific concern regarding COMPILE_TEST?
+> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+> index ea18cb5..10fa25e 100644
+> --- a/arch/arm64/kernel/psci.c
+> +++ b/arch/arm64/kernel/psci.c
+> @@ -498,7 +498,7 @@ static int cpu_psci_cpu_kill(unsigned int cpu)
+>   	int err, i;
+>
+>   	if (!psci_ops.affinity_info)
+> -		return 1;
+> +		return 0;
+>   	/*
+>   	 * cpu_kill could race with cpu_die and we can
+>   	 * potentially end up declaring this cpu undead
+> @@ -509,7 +509,7 @@ static int cpu_psci_cpu_kill(unsigned int cpu)
+>   		err = psci_ops.affinity_info(cpu_logical_map(cpu), 0);
+>   		if (err == PSCI_0_2_AFFINITY_LEVEL_OFF) {
+>   			pr_info("CPU%d killed.\n", cpu);
+> -			return 1;
+> +			return 0;
+>   		}
+>
+>   		msleep(10);
+> @@ -518,8 +518,7 @@ static int cpu_psci_cpu_kill(unsigned int cpu)
+>
+>   	pr_warn("CPU%d may not have shut down cleanly (AFFINITY_INFO reports %d)\n",
+>   			cpu, err);
+> -	/* Make op_cpu_kill() fail. */
+> -	return 0;
+> +	return -ETIMEDOUT;
+>   }
+>   #endif
+>   #endif
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index 2cb0081..3799df2 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -248,7 +248,7 @@ static int op_cpu_kill(unsigned int cpu)
+>   	 * time and hope that it's dead, so let's skip the wait and just hope.
+>   	 */
+>   	if (!cpu_ops[cpu]->cpu_kill)
+> -		return 1;
+> +		return 0;
+>
+>   	return cpu_ops[cpu]->cpu_kill(cpu);
+>   }
+> @@ -261,6 +261,8 @@ static DECLARE_COMPLETION(cpu_died);
+>    */
+>   void __cpu_die(unsigned int cpu)
+>   {
+> +	int err;
+> +
+>   	if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(5000))) {
+>   		pr_crit("CPU%u: cpu didn't die\n", cpu);
+>   		return;
+> @@ -273,8 +275,10 @@ void __cpu_die(unsigned int cpu)
+>   	 * verify that it has really left the kernel before we consider
+>   	 * clobbering anything it might still be using.
+>   	 */
+> -	if (!op_cpu_kill(cpu))
+> -		pr_warn("CPU%d may not have shut down cleanly\n", cpu);
+> +	err = op_cpu_kill(cpu);
+> +	if (err)
+> +		pr_warn("CPU%d may not have shut down cleanly: %d\n",
+> +			cpu, err);
+>   }
 
-Actually, we try to keep the timer selection non-interactive and let the 
-platform's Kconfig to select the timer.
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-I like when the code is consistent. The COMPILE_TEST was introduced and 
-created a precedence. I would like to get rid of the interactive timer 
-selection but I did not have time to go through this yet.
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Thanks
+Hanjun
