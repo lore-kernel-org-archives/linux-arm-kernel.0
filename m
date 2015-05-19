@@ -1,57 +1,47 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 May 2015 15:36:06 +0200
-Subject: [PATCH] [RESEND] SCSI: initio: remove duplicate module device table
-Message-ID: <11814945.RJWVP7jqUX@wuerfel>
+Date: Tue, 19 May 2015 15:40:37 +0200
+Subject: [PATCH v2] ARM: shmobile: only select sound drivers that build
+Message-ID: <2384220.GLN49TmlTT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The initio driver has for many years had two copies of the
-same module device table. One of them is also used for registering
-the other driver, the other one is entirely useless after the
-large scale cleanup that Alan Cox did back in 2007.
+A couple of codec drivers are selected by shmobile platform code,
+but depend on I2C, which results in a build error:
 
-The compiler warns about this whenever the driver is built-in:
+sound/soc/codecs/ak4642.c:638:1: warning: data definition has no type or storage class
+ module_i2c_driver(ak4642_i2c_driver);
+ ^
+sound/soc/codecs/ak4642.c:638:1: error: type defaults to 'int' in declaration of 'module_i2c_driver' [-Werror=implicit-int]
+sound/soc/codecs/ak4642.c:638:1: warning: parameter names (without types) in function declaration
+sound/soc/codecs/ak4642.c:627:26: warning: 'ak4642_i2c_driver' defined but not used [-Wunused-variable]
 
-drivers/scsi/initio.c:131:29: warning: 'i91u_pci_devices' defined but not used [-Wunused-variable]
-
-This removes the extraneous table and the warning.
+This ensures that we do not enable the respective drivers when I2C
+is disabled.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 72d39fea901 ("[SCSI] initio: Convert into a real Linux driver and update to modern style")
----
-Submitted in January, but got no reply.
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+----
+v2: removed incorrect change for SND_SOC_AK4554, as pointed out by Geert
 
-diff --git a/drivers/scsi/initio.c b/drivers/scsi/initio.c
-index e5dae7b54d9a..51063177f18e 100644
---- a/drivers/scsi/initio.c
-+++ b/drivers/scsi/initio.c
-@@ -110,11 +110,6 @@
- #define i91u_MAXQUEUE		2
- #define i91u_REVID "Initio INI-9X00U/UW SCSI device driver; Revision: 1.04a"
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 679b866399f2..c4cb4b590d47 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -150,7 +150,7 @@ config MACH_ARMADILLO800EVA
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+ 	select SMSC_PHY if SH_ETH
+-	select SND_SOC_WM8978 if SND_SIMPLE_CARD
++	select SND_SOC_WM8978 if SND_SIMPLE_CARD && I2C
+ 	select USE_OF
  
--#define I950_DEVICE_ID	0x9500	/* Initio's inic-950 product ID   */
--#define I940_DEVICE_ID	0x9400	/* Initio's inic-940 product ID   */
--#define I935_DEVICE_ID	0x9401	/* Initio's inic-935 product ID   */
--#define I920_DEVICE_ID	0x0002	/* Initio's other product ID      */
--
- #ifdef DEBUG_i91u
- static unsigned int i91u_debug = DEBUG_DEFAULT;
- #endif
-@@ -127,17 +122,6 @@ static int setup_debug = 0;
+ config MACH_BOCKW
+@@ -159,7 +159,7 @@ config MACH_BOCKW
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+ 	select SND_SOC_AK4554 if SND_SIMPLE_CARD
+-	select SND_SOC_AK4642 if SND_SIMPLE_CARD
++	select SND_SOC_AK4642 if SND_SIMPLE_CARD && I2C
+ 	select USE_OF
  
- static void i91uSCBPost(u8 * pHcb, u8 * pScb);
- 
--/* PCI Devices supported by this driver */
--static struct pci_device_id i91u_pci_devices[] = {
--	{ PCI_VENDOR_ID_INIT,  I950_DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
--	{ PCI_VENDOR_ID_INIT,  I940_DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
--	{ PCI_VENDOR_ID_INIT,  I935_DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
--	{ PCI_VENDOR_ID_INIT,  I920_DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
--	{ PCI_VENDOR_ID_DOMEX, I920_DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
--	{ }
--};
--MODULE_DEVICE_TABLE(pci, i91u_pci_devices);
--
- #define DEBUG_INTERRUPT 0
- #define DEBUG_QUEUE     0
- #define DEBUG_STATE     0
+ config MACH_BOCKW_REFERENCE
