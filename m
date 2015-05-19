@@ -1,77 +1,81 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 20 May 2015 00:06:22 +0200
-Subject: [PATCH defconfig v8] ARM: vf610m4: add defconfig for Linux on Vybrids
- Cortex-M4
-Message-ID: <1432073182-27114-1-git-send-email-stefan@agner.ch>
+From: lorenx4@gmail.com (Lorenzo Nava)
+Date: Wed, 20 May 2015 00:09:09 +0200
+Subject: [RFC] arm: DMA-API contiguous cacheable memory
+In-Reply-To: <20150519163436.GZ21251@e104818-lin.cambridge.arm.com>
+References: <CAE=W-e24oDH5RZfPftRg_xYBiG+b9Sj09vpyay9EwqOo9cVX1w@mail.gmail.com>
+ <20150519163436.GZ21251@e104818-lin.cambridge.arm.com>
+Message-ID: <CAE=W-e2XJA_d2GSG8wd7jr0nGj6D_juMtr-Wbd6VLLZMOLWr5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add defconfig for Linux on Vybrid (vf610) on the secondary Cortex-
-M4 CPU. The use of a XIP image has been tested which needs to be
-loaded (e.g. using the custom m4boot loader) to the end of the
-available RAM at address 0x8f000000. The Cortex-M4 has a code-alias
-which makes sure that the instructions get fetched through the code
-bus (alias starts at 0x00800000 => 0x80800000 in system address).
-Hence, to get optimal performance, use 0x0f000000 as XIP_PHYS_ADDR.
-This address is additionally shifted by the length of the minimal
-loader which is inserted by m4boot. Currently, this offset is 0x80.
+On Tue, May 19, 2015 at 6:34 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Mon, May 18, 2015 at 10:56:06PM +0200, Lorenzo Nava wrote:
+>> it's been a while since I've started working with DMA on ARM processor
+>> for a smart camera project. Typically the requirements is to have a
+>> large memory area which can be accessed by both DMA and user. I've
+>> already noticed that many people wonder about which would be the best
+>> way to have data received from DMA mapped in user space and, more
+>> important, mapped in a cacheable area of memory. Having a memory
+>> mapped region which is cacheable is very important if the user must
+>> access the data and make some sort of processing on that.
+>> My question is: why don't we introduce a function in the DMA-API
+>> interface for ARM processors which allows to allocate a contiguous and
+>> cacheable area of memory (> 4MB)?
+>> This new function can take advantage of the CMA mechanism as
+>> dma_alloc_coherent() function does, but using different PTE attribute
+>> for the allocated pages. Basically making a function similar to
+>> arm_dma_alloc() and set the attributes differently would do the trick:
+>>
+>> pgprot_t prot = __pgprot_modify(prot, L_PTE_MT_MASK,
+>>         L_PTE_MT_WRITEALLOC | L_PTE_XN)
+>
+> We already have a way to specify whether a device is coherent via the
+> "dma-coherent" DT property. This allows the correct dma_map_ops to be
+> set for a device. For cache coherent devices, the
+> arm_coherent_dma_alloc() and __dma_alloc() should return cacheable
+> memory.
+>
+> However, looking at the code, it seems that __dma_alloc() does not use
+> the CMA when is_coherent == true, though you would hit a limit on the
+> number of pages that can be allocated.
+>
+> As for mmap'ing to user space, there is arm_dma_mmap(). This one sets
+> the vm_page_prot to what __get_dma_pgprot() returns which is always
+> non-cacheable.
+>
+> I haven't checked the history cache coherent DMA support on arm but I
+> think some of the above can be changed. As an example, on arm64
+> __dma_alloc() allocates from CMA independent of whether the device is
+> coherent or not. Also __get_dma_pgprot() returns cacheable attributes
+> for coherent devices, which in turn allows cacheable user mapping of
+> such buffers. You don't really need to implement additional functions,
+> just tweaks to the existing ones.
+>
+> Patches welcome ;)
+>
+> --
+> Catalin
 
-The standard DRAM base address is configured to 0x8C000000, which
-gives the Cortex-M4 48MiB of RAM.
+Thanks for the answer. I do agree with you on that: I'll take a look
+at arm64 code and I'll be glad to contribute with patches as soon as
+possible.
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- arch/arm/configs/vf610m4_defconfig | 42 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
- create mode 100644 arch/arm/configs/vf610m4_defconfig
+Anyway I'd like to focus on a different aspect: I think that this
+solution can manage cache coherent DMA, so devices which guarantees
+the coherency using cache snooping mechanism. However how can I manage
+devices which needs contiguous memory and don't guarantee cache
+coherency? If the device doesn't implement sg functionality, I can't
+allocate buffers which is greater than 4MB because I can't use neither
+dma_alloc_coherent() nor accessing directly to CMA (well, actually I
+can use dma_alloc_coherent(), but it sounds a little bit confusing).
 
-diff --git a/arch/arm/configs/vf610m4_defconfig b/arch/arm/configs/vf610m4_defconfig
-new file mode 100644
-index 0000000..aeb2482
---- /dev/null
-+++ b/arch/arm/configs/vf610m4_defconfig
-@@ -0,0 +1,42 @@
-+CONFIG_NAMESPACES=y
-+CONFIG_BLK_DEV_INITRD=y
-+# CONFIG_RD_BZIP2 is not set
-+# CONFIG_RD_LZMA is not set
-+# CONFIG_RD_XZ is not set
-+# CONFIG_RD_LZ4 is not set
-+CONFIG_KALLSYMS_ALL=y
-+CONFIG_EMBEDDED=y
-+# CONFIG_MMU is not set
-+CONFIG_ARM_SINGLE_ARMV7M=y
-+CONFIG_ARCH_MXC=y
-+CONFIG_SOC_VF610=y
-+CONFIG_SET_MEM_PARAM=y
-+CONFIG_DRAM_BASE=0x8c000000
-+CONFIG_FLASH_MEM_BASE=0x8f000000
-+CONFIG_FLASH_SIZE=0x01000000
-+CONFIG_CMDLINE="console=/dev/ttyLP2"
-+CONFIG_XIP_KERNEL=y
-+CONFIG_XIP_PHYS_ADDR=0x0f000080
-+CONFIG_BINFMT_FLAT=y
-+CONFIG_BINFMT_ZFLAT=y
-+CONFIG_BINFMT_SHARED_FLAT=y
-+# CONFIG_SUSPEND is not set
-+# CONFIG_UEVENT_HELPER is not set
-+# CONFIG_STANDALONE is not set
-+# CONFIG_PREVENT_FIRMWARE_BUILD is not set
-+# CONFIG_FIRMWARE_IN_KERNEL is not set
-+# CONFIG_ALLOW_DEV_COREDUMP is not set
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_BLK_DEV_RAM_COUNT=4
-+# CONFIG_INPUT_MOUSEDEV is not set
-+# CONFIG_KEYBOARD_ATKBD is not set
-+# CONFIG_INPUT_MOUSE is not set
-+# CONFIG_SERIO is not set
-+CONFIG_SERIAL_FSL_LPUART=y
-+CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
-+# CONFIG_HW_RANDOM is not set
-+CONFIG_MFD_SYSCON=y
-+# CONFIG_HID is not set
-+# CONFIG_USB_SUPPORT is not set
-+# CONFIG_MISC_FILESYSTEMS is not set
-+# CONFIG_FTRACE is not set
--- 
-2.4.1
+Do you think that dma_alloc_coherent() can be used as well with this
+type of devices? Do you think that a new dma_alloc_contiguous()
+function would help in this case?
+Maybe my interpretation of dma_alloc_coherent() is not correct, and
+the coherency can be managed using the dma_sync_single_for_* functions
+and it doesn't require hardware mechanism.
+
+Thank you.
+Cheers
