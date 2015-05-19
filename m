@@ -1,29 +1,40 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 19 May 2015 23:32:59 +0200
-Subject: [PATCH v7 08/13] ARM: unify MMU/!MMU addruart calls
-In-Reply-To: <alpine.DEB.2.11.1505192331220.4225@nanos>
-References: <1431769465-26867-1-git-send-email-stefan@agner.ch>
- <2419398.cbLWQC7K5f@wuerfel> <b41ebeb9d62b9c49faec6500f73460b9@agner.ch>
- <5548280.7uBnLuun8k@wuerfel> <0103afd0e9dd50c1bf85153a38a3490f@agner.ch>
- <alpine.DEB.2.11.1505192331220.4225@nanos>
-Message-ID: <84257d3d23dbcc063b6f60e73970cc40@agner.ch>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 19 May 2015 23:34:33 +0200
+Subject: [PATCH] [media] coda: remove extraneous TRACE_SYSTEM_STRING
+Message-ID: <4790110.OLqddgPxAn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-05-19 23:32, Thomas Gleixner wrote:
-> On Tue, 19 May 2015, Stefan Agner wrote:
->> Ok, I will rebase this patchset (06-13) then, send the clocksource patch
->> (07) as a single patch and send the EFM32 convertion patch (10) together
->> with a conversion patch of the other two platforms as a follow-up.
-> 
-> Is the clocksource one independent? Then I can just pick it up now and
-> route it through tip.
+The coda tracing code causes lots of warnings like
 
-With the current Kconfig symbol setup, both should be selected by other
-config symbols (CLKSRC_OF by ARM_SINGLE_ARMV7M and CLKSRC_MMIO by
-ARCH_MXC).
+In file included from /git/arm-soc/include/trace/define_trace.h:90:0,
+                 from /git/arm-soc/drivers/media/platform/coda/trace.h:203,
+                 from /git/arm-soc/drivers/media/platform/coda/coda-bit.c:34:
+/git/arm-soc/include/trace/ftrace.h:28:0: warning: "TRACE_SYSTEM_STRING" redefined
+ #define TRACE_SYSTEM_STRING __app(TRACE_SYSTEM_VAR,__trace_system_name)
+ ^
+In file included from /git/arm-soc/include/trace/define_trace.h:83:0,
+                 from /git/arm-soc/drivers/media/platform/coda/trace.h:203,
+                 from /git/arm-soc/drivers/media/platform/coda/coda-bit.c:34:
+/git/arm-soc/drivers/media/platform/coda/./trace.h:12:0: note: this is the location of the previous definition
+ #define TRACE_SYSTEM_STRING __stringify(TRACE_SYSTEM)
 
-Hence yes, this can go independently through tip.
+>From what I can tell, this is just the result of a bogus TRACE_SYSTEM_STRING
+definition, and removing that one makes the warnings go away.
 
---
-Stefan
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 9a1a8f9953f ("[media] coda: Add tracing support")
+
+diff --git a/drivers/media/platform/coda/trace.h b/drivers/media/platform/coda/trace.h
+index d1d06cbd1f6a..781bf7286d53 100644
+--- a/drivers/media/platform/coda/trace.h
++++ b/drivers/media/platform/coda/trace.h
+@@ -9,8 +9,6 @@
+ 
+ #include "coda.h"
+ 
+-#define TRACE_SYSTEM_STRING __stringify(TRACE_SYSTEM)
+-
+ TRACE_EVENT(coda_bit_run,
+ 	TP_PROTO(struct coda_ctx *ctx, int cmd),
+ 
