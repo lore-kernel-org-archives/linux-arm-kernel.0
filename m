@@ -1,77 +1,51 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 19 May 2015 15:12:11 +0800
-Subject: [RFC 2/7] ARM: dts: sun9i: Add CCI-400 device nodes for A80
-In-Reply-To: <20150517145146.GK4004@lukather>
-References: <1431583811-25780-1-git-send-email-wens@csie.org>
- <1431583811-25780-3-git-send-email-wens@csie.org>
- <20150517145146.GK4004@lukather>
-Message-ID: <CAGb2v647bRaHdiWu6GajiYbBfsev6tyBnZEsxN7Ezazr4eXc8Q@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 19 May 2015 09:12:49 +0200
+Subject: at91sam9: watchdog: period
+In-Reply-To: <5559865F.9010502@aksignal.cz>
+References: <55559D55.6020703@aksignal.cz> <20150515172516.005e3a21@bbrezillon>
+ <5559865F.9010502@aksignal.cz>
+Message-ID: <20150519091249.1d1029ff@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 17, 2015 at 10:51 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Thu, May 14, 2015 at 02:10:06PM +0800, Chen-Yu Tsai wrote:
->> The A80 includes an ARM CCI-400 interconnect to support multi-cluster
->> CPU caches.
->>
->> Also add the default clock frequency for the CPUs.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  arch/arm/boot/dts/sun9i-a80.dtsi | 46 ++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 46 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
->> index ca272e92b85d..200e712fbf0e 100644
->> --- a/arch/arm/boot/dts/sun9i-a80.dtsi
->> +++ b/arch/arm/boot/dts/sun9i-a80.dtsi
->> @@ -58,48 +58,64 @@
->>               cpu0: cpu at 0 {
->>                       compatible = "arm,cortex-a7";
->>                       device_type = "cpu";
->> +                     cci-control-port = <&cci_control0>;
->> +                     clock-frequency = <12000000>;
->>                       reg = <0x0>;
->>               };
->>
->>               cpu1: cpu at 1 {
->>                       compatible = "arm,cortex-a7";
->>                       device_type = "cpu";
->> +                     cci-control-port = <&cci_control0>;
->> +                     clock-frequency = <12000000>;
->>                       reg = <0x1>;
->>               };
->>
->>               cpu2: cpu at 2 {
->>                       compatible = "arm,cortex-a7";
->>                       device_type = "cpu";
->> +                     cci-control-port = <&cci_control0>;
->> +                     clock-frequency = <12000000>;
->>                       reg = <0x2>;
->>               };
->>
->>               cpu3: cpu at 3 {
->>                       compatible = "arm,cortex-a7";
->>                       device_type = "cpu";
->> +                     cci-control-port = <&cci_control0>;
->> +                     clock-frequency = <12000000>;
->>                       reg = <0x3>;
->>               };
->>
->>               cpu4: cpu at 100 {
->>                       compatible = "arm,cortex-a15";
->>                       device_type = "cpu";
->> +                     cci-control-port = <&cci_control1>;
->> +                     clock-frequency = <9000000>;
->
-> Isn't the clock frequency property is supposed to be the maximum
-> frequency of that CPU in Linux?
->
-> It looks odd that the A15 are clocked at a lower frequency than the
-> A7...
+On Mon, 18 May 2015 08:27:43 +0200
+Ji?? Prchal <jiri.prchal@aksignal.cz> wrote:
 
-You're right. Looking at the FEX file, the A15s can go up to 1.8 GHz.
-I'll update the numbers.
+> 
+> 
+> On 15.5.2015 17:25, Boris Brezillon wrote:
+> > Is this file present on your board ?
+> > /proc/device-tree/ahb/apb/watchdog at fffffe40/atmel,idle-halt
+> >
+> > If it is then you should patch your DT to remove the property.
+> >
+> > Best Regards,
+> >
+> > Boris
+> >
+> >
+> No, there is only:
+> drwxrwxr-x    2 root     root             0 May 18 06:12 .
+> drwxrwxr-x   35 root     root             0 May 18 06:12 ..
+> -r--rw-r--    1 root     root             0 May 18 06:12 atmel,dbg-halt
 
-ChenYu
+Are you debugging your platform with a JTAG (if that's the case and you
+still want the watchdog to expire in 16 seconds, then you should remove
+the dbg-halt property).
+
+> -r--rw-r--    1 root     root             4 May 18 06:12 atmel,reset-type
+> -r--rw-r--    1 root     root             9 May 18 06:12 atmel,watchdog-type
+> -r--rw-r--    1 root     root            22 May 18 06:12 compatible
+> -r--rw-r--    1 root     root            12 May 18 06:12 interrupts
+> -r--rw-r--    1 root     root             9 May 18 06:12 name
+> -r--rw-r--    1 root     root             8 May 18 06:12 reg
+> -r--rw-r--    1 root     root             5 May 18 06:12 status
+> -r--rw-r--    1 root     root             4 May 18 06:12 timeout-sec
+> 
+
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
