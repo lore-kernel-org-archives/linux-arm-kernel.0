@@ -1,33 +1,41 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 19 May 2015 21:37:32 +0200
-Subject: [PATCH] ARM: lpc18xx: define low-level debug symbol for
- LPC18xx/43xx
-In-Reply-To: <1432061703-29104-1-git-send-email-manabian@gmail.com>
-References: <1432061703-29104-1-git-send-email-manabian@gmail.com>
-Message-ID: <CAMuHMdU=MAr3nGE0cXH0X3a5eEqsw13b_WESYayoCABz4Z_YcQ@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 19 May 2015 21:49:17 +0200
+Subject: [PATCH v8 2/3] I2C: mediatek: Add driver for MediaTek I2C
+ controller
+In-Reply-To: <CABuKBeJcpufi-eEWmDRK6F2kgpz3DmCz8rp4hVPCJVgkmGr-KA@mail.gmail.com>
+References: <1431967209-5261-1-git-send-email-eddie.huang@mediatek.com>
+ <1431967209-5261-3-git-send-email-eddie.huang@mediatek.com>
+ <20150518184300.GB28888@pengutronix.de>
+ <CABuKBeJcpufi-eEWmDRK6F2kgpz3DmCz8rp4hVPCJVgkmGr-KA@mail.gmail.com>
+Message-ID: <20150519194917.GI24769@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joachim,
+Hello Matthias,
 
-On Tue, May 19, 2015 at 8:55 PM, Joachim Eastwood <manabian@gmail.com> wrote:
-> Using a dedicated symbol for low-level debugging instead of the
-> arch symbol will make this platform play nice when enabled on a
-> kernel that supports multiple platforms.
+On Tue, May 19, 2015 at 04:48:23PM +0200, Matthias Brugger wrote:
+> 2015-05-18 20:43 GMT+02:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> > On Tue, May 19, 2015 at 12:40:08AM +0800, Eddie Huang wrote:
+> >> [...]
+> >>  drivers/i2c/busses/i2c-mt65xx.c | 675 ++++++++++++++++++++++++++++++++++++++++
+> >> [...]
+> >> +#define I2C_DRV_NAME         "mt-i2c"
+> > i2c-mt65xx ?
+> 
+> As this works for all SoCs so far, I would propose: i2c-mtk
+Hmm, currently we have:
 
-Thanks a lot!
+  - #define I2C_DRV_NAME mt-i2c
+  - dt-compatibles: "mediatek,mt6577-i2c" + "mediatek,mt6589-i2c"
+  - function prefix: mtk_i2c_
+  - filename: i2c-mt65xx.c
+  - Kconfig symbol: I2C_MT65XX
 
-> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+Getting some harmonization here would definitly be nice.
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Best regards
+Uwe
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
