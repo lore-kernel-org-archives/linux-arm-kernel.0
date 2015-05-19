@@ -1,66 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 19 May 2015 15:59:59 +0200
-Subject: [PATCH v3] pinctrl: sirf: add sirf atlas7 pinctrl and gpio support
-In-Reply-To: <1431934112-16132-1-git-send-email-21cnbao@gmail.com>
-References: <1431934112-16132-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <CACRpkdYT8bti=8iRPs_21r15vB8XWMbUXCpkfScg_J+=werwdw@mail.gmail.com>
+From: ivan.ivanov@linaro.org (Ivan T. Ivanov)
+Date: Tue, 19 May 2015 17:02:43 +0300
+Subject: [PATCH v3] arm64: dts: qcom: Add msm8916 CoreSight components
+In-Reply-To: <CANLsYkwTm+8B-ehnC-9MD19MCha_jZU1UCVCev+44eGv_nS50w@mail.gmail.com>
+References: <1431333119-13626-1-git-send-email-ivan.ivanov@linaro.org>
+ <CANLsYkyKrtyMicsNs2CDd4=GfrQJOPJkAqSUiTB=5hRs3+d=tQ@mail.gmail.com>
+ <7F8B0480-06A8-4381-90C8-3F2A35F14FCD@codeaurora.org>
+ <1432018984.29174.2.camel@linaro.org>
+ <CANLsYkwTm+8B-ehnC-9MD19MCha_jZU1UCVCev+44eGv_nS50w@mail.gmail.com>
+Message-ID: <1432044163.29174.11.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 18, 2015 at 9:28 AM, Barry Song <21cnbao@gmail.com> wrote:
 
-> From: Wei Chen <Wei.Chen@csr.com>
->
-> The Pinctrl module (ioc) controls the Pad's function select
-> (each pad can have 8 functions), Pad's Drive Strength, Pad's
-> Pull Select and Pad's Input Disable status.
->
-> The ioc has two modules, ioc_top & ioc_rtc. Both of these two
-> modules have function select/clear, Pull select and Drive
-> Strength registers. But only ioc_rtc has input-disable
-> registers. The Pads on ioc_top have to access ioc_rtc to set
-> their input-disable status and intpu-disable-value.
->
-> So have to use one ioc driver instance to drive these two
-> ioc modules at the same time, and each ioc module will be
-> treat as one bank on the "IOC Device".
->
-> The GPIO Controller controls the GPIO status if the Pad has
-> been config as GPIO by Pinctrl already. Includes the GPIO
-> Input/output, Interrupt type, Interrupt Status, and Set/Get
-> Values.
-> The GPIO pull up/down are controlled by Pinctrl.
->
-> There are 7 GPIO Groups and splited into 3 MACROs in atlas7.
-> The GPIO Groups in one MACRO share one GPIO controllers, each
-> GPIO Group are treated as one GPIO bank.
->
-> For example:
-> In VDIFM macro, there is one GPIO Controller, it has 3 banks
-> to control 3 gpio groups. Its gpio name space is from 0 to 95.
->
-> The Device Tree can be written as following:
->
-> gpio-ranges = <&pinctrl 0 0 0>,
-> <&pinctrl 32 0 0>,
-> <&pinctrl 64 0 0>;
->
-> gpio-ranges-group-names = "gnss_gpio_grp",
-> "lcd_vip_gpio_grp",
-> "sdio_i2s_gpio_grp";
->
-> bank#0 is from 0~31, the pins are from pinctrl's "gnss_gpio_grp".
-> bank#2 is from 32~63, the pins are from pinctrl's "lcd_vip_gpio_grp".
-> bank#3 is from 64~95, the pins are from pinctrl's "sdio_i2s_gpio_grp".
->
-> Signed-off-by: Wei Chen <Wei.Chen@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> ---
->  -v3: use generic pinconf to replace self-defined APIs
+On Tue, 2015-05-19 at 07:52 -0600, Mathieu Poirier wrote:
+> On 19 May 2015 at 01:03, Ivan T. Ivanov ivanov at linaro.org> wrote:
+> > On Mon, 2015-05-18 at 13:52 -0500, Kumar Gala wrote:
+> > > > On May 11, 2015, at 2:21 PM, Mathieu Poirier poirier at linaro.org> wrote:
+> > > > 
+> > > > On 11 May 2015 at 02:31, Ivan T. Ivanov ivanov at linaro.org> wrote:
+> > > > > Add initial set of CoreSight components found on Qualcomm's 8x16 chipset.
+> > > > 
+> > 
+> > > > Kumar, I'm happy with this DT specification for Coresight.  Since I'm
+> > > > taking the driver it would likely make more sense for this to go
+> > > > through my tree.  Could you please have a look and give me your ack?
+> > > 
+> > > It looks ok, however I don?t see us including this file anywhere, so that?s my only concern.
+> > > 
+> > 
+> > True. The reason is that 'rpmcc' driver is still in testing phase
+> > and it is not upstreamed. Once it is ready, I will include this file
+> > where is appropriate.
+> > 
+> > Regards,
+> > Ivan
+> 
+> Very well - as such I won't take the DT patch right away.  Please
+> re-submit when all the components are ready.
 
-Awesome job Barry, well done.
+Eeh, I was hoping to include this file to main msm8916.dtsi,
+not to resend it, but I'm ?k either way.
 
-Patch applied!
-
-Yours,
-Linus Walleij
+Regards,
+Ivan
