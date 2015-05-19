@@ -1,87 +1,93 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 19 May 2015 16:21:14 +0800
-Subject: [PATCHv2 04/12] arm64: psci: remove unnecessary id indirection
-In-Reply-To: <1431945503-6939-5-git-send-email-mark.rutland@arm.com>
-References: <1431945503-6939-1-git-send-email-mark.rutland@arm.com>
- <1431945503-6939-5-git-send-email-mark.rutland@arm.com>
-Message-ID: <555AF27A.1000500@linaro.org>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 19 May 2015 10:22:06 +0200
+Subject: [PATCH v3] serial: 8250_uniphier: add UniPhier serial driver
+In-Reply-To: <1431997900-18390-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1431997900-18390-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CABuKBeJwOp3Km=Vw+xn8cRtH8DC-TNB_m7s8WSdPxzKHdzrdcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?05?18? 18:38, Mark Rutland wrote:
-> PSCI 0.1 did not define canonical IDs for CPU_ON, CPU_OFF, CPU_SUSPEND,
-> or MIGRATE, and so these need to be provided when using firmware
-> compliant to PSCI 0.1.
+2015-05-19 3:11 GMT+02:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> Add the driver for on-chip UART used on UniPhier SoCs.
 >
-> However, functions introduced in 0.2 or later have canonical IDs, and
-> these cannot be provided via DT. There's no need to indirect the IDs via
-> a table; they can be used directly at callsites (and already are for
-> SYSTEM_OFF and SYSTEM_RESET).
+> This hardware is similar to 8250 with a slightly different register
+> mapping, so it should go into drivers/tty/serial/8250 directory.
+
+The patch is for a driver in this folder, so no need to but it in the
+commit message.
+Instead just write a short description about the difference to a
+standard 8250 device.
+
 >
-> This patch removes the unnecessary function ID indirection for
-> AFFINITY_INFO and MIGRATE_INFO_TYPE.
->
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 > ---
->   arch/arm64/kernel/psci.c | 20 +++-----------------
->   1 file changed, 3 insertions(+), 17 deletions(-)
 >
-> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-> index 10fa25e..66b5b75 100644
-> --- a/arch/arm64/kernel/psci.c
-> +++ b/arch/arm64/kernel/psci.c
-> @@ -67,8 +67,6 @@ enum psci_function {
->   	PSCI_FN_CPU_ON,
->   	PSCI_FN_CPU_OFF,
->   	PSCI_FN_MIGRATE,
-> -	PSCI_FN_AFFINITY_INFO,
-> -	PSCI_FN_MIGRATE_INFO_TYPE,
->   	PSCI_FN_MAX,
->   };
+> Changes in v3:
+>   - Just add *_SHIFT macro for the special case
 >
-> @@ -168,22 +166,13 @@ static int psci_migrate(unsigned long cpuid)
->   static int psci_affinity_info(unsigned long target_affinity,
->   		unsigned long lowest_affinity_level)
->   {
-> -	int err;
-> -	u32 fn;
-> -
-> -	fn = psci_function_id[PSCI_FN_AFFINITY_INFO];
-> -	err = invoke_psci_fn(fn, target_affinity, lowest_affinity_level, 0);
-> -	return err;
-> +	return invoke_psci_fn(PSCI_0_2_FN64_AFFINITY_INFO, target_affinity,
-> +			      lowest_affinity_level, 0);
->   }
+> Changes in v2:
+>   - Drop unnecessary #include <linux/init.h>
+>   - Sort includes in alphabetical order
+>   - Use devm_clk_get() rather than of_clk_get()
+>   - Delete unneeded clk_put() from uniphier_uart_remove callback
+>   - Delete unneeded IS_ERR_OR_NULL check from uniphier_uart_remove callback
+>   - Use UNIPHIER_UART_*_SHIFT instead of hard-coded shift values
+>   - Change the first argument type of uniphier_of_serial_setup()
+>     from (struct platform_device *) to (struct device *) for code-cleanup.
 >
->   static int psci_migrate_info_type(void)
->   {
-> -	int err;
-> -	u32 fn;
-> -
-> -	fn = psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE];
-> -	err = invoke_psci_fn(fn, 0, 0, 0);
-> -	return err;
-> +	return invoke_psci_fn(PSCI_0_2_FN_MIGRATE_INFO_TYPE, 0, 0, 0);
->   }
+>  drivers/tty/serial/8250/8250_uniphier.c | 237 ++++++++++++++++++++++++++++++++
+>  drivers/tty/serial/8250/Kconfig         |   7 +
+>  drivers/tty/serial/8250/Makefile        |   1 +
+>  3 files changed, 245 insertions(+)
+>  create mode 100644 drivers/tty/serial/8250/8250_uniphier.c
 >
->   static int __maybe_unused cpu_psci_cpu_init_idle(struct device_node *cpu_node,
-> @@ -290,11 +279,8 @@ static void __init psci_0_2_set_functions(void)
->   	psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN64_MIGRATE;
->   	psci_ops.migrate = psci_migrate;
->
-> -	psci_function_id[PSCI_FN_AFFINITY_INFO] = PSCI_0_2_FN64_AFFINITY_INFO;
->   	psci_ops.affinity_info = psci_affinity_info;
->
-> -	psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE] =
-> -		PSCI_0_2_FN_MIGRATE_INFO_TYPE;
->   	psci_ops.migrate_info_type = psci_migrate_info_type;
->
->   	arm_pm_restart = psci_sys_reset;
+> diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
+> new file mode 100644
+> index 0000000..50349bf
+> --- /dev/null
+> +++ b/drivers/tty/serial/8250/8250_uniphier.c
+> @@ -0,0 +1,237 @@
+> +/*
+> + * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/serial_8250.h>
+> +#include <linux/serial_core.h>
+> +#include <linux/serial_reg.h>
+> +#include "8250.h"
+> +
+> +/* Most (but not all) of UniPhier UART devices have 64-depth FIFO. */
+> +#define UNIPHIER_UART_DEFAULT_FIFO_SIZE        64
+> +
+> +#define UNIPHIER_UART_CHAR_FCR 3       /* Character / FIFO Control Register */
+> +#define UNIPHIER_UART_LCR_MCR  4       /* Line/Modem Control Register */
+> +#define     UNIPHIER_UART_LCR_SHIFT    8
+> +#define UNIPHIER_UART_DLR      9       /* Divisor Latch Register */
 
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+Nit pick: Please fix identation. After "define" just put one blank.
+I personally prefer that the define values are aligned by tabs, but
+that's up tu you.
 
-Thanks
-Hanjun
+With these changes you can add:
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+
+Thanks,
+Matthias
+
+-- 
+motzblog.wordpress.com
