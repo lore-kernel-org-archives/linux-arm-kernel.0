@@ -1,25 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 19 May 2015 11:11:02 +0200
-Subject: [PATCH v2 01/11] dt-bindings: mediatek: Modify pinctrl bindings
- for mt6397.
-In-Reply-To: <1432015882-8646-2-git-send-email-hongzhou.yang@mediatek.com>
-References: <1432015882-8646-1-git-send-email-hongzhou.yang@mediatek.com>
- <1432015882-8646-2-git-send-email-hongzhou.yang@mediatek.com>
-Message-ID: <CACRpkdZhSUZVKZr5nWXX-15+GwrqrKkW_u_+cQDH1pO_NrayEA@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 19 May 2015 18:10:27 +0900
+Subject: [PATCH v3] serial: 8250_uniphier: add UniPhier serial driver
+In-Reply-To: <555AFB17.1050703@suse.cz>
+References: <1431997900-18390-1-git-send-email-yamada.masahiro@socionext.com>
+ <CABuKBeJwOp3Km=Vw+xn8cRtH8DC-TNB_m7s8WSdPxzKHdzrdcw@mail.gmail.com>
+ <CAK7LNARrjkCcMsVJwe5hdB71QsEQAf51sNf4xYVMkNazdbdxKA@mail.gmail.com>
+ <555AFB17.1050703@suse.cz>
+Message-ID: <CAK7LNAT0DKTkxeuuq2VQW2Rn4MrHTN+CLBXCjicQDb3aSjeQGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 8:11 AM, Hongzhou Yang
-<hongzhou.yang@mediatek.com> wrote:
-
-> Since 6397 is no need to support interrupt controller,
-> moving interrupt controller relate property to optional list.
-> Also adding mt8173 and mt8127 to bindings.
+2015-05-19 17:57 GMT+09:00 Jiri Slaby <jslaby@suse.cz>:
+> On 05/19/2015, 10:54 AM, Masahiro Yamada wrote:
+>>>> +#define UNIPHIER_UART_CHAR_FCR 3       /* Character / FIFO Control Register */
+>>>> +#define UNIPHIER_UART_LCR_MCR  4       /* Line/Modem Control Register */
+>>>> +#define     UNIPHIER_UART_LCR_SHIFT    8
+>>>> +#define UNIPHIER_UART_DLR      9       /* Divisor Latch Register */
+>>>
+>>> Nit pick: Please fix identation. After "define" just put one blank.
+>>> I personally prefer that the define values are aligned by tabs, but
+>>> that's up tu you.
+>>>
+>>
+>> I intentionally use deeper indentation for *_SHIFT
+>> because I want to clearly show  UNIPHIER_UART_LCR_SHIFT
+>> belongs to UNIPHIER_UART_LCR_MCR register.
+>>
+>> I also want to describe them within 80 columns including comments,
+>> so I cannot insert extra TABs to align the values.
 >
-> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+> Hi, what about one space between # and define which is used sometimes?
 
-Backed out earlier applied MTK patches and applied
-this one instead, sorry too intense development...
 
-Yours,
-Linus Walleij
+With more one space after #, '8' goes to the next stop,
+so it makes no difference.
+
+
+Is this a problem?  It almost seems a bike shed...
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
