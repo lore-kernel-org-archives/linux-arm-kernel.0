@@ -1,32 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 May 2015 15:08:05 +0200
-Subject: [PATCH] input: sur40: fix v4l dependency
-Message-ID: <6880566.G7eZ6NqpSp@wuerfel>
+From: mika.westerberg@linux.intel.com (Mika Westerberg)
+Date: Tue, 19 May 2015 16:15:16 +0300
+Subject: [PATCH] i2c: designware: separate ops for system_sleep_pm and
+ runtime_pm
+In-Reply-To: <20150519203242.74617ad6@xhacker>
+References: <1431693099-2292-1-git-send-email-jszhang@marvell.com>
+ <20150518082823.GH1490@lahna.fi.intel.com>
+ <20150519203242.74617ad6@xhacker>
+Message-ID: <20150519131516.GO1490@lahna.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The recently added support for the raw video stream in the SUR40
-driver fails to link if the driver is built-in but v4l2 is not:
+On Tue, May 19, 2015 at 08:32:42PM +0800, Jisheng Zhang wrote:
+> > I can see that this fixes the issue with the platform driver (as the
+> > platform bus core doesn't power on the device automatically as opposed
+> > to other buses, like PCI). However, I'm thinking that can we do better
+> > here.
+> > 
+> > Instead of powering the device on again, can't we leave it in low power
+> > state? Recently added 'dev->power.direct_complete' may be used to
+> > achieve that, I think.
+> 
+> how to handle runtime suspended via just being clock gated?
 
-drivers/built-in.o: In function `sur40_disconnect':
-:(.text+0xf2ed2): undefined reference to `video_unregister_device'
-:(.text+0xf2eda): undefined reference to `v4l2_device_unregister'
-:(.text+0xf2ee2): undefined reference to `vb2_dma_sg_cleanup_ctx'
+As far as I can tell driver's suspend hook does the clock gating so why
+would you need to handle it differently? Once the device is runtime
+suspended, it is both clock and power gated depending on the platform.
 
-This adds an explicit dependency, to avoid the broken build.
+> Currently the only solution is using the runtime pm apis to ensure the
+> device is in a working state during s2ram. What's your opinion?
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: e831cd251fb ("[media] add raw video stream support for Samsung SUR40")
+Well, it sounds a bit silly to resume the device just because you want
+to call i2c_dw_disable() for it before suspending again ;-)
 
-diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
-index cee8ffe4ffd9..90935f3918db 100644
---- a/drivers/input/touchscreen/Kconfig
-+++ b/drivers/input/touchscreen/Kconfig
-@@ -980,6 +980,7 @@ config TOUCHSCREEN_SUN4I
- config TOUCHSCREEN_SUR40
- 	tristate "Samsung SUR40 (Surface 2.0/PixelSense) touchscreen"
- 	depends on USB && MEDIA_USB_SUPPORT && HAS_DMA
-+	depends on VIDEO_V4L2
- 	select INPUT_POLLDEV
- 	select VIDEOBUF2_DMA_SG
- 	help
+At least, it would be nice to check if we can keep it runtime suspended
+with the help of 'dev->power.direct_complete'. If not possible, then I
+suppose your patch is sufficient.
