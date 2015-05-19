@@ -1,46 +1,44 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 19 May 2015 14:33:59 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: Add Atmel SAMA5 family
-In-Reply-To: <9986808.t62JLgg5NJ@wuerfel>
-References: <1428051678-20450-1-git-send-email-alexandre.belloni@free-electrons.com>
- <555AFF3F.10400@atmel.com> <9986808.t62JLgg5NJ@wuerfel>
-Message-ID: <20150519123358.GA15179@piout.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 19 May 2015 13:34:18 +0100
+Subject: [PATCH v3 06/17] video: lcd: add LoCoMo LCD driver
+In-Reply-To: <CALT56yMwGngNvRWiCux962B=EQODUHW3=-ed6SZWJ9PnSPm09A@mail.gmail.com>
+References: <1431880077-26321-1-git-send-email-dbaryshkov@gmail.com>
+ <1431880077-26321-7-git-send-email-dbaryshkov@gmail.com>
+ <20150519093644.GT22418@x1>
+ <CALT56yMwGngNvRWiCux962B=EQODUHW3=-ed6SZWJ9PnSPm09A@mail.gmail.com>
+Message-ID: <20150519123418.GB3627@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/05/2015 at 13:04:22 +0200, Arnd Bergmann wrote :
-> > > @@ -250,15 +261,18 @@ CONFIG_SERIAL_FSL_LPUART=y
-> > >  CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
-> > >  CONFIG_SERIAL_ST_ASC=y
-> > >  CONFIG_SERIAL_ST_ASC_CONSOLE=y
-> > > +CONFIG_HW_RANDOM=y
-> > >  CONFIG_I2C_CHARDEV=y
-> > >  CONFIG_I2C_DAVINCI=y
-> > >  CONFIG_I2C_MUX=y
-> 
-> seems non-essential.
-> 
+On Tue, 19 May 2015, Dmitry Eremin-Solenikov wrote:
 
-That is an oversight, it should be compiled as a module.
-
-> > > @@ -502,6 +522,8 @@ CONFIG_RTC_DRV_MV=y
-> > >  CONFIG_RTC_DRV_TEGRA=y
-> > >  CONFIG_DMADEVICES=y
-> > >  CONFIG_DW_DMAC=y
-> > > +CONFIG_AT_HDMAC=y
-> > > +CONFIG_AT_XDMAC=y
-> > >  CONFIG_MV_XOR=y
-> > >  CONFIG_TEGRA20_APB_DMA=y
-> > >  CONFIG_SH_DMAE=y
+> 2015-05-19 12:36 GMT+03:00 Lee Jones <lee.jones@linaro.org>:
+> > On Sun, 17 May 2015, Dmitry Eremin-Solenikov wrote:
+> >
+> >> LoCoMo has some special handling for TFT screens attached to Collie and
+> >> Poodle. Implement that as a separate driver.
+> >>
+> >> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> >> ---
+> >>  drivers/video/backlight/Kconfig      |  10 ++
+> >>  drivers/video/backlight/Makefile     |   1 +
+> >>  drivers/video/backlight/locomo_lcd.c | 285 +++++++++++++++++++++++++++++++++++
+> >>  3 files changed, 296 insertions(+)
+> >>  create mode 100644 drivers/video/backlight/locomo_lcd.c
+> >
+> > This looks like it should be part of patch 16.
+> >
+> > How much of this file is the same as the one removed later in the set?
 > 
-> What are these required for? I assume you need them for MMC? If so, that's
-> fine.
-> 
+> This is a completely new driver. Only few comments remained from old
+> locomolcd.c.
 
-That is indeed the reason.
+Okay, thanks for the explanation.
 
+I'm sure Jingoo will be around to review shortly.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
