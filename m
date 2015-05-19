@@ -1,54 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 May 2015 20:24:04 +0200
-Subject: [PATCH v7 08/13] ARM: unify MMU/!MMU addruart calls
-In-Reply-To: <b41ebeb9d62b9c49faec6500f73460b9@agner.ch>
-References: <1431769465-26867-1-git-send-email-stefan@agner.ch>
- <2419398.cbLWQC7K5f@wuerfel> <b41ebeb9d62b9c49faec6500f73460b9@agner.ch>
-Message-ID: <5548280.7uBnLuun8k@wuerfel>
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Tue, 19 May 2015 11:38:17 -0700
+Subject: [PATCH] [RESEND] SCSI: ips: remove pointless #warning
+In-Reply-To: <2850783.725LtIIUFq@wuerfel>
+References: <3121960.dnOqT9LCth@wuerfel>
+ <1432043572.3007.14.camel@HansenPartnership.com>
+ <2850783.725LtIIUFq@wuerfel>
+Message-ID: <1432060697.14737.1.camel@HansenPartnership.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 May 2015 18:06:53 Stefan Agner wrote:
-> On 2015-05-19 13:50, Arnd Bergmann wrote:
-> > On Tuesday 19 May 2015 13:23:22 Stefan Agner wrote:
-> >> On 2015-05-19 12:16, Russell King - ARM Linux wrote:
-> <snip>
-> >> Not sure how we can deal with the EFM32 vs. IMX changes... Patches 08-10
-> >> has no dependencies on the clock changes which Thomas merged. They could
-> >> go through whatever EFM32 is merged normally (last time Arnd directly
-> >> merged from Uwe), and then Shawn could base the rest of the changes on
-> >> that too?
+On Tue, 2015-05-19 at 15:56 +0200, Arnd Bergmann wrote:
+> On Tuesday 19 May 2015 06:52:52 James Bottomley wrote:
+> > On Tue, 2015-05-19 at 15:33 +0200, Arnd Bergmann wrote:
+> > > The ips driver contains
+> > > 
+> > >  #warning "This driver has only been tested on the x86/ia64/x86_64 platforms"
+> > > 
+> > > which gets printed by the compiler every time this driver gets
+> > > build for something other than those three architectures. The same
+> > > is true for most other drivers, but none of them prints a warning like
+> > > this.
+> > > 
+> > > Let's remove the warning now to reduce the amount of clutter.
+> > > 
+> > > FWIW, I've reviewed the driver and found a few oddities, but nothing
+> > > that needs to be fixed or that would be architecture specific.
 > > 
-> > Do you have a dependency on patch 10 (the one for EFM32) in your later
-> > patches?
+> > In principle I don't disagree.  However this warning was a specific
+> > request of the driver writers.  Since the driver is pretty much dead,
+> > I'm not sure anyone is going to check or fix it for non-intel any time
+> > soon.
 > 
-> Unfortunately, there is a dependency on that patch: I change the default
-> of UNCOMPRESS_INCLUDE to debug/uncompress.h for all ARM_SINGLE_ARMV7M
-> platforms. Without that patch, it would default to mach/uncompress.h,
-> which does not exist for MACH_MXC/SOC_VF610.
-
-An easy approach would be to list both ARM_SINGLE_ARMV7M and
-EFM32 in the UNCOMPRESS_INCLUDE option initially, and then
-follow-up with a patch that converts the three other platforms
-(efm32, stm32 and lpc18xx) to ARM_SINGLE_ARMV7M and also
-change the UNCOMPRESS_INCLUDE statement.
-
-Note that I've already added both stm32 and lpc18xx to the
-UNCOMPRESS_INCLUDE list in the next/soc branch.
-
-> > If not, you can send the other ones to Shawn, so I pull them as
-> > a branch, and then I apply that on top of the merges. I have also
-> > merged two other ARMv7M platforms for 4.2 now (both in next/soc),
-> > so we should do the same change for those as well, and I'd rather
-> > apply a patch for that, than merge a branch that is based on
-> > next/soc.
+> My main interest here is to get a clean build of ARM 'allmodconfig'.
 > 
-> I guess, in that case, you need to take the others too? (08/09?)
+> If you prefer another approach, we could also add 'depends on X86 || IA64'
+> into Kconfig, which would also avoid that warning.
 
-I'm fine with that, too. If Shawn thinks the patches are ok, you can
-just send all patches you want me to apply in arm-soc based on
-the appropriate branches (next/soc, next/dt and next/defconfig, I
-presume), and I'll apply them this time. In the future, you should
-send all patches to Shawn though.
+Actually, no, that would cause problems if anyone is actually using this
+driver on non-intel.  What about this?  It captures the intent of the
+original but gets rid of the warning.
 
-	Arnd
+James
+
+---
+
+diff --git a/drivers/scsi/ips.c b/drivers/scsi/ips.c
+index 7542f11..6242872 100644
+--- a/drivers/scsi/ips.c
++++ b/drivers/scsi/ips.c
+@@ -206,10 +206,6 @@ module_param(ips, charp, 0);
+ #define IPS_VERSION_HIGH        IPS_VER_MAJOR_STRING "." IPS_VER_MINOR_STRING
+ #define IPS_VERSION_LOW         "." IPS_VER_BUILD_STRING " "
+ 
+-#if !defined(__i386__) && !defined(__ia64__) && !defined(__x86_64__)
+-#warning "This driver has only been tested on the x86/ia64/x86_64 platforms"
+-#endif
+-
+ #define IPS_DMA_DIR(scb) ((!scb->scsi_cmd || ips_is_passthru(scb->scsi_cmd) || \
+                          DMA_NONE == scb->scsi_cmd->sc_data_direction) ? \
+                          PCI_DMA_BIDIRECTIONAL : \
+@@ -6788,6 +6784,11 @@ ips_remove_device(struct pci_dev *pci_dev)
+ static int __init
+ ips_module_init(void)
+ {
++#if !defined(__i386__) && !defined(__ia64__) && !defined(__x86_64__)
++        printk(KERN_ERR, "ips: This driver has only been tested on the x86/ia64/x86_64 platforms\n");
++        add_taint(TAINT_CPU_OUT_OF_SPEC, LOCKDEP_STILL_OK);
++#endif
++
+ 	if (pci_register_driver(&ips_pci_driver) < 0)
+ 		return -ENODEV;
+ 	ips_driver_template.module = THIS_MODULE;
