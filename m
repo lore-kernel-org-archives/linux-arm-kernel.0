@@ -1,44 +1,115 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 19 May 2015 15:34:00 +0200
-Subject: [PATCH] ARM: shmobile: only select sound drivers that build
-In-Reply-To: <5616798.tmraH8vpuI@wuerfel>
-References: <5616798.tmraH8vpuI@wuerfel>
-Message-ID: <CAMuHMdWDS73aA8ottgEPYgE=FHFeOwWdEcRGEyv8LbOUU1eUgQ@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Tue, 19 May 2015 15:34:12 +0200
+Subject: [RFC PATCH 2/4] ARM: dts: Add SPI flash node for Peach boards
+In-Reply-To: <1432042454-19234-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1432042454-19234-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1432042454-19234-3-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+From: Simon Glass <sjg@chromium.org>
 
-On Tue, May 19, 2015 at 2:49 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> A couple of codec drivers are selected by shmobile platform code,
-> but depend on I2C, which results in a build error:
+Peach Pit and Pi machines have a SPI flash memory that is used to
+store firmware and different system parameters and data.
 
-> --- a/arch/arm/mach-shmobile/Kconfig
-> +++ b/arch/arm/mach-shmobile/Kconfig
+Add information about the SPI flash chip so that user-space tools
+can access it.
 
-> @@ -158,8 +158,8 @@ config MACH_BOCKW
->         depends on ARCH_R8A7778
->         select ARCH_REQUIRE_GPIOLIB
->         select REGULATOR_FIXED_VOLTAGE if REGULATOR
-> -       select SND_SOC_AK4554 if SND_SIMPLE_CARD
-> -       select SND_SOC_AK4642 if SND_SIMPLE_CARD
-> +       select SND_SOC_AK4554 if SND_SIMPLE_CARD && I2C
+Signed-off-by: Simon Glass <sjg@chromium.org>
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
+ arch/arm/boot/dts/exynos5420-peach-pit.dts | 26 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos5800-peach-pi.dts  | 26 ++++++++++++++++++++++++++
+ 2 files changed, 52 insertions(+)
 
-AK4554 is not an i2c device, but a plain platform device.
-
-> +       select SND_SOC_AK4642 if SND_SIMPLE_CARD && I2C
->         select USE_OF
-
-The others are OK, so if you have remove AK4554, you can add my
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+index 146e71118a72..8e88088d6815 100644
+--- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
++++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+@@ -892,6 +892,13 @@
+ 		samsung,pin-drv = <2>;
+ 	};
+ 
++	spi_flash_cs: spi-flash-cs {
++		samsung,pins = "gpa2-5";
++		samsung,pin-function = <1>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <3>;
++	};
++
+ 	usb300_vbus_en: usb300-vbus-en {
+ 		samsung,pins = "gph0-0";
+ 		samsung,pin-function = <1>;
+@@ -921,6 +928,25 @@
+ 	clock-names = "rtc", "rtc_src";
+ };
+ 
++&spi_1 {
++	status = "okay";
++	samsung,spi-src-clk = <0>;
++	num-cs = <1>;
++	cs-gpios = <&gpa2 5 0>;
++
++	spidev at 0 {
++		compatible = "google,spi-flash";
++		reg = <0>;
++		spi-max-frequency = <50000000>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&spi_flash_cs>;
++
++		controller-data {
++			samsung,spi-feedback-delay = <2>;
++		};
++	};
++};
++
+ &spi_2 {
+ 	status = "okay";
+ 	num-cs = <1>;
+diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+index 02eb8b15374f..f2b89991b224 100644
+--- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
++++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+@@ -855,6 +855,13 @@
+ 		samsung,pin-drv = <2>;
+ 	};
+ 
++	spi_flash_cs: spi-flash-cs {
++		samsung,pins = "gpa2-5";
++		samsung,pin-function = <1>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <3>;
++	};
++
+ 	usb300_vbus_en: usb300-vbus-en {
+ 		samsung,pins = "gph0-0";
+ 		samsung,pin-function = <1>;
+@@ -884,6 +891,25 @@
+ 	clock-names = "rtc", "rtc_src";
+ };
+ 
++&spi_1 {
++	status = "okay";
++	samsung,spi-src-clk = <0>;
++	num-cs = <1>;
++	cs-gpios = <&gpa2 5 0>;
++
++	spidev at 0 {
++		compatible = "google,spi-flash";
++		reg = <0>;
++		spi-max-frequency = <50000000>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&spi_flash_cs>;
++
++		controller-data {
++			samsung,spi-feedback-delay = <2>;
++		};
++	};
++};
++
+ &spi_2 {
+ 	status = "okay";
+ 	num-cs = <1>;
+-- 
+2.1.4
