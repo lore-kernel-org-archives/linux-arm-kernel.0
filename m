@@ -1,30 +1,24 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 19 May 2015 12:21:34 +0100
-Subject: [PATCH v3 01/17] mfd: add new driver for Sharp LoCoMo
-In-Reply-To: <20150519103828.GU22418@x1>
-References: <1431880077-26321-1-git-send-email-dbaryshkov@gmail.com>
- <1431880077-26321-2-git-send-email-dbaryshkov@gmail.com>
- <20150519103828.GU22418@x1>
-Message-ID: <20150519112134.GD2067@n2100.arm.linux.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 19 May 2015 12:22:01 +0100
+Subject: [PATCH v2] spi: sirf: add support for USP-based SPI
+In-Reply-To: <1431602829-12428-1-git-send-email-21cnbao@gmail.com>
+References: <1431602829-12428-1-git-send-email-21cnbao@gmail.com>
+Message-ID: <20150519112201.GH2761@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 11:38:28AM +0100, Lee Jones wrote:
-> On Sun, 17 May 2015, Dmitry Eremin-Solenikov wrote:
-> > +static void locomo_mask_irq(struct irq_data *d)
-> > +{
-> > +	struct locomo *ldev = irq_data_get_irq_chip_data(d);
-> > +	unsigned int mask = 0x0010 << d->hwirq;
+On Thu, May 14, 2015 at 11:27:09AM +0000, Barry Song wrote:
+> From: Qipan Li <Qipan.Li@csr.com>
 > 
-> This also needs defining.
-> 
-> Why not
->   BIT(d->hwirq + 1)
+> USP is a general purpose serial port in SiRFSoC, which can work as SPI.
+> the most data flow of USP and pure SPI is same with main differences
+> in registers layout.
 
-I think your maths is off...
-
-0x0010 << d->hwirq != BIT(d->hwirq + 1)
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+This doesn't apply against current code, please check and resend.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150519/59ae7e47/attachment.sig>
