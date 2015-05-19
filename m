@@ -1,59 +1,44 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 19 May 2015 10:03:13 +0100
-Subject: [PATCHv2 00/12] arm/arm64: Unify PSCI client support
-In-Reply-To: <20150518174957.GT21251@e104818-lin.cambridge.arm.com>
-References: <1431945503-6939-1-git-send-email-mark.rutland@arm.com>
- <20150518174957.GT21251@e104818-lin.cambridge.arm.com>
-Message-ID: <20150519090313.GA11175@red-moon>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 19 May 2015 11:04:28 +0200
+Subject: [PATCH] ARM: at91/defconfig: add CONFIG_REGULATOR_FIXED_VOLTAGE for
+ mmc driver
+Message-ID: <1432026268-14007-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 18, 2015 at 06:49:57PM +0100, Catalin Marinas wrote:
-> On Mon, May 18, 2015 at 11:38:11AM +0100, Mark Rutland wrote:
-> > This series unifies the 32-bit and 64-bit PSCI client code, moving the bulk of
-> > the FW invocation and probing out to a common locaiton in drivers/firmware.
-> > As part of this, the remaining edge cases for PSCI 0.2 (Trusted OSs rejecting
-> > CPU_OFF) are accounted for, maknig both 32-bit adn 64-bit clients more robust.
-> > 
-> > This results in a reasonable saving in terms of lines of code, and will allow
-> > for PSCI 1.0 support to be unified form the beginning, avoiding further
-> > duplication.
-> > 
-> > The series is based on v4.1-rc3.
-> > 
-> > Since v1 [1]:
-> > * Fix build when PSCI isn't selected
-> > * Don't indirect migrate_info_up_cpu
-> > * Fix ver to u32 in psci_get_version
-> > 
-> > Thanks,
-> > Mark.
-> > 
-> > [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/341770.html
-> > 
-> > Mark Rutland (12):
-> >   arm/arm64: kvm: add missing PSCI include
-> >   arm64: smp_plat: add get_logical_index
-> >   arm64: smp: consistently use error codes
-> >   arm64: psci: remove unnecessary id indirection
-> >   arm64: psci: support unsigned return values
-> >   arm64: psci: account for Trusted OS instances
-> >   arm64: psci: kill psci_power_state
-> >   arm64: psci: remove ACPI coupling
-> >   arm64: psci: factor invocation code to drivers
-> >   drivers: psci: support native SMC{32,64} calls
-> >   ARM: migrate to common PSCI client code
-> >   MAINTAINERS: add PSCI entry
-> 
-> So, apart from some comments I had, the series looks fine.
-> 
-> How do you plan to merge this? I'm happy for it to go through the
-> arm-soc tree (hopefully there are no conflicts with some of Lorenzo's
-> patches for the unification of ACPI/DT CPU initialisation).
+As an update of the sd/mmc DT definition needs the fixed voltage regulator, add
+it to the at91 defconfigs.
 
-Unfortunately I think there are (minor, owing to PSCI headers reshuffling,
-but to be sorted out), let me know please the preferred way to merge the
-two sets.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/configs/at91_dt_defconfig | 2 ++
+ arch/arm/configs/sama5_defconfig   | 1 +
+ 2 files changed, 3 insertions(+)
 
-Thanks,
-Lorenzo
+diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
+index bcef49a21801..94b5dcabdecc 100644
+--- a/arch/arm/configs/at91_dt_defconfig
++++ b/arch/arm/configs/at91_dt_defconfig
+@@ -131,6 +131,8 @@ CONFIG_POWER_RESET=y
+ CONFIG_WATCHDOG=y
+ CONFIG_AT91SAM9X_WATCHDOG=y
+ CONFIG_SSB=m
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_FB=y
+ CONFIG_FB_ATMEL=y
+ CONFIG_BACKLIGHT_LCD_SUPPORT=y
+diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
+index 510c747c65b4..31eb951880ae 100644
+--- a/arch/arm/configs/sama5_defconfig
++++ b/arch/arm/configs/sama5_defconfig
+@@ -136,6 +136,7 @@ CONFIG_POWER_RESET=y
+ # CONFIG_HWMON is not set
+ CONFIG_SSB=m
+ CONFIG_REGULATOR=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_REGULATOR_ACT8865=y
+ CONFIG_MEDIA_SUPPORT=y
+ CONFIG_MEDIA_CAMERA_SUPPORT=y
+-- 
+2.1.3
