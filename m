@@ -1,101 +1,58 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 19 May 2015 09:53:01 +0200
-Subject: [PATCH v2 02/10] clk: sunxi: Add support for multiple parents to
- gates
-In-Reply-To: <5559ACC6.6050202@gmail.com>
-References: <1431707940-19372-1-git-send-email-jenskuske@gmail.com>
- <1431707940-19372-3-git-send-email-jenskuske@gmail.com>
- <20150517125014.GB4004@lukather> <5559ACC6.6050202@gmail.com>
-Message-ID: <20150519075301.GT4004@lukather>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 19 May 2015 15:57:42 +0800
+Subject: [PATCH 1/9] ARM: imx: move timer resources into a structure
+In-Reply-To: <BL2PR03MB37086957FE1515FD0D2E87983C70@BL2PR03MB370.namprd03.prod.outlook.com>
+References: <1431677507-27420-1-git-send-email-shawnguo@kernel.org>
+ <1431677507-27420-2-git-send-email-shawnguo@kernel.org>
+ <BL2PR03MB37086957FE1515FD0D2E87983C70@BL2PR03MB370.namprd03.prod.outlook.com>
+Message-ID: <20150519075742.GU1071@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 18, 2015 at 11:11:34AM +0200, Jens Kuske wrote:
-> Hi,
+On Fri, May 15, 2015 at 04:36:18PM +0000, Shenwei Wang wrote:
 > 
-> On 05/17/15 14:50, Maxime Ripard wrote:
-> > Hi Jens,
-> > 
-> > On Fri, May 15, 2015 at 06:38:52PM +0200, Jens Kuske wrote:
-> >> Some newer sunxi SoCs (A83T, H3) don't have individual registers for
-> >> AHB1, APB1 and APB2 gates anymore, but one big bus gates area where each
-> >> gate can have a different parent.
-> >>
-> >> The current clock driver sets the same parent for all gates in a group.
-> >> This commit adds a new parents field to the gates_data structure, which
-> >> allows us to specify an array of parent indices for every single gate.
-> >>
-> >> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
-> >> ---
-> >>  drivers/clk/sunxi/clk-sunxi.c | 12 +++++++++++-
-> >>  1 file changed, 11 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> >> index 9a82f17..17cba4d 100644
-> >> --- a/drivers/clk/sunxi/clk-sunxi.c
-> >> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> >> @@ -898,6 +898,8 @@ static void __init sunxi_divider_clk_setup(struct device_node *node,
-> >>  
-> >>  struct gates_data {
-> >>  	DECLARE_BITMAP(mask, SUNXI_GATES_MAX_SIZE);
-> >> +	/* If used, ARRAY_SIZE(parents) has to be >= bitmap_weight(mask) */
-> >> +	const u8 *parents;
-> >>  };
-> >>  
-> >>  static const struct gates_data sun4i_axi_gates_data __initconst = {
-> >> @@ -1000,16 +1002,21 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
-> >>  					 struct gates_data *data)
-> >>  {
-> >>  	struct clk_onecell_data *clk_data;
-> >> +	const char *parents[SUNXI_MAX_PARENTS];
-> >>  	const char *clk_parent;
-> >>  	const char *clk_name;
-> >>  	void __iomem *reg;
-> >> +	int npar = 0;
-> >>  	int qty;
-> >>  	int i = 0;
-> >>  	int j = 0;
-> >>  
-> >>  	reg = of_iomap(node, 0);
-> >>  
-> >> -	clk_parent = of_clk_get_parent_name(node, 0);
-> >> +	while (npar < SUNXI_MAX_PARENTS &&
-> >> +	       (parents[npar] = of_clk_get_parent_name(node, npar)) != NULL)
-> >> +		npar++;
-> >> +	clk_parent = parents[0];
-> >>  
-> >>  	/* Worst-case size approximation and memory allocation */
-> >>  	qty = find_last_bit(data->mask, SUNXI_GATES_MAX_SIZE);
-> >> @@ -1026,6 +1033,9 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
-> >>  		of_property_read_string_index(node, "clock-output-names",
-> >>  					      j, &clk_name);
-> >>  
-> >> +		if (data->parents && !WARN_ON(data->parents[j] >= npar))
-> >> +			clk_parent = parents[data->parents[j]];
-> >> +
-> > 
-> > I'm currently removing that code, so I was more expecting a new
-> > standalone driver for that clock.
 > 
-> How do you want to replace that code? To me this looks like a good way
-> to set up all the different gates sunxi has.
+> > -----Original Message-----
+> > From: shawnguo at kernel.org [mailto:shawnguo at kernel.org]
+> > Sent: 2015?5?15? 3:12
+> > To: linux-arm-kernel at lists.infradead.org
+> > Cc: kernel at pengutronix.de; Daniel Lezcano; Wang Shenwei-B38339; Shawn Guo
+> > Subject: [PATCH 1/9] ARM: imx: move timer resources into a structure
+> > 
+> > From: Shawn Guo <shawn.guo@linaro.org>
+> > 
+> > Instead of passing around as argument, let's move timer resources like irq and
+> > clocks together with base address into a data structure, and reference the
+> > resources from the struct variable directly to simplify the function call interface.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> >  arch/arm/mach-imx/time.c | 119 ++++++++++++++++++++++++-----------------------
+> >  1 file changed, 61 insertions(+), 58 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c index
+> > ab5ee1c445f3..8ad7cb2a7f08 100644
+> > --- a/arch/arm/mach-imx/time.c
+> > +++ b/arch/arm/mach-imx/time.c
+> > @@ -84,27 +84,34 @@
+> >  static struct clock_event_device clockevent_mxc;  static enum
+> > clock_event_mode clockevent_mode = CLOCK_EVT_MODE_UNUSED;
+> > 
+> > -static void __iomem *timer_base;
+> > +struct imx_timer {
+> > +	void __iomem *base;
+> > +	int irq;
+> > +	struct clk *clk_per;
+> > +	struct clk *clk_ipg;
+> > +};
+> > +
+> > +static struct imx_timer imxtm;
+> > 
+> Since the changes still used a global variable to hold the information, it doesn't take advantage of what the clocksource framework provides, and make the driver unable to support multi-instances.
+> 
 
-By using clock-indices and moving all this gate stuff out of clk-sunxi
-and into a new driver.
+The goal of the series is to clean up cpu_is_xxx usages, and move the
+driver into drivers/clocksource.  The multi-instances can be supported
+later when we see a need for that.
 
-It's done already, I just need to make sure everything works at it
-used to on all the SoCs.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150519/41783623/attachment.sig>
+Shawn
