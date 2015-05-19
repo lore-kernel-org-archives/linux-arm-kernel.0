@@ -1,48 +1,46 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 19 May 2015 13:33:14 +0100
-Subject: [PATCH v3 01/17] mfd: add new driver for Sharp LoCoMo
-In-Reply-To: <20150519112134.GD2067@n2100.arm.linux.org.uk>
-References: <1431880077-26321-1-git-send-email-dbaryshkov@gmail.com>
- <1431880077-26321-2-git-send-email-dbaryshkov@gmail.com>
- <20150519103828.GU22418@x1>
- <20150519112134.GD2067@n2100.arm.linux.org.uk>
-Message-ID: <20150519123314.GA3627@x1>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 19 May 2015 14:33:59 +0200
+Subject: [PATCH] ARM: multi_v7_defconfig: Add Atmel SAMA5 family
+In-Reply-To: <9986808.t62JLgg5NJ@wuerfel>
+References: <1428051678-20450-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <555AFF3F.10400@atmel.com> <9986808.t62JLgg5NJ@wuerfel>
+Message-ID: <20150519123358.GA15179@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 May 2015, Russell King - ARM Linux wrote:
-
-> On Tue, May 19, 2015 at 11:38:28AM +0100, Lee Jones wrote:
-> > On Sun, 17 May 2015, Dmitry Eremin-Solenikov wrote:
-> > > +static void locomo_mask_irq(struct irq_data *d)
-> > > +{
-> > > +	struct locomo *ldev = irq_data_get_irq_chip_data(d);
-> > > +	unsigned int mask = 0x0010 << d->hwirq;
-> > 
-> > This also needs defining.
-> > 
-> > Why not
-> >   BIT(d->hwirq + 1)
+On 19/05/2015 at 13:04:22 +0200, Arnd Bergmann wrote :
+> > > @@ -250,15 +261,18 @@ CONFIG_SERIAL_FSL_LPUART=y
+> > >  CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
+> > >  CONFIG_SERIAL_ST_ASC=y
+> > >  CONFIG_SERIAL_ST_ASC_CONSOLE=y
+> > > +CONFIG_HW_RANDOM=y
+> > >  CONFIG_I2C_CHARDEV=y
+> > >  CONFIG_I2C_DAVINCI=y
+> > >  CONFIG_I2C_MUX=y
 > 
-> I think your maths is off...
+> seems non-essential.
 > 
-> 0x0010 << d->hwirq != BIT(d->hwirq + 1)
 
-Ah, that's hex.  I was blinded by the 1's and 0's.  Doh!
+That is an oversight, it should be compiled as a module.
 
-Thanks Russell.
+> > > @@ -502,6 +522,8 @@ CONFIG_RTC_DRV_MV=y
+> > >  CONFIG_RTC_DRV_TEGRA=y
+> > >  CONFIG_DMADEVICES=y
+> > >  CONFIG_DW_DMAC=y
+> > > +CONFIG_AT_HDMAC=y
+> > > +CONFIG_AT_XDMAC=y
+> > >  CONFIG_MV_XOR=y
+> > >  CONFIG_TEGRA20_APB_DMA=y
+> > >  CONFIG_SH_DMAE=y
+> 
+> What are these required for? I assume you need them for MMC? If so, that's
+> fine.
+> 
 
----
+That is indeed the reason.
 
-Why not
-  BIT(d->hwirq + 4)
-
-... with an explanation as to why you're skipping the first 4 bits?
-
-/me hopes that maths is right now. :)
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
