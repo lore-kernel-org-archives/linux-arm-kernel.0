@@ -1,48 +1,34 @@
-From: jaegeuk@kernel.org (Jaegeuk Kim)
-Date: Tue, 19 May 2015 00:59:05 -0700
-Subject: [PATCH] crypto: allow to assign gfp_t for __crypto_alloc_tfm
-In-Reply-To: <20150519073012.GA29030@gondor.apana.org.au>
-References: <1432014416-39326-1-git-send-email-jaegeuk@kernel.org>
- <20150519054945.GA28060@gondor.apana.org.au>
- <20150519062430.GA39588@jaegeuk-mac02.hsd1.ca.comcast.net>
- <20150519063211.GA28347@gondor.apana.org.au>
- <20150519065812.GA40012@jaegeuk-mac02.hsd1.ca.comcast.net>
- <20150519065929.GA28610@gondor.apana.org.au>
- <20150519071317.GB40012@jaegeuk-mac02.hsd1.ca.comcast.net>
- <20150519071521.GA28862@gondor.apana.org.au>
- <20150519072740.GA40281@jaegeuk-mac02.hsd1.ca.comcast.net>
- <20150519073012.GA29030@gondor.apana.org.au>
-Message-ID: <20150519075905.GA40521@jaegeuk-mac02.hsd1.ca.comcast.net>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 19 May 2015 15:58:51 +0800
+Subject: [PATCH 1/9] ARM: imx: move timer resources into a structure
+In-Reply-To: <5559C23E.5070100@linaro.org>
+References: <1431677507-27420-1-git-send-email-shawnguo@kernel.org>
+ <1431677507-27420-2-git-send-email-shawnguo@kernel.org>
+ <5559C23E.5070100@linaro.org>
+Message-ID: <20150519075851.GV1071@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 03:30:12PM +0800, Herbert Xu wrote:
-> On Tue, May 19, 2015 at 12:27:40AM -0700, Jaegeuk Kim wrote:
+On Mon, May 18, 2015 at 12:43:10PM +0200, Daniel Lezcano wrote:
+> On 05/15/2015 10:11 AM, shawnguo at kernel.org wrote:
+> >From: Shawn Guo <shawn.guo@linaro.org>
 > >
-> > So, IMHO, it can consume memory too much, since tfm should be allocated for
-> > every inodes and be alive until inode eviction.
+> >Instead of passing around as argument, let's move timer resources like
+> >irq and clocks together with base address into a data structure, and
+> >reference the resources from the struct variable directly to simplify
+> >the function call interface.
+> >
+> >Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 > 
-> Are you sure this is a real problem? Have you actually looked at
-> how much memory it consumes?
-
-I didn't measure the memory footprint. I can't tell it is a real problem,
-but at least, I hope it can reduce somewhat memory consumption.
-Because, already per-inode crypto structure consumes at least 84 bytes.
-
+> I would be nice to embed the clockevent_mxc variable in the
+> structure as well and use container_of to retrieve the structure
+> from the struct clockevent.
 > 
-> > Apart from giving GFP_NOFS, do you mean that it is a wrong approach?
+> The struct clockevent can be the unified parameter across the
+> different functions.
 > 
-> Allocating the tfm and setting a key on the data path is not
-> acceptable.
+> Refer to drivers/clocksource/rockchip_timer.c as an example.
 
-Ok, I'll check it again and investigate in more detail how not to break
-this rule.
+Okay, thanks for the example.  I will add a patch to do that.
 
-Thank you very much for the comments.
-
-> 
-> Cheers,
-> -- 
-> Email: Herbert Xu <herbert@gondor.apana.org.au>
-> Home Page: http://gondor.apana.org.au/~herbert/
-> PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Shawn
