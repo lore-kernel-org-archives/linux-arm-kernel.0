@@ -1,33 +1,22 @@
-From: marcel@holtmann.org (Marcel Holtmann)
-Date: Tue, 19 May 2015 19:39:01 +0200
-Subject: [PATCH] mac802154: select CRYPTO when needed
-In-Reply-To: <4189396.LhxDXkIPfr@wuerfel>
-References: <4189396.LhxDXkIPfr@wuerfel>
-Message-ID: <611EB56D-2A2D-4307-969F-6E7BEAEB597C@holtmann.org>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 19 May 2015 19:53:39 +0200
+Subject: [PATCH 2/2] iio: adc: xilinx-xadc: Add xlnx,extend-name as an
+ optional argument for aux channels
+In-Reply-To: <1431038644-41600-2-git-send-email-xander.huff@ni.com>
+References: <1431038644-41600-1-git-send-email-xander.huff@ni.com>
+ <1431038644-41600-2-git-send-email-xander.huff@ni.com>
+Message-ID: <555B78A3.2030202@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 05/08/2015 12:44 AM, Xander Huff wrote:
+> To better facilitate user-mode access to optional aux channels, allow
+> device trees to specify a custom extended name for defined channels.
 
-> The mac802154 subsystem uses functions from the crypto layer and correctly
-> selects the individual crypto algorithms, but fails to build when the
-> crypto layer is disabled altogether:
-> 
-> crypto/built-in.o: In function `crypto_ctr_free':
-> :(.text+0x80): undefined reference to `crypto_drop_spawn'
-> crypto/built-in.o: In function `crypto_rfc3686_free':
-> :(.text+0xac): undefined reference to `crypto_drop_spawn'
-> crypto/built-in.o: In function `crypto_ctr_crypt':
-> :(.text+0x2f0): undefined reference to `blkcipher_walk_virt_block'
-> :(.text+0x2f8): undefined reference to `crypto_inc'
-> 
-> To solve that, this patch also selects the core crypto code,
-> like all other users of that code do.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Hi,
 
-patch has been applied to bluetooth-next tree.
+'extend-name' is kind of a IIO specific term. I think a better name in the 
+devicetree context would be 'label'. That's used everywhere else when giving 
+a short description string to a node.
 
-Regards
-
-Marcel
+- Lars
