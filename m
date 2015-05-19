@@ -1,52 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 19 May 2015 16:08:53 +0100
-Subject: [PATCH 1/2] ARM: imx: enable smp for i.MX7D
-In-Reply-To: <CAHrpEqTwwb0P1wE+AOYVPgPz8=tBbEKn92amWaoN63GPOJxRgw@mail.gmail.com>
-References: <1431378955-991-1-git-send-email-Frank.Li@freescale.com>
- <20150519025758.GK1071@dragon>
- <CAHrpEqTwwb0P1wE+AOYVPgPz8=tBbEKn92amWaoN63GPOJxRgw@mail.gmail.com>
-Message-ID: <20150519150852.GI2067@n2100.arm.linux.org.uk>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Tue, 19 May 2015 17:34:16 +0200
+Subject: [PATCH v8 09/16] clockevents/drivers: Add STM32 Timer driver
+In-Reply-To: <20150519145006.GH2067@n2100.arm.linux.org.uk>
+References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <555B098A.8030202@linaro.org>
+ <CALszF6AJ3Zf598wYeUx=iNWHHKT24xUyfagB=+4GocwZ-Fd-0g@mail.gmail.com>
+ <6177628.0ZDPLeVyah@wuerfel>
+ <CALszF6BZKD-CPTZ6Hc85wv2Z3Y7JmUv-cMkBtbk2Ga6WeeWU=A@mail.gmail.com>
+ <555B3F80.8070605@linaro.org>
+ <CALszF6A-De6dvcRNoa9ruL+y6Wt_rc7bi-O-VxHWkFF9NSt5_g@mail.gmail.com>
+ <20150519145006.GH2067@n2100.arm.linux.org.uk>
+Message-ID: <CALszF6CRXst-4UwMYeDLxrN_3N4Z9q1dxAR7CzFyngeM6Qeqzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 09:52:54AM -0500, Zhi Li wrote:
-> On Mon, May 18, 2015 at 9:57 PM, Shawn Guo <shawnguo@kernel.org> wrote:
-> >> diff --git a/arch/arm/mach-imx/headsmp.S b/arch/arm/mach-imx/headsmp.S
-> >> index de5047c..95467c7 100644
-> >> --- a/arch/arm/mach-imx/headsmp.S
-> >> +++ b/arch/arm/mach-imx/headsmp.S
-> >> @@ -29,3 +29,8 @@ ENTRY(v7_secondary_startup)
-> >>       set_diag_reg
-> >>       b       secondary_startup
-> >>  ENDPROC(v7_secondary_startup)
-> >> +
-> >> +ENTRY(ca7_secondary_startup)
-> >> +     bl      v7_invalidate_l1
-> >> +     b       secondary_startup
-> >> +ENDPROC(ca7_secondary_startup)
-> >
-> > v7_secondary_startup doesn't work for you?
-> 
-> Yes,
-> v7_secondary_startup check debug register and cause halt.
+2015-05-19 16:50 GMT+02:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+>
+> config CLKSRC_STM32
+>         bool "Clocksource for STM32 SoCs" if COMPILE_TEST
+>         depends on OF
+>         select CLKSRC_MMIO
+>
+> This permits CLKSRC_STM32 to be selected by STM32 (provided OF is enabled,
+> it's always going to be for that case, right?) while allowing the option
+> to be visible when both OF!=n and COMPILE_TEST!=n.
 
-A better question is, why do we have the diagnostic register setting at
-platform level... and should we move it into the core SMP code so that
-we can guarantee that all CPUs are setup the same.  I guess there are
-problems on big.LITTLE systems where we have to deal with different CPU
-types.
+Yes OF is always enabled when STM32.
 
-A separate issue is the v7_invalidate_l1, and looking at this again, I
-wonder whether the v7_flush_dcache_louis in __v7_setup is really the
-right thing to be doing there.  At that point, the caches are disabled,
-so we're not using them.  Any dirty cache lines at that point would be
-inaccessible to the CPU, and so would be a bug.  I think that should
-become v7_invalidate_l1, which would then elimiante all the platforms
-which are doing this local hack.
+So it fits our needs, as we only want the option to be visible when
+both OF!=n and COMPILE_TEST!=n.
 
-In fact, on CPUs prior to ARMv6, we have always invalidated the caches,
-rather than asking them to write back dirty cache lines.
+>
+> Remember,
+>
+>         bool "string" if <condition-affects-visibility-of-string>
+>         depends on <condition-affects-config-symbol-availability>
+>
+> The former merely hides the option from the user _if_ the condition fails.
+> The latter _disables_ the option completely (except if you try and select
+> it, at which point you end up with a Kconfig warning about that.)
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Thanks for the reminder!
+Maxime
