@@ -1,47 +1,34 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Tue, 19 May 2015 15:12:11 +0100
-Subject: [Xen-devel] [RFC 02/23] xen/xenbus: client: Fix call of
- virt_to_mfn in xenbus_grant_ring
-In-Reply-To: <555B3FF6.4050902@citrix.com>
-References: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
- <1431622863-28575-3-git-send-email-julien.grall@citrix.com>
- <555B3FF6.4050902@citrix.com>
-Message-ID: <555B44BB.1090200@citrix.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 19 May 2015 22:13:46 +0800
+Subject: [PATCH] ARM: dts: fix imx27 dtb build rule
+Message-ID: <1432044826-6629-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+From: Shawn Guo <shawn.guo@linaro.org>
 
-On 19/05/15 14:51, David Vrabel wrote:
->> --- a/drivers/xen/xenbus/xenbus_client.c
->> +++ b/drivers/xen/xenbus/xenbus_client.c
->> @@ -379,16 +379,16 @@ int xenbus_grant_ring(struct xenbus_device *dev, void *vaddr,
->>  	int i, j;
->>  
->>  	for (i = 0; i < nr_pages; i++) {
->> -		unsigned long addr = (unsigned long)vaddr +
->> -			(PAGE_SIZE * i);
->>  		err = gnttab_grant_foreign_access(dev->otherend_id,
->> -						  virt_to_mfn(addr), 0);
->> +						  virt_to_mfn(vaddr), 0);
->>  		if (err < 0) {
->>  			xenbus_dev_fatal(dev, err,
->>  					 "granting access to ring page");
->>  			goto fail;
->>  		}
->>  		grefs[i] = err;
->> +
->> +		vaddr = (char *)vaddr + PAGE_SIZE;
-> 
-> You don't need the cast here since vaddr is a void *.
+The i.MX27 dtb build should be controlled by CONFIG_SOC_IMX27 rather
+than CONFIG_SOC_IMX31.
 
-Arithmetic on void pointer is a GCC extension [1]. I wasn't sure what is
-the Linux policy on it.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Fixes: cb612390e546 ("ARM: dts: Only build dtb if associated Arch and/or SoC is enabled")
+Cc: <stable@vger.kernel.org>
+---
+ arch/arm/boot/dts/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Regards,
-
-[1] https://gcc.gnu.org/onlinedocs/gcc/Pointer-Arith.html#Pointer-Arith
-
-
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 86217db2937a..992736b5229b 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -223,7 +223,7 @@ dtb-$(CONFIG_SOC_IMX25) += \
+ 	imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dtb \
+ 	imx25-karo-tx25.dtb \
+ 	imx25-pdk.dtb
+-dtb-$(CONFIG_SOC_IMX31) += \
++dtb-$(CONFIG_SOC_IMX27) += \
+ 	imx27-apf27.dtb \
+ 	imx27-apf27dev.dtb \
+ 	imx27-eukrea-mbimxsd27-baseboard.dtb \
 -- 
-Julien Grall
+1.9.1
