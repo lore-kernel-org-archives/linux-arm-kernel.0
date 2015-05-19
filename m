@@ -1,30 +1,40 @@
-From: treding@nvidia.com (Thierry Reding)
-Date: Tue, 19 May 2015 15:32:27 +0200
-Subject: [PATCH] drm/nouveau/platform: add IOMMU dependency
-In-Reply-To: <2918377.0irYYn09PU@wuerfel>
-References: <2918377.0irYYn09PU@wuerfel>
-Message-ID: <20150519133225.GA26555@ulmo.nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 19 May 2015 15:33:28 +0200
+Subject: [PATCH] [RESEND] SCSI: ips: remove pointless #warning
+Message-ID: <3121960.dnOqT9LCth@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 02:53:26PM +0200, Arnd Bergmann wrote:
-> The recently added iommu code in the nouveau driver fails to build
-> when the IOMMU support is disabled:
-> 
-> drivers/gpu/drm/nouveau/nouveau_platform.c: In function 'nouveau_platform_probe_iommu':
-> drivers/gpu/drm/nouveau/nouveau_platform.c:113:41: error: 'const struct iommu_ops' has no mem
-> 
-> To avoid the build error, this now adds an explicit dependency on the
-> IOMMU implementation.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 58fd9375c2c5 ("drm/nouveau/platform: probe IOMMU if present")
+The ips driver contains
 
-Acked-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150519/b896fe1c/attachment.sig>
+ #warning "This driver has only been tested on the x86/ia64/x86_64 platforms"
+
+which gets printed by the compiler every time this driver gets
+build for something other than those three architectures. The same
+is true for most other drivers, but none of them prints a warning like
+this.
+
+Let's remove the warning now to reduce the amount of clutter.
+
+FWIW, I've reviewed the driver and found a few oddities, but nothing
+that needs to be fixed or that would be architecture specific.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+Submitted last in January, but got no reply
+
+diff --git a/drivers/scsi/ips.c b/drivers/scsi/ips.c
+index 7542f11d3fcd..d86673a4cdb4 100644
+--- a/drivers/scsi/ips.c
++++ b/drivers/scsi/ips.c
+@@ -206,10 +206,6 @@ module_param(ips, charp, 0);
+ #define IPS_VERSION_HIGH        IPS_VER_MAJOR_STRING "." IPS_VER_MINOR_STRING
+ #define IPS_VERSION_LOW         "." IPS_VER_BUILD_STRING " "
+ 
+-#if !defined(__i386__) && !defined(__ia64__) && !defined(__x86_64__)
+-#warning "This driver has only been tested on the x86/ia64/x86_64 platforms"
+-#endif
+-
+ #define IPS_DMA_DIR(scb) ((!scb->scsi_cmd || ips_is_passthru(scb->scsi_cmd) || \
+                          DMA_NONE == scb->scsi_cmd->sc_data_direction) ? \
+                          PCI_DMA_BIDIRECTIONAL : \
