@@ -1,60 +1,35 @@
-From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
-Date: Tue, 19 May 2015 15:12:23 +0530
-Subject: [PATCH v1 2/2] ARM: vf610: Add SoC bus support for Vybrid
-In-Reply-To: <20150519062413.GR1071@dragon>
-References: <cover.1431928866.git.maitysanchayan@gmail.com>
- <653ed53ef933a6834c4fd3c90ee47e5fb5c78160.1431928866.git.maitysanchayan@gmail.com>
- <20150519062413.GR1071@dragon>
-Message-ID: <20150519094223.GA3194@Sanchayan-Arch.toradex.int>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Tue, 19 May 2015 12:45:00 +0300
+Subject: [PATCH v3 06/17] video: lcd: add LoCoMo LCD driver
+In-Reply-To: <20150519093644.GT22418@x1>
+References: <1431880077-26321-1-git-send-email-dbaryshkov@gmail.com>
+ <1431880077-26321-7-git-send-email-dbaryshkov@gmail.com>
+ <20150519093644.GT22418@x1>
+Message-ID: <CALT56yMwGngNvRWiCux962B=EQODUHW3=-ed6SZWJ9PnSPm09A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn,
+2015-05-19 12:36 GMT+03:00 Lee Jones <lee.jones@linaro.org>:
+> On Sun, 17 May 2015, Dmitry Eremin-Solenikov wrote:
+>
+>> LoCoMo has some special handling for TFT screens attached to Collie and
+>> Poodle. Implement that as a separate driver.
+>>
+>> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+>> ---
+>>  drivers/video/backlight/Kconfig      |  10 ++
+>>  drivers/video/backlight/Makefile     |   1 +
+>>  drivers/video/backlight/locomo_lcd.c | 285 +++++++++++++++++++++++++++++++++++
+>>  3 files changed, 296 insertions(+)
+>>  create mode 100644 drivers/video/backlight/locomo_lcd.c
+>
+> This looks like it should be part of patch 16.
+>
+> How much of this file is the same as the one removed later in the set?
 
-On 15-05-19 14:24:13, Shawn Guo wrote:
-> On Mon, May 18, 2015 at 11:50:07AM +0530, Sanchayan Maity wrote:
-> > Implements SoC bus support to export SoC specific information. Read
-> > the unique SoC ID from the Vybrid On Chip One Time Programmable
-> > (OCOTP) controller, SoC specific information from the Miscellaneous
-> > System Control Module (MSCM), revision from the ROM revision register
-> > and expose it via the SoC bus infrastructure.
-> > 
-> > Sample Output:
-> > 
-> > root at vf:/sys/devices/soc0# cat soc_id
-> > df63c12a2e2161d4
-> > root at vf:/sys/devices/soc0# cat family
-> > Freescale Vybrid VF500
-> > root at vf:/sys/devices/soc0# cat revision
-> > 00000013
-> > root at vf:/sys/devices/soc0# cat machine
-> > Freescale Vybrid
-> > 
-> > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> > ---
-> >  arch/arm/mach-imx/mach-vf610.c | 81 ++++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 81 insertions(+)
-> > 
-> > diff --git a/arch/arm/mach-imx/mach-vf610.c b/arch/arm/mach-imx/mach-vf610.c
-> > index 2e7c75b..64c78e4 100644
-> > --- a/arch/arm/mach-imx/mach-vf610.c
-> > +++ b/arch/arm/mach-imx/mach-vf610.c
-> > @@ -11,6 +11,86 @@
-> >  #include <linux/irqchip.h>
-> >  #include <asm/mach/arch.h>
-> >  #include <asm/hardware/cache-l2x0.h>
-> > +#include <linux/slab.h>
-> > +#include <linux/sys_soc.h>
-> > +#include <linux/mfd/syscon.h>
-> > +#include <linux/regmap.h>
-> > +#include <linux/random.h>
-> 
-> Please group <linux/*> headers together and sort alphabetically.
+This is a completely new driver. Only few comments remained from old
+locomolcd.c.
 
-Ok. Will fix this and send out a v2. The rest is acceptable?
-
-> 
-> Shawn
-
-Thanks & Regards,
-Sanchayan Maity.
+-- 
+With best wishes
+Dmitry
