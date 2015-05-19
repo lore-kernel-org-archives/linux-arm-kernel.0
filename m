@@ -1,61 +1,83 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 19 May 2015 11:16:15 +0100
-Subject: [PATCH v7 08/13] ARM: unify MMU/!MMU addruart calls
-In-Reply-To: <20150519053503.GP1071@dragon>
-References: <1431769465-26867-1-git-send-email-stefan@agner.ch>
- <1431769465-26867-9-git-send-email-stefan@agner.ch>
- <20150516205103.GO2067@n2100.arm.linux.org.uk>
- <alpine.DEB.2.11.1505170952060.4225@nanos>
- <alpine.DEB.2.11.1505181735230.4225@nanos>
- <20150519053503.GP1071@dragon>
-Message-ID: <20150519101615.GA2067@n2100.arm.linux.org.uk>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 19 May 2015 11:17:32 +0100
+Subject: [RFC/PATCH 2/9] arm: dma-mapping: Support IOMMU mappings spanning
+ the full 32 bits range
+In-Reply-To: <1431644410-2997-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1431644410-2997-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1431644410-2997-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <555B0DBC.6090204@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 01:35:03PM +0800, Shawn Guo wrote:
-> On Mon, May 18, 2015 at 05:36:43PM +0200, Thomas Gleixner wrote:
-> > On Sun, 17 May 2015, Thomas Gleixner wrote:
-> > > On Sat, 16 May 2015, Russell King - ARM Linux wrote:
-> > > > On Sat, May 16, 2015 at 11:44:20AM +0200, Stefan Agner wrote:
-> > > > > Remove the needless differences between MMU/!MMU addruart calls.
-> > > > > This allows to use the same addruart macro on SoC level. Useful
-> > > > > for SoC consisting of multiple CPUs with and without MMU such as
-> > > > > Freescale Vybrid.
-> > > > > 
-> > > > > Signed-off-by: Stefan Agner <stefan@agner.ch>
-> > > > 
-> > > > Depending on the merge plan for the remainder (has tglx reviewed the IRQ
-> > > > changes yet?  I think he needs to before this can be merged)... if it's
-> > > > not going to go in for the next merge window, this should find its way
-> > > > into the patch system so it can be applied anyway.
-> > > 
-> > > I'm going to apply the irq core and chip driver modifications to a
-> > > separate branch later today, so you or ARM-SOC folks can pull that
-> > > in. Will send you a mail where it can be found.
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip.git irq/for-arm
-> > 
-> > That contains the first 5 patches which touch kernel/irq/ and
-> > drivers/irqchip/
-> 
-> Russell, Arnd,
-> 
-> I guess the easiest way to merge rest of the series is to have them go
-> via i.MX tree with your nods?
+Hi Laurent,
 
-I don't know, I've not looked at the remainder of the patches.  Having
-looked briefly at them, it looks like they touch EFM32 as well, so I'm
-not sure having them all go through iMX is the right approach either.
+On 15/05/15 00:00, Laurent Pinchart wrote:
+> The arm_iommu_create_mapping() function takes the IOMMU mapping size as
+> a size_t, limiting the size to 4GB - 1 on 32 bit platforms while most
+> bus masters would support the full 32 bits range. Fix this by passing
+> the size as a 64 bits integer, and limiting it to 4GB for now.
 
-Looking at the EFM32 patch, it looks like we've adopted my suggestion
-(discussed with Arnd in the previous month) wrt noMMU, so I'll post a
-couple of patches in a moment which fix Integrator for this as well.
-Integrator is independent of this series, and it fixes real problems
-caused by the single zImage stuff for noMMU there.
+FYI there's already an almost-identical patch in -rc3 from Marek fixing 
+this: 1424532b2163 ("ARM: 8347/1: dma-mapping: fix off-by-one check in 
+arm_setup_iommu_dma_ops").
 
-It makes sense for these to all go through arm-soc - but the question
-is how do we get them all into arm-soc...
+Robin.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+>
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> ---
+>   arch/arm/include/asm/dma-iommu.h |  2 +-
+>   arch/arm/mm/dma-mapping.c        | 12 +++---------
+>   2 files changed, 4 insertions(+), 10 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/dma-iommu.h b/arch/arm/include/asm/dma-iommu.h
+> index 8e3fcb924db6..2ef282f96651 100644
+> --- a/arch/arm/include/asm/dma-iommu.h
+> +++ b/arch/arm/include/asm/dma-iommu.h
+> @@ -25,7 +25,7 @@ struct dma_iommu_mapping {
+>   };
+>
+>   struct dma_iommu_mapping *
+> -arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size);
+> +arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, u64 size);
+>
+>   void arm_iommu_release_mapping(struct dma_iommu_mapping *mapping);
+>
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 7aa5e339a596..c69e216a0cf9 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -1878,7 +1878,7 @@ struct dma_map_ops iommu_coherent_ops = {
+>    * arm_iommu_attach_device function.
+>    */
+>   struct dma_iommu_mapping *
+> -arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size)
+> +arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, u64 size)
+>   {
+>   	unsigned int bits = size >> PAGE_SHIFT;
+>   	unsigned int bitmap_size = BITS_TO_LONGS(bits) * sizeof(long);
+> @@ -1886,7 +1886,8 @@ arm_iommu_create_mapping(struct bus_type *bus, dma_addr_t base, size_t size)
+>   	int extensions = 1;
+>   	int err = -ENOMEM;
+>
+> -	if (!bitmap_size)
+> +	/* Limit the size to 4GB for now. */
+> +	if (!size || size > (1ULL << 32))
+>   		return ERR_PTR(-EINVAL);
+>
+>   	if (bitmap_size > PAGE_SIZE) {
+> @@ -2057,13 +2058,6 @@ static bool arm_setup_iommu_dma_ops(struct device *dev, u64 dma_base, u64 size,
+>   	if (!iommu)
+>   		return false;
+>
+> -	/*
+> -	 * currently arm_iommu_create_mapping() takes a max of size_t
+> -	 * for size param. So check this limit for now.
+> -	 */
+> -	if (size > SIZE_MAX)
+> -		return false;
+> -
+>   	mapping = arm_iommu_create_mapping(dev->bus, dma_base, size);
+>   	if (IS_ERR(mapping)) {
+>   		pr_warn("Failed to create %llu-byte IOMMU mapping for device %s\n",
+>
