@@ -1,29 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 19 May 2015 11:17:10 +0200
-Subject: [PATCH v2 06/11] pinctrl: mediatek: Add Pinctrl/GPIO driver for
- mt6397.
-In-Reply-To: <1432015882-8646-7-git-send-email-hongzhou.yang@mediatek.com>
-References: <1432015882-8646-1-git-send-email-hongzhou.yang@mediatek.com>
- <1432015882-8646-7-git-send-email-hongzhou.yang@mediatek.com>
-Message-ID: <CACRpkdYZ74avT1kKoKUc-kF9BBRrA4X_sj8CCk=K=vOjzhAYTg@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 19 May 2015 10:18:56 +0100
+Subject: [PATCHv2 08/12] arm64: psci: remove ACPI coupling
+In-Reply-To: <555AF703.4050702@linaro.org>
+References: <1431945503-6939-1-git-send-email-mark.rutland@arm.com>
+ <1431945503-6939-9-git-send-email-mark.rutland@arm.com>
+ <555AF703.4050702@linaro.org>
+Message-ID: <20150519091856.GA1035@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 8:11 AM, Hongzhou Yang
-<hongzhou.yang@mediatek.com> wrote:
+On Tue, May 19, 2015 at 09:40:35AM +0100, Hanjun Guo wrote:
+> > diff --git a/arch/arm64/include/asm/psci.h b/arch/arm64/include/asm/psci.h
+> > index 2454bc5..b5d4c1d 100644
+> > --- a/arch/arm64/include/asm/psci.h
+> > +++ b/arch/arm64/include/asm/psci.h
+> > @@ -14,7 +14,14 @@
+> >   #ifndef __ASM_PSCI_H
+> >   #define __ASM_PSCI_H
+> >
+> > -int psci_dt_init(void);
+> > -int psci_acpi_init(void);
+> > +int __init psci_dt_init(void);
+> > +
+> > +#ifdef CONFIG_ACPI
+> > +int __init psci_acpi_init(void);
+> > +bool __init acpi_psci_present(void);
+> > +bool __init acpi_psci_use_hvc(void);
+> 
+> really some nit, do we need __init for function declaration?
 
-> Add mt6397 support using mediatek common pinctrl driver.
->
-> mt6397 is a PMIC, and pinctrl/GPIO is part of 6397 chip.
-> Pinctrl/GPIO driver should obtain regmap from PMIC,
-> so adding this support to common code.
->
-> Also, mt6397 is no need to support interrupt controller,
-> so changing common code to skip it.
->
-> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+Given that it's used for function declarations in init.h and other
+places, I believe it is best practice. Even if not strictly necessary it
+makes clear to the casual read when a function may be called.
 
-APplied this version instead.
+> 
+> other than that,
+> 
+> Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-Yours,
-Linus Walleij
+Cheers!
+
+Mark.
