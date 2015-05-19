@@ -1,78 +1,39 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 19 May 2015 02:07:52 +0200 (CEST)
-Subject: [PATCH] arch/arm64 :Cyclic Test fix in ARM64 fpsimd
-In-Reply-To: <20150518213835.GD4275@linutronix.de>
-References: <CAPyr0yJSGqvxkUWLtNKe0q5mNanBczAfAVx0tPKuzYeDG+eJ=Q@mail.gmail.com>
- <20150506193803.GC32577@8074w.roxell.se>
- <CAPyr0y+OYikc2Euh++2nTWnVb-aZ4i-tifLLk3XUiRahtHKjCA@mail.gmail.com>
- <20150508000929.GE31914@8074w.roxell.se>
- <CAPyr0yLq7PsMW45G+oJzJLbQ-be6Xx9n2S2SU2CiV+AMH9jJ8Q@mail.gmail.com>
- <20150514160733.GE13442@linutronix.de>
- <CAPyr0yL8xJt4bj7poLFrauR0wtfKB7nPg+uy4A+R0dTT-eM3Qw@mail.gmail.com>
- <CAF7YWnw08YK7ogAoLTYXusOvtGCxfDPJW0H+8LyWDzNi_CbR=w@mail.gmail.com>
- <20150518213835.GD4275@linutronix.de>
-Message-ID: <alpine.DEB.2.11.1505190207070.4225@nanos>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 18 May 2015 19:37:59 -0500
+Subject: How to encode being an I2C slave in DT?
+In-Reply-To: <20150506161712.GA4003@katana>
+References: <1427745615-5428-1-git-send-email-danindrey@mail.ru>
+ <20150403194635.GC2016@katana> <1549160.njMIY2NVTi@fb07-iapwap2>
+ <20150505105513.GA1841@katana> <554922EF.3050906@wwwdotorg.org>
+ <20150506161712.GA4003@katana>
+Message-ID: <CAL_Jsq+iyeK-bV3ggcJv8Cw3EU71fkBo1wqYZnhCoh2-b_tO-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 18 May 2015, Sebastian Andrzej Siewior wrote:
+On Wed, May 6, 2015 at 11:17 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
+>
+>> The container node has a #address-cells property for this very reason. It's
+>> perfectly well-defined how to split up a property containing a large number
+>> of cells into separate values, by using the value of #address-cells. Plus,
+>> the canonical formatting (albeit not enforced by the DT compiler) for a
+>> property that contains an array of entries, each 2 cells in size, would be:
+>>
+>> reg = <0 0x1a>, <0 0x40>, <0 0x48>;
+>>
+>> rather than:
+>>
+>> reg = <0 0x1a 0 0x40 0 0x48>;
+>>
+>> ... so it's quite simple to make it very human-readable too.
+>
+> I give in to the flag idea. I also noticed that we'd need another flag
+> anyhow to mark 10 bit addresses. I am still thinking between using two
+> address-cells in that case (clean seperation between address and flags)
+> or to encode the flags as MSB in the current address (all busses will
+> have same address-cells and child description, less code paths and no
+> overhead in dtbs).
 
-> * Gary Robertson | 2015-05-18 08:23:16 [-0500]:
-> 
-> >I have been following this thread and was able to obtain a copy of the full
-> >log from Anders.
-> >My initial impression based upon the log entries is that the excessive
-> >latencies did not occur during the fpsimd calls -
-> >but the actual progress of an individual task is a bit difficult to follow
-> >through the logs, so in my spare time
-> >I started writing a parser to sort it into a format easier to follow.  I
-> >hope to have it completed shortly.
-> >This parser will sort the log first by CPU and then by thread so the cause
-> >of the delay will be easier to see.
-> 
-> There is a smaller version of it at 
->     https://breakpoint.cc/arm64_simd_trace_cpu.txt
-> 
-> which contains only CPU0 around that "event. Here are a few pieces:
-> |cyclicte-964     0....1.. 511965877us : __schedule <-schedule
-> cyclictest goes away
-> 
-> |kworker/-353     0....111 511965906us : rt_spin_unlock <-process_one_work
-> kworker is now active
-> 
-> |kworker/-353     0....112 511965954us : kernel_neon_begin_partial <-virt_efi_set_time
-> |kworker/-353     0....112 511965955us : preempt_count_add <-kernel_neon_begin_partial
-> and kworker invokes virt_efi_set_time which does the neon save thingy.
-> 
-> |kworker/-353     0d...212 511966764us : __handle_domain_irq <-gic_handle_irq
-> now we have an interrupt comming.
-> 
-> |kworker/-353     0dn.h412 511966793us : task_woken_rt <-ttwu_do_wakeup
-> it might be the timer for cyclictest wakeup it might not, however we
-> have the N flag set and kworker has to go.
-> 
-> |kworker/-353     0dn..212 511966806us : rcu_sysidle_enter <-rcu_irq_exit
-> |kworker/-353     0dn..212 511967108us : __handle_domain_irq <-gic_handle_irq
-> |kworker/-353     0dn..212 511967109us : irq_enter <-__handle_domain_irq
-> so we finished handling one irq and we contiunue with the next one? This
-> goes on and on and on until finally after a while we have this:
-> 
-> |kworker/-353     0dn..212 512064373us : rcu_irq_exit <-irq_exit
-> |kworker/-353     0dn..212 512064374us : rcu_sysidle_enter <-rcu_irq_exit
-> |kworker/-353     0.n..212 512065116us : kernel_neon_end <-virt_efi_set_time
-> |kworker/-353     0.n..212 512065116us : preempt_count_sub <-kernel_neon_end
-> |kworker/-353     0.n..112 512065117us : __schedule <-preempt_schedule
-> 
-> and this time we were able to return from rcu_irq_exit and continue with
-> virt_efi_set_time and finally switch the task. So yes, preemption was
-> disabled during kernel_neon_{being|end} but we also received 81
-> interrupt ("gic_handle_irq invocation") during that time. Why is that?
+Reading thru the thread, this seems good to me. I would go with adding
+flags in the MSB of the reg cell rather than adding a cell.
 
-> |kworker/-353     0dn..212 512064373us : rcu_irq_exit <-irq_exit
-> |kworker/-353     0dn..212 512064374us : rcu_sysidle_enter <-rcu_irq_exit
-
-That's called from RCU_NONIDLE(). Go figure ...
-
-Thanks,
-
-	tglx
+Rob
