@@ -1,37 +1,38 @@
-From: mika.westerberg@linux.intel.com (Mika Westerberg)
-Date: Tue, 19 May 2015 16:15:16 +0300
-Subject: [PATCH] i2c: designware: separate ops for system_sleep_pm and
- runtime_pm
-In-Reply-To: <20150519203242.74617ad6@xhacker>
-References: <1431693099-2292-1-git-send-email-jszhang@marvell.com>
- <20150518082823.GH1490@lahna.fi.intel.com>
- <20150519203242.74617ad6@xhacker>
-Message-ID: <20150519131516.GO1490@lahna.fi.intel.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Tue, 19 May 2015 15:17:32 +0200
+Subject: [PATCH v8 09/16] clockevents/drivers: Add STM32 Timer driver
+In-Reply-To: <20150519130028.GF2067@n2100.arm.linux.org.uk>
+References: <1431158038-3813-10-git-send-email-mcoquelin.stm32@gmail.com>
+ <5559E4B0.70506@linaro.org>
+ <CALszF6CK7axU0qrWNf38aqrt2R2126ZACn7wx5jNY_1KE+4H+g@mail.gmail.com>
+ <555AF143.2060807@linaro.org>
+ <CALszF6CwGuKqgbX6gVrya1-_YOgvtrgC7pVqKTNjCRif_o532A@mail.gmail.com>
+ <555AFD18.2070009@linaro.org>
+ <CALszF6Asfke0-cMQJcEQ8ya+rbPPPhUc6aXTZXQvQ8QF66cwYQ@mail.gmail.com>
+ <555B098A.8030202@linaro.org>
+ <CALszF6AJ3Zf598wYeUx=iNWHHKT24xUyfagB=+4GocwZ-Fd-0g@mail.gmail.com>
+ <alpine.DEB.2.11.1505191455540.4225@nanos>
+ <20150519130028.GF2067@n2100.arm.linux.org.uk>
+Message-ID: <CALszF6CLE3NY=pcsKeL2HGbr0HvJJZnHprpkOHgjRquC4pWNxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 08:32:42PM +0800, Jisheng Zhang wrote:
-> > I can see that this fixes the issue with the platform driver (as the
-> > platform bus core doesn't power on the device automatically as opposed
-> > to other buses, like PCI). However, I'm thinking that can we do better
-> > here.
-> > 
-> > Instead of powering the device on again, can't we leave it in low power
-> > state? Recently added 'dev->power.direct_complete' may be used to
-> > achieve that, I think.
-> 
-> how to handle runtime suspended via just being clock gated?
+2015-05-19 15:00 GMT+02:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Tue, May 19, 2015 at 02:56:43PM +0200, Thomas Gleixner wrote:
+>> Folks, can you please trim your replies. It's a PITA to scroll down
+>> through several pages to find a single line of content.
+>
+> Absolutely right.  Too many people do not do this, and it's a waste of
+> readers time.  Maybe we should start ignoring emails which contain only
+> quoted mail in the first 50 lines.
+>
+> Also, cutting the rest of the email below the point which you've finished
+> replying is good etiquette as well.  I've seen a number of posts where
+> people have added their signature mid-mail and left a huge chunk of quoted
+> mail below.  That's just not on either.
+>
 
-As far as I can tell driver's suspend hook does the clock gating so why
-would you need to handle it differently? Once the device is runtime
-suspended, it is both clock and power gated depending on the platform.
+Ok, I will take care of that.
+Sorry for the inconvenience,
 
-> Currently the only solution is using the runtime pm apis to ensure the
-> device is in a working state during s2ram. What's your opinion?
-
-Well, it sounds a bit silly to resume the device just because you want
-to call i2c_dw_disable() for it before suspending again ;-)
-
-At least, it would be nice to check if we can keep it runtime suspended
-with the help of 'dev->power.direct_complete'. If not possible, then I
-suppose your patch is sufficient.
+Maxime
