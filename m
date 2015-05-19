@@ -1,86 +1,188 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 19 May 2015 12:31:17 +0100
-Subject: [PATCH v2 3/5] arm64: Juno: Add memory mapped timer node
-In-Reply-To: <1432033003.3047.43.camel@linaro.org>
-References: <1431970109-8902-1-git-send-email-Liviu.Dudau@arm.com>
- <1431970109-8902-4-git-send-email-Liviu.Dudau@arm.com>
- <1432033003.3047.43.camel@linaro.org>
-Message-ID: <20150519113116.GH2175@e106497-lin.cambridge.arm.com>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Tue, 19 May 2015 13:40:16 +0200
+Subject: [PATCH] ARM: kirkwood: add "jedec,spi-nor" flash compatible binding
+Message-ID: <1432035616-14783-1-git-send-email-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 11:56:43AM +0100, Jon Medhurst (Tixy) wrote:
-> On Mon, 2015-05-18 at 18:28 +0100, Liviu Dudau wrote:
-> > Juno based boards have a memory mapped timer @ 0x2a810000. This
-> > is disabled on r0 version of the board due to an SoC errata.
-> 
-> So wouldn't it make more sense then to disable it in the dts for r0? As
-> it is, you disable it in the common file below then have to later
-> re-enable it in juno-r1.dts.
+Starting with commit 8947e396a829 ("Documentation: dt: mtd: replace
+"nor-jedec" binding with "jedec, spi-nor"") we have "jedec,spi-nor"
+binding indicating support for JEDEC identification.
 
->From what I have seen in the existing DTs the preffer approach seems to be of
-disabling by default the node declared in the common files and enable
-it in the DT that makes use of it. My quick grep through the arch/arm/boot/dts
-files shows 2638 .dtsi files using 'status = "disabled";' string vs 93 .dts
-files. 'status = "okay";' is more evenly balances with 805 .dtsi files using
-it vs 3256 .dts files.
+Use it for all flashes that are supposed to support READ ID op according
+to the datasheets.
 
-If there is any guidance on how to describe this sort of situations I
-would really love to read it.
+Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+---
+ arch/arm/boot/dts/kirkwood-b3.dts              | 2 +-
+ arch/arm/boot/dts/kirkwood-cloudbox.dts        | 2 +-
+ arch/arm/boot/dts/kirkwood-dir665.dts          | 2 +-
+ arch/arm/boot/dts/kirkwood-dreamplug.dts       | 2 +-
+ arch/arm/boot/dts/kirkwood-lsxl.dtsi           | 2 +-
+ arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts | 2 +-
+ arch/arm/boot/dts/kirkwood-netxbig.dtsi        | 2 +-
+ arch/arm/boot/dts/kirkwood-ns2-common.dtsi     | 2 +-
+ arch/arm/boot/dts/kirkwood-rd88f6192.dts       | 2 +-
+ arch/arm/boot/dts/kirkwood-synology.dtsi       | 2 +-
+ arch/arm/boot/dts/kirkwood-t5325.dts           | 2 +-
+ arch/arm/boot/dts/kirkwood-ts219.dtsi          | 2 +-
+ 12 files changed, 12 insertions(+), 12 deletions(-)
 
-> 
-> Apart from that, the whole series looks good to be and I've given it a
-> spin on r0 and r1. So consider that an
-> Acked-by: Jon Medhurst <tixy@linaro.org>
-
-Many thanks,
-Liviu
-
-> 
-> 
-> > 
-> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > ---
-> >  arch/arm64/boot/dts/arm/juno-base.dtsi | 15 +++++++++++++++
-> >  1 file changed, 15 insertions(+)
-> > 
-> > diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-> > index 5c4c035..b7e862f 100644
-> > --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
-> > +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-> > @@ -2,6 +2,21 @@
-> >  	 *  Devices shared by all Juno boards
-> >  	 */
-> >  
-> > +	memtimer: timer at 2a810000 {
-> > +		compatible = "arm,armv7-timer-mem";
-> > +		reg = <0x0 0x2a810000 0x0 0x10000>;
-> > +		clock-frequency = <50000000>;
-> 
-> 
-> > +		#address-cells = <2>;
-> > +		#size-cells = <2>;
-> > +		ranges;
-> > +		status = "disabled";
-> > +		frame at 2a830000 {
-> > +			frame-number = <1>;
-> > +			interrupts = <0 60 4>;
-> > +			reg = <0x0 0x2a830000 0x0 0x10000>;
-> > +		};
-> > +	};
-> > +
-> >  	gic: interrupt-controller at 2c010000 {
-> >  		compatible = "arm,gic-400", "arm,cortex-a15-gic";
-> >  		reg = <0x0 0x2c010000 0 0x1000>,
-> 
-> 
-
+diff --git a/arch/arm/boot/dts/kirkwood-b3.dts b/arch/arm/boot/dts/kirkwood-b3.dts
+index c9247f8..d2936ad 100644
+--- a/arch/arm/boot/dts/kirkwood-b3.dts
++++ b/arch/arm/boot/dts/kirkwood-b3.dts
+@@ -74,7 +74,7 @@
+ 			m25p16 at 0 {
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
+-				compatible = "st,m25p16";
++				compatible = "st,m25p16", "jedec,spi-nor";
+ 				reg = <0>;
+ 				spi-max-frequency = <40000000>;
+ 				mode = <0>;
+diff --git a/arch/arm/boot/dts/kirkwood-cloudbox.dts b/arch/arm/boot/dts/kirkwood-cloudbox.dts
+index ab6ab49..7ec7656 100644
+--- a/arch/arm/boot/dts/kirkwood-cloudbox.dts
++++ b/arch/arm/boot/dts/kirkwood-cloudbox.dts
+@@ -42,7 +42,7 @@
+ 			flash at 0 {
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
+-				compatible = "mxicy,mx25l4005a";
++				compatible = "mxicy,mx25l4005a", "jedec,spi-nor";
+ 				reg = <0>;
+ 				spi-max-frequency = <20000000>;
+ 				mode = <0>;
+diff --git a/arch/arm/boot/dts/kirkwood-dir665.dts b/arch/arm/boot/dts/kirkwood-dir665.dts
+index 786959e..0473fcc 100644
+--- a/arch/arm/boot/dts/kirkwood-dir665.dts
++++ b/arch/arm/boot/dts/kirkwood-dir665.dts
+@@ -93,7 +93,7 @@
+ 			m25p80 at 0 {
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
+-				compatible = "mxicy,mx25l12805d";
++				compatible = "mxicy,mx25l12805d", "jedec,spi-nor";
+ 				spi-max-frequency = <50000000>;
+ 				reg = <0>;
+ 
+diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
+index 6467c79..e2abc82 100644
+--- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
++++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
+@@ -42,7 +42,7 @@
+ 			m25p40 at 0 {
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
+-				compatible = "mxicy,mx25l1606e";
++				compatible = "mxicy,mx25l1606e", "jedec,spi-nor";
+ 				reg = <0>;
+ 				spi-max-frequency = <50000000>;
+ 				mode = <0>;
+diff --git a/arch/arm/boot/dts/kirkwood-lsxl.dtsi b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
+index 5348447..1d6528d 100644
+--- a/arch/arm/boot/dts/kirkwood-lsxl.dtsi
++++ b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
+@@ -74,7 +74,7 @@
+ 			m25p40 at 0 {
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
+-				compatible = "m25p40";
++				compatible = "m25p40", "jedec,spi-nor";
+ 				reg = <0>;
+ 				spi-max-frequency = <25000000>;
+ 				mode = <0>;
+diff --git a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
+index f82827d..b7e7d78 100644
+--- a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
++++ b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
+@@ -65,7 +65,7 @@
+ 			flash at 0 {
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
+-				compatible = "mxicy,mx25l12805d";
++				compatible = "mxicy,mx25l12805d", "jedec,spi-nor";
+ 				reg = <0>;
+ 				spi-max-frequency = <50000000>;
+ 				mode = <0>;
+diff --git a/arch/arm/boot/dts/kirkwood-netxbig.dtsi b/arch/arm/boot/dts/kirkwood-netxbig.dtsi
+index b0cfb7c..1508b121 100644
+--- a/arch/arm/boot/dts/kirkwood-netxbig.dtsi
++++ b/arch/arm/boot/dts/kirkwood-netxbig.dtsi
+@@ -33,7 +33,7 @@
+ 			flash at 0 {
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
+-				compatible = "mxicy,mx25l4005a";
++				compatible = "mxicy,mx25l4005a", "jedec,spi-nor";
+ 				reg = <0>;
+ 				spi-max-frequency = <20000000>;
+ 				mode = <0>;
+diff --git a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
+index fe6c024..e832b63 100644
+--- a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
++++ b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
+@@ -29,7 +29,7 @@
+ 			flash at 0 {
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
+-				compatible = "mxicy,mx25l4005a";
++				compatible = "mxicy,mx25l4005a", "jedec,spi-nor";
+ 				reg = <0>;
+ 				spi-max-frequency = <20000000>;
+ 				mode = <0>;
+diff --git a/arch/arm/boot/dts/kirkwood-rd88f6192.dts b/arch/arm/boot/dts/kirkwood-rd88f6192.dts
+index 35a29de..e0b9593 100644
+--- a/arch/arm/boot/dts/kirkwood-rd88f6192.dts
++++ b/arch/arm/boot/dts/kirkwood-rd88f6192.dts
+@@ -61,7 +61,7 @@
+ 			m25p128 at 0 {
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
+-				compatible = "st,m25p128";
++				compatible = "st,m25p128", "jedec,spi-nor";
+ 				reg = <0>;
+ 				spi-max-frequency = <20000000>;
+ 				mode = <0>;
+diff --git a/arch/arm/boot/dts/kirkwood-synology.dtsi b/arch/arm/boot/dts/kirkwood-synology.dtsi
+index 8be5b2e..04015c17 100644
+--- a/arch/arm/boot/dts/kirkwood-synology.dtsi
++++ b/arch/arm/boot/dts/kirkwood-synology.dtsi
+@@ -217,7 +217,7 @@
+ 			m25p80 at 0 {
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
+-				compatible = "st,m25p80";
++				compatible = "st,m25p80", "jedec,spi-nor";
+ 				reg = <0>;
+ 				spi-max-frequency = <20000000>;
+ 				mode = <0>;
+diff --git a/arch/arm/boot/dts/kirkwood-t5325.dts b/arch/arm/boot/dts/kirkwood-t5325.dts
+index 610ec0f..ed956b8 100644
+--- a/arch/arm/boot/dts/kirkwood-t5325.dts
++++ b/arch/arm/boot/dts/kirkwood-t5325.dts
+@@ -88,7 +88,7 @@
+ 			flash at 0 {
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
+-				compatible = "st,m25p80";
++				compatible = "st,m25p80", "jedec,spi-nor";
+ 				spi-max-frequency = <86000000>;
+ 				reg = <0>;
+ 				mode = <0>;
+diff --git a/arch/arm/boot/dts/kirkwood-ts219.dtsi b/arch/arm/boot/dts/kirkwood-ts219.dtsi
+index df7f152..c56ab6b 100644
+--- a/arch/arm/boot/dts/kirkwood-ts219.dtsi
++++ b/arch/arm/boot/dts/kirkwood-ts219.dtsi
+@@ -49,7 +49,7 @@
+ 			m25p128 at 0 {
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
+-				compatible = "m25p128";
++				compatible = "m25p128", "jedec,spi-nor";
+ 				reg = <0>;
+ 				spi-max-frequency = <20000000>;
+ 				mode = <0>;
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+1.8.4.5
