@@ -1,98 +1,52 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 19 May 2015 15:58:27 +0200
-Subject: [PATCH 11/15] thermal: thermal: Add support for hardware-tracked
- trip points
-In-Reply-To: <20150518120944.GQ6325@pengutronix.de>
-References: <1431507163-19933-1-git-send-email-s.hauer@pengutronix.de>
- <1431507163-19933-12-git-send-email-s.hauer@pengutronix.de>
- <5559ABAA.6040001@kapsi.fi> <20150518120944.GQ6325@pengutronix.de>
-Message-ID: <20150519135827.GF6325@pengutronix.de>
+From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
+Date: Tue, 19 May 2015 09:57:19 -0400
+Subject: [PATCH] xen: fix building on ARM with CONFIG_HIBERNATE_CALLBACKS
+In-Reply-To: <3837965.uXvcfKiP40@wuerfel>
+References: <3837965.uXvcfKiP40@wuerfel>
+Message-ID: <555B413F.7020509@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 18, 2015 at 02:09:44PM +0200, Sascha Hauer wrote:
-> Hi Mikko,
-> 
-> On Mon, May 18, 2015 at 12:06:50PM +0300, Mikko Perttunen wrote:
-> > > +	for (i = 0; i < tz->trips; i++) {
-> > > +		int trip_low;
-> > > +
-> > > +		tz->ops->get_trip_temp(tz, i, &trip_temp);
-> > > +		tz->ops->get_trip_hyst(tz, i, &hysteresis);
-> > > +
-> > > +		trip_low = trip_temp - hysteresis;
-> > > +
-> > > +		if (trip_low < temp && trip_low > low)
-> > > +			low = trip_low;
-> > > +
-> > > +		if (trip_temp > temp && trip_temp < high)
-> > > +			high = trip_temp;
-> > > +	}
-> > > +
-> > > +	tz->prev_low_trip = low;
-> > > +	tz->prev_high_trip = high;
-> > > +
-> > > +	dev_dbg(&tz->device, "new temperature boundaries: %d < x < %d\n",
-> > > +			low, high);
-> > > +
-> > > +	tz->ops->set_trips(tz, low, high);
-> > 
-> > This should probably do something if set_trips returns an error
-> > code; at least an error message, perhaps enable polling? I'm not
-> > exactly sure what safety features the thermal framework has in
-> > general if errors happen..
-> 
-> Currently a thermal zone has the passive_delay and polling_delay
-> variables. If these are nonzero the thermal core will always poll. A
-> purely interrupt driven thermal zone would set these values to zero.
-> In this case the thermal core has no basis for polling, so we would
-> have to make up polling intervals when set_trips fails. Another
-> possibility would be to interpret the *_delay variables as 'when
-> set_trips is available, do not poll. When something goes wrong, use
-> *_delay as polling intervals'
-> 
-> > 
-> > One interesting thing I noticed was that at least the bang-bang
-> > governor only acts if the temperature is properly smaller than (trip
-> > temp - hysteresis). So perhaps we should specify the non-tripping
-> > range as [low, high)? Or we could change bang-bang.
-> 
-> I wonder how we can protect against such off-by-one errors anyway.
-> Generally a hardware might operate on raw values rather than directly
-> in temperature values in ?C. This means a driver for this must have
-> celsius_to_raw and raw_to_celsius conversion functions. Now it can
-> happen that due to rounding errors celsius_to_raw(Tcrit) returns a raw
-> value that when converted back to celsius is different from the
-> original value in ?C. This would mean the hardware triggers an interrupt
-> for a trip point and the thermal core does not react because get_temp
-> actually returns a different temperature than previously programmed as
-> interrupt trigger. This way we would lose hot (or cold) events.
+On 05/19/2015 08:58 AM, Arnd Bergmann wrote:
+> A recent bug fix for x86 broke Xen on ARM for the case that
+> CONFIG_HIBERNATE_CALLBACKS is enabled:
+>
+> drivers/built-in.o: In function `do_suspend':
+> /git/arm-soc/drivers/xen/manage.c:134: undefined reference to `xen_arch_suspend'
+> drivers/built-in.o:(.debug_addr+0xc3f4): undefined reference to `xen_arch_suspend'
+>
+> It is not clear to me what needs to be done here, but this
+> patch avoids the build error by adding a stub for the
+> missing function.
 
-As a simple example we could imagine a 12bit adc which has:
+This is already fixed in Xen staging tree.
 
-u32 mcelsius_to_raw(int temp)
-{
-	return temp / 30;
-}
+Thanks.
+-boris
 
-int raw_to_mcelsius(u32 raw)
-{
-	return temp * 30;
-}
-
-Now if the thermal framework requests an interrupt at 77000mC we
-would program a raw value of 77000 / 30 = 2566.666667, due to integer
-rounding we would program 2566. Now when the interrupt is triggered with
-this exact raw value we would convert it back to 2566 * 30 = 76980. The
-thermal framework would realize that this is below the threshold, do
-nothing and go back to sleep.
-I am beginning to think that implementing interrupts like this is not a
-good idea, at least I found no convenient way out of this situation.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 2b953a5e99 ("xen: Suspend ticks on all CPUs during suspend")
+> ---
+> Please review, and submit an alternate patch if this one turns
+> out to be incorrect.
+>
+> diff --git a/include/xen/xen-ops.h b/include/xen/xen-ops.h
+> index 0ce4f32017ea..034dc8acd47e 100644
+> --- a/include/xen/xen-ops.h
+> +++ b/include/xen/xen-ops.h
+> @@ -13,7 +13,13 @@ void xen_arch_post_suspend(int suspend_cancelled);
+>   
+>   void xen_timer_resume(void);
+>   void xen_arch_resume(void);
+> +#ifdef CONFIG_X86
+>   void xen_arch_suspend(void);
+> +#else
+> +static inline void xen_arch_suspend(void)
+> +{
+> +}
+> +#endif
+>   
+>   void xen_resume_notifier_register(struct notifier_block *nb);
+>   void xen_resume_notifier_unregister(struct notifier_block *nb);
+>
