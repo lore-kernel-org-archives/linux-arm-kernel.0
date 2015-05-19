@@ -1,36 +1,33 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 19 May 2015 12:25:37 -0700
-Subject: [PATCH] [RESEND] SCSI: ips: remove pointless #warning
-In-Reply-To: <1432060697.14737.1.camel@HansenPartnership.com>
-References: <3121960.dnOqT9LCth@wuerfel>
- <1432043572.3007.14.camel@HansenPartnership.com>
- <2850783.725LtIIUFq@wuerfel>
- <1432060697.14737.1.camel@HansenPartnership.com>
-Message-ID: <1432063537.2870.203.camel@perches.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 19 May 2015 21:37:32 +0200
+Subject: [PATCH] ARM: lpc18xx: define low-level debug symbol for
+ LPC18xx/43xx
+In-Reply-To: <1432061703-29104-1-git-send-email-manabian@gmail.com>
+References: <1432061703-29104-1-git-send-email-manabian@gmail.com>
+Message-ID: <CAMuHMdU=MAr3nGE0cXH0X3a5eEqsw13b_WESYayoCABz4Z_YcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-05-19 at 11:38 -0700, James Bottomley wrote:
-> On Tue, 2015-05-19 at 15:56 +0200, Arnd Bergmann wrote:
-> > On Tuesday 19 May 2015 06:52:52 James Bottomley wrote:
-> > > On Tue, 2015-05-19 at 15:33 +0200, Arnd Bergmann wrote:
-> > > > The ips driver contains
-> > > >  #warning "This driver has only been tested on the x86/ia64/x86_64 platforms"
+Hi Joachim,
 
-trivial:
+On Tue, May 19, 2015 at 8:55 PM, Joachim Eastwood <manabian@gmail.com> wrote:
+> Using a dedicated symbol for low-level debugging instead of the
+> arch symbol will make this platform play nice when enabled on a
+> kernel that supports multiple platforms.
 
-> > My main interest here is to get a clean build of ARM 'allmodconfig'.
-[]
-> What about this?  It captures the intent of the
-> original but gets rid of the warning.
-[]
-> diff --git a/drivers/scsi/ips.c b/drivers/scsi/ips.c
-[]
-> @@ -6788,6 +6784,11 @@ ips_remove_device(struct pci_dev *pci_dev)
->  static int __init
->  ips_module_init(void)
->  {
-> +#if !defined(__i386__) && !defined(__ia64__) && !defined(__x86_64__)
-> +        printk(KERN_ERR, "ips: This driver has only been tested on the x86/ia64/x86_64 platforms\n");
+Thanks a lot!
 
-Bad comma after KERN_ERR, and KERN_ALERT might be better.
+> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
