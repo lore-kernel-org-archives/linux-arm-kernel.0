@@ -1,103 +1,61 @@
-From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
-Date: Tue, 19 May 2015 17:05:29 +0300
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 19 May 2015 16:05:46 +0200
 Subject: [PATCH 11/15] thermal: thermal: Add support for hardware-tracked
  trip points
-In-Reply-To: <20150519135827.GF6325@pengutronix.de>
+In-Reply-To: <20150518184433.GS11598@ld-irv-0074>
 References: <1431507163-19933-1-git-send-email-s.hauer@pengutronix.de>
  <1431507163-19933-12-git-send-email-s.hauer@pengutronix.de>
  <5559ABAA.6040001@kapsi.fi> <20150518120944.GQ6325@pengutronix.de>
- <20150519135827.GF6325@pengutronix.de>
-Message-ID: <555B4329.8070504@kapsi.fi>
+ <20150518184433.GS11598@ld-irv-0074>
+Message-ID: <20150519140546.GE26575@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/19/15 16:58, Sascha Hauer wrote:
+On Mon, May 18, 2015 at 11:44:33AM -0700, Brian Norris wrote:
 > On Mon, May 18, 2015 at 02:09:44PM +0200, Sascha Hauer wrote:
->> Hi Mikko,
->>
->> On Mon, May 18, 2015 at 12:06:50PM +0300, Mikko Perttunen wrote:
->>>> +	for (i = 0; i < tz->trips; i++) {
->>>> +		int trip_low;
->>>> +
->>>> +		tz->ops->get_trip_temp(tz, i, &trip_temp);
->>>> +		tz->ops->get_trip_hyst(tz, i, &hysteresis);
->>>> +
->>>> +		trip_low = trip_temp - hysteresis;
->>>> +
->>>> +		if (trip_low < temp && trip_low > low)
->>>> +			low = trip_low;
->>>> +
->>>> +		if (trip_temp > temp && trip_temp < high)
->>>> +			high = trip_temp;
->>>> +	}
->>>> +
->>>> +	tz->prev_low_trip = low;
->>>> +	tz->prev_high_trip = high;
->>>> +
->>>> +	dev_dbg(&tz->device, "new temperature boundaries: %d < x < %d\n",
->>>> +			low, high);
->>>> +
->>>> +	tz->ops->set_trips(tz, low, high);
->>>
->>> This should probably do something if set_trips returns an error
->>> code; at least an error message, perhaps enable polling? I'm not
->>> exactly sure what safety features the thermal framework has in
->>> general if errors happen..
->>
->> Currently a thermal zone has the passive_delay and polling_delay
->> variables. If these are nonzero the thermal core will always poll. A
->> purely interrupt driven thermal zone would set these values to zero.
->> In this case the thermal core has no basis for polling, so we would
->> have to make up polling intervals when set_trips fails. Another
->> possibility would be to interpret the *_delay variables as 'when
->> set_trips is available, do not poll. When something goes wrong, use
->> *_delay as polling intervals'
->>
->>>
->>> One interesting thing I noticed was that at least the bang-bang
->>> governor only acts if the temperature is properly smaller than (trip
->>> temp - hysteresis). So perhaps we should specify the non-tripping
->>> range as [low, high)? Or we could change bang-bang.
->>
->> I wonder how we can protect against such off-by-one errors anyway.
->> Generally a hardware might operate on raw values rather than directly
->> in temperature values in ?C. This means a driver for this must have
->> celsius_to_raw and raw_to_celsius conversion functions. Now it can
->> happen that due to rounding errors celsius_to_raw(Tcrit) returns a raw
->> value that when converted back to celsius is different from the
->> original value in ?C. This would mean the hardware triggers an interrupt
->> for a trip point and the thermal core does not react because get_temp
->> actually returns a different temperature than previously programmed as
->> interrupt trigger. This way we would lose hot (or cold) events.
->
-> As a simple example we could imagine a 12bit adc which has:
->
-> u32 mcelsius_to_raw(int temp)
-> {
-> 	return temp / 30;
-> }
->
-> int raw_to_mcelsius(u32 raw)
-> {
-> 	return temp * 30;
-> }
->
-> Now if the thermal framework requests an interrupt at 77000mC we
-> would program a raw value of 77000 / 30 = 2566.666667, due to integer
-> rounding we would program 2566. Now when the interrupt is triggered with
-> this exact raw value we would convert it back to 2566 * 30 = 76980. The
-> thermal framework would realize that this is below the threshold, do
-> nothing and go back to sleep.
-> I am beginning to think that implementing interrupts like this is not a
-> good idea, at least I found no convenient way out of this situation.
+> > On Mon, May 18, 2015 at 12:06:50PM +0300, Mikko Perttunen wrote:
+> > > One interesting thing I noticed was that at least the bang-bang
+> > > governor only acts if the temperature is properly smaller than (trip
+> > > temp - hysteresis). So perhaps we should specify the non-tripping
+> > > range as [low, high)? Or we could change bang-bang.
+> > 
+> > I wonder how we can protect against such off-by-one errors anyway.
+> > Generally a hardware might operate on raw values rather than directly
+> > in temperature values in ?C. This means a driver for this must have
+> > celsius_to_raw and raw_to_celsius conversion functions. Now it can
+> > happen that due to rounding errors celsius_to_raw(Tcrit) returns a raw
+> > value that when converted back to celsius is different from the
+> > original value in ?C. This would mean the hardware triggers an interrupt
+> > for a trip point and the thermal core does not react because get_temp
+> > actually returns a different temperature than previously programmed as
+> > interrupt trigger. This way we would lose hot (or cold) events.
+> 
+> This also highlights another fact: there's a race between interrupt
+> generation and temperature reading (->get_temp()). I would expect any
+> hardware interrupt thermal sensor would also have a latched temperature
+> reading to correspond with it, and there would be no guarantee that this
+> latched temperature will match the polled reading seen once you reach
+> thermal_zone_device_update(). So a hardware driver might report a
+> thermal update, but the temperature reported to the core won't
+> necessarily match what interrupt was meant for.
+> 
+> I have a patch that adds a thermal_zone_device_update_temp() API, so
+> drivers can report the temperature along with the interrupt
+> notification. (Such a patch also helps so that the driver can choose to
+> round down on cold events and up on hot events, resolving your rounding
+> issue too.)
 
-Couldn't you just specify that the driver should do the best it can? 
-That is, in this case, the driver would program the hardware for the 
-least possible value x for which raw_to_mcelsius(x) >= 77000.
+Could you send me that patch? Thinking about it this might indeed work.
+The only thing that a driver needs to make sure then is that it actually
+at least one time reports a temperature beyond the currently programmed
+thresholds. With the patch you describe a driver could simply do that by
+ignoring the current ADC values and simply reporting the previously
+desired values.
 
->
-> Sascha
->
+Sascha
 
-Cheers,
-Mikko.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
