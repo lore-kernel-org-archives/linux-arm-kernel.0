@@ -1,47 +1,111 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 19 May 2015 23:23:21 +0100
-Subject: sdhci(imx6): misbehaves while installing debian jessie, "Got data
- interrupt 0x00100000"
-Message-ID: <20150519222320.GM2067@n2100.arm.linux.org.uk>
+From: lorenx4@gmail.com (Lorenzo Nava)
+Date: Wed, 20 May 2015 00:27:53 +0200
+Subject: [RFC] arm: DMA-API contiguous cacheable memory
+In-Reply-To: <2882347.Nj1Dq9Wlqh@wuerfel>
+References: <CAE=W-e24oDH5RZfPftRg_xYBiG+b9Sj09vpyay9EwqOo9cVX1w@mail.gmail.com>
+ <20150519163436.GZ21251@e104818-lin.cambridge.arm.com>
+ <CAE=W-e1qynowbccHpYntWwwZPZOMHAVXH=Yj3ukyr_X8WKwQJQ@mail.gmail.com>
+ <2882347.Nj1Dq9Wlqh@wuerfel>
+Message-ID: <CAE=W-e0PkXY3HZA=7Jn8obmLQ75wRr1nCeYb4Ui5+dRJCz7BeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-iMX6 with a Samsung EVO UHS-1 16GB card.
+On Wed, May 20, 2015 at 12:14 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 20 May 2015 00:05:54 Lorenzo Nava wrote:
+>>
+>> On Tue, May 19, 2015 at 6:34 PM, Catalin Marinas
+>> <catalin.marinas@arm.com> wrote:
+>> > On Mon, May 18, 2015 at 10:56:06PM +0200, Lorenzo Nava wrote:
+>> >> it's been a while since I've started working with DMA on ARM processor
+>> >> for a smart camera project. Typically the requirements is to have a
+>> >> large memory area which can be accessed by both DMA and user. I've
+>> >> already noticed that many people wonder about which would be the best
+>> >> way to have data received from DMA mapped in user space and, more
+>> >> important, mapped in a cacheable area of memory. Having a memory
+>> >> mapped region which is cacheable is very important if the user must
+>> >> access the data and make some sort of processing on that.
+>> >> My question is: why don't we introduce a function in the DMA-API
+>> >> interface for ARM processors which allows to allocate a contiguous and
+>> >> cacheable area of memory (> 4MB)?
+>> >> This new function can take advantage of the CMA mechanism as
+>> >> dma_alloc_coherent() function does, but using different PTE attribute
+>> >> for the allocated pages. Basically making a function similar to
+>> >> arm_dma_alloc() and set the attributes differently would do the trick:
+>> >>
+>> >> pgprot_t prot = __pgprot_modify(prot, L_PTE_MT_MASK,
+>> >>         L_PTE_MT_WRITEALLOC | L_PTE_XN)
+>> >
+>> > We already have a way to specify whether a device is coherent via the
+>> > "dma-coherent" DT property. This allows the correct dma_map_ops to be
+>> > set for a device. For cache coherent devices, the
+>> > arm_coherent_dma_alloc() and __dma_alloc() should return cacheable
+>> > memory.
+>
+> That is not what Lorenzo was asking about though.
+>
+>> > However, looking at the code, it seems that __dma_alloc() does not use
+>> > the CMA when is_coherent == true, though you would hit a limit on the
+>> > number of pages that can be allocated.
+>> >
+>> > As for mmap'ing to user space, there is arm_dma_mmap(). This one sets
+>> > the vm_page_prot to what __get_dma_pgprot() returns which is always
+>> > non-cacheable.
+>> >
+>> > I haven't checked the history cache coherent DMA support on arm but I
+>> > think some of the above can be changed. As an example, on arm64
+>> > __dma_alloc() allocates from CMA independent of whether the device is
+>> > coherent or not. Also __get_dma_pgprot() returns cacheable attributes
+>> > for coherent devices, which in turn allows cacheable user mapping of
+>> > such buffers. You don't really need to implement additional functions,
+>> > just tweaks to the existing ones.
+>>
+>> Thanks for the answer. I do agree with you on that: I'll take a look
+>> at arm64 code and I'll be glad to contribute with patches as soon as
+>> possible.
+>>
+>> Anyway I'd like to focus on a different aspect: I think that this
+>> solution can manage cache coherent DMA, so devices which guarantees
+>> the coherency using cache snooping mechanism. However how can I manage
+>> devices which needs contiguous memory and don't guarantee cache
+>> coherency? If the device doesn't implement sg functionality, I can't
+>> allocate buffers which is greater than 4MB because I can't use neither
+>> dma_alloc_coherent() nor accessing directly to CMA (well, actually I
+>> can use dma_alloc_coherent(), but it sounds a little bit confusing).
+>
+> So you have a device that is not cache-coherent, and you want to
+> allocate cacheable memory and manage coherency manually.
+>
+> This is normally done using alloc_pages() and dma_map_single(),
+> but as you have realized, that does not use the CMA area.
+>
+>> Do you think that dma_alloc_coherent() can be used as well with this
+>> type of devices? Do you think that a new dma_alloc_contiguous()
+>> function would help in this case?
+>> Maybe my interpretation of dma_alloc_coherent() is not correct, and
+>> the coherency can be managed using the dma_sync_single_for_* functions
+>> and it doesn't require hardware mechanism.
+>
+> I believe dma_alloc_attrs is the interface you want, with attributes
+> DMA_ATTR_FORCE_CONTIGUOUS and DMA_ATTR_NON_CONSISTENT. I don't
+> know if that is already implemented on arm64, but this is something
+> that can definitely be done.
+>
+> With that memory, you should be able to use the normal streaming
+> API (dma_sync_single_for_*). There is an older interface called
+> dma_alloc_noncoherent(), but that cannot be easily implemented on
+> ARM.
+>
+>         Arnd
 
-There's actually two problems here.
+Yes, this is exactly the point. Currently this function is used only
+with dma_alloc_coherent() function (which actually call
+dma_alloc_attrs()).
+This function, anyway, is not available in the DMA API of linux, but I
+think it could be useful to manage some kind of devices (see my
+previous mail).
 
-1. SDHCI chooses to impose a 10 second timeout on any data operation.
-   This magic value of 10 seconds is rediculous.  Consider that SD
-   cards are typically slower than ATA, and ATA has a timeout of more
-   than one minute for a stuck command...  And yes, I've had this fire
-   a good 10 seconds before I then got...
+What do you think would be the best way to access dma_alloc_attrs
+function from a device driver? Call the function directly?
 
-2. "Got data interrupt 0x00100000 even though no data operation was in progress."
-
-   That's SDHCI_INT_DATA_TIMEOUT.
-
-   Unfortunately, I have no other information, as the registers are
-   dumped at pr_debug() level, which means that they're all compiled
-   out in normal kernel builds.  In any case, I have no way to copy
-   information off of the installing system; debian does not start up
-   a ssh daemon during the install, so remote login is not possible.
-   Nor can I photograph the rather reflective TV screen.
-
-The side-effect of this is that the entire MMC IO subsystem locks up
-and I'm left with lots of processes stuck in IO-wait state, with the
-hungtask detector spewing onto the console.
-
-This happens while installing Debian Jessie, which is an "expensive"
-operation: not only in time (it takes 45 minutes or so to reproduce,
-requiring the stupid debian installer to be babysat during that time)
-but also because it's having to download the entire distro for each
-attempt (which eats into my monthly bandwidth allowance, so I can
-_only_ do this after 8pm local time.)
-
-I've tried twice tonight (which is about the limit that I can do in an
-evening), the second time after having up-ed the stupid 10 second limit
-to 60 seconds.  However (2) still occurs.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Thank you.
+Lorenzo
