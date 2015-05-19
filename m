@@ -1,194 +1,82 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 20 May 2015 00:05:18 +0200
-Subject: [PATCH dt v8] ARM: dts: add support for Vybrid running on Cortex-M4
-Message-ID: <1432073118-26898-1-git-send-email-stefan@agner.ch>
+From: lorenx4@gmail.com (Lorenzo Nava)
+Date: Wed, 20 May 2015 00:05:54 +0200
+Subject: [RFC] arm: DMA-API contiguous cacheable memory
+In-Reply-To: <20150519163436.GZ21251@e104818-lin.cambridge.arm.com>
+References: <CAE=W-e24oDH5RZfPftRg_xYBiG+b9Sj09vpyay9EwqOo9cVX1w@mail.gmail.com>
+ <20150519163436.GZ21251@e104818-lin.cambridge.arm.com>
+Message-ID: <CAE=W-e1qynowbccHpYntWwwZPZOMHAVXH=Yj3ukyr_X8WKwQJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds an initial device tree to run Linux on the Cortex-M4 on
-the Vybrid based Colibri VF61 module.
+Thanks for the answer. I do agree with you on that: I'll take a look
+at arm64 code and I'll be glad to contribute with patches as soon as
+possible.
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- arch/arm/boot/dts/Makefile            |  1 +
- arch/arm/boot/dts/vf610m4-colibri.dts | 99 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/vf610m4.dtsi        | 50 ++++++++++++++++++
- 3 files changed, 150 insertions(+)
- create mode 100644 arch/arm/boot/dts/vf610m4-colibri.dts
- create mode 100644 arch/arm/boot/dts/vf610m4.dtsi
+Anyway I'd like to focus on a different aspect: I think that this
+solution can manage cache coherent DMA, so devices which guarantees
+the coherency using cache snooping mechanism. However how can I manage
+devices which needs contiguous memory and don't guarantee cache
+coherency? If the device doesn't implement sg functionality, I can't
+allocate buffers which is greater than 4MB because I can't use neither
+dma_alloc_coherent() nor accessing directly to CMA (well, actually I
+can use dma_alloc_coherent(), but it sounds a little bit confusing).
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 07476a0..02a7a62 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -328,6 +328,7 @@ dtb-$(CONFIG_SOC_LS1021A) += \
- dtb-$(CONFIG_SOC_VF610) += \
- 	vf500-colibri-eval-v3.dtb \
- 	vf610-colibri-eval-v3.dtb \
-+	vf610m4-colibri.dtb \
- 	vf610-cosmic.dtb \
- 	vf610-twr.dtb
- dtb-$(CONFIG_ARCH_MXS) += \
-diff --git a/arch/arm/boot/dts/vf610m4-colibri.dts b/arch/arm/boot/dts/vf610m4-colibri.dts
-new file mode 100644
-index 0000000..2931a80
---- /dev/null
-+++ b/arch/arm/boot/dts/vf610m4-colibri.dts
-@@ -0,0 +1,99 @@
-+/*
-+ * Device tree for Colibri VF61 Cortex-M4 support
-+ *
-+ * Copyright (C) 2015 Stefan Agner
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "vf610m4.dtsi"
-+
-+/ {
-+	model = "VF610 Cortex-M4";
-+	compatible = "fsl,vf610m4";
-+
-+	chosen {
-+		bootargs = "console=ttyLP2,115200 clk_ignore_unused init=/linuxrc rw";
-+		linux,stdout-path = "&uart2";
-+	};
-+
-+	memory {
-+		reg = <0x8c000000 0x3000000>;
-+	};
-+};
-+
-+&gpio0 {
-+	status = "disabled";
-+};
-+
-+&gpio1 {
-+	status = "disabled";
-+};
-+
-+&gpio2 {
-+	status = "disabled";
-+};
-+
-+&gpio3 {
-+	status = "disabled";
-+};
-+
-+&gpio4 {
-+	status = "disabled";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart2>;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	vf610-colibri {
-+		pinctrl_uart2: uart2grp {
-+			fsl,pins = <
-+				VF610_PAD_PTD0__UART2_TX		0x21a2
-+				VF610_PAD_PTD1__UART2_RX		0x21a1
-+				VF610_PAD_PTD2__UART2_RTS		0x21a2
-+				VF610_PAD_PTD3__UART2_CTS		0x21a1
-+			>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/vf610m4.dtsi b/arch/arm/boot/dts/vf610m4.dtsi
-new file mode 100644
-index 0000000..9ffe2eb
---- /dev/null
-+++ b/arch/arm/boot/dts/vf610m4.dtsi
-@@ -0,0 +1,50 @@
-+/*
-+ * Device tree for VF6xx Cortex-M4 support
-+ *
-+ * Copyright (C) 2015 Stefan Agner
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include "armv7-m.dtsi"
-+#include "vfxxx.dtsi"
-+
-+&mscm_ir {
-+	interrupt-parent = <&nvic>;
-+};
--- 
-2.4.1
+Do you think that dma_alloc_coherent() can be used as well with this
+type of devices? Do you think that a new dma_alloc_contiguous()
+function would help in this case?
+Maybe my interpretation of dma_alloc_coherent() is not correct, and
+the coherency can be managed using the dma_sync_single_for_* functions
+and it doesn't require hardware mechanism.
+
+Thank you.
+Cheers
+
+
+On Tue, May 19, 2015 at 6:34 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Mon, May 18, 2015 at 10:56:06PM +0200, Lorenzo Nava wrote:
+>> it's been a while since I've started working with DMA on ARM processor
+>> for a smart camera project. Typically the requirements is to have a
+>> large memory area which can be accessed by both DMA and user. I've
+>> already noticed that many people wonder about which would be the best
+>> way to have data received from DMA mapped in user space and, more
+>> important, mapped in a cacheable area of memory. Having a memory
+>> mapped region which is cacheable is very important if the user must
+>> access the data and make some sort of processing on that.
+>> My question is: why don't we introduce a function in the DMA-API
+>> interface for ARM processors which allows to allocate a contiguous and
+>> cacheable area of memory (> 4MB)?
+>> This new function can take advantage of the CMA mechanism as
+>> dma_alloc_coherent() function does, but using different PTE attribute
+>> for the allocated pages. Basically making a function similar to
+>> arm_dma_alloc() and set the attributes differently would do the trick:
+>>
+>> pgprot_t prot = __pgprot_modify(prot, L_PTE_MT_MASK,
+>>         L_PTE_MT_WRITEALLOC | L_PTE_XN)
+>
+> We already have a way to specify whether a device is coherent via the
+> "dma-coherent" DT property. This allows the correct dma_map_ops to be
+> set for a device. For cache coherent devices, the
+> arm_coherent_dma_alloc() and __dma_alloc() should return cacheable
+> memory.
+>
+> However, looking at the code, it seems that __dma_alloc() does not use
+> the CMA when is_coherent == true, though you would hit a limit on the
+> number of pages that can be allocated.
+>
+> As for mmap'ing to user space, there is arm_dma_mmap(). This one sets
+> the vm_page_prot to what __get_dma_pgprot() returns which is always
+> non-cacheable.
+>
+> I haven't checked the history cache coherent DMA support on arm but I
+> think some of the above can be changed. As an example, on arm64
+> __dma_alloc() allocates from CMA independent of whether the device is
+> coherent or not. Also __get_dma_pgprot() returns cacheable attributes
+> for coherent devices, which in turn allows cacheable user mapping of
+> such buffers. You don't really need to implement additional functions,
+> just tweaks to the existing ones.
+>
+> Patches welcome ;)
+>
+> --
+> Catalin
