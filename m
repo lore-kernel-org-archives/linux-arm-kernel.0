@@ -1,63 +1,66 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 19 May 2015 16:00:09 +0200
-Subject: [GIT PULL] at91: dt for 4.2 #2
-Message-ID: <1432044009-26072-1-git-send-email-nicolas.ferre@atmel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 19 May 2015 15:59:59 +0200
+Subject: [PATCH v3] pinctrl: sirf: add sirf atlas7 pinctrl and gpio support
+In-Reply-To: <1431934112-16132-1-git-send-email-21cnbao@gmail.com>
+References: <1431934112-16132-1-git-send-email-21cnbao@gmail.com>
+Message-ID: <CACRpkdYT8bti=8iRPs_21r15vB8XWMbUXCpkfScg_J+=werwdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+On Mon, May 18, 2015 at 9:28 AM, Barry Song <21cnbao@gmail.com> wrote:
 
-Some DT updates, manly for our latest SoCs and Xplained boards.
-Base on top of the at91-dt tag that you already pulled.
+> From: Wei Chen <Wei.Chen@csr.com>
+>
+> The Pinctrl module (ioc) controls the Pad's function select
+> (each pad can have 8 functions), Pad's Drive Strength, Pad's
+> Pull Select and Pad's Input Disable status.
+>
+> The ioc has two modules, ioc_top & ioc_rtc. Both of these two
+> modules have function select/clear, Pull select and Drive
+> Strength registers. But only ioc_rtc has input-disable
+> registers. The Pads on ioc_top have to access ioc_rtc to set
+> their input-disable status and intpu-disable-value.
+>
+> So have to use one ioc driver instance to drive these two
+> ioc modules at the same time, and each ioc module will be
+> treat as one bank on the "IOC Device".
+>
+> The GPIO Controller controls the GPIO status if the Pad has
+> been config as GPIO by Pinctrl already. Includes the GPIO
+> Input/output, Interrupt type, Interrupt Status, and Set/Get
+> Values.
+> The GPIO pull up/down are controlled by Pinctrl.
+>
+> There are 7 GPIO Groups and splited into 3 MACROs in atlas7.
+> The GPIO Groups in one MACRO share one GPIO controllers, each
+> GPIO Group are treated as one GPIO bank.
+>
+> For example:
+> In VDIFM macro, there is one GPIO Controller, it has 3 banks
+> to control 3 gpio groups. Its gpio name space is from 0 to 95.
+>
+> The Device Tree can be written as following:
+>
+> gpio-ranges = <&pinctrl 0 0 0>,
+> <&pinctrl 32 0 0>,
+> <&pinctrl 64 0 0>;
+>
+> gpio-ranges-group-names = "gnss_gpio_grp",
+> "lcd_vip_gpio_grp",
+> "sdio_i2s_gpio_grp";
+>
+> bank#0 is from 0~31, the pins are from pinctrl's "gnss_gpio_grp".
+> bank#2 is from 32~63, the pins are from pinctrl's "lcd_vip_gpio_grp".
+> bank#3 is from 64~95, the pins are from pinctrl's "sdio_i2s_gpio_grp".
+>
+> Signed-off-by: Wei Chen <Wei.Chen@csr.com>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> ---
+>  -v3: use generic pinconf to replace self-defined APIs
 
-Thanks, best regards,
+Awesome job Barry, well done.
 
-The following changes since commit 7107bb0b2836f0f9b1ffed1f5189e269ee25e5b9:
+Patch applied!
 
-  ARM: at91/dt: drop deprecated mainck node from pmc (2015-05-11 11:24:01 +0200)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-dt2
-
-for you to fetch changes up to 8d545f32bd77c10c2ab85fce4ddf1273d325d7d3:
-
-  ARM: at91/dt: sama5d4 xplained: add regulators for v(q)mmc1 supplies (2015-05-19 15:04:55 +0200)
-
-----------------------------------------------------------------
-Second batch of DT changes for 4.2:
-- sama5d4: more peripherals: usarts, uarts, spi, pioD access
-- sama5d3: phy address for gmac
-- change NFC register map
-- regulator additions for the sd/mmc
-
-----------------------------------------------------------------
-Ben Dooks (3):
-      ARM: at91/dt: sama5d3 xplained: fill in mmc1 and set it to disabled
-      ARM: at91/dt: sama5d3 xplained: add mmc0 vqmmc entry
-      ARM: at91/dt: sama5d3 xplained: add fixed regulator for vmmc0
-
-Josh Wu (2):
-      ARM: at91/dt: sama5d4: add usart0, usart1 dt nodes
-      ARM: at91/dt: sama5: reduce the NFC command register map
-
-Ludovic Desroches (2):
-      ARM: at91/dt: sama5d4: update pinctrl ranges
-      ARM: at91/dt: sama5d4 xplained: add regulators for v(q)mmc1 supplies
-
-Nicolas Ferre (2):
-      ARM: at91/dt: sama5d4 xplained: add spi1 on j14 connector
-      ARM: at91/dt: sama5d3 xplained: add phy address for macb0
-
-Suchang Ko (2):
-      ARM: at91/dt: sama5d4: add uart0, uart1 dt nodes
-      ARM: at91/dt: sama5d4: add spi1, spi2 dt nodes
-
- arch/arm/boot/dts/at91-sama5d3_xplained.dts |  27 ++++
- arch/arm/boot/dts/at91-sama5d4_xplained.dts |  25 ++++
- arch/arm/boot/dts/sama5d3.dtsi              |   2 +-
- arch/arm/boot/dts/sama5d4.dtsi              | 189 +++++++++++++++++++++++++++-
- 4 files changed, 240 insertions(+), 3 deletions(-)
-
--- 
-Nicolas Ferre
+Yours,
+Linus Walleij
