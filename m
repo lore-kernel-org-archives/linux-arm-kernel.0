@@ -1,44 +1,46 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 19 May 2015 13:34:18 +0100
-Subject: [PATCH v3 06/17] video: lcd: add LoCoMo LCD driver
-In-Reply-To: <CALT56yMwGngNvRWiCux962B=EQODUHW3=-ed6SZWJ9PnSPm09A@mail.gmail.com>
-References: <1431880077-26321-1-git-send-email-dbaryshkov@gmail.com>
- <1431880077-26321-7-git-send-email-dbaryshkov@gmail.com>
- <20150519093644.GT22418@x1>
- <CALT56yMwGngNvRWiCux962B=EQODUHW3=-ed6SZWJ9PnSPm09A@mail.gmail.com>
-Message-ID: <20150519123418.GB3627@x1>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 19 May 2015 20:32:42 +0800
+Subject: [PATCH] i2c: designware: separate ops for system_sleep_pm and
+ runtime_pm
+In-Reply-To: <20150518082823.GH1490@lahna.fi.intel.com>
+References: <1431693099-2292-1-git-send-email-jszhang@marvell.com>
+ <20150518082823.GH1490@lahna.fi.intel.com>
+Message-ID: <20150519203242.74617ad6@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 May 2015, Dmitry Eremin-Solenikov wrote:
+Dear Mika,
 
-> 2015-05-19 12:36 GMT+03:00 Lee Jones <lee.jones@linaro.org>:
-> > On Sun, 17 May 2015, Dmitry Eremin-Solenikov wrote:
-> >
-> >> LoCoMo has some special handling for TFT screens attached to Collie and
-> >> Poodle. Implement that as a separate driver.
-> >>
-> >> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> >> ---
-> >>  drivers/video/backlight/Kconfig      |  10 ++
-> >>  drivers/video/backlight/Makefile     |   1 +
-> >>  drivers/video/backlight/locomo_lcd.c | 285 +++++++++++++++++++++++++++++++++++
-> >>  3 files changed, 296 insertions(+)
-> >>  create mode 100644 drivers/video/backlight/locomo_lcd.c
-> >
-> > This looks like it should be part of patch 16.
-> >
-> > How much of this file is the same as the one removed later in the set?
+On Mon, 18 May 2015 11:28:23 +0300
+Mika Westerberg <mika.westerberg@linux.intel.com> wrote:
+
+> On Fri, May 15, 2015 at 08:31:39PM +0800, Jisheng Zhang wrote:
+> > Commit 1fc2fe204cb9 ("i2c: designware: Add runtime PM hooks") adds
+> > runtime pm support using the same ops for system sleep and runtime pm.
+> > When suspend to ram, the i2c host may have been runtime suspended, thus
+> > i2c_dw_disable() hangs.
 > 
-> This is a completely new driver. Only few comments remained from old
-> locomolcd.c.
+> It hangs because it has already been powered off, right?
 
-Okay, thanks for the explanation.
+Either be powered off or clock gated or even both.
 
-I'm sure Jingoo will be around to review shortly.
+> 
+> > This patch fixes this issue by separating ops for system sleep pm and
+> > runtime pm, and in the system suspend/resume path, runtime pm apis are
+> > used to ensure the device is at correct state.
+> 
+> I can see that this fixes the issue with the platform driver (as the
+> platform bus core doesn't power on the device automatically as opposed
+> to other buses, like PCI). However, I'm thinking that can we do better
+> here.
+> 
+> Instead of powering the device on again, can't we leave it in low power
+> state? Recently added 'dev->power.direct_complete' may be used to
+> achieve that, I think.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+how to handle runtime suspended via just being clock gated? Currently the
+only solution is using the runtime pm apis to ensure the device is in a working
+state during s2ram. What's your opinion?
+
+Thanks,
+Jisheng
