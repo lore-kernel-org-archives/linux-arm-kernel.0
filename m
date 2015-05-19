@@ -1,116 +1,77 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 19 May 2015 10:26:35 +0200
-Subject: [PATCH v2 03/10] clk: sunxi: Let divs clocks read the base
- factor clock name from devicetree
-In-Reply-To: <5559AF58.60508@gmail.com>
-References: <1431707940-19372-1-git-send-email-jenskuske@gmail.com>
- <1431707940-19372-4-git-send-email-jenskuske@gmail.com>
- <20150517130657.GD4004@lukather> <5559AF58.60508@gmail.com>
-Message-ID: <20150519082635.GW4004@lukather>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 19 May 2015 09:31:55 +0100
+Subject: [PATCHv2 02/12] arm64: smp_plat: add get_logical_index
+In-Reply-To: <20150518175532.GC7064@leverpostej>
+References: <1431945503-6939-1-git-send-email-mark.rutland@arm.com>
+ <1431945503-6939-3-git-send-email-mark.rutland@arm.com>
+ <20150518170912.GI21251@e104818-lin.cambridge.arm.com>
+ <20150518175532.GC7064@leverpostej>
+Message-ID: <20150519083154.GU21251@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 18, 2015 at 11:22:32AM +0200, Jens Kuske wrote:
-> On 05/17/15 15:06, Maxime Ripard wrote:
-> > On Fri, May 15, 2015 at 06:38:53PM +0200, Jens Kuske wrote:
-> >> Currently, the sunxi clock driver gets the name for the base factor clock
-> >> of divs clocks from the name field in factors_data. This prevents reusing
-> >> of the factor clock for clocks with same properties, but different name.
-> >>
-> >> This commit makes the divs setup function try to get a name from
-> >> clock-output-names in the devicetree. It also removes the name field where
-> >> possible and merges the sun4i PLL5 and PLL6 clocks.
-> >>
-> >> The sun4i PLL5 clock doesn't have a output for the base factor clock,
-> >> so we still have to use the name field there.
-> >>
-> >> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
-> >> ---
-> >>  drivers/clk/sunxi/clk-sunxi.c | 22 ++++++++++++----------
-> >>  1 file changed, 12 insertions(+), 10 deletions(-)
-> >>
-> >> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> >> index 17cba4d..afe560c 100644
-> >> --- a/drivers/clk/sunxi/clk-sunxi.c
-> >> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> >> @@ -708,18 +708,10 @@ static const struct factors_data sun4i_pll5_data __initconst = {
-> >>  	.name = "pll5",
-> >>  };
-> >>  
-> >> -static const struct factors_data sun4i_pll6_data __initconst = {
-> >> -	.enable = 31,
-> >> -	.table = &sun4i_pll5_config,
-> >> -	.getter = sun4i_get_pll5_factors,
-> >> -	.name = "pll6",
-> >> -};
-> >> -
-> >>  static const struct factors_data sun6i_a31_pll6_data __initconst = {
-> >>  	.enable = 31,
-> >>  	.table = &sun6i_a31_pll6_config,
-> >>  	.getter = sun6i_a31_get_pll6_factors,
-> >> -	.name = "pll6x2",
-> >>  };
-> >>  
-> >>  static const struct factors_data sun5i_a13_ahb_data __initconst = {
-> >> @@ -1099,7 +1091,7 @@ static const struct divs_data pll5_divs_data __initconst = {
-> >>  };
-> >>  
-> >>  static const struct divs_data pll6_divs_data __initconst = {
-> >> -	.factors = &sun4i_pll6_data,
-> >> +	.factors = &sun4i_pll5_data,
-> >>  	.ndivs = 4,
-> >>  	.div = {
-> >>  		{ .shift = 0, .table = pll6_sata_tbl, .gate = 14 }, /* M, SATA */
-> >> @@ -1141,6 +1133,7 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
-> >>  	struct clk_gate *gate = NULL;
-> >>  	struct clk_fixed_factor *fix_factor;
-> >>  	struct clk_divider *divider;
-> >> +	struct factors_data factors = *data->factors;
-> >>  	void __iomem *reg;
-> >>  	int ndivs = SUNXI_DIVS_MAX_QTY, i = 0;
-> >>  	int flags, clkflags;
-> >> @@ -1149,8 +1142,17 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
-> >>  	if (data->ndivs)
-> >>  		ndivs = data->ndivs;
-> >>  
-> >> +	/* Try to find a name for base factor clock */
-> >> +	for (i = 0; i < ndivs; i++) {
-> >> +		if (data->div[i].self) {
+On Mon, May 18, 2015 at 06:55:32PM +0100, Mark Rutland wrote:
+> On Mon, May 18, 2015 at 06:09:13PM +0100, Catalin Marinas wrote:
+> > On Mon, May 18, 2015 at 11:38:13AM +0100, Mark Rutland wrote:
+> > > The PSCI MIGRATE_INFO_UP_CPU call returns a physical ID, which we will
+> > > need to map back to a Linux logical ID.
+> > > 
+> > > Implement a reusable get_logical_index to map from a physical ID to a
+> > > logical ID.
+> > > 
+> > > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > > Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > > Cc: Will Deacon <will.deacon@arm.com>
+> > > ---
+> > >  arch/arm64/include/asm/smp_plat.h | 16 ++++++++++++++++
+> > >  1 file changed, 16 insertions(+)
+> > > 
+> > > diff --git a/arch/arm64/include/asm/smp_plat.h b/arch/arm64/include/asm/smp_plat.h
+> > > index 8dcd61e..7abf757 100644
+> > > --- a/arch/arm64/include/asm/smp_plat.h
+> > > +++ b/arch/arm64/include/asm/smp_plat.h
+> > > @@ -19,6 +19,8 @@
+> > >  #ifndef __ASM_SMP_PLAT_H
+> > >  #define __ASM_SMP_PLAT_H
+> > >  
+> > > +#include <linux/cpumask.h>
+> > > +
+> > >  #include <asm/types.h>
+> > >  
+> > >  struct mpidr_hash {
+> > > @@ -39,6 +41,20 @@ static inline u32 mpidr_hash_size(void)
+> > >   */
+> > >  extern u64 __cpu_logical_map[NR_CPUS];
+> > >  #define cpu_logical_map(cpu)    __cpu_logical_map[cpu]
+> > > +/*
+> > > + * Retrieve logical cpu index corresponding to a given MPIDR.Aff*
+> > > + *  - mpidr: MPIDR.Aff* bits to be used for the look-up
+> > > + *
+> > > + * Returns the cpu logical index or -EINVAL on look-up error
+> > > + */
+> > > +static inline int get_logical_index(u64 mpidr)
+> > > +{
+> > > +	int cpu;
+> > > +	for (cpu = 0; cpu < nr_cpu_ids; cpu++)
+> > > +		if (cpu_logical_map(cpu) == mpidr)
+> > > +			return cpu;
+> > > +	return -EINVAL;
+> > > +}
 > > 
-> > I'm not sure we should expect the factor clock to have a self factor.
+> > Do we guarantee that mpidr here only contains the affinity bits (i.e. no
+> > masking)?
 > 
-> Maybe not, but in that case it would fall back to the name provided in
-> the factors_data struct, as it is the case for sun4i pll5.
-
-Which doesn't really solve the underlying issue, just make it work in
-your (pll6/pll8) case.
- 
-> > what about taking the first output and taking the substring up to the
-> > first "_" ?
+> In the DT and ACPI probe paths we reject IDs with bits other than the
+> aff bits set.
 > 
-> That only works for the sun[457]i pll5 & pll6, for sun[68]i the base
-> clock name would have to be "pll6x2".
+> I don't currently have a sanity check in the code handling
+> MIGRATE_INFO_UP_CPU, but I should add one.
+> 
+> Would you like a warning here too?
 
-Why?
-
-It's called pll6 in the datasheet, it should really be called
-pll6. The fact that there is some fixed factors or dividers on some
-children only impacts those children, and not the system as a whole.
-
-And the fact that the "base" clock is pll6x2 and not pll6 itself is
-very debatable. How do you know which clock is the base one? Most
-clocks are actually using pll6 as a reference.
-
-Maxime
+Or maybe just the warning if the code paths to this function already
+mask out the non-affinity bits.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150519/abf28062/attachment.sig>
+Catalin
