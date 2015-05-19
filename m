@@ -1,81 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 May 2015 14:17:23 +0200
-Subject: [PATCH] video: exynos: fix modular build
-Message-ID: <2708563.ADEZz3igC5@wuerfel>
+Date: Tue, 19 May 2015 14:18:35 +0200
+Subject: [PATCH] mac802154: select CRYPTO when needed
+Message-ID: <4189396.LhxDXkIPfr@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The s6e8ax0 driver has a dependency on BACKLIGHT_CLASS_DEVICE,
-which can be configured as a loadable module, so we have to
-make the driver a tristate symbol as well, to avoid this error:
+The mac802154 subsystem uses functions from the crypto layer and correctly
+selects the individual crypto algorithms, but fails to build when the
+crypto layer is disabled altogether:
 
-drivers/built-in.o: In function `s6e8ax0_probe':
-:(.text+0x23a48): undefined reference to `devm_backlight_device_register'
+crypto/built-in.o: In function `crypto_ctr_free':
+:(.text+0x80): undefined reference to `crypto_drop_spawn'
+crypto/built-in.o: In function `crypto_rfc3686_free':
+:(.text+0xac): undefined reference to `crypto_drop_spawn'
+crypto/built-in.o: In function `crypto_ctr_crypt':
+:(.text+0x2f0): undefined reference to `blkcipher_walk_virt_block'
+:(.text+0x2f8): undefined reference to `crypto_inc'
 
-This also means we get another error from a missing export, which
-this fixes as well:
-
-ERROR: "exynos_mipi_dsi_register_lcd_driver" [drivers/video/fbdev/exynos/s6e8ax0.ko] undefined!
-
-Finally, the EXYNOS_VIDEO option is turned into tristate as well
-for good measure, as all framebuffer drivers should be configurable
-as modules.
+To solve that, this patch also selects the core crypto code,
+like all other users of that code do.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+Found in ARM randconfig testing
 
-diff --git a/drivers/video/fbdev/exynos/Kconfig b/drivers/video/fbdev/exynos/Kconfig
-index 1f16b4678c71..d916bef94f25 100644
---- a/drivers/video/fbdev/exynos/Kconfig
-+++ b/drivers/video/fbdev/exynos/Kconfig
-@@ -3,7 +3,7 @@
- #
- 
- menuconfig EXYNOS_VIDEO
--	bool "Exynos Video driver support"
-+	tristate "Exynos Video driver support"
- 	depends on ARCH_S5PV210 || ARCH_EXYNOS
- 	help
- 	  This enables support for EXYNOS Video device.
-@@ -15,13 +15,13 @@ if EXYNOS_VIDEO
- #
- 
- config EXYNOS_MIPI_DSI
--	bool "EXYNOS MIPI DSI driver support."
-+	tristate "EXYNOS MIPI DSI driver support."
- 	select GENERIC_PHY
- 	help
- 	  This enables support for MIPI-DSI device.
- 
- config EXYNOS_LCD_S6E8AX0
--	bool "S6E8AX0 MIPI AMOLED LCD Driver"
-+	tristate "S6E8AX0 MIPI AMOLED LCD Driver"
- 	depends on EXYNOS_MIPI_DSI && BACKLIGHT_CLASS_DEVICE
- 	depends on (LCD_CLASS_DEVICE = y)
- 	default n
-diff --git a/drivers/video/fbdev/exynos/Makefile b/drivers/video/fbdev/exynos/Makefile
-index b5b1bd228abb..02d8dc522fea 100644
---- a/drivers/video/fbdev/exynos/Makefile
-+++ b/drivers/video/fbdev/exynos/Makefile
-@@ -2,6 +2,8 @@
- # Makefile for the exynos video drivers.
- #
- 
--obj-$(CONFIG_EXYNOS_MIPI_DSI)		+= exynos_mipi_dsi.o exynos_mipi_dsi_common.o \
--				     	exynos_mipi_dsi_lowlevel.o
-+obj-$(CONFIG_EXYNOS_MIPI_DSI)		+= exynos-mipi-dsi-mod.o
-+
-+exynos-mipi-dsi-mod-objs		+= exynos_mipi_dsi.o exynos_mipi_dsi_common.o \
-+					   exynos_mipi_dsi_lowlevel.o
- obj-$(CONFIG_EXYNOS_LCD_S6E8AX0)	+= s6e8ax0.o
-diff --git a/drivers/video/fbdev/exynos/exynos_mipi_dsi.c b/drivers/video/fbdev/exynos/exynos_mipi_dsi.c
-index b527fe464628..18edc724bf57 100644
---- a/drivers/video/fbdev/exynos/exynos_mipi_dsi.c
-+++ b/drivers/video/fbdev/exynos/exynos_mipi_dsi.c
-@@ -263,6 +263,7 @@ int exynos_mipi_dsi_register_lcd_driver(struct mipi_dsim_lcd_driver *lcd_drv)
- 	return 0;
- 
- }
-+EXPORT_SYMBOL_GPL(exynos_mipi_dsi_register_lcd_driver);
- 
- static struct mipi_dsim_ddi *exynos_mipi_dsi_bind_lcd_ddi(
- 						struct mipi_dsim_device *dsim,
+diff --git a/net/mac802154/Kconfig b/net/mac802154/Kconfig
+index aa462b480a39..b355989c63b3 100644
+--- a/net/mac802154/Kconfig
++++ b/net/mac802154/Kconfig
+@@ -1,6 +1,7 @@
+ config MAC802154
+ 	tristate "Generic IEEE 802.15.4 Soft Networking Stack (mac802154)"
+ 	depends on IEEE802154
++	select CRYPTO
+ 	select CRC_CCITT
+ 	select CRYPTO_AUTHENC
+ 	select CRYPTO_CCM
