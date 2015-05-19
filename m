@@ -1,33 +1,48 @@
-From: mirza.krak@hostmobility.com (Mirza Krak)
-Date: Tue, 19 May 2015 14:27:36 +0200
-Subject: [PATCH 1/1] ARM: imx: clk-v610: Add clock for I2C2 and I2C3
-Message-ID: <1432038456-29706-1-git-send-email-mirza.krak@hostmobility.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 19 May 2015 13:33:14 +0100
+Subject: [PATCH v3 01/17] mfd: add new driver for Sharp LoCoMo
+In-Reply-To: <20150519112134.GD2067@n2100.arm.linux.org.uk>
+References: <1431880077-26321-1-git-send-email-dbaryshkov@gmail.com>
+ <1431880077-26321-2-git-send-email-dbaryshkov@gmail.com>
+ <20150519103828.GU22418@x1>
+ <20150519112134.GD2067@n2100.arm.linux.org.uk>
+Message-ID: <20150519123314.GA3627@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mirza Krak <mirza.krak@gmail.com>
+On Tue, 19 May 2015, Russell King - ARM Linux wrote:
 
-Add support for clock gating of I2C2 and I2C3.
-We use I2C2 in a (not yet mainlined) device tree.
+> On Tue, May 19, 2015 at 11:38:28AM +0100, Lee Jones wrote:
+> > On Sun, 17 May 2015, Dmitry Eremin-Solenikov wrote:
+> > > +static void locomo_mask_irq(struct irq_data *d)
+> > > +{
+> > > +	struct locomo *ldev = irq_data_get_irq_chip_data(d);
+> > > +	unsigned int mask = 0x0010 << d->hwirq;
+> > 
+> > This also needs defining.
+> > 
+> > Why not
+> >   BIT(d->hwirq + 1)
+> 
+> I think your maths is off...
+> 
+> 0x0010 << d->hwirq != BIT(d->hwirq + 1)
 
-Signed-off-by: Mirza Krak <mirza.krak@hostmobility.com>
-Signed-off-by: Mirza Krak <mirza.krak@gmail.com>
+Ah, that's hex.  I was blinded by the 1's and 0's.  Doh!
+
+Thanks Russell.
+
 ---
- arch/arm/mach-imx/clk-vf610.c | 2 ++
- 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-imx/clk-vf610.c b/arch/arm/mach-imx/clk-vf610.c
-index 5fcc4be..f5fff09 100644
---- a/arch/arm/mach-imx/clk-vf610.c
-+++ b/arch/arm/mach-imx/clk-vf610.c
-@@ -279,6 +279,8 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
- 
- 	clk[VF610_CLK_I2C0] = imx_clk_gate2("i2c0", "ipg_bus", CCM_CCGR4, CCM_CCGRx_CGn(6));
- 	clk[VF610_CLK_I2C1] = imx_clk_gate2("i2c1", "ipg_bus", CCM_CCGR4, CCM_CCGRx_CGn(7));
-+	clk[VF610_CLK_I2C2] = imx_clk_gate2("i2c2", "ipg_bus", CCM_CCGR10, CCM_CCGRx_CGn(6));
-+	clk[VF610_CLK_I2C3] = imx_clk_gate2("i2c3", "ipg_bus", CCM_CCGR10, CCM_CCGRx_CGn(7));
- 
- 	clk[VF610_CLK_DSPI0] = imx_clk_gate2("dspi0", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(12));
- 	clk[VF610_CLK_DSPI1] = imx_clk_gate2("dspi1", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(13));
+Why not
+  BIT(d->hwirq + 4)
+
+... with an explanation as to why you're skipping the first 4 bits?
+
+/me hopes that maths is right now. :)
+
 -- 
-2.1.0
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
