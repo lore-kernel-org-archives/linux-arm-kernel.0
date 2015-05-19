@@ -1,46 +1,61 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 19 May 2015 15:54:04 +0200
-Subject: [GIT PULL] at91: defconfig for 4.2 #1
-Message-ID: <1432043644-25879-1-git-send-email-nicolas.ferre@atmel.com>
+Date: Tue, 19 May 2015 15:53:04 +0200
+Subject: [PATCH] ARM: multi_v7_defconfig: Add Atmel SAMA5 family
+In-Reply-To: <555B3A92.7010409@atmel.com>
+References: <1428051678-20450-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <555AFF3F.10400@atmel.com> <9986808.t62JLgg5NJ@wuerfel>
+ <20150519123358.GA15179@piout.net> <555B3463.2060700@atmel.com>
+ <555B3A92.7010409@atmel.com>
+Message-ID: <555B4040.2090302@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+Le 19/05/2015 15:28, Nicolas Ferre a ?crit :
+> Le 19/05/2015 15:02, Nicolas Ferre a ?crit :
+>> Le 19/05/2015 14:33, Alexandre Belloni a ?crit :
+>>> On 19/05/2015 at 13:04:22 +0200, Arnd Bergmann wrote :
+>>>>>> @@ -250,15 +261,18 @@ CONFIG_SERIAL_FSL_LPUART=y
+>>>>>>  CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
+>>>>>>  CONFIG_SERIAL_ST_ASC=y
+>>>>>>  CONFIG_SERIAL_ST_ASC_CONSOLE=y
+>>>>>> +CONFIG_HW_RANDOM=y
+>>>>>>  CONFIG_I2C_CHARDEV=y
+>>>>>>  CONFIG_I2C_DAVINCI=y
+>>>>>>  CONFIG_I2C_MUX=y
+>>>>
+>>>> seems non-essential.
+>>>>
+>>>
+>>> That is an oversight, it should be compiled as a module.
+>>
+>> Ok, I modify it: no need to bother sending a new revision.
+>>
+>>>>>> @@ -502,6 +522,8 @@ CONFIG_RTC_DRV_MV=y
+>>>>>>  CONFIG_RTC_DRV_TEGRA=y
+>>>>>>  CONFIG_DMADEVICES=y
+>>>>>>  CONFIG_DW_DMAC=y
+>>>>>> +CONFIG_AT_HDMAC=y
+>>>>>> +CONFIG_AT_XDMAC=y
+>>>>>>  CONFIG_MV_XOR=y
+>>>>>>  CONFIG_TEGRA20_APB_DMA=y
+>>>>>>  CONFIG_SH_DMAE=y
+>>>>
+>>>> What are these required for? I assume you need them for MMC? If so, that's
+>>>> fine.
+>>>>
+>>>
+>>> That is indeed the reason.
+>>
+>> Yep.
+>>
+>> So I simply do a s/y/m/ on the CONFIG_HW_RANDOM then included it in our
+>> at91-4.2-defconfig branch.
+> 
+> In fact it's a boolean. So removing it does the trick.
 
-Little update to defconfig files... but big step forward for AT91 as we now
-enter the multi_v7_defconfig club!
-The pull-request is based on v4.2-rc3.
+Wrong: it's a tristate: sorry for the noise. But removing is the way to
+go anyway...
 
-Thanks, best regards,
-
-The following changes since commit 030bbdbf4c833bc69f502eae58498bc5572db736:
-
-  Linux 4.1-rc3 (2015-05-10 15:12:29 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-defconfig
-
-for you to fetch changes up to 822cfdfb9511c2658a10a21b0323144c632aa08c:
-
-  ARM: multi_v7_defconfig: Add Atmel SAMA5 family (2015-05-19 15:38:40 +0200)
-
-----------------------------------------------------------------
-First batch of defconfig changes for 4.2:
-- fixed regulators for sd/mmc
-- addition of AT91 to the multi_v7_defconfig
-
-----------------------------------------------------------------
-Alexandre Belloni (1):
-      ARM: multi_v7_defconfig: Add Atmel SAMA5 family
-
-Nicolas Ferre (1):
-      ARM: at91/defconfig: add CONFIG_REGULATOR_FIXED_VOLTAGE for mmc driver
-
- arch/arm/configs/at91_dt_defconfig  |  2 ++
- arch/arm/configs/multi_v7_defconfig | 26 ++++++++++++++++++++++++++
- arch/arm/configs/sama5_defconfig    |  1 +
- 3 files changed, 29 insertions(+)
-
+Bye,
 -- 
 Nicolas Ferre
