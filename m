@@ -1,50 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 May 2015 22:33:23 +0200
-Subject: [PATCH] ARM: hisi: fix hip04 build without HOTPLUG_CPU
-Message-ID: <5060758.bQYeG67z55@wuerfel>
+From: bp@alien8.de (Borislav Petkov)
+Date: Tue, 19 May 2015 22:33:36 +0200
+Subject: [PATCH v10 1/5] arm64: Enable EDAC on ARM64
+In-Reply-To: <CAPw-ZT=mTpt_vz+e=rM5ywK8feNKkJQrpEWg=noRCziJ0840TQ@mail.gmail.com>
+References: <1431991481-25684-1-git-send-email-lho@apm.com>
+ <1431991481-25684-2-git-send-email-lho@apm.com>
+ <20150519170308.GL4641@pd.tnic>
+ <CAPw-ZT=mTpt_vz+e=rM5ywK8feNKkJQrpEWg=noRCziJ0840TQ@mail.gmail.com>
+Message-ID: <20150519203336.GP4641@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The hip04 smp implementation provides the hotplug operations (cpu_die
-and cpu_kill) unconditionally at the moment, which leads to a build
-error when HOTPLUG_CPU is disabled:
+On Tue, May 19, 2015 at 12:57:32PM -0700, Loc Ho wrote:
+> This was discussed here
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/326986.html.
+> Without this, it will have compiler error as this function is called
+> by.function edac_mc_scrub_block in file drivers/edac/edac_mc.c.
 
-mach-hisi/platmcpm.c:242:13: note: (near initialization for 'hip04_smp_ops')
-mach-hisi/platmcpm.c:242:2: error: unknown field 'cpu_die' specified in initializer
-mach-hisi/platmcpm.c:243:2: error: unknown field 'cpu_kill' specified in initializer
+Argh, that's just silly. We should have a __weak atomic_scrub() in the
+edac core which arches can override but not have to supply a dummy just
+because...
 
-This uses an #ifdef to remove the code from the build when that
-option is not set.
+I'll try to hack up something later.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 905cdf9dda5d ("ARM: hisi/hip04: remove the MCPM overhead")
----
-The patch causing this is currently part of rmk's devel-stable branch.
+-- 
+Regards/Gruss,
+    Boris.
 
-diff --git a/arch/arm/mach-hisi/platmcpm.c b/arch/arm/mach-hisi/platmcpm.c
-index 880cbfa9c343..b5f8f5ffda79 100644
---- a/arch/arm/mach-hisi/platmcpm.c
-+++ b/arch/arm/mach-hisi/platmcpm.c
-@@ -152,6 +152,7 @@ out:
- 	return 0;
- }
- 
-+#ifdef CONFIG_HOTPLUG_CPU
- static void hip04_cpu_die(unsigned int l_cpu)
- {
- 	unsigned int mpidr, cpu, cluster;
-@@ -236,11 +237,14 @@ err:
- 	spin_unlock_irq(&boot_lock);
- 	return 0;
- }
-+#endif
- 
- static struct smp_operations __initdata hip04_smp_ops = {
- 	.smp_boot_secondary	= hip04_boot_secondary,
-+#ifdef CONFIG_HOTPLUG_CPU
- 	.cpu_die		= hip04_cpu_die,
- 	.cpu_kill		= hip04_cpu_kill,
-+#endif
- };
- 
- static bool __init hip04_cpu_table_init(void)
+ECO tip #101: Trim your mails when you reply.
+--
