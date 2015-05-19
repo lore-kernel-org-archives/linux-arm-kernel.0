@@ -1,34 +1,52 @@
-From: prabhakar.csengg@gmail.com (Lad, Prabhakar)
-Date: Tue, 19 May 2015 17:46:55 +0100
-Subject: [PATCH] [media] ov2659: add v4l2_subdev dependency
-In-Reply-To: <6092911.yr0lA5IaG4@wuerfel>
-References: <6092911.yr0lA5IaG4@wuerfel>
-Message-ID: <CA+V-a8tPSmRgNphN_CRjcsuL0xssDQ+3Oxne_mb=DQgs60ab8g@mail.gmail.com>
+From: eric.nelson@boundarydevices.com (Eric Nelson)
+Date: Tue, 19 May 2015 09:51:23 -0700
+Subject: [PATCH 2/2] ARM: dts: sabrelite: use simple-panel instead of
+ display-timings for LVDS0
+In-Reply-To: <1432051452.15181.48.camel@pengutronix.de>
+References: <20150518075844.7e1b5916@ipc1.ka-ro>	
+ <1432050616-11465-1-git-send-email-eric.nelson@boundarydevices.com>	
+ <1432050616-11465-3-git-send-email-eric.nelson@boundarydevices.com>
+ <1432051452.15181.48.camel@pengutronix.de>
+Message-ID: <555B6A0B.4010205@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 05/19/2015 09:04 AM, Philipp Zabel wrote:
+> Hi Eric,
+> 
+> Am Dienstag, den 19.05.2015, 08:50 -0700 schrieb Eric Nelson:
+>> Also add label for backlight_lvds and connect it to the LVDS display.
+>>
+>> Signed-off-by: Eric Nelson <eric.nelson@boundarydevices.com>
+>> ---
+> [...]
+>> @@ -129,6 +129,17 @@
+>>  		power-supply = <&reg_3p3v>;
+>>  		status = "okay";
+>>  	};
+>> +
+>> +	panel {
+>> +		compatible = "hannstar,hsd100pxn1";
+>> +		backlight = <&backlight_lvds>;
+>> +
+>> +		port {
+>> +			panel_in: endpoint {
+>> +				remote-endpoint = <&lvds0_out>;
+>> +			};
+>> +		};
+>> +	};
+>>  };
+>>  
+>>  &audmux {
+>> @@ -374,18 +385,11 @@
+>>  		fsl,data-width = <18>;
+> 
+> The fsl,data-width property shouldn't be needed anymore if you
+> set .bus_format = MEDIA_BUS_FMT_RGB666_1X7X3_SPWG for the hsd100pxn1
+> panel in panel-simple.c.
+> 
 
-Thanks for the patch.
+Thanks again Philipp.
 
-On Tue, May 19, 2015 at 1:39 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The newly added ov2659 driver uses the v4l2 subdev API, but
-> can be enabled even when that API is not part of the kernel,
-> resulting in this build error:
->
-> media/i2c/ov2659.c: In function 'ov2659_get_fmt':
-> media/i2c/ov2659.c:1054:8: error: implicit declaration of function 'v4l2_subdev_get_try_format' [-Werror=implicit-function-declaration]
-> media/i2c/ov2659.c:1054:6: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-> media/i2c/ov2659.c: In function 'ov2659_set_fmt':
-> media/i2c/ov2659.c:1129:6: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-> media/i2c/ov2659.c: In function 'ov2659_open':
-> media/i2c/ov2659.c:1264:38: error: 'struct v4l2_subdev_fh' has no member named 'pad'
->
-> This adds an explicit dependency, like all the other drivers have.
->
-Patch fixing the above issue is already posted in the ML [1].
-
-[1] https://patchwork.linuxtv.org/patch/29665/
-
-Cheers,
---Prabhakar Lad
+That's a much better place to put it, since this is a panel feature,
+not a feature of the LVDS channel.
