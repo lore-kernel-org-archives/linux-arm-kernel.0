@@ -1,38 +1,34 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 19 May 2015 16:36:39 +0200
-Subject: [PATCH] memory: tegra: Expose supported rates via debugfs
-In-Reply-To: <CAAObsKCo7x4qMdPvBb-dNoN=j7Od-eMCxw9BNoSvDR5mUZXGtA@mail.gmail.com>
-References: <1431963330-25708-1-git-send-email-thierry.reding@gmail.com>
- <CAAObsKCo7x4qMdPvBb-dNoN=j7Od-eMCxw9BNoSvDR5mUZXGtA@mail.gmail.com>
-Message-ID: <20150519143637.GF26748@ulmo.nvidia.com>
+From: tytso@mit.edu (Theodore Ts'o)
+Date: Tue, 19 May 2015 10:39:04 -0400
+Subject: [PATCH] crypto: allow to assign gfp_t for __crypto_alloc_tfm
+In-Reply-To: <20150519142755.GB32663@gondor.apana.org.au>
+References: <1432014416-39326-1-git-send-email-jaegeuk@kernel.org>
+ <20150519054945.GA28060@gondor.apana.org.au>
+ <20150519062430.GA39588@jaegeuk-mac02.hsd1.ca.comcast.net>
+ <20150519063211.GA28347@gondor.apana.org.au>
+ <20150519065812.GA40012@jaegeuk-mac02.hsd1.ca.comcast.net>
+ <20150519065929.GA28610@gondor.apana.org.au>
+ <20150519071317.GB40012@jaegeuk-mac02.hsd1.ca.comcast.net>
+ <20150519071521.GA28862@gondor.apana.org.au>
+ <20150519141430.GD20421@thunk.org>
+ <20150519142755.GB32663@gondor.apana.org.au>
+Message-ID: <20150519143904.GA25684@thunk.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 02:21:01PM +0200, Tomeu Vizoso wrote:
-> On 18 May 2015 at 17:35, Thierry Reding <thierry.reding@gmail.com> wrote:
-> > From: Thierry Reding <treding@nvidia.com>
-> >
-> > In order to ease testing, expose the list of supported EMC frequencies
-> > via debugfs.
+On Tue, May 19, 2015 at 10:27:55PM +0800, Herbert Xu wrote:
+> On Tue, May 19, 2015 at 10:14:30AM -0400, Theodore Ts'o wrote:
+> > 
+> > There can be multiple reads going on in parallel, so we're currently
+> > creating tfm's as necessary.  In fact one of the things that we've
 > 
-> Looks good to me, but if this is for automated testing, why not just
-> read the timings from the DT? We would be covering more code that way.
-> 
-> Reviewed-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> A single tfm is fully-reentrant (as long as you don't change the
+> key).  So multiple reads/writes on a single file can all use one
+> tfm with no locking at all.
 
-The idea is that by putting this into debugfs we have a single source of
-information to use in tests.
+Cool, we didn't realize this was the case.  Excellent, this makes life
+much simpler for us!  :-)
 
-Now if in addition to merely testing the frequencies you want to make
-sure the driver has a consistent representation of what's in device tree
-we could always write another test that reads the device tree nodes and
-compares them to the list of supported rates from debugfs.
+Thanks,
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150519/9abd9450/attachment.sig>
+					- Ted
