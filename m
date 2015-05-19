@@ -1,9 +1,9 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 19 May 2015 10:55:12 -0600
-Subject: [PATCH 07/16] coresight: funnel: let runtime PM handle core clock
+Date: Tue, 19 May 2015 10:55:13 -0600
+Subject: [PATCH 08/16] coresight: tmc: let runtime PM handle core clock
 In-Reply-To: <1432054521-24807-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1432054521-24807-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1432054521-24807-8-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1432054521-24807-9-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,98 +17,135 @@ CONFIG_PM is selected, else the clock will be always on.
 
 Prior to this patch, as the AMBA primecell bus code enables
 the PCLK, it would be left on after probe as
-clk_disable_unprepare() was not called. Now the runtime PM
-callbacks will make sure the PCLK is properly disabled
-after probe.
+the clk_prepare_enable() and clk_disable_unprepare() was
+called and thus just increase and decreas the refcount by
+one, without it reaching zero and actually disabling the
+clock. Now the runtime PM callbacks will make sure the PCLK
+is properly disabled after probe.
 
 Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-funnel.c | 24 +++++++-----------------
- 1 file changed, 7 insertions(+), 17 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc.c | 31 ++++++++---------------------
+ 1 file changed, 8 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-funnel.c b/drivers/hwtracing/coresight/coresight-funnel.c
-index 3db36f70b666..330de2c88759 100644
---- a/drivers/hwtracing/coresight/coresight-funnel.c
-+++ b/drivers/hwtracing/coresight/coresight-funnel.c
-@@ -18,7 +18,7 @@
- #include <linux/err.h>
- #include <linux/fs.h>
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
+index 7147f3dd363c..a57c7ec1661f 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.c
++++ b/drivers/hwtracing/coresight/coresight-tmc.c
+@@ -23,7 +23,7 @@
  #include <linux/slab.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/spinlock.h>
 -#include <linux/clk.h>
 +#include <linux/pm_runtime.h>
+ #include <linux/of.h>
  #include <linux/coresight.h>
  #include <linux/amba/bus.h>
- 
-@@ -36,14 +36,12 @@
-  * @base:	memory mapped base address for this component.
+@@ -104,7 +104,6 @@ enum tmc_mem_intf_width {
   * @dev:	the device entity associated to this component.
   * @csdev:	component vitals needed by the framework.
+  * @miscdev:	specifics to handle "/dev/xyz.tmc" entry.
 - * @clk:	the clock this component is associated to.
-  * @priority:	port selection order.
-  */
- struct funnel_drvdata {
- 	void __iomem		*base;
+  * @spinlock:	only one at a time pls.
+  * @read_count:	manages preparation of buffer for reading.
+  * @buf:	area of memory where trace data get sent.
+@@ -120,7 +119,6 @@ struct tmc_drvdata {
  	struct device		*dev;
  	struct coresight_device	*csdev;
+ 	struct miscdevice	miscdev;
 -	struct clk		*clk;
- 	unsigned long		priority;
- };
+ 	spinlock_t		spinlock;
+ 	int			read_count;
+ 	bool			reading;
+@@ -242,17 +240,14 @@ static void tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
  
-@@ -67,12 +65,8 @@ static int funnel_enable(struct coresight_device *csdev, int inport,
- 			 int outport)
+ static int tmc_enable(struct tmc_drvdata *drvdata, enum tmc_mode mode)
  {
- 	struct funnel_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 -	int ret;
--
+ 	unsigned long flags;
+ 
 -	ret = clk_prepare_enable(drvdata->clk);
 -	if (ret)
 -		return ret;
- 
 +	pm_runtime_get_sync(drvdata->dev);
- 	funnel_enable_hw(drvdata, inport);
  
- 	dev_info(drvdata->dev, "FUNNEL inport %d enabled\n", inport);
-@@ -98,8 +92,7 @@ static void funnel_disable(struct coresight_device *csdev, int inport,
- 	struct funnel_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+ 	spin_lock_irqsave(&drvdata->spinlock, flags);
+ 	if (drvdata->reading) {
+ 		spin_unlock_irqrestore(&drvdata->spinlock, flags);
+-		clk_disable_unprepare(drvdata->clk);
++		pm_runtime_put(drvdata->dev);
+ 		return -EBUSY;
+ 	}
  
- 	funnel_disable_hw(drvdata, inport);
+@@ -386,7 +381,7 @@ out:
+ 	drvdata->enable = false;
+ 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+ 
+-	clk_disable_unprepare(drvdata->clk);
++	pm_runtime_put(drvdata->dev);
+ 
+ 	dev_info(drvdata->dev, "TMC disabled\n");
+ }
+@@ -568,17 +563,13 @@ static const struct file_operations tmc_fops = {
+ static ssize_t status_show(struct device *dev,
+ 			   struct device_attribute *attr, char *buf)
+ {
+-	int ret;
+ 	unsigned long flags;
+ 	u32 tmc_rsz, tmc_sts, tmc_rrp, tmc_rwp, tmc_trg;
+ 	u32 tmc_ctl, tmc_ffsr, tmc_ffcr, tmc_mode, tmc_pscr;
+ 	u32 devid;
+ 	struct tmc_drvdata *drvdata = dev_get_drvdata(dev->parent);
+ 
+-	ret = clk_prepare_enable(drvdata->clk);
+-	if (ret)
+-		goto out;
+-
++	pm_runtime_get_sync(drvdata->dev);
+ 	spin_lock_irqsave(&drvdata->spinlock, flags);
+ 	CS_UNLOCK(drvdata->base);
+ 
+@@ -596,8 +587,7 @@ static ssize_t status_show(struct device *dev,
+ 
+ 	CS_LOCK(drvdata->base);
+ 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
 -
 -	clk_disable_unprepare(drvdata->clk);
 +	pm_runtime_put(drvdata->dev);
  
- 	dev_info(drvdata->dev, "FUNNEL inport %d disabled\n", inport);
- }
-@@ -153,16 +146,14 @@ static u32 get_funnel_ctrl_hw(struct funnel_drvdata *drvdata)
- static ssize_t funnel_ctrl_show(struct device *dev,
- 			     struct device_attribute *attr, char *buf)
- {
--	int ret;
- 	u32 val;
- 	struct funnel_drvdata *drvdata = dev_get_drvdata(dev->parent);
- 
--	ret = clk_prepare_enable(drvdata->clk);
--	if (ret)
--		return ret;
-+	pm_runtime_get_sync(drvdata->dev);
- 
- 	val = get_funnel_ctrl_hw(drvdata);
--	clk_disable_unprepare(drvdata->clk);
+ 	return sprintf(buf,
+ 		       "Depth:\t\t0x%x\n"
+@@ -613,7 +603,7 @@ static ssize_t status_show(struct device *dev,
+ 		       "DEVID:\t\t0x%x\n",
+ 			tmc_rsz, tmc_sts, tmc_rrp, tmc_rwp, tmc_trg,
+ 			tmc_ctl, tmc_ffsr, tmc_ffcr, tmc_mode, tmc_pscr, devid);
+-out:
 +
-+	pm_runtime_put(drvdata->dev);
- 
- 	return sprintf(buf, "%#x\n", val);
+ 	return -EINVAL;
  }
-@@ -205,8 +196,7 @@ static int funnel_probe(struct amba_device *adev, const struct amba_id *id)
- 		return PTR_ERR(base);
+ static DEVICE_ATTR_RO(status);
+@@ -700,11 +690,6 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
  
- 	drvdata->base = base;
--
+ 	spin_lock_init(&drvdata->spinlock);
+ 
 -	drvdata->clk = adev->pclk;
+-	ret = clk_prepare_enable(drvdata->clk);
+-	if (ret)
+-		return ret;
+-
+ 	devid = readl_relaxed(drvdata->base + CORESIGHT_DEVID);
+ 	drvdata->config_type = BMVAL(devid, 6, 7);
+ 
+@@ -719,7 +704,7 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
+ 		drvdata->size = readl_relaxed(drvdata->base + TMC_RSZ) * 4;
+ 	}
+ 
+-	clk_disable_unprepare(drvdata->clk);
 +	pm_runtime_put(&adev->dev);
  
- 	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
- 	if (!desc)
+ 	if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
+ 		drvdata->vaddr = dma_alloc_coherent(dev, drvdata->size,
 -- 
 1.9.1
