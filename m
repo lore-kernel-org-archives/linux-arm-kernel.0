@@ -1,19 +1,18 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 19 May 2015 07:53:05 -0600
-Subject: [RESEND PATCH 1/2] ARM: dts: tegra: Add labels to Tegra114 nodes
-In-Reply-To: <1432036279-6318-1-git-send-email-k.kozlowski.k@gmail.com>
-References: <1432036279-6318-1-git-send-email-k.kozlowski.k@gmail.com>
-Message-ID: <555B4041.5090208@wwwdotorg.org>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Tue, 19 May 2015 14:53:03 +0100
+Subject: [Xen-devel] [RFC 07/23] net/xen-netfront: Correct printf format
+ in xennet_get_responses
+In-Reply-To: <1431622863-28575-8-git-send-email-julien.grall@citrix.com>
+References: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
+ <1431622863-28575-8-git-send-email-julien.grall@citrix.com>
+Message-ID: <555B403F.3030708@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/19/2015 05:51 AM, Krzysztof Kozlowski wrote:
-> Add new labels to certain nodes on Tegra114 so they could be easily
-> referenced by board DTS files.
->
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+On 14/05/15 18:00, Julien Grall wrote:
+> rx->status is an int16_t, print it using %d rather than %u in order to
+> have a meaningful value when the field is negative.
 
-As I think I mentioned last time, this would make the Tegra114 files 
-inconsistent with all other Tegra files. Either we should convert 
-everything, or none at all. I'm personally not sure the churn this will 
-introduce is worth it, but maybe.
+Reviewed-by: David Vrabel <david.vrabel@citrix.com>
+
+David
