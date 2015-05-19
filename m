@@ -1,50 +1,48 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 May 2015 14:47:32 +0200
-Subject: [PATCH] ASoC: omap: fix up SND_OMAP_SOC_OMAP_ABE_TWL6040 dependency,
- again
-Message-ID: <3413182.qcoNiOhonF@wuerfel>
+Date: Tue, 19 May 2015 14:49:44 +0200
+Subject: [PATCH] ARM: shmobile: only select sound drivers that build
+Message-ID: <5616798.tmraH8vpuI@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I tried to fix this before and submitted a working patch, but after
-some discussion we came up with what seemed to be a nicer solution,
-resulting in commit 3d4cf65e2d ("ASoC: omap: fix up
-SND_OMAP_SOC_OMAP_ABE_TWL6040 dependency"). Unfortunately, that
-version was incomplete, and we still get this build error:
+A couple of codec drivers are selected by shmobile platform code,
+but depend on I2C, which results in a build error:
 
-drivers/clk/clk-palmas.c:46:16: error: field 'hw' has incomplete type
-drivers/clk/clk-palmas.c: In function 'to_palmas_clks_info':
-drivers/clk/clk-palmas.c:54:74: warning: initialization from incompatible pointer type [-Winc
+sound/soc/codecs/ak4642.c:638:1: warning: data definition has no type or storage class
+ module_i2c_driver(ak4642_i2c_driver);
+ ^
+sound/soc/codecs/ak4642.c:638:1: error: type defaults to 'int' in declaration of 'module_i2c_driver' [-Werror=implicit-int]
+sound/soc/codecs/ak4642.c:638:1: warning: parameter names (without types) in function declaration
+sound/soc/codecs/ak4642.c:627:26: warning: 'ak4642_i2c_driver' defined but not used [-Wunused-variable]
 
-This happens only in randconfig builds that turn on MFD_PALMAS
-on a platform other than OMAP2+ when COMPILE_TEST is set
-but COMMON_CLK is not.
-
-The new approach is only 'select COMMON_CLK_PALMAS' if we know
-that we are on an OMAP5 platform and MFD_PALMAS is already set.
-This patch has survived thousands of randconfig builds and I
-don't see a remaining hole in the logic.
+This ensures that we do not enable the respective drivers when I2C
+is disabled.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 3d4cf65e2d ("ASoC: omap: fix up SND_OMAP_SOC_OMAP_ABE_TWL6040 dependency")
+---
+If this patch looks good, please add it to the shmobile git
 
-diff --git a/sound/soc/omap/Kconfig b/sound/soc/omap/Kconfig
-index 6768e4f7d7d0..30d0109703a9 100644
---- a/sound/soc/omap/Kconfig
-+++ b/sound/soc/omap/Kconfig
-@@ -100,12 +100,13 @@ config SND_OMAP_SOC_OMAP_TWL4030
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 679b866399f2..ca2182078547 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -150,7 +150,7 @@ config MACH_ARMADILLO800EVA
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+ 	select SMSC_PHY if SH_ETH
+-	select SND_SOC_WM8978 if SND_SIMPLE_CARD
++	select SND_SOC_WM8978 if SND_SIMPLE_CARD && I2C
+ 	select USE_OF
  
- config SND_OMAP_SOC_OMAP_ABE_TWL6040
- 	tristate "SoC Audio support for OMAP boards using ABE and twl6040 codec"
--	depends on TWL6040_CORE && SND_OMAP_SOC && (ARCH_OMAP4 || SOC_OMAP5 || COMPILE_TEST)
-+	depends on TWL6040_CORE && SND_OMAP_SOC
-+	depends on ARCH_OMAP4 || (SOC_OMAP5 && MFD_PALMAS) || COMPILE_TEST
- 	select SND_OMAP_SOC_DMIC
- 	select SND_OMAP_SOC_MCPDM
- 	select SND_SOC_TWL6040
- 	select SND_SOC_DMIC
--	select COMMON_CLK_PALMAS if MFD_PALMAS
-+	select COMMON_CLK_PALMAS if (SOC_OMAP5 && MFD_PALMAS)
- 	help
- 	  Say Y if you want to add support for SoC audio on OMAP boards using
- 	  ABE and twl6040 codec. This driver currently supports:
+ config MACH_BOCKW
+@@ -158,8 +158,8 @@ config MACH_BOCKW
+ 	depends on ARCH_R8A7778
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+-	select SND_SOC_AK4554 if SND_SIMPLE_CARD
+-	select SND_SOC_AK4642 if SND_SIMPLE_CARD
++	select SND_SOC_AK4554 if SND_SIMPLE_CARD && I2C
++	select SND_SOC_AK4642 if SND_SIMPLE_CARD && I2C
+ 	select USE_OF
+ 
+ config MACH_BOCKW_REFERENCE
