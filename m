@@ -1,108 +1,173 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 19 May 2015 16:25:31 +0800
-Subject: [PATCHv2 05/12] arm64: psci: support unsigned return values
-In-Reply-To: <1431945503-6939-6-git-send-email-mark.rutland@arm.com>
-References: <1431945503-6939-1-git-send-email-mark.rutland@arm.com>
- <1431945503-6939-6-git-send-email-mark.rutland@arm.com>
-Message-ID: <555AF37B.9050300@linaro.org>
+From: timo.kokkonen@offcode.fi (Timo Kokkonen)
+Date: Tue, 19 May 2015 11:26:04 +0300
+Subject: [PATCHv8 05/10] Documentation/watchdog: Document watchdog core API
+ changes
+In-Reply-To: <1432023969-20736-1-git-send-email-timo.kokkonen@offcode.fi>
+References: <1432023969-20736-1-git-send-email-timo.kokkonen@offcode.fi>
+Message-ID: <1432023969-20736-6-git-send-email-timo.kokkonen@offcode.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?05?18? 18:38, Mark Rutland wrote:
-> PSCI_VERSION and MIGRATE_INFO_TYPE_UP_CPU return unsigned values, with
-> the latter returning a 64-bit value. However, the PSCI invocation
-> functions have prototypes returning int.
->
-> This patch upgrades the invocation functions to return unsigned long,
-> with a new typedef to keep things legible. As PSCI_VERSION cannot return
-> a negative value, the erroneous check against PSCI_RET_NOT_SUPPORTED is
-> also removed. The unrelated psci_initcall_t typedef is moved closer to
-> its first user, to avoid confusion with the invocation functions.
->
-> In preparation for sharing the code with ARM, unsigned long is used in
-> preference of u64. In the SMC32 calling convention, the relevant fields
-> will be 32 bits wide.
->
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->   arch/arm64/kernel/psci.c | 47 ++++++++++++++++++-----------------------------
->   1 file changed, 18 insertions(+), 29 deletions(-)
->
-> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-> index 66b5b75..9c4de4b 100644
-> --- a/arch/arm64/kernel/psci.c
-> +++ b/arch/arm64/kernel/psci.c
-> @@ -56,11 +56,11 @@ struct psci_operations {
->
->   static struct psci_operations psci_ops;
->
-> -static int (*invoke_psci_fn)(u64, u64, u64, u64);
-> -typedef int (*psci_initcall_t)(const struct device_node *);
-> -
-> -asmlinkage int __invoke_psci_fn_hvc(u64, u64, u64, u64);
-> -asmlinkage int __invoke_psci_fn_smc(u64, u64, u64, u64);
-> +typedef unsigned long (psci_fn)(unsigned long, unsigned long,
-> +				unsigned long, unsigned long);
-> +asmlinkage psci_fn __invoke_psci_fn_hvc;
-> +asmlinkage psci_fn __invoke_psci_fn_smc;
-> +static psci_fn *invoke_psci_fn;
->
->   enum psci_function {
->   	PSCI_FN_CPU_SUSPEND,
-> @@ -112,12 +112,9 @@ static void psci_power_state_unpack(u32 power_state,
->   			PSCI_0_2_POWER_STATE_AFFL_SHIFT;
->   }
->
-> -static int psci_get_version(void)
-> +static u32 psci_get_version(void)
->   {
-> -	int err;
-> -
-> -	err = invoke_psci_fn(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
-> -	return err;
-> +	return invoke_psci_fn(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
->   }
->
->   static int psci_cpu_suspend(struct psci_power_state state,
-> @@ -293,25 +290,15 @@ static void __init psci_0_2_set_functions(void)
->    */
->   static int __init psci_probe(void)
->   {
-> -	int ver = psci_get_version();
-> -
-> -	if (ver == PSCI_RET_NOT_SUPPORTED) {
-> -		/*
-> -		 * PSCI versions >=0.2 mandates implementation of
-> -		 * PSCI_VERSION.
-> -		 */
-> -		pr_err("PSCI firmware does not comply with the v0.2 spec.\n");
-> -		return -EOPNOTSUPP;
-> -	} else {
-> -		pr_info("PSCIv%d.%d detected in firmware.\n",
-> -				PSCI_VERSION_MAJOR(ver),
-> -				PSCI_VERSION_MINOR(ver));
-> -
-> -		if (PSCI_VERSION_MAJOR(ver) == 0 &&
-> -				PSCI_VERSION_MINOR(ver) < 2) {
-> -			pr_err("Conflicting PSCI version detected.\n");
-> -			return -EINVAL;
-> -		}
-> +	u32 ver = psci_get_version();
-> +
-> +	pr_info("PSCIv%d.%d detected in firmware.\n",
-> +			PSCI_VERSION_MAJOR(ver),
-> +			PSCI_VERSION_MINOR(ver));
-> +
-> +	if (PSCI_VERSION_MAJOR(ver) == 0 && PSCI_VERSION_MINOR(ver) < 2) {
-> +		pr_err("Conflicting PSCI version detected.\n");
-> +		return -EINVAL;
+Watchdog core API has changed somewhat and drivers are expected to
+change. Document the new requirements so that driver writers know how
+to do the change properly.
 
-simplified the code both for DT and ACPI,
+Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
+---
+ .../watchdog/convert_drivers_to_kernel_api.txt     | 26 ++++++++
+ Documentation/watchdog/watchdog-kernel-api.txt     | 71 +++++++++++++---------
+ 2 files changed, 68 insertions(+), 29 deletions(-)
 
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
-
-Thanks
-Hanjun
+diff --git a/Documentation/watchdog/convert_drivers_to_kernel_api.txt b/Documentation/watchdog/convert_drivers_to_kernel_api.txt
+index 271b885..c9ba973 100644
+--- a/Documentation/watchdog/convert_drivers_to_kernel_api.txt
++++ b/Documentation/watchdog/convert_drivers_to_kernel_api.txt
+@@ -185,6 +185,32 @@ by adding a module parameter. The conversion for this would be something like:
+ The module parameter itself needs to stay, everything else related to nowayout
+ can go, though. This will likely be some code in open(), close() or write().
+ 
++Remove possible adhoc timer code
++--------------------------------
++
++The watchdog core is capable of handling various features many
++watchdog hardware are missing, such as emulating stopped watchdog with
++unstoppable hardware or extending the timeout when hardware only
++supports very short timeout values. Traditionally watchdog drivers
++needed to implement code of their own to work around the hardware
++limitations. Now it is enough to record the watchdog boot time status
++with watchdog_set_hw_active() function and the watchdog core takes
++care of starting or stopping the watchdog, depending on the used
++policy. If watchdog cannot be stopped, the stop() function should
++return -ENOTSUPP and let core emulate stopping the watchdog.
++
++Initialize parameters with watchdog_init_params()
++-------------------------------------------------
++
++There are parameters that the watchdog driver does not need to be
++aware of and there are parameters that are optional to the driver. The
++watchdog_init_params() function takes care of validating the mandatory
++parameters and filling in reasonable values for the optional ones.
++
++What the driver MUST do is to fill in hw_max_timeout value in
++milliseconds, record the current watchdog hardware active status with
++watchdog_set_hw_active() and then call watchdog_init_params() and
++check the return value to see that everything went right.
+ 
+ Register the watchdog device
+ ----------------------------
+diff --git a/Documentation/watchdog/watchdog-kernel-api.txt b/Documentation/watchdog/watchdog-kernel-api.txt
+index a0438f3..265306c 100644
+--- a/Documentation/watchdog/watchdog-kernel-api.txt
++++ b/Documentation/watchdog/watchdog-kernel-api.txt
+@@ -11,12 +11,21 @@ It also does not describe the API which can be used by user space to communicate
+ with a WatchDog Timer. If you want to know this then please read the following
+ file: Documentation/watchdog/watchdog-api.txt .
+ 
+-So what does this document describe? It describes the API that can be used by
+-WatchDog Timer Drivers that want to use the WatchDog Timer Driver Core
+-Framework. This framework provides all interfacing towards user space so that
+-the same code does not have to be reproduced each time. This also means that
+-a watchdog timer driver then only needs to provide the different routines
+-(operations) that control the watchdog timer (WDT).
++So what does this document describe? It describes the API that can be
++used by WatchDog Timer Drivers that want to use the WatchDog Timer
++Driver Core Framework. This framework provides all interfacing towards
++user space so that the same code does not have to be reproduced each
++time. This also means that a watchdog timer driver then only needs to
++provide the different routines (operations) that control the watchdog
++timer (WDT).
++
++The Watchdog Timer Driver Core also intermediates between the user
++space and the driver and provides same user experience to the user
++space regardless of the hardware limitations. For example, some
++watchdog hardware can not be stopped or they have very short maximum
++keepalive timeout. In such case watchdog core can emulate a stopped
++watchdog device or extend watchdog timeout by pinging periodically the
++watchdog driver on behalf of the user space.
+ 
+ The API
+ -------
+@@ -48,7 +57,8 @@ struct watchdog_device {
+ 	unsigned int bootstatus;
+ 	unsigned int timeout;
+ 	unsigned int min_timeout;
+-	unsigned int max_timeout;
++	unsigned int hw_max_timeout;
++	unsigned int hw_keepalive;
+ 	void *driver_data;
+ 	struct mutex lock;
+ 	unsigned long status;
+@@ -69,7 +79,8 @@ It contains following fields:
+ * ops: a pointer to the list of watchdog operations that the watchdog supports.
+ * timeout: the watchdog timer's timeout value (in seconds).
+ * min_timeout: the watchdog timer's minimum timeout value (in seconds).
+-* max_timeout: the watchdog timer's maximum timeout value (in seconds).
++* hw_max_timeout: the watchdog timer's maximum timeout value supported
++  in hardware (in milliseconds).
+ * bootstatus: status of the device after booting (reported with watchdog
+   WDIOF_* status bits).
+ * driver_data: a pointer to the drivers private data of a watchdog device.
+@@ -124,12 +135,13 @@ are:
+   The routine needs a pointer to the watchdog timer device structure as a
+   parameter. It returns zero on success or a negative errno code for failure.
+ * stop: with this routine the watchdog timer device is being stopped.
+-  The routine needs a pointer to the watchdog timer device structure as a
+-  parameter. It returns zero on success or a negative errno code for failure.
+-  Some watchdog timer hardware can only be started and not be stopped. The
+-  driver supporting this hardware needs to make sure that a start and stop
+-  routine is being provided. This can be done by using a timer in the driver
+-  that regularly sends a keepalive ping to the watchdog timer hardware.
++  The routine needs a pointer to the watchdog timer device structure
++  as a parameter. It returns zero on success or a negative errno code
++  for failure. Some watchdog timer hardware can only be started and
++  not be stopped. If the watchdog timer can not be stopped, the stop
++  routine must return -ENOTSUPP error code. The watchdog core can then
++  take care of pinging the watchdog hardware while user space expects
++  it to be stopped.
+ 
+ Not all watchdog timer hardware supports the same functionality. That's why
+ all other routines/operations are optional. They only need to be provided if
+@@ -168,10 +180,11 @@ they are supported. These optional routines/operations are:
+ 
+ The status bits should (preferably) be set with the set_bit and clear_bit alike
+ bit-operations. The status bits that are defined are:
+-* WDOG_ACTIVE: this status bit indicates whether or not a watchdog timer device
+-  is active or not. When the watchdog is active after booting, then you should
+-  set this status bit (Note: when you register the watchdog timer device with
+-  this bit set, then opening /dev/watchdog will skip the start operation)
++* WDOG_ACTIVE: this status bit indicates whether or not a watchdog
++  timer hardware is active or not. When the watchdog is active after
++  booting, then you should set this status bit (Note: when you
++  register the watchdog timer device with this bit set, then opening
++  /dev/watchdog will skip the start operation)
+ * WDOG_DEV_OPEN: this status bit shows whether or not the watchdog device
+   was opened via /dev/watchdog.
+   (This bit should only be used by the WatchDog Timer Driver Core).
+@@ -213,14 +226,14 @@ The watchdog_get_drvdata function allows you to retrieve driver specific data.
+ The argument of this function is the watchdog device where you want to retrieve
+ data from. The function returns the pointer to the driver specific data.
+ 
+-To initialize the timeout field, the following function can be used:
+-
+-extern int watchdog_init_timeout(struct watchdog_device *wdd,
+-                                  unsigned int timeout_parm, struct device *dev);
+-
+-The watchdog_init_timeout function allows you to initialize the timeout field
+-using the module timeout parameter or by retrieving the timeout-sec property from
+-the device tree (if the module timeout parameter is invalid). Best practice is
+-to set the default timeout value as timeout value in the watchdog_device and
+-then use this function to set the user "preferred" timeout value.
+-This routine returns zero on success and a negative errno code for failure.
++You can initialize timeout field in the watchdog_device structure
++eg. based from a module parameter in case user has a preference over
++the initial timeout when loading the module.
++
++Your driver also must fill in appropriate hw_max_timeout value in the
++watchdog_device structure and then call watchdog_init_params
++function. This function will initialize watchdog internal parameters
++and fill in missing values, such as timeout value. The function can
++use device tree to fill in the necessary values, but it does not
++override timeout value set by the driver. In case invalid values are
++given, watchdog_inint_params returns a negative error.
+-- 
+2.1.0
