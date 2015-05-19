@@ -1,35 +1,59 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 19 May 2015 15:30:12 +0800
-Subject: [PATCH] crypto: allow to assign gfp_t for __crypto_alloc_tfm
-In-Reply-To: <20150519072740.GA40281@jaegeuk-mac02.hsd1.ca.comcast.net>
-References: <1432014416-39326-1-git-send-email-jaegeuk@kernel.org>
- <20150519054945.GA28060@gondor.apana.org.au>
- <20150519062430.GA39588@jaegeuk-mac02.hsd1.ca.comcast.net>
- <20150519063211.GA28347@gondor.apana.org.au>
- <20150519065812.GA40012@jaegeuk-mac02.hsd1.ca.comcast.net>
- <20150519065929.GA28610@gondor.apana.org.au>
- <20150519071317.GB40012@jaegeuk-mac02.hsd1.ca.comcast.net>
- <20150519071521.GA28862@gondor.apana.org.au>
- <20150519072740.GA40281@jaegeuk-mac02.hsd1.ca.comcast.net>
-Message-ID: <20150519073012.GA29030@gondor.apana.org.au>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Tue, 19 May 2015 09:34:47 +0200
+Subject: [RFC PATCH] ALSA: pcm: Modify double acknowledged interrupts
+ check condition
+In-Reply-To: <1431527943-64178-1-git-send-email-koro.chen@mediatek.com>
+References: <1431527943-64178-1-git-send-email-koro.chen@mediatek.com>
+Message-ID: <s5hfv6t10mg.wl-tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 12:27:40AM -0700, Jaegeuk Kim wrote:
->
-> So, IMHO, it can consume memory too much, since tfm should be allocated for
-> every inodes and be alive until inode eviction.
+At Wed, 13 May 2015 22:39:03 +0800,
+Koro Chen wrote:
+> 
+> Currently in snd_pcm_update_hw_ptr0 during interrupt,
+> we consider there were double acknowledged interrupts when:
+> 1. HW reported pointer is smaller than expected, and
+> 2. Time from last update time (hdelta) is over half a buffer time.
+> 
+> However, when HW reported pointer is only a few bytes smaller than
+> expected, and when hdelta is just a little larger than half a buffer time
+> (e.g. ping-pong buffer), it wrongly treats this IRQ as double acknowledged.
+> 
+> The condition #2 uses jiffies, but jiffies is not high resolution
+> since it is integer. We should consider jiffies inaccuracy.
+> 
+> Signed-off-by: Koro Chen <koro.chen@mediatek.com>
 
-Are you sure this is a real problem? Have you actually looked at
-how much memory it consumes?
+The condition looks too strict, indeed.  I applied the patch as is
+now.
 
-> Apart from giving GFP_NOFS, do you mean that it is a wrong approach?
+BTW, the similar check is already present for the free-wheeling case.
+I'm going to clean up the code a bit for using the common code.
 
-Allocating the tfm and setting a key on the data path is not
-acceptable.
 
-Cheers,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+thanks,
+
+Takashi
+
+
+> ---
+>  sound/core/pcm_lib.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/sound/core/pcm_lib.c b/sound/core/pcm_lib.c
+> index ac6b33f..7d45645 100644
+> --- a/sound/core/pcm_lib.c
+> +++ b/sound/core/pcm_lib.c
+> @@ -339,7 +339,7 @@ static int snd_pcm_update_hw_ptr0(struct snd_pcm_substream *substream,
+>  		if (delta > new_hw_ptr) {
+>  			/* check for double acknowledged interrupts */
+>  			hdelta = curr_jiffies - runtime->hw_ptr_jiffies;
+> -			if (hdelta > runtime->hw_ptr_buffer_jiffies/2) {
+> +			if (hdelta > runtime->hw_ptr_buffer_jiffies/2 + 1) {
+>  				hw_base += runtime->buffer_size;
+>  				if (hw_base >= runtime->boundary) {
+>  					hw_base = 0;
+> -- 
+> 1.8.1.1.dirty
+> 
