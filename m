@@ -1,75 +1,83 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 19 May 2015 16:46:50 +0200
-Subject: [PATCH v2 0/9] ARM: at91 cleanups for 4.1 #2
-In-Reply-To: <1427138955-3617-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1427138955-3617-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <555B4CDA.3000308@atmel.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 19 May 2015 16:48:23 +0200
+Subject: [PATCH v8 2/3] I2C: mediatek: Add driver for MediaTek I2C
+ controller
+In-Reply-To: <20150518184300.GB28888@pengutronix.de>
+References: <1431967209-5261-1-git-send-email-eddie.huang@mediatek.com>
+ <1431967209-5261-3-git-send-email-eddie.huang@mediatek.com>
+ <20150518184300.GB28888@pengutronix.de>
+Message-ID: <CABuKBeJcpufi-eEWmDRK6F2kgpz3DmCz8rp4hVPCJVgkmGr-KA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 23/03/2015 20:29, Alexandre Belloni a ?crit :
-> Hi,
-> 
-> This patch set finishes the clean up of the mach-at91 directory.
-> 
-> It fixes the remaining two drivers (at91_cf and pata_at91) so that they compile
-> in a multiplatform configuration.
-> 
-> Then it removes the uneeded headers.
-> 
-> Changes in v2:
->  - remove incorrect tabs in atmel-mc.h
->  - collected acks
->  - Added a new patch to remove Makefile.boot
->  - improved the commit massage of the first patch
-> 
-> Alexandre Belloni (8):
->   ata: at91: use syscon to configure the smc
->   ARM: at91: drop sam9_smc.c
->   ARM: at91: declare the at91rm9200 memory controller as a syscon
->   pcmcia: at91_cf: Use syscon to configure the MC/smc
->   ARM: at91/pm: use the atmel-mc syscon defines
->   ARM: at91: remove mach/at91_ramc.h and mach/at91rm9200_mc.h
->   ARM: at91: remove at91rm9200_sdramc.h
->   ARM: at91: remove useless Makefile.boot
-> 
-> Boris Brezillon (1):
->   mfd: syscon: Add Atmel MC (Memory Controller) registers definition
+2015-05-18 20:43 GMT+02:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello,
+>
+> On Tue, May 19, 2015 at 12:40:08AM +0800, Eddie Huang wrote:
+>> From: Xudong Chen <xudong.chen@mediatek.com>
+>>
+>> The mediatek SoCs have I2C controller that handle I2C transfer.
+>> This patch include common I2C bus driver.
+>> This driver is compatible with I2C controller on mt65xx/mt81xx.
+>>
+>> Signed-off-by: Xudong Chen <xudong.chen@mediatek.com>
+>> Signed-off-by: Liguo Zhang <liguo.zhang@mediatek.com>
+>> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+>> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+>> ---
+>>  drivers/i2c/busses/Kconfig      |   9 +
+>>  drivers/i2c/busses/Makefile     |   1 +
+>>  drivers/i2c/busses/i2c-mt65xx.c | 675 ++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 685 insertions(+)
+>>  create mode 100644 drivers/i2c/busses/i2c-mt65xx.c
+>>
+>> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+>> index 2255af2..14c7266 100644
+>> --- a/drivers/i2c/busses/Kconfig
+>> +++ b/drivers/i2c/busses/Kconfig
+>> @@ -620,6 +620,15 @@ config I2C_MPC
+>>         This driver can also be built as a module.  If so, the module
+>>         will be called i2c-mpc.
+>>
+>> +config I2C_MT65XX
+>> +     tristate "MediaTek I2C adapter"
+>> +     depends on ARCH_MEDIATEK || COMPILE_TEST
+>> +     help
+>> +       This selects the MediaTek(R) Integrated Inter Circuit bus driver
+>> +       for MT65xx and MT81xx.
+>> +       If you want to use MediaTek(R) I2C interface, say Y or M here.
+>> +       If unsure, say N.
+>> +
+>>  config I2C_MV64XXX
+>>       tristate "Marvell mv64xxx I2C Controller"
+>>       depends on MV64X60 || PLAT_ORION || ARCH_SUNXI
+>> diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
+>> index cdf941d..abbf422 100644
+>> --- a/drivers/i2c/busses/Makefile
+>> +++ b/drivers/i2c/busses/Makefile
+>> @@ -60,6 +60,7 @@ obj-$(CONFIG_I2C_JZ4780)    += i2c-jz4780.o
+>>  obj-$(CONFIG_I2C_KEMPLD)     += i2c-kempld.o
+>>  obj-$(CONFIG_I2C_MESON)              += i2c-meson.o
+>>  obj-$(CONFIG_I2C_MPC)                += i2c-mpc.o
+>> +obj-$(CONFIG_I2C_MT65XX)     += i2c-mt65xx.o
+>>  obj-$(CONFIG_I2C_MV64XXX)    += i2c-mv64xxx.o
+>>  obj-$(CONFIG_I2C_MXS)                += i2c-mxs.o
+>>  obj-$(CONFIG_I2C_NOMADIK)    += i2c-nomadik.o
+>> diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
+>> new file mode 100644
+>> index 0000000..7462f05
+>> --- /dev/null
+>> +++ b/drivers/i2c/busses/i2c-mt65xx.c
+>> @@ -0,0 +1,675 @@
+>> +/*
+>> + * Copyright (c) 2014 MediaTek Inc.
+>> + * Author: Xudong.chen <xudong.chen@mediatek.com>
+> s/Xudong.chen/Xudong Chen/
+>
+>> +#define I2C_DRV_NAME         "mt-i2c"
+> i2c-mt65xx ?
 
-On the whole series for patches where my tag is not set yet:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-Thanks, bye.
-
->  .../devicetree/bindings/arm/atmel-at91.txt         |   2 +-
->  arch/arm/boot/dts/at91rm9200.dtsi                  |   2 +-
->  arch/arm/mach-at91/Makefile                        |   5 -
->  arch/arm/mach-at91/Makefile.boot                   |   8 --
->  arch/arm/mach-at91/include/mach/at91_ramc.h        |  28 ----
->  arch/arm/mach-at91/include/mach/at91rm9200_mc.h    | 116 -----------------
->  arch/arm/mach-at91/include/mach/at91sam9_smc.h     |  98 --------------
->  arch/arm/mach-at91/pm.c                            |   8 +-
->  arch/arm/mach-at91/pm.h                            |  14 +-
->  arch/arm/mach-at91/pm_suspend.S                    |   3 +-
->  arch/arm/mach-at91/sam9_smc.c                      | 136 -------------------
->  arch/arm/mach-at91/sam9_smc.h                      |  11 --
->  drivers/ata/Kconfig                                |   1 -
->  drivers/ata/pata_at91.c                            |  92 ++++++++++---
->  drivers/pcmcia/Kconfig                             |   1 -
->  drivers/pcmcia/at91_cf.c                           |  25 ++--
->  include/linux/mfd/syscon/atmel-mc.h                | 144 +++++++++++++++++++++
->  include/soc/at91/at91rm9200_sdramc.h               |  63 ---------
->  18 files changed, 249 insertions(+), 508 deletions(-)
->  delete mode 100644 arch/arm/mach-at91/Makefile.boot
->  delete mode 100644 arch/arm/mach-at91/include/mach/at91_ramc.h
->  delete mode 100644 arch/arm/mach-at91/include/mach/at91rm9200_mc.h
->  delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9_smc.h
->  delete mode 100644 arch/arm/mach-at91/sam9_smc.c
->  delete mode 100644 arch/arm/mach-at91/sam9_smc.h
->  create mode 100644 include/linux/mfd/syscon/atmel-mc.h
->  delete mode 100644 include/soc/at91/at91rm9200_sdramc.h
-> 
-
+As this works for all SoCs so far, I would propose: i2c-mtk
 
 -- 
-Nicolas Ferre
+motzblog.wordpress.com
