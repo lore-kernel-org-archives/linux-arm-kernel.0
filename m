@@ -1,69 +1,57 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Tue, 19 May 2015 15:34:10 +0200
-Subject: [RFC PATCH 0/4] Add SPI flash support for Exynos Chromebooks
-Message-ID: <1432042454-19234-1-git-send-email-javier.martinez@collabora.co.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 19 May 2015 15:36:06 +0200
+Subject: [PATCH] [RESEND] SCSI: initio: remove duplicate module device table
+Message-ID: <11814945.RJWVP7jqUX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mark,
+The initio driver has for many years had two copies of the
+same module device table. One of them is also used for registering
+the other driver, the other one is entirely useless after the
+large scale cleanup that Alan Cox did back in 2007.
 
-This is an RFC patch series to add SPI flash support for the Exynos
-Chromebooks. These machines store in the flash, firmware and system
-parameters such as the Google Binary Block flags that controls many
-aspects of the system.
+The compiler warns about this whenever the driver is built-in:
 
-There isn't a driver for this flash memory device so the downstream
-tree uses spidev to access the device from userspace (i.e: flashrom).
+drivers/scsi/initio.c:131:29: warning: 'i91u_pci_devices' defined but not used [-Wunused-variable]
 
-For example, the Google Binary Block (GBB) flags can be updated with:
+This removes the extraneous table and the warning.
 
-# flashrom -p linux_spi:dev=/dev/spidev1.0 -r gbb.bin
-# gbb_utility -s --flags=0x39 gbb.bin
-# flashrom -p linux_spi:dev=/dev/spidev1.0 -w gbb.bin
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 72d39fea901 ("[SCSI] initio: Convert into a real Linux driver and update to modern style")
+---
+Submitted in January, but got no reply.
 
-I took the downstream patches and posted a while ago [0] but you said
-that using compatible = "spidev" is wrong since is an implementation
-detail of Linux and does not describe the hardware [1].
-
-By looking at a recent discussion [2] and commit [3], it seems that
-you agree to use spidev as long as a relevant device ID is added to
-the spidev OF device table.
-
-This is a RFC series though since I may missunderstood your comments.
-
-The series is composed of the following patches:
-
-Doug Anderson (1):
-  ARM: dts: Add spidev registration to exynos5250-snow
-
-Javier Martinez Canillas (2):
-  spi: spidev: Add Google SPI flash compatible string
-  ARM: exynos_defconfig: Enable user mode SPI device support
-
-Simon Glass (1):
-  ARM: dts: Add SPI flash node for Peach boards
-
- arch/arm/boot/dts/exynos5250-snow.dts      | 20 ++++++++++++++++++++
- arch/arm/boot/dts/exynos5420-peach-pit.dts | 26 ++++++++++++++++++++++++++
- arch/arm/boot/dts/exynos5800-peach-pi.dts  | 26 ++++++++++++++++++++++++++
- arch/arm/configs/exynos_defconfig          |  1 +
- drivers/spi/spidev.c                       |  1 +
- 5 files changed, 74 insertions(+)
-
-Patch #1 adds a "google,spi-flash" entry to the spidev OF ID device table.
-
-Patch #2 and #3 add as device node for the SPI flash to the Snow and Peach
-Chromebooks DTS.
-
-Patch #4 enables support for spidev to the exynos_defconfig.
-
-The patches have been tested on an Exynos5250 Snow and Exynos5420 Peach Pit
-and #1 should go through the spi tree while #2-4 through linux-samsung tree.
-
-Best regards,
-Javier
-
-[0]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/303348.html
-[1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/304256.html
-[2]: https://lkml.org/lkml/2015/4/26/28
-[3]: https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/?id=956b200a846e324322f6211034c734c65a38e550
+diff --git a/drivers/scsi/initio.c b/drivers/scsi/initio.c
+index e5dae7b54d9a..51063177f18e 100644
+--- a/drivers/scsi/initio.c
++++ b/drivers/scsi/initio.c
+@@ -110,11 +110,6 @@
+ #define i91u_MAXQUEUE		2
+ #define i91u_REVID "Initio INI-9X00U/UW SCSI device driver; Revision: 1.04a"
+ 
+-#define I950_DEVICE_ID	0x9500	/* Initio's inic-950 product ID   */
+-#define I940_DEVICE_ID	0x9400	/* Initio's inic-940 product ID   */
+-#define I935_DEVICE_ID	0x9401	/* Initio's inic-935 product ID   */
+-#define I920_DEVICE_ID	0x0002	/* Initio's other product ID      */
+-
+ #ifdef DEBUG_i91u
+ static unsigned int i91u_debug = DEBUG_DEFAULT;
+ #endif
+@@ -127,17 +122,6 @@ static int setup_debug = 0;
+ 
+ static void i91uSCBPost(u8 * pHcb, u8 * pScb);
+ 
+-/* PCI Devices supported by this driver */
+-static struct pci_device_id i91u_pci_devices[] = {
+-	{ PCI_VENDOR_ID_INIT,  I950_DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+-	{ PCI_VENDOR_ID_INIT,  I940_DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+-	{ PCI_VENDOR_ID_INIT,  I935_DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+-	{ PCI_VENDOR_ID_INIT,  I920_DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+-	{ PCI_VENDOR_ID_DOMEX, I920_DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+-	{ }
+-};
+-MODULE_DEVICE_TABLE(pci, i91u_pci_devices);
+-
+ #define DEBUG_INTERRUPT 0
+ #define DEBUG_QUEUE     0
+ #define DEBUG_STATE     0
