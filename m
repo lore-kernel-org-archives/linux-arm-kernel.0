@@ -1,97 +1,118 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 19 May 2015 16:17:58 +0800
-Subject: [PATCHv2 03/12] arm64: smp: consistently use error codes
-In-Reply-To: <1431945503-6939-4-git-send-email-mark.rutland@arm.com>
-References: <1431945503-6939-1-git-send-email-mark.rutland@arm.com>
- <1431945503-6939-4-git-send-email-mark.rutland@arm.com>
-Message-ID: <555AF1B6.5040401@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 19 May 2015 10:16:37 +0200
+Subject: [PATCH v2 04/10] pinctrl: sunxi: Prepare for building SoC
+ specific drivers as modules
+In-Reply-To: <CAGb2v6608XVsxN0f2DEmqmts1zDo223t+fBv46WjGQVQbw7+CA@mail.gmail.com>
+References: <1431707940-19372-1-git-send-email-jenskuske@gmail.com>
+ <1431707940-19372-5-git-send-email-jenskuske@gmail.com>
+ <20150517141922.GE4004@lukather> <5559B1AF.2010200@gmail.com>
+ <20150519075537.GU4004@lukather>
+ <CAGb2v6608XVsxN0f2DEmqmts1zDo223t+fBv46WjGQVQbw7+CA@mail.gmail.com>
+Message-ID: <20150519081637.GV4004@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?05?18? 18:38, Mark Rutland wrote:
-> cpu_kill currently returns one for success and zero for failure, which
-> is unlike all the other cpu_operations, which return zero for success
-> and an error code upon failure. This difference is unnecessarily
-> confusing.
->
-> Make cpu_kill consistent with the other cpu_operations.
->
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->   arch/arm64/kernel/psci.c |  7 +++----
->   arch/arm64/kernel/smp.c  | 10 +++++++---
->   2 files changed, 10 insertions(+), 7 deletions(-)
->
-> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-> index ea18cb5..10fa25e 100644
-> --- a/arch/arm64/kernel/psci.c
-> +++ b/arch/arm64/kernel/psci.c
-> @@ -498,7 +498,7 @@ static int cpu_psci_cpu_kill(unsigned int cpu)
->   	int err, i;
->
->   	if (!psci_ops.affinity_info)
-> -		return 1;
-> +		return 0;
->   	/*
->   	 * cpu_kill could race with cpu_die and we can
->   	 * potentially end up declaring this cpu undead
-> @@ -509,7 +509,7 @@ static int cpu_psci_cpu_kill(unsigned int cpu)
->   		err = psci_ops.affinity_info(cpu_logical_map(cpu), 0);
->   		if (err == PSCI_0_2_AFFINITY_LEVEL_OFF) {
->   			pr_info("CPU%d killed.\n", cpu);
-> -			return 1;
-> +			return 0;
->   		}
->
->   		msleep(10);
-> @@ -518,8 +518,7 @@ static int cpu_psci_cpu_kill(unsigned int cpu)
->
->   	pr_warn("CPU%d may not have shut down cleanly (AFFINITY_INFO reports %d)\n",
->   			cpu, err);
-> -	/* Make op_cpu_kill() fail. */
-> -	return 0;
-> +	return -ETIMEDOUT;
->   }
->   #endif
->   #endif
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index 2cb0081..3799df2 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -248,7 +248,7 @@ static int op_cpu_kill(unsigned int cpu)
->   	 * time and hope that it's dead, so let's skip the wait and just hope.
->   	 */
->   	if (!cpu_ops[cpu]->cpu_kill)
-> -		return 1;
-> +		return 0;
->
->   	return cpu_ops[cpu]->cpu_kill(cpu);
->   }
-> @@ -261,6 +261,8 @@ static DECLARE_COMPLETION(cpu_died);
->    */
->   void __cpu_die(unsigned int cpu)
->   {
-> +	int err;
-> +
->   	if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(5000))) {
->   		pr_crit("CPU%u: cpu didn't die\n", cpu);
->   		return;
-> @@ -273,8 +275,10 @@ void __cpu_die(unsigned int cpu)
->   	 * verify that it has really left the kernel before we consider
->   	 * clobbering anything it might still be using.
->   	 */
-> -	if (!op_cpu_kill(cpu))
-> -		pr_warn("CPU%d may not have shut down cleanly\n", cpu);
-> +	err = op_cpu_kill(cpu);
-> +	if (err)
-> +		pr_warn("CPU%d may not have shut down cleanly: %d\n",
-> +			cpu, err);
->   }
+On Tue, May 19, 2015 at 04:02:39PM +0800, Chen-Yu Tsai wrote:
+> On Tue, May 19, 2015 at 3:55 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Mon, May 18, 2015 at 11:32:31AM +0200, Jens Kuske wrote:
+> >> Hi,
+> >>
+> >> On 05/17/15 16:19, Maxime Ripard wrote:
+> >> > On Fri, May 15, 2015 at 06:38:54PM +0200, Jens Kuske wrote:
+> >> >> Add a remove function and export the init and remove function
+> >> >> to allow us to build the SoC specific drivers as modules.
+> >> >>
+> >> >> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
+> >> >> ---
+> >> >>  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 25 +++++++++++++++++++------
+> >> >>  drivers/pinctrl/sunxi/pinctrl-sunxi.h |  2 ++
+> >> >>  2 files changed, 21 insertions(+), 6 deletions(-)
+> >> >>
+> >> >> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+> >> >> index f8e171b..4ef6b3d 100644
+> >> >> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+> >> >> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+> >> >> @@ -856,7 +856,6 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
+> >> >>    struct sunxi_pinctrl *pctl;
+> >> >>    struct resource *res;
+> >> >>    int i, ret, last_pin;
+> >> >> -  struct clk *clk;
+> >> >>
+> >> >>    pctl = devm_kzalloc(&pdev->dev, sizeof(*pctl), GFP_KERNEL);
+> >> >>    if (!pctl)
+> >> >> @@ -954,13 +953,13 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
+> >> >>                    goto gpiochip_error;
+> >> >>    }
+> >> >>
+> >> >> -  clk = devm_clk_get(&pdev->dev, NULL);
+> >> >> -  if (IS_ERR(clk)) {
+> >> >> -          ret = PTR_ERR(clk);
+> >> >> +  pctl->clk = devm_clk_get(&pdev->dev, NULL);
+> >> >> +  if (IS_ERR(pctl->clk)) {
+> >> >> +          ret = PTR_ERR(pctl->clk);
+> >> >>            goto gpiochip_error;
+> >> >>    }
+> >> >>
+> >> >> -  ret = clk_prepare_enable(clk);
+> >> >> +  ret = clk_prepare_enable(pctl->clk);
+> >> >>    if (ret)
+> >> >>            goto gpiochip_error;
+> >> >>
+> >> >> @@ -1015,10 +1014,24 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
+> >> >>    return 0;
+> >> >>
+> >> >>  clk_error:
+> >> >> -  clk_disable_unprepare(clk);
+> >> >> +  clk_disable_unprepare(pctl->clk);
+> >> >>  gpiochip_error:
+> >> >>    gpiochip_remove(pctl->chip);
+> >> >>  pinctrl_error:
+> >> >>    pinctrl_unregister(pctl->pctl_dev);
+> >> >>    return ret;
+> >> >>  }
+> >> >> +EXPORT_SYMBOL(sunxi_pinctrl_init);
+> >> >> +
+> >> >> +int sunxi_pinctrl_remove(struct platform_device *pdev)
+> >> >> +{
+> >> >> +  struct sunxi_pinctrl *pctl = platform_get_drvdata(pdev);
+> >> >> +
+> >> >> +  gpiochip_remove(pctl->chip);
+> >> >> +  pinctrl_unregister(pctl->pctl_dev);
+> >> >> +
+> >> >> +  clk_disable_unprepare(pctl->clk);
+> >> >
+> >> > We should also remove the domain and the interrupt mapping here.
+> >>
+> >> Ouch, I missed that. Only looked at the *_error: labels.
+> >>
+> >> Apart from that, currently the kernel panics some seconds after removing
+> >> the pinctrl module because mmc wants to access a gpio. Can this be
+> >> prevented somehow? I think pinctrl must not be removed once other
+> >> devices use any pin-related things.
+> >
+> > pinctrl_unregister doesn't look like it cares about whether or not
+> > there's users left in the system.
+> >
+> > Maybe the easiest path would be to just make this builtin like Paul
+> > suggested then ... :/
+> 
+> Is there a way to mark modules as not removable? At least we can keep
+> the multi-platform kernel image small.
 
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+If there's no module_exit, the module will only be removable through a
+rmmod -f, which seems like an acceptable solution.
 
-Thanks
-Hanjun
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150519/c96e40e7/attachment.sig>
