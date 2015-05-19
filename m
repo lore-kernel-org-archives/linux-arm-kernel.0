@@ -1,48 +1,57 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 19 May 2015 12:53:44 +0200
-Subject: [PATCH 3/3] ARM64: dts: mt8173: Add PMIC wrapper device node
-In-Reply-To: <1432032824-7955-1-git-send-email-s.hauer@pengutronix.de>
-References: <1432032824-7955-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1432032824-7955-4-git-send-email-s.hauer@pengutronix.de>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Tue, 19 May 2015 11:56:43 +0100
+Subject: [PATCH v2 3/5] arm64: Juno: Add memory mapped timer node
+In-Reply-To: <1431970109-8902-4-git-send-email-Liviu.Dudau@arm.com>
+References: <1431970109-8902-1-git-send-email-Liviu.Dudau@arm.com>
+ <1431970109-8902-4-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1432033003.3047.43.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the device node for the PMIC wrapper.
+On Mon, 2015-05-18 at 18:28 +0100, Liviu Dudau wrote:
+> Juno based boards have a memory mapped timer @ 0x2a810000. This
+> is disabled on r0 version of the board due to an SoC errata.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm64/boot/dts/mediatek/mt8173.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+So wouldn't it make more sense then to disable it in the dts for r0? As
+it is, you disable it in the common file below then have to later
+re-enable it in juno-r1.dts.
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index cfdca03..16ec639 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -14,6 +14,7 @@
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include "mt8173-pinfunc.h"
-+#include <dt-bindings/reset-controller/mt8173-resets.h>
- #include <dt-bindings/clock/mt8173-clk.h>
- 
- / {
-@@ -154,6 +155,17 @@
- 						<GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
- 		};
- 
-+		pwrap: pwrap at 1000D000 {
-+			compatible = "mediatek,mt8173-pwrap";
-+			reg = <0 0x1000D000 0 0x1000>;
-+			reg-names = "pwrap";
-+			interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
-+			resets = <&infracfg MT8173_INFRA_PMIC_WRAP_RST>;
-+			reset-names = "pwrap";
-+			clocks = <&infracfg CLK_INFRA_PMICSPI>, <&infracfg CLK_INFRA_PMICWRAP>;
-+			clock-names = "spi", "wrap";
-+		};
-+
- 		sysirq: intpol-controller at 10200620 {
- 			compatible = "mediatek,mt8173-sysirq",
- 					"mediatek,mt6577-sysirq";
--- 
-2.1.4
+Apart from that, the whole series looks good to be and I've given it a
+spin on r0 and r1. So consider that an
+Acked-by: Jon Medhurst <tixy@linaro.org>
+
+
+> 
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> ---
+>  arch/arm64/boot/dts/arm/juno-base.dtsi | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> index 5c4c035..b7e862f 100644
+> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
+> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> @@ -2,6 +2,21 @@
+>  	 *  Devices shared by all Juno boards
+>  	 */
+>  
+> +	memtimer: timer at 2a810000 {
+> +		compatible = "arm,armv7-timer-mem";
+> +		reg = <0x0 0x2a810000 0x0 0x10000>;
+> +		clock-frequency = <50000000>;
+
+
+> +		#address-cells = <2>;
+> +		#size-cells = <2>;
+> +		ranges;
+> +		status = "disabled";
+> +		frame at 2a830000 {
+> +			frame-number = <1>;
+> +			interrupts = <0 60 4>;
+> +			reg = <0x0 0x2a830000 0x0 0x10000>;
+> +		};
+> +	};
+> +
+>  	gic: interrupt-controller at 2c010000 {
+>  		compatible = "arm,gic-400", "arm,cortex-a15-gic";
+>  		reg = <0x0 0x2c010000 0 0x1000>,
