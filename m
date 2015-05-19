@@ -1,86 +1,68 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 19 May 2015 15:20:22 +0200
-Subject: [PATCH v7 02/25] drm/exynos: fimd: ensure proper hw state in
- fimd_clear_channel()
+Date: Tue, 19 May 2015 15:20:25 +0200
+Subject: [PATCH v7 05/25] iommu/exynos: Remove unused functions
 In-Reply-To: <1432041645-11172-1-git-send-email-m.szyprowski@samsung.com>
 References: <1432041645-11172-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1432041645-11172-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1432041645-11172-6-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One should not do any assumptions on the stare of the fimd hardware
-during driver initialization, so to properly reset fimd before enabling
-IOMMU, one should ensure that all power domains and clocks are really
-enabled. This patch adds calls to power on/off in the
-fimd_clear_channel() function to ensure that any access to fimd
-registers will be performed with clocks and power domains enabled.
+This patch removes two unneeded functions, which are not a part of
+generic IOMMU API and were never used by any other driver.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/gpu/drm/exynos/exynos_drm_fimd.c | 27 +++++++++++++++++----------
- 1 file changed, 17 insertions(+), 10 deletions(-)
+ drivers/iommu/exynos-iommu.c | 31 -------------------------------
+ 1 file changed, 31 deletions(-)
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimd.c b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
-index 9819fa6a9e2a..cf64550df59d 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_fimd.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
-@@ -242,12 +242,20 @@ static void fimd_enable_shadow_channel_path(struct fimd_context *ctx, int win,
- 	writel(val, ctx->regs + SHADOWCON);
+diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+index e9385ef0b8df..c9806868c14f 100644
+--- a/drivers/iommu/exynos-iommu.c
++++ b/drivers/iommu/exynos-iommu.c
+@@ -496,13 +496,6 @@ static int __exynos_sysmmu_enable(struct device *dev, phys_addr_t pgtable,
+ 	return ret;
  }
  
--static void fimd_clear_channel(struct fimd_context *ctx)
-+static int fimd_poweron(struct fimd_context *ctx);
-+static int fimd_poweroff(struct fimd_context *ctx);
-+
-+static int fimd_clear_channel(struct fimd_context *ctx)
+-int exynos_sysmmu_enable(struct device *dev, phys_addr_t pgtable)
+-{
+-	BUG_ON(!memblock_is_memory(pgtable));
+-
+-	return __exynos_sysmmu_enable(dev, pgtable, NULL);
+-}
+-
+ static bool exynos_sysmmu_disable(struct device *dev)
  {
--	int win, ch_enabled = 0;
-+	int ret, win, ch_enabled = 0;
- 
- 	DRM_DEBUG_KMS("%s\n", __FILE__);
- 
-+	/* Hardware is in unknown state, so ensure it get enabled properly */
-+	ret = fimd_poweron(ctx);
-+	if (ret)
-+		return ret;
-+
- 	/* Check if any channel is enabled. */
- 	for (win = 0; win < WINDOWS_NR; win++) {
- 		u32 val = readl(ctx->regs + WINCON(win));
-@@ -258,19 +266,15 @@ static void fimd_clear_channel(struct fimd_context *ctx)
- 			if (ctx->driver_data->has_shadowcon)
- 				fimd_enable_shadow_channel_path(ctx, win,
- 								false);
--
- 			ch_enabled = 1;
- 		}
- 	}
- 
- 	/* Wait for vsync, as disable channel takes effect at next vsync */
--	if (ch_enabled) {
--		unsigned int state = ctx->suspended;
--
--		ctx->suspended = 0;
-+	if (ch_enabled)
- 		fimd_wait_for_vblank(ctx->crtc);
--		ctx->suspended = state;
--	}
-+
-+	return fimd_poweroff(ctx);
+ 	unsigned long flags;
+@@ -594,30 +587,6 @@ static void sysmmu_tlb_invalidate_entry(struct device *dev, sysmmu_iova_t iova,
+ 	spin_unlock_irqrestore(&data->lock, flags);
  }
  
- static int fimd_iommu_attach_devices(struct fimd_context *ctx,
-@@ -285,7 +289,10 @@ static int fimd_iommu_attach_devices(struct fimd_context *ctx,
- 		 * If any channel is already active, iommu will throw
- 		 * a PAGE FAULT when enabled. So clear any channel if enabled.
- 		 */
--		fimd_clear_channel(ctx);
-+		ret = fimd_clear_channel(ctx);
-+		if (ret)
-+			return ret;
-+
- 		ret = drm_iommu_attach_device(ctx->drm_dev, ctx->dev);
- 		if (ret) {
- 			DRM_ERROR("drm_iommu_attach failed.\n");
+-void exynos_sysmmu_tlb_invalidate(struct device *dev)
+-{
+-	struct exynos_iommu_owner *owner = dev->archdata.iommu;
+-	unsigned long flags;
+-	struct sysmmu_drvdata *data;
+-
+-	data = dev_get_drvdata(owner->sysmmu);
+-
+-	spin_lock_irqsave(&data->lock, flags);
+-	if (is_sysmmu_active(data)) {
+-		if (!IS_ERR(data->clk_master))
+-			clk_enable(data->clk_master);
+-		if (sysmmu_block(data->sfrbase)) {
+-			__sysmmu_tlb_invalidate(data->sfrbase);
+-			sysmmu_unblock(data->sfrbase);
+-		}
+-		if (!IS_ERR(data->clk_master))
+-			clk_disable(data->clk_master);
+-	} else {
+-		dev_dbg(dev, "disabled. Skipping TLB invalidation\n");
+-	}
+-	spin_unlock_irqrestore(&data->lock, flags);
+-}
+-
+ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
+ {
+ 	int irq, ret;
 -- 
 1.9.2
