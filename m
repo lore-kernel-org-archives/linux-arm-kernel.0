@@ -1,24 +1,33 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 19 May 2015 06:05:44 +0300
-Subject: [PATCH 2/7] ARM: bcm2835: Add a Raspberry Pi-specific clock
- driver.
-In-Reply-To: <1431978219-14226-3-git-send-email-eric@anholt.net>
-References: <1431978219-14226-1-git-send-email-eric@anholt.net>
- <1431978219-14226-3-git-send-email-eric@anholt.net>
-Message-ID: <20150519030544.GQ2845@tarshish>
+From: wenyou.yang@atmel.com (Yang, Wenyou)
+Date: Tue, 19 May 2015 11:07:29 +0800
+Subject: at91sam9: watchdog: period
+In-Reply-To: <5559A029.9060007@aksignal.cz>
+References: <55559D55.6020703@aksignal.cz>	<20150515172516.005e3a21@bbrezillon>	<5559865F.9010502@aksignal.cz>
+ <20150518092750.449d6c8c@bbrezillon> <5559A029.9060007@aksignal.cz>
+Message-ID: <555AA8F1.80100@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
 
-On Mon, May 18, 2015 at 12:43:34PM -0700, Eric Anholt wrote:
-> +DEFINE_MUTEX(delayed_clock_init);
 
-Static?
+On 2015/5/18 16:17, Ji?? Prchal wrote:
+>
+>
+> On 18.5.2015 09:27, Boris Brezillon wrote:
+>>
+>> Can you dump watchdog registers (using devmem) ?
+>
+> / # devmem 0xfffffe40
+> 0x00000000
+> / # devmem 0xfffffe44
+> 0x1FFF2FFF
+> / # devmem 0xfffffe48
+> 0x00000000
+>
+The register value is right.
 
-baruch
+I tested the Linux-3.18-at91-linux4sam_4.7 on the at91sam9g35ek. It 
+reset the system in the 16s after removing atmel,idle-halt property.
 
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Best Regards,
+Wenyou Yang
