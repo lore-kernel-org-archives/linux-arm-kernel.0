@@ -1,39 +1,22 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 19 May 2015 23:32:47 +0100
-Subject: [PATCH] ARM: v7 setup function should invalidate L1 cache
-In-Reply-To: <8164344.VcU8v2tIF5@wuerfel>
-References: <E1Yuk8W-0001tC-IK@rmk-PC.arm.linux.org.uk>
- <2080993.BUNZpO9uLL@wuerfel>
- <20150519220721.GK2067@n2100.arm.linux.org.uk>
- <8164344.VcU8v2tIF5@wuerfel>
-Message-ID: <20150519223247.GN2067@n2100.arm.linux.org.uk>
+Date: Tue, 19 May 2015 23:34:44 +0100
+Subject: [RFC] arm: DMA-API contiguous cacheable memory
+In-Reply-To: <2882347.Nj1Dq9Wlqh@wuerfel>
+References: <CAE=W-e24oDH5RZfPftRg_xYBiG+b9Sj09vpyay9EwqOo9cVX1w@mail.gmail.com>
+ <20150519163436.GZ21251@e104818-lin.cambridge.arm.com>
+ <CAE=W-e1qynowbccHpYntWwwZPZOMHAVXH=Yj3ukyr_X8WKwQJQ@mail.gmail.com>
+ <2882347.Nj1Dq9Wlqh@wuerfel>
+Message-ID: <20150519223444.GO2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 12:18:43AM +0200, Arnd Bergmann wrote:
-> On Tuesday 19 May 2015 23:07:21 Russell King - ARM Linux wrote:
-> > The /simplest/ change which would fix this problem is to just change
-> > proc-v7.S.  The remainder is effectively a cleanup removing redundant
-> > code.
-> 
-> Fair enough. I wasn't sure if we're confident enough about that
-> change already to put it into stable backports. If the risk is low
-> enough, that's fine.
+On Wed, May 20, 2015 at 12:14:48AM +0200, Arnd Bergmann wrote:
+> With that memory, you should be able to use the normal streaming
+> API (dma_sync_single_for_*).
 
-When the kernel is entered from the decompressor, the last steps just
-before calling the kernel is to clean and invalidate the caches, then
-turn them off, and then jump to the kernel.
-
-So, there _should_ be no dirty cache lines which we rely upon at this
-point - if there was dirty data in the cache, then it hasn't been flushed
-to memory, and we're potentially going to crash because some part of
-the decompressed kernel image hasn't been flushed out to memory.
-
-So I'll put a confidence value of 99.999% on this.
-
-The case which might bite people is if they bypass the decompressor.
-Even then, leaving bits of the kernel image in the caches is really
-dodgy.
+Wrong, as I've pointed out previously.  The only memory which you're
+allowed to sync is with memory which has been mapped with a dma_map_*()
+function.
 
 -- 
 FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
