@@ -1,70 +1,90 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 19 May 2015 15:20:35 +0200
-Subject: [PATCH v7 15/25] iommu/exynos: Add system suspend/resume support
+Date: Tue, 19 May 2015 15:20:31 +0200
+Subject: [PATCH v7 11/25] iommu/exynos: Document internal structures
 In-Reply-To: <1432041645-11172-1-git-send-email-m.szyprowski@samsung.com>
 References: <1432041645-11172-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1432041645-11172-16-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1432041645-11172-12-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When system goes into suspend state, iommu should save it's state and
-restore after system resume. This is handled by 'late' pm ops to ensure
-that sysmmu will be suspended after its master devices and restored
-before them.
+Add a few words of comment to all internal structures used by the driver.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ drivers/iommu/exynos-iommu.c | 53 +++++++++++++++++++++++++++++---------------
+ 1 file changed, 35 insertions(+), 18 deletions(-)
 
 diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index fcd23e9c409a..15551f17fa37 100644
+index 646adb547cba..0e7250fda087 100644
 --- a/drivers/iommu/exynos-iommu.c
 +++ b/drivers/iommu/exynos-iommu.c
-@@ -601,6 +601,36 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_PM_SLEEP
-+static int exynos_sysmmu_suspend(struct device *dev)
-+{
-+	struct sysmmu_drvdata *data = dev_get_drvdata(dev);
-+
-+	dev_dbg(dev, "suspend\n");
-+	if (is_sysmmu_active(data)) {
-+		__sysmmu_disable_nocount(data);
-+		pm_runtime_put(dev);
-+	}
-+	return 0;
-+}
-+
-+static int exynos_sysmmu_resume(struct device *dev)
-+{
-+	struct sysmmu_drvdata *data = dev_get_drvdata(dev);
-+
-+	dev_dbg(dev, "resume\n");
-+	if (is_sysmmu_active(data)) {
-+		pm_runtime_get_sync(dev);
-+		__sysmmu_enable_nocount(data);
-+	}
-+	return 0;
-+}
-+#endif
-+
-+static const struct dev_pm_ops sysmmu_pm_ops = {
-+	SET_LATE_SYSTEM_SLEEP_PM_OPS(exynos_sysmmu_suspend, exynos_sysmmu_resume)
-+};
-+
- static const struct of_device_id sysmmu_of_match[] __initconst = {
- 	{ .compatible	= "samsung,exynos-sysmmu", },
- 	{ },
-@@ -611,6 +641,7 @@ static struct platform_driver exynos_sysmmu_driver __refdata = {
- 	.driver	= {
- 		.name		= "exynos-sysmmu",
- 		.of_match_table	= sysmmu_of_match,
-+		.pm		= &sysmmu_pm_ops,
- 	}
+@@ -180,32 +180,49 @@ static char *sysmmu_fault_name[SYSMMU_FAULTS_NUM] = {
+ 	"UNKNOWN FAULT"
  };
  
+-/* attached to dev.archdata.iommu of the master device */
++/*
++ * This structure is attached to dev.archdata.iommu of the master device
++ * on device add, contains a list of SYSMMU controllers defined by device tree,
++ * which are bound to given master device. It is usually referenced by 'owner'
++ * pointer.
++*/
+ struct exynos_iommu_owner {
+-	struct device *sysmmu;
++	struct device *sysmmu;		/* sysmmu controller for given master */
+ };
+ 
++/*
++ * This structure exynos specific generalization of struct iommu_domain.
++ * It contains list of SYSMMU controllers from all master devices, which has
++ * been attached to this domain and page tables of IO address space defined by
++ * it. It is usually referenced by 'domain' pointer.
++ */
+ struct exynos_iommu_domain {
+-	struct list_head clients; /* list of sysmmu_drvdata.node */
+-	sysmmu_pte_t *pgtable; /* lv1 page table, 16KB */
+-	short *lv2entcnt; /* free lv2 entry counter for each section */
+-	spinlock_t lock; /* lock for this structure */
+-	spinlock_t pgtablelock; /* lock for modifying page table @ pgtable */
++	struct list_head clients; /* list of sysmmu_drvdata.domain_node */
++	sysmmu_pte_t *pgtable;	/* lv1 page table, 16KB */
++	short *lv2entcnt;	/* free lv2 entry counter for each section */
++	spinlock_t lock;	/* lock for modyfying list of clients */
++	spinlock_t pgtablelock;	/* lock for modifying page table @ pgtable */
+ 	struct iommu_domain domain; /* generic domain data structure */
+ };
+ 
++/*
++ * This structure hold all data of a single SYSMMU controller, this includes
++ * hw resources like registers and clocks, pointers and list nodes to connect
++ * it to all other structures, internal state and parameters read from device
++ * tree. It is usually referenced by 'data' pointer.
++ */
+ struct sysmmu_drvdata {
+-	struct device *sysmmu;	/* System MMU's device descriptor */
+-	struct device *master;	/* Owner of system MMU */
+-	void __iomem *sfrbase;
+-	struct clk *clk;
+-	struct clk *clk_master;
+-	int activations;
+-	spinlock_t lock;
+-	struct exynos_iommu_domain *domain;
+-	struct list_head domain_node;
+-	phys_addr_t pgtable;
+-	unsigned int version;
++	struct device *sysmmu;		/* SYSMMU controller device */
++	struct device *master;		/* master device (owner) */
++	void __iomem *sfrbase;		/* our registers */
++	struct clk *clk;		/* SYSMMU's clock */
++	struct clk *clk_master;		/* master's device clock */
++	int activations;		/* number of calls to sysmmu_enable */
++	spinlock_t lock;		/* lock for modyfying state */
++	struct exynos_iommu_domain *domain; /* domain we belong to */
++	struct list_head domain_node;	/* node for domain clients list */
++	phys_addr_t pgtable;		/* assigned page table structure */
++	unsigned int version;		/* our version */
+ };
+ 
+ static struct exynos_iommu_domain *to_exynos_domain(struct iommu_domain *dom)
 -- 
 1.9.2
