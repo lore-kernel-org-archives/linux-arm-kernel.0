@@ -1,54 +1,55 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 19 May 2015 16:09:24 +0800
-Subject: [PATCH 6/9] ARM: imx: define gpt register offset per device type
-In-Reply-To: <2146941.M15MKfMlJf@wuerfel>
-References: <1431677507-27420-1-git-send-email-shawnguo@kernel.org>
- <1431677507-27420-7-git-send-email-shawnguo@kernel.org>
- <2146941.M15MKfMlJf@wuerfel>
-Message-ID: <20150519080924.GX1071@dragon>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 19 May 2015 10:11:40 +0200 (CEST)
+Subject: [PATCH v7 08/13] ARM: unify MMU/!MMU addruart calls
+In-Reply-To: <20150519053503.GP1071@dragon>
+References: <1431769465-26867-1-git-send-email-stefan@agner.ch>
+ <1431769465-26867-9-git-send-email-stefan@agner.ch>
+ <20150516205103.GO2067@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.11.1505170952060.4225@nanos>
+ <alpine.DEB.2.11.1505181735230.4225@nanos>
+ <20150519053503.GP1071@dragon>
+Message-ID: <alpine.DEB.2.11.1505191010510.4225@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 15, 2015 at 10:34:03AM +0200, Arnd Bergmann wrote:
-> On Friday 15 May 2015 16:11:44 shawnguo at kernel.org wrote:
-> >  {
-> >         switch (imxtm.type) {
-> >         case GPT_TYPE_IMX1:
-> > +               imxtm.reg_tstat = MX1_2_TSTAT;
-> > +               imxtm.reg_tcn = MX1_2_TCN;
-> > +               imxtm.reg_tcmp = MX1_2_TCMP;
-> >                 imxtm.gpt_setup_tctl = imx1_gpt_setup_tctl;
-> >                 clockevent_mxc.set_next_event = mx1_2_set_next_event;
-> >                 break;
-> >         case GPT_TYPE_IMX21:
-> > +               imxtm.reg_tstat = MX1_2_TSTAT;
-> > +               imxtm.reg_tcn = MX1_2_TCN;
-> > +               imxtm.reg_tcmp = MX1_2_TCMP;
-> >                 imxtm.gpt_setup_tctl = imx21_gpt_setup_tctl;
-> >                 clockevent_mxc.set_next_event = mx1_2_set_next_event;
-> >                 break;
-> >         case GPT_TYPE_IMX31:
-> > +               imxtm.reg_tstat = V2_TSTAT;
-> > +               imxtm.reg_tcn = V2_TCN;
-> > +               imxtm.reg_tcmp = V2_TCMP;
-> >                 imxtm.gpt_setup_tctl = imx31_gpt_setup_tctl;
-> >                 clockevent_mxc.set_next_event = v2_set_next_event;
-> >                 break;
-> >         case GPT_TYPE_IMX6DL:
-> > +               imxtm.reg_tstat = V2_TSTAT;
-> > +               imxtm.reg_tcn = V2_TCN;
-> > +               imxtm.reg_tcmp = V2_TCMP;
-> >                 imxtm.gpt_setup_tctl = imx6dl_gpt_setup_tctl;
-> >                 clockevent_mxc.set_next_event = v2_set_next_event;
-> >                 break;
+On Tue, 19 May 2015, Shawn Guo wrote:
+> On Mon, May 18, 2015 at 05:36:43PM +0200, Thomas Gleixner wrote:
 > > 
+> > 
+> > On Sun, 17 May 2015, Thomas Gleixner wrote:
+> > 
+> > > On Sat, 16 May 2015, Russell King - ARM Linux wrote:
+> > > 
+> > > > On Sat, May 16, 2015 at 11:44:20AM +0200, Stefan Agner wrote:
+> > > > > Remove the needless differences between MMU/!MMU addruart calls.
+> > > > > This allows to use the same addruart macro on SoC level. Useful
+> > > > > for SoC consisting of multiple CPUs with and without MMU such as
+> > > > > Freescale Vybrid.
+> > > > > 
+> > > > > Signed-off-by: Stefan Agner <stefan@agner.ch>
+> > > > 
+> > > > Depending on the merge plan for the remainder (has tglx reviewed the IRQ
+> > > > changes yet?  I think he needs to before this can be merged)... if it's
+> > > > not going to go in for the next merge window, this should find its way
+> > > > into the patch system so it can be applied anyway.
+> > > 
+> > > I'm going to apply the irq core and chip driver modifications to a
+> > > separate branch later today, so you or ARM-SOC folks can pull that
+> > > in. Will send you a mail where it can be found.
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip.git irq/for-arm
+> > 
+> > That contains the first 5 patches which touch kernel/irq/ and
+> > drivers/irqchip/
 > 
-> Hi Shawn,
+> Russell, Arnd,
 > 
-> I think this could be expressed in a nicer way by defining a structure
-> that contains all the settings you derive from the type here, and then
-> setting a pointer to that structure based on the compatible string.
+> I guess the easiest way to merge rest of the series is to have them go
+> via i.MX tree with your nods?
 
-Yeah, good suggestion.  Will change.
+If you pull the irq stuff. Make sure that the HEAD is b5cc5cbc11697. I
+pushed out a broken version earlier.
 
-Shawn
+Thanks,
+
+	tglx
