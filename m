@@ -1,123 +1,71 @@
-From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
-Date: Tue, 19 May 2015 18:06:39 +0300
-Subject: [PATCH v10 05/17] clk: tegra: Introduce ability for SoC-specific
- reset control callbacks
-In-Reply-To: <20150519145922.GA28018@ulmo>
-References: <1431529131-16710-6-git-send-email-mikko.perttunen@kapsi.fi>
- <1432035567-19008-1-git-send-email-mikko.perttunen@kapsi.fi>
- <20150519145922.GA28018@ulmo>
-Message-ID: <555B517F.4080506@kapsi.fi>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Tue, 19 May 2015 16:39:31 +0100
+Subject: [Xen-devel] [RFC 22/23] xen/privcmd: Add support for Linux 64KB
+ page granularity
+In-Reply-To: <1431622863-28575-23-git-send-email-julien.grall@citrix.com>
+References: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
+ <1431622863-28575-23-git-send-email-julien.grall@citrix.com>
+Message-ID: <555B5933.9040405@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/19/2015 05:59 PM, Thierry Reding wrote:
-> On Tue, May 19, 2015 at 02:39:27PM +0300, Mikko Perttunen wrote:
->> This patch allows SoC-specific CAR initialization routines to register
->> their own reset_assert and reset_deassert callbacks with the common Tegra
->> CAR code. If defined, the common code will call these callbacks when a
->> reset control with number >= num_periph_banks * 32 is attempted to be asserted
->> or deasserted respectively. Numbers greater than or equal to num_periph_banks * 32
->> are used to avoid clashes with low numbers that are automatically mapped to
->> standard CAR reset lines.
->>
->> Each SoC with these special resets should specify the defined reset control
->> numbers in a device tree header file.
->
-> This is looking pretty good, but I think we can simplify a wee bit
-> more...
->
->> Signed-off-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
->> Acked-by: Michael Turquette <mturquette@linaro.org>
->> ---
->>   drivers/clk/tegra/clk.c | 39 +++++++++++++++++++++++++++++++--------
->>   drivers/clk/tegra/clk.h |  3 +++
->>   2 files changed, 34 insertions(+), 8 deletions(-)
->>
->> diff --git a/drivers/clk/tegra/clk.c b/drivers/clk/tegra/clk.c
->> index 41cd87c..c093ed9 100644
->> --- a/drivers/clk/tegra/clk.c
->> +++ b/drivers/clk/tegra/clk.c
->> @@ -49,7 +49,6 @@
->>   #define RST_DEVICES_L			0x004
->>   #define RST_DEVICES_H			0x008
->>   #define RST_DEVICES_U			0x00C
->> -#define RST_DFLL_DVCO			0x2F4
->>   #define RST_DEVICES_V			0x358
->>   #define RST_DEVICES_W			0x35C
->>   #define RST_DEVICES_X			0x28C
->> @@ -79,6 +78,11 @@ static struct clk **clks;
->>   static int clk_num;
->>   static struct clk_onecell_data clk_data;
->>
->> +/* Handlers for SoC-specific reset lines */
->> +static int (*special_reset_assert)(unsigned long);
->> +static int (*special_reset_deassert)(unsigned long);
->> +static int special_reset_num;
->
-> I think we can get rid of this if we...
->
->> +
->>   static struct tegra_clk_periph_regs periph_regs[] = {
->>   	[0] = {
->>   		.enb_reg = CLK_OUT_ENB_L,
->> @@ -152,19 +156,29 @@ static int tegra_clk_rst_assert(struct reset_controller_dev *rcdev,
->>   	 */
->>   	tegra_read_chipid();
->>
->> -	writel_relaxed(BIT(id % 32),
->> -			clk_base + periph_regs[id / 32].rst_set_reg);
->> +	if (id < periph_banks * 32) {
->> +		writel_relaxed(BIT(id % 32),
->> +			       clk_base + periph_regs[id / 32].rst_set_reg);
->> +		return 0;
->> +	} else if (id < periph_banks * 32 + special_reset_num) {
->> +		return special_reset_assert(id);
->> +	}
->
-> ... pass id - periph_banks * 32 into special_reset_assert(). Oh, but
-> then...
+On 14/05/15 18:01, Julien Grall wrote:
+> The hypercall interface (as well as the toolstack) is always using 4KB
+> page granularity. When the toolstack is asking for mapping a series of
+> guest PFN in a batch, it expects to have the page map contiguously in
+> its virtual memory.
+> 
+> When Linux is using 64KB page granularity, the privcmd driver will have
+> to map multiple Xen PFN in a single Linux page.
+> 
+> Note that this solution works on page granularity which is a multiple of
+> 4KB.
+[...]
+> --- a/drivers/xen/xlate_mmu.c
+> +++ b/drivers/xen/xlate_mmu.c
+> @@ -63,6 +63,7 @@ static int map_foreign_page(unsigned long lpfn, unsigned long fgmfn,
+>  
+>  struct remap_data {
+>  	xen_pfn_t *fgmfn; /* foreign domain's gmfn */
+> +	xen_pfn_t *egmfn; /* end foreign domain's gmfn */
 
-The reason I don't subtract periph_banks * 32 is because this way the 
-code in the SoC-specific callback can just include the dt-bindings 
-header and use the same defines used in the device tree.
+I don't know what you mean by "end foreign domain".
 
->
->> @@ -286,10 +300,19 @@ void __init tegra_add_of_provider(struct device_node *np)
->>   	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
->>
->>   	rst_ctlr.of_node = np;
->> -	rst_ctlr.nr_resets = periph_banks * 32;
->> +	rst_ctlr.nr_resets = periph_banks * 32 + special_reset_num;
->
-> ... this is no longer going to work. We could keep special_reset_num,
-> though obviously it should be an unsigned int and renamed to
-> num_special_reset, yet still pass the relative ID into the SoC-specific
-> callbacks, after all that's what they care about and each implementation
-> would have to subtract periph_banks * 32 anyway.
+>  	pgprot_t prot;
+>  	domid_t  domid;
+>  	struct vm_area_struct *vma;
+> @@ -78,17 +79,23 @@ static int remap_pte_fn(pte_t *ptep, pgtable_t token, unsigned long addr,
+>  {
+>  	struct remap_data *info = data;
+>  	struct page *page = info->pages[info->index++];
+> -	unsigned long pfn = page_to_pfn(page);
+> -	pte_t pte = pte_mkspecial(pfn_pte(pfn, info->prot));
+> +	unsigned long pfn = xen_page_to_pfn(page);
+> +	pte_t pte = pte_mkspecial(pfn_pte(page_to_pfn(page), info->prot));
+>  	int rc;
+> -
+> -	rc = map_foreign_page(pfn, *info->fgmfn, info->domid);
+> -	*info->err_ptr++ = rc;
+> -	if (!rc) {
+> -		set_pte_at(info->vma->vm_mm, addr, ptep, pte);
+> -		info->mapped++;
+> +	uint32_t i;
+> +
+> +	for (i = 0; i < XEN_PFN_PER_PAGE; i++) {
+> +		if (info->fgmfn == info->egmfn)
+> +			break;
+> +
+> +		rc = map_foreign_page(pfn++, *info->fgmfn, info->domid);
+> +		*info->err_ptr++ = rc;
+> +		if (!rc) {
+> +			set_pte_at(info->vma->vm_mm, addr, ptep, pte);
+> +			info->mapped++;
+> +		}
+> +		info->fgmfn++;
 
-Mostly agreed, but see above :)
+This doesn't make any sense to me.  Don't you need to gather the foreign
+GFNs into batches of PAGE_SIZE / XEN_PAGE_SIZE and map these all at once
+into a 64 KiB page?  I don't see how you can have a set_pte_at() for
+each foreign GFN.
 
->
->>   	reset_controller_register(&rst_ctlr);
->>   }
->>
->> +void __init tegra_init_special_resets(int num,
->> +				      int (*assert)(unsigned long),
->> +				      int (*deassert)(unsigned long))
->> +{
->> +	special_reset_num = num;
->> +	special_reset_assert = assert;
->> +	special_reset_deassert = deassert;
->> +}
->> +
->
-> I think we could possibly improve this interface somewhat by turning it
-> upside-down, that is, make SoC-specific drivers call this in a helper
-> fashion. But this is good enough for now, I can always take a stab at
-> refactoring if I get bored.
->
-> Thierry
->
-
-Thanks,
-Mikko
+David
