@@ -1,38 +1,76 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Tue, 19 May 2015 10:39:51 +0200
-Subject: [PATCH v4 1/7] ARM: lpc18xx: add basic support for NXP
- LPC18xx/43xx SoCs
-In-Reply-To: <CAMuHMdVfh6-Y6BuRpxXRJexXK+U-Bp0P+W-2e4ioAZ=60C_TYQ@mail.gmail.com>
-References: <1431381653-25356-1-git-send-email-manabian@gmail.com>
- <1431381653-25356-2-git-send-email-manabian@gmail.com>
- <CAMuHMdVfh6-Y6BuRpxXRJexXK+U-Bp0P+W-2e4ioAZ=60C_TYQ@mail.gmail.com>
-Message-ID: <CAGhQ9Vy6ByVtpbebMiSCQoQfbKMvtpyt85dShW_gav=CQ6vDWQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 19 May 2015 10:40:21 +0200
+Subject: [PATCH v4 2/3] irqchip: GIC: Add support for irq_{get,
+ set}_irqchip_state
+In-Reply-To: <CAL85gmD=12u87vDAc601T=ZOgcS-jDo_=LaC5gRAZUHgp_iTbA@mail.gmail.com>
+References: <1426676484-21812-1-git-send-email-marc.zyngier@arm.com>
+ <1426676484-21812-3-git-send-email-marc.zyngier@arm.com>
+ <CAL85gmBrkonMcKdUVGmYx6zT3wSe-e2jPhnL_+Tkf3s4jsAiWg@mail.gmail.com>
+ <CACRpkdYffHJEzksc5mg7JZdwTzShGaQofAmbmn65=_V3ot04Rg@mail.gmail.com>
+ <CAL85gmC4ovR99wQQYoKs=oo24So80jZ_guxDDFhi-1MXXj0uSw@mail.gmail.com>
+ <CACRpkdZkBLrhFpZiYk4fiM3ND+UwnVJhNKs=+rL5iZY4fS7zCg@mail.gmail.com>
+ <CAL85gmD=12u87vDAc601T=ZOgcS-jDo_=LaC5gRAZUHgp_iTbA@mail.gmail.com>
+Message-ID: <CACRpkdYV1MzjW6ZMvmOhqi0qhXeeQnC62--7WBY=_hZBT8cvXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 May 2015 at 09:26, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> On Tue, May 12, 2015 at 12:00 AM, Joachim Eastwood <manabian@gmail.com> wrote:
->> --- a/arch/arm/Kconfig.debug
->> +++ b/arch/arm/Kconfig.debug
->> @@ -1359,6 +1359,7 @@ config DEBUG_UART_PHYS
->>         default 0x20201000 if DEBUG_BCM2835
->>         default 0x3e000000 if DEBUG_BCM_KONA_UART
->>         default 0x4000e400 if DEBUG_LL_UART_EFM32
->> +       default 0x40081000 if ARCH_LPC18XX
+On Thu, May 14, 2015 at 10:14 PM, Feng Kan <fkan@apm.com> wrote:
+> On Thu, May 14, 2015 at 3:32 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+
+>> But surely the GPIO block has its own status register, so are
+>> you saying that this register is unreliable?
 >
-> This will be used in any multi-platform kernel with DEBUG_LL=y,  possible
-> overriding a correct value, even if low-level LPC18XX debug support itself
-> (what's the config option for that, I couldn't find it?) is disabled.
+> When the GPIO is used as interrupt, the gpio block does not report the
+> status anymore. Which leaves us stuck with SPISR.
+>>
+>> I can think of a few reasons, like transient IRQs etc but
+>> what is actually causing this?
+>
+> I won't say the obvious.
 
-Right now LPC18xx can't be a part of any multi-platform kernel.
+Yeah I see your problem now :(
 
-> Please make this dependent on an appropriate DEBUG_LPC18XX
-> option. Thanks!
+I think it's better to fix the access functions so that you can
+cross-call to the GIC driver to get the SPISR flag out though.
+Let's see what Marc says.
 
-But anyways defining a DEBUG_LPC18XX symbol seems to be what most
-other platforms do. I'll send a follow up patch defining DEBUG_LPC18XX
-and then use that in DEBUG_UART_PHYS.
+>> Which GPIO driver is this? Is it upstream?
+>
+> Yes, it is upstream. It is the xgene slimpro gpio driver. I am starting to
+> think that we ought to switch to use some gpio poll driver rather than
+> using gpio-key.
 
+There is both gpio_keys_polled and IRQ-driven gpio_keys so yeah
+that's possible. But honestly I think it's better to deal with this
+problem for real because IRQ is more efficient.
 
-regards,
-Joachim Eastwood
+So the way I perceive it this is the real problem:
+
++static int gic_irq_get_irqchip_state(struct irq_data *d,
++                                     enum irqchip_irq_state which, bool *val)
++{
++       switch (which) {
+(...)
++       case IRQCHIP_STATE_ACTIVE:
++               *val = gic_peek_irq(d, GIC_DIST_ACTIVE_SET);
++               break;
+
+Here it reads the status from 0x300 where DIST_ACTIVE_SET
+is, so if you change GIC_DIST_ACTIVE_SET to
+0xd04 (SPISR), does it start working?
+
+I would *guess* that maybe you want to implement and
+ask for IRQCHIP_STATE_LINE_LEVEL instead of
+IRQCHIP_STATE_ACTIVE, and have that case: read
+from 0xd04 (SPISR) instead, because that makes more
+sense to me, or am I wrong at it?
+
++       case IRQCHIP_STATE_LINE_LEVEL:
++               *val = gic_peek_irq(d, GIC_DIST_SPISR);
++               break;
+
+And then put a define into <linux/irqchip/arm-gic.h> for
+GIC_DIST_SPISR.
+
+Yours,
+Linus Walleij
