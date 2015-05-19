@@ -1,24 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 19 May 2015 10:57:55 +0200
-Subject: [PATCH 08/10] ARM: dts: mt8135-evbp1: Add pinctrl/GPIO node for
- mt6397.
-In-Reply-To: <1431567346-33780-9-git-send-email-hongzhou.yang@mediatek.com>
-References: <1431567346-33780-1-git-send-email-hongzhou.yang@mediatek.com>
- <1431567346-33780-9-git-send-email-hongzhou.yang@mediatek.com>
-Message-ID: <CACRpkdaVyfWimkQwTnrVyWz5479NFwAgsO-_DAAAjZUkQ9rDQQ@mail.gmail.com>
+From: jslaby@suse.cz (Jiri Slaby)
+Date: Tue, 19 May 2015 10:57:59 +0200
+Subject: [PATCH v3] serial: 8250_uniphier: add UniPhier serial driver
+In-Reply-To: <CAK7LNARrjkCcMsVJwe5hdB71QsEQAf51sNf4xYVMkNazdbdxKA@mail.gmail.com>
+References: <1431997900-18390-1-git-send-email-yamada.masahiro@socionext.com>	<CABuKBeJwOp3Km=Vw+xn8cRtH8DC-TNB_m7s8WSdPxzKHdzrdcw@mail.gmail.com>
+ <CAK7LNARrjkCcMsVJwe5hdB71QsEQAf51sNf4xYVMkNazdbdxKA@mail.gmail.com>
+Message-ID: <555AFB17.1050703@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 14, 2015 at 3:35 AM, Hongzhou Yang
-<hongzhou.yang@mediatek.com> wrote:
+On 05/19/2015, 10:54 AM, Masahiro Yamada wrote:
+>>> +#define UNIPHIER_UART_CHAR_FCR 3       /* Character / FIFO Control Register */
+>>> +#define UNIPHIER_UART_LCR_MCR  4       /* Line/Modem Control Register */
+>>> +#define     UNIPHIER_UART_LCR_SHIFT    8
+>>> +#define UNIPHIER_UART_DLR      9       /* Divisor Latch Register */
+>>
+>> Nit pick: Please fix identation. After "define" just put one blank.
+>> I personally prefer that the define values are aligned by tabs, but
+>> that's up tu you.
+>>
+> 
+> I intentionally use deeper indentation for *_SHIFT
+> because I want to clearly show  UNIPHIER_UART_LCR_SHIFT
+> belongs to UNIPHIER_UART_LCR_MCR register.
+> 
+> I also want to describe them within 80 columns including comments,
+> so I cannot insert extra TABs to align the values.
 
-> Add pinctrl and GPIO node to mt8135-evbp1.dts.
->
-> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+Hi, what about one space between # and define which is used sometimes?
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Same comment as on patch 7.
-
-Yours,
-Linus Walleij
+-- 
+js
+suse labs
