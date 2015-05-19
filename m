@@ -1,46 +1,61 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 19 May 2015 10:55:19 -0600
-Subject: [PATCH 14/16] coresight: document the bindings for the ATCLK
-In-Reply-To: <1432054521-24807-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1432054521-24807-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1432054521-24807-15-git-send-email-mathieu.poirier@linaro.org>
+From: Frank.Li@freescale.com (Frank.Li at freescale.com)
+Date: Wed, 20 May 2015 01:04:35 +0800
+Subject: [PATCH v2 0/7] Change snvs rtc and poweroff to use syscon add pwrkey
+ driver
+Message-ID: <1432055082-28983-1-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+From: Frank Li <Frank.Li@freescale.com>
 
-Put in a blurb in the device tree bindings indicating that
-coresight blocks may have an optional ATCLK.
+Change from v1 to v2
+ - Change simple-bus to simple-mfd
+ - RTC remove lock.
+ - RTC remove comments "These register offsets are relative to LP (Low Power) range"
+ - power off, remove extra space
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- Documentation/devicetree/bindings/arm/coresight.txt | 13 ++++++++-----
- 1 file changed, 8 insertions(+), 5 deletions(-)
+SNVS is MPF module.
+include rtc, power off, ON/OFF power key
 
-diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
-index 88602b75418e..8711c1065479 100644
---- a/Documentation/devicetree/bindings/arm/coresight.txt
-+++ b/Documentation/devicetree/bindings/arm/coresight.txt
-@@ -21,11 +21,14 @@ its hardware characteristcs.
- 	* reg: physical base address and length of the register
- 	  set(s) of the component.
- 
--	* clocks: the clock associated to this component.
--
--	* clock-names: the name of the clock as referenced by the code.
--	  Since we are using the AMBA framework, the name should be
--	  "apb_pclk".
-+	* clocks: the clocks associated to this component.
-+
-+	* clock-names: the name of the clocks referenced by the code.
-+	  Since we are using the AMBA framework, the name of the clock
-+	  providing the interconnect should be "apb_pclk", and some
-+	  coresight blocks also have an additional clock "atclk", which
-+	  clocks the core of that coresight component. The latter clock
-+	  is optional.
- 
- 	* port or ports: The representation of the component's port
- 	  layout using the generic DT graph presentation found in
+  arm: imx: power-off: change to syscon to access register
+  rtc: arm: imx: snvs: change use syscon to access register
+Above two patch change existed power-off and rtc use syscon
+
+  Document: dt: fsl: snvs: change support syscon
+  arm: dts: imx: update snvs to use syscon access register
+Update dt file and document
+
+  input: keyboard: imx: add snvs power key driver
+  document: devicetree: input: imx: i.mx snvs power device tree bindings
+  arm: dts: imx6sx: enable snvs power key
+Added on/off key driver
+
+Frank Li (6):
+  arm: imx: power-off: change to syscon to access register
+  rtc: arm: imx: snvs: change use syscon to access register
+  Document: dt: fsl: snvs: change support syscon
+  arm: dts: imx: update snvs to use syscon access register
+  document: devicetree: input: imx: i.mx snvs power device tree bindings
+  arm: dts: imx6sx: enable snvs power key
+
+Robin Gong (1):
+  input: keyboard: imx: add snvs power key driver
+
+ .../devicetree/bindings/crypto/fsl-sec4.txt        |  93 +++++++--
+ .../devicetree/bindings/input/snvs-pwrkey.txt      |   1 +
+ .../bindings/power_supply/imx-snvs-poweroff.txt    |  24 +--
+ arch/arm/boot/dts/imx6qdl.dtsi                     |  12 +-
+ arch/arm/boot/dts/imx6sl.dtsi                      |  12 +-
+ arch/arm/boot/dts/imx6sx.dtsi                      |  19 +-
+ arch/arm/boot/dts/vfxxx.dtsi                       |   9 +-
+ drivers/input/keyboard/Kconfig                     |  11 +
+ drivers/input/keyboard/Makefile                    |   1 +
+ drivers/input/keyboard/snvs_pwrkey.c               | 232 +++++++++++++++++++++
+ drivers/power/reset/imx-snvs-poweroff.c            |  21 +-
+ drivers/rtc/rtc-snvs.c                             | 128 +++++-------
+ 12 files changed, 417 insertions(+), 146 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/input/snvs-pwrkey.txt
+ create mode 100644 drivers/input/keyboard/snvs_pwrkey.c
+
 -- 
 1.9.1
