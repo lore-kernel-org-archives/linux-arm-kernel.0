@@ -1,45 +1,51 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 19 May 2015 18:10:27 +0900
-Subject: [PATCH v3] serial: 8250_uniphier: add UniPhier serial driver
-In-Reply-To: <555AFB17.1050703@suse.cz>
-References: <1431997900-18390-1-git-send-email-yamada.masahiro@socionext.com>
- <CABuKBeJwOp3Km=Vw+xn8cRtH8DC-TNB_m7s8WSdPxzKHdzrdcw@mail.gmail.com>
- <CAK7LNARrjkCcMsVJwe5hdB71QsEQAf51sNf4xYVMkNazdbdxKA@mail.gmail.com>
- <555AFB17.1050703@suse.cz>
-Message-ID: <CAK7LNAT0DKTkxeuuq2VQW2Rn4MrHTN+CLBXCjicQDb3aSjeQGw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 19 May 2015 10:10:57 +0100
+Subject: [PATCHv2 02/12] arm64: smp_plat: add get_logical_index
+In-Reply-To: <20150519083154.GU21251@e104818-lin.cambridge.arm.com>
+References: <1431945503-6939-1-git-send-email-mark.rutland@arm.com>
+ <1431945503-6939-3-git-send-email-mark.rutland@arm.com>
+ <20150518170912.GI21251@e104818-lin.cambridge.arm.com>
+ <20150518175532.GC7064@leverpostej>
+ <20150519083154.GU21251@e104818-lin.cambridge.arm.com>
+Message-ID: <20150519091057.GA32656@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-19 17:57 GMT+09:00 Jiri Slaby <jslaby@suse.cz>:
-> On 05/19/2015, 10:54 AM, Masahiro Yamada wrote:
->>>> +#define UNIPHIER_UART_CHAR_FCR 3       /* Character / FIFO Control Register */
->>>> +#define UNIPHIER_UART_LCR_MCR  4       /* Line/Modem Control Register */
->>>> +#define     UNIPHIER_UART_LCR_SHIFT    8
->>>> +#define UNIPHIER_UART_DLR      9       /* Divisor Latch Register */
->>>
->>> Nit pick: Please fix identation. After "define" just put one blank.
->>> I personally prefer that the define values are aligned by tabs, but
->>> that's up tu you.
->>>
->>
->> I intentionally use deeper indentation for *_SHIFT
->> because I want to clearly show  UNIPHIER_UART_LCR_SHIFT
->> belongs to UNIPHIER_UART_LCR_MCR register.
->>
->> I also want to describe them within 80 columns including comments,
->> so I cannot insert extra TABs to align the values.
->
-> Hi, what about one space between # and define which is used sometimes?
+> > > > +/*
+> > > > + * Retrieve logical cpu index corresponding to a given MPIDR.Aff*
+> > > > + *  - mpidr: MPIDR.Aff* bits to be used for the look-up
+> > > > + *
+> > > > + * Returns the cpu logical index or -EINVAL on look-up error
+> > > > + */
+> > > > +static inline int get_logical_index(u64 mpidr)
+> > > > +{
+> > > > +	int cpu;
+> > > > +	for (cpu = 0; cpu < nr_cpu_ids; cpu++)
+> > > > +		if (cpu_logical_map(cpu) == mpidr)
+> > > > +			return cpu;
+> > > > +	return -EINVAL;
+> > > > +}
+> > > 
+> > > Do we guarantee that mpidr here only contains the affinity bits (i.e. no
+> > > masking)?
+> > 
+> > In the DT and ACPI probe paths we reject IDs with bits other than the
+> > aff bits set.
+> > 
+> > I don't currently have a sanity check in the code handling
+> > MIGRATE_INFO_UP_CPU, but I should add one.
+> > 
+> > Would you like a warning here too?
+> 
+> Or maybe just the warning if the code paths to this function already
+> mask out the non-affinity bits.
 
+Sure; that's what I meant about a sanity check in the code handling
+MIGRATE_INFO_UP_CPU (where query a CPU ID from the PSCI implementation).
+I'll see about adding a warning there.
 
-With more one space after #, '8' goes to the next stop,
-so it makes no difference.
+In the DT and ACPI parsing cases we already warn if non-affinity bits
+are set.
 
-
-Is this a problem?  It almost seems a bike shed...
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+Thanks,
+Mark.
