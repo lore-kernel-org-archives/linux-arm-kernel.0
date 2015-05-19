@@ -1,137 +1,60 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Tue, 19 May 2015 11:44:03 +0200
-Subject: [PATCH v8 09/16] clockevents/drivers: Add STM32 Timer driver
-In-Reply-To: <555AFD18.2070009@linaro.org>
-References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1431158038-3813-10-git-send-email-mcoquelin.stm32@gmail.com>
- <5559E4B0.70506@linaro.org>
- <CALszF6CK7axU0qrWNf38aqrt2R2126ZACn7wx5jNY_1KE+4H+g@mail.gmail.com>
- <555AF143.2060807@linaro.org>
- <CALszF6CwGuKqgbX6gVrya1-_YOgvtrgC7pVqKTNjCRif_o532A@mail.gmail.com>
- <555AFD18.2070009@linaro.org>
-Message-ID: <CALszF6Asfke0-cMQJcEQ8ya+rbPPPhUc6aXTZXQvQ8QF66cwYQ@mail.gmail.com>
+From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
+Date: Tue, 19 May 2015 15:12:23 +0530
+Subject: [PATCH v1 2/2] ARM: vf610: Add SoC bus support for Vybrid
+In-Reply-To: <20150519062413.GR1071@dragon>
+References: <cover.1431928866.git.maitysanchayan@gmail.com>
+ <653ed53ef933a6834c4fd3c90ee47e5fb5c78160.1431928866.git.maitysanchayan@gmail.com>
+ <20150519062413.GR1071@dragon>
+Message-ID: <20150519094223.GA3194@Sanchayan-Arch.toradex.int>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-19 11:06 GMT+02:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
-> On 05/19/2015 10:55 AM, Maxime Coquelin wrote:
->>
->> 2015-05-19 10:16 GMT+02:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
->>>
->>> On 05/18/2015 04:03 PM, Maxime Coquelin wrote:
->>>>
->>>>
->>>> 2015-05-18 15:10 GMT+02:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
->>>>>
->>>>>
->>>>> On 05/09/2015 09:53 AM, Maxime Coquelin wrote:
->>>>>>
->>>>>>
->>>>>>
->>>>>> STM32 MCUs feature 16 and 32 bits general purpose timers with
->>>>>> prescalers.
->>>>>> The drivers detects whether the time is 16 or 32 bits, and applies a
->>>>>> 1024 prescaler value if it is 16 bits.
->>>>>>
->>>>>> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
->>>>>> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
->>>>>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->>>>>> ---
->>>>>>     drivers/clocksource/Kconfig       |   8 ++
->>>>>>     drivers/clocksource/Makefile      |   1 +
->>>>>>     drivers/clocksource/timer-stm32.c | 184
->>>>>> ++++++++++++++++++++++++++++++++++++++
->>>>>>     3 files changed, 193 insertions(+)
->>>>>>     create mode 100644 drivers/clocksource/timer-stm32.c
->>>>>>
->>>>>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
->>>>>> index bf9364c..2443520 100644
->>>>>> --- a/drivers/clocksource/Kconfig
->>>>>> +++ b/drivers/clocksource/Kconfig
->>>>>> @@ -106,6 +106,14 @@ config CLKSRC_EFM32
->>>>>>             Support to use the timers of EFM32 SoCs as clock source
->>>>>> and
->>>>>> clock
->>>>>>             event device.
->>>>>>
->>>>>> +config CLKSRC_STM32
->>>>>> +       bool "Clocksource for STM32 SoCs" if !ARCH_STM32
->>>>>> +       depends on OF && ARM && (ARCH_STM32 || COMPILE_TEST)
->>>>>
->>>>>
->>>>>
->>>>>
->>>>> Are the interactive bool and the 'COMPILE_TEST' necessary ?
->>>>>
->>>>
->>>> The interactive bool is necessary if we want to be able to
->>>> select/deselect it in COMPILE_TEST configuration.
->>>> And personnaly, I think COMPILE_TEST use makes sense.
->>>>
->>>> Note that other timer drivers are doing the same thing today
->>>> (CLKSRC_EFM32, SH_TIMER_CMT, EM_TIMER_STI...).
->>>>
->>>> Do you have a specific concern regarding COMPILE_TEST?
->>>
->>>
->>>
->>> Actually, we try to keep the timer selection non-interactive and let the
->>> platform's Kconfig to select the timer.
->>
->>
->> Ok.
->>
->>>
->>> I like when the code is consistent. The COMPILE_TEST was introduced and
->>> created a precedence. I would like to get rid of the interactive timer
->>> selection but I did not have time to go through this yet.
->>
->>
->> Indeed, consistency is important.
->> On my side, I don't have a strong opinion regarding the COMPILE_TEST
->> thing.
->> IMHO, it is more a subsystem's maintainer choice.
->>
->> So, if as a maintainer you don't use it and prefer not supporting it,
->> I'm fine to provide you a new version without COMPILE_TEST.
->> Doing that, the interactive selection will disappear too.
->>
->> I can provide you a new version this evenning.
->
->
-> Ok, great.
+Hello Shawn,
 
-Is the below Kconfig entry fine for you?
+On 15-05-19 14:24:13, Shawn Guo wrote:
+> On Mon, May 18, 2015 at 11:50:07AM +0530, Sanchayan Maity wrote:
+> > Implements SoC bus support to export SoC specific information. Read
+> > the unique SoC ID from the Vybrid On Chip One Time Programmable
+> > (OCOTP) controller, SoC specific information from the Miscellaneous
+> > System Control Module (MSCM), revision from the ROM revision register
+> > and expose it via the SoC bus infrastructure.
+> > 
+> > Sample Output:
+> > 
+> > root at vf:/sys/devices/soc0# cat soc_id
+> > df63c12a2e2161d4
+> > root at vf:/sys/devices/soc0# cat family
+> > Freescale Vybrid VF500
+> > root at vf:/sys/devices/soc0# cat revision
+> > 00000013
+> > root at vf:/sys/devices/soc0# cat machine
+> > Freescale Vybrid
+> > 
+> > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+> > ---
+> >  arch/arm/mach-imx/mach-vf610.c | 81 ++++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 81 insertions(+)
+> > 
+> > diff --git a/arch/arm/mach-imx/mach-vf610.c b/arch/arm/mach-imx/mach-vf610.c
+> > index 2e7c75b..64c78e4 100644
+> > --- a/arch/arm/mach-imx/mach-vf610.c
+> > +++ b/arch/arm/mach-imx/mach-vf610.c
+> > @@ -11,6 +11,86 @@
+> >  #include <linux/irqchip.h>
+> >  #include <asm/mach/arch.h>
+> >  #include <asm/hardware/cache-l2x0.h>
+> > +#include <linux/slab.h>
+> > +#include <linux/sys_soc.h>
+> > +#include <linux/mfd/syscon.h>
+> > +#include <linux/regmap.h>
+> > +#include <linux/random.h>
+> 
+> Please group <linux/*> headers together and sort alphabetically.
 
-config CLKSRC_STM32
-    def_bool y if ARCH_STM32
-    select CLKSRC_MMIO
+Ok. Will fix this and send out a v2. The rest is acceptable?
 
-Best regards,
-Maxime
+> 
+> Shawn
 
-
->
-> Thanks
->   -- Daniel
->
->
->>>
->>>
->>>
->>> --
->>>   <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
->>>
->>> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
->>> <http://twitter.com/#!/linaroorg> Twitter |
->>> <http://www.linaro.org/linaro-blog/> Blog
->>>
->
->
-> --
->  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
->
-> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-> <http://twitter.com/#!/linaroorg> Twitter |
-> <http://www.linaro.org/linaro-blog/> Blog
->
+Thanks & Regards,
+Sanchayan Maity.
