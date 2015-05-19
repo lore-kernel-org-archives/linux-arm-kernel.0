@@ -1,30 +1,37 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 19 May 2015 11:58:32 -0700
-Subject: [PATCH] phy: qcom-ufs: fix platform dependency
-In-Reply-To: <4583047.eZev6xPGf6@wuerfel>
-References: <4583047.eZev6xPGf6@wuerfel>
-Message-ID: <555B87D8.2060406@codeaurora.org>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Tue, 19 May 2015 20:59:21 +0200
+Subject: [PATCH] MAINTAINERS: Add entry for NXP LPC18xx/43xx MCUs
+Message-ID: <1432061961-29179-1-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/19/15 08:11, Arnd Bergmann wrote:
-> The UFS PHY driver is written for the QCOM platform, but
-> has an incorrect dependency pointing to the recently
-> removed MSM platform, causing a warning whenever it
-> gets selected:
->
-> warning: (SCSI_UFS_QCOM) selects PHY_QCOM_UFS which has unmet direct dependencies (OF && ARCH_MSM)
->
-> This fixes the dependency.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: af6f8fff446 ("ufs-qcom: Switch dependency to ARCH_QCOM")
+Add a MAINTAINER entry covering all NXP LPC18xx/43xx
+machine and drivers files.
 
-Hm... I guess I should have combined the two patches into one. See [1]
-for this exact patch from last month.
+Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+---
 
-[1] https://lkml.org/lkml/2015/4/10/862
+Patch based on arm-soc next/soc branch.
 
+ MAINTAINERS | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 5dcb4392ec10..e556b7f7fea3 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1189,6 +1189,12 @@ M:	Lennert Buytenhek <kernel@wantstofly.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ 
++ARM/LPC18XX ARCHITECTURE
++M:	Joachim Eastwood <manabian@gmail.com>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++N:	lpc18xx
++
+ ARM/MAGICIAN MACHINE SUPPORT
+ M:	Philipp Zabel <philipp.zabel@gmail.com>
+ S:	Maintained
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.8.0
