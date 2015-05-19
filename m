@@ -1,44 +1,34 @@
-From: dgreid@chromium.org (Dylan Reid)
-Date: Tue, 19 May 2015 09:37:58 -0700
-Subject: [alsa-devel] [PATCH 1/4] ASoC: rockchip: add rockchip machine
- driver
-In-Reply-To: <20150519111602.GG2761@sirena.org.uk>
-References: <1431422797-31903-1-git-send-email-zhengxing@rock-chips.com>
- <1431422797-31903-2-git-send-email-zhengxing@rock-chips.com>
- <20150512192215.GZ3066@sirena.org.uk> <55535035.5070608@rock-chips.com>
- <20150513164250.GB2761@sirena.org.uk>
- <CAEUnVG5+PqhkZ4TBMnfdbUr66-EaLVGDEewJ_=XZnfbvBEn13w@mail.gmail.com>
- <CAEUnVG5nkagx7CZC3t=-oOAyXOBaxxVynBxaGMf0NJpfr9ZVbA@mail.gmail.com>
- <555659DB.9010204@metafoo.de> <20150519111602.GG2761@sirena.org.uk>
-Message-ID: <CAEUnVG6QLtV3AXjdPAp5mYDTnmNVsyLfYQmLykeLMd-KgnX+5A@mail.gmail.com>
+From: prabhakar.csengg@gmail.com (Lad, Prabhakar)
+Date: Tue, 19 May 2015 17:46:55 +0100
+Subject: [PATCH] [media] ov2659: add v4l2_subdev dependency
+In-Reply-To: <6092911.yr0lA5IaG4@wuerfel>
+References: <6092911.yr0lA5IaG4@wuerfel>
+Message-ID: <CA+V-a8tPSmRgNphN_CRjcsuL0xssDQ+3Oxne_mb=DQgs60ab8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 4:16 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Fri, May 15, 2015 at 10:40:59PM +0200, Lars-Peter Clausen wrote:
->
->> I think the proper way to support this is come up with the concept of jack
->> detection providers and consumers. A component can register a jack detection
->> provider just like it can register a DAI. And then in the board driver you'd
->> just link the jack detection logic to the jack using the usual approach,
->> which is also used for DAIs (e.g. of node or device name). The core would
->> then take care of calling a enable callback or whatever is required to setup
->> the jack detection logic in the driver.
->
-> Yes, nobody has really cared about it since we started pushing things
-> out of the card init into the device level.  We would also need to add a
-> way to force microphone biases on for devices where that's not a part of
-> the jack detection IP.
->
+Hi Arnd,
 
-Can the jacks can each be an aux_dev?  The jack driver would create
-the jack at probe time and register it with the card in aux_dev->init.
-cht_bsw_max98090_ti.c is already doing something similar, although all
-contained in the machine driver.
+Thanks for the patch.
 
-If the jack detection circuit is integrated with a full codec, then
-the codec driver can also create the jack and register it with the
-card.
+On Tue, May 19, 2015 at 1:39 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> The newly added ov2659 driver uses the v4l2 subdev API, but
+> can be enabled even when that API is not part of the kernel,
+> resulting in this build error:
+>
+> media/i2c/ov2659.c: In function 'ov2659_get_fmt':
+> media/i2c/ov2659.c:1054:8: error: implicit declaration of function 'v4l2_subdev_get_try_format' [-Werror=implicit-function-declaration]
+> media/i2c/ov2659.c:1054:6: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+> media/i2c/ov2659.c: In function 'ov2659_set_fmt':
+> media/i2c/ov2659.c:1129:6: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+> media/i2c/ov2659.c: In function 'ov2659_open':
+> media/i2c/ov2659.c:1264:38: error: 'struct v4l2_subdev_fh' has no member named 'pad'
+>
+> This adds an explicit dependency, like all the other drivers have.
+>
+Patch fixing the above issue is already posted in the ML [1].
 
-Then simple-card can have an optional property to specify aux devs.  A
-GPIO jack device could handle simple switch-based jack detection.
+[1] https://patchwork.linuxtv.org/patch/29665/
+
+Cheers,
+--Prabhakar Lad
