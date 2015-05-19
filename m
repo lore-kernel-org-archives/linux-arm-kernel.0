@@ -1,188 +1,86 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Tue, 19 May 2015 13:30:46 +0200
-Subject: [PATCH] ARM: mvebu: add "jedec,spi-nor" flash compatible binding
-Message-ID: <1432035046-12888-1-git-send-email-zajec5@gmail.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Tue, 19 May 2015 12:31:17 +0100
+Subject: [PATCH v2 3/5] arm64: Juno: Add memory mapped timer node
+In-Reply-To: <1432033003.3047.43.camel@linaro.org>
+References: <1431970109-8902-1-git-send-email-Liviu.Dudau@arm.com>
+ <1431970109-8902-4-git-send-email-Liviu.Dudau@arm.com>
+ <1432033003.3047.43.camel@linaro.org>
+Message-ID: <20150519113116.GH2175@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Starting with commit 8947e396a829 ("Documentation: dt: mtd: replace
-"nor-jedec" binding with "jedec, spi-nor"") we have "jedec,spi-nor"
-binding indicating support for JEDEC identification.
+On Tue, May 19, 2015 at 11:56:43AM +0100, Jon Medhurst (Tixy) wrote:
+> On Mon, 2015-05-18 at 18:28 +0100, Liviu Dudau wrote:
+> > Juno based boards have a memory mapped timer @ 0x2a810000. This
+> > is disabled on r0 version of the board due to an SoC errata.
+> 
+> So wouldn't it make more sense then to disable it in the dts for r0? As
+> it is, you disable it in the common file below then have to later
+> re-enable it in juno-r1.dts.
 
-Use it for all flashes that are supposed to support READ ID op according
-to the datasheets.
+>From what I have seen in the existing DTs the preffer approach seems to be of
+disabling by default the node declared in the common files and enable
+it in the DT that makes use of it. My quick grep through the arch/arm/boot/dts
+files shows 2638 .dtsi files using 'status = "disabled";' string vs 93 .dts
+files. 'status = "okay";' is more evenly balances with 805 .dtsi files using
+it vs 3256 .dts files.
 
-Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
----
- arch/arm/boot/dts/armada-370-db.dts              | 2 +-
- arch/arm/boot/dts/armada-370-synology-ds213j.dts | 2 +-
- arch/arm/boot/dts/armada-375-db.dts              | 2 +-
- arch/arm/boot/dts/armada-385-db-ap.dts           | 2 +-
- arch/arm/boot/dts/armada-388-db.dts              | 2 +-
- arch/arm/boot/dts/armada-388-gp.dts              | 2 +-
- arch/arm/boot/dts/armada-388-rd.dts              | 2 +-
- arch/arm/boot/dts/armada-398-db.dts              | 2 +-
- arch/arm/boot/dts/armada-xp-axpwifiap.dts        | 2 +-
- arch/arm/boot/dts/armada-xp-db.dts               | 2 +-
- arch/arm/boot/dts/armada-xp-gp.dts               | 2 +-
- arch/arm/boot/dts/armada-xp-synology-ds414.dts   | 2 +-
- 12 files changed, 12 insertions(+), 12 deletions(-)
+If there is any guidance on how to describe this sort of situations I
+would really love to read it.
 
-diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
-index 19f3bf2..03542f7 100644
---- a/arch/arm/boot/dts/armada-370-db.dts
-+++ b/arch/arm/boot/dts/armada-370-db.dts
-@@ -162,7 +162,7 @@
- 				spi-flash at 0 {
- 					#address-cells = <1>;
- 					#size-cells = <1>;
--					compatible = "mx25l25635e";
-+					compatible = "mx25l25635e", "jedec,spi-nor";
- 					reg = <0>; /* Chip select 0 */
- 					spi-max-frequency = <50000000>;
- 				};
-diff --git a/arch/arm/boot/dts/armada-370-synology-ds213j.dts b/arch/arm/boot/dts/armada-370-synology-ds213j.dts
-index b42b767..4f49243 100644
---- a/arch/arm/boot/dts/armada-370-synology-ds213j.dts
-+++ b/arch/arm/boot/dts/armada-370-synology-ds213j.dts
-@@ -92,7 +92,7 @@
- 				spi-flash at 0 {
- 					#address-cells = <1>;
- 					#size-cells = <1>;
--					compatible = "micron,n25q064";
-+					compatible = "micron,n25q064", "jedec,spi-nor";
- 					reg = <0>; /* Chip select 0 */
- 					spi-max-frequency = <20000000>;
- 
-diff --git a/arch/arm/boot/dts/armada-375-db.dts b/arch/arm/boot/dts/armada-375-db.dts
-index 4eabc9c..5711b97 100644
---- a/arch/arm/boot/dts/armada-375-db.dts
-+++ b/arch/arm/boot/dts/armada-375-db.dts
-@@ -81,7 +81,7 @@
- 				spi-flash at 0 {
- 					#address-cells = <1>;
- 					#size-cells = <1>;
--					compatible = "n25q128a13";
-+					compatible = "n25q128a13", "jedec,spi-nor";
- 					reg = <0>; /* Chip select 0 */
- 					spi-max-frequency = <108000000>;
- 				};
-diff --git a/arch/arm/boot/dts/armada-385-db-ap.dts b/arch/arm/boot/dts/armada-385-db-ap.dts
-index 7219ac3..89f5a95 100644
---- a/arch/arm/boot/dts/armada-385-db-ap.dts
-+++ b/arch/arm/boot/dts/armada-385-db-ap.dts
-@@ -70,7 +70,7 @@
- 				spi-flash at 0 {
- 					#address-cells = <1>;
- 					#size-cells = <1>;
--					compatible = "st,m25p128";
-+					compatible = "st,m25p128", "jedec,spi-nor";
- 					reg = <0>; /* Chip select 0 */
- 					spi-max-frequency = <54000000>;
- 				};
-diff --git a/arch/arm/boot/dts/armada-388-db.dts b/arch/arm/boot/dts/armada-388-db.dts
-index 51d1623..91ac8c1 100644
---- a/arch/arm/boot/dts/armada-388-db.dts
-+++ b/arch/arm/boot/dts/armada-388-db.dts
-@@ -73,7 +73,7 @@
- 				spi-flash at 0 {
- 					#address-cells = <1>;
- 					#size-cells = <1>;
--					compatible = "w25q32";
-+					compatible = "w25q32", "jedec,spi-nor";
- 					reg = <0>; /* Chip select 0 */
- 					spi-max-frequency = <108000000>;
- 				};
-diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
-index 78514ab..fd4f6fd 100644
---- a/arch/arm/boot/dts/armada-388-gp.dts
-+++ b/arch/arm/boot/dts/armada-388-gp.dts
-@@ -69,7 +69,7 @@
- 				spi-flash at 0 {
- 					#address-cells = <1>;
- 					#size-cells = <1>;
--					compatible = "st,m25p128";
-+					compatible = "st,m25p128", "jedec,spi-nor";
- 					reg = <0>; /* Chip select 0 */
- 					spi-max-frequency = <50000000>;
- 					m25p,fast-read;
-diff --git a/arch/arm/boot/dts/armada-388-rd.dts b/arch/arm/boot/dts/armada-388-rd.dts
-index 1dc6e23..b657b16 100644
---- a/arch/arm/boot/dts/armada-388-rd.dts
-+++ b/arch/arm/boot/dts/armada-388-rd.dts
-@@ -74,7 +74,7 @@
- 				spi-flash at 0 {
- 					#address-cells = <1>;
- 					#size-cells = <1>;
--					compatible = "st,m25p128";
-+					compatible = "st,m25p128", "jedec,spi-nor";
- 					reg = <0>; /* Chip select 0 */
- 					spi-max-frequency = <108000000>;
- 				};
-diff --git a/arch/arm/boot/dts/armada-398-db.dts b/arch/arm/boot/dts/armada-398-db.dts
-index bbf8375..788c3ba 100644
---- a/arch/arm/boot/dts/armada-398-db.dts
-+++ b/arch/arm/boot/dts/armada-398-db.dts
-@@ -73,7 +73,7 @@
- 				spi-flash at 0 {
- 					#address-cells = <1>;
- 					#size-cells = <0>;
--					compatible = "n25q128a13";
-+					compatible = "n25q128a13", "jedec,spi-nor";
- 					reg = <0>;
- 					spi-max-frequency = <108000000>;
- 
-diff --git a/arch/arm/boot/dts/armada-xp-axpwifiap.dts b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-index dfd782b..60bbfe3 100644
---- a/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-+++ b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-@@ -140,7 +140,7 @@
- 				spi-flash at 0 {
- 					#address-cells = <1>;
- 					#size-cells = <1>;
--					compatible = "n25q128a13";
-+					compatible = "n25q128a13", "jedec,spi-nor";
- 					reg = <0>; /* Chip select 0 */
- 					spi-max-frequency = <108000000>;
- 				};
-diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
-index 1037824..7dd900f 100644
---- a/arch/arm/boot/dts/armada-xp-db.dts
-+++ b/arch/arm/boot/dts/armada-xp-db.dts
-@@ -222,7 +222,7 @@
- 				spi-flash at 0 {
- 					#address-cells = <1>;
- 					#size-cells = <1>;
--					compatible = "m25p64";
-+					compatible = "m25p64", "jedec,spi-nor";
- 					reg = <0>; /* Chip select 0 */
- 					spi-max-frequency = <20000000>;
- 				};
-diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
-index 565227e..bf724ca 100644
---- a/arch/arm/boot/dts/armada-xp-gp.dts
-+++ b/arch/arm/boot/dts/armada-xp-gp.dts
-@@ -227,7 +227,7 @@
- 				spi-flash at 0 {
- 					#address-cells = <1>;
- 					#size-cells = <1>;
--					compatible = "n25q128a13";
-+					compatible = "n25q128a13", "jedec,spi-nor";
- 					reg = <0>; /* Chip select 0 */
- 					spi-max-frequency = <108000000>;
- 				};
-diff --git a/arch/arm/boot/dts/armada-xp-synology-ds414.dts b/arch/arm/boot/dts/armada-xp-synology-ds414.dts
-index 6063428..20267ad 100644
---- a/arch/arm/boot/dts/armada-xp-synology-ds414.dts
-+++ b/arch/arm/boot/dts/armada-xp-synology-ds414.dts
-@@ -114,7 +114,7 @@
- 				spi-flash at 0 {
- 					#address-cells = <1>;
- 					#size-cells = <1>;
--					compatible = "micron,n25q064";
-+					compatible = "micron,n25q064", "jedec,spi-nor";
- 					reg = <0>; /* Chip select 0 */
- 					spi-max-frequency = <20000000>;
- 
+> 
+> Apart from that, the whole series looks good to be and I've given it a
+> spin on r0 and r1. So consider that an
+> Acked-by: Jon Medhurst <tixy@linaro.org>
+
+Many thanks,
+Liviu
+
+> 
+> 
+> > 
+> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > ---
+> >  arch/arm64/boot/dts/arm/juno-base.dtsi | 15 +++++++++++++++
+> >  1 file changed, 15 insertions(+)
+> > 
+> > diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> > index 5c4c035..b7e862f 100644
+> > --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
+> > +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> > @@ -2,6 +2,21 @@
+> >  	 *  Devices shared by all Juno boards
+> >  	 */
+> >  
+> > +	memtimer: timer at 2a810000 {
+> > +		compatible = "arm,armv7-timer-mem";
+> > +		reg = <0x0 0x2a810000 0x0 0x10000>;
+> > +		clock-frequency = <50000000>;
+> 
+> 
+> > +		#address-cells = <2>;
+> > +		#size-cells = <2>;
+> > +		ranges;
+> > +		status = "disabled";
+> > +		frame at 2a830000 {
+> > +			frame-number = <1>;
+> > +			interrupts = <0 60 4>;
+> > +			reg = <0x0 0x2a830000 0x0 0x10000>;
+> > +		};
+> > +	};
+> > +
+> >  	gic: interrupt-controller at 2c010000 {
+> >  		compatible = "arm,gic-400", "arm,cortex-a15-gic";
+> >  		reg = <0x0 0x2c010000 0 0x1000>,
+> 
+> 
+
 -- 
-1.8.4.5
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
