@@ -1,90 +1,89 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 19 May 2015 15:20:31 +0200
-Subject: [PATCH v7 11/25] iommu/exynos: Document internal structures
+Date: Tue, 19 May 2015 15:20:38 +0200
+Subject: [PATCH v7 18/25] ARM: Exynos: pm_domains: register power domain driver
+ from core_initcall
 In-Reply-To: <1432041645-11172-1-git-send-email-m.szyprowski@samsung.com>
 References: <1432041645-11172-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1432041645-11172-12-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1432041645-11172-19-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a few words of comment to all internal structures used by the driver.
+SYSMMU devices are registered very early in arch_initcall, so ensure
+that they can get access to power domains by registering power domain
+driver from earlier initcall. This change requires dropping usage of the
+platform device associated with each power domain and replacing clock
+calls with respective of_clk_* equivalents.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/iommu/exynos-iommu.c | 53 +++++++++++++++++++++++++++++---------------
- 1 file changed, 35 insertions(+), 18 deletions(-)
+ arch/arm/mach-exynos/pm_domains.c | 18 +++++++-----------
+ 1 file changed, 7 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 646adb547cba..0e7250fda087 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -180,32 +180,49 @@ static char *sysmmu_fault_name[SYSMMU_FAULTS_NUM] = {
- 	"UNKNOWN FAULT"
- };
+diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+index a9686535f9ed..6864178e21b9 100644
+--- a/arch/arm/mach-exynos/pm_domains.c
++++ b/arch/arm/mach-exynos/pm_domains.c
+@@ -117,16 +117,11 @@ static int exynos_pd_power_off(struct generic_pm_domain *domain)
  
--/* attached to dev.archdata.iommu of the master device */
-+/*
-+ * This structure is attached to dev.archdata.iommu of the master device
-+ * on device add, contains a list of SYSMMU controllers defined by device tree,
-+ * which are bound to given master device. It is usually referenced by 'owner'
-+ * pointer.
-+*/
- struct exynos_iommu_owner {
--	struct device *sysmmu;
-+	struct device *sysmmu;		/* sysmmu controller for given master */
- };
+ static __init int exynos4_pm_init_power_domain(void)
+ {
+-	struct platform_device *pdev;
+ 	struct device_node *np;
  
-+/*
-+ * This structure exynos specific generalization of struct iommu_domain.
-+ * It contains list of SYSMMU controllers from all master devices, which has
-+ * been attached to this domain and page tables of IO address space defined by
-+ * it. It is usually referenced by 'domain' pointer.
-+ */
- struct exynos_iommu_domain {
--	struct list_head clients; /* list of sysmmu_drvdata.node */
--	sysmmu_pte_t *pgtable; /* lv1 page table, 16KB */
--	short *lv2entcnt; /* free lv2 entry counter for each section */
--	spinlock_t lock; /* lock for this structure */
--	spinlock_t pgtablelock; /* lock for modifying page table @ pgtable */
-+	struct list_head clients; /* list of sysmmu_drvdata.domain_node */
-+	sysmmu_pte_t *pgtable;	/* lv1 page table, 16KB */
-+	short *lv2entcnt;	/* free lv2 entry counter for each section */
-+	spinlock_t lock;	/* lock for modyfying list of clients */
-+	spinlock_t pgtablelock;	/* lock for modifying page table @ pgtable */
- 	struct iommu_domain domain; /* generic domain data structure */
- };
+ 	for_each_compatible_node(np, NULL, "samsung,exynos4210-pd") {
+ 		struct exynos_pm_domain *pd;
+ 		int on, i;
+-		struct device *dev;
+-
+-		pdev = of_find_device_by_node(np);
+-		dev = &pdev->dev;
  
-+/*
-+ * This structure hold all data of a single SYSMMU controller, this includes
-+ * hw resources like registers and clocks, pointers and list nodes to connect
-+ * it to all other structures, internal state and parameters read from device
-+ * tree. It is usually referenced by 'data' pointer.
-+ */
- struct sysmmu_drvdata {
--	struct device *sysmmu;	/* System MMU's device descriptor */
--	struct device *master;	/* Owner of system MMU */
--	void __iomem *sfrbase;
--	struct clk *clk;
--	struct clk *clk_master;
--	int activations;
--	spinlock_t lock;
--	struct exynos_iommu_domain *domain;
--	struct list_head domain_node;
--	phys_addr_t pgtable;
--	unsigned int version;
-+	struct device *sysmmu;		/* SYSMMU controller device */
-+	struct device *master;		/* master device (owner) */
-+	void __iomem *sfrbase;		/* our registers */
-+	struct clk *clk;		/* SYSMMU's clock */
-+	struct clk *clk_master;		/* master's device clock */
-+	int activations;		/* number of calls to sysmmu_enable */
-+	spinlock_t lock;		/* lock for modyfying state */
-+	struct exynos_iommu_domain *domain; /* domain we belong to */
-+	struct list_head domain_node;	/* node for domain clients list */
-+	phys_addr_t pgtable;		/* assigned page table structure */
-+	unsigned int version;		/* our version */
- };
+ 		pd = kzalloc(sizeof(*pd), GFP_KERNEL);
+ 		if (!pd) {
+@@ -135,7 +130,8 @@ static __init int exynos4_pm_init_power_domain(void)
+ 			return -ENOMEM;
+ 		}
  
- static struct exynos_iommu_domain *to_exynos_domain(struct iommu_domain *dom)
+-		pd->pd.name = kstrdup(dev_name(dev), GFP_KERNEL);
++		pd->pd.name = kstrdup_const(strrchr(np->full_name, '/') + 1,
++					    GFP_KERNEL);
+ 		pd->name = pd->pd.name;
+ 		pd->base = of_iomap(np, 0);
+ 		pd->pd.power_off = exynos_pd_power_off;
+@@ -145,12 +141,12 @@ static __init int exynos4_pm_init_power_domain(void)
+ 			char clk_name[8];
+ 
+ 			snprintf(clk_name, sizeof(clk_name), "asb%d", i);
+-			pd->asb_clk[i] = clk_get(dev, clk_name);
++			pd->asb_clk[i] = of_clk_get_by_name(np, clk_name);
+ 			if (IS_ERR(pd->asb_clk[i]))
+ 				break;
+ 		}
+ 
+-		pd->oscclk = clk_get(dev, "oscclk");
++		pd->oscclk = of_clk_get_by_name(np, "oscclk");
+ 		if (IS_ERR(pd->oscclk))
+ 			goto no_clk;
+ 
+@@ -158,11 +154,11 @@ static __init int exynos4_pm_init_power_domain(void)
+ 			char clk_name[8];
+ 
+ 			snprintf(clk_name, sizeof(clk_name), "clk%d", i);
+-			pd->clk[i] = clk_get(dev, clk_name);
++			pd->clk[i] = of_clk_get_by_name(np, clk_name);
+ 			if (IS_ERR(pd->clk[i]))
+ 				break;
+ 			snprintf(clk_name, sizeof(clk_name), "pclk%d", i);
+-			pd->pclk[i] = clk_get(dev, clk_name);
++			pd->pclk[i] = of_clk_get_by_name(np, clk_name);
+ 			if (IS_ERR(pd->pclk[i])) {
+ 				clk_put(pd->clk[i]);
+ 				pd->clk[i] = ERR_PTR(-EINVAL);
+@@ -210,4 +206,4 @@ no_clk:
+ 
+ 	return 0;
+ }
+-arch_initcall(exynos4_pm_init_power_domain);
++core_initcall(exynos4_pm_init_power_domain);
 -- 
 1.9.2
