@@ -1,38 +1,27 @@
-From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
-Date: Tue, 19 May 2015 11:01:49 +0200
-Subject: at91sam9: watchdog: period
-In-Reply-To: <20150519091442.675b1a98@bbrezillon>
-References: <55559D55.6020703@aksignal.cz>	<20150515172516.005e3a21@bbrezillon>	<5559865F.9010502@aksignal.cz>	<20150518092750.449d6c8c@bbrezillon>	<5559A029.9060007@aksignal.cz>	<555AA8F1.80100@atmel.com>
- <20150519091442.675b1a98@bbrezillon>
-Message-ID: <555AFBFD.3010506@aksignal.cz>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 19 May 2015 11:02:36 +0200
+Subject: [PATCH 10/10] ARM: dts: mt8127: add pinctrl/GPIO/EINT node for
+ mt8127
+In-Reply-To: <1431567346-33780-11-git-send-email-hongzhou.yang@mediatek.com>
+References: <1431567346-33780-1-git-send-email-hongzhou.yang@mediatek.com>
+ <1431567346-33780-11-git-send-email-hongzhou.yang@mediatek.com>
+Message-ID: <CACRpkdZJ0oVQxLjOv_YVm_RN8_8ActMAx0hfNJDoJBdV7Rc=Qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, May 14, 2015 at 3:35 AM, Hongzhou Yang
+<hongzhou.yang@mediatek.com> wrote:
 
+> From: Yingjoe Chen <yingjoe.chen@mediatek.com>
+>
+> Add pinctrl,GPIO and EINT node to mt8127.dtsi.
+>
+> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
 
-On 19.5.2015 09:14, Boris Brezillon wrote:
-> On Tue, 19 May 2015 11:07:29 +0800
-> "Yang, Wenyou" <wenyou.yang@atmel.com> wrote:
->
->>
->>
->> On 2015/5/18 16:17, Ji?? Prchal wrote:
->>>
->>>
->>> On 18.5.2015 09:27, Boris Brezillon wrote:
->>>>
->>>> Can you dump watchdog registers (using devmem) ?
->>>
->>> / # devmem 0xfffffe40
->>> 0x00000000
->>> / # devmem 0xfffffe44
->>> 0x1FFF2FFF
->>> / # devmem 0xfffffe48
->>> 0x00000000
->>>
->> The register value is right.
->
-> It seems correct to me too.
->
-Not to me, I want 4s:
-[    4.675675] at91sam9_wdt: enabled (heartbeat=4 sec, nowayout=1)
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Same comment as on patch 7.
+
+Yours,
+Linus Walleij
