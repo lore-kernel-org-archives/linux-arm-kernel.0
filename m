@@ -1,28 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 19 May 2015 17:14:19 +0100
-Subject: [PATCH 1/2] ARM: imx: enable smp for i.MX7D
-In-Reply-To: <CAHrpEqSGQ4G-nkCporLee5fw0fFtB5+m3dJK2dGdYDd2R+rKrw@mail.gmail.com>
-References: <1431378955-991-1-git-send-email-Frank.Li@freescale.com>
- <20150519025758.GK1071@dragon>
- <CAHrpEqTwwb0P1wE+AOYVPgPz8=tBbEKn92amWaoN63GPOJxRgw@mail.gmail.com>
- <20150519150852.GI2067@n2100.arm.linux.org.uk>
- <CAHrpEqSGQ4G-nkCporLee5fw0fFtB5+m3dJK2dGdYDd2R+rKrw@mail.gmail.com>
-Message-ID: <20150519161419.GJ2067@n2100.arm.linux.org.uk>
+From: bparrot@ti.com (Benoit Parrot)
+Date: Tue, 19 May 2015 11:20:03 -0500
+Subject: [PATCH] [media] ov2659: add v4l2_subdev dependency
+In-Reply-To: <6092911.yr0lA5IaG4@wuerfel>
+References: <6092911.yr0lA5IaG4@wuerfel>
+Message-ID: <20150519162002.GE8123@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 10:52:23AM -0500, Zhi Li wrote:
-> On Tue, May 19, 2015 at 10:08 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > I think that should
-> > become v7_invalidate_l1, which would then elimiante all the platforms
-> > which are doing this local hack.
+Thanks, for the patch.
+
+Acked-by: Benoit Parrot <bparrot@ti.com>
+
+Arnd Bergmann <arnd@arndb.de> wrote on Tue [2015-May-19 14:39:12 +0200]:
+> The newly added ov2659 driver uses the v4l2 subdev API, but
+> can be enabled even when that API is not part of the kernel,
+> resulting in this build error:
 > 
-> I think this is good.
-> What can I do for this patch?
-
-Just wait for it to filter through the mailing list - it's on its way. :)
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+> media/i2c/ov2659.c: In function 'ov2659_get_fmt':
+> media/i2c/ov2659.c:1054:8: error: implicit declaration of function 'v4l2_subdev_get_try_format' [-Werror=implicit-function-declaration]
+> media/i2c/ov2659.c:1054:6: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+> media/i2c/ov2659.c: In function 'ov2659_set_fmt':
+> media/i2c/ov2659.c:1129:6: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+> media/i2c/ov2659.c: In function 'ov2659_open':
+> media/i2c/ov2659.c:1264:38: error: 'struct v4l2_subdev_fh' has no member named 'pad'
+> 
+> This adds an explicit dependency, like all the other drivers have.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: c4c0283ab3c ("[media] media: i2c: add support for omnivision's ov2659 sensor")
+> 
+> diff --git a/drivers/media/i2c/Kconfig b/drivers/media/i2c/Kconfig
+> index 6f30ea76151a..db01ed84918f 100644
+> --- a/drivers/media/i2c/Kconfig
+> +++ b/drivers/media/i2c/Kconfig
+> @@ -469,7 +469,7 @@ config VIDEO_SMIAPP_PLL
+>  config VIDEO_OV2659
+>  	tristate "OmniVision OV2659 sensor support"
+>  	depends on VIDEO_V4L2 && I2C
+> -	depends on MEDIA_CAMERA_SUPPORT
+> +	depends on MEDIA_CAMERA_SUPPORT && VIDEO_V4L2_SUBDEV_API
+>  	---help---
+>  	  This is a Video4Linux2 sensor-level driver for the OmniVision
+>  	  OV2659 camera.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-media" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
