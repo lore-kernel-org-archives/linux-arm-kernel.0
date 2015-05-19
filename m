@@ -1,24 +1,208 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 19 May 2015 10:53:26 +0200
-Subject: [PATCH 04/10] dt-bindings: mediatek: Modify pinctrl bindings for
- mt6397.
-In-Reply-To: <1431567346-33780-5-git-send-email-hongzhou.yang@mediatek.com>
-References: <1431567346-33780-1-git-send-email-hongzhou.yang@mediatek.com>
- <1431567346-33780-5-git-send-email-hongzhou.yang@mediatek.com>
-Message-ID: <CACRpkdYAWHN7-tH8eqUkhgev-vHmf-S9wvxFUVybdyE6rU4fkQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 19 May 2015 10:50:51 +0200
+Subject: [PATCH v2 06/10] clk: sunxi: Add H3 clocks support
+In-Reply-To: <5559B4CE.2050703@gmail.com>
+References: <1431707940-19372-1-git-send-email-jenskuske@gmail.com>
+ <1431707940-19372-7-git-send-email-jenskuske@gmail.com>
+ <20150517142749.GG4004@lukather> <5559B4CE.2050703@gmail.com>
+Message-ID: <20150519085051.GX4004@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 14, 2015 at 3:35 AM, Hongzhou Yang
-<hongzhou.yang@mediatek.com> wrote:
+On Mon, May 18, 2015 at 11:45:50AM +0200, Jens Kuske wrote:
+> Hi,
+> 
+> On 05/17/15 16:27, Maxime Ripard wrote:
+> > On Fri, May 15, 2015 at 06:38:56PM +0200, Jens Kuske wrote:
+> >> The H3 clock control unit is similar to the those of other sun8i family
+> >> members like the A23.
+> >>
+> >> It makes use of the new multiple parents option for the bus gates.
+> >> Some of the gates use the new AHB2 clock as parent, whose clock source
+> >> is muxable between AHB1 and PLL6/2. The documentation isn't totally clear
+> >> about which devices belong to AHB2 now, especially USB EHIC/OHIC, so it
+> >> is mostly based on Allwinner kernel source code.
+> >>
+> >> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
+> >> ---
+> >>  Documentation/devicetree/bindings/clock/sunxi.txt |  6 +++
+> >>  drivers/clk/sunxi/clk-sunxi.c                     | 50 ++++++++++++++++++++++-
+> >>  2 files changed, 55 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+> >> index 4fa11af..e367963 100644
+> >> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> >> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> >> @@ -14,6 +14,7 @@ Required properties:
+> >>  	"allwinner,sun4i-a10-pll5-clk" - for the PLL5 clock
+> >>  	"allwinner,sun4i-a10-pll6-clk" - for the PLL6 clock
+> >>  	"allwinner,sun6i-a31-pll6-clk" - for the PLL6 clock on A31
+> >> +	"allwinner,sun8i-h3-pll6-clk" - for the PLL6 clock on H3
+> >>  	"allwinner,sun9i-a80-gt-clk" - for the GT bus clock on A80
+> >>  	"allwinner,sun4i-a10-cpu-clk" - for the CPU multiplexer clock
+> >>  	"allwinner,sun4i-a10-axi-clk" - for the AXI clock
+> >> @@ -28,6 +29,7 @@ Required properties:
+> >>  	"allwinner,sun7i-a20-ahb-gates-clk" - for the AHB gates on A20
+> >>  	"allwinner,sun6i-a31-ar100-clk" - for the AR100 on A31
+> >>  	"allwinner,sun6i-a31-ahb1-clk" - for the AHB1 clock on A31
+> >> +	"allwinner,sun8i-h3-ahb2-clk" - for the AHB2 clock on H3
+> >>  	"allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
+> >>  	"allwinner,sun8i-a23-ahb1-gates-clk" - for the AHB1 gates on A23
+> >>  	"allwinner,sun9i-a80-ahb0-gates-clk" - for the AHB0 gates on A80
+> >> @@ -55,6 +57,7 @@ Required properties:
+> >>  	"allwinner,sun9i-a80-apb1-gates-clk" - for the APB1 gates on A80
+> >>  	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
+> >>  	"allwinner,sun8i-a23-apb2-gates-clk" - for the APB2 gates on A23
+> >> +	"allwinner,sun8i-h3-bus-gates-clk" - for the bus gates on H3
+> >>  	"allwinner,sun5i-a13-mbus-clk" - for the MBUS clock on A13
+> >>  	"allwinner,sun4i-a10-mmc-clk" - for the MMC clock
+> >>  	"allwinner,sun9i-a80-mmc-clk" - for mmc module clocks on A80
+> >> @@ -95,6 +98,9 @@ The "allwinner,sun9i-a80-mmc-config-clk" clock also requires:
+> >>  For "allwinner,sun7i-a20-gmac-clk", the parent clocks shall be fixed rate
+> >>  dummy clocks at 25 MHz and 125 MHz, respectively. See example.
+> >>  
+> >> +For "allwinner,sun8i-h3-bus-gates-clk", the parent clocks shall be
+> >> +AHB1, AHB2, APB1 and APB2, in that order.
+> >> +
+> >>  Clock consumers should specify the desired clocks they use with a
+> >>  "clocks" phandle cell. Consumers that are using a gated clock should
+> >>  provide an additional ID in their clock property. This ID is the
+> >> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+> >> index afe560c..79364be 100644
+> >> --- a/drivers/clk/sunxi/clk-sunxi.c
+> >> +++ b/drivers/clk/sunxi/clk-sunxi.c
+> >> @@ -771,6 +771,10 @@ static const struct mux_data sun6i_a31_ahb1_mux_data __initconst = {
+> >>  	.shift = 12,
+> >>  };
+> >>  
+> >> +static const struct mux_data sun8i_h3_ahb2_mux_data __initconst = {
+> >> +	.shift = 0,
+> >> +};
+> >> +
+> >>  static void __init sunxi_mux_clk_setup(struct device_node *node,
+> >>  				       struct mux_data *data)
+> >>  {
+> >> @@ -886,7 +890,7 @@ static void __init sunxi_divider_clk_setup(struct device_node *node,
+> >>   * sunxi_gates_clk_setup() - Setup function for leaf gates on clocks
+> >>   */
+> >>  
+> >> -#define SUNXI_GATES_MAX_SIZE	64
+> >> +#define SUNXI_GATES_MAX_SIZE	160
+> >>  
+> >>  struct gates_data {
+> >>  	DECLARE_BITMAP(mask, SUNXI_GATES_MAX_SIZE);
+> >> @@ -990,6 +994,36 @@ static const struct gates_data sun8i_a23_apb2_gates_data __initconst = {
+> >>  	.mask = {0x1F0007},
+> >>  };
+> >>  
+> >> +#define BUS_GATE_PARENT_AHB1	0
+> >> +#define BUS_GATE_PARENT_AHB2	1
+> >> +#define BUS_GATE_PARENT_APB1	2
+> >> +#define BUS_GATE_PARENT_APB2	3
+> >> +
+> >> +static const u8 sun8i_h3_bus_gates_parents[] __initconst = {
+> >> +	BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1,
+> >> +	BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1,
+> >> +	BUS_GATE_PARENT_AHB1,
+> > 
+> >> BUS_GATE_PARENT_AHB2,
+> >> BUS_GATE_PARENT_AHB1,
+> >> +	BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1,
+> >> +	BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1,
+> >> +	BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1,
+> > 
+> >> +	BUS_GATE_PARENT_AHB2, BUS_GATE_PARENT_AHB2, BUS_GATE_PARENT_AHB2,
+> > 
+> >> +	BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1,
+> >> +	BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1,
+> >> +	BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1,
+> >> +	BUS_GATE_PARENT_AHB1, BUS_GATE_PARENT_AHB1,
+> > 
+> >> BUS_GATE_PARENT_APB1,
+> >> +	BUS_GATE_PARENT_APB1, BUS_GATE_PARENT_APB1, BUS_GATE_PARENT_APB1,
+> >> +	BUS_GATE_PARENT_APB1, BUS_GATE_PARENT_APB1, BUS_GATE_PARENT_APB1,
+> > 
+> >> +	BUS_GATE_PARENT_APB2, BUS_GATE_PARENT_APB2, BUS_GATE_PARENT_APB2,
+> >> +	BUS_GATE_PARENT_APB2, BUS_GATE_PARENT_APB2, BUS_GATE_PARENT_APB2,
+> >> +	BUS_GATE_PARENT_APB2, BUS_GATE_PARENT_APB2,
+> > 
+> >> BUS_GATE_PARENT_AHB1,
+> >> +	BUS_GATE_PARENT_AHB1
+> >> +}
+> > 
+> > I think something like this:
+> > 
+> > if (index < .. || index > ..)
+> >     clk_parent = "ahb1"
+> > if (index == .. || index < ...)
+> >     clk_parent = "ahb2"
+> > etc...
+> > 
+> > Would be both easier to maintain and to read.
+> 
+> At least as long as there aren't too many disjunct groups.
+> But it would mean duplicate setup functions for each SoC (or something
+> like sun8i_h3_bus_gate_get_parent(int index))
+> 
+> But since you want to rework the gate setup anyway I think I'll wait
+> until then. Currently I can't see how this should look like.
 
-> Since 6397 is no need to support interrupt controller,
-> moving interrupt controller relate property to optional list.
-> Also adding mt8173 and mt8127 to bindings.
->
-> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+We shouldn't care too much about how we can factorise things that
+don't need to be factorised.
 
-Patch applied. (Modified subject slightly.)
+We have a single user for a clock like this one. Don't try to be smart
+by covering all possible cases that might or might not happen in the
+future, just make it work for your single user, hardcoding everything
+is a good option here.
 
-Yours,
-Linus Walleij
+> >> +static const struct gates_data sun8i_h3_bus_gates_data __initconst = {
+> >> +	.mask = {0xffbe6760, 0x00701b39, 0x00007123, 0x001f0007, 0x00000081},
+> >> +	.parents = sun8i_h3_bus_gates_parents,
+> >> +};
+> >> +
+> >>  static void __init sunxi_gates_clk_setup(struct device_node *node,
+> >>  					 struct gates_data *data)
+> >>  {
+> >> @@ -1110,6 +1144,16 @@ static const struct divs_data sun6i_a31_pll6_divs_data __initconst = {
+> >>  	}
+> >>  };
+> >>  
+> >> +static const struct divs_data sun8i_h3_pll6_divs_data __initconst = {
+> >> +	.factors = &sun6i_a31_pll6_data,
+> >> +	.ndivs = 3,
+> >> +	.div = {
+> >> +		{ .fixed = 2 }, /* normal output, pll6 */
+> >> +		{ .self = 1 }, /* base factor clock, pll6 x2 */
+> >> +		{ .fixed = 4 }, /* divided output, pll6 /2 */
+> >> +	}
+> >> +};
+> > 
+> > This is exactly the same clock as A31's PLL6, it shouldn't be declared
+> > as a different one.
+> 
+> Um, sorry, but I can't see the /2 output at A31's pll6.
+> 
+> Or shall we add the /2 output to A31's PLL6 and simply ignore it on A31?
+> I don't think this is a good idea, what happens if we need to add an
+> additional output on A31 later.
+
+This /2 output is not an output, it really is an input of some other
+clocks.
+
+This whole thing is currently a mess, I agree, but still, it's the
+exact same clock from a register point of view. How it's used by other
+components in the system shouldn't matter at all.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150519/0919b3e6/attachment.sig>
