@@ -1,77 +1,125 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 May 2015 13:50:05 +0200
-Subject: [PATCH v7 08/13] ARM: unify MMU/!MMU addruart calls
-In-Reply-To: <bb773210f5f7068a8cba2c283422676c@agner.ch>
-References: <1431769465-26867-1-git-send-email-stefan@agner.ch>
- <20150519101615.GA2067@n2100.arm.linux.org.uk>
- <bb773210f5f7068a8cba2c283422676c@agner.ch>
-Message-ID: <2419398.cbLWQC7K5f@wuerfel>
+From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
+Date: Tue, 19 May 2015 20:51:18 +0900
+Subject: [RESEND PATCH 1/2] ARM: dts: tegra: Add labels to Tegra114 nodes
+Message-ID: <1432036279-6318-1-git-send-email-k.kozlowski.k@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 May 2015 13:23:22 Stefan Agner wrote:
-> On 2015-05-19 12:16, Russell King - ARM Linux wrote:
-> > On Tue, May 19, 2015 at 01:35:03PM +0800, Shawn Guo wrote:
-> >> On Mon, May 18, 2015 at 05:36:43PM +0200, Thomas Gleixner wrote:
-> >> > On Sun, 17 May 2015, Thomas Gleixner wrote:
-> >> > > I'm going to apply the irq core and chip driver modifications to a
-> >> > > separate branch later today, so you or ARM-SOC folks can pull that
-> >> > > in. Will send you a mail where it can be found.
-> >> >
-> >> >   git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip.git irq/for-arm
-> >> >
-> >> > That contains the first 5 patches which touch kernel/irq/ and
-> >> > drivers/irqchip/
-> >>
-> >> Russell, Arnd,
-> >>
-> >> I guess the easiest way to merge rest of the series is to have them go
-> >> via i.MX tree with your nods?
+Add new labels to certain nodes on Tegra114 so they could be easily
+referenced by board DTS files.
 
-Yes, that would be good.
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
 
-> > I don't know, I've not looked at the remainder of the patches.  Having
-> > looked briefly at them, it looks like they touch EFM32 as well, so I'm
-> > not sure having them all go through iMX is the right approach either.
-> > 
-> > Looking at the EFM32 patch, it looks like we've adopted my suggestion
-> > (discussed with Arnd in the previous month) wrt noMMU, so I'll post a
-> > couple of patches in a moment which fix Integrator for this as well.
-> > Integrator is independent of this series, and it fixes real problems
-> > caused by the single zImage stuff for noMMU there.
-> > 
-> > It makes sense for these to all go through arm-soc - but the question
-> > is how do we get them all into arm-soc...
-> 
-> Sorry for the mess, I see, I should have tried split it in pieces which
-> match the subsystems.
-> 
-> Patch 06 defines a smaller vector table size, which is by default too
-> large. Hence this patch is quite independent, the rest of the patch set
-> works flawless without that patch. However, that patch relies on 8340/1
-> being applied ("ARM: ARMv7-M: Enlarge vector table up to 256 entries").
-> If this is ok for you Russel, I would submit that to your patch system.
-> 
-> Patch 07 defines dependencies a bit more explicitly, however, with the
-> current Kconfig symbol setup, both should be selected by other config
-> symbols (CLKSRC_OF by ARM_SINGLE_ARMV7M and CLKSRC_MMIO by ARCH_MXC).
-> Hence this can go independently through clocksource trees
-> (Daniel/Thomas?)
-> 
-> Not sure how we can deal with the EFM32 vs. IMX changes... Patches 08-10
-> has no dependencies on the clock changes which Thomas merged. They could
-> go through whatever EFM32 is merged normally (last time Arnd directly
-> merged from Uwe), and then Shawn could base the rest of the changes on
-> that too?
+---
 
-Do you have a dependency on patch 10 (the one for EFM32) in your later
-patches?
+Tested by comparison of generated DTB and decompiled DTB->DTS for each
+commit. Each output was the same.
+---
+ arch/arm/boot/dts/tegra114.dtsi | 22 +++++++++++-----------
+ 1 file changed, 11 insertions(+), 11 deletions(-)
 
-If not, you can send the other ones to Shawn, so I pull them as
-a branch, and then I apply that on top of the merges. I have also
-merged two other ARMv7M platforms for 4.2 now (both in next/soc),
-so we should do the same change for those as well, and I'd rather
-apply a patch for that, than merge a branch that is based on
-next/soc.
-
-	Arnd
+diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+index f58a3d9d5f13..1b31cefd1047 100644
+--- a/arch/arm/boot/dts/tegra114.dtsi
++++ b/arch/arm/boot/dts/tegra114.dtsi
+@@ -10,7 +10,7 @@
+ 	compatible = "nvidia,tegra114";
+ 	interrupt-parent = <&lic>;
+ 
+-	host1x at 50000000 {
++	host1x: host1x at 50000000 {
+ 		compatible = "nvidia,tegra114-host1x", "simple-bus";
+ 		reg = <0x50000000 0x00028000>;
+ 		interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>, /* syncpt */
+@@ -318,7 +318,7 @@
+ 		status = "disabled";
+ 	};
+ 
+-	i2c at 7000c000 {
++	i2c1: i2c at 7000c000 {
+ 		compatible = "nvidia,tegra114-i2c";
+ 		reg = <0x7000c000 0x100>;
+ 		interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
+@@ -363,7 +363,7 @@
+ 		status = "disabled";
+ 	};
+ 
+-	i2c at 7000c700 {
++	i2c4: i2c at 7000c700 {
+ 		compatible = "nvidia,tegra114-i2c";
+ 		reg = <0x7000c700 0x100>;
+ 		interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
+@@ -378,7 +378,7 @@
+ 		status = "disabled";
+ 	};
+ 
+-	i2c at 7000d000 {
++	i2c5: i2c at 7000d000 {
+ 		compatible = "nvidia,tegra114-i2c";
+ 		reg = <0x7000d000 0x100>;
+ 		interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
+@@ -438,7 +438,7 @@
+ 		status = "disabled";
+ 	};
+ 
+-	spi at 7000da00 {
++	spi4: spi at 7000da00 {
+ 		compatible = "nvidia,tegra114-spi";
+ 		reg = <0x7000da00 0x200>;
+ 		interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
+@@ -500,7 +500,7 @@
+ 		status = "disabled";
+ 	};
+ 
+-	pmc at 7000e400 {
++	pmc: pmc at 7000e400 {
+ 		compatible = "nvidia,tegra114-pmc";
+ 		reg = <0x7000e400 0x400>;
+ 		clocks = <&tegra_car TEGRA114_CLK_PCLK>, <&clk32k_in>;
+@@ -527,7 +527,7 @@
+ 		#iommu-cells = <1>;
+ 	};
+ 
+-	ahub at 70080000 {
++	ahub: ahub at 70080000 {
+ 		compatible = "nvidia,tegra114-ahub";
+ 		reg = <0x70080000 0x200>,
+ 		      <0x70080200 0x100>,
+@@ -648,7 +648,7 @@
+ 		status = "disabled";
+ 	};
+ 
+-	sdhci at 78000400 {
++	sdhci3: sdhci at 78000400 {
+ 		compatible = "nvidia,tegra114-sdhci", "nvidia,tegra30-sdhci";
+ 		reg = <0x78000400 0x200>;
+ 		interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
+@@ -658,7 +658,7 @@
+ 		status = "disabled";
+ 	};
+ 
+-	sdhci at 78000600 {
++	sdhci4: sdhci at 78000600 {
+ 		compatible = "nvidia,tegra114-sdhci", "nvidia,tegra30-sdhci";
+ 		reg = <0x78000600 0x200>;
+ 		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
+@@ -668,7 +668,7 @@
+ 		status = "disabled";
+ 	};
+ 
+-	usb at 7d000000 {
++	usb1: usb at 7d000000 {
+ 		compatible = "nvidia,tegra30-ehci", "usb-ehci";
+ 		reg = <0x7d000000 0x4000>;
+ 		interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
+@@ -704,7 +704,7 @@
+ 		status = "disabled";
+ 	};
+ 
+-	usb at 7d008000 {
++	usb3: usb at 7d008000 {
+ 		compatible = "nvidia,tegra30-ehci", "usb-ehci";
+ 		reg = <0x7d008000 0x4000>;
+ 		interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
+-- 
+2.1.4
