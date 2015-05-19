@@ -1,48 +1,97 @@
 From: timo.kokkonen@offcode.fi (Timo Kokkonen)
-Date: Tue, 19 May 2015 11:26:05 +0300
-Subject: [PATCHv8 06/10] devicetree: Document generic watchdog properties
+Date: Tue, 19 May 2015 11:26:09 +0300
+Subject: [PATCHv8 10/10] watchdog: omap_wdt: Convert to use new core extensions
 In-Reply-To: <1432023969-20736-1-git-send-email-timo.kokkonen@offcode.fi>
 References: <1432023969-20736-1-git-send-email-timo.kokkonen@offcode.fi>
-Message-ID: <1432023969-20736-7-git-send-email-timo.kokkonen@offcode.fi>
+Message-ID: <1432023969-20736-11-git-send-email-timo.kokkonen@offcode.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no documentation for the watchdog properties that are common
-among most of the watchdog drivers. Add document where these generic
-properties can be described and told how they should be used in
-drivers.
+Use the new watchdog core extensions to let watchdog core take over
+boot time watchdog behavior. The difference is that early-timeout-sec
+device tree property becomes available for this driver and a running
+watchdog is not stopped unless the core decides to stop it.
+
+Omap watchdog is running by default in the boot up but bootloader
+might have stopped it. Therefore we will set the watchdog_active flag
+depending on the actual watchdog state so that the watchdog core can
+act properly depending on the watchdog policy.
 
 Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
 ---
- .../devicetree/bindings/watchdog/watchdog.txt        | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/watchdog/watchdog.txt
+ drivers/watchdog/omap_wdt.c | 26 +++++++++++++++++++++++++-
+ 1 file changed, 25 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/watchdog/watchdog.txt b/Documentation/devicetree/bindings/watchdog/watchdog.txt
-new file mode 100644
-index 0000000..3781406
---- /dev/null
-+++ b/Documentation/devicetree/bindings/watchdog/watchdog.txt
-@@ -0,0 +1,20 @@
-+These properties are common among most watchdog drivers. Any driver
-+that requires the functionality listed below should implement them
-+using these definitions.
+diff --git a/drivers/watchdog/omap_wdt.c b/drivers/watchdog/omap_wdt.c
+index 1e6be9e..fc230b0 100644
+--- a/drivers/watchdog/omap_wdt.c
++++ b/drivers/watchdog/omap_wdt.c
+@@ -78,6 +78,13 @@ static void omap_wdt_reload(struct omap_wdt_dev *wdev)
+ 	/* reloaded WCRR from WLDR */
+ }
+ 
++static int omap_wdt_is_running(struct omap_wdt_dev *wdev)
++{
++	void __iomem *base = wdev->base;
 +
-+Optional properties:
-+- timeout-sec: Contains the watchdog timeout in seconds.
-+- early-timeout-sec: If present, specify the timeout in seconds for
-+  how long it can take for the watchdog daemon to take over the
-+  watchdog device. If driver supports this property it must ensure the
-+  watchdog hardware is running during this period and a watchdog reset
-+  must occur if user space fails to open the device in time. If left
-+  zero, the driver only needs to guarantee the watchdog is not
-+  stopped or is started during driver init.
++	return readl_relaxed(base + OMAP_WATCHDOG_SPR) == 0x4444;
++}
 +
-+Example:
+ static void omap_wdt_enable(struct omap_wdt_dev *wdev)
+ {
+ 	void __iomem *base = wdev->base;
+@@ -183,6 +190,7 @@ static int omap_wdt_set_timeout(struct watchdog_device *wdog,
+ 	omap_wdt_enable(wdev);
+ 	omap_wdt_reload(wdev);
+ 	wdog->timeout = timeout;
++	wdog->hw_heartbeat = timeout * 1000;
+ 	mutex_unlock(&wdev->lock);
+ 
+ 	return 0;
+@@ -233,12 +241,14 @@ static int omap_wdt_probe(struct platform_device *pdev)
+ 	omap_wdt->ops	      = &omap_wdt_ops;
+ 	omap_wdt->min_timeout = TIMER_MARGIN_MIN;
+ 	omap_wdt->max_timeout = TIMER_MARGIN_MAX;
++	omap_wdt->hw_max_timeout = TIMER_MARGIN_MAX * 1000;
+ 
+ 	if (timer_margin >= TIMER_MARGIN_MIN &&
+ 	    timer_margin <= TIMER_MARGIN_MAX)
+ 		omap_wdt->timeout = timer_margin;
+ 	else
+ 		omap_wdt->timeout = TIMER_MARGIN_DEFAULT;
++	omap_wdt->hw_heartbeat = omap_wdt->timeout / 2 * 1000;
+ 
+ 	watchdog_set_drvdata(omap_wdt, wdev);
+ 	watchdog_set_nowayout(omap_wdt, nowayout);
+@@ -248,6 +258,18 @@ static int omap_wdt_probe(struct platform_device *pdev)
+ 	pm_runtime_enable(wdev->dev);
+ 	pm_runtime_get_sync(wdev->dev);
+ 
++	if (omap_wdt_is_running(wdev))
++		watchdog_set_hw_active(omap_wdt, 1);
++	else
++		/*
++		 * The watchdog should be stopped already by
++		 * bootloader. But unless we call disable here, the
++		 * timeout might not be set correctly on the first
++		 * start. So call disable anyway to make sure the
++		 * watchdog really is stopped properly.
++		 */
++		omap_wdt_disable(wdev);
 +
-+watchdog {
-+	 timeout-sec = <60>;
-+	 early-timeout-sec = <120>;
-+};
+ 	if (pdata && pdata->read_reset_sources)
+ 		rs = pdata->read_reset_sources();
+ 	else
+@@ -255,7 +277,9 @@ static int omap_wdt_probe(struct platform_device *pdev)
+ 	omap_wdt->bootstatus = (rs & (1 << OMAP_MPU_WD_RST_SRC_ID_SHIFT)) ?
+ 				WDIOF_CARDRESET : 0;
+ 
+-	omap_wdt_disable(wdev);
++	ret = watchdog_init_params(omap_wdt, &pdev->dev);
++	if (ret)
++		return ret;
+ 
+ 	ret = watchdog_register_device(omap_wdt);
+ 	if (ret) {
 -- 
 2.1.0
