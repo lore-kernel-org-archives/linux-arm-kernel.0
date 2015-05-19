@@ -1,61 +1,38 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Tue, 19 May 2015 15:16:01 +0100
-Subject: [RFC 10/23] xen/biomerge: WORKAROUND always says the biovec are
- not mergeable
-In-Reply-To: <555616D3.7060603@oracle.com>
+Date: Tue, 19 May 2015 15:18:24 +0100
+Subject: [Xen-devel] [RFC 12/23] xen: Extend page_to_mfn to take an offset
+ in the page
+In-Reply-To: <555B4167.7050506@citrix.com>
 References: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
- <1431622863-28575-11-git-send-email-julien.grall@citrix.com>
- <555616D3.7060603@oracle.com>
-Message-ID: <555B45A1.4070604@citrix.com>
+ <1431622863-28575-13-git-send-email-julien.grall@citrix.com>
+ <555B4167.7050506@citrix.com>
+Message-ID: <555B4630.8050304@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+Hi David,
 
-On 15/05/15 16:54, Boris Ostrovsky wrote:
-> On 05/14/2015 01:00 PM, Julien Grall wrote:
->> When Linux is using 64K page granularity, every page will be slipt in
->> multiple non-contiguous 4K MFN.
+On 19/05/15 14:57, David Vrabel wrote:
+> On 14/05/15 18:00, Julien Grall wrote:
+>> With 64KB page granularity support in Linux, a page will be split accross
+>> multiple MFN (Xen is using 4KB page granularity). Thoses MFNs may not be
+>> contiguous.
 >>
->> I'm not sure how to handle efficiently the check to know whether we can
->> merge 2 biovec with a such case. So for now, always says that biovec are
->> not mergeable.
->>
->> Signed-off-by: Julien Grall <julien.grall@citrix.com>
->> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
->> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
->> Cc: David Vrabel <david.vrabel@citrix.com>
->> ---
->>   drivers/xen/biomerge.c | 3 +++
->>   1 file changed, 3 insertions(+)
->>
->> diff --git a/drivers/xen/biomerge.c b/drivers/xen/biomerge.c
->> index 0edb91c..20387c2 100644
->> --- a/drivers/xen/biomerge.c
->> +++ b/drivers/xen/biomerge.c
->> @@ -9,6 +9,9 @@ bool xen_biovec_phys_mergeable(const struct bio_vec
->> *vec1,
->>       unsigned long mfn1 = pfn_to_mfn(page_to_pfn(vec1->bv_page));
->>       unsigned long mfn2 = pfn_to_mfn(page_to_pfn(vec2->bv_page));
->>   +    /* TODO: Implement it correctly */
->> +    return 0;
->> +
->>       return __BIOVEC_PHYS_MERGEABLE(vec1, vec2) &&
->>           ((mfn1 == mfn2) || ((mfn1+1) == mfn2));
->>   }
+>> With the offset in the page, the helper will be able to know which MFN
+>> the driver needs to retrieve.
 > 
-> 
-> I think this is a bit too blunt.  Perhaps check first whether page sizes
-> are different in the hypervisor and the guest?
+> I think a gnttab_grant_foreign_access_ref()-like helper that takes a
+> page would be better.
+>
+> You will probably want this helper able to return/fill a set of refs for
+> 64 KiB pages.
 
-Sounds good.
+I will see what I can do.
 
-> 
-> (And I am not sure we need __BIOVEC_PHYS_MERGEABLE() test here as it is
-> already checked by BIOVEC_PHYS_MERGEABLE() which appears to be the only
-> user of xen_biovec_phys_mergeable())
+Although, I think this patch is still valid to avoid wrong usage with
+64KB page granularity by the caller.
 
-I can send a patch to drop __BIOVEC_PHYS_MERGEABLE.
+The developer may think that MFN are contiguous which is not always true.
 
 Regards,
 
