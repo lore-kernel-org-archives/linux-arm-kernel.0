@@ -1,51 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 19 May 2015 15:50:07 +0100
-Subject: [PATCH v8 09/16] clockevents/drivers: Add STM32 Timer driver
-In-Reply-To: <CALszF6A-De6dvcRNoa9ruL+y6Wt_rc7bi-O-VxHWkFF9NSt5_g@mail.gmail.com>
-References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
- <555B098A.8030202@linaro.org>
- <CALszF6AJ3Zf598wYeUx=iNWHHKT24xUyfagB=+4GocwZ-Fd-0g@mail.gmail.com>
- <6177628.0ZDPLeVyah@wuerfel>
- <CALszF6BZKD-CPTZ6Hc85wv2Z3Y7JmUv-cMkBtbk2Ga6WeeWU=A@mail.gmail.com>
- <555B3F80.8070605@linaro.org>
- <CALszF6A-De6dvcRNoa9ruL+y6Wt_rc7bi-O-VxHWkFF9NSt5_g@mail.gmail.com>
-Message-ID: <20150519145006.GH2067@n2100.arm.linux.org.uk>
+From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
+Date: Tue, 19 May 2015 10:49:20 -0400
+Subject: [PATCH] xen: fix building on ARM with CONFIG_HIBERNATE_CALLBACKS
+In-Reply-To: <2292282.A4UNIrHzbV@wuerfel>
+References: <3837965.uXvcfKiP40@wuerfel> <555B413F.7020509@oracle.com>
+ <2292282.A4UNIrHzbV@wuerfel>
+Message-ID: <555B4D70.7050900@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 04:41:58PM +0200, Maxime Coquelin wrote:
-> 2015-05-19 15:49 GMT+02:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
-> >
-> >
-> > It is not exactly as the initial patch.
-> >
-> > I think Arnd is proposing:
-> >
-> > config CLKSRC_STM32
-> >         bool "Clocksource for STM32 SoCs" if COMPILE_TEST
-> >         select CLKSRC_MMIO
-> >
-> 
-> Isn't "depends on OF" missing for COMPILE_TEST case?
+On 05/19/2015 10:36 AM, Arnd Bergmann wrote:
+> On Tuesday 19 May 2015 09:57:19 Boris Ostrovsky wrote:
+>> On 05/19/2015 08:58 AM, Arnd Bergmann wrote:
+>>> A recent bug fix for x86 broke Xen on ARM for the case that
+>>> CONFIG_HIBERNATE_CALLBACKS is enabled:
+>>>
+>>> drivers/built-in.o: In function `do_suspend':
+>>> /git/arm-soc/drivers/xen/manage.c:134: undefined reference to `xen_arch_suspend'
+>>> drivers/built-in.o:(.debug_addr+0xc3f4): undefined reference to `xen_arch_suspend'
+>>>
+>>> It is not clear to me what needs to be done here, but this
+>>> patch avoids the build error by adding a stub for the
+>>> missing function.
+>> This is already fixed in Xen staging tree.
+> I see. Any chance to get that fix into linux-next soon?
 
-config CLKSRC_STM32
-	bool "Clocksource for STM32 SoCs" if COMPILE_TEST
-	depends on OF
-	select CLKSRC_MMIO
 
-This permits CLKSRC_STM32 to be selected by STM32 (provided OF is enabled,
-it's always going to be for that case, right?) while allowing the option
-to be visible when both OF!=n and COMPILE_TEST!=n.
+David, are you going to send pull request to Linus before rc5?
 
-Remember,
-
-	bool "string" if <condition-affects-visibility-of-string>
-	depends on <condition-affects-config-symbol-availability>
-
-The former merely hides the option from the user _if_ the condition fails.
-The latter _disables_ the option completely (except if you try and select
-it, at which point you end up with a Kconfig warning about that.)
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+-boris
