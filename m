@@ -1,157 +1,123 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 19 May 2015 10:55:11 -0600
-Subject: [PATCH 06/16] coresight: etb: let runtime PM handle core clock
+Date: Tue, 19 May 2015 10:55:15 -0600
+Subject: [PATCH 10/16] coresight: tpiu: retrieve and handle atclk
 In-Reply-To: <1432054521-24807-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1432054521-24807-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1432054521-24807-7-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1432054521-24807-11-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-This uses runtime PM to manage the PCLK ("amba_pclk") instead
-of screwing around with the framework by going in and taking
-a copy from the amba device. The amba bus core will unprepare
-and disable the clock when the device is unused when
-CONFIG_PM is selected, else the clock will be always on.
+As can be seen from the datasheet of the CoreSight
+Components, DDI0314H page A-19 the TPIU has a clock signal
+apart from the AHB interconnect ("amba_pclk", that we're
+already handling) called ATCLK, ARM Trace Clock, that SoC
+implementers may provide from an entirely different clock
+source. So to model this correctly create an optional
+path for handling ATCLK alongside the PCLK so we don't
+break old platforms that only define PCLK ("amba_pclk") but
+still makes it possible for SoCs that have both clock signals
+(such as the DB8500) to fetch and prepare/enable/disable/
+unprepare both clocks in conjunction.
 
-Prior to this patch, as the AMBA primecell bus code enables
-the PCLK, it would be left on after probe as
-the clk_prepare_enable() and clk_disable_unprepare() was
-called and thus just increase and decreas the refcount by
-one, without it reaching zero and actually disabling the
-clock. Now the runtime PM callbacks will make sure the PCLK
-is properly disabled after probe.
+The ATCLK is enabled and disabled using the runtime PM
+callbacks.
 
 Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etb10.c | 35 +++++++--------------------
- 1 file changed, 9 insertions(+), 26 deletions(-)
+ drivers/hwtracing/coresight/coresight-tpiu.c | 37 ++++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-index 2a77d83130e6..df306aef4360 100644
---- a/drivers/hwtracing/coresight/coresight-etb10.c
-+++ b/drivers/hwtracing/coresight/coresight-etb10.c
-@@ -22,7 +22,7 @@
- #include <linux/uaccess.h>
- #include <linux/slab.h>
- #include <linux/spinlock.h>
--#include <linux/clk.h>
-+#include <linux/pm_runtime.h>
- #include <linux/seq_file.h>
+diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
+index 688ba937069e..7214efd10db5 100644
+--- a/drivers/hwtracing/coresight/coresight-tpiu.c
++++ b/drivers/hwtracing/coresight/coresight-tpiu.c
+@@ -20,6 +20,7 @@
+ #include <linux/pm_runtime.h>
  #include <linux/coresight.h>
  #include <linux/amba/bus.h>
-@@ -68,7 +68,6 @@
++#include <linux/clk.h>
+ 
+ #include "coresight-priv.h"
+ 
+@@ -50,11 +51,13 @@
+ /**
+  * @base:	memory mapped base address for this component.
   * @dev:	the device entity associated to this component.
++ * @atclk:	optional clock for the core parts of the TPIU.
   * @csdev:	component vitals needed by the framework.
-  * @miscdev:	specifics to handle "/dev/xyz.etb" entry.
-- * @clk:	the clock this component is associated to.
-  * @spinlock:	only one at a time pls.
-  * @in_use:	synchronise user space access to etb buffer.
-  * @buf:	area of memory where ETB buffer content gets sent.
-@@ -81,7 +80,6 @@ struct etb_drvdata {
+  */
+ struct tpiu_drvdata {
+ 	void __iomem		*base;
  	struct device		*dev;
++	struct clk		*atclk;
  	struct coresight_device	*csdev;
- 	struct miscdevice	miscdev;
--	struct clk		*clk;
- 	spinlock_t		spinlock;
- 	atomic_t		in_use;
- 	u8			*buf;
-@@ -92,17 +90,14 @@ struct etb_drvdata {
+ };
  
- static unsigned int etb_get_buffer_depth(struct etb_drvdata *drvdata)
+@@ -111,6 +114,7 @@ static const struct coresight_ops tpiu_cs_ops = {
+ 
+ static int tpiu_probe(struct amba_device *adev, const struct amba_id *id)
  {
--	int ret;
- 	u32 depth = 0;
++	int ret;
+ 	void __iomem *base;
+ 	struct device *dev = &adev->dev;
+ 	struct coresight_platform_data *pdata = NULL;
+@@ -131,6 +135,12 @@ static int tpiu_probe(struct amba_device *adev, const struct amba_id *id)
+ 		return -ENOMEM;
  
--	ret = clk_prepare_enable(drvdata->clk);
--	if (ret)
--		return ret;
-+	pm_runtime_get_sync(drvdata->dev);
+ 	drvdata->dev = &adev->dev;
++	drvdata->atclk = devm_clk_get(&adev->dev, "atclk"); /* optional */
++	if (!IS_ERR(drvdata->atclk)) {
++		ret = clk_prepare_enable(drvdata->atclk);
++		if (ret)
++			return ret;
++	}
+ 	dev_set_drvdata(dev, drvdata);
  
- 	/* RO registers don't need locking */
- 	depth = readl_relaxed(drvdata->base + ETB_RAM_DEPTH_REG);
- 
--	clk_disable_unprepare(drvdata->clk);
-+	pm_runtime_put(drvdata->dev);
- 	return depth;
+ 	/* Validity for the resource is already checked by the AMBA core */
+@@ -170,6 +180,32 @@ static int tpiu_remove(struct amba_device *adev)
+ 	return 0;
  }
  
-@@ -137,12 +132,9 @@ static void etb_enable_hw(struct etb_drvdata *drvdata)
- static int etb_enable(struct coresight_device *csdev)
- {
- 	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
--	int ret;
- 	unsigned long flags;
- 
--	ret = clk_prepare_enable(drvdata->clk);
--	if (ret)
--		return ret;
-+	pm_runtime_get_sync(drvdata->dev);
- 
- 	spin_lock_irqsave(&drvdata->spinlock, flags);
- 	etb_enable_hw(drvdata);
-@@ -252,7 +244,7 @@ static void etb_disable(struct coresight_device *csdev)
- 	drvdata->enable = false;
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
--	clk_disable_unprepare(drvdata->clk);
-+	pm_runtime_put(drvdata->dev);
- 
- 	dev_info(drvdata->dev, "ETB disabled\n");
- }
-@@ -339,16 +331,12 @@ static const struct file_operations etb_fops = {
- static ssize_t status_show(struct device *dev,
- 			   struct device_attribute *attr, char *buf)
- {
--	int ret;
- 	unsigned long flags;
- 	u32 etb_rdr, etb_sr, etb_rrp, etb_rwp;
- 	u32 etb_trg, etb_cr, etb_ffsr, etb_ffcr;
- 	struct etb_drvdata *drvdata = dev_get_drvdata(dev->parent);
- 
--	ret = clk_prepare_enable(drvdata->clk);
--	if (ret)
--		goto out;
--
-+	pm_runtime_get_sync(drvdata->dev);
- 	spin_lock_irqsave(&drvdata->spinlock, flags);
- 	CS_UNLOCK(drvdata->base);
- 
-@@ -364,7 +352,7 @@ static ssize_t status_show(struct device *dev,
- 	CS_LOCK(drvdata->base);
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
--	clk_disable_unprepare(drvdata->clk);
-+	pm_runtime_put(drvdata->dev);
- 
- 	return sprintf(buf,
- 		       "Depth:\t\t0x%x\n"
-@@ -377,7 +365,7 @@ static ssize_t status_show(struct device *dev,
- 		       "Flush ctrl:\t0x%x\n",
- 		       etb_rdr, etb_sr, etb_rrp, etb_rwp,
- 		       etb_trg, etb_cr, etb_ffsr, etb_ffcr);
--out:
++#ifdef CONFIG_PM
++static int tpiu_runtime_suspend(struct device *dev)
++{
++	struct tpiu_drvdata *drvdata = dev_get_drvdata(dev);
 +
- 	return -EINVAL;
- }
- static DEVICE_ATTR_RO(status);
-@@ -449,13 +437,8 @@ static int etb_probe(struct amba_device *adev, const struct amba_id *id)
- 
- 	spin_lock_init(&drvdata->spinlock);
- 
--	drvdata->clk = adev->pclk;
--	ret = clk_prepare_enable(drvdata->clk);
--	if (ret)
--		return ret;
--
- 	drvdata->buffer_depth = etb_get_buffer_depth(drvdata);
--	clk_disable_unprepare(drvdata->clk);
-+	pm_runtime_put(&adev->dev);
- 
- 	if (drvdata->buffer_depth & 0x80000000)
- 		return -EINVAL;
++	if (drvdata && !IS_ERR(drvdata->atclk))
++		clk_disable_unprepare(drvdata->atclk);
++
++	return 0;
++}
++
++static int tpiu_runtime_resume(struct device *dev)
++{
++	struct tpiu_drvdata *drvdata = dev_get_drvdata(dev);
++
++	if (drvdata && !IS_ERR(drvdata->atclk))
++		clk_prepare_enable(drvdata->atclk);
++
++	return 0;
++}
++#endif
++
++static const struct dev_pm_ops tpiu_dev_pm_ops = {
++	SET_RUNTIME_PM_OPS(tpiu_runtime_suspend, tpiu_runtime_resume, NULL)
++};
++
+ static struct amba_id tpiu_ids[] = {
+ 	{
+ 		.id	= 0x0003b912,
+@@ -186,6 +222,7 @@ static struct amba_driver tpiu_driver = {
+ 	.drv = {
+ 		.name	= "coresight-tpiu",
+ 		.owner	= THIS_MODULE,
++		.pm	= &tpiu_dev_pm_ops,
+ 	},
+ 	.probe		= tpiu_probe,
+ 	.remove		= tpiu_remove,
 -- 
 1.9.1
