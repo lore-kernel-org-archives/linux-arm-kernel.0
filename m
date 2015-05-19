@@ -1,38 +1,48 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 19 May 2015 15:01:18 -0700
-Subject: [PATCH] ARM: v7 setup function should invalidate L1 cache
-In-Reply-To: <E1Yuk8W-0001tC-IK@rmk-PC.arm.linux.org.uk>
-References: <E1Yuk8W-0001tC-IK@rmk-PC.arm.linux.org.uk>
-Message-ID: <555BB2AE.50302@gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 20 May 2015 00:03:50 +0200
+Subject: [PATCH soc v8 1/3] ARM: unify MMU/!MMU addruart calls
+In-Reply-To: <1432073032-26561-1-git-send-email-stefan@agner.ch>
+References: <1432073032-26561-1-git-send-email-stefan@agner.ch>
+Message-ID: <1432073032-26561-2-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/05/15 09:12, Russell King wrote:
-> All ARMv5 and older CPUs invalidate their caches in the early assembly
-> setup function, prior to enabling the MMU.  This is because the L1
-> cache should not contain any data relevant to the execution of the
-> kernel at this point; all data should have been flushed out to memory.
-> 
-> This requirement should also be true for ARMv6 and ARMv7 CPUs - indeed,
-> these typically do not search their caches when caching is disabled (as
-> it needs to be when the MMU is disabled) so this change should be safe.
-> 
-> ARMv7 allows there to be CPUs which search their caches while caching is
-> disabled, and it's permitted that the cache is uninitialised at boot;
-> for these, the architecture reference manual requires that an
-> implementation specific code sequence is used immediately after reset
-> to ensure that the cache is placed into a sane state.  Such
-> functionality is definitely outside the remit of the Linux kernel, and
-> must be done by the SoC's firmware before _any_ CPU gets to the Linux
-> kernel.
-> 
-> Changing the data cache clean+invalidate to a mere invalidate allows us
-> to get rid of a lot of platform specific hacks around this issue for
-> their secondary CPU bringup paths - some of which were buggy.
+Remove the needless differences between MMU/!MMU addruart calls.
+This allows to use the same addruart macro on SoC level. Useful
+for SoC consisting of multiple CPUs with and without MMU such as
+Freescale Vybrid.
 
-For brcmstb:
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ arch/arm/include/debug/efm32.S | 2 +-
+ arch/arm/kernel/debug.S        | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
-Tested-by: Florian Fainelli <f.fainelli@gmail.com>
+diff --git a/arch/arm/include/debug/efm32.S b/arch/arm/include/debug/efm32.S
+index 2265a19..660fa1e 100644
+--- a/arch/arm/include/debug/efm32.S
++++ b/arch/arm/include/debug/efm32.S
+@@ -16,7 +16,7 @@
+ 
+ #define	UARTn_TXDATA		0x0034
+ 
+-		.macro	addruart, rx, tmp
++		.macro	addruart, rx, tmp, tmp2
+ 		ldr	\rx, =(CONFIG_DEBUG_UART_PHYS)
+ 
+ 		/*
+diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
+index 78c91b5..ea9646c 100644
+--- a/arch/arm/kernel/debug.S
++++ b/arch/arm/kernel/debug.S
+@@ -35,7 +35,7 @@
+ 
+ #else /* !CONFIG_MMU */
+ 		.macro	addruart_current, rx, tmp1, tmp2
+-		addruart	\rx, \tmp1
++		addruart	\rx, \tmp1, \tmp2
+ 		.endm
+ 
+ #endif /* CONFIG_MMU */
 -- 
-Florian
+2.4.1
