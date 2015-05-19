@@ -1,34 +1,24 @@
-From: tytso@mit.edu (Theodore Ts'o)
-Date: Tue, 19 May 2015 10:39:04 -0400
-Subject: [PATCH] crypto: allow to assign gfp_t for __crypto_alloc_tfm
-In-Reply-To: <20150519142755.GB32663@gondor.apana.org.au>
-References: <1432014416-39326-1-git-send-email-jaegeuk@kernel.org>
- <20150519054945.GA28060@gondor.apana.org.au>
- <20150519062430.GA39588@jaegeuk-mac02.hsd1.ca.comcast.net>
- <20150519063211.GA28347@gondor.apana.org.au>
- <20150519065812.GA40012@jaegeuk-mac02.hsd1.ca.comcast.net>
- <20150519065929.GA28610@gondor.apana.org.au>
- <20150519071317.GB40012@jaegeuk-mac02.hsd1.ca.comcast.net>
- <20150519071521.GA28862@gondor.apana.org.au>
- <20150519141430.GD20421@thunk.org>
- <20150519142755.GB32663@gondor.apana.org.au>
-Message-ID: <20150519143904.GA25684@thunk.org>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 19 May 2015 22:41:09 +0800
+Subject: [PATCH v2] spi: sirf: add support for USP-based SPI
+In-Reply-To: <20150519112201.GH2761@sirena.org.uk>
+References: <1431602829-12428-1-git-send-email-21cnbao@gmail.com>
+ <20150519112201.GH2761@sirena.org.uk>
+Message-ID: <CAGsJ_4yTm_JE36iGNxw5sk4BaugfmwMLQQUFPX_kQrTamkX91Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 10:27:55PM +0800, Herbert Xu wrote:
-> On Tue, May 19, 2015 at 10:14:30AM -0400, Theodore Ts'o wrote:
-> > 
-> > There can be multiple reads going on in parallel, so we're currently
-> > creating tfm's as necessary.  In fact one of the things that we've
-> 
-> A single tfm is fully-reentrant (as long as you don't change the
-> key).  So multiple reads/writes on a single file can all use one
-> tfm with no locking at all.
+2015-05-19 19:22 GMT+08:00 Mark Brown <broonie@kernel.org>:
+> On Thu, May 14, 2015 at 11:27:09AM +0000, Barry Song wrote:
+>> From: Qipan Li <Qipan.Li@csr.com>
+>>
+>> USP is a general purpose serial port in SiRFSoC, which can work as SPI.
+>> the most data flow of USP and pure SPI is same with main differences
+>> in registers layout.
+>
+> This doesn't apply against current code, please check and resend.
 
-Cool, we didn't realize this was the case.  Excellent, this makes life
-much simpler for us!  :-)
+sorry.
+i made a big mis-operation. right now i sent a new version to fix it.
 
-Thanks,
-
-					- Ted
+-barry
