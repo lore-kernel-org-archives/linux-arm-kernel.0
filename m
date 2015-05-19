@@ -1,52 +1,50 @@
-From: eric.nelson@boundarydevices.com (Eric Nelson)
-Date: Tue, 19 May 2015 09:51:23 -0700
-Subject: [PATCH 2/2] ARM: dts: sabrelite: use simple-panel instead of
- display-timings for LVDS0
-In-Reply-To: <1432051452.15181.48.camel@pengutronix.de>
-References: <20150518075844.7e1b5916@ipc1.ka-ro>	
- <1432050616-11465-1-git-send-email-eric.nelson@boundarydevices.com>	
- <1432050616-11465-3-git-send-email-eric.nelson@boundarydevices.com>
- <1432051452.15181.48.camel@pengutronix.de>
-Message-ID: <555B6A0B.4010205@boundarydevices.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 19 May 2015 17:52:03 +0100
+Subject: [PATCH v5] arm64: perf: Fix callchain parse error with kernel
+ tracepoint events
+In-Reply-To: <1431256060-161483-1-git-send-email-houpengyang@huawei.com>
+References: <20150508153758.GG25587@arm.com>
+ <1431256060-161483-1-git-send-email-houpengyang@huawei.com>
+Message-ID: <20150519165202.GA21251@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/19/2015 09:04 AM, Philipp Zabel wrote:
-> Hi Eric,
+On Sun, May 10, 2015 at 11:07:40AM +0000, Hou Pengyang wrote:
+> For ARM64, when tracing with tracepoint events, the IP and pstate are set
+> to 0, preventing the perf code parsing the callchain and resolving the
+> symbols correctly.
 > 
-> Am Dienstag, den 19.05.2015, 08:50 -0700 schrieb Eric Nelson:
->> Also add label for backlight_lvds and connect it to the LVDS display.
->>
->> Signed-off-by: Eric Nelson <eric.nelson@boundarydevices.com>
->> ---
-> [...]
->> @@ -129,6 +129,17 @@
->>  		power-supply = <&reg_3p3v>;
->>  		status = "okay";
->>  	};
->> +
->> +	panel {
->> +		compatible = "hannstar,hsd100pxn1";
->> +		backlight = <&backlight_lvds>;
->> +
->> +		port {
->> +			panel_in: endpoint {
->> +				remote-endpoint = <&lvds0_out>;
->> +			};
->> +		};
->> +	};
->>  };
->>  
->>  &audmux {
->> @@ -374,18 +385,11 @@
->>  		fsl,data-width = <18>;
+>  ./perf record -e sched:sched_switch -g --call-graph dwarf ls
+>     [ perf record: Captured and wrote 0.146 MB perf.data ]
+>  ./perf report -f
+>     Samples: 194  of event 'sched:sched_switch', Event count (approx.): 194
+>     Children      Self    Command  Shared Object     Symbol
+>     100.00%       100.00%  ls       [unknown]         [.] 0000000000000000
 > 
-> The fsl,data-width property shouldn't be needed anymore if you
-> set .bus_format = MEDIA_BUS_FMT_RGB666_1X7X3_SPWG for the hsd100pxn1
-> panel in panel-simple.c.
+> The fix is to implement perf_arch_fetch_caller_regs for ARM64, which fills
+> several necessary registers used for callchain unwinding, including pc,sp,
+> fp and spsr .
 > 
+> With this patch, callchain can be parsed correctly as follows:
+> 
+>      ......
+> +    2.63%     0.00%  ls       [kernel.kallsyms]  [k] vfs_symlink
+> +    2.63%     0.00%  ls       [kernel.kallsyms]  [k] follow_down
+> +    2.63%     0.00%  ls       [kernel.kallsyms]  [k] pfkey_get
+> +    2.63%     0.00%  ls       [kernel.kallsyms]  [k] do_execveat_common.isra.33
+> -    2.63%     0.00%  ls       [kernel.kallsyms]  [k] pfkey_send_policy_notify
+>      pfkey_send_policy_notify
+>      pfkey_get
+>      v9fs_vfs_rename
+>      page_follow_link_light
+>      link_path_walk
+>      el0_svc_naked
+>     .......
+> 
+> Signed-off-by: Hou Pengyang <houpengyang@huawei.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
 
-Thanks again Philipp.
+Queued for 4.2. Thanks.
 
-That's a much better place to put it, since this is a panel feature,
-not a feature of the LVDS channel.
+-- 
+Catalin
