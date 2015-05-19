@@ -1,46 +1,104 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 19 May 2015 12:04:33 +0200
-Subject: at91sam9: watchdog: period
-In-Reply-To: <555B07D0.4030000@aksignal.cz>
-References: <55559D55.6020703@aksignal.cz> <20150515172516.005e3a21@bbrezillon>
- <5559865F.9010502@aksignal.cz> <20150518092750.449d6c8c@bbrezillon>
- <5559A029.9060007@aksignal.cz> <555AA8F1.80100@atmel.com>
- <20150519091442.675b1a98@bbrezillon> <555AFBFD.3010506@aksignal.cz>
- <20150519111402.747e8eb2@bbrezillon> <555B07D0.4030000@aksignal.cz>
-Message-ID: <20150519120433.763a416e@bbrezillon>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 19 May 2015 12:13:51 +0200
+Subject: [PATCH v3] serial: 8250_uniphier: add UniPhier serial driver
+In-Reply-To: <CAK7LNARrjkCcMsVJwe5hdB71QsEQAf51sNf4xYVMkNazdbdxKA@mail.gmail.com>
+References: <1431997900-18390-1-git-send-email-yamada.masahiro@socionext.com>
+ <CABuKBeJwOp3Km=Vw+xn8cRtH8DC-TNB_m7s8WSdPxzKHdzrdcw@mail.gmail.com>
+ <CAK7LNARrjkCcMsVJwe5hdB71QsEQAf51sNf4xYVMkNazdbdxKA@mail.gmail.com>
+Message-ID: <CABuKBeLNdeHCOY1c6Szn-WfN2GUBz7OUe2kPNifwe1XFEj1yRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 May 2015 11:52:16 +0200
-Ji?? Prchal <jiri.prchal@aksignal.cz> wrote:
+2015-05-19 10:54 GMT+02:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> Hi Matthias,
+>
+> 2015-05-19 17:22 GMT+09:00 Matthias Brugger <matthias.bgg@gmail.com>:
+>> 2015-05-19 3:11 GMT+02:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+>>> Add the driver for on-chip UART used on UniPhier SoCs.
+>>>
+>>> This hardware is similar to 8250 with a slightly different register
+>>> mapping, so it should go into drivers/tty/serial/8250 directory.
+>>
+>> The patch is for a driver in this folder, so no need to but it in the
+>> commit message.
+>> Instead just write a short description about the difference to a
+>> standard 8250 device.
+>>
+>>>
+>>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>>> ---
+>>>
+>>> Changes in v3:
+>>>   - Just add *_SHIFT macro for the special case
+>>>
+>>> Changes in v2:
+>>>   - Drop unnecessary #include <linux/init.h>
+>>>   - Sort includes in alphabetical order
+>>>   - Use devm_clk_get() rather than of_clk_get()
+>>>   - Delete unneeded clk_put() from uniphier_uart_remove callback
+>>>   - Delete unneeded IS_ERR_OR_NULL check from uniphier_uart_remove callback
+>>>   - Use UNIPHIER_UART_*_SHIFT instead of hard-coded shift values
+>>>   - Change the first argument type of uniphier_of_serial_setup()
+>>>     from (struct platform_device *) to (struct device *) for code-cleanup.
+>>>
+>>>  drivers/tty/serial/8250/8250_uniphier.c | 237 ++++++++++++++++++++++++++++++++
+>>>  drivers/tty/serial/8250/Kconfig         |   7 +
+>>>  drivers/tty/serial/8250/Makefile        |   1 +
+>>>  3 files changed, 245 insertions(+)
+>>>  create mode 100644 drivers/tty/serial/8250/8250_uniphier.c
+>>>
+>>> diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
+>>> new file mode 100644
+>>> index 0000000..50349bf
+>>> --- /dev/null
+>>> +++ b/drivers/tty/serial/8250/8250_uniphier.c
+>>> @@ -0,0 +1,237 @@
+>>> +/*
+>>> + * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify
+>>> + * it under the terms of the GNU General Public License as published by
+>>> + * the Free Software Foundation; either version 2 of the License, or
+>>> + * (at your option) any later version.
+>>> + *
+>>> + * This program is distributed in the hope that it will be useful,
+>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>> + * GNU General Public License for more details.
+>>> + */
+>>> +
+>>> +#include <linux/clk.h>
+>>> +#include <linux/io.h>
+>>> +#include <linux/module.h>
+>>> +#include <linux/of.h>
+>>> +#include <linux/platform_device.h>
+>>> +#include <linux/serial_8250.h>
+>>> +#include <linux/serial_core.h>
+>>> +#include <linux/serial_reg.h>
+>>> +#include "8250.h"
+>>> +
+>>> +/* Most (but not all) of UniPhier UART devices have 64-depth FIFO. */
+>>> +#define UNIPHIER_UART_DEFAULT_FIFO_SIZE        64
+>>> +
+>>> +#define UNIPHIER_UART_CHAR_FCR 3       /* Character / FIFO Control Register */
+>>> +#define UNIPHIER_UART_LCR_MCR  4       /* Line/Modem Control Register */
+>>> +#define     UNIPHIER_UART_LCR_SHIFT    8
+>>> +#define UNIPHIER_UART_DLR      9       /* Divisor Latch Register */
+>>
+>> Nit pick: Please fix identation. After "define" just put one blank.
+>> I personally prefer that the define values are aligned by tabs, but
+>> that's up tu you.
+>>
+>
+> I intentionally use deeper indentation for *_SHIFT
+> because I want to clearly show  UNIPHIER_UART_LCR_SHIFT
+> belongs to UNIPHIER_UART_LCR_MCR register.
+>
+> I also want to describe them within 80 columns including comments,
+> so I cannot insert extra TABs to align the values.
 
-> 
-> 
-> On 19.5.2015 11:14, Boris Brezillon wrote:
-> >
-> > There's a difference between your heartbeat (the frequency you
-> > refresh/reset your watchdog) and the watchdog expiration time (here set
-> > to 16 secs).
-> > We usually set the heartbeat to 1/2 or 1/4 the expiration time, so that
-> > we're (almost) sure we can reset the watchdog before its expiration.
-> >
-> >
-> I'm confused. Why need kernel to know the time in witch userspace process will reset watchdog?
+Ok, than from my side that's fine as it is.
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
 
-This time is not exposed to userspace, it's the internal heartbeat used
-by the driver to refresh the watchdog.
-
-> And how to change watchdog expiration time?
-
-With the atmel,max-heartbeat-sec property.
-
-Anyway, that does not explain why your system takes 61 secs to trigger
-a reset (instead of 16 secs).
-Can you try to revert this commit [1] ?
-
-
-[1]https://git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git/commit/drivers/watchdog/at91sam9_wdt.c?id=d677772e1358924bf487cd833bdc4d50f3f6f64d
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+motzblog.wordpress.com
