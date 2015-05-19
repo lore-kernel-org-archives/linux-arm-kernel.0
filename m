@@ -1,34 +1,63 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 19 May 2015 22:13:46 +0800
-Subject: [PATCH] ARM: dts: fix imx27 dtb build rule
-Message-ID: <1432044826-6629-1-git-send-email-shawnguo@kernel.org>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Tue, 19 May 2015 15:16:01 +0100
+Subject: [RFC 10/23] xen/biomerge: WORKAROUND always says the biovec are
+ not mergeable
+In-Reply-To: <555616D3.7060603@oracle.com>
+References: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
+ <1431622863-28575-11-git-send-email-julien.grall@citrix.com>
+ <555616D3.7060603@oracle.com>
+Message-ID: <555B45A1.4070604@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shawn Guo <shawn.guo@linaro.org>
+Hi Boris,
 
-The i.MX27 dtb build should be controlled by CONFIG_SOC_IMX27 rather
-than CONFIG_SOC_IMX31.
+On 15/05/15 16:54, Boris Ostrovsky wrote:
+> On 05/14/2015 01:00 PM, Julien Grall wrote:
+>> When Linux is using 64K page granularity, every page will be slipt in
+>> multiple non-contiguous 4K MFN.
+>>
+>> I'm not sure how to handle efficiently the check to know whether we can
+>> merge 2 biovec with a such case. So for now, always says that biovec are
+>> not mergeable.
+>>
+>> Signed-off-by: Julien Grall <julien.grall@citrix.com>
+>> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+>> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+>> Cc: David Vrabel <david.vrabel@citrix.com>
+>> ---
+>>   drivers/xen/biomerge.c | 3 +++
+>>   1 file changed, 3 insertions(+)
+>>
+>> diff --git a/drivers/xen/biomerge.c b/drivers/xen/biomerge.c
+>> index 0edb91c..20387c2 100644
+>> --- a/drivers/xen/biomerge.c
+>> +++ b/drivers/xen/biomerge.c
+>> @@ -9,6 +9,9 @@ bool xen_biovec_phys_mergeable(const struct bio_vec
+>> *vec1,
+>>       unsigned long mfn1 = pfn_to_mfn(page_to_pfn(vec1->bv_page));
+>>       unsigned long mfn2 = pfn_to_mfn(page_to_pfn(vec2->bv_page));
+>>   +    /* TODO: Implement it correctly */
+>> +    return 0;
+>> +
+>>       return __BIOVEC_PHYS_MERGEABLE(vec1, vec2) &&
+>>           ((mfn1 == mfn2) || ((mfn1+1) == mfn2));
+>>   }
+> 
+> 
+> I think this is a bit too blunt.  Perhaps check first whether page sizes
+> are different in the hypervisor and the guest?
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Fixes: cb612390e546 ("ARM: dts: Only build dtb if associated Arch and/or SoC is enabled")
-Cc: <stable@vger.kernel.org>
----
- arch/arm/boot/dts/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Sounds good.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 86217db2937a..992736b5229b 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -223,7 +223,7 @@ dtb-$(CONFIG_SOC_IMX25) += \
- 	imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dtb \
- 	imx25-karo-tx25.dtb \
- 	imx25-pdk.dtb
--dtb-$(CONFIG_SOC_IMX31) += \
-+dtb-$(CONFIG_SOC_IMX27) += \
- 	imx27-apf27.dtb \
- 	imx27-apf27dev.dtb \
- 	imx27-eukrea-mbimxsd27-baseboard.dtb \
+> 
+> (And I am not sure we need __BIOVEC_PHYS_MERGEABLE() test here as it is
+> already checked by BIOVEC_PHYS_MERGEABLE() which appears to be the only
+> user of xen_biovec_phys_mergeable())
+
+I can send a patch to drop __BIOVEC_PHYS_MERGEABLE.
+
+Regards,
+
 -- 
-1.9.1
+Julien Grall
