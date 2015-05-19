@@ -1,273 +1,186 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 19 May 2015 12:41:19 +0200
-Subject: [PATCH v4 3/7] mmc: mediatek: Add PM support for MMC driver
-In-Reply-To: <1432017411-2996-4-git-send-email-chaotian.jing@mediatek.com>
-References: <1432017411-2996-1-git-send-email-chaotian.jing@mediatek.com>
- <1432017411-2996-4-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <CAPDyKFrQtFL9tTa7uhxX5k5CwgBk6SQ+W+Fi3aM6BDB0VdM-JA@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 19 May 2015 12:49:36 +0200
+Subject: [PATCH v6 01/25] arm: dma-mapping: add support for creating
+ reserved mappings in iova space
+In-Reply-To: <554A1E9C.7060101@arm.com>
+References: <1430727380-10912-1-git-send-email-m.szyprowski@samsung.com>
+ <1430727380-10912-2-git-send-email-m.szyprowski@samsung.com>
+ <554A1E9C.7060101@arm.com>
+Message-ID: <555B1540.4040104@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 May 2015 at 08:36, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> Add PM support for Mediatek MMC driver
-> Save/restore registers when PM
->
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> ---
->  drivers/mmc/host/mtk-sd.c | 99 +++++++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 95 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-> index 26e9590..c0b2e2d 100644
-> --- a/drivers/mmc/host/mtk-sd.c
-> +++ b/drivers/mmc/host/mtk-sd.c
-> @@ -22,6 +22,7 @@
->  #include <linux/of_gpio.h>
->  #include <linux/pinctrl/consumer.h>
->  #include <linux/platform_device.h>
-> +#include <linux/pm_runtime.h>
->  #include <linux/regulator/consumer.h>
->  #include <linux/spinlock.h>
->
-> @@ -212,6 +213,7 @@
->  #define MSDC_ASYNC_FLAG (0x1 << 1)
->  #define MSDC_MMAP_FLAG (0x1 << 2)
->
-> +#define MTK_MMC_AUTOSUSPEND_DELAY      50
->  #define CMD_TIMEOUT         (HZ/10 * 5)        /* 100ms x5 */
->  #define DAT_TIMEOUT         (HZ    * 5)        /* 1000ms x5 */
->
-> @@ -254,6 +256,15 @@ struct msdc_dma {
->         dma_addr_t bd_addr;     /* the physical address of bd array */
->  };
->
-> +struct msdc_save_para {
-> +       u32 msdc_cfg;
-> +       u32 iocon;
-> +       u32 sdc_cfg;
-> +       u32 pad_tune;
-> +       u32 patch_bit0;
-> +       u32 patch_bit1;
-> +};
-> +
->  struct msdc_host {
->         struct device *dev;
->         struct mmc_host *mmc;   /* mmc structure */
-> @@ -287,6 +298,8 @@ struct msdc_host {
->         bool vqmmc_enabled;
->         bool sclk_enabled;      /* source clock enabled */
->         bool hclk_enabled;      /* Hclk enabled */
-> +       bool in_suspend;        /* used for apply restore regs */
+Hello,
 
-You shouldn't need to track this.
+On 2015-05-06 16:01, Robin Murphy wrote:
+> Hi Marek,
+>
+> On 04/05/15 09:15, Marek Szyprowski wrote:
+>> Some devices (like frame buffers) are enabled by bootloader and 
+>> configured
+>> to perform DMA operations automatically (like displaying boot logo or 
+>> splash
+>> screen). Such devices operate and perform DMA operation usually until 
+>> the
+>> proper driver for them is loaded and probed. However before that 
+>> happens,
+>> system usually loads IOMMU drivers and configures dma parameters for 
+>> each
+>> device. When such initial configuration is created and enabled, it 
+>> usually
+>> contains empty translation rules betweem IO address space and physical
+>> memory, because no buffers nor memory regions have been requested by the
+>> respective driver.
+>>
+>> This patch adds support for "iommu-reserved-mapping", which can be used
+>> to provide definitions for mappings that need to be created on system
+>> boot to let such devices (enabled by bootloader) to operate properly
+>> until respective driver is probed.
+>
+> This appears to only work if you assume the driver is going to tear 
+> down the existing domain entirely; what about drivers that don't 
+> manage IOMMUs explicitly, or if there are multiple active devices 
+> behind the same IOMMU which (in future) start out in the same default 
+> domain? If any device is happy to remain in the default domain then it 
+> would be nice to clear the reservations once they are no longer needed.
 
-> +       struct msdc_save_para save_para; /* used when gate HCLK */
->  };
->
->  static void sdr_set_bits(void __iomem *reg, u32 bs)
-> @@ -459,6 +472,30 @@ static void msdc_set_timeout(struct msdc_host *host, u32 ns, u32 clks)
->         sdr_set_field(host->base + SDC_CFG, SDC_CFG_DTOC, timeout);
->  }
->
-> +static void msdc_save_reg(struct msdc_host *host)
-> +{
-> +       host->save_para.msdc_cfg = readl(host->base + MSDC_CFG);
-> +       host->save_para.iocon = readl(host->base + MSDC_IOCON);
-> +       host->save_para.sdc_cfg = readl(host->base + SDC_CFG);
-> +       host->save_para.pad_tune = readl(host->base + MSDC_PAD_TUNE);
-> +       host->save_para.patch_bit0 = readl(host->base + MSDC_PATCH_BIT);
-> +       host->save_para.patch_bit1 = readl(host->base + MSDC_PATCH_BIT1);
-> +       host->in_suspend = true;
-> +}
-> +
-> +static void msdc_restore_reg(struct msdc_host *host)
-> +{
-> +       if (host->in_suspend == false)
-> +               return;
-> +       writel(host->save_para.msdc_cfg, host->base + MSDC_CFG);
-> +       writel(host->save_para.iocon, host->base + MSDC_IOCON);
-> +       writel(host->save_para.sdc_cfg, host->base + SDC_CFG);
-> +       writel(host->save_para.pad_tune, host->base + MSDC_PAD_TUNE);
-> +       writel(host->save_para.patch_bit0, host->base + MSDC_PATCH_BIT);
-> +       writel(host->save_para.patch_bit1, host->base + MSDC_PATCH_BIT1);
-> +       host->in_suspend = false;
-> +}
-> +
->  static void msdc_disable_src_clk(struct msdc_host *host)
->  {
->         if (host->sclk_enabled) {
-> @@ -479,6 +516,10 @@ static void msdc_enable_src_clk(struct msdc_host *host)
->
->  static void msdc_gate_clock(struct msdc_host *host)
->  {
-> +       /* Save register first, only when clk is on */
-> +       if (host->sclk_enabled)
-> +               msdc_save_reg(host);
+Right, this need to be somehow worked out, but frankly right now I don't 
+have
+good idea which code should do it. The only idea that comes to my mind 
+is using
+a BUS_NOTIFY_BOUND_DRIVER notifier, but I don't like this approach.
 
-Please move msdc_save_reg() outside the msdc_gate_clock() function,
-since I think these things should be somewhat decoupled for each
-other.
+> Could we not address the issue in a more robust way, like fleshing out 
+> an implementation of the nascent IOMMU_DOMAIN_IDENTITY type, then just 
+> flagging such devices to stipulate that their boot-time default domain 
+> must be an identity-mapped one?
 
-> +
->         msdc_disable_src_clk(host);
->         if (!IS_ERR(host->h_clk) && host->hclk_enabled) {
->                 clk_disable_unprepare(host->h_clk);
-> @@ -493,6 +534,8 @@ static void msdc_ungate_clock(struct msdc_host *host)
->                 host->hclk_enabled = true;
->         }
->         msdc_enable_src_clk(host);
-> +       /* Then restore register */
-> +       msdc_restore_reg(host);
-
-As above, please do msdc_restore_reg() outside of msdc_ungate_clock().
-
->  }
->
->  static void msdc_set_mclk(struct msdc_host *host, int ddr, u32 hz)
-> @@ -710,6 +753,9 @@ static void msdc_request_done(struct msdc_host *host, struct mmc_request *mrq)
->         if (mrq->data)
->                 msdc_unprepare_data(host, mrq);
->         mmc_request_done(host->mmc, mrq);
-> +
-> +       pm_runtime_mark_last_busy(host->dev);
-> +       pm_runtime_put_autosuspend(host->dev);
->  }
->
->  /* returns true if command is fully handled; returns false otherwise */
-> @@ -866,6 +912,8 @@ static void msdc_ops_request(struct mmc_host *mmc, struct mmc_request *mrq)
->                 WARN_ON(host->mrq);
->         spin_unlock_irqrestore(&host->lock, flags);
->
-> +       pm_runtime_get_sync(host->dev);
-> +
->         if (mrq->data)
->                 msdc_prepare_data(host, mrq);
->
-> @@ -1130,7 +1178,8 @@ static void msdc_init_hw(struct msdc_host *host)
->         sdr_set_field(host->base + MSDC_PATCH_BIT, MSDC_CKGEN_MSDC_DLY_SEL, 1);
->         writel(0xffff0089, host->base + MSDC_PATCH_BIT1);
->         /* Configure to enable SDIO mode.
-> -          it's must otherwise sdio cmd5 failed */
-> +        * it's must otherwise sdio cmd5 failed
-> +        */
-
-White space.
-
->         sdr_set_bits(host->base + SDC_CFG, SDC_CFG_SDIO);
->
->         /* disable detect SDIO device interrupt function */
-> @@ -1185,6 +1234,8 @@ static void msdc_ops_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->         int ret;
->         u32 ddr = 0;
->
-> +       pm_runtime_get_sync(host->dev);
-> +
->         if (ios->timing == MMC_TIMING_UHS_DDR50 ||
->                         ios->timing == MMC_TIMING_MMC_DDR52)
->                 ddr = 1;
-> @@ -1200,7 +1251,7 @@ static void msdc_ops_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->                                         ios->vdd);
->                         if (ret) {
->                                 dev_err(host->dev, "Failed to set vmmc power!\n");
-> -                               return;
-> +                               goto end;
->                         }
->                 }
->                 break;
-> @@ -1234,6 +1285,10 @@ static void msdc_ops_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->
->         if (host->mclk != ios->clock || host->ddr != ddr)
->                 msdc_set_mclk(host, ddr, ios->clock);
-> +
-> +end:
-> +       pm_runtime_mark_last_busy(host->dev);
-> +       pm_runtime_put_autosuspend(host->dev);
->  }
->
->  static struct mmc_host_ops mt_msdc_ops = {
-> @@ -1355,12 +1410,18 @@ static int msdc_drv_probe(struct platform_device *pdev)
->         if (ret)
->                 goto release;
->
-> +       pm_runtime_set_active(host->dev);
-> +       pm_runtime_set_autosuspend_delay(host->dev, MTK_MMC_AUTOSUSPEND_DELAY);
-> +       pm_runtime_use_autosuspend(host->dev);
-> +       pm_runtime_enable(host->dev);
->         ret = mmc_add_host(mmc);
-> +
->         if (ret)
-> -               goto release;
-> +               goto end;
->
->         return 0;
-> -
-> +end:
-> +       pm_runtime_disable(host->dev);
->  release:
->         platform_set_drvdata(pdev, NULL);
->         msdc_deinit_hw(host);
-> @@ -1388,10 +1449,15 @@ static int msdc_drv_remove(struct platform_device *pdev)
->         mmc = platform_get_drvdata(pdev);
->         host = mmc_priv(mmc);
->
-> +       pm_runtime_get_sync(host->dev);
-> +
->         platform_set_drvdata(pdev, NULL);
->         mmc_remove_host(host->mmc);
->         msdc_deinit_hw(host);
-> +       msdc_gate_clock(host);
-
-As per comment on patch 2. This clock gating should be a part of that
-patch instead.
+I'm open for any solution that will cover this case. Maybe my idea of iommu
+reserved regions is a bit over-engineered? Maybe instead of defining 
+reserved
+ranges it will be enough to add something like 
+'iommu-on-boot-identity-mapping'
+property? This way one can later use it for IOMMU_DOMAIN_IDENTITY 
+approach or
+something else what will be agreed?
 
 >
-> +       pm_runtime_disable(host->dev);
-> +       pm_runtime_put_noidle(host->dev);
->         dma_free_coherent(&pdev->dev,
->                         sizeof(struct mt_gpdma_desc),
->                         host->dma.gpd, host->dma.gpd_addr);
-> @@ -1403,6 +1469,30 @@ static int msdc_drv_remove(struct platform_device *pdev)
->         return 0;
->  }
+>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> ---
+>>   Documentation/devicetree/bindings/iommu/iommu.txt |  44 +++++++++
+>>   arch/arm/mm/dma-mapping.c                         | 112 
+>> ++++++++++++++++++++++
+>>   2 files changed, 156 insertions(+)
+>>
+> [...]
+>> @@ -2048,6 +2092,66 @@ void arm_iommu_detach_device(struct device *dev)
+>>   }
+>>   EXPORT_SYMBOL_GPL(arm_iommu_detach_device);
+>>
+>> +static int arm_iommu_add_reserved(struct device *dev,
+>> +                       struct dma_iommu_mapping *domain, phys_addr_t 
+>> phys,
+>> +                       dma_addr_t dma, size_t size)
+>> +{
+>> +       int ret;
+>> +
+>> +       ret = __reserve_iova(domain, dma, size);
+>> +       if (ret) {
+>> +               dev_err(dev, "failed to reserve mapping\n");
+>> +               return -EINVAL;
+>> +       }
+>> +
+>> +       ret = iommu_map(domain->domain, dma, phys, size, IOMMU_READ);
+>> +       if (ret != 0) {
+>> +               dev_err(dev, "create IOMMU mapping\n");
+>> +               return ret;
+>> +       }
+>> +
+>> +       dev_info(dev, "created reserved DMA mapping (%pa -> %pad, %zu 
+>> bytes)\n",
+>> +                &phys, &dma, size);
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +static int arm_iommu_init_reserved(struct device *dev,
+>> +                                  struct dma_iommu_mapping *domain)
+>> +{
+>> +       const char *name = "iommu-reserved-mapping";
+>> +       const __be32 *prop = NULL;
+>> +       int len, naddr, nsize;
+>> +       struct device_node *node = dev->of_node;
+>> +       phys_addr_t phys;
+>> +       dma_addr_t dma;
+>> +       size_t size;
+>> +
+>> +       if (!node)
+>> +               return 0;
+>> +
+>> +       naddr = of_n_addr_cells(node);
+>> +       nsize = of_n_size_cells(node);
+>> +
+>> +       prop = of_get_property(node, name, &len);
+>> +       if (!prop)
+>> +               return 0;
+>> +
+>> +       len /= sizeof(u32);
+>> +
+>> +       if (len < 2 * naddr + nsize) {
+>> +               dev_err(dev, "invalid length (%d cells) of %s 
+>> property\n",
+>> +                       len, name);
+>> +               return -EINVAL;
+>> +       }
+>> +
+>> +       phys = of_read_number(prop, naddr);
+>> +       dma = of_read_number(prop + naddr, naddr);
+>> +       size = of_read_number(prop + 2*naddr, nsize);
+>> +
+>> +       return arm_iommu_add_reserved(dev, domain, phys, dma, size);
+> > +}
 >
-> +#ifdef CONFIG_PM
-> +static int msdc_runtime_suspend(struct device *dev)
-> +{
-> +       struct mmc_host *mmc = dev_get_drvdata(dev);
-> +       struct msdc_host *host = mmc_priv(mmc);
-> +
-> +       msdc_gate_clock(host);
-> +       return 0;
-> +}
-> +
-> +static int msdc_runtime_resume(struct device *dev)
-> +{
-> +       struct mmc_host *mmc = dev_get_drvdata(dev);
-> +       struct msdc_host *host = mmc_priv(mmc);
-> +
-> +       msdc_ungate_clock(host);
-> +       return 0;
-> +}
-> +#endif
-> +
-> +static const struct dev_pm_ops msdc_dev_pm_ops = {
-> +       SET_RUNTIME_PM_OPS(msdc_runtime_suspend, msdc_runtime_resume, NULL)
-> +};
-> +
->  static const struct of_device_id msdc_of_ids[] = {
->         {   .compatible = "mediatek,mt8135-mmc", },
->         {}
-> @@ -1414,6 +1504,7 @@ static struct platform_driver mt_msdc_driver = {
->         .driver = {
->                 .name = "mtk-msdc",
->                 .of_match_table = msdc_of_ids,
-> +               .pm = &msdc_dev_pm_ops,
->         },
->  };
->
-> --
-> 1.8.1.1.dirty
+> I may be missing something, but I don't see how this can handle 
+> multiple ranges for the same device as the binding says.
 >
 
-Kind regards
-Uffe
+Right, loop is missing in the above calls.
+
+>>   static struct dma_map_ops *arm_get_iommu_dma_map_ops(bool coherent)
+>>   {
+>>          return coherent ? &iommu_coherent_ops : &iommu_ops;
+>> @@ -2068,6 +2172,14 @@ static bool arm_setup_iommu_dma_ops(struct 
+>> device *dev, u64 dma_base, u64 size,
+>>                  return false;
+>>          }
+>>
+>> +       if (arm_iommu_init_reserved(dev, mapping) != 0) {
+>> +               pr_warn("Failed to initialize reserved mapping for 
+>> device %s\n",
+>> +                       dev_name(dev));
+>> +               __arm_iommu_detach_device(dev);
+>> +               arm_iommu_release_mapping(mapping);
+>> +               return false;
+>> +       }
+>> +
+>>          if (__arm_iommu_attach_device(dev, mapping)) {
+>>                  pr_warn("Failed to attached device %s to 
+>> IOMMU_mapping\n",
+>>                                  dev_name(dev));
+>
+> I'm hoping Joerg is still working on his default domain series, 
+> because the domain creation in arch_setup_dma_ops turns out to be 
+> horrible on a number of levels (like everything happening in the wrong 
+> order for platform devices). If that doesn't negate this issue 
+> entirely, it's going to significantly break this way of hooking up the 
+> solution (depending on what the drivers do) - worth some 
+> consideration, at least.
+
+I would really like to have something working soon, it's been a lot of 
+discussion but still
+very little of code that actually implements anything...
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
