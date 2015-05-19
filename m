@@ -1,40 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 May 2015 15:33:28 +0200
-Subject: [PATCH] [RESEND] SCSI: ips: remove pointless #warning
-Message-ID: <3121960.dnOqT9LCth@wuerfel>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 19 May 2015 15:34:00 +0200
+Subject: [PATCH] ARM: shmobile: only select sound drivers that build
+In-Reply-To: <5616798.tmraH8vpuI@wuerfel>
+References: <5616798.tmraH8vpuI@wuerfel>
+Message-ID: <CAMuHMdWDS73aA8ottgEPYgE=FHFeOwWdEcRGEyv8LbOUU1eUgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ips driver contains
+Hi Arnd,
 
- #warning "This driver has only been tested on the x86/ia64/x86_64 platforms"
+On Tue, May 19, 2015 at 2:49 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> A couple of codec drivers are selected by shmobile platform code,
+> but depend on I2C, which results in a build error:
 
-which gets printed by the compiler every time this driver gets
-build for something other than those three architectures. The same
-is true for most other drivers, but none of them prints a warning like
-this.
+> --- a/arch/arm/mach-shmobile/Kconfig
+> +++ b/arch/arm/mach-shmobile/Kconfig
 
-Let's remove the warning now to reduce the amount of clutter.
+> @@ -158,8 +158,8 @@ config MACH_BOCKW
+>         depends on ARCH_R8A7778
+>         select ARCH_REQUIRE_GPIOLIB
+>         select REGULATOR_FIXED_VOLTAGE if REGULATOR
+> -       select SND_SOC_AK4554 if SND_SIMPLE_CARD
+> -       select SND_SOC_AK4642 if SND_SIMPLE_CARD
+> +       select SND_SOC_AK4554 if SND_SIMPLE_CARD && I2C
 
-FWIW, I've reviewed the driver and found a few oddities, but nothing
-that needs to be fixed or that would be architecture specific.
+AK4554 is not an i2c device, but a plain platform device.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-Submitted last in January, but got no reply
+> +       select SND_SOC_AK4642 if SND_SIMPLE_CARD && I2C
+>         select USE_OF
 
-diff --git a/drivers/scsi/ips.c b/drivers/scsi/ips.c
-index 7542f11d3fcd..d86673a4cdb4 100644
---- a/drivers/scsi/ips.c
-+++ b/drivers/scsi/ips.c
-@@ -206,10 +206,6 @@ module_param(ips, charp, 0);
- #define IPS_VERSION_HIGH        IPS_VER_MAJOR_STRING "." IPS_VER_MINOR_STRING
- #define IPS_VERSION_LOW         "." IPS_VER_BUILD_STRING " "
- 
--#if !defined(__i386__) && !defined(__ia64__) && !defined(__x86_64__)
--#warning "This driver has only been tested on the x86/ia64/x86_64 platforms"
--#endif
--
- #define IPS_DMA_DIR(scb) ((!scb->scsi_cmd || ips_is_passthru(scb->scsi_cmd) || \
-                          DMA_NONE == scb->scsi_cmd->sc_data_direction) ? \
-                          PCI_DMA_BIDIRECTIONAL : \
+The others are OK, so if you have remove AK4554, you can add my
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
