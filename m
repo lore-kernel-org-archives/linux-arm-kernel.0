@@ -1,16 +1,16 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 19 May 2015 10:55:14 -0600
-Subject: [PATCH 09/16] coresight: etm: retrieve and handle atclk
+Date: Tue, 19 May 2015 10:55:18 -0600
+Subject: [PATCH 13/16] coresight: replicator: retrieve and handle atclk
 In-Reply-To: <1432054521-24807-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1432054521-24807-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1432054521-24807-10-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1432054521-24807-14-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
 As can be seen from the datasheet of the CoreSight
-Components, DDI0401C A.1.1 the ETM has a clock signal
+Components, DDI0314 table A-4 the funnel has a clock signal
 apart from the AHB interconnect ("amba_pclk", that we're
 already handling) called ATCLK, ARM Trace Clock, that SoC
 implementers may provide from an entirely different clock
@@ -22,88 +22,145 @@ still makes it possible for SoCs that have both clock signals
 unprepare both clocks.
 
 The ATCLK is enabled and disabled using the runtime PM
-callbacks.
+callbacks. As the replicator is a platform device, the
+code is a bit different from the other CoreSight components
+and the bus core does not activate runtime PM by default,
+so we need a few extra calls.
 
 Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm.h   |  2 ++
- drivers/hwtracing/coresight/coresight-etm3x.c | 36 ++++++++++++++++++++++++++-
- 2 files changed, 37 insertions(+), 1 deletion(-)
+ drivers/hwtracing/coresight/coresight-replicator.c | 71 ++++++++++++++++++++--
+ 1 file changed, 67 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm.h b/drivers/hwtracing/coresight/coresight-etm.h
-index d1421e1f8b8a..098ffbec0a44 100644
---- a/drivers/hwtracing/coresight/coresight-etm.h
-+++ b/drivers/hwtracing/coresight/coresight-etm.h
-@@ -140,6 +140,7 @@
-  * struct etm_drvdata - specifics associated to an ETM component
-  * @base:	memory mapped base address for this component.
-  * @dev:	the device entity associated to this component.
-+ * @atclk:	optional clock for the core parts of the ETM.
-  * @csdev:	component vitals needed by the framework.
-  * @spinlock:	only one at a time pls.
-  * @cpu:	the cpu this component is affined to.
-@@ -191,6 +192,7 @@
- struct etm_drvdata {
- 	void __iomem			*base;
- 	struct device			*dev;
-+	struct clk			*atclk;
- 	struct coresight_device		*csdev;
- 	spinlock_t			spinlock;
- 	int				cpu;
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index 7f0df778bd85..018a00fda611 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -30,6 +30,7 @@
- #include <linux/amba/bus.h>
- #include <linux/seq_file.h>
- #include <linux/uaccess.h>
-+#include <linux/clk.h>
- #include <asm/sections.h>
+diff --git a/drivers/hwtracing/coresight/coresight-replicator.c b/drivers/hwtracing/coresight/coresight-replicator.c
+index 75b9abd804e6..7974b7c3da6b 100644
+--- a/drivers/hwtracing/coresight/coresight-replicator.c
++++ b/drivers/hwtracing/coresight/coresight-replicator.c
+@@ -18,6 +18,7 @@
+ #include <linux/io.h>
+ #include <linux/err.h>
+ #include <linux/slab.h>
++#include <linux/pm_runtime.h>
+ #include <linux/clk.h>
+ #include <linux/of.h>
+ #include <linux/coresight.h>
+@@ -27,10 +28,12 @@
+ /**
+  * struct replicator_drvdata - specifics associated to a replicator component
+  * @dev:	the device entity associated with this component
++ * @atclk:	optional clock for the core parts of the replicator.
+  * @csdev:	component vitals needed by the framework
+  */
+ struct replicator_drvdata {
+ 	struct device		*dev;
++	struct clk		*atclk;
+ 	struct coresight_device	*csdev;
+ };
  
- #include "coresight-etm.h"
-@@ -1315,7 +1316,6 @@ static ssize_t seq_curr_state_show(struct device *dev,
- 	}
+@@ -39,6 +42,7 @@ static int replicator_enable(struct coresight_device *csdev, int inport,
+ {
+ 	struct replicator_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
  
- 	pm_runtime_get_sync(drvdata->dev);
--
- 	spin_lock_irqsave(&drvdata->spinlock, flags);
++	pm_runtime_get_sync(drvdata->dev);
+ 	dev_info(drvdata->dev, "REPLICATOR enabled\n");
+ 	return 0;
+ }
+@@ -48,6 +52,7 @@ static void replicator_disable(struct coresight_device *csdev, int inport,
+ {
+ 	struct replicator_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
  
- 	CS_UNLOCK(drvdata->base);
-@@ -1796,6 +1796,13 @@ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
++	pm_runtime_put(drvdata->dev);
+ 	dev_info(drvdata->dev, "REPLICATOR disabled\n");
+ }
  
- 	spin_lock_init(&drvdata->spinlock);
+@@ -62,6 +67,7 @@ static const struct coresight_ops replicator_cs_ops = {
  
-+	drvdata->atclk = devm_clk_get(&adev->dev, "atclk"); /* optional */
+ static int replicator_probe(struct platform_device *pdev)
+ {
++	int ret;
+ 	struct device *dev = &pdev->dev;
+ 	struct coresight_platform_data *pdata = NULL;
+ 	struct replicator_drvdata *drvdata;
+@@ -80,11 +86,22 @@ static int replicator_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 
+ 	drvdata->dev = &pdev->dev;
++	drvdata->atclk = devm_clk_get(&pdev->dev, "atclk"); /* optional */
 +	if (!IS_ERR(drvdata->atclk)) {
 +		ret = clk_prepare_enable(drvdata->atclk);
 +		if (ret)
 +			return ret;
 +	}
-+
- 	drvdata->cpu = pdata ? pdata->cpu : 0;
++	pm_runtime_get_noresume(&pdev->dev);
++	pm_runtime_set_active(&pdev->dev);
++	pm_runtime_enable(&pdev->dev);
+ 	platform_set_drvdata(pdev, drvdata);
  
- 	get_online_cpus();
-@@ -1858,6 +1865,32 @@ static int etm_remove(struct amba_device *adev)
+ 	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
+-	if (!desc)
+-		return -ENOMEM;
++	if (!desc) {
++		ret = -ENOMEM;
++		goto out_disable_pm;
++	}
+ 
+ 	desc->type = CORESIGHT_DEV_TYPE_LINK;
+ 	desc->subtype.link_subtype = CORESIGHT_DEV_SUBTYPE_LINK_SPLIT;
+@@ -92,11 +109,23 @@ static int replicator_probe(struct platform_device *pdev)
+ 	desc->pdata = pdev->dev.platform_data;
+ 	desc->dev = &pdev->dev;
+ 	drvdata->csdev = coresight_register(desc);
+-	if (IS_ERR(drvdata->csdev))
+-		return PTR_ERR(drvdata->csdev);
++	if (IS_ERR(drvdata->csdev)) {
++		ret = PTR_ERR(drvdata->csdev);
++		goto out_disable_pm;
++	}
++
++	pm_runtime_put(&pdev->dev);
+ 
+ 	dev_info(dev, "REPLICATOR initialized\n");
  	return 0;
++
++out_disable_pm:
++	if (!IS_ERR(drvdata->atclk))
++		clk_disable_unprepare(drvdata->atclk);
++	pm_runtime_put_noidle(&pdev->dev);
++	pm_runtime_disable(&pdev->dev);
++
++	return ret;
  }
  
-+#ifdef CONFIG_PM
-+static int etm_runtime_suspend(struct device *dev)
-+{
-+	struct etm_drvdata *drvdata = dev_get_drvdata(dev);
-+
-+	if (drvdata && !IS_ERR(drvdata->atclk))
+ static int replicator_remove(struct platform_device *pdev)
+@@ -104,9 +133,42 @@ static int replicator_remove(struct platform_device *pdev)
+ 	struct replicator_drvdata *drvdata = platform_get_drvdata(pdev);
+ 
+ 	coresight_unregister(drvdata->csdev);
++	pm_runtime_get_sync(&pdev->dev);
++	if (!IS_ERR(drvdata->atclk))
 +		clk_disable_unprepare(drvdata->atclk);
++	pm_runtime_put_noidle(&pdev->dev);
++	pm_runtime_disable(&pdev->dev);
 +
 +	return 0;
 +}
 +
-+static int etm_runtime_resume(struct device *dev)
++#ifdef CONFIG_PM
++static int replicator_runtime_suspend(struct device *dev)
 +{
-+	struct etm_drvdata *drvdata = dev_get_drvdata(dev);
++	struct replicator_drvdata *drvdata = dev_get_drvdata(dev);
++
++	if (drvdata && !IS_ERR(drvdata->atclk))
++		clk_disable_unprepare(drvdata->atclk);
++
+ 	return 0;
+ }
+ 
++static int replicator_runtime_resume(struct device *dev)
++{
++	struct replicator_drvdata *drvdata = dev_get_drvdata(dev);
 +
 +	if (drvdata && !IS_ERR(drvdata->atclk))
 +		clk_prepare_enable(drvdata->atclk);
@@ -112,20 +169,21 @@ index 7f0df778bd85..018a00fda611 100644
 +}
 +#endif
 +
-+static const struct dev_pm_ops etm_dev_pm_ops = {
-+	SET_RUNTIME_PM_OPS(etm_runtime_suspend, etm_runtime_resume, NULL)
++static const struct dev_pm_ops replicator_dev_pm_ops = {
++	SET_RUNTIME_PM_OPS(replicator_runtime_suspend,
++			   replicator_runtime_resume, NULL)
 +};
 +
- static struct amba_id etm_ids[] = {
- 	{	/* ETM 3.3 */
- 		.id	= 0x0003b921,
-@@ -1886,6 +1919,7 @@ static struct amba_driver etm_driver = {
- 	.drv = {
- 		.name	= "coresight-etm3x",
- 		.owner	= THIS_MODULE,
-+		.pm	= &etm_dev_pm_ops,
+ static const struct of_device_id replicator_match[] = {
+ 	{.compatible = "arm,coresight-replicator"},
+ 	{}
+@@ -118,6 +180,7 @@ static struct platform_driver replicator_driver = {
+ 	.driver         = {
+ 		.name   = "coresight-replicator",
+ 		.of_match_table = replicator_match,
++		.pm	= &replicator_dev_pm_ops,
  	},
- 	.probe		= etm_probe,
- 	.remove		= etm_remove,
+ };
+ 
 -- 
 1.9.1
