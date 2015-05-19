@@ -1,38 +1,42 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 19 May 2015 09:26:50 +0200
-Subject: [PATCH v4 1/7] ARM: lpc18xx: add basic support for NXP
- LPC18xx/43xx SoCs
-In-Reply-To: <1431381653-25356-2-git-send-email-manabian@gmail.com>
-References: <1431381653-25356-1-git-send-email-manabian@gmail.com>
- <1431381653-25356-2-git-send-email-manabian@gmail.com>
-Message-ID: <CAMuHMdVfh6-Y6BuRpxXRJexXK+U-Bp0P+W-2e4ioAZ=60C_TYQ@mail.gmail.com>
+From: jaegeuk@kernel.org (Jaegeuk Kim)
+Date: Tue, 19 May 2015 00:27:40 -0700
+Subject: [PATCH] crypto: allow to assign gfp_t for __crypto_alloc_tfm
+In-Reply-To: <20150519071521.GA28862@gondor.apana.org.au>
+References: <1432014416-39326-1-git-send-email-jaegeuk@kernel.org>
+ <20150519054945.GA28060@gondor.apana.org.au>
+ <20150519062430.GA39588@jaegeuk-mac02.hsd1.ca.comcast.net>
+ <20150519063211.GA28347@gondor.apana.org.au>
+ <20150519065812.GA40012@jaegeuk-mac02.hsd1.ca.comcast.net>
+ <20150519065929.GA28610@gondor.apana.org.au>
+ <20150519071317.GB40012@jaegeuk-mac02.hsd1.ca.comcast.net>
+ <20150519071521.GA28862@gondor.apana.org.au>
+Message-ID: <20150519072740.GA40281@jaegeuk-mac02.hsd1.ca.comcast.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 12, 2015 at 12:00 AM, Joachim Eastwood <manabian@gmail.com> wrote:
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -1359,6 +1359,7 @@ config DEBUG_UART_PHYS
->         default 0x20201000 if DEBUG_BCM2835
->         default 0x3e000000 if DEBUG_BCM_KONA_UART
->         default 0x4000e400 if DEBUG_LL_UART_EFM32
-> +       default 0x40081000 if ARCH_LPC18XX
+On Tue, May 19, 2015 at 03:15:21PM +0800, Herbert Xu wrote:
+> On Tue, May 19, 2015 at 12:13:17AM -0700, Jaegeuk Kim wrote:
+> >
+> > The key generation is done by ext4_generate_encryption_key in
+> > fs/ext4/crypto_key.c.
+> > And, ext4_file_mmap and ext4_file_open trigger it.
+> 
+> Well that's where you should be doing crypto_alloc_ablkcipher
+> and crypto_ablkcipher_setkey.
+> 
+> The whole point of a crypto tfm is to represent a key so any time
+> you get one you should create a crypto tfm.  Carrying around a raw
+> key is just wrong.
 
-This will be used in any multi-platform kernel with DEBUG_LL=y,  possible
-overriding a correct value, even if low-level LPC18XX debug support itself
-(what's the config option for that, I couldn't find it?) is disabled.
-Please make this dependent on an appropriate DEBUG_LPC18XX
-option. Thanks!
+So, IMHO, it can consume memory too much, since tfm should be allocated for
+every inodes and be alive until inode eviction.
+Apart from giving GFP_NOFS, do you mean that it is a wrong approach?
 
-I noticed this was already applied...
+Thanks,
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> 
+> Cheers,
+> -- 
+> Email: Herbert Xu <herbert@gondor.apana.org.au>
+> Home Page: http://gondor.apana.org.au/~herbert/
+> PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
