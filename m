@@ -1,63 +1,38 @@
-From: matthijsvanduin@gmail.com (Matthijs van Duin)
-Date: Tue, 19 May 2015 09:25:40 +0200
-Subject: [PATCH] ARM: dts: am335x-bone* enable pmic-shutdown-controller
-In-Reply-To: <20150518152108.GE10274@atomide.com>
-References: <1431525001-5747-1-git-send-email-robertcnelson@gmail.com>
- <20150513141658.GB6605@localhost> <20150513144846.GC6605@localhost>
- <CAALWOA-hkgrMi+OeNrmwaVpdEfNadFn0R-QbpXi9LU-4sbakJQ@mail.gmail.com>
- <20150518152108.GE10274@atomide.com>
-Message-ID: <CAALWOA-OwUuAbc7Wd_SV-14mVbOCVWvKwKgb3eOjVGEery28og@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 19 May 2015 09:26:50 +0200
+Subject: [PATCH v4 1/7] ARM: lpc18xx: add basic support for NXP
+ LPC18xx/43xx SoCs
+In-Reply-To: <1431381653-25356-2-git-send-email-manabian@gmail.com>
+References: <1431381653-25356-1-git-send-email-manabian@gmail.com>
+ <1431381653-25356-2-git-send-email-manabian@gmail.com>
+Message-ID: <CAMuHMdVfh6-Y6BuRpxXRJexXK+U-Bp0P+W-2e4ioAZ=60C_TYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 May 2015 at 17:21, Tony Lindgren <tony@atomide.com> wrote:
-> If some of these depend on the SoC revision and cannot be detected
-> based on the RTC driver revision register, that information should
-> be be passed to the RTC driver in platform data.
+On Tue, May 12, 2015 at 12:00 AM, Joachim Eastwood <manabian@gmail.com> wrote:
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -1359,6 +1359,7 @@ config DEBUG_UART_PHYS
+>         default 0x20201000 if DEBUG_BCM2835
+>         default 0x3e000000 if DEBUG_BCM_KONA_UART
+>         default 0x4000e400 if DEBUG_LL_UART_EFM32
+> +       default 0x40081000 if ARCH_LPC18XX
 
-The SoC revision is easy enough to check via the control module as
-usual, but is not really the biggest issue. Even on SoC rev 1.0
-RTC-only sleep still has some functionality (the RTC freezes if PMIC
-enters sleep-state, but that may still be preferred compared to
-complete loss of date and time), so I'm not even sure I'd bother with
-this check.
+This will be used in any multi-platform kernel with DEBUG_LL=y,  possible
+overriding a correct value, even if low-level LPC18XX debug support itself
+(what's the config option for that, I couldn't find it?) is disabled.
+Please make this dependent on an appropriate DEBUG_LPC18XX
+option. Thanks!
 
-The serious problems however depend on the PCB: Entering RTC-only
-sleep is only properly supported on some early prototype series
-(pre-A6) of the BeagleBone Black. Since rev A6A (which includes all
-production versions) it is not supported at all.
+I noticed this was already applied...
 
-On rev A6 of the Black, as well as (afaik) all versions of the White
-(if anyone cares, since they normally have SoC rev 1.0), the impact of
-entering RTC-only sleep is heavily dependent on external connections
-and hardware, most of which not really detectable. It is possible to
-go from "hmm, annoying standby current" to a recipe for stir-fried I/O
-pin simply by connecting a console cable while the device is in sleep.
-This is not something the kernel can foresee or prevent.
+Gr{oetje,eeting}s,
 
-I'm pretty sure the sane thing to do here is disable RTC-only sleep by
-default. People who care about it can still enable it after they
-verified the particular combination of pcb revision, external
-hardware, and usage scenario is safe (or patched the hardware to make
-it safe, or decided they're willing to take the risk.)
+                        Geert
 
-It may be useful to leave some references for those who seek guidance:
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-1. The issues with AM335x rev 1.0 SoCs are documented in the errata.
-
-2. Unfortunately I still have no idea why TI altered the connection
-diagram w.r.t. "VDDS" (and as a consequence officially defeatured
-RTC-only sleep) when the TPS65217C/D PMIC for AM335x + DDR3/3L memory
-is used. Maybe I'll still get an answer from TI on E2E, but I'm also
-planning to do more thorough testing this week especially w.r.t.
-current consumption patterns during boot and shutdown.
-
-3. The BeagleBone regulator problem is particularly notorious among
-people who (try to) use the PMIC's battery power support, since the
-problem then also surfaces during full shutdown. It has a long
-discussion thread here:
-https://groups.google.com/d/topic/beagleboard/7sxPePT7wkM/discussion
-which includes two posts by me with fairly detailed analysis along
-with scope pics:
-https://groups.google.com/d/msg/beagleboard/7sxPePT7wkM/3vFMPydR20IJ
-https://groups.google.com/d/msg/beagleboard/7sxPePT7wkM/V1Ft-xxh0agJ
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
