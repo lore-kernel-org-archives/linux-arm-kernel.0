@@ -1,26 +1,32 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 19 May 2015 08:00:04 +0200
-Subject: mach-pxa/pxa_cplds_irqs.c:126: bad if test ?
-In-Reply-To: <DUB128-W342054A60A9EB2505BCA469CC40@phx.gbl> (David Binderman's
- message of "Mon, 18 May 2015 21:44:30 +0000")
-References: <DUB128-W342054A60A9EB2505BCA469CC40@phx.gbl>
-Message-ID: <87382tjee3.fsf@belgarion.home>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 19 May 2015 15:01:21 +0900
+Subject: [PATCH v2 3/4] ARM: multi_v7_defconfig: Enable TMU for Exynos
+In-Reply-To: <555AD0D9.9060502@kernel.org>
+References: <1431913636-31854-1-git-send-email-k.kozlowski@samsung.com>
+ <1431913636-31854-4-git-send-email-k.kozlowski@samsung.com>
+ <555AD0D9.9060502@kernel.org>
+Message-ID: <CAJKOXPfayLo1xM-9nhzOAOS2uDeQyTbxs1F0vb-SGFKhMc-uPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David Binderman <dcb314@hotmail.com> writes:
-
-> Hello there,
+2015-05-19 14:57 GMT+09:00 Kukjin Kim <kgene@kernel.org>:
+> On 05/18/15 10:47, Krzysztof Kozlowski wrote:
+>> From: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+>>
+>> Enable support for Thermal Monitoring Unit present on Exynos SoCs. This
+>> allows detection of overheat and handling this gracefully.
+>>
+>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
 >
-> [linux-4.1-rc4/arch/arm/mach-pxa/pxa_cplds_irqs.c:126]: (style) Checking if
-> unsigned variable 'base_irq' is less than zero.
->
-> ??? base_irq = platform_get_irq(pdev, 1);
-> ??? if (base_irq < 0)
-> ??????? base_irq = 0;
-Thanks David, a patch has already been provided by Dan Carpenter.
+> Krzysztof, you want to use gmail account on this, you used samsung
+> accoung on 1st and 2nd patches though?
 
-Cheers.
+Yes, that is correct. I know that it seems mixed up and sorry for the confusion.
 
---
-Robert
+I use the gmail account when I am developing at home to distinguish my
+personal and company's rights. So in one patchset I got some old
+patches done in company (@samsung.com) and newer one prepared during
+my free time.
+
+Best regards,
+Krzysztof
