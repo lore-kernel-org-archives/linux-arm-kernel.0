@@ -1,46 +1,38 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 19 May 2015 10:55:06 -0600
-Subject: [PATCH 01/16] coresight-etm3x: use module_amba_driver to simplify the
- code
+Date: Tue, 19 May 2015 10:55:08 -0600
+Subject: [PATCH 03/16] coresight: support the TPIU version found in Ux500
 In-Reply-To: <1432054521-24807-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1432054521-24807-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1432054521-24807-2-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1432054521-24807-4-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using function "module_amba_driver()" makes the code simpler by
-eliminating boilerplate code.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Wei Yongjun sent out a set of patches addressing those in all the
-coresight driver but missed ETMv3.
+The Ux500 has a PrimeCell version 4B instead of the 3B as
+supported by the driver, extend the match table to cover
+this version.
 
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm3x.c | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+ drivers/hwtracing/coresight/coresight-tpiu.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index c965f5724abd..d78fcc23c4e0 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -1916,17 +1916,7 @@ static struct amba_driver etm_driver = {
- 	.id_table	= etm_ids,
+diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
+index 3b33af2416bb..88b6b0c32538 100644
+--- a/drivers/hwtracing/coresight/coresight-tpiu.c
++++ b/drivers/hwtracing/coresight/coresight-tpiu.c
+@@ -188,6 +188,10 @@ static struct amba_id tpiu_ids[] = {
+ 		.id	= 0x0003b912,
+ 		.mask	= 0x0003ffff,
+ 	},
++	{
++		.id	= 0x0004b912,
++		.mask	= 0x0007ffff,
++	},
+ 	{ 0, 0},
  };
  
--int __init etm_init(void)
--{
--	return amba_driver_register(&etm_driver);
--}
--module_init(etm_init);
--
--void __exit etm_exit(void)
--{
--	amba_driver_unregister(&etm_driver);
--}
--module_exit(etm_exit);
-+module_amba_driver(etm_driver);
- 
- MODULE_LICENSE("GPL v2");
- MODULE_DESCRIPTION("CoreSight Program Flow Trace driver");
 -- 
 1.9.1
