@@ -1,51 +1,51 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 19 May 2015 11:20:27 +0100
-Subject: [PATCH 2/2] ARM: allow Integrator to be selected for noMMU builds
-In-Reply-To: <20150519101939.GB2067@n2100.arm.linux.org.uk>
-References: <20150519101939.GB2067@n2100.arm.linux.org.uk>
-Message-ID: <E1YuedP-0003tv-IF@rmk-PC.arm.linux.org.uk>
+From: raghumag@gmail.com (raghu MG)
+Date: Tue, 19 May 2015 15:50:39 +0530
+Subject: ARMADAXP MV78260 CPU-1:failed to come online
+In-Reply-To: <20150519104936.3e5f6bc2@free-electrons.com>
+References: <CAG1O52XwiW9a0+XS==vNAiKoYiVg7TR5XfYrQxHO7R089RWcfg@mail.gmail.com>
+ <20150518202033.GH21807@lunn.ch>
+ <20150518223019.70ccf639@free-electrons.com>
+ <CAG1O52Uc0On7tGAp5Ae6bwmSt4S5rQZKcPGA9Dy7vy6y5DzS5A@mail.gmail.com>
+ <20150519104936.3e5f6bc2@free-electrons.com>
+Message-ID: <CAG1O52WQR_O0joDbSg9N78YBpSZRDd16-ArBfUzKM9hPtcRX6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow Integrator to be selected from the top level choice table again
-for noMMU builds.  The Integrator platform can have ARM940 and ARM946
-CPU tiles attached, which are MPU-based CPUs, and the recent conversion
-of Integrator overlooked these.
+Hi Thomas
+That was quick.....Yes the append works fine..
+I have to port drivers for the board now.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/Kconfig                 | 4 ++++
- arch/arm/mach-integrator/Kconfig | 3 +--
- 2 files changed, 5 insertions(+), 2 deletions(-)
+Thanks for the help..Will post queries if I  get into trouble on
+ARMADAXP platform.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ef25d453da94..398d19106d99 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -329,6 +329,10 @@ config ARCH_MULTIPLATFORM
- 	select SPARSE_IRQ
- 	select USE_OF
- 
-+config ARM_SINGLE_INTEGRATOR
-+	bool "ARM Ltd. Integrator family (noMMU)"
-+	depends on !MMU
-+
- config ARCH_REALVIEW
- 	bool "ARM Ltd. RealView family"
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
-diff --git a/arch/arm/mach-integrator/Kconfig b/arch/arm/mach-integrator/Kconfig
-index 02d083489a26..c86f156ac21a 100644
---- a/arch/arm/mach-integrator/Kconfig
-+++ b/arch/arm/mach-integrator/Kconfig
-@@ -1,8 +1,7 @@
- config ARCH_INTEGRATOR
- 	bool "ARM Ltd. Integrator family" if (ARCH_MULTI_V4T || ARCH_MULTI_V5 || ARCH_MULTI_V6)
-+	default y if ARM_SINGLE_INTEGRATOR
- 	select ARM_AMBA
--	select ARM_PATCH_PHYS_VIRT if MMU
--	select AUTO_ZRELADDR
- 	select COMMON_CLK
- 	select COMMON_CLK_VERSATILE
- 	select GENERIC_CLOCKEVENTS
--- 
-2.1.0
+Anyways thanks  a ton :)
+
+On Tue, May 19, 2015 at 2:19 PM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> Raghu,
+>
+> On Tue, 19 May 2015 14:15:49 +0530, raghu MG wrote:
+>
+>> I am trying latest stable release from kernel.org -->linux-4.0.3.
+>>
+>> I have seen this issue in linux-3.10.39 & linux-3.10.32 for which
+>> Marvell has provided lsp.
+>>
+>> This issue doesnt crop up in older version like linux-3.2.40 &
+>> linux-3.2.52 with uImage
+>>
+>> Not sure but I think this is something do with zImage & device tree combination.
+>
+> Can you please try to boot with appended DTB? Some versions of the
+> Marvell bootloader tend to do horrible modifications to the FDT, making
+> assumptions that might be true with their Linux LSP, but not with the
+> mainline kernel. Using appended DTB is a way of making sure that their
+> bootloader will not touch the kernel DTB.
+>
+> Thanks,
+>
+> Thomas
+> --
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
