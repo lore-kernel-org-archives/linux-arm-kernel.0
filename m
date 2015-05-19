@@ -1,54 +1,47 @@
-From: tytso@mit.edu (Theodore Ts'o)
-Date: Tue, 19 May 2015 10:14:30 -0400
-Subject: [PATCH] crypto: allow to assign gfp_t for __crypto_alloc_tfm
-In-Reply-To: <20150519071521.GA28862@gondor.apana.org.au>
-References: <1432014416-39326-1-git-send-email-jaegeuk@kernel.org>
- <20150519054945.GA28060@gondor.apana.org.au>
- <20150519062430.GA39588@jaegeuk-mac02.hsd1.ca.comcast.net>
- <20150519063211.GA28347@gondor.apana.org.au>
- <20150519065812.GA40012@jaegeuk-mac02.hsd1.ca.comcast.net>
- <20150519065929.GA28610@gondor.apana.org.au>
- <20150519071317.GB40012@jaegeuk-mac02.hsd1.ca.comcast.net>
- <20150519071521.GA28862@gondor.apana.org.au>
-Message-ID: <20150519141430.GD20421@thunk.org>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Tue, 19 May 2015 15:12:11 +0100
+Subject: [Xen-devel] [RFC 02/23] xen/xenbus: client: Fix call of
+ virt_to_mfn in xenbus_grant_ring
+In-Reply-To: <555B3FF6.4050902@citrix.com>
+References: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
+ <1431622863-28575-3-git-send-email-julien.grall@citrix.com>
+ <555B3FF6.4050902@citrix.com>
+Message-ID: <555B44BB.1090200@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 03:15:21PM +0800, Herbert Xu wrote:
-> On Tue, May 19, 2015 at 12:13:17AM -0700, Jaegeuk Kim wrote:
-> >
-> > The key generation is done by ext4_generate_encryption_key in
-> > fs/ext4/crypto_key.c.
-> > And, ext4_file_mmap and ext4_file_open trigger it.
+Hi David,
+
+On 19/05/15 14:51, David Vrabel wrote:
+>> --- a/drivers/xen/xenbus/xenbus_client.c
+>> +++ b/drivers/xen/xenbus/xenbus_client.c
+>> @@ -379,16 +379,16 @@ int xenbus_grant_ring(struct xenbus_device *dev, void *vaddr,
+>>  	int i, j;
+>>  
+>>  	for (i = 0; i < nr_pages; i++) {
+>> -		unsigned long addr = (unsigned long)vaddr +
+>> -			(PAGE_SIZE * i);
+>>  		err = gnttab_grant_foreign_access(dev->otherend_id,
+>> -						  virt_to_mfn(addr), 0);
+>> +						  virt_to_mfn(vaddr), 0);
+>>  		if (err < 0) {
+>>  			xenbus_dev_fatal(dev, err,
+>>  					 "granting access to ring page");
+>>  			goto fail;
+>>  		}
+>>  		grefs[i] = err;
+>> +
+>> +		vaddr = (char *)vaddr + PAGE_SIZE;
 > 
-> Well that's where you should be doing crypto_alloc_ablkcipher
-> and crypto_ablkcipher_setkey.
-> 
-> The whole point of a crypto tfm is to represent a key so any time
-> you get one you should create a crypto tfm.  Carrying around a raw
-> key is just wrong.
+> You don't need the cast here since vaddr is a void *.
 
-There can be multiple reads going on in parallel, so we're currently
-creating tfm's as necessary.  In fact one of the things that we've
-talked about doing is since there are some ARM cores where their
-"hardware acceleration" is slower than optimized software (sigh), and
-there are some Android applications (such as Facebook) that read
-*vast* quantities of data from flash on startup before painting a
-single pixel, that we might want to consider in some cases,
-parallelizing the decryption across multiple ARM cores.  Figuring out
-when to do this, both in terms of the workload, how many cores to use
-to balance off against power utilization, how much (if ever) to use
-the hardware "accelerator", and just plain lack of time caused us not
-to go down that particular path.
+Arithmetic on void pointer is a GCC extension [1]. I wasn't sure what is
+the Linux policy on it.
 
-We do have a tfm pointer hanging off the inode (currently only used
-for directories and file name encryption, where i_mutex is serializing
-us anyway), and in theory we could use that for the data path as well.
-We'd have to serialize access to it, which could be performance
-problem, and if the tfm is significantly larger than the raw key, we'd
-need to know when we should nuke the tfm.
+Regards,
 
-After all, we don't want to have users waiting for their Facebook app
-to launch.  :-)
+[1] https://gcc.gnu.org/onlinedocs/gcc/Pointer-Arith.html#Pointer-Arith
 
-					- Ted
+
+-- 
+Julien Grall
