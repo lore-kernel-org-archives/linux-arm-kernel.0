@@ -1,21 +1,25 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 19 May 2015 12:54:06 +0800
-Subject: [PATCH] vf610: dt: Nomenclature fixup for PTC12 pin used in RMII
- mode.
-In-Reply-To: <1431573098-23809-1-git-send-email-cory.tusar@pid1solutions.com>
-References: <1431573098-23809-1-git-send-email-cory.tusar@pid1solutions.com>
-Message-ID: <20150519045406.GM1071@dragon>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Tue, 19 May 2015 07:09:45 +0200
+Subject: [PATCH soc] ARM: BCM5301X: Ignore another (BCM4709 specific)
+ fault code
+In-Reply-To: <55282985.6070009@gmail.com>
+References: <1423669258-27449-1-git-send-email-zajec5@gmail.com>
+ <55282985.6070009@gmail.com>
+Message-ID: <CACna6rwMmm4wNaCRhi1dHCh8KwXt+-XuAejb4CuhkELhJ2=V4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 13, 2015 at 11:11:38PM -0400, Cory Tusar wrote:
-> This commit includes a minor nomenclature fixup for boards based on the
-> Freescale VF610 SoC and which make use of the alternate "RMII1_RXD1"
-> functionality for pin PTC12.  This brings the macro name in-line with
-> both the datasheet and other similar macros.
-> 
-> Signed-off-by: Cory Tusar <cory.tusar@pid1solutions.com>
+On 10 April 2015 at 21:50, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> On 11/02/15 07:40, Rafa? Mi?ecki wrote:
+>> Broadcom ARM devices seem to generate some fault once per boot. We
+>> already have an ignoring handler for BCM4707/BCM4708, but BCM4709
+>> generates different code.
+>>
+>> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+>
+> Applied to platform/next, sorry for the lag, thanks!
 
-Change patch prefix to 'ARM: dts: vf610: ', and applied.
+Could you send a pull request for platform/next, please?
 
-Shawn
+-- 
+Rafa?
