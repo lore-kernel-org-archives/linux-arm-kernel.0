@@ -1,123 +1,114 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 19 May 2015 10:55:15 -0600
-Subject: [PATCH 10/16] coresight: tpiu: retrieve and handle atclk
+Date: Tue, 19 May 2015 10:55:12 -0600
+Subject: [PATCH 07/16] coresight: funnel: let runtime PM handle core clock
 In-Reply-To: <1432054521-24807-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1432054521-24807-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1432054521-24807-11-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1432054521-24807-8-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-As can be seen from the datasheet of the CoreSight
-Components, DDI0314H page A-19 the TPIU has a clock signal
-apart from the AHB interconnect ("amba_pclk", that we're
-already handling) called ATCLK, ARM Trace Clock, that SoC
-implementers may provide from an entirely different clock
-source. So to model this correctly create an optional
-path for handling ATCLK alongside the PCLK so we don't
-break old platforms that only define PCLK ("amba_pclk") but
-still makes it possible for SoCs that have both clock signals
-(such as the DB8500) to fetch and prepare/enable/disable/
-unprepare both clocks in conjunction.
+This uses runtime PM to manage the PCLK ("amba_pclk") instead
+of screwing around with the framework by going in and taking
+a copy from the amba device. The amba bus core will unprepare
+and disable the clock when the device is unused when
+CONFIG_PM is selected, else the clock will be always on.
 
-The ATCLK is enabled and disabled using the runtime PM
-callbacks.
+Prior to this patch, as the AMBA primecell bus code enables
+the PCLK, it would be left on after probe as
+clk_disable_unprepare() was not called. Now the runtime PM
+callbacks will make sure the PCLK is properly disabled
+after probe.
 
 Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-tpiu.c | 37 ++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+ drivers/hwtracing/coresight/coresight-funnel.c | 24 +++++++-----------------
+ 1 file changed, 7 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
-index 688ba937069e..7214efd10db5 100644
---- a/drivers/hwtracing/coresight/coresight-tpiu.c
-+++ b/drivers/hwtracing/coresight/coresight-tpiu.c
-@@ -20,6 +20,7 @@
- #include <linux/pm_runtime.h>
+diff --git a/drivers/hwtracing/coresight/coresight-funnel.c b/drivers/hwtracing/coresight/coresight-funnel.c
+index 3db36f70b666..330de2c88759 100644
+--- a/drivers/hwtracing/coresight/coresight-funnel.c
++++ b/drivers/hwtracing/coresight/coresight-funnel.c
+@@ -18,7 +18,7 @@
+ #include <linux/err.h>
+ #include <linux/fs.h>
+ #include <linux/slab.h>
+-#include <linux/clk.h>
++#include <linux/pm_runtime.h>
  #include <linux/coresight.h>
  #include <linux/amba/bus.h>
-+#include <linux/clk.h>
  
- #include "coresight-priv.h"
- 
-@@ -50,11 +51,13 @@
- /**
+@@ -36,14 +36,12 @@
   * @base:	memory mapped base address for this component.
   * @dev:	the device entity associated to this component.
-+ * @atclk:	optional clock for the core parts of the TPIU.
   * @csdev:	component vitals needed by the framework.
+- * @clk:	the clock this component is associated to.
+  * @priority:	port selection order.
   */
- struct tpiu_drvdata {
+ struct funnel_drvdata {
  	void __iomem		*base;
  	struct device		*dev;
-+	struct clk		*atclk;
  	struct coresight_device	*csdev;
+-	struct clk		*clk;
+ 	unsigned long		priority;
  };
  
-@@ -111,6 +114,7 @@ static const struct coresight_ops tpiu_cs_ops = {
- 
- static int tpiu_probe(struct amba_device *adev, const struct amba_id *id)
+@@ -67,12 +65,8 @@ static int funnel_enable(struct coresight_device *csdev, int inport,
+ 			 int outport)
  {
-+	int ret;
- 	void __iomem *base;
- 	struct device *dev = &adev->dev;
- 	struct coresight_platform_data *pdata = NULL;
-@@ -131,6 +135,12 @@ static int tpiu_probe(struct amba_device *adev, const struct amba_id *id)
- 		return -ENOMEM;
+ 	struct funnel_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+-	int ret;
+-
+-	ret = clk_prepare_enable(drvdata->clk);
+-	if (ret)
+-		return ret;
  
- 	drvdata->dev = &adev->dev;
-+	drvdata->atclk = devm_clk_get(&adev->dev, "atclk"); /* optional */
-+	if (!IS_ERR(drvdata->atclk)) {
-+		ret = clk_prepare_enable(drvdata->atclk);
-+		if (ret)
-+			return ret;
-+	}
- 	dev_set_drvdata(dev, drvdata);
++	pm_runtime_get_sync(drvdata->dev);
+ 	funnel_enable_hw(drvdata, inport);
  
- 	/* Validity for the resource is already checked by the AMBA core */
-@@ -170,6 +180,32 @@ static int tpiu_remove(struct amba_device *adev)
- 	return 0;
+ 	dev_info(drvdata->dev, "FUNNEL inport %d enabled\n", inport);
+@@ -98,8 +92,7 @@ static void funnel_disable(struct coresight_device *csdev, int inport,
+ 	struct funnel_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+ 
+ 	funnel_disable_hw(drvdata, inport);
+-
+-	clk_disable_unprepare(drvdata->clk);
++	pm_runtime_put(drvdata->dev);
+ 
+ 	dev_info(drvdata->dev, "FUNNEL inport %d disabled\n", inport);
  }
+@@ -153,16 +146,14 @@ static u32 get_funnel_ctrl_hw(struct funnel_drvdata *drvdata)
+ static ssize_t funnel_ctrl_show(struct device *dev,
+ 			     struct device_attribute *attr, char *buf)
+ {
+-	int ret;
+ 	u32 val;
+ 	struct funnel_drvdata *drvdata = dev_get_drvdata(dev->parent);
  
-+#ifdef CONFIG_PM
-+static int tpiu_runtime_suspend(struct device *dev)
-+{
-+	struct tpiu_drvdata *drvdata = dev_get_drvdata(dev);
+-	ret = clk_prepare_enable(drvdata->clk);
+-	if (ret)
+-		return ret;
++	pm_runtime_get_sync(drvdata->dev);
+ 
+ 	val = get_funnel_ctrl_hw(drvdata);
+-	clk_disable_unprepare(drvdata->clk);
 +
-+	if (drvdata && !IS_ERR(drvdata->atclk))
-+		clk_disable_unprepare(drvdata->atclk);
-+
-+	return 0;
-+}
-+
-+static int tpiu_runtime_resume(struct device *dev)
-+{
-+	struct tpiu_drvdata *drvdata = dev_get_drvdata(dev);
-+
-+	if (drvdata && !IS_ERR(drvdata->atclk))
-+		clk_prepare_enable(drvdata->atclk);
-+
-+	return 0;
-+}
-+#endif
-+
-+static const struct dev_pm_ops tpiu_dev_pm_ops = {
-+	SET_RUNTIME_PM_OPS(tpiu_runtime_suspend, tpiu_runtime_resume, NULL)
-+};
-+
- static struct amba_id tpiu_ids[] = {
- 	{
- 		.id	= 0x0003b912,
-@@ -186,6 +222,7 @@ static struct amba_driver tpiu_driver = {
- 	.drv = {
- 		.name	= "coresight-tpiu",
- 		.owner	= THIS_MODULE,
-+		.pm	= &tpiu_dev_pm_ops,
- 	},
- 	.probe		= tpiu_probe,
- 	.remove		= tpiu_remove,
++	pm_runtime_put(drvdata->dev);
+ 
+ 	return sprintf(buf, "%#x\n", val);
+ }
+@@ -205,8 +196,7 @@ static int funnel_probe(struct amba_device *adev, const struct amba_id *id)
+ 		return PTR_ERR(base);
+ 
+ 	drvdata->base = base;
+-
+-	drvdata->clk = adev->pclk;
++	pm_runtime_put(&adev->dev);
+ 
+ 	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
+ 	if (!desc)
 -- 
 1.9.1
