@@ -1,61 +1,124 @@
-From: Frank.Li@freescale.com (Frank.Li at freescale.com)
-Date: Wed, 20 May 2015 01:04:35 +0800
-Subject: [PATCH v2 0/7] Change snvs rtc and poweroff to use syscon add pwrkey
- driver
-Message-ID: <1432055082-28983-1-git-send-email-Frank.Li@freescale.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 19 May 2015 10:55:17 -0600
+Subject: [PATCH 12/16] coresight: funnel: retrieve and handle atclk
+In-Reply-To: <1432054521-24807-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1432054521-24807-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1432054521-24807-13-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Li <Frank.Li@freescale.com>
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Change from v1 to v2
- - Change simple-bus to simple-mfd
- - RTC remove lock.
- - RTC remove comments "These register offsets are relative to LP (Low Power) range"
- - power off, remove extra space
+As can be seen from the datasheet of the CoreSight
+Components, DDI0314 table A-6 the funnel has a clock signal
+apart from the AHB interconnect ("amba_pclk", that we're
+already handling) called ATCLK, ARM Trace Clock, that SoC
+implementers may provide from an entirely different clock
+source. So to model this correctly create an optional
+path for handling ATCLK alongside the PCLK so we don't
+break old platforms that only define PCLK ("amba_pclk") but
+still makes it possible for SoCs that have both clock signals
+(such as the DB8500) to fetch and prepare/enable/disable/
+unprepare both clocks.
 
-SNVS is MPF module.
-include rtc, power off, ON/OFF power key
+The ATCLK is enabled and disabled using the runtime PM
+callbacks.
 
-  arm: imx: power-off: change to syscon to access register
-  rtc: arm: imx: snvs: change use syscon to access register
-Above two patch change existed power-off and rtc use syscon
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ drivers/hwtracing/coresight/coresight-funnel.c | 37 ++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-  Document: dt: fsl: snvs: change support syscon
-  arm: dts: imx: update snvs to use syscon access register
-Update dt file and document
-
-  input: keyboard: imx: add snvs power key driver
-  document: devicetree: input: imx: i.mx snvs power device tree bindings
-  arm: dts: imx6sx: enable snvs power key
-Added on/off key driver
-
-Frank Li (6):
-  arm: imx: power-off: change to syscon to access register
-  rtc: arm: imx: snvs: change use syscon to access register
-  Document: dt: fsl: snvs: change support syscon
-  arm: dts: imx: update snvs to use syscon access register
-  document: devicetree: input: imx: i.mx snvs power device tree bindings
-  arm: dts: imx6sx: enable snvs power key
-
-Robin Gong (1):
-  input: keyboard: imx: add snvs power key driver
-
- .../devicetree/bindings/crypto/fsl-sec4.txt        |  93 +++++++--
- .../devicetree/bindings/input/snvs-pwrkey.txt      |   1 +
- .../bindings/power_supply/imx-snvs-poweroff.txt    |  24 +--
- arch/arm/boot/dts/imx6qdl.dtsi                     |  12 +-
- arch/arm/boot/dts/imx6sl.dtsi                      |  12 +-
- arch/arm/boot/dts/imx6sx.dtsi                      |  19 +-
- arch/arm/boot/dts/vfxxx.dtsi                       |   9 +-
- drivers/input/keyboard/Kconfig                     |  11 +
- drivers/input/keyboard/Makefile                    |   1 +
- drivers/input/keyboard/snvs_pwrkey.c               | 232 +++++++++++++++++++++
- drivers/power/reset/imx-snvs-poweroff.c            |  21 +-
- drivers/rtc/rtc-snvs.c                             | 128 +++++-------
- 12 files changed, 417 insertions(+), 146 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/input/snvs-pwrkey.txt
- create mode 100644 drivers/input/keyboard/snvs_pwrkey.c
-
+diff --git a/drivers/hwtracing/coresight/coresight-funnel.c b/drivers/hwtracing/coresight/coresight-funnel.c
+index 330de2c88759..2e36bde7fcb4 100644
+--- a/drivers/hwtracing/coresight/coresight-funnel.c
++++ b/drivers/hwtracing/coresight/coresight-funnel.c
+@@ -21,6 +21,7 @@
+ #include <linux/pm_runtime.h>
+ #include <linux/coresight.h>
+ #include <linux/amba/bus.h>
++#include <linux/clk.h>
+ 
+ #include "coresight-priv.h"
+ 
+@@ -35,12 +36,14 @@
+  * struct funnel_drvdata - specifics associated to a funnel component
+  * @base:	memory mapped base address for this component.
+  * @dev:	the device entity associated to this component.
++ * @atclk:	optional clock for the core parts of the funnel.
+  * @csdev:	component vitals needed by the framework.
+  * @priority:	port selection order.
+  */
+ struct funnel_drvdata {
+ 	void __iomem		*base;
+ 	struct device		*dev;
++	struct clk		*atclk;
+ 	struct coresight_device	*csdev;
+ 	unsigned long		priority;
+ };
+@@ -168,6 +171,7 @@ ATTRIBUTE_GROUPS(coresight_funnel);
+ 
+ static int funnel_probe(struct amba_device *adev, const struct amba_id *id)
+ {
++	int ret;
+ 	void __iomem *base;
+ 	struct device *dev = &adev->dev;
+ 	struct coresight_platform_data *pdata = NULL;
+@@ -188,6 +192,12 @@ static int funnel_probe(struct amba_device *adev, const struct amba_id *id)
+ 		return -ENOMEM;
+ 
+ 	drvdata->dev = &adev->dev;
++	drvdata->atclk = devm_clk_get(&adev->dev, "atclk"); /* optional */
++	if (!IS_ERR(drvdata->atclk)) {
++		ret = clk_prepare_enable(drvdata->atclk);
++		if (ret)
++			return ret;
++	}
+ 	dev_set_drvdata(dev, drvdata);
+ 
+ 	/* Validity for the resource is already checked by the AMBA core */
+@@ -224,6 +234,32 @@ static int funnel_remove(struct amba_device *adev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM
++static int funnel_runtime_suspend(struct device *dev)
++{
++	struct funnel_drvdata *drvdata = dev_get_drvdata(dev);
++
++	if (drvdata && !IS_ERR(drvdata->atclk))
++		clk_disable_unprepare(drvdata->atclk);
++
++	return 0;
++}
++
++static int funnel_runtime_resume(struct device *dev)
++{
++	struct funnel_drvdata *drvdata = dev_get_drvdata(dev);
++
++	if (drvdata && !IS_ERR(drvdata->atclk))
++		clk_prepare_enable(drvdata->atclk);
++
++	return 0;
++}
++#endif
++
++static const struct dev_pm_ops funnel_dev_pm_ops = {
++	SET_RUNTIME_PM_OPS(funnel_runtime_suspend, funnel_runtime_resume, NULL)
++};
++
+ static struct amba_id funnel_ids[] = {
+ 	{
+ 		.id     = 0x0003b908,
+@@ -236,6 +272,7 @@ static struct amba_driver funnel_driver = {
+ 	.drv = {
+ 		.name	= "coresight-funnel",
+ 		.owner	= THIS_MODULE,
++		.pm	= &funnel_dev_pm_ops,
+ 	},
+ 	.probe		= funnel_probe,
+ 	.remove		= funnel_remove,
 -- 
 1.9.1
