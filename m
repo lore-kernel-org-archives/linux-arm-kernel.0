@@ -1,41 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 19 May 2015 10:49:19 +0200
-Subject: [PATCH 01/10] pinctrl: mediatek: data struct optimize and remove
- unused member
-In-Reply-To: <1431567346-33780-2-git-send-email-hongzhou.yang@mediatek.com>
-References: <1431567346-33780-1-git-send-email-hongzhou.yang@mediatek.com>
- <1431567346-33780-2-git-send-email-hongzhou.yang@mediatek.com>
-Message-ID: <CACRpkdZhxAxOMCwvMz2BWqND053kZ0taVstQn8n2emN=wktF-Q@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 19 May 2015 10:49:36 +0200
+Subject: ARMADAXP MV78260 CPU-1:failed to come online
+In-Reply-To: <CAG1O52Uc0On7tGAp5Ae6bwmSt4S5rQZKcPGA9Dy7vy6y5DzS5A@mail.gmail.com>
+References: <CAG1O52XwiW9a0+XS==vNAiKoYiVg7TR5XfYrQxHO7R089RWcfg@mail.gmail.com>
+ <20150518202033.GH21807@lunn.ch>
+ <20150518223019.70ccf639@free-electrons.com>
+ <CAG1O52Uc0On7tGAp5Ae6bwmSt4S5rQZKcPGA9Dy7vy6y5DzS5A@mail.gmail.com>
+Message-ID: <20150519104936.3e5f6bc2@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 14, 2015 at 3:35 AM, Hongzhou Yang
-<hongzhou.yang@mediatek.com> wrote:
+Raghu,
 
-> From: Yingjoe Chen <yingjoe.chen@mediatek.com>
->
-> struct mtk_desc_pin.chip, mtk_pinctrl_devdata.invser_offset
-> and mtk_pinctrl_devdata.chip_type are never used in code.
-> Remove them.
->
-> Some per-pin data are using int for pin number and offsets.
-> Change to short and rearrange to reduce const data size.
->
-> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+On Tue, 19 May 2015 14:15:49 +0530, raghu MG wrote:
 
-Patch applied.
+> I am trying latest stable release from kernel.org -->linux-4.0.3.
+> 
+> I have seen this issue in linux-3.10.39 & linux-3.10.32 for which
+> Marvell has provided lsp.
+> 
+> This issue doesnt crop up in older version like linux-3.2.40 &
+> linux-3.2.52 with uImage
+> 
+> Not sure but I think this is something do with zImage & device tree combination.
 
-However I suggest you use:
+Can you please try to boot with appended DTB? Some versions of the
+Marvell bootloader tend to do horrible modifications to the FDT, making
+assumptions that might be true with their Linux LSP, but not with the
+mainline kernel. Using appended DTB is a way of making sure that their
+bootloader will not touch the kernel DTB.
 
-unsigned int => u32
-unsigned short => u16
-unsigned char => u8
+Thanks,
 
-These kernel-specific types are more to the point,
-you immediately see how many bits they use, so a
-patch chaning all of the types to u32/u16/u8 would
-be welcome.
-
-Yours,
-Linus Walleij
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
