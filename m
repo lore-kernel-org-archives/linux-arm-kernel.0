@@ -1,121 +1,333 @@
 From: hongzhou.yang@mediatek.com (Hongzhou Yang)
-Date: Mon, 18 May 2015 23:11:14 -0700
-Subject: [PATCH v2 03/11] pinctrl: mediatek: data struct optimize and remove
- unused member
+Date: Mon, 18 May 2015 23:11:15 -0700
+Subject: [PATCH v2 04/11] pinctrl: mediatek: add
+ mtk_pctrl_spec_pull_set_samereg common code
 In-Reply-To: <1432015882-8646-1-git-send-email-hongzhou.yang@mediatek.com>
 References: <1432015882-8646-1-git-send-email-hongzhou.yang@mediatek.com>
-Message-ID: <1432015882-8646-4-git-send-email-hongzhou.yang@mediatek.com>
+Message-ID: <1432015882-8646-5-git-send-email-hongzhou.yang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Yingjoe Chen <yingjoe.chen@mediatek.com>
 
-struct mtk_desc_pin.chip, mtk_pinctrl_devdata.invser_offset
-and mtk_pinctrl_devdata.chip_type are never used in code.
-Remove them.
-
-Some per-pin data are using int for pin number and offsets.
-Change to short and rearrange to reduce const data size.
+Several mediatek soc use similar pull setting procedure as mt8173,
+the pupd enable and resistance setting are in the same register.
+Add common code mtk_pctrl_spec_pull_set_samereg out of spec_pull_set
+in mt8173 to handle this case, so future soc driver can use it.
 
 Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
 Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
 ---
- drivers/pinctrl/mediatek/pinctrl-mt8135.c     |   10 ++++------
- drivers/pinctrl/mediatek/pinctrl-mtk-common.h |   10 ++--------
- 2 files changed, 6 insertions(+), 14 deletions(-)
+ drivers/pinctrl/mediatek/pinctrl-mt8173.c     |  166 +++++++------------------
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.c |   60 +++++++++
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.h |   31 +++++
+ 3 files changed, 136 insertions(+), 121 deletions(-)
 
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mt8135.c b/drivers/pinctrl/mediatek/pinctrl-mt8135.c
-index f1e1e18..8e6abd5 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mt8135.c
-+++ b/drivers/pinctrl/mediatek/pinctrl-mt8135.c
-@@ -32,12 +32,12 @@
- #define R1_BASE2				0x250
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mt8173.c b/drivers/pinctrl/mediatek/pinctrl-mt8173.c
+index 412ea84..cc44b27 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mt8173.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mt8173.c
+@@ -47,130 +47,54 @@ struct mtk_pin_ies_smt_set {
+ 		.offset = _offset,	\
+ 	}
  
- struct mtk_spec_pull_set {
--	unsigned int pin;
--	unsigned int pupd_offset;
-+	unsigned char pin;
- 	unsigned char pupd_bit;
--	unsigned int r0_offset;
-+	unsigned short pupd_offset;
-+	unsigned short r0_offset;
-+	unsigned short r1_offset;
- 	unsigned char r0_bit;
--	unsigned int r1_offset;
- 	unsigned char r1_bit;
- };
- 
-@@ -305,7 +305,6 @@ static const struct mtk_pinctrl_devdata mt8135_pinctrl_data = {
- 	.pullen_offset = 0x0200,
- 	.smt_offset = 0x0300,
- 	.pullsel_offset = 0x0400,
--	.invser_offset = 0x0600,
- 	.dout_offset = 0x0800,
- 	.din_offset = 0x0A00,
- 	.pinmux_offset = 0x0C00,
-@@ -314,7 +313,6 @@ static const struct mtk_pinctrl_devdata mt8135_pinctrl_data = {
- 	.port_shf = 4,
- 	.port_mask = 0xf,
- 	.port_align = 4,
--	.chip_type = MTK_CHIP_TYPE_BASE,
- 	.eint_offsets = {
- 		.name = "mt8135_eint",
- 		.stat      = 0x000,
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.h b/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
-index 375771d..1508849 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
-+++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
-@@ -19,8 +19,6 @@
- #include <linux/regmap.h>
- 
- #define NO_EINT_SUPPORT    255
--#define MTK_CHIP_TYPE_BASE     0
--#define MTK_CHIP_TYPE_PMIC     1
- #define MT_EDGE_SENSITIVE           0
- #define MT_LEVEL_SENSITIVE          1
- #define EINT_DBNC_SET_DBNC_BITS     4
-@@ -39,7 +37,6 @@ struct mtk_desc_eint {
- 
- struct mtk_desc_pin {
- 	struct pinctrl_pin_desc	pin;
--	const char *chip;
- 	const struct mtk_desc_eint eint;
- 	const struct mtk_desc_function	*functions;
- };
-@@ -47,7 +44,6 @@ struct mtk_desc_pin {
- #define MTK_PIN(_pin, _pad, _chip, _eint, ...)		\
- 	{							\
- 		.pin = _pin,					\
--		.chip = _chip,					\
- 		.eint = _eint,					\
- 		.functions = (struct mtk_desc_function[]){	\
- 			__VA_ARGS__, { } },			\
-@@ -107,8 +103,8 @@ struct mtk_drv_group_desc {
-  * @grp: The group for this pin belongs to.
-  */
- struct mtk_pin_drv_grp {
+-/**
+- * struct mtk_pin_spec_pupd_set - For special pins' pull up/down setting.
+- * @pin: The pin number.
+- * @offset: The offset of special pull up/down setting register.
+- * @pupd_bit: The pull up/down bit in this register.
+- * @r0_bit: The r0 bit of pull resistor.
+- * @r1_bit: The r1 bit of pull resistor.
+- */
+-struct mtk_pin_spec_pupd_set {
 -	unsigned int pin;
 -	unsigned int offset;
+-	unsigned char pupd_bit;
+-	unsigned char r1_bit;
+-	unsigned char r0_bit;
+-};
+-
+-#define MTK_PIN_PUPD_SPEC(_pin, _offset, _pupd, _r1, _r0)	\
+-	{	\
+-		.pin = _pin,	\
+-		.offset = _offset,	\
+-		.pupd_bit = _pupd,	\
+-		.r1_bit = _r1,		\
+-		.r0_bit = _r0,		\
+-	}
+-
+-static const struct mtk_pin_spec_pupd_set mt8173_spec_pupd[] = {
+-	MTK_PIN_PUPD_SPEC(119, 0xe00, 2, 1, 0),  /* KROW0 */
+-	MTK_PIN_PUPD_SPEC(120, 0xe00, 6, 5, 4),  /* KROW1 */
+-	MTK_PIN_PUPD_SPEC(121, 0xe00, 10, 9, 8), /* KROW2 */
+-	MTK_PIN_PUPD_SPEC(122, 0xe10, 2, 1, 0),  /* KCOL0 */
+-	MTK_PIN_PUPD_SPEC(123, 0xe10, 6, 5, 4),  /* KCOL1 */
+-	MTK_PIN_PUPD_SPEC(124, 0xe10, 10, 9, 8), /* KCOL2 */
+-
+-	MTK_PIN_PUPD_SPEC(67, 0xd10, 2, 1, 0),   /* ms0 DS */
+-	MTK_PIN_PUPD_SPEC(68, 0xd00, 2, 1, 0),   /* ms0 RST */
+-	MTK_PIN_PUPD_SPEC(66, 0xc10, 2, 1, 0),   /* ms0 cmd */
+-	MTK_PIN_PUPD_SPEC(65, 0xc00, 2, 1, 0),   /* ms0 clk */
+-	MTK_PIN_PUPD_SPEC(57, 0xc20, 2, 1, 0),   /* ms0 data0 */
+-	MTK_PIN_PUPD_SPEC(58, 0xc20, 2, 1, 0),   /* ms0 data1 */
+-	MTK_PIN_PUPD_SPEC(59, 0xc20, 2, 1, 0),   /* ms0 data2 */
+-	MTK_PIN_PUPD_SPEC(60, 0xc20, 2, 1, 0),   /* ms0 data3 */
+-	MTK_PIN_PUPD_SPEC(61, 0xc20, 2, 1, 0),   /* ms0 data4 */
+-	MTK_PIN_PUPD_SPEC(62, 0xc20, 2, 1, 0),   /* ms0 data5 */
+-	MTK_PIN_PUPD_SPEC(63, 0xc20, 2, 1, 0),   /* ms0 data6 */
+-	MTK_PIN_PUPD_SPEC(64, 0xc20, 2, 1, 0),   /* ms0 data7 */
+-
+-	MTK_PIN_PUPD_SPEC(78, 0xc50, 2, 1, 0),    /* ms1 cmd */
+-	MTK_PIN_PUPD_SPEC(73, 0xd20, 2, 1, 0),    /* ms1 dat0 */
+-	MTK_PIN_PUPD_SPEC(74, 0xd20, 6, 5, 4),    /* ms1 dat1 */
+-	MTK_PIN_PUPD_SPEC(75, 0xd20, 10, 9, 8),   /* ms1 dat2 */
+-	MTK_PIN_PUPD_SPEC(76, 0xd20, 14, 13, 12), /* ms1 dat3 */
+-	MTK_PIN_PUPD_SPEC(77, 0xc40, 2, 1, 0),    /* ms1 clk */
+-
+-	MTK_PIN_PUPD_SPEC(100, 0xd40, 2, 1, 0),    /* ms2 dat0 */
+-	MTK_PIN_PUPD_SPEC(101, 0xd40, 6, 5, 4),    /* ms2 dat1 */
+-	MTK_PIN_PUPD_SPEC(102, 0xd40, 10, 9, 8),   /* ms2 dat2 */
+-	MTK_PIN_PUPD_SPEC(103, 0xd40, 14, 13, 12), /* ms2 dat3 */
+-	MTK_PIN_PUPD_SPEC(104, 0xc80, 2, 1, 0),    /* ms2 clk */
+-	MTK_PIN_PUPD_SPEC(105, 0xc90, 2, 1, 0),    /* ms2 cmd */
+-
+-	MTK_PIN_PUPD_SPEC(22, 0xd60, 2, 1, 0),    /* ms3 dat0 */
+-	MTK_PIN_PUPD_SPEC(23, 0xd60, 6, 5, 4),    /* ms3 dat1 */
+-	MTK_PIN_PUPD_SPEC(24, 0xd60, 10, 9, 8),   /* ms3 dat2 */
+-	MTK_PIN_PUPD_SPEC(25, 0xd60, 14, 13, 12), /* ms3 dat3 */
+-	MTK_PIN_PUPD_SPEC(26, 0xcc0, 2, 1, 0),    /* ms3 clk */
+-	MTK_PIN_PUPD_SPEC(27, 0xcd0, 2, 1, 0)     /* ms3 cmd */
++static const struct mtk_pin_spec_pupd_set_samereg mt8173_spec_pupd[] = {
++	MTK_PIN_PUPD_SPEC_SR(119, 0xe00, 2, 1, 0),  /* KROW0 */
++	MTK_PIN_PUPD_SPEC_SR(120, 0xe00, 6, 5, 4),  /* KROW1 */
++	MTK_PIN_PUPD_SPEC_SR(121, 0xe00, 10, 9, 8), /* KROW2 */
++	MTK_PIN_PUPD_SPEC_SR(122, 0xe10, 2, 1, 0),  /* KCOL0 */
++	MTK_PIN_PUPD_SPEC_SR(123, 0xe10, 6, 5, 4),  /* KCOL1 */
++	MTK_PIN_PUPD_SPEC_SR(124, 0xe10, 10, 9, 8), /* KCOL2 */
++
++	MTK_PIN_PUPD_SPEC_SR(67, 0xd10, 2, 1, 0),   /* ms0 DS */
++	MTK_PIN_PUPD_SPEC_SR(68, 0xd00, 2, 1, 0),   /* ms0 RST */
++	MTK_PIN_PUPD_SPEC_SR(66, 0xc10, 2, 1, 0),   /* ms0 cmd */
++	MTK_PIN_PUPD_SPEC_SR(65, 0xc00, 2, 1, 0),   /* ms0 clk */
++	MTK_PIN_PUPD_SPEC_SR(57, 0xc20, 2, 1, 0),   /* ms0 data0 */
++	MTK_PIN_PUPD_SPEC_SR(58, 0xc20, 2, 1, 0),   /* ms0 data1 */
++	MTK_PIN_PUPD_SPEC_SR(59, 0xc20, 2, 1, 0),   /* ms0 data2 */
++	MTK_PIN_PUPD_SPEC_SR(60, 0xc20, 2, 1, 0),   /* ms0 data3 */
++	MTK_PIN_PUPD_SPEC_SR(61, 0xc20, 2, 1, 0),   /* ms0 data4 */
++	MTK_PIN_PUPD_SPEC_SR(62, 0xc20, 2, 1, 0),   /* ms0 data5 */
++	MTK_PIN_PUPD_SPEC_SR(63, 0xc20, 2, 1, 0),   /* ms0 data6 */
++	MTK_PIN_PUPD_SPEC_SR(64, 0xc20, 2, 1, 0),   /* ms0 data7 */
++
++	MTK_PIN_PUPD_SPEC_SR(78, 0xc50, 2, 1, 0),    /* ms1 cmd */
++	MTK_PIN_PUPD_SPEC_SR(73, 0xd20, 2, 1, 0),    /* ms1 dat0 */
++	MTK_PIN_PUPD_SPEC_SR(74, 0xd20, 6, 5, 4),    /* ms1 dat1 */
++	MTK_PIN_PUPD_SPEC_SR(75, 0xd20, 10, 9, 8),   /* ms1 dat2 */
++	MTK_PIN_PUPD_SPEC_SR(76, 0xd20, 14, 13, 12), /* ms1 dat3 */
++	MTK_PIN_PUPD_SPEC_SR(77, 0xc40, 2, 1, 0),    /* ms1 clk */
++
++	MTK_PIN_PUPD_SPEC_SR(100, 0xd40, 2, 1, 0),    /* ms2 dat0 */
++	MTK_PIN_PUPD_SPEC_SR(101, 0xd40, 6, 5, 4),    /* ms2 dat1 */
++	MTK_PIN_PUPD_SPEC_SR(102, 0xd40, 10, 9, 8),   /* ms2 dat2 */
++	MTK_PIN_PUPD_SPEC_SR(103, 0xd40, 14, 13, 12), /* ms2 dat3 */
++	MTK_PIN_PUPD_SPEC_SR(104, 0xc80, 2, 1, 0),    /* ms2 clk */
++	MTK_PIN_PUPD_SPEC_SR(105, 0xc90, 2, 1, 0),    /* ms2 cmd */
++
++	MTK_PIN_PUPD_SPEC_SR(22, 0xd60, 2, 1, 0),    /* ms3 dat0 */
++	MTK_PIN_PUPD_SPEC_SR(23, 0xd60, 6, 5, 4),    /* ms3 dat1 */
++	MTK_PIN_PUPD_SPEC_SR(24, 0xd60, 10, 9, 8),   /* ms3 dat2 */
++	MTK_PIN_PUPD_SPEC_SR(25, 0xd60, 14, 13, 12), /* ms3 dat3 */
++	MTK_PIN_PUPD_SPEC_SR(26, 0xcc0, 2, 1, 0),    /* ms3 clk */
++	MTK_PIN_PUPD_SPEC_SR(27, 0xcd0, 2, 1, 0)     /* ms3 cmd */
+ };
+ 
+-static int spec_pull_set(struct regmap *regmap, unsigned int pin,
++static int mt8173_spec_pull_set(struct regmap *regmap, unsigned int pin,
+ 		unsigned char align, bool isup, unsigned int r1r0)
+ {
+-	unsigned int i;
+-	unsigned int reg_pupd, reg_set, reg_rst;
+-	unsigned int bit_pupd, bit_r0, bit_r1;
+-	const struct mtk_pin_spec_pupd_set *spec_pupd_pin;
+-	bool find = false;
+-
+-	for (i = 0; i < ARRAY_SIZE(mt8173_spec_pupd); i++) {
+-		if (pin == mt8173_spec_pupd[i].pin) {
+-			find = true;
+-			break;
+-		}
+-	}
+-
+-	if (!find)
+-		return -EINVAL;
+-
+-	spec_pupd_pin = mt8173_spec_pupd + i;
+-	reg_set = spec_pupd_pin->offset + align;
+-	reg_rst = spec_pupd_pin->offset + (align << 1);
+-
+-	if (isup)
+-		reg_pupd = reg_rst;
+-	else
+-		reg_pupd = reg_set;
+-
+-	bit_pupd = BIT(spec_pupd_pin->pupd_bit);
+-	regmap_write(regmap, reg_pupd, bit_pupd);
+-
+-	bit_r0 = BIT(spec_pupd_pin->r0_bit);
+-	bit_r1 = BIT(spec_pupd_pin->r1_bit);
+-
+-	switch (r1r0) {
+-	case MTK_PUPD_SET_R1R0_00:
+-		regmap_write(regmap, reg_rst, bit_r0);
+-		regmap_write(regmap, reg_rst, bit_r1);
+-		break;
+-	case MTK_PUPD_SET_R1R0_01:
+-		regmap_write(regmap, reg_set, bit_r0);
+-		regmap_write(regmap, reg_rst, bit_r1);
+-		break;
+-	case MTK_PUPD_SET_R1R0_10:
+-		regmap_write(regmap, reg_rst, bit_r0);
+-		regmap_write(regmap, reg_set, bit_r1);
+-		break;
+-	case MTK_PUPD_SET_R1R0_11:
+-		regmap_write(regmap, reg_set, bit_r0);
+-		regmap_write(regmap, reg_set, bit_r1);
+-		break;
+-	default:
+-		return -EINVAL;
+-	}
+-
+-	return 0;
++	return mtk_pctrl_spec_pull_set_samereg(regmap, mt8173_spec_pupd,
++		ARRAY_SIZE(mt8173_spec_pupd), pin, align, isup, r1r0);
+ }
+ 
+ static const struct mtk_pin_ies_smt_set mt8173_ies_smt_set[] = {
+@@ -382,7 +306,7 @@ static const struct mtk_pinctrl_devdata mt8173_pinctrl_data = {
+ 	.n_grp_cls = ARRAY_SIZE(mt8173_drv_grp),
+ 	.pin_drv_grp = mt8173_pin_drv,
+ 	.n_pin_drv_grps = ARRAY_SIZE(mt8173_pin_drv),
+-	.spec_pull_set = spec_pull_set,
++	.spec_pull_set = mt8173_spec_pull_set,
+ 	.spec_ies_smt_set = spec_ies_smt_set,
+ 	.dir_offset = 0x0000,
+ 	.pullen_offset = 0x0100,
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+index 493294c..0aee6bc 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+@@ -186,6 +186,66 @@ static int mtk_pconf_set_driving(struct mtk_pinctrl *pctl,
+ 	return -EINVAL;
+ }
+ 
++int mtk_pctrl_spec_pull_set_samereg(struct regmap *regmap,
++		const struct mtk_pin_spec_pupd_set_samereg *pupd_infos,
++		unsigned int info_num, unsigned int pin,
++		unsigned char align, bool isup, unsigned int r1r0)
++{
++	unsigned int i;
++	unsigned int reg_pupd, reg_set, reg_rst;
++	unsigned int bit_pupd, bit_r0, bit_r1;
++	const struct mtk_pin_spec_pupd_set_samereg *spec_pupd_pin;
++	bool find = false;
++
++	for (i = 0; i < info_num; i++) {
++		if (pin == pupd_infos[i].pin) {
++			find = true;
++			break;
++		}
++	}
++
++	if (!find)
++		return -EINVAL;
++
++	spec_pupd_pin = pupd_infos + i;
++	reg_set = spec_pupd_pin->offset + align;
++	reg_rst = spec_pupd_pin->offset + (align << 1);
++
++	if (isup)
++		reg_pupd = reg_rst;
++	else
++		reg_pupd = reg_set;
++
++	bit_pupd = BIT(spec_pupd_pin->pupd_bit);
++	regmap_write(regmap, reg_pupd, bit_pupd);
++
++	bit_r0 = BIT(spec_pupd_pin->r0_bit);
++	bit_r1 = BIT(spec_pupd_pin->r1_bit);
++
++	switch (r1r0) {
++	case MTK_PUPD_SET_R1R0_00:
++		regmap_write(regmap, reg_rst, bit_r0);
++		regmap_write(regmap, reg_rst, bit_r1);
++		break;
++	case MTK_PUPD_SET_R1R0_01:
++		regmap_write(regmap, reg_set, bit_r0);
++		regmap_write(regmap, reg_rst, bit_r1);
++		break;
++	case MTK_PUPD_SET_R1R0_10:
++		regmap_write(regmap, reg_rst, bit_r0);
++		regmap_write(regmap, reg_set, bit_r1);
++		break;
++	case MTK_PUPD_SET_R1R0_11:
++		regmap_write(regmap, reg_set, bit_r0);
++		regmap_write(regmap, reg_set, bit_r1);
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
+ static int mtk_pconf_set_pull_select(struct mtk_pinctrl *pctl,
+ 		unsigned int pin, bool enable, bool isup, unsigned int arg)
+ {
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.h b/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
+index 1508849..2a4b7be 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
++++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.h
+@@ -117,6 +117,32 @@ struct mtk_pin_drv_grp {
+ 		.grp = _grp,	\
+ 	}
+ 
++/**
++ * struct mtk_pin_spec_pupd_set_samereg
++ * - For special pins' pull up/down setting which resides in same register
++ * @pin: The pin number.
++ * @offset: The offset of special pull up/down setting register.
++ * @pupd_bit: The pull up/down bit in this register.
++ * @r0_bit: The r0 bit of pull resistor.
++ * @r1_bit: The r1 bit of pull resistor.
++ */
++struct mtk_pin_spec_pupd_set_samereg {
 +	unsigned short pin;
 +	unsigned short offset;
- 	unsigned char bit;
- 	unsigned char grp;
- };
-@@ -193,7 +189,6 @@ struct mtk_pinctrl_devdata {
- 	unsigned int pullen_offset;
- 	unsigned int pullsel_offset;
- 	unsigned int drv_offset;
--	unsigned int invser_offset;
- 	unsigned int dout_offset;
- 	unsigned int din_offset;
- 	unsigned int pinmux_offset;
-@@ -202,7 +197,6 @@ struct mtk_pinctrl_devdata {
- 	unsigned char  port_shf;
- 	unsigned char  port_mask;
- 	unsigned char  port_align;
--	unsigned char	chip_type;
- 	struct mtk_eint_offsets eint_offsets;
- 	unsigned int	ap_num;
- 	unsigned int	db_cnt;
++	unsigned char pupd_bit;
++	unsigned char r1_bit;
++	unsigned char r0_bit;
++};
++
++#define MTK_PIN_PUPD_SPEC_SR(_pin, _offset, _pupd, _r1, _r0)	\
++	{	\
++		.pin = _pin,	\
++		.offset = _offset,	\
++		.pupd_bit = _pupd,	\
++		.r1_bit = _r1,		\
++		.r0_bit = _r0,		\
++	}
++
+ struct mtk_eint_offsets {
+ 	const char *name;
+ 	unsigned int  stat;
+@@ -220,4 +246,9 @@ struct mtk_pinctrl {
+ int mtk_pctrl_init(struct platform_device *pdev,
+ 		const struct mtk_pinctrl_devdata *data);
+ 
++int mtk_pctrl_spec_pull_set_samereg(struct regmap *regmap,
++		const struct mtk_pin_spec_pupd_set_samereg *pupd_infos,
++		unsigned int info_num, unsigned int pin,
++		unsigned char align, bool isup, unsigned int r1r0);
++
+ #endif /* __PINCTRL_MTK_COMMON_H */
 -- 
 1.7.9.5
