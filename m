@@ -1,38 +1,33 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 19 May 2015 09:14:42 +0200
-Subject: at91sam9: watchdog: period
-In-Reply-To: <555AA8F1.80100@atmel.com>
-References: <55559D55.6020703@aksignal.cz> <20150515172516.005e3a21@bbrezillon>
- <5559865F.9010502@aksignal.cz> <20150518092750.449d6c8c@bbrezillon>
- <5559A029.9060007@aksignal.cz> <555AA8F1.80100@atmel.com>
-Message-ID: <20150519091442.675b1a98@bbrezillon>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Tue, 19 May 2015 15:15:21 +0800
+Subject: [PATCH] crypto: allow to assign gfp_t for __crypto_alloc_tfm
+In-Reply-To: <20150519071317.GB40012@jaegeuk-mac02.hsd1.ca.comcast.net>
+References: <1432014416-39326-1-git-send-email-jaegeuk@kernel.org>
+ <20150519054945.GA28060@gondor.apana.org.au>
+ <20150519062430.GA39588@jaegeuk-mac02.hsd1.ca.comcast.net>
+ <20150519063211.GA28347@gondor.apana.org.au>
+ <20150519065812.GA40012@jaegeuk-mac02.hsd1.ca.comcast.net>
+ <20150519065929.GA28610@gondor.apana.org.au>
+ <20150519071317.GB40012@jaegeuk-mac02.hsd1.ca.comcast.net>
+Message-ID: <20150519071521.GA28862@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 May 2015 11:07:29 +0800
-"Yang, Wenyou" <wenyou.yang@atmel.com> wrote:
+On Tue, May 19, 2015 at 12:13:17AM -0700, Jaegeuk Kim wrote:
+>
+> The key generation is done by ext4_generate_encryption_key in
+> fs/ext4/crypto_key.c.
+> And, ext4_file_mmap and ext4_file_open trigger it.
 
-> 
-> 
-> On 2015/5/18 16:17, Ji?? Prchal wrote:
-> >
-> >
-> > On 18.5.2015 09:27, Boris Brezillon wrote:
-> >>
-> >> Can you dump watchdog registers (using devmem) ?
-> >
-> > / # devmem 0xfffffe40
-> > 0x00000000
-> > / # devmem 0xfffffe44
-> > 0x1FFF2FFF
-> > / # devmem 0xfffffe48
-> > 0x00000000
-> >
-> The register value is right.
+Well that's where you should be doing crypto_alloc_ablkcipher
+and crypto_ablkcipher_setkey.
 
-It seems correct to me too.
+The whole point of a crypto tfm is to represent a key so any time
+you get one you should create a crypto tfm.  Carrying around a raw
+key is just wrong.
 
+Cheers,
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
