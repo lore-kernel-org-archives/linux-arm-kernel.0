@@ -1,56 +1,30 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 19 May 2015 15:28:50 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: Add Atmel SAMA5 family
-In-Reply-To: <555B3463.2060700@atmel.com>
-References: <1428051678-20450-1-git-send-email-alexandre.belloni@free-electrons.com>
- <555AFF3F.10400@atmel.com> <9986808.t62JLgg5NJ@wuerfel>
- <20150519123358.GA15179@piout.net> <555B3463.2060700@atmel.com>
-Message-ID: <555B3A92.7010409@atmel.com>
+From: treding@nvidia.com (Thierry Reding)
+Date: Tue, 19 May 2015 15:32:27 +0200
+Subject: [PATCH] drm/nouveau/platform: add IOMMU dependency
+In-Reply-To: <2918377.0irYYn09PU@wuerfel>
+References: <2918377.0irYYn09PU@wuerfel>
+Message-ID: <20150519133225.GA26555@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 19/05/2015 15:02, Nicolas Ferre a ?crit :
-> Le 19/05/2015 14:33, Alexandre Belloni a ?crit :
->> On 19/05/2015 at 13:04:22 +0200, Arnd Bergmann wrote :
->>>>> @@ -250,15 +261,18 @@ CONFIG_SERIAL_FSL_LPUART=y
->>>>>  CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
->>>>>  CONFIG_SERIAL_ST_ASC=y
->>>>>  CONFIG_SERIAL_ST_ASC_CONSOLE=y
->>>>> +CONFIG_HW_RANDOM=y
->>>>>  CONFIG_I2C_CHARDEV=y
->>>>>  CONFIG_I2C_DAVINCI=y
->>>>>  CONFIG_I2C_MUX=y
->>>
->>> seems non-essential.
->>>
->>
->> That is an oversight, it should be compiled as a module.
+On Tue, May 19, 2015 at 02:53:26PM +0200, Arnd Bergmann wrote:
+> The recently added iommu code in the nouveau driver fails to build
+> when the IOMMU support is disabled:
 > 
-> Ok, I modify it: no need to bother sending a new revision.
+> drivers/gpu/drm/nouveau/nouveau_platform.c: In function 'nouveau_platform_probe_iommu':
+> drivers/gpu/drm/nouveau/nouveau_platform.c:113:41: error: 'const struct iommu_ops' has no mem
 > 
->>>>> @@ -502,6 +522,8 @@ CONFIG_RTC_DRV_MV=y
->>>>>  CONFIG_RTC_DRV_TEGRA=y
->>>>>  CONFIG_DMADEVICES=y
->>>>>  CONFIG_DW_DMAC=y
->>>>> +CONFIG_AT_HDMAC=y
->>>>> +CONFIG_AT_XDMAC=y
->>>>>  CONFIG_MV_XOR=y
->>>>>  CONFIG_TEGRA20_APB_DMA=y
->>>>>  CONFIG_SH_DMAE=y
->>>
->>> What are these required for? I assume you need them for MMC? If so, that's
->>> fine.
->>>
->>
->> That is indeed the reason.
+> To avoid the build error, this now adds an explicit dependency on the
+> IOMMU implementation.
 > 
-> Yep.
-> 
-> So I simply do a s/y/m/ on the CONFIG_HW_RANDOM then included it in our
-> at91-4.2-defconfig branch.
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 58fd9375c2c5 ("drm/nouveau/platform: probe IOMMU if present")
 
-In fact it's a boolean. So removing it does the trick.
-
-Bye,
--- 
-Nicolas Ferre
+Acked-by: Thierry Reding <treding@nvidia.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150519/b896fe1c/attachment.sig>
