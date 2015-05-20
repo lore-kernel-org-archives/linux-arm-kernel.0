@@ -1,73 +1,71 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 20 May 2015 18:50:25 +0200
-Subject: [GIT PULL v2] ARM: berlin: DT changes for v4.2 (round 1)
-Message-ID: <1432140626-6109-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Wed, 20 May 2015 18:50:26 +0200
+Subject: [GIT PULL v2] ARM: berlin: Simple-MFD rework for v4.2 (round 1)
+In-Reply-To: <1432140626-6109-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1432140626-6109-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1432140626-6109-2-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Arnd, Kevin, Olof,
 
-as pointed out by Arnd on the last PR, this is the remainder of the DT
-branch based on v4.1-rc1 without the simple-mfd rework comprising
-
-- GPLv2/X11 relicensing of all Berlin DT files with all Acked-bys.
-- Unstable DT note in Berlin binding docs.
-- Updated binding documentation of reworked chip/system controller and
-  dependant pinctrl, clk, reset bindings.
-
-The actual DT rework patches will be sent as a different PR based on
-arm-soc driver/simple-mfd instead.
+this is a PR for the Berlin System/Chip controller simple-mfd rework
+which is now bisect compatible and rebased on top of arm-soc's
+drivers/simple-mfd tag. Compared to the corresponding patch set, I
+also added the ADC node patch for berlin2q which also depends on
+simple-mfd.
 
 Please pull.
 
 Thanks,
   Sebastian
 
-The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+The following changes since commit 48f1a9a4e268dec7c7f3e79339cfb85699c48eb0:
 
-  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+  arm64: add LEDs and some trigger support to defconfig (2015-05-11 08:55:04 +0200)
 
 are available in the git repository at:
 
-  git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin-dt-4.2-1
+  git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin-simple-mfd-4.2-1
 
-for you to fetch changes up to 576efe38000dc81d8140925d9725a4f4e789514a:
+for you to fetch changes up to 5be2361160cdbbfcc580b82a440218c115c15504:
 
-  Documentation: bindings: update the berlin chip and system ctrl doc (2015-05-16 00:07:51 +0200)
-
-----------------------------------------------------------------
-Berlin DT changes for v4.2
-- GPLv2/X11 dual licensing
-- Mark Berlin DT bindings as unstable
-- Updated binding documentation for reworked
-  chip/system ctrl nodes
+  ARM: berlin: add an ADC node for the BG2Q (2015-05-18 18:10:16 +0200)
 
 ----------------------------------------------------------------
-Antoine Tenart (12):
-      ARM: dts: berlin: relicense the berlin2q dtsi under GPLv2/X11
-      ARM: dts: berlin: relicense the BG2Q Marvell DMP dts under GPLv2/X11
-      ARM: dts: berlin: relicense the berlin2 dtsi under GPLv2/X11
-      ARM: dts: berlin: relicense the BG2 Sony NSZ-GS7 dts under GPLv2/X11
-      ARM: dts: berlin: relicense the berlin2cd dtsi under GPLv2/X11
-      ARM: dts: berlin: relicense the BG2CD Google Chromecast dts under GPLv2/X11
-      Documentation: bindings: berlin: consider our dt bindings as unstable
-      Documentation: bindings: update the Berlin controllers documentation
-      Documentation: bindings: move the Berlin reset documentation
-      Documentation: bindings: move the Berlin pinctrl documentation
-      Documentation: bindings: move the Berlin clock documentation
-      Documentation: bindings: update the berlin chip and system ctrl doc
+Berlin simple-mfd for v4.2
+- based on arm-soc drivers/simple-mfd branch
+- rework of chip/system ctrl nodes to simple-mfd probing for
+  clk, pinctrl, and reset
+- add adc node
 
- .../devicetree/bindings/arm/marvell,berlin.txt     | 100 +++++----------------
- .../devicetree/bindings/clock/marvell,berlin.txt   |  31 +++++++
- .../devicetree/bindings/pinctrl/berlin,pinctrl.txt |  43 +++++++++
- .../devicetree/bindings/reset/berlin,reset.txt     |  23 +++++
- arch/arm/boot/dts/berlin2-sony-nsz-gs7.dts         |  34 ++++++-
- arch/arm/boot/dts/berlin2.dtsi                     |  34 ++++++-
- arch/arm/boot/dts/berlin2cd-google-chromecast.dts  |  34 ++++++-
- arch/arm/boot/dts/berlin2cd.dtsi                   |  34 ++++++-
- arch/arm/boot/dts/berlin2q-marvell-dmp.dts         |  34 ++++++-
- arch/arm/boot/dts/berlin2q.dtsi                    |  34 ++++++-
- 10 files changed, 305 insertions(+), 96 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/marvell,berlin.txt
- create mode 100644 Documentation/devicetree/bindings/pinctrl/berlin,pinctrl.txt
- create mode 100644 Documentation/devicetree/bindings/reset/berlin,reset.txt
+----------------------------------------------------------------
+Antoine Tenart (15):
+      ARM: berlin: select MFD_SYSCON by default
+      ARM: berlin: prepare simple-mfd/syscon conversion of sys/chip ctrl nodes
+      reset: berlin: convert to a platform driver
+      ARM: berlin: move reset to simple-mfd nodes
+      reset: berlin: drop arch_initcall initialization
+      pinctrl: berlin: prepare to use regmap provided by syscon
+      ARM: berlin: move pinctrl to simple-mfd nodes
+      pinctrl: berlin: drop SoC stub provided regmap
+      clk: berlin: prepare simple-mfd conversion
+      ARM: berlin: move BG2 clock node
+      ARM: berlin: move BG2CD clock node
+      ARM: berlin: move BG2Q clock node
+      clk: berlin: drop direct of_iomap of nodes reg property
+      ARM: berlin: remove useless chip and system ctrl compatibles
+      ARM: berlin: add an ADC node for the BG2Q
+
+ arch/arm/boot/dts/berlin2.dtsi        |  90 ++++++++++++++-----------
+ arch/arm/boot/dts/berlin2cd.dtsi      |  66 ++++++++++++-------
+ arch/arm/boot/dts/berlin2q.dtsi       | 120 ++++++++++++++++++++--------------
+ arch/arm/mach-berlin/Kconfig          |   1 +
+ drivers/clk/berlin/bg2.c              |   7 +-
+ drivers/clk/berlin/bg2q.c             |   7 +-
+ drivers/pinctrl/berlin/berlin-bg2.c   |  26 +-------
+ drivers/pinctrl/berlin/berlin-bg2cd.c |  26 +-------
+ drivers/pinctrl/berlin/berlin-bg2q.c  |  26 +-------
+ drivers/pinctrl/berlin/berlin.c       |   9 ++-
+ drivers/reset/reset-berlin.c          |  74 ++++++++-------------
+ 11 files changed, 212 insertions(+), 240 deletions(-)
