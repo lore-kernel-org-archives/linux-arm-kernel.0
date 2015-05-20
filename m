@@ -1,36 +1,32 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 20 May 2015 07:23:58 -0700
-Subject: [RESEND PATCH 0/2] pinctrl: zynq: fix two bugs of zynq pinmux
- function
-In-Reply-To: <1432111351-21336-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1432111351-21336-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20150520142358.GS31550@xsjsorenbubuntu>
+From: sebastien.szymanski@armadeus.com (=?UTF-8?q?S=C3=A9bastien=20Szymanski?=)
+Date: Wed, 20 May 2015 16:30:37 +0200
+Subject: [PATCH 1/1] ARM: clk-imx6q: refine sata's parent
+Message-ID: <1432132237-31004-1-git-send-email-sebastien.szymanski@armadeus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Masahiro,
+According to IMX6D/Q RM, table 18-3, sata clock's parent is ahb, not ipg.
 
-On Wed, 2015-05-20 at 05:42PM +0900, Masahiro Yamada wrote:
-> 
-> I sent the previous one to linux-serial by mistake.
-> I am resending to linux-gpio, dropping linux-serial.
-> Sorry for noise.
-> 
-> 
-> 
-> Masahiro Yamada (2):
->   pinctrl: zynq: fix DEFINE_ZYNQ_PINMUX_FUNCTION_MUX macro
->   pinctrl: zynq: fix offset address for {SD0,SD1}_WP_CD_SEL
+This patch is based on branch:
+git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git imx/soc
 
-For the series:
-Reviewed-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
+---
+ drivers/clk/imx/clk-imx6q.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I'm not sure how severe the impact of these bugs is. It looks like the
-the current driver could corrupt the register for MIO pin0, am I right?
-It may be a good ides to add
-  Fixes: add958cee967 "pinctrl: Add driver for Zynq"
-(I suspect that bug is there from the beginning) and ask Linus to
-consider this for stable.
-
-	Thanks,
-	S?ren
+diff --git a/drivers/clk/imx/clk-imx6q.c b/drivers/clk/imx/clk-imx6q.c
+index 128f887..d046f8e 100644
+--- a/drivers/clk/imx/clk-imx6q.c
++++ b/drivers/clk/imx/clk-imx6q.c
+@@ -450,7 +450,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	clk[IMX6QDL_CLK_GPMI_IO]      = imx_clk_gate2("gpmi_io",       "enfc",              base + 0x78, 28);
+ 	clk[IMX6QDL_CLK_GPMI_APB]     = imx_clk_gate2("gpmi_apb",      "usdhc3",            base + 0x78, 30);
+ 	clk[IMX6QDL_CLK_ROM]          = imx_clk_gate2("rom",           "ahb",               base + 0x7c, 0);
+-	clk[IMX6QDL_CLK_SATA]         = imx_clk_gate2("sata",          "ipg",               base + 0x7c, 4);
++	clk[IMX6QDL_CLK_SATA]         = imx_clk_gate2("sata",          "ahb",               base + 0x7c, 4);
+ 	clk[IMX6QDL_CLK_SDMA]         = imx_clk_gate2("sdma",          "ahb",               base + 0x7c, 6);
+ 	clk[IMX6QDL_CLK_SPBA]         = imx_clk_gate2("spba",          "ipg",               base + 0x7c, 12);
+ 	clk[IMX6QDL_CLK_SPDIF]        = imx_clk_gate2("spdif",         "spdif_podf",        base + 0x7c, 14);
+-- 
+2.0.5
