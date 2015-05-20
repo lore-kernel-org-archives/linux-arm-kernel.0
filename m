@@ -1,110 +1,93 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 20 May 2015 08:58:46 +0100
-Subject: [PATCH v4 2/3] irqchip: GIC: Add support for
- irq_{get,set}_irqchip_state
-In-Reply-To: <CAL85gmDugvn0Gv-Ypm0EN-3bE6JM+hWFkVV8FxCeBQ1FS7EERw@mail.gmail.com>
-References: <1426676484-21812-1-git-send-email-marc.zyngier@arm.com>
- <1426676484-21812-3-git-send-email-marc.zyngier@arm.com>
- <CAL85gmBrkonMcKdUVGmYx6zT3wSe-e2jPhnL_+Tkf3s4jsAiWg@mail.gmail.com>
- <CACRpkdYffHJEzksc5mg7JZdwTzShGaQofAmbmn65=_V3ot04Rg@mail.gmail.com>
- <CAL85gmC4ovR99wQQYoKs=oo24So80jZ_guxDDFhi-1MXXj0uSw@mail.gmail.com>
- <CACRpkdZkBLrhFpZiYk4fiM3ND+UwnVJhNKs=+rL5iZY4fS7zCg@mail.gmail.com>
- <CAL85gmD=12u87vDAc601T=ZOgcS-jDo_=LaC5gRAZUHgp_iTbA@mail.gmail.com>
- <CACRpkdYV1MzjW6ZMvmOhqi0qhXeeQnC62--7WBY=_hZBT8cvXg@mail.gmail.com>
- <20150519110131.522f9c16@arm.com>
- <CAL85gmDugvn0Gv-Ypm0EN-3bE6JM+hWFkVV8FxCeBQ1FS7EERw@mail.gmail.com>
-Message-ID: <20150520085846.43ad36b7@why.wild-wind.fr.eu.org>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Wed, 20 May 2015 15:59:35 +0800
+Subject: [PATCH v8 2/3] I2C: mediatek: Add driver for MediaTek I2C
+ controller
+In-Reply-To: <20150520071152.GP24769@pengutronix.de>
+References: <1431967209-5261-1-git-send-email-eddie.huang@mediatek.com>
+ <1431967209-5261-3-git-send-email-eddie.huang@mediatek.com>
+ <20150518184300.GB28888@pengutronix.de>
+ <1432089611.13819.9.camel@mtksdaap41>
+ <20150520071152.GP24769@pengutronix.de>
+Message-ID: <1432108775.12796.11.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 May 2015 22:45:26 +0100
-Feng Kan <fkan@apm.com> wrote:
+Hi Uwe,
 
-> On Tue, May 19, 2015 at 3:01 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > On Tue, 19 May 2015 09:40:21 +0100
-> > Linus Walleij <linus.walleij@linaro.org> wrote:
-> >
-> >> On Thu, May 14, 2015 at 10:14 PM, Feng Kan <fkan@apm.com> wrote:
-> >> > On Thu, May 14, 2015 at 3:32 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> >>
-> >> >> But surely the GPIO block has its own status register, so are
-> >> >> you saying that this register is unreliable?
-> >> >
-> >> > When the GPIO is used as interrupt, the gpio block does not report the
-> >> > status anymore. Which leaves us stuck with SPISR.
-> >> >>
-> >> >> I can think of a few reasons, like transient IRQs etc but
-> >> >> what is actually causing this?
-> >> >
-> >> > I won't say the obvious.
-> >>
-> >> Yeah I see your problem now :(
-> >>
-> >> I think it's better to fix the access functions so that you can
-> >> cross-call to the GIC driver to get the SPISR flag out though.
-> >> Let's see what Marc says.
-> >>
-> >> >> Which GPIO driver is this? Is it upstream?
-> >> >
-> >> > Yes, it is upstream. It is the xgene slimpro gpio driver. I am starting to
-> >> > think that we ought to switch to use some gpio poll driver rather than
-> >> > using gpio-key.
-> >>
-> >> There is both gpio_keys_polled and IRQ-driven gpio_keys so yeah
-> >> that's possible. But honestly I think it's better to deal with this
-> >> problem for real because IRQ is more efficient.
-> >>
-> >> So the way I perceive it this is the real problem:
-> >>
-> >> +static int gic_irq_get_irqchip_state(struct irq_data *d,
-> >> +                                     enum irqchip_irq_state which, bool *val)
-> >> +{
-> >> +       switch (which) {
-> >> (...)
-> >> +       case IRQCHIP_STATE_ACTIVE:
-> >> +               *val = gic_peek_irq(d, GIC_DIST_ACTIVE_SET);
-> >> +               break; case: read
-> >> from 0xd04 (SPISR) instead, because that makes more
-> >> sense to me, or am I wrong at it?
-> >>
-> >> +       case IRQCHIP_STATE_LINE_LEVEL:
-> >> +               *val = gic_peek_irq(d, GIC_DIST_SPISR);
-> >> +               break;
-> >>
-> >> And then put a define into <linux/irqchip/arm-gic.h> for
-> >> GIC_DIST_SPISR.
-> >
-> > What worries me here is that the PENDING state should already give you
-> > the right level of information (this is what the GIC-400 TRM says). The
-> > only reason why SPISR exists is that software can write to the PENDING
-> > register, while SPISR is RO.
-> >
-> > If reading the pending state doesn't work, then I'd like to know
-> > exactly *why*. Only then we can add support for LINE_LEVEL using SPISR
-> > (which has to be GIC-400 specific, as it is not architected).
+On Wed, 2015-05-20 at 09:11 +0200, Uwe Kleine-K?nig wrote:
+> Hello Eddie,
 > 
-> IS_PENDING and IS_ACTIVE works fine for the ISR context. However,
-> the nature of the register is meant for IRQ handling and not to read
-> the status of a GPIO. By the time the gpio_key throws a work queue
-> and check the status of the PENDING register, it is no long relevant.
+> On Wed, May 20, 2015 at 10:40:11AM +0800, Eddie Huang wrote:
+> > On Mon, 2015-05-18 at 20:43 +0200, Uwe Kleine-K?nig wrote:
+> > > On Tue, May 19, 2015 at 12:40:08AM +0800, Eddie Huang wrote:
+> > > > +/* calculate i2c port speed */
+> > > It would be nice to summarize the clock frequency settings here.
+> > > Something like:
+> > > 
+> > > 	/*
+> > > 	 * The input clock is divided by the value specified in the
+> > > 	 * device tree as clock-div. The actual bus speed is then
+> > > 	 * derived from this frequency by the following formula:
+> > > 	 *  ....
+> > > 
+> > > This would make it possible to verify your calculations below.
+> > 
+> > The comment will be:
+> > /*
+> >  * khz: I2C bus clock
+> >  * hclk: The input clock is divided by the value specified in the 
+> >  *       device tree as clock-div
+> and which one of the two clocks you're writing about is hclk now? I
+> assume the divided one.
+> >  * div = (sample_cnt + 1) * (step_cnt + 1)
+> >  * khz = (hclk / 2) / div
+> khz for the 2nd time.
+> 
+> >  *
+> >  * The calculation is to get div value that let result of 
+> >  * ((hclk / 2) / div) most approach and less than khz
+> >  */
+> I imagined something more hardware related. A list of register (or
+> register bit fields) that influence the frequency and a formula
 
-This is far more subtle that that. Assuming a level-triggered
-interrupt, the PENDING state is completely independent of the state of
-the interrupt (see the GIC state machine), and will accurately reflect
-the input line (an edge-triggered interrupt is of course a different
-matter). As outlined in the GIC-400 TRM, both GICD_ICPENDINGRn,
-GICD_ISPENDINGRn and GICD_SPISRn are providing the same information
-(the only difference being that SPISRn is offering a RO view before the
-latches).
+> 	i2c_freq = parent_clk / clock-div * (...)
+> 
+> (It seems to be a bit more complicated here as there are two registers
+> involved that are set differently depending on the target frequency.)
 
-SPISRn is essentially a debug register, not something that is meant to
-be used in normal code, GPIO or otherwise. So assuming we have an
-actual GIC-400 implementation here, I want to know why this isn't
-working, and you are in a position to tell me (I assume you can talk to
-the HW people that did the integration).
+Yes, hardware is a little complicated. I rewrite the comment:
 
-Thanks,
+/*
+ * Calculate i2c port speed
+ *
+ * Hardware design:
+ * i2c_bus_freq = parent_clk / (clock-div * 2 * (sample_cnt) *
+(step_cnt))
+ * clock-div: fixed in hardware, but may be various in different SoCs
+ *
+ * The calculation want to pick the highest bus frequency that is still 
+ * less than or equal to i2c->speed_hz. and the calculation try to get 
+ * sample_cnt and step_cnt to fill in hardware register.
+ */
 
-	M.
--- 
-Without deviation from the norm, progress is not possible.
+> 
+> > > > +static int mtk_i2c_set_speed(struct mtk_i2c *i2c, unsigned int clk_src_in_hz)
+> clk_src_in_hz is the module's input rate already divided by clock-div.
+> This clock-div value is fixed in hardware and unchangeable, right?
+Yes
+
+> Maybe give that divided clock a nice name?
+I don't know, after new comment, maybe this name is ok.
+
+> The target frequency is i2c->speed_hz, so among the possible frequencies
+> we want to pick the highest one that is still less than or equal
+> i2c->speed_hz, right?
+Right.
+
+> 
+> > > > +		/* Set the hign speed mode register */
+> I just notice s/hign/high/ here.
+> 
+Thanks, will fix it.
+
+Eddie
