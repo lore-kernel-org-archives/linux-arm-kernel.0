@@ -1,305 +1,97 @@
-From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
-Date: Wed, 20 May 2015 22:44:43 +0200
-Subject: [PATCH 10/11] irqchip / GICv2 / ACPI: Consolidate GICv2 ACPI
- related init code
-In-Reply-To: <1431953961-22706-11-git-send-email-hanjun.guo@linaro.org>
-References: <1431953961-22706-1-git-send-email-hanjun.guo@linaro.org>
- <1431953961-22706-11-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <555CF23B.1000002@linaro.org>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 20 May 2015 15:46:06 -0500
+Subject: [PATCH v2 1/2] PCI: generic: remove dependency on hw_pci
+In-Reply-To: <20150520172903.GJ11498@arm.com>
+References: <1430791333-26013-1-git-send-email-jchandra@broadcom.com>
+ <20150505155346.GJ1550@arm.com>
+ <20150512000746.GA31418@jayachandranc.netlogicmicro.com>
+ <20150519230918.GW31666@google.com> <20150520172903.GJ11498@arm.com>
+Message-ID: <CAErSpo7r6cwztxNW-92LT_AT_moufQAQO_OJein7qOQjdszKUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hanjun,
+On Wed, May 20, 2015 at 12:29 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, May 20, 2015 at 12:09:18AM +0100, Bjorn Helgaas wrote:
+>> On Tue, May 12, 2015 at 05:37:47AM +0530, Jayachandran C. wrote:
+>> > On Tue, May 05, 2015 at 04:53:46PM +0100, Will Deacon wrote:
+>> > > On Tue, May 05, 2015 at 03:02:12AM +0100, Jayachandran C wrote:
+>> > > > The current code in pci-host-generic.c uses pci_common_init_dev()
+>> > > > from the arch/arm/ to do a part of the PCI initialization, and this
+>> > > > prevents it from being used on arm64.
+>> > > >
+>> > > > The initialization done by pci_common_init_dev() that is really
+>> > > > needed by pci-host-generic.c can be done in the same file without
+>> > > > using the hw_pci API of ARM.
+>> > > >
+>> > > > The ARM platform requires a pci_sys_data as sysdata for the PCI bus,
+>> > > > this is be handled by setting up 'struct gen_pci' to embed a
+>> > > > pci_sys_data variable as the first element on the ARM platform.
+>> > > >
+>> > > > Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+>> > > > ---
+>> > > > Here's v2 of the patches, this enables use of pci-host-generic on
+>> > > > arm64.
+>> > > >
+>> > > > This has been tested on both qemu and fast model for arm64, and on
+>> > > > qemu for arm32.
+>> > > >
+>> > > > v1->v2
+>> > > >  - Address comments from Arnd Bergmann and Lorenzo Pieralisi
+>> > > >     - move contents of gen_pci_init to gen_pci_probe
+>> > > >     - assign resources only when !probe_only
+>> > > >  - tested on ARM32 with qemu option -M virt
+>> > >
+>> > > I tried this with an arm64 kernel running under kvmtool, but I get the
+>> > > following errors (a 32-bit ARM kernel does seem to work):
+>> > >
+>> > >   PCI host bridge /pci ranges:
+>> > >      IO 0x00000000..0x0000ffff -> 0x00000000
+>> > >     MEM 0x41000000..0x7fffffff -> 0x41000000
+>> > >   pci-host-generic 40000000.pci: PCI host bridge to bus 0000:00
+>> > >   pci_bus 0000:00: root bus resource [bus 00-01]
+>> > >   pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
+>> > >   pci_bus 0000:00: root bus resource [mem 0x41000000-0x7fffffff]
+>> > >   pci_bus 0000:00: scanning bus
+>> > >   pci 0000:00:00.0: [1af4:1009] type 00 class 0xff0000
+>> > >   pci 0000:00:00.0: reg 0x10: [mem 0x41000000-0x410003ff]
+>> > >   pci 0000:00:00.0: reg 0x14: [io  0x6200-0x65ff]
+>> > >   pci 0000:00:00.0: reg 0x18: [mem 0x41000400-0x410005ff]
+>> > >   pci 0000:00:01.0: [1af4:1009] type 00 class 0xff0000
+>> > >   pci 0000:00:01.0: reg 0x10: [mem 0x41000800-0x41000bff]
+>> > >   pci 0000:00:01.0: reg 0x14: [io  0x6600-0x69ff]
+>> > >   pci 0000:00:01.0: reg 0x18: [mem 0x41000c00-0x41000dff]
+>> > >   pci_bus 0000:00: fixups for bus
+>> > >   pci_bus 0000:00: bus scan returning with max=00
+>> > >   pci 0000:00:00.0: fixup irq: got 10
+>> > >   pci 0000:00:00.0: assigning IRQ 10
+>> > >   pci 0000:00:01.0: fixup irq: got 11
+>> > >   pci 0000:00:01.0: assigning IRQ 11
+>> > >   virtio-pci 0000:00:00.0: can't enable device: BAR 0 [mem 0x41000000-0x410003ff] not claimed
+>> > >   virtio-pci: probe of 0000:00:00.0 failed with error -22
+>> > >   virtio-pci 0000:00:01.0: can't enable device: BAR 0 [mem 0x41000800-0x41000bff] not claimed
+>> > >   virtio-pci: probe of 0000:00:01.0 failed with error -22
+>> >
+>> > PCI_PROBE_ONLY does not work yet for arm64, this will need further changes
+>> > in either arm64 or pci as noted by Lorenzo. This is not due to a problem with
+>> > this patch per se.
+>> >
+>> > More importantly, this does not change the current arm32 behavior and adds
+>> > support for arm64 for two very useful cases
+>> >  - we can use "pci-host-ecam-generic" for a host bridge controller that is
+>> >    initialized by firmware, without adding a custom driver.
+>> >  - qemu virt platform works on arm64
+>> >
+>> > If you think there are any furhter changes needed in this patchset please
+>> > let me know.
+>>
+>> I'm waiting for at least an ack from Will.
+>
+> I'm not too keen on the current state of this patch. Firstly, I'd really
+> like to see the PROBE_ONLY case addressed at the same time as this port
+> (Lorenzo and Suravee are working on this). Secondly, the hack to put
+> pci_sys_data as the first member of gen_pci is ugly at best and probably
+> makes it difficult to support MSIs on ARM.
 
-On 05/18/2015 02:59 PM, Hanjun Guo wrote:
-> Move GICv2 ACPI related init code in irq-gic.c to irq-gic-acpi.c,
-> this can make the ACPI related GIC init code slef-contained.
->
-> Introduce set_acpi_core_irqdomain() to set acpi_irqdomain then
-> it will be no need to make gic_data[] as a global value, and
-> it will save the confilcts with GICv3's gic_data in the later
-> patch.
->
-> acpi_gic_parse_distributor() have the same function as
-> gic_acpi_parse_madt_distributor() to get the GIC distributor
-> physical base address, so just remove the duplicate one, and
-> only get the GIC version when it is unknown.
->
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->   drivers/irqchip/irq-gic-acpi.c       |  95 +++++++++++++++++++++++++++++++-
->   drivers/irqchip/irq-gic.c            | 103 +----------------------------------
->   include/linux/irqchip/arm-gic-acpi.h |   5 ++
->   3 files changed, 101 insertions(+), 102 deletions(-)
->
-> diff --git a/drivers/irqchip/irq-gic-acpi.c b/drivers/irqchip/irq-gic-acpi.c
-> index 1388d9e..8463e48 100644
-> --- a/drivers/irqchip/irq-gic-acpi.c
-> +++ b/drivers/irqchip/irq-gic-acpi.c
-> @@ -13,12 +13,16 @@
->
->   #include <linux/acpi.h>
->   #include <linux/init.h>
-> +#include <linux/irqchip/arm-gic.h>
->   #include <linux/irqchip/arm-gic-acpi.h>
->   #include <linux/irqchip/arm-gic-v3.h>
+Thanks, Will.  I'll wait for another iteration that addresses these.
 
-arm-gic.h and arm-gic-v3.h describe register map for respective drivers 
-and should be used separately within parent driver only.
-
-Tomasz
-
->
-> +#include "irqchip.h"
-> +
->   /* GIC version presented in MADT GIC distributor structure */
->   static u8 gic_version __initdata = ACPI_MADT_GIC_VER_UNKNOWN;
->
-> +/* GIC distributor physical base address, which is needed for both GICv2/3 */
->   static phys_addr_t dist_phy_base __initdata;
->
->   u8 __init acpi_gic_version(void)
-> @@ -26,6 +30,11 @@ u8 __init acpi_gic_version(void)
->   	return gic_version;
->   }
->
-> +void __init set_acpi_core_irqdomain(struct irq_domain *domain)
-> +{
-> +	acpi_irq_domain = domain;
-> +}
-> +
->   static int __init
->   acpi_gic_parse_distributor(struct acpi_subtable_header *header,
->   				const unsigned long end)
-> @@ -37,8 +46,9 @@ acpi_gic_parse_distributor(struct acpi_subtable_header *header,
->   	if (BAD_MADT_ENTRY(dist, end))
->   		return -EINVAL;
->
-> -	gic_version = dist->gic_version;
->   	dist_phy_base = dist->base_address;
-> +	if (gic_version == ACPI_MADT_GIC_VER_UNKNOWN)
-> +		gic_version = dist->gic_version;
->   	return 0;
->   }
->
-> @@ -114,3 +124,86 @@ int __init acpi_gic_version_init(void)
->
->   	return 0;
->   }
-> +
-> +static phys_addr_t cpu_phy_base __initdata;
-> +
-> +static int __init
-> +gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
-> +			const unsigned long end)
-> +{
-> +	struct acpi_madt_generic_interrupt *processor;
-> +	phys_addr_t gic_cpu_base;
-> +	static int cpu_base_assigned;
-> +
-> +	processor = (struct acpi_madt_generic_interrupt *)header;
-> +
-> +	if (BAD_MADT_ENTRY(processor, end))
-> +		return -EINVAL;
-> +
-> +	/*
-> +	 * There is no support for non-banked GICv1/2 register in ACPI spec.
-> +	 * All CPU interface addresses have to be the same.
-> +	 */
-> +	gic_cpu_base = processor->base_address;
-> +	if (cpu_base_assigned && gic_cpu_base != cpu_phy_base)
-> +		return -EINVAL;
-> +
-> +	cpu_phy_base = gic_cpu_base;
-> +	cpu_base_assigned = 1;
-> +	return 0;
-> +}
-> +
-> +static int __init
-> +gic_v2_acpi_init(struct acpi_table_header *table)
-> +{
-> +	void __iomem *cpu_base, *dist_base;
-> +	int count;
-> +
-> +	if (acpi_gic_version() >= ACPI_MADT_GIC_VER_V3)
-> +		return -ENODEV;
-> +
-> +	/* Collect CPU base addresses */
-> +	count = acpi_parse_entries(ACPI_SIG_MADT,
-> +				   sizeof(struct acpi_table_madt),
-> +				   gic_acpi_parse_madt_cpu, table,
-> +				   ACPI_MADT_TYPE_GENERIC_INTERRUPT, 0);
-> +	if (count <= 0) {
-> +		pr_err("No valid GICC entries exist\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	/*
-> +	 * Find distributor base address. We expect one distributor entry since
-> +	 * ACPI 5.1 spec neither support multi-GIC instances nor GIC cascade.
-> +	 */
-> +	count = acpi_parse_entries(ACPI_SIG_MADT,
-> +				   sizeof(struct acpi_table_madt),
-> +				   acpi_gic_parse_distributor, table,
-> +				   ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR, 0);
-> +	if (count <= 0) {
-> +		pr_err("No valid GICD entries exist\n");
-> +		return -EINVAL;
-> +	} else if (count > 1) {
-> +		pr_err("More than one GICD entry detected\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	cpu_base = ioremap(cpu_phy_base, ACPI_GIC_CPU_IF_MEM_SIZE);
-> +	if (!cpu_base) {
-> +		pr_err("Unable to map GICC registers\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	dist_base = ioremap(dist_phy_base, ACPI_GICV2_DIST_MEM_SIZE);
-> +	if (!dist_base) {
-> +		pr_err("Unable to map GICD registers\n");
-> +		iounmap(cpu_base);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	gic_init_bases(0, -1, dist_base, cpu_base, 0, NULL);
-> +
-> +	acpi_irq_model = ACPI_IRQ_MODEL_GIC;
-> +	return 0;
-> +}
-> +IRQCHIP_ACPI_DECLARE(gic_v2, ACPI_SIG_MADT, gic_v2_acpi_init);
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index 869a69f..2f934fe 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -986,6 +986,8 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->   	if (WARN_ON(!gic->domain))
->   		return;
->
-> +	set_acpi_core_irqdomain(gic->domain);
-> +
->   	if (gic_nr == 0) {
->   #ifdef CONFIG_SMP
->   		set_smp_cross_call(gic_raise_softirq);
-> @@ -1047,104 +1049,3 @@ IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
->   IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
->
->   #endif
-> -
-> -#ifdef CONFIG_ACPI
-> -static phys_addr_t dist_phy_base, cpu_phy_base __initdata;
-> -
-> -static int __init
-> -gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
-> -			const unsigned long end)
-> -{
-> -	struct acpi_madt_generic_interrupt *processor;
-> -	phys_addr_t gic_cpu_base;
-> -	static int cpu_base_assigned;
-> -
-> -	processor = (struct acpi_madt_generic_interrupt *)header;
-> -
-> -	if (BAD_MADT_ENTRY(processor, end))
-> -		return -EINVAL;
-> -
-> -	/*
-> -	 * There is no support for non-banked GICv1/2 register in ACPI spec.
-> -	 * All CPU interface addresses have to be the same.
-> -	 */
-> -	gic_cpu_base = processor->base_address;
-> -	if (cpu_base_assigned && gic_cpu_base != cpu_phy_base)
-> -		return -EINVAL;
-> -
-> -	cpu_phy_base = gic_cpu_base;
-> -	cpu_base_assigned = 1;
-> -	return 0;
-> -}
-> -
-> -static int __init
-> -gic_acpi_parse_madt_distributor(struct acpi_subtable_header *header,
-> -				const unsigned long end)
-> -{
-> -	struct acpi_madt_generic_distributor *dist;
-> -
-> -	dist = (struct acpi_madt_generic_distributor *)header;
-> -
-> -	if (BAD_MADT_ENTRY(dist, end))
-> -		return -EINVAL;
-> -
-> -	dist_phy_base = dist->base_address;
-> -	return 0;
-> -}
-> -
-> -static int __init
-> -gic_v2_acpi_init(struct acpi_table_header *table)
-> -{
-> -	void __iomem *cpu_base, *dist_base;
-> -	int count;
-> -
-> -	if (acpi_gic_version() >= ACPI_MADT_GIC_VER_V3)
-> -		return -ENODEV;
-> -
-> -	/* Collect CPU base addresses */
-> -	count = acpi_parse_entries(ACPI_SIG_MADT,
-> -				   sizeof(struct acpi_table_madt),
-> -				   gic_acpi_parse_madt_cpu, table,
-> -				   ACPI_MADT_TYPE_GENERIC_INTERRUPT, 0);
-> -	if (count <= 0) {
-> -		pr_err("No valid GICC entries exist\n");
-> -		return -EINVAL;
-> -	}
-> -
-> -	/*
-> -	 * Find distributor base address. We expect one distributor entry since
-> -	 * ACPI 5.1 spec neither support multi-GIC instances nor GIC cascade.
-> -	 */
-> -	count = acpi_parse_entries(ACPI_SIG_MADT,
-> -				   sizeof(struct acpi_table_madt),
-> -				   gic_acpi_parse_madt_distributor, table,
-> -				   ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR, 0);
-> -	if (count <= 0) {
-> -		pr_err("No valid GICD entries exist\n");
-> -		return -EINVAL;
-> -	} else if (count > 1) {
-> -		pr_err("More than one GICD entry detected\n");
-> -		return -EINVAL;
-> -	}
-> -
-> -	cpu_base = ioremap(cpu_phy_base, ACPI_GIC_CPU_IF_MEM_SIZE);
-> -	if (!cpu_base) {
-> -		pr_err("Unable to map GICC registers\n");
-> -		return -ENOMEM;
-> -	}
-> -
-> -	dist_base = ioremap(dist_phy_base, ACPI_GICV2_DIST_MEM_SIZE);
-> -	if (!dist_base) {
-> -		pr_err("Unable to map GICD registers\n");
-> -		iounmap(cpu_base);
-> -		return -ENOMEM;
-> -	}
-> -
-> -	gic_init_bases(0, -1, dist_base, cpu_base, 0, NULL);
-> -	acpi_irq_domain = gic_data[0].domain;
-> -
-> -	acpi_irq_model = ACPI_IRQ_MODEL_GIC;
-> -	return 0;
-> -}
-> -IRQCHIP_ACPI_DECLARE(gic_v2, ACPI_SIG_MADT, gic_v2_acpi_init);
-> -#endif
-> diff --git a/include/linux/irqchip/arm-gic-acpi.h b/include/linux/irqchip/arm-gic-acpi.h
-> index 245386d..f4a17c7 100644
-> --- a/include/linux/irqchip/arm-gic-acpi.h
-> +++ b/include/linux/irqchip/arm-gic-acpi.h
-> @@ -25,5 +25,10 @@ extern struct irq_domain *acpi_irq_domain;
->
->   int acpi_gic_version_init(void);
->   u8 acpi_gic_version(void);
-> +
-> +void set_acpi_core_irqdomain(struct irq_domain *domain);
-> +#else
-> +#define set_acpi_core_irqdomain(domain)
->   #endif /* CONFIG_ACPI */
-> +
->   #endif /* ARM_GIC_ACPI_H_ */
->
+Bjorn
