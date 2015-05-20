@@ -1,57 +1,36 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 20 May 2015 20:03:11 +0000
-Subject: [RESEND][ PATCH v3] irqchip/gicv3-its: ITS table size should not
- be smaller than PSZ
-In-Reply-To: <CY1PR0301MB074800AFD74B97267DD71BA287C20@CY1PR0301MB0748.namprd03.prod.outlook.com>
-References: <1432134795-661-1-git-send-email-stuart.yoder@freescale.com>
- <alpine.DEB.2.11.1505202125220.4225@nanos>
- <CY1PR0301MB074800AFD74B97267DD71BA287C20@CY1PR0301MB0748.namprd03.prod.outlook.com>
-Message-ID: <20150520200311.GA19834@io.lakedaemon.net>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 20 May 2015 15:03:30 -0500
+Subject: [PATCH v2 0/2] PCI: designware: improve iATU programming and usage
+In-Reply-To: <1430382149-1645-1-git-send-email-jszhang@marvell.com>
+References: <1430382149-1645-1-git-send-email-jszhang@marvell.com>
+Message-ID: <20150520200330.GB32152@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stuart,
+[+cc Pratyush]
 
-On Wed, May 20, 2015 at 07:54:57PM +0000, Stuart Yoder wrote:
+On Thu, Apr 30, 2015 at 04:22:27PM +0800, Jisheng Zhang wrote:
+> The outbound iATU programming functions are similar, so PATCH1 consolidates
+> them into one.
 > 
+> Most transactions' type are cfg0 and MEM, so current iATU usage is not
+> balanced. PATCH2 adopts idea from Minghuan Lian <Minghuan.Lian@freescale.com>:
 > 
-> > -----Original Message-----
-> > From: Thomas Gleixner [mailto:tglx at linutronix.de]
-> > Sent: Wednesday, May 20, 2015 2:26 PM
-> > To: Yoder Stuart-B08248
-> > Cc: marc.zyngier at arm.com; jason at lakedaemon.net; linux-kernel at vger.kernel.org; linux-arm-
-> > kernel at lists.infradead.org; Lian Minghuan-B31939
-> > Subject: Re: [RESEND][ PATCH v3] irqchip/gicv3-its: ITS table size should not be smaller than PSZ
-> > 
-> > On Wed, 20 May 2015, Stuart Yoder wrote:
-> > 
-
-If this were your original email:
----------------------------------------
-> > > 
-> > > From: Minghuan Lian <Minghuan.Lian@freescale.com>
-> > > 
-> > > when allocating a device table, if the requested allocation
-> > > is smaller than the default granule size of the ITS
-> > > then, we need to round up to the default size
-> > >
-> > > [sy: Added code comments and resubmitted]
-> > >
-> > > Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
-> > > Signed-off-by: Stuart Yoder <stuart.yoder@freescale.com>
----------------------------------------
-
-it would have worked.
-
-By adding a second 'From' line in the body of the message, 'git am' will put
-the correct author on the commit.
-
-> > So who wrote that patch? That's not a valid SOB chain ....
+>  http://www.spinics.net/lists/linux-pci/msg40440.html
 > 
-> Minghuan wrote the original patch (v1,v2), making the functional change.
-> I wrote/added the comments and submitted v3, after discussing with
-> Minghuan.
+> to change the iATU allocation: iATU0 for cfg and IO, iATU1 for MEM.
+> 
+> Changes since v1:
+> - remove outbound iATU programming for IO in dw_pcie_host_init, since it can
+>   be done by berlin_pcie_{rd|wr}_other_conf() latter.
+> - only do outbound iATU programming for MEM if pp->ops->rd_other_conf is not
+>   set. Thank Fabrice Gasnier to point out "some platforms doesn't have support
+>   for ATU"
+> 
+> Jisheng Zhang (2):
+>   PCI: designware: consolidate outbound iATU programming functions
+>   PCI: designware: use iATU0 for cfg and IO, iATU1 for MEM
+> 
+>  drivers/pci/host/pcie-designware.c | 142 ++++++++++++++++---------------------
 
-thx,
-
-Jason.
+Applied both with Pratyush's ack to pci/host-designware for v4.2, thanks!
