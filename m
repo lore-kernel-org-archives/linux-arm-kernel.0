@@ -1,57 +1,47 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Wed, 20 May 2015 13:44:58 -0500
-Subject: [PATCH v2 0/7] Change snvs rtc and poweroff to use syscon add
- pwrkey driver
-In-Reply-To: <20150520183050.GR2067@n2100.arm.linux.org.uk>
-References: <1432055082-28983-1-git-send-email-Frank.Li@freescale.com>
- <20150520015851.GB1071@dragon>
- <20150520182540.GQ2067@n2100.arm.linux.org.uk>
- <20150520183050.GR2067@n2100.arm.linux.org.uk>
-Message-ID: <CAHrpEqSngMgOj5Bjp0XWpw9CJCjoiU63iRuAX3Zw_aEO+-5RHg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 20 May 2015 20:50:44 +0200
+Subject: schedule_timeout sleeps too long after dividing CPU frequency
+In-Reply-To: <555CB499.7060600@free.fr>
+References: <20150514144239.GZ2067@n2100.arm.linux.org.uk>
+ <20150518115452.GV2067@n2100.arm.linux.org.uk> <555CB499.7060600@free.fr>
+Message-ID: <12867692.bB1EJHiPzq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 1:30 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, May 20, 2015 at 07:25:41PM +0100, Russell King - ARM Linux wrote:
->> On Wed, May 20, 2015 at 09:58:51AM +0800, Shawn Guo wrote:
->> > On Wed, May 20, 2015 at 01:04:35AM +0800, Frank.Li at freescale.com wrote:
->> > > Frank Li (6):
->> > >   arm: imx: power-off: change to syscon to access register
->> > >   rtc: arm: imx: snvs: change use syscon to access register
->> > >   Document: dt: fsl: snvs: change support syscon
->> > >   arm: dts: imx: update snvs to use syscon access register
->> > >   document: devicetree: input: imx: i.mx snvs power device tree bindings
->> > >   arm: dts: imx6sx: enable snvs power key
->> >
->> > So, the series will break existing DTBs for RTC and poweroff, right?
->> > If this is unavoidable, should we at least have some warning messages
->> > telling users about his breakage?
->>
->> What's the justification for breaking existing DTBs?  Really, this is
->> something we should strive to avoid, _and_ actually avoid by providing
->> backwards compatibility.
->
-> Looking at the RTC code, it would be pretty trivial to do.
->
-> Rather than passing around struct regmap, pass around the private data
-> structure.
->
-> Rename the regmap_* function calls to be private accessors.  Implement
-> a set of new accessors - if the private data has the regmap, use the
-> regmap API.  Otherwise, use the old method, and print a warning that an
-> old DT is being used.
+On Wednesday 20 May 2015 18:21:45 Mason wrote:
+> 
+> On 18/05/2015 13:54, Russell King - ARM Linux wrote:
+> 
+> > For a SoC where WFI is not programmed to cause anything other than
+> > the architecture specified dormant behaviour, WFI will not cause the
+> > TWD to stop.
+> 
+> According to the hardware engineers, my SoC does not support any
+> low-power modes.
+> 
+> But I didn't see the "clean" way to make the kernel aware of this.
+> Is this an acceptable patch? (I have my doubts.)
 
-This method work.  But code will become ugly and complex. I seach
-whole dts tree.
-Only imx6 use this driver.
+No, this is clearly broken.
 
-Does it really valuable to keep compatiblity with cost of complex driver code?
+> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+> index 6591e26..300f13a 100644
+> --- a/arch/arm/kernel/smp_twd.c
+> +++ b/arch/arm/kernel/smp_twd.c
+> @@ -295,6 +295,10 @@ static void twd_timer_setup(void)
+>         clk->name = "local_timer";
+>         clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
+>                         CLOCK_EVT_FEAT_C3STOP;
+> +#ifdef CONFIG_TANGOX
+> +       /*** Tango does not implement low power modes ***/
+> +       clk->features &= ~CLOCK_EVT_FEAT_C3STOP;
+> +#endif
+>         clk->rating = 350;
+>         clk->set_mode = twd_set_mode;
+>         clk->set_next_event = twd_set_next_event;
 
-best regards
-Frank Li
+This will disable the feature on all machines that are configured 
+in the kernel. You have to make a run-time decision instead, e.g.
+based on a boolean DT property of the twd node.
 
->
-> --
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
+	Arnd
