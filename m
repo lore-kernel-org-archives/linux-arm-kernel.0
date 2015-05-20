@@ -1,34 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 20 May 2015 09:13:11 +0200
-Subject: [PATCH] pinctrl: mediatek: add OF dependency to MT6397
-Message-ID: <1432105991-3731-1-git-send-email-linus.walleij@linaro.org>
+From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
+Date: Wed, 20 May 2015 10:18:30 +0300
+Subject: [PATCH 05/15] thermal: Add comment explaining test for critical
+ temperature
+In-Reply-To: <1431507163-19933-6-git-send-email-s.hauer@pengutronix.de>
+References: <1431507163-19933-1-git-send-email-s.hauer@pengutronix.de>
+ <1431507163-19933-6-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <555C3546.5070808@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-X86_64 allmodconfig screams like so:
-warning: (PINCTRL_MT6397) selects PINCTRL_MTK_COMMON
-which has unmet direct dependencies
-(PINCTRL && (ARCH_MEDIATEK || COMPILE_TEST) && OF)
+On 05/13/15 11:52, Sascha Hauer wrote:
+> The code testing if a temperature should be emulated or not is
+> not obvious. Add a comment explaining why this test is done.
+>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>   drivers/thermal/thermal_core.c | 5 +++++
+>   1 file changed, 5 insertions(+)
+>
+> diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
+> index 3e0fe55..e204deb 100644
+> --- a/drivers/thermal/thermal_core.c
+> +++ b/drivers/thermal/thermal_core.c
+> @@ -435,6 +435,11 @@ int thermal_zone_get_temp(struct thermal_zone_device *tz, int *temp)
+>   			}
+>   		}
+>
+> +		/*
+> +		 * Only allow emulating a temperature when the real temperature
+> +		 * is below the critical temperature so that the emulation code
+> +		 * cannot hide critical conditions.
+> +		 */
+>   		if (!ret && *temp < crit_temp)
+>   			*temp = tz->emul_temperature;
+>   	}
+>
 
-So add OF to dependencies to shut up this warning.
-
-Cc: Hongzhou Yang <hongzhou.yang@mediatek.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/mediatek/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/pinctrl/mediatek/Kconfig b/drivers/pinctrl/mediatek/Kconfig
-index 0bc84fb2f4f2..02f6f92df86c 100644
---- a/drivers/pinctrl/mediatek/Kconfig
-+++ b/drivers/pinctrl/mediatek/Kconfig
-@@ -32,6 +32,7 @@ config PINCTRL_MT8173
- # For PMIC
- config PINCTRL_MT6397
- 	bool "Mediatek MT6397 pin control" if COMPILE_TEST && !MFD_MT6397
-+	depends on OF
- 	default MFD_MT6397
- 	select PINCTRL_MTK_COMMON
- 
--- 
-1.9.3
+Reviewed-by: Mikko Perttunen <mperttunen@nvidia.com>
