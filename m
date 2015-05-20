@@ -1,77 +1,97 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 20 May 2015 16:54:43 +0800
-Subject: [PATCH v3] pinctrl: sirf: add sirf atlas7 pinctrl and gpio support
-In-Reply-To: <CACRpkdYT8bti=8iRPs_21r15vB8XWMbUXCpkfScg_J+=werwdw@mail.gmail.com>
-References: <1431934112-16132-1-git-send-email-21cnbao@gmail.com>
- <CACRpkdYT8bti=8iRPs_21r15vB8XWMbUXCpkfScg_J+=werwdw@mail.gmail.com>
-Message-ID: <CAGsJ_4wSnJA+2B5_tbBJ3akwbBwiCjD+v3SXqyv-Cu7kkg0KSw@mail.gmail.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Wed, 20 May 2015 10:55:41 +0200
+Subject: [PATCH v3] ARM: tegra: cpuidle: implement
+ cpuidle_state.enter_freeze()
+In-Reply-To: <20150520084441.GA29274@red-moon>
+References: <1432046953-12945-1-git-send-email-tomeu.vizoso@collabora.com>
+ <20150520084441.GA29274@red-moon>
+Message-ID: <555C4C0D.4040605@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-19 21:59 GMT+08:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Mon, May 18, 2015 at 9:28 AM, Barry Song <21cnbao@gmail.com> wrote:
->
->> From: Wei Chen <Wei.Chen@csr.com>
+On 05/20/2015 10:44 AM, Lorenzo Pieralisi wrote:
+> On Tue, May 19, 2015 at 03:49:12PM +0100, Tomeu Vizoso wrote:
+>> This callback is expected to do the same as enter() but it has to
+>> guarantee that interrupts aren't enabled at any point in its execution,
+>> as the tick is frozen.
 >>
->> The Pinctrl module (ioc) controls the Pad's function select
->> (each pad can have 8 functions), Pad's Drive Strength, Pad's
->> Pull Select and Pad's Input Disable status.
+>> It will be called when the system goes to suspend-to-idle and will
+>> reduce power usage because CPUs won't be awaken for unnecessary IRQs.
 >>
->> The ioc has two modules, ioc_top & ioc_rtc. Both of these two
->> modules have function select/clear, Pull select and Drive
->> Strength registers. But only ioc_rtc has input-disable
->> registers. The Pads on ioc_top have to access ioc_rtc to set
->> their input-disable status and intpu-disable-value.
+>> By setting the CPUIDLE_FLAG_TIMER_STOP flag, we can reuse the same code
+>> for both the enter() and enter_freeze() callbacks.
 >>
->> So have to use one ioc driver instance to drive these two
->> ioc modules at the same time, and each ioc module will be
->> treat as one bank on the "IOC Device".
+>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>> Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 >>
->> The GPIO Controller controls the GPIO status if the Pad has
->> been config as GPIO by Pinctrl already. Includes the GPIO
->> Input/output, Interrupt type, Interrupt Status, and Set/Get
->> Values.
->> The GPIO pull up/down are controlled by Pinctrl.
->>
->> There are 7 GPIO Groups and splited into 3 MACROs in atlas7.
->> The GPIO Groups in one MACRO share one GPIO controllers, each
->> GPIO Group are treated as one GPIO bank.
->>
->> For example:
->> In VDIFM macro, there is one GPIO Controller, it has 3 banks
->> to control 3 gpio groups. Its gpio name space is from 0 to 95.
->>
->> The Device Tree can be written as following:
->>
->> gpio-ranges = <&pinctrl 0 0 0>,
->> <&pinctrl 32 0 0>,
->> <&pinctrl 64 0 0>;
->>
->> gpio-ranges-group-names = "gnss_gpio_grp",
->> "lcd_vip_gpio_grp",
->> "sdio_i2s_gpio_grp";
->>
->> bank#0 is from 0~31, the pins are from pinctrl's "gnss_gpio_grp".
->> bank#2 is from 32~63, the pins are from pinctrl's "lcd_vip_gpio_grp".
->> bank#3 is from 64~95, the pins are from pinctrl's "sdio_i2s_gpio_grp".
->>
->> Signed-off-by: Wei Chen <Wei.Chen@csr.com>
->> Signed-off-by: Barry Song <Baohua.Song@csr.com>
 >> ---
->>  -v3: use generic pinconf to replace self-defined APIs
->
-> Awesome job Barry, well done.
->
+>>
+>> v3:	* Set CPUIDLE_FLAG_TIMER_STOP to simplify things as suggested by
+>> 	Lorenzo Pieralisi
+>> v2:	* Disable FIQs also when suspending-to-idle
+>> ---
+>>  arch/arm/mach-tegra/cpuidle-tegra114.c | 13 +++++++++----
+>>  1 file changed, 9 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
+>> index 155807f..7e59ac0 100644
+>> --- a/arch/arm/mach-tegra/cpuidle-tegra114.c
+>> +++ b/arch/arm/mach-tegra/cpuidle-tegra114.c
+>> @@ -44,16 +44,12 @@ static int tegra114_idle_power_down(struct cpuidle_device *dev,
+>>  	tegra_set_cpu_in_lp2();
+>>  	cpu_pm_enter();
+>>  
+>> -	tick_broadcast_enter();
+>> -
+>>  	call_firmware_op(prepare_idle);
+>>  
+>>  	/* Do suspend by ourselves if the firmware does not implement it */
+>>  	if (call_firmware_op(do_idle, 0) == -ENOSYS)
+>>  		cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
+>>  
+>> -	tick_broadcast_exit();
+>> -
+>>  	cpu_pm_exit();
+>>  	tegra_clear_cpu_in_lp2();
+>>  
+>> @@ -61,6 +57,13 @@ static int tegra114_idle_power_down(struct cpuidle_device *dev,
+>>  
+>>  	return index;
+>>  }
+>> +
+>> +static void tegra114_idle_enter_freeze(struct cpuidle_device *dev,
+>> +				       struct cpuidle_driver *drv,
+>> +				       int index)
+>> +{
+>> +       tegra114_idle_power_down(dev, drv, index);
+>> +}
+> 
+> You do not need this function, remove it and update the enter_freeze
+> pointer below with tegra114_idle_power_down please.
 
-thanks, Linus, for your hard review and good suggestions to improve
-the codes. it is mainly a job of Chen Wei. i am only a s-o-b :-)
+How so? The callbacks have different signatures.
 
-> Patch applied!
+Regards,
 
-i sent the dts stuff just now.
+Tomeu
 
->
-> Yours,
-> Linus Walleij
-
--barry
+> Thanks,
+> Lorenzo
+> 
+>>  #endif
+>>  
+>>  static struct cpuidle_driver tegra_idle_driver = {
+>> @@ -72,8 +75,10 @@ static struct cpuidle_driver tegra_idle_driver = {
+>>  #ifdef CONFIG_PM_SLEEP
+>>  		[1] = {
+>>  			.enter			= tegra114_idle_power_down,
+>> +			.enter_freeze		= tegra114_idle_enter_freeze,
+>>  			.exit_latency		= 500,
+>>  			.target_residency	= 1000,
+>> +			.flags			= CPUIDLE_FLAG_TIMER_STOP,
+>>  			.power_usage		= 0,
+>>  			.name			= "powered-down",
+>>  			.desc			= "CPU power gated",
+>> -- 
+>> 2.4.1
+>>
