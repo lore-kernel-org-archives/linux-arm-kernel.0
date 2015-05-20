@@ -1,60 +1,40 @@
-From: timo.kokkonen@offcode.fi (Timo Kokkonen)
-Date: Wed, 20 May 2015 08:45:44 +0300
-Subject: [PATCHv8 03/10] watchdog: core: Introduce default watchdog policy
-In-Reply-To: <555BDFD4.6050003@roeck-us.net>
-References: <1432023969-20736-1-git-send-email-timo.kokkonen@offcode.fi>
- <1432023969-20736-4-git-send-email-timo.kokkonen@offcode.fi>
- <555BDFD4.6050003@roeck-us.net>
-Message-ID: <555C1F88.90203@offcode.fi>
+From: hongzhou.yang@mediatek.com (Hongzhou Yang)
+Date: Tue, 19 May 2015 23:05:35 -0700
+Subject: [PATCH v2 08/11] mfd: mediatek: Add GPIO sub module support
+ into mfd.
+In-Reply-To: <20150519093426.GS22418@x1>
+References: <1432015882-8646-1-git-send-email-hongzhou.yang@mediatek.com>
+ <1432015882-8646-9-git-send-email-hongzhou.yang@mediatek.com>
+ <20150519093426.GS22418@x1>
+Message-ID: <1432101935.4007.1.camel@mussux00.eus.mediatek.inc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.05.2015 04:13, Guenter Roeck wrote:
-> On 05/19/2015 01:26 AM, Timo Kokkonen wrote:
->> Traditionally there have been no such thing as a policy for
->> watchdogs. The watchdog timer was simply explicitly stopped at driver
->> probe time and there was nothing else to do. Now that we have ability
->> to work around HW disabilities in the watchdog core, it is time to
->> introduce more policy options.
->>
->> The default option is to shut down the watchdog driver, as
->> before. This ensures backward compatibility with current kernels and
->> hardware that might have a watchdog, but user has not set up a
->> watchdog daemon at all.
->>
->> A new option is introduced to keep the watchdog running or start it up
->> at boot up. This is useful on many production systems that rely on the
->> watchdog to reboot the device in case a crash. With this option even
->> early kernel crashes or early user space crashes will lead to a reboot
->> even though watchdog daemon has not opened and started the watchdog
->> device yet.
->>
->> The third introduced option is to not touch the hardware at all in
->> case bootloader have made an intelligent decision about the watchdog
->> state and does not know how to tell kernel about it. The watchdog
->> state is not touched until userspace takes over it.
->>
->> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
->
-> Dislike. I don't think it is a good idea to have configuration options
-> like this. This means users will have to deal with those "default"
-> options for an entire distribution, which I don't think is desirable.
-> Maybe for you, but not for everyone, and definitely not for me.
+On Tue, 2015-05-19 at 10:34 +0100, Lee Jones wrote:
+> On Mon, 18 May 2015, Hongzhou Yang wrote:
+> 
+> > Register pinctrl subnode into 6397 mfd cell.
+> > 
+> > Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+> > ---
+> >  drivers/mfd/mt6397-core.c |    3 +++
+> >  1 file changed, 3 insertions(+)
+> > 
+> > diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
+> > index 09bc780..012c620 100644
+> > --- a/drivers/mfd/mt6397-core.c
+> > +++ b/drivers/mfd/mt6397-core.c
+> > @@ -34,6 +34,9 @@ static const struct mfd_cell mt6397_devs[] = {
+> >  	}, {
+> >  		.name = "mt6397-clk",
+> >  		.of_compatible = "mediatek,mt6397-clk",
+> > +	}, {
+> > +		.name = "mediatek-mt6397-pinctrl",
+> 
+> I think the "mediatek-" part should be removed, no?
 
-The configuration option was suggested by Uwe Kleine-K?nig. I think it 
-makes sense as there would not be otherwise any other way to enable the 
-early-timeout-sec as device tree. I would think that for example in some 
-server environment it would be good to enable watchdogs as early as 
-possible and there probably are no device tree available.
 
-> I think you are trying to do too much in your patch set.
-> Can we possibly focus on getting early timeout to an acceptable form
-> instead of trying to do everything at the same time.
+Ok, I will send another patch to change it, thank you.
 
-I would be happy to do it the way that guarantees the inclusion, but I 
-feel that I am getting conflicting feedback from different people giving 
-review. I appreciate any concrete guidance you can give about the 
-direction I should go with the patch set.
-
-Thanks,
--Timo
+Yours,
+Hongzhou
