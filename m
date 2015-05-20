@@ -1,44 +1,170 @@
-From: lorenx4@gmail.com (Lorenzo Nava)
-Date: Wed, 20 May 2015 14:57:36 +0200
-Subject: [RFC] arm: DMA-API contiguous cacheable memory
-In-Reply-To: <20150519223444.GO2067@n2100.arm.linux.org.uk>
-References: <CAE=W-e24oDH5RZfPftRg_xYBiG+b9Sj09vpyay9EwqOo9cVX1w@mail.gmail.com>
- <20150519163436.GZ21251@e104818-lin.cambridge.arm.com>
- <CAE=W-e1qynowbccHpYntWwwZPZOMHAVXH=Yj3ukyr_X8WKwQJQ@mail.gmail.com>
- <2882347.Nj1Dq9Wlqh@wuerfel>
- <20150519223444.GO2067@n2100.arm.linux.org.uk>
-Message-ID: <CAE=W-e2LZN9cEvTQNm0z1_ZMg1mKs=o2TcEy5QRkiEPMMFWuPg@mail.gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 20 May 2015 08:02:52 -0500
+Subject: [RFC/RFT PATCH 2/2] ARM64: kernel: pci: implement PCI device
+ resources claiming
+In-Reply-To: <20150520085656.GB29274@red-moon>
+References: <1431614537-16136-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1431614537-16136-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <5555553F.9070608@amd.com> <20150520085656.GB29274@red-moon>
+Message-ID: <CAErSpo4OY+mm4R34_1DG5tb+tTJVGQbjuQ75esSF26LUzNWL9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 12:34 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, May 20, 2015 at 12:14:48AM +0200, Arnd Bergmann wrote:
->> With that memory, you should be able to use the normal streaming
->> API (dma_sync_single_for_*).
+On Wed, May 20, 2015 at 3:56 AM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Fri, May 15, 2015 at 03:09:03AM +0100, Suravee Suthikulanit wrote:
+>> On 5/14/2015 9:42 AM, Lorenzo Pieralisi wrote:
+>> > When a device is scanned and added to the PCI bus, its resources
+>> > should be claimed to validate the BARs configuration and to assign
+>> > them a parent resource so that the resource hierarchy can be sanity
+>> > checked.
+>> >
+>> > This patch adds code that carries out PCI device resources claiming to
+>> > the ARM64 pcibios_add_device implementation so that device resources
+>> > are claimed by the core PCI layer upon PCI device initialization on
+>> > ARM64 systems.
+>> >
+>> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> > Cc: Arnd Bergmann <arnd@arndb.de>
+>> > Cc: Will Deacon <will.deacon@arm.com>
+>> > Cc: Liviu Dudau <liviu.dudau@arm.com>
+>> > Cc: Bjorn Helgaas <bhelgaas@google.com>
+>> > ---
+>> >   arch/arm64/kernel/pci.c | 10 ++++++++++
+>> >   1 file changed, 10 insertions(+)
+>> >
+>> > diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+>> > index 4095379..c0a88ca 100644
+>> > --- a/arch/arm64/kernel/pci.c
+>> > +++ b/arch/arm64/kernel/pci.c
+>> > @@ -43,8 +43,18 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+>> >    */
+>> >   int pcibios_add_device(struct pci_dev *dev)
+>> >   {
+>> > +   struct resource *res;
+>> > +   int i;
+>> > +
+>> >     dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+>> >
+>> > +   for (i = 0; i < PCI_NUM_RESOURCES; i++) {
+>> > +           res = &dev->resource[i];
+>> > +           if (res->parent || !res->flags)
+>> > +                   continue;
+>> > +           pci_claim_resource(dev, i);
+>> > +   }
+>> > +
+>> >     return 0;
+>> >   }
+>> >
+>> >
+>>
+>> Lorenzo/Bjorn,
+>>
+>> I have tested this patch on top of Jayachandran's V2 patch series
+>> (http://www.spinics.net/lists/linux-pci/msg40811.html) on AMD Seattle
+>> (w/ PROBE_ONLY and non-PROBE_ONLY mode), and your changes here works
+>> with additional changes below.
+>>
+>> It seems that when booting w/ PROBE_ONLY case, we need to call
+>> pci_read_bridge_bases() at some point before claiming the resources of
+>> devices underneath the bridge. This is needed to determine the bridge
+>> bases (i.e. bridge io, mmio and mmio_pref bases), and update bridge
+>> resources accordingly.
+>>
+>> ---- BEGIN PATCH -----
+>> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+>> index c0a88ca..57be6aa 100644
+>> --- a/arch/arm64/kernel/pci.c
+>> +++ b/arch/arm64/kernel/pci.c
+>> @@ -48,6 +48,11 @@ int pcibios_add_device(struct pci_dev *dev)
+>>
+>>          dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+>>
+>> +       if (pci_has_flag(PCI_PROBE_ONLY) &&
 >
-> Wrong, as I've pointed out previously.  The only memory which you're
-> allowed to sync is with memory which has been mapped with a dma_map_*()
-> function.
+> Does it really matter if PCI_PROBE_ONLY is set ?
 >
-> --
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
+>> +           !pci_is_root_bus(dev->bus) &&
+>
+> This check is useless, since pci_read_bridge_bases checks that already.
+>
+>> +           !pci_bridge_bases_is_read(dev->bus))
+>> +               pci_read_bridge_bases(dev->bus);
+>> +
+>
+> Ok. Most of the archs do that in pcibios_fixup_bus, I would like to
+> understand:
+>
+> 1) Should we do it on PCI_PROBE_ONLY only
+> 2) Can we move this to generic code - ie pci_scan_child_bus (I guess answer
+>    is no, because there are corner cases I am not aware of)
 
-Russell,
+In my opinion, we should call pci_read_bridge_bases() in all cases,
+regardless of PCI_PROBE_ONLY.  pci_read_bridge_bases() doesn't
+*change* anything in the hardware; it only reads what's there.  (It
+should attempt writes to learn whether I/O and prefetchable memory
+apertures are implemented, but those should be done as in
+pci_bridge_check_ranges(), where the original value is restored.)
 
-so probably currently is impossible to allocate a contiguous cachable
-DMA memory. You can't use CMA, and the only functions which allow you
-to use it are not compatible with sync functions.
-Do you think the problem is the CMA design, the DMA API design, or
-there is no problem at all and this is not something useful?
-Anyway it's not completely clear to me which is the difference between:
-  - allocating memory and use sync function on memory mapped with dma_map_*()
-  - allocating memory with dma_alloc_*() (with cacheable attributes)
-and use the sync functions on it
-It looks that the second just make alloc + map in a single step
-instead of splitting the operation in two steps.
-I'm sure I'm losing something, can you please help me understand that?
+I also think this should be done in generic code, since there's
+nothing architecture-specific about bridge operation.
 
-Thanks.
-Lorenzo
+I've been hoping to get rid of pcibios_fixup_bus() completely for
+years, and doing pci_read_bridge_bases() in generic code would be a
+big step.
+
+No doubt there are corner cases we'll trip over, but I'm not aware of them yet.
+
+> If I add it to arm64 (in pcibios_fixup_bus) I have to add it to arm too, more
+> arch specific code that has nothing arch specific in it so I am not really
+> keen on that.
+>
+> Comments appreciated.
+>
+> Lorenzo
+>
+>>          for (i = 0; i < PCI_NUM_RESOURCES; i++) {
+>>                  res = &dev->resource[i];
+>>                  if (res->parent || !res->flags)
+>> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+>> index 6675a7a..6cab8be 100644
+>> --- a/drivers/pci/probe.c
+>> +++ b/drivers/pci/probe.c
+>> @@ -447,6 +447,13 @@ static void pci_read_bridge_mmio_pref(struct
+>> pci_bus *child)
+>>          }
+>>   }
+>>
+>> +bool pci_bridge_bases_is_read(struct pci_bus *bus)
+>> +{
+>> +       return (bus->resource[0]->start ||
+>> +               bus->resource[1]->start ||
+>> +               bus->resource[2]->start);
+>> +}
+>> +
+>>   void pci_read_bridge_bases(struct pci_bus *child)
+>>   {
+>>          struct pci_dev *dev = child->self;
+>> diff --git a/include/linux/pci.h b/include/linux/pci.h
+>> index 353db8d..11c674d 100644
+>> --- a/include/linux/pci.h
+>> +++ b/include/linux/pci.h
+>> @@ -798,6 +798,7 @@ void pci_device_add(struct pci_dev *dev, struct
+>> pci_bus *bus);
+>>   unsigned int pci_scan_child_bus(struct pci_bus *bus);
+>>   void pci_bus_add_device(struct pci_dev *dev);
+>>   void pci_read_bridge_bases(struct pci_bus *child);
+>> +bool pci_bridge_bases_is_read(struct pci_bus *bus);
+>>   struct resource *pci_find_parent_resource(const struct pci_dev *dev,
+>>                                            struct resource *res);
+>>   u8 pci_swizzle_interrupt_pin(const struct pci_dev *dev, u8 pin);
+>> ---- END PATCH -----
+>>
+>> I'm not sure if this is the best place to be reading the bridge bases.
+>> I guess we should be able to do this when adding bridge devices.
+>>
+>> Thanks,
+>>
+>> Suravee
+>>
+>>
