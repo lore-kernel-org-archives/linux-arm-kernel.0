@@ -1,39 +1,93 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 20 May 2015 15:20:30 +0200
-Subject: [PATCH v4] Thermal cleanups and hardware trip points
-Message-ID: <1432128046-12921-1-git-send-email-s.hauer@pengutronix.de>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 20 May 2015 22:33:13 +0800
+Subject: [PATCH v2] i2c: designware: Avoid unnecessary resuming during system
+ suspend
+Message-ID: <1432132393-693-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for hardware trip points. It picks up earlier
-work from Mikko Perttunen. Mikko implemented hardware trip points as part
-of the device tree support. It was suggested back then to move the
-functionality to the thermal core instead of putting more code into the
-device tree support. This series does exactly that.
+Commit 1fc2fe204cb9 ("i2c: designware: Add runtime PM hooks") adds
+runtime pm support using the same ops for system pm and runtime pm.
+When suspend to ram, the i2c host may have been runtime suspended, thus
+i2c_dw_disable() hangs.
 
-The majority of the patches are cleanups and fixes. Patch 11 introduces
-hardware tracked trip points and finally a driver for the Mediatek
-thermal controller is introduced as the first user.
+Previously, I fixed this issue by separating ops for system pm and
+runtime pm, then in the system suspend/resume path, runtime pm apis are
+used to ensure the device is at correct state.
 
-All comments welcome
+But as Mika Westerberg pointed out: it sounds a bit silly to resume the
+device just because you want to call i2c_dw_disable() for it before
+suspending again. He then suggested an elegant solution which keeps the
+device runtime suspended during system suspend with the help of
+'dev->power.direct_complete'. This patch adopted this solution, and in
+fact Mika provided the main code.
 
-Changes since v3:
-- Fix some missing function type changes in int3400_thermal.c,
-  processor_thermal_device.c, kirkwood_thermal.c and exynos_tmu.c
-- Add better description for set_trips callback
-- update the interrupt triggers also when the trip points change
-- Add missing MODULE_* tags
-- Broaden temperature range in the Mediatek driver so that we can be sure
-  the measured temperatures are really out of the desired range
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ v2 change:
+	- adopt Mika's suggestion to make use of direct_complete flag
 
-Changes since v2:
-- Add Mediatek thermal controller driver as first user for hardware trip
-  points
+ drivers/i2c/busses/i2c-designware-platdrv.c | 33 +++++++++++++++++++++++++----
+ 1 file changed, 29 insertions(+), 4 deletions(-)
 
-Changes since v1:
-- Use int instead of unsigned long consistently for temperatures
-- Instead of misfixing the emulation code add a comment how the
-  code is meant
-- Add doc entry for .set_trips callback
-- initialize prev_low_trip/prev_high_trip properly
-- get tz->lock before calling thermal_zone_set_trips()
+diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
+index 0a80e4a..f89650f 100644
+--- a/drivers/i2c/busses/i2c-designware-platdrv.c
++++ b/drivers/i2c/busses/i2c-designware-platdrv.c
+@@ -298,6 +298,22 @@ static const struct of_device_id dw_i2c_of_match[] = {
+ MODULE_DEVICE_TABLE(of, dw_i2c_of_match);
+ #endif
+ 
++#ifdef CONFIG_PM_SLEEP
++static int dw_i2c_prepare(struct device *dev)
++{
++	return pm_runtime_suspended(dev);
++}
++
++static void dw_i2c_complete(struct device *dev)
++{
++	if (dev->power.direct_complete)
++		pm_request_resume(dev);
++}
++#else
++#define dw_i2c_prepare	NULL
++#define dw_i2c_complete	NULL
++#endif
++
+ #ifdef CONFIG_PM
+ static int dw_i2c_suspend(struct device *dev)
+ {
+@@ -322,10 +338,19 @@ static int dw_i2c_resume(struct device *dev)
+ 
+ 	return 0;
+ }
+-#endif
+ 
+-static UNIVERSAL_DEV_PM_OPS(dw_i2c_dev_pm_ops, dw_i2c_suspend,
+-			    dw_i2c_resume, NULL);
++static const struct dev_pm_ops dw_i2c_dev_pm_ops = {
++	.prepare = dw_i2c_prepare,
++	.complete = dw_i2c_complete,
++	SET_SYSTEM_SLEEP_PM_OPS(dw_i2c_suspend, dw_i2c_resume)
++	SET_RUNTIME_PM_OPS(dw_i2c_suspend,
++		dw_i2c_resume, NULL)
++};
++
++#define DW_I2C_DEV_PMOPS (&dw_i2c_dev_pm_ops)
++#else
++#define DW_I2C_DEV_PMOPS NULL
++#endif
+ 
+ /* work with hotplug and coldplug */
+ MODULE_ALIAS("platform:i2c_designware");
+@@ -337,7 +362,7 @@ static struct platform_driver dw_i2c_driver = {
+ 		.name	= "i2c_designware",
+ 		.of_match_table = of_match_ptr(dw_i2c_of_match),
+ 		.acpi_match_table = ACPI_PTR(dw_i2c_acpi_match),
+-		.pm	= &dw_i2c_dev_pm_ops,
++		.pm	= DW_I2C_DEV_PMOPS,
+ 	},
+ };
+ 
+-- 
+2.1.4
