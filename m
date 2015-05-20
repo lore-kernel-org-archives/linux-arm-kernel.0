@@ -1,72 +1,61 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Wed, 20 May 2015 12:17:16 +0100
-Subject: [PATCH v2 2/5] firmware: add support for ARM System Control and
- Power Interface(SCPI) protocol
-In-Reply-To: <1431618155-3132-3-git-send-email-sudeep.holla@arm.com>
-References: <1431618155-3132-1-git-send-email-sudeep.holla@arm.com>
- <1431618155-3132-3-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1432120636.3231.24.camel@linaro.org>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 20 May 2015 13:18:47 +0200
+Subject: [PATCH] ata: hpt366: fix constant cast warning
+In-Reply-To: <2549322.XbiTlcDvMS@wuerfel>
+References: <2549322.XbiTlcDvMS@wuerfel>
+Message-ID: <1603711.yg6aGn68IJ@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-05-14 at 16:42 +0100, Sudeep Holla wrote:
-> This patch adds support for System Control and Power Interface (SCPI)
-> Message Protocol used between the Application Cores(AP) and the System
-> Control Processor(SCP). The MHU peripheral provides a mechanism for
-> inter-processor communication between SCP's M3 processor and AP.
+
+Hi,
+
+On Tuesday, May 19, 2015 04:34:05 PM Arnd Bergmann wrote:
+> gcc-5.x warns about a preexisting problem in the hpt36x pata driver:
 > 
-> SCP offers control and management of the core/cluster power states,
-> various power domain DVFS including the core/cluster, certain system
-> clocks configuration, thermal sensors and many others.
+> drivers/ata/pata_hpt366.c: In function 'hpt36x_init_one':
+> drivers/ata/pata_hpt366.c:376:9: warning: assignment discards 'const' qualifier from pointer target type [-Wdiscarded-array-qualifiers]
 > 
-> This protocol driver provides interface for all the client drivers using
-> SCPI to make use of the features offered by the SCP.
+> Other ata drivers have the same problem, as ata_pci_bmdma_init_one
+> takes a non-const pointer, and they solve it by using a cast to
+> turn that pointer into a normal non-const pointer.
 > 
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> CC: Jassi Brar <jassisinghbrar@gmail.com>
-> Cc: Liviu Dudau <Liviu.Dudau@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Jon Medhurst (Tixy) <tixy@linaro.org>
-> ---
+> I also tried to change the ata core code to make host->private_data
+> a const pointer, but that quickly got out of hand, as some other
+> drivers expect it to be writable, so I ended up using the same
+> hack as the others here.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Sorry for the delay in looking at this. I have one nitpick below but
-anyway, here's a
+Your patch looks fine to me, thanks.
 
-Reviewed-by: Jon Medhurst (Tixy) <tixy@linaro.org>
+Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
-[...]
-> +++ b/drivers/firmware/arm_scpi.c
-[...]
-> +static void scpi_process_cmd(struct scpi_chan *ch, u32 cmd)
-> +{
-> +	unsigned long flags;
-> +	struct scpi_xfer *t, *match = NULL;
-> +
-> +	spin_lock_irqsave(&ch->rx_lock, flags);
-> +	if (list_empty(&ch->rx_pending)) {
-> +		spin_unlock_irqrestore(&ch->rx_lock, flags);
-> +		return;
-> +	}
-> +
-> +	list_for_each_entry(t, &ch->rx_pending, node)
-> +		if (CMD_XTRACT_UNIQ(t->cmd) == CMD_XTRACT_UNIQ(cmd)) {
-> +			list_del(&t->node);
-> +			match = t;
-> +			break;
-> +		}
-> +	/* check if wait_for_completion is in progress or timed-out */
-> +	if (match && !completion_done(&match->done)) {
-> +		struct scpi_shared_mem *mem = ch->rx_payload;
-> +		int len = min(match->rx_len, CMD_SIZE(cmd));
-> +
-> +		match->status = le32_to_cpu(mem->status);
-> +		memcpy_fromio(match->rx_buf, mem->payload, len);
-> +		if (match->rx_len > len)
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
 
-rx_len is unsigned and len is signed and so I had to go refresh my
-memory from the C standard before I could convince myself that this if
-statement was OK. Might be clearer if len was unsigned, especially as
-it's the 'min' of two unsigned values.
-
--- 
-Tixy
+> diff --git a/drivers/ata/pata_hpt366.c b/drivers/ata/pata_hpt366.c
+> index cbc3de793d1d..0038dc4c06c7 100644
+> --- a/drivers/ata/pata_hpt366.c
+> +++ b/drivers/ata/pata_hpt366.c
+> @@ -352,7 +352,7 @@ static int hpt36x_init_one(struct pci_dev *dev, const struct pci_device_id *id)
+>  	};
+>  	const struct ata_port_info *ppi[] = { &info_hpt366, NULL };
+>  
+> -	void *hpriv = NULL;
+> +	const void *hpriv = NULL;
+>  	u32 reg1;
+>  	int rc;
+>  
+> @@ -383,7 +383,7 @@ static int hpt36x_init_one(struct pci_dev *dev, const struct pci_device_id *id)
+>  		break;
+>  	}
+>  	/* Now kick off ATA set up */
+> -	return ata_pci_bmdma_init_one(dev, ppi, &hpt36x_sht, hpriv, 0);
+> +	return ata_pci_bmdma_init_one(dev, ppi, &hpt36x_sht, (void *)hpriv, 0);
+>  }
+>  
+>  #ifdef CONFIG_PM_SLEEP
