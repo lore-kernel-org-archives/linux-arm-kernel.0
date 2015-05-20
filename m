@@ -1,25 +1,23 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 20 May 2015 19:06:36 +0100
-Subject: [PATCH] ASoC: omap: fix up SND_OMAP_SOC_OMAP_ABE_TWL6040
- dependency, again
-In-Reply-To: <3413182.qcoNiOhonF@wuerfel>
-References: <3413182.qcoNiOhonF@wuerfel>
-Message-ID: <20150520180636.GK21577@sirena.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 20 May 2015 11:07:03 -0700
+Subject: [PATCH RESEND] mach-omap2:Remove calls to deprecacted
+ marco,PTR_RET in the files,fb.c and pmu.c
+In-Reply-To: <1431958079-486-1-git-send-email-xerofoify@gmail.com>
+References: <1431958079-486-1-git-send-email-xerofoify@gmail.com>
+Message-ID: <20150520180703.GI10274@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 02:47:32PM +0200, Arnd Bergmann wrote:
-> I tried to fix this before and submitted a working patch, but after
-> some discussion we came up with what seemed to be a nicer solution,
-> resulting in commit 3d4cf65e2d ("ASoC: omap: fix up
-> SND_OMAP_SOC_OMAP_ABE_TWL6040 dependency"). Unfortunately, that
-> version was incomplete, and we still get this build error:
+* Nicholas Krause <xerofoify@gmail.com> [150518 07:09]:
+> This removes two calls to the deprecated marco,PTR_RET in
+> the files,fb.c and pmu.c for the functions,omap_init_vrfb
+> and omap_init_pmu respectfully. Furthermore these are now
+> replaced by calling the correctly non deprecacted function,
+> PTR_ERR_OR_ZERO in both functions.
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150520/6bc10918/attachment.sig>
+I've applied the original version today as they seem to be
+the same.
+
+Thanks,
+
+Tony
