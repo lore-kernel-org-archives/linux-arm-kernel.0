@@ -1,105 +1,60 @@
-From: jonathar@broadcom.com (Jonathan Richardson)
-Date: Wed, 20 May 2015 16:38:02 -0700
-Subject: [PATCH 2/2] misc: Add initial Digital Timing Engine (DTE) driver
- for cygnus
-In-Reply-To: <20150514113054.GB1580@localhost.localdomain>
-References: <1429744923-2007-1-git-send-email-jonathar@broadcom.com>
- <5543CD73.2030902@broadcom.com> <20150501203004.3add2c95@lxorguk.ukuu.org.uk>
- <9193036.7UYD2OGJHk@wuerfel> <554D1649.2030106@broadcom.com>
- <20150513153544.GC2065@localhost.localdomain> <5553AAEA.30503@broadcom.com>
- <20150513202716.GA15878@localhost.localdomain>
- <5553DD7D.8090905@broadcom.com> <20150514113054.GB1580@localhost.localdomain>
-Message-ID: <555D1ADA.8070308@broadcom.com>
+From: afaerber@suse.de (=?windows-1252?Q?Andreas_F=E4rber?=)
+Date: Thu, 21 May 2015 01:45:01 +0200
+Subject: [PATCH v8 07/16] drivers: reset: Add STM32 reset driver
+In-Reply-To: <1431158038-3813-8-git-send-email-mcoquelin.stm32@gmail.com>
+References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1431158038-3813-8-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <555D1C7D.1060205@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15-05-14 04:30 AM, Richard Cochran wrote:
-> On Wed, May 13, 2015 at 04:25:49PM -0700, Jonathan Richardson wrote:
->> On 15-05-13 01:27 PM, Richard Cochran wrote:
->>> If the ISR is delivering batches of time stamps, then the interrupt
->>> rate aught to be the highest rate that the system can support.
->>
->> It to nanosecond precision so it can be ridiculously quick.
+Am 09.05.2015 um 09:53 schrieb Maxime Coquelin:
+> The STM32 MCUs family IPs can be reset by accessing some registers
+> from the RCC block.
 > 
-> Your interrupt rate directly controls the worst case delay between the
-> time the event occurs and the time the application (or stack) obtains
-> the time stamp.  You want this delay to be as short as possible, but
-> you cannot afford to bog down the entire operating system.  I would
-> suggest a fixed value of 1000 Hz (with perhaps a debugfs knob).
+> The list of available reset lines is documented in the DT bindings.
 > 
-> What a poor hardware design.  Oh well.
+> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> ---
+>  drivers/reset/Makefile      |   1 +
+>  drivers/reset/reset-stm32.c | 124 ++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 125 insertions(+)
+>  create mode 100644 drivers/reset/reset-stm32.c
 > 
->> Having separate FIFO's allows process A to only retrieve channel 1
->> timestamps.
-> 
-> Having lots of different processes reading time stamps directly, and
-> trying to match them up with various HW events after the fact, is not
-> way to go.  Instead, kernel time stamp consumers should pair the time
-> stamps with the associated events and then provide the time
-> information conveniently over the existing APIs. (See also my last
-> comment.)
-> 
->> Our original non PTP driver ioctl (DTE_GET_TIMESTAMP) solved that
->> problem because we could specify a channel. We're now trying to adapt it
->> to PTP so we don't have to write a new "DTE" user and kernel side API.
-> 
-> For mainline, we want the best interface possible.  Sometimes that
-> means that programs based on out-of-tree interfaces will need to be
-> changed.
-> 
->>> Ideally, there will be kernel consumers for most of the channels, and
->>> they will forward the time stamps in a way appropriate to their
->>> subsystem.  For example, network devices will use so_timestamping. 
->>> Any "leftover" channels can go through the generic PTP interface.
->>
->> I'll look more into so_timestamping to see how that's used but we wanted
->> one generic interface to get timestamps from channels because anything
->> can be hooked up to a channel.
-> 
-> I definitely do *not* want one generic interface.  The task of
-> matching time stamps with hardware events belongs to the kernel.  For
-> random GPIOs, the existing PTP ioctl is plenty good enough, but for
-> other devices (network, audio) more work is needed.
-
-Richard, this design isn't going to work. We need to have both kernel
-and user space consumers. We don't want all GPIO's in a common timestamp
-buffer either, as it presents problems I mentioned previously. Currently
-the network input is a gpio. After some discussion here I think we'll
-have to keep this driver out of the kernel for now.
-
-Thanks.
-
-> 
-> One huge lacuna in your patch series is the code that associates the
-> time stamps with events.  How is this supposed to work?
-> 
-> So far you have:
-> 
-> +enum dte_client {
-> +       DTE_CLIENT_MIN = 0,
-> +       DTE_CLIENT_I2S0_BITCLOCK = 0,
-> +       DTE_CLIENT_I2S1_BITCLOCK,
-> +       DTE_CLIENT_I2S2_BITCLOCK,
-> +       DTE_CLIENT_I2S0_WORDCLOCK,
-> +       DTE_CLIENT_I2S1_WORDCLOCK,
-> +       DTE_CLIENT_I2S2_WORDCLOCK,
-> +       DTE_CLIENT_LCD_CLFP,
-> +       DTE_CLIENT_LCD_CLLP,
-> +       DTE_CLIENT_GPIO14,
-> +       DTE_CLIENT_GPIO15,
-> +       DTE_CLIENT_GPIO22,
-> +       DTE_CLIENT_GPIO23,
-> +       DTE_CLIENT_MAX,
+> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+> index 157d421..aed12d1 100644
+> --- a/drivers/reset/Makefile
+> +++ b/drivers/reset/Makefile
+> @@ -1,5 +1,6 @@
+>  obj-$(CONFIG_RESET_CONTROLLER) += core.o
+>  obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
+>  obj-$(CONFIG_ARCH_BERLIN) += reset-berlin.o
+> +obj-$(CONFIG_ARCH_STM32) += reset-stm32.o
+>  obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
+>  obj-$(CONFIG_ARCH_STI) += sti/
+> diff --git a/drivers/reset/reset-stm32.c b/drivers/reset/reset-stm32.c
+> new file mode 100644
+> index 0000000..2c41858
+> --- /dev/null
+> +++ b/drivers/reset/reset-stm32.c
+[...]
+> +static const struct of_device_id stm32_reset_dt_ids[] = {
+> +	 { .compatible = "st,stm32-rcc", },
+> +	 { /* sentinel */ },
 > +};
-> 
-> Network devices are not present at all.  No idea why LCD signals are
-> included.  For the i2s, this appears to stamp the audio clock.  But
-> which audio sample has been stamped?  Or do you only care about
-> frequency and not phase?
-> 
-> For the next round, please include John Stulz, Thomas Gleixner,
-> netdev, and the appropriate audio list on CC.
-> 
-> Thanks,
-> Richard
-> 
+> +MODULE_DEVICE_TABLE(of, sstm32_reset_dt_ids);
+
+Typo.
+
+IIUC the timer depends on the reset controller, so it must be built in
+anyway, and that's what's enforced in the Makefile above. Drop the line?
+
+Regards,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Dilip Upmanyu, Graham Norton; HRB
+21284 (AG N?rnberg)
