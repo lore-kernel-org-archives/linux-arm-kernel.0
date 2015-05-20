@@ -1,22 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 May 2015 17:21:55 +0200
-Subject: [PATCH] ARM: uniphier: only select TWD for SMP
-In-Reply-To: <CAK7LNAQdndXzphHquZJRVwHwfRa5uOfeaQpWZ151PN8FNg9xGw@mail.gmail.com>
-References: <2227073.rylFc5jIqu@wuerfel> <2076486.2f0MnouCnx@wuerfel>
- <CAK7LNAQdndXzphHquZJRVwHwfRa5uOfeaQpWZ151PN8FNg9xGw@mail.gmail.com>
-Message-ID: <2163738.HLjmavUv0R@wuerfel>
+From: stuart.yoder@freescale.com (Stuart Yoder)
+Date: Wed, 20 May 2015 10:13:15 -0500
+Subject: [RESEND][ PATCH v3] irqchip/gicv3-its: ITS table size should not be
+ smaller than PSZ
+Message-ID: <1432134795-661-1-git-send-email-stuart.yoder@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 May 2015 09:52:13 Masahiro Yamada wrote:
-> 
-> OK, then.  Anyway, we should fix the build error asap.
-> Let's go with "if SMP" for now.
-> 
-> Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> 
-> 
+when allocating a device table, if the requested allocation
+is smaller than the default granule size of the ITS
+then, we need to round up to the default size
 
-Applied now, thanks!
+Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+Signed-off-by: Stuart Yoder <stuart.yoder@freescale.com>
+---
+  -v3 changes
+     -updated commit message and added comment
+  -v3 resend-- updated email addresses sent to
+  -would be nice to get this into 4.1 as the kernel will hang booting
+   on some systems
 
-	Arnd
+ drivers/irqchip/irq-gic-v3-its.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 9687f8a..1b7e155 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -828,7 +828,14 @@ static int its_alloc_tables(struct its_node *its)
+ 			u64 typer = readq_relaxed(its->base + GITS_TYPER);
+ 			u32 ids = GITS_TYPER_DEVBITS(typer);
+ 
+-			order = get_order((1UL << ids) * entry_size);
++			/*
++			 * 'order' was initialized earlier to the default page
++			 * granule of the the ITS.  We can't have an allocation
++			 * smaller than that.  If the requested allocation
++			 * is smaller, round up to the default page granule.
++			 */
++			order = max(get_order((1UL << ids) * entry_size),
++				    order);
+ 			if (order >= MAX_ORDER) {
+ 				order = MAX_ORDER - 1;
+ 				pr_warn("%s: Device Table too large, reduce its page order to %u\n",
+-- 
+2.3.3
