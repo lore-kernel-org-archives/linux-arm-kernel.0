@@ -1,51 +1,47 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Wed, 20 May 2015 13:33:52 +0800
-Subject: [PATCH v8 2/3] I2C: mediatek: Add driver for MediaTek I2C
- controller
-In-Reply-To: <20150519194917.GI24769@pengutronix.de>
-References: <1431967209-5261-1-git-send-email-eddie.huang@mediatek.com>
- <1431967209-5261-3-git-send-email-eddie.huang@mediatek.com>
- <20150518184300.GB28888@pengutronix.de>
- <CABuKBeJcpufi-eEWmDRK6F2kgpz3DmCz8rp4hVPCJVgkmGr-KA@mail.gmail.com>
- <20150519194917.GI24769@pengutronix.de>
-Message-ID: <1432100032.3422.13.camel@mtksdaap41>
+From: timo.kokkonen@offcode.fi (Timo Kokkonen)
+Date: Wed, 20 May 2015 08:37:35 +0300
+Subject: [PATCHv8 01/10] watchdog: Rename watchdog_active to
+ watchdog_hw_active
+In-Reply-To: <555BDF22.2090208@roeck-us.net>
+References: <1432023969-20736-1-git-send-email-timo.kokkonen@offcode.fi>
+ <1432023969-20736-2-git-send-email-timo.kokkonen@offcode.fi>
+ <555BDF22.2090208@roeck-us.net>
+Message-ID: <555C1D9F.4060600@offcode.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On 20.05.2015 04:10, Guenter Roeck wrote:
+> On 05/19/2015 01:26 AM, Timo Kokkonen wrote:
+>> Before extending the watchdog core midlayer, it is useful to rename
+>> the watchdog_active function so that it states explicitly what it
+>> really does. That is, "active" watchdog means really that the watchdog
+>> hardware is running and needs pinging to prevent a watchdog reset
+>> taking place in near future.
+>>
+>> This is different to "watchdog open" state, which simply states that
+>> kernel is expecting the user space to keep the watchdog alive. These
+>> states might become different mainly because some hardware have
+>> limitations that prevent them from being stopped at will.
+>>
+>
+> I don't see why this is needed. If you need another state, per your
+> description, it would be "open" in addition to "active".
 
-On Tue, 2015-05-19 at 21:49 +0200, Uwe Kleine-K?nig wrote:
-> Hello Matthias,
-> 
-> On Tue, May 19, 2015 at 04:48:23PM +0200, Matthias Brugger wrote:
-> > 2015-05-18 20:43 GMT+02:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> > > On Tue, May 19, 2015 at 12:40:08AM +0800, Eddie Huang wrote:
-> > >> [...]
-> > >>  drivers/i2c/busses/i2c-mt65xx.c | 675 ++++++++++++++++++++++++++++++++++++++++
-> > >> [...]
-> > >> +#define I2C_DRV_NAME         "mt-i2c"
-> > > i2c-mt65xx ?
-> > 
-> > As this works for all SoCs so far, I would propose: i2c-mtk
-> Hmm, currently we have:
-> 
->   - #define I2C_DRV_NAME mt-i2c
-Change to i2c-mt65xx.
+Yes, the watchdog_is_open() is introduced on patch number two. The 
+original watchdog_is_active() is really confusing. It doesn't really 
+state what it means. Most of the drivers are using it to test whether 
+the watchdog HW is active when going to suspend, but at least atmel 
+watchdog was testing it to see whether the watchdog device is open from 
+user space. The HW itself is always active in that driver.
 
->   - dt-compatibles: "mediatek,mt6577-i2c" + "mediatek,mt6589-i2c"
+If we are about to distinguish between "device open from user space" and 
+"hardware timer running", we better be clear about the naming. 
+"watchdog_is_active" doesn't really tell what it does.
 
-We hope all mobile chip series use the same I2C driver.
-I don't list all chips in driver to avoid too many dt-compatibles.
-Only list chips that are different from others.
+This was originally suggested by Uwe Kleine-K?nig. He also recommended 
+changing the timeout parameter so that is would state more clearly that 
+it is the SW timeout and not HW timeout. But I felt that it would have 
+been too invasive to change the timeout parameter as well. The 
+watchdog_is_active was not used very much so the change was easy.
 
->   - function prefix: mtk_i2c_
-Maybe use i2c-mt65xx_ is better, but I tend to keep mtk_i2c_ after these
-review rounds.
-
->   - filename: i2c-mt65xx.c
->   - Kconfig symbol: I2C_MT65XX
-> 
-> Getting some harmonization here would definitly be nice.
-> 
-
-Eddie Huang
+-Timo
