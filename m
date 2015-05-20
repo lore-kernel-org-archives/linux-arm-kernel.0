@@ -1,50 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 20 May 2015 13:55:03 -0700
-Subject: [PATCH] mach-omap2: Remove use of deprecated marco, PTR_RET in
- devices.c
-In-Reply-To: <1432150346-31590-1-git-send-email-xerofoify@gmail.com>
-References: <1432150346-31590-1-git-send-email-xerofoify@gmail.com>
-Message-ID: <20150520205503.GN10274@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 20 May 2015 21:55:54 +0100
+Subject: imx53 IPU support on 4.0.4
+In-Reply-To: <555C86A5.2030007@melag.de>
+References: <555C86A5.2030007@melag.de>
+Message-ID: <20150520205554.GY2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nicholas Krause <xerofoify@gmail.com> [150520 12:33]:
-> This removes the deprecacted marco, PTR_RET and changes the
-> functions that use this marco in their return statement to
-> instead use the non deprecacted function, PTR_ERR_OR_ZERO
-> for the file devices.c.
+On Wed, May 20, 2015 at 03:05:41PM +0200, Enrico Weigelt, metux IT consult wrote:
+> I've rebased the IPUv3 patches from ptx folks onto 4.0.4,
+> working good for me. (now gst plays h264 @25fps on imx53)
 > 
-> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
-
-Applying into omap-for-v4.2/cleanup thanks.
-
-Tony
-
-> ---
->  arch/arm/mach-omap2/devices.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> https://github.com/metux/linux/commits/submit-4.0-imx53-ipuv3
 > 
-> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-> index 990338f..a69bd67 100644
-> --- a/arch/arm/mach-omap2/devices.c
-> +++ b/arch/arm/mach-omap2/devices.c
-> @@ -63,7 +63,7 @@ static int __init omap3_l3_init(void)
->  
->  	WARN(IS_ERR(pdev), "could not build omap_device for %s\n", oh_name);
->  
-> -	return PTR_RET(pdev);
-> +	return PTR_ERR_OR_ZERO(pdev);
->  }
->  omap_postcore_initcall(omap3_l3_init);
->  
-> @@ -333,6 +333,6 @@ static int __init omap_gpmc_init(void)
->  	pdev = omap_device_build("omap-gpmc", -1, oh, NULL, 0);
->  	WARN(IS_ERR(pdev), "could not build omap_device for %s\n", oh_name);
->  
-> -	return PTR_RET(pdev);
-> +	return PTR_ERR_OR_ZERO(pdev);
->  }
->  omap_postcore_initcall(omap_gpmc_init);
-> -- 
-> 2.1.4
-> 
+> (Haven't 4.1rc* yet, as it broke some other things for me.)
+
+While it's useful to broadcast your work, please have some consideration
+for the forum(s) you're doing that to.
+
+The way kernel development works is that patches are sent to mailing
+lists for review.  Kernel developers review the patches and provide
+comments back.  The comments are discussed and actioned, and a new
+set of patches posted for further review.  This cycle repeats.
+
+When everyone is happy, the patches can be applied, or pulled from
+a non-github git tree.  (Kernel people generally don't like github.)
+
+This is so that upstream kernel developers don't get too overloaded
+with work that really should be done by downstream folk (imagine if
+they had to rewrite every patch that came their way...)
+
+Thanks.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
