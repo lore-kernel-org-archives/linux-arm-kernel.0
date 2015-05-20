@@ -1,55 +1,61 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 20 May 2015 11:47:45 +0200
-Subject: linux-next: manual merge of the samsung tree with the arm-soc and
- at91 trees
-In-Reply-To: <20150520091646.GF3338@piout.net>
-References: <20150520102743.3d336a73@canb.auug.org.au>
- <CAJKOXPdsi-5kdQJtybeaMCy0DXuRTRGgBEOM=SH9BsjquEMjCQ@mail.gmail.com>
- <20150520091646.GF3338@piout.net>
-Message-ID: <CAMuHMdVoot1mBHUmGMuTzCkxzd7H5TJThrwmPvnedFAOAP49pw@mail.gmail.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Wed, 20 May 2015 17:59:49 +0800
+Subject: [RFC v1 01/25] ARM,
+ irq: Use irq_desc_get_xxx() to avoid redundant lookup of irq_desc
+In-Reply-To: <1432116013-25902-1-git-send-email-jiang.liu@linux.intel.com>
+References: <1432116013-25902-1-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <1432116013-25902-2-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 11:16 AM, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
-> On 20/05/2015 at 09:35:36 +0900, Krzysztof Kozlowski wrote :
->> 2015-05-20 9:27 GMT+09:00 Stephen Rothwell <sfr@canb.auug.org.au>:
->> > Today's linux-next merge of the samsung tree got a conflict in
->> > arch/arm/configs/multi_v7_defconfig between various commits from the
->> > arm-soc and at91 trees and various commits from the samsung tree.
->> >
->> > I fixed it up (see below) and can carry the fix as necessary (no action
->> > is required).
->>
->> Hi,
->>
->> Thanks for the merge.
->>
->> The parts coming from samsung-soc related to manually toggling stuff
->> (by me and Javier) look fine. The rest (coming from Kukjin's
->> savedefconfig) I don't know - too much of them.
->>
->
-> Hum, last time I asked, we were not supposed to do a savedefconfig on
-> multi_v7...
+Use irq_desc_get_xxx() to avoid redundant lookup of irq_desc while we
+already have a pointer to corresponding irq_desc.
 
-Yeah, IMHO it's something the arm-soc maintainers should do only right
-after rc1.
+Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+---
+ arch/arm/common/locomo.c   |    2 +-
+ arch/arm/common/sa1111.c   |    2 +-
+ arch/arm/plat-orion/gpio.c |    2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-Doing it at any other point in time may remove options that have just been
-added to multi_v7_defconfig by an arm-soc submaintainer, and that depend on
-a Kconfig change queued in another maintainer's for-next branch.
-
-Personally, I think no arm-soc submaintainer should touch multi_v7_defconfig,
-and all changes should be applied by the arm-soc maintainers.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/common/locomo.c b/arch/arm/common/locomo.c
+index b55c3625d7ee..02af4a07ceca 100644
+--- a/arch/arm/common/locomo.c
++++ b/arch/arm/common/locomo.c
+@@ -140,7 +140,7 @@ static struct locomo_dev_info locomo_devices[] = {
+ 
+ static void locomo_handler(unsigned int irq, struct irq_desc *desc)
+ {
+-	struct locomo *lchip = irq_get_chip_data(irq);
++	struct locomo *lchip = irq_desc_get_chip_data(desc);
+ 	int req, i;
+ 
+ 	/* Acknowledge the parent IRQ */
+diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
+index 5cc779c8e9c6..0d0844fa54c2 100644
+--- a/arch/arm/common/sa1111.c
++++ b/arch/arm/common/sa1111.c
+@@ -200,7 +200,7 @@ static void
+ sa1111_irq_handler(unsigned int irq, struct irq_desc *desc)
+ {
+ 	unsigned int stat0, stat1, i;
+-	struct sa1111 *sachip = irq_get_handler_data(irq);
++	struct sa1111 *sachip = irq_desc_get_handler_data(desc);
+ 	void __iomem *mapbase = sachip->base + SA1111_INTC;
+ 
+ 	stat0 = sa1111_readl(mapbase + SA1111_INTSTATCLR0);
+diff --git a/arch/arm/plat-orion/gpio.c b/arch/arm/plat-orion/gpio.c
+index 5168a52a17f9..caba04340619 100644
+--- a/arch/arm/plat-orion/gpio.c
++++ b/arch/arm/plat-orion/gpio.c
+@@ -409,7 +409,7 @@ static int gpio_irq_set_type(struct irq_data *d, u32 type)
+ 
+ static void gpio_irq_handler(unsigned irq, struct irq_desc *desc)
+ {
+-	struct orion_gpio_chip *ochip = irq_get_handler_data(irq);
++	struct orion_gpio_chip *ochip = irq_desc_get_handler_data(desc);
+ 	u32 cause, type;
+ 	int i;
+ 
+-- 
+1.7.10.4
