@@ -1,57 +1,43 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 20 May 2015 17:37:28 +0200
-Subject: [PATCH v8 2/3] I2C: mediatek: Add driver for MediaTek I2C
- controller
-In-Reply-To: <1432127020.20394.15.camel@mtksdaap41>
-References: <1431967209-5261-1-git-send-email-eddie.huang@mediatek.com>
- <1431967209-5261-3-git-send-email-eddie.huang@mediatek.com>
- <20150520085715.GA17078@pengutronix.de>
- <1432127020.20394.15.camel@mtksdaap41>
-Message-ID: <20150520153728.GT24769@pengutronix.de>
+From: robertcnelson@gmail.com (Robert Nelson)
+Date: Wed, 20 May 2015 10:38:42 -0500
+Subject: [PATCH] ARM: dts: am335x-boneblack: disable RTC-only sleep
+Message-ID: <1432136322-7609-1-git-send-email-robertcnelson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Fixes: http://bugs.elinux.org/issues/143
 
-On Wed, May 20, 2015 at 09:03:40PM +0800, Yingjoe Chen wrote:
-> On Wed, 2015-05-20 at 10:57 +0200, Uwe Kleine-K?nig wrote:
-> > On Tue, May 19, 2015 at 12:40:08AM +0800, Eddie Huang wrote:
-> > > +	if (i2c->speed_hz > MAX_HS_MODE_SPEED)
-> > > +		return -EINVAL;
-> > According to the plan to tune for the highest possible rate <=
-> > i2c->speed_hz, you should handle the case (i2c->speed_hz >
-> > MAX_HS_MODE_SPEED) like i2c->speed_hz == MAX_HS_MODE_SPEED.
-> > Well, you might want to prevent an overflow in the calculation below
-> > however.
-> 
-> The check here means we don't support speed > MAX_HS_MODE_SPEED. This is
-> different then slightly slower bus speed due to rounding error.
-Well from outside there no difference between asking for 100 with
-getting 98 or asking for 405 with getting 400. IMHO the expectation is
-that you set the maximal possible rate when something too big for you is
-requested. Consider a communication with a i2c device that supports 600
-kHz. You have the choice to communicate with 400 kHz with that or not at
-all.
+Entering RTC-only sleep is only properly supported on early prototypes series
+(pre-A6) of the BeagleBone Black.  Since rev (A6A), which include all production
+versions, it is not support at due to.
 
-> > > +	best_mul = MAX_SAMPLE_CNT_DIV * max_step_cnt;
-> > > +
-> > > +	for (sample_cnt = 1; sample_cnt <= MAX_SAMPLE_CNT_DIV; sample_cnt++) {
-> > > +		step_cnt = (min_div + sample_cnt - 1) / sample_cnt;
-> > DIV_ROUND_UP
-> > 
-> > > +		cnt_mul = step_cnt * sample_cnt;
-> > > +		if (step_cnt > max_step_cnt)
-> > > +			continue;
-> > I think it can happen that you have step_cnt > max_step_cnt here, but
-> > that (sample_cnt, max_step_cnt) still is a good pair to consider. So:
-> 
-> If step_cnt > max_step_cnt, then sample_cnt * max_step_cnt < min_div.
-> This means (sample_cnt, max_step_cnt) is not a valid.
-You're right.
+(rev A6) enable of the 3v3b regulator moved from LDO2 to LDO4 (3v3a)
+side-effect: 3v3b rail remains on in sleep-mode (also in off-mode when battery-powered)
 
-Best regards
-Uwe
+(rev A6A) am335x vdds supply moved from LDO3 to LDO1
+side-effect: vdds remains supplied in sleep-mode
 
+Reported-by: Matthijs van Duin <matthijsvanduin@gmail.com>
+Tested-by: Matthijs van Duin <matthijsvanduin@gmail.com>
+Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Johan Hovold <johan@kernel.org>
+---
+ arch/arm/boot/dts/am335x-boneblack.dts | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/am335x-boneblack.dts b/arch/arm/boot/dts/am335x-boneblack.dts
+index 5c42d25..901739f 100644
+--- a/arch/arm/boot/dts/am335x-boneblack.dts
++++ b/arch/arm/boot/dts/am335x-boneblack.dts
+@@ -80,7 +80,3 @@
+ 		status = "okay";
+ 	};
+ };
+-
+-&rtc {
+-	system-power-controller;
+-};
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+2.1.4
