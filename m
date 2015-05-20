@@ -1,19 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 May 2015 17:20:22 +0200
-Subject: [PATCH] MAINTAINERS: Add entry for NXP LPC18xx/43xx MCUs
-In-Reply-To: <1432061961-29179-1-git-send-email-manabian@gmail.com>
-References: <1432061961-29179-1-git-send-email-manabian@gmail.com>
-Message-ID: <16901376.4BlHa3JvZJ@wuerfel>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 20 May 2015 12:20:50 -0300
+Subject: [PATCH 1/1] ARM: clk-imx6q: refine sata's parent
+In-Reply-To: <1432132237-31004-1-git-send-email-sebastien.szymanski@armadeus.com>
+References: <1432132237-31004-1-git-send-email-sebastien.szymanski@armadeus.com>
+Message-ID: <CAOMZO5ByAL=-EXUiEoKnWVWbcpLPKDxQShPf_FPDhmHmiG3bmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 May 2015 20:59:21 Joachim Eastwood wrote:
-> Add a MAINTAINER entry covering all NXP LPC18xx/43xx
-> machine and drivers files.
-> 
-> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
-> 
+On Wed, May 20, 2015 at 11:30 AM, S?bastien Szymanski
+<sebastien.szymanski@armadeus.com> wrote:
+> According to IMX6D/Q RM, table 18-3, sata clock's parent is ahb, not ipg.
 
-Applied to next/soc, thanks!
+Good catch!
 
-	Arnd
+>
+> This patch is based on branch:
+> git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git imx/soc
+
+Please put this below the --- line.
+
+Reviewed-by: Fabio Estevam <fabio.estevam@freescale.com>
