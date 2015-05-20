@@ -1,42 +1,52 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 20 May 2015 08:50:35 +0200
-Subject: [PATCH 01/12] ARM: mach-imx: iomux-imx31: Use DECLARE_BITMAP
-In-Reply-To: <04e6c29d921d20f6089dd5d13f2c35bbe362eb0e.1432085659.git.joe@perches.com>
-References: <cover.1432085659.git.joe@perches.com>
- <04e6c29d921d20f6089dd5d13f2c35bbe362eb0e.1432085659.git.joe@perches.com>
-Message-ID: <20150520065035.GO24769@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 20 May 2015 08:51:32 +0200
+Subject: [RFC] arm: Add for atomic half word exchange
+In-Reply-To: <1348896100.440561432098574765.JavaMail.weblogic@ep2mlwas07a>
+References: <1348896100.440561432098574765.JavaMail.weblogic@ep2mlwas07a>
+Message-ID: <2528978.P5FT0BVksd@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wednesday 20 May 2015 05:09:35 Sarbojit Ganguly wrote:
 
-On Tue, May 19, 2015 at 06:37:49PM -0700, Joe Perches wrote:
-> Use the generic mechanism to declare a bitmap instead of unsigned long.
-> 
-> Signed-off-by: Joe Perches <joe@perches.com>
-> ---
->  arch/arm/mach-imx/iomux-imx31.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-imx/iomux-imx31.c b/arch/arm/mach-imx/iomux-imx31.c
-> index d6a3075..6dd22ca 100644
-> --- a/arch/arm/mach-imx/iomux-imx31.c
-> +++ b/arch/arm/mach-imx/iomux-imx31.c
-> @@ -40,7 +40,7 @@ static DEFINE_SPINLOCK(gpio_mux_lock);
->  
->  #define IOMUX_REG_MASK (IOMUX_PADNUM_MASK & ~0x3)
->  
-> -static unsigned long mxc_pin_alloc_map[NB_PORTS * 32 / BITS_PER_LONG];
-> +static DECLARE_BITMAP(mxc_pin_alloc_map, NB_PORTS * 32);
->  /*
->   * set the mode for a IOMUX pin.
->   */
-Compile tested and
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > ------- Original Message -------
+> > Sender : Peter Zijlstra<peterz@infradead.org>
+> > Date : May 19, 2015 21:43 (GMT+09:00)
+> > Title : Re: [RFC] arm: Add for atomic half word exchange
+> > 
+> > On Tue, May 19, 2015 at 11:20:13AM +0000, Sarbojit Ganguly wrote:
+> > > On Tuesday 19 May 2015 09:39:33 Sarbojit Ganguly wrote:
+> > > > Since 16 bit half word exchange was not there and MCS based
+> > > > qspinlock by Waiman's xchg_tail() requires an atomic exchange on a
+> > > > half word, here is a small modification to __xchg() code.
+> > 
+> > Can you actually see a performance improvement with the qspinlock code
+> > on ARM ?
+> > 
+> > The real improvements on x86 were on NUMA systems; although there were
+> > real improvements on light loads as well.
+> > 
+> > 
+> > Note that ARM (or any load-store arch) could get rid of all the cmpxchg
+> > loops in that code. Although I suppose we replaced the most common ones
+> > with these unconditional atomics already -- like that xchg16 -- so
+> > implementing those with ll/sc, as you did, should be near optimal.
+>
+> Yes, the main advantage of Qspinlock code can be observed in NUMA but
+> when I tested in an embedded system, a slight advantage was observed.
 
-Best regards
-Uwe
+Is this a multi-cluster SMP system? Those can behave like NUMA
+machines in some ways.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+We could easily limit the use of 16-bit xchg() to ARMv7 machines
+by using
+
+	select ARCH_USE_QUEUED_SPINLOCKS if !SMP_ON_UP
+
+or
+
+	select ARCH_USE_QUEUED_SPINLOCKS if !CPU_V6
+
+when enabling the qspinlock implementation.
+
+	Arnd
