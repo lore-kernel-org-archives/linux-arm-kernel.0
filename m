@@ -1,71 +1,113 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 20 May 2015 18:50:26 +0200
-Subject: [GIT PULL v2] ARM: berlin: Simple-MFD rework for v4.2 (round 1)
-In-Reply-To: <1432140626-6109-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1432140626-6109-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1432140626-6109-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Wed, 20 May 2015 18:58:35 +0200
+Subject: [PATCH] ARM: berlin: add SPI nodes for BG2Q
+In-Reply-To: <1432126385-27402-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1432126385-27402-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <555CBD3B.1000809@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Kevin, Olof,
+On 20.05.2015 14:53, Antoine Tenart wrote:
+> The BG2Q SoC has two SPI controllers. Add the corresponding nodes.
+>
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> ---
+>
+> Based on top of the Berlin clock rework series.
+>
+>   arch/arm/boot/dts/berlin2q.dtsi | 38 ++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 38 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+> index 187d056f7ad2..c25ee86b2bfa 100644
+> --- a/arch/arm/boot/dts/berlin2q.dtsi
+> +++ b/arch/arm/boot/dts/berlin2q.dtsi
+> @@ -286,6 +286,20 @@
+>   				status = "disabled";
+>   			};
+>
+> +			spi0: spi at 1c00 {
+> +				compatible = "snps,dw-apb-ssi";
+> +				reg = <0x1c00 0x100>;
+> +				interrupt-parrent = <&aic>;
 
-this is a PR for the Berlin System/Chip controller simple-mfd rework
-which is now bisect compatible and rebased on top of arm-soc's
-drivers/simple-mfd tag. Compared to the corresponding patch set, I
-also added the ADC node patch for berlin2q which also depends on
-simple-mfd.
+Antoine,
 
-Please pull.
+the same question as for the ADC node patch: IIRC you don't have
+to repeat the interrupt-parent property as long as any node upstream
+will have it already.
 
-Thanks,
-  Sebastian
+> +				interrupts = <7>;
+> +				clocks = <&chip_clk CLKID_CFG>;
+> +				pinctrl-0 = <&spi0_pmux>;
+> +				pinctrl-names = "default";
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				num-cs = <4>;
+> +				status = "disabled";
+> +			};
+> +
+>   			timer0: timer at 2c00 {
+>   				compatible = "snps,dw-apb-timer";
+>   				reg = <0x2c00 0x14>;
+> @@ -383,6 +397,11 @@
+>   					groups = "G7";
+>   					function = "twsi1";
+>   				};
+> +
+> +				spi0_pmux: spi0-pmux {
+> +					groups = "G8", "G9", "G10", "G11";
+> +					function = "spi1";
 
-The following changes since commit 48f1a9a4e268dec7c7f3e79339cfb85699c48eb0:
+Hmm, "spi0_pmux" but "spi1" function?
 
-  arm64: add LEDs and some trigger support to defconfig (2015-05-11 08:55:04 +0200)
+> +				};
+>   			};
+>
+>   			chip_rst: reset {
+> @@ -473,6 +492,20 @@
+>   				};
+>   			};
+>
+> +			spi1: spi at 5000 {
+> +				compatible = "snps,dw-apb-ssi";
+> +				reg = <0x6000 0x100>;
+> +				interrupt-parent = <&sic>;
+> +				interrupts = <5>;
+> +				clocks = <&refclk>;
+> +				pinctrl-0 = <&spi1_pmux>;
+> +				pinctrl-names = "default";
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				num-cs = <4>;
+> +				status = "disabled";
+> +			};
+> +
+>   			i2c2: i2c at 7000 {
+>   				compatible = "snps,designware-i2c";
+>   				#address-cells = <1>;
+> @@ -564,6 +597,11 @@
+>   						groups = "GSM14";
+>   						function = "twsi3";
+>   					};
+> +
+> +					spi1_pmux: spi1-pmux {
+> +						groups = "GSM0", "GSM1", "GSM2", "GSM3";
+> +						function = "spi2";
 
-are available in the git repository at:
+ditto.
 
-  git://git.infradead.org/users/hesselba/linux-berlin.git tags/berlin-simple-mfd-4.2-1
+I know the internal numbering scheme on BG-SoCs is weird, but it looks 
+like that either you are missing the third SPI or there is only 2 and
+numbering starts with 1 *sigh* ;)
 
-for you to fetch changes up to 5be2361160cdbbfcc580b82a440218c115c15504:
+Anyway, the numbering should be consistent with pinctrl function names
+although I would have preferred to start counting with 0.
 
-  ARM: berlin: add an ADC node for the BG2Q (2015-05-18 18:10:16 +0200)
+Sebastian
 
-----------------------------------------------------------------
-Berlin simple-mfd for v4.2
-- based on arm-soc drivers/simple-mfd branch
-- rework of chip/system ctrl nodes to simple-mfd probing for
-  clk, pinctrl, and reset
-- add adc node
-
-----------------------------------------------------------------
-Antoine Tenart (15):
-      ARM: berlin: select MFD_SYSCON by default
-      ARM: berlin: prepare simple-mfd/syscon conversion of sys/chip ctrl nodes
-      reset: berlin: convert to a platform driver
-      ARM: berlin: move reset to simple-mfd nodes
-      reset: berlin: drop arch_initcall initialization
-      pinctrl: berlin: prepare to use regmap provided by syscon
-      ARM: berlin: move pinctrl to simple-mfd nodes
-      pinctrl: berlin: drop SoC stub provided regmap
-      clk: berlin: prepare simple-mfd conversion
-      ARM: berlin: move BG2 clock node
-      ARM: berlin: move BG2CD clock node
-      ARM: berlin: move BG2Q clock node
-      clk: berlin: drop direct of_iomap of nodes reg property
-      ARM: berlin: remove useless chip and system ctrl compatibles
-      ARM: berlin: add an ADC node for the BG2Q
-
- arch/arm/boot/dts/berlin2.dtsi        |  90 ++++++++++++++-----------
- arch/arm/boot/dts/berlin2cd.dtsi      |  66 ++++++++++++-------
- arch/arm/boot/dts/berlin2q.dtsi       | 120 ++++++++++++++++++++--------------
- arch/arm/mach-berlin/Kconfig          |   1 +
- drivers/clk/berlin/bg2.c              |   7 +-
- drivers/clk/berlin/bg2q.c             |   7 +-
- drivers/pinctrl/berlin/berlin-bg2.c   |  26 +-------
- drivers/pinctrl/berlin/berlin-bg2cd.c |  26 +-------
- drivers/pinctrl/berlin/berlin-bg2q.c  |  26 +-------
- drivers/pinctrl/berlin/berlin.c       |   9 ++-
- drivers/reset/reset-berlin.c          |  74 ++++++++-------------
- 11 files changed, 212 insertions(+), 240 deletions(-)
+> +					};
+>   				};
+>   			};
+>
+>
