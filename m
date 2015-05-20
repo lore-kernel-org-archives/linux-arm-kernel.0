@@ -1,38 +1,68 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 20 May 2015 10:21:44 -0300
-Subject: imx53 IPU support on 4.0.4
-In-Reply-To: <555C86A5.2030007@melag.de>
-References: <555C86A5.2030007@melag.de>
-Message-ID: <CAOMZO5CTz4DOdB6xvrw1=i4DRsukQjtzyDMJn50znXd6uXMBUA@mail.gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 20 May 2015 08:23:32 -0500
+Subject: [PATCH v2 2/5] phy: qcom: Add Qualcomm PCIe PHY
+In-Reply-To: <555C8743.6020708@ti.com>
+References: <1430743338-10441-1-git-send-email-svarbanov@mm-sol.com>
+ <1430743338-10441-3-git-send-email-svarbanov@mm-sol.com>
+ <554783CD.50708@ti.com>
+ <55478F1A.3000401@mm-sol.com> <20150519224143.GS31666@google.com>
+ <555C8743.6020708@ti.com>
+Message-ID: <CAErSpo42N8YHWjrqUCj0ubqZLt4w-3g=ykPdR8ZMmWaW1GjWDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Enrico,
-
-On Wed, May 20, 2015 at 10:05 AM, Enrico Weigelt, metux IT consult
-<weigelt@melag.de> wrote:
->
-> Hi folks,
+On Wed, May 20, 2015 at 8:08 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> Hi Bjorn,
 >
 >
-> I've rebased the IPUv3 patches from ptx folks onto 4.0.4,
-> working good for me. (now gst plays h264 @25fps on imx53)
+> On Wednesday 20 May 2015 04:11 AM, Bjorn Helgaas wrote:
+>>
+>> On Mon, May 04, 2015 at 06:24:10PM +0300, Stanimir Varbanov wrote:
+>>>
+>>> On 05/04/2015 05:35 PM, Kishon Vijay Abraham I wrote:
+>>>>
+>>>> Hi,
+>>>>
+>>>> On Monday 04 May 2015 06:12 PM, Stanimir Varbanov wrote:
+>>>>>
+>>>>> Add a PCIe PHY driver used by PCIe host controller driver
+>>>>> on Qualcomm SoCs like Snapdragon 805.
+>>>>>
+>>>>> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
+>>>>> ---
+>>>>>    drivers/phy/Kconfig         |    9 ++
+>>>>>    drivers/phy/Makefile        |    1 +
+>>>>>    drivers/phy/phy-qcom-pcie.c |  291
+>>>>> +++++++++++++++++++++++++++++++++++++++++++
+>>>>
+>>>>
+>>>> Why do you need a new PHY driver for this? Why not use the existing QCOM
+>>>> PHY driver. I can see the registers used here in
+>>>> phy-qcom-ufs-qmp-14nm.h?
+>>>
+>>>
+>>> I agree that on first glance there are similarities, but I'm not sure
+>>> does the PHYs are the same IP blocks. Or at least they are different
+>>> revisions which have too many differences. So trying to combine them
+>>> will lead to more code than now.
+>>>
+>>> Either way I will try to understand how many the differences are.
+>>
+>>
+>> Ping, where are we with this?  Should I wait for something else, or are
+>> you
+>> convinced there's enough difference to warrant a new PHY driver, Kishon?
 >
-> https://github.com/metux/linux/commits/submit-4.0-imx53-ipuv3
-
-That's great.
-
-Kamil mentioned that the scaler patches should be merged via the the
-gpu subsystem:
-http://www.spinics.net/lists/linux-media/msg88582.html
-
-,so I guess Phillip will handle it.
-
 >
-> (Haven't 4.1rc* yet, as it broke some other things for me.)
+> I'd like to wait to see if Stanimir can use existing driver instead of
+> creating a new driver.
 
-What are the regressions you see?
+OK, I'm waiting for a v3 with either tweaks to the QCOM PHY driver, or
+stronger justification as to why that's impossible.  It's hard to
+quantify statements like "there are similarities, but there are too
+many differences," so you might have to actually attempt a patch for
+the QCOM code and we can see how ugly that would turn out to be.
 
-Regards,
+Thanks, Kishon.
 
-Fabio Estevam
+Bjorn
