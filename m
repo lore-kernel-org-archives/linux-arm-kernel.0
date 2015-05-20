@@ -1,49 +1,45 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 20 May 2015 18:21:45 +0200
-Subject: schedule_timeout sleeps too long after dividing CPU frequency
-In-Reply-To: <20150518115452.GV2067@n2100.arm.linux.org.uk>
-References: <20150514144239.GZ2067@n2100.arm.linux.org.uk>
- <5555BC7E.7010601@free.fr> <20150515095159.GF2067@n2100.arm.linux.org.uk>
- <5555CC1A.5040604@free.fr> <20150515115852.GJ2067@n2100.arm.linux.org.uk>
- <5555EA68.7030006@free.fr> <20150515131521.GK2067@n2100.arm.linux.org.uk>
- <5555FB7F.901@free.fr> <55563C63.8090504@free.fr> <5559CC01.9040306@free.fr>
- <20150518115452.GV2067@n2100.arm.linux.org.uk>
-Message-ID: <555CB499.7060600@free.fr>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 20 May 2015 17:39:47 +0100
+Subject: [PATCH v6 3/6] arm64: Kprobes with single stepping support
+In-Reply-To: <1429561187-3661-4-git-send-email-dave.long@linaro.org>
+References: <1429561187-3661-1-git-send-email-dave.long@linaro.org>
+ <1429561187-3661-4-git-send-email-dave.long@linaro.org>
+Message-ID: <20150520163946.GC29424@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+On Mon, Apr 20, 2015 at 04:19:44PM -0400, David Long wrote:
+> Add support for basic kernel probes(kprobes) and jump probes
+> (jprobes) for ARM64.
+> 
+> Kprobes utilizes software breakpoint and single step debug
+> exceptions supported on ARM v8.
+> 
+> A software breakpoint is placed at the probe address to trap the
+> kernel execution into the kprobe handler.
+> 
+> ARM v8 supports enabling single stepping before the break exception
+> return (ERET), with next PC in exception return address (ELR_EL1). The
+> kprobe handler prepares an executable memory slot for out-of-line
+> execution with a copy of the original instruction being probed, and
+> enables single stepping. The PC is set to the out-of-line slot address
+> before the ERET. With this scheme, the instruction is executed with the
+> exact same register context except for the PC (and DAIF) registers.
 
-Thanks for your detailed answer.
+I wonder whether it would be simpler to use another software breakpoint
+after the out of line instruction copy. You won't run the instructions
+that change the PC anyway.
 
-On 18/05/2015 13:54, Russell King - ARM Linux wrote:
+Since an unconditional branch instruction within the kernel address
+space can reach any point in the kernel (and modules), could we go a
+step further and avoid the software breakpoint altogether, just generate
+a branch instruction to the original location (after the software
+breakpoint)?
 
-> For a SoC where WFI is not programmed to cause anything other than
-> the architecture specified dormant behaviour, WFI will not cause the
-> TWD to stop.
+As for simulating/emulating instructions, could we actually avoid it for
+most of them where we can generate a similar instruction with the
+corrected offset? If the out of line slot is somewhere within the kernel
+data section, I think many of them can be re-encoded (e.g. branches).
 
-According to the hardware engineers, my SoC does not support any
-low-power modes.
-
-But I didn't see the "clean" way to make the kernel aware of this.
-Is this an acceptable patch? (I have my doubts.)
-
-
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index 6591e26..300f13a 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -295,6 +295,10 @@ static void twd_timer_setup(void)
-        clk->name = "local_timer";
-        clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
-                        CLOCK_EVT_FEAT_C3STOP;
-+#ifdef CONFIG_TANGOX
-+       /*** Tango does not implement low power modes ***/
-+       clk->features &= ~CLOCK_EVT_FEAT_C3STOP;
-+#endif
-        clk->rating = 350;
-        clk->set_mode = twd_set_mode;
-        clk->set_next_event = twd_set_next_event;
-
-
-Regards.
+-- 
+Catalin
