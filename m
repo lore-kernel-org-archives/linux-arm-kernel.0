@@ -1,59 +1,38 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Wed, 20 May 2015 15:10:24 +0900
-Subject: [PATCH] drm/nouveau/platform: fix compilation if !CONFIG_IOMMU
-In-Reply-To: <555BD66A.5020704@nvidia.com>
-References: <555BD66A.5020704@nvidia.com>
-Message-ID: <1432102224-15169-1-git-send-email-acourbot@nvidia.com>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Wed, 20 May 2015 14:21:38 +0800
+Subject: [RFC PATCH v1 0/3] PCI: hisi: Add PCIe host support for Hisilicon Soc
+ Hip05
+Message-ID: <1432102901-186201-1-git-send-email-wangzhou1@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The lack of IOMMU API support can make nouveau_platform_probe_iommu()
-fail to compile because struct iommu_ops is then empty. Fix this by
-skipping IOMMU probe in that case - lack of IOMMU on platform devices
-is sub-optimal, but is not an error.
+This patchset adds PCIe host support for Hisilicon Soc Hip05. The PCIe hosts
+use PCIe IP core from Synopsys, So this driver is base on designware PCIe driver.
 
-Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
----
-This is an alternative to https://lkml.org/lkml/2015/5/19/484. Most users
-of Nouveau do not care about IOMMU support, so we should not impose that
-option on them.
+Hip05 is an ARMv8 architecture Soc. It should be able to use ARM64 PCIe API in
+designeware PCIe driver. Following Arnd's suggestion[1], just try to unify
+ARM32 and ARM64 PCIe in designware driver.
 
- drm/nouveau/nouveau_platform.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+This patchset is based on v4.1-rc1.
 
-diff --git a/drivers/gpu/drm/nouveau/nouveau_platform.c b/drivers/gpu/drm/nouveau/nouveau_platform.c
-index 775277f1edb0..dcfbbfaf1739 100644
---- a/drivers/gpu/drm/nouveau/nouveau_platform.c
-+++ b/drivers/gpu/drm/nouveau/nouveau_platform.c
-@@ -92,6 +92,8 @@ static int nouveau_platform_power_down(struct nouveau_platform_gpu *gpu)
- 	return 0;
- }
- 
-+#if IS_ENABLED(CONFIG_IOMMU_API)
-+
- static void nouveau_platform_probe_iommu(struct device *dev,
- 					 struct nouveau_platform_gpu *gpu)
- {
-@@ -158,6 +160,20 @@ static void nouveau_platform_remove_iommu(struct device *dev,
- 	}
- }
- 
-+#else
-+
-+static void nouveau_platform_probe_iommu(struct device *dev,
-+					 struct nouveau_platform_gpu *gpu)
-+{
-+}
-+
-+static void nouveau_platform_remove_iommu(struct device *dev,
-+					  struct nouveau_platform_gpu *gpu)
-+{
-+}
-+
-+#endif
-+
- static int nouveau_platform_probe(struct platform_device *pdev)
- {
- 	struct nouveau_platform_gpu *gpu;
+Change from RFC:
+1. delete dw_pcie_setup, dw_pcie_scan_bus, dw_pcie_map_irq and struct hw_pci,
+   merge related operations into dw_pcie_host_init.
+
+[1] http://www.spinics.net/lists/devicetree/msg76463.html
+Zhou Wang (3):
+  PCI: designware: Add ARM64 support
+  PCI: hisi: Add PCIe host support for Hisilicon Soc Hip05
+  Documentation: DT: Add hisilicon PCIe host binding
+
+ .../devicetree/bindings/pci/hisilicon-pcie.txt     |  46 ++++
+ drivers/pci/host/Kconfig                           |   5 +
+ drivers/pci/host/Makefile                          |   1 +
+ drivers/pci/host/pcie-designware.c                 | 128 ++++-------
+ drivers/pci/host/pcie-hisi.c                       | 252 +++++++++++++++++++++
+ 5 files changed, 354 insertions(+), 78 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
+ create mode 100644 drivers/pci/host/pcie-hisi.c
+
 -- 
-2.4.0
+1.9.1
