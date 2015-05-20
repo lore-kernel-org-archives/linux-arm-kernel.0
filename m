@@ -1,47 +1,67 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 20 May 2015 17:42:31 +0900
-Subject: [RESEND PATCH 2/2] pinctrl: zynq: fix offset address for {SD0,
- SD1}_WP_CD_SEL
-In-Reply-To: <1432111351-21336-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1432111351-21336-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1432111351-21336-3-git-send-email-yamada.masahiro@socionext.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 20 May 2015 10:43:36 +0200
+Subject: [PATCH v2 5/9] ARM: mediatek: enable gpt6 on boot up to make arch
+ timer working
+In-Reply-To: <555B9438.9020404@codeaurora.org>
+References: <1431763110-443-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1431763110-443-6-git-send-email-yingjoe.chen@mediatek.com>
+ <555B9438.9020404@codeaurora.org>
+Message-ID: <CABuKBeKgWc8YJeacr1VeVaOQ1hzpqdTskarDJk6W2AdfWqQ9nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The address for SD0_WP_CD_SEL, SD1_WP_CD_SEL is 0xf8000830,
-0xf8000834, respectively.
+2015-05-19 21:51 GMT+02:00 Stephen Boyd <sboyd@codeaurora.org>:
+> On 05/16/15 00:58, Yingjoe Chen wrote:
+>> diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
+>> index a954900..6b38d67 100644
+>> --- a/arch/arm/mach-mediatek/mediatek.c
+>> +++ b/arch/arm/mach-mediatek/mediatek.c
+>> @@ -16,6 +16,34 @@
+>>   */
+>>  #include <linux/init.h>
+>>  #include <asm/mach/arch.h>
+>> +#include <linux/of.h>
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/clocksource.h>
+>> +
+>> +
+>> +#define GPT6_CON_MT65xx 0x10008060
+>> +#define GPT_ENABLE      0x31
+>> +
+>> +static void __init mediatek_timer_init(void)
+>> +{
+>> +     void __iomem *gpt_base = 0;
+>
+>  = NULL ?
+>
+>> +
+>> +     if (of_machine_is_compatible("mediatek,mt6589") ||
+>> +         of_machine_is_compatible("mediatek,mt8135") ||
+>> +         of_machine_is_compatible("mediatek,mt8127")) {
+>> +             /* turn on GPT6 which ungates arch timer clocks */
+>> +             gpt_base = ioremap(GPT6_CON_MT65xx, 0x04);
+>> +     }
+>> +
+>> +     /* enabel clock and set to free-run */
+>
+> s/enabel/enable/
+>
+>> +     if (gpt_base) {
+>> +             writel(GPT_ENABLE, gpt_base);
+>> +             iounmap(gpt_base);
+>> +     }
+>> +
+>
+> Why not join the two conditions together?
 
-Each offset address must be prefixed with 0x.
+The initial patch supposed that on different SoCs GPT6_CON register
+would be mapped on different addresses, but that seems not the case.
+So yes, we can join the two conditions together.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+Yingjoe, can you add the changes in the next series or do you want me to do it?
 
- drivers/pinctrl/pinctrl-zynq.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+Thanks,
+Matthias
 
-diff --git a/drivers/pinctrl/pinctrl-zynq.c b/drivers/pinctrl/pinctrl-zynq.c
-index 77c5a98..04748a4 100644
---- a/drivers/pinctrl/pinctrl-zynq.c
-+++ b/drivers/pinctrl/pinctrl-zynq.c
-@@ -745,15 +745,15 @@ static const struct zynq_pinmux_function zynq_pmux_functions[] = {
- 	DEFINE_ZYNQ_PINMUX_FUNCTION(spi1, 0x50),
- 	DEFINE_ZYNQ_PINMUX_FUNCTION(sdio0, 0x40),
- 	DEFINE_ZYNQ_PINMUX_FUNCTION(sdio0_pc, 0xc),
--	DEFINE_ZYNQ_PINMUX_FUNCTION_MUX(sdio0_wp, 0, 130, ZYNQ_SDIO_WP_MASK,
-+	DEFINE_ZYNQ_PINMUX_FUNCTION_MUX(sdio0_wp, 0, 0x130, ZYNQ_SDIO_WP_MASK,
- 					ZYNQ_SDIO_WP_SHIFT),
--	DEFINE_ZYNQ_PINMUX_FUNCTION_MUX(sdio0_cd, 0, 130, ZYNQ_SDIO_CD_MASK,
-+	DEFINE_ZYNQ_PINMUX_FUNCTION_MUX(sdio0_cd, 0, 0x130, ZYNQ_SDIO_CD_MASK,
- 					ZYNQ_SDIO_CD_SHIFT),
- 	DEFINE_ZYNQ_PINMUX_FUNCTION(sdio1, 0x40),
- 	DEFINE_ZYNQ_PINMUX_FUNCTION(sdio1_pc, 0xc),
--	DEFINE_ZYNQ_PINMUX_FUNCTION_MUX(sdio1_wp, 0, 134, ZYNQ_SDIO_WP_MASK,
-+	DEFINE_ZYNQ_PINMUX_FUNCTION_MUX(sdio1_wp, 0, 0x134, ZYNQ_SDIO_WP_MASK,
- 					ZYNQ_SDIO_WP_SHIFT),
--	DEFINE_ZYNQ_PINMUX_FUNCTION_MUX(sdio1_cd, 0, 134, ZYNQ_SDIO_CD_MASK,
-+	DEFINE_ZYNQ_PINMUX_FUNCTION_MUX(sdio1_cd, 0, 0x134, ZYNQ_SDIO_CD_MASK,
- 					ZYNQ_SDIO_CD_SHIFT),
- 	DEFINE_ZYNQ_PINMUX_FUNCTION(smc0_nor, 4),
- 	DEFINE_ZYNQ_PINMUX_FUNCTION(smc0_nor_cs1, 8),
 -- 
-1.9.1
+motzblog.wordpress.com
