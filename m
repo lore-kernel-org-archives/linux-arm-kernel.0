@@ -1,28 +1,30 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 20 May 2015 11:13:18 +0100
-Subject: [RFC PATCH 1/4] spi: spidev: Add Google SPI flash compatible
- string
-In-Reply-To: <1432042454-19234-2-git-send-email-javier.martinez@collabora.co.uk>
-References: <1432042454-19234-1-git-send-email-javier.martinez@collabora.co.uk>
- <1432042454-19234-2-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <20150520101318.GB21577@sirena.org.uk>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Wed, 20 May 2015 12:16:16 +0200
+Subject: [RFC v1 00/25] Optimize irq flow handler
+In-Reply-To: <1432116013-25902-1-git-send-email-jiang.liu@linux.intel.com>
+References: <1432116013-25902-1-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <20150520101616.GA20163@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 03:34:11PM +0200, Javier Martinez Canillas wrote:
-> Google Chromebooks have a SPI flash that is used to store firmware and
-> different system parameters and data (i.e: Google Binary Block flags).
 
-> ---
->  drivers/spi/spidev.c | 1 +
->  1 file changed, 1 insertion(+)
+* Jiang Liu <jiang.liu@linux.intel.com> wrote:
 
-This is adding a binding with no documentation, documentation is
-mandatory for all bindings.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150520/ea1784dc/attachment.sig>
+>   genirq: Kill the first parameter 'irq' of irq_flow_handler_t
+>   genirq: Kill the first parameter 'irq' of irq_flow_handler_t
+>   genirq: Kill the first parameter 'irq' of irq_flow_handler_t
+>   genirq: Kill the first parameter 'irq' of irq_flow_handler_t
+>   genirq: Kill the first parameter 'irq' of irq_flow_handler_t
+>   genirq: Kill the first parameter 'irq' of irq_flow_handler_t
+>   genirq: Kill the first parameter 'irq' of irq_flow_handler_t
+>   genirq: Kill the first parameter 'irq' of irq_flow_handler_t
+>   genirq: Kill the first parameter 'irq' of irq_flow_handler_t
+>   genirq: Kill the first parameter 'irq' of irq_flow_handler_t
+>   genirq: Kill the first parameter 'irq' of irq_flow_handler_t
+>   genirq: Kill the first parameter 'irq' of irq_flow_handler_t
+
+Those kinds of identical titles are not acceptable.
+
+Thanks,
+
+	Ingo
