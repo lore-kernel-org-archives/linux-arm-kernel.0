@@ -1,21 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 May 2015 17:27:20 +0200
-Subject: [PATCH] MAINTAINERS: update Shawn's email to use kernel.org one
-In-Reply-To: <1431783155-30384-1-git-send-email-shawnguo@kernel.org>
-References: <1431783155-30384-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <7257370.pzxAn0ir2Q@wuerfel>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 20 May 2015 17:28:06 +0200 (CEST)
+Subject: [RFC v1 15/25] genirq: Kill the first parameter 'irq' of
+ irq_flow_handler_t
+In-Reply-To: <1432116013-25902-16-git-send-email-jiang.liu@linux.intel.com>
+References: <1432116013-25902-1-git-send-email-jiang.liu@linux.intel.com>
+ <1432116013-25902-16-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <alpine.DEB.2.11.1505201715380.4225@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 16 May 2015 21:32:35 shawnguo at kernel.org wrote:
-> From: Shawn Guo <shawn.guo@linaro.org>
-> 
-> Update my email address to use kernel.org mailbox, so that emails
-> between kernel community and company can be separated.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> 
+On Wed, 20 May 2015, Jiang Liu wrote:
+> -static void locomo_handler(unsigned int irq, struct irq_desc *desc)
+> +static void locomo_handler(struct irq_desc *desc)
+>  {
+>  	struct locomo *lchip = irq_desc_get_chip_data(desc);
+> +	unsigned int irq;
+>  	int req, i;
 
-Applied to the fixes branch, thanks!
+That leaves irq unitialized ....
 
-	Arnd
+Thanks,
+
+	tglx
