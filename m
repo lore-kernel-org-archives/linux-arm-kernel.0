@@ -1,51 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 May 2015 10:18:48 +0200
-Subject: [PATCH v2 2/2] ARM: vf610: Add SoC bus support for Vybrid
-In-Reply-To: <61cec15fe896133ee6e102b0242fb43d@agner.ch>
-References: <cover.1432099651.git.maitysanchayan@gmail.com>
- <9691074.oWRy1bscbz@wuerfel> <61cec15fe896133ee6e102b0242fb43d@agner.ch>
-Message-ID: <9101136.1OZzWnf52Q@wuerfel>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 20 May 2015 11:24:15 +0300
+Subject: [PATCHv3 00/10] ARM: DRA7: add display support
+In-Reply-To: <1430906938-26128-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1430906938-26128-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <555C44AF.2040800@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 20 May 2015 09:36:38 Stefan Agner wrote:
-> On 2015-05-20 09:12, Arnd Bergmann wrote:
-> > On Wednesday 20 May 2015 11:06:52 Sanchayan Maity wrote:
-> >> Implements SoC bus support to export SoC specific information. Read
-> >> the unique SoC ID from the Vybrid On Chip One Time Programmable
-> >> (OCOTP) controller, SoC specific information from the Miscellaneous
-> >> System Control Module (MSCM), revision from the ROM revision register
-> >> and expose it via the SoC bus infrastructure.
-> >>
-> >> Sample Output:
-> >>
-> >> root at vf:/sys/devices/soc0# cat soc_id
-> >> df63c12a2e2161d4
-> >> root at vf:/sys/devices/soc0# cat family
-> >> Freescale Vybrid VF500
-> >> root at vf:/sys/devices/soc0# cat revision
-> >> 00000013
-> >> root at vf:/sys/devices/soc0# cat machine
-> >> Freescale Vybrid
-> >>
-> > 
-> > I would prefer to see this as a driver in drivers/soc that registers
-> > to a platform device. Is there any DT node that would be a reasonable
-> > device to bind to?
+Hi,
+
+On 06/05/15 13:08, Tomi Valkeinen wrote:
+> Hi,
 > 
-> Hm, what is a viable device? Probably the most SoC specific device in
-> the SoC? Currently, all three devices we read from do have a
-> vf610-something compatible string, hence would be SoC specific (ocotp,
-> ocrom and mscm-cpucfg). Probably the last is the most SoC specific...
+> This series adds the arch/arm/ side of the display support for DRA7 (DRA72x,
+> DRA74x, AM54xx) SoCs. Also support for HDMI output on x15 and DRA72 EVM boards
+> is added.
 > 
-> But somehow bind to just a random device sounds wrong to me. Couldn't we
-> add a more specific compatible string to the soc node and bind to that?
+> This series is v3, and is based on v4.1-rc2. There are no differences to v2,
+> except rebased and tested.
+> 
+>  Tomi
+> 
+> Tomi Valkeinen (10):
+>   arm/dts: dra7xx: add 'ti,set-rate-parent' for dss_dss_clk
+>   ARM: DRA7: hwmod: add DMM hwmod description
+>   ARM: DRA7: hwmod: set DSS submodule parent hwmods
+>   ARM: OMAP: display: change compat names to array
+>   ARM: OMAP2+: display: detect DRA7 DSS
+>   arm/dts: dra7.dtsi: add DSS support
+>   arm/dts: dra72-evm.dts: add HDMI
+>   arm/dts: am57xx-beagle-x15.dts: add HDMI
+>   arm: dra7: add DESHDCP clock
+>   CLK: TI: always enable DESHDCP clock
+> 
+>  arch/arm/boot/dts/am57xx-beagle-x15.dts   |  81 ++++++++++++++++++++++
+>  arch/arm/boot/dts/dra7.dtsi               |  43 ++++++++++++
+>  arch/arm/boot/dts/dra72-evm.dts           | 110 ++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/dra72x.dtsi             |  11 +++
+>  arch/arm/boot/dts/dra74x.dtsi             |  15 ++++
+>  arch/arm/boot/dts/dra7xx-clocks.dtsi      |  11 +++
+>  arch/arm/mach-omap2/display.c             |  32 +++++----
+>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c |  33 +++++++++
+>  drivers/clk/ti/clk-7xx.c                  |   8 ++-
+>  9 files changed, 328 insertions(+), 16 deletions(-)
 
-mscm-cpucfg by the name  sounds right to me, especially if we later
-want to add some exported functions or configuration to the driver.
+Ping. Any comments? Can we get this into the next merge window?
 
-The other two (judging by the name without knowing anything
-about them) seem like pure data areas that may also be shared with
-other drivers and are better represented as syscon or eprom devices.
+ Tomi
 
-	Arnd
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150520/f16222d0/attachment.sig>
