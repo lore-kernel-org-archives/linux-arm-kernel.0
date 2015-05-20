@@ -1,44 +1,78 @@
-From: robert.richter@caviumnetworks.com (Robert Richter)
-Date: Wed, 20 May 2015 14:31:59 +0200
-Subject: [PATCH 4/4] arm64: gicv3: its: Increase FORCE_MAX_ZONEORDER for
- Cavium ThunderX
-In-Reply-To: <20150520132213.1128eb90@why.wild-wind.fr.eu.org>
-References: <1430686172-18222-1-git-send-email-rric@kernel.org>
- <1430686172-18222-5-git-send-email-rric@kernel.org>
- <20150505105329.GC1550@arm.com>
- <20150511091438.GW4251@rric.localhost>
- <20150512123056.GA2062@arm.com>
- <20150512162049.GP10428@rric.localhost>
- <20150512172416.GF2062@arm.com>
- <20150520132213.1128eb90@why.wild-wind.fr.eu.org>
-Message-ID: <20150520123159.GE10428@rric.localhost>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Wed, 20 May 2015 13:33:48 +0100
+Subject: [PATCH v4 06/12] KVM: arm64: guest debug,
+ add SW break point support
+In-Reply-To: <20150520091735.GB8986@arm.com>
+References: <1431700035-23479-1-git-send-email-alex.bennee@linaro.org>
+ <1431700035-23479-7-git-send-email-alex.bennee@linaro.org>
+ <20150520091735.GB8986@arm.com>
+Message-ID: <87bnhfig2b.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.05.15 13:22:13, Marc Zyngier wrote:
-> On Tue, 12 May 2015 18:24:16 +0100
-> Will Deacon <will.deacon@arm.com> wrote:
-> > On Tue, May 12, 2015 at 05:20:49PM +0100, Robert Richter wrote:
-> > > On 12.05.15 13:30:57, Will Deacon wrote:
 
-> > > For allocation of 16MB cont. phys mem of a defconfig kernel (4KB
-> > > default pagesize) I see this different approaches:
-> > 
-> > 16MB sounds like an awful lot. Is this because you have tonnes of MSIs or
-> > a sparse DeviceID space or both?
-> 
-> That's probably due to the sparseness of the DeviceID space. With some
-> form of bridge number encoded on top of the BFD number, the device
-> table is enormous, and I don't see a nice way to avoid it...
+Will Deacon <will.deacon@arm.com> writes:
 
-Right. At the momement out of 21 bits (16MB) we currently have 2 spare
-bits, which reduces the actually size used to 4MB. Though, for the
-current cpu model we can reduce it at least to 8MB total.
+> Hi Alex,
+>
+> On Fri, May 15, 2015 at 03:27:09PM +0100, Alex Benn?e wrote:
+>> This adds support for SW breakpoints inserted by userspace.
+>> 
+>> We do this by trapping all guest software debug exceptions to the
+>> hypervisor (MDCR_EL2.TDE). The exit handler sets an exit reason of
+>> KVM_EXIT_DEBUG with the kvm_debug_exit_arch structure holding the
+>> exception syndrome information.
+>> 
+>> It will be up to userspace to extract the PC (via GET_ONE_REG) and
+>> determine if the debug event was for a breakpoint it inserted. If not
+>> userspace will need to re-inject the correct exception restart the
+>> hypervisor to deliver the debug exception to the guest.
+>> 
+>> Any other guest software debug exception (e.g. single step or HW
+>> assisted breakpoints) will cause an error and the VM to be killed. This
+>> is addressed by later patches which add support for the other debug
+>> types.
+>> 
+>> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+>> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+>> 
+>> ---
+>> v2
+>>   - update to use new exit struct
+>>   - tweak for C setup
+>>   - do our setup in debug_setup/clear code
+>>   - fixed up comments
+>> v3:
+>>   - fix spacing in KVM_GUESTDBG_VALID_MASK
+>>   - fix and clarify wording on kvm_handle_guest_debug
+>>   - handle error case in kvm_handle_guest_debug
+>>   - re-word the commit message
+>> v4
+>>   - rm else leg
+>>   - add r-b-tag
+>> 
+>> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+>> index ba635c7..33c8143 100644
+>> --- a/Documentation/virtual/kvm/api.txt
+>> +++ b/Documentation/virtual/kvm/api.txt
+>
+> Not sure why, but your patches seem to drop the diffstat which makes it
+> slightly more onerous for reviewers trying to figure out which bits touch
+> their trees. Are you removing it manually?
 
-I will come up with an additional patch setting this to 8MB.
+No - I'm running:
 
-As said before, I also write on a patch to use CMA.
+git pps -v 4 origin/master..HEAD -o guestdbg.patches
 
-Thanks,
+Where pps is an alias:
 
--Robert
+pps = format-patch --cover-letter --summary
+
+Manually expanding the alias gives the same results. I'll have a dig to
+see what's going on.
+
+>
+> Will
+
+-- 
+Alex Benn?e
