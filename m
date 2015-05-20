@@ -1,37 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 20 May 2015 21:55:54 +0100
-Subject: imx53 IPU support on 4.0.4
-In-Reply-To: <555C86A5.2030007@melag.de>
-References: <555C86A5.2030007@melag.de>
-Message-ID: <20150520205554.GY2067@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 20 May 2015 22:59:12 +0200
+Subject: [GIT PULL] Broadcom SoC changes for 4.2
+In-Reply-To: <1431556453-11633-3-git-send-email-f.fainelli@gmail.com>
+References: <1431556453-11633-1-git-send-email-f.fainelli@gmail.com>
+ <1431556453-11633-3-git-send-email-f.fainelli@gmail.com>
+Message-ID: <3339528.zIO9EH4AJz@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 03:05:41PM +0200, Enrico Weigelt, metux IT consult wrote:
-> I've rebased the IPUv3 patches from ptx folks onto 4.0.4,
-> working good for me. (now gst plays h264 @25fps on imx53)
+On Wednesday 13 May 2015 15:34:13 Florian Fainelli wrote:
+>  arch/arm/include/asm/vfp.h          |   9 ++
+>  arch/arm/mach-bcm/Makefile          |   7 +-
+>  arch/arm/mach-bcm/bcm63xx_headsmp.S |  23 ++++
+>  arch/arm/mach-bcm/bcm63xx_pmb.c     | 221 ++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-bcm/bcm63xx_smp.c     | 170 +++++++++++++++++++++++++++
+>  arch/arm/mach-bcm/bcm63xx_smp.h     |   9 ++
+>  arch/arm/vfp/vfpmodule.c            |  13 +++
+>  include/linux/bcm63xx_pmb.h         |  76 +++++++++++++
 > 
-> https://github.com/metux/linux/commits/submit-4.0-imx53-ipuv3
-> 
-> (Haven't 4.1rc* yet, as it broke some other things for me.)
 
-While it's useful to broadcast your work, please have some consideration
-for the forum(s) you're doing that to.
+And taken out again, sorry.
 
-The way kernel development works is that patches are sent to mailing
-lists for review.  Kernel developers review the patches and provide
-comments back.  The comments are discussed and actioned, and a new
-set of patches posted for further review.  This cycle repeats.
+I got a build error in include/linux/bcm63xx_pmb.h and that triggered me to take
+a closer look. I tried to fix up the trivial error first, but then noticed
+several other things wrong with bcm63xx_pmb.h:
 
-When everyone is happy, the patches can be applied, or pulled from
-a non-github git tree.  (Kernel people generally don't like github.)
+- it is in include/linux/ where it clearly does not belong, as no other component
+  should be including it. Even the function documentation in there mentions that
+  one must hold the pmb_lock before calling it, and that is defined statically
+  arch/arm/mach-bcm/bcm63xx_pmb.c, so it's impossible for other code to use.
+  Just move it all into bcm63xx_pmb.c.
 
-This is so that upstream kernel developers don't get too overloaded
-with work that really should be done by downstream folk (imagine if
-they had to rewrite every patch that came their way...)
+- the code uses __raw_readl/__raw_writel for MMIO register access, which is
+  broken on big-endian machines. You need to use readl_relaxed()/write_relaxed()
+  or readl()/writel() instead. If you use the latter, you can also avoid
+  introducing extra barriers.
 
-Thanks.
+- finally, a heads-up for the "[PATCH] ARM: v7 setup function should invalidate
+  L1 cache" patch that Russell submitted. I think your bcm63xx_headsmp.S
+  function is completely fine for now, but with his patch applied, it will
+  no longer be needed and you should follow up with a patch to replace it
+  with a direct branch to secondary_startup.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+	Arnd
