@@ -1,130 +1,119 @@
-From: nerv@dawncrow.de (=?windows-1252?Q?Andr=E9_Hentschel?=)
-Date: Wed, 20 May 2015 18:18:29 +0200
-Subject: [PATCH v2] arm64: Preserve the user r/w register tpidr_el0 on context
- switch and fork in compat mode
-Message-ID: <555CB3D5.7000307@dawncrow.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 20 May 2015 17:20:06 +0100
+Subject: [RFC] arm: DMA-API contiguous cacheable memory
+In-Reply-To: <CAE=W-e2LZN9cEvTQNm0z1_ZMg1mKs=o2TcEy5QRkiEPMMFWuPg@mail.gmail.com>
+References: <CAE=W-e24oDH5RZfPftRg_xYBiG+b9Sj09vpyay9EwqOo9cVX1w@mail.gmail.com>
+ <20150519163436.GZ21251@e104818-lin.cambridge.arm.com>
+ <CAE=W-e1qynowbccHpYntWwwZPZOMHAVXH=Yj3ukyr_X8WKwQJQ@mail.gmail.com>
+ <2882347.Nj1Dq9Wlqh@wuerfel>
+ <20150519223444.GO2067@n2100.arm.linux.org.uk>
+ <CAE=W-e2LZN9cEvTQNm0z1_ZMg1mKs=o2TcEy5QRkiEPMMFWuPg@mail.gmail.com>
+Message-ID: <20150520162005.GP2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andr? Hentschel <nerv@dawncrow.de>
+On Wed, May 20, 2015 at 02:57:36PM +0200, Lorenzo Nava wrote:
+> so probably currently is impossible to allocate a contiguous cachable
+> DMA memory. You can't use CMA, and the only functions which allow you
+> to use it are not compatible with sync functions.
+> Do you think the problem is the CMA design, the DMA API design, or
+> there is no problem at all and this is not something useful?
 
-Since commit a4780adeefd042482f624f5e0d577bf9cdcbb760 the user writeable TLS
-register on ARM is preserved per thread.
+Well, the whole issue of DMA from userspace is a fraught topic.  I
+consider what we have at the moment as mere luck than anything else -
+there are architecture maintainers who'd like to see dma_mmap_* be
+deleted from the kernel.
 
-This patch does it analogous to the ARM patch, but for compat mode on ARM64.
+However, I have a problem with what you're trying to do.
 
-Signed-off-by: Andr? Hentschel <nerv@dawncrow.de>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
+You want to allocate a large chunk of memory for DMA.  Large chunks
+of memory can _only_ come from CMA - the standard Linux allocators do
+_not_ cope well with large allocations.  Even 16K allocations can
+become difficult after the system has been running for a while.  So,
+CMA is really the only way to go to obtain large chunks of memory.
 
----
-This patch is against Linux 4.1-rc1 (b787f68c36d49bb1d9236f403813641efa74a031)
+You want this large chunk of memory to be cacheable.  CMA might be
+able to provide that.
 
-v2: Trying to address suggestions by Will Deacon
+You want to DMA to this memory, and then read from it.  The problem
+there is, how do you ensure that the data you're reading is the data
+that the DMA wrote there.  If you have caching enabled, the caching
+model that we _have_ to assume is that the cache is infinite, and that
+it speculates aggressively.  This means that we can not guarantee that
+any data read through a cacheable mapping will be coherent with the
+DMA'd data.
 
-@Will Deacon: 	The macro you suggested is not helpful it seems, instead i introduced
-		static functions. They also could be macros i guess, but it seems
-		much cleaner to me to use functions as it only affects one file.
-Should the final version be send to rmk's patchtracker or will someone else pick it up?
+So, we have to flush the cache.  The problem is that with an infinite
+cache size model, we have to flush all possible lines associated with
+the buffer, because we don't know which might be in the cache and
+which are not.
 
+Of course, caches are finite, and we can say that if the size of the
+region being flushed is greater than the cache size (or multiple of the
+cache size), we _could_ just flush the entire cache instead.  (This can
+only work for non-SG stuff, as we don't know before hand how large the
+SG is in bytes.)
 
- arch/arm64/include/asm/processor.h |  3 +++
- arch/arm64/kernel/process.c        | 41 +++++++++++++++++++++++++++++---------
- 2 files changed, 35 insertions(+), 9 deletions(-)
+However, here's the problem.  As I mentioned above, we have dma_mmap_*
+stuff, which works for memory allocated by dma_alloc_coherent().  The
+only reason mapping that memory into userspace works is because (for
+the non-coherent cache case) we map it in such a way that the caches
+are disabled, and this works fine.  For the coherent cache case, it
+doesn't matter that we map it with the caches enabled.  So both of these
+work.
 
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index d2c37a1..466a851 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -79,6 +79,9 @@ struct cpu_context {
- struct thread_struct {
- 	struct cpu_context	cpu_context;	/* cpu context */
- 	unsigned long		tp_value;
-+#ifdef CONFIG_COMPAT
-+	unsigned long		tp_compat;
-+#endif
- 	struct fpsimd_state	fpsimd_state;
- 	unsigned long		fault_address;	/* fault info */
- 	unsigned long		fault_code;	/* ESR_EL1 value */
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index c6b1f3b..630f44b 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -58,6 +58,22 @@ unsigned long __stack_chk_guard __read_mostly;
- EXPORT_SYMBOL(__stack_chk_guard);
- #endif
- 
-+static unsigned long get_tp_compat(struct thread_struct *p)
-+{
-+#ifdef CONFIG_COMPAT
-+	return p->tp_compat;
-+#else
-+	return 0;
-+#endif
-+}
-+
-+static void set_tp_compat(struct thread_struct *p, unsigned long tpidr)
-+{
-+#ifdef CONFIG_COMPAT
-+	p->tp_compat = tpidr;
-+#endif
-+}
-+
- void soft_restart(unsigned long addr)
- {
- 	setup_mm_for_reboot();
-@@ -219,6 +235,7 @@ static void tls_thread_flush(void)
- 
- 	if (is_compat_task()) {
- 		current->thread.tp_value = 0;
-+		set_tp_compat(&current->thread, 0);
- 
- 		/*
- 		 * We need to ensure ordering between the shadow state and the
-@@ -259,17 +276,22 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
- 	memset(&p->thread.cpu_context, 0, sizeof(struct cpu_context));
- 
- 	if (likely(!(p->flags & PF_KTHREAD))) {
-+		unsigned long tpidr;
- 		*childregs = *current_pt_regs();
- 		childregs->regs[0] = 0;
-+		/*
-+		 * Read the current TLS pointer from tpidr_el0 as it may be
-+		 * out-of-sync with the saved value.
-+		 */
-+		asm("mrs %0, tpidr_el0" : "=r" (tpidr));
- 		if (is_compat_thread(task_thread_info(p))) {
-+			set_tp_compat(&p->thread, tpidr);
-+
- 			if (stack_start)
- 				childregs->compat_sp = stack_start;
- 		} else {
--			/*
--			 * Read the current TLS pointer from tpidr_el0 as it may be
--			 * out-of-sync with the saved value.
--			 */
--			asm("mrs %0, tpidr_el0" : "=r" (tls));
-+			tls = tpidr;
-+
- 			if (stack_start) {
- 				/* 16-byte aligned stack mandatory on AArch64 */
- 				if (stack_start & 15)
-@@ -302,13 +324,14 @@ static void tls_thread_switch(struct task_struct *next)
- {
- 	unsigned long tpidr, tpidrro;
- 
--	if (!is_compat_task()) {
--		asm("mrs %0, tpidr_el0" : "=r" (tpidr));
-+	asm("mrs %0, tpidr_el0" : "=r" (tpidr));
-+	if (is_compat_task())
-+		set_tp_compat(&current->thread, tpidr);
-+	else
- 		current->thread.tp_value = tpidr;
--	}
- 
- 	if (is_compat_thread(task_thread_info(next))) {
--		tpidr = 0;
-+		tpidr = get_tp_compat(&next->thread);
- 		tpidrro = next->thread.tp_value;
- 	} else {
- 		tpidr = next->thread.tp_value;
+When you have a non-coherent cache _and_ you want the mapping to be
+cacheable, you have extra problems to worry about.  You need to know
+the type of the CPU cache.  If the CPU cache is physically indexed,
+physically tagged, then you can perform cache maintanence on any
+mapping of that memory, and you will hit the appropriate cache lines.
+For other types of caches, this is not true.  Hence, a userspace
+mapping of non-coherent cacheable memory with a cache which makes use
+of virtual addresses would need to be flushed at the virtual aliases -
+this is precisely why kernel arch maintainers don't like DMA from
+userspace.  It's brings with it huge problems.
+
+Thankfully, ARMv7 caches are PIPT - but that doesn't really give us
+"permission" to just consider PIPT for this case, especially for
+something which is used between arch code and driver code.
+
+What I'm trying to say is that what you're asking for is not a simple
+issue - it needs lots of thought and consideration, more than I have
+time to spare (or likely have time to spare in the future, _most_ of
+my time is wasted trying to deal with the flood of email from these
+mailing lists rather than doing any real work - even non-relevant email
+has a non-zero time cost as it takes a certain amount of time to decide
+whether an email is relevant or not.)
+
+> Anyway it's not completely clear to me which is the difference between:
+>   - allocating memory and use sync function on memory mapped with dma_map_*()
+>   - allocating memory with dma_alloc_*() (with cacheable attributes)
+> and use the sync functions on it
+
+Let me say _for the third time_: dma_sync_*() on memory returned from
+dma_alloc_*() is not permitted.  Anyone who tells you different is
+just plain wrong, and is telling you to do something which is _not_
+supported by the API, and _will_ fail with some implementations
+including the ARM implementation if it uses the atomic pool to satisfy
+your allocation.
+
+> It looks that the second just make alloc + map in a single step
+> instead of splitting the operation in two steps.
+> I'm sure I'm losing something, can you please help me understand that?
+
+The problem is that you're hitting two different costs: the cost from
+accessing data via an uncacheable mapping, vs the cost of having to do
+cache maintanence to ensure that you're reading the up-to-date data.
+
+At the end of the day, there's only one truth here: large DMA buffers
+on architectures which are not cache-coherent suck and require a non-zero
+cost to ensure that you can read the data written to the buffer by DMA,
+or that DMA can see the data you have written to the buffer.
+
+The final thing to mention is that the ARM cache maintanence instructions
+are not available in userspace, so you can't have userspace taking care
+of flushing the caches where they need to...
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
