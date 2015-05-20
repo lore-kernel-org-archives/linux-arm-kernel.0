@@ -1,166 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 20 May 2015 22:56:50 +0100
-Subject: [PATCH] ARM: dts: cubox-i/hummingboard: Fix the license text
-In-Reply-To: <1432148222-12603-1-git-send-email-festevam@gmail.com>
-References: <1432148222-12603-1-git-send-email-festevam@gmail.com>
-Message-ID: <20150520215650.GA2067@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 May 2015 00:02:48 +0200
+Subject: [GIT PULL] Broadcom SoC changes for 4.2
+In-Reply-To: <555D01AD.2040705@broadcom.com>
+References: <1431556453-11633-1-git-send-email-f.fainelli@gmail.com>
+ <26666329.i6kznPGNxa@wuerfel> <555D01AD.2040705@broadcom.com>
+Message-ID: <3733749.guFogFhQqU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 03:57:02PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Wednesday 20 May 2015 14:50:37 Florian Fainelli wrote:
+> >>> - it is in include/linux/ where it clearly does not belong, as no other component
+> >>>   should be including it. Even the function documentation in there mentions that
+> >>>   one must hold the pmb_lock before calling it, and that is defined statically
+> >>>   arch/arm/mach-bcm/bcm63xx_pmb.c, so it's impossible for other code to use.
+> >>>   Just move it all into bcm63xx_pmb.c.
+> >>
+> >> This header will later be used by the bcm63138 reset controller, and I
+> >> thought I had explained the reasoning behind that in either the commit
+> >> message or cover letter, I will make sure the commit message explains it.
+> > 
+> > I see. I still think it's a bit rude to place this header in the top-level
+> > include/linux directory though. I realize there are a lot of other headers
+> > like this, but I'm trying not to add too many more.
 > 
-> Arrange the license text a bit to make it clear.
+> Would a lesser evil be to create include/linux/resets/ and place this
+> header file there?
+
+I've also thought about that. It would certainly help.
+
+> > Maybe a lesser evil would be to put the reset driver into
+> > arch/arm/mach-bcm/bcm63xx_pmb.c as well?
+> > 
+> > How big is it? And is there anything else besides that driver which would
+> > need these functions?
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-
-Thanks for fixing this Fabio.
-
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
-
-> ---
->  arch/arm/boot/dts/imx6dl-cubox-i.dts           | 5 ++---
->  arch/arm/boot/dts/imx6dl-hummingboard.dts      | 5 ++---
->  arch/arm/boot/dts/imx6q-cubox-i.dts            | 5 ++---
->  arch/arm/boot/dts/imx6q-hummingboard.dts       | 5 ++---
->  arch/arm/boot/dts/imx6qdl-cubox-i.dtsi         | 5 ++---
->  arch/arm/boot/dts/imx6qdl-hummingboard.dtsi    | 5 ++---
->  arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi | 5 ++---
->  arch/arm/boot/dts/imx6qdl-microsom.dtsi        | 5 ++---
->  8 files changed, 16 insertions(+), 24 deletions(-)
+> It is going to be (once feature complete) as big as
+> arch/arm/mach-bcm/bcm63xx_pmb.c except that it will also have to inspect
+> the client asking for the reset, e.g: the reset procedure for the SATA
+> block is a little different than the one for the PCIe PHY, or integrated
+> Ethernet switch, or USB controlers...
 > 
-> diff --git a/arch/arm/boot/dts/imx6dl-cubox-i.dts b/arch/arm/boot/dts/imx6dl-cubox-i.dts
-> index e0b7fe8..2a43917 100644
-> --- a/arch/arm/boot/dts/imx6dl-cubox-i.dts
-> +++ b/arch/arm/boot/dts/imx6dl-cubox-i.dts
-> @@ -7,9 +7,8 @@
->   * whole.
->   *
->   *  a) This file is free software; you can redistribute it and/or
-> - *     modify it under the terms of the GNU General Public License as
-> - *     published by the Free Software Foundation; either version 2 of the
-> - *     License.
-> + *     modify it under the terms of the GNU General Public License
-> + *     version 2 as published by the Free Software Foundation.
->   *
->   *     This file is distributed in the hope that it will be useful
->   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> diff --git a/arch/arm/boot/dts/imx6dl-hummingboard.dts b/arch/arm/boot/dts/imx6dl-hummingboard.dts
-> index 7369d2d..d5c9660 100644
-> --- a/arch/arm/boot/dts/imx6dl-hummingboard.dts
-> +++ b/arch/arm/boot/dts/imx6dl-hummingboard.dts
-> @@ -8,9 +8,8 @@
->   * whole.
->   *
->   *  a) This file is free software; you can redistribute it and/or
-> - *     modify it under the terms of the GNU General Public License as
-> - *     published by the Free Software Foundation; either version 2 of the
-> - *     License.
-> + *     modify it under the terms of the GNU General Public License
-> + *     version 2 as published by the Free Software Foundation.
->   *
->   *     This file is distributed in the hope that it will be useful
->   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> diff --git a/arch/arm/boot/dts/imx6q-cubox-i.dts b/arch/arm/boot/dts/imx6q-cubox-i.dts
-> index 670bd8c..353425e 100644
-> --- a/arch/arm/boot/dts/imx6q-cubox-i.dts
-> +++ b/arch/arm/boot/dts/imx6q-cubox-i.dts
-> @@ -7,9 +7,8 @@
->   * whole.
->   *
->   *  a) This file is free software; you can redistribute it and/or
-> - *     modify it under the terms of the GNU General Public License as
-> - *     published by the Free Software Foundation; either version 2 of the
-> - *     License.
-> + *     modify it under the terms of the GNU General Public License
-> + *     version 2 as published by the Free Software Foundation.
->   *
->   *     This file is distributed in the hope that it will be useful
->   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> diff --git a/arch/arm/boot/dts/imx6q-hummingboard.dts b/arch/arm/boot/dts/imx6q-hummingboard.dts
-> index 0f60445..1884c16 100644
-> --- a/arch/arm/boot/dts/imx6q-hummingboard.dts
-> +++ b/arch/arm/boot/dts/imx6q-hummingboard.dts
-> @@ -8,9 +8,8 @@
->   * whole.
->   *
->   *  a) This file is free software; you can redistribute it and/or
-> - *     modify it under the terms of the GNU General Public License as
-> - *     published by the Free Software Foundation; either version 2 of the
-> - *     License.
-> + *     modify it under the terms of the GNU General Public License
-> + *     version 2 as published by the Free Software Foundation.
->   *
->   *     This file is distributed in the hope that it will be useful
->   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-> index d033bb1..59e5d15 100644
-> --- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-> @@ -7,9 +7,8 @@
->   * whole.
->   *
->   *  a) This file is free software; you can redistribute it and/or
-> - *     modify it under the terms of the GNU General Public License as
-> - *     published by the Free Software Foundation; either version 2 of the
-> - *     License.
-> + *     modify it under the terms of the GNU General Public License
-> + *     version 2 as published by the Free Software Foundation.
->   *
->   *     This file is distributed in the hope that it will be useful
->   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-> index e56b44c..62a82f3 100644
-> --- a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-> @@ -7,9 +7,8 @@
->   * whole.
->   *
->   *  a) This file is free software; you can redistribute it and/or
-> - *     modify it under the terms of the GNU General Public License as
-> - *     published by the Free Software Foundation; either version 2 of the
-> - *     License.
-> + *     modify it under the terms of the GNU General Public License
-> + *     version 2 as published by the Free Software Foundation.
->   *
->   *     This file is distributed in the hope that it will be useful
->   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> diff --git a/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi b/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
-> index 4a18203..469ef58 100644
-> --- a/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
-> @@ -10,9 +10,8 @@
->   * whole.
->   *
->   *  a) This file is free software; you can redistribute it and/or
-> - *     modify it under the terms of the GNU General Public License as
-> - *     published by the Free Software Foundation; either version 2 of the
-> - *     License.
-> + *     modify it under the terms of the GNU General Public License
-> + *     version 2 as published by the Free Software Foundation.
->   *
->   *     This file is distributed in the hope that it will be useful
->   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> diff --git a/arch/arm/boot/dts/imx6qdl-microsom.dtsi b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
-> index ec6c7c7..6d4069c 100644
-> --- a/arch/arm/boot/dts/imx6qdl-microsom.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
-> @@ -7,9 +7,8 @@
->   * whole.
->   *
->   *  a) This file is free software; you can redistribute it and/or
-> - *     modify it under the terms of the GNU General Public License as
-> - *     published by the Free Software Foundation; either version 2 of the
-> - *     License.
-> + *     modify it under the terms of the GNU General Public License
-> + *     version 2 as published by the Free Software Foundation.
->   *
->   *     This file is distributed in the hope that it will be useful
->   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> -- 
-> 1.9.1
-> 
+> The way we power on a secondary CPU is code that is not shared with how
+> other on-chip peripherals are powered on, hence the idea behind the
+> separation.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Ok, I see. Let's start with the include/linux/resets/ approach then.
+
+Yet another idea would be to expose the read/write interface here
+as a regmap and find a way to share that. That way, you could move
+a large part of bcm63xx_pmb.c and bcm63xx_pmb.h into the reset
+driver and just have one interface to get the regmap, like we do
+for syscon devices. It would still need a single function declaration
+though.
+
+	Arnd
