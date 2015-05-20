@@ -1,22 +1,20 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 19 May 2015 18:41:33 -0700
-Subject: [PATCH v3] clk: mediatek: Initialize clk_init_data
-In-Reply-To: <1431957632-2182-1-git-send-email-jcliang@chromium.org>
-References: <1431957632-2182-1-git-send-email-jcliang@chromium.org>
-Message-ID: <20150520014133.GE31054@codeaurora.org>
+Date: Tue, 19 May 2015 18:44:22 -0700
+Subject: [GIT PULL] SoCFPGA clk update for v4.2
+In-Reply-To: <1431544086-11274-1-git-send-email-dinguyen@opensource.altera.com>
+References: <1431544086-11274-1-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <20150520014422.GA4815@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/18, Ricky Liang wrote:
-> The variable init (struct clk_init_data) is allocated on the stack.
-> We weren't initializing the .flags field, so it contains random junk,
-> which can cause all kinds of interesting issues when the flags are
-> parsed by clk_register.
+On 05/13, dinguyen at opensource.altera.com wrote:
+> Hi Mike/Stephen,
 > 
-> Signed-off-by: Ricky Liang <jcliang@chromium.org>
-> ---
+> Please consider pulling these 2 patches that adds the clock driver for the
+> SoCFPGA Arria10 platform.
 
-Applied to clk-next
+I think we're waiting on another round for the small fixes? I can
+apply the patches directly after that.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
