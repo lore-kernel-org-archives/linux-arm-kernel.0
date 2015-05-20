@@ -1,34 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 May 2015 09:12:08 +0200
-Subject: [PATCH v2 2/2] ARM: vf610: Add SoC bus support for Vybrid
-In-Reply-To: <27733a88b73adb7000205e020bafdb6f7ebe1843.1432099651.git.maitysanchayan@gmail.com>
-References: <cover.1432099651.git.maitysanchayan@gmail.com>
- <27733a88b73adb7000205e020bafdb6f7ebe1843.1432099651.git.maitysanchayan@gmail.com>
-Message-ID: <9691074.oWRy1bscbz@wuerfel>
+From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
+Date: Wed, 20 May 2015 10:12:44 +0300
+Subject: [PATCH 01/15] thermal: consistently use int for temperatures
+In-Reply-To: <1431507163-19933-2-git-send-email-s.hauer@pengutronix.de>
+References: <1431507163-19933-1-git-send-email-s.hauer@pengutronix.de>
+ <1431507163-19933-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <555C33EC.7050906@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 20 May 2015 11:06:52 Sanchayan Maity wrote:
-> Implements SoC bus support to export SoC specific information. Read
-> the unique SoC ID from the Vybrid On Chip One Time Programmable
-> (OCOTP) controller, SoC specific information from the Miscellaneous
-> System Control Module (MSCM), revision from the ROM revision register
-> and expose it via the SoC bus infrastructure.
-> 
-> Sample Output:
-> 
-> root at vf:/sys/devices/soc0# cat soc_id
-> df63c12a2e2161d4
-> root at vf:/sys/devices/soc0# cat family
-> Freescale Vybrid VF500
-> root at vf:/sys/devices/soc0# cat revision
-> 00000013
-> root at vf:/sys/devices/soc0# cat machine
-> Freescale Vybrid
-> 
+On 05/13/15 11:52, Sascha Hauer wrote:
+> The thermal code uses int, long and unsigned long for temperatures
+> in different places. Using an unsigned type limits the thermal framework
+> to positive temperatures without need. 'long' is 64bit on several
+> architectures which is not needed. Consistently use a plain 'int'
+> for temperatures.
+>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+> ...
 
-I would prefer to see this as a driver in drivers/soc that registers
-to a platform device. Is there any DT node that would be a reasonable
-device to bind to?
+It looks like some longs remain in db8500_thermal.c, int340x_thermal/*,
+intel_soc_dts_thermal.c, kirkwood_thermal.c, rockchip_thermal.c and 
+samsung/exynos_tmu.c. (found by 'grep -R long drivers/thermal/*)
 
-	Arnd
+Cheers,
+Mikko.
