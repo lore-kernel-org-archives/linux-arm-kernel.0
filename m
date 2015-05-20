@@ -1,84 +1,52 @@
-From: bjorn@mork.no (=?UTF-8?q?Bj=C3=B8rn=20Mork?=)
-Date: Wed, 20 May 2015 12:23:07 +0200
-Subject: [RESEND PATCH 3.18-stable v2] ARM: mvebu: do not register custom DMA
- operations when coherency is disabled
-Message-ID: <1432117387-22435-1-git-send-email-bjorn@mork.no>
+From: bintian.wang@huawei.com (Bintian Wang)
+Date: Wed, 20 May 2015 18:29:10 +0800
+Subject: [PATCH v7 5/7] clk: hisilicon: Remove __init for marking function
+ prototypes
+Message-ID: <1432117752-7074-1-git-send-email-bintian.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sasha!
+__init markings on function prototypes are useless, so remove
+them.
 
-This backported mvebu fix seems to have slipped through the cracks by
-accident.  IIUC, the OpenWRT mvebu maintainer(s) are particularily
-interested in having this bug fixed for 3.18-stable.  See this thread
-for the original patch submission and discussion:
-http://permalink.gmane.org/gmane.linux.kernel.stable/127243
-
-I'm including the full patch below for convenicence. It still applies
-to the current 3.18-stable tree (apply with "git am --scissors" if you
-use this email as source).
-
-I hope Thomas, Imre or Andrew can fill in the details if more
-background info is necessary...
-
-
-Thanks,
-Bj?rn
-
----- >8 ---- >8 ----
-From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Subject: ARM: mvebu: do not register custom DMA operations when coherency is disabled
-Date: Thu, 12 Mar 2015 11:58:12 +0100
-
-This patch is a partial backport of commit ef01c6c36bb8 ("ARM: mvebu:
-remove Armada 375 Z1 workaround for I/O coherency"). This commit was
-merged in v3.19, so kernel versions later than v3.19 are not affected
-by the problem that this commit fixes.
-
-It does not make a lot of sense to backport this commit entirely,
-since it is mainly removing some no longer useful code. However, this
-commit is also making sure that the bus_register_notifier that
-register the custom DMA operations that should be used for HW I/O
-coherency does not get registered when said HW I/O coherency is not
-enabled.
-
-This is particularly critical since we have decided to disable HW I/O
-coherency completely in all kernels < 4.0, to be on the safe side,
-while experimenting a new implementation of the HW I/O coherency in >=
-4.0.
-
-Without this commit, kernels earlier than 3.18 have the custom DMA
-operations normally used for HW I/O coherency registered (they don't
-do cache maintenance operations), while HW I/O coherency is
-disabled. It essentially causes every DMA transfer to transfer
-garbage.
-
-The issue fixed by this commit was introduced by 5ab5afd8ba83 ("ARM:
-mvebu: implement Armada 375 coherency workaround"), but it was not
-visible until now since it didn't cause any problem when HW I/O
-coherency is enabled.
-
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: <stable@vger.kernel.org> v3.16..v3.18
+Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Bintian Wang <bintian.wang@huawei.com>
 ---
- arch/arm/mach-mvebu/coherency.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/clk/hisilicon/clk.h |   22 +++++++++++-----------
+ 1 file changed, 11 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index 2ffccd4..01efe13 100644
---- a/arch/arm/mach-mvebu/coherency.c
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -448,8 +448,9 @@ static int __init coherency_late_init(void)
- 			armada_375_coherency_init_wa();
- 	}
+diff --git a/drivers/clk/hisilicon/clk.h b/drivers/clk/hisilicon/clk.h
+index 31083ff..6b6f994 100644
+--- a/drivers/clk/hisilicon/clk.h
++++ b/drivers/clk/hisilicon/clk.h
+@@ -95,17 +95,17 @@ struct clk *hisi_register_clkgate_sep(struct device *, const char *,
+ 				void __iomem *, u8,
+ 				u8, spinlock_t *);
  
--	bus_register_notifier(&platform_bus_type,
--			      &mvebu_hwcc_nb);
-+	if (coherency_available())
-+		bus_register_notifier(&platform_bus_type,
-+				      &mvebu_hwcc_nb);
- 
- 	return 0;
- }
+-struct hisi_clock_data __init *hisi_clk_init(struct device_node *, int);
+-void __init hisi_clk_register_fixed_rate(struct hisi_fixed_rate_clock *,
+-					int, struct hisi_clock_data *);
+-void __init hisi_clk_register_fixed_factor(struct hisi_fixed_factor_clock *,
+-					int, struct hisi_clock_data *);
+-void __init hisi_clk_register_mux(struct hisi_mux_clock *, int,
++struct hisi_clock_data *hisi_clk_init(struct device_node *, int);
++void hisi_clk_register_fixed_rate(struct hisi_fixed_rate_clock *,
++				int, struct hisi_clock_data *);
++void hisi_clk_register_fixed_factor(struct hisi_fixed_factor_clock *,
++				int, struct hisi_clock_data *);
++void hisi_clk_register_mux(struct hisi_mux_clock *, int,
+ 				struct hisi_clock_data *);
+-void __init hisi_clk_register_divider(struct hisi_divider_clock *,
++void hisi_clk_register_divider(struct hisi_divider_clock *,
++				int, struct hisi_clock_data *);
++void hisi_clk_register_gate(struct hisi_gate_clock *,
++				int, struct hisi_clock_data *);
++void hisi_clk_register_gate_sep(struct hisi_gate_clock *,
+ 				int, struct hisi_clock_data *);
+-void __init hisi_clk_register_gate(struct hisi_gate_clock *,
+-					int, struct hisi_clock_data *);
+-void __init hisi_clk_register_gate_sep(struct hisi_gate_clock *,
+-					int, struct hisi_clock_data *);
+ #endif	/* __HISI_CLK_H */
 -- 
-2.1.0
+1.7.9.5
