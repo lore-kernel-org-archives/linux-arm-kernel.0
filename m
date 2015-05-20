@@ -1,22 +1,30 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 20 May 2015 12:20:50 -0300
-Subject: [PATCH 1/1] ARM: clk-imx6q: refine sata's parent
-In-Reply-To: <1432132237-31004-1-git-send-email-sebastien.szymanski@armadeus.com>
-References: <1432132237-31004-1-git-send-email-sebastien.szymanski@armadeus.com>
-Message-ID: <CAOMZO5ByAL=-EXUiEoKnWVWbcpLPKDxQShPf_FPDhmHmiG3bmQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 20 May 2015 17:21:05 +0200
+Subject: [PATCH] ARM: lpc18xx: define low-level debug symbol for
+ LPC18xx/43xx
+In-Reply-To: <CAMuHMdU=MAr3nGE0cXH0X3a5eEqsw13b_WESYayoCABz4Z_YcQ@mail.gmail.com>
+References: <1432061703-29104-1-git-send-email-manabian@gmail.com>
+ <CAMuHMdU=MAr3nGE0cXH0X3a5eEqsw13b_WESYayoCABz4Z_YcQ@mail.gmail.com>
+Message-ID: <3207536.veFSQqEDN9@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 11:30 AM, S?bastien Szymanski
-<sebastien.szymanski@armadeus.com> wrote:
-> According to IMX6D/Q RM, table 18-3, sata clock's parent is ahb, not ipg.
+On Tuesday 19 May 2015 21:37:32 Geert Uytterhoeven wrote:
+> Hi Joachim,
+> 
+> On Tue, May 19, 2015 at 8:55 PM, Joachim Eastwood <manabian@gmail.com> wrote:
+> > Using a dedicated symbol for low-level debugging instead of the
+> > arch symbol will make this platform play nice when enabled on a
+> > kernel that supports multiple platforms.
+> 
+> Thanks a lot!
+> 
+> > Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+> 
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> 
+> 
 
-Good catch!
+Applied to next/soc, with Geert's Ack. Thanks!
 
->
-> This patch is based on branch:
-> git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git imx/soc
-
-Please put this below the --- line.
-
-Reviewed-by: Fabio Estevam <fabio.estevam@freescale.com>
+	Arnd
