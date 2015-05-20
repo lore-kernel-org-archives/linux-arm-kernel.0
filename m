@@ -1,75 +1,77 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Wed, 20 May 2015 16:47:53 +0800
-Subject: [PATCH 3/3] ARM64: dts: mt8173: Add PMIC wrapper device node
-In-Reply-To: <CAGS+omD2cE9HyyXsV-2+m5Ugj0EC-dmBo1QRsROM3URu+7mhsA@mail.gmail.com>
-References: <1432032824-7955-1-git-send-email-s.hauer@pengutronix.de>
- <1432032824-7955-4-git-send-email-s.hauer@pengutronix.de>
- <CAGS+omD2cE9HyyXsV-2+m5Ugj0EC-dmBo1QRsROM3URu+7mhsA@mail.gmail.com>
-Message-ID: <CAGS+omDY2eVC1WVXm2Jv5fS_BRfS_vV7RJj7qrddtj1OMzjxyw@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 20 May 2015 16:54:43 +0800
+Subject: [PATCH v3] pinctrl: sirf: add sirf atlas7 pinctrl and gpio support
+In-Reply-To: <CACRpkdYT8bti=8iRPs_21r15vB8XWMbUXCpkfScg_J+=werwdw@mail.gmail.com>
+References: <1431934112-16132-1-git-send-email-21cnbao@gmail.com>
+ <CACRpkdYT8bti=8iRPs_21r15vB8XWMbUXCpkfScg_J+=werwdw@mail.gmail.com>
+Message-ID: <CAGsJ_4wSnJA+2B5_tbBJ3akwbBwiCjD+v3SXqyv-Cu7kkg0KSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 4:44 PM, Daniel Kurtz <djkurtz@chromium.org> wrote:
-> On Tue, May 19, 2015 at 6:53 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
->> This adds the device node for the PMIC wrapper.
+2015-05-19 21:59 GMT+08:00 Linus Walleij <linus.walleij@linaro.org>:
+> On Mon, May 18, 2015 at 9:28 AM, Barry Song <21cnbao@gmail.com> wrote:
+>
+>> From: Wei Chen <Wei.Chen@csr.com>
 >>
->> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+>> The Pinctrl module (ioc) controls the Pad's function select
+>> (each pad can have 8 functions), Pad's Drive Strength, Pad's
+>> Pull Select and Pad's Input Disable status.
+>>
+>> The ioc has two modules, ioc_top & ioc_rtc. Both of these two
+>> modules have function select/clear, Pull select and Drive
+>> Strength registers. But only ioc_rtc has input-disable
+>> registers. The Pads on ioc_top have to access ioc_rtc to set
+>> their input-disable status and intpu-disable-value.
+>>
+>> So have to use one ioc driver instance to drive these two
+>> ioc modules at the same time, and each ioc module will be
+>> treat as one bank on the "IOC Device".
+>>
+>> The GPIO Controller controls the GPIO status if the Pad has
+>> been config as GPIO by Pinctrl already. Includes the GPIO
+>> Input/output, Interrupt type, Interrupt Status, and Set/Get
+>> Values.
+>> The GPIO pull up/down are controlled by Pinctrl.
+>>
+>> There are 7 GPIO Groups and splited into 3 MACROs in atlas7.
+>> The GPIO Groups in one MACRO share one GPIO controllers, each
+>> GPIO Group are treated as one GPIO bank.
+>>
+>> For example:
+>> In VDIFM macro, there is one GPIO Controller, it has 3 banks
+>> to control 3 gpio groups. Its gpio name space is from 0 to 95.
+>>
+>> The Device Tree can be written as following:
+>>
+>> gpio-ranges = <&pinctrl 0 0 0>,
+>> <&pinctrl 32 0 0>,
+>> <&pinctrl 64 0 0>;
+>>
+>> gpio-ranges-group-names = "gnss_gpio_grp",
+>> "lcd_vip_gpio_grp",
+>> "sdio_i2s_gpio_grp";
+>>
+>> bank#0 is from 0~31, the pins are from pinctrl's "gnss_gpio_grp".
+>> bank#2 is from 32~63, the pins are from pinctrl's "lcd_vip_gpio_grp".
+>> bank#3 is from 64~95, the pins are from pinctrl's "sdio_i2s_gpio_grp".
+>>
+>> Signed-off-by: Wei Chen <Wei.Chen@csr.com>
+>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
 >> ---
->>  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 12 ++++++++++++
->>  1 file changed, 12 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> index cfdca03..16ec639 100644
->> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> @@ -14,6 +14,7 @@
->>  #include <dt-bindings/interrupt-controller/irq.h>
->>  #include <dt-bindings/interrupt-controller/arm-gic.h>
->>  #include "mt8173-pinfunc.h"
->> +#include <dt-bindings/reset-controller/mt8173-resets.h>
->>  #include <dt-bindings/clock/mt8173-clk.h>
->>
->>  / {
->> @@ -154,6 +155,17 @@
->>                                                 <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
->>                 };
->>
->> +               pwrap: pwrap at 1000D000 {
->> +                       compatible = "mediatek,mt8173-pwrap";
->> +                       reg = <0 0x1000D000 0 0x1000>;
+>>  -v3: use generic pinconf to replace self-defined APIs
 >
-> nit: Use lowercase for the hex value 'd' in reg and pwrap@<>.
+> Awesome job Barry, well done.
 >
-> With that fixed, this one is:
-> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
 
-FYI: the patches in this set no longer apply cleanly onto Matthias'
-https://github.com/mbgg/linux-mediatek v4.1-next/arm64
+thanks, Linus, for your hard review and good suggestions to improve
+the codes. it is mainly a job of Chen Wei. i am only a s-o-b :-)
 
-Due to collisions with:
+> Patch applied!
 
-commit 6769b93c082afb7241708685f1c23cbaf5bf00eb
-Author:     Yingjoe Chen <yingjoe.chen@mediatek.com>
-Commit:     Matthias Brugger <matthias.bgg@gmail.com>
-    arm64: dts: mt8173: Fixup pinctrl nodes
+i sent the dts stuff just now.
 
+>
+> Yours,
+> Linus Walleij
 
->> +                       reg-names = "pwrap";
->> +                       interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
->> +                       resets = <&infracfg MT8173_INFRA_PMIC_WRAP_RST>;
->> +                       reset-names = "pwrap";
->> +                       clocks = <&infracfg CLK_INFRA_PMICSPI>, <&infracfg CLK_INFRA_PMICWRAP>;
->> +                       clock-names = "spi", "wrap";
->> +               };
->> +
->>                 sysirq: intpol-controller at 10200620 {
->>                         compatible = "mediatek,mt8173-sysirq",
->>                                         "mediatek,mt6577-sysirq";
->> --
->> 2.1.4
->>
->>
->> _______________________________________________
->> Linux-mediatek mailing list
->> Linux-mediatek at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+-barry
