@@ -1,67 +1,63 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Wed, 20 May 2015 13:57:05 +0200
-Subject: [PATCH] ARM: 8351/1: perf: fix memory leak on return
-In-Reply-To: <5559BAF7.70205@canonical.com>
-References: <1431693789-9679-1-git-send-email-colin.king@canonical.com>
- <20150516070955.GA2429@gmail.com> <5559BAF7.70205@canonical.com>
-Message-ID: <20150520115705.GA5273@gmail.com>
+From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
+Date: Wed, 20 May 2015 07:00:25 -0500
+Subject: [V4 PATCH 3/6] pci: Generic function for setting up PCI device
+ DMA coherency
+In-Reply-To: <20150520093401.GC25313@e104818-lin.cambridge.arm.com>
+References: <1431724994-21601-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <3954735.qeaTp8qOcM@vostro.rjw.lan>
+ <20150520092415.GA25313@e104818-lin.cambridge.arm.com>
+ <2072233.lIH4idDurI@wuerfel>
+ <20150520093401.GC25313@e104818-lin.cambridge.arm.com>
+Message-ID: <555C7759.3040304@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 5/20/2015 4:34 AM, Catalin Marinas wrote:
+> On Wed, May 20, 2015 at 11:27:54AM +0200, Arnd Bergmann wrote:
+>> On Wednesday 20 May 2015 10:24:15 Catalin Marinas wrote:
+>>> On Sat, May 16, 2015 at 01:59:00AM +0200, Rafael J. Wysocki wrote:
+>>>> On Friday, May 15, 2015 04:23:11 PM Suravee Suthikulpanit wrote:
+>>>>> +/**
+>>>>> + * pci_dma_configure - Setup DMA configuration
+>>>>> + * @pci_dev: ptr to pci_dev struct of the PCI device
+>>>>> + *
+>>>>> + * Function to update PCI devices's DMA configuration using the same
+>>>>> + * info from the OF node or ACPI node of host bridge's parent (if any).
+>>>>> + */
+>>>>> +static void pci_dma_configure(struct pci_dev *pci_dev)
+>>>>> +{
+>>>>> +   struct device *dev = &pci_dev->dev;
+>>>>> +   struct device *bridge = pci_get_host_bridge_device(pci_dev);
+>>>>> +   struct device *host = bridge->parent;
+>>>>> +   struct acpi_device *adev;
+>>>>> +
+>>>>> +   if (!host)
+>>>>> +           return;
+>>>>> +
+>>>>> +   if (acpi_disabled) {
+>>>>> +           of_dma_configure(dev, host->of_node);
+>>>>
+>>>> I'd rather do
+>>>>
+>>>>        if (IS_ENABLED(CONFIG_OF) && host->of_node) {
+>>>>                of_dma_configure(dev, host->of_node);
+>>>
+>>> Nitpick: do we need the CONFIG_OF check? If disabled, I don't think
+>>> anyone would set host->of_node.
+>>
+>> If of_dma_configure() is defined in a file that is built conditionally
+>> based on CONFIG_OF, you need it.
+>
+> We have a dummy of_dma_configure() already when !CONFIG_OF, otherwise
+> we would need #ifndef here. I already replied, I think for other
+> architectures we need this check to avoid a useless host->of_node test.
+>
 
-* Colin Ian King <colin.king@canonical.com> wrote:
+It seems that there are several places that have similar check. Would it 
+be good to convert this into a macro? Something like:
 
-> On 16/05/15 08:09, Ingo Molnar wrote:
-> > 
-> > * Colin King <colin.king@canonical.com> wrote:
-> > 
-> >> From: Colin Ian King <colin.king@canonical.com>
-> >>
-> >> Recent commit 3b8786ff7a1b31645ae2c26a2ec32dbd42ac1094
-> >> ("ARM: 8352/1: perf: Fix the pmu node name in warning message")
-> >> introduced a memory leak of irqs on the "Don't bother with PPIs"
-> >> return path. This was picked up by static analysis by cppcheck:
-> >>
-> >> [arch/arm/kernel/perf_event_cpu.c:315]: (error) Memory leak: irqs
-> >>
-> >> simpele fix is to free irqs when returning.
-> >>
-> >> Signed-off-by: Colin Ian King <colin.king@canonical.com>
-> >> ---
-> >>  arch/arm/kernel/perf_event_cpu.c | 4 +++-
-> >>  1 file changed, 3 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-> >> index 213919b..9e5b2a5 100644
-> >> --- a/arch/arm/kernel/perf_event_cpu.c
-> >> +++ b/arch/arm/kernel/perf_event_cpu.c
-> >> @@ -311,8 +311,10 @@ static int of_pmu_irq_cfg(struct platform_device *pdev)
-> >>  
-> >>  	/* Don't bother with PPIs; they're already affine */
-> >>  	irq = platform_get_irq(pdev, 0);
-> >> -	if (irq >= 0 && irq_is_percpu(irq))
-> >> +	if (irq >= 0 && irq_is_percpu(irq)) {
-> >> +		kfree(irqs);
-> >>  		return 0;
-> >> +	}
-> >>  
-> >>  	for (i = 0; i < pdev->num_resources; ++i) {
-> >>  		struct device_node *dn;
-> > 
-> > So returning from the middle of a function isn't very clean.
-> > 
-> > Also, why do we return 0 in an error case?
-> 
-> I believe that's explained in commit
-> 338d9dd3e2aee00a9198e8bf6e7d535d3feeaf32 ("ARM: 8351/1: perf: don't warn
-> about missing interrupt-affinity property for PPIs"):
-> 
-> "PPIs are affine by nature, so the interrupt-affinity property is not
->  used and therefore we shouldn't print a warning in its absence."
+#define OF_NODE_ENABLED(dev)	(IS_ENABLED(CONFIG_OF) && dev->of_node)
 
-That should probably be mentioned in the fine code as well, to keep 
-future generations from wondering.
+Thanks all for the review feedback.
 
-Thanks,
-
-	Ingo
+Suravee
