@@ -1,46 +1,78 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 20 May 2015 22:40:15 +0000 (UTC)
-Subject: [PATCHv2 00/27] ARM: OMAP2+: clock code migration to
- drivers/clk/ti
-In-Reply-To: <555B8DC0.5080905@ti.com>
-References: <1431334493-24455-1-git-send-email-t-kristo@ti.com>
- <alpine.DEB.2.02.1505111747460.19833@utopia.booyaka.com>
- <5551D178.3000904@ti.com>
- <alpine.DEB.2.02.1505122019220.21747@utopia.booyaka.com>
- <5552F32C.7060606@ti.com>
- <alpine.DEB.2.02.1505131438430.7921@utopia.booyaka.com>
- <555B8DC0.5080905@ti.com>
-Message-ID: <alpine.DEB.2.02.1505202234330.7960@utopia.booyaka.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 20 May 2015 15:41:20 -0700
+Subject: [PATCH v3 4/4] mtd: mxc_nand: generate nand_ecclayout for 8 bit
+ ECC
+In-Reply-To: <95e2a17d74da5a0415ab93e060f6efc681216313.1431504091.git.baruch@tkos.co.il>
+References: <cover.1431504091.git.baruch@tkos.co.il>
+ <95e2a17d74da5a0415ab93e060f6efc681216313.1431504091.git.baruch@tkos.co.il>
+Message-ID: <20150520224120.GS11598@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 19 May 2015, Tero Kristo wrote:
+On Wed, May 13, 2015 at 11:17:39AM +0300, Baruch Siach wrote:
+> Hardware 8 bit ECC requires a different nand_ecclayout. Instead of adding yet
+> another static struct nand_ecclayout, generate it in code.
 
-> Any news on this? As noted previously, I am not able to reproduce the issue
-> you are seeing currently, can you give DEBUG_LL a shot?
+I like the idea of not adding more static declarations. But I think you
+have a potential problem below.
 
-Yeah I just bisected it, it was caused by this:
+> Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> ---
+> v3:
+>    Rename ecc_8bit_layout to ecc_8bit_layout_4k (Uwe Kleine-K?nig)
+> 
+> v2:
+>    Initialize eccbytes
+> ---
+>  drivers/mtd/nand/mxc_nand.c | 22 +++++++++++++++++++++-
+>  1 file changed, 21 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+> index 010be8aa41d4..25759563bf11 100644
+> --- a/drivers/mtd/nand/mxc_nand.c
+> +++ b/drivers/mtd/nand/mxc_nand.c
+> @@ -960,6 +960,23 @@ static int get_eccsize(struct mtd_info *mtd)
+>  		return 8;
+>  }
+>  
+> +static void ecc_8bit_layout_4k(struct nand_ecclayout *layout)
+> +{
+> +	int i, j;
+> +
+> +	layout->eccbytes = 8*18;
+> +	for (i = 0; i < 8; i++)
+> +		for (j = 0; j < 18; j++)
+> +			layout->eccpos[i*18 + j] = i*26 + j + 7;
+> +
+> +	layout->oobfree[0].offset = 2;
+> +	layout->oobfree[0].length = 4;
+> +	for (i = 1; i < 8; i++) {
+> +		layout->oobfree[i].offset = i*26;
+> +		layout->oobfree[i].length = 7;
+> +	}
+> +}
+> +
+>  static void preset_v1(struct mtd_info *mtd)
+>  {
+>  	struct nand_chip *nand_chip = mtd->priv;
+> @@ -1636,8 +1653,11 @@ static int mxcnd_probe(struct platform_device *pdev)
+>  
+>  	if (mtd->writesize == 2048)
+>  		this->ecc.layout = host->devtype_data->ecclayout_2k;
+> -	else if (mtd->writesize == 4096)
+> +	else if (mtd->writesize == 4096) {
+>  		this->ecc.layout = host->devtype_data->ecclayout_4k;
+> +		if (get_eccsize(mtd) == 8)
+> +			ecc_8bit_layout_4k(this->ecc.layout);
 
-commit cc4a5fe972ad7834e8662b49b3a5fdb597e9e15e
-Author: Felipe Balbi <balbi@ti.com>
-Date:   Fri Jan 30 11:18:56 2015 -0600
+So you're overwriting an existing layout (e.g., nandv2_hw_eccoob_4k).
+What if you have more than one NAND chip? You might do better by
+dynamically allocating the memory.
 
-    arm: config: omap2plus_defconfig: switch over to LZMA compression
-    
-    LZMA compression makes about 33% smaller zImage
-    with just a slight extra decompression time.
-    
-    Before this patch, zImage built with o2+_dc
-    is 4.5MiB and after it's about 3.3MiB.
-    
-    Suggested-by: David Cohen <david.a.cohen@linux.intel.com>
-    Signed-off-by: Felipe Balbi <balbi@ti.com>
-    Signed-off-by: Tony Lindgren <tony@atomide.com>
+> +	}
+>  
+>  	/*
+>  	 * Experimentation shows that i.MX NFC can only handle up to 218 oob
 
-
-and the timeouts on the testbed being set to fail if a kernel takes longer 
-than five seconds to start.  Seems that the part about a "slight extra 
-decompression time" probably only applies to relatively recent chips.
-
-
-- Paul
+Brian
