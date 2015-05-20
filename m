@@ -1,45 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 May 2015 22:59:12 +0200
-Subject: [GIT PULL] Broadcom SoC changes for 4.2
-In-Reply-To: <1431556453-11633-3-git-send-email-f.fainelli@gmail.com>
-References: <1431556453-11633-1-git-send-email-f.fainelli@gmail.com>
- <1431556453-11633-3-git-send-email-f.fainelli@gmail.com>
-Message-ID: <3339528.zIO9EH4AJz@wuerfel>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 20 May 2015 14:03:09 -0700
+Subject: [GIT PULL] omap fixes against v4.1-rc4
+Message-ID: <20150520210309.GA18439@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 May 2015 15:34:13 Florian Fainelli wrote:
->  arch/arm/include/asm/vfp.h          |   9 ++
->  arch/arm/mach-bcm/Makefile          |   7 +-
->  arch/arm/mach-bcm/bcm63xx_headsmp.S |  23 ++++
->  arch/arm/mach-bcm/bcm63xx_pmb.c     | 221 ++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-bcm/bcm63xx_smp.c     | 170 +++++++++++++++++++++++++++
->  arch/arm/mach-bcm/bcm63xx_smp.h     |   9 ++
->  arch/arm/vfp/vfpmodule.c            |  13 +++
->  include/linux/bcm63xx_pmb.h         |  76 +++++++++++++
-> 
+The following changes since commit e60a8fe1792dcd3aacda0959e0f4865bfefb7bb5:
 
-And taken out again, sorry.
+  Merge tag 'for-v4.1-rc/omap-fixes-a' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into omap-for-v4.1/fixes (2015-05-11 13:23:19 -0700)
 
-I got a build error in include/linux/bcm63xx_pmb.h and that triggered me to take
-a closer look. I tried to fix up the trivial error first, but then noticed
-several other things wrong with bcm63xx_pmb.h:
+are available in the git repository at:
 
-- it is in include/linux/ where it clearly does not belong, as no other component
-  should be including it. Even the function documentation in there mentions that
-  one must hold the pmb_lock before calling it, and that is defined statically
-  arch/arm/mach-bcm/bcm63xx_pmb.c, so it's impossible for other code to use.
-  Just move it all into bcm63xx_pmb.c.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.1/fixes-rc4
 
-- the code uses __raw_readl/__raw_writel for MMIO register access, which is
-  broken on big-endian machines. You need to use readl_relaxed()/write_relaxed()
-  or readl()/writel() instead. If you use the latter, you can also avoid
-  introducing extra barriers.
+for you to fetch changes up to f25bf74c8862efdc30453d16d60cf22958a4873e:
 
-- finally, a heads-up for the "[PATCH] ARM: v7 setup function should invalidate
-  L1 cache" patch that Russell submitted. I think your bcm63xx_headsmp.S
-  function is completely fine for now, but with his patch applied, it will
-  no longer be needed and you should follow up with a patch to replace it
-  with a direct branch to secondary_startup.
+  ARM: dts: Fix WLAN interrupt line for AM335x EVM-SK (2015-05-20 10:00:10 -0700)
 
-	Arnd
+----------------------------------------------------------------
+Few minimal omap device tree fixes for v4.1-rc series:
+
+- Disable BeagleBone black RTC-only sleep mode because of hardare
+  related issues
+
+- Fix NAND on Devkit8000
+
+- Fix WLAN interrupt line on AM335x EVM-SK
+
+----------------------------------------------------------------
+Anthoine Bourgeois (1):
+      ARM: dts: omap3-devkit8000: Fix NAND DT node
+
+Robert Nelson (1):
+      ARM: dts: am335x-boneblack: disable RTC-only sleep
+
+Romain Izard (1):
+      ARM: dts: Fix WLAN interrupt line for AM335x EVM-SK
+
+ arch/arm/boot/dts/am335x-boneblack.dts | 4 ----
+ arch/arm/boot/dts/am335x-evmsk.dts     | 2 +-
+ arch/arm/boot/dts/omap3-devkit8000.dts | 2 ++
+ 3 files changed, 3 insertions(+), 5 deletions(-)
