@@ -1,24 +1,35 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 20 May 2015 17:28:06 +0200 (CEST)
-Subject: [RFC v1 15/25] genirq: Kill the first parameter 'irq' of
- irq_flow_handler_t
-In-Reply-To: <1432116013-25902-16-git-send-email-jiang.liu@linux.intel.com>
-References: <1432116013-25902-1-git-send-email-jiang.liu@linux.intel.com>
- <1432116013-25902-16-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <alpine.DEB.2.11.1505201715380.4225@nanos>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 20 May 2015 17:28:45 +0200
+Subject: [PATCH] ARM: xz: do not try to use a ramdisk in defconfig
+In-Reply-To: <CABymUCOAza58gFbaScsr8Bbw5WCFPTKj47Oq+qNYnVxN2u4JuA@mail.gmail.com>
+References: <96091291.NVWbJdm5EK@wuerfel>
+ <CABymUCOAza58gFbaScsr8Bbw5WCFPTKj47Oq+qNYnVxN2u4JuA@mail.gmail.com>
+Message-ID: <3648496.HpmThcFSVv@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 May 2015, Jiang Liu wrote:
-> -static void locomo_handler(unsigned int irq, struct irq_desc *desc)
-> +static void locomo_handler(struct irq_desc *desc)
->  {
->  	struct locomo *lchip = irq_desc_get_chip_data(desc);
-> +	unsigned int irq;
->  	int req, i;
+On Tuesday 19 May 2015 08:49:25 Jun Nie wrote:
+> 2015-05-18 23:24 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
+> > The original zx defconfig file looks for a ./rootfs.cpio file,
+> > but that breaks with
+> >
+> >   scripts/gen_initramfs_list.sh: Cannot open 'initramfs.cpio.gz'
+> >
+> > when trying to build this kernel. Anybody who relies on the
+> > current behavior should change their build scripts to append
+> > the initramfs manually, as this patch removes that default
+> > in order to help autmatic testing.
+> >
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > ---
+> > I'm applying this directly to the next/defconfig branch to kernel the
+> > kernelci builds.
+> >
+> Thanks for education. I learn it now 
+> 
 
-That leaves irq unitialized ....
+I've applied the patch now, and added "Acked-by: Jun Nie <jun.nie@linaro.org>".
 
 Thanks,
 
-	tglx
+	Arnd
