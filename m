@@ -1,67 +1,110 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 20 May 2015 10:54:32 +0300
-Subject: [PATCH] ASoC: omap: fix up SND_OMAP_SOC_OMAP_ABE_TWL6040
- dependency, again
-In-Reply-To: <3413182.qcoNiOhonF@wuerfel>
-References: <3413182.qcoNiOhonF@wuerfel>
-Message-ID: <555C3DB8.5050506@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 20 May 2015 08:58:46 +0100
+Subject: [PATCH v4 2/3] irqchip: GIC: Add support for
+ irq_{get,set}_irqchip_state
+In-Reply-To: <CAL85gmDugvn0Gv-Ypm0EN-3bE6JM+hWFkVV8FxCeBQ1FS7EERw@mail.gmail.com>
+References: <1426676484-21812-1-git-send-email-marc.zyngier@arm.com>
+ <1426676484-21812-3-git-send-email-marc.zyngier@arm.com>
+ <CAL85gmBrkonMcKdUVGmYx6zT3wSe-e2jPhnL_+Tkf3s4jsAiWg@mail.gmail.com>
+ <CACRpkdYffHJEzksc5mg7JZdwTzShGaQofAmbmn65=_V3ot04Rg@mail.gmail.com>
+ <CAL85gmC4ovR99wQQYoKs=oo24So80jZ_guxDDFhi-1MXXj0uSw@mail.gmail.com>
+ <CACRpkdZkBLrhFpZiYk4fiM3ND+UwnVJhNKs=+rL5iZY4fS7zCg@mail.gmail.com>
+ <CAL85gmD=12u87vDAc601T=ZOgcS-jDo_=LaC5gRAZUHgp_iTbA@mail.gmail.com>
+ <CACRpkdYV1MzjW6ZMvmOhqi0qhXeeQnC62--7WBY=_hZBT8cvXg@mail.gmail.com>
+ <20150519110131.522f9c16@arm.com>
+ <CAL85gmDugvn0Gv-Ypm0EN-3bE6JM+hWFkVV8FxCeBQ1FS7EERw@mail.gmail.com>
+Message-ID: <20150520085846.43ad36b7@why.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/19/2015 03:47 PM, Arnd Bergmann wrote:
-> I tried to fix this before and submitted a working patch, but after
-> some discussion we came up with what seemed to be a nicer solution,
-> resulting in commit 3d4cf65e2d ("ASoC: omap: fix up
-> SND_OMAP_SOC_OMAP_ABE_TWL6040 dependency"). Unfortunately, that
-> version was incomplete, and we still get this build error:
-> 
-> drivers/clk/clk-palmas.c:46:16: error: field 'hw' has incomplete type
-> drivers/clk/clk-palmas.c: In function 'to_palmas_clks_info':
-> drivers/clk/clk-palmas.c:54:74: warning: initialization from incompatible pointer type [-Winc
-> 
-> This happens only in randconfig builds that turn on MFD_PALMAS
-> on a platform other than OMAP2+ when COMPILE_TEST is set
-> but COMMON_CLK is not.
-> 
-> The new approach is only 'select COMMON_CLK_PALMAS' if we know
-> that we are on an OMAP5 platform and MFD_PALMAS is already set.
-> This patch has survived thousands of randconfig builds and I
-> don't see a remaining hole in the logic.
+On Tue, 19 May 2015 22:45:26 +0100
+Feng Kan <fkan@apm.com> wrote:
 
-Yeah, debugging Kconfig is not for the faint-hearted ;)
-
-Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 3d4cf65e2d ("ASoC: omap: fix up SND_OMAP_SOC_OMAP_ABE_TWL6040 dependency")
+> On Tue, May 19, 2015 at 3:01 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > On Tue, 19 May 2015 09:40:21 +0100
+> > Linus Walleij <linus.walleij@linaro.org> wrote:
+> >
+> >> On Thu, May 14, 2015 at 10:14 PM, Feng Kan <fkan@apm.com> wrote:
+> >> > On Thu, May 14, 2015 at 3:32 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> >>
+> >> >> But surely the GPIO block has its own status register, so are
+> >> >> you saying that this register is unreliable?
+> >> >
+> >> > When the GPIO is used as interrupt, the gpio block does not report the
+> >> > status anymore. Which leaves us stuck with SPISR.
+> >> >>
+> >> >> I can think of a few reasons, like transient IRQs etc but
+> >> >> what is actually causing this?
+> >> >
+> >> > I won't say the obvious.
+> >>
+> >> Yeah I see your problem now :(
+> >>
+> >> I think it's better to fix the access functions so that you can
+> >> cross-call to the GIC driver to get the SPISR flag out though.
+> >> Let's see what Marc says.
+> >>
+> >> >> Which GPIO driver is this? Is it upstream?
+> >> >
+> >> > Yes, it is upstream. It is the xgene slimpro gpio driver. I am starting to
+> >> > think that we ought to switch to use some gpio poll driver rather than
+> >> > using gpio-key.
+> >>
+> >> There is both gpio_keys_polled and IRQ-driven gpio_keys so yeah
+> >> that's possible. But honestly I think it's better to deal with this
+> >> problem for real because IRQ is more efficient.
+> >>
+> >> So the way I perceive it this is the real problem:
+> >>
+> >> +static int gic_irq_get_irqchip_state(struct irq_data *d,
+> >> +                                     enum irqchip_irq_state which, bool *val)
+> >> +{
+> >> +       switch (which) {
+> >> (...)
+> >> +       case IRQCHIP_STATE_ACTIVE:
+> >> +               *val = gic_peek_irq(d, GIC_DIST_ACTIVE_SET);
+> >> +               break; case: read
+> >> from 0xd04 (SPISR) instead, because that makes more
+> >> sense to me, or am I wrong at it?
+> >>
+> >> +       case IRQCHIP_STATE_LINE_LEVEL:
+> >> +               *val = gic_peek_irq(d, GIC_DIST_SPISR);
+> >> +               break;
+> >>
+> >> And then put a define into <linux/irqchip/arm-gic.h> for
+> >> GIC_DIST_SPISR.
+> >
+> > What worries me here is that the PENDING state should already give you
+> > the right level of information (this is what the GIC-400 TRM says). The
+> > only reason why SPISR exists is that software can write to the PENDING
+> > register, while SPISR is RO.
+> >
+> > If reading the pending state doesn't work, then I'd like to know
+> > exactly *why*. Only then we can add support for LINE_LEVEL using SPISR
+> > (which has to be GIC-400 specific, as it is not architected).
 > 
-> diff --git a/sound/soc/omap/Kconfig b/sound/soc/omap/Kconfig
-> index 6768e4f7d7d0..30d0109703a9 100644
-> --- a/sound/soc/omap/Kconfig
-> +++ b/sound/soc/omap/Kconfig
-> @@ -100,12 +100,13 @@ config SND_OMAP_SOC_OMAP_TWL4030
->  
->  config SND_OMAP_SOC_OMAP_ABE_TWL6040
->  	tristate "SoC Audio support for OMAP boards using ABE and twl6040 codec"
-> -	depends on TWL6040_CORE && SND_OMAP_SOC && (ARCH_OMAP4 || SOC_OMAP5 || COMPILE_TEST)
-> +	depends on TWL6040_CORE && SND_OMAP_SOC
-> +	depends on ARCH_OMAP4 || (SOC_OMAP5 && MFD_PALMAS) || COMPILE_TEST
->  	select SND_OMAP_SOC_DMIC
->  	select SND_OMAP_SOC_MCPDM
->  	select SND_SOC_TWL6040
->  	select SND_SOC_DMIC
-> -	select COMMON_CLK_PALMAS if MFD_PALMAS
-> +	select COMMON_CLK_PALMAS if (SOC_OMAP5 && MFD_PALMAS)
->  	help
->  	  Say Y if you want to add support for SoC audio on OMAP boards using
->  	  ABE and twl6040 codec. This driver currently supports:
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> IS_PENDING and IS_ACTIVE works fine for the ISR context. However,
+> the nature of the register is meant for IRQ handling and not to read
+> the status of a GPIO. By the time the gpio_key throws a work queue
+> and check the status of the PENDING register, it is no long relevant.
 
+This is far more subtle that that. Assuming a level-triggered
+interrupt, the PENDING state is completely independent of the state of
+the interrupt (see the GIC state machine), and will accurately reflect
+the input line (an edge-triggered interrupt is of course a different
+matter). As outlined in the GIC-400 TRM, both GICD_ICPENDINGRn,
+GICD_ISPENDINGRn and GICD_SPISRn are providing the same information
+(the only difference being that SPISRn is offering a RO view before the
+latches).
 
+SPISRn is essentially a debug register, not something that is meant to
+be used in normal code, GPIO or otherwise. So assuming we have an
+actual GIC-400 implementation here, I want to know why this isn't
+working, and you are in a position to tell me (I assume you can talk to
+the HW people that did the integration).
+
+Thanks,
+
+	M.
 -- 
-P?ter
+Without deviation from the norm, progress is not possible.
