@@ -1,52 +1,35 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 20 May 2015 11:35:59 +0200
-Subject: [PATCH 2/2] ARM: dts: sabrelite: use simple-panel instead of
- display-timings for LVDS0
-In-Reply-To: <555B8678.8090002@boundarydevices.com>
-References: <20150518075844.7e1b5916@ipc1.ka-ro>
- <1432050616-11465-1-git-send-email-eric.nelson@boundarydevices.com>
- <1432050616-11465-3-git-send-email-eric.nelson@boundarydevices.com>
- <1432051452.15181.48.camel@pengutronix.de>
- <555B6A0B.4010205@boundarydevices.com>
- <555B8678.8090002@boundarydevices.com>
-Message-ID: <1432114559.4466.1.camel@pengutronix.de>
+From: mirza.krak@hostmobility.com (Mirza Krak)
+Date: Wed, 20 May 2015 11:38:03 +0200
+Subject: [PATCH v2] ARM: imx: clk-v610: Add clock for I2C2 and I2C3
+Message-ID: <1432114683-24945-1-git-send-email-mirza.krak@hostmobility.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+From: Mirza Krak <mirza.krak@hostmobility.com>
 
-Am Dienstag, den 19.05.2015, 11:52 -0700 schrieb Eric Nelson:
-> Hi Philipp,
-> 
-> On 05/19/2015 09:51 AM, Eric Nelson wrote:
-> > On 05/19/2015 09:04 AM, Philipp Zabel wrote:
-> >> Hi Eric,
-> >>
-> >> Am Dienstag, den 19.05.2015, 08:50 -0700 schrieb Eric Nelson:
-> >>> Also add label for backlight_lvds and connect it to the LVDS display.
-> >>>
-> >>> Signed-off-by: Eric Nelson <eric.nelson@boundarydevices.com>
-> >>> ---
-> >> [...]
-> >>>  
-> >>>  &audmux {
-> >>> @@ -374,18 +385,11 @@
-> >>>  		fsl,data-width = <18>;
-> >>
-> >> The fsl,data-width property shouldn't be needed anymore if you
-> >> set .bus_format = MEDIA_BUS_FMT_RGB666_1X7X3_SPWG for the hsd100pxn1
-> >> panel in panel-simple.c.
-> >>
-> 
-> Are you planning to submit a patch to panel-simple.c for this?
+Add support for clock gating of I2C2 and I2C3.
+We use I2C2 in a (not yet mainlined) device tree.
 
-Done.
+Signed-off-by: Mirza Krak <mirza.krak@hostmobility.com>
+---
 
-> Because of the dependency, I'd like to handle this in a separate
-> patch instead of V3 of this patch set.
+Changes since v1:
+	* Rebased on branch git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git imx/soc
+ drivers/clk/imx/clk-vf610.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-I agree, it's better to remove this in a separate step after the panel
-driver is merged.
-
-regards
-Philipp
+diff --git a/drivers/clk/imx/clk-vf610.c b/drivers/clk/imx/clk-vf610.c
+index 1c2d324..bff45ea 100644
+--- a/drivers/clk/imx/clk-vf610.c
++++ b/drivers/clk/imx/clk-vf610.c
+@@ -273,6 +273,8 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
+ 
+ 	clk[VF610_CLK_I2C0] = imx_clk_gate2("i2c0", "ipg_bus", CCM_CCGR4, CCM_CCGRx_CGn(6));
+ 	clk[VF610_CLK_I2C1] = imx_clk_gate2("i2c1", "ipg_bus", CCM_CCGR4, CCM_CCGRx_CGn(7));
++	clk[VF610_CLK_I2C2] = imx_clk_gate2("i2c2", "ipg_bus", CCM_CCGR10, CCM_CCGRx_CGn(6));
++	clk[VF610_CLK_I2C3] = imx_clk_gate2("i2c3", "ipg_bus", CCM_CCGR10, CCM_CCGRx_CGn(7));
+ 
+ 	clk[VF610_CLK_DSPI0] = imx_clk_gate2("dspi0", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(12));
+ 	clk[VF610_CLK_DSPI1] = imx_clk_gate2("dspi1", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(13));
+-- 
+2.1.0
