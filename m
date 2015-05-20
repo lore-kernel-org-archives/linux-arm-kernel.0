@@ -1,41 +1,43 @@
-From: xerofoify@gmail.com (Nicholas Krause)
-Date: Wed, 20 May 2015 15:32:26 -0400
-Subject: [PATCH] mach-omap2: Remove use of deprecated marco,
- PTR_RET in devices.c
-Message-ID: <1432150346-31590-1-git-send-email-xerofoify@gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 20 May 2015 12:34:23 -0700
+Subject: [PATCHv3 10/10] CLK: TI: always enable DESHDCP clock
+In-Reply-To: <555C74E8.5010105@ti.com>
+References: <1430906938-26128-1-git-send-email-tomi.valkeinen@ti.com>
+ <1430906938-26128-11-git-send-email-tomi.valkeinen@ti.com>
+ <555C744C.6070901@ti.com> <555C74E8.5010105@ti.com>
+Message-ID: <555CE1BF.4050506@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This removes the deprecacted marco, PTR_RET and changes the
-functions that use this marco in their return statement to
-instead use the non deprecacted function, PTR_ERR_OR_ZERO
-for the file devices.c.
+On 05/20/15 04:50, Tero Kristo wrote:
+>
+>>>
+>>> @@ -348,5 +348,10 @@ int __init dra7xx_dt_clk_init(void)
+>>>       if (rc)
+>>>           pr_err("%s: failed to set USB_DPLL M2 OUT\n", __func__);
+>>>
+>>> +    hdcp_ck = clk_get_sys(NULL, "dss_deshdcp_clk");
+>>> +    rc = clk_prepare_enable(hdcp_ck);
+>>> +    if (rc)
+>>> +        pr_err("%s: failed to set dss_deshdcp_clk\n", __func__);
+>>> +
+>>>       return rc;
+>>>   }
+>>>
+>>
+>> You should rather use the assigned-clock properties in DT to accomplish
+>> this, the manual clock tweaks under the drivers/clk/ti/clk-* files
+>> should be converted to DT setup also.
+>
+> Now that I sent this, I realize we only have support to set_parent /
+> set_rate through the assigned-clock props, no enable. Any plans to
+> extend this support Mike/Stephen?
+>
+>
 
-Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
----
- arch/arm/mach-omap2/devices.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Enable falls under the "critical clocks" discussion that is ongoing. I
+assume that this is some sort of critical clock that can't be turned off?
 
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index 990338f..a69bd67 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -63,7 +63,7 @@ static int __init omap3_l3_init(void)
- 
- 	WARN(IS_ERR(pdev), "could not build omap_device for %s\n", oh_name);
- 
--	return PTR_RET(pdev);
-+	return PTR_ERR_OR_ZERO(pdev);
- }
- omap_postcore_initcall(omap3_l3_init);
- 
-@@ -333,6 +333,6 @@ static int __init omap_gpmc_init(void)
- 	pdev = omap_device_build("omap-gpmc", -1, oh, NULL, 0);
- 	WARN(IS_ERR(pdev), "could not build omap_device for %s\n", oh_name);
- 
--	return PTR_RET(pdev);
-+	return PTR_ERR_OR_ZERO(pdev);
- }
- omap_postcore_initcall(omap_gpmc_init);
 -- 
-2.1.4
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
