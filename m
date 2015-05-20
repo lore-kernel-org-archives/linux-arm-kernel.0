@@ -1,77 +1,66 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 20 May 2015 09:58:51 +0800
-Subject: [PATCH v2 0/7] Change snvs rtc and poweroff to use syscon add
- pwrkey driver
-In-Reply-To: <1432055082-28983-1-git-send-email-Frank.Li@freescale.com>
-References: <1432055082-28983-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20150520015851.GB1071@dragon>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 20 May 2015 07:37:15 +0530
+Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <555BDA7C.7020506@codeaurora.org>
+References: <cover.1430394884.git.viresh.kumar@linaro.org>
+ <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
+ <555BDA7C.7020506@codeaurora.org>
+Message-ID: <20150520020715.GA6465@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 01:04:35AM +0800, Frank.Li at freescale.com wrote:
-> From: Frank Li <Frank.Li@freescale.com>
-> 
-> Change from v1 to v2
->  - Change simple-bus to simple-mfd
->  - RTC remove lock.
->  - RTC remove comments "These register offsets are relative to LP (Low Power) range"
->  - power off, remove extra space
-> 
-> SNVS is MPF module.
-> include rtc, power off, ON/OFF power key
-> 
->   arm: imx: power-off: change to syscon to access register
->   rtc: arm: imx: snvs: change use syscon to access register
-> Above two patch change existed power-off and rtc use syscon
-> 
->   Document: dt: fsl: snvs: change support syscon
->   arm: dts: imx: update snvs to use syscon access register
-> Update dt file and document
-> 
->   input: keyboard: imx: add snvs power key driver
->   document: devicetree: input: imx: i.mx snvs power device tree bindings
->   arm: dts: imx6sx: enable snvs power key
-> Added on/off key driver
-> 
-> Frank Li (6):
->   arm: imx: power-off: change to syscon to access register
->   rtc: arm: imx: snvs: change use syscon to access register
->   Document: dt: fsl: snvs: change support syscon
->   arm: dts: imx: update snvs to use syscon access register
->   document: devicetree: input: imx: i.mx snvs power device tree bindings
->   arm: dts: imx6sx: enable snvs power key
+On 19-05-15, 17:51, Stephen Boyd wrote:
+> This looks like it covers my usecases. I'm not sure if I'm going to put
+> all of this data in DT because of the philosophical question regarding
+> what should be in DT and the technical decisions that some platforms I'm
+> working on have made to encode parts of the OPPs in fuses, but at least
+> the binding looks to support all the scenarios I have today.
 
-So, the series will break existing DTBs for RTC and poweroff, right?
-If this is unavoidable, should we at least have some warning messages
-telling users about his breakage?
+Thanks.
 
-Shawn
+> > +Required properties:
+> > +- opp-khz: Frequency in kHz
+> 
+> Can this be in Hz? I thought there were some problems with kHz and Hz
+> before where we wanted to make this into Hz so that rounding problems
+> don't arise?
 
+Yeah, good point.
+
+> Also I wonder if all properties should be optional? I don't have this
+> scenario today, but perhaps the frequencies could be encoded in fuses,
+> but the voltages wouldn't be and so we might want to read out the
+> frequencies for a fixed set of voltages. Of course, if there's nothing
+> in the OPP node at all, it's not very useful, so perhaps some statement
+> that at least one of the frequency/voltage/amperage properties should be
+> present.
+
+I am not sure. What we are trying to do (fill partially in DT and
+partially in platform), is a trick and not the right use of bindings.
+
+Ideally whatever is passed in DT should be complete by itself and
+doesn't require platform to tweak it (which it can't). For example,
+the cpufreq-dt driver will try to initialize OPPs from the DT directly
+and wouldn't know about the platform tweaks. That can work eventually
+as platform will add OPPs for the same bindings before cpufreq driver
+will try to do, but that's a trick.
+
+And then its all about frequency in the first place, and so marking
+that optional looks wrong. Probably not the right use of these
+bindings.
+
+> > +  Entries for multiple regulators must be present in the same order as
+> > +  regulators are specified in device's DT node. If few regulators don't provide
+> > +  capability to configure current, then values for then should be marked as
 > 
-> Robin Gong (1):
->   input: keyboard: imx: add snvs power key driver
-> 
->  .../devicetree/bindings/crypto/fsl-sec4.txt        |  93 +++++++--
->  .../devicetree/bindings/input/snvs-pwrkey.txt      |   1 +
->  .../bindings/power_supply/imx-snvs-poweroff.txt    |  24 +--
->  arch/arm/boot/dts/imx6qdl.dtsi                     |  12 +-
->  arch/arm/boot/dts/imx6sl.dtsi                      |  12 +-
->  arch/arm/boot/dts/imx6sx.dtsi                      |  19 +-
->  arch/arm/boot/dts/vfxxx.dtsi                       |   9 +-
->  drivers/input/keyboard/Kconfig                     |  11 +
->  drivers/input/keyboard/Makefile                    |   1 +
->  drivers/input/keyboard/snvs_pwrkey.c               | 232 +++++++++++++++++++++
->  drivers/power/reset/imx-snvs-poweroff.c            |  21 +-
->  drivers/rtc/rtc-snvs.c                             | 128 +++++-------
->  12 files changed, 417 insertions(+), 146 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/input/snvs-pwrkey.txt
->  create mode 100644 drivers/input/keyboard/snvs_pwrkey.c
-> 
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> s/then/them/
+
+Thanks. But this part is already re-written and doesn't have this
+issue anymore.
+
+> Please put some space between properties so they can be found quickly:
+
+Sure, thanks.
+
+-- 
+viresh
