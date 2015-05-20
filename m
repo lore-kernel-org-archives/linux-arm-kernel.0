@@ -1,40 +1,28 @@
-From: bintian.wang@huawei.com (Bintian)
-Date: Wed, 20 May 2015 08:52:37 +0800
-Subject: [PATCH v4 4/5] clk: hi6220: Clock driver support for Hisilicon
- hi6220 SoC
-In-Reply-To: <555B9E7B.9000809@codeaurora.org>
-References: <1430827599-11560-1-git-send-email-bintian.wang@huawei.com>	<1430827599-11560-5-git-send-email-bintian.wang@huawei.com>	<20150515002527.GD31753@codeaurora.org>	<5555A37B.1090105@huawei.com>	<20150515193041.GO31753@codeaurora.org>
- <CAAS=xmjsFoQg-HgWA5-e=cF3qF+PcVNc3i_3Z5EBPNJ2HyOZKQ@mail.gmail.com>
- <555B9E7B.9000809@codeaurora.org>
-Message-ID: <555BDAD5.1080301@huawei.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 19 May 2015 18:10:58 -0700
+Subject: [PATCHv8 01/10] watchdog: Rename watchdog_active to
+ watchdog_hw_active
+In-Reply-To: <1432023969-20736-2-git-send-email-timo.kokkonen@offcode.fi>
+References: <1432023969-20736-1-git-send-email-timo.kokkonen@offcode.fi>
+ <1432023969-20736-2-git-send-email-timo.kokkonen@offcode.fi>
+Message-ID: <555BDF22.2090208@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Stephen,
-
-On 2015/5/20 4:35, Stephen Boyd wrote:
-> On 05/15/15 19:54, Brent Wang wrote:
->>
->>>> How about just send this patch for review not the whole patch set in
->>>> next version?
->>>>
->>> Yes a single patch is fine. I take it you want the patch to go
->>> through arm-soc with some Ack from us?
->> Yes, exactly.
->> The dts file includes the clock head file,  this patch goes through
->> arm-soc is a good choice.
+On 05/19/2015 01:26 AM, Timo Kokkonen wrote:
+> Before extending the watchdog core midlayer, it is useful to rename
+> the watchdog_active function so that it states explicitly what it
+> really does. That is, "active" watchdog means really that the watchdog
+> hardware is running and needs pinging to prevent a watchdog reset
+> taking place in near future.
 >
-> One way to avoid that problem is to split the clock header file into its
-> own patch and then duplicate that patch in two trees, one that goes
-> through arm-soc and one that goes through clk.
+> This is different to "watchdog open" state, which simply states that
+> kernel is expecting the user space to keep the watchdog alive. These
+> states might become different mainly because some hardware have
+> limitations that prevent them from being stopped at will.
 >
-Thanks for your suggestion, I will talk about this with Hisilicon SoC
-maintainer XuWei.
 
-I have updated this patch based on your suggestion, could you help
-review patch "[PATCH v6 5/6] clk: hi6220: Clock driver support for 
-Hisilicon hi6220 SoC"?
+I don't see why this is needed. If you need another state, per your
+description, it would be "open" in addition to "active".
 
-Thanks,
-
-Bintian
+Guenter
