@@ -1,93 +1,21 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 20 May 2015 22:33:13 +0800
-Subject: [PATCH v2] i2c: designware: Avoid unnecessary resuming during system
- suspend
-Message-ID: <1432132393-693-1-git-send-email-jszhang@marvell.com>
+From: roger.pau@citrix.com (=?windows-1252?Q?Roger_Pau_Monn=E9?=)
+Date: Wed, 20 May 2015 16:36:29 +0200
+Subject: [RFC 04/23] block/xen-blkfront: Remove unused macro
+ MAXIMUM_OUTSTANDING_BLOCK_REQS
+In-Reply-To: <1431622863-28575-5-git-send-email-julien.grall@citrix.com>
+References: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
+ <1431622863-28575-5-git-send-email-julien.grall@citrix.com>
+Message-ID: <555C9BED.60207@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 1fc2fe204cb9 ("i2c: designware: Add runtime PM hooks") adds
-runtime pm support using the same ops for system pm and runtime pm.
-When suspend to ram, the i2c host may have been runtime suspended, thus
-i2c_dw_disable() hangs.
+El 14/05/15 a les 19.00, Julien Grall ha escrit:
+> From: Julien Grall <julien.grall@linaro.org>
+> 
+> Signed-off-by: Julien Grall <julien.grall@citrix.com>
 
-Previously, I fixed this issue by separating ops for system pm and
-runtime pm, then in the system suspend/resume path, runtime pm apis are
-used to ensure the device is at correct state.
+Acked-by: Roger Pau Monn? <roger.pau@citrix.com>
 
-But as Mika Westerberg pointed out: it sounds a bit silly to resume the
-device just because you want to call i2c_dw_disable() for it before
-suspending again. He then suggested an elegant solution which keeps the
-device runtime suspended during system suspend with the help of
-'dev->power.direct_complete'. This patch adopted this solution, and in
-fact Mika provided the main code.
+Note that Bob multipage ring patches also remove this.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- v2 change:
-	- adopt Mika's suggestion to make use of direct_complete flag
-
- drivers/i2c/busses/i2c-designware-platdrv.c | 33 +++++++++++++++++++++++++----
- 1 file changed, 29 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
-index 0a80e4a..f89650f 100644
---- a/drivers/i2c/busses/i2c-designware-platdrv.c
-+++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-@@ -298,6 +298,22 @@ static const struct of_device_id dw_i2c_of_match[] = {
- MODULE_DEVICE_TABLE(of, dw_i2c_of_match);
- #endif
- 
-+#ifdef CONFIG_PM_SLEEP
-+static int dw_i2c_prepare(struct device *dev)
-+{
-+	return pm_runtime_suspended(dev);
-+}
-+
-+static void dw_i2c_complete(struct device *dev)
-+{
-+	if (dev->power.direct_complete)
-+		pm_request_resume(dev);
-+}
-+#else
-+#define dw_i2c_prepare	NULL
-+#define dw_i2c_complete	NULL
-+#endif
-+
- #ifdef CONFIG_PM
- static int dw_i2c_suspend(struct device *dev)
- {
-@@ -322,10 +338,19 @@ static int dw_i2c_resume(struct device *dev)
- 
- 	return 0;
- }
--#endif
- 
--static UNIVERSAL_DEV_PM_OPS(dw_i2c_dev_pm_ops, dw_i2c_suspend,
--			    dw_i2c_resume, NULL);
-+static const struct dev_pm_ops dw_i2c_dev_pm_ops = {
-+	.prepare = dw_i2c_prepare,
-+	.complete = dw_i2c_complete,
-+	SET_SYSTEM_SLEEP_PM_OPS(dw_i2c_suspend, dw_i2c_resume)
-+	SET_RUNTIME_PM_OPS(dw_i2c_suspend,
-+		dw_i2c_resume, NULL)
-+};
-+
-+#define DW_I2C_DEV_PMOPS (&dw_i2c_dev_pm_ops)
-+#else
-+#define DW_I2C_DEV_PMOPS NULL
-+#endif
- 
- /* work with hotplug and coldplug */
- MODULE_ALIAS("platform:i2c_designware");
-@@ -337,7 +362,7 @@ static struct platform_driver dw_i2c_driver = {
- 		.name	= "i2c_designware",
- 		.of_match_table = of_match_ptr(dw_i2c_of_match),
- 		.acpi_match_table = ACPI_PTR(dw_i2c_acpi_match),
--		.pm	= &dw_i2c_dev_pm_ops,
-+		.pm	= DW_I2C_DEV_PMOPS,
- 	},
- };
- 
--- 
-2.1.4
+Roger.
