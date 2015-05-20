@@ -1,36 +1,78 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Wed, 20 May 2015 11:07:39 +0800
-Subject: [PATCH v8 2/3] I2C: mediatek: Add driver for MediaTek I2C
- controller
-In-Reply-To: <CABuKBeJcpufi-eEWmDRK6F2kgpz3DmCz8rp4hVPCJVgkmGr-KA@mail.gmail.com>
-References: <1431967209-5261-1-git-send-email-eddie.huang@mediatek.com>
- <1431967209-5261-3-git-send-email-eddie.huang@mediatek.com>
- <20150518184300.GB28888@pengutronix.de>
- <CABuKBeJcpufi-eEWmDRK6F2kgpz3DmCz8rp4hVPCJVgkmGr-KA@mail.gmail.com>
-Message-ID: <1432091259.20394.7.camel@mtksdaap41>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Wed, 20 May 2015 11:16:02 +0800
+Subject: [Patch v3 5/7] PCI/ACPI: Consolidate common PCI host bridge code
+ into ACPI core
+In-Reply-To: <5559E44B.2010702@linaro.org>
+References: <1431593803-5213-1-git-send-email-jiang.liu@linux.intel.com>
+ <1431593803-5213-6-git-send-email-jiang.liu@linux.intel.com>
+ <5559E44B.2010702@linaro.org>
+Message-ID: <555BFC72.3060703@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-05-19 at 16:48 +0200, Matthias Brugger wrote:
-> 2015-05-18 20:43 GMT+02:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-<...>
-> >> --- /dev/null
-> >> +++ b/drivers/i2c/busses/i2c-mt65xx.c
-> >> @@ -0,0 +1,675 @@
-> >> +/*
-> >> + * Copyright (c) 2014 MediaTek Inc.
-> >> + * Author: Xudong.chen <xudong.chen@mediatek.com>
-> > s/Xudong.chen/Xudong Chen/
-> >
-> >> +#define I2C_DRV_NAME         "mt-i2c"
-> > i2c-mt65xx ?
+On 2015/5/18 21:08, Hanjun Guo wrote:
+> Hi Jiang,
 > 
-> As this works for all SoCs so far, I would propose: i2c-mtk
+> On 2015?05?14? 16:56, Jiang Liu wrote:
+>> Introduce common interface acpi_pci_root_create() and related data
+>> structures to create PCI root bus for ACPI PCI host bridges. It will
+>> be used to kill duplicated arch specific code for IA64 and x86. It may
+>> also help ARM64 in future.
+> 
+> As I commented in previous version, this patch will introduce
+> compile error on ACPI enabled ARM64 kernel because struct
+> pci_controller is not defined for ARM64, so how about adding
+> the following patch before this patch, or squash to this one,
+> does it make sense?
+Hi Hanjun,
+	Thanks for fixing this building issue for ARM64. The patch
+is really what I want:). Will merge it into next version. With this
+patch applied, are there any other issues from ARM64 side?
+Thanks!
+Gerry
 
-Hi,
-
-I'm pretty sure this driver won't work for MTK TV socs(mt53xx) and BDP
-mt8580, they are using different I2C IP. They are not working on
-upstream now, but I think using i2c-mt65xx make more sense here.
-
-Joe.C
+> 
+> From 11d0e98154e681e75936698208398cb4dcd73632 Mon Sep 17 00:00:00 2001
+> From: Hanjun Guo <hanjun.guo@linaro.org>
+> Date: Mon, 18 May 2015 19:41:56 +0800
+> Subject: [PATCH] ARM64 / PCI: introduce struct pci_controller for ACPI
+> 
+> ARM64 ACPI based PCI host bridge init needs a arch dependent
+> struct pci_controller to accommodate common PCI host bridge
+> code which is introduced later, or it will lead to compile
+> errors on ARM64.
+> 
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> CC: Liviu Dudau <Liviu.Dudau@arm.com>
+> CC: Will Deacon <will.deacon@arm.com>
+> CC: Catalin Marinas <catalin.marinas@arm.com>
+> CC: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
+> CC: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm64/include/asm/pci.h | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
+> index b008a72..7088495 100644
+> --- a/arch/arm64/include/asm/pci.h
+> +++ b/arch/arm64/include/asm/pci.h
+> @@ -10,6 +10,16 @@
+>  #include <asm-generic/pci-bridge.h>
+>  #include <asm-generic/pci-dma-compat.h>
+> 
+> +struct acpi_device;
+> +
+> +struct pci_controller {
+> +#ifdef CONFIG_ACPI
+> +       struct acpi_device *companion;  /* ACPI companion device */
+> +#endif
+> +       int             segment;        /* PCI domain */
+> +       int             node;           /* NUMA node */
+> +};
+> +
+>  #define PCIBIOS_MIN_IO         0x1000
+>  #define PCIBIOS_MIN_MEM                0
+> 
+> 
+> Thanks
+> Hanjun
