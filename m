@@ -1,20 +1,25 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 19 May 2015 18:44:22 -0700
-Subject: [GIT PULL] SoCFPGA clk update for v4.2
-In-Reply-To: <1431544086-11274-1-git-send-email-dinguyen@opensource.altera.com>
-References: <1431544086-11274-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <20150520014422.GA4815@codeaurora.org>
+Date: Tue, 19 May 2015 18:44:59 -0700
+Subject: [PATCH v2 1/2] dt-bindings: Add pxa1928 clock binding
+In-Reply-To: <1431383120-16957-1-git-send-email-robh@kernel.org>
+References: <1431383120-16957-1-git-send-email-robh@kernel.org>
+Message-ID: <20150520014459.GB4815@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/13, dinguyen at opensource.altera.com wrote:
-> Hi Mike/Stephen,
+On 05/11, Rob Herring wrote:
+> This adds the clock binding documentation for the Marvell PXA1928 SOC.
+> The PXA1928 has 3 clock control blocks for different subsystems of the
+> chip.
 > 
-> Please consider pulling these 2 patches that adds the clock driver for the
-> SoCFPGA Arria10 platform.
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> ---
 
-I think we're waiting on another round for the small fixes? I can
-apply the patches directly after that.
+Applied to clk-next
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
