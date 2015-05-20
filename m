@@ -1,49 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 20 May 2015 21:14:38 +0100
-Subject: schedule_timeout sleeps too long after dividing CPU frequency
-In-Reply-To: <555CE1B8.70205@free.fr>
-References: <20150514144239.GZ2067@n2100.arm.linux.org.uk>
- <20150518115452.GV2067@n2100.arm.linux.org.uk>
- <555CB499.7060600@free.fr> <12867692.bB1EJHiPzq@wuerfel>
- <555CE1B8.70205@free.fr>
-Message-ID: <20150520201438.GW2067@n2100.arm.linux.org.uk>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 20 May 2015 13:34:08 -0700
+Subject: [PATCH] ARM: rockchip: restore dapswjdp after suspend
+Message-ID: <1432154048-19126-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 09:34:16PM +0200, Mason wrote:
-> On 20/05/2015 20:50, Arnd Bergmann wrote:
-> >> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-> >> index 6591e26..300f13a 100644
-> >> --- a/arch/arm/kernel/smp_twd.c
-> >> +++ b/arch/arm/kernel/smp_twd.c
-> >> @@ -295,6 +295,10 @@ static void twd_timer_setup(void)
-> >>         clk->name = "local_timer";
-> >>         clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
-> >>                         CLOCK_EVT_FEAT_C3STOP;
-> >> +#ifdef CONFIG_TANGOX
-> >> +       /*** Tango does not implement low power modes ***/
-> >> +       clk->features &= ~CLOCK_EVT_FEAT_C3STOP;
-> >> +#endif
-> >>         clk->rating = 350;
-> >>         clk->set_mode = twd_set_mode;
-> >>         clk->set_next_event = twd_set_next_event;
-> > 
-> > This will disable the feature on all machines that are configured 
-> > in the kernel.
-> 
-> What do you mean, "disable the feature"?
-> 
-> My proposed patch doesn't change the default, which is to set
-> CLOCK_EVT_FEAT_C3STOP unconditionally for all machines.
-> 
-> And then only for some platforms (in this case only TANGOX)
-> CLOCK_EVT_FEAT_C3STOP is *removed* from the features list.
+In the commit (0ea001d ARM: rockchip: disable dapswjdp during suspend)
+we made the assumption that we didn't need to restore dapswjdp after
+suspend because "the MASKROM will enable it back".
 
-So we build a kernel containing both tangox and OMAP together, and
-OMAP starts misbehaving because CLOCK_EVT_FEAT_C3STOP is no longer
-set.  That's a regression caused by your change, even if you didn't
-intend for anyone else to enable your option.
+It turns out that's not a safe assumption.  In some cases (pending
+interrupts) it's possible that the WFI might act as a no-op and the
+MaskROM will never run.  Since we're changing the bit, we should
+restore it ourselves.
 
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+ arch/arm/mach-rockchip/pm.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm/mach-rockchip/pm.c b/arch/arm/mach-rockchip/pm.c
+index b0dcbe2..a7be465 100644
+--- a/arch/arm/mach-rockchip/pm.c
++++ b/arch/arm/mach-rockchip/pm.c
+@@ -48,6 +48,7 @@ static struct regmap *sgrf_regmap;
+ 
+ static u32 rk3288_pmu_pwr_mode_con;
+ static u32 rk3288_sgrf_soc_con0;
++static u32 rk3288_sgrf_cpu_con0;
+ 
+ static inline u32 rk3288_l2_config(void)
+ {
+@@ -70,6 +71,7 @@ static void rk3288_slp_mode_set(int level)
+ {
+ 	u32 mode_set, mode_set1;
+ 
++	regmap_read(sgrf_regmap, RK3288_SGRF_CPU_CON0, &rk3288_sgrf_cpu_con0);
+ 	regmap_read(sgrf_regmap, RK3288_SGRF_SOC_CON0, &rk3288_sgrf_soc_con0);
+ 
+ 	regmap_read(pmu_regmap, RK3288_PMU_PWRMODE_CON,
+@@ -129,6 +131,9 @@ static void rk3288_slp_mode_set(int level)
+ 
+ static void rk3288_slp_mode_set_resume(void)
+ {
++	regmap_write(sgrf_regmap, RK3288_SGRF_CPU_CON0,
++		     rk3288_sgrf_cpu_con0 | SGRF_DAPDEVICEEN_WRITE);
++
+ 	regmap_write(pmu_regmap, RK3288_PMU_PWRMODE_CON,
+ 		     rk3288_pmu_pwr_mode_con);
+ 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.2.0.rc0.207.ga3a616c
