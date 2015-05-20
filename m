@@ -1,40 +1,34 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 20 May 2015 11:33:37 +0800
-Subject: [Patch v3 5/7] PCI/ACPI: Consolidate common PCI host bridge code
- into ACPI core
-In-Reply-To: <555BFC72.3060703@linux.intel.com>
-References: <1431593803-5213-1-git-send-email-jiang.liu@linux.intel.com>
- <1431593803-5213-6-git-send-email-jiang.liu@linux.intel.com>
- <5559E44B.2010702@linaro.org> <555BFC72.3060703@linux.intel.com>
-Message-ID: <555C0091.6050301@linaro.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 20 May 2015 12:37:29 +0900
+Subject: [RFC PATCH 2/4] ARM: dts: Add SPI flash node for Peach boards
+In-Reply-To: <1432042454-19234-3-git-send-email-javier.martinez@collabora.co.uk>
+References: <1432042454-19234-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1432042454-19234-3-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <555C0179.8040102@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+CC Suravee,
+On 19.05.2015 22:34, Javier Martinez Canillas wrote:
+> From: Simon Glass <sjg@chromium.org>
+> 
+> Peach Pit and Pi machines have a SPI flash memory that is used to
+> store firmware and different system parameters and data.
+> 
+> Add information about the SPI flash chip so that user-space tools
+> can access it.
+> 
+> Signed-off-by: Simon Glass <sjg@chromium.org>
+> Reviewed-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-On 2015?05?20? 11:16, Jiang Liu wrote:
-> On 2015/5/18 21:08, Hanjun Guo wrote:
->> Hi Jiang,
->>
->> On 2015?05?14? 16:56, Jiang Liu wrote:
->>> Introduce common interface acpi_pci_root_create() and related data
->>> structures to create PCI root bus for ACPI PCI host bridges. It will
->>> be used to kill duplicated arch specific code for IA64 and x86. It may
->>> also help ARM64 in future.
->>
->> As I commented in previous version, this patch will introduce
->> compile error on ACPI enabled ARM64 kernel because struct
->> pci_controller is not defined for ARM64, so how about adding
->> the following patch before this patch, or squash to this one,
->> does it make sense?
-> Hi Hanjun,
-> 	Thanks for fixing this building issue for ARM64. The patch
-> is really what I want:). Will merge it into next version. With this
-> patch applied, are there any other issues from ARM64 side?
+Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Suravee is testing ARM64 PCI on top of your patch set, he can confirm
-that if there are any other issues :) (Suravee has a real ARM64 hardware
-in hand)
+I assume this can go through samsung-soc tree (after documenting new
+compatible)?
 
-Thanks
-Hanjun
+The exynos5800-peach-pi.dts and exynos5420-peach-pit.dts have a lot of
+common nodes. I wonder if there is a common part which could have its
+own dtsi? Like exynos4412-odroid-common.dtsi?
+
+Best regards,
+Krzysztof
