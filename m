@@ -1,66 +1,73 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 20 May 2015 08:53:07 +0200
-Subject: [PATCH v5] arm64: perf: Fix callchain parse error with kernel
- tracepoint events
-In-Reply-To: <20150519165202.GA21251@e104818-lin.cambridge.arm.com>
-References: <20150508153758.GG25587@arm.com>
- <1431256060-161483-1-git-send-email-houpengyang@huawei.com>
- <20150519165202.GA21251@e104818-lin.cambridge.arm.com>
-Message-ID: <CAORVsuVtHO49Ybu9SNv0XZS6CvvyMV5uQQAxJktOr5+VS-VJvg@mail.gmail.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Wed, 20 May 2015 09:05:40 +0200
+Subject: [PATCH] video: exynos: fix modular build
+In-Reply-To: <2708563.ADEZz3igC5@wuerfel>
+References: <2708563.ADEZz3igC5@wuerfel>
+Message-ID: <1432105540.21715.26.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin, Will,
+On Tue, 2015-05-19 at 14:17 +0200, Arnd Bergmann wrote:
+> Finally, the EXYNOS_VIDEO option is turned into tristate as well
+> for good measure, as all framebuffer drivers should be configurable
+> as modules.
 
-On Tue, May 19, 2015 at 6:52 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Sun, May 10, 2015 at 11:07:40AM +0000, Hou Pengyang wrote:
->> For ARM64, when tracing with tracepoint events, the IP and pstate are set
->> to 0, preventing the perf code parsing the callchain and resolving the
->> symbols correctly.
->>
->>  ./perf record -e sched:sched_switch -g --call-graph dwarf ls
->>     [ perf record: Captured and wrote 0.146 MB perf.data ]
->>  ./perf report -f
->>     Samples: 194  of event 'sched:sched_switch', Event count (approx.): 194
->>     Children      Self    Command  Shared Object     Symbol
->>     100.00%       100.00%  ls       [unknown]         [.] 0000000000000000
->>
->> The fix is to implement perf_arch_fetch_caller_regs for ARM64, which fills
->> several necessary registers used for callchain unwinding, including pc,sp,
->> fp and spsr .
->>
->> With this patch, callchain can be parsed correctly as follows:
->>
->>      ......
->> +    2.63%     0.00%  ls       [kernel.kallsyms]  [k] vfs_symlink
->> +    2.63%     0.00%  ls       [kernel.kallsyms]  [k] follow_down
->> +    2.63%     0.00%  ls       [kernel.kallsyms]  [k] pfkey_get
->> +    2.63%     0.00%  ls       [kernel.kallsyms]  [k] do_execveat_common.isra.33
->> -    2.63%     0.00%  ls       [kernel.kallsyms]  [k] pfkey_send_policy_notify
->>      pfkey_send_policy_notify
->>      pfkey_get
->>      v9fs_vfs_rename
->>      page_follow_link_light
->>      link_path_walk
->>      el0_svc_naked
->>     .......
->>
->> Signed-off-by: Hou Pengyang <houpengyang@huawei.com>
->> Acked-by: Will Deacon <will.deacon@arm.com>
->
-> Queued for 4.2. Thanks.
+EXYNOS_MIPI_DSI and EXYNOS_LCD_S6E8AX0 are made tristate too. And that
+is, I think, what counts. See below.
 
-Nice to see this one going out, finally.
+For anyone wondering how these two drivers can be made modular with only
+a few tweaks to the build system: that is because exynos_mipi_dsi.c and
+s6e8ax0.c already contain module specific boilerplate. They probably
+already contained that boilerplate when they were added three years ago.
+(Perhaps the changelog should mention this.)
 
-Cheers,
-Jean
+> --- a/drivers/video/fbdev/exynos/Kconfig
+> +++ b/drivers/video/fbdev/exynos/Kconfig
 
->
-> --
-> Catalin
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>  menuconfig EXYNOS_VIDEO
+> -	bool "Exynos Video driver support"
+> +	tristate "Exynos Video driver support"
+>  	depends on ARCH_S5PV210 || ARCH_EXYNOS
+>  	help
+>  	  This enables support for EXYNOS Video device.
+
+I have tested this only lightly but I do think this hunk is not needed.
+Because basically all that this entry does is making EXYNOS_MIPI_DSI and
+EXYNOS_LCD_S6E8AX0 available. And that works just as well if it's a
+bool. Correct?
+
+>  config EXYNOS_MIPI_DSI
+> -	bool "EXYNOS MIPI DSI driver support."
+> +	tristate "EXYNOS MIPI DSI driver support."
+>  	select GENERIC_PHY
+>  	help
+>  	  This enables support for MIPI-DSI device.
+>  
+>  config EXYNOS_LCD_S6E8AX0
+> -	bool "S6E8AX0 MIPI AMOLED LCD Driver"
+> +	tristate "S6E8AX0 MIPI AMOLED LCD Driver"
+>  	depends on EXYNOS_MIPI_DSI && BACKLIGHT_CLASS_DEVICE
+>  	depends on (LCD_CLASS_DEVICE = y)
+>  	default n
+
+> --- a/drivers/video/fbdev/exynos/Makefile
+> +++ b/drivers/video/fbdev/exynos/Makefile
+
+> -obj-$(CONFIG_EXYNOS_MIPI_DSI)		+= exynos_mipi_dsi.o exynos_mipi_dsi_common.o \
+> -				     	exynos_mipi_dsi_lowlevel.o
+> +obj-$(CONFIG_EXYNOS_MIPI_DSI)		+= exynos-mipi-dsi-mod.o
+> +
+> +exynos-mipi-dsi-mod-objs		+= exynos_mipi_dsi.o exynos_mipi_dsi_common.o \
+> +					   exynos_mipi_dsi_lowlevel.o
+
+I don't speak Makefilese fluently, so I have to ask. Is the -mod
+extension needed because a module built from multiple files can't have a
+name that matches the name of one of its .c files (minus the .c
+extension, of course)?
+
+>  obj-$(CONFIG_EXYNOS_LCD_S6E8AX0)	+= s6e8ax0.o
+
+Thanks,
+
+
+Paul Bolle
