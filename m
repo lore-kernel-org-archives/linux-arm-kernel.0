@@ -1,23 +1,19 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 May 2015 23:06:28 +0200
-Subject: [GIT PULL v2] ARM: berlin: Simple-MFD rework for v4.2 (round 1)
-In-Reply-To: <1432140626-6109-2-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1432140626-6109-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1432140626-6109-2-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <2918562.6HiyIinobj@wuerfel>
+Date: Wed, 20 May 2015 23:08:36 +0200
+Subject: [PATCH dt v8] ARM: dts: add support for Vybrid running on
+ Cortex-M4
+In-Reply-To: <1432073118-26898-1-git-send-email-stefan@agner.ch>
+References: <1432073118-26898-1-git-send-email-stefan@agner.ch>
+Message-ID: <7860224.Pgxp066tzV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 20 May 2015 18:50:26 Sebastian Hesselbarth wrote:
+On Wednesday 20 May 2015 00:05:18 Stefan Agner wrote:
+> This adds an initial device tree to run Linux on the Cortex-M4 on
+> the Vybrid based Colibri VF61 module.
 > 
-> this is a PR for the Berlin System/Chip controller simple-mfd rework
-> which is now bisect compatible and rebased on top of arm-soc's
-> drivers/simple-mfd tag. Compared to the corresponding patch set, I
-> also added the ADC node patch for berlin2q which also depends on
-> simple-mfd.
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 
-Ok, great. Pulled into next/drivers now.
-
-Thanks,
+Pulled into next/dt, thanks!
 
 	Arnd
