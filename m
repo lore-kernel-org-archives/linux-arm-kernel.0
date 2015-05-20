@@ -1,35 +1,30 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Wed, 20 May 2015 23:22:04 +0200
-Subject: [PATCH] ARM: mvebu: armada-xp-linksys-mamba: Disable internal RTC
-Message-ID: <1432156924-1030-1-git-send-email-kaloz@openwrt.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 20 May 2015 23:25:44 +0200
+Subject: [PATCH defconfig v8] ARM: vf610m4: add defconfig for Linux on
+ Vybrids Cortex-M4
+In-Reply-To: <1432073182-27114-1-git-send-email-stefan@agner.ch>
+References: <1432073182-27114-1-git-send-email-stefan@agner.ch>
+Message-ID: <7545746.Jl1zbQvhrm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Mamba (like the OpenBlocks AX3) doesn't have a crystal
-connected to the internal RTC - let's prevent the kernel from
-probing it.
+On Wednesday 20 May 2015 00:06:22 Stefan Agner wrote:
+> Add defconfig for Linux on Vybrid (vf610) on the secondary Cortex-
+> M4 CPU. The use of a XIP image has been tested which needs to be
+> loaded (e.g. using the custom m4boot loader) to the end of the
+> available RAM at address 0x8f000000. The Cortex-M4 has a code-alias
+> which makes sure that the instructions get fetched through the code
+> bus (alias starts at 0x00800000 => 0x80800000 in system address).
+> Hence, to get optimal performance, use 0x0f000000 as XIP_PHYS_ADDR.
+> This address is additionally shifted by the length of the minimal
+> loader which is inserted by m4boot. Currently, this offset is 0x80.
+> 
+> The standard DRAM base address is configured to 0x8C000000, which
+> gives the Cortex-M4 48MiB of RAM.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> 
 
-Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
-Cc: <stable@vger.kernel.org> # v4.0 +
----
- arch/arm/boot/dts/armada-xp-linksys-mamba.dts | 5 +++++
- 1 file changed, 5 insertions(+)
+Applied to next/defconfig, thanks!
 
-diff --git a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-index a2cf215..fdd187c 100644
---- a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-+++ b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-@@ -95,6 +95,11 @@
- 
- 		internal-regs {
- 
-+			rtc at 10300 {
-+				/* No crystal connected to the internal RTC */
-+				status = "disabled";
-+			};
-+
- 			/* J10: VCC, NC, RX, NC, TX, GND  */
- 			serial at 12000 {
- 				status = "okay";
--- 
-2.1.0
+	Arnd
