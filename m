@@ -1,31 +1,39 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 20 May 2015 22:50:56 +0000 (UTC)
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 20 May 2015 15:56:28 -0700
 Subject: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
-In-Reply-To: <1432156863-19695-3-git-send-email-tony@atomide.com>
+In-Reply-To: <alpine.DEB.2.02.1505202249450.7960@utopia.booyaka.com>
 References: <1432156863-19695-1-git-send-email-tony@atomide.com>
  <1432156863-19695-3-git-send-email-tony@atomide.com>
-Message-ID: <alpine.DEB.2.02.1505202249450.7960@utopia.booyaka.com>
+ <alpine.DEB.2.02.1505202249450.7960@utopia.booyaka.com>
+Message-ID: <20150520225628.GO10274@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 May 2015, Tony Lindgren wrote:
-
-> We support decoding the bootloader values if DEBUG is defined.
-> But we also need to change the struct omap_hwmod flags to have
-> HWMOD_INIT_NO_RESET to avoid the GPMC being reset during the
-> boot. Otherwise just the default timings will be displayed
-> instead of the bootloader configured timings.
+* Paul Walmsley <paul@pwsan.com> [150520 15:52]:
+> On Wed, 20 May 2015, Tony Lindgren wrote:
 > 
-> This also allows us to clean up the various GPMC related
-> hwmod flags. For debugging, we only need HWMOD_INIT_NO_RESET,
-> and HWMOD_INIT_NO_IDLE is not needed.
+> > We support decoding the bootloader values if DEBUG is defined.
+> > But we also need to change the struct omap_hwmod flags to have
+> > HWMOD_INIT_NO_RESET to avoid the GPMC being reset during the
+> > boot. Otherwise just the default timings will be displayed
+> > instead of the bootloader configured timings.
+> > 
+> > This also allows us to clean up the various GPMC related
+> > hwmod flags. For debugging, we only need HWMOD_INIT_NO_RESET,
+> > and HWMOD_INIT_NO_IDLE is not needed.
+> > 
+> > Cc: Brian Hutchinson <b.hutchman@gmail.com>
+> > Cc: Paul Walmsley <paul@pwsan.com>
+> > Cc: Roger Quadros <rogerq@ti.com>
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
 > 
-> Cc: Brian Hutchinson <b.hutchman@gmail.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Roger Quadros <rogerq@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> Looks good to me, want me to queue it or do you want to?
 
-Looks good to me, want me to queue it or do you want to?
+Feel free to take it if it looks OK to you, I'll just queue
+the first patch then. Roger may have other GPMC patches
+coming up, but this should not conflict with them, there's
+more of a hwmod conflict chance.
 
+Regards,
 
-- Paul
+Tony
