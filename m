@@ -1,41 +1,80 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 May 2015 00:14:43 +0100
-Subject: schedule_timeout sleeps too long after dividing CPU frequency
-In-Reply-To: <555D030F.8030100@free.fr>
-References: <20150514144239.GZ2067@n2100.arm.linux.org.uk>
- <20150520201438.GW2067@n2100.arm.linux.org.uk>
- <555CF17D.4060500@free.fr> <76003699.Oyq777txnm@wuerfel>
- <555D030F.8030100@free.fr>
-Message-ID: <20150520231443.GB2067@n2100.arm.linux.org.uk>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 21 May 2015 01:21:42 +0200
+Subject: [PATCH] ARM: berlin: add SPI nodes for BG2Q
+In-Reply-To: <1432126385-27402-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1432126385-27402-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <555D1706.7040309@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 11:56:31PM +0200, Mason wrote:
-> Russell, when you added the FEAT_C3STOP flag unconditionally in
-> commit 5388a6b266, didn't that potentially break platforms that
-> didn't expect the flag to be set?
+On 20.05.2015 14:53, Antoine Tenart wrote:
+> The BG2Q SoC has two SPI controllers. Add the corresponding nodes.
+>
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> ---
+[...]
 
-Why would it break any platforms at the time it was merged?
+Some more I noticed while looking at BG2's spi controllers.
 
-You're only having problems because you don't provide a global timer
-to the kernel, which the C3STOP feature does require - and that's
-because your platform appears to be very limited in what it can
-provide.  All other platforms at the time provided a global timer,
-so the scenario you're facing never existed.
+> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+> index 187d056f7ad2..c25ee86b2bfa 100644
+> --- a/arch/arm/boot/dts/berlin2q.dtsi
+> +++ b/arch/arm/boot/dts/berlin2q.dtsi
+> @@ -286,6 +286,20 @@
+>   				status = "disabled";
+>   			};
+>
+> +			spi0: spi at 1c00 {
+> +				compatible = "snps,dw-apb-ssi";
+> +				reg = <0x1c00 0x100>;
+> +				interrupt-parrent = <&aic>;
+> +				interrupts = <7>;
+> +				clocks = <&chip_clk CLKID_CFG>;
+> +				pinctrl-0 = <&spi0_pmux>;
+> +				pinctrl-names = "default";
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				num-cs = <4>;
 
-Maybe you also should read the discussion around this which is over 5
-years old.  You can find some initial discussion via these message IDs:
+As you are adding this node to the SoC dtsi, I doubt that all boards
+will use the _up to_ 4 available CSn lines. Most likely only one (or
+even none) CSn will be used.
 
-alpine.LFD.2.00.1004171152080.3625 at localhost.localdomain
+Anyway, you can leave the num-cs at 4 but...
 
-And the thread "SMP Local timer and power management" from May 2010.
+> +				status = "disabled";
+> +			};
+> +
+>   			timer0: timer at 2c00 {
+>   				compatible = "snps,dw-apb-timer";
+>   				reg = <0x2c00 0x14>;
+> @@ -383,6 +397,11 @@
+>   					groups = "G7";
+>   					function = "twsi1";
+>   				};
+> +
+> +				spi0_pmux: spi0-pmux {
+> +					groups = "G8", "G9", "G10", "G11";
+> +					function = "spi1";
+> +				};
 
-Yes, making it conditional depending on the platform was mooted, but
-it seemed unnecessary.  The fact that no one until now has had a
-problem with it is testament to the approach being correct for the
-hardware that was in use over the last five years.  No bug reports
-means no problem.
+... can you check which of G8-G11 are actually clock/data and which
+are CSn lines?
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+CSn lines should all be optional and per-board pinmux - same for the
+other spi pinmux.
+
+>   			};
+>
+>   			chip_rst: reset {
+> @@ -473,6 +492,20 @@
+>   				};
+>   			};
+>
+> +			spi1: spi at 5000 {
+> +				compatible = "snps,dw-apb-ssi";
+> +				reg = <0x6000 0x100>;
+
+s/spi at 5000/spi at 6000/
+
+Sebastian
