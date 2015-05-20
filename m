@@ -1,75 +1,33 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 20 May 2015 14:50:00 +0300
-Subject: [PATCHv3 10/10] CLK: TI: always enable DESHDCP clock
-In-Reply-To: <555C744C.6070901@ti.com>
-References: <1430906938-26128-1-git-send-email-tomi.valkeinen@ti.com>
- <1430906938-26128-11-git-send-email-tomi.valkeinen@ti.com>
- <555C744C.6070901@ti.com>
-Message-ID: <555C74E8.5010105@ti.com>
+From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
+Date: Wed, 20 May 2015 06:51:34 -0500
+Subject: [V4 PATCH 2/6] arm64 : Introduce support for ACPI _CCA object
+In-Reply-To: <20150520100304.GE25313@e104818-lin.cambridge.arm.com>
+References: <1431724994-21601-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1431724994-21601-3-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <20150520100304.GE25313@e104818-lin.cambridge.arm.com>
+Message-ID: <555C7546.4040601@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/20/2015 02:47 PM, Tero Kristo wrote:
-> On 05/06/2015 01:08 PM, Tomi Valkeinen wrote:
->> DESHDCP clock is needed on DRA7 based SoCs to enable the DSS IP. That
->> clock is an odd one, as it is not supposed to be any kind of core clock
->> for DSS, and we don't even support HDCP, but the clock is still needed
->> even for the HWMOD framework to be able to reset the DSS IP.
+On 5/20/2015 5:03 AM, Catalin Marinas wrote:
+> On Fri, May 15, 2015 at 04:23:10PM -0500, Suravee Suthikulpanit wrote:
+>>  From http://www.uefi.org/sites/default/files/resources/ACPI_6.0.pdf,
+>> section 6.2.17 _CCA states that ARM platforms require ACPI _CCA
+>> object to be specified for DMA-cabpable devices. This patch introduces
+>> ACPI_MUST_HAVE_CCA in arm64 Kconfig to specify such requirement.
 >>
->> As there's no support for multiple core clocks in the HWMOD framework,
->> we don't have any obvious place to enable this clock when DSS IP is
->> being enabled.
+>> In case _CCA is missing, arm64 would assign dummy_dma_ops
+>> to disable DMA capability of the device.
 >>
->> Furthermore, the HDMI on OMAP5 DSS is the same as on DRA7, and OMAP5
->> does not have any such clock configuration bit. This suggests that on
->> OMAP5 the DESHDCP clock is always enabled, and for DRA7 we have the
->> possibility to gate it.
->>
->> So, as we don't have any clean way to enable and disable the clock
->> based on the need, this patch enables the clock at boot time, making it
->> work similarly to OMAP5.
->>
->> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
->> ---
->>   drivers/clk/ti/clk-7xx.c | 7 ++++++-
->>   1 file changed, 6 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/clk/ti/clk-7xx.c b/drivers/clk/ti/clk-7xx.c
->> index 2dd956b9affa..63b8323df918 100644
->> --- a/drivers/clk/ti/clk-7xx.c
->> +++ b/drivers/clk/ti/clk-7xx.c
->> @@ -312,7 +312,7 @@ static struct ti_dt_clk dra7xx_clks[] = {
->>   int __init dra7xx_dt_clk_init(void)
->>   {
->>       int rc;
->> -    struct clk *abe_dpll_mux, *sys_clkin2, *dpll_ck;
->> +    struct clk *abe_dpll_mux, *sys_clkin2, *dpll_ck, *hdcp_ck;
->>
->>       ti_dt_clocks_register(dra7xx_clks);
->>
->> @@ -348,5 +348,10 @@ int __init dra7xx_dt_clk_init(void)
->>       if (rc)
->>           pr_err("%s: failed to set USB_DPLL M2 OUT\n", __func__);
->>
->> +    hdcp_ck = clk_get_sys(NULL, "dss_deshdcp_clk");
->> +    rc = clk_prepare_enable(hdcp_ck);
->> +    if (rc)
->> +        pr_err("%s: failed to set dss_deshdcp_clk\n", __func__);
->> +
->>       return rc;
->>   }
->>
+>> Signed-off-by: Mark Salter <msalter@redhat.com>
+>> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>> CC: Catalin Marinas <catalin.marinas@arm.com>
+>> CC: Will Deacon <will.deacon@arm.com>
+>> CC: Arnd Bergmann <arnd@arndb.de>
 >
-> You should rather use the assigned-clock properties in DT to accomplish
-> this, the manual clock tweaks under the drivers/clk/ti/clk-* files
-> should be converted to DT setup also.
-
-Now that I sent this, I realize we only have support to set_parent / 
-set_rate through the assigned-clock props, no enable. Any plans to 
-extend this support Mike/Stephen?
-
--Tero
-
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 >
-> -Tero
->
+
+Thanks,
+
+Suravee
