@@ -1,222 +1,149 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 20 May 2015 12:38:39 +0200
-Subject: [PATCH v3] arm, imx6, dts: add DT for aristainetos2 board
-In-Reply-To: <1432099863-8642-1-git-send-email-hs@denx.de>
-References: <1432099863-8642-1-git-send-email-hs@denx.de>
-Message-ID: <1432118319.4466.40.camel@pengutronix.de>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Wed, 20 May 2015 11:47:52 +0100
+Subject: [PATCH v2 0/5]  arm64: Juno DT updates and new DT for Juno R1
+In-Reply-To: <555B1A77.9070403@arm.com>
+References: <1431970109-8902-1-git-send-email-Liviu.Dudau@arm.com>
+ <555B1A77.9070403@arm.com>
+Message-ID: <20150520104752.GM2175@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+On Tue, May 19, 2015 at 12:11:51PM +0100, Sudeep Holla wrote:
+> 
+> 
+> On 18/05/15 18:28, Liviu Dudau wrote:
+> > This series restructures the Juno DT files and introduces the DT
+> > for the new Juno R1. The board is an update of the Juno R0 with
+> > support for PCIe, but the current series only brings the board to
+> > parity with Juno R0. The series that enable the PCIe Generic Host
+> > Bridge to be used on Juno R1 will be posted separately.
+> >
+> > Changes from v1:
+> >   - Moved memory node inside juno-base.dtsi as this is common between
+> >     boards and unlikely to change soon.
+> >   - Added "arm,juno-r1" as compatible string in juno-r1.dts at Jon Medhurst's
+> >     suggestion.
+> 
+> It would be good to add these juno* compatible somewhere in the binding
+> document. In past I have seen checkpatch complaining about missing
+> compatibles on vexpress(which is annoying if you are not adding it
+> but fixing a bug around existing node).
 
-Am Mittwoch, den 20.05.2015, 07:31 +0200 schrieb Heiko Schocher:
-[...]
-> diff --git a/arch/arm/boot/dts/imx6dl-aristainetos2_4.dts b/arch/arm/boot/dts/imx6dl-aristainetos2_4.dts
-> new file mode 100644
-> index 0000000..780fc42
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6dl-aristainetos2_4.dts
-> @@ -0,0 +1,174 @@
-> +/*
-> + * support fot the imx6 based aristainetos2 board
+How about something like this:
 
-Typo, "support for".
 
-> + *
-> + * Copyright (C) 2015 Heiko Schocher <hs@denx.de>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of
-> + *     the License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + *     You should have received a copy of the GNU General Public
-> + *     License along with this file; if not, write to the Free
-> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-> + *     MA 02110-1301 USA
+8<---------------------------------------------------------------------------
+>From 55b575f3d0888e6134c492b66a3fa12c9cceca02 Mon Sep 17 00:00:00 2001
+From: Liviu Dudau <Liviu.Dudau@arm.com>
+Date: Wed, 20 May 2015 11:42:37 +0100
+Subject: [PATCH] Documentation: bindings: Add DT bindings for ARM Juno boards.
 
-checkpatch warns that you should not include this paragraph because the
-mail address might change in the future and it is contained in COPYING.
+List the required properties and nodes used to describe the
+ARM Juno boards.
 
-[...]
-> +/dts-v1/;
-> +#include "imx6dl.dtsi"
-> +#include "imx6qdl-aristainetos2.dtsi"
-> +
-> +/ {
-> +	model = "aristainetos2 i.MX6 Dual Lite Board 4";
-> +	compatible = "fsl,imx6dl";
+Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+---
+ Documentation/devicetree/bindings/arm/arm-boards | 66 ++++++++++++++++++++++++
+ 1 file changed, 66 insertions(+)
 
-Doesn't this board get its own compatible?
+diff --git a/Documentation/devicetree/bindings/arm/arm-boards b/Documentation/devicetree/bindings/arm/arm-boards
+index b78564b..1a70997 100644
+--- a/Documentation/devicetree/bindings/arm/arm-boards
++++ b/Documentation/devicetree/bindings/arm/arm-boards
+@@ -157,3 +157,69 @@ Example:
+ 
+ 	};
+ };
++
++ARM Versatile Express Boards
++-----------------------------
++For details on the device tree bindings for ARM Versatile Express boards
++please consult the vexpress.txt file in the same directory as this file.
++
++ARM Juno Boards
++----------------
++The Juno boards are targeting development for AArch64 systems. The first
++iteration, Juno r0, is a vehicle for evaluating big.LITTLE on AArch64,
++with the second iteration, Juno r1, mainly aimed at development of PCIe
++based systems. Juno r1 also has support for AXI masters placed on the TLX
++connectors to join the coherency domain.
++
++Juno boards are described in a similar way to ARM Versatile Express boards,
++with the motherboard part of the hardware being described in a separate file
++to highlight the fact that is part of the support infrastructure for the SoC.
++Juno device tree bindings also share the Versatile Express bindings as
++described under the RS1 memory mapping.
++
++Required properties (in root node):
++	compatible = "arm,juno";	/* For Juno r0 board */
++	compatible = "arm,juno-r1";	/* For Juno r1 board */
++
++Required nodes:
++The description for the board must include:
++   - a "psci" node describing the boot method used for the secondary CPUs.
++     A detailed description of the bindings used for "psci" nodes is present
++     in the psci.txt file.
++   - a "cpus" node describing the available cores and their associated
++     "enable-method"s. For more details see cpus.txt file.
++
++Example:
++
++/dts-v1/;
++/ {
++	model = "ARM Juno development board (r0)";
++	compatible = "arm,juno", "arm,vexpress";
++	interrupt-parent = <&gic>;
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	cpus {
++		#address-cells = <2>;
++		#size-cells = <0>;
++
++		A57_0: cpu at 0 {
++			compatible = "arm,cortex-a57","arm,armv8";
++			reg = <0x0 0x0>;
++			device_type = "cpu";
++			enable-method = "psci";
++		};
++
++		.....
++
++		A53_0: cpu at 100 {
++			compatible = "arm,cortex-a53","arm,armv8";
++			reg = <0x0 0x100>;
++			device_type = "cpu";
++			enable-method = "psci";
++		};
++
++		.....
++	};
++
++};
+-- 
+2.4.0
 
-[...]
-> +	display0: display at di0 {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		compatible = "fsl,imx-parallel-display";
-> +		interface-pix-fmt = "rgb24";
+>8---------------------------------------------------------------------------
 
-It's ok to keep this property for now, but in the future I'd like it to
-be removed. The panel driver should provide all necessary information
-using drm_display_info_set_bus_formats. The imx parallel-display driver
-then needs to be made aware of the connector display_info->bus_formats.
+> 
+> Otherwise the whole series looks good to me. So feel free to add
+> 
+> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
 
-[...]
-> diff --git a/arch/arm/boot/dts/imx6dl-aristainetos2_7.dts b/arch/arm/boot/dts/imx6dl-aristainetos2_7.dts
-> new file mode 100644
-> index 0000000..14cf4e8
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6dl-aristainetos2_7.dts
-> @@ -0,0 +1,103 @@
-> +/*
-> + * support fot the imx6 based aristainetos2 board
+Thanks,
+Liviu
 
-Typo, "support for".
+> 
+> Regards,
+> Sudeep
+> 
 
-> + * Copyright (C) 2015 Heiko Schocher <hs@denx.de>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of
-> + *     the License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + *     You should have received a copy of the GNU General Public
-> + *     License along with this file; if not, write to the Free
-> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-> + *     MA 02110-1301 USA
-
-Same comment as above.
-
-[...]
-> +/ {
-> +	model = "aristainetos2 i.MX6 Dual Lite Board 7";
-> +	compatible = "fsl,imx6dl";
-
-Same comment as above.
-
-> +&ldb {
-> +	status = "okay";
-> +
-> +	lvds-channel at 0 {
-> +		fsl,data-mapping = "spwg";
-> +		fsl,data-width = <24>;
-> +		status = "okay";
-> +
-> +		display-timings {
-> +			native-mode = <&timing0>;
-> +			timing0: 800x480p60 {
-> +				clock-frequency = <33246000>;
-> +				hactive = <800>;
-> +				vactive = <480>;
-> +				hfront-porch = <88>;
-> +				hback-porch = <88>;
-> +				hsync-len = <80>;
-> +				vback-porch = <10>;
-> +				vfront-porch = <10>;
-> +				vsync-len = <25>;
-> +			};
-> +		};
-> +	};
-
-What panel is this? I'd prefer if you used the panel-simple driver here
-and connected it to the ldb channel using OF graph bindings same as the
-parallel display above. That would allow to remove the fsl,data-mapping
-and fsl,data-width properties and the display-timings node.
-
-> +};
-> diff --git a/arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi b/arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi
-> new file mode 100644
-> index 0000000..eac7c3b
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi
-> @@ -0,0 +1,634 @@
-> +/*
-> + * support fot the imx6 based aristainetos2 board
-
-Typo, "support for". Also, maybe s/board/boards/ as this contains the
-common parts for both the 4 and 7 variant?
-
-> + *
-> + * Copyright (C) 2015 Heiko Schocher <hs@denx.de>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of
-> + *     the License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + *     You should have received a copy of the GNU General Public
-> + *     License along with this file; if not, write to the Free
-> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-> + *     MA 02110-1301 USA
-
-Same comment as above.
-
-[...]
-> +&i2c1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c1>;
-> +	status = "okay";
-> +
-> +	pmic at 58 {
-> +		compatible = "dialog,da9063";
-
-This should be "dlg,da9063" as per
-Documentation/devicetree/bindings/mfd/da9063.txt.
-
-[...]
-> +&i2c4 {
-> +	clocks = <&clks IMX6DL_CLK_I2C4>;
-
-The clocks property is already contained in imx6dl.dtsi
-
-[...]
-> +&fec
-> +&gpmi
-> +&pcie
-> +&pwm1
-> +&uart1
-> +&uart2
-> +&uart3
-> +&uart4
-> +&usbh1
-> +&usbotg
-> +&usdhc1
-> +&usdhc2
-> +&iomuxc
-
-Do all aristainetos2 boards have all of these ports routed out? (Should
-the status = "okay" properties be set here, or in the per-board .dts
-files?)
-
-regards
-Philipp
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
