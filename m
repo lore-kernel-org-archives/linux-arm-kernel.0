@@ -1,48 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 20 May 2015 17:48:59 +0100
-Subject: [PATCH 4/4] arm64: gicv3: its: Increase FORCE_MAX_ZONEORDER for
- Cavium ThunderX
-In-Reply-To: <20150520123159.GE10428@rric.localhost>
-References: <1430686172-18222-1-git-send-email-rric@kernel.org>
- <1430686172-18222-5-git-send-email-rric@kernel.org>
- <20150505105329.GC1550@arm.com>
- <20150511091438.GW4251@rric.localhost>
- <20150512123056.GA2062@arm.com>
- <20150512162049.GP10428@rric.localhost>
- <20150512172416.GF2062@arm.com>
- <20150520132213.1128eb90@why.wild-wind.fr.eu.org>
- <20150520123159.GE10428@rric.localhost>
-Message-ID: <20150520164858.GD29424@e104818-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 20 May 2015 17:50:25 +0100
+Subject: [EDT][PATCH 1/1] hw_breakpoint.c :cpu hotplug handling
+In-Reply-To: <1973496787.315501431924391025.JavaMail.weblogic@ep2mlwas08c>
+References: <1973496787.315501431924391025.JavaMail.weblogic@ep2mlwas08c>
+Message-ID: <20150520165025.GF11498@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 02:31:59PM +0200, Robert Richter wrote:
-> On 20.05.15 13:22:13, Marc Zyngier wrote:
-> > On Tue, 12 May 2015 18:24:16 +0100
-> > Will Deacon <will.deacon@arm.com> wrote:
-> > > On Tue, May 12, 2015 at 05:20:49PM +0100, Robert Richter wrote:
-> > > > On 12.05.15 13:30:57, Will Deacon wrote:
+On Mon, May 18, 2015 at 05:46:31AM +0100, Vaneet Narang wrote:
+> EP-2DAD0AFA905A4ACB804C4F82A001242F
 > 
-> > > > For allocation of 16MB cont. phys mem of a defconfig kernel (4KB
-> > > > default pagesize) I see this different approaches:
-> > > 
-> > > 16MB sounds like an awful lot. Is this because you have tonnes of MSIs or
-> > > a sparse DeviceID space or both?
-> > 
-> > That's probably due to the sparseness of the DeviceID space. With some
-> > form of bridge number encoded on top of the BFD number, the device
-> > table is enormous, and I don't see a nice way to avoid it...
+> On Wed, May 13, 2015 at 06:24:06AM +0100, Maninder Singh wrote:
+> >> EP-2DAD0AFA905A4ACB804C4F82A001242F
+> >> 
+> >> Subject: [PATCH 1/1] hw_breakpoint.c :cpu hotplug handling
+> >> 
+> >> This patch adds support for CPU hotplug, It re-installl all installed watchpoints and breakpoints
+> >> back on H/W in case of cpu-hot plug.
 > 
-> Right. At the momement out of 21 bits (16MB) we currently have 2 spare
-> bits, which reduces the actually size used to 4MB. Though, for the
-> current cpu model we can reduce it at least to 8MB total.
+> >Not sure why this is needed -- the scheduler should reinstall the
+> >breakpoints when the debugged task gets scheduled in via
+> >arch_install_hw_breakpoint.
+> >
+> >Will
 > 
-> I will come up with an additional patch setting this to 8MB.
-> 
-> As said before, I also write on a patch to use CMA.
+> I agree with you this reinstalling has to be either take care by scheduler
+> or Debug tool. 
 
-Can we not reserve a chunk of memory and pass the information to the
-kernel via DT (/memreserve/ and a new GIC-specific binding)?
+Which debug tool? If it's a ptrace user, then the scheduler should still
+manage this, as ptrace will call into perf to create the breakpoints.
 
--- 
-Catalin
+> In current implementation we clear H/W registers but we don't clear slots
+> (wp_on_reg / bp_on_reg) for both watchpoint or breakpoint.
+
+Ok, so are you saying that when the CPU is hotplugged off, the active
+breakpoints aren't being uninstalled by perf? I thought this would have
+happened as a result of the scheduler migrating the current task away
+from the dying CPU.
+
+Will
