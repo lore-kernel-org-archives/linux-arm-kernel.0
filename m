@@ -1,51 +1,224 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 20 May 2015 18:06:45 +0200
-Subject: [PATCH 3/5] soc: Mediatek: Add SCPSYS power domain driver
-In-Reply-To: <20150520140325.GN6325@pengutronix.de>
-References: <1431372206-1237-1-git-send-email-s.hauer@pengutronix.de>
- <1431372206-1237-4-git-send-email-s.hauer@pengutronix.de>
- <CAGS+omDJ-7+L_46vwMyewHMkMNj69odhp=JY5i6Xj3-Loe6UNA@mail.gmail.com>
- <20150519103010.GA6325@pengutronix.de>
- <CABuKBeKiw8MkG5kWaUBqfDzopwvrX8Kh8XpNfRiC_uJD67OcEg@mail.gmail.com>
- <20150520140325.GN6325@pengutronix.de>
-Message-ID: <CABuKBeLuNdVjuy81egtfhwdLKtje_Ff8vz3EGgRy6ZcrfFX8AA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 20 May 2015 18:09:07 +0200
+Subject: [PATCH 1/2] ARM: allow CPUs to be selected when non-multiplatform
+ is enabled
+In-Reply-To: <E1YuedK-0003tp-Dg@rmk-PC.arm.linux.org.uk>
+References: <20150519101939.GB2067@n2100.arm.linux.org.uk>
+ <E1YuedK-0003tp-Dg@rmk-PC.arm.linux.org.uk>
+Message-ID: <11004925.UhsIpHSqJl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-20 16:03 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
-> On Tue, May 19, 2015 at 01:06:10PM +0200, Matthias Brugger wrote:
->> 2015-05-19 12:30 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
->> >
->> > I'll check for errors next round. However, I cannot bail out in this
->> > case since once pm_genpd_init() is called the domain cannot be
->> > unregistered anymore.
->>
->> We should think of implementing this.
->> I had a quick look on it, and from what I understand as long as you
->> don't have any subdomains, devices and masters added, it's just
->> deleting an element from a linked list.
->
-> In my error path I would have subdomains added though, so I would need
-> that to be handled.
+On Tuesday 19 May 2015 11:20:22 Russell King wrote:
+> Commit dc680b989d51 ("ARM: fix multiplatform allmodcompile") went a
+> little too far, and effectively prevented noMMU CPUs from ever being
+> selectable.
+> 
+> Fix this by introducing a set of CPU_CLASS_xxx configuration symbols
+> which control whether a class of CPU symbols are visible for selection,
+> and arrange for these to be set according to the multiplatform class
+> selected, or whenever multiplatform is itself disabled.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Well we could bail out, when pm_genpd_add_subdomain fails. But the
-actual implementations don't do that neither at the moment.
+Hi Russell,
 
->
->> Maybe we should split this in pm_genpd_prepare and pm_genpd_add, with
->> the last one actually adding the generic_pm_domain to gpd_list.
->>
->> This way we could also get rid of the two for loops.
->
-> Well, with pm_genpd_prepare and pm_genpd_add I would still need two
-> loops, one for preparing and one for adding.
->
-> I'm not sure how useful it really is to be able to unregister power
-> domains. For now I suggest to continue with the domains that are
-> successfully registered. I'll look into it should the pm domain
-> maintainers request it.
+sorry for dropping the ball on this myself. When we last talked about it,
+I mentioned that I had an alternative approach. This is unfortunately
+still based on the earlier idea of allowing !MMU in combination with
+ARCH_MULTIPLATFORM, but I could easily rework it. I see that your patch
+intentionally allows any CPU type to be selected on !MMU, and that
+is what I had done as well, but we could also decide to limit !MMU
+to the cores that actually don't have an MMU.
 
-Alright.
+You also seem to (unintentionally?) allow ARMv5+ARMv6 !MMU builds
+in your patch, which leads to build errors in randconfig builds.
+Limiting Integrator to the core modules that don't have an MMU
+would solve that, because they are all ARMv4 or ARMv5, and can
+coexist in one kernel.
 
--- 
-motzblog.wordpress.com
+I have a similar patch for realview, as part of making that multiplatform,
+and with both applied, we could just hide all the individual CPU
+selection options.
+
+Any further thoughts on this from your side?
+
+	Arnd
+
+8<---
+>From b8dcfdd0fca9db1de7a4b03a9e8d9f9ce65d0a43 Mon Sep 17 00:00:00 2001
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Wed, 25 Feb 2015 17:53:58 +0100
+Subject: [PATCH] ARM: integrator: use explicit core module options
+
+For consistency with the other platforms, this remove the CPU
+selection logic in mm/Kconfig that was only used by integrator,
+and adds specific options for each available core tile and core
+module, which in turn select the correct CPUs.
+
+This is consistent with the new way that we do it for realview
+and all other platforms.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Tested-by: Linus Walleij <linus.walleij@linaro.org>
+
+diff --git a/arch/arm/mach-integrator/Kconfig b/arch/arm/mach-integrator/Kconfig
+index 02d083489a26..e936cf420b48 100644
+--- a/arch/arm/mach-integrator/Kconfig
++++ b/arch/arm/mach-integrator/Kconfig
+@@ -1,4 +1,4 @@
+-config ARCH_INTEGRATOR
++menuconfig ARCH_INTEGRATOR
+ 	bool "ARM Ltd. Integrator family" if (ARCH_MULTI_V4T || ARCH_MULTI_V5 || ARCH_MULTI_V6)
+ 	select ARM_AMBA
+ 	select ARM_PATCH_PHYS_VIRT if MMU
+@@ -23,8 +23,6 @@ config ARCH_INTEGRATOR
+ 
+ if ARCH_INTEGRATOR
+ 
+-menu "Integrator Options"
+-
+ config ARCH_INTEGRATOR_AP
+ 	bool "Support Integrator/AP and Integrator/PP2 platforms"
+ 	select CLKSRC_MMIO
+@@ -36,19 +34,6 @@ config ARCH_INTEGRATOR_AP
+ 	  Include support for the ARM(R) Integrator/AP and
+ 	  Integrator/PP2 platforms.
+ 
+-config ARCH_INTEGRATOR_CP
+-	bool "Support Integrator/CP platform"
+-	select ARCH_CINTEGRATOR
+-	select ARM_TIMER_SP804
+-	select SERIAL_AMBA_PL011 if TTY
+-	select SERIAL_AMBA_PL011_CONSOLE if TTY
+-	select SOC_BUS
+-	help
+-	  Include support for the ARM(R) Integrator CP platform.
+-
+-config ARCH_CINTEGRATOR
+-	bool
+-
+ config INTEGRATOR_IMPD1
+ 	bool "Include support for Integrator/IM-PD1"
+ 	depends on ARCH_INTEGRATOR_AP
+@@ -63,6 +48,119 @@ config INTEGRATOR_IMPD1
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called impd1.
+ 
+-endmenu
++config INTEGRATOR_CM7TDMI
++	bool "Integrator/CM7TDMI core module"
++	depends on ARCH_INTEGRATOR_AP
++	depends on ARCH_MULTI_V4 && !MMU
++	select CPU_ARM7TDMI
++
++config INTEGRATOR_CM720T
++	bool "Integrator/CM720T core module"
++	depends on ARCH_INTEGRATOR_AP
++	depends on ARCH_MULTI_V4T
++	select CPU_ARM720T
++
++config INTEGRATOR_CM740T
++	bool "Integrator/CM740T core module"
++	depends on ARCH_INTEGRATOR_AP
++	depends on ARCH_MULTI_V4T && !MMU
++	select CPU_ARM740T
++
++config INTEGRATOR_CM920T
++	bool "Integrator/CM920T core module"
++	depends on ARCH_INTEGRATOR_AP
++	depends on ARCH_MULTI_V4T
++	select CPU_ARM920T
++
++config INTEGRATOR_CM922T_XA10
++	bool "Integrator/CM922T-XA10 core module"
++	depends on ARCH_MULTI_V4T
++	depends on ARCH_INTEGRATOR_AP
++	select CPU_ARM922T
++
++config INTEGRATOR_CM926EJS
++	bool "Integrator/CM926EJ-S core module"
++	depends on ARCH_INTEGRATOR_AP
++	depends on ARCH_MULTI_V5
++	select CPU_ARM926T
++
++config INTEGRATOR_CM940T
++	bool "Integrator/CM940T core module"
++	depends on ARCH_INTEGRATOR_AP
++	depends on ARCH_MULTI_V4T && !MMU
++	select CPU_ARM940T
++
++config INTEGRATOR_CM946ES
++	bool "Integrator/CM946E-S core module"
++	depends on ARCH_INTEGRATOR_AP
++	depends on ARCH_MULTI_V5 && !MMU
++	select CPU_ARM946E
++
++config INTEGRATOR_CM966ES
++	bool "Integrator/CM966E-S core module"
++	depends on ARCH_INTEGRATOR_AP
++	depends on BROKEN # no kernel support
++
++config INTEGRATOR_CM10200E_REV0
++	bool "Integrator/CM10200E rev.0 core module"
++	depends on ARCH_INTEGRATOR_AP && n
++	depends on ARCH_MULTI_V5
++	select CPU_ARM1020
++
++config INTEGRATOR_CM10200E
++	bool "Integrator/CM10200E core module"
++	depends on ARCH_INTEGRATOR_AP && n
++	depends on ARCH_MULTI_V5
++	select CPU_ARM1020E
++
++config INTEGRATOR_CM10220E
++	bool "Integrator/CM10220E core module"
++	depends on ARCH_INTEGRATOR_AP
++	depends on ARCH_MULTI_V5
++	select CPU_ARM1022
++
++config INTEGRATOR_CM1026EJS
++	bool "Integrator/CM1026EJ-S core module"
++	depends on ARCH_INTEGRATOR_AP
++	depends on ARCH_MULTI_V5
++	select CPU_ARM1026
++
++config INTEGRATOR_CM1136JFS
++	bool "Integrator/CM1136JF-S core module"
++	depends on ARCH_INTEGRATOR_AP
++	depends on ARCH_MULTI_V6
++	select CPU_V6
++
++config ARCH_INTEGRATOR_CP
++	bool "Support Integrator/CP platform"
++	depends on (!MMU || ARCH_MULTI_V5 || ARCH_MULTI_V6)
++	select ARM_TIMER_SP804
++	select SERIAL_AMBA_PL011 if TTY
++	select SERIAL_AMBA_PL011_CONSOLE if TTY
++	select SOC_BUS
++	help
++	  Include support for the ARM(R) Integrator CP platform.
++
++config INTEGRATOR_CT7T
++	bool "Integrator/CT7TD (ARM7TDMI) core tile"
++	depends on ARCH_INTEGRATOR_CP
++	depends on ARCH_MULTI_V4T && !MMU
++	select CPU_ARM7TDMI
++
++config INTEGRATOR_CT926
++	bool "Integrator/CT926 (ARM926EJ-S) core tile"
++	depends on ARCH_INTEGRATOR_CP
++	depends on ARCH_MULTI_V5
++	select CPU_ARM926T
++
++config INTEGRATOR_CTB36
++	bool "Integrator/CTB36 (ARM1136JF-S) core tile"
++	depends on ARCH_INTEGRATOR_CP
++	depends on ARCH_MULTI_V6
++	select CPU_V6
++
++config ARCH_CINTEGRATOR
++	depends on ARCH_INTEGRATOR_CP
++	def_bool y
+ 
+ endif
