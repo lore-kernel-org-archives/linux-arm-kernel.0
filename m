@@ -1,43 +1,20 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Wed, 20 May 2015 10:38:42 -0500
-Subject: [PATCH] ARM: dts: am335x-boneblack: disable RTC-only sleep
-Message-ID: <1432136322-7609-1-git-send-email-robertcnelson@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 20 May 2015 17:38:39 +0200
+Subject: [GIT PULL] at91: dt for 4.2 #2
+In-Reply-To: <1432044009-26072-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1432044009-26072-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <4707273.WFhxiT6OR2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes: http://bugs.elinux.org/issues/143
+On Tuesday 19 May 2015 16:00:09 Nicolas Ferre wrote:
+> Second batch of DT changes for 4.2:
+> - sama5d4: more peripherals: usarts, uarts, spi, pioD access
+> - sama5d3: phy address for gmac
+> - change NFC register map
+> - regulator additions for the sd/mmc
+> 
 
-Entering RTC-only sleep is only properly supported on early prototypes series
-(pre-A6) of the BeagleBone Black.  Since rev (A6A), which include all production
-versions, it is not support at due to.
+Pulled into next/dt, thanks!
 
-(rev A6) enable of the 3v3b regulator moved from LDO2 to LDO4 (3v3a)
-side-effect: 3v3b rail remains on in sleep-mode (also in off-mode when battery-powered)
-
-(rev A6A) am335x vdds supply moved from LDO3 to LDO1
-side-effect: vdds remains supplied in sleep-mode
-
-Reported-by: Matthijs van Duin <matthijsvanduin@gmail.com>
-Tested-by: Matthijs van Duin <matthijsvanduin@gmail.com>
-Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: Johan Hovold <johan@kernel.org>
----
- arch/arm/boot/dts/am335x-boneblack.dts | 4 ----
- 1 file changed, 4 deletions(-)
-
-diff --git a/arch/arm/boot/dts/am335x-boneblack.dts b/arch/arm/boot/dts/am335x-boneblack.dts
-index 5c42d25..901739f 100644
---- a/arch/arm/boot/dts/am335x-boneblack.dts
-+++ b/arch/arm/boot/dts/am335x-boneblack.dts
-@@ -80,7 +80,3 @@
- 		status = "okay";
- 	};
- };
--
--&rtc {
--	system-power-controller;
--};
--- 
-2.1.4
+	Arnd
