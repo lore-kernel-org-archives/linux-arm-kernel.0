@@ -1,82 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 20 May 2015 15:36:04 -0700
-Subject: [GIT PULL 1/2] omap clean-up for v4.2
-Message-ID: <pull-1432161303-403113>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 20 May 2015 15:38:08 -0700
+Subject: [PATCH v3 0/4] mtd: mxc_nand: fix 8 bit ECC and large oob
+In-Reply-To: <cover.1431504091.git.baruch@tkos.co.il>
+References: <cover.1431504091.git.baruch@tkos.co.il>
+Message-ID: <20150520223808.GR11598@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+On Wed, May 13, 2015 at 11:17:35AM +0300, Baruch Siach wrote:
+> This patch series fixes mxc_nand bugs that I encountered while trying to use 8
+> bit ECC mode on i.MX25 with the Micron MT29F8G08ABABA flash chip.
+> 
+> Many thanks to Uwe Kleine-K?nig for guiding me through the process of
+> debugging and fixing, for contributing a clean-up patch to this series, and
+> for reviewing the rest.
+> 
+> This series applies on v4.1-rc1.
+> 
+> This is version 3 of the patch series, adding Reviewed-by and Acked-by tags
+> from Sascha Hauer and Uwe Kleine-K?nig. Patch 4/4 renamed a function as
+> suggested by Uwe Kleine-K?nig.
+> 
+> Version 2 of the patch series
+> (http://thread.gmane.org/gmane.linux.drivers.mtd/58687), addressed the
+> comments and suggestion of Uwe Kleine-K?nig on the first series
+> (http://thread.gmane.org/gmane.linux.ports.arm.kernel/408635). See each patch
+> for detailed per-patch changelog.
 
-  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+Pushed the first 3 to l2-mtd.git. Thanks all!
 
-are available in the git repository at:
+I have one comment on the 4th.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.2/clean
-
-for you to fetch changes up to fd0dbc83c6602ad57f34d1ec0b120fea25fcca56:
-
-  Merge branch 'omap-for-v4.2/legacy' into omap-for-v4.2/cleanup (2015-05-20 14:51:05 -0700)
-
-----------------------------------------------------------------
-Clean-up for omaps for v4.2 merge window:
-
-Drop more omap3 legacy board-*.c files for v4.2. This time we're
-dropping the board files for beagle, overo and cm-t35.
-
-The reason for dropping these now rather than later is that now
-we can simply revert the patches in case of unexpected issues as
-we are not dropping any platform data at this point.
-
-This leaves us with only the following board-*.c files:
-
-BOARD                   REASON NEEDED
-board-ldp.c             Still used in RMKs boot test system
-board-omap3logic.c      Getting a .dts file for v4.2
-board-omap3pandora.c    Got a .dts file for v4.1
-board-rx51-*.c          Needs /proc/atags support for user space
-
-I'm hoping we can drop the remaining board-*.c for v4.3 merge
-window, then keep the platform data around for one more merge
-window in case of reverting needed, then drop the platform data
-too for v4.4 if no issues needing reverting are found.
-
-Also, few patches to clean-up the usage of Linux generic
-macros:
-
-- Use define for console loglevel
-
-- Use const for struct irq_domain_ops
-
-- Use PTR_ERR_OR_ZERO instead of PTR_RET
-
-----------------------------------------------------------------
-Alexander Kuleshov (1):
-      ARM: OMAP2+: use symbolic defines for console loglevels instead of numbers
-
-Krzysztof Kozlowski (1):
-      ARM: OMAP2+: Constify irq_domain_ops
-
-Nicholas Krause (2):
-      ARM: OMAP2+: Remove calls to deprecacted marco,PTR_RET in the files,fb.c and pmu.c
-      mach-omap2: Remove use of deprecated marco, PTR_RET in devices.c
-
-Tony Lindgren (4):
-      ARM: OMAP2+: Remove legacy booting support for cm-t35
-      ARM: OMAP2+: Remove legacy booting support for Overo
-      ARM: OMAP2+: Remove legacy booting support for Beagleboards
-      Merge branch 'omap-for-v4.2/legacy' into omap-for-v4.2/cleanup
-
- arch/arm/mach-omap2/Kconfig             |  22 -
- arch/arm/mach-omap2/Makefile            |   3 -
- arch/arm/mach-omap2/board-cm-t35.c      | 769 --------------------------------
- arch/arm/mach-omap2/board-omap3beagle.c | 595 ------------------------
- arch/arm/mach-omap2/board-overo.c       | 571 ------------------------
- arch/arm/mach-omap2/devices.c           |   4 +-
- arch/arm/mach-omap2/fb.c                |   2 +-
- arch/arm/mach-omap2/omap-wakeupgen.c    |   2 +-
- arch/arm/mach-omap2/pmu.c               |   2 +-
- arch/arm/mach-omap2/serial.c            |   2 +-
- 10 files changed, 6 insertions(+), 1966 deletions(-)
- delete mode 100644 arch/arm/mach-omap2/board-cm-t35.c
- delete mode 100644 arch/arm/mach-omap2/board-omap3beagle.c
- delete mode 100644 arch/arm/mach-omap2/board-overo.c
+Brian
