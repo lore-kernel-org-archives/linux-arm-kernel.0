@@ -1,51 +1,58 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 20 May 2015 20:05:40 +0800
-Subject: [PATCH] i2c: designware: separate ops for system_sleep_pm and
- runtime_pm
-In-Reply-To: <20150520193422.73de7d90@xhacker>
-References: <1431693099-2292-1-git-send-email-jszhang@marvell.com>
- <20150518082823.GH1490@lahna.fi.intel.com>
- <20150519203242.74617ad6@xhacker>
- <20150519131516.GO1490@lahna.fi.intel.com>
- <20150520193422.73de7d90@xhacker>
-Message-ID: <20150520200540.58b1230b@xhacker>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 20 May 2015 13:11:38 +0100
+Subject: [PATCH 1/4] arm64: gicv3: its: Encode domain number in PCI
+ stream id
+In-Reply-To: <1430686172-18222-2-git-send-email-rric@kernel.org>
+References: <1430686172-18222-1-git-send-email-rric@kernel.org>
+ <1430686172-18222-2-git-send-email-rric@kernel.org>
+Message-ID: <20150520131138.2c94a32a@why.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mika,
+On Sun, 3 May 2015 21:49:29 +0100
+Robert Richter <rric@kernel.org> wrote:
 
-On Wed, 20 May 2015 19:34:22 +0800
-Jisheng Zhang <jszhang@marvell.com> wrote:
-
-> Dear Mika,
+> From: Tirumalesh Chalamarla <tchalamarla@cavium.com>
 > 
-> On Tue, 19 May 2015 16:15:16 +0300
-> Mika Westerberg <mika.westerberg@linux.intel.com> wrote:
+> PCI stream ids need to consider pci bridge number to be unique on the
+> system. Using only bus and devfn can't do the trick in systems that
+> have multiple pci bridges.
 > 
-> > On Tue, May 19, 2015 at 08:32:42PM +0800, Jisheng Zhang wrote:
-> > > > I can see that this fixes the issue with the platform driver (as the
-> > > > platform bus core doesn't power on the device automatically as opposed
-> > > > to other buses, like PCI). However, I'm thinking that can we do better
-> > > > here.
-> > > > 
-> > > > Instead of powering the device on again, can't we leave it in low power
-> > > > state? Recently added 'dev->power.direct_complete' may be used to
-> > > > achieve that, I think.
-> > > 
-> > > how to handle runtime suspended via just being clock gated?
-> > 
-> > As far as I can tell driver's suspend hook does the clock gating so why
-> > would you need to handle it differently? Once the device is runtime
-> > suspended, it is both clock and power gated depending on the platform.
+> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@cavium.com>
+> Signed-off-by: Robert Richter <rrichter@cavium.com>
+> ---
+>  drivers/irqchip/irq-gic-v3-its.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Sorry for confusion. Considering one platform which doesn't support power off
-> the i2c host but it can disable the host's clock. So in such platform, when
-> the host is runtime suspended, its clock is disabled, then i2c_dw_disable() will
-> hang when s2ram. Except using the runtime pm API to ensure the host is in
-> a correct state, is there any other solution? AFAIK, 'dev->power.direct_complete'
-> doesn't help such case.
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 9687f8afebff..e30b4de04c6c 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -1186,7 +1186,7 @@ static int its_get_pci_alias(struct pci_dev *pdev, u16 alias, void *data)
+>  {
+>  	struct its_pci_alias *dev_alias = data;
+>  
+> -	dev_alias->dev_id = alias;
+> +	dev_alias->dev_id = (pci_domain_nr(pdev->bus) << 16) | alias;
+>  	if (pdev != dev_alias->pdev)
+>  		dev_alias->count += its_pci_msi_vec_count(dev_alias->pdev);
+>  
 
-I misunderstood the direct_complete flag usage. I think it can help such case
-will investigate and provide new patch if necessary.
+This feels very scary. We're now assuming that the domain number will
+always be presented to the doorbell. What guarantee do we have that
+this is always the case, irrespective of the platform?
 
-Thanks a lot
+Also, domains have no PCI reality, they are a Linux thing. And they can
+be "randomly" assigned, unless you force the domain in DT with a
+linux,pci-domain property. This looks even more wrong, specially
+considering ACPI.
+
+It really feels like we need a way to describe how the BDF numbering is
+augmented. We also need to guarantee that we get the actual bridge
+number, as opposed to the domain number.
+
+Thoughts?
+
+	M.
+-- 
+Without deviation from the norm, progress is not possible.
