@@ -1,29 +1,59 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 20 May 2015 08:08:09 +0200
-Subject: [PATCH v2 0/2] Implement SoC bus support for Vybrid
-In-Reply-To: <cover.1432099651.git.maitysanchayan@gmail.com>
-References: <cover.1432099651.git.maitysanchayan@gmail.com>
-Message-ID: <283beb50db48f2a7a43dcdd249e4d93e@agner.ch>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Wed, 20 May 2015 15:10:24 +0900
+Subject: [PATCH] drm/nouveau/platform: fix compilation if !CONFIG_IOMMU
+In-Reply-To: <555BD66A.5020704@nvidia.com>
+References: <555BD66A.5020704@nvidia.com>
+Message-ID: <1432102224-15169-1-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-05-20 07:36, Sanchayan Maity wrote:
-> Sanchayan Maity (2):
->   ARM: dts: vfxxx: Add OCOTP and OCROM nodes
->   ARM: vf610: Add SoC bus support for Vybrid
-> 
->  arch/arm/boot/dts/vfxxx.dtsi   | 10 +++++
->  arch/arm/mach-imx/mach-vf610.c | 85 +++++++++++++++++++++++++++++++++++++++++-
->  2 files changed, 93 insertions(+), 2 deletions(-)
+The lack of IOMMU API support can make nouveau_platform_probe_iommu()
+fail to compile because struct iommu_ops is then empty. Fix this by
+skipping IOMMU probe in that case - lack of IOMMU on platform devices
+is sub-optimal, but is not an error.
 
+Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+---
+This is an alternative to https://lkml.org/lkml/2015/5/19/484. Most users
+of Nouveau do not care about IOMMU support, so we should not impose that
+option on them.
 
-This patchset
-Acked-by: Stefan Agner <stefan@agner.ch>
+ drm/nouveau/nouveau_platform.c | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-Shawn, speaking of Ack, the current plan is to merge the Vybrid
-Cortex-M4 patches directly into the arm-soc tree. If you are ok with
-them, could I have your Ack on them (sent out a split version of them
-(v8) some hours ago).
-
---
-Stefan
+diff --git a/drivers/gpu/drm/nouveau/nouveau_platform.c b/drivers/gpu/drm/nouveau/nouveau_platform.c
+index 775277f1edb0..dcfbbfaf1739 100644
+--- a/drivers/gpu/drm/nouveau/nouveau_platform.c
++++ b/drivers/gpu/drm/nouveau/nouveau_platform.c
+@@ -92,6 +92,8 @@ static int nouveau_platform_power_down(struct nouveau_platform_gpu *gpu)
+ 	return 0;
+ }
+ 
++#if IS_ENABLED(CONFIG_IOMMU_API)
++
+ static void nouveau_platform_probe_iommu(struct device *dev,
+ 					 struct nouveau_platform_gpu *gpu)
+ {
+@@ -158,6 +160,20 @@ static void nouveau_platform_remove_iommu(struct device *dev,
+ 	}
+ }
+ 
++#else
++
++static void nouveau_platform_probe_iommu(struct device *dev,
++					 struct nouveau_platform_gpu *gpu)
++{
++}
++
++static void nouveau_platform_remove_iommu(struct device *dev,
++					  struct nouveau_platform_gpu *gpu)
++{
++}
++
++#endif
++
+ static int nouveau_platform_probe(struct platform_device *pdev)
+ {
+ 	struct nouveau_platform_gpu *gpu;
+-- 
+2.4.0
