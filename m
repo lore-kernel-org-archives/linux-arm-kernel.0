@@ -1,67 +1,83 @@
-From: wei.liu2@citrix.com (Wei Liu)
-Date: Wed, 20 May 2015 09:26:50 +0100
-Subject: [Xen-devel] [RFC 21/23] net/xen-netback: Make it running on 64KB
- page granularity
-In-Reply-To: <555BBFA7.8030502@citrix.com>
-References: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
- <1431622863-28575-22-git-send-email-julien.grall@citrix.com>
- <20150515023534.GE19352@zion.uk.xensource.com> <5555E81E.8070803@citrix.com>
- <20150515153143.GA8521@zion.uk.xensource.com> <5559D6EE.3030400@citrix.com>
- <20150518125406.GA9503@zion.uk.xensource.com> <555BBFA7.8030502@citrix.com>
-Message-ID: <20150520082650.GU26335@zion.uk.xensource.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 20 May 2015 10:33:35 +0200
+Subject: [PATCH v8 2/3] I2C: mediatek: Add driver for MediaTek I2C
+ controller
+In-Reply-To: <1432108775.12796.11.camel@mtksdaap41>
+References: <1431967209-5261-1-git-send-email-eddie.huang@mediatek.com>
+ <1431967209-5261-3-git-send-email-eddie.huang@mediatek.com>
+ <20150518184300.GB28888@pengutronix.de>
+ <1432089611.13819.9.camel@mtksdaap41>
+ <20150520071152.GP24769@pengutronix.de>
+ <1432108775.12796.11.camel@mtksdaap41>
+Message-ID: <20150520083335.GQ24769@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 11:56:39PM +0100, Julien Grall wrote:
+Hello Eddie,
 
+On Wed, May 20, 2015 at 03:59:35PM +0800, Eddie Huang wrote:
+> On Wed, 2015-05-20 at 09:11 +0200, Uwe Kleine-K?nig wrote:
+> > On Wed, May 20, 2015 at 10:40:11AM +0800, Eddie Huang wrote:
+> > > On Mon, 2015-05-18 at 20:43 +0200, Uwe Kleine-K?nig wrote:
+> > > > On Tue, May 19, 2015 at 12:40:08AM +0800, Eddie Huang wrote:
+> > > > > +/* calculate i2c port speed */
+> > > > It would be nice to summarize the clock frequency settings here.
+> > > > Something like:
+> > > > 
+> > > > 	/*
+> > > > 	 * The input clock is divided by the value specified in the
+> > > > 	 * device tree as clock-div. The actual bus speed is then
+> > > > 	 * derived from this frequency by the following formula:
+> > > > 	 *  ....
+> > > > 
+> > > > This would make it possible to verify your calculations below.
+> > > 
+> > > The comment will be:
+> > > /*
+> > >  * khz: I2C bus clock
+> > >  * hclk: The input clock is divided by the value specified in the 
+> > >  *       device tree as clock-div
+> > and which one of the two clocks you're writing about is hclk now? I
+> > assume the divided one.
+> > >  * div = (sample_cnt + 1) * (step_cnt + 1)
+> > >  * khz = (hclk / 2) / div
+> > khz for the 2nd time.
+> > 
+> > >  *
+> > >  * The calculation is to get div value that let result of 
+> > >  * ((hclk / 2) / div) most approach and less than khz
+> > >  */
+> > I imagined something more hardware related. A list of register (or
+> > register bit fields) that influence the frequency and a formula
 > 
-> >>diff --git a/drivers/net/xen-netback/common.h b/drivers/net/xen-netback/common.h
-> >>index 0eda6e9..c2a5402 100644
-> >>--- a/drivers/net/xen-netback/common.h
-> >>+++ b/drivers/net/xen-netback/common.h
-> >>@@ -204,7 +204,7 @@ struct xenvif_queue { /* Per-queue data for xenvif */
-> >>  /* Maximum number of Rx slots a to-guest packet may use, including the
-> >>   * slot needed for GSO meta-data.
-> >>   */
-> >>-#define XEN_NETBK_RX_SLOTS_MAX (MAX_SKB_FRAGS + 1)
-> >>+#define XEN_NETBK_RX_SLOTS_MAX ((MAX_SKB_FRAGS + 1) * XEN_PFN_PER_PAGE)
-> >>
-> >>  enum state_bit_shift {
-> >>         /* This bit marks that the vif is connected */
-> >>
-> >>The function xenvif_wait_for_rx_work never returns. I guess it's because there
-> >>is not enough slot available.
-> >>
-> >>For 64KB page granularity we ask for 16 times more slots than 4KB page
-> >>granularity. Although, it's very unlikely that all the slot will be used.
-> >>
-> >>FWIW I pointed out the same problem on blkfront.
-> >>
-> >
-> >This is not going to work. The ring in netfront / netback has only 256
-> >slots. Now you ask for netback to reserve more than 256 slots -- (17 +
-> >1) * (64 / 4) = 288, which can never be fulfilled. See the call to
-> >xenvif_rx_ring_slots_available.
-> >
-> >I think XEN_NETBK_RX_SLOTS_MAX derived from the fact the each packet to
-> >the guest cannot be larger than 64K. So you might be able to
-> >
-> >#define XEN_NETBK_RX_SLOTS_MAX ((65536 / XEN_PAGE_SIZE) + 1)
+> > 	i2c_freq = parent_clk / clock-div * (...)
+> > 
+> > (It seems to be a bit more complicated here as there are two registers
+> > involved that are set differently depending on the target frequency.)
 > 
-> I didn't know that packet cannot be larger than 64KB. That's simply a lot
-> the problem.
+> Yes, hardware is a little complicated. I rewrite the comment:
 > 
+> /*
+>  * Calculate i2c port speed
+>  *
+>  * Hardware design:
+>  * i2c_bus_freq = parent_clk / (clock-div * 2 * (sample_cnt) *
+> (step_cnt))
+>  * clock-div: fixed in hardware, but may be various in different SoCs
+... fixed in hardware, but different on different SoCs.
 
-I think about this more, you will need one more slot for GSO
-information, so make it ((65536 / XEN_PAGE_SIZE) + 1 + 1).
+>  *
+>  * The calculation want to pick the highest bus frequency that is still 
+>  * less than or equal to i2c->speed_hz. and the calculation try to get 
+>  * sample_cnt and step_cnt to fill in hardware register.
+"The calculation picks the highest bus frequency that is still less than
+or equal to i2c->speed_hz." and I'd drop the last sentence.
 
-> >
-> >Blk driver may have a different story. But the default ring size (1
-> >page) yields even less slots than net (given that sizeof(union(req/rsp))
-> >is larger IIRC).
-> 
-> I will see with Roger for Blkback.
-> 
-> 
-> -- 
-> Julien Grall
+With that in mind I'll reply once more to the original patch.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
