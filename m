@@ -1,27 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 May 2015 23:29:17 +0200
-Subject: [PATCH soc v8 0/3] ARM: vf610m4: Add Vybrid Cortex-M4 support
-In-Reply-To: <12f1cde68eef7d4e35646e83aabae5c3@agner.ch>
-References: <1432073032-26561-1-git-send-email-stefan@agner.ch>
- <12f1cde68eef7d4e35646e83aabae5c3@agner.ch>
-Message-ID: <2317971.r85DvjF4GE@wuerfel>
+From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
+Date: Wed, 20 May 2015 16:32:45 -0500
+Subject: [V4 PATCH 4/6] device property: Introduces
+ device_dma_is_coherent()
+In-Reply-To: <20150520102829.GB11498@arm.com>
+References: <1431724994-21601-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1431724994-21601-5-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <20150520102829.GB11498@arm.com>
+Message-ID: <555CFD7D.5090208@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 20 May 2015 00:42:21 Stefan Agner wrote:
-> On 2015-05-20 00:03, Stefan Agner wrote:
-> > This is the soc part of the splitted patchset which enables Cortex-M4
-> > support on Vybrid, as discussed in the thread of patchset v7.
-> 
-> Arnd, forgot to mention that this depends on the irqchip changes merged
-> by Thomas, see
-> https://lkml.org/lkml/2015/5/19/204
+On 5/20/2015 5:28 AM, Will Deacon wrote:
+> On Fri, May 15, 2015 at 10:23:12PM +0100, Suravee Suthikulpanit wrote:
+>> Currently, device drivers, which support both OF and ACPI,
+>> need to call two separate APIs, of_dma_is_coherent() and
+>> acpi_dma_is_coherent()) to determine device coherency attribute.
+>>
+>> This patch simplifies this process by introducing a new device
+>> property API, device_dma_is_coherent(), which calls the appropriate
+>> interface based on the booting architecture.
+>>
+>> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>> CC: Rafael J. Wysocki <rjw@rjwysocki.net>
+>> ---
+>>   drivers/base/property.c  | 12 ++++++++++++
+>>   include/linux/property.h |  2 ++
+>>   2 files changed, 14 insertions(+)
+>>
+>> diff --git a/drivers/base/property.c b/drivers/base/property.c
+>> index 1d0b116..8123c6e 100644
+>> --- a/drivers/base/property.c
+>> +++ b/drivers/base/property.c
+>> @@ -14,6 +14,7 @@
+>>   #include <linux/export.h>
+>>   #include <linux/kernel.h>
+>>   #include <linux/of.h>
+>> +#include <linux/of_address.h>
+>>   #include <linux/property.h>
+>>
+>>   /**
+>> @@ -519,3 +520,14 @@ unsigned int device_get_child_node_count(struct device *dev)
+>>   	return count;
+>>   }
+>>   EXPORT_SYMBOL_GPL(device_get_child_node_count);
+>> +
+>> +bool device_dma_is_coherent(struct device *dev)
+>> +{
+>> +	if (IS_ENABLED(CONFIG_OF) && dev->of_node)
+>> +		return of_dma_is_coherent(dev->of_node);
+>> +	else if (has_acpi_companion(dev))
+>> +		return acpi_dma_is_coherent(acpi_node(dev->fwnode));
+>
+> I don't think you need the has_acpi_companion check, as acpi_node handles
+> this and acpi_dma_is_coherent(NULL) returns false.
+>
+> Will
+>
+You are right.
 
-I've pulled that branch into next/soc now and merged your patches on top.
-Great job, thanks a lot!
+Thanks,
 
-Can you take a look at the branch now and see what needs to be done
-for the other three Cortex-M based platforms, to get them to use
-ARM_SINGLE_ARMV7M?
-
-	Arnd
+Suravee
