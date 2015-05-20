@@ -1,97 +1,152 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Wed, 20 May 2015 10:55:41 +0200
-Subject: [PATCH v3] ARM: tegra: cpuidle: implement
- cpuidle_state.enter_freeze()
-In-Reply-To: <20150520084441.GA29274@red-moon>
-References: <1432046953-12945-1-git-send-email-tomeu.vizoso@collabora.com>
- <20150520084441.GA29274@red-moon>
-Message-ID: <555C4C0D.4040605@collabora.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 20 May 2015 09:56:56 +0100
+Subject: [RFC/RFT PATCH 2/2] ARM64: kernel: pci: implement PCI device
+ resources claiming
+In-Reply-To: <5555553F.9070608@amd.com>
+References: <1431614537-16136-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1431614537-16136-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <5555553F.9070608@amd.com>
+Message-ID: <20150520085656.GB29274@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/20/2015 10:44 AM, Lorenzo Pieralisi wrote:
-> On Tue, May 19, 2015 at 03:49:12PM +0100, Tomeu Vizoso wrote:
->> This callback is expected to do the same as enter() but it has to
->> guarantee that interrupts aren't enabled at any point in its execution,
->> as the tick is frozen.
->>
->> It will be called when the system goes to suspend-to-idle and will
->> reduce power usage because CPUs won't be awaken for unnecessary IRQs.
->>
->> By setting the CPUIDLE_FLAG_TIMER_STOP flag, we can reuse the same code
->> for both the enter() and enter_freeze() callbacks.
->>
->> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->> Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
->>
->> ---
->>
->> v3:	* Set CPUIDLE_FLAG_TIMER_STOP to simplify things as suggested by
->> 	Lorenzo Pieralisi
->> v2:	* Disable FIQs also when suspending-to-idle
->> ---
->>  arch/arm/mach-tegra/cpuidle-tegra114.c | 13 +++++++++----
->>  1 file changed, 9 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
->> index 155807f..7e59ac0 100644
->> --- a/arch/arm/mach-tegra/cpuidle-tegra114.c
->> +++ b/arch/arm/mach-tegra/cpuidle-tegra114.c
->> @@ -44,16 +44,12 @@ static int tegra114_idle_power_down(struct cpuidle_device *dev,
->>  	tegra_set_cpu_in_lp2();
->>  	cpu_pm_enter();
->>  
->> -	tick_broadcast_enter();
->> -
->>  	call_firmware_op(prepare_idle);
->>  
->>  	/* Do suspend by ourselves if the firmware does not implement it */
->>  	if (call_firmware_op(do_idle, 0) == -ENOSYS)
->>  		cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
->>  
->> -	tick_broadcast_exit();
->> -
->>  	cpu_pm_exit();
->>  	tegra_clear_cpu_in_lp2();
->>  
->> @@ -61,6 +57,13 @@ static int tegra114_idle_power_down(struct cpuidle_device *dev,
->>  
->>  	return index;
->>  }
->> +
->> +static void tegra114_idle_enter_freeze(struct cpuidle_device *dev,
->> +				       struct cpuidle_driver *drv,
->> +				       int index)
->> +{
->> +       tegra114_idle_power_down(dev, drv, index);
->> +}
+On Fri, May 15, 2015 at 03:09:03AM +0100, Suravee Suthikulanit wrote:
+> On 5/14/2015 9:42 AM, Lorenzo Pieralisi wrote:
+> > When a device is scanned and added to the PCI bus, its resources
+> > should be claimed to validate the BARs configuration and to assign
+> > them a parent resource so that the resource hierarchy can be sanity
+> > checked.
+> >
+> > This patch adds code that carries out PCI device resources claiming to
+> > the ARM64 pcibios_add_device implementation so that device resources
+> > are claimed by the core PCI layer upon PCI device initialization on
+> > ARM64 systems.
+> >
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Liviu Dudau <liviu.dudau@arm.com>
+> > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > ---
+> >   arch/arm64/kernel/pci.c | 10 ++++++++++
+> >   1 file changed, 10 insertions(+)
+> >
+> > diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> > index 4095379..c0a88ca 100644
+> > --- a/arch/arm64/kernel/pci.c
+> > +++ b/arch/arm64/kernel/pci.c
+> > @@ -43,8 +43,18 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+> >    */
+> >   int pcibios_add_device(struct pci_dev *dev)
+> >   {
+> > +	struct resource *res;
+> > +	int i;
+> > +
+> >   	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+> >
+> > +	for (i = 0; i < PCI_NUM_RESOURCES; i++) {
+> > +		res = &dev->resource[i];
+> > +		if (res->parent || !res->flags)
+> > +			continue;
+> > +		pci_claim_resource(dev, i);
+> > +	}
+> > +
+> >   	return 0;
+> >   }
+> >
+> >
 > 
-> You do not need this function, remove it and update the enter_freeze
-> pointer below with tegra114_idle_power_down please.
+> Lorenzo/Bjorn,
+> 
+> I have tested this patch on top of Jayachandran's V2 patch series 
+> (http://www.spinics.net/lists/linux-pci/msg40811.html) on AMD Seattle 
+> (w/ PROBE_ONLY and non-PROBE_ONLY mode), and your changes here works 
+> with additional changes below.
+> 
+> It seems that when booting w/ PROBE_ONLY case, we need to call 
+> pci_read_bridge_bases() at some point before claiming the resources of 
+> devices underneath the bridge. This is needed to determine the bridge 
+> bases (i.e. bridge io, mmio and mmio_pref bases), and update bridge 
+> resources accordingly.
+> 
+> ---- BEGIN PATCH -----
+> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> index c0a88ca..57be6aa 100644
+> --- a/arch/arm64/kernel/pci.c
+> +++ b/arch/arm64/kernel/pci.c
+> @@ -48,6 +48,11 @@ int pcibios_add_device(struct pci_dev *dev)
+> 
+>          dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+> 
+> +       if (pci_has_flag(PCI_PROBE_ONLY) &&
 
-How so? The callbacks have different signatures.
+Does it really matter if PCI_PROBE_ONLY is set ?
 
-Regards,
+> +           !pci_is_root_bus(dev->bus) &&
 
-Tomeu
+This check is useless, since pci_read_bridge_bases checks that already.
 
+> +           !pci_bridge_bases_is_read(dev->bus))
+> +               pci_read_bridge_bases(dev->bus);
+> +
+
+Ok. Most of the archs do that in pcibios_fixup_bus, I would like to
+understand:
+
+1) Should we do it on PCI_PROBE_ONLY only
+2) Can we move this to generic code - ie pci_scan_child_bus (I guess answer
+   is no, because there are corner cases I am not aware of)
+
+If I add it to arm64 (in pcibios_fixup_bus) I have to add it to arm too, more
+arch specific code that has nothing arch specific in it so I am not really
+keen on that.
+
+Comments appreciated.
+
+Lorenzo
+
+>          for (i = 0; i < PCI_NUM_RESOURCES; i++) {
+>                  res = &dev->resource[i];
+>                  if (res->parent || !res->flags)
+> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> index 6675a7a..6cab8be 100644
+> --- a/drivers/pci/probe.c
+> +++ b/drivers/pci/probe.c
+> @@ -447,6 +447,13 @@ static void pci_read_bridge_mmio_pref(struct 
+> pci_bus *child)
+>          }
+>   }
+> 
+> +bool pci_bridge_bases_is_read(struct pci_bus *bus)
+> +{
+> +       return (bus->resource[0]->start ||
+> +               bus->resource[1]->start ||
+> +               bus->resource[2]->start);
+> +}
+> +
+>   void pci_read_bridge_bases(struct pci_bus *child)
+>   {
+>          struct pci_dev *dev = child->self;
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index 353db8d..11c674d 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -798,6 +798,7 @@ void pci_device_add(struct pci_dev *dev, struct 
+> pci_bus *bus);
+>   unsigned int pci_scan_child_bus(struct pci_bus *bus);
+>   void pci_bus_add_device(struct pci_dev *dev);
+>   void pci_read_bridge_bases(struct pci_bus *child);
+> +bool pci_bridge_bases_is_read(struct pci_bus *bus);
+>   struct resource *pci_find_parent_resource(const struct pci_dev *dev,
+>                                            struct resource *res);
+>   u8 pci_swizzle_interrupt_pin(const struct pci_dev *dev, u8 pin);
+> ---- END PATCH -----
+> 
+> I'm not sure if this is the best place to be reading the bridge bases. 
+> I guess we should be able to do this when adding bridge devices.
+> 
 > Thanks,
-> Lorenzo
 > 
->>  #endif
->>  
->>  static struct cpuidle_driver tegra_idle_driver = {
->> @@ -72,8 +75,10 @@ static struct cpuidle_driver tegra_idle_driver = {
->>  #ifdef CONFIG_PM_SLEEP
->>  		[1] = {
->>  			.enter			= tegra114_idle_power_down,
->> +			.enter_freeze		= tegra114_idle_enter_freeze,
->>  			.exit_latency		= 500,
->>  			.target_residency	= 1000,
->> +			.flags			= CPUIDLE_FLAG_TIMER_STOP,
->>  			.power_usage		= 0,
->>  			.name			= "powered-down",
->>  			.desc			= "CPU power gated",
->> -- 
->> 2.4.1
->>
+> Suravee
+> 
+> 
