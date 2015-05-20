@@ -1,29 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 20 May 2015 11:14:06 -0700
-Subject: [PATCH] ARM: dts: am437x-gp-evm: add DT nodes for ov2659 sensor
-In-Reply-To: <20150316221740.GQ12397@atomide.com>
-References: <1426203501-32115-1-git-send-email-prabhakar.csengg@gmail.com>
- <20150316221740.GQ12397@atomide.com>
-Message-ID: <20150520181406.GK10274@atomide.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Wed, 20 May 2015 20:16:54 +0200
+Subject: [PATCH 5/5] ARM: shmobile: koelsch dts: Replace "nor-jedec" by "jedec,
+ spi-nor"
+In-Reply-To: <1432145814-12442-1-git-send-email-geert+renesas@glider.be>
+References: <1432145814-12442-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1432145814-12442-6-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [150316 15:22]:
-> * Lad Prabhakar <prabhakar.csengg@gmail.com> [150312 16:38]:
-> > From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
-> > 
-> > this patch does the following:
-> > 1: adds DT node for fixed oscillator.
-> > 2: adds DT node entries for ov2659 sensor
-> > 3: adds remote-endpoint entry for VPFE.
-> > 
-> > Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
-> 
-> Applying into omap-for-v4.1/dt thanks.
+Cfr. commit 8947e396a8296c52 ('Documentation: dt: mtd: replace
+"nor-jedec" binding with "jedec, spi-nor"')
 
-Hmm looks like I somehow dropped this one, sorry. Applying into
-omap-for-v4.2/dt now thanks.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Regards,
-
-Tony
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index e9c24036f00027c9..cffe33ff4d16f41f 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -474,7 +474,7 @@
+ 	flash: flash at 0 {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+-		compatible = "spansion,s25fl512s", "nor-jedec";
++		compatible = "spansion,s25fl512s", "jedec,spi-nor";
+ 		reg = <0>;
+ 		spi-max-frequency = <30000000>;
+ 		spi-tx-bus-width = <4>;
+-- 
+1.9.1
