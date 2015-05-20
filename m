@@ -1,23 +1,39 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 20 May 2015 17:42:29 +0900
-Subject: [RESEND PATCH 0/2] pinctrl: zynq: fix two bugs of zynq pinmux function
-Message-ID: <1432111351-21336-1-git-send-email-yamada.masahiro@socionext.com>
+Date: Wed, 20 May 2015 17:42:30 +0900
+Subject: [RESEND PATCH 1/2] pinctrl: zynq: fix DEFINE_ZYNQ_PINMUX_FUNCTION_MUX
+ macro
+In-Reply-To: <1432111351-21336-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1432111351-21336-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1432111351-21336-2-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The offset to the mux register is missing.
 
-I sent the previous one to linux-serial by mistake.
-I am resending to linux-gpio, dropping linux-serial.
-Sorry for noise.
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
+ drivers/pinctrl/pinctrl-zynq.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-
-Masahiro Yamada (2):
-  pinctrl: zynq: fix DEFINE_ZYNQ_PINMUX_FUNCTION_MUX macro
-  pinctrl: zynq: fix offset address for {SD0,SD1}_WP_CD_SEL
-
- drivers/pinctrl/pinctrl-zynq.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
-
+diff --git a/drivers/pinctrl/pinctrl-zynq.c b/drivers/pinctrl/pinctrl-zynq.c
+index 3d5453a..77c5a98 100644
+--- a/drivers/pinctrl/pinctrl-zynq.c
++++ b/drivers/pinctrl/pinctrl-zynq.c
+@@ -714,12 +714,13 @@ static const char * const gpio0_groups[] = {"gpio0_0_grp",
+ 		.mux_val = mval,			\
+ 	}
+ 
+-#define DEFINE_ZYNQ_PINMUX_FUNCTION_MUX(fname, mval, mux, mask, shift)	\
++#define DEFINE_ZYNQ_PINMUX_FUNCTION_MUX(fname, mval, offset, mask, shift)\
+ 	[ZYNQ_PMUX_##fname] = {				\
+ 		.name = #fname,				\
+ 		.groups = fname##_groups,		\
+ 		.ngroups = ARRAY_SIZE(fname##_groups),	\
+ 		.mux_val = mval,			\
++		.mux = offset,				\
+ 		.mux_mask = mask,			\
+ 		.mux_shift = shift,			\
+ 	}
 -- 
 1.9.1
