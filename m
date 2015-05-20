@@ -1,194 +1,83 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Wed, 20 May 2015 10:40:11 +0800
-Subject: [PATCH v8 2/3] I2C: mediatek: Add driver for MediaTek I2C
- controller
-In-Reply-To: <20150518184300.GB28888@pengutronix.de>
-References: <1431967209-5261-1-git-send-email-eddie.huang@mediatek.com>
- <1431967209-5261-3-git-send-email-eddie.huang@mediatek.com>
- <20150518184300.GB28888@pengutronix.de>
-Message-ID: <1432089611.13819.9.camel@mtksdaap41>
+From: lznuaa@gmail.com (Zhi Li)
+Date: Tue, 19 May 2015 21:44:46 -0500
+Subject: [PATCH v2 0/7] Change snvs rtc and poweroff to use syscon add
+ pwrkey driver
+In-Reply-To: <20150520015851.GB1071@dragon>
+References: <1432055082-28983-1-git-send-email-Frank.Li@freescale.com>
+ <20150520015851.GB1071@dragon>
+Message-ID: <CAHrpEqS5gAsu6=ut-mPwZiipqKJb=VicRooCPFhEf324kuhnDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Tue, May 19, 2015 at 8:58 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+> On Wed, May 20, 2015 at 01:04:35AM +0800, Frank.Li at freescale.com wrote:
+>> From: Frank Li <Frank.Li@freescale.com>
+>>
+>> Change from v1 to v2
+>>  - Change simple-bus to simple-mfd
+>>  - RTC remove lock.
+>>  - RTC remove comments "These register offsets are relative to LP (Low Power) range"
+>>  - power off, remove extra space
+>>
+>> SNVS is MPF module.
+>> include rtc, power off, ON/OFF power key
+>>
+>>   arm: imx: power-off: change to syscon to access register
+>>   rtc: arm: imx: snvs: change use syscon to access register
+>> Above two patch change existed power-off and rtc use syscon
+>>
+>>   Document: dt: fsl: snvs: change support syscon
+>>   arm: dts: imx: update snvs to use syscon access register
+>> Update dt file and document
+>>
+>>   input: keyboard: imx: add snvs power key driver
+>>   document: devicetree: input: imx: i.mx snvs power device tree bindings
+>>   arm: dts: imx6sx: enable snvs power key
+>> Added on/off key driver
+>>
+>> Frank Li (6):
+>>   arm: imx: power-off: change to syscon to access register
+>>   rtc: arm: imx: snvs: change use syscon to access register
+>>   Document: dt: fsl: snvs: change support syscon
+>>   arm: dts: imx: update snvs to use syscon access register
+>>   document: devicetree: input: imx: i.mx snvs power device tree bindings
+>>   arm: dts: imx6sx: enable snvs power key
+>
+> So, the series will break existing DTBs for RTC and poweroff, right?
+> If this is unavoidable, should we at least have some warning messages
+> telling users about his breakage?
 
-On Mon, 2015-05-18 at 20:43 +0200, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> On Tue, May 19, 2015 at 12:40:08AM +0800, Eddie Huang wrote:
-> > From: Xudong Chen <xudong.chen@mediatek.com>
-> > 
-> > The mediatek SoCs have I2C controller that handle I2C transfer.
-> > This patch include common I2C bus driver.
-> > This driver is compatible with I2C controller on mt65xx/mt81xx.
-> > 
-> > Signed-off-by: Xudong Chen <xudong.chen@mediatek.com>
-> > Signed-off-by: Liguo Zhang <liguo.zhang@mediatek.com>
-> > Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-> > Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > ---
-> >  drivers/i2c/busses/Kconfig      |   9 +
-> >  drivers/i2c/busses/Makefile     |   1 +
-> >  drivers/i2c/busses/i2c-mt65xx.c | 675 ++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 685 insertions(+)
-> >  create mode 100644 drivers/i2c/busses/i2c-mt65xx.c
-> > 
-> > diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-> > index 2255af2..14c7266 100644
-> > --- a/drivers/i2c/busses/Kconfig
-> > +++ b/drivers/i2c/busses/Kconfig
-> > @@ -620,6 +620,15 @@ config I2C_MPC
-> >  	  This driver can also be built as a module.  If so, the module
-> >  	  will be called i2c-mpc.
-> >  
-> > +config I2C_MT65XX
-> > +	tristate "MediaTek I2C adapter"
-> > +	depends on ARCH_MEDIATEK || COMPILE_TEST
-> > +	help
-> > +	  This selects the MediaTek(R) Integrated Inter Circuit bus driver
-> > +	  for MT65xx and MT81xx.
-> > +	  If you want to use MediaTek(R) I2C interface, say Y or M here.
-> > +	  If unsure, say N.
-> > +
-> >  config I2C_MV64XXX
-> >  	tristate "Marvell mv64xxx I2C Controller"
-> >  	depends on MV64X60 || PLAT_ORION || ARCH_SUNXI
-> > diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
-> > index cdf941d..abbf422 100644
-> > --- a/drivers/i2c/busses/Makefile
-> > +++ b/drivers/i2c/busses/Makefile
-> > @@ -60,6 +60,7 @@ obj-$(CONFIG_I2C_JZ4780)	+= i2c-jz4780.o
-> >  obj-$(CONFIG_I2C_KEMPLD)	+= i2c-kempld.o
-> >  obj-$(CONFIG_I2C_MESON)		+= i2c-meson.o
-> >  obj-$(CONFIG_I2C_MPC)		+= i2c-mpc.o
-> > +obj-$(CONFIG_I2C_MT65XX)	+= i2c-mt65xx.o
-> >  obj-$(CONFIG_I2C_MV64XXX)	+= i2c-mv64xxx.o
-> >  obj-$(CONFIG_I2C_MXS)		+= i2c-mxs.o
-> >  obj-$(CONFIG_I2C_NOMADIK)	+= i2c-nomadik.o
-> > diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
-> > new file mode 100644
-> > index 0000000..7462f05
-> > --- /dev/null
-> > +++ b/drivers/i2c/busses/i2c-mt65xx.c
-> > @@ -0,0 +1,675 @@
-> > +/*
-> > + * Copyright (c) 2014 MediaTek Inc.
-> > + * Author: Xudong.chen <xudong.chen@mediatek.com>
-> s/Xudong.chen/Xudong Chen/
-OK
+How to do that?
+Just added it commit message or need runtime warning?
 
-> 
-> > +#define I2C_DRV_NAME		"mt-i2c"
-> i2c-mt65xx ?
-
-OK, i2c-mt65xx make more sense
-
-> 
-> > +}
-> > +
-> > +/* calculate i2c port speed */
-> It would be nice to summarize the clock frequency settings here.
-> Something like:
-> 
-> 	/*
-> 	 * The input clock is divided by the value specified in the
-> 	 * device tree as clock-div. The actual bus speed is then
-> 	 * derived from this frequency by the following formula:
-> 	 *  ....
-> 
-> This would make it possible to verify your calculations below.
-
-The comment will be:
-/*
- * khz: I2C bus clock
- * hclk: The input clock is divided by the value specified in the 
- *       device tree as clock-div
- * div = (sample_cnt + 1) * (step_cnt + 1)
- * khz = (hclk / 2) / div
- *
- * The calculation is to get div value that let result of 
- * ((hclk / 2) / div) most approach and less than khz
- */
-
-> 
-> > +static int mtk_i2c_set_speed(struct mtk_i2c *i2c, unsigned int clk_src_in_hz)
-> > +{
-> > +	unsigned int khz;
-> > +	unsigned int step_cnt;
-> > +	unsigned int sample_cnt;
-> > +	unsigned int sclk;
-> > +	unsigned int hclk;
-> > +	unsigned int max_step_cnt;
-> > +	unsigned int sample_div = MAX_SAMPLE_CNT_DIV;
-> > +	unsigned int step_div;
-> > +	unsigned int min_div;
-> > +	unsigned int best_mul;
-> > +	unsigned int cnt_mul;
-> > +
-> > +	if (i2c->speed_hz > MAX_HS_MODE_SPEED)
-> > +		return -EINVAL;
-> > +	else if (i2c->speed_hz > MAX_FS_MODE_SPEED)
-> > +		max_step_cnt = MAX_HS_STEP_CNT_DIV;
-> > +	else
-> > +		max_step_cnt = MAX_STEP_CNT_DIV;
-> > +
-> > +	step_div = max_step_cnt;
-> > +	/* Find the best combination */
-> > +	khz = i2c->speed_hz / 1000;
-> > +	hclk = clk_src_in_hz / 1000;
-> > +	min_div = ((hclk >> 1) + khz - 1) / khz;
-> This is DIV_ROUND_UP(hclk >> 1, khz).
-OK, it is good to use existed macro.
-
-> 
-> > +	best_mul = MAX_SAMPLE_CNT_DIV * max_step_cnt;
-> > +
-> > +	for (sample_cnt = 1; sample_cnt <= MAX_SAMPLE_CNT_DIV; sample_cnt++) {
-> > +		step_cnt = (min_div + sample_cnt - 1) / sample_cnt;
-> > +		cnt_mul = step_cnt * sample_cnt;
-> > +		if (step_cnt > max_step_cnt)
-> > +			continue;
-> > +
-> > +		if (cnt_mul < best_mul) {
-> > +			best_mul = cnt_mul;
-> > +			sample_div = sample_cnt;
-> > +			step_div = step_cnt;
-> > +			if (best_mul == min_div)
-> > +				break;
-> > +		}
-> > +	}
-> > +
-> > +	sample_cnt = sample_div;
-> > +	step_cnt = step_div;
-> > +	sclk = hclk / (2 * sample_cnt * step_cnt);
-> > +	if (sclk > khz) {
-> > +		dev_dbg(i2c->dev, "%s mode: unsupported speed (%ldkhz)\n",
-> > +			(i2c->speed_hz > MAX_HS_MODE_SPEED) ? "HS" : "ST/FT",
-> > +			(long int)khz);
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	step_cnt--;
-> > +	sample_cnt--;
-> > +
-> > +	if (i2c->speed_hz > MAX_FS_MODE_SPEED) {
-> > +		/* Set the hign speed mode register */
-> > +		i2c->timing_reg = I2C_FS_TIME_INIT_VALUE;
-> > +		i2c->high_speed_reg = I2C_TIME_DEFAULT_VALUE |
-> > +			(sample_cnt & I2C_TIMING_SAMPLE_COUNT_MASK) << 12 |
-> > +			(step_cnt & I2C_TIMING_SAMPLE_COUNT_MASK) << 8;
-> > +	} else {
-> > +		i2c->timing_reg =
-> > +			(sample_cnt & I2C_TIMING_SAMPLE_COUNT_MASK) << 8 |
-> > +			(step_cnt & I2C_TIMING_STEP_DIV_MASK) << 0;
-> > +		/* Disable the high speed transaction */
-> > +		i2c->high_speed_reg = I2C_TIME_CLR_VALUE;
-> Can it happen that sample_cnt & I2C_TIMING_SAMPLE_COUNT_MASK !=
-> sample_cnt? If yes, what is the influence on correctness? Same question
-> for step_cnt.
-
-No. it should not happen because we already limit value less than max
-value. Will remove mask here.
-
-
-Eddie
+>
+> Shawn
+>
+>>
+>> Robin Gong (1):
+>>   input: keyboard: imx: add snvs power key driver
+>>
+>>  .../devicetree/bindings/crypto/fsl-sec4.txt        |  93 +++++++--
+>>  .../devicetree/bindings/input/snvs-pwrkey.txt      |   1 +
+>>  .../bindings/power_supply/imx-snvs-poweroff.txt    |  24 +--
+>>  arch/arm/boot/dts/imx6qdl.dtsi                     |  12 +-
+>>  arch/arm/boot/dts/imx6sl.dtsi                      |  12 +-
+>>  arch/arm/boot/dts/imx6sx.dtsi                      |  19 +-
+>>  arch/arm/boot/dts/vfxxx.dtsi                       |   9 +-
+>>  drivers/input/keyboard/Kconfig                     |  11 +
+>>  drivers/input/keyboard/Makefile                    |   1 +
+>>  drivers/input/keyboard/snvs_pwrkey.c               | 232 +++++++++++++++++++++
+>>  drivers/power/reset/imx-snvs-poweroff.c            |  21 +-
+>>  drivers/rtc/rtc-snvs.c                             | 128 +++++-------
+>>  12 files changed, 417 insertions(+), 146 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/input/snvs-pwrkey.txt
+>>  create mode 100644 drivers/input/keyboard/snvs_pwrkey.c
+>>
+>> --
+>> 1.9.1
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
