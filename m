@@ -1,28 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 May 2015 17:40:12 +0200
-Subject: [GIT PULL] ux500 cleanups for v4.2
-In-Reply-To: <CACRpkdbRXN4bBWdqpMVRJ6bqqKrkO-8ssfWmHfbguNjjbjGpGw@mail.gmail.com>
-References: <CACRpkdbRXN4bBWdqpMVRJ6bqqKrkO-8ssfWmHfbguNjjbjGpGw@mail.gmail.com>
-Message-ID: <2271356.zMzJ8CSdNi@wuerfel>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 20 May 2015 17:40:11 +0200 (CEST)
+Subject: [RFC v1 25/25] genirq: Kill the first parameter 'irq' of
+ irq_flow_handler_t
+In-Reply-To: <1432116013-25902-26-git-send-email-jiang.liu@linux.intel.com>
+References: <1432116013-25902-1-git-send-email-jiang.liu@linux.intel.com>
+ <1432116013-25902-26-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <alpine.DEB.2.11.1505201737510.4225@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 May 2015 15:23:49 Linus Walleij wrote:
-> Hi ARM SoC people,
-> 
-> this is a pull request for some additional cleanups requested by Arnd
-> in this message:
-> http://marc.info/?l=linux-arm-kernel&m=143151859309482&w=2
-> 
-> Please pull this into next/cleanup where the dependent patch is.
-> A patch from the next/dt, commit 487934109d33e1749d3034899685111bca6ffd0b
-> "ARM: ux500: add SCU and WD to device tree" is needed for this to
-> work but since I regard all DT work as essentially orthogonal I rely on
-> the two to merge up in the end and work nicely.
-> 
-> Please pull this into next/cleanup!
-> 
+On Wed, 20 May 2015, Jiang Liu wrote:
+>  /* Chained IRQ handler for IPU error interrupt */
+> -static void ipu_irq_err(unsigned int irq, struct irq_desc *desc)
+> +static void ipu_irq_err(struct irq_desc *desc)
+>  {
+> +	unsigned int irq = irq_desc_to_irq(desc);
 
-Pulled into next/cleanup, thanks!
+Why initializing? It's overwritten in the loop.
 
-	Arnd
+>  /* Chained IRQ handler for IPU function interrupt */
+> -static void ipu_irq_fn(unsigned int irq, struct irq_desc *desc)
+> +static void ipu_irq_fn(struct irq_desc *desc)
+>  {
+> +	unsigned int irq = irq_desc_to_irq(desc);
+
+Ditto.
+
+Thanks,
+
+	tglx
