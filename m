@@ -1,50 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 20 May 2015 09:47:26 -0700
-Subject: [PATCH] ARM: dts: am335x-boneblack: disable RTC-only sleep
-In-Reply-To: <1432136322-7609-1-git-send-email-robertcnelson@gmail.com>
-References: <1432136322-7609-1-git-send-email-robertcnelson@gmail.com>
-Message-ID: <20150520164725.GU10274@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 20 May 2015 17:48:59 +0100
+Subject: [PATCH 4/4] arm64: gicv3: its: Increase FORCE_MAX_ZONEORDER for
+ Cavium ThunderX
+In-Reply-To: <20150520123159.GE10428@rric.localhost>
+References: <1430686172-18222-1-git-send-email-rric@kernel.org>
+ <1430686172-18222-5-git-send-email-rric@kernel.org>
+ <20150505105329.GC1550@arm.com>
+ <20150511091438.GW4251@rric.localhost>
+ <20150512123056.GA2062@arm.com>
+ <20150512162049.GP10428@rric.localhost>
+ <20150512172416.GF2062@arm.com>
+ <20150520132213.1128eb90@why.wild-wind.fr.eu.org>
+ <20150520123159.GE10428@rric.localhost>
+Message-ID: <20150520164858.GD29424@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Robert Nelson <robertcnelson@gmail.com> [150520 08:53]:
-> Fixes: http://bugs.elinux.org/issues/143
+On Wed, May 20, 2015 at 02:31:59PM +0200, Robert Richter wrote:
+> On 20.05.15 13:22:13, Marc Zyngier wrote:
+> > On Tue, 12 May 2015 18:24:16 +0100
+> > Will Deacon <will.deacon@arm.com> wrote:
+> > > On Tue, May 12, 2015 at 05:20:49PM +0100, Robert Richter wrote:
+> > > > On 12.05.15 13:30:57, Will Deacon wrote:
 > 
-> Entering RTC-only sleep is only properly supported on early prototypes series
-> (pre-A6) of the BeagleBone Black.  Since rev (A6A), which include all production
-> versions, it is not support at due to.
+> > > > For allocation of 16MB cont. phys mem of a defconfig kernel (4KB
+> > > > default pagesize) I see this different approaches:
+> > > 
+> > > 16MB sounds like an awful lot. Is this because you have tonnes of MSIs or
+> > > a sparse DeviceID space or both?
+> > 
+> > That's probably due to the sparseness of the DeviceID space. With some
+> > form of bridge number encoded on top of the BFD number, the device
+> > table is enormous, and I don't see a nice way to avoid it...
 > 
-> (rev A6) enable of the 3v3b regulator moved from LDO2 to LDO4 (3v3a)
-> side-effect: 3v3b rail remains on in sleep-mode (also in off-mode when battery-powered)
+> Right. At the momement out of 21 bits (16MB) we currently have 2 spare
+> bits, which reduces the actually size used to 4MB. Though, for the
+> current cpu model we can reduce it at least to 8MB total.
 > 
-> (rev A6A) am335x vdds supply moved from LDO3 to LDO1
-> side-effect: vdds remains supplied in sleep-mode
+> I will come up with an additional patch setting this to 8MB.
 > 
-> Reported-by: Matthijs van Duin <matthijsvanduin@gmail.com>
-> Tested-by: Matthijs van Duin <matthijsvanduin@gmail.com>
-> Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Johan Hovold <johan@kernel.org>
-> ---
->  arch/arm/boot/dts/am335x-boneblack.dts | 4 ----
->  1 file changed, 4 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/am335x-boneblack.dts b/arch/arm/boot/dts/am335x-boneblack.dts
-> index 5c42d25..901739f 100644
-> --- a/arch/arm/boot/dts/am335x-boneblack.dts
-> +++ b/arch/arm/boot/dts/am335x-boneblack.dts
-> @@ -80,7 +80,3 @@
->  		status = "okay";
->  	};
->  };
-> -
-> -&rtc {
-> -	system-power-controller;
-> -};
+> As said before, I also write on a patch to use CMA.
 
-Applying into omap-for-v4.1/fixes thanks.
+Can we not reserve a chunk of memory and pass the information to the
+kernel via DT (/memreserve/ and a new GIC-specific binding)?
 
-Regards,
-
-Tony
+-- 
+Catalin
