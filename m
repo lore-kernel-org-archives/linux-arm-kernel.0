@@ -1,34 +1,42 @@
-From: ivan.ivanov@linaro.org (Ivan T. Ivanov)
-Date: Wed, 20 May 2015 18:02:25 +0300
-Subject: [PATCH] coresight-etm3x: Add Qualcomm PFT v1.1 peripheral ID
-Message-ID: <1432134145-28298-1-git-send-email-ivan.ivanov@linaro.org>
+From: lznuaa@gmail.com (Zhi Li)
+Date: Wed, 20 May 2015 10:03:46 -0500
+Subject: [PATCH v2 0/7] Change snvs rtc and poweroff to use syscon add
+ pwrkey driver
+In-Reply-To: <6111368.e0EOBSJsmZ@jclayton-pc>
+References: <1432055082-28983-1-git-send-email-Frank.Li@freescale.com>
+ <20150520142205.GA24844@dragon>
+ <CAHrpEqSpeMO=zLyii8qZUznP+9EAQqJ-D3O8hbXj99m+UNvpzA@mail.gmail.com>
+ <6111368.e0EOBSJsmZ@jclayton-pc>
+Message-ID: <CAHrpEqQ9F1qXw6RmKPgwpqsFOq=O0dsNL7YtqNQ2ZUVBYz6DSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Qualcomm's PFT v1.1 peripheral ID to supported devices.
-This device could be found at least in MSM8974 and APQ8064
-chipsets.
+On Wed, May 20, 2015 at 9:46 AM, Joshua Clayton
+<stillcompiling@gmail.com> wrote:
+>>
+>> +       snvs_np = of_get_parent(pdev->dev.of_node);
+>> +       if (!snvs_np)
+>> +               return -ENODEV;
+>> +
+>> +       data->snvs = syscon_node_to_regmap(snvs_np);
+>> +       of_node_put(snvs_np);
+>> +
+>> +       if (!data->snvs) {
+>> +               pr_err("Can't snvs syscon\n");
+>> +               return -ENODEV;
+>> +       }
+>>
+>> How about change error message to " Can't snvs syscon, probably use
+>> old dts file"?
+> How about simply: "Cannot find snvs syscon node in devicetree."
 
-Signed-off-by: Ivan T. Ivanov <ivan.ivanov@linaro.org>
----
- drivers/hwtracing/coresight/coresight-etm3x.c | 5 +++++
- 1 file changed, 5 insertions(+)
+Shawn:
+          Are you okay for that?
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index 018a00f..e13520f 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -1912,6 +1912,11 @@ static struct amba_id etm_ids[] = {
- 		.mask	= 0x0003ffff,
- 		.data	= "PTM 1.1",
- 	},
-+	{	/* PFT 1.1 Qualcomm */
-+		.id	= 0x0003006f,
-+		.mask	= 0x0003ffff,
-+		.data	= "PFT 1.1",
-+	},
- 	{ 0, 0},
- };
+best regards
+Frank Li
 
---
-1.9.1
+>
+>
+> --
+> ~Joshua Clayton
