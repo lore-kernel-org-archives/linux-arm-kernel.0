@@ -1,45 +1,50 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 20 May 2015 17:39:47 +0100
-Subject: [PATCH v6 3/6] arm64: Kprobes with single stepping support
-In-Reply-To: <1429561187-3661-4-git-send-email-dave.long@linaro.org>
-References: <1429561187-3661-1-git-send-email-dave.long@linaro.org>
- <1429561187-3661-4-git-send-email-dave.long@linaro.org>
-Message-ID: <20150520163946.GC29424@e104818-lin.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 20 May 2015 09:47:26 -0700
+Subject: [PATCH] ARM: dts: am335x-boneblack: disable RTC-only sleep
+In-Reply-To: <1432136322-7609-1-git-send-email-robertcnelson@gmail.com>
+References: <1432136322-7609-1-git-send-email-robertcnelson@gmail.com>
+Message-ID: <20150520164725.GU10274@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 20, 2015 at 04:19:44PM -0400, David Long wrote:
-> Add support for basic kernel probes(kprobes) and jump probes
-> (jprobes) for ARM64.
+* Robert Nelson <robertcnelson@gmail.com> [150520 08:53]:
+> Fixes: http://bugs.elinux.org/issues/143
 > 
-> Kprobes utilizes software breakpoint and single step debug
-> exceptions supported on ARM v8.
+> Entering RTC-only sleep is only properly supported on early prototypes series
+> (pre-A6) of the BeagleBone Black.  Since rev (A6A), which include all production
+> versions, it is not support at due to.
 > 
-> A software breakpoint is placed at the probe address to trap the
-> kernel execution into the kprobe handler.
+> (rev A6) enable of the 3v3b regulator moved from LDO2 to LDO4 (3v3a)
+> side-effect: 3v3b rail remains on in sleep-mode (also in off-mode when battery-powered)
 > 
-> ARM v8 supports enabling single stepping before the break exception
-> return (ERET), with next PC in exception return address (ELR_EL1). The
-> kprobe handler prepares an executable memory slot for out-of-line
-> execution with a copy of the original instruction being probed, and
-> enables single stepping. The PC is set to the out-of-line slot address
-> before the ERET. With this scheme, the instruction is executed with the
-> exact same register context except for the PC (and DAIF) registers.
+> (rev A6A) am335x vdds supply moved from LDO3 to LDO1
+> side-effect: vdds remains supplied in sleep-mode
+> 
+> Reported-by: Matthijs van Duin <matthijsvanduin@gmail.com>
+> Tested-by: Matthijs van Duin <matthijsvanduin@gmail.com>
+> Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Johan Hovold <johan@kernel.org>
+> ---
+>  arch/arm/boot/dts/am335x-boneblack.dts | 4 ----
+>  1 file changed, 4 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/am335x-boneblack.dts b/arch/arm/boot/dts/am335x-boneblack.dts
+> index 5c42d25..901739f 100644
+> --- a/arch/arm/boot/dts/am335x-boneblack.dts
+> +++ b/arch/arm/boot/dts/am335x-boneblack.dts
+> @@ -80,7 +80,3 @@
+>  		status = "okay";
+>  	};
+>  };
+> -
+> -&rtc {
+> -	system-power-controller;
+> -};
 
-I wonder whether it would be simpler to use another software breakpoint
-after the out of line instruction copy. You won't run the instructions
-that change the PC anyway.
+Applying into omap-for-v4.1/fixes thanks.
 
-Since an unconditional branch instruction within the kernel address
-space can reach any point in the kernel (and modules), could we go a
-step further and avoid the software breakpoint altogether, just generate
-a branch instruction to the original location (after the software
-breakpoint)?
+Regards,
 
-As for simulating/emulating instructions, could we actually avoid it for
-most of them where we can generate a similar instruction with the
-corrected offset? If the out of line slot is somewhere within the kernel
-data section, I think many of them can be re-encoded (e.g. branches).
-
--- 
-Catalin
+Tony
