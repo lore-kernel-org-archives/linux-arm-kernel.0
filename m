@@ -1,30 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 May 2015 17:37:13 +0200
-Subject: [PATCH] MAINTAINERS: update Shawn's email to use kernel.org one
-In-Reply-To: <20150520153343.GB24844@dragon>
-References: <1431783155-30384-1-git-send-email-shawnguo@kernel.org>
- <7257370.pzxAn0ir2Q@wuerfel> <20150520153343.GB24844@dragon>
-Message-ID: <2258247.12JSLXRN4l@wuerfel>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 20 May 2015 17:37:26 +0200
+Subject: [PATCH 00/14] ARM: berlin: bisect compatible simple-mfd conversion
+In-Reply-To: <7681967.oFTclmPvdm@wuerfel>
+References: <1431735823-28006-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <7681967.oFTclmPvdm@wuerfel>
+Message-ID: <555CAA36.9020301@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 20 May 2015 23:33:45 Shawn Guo wrote:
-> On Wed, May 20, 2015 at 05:27:20PM +0200, Arnd Bergmann wrote:
-> > On Saturday 16 May 2015 21:32:35 shawnguo at kernel.org wrote:
-> > > From: Shawn Guo <shawn.guo@linaro.org>
-> > > 
-> > > Update my email address to use kernel.org mailbox, so that emails
-> > > between kernel community and company can be separated.
-> > > 
-> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > > 
-> > 
-> > Applied to the fixes branch, thanks!
-> 
-> Arnd, please drop the patch for now, as I haven't found a reliable
-> back mailbox for my kernel.org account.  Sorry for the confusion.
+On 20.05.2015 17:25, Arnd Bergmann wrote:
+> On Saturday 16 May 2015 02:23:29 Sebastian Hesselbarth wrote:
+>>
+>> I am still planing to get this into v4.2 as soon as possible, so if Arnd is
+>> now happy with the dependency of the patches and none of the maintainers is
+>> against it, I'll prepare a PR next week.
+>
+> I haven't see the pull request yet, are you still working on it?
 
-Ok, no problem. I had not pushed the branch yet. Sorry for missing
-your earlier update on the patch.
+I was hoping to find some time to actually test bisectability.
+How much time do I have left for getting into v4.2 cycle?
 
-	Arnd
+Sebastian
