@@ -1,47 +1,74 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 20 May 2015 09:51:55 +0800
-Subject: [PATCH 1/1] ARM: imx: clk-v610: Add clock for I2C2 and I2C3
-In-Reply-To: <1432038456-29706-1-git-send-email-mirza.krak@hostmobility.com>
-References: <1432038456-29706-1-git-send-email-mirza.krak@hostmobility.com>
-Message-ID: <20150520015155.GA1071@dragon>
+Date: Wed, 20 May 2015 09:58:51 +0800
+Subject: [PATCH v2 0/7] Change snvs rtc and poweroff to use syscon add
+ pwrkey driver
+In-Reply-To: <1432055082-28983-1-git-send-email-Frank.Li@freescale.com>
+References: <1432055082-28983-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <20150520015851.GB1071@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 02:27:36PM +0200, Mirza Krak wrote:
-> From: Mirza Krak <mirza.krak@gmail.com>
+On Wed, May 20, 2015 at 01:04:35AM +0800, Frank.Li at freescale.com wrote:
+> From: Frank Li <Frank.Li@freescale.com>
 > 
-> Add support for clock gating of I2C2 and I2C3.
-> We use I2C2 in a (not yet mainlined) device tree.
+> Change from v1 to v2
+>  - Change simple-bus to simple-mfd
+>  - RTC remove lock.
+>  - RTC remove comments "These register offsets are relative to LP (Low Power) range"
+>  - power off, remove extra space
 > 
-> Signed-off-by: Mirza Krak <mirza.krak@hostmobility.com>
-> Signed-off-by: Mirza Krak <mirza.krak@gmail.com>
-> ---
->  arch/arm/mach-imx/clk-vf610.c | 2 ++
+> SNVS is MPF module.
+> include rtc, power off, ON/OFF power key
+> 
+>   arm: imx: power-off: change to syscon to access register
+>   rtc: arm: imx: snvs: change use syscon to access register
+> Above two patch change existed power-off and rtc use syscon
+> 
+>   Document: dt: fsl: snvs: change support syscon
+>   arm: dts: imx: update snvs to use syscon access register
+> Update dt file and document
+> 
+>   input: keyboard: imx: add snvs power key driver
+>   document: devicetree: input: imx: i.mx snvs power device tree bindings
+>   arm: dts: imx6sx: enable snvs power key
+> Added on/off key driver
+> 
+> Frank Li (6):
+>   arm: imx: power-off: change to syscon to access register
+>   rtc: arm: imx: snvs: change use syscon to access register
+>   Document: dt: fsl: snvs: change support syscon
+>   arm: dts: imx: update snvs to use syscon access register
+>   document: devicetree: input: imx: i.mx snvs power device tree bindings
+>   arm: dts: imx6sx: enable snvs power key
 
-The file is being moved into drivers/clk/imx.  Please rebase your patch
-on branch below:
-
- git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git imx/soc
+So, the series will break existing DTBs for RTC and poweroff, right?
+If this is unavoidable, should we at least have some warning messages
+telling users about his breakage?
 
 Shawn
 
->  1 file changed, 2 insertions(+)
 > 
-> diff --git a/arch/arm/mach-imx/clk-vf610.c b/arch/arm/mach-imx/clk-vf610.c
-> index 5fcc4be..f5fff09 100644
-> --- a/arch/arm/mach-imx/clk-vf610.c
-> +++ b/arch/arm/mach-imx/clk-vf610.c
-> @@ -279,6 +279,8 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
->  
->  	clk[VF610_CLK_I2C0] = imx_clk_gate2("i2c0", "ipg_bus", CCM_CCGR4, CCM_CCGRx_CGn(6));
->  	clk[VF610_CLK_I2C1] = imx_clk_gate2("i2c1", "ipg_bus", CCM_CCGR4, CCM_CCGRx_CGn(7));
-> +	clk[VF610_CLK_I2C2] = imx_clk_gate2("i2c2", "ipg_bus", CCM_CCGR10, CCM_CCGRx_CGn(6));
-> +	clk[VF610_CLK_I2C3] = imx_clk_gate2("i2c3", "ipg_bus", CCM_CCGR10, CCM_CCGRx_CGn(7));
->  
->  	clk[VF610_CLK_DSPI0] = imx_clk_gate2("dspi0", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(12));
->  	clk[VF610_CLK_DSPI1] = imx_clk_gate2("dspi1", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(13));
+> Robin Gong (1):
+>   input: keyboard: imx: add snvs power key driver
+> 
+>  .../devicetree/bindings/crypto/fsl-sec4.txt        |  93 +++++++--
+>  .../devicetree/bindings/input/snvs-pwrkey.txt      |   1 +
+>  .../bindings/power_supply/imx-snvs-poweroff.txt    |  24 +--
+>  arch/arm/boot/dts/imx6qdl.dtsi                     |  12 +-
+>  arch/arm/boot/dts/imx6sl.dtsi                      |  12 +-
+>  arch/arm/boot/dts/imx6sx.dtsi                      |  19 +-
+>  arch/arm/boot/dts/vfxxx.dtsi                       |   9 +-
+>  drivers/input/keyboard/Kconfig                     |  11 +
+>  drivers/input/keyboard/Makefile                    |   1 +
+>  drivers/input/keyboard/snvs_pwrkey.c               | 232 +++++++++++++++++++++
+>  drivers/power/reset/imx-snvs-poweroff.c            |  21 +-
+>  drivers/rtc/rtc-snvs.c                             | 128 +++++-------
+>  12 files changed, 417 insertions(+), 146 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/input/snvs-pwrkey.txt
+>  create mode 100644 drivers/input/keyboard/snvs_pwrkey.c
+> 
 > -- 
-> 2.1.0
+> 1.9.1
 > 
 > 
 > _______________________________________________
