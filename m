@@ -1,81 +1,95 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 20 May 2015 18:09:26 +0100
-Subject: [PATCH 2/3] iommu/arm-smmu: Add initial driver support for ARM
- SMMUv3 devices
-In-Reply-To: <20150519152435.GL20611@8bytes.org>
-References: <1431108046-9675-1-git-send-email-will.deacon@arm.com>
- <1431108046-9675-3-git-send-email-will.deacon@arm.com>
- <20150519152435.GL20611@8bytes.org>
-Message-ID: <20150520170926.GI11498@arm.com>
+From: javier@javigon.com (=?utf-8?Q?Javier_Gonz=C3=A1lez?=)
+Date: Wed, 20 May 2015 16:11:05 +0200
+Subject: [PATCH V3 2/2] tee: add OP-TEE driver
+In-Reply-To: <20150520121648.GA9819@ermac>
+References: <1431671667-11219-1-git-send-email-jens.wiklander@linaro.org>
+ <1431671667-11219-3-git-send-email-jens.wiklander@linaro.org>
+ <20150518131850.GA7064@leverpostej> <20150520121648.GA9819@ermac>
+Message-ID: <887DE856-552A-4A21-8CC7-CFB9B80033E4@javigon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 04:24:35PM +0100, Joerg Roedel wrote:
-> Hi Will,
+Hi,
+Just for completeness,
 
-Hi Joerg,
-
-> the code looks good overall, I just have some questions below.
-
-Great, thanks for having a look. I'll still need to post a v2 to address
-some of the other comments I've had.
-
-> On Fri, May 08, 2015 at 07:00:45PM +0100, Will Deacon wrote:
-> > +static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
-> > +{
-> > +	int ret = 0;
-> > +	struct arm_smmu_device *smmu;
-> > +	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
-> > +	struct arm_smmu_group *smmu_group = arm_smmu_group_get(dev);
-> > +
-> > +	if (!smmu_group)
-> > +		return -ENOENT;
-> > +
-> > +	/* Already attached to a different domain? */
-> > +	if (smmu_group->domain && smmu_group->domain != smmu_domain)
-> > +		return -EEXIST;
-> > +
-> > +	smmu = smmu_group->smmu;
-> > +	mutex_lock(&smmu_domain->init_mutex);
-> > +
-> > +	if (!smmu_domain->smmu) {
-> > +		smmu_domain->smmu = smmu;
-> > +		ret = arm_smmu_domain_finalise(domain);
-> > +		if (ret) {
-> > +			smmu_domain->smmu = NULL;
-> > +			goto out_unlock;
-> > +		}
-> > +	} else if (smmu_domain->smmu != smmu) {
-> > +		dev_err(dev,
-> > +			"cannot attach to SMMU %s (upstream of %s)\n",
-> > +			dev_name(smmu_domain->smmu->dev),
-> > +			dev_name(smmu->dev));
-> > +		ret = -ENXIO;
-> > +		goto out_unlock;
-> > +	}
+> On 20 May 2015, at 14:16, Jens Wiklander <jens.wiklander@linaro.org> wrote:
 > 
-> This looks like all devices in a domain need to be behind the same SMMU
-> device, right?
-
-Yes, that's correct. This matches what we do for the arm-smmu driver
-already and is mainly brought about by the potential for hardware
-differences between different SMMU instances in the same SoC.
-
-> > +	/* Page sizes */
-> > +	if (reg & IDR5_GRAN64K)
-> > +		pgsize_bitmap |= SZ_64K | SZ_512M;
-> > +	if (reg & IDR5_GRAN16K)
-> > +		pgsize_bitmap |= SZ_16K | SZ_32M;
-> > +	if (reg & IDR5_GRAN4K)
-> > +		pgsize_bitmap |= SZ_4K | SZ_2M | SZ_1G;
-> > +
-> > +	arm_smmu_ops.pgsize_bitmap &= pgsize_bitmap;
+> Hi,
 > 
-> So this could effictivly lead to a zero pgsize_bitmap when there are
-> SMMUs in the system with support for different page sizes, no?
+> On Mon, May 18, 2015 at 02:18:50PM +0100, Mark Rutland wrote:
+>> Hi,
+>> 
+>> On Fri, May 15, 2015 at 07:34:27AM +0100, Jens Wiklander wrote:
+> 
+[?]
 
-Indeed, if there is no common page size then we end up not being able to
-support any. I tried to resolve this by moving the bitmap out of the
-iommu_ops and into the iommu_domain, but you weren't fond of that idea ;)
+>> 
+>> I'm also very concerned that the interface exposed to userspace is
+>> hideously low-level. Surely we'd expect kernel-side drivers to be doing
+>> the bulk of direct communication to the OP-TEE instance? In the lack of
+>> a provided rationale I don't see why the current messaging interface
+>> would make sense.
+> The kernel-side does all the direct communication since there's where
+> the SMC is done, but one level above most of the communication is
+> terminated in user space. Loading of Trusted Applications and other file
+> system access is done in by a helper process in user space,
+> tee-supplicant. A large part of the OP-TEE message protocol is
+> transparent to the kernel.
+> 
+> We're trying to not exclude any TEE implementation by having this low
+> level TEE_IOC_CMD instead of a high level interface. The problem with
+> the different TEEs is that they are designed differently and we haven't
+> been able to find a high level interface that suits all. Applications
+> aren't expected to use TEE_IOC_CMD directly, instead there's supposed to
+> be a client lib wich wraps the kernel interface and provides a higher
+> level interface, for instance a Global Platform Client API in the case
+> of a GP TEE.
+> 
+> For OP-TEE we're using the same protocol all the way down to user space,
+> the advantage is that it's only one protocol to keep track of and we
+> don't need to translate the entire message (we do need to copy it,
+> excluding the payload) each time the message is passed to the next
+> memory space. In the presence of a hypervisor we have
+> user space -> kernel -> hypervisor -> secure world
+> Unfortunately some fields has a different meaning in user space and
+> kernel space. I'll address this in the documentation.
+> 
+> The OP-TEE helper process, tee-supplicant, is specific to only OP-TEE.
+> Other TEEs uses helper processes too, but what they do depend on the
+> design of the TEE. As a consequence more or less all TEEs needs
+> something specific for that particular TEE in user space to be fully
+> functional.
+> 
+> To summarize, the current assumption is that all TEEs can't use the same
+> high level interface. Instead we need to provide a way for each TEE to
+> have their own low level interface which should be wrapped in a user
+> space library to provide a more reasonable interface to the client
+> application.
+> 
+> 
 
-Will
+This design aims to be TEE agnostic.
+
+As Jens mentioned, user space applications are supposed to use client-side
+API?s (e.g., Global Platform). It is convenient that these APIs reside in user
+space together with the wrapper using the kernel TEE interface. Note that
+GP?s APIs have changed much since they were first released. It would be
+a lot of work to keep them updated in the kernel and we would eventually
+run into the issue that they are not backwards compatible, thus making  user
+space applications break.
+
+Also, we want to eventually support kernel submodules to use the TEE subsystem.
+In this case, having a simple in-kernel interface makes things easier. Again,
+having a rich API such as GP in the kernel would not add any value.
+
+[?]
+
+Javier.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 842 bytes
+Desc: Message signed with OpenPGP using GPGMail
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150520/12cbfa54/attachment.sig>
