@@ -1,44 +1,61 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 19 May 2015 18:01:44 -0700
-Subject: [PATCH v2 1/2] clk: change clk_ops' ->round_rate() prototype
-In-Reply-To: <5557267D.7080209@kapsi.fi>
-References: <1430407809-31147-1-git-send-email-boris.brezillon@free-electrons.com>
- <1430407809-31147-2-git-send-email-boris.brezillon@free-electrons.com>
- <20150507063953.GC32399@codeaurora.org>
- <20150507093702.0b58753d@bbrezillon>
- <20150515174048.4a31af49@bbrezillon> <5557267D.7080209@kapsi.fi>
-Message-ID: <20150520010144.GA31054@codeaurora.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 20 May 2015 09:01:51 +0800
+Subject: [PATCH v1 2/2] ARM: vf610: Add SoC bus support for Vybrid
+In-Reply-To: <20150519094223.GA3194@Sanchayan-Arch.toradex.int>
+References: <cover.1431928866.git.maitysanchayan@gmail.com>
+ <653ed53ef933a6834c4fd3c90ee47e5fb5c78160.1431928866.git.maitysanchayan@gmail.com>
+ <20150519062413.GR1071@dragon>
+ <20150519094223.GA3194@Sanchayan-Arch.toradex.int>
+Message-ID: <20150520010151.GZ1071@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16, Mikko Perttunen wrote:
-> On 05/15/2015 06:40 PM, Boris Brezillon wrote:
-> >Hi Stephen,
-> >
-> >Adding Mikko in the loop (after all, he was the one complaining about
-> >this signed long limitation in the first place, and I forgot to add
-> >him in the Cc list :-/).
+On Tue, May 19, 2015 at 03:12:23PM +0530, maitysanchayan at gmail.com wrote:
+> Hello Shawn,
 > 
-> I think I got it through linux-tegra anyway, but thanks :)
+> On 15-05-19 14:24:13, Shawn Guo wrote:
+> > On Mon, May 18, 2015 at 11:50:07AM +0530, Sanchayan Maity wrote:
+> > > Implements SoC bus support to export SoC specific information. Read
+> > > the unique SoC ID from the Vybrid On Chip One Time Programmable
+> > > (OCOTP) controller, SoC specific information from the Miscellaneous
+> > > System Control Module (MSCM), revision from the ROM revision register
+> > > and expose it via the SoC bus infrastructure.
+> > > 
+> > > Sample Output:
+> > > 
+> > > root at vf:/sys/devices/soc0# cat soc_id
+> > > df63c12a2e2161d4
+> > > root at vf:/sys/devices/soc0# cat family
+> > > Freescale Vybrid VF500
+> > > root at vf:/sys/devices/soc0# cat revision
+> > > 00000013
+> > > root at vf:/sys/devices/soc0# cat machine
+> > > Freescale Vybrid
+> > > 
+> > > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+> > > ---
+> > >  arch/arm/mach-imx/mach-vf610.c | 81 ++++++++++++++++++++++++++++++++++++++++++
+> > >  1 file changed, 81 insertions(+)
+> > > 
+> > > diff --git a/arch/arm/mach-imx/mach-vf610.c b/arch/arm/mach-imx/mach-vf610.c
+> > > index 2e7c75b..64c78e4 100644
+> > > --- a/arch/arm/mach-imx/mach-vf610.c
+> > > +++ b/arch/arm/mach-imx/mach-vf610.c
+> > > @@ -11,6 +11,86 @@
+> > >  #include <linux/irqchip.h>
+> > >  #include <asm/mach/arch.h>
+> > >  #include <asm/hardware/cache-l2x0.h>
+> > > +#include <linux/slab.h>
+> > > +#include <linux/sys_soc.h>
+> > > +#include <linux/mfd/syscon.h>
+> > > +#include <linux/regmap.h>
+> > > +#include <linux/random.h>
+> > 
+> > Please group <linux/*> headers together and sort alphabetically.
 > 
-> >
-> >Mikko, are you okay with the approach proposed by Stephen (adding a
-> >new method) ?
-> 
-> Yes, sounds good to me. If a driver uses the existing methods with
-> too large frequencies, the issue is pretty discoverable anyway. I
-> think "adjust_rate" sounds a bit too much like it sets the clock's
-> rate, though; perhaps "adjust_rate_request" or something like that?
-> 
+> Ok. Will fix this and send out a v2. The rest is acceptable?
 
-Well I'm also OK with changing the determine_rate API one more
-time, but we'll have to be careful. Invariably someone will push
-a new clock driver through some non-clk tree path and we'll get
-build breakage. They shouldn't be doing that, so either we do the
-change now and push it to -next and see what breaks, or we do
-this after -rc1 comes out and make sure everyone has lots of
-warning.
+I'm fine with the rest, but would need an ACK from Stefan to apply the
+patch.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Shawn
