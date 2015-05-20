@@ -1,93 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 20 May 2015 14:25:12 -0700
-Subject: [PATCH] ARM: dts: Fix ldp gpio keys to use defines
-Message-ID: <1432157112-19941-1-git-send-email-tony@atomide.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 20 May 2015 23:29:37 +0200
+Subject: [PATCH] ARM: multi_v7_defconfig: Add Atmel SAMA5 family
+In-Reply-To: <CAMAWPa_cKV95X3TNtcv9N3tB7w1XYkqqwFqqqDvdUhjFg=rpnQ@mail.gmail.com>
+References: <1428051678-20450-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <555AFF3F.10400@atmel.com> <9986808.t62JLgg5NJ@wuerfel>
+ <20150519123358.GA15179@piout.net> <555B3463.2060700@atmel.com>
+ <555B3A92.7010409@atmel.com> <555B4040.2090302@atmel.com>
+ <CAMAWPa95VTM+VgNpcs1oZwX9NqzrL1JeNy=MqL0Zo3JP=svyUQ@mail.gmail.com>
+ <20150520140856.GE3907@piout.net>
+ <CAMAWPa_cKV95X3TNtcv9N3tB7w1XYkqqwFqqqDvdUhjFg=rpnQ@mail.gmail.com>
+Message-ID: <20150520212937.GC3244@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix ldp gpio keys to use defines.
+On 20/05/2015 at 07:59:10 -0700, Kevin Hilman wrote :
+> > Hum, I'm pretty sure you see the heartbeat led blinking ;)
+> 
+> I don't see anything because this is automated testing. ;)
+> 
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/boot/dts/omap3-ldp.dts | 18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
+I was thinking that your job was looking at those boards with blinking
+LEDs while attending conference calls ;)
 
-diff --git a/arch/arm/boot/dts/omap3-ldp.dts b/arch/arm/boot/dts/omap3-ldp.dts
-index b699bc4..bd6e676 100644
---- a/arch/arm/boot/dts/omap3-ldp.dts
-+++ b/arch/arm/boot/dts/omap3-ldp.dts
-@@ -34,63 +34,63 @@
- 		key_enter {
- 			label = "enter";
- 			gpios = <&gpio4 5 GPIO_ACTIVE_LOW>; /* gpio101 */
--			linux,code = <0x0107001c>; /* KEY_ENTER */
-+			linux,code = <KEY_ENTER>;
- 			gpio-key,wakeup;
- 		};
- 
- 		key_f1 {
- 			label = "f1";
- 			gpios = <&gpio4 6 GPIO_ACTIVE_LOW>; /* gpio102 */
--			linux,code = <0x0303003b>; /* KEY_F1 */
-+			linux,code = <KEY_F1>;
- 			gpio-key,wakeup;
- 		};
- 
- 		key_f2 {
- 			label = "f2";
- 			gpios = <&gpio4 7 GPIO_ACTIVE_LOW>; /* gpio103 */
--			linux,code = <0x0403003c>; /* KEY_F2 */
-+			linux,code = <KEY_F2>;
- 			gpio-key,wakeup;
- 		};
- 
- 		key_f3 {
- 			label = "f3";
- 			gpios = <&gpio4 8 GPIO_ACTIVE_LOW>; /* gpio104 */
--			linux,code = <0x0503003d>; /* KEY_F3 */
-+			linux,code = <KEY_F3>;
- 			gpio-key,wakeup;
- 		};
- 
- 		key_f4 {
- 			label = "f4";
- 			gpios = <&gpio4 9 GPIO_ACTIVE_LOW>; /* gpio105 */
--			linux,code = <0x0704003e>; /* KEY_F4 */
-+			linux,code = <KEY_F4>;
- 			gpio-key,wakeup;
- 		};
- 
- 		key_left {
- 			label = "left";
- 			gpios = <&gpio4 10 GPIO_ACTIVE_LOW>; /* gpio106 */
--			linux,code = <0x04070069>; /* KEY_LEFT */
-+			linux,code = <KEY_LEFT>;
- 			gpio-key,wakeup;
- 		};
- 
- 		key_right {
- 			label = "right";
- 			gpios = <&gpio4 11 GPIO_ACTIVE_LOW>; /* gpio107 */
--			linux,code = <0x0507006a>; /* KEY_RIGHT */
-+			linux,code = <KEY_RIGHT>;
- 			gpio-key,wakeup;
- 		};
- 
- 		key_up {
- 			label = "up";
- 			gpios = <&gpio4 12 GPIO_ACTIVE_LOW>; /* gpio108 */
--			linux,code = <0x06070067>; /* KEY_UP */
-+			linux,code = <KEY_UP>;
- 			gpio-key,wakeup;
- 		};
- 
- 		key_down {
- 			label = "down";
- 			gpios = <&gpio4 13 GPIO_ACTIVE_LOW>; /* gpio109 */
--			linux,code = <0x0707006c>; /* KEY_DOWN */
-+			linux,code = <KEY_DOWN>;
- 			gpio-key,wakeup;
- 		};
- 	};
+> > I think I told you a while ago on IRC and this is part of the commit
+> > message. You have to use ttyAT0 instead of ttyS0 in your bootargs. I'm
+> > not sure how I can make that more obvious, I'm open to any idea.
+> 
+> If you told me, I forgot.  Sorry.
+> 
+
+No problem, it was in the previous development cycle, I was not
+expecting you to remember :)
+
+> That should solve it.  In the mean time, I'll have to tweak the
+> bootargs to have both ttyS0 and ttyATA0 because these boards are
+> tested on older kernels as well.
+
+Like said this is not really a matter of old/new kernel. The only thing
+that is changing is the selection of CONFIG_SERIAL_ATMEL_TTYAT. This
+option is not selected by sama5_defconfig but you could already build a
+kernel with it since 2.6.19.
+
 -- 
-2.1.4
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
