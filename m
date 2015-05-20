@@ -1,59 +1,37 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 20 May 2015 21:34:16 +0200
-Subject: schedule_timeout sleeps too long after dividing CPU frequency
-In-Reply-To: <12867692.bB1EJHiPzq@wuerfel>
-References: <20150514144239.GZ2067@n2100.arm.linux.org.uk>
- <20150518115452.GV2067@n2100.arm.linux.org.uk> <555CB499.7060600@free.fr>
- <12867692.bB1EJHiPzq@wuerfel>
-Message-ID: <555CE1B8.70205@free.fr>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 20 May 2015 20:35:47 +0100
+Subject: [RFC v1 01/25] ARM, irq: Use irq_desc_get_xxx() to avoid
+ redundant lookup of irq_desc
+In-Reply-To: <1432116013-25902-2-git-send-email-jiang.liu@linux.intel.com>
+References: <1432116013-25902-1-git-send-email-jiang.liu@linux.intel.com>
+ <1432116013-25902-2-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <20150520193547.GU2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/05/2015 20:50, Arnd Bergmann wrote:
+On Wed, May 20, 2015 at 05:59:49PM +0800, Jiang Liu wrote:
+> diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
+> index 5cc779c8e9c6..0d0844fa54c2 100644
+> --- a/arch/arm/common/sa1111.c
+> +++ b/arch/arm/common/sa1111.c
+> @@ -200,7 +200,7 @@ static void
+>  sa1111_irq_handler(unsigned int irq, struct irq_desc *desc)
+>  {
+>  	unsigned int stat0, stat1, i;
+> -	struct sa1111 *sachip = irq_get_handler_data(irq);
+> +	struct sa1111 *sachip = irq_desc_get_handler_data(desc);
+>  	void __iomem *mapbase = sachip->base + SA1111_INTC;
+>  
+>  	stat0 = sa1111_readl(mapbase + SA1111_INTSTATCLR0);
 
-> On Wednesday 20 May 2015 18:21:45 Mason wrote:
->>
->> On 18/05/2015 13:54, Russell King - ARM Linux wrote:
->>
->>> For a SoC where WFI is not programmed to cause anything other than
->>> the architecture specified dormant behaviour, WFI will not cause the
->>> TWD to stop.
->>
->> According to the hardware engineers, my SoC does not support any
->> low-power modes.
->>
->> But I didn't see the "clean" way to make the kernel aware of this.
->> Is this an acceptable patch? (I have my doubts.)
-> 
-> No, this is clearly broken.
+For this one only,
 
-I don't see it. Could you be more explicit?
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
->> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
->> index 6591e26..300f13a 100644
->> --- a/arch/arm/kernel/smp_twd.c
->> +++ b/arch/arm/kernel/smp_twd.c
->> @@ -295,6 +295,10 @@ static void twd_timer_setup(void)
->>         clk->name = "local_timer";
->>         clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
->>                         CLOCK_EVT_FEAT_C3STOP;
->> +#ifdef CONFIG_TANGOX
->> +       /*** Tango does not implement low power modes ***/
->> +       clk->features &= ~CLOCK_EVT_FEAT_C3STOP;
->> +#endif
->>         clk->rating = 350;
->>         clk->set_mode = twd_set_mode;
->>         clk->set_next_event = twd_set_next_event;
-> 
-> This will disable the feature on all machines that are configured 
-> in the kernel.
+Other maintainers are responsible for the others...
 
-What do you mean, "disable the feature"?
+Thanks.
 
-My proposed patch doesn't change the default, which is to set
-CLOCK_EVT_FEAT_C3STOP unconditionally for all machines.
-
-And then only for some platforms (in this case only TANGOX)
-CLOCK_EVT_FEAT_C3STOP is *removed* from the features list.
-
-Regards.
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
