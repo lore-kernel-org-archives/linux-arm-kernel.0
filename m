@@ -1,50 +1,62 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
-Date: Wed, 20 May 2015 06:52:03 -0500
-Subject: [V4 PATCH 1/6] ACPI / scan: Parse _CCA and setup device coherency
-In-Reply-To: <20150520100122.GD25313@e104818-lin.cambridge.arm.com>
-References: <1431724994-21601-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1431724994-21601-2-git-send-email-Suravee.Suthikulpanit@amd.com>
- <20150520100122.GD25313@e104818-lin.cambridge.arm.com>
-Message-ID: <555C7563.6080409@amd.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 20 May 2015 19:42:56 +0800
+Subject: [PATCH v2 0/5] clk: support clocks which requires parent clock
+ on during operation
+In-Reply-To: <1431610143-21853-1-git-send-email-aisheng.dong@freescale.com>
+References: <1431610143-21853-1-git-send-email-aisheng.dong@freescale.com>
+Message-ID: <20150520114253.GA6423@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/20/2015 5:01 AM, Catalin Marinas wrote:
-> On Fri, May 15, 2015 at 04:23:09PM -0500, Suravee Suthikulpanit wrote:
->> +static inline bool acpi_dma_is_supported(struct acpi_device *adev)
->> +{
->> +	/**
->> +	 * Currently, we mainly support _CCA=1 (i.e. is_coherent=1)
->> +	 * This should be equivalent to specifyig dma-coherent for
->> +	 * a device in OF.
->> +	 *
->> +	 * For the case when _CCA=0 (i.e. is_coherent=0 && cca_seen=1),
->> +	 * There are two approaches:
->> +	 * 1. Do not support and disable DMA.
->> +	 * 2. Support but rely on arch-specific cache maintenance for
->> +	 * non-coherence DMA operations. ARM64 is one example.
->> +	 *
->> +	 * For the case when _CCA is missing (i.e. cca_seen=0) but
->> +	 * platform specifies ACPI_CCA_REQUIRED, we do not support DMA,
->> +	 * and fallback to arch-specific default handling.
->> +	 *
->> +	 * See acpi_init_coherency() for more info.
->> +	 */
->> +	return adev && (adev->flags.is_coherent ||
->> +			(adev->flags.cca_seen && IS_ENABLED(CONFIG_ARM64)));
->> +}
->
-> I don't particularly like the check for CONFIG_ARM64 here but I
-> understand why it was added (I had the wrong impression that x86 can
-> cope with _CCA = 0).
->
-> Alternatively, we could leave it out (together with cca_seen) until
-> someone comes forward with a real use-case for _CCA = 0 on arm64. One
-> platform I'm aware of is Juno but even though it boot with ACPI, I
-> wouldn't call it a server platform.
+Hi Stephen,
 
-Ok. That seems to be what Arnd would prefer as well.  Let's just leave 
-the support for _CCA=0 out until it is needed then.
+On Thu, May 14, 2015 at 09:28:58PM +0800, Dong Aisheng wrote:
+> This patch series adds support in clock framework for clocks which operations
+> requires its parent clock is on.
+> 
+> Such clock type is initially met on Freescale i.MX7D platform that all clocks
+> operations, including enable/disable, rate change and re-parent, requires its
+> parent clock on. No sure if any other SoC has the similar clock type.
+> 
+> Current clock core can not support such type of clock well.
+> 
+> This patch introduce a new flag CLK_SET_PARENT_ON to handle this special case
+> in clock core that enable its parent clock firstly for each operation and disable
+> it later after operation complete.
+> 
+> The most special case is for set_parent() operation which requires both parent,
+> old one and new one, to be enabled at the same time during the operation.
+> 
+> The patch series is based on for-next branch of Michael's git:
+> git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git
+> 
+> Change Log v1->v2:
+>  Mainly addressed Stephen Boyd's comments
+>  * remove dupliciated code with __clk_set_parent_after
+>  * introduce more clk_core_x APIs for core easily use
+>  * move clk_disable_unused code position
+>  * use clk_core_x API to make code more clean and easily read
+> 
+> Dong Aisheng (5):
+>   clk: remove duplicated code with __clk_set_parent_after
+>   clk: introduce clk_core_enable_lock and clk_core_disable_lock
+>     functions
+>   clk: move clk_disable_unused after clk_core_disable_unprepare function
+>   clk: core: add CLK_OPS_PARENT_ON flags to support clocks require
+>     parent on
+>   clk: core: add CLK_OPS_PARENT_ON flags to support clocks require
+>     parent on
+> 
 
-Thanks,
-Suravee
+Can you help review this updated series?
+
+>  drivers/clk/clk.c            | 338 +++++++++++++++++++++++++------------------
+>  include/linux/clk-provider.h |   5 +
+>  2 files changed, 200 insertions(+), 143 deletions(-)
+> 
+> -- 
+> 1.9.1
+> 
+
+Regards
+Dong Aisheng
