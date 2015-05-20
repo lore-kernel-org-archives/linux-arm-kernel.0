@@ -1,32 +1,76 @@
-From: sebastien.szymanski@armadeus.com (=?UTF-8?q?S=C3=A9bastien=20Szymanski?=)
-Date: Wed, 20 May 2015 16:30:37 +0200
-Subject: [PATCH 1/1] ARM: clk-imx6q: refine sata's parent
-Message-ID: <1432132237-31004-1-git-send-email-sebastien.szymanski@armadeus.com>
+From: lznuaa@gmail.com (Zhi Li)
+Date: Wed, 20 May 2015 09:30:45 -0500
+Subject: [PATCH v2 0/7] Change snvs rtc and poweroff to use syscon add
+ pwrkey driver
+In-Reply-To: <20150520142205.GA24844@dragon>
+References: <1432055082-28983-1-git-send-email-Frank.Li@freescale.com>
+ <20150520015851.GB1071@dragon>
+ <CAHrpEqS5gAsu6=ut-mPwZiipqKJb=VicRooCPFhEf324kuhnDQ@mail.gmail.com>
+ <20150520142205.GA24844@dragon>
+Message-ID: <CAHrpEqSpeMO=zLyii8qZUznP+9EAQqJ-D3O8hbXj99m+UNvpzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to IMX6D/Q RM, table 18-3, sata clock's parent is ahb, not ipg.
+On Wed, May 20, 2015 at 9:22 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Tue, May 19, 2015 at 09:44:46PM -0500, Zhi Li wrote:
+>> On Tue, May 19, 2015 at 8:58 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+>> > On Wed, May 20, 2015 at 01:04:35AM +0800, Frank.Li at freescale.com wrote:
+>> >> From: Frank Li <Frank.Li@freescale.com>
+>> >>
+>> >> Change from v1 to v2
+>> >>  - Change simple-bus to simple-mfd
+>> >>  - RTC remove lock.
+>> >>  - RTC remove comments "These register offsets are relative to LP (Low Power) range"
+>> >>  - power off, remove extra space
+>> >>
+>> >> SNVS is MPF module.
+>> >> include rtc, power off, ON/OFF power key
+>> >>
+>> >>   arm: imx: power-off: change to syscon to access register
+>> >>   rtc: arm: imx: snvs: change use syscon to access register
+>> >> Above two patch change existed power-off and rtc use syscon
+>> >>
+>> >>   Document: dt: fsl: snvs: change support syscon
+>> >>   arm: dts: imx: update snvs to use syscon access register
+>> >> Update dt file and document
+>> >>
+>> >>   input: keyboard: imx: add snvs power key driver
+>> >>   document: devicetree: input: imx: i.mx snvs power device tree bindings
+>> >>   arm: dts: imx6sx: enable snvs power key
+>> >> Added on/off key driver
+>> >>
+>> >> Frank Li (6):
+>> >>   arm: imx: power-off: change to syscon to access register
+>> >>   rtc: arm: imx: snvs: change use syscon to access register
+>> >>   Document: dt: fsl: snvs: change support syscon
+>> >>   arm: dts: imx: update snvs to use syscon access register
+>> >>   document: devicetree: input: imx: i.mx snvs power device tree bindings
+>> >>   arm: dts: imx6sx: enable snvs power key
+>> >
+>> > So, the series will break existing DTBs for RTC and poweroff, right?
+>> > If this is unavoidable, should we at least have some warning messages
+>> > telling users about his breakage?
+>>
+>> How to do that?
+>> Just added it commit message or need runtime warning?
+>
+> runtime, so that users can know why their installed DTBs break with the
+> new kernel.
 
-This patch is based on branch:
-git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git imx/soc
++       snvs_np = of_get_parent(pdev->dev.of_node);
++       if (!snvs_np)
++               return -ENODEV;
++
++       data->snvs = syscon_node_to_regmap(snvs_np);
++       of_node_put(snvs_np);
++
++       if (!data->snvs) {
++               pr_err("Can't snvs syscon\n");
++               return -ENODEV;
++       }
 
-Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
----
- drivers/clk/imx/clk-imx6q.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+How about change error message to " Can't snvs syscon, probably use
+old dts file"?
 
-diff --git a/drivers/clk/imx/clk-imx6q.c b/drivers/clk/imx/clk-imx6q.c
-index 128f887..d046f8e 100644
---- a/drivers/clk/imx/clk-imx6q.c
-+++ b/drivers/clk/imx/clk-imx6q.c
-@@ -450,7 +450,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[IMX6QDL_CLK_GPMI_IO]      = imx_clk_gate2("gpmi_io",       "enfc",              base + 0x78, 28);
- 	clk[IMX6QDL_CLK_GPMI_APB]     = imx_clk_gate2("gpmi_apb",      "usdhc3",            base + 0x78, 30);
- 	clk[IMX6QDL_CLK_ROM]          = imx_clk_gate2("rom",           "ahb",               base + 0x7c, 0);
--	clk[IMX6QDL_CLK_SATA]         = imx_clk_gate2("sata",          "ipg",               base + 0x7c, 4);
-+	clk[IMX6QDL_CLK_SATA]         = imx_clk_gate2("sata",          "ahb",               base + 0x7c, 4);
- 	clk[IMX6QDL_CLK_SDMA]         = imx_clk_gate2("sdma",          "ahb",               base + 0x7c, 6);
- 	clk[IMX6QDL_CLK_SPBA]         = imx_clk_gate2("spba",          "ipg",               base + 0x7c, 12);
- 	clk[IMX6QDL_CLK_SPDIF]        = imx_clk_gate2("spdif",         "spdif_podf",        base + 0x7c, 14);
--- 
-2.0.5
+>
+> Shawn
