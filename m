@@ -1,83 +1,130 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 20 May 2015 10:33:35 +0200
-Subject: [PATCH v8 2/3] I2C: mediatek: Add driver for MediaTek I2C
- controller
-In-Reply-To: <1432108775.12796.11.camel@mtksdaap41>
-References: <1431967209-5261-1-git-send-email-eddie.huang@mediatek.com>
- <1431967209-5261-3-git-send-email-eddie.huang@mediatek.com>
- <20150518184300.GB28888@pengutronix.de>
- <1432089611.13819.9.camel@mtksdaap41>
- <20150520071152.GP24769@pengutronix.de>
- <1432108775.12796.11.camel@mtksdaap41>
-Message-ID: <20150520083335.GQ24769@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 20 May 2015 10:34:54 +0200
+Subject: [PATCH 01/15] thermal: consistently use int for temperatures
+In-Reply-To: <555C33EC.7050906@kapsi.fi>
+References: <1431507163-19933-1-git-send-email-s.hauer@pengutronix.de>
+ <1431507163-19933-2-git-send-email-s.hauer@pengutronix.de>
+ <555C33EC.7050906@kapsi.fi>
+Message-ID: <20150520083454.GM6325@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Eddie,
-
-On Wed, May 20, 2015 at 03:59:35PM +0800, Eddie Huang wrote:
-> On Wed, 2015-05-20 at 09:11 +0200, Uwe Kleine-K?nig wrote:
-> > On Wed, May 20, 2015 at 10:40:11AM +0800, Eddie Huang wrote:
-> > > On Mon, 2015-05-18 at 20:43 +0200, Uwe Kleine-K?nig wrote:
-> > > > On Tue, May 19, 2015 at 12:40:08AM +0800, Eddie Huang wrote:
-> > > > > +/* calculate i2c port speed */
-> > > > It would be nice to summarize the clock frequency settings here.
-> > > > Something like:
-> > > > 
-> > > > 	/*
-> > > > 	 * The input clock is divided by the value specified in the
-> > > > 	 * device tree as clock-div. The actual bus speed is then
-> > > > 	 * derived from this frequency by the following formula:
-> > > > 	 *  ....
-> > > > 
-> > > > This would make it possible to verify your calculations below.
-> > > 
-> > > The comment will be:
-> > > /*
-> > >  * khz: I2C bus clock
-> > >  * hclk: The input clock is divided by the value specified in the 
-> > >  *       device tree as clock-div
-> > and which one of the two clocks you're writing about is hclk now? I
-> > assume the divided one.
-> > >  * div = (sample_cnt + 1) * (step_cnt + 1)
-> > >  * khz = (hclk / 2) / div
-> > khz for the 2nd time.
-> > 
-> > >  *
-> > >  * The calculation is to get div value that let result of 
-> > >  * ((hclk / 2) / div) most approach and less than khz
-> > >  */
-> > I imagined something more hardware related. A list of register (or
-> > register bit fields) that influence the frequency and a formula
+On Wed, May 20, 2015 at 10:12:44AM +0300, Mikko Perttunen wrote:
+> On 05/13/15 11:52, Sascha Hauer wrote:
+> >The thermal code uses int, long and unsigned long for temperatures
+> >in different places. Using an unsigned type limits the thermal framework
+> >to positive temperatures without need. 'long' is 64bit on several
+> >architectures which is not needed. Consistently use a plain 'int'
+> >for temperatures.
+> >
+> >Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> >---
+> >...
 > 
-> > 	i2c_freq = parent_clk / clock-div * (...)
-> > 
-> > (It seems to be a bit more complicated here as there are two registers
-> > involved that are set differently depending on the target frequency.)
-> 
-> Yes, hardware is a little complicated. I rewrite the comment:
-> 
-> /*
->  * Calculate i2c port speed
->  *
->  * Hardware design:
->  * i2c_bus_freq = parent_clk / (clock-div * 2 * (sample_cnt) *
-> (step_cnt))
->  * clock-div: fixed in hardware, but may be various in different SoCs
-... fixed in hardware, but different on different SoCs.
+> It looks like some longs remain in db8500_thermal.c, int340x_thermal/*,
+> intel_soc_dts_thermal.c, kirkwood_thermal.c, rockchip_thermal.c and
+> samsung/exynos_tmu.c. (found by 'grep -R long drivers/thermal/*)
 
->  *
->  * The calculation want to pick the highest bus frequency that is still 
->  * less than or equal to i2c->speed_hz. and the calculation try to get 
->  * sample_cnt and step_cnt to fill in hardware register.
-"The calculation picks the highest bus frequency that is still less than
-or equal to i2c->speed_hz." and I'd drop the last sentence.
+I looked over it again and found the following. Sorry, I really thought
+I had compile tested all drivers. I found nothing in db8500_thermal.c,
+intel_soc_dts_thermal.c and rockchip_thermal.c though. There are some
+(unsigned)longs used as temperatures in these files, but I haven't
+changed them on purpose to not make the patch bigger as necessary. I
+only changed the places where (unsigned)longs are used as pointers.
+Do you think it's necessary to change all temperatures, even the ones
+only used internally in drivers?
 
-With that in mind I'll reply once more to the original patch.
+Sascha
 
-Best regards
-Uwe
+-----------------------8<------------------
+
+>From 4cf8fe3b3ef1bd9db6090305ea2b9995f0dbffa4 Mon Sep 17 00:00:00 2001
+From: Sascha Hauer <s.hauer@pengutronix.de>
+Date: Wed, 20 May 2015 10:28:39 +0200
+Subject: [PATCH] fixup! thermal: consistently use int for temperatures
+
+---
+ drivers/thermal/int340x_thermal/int3400_thermal.c          | 4 ++--
+ drivers/thermal/int340x_thermal/processor_thermal_device.c | 4 ++--
+ drivers/thermal/kirkwood_thermal.c                         | 2 +-
+ drivers/thermal/samsung/exynos_tmu.c                       | 2 +-
+ 4 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/thermal/int340x_thermal/int3400_thermal.c b/drivers/thermal/int340x_thermal/int3400_thermal.c
+index 96bdf8a..5836e55 100644
+--- a/drivers/thermal/int340x_thermal/int3400_thermal.c
++++ b/drivers/thermal/int340x_thermal/int3400_thermal.c
+@@ -186,7 +186,7 @@ static int int3400_thermal_run_osc(acpi_handle handle,
+ }
+ 
+ static int int3400_thermal_get_temp(struct thermal_zone_device *thermal,
+-			unsigned long *temp)
++			int *temp)
+ {
+ 	*temp = 20 * 1000; /* faked temp sensor with 20C */
+ 	return 0;
+@@ -231,7 +231,7 @@ static int int3400_thermal_set_mode(struct thermal_zone_device *thermal,
+ 	return result;
+ }
+ 
+-static const struct thermal_zone_device_ops int3400_thermal_ops = {
++static struct thermal_zone_device_ops int3400_thermal_ops = {
+ 	.get_temp = int3400_thermal_get_temp,
+ };
+ 
+diff --git a/drivers/thermal/int340x_thermal/processor_thermal_device.c b/drivers/thermal/int340x_thermal/processor_thermal_device.c
+index 5e8d8e9..c8afd34 100644
+--- a/drivers/thermal/int340x_thermal/processor_thermal_device.c
++++ b/drivers/thermal/int340x_thermal/processor_thermal_device.c
+@@ -139,7 +139,7 @@ static int get_tjmax(void)
+ 	return -EINVAL;
+ }
+ 
+-static int read_temp_msr(unsigned long *temp)
++static int read_temp_msr(int *temp)
+ {
+ 	int cpu;
+ 	u32 eax, edx;
+@@ -171,7 +171,7 @@ err_ret:
+ }
+ 
+ static int proc_thermal_get_zone_temp(struct thermal_zone_device *zone,
+-					 unsigned long *temp)
++					 int *temp)
+ {
+ 	int ret;
+ 
+diff --git a/drivers/thermal/kirkwood_thermal.c b/drivers/thermal/kirkwood_thermal.c
+index abba3e2..5bcdbd6 100644
+--- a/drivers/thermal/kirkwood_thermal.c
++++ b/drivers/thermal/kirkwood_thermal.c
+@@ -33,7 +33,7 @@ struct kirkwood_thermal_priv {
+ };
+ 
+ static int kirkwood_get_temp(struct thermal_zone_device *thermal,
+-			  unsigned long *temp)
++			  int *temp)
+ {
+ 	unsigned long reg;
+ 	struct kirkwood_thermal_priv *priv = thermal->devdata;
+diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
+index 29eaf4d..ed55fd9 100644
+--- a/drivers/thermal/samsung/exynos_tmu.c
++++ b/drivers/thermal/samsung/exynos_tmu.c
+@@ -812,7 +812,7 @@ out:
+ #else
+ #define exynos4412_tmu_set_emulation NULL
+ #define exynos5440_tmu_set_emulation NULL
+-static int exynos_tmu_set_emulation(void *drv_data,	unsigned long temp)
++static int exynos_tmu_set_emulation(void *drv_data, int temp)
+ 	{ return -EINVAL; }
+ #endif /* CONFIG_THERMAL_EMULATION */
+ 
+-- 
+2.1.4
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
