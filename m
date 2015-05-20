@@ -1,36 +1,40 @@
-From: weigelt@melag.de (Enrico Weigelt, metux IT consult)
-Date: Wed, 20 May 2015 14:38:46 +0200
-Subject: hardware aac codec on imx53 ?
-In-Reply-To: <CAOMZO5CxSOVNcJSxLQcu0nKM=abEXfxK3CQve5JYXVQ7dTTGDg@mail.gmail.com>
-References: <555B236B.10506@melag.de>
- <CAOMZO5CxSOVNcJSxLQcu0nKM=abEXfxK3CQve5JYXVQ7dTTGDg@mail.gmail.com>
-Message-ID: <555C8056.4090300@melag.de>
+From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
+Date: Wed, 20 May 2015 14:39:57 +0200
+Subject: at91sam9: watchdog: period
+In-Reply-To: <20150519120433.763a416e@bbrezillon>
+References: <55559D55.6020703@aksignal.cz>	<20150515172516.005e3a21@bbrezillon>	<5559865F.9010502@aksignal.cz>	<20150518092750.449d6c8c@bbrezillon>	<5559A029.9060007@aksignal.cz>	<555AA8F1.80100@atmel.com>	<20150519091442.675b1a98@bbrezillon>	<555AFBFD.3010506@aksignal.cz>	<20150519111402.747e8eb2@bbrezillon>	<555B07D0.4030000@aksignal.cz>
+ <20150519120433.763a416e@bbrezillon>
+Message-ID: <555C809D.8090407@aksignal.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 20.05.2015 um 04:27 schrieb Fabio Estevam:
-> On Tue, May 19, 2015 at 8:50 AM, Enrico Weigelt, metux IT consult
-> <weigelt@melag.de> wrote:
->> Hi folks,
->>
->> I've heared that i.MX53 has an hardware AAC codec.
->>
->> Is that correct ? And if it is, do we already have drivers support
->> for it ?
+
+
+On 19.5.2015 12:04, Boris Brezillon wrote:
+>> I'm confused. Why need kernel to know the time in witch userspace process will reset watchdog?
 >
-> No, AAC decoding is done in software.
+> This time is not exposed to userspace, it's the internal heartbeat used
+> by the driver to refresh the watchdog.
 
-Okay, thanks.
+Kernel driver does refresh? For what is utility "watchdog" in busybox?
+When I stop this util then it will reboot.
 
-Any idea what their proprietary / binary-only aac codec library is for ?
-Just an software codec ?
+>
+>> And how to change watchdog expiration time?
+>
+> With the atmel,max-heartbeat-sec property.
 
+No effect on it, still 61s.
 
-cu
---
-Enrico Weigelt, metux IT consult
-+49-151-27565287
-MELAG Medizintechnik oHG Sitz Berlin Registergericht AG Charlottenburg HRA 21333 B
+>
+> Anyway, that does not explain why your system takes 61 secs to trigger
+> a reset (instead of 16 secs).
+> Can you try to revert this commit [1] ?
 
-Wichtiger Hinweis: Diese Nachricht kann vertrauliche oder nur f?r einen begrenzten Personenkreis bestimmte Informationen enthalten. Sie ist ausschlie?lich f?r denjenigen bestimmt, an den sie gerichtet worden ist. Wenn Sie nicht der Adressat dieser E-Mail sind, d?rfen Sie diese nicht kopieren, weiterleiten, weitergeben oder sie ganz oder teilweise in irgendeiner Weise nutzen. Sollten Sie diese E-Mail irrt?mlich erhalten haben, so benachrichtigen Sie bitte den Absender, indem Sie auf diese Nachricht antworten. Bitte l?schen Sie in diesem Fall diese Nachricht und alle Anh?nge, ohne eine Kopie zu behalten.
-Important Notice: This message may contain confidential or privileged information. It is intended only for the person it was addressed to. If you are not the intended recipient of this email you may not copy, forward, disclose or otherwise use it or any part of it in any form whatsoever. If you received this email in error please notify the sender by replying and delete this message and any attachments without retaining a copy.
+Because of our company internet policy I can't clone git so I tried kernel 3.18.13.
+No change, still 61s.
+
+>
+>
+> [1]https://git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git/commit/drivers/watchdog/at91sam9_wdt.c?id=d677772e1358924bf487cd833bdc4d50f3f6f64d
+>
