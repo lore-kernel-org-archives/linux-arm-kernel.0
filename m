@@ -1,43 +1,75 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 20 May 2015 13:21:53 +0200
-Subject: [RFC PATCH 1/4] spi: spidev: Add Google SPI flash compatible
- string
-In-Reply-To: <20150520103746.GD21577@sirena.org.uk>
-References: <1432042454-19234-1-git-send-email-javier.martinez@collabora.co.uk>
- <1432042454-19234-2-git-send-email-javier.martinez@collabora.co.uk>
- <20150520101318.GB21577@sirena.org.uk> <555C5F65.7010204@collabora.co.uk>
- <20150520103746.GD21577@sirena.org.uk>
-Message-ID: <555C6E51.5030601@collabora.co.uk>
+From: treding@nvidia.com (Thierry Reding)
+Date: Wed, 20 May 2015 13:32:33 +0200
+Subject: [PATCH] drm/nouveau/platform: fix compilation if !CONFIG_IOMMU
+In-Reply-To: <1432102224-15169-1-git-send-email-acourbot@nvidia.com>
+References: <555BD66A.5020704@nvidia.com>
+ <1432102224-15169-1-git-send-email-acourbot@nvidia.com>
+Message-ID: <20150520113231.GA21937@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mark,
-
-On 05/20/2015 12:37 PM, Mark Brown wrote:
-> On Wed, May 20, 2015 at 12:18:13PM +0200, Javier Martinez Canillas wrote:
->> On 05/20/2015 12:13 PM, Mark Brown wrote:
+On Wed, May 20, 2015 at 03:10:24PM +0900, Alexandre Courbot wrote:
+> The lack of IOMMU API support can make nouveau_platform_probe_iommu()
+> fail to compile because struct iommu_ops is then empty. Fix this by
+> skipping IOMMU probe in that case - lack of IOMMU on platform devices
+> is sub-optimal, but is not an error.
 > 
->> > This is adding a binding with no documentation, documentation is
->> > mandatory for all bindings.
+> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+> ---
+> This is an alternative to https://lkml.org/lkml/2015/5/19/484. Most users
+> of Nouveau do not care about IOMMU support, so we should not impose that
+> option on them.
 > 
->> Yes, I missed... sorry about that. Do you agree with the approach
->> though so I can re-spin the patches adding the missing DT binding?
+>  drm/nouveau/nouveau_platform.c | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
 > 
-> It's probably OK but I didn't really drill through since the binding was
-> missing.  If these parts are commodity as described it seems surprising
-> that they aren't compatible with any existing kernel driver.
-> 
+> diff --git a/drivers/gpu/drm/nouveau/nouveau_platform.c b/drivers/gpu/drm/nouveau/nouveau_platform.c
+> index 775277f1edb0..dcfbbfaf1739 100644
+> --- a/drivers/gpu/drm/nouveau/nouveau_platform.c
+> +++ b/drivers/gpu/drm/nouveau/nouveau_platform.c
+> @@ -92,6 +92,8 @@ static int nouveau_platform_power_down(struct nouveau_platform_gpu *gpu)
+>  	return 0;
+>  }
+>  
+> +#if IS_ENABLED(CONFIG_IOMMU_API)
+> +
+>  static void nouveau_platform_probe_iommu(struct device *dev,
+>  					 struct nouveau_platform_gpu *gpu)
+>  {
+> @@ -158,6 +160,20 @@ static void nouveau_platform_remove_iommu(struct device *dev,
+>  	}
+>  }
+>  
+> +#else
+> +
+> +static void nouveau_platform_probe_iommu(struct device *dev,
+> +					 struct nouveau_platform_gpu *gpu)
+> +{
+> +}
+> +
+> +static void nouveau_platform_remove_iommu(struct device *dev,
+> +					  struct nouveau_platform_gpu *gpu)
+> +{
+> +}
+> +
+> +#endif
+> +
 
-The ChromeOS user-space just uses flashrom to send a raw stream of bytes
-via spidev to the SPI NOR flash chip. There is drivers/mtd/spi-nor/spi-nor.c
-but AFAIU there are some limitations when interfacing the flash through
-the MTD layer, for example there isn't a way to set the SPI flash write
-protection through MTD. But I'll do some investigation before re-spinning
-the patches.
+Since these are all static functions, perhaps an "if (IS_ENABLED(...))"
+would work here? That way you'd get compile coverage of the code in all
+cases.
 
-BTW, the other "rohm,dh2228fv" compatible string in spidev added by commit
-8fad805bdc52 ("spi: spidev: Add Rohm DH2228FV DAC compatible string"), also
-does not have a documented DT binding so that should be fixed as well.
+But perhaps that doesn't work for IOMMU. I have a vague memory of
+running across something like this before and IOMMU has this quirk of
+defining struct iommu_ops as empty if IOMMU_API is deselected so you'll
+probably get compiler errors unless you actually preprocess the code
+out.
 
-Best regards,
-Javier
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150520/b2177925/attachment.sig>
