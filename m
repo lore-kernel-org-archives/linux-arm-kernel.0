@@ -1,52 +1,39 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Wed, 20 May 2015 09:34:39 +0800
-Subject: [PATCH] tty: serial/8250: remove console dependency for mediatek
-In-Reply-To: <2421682.546VBfrkgn@wuerfel>
-References: <2421682.546VBfrkgn@wuerfel>
-Message-ID: <1432085679.18194.1.camel@mtksdaap41>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 19 May 2015 18:37:48 -0700
+Subject: [PATCH 00/12] treewide: Use DECLARE_BITMAP
+Message-ID: <cover.1432085659.git.joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Use the standard method to declare a bitmap array.
 
-On Tue, 2015-05-19 at 22:11 +0200, Arnd Bergmann wrote:
-> If the mediatek serial port driver is built-in, but serial
-> console is disabled in Kconfig (e.g. when the serial driver
-> itself is a loadable module), we get this build error:
-> 
-> drivers/built-in.o: In function `early_mtk8250_setup':
-> undefined reference to `early_serial8250_setup'
-> 
-> To avoid that problem, this patch encloses the early_mtk8250_setup
-> function in #ifdef CONFIG_SERIAL_8250_CONSOLE, the same symbol
-> that guards the early_serial8250_setup function.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
-> index 4488c2bdb7ba..78883ca64ddd 100644
-> --- a/drivers/tty/serial/8250/8250_mtk.c
-> +++ b/drivers/tty/serial/8250/8250_mtk.c
-> @@ -305,6 +305,7 @@ static struct platform_driver mtk8250_platform_driver = {
->  };
->  module_platform_driver(mtk8250_platform_driver);
->  
-> +#ifdef CONFIG_SERIAL_8250_CONSOLE
->  static int __init early_mtk8250_setup(struct earlycon_device *device,
->  					const char *options)
->  {
-> @@ -317,6 +318,7 @@ static int __init early_mtk8250_setup(struct earlycon_device *device,
->  }
->  
->  OF_EARLYCON_DECLARE(mtk8250, "mediatek,mt6577-uart", early_mtk8250_setup);
-> +#endif
->  
->  MODULE_AUTHOR("Matthias Brugger");
->  MODULE_LICENSE("GPL");
-> 
+Joe Perches (12):
+  ARM: mach-imx: iomux-imx31: Use DECLARE_BITMAP
+  dmaengine: rcar-dmac: Use DECLARE_BITMAP
+  drm/amdkfd: Use DECLARE_BITMAP
+  drm/radeon: Use DECLARE_BITMAP
+  IB/ehca: Use DECLARE_BITMAP
+  bcache: Use DECLARE_BITMAP
+  spider_net: Use DECLARE_BITMAP
+  s390/sclp: Use DECLARE_BITMAP
+  [SCSI] qla4xxx: Use DECLARE_BITMAP
+  scsi: Use DECLARE_BITMAP
+  logfs: Use DECLARE_BITMAP
+  sunrpc: Use DECLARE_BITMAP
 
-Acked-by: Eddie Huang <eddie.huang@mediatek.com>
+ arch/arm/mach-imx/iomux-imx31.c           | 2 +-
+ drivers/dma/sh/rcar-dmac.c                | 2 +-
+ drivers/gpu/drm/amd/amdkfd/kfd_priv.h     | 5 ++---
+ drivers/gpu/drm/radeon/radeon.h           | 2 +-
+ drivers/infiniband/hw/ehca/ipz_pt_fn.h    | 2 +-
+ drivers/md/bcache/journal.c               | 2 +-
+ drivers/net/ethernet/toshiba/spider_net.c | 3 +--
+ drivers/s390/char/sclp_cmd.c              | 2 +-
+ drivers/scsi/qla4xxx/ql4_def.h            | 2 +-
+ drivers/scsi/sr.c                         | 2 +-
+ fs/logfs/logfs.h                          | 2 +-
+ net/sunrpc/auth_gss/svcauth_gss.c         | 2 +-
+ 12 files changed, 13 insertions(+), 15 deletions(-)
 
-Thanks your correction.
-
-Eddie
+-- 
+2.1.2
