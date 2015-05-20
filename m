@@ -1,49 +1,51 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 20 May 2015 14:46:23 +0200
-Subject: [PATCH] ARM: at91/dt: at91sam9x5: fix usart1 sck pin definition
-In-Reply-To: <20150520124154.GB3907@piout.net>
-References: <1432125370-21092-1-git-send-email-nicolas.ferre@atmel.com>
- <20150520124154.GB3907@piout.net>
-Message-ID: <555C821F.7090104@atmel.com>
+From: robert.richter@caviumnetworks.com (Robert Richter)
+Date: Wed, 20 May 2015 14:48:27 +0200
+Subject: [PATCH 1/4] arm64: gicv3: its: Encode domain number in PCI
+ stream id
+In-Reply-To: <20150520131138.2c94a32a@why.wild-wind.fr.eu.org>
+References: <1430686172-18222-1-git-send-email-rric@kernel.org>
+ <1430686172-18222-2-git-send-email-rric@kernel.org>
+ <20150520131138.2c94a32a@why.wild-wind.fr.eu.org>
+Message-ID: <20150520124827.GF10428@rric.localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 20/05/2015 14:41, Alexandre Belloni a ?crit :
-> On 20/05/2015 at 14:36:10 +0200, Nicolas Ferre wrote :
->> SCK1 pin is pioC 29. Comment was okay.
->>
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> ---
->>  arch/arm/boot/dts/at91sam9x5.dtsi | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
->> index 9c236c317eeb..dfdbdf43860e 100644
->> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
->> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
->> @@ -505,7 +505,7 @@
->>  
->>  					pinctrl_usart1_sck: usart1_sck-0 {
->>  						atmel,pins =
->> -							<AT91_PIOC 28 AT91_PERIPH_C AT91_PINCTRL_NONE>;	/* PC29 periph C */
->> +							<AT91_PIOC 29 AT91_PERIPH_C AT91_PINCTRL_NONE>;	/* PC29 periph C */
+Mark,
+
+thanks for review, also of the other patches of this series.
+
+See below
+
+On 20.05.15 13:11:38, Marc Zyngier wrote:
+> > -	dev_alias->dev_id = alias;
+> > +	dev_alias->dev_id = (pci_domain_nr(pdev->bus) << 16) | alias;
+
+> This feels very scary. We're now assuming that the domain number will
+> always be presented to the doorbell. What guarantee do we have that
+> this is always the case, irrespective of the platform?
 > 
-> I think you should remove the comment. As you can see, it didn't help ;)
+> Also, domains have no PCI reality, they are a Linux thing. And they can
+> be "randomly" assigned, unless you force the domain in DT with a
+> linux,pci-domain property. This looks even more wrong, specially
+> considering ACPI.
 
-I agree, but didn't do it in this patch because the whole file is
-stuffed with these useless comments... We'd better do it in a single
-patch or... leave it like this...
+The main problem here is that device ids (32 bits) are system
+specific. Since we have more than one PCI root complex we need the
+upper 16 bits in the devid for mapping. Using pci_domain_nr for this
+fits our needs for now and shouldn't affect systems with a single RC
+only as the domain nr is zero then.
 
-Bye,
+The domain number is incremented during initialization beginnig with
+zero and the order of it is fixed since it is taken from DT or ACPI
+tables. So we have full controll of it. I don't see issues here.
 
->>  					};
->>  				};
->>  
->> -- 
->> 2.1.3
->>
-> 
+> It really feels like we need a way to describe how the BDF numbering is
+> augmented. We also need to guarantee that we get the actual bridge
+> number, as opposed to the domain number.
 
+But true, the obove is just intermediate. In the end we need some sort
+of handler that is setup during cpu initialization that registers a
+callback for the gic to determine the device id of that paricular
+system.
 
--- 
-Nicolas Ferre
+-Robert
