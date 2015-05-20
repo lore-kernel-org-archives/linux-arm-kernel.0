@@ -1,185 +1,39 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 20 May 2015 16:18:56 +0200
-Subject: [PATCH 1/5] soc: mediatek: Add infracfg misc driver support
+Date: Wed, 20 May 2015 16:19:00 +0200
+Subject: [PATCH 5/5] ARM64: MediaTek MT8173: Add SCPSYS device node
 In-Reply-To: <1432131540-2523-1-git-send-email-s.hauer@pengutronix.de>
 References: <1432131540-2523-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1432131540-2523-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1432131540-2523-6-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for some miscellaneous bits of the infracfg controller.
-The mtk_infracfg_set/clear_bus_protection functions are necessary for
-the scpsys power domain driver to handle the bus protection bits which
-are contained in the infacfg register space.
+This adds the SCPSYS device node to the MT8173 dtsi file.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/soc/mediatek/Kconfig          |  9 ++++
- drivers/soc/mediatek/Makefile         |  1 +
- drivers/soc/mediatek/mtk-infracfg.c   | 94 +++++++++++++++++++++++++++++++++++
- include/linux/soc/mediatek/infracfg.h | 26 ++++++++++
- 4 files changed, 130 insertions(+)
- create mode 100644 drivers/soc/mediatek/mtk-infracfg.c
- create mode 100644 include/linux/soc/mediatek/infracfg.h
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
-index bcdb22d..e4f37a3 100644
---- a/drivers/soc/mediatek/Kconfig
-+++ b/drivers/soc/mediatek/Kconfig
-@@ -1,6 +1,15 @@
- #
- # MediaTek SoC drivers
- #
-+config MTK_INFRACFG
-+	bool "MediaTek INFRACFG Support"
-+	depends on ARCH_MEDIATEK
-+	select REGMAP
-+	help
-+	  Say yes here to add support for the MediaTek INFRACFG controller. The
-+	  INFRACFG controller contains various infrastructure registers not
-+	  directly associated to any device.
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index 924fdb6..12430f0 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -125,6 +125,16 @@
+ 						<GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
+ 		};
+ 
++		scpsys: scpsys at 10006000 {
++			compatible = "mediatek,mt8173-scpsys";
++			#power-domain-cells = <1>;
++			reg = <0 0x10006000 0 0x1000>;
++			clocks = <&clk26m>,
++				 <&topckgen CLK_TOP_MM_SEL>;
++			clock-names = "mfg", "mm";
++			infracfg = <&infracfg>;
++		};
 +
- config MTK_PMIC_WRAP
- 	tristate "MediaTek PMIC Wrapper Support"
- 	depends on ARCH_MEDIATEK
-diff --git a/drivers/soc/mediatek/Makefile b/drivers/soc/mediatek/Makefile
-index ecaf4de..3fa940f 100644
---- a/drivers/soc/mediatek/Makefile
-+++ b/drivers/soc/mediatek/Makefile
-@@ -1 +1,2 @@
-+obj-$(CONFIG_MTK_INFRACFG) += mtk-infracfg.o
- obj-$(CONFIG_MTK_PMIC_WRAP) += mtk-pmic-wrap.o
-diff --git a/drivers/soc/mediatek/mtk-infracfg.c b/drivers/soc/mediatek/mtk-infracfg.c
-new file mode 100644
-index 0000000..d80ee5a
---- /dev/null
-+++ b/drivers/soc/mediatek/mtk-infracfg.c
-@@ -0,0 +1,94 @@
-+/*
-+ * Copyright (c) 2015 Pengutronix, Sascha Hauer <kernel@pengutronix.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/export.h>
-+#include <linux/jiffies.h>
-+#include <linux/module.h>
-+#include <linux/regmap.h>
-+#include <linux/soc/mediatek/infracfg.h>
-+#include <asm/processor.h>
-+
-+#define INFRA_TOPAXI_PROTECTEN		0x0220
-+#define INFRA_TOPAXI_PROTECTSTA1	0x0228
-+
-+/**
-+ * mtk_infracfg_set_bus_protection - enable bus protection
-+ * @regmap: The infracfg regmap
-+ * @mask: The mask containing the protection bits to be enabled.
-+ *
-+ * This function enables the bus protection bits for disabled power
-+ * domains so that the system does not hanf when some unit accesses the
-+ * bus while in power down.
-+ */
-+int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask)
-+{
-+	unsigned long expired;
-+	u32 val;
-+	int ret;
-+
-+	regmap_update_bits(infracfg, INFRA_TOPAXI_PROTECTEN, mask, mask);
-+
-+	expired = jiffies + HZ;
-+
-+	while (1) {
-+		ret = regmap_read(infracfg, INFRA_TOPAXI_PROTECTSTA1, &val);
-+		if (ret)
-+			return ret;
-+
-+		if ((val & mask) == mask)
-+			break;
-+
-+		cpu_relax();
-+		if (time_after(jiffies, expired))
-+			return -EIO;
-+	}
-+
-+	return 0;
-+}
-+
-+/**
-+ * mtk_infracfg_clear_bus_protection - disable bus protection
-+ * @regmap: The infracfg regmap
-+ * @mask: The mask containing the protection bits to be disabled.
-+ *
-+ * This function disables the bus protection bits previously enabled with
-+ * mtk_infracfg_set_bus_protection.
-+ */
-+int mtk_infracfg_clear_bus_protection(struct regmap *infracfg, u32 mask)
-+{
-+	unsigned long expired;
-+	int ret;
-+
-+	regmap_update_bits(infracfg, INFRA_TOPAXI_PROTECTEN, mask, 0);
-+
-+	expired = jiffies + HZ;
-+
-+	while (1) {
-+		u32 val;
-+
-+		ret = regmap_read(infracfg, INFRA_TOPAXI_PROTECTSTA1, &val);
-+		if (ret)
-+			return ret;
-+
-+		if (!(val & mask))
-+			break;
-+
-+		cpu_relax();
-+		if (time_after(jiffies, expired))
-+			return -EIO;
-+	}
-+
-+	return 0;
-+}
-+
-+MODULE_LICENSE("GPL v2");
-diff --git a/include/linux/soc/mediatek/infracfg.h b/include/linux/soc/mediatek/infracfg.h
-new file mode 100644
-index 0000000..a5714e9
---- /dev/null
-+++ b/include/linux/soc/mediatek/infracfg.h
-@@ -0,0 +1,26 @@
-+#ifndef __SOC_MEDIATEK_INFRACFG_H
-+#define __SOC_MEDIATEK_INFRACFG_H
-+
-+#define MT8173_TOP_AXI_PROT_EN_MCI_M2		BIT(0)
-+#define MT8173_TOP_AXI_PROT_EN_MM_M0		BIT(1)
-+#define MT8173_TOP_AXI_PROT_EN_MM_M1		BIT(2)
-+#define MT8173_TOP_AXI_PROT_EN_MMAPB_S		BIT(6)
-+#define MT8173_TOP_AXI_PROT_EN_L2C_M2		BIT(9)
-+#define MT8173_TOP_AXI_PROT_EN_L2SS_SMI		BIT(11)
-+#define MT8173_TOP_AXI_PROT_EN_L2SS_ADD		BIT(12)
-+#define MT8173_TOP_AXI_PROT_EN_CCI_M2		BIT(13)
-+#define MT8173_TOP_AXI_PROT_EN_MFG_S		BIT(14)
-+#define MT8173_TOP_AXI_PROT_EN_PERI_M0		BIT(15)
-+#define MT8173_TOP_AXI_PROT_EN_PERI_M1		BIT(16)
-+#define MT8173_TOP_AXI_PROT_EN_DEBUGSYS		BIT(17)
-+#define MT8173_TOP_AXI_PROT_EN_CQ_DMA		BIT(18)
-+#define MT8173_TOP_AXI_PROT_EN_GCPU		BIT(19)
-+#define MT8173_TOP_AXI_PROT_EN_IOMMU		BIT(20)
-+#define MT8173_TOP_AXI_PROT_EN_MFG_M0		BIT(21)
-+#define MT8173_TOP_AXI_PROT_EN_MFG_M1		BIT(22)
-+#define MT8173_TOP_AXI_PROT_EN_MFG_SNOOP_OUT	BIT(23)
-+
-+int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask);
-+int mtk_infracfg_clear_bus_protection(struct regmap *infracfg, u32 mask);
-+
-+#endif /* __SOC_MEDIATEK_INFRACFG_H */
+ 		sysirq: intpol-controller at 10200620 {
+ 			compatible = "mediatek,mt8173-sysirq",
+ 					"mediatek,mt6577-sysirq";
 -- 
 2.1.4
