@@ -1,29 +1,26 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 20 May 2015 17:16:39 +0200
-Subject: Problems with device tree PMC clocks and threadirqs on at91
-In-Reply-To: <CANfhG66vxOxXB+jZYz_UhbjFpRL6ceMGJD+K5X0H_js=3U1_Zw@mail.gmail.com>
-References: <555C8117.9010508@pcs.com> <20150520151008.76e180db@bbrezillon>
- <CANfhG66vxOxXB+jZYz_UhbjFpRL6ceMGJD+K5X0H_js=3U1_Zw@mail.gmail.com>
-Message-ID: <20150520171639.03d6d081@bbrezillon>
+From: pratyush.anand@gmail.com (Pratyush Anand)
+Date: Wed, 20 May 2015 20:48:34 +0530
+Subject: [PATCH v2 1/2] PCI: designware: consolidate outbound iATU
+ programming functions
+In-Reply-To: <1430382149-1645-2-git-send-email-jszhang@marvell.com>
+References: <1430382149-1645-1-git-send-email-jszhang@marvell.com>
+ <1430382149-1645-2-git-send-email-jszhang@marvell.com>
+Message-ID: <CAHM4w1n5+xk7Xymo4erxzw-ojC0z76uZe9C5k=9Rrt-TgbaO_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 May 2015 17:14:02 +0200
-"D. Dueck" <davidcdueck@googlemail.com> wrote:
+On Thu, Apr 30, 2015 at 1:52 PM, Jisheng Zhang <jszhang@marvell.com> wrote:
+> Currently, the outbound iATU programming functions are similar, the only
+> difference is index, type, addr and size. This patch tries to consolidate
+> these functions into one. One side effect is it saves around 1700 bytes in
+> text:
+>
+>    text    data     bss     dec     hex filename
+>    9276     204       4    9484    250c pcie-designware.o-before
+>    7532     204       4    7740    1e3c pcie-designware.o
+>
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 
-> 2015-05-20 15:10 GMT+02:00 Boris Brezillon <boris.brezillon@free-electrons.com>:
-> 
-> > That's my favorite option. But it also implies modify all other
-> > interrupts handler registered on irq line 1 to use IRQF_NO_THREAD (PMC,
-> > RTC, WDT, ...)
-> 
-> And those handlers currently take spin locks. So that is also not that simple.
+looks fine to me.
 
-Yes, I forgot that aspect, thanks for the reminder.
-
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Acked-by: Pratyush Anand <pratyush.anand@gmail.com>
