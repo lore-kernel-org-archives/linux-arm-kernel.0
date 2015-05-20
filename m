@@ -1,84 +1,105 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 21 May 2015 00:22:28 +0100
-Subject: NFS client broken in 4.1.0-rc2
-In-Reply-To: <20150515145013.GM2067@n2100.arm.linux.org.uk>
-References: <20150515142403.GL2067@n2100.arm.linux.org.uk>
- <F423EE93-1A93-42F8-8593-9D2E4F85CB3B@oracle.com>
- <20150515145013.GM2067@n2100.arm.linux.org.uk>
-Message-ID: <20150520232228.GC2067@n2100.arm.linux.org.uk>
+From: jonathar@broadcom.com (Jonathan Richardson)
+Date: Wed, 20 May 2015 16:38:02 -0700
+Subject: [PATCH 2/2] misc: Add initial Digital Timing Engine (DTE) driver
+ for cygnus
+In-Reply-To: <20150514113054.GB1580@localhost.localdomain>
+References: <1429744923-2007-1-git-send-email-jonathar@broadcom.com>
+ <5543CD73.2030902@broadcom.com> <20150501203004.3add2c95@lxorguk.ukuu.org.uk>
+ <9193036.7UYD2OGJHk@wuerfel> <554D1649.2030106@broadcom.com>
+ <20150513153544.GC2065@localhost.localdomain> <5553AAEA.30503@broadcom.com>
+ <20150513202716.GA15878@localhost.localdomain>
+ <5553DD7D.8090905@broadcom.com> <20150514113054.GB1580@localhost.localdomain>
+Message-ID: <555D1ADA.8070308@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 15, 2015 at 03:50:14PM +0100, Russell King - ARM Linux wrote:
-> On Fri, May 15, 2015 at 10:26:48AM -0400, Chuck Lever wrote:
-> > On May 15, 2015, at 10:24 AM, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > > While trying to update a kernel and modules on one of my test systems,
-> > > I was greeted by these errors:
-> > > 
-> > > tar: lib/modules/4.1.0-rc2+/kernel/drivers/media/platform/coda/coda.ko: Cannot utime
-> > > tar: lib/modules/4.1.0-rc2+/kernel/drivers/media/dvb-frontends/drx39xyj/drx39xyj.ko: Cannot utime
-> > > tar: lib/modules/4.1.0-rc2+/kernel/drivers/media/usb/em28xx/em28xx.ko: Cannot utime
-> > > tar: lib/modules/4.1.0-rc2+/kernel/drivers/usb/serial/option.ko: Cannot utime
-> > > tar: lib/modules/4.1.0-rc2+/kernel/drivers/usb/serial/ftdi_sio.ko: Cannot utime
-> > > tar: lib/modules/4.1.0-rc2+/kernel/drivers/net/wireless/brcm80211/brcmfmac/brcmfmac.ko: Cannot utime
-> > > tar: lib/modules/4.1.0-rc2+/kernel/drivers/input/mouse/psmouse.ko: Cannot utime
-> > > tar: lib/modules/4.1.0-rc2+/kernel/fs/udf/udf.ko: Cannot utime
-> > > tar: lib/modules/4.1.0-rc2+/kernel/fs/fuse/fuse.ko: Cannot utime
-> > > tar: lib/modules/4.1.0-rc2+/kernel/fs/nfsd/nfsd.ko: Cannot utime
-> > > tar: lib/modules/4.1.0-rc2+/kernel/sound/soc/codecs/snd-soc-wm8962.ko: Cannot utime
-> > > tar: lib/modules/4.1.0-rc2+/kernel/net/bluetooth/bluetooth.ko: Cannot utime
-> > > tar: lib/modules/4.1.0-rc2+/modules.alias.bin: Cannot utime
-> > > tar: lib/modules/4.1.0-rc2+/modules.alias: Cannot utime
-> > > tar: Exiting with failure status due to previous errors
-> > > 
-> > > Searching google wasn't helpful, as all the "Cannot utime" errors that
-> > > google could find are followed by an errno string.
-> > > 
-> > > stracing at first sight didn't seem to be helpful, as no syscalls (apart
-> > > from openat() with a pre-existing file) were failing.
-> > > 
-> > > Having recently updated to fc21 tar generating the archive, I thought
-> > > maybe it was a tar format bug between fc21 tar and the target's tar.
-> > > That was until I tried to "apt-get source tar" on the target, and was
-> > > greeted by the same error.
-> > > 
-> > > So I then tried untaring the tar source archive onto a ramfs, which
-> > > worked without complaint.  The difference being that it's a root NFS
-> > > box, and so I was untaring onto NFS.
-> > > 
-> > > Here's the entry from /proc/mounts:
-> > > 
-> > > x.y.z.221:/var/boot/ci on / type nfs (rw,nolock,vers=4,addr=x.y.z.221,clientaddr=a.b.c.55)
-> > > 
-> > > Looking closer at the strace reveals this:
-> > > 
-> > > openat(AT_FDCWD, "lib/modules/4.1.0-rc2+/kernel/drivers/media/platform/coda/coda.ko", O_WRONLY|O_CREAT|O_EXCL|O_NOCTTY|O_NONBLOCK|O_LARGEFILE|O_CLOEXEC, 0600) = -1 EEXIST (File exists)
-> > > unlinkat(AT_FDCWD, "lib/modules/4.1.0-rc2+/kernel/drivers/media/platform/coda/coda.ko", 0) = 0
-> > > openat(AT_FDCWD, "lib/modules/4.1.0-rc2+/kernel/drivers/media/platform/coda/coda.ko", O_WRONLY|O_CREAT|O_EXCL|O_NOCTTY|O_NONBLOCK|O_LARGEFILE|O_CLOEXEC, 0600) = 4
-> > > write(4, "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\1\0(\0\1\0\0\0\0\0\0\0\0\0\0\0"..., 4096) = 4096
-> > > ...
-> > > write(4, "\300H\0\0\34\345\1\0\314H\0\0\34\345\1\0\330H\0\0\34\345\1\0<I\0\0\34\370\1\0"..., 7312) = 7312
-> > > dup2(4, 4)                              = 4
-> > > fstat64(4, {st_mode=0757221, st_size=13181880119170311768, ...}) = 21
-> > > write(2, "tar: ", 5)                    = 5
-> > > write(2, "lib/modules/4.1.0-rc2+/kernel/dr"..., 79) = 79
-> > > write(2, "\n", 1)                       = 1
-> > > fchown32(4, 0, 0)                       = 0
-> > > fchmod(4, 0664)                         = 0
-> > > close(4)                                = 0
-> > > 
-> > > Look closely at that fstat64, and you'll notice that it's returning crap.
-> > 
-> > This is likely fixed by:
-> > 
-> >   http://marc.info/?l=linux-nfs&m=143095122604344&w=2
+On 15-05-14 04:30 AM, Richard Cochran wrote:
+> On Wed, May 13, 2015 at 04:25:49PM -0700, Jonathan Richardson wrote:
+>> On 15-05-13 01:27 PM, Richard Cochran wrote:
+>>> If the ISR is delivering batches of time stamps, then the interrupt
+>>> rate aught to be the highest rate that the system can support.
+>>
+>> It to nanosecond precision so it can be ridiculously quick.
 > 
-> Yes, it appears to be fixed by that change.  I'll add it to my tree so
-> my test systems work.
+> Your interrupt rate directly controls the worst case delay between the
+> time the event occurs and the time the application (or stack) obtains
+> the time stamp.  You want this delay to be as short as possible, but
+> you cannot afford to bog down the entire operating system.  I would
+> suggest a fixed value of 1000 Hz (with perhaps a debugfs knob).
+> 
+> What a poor hardware design.  Oh well.
+> 
+>> Having separate FIFO's allows process A to only retrieve channel 1
+>> timestamps.
+> 
+> Having lots of different processes reading time stamps directly, and
+> trying to match them up with various HW events after the fact, is not
+> way to go.  Instead, kernel time stamp consumers should pair the time
+> stamps with the associated events and then provide the time
+> information conveniently over the existing APIs. (See also my last
+> comment.)
+> 
+>> Our original non PTP driver ioctl (DTE_GET_TIMESTAMP) solved that
+>> problem because we could specify a channel. We're now trying to adapt it
+>> to PTP so we don't have to write a new "DTE" user and kernel side API.
+> 
+> For mainline, we want the best interface possible.  Sometimes that
+> means that programs based on out-of-tree interfaces will need to be
+> changed.
+> 
+>>> Ideally, there will be kernel consumers for most of the channels, and
+>>> they will forward the time stamps in a way appropriate to their
+>>> subsystem.  For example, network devices will use so_timestamping. 
+>>> Any "leftover" channels can go through the generic PTP interface.
+>>
+>> I'll look more into so_timestamping to see how that's used but we wanted
+>> one generic interface to get timestamps from channels because anything
+>> can be hooked up to a channel.
+> 
+> I definitely do *not* want one generic interface.  The task of
+> matching time stamps with hardware events belongs to the kernel.  For
+> random GPIOs, the existing PTP ioctl is plenty good enough, but for
+> other devices (network, audio) more work is needed.
 
-I notice NFS patches were merged by Linus recently, but this patch was not
-in the set.  Is this patch scheduled to go in for 4.1?
+Richard, this design isn't going to work. We need to have both kernel
+and user space consumers. We don't want all GPIO's in a common timestamp
+buffer either, as it presents problems I mentioned previously. Currently
+the network input is a gpio. After some discussion here I think we'll
+have to keep this driver out of the kernel for now.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Thanks.
+
+> 
+> One huge lacuna in your patch series is the code that associates the
+> time stamps with events.  How is this supposed to work?
+> 
+> So far you have:
+> 
+> +enum dte_client {
+> +       DTE_CLIENT_MIN = 0,
+> +       DTE_CLIENT_I2S0_BITCLOCK = 0,
+> +       DTE_CLIENT_I2S1_BITCLOCK,
+> +       DTE_CLIENT_I2S2_BITCLOCK,
+> +       DTE_CLIENT_I2S0_WORDCLOCK,
+> +       DTE_CLIENT_I2S1_WORDCLOCK,
+> +       DTE_CLIENT_I2S2_WORDCLOCK,
+> +       DTE_CLIENT_LCD_CLFP,
+> +       DTE_CLIENT_LCD_CLLP,
+> +       DTE_CLIENT_GPIO14,
+> +       DTE_CLIENT_GPIO15,
+> +       DTE_CLIENT_GPIO22,
+> +       DTE_CLIENT_GPIO23,
+> +       DTE_CLIENT_MAX,
+> +};
+> 
+> Network devices are not present at all.  No idea why LCD signals are
+> included.  For the i2s, this appears to stamp the audio clock.  But
+> which audio sample has been stamped?  Or do you only care about
+> frequency and not phase?
+> 
+> For the next round, please include John Stulz, Thomas Gleixner,
+> netdev, and the appropriate audio list on CC.
+> 
+> Thanks,
+> Richard
+> 
