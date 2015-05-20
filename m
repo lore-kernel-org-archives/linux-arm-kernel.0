@@ -1,23 +1,53 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 20 May 2015 12:09:12 +0200
-Subject: [PATCH] ARM: dts: atlas7: add pinctrl and gpio descriptions
-In-Reply-To: <1432109307-19720-1-git-send-email-21cnbao@gmail.com>
-References: <1432109307-19720-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <CACRpkdZ4nbX1NB2u=3iNTMABkTdkvhe_uiRLy8NM=dhO9a3Obw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 20 May 2015 12:08:31 +0200
+Subject: [RFC 7/7] ARM: dts: sun9i: Add secure SRAM node used for MCPM
+ SMP hotplug
+In-Reply-To: <1431583811-25780-8-git-send-email-wens@csie.org>
+References: <1431583811-25780-1-git-send-email-wens@csie.org>
+ <1431583811-25780-8-git-send-email-wens@csie.org>
+Message-ID: <20150520100831.GE4004@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 10:08 AM, Barry Song <21cnbao@gmail.com> wrote:
+On Thu, May 14, 2015 at 02:10:11PM +0800, Chen-Yu Tsai wrote:
+> The A80 stores some magic flags in a portion of the secure SRAM. The
+> BROM jumps directly to the software entry point set by the SMP code
+> if the flags are set. This is required for CPU0 hotplugging.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  arch/arm/boot/dts/sun9i-a80.dtsi | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+> index 1507bd2a88f0..0695215634d4 100644
+> --- a/arch/arm/boot/dts/sun9i-a80.dtsi
+> +++ b/arch/arm/boot/dts/sun9i-a80.dtsi
+> @@ -366,6 +366,26 @@
+>  		 */
+>  		ranges = <0 0 0 0x20000000>;
+>  
+> +		sram_b: sram at 00020000 {
+> +			/* 256 KiB secure SRAM at 0x20000 */
+> +			compatible = "mmio-sram";
+> +			reg = <0x00020000 0x40000>;
+> +
 
-> From: Wei Chen <Wei.Chen@csr.com>
->
-> This patch adds pinctrl and gpio stuff according to the atlas7
-> pinctrl driver.
->
-> Signed-off-by: Wei Chen <Wei.Chen@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+We should probably add a property to that SRAM to tell the driver not
+to access it if we're not booted in secure mode.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Otherwise, bad things might happen.
 
-Yours,
-Linus Walleij
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150520/f4294a49/attachment.sig>
