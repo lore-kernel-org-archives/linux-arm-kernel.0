@@ -1,33 +1,25 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 20 May 2015 20:16:53 +0200
-Subject: [PATCH 4/5] ARM: shmobile: henninger dts: Replace "nor-jedec" by
- "jedec, spi-nor"
-In-Reply-To: <1432145814-12442-1-git-send-email-geert+renesas@glider.be>
-References: <1432145814-12442-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1432145814-12442-5-git-send-email-geert+renesas@glider.be>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 20 May 2015 11:17:08 -0700
+Subject: [PATCH] arm: dts: Beaglebone i2c definitions
+In-Reply-To: <20150514153822.GJ15563@atomide.com>
+References: <1431504274-32084-1-git-send-email-pantelis.antoniou@konsulko.com>
+ <20150514153822.GJ15563@atomide.com>
+Message-ID: <20150520181708.GL10274@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cfr. commit 8947e396a8296c52 ('Documentation: dt: mtd: replace
-"nor-jedec" binding with "jedec, spi-nor"')
+* Tony Lindgren <tony@atomide.com> [150514 08:40]:
+> * Pantelis Antoniou <pantelis.antoniou@konsulko.com> [150513 01:05]:
+> > The beaglebone family of boards contain two I2C busses enabled.
+> > The first one with a baseboard identification EEPROM and a
+> > cape I2C bus.
+> 
+> This seems safe to apply as the i2c2 pins are listed in the cape
+> specification.
+> 
+> These pins could be used for other devices too.. But in that case
+> the cape would not follow the cape standard.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/boot/dts/r8a7791-henninger.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+So applying this one into omap-for-v4.2/dt thanks.
 
-diff --git a/arch/arm/boot/dts/r8a7791-henninger.dts b/arch/arm/boot/dts/r8a7791-henninger.dts
-index bb80122b4113bd8a..655d1804e5e9ceda 100644
---- a/arch/arm/boot/dts/r8a7791-henninger.dts
-+++ b/arch/arm/boot/dts/r8a7791-henninger.dts
-@@ -226,7 +226,7 @@
- 	flash at 0 {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
--		compatible = "spansion,s25fl512s", "nor-jedec";
-+		compatible = "spansion,s25fl512s", "jedec,spi-nor";
- 		reg = <0>;
- 		spi-max-frequency = <30000000>;
- 		spi-tx-bus-width = <4>;
--- 
-1.9.1
+Tony
