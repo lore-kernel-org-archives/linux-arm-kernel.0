@@ -1,58 +1,87 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 20 May 2015 13:11:38 +0100
-Subject: [PATCH 1/4] arm64: gicv3: its: Encode domain number in PCI
- stream id
-In-Reply-To: <1430686172-18222-2-git-send-email-rric@kernel.org>
+Date: Wed, 20 May 2015 13:14:38 +0100
+Subject: [PATCH 2/4] arm64: gicv3: its: Add range check for number of
+ allocated pages
+In-Reply-To: <1430686172-18222-3-git-send-email-rric@kernel.org>
 References: <1430686172-18222-1-git-send-email-rric@kernel.org>
- <1430686172-18222-2-git-send-email-rric@kernel.org>
-Message-ID: <20150520131138.2c94a32a@why.wild-wind.fr.eu.org>
+ <1430686172-18222-3-git-send-email-rric@kernel.org>
+Message-ID: <20150520131438.6e94e661@why.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 3 May 2015 21:49:29 +0100
+On Sun, 3 May 2015 21:49:30 +0100
 Robert Richter <rric@kernel.org> wrote:
 
-> From: Tirumalesh Chalamarla <tchalamarla@cavium.com>
+> From: Robert Richter <rrichter@cavium.com>
 > 
-> PCI stream ids need to consider pci bridge number to be unique on the
-> system. Using only bus and devfn can't do the trick in systems that
-> have multiple pci bridges.
+> The number of pages for the its table may exceed the maximum of 256.
+> Adding a range check and limitting the number to its maximum.
 > 
-> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@cavium.com>
+> Based on a patch from Tirumalesh Chalamarla <tchalamarla@cavium.com>.
+> 
 > Signed-off-by: Robert Richter <rrichter@cavium.com>
-> ---
->  drivers/irqchip/irq-gic-v3-its.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 9687f8afebff..e30b4de04c6c 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -1186,7 +1186,7 @@ static int its_get_pci_alias(struct pci_dev *pdev, u16 alias, void *data)
->  {
->  	struct its_pci_alias *dev_alias = data;
->  
-> -	dev_alias->dev_id = alias;
-> +	dev_alias->dev_id = (pci_domain_nr(pdev->bus) << 16) | alias;
->  	if (pdev != dev_alias->pdev)
->  		dev_alias->count += its_pci_msi_vec_count(dev_alias->pdev);
->  
 
-This feels very scary. We're now assuming that the domain number will
-always be presented to the doorbell. What guarantee do we have that
-this is always the case, irrespective of the platform?
+Looks good to me.
 
-Also, domains have no PCI reality, they are a Linux thing. And they can
-be "randomly" assigned, unless you force the domain in DT with a
-linux,pci-domain property. This looks even more wrong, specially
-considering ACPI.
-
-It really feels like we need a way to describe how the BDF numbering is
-augmented. We also need to guarantee that we get the actual bridge
-number, as opposed to the domain number.
-
-Thoughts?
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
 	M.
+
+> ---
+>  drivers/irqchip/irq-gic-v3-its.c   | 11 ++++++++++-
+>  include/linux/irqchip/arm-gic-v3.h |  1 +
+>  2 files changed, 11 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index e30b4de04c6c..a2619a1d5bb3 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -810,6 +810,7 @@ static int its_alloc_tables(struct its_node *its)
+>  		u64 entry_size = GITS_BASER_ENTRY_SIZE(val);
+>  		int order = get_order(psz);
+>  		int alloc_size;
+> +		int alloc_pages;
+>  		u64 tmp;
+>  		void *base;
+>  
+> @@ -837,6 +838,14 @@ static int its_alloc_tables(struct its_node *its)
+>  		}
+>  
+>  		alloc_size = (1 << order) * PAGE_SIZE;
+> +		alloc_pages = (alloc_size / psz);
+> +		if (alloc_pages > GITS_BASER_PAGES_MAX) {
+> +			alloc_pages = GITS_BASER_PAGES_MAX;
+> +			order = get_order(GITS_BASER_PAGES_MAX * psz);
+> +			pr_warn("%s: Device Table too large, reduce its page order to %u (%u pages)\n",
+> +				its->msi_chip.of_node->full_name, order, alloc_pages);
+> +		}
+> +
+>  		base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
+>  		if (!base) {
+>  			err = -ENOMEM;
+> @@ -865,7 +874,7 @@ static int its_alloc_tables(struct its_node *its)
+>  			break;
+>  		}
+>  
+> -		val |= (alloc_size / psz) - 1;
+> +		val |= alloc_pages - 1;
+>  
+>  		writeq_relaxed(val, its->base + GITS_BASER + i * 8);
+>  		tmp = readq_relaxed(its->base + GITS_BASER + i * 8);
+> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+> index ffbc034c8810..f28da189c4aa 100644
+> --- a/include/linux/irqchip/arm-gic-v3.h
+> +++ b/include/linux/irqchip/arm-gic-v3.h
+> @@ -229,6 +229,7 @@
+>  #define GITS_BASER_PAGE_SIZE_16K	(1UL << GITS_BASER_PAGE_SIZE_SHIFT)
+>  #define GITS_BASER_PAGE_SIZE_64K	(2UL << GITS_BASER_PAGE_SIZE_SHIFT)
+>  #define GITS_BASER_PAGE_SIZE_MASK	(3UL << GITS_BASER_PAGE_SIZE_SHIFT)
+> +#define GITS_BASER_PAGES_MAX		256
+>  
+>  #define GITS_BASER_TYPE_NONE		0
+>  #define GITS_BASER_TYPE_DEVICE		1
+
+
+
 -- 
 Without deviation from the norm, progress is not possible.
