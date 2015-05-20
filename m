@@ -1,53 +1,68 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 20 May 2015 22:56:15 +0100
-Subject: [PATCH v2 0/7] Change snvs rtc and poweroff to use syscon add
- pwrkey driver
-In-Reply-To: <CAHrpEqSngMgOj5Bjp0XWpw9CJCjoiU63iRuAX3Zw_aEO+-5RHg@mail.gmail.com>
-References: <1432055082-28983-1-git-send-email-Frank.Li@freescale.com>
- <20150520015851.GB1071@dragon>
- <20150520182540.GQ2067@n2100.arm.linux.org.uk>
- <20150520183050.GR2067@n2100.arm.linux.org.uk>
- <CAHrpEqSngMgOj5Bjp0XWpw9CJCjoiU63iRuAX3Zw_aEO+-5RHg@mail.gmail.com>
-Message-ID: <20150520215615.GZ2067@n2100.arm.linux.org.uk>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 20 May 2015 23:56:31 +0200
+Subject: schedule_timeout sleeps too long after dividing CPU frequency
+In-Reply-To: <76003699.Oyq777txnm@wuerfel>
+References: <20150514144239.GZ2067@n2100.arm.linux.org.uk>
+ <20150520201438.GW2067@n2100.arm.linux.org.uk> <555CF17D.4060500@free.fr>
+ <76003699.Oyq777txnm@wuerfel>
+Message-ID: <555D030F.8030100@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 01:44:58PM -0500, Zhi Li wrote:
-> On Wed, May 20, 2015 at 1:30 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > Looking at the RTC code, it would be pretty trivial to do.
-> >
-> > Rather than passing around struct regmap, pass around the private data
-> > structure.
-> >
-> > Rename the regmap_* function calls to be private accessors.  Implement
-> > a set of new accessors - if the private data has the regmap, use the
-> > regmap API.  Otherwise, use the old method, and print a warning that an
-> > old DT is being used.
+On 20/05/2015 22:52, Arnd Bergmann wrote:
+
+> On Wednesday 20 May 2015 22:41:33 Mason wrote:
+>
+>> Oh... I didn't even think it made sense (and was supported)
+>> to select more than one machine...
+>>
+>> Is this related to CONFIG_ARCH_MULTIPLATFORM?
 > 
-> This method work.  But code will become ugly and complex. I seach
-> whole dts tree.
-> Only imx6 use this driver.
-> 
-> Does it really valuable to keep compatiblity with cost of complex driver code?
+> Yes. In the old days, each platform had its own entry in the top-level
+> choice statement, which meant they were mutually exclusive. Most of
+> them are converted now and can be put into a single kernel with
+> CONFIG_ARCH_MULTIPLATFORM, and we stopped accepting new ones that
+> don't do this a few years ago.
 
-Let me put this a different way.
+Is the following patch (more) acceptable:
 
-Would you be upset if you installed a new kernel, rebooted and found that
-the system then fscked your filesystem, stamping a date of 1 Jan 1970
-on it.  Then you use a later dtb, and you have to go through another
-fsck of your filesystem because it's apparently been more than "31 days"
-or so since it was last fscked, and all this caused by the RTC vanishing
-because we couldn't be bothered with backward compatibility?
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index 6591e26fc13f..3e867b2f067f 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -32,6 +32,7 @@ static void __iomem *twd_base;
+ static struct clk *twd_clk;
+ static unsigned long twd_timer_rate;
+ static DEFINE_PER_CPU(bool, percpu_setup_called);
++static int feat_c3stop = CLOCK_EVT_FEAT_C3STOP;
+ 
+ static struct clock_event_device __percpu *twd_evt;
+ static int twd_ppi;
+@@ -294,7 +295,7 @@ static void twd_timer_setup(void)
+ 
+        clk->name = "local_timer";
+        clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
+-                       CLOCK_EVT_FEAT_C3STOP;
++                       feat_c3stop;
+        clk->rating = 350;
+        clk->set_mode = twd_set_mode;
+        clk->set_next_event = twd_set_next_event;
+@@ -346,6 +347,7 @@ static int __init twd_local_timer_common_register(struct device_node *np)
+                goto out_irq;
+ 
+        twd_get_clock(np);
++       if (of_get_property(np, "twd_never_stops", NULL)) feat_c3stop = 0;
+ 
+        /*
+         * Immediately configure the timer on the boot CPU, unless we need
 
-There are real products out there which use iMX6 today.  In production,
-being sold.
 
-Do not break existing DTBs unless there really is no other choice.
+Or perhaps the other way around?
+i.e. feat_c3stop initialized to 0 (thus in the bss section)
+and set to FEAT_C3STOP if "twd_never_stops" doesn't exist...
 
-And I don't think it makes the code ugly, though it does make it _slightly_
-more complex.  That's a price worth paying for keeping stuff working.
+Russell, when you added the FEAT_C3STOP flag unconditionally in
+commit 5388a6b266, didn't that potentially break platforms that
+didn't expect the flag to be set?
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Regards.
