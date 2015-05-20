@@ -1,57 +1,67 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 20 May 2015 11:24:15 +0300
-Subject: [PATCHv3 00/10] ARM: DRA7: add display support
-In-Reply-To: <1430906938-26128-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1430906938-26128-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <555C44AF.2040800@ti.com>
+From: wei.liu2@citrix.com (Wei Liu)
+Date: Wed, 20 May 2015 09:26:50 +0100
+Subject: [Xen-devel] [RFC 21/23] net/xen-netback: Make it running on 64KB
+ page granularity
+In-Reply-To: <555BBFA7.8030502@citrix.com>
+References: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
+ <1431622863-28575-22-git-send-email-julien.grall@citrix.com>
+ <20150515023534.GE19352@zion.uk.xensource.com> <5555E81E.8070803@citrix.com>
+ <20150515153143.GA8521@zion.uk.xensource.com> <5559D6EE.3030400@citrix.com>
+ <20150518125406.GA9503@zion.uk.xensource.com> <555BBFA7.8030502@citrix.com>
+Message-ID: <20150520082650.GU26335@zion.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, May 19, 2015 at 11:56:39PM +0100, Julien Grall wrote:
 
-On 06/05/15 13:08, Tomi Valkeinen wrote:
-> Hi,
 > 
-> This series adds the arch/arm/ side of the display support for DRA7 (DRA72x,
-> DRA74x, AM54xx) SoCs. Also support for HDMI output on x15 and DRA72 EVM boards
-> is added.
+> >>diff --git a/drivers/net/xen-netback/common.h b/drivers/net/xen-netback/common.h
+> >>index 0eda6e9..c2a5402 100644
+> >>--- a/drivers/net/xen-netback/common.h
+> >>+++ b/drivers/net/xen-netback/common.h
+> >>@@ -204,7 +204,7 @@ struct xenvif_queue { /* Per-queue data for xenvif */
+> >>  /* Maximum number of Rx slots a to-guest packet may use, including the
+> >>   * slot needed for GSO meta-data.
+> >>   */
+> >>-#define XEN_NETBK_RX_SLOTS_MAX (MAX_SKB_FRAGS + 1)
+> >>+#define XEN_NETBK_RX_SLOTS_MAX ((MAX_SKB_FRAGS + 1) * XEN_PFN_PER_PAGE)
+> >>
+> >>  enum state_bit_shift {
+> >>         /* This bit marks that the vif is connected */
+> >>
+> >>The function xenvif_wait_for_rx_work never returns. I guess it's because there
+> >>is not enough slot available.
+> >>
+> >>For 64KB page granularity we ask for 16 times more slots than 4KB page
+> >>granularity. Although, it's very unlikely that all the slot will be used.
+> >>
+> >>FWIW I pointed out the same problem on blkfront.
+> >>
+> >
+> >This is not going to work. The ring in netfront / netback has only 256
+> >slots. Now you ask for netback to reserve more than 256 slots -- (17 +
+> >1) * (64 / 4) = 288, which can never be fulfilled. See the call to
+> >xenvif_rx_ring_slots_available.
+> >
+> >I think XEN_NETBK_RX_SLOTS_MAX derived from the fact the each packet to
+> >the guest cannot be larger than 64K. So you might be able to
+> >
+> >#define XEN_NETBK_RX_SLOTS_MAX ((65536 / XEN_PAGE_SIZE) + 1)
 > 
-> This series is v3, and is based on v4.1-rc2. There are no differences to v2,
-> except rebased and tested.
+> I didn't know that packet cannot be larger than 64KB. That's simply a lot
+> the problem.
 > 
->  Tomi
-> 
-> Tomi Valkeinen (10):
->   arm/dts: dra7xx: add 'ti,set-rate-parent' for dss_dss_clk
->   ARM: DRA7: hwmod: add DMM hwmod description
->   ARM: DRA7: hwmod: set DSS submodule parent hwmods
->   ARM: OMAP: display: change compat names to array
->   ARM: OMAP2+: display: detect DRA7 DSS
->   arm/dts: dra7.dtsi: add DSS support
->   arm/dts: dra72-evm.dts: add HDMI
->   arm/dts: am57xx-beagle-x15.dts: add HDMI
->   arm: dra7: add DESHDCP clock
->   CLK: TI: always enable DESHDCP clock
-> 
->  arch/arm/boot/dts/am57xx-beagle-x15.dts   |  81 ++++++++++++++++++++++
->  arch/arm/boot/dts/dra7.dtsi               |  43 ++++++++++++
->  arch/arm/boot/dts/dra72-evm.dts           | 110 ++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/dra72x.dtsi             |  11 +++
->  arch/arm/boot/dts/dra74x.dtsi             |  15 ++++
->  arch/arm/boot/dts/dra7xx-clocks.dtsi      |  11 +++
->  arch/arm/mach-omap2/display.c             |  32 +++++----
->  arch/arm/mach-omap2/omap_hwmod_7xx_data.c |  33 +++++++++
->  drivers/clk/ti/clk-7xx.c                  |   8 ++-
->  9 files changed, 328 insertions(+), 16 deletions(-)
 
-Ping. Any comments? Can we get this into the next merge window?
+I think about this more, you will need one more slot for GSO
+information, so make it ((65536 / XEN_PAGE_SIZE) + 1 + 1).
 
- Tomi
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150520/f16222d0/attachment.sig>
+> >
+> >Blk driver may have a different story. But the default ring size (1
+> >page) yields even less slots than net (given that sizeof(union(req/rsp))
+> >is larger IIRC).
+> 
+> I will see with Roger for Blkback.
+> 
+> 
+> -- 
+> Julien Grall
