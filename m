@@ -1,103 +1,58 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Wed, 20 May 2015 22:05:25 +0800
-Subject: [PATCH v2 4/9] clocksource: mediatek: Use GPT as sched clock
- source
-In-Reply-To: <CABuKBeJhdRBBw1v1kj8J0YFVWZ27vzx5W=XU8jiwePVgL_7g_g@mail.gmail.com>
-References: <1431763110-443-1-git-send-email-yingjoe.chen@mediatek.com>
- <1431763110-443-5-git-send-email-yingjoe.chen@mediatek.com>
- <CABuKBeJhdRBBw1v1kj8J0YFVWZ27vzx5W=XU8jiwePVgL_7g_g@mail.gmail.com>
-Message-ID: <1432130725.20394.24.camel@mtksdaap41>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Wed, 20 May 2015 16:06:31 +0200
+Subject: [PATCH v5 07/12] mtd: nand: add Samsung K9GBG08U0A-M to nand_ids
+ table
+In-Reply-To: <555792FC.8030407@vanguardiasur.com.ar>
+References: <1431356341-31640-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1431356341-31640-8-git-send-email-antoine.tenart@free-electrons.com>
+ <555792FC.8030407@vanguardiasur.com.ar>
+Message-ID: <20150520140631.GN22054@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-05-20 at 13:02 +0200, Matthias Brugger wrote:
-> 2015-05-16 9:58 GMT+02:00 Yingjoe Chen <yingjoe.chen@mediatek.com>:
-> > When cpu is in deep idle, arch timer will stop counting. Setup GPT as
-> > sched clock source so it can keep counting in idle.
-> >
-> > Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+On Sat, May 16, 2015 at 03:57:00PM -0300, Ezequiel Garcia wrote:
+> On 05/11/2015 11:58 AM, Antoine Tenart wrote:
+> > Add the full description of the Samsung K9GBG08U0A-M nand chip in the
+> > nand_ids table.
+> > 
+> > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 > > ---
-> >  drivers/clocksource/mtk_timer.c | 10 ++++++++++
-> >  1 file changed, 10 insertions(+)
-> >
-> > diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
-> > index 91206f9..fe7cf72 100644
-> > --- a/drivers/clocksource/mtk_timer.c
-> > +++ b/drivers/clocksource/mtk_timer.c
-> > @@ -24,6 +24,7 @@
-> >  #include <linux/of.h>
-> >  #include <linux/of_address.h>
-> >  #include <linux/of_irq.h>
-> > +#include <linux/sched_clock.h>
-> >  #include <linux/slab.h>
-> >
-> >  #define GPT_IRQ_EN_REG         0x00
-> > @@ -59,6 +60,13 @@ struct mtk_clock_event_device {
-> >         struct clock_event_device dev;
-> >  };
-> >
-> > +static void __iomem *gpt_base __read_mostly;
-> > +
-> > +static u64 notrace mtk_read_sched_clock(void)
-> > +{
-> > +       return readl_relaxed(gpt_base + TIMER_CNT_REG(GPT_CLK_SRC));
-> > +}
-> > +
-> >  static inline struct mtk_clock_event_device *to_mtk_clk(
-> >                                 struct clock_event_device *c)
-> >  {
-> > @@ -243,6 +251,8 @@ static void __init mtk_timer_init(struct device_node *node)
-> >         mtk_timer_setup(evt, GPT_CLK_SRC, TIMER_CTRL_OP_FREERUN, 1);
-> >         clocksource_mmio_init(evt->gpt_base + TIMER_CNT_REG(GPT_CLK_SRC),
-> >                         node->name, rate, 300, 32, clocksource_mmio_readl_up);
-> > +       gpt_base = evt->gpt_base;
+> >  drivers/mtd/nand/nand_ids.c | 4 ++++
+> >  1 file changed, 4 insertions(+)
+> > 
+> > diff --git a/drivers/mtd/nand/nand_ids.c b/drivers/mtd/nand/nand_ids.c
+> > index dd620c19c619..500c33e1db06 100644
+> > --- a/drivers/mtd/nand/nand_ids.c
+> > +++ b/drivers/mtd/nand/nand_ids.c
+> > @@ -50,6 +50,10 @@ struct nand_flash_dev nand_flash_ids[] = {
+> >  		{ .id = {0xad, 0xde, 0x94, 0xda, 0x74, 0xc4} },
+> >  		  SZ_8K, SZ_8K, SZ_2M, 0, 6, 640, NAND_ECC_INFO(40, SZ_1K),
+> >  		  4 },
+> > +	{"NAND 4GiB 3,3V 8-bit",
+> > +		{ .id = {0xec, 0xd7, 0x94, 0x76, 0x64, 0x43}, },
+> > +		  8192, 4096, SZ_1M, LP_OPTIONS, 0, 0, NAND_ECC_INFO(40, SZ_1K),
 > 
-> This is really hacky. We should clean up the code and provide
-> mtk_clock_event_device globally.
-> Please add the patch below, which does exactly this.
-> ---- 8< ---------------- >8 ------
-> From 631e7bf4e5d9456d0bb4a29b2dee4b84e8c052bd Mon Sep 17 00:00:00 2001
-> From: Matthias Brugger <matthias.bgg@gmail.com>
-> Date: Wed, 20 May 2015 12:43:16 +0200
-> Subject: [PATCH] clocksource: mediatek: Define mtk_clock_event_device globally
+> You should stick to SZ_8K and SZ_4K here.
+
+Right.
+
 > 
-> Sched clock code, especially sched_clock_register does not allow to pass a
-> pointer to actual_read_sched_clock. So if in the driver the register base
-> address is not globally defined, we are not able to read the scheduler
-> clock register. This patch sets the mtk_clock_event_device struct globally
-> for the driver, to be able to read the register.
-
-Hi,
-
-I'm not sure using a global device pointer is any better.
-
-Actually, almost every user of sched_clock_register need to keep a
-global register base address. Does it make sense to fix this in
-sched_clock_register?
-
-
-> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-> ---
->  drivers/clocksource/mtk_timer.c | 50 +++++++++++++++--------------------------
->  1 file changed, 18 insertions(+), 32 deletions(-)
+> > +		  4 },
+> >  
+> >  	LEGACY_ID_NAND("NAND 4MiB 5V 8-bit",   0x6B, 4, SZ_8K, SP_OPTIONS),
+> >  	LEGACY_ID_NAND("NAND 4MiB 3,3V 8-bit", 0xE3, 4, SZ_8K, SP_OPTIONS),
+> > 
 > 
-> diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
-> index 68ab423..c5f5b40 100644
-> --- a/drivers/clocksource/mtk_timer.c
-> +++ b/drivers/clocksource/mtk_timer.c
-> @@ -59,13 +59,9 @@ struct mtk_clock_event_device {
->      struct clock_event_device dev;
->  };
-> 
-> -static inline struct mtk_clock_event_device *to_mtk_clk(
-> -                struct clock_event_device *c)
-> -{
-> -    return container_of(c, struct mtk_clock_event_device, dev);
-> -}
-> +struct mtk_clock_event_device *evt;
+> I found a datasheet here for K9GBG08U0A that claims to support JEDEC
+> device identification (i.e. 0x90 0x40 and 0xEC 0x40 commands). Have you
+> tested it? Any reason you are adding full ID instead?
 
-The name is too short even if we make it static:
+This nand looks like another one defined in this file, so a full ID make
+sure the right parameters applies here.
 
-static struct mtk_clock_event_device *evt __read_mostly;
+Antoine
 
-Joe.C
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
