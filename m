@@ -1,31 +1,19 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 20 May 2015 17:40:11 +0200 (CEST)
-Subject: [RFC v1 25/25] genirq: Kill the first parameter 'irq' of
- irq_flow_handler_t
-In-Reply-To: <1432116013-25902-26-git-send-email-jiang.liu@linux.intel.com>
-References: <1432116013-25902-1-git-send-email-jiang.liu@linux.intel.com>
- <1432116013-25902-26-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <alpine.DEB.2.11.1505201737510.4225@nanos>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 20 May 2015 17:41:59 +0200
+Subject: [GIT PULL] Xilinx Zynq changes for v4.2
+In-Reply-To: <5559E547.6090109@monstr.eu>
+References: <5559E547.6090109@monstr.eu>
+Message-ID: <8164673.xiV4JnLhlu@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 20 May 2015, Jiang Liu wrote:
->  /* Chained IRQ handler for IPU error interrupt */
-> -static void ipu_irq_err(unsigned int irq, struct irq_desc *desc)
-> +static void ipu_irq_err(struct irq_desc *desc)
->  {
-> +	unsigned int irq = irq_desc_to_irq(desc);
+On Monday 18 May 2015 15:12:39 Michal Simek wrote:
+> arm: Xilinx Zynq SoC patches for v4.2
+> 
+> - Change SoC reset path
+> - Fix SLCR unlock scheme
+> 
 
-Why initializing? It's overwritten in the loop.
+Pulled into next/soc, thanks!
 
->  /* Chained IRQ handler for IPU function interrupt */
-> -static void ipu_irq_fn(unsigned int irq, struct irq_desc *desc)
-> +static void ipu_irq_fn(struct irq_desc *desc)
->  {
-> +	unsigned int irq = irq_desc_to_irq(desc);
-
-Ditto.
-
-Thanks,
-
-	tglx
+	Arnd
