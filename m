@@ -1,37 +1,58 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Wed, 20 May 2015 14:05:38 +0900
-Subject: [RESEND PATCH 2/2] ARM: dts: tegra: Use labels for overriding
- nodes in Tegra114 boards
-In-Reply-To: <CAJKOXPeDSOwRU4Btt97Tf6Qd1zj5ctVnL_3-_RWGSy004SAACA@mail.gmail.com>
-References: <1432036279-6318-1-git-send-email-k.kozlowski.k@gmail.com>
- <1432036279-6318-2-git-send-email-k.kozlowski.k@gmail.com>
- <CAAVeFu+-EYwZ9veNK8T6ZTc9tV0ZgGGm4M6vsiXe70TGTvfOzA@mail.gmail.com>
- <CAJKOXPeDSOwRU4Btt97Tf6Qd1zj5ctVnL_3-_RWGSy004SAACA@mail.gmail.com>
-Message-ID: <CAAVeFu+2aqCJ-nUomXy+PxKvDEm-yFPd+xq1rvgYiSUp5NohtA@mail.gmail.com>
+From: hs@denx.de (Heiko Schocher)
+Date: Wed, 20 May 2015 07:14:18 +0200
+Subject: [PATCH v2] arm, imx6, dts: add DT for aristainetos2 board
+In-Reply-To: <1432045990.15181.36.camel@pengutronix.de>
+References: <1431334974-27531-1-git-send-email-hs@denx.de>
+ <20150518113135.GD1071@dragon> <555AE192.8010700@denx.de>
+ <1432025280.3182.6.camel@pengutronix.de> <555B3E3A.8000605@denx.de>
+ <1432045990.15181.36.camel@pengutronix.de>
+Message-ID: <555C182A.1030608@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 2:03 PM, Krzysztof Koz?owski
-<k.kozlowski.k@gmail.com> wrote:
-> 2015-05-20 13:05 GMT+09:00 Alexandre Courbot <gnurou@gmail.com>:
->> On Tue, May 19, 2015 at 8:51 PM, Krzysztof Kozlowski
->> <k.kozlowski.k@gmail.com> wrote:
->>> Usage of labels instead of full paths reduces possible mistakes when
->>> overriding nodes.
->>>
->>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
->>
->> Indentation seems to be off by one tab in the added code (hence the
->> huge size of this patch ; most lines should not change), can you
->> check?
->
-> It is correct. This change in indentation is an effect of moving nodes
-> out of first bracket ("\ {"). That is the convention.
->
-> It us up to you guys if this is worth the effort. For exynos we use
-> label-convention and now I am converting old DTS to it. I think the
-> label-convention is less error-prone when extending or overriding
-> nodes. Also it removes duplicated addresses.
+Hello Philipp,
 
-I don't really have a strong opinion on this - Stephen and Thierry
-have worked with DT much more, let's see what they think...
+Am 19.05.2015 16:33, schrieb Philipp Zabel:
+> Hi Heiko,
+>
+> Am Dienstag, den 19.05.2015, 15:44 +0200 schrieb Heiko Schocher:
+>> Hello Philipp,
+>>
+>> Am 19.05.2015 10:48, schrieb Philipp Zabel:
+>>> Hi Heiko, Shawn,
+>>>
+>>> Am Dienstag, den 19.05.2015, 09:09 +0200 schrieb Heiko Schocher:
+>>> [...]
+>>>>> What is this?  I failed to find it in Documentation/devicetree/bindings/
+>>>>
+>>>> Ah, this is not documentated, see commit:
+>>>>
+>>>> commit 628f435be4359e6ae8ecfdda9b492053be76a057
+>>>> Author: Philipp Zabel <p.zabel@pengutronix.de>
+>>>> Date:   Tue Feb 25 11:55:04 2014 +0100
+>>>>
+>>>>        imx-drm: parallel-display: Add drm_panel support
+>>>>
+>>>> added Philipp to cc ...
+>>>
+>>> This was meant to be a temporary solution to connect a drm_panel to the
+>>> parallel-display when the of-graph bindings were not yet available.
+>>> I'd very much prefer to switch to the common of-graph bindings similarly
+>>> to the LDB driver instead. Could you check if this would work for you:
+>>
+>> Yes, your patch works for me (with appropriate changes in the dts file)
+>> You can add my
+>> Tested-by: Heiko Schocher <hs@denx.de>
+>> for this patch, thanks!
+>
+> Thank you, I've posted that parallel-display patch and will try to queue
+> it for v4.2 when it gets accepted.
+
+Thanks! So, I post my v3 for the aristainetos2 board based on this
+patch ...
+
+bye,
+Heiko
+-- 
+DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
