@@ -1,36 +1,47 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 20 May 2015 23:48:41 +0800
-Subject: [GIT PULL] ARM: imx: fixes for 4.1, 2nd round
-Message-ID: <20150520154840.GC24844@dragon>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Wed, 20 May 2015 23:49:53 +0800
+Subject: [RFC v1 25/25] genirq: Kill the first parameter 'irq' of
+ irq_flow_handler_t
+In-Reply-To: <alpine.DEB.2.11.1505201737510.4225@nanos>
+References: <1432116013-25902-1-git-send-email-jiang.liu@linux.intel.com>
+ <1432116013-25902-26-git-send-email-jiang.liu@linux.intel.com>
+ <alpine.DEB.2.11.1505201737510.4225@nanos>
+Message-ID: <555CAD21.7040907@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 68ce9a1f24b8e8894955032a4af74998315be9fe:
+On 2015/5/20 23:40, Thomas Gleixner wrote:
+> On Wed, 20 May 2015, Jiang Liu wrote:
+>>  /* Chained IRQ handler for IPU error interrupt */
+>> -static void ipu_irq_err(unsigned int irq, struct irq_desc *desc)
+>> +static void ipu_irq_err(struct irq_desc *desc)
+>>  {
+>> +	unsigned int irq = irq_desc_to_irq(desc);
+> 
+> Why initializing? It's overwritten in the loop.
+Hi Thomas,
 
-  ARM: dts: imx6qdl-sabreauto: remove pinctrl-assert-gpios (2015-04-28 09:05:21 +0800)
+I'm not familiar with the hardware, but if src2map() returns 0
+on the first call, we need to initialize irq. Otherwise
+generic_handle_irq(irq) will use random value on the first call.
+---------------------------------------------------------
+                        map = src2map(32 * i + line);
+                        if (map)
+                                irq = map->irq;
+---------------------------------------------------------
+Thanks!
+Gerry
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.1-2
-
-for you to fetch changes up to e46b5a6470a5e2c8e1096f8f60887ac19949055b:
-
-  ARM: dts: fix imx27 dtb build rule (2015-05-19 22:06:41 +0800)
-
-----------------------------------------------------------------
-The i.MX fixes for 4.1, 2nd round:
- - Fix i.MX27 FEC register map which overlaps the SCC (Security
-   Controller) register space.
- - Fix i.MX27 DTB build rule which was wrongly controlled by i.MX31
-   option.
-
-----------------------------------------------------------------
-Philippe Reynes (1):
-      ARM: dts: imx27: only map 4 Kbyte for fec registers
-
-Shawn Guo (1):
-      ARM: dts: fix imx27 dtb build rule
-
- arch/arm/boot/dts/Makefile   | 2 +-
- arch/arm/boot/dts/imx27.dtsi | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+>>  /* Chained IRQ handler for IPU function interrupt */
+>> -static void ipu_irq_fn(unsigned int irq, struct irq_desc *desc)
+>> +static void ipu_irq_fn(struct irq_desc *desc)
+>>  {
+>> +	unsigned int irq = irq_desc_to_irq(desc);
+> 
+> Ditto.
+> 
+> Thanks,
+> 
+> 	tglx
+> 
