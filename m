@@ -1,303 +1,194 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Wed, 20 May 2015 14:21:40 +0800
-Subject: [RFC PATCH v1 2/3] PCI: hisi: Add PCIe host support for Hisilicon Soc
- Hip05
-In-Reply-To: <1432102901-186201-1-git-send-email-wangzhou1@hisilicon.com>
-References: <1432102901-186201-1-git-send-email-wangzhou1@hisilicon.com>
-Message-ID: <1432102901-186201-3-git-send-email-wangzhou1@hisilicon.com>
+From: timo.kokkonen@offcode.fi (Timo Kokkonen)
+Date: Wed, 20 May 2015 09:18:42 +0300
+Subject: [PATCHv8 02/10] watchdog: core: Ping watchdog on behalf of user
+ space when needed
+In-Reply-To: <555BE1CB.10605@roeck-us.net>
+References: <1432023969-20736-1-git-send-email-timo.kokkonen@offcode.fi>
+ <1432023969-20736-3-git-send-email-timo.kokkonen@offcode.fi>
+ <555BE1CB.10605@roeck-us.net>
+Message-ID: <555C2742.2080408@offcode.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds PCIe host support for Hisilicon Soc Hip05.
+On 20.05.2015 04:22, Guenter Roeck wrote:
+> On 05/19/2015 01:26 AM, Timo Kokkonen wrote:
+>> Many watchdogs are not stoppable on the hardware level at all. Some
+>> others have a very short maximum timeout value. Both of these limits
+>> are problematic to the userspace and watchdog drivers have been
+>> traditionally implementing workarounds of their own in order to
+>> overcome the limitations. This obviously results in duplicate code in
+>> the driver level and makes it harder to implement generic hardware
+>> independent features.
+>>
+>> Extend the watchdog core by allowing it do the most common tasks on
+>> behalf of the driver. For this to work the watchdog core needs two new
+>> values from the driver, hw_max_timeout and hw_heartbeat. The first one
+>> tells the core what is the maximum supported timeout value in the
+>> hardware and the second one tells the preferred heartbeat value for
+>> the hardware. Both values are in milliseconds.
+>>
+>> The driver needs to also call watchdog_init_params() in order to let
+>> watchdog core fill in default watchdog paramters and let the core
+>> check the validity of the values.
+>>
+>> The watchdog core api changes slightly because of this change. Most
+>> importantly, the watchdog core now stands out as a clear midlayer
+>> between the driver and the user space. That is, the hw_max_timeout and
+>> hw_heartbeat values are meant to be filled in by the driver for the
+>> core. They will not be visible to user space any way. The timeout
+>> variable however is part of user space API. The comments in watchdog.h
+>> are changed also to reflect more clearly the difference. The
+>> max_timeout also becomes obsolete as the worker can support arbitrary
+>> timeout values.
+>>
+>> As long as we have still old drivers that don't tell the core about
+>> their hw capabilities, we need to support the old driver handling
+>> too. Add watchdog_needs_legacy_handling() function to watchdog.h so we
+>> can implement easily the old driver behavior and it becomes clear from
+>> the code which parts can be removed once all existing drivers supply
+>> the new parameters to watchdog core.
+>>
+>> Signed-off-by: Timo Kokkonen <timo.kokkonen@offcode.fi>
+>> ---
+>>   drivers/watchdog/watchdog_core.c | 124
+>> ++++++++++++++++++++++++++++++++++++++-
+>>   drivers/watchdog/watchdog_dev.c  | 105
+>> ++++++++++++++++++++++++++-------
+>>   include/linux/watchdog.h         |  64 ++++++++++++++++++--
+>>   3 files changed, 265 insertions(+), 28 deletions(-)
+>>
+>> diff --git a/drivers/watchdog/watchdog_core.c
+>> b/drivers/watchdog/watchdog_core.c
+>> index cec9b55..16e10e0 100644
+>> --- a/drivers/watchdog/watchdog_core.c
+>> +++ b/drivers/watchdog/watchdog_core.c
+>> @@ -45,6 +45,9 @@ static struct class *watchdog_class;
+>>
+>>   static void watchdog_check_min_max_timeout(struct watchdog_device *wdd)
+>>   {
+>> +    /* Newer drivers don't need this check any more */
+>> +    if (!watchdog_needs_legacy_handling(wdd))
+>> +        return;
+>
+> Something is conceptually wrong here.
+>
 
-Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
----
- drivers/pci/host/Kconfig     |   5 +
- drivers/pci/host/Makefile    |   1 +
- drivers/pci/host/pcie-hisi.c | 252 +++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 258 insertions(+)
- create mode 100644 drivers/pci/host/pcie-hisi.c
+The max timeout concept becomes obsolete once the watchdog core starts 
+intermediating between the driver and the user space and extend the 
+watchdog period as needed. Once you remove the max timeout from the 
+check, it becomes so trivial that I don't see point factoring it out as 
+a separate check. If you had something else on your mind, please elaborate.
 
-diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index 1dfb567..486d822 100644
---- a/drivers/pci/host/Kconfig
-+++ b/drivers/pci/host/Kconfig
-@@ -125,4 +125,9 @@ config PCIE_IPROC_PLATFORM
- 	  Say Y here if you want to use the Broadcom iProc PCIe controller
- 	  through the generic platform bus interface
- 
-+config PCI_HISI
-+	depends on OF && ARM64
-+	bool "Hisilicon Soc HIP05 PCIe controller"
-+	select PCIE_DW
-+
- endmenu
-diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
-index f733b4e..562142e 100644
---- a/drivers/pci/host/Makefile
-+++ b/drivers/pci/host/Makefile
-@@ -15,3 +15,4 @@ obj-$(CONFIG_PCI_LAYERSCAPE) += pci-layerscape.o
- obj-$(CONFIG_PCI_VERSATILE) += pci-versatile.o
- obj-$(CONFIG_PCIE_IPROC) += pcie-iproc.o
- obj-$(CONFIG_PCIE_IPROC_PLATFORM) += pcie-iproc-platform.o
-+obj-$(CONFIG_PCI_HISI) += pcie-hisi.o
-diff --git a/drivers/pci/host/pcie-hisi.c b/drivers/pci/host/pcie-hisi.c
-new file mode 100644
-index 0000000..3f8cb9a
---- /dev/null
-+++ b/drivers/pci/host/pcie-hisi.c
-@@ -0,0 +1,252 @@
-+/*
-+ * PCIe host controller driver for Hisilicon Hip05 SoCs
-+ *
-+ * Copyright (C) 2014 Hisilicon Co., Ltd. http://www.hisilicon.com
-+ *
-+ * Author: Zhou Wang <wangzhou1@hisilicon.com>
-+ *         Dacai Zhu <zhudacai@hisilicon.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/interrupt.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_pci.h>
-+#include <linux/platform_device.h>
-+
-+#include "pcie-designware.h"
-+
-+#define PCIE_SUBCTRL_MODE_REG                           (0x2800)
-+#define PCIE_SUBCTRL_SYS_STATE4_REG                     (0x6818)
-+#define PCIE_SLV_DBI_MODE                               (0x0)
-+#define PCIE_SLV_SYSCTRL_MODE                           (0x1)
-+#define PCIE_SLV_CONTENT_MODE                           (0x2)
-+#define PCIE_LTSSM_LINKUP_STATE                         (0x11)
-+#define PCIE_LTSSM_STATE_MASK                           (0x3F)
-+#define PCIE_MSI_CONTEXT_VALUE                          (0x1011000)
-+#define PCIE_MSI_TRANS_ENABLE                           (0x1ff0)
-+#define PCIE_MSI_LOW_ADDRESS                            (0x1b4)
-+#define PCIE_MSI_HIGH_ADDRESS                           (0x1c4)
-+
-+#define to_hisi_pcie(x)	container_of(x, struct hisi_pcie, pp)
-+
-+struct hisi_pcie {
-+	void __iomem *subctrl_base;
-+	void __iomem *reg_base;
-+	struct msi_controller *msi;
-+	u32 port_id;
-+	struct pcie_port pp;
-+};
-+
-+static inline void hisi_pcie_subctrl_writel(struct hisi_pcie *pcie,
-+					    u32 val, u32 reg)
-+{
-+	writel(val, pcie->subctrl_base + reg);
-+}
-+
-+static inline u32 hisi_pcie_subctrl_readl(struct hisi_pcie *pcie, u32 reg)
-+{
-+	return readl(pcie->subctrl_base + reg);
-+}
-+
-+static inline void hisi_pcie_apb_writel(struct hisi_pcie *pcie,
-+					u32 val, u32 reg)
-+{
-+	writel(val, pcie->reg_base + reg);
-+}
-+
-+static inline u32 hisi_pcie_apb_readl(struct hisi_pcie *pcie, u32 reg)
-+{
-+	return readl(pcie->reg_base + reg);
-+}
-+
-+/*
-+ * Change mode to indicate the same reg_base to base of PCIe host configure
-+ * registers, base of RC configure space or base of vmid/asid context table
-+ */
-+static void hisi_pcie_change_apb_mode(struct hisi_pcie *pcie, u32 mode)
-+{
-+	u32 val;
-+	u32 bit_mask;
-+	u32 bit_shift;
-+	u32 port_id = pcie->port_id;
-+	u32 reg = PCIE_SUBCTRL_MODE_REG + 0x100 * port_id;
-+
-+	if ((port_id == 1) || (port_id == 2)) {
-+		bit_mask = 0xc;
-+		bit_shift = 0x2;
-+	} else {
-+		bit_mask = 0x6;
-+		bit_shift = 0x1;
-+	}
-+
-+	val = hisi_pcie_subctrl_readl(pcie, reg);
-+	val = (val & (~bit_mask)) | (mode << bit_shift);
-+	hisi_pcie_subctrl_writel(pcie, val, reg);
-+}
-+
-+/* Configure vmid/asid table in PCIe host */
-+static void hisi_pcie_config_context(struct hisi_pcie *pcie)
-+{
-+	int i;
-+
-+	hisi_pcie_change_apb_mode(pcie, PCIE_SLV_CONTENT_MODE);
-+
-+	for (i = 0; i < 0x400; i++)
-+		hisi_pcie_apb_writel(pcie, 0x0, i * 4);
-+
-+	for (i = 0x400; i < 0x800; i++)
-+		hisi_pcie_apb_writel(pcie, 0x0, i * 4);
-+
-+	hisi_pcie_change_apb_mode(pcie, PCIE_SLV_SYSCTRL_MODE);
-+
-+	hisi_pcie_apb_writel(pcie, 0xb7010040, PCIE_MSI_LOW_ADDRESS);
-+	hisi_pcie_apb_writel(pcie, 0x0, PCIE_MSI_HIGH_ADDRESS);
-+	hisi_pcie_apb_writel(pcie, PCIE_MSI_CONTEXT_VALUE, 0x10);
-+	hisi_pcie_apb_writel(pcie, PCIE_MSI_TRANS_ENABLE, 0x1c8);
-+
-+	hisi_pcie_change_apb_mode(pcie, PCIE_SLV_DBI_MODE);
-+}
-+
-+static int hisi_pcie_link_up(struct pcie_port *pp)
-+{
-+	u32 val;
-+
-+	struct hisi_pcie *hisi_pcie = to_hisi_pcie(pp);
-+
-+	val = hisi_pcie_subctrl_readl(hisi_pcie, PCIE_SUBCTRL_SYS_STATE4_REG +
-+				      0x100 * hisi_pcie->port_id);
-+
-+	return ((val & PCIE_LTSSM_STATE_MASK) == PCIE_LTSSM_LINKUP_STATE);
-+}
-+
-+static
-+int hisi_pcie_msi_host_init(struct pcie_port *pp, struct msi_controller *chip)
-+{
-+	struct device_node *msi_node;
-+	struct msi_controller *msi;
-+	struct device_node *np = pp->dev->of_node;
-+	struct hisi_pcie *hisi_pcie = to_hisi_pcie(pp);
-+
-+	msi_node = of_parse_phandle(np, "msi-parent", 0);
-+	if (!msi_node) {
-+		pr_err("failed to find msi-parent\n");
-+		return -ENODEV;
-+	}
-+
-+	msi = of_pci_find_msi_chip_by_node(msi_node);
-+	hisi_pcie->msi = msi;
-+
-+	pp->irq_domain = msi->domain;
-+
-+	return 0;
-+}
-+
-+static struct pcie_host_ops hisi_pcie_host_ops = {
-+	.link_up = hisi_pcie_link_up,
-+	.msi_host_init = hisi_pcie_msi_host_init,
-+};
-+
-+static int __init hisi_add_pcie_port(struct pcie_port *pp,
-+				     struct platform_device *pdev)
-+{
-+	int ret;
-+	u32 port_id;
-+	struct resource busn;
-+
-+	struct hisi_pcie *hisi_pcie = to_hisi_pcie(pp);
-+
-+	if (of_property_read_u32(pdev->dev.of_node, "port-id", &port_id)) {
-+		dev_err(&pdev->dev, "failed to read port-id\n");
-+		return -EINVAL;
-+	}
-+	if (port_id > 3) {
-+		dev_err(&pdev->dev, "Invalid port-id\n");
-+		return -EINVAL;
-+	}
-+
-+	hisi_pcie->port_id = port_id;
-+
-+	if (of_pci_parse_bus_range(pdev->dev.of_node, &busn)) {
-+		dev_err(&pdev->dev, "failed to parse bus-ranges\n");
-+		return -EINVAL;
-+	}
-+
-+	pp->root_bus_nr = busn.start;
-+	pp->ops = &hisi_pcie_host_ops;
-+
-+	hisi_pcie_config_context(hisi_pcie);
-+
-+	ret = dw_pcie_host_init(pp);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to initialize host\n");
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static int __init hisi_pcie_probe(struct platform_device *pdev)
-+{
-+	struct hisi_pcie *hisi_pcie;
-+	struct pcie_port *pp;
-+	struct resource *reg;
-+	struct resource *subctrl;
-+	int ret;
-+
-+	hisi_pcie = devm_kzalloc(&pdev->dev, sizeof(*hisi_pcie), GFP_KERNEL);
-+	if (!hisi_pcie)
-+		return -ENOMEM;
-+
-+	pp = &hisi_pcie->pp;
-+	pp->dev = &pdev->dev;
-+
-+	subctrl = platform_get_resource_byname(pdev, IORESOURCE_MEM, "subctrl");
-+	hisi_pcie->subctrl_base = devm_ioremap_nocache(&pdev->dev,
-+					subctrl->start, resource_size(subctrl));
-+	if (IS_ERR(hisi_pcie->subctrl_base)) {
-+		dev_err(pp->dev, "cannot get subctrl base\n");
-+		return PTR_ERR(hisi_pcie->subctrl_base);
-+	}
-+
-+	reg = platform_get_resource_byname(pdev, IORESOURCE_MEM, "rc_dbi");
-+	hisi_pcie->reg_base = devm_ioremap_resource(&pdev->dev, reg);
-+	if (IS_ERR(hisi_pcie->reg_base)) {
-+		dev_err(pp->dev, "cannot get reg base\n");
-+		return PTR_ERR(hisi_pcie->reg_base);
-+	}
-+
-+	hisi_pcie->pp.dbi_base = hisi_pcie->reg_base;
-+
-+	ret = hisi_add_pcie_port(pp, pdev);
-+	if (ret < 0)
-+		return ret;
-+
-+	platform_set_drvdata(pdev, hisi_pcie);
-+
-+	return ret;
-+}
-+
-+static const struct of_device_id hisi_pcie_of_match[] = {
-+	{.compatible = "hisilicon,hip05-pcie",},
-+	{},
-+};
-+
-+MODULE_DEVICE_TABLE(of, hisi_pcie_of_match);
-+
-+static struct platform_driver hisi_pcie_driver = {
-+	.probe  = hisi_pcie_probe,
-+	.driver = {
-+		   .name = "hisi-pcie",
-+		   .owner = THIS_MODULE,
-+		   .of_match_table = hisi_pcie_of_match,
-+	},
-+};
-+
-+module_platform_driver(hisi_pcie_driver);
-+
-+MODULE_AUTHOR("Zhou Wang <wangzhou1@huawei.com>");
-+MODULE_AUTHOR("Dacai Zhu <zhudacai@huawei.com>");
-+MODULE_LICENSE("GPL v2");
--- 
-1.9.1
+>>       /*
+>>        * Check that we have valid min and max timeout values, if
+>>        * not reset them both to 0 (=not used or unknown)
+>> @@ -98,6 +101,110 @@ int watchdog_init_timeout(struct watchdog_device
+>> *wdd,
+>>   }
+>>   EXPORT_SYMBOL_GPL(watchdog_init_timeout);
+>>
+>> +static void watchdog_set_default_timeout(struct watchdog_device *wdd,
+>> +                     struct device *dev)
+>> +{
+>> +    int ret;
+>> +    /*
+>> +     * If driver has already set up a timeout, eg. from a module
+>> +     * parameter, no need to do anything here
+>> +     */
+>> +    if (!watchdog_timeout_invalid(wdd, wdd->timeout))
+>> +        return;
+>> +
+>> +    /* Query device tree */
+>> +    if (dev && dev->of_node) {
+>> +        ret = of_property_read_u32(dev->of_node, "timeout-sec",
+>> +                       &wdd->timeout);
+>> +        if (!ret && !watchdog_timeout_invalid(wdd, wdd->timeout))
+>> +            return;
+>> +    }
+>> +
+>> +    /*
+>> +     * If no other preference is given, use 60 seconds as the
+>> +     * default timeout value
+>> +     */
+>> +    wdd->timeout = 60;
+>> +}
+>> +
+>> +/**
+>> + * watchdog_init_parms() - initialize generic watchdog parameters
+>> + * @wdd: Watchdog device to operate
+>> + * @dev: Device that stores the device tree properties
+>> + *
+>> + * Initialize the generic watchdog parameters. At least hw_max_timeout
+>> + * must be set prior calling this function. Other unset parameters are
+>> + * set based on information gathered from different sources (kernel
+>> + * config, device tree, ...) or set up with a reasonable defaults.
+>> + *
+>> + * A zero is returned on success and -EINVAL for failure.
+>> + */
+>> +int watchdog_init_params(struct watchdog_device *wdd, struct device
+>> *dev)
+>> +{
+>> +    int ret = 0;
+>> +
+>> +    watchdog_set_default_timeout(wdd, dev);
+>> +
+>> +    if (wdd->max_timeout)
+>> +        dev_err(dev, "Driver setting deprecated max_timeout, please
+>> fix\n");
+>> +
+>> +    if (!wdd->hw_max_timeout)
+>> +        return -EINVAL;
+>> +
+>> +    return ret;
+>> +}
+>> +EXPORT_SYMBOL_GPL(watchdog_init_params);
+>> +
+>
+> I really think things are going into the wrong direction. I prefer the
+> approach
+> that is taken with the pretimeout introduction code, where we try to change
+> as little as possible. Specifically I dislike here that this function takes
+> parameters from wdd, instead of having function arguments. Again, the
+> approach
+> used by the pretimeout code, where we introduce watchdog_init_timeouts()
+> with
+> an additional parameter (while keeping the original
+> watchdog_init_timeout API)
+> makes much more sense to me.
+
+The reason why I replaced the watchdog_init_timeout() call with a new 
+one was that I give a chance to the watchdog core to do generic 
+initialization for the driver. The core would parse timeout and 
+early-timeout-sec parameters from device tree and possible do something 
+else that the driver does not need to know about. We could keep the 
+watchdog_init_timeout and add another call for parsing the 
+early-timeout-sec, but the timeout handling changes a bit too as the 
+concept of max timeout disappears.
+
+And if we are going to change the drivers calling watchdog_init_timeout 
+anyway, why not think something that initializes all parameters in one 
+call? That's what I thought. We can do it on some other way, but now is 
+a chance to think about a bit how it should be done right. I'm open to 
+suggestions.
+
+> Overall I really think we should keep the changes minimalistic. This
+> patch set
+> is growing larger and larger, and I see less and less benefit and more and
+> more changes.
+
+I have got feedback about what I should do and I have learned more about 
+the problems the current watchdog api has. My goal is to keep changes to 
+most of the drivers minimal, simply let core know about hw_max_timeout 
+and hw_heartbeat values. Some drivers can also remove a lot of timer 
+handling code that they no longer need to duplicate. The end result is 
+that watchdogs appear to userspace more as a unified subsystem instead 
+of a collection of separate drivers that all behave different to each 
+others. This is something that I think makes things better.
+
+I hope you can give clear directions on where to go with the patches. I 
+have spent a lot of time with these now and I probably don't have that 
+luxury much longer any more, so I am all open in keeping the changes 
+minimalistic.
+
+Thanks,
+-Timo
