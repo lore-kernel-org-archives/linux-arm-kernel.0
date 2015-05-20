@@ -1,45 +1,18 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 20 May 2015 06:46:08 -0700
-Subject: [PATCHv8 01/10] watchdog: Rename watchdog_active to
- watchdog_hw_active
-In-Reply-To: <555C1D9F.4060600@offcode.fi>
-References: <1432023969-20736-1-git-send-email-timo.kokkonen@offcode.fi>
- <1432023969-20736-2-git-send-email-timo.kokkonen@offcode.fi>
- <555BDF22.2090208@roeck-us.net> <555C1D9F.4060600@offcode.fi>
-Message-ID: <555C9020.6060908@roeck-us.net>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 20 May 2015 06:53:50 -0700
+Subject: [PATCH] ARM: multi_v7_defconfig: Add Atmel SAMA5 family
+In-Reply-To: <555B4040.2090302@atmel.com>
+References: <1428051678-20450-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <555AFF3F.10400@atmel.com> <9986808.t62JLgg5NJ@wuerfel>
+ <20150519123358.GA15179@piout.net> <555B3463.2060700@atmel.com>
+ <555B3A92.7010409@atmel.com> <555B4040.2090302@atmel.com>
+Message-ID: <CAMAWPa95VTM+VgNpcs1oZwX9NqzrL1JeNy=MqL0Zo3JP=svyUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/19/2015 10:37 PM, Timo Kokkonen wrote:
-> On 20.05.2015 04:10, Guenter Roeck wrote:
->> On 05/19/2015 01:26 AM, Timo Kokkonen wrote:
->>> Before extending the watchdog core midlayer, it is useful to rename
->>> the watchdog_active function so that it states explicitly what it
->>> really does. That is, "active" watchdog means really that the watchdog
->>> hardware is running and needs pinging to prevent a watchdog reset
->>> taking place in near future.
->>>
->>> This is different to "watchdog open" state, which simply states that
->>> kernel is expecting the user space to keep the watchdog alive. These
->>> states might become different mainly because some hardware have
->>> limitations that prevent them from being stopped at will.
->>>
->>
->> I don't see why this is needed. If you need another state, per your
->> description, it would be "open" in addition to "active".
->
-> Yes, the watchdog_is_open() is introduced on patch number two. The original watchdog_is_active() is really confusing. It doesn't really state what it means. Most of the drivers are using it to test whether the watchdog HW is active when going to suspend, but at least atmel watchdog was testing it to see whether the watchdog device is open from user space. The HW itself is always active in that driver.
->
-> If we are about to distinguish between "device open from user space" and "hardware timer running", we better be clear about the naming. "watchdog_is_active" doesn't really tell what it does.
->
-> This was originally suggested by Uwe Kleine-K?nig. He also recommended changing the timeout parameter so that is would state more clearly that it is the SW timeout and not HW timeout. But I felt that it would have been too invasive to change the timeout parameter as well. The watchdog_is_active was not used very much so the change was easy.
->
-> -Timo
->
-You could just clarify what it means.
+FYI... This patch is now in linux-next, and boot tests for all the
+sama5d[34] boards in kernelci.org have failed to boot.
 
-Anyway, I think I'll have to step back from this for a while.
-As I mentioned, I think it is getting too invasive, which clouds
-my judgment. I think I'll leave this patch set up to Wim to handle.
+   http://kernelci.org/boot/all/job/next/kernel/next-20150520/
 
-Guenter
+Kevin
