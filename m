@@ -1,47 +1,29 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Wed, 20 May 2015 23:49:53 +0800
-Subject: [RFC v1 25/25] genirq: Kill the first parameter 'irq' of
- irq_flow_handler_t
-In-Reply-To: <alpine.DEB.2.11.1505201737510.4225@nanos>
-References: <1432116013-25902-1-git-send-email-jiang.liu@linux.intel.com>
- <1432116013-25902-26-git-send-email-jiang.liu@linux.intel.com>
- <alpine.DEB.2.11.1505201737510.4225@nanos>
-Message-ID: <555CAD21.7040907@linux.intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 20 May 2015 17:51:01 +0200
+Subject: [PATCH 00/14] ARM: berlin: bisect compatible simple-mfd conversion
+In-Reply-To: <555CAA36.9020301@gmail.com>
+References: <1431735823-28006-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <7681967.oFTclmPvdm@wuerfel> <555CAA36.9020301@gmail.com>
+Message-ID: <2978733.6m9o3u51Aq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/5/20 23:40, Thomas Gleixner wrote:
-> On Wed, 20 May 2015, Jiang Liu wrote:
->>  /* Chained IRQ handler for IPU error interrupt */
->> -static void ipu_irq_err(unsigned int irq, struct irq_desc *desc)
->> +static void ipu_irq_err(struct irq_desc *desc)
->>  {
->> +	unsigned int irq = irq_desc_to_irq(desc);
+On Wednesday 20 May 2015 17:37:26 Sebastian Hesselbarth wrote:
+> On 20.05.2015 17:25, Arnd Bergmann wrote:
+> > On Saturday 16 May 2015 02:23:29 Sebastian Hesselbarth wrote:
+> >>
+> >> I am still planing to get this into v4.2 as soon as possible, so if Arnd is
+> >> now happy with the dependency of the patches and none of the maintainers is
+> >> against it, I'll prepare a PR next week.
+> >
+> > I haven't see the pull request yet, are you still working on it?
 > 
-> Why initializing? It's overwritten in the loop.
-Hi Thomas,
+> I was hoping to find some time to actually test bisectability.
+> How much time do I have left for getting into v4.2 cycle?
 
-I'm not familiar with the hardware, but if src2map() returns 0
-on the first call, we need to initialize irq. Otherwise
-generic_handle_irq(irq) will use random value on the first call.
----------------------------------------------------------
-                        map = src2map(32 * i + line);
-                        if (map)
-                                irq = map->irq;
----------------------------------------------------------
-Thanks!
-Gerry
+I've reviewed your patches for possible bisection problems now, and
+they seem to all be good in this regard. I think it's best if you
+send a pull request now. It's not urgent yet, but I'd rather have
+more stuff merged earlier than later.
 
-> 
->>  /* Chained IRQ handler for IPU function interrupt */
->> -static void ipu_irq_fn(unsigned int irq, struct irq_desc *desc)
->> +static void ipu_irq_fn(struct irq_desc *desc)
->>  {
->> +	unsigned int irq = irq_desc_to_irq(desc);
-> 
-> Ditto.
-> 
-> Thanks,
-> 
-> 	tglx
-> 
+	Arnd
