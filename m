@@ -1,21 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 May 2015 17:44:42 +0200
-Subject: [GIT PULL] Broadcom MAINTAINERS file update for 4.2
-In-Reply-To: <1431556453-11633-2-git-send-email-f.fainelli@gmail.com>
-References: <1431556453-11633-1-git-send-email-f.fainelli@gmail.com>
- <1431556453-11633-2-git-send-email-f.fainelli@gmail.com>
-Message-ID: <8164674.Waa03Rnt97@wuerfel>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 20 May 2015 17:48:19 +0200 (CEST)
+Subject: [RFC v1 15/25] genirq: Kill the first parameter 'irq' of
+ irq_flow_handler_t
+In-Reply-To: <555CA929.3080306@linux.intel.com>
+References: <1432116013-25902-1-git-send-email-jiang.liu@linux.intel.com>
+ <1432116013-25902-16-git-send-email-jiang.liu@linux.intel.com>
+ <alpine.DEB.2.11.1505201715380.4225@nanos> <555CA929.3080306@linux.intel.com>
+Message-ID: <alpine.DEB.2.11.1505201748000.4225@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 May 2015 15:34:12 Florian Fainelli wrote:
-> This pull request for the MAINTAINERS file contains the following changes:
-> 
-> - Brian adds a general "brcmstb" regexp to catch Broadcom Set Top Box related
->   changes throughout the Linux tree
-> 
+On Wed, 20 May 2015, Jiang Liu wrote:
 
-As this does not seem urgent enough for fixes (which you confirmed on IRC),
-I've put it into next/soc as well. Thanks!
+> On 2015/5/20 23:28, Thomas Gleixner wrote:
+> > On Wed, 20 May 2015, Jiang Liu wrote:
+> >> -static void locomo_handler(unsigned int irq, struct irq_desc *desc)
+> >> +static void locomo_handler(struct irq_desc *desc)
+> >>  {
+> >>  	struct locomo *lchip = irq_desc_get_chip_data(desc);
+> >> +	unsigned int irq;
+> >>  	int req, i;
+> > 
+> > That leaves irq unitialized ....
+> That should be OK, 'irq' here is just a local variable.
+> Actually it may be changed as:
+>         if (req) {
+>                 /* generate the next interrupt(s) */
+> -                irq = lchip->irq_base;
+> +                unsigned int irq = lchip->irq_base;
 
-	Arnd
+Indeed. 
