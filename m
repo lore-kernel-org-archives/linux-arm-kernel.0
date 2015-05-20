@@ -1,153 +1,40 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 20 May 2015 15:57:02 -0300
-Subject: [PATCH] ARM: dts: cubox-i/hummingboard: Fix the license text
-Message-ID: <1432148222-12603-1-git-send-email-festevam@gmail.com>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Wed, 20 May 2015 13:54:34 -0500
+Subject: [PATCH] ARM: v7 setup function should invalidate L1 cache
+In-Reply-To: <E1Yuk8W-0001tC-IK@rmk-PC.arm.linux.org.uk>
+References: <E1Yuk8W-0001tC-IK@rmk-PC.arm.linux.org.uk>
+Message-ID: <555CD86A.2090206@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On 05/19/2015 11:12 AM, Russell King wrote:
+> All ARMv5 and older CPUs invalidate their caches in the early assembly
+> setup function, prior to enabling the MMU.  This is because the L1
+> cache should not contain any data relevant to the execution of the
+> kernel at this point; all data should have been flushed out to memory.
+> 
+> This requirement should also be true for ARMv6 and ARMv7 CPUs - indeed,
+> these typically do not search their caches when caching is disabled (as
+> it needs to be when the MMU is disabled) so this change should be safe.
+> 
+> ARMv7 allows there to be CPUs which search their caches while caching is
+> disabled, and it's permitted that the cache is uninitialised at boot;
+> for these, the architecture reference manual requires that an
+> implementation specific code sequence is used immediately after reset
+> to ensure that the cache is placed into a sane state.  Such
+> functionality is definitely outside the remit of the Linux kernel, and
+> must be done by the SoC's firmware before _any_ CPU gets to the Linux
+> kernel.
+> 
+> Changing the data cache clean+invalidate to a mere invalidate allows us
+> to get rid of a lot of platform specific hacks around this issue for
+> their secondary CPU bringup paths - some of which were buggy.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Arrange the license text a bit to make it clear.
+For socfpga:
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx6dl-cubox-i.dts           | 5 ++---
- arch/arm/boot/dts/imx6dl-hummingboard.dts      | 5 ++---
- arch/arm/boot/dts/imx6q-cubox-i.dts            | 5 ++---
- arch/arm/boot/dts/imx6q-hummingboard.dts       | 5 ++---
- arch/arm/boot/dts/imx6qdl-cubox-i.dtsi         | 5 ++---
- arch/arm/boot/dts/imx6qdl-hummingboard.dtsi    | 5 ++---
- arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi | 5 ++---
- arch/arm/boot/dts/imx6qdl-microsom.dtsi        | 5 ++---
- 8 files changed, 16 insertions(+), 24 deletions(-)
+Tested-by: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-diff --git a/arch/arm/boot/dts/imx6dl-cubox-i.dts b/arch/arm/boot/dts/imx6dl-cubox-i.dts
-index e0b7fe8..2a43917 100644
---- a/arch/arm/boot/dts/imx6dl-cubox-i.dts
-+++ b/arch/arm/boot/dts/imx6dl-cubox-i.dts
-@@ -7,9 +7,8 @@
-  * whole.
-  *
-  *  a) This file is free software; you can redistribute it and/or
-- *     modify it under the terms of the GNU General Public License as
-- *     published by the Free Software Foundation; either version 2 of the
-- *     License.
-+ *     modify it under the terms of the GNU General Public License
-+ *     version 2 as published by the Free Software Foundation.
-  *
-  *     This file is distributed in the hope that it will be useful
-  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-diff --git a/arch/arm/boot/dts/imx6dl-hummingboard.dts b/arch/arm/boot/dts/imx6dl-hummingboard.dts
-index 7369d2d..d5c9660 100644
---- a/arch/arm/boot/dts/imx6dl-hummingboard.dts
-+++ b/arch/arm/boot/dts/imx6dl-hummingboard.dts
-@@ -8,9 +8,8 @@
-  * whole.
-  *
-  *  a) This file is free software; you can redistribute it and/or
-- *     modify it under the terms of the GNU General Public License as
-- *     published by the Free Software Foundation; either version 2 of the
-- *     License.
-+ *     modify it under the terms of the GNU General Public License
-+ *     version 2 as published by the Free Software Foundation.
-  *
-  *     This file is distributed in the hope that it will be useful
-  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-diff --git a/arch/arm/boot/dts/imx6q-cubox-i.dts b/arch/arm/boot/dts/imx6q-cubox-i.dts
-index 670bd8c..353425e 100644
---- a/arch/arm/boot/dts/imx6q-cubox-i.dts
-+++ b/arch/arm/boot/dts/imx6q-cubox-i.dts
-@@ -7,9 +7,8 @@
-  * whole.
-  *
-  *  a) This file is free software; you can redistribute it and/or
-- *     modify it under the terms of the GNU General Public License as
-- *     published by the Free Software Foundation; either version 2 of the
-- *     License.
-+ *     modify it under the terms of the GNU General Public License
-+ *     version 2 as published by the Free Software Foundation.
-  *
-  *     This file is distributed in the hope that it will be useful
-  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-diff --git a/arch/arm/boot/dts/imx6q-hummingboard.dts b/arch/arm/boot/dts/imx6q-hummingboard.dts
-index 0f60445..1884c16 100644
---- a/arch/arm/boot/dts/imx6q-hummingboard.dts
-+++ b/arch/arm/boot/dts/imx6q-hummingboard.dts
-@@ -8,9 +8,8 @@
-  * whole.
-  *
-  *  a) This file is free software; you can redistribute it and/or
-- *     modify it under the terms of the GNU General Public License as
-- *     published by the Free Software Foundation; either version 2 of the
-- *     License.
-+ *     modify it under the terms of the GNU General Public License
-+ *     version 2 as published by the Free Software Foundation.
-  *
-  *     This file is distributed in the hope that it will be useful
-  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-index d033bb1..59e5d15 100644
---- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-@@ -7,9 +7,8 @@
-  * whole.
-  *
-  *  a) This file is free software; you can redistribute it and/or
-- *     modify it under the terms of the GNU General Public License as
-- *     published by the Free Software Foundation; either version 2 of the
-- *     License.
-+ *     modify it under the terms of the GNU General Public License
-+ *     version 2 as published by the Free Software Foundation.
-  *
-  *     This file is distributed in the hope that it will be useful
-  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-index e56b44c..62a82f3 100644
---- a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-@@ -7,9 +7,8 @@
-  * whole.
-  *
-  *  a) This file is free software; you can redistribute it and/or
-- *     modify it under the terms of the GNU General Public License as
-- *     published by the Free Software Foundation; either version 2 of the
-- *     License.
-+ *     modify it under the terms of the GNU General Public License
-+ *     version 2 as published by the Free Software Foundation.
-  *
-  *     This file is distributed in the hope that it will be useful
-  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-diff --git a/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi b/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
-index 4a18203..469ef58 100644
---- a/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
-@@ -10,9 +10,8 @@
-  * whole.
-  *
-  *  a) This file is free software; you can redistribute it and/or
-- *     modify it under the terms of the GNU General Public License as
-- *     published by the Free Software Foundation; either version 2 of the
-- *     License.
-+ *     modify it under the terms of the GNU General Public License
-+ *     version 2 as published by the Free Software Foundation.
-  *
-  *     This file is distributed in the hope that it will be useful
-  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-diff --git a/arch/arm/boot/dts/imx6qdl-microsom.dtsi b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
-index ec6c7c7..6d4069c 100644
---- a/arch/arm/boot/dts/imx6qdl-microsom.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
-@@ -7,9 +7,8 @@
-  * whole.
-  *
-  *  a) This file is free software; you can redistribute it and/or
-- *     modify it under the terms of the GNU General Public License as
-- *     published by the Free Software Foundation; either version 2 of the
-- *     License.
-+ *     modify it under the terms of the GNU General Public License
-+ *     version 2 as published by the Free Software Foundation.
-  *
-  *     This file is distributed in the hope that it will be useful
-  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
--- 
-1.9.1
+Thanks,
+Dinh
