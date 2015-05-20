@@ -1,68 +1,166 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 20 May 2015 23:56:31 +0200
-Subject: schedule_timeout sleeps too long after dividing CPU frequency
-In-Reply-To: <76003699.Oyq777txnm@wuerfel>
-References: <20150514144239.GZ2067@n2100.arm.linux.org.uk>
- <20150520201438.GW2067@n2100.arm.linux.org.uk> <555CF17D.4060500@free.fr>
- <76003699.Oyq777txnm@wuerfel>
-Message-ID: <555D030F.8030100@free.fr>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 20 May 2015 22:56:50 +0100
+Subject: [PATCH] ARM: dts: cubox-i/hummingboard: Fix the license text
+In-Reply-To: <1432148222-12603-1-git-send-email-festevam@gmail.com>
+References: <1432148222-12603-1-git-send-email-festevam@gmail.com>
+Message-ID: <20150520215650.GA2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/05/2015 22:52, Arnd Bergmann wrote:
-
-> On Wednesday 20 May 2015 22:41:33 Mason wrote:
->
->> Oh... I didn't even think it made sense (and was supported)
->> to select more than one machine...
->>
->> Is this related to CONFIG_ARCH_MULTIPLATFORM?
+On Wed, May 20, 2015 at 03:57:02PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Yes. In the old days, each platform had its own entry in the top-level
-> choice statement, which meant they were mutually exclusive. Most of
-> them are converted now and can be put into a single kernel with
-> CONFIG_ARCH_MULTIPLATFORM, and we stopped accepting new ones that
-> don't do this a few years ago.
+> Arrange the license text a bit to make it clear.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Is the following patch (more) acceptable:
+Thanks for fixing this Fabio.
 
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index 6591e26fc13f..3e867b2f067f 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -32,6 +32,7 @@ static void __iomem *twd_base;
- static struct clk *twd_clk;
- static unsigned long twd_timer_rate;
- static DEFINE_PER_CPU(bool, percpu_setup_called);
-+static int feat_c3stop = CLOCK_EVT_FEAT_C3STOP;
- 
- static struct clock_event_device __percpu *twd_evt;
- static int twd_ppi;
-@@ -294,7 +295,7 @@ static void twd_timer_setup(void)
- 
-        clk->name = "local_timer";
-        clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
--                       CLOCK_EVT_FEAT_C3STOP;
-+                       feat_c3stop;
-        clk->rating = 350;
-        clk->set_mode = twd_set_mode;
-        clk->set_next_event = twd_set_next_event;
-@@ -346,6 +347,7 @@ static int __init twd_local_timer_common_register(struct device_node *np)
-                goto out_irq;
- 
-        twd_get_clock(np);
-+       if (of_get_property(np, "twd_never_stops", NULL)) feat_c3stop = 0;
- 
-        /*
-         * Immediately configure the timer on the boot CPU, unless we need
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
+> ---
+>  arch/arm/boot/dts/imx6dl-cubox-i.dts           | 5 ++---
+>  arch/arm/boot/dts/imx6dl-hummingboard.dts      | 5 ++---
+>  arch/arm/boot/dts/imx6q-cubox-i.dts            | 5 ++---
+>  arch/arm/boot/dts/imx6q-hummingboard.dts       | 5 ++---
+>  arch/arm/boot/dts/imx6qdl-cubox-i.dtsi         | 5 ++---
+>  arch/arm/boot/dts/imx6qdl-hummingboard.dtsi    | 5 ++---
+>  arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi | 5 ++---
+>  arch/arm/boot/dts/imx6qdl-microsom.dtsi        | 5 ++---
+>  8 files changed, 16 insertions(+), 24 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6dl-cubox-i.dts b/arch/arm/boot/dts/imx6dl-cubox-i.dts
+> index e0b7fe8..2a43917 100644
+> --- a/arch/arm/boot/dts/imx6dl-cubox-i.dts
+> +++ b/arch/arm/boot/dts/imx6dl-cubox-i.dts
+> @@ -7,9 +7,8 @@
+>   * whole.
+>   *
+>   *  a) This file is free software; you can redistribute it and/or
+> - *     modify it under the terms of the GNU General Public License as
+> - *     published by the Free Software Foundation; either version 2 of the
+> - *     License.
+> + *     modify it under the terms of the GNU General Public License
+> + *     version 2 as published by the Free Software Foundation.
+>   *
+>   *     This file is distributed in the hope that it will be useful
+>   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> diff --git a/arch/arm/boot/dts/imx6dl-hummingboard.dts b/arch/arm/boot/dts/imx6dl-hummingboard.dts
+> index 7369d2d..d5c9660 100644
+> --- a/arch/arm/boot/dts/imx6dl-hummingboard.dts
+> +++ b/arch/arm/boot/dts/imx6dl-hummingboard.dts
+> @@ -8,9 +8,8 @@
+>   * whole.
+>   *
+>   *  a) This file is free software; you can redistribute it and/or
+> - *     modify it under the terms of the GNU General Public License as
+> - *     published by the Free Software Foundation; either version 2 of the
+> - *     License.
+> + *     modify it under the terms of the GNU General Public License
+> + *     version 2 as published by the Free Software Foundation.
+>   *
+>   *     This file is distributed in the hope that it will be useful
+>   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> diff --git a/arch/arm/boot/dts/imx6q-cubox-i.dts b/arch/arm/boot/dts/imx6q-cubox-i.dts
+> index 670bd8c..353425e 100644
+> --- a/arch/arm/boot/dts/imx6q-cubox-i.dts
+> +++ b/arch/arm/boot/dts/imx6q-cubox-i.dts
+> @@ -7,9 +7,8 @@
+>   * whole.
+>   *
+>   *  a) This file is free software; you can redistribute it and/or
+> - *     modify it under the terms of the GNU General Public License as
+> - *     published by the Free Software Foundation; either version 2 of the
+> - *     License.
+> + *     modify it under the terms of the GNU General Public License
+> + *     version 2 as published by the Free Software Foundation.
+>   *
+>   *     This file is distributed in the hope that it will be useful
+>   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> diff --git a/arch/arm/boot/dts/imx6q-hummingboard.dts b/arch/arm/boot/dts/imx6q-hummingboard.dts
+> index 0f60445..1884c16 100644
+> --- a/arch/arm/boot/dts/imx6q-hummingboard.dts
+> +++ b/arch/arm/boot/dts/imx6q-hummingboard.dts
+> @@ -8,9 +8,8 @@
+>   * whole.
+>   *
+>   *  a) This file is free software; you can redistribute it and/or
+> - *     modify it under the terms of the GNU General Public License as
+> - *     published by the Free Software Foundation; either version 2 of the
+> - *     License.
+> + *     modify it under the terms of the GNU General Public License
+> + *     version 2 as published by the Free Software Foundation.
+>   *
+>   *     This file is distributed in the hope that it will be useful
+>   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+> index d033bb1..59e5d15 100644
+> --- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+> @@ -7,9 +7,8 @@
+>   * whole.
+>   *
+>   *  a) This file is free software; you can redistribute it and/or
+> - *     modify it under the terms of the GNU General Public License as
+> - *     published by the Free Software Foundation; either version 2 of the
+> - *     License.
+> + *     modify it under the terms of the GNU General Public License
+> + *     version 2 as published by the Free Software Foundation.
+>   *
+>   *     This file is distributed in the hope that it will be useful
+>   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
+> index e56b44c..62a82f3 100644
+> --- a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
+> @@ -7,9 +7,8 @@
+>   * whole.
+>   *
+>   *  a) This file is free software; you can redistribute it and/or
+> - *     modify it under the terms of the GNU General Public License as
+> - *     published by the Free Software Foundation; either version 2 of the
+> - *     License.
+> + *     modify it under the terms of the GNU General Public License
+> + *     version 2 as published by the Free Software Foundation.
+>   *
+>   *     This file is distributed in the hope that it will be useful
+>   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> diff --git a/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi b/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
+> index 4a18203..469ef58 100644
+> --- a/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
+> @@ -10,9 +10,8 @@
+>   * whole.
+>   *
+>   *  a) This file is free software; you can redistribute it and/or
+> - *     modify it under the terms of the GNU General Public License as
+> - *     published by the Free Software Foundation; either version 2 of the
+> - *     License.
+> + *     modify it under the terms of the GNU General Public License
+> + *     version 2 as published by the Free Software Foundation.
+>   *
+>   *     This file is distributed in the hope that it will be useful
+>   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> diff --git a/arch/arm/boot/dts/imx6qdl-microsom.dtsi b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
+> index ec6c7c7..6d4069c 100644
+> --- a/arch/arm/boot/dts/imx6qdl-microsom.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
+> @@ -7,9 +7,8 @@
+>   * whole.
+>   *
+>   *  a) This file is free software; you can redistribute it and/or
+> - *     modify it under the terms of the GNU General Public License as
+> - *     published by the Free Software Foundation; either version 2 of the
+> - *     License.
+> + *     modify it under the terms of the GNU General Public License
+> + *     version 2 as published by the Free Software Foundation.
+>   *
+>   *     This file is distributed in the hope that it will be useful
+>   *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> -- 
+> 1.9.1
+> 
 
-Or perhaps the other way around?
-i.e. feat_c3stop initialized to 0 (thus in the bss section)
-and set to FEAT_C3STOP if "twd_never_stops" doesn't exist...
-
-Russell, when you added the FEAT_C3STOP flag unconditionally in
-commit 5388a6b266, didn't that potentially break platforms that
-didn't expect the flag to be set?
-
-Regards.
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
