@@ -1,61 +1,43 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Wed, 20 May 2015 13:18:47 +0200
-Subject: [PATCH] ata: hpt366: fix constant cast warning
-In-Reply-To: <2549322.XbiTlcDvMS@wuerfel>
-References: <2549322.XbiTlcDvMS@wuerfel>
-Message-ID: <1603711.yg6aGn68IJ@amdc1976>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 20 May 2015 13:21:53 +0200
+Subject: [RFC PATCH 1/4] spi: spidev: Add Google SPI flash compatible
+ string
+In-Reply-To: <20150520103746.GD21577@sirena.org.uk>
+References: <1432042454-19234-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1432042454-19234-2-git-send-email-javier.martinez@collabora.co.uk>
+ <20150520101318.GB21577@sirena.org.uk> <555C5F65.7010204@collabora.co.uk>
+ <20150520103746.GD21577@sirena.org.uk>
+Message-ID: <555C6E51.5030601@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Mark,
 
-Hi,
+On 05/20/2015 12:37 PM, Mark Brown wrote:
+> On Wed, May 20, 2015 at 12:18:13PM +0200, Javier Martinez Canillas wrote:
+>> On 05/20/2015 12:13 PM, Mark Brown wrote:
+> 
+>> > This is adding a binding with no documentation, documentation is
+>> > mandatory for all bindings.
+> 
+>> Yes, I missed... sorry about that. Do you agree with the approach
+>> though so I can re-spin the patches adding the missing DT binding?
+> 
+> It's probably OK but I didn't really drill through since the binding was
+> missing.  If these parts are commodity as described it seems surprising
+> that they aren't compatible with any existing kernel driver.
+> 
 
-On Tuesday, May 19, 2015 04:34:05 PM Arnd Bergmann wrote:
-> gcc-5.x warns about a preexisting problem in the hpt36x pata driver:
-> 
-> drivers/ata/pata_hpt366.c: In function 'hpt36x_init_one':
-> drivers/ata/pata_hpt366.c:376:9: warning: assignment discards 'const' qualifier from pointer target type [-Wdiscarded-array-qualifiers]
-> 
-> Other ata drivers have the same problem, as ata_pci_bmdma_init_one
-> takes a non-const pointer, and they solve it by using a cast to
-> turn that pointer into a normal non-const pointer.
-> 
-> I also tried to change the ata core code to make host->private_data
-> a const pointer, but that quickly got out of hand, as some other
-> drivers expect it to be writable, so I ended up using the same
-> hack as the others here.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+The ChromeOS user-space just uses flashrom to send a raw stream of bytes
+via spidev to the SPI NOR flash chip. There is drivers/mtd/spi-nor/spi-nor.c
+but AFAIU there are some limitations when interfacing the flash through
+the MTD layer, for example there isn't a way to set the SPI flash write
+protection through MTD. But I'll do some investigation before re-spinning
+the patches.
 
-Your patch looks fine to me, thanks.
-
-Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+BTW, the other "rohm,dh2228fv" compatible string in spidev added by commit
+8fad805bdc52 ("spi: spidev: Add Rohm DH2228FV DAC compatible string"), also
+does not have a documented DT binding so that should be fixed as well.
 
 Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
-
-> diff --git a/drivers/ata/pata_hpt366.c b/drivers/ata/pata_hpt366.c
-> index cbc3de793d1d..0038dc4c06c7 100644
-> --- a/drivers/ata/pata_hpt366.c
-> +++ b/drivers/ata/pata_hpt366.c
-> @@ -352,7 +352,7 @@ static int hpt36x_init_one(struct pci_dev *dev, const struct pci_device_id *id)
->  	};
->  	const struct ata_port_info *ppi[] = { &info_hpt366, NULL };
->  
-> -	void *hpriv = NULL;
-> +	const void *hpriv = NULL;
->  	u32 reg1;
->  	int rc;
->  
-> @@ -383,7 +383,7 @@ static int hpt36x_init_one(struct pci_dev *dev, const struct pci_device_id *id)
->  		break;
->  	}
->  	/* Now kick off ATA set up */
-> -	return ata_pci_bmdma_init_one(dev, ppi, &hpt36x_sht, hpriv, 0);
-> +	return ata_pci_bmdma_init_one(dev, ppi, &hpt36x_sht, (void *)hpriv, 0);
->  }
->  
->  #ifdef CONFIG_PM_SLEEP
+Javier
