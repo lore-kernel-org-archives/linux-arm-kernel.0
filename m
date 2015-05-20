@@ -1,75 +1,57 @@
-From: treding@nvidia.com (Thierry Reding)
-Date: Wed, 20 May 2015 13:32:33 +0200
-Subject: [PATCH] drm/nouveau/platform: fix compilation if !CONFIG_IOMMU
-In-Reply-To: <1432102224-15169-1-git-send-email-acourbot@nvidia.com>
-References: <555BD66A.5020704@nvidia.com>
- <1432102224-15169-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <20150520113231.GA21937@ulmo.nvidia.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 20 May 2015 19:34:22 +0800
+Subject: [PATCH] i2c: designware: separate ops for system_sleep_pm and
+ runtime_pm
+In-Reply-To: <20150519131516.GO1490@lahna.fi.intel.com>
+References: <1431693099-2292-1-git-send-email-jszhang@marvell.com>
+ <20150518082823.GH1490@lahna.fi.intel.com>
+ <20150519203242.74617ad6@xhacker>
+ <20150519131516.GO1490@lahna.fi.intel.com>
+Message-ID: <20150520193422.73de7d90@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 03:10:24PM +0900, Alexandre Courbot wrote:
-> The lack of IOMMU API support can make nouveau_platform_probe_iommu()
-> fail to compile because struct iommu_ops is then empty. Fix this by
-> skipping IOMMU probe in that case - lack of IOMMU on platform devices
-> is sub-optimal, but is not an error.
-> 
-> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-> ---
-> This is an alternative to https://lkml.org/lkml/2015/5/19/484. Most users
-> of Nouveau do not care about IOMMU support, so we should not impose that
-> option on them.
-> 
->  drm/nouveau/nouveau_platform.c | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/nouveau/nouveau_platform.c b/drivers/gpu/drm/nouveau/nouveau_platform.c
-> index 775277f1edb0..dcfbbfaf1739 100644
-> --- a/drivers/gpu/drm/nouveau/nouveau_platform.c
-> +++ b/drivers/gpu/drm/nouveau/nouveau_platform.c
-> @@ -92,6 +92,8 @@ static int nouveau_platform_power_down(struct nouveau_platform_gpu *gpu)
->  	return 0;
->  }
->  
-> +#if IS_ENABLED(CONFIG_IOMMU_API)
-> +
->  static void nouveau_platform_probe_iommu(struct device *dev,
->  					 struct nouveau_platform_gpu *gpu)
->  {
-> @@ -158,6 +160,20 @@ static void nouveau_platform_remove_iommu(struct device *dev,
->  	}
->  }
->  
-> +#else
-> +
-> +static void nouveau_platform_probe_iommu(struct device *dev,
-> +					 struct nouveau_platform_gpu *gpu)
-> +{
-> +}
-> +
-> +static void nouveau_platform_remove_iommu(struct device *dev,
-> +					  struct nouveau_platform_gpu *gpu)
-> +{
-> +}
-> +
-> +#endif
-> +
+Dear Mika,
 
-Since these are all static functions, perhaps an "if (IS_ENABLED(...))"
-would work here? That way you'd get compile coverage of the code in all
-cases.
+On Tue, 19 May 2015 16:15:16 +0300
+Mika Westerberg <mika.westerberg@linux.intel.com> wrote:
 
-But perhaps that doesn't work for IOMMU. I have a vague memory of
-running across something like this before and IOMMU has this quirk of
-defining struct iommu_ops as empty if IOMMU_API is deselected so you'll
-probably get compiler errors unless you actually preprocess the code
-out.
+> On Tue, May 19, 2015 at 08:32:42PM +0800, Jisheng Zhang wrote:
+> > > I can see that this fixes the issue with the platform driver (as the
+> > > platform bus core doesn't power on the device automatically as opposed
+> > > to other buses, like PCI). However, I'm thinking that can we do better
+> > > here.
+> > > 
+> > > Instead of powering the device on again, can't we leave it in low power
+> > > state? Recently added 'dev->power.direct_complete' may be used to
+> > > achieve that, I think.
+> > 
+> > how to handle runtime suspended via just being clock gated?
+> 
+> As far as I can tell driver's suspend hook does the clock gating so why
+> would you need to handle it differently? Once the device is runtime
+> suspended, it is both clock and power gated depending on the platform.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150520/b2177925/attachment.sig>
+Sorry for confusion. Considering one platform which doesn't support power off
+the i2c host but it can disable the host's clock. So in such platform, when
+the host is runtime suspended, its clock is disabled, then i2c_dw_disable() will
+hang when s2ram. Except using the runtime pm API to ensure the host is in
+a correct state, is there any other solution? AFAIK, 'dev->power.direct_complete'
+doesn't help such case.
+
+> 
+> > Currently the only solution is using the runtime pm apis to ensure the
+> > device is in a working state during s2ram. What's your opinion?
+> 
+> Well, it sounds a bit silly to resume the device just because you want
+> to call i2c_dw_disable() for it before suspending again ;-)
+> 
+
+Agree. But it's the only solution I know so far.
+
+> At least, it would be nice to check if we can keep it runtime suspended
+> with the help of 'dev->power.direct_complete'. If not possible, then I
+> suppose your patch is sufficient.
+
+Thanks,
+Jisheng
