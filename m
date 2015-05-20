@@ -1,83 +1,70 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Tue, 19 May 2015 21:44:46 -0500
-Subject: [PATCH v2 0/7] Change snvs rtc and poweroff to use syscon add
- pwrkey driver
-In-Reply-To: <20150520015851.GB1071@dragon>
-References: <1432055082-28983-1-git-send-email-Frank.Li@freescale.com>
- <20150520015851.GB1071@dragon>
-Message-ID: <CAHrpEqS5gAsu6=ut-mPwZiipqKJb=VicRooCPFhEf324kuhnDQ@mail.gmail.com>
+From: cory.tusar@pid1solutions.com (Cory Tusar)
+Date: Tue, 19 May 2015 22:45:39 -0400
+Subject: [PATCH] ARM: dts: vf610: Extend I2C support to all available busses.
+Message-ID: <1432089939-1086-1-git-send-email-cory.tusar@pid1solutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 8:58 PM, Shawn Guo <shawnguo@kernel.org> wrote:
-> On Wed, May 20, 2015 at 01:04:35AM +0800, Frank.Li at freescale.com wrote:
->> From: Frank Li <Frank.Li@freescale.com>
->>
->> Change from v1 to v2
->>  - Change simple-bus to simple-mfd
->>  - RTC remove lock.
->>  - RTC remove comments "These register offsets are relative to LP (Low Power) range"
->>  - power off, remove extra space
->>
->> SNVS is MPF module.
->> include rtc, power off, ON/OFF power key
->>
->>   arm: imx: power-off: change to syscon to access register
->>   rtc: arm: imx: snvs: change use syscon to access register
->> Above two patch change existed power-off and rtc use syscon
->>
->>   Document: dt: fsl: snvs: change support syscon
->>   arm: dts: imx: update snvs to use syscon access register
->> Update dt file and document
->>
->>   input: keyboard: imx: add snvs power key driver
->>   document: devicetree: input: imx: i.mx snvs power device tree bindings
->>   arm: dts: imx6sx: enable snvs power key
->> Added on/off key driver
->>
->> Frank Li (6):
->>   arm: imx: power-off: change to syscon to access register
->>   rtc: arm: imx: snvs: change use syscon to access register
->>   Document: dt: fsl: snvs: change support syscon
->>   arm: dts: imx: update snvs to use syscon access register
->>   document: devicetree: input: imx: i.mx snvs power device tree bindings
->>   arm: dts: imx6sx: enable snvs power key
->
-> So, the series will break existing DTBs for RTC and poweroff, right?
-> If this is unavoidable, should we at least have some warning messages
-> telling users about his breakage?
+This commit extends the existing Vybrid I2C support to cover busses
+I2C1, I2C2, and I2C3.
 
-How to do that?
-Just added it commit message or need runtime warning?
+Signed-off-by: Cory Tusar <cory.tusar@pid1solutions.com>
+---
+ arch/arm/boot/dts/vfxxx.dtsi | 42 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
->
-> Shawn
->
->>
->> Robin Gong (1):
->>   input: keyboard: imx: add snvs power key driver
->>
->>  .../devicetree/bindings/crypto/fsl-sec4.txt        |  93 +++++++--
->>  .../devicetree/bindings/input/snvs-pwrkey.txt      |   1 +
->>  .../bindings/power_supply/imx-snvs-poweroff.txt    |  24 +--
->>  arch/arm/boot/dts/imx6qdl.dtsi                     |  12 +-
->>  arch/arm/boot/dts/imx6sl.dtsi                      |  12 +-
->>  arch/arm/boot/dts/imx6sx.dtsi                      |  19 +-
->>  arch/arm/boot/dts/vfxxx.dtsi                       |   9 +-
->>  drivers/input/keyboard/Kconfig                     |  11 +
->>  drivers/input/keyboard/Makefile                    |   1 +
->>  drivers/input/keyboard/snvs_pwrkey.c               | 232 +++++++++++++++++++++
->>  drivers/power/reset/imx-snvs-poweroff.c            |  21 +-
->>  drivers/rtc/rtc-snvs.c                             | 128 +++++-------
->>  12 files changed, 417 insertions(+), 146 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/input/snvs-pwrkey.txt
->>  create mode 100644 drivers/input/keyboard/snvs_pwrkey.c
->>
->> --
->> 1.9.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+index 4aa3351..ec98b6c 100644
+--- a/arch/arm/boot/dts/vfxxx.dtsi
++++ b/arch/arm/boot/dts/vfxxx.dtsi
+@@ -347,6 +347,48 @@
+ 				status = "disabled";
+ 			};
+ 
++			i2c1: i2c at 40067000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "fsl,vf610-i2c";
++				reg = <0x40067000 0x1000>;
++				interrupts = <72 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks VF610_CLK_I2C1>;
++				clock-names = "ipg";
++				dmas = <&edma0 0 52>,
++					<&edma0 0 53>;
++				dma-names = "rx","tx";
++				status = "disabled";
++			};
++
++			i2c2: i2c at 400e6000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "fsl,vf610-i2c";
++				reg = <0x400e6000 0x1000>;
++				interrupts = <73 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks VF610_CLK_I2C2>;
++				clock-names = "ipg";
++				dmas = <&edma0 1 36>,
++					<&edma0 1 37>;
++				dma-names = "rx","tx";
++				status = "disabled";
++			};
++
++			i2c3: i2c at 400e7000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "fsl,vf610-i2c";
++				reg = <0x400e7000 0x1000>;
++				interrupts = <74 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks VF610_CLK_I2C3>;
++				clock-names = "ipg";
++				dmas = <&edma0 1 38>,
++					<&edma0 1 39>;
++				dma-names = "rx","tx";
++				status = "disabled";
++			};
++
+ 			clks: ccm at 4006b000 {
+ 				compatible = "fsl,vf610-ccm";
+ 				reg = <0x4006b000 0x1000>;
+-- 
+2.3.6
