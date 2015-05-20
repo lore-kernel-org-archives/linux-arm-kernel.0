@@ -1,66 +1,96 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 20 May 2015 16:08:32 +0200
-Subject: [PATCH v5 00/12] ARM: berlin: add nand support
-In-Reply-To: <5557B8AF.9090703@vanguardiasur.com.ar>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Wed, 20 May 2015 11:05:13 -0300
+Subject: [PATCH v5 05/12] mtd: pxa3xx_nand: rework flash detection and
+ timing setup
+In-Reply-To: <20150520140348.GL22054@kwain>
 References: <1431356341-31640-1-git-send-email-antoine.tenart@free-electrons.com>
- <5557B8AF.9090703@vanguardiasur.com.ar>
-Message-ID: <20150520140832.GO22054@kwain>
+ <1431356341-31640-6-git-send-email-antoine.tenart@free-electrons.com>
+ <5557BE85.4050208@vanguardiasur.com.ar> <20150520140348.GL22054@kwain>
+Message-ID: <555C9499.10606@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 16, 2015 at 06:37:51PM -0300, Ezequiel Garcia wrote:
-> Hi Antoine,
-> 
-> This is a long patchset, which involves some very invasive changes
-> to the driver. So, I think it'll be better to split it in different
-> patchsets.
-> 
-> On 05/11/2015 11:58 AM, Antoine Tenart wrote:
-> [..]
-> > 
-> > Antoine Tenart (12):
-> 
-> These two clock patches are related to Berlin support only.
-> 
-> >   mtd: pxa3xx_nand: add a non mandatory ECC clock
-> >   Documentation: bindings: document the clocks for pxa3xx-nand
-> 
-> The next four patches rework the timing setup and remove the legacy
-> device detection. I think we should try to get them merged in first place.
-> 
-> >   mtd: pxa3xx_nand: add a default chunk size
-> >   mtd: pxa3xx_nand: add helpers to setup the timings
-> >   mtd: pxa3xx_nand: rework flash detection and timing setup
-> >   mtd: pxa3xx_nand: clean up the pxa3xx timings
-> 
-> Next one just adds support for a new device. It has little to do with
-> the series. I already replied about using JEDEC ID; once we solve that,
-> I suggest that you submit this patch alone.
-> 
-> >   mtd: nand: add Samsung K9GBG08U0A-M to nand_ids table
-> 
-> And finally, once we solve the timing rework, we can go through Berlin
-> support.
-> 
-> >   mtd: pxa3xx_nand: add support for the Marvell Berlin nand controller
-> >   Documentation: bindings: add the Berlin nand controller compatible
-> >   mtd: nand: let Marvell Berlin SoCs select the pxa3xx driver
-> >   ARM: berlin: add BG2Q node for the nand
-> >   ARM: berlin: enable flash on the BG2Q DMP
-> > 
-> 
-> What do you think?
 
-So we'd have 3 series:
-- Timing rework.
-- Berlin stuff.
-- Samsung K9GBG08U0A-M support.
 
-I'm OK with splitting the series to ease the review process :)
+On 05/20/2015 11:03 AM, Antoine Tenart wrote:
+> Ezequiel,
+> 
+> On Sat, May 16, 2015 at 07:02:45PM -0300, Ezequiel Garcia wrote:
+>> On 05/11/2015 11:58 AM, Antoine Tenart wrote:
+> 
+>>> -
+>>>  	ndcr |= (pdata->enable_arbiter) ? NDCR_ND_ARB_EN : 0;
+>>>  	ndcr |= (host->col_addr_cycles == 2) ? NDCR_RA_START : 0;
+>>> -	ndcr |= (f->page_per_block == 64) ? NDCR_PG_PER_BLK : 0;
+>>> -	ndcr |= (f->page_size == 2048) ? NDCR_PAGE_SZ : 0;
+>>> -	ndcr |= (f->flash_width == 16) ? NDCR_DWIDTH_M : 0;
+>>> -	ndcr |= (f->dfc_width == 16) ? NDCR_DWIDTH_C : 0;
+>>> +	ndcr |= (chip->page_shift == 6) ? NDCR_PG_PER_BLK : 0;
+>>> +	ndcr |= (mtd->writesize == 2048) ? NDCR_PAGE_SZ : 0;
+>>
+>> By the time you call this, there's no detected flash, so there's
+>> no geometry information such as mtd->writesize, chip->page_shift, etc.
+> 
+> I'll move this to pxa3xx_nand_init_timings().
+> 
 
-Antoine
+Well, please don't call it init_timings() if you are doing more than
+timings setup.
+
+>>> @@ -1577,64 +1558,20 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
+>>>  		return ret;
+>>>  	}
+>>>  
+>>> -	chip->cmdfunc(mtd, NAND_CMD_READID, 0, 0);
+>>> -	id = *((uint16_t *)(info->data_buff));
+>>> -	if (id != 0)
+>>> -		dev_info(&info->pdev->dev, "Detect a flash id %x\n", id);
+>>> -	else {
+>>> -		dev_warn(&info->pdev->dev,
+>>> -			 "Read out ID 0, potential timing set wrong!!\n");
+>>> -
+>>> -		return -EINVAL;
+>>> -	}
+>>> -
+>>> -	num = ARRAY_SIZE(builtin_flash_types) + pdata->num_flash - 1;
+>>> -	for (i = 0; i < num; i++) {
+>>> -		if (i < pdata->num_flash)
+>>> -			f = pdata->flash + i;
+>>> -		else
+>>> -			f = &builtin_flash_types[i - pdata->num_flash + 1];
+>>> -
+>>> -		/* find the chip in default list */
+>>> -		if (f->chip_id == id)
+>>> -			break;
+>>> -	}
+>>> -
+>>> -	if (i >= (ARRAY_SIZE(builtin_flash_types) + pdata->num_flash - 1)) {
+>>> -		dev_err(&info->pdev->dev, "ERROR!! flash not defined!!!\n");
+>>> -
+>>> -		return -EINVAL;
+>>> -	}
+>>> -
+>>> -	ret = pxa3xx_nand_config_flash(info, f);
+>>
+>> This second call to pxa3xx_nand_config_flash was in charge of re-configuring
+>> the device after proper identification.
+>>
+>> I'd say a proper approach is to configure default parameters,
+>> call nand_scan_ident, and finally re-configure using the detected values.
+> 
+> That's what is done already, default parameters are setup in
+> pxa3xx_nand_sensing(), using onfi_async_timing_mode_to_sdr_timings(0).
+> Then once the device is recognized, the proper timings are used by
+> calling pxa3xx_nand_init_timings().
+> 
+> Did I miss something here?
+> 
+
+I'm not talking about the timings but about ndcr configuration. You can
+only do that once the device is detected, not before.
+
+The timing stuff look OK.
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Ezequiel Garcia, VanguardiaSur
+www.vanguardiasur.com.ar
