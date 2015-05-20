@@ -1,174 +1,67 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 21 May 2015 00:35:44 +0200
-Subject: [PATCH soc] ARM: use ARM_SINGLE_ARMV7M for ARMv7-M platforms
-Message-ID: <1432161344-1930-1-git-send-email-stefan@agner.ch>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 20 May 2015 15:36:05 -0700
+Subject: [GIT PULL 2/2] omap1 sparse irq support for v4.2
+In-Reply-To: <pull-1432161303-403113>
+References: <pull-1432161303-403113>
+Message-ID: <pull-1432161303-403113-2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the new config symbol ARM_SINGLE_ARMV7M which groups config
-symbols used by modern ARMv7-M platforms. This allows supporting
-multiple ARMv7-M platforms in one kernel image. However, a common
-kernel image requires the combined platforms to share the same
-main memory layout to be bootable.
+The following changes since commit 030bbdbf4c833bc69f502eae58498bc5572db736:
 
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
-Since this is essentially only a shift of config symbols, it
-should not change runtime behavior, at least when selecting
-only one platform.
+  Linux 4.1-rc3 (2015-05-10 15:12:29 -0700)
 
-Uwe, this is essentially the same I had in my patchset, just
-converting the other platforms too. I was bold and added your
-Ack anyway...
+are available in the git repository at:
 
-Joachim, Maxime, I test compiled with your defconfigs, compiled
-fine on my machine.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.2/omap1
 
- arch/arm/Kconfig       | 86 ++++++++++++++++++--------------------------------
- arch/arm/Kconfig.debug |  5 ++-
- 2 files changed, 32 insertions(+), 59 deletions(-)
+for you to fetch changes up to 685e2d08c54b1a1bf31bbe6562f06db089d31c7b:
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 75920ed..9b777e3 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -334,6 +334,7 @@ config ARM_SINGLE_ARMV7M
- 	depends on !MMU
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_NVIC
-+	select AUTO_ZRELADDR
- 	select CLKSRC_OF
- 	select COMMON_CLK
- 	select CPU_V7M
-@@ -411,24 +412,6 @@ config ARCH_EBSA110
- 	  Ethernet interface, two PCMCIA sockets, two serial ports and a
- 	  parallel port.
- 
--config ARCH_EFM32
--	bool "Energy Micro efm32"
--	depends on !MMU
--	select ARCH_REQUIRE_GPIOLIB
--	select ARM_NVIC
--	select AUTO_ZRELADDR
--	select CLKSRC_OF
--	select COMMON_CLK
--	select CPU_V7M
--	select GENERIC_CLOCKEVENTS
--	select NO_DMA
--	select NO_IOPORT_MAP
--	select SPARSE_IRQ
--	select USE_OF
--	help
--	  Support for Energy Micro's (now Silicon Labs) efm32 Giant Gecko
--	  processors.
--
- config ARCH_EP93XX
- 	bool "EP93xx-based"
- 	select ARCH_HAS_HOLES_MEMORYMODEL
-@@ -599,26 +582,6 @@ config ARCH_W90X900
- 	  <http://www.nuvoton.com/hq/enu/ProductAndSales/ProductLines/
- 		ConsumerElectronicsIC/ARMMicrocontroller/ARMMicrocontroller>
- 
--config ARCH_LPC18XX
--	bool "NXP LPC18xx/LPC43xx"
--	depends on !MMU
--	select ARCH_HAS_RESET_CONTROLLER
--	select ARCH_REQUIRE_GPIOLIB
--	select ARM_AMBA
--	select ARM_NVIC
--	select AUTO_ZRELADDR
--	select CLKSRC_LPC32XX
--	select COMMON_CLK
--	select CPU_V7M
--	select GENERIC_CLOCKEVENTS
--	select NO_IOPORT_MAP
--	select PINCTRL
--	select SPARSE_IRQ
--	select USE_OF
--	help
--	  Support for NXP's LPC18xx Cortex-M3 and LPC43xx Cortex-M4
--	  high performance microcontrollers.
--
- config ARCH_LPC32XX
- 	bool "NXP LPC32XX"
- 	select ARCH_REQUIRE_GPIOLIB
-@@ -791,24 +754,6 @@ config ARCH_OMAP1
- 	help
- 	  Support for older TI OMAP1 (omap7xx, omap15xx or omap16xx)
- 
--config ARCH_STM32
--	bool "STMicrolectronics STM32"
--	depends on !MMU
--	select ARCH_HAS_RESET_CONTROLLER
--	select ARM_NVIC
--	select ARMV7M_SYSTICK
--	select AUTO_ZRELADDR
--	select CLKSRC_OF
--	select COMMON_CLK
--	select CPU_V7M
--	select GENERIC_CLOCKEVENTS
--	select NO_IOPORT_MAP
--	select RESET_CONTROLLER
--	select SPARSE_IRQ
--	select USE_OF
--	help
--	  Support for STMicroelectronics STM32 processors.
--
- endchoice
- 
- menu "Multiple platform selection"
-@@ -1006,6 +951,35 @@ source "arch/arm/mach-zx/Kconfig"
- 
- source "arch/arm/mach-zynq/Kconfig"
- 
-+# ARMv7-M architecture
-+config ARCH_EFM32
-+	bool "Energy Micro efm32"
-+	depends on ARM_SINGLE_ARMV7M
-+	select ARCH_REQUIRE_GPIOLIB
-+	help
-+	  Support for Energy Micro's (now Silicon Labs) efm32 Giant Gecko
-+	  processors.
-+
-+config ARCH_LPC18XX
-+	bool "NXP LPC18xx/LPC43xx"
-+	depends on ARM_SINGLE_ARMV7M
-+	select ARCH_HAS_RESET_CONTROLLER
-+	select ARM_AMBA
-+	select CLKSRC_LPC32XX
-+	select PINCTRL
-+	help
-+	  Support for NXP's LPC18xx Cortex-M3 and LPC43xx Cortex-M4
-+	  high performance microcontrollers.
-+
-+config ARCH_STM32
-+	bool "STMicrolectronics STM32"
-+	depends on ARM_SINGLE_ARMV7M
-+	select ARCH_HAS_RESET_CONTROLLER
-+	select ARMV7M_SYSTICK
-+	select RESET_CONTROLLER
-+	help
-+	  Support for STMicroelectronics STM32 processors.
-+
- # Definitions to make life easier
- config ARCH_ACORN
- 	bool
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 9553759..e27fd3f 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1596,9 +1596,8 @@ config DEBUG_UNCOMPRESS
- config UNCOMPRESS_INCLUDE
- 	string
- 	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM || \
--					PLAT_SAMSUNG || ARCH_EFM32 || \
--					ARCH_SHMOBILE_LEGACY || \
--					ARCH_LPC18XX || ARM_SINGLE_ARMV7M
-+					PLAT_SAMSUNG || ARM_SINGLE_ARMV7M || \
-+					ARCH_SHMOBILE_LEGACY
- 	default "mach/uncompress.h"
- 
- config EARLY_PRINTK
--- 
-2.4.1
+  ARM: OMAP1: Change interrupt numbering for sparse IRQ (2015-05-20 09:01:21 -0700)
+
+----------------------------------------------------------------
+Add support for CONFIG_SPARSE_IRQ for omap1. This takes us a bit closer
+to making omap1 support multiarch. After this series we still need to
+make omap1 use the common clock framework and fix up the drivers to not
+rely on includes from mach and plat directories.
+
+Note that this branch depends on a GPIO driver fix in v4.1-rc3
+d2d05c65c40e ("gpio: omap: Fix regression for MPUIO interrupts").
+
+----------------------------------------------------------------
+Tony Lindgren (4):
+      ARM: OMAP1: Move UART defines to prepare for sparse IRQ
+      ARM: OMAP1: Switch to use generic irqchip in preparation for sparse IRQ
+      ARM: omap1: Switch to use MULTI_IRQ
+      ARM: OMAP1: Change interrupt numbering for sparse IRQ
+
+ arch/arm/Kconfig                               |   2 +
+ arch/arm/mach-omap1/ams-delta-fiq-handler.S    |   3 +-
+ arch/arm/mach-omap1/board-ams-delta.c          |   1 +
+ arch/arm/mach-omap1/board-fsample.c            |   1 +
+ arch/arm/mach-omap1/board-generic.c            |   1 +
+ arch/arm/mach-omap1/board-h2.c                 |   1 +
+ arch/arm/mach-omap1/board-h3.c                 |   1 +
+ arch/arm/mach-omap1/board-htcherald.c          |   1 +
+ arch/arm/mach-omap1/board-innovator.c          |   1 +
+ arch/arm/mach-omap1/board-nokia770.c           |   1 +
+ arch/arm/mach-omap1/board-osk.c                |   1 +
+ arch/arm/mach-omap1/board-palmte.c             |   1 +
+ arch/arm/mach-omap1/board-palmtt.c             |   1 +
+ arch/arm/mach-omap1/board-palmz71.c            |   1 +
+ arch/arm/mach-omap1/board-perseus2.c           |   1 +
+ arch/arm/mach-omap1/board-sx1.c                |   1 +
+ arch/arm/mach-omap1/board-voiceblue.c          |   1 +
+ arch/arm/mach-omap1/common.h                   |   5 +-
+ arch/arm/mach-omap1/dma.c                      |   2 +-
+ arch/arm/mach-omap1/i2c.c                      |   3 +-
+ arch/arm/mach-omap1/include/mach/entry-macro.S |  39 ------
+ arch/arm/mach-omap1/include/mach/irqs.h        | 124 ++++++++++---------
+ arch/arm/mach-omap1/include/mach/serial.h      |   5 -
+ arch/arm/mach-omap1/include/mach/soc.h         |   4 +
+ arch/arm/mach-omap1/irq.c                      | 157 +++++++++++++++----------
+ arch/arm/mach-omap1/timer.c                    |   4 +-
+ arch/arm/plat-omap/dma.c                       |   4 +
+ include/uapi/linux/serial_reg.h                |   3 +
+ 28 files changed, 190 insertions(+), 180 deletions(-)
+ delete mode 100644 arch/arm/mach-omap1/include/mach/entry-macro.S
