@@ -1,214 +1,62 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 20 May 2015 14:21:03 -0700
-Subject: [PATCH 2/2] memory: omap-gpmc: Add Kconfig option for debug
-In-Reply-To: <1432156863-19695-1-git-send-email-tony@atomide.com>
-References: <1432156863-19695-1-git-send-email-tony@atomide.com>
-Message-ID: <1432156863-19695-3-git-send-email-tony@atomide.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 20 May 2015 23:22:24 +0200
+Subject: [PATCH] ARM: multi_v7_defconfig: Add Atmel SAMA5 family
+In-Reply-To: <CAOCHtYiYBsE=31E3ZNNnEkZrbFXmBmgwD8Qpt69iK6h6cW9shA@mail.gmail.com>
+References: <1428051678-20450-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <555AFF3F.10400@atmel.com> <9986808.t62JLgg5NJ@wuerfel>
+ <20150519123358.GA15179@piout.net> <555B3463.2060700@atmel.com>
+ <555B3A92.7010409@atmel.com> <555B4040.2090302@atmel.com>
+ <CAMAWPa95VTM+VgNpcs1oZwX9NqzrL1JeNy=MqL0Zo3JP=svyUQ@mail.gmail.com>
+ <20150520140856.GE3907@piout.net>
+ <CAOCHtYiYBsE=31E3ZNNnEkZrbFXmBmgwD8Qpt69iK6h6cW9shA@mail.gmail.com>
+Message-ID: <20150520212224.GB3244@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We support decoding the bootloader values if DEBUG is defined.
-But we also need to change the struct omap_hwmod flags to have
-HWMOD_INIT_NO_RESET to avoid the GPMC being reset during the
-boot. Otherwise just the default timings will be displayed
-instead of the bootloader configured timings.
+Hi,
 
-This also allows us to clean up the various GPMC related
-hwmod flags. For debugging, we only need HWMOD_INIT_NO_RESET,
-and HWMOD_INIT_NO_IDLE is not needed.
+On 20/05/2015 at 10:18:16 -0500, Robert Nelson wrote :
+> On Wed, May 20, 2015 at 9:08 AM, Alexandre Belloni
+> <alexandre.belloni@free-electrons.com> wrote:
+> > Hi,
+> >
+> > On 20/05/2015 at 06:53:50 -0700, Kevin Hilman wrote :
+> >> FYI... This patch is now in linux-next, and boot tests for all the
+> >> sama5d[34] boards in kernelci.org have failed to boot.
+> >>
+> >>    http://kernelci.org/boot/all/job/next/kernel/next-20150520/
+> >>
+> >
+> > Hum, I'm pretty sure you see the heartbeat led blinking ;)
+> >
+> > I think I told you a while ago on IRC and this is part of the commit
+> > message. You have to use ttyAT0 instead of ttyS0 in your bootargs. I'm
+> > not sure how I can make that more obvious, I'm open to any idea.
+> >
+> > I'm planning to send a series adding stdout-path to the atmel boards
+> > when I'm back next week. Hopefully this will solve that issue.
+> 
+> Alexandre,
+> 
+> considering all the old boot-loaders, have you thought about adding a
+> compatibility config similar to:
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=00648d0282dcca1da453c0b20d27e24bf901a854
+> 
 
-Cc: Brian Hutchinson <b.hutchman@gmail.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Roger Quadros <rogerq@ti.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/omap_hwmod.h                        |  6 ++++++
- arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c      | 12 ++----------
- arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |  3 ++-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c              | 12 ++----------
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c              | 11 ++---------
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c               |  4 ++--
- arch/arm/mach-omap2/omap_hwmod_81xx_data.c              |  2 ++
- drivers/memory/Kconfig                                  |  8 ++++++++
- drivers/memory/omap-gpmc.c                              |  6 +++---
- 9 files changed, 29 insertions(+), 35 deletions(-)
+We are not there yet. sama5_defconfig and at91_dt_defconfig will still
+produce kernels using ttyS and not ttyAT. The switch will not happen
+until you set CONFIG_SERIAL_ATMEL_TTYAT which has been present since
+2.6.19. The issue is that it is mandatory to use it in a multi_v7
+configuration because the 8250 driver is compiled in and is conflicting.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
-index 9611c91..b5d27ec 100644
---- a/arch/arm/mach-omap2/omap_hwmod.h
-+++ b/arch/arm/mach-omap2/omap_hwmod.h
-@@ -109,6 +109,12 @@ extern struct omap_hwmod_sysc_fields omap_hwmod_sysc_type3;
- 
- #define DEBUG_OMAPUART_FLAGS	(HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET)
- 
-+#ifdef CONFIG_OMAP_GPMC_DEBUG
-+#define DEBUG_OMAP_GPMC_HWMOD_FLAGS	HWMOD_INIT_NO_RESET
-+#else
-+#define DEBUG_OMAP_GPMC_HWMOD_FLAGS	0
-+#endif
-+
- #if defined(CONFIG_DEBUG_OMAP2UART1)
- #undef DEBUG_OMAP2UART1_FLAGS
- #define DEBUG_OMAP2UART1_FLAGS DEBUG_OMAPUART_FLAGS
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
-index 8821b9d..6dcfd03 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
-@@ -762,16 +762,8 @@ struct omap_hwmod omap2xxx_gpmc_hwmod = {
- 	.name		= "gpmc",
- 	.class		= &omap2xxx_gpmc_hwmod_class,
- 	.main_clk	= "gpmc_fck",
--	/*
--	 * XXX HWMOD_INIT_NO_RESET should not be needed for this IP
--	 * block.  It is not being added due to any known bugs with
--	 * resetting the GPMC IP block, but rather because any timings
--	 * set by the bootloader are not being correctly programmed by
--	 * the kernel from the board file or DT data.
--	 * HWMOD_INIT_NO_RESET should be removed ASAP.
--	 */
--	.flags		= (HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET |
--			   HWMOD_NO_IDLEST),
-+	/* Skip reset for CONFIG_OMAP_GPMC_DEBUG for bootloader timings */
-+	.flags		= HWMOD_NO_IDLEST | DEBUG_OMAP_GPMC_HWMOD_FLAGS,
- 	.prcm		= {
- 		.omap2	= {
- 			.prcm_reg_id = 3,
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
-index cabc569..ae0cb67 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c
-@@ -668,7 +668,8 @@ struct omap_hwmod am33xx_gpmc_hwmod = {
- 	.name		= "gpmc",
- 	.class		= &am33xx_gpmc_hwmod_class,
- 	.clkdm_name	= "l3s_clkdm",
--	.flags		= (HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET),
-+	/* Skip reset for CONFIG_OMAP_GPMC_DEBUG for bootloader timings */
-+	.flags		= DEBUG_OMAP_GPMC_HWMOD_FLAGS,
- 	.main_clk	= "l3s_gclk",
- 	.prcm		= {
- 		.omap4	= {
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index 4e8e93c..0ca4d3f 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -2169,16 +2169,8 @@ static struct omap_hwmod omap3xxx_gpmc_hwmod = {
- 	.clkdm_name	= "core_l3_clkdm",
- 	.mpu_irqs	= omap3xxx_gpmc_irqs,
- 	.main_clk	= "gpmc_fck",
--	/*
--	 * XXX HWMOD_INIT_NO_RESET should not be needed for this IP
--	 * block.  It is not being added due to any known bugs with
--	 * resetting the GPMC IP block, but rather because any timings
--	 * set by the bootloader are not being correctly programmed by
--	 * the kernel from the board file or DT data.
--	 * HWMOD_INIT_NO_RESET should be removed ASAP.
--	 */
--	.flags		= (HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET |
--			   HWMOD_NO_IDLEST),
-+	/* Skip reset for CONFIG_OMAP_GPMC_DEBUG for bootloader timings */
-+	.flags		= HWMOD_NO_IDLEST | DEBUG_OMAP_GPMC_HWMOD_FLAGS,
- };
- 
- /*
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index f5e68a7..43eebf2 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -1188,15 +1188,8 @@ static struct omap_hwmod omap44xx_gpmc_hwmod = {
- 	.name		= "gpmc",
- 	.class		= &omap44xx_gpmc_hwmod_class,
- 	.clkdm_name	= "l3_2_clkdm",
--	/*
--	 * XXX HWMOD_INIT_NO_RESET should not be needed for this IP
--	 * block.  It is not being added due to any known bugs with
--	 * resetting the GPMC IP block, but rather because any timings
--	 * set by the bootloader are not being correctly programmed by
--	 * the kernel from the board file or DT data.
--	 * HWMOD_INIT_NO_RESET should be removed ASAP.
--	 */
--	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
-+	/* Skip reset for CONFIG_OMAP_GPMC_DEBUG for bootloader timings */
-+	.flags		= DEBUG_OMAP_GPMC_HWMOD_FLAGS,
- 	.prcm = {
- 		.omap4 = {
- 			.clkctrl_offs = OMAP4_CM_L3_2_GPMC_CLKCTRL_OFFSET,
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index 0e64c2f..a0411f3 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -819,8 +819,8 @@ static struct omap_hwmod dra7xx_gpmc_hwmod = {
- 	.name		= "gpmc",
- 	.class		= &dra7xx_gpmc_hwmod_class,
- 	.clkdm_name	= "l3main1_clkdm",
--	.flags		= (HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET |
--			   HWMOD_SWSUP_SIDLE),
-+	/* Skip reset for CONFIG_OMAP_GPMC_DEBUG for bootloader timings */
-+	.flags		= HWMOD_SWSUP_SIDLE | DEBUG_OMAP_GPMC_HWMOD_FLAGS,
- 	.main_clk	= "l3_iclk_div",
- 	.prcm = {
- 		.omap4 = {
-diff --git a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
-index cab1eb6..c924137 100644
---- a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
-@@ -478,6 +478,8 @@ static struct omap_hwmod dm81xx_gpmc_hwmod = {
- 	.clkdm_name	= "alwon_l3s_clkdm",
- 	.class		= &dm81xx_gpmc_hwmod_class,
- 	.main_clk	= "sysclk6_ck",
-+	/* Skip reset for CONFIG_OMAP_GPMC_DEBUG for bootloader timings */
-+	.flags		= DEBUG_OMAP_GPMC_HWMOD_FLAGS,
- 	.prcm = {
- 		.omap4 = {
- 			.clkctrl_offs = DM816X_CM_ALWON_GPMC_CLKCTRL,
-diff --git a/drivers/memory/Kconfig b/drivers/memory/Kconfig
-index 868036f..8406c668 100644
---- a/drivers/memory/Kconfig
-+++ b/drivers/memory/Kconfig
-@@ -49,6 +49,14 @@ config OMAP_GPMC
- 	  interfacing to a variety of asynchronous as well as synchronous
- 	  memory drives like NOR, NAND, OneNAND, SRAM.
- 
-+config OMAP_GPMC_DEBUG
-+	bool
-+	depends on OMAP_GPMC
-+	help
-+	  Enables verbose debugging mostly to decode the bootloader provided
-+	  timings. Enable this during development to configure devices
-+	  connected to the GPMC bus.
-+
- config MVEBU_DEVBUS
- 	bool "Marvell EBU Device Bus Controller"
- 	default y
-diff --git a/drivers/memory/omap-gpmc.c b/drivers/memory/omap-gpmc.c
-index 0e524a1..3a27a84 100644
---- a/drivers/memory/omap-gpmc.c
-+++ b/drivers/memory/omap-gpmc.c
-@@ -403,7 +403,7 @@ static void gpmc_cs_bool_timings(int cs, const struct gpmc_bool_timings *p)
- 			   p->cycle2cyclediffcsen);
- }
- 
--#ifdef DEBUG
-+#ifdef CONFIG_OMAP_GPMC_DEBUG
- /**
-  * get_gpmc_timing_reg - read a timing parameter and print DTS settings for it.
-  * @cs:      Chip Select Region
-@@ -612,7 +612,7 @@ static int set_gpmc_timing_reg(int cs, int reg, int st_bit, int end_bit, int max
- 	}
- 
- 	l = gpmc_cs_read_reg(cs, reg);
--#ifdef DEBUG
-+#ifdef CONFIG_OMAP_GPMC_DEBUG
- 	pr_info(
- 		"GPMC CS%d: %-17s: %3d ticks, %3lu ns (was %3i ticks) %3d ns\n",
- 	       cs, name, ticks, gpmc_get_clk_period(cs, cd) * ticks / 1000,
-@@ -767,7 +767,7 @@ int gpmc_cs_set_timings(int cs, const struct gpmc_timings *t,
- 			    GPMC_CONFIG1_CLKACTIVATIONTIME_MAX,
- 			    clk_activation, GPMC_CD_FCLK);
- 
--#ifdef DEBUG
-+#ifdef CONFIG_OMAP_GPMC_DEBUG
- 	pr_info("GPMC CS%d CLK period is %lu ns (div %d)\n",
- 			cs, (div * gpmc_get_fclk_period()) / 1000, div);
- #endif
+
+Kevin and Tyler jumped on the introduction of sama5 in multi_v7 and got
+the issue. As long as you stick to the at91 only configurations, you
+will be fine ;)
+I hope this clarifies the thing :)
+
 -- 
-2.1.4
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
