@@ -1,39 +1,65 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 20 May 2015 10:46:49 -0700
-Subject: [PATCHv2 02/27] clk: ti: move generic OMAP DPLL implementation
- under drivers/clk
-In-Reply-To: <555CC7CA.2090104@ti.com>
-References: <1431334493-24455-1-git-send-email-t-kristo@ti.com>
- <1431334493-24455-3-git-send-email-t-kristo@ti.com>
- <20150520012053.GC31054@codeaurora.org> <555CC7CA.2090104@ti.com>
-Message-ID: <20150520174648.GC10274@atomide.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 20 May 2015 18:48:17 +0100
+Subject: [RFC/RFT PATCH 2/2] ARM64: kernel: pci: implement PCI device
+ resources claiming
+In-Reply-To: <CAErSpo4OY+mm4R34_1DG5tb+tTJVGQbjuQ75esSF26LUzNWL9A@mail.gmail.com>
+References: <1431614537-16136-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1431614537-16136-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <5555553F.9070608@amd.com> <20150520085656.GB29274@red-moon>
+ <CAErSpo4OY+mm4R34_1DG5tb+tTJVGQbjuQ75esSF26LUzNWL9A@mail.gmail.com>
+Message-ID: <20150520174817.GA10750@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [150520 10:45]:
-> On 05/20/2015 04:20 AM, Stephen Boyd wrote:
-> >On 05/11, Tero Kristo wrote:
-> >>With the legacy clock data now gone, we can start moving OMAP clock
-> >>type implementations under clock driver. Start this with moving the
-> >>generic OMAP DPLL clock type under TI clock driver.
+On Wed, May 20, 2015 at 02:02:52PM +0100, Bjorn Helgaas wrote:
+
+[...]
+
+> >> @@ -48,6 +48,11 @@ int pcibios_add_device(struct pci_dev *dev)
 > >>
-> >>Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> >>---
+> >>          dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+> >>
+> >> +       if (pci_has_flag(PCI_PROBE_ONLY) &&
 > >
-> >How much of the code is the same from the original copy? Can you
-> >generate these patches with -M -C so that we can see?
+> > Does it really matter if PCI_PROBE_ONLY is set ?
+> >
+> >> +           !pci_is_root_bus(dev->bus) &&
+> >
+> > This check is useless, since pci_read_bridge_bases checks that already.
+> >
+> >> +           !pci_bridge_bases_is_read(dev->bus))
+> >> +               pci_read_bridge_bases(dev->bus);
+> >> +
+> >
+> > Ok. Most of the archs do that in pcibios_fixup_bus, I would like to
+> > understand:
+> >
+> > 1) Should we do it on PCI_PROBE_ONLY only
+> > 2) Can we move this to generic code - ie pci_scan_child_bus (I guess answer
+> >    is no, because there are corner cases I am not aware of)
 > 
-> Looks like for the move patches the range is from 85%...95% exact copy.
-> Shall I repost the patches in this format? Good hint for the -M -C btw, I
-> wonder why those are not default options for git-format-patch.
+> In my opinion, we should call pci_read_bridge_bases() in all cases,
+> regardless of PCI_PROBE_ONLY.  pci_read_bridge_bases() doesn't
+> *change* anything in the hardware; it only reads what's there.  (It
+> should attempt writes to learn whether I/O and prefetchable memory
+> apertures are implemented, but those should be done as in
+> pci_bridge_check_ranges(), where the original value is restored.)
+> 
+> I also think this should be done in generic code, since there's
+> nothing architecture-specific about bridge operation.
+> 
+> I've been hoping to get rid of pcibios_fixup_bus() completely for
+> years, and doing pci_read_bridge_bases() in generic code would be a
+> big step.
 
-While tweaking your scripts.. Can you also check why the cover
-letter for your patches is missing the whole series diffstat?
+I put together a patch to move it to pci_scan_child_bus, and to
+remove it from almost all archs pcibios_fixup_bus implementations,
+let's see how it goes.
 
-The diffstat is automatically created with:
+> No doubt there are corner cases we'll trip over, but I'm not aware of them yet.
+> 
 
-$ git format-patch --cover-letter -o /tmp/outgoing v4.1-rc1..
+Let's find out :), posting tomorrow.
 
-Regards,
-
-Tony
+Thanks,
+Lorenzo
