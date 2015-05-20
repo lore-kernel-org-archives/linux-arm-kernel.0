@@ -1,60 +1,95 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 May 2015 00:18:06 +0200
-Subject: schedule_timeout sleeps too long after dividing CPU frequency
-In-Reply-To: <555D030F.8030100@free.fr>
-References: <20150514144239.GZ2067@n2100.arm.linux.org.uk>
- <76003699.Oyq777txnm@wuerfel> <555D030F.8030100@free.fr>
-Message-ID: <2681862.SyQNaSxams@wuerfel>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 20 May 2015 15:25:55 -0700
+Subject: [PATCH v7 6/7] clk: hi6220: Clock driver support for Hisilicon
+ hi6220 SoC
+In-Reply-To: <1432117752-7074-2-git-send-email-bintian.wang@huawei.com>
+References: <1432117752-7074-1-git-send-email-bintian.wang@huawei.com>
+ <1432117752-7074-2-git-send-email-bintian.wang@huawei.com>
+Message-ID: <555D09F3.7020506@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 20 May 2015 23:56:31 Mason wrote:
-> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-> index 6591e26fc13f..3e867b2f067f 100644
-> --- a/arch/arm/kernel/smp_twd.c
-> +++ b/arch/arm/kernel/smp_twd.c
-> @@ -32,6 +32,7 @@ static void __iomem *twd_base;
->  static struct clk *twd_clk;
->  static unsigned long twd_timer_rate;
->  static DEFINE_PER_CPU(bool, percpu_setup_called);
-> +static int feat_c3stop = CLOCK_EVT_FEAT_C3STOP;
+On 05/20/15 03:29, Bintian Wang wrote:
+> Add clock drivers for hi6220 SoC, this driver controls the SoC
+> registers to supply different clocks to different IPs in the SoC.
+>
+> We add one divider clock for hi6220 because the divider in hi6220
+> also has a mask bit but it doesnot obey the rule defined by flag
+> "CLK_DIVIDER_HIWORD_MASK", we can not get index of the mask bit by
+> left shift fixed bits (e.g. 16 bits), so we add this divider clock
+> to handle it.
+>
+> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
+> Signed-off-by: Bintian Wang <bintian.wang@huawei.com>
+> Acked-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> Reviewed-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> Tested-by: Will Deacon <will.deacon@arm.com>
+> Tested-by: Tyler Baker <tyler.baker@linaro.org>
+> ---
+>  drivers/clk/Kconfig                       |    2 +
+>  drivers/clk/Makefile                      |    4 +-
+>  drivers/clk/hisilicon/Kconfig             |    6 +
+>  drivers/clk/hisilicon/Makefile            |    3 +-
+>  drivers/clk/hisilicon/clk-hi6220.c        |  291 +++++++++++++++++++++++++++++
+>  drivers/clk/hisilicon/clk.c               |   29 +++
+>  drivers/clk/hisilicon/clk.h               |   17 ++
+>  drivers/clk/hisilicon/clkdivider-hi6220.c |  156 ++++++++++++++++
+>  include/dt-bindings/clock/hi6220-clock.h  |  173 +++++++++++++++++
+>  9 files changed, 677 insertions(+), 4 deletions(-)
+>  create mode 100644 drivers/clk/hisilicon/Kconfig
+>  create mode 100644 drivers/clk/hisilicon/clk-hi6220.c
+>  create mode 100644 drivers/clk/hisilicon/clkdivider-hi6220.c
+>  create mode 100644 include/dt-bindings/clock/hi6220-clock.h
+>
+> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+> index 9897f35..18bb930 100644
+> --- a/drivers/clk/Kconfig
+> +++ b/drivers/clk/Kconfig
+> @@ -150,6 +150,8 @@ config COMMON_CLK_CDCE706
+>  	---help---
+>  	  This driver supports TI CDCE706 programmable 3-PLL clock synthesizer.
 >  
->  static struct clock_event_device __percpu *twd_evt;
->  static int twd_ppi;
-> @@ -294,7 +295,7 @@ static void twd_timer_setup(void)
+> +source "drivers/clk/hisilicon/Kconfig"
+> +
+>  source "drivers/clk/qcom/Kconfig"
 >  
->         clk->name = "local_timer";
->         clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
-> -                       CLOCK_EVT_FEAT_C3STOP;
-> +                       feat_c3stop;
->         clk->rating = 350;
->         clk->set_mode = twd_set_mode;
->         clk->set_next_event = twd_set_next_event;
-> @@ -346,6 +347,7 @@ static int __init twd_local_timer_common_register(struct device_node *np)
->                 goto out_irq;
->  
->         twd_get_clock(np);
-> +       if (of_get_property(np, "twd_never_stops", NULL)) feat_c3stop = 0;
 
-of_property_read_bool(), and newline between the condition and the
-assignment.
+There's going to be a merge conflict here if this doesn't go through the
+clk tree.
 
->         /*
->          * Immediately configure the timer on the boot CPU, unless we need
-> 
-> 
-> Or perhaps the other way around?
-> i.e. feat_c3stop initialized to 0 (thus in the bss section)
-> and set to FEAT_C3STOP if "twd_never_stops" doesn't exist...
+>
+> +
+> +static void __init hi6220_clk_sys_init(struct device_node *np)
+> +{
+> +	struct hisi_clock_data *clk_data;
+> +
+> +	clk_data = hisi_clk_init(np, HI6220_SYS_NR_CLKS);
+> +	if (!clk_data)
+> +		return;
+> +
+> +	hisi_clk_register_gate_sep(hi6220_separated_gate_clks_sys,
+> +			ARRAY_SIZE(hi6220_separated_gate_clks_sys), clk_data);
+> +
+> +	hisi_clk_register_mux(hi6220_mux_clks_sys,
+> +			ARRAY_SIZE(hi6220_mux_clks_sys), clk_data);
+> +
+> +	hi6220_clk_register_divider(hi6220_div_clks_sys,
+> +			ARRAY_SIZE(hi6220_div_clks_sys), clk_data);
+> +
+> +	if (!clk_data_ao)
+> +		return;
+> +
+> +	/* enable high speed clock on UART1 mux */
+> +	clk_set_parent(clk_data->clk_data.clks[HI6220_UART1_SRC],
+> +			clk_data_ao->clk_data.clks[HI6220_150M]);
 
-yes.
+Sorry I missed this one earlier. Can we do this clk_set_parent() through
+assigned-parents instead? I expected an #include <linux/clk.h> for the
+usage of clk_set_parent() here so I didn't look hard to see if consumer
+APIs were being used.
 
-> Russell, when you added the FEAT_C3STOP flag unconditionally in
-> commit 5388a6b266, didn't that potentially break platforms that
-> didn't expect the flag to be set?
+Otherwise the patch looks fine.
 
-To take a step back, you should first figure out whether clearing
-this flag is actually the correct behavior for your hardware, or
-just happens to work by accident.
-
-	Arnd
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
