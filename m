@@ -1,77 +1,45 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Wed, 20 May 2015 17:59:59 +0800
-Subject: [RFC v1 11/25] keystone,
- irq: Use irq_data_get_xxx() to avoid redundant lookup of irq_data
-In-Reply-To: <1432116013-25902-1-git-send-email-jiang.liu@linux.intel.com>
-References: <1432116013-25902-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <1432116013-25902-12-git-send-email-jiang.liu@linux.intel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 20 May 2015 11:01:22 +0100
+Subject: [V4 PATCH 1/6] ACPI / scan: Parse _CCA and setup device coherency
+In-Reply-To: <1431724994-21601-2-git-send-email-Suravee.Suthikulpanit@amd.com>
+References: <1431724994-21601-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1431724994-21601-2-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <20150520100122.GD25313@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use irq_data_get_xxx() to avoid redundant lookup of irq_data while we
-already have a pointer to corresponding irq_data.
+On Fri, May 15, 2015 at 04:23:09PM -0500, Suravee Suthikulpanit wrote:
+> +static inline bool acpi_dma_is_supported(struct acpi_device *adev)
+> +{
+> +	/**
+> +	 * Currently, we mainly support _CCA=1 (i.e. is_coherent=1)
+> +	 * This should be equivalent to specifyig dma-coherent for
+> +	 * a device in OF.
+> +	 *
+> +	 * For the case when _CCA=0 (i.e. is_coherent=0 && cca_seen=1),
+> +	 * There are two approaches:
+> +	 * 1. Do not support and disable DMA.
+> +	 * 2. Support but rely on arch-specific cache maintenance for
+> +	 * non-coherence DMA operations. ARM64 is one example.
+> +	 *
+> +	 * For the case when _CCA is missing (i.e. cca_seen=0) but
+> +	 * platform specifies ACPI_CCA_REQUIRED, we do not support DMA,
+> +	 * and fallback to arch-specific default handling.
+> +	 *
+> +	 * See acpi_init_coherency() for more info.
+> +	 */
+> +	return adev && (adev->flags.is_coherent ||
+> +			(adev->flags.cca_seen && IS_ENABLED(CONFIG_ARM64)));
+> +}
 
-Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
----
- drivers/pci/host/pci-keystone-dw.c |   15 ++++++---------
- 1 file changed, 6 insertions(+), 9 deletions(-)
+I don't particularly like the check for CONFIG_ARM64 here but I
+understand why it was added (I had the wrong impression that x86 can
+cope with _CCA = 0).
 
-diff --git a/drivers/pci/host/pci-keystone-dw.c b/drivers/pci/host/pci-keystone-dw.c
-index f34892e0edb4..e42d077039d3 100644
---- a/drivers/pci/host/pci-keystone-dw.c
-+++ b/drivers/pci/host/pci-keystone-dw.c
-@@ -104,14 +104,13 @@ static void ks_dw_pcie_msi_irq_ack(struct irq_data *d)
- {
- 	u32 offset, reg_offset, bit_pos;
- 	struct keystone_pcie *ks_pcie;
--	unsigned int irq = d->irq;
- 	struct msi_desc *msi;
- 	struct pcie_port *pp;
- 
--	msi = irq_get_msi_desc(irq);
-+	msi = irq_data_get_msi_desc(d);
- 	pp = sys_to_pcie(msi->dev->bus->sysdata);
- 	ks_pcie = to_keystone_pcie(pp);
--	offset = irq - irq_linear_revmap(pp->irq_domain, 0);
-+	offset = d->irq - irq_linear_revmap(pp->irq_domain, 0);
- 	update_reg_offset_bit_pos(offset, &reg_offset, &bit_pos);
- 
- 	writel(BIT(bit_pos),
-@@ -142,15 +141,14 @@ void ks_dw_pcie_msi_clear_irq(struct pcie_port *pp, int irq)
- static void ks_dw_pcie_msi_irq_mask(struct irq_data *d)
- {
- 	struct keystone_pcie *ks_pcie;
--	unsigned int irq = d->irq;
- 	struct msi_desc *msi;
- 	struct pcie_port *pp;
- 	u32 offset;
- 
--	msi = irq_get_msi_desc(irq);
-+	msi = irq_data_get_msi_desc(d);
- 	pp = sys_to_pcie(msi->dev->bus->sysdata);
- 	ks_pcie = to_keystone_pcie(pp);
--	offset = irq - irq_linear_revmap(pp->irq_domain, 0);
-+	offset = d->irq - irq_linear_revmap(pp->irq_domain, 0);
- 
- 	/* Mask the end point if PVM implemented */
- 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-@@ -164,15 +162,14 @@ static void ks_dw_pcie_msi_irq_mask(struct irq_data *d)
- static void ks_dw_pcie_msi_irq_unmask(struct irq_data *d)
- {
- 	struct keystone_pcie *ks_pcie;
--	unsigned int irq = d->irq;
- 	struct msi_desc *msi;
- 	struct pcie_port *pp;
- 	u32 offset;
- 
--	msi = irq_get_msi_desc(irq);
-+	msi = irq_data_get_msi_desc(d);
- 	pp = sys_to_pcie(msi->dev->bus->sysdata);
- 	ks_pcie = to_keystone_pcie(pp);
--	offset = irq - irq_linear_revmap(pp->irq_domain, 0);
-+	offset = d->irq - irq_linear_revmap(pp->irq_domain, 0);
- 
- 	/* Mask the end point if PVM implemented */
- 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+Alternatively, we could leave it out (together with cca_seen) until
+someone comes forward with a real use-case for _CCA = 0 on arm64. One
+platform I'm aware of is Juno but even though it boot with ACPI, I
+wouldn't call it a server platform.
+
 -- 
-1.7.10.4
+Catalin
