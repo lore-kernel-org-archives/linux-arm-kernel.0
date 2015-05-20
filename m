@@ -1,35 +1,51 @@
-From: mirza.krak@hostmobility.com (Mirza Krak)
-Date: Wed, 20 May 2015 11:38:03 +0200
-Subject: [PATCH v2] ARM: imx: clk-v610: Add clock for I2C2 and I2C3
-Message-ID: <1432114683-24945-1-git-send-email-mirza.krak@hostmobility.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 20 May 2015 11:42:39 +0200
+Subject: [PATCH] [media] coda: remove extraneous TRACE_SYSTEM_STRING
+In-Reply-To: <4790110.OLqddgPxAn@wuerfel>
+References: <4790110.OLqddgPxAn@wuerfel>
+Message-ID: <1432114959.4466.10.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mirza Krak <mirza.krak@hostmobility.com>
+Am Dienstag, den 19.05.2015, 23:34 +0200 schrieb Arnd Bergmann:
+> The coda tracing code causes lots of warnings like
+> 
+> In file included from /git/arm-soc/include/trace/define_trace.h:90:0,
+>                  from /git/arm-soc/drivers/media/platform/coda/trace.h:203,
+>                  from /git/arm-soc/drivers/media/platform/coda/coda-bit.c:34:
+> /git/arm-soc/include/trace/ftrace.h:28:0: warning: "TRACE_SYSTEM_STRING" redefined
+>  #define TRACE_SYSTEM_STRING __app(TRACE_SYSTEM_VAR,__trace_system_name)
+>  ^
+> In file included from /git/arm-soc/include/trace/define_trace.h:83:0,
+>                  from /git/arm-soc/drivers/media/platform/coda/trace.h:203,
+>                  from /git/arm-soc/drivers/media/platform/coda/coda-bit.c:34:
+> /git/arm-soc/drivers/media/platform/coda/./trace.h:12:0: note: this is the location of the previous definition
+>  #define TRACE_SYSTEM_STRING __stringify(TRACE_SYSTEM)
+> 
+> From what I can tell, this is just the result of a bogus TRACE_SYSTEM_STRING
+> definition, and removing that one makes the warnings go away.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 9a1a8f9953f ("[media] coda: Add tracing support")
+> 
+> diff --git a/drivers/media/platform/coda/trace.h b/drivers/media/platform/coda/trace.h
+> index d1d06cbd1f6a..781bf7286d53 100644
+> --- a/drivers/media/platform/coda/trace.h
+> +++ b/drivers/media/platform/coda/trace.h
+> @@ -9,8 +9,6 @@
+>  
+>  #include "coda.h"
+>  
+> -#define TRACE_SYSTEM_STRING __stringify(TRACE_SYSTEM)
+> -
+>  TRACE_EVENT(coda_bit_run,
+>  	TP_PROTO(struct coda_ctx *ctx, int cmd),
 
-Add support for clock gating of I2C2 and I2C3.
-We use I2C2 in a (not yet mainlined) device tree.
+Steven sent the same fix to linux-next recently ("[PATCH][linux-next]
+coda: Do not define TRACE_SYSTEM_STRING"). As he points out, this is the
+result of a bogus copy & paste. Kamil, would you queue either of them
+with my
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-Signed-off-by: Mirza Krak <mirza.krak@hostmobility.com>
----
-
-Changes since v1:
-	* Rebased on branch git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git imx/soc
- drivers/clk/imx/clk-vf610.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/drivers/clk/imx/clk-vf610.c b/drivers/clk/imx/clk-vf610.c
-index 1c2d324..bff45ea 100644
---- a/drivers/clk/imx/clk-vf610.c
-+++ b/drivers/clk/imx/clk-vf610.c
-@@ -273,6 +273,8 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
- 
- 	clk[VF610_CLK_I2C0] = imx_clk_gate2("i2c0", "ipg_bus", CCM_CCGR4, CCM_CCGRx_CGn(6));
- 	clk[VF610_CLK_I2C1] = imx_clk_gate2("i2c1", "ipg_bus", CCM_CCGR4, CCM_CCGRx_CGn(7));
-+	clk[VF610_CLK_I2C2] = imx_clk_gate2("i2c2", "ipg_bus", CCM_CCGR10, CCM_CCGRx_CGn(6));
-+	clk[VF610_CLK_I2C3] = imx_clk_gate2("i2c3", "ipg_bus", CCM_CCGR10, CCM_CCGRx_CGn(7));
- 
- 	clk[VF610_CLK_DSPI0] = imx_clk_gate2("dspi0", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(12));
- 	clk[VF610_CLK_DSPI1] = imx_clk_gate2("dspi1", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(13));
--- 
-2.1.0
+thanks
+Philipp
