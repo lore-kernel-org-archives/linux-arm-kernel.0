@@ -1,37 +1,52 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 20 May 2015 15:20:33 +0200
-Subject: [PATCH 03/16] thermal: remove useless call to
- thermal_zone_device_set_polling
+Date: Wed, 20 May 2015 15:20:46 +0200
+Subject: [PATCH 16/16] ARM64: dts: mt8173: Add thermal/auxadc device nodes
 In-Reply-To: <1432128046-12921-1-git-send-email-s.hauer@pengutronix.de>
 References: <1432128046-12921-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1432128046-12921-4-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1432128046-12921-17-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the thermal zone has no get_temp callback then thermal_zone_device_register()
-calls thermal_zone_device_set_polling() with a polling delay of 0. This
-only cancels the poll_queue. Since the poll_queue hasn't been scheduled this
-is a no-op. Remove it.
-
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Acked-by: Eduardo Valentin <edubezval@gmail.com>
 ---
- drivers/thermal/thermal_core.c | 3 ---
- 1 file changed, 3 deletions(-)
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
-index 244784f..1b68d20 100644
---- a/drivers/thermal/thermal_core.c
-+++ b/drivers/thermal/thermal_core.c
-@@ -1571,9 +1571,6 @@ struct thermal_zone_device *thermal_zone_device_register(const char *type,
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index 924fdb6..50d424f 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -147,6 +147,11 @@
+ 				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+ 		};
  
- 	INIT_DELAYED_WORK(&(tz->poll_queue), thermal_zone_device_check);
++		auxadc: auxadc at 11001000 {
++			compatible = "mediatek,mt8173-auxadc";
++			reg = <0 0x11001000 0 0x1000>;
++		};
++
+ 		uart0: serial at 11002000 {
+ 			compatible = "mediatek,mt8173-uart",
+ 					"mediatek,mt6577-uart";
+@@ -182,6 +187,19 @@
+ 			clocks = <&uart_clk>;
+ 			status = "disabled";
+ 		};
++
++		thermal: thermal at 1100b000 {
++			#thermal-sensor-cells = <1>;
++			compatible = "mediatek,mt8173-thermal";
++			reg = <0 0x1100b000 0 0x1000>;
++			interrupts = <0 70 IRQ_TYPE_LEVEL_LOW>;
++			clocks = <&pericfg CLK_PERI_THERM>, <&pericfg CLK_PERI_AUXADC>;
++			clock-names = "therm", "auxadc";
++			resets = <&pericfg MT8173_PERI_THERM_SW_RST>;
++			reset-names = "therm";
++			auxadc = <&auxadc>;
++			apmixedsys = <&apmixedsys>;
++		};
+ 	};
  
--	if (!tz->ops->get_temp)
--		thermal_zone_device_set_polling(tz, 0);
--
- 	thermal_zone_device_update(tz);
- 
- 	return tz;
+ };
 -- 
 2.1.4
