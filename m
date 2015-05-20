@@ -1,68 +1,30 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 20 May 2015 08:23:32 -0500
-Subject: [PATCH v2 2/5] phy: qcom: Add Qualcomm PCIe PHY
-In-Reply-To: <555C8743.6020708@ti.com>
-References: <1430743338-10441-1-git-send-email-svarbanov@mm-sol.com>
- <1430743338-10441-3-git-send-email-svarbanov@mm-sol.com>
- <554783CD.50708@ti.com>
- <55478F1A.3000401@mm-sol.com> <20150519224143.GS31666@google.com>
- <555C8743.6020708@ti.com>
-Message-ID: <CAErSpo42N8YHWjrqUCj0ubqZLt4w-3g=ykPdR8ZMmWaW1GjWDw@mail.gmail.com>
+From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
+Date: Wed, 20 May 2015 15:26:17 +0200
+Subject: [BUG] at91: serial: is it using DMA?
+Message-ID: <555C8B79.4030900@aksignal.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 8:08 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> Hi Bjorn,
->
->
-> On Wednesday 20 May 2015 04:11 AM, Bjorn Helgaas wrote:
->>
->> On Mon, May 04, 2015 at 06:24:10PM +0300, Stanimir Varbanov wrote:
->>>
->>> On 05/04/2015 05:35 PM, Kishon Vijay Abraham I wrote:
->>>>
->>>> Hi,
->>>>
->>>> On Monday 04 May 2015 06:12 PM, Stanimir Varbanov wrote:
->>>>>
->>>>> Add a PCIe PHY driver used by PCIe host controller driver
->>>>> on Qualcomm SoCs like Snapdragon 805.
->>>>>
->>>>> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
->>>>> ---
->>>>>    drivers/phy/Kconfig         |    9 ++
->>>>>    drivers/phy/Makefile        |    1 +
->>>>>    drivers/phy/phy-qcom-pcie.c |  291
->>>>> +++++++++++++++++++++++++++++++++++++++++++
->>>>
->>>>
->>>> Why do you need a new PHY driver for this? Why not use the existing QCOM
->>>> PHY driver. I can see the registers used here in
->>>> phy-qcom-ufs-qmp-14nm.h?
->>>
->>>
->>> I agree that on first glance there are similarities, but I'm not sure
->>> does the PHYs are the same IP blocks. Or at least they are different
->>> revisions which have too many differences. So trying to combine them
->>> will lead to more code than now.
->>>
->>> Either way I will try to understand how many the differences are.
->>
->>
->> Ping, where are we with this?  Should I wait for something else, or are
->> you
->> convinced there's enough difference to warrant a new PHY driver, Kishon?
->
->
-> I'd like to wait to see if Stanimir can use existing driver instead of
-> creating a new driver.
+Hi all,
+I discovered problem with serial driver in kernel 4.0.4 on at91sam9g25 at 400MHz.
+When I want receive frames on UART at 115200kb/s I get many errors caused by loss of some bytes.
+These errors were there if no DMA was used in previous version.
+Dmesg says DMA us used:
+[    0.000000] Linux version 4.0.4_cpm9g25 (prchal at prchal) (gcc version 4.7.3 (Ubuntu/Linaro 4.7.3-12ubuntu1) ) #5 
+PREEMPT Wed May 20 12:19:37 CEST 2015
+...
+[   16.090090] atmel_usart f801c000.serial: using dma0chan4 for rx DMA transfers
+[   16.105105] atmel_usart f801c000.serial: using dma0chan5 for tx DMA transfers
 
-OK, I'm waiting for a v3 with either tweaks to the QCOM PHY driver, or
-stronger justification as to why that's impossible.  It's hard to
-quantify statements like "there are similarities, but there are too
-many differences," so you might have to actually attempt a patch for
-the QCOM code and we can see how ugly that would turn out to be.
+In 3.18.13 it works properly and dmesg says the same:
+[    0.000000] Linux version 3.18.13_cpm9g25 (prchal at prchal) (gcc version 4.7.3 (Ubuntu/Linaro 4.7.3-12ubuntu1) ) #3 
+PREEMPT Wed May 20 14:29:26 CEST 2015
+...
+[   14.936936] atmel_usart f801c000.serial: using dma0chan4 for rx DMA transfers
+[   14.954954] atmel_usart f801c000.serial: using dma0chan5 for tx DMA transfers
 
-Thanks, Kishon.
+I made diff of drivers/tty/serial/atmel_serial.c and I see many changes in function atmel_rx_from_dma witch I don't 
+understand. Could it bee there?
+All other DMAs work fine.
 
-Bjorn
+Jiri
