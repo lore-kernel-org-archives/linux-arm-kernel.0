@@ -1,66 +1,60 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Wed, 20 May 2015 15:26:46 +0100
-Subject: [Xen-devel] [RFC 21/23] net/xen-netback: Make it running on 64KB
- page granularity
-In-Reply-To: <20150520082650.GU26335@zion.uk.xensource.com>
-References: <1431622863-28575-1-git-send-email-julien.grall@citrix.com>
- <1431622863-28575-22-git-send-email-julien.grall@citrix.com>
- <20150515023534.GE19352@zion.uk.xensource.com>	<5555E81E.8070803@citrix.com>
- <20150515153143.GA8521@zion.uk.xensource.com>	<5559D6EE.3030400@citrix.com>
- <20150518125406.GA9503@zion.uk.xensource.com>	<555BBFA7.8030502@citrix.com>
- <20150520082650.GU26335@zion.uk.xensource.com>
-Message-ID: <555C99A6.60404@citrix.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 20 May 2015 15:20:44 +0200
+Subject: [PATCH 14/16] dt-bindings: thermal: Add binding document for Mediatek
+ thermal controller
+In-Reply-To: <1432128046-12921-1-git-send-email-s.hauer@pengutronix.de>
+References: <1432128046-12921-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1432128046-12921-15-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/05/15 09:26, Wei Liu wrote:
-> On Tue, May 19, 2015 at 11:56:39PM +0100, Julien Grall wrote:
-> 
->>
->>>> diff --git a/drivers/net/xen-netback/common.h b/drivers/net/xen-netback/common.h
->>>> index 0eda6e9..c2a5402 100644
->>>> --- a/drivers/net/xen-netback/common.h
->>>> +++ b/drivers/net/xen-netback/common.h
->>>> @@ -204,7 +204,7 @@ struct xenvif_queue { /* Per-queue data for xenvif */
->>>>  /* Maximum number of Rx slots a to-guest packet may use, including the
->>>>   * slot needed for GSO meta-data.
->>>>   */
->>>> -#define XEN_NETBK_RX_SLOTS_MAX (MAX_SKB_FRAGS + 1)
->>>> +#define XEN_NETBK_RX_SLOTS_MAX ((MAX_SKB_FRAGS + 1) * XEN_PFN_PER_PAGE)
->>>>
->>>>  enum state_bit_shift {
->>>>         /* This bit marks that the vif is connected */
->>>>
->>>> The function xenvif_wait_for_rx_work never returns. I guess it's because there
->>>> is not enough slot available.
->>>>
->>>> For 64KB page granularity we ask for 16 times more slots than 4KB page
->>>> granularity. Although, it's very unlikely that all the slot will be used.
->>>>
->>>> FWIW I pointed out the same problem on blkfront.
->>>>
->>>
->>> This is not going to work. The ring in netfront / netback has only 256
->>> slots. Now you ask for netback to reserve more than 256 slots -- (17 +
->>> 1) * (64 / 4) = 288, which can never be fulfilled. See the call to
->>> xenvif_rx_ring_slots_available.
->>>
->>> I think XEN_NETBK_RX_SLOTS_MAX derived from the fact the each packet to
->>> the guest cannot be larger than 64K. So you might be able to
->>>
->>> #define XEN_NETBK_RX_SLOTS_MAX ((65536 / XEN_PAGE_SIZE) + 1)
->>
->> I didn't know that packet cannot be larger than 64KB. That's simply a lot
->> the problem.
->>
-> 
-> I think about this more, you will need one more slot for GSO
-> information, so make it ((65536 / XEN_PAGE_SIZE) + 1 + 1).
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ .../bindings/thermal/mediatek-thermal.txt          | 36 ++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
 
-I have introduced a XEN_MAX_SKB_FRAGS (65536 / XEN_PAGE_SIZE + 1)
-because it's required in another place.
-
-Regards,
-
+diff --git a/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+new file mode 100644
+index 0000000..adf5d2c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+@@ -0,0 +1,36 @@
++* Mediatek Thermal
++
++This describes the device tree binding for the Mediatek thermal controller
++which measures the on-SoC temperatures. This device does not have its own ADC,
++instead it directly controls the AUXADC via AHB bus accesses. For this reason
++this device needs phandles to the AUXADC.
++
++Required properties:
++- compatible: "mediatek,mt8173-thermal"
++- reg: Address range of the thermal controller
++- interrupts: IRQ for the thermal controller
++- clocks, clock-names: Clocks needed for the thermal controller. required
++                       clocks are:
++		"therm":	Main clock needed for register access
++		"auxadc":	The AUXADC clock
++- resets, reset-names: Reference to the reset controller controlling the thermal
++                       controller. Required reset-names:
++		"therm":	The main reset line
++- auxadc: A phandle to the AUXADC which the thermal controller uses
++- apmixedsys: A phandle to the APMIXEDSYS controller.
++- #thermal-sensor-cells : Should be 1. See ./thermal.txt for a description
++
++Example:
++
++	thermal: thermal at 1100b000 {
++		#thermal-sensor-cells = <1>;
++		compatible = "mediatek,mt8173-thermal";
++		reg = <0 0x1100b000 0 0x1000>;
++		interrupts = <0 70 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&pericfg CLK_PERI_THERM>, <&pericfg CLK_PERI_AUXADC>;
++		clock-names = "therm", "auxadc";
++		resets = <&pericfg MT8173_PERI_THERM_SW_RST>;
++		reset-names = "therm";
++		auxadc = <&auxadc>;
++		apmixedsys = <&apmixedsys>;
++	};
 -- 
-Julien Grall
+2.1.4
