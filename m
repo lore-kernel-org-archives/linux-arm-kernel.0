@@ -1,29 +1,153 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 20 May 2015 20:54:12 +0200
-Subject: [RFC v1 15/25] genirq: Kill the first parameter 'irq' of
- irq_flow_handler_t
-In-Reply-To: <1432116013-25902-16-git-send-email-jiang.liu@linux.intel.com>
- (Jiang Liu's message of "Wed, 20 May 2015 18:00:03 +0800")
-References: <1432116013-25902-1-git-send-email-jiang.liu@linux.intel.com>
- <1432116013-25902-16-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <87mw0zhygb.fsf@belgarion.home>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 20 May 2015 15:57:02 -0300
+Subject: [PATCH] ARM: dts: cubox-i/hummingboard: Fix the license text
+Message-ID: <1432148222-12603-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jiang Liu <jiang.liu@linux.intel.com> writes:
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-> diff --git a/arch/arm/mach-pxa/pcm990-baseboard.c b/arch/arm/mach-pxa/pcm990-baseboard.c
-> index 2897da2a5df6..0d8331f8536e 100644
-> --- a/arch/arm/mach-pxa/pcm990-baseboard.c
-> +++ b/arch/arm/mach-pxa/pcm990-baseboard.c
-> @@ -287,6 +287,7 @@ static struct irq_chip pcm990_irq_chip = {
->  static void pcm990_irq_handler(unsigned int irq, struct irq_desc *desc)
->  {
->  	unsigned long pending;
-> +	unsigned int irq;
-That doesn't look good, double irq definition.
+Arrange the license text a bit to make it clear.
 
-Cheers.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx6dl-cubox-i.dts           | 5 ++---
+ arch/arm/boot/dts/imx6dl-hummingboard.dts      | 5 ++---
+ arch/arm/boot/dts/imx6q-cubox-i.dts            | 5 ++---
+ arch/arm/boot/dts/imx6q-hummingboard.dts       | 5 ++---
+ arch/arm/boot/dts/imx6qdl-cubox-i.dtsi         | 5 ++---
+ arch/arm/boot/dts/imx6qdl-hummingboard.dtsi    | 5 ++---
+ arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi | 5 ++---
+ arch/arm/boot/dts/imx6qdl-microsom.dtsi        | 5 ++---
+ 8 files changed, 16 insertions(+), 24 deletions(-)
 
+diff --git a/arch/arm/boot/dts/imx6dl-cubox-i.dts b/arch/arm/boot/dts/imx6dl-cubox-i.dts
+index e0b7fe8..2a43917 100644
+--- a/arch/arm/boot/dts/imx6dl-cubox-i.dts
++++ b/arch/arm/boot/dts/imx6dl-cubox-i.dts
+@@ -7,9 +7,8 @@
+  * whole.
+  *
+  *  a) This file is free software; you can redistribute it and/or
+- *     modify it under the terms of the GNU General Public License as
+- *     published by the Free Software Foundation; either version 2 of the
+- *     License.
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
+  *
+  *     This file is distributed in the hope that it will be useful
+  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+diff --git a/arch/arm/boot/dts/imx6dl-hummingboard.dts b/arch/arm/boot/dts/imx6dl-hummingboard.dts
+index 7369d2d..d5c9660 100644
+--- a/arch/arm/boot/dts/imx6dl-hummingboard.dts
++++ b/arch/arm/boot/dts/imx6dl-hummingboard.dts
+@@ -8,9 +8,8 @@
+  * whole.
+  *
+  *  a) This file is free software; you can redistribute it and/or
+- *     modify it under the terms of the GNU General Public License as
+- *     published by the Free Software Foundation; either version 2 of the
+- *     License.
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
+  *
+  *     This file is distributed in the hope that it will be useful
+  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+diff --git a/arch/arm/boot/dts/imx6q-cubox-i.dts b/arch/arm/boot/dts/imx6q-cubox-i.dts
+index 670bd8c..353425e 100644
+--- a/arch/arm/boot/dts/imx6q-cubox-i.dts
++++ b/arch/arm/boot/dts/imx6q-cubox-i.dts
+@@ -7,9 +7,8 @@
+  * whole.
+  *
+  *  a) This file is free software; you can redistribute it and/or
+- *     modify it under the terms of the GNU General Public License as
+- *     published by the Free Software Foundation; either version 2 of the
+- *     License.
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
+  *
+  *     This file is distributed in the hope that it will be useful
+  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+diff --git a/arch/arm/boot/dts/imx6q-hummingboard.dts b/arch/arm/boot/dts/imx6q-hummingboard.dts
+index 0f60445..1884c16 100644
+--- a/arch/arm/boot/dts/imx6q-hummingboard.dts
++++ b/arch/arm/boot/dts/imx6q-hummingboard.dts
+@@ -8,9 +8,8 @@
+  * whole.
+  *
+  *  a) This file is free software; you can redistribute it and/or
+- *     modify it under the terms of the GNU General Public License as
+- *     published by the Free Software Foundation; either version 2 of the
+- *     License.
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
+  *
+  *     This file is distributed in the hope that it will be useful
+  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+index d033bb1..59e5d15 100644
+--- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+@@ -7,9 +7,8 @@
+  * whole.
+  *
+  *  a) This file is free software; you can redistribute it and/or
+- *     modify it under the terms of the GNU General Public License as
+- *     published by the Free Software Foundation; either version 2 of the
+- *     License.
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
+  *
+  *     This file is distributed in the hope that it will be useful
+  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
+index e56b44c..62a82f3 100644
+--- a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
+@@ -7,9 +7,8 @@
+  * whole.
+  *
+  *  a) This file is free software; you can redistribute it and/or
+- *     modify it under the terms of the GNU General Public License as
+- *     published by the Free Software Foundation; either version 2 of the
+- *     License.
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
+  *
+  *     This file is distributed in the hope that it will be useful
+  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+diff --git a/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi b/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
+index 4a18203..469ef58 100644
+--- a/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
+@@ -10,9 +10,8 @@
+  * whole.
+  *
+  *  a) This file is free software; you can redistribute it and/or
+- *     modify it under the terms of the GNU General Public License as
+- *     published by the Free Software Foundation; either version 2 of the
+- *     License.
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
+  *
+  *     This file is distributed in the hope that it will be useful
+  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+diff --git a/arch/arm/boot/dts/imx6qdl-microsom.dtsi b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
+index ec6c7c7..6d4069c 100644
+--- a/arch/arm/boot/dts/imx6qdl-microsom.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
+@@ -7,9 +7,8 @@
+  * whole.
+  *
+  *  a) This file is free software; you can redistribute it and/or
+- *     modify it under the terms of the GNU General Public License as
+- *     published by the Free Software Foundation; either version 2 of the
+- *     License.
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
+  *
+  *     This file is distributed in the hope that it will be useful
+  *     but WITHOUT ANY WARRANTY; without even the implied warranty of
 -- 
-Robert
+1.9.1
