@@ -1,60 +1,94 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 20 May 2015 15:20:44 +0200
-Subject: [PATCH 14/16] dt-bindings: thermal: Add binding document for Mediatek
- thermal controller
-In-Reply-To: <1432128046-12921-1-git-send-email-s.hauer@pengutronix.de>
-References: <1432128046-12921-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1432128046-12921-15-git-send-email-s.hauer@pengutronix.de>
+Date: Wed, 20 May 2015 15:32:44 +0200
+Subject: [PATCH 1/3] arm64: dts: mt8173: Add clock controller device nodes
+In-Reply-To: <1432128766-4445-1-git-send-email-s.hauer@pengutronix.de>
+References: <1432128766-4445-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1432128766-4445-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- .../bindings/thermal/mediatek-thermal.txt          | 36 ++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+This adds the device nodes providing clocks on the Mediatek MT8173.
+These are: topckgen, infracfg, pericfg and apmixedsys. These are
+fed by two oscillators also added by this patch.
 
-diff --git a/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
-new file mode 100644
-index 0000000..adf5d2c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
-@@ -0,0 +1,36 @@
-+* Mediatek Thermal
-+
-+This describes the device tree binding for the Mediatek thermal controller
-+which measures the on-SoC temperatures. This device does not have its own ADC,
-+instead it directly controls the AUXADC via AHB bus accesses. For this reason
-+this device needs phandles to the AUXADC.
-+
-+Required properties:
-+- compatible: "mediatek,mt8173-thermal"
-+- reg: Address range of the thermal controller
-+- interrupts: IRQ for the thermal controller
-+- clocks, clock-names: Clocks needed for the thermal controller. required
-+                       clocks are:
-+		"therm":	Main clock needed for register access
-+		"auxadc":	The AUXADC clock
-+- resets, reset-names: Reference to the reset controller controlling the thermal
-+                       controller. Required reset-names:
-+		"therm":	The main reset line
-+- auxadc: A phandle to the AUXADC which the thermal controller uses
-+- apmixedsys: A phandle to the APMIXEDSYS controller.
-+- #thermal-sensor-cells : Should be 1. See ./thermal.txt for a description
-+
-+Example:
-+
-+	thermal: thermal at 1100b000 {
-+		#thermal-sensor-cells = <1>;
-+		compatible = "mediatek,mt8173-thermal";
-+		reg = <0 0x1100b000 0 0x1000>;
-+		interrupts = <0 70 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&pericfg CLK_PERI_THERM>, <&pericfg CLK_PERI_AUXADC>;
-+		clock-names = "therm", "auxadc";
-+		resets = <&pericfg MT8173_PERI_THERM_SW_RST>;
-+		reset-names = "therm";
-+		auxadc = <&auxadc>;
-+		apmixedsys = <&apmixedsys>;
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+---
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi | 41 ++++++++++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index 4595196..ef1d92f 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -11,6 +11,7 @@
+  * GNU General Public License for more details.
+  */
+ 
++#include <dt-bindings/clock/mt8173-clk.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include "mt8173-pinfunc.h"
+@@ -87,6 +88,20 @@
+ 		#clock-cells = <0>;
+ 	};
+ 
++	clk26m: oscillator at 0 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <26000000>;
++		clock-output-names = "clk26m";
 +	};
++
++	clk32k: oscillator at 1 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <32000>;
++		clock-output-names = "clk32k";
++	};
++
+ 	timer {
+ 		compatible = "arm,armv8-timer";
+ 		interrupt-parent = <&gic>;
+@@ -106,6 +121,26 @@
+ 		compatible = "simple-bus";
+ 		ranges;
+ 
++		topckgen: clock-controller at 10000000 {
++			compatible = "mediatek,mt8173-topckgen";
++			reg = <0 0x10000000 0 0x1000>;
++			#clock-cells = <1>;
++		};
++
++		infracfg: power-controller at 10001000 {
++			compatible = "mediatek,mt8173-infracfg", "syscon";
++			reg = <0 0x10001000 0 0x1000>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++
++		pericfg: power-controller at 10003000 {
++			compatible = "mediatek,mt8173-pericfg", "syscon";
++			reg = <0 0x10003000 0 0x1000>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++
+ 		/*
+ 		 * Pinctrl access register at 0x10005000 through regmap.
+ 		 * Register 0x1000b000 is used by EINT.
+@@ -138,6 +173,12 @@
+ 			reg = <0 0x10200620 0 0x20>;
+ 		};
+ 
++		apmixedsys: clock-controller at 10209000 {
++			compatible = "mediatek,mt8173-apmixedsys";
++			reg = <0 0x10209000 0 0x1000>;
++			#clock-cells = <1>;
++		};
++
+ 		gic: interrupt-controller at 10220000 {
+ 			compatible = "arm,gic-400";
+ 			#interrupt-cells = <3>;
 -- 
 2.1.4
