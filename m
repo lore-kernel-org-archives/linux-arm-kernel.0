@@ -1,42 +1,19 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Wed, 20 May 2015 10:03:46 -0500
-Subject: [PATCH v2 0/7] Change snvs rtc and poweroff to use syscon add
- pwrkey driver
-In-Reply-To: <6111368.e0EOBSJsmZ@jclayton-pc>
-References: <1432055082-28983-1-git-send-email-Frank.Li@freescale.com>
- <20150520142205.GA24844@dragon>
- <CAHrpEqSpeMO=zLyii8qZUznP+9EAQqJ-D3O8hbXj99m+UNvpzA@mail.gmail.com>
- <6111368.e0EOBSJsmZ@jclayton-pc>
-Message-ID: <CAHrpEqQ9F1qXw6RmKPgwpqsFOq=O0dsNL7YtqNQ2ZUVBYz6DSw@mail.gmail.com>
+From: davidcdueck@googlemail.com (D. Dueck)
+Date: Wed, 20 May 2015 17:14:02 +0200
+Subject: Problems with device tree PMC clocks and threadirqs on at91
+In-Reply-To: <20150520151008.76e180db@bbrezillon>
+References: <555C8117.9010508@pcs.com>
+	<20150520151008.76e180db@bbrezillon>
+Message-ID: <CANfhG66vxOxXB+jZYz_UhbjFpRL6ceMGJD+K5X0H_js=3U1_Zw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 9:46 AM, Joshua Clayton
-<stillcompiling@gmail.com> wrote:
->>
->> +       snvs_np = of_get_parent(pdev->dev.of_node);
->> +       if (!snvs_np)
->> +               return -ENODEV;
->> +
->> +       data->snvs = syscon_node_to_regmap(snvs_np);
->> +       of_node_put(snvs_np);
->> +
->> +       if (!data->snvs) {
->> +               pr_err("Can't snvs syscon\n");
->> +               return -ENODEV;
->> +       }
->>
->> How about change error message to " Can't snvs syscon, probably use
->> old dts file"?
-> How about simply: "Cannot find snvs syscon node in devicetree."
+2015-05-20 15:10 GMT+02:00 Boris Brezillon <boris.brezillon@free-electrons.com>:
 
-Shawn:
-          Are you okay for that?
+> That's my favorite option. But it also implies modify all other
+> interrupts handler registered on irq line 1 to use IRQF_NO_THREAD (PMC,
+> RTC, WDT, ...)
 
-best regards
-Frank Li
+And those handlers currently take spin locks. So that is also not that simple.
 
->
->
-> --
-> ~Joshua Clayton
+David
