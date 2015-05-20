@@ -1,32 +1,42 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Wed, 20 May 2015 20:03:05 +0200
-Subject: [PATCH net-next 0/4] stmmac: probe code refactoring and clean up part
- 1
-Message-ID: <1432144989-28283-1-git-send-email-manabian@gmail.com>
+Date: Wed, 20 May 2015 20:03:09 +0200
+Subject: [PATCH net-next 4/4] stmmac: drop unnecessary dt checks in
+ stmmac_probe_config_dt
+In-Reply-To: <1432144989-28283-1-git-send-email-manabian@gmail.com>
+References: <1432144989-28283-1-git-send-email-manabian@gmail.com>
+Message-ID: <1432144989-28283-5-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set refactor the code in stmmac_pci_probe and stmmac_pltfr_probe
-and moves the common bits into stmmac_dvr_probe. Along the way some clean-
-ups are applied to stmmac_pltfr_probe.
+Since the caller already check the presence of a of_node there
+is no need to repeat the check in stmmac_probe_config_dt.
 
-The code has been tested on the LPC18xx platform.
+There is also no point in checking the return value of the
+of_match_device function since if there wasn't match in the
+first place we would never be in this function.
 
-I am still working on more refactoring of the platform probe code, hence
-part 1, but I need some more time on this.
+Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+---
+ drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c | 6 ------
+ 1 file changed, 6 deletions(-)
 
-
-Joachim Eastwood (4):
-  stmmac: move driver data setting into stmmac_dvr_probe
-  stmmac: let stmmac_dvr_probe take a struct of resources
-  stmmac: change the stmmac_dvr_probe return type to int
-  stmmac: drop unnecessary dt checks in stmmac_probe_config_dt
-
- drivers/net/ethernet/stmicro/stmmac/stmmac.h       | 14 +++--
- drivers/net/ethernet/stmicro/stmmac/stmmac_main.c  | 30 +++++++----
- drivers/net/ethernet/stmicro/stmmac/stmmac_pci.c   | 19 +++----
- .../net/ethernet/stmicro/stmmac/stmmac_platform.c  | 62 +++++++---------------
- 4 files changed, 54 insertions(+), 71 deletions(-)
-
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+index 10de9351a1ec..d2bb7907bf61 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+@@ -111,13 +111,7 @@ static int stmmac_probe_config_dt(struct platform_device *pdev,
+ 	const struct of_device_id *device;
+ 	struct device *dev = &pdev->dev;
+ 
+-	if (!np)
+-		return -ENODEV;
+-
+ 	device = of_match_device(dev->driver->of_match_table, dev);
+-	if (!device)
+-		return -ENODEV;
+-
+ 	if (device->data) {
+ 		const struct stmmac_of_data *data = device->data;
+ 		plat->has_gmac = data->has_gmac;
 -- 
 1.8.0
