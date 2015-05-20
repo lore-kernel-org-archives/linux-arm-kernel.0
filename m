@@ -1,25 +1,49 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 20 May 2015 11:17:08 -0700
-Subject: [PATCH] arm: dts: Beaglebone i2c definitions
-In-Reply-To: <20150514153822.GJ15563@atomide.com>
-References: <1431504274-32084-1-git-send-email-pantelis.antoniou@konsulko.com>
- <20150514153822.GJ15563@atomide.com>
-Message-ID: <20150520181708.GL10274@atomide.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 20 May 2015 11:23:19 -0700
+Subject: [PATCHv2 02/27] clk: ti: move generic OMAP DPLL implementation
+ under drivers/clk
+In-Reply-To: <555CC7CA.2090104@ti.com>
+References: <1431334493-24455-1-git-send-email-t-kristo@ti.com>
+ <1431334493-24455-3-git-send-email-t-kristo@ti.com>
+ <20150520012053.GC31054@codeaurora.org> <555CC7CA.2090104@ti.com>
+Message-ID: <20150520182319.GD4815@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [150514 08:40]:
-> * Pantelis Antoniou <pantelis.antoniou@konsulko.com> [150513 01:05]:
-> > The beaglebone family of boards contain two I2C busses enabled.
-> > The first one with a baseboard identification EEPROM and a
-> > cape I2C bus.
+On 05/20, Tero Kristo wrote:
+> On 05/20/2015 04:20 AM, Stephen Boyd wrote:
+> >On 05/11, Tero Kristo wrote:
+> >>With the legacy clock data now gone, we can start moving OMAP clock
+> >>type implementations under clock driver. Start this with moving the
+> >>generic OMAP DPLL clock type under TI clock driver.
+> >>
+> >>Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> >>---
+> >
+> >How much of the code is the same from the original copy? Can you
+> >generate these patches with -M -C so that we can see?
 > 
-> This seems safe to apply as the i2c2 pins are listed in the cape
-> specification.
+> Looks like for the move patches the range is from 85%...95% exact
+> copy. Shall I repost the patches in this format?
+
+Sure, a resend would be nice to actually see what changed. If
+that's too much mail, maybe you can share the diffstat for the
+whole series with -M -C so we can see what's moved instead.
+
+> Good hint for the
+> -M -C btw, I wonder why those are not default options for
+> git-format-patch.
 > 
-> These pins could be used for other devices too.. But in that case
-> the cape would not follow the cape standard.
 
-So applying this one into omap-for-v4.2/dt thanks.
+I think it isn't the default because 'patch' the program didn't
+always support the diff format that git generates with the -M and
+-C options. FWIW, I have
 
-Tony
+	[diff] 
+		renames = copy
+
+in my .gitconfig for this purpose.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
