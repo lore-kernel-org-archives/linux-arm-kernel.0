@@ -1,103 +1,87 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 20 May 2015 09:11:39 +0530
-Subject: [PATCH V5 2/3] OPP: Allow multiple OPP tables to be passed via DT
+Date: Wed, 20 May 2015 09:11:40 +0530
+Subject: [PATCH V5 3/3] OPP: Add binding for 'opp-suspend'
 In-Reply-To: <cover.1432091956.git.viresh.kumar@linaro.org>
 References: <cover.1432091956.git.viresh.kumar@linaro.org>
-Message-ID: <4690ad854263d6553debab67d65d230105c206ec.1432091956.git.viresh.kumar@linaro.org>
+Message-ID: <618b02107af650bcb3246e165095bbca207d511a.1432091956.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some platforms (Like Qualcomm's SoCs), it is not decided until
-runtime on what OPPs to use. The OPP tables can be fixed at compile
-time, but which table to use is found out only after reading some efuses
-(sort of an prom) and knowing characteristics of the SoC.
+On few platforms, for power efficiency, we want the device to be
+configured for a specific OPP while we put the device in suspend state.
 
-To support such platform we need to pass multiple OPP tables per device
-and hardware should be able to choose one and only one table out of
-those.
+Add an optional property in operating-points-v2 bindings for that.
 
-Update OPP-v2 bindings to support that.
-
-Acked-by: Nishanth Menon <nm@ti.com>
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+Suggested-by: Nishanth Menon <nm@ti.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- Documentation/devicetree/bindings/power/opp.txt | 52 +++++++++++++++++++++++++
- 1 file changed, 52 insertions(+)
+ Documentation/devicetree/bindings/power/opp.txt | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/power/opp.txt b/Documentation/devicetree/bindings/power/opp.txt
-index d132e2927b21..7f30d9b07db7 100644
+index 7f30d9b07db7..880f5e14b6e2 100644
 --- a/Documentation/devicetree/bindings/power/opp.txt
 +++ b/Documentation/devicetree/bindings/power/opp.txt
-@@ -46,6 +46,9 @@ Devices supporting OPPs must set their "operating-points-v2" property with
- phandle to a OPP descriptor in their DT node. The OPP core will use this phandle
- to find the operating points for the device.
- 
-+Devices may want to choose OPP tables at runtime and so can provide a list of
-+phandles here. But only *one* of them should be chosen at runtime.
-+
- 
- * OPP Descriptor Node
- 
-@@ -61,6 +64,9 @@ This describes the OPPs belonging to a device. This node can have following
-   reference an OPP.
- 
- Optional properties:
-+- opp-name: Name of the OPP table, to uniquely identify it if more than one OPP
-+  table is supplied in "operating-points-v2" property of device.
-+
- - opp-shared: Indicates that device nodes using this OPP descriptor's phandle
-   switch their DVFS state together, i.e. they share clock/voltage/current lines.
+@@ -72,6 +72,8 @@ This describes the OPPs belonging to a device. This node can have following
    Missing property means devices have independent clock/voltage/current lines,
-@@ -394,3 +400,49 @@ Example 4: Handling multiple regulators
- 		};
- 	};
- };
+   but they share OPP tables.
+ 
++- opp-suspend: Phandle of the OPP to set while device is suspended.
 +
-+Example 5: Multiple OPP tables
-+
-+/ {
-+	cpus {
-+		cpu at 0 {
-+			compatible = "arm,cortex-a7";
-+			...
-+
-+			opp-supply = <&cpu_supply>
-+			operating-points-v2 = <&cpu0_opp0>, <&cpu0_opp1>;
-+		};
-+	};
-+
-+	cpu0_opp0: opp0 {
-+		compatible = "operating-points-v2";
-+		opp-name = "opp-slow";
-+		opp-shared;
-+
-+		entry00 {
-+			opp-hz = <600000000>;
-+			...
-+		};
-+
-+		entry01 {
-+			opp-hz = <800000000>;
-+			...
-+		};
-+	};
-+
-+	cpu0_opp1: opp1 {
-+		compatible = "operating-points-v2";
-+		opp-name = "opp-fast";
-+		opp-shared;
-+
-+		entry10 {
-+			opp-hz = <1000000000>;
-+			...
-+		};
-+
-+		entry11 {
-+			opp-hz = <1100000000>;
-+			...
-+		};
-+	};
-+};
+ 
+ * OPP Node
+ 
+@@ -143,9 +145,10 @@ Example 1: Single cluster Dual-core ARM cortex A9, switch DVFS states together.
+ 
+ 	cpu0_opp: opp0 {
+ 		compatible = "operating-points-v2";
++		opp-suspend = <&suspend_opp>;
+ 		opp-shared;
+ 
+-		entry00 {
++		suspend-opp: entry00 {
+ 			opp-hz = <1000000000>;
+ 			opp-microvolt = <970000 975000 985000>;
+ 			opp-microamp = <70000>;
+@@ -217,13 +220,14 @@ independently.
+ 
+ 	cpu0_opp: opp0 {
+ 		compatible = "operating-points-v2";
++		opp-suspend = <&suspend_opp>;
+ 
+ 		/*
+ 		 * Missing opp-shared property means CPUs switch DVFS states
+ 		 * independently.
+ 		 */
+ 
+-		entry00 {
++		suspend-opp: entry00 {
+ 			opp-hz = <1000000000>;
+ 			opp-microvolt = <970000 975000 985000>;
+ 			opp-microamp = <70000>;
+@@ -296,9 +300,10 @@ DVFS state together.
+ 
+ 	cluster0_opp: opp0 {
+ 		compatible = "operating-points-v2";
++		opp-suspend = <&suspend_opp0>;
+ 		opp-shared;
+ 
+-		entry00 {
++		suspend-opp0: entry00 {
+ 			opp-hz = <1000000000>;
+ 			opp-microvolt = <970000 975000 985000>;
+ 			opp-microamp = <70000>;
+@@ -321,9 +326,10 @@ DVFS state together.
+ 
+ 	cluster1_opp: opp1 {
+ 		compatible = "operating-points-v2";
++		opp-suspend = <&suspend_opp1>;
+ 		opp-shared;
+ 
+-		entry10 {
++		suspend-opp1: entry10 {
+ 			opp-hz = <1300000000>;
+ 			opp-microvolt = <1045000 1050000 1055000>;
+ 			opp-microamp = <95000>;
 -- 
 2.4.0
