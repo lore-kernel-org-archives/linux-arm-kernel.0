@@ -1,54 +1,65 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 20 May 2015 14:40:09 +0200
-Subject: [RESEND PATCH 2/2] ARM: dts: tegra: Use labels for overriding
- nodes in Tegra114 boards
-In-Reply-To: <CAAVeFu+2aqCJ-nUomXy+PxKvDEm-yFPd+xq1rvgYiSUp5NohtA@mail.gmail.com>
-References: <1432036279-6318-1-git-send-email-k.kozlowski.k@gmail.com>
- <1432036279-6318-2-git-send-email-k.kozlowski.k@gmail.com>
- <CAAVeFu+-EYwZ9veNK8T6ZTc9tV0ZgGGm4M6vsiXe70TGTvfOzA@mail.gmail.com>
- <CAJKOXPeDSOwRU4Btt97Tf6Qd1zj5ctVnL_3-_RWGSy004SAACA@mail.gmail.com>
- <CAAVeFu+2aqCJ-nUomXy+PxKvDEm-yFPd+xq1rvgYiSUp5NohtA@mail.gmail.com>
-Message-ID: <20150520124008.GB24016@ulmo.nvidia.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 20 May 2015 20:38:10 +0800
+Subject: [PATCH] i2c: designware: separate ops for system_sleep_pm and
+ runtime_pm
+In-Reply-To: <20150520203430.24edd2a8@xhacker>
+References: <1431693099-2292-1-git-send-email-jszhang@marvell.com>
+ <20150518082823.GH1490@lahna.fi.intel.com>
+ <20150519203242.74617ad6@xhacker>
+ <20150519131516.GO1490@lahna.fi.intel.com>
+ <20150520193422.73de7d90@xhacker>
+ <20150520121506.GU1490@lahna.fi.intel.com>
+ <20150520203430.24edd2a8@xhacker>
+Message-ID: <20150520203810.2fa5b489@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 02:05:38PM +0900, Alexandre Courbot wrote:
-> On Wed, May 20, 2015 at 2:03 PM, Krzysztof Koz?owski
-> <k.kozlowski.k@gmail.com> wrote:
-> > 2015-05-20 13:05 GMT+09:00 Alexandre Courbot <gnurou@gmail.com>:
-> >> On Tue, May 19, 2015 at 8:51 PM, Krzysztof Kozlowski
-> >> <k.kozlowski.k@gmail.com> wrote:
-> >>> Usage of labels instead of full paths reduces possible mistakes when
-> >>> overriding nodes.
-> >>>
-> >>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
-> >>
-> >> Indentation seems to be off by one tab in the added code (hence the
-> >> huge size of this patch ; most lines should not change), can you
-> >> check?
-> >
-> > It is correct. This change in indentation is an effect of moving nodes
-> > out of first bracket ("\ {"). That is the convention.
-> >
-> > It us up to you guys if this is worth the effort. For exynos we use
-> > label-convention and now I am converting old DTS to it. I think the
-> > label-convention is less error-prone when extending or overriding
-> > nodes. Also it removes duplicated addresses.
+On Wed, 20 May 2015 20:34:30 +0800
+Jisheng Zhang <jszhang@marvell.com> wrote:
+
+> Dear Mika,
 > 
-> I don't really have a strong opinion on this - Stephen and Thierry
-> have worked with DT much more, let's see what they think...
+> On Wed, 20 May 2015 15:15:06 +0300
+> Mika Westerberg <mika.westerberg@linux.intel.com> wrote:
+> 
+> > On Wed, May 20, 2015 at 07:34:22PM +0800, Jisheng Zhang wrote:
+> > > Sorry for confusion. Considering one platform which doesn't support power off
+> > > the i2c host but it can disable the host's clock. So in such platform, when
+> > > the host is runtime suspended, its clock is disabled, then i2c_dw_disable() will
+> > > hang when s2ram.
+> > 
+> > Right. This happens also when the platform powers off the device.
+> > 
+> > > Except using the runtime pm API to ensure the host is in
+> > > a correct state, is there any other solution? AFAIK, 'dev->power.direct_complete'
+> > > doesn't help such case.
+> > 
+> > What I had in mind is something like below:
+> > 
+> > static int i2c_dw_prepare(struct device *dev)
+> > {
+> > 	return pm_runtime_suspended(dev);
+> > }
+> > 
+> > static void i2c_dw_complete(struct device *dev)
+> > {
+> > 	if (dev->power.direct_complete)
+> > 		pm_request_resume(dev);
+> > }
+> > 
+> > In other words it checks if the device is already runtime suspended and
+> > prevents ->suspend() etc. from being called.
+> 
+> What amazing! I wrote the same code as yours after sending out the last email.
+> 
+> > 
+> > If that does not work (I didn't try as this problem does not exist on
+> 
+> It works! How to submit the patch? Do you mind if I cook the patch and add
+> you signed-off?
+> 
 
-I agree with Stephen that this is unnecessary churn. I understand the
-reason why people prefer to use labels, but I don't think it's enough of
-an issue to warrent rewriting all of the DTS files. I personally don't
-like the convention very much because it makes the otherwise very neatly
-structured DTS files hard to read.
+PS: If you cook the patch instead,  feel free to add my acked-by and tested-by
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150520/9e2e729e/attachment.sig>
+Thanks a lot for the direct_complete idea,
+Jisheng
