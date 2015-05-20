@@ -1,52 +1,167 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 20 May 2015 15:31:16 +0900
-Subject: [PATCH] exynos: pmu: use PS_HOLD based poweroff for all supported
- SoCs
-In-Reply-To: <020001d06609$74970ee0$5dc52ca0$@kernel.org>
-References: <1423466741-11421-1-git-send-email-m.szyprowski@samsung.com>
- <CAJKOXPeeUjcwO6qBdHA8DJaviPxRwjAsSe7ciyGDFOUoNhZvcQ@mail.gmail.com>
- <CAJKOXPe4=DHsV3_axDUhpimRaqSHA3=HLiSJ1K3DYZoGRRiTTg@mail.gmail.com>
- <550C3888.7050905@samsung.com>
- <020001d06609$74970ee0$5dc52ca0$@kernel.org>
-Message-ID: <CAJKOXPcFH4_udSmSjttON4AEJ84QUUu+8u-uaN1qtNeWU3NntA@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 20 May 2015 07:35:51 +0100
+Subject: [PATCH v8 4/9] mfd: Add binding document for NVIDIA Tegra XUSB
+In-Reply-To: <CAL1qeaHy0h7bXhuLHh4AG2Zfu48JYeawgVo4dp_k4oX8YFw6tA@mail.gmail.com>
+References: <1430761002-9327-1-git-send-email-abrestic@chromium.org>
+ <1430761002-9327-5-git-send-email-abrestic@chromium.org>
+ <20150513143954.GA3394@x1> <55544CC5.9050001@nvidia.com>
+ <20150514074058.GA22418@x1>
+ <CAL1qeaEqNejuGkN-ke11mtWnaaRo+XieCBkQ6+NQ-Afym6uxVA@mail.gmail.com>
+ <CAL1qeaHy0h7bXhuLHh4AG2Zfu48JYeawgVo4dp_k4oX8YFw6tA@mail.gmail.com>
+Message-ID: <20150520063551.GD3627@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-03-24 17:06 GMT+09:00 Kukjin Kim <kgene@kernel.org>:
-> Marek Szyprowski wrote:
->>
->> Hello,
->>
-> Hi,
->
->> On 2015-02-09 11:58, Krzysztof Kozlowski wrote:
->> > 2015-02-09 10:06 GMT+01:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
->> >> 2015-02-09 8:25 GMT+01:00 Marek Szyprowski <m.szyprowski@samsung.com>:
->> >>> PS_HOLD based power off procedure is common for all Exynos SoCs, so use
->> >>> it for every Exynos SoC.
->> >>>
->> >>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> >>> ---
->> >>>   arch/arm/mach-exynos/pmu.c | 6 +++---
->> >>>   1 file changed, 3 insertions(+), 3 deletions(-)
->> >> I tried this on Trats2 board (Exynos 4412) and message "Power down
->> >> failed, please power off system manually." appears. Is it expected? Or
->> >> am I missing some patches (I applied this on top of next-20150129)?
->> > It was my fault (I left attached JIG cable which prevents power off).
->> > Now it works fine.
->> >
->> > Tested on Trats2 (Exynos4412):
->> > Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> >
->> > Patch also looks good, so:
->> > Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>
->> Gentle ping for merging this in v4.1-next...
->>
-> OK, I'll queue this into v4.1-next/mach-samsung.
+On Tue, 19 May 2015, Andrew Bresticker wrote:
 
-This patch is waiting enough time and it missed the 4.1. Kukjin, could
-you apply it for 4.2? I'll apply it anyway to my tree.
+> Lee,
+> 
+> On Thu, May 14, 2015 at 10:38 AM, Andrew Bresticker
+> <abrestic@chromium.org> wrote:
+> > On Thu, May 14, 2015 at 12:40 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> >> On Thu, 14 May 2015, Jon Hunter wrote:
+> >>
+> >>> Hi Lee,
+> >>>
+> >>> On 13/05/15 15:39, Lee Jones wrote:
+> >>> > On Mon, 04 May 2015, Andrew Bresticker wrote:
+> >>> >
+> >>> >> Add a binding document for the XUSB host complex on NVIDIA Tegra124
+> >>> >> and later SoCs.  The XUSB host complex includes a mailbox for
+> >>> >> communication with the XUSB micro-controller and an xHCI host-controller.
+> >>> >>
+> >>> >> Signed-off-by: Andrew Bresticker <abrestic@chromium.org>
+> >>> >> Cc: Rob Herring <robh+dt@kernel.org>
+> >>> >> Cc: Pawel Moll <pawel.moll@arm.com>
+> >>> >> Cc: Mark Rutland <mark.rutland@arm.com>
+> >>> >> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> >>> >> Cc: Kumar Gala <galak@codeaurora.org>
+> >>> >> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> >>> >> Cc: Lee Jones <lee.jones@linaro.org>
+> >>> >> ---
+> >>> >> Changes from v7:
+> >>> >>  - Move non-shared resources into child nodes.
+> >>> >> New for v7.
+> >>> >> ---
+> >>> >>  .../bindings/mfd/nvidia,tegra124-xusb.txt          | 37 ++++++++++++++++++++++
+> >>> >>  1 file changed, 37 insertions(+)
+> >>> >>  create mode 100644 Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
+> >>> >>
+> >>> >> diff --git a/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt b/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
+> >>> >> new file mode 100644
+> >>> >> index 0000000..bc50110
+> >>> >> --- /dev/null
+> >>> >> +++ b/Documentation/devicetree/bindings/mfd/nvidia,tegra124-xusb.txt
+> >>> >> @@ -0,0 +1,37 @@
+> >>> >> +NVIDIA Tegra XUSB host copmlex
+> >>> >> +==============================
+> >>> >> +
+> >>> >> +The XUSB host complex on Tegra124 and later SoCs contains an xHCI host
+> >>> >> +controller and a mailbox for communication with the XUSB micro-controller.
+> >>> >> +
+> >>> >> +Required properties:
+> >>> >> +--------------------
+> >>> >> + - compatible: For Tegra124, must contain "nvidia,tegra124-xusb".
+> >>> >> +   Otherwise, must contain '"nvidia,<chip>-xusb", "nvidia,tegra124-xusb"'
+> >>> >> +   where <chip> is tegra132.
+> >>> >> + - reg: Must contain the base and length of the XUSB FPCI registers.
+> >>> >> + - ranges: Bus address mapping for the XUSB block.  Can be empty since the
+> >>> >> +   mapping is 1:1.
+> >>> >> + - #address-cells: Must be 2.
+> >>> >> + - #size-cells: Must be 2.
+> >>> >> +
+> >>> >> +Example:
+> >>> >> +--------
+> >>> >> +  usb at 0,70098000 {
+> >>> >> +          compatible = "nvidia,tegra124-xusb";
+> >>> >> +          reg = <0x0 0x70098000 0x0 0x1000>;
+> >>> >> +          ranges;
+> >>> >> +
+> >>> >> +          #address-cells = <2>;
+> >>> >> +          #size-cells = <2>;
+> >>> >> +
+> >>> >> +          usb-host at 0,70090000 {
+> >>> >> +                  compatible = "nvidia,tegra124-xhci";
+> >>> >> +                  ...
+> >>> >> +          };
+> >>> >> +
+> >>> >> +          mailbox {
+> >>> >> +                  compatible = "nvidia,tegra124-xusb-mbox";
+> >>> >> +                  ...
+> >>> >> +          };
+> >>> >
+> >>> > This doesn't appear to be a proper MFD.  I would have the USB and
+> >>> > Mailbox devices probe seperately and use a phandle to point the USB
+> >>> > device to its Mailbox.
+> >>> >
+> >>> > usb at xyz {
+> >>> >     mboxes = <&xusb-mailbox, [chan]>;
+> >>> > };
+> >>> >
+> >>>
+> >>> I am assuming that Andrew had laid it out like this to reflect the hw
+> >>> structure. The mailbox and xhci controller are part of the xusb
+> >>> sub-system and hence appear as child nodes. My understanding is that for
+> >>> device-tree we want the device-tree structure to reflect the actual hw.
+> >>> Is this not the case?
+> >>
+> >> Yes, the DT files should reflect h/w.  I have requested to see what
+> >> the memory map looks like, so I might provide a more appropriate
+> >> solution to accepting a pretty pointless MFD.
+> >
+> > FWIW, the address map for XUSB looks like this:
+> >
+> > XUSB_HOST: 0x70090000 - 0x7009a000
+> >     xHCI registers: 0x70090000 - 0x70098000
+> >     FPCI configuration registers: 0x70098000 - 0x70099000
+> >     IPFS configuration registers: 0x70099000 - 0x7009a000
+> >
+> >> Two solutions spring to mind.  You can either call
+> >> of_platform_populate() from the USB driver, as some already do:
+> >>
+> >>   drivers/usb/dwc3/dwc3-exynos.c:
+> >>     ret = of_platform_populate(node, NULL, NULL, dev);
+> >>   drivers/usb/dwc3/dwc3-keystone.c:
+> >>     error = of_platform_populate(node, NULL, NULL, dev);
+> >>   drivers/usb/dwc3/dwc3-omap.c:
+> >>     ret = of_platform_populate(node, NULL, NULL, dev);
+> >>   drivers/usb/dwc3/dwc3-qcom.c:
+> >>     ret = of_platform_populate(node, NULL, NULL, qdwc->dev);
+> >>   drivers/usb/dwc3/dwc3-st.c:
+> >>     ret = of_platform_populate(node, NULL, NULL, dev);
+> >>   drivers/usb/musb/musb_am335x.c:
+> >>     ret = of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
+> >
+> > This still requires a small, separate driver to setup the regmap and
+> > do of_platform_populate().  The only difference is it lives in
+> > drivers/usb/ instead of drivers/mfd/.
+> >
+> >> Or use the "simple-mfd", which is currently in -next:
+> >>
+> >>   git show next/master:Documentation/devicetree/bindings/mfd/mfd.txt
+> >
+> > I'm not too opposed to this, but Thierry was when I brought this up
+> > before.  The issue here is that if we ever have to do something
+> > besides setting up a regmap in the MFD, we'd have to change the
+> > binding and break DT backwards-compatibility.
+> 
+> Any thoughts on this?  A minimal MFD seems to be the best way to
+> future-proof this binding/driver should it need to be extended in the
+> future.  If this is a firm NAK from you however, I'll need to let
+> Jassi now so that he can un-queue the mailbox patches for 4.2....
 
-Best regards,
-Krzysztof
+I was waiting to hear Thierry's thoughts.  However, I am unconvinced
+that you need an MFD driver for this and refuse to take a shell (read
+"pointless") one on an "if we ever ..." clause.
+
+Will you break backwards capability though?  I'm not sure you will.
+Old DTBs will still use 'simple-mfd' and probe the devices in the
+normal way.  *If* you introduce an MFD driver at a later date then the
+old DTB will miss out the *new* functionality, which is expected and
+accepted.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
