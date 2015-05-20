@@ -1,43 +1,28 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 20 May 2015 14:03:09 -0700
-Subject: [GIT PULL] omap fixes against v4.1-rc4
-Message-ID: <20150520210309.GA18439@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 20 May 2015 23:04:24 +0200
+Subject: [GIT PULL v2] ARM: berlin: DT changes for v4.2 (round 1)
+In-Reply-To: <1432140626-6109-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1432140626-6109-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <5498391.Fl346EDjWm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit e60a8fe1792dcd3aacda0959e0f4865bfefb7bb5:
+On Wednesday 20 May 2015 18:50:25 Sebastian Hesselbarth wrote:
+> Arnd, Kevin, Olof,
+> 
+> as pointed out by Arnd on the last PR, this is the remainder of the DT
+> branch based on v4.1-rc1 without the simple-mfd rework comprising
+> 
+> - GPLv2/X11 relicensing of all Berlin DT files with all Acked-bys.
+> - Unstable DT note in Berlin binding docs.
+> - Updated binding documentation of reworked chip/system controller and
+>   dependant pinctrl, clk, reset bindings.
+> 
+> The actual DT rework patches will be sent as a different PR based on
+> arm-soc driver/simple-mfd instead.
+> 
+> 
 
-  Merge tag 'for-v4.1-rc/omap-fixes-a' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into omap-for-v4.1/fixes (2015-05-11 13:23:19 -0700)
+Pulled into next/dt, thanks a lot for the rework!
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.1/fixes-rc4
-
-for you to fetch changes up to f25bf74c8862efdc30453d16d60cf22958a4873e:
-
-  ARM: dts: Fix WLAN interrupt line for AM335x EVM-SK (2015-05-20 10:00:10 -0700)
-
-----------------------------------------------------------------
-Few minimal omap device tree fixes for v4.1-rc series:
-
-- Disable BeagleBone black RTC-only sleep mode because of hardare
-  related issues
-
-- Fix NAND on Devkit8000
-
-- Fix WLAN interrupt line on AM335x EVM-SK
-
-----------------------------------------------------------------
-Anthoine Bourgeois (1):
-      ARM: dts: omap3-devkit8000: Fix NAND DT node
-
-Robert Nelson (1):
-      ARM: dts: am335x-boneblack: disable RTC-only sleep
-
-Romain Izard (1):
-      ARM: dts: Fix WLAN interrupt line for AM335x EVM-SK
-
- arch/arm/boot/dts/am335x-boneblack.dts | 4 ----
- arch/arm/boot/dts/am335x-evmsk.dts     | 2 +-
- arch/arm/boot/dts/omap3-devkit8000.dts | 2 ++
- 3 files changed, 3 insertions(+), 5 deletions(-)
+	Arnd
