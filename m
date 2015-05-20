@@ -1,58 +1,31 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Wed, 20 May 2015 07:14:18 +0200
-Subject: [PATCH v2] arm, imx6, dts: add DT for aristainetos2 board
-In-Reply-To: <1432045990.15181.36.camel@pengutronix.de>
-References: <1431334974-27531-1-git-send-email-hs@denx.de>
- <20150518113135.GD1071@dragon> <555AE192.8010700@denx.de>
- <1432025280.3182.6.camel@pengutronix.de> <555B3E3A.8000605@denx.de>
- <1432045990.15181.36.camel@pengutronix.de>
-Message-ID: <555C182A.1030608@denx.de>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Wed, 20 May 2015 07:27:30 +0200
+Subject: [PATCH 2/2] PCI: iproc: add bcma pcie driver
+In-Reply-To: <1431465781-10753-3-git-send-email-hauke@hauke-m.de>
+References: <1431465781-10753-1-git-send-email-hauke@hauke-m.de>
+ <1431465781-10753-3-git-send-email-hauke@hauke-m.de>
+Message-ID: <CACna6rxfKT5+LEDHq+QgPuSgX5t-HpOfX93pfnHRXX1_cGy3+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Philipp,
-
-Am 19.05.2015 16:33, schrieb Philipp Zabel:
-> Hi Heiko,
+On 12 May 2015 at 23:23, Hauke Mehrtens <hauke@hauke-m.de> wrote:
+> This driver adds support for the PCIe 2.0 controller found on the bcma
+> bus. This controller can be found on (mostly) all Broadcom BCM470X /
+> BCM5301X ARM SoCs.
 >
-> Am Dienstag, den 19.05.2015, 15:44 +0200 schrieb Heiko Schocher:
->> Hello Philipp,
->>
->> Am 19.05.2015 10:48, schrieb Philipp Zabel:
->>> Hi Heiko, Shawn,
->>>
->>> Am Dienstag, den 19.05.2015, 09:09 +0200 schrieb Heiko Schocher:
->>> [...]
->>>>> What is this?  I failed to find it in Documentation/devicetree/bindings/
->>>>
->>>> Ah, this is not documentated, see commit:
->>>>
->>>> commit 628f435be4359e6ae8ecfdda9b492053be76a057
->>>> Author: Philipp Zabel <p.zabel@pengutronix.de>
->>>> Date:   Tue Feb 25 11:55:04 2014 +0100
->>>>
->>>>        imx-drm: parallel-display: Add drm_panel support
->>>>
->>>> added Philipp to cc ...
->>>
->>> This was meant to be a temporary solution to connect a drm_panel to the
->>> parallel-display when the of-graph bindings were not yet available.
->>> I'd very much prefer to switch to the common of-graph bindings similarly
->>> to the LDB driver instead. Could you check if this would work for you:
->>
->> Yes, your patch works for me (with appropriate changes in the dts file)
->> You can add my
->> Tested-by: Heiko Schocher <hs@denx.de>
->> for this patch, thanks!
+> The driver found in the Broadcom SDK does some more stuff, like setting
+> up some DMA memory areas, chaining MPS and MRRS to 512 and also some
+> PHY changes like "improving" the PCIe jitter and doing some special
+> initializations for the 3rd PCIe port.
 >
-> Thank you, I've posted that parallel-display patch and will try to queue
-> it for v4.2 when it gets accepted.
+> This was tested on a bcm4708 board with 2 PCIe ports and wireless cards
+> connected to them.
+>
+> PCI_DOMAINS is needed by this driver, because normally there is more
+> than one PCIe controller and without PCI_DOMAINS only the first
+> controller gets registered.
+> This controller gets 6 IRQs, the last one is trigged by all IRQ events.
+>
+> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
 
-Thanks! So, I post my v3 for the aristainetos2 board based on this
-patch ...
-
-bye,
-Heiko
--- 
-DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Acked-by: Rafa? Mi?ecki <zajec5@gmail.com>
