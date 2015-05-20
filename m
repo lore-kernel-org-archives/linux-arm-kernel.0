@@ -1,47 +1,80 @@
-From: timo.kokkonen@offcode.fi (Timo Kokkonen)
-Date: Wed, 20 May 2015 08:37:35 +0300
-Subject: [PATCHv8 01/10] watchdog: Rename watchdog_active to
- watchdog_hw_active
-In-Reply-To: <555BDF22.2090208@roeck-us.net>
-References: <1432023969-20736-1-git-send-email-timo.kokkonen@offcode.fi>
- <1432023969-20736-2-git-send-email-timo.kokkonen@offcode.fi>
- <555BDF22.2090208@roeck-us.net>
-Message-ID: <555C1D9F.4060600@offcode.fi>
+From: maitysanchayan@gmail.com (Sanchayan Maity)
+Date: Wed, 20 May 2015 11:06:50 +0530
+Subject: [PATCH v2 0/2] Implement SoC bus support for Vybrid
+Message-ID: <cover.1432099651.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.05.2015 04:10, Guenter Roeck wrote:
-> On 05/19/2015 01:26 AM, Timo Kokkonen wrote:
->> Before extending the watchdog core midlayer, it is useful to rename
->> the watchdog_active function so that it states explicitly what it
->> really does. That is, "active" watchdog means really that the watchdog
->> hardware is running and needs pinging to prevent a watchdog reset
->> taking place in near future.
->>
->> This is different to "watchdog open" state, which simply states that
->> kernel is expecting the user space to keep the watchdog alive. These
->> states might become different mainly because some hardware have
->> limitations that prevent them from being stopped at will.
->>
->
-> I don't see why this is needed. If you need another state, per your
-> description, it would be "open" in addition to "active".
+Hello,
 
-Yes, the watchdog_is_open() is introduced on patch number two. The 
-original watchdog_is_active() is really confusing. It doesn't really 
-state what it means. Most of the drivers are using it to test whether 
-the watchdog HW is active when going to suspend, but at least atmel 
-watchdog was testing it to see whether the watchdog device is open from 
-user space. The HW itself is always active in that driver.
+This patchset implements SoC bus support for Freescale Vybrid platform,
+implementing the following
+https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-devices-soc
 
-If we are about to distinguish between "device open from user space" and 
-"hardware timer running", we better be clear about the naming. 
-"watchdog_is_active" doesn't really tell what it does.
+Currently the required information is more or less read across the whole
+SoC, but I guess we cannot change that since these are the locations
+with the required information.
 
-This was originally suggested by Uwe Kleine-K?nig. He also recommended 
-changing the timeout parameter so that is would state more clearly that 
-it is the SW timeout and not HW timeout. But I felt that it would have 
-been too invasive to change the timeout parameter as well. The 
-watchdog_is_active was not used very much so the change was easy.
+There seem to be three options for the revision field:
+- ROM revision (see https://community.freescale.com/docs/DOC-94802)
+- ANADIG revision (ANADIG_DIGIPROC, as used for the i.MX SoC's)
+- OCOTP revision
 
--Timo
+Some numbers:
+
+Colibri VF61 1.1A (2N02G)
+- 0x00000013
+- 0x00610000
+- 0x01000000
+- 0x410000c8
+
+Colibri VF61 V1.0B (1N02G)
+- 0x00000011
+- 0x00610000
+- 0x01000000
+- 0x410000c8
+
+Colibri VF61 V1.0A (which is actually a VF600 SoC, no L2 cache, since
+that was the only one we could buy back then, 1N02G printed on it)
+- 0x00000011
+- 0x00610000
+- 0x01000000
+- none...
+
+Colibri VF50 V1.0A (1N02G)
+- 0x00000011
+- 0x00610000
+- 0x01000000
+- none...
+
+Vybrid Tower Rev J (1N02G)
+- 0x00000011
+- 0x00610000
+- 0x01000000
+- 0x410000c8
+
+The ROM revision differs the most, so we would like to go with the
+revision information from the ROM register 0x80.
+
+Version 1 of the patchset can be found here
+http://www.spinics.net/lists/devicetree/msg80257.html
+
+The RFC version can be found here
+https://lkml.org/lkml/2015/5/11/13
+
+Changes since v1:
+- Sort the headers in alphabetical order
+
+Changes since RFC:
+- Use a DT entry for the ROM area while specifying it as syscon.
+
+Sanchayan Maity (2):
+  ARM: dts: vfxxx: Add OCOTP and OCROM nodes
+  ARM: vf610: Add SoC bus support for Vybrid
+
+ arch/arm/boot/dts/vfxxx.dtsi   | 10 +++++
+ arch/arm/mach-imx/mach-vf610.c | 85 +++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 93 insertions(+), 2 deletions(-)
+
+-- 
+2.4.1
