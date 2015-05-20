@@ -1,62 +1,77 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 20 May 2015 23:22:24 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: Add Atmel SAMA5 family
-In-Reply-To: <CAOCHtYiYBsE=31E3ZNNnEkZrbFXmBmgwD8Qpt69iK6h6cW9shA@mail.gmail.com>
-References: <1428051678-20450-1-git-send-email-alexandre.belloni@free-electrons.com>
- <555AFF3F.10400@atmel.com> <9986808.t62JLgg5NJ@wuerfel>
- <20150519123358.GA15179@piout.net> <555B3463.2060700@atmel.com>
- <555B3A92.7010409@atmel.com> <555B4040.2090302@atmel.com>
- <CAMAWPa95VTM+VgNpcs1oZwX9NqzrL1JeNy=MqL0Zo3JP=svyUQ@mail.gmail.com>
- <20150520140856.GE3907@piout.net>
- <CAOCHtYiYBsE=31E3ZNNnEkZrbFXmBmgwD8Qpt69iK6h6cW9shA@mail.gmail.com>
-Message-ID: <20150520212224.GB3244@piout.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 20 May 2015 23:22:10 +0200
+Subject: [GIT PULL] Broadcom SoC changes for 4.2
+In-Reply-To: <555CF71F.7000409@broadcom.com>
+References: <1431556453-11633-1-git-send-email-f.fainelli@gmail.com>
+ <3339528.zIO9EH4AJz@wuerfel> <555CF71F.7000409@broadcom.com>
+Message-ID: <26666329.i6kznPGNxa@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 20/05/2015 at 10:18:16 -0500, Robert Nelson wrote :
-> On Wed, May 20, 2015 at 9:08 AM, Alexandre Belloni
-> <alexandre.belloni@free-electrons.com> wrote:
-> > Hi,
-> >
-> > On 20/05/2015 at 06:53:50 -0700, Kevin Hilman wrote :
-> >> FYI... This patch is now in linux-next, and boot tests for all the
-> >> sama5d[34] boards in kernelci.org have failed to boot.
+On Wednesday 20 May 2015 14:05:35 Florian Fainelli wrote:
+> On 20/05/15 13:59, Arnd Bergmann wrote:
+> > On Wednesday 13 May 2015 15:34:13 Florian Fainelli wrote:
+> >>  arch/arm/include/asm/vfp.h          |   9 ++
+> >>  arch/arm/mach-bcm/Makefile          |   7 +-
+> >>  arch/arm/mach-bcm/bcm63xx_headsmp.S |  23 ++++
+> >>  arch/arm/mach-bcm/bcm63xx_pmb.c     | 221 ++++++++++++++++++++++++++++++++++++
+> >>  arch/arm/mach-bcm/bcm63xx_smp.c     | 170 +++++++++++++++++++++++++++
+> >>  arch/arm/mach-bcm/bcm63xx_smp.h     |   9 ++
+> >>  arch/arm/vfp/vfpmodule.c            |  13 +++
+> >>  include/linux/bcm63xx_pmb.h         |  76 +++++++++++++
 > >>
-> >>    http://kernelci.org/boot/all/job/next/kernel/next-20150520/
-> >>
-> >
-> > Hum, I'm pretty sure you see the heartbeat led blinking ;)
-> >
-> > I think I told you a while ago on IRC and this is part of the commit
-> > message. You have to use ttyAT0 instead of ttyS0 in your bootargs. I'm
-> > not sure how I can make that more obvious, I'm open to any idea.
-> >
-> > I'm planning to send a series adding stdout-path to the atmel boards
-> > when I'm back next week. Hopefully this will solve that issue.
+> > 
+> > And taken out again, sorry.
 > 
-> Alexandre,
+> No problem, Rafal reminded me of a patch I forgot to submit earlier, so
+> I will take that as an opportunity to re-do this pull request.
 > 
-> considering all the old boot-loaders, have you thought about adding a
-> compatibility config similar to:
+> > 
+> > I got a build error in include/linux/bcm63xx_pmb.h and that triggered me to take
+> > a closer look. I tried to fix up the trivial error first, but then noticed
+> > several other things wrong with bcm63xx_pmb.h:
 > 
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=00648d0282dcca1da453c0b20d27e24bf901a854
+> What kind of build error? Do you have it handy?
+
+I sent it to you on IRC earlier, here is the full error log:
+
+/git/arm-soc/include/linux/bcm63xx_pmb.h: In function '__bpcm_do_op':
+/git/arm-soc/include/linux/bcm63xx_pmb.h:39:12: error: 'EIO' undeclared (first use in this function)
+    return -EIO;
+            ^
+/git/arm-soc/include/linux/bcm63xx_pmb.h:39:12: note: each undeclared identifier is reported only once for each function it appears in
+/git/arm-soc/include/linux/bcm63xx_pmb.h:42:12: error: 'ETIMEDOUT' undeclared (first use in this function)
+    return -ETIMEDOUT;
+            ^
+In file included from /git/arm-soc/arch/arm/mach-bcm/bcm63xx_pmb.c:15:0:
+/git/arm-soc/include/linux/bcm63xx_pmb.h:48:1: warning: control reaches end of non-void function [-Wreturn-type]
+
+This is fixed by including linux/errno.h in the header.
+
+> > - it is in include/linux/ where it clearly does not belong, as no other component
+> >   should be including it. Even the function documentation in there mentions that
+> >   one must hold the pmb_lock before calling it, and that is defined statically
+> >   arch/arm/mach-bcm/bcm63xx_pmb.c, so it's impossible for other code to use.
+> >   Just move it all into bcm63xx_pmb.c.
 > 
+> This header will later be used by the bcm63138 reset controller, and I
+> thought I had explained the reasoning behind that in either the commit
+> message or cover letter, I will make sure the commit message explains it.
 
-We are not there yet. sama5_defconfig and at91_dt_defconfig will still
-produce kernels using ttyS and not ttyAT. The switch will not happen
-until you set CONFIG_SERIAL_ATMEL_TTYAT which has been present since
-2.6.19. The issue is that it is mandatory to use it in a multi_v7
-configuration because the 8250 driver is compiled in and is conflicting.
+I see. I still think it's a bit rude to place this header in the top-level
+include/linux directory though. I realize there are a lot of other headers
+like this, but I'm trying not to add too many more.
 
+Maybe a lesser evil would be to put the reset driver into
+arch/arm/mach-bcm/bcm63xx_pmb.c as well?
 
-Kevin and Tyler jumped on the introduction of sama5 in multi_v7 and got
-the issue. As long as you stick to the at91 only configurations, you
-will be fine ;)
-I hope this clarifies the thing :)
+How big is it? And is there anything else besides that driver which would
+need these functions?
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> The lock issue is not much of a problem since we do not support CPU
+> hotplug and the reset controller subsystem is initialized later so there
+> is no possibility for these two pieces of code to conflict.
+
+Ok
+
+	Arnd
