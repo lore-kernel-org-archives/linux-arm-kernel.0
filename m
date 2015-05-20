@@ -1,40 +1,54 @@
-From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
-Date: Wed, 20 May 2015 14:39:57 +0200
-Subject: at91sam9: watchdog: period
-In-Reply-To: <20150519120433.763a416e@bbrezillon>
-References: <55559D55.6020703@aksignal.cz>	<20150515172516.005e3a21@bbrezillon>	<5559865F.9010502@aksignal.cz>	<20150518092750.449d6c8c@bbrezillon>	<5559A029.9060007@aksignal.cz>	<555AA8F1.80100@atmel.com>	<20150519091442.675b1a98@bbrezillon>	<555AFBFD.3010506@aksignal.cz>	<20150519111402.747e8eb2@bbrezillon>	<555B07D0.4030000@aksignal.cz>
- <20150519120433.763a416e@bbrezillon>
-Message-ID: <555C809D.8090407@aksignal.cz>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 20 May 2015 14:40:09 +0200
+Subject: [RESEND PATCH 2/2] ARM: dts: tegra: Use labels for overriding
+ nodes in Tegra114 boards
+In-Reply-To: <CAAVeFu+2aqCJ-nUomXy+PxKvDEm-yFPd+xq1rvgYiSUp5NohtA@mail.gmail.com>
+References: <1432036279-6318-1-git-send-email-k.kozlowski.k@gmail.com>
+ <1432036279-6318-2-git-send-email-k.kozlowski.k@gmail.com>
+ <CAAVeFu+-EYwZ9veNK8T6ZTc9tV0ZgGGm4M6vsiXe70TGTvfOzA@mail.gmail.com>
+ <CAJKOXPeDSOwRU4Btt97Tf6Qd1zj5ctVnL_3-_RWGSy004SAACA@mail.gmail.com>
+ <CAAVeFu+2aqCJ-nUomXy+PxKvDEm-yFPd+xq1rvgYiSUp5NohtA@mail.gmail.com>
+Message-ID: <20150520124008.GB24016@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, May 20, 2015 at 02:05:38PM +0900, Alexandre Courbot wrote:
+> On Wed, May 20, 2015 at 2:03 PM, Krzysztof Koz?owski
+> <k.kozlowski.k@gmail.com> wrote:
+> > 2015-05-20 13:05 GMT+09:00 Alexandre Courbot <gnurou@gmail.com>:
+> >> On Tue, May 19, 2015 at 8:51 PM, Krzysztof Kozlowski
+> >> <k.kozlowski.k@gmail.com> wrote:
+> >>> Usage of labels instead of full paths reduces possible mistakes when
+> >>> overriding nodes.
+> >>>
+> >>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+> >>
+> >> Indentation seems to be off by one tab in the added code (hence the
+> >> huge size of this patch ; most lines should not change), can you
+> >> check?
+> >
+> > It is correct. This change in indentation is an effect of moving nodes
+> > out of first bracket ("\ {"). That is the convention.
+> >
+> > It us up to you guys if this is worth the effort. For exynos we use
+> > label-convention and now I am converting old DTS to it. I think the
+> > label-convention is less error-prone when extending or overriding
+> > nodes. Also it removes duplicated addresses.
+> 
+> I don't really have a strong opinion on this - Stephen and Thierry
+> have worked with DT much more, let's see what they think...
 
+I agree with Stephen that this is unnecessary churn. I understand the
+reason why people prefer to use labels, but I don't think it's enough of
+an issue to warrent rewriting all of the DTS files. I personally don't
+like the convention very much because it makes the otherwise very neatly
+structured DTS files hard to read.
 
-On 19.5.2015 12:04, Boris Brezillon wrote:
->> I'm confused. Why need kernel to know the time in witch userspace process will reset watchdog?
->
-> This time is not exposed to userspace, it's the internal heartbeat used
-> by the driver to refresh the watchdog.
-
-Kernel driver does refresh? For what is utility "watchdog" in busybox?
-When I stop this util then it will reboot.
-
->
->> And how to change watchdog expiration time?
->
-> With the atmel,max-heartbeat-sec property.
-
-No effect on it, still 61s.
-
->
-> Anyway, that does not explain why your system takes 61 secs to trigger
-> a reset (instead of 16 secs).
-> Can you try to revert this commit [1] ?
-
-Because of our company internet policy I can't clone git so I tried kernel 3.18.13.
-No change, still 61s.
-
->
->
-> [1]https://git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git/commit/drivers/watchdog/at91sam9_wdt.c?id=d677772e1358924bf487cd833bdc4d50f3f6f64d
->
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150520/9e2e729e/attachment.sig>
