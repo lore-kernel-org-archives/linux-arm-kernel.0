@@ -1,66 +1,61 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 20 May 2015 07:37:15 +0530
-Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
-In-Reply-To: <555BDA7C.7020506@codeaurora.org>
-References: <cover.1430394884.git.viresh.kumar@linaro.org>
- <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
- <555BDA7C.7020506@codeaurora.org>
-Message-ID: <20150520020715.GA6465@linux>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 20 May 2015 11:18:07 +0900
+Subject: [PATCH v2] ARM: shmobile: only select sound drivers that build
+In-Reply-To: <2384220.GLN49TmlTT@wuerfel>
+References: <2384220.GLN49TmlTT@wuerfel>
+Message-ID: <20150520021807.GB31103@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19-05-15, 17:51, Stephen Boyd wrote:
-> This looks like it covers my usecases. I'm not sure if I'm going to put
-> all of this data in DT because of the philosophical question regarding
-> what should be in DT and the technical decisions that some platforms I'm
-> working on have made to encode parts of the OPPs in fuses, but at least
-> the binding looks to support all the scenarios I have today.
-
-Thanks.
-
-> > +Required properties:
-> > +- opp-khz: Frequency in kHz
+On Tue, May 19, 2015 at 03:40:37PM +0200, Arnd Bergmann wrote:
+> A couple of codec drivers are selected by shmobile platform code,
+> but depend on I2C, which results in a build error:
 > 
-> Can this be in Hz? I thought there were some problems with kHz and Hz
-> before where we wanted to make this into Hz so that rounding problems
-> don't arise?
-
-Yeah, good point.
-
-> Also I wonder if all properties should be optional? I don't have this
-> scenario today, but perhaps the frequencies could be encoded in fuses,
-> but the voltages wouldn't be and so we might want to read out the
-> frequencies for a fixed set of voltages. Of course, if there's nothing
-> in the OPP node at all, it's not very useful, so perhaps some statement
-> that at least one of the frequency/voltage/amperage properties should be
-> present.
-
-I am not sure. What we are trying to do (fill partially in DT and
-partially in platform), is a trick and not the right use of bindings.
-
-Ideally whatever is passed in DT should be complete by itself and
-doesn't require platform to tweak it (which it can't). For example,
-the cpufreq-dt driver will try to initialize OPPs from the DT directly
-and wouldn't know about the platform tweaks. That can work eventually
-as platform will add OPPs for the same bindings before cpufreq driver
-will try to do, but that's a trick.
-
-And then its all about frequency in the first place, and so marking
-that optional looks wrong. Probably not the right use of these
-bindings.
-
-> > +  Entries for multiple regulators must be present in the same order as
-> > +  regulators are specified in device's DT node. If few regulators don't provide
-> > +  capability to configure current, then values for then should be marked as
+> sound/soc/codecs/ak4642.c:638:1: warning: data definition has no type or storage class
+>  module_i2c_driver(ak4642_i2c_driver);
+>  ^
+> sound/soc/codecs/ak4642.c:638:1: error: type defaults to 'int' in declaration of 'module_i2c_driver' [-Werror=implicit-int]
+> sound/soc/codecs/ak4642.c:638:1: warning: parameter names (without types) in function declaration
+> sound/soc/codecs/ak4642.c:627:26: warning: 'ak4642_i2c_driver' defined but not used [-Wunused-variable]
 > 
-> s/then/them/
+> This ensures that we do not enable the respective drivers when I2C
+> is disabled.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Thanks. But this part is already re-written and doesn't have this
-issue anymore.
+Thanks Arnd,
 
-> Please put some space between properties so they can be found quickly:
+I have queued this up as a fix for v4.1.
 
-Sure, thanks.
-
--- 
-viresh
+> ----
+> v2: removed incorrect change for SND_SOC_AK4554, as pointed out by Geert
+> 
+> diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+> index 679b866399f2..c4cb4b590d47 100644
+> --- a/arch/arm/mach-shmobile/Kconfig
+> +++ b/arch/arm/mach-shmobile/Kconfig
+> @@ -150,7 +150,7 @@ config MACH_ARMADILLO800EVA
+>  	select ARCH_REQUIRE_GPIOLIB
+>  	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+>  	select SMSC_PHY if SH_ETH
+> -	select SND_SOC_WM8978 if SND_SIMPLE_CARD
+> +	select SND_SOC_WM8978 if SND_SIMPLE_CARD && I2C
+>  	select USE_OF
+>  
+>  config MACH_BOCKW
+> @@ -159,7 +159,7 @@ config MACH_BOCKW
+>  	select ARCH_REQUIRE_GPIOLIB
+>  	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+>  	select SND_SOC_AK4554 if SND_SIMPLE_CARD
+> -	select SND_SOC_AK4642 if SND_SIMPLE_CARD
+> +	select SND_SOC_AK4642 if SND_SIMPLE_CARD && I2C
+>  	select USE_OF
+>  
+>  config MACH_BOCKW_REFERENCE
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
