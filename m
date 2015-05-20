@@ -1,54 +1,52 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 20 May 2015 10:34:01 +0100
-Subject: [V4 PATCH 3/6] pci: Generic function for setting up PCI device
- DMA coherency
-In-Reply-To: <2072233.lIH4idDurI@wuerfel>
-References: <1431724994-21601-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <3954735.qeaTp8qOcM@vostro.rjw.lan>
- <20150520092415.GA25313@e104818-lin.cambridge.arm.com>
- <2072233.lIH4idDurI@wuerfel>
-Message-ID: <20150520093401.GC25313@e104818-lin.cambridge.arm.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 20 May 2015 11:35:59 +0200
+Subject: [PATCH 2/2] ARM: dts: sabrelite: use simple-panel instead of
+ display-timings for LVDS0
+In-Reply-To: <555B8678.8090002@boundarydevices.com>
+References: <20150518075844.7e1b5916@ipc1.ka-ro>
+ <1432050616-11465-1-git-send-email-eric.nelson@boundarydevices.com>
+ <1432050616-11465-3-git-send-email-eric.nelson@boundarydevices.com>
+ <1432051452.15181.48.camel@pengutronix.de>
+ <555B6A0B.4010205@boundarydevices.com>
+ <555B8678.8090002@boundarydevices.com>
+Message-ID: <1432114559.4466.1.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 11:27:54AM +0200, Arnd Bergmann wrote:
-> On Wednesday 20 May 2015 10:24:15 Catalin Marinas wrote:
-> > On Sat, May 16, 2015 at 01:59:00AM +0200, Rafael J. Wysocki wrote:
-> > > On Friday, May 15, 2015 04:23:11 PM Suravee Suthikulpanit wrote:
-> > > > +/**
-> > > > + * pci_dma_configure - Setup DMA configuration
-> > > > + * @pci_dev: ptr to pci_dev struct of the PCI device
-> > > > + *
-> > > > + * Function to update PCI devices's DMA configuration using the same
-> > > > + * info from the OF node or ACPI node of host bridge's parent (if any).
-> > > > + */
-> > > > +static void pci_dma_configure(struct pci_dev *pci_dev)
-> > > > +{
-> > > > +   struct device *dev = &pci_dev->dev;
-> > > > +   struct device *bridge = pci_get_host_bridge_device(pci_dev);
-> > > > +   struct device *host = bridge->parent;
-> > > > +   struct acpi_device *adev;
-> > > > +
-> > > > +   if (!host)
-> > > > +           return;
-> > > > +
-> > > > +   if (acpi_disabled) {
-> > > > +           of_dma_configure(dev, host->of_node);
-> > > 
-> > > I'd rather do
-> > > 
-> > >       if (IS_ENABLED(CONFIG_OF) && host->of_node) {
-> > >               of_dma_configure(dev, host->of_node);
-> > 
-> > Nitpick: do we need the CONFIG_OF check? If disabled, I don't think
-> > anyone would set host->of_node.
+Hi Eric,
+
+Am Dienstag, den 19.05.2015, 11:52 -0700 schrieb Eric Nelson:
+> Hi Philipp,
 > 
-> If of_dma_configure() is defined in a file that is built conditionally
-> based on CONFIG_OF, you need it.
+> On 05/19/2015 09:51 AM, Eric Nelson wrote:
+> > On 05/19/2015 09:04 AM, Philipp Zabel wrote:
+> >> Hi Eric,
+> >>
+> >> Am Dienstag, den 19.05.2015, 08:50 -0700 schrieb Eric Nelson:
+> >>> Also add label for backlight_lvds and connect it to the LVDS display.
+> >>>
+> >>> Signed-off-by: Eric Nelson <eric.nelson@boundarydevices.com>
+> >>> ---
+> >> [...]
+> >>>  
+> >>>  &audmux {
+> >>> @@ -374,18 +385,11 @@
+> >>>  		fsl,data-width = <18>;
+> >>
+> >> The fsl,data-width property shouldn't be needed anymore if you
+> >> set .bus_format = MEDIA_BUS_FMT_RGB666_1X7X3_SPWG for the hsd100pxn1
+> >> panel in panel-simple.c.
+> >>
+> 
+> Are you planning to submit a patch to panel-simple.c for this?
 
-We have a dummy of_dma_configure() already when !CONFIG_OF, otherwise
-we would need #ifndef here. I already replied, I think for other
-architectures we need this check to avoid a useless host->of_node test.
+Done.
 
--- 
-Catalin
+> Because of the dependency, I'd like to handle this in a separate
+> patch instead of V3 of this patch set.
+
+I agree, it's better to remove this in a separate step after the panel
+driver is merged.
+
+regards
+Philipp
