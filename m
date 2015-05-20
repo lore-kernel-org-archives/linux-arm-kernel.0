@@ -1,28 +1,63 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 20 May 2015 14:54:40 +0200
-Subject: [PATCH v3] pinctrl: sirf: add sirf atlas7 pinctrl and gpio support
-In-Reply-To: <CAGsJ_4wSnJA+2B5_tbBJ3akwbBwiCjD+v3SXqyv-Cu7kkg0KSw@mail.gmail.com>
-References: <1431934112-16132-1-git-send-email-21cnbao@gmail.com>
- <CACRpkdYT8bti=8iRPs_21r15vB8XWMbUXCpkfScg_J+=werwdw@mail.gmail.com>
- <CAGsJ_4wSnJA+2B5_tbBJ3akwbBwiCjD+v3SXqyv-Cu7kkg0KSw@mail.gmail.com>
-Message-ID: <CACRpkdagGV09P+Br2zjj05ON8EF47yOiLmKCg3aAA3RQuGKfOw@mail.gmail.com>
+From: mika.westerberg@linux.intel.com (Mika Westerberg)
+Date: Wed, 20 May 2015 15:55:53 +0300
+Subject: [PATCH] i2c: designware: separate ops for system_sleep_pm and
+ runtime_pm
+In-Reply-To: <20150520203430.24edd2a8@xhacker>
+References: <1431693099-2292-1-git-send-email-jszhang@marvell.com>
+ <20150518082823.GH1490@lahna.fi.intel.com>
+ <20150519203242.74617ad6@xhacker>
+ <20150519131516.GO1490@lahna.fi.intel.com>
+ <20150520193422.73de7d90@xhacker>
+ <20150520121506.GU1490@lahna.fi.intel.com>
+ <20150520203430.24edd2a8@xhacker>
+Message-ID: <20150520125553.GV1490@lahna.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 10:54 AM, Barry Song <21cnbao@gmail.com> wrote:
-> 2015-05-19 21:59 GMT+08:00 Linus Walleij <linus.walleij@linaro.org>:
+On Wed, May 20, 2015 at 08:34:30PM +0800, Jisheng Zhang wrote:
+> Dear Mika,
+> 
+> On Wed, 20 May 2015 15:15:06 +0300
+> Mika Westerberg <mika.westerberg@linux.intel.com> wrote:
+> 
+> > On Wed, May 20, 2015 at 07:34:22PM +0800, Jisheng Zhang wrote:
+> > > Sorry for confusion. Considering one platform which doesn't support power off
+> > > the i2c host but it can disable the host's clock. So in such platform, when
+> > > the host is runtime suspended, its clock is disabled, then i2c_dw_disable() will
+> > > hang when s2ram.
+> > 
+> > Right. This happens also when the platform powers off the device.
+> > 
+> > > Except using the runtime pm API to ensure the host is in
+> > > a correct state, is there any other solution? AFAIK, 'dev->power.direct_complete'
+> > > doesn't help such case.
+> > 
+> > What I had in mind is something like below:
+> > 
+> > static int i2c_dw_prepare(struct device *dev)
+> > {
+> > 	return pm_runtime_suspended(dev);
+> > }
+> > 
+> > static void i2c_dw_complete(struct device *dev)
+> > {
+> > 	if (dev->power.direct_complete)
+> > 		pm_request_resume(dev);
+> > }
+> > 
+> > In other words it checks if the device is already runtime suspended and
+> > prevents ->suspend() etc. from being called.
+> 
+> What amazing! I wrote the same code as yours after sending out the last email.
 
->> Awesome job Barry, well done.
->>
->
-> thanks, Linus, for your hard review and good suggestions to improve
-> the codes. it is mainly a job of Chen Wei. i am only a s-o-b :-)
+Cool :)
 
-Aw typical I just go for names I recognize.
+> > 
+> > If that does not work (I didn't try as this problem does not exist on
+> 
+> It works! How to submit the patch? Do you mind if I cook the patch and add
+> you signed-off?
 
-Sorry: credit where credit is due.
-
-Awesome job Chen Wei.
-
-Yours,
-Linus Walleij
+That's fine and you don't need to add my SoB there. I'll test the patch
+here on some our platforms to ensure it does not break anything and if
+it turns out working you can have my Tested-by then.
