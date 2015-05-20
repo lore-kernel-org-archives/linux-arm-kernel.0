@@ -1,229 +1,254 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 20 May 2015 13:02:21 +0200
-Subject: [PATCH v2 4/9] clocksource: mediatek: Use GPT as sched clock
- source
-In-Reply-To: <1431763110-443-5-git-send-email-yingjoe.chen@mediatek.com>
-References: <1431763110-443-1-git-send-email-yingjoe.chen@mediatek.com>
- <1431763110-443-5-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <CABuKBeJhdRBBw1v1kj8J0YFVWZ27vzx5W=XU8jiwePVgL_7g_g@mail.gmail.com>
+From: hs@denx.de (Heiko Schocher)
+Date: Wed, 20 May 2015 13:13:54 +0200
+Subject: [PATCH v3] arm, imx6, dts: add DT for aristainetos2 board
+In-Reply-To: <1432118319.4466.40.camel@pengutronix.de>
+References: <1432099863-8642-1-git-send-email-hs@denx.de>
+ <1432118319.4466.40.camel@pengutronix.de>
+Message-ID: <555C6C72.2060302@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-16 9:58 GMT+02:00 Yingjoe Chen <yingjoe.chen@mediatek.com>:
-> When cpu is in deep idle, arch timer will stop counting. Setup GPT as
-> sched clock source so it can keep counting in idle.
+Hello Philipp,
+
+Am 20.05.2015 12:38, schrieb Philipp Zabel:
+> Hi Heiko,
 >
-> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> ---
->  drivers/clocksource/mtk_timer.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
+> Am Mittwoch, den 20.05.2015, 07:31 +0200 schrieb Heiko Schocher:
+> [...]
+>> diff --git a/arch/arm/boot/dts/imx6dl-aristainetos2_4.dts b/arch/arm/boot/dts/imx6dl-aristainetos2_4.dts
+>> new file mode 100644
+>> index 0000000..780fc42
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/imx6dl-aristainetos2_4.dts
+>> @@ -0,0 +1,174 @@
+>> +/*
+>> + * support fot the imx6 based aristainetos2 board
 >
-> diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
-> index 91206f9..fe7cf72 100644
-> --- a/drivers/clocksource/mtk_timer.c
-> +++ b/drivers/clocksource/mtk_timer.c
-> @@ -24,6 +24,7 @@
->  #include <linux/of.h>
->  #include <linux/of_address.h>
->  #include <linux/of_irq.h>
-> +#include <linux/sched_clock.h>
->  #include <linux/slab.h>
+> Typo, "support for".
+
+Oh, thanks! Fixed (for all files)
+
+>> + *
+>> + * Copyright (C) 2015 Heiko Schocher <hs@denx.de>
+>> + *
+>> + * This file is dual-licensed: you can use it either under the terms
+>> + * of the GPL or the X11 license, at your option. Note that this dual
+>> + * licensing only applies to this file, and not this project as a
+>> + * whole.
+>> + *
+>> + *  a) This file is free software; you can redistribute it and/or
+>> + *     modify it under the terms of the GNU General Public License as
+>> + *     published by the Free Software Foundation; either version 2 of
+>> + *     the License, or (at your option) any later version.
+>> + *
+>> + *     This file is distributed in the hope that it will be useful,
+>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + *     GNU General Public License for more details.
+>> + *
+>> + *     You should have received a copy of the GNU General Public
+>> + *     License along with this file; if not, write to the Free
+>> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+>> + *     MA 02110-1301 USA
 >
->  #define GPT_IRQ_EN_REG         0x00
-> @@ -59,6 +60,13 @@ struct mtk_clock_event_device {
->         struct clock_event_device dev;
->  };
+> checkpatch warns that you should not include this paragraph because the
+> mail address might change in the future and it is contained in COPYING.
+
+Hmm... Shawn mentioned to change it to the "GPL/X11 dual licence"
+as in the arch/arm/boot/dts/imx6sl-warp.dts file ... so I copied this
+from there ... is there a better option for this?
+
+> [...]
+>> +/dts-v1/;
+>> +#include "imx6dl.dtsi"
+>> +#include "imx6qdl-aristainetos2.dtsi"
+>> +
+>> +/ {
+>> +	model = "aristainetos2 i.MX6 Dual Lite Board 4";
+>> +	compatible = "fsl,imx6dl";
 >
-> +static void __iomem *gpt_base __read_mostly;
-> +
-> +static u64 notrace mtk_read_sched_clock(void)
-> +{
-> +       return readl_relaxed(gpt_base + TIMER_CNT_REG(GPT_CLK_SRC));
-> +}
-> +
->  static inline struct mtk_clock_event_device *to_mtk_clk(
->                                 struct clock_event_device *c)
->  {
-> @@ -243,6 +251,8 @@ static void __init mtk_timer_init(struct device_node *node)
->         mtk_timer_setup(evt, GPT_CLK_SRC, TIMER_CTRL_OP_FREERUN, 1);
->         clocksource_mmio_init(evt->gpt_base + TIMER_CNT_REG(GPT_CLK_SRC),
->                         node->name, rate, 300, 32, clocksource_mmio_readl_up);
-> +       gpt_base = evt->gpt_base;
+> Doesn't this board get its own compatible?
 
-This is really hacky. We should clean up the code and provide
-mtk_clock_event_device globally.
-Please add the patch below, which does exactly this.
----- 8< ---------------- >8 ------
->From 631e7bf4e5d9456d0bb4a29b2dee4b84e8c052bd Mon Sep 17 00:00:00 2001
-From: Matthias Brugger <matthias.bgg@gmail.com>
-Date: Wed, 20 May 2015 12:43:16 +0200
-Subject: [PATCH] clocksource: mediatek: Define mtk_clock_event_device globally
+Hmm... why?
 
-Sched clock code, especially sched_clock_register does not allow to pass a
-pointer to actual_read_sched_clock. So if in the driver the register base
-address is not globally defined, we are not able to read the scheduler
-clock register. This patch sets the mtk_clock_event_device struct globally
-for the driver, to be able to read the register.
+> [...]
+>> +	display0: display at di0 {
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +		compatible = "fsl,imx-parallel-display";
+>> +		interface-pix-fmt = "rgb24";
+>
+> It's ok to keep this property for now, but in the future I'd like it to
+> be removed. The panel driver should provide all necessary information
+> using drm_display_info_set_bus_formats. The imx parallel-display driver
+> then needs to be made aware of the connector display_info->bus_formats.
 
-Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
----
- drivers/clocksource/mtk_timer.c | 50 +++++++++++++++--------------------------
- 1 file changed, 18 insertions(+), 32 deletions(-)
+Ok.
 
-diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
-index 68ab423..c5f5b40 100644
---- a/drivers/clocksource/mtk_timer.c
-+++ b/drivers/clocksource/mtk_timer.c
-@@ -59,13 +59,9 @@ struct mtk_clock_event_device {
-     struct clock_event_device dev;
- };
+> [...]
+>> diff --git a/arch/arm/boot/dts/imx6dl-aristainetos2_7.dts b/arch/arm/boot/dts/imx6dl-aristainetos2_7.dts
+>> new file mode 100644
+>> index 0000000..14cf4e8
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/imx6dl-aristainetos2_7.dts
+>> @@ -0,0 +1,103 @@
+>> +/*
+>> + * support fot the imx6 based aristainetos2 board
+>
+> Typo, "support for".
 
--static inline struct mtk_clock_event_device *to_mtk_clk(
--                struct clock_event_device *c)
--{
--    return container_of(c, struct mtk_clock_event_device, dev);
--}
-+struct mtk_clock_event_device *evt;
+fixed.
 
--static void mtk_clkevt_time_stop(struct mtk_clock_event_device *evt, u8 timer)
-+static void mtk_clkevt_time_stop(u8 timer)
- {
-     u32 val;
+>> + * Copyright (C) 2015 Heiko Schocher <hs@denx.de>
+>> + *
+>> + * This file is dual-licensed: you can use it either under the terms
+>> + * of the GPL or the X11 license, at your option. Note that this dual
+>> + * licensing only applies to this file, and not this project as a
+>> + * whole.
+>> + *
+>> + *  a) This file is free software; you can redistribute it and/or
+>> + *     modify it under the terms of the GNU General Public License as
+>> + *     published by the Free Software Foundation; either version 2 of
+>> + *     the License, or (at your option) any later version.
+>> + *
+>> + *     This file is distributed in the hope that it will be useful,
+>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + *     GNU General Public License for more details.
+>> + *
+>> + *     You should have received a copy of the GNU General Public
+>> + *     License along with this file; if not, write to the Free
+>> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+>> + *     MA 02110-1301 USA
+>
+> Same comment as above.
+>
+> [...]
+>> +/ {
+>> +	model = "aristainetos2 i.MX6 Dual Lite Board 7";
+>> +	compatible = "fsl,imx6dl";
+>
+> Same comment as above.
+>
+>> +&ldb {
+>> +	status = "okay";
+>> +
+>> +	lvds-channel at 0 {
+>> +		fsl,data-mapping = "spwg";
+>> +		fsl,data-width = <24>;
+>> +		status = "okay";
+>> +
+>> +		display-timings {
+>> +			native-mode = <&timing0>;
+>> +			timing0: 800x480p60 {
+>> +				clock-frequency = <33246000>;
+>> +				hactive = <800>;
+>> +				vactive = <480>;
+>> +				hfront-porch = <88>;
+>> +				hback-porch = <88>;
+>> +				hsync-len = <80>;
+>> +				vback-porch = <10>;
+>> +				vfront-porch = <10>;
+>> +				vsync-len = <25>;
+>> +			};
+>> +		};
+>> +	};
+>
+> What panel is this? I'd prefer if you used the panel-simple driver here
+> and connected it to the ldb channel using OF graph bindings same as the
+> parallel display above. That would allow to remove the fsl,data-mapping
+> and fsl,data-width properties and the display-timings node.
 
-@@ -74,14 +70,12 @@ static void mtk_clkevt_time_stop(struct
-mtk_clock_event_device *evt, u8 timer)
-             TIMER_CTRL_REG(timer));
- }
+It is an Display from LG, MODEL LB070WV8, SUFFIX SL01
+I try to add it to the panel-simple driver
 
--static void mtk_clkevt_time_setup(struct mtk_clock_event_device *evt,
--                unsigned long delay, u8 timer)
-+static void mtk_clkevt_time_setup(unsigned long delay, u8 timer)
- {
-     writel(delay, evt->gpt_base + TIMER_CMP_REG(timer));
- }
+>> +};
+>> diff --git a/arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi b/arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi
+>> new file mode 100644
+>> index 0000000..eac7c3b
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi
+>> @@ -0,0 +1,634 @@
+>> +/*
+>> + * support fot the imx6 based aristainetos2 board
+>
+> Typo, "support for". Also, maybe s/board/boards/ as this contains the
+> common parts for both the 4 and 7 variant?
 
--static void mtk_clkevt_time_start(struct mtk_clock_event_device *evt,
--        bool periodic, u8 timer)
-+static void mtk_clkevt_time_start(bool periodic, u8 timer)
- {
-     u32 val;
+Yep, fixed.
 
-@@ -105,14 +99,12 @@ static void mtk_clkevt_time_start(struct
-mtk_clock_event_device *evt,
- static void mtk_clkevt_mode(enum clock_event_mode mode,
-                 struct clock_event_device *clk)
- {
--    struct mtk_clock_event_device *evt = to_mtk_clk(clk);
--
--    mtk_clkevt_time_stop(evt, GPT_CLK_EVT);
-+    mtk_clkevt_time_stop(GPT_CLK_EVT);
+>> + *
+>> + * Copyright (C) 2015 Heiko Schocher <hs@denx.de>
+>> + *
+>> + * This file is dual-licensed: you can use it either under the terms
+>> + * of the GPL or the X11 license, at your option. Note that this dual
+>> + * licensing only applies to this file, and not this project as a
+>> + * whole.
+>> + *
+>> + *  a) This file is free software; you can redistribute it and/or
+>> + *     modify it under the terms of the GNU General Public License as
+>> + *     published by the Free Software Foundation; either version 2 of
+>> + *     the License, or (at your option) any later version.
+>> + *
+>> + *     This file is distributed in the hope that it will be useful,
+>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + *     GNU General Public License for more details.
+>> + *
+>> + *     You should have received a copy of the GNU General Public
+>> + *     License along with this file; if not, write to the Free
+>> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+>> + *     MA 02110-1301 USA
+>
+> Same comment as above.
+>
+> [...]
+>> +&i2c1 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_i2c1>;
+>> +	status = "okay";
+>> +
+>> +	pmic at 58 {
+>> +		compatible = "dialog,da9063";
+>
+> This should be "dlg,da9063" as per
+> Documentation/devicetree/bindings/mfd/da9063.txt.
 
-     switch (mode) {
-     case CLOCK_EVT_MODE_PERIODIC:
--        mtk_clkevt_time_setup(evt, evt->ticks_per_jiffy, GPT_CLK_EVT);
--        mtk_clkevt_time_start(evt, true, GPT_CLK_EVT);
-+        mtk_clkevt_time_setup(evt->ticks_per_jiffy, GPT_CLK_EVT);
-+        mtk_clkevt_time_start(true, GPT_CLK_EVT);
-         break;
-     case CLOCK_EVT_MODE_ONESHOT:
-         /* Timer is enabled in set_next_event */
-@@ -128,19 +120,15 @@ static void mtk_clkevt_mode(enum clock_event_mode mode,
- static int mtk_clkevt_next_event(unsigned long event,
-                    struct clock_event_device *clk)
- {
--    struct mtk_clock_event_device *evt = to_mtk_clk(clk);
--
--    mtk_clkevt_time_stop(evt, GPT_CLK_EVT);
--    mtk_clkevt_time_setup(evt, event, GPT_CLK_EVT);
--    mtk_clkevt_time_start(evt, false, GPT_CLK_EVT);
-+    mtk_clkevt_time_stop(GPT_CLK_EVT);
-+    mtk_clkevt_time_setup(event, GPT_CLK_EVT);
-+    mtk_clkevt_time_start(false, GPT_CLK_EVT);
+fixed.
 
-     return 0;
- }
+> [...]
+>> +&i2c4 {
+>> +	clocks = <&clks IMX6DL_CLK_I2C4>;
+>
+i> The clocks property is already contained in imx6dl.dtsi
 
- static irqreturn_t mtk_timer_interrupt(int irq, void *dev_id)
- {
--    struct mtk_clock_event_device *evt = dev_id;
--
-     /* Acknowledge timer0 irq */
-     writel(GPT_IRQ_ACK(GPT_CLK_EVT), evt->gpt_base + GPT_IRQ_ACK_REG);
-     evt->dev.event_handler(&evt->dev);
-@@ -148,7 +136,7 @@ static irqreturn_t mtk_timer_interrupt(int irq,
-void *dev_id)
-     return IRQ_HANDLED;
- }
+removed.
 
--static void mtk_timer_global_reset(struct mtk_clock_event_device *evt)
-+static inline void mtk_timer_global_reset(void)
- {
-     /* Disable all interrupts */
-     writel(0x0, evt->gpt_base + GPT_IRQ_EN_REG);
-@@ -156,8 +144,7 @@ static void mtk_timer_global_reset(struct
-mtk_clock_event_device *evt)
-     writel(0x3f, evt->gpt_base + GPT_IRQ_ACK_REG);
- }
+> [...]
+>> +&fec
+>> +&gpmi
+>> +&pcie
+>> +&pwm1
+>> +&uart1
+>> +&uart2
+>> +&uart3
+>> +&uart4
+>> +&usbh1
+>> +&usbotg
+>> +&usdhc1
+>> +&usdhc2
+>> +&iomuxc
+>
+> Do all aristainetos2 boards have all of these ports routed out? (Should
+> the status = "okay" properties be set here, or in the per-board .dts
+> files?)
 
--static void
--mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
-+static void mtk_timer_setup(u8 timer, u8 option)
- {
-     writel(TIMER_CTRL_CLEAR | TIMER_CTRL_DISABLE,
-         evt->gpt_base + TIMER_CTRL_REG(timer));
-@@ -171,7 +158,7 @@ mtk_timer_setup(struct mtk_clock_event_device
-*evt, u8 timer, u8 option)
-             evt->gpt_base + TIMER_CTRL_REG(timer));
- }
+All aristainetos2 variants use this ports, yes.
 
--static void mtk_timer_enable_irq(struct mtk_clock_event_device *evt, u8 timer)
-+static void mtk_timer_enable_irq(u8 timer)
- {
-     u32 val;
+Thanks for your review!
 
-@@ -182,7 +169,6 @@ static void mtk_timer_enable_irq(struct
-mtk_clock_event_device *evt, u8 timer)
-
- static void __init mtk_timer_init(struct device_node *node)
- {
--    struct mtk_clock_event_device *evt;
-     struct resource res;
-     unsigned long rate = 0;
-     struct clk *clk;
-@@ -224,10 +210,10 @@ static void __init mtk_timer_init(struct
-device_node *node)
-     }
-     rate = clk_get_rate(clk);
-
--    mtk_timer_global_reset(evt);
-+    mtk_timer_global_reset();
-
-     if (request_irq(evt->dev.irq, mtk_timer_interrupt,
--            IRQF_TIMER | IRQF_IRQPOLL, "mtk_timer", evt)) {
-+            IRQF_TIMER | IRQF_IRQPOLL, "mtk_timer", NULL)) {
-         pr_warn("failed to setup irq %d\n", evt->dev.irq);
-         goto err_clk_disable;
-     }
-@@ -235,16 +221,16 @@ static void __init mtk_timer_init(struct
-device_node *node)
-     evt->ticks_per_jiffy = DIV_ROUND_UP(rate, HZ);
-
-     /* Configure clock source */
--    mtk_timer_setup(evt, GPT_CLK_SRC, TIMER_CTRL_OP_FREERUN);
-+    mtk_timer_setup(GPT_CLK_SRC, TIMER_CTRL_OP_FREERUN);
-     clocksource_mmio_init(evt->gpt_base + TIMER_CNT_REG(GPT_CLK_SRC),
-             node->name, rate, 300, 32, clocksource_mmio_readl_up);
-
-     /* Configure clock event */
--    mtk_timer_setup(evt, GPT_CLK_EVT, TIMER_CTRL_OP_REPEAT);
-+    mtk_timer_setup(GPT_CLK_EVT, TIMER_CTRL_OP_REPEAT);
-     clockevents_config_and_register(&evt->dev, rate, 0x3,
-                     0xffffffff);
-
--    mtk_timer_enable_irq(evt, GPT_CLK_EVT);
-+    mtk_timer_enable_irq(GPT_CLK_EVT);
-
-     return;
-
+bye,
+Heiko
 -- 
-1.9.1
+DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
