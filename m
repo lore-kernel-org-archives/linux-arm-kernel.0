@@ -1,113 +1,81 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 20 May 2015 18:58:35 +0200
-Subject: [PATCH] ARM: berlin: add SPI nodes for BG2Q
-In-Reply-To: <1432126385-27402-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1432126385-27402-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <555CBD3B.1000809@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 20 May 2015 18:09:26 +0100
+Subject: [PATCH 2/3] iommu/arm-smmu: Add initial driver support for ARM
+ SMMUv3 devices
+In-Reply-To: <20150519152435.GL20611@8bytes.org>
+References: <1431108046-9675-1-git-send-email-will.deacon@arm.com>
+ <1431108046-9675-3-git-send-email-will.deacon@arm.com>
+ <20150519152435.GL20611@8bytes.org>
+Message-ID: <20150520170926.GI11498@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.05.2015 14:53, Antoine Tenart wrote:
-> The BG2Q SoC has two SPI controllers. Add the corresponding nodes.
->
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> ---
->
-> Based on top of the Berlin clock rework series.
->
->   arch/arm/boot/dts/berlin2q.dtsi | 38 ++++++++++++++++++++++++++++++++++++++
->   1 file changed, 38 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-> index 187d056f7ad2..c25ee86b2bfa 100644
-> --- a/arch/arm/boot/dts/berlin2q.dtsi
-> +++ b/arch/arm/boot/dts/berlin2q.dtsi
-> @@ -286,6 +286,20 @@
->   				status = "disabled";
->   			};
->
-> +			spi0: spi at 1c00 {
-> +				compatible = "snps,dw-apb-ssi";
-> +				reg = <0x1c00 0x100>;
-> +				interrupt-parrent = <&aic>;
+On Tue, May 19, 2015 at 04:24:35PM +0100, Joerg Roedel wrote:
+> Hi Will,
 
-Antoine,
+Hi Joerg,
 
-the same question as for the ADC node patch: IIRC you don't have
-to repeat the interrupt-parent property as long as any node upstream
-will have it already.
+> the code looks good overall, I just have some questions below.
 
-> +				interrupts = <7>;
-> +				clocks = <&chip_clk CLKID_CFG>;
-> +				pinctrl-0 = <&spi0_pmux>;
-> +				pinctrl-names = "default";
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				num-cs = <4>;
-> +				status = "disabled";
-> +			};
-> +
->   			timer0: timer at 2c00 {
->   				compatible = "snps,dw-apb-timer";
->   				reg = <0x2c00 0x14>;
-> @@ -383,6 +397,11 @@
->   					groups = "G7";
->   					function = "twsi1";
->   				};
-> +
-> +				spi0_pmux: spi0-pmux {
-> +					groups = "G8", "G9", "G10", "G11";
-> +					function = "spi1";
+Great, thanks for having a look. I'll still need to post a v2 to address
+some of the other comments I've had.
 
-Hmm, "spi0_pmux" but "spi1" function?
+> On Fri, May 08, 2015 at 07:00:45PM +0100, Will Deacon wrote:
+> > +static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+> > +{
+> > +	int ret = 0;
+> > +	struct arm_smmu_device *smmu;
+> > +	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+> > +	struct arm_smmu_group *smmu_group = arm_smmu_group_get(dev);
+> > +
+> > +	if (!smmu_group)
+> > +		return -ENOENT;
+> > +
+> > +	/* Already attached to a different domain? */
+> > +	if (smmu_group->domain && smmu_group->domain != smmu_domain)
+> > +		return -EEXIST;
+> > +
+> > +	smmu = smmu_group->smmu;
+> > +	mutex_lock(&smmu_domain->init_mutex);
+> > +
+> > +	if (!smmu_domain->smmu) {
+> > +		smmu_domain->smmu = smmu;
+> > +		ret = arm_smmu_domain_finalise(domain);
+> > +		if (ret) {
+> > +			smmu_domain->smmu = NULL;
+> > +			goto out_unlock;
+> > +		}
+> > +	} else if (smmu_domain->smmu != smmu) {
+> > +		dev_err(dev,
+> > +			"cannot attach to SMMU %s (upstream of %s)\n",
+> > +			dev_name(smmu_domain->smmu->dev),
+> > +			dev_name(smmu->dev));
+> > +		ret = -ENXIO;
+> > +		goto out_unlock;
+> > +	}
+> 
+> This looks like all devices in a domain need to be behind the same SMMU
+> device, right?
 
-> +				};
->   			};
->
->   			chip_rst: reset {
-> @@ -473,6 +492,20 @@
->   				};
->   			};
->
-> +			spi1: spi at 5000 {
-> +				compatible = "snps,dw-apb-ssi";
-> +				reg = <0x6000 0x100>;
-> +				interrupt-parent = <&sic>;
-> +				interrupts = <5>;
-> +				clocks = <&refclk>;
-> +				pinctrl-0 = <&spi1_pmux>;
-> +				pinctrl-names = "default";
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				num-cs = <4>;
-> +				status = "disabled";
-> +			};
-> +
->   			i2c2: i2c at 7000 {
->   				compatible = "snps,designware-i2c";
->   				#address-cells = <1>;
-> @@ -564,6 +597,11 @@
->   						groups = "GSM14";
->   						function = "twsi3";
->   					};
-> +
-> +					spi1_pmux: spi1-pmux {
-> +						groups = "GSM0", "GSM1", "GSM2", "GSM3";
-> +						function = "spi2";
+Yes, that's correct. This matches what we do for the arm-smmu driver
+already and is mainly brought about by the potential for hardware
+differences between different SMMU instances in the same SoC.
 
-ditto.
+> > +	/* Page sizes */
+> > +	if (reg & IDR5_GRAN64K)
+> > +		pgsize_bitmap |= SZ_64K | SZ_512M;
+> > +	if (reg & IDR5_GRAN16K)
+> > +		pgsize_bitmap |= SZ_16K | SZ_32M;
+> > +	if (reg & IDR5_GRAN4K)
+> > +		pgsize_bitmap |= SZ_4K | SZ_2M | SZ_1G;
+> > +
+> > +	arm_smmu_ops.pgsize_bitmap &= pgsize_bitmap;
+> 
+> So this could effictivly lead to a zero pgsize_bitmap when there are
+> SMMUs in the system with support for different page sizes, no?
 
-I know the internal numbering scheme on BG-SoCs is weird, but it looks 
-like that either you are missing the third SPI or there is only 2 and
-numbering starts with 1 *sigh* ;)
+Indeed, if there is no common page size then we end up not being able to
+support any. I tried to resolve this by moving the bitmap out of the
+iommu_ops and into the iommu_domain, but you weren't fond of that idea ;)
 
-Anyway, the numbering should be consistent with pinctrl function names
-although I would have preferred to start counting with 0.
-
-Sebastian
-
-> +					};
->   				};
->   			};
->
->
+Will
