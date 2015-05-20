@@ -1,211 +1,23 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 20 May 2015 10:27:43 +1000
-Subject: linux-next: manual merge of the samsung tree with the arm-soc and
- at91 trees
-Message-ID: <20150520102743.3d336a73@canb.auug.org.au>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Wed, 20 May 2015 09:33:46 +0900
+Subject: [PATCH] drm/nouveau/platform: add IOMMU dependency
+In-Reply-To: <2918377.0irYYn09PU@wuerfel>
+References: <2918377.0irYYn09PU@wuerfel>
+Message-ID: <555BD66A.5020704@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+On 05/19/2015 09:53 PM, Arnd Bergmann wrote:
+> The recently added iommu code in the nouveau driver fails to build
+> when the IOMMU support is disabled:
+>
+> drivers/gpu/drm/nouveau/nouveau_platform.c: In function 'nouveau_platform_probe_iommu':
+> drivers/gpu/drm/nouveau/nouveau_platform.c:113:41: error: 'const struct iommu_ops' has no mem
+>
+> To avoid the build error, this now adds an explicit dependency on the
+> IOMMU implementation.
 
-Today's linux-next merge of the samsung tree got a conflict in
-arch/arm/configs/multi_v7_defconfig between various commits from the
-arm-soc and at91 trees and various commits from the samsung tree.
-
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc arch/arm/configs/multi_v7_defconfig
-index 84eb4eaea423,e88d6d6fdfd2..000000000000
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@@ -20,14 -19,12 +19,15 @@@ CONFIG_MACH_ARMADA_38X=
-  CONFIG_MACH_ARMADA_39X=y
-  CONFIG_MACH_ARMADA_XP=y
-  CONFIG_MACH_DOVE=y
- +CONFIG_ARCH_AT91=y
- +CONFIG_SOC_SAMA5D3=y
- +CONFIG_SOC_SAMA5D4=y
-+ CONFIG_ARCH_ALPINE=y
-  CONFIG_ARCH_BCM=y
-  CONFIG_ARCH_BCM_CYGNUS=y
-- CONFIG_ARCH_BCM_21664=y
-- CONFIG_ARCH_BCM_281XX=y
-  CONFIG_ARCH_BCM_5301X=y
-+ CONFIG_ARCH_BCM_281XX=y
-+ CONFIG_ARCH_BCM_21664=y
-  CONFIG_ARCH_BRCMSTB=y
-  CONFIG_ARCH_BERLIN=y
-  CONFIG_MACH_BERLIN_BG2=y
-@@@ -89,8 -85,6 +89,7 @@@ CONFIG_ARCH_TEGRA_2x_SOC=
-  CONFIG_ARCH_TEGRA_3x_SOC=y
-  CONFIG_ARCH_TEGRA_114_SOC=y
-  CONFIG_ARCH_TEGRA_124_SOC=y
-- CONFIG_TEGRA_EMC_SCALING_ENABLE=y
- +CONFIG_ARCH_UNIPHIER=y
-  CONFIG_ARCH_U8500=y
-  CONFIG_MACH_HREFV60=y
-  CONFIG_MACH_SNOWBALL=y
-@@@ -119,10 -107,10 +112,11 @@@ CONFIG_KEXEC=
-  CONFIG_CPU_FREQ=y
-  CONFIG_CPU_FREQ_STAT_DETAILS=y
-  CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
-+ CONFIG_CPUFREQ_DT=y
-  CONFIG_CPU_IDLE=y
-- CONFIG_NEON=y
- +CONFIG_KERNEL_MODE_NEON=y
-  CONFIG_ARM_ZYNQ_CPUIDLE=y
-+ CONFIG_ARM_EXYNOS_CPUIDLE=y
-  CONFIG_NET=y
-  CONFIG_PACKET=y
-  CONFIG_UNIX=y
-@@@ -140,10 -128,6 +134,7 @@@ CONFIG_IPV6_MIP6=
-  CONFIG_IPV6_TUNNEL=m
-  CONFIG_IPV6_MULTIPLE_TABLES=y
-  CONFIG_CAN=y
-- CONFIG_CAN_RAW=y
-- CONFIG_CAN_BCM=y
-- CONFIG_CAN_DEV=y
- +CONFIG_CAN_AT91=m
-  CONFIG_CAN_XILINXCAN=y
-  CONFIG_CAN_MCP251X=y
-  CONFIG_BT=m
-@@@ -223,13 -203,13 +213,14 @@@ CONFIG_MWIFIEX=
-  CONFIG_MWIFIEX_SDIO=m
-  CONFIG_INPUT_JOYDEV=y
-  CONFIG_INPUT_EVDEV=y
- +CONFIG_KEYBOARD_QT1070=m
-  CONFIG_KEYBOARD_GPIO=y
-  CONFIG_KEYBOARD_TEGRA=y
-- CONFIG_KEYBOARD_SPEAR=y
-  CONFIG_KEYBOARD_ST_KEYSCAN=y
-+ CONFIG_KEYBOARD_SPEAR=y
-  CONFIG_KEYBOARD_CROS_EC=y
-  CONFIG_MOUSE_PS2_ELANTECH=y
-+ CONFIG_MOUSE_CYAPA=m
-  CONFIG_MOUSE_ELAN_I2C=y
-  CONFIG_INPUT_TOUCHSCREEN=y
-  CONFIG_TOUCHSCREEN_ATMEL_MXT=y
-@@@ -279,16 -254,14 +270,16 @@@ CONFIG_SERIAL_CONEXANT_DIGICOLOR_CONSOL
-  CONFIG_SERIAL_ST_ASC=y
-  CONFIG_SERIAL_ST_ASC_CONSOLE=y
-  CONFIG_I2C_CHARDEV=y
-- CONFIG_I2C_DAVINCI=y
-  CONFIG_I2C_MUX=y
-+ CONFIG_I2C_ARB_GPIO_CHALLENGE=m
-  CONFIG_I2C_MUX_PCA954x=y
-  CONFIG_I2C_MUX_PINCTRL=y
- +CONFIG_I2C_AT91=m
-  CONFIG_I2C_CADENCE=y
-+ CONFIG_I2C_DAVINCI=y
-  CONFIG_I2C_DESIGNWARE_PLATFORM=y
- +CONFIG_I2C_DIGICOLOR=m
-  CONFIG_I2C_GPIO=m
-- CONFIG_I2C_EXYNOS5=y
-  CONFIG_I2C_MV64XXX=y
-  CONFIG_I2C_RIIC=y
-  CONFIG_I2C_S3C2410=y
-@@@ -298,8 -271,8 +289,9 @@@ CONFIG_I2C_ST=
-  CONFIG_I2C_TEGRA=y
-  CONFIG_I2C_XILINX=y
-  CONFIG_I2C_RCAR=y
-+ CONFIG_I2C_CROS_EC_TUNNEL=m
-  CONFIG_SPI=y
- +CONFIG_SPI_ATMEL=m
-  CONFIG_SPI_CADENCE=y
-  CONFIG_SPI_DAVINCI=y
-  CONFIG_SPI_OMAP24XX=y
-@@@ -522,18 -497,17 +519,21 @@@ CONFIG_RTC_DRV_AS3722=
-  CONFIG_RTC_DRV_DS1307=y
-  CONFIG_RTC_DRV_MAX8907=y
-  CONFIG_RTC_DRV_MAX77686=y
-+ CONFIG_RTC_DRV_MAX77802=m
-  CONFIG_RTC_DRV_RS5C372=m
-  CONFIG_RTC_DRV_PALMAS=y
- +CONFIG_RTC_DRV_ST_LPC=y
-  CONFIG_RTC_DRV_TWL4030=y
-  CONFIG_RTC_DRV_TPS6586X=y
-  CONFIG_RTC_DRV_TPS65910=y
-  CONFIG_RTC_DRV_S35390A=m
-  CONFIG_RTC_DRV_EM3027=y
- +CONFIG_RTC_DRV_DIGICOLOR=m
-+ CONFIG_RTC_DRV_S5M=m
-+ CONFIG_RTC_DRV_S3C=m
-  CONFIG_RTC_DRV_PL031=y
- +CONFIG_RTC_DRV_AT91RM9200=m
- +CONFIG_RTC_DRV_AT91SAM9=m
-  CONFIG_RTC_DRV_VT8500=y
-  CONFIG_RTC_DRV_SUN6I=y
-  CONFIG_RTC_DRV_SUNXI=y
-@@@ -573,30 -548,29 +576,33 @@@ CONFIG_MSM_MMCC_8960=
-  CONFIG_MSM_MMCC_8974=y
-  CONFIG_TEGRA_IOMMU_GART=y
-  CONFIG_TEGRA_IOMMU_SMMU=y
-+ CONFIG_QCOM_GSBI=y
-  CONFIG_PM_DEVFREQ=y
-  CONFIG_ARM_TEGRA_DEVFREQ=m
-- CONFIG_MEMORY=y
-  CONFIG_TI_AEMIF=y
-  CONFIG_IIO=y
- +CONFIG_AT91_ADC=m
-  CONFIG_XILINX_XADC=y
-  CONFIG_AK8975=y
-  CONFIG_PWM=y
- +CONFIG_PWM_ATMEL=m
- +CONFIG_PWM_ATMEL_TCB=m
-  CONFIG_PWM_RENESAS_TPU=y
-+ CONFIG_PWM_SAMSUNG=m
-  CONFIG_PWM_TEGRA=y
-  CONFIG_PWM_VT8500=y
-- CONFIG_PHY_HIX5HD2_SATA=y
-- CONFIG_OMAP_USB2=y
-- CONFIG_TI_PIPE3=y
-+ CONFIG_KEYSTONE_IRQ=y
-  CONFIG_PHY_MIPHY28LP=y
-  CONFIG_PHY_MIPHY365X=y
- +CONFIG_PHY_RCAR_GEN2=m
-- CONFIG_PHY_STIH41X_USB=y
-- CONFIG_PHY_STIH407_USB=y
-+ CONFIG_OMAP_USB2=y
-+ CONFIG_TI_PIPE3=y
-+ CONFIG_PHY_HIX5HD2_SATA=y
-  CONFIG_PHY_SUN4I_USB=y
-  CONFIG_PHY_SUN9I_USB=y
-+ CONFIG_PHY_SAMSUNG_USB2=m
-+ CONFIG_PHY_STIH407_USB=y
-+ CONFIG_PHY_STIH41X_USB=y
-  CONFIG_EXT4_FS=y
-  CONFIG_AUTOFS4_FS=y
-  CONFIG_MSDOS_FS=y
-@@@ -619,20 -592,3 +624,17 @@@ CONFIG_PRINTK_TIME=
-  CONFIG_DEBUG_FS=y
-  CONFIG_MAGIC_SYSRQ=y
-  CONFIG_LOCKUP_DETECTOR=y
-- CONFIG_CRYPTO_DEV_TEGRA_AES=y
-- CONFIG_CPUFREQ_DT=y
-- CONFIG_KEYSTONE_IRQ=y
- +CONFIG_ARM_CRYPTO=y
- +CONFIG_CRYPTO_SHA1_ARM=m
- +CONFIG_CRYPTO_SHA1_ARM_NEON=m
- +CONFIG_CRYPTO_SHA1_ARM_CE=m
- +CONFIG_CRYPTO_SHA2_ARM_CE=m
- +CONFIG_CRYPTO_SHA256_ARM=m
- +CONFIG_CRYPTO_SHA512_ARM=m
- +CONFIG_CRYPTO_AES_ARM=m
- +CONFIG_CRYPTO_AES_ARM_BS=m
- +CONFIG_CRYPTO_AES_ARM_CE=m
- +CONFIG_CRYPTO_GHASH_ARM_CE=m
- +CONFIG_CRYPTO_DEV_ATMEL_AES=m
- +CONFIG_CRYPTO_DEV_ATMEL_TDES=m
- +CONFIG_CRYPTO_DEV_ATMEL_SHA=m
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150520/5de48118/attachment.sig>
+I have a local patch to nouveau_platform.c that only calls the IOMMU 
+functions if CONFIG_IOMMU is set. Wouldn't this be more suitable as 
+IOMMU support is only used by Tegra and thus not beneficial for desktop 
+GPUs?
