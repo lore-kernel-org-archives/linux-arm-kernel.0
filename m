@@ -1,62 +1,67 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 20 May 2015 19:42:56 +0800
-Subject: [PATCH v2 0/5] clk: support clocks which requires parent clock
- on during operation
-In-Reply-To: <1431610143-21853-1-git-send-email-aisheng.dong@freescale.com>
-References: <1431610143-21853-1-git-send-email-aisheng.dong@freescale.com>
-Message-ID: <20150520114253.GA6423@shlinux1.ap.freescale.net>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Wed, 20 May 2015 13:57:05 +0200
+Subject: [PATCH] ARM: 8351/1: perf: fix memory leak on return
+In-Reply-To: <5559BAF7.70205@canonical.com>
+References: <1431693789-9679-1-git-send-email-colin.king@canonical.com>
+ <20150516070955.GA2429@gmail.com> <5559BAF7.70205@canonical.com>
+Message-ID: <20150520115705.GA5273@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
 
-On Thu, May 14, 2015 at 09:28:58PM +0800, Dong Aisheng wrote:
-> This patch series adds support in clock framework for clocks which operations
-> requires its parent clock is on.
-> 
-> Such clock type is initially met on Freescale i.MX7D platform that all clocks
-> operations, including enable/disable, rate change and re-parent, requires its
-> parent clock on. No sure if any other SoC has the similar clock type.
-> 
-> Current clock core can not support such type of clock well.
-> 
-> This patch introduce a new flag CLK_SET_PARENT_ON to handle this special case
-> in clock core that enable its parent clock firstly for each operation and disable
-> it later after operation complete.
-> 
-> The most special case is for set_parent() operation which requires both parent,
-> old one and new one, to be enabled at the same time during the operation.
-> 
-> The patch series is based on for-next branch of Michael's git:
-> git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git
-> 
-> Change Log v1->v2:
->  Mainly addressed Stephen Boyd's comments
->  * remove dupliciated code with __clk_set_parent_after
->  * introduce more clk_core_x APIs for core easily use
->  * move clk_disable_unused code position
->  * use clk_core_x API to make code more clean and easily read
-> 
-> Dong Aisheng (5):
->   clk: remove duplicated code with __clk_set_parent_after
->   clk: introduce clk_core_enable_lock and clk_core_disable_lock
->     functions
->   clk: move clk_disable_unused after clk_core_disable_unprepare function
->   clk: core: add CLK_OPS_PARENT_ON flags to support clocks require
->     parent on
->   clk: core: add CLK_OPS_PARENT_ON flags to support clocks require
->     parent on
-> 
+* Colin Ian King <colin.king@canonical.com> wrote:
 
-Can you help review this updated series?
-
->  drivers/clk/clk.c            | 338 +++++++++++++++++++++++++------------------
->  include/linux/clk-provider.h |   5 +
->  2 files changed, 200 insertions(+), 143 deletions(-)
+> On 16/05/15 08:09, Ingo Molnar wrote:
+> > 
+> > * Colin King <colin.king@canonical.com> wrote:
+> > 
+> >> From: Colin Ian King <colin.king@canonical.com>
+> >>
+> >> Recent commit 3b8786ff7a1b31645ae2c26a2ec32dbd42ac1094
+> >> ("ARM: 8352/1: perf: Fix the pmu node name in warning message")
+> >> introduced a memory leak of irqs on the "Don't bother with PPIs"
+> >> return path. This was picked up by static analysis by cppcheck:
+> >>
+> >> [arch/arm/kernel/perf_event_cpu.c:315]: (error) Memory leak: irqs
+> >>
+> >> simpele fix is to free irqs when returning.
+> >>
+> >> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+> >> ---
+> >>  arch/arm/kernel/perf_event_cpu.c | 4 +++-
+> >>  1 file changed, 3 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
+> >> index 213919b..9e5b2a5 100644
+> >> --- a/arch/arm/kernel/perf_event_cpu.c
+> >> +++ b/arch/arm/kernel/perf_event_cpu.c
+> >> @@ -311,8 +311,10 @@ static int of_pmu_irq_cfg(struct platform_device *pdev)
+> >>  
+> >>  	/* Don't bother with PPIs; they're already affine */
+> >>  	irq = platform_get_irq(pdev, 0);
+> >> -	if (irq >= 0 && irq_is_percpu(irq))
+> >> +	if (irq >= 0 && irq_is_percpu(irq)) {
+> >> +		kfree(irqs);
+> >>  		return 0;
+> >> +	}
+> >>  
+> >>  	for (i = 0; i < pdev->num_resources; ++i) {
+> >>  		struct device_node *dn;
+> > 
+> > So returning from the middle of a function isn't very clean.
+> > 
+> > Also, why do we return 0 in an error case?
 > 
-> -- 
-> 1.9.1
+> I believe that's explained in commit
+> 338d9dd3e2aee00a9198e8bf6e7d535d3feeaf32 ("ARM: 8351/1: perf: don't warn
+> about missing interrupt-affinity property for PPIs"):
 > 
+> "PPIs are affine by nature, so the interrupt-affinity property is not
+>  used and therefore we shouldn't print a warning in its absence."
 
-Regards
-Dong Aisheng
+That should probably be mentioned in the fine code as well, to keep 
+future generations from wondering.
+
+Thanks,
+
+	Ingo
