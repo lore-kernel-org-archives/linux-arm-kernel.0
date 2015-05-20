@@ -1,34 +1,63 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 20 May 2015 15:38:08 -0700
-Subject: [PATCH v3 0/4] mtd: mxc_nand: fix 8 bit ECC and large oob
-In-Reply-To: <cover.1431504091.git.baruch@tkos.co.il>
-References: <cover.1431504091.git.baruch@tkos.co.il>
-Message-ID: <20150520223808.GR11598@ld-irv-0074>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 21 May 2015 00:38:21 +0200
+Subject: [PATCH defconfig] ARM: add ARM_SINGLE_ARMV7M in ARMv7-M defconfigs
+Message-ID: <1432161501-2323-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 13, 2015 at 11:17:35AM +0300, Baruch Siach wrote:
-> This patch series fixes mxc_nand bugs that I encountered while trying to use 8
-> bit ECC mode on i.MX25 with the Micron MT29F8G08ABABA flash chip.
-> 
-> Many thanks to Uwe Kleine-K?nig for guiding me through the process of
-> debugging and fixing, for contributing a clean-up patch to this series, and
-> for reviewing the rest.
-> 
-> This series applies on v4.1-rc1.
-> 
-> This is version 3 of the patch series, adding Reviewed-by and Acked-by tags
-> from Sascha Hauer and Uwe Kleine-K?nig. Patch 4/4 renamed a function as
-> suggested by Uwe Kleine-K?nig.
-> 
-> Version 2 of the patch series
-> (http://thread.gmane.org/gmane.linux.drivers.mtd/58687), addressed the
-> comments and suggestion of Uwe Kleine-K?nig on the first series
-> (http://thread.gmane.org/gmane.linux.ports.arm.kernel/408635). See each patch
-> for detailed per-patch changelog.
+Select ARM_SINGLE_ARMV7M in defconfigs of the converted ARMv7-M
+platforms.
 
-Pushed the first 3 to l2-mtd.git. Thanks all!
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ arch/arm/configs/efm32_defconfig   | 2 +-
+ arch/arm/configs/lpc18xx_defconfig | 1 +
+ arch/arm/configs/stm32_defconfig   | 1 +
+ 3 files changed, 3 insertions(+), 1 deletion(-)
 
-I have one comment on the 4th.
-
-Brian
+diff --git a/arch/arm/configs/efm32_defconfig b/arch/arm/configs/efm32_defconfig
+index c4c17e3..c0dac0f0f 100644
+--- a/arch/arm/configs/efm32_defconfig
++++ b/arch/arm/configs/efm32_defconfig
+@@ -16,6 +16,7 @@ CONFIG_EMBEDDED=y
+ # CONFIG_IOSCHED_DEADLINE is not set
+ # CONFIG_IOSCHED_CFQ is not set
+ # CONFIG_MMU is not set
++CONFIG_ARM_SINGLE_ARMV7M=y
+ CONFIG_ARCH_EFM32=y
+ CONFIG_SET_MEM_PARAM=y
+ CONFIG_DRAM_BASE=0x88000000
+@@ -85,7 +86,6 @@ CONFIG_GPIO_SYSFS=y
+ # CONFIG_USB_SUPPORT is not set
+ CONFIG_MMC=y
+ CONFIG_MMC_SPI=y
+-# CONFIG_IOMMU_SUPPORT is not set
+ CONFIG_EXT2_FS=y
+ # CONFIG_FILE_LOCKING is not set
+ # CONFIG_DNOTIFY is not set
+diff --git a/arch/arm/configs/lpc18xx_defconfig b/arch/arm/configs/lpc18xx_defconfig
+index caf7b52..d4320a7 100644
+--- a/arch/arm/configs/lpc18xx_defconfig
++++ b/arch/arm/configs/lpc18xx_defconfig
+@@ -22,6 +22,7 @@ CONFIG_EMBEDDED=y
+ # CONFIG_IOSCHED_DEADLINE is not set
+ # CONFIG_IOSCHED_CFQ is not set
+ # CONFIG_MMU is not set
++CONFIG_ARM_SINGLE_ARMV7M=y
+ CONFIG_ARCH_LPC18XX=y
+ CONFIG_SET_MEM_PARAM=y
+ CONFIG_DRAM_BASE=0x28000000
+diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
+index fab9cf9..4725fab 100644
+--- a/arch/arm/configs/stm32_defconfig
++++ b/arch/arm/configs/stm32_defconfig
+@@ -18,6 +18,7 @@ CONFIG_EMBEDDED=y
+ # CONFIG_IOSCHED_DEADLINE is not set
+ # CONFIG_IOSCHED_CFQ is not set
+ # CONFIG_MMU is not set
++CONFIG_ARM_SINGLE_ARMV7M=y
+ CONFIG_ARCH_STM32=y
+ CONFIG_SET_MEM_PARAM=y
+ CONFIG_DRAM_BASE=0x90000000
+-- 
+2.4.1
