@@ -1,58 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 20 May 2015 13:15:24 +0100
-Subject: [PATCH 3/4] arm64: gicv3: its: Read typer register outside the
- loop
-In-Reply-To: <1430686172-18222-4-git-send-email-rric@kernel.org>
-References: <1430686172-18222-1-git-send-email-rric@kernel.org>
- <1430686172-18222-4-git-send-email-rric@kernel.org>
-Message-ID: <20150520131524.09d325fe@why.wild-wind.fr.eu.org>
+From: mika.westerberg@linux.intel.com (Mika Westerberg)
+Date: Wed, 20 May 2015 15:15:06 +0300
+Subject: [PATCH] i2c: designware: separate ops for system_sleep_pm and
+ runtime_pm
+In-Reply-To: <20150520193422.73de7d90@xhacker>
+References: <1431693099-2292-1-git-send-email-jszhang@marvell.com>
+ <20150518082823.GH1490@lahna.fi.intel.com>
+ <20150519203242.74617ad6@xhacker>
+ <20150519131516.GO1490@lahna.fi.intel.com>
+ <20150520193422.73de7d90@xhacker>
+Message-ID: <20150520121506.GU1490@lahna.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 3 May 2015 21:49:31 +0100
-Robert Richter <rric@kernel.org> wrote:
+On Wed, May 20, 2015 at 07:34:22PM +0800, Jisheng Zhang wrote:
+> Sorry for confusion. Considering one platform which doesn't support power off
+> the i2c host but it can disable the host's clock. So in such platform, when
+> the host is runtime suspended, its clock is disabled, then i2c_dw_disable() will
+> hang when s2ram.
 
-> From: Robert Richter <rrichter@cavium.com>
-> 
-> No need to read the typer register in the loop. Values do not change.
-> 
-> Signed-off-by: Robert Richter <rrichter@cavium.com>
+Right. This happens also when the platform powers off the device.
 
-Fair enough.
+> Except using the runtime pm API to ensure the host is in
+> a correct state, is there any other solution? AFAIK, 'dev->power.direct_complete'
+> doesn't help such case.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+What I had in mind is something like below:
 
-	M.
+static int i2c_dw_prepare(struct device *dev)
+{
+	return pm_runtime_suspended(dev);
+}
 
-> ---
->  drivers/irqchip/irq-gic-v3-its.c | 5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index a2619a1d5bb3..916c4724c771 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -803,6 +803,8 @@ static int its_alloc_tables(struct its_node *its)
->  	int psz = SZ_64K;
->  	u64 shr = GITS_BASER_InnerShareable;
->  	u64 cache = GITS_BASER_WaWb;
-> +	u64 typer = readq_relaxed(its->base + GITS_TYPER);
-> +	u32 ids = GITS_TYPER_DEVBITS(typer);
->  
->  	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
->  		u64 val = readq_relaxed(its->base + GITS_BASER + i * 8);
-> @@ -826,9 +828,6 @@ static int its_alloc_tables(struct its_node *its)
->  		 * For other tables, only allocate a single page.
->  		 */
->  		if (type == GITS_BASER_TYPE_DEVICE) {
-> -			u64 typer = readq_relaxed(its->base + GITS_TYPER);
-> -			u32 ids = GITS_TYPER_DEVBITS(typer);
-> -
->  			order = get_order((1UL << ids) * entry_size);
->  			if (order >= MAX_ORDER) {
->  				order = MAX_ORDER - 1;
+static void i2c_dw_complete(struct device *dev)
+{
+	if (dev->power.direct_complete)
+		pm_request_resume(dev);
+}
 
+In other words it checks if the device is already runtime suspended and
+prevents ->suspend() etc. from being called.
 
-
--- 
-Without deviation from the norm, progress is not possible.
+If that does not work (I didn't try as this problem does not exist on
+ACPI platforms because we have PM domain handling things) then we do not
+have much of a choice than do what you suggest and runtime resume the
+device on ->suspend()
