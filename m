@@ -1,40 +1,30 @@
-From: stuart.yoder@freescale.com (Stuart Yoder)
-Date: Wed, 20 May 2015 19:54:57 +0000
-Subject: [RESEND][ PATCH v3] irqchip/gicv3-its: ITS table size should not
- be smaller than PSZ
-In-Reply-To: <alpine.DEB.2.11.1505202125220.4225@nanos>
-References: <1432134795-661-1-git-send-email-stuart.yoder@freescale.com>
- <alpine.DEB.2.11.1505202125220.4225@nanos>
-Message-ID: <CY1PR0301MB074800AFD74B97267DD71BA287C20@CY1PR0301MB0748.namprd03.prod.outlook.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 20 May 2015 22:02:12 +0200 (CEST)
+Subject: [PATCH 03/11] irqchip / GIC: Add GIC version support in ACPI MADT
+In-Reply-To: <1431953961-22706-4-git-send-email-hanjun.guo@linaro.org>
+References: <1431953961-22706-1-git-send-email-hanjun.guo@linaro.org>
+ <1431953961-22706-4-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <alpine.DEB.2.11.1505202157190.4225@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 18 May 2015, Hanjun Guo wrote:
+> diff --git a/drivers/acpi/irq.c b/drivers/acpi/irq.c
+> index 65d6b93..855ead9 100644
+> --- a/drivers/acpi/irq.c
+> +++ b/drivers/acpi/irq.c
+> @@ -32,6 +32,9 @@ void __init acpi_irqchip_init(void)
+>  	if (acpi_disabled)
+>  		return;
+>  
+> +	if (acpi_gic_version_init())
+> +		return;
 
+This looks just wrong. acpi_irqchip_init() is a generic ACPI function
+and now you stick a GIC specific callback into it?
 
-> -----Original Message-----
-> From: Thomas Gleixner [mailto:tglx at linutronix.de]
-> Sent: Wednesday, May 20, 2015 2:26 PM
-> To: Yoder Stuart-B08248
-> Cc: marc.zyngier at arm.com; jason at lakedaemon.net; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; Lian Minghuan-B31939
-> Subject: Re: [RESEND][ PATCH v3] irqchip/gicv3-its: ITS table size should not be smaller than PSZ
-> 
-> On Wed, 20 May 2015, Stuart Yoder wrote:
-> 
-> > when allocating a device table, if the requested allocation
-> > is smaller than the default granule size of the ITS
-> > then, we need to round up to the default size
-> >
-> > Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
-> > Signed-off-by: Stuart Yoder <stuart.yoder@freescale.com>
-> 
-> So who wrote that patch? That's not a valid SOB chain ....
-
-Minghuan wrote the original patch (v1,v2), making the functional change.
-I wrote/added the comments and submitted v3, after discussing with
-Minghuan.
-
-Given that, what is the correct signed-off-by chain?
+What calls acpi_irqchip_init?
 
 Thanks,
-Stuart
+
+	tglx
