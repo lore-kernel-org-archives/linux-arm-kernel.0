@@ -1,17 +1,57 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 20 May 2015 19:26:18 -0300
-Subject: [PATCH v1] ARM: dts: nitrogen6x: add CAN support
-In-Reply-To: <1432158569-4415-1-git-send-email-ps.report@gmx.net>
-References: <1432158569-4415-1-git-send-email-ps.report@gmx.net>
-Message-ID: <CAOMZO5Cazk3TGSF1c4pt0WhY2stmJzHWfTyySnf_NyHxaAfgDA@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 20 May 2015 15:32:59 -0700
+Subject: [PATCH 2/2 v4] ARM: dts: atlas7: add fixed frequency clocks in
+ car node
+In-Reply-To: <1432111834-21178-2-git-send-email-21cnbao@gmail.com>
+References: <1432111834-21178-1-git-send-email-21cnbao@gmail.com>
+ <1432111834-21178-2-git-send-email-21cnbao@gmail.com>
+Message-ID: <20150520223259.GV31753@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 6:49 PM, Peter Seiderer <ps.report@gmx.net> wrote:
+On 05/20, Barry Song wrote:
+> From: Guo Zeng <Guo.Zeng@csr.com>
+> 
+> This patch adds the fixed clocks of external crystal oscillators.
+> 
+> Signed-off-by: Guo Zeng <Guo.Zeng@csr.com>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> ---
+>  -v4: move the clocks to be global;
+> 
+>  arch/arm/boot/dts/atlas7.dtsi | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/atlas7.dtsi b/arch/arm/boot/dts/atlas7.dtsi
+> index a753178..1760dac 100644
+> --- a/arch/arm/boot/dts/atlas7.dtsi
+> +++ b/arch/arm/boot/dts/atlas7.dtsi
+> @@ -38,6 +38,24 @@
+>  		};
+>  	};
+>  
+> +	clocks {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
 
-> +               pinctrl_can1_1: can1grp-1 {
-> +                       fsl,pins = <
-> +                               MX6QDL_PAD_KEY_COL2__FLEXCAN1_TX 0x80000000
-> +                               MX6QDL_PAD_KEY_ROW2__FLEXCAN1_RX 0x80000000
+This isn't necessary right? I dropped it and applied it.
 
-Better not to pass 0x80000000. Use the real PAD settings instead.
+----8<-----
+diff --git a/arch/arm/boot/dts/atlas7.dtsi b/arch/arm/boot/dts/atlas7.dtsi
+index 1760dac6a2b0..5dfd3a44bf82 100644
+--- a/arch/arm/boot/dts/atlas7.dtsi
++++ b/arch/arm/boot/dts/atlas7.dtsi
+@@ -39,9 +39,6 @@
+ 	};
+ 
+ 	clocks {
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+-
+ 		xinw {
+ 			compatible = "fixed-clock";
+ 			#clock-cells = <0>;
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
