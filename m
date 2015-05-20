@@ -1,30 +1,93 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 20 May 2015 23:25:44 +0200
-Subject: [PATCH defconfig v8] ARM: vf610m4: add defconfig for Linux on
- Vybrids Cortex-M4
-In-Reply-To: <1432073182-27114-1-git-send-email-stefan@agner.ch>
-References: <1432073182-27114-1-git-send-email-stefan@agner.ch>
-Message-ID: <7545746.Jl1zbQvhrm@wuerfel>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 20 May 2015 14:25:12 -0700
+Subject: [PATCH] ARM: dts: Fix ldp gpio keys to use defines
+Message-ID: <1432157112-19941-1-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 20 May 2015 00:06:22 Stefan Agner wrote:
-> Add defconfig for Linux on Vybrid (vf610) on the secondary Cortex-
-> M4 CPU. The use of a XIP image has been tested which needs to be
-> loaded (e.g. using the custom m4boot loader) to the end of the
-> available RAM at address 0x8f000000. The Cortex-M4 has a code-alias
-> which makes sure that the instructions get fetched through the code
-> bus (alias starts at 0x00800000 => 0x80800000 in system address).
-> Hence, to get optimal performance, use 0x0f000000 as XIP_PHYS_ADDR.
-> This address is additionally shifted by the length of the minimal
-> loader which is inserted by m4boot. Currently, this offset is 0x80.
-> 
-> The standard DRAM base address is configured to 0x8C000000, which
-> gives the Cortex-M4 48MiB of RAM.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> 
+Fix ldp gpio keys to use defines.
 
-Applied to next/defconfig, thanks!
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/boot/dts/omap3-ldp.dts | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-	Arnd
+diff --git a/arch/arm/boot/dts/omap3-ldp.dts b/arch/arm/boot/dts/omap3-ldp.dts
+index b699bc4..bd6e676 100644
+--- a/arch/arm/boot/dts/omap3-ldp.dts
++++ b/arch/arm/boot/dts/omap3-ldp.dts
+@@ -34,63 +34,63 @@
+ 		key_enter {
+ 			label = "enter";
+ 			gpios = <&gpio4 5 GPIO_ACTIVE_LOW>; /* gpio101 */
+-			linux,code = <0x0107001c>; /* KEY_ENTER */
++			linux,code = <KEY_ENTER>;
+ 			gpio-key,wakeup;
+ 		};
+ 
+ 		key_f1 {
+ 			label = "f1";
+ 			gpios = <&gpio4 6 GPIO_ACTIVE_LOW>; /* gpio102 */
+-			linux,code = <0x0303003b>; /* KEY_F1 */
++			linux,code = <KEY_F1>;
+ 			gpio-key,wakeup;
+ 		};
+ 
+ 		key_f2 {
+ 			label = "f2";
+ 			gpios = <&gpio4 7 GPIO_ACTIVE_LOW>; /* gpio103 */
+-			linux,code = <0x0403003c>; /* KEY_F2 */
++			linux,code = <KEY_F2>;
+ 			gpio-key,wakeup;
+ 		};
+ 
+ 		key_f3 {
+ 			label = "f3";
+ 			gpios = <&gpio4 8 GPIO_ACTIVE_LOW>; /* gpio104 */
+-			linux,code = <0x0503003d>; /* KEY_F3 */
++			linux,code = <KEY_F3>;
+ 			gpio-key,wakeup;
+ 		};
+ 
+ 		key_f4 {
+ 			label = "f4";
+ 			gpios = <&gpio4 9 GPIO_ACTIVE_LOW>; /* gpio105 */
+-			linux,code = <0x0704003e>; /* KEY_F4 */
++			linux,code = <KEY_F4>;
+ 			gpio-key,wakeup;
+ 		};
+ 
+ 		key_left {
+ 			label = "left";
+ 			gpios = <&gpio4 10 GPIO_ACTIVE_LOW>; /* gpio106 */
+-			linux,code = <0x04070069>; /* KEY_LEFT */
++			linux,code = <KEY_LEFT>;
+ 			gpio-key,wakeup;
+ 		};
+ 
+ 		key_right {
+ 			label = "right";
+ 			gpios = <&gpio4 11 GPIO_ACTIVE_LOW>; /* gpio107 */
+-			linux,code = <0x0507006a>; /* KEY_RIGHT */
++			linux,code = <KEY_RIGHT>;
+ 			gpio-key,wakeup;
+ 		};
+ 
+ 		key_up {
+ 			label = "up";
+ 			gpios = <&gpio4 12 GPIO_ACTIVE_LOW>; /* gpio108 */
+-			linux,code = <0x06070067>; /* KEY_UP */
++			linux,code = <KEY_UP>;
+ 			gpio-key,wakeup;
+ 		};
+ 
+ 		key_down {
+ 			label = "down";
+ 			gpios = <&gpio4 13 GPIO_ACTIVE_LOW>; /* gpio109 */
+-			linux,code = <0x0707006c>; /* KEY_DOWN */
++			linux,code = <KEY_DOWN>;
+ 			gpio-key,wakeup;
+ 		};
+ 	};
+-- 
+2.1.4
