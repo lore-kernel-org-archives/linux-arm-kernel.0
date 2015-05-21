@@ -1,78 +1,190 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 21 May 2015 09:58:06 +0100
-Subject: [PATCH tip/core/rcu 7/9] arm64: Use common
- outgoing-CPU-notification code
-In-Reply-To: <1431467407-1223-7-git-send-email-paulmck@linux.vnet.ibm.com>
-References: <20150512214945.GA813@linux.vnet.ibm.com>
- <1431467407-1223-1-git-send-email-paulmck@linux.vnet.ibm.com>
- <1431467407-1223-7-git-send-email-paulmck@linux.vnet.ibm.com>
-Message-ID: <20150521085806.GC21920@arm.com>
+From: davidcdueck@googlemail.com (David Dueck)
+Date: Thu, 21 May 2015 11:06:56 +0200
+Subject: [PATCH] drm: atmel_hlcdc: Add support for get_timings
+Message-ID: <1432199216-1139-1-git-send-email-davidcdueck@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+drm_panel supports querying timing ranges. If the supplied mode does
+not work with the hlcdc we query the panel and try to find a suitable
+mode.
 
-Sorry for being late on this one.
+Signed-off-by: David Dueck <davidcdueck@googlemail.com>
+---
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 118 +++++++++++++++++++----
+ 1 file changed, 98 insertions(+), 20 deletions(-)
 
-On Tue, May 12, 2015 at 10:50:05PM +0100, Paul E. McKenney wrote:
-> From: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
-> 
-> This commit removes the open-coded CPU-offline notification with new
-> common code.  In particular, this change avoids calling scheduler code
-> using RCU from an offline CPU that RCU is ignoring.  This is a minimal
-> change.  A more intrusive change might invoke the cpu_check_up_prepare()
-> and cpu_set_state_online() functions at CPU-online time, which would
-> allow onlining throw an error if the CPU did not go offline properly.
-> 
-> Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/kernel/smp.c | 6 ++----
->  1 file changed, 2 insertions(+), 4 deletions(-)
-
-I don't have a better idea, so:
-
-  Acked-by: Will Deacon <will.deacon@arm.com>
-
-Is this queued via -tip already, or can we pick it into the arm64 tree
-for 4.2?
-
-Cheers,
-
-Will
-
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index 2cb008177252..a899c1beff54 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -253,15 +253,13 @@ static int op_cpu_kill(unsigned int cpu)
->  	return cpu_ops[cpu]->cpu_kill(cpu);
->  }
->  
-> -static DECLARE_COMPLETION(cpu_died);
-> -
->  /*
->   * called on the thread which is asking for a CPU to be shutdown -
->   * waits until shutdown has completed, or it is timed out.
->   */
->  void __cpu_die(unsigned int cpu)
->  {
-> -	if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(5000))) {
-> +	if (!cpu_wait_death(cpu, 5)) {
->  		pr_crit("CPU%u: cpu didn't die\n", cpu);
->  		return;
->  	}
-> @@ -294,7 +292,7 @@ void cpu_die(void)
->  	local_irq_disable();
->  
->  	/* Tell __cpu_die() that this CPU is now safe to dispose of */
-> -	complete(&cpu_died);
-> +	(void)cpu_report_death();
->  
->  	/*
->  	 * Actually shutdown the CPU. This must never fail. The specific hotplug
-> -- 
-> 1.8.1.5
-> 
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
+index 9c45130..ea36c24 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
+@@ -20,6 +20,7 @@
+  */
+ 
+ #include <linux/of_graph.h>
++#include <video/display_timing.h>
+ 
+ #include <drm/drmP.h>
+ #include <drm/drm_panel.h>
+@@ -78,6 +79,8 @@ drm_encoder_to_atmel_hlcdc_rgb_output(struct drm_encoder *encoder)
+ struct atmel_hlcdc_panel {
+ 	struct atmel_hlcdc_rgb_output base;
+ 	struct drm_panel *panel;
++	struct display_timing *timings;
++	unsigned int num_timings;
+ };
+ 
+ static inline struct atmel_hlcdc_panel *
+@@ -104,14 +107,6 @@ static void atmel_hlcdc_panel_encoder_disable(struct drm_encoder *encoder)
+ 	drm_panel_disable(panel->panel);
+ }
+ 
+-static bool
+-atmel_hlcdc_panel_encoder_mode_fixup(struct drm_encoder *encoder,
+-				     const struct drm_display_mode *mode,
+-				     struct drm_display_mode *adjusted)
+-{
+-	return true;
+-}
+-
+ static void
+ atmel_hlcdc_rgb_encoder_mode_set(struct drm_encoder *encoder,
+ 				 struct drm_display_mode *mode,
+@@ -142,8 +137,86 @@ atmel_hlcdc_rgb_encoder_mode_set(struct drm_encoder *encoder,
+ 			   cfg);
+ }
+ 
++/**
++ * atmel_hlcdc_choose_parameter - choose timing parameter
++ * @dc_min: minimum parameter value allowed by dc
++ * @dc_max: maximum parameter value allowed by dc
++ * @te: parameter range allowed by panel
++ * @result: chosen parameter
++ *
++ * DESCRIPTION:
++ * If there is overlap in the allowed ranges, we will pick a parameter
++ * minimizing the distance to te.typ. If not, we return te.min or te.max.
++ **/
++static u32 atmel_hlcdc_choose_parameter(u32 dc_min, u32 dc_max,
++					struct timing_entry te)
++{
++	if (te.typ <= dc_max && te.typ >= dc_min)
++		return te.typ;
++	else if (te.typ > dc_max)
++		return max(dc_max, te.min);
++	else
++		return min(dc_min, te.max);
++}
++
++static void atmel_hlcdc_calculate_mode(struct display_timing *timings,
++				       struct drm_display_mode *adjusted_mode)
++{
++	u32 hsync_len, hfront_porch, hback_porch;
++	u32 vsync_len, vfront_porch, vback_porch;
++
++	hsync_len = atmel_hlcdc_choose_parameter(1, 0x40, timings->hsync_len);
++	vsync_len = atmel_hlcdc_choose_parameter(1, 0x40, timings->vsync_len);
++
++	hfront_porch = atmel_hlcdc_choose_parameter(1, 0x200,
++						    timings->hfront_porch);
++	hback_porch = atmel_hlcdc_choose_parameter(1, 0x200,
++						   timings->hback_porch);
++	vfront_porch = atmel_hlcdc_choose_parameter(1, 0x40,
++						    timings->vfront_porch);
++	vback_porch = atmel_hlcdc_choose_parameter(0, 0x40,
++						   timings->vback_porch);
++
++	adjusted_mode->hsync_start = adjusted_mode->hdisplay + hfront_porch;
++	adjusted_mode->hsync_end = adjusted_mode->hsync_start + hsync_len;
++	adjusted_mode->htotal = adjusted_mode->hsync_end + hback_porch;
++
++	adjusted_mode->vsync_start = adjusted_mode->vdisplay + vfront_porch;
++	adjusted_mode->vsync_end = adjusted_mode->vsync_start + vsync_len;
++	adjusted_mode->vtotal = adjusted_mode->vsync_end + vback_porch;
++}
++
++static int
++atmel_hlcdc_panel_encoder_atomic_check(struct drm_encoder *encoder,
++				       struct drm_crtc_state *crtc_state,
++				       struct drm_connector_state *conn_state)
++{
++	struct atmel_hlcdc_rgb_output *rgb =
++			drm_encoder_to_atmel_hlcdc_rgb_output(encoder);
++	struct atmel_hlcdc_panel *panel = atmel_hlcdc_rgb_output_to_panel(rgb);
++	struct drm_display_mode *mode = &crtc_state->mode;
++	struct drm_display_mode *adjusted_mode = &crtc_state->adjusted_mode;
++	int i;
++
++	if (atmel_hlcdc_dc_mode_valid(rgb->dc, mode) == MODE_OK)
++		return 0;
++
++	for (i = 0; i < panel->num_timings; i++) {
++		if (panel->timings->hactive.typ != mode->hdisplay ||
++		    panel->timings->vactive.typ != mode->vdisplay)
++			continue;
++
++		atmel_hlcdc_calculate_mode(panel->timings, adjusted_mode);
++		if (atmel_hlcdc_dc_mode_valid(rgb->dc, adjusted_mode) ==
++		    MODE_OK)
++			return 0;
++	}
++
++	return -EINVAL;
++}
++
+ static struct drm_encoder_helper_funcs atmel_hlcdc_panel_encoder_helper_funcs = {
+-	.mode_fixup = atmel_hlcdc_panel_encoder_mode_fixup,
++	.atomic_check = atmel_hlcdc_panel_encoder_atomic_check,
+ 	.mode_set = atmel_hlcdc_rgb_encoder_mode_set,
+ 	.disable = atmel_hlcdc_panel_encoder_disable,
+ 	.enable = atmel_hlcdc_panel_encoder_enable,
+@@ -168,16 +241,6 @@ static int atmel_hlcdc_panel_get_modes(struct drm_connector *connector)
+ 	return panel->panel->funcs->get_modes(panel->panel);
+ }
+ 
+-static int atmel_hlcdc_rgb_mode_valid(struct drm_connector *connector,
+-				      struct drm_display_mode *mode)
+-{
+-	struct atmel_hlcdc_rgb_output *rgb =
+-			drm_connector_to_atmel_hlcdc_rgb_output(connector);
+-
+-	return atmel_hlcdc_dc_mode_valid(rgb->dc, mode);
+-}
+-
+-
+ 
+ static struct drm_encoder *
+ atmel_hlcdc_rgb_best_encoder(struct drm_connector *connector)
+@@ -190,7 +253,6 @@ atmel_hlcdc_rgb_best_encoder(struct drm_connector *connector)
+ 
+ static struct drm_connector_helper_funcs atmel_hlcdc_panel_connector_helper_funcs = {
+ 	.get_modes = atmel_hlcdc_panel_get_modes,
+-	.mode_valid = atmel_hlcdc_rgb_mode_valid,
+ 	.best_encoder = atmel_hlcdc_rgb_best_encoder,
+ };
+ 
+@@ -273,6 +335,22 @@ static int atmel_hlcdc_create_panel_output(struct drm_device *dev,
+ 	drm_panel_attach(p, &panel->base.connector);
+ 	panel->panel = p;
+ 
++	if (!panel->panel->funcs->get_timings)
++		return 0;
++
++	panel->num_timings =
++		panel->panel->funcs->get_timings(panel->panel, 0, NULL);
++	panel->timings =
++		devm_kzalloc(dev->dev,
++			     panel->num_timings * sizeof(struct display_timing),
++			     GFP_KERNEL);
++
++	if (!panel->timings)
++		return 0;
++
++	panel->panel->funcs->get_timings(panel->panel, panel->num_timings,
++					 panel->timings);
++
+ 	return 0;
+ 
+ err_encoder_cleanup:
+-- 
+2.3.6
