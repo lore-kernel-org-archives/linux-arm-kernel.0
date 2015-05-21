@@ -1,39 +1,59 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 21 May 2015 08:40:55 -0700
-Subject: [PATCH] ARM: rockchip: restore dapswjdp after suspend
-In-Reply-To: <555D3CB7.2000002@rock-chips.com>
-References: <1432154048-19126-1-git-send-email-dianders@chromium.org>
- <555D3CB7.2000002@rock-chips.com>
-Message-ID: <CAD=FV=XARAYzLWy+i9f1XuTZTa4RiA5Yb9aJoAuh9uJmgs-ZOQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 21 May 2015 08:49:57 -0700
+Subject: [GIT PULL 2/2] omap1 sparse irq support for v4.2
+In-Reply-To: <2613552.WPU8qB3AF6@wuerfel>
+References: <80194352.chs4cqVdmg@wuerfel> <20150521145840.GQ10274@atomide.com>
+ <2613552.WPU8qB3AF6@wuerfel>
+Message-ID: <20150521154957.GR10274@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Huang Tao,
+* Arnd Bergmann <arnd@arndb.de> [150521 08:41]:
+> On Thursday 21 May 2015 07:58:41 Tony Lindgren wrote:
+> > * Arnd Bergmann <arnd@arndb.de> [150521 05:13]:
+> > > On Wednesday 20 May 2015 15:36:05 Tony Lindgren wrote:
+> > > > Add support for CONFIG_SPARSE_IRQ for omap1. This takes us a bit closer
+> > > > to making omap1 support multiarch. After this series we still need to
+> > > > make omap1 use the common clock framework and fix up the drivers to not
+> > > > rely on includes from mach and plat directories.
+> > > > 
+> > > > Note that this branch depends on a GPIO driver fix in v4.1-rc3
+> > > > d2d05c65c40e ("gpio: omap: Fix regression for MPUIO interrupts").
+> > > > 
+> > > 
+> > > I'm getting lots of build errors in linux-next, which I think are
+> > > caused by this series.
+> > 
+> > Hmm is this with make randconfig?
+> 
+> Yes, all sorts of randconfig builds hit different parts here
+> 
+> > What's the Kconfig option enabling these errors?
+> 
+> From what I can tell, this is simply a result of enabling
+> CONFIG_SPARSE_IRQ, which results in linux/irq.h no longer
+> implicitly including  mach/hardware.h through mach/irqs.h.
 
-On Wed, May 20, 2015 at 7:02 PM, Huang, Tao <huangtao@rock-chips.com> wrote:
->> It turns out that's not a safe assumption.  In some cases (pending
->> interrupts) it's possible that the WFI might act as a no-op and the
->> MaskROM will never run.
->
->
-> I don't think this can happen. It seems we set PMU_GLOBAL_INT_DISABLE
-> bit, which means in power off flow, the IRQ will not accepted until the
-> ARM is power off. Do you see the SGRF_CPU_CON0[0] is 0 after resume?
+Hmm not seeing that here, well at least not with what I've
+tried so far.
+ 
+> You should be able to see these errors by just enabling
+> the respective drivers. The errors manifest as a long list
+> of undefined symbols like
+> 
+> /git/arm-soc/arch/arm/mach-omap1/io.c:33:28: error: 'OMAP1_IO_OFFSET' undeclared here (not in a function)
+> /git/arm-soc/arch/arm/mach-omap1/io.c:43:14: error: 'OMAP7XX_DSP_BASE' undeclared here (not in a function)
+> /git/arm-soc/arch/arm/mach-omap1/serial.c:114:33: note: each undeclared identifier is reported only once for each function it appears in
+> /git/arm-soc/arch/arm/mach-omap1/pm.c:217:23: error: 'ULPD_SOFT_DISABLE_REQ_REG' undeclared (first use in this function)
+> /git/arm-soc/drivers/video/fbdev/omap/sossi.c:608:17: error: 'MOD_CONF_CTRL_1' undeclared (first use in this function)
+> 
+> Then again, it is possible that I only see the errors because of
+> an interaction with another patch from my randconfig fixes
+> series.
 
->From testing, it appears that it can happen that the WFI might act as a no-op.
+I think there's something like that going on.. Maybe you're
+now enabling multiarch for omap1 in your branch?
 
-...but you're right in pointing out that unless we can solve the
-PMU_GLOBAL_INT_DISABLE() problem then this patch here to fix
-DAPDEVICEEN isn't too useful.  I was hoping to fix the
-PMU_GLOBAL_INT_DISABLE() in
-<https://chromium-review.googlesource.com/#/c/272442/> or find a
-similar solution.  ...if we can's solve that though, then I'm not sure
-what to suggest.
+Regards,
 
-
-> Anyway, restore the value is okay, which make the code more symmetrically
-
-OK.  Heiko: applying this won't hurt, but it will only be useful if we
-find a way to return from the WFI successfully...
-
--Doug
+Tony
