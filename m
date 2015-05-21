@@ -1,64 +1,58 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 21 May 2015 22:27:54 +0800
-Subject: [PATCH 10/11] irqchip / GICv2 / ACPI: Consolidate GICv2 ACPI
- related init code
-In-Reply-To: <555CF23B.1000002@linaro.org>
-References: <1431953961-22706-1-git-send-email-hanjun.guo@linaro.org>
- <1431953961-22706-11-git-send-email-hanjun.guo@linaro.org>
- <555CF23B.1000002@linaro.org>
-Message-ID: <555DEB6A.8090404@linaro.org>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 21 May 2015 23:31:54 +0900
+Subject: [RESEND PATCH 0/2] pinctrl: zynq: fix two bugs of zynq pinmux
+ function
+In-Reply-To: <20150520142358.GS31550@xsjsorenbubuntu>
+References: <1432111351-21336-1-git-send-email-yamada.masahiro@socionext.com>
+ <20150520142358.GS31550@xsjsorenbubuntu>
+Message-ID: <CAK7LNARutQyESi90faNUC0LvCQ3woS8wUvHLDw5emcBOza9eng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?05?21? 04:44, Tomasz Nowicki wrote:
-> Hi Hanjun,
+Hi S?ren,
+
+
+2015-05-20 23:23 GMT+09:00 S?ren Brinkmann <soren.brinkmann@xilinx.com>:
+> Hi Masahiro,
 >
-> On 05/18/2015 02:59 PM, Hanjun Guo wrote:
->> Move GICv2 ACPI related init code in irq-gic.c to irq-gic-acpi.c,
->> this can make the ACPI related GIC init code slef-contained.
+> On Wed, 2015-05-20 at 05:42PM +0900, Masahiro Yamada wrote:
 >>
->> Introduce set_acpi_core_irqdomain() to set acpi_irqdomain then
->> it will be no need to make gic_data[] as a global value, and
->> it will save the confilcts with GICv3's gic_data in the later
->> patch.
+>> I sent the previous one to linux-serial by mistake.
+>> I am resending to linux-gpio, dropping linux-serial.
+>> Sorry for noise.
 >>
->> acpi_gic_parse_distributor() have the same function as
->> gic_acpi_parse_madt_distributor() to get the GIC distributor
->> physical base address, so just remove the duplicate one, and
->> only get the GIC version when it is unknown.
 >>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> ---
->>   drivers/irqchip/irq-gic-acpi.c       |  95
->> +++++++++++++++++++++++++++++++-
->>   drivers/irqchip/irq-gic.c            | 103
->> +----------------------------------
->>   include/linux/irqchip/arm-gic-acpi.h |   5 ++
->>   3 files changed, 101 insertions(+), 102 deletions(-)
 >>
->> diff --git a/drivers/irqchip/irq-gic-acpi.c
->> b/drivers/irqchip/irq-gic-acpi.c
->> index 1388d9e..8463e48 100644
->> --- a/drivers/irqchip/irq-gic-acpi.c
->> +++ b/drivers/irqchip/irq-gic-acpi.c
->> @@ -13,12 +13,16 @@
->>
->>   #include <linux/acpi.h>
->>   #include <linux/init.h>
->> +#include <linux/irqchip/arm-gic.h>
->>   #include <linux/irqchip/arm-gic-acpi.h>
->>   #include <linux/irqchip/arm-gic-v3.h>
+>> Masahiro Yamada (2):
+>>   pinctrl: zynq: fix DEFINE_ZYNQ_PINMUX_FUNCTION_MUX macro
+>>   pinctrl: zynq: fix offset address for {SD0,SD1}_WP_CD_SEL
 >
-> arm-gic.h and arm-gic-v3.h describe register map for respective drivers
-> and should be used separately within parent driver only.
+> For the series:
+> Reviewed-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+>
+> I'm not sure how severe the impact of these bugs is. It looks like the
+> the current driver could corrupt the register for MIO pin0, am I right?
 
-Seems that there is no duplicate macros in that two head
-file, but yes, it will confuse people.
+Right.
+DEFINE_ZYNQ_PINMUX_FUNCTION_MUX() is missing the .mux
+so it is always set to zero, i.e. MIO pin0 register is corrupted.
 
-Consolidating all ACPI GIC code is an improvement to make
-ACPI related code self-contained, but also have some drawbacks,
 
-Marc, what do you think?
+> It may be a good ides to add
+>   Fixes: add958cee967 "pinctrl: Add driver for Zynq"
+> (I suspect that bug is there from the beginning) and ask Linus to
+> consider this for stable.
 
-Thanks
-Hanjun
+Yes, looks like these two bugs have been there
+since the introduction of this driver.
+
+For the series,
+Fixes: add958cee967 (pinctrl: Add driver for Zynq)
+
+Linus,
+Could you consider this series for stable and linux-4.1, please?
+
+
+-- 
+Best Regards
+Masahiro Yamada
