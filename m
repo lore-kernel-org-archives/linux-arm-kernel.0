@@ -1,58 +1,53 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 21 May 2015 17:34:06 +0200
-Subject: [PATCH 5/5] ARM64: MediaTek MT8173: Add SCPSYS device node
-In-Reply-To: <CAGS+omDHEY54TzhNTJcFOeHkGbXAQwiTh9gxc=PsbzjwmpHEDA@mail.gmail.com>
-References: <1432131540-2523-1-git-send-email-s.hauer@pengutronix.de>
- <1432131540-2523-6-git-send-email-s.hauer@pengutronix.de>
- <CAGS+omDHEY54TzhNTJcFOeHkGbXAQwiTh9gxc=PsbzjwmpHEDA@mail.gmail.com>
-Message-ID: <CABuKBeKmdjhmUprdibJHsKo4JfQ4vzX2SsCnobfpKSQn_PsGHw@mail.gmail.com>
+From: arnd@linaro.org (Arnd Bergmann)
+Date: Thu, 21 May 2015 17:35:11 +0200
+Subject: [PATCH] arch/arm64 :Cyclic Test fix in ARM64 fpsimd
+In-Reply-To: <CAKv+Gu_u+iYL4niHip9nzUd9p7tEt6XEvhZ4fQLJK_gVaw+FSA@mail.gmail.com>
+References: <CAPyr0yJSGqvxkUWLtNKe0q5mNanBczAfAVx0tPKuzYeDG+eJ=Q@mail.gmail.com>
+ <20150521135007.GC3983@localhost.localdomain>
+ <CAKv+Gu_u+iYL4niHip9nzUd9p7tEt6XEvhZ4fQLJK_gVaw+FSA@mail.gmail.com>
+Message-ID: <4053482.VK9u0kqo8W@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-21 16:32 GMT+02:00 Daniel Kurtz <djkurtz@chromium.org>:
-> On Wed, May 20, 2015 at 10:19 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
->> This adds the SCPSYS device node to the MT8173 dtsi file.
->>
->> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
->> ---
->>  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 10 ++++++++++
->>  1 file changed, 10 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> index 924fdb6..12430f0 100644
->> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> @@ -125,6 +125,16 @@
->>                                                 <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
->>                 };
->>
->> +               scpsys: scpsys at 10006000 {
->> +                       compatible = "mediatek,mt8173-scpsys";
->> +                       #power-domain-cells = <1>;
->> +                       reg = <0 0x10006000 0 0x1000>;
->> +                       clocks = <&clk26m>,
->
-> Why is mfg using <&clk26m> and not <&topckgen CLK_TOP_MFG_SEL>?
-> I saw another patch set on the list today from James Liao that adds more clocks.
-> Perhaps we can move the SCPSYS set on top of that one and include more clocks?
->
->> +                                <&topckgen CLK_TOP_MM_SEL>;
->
-> FYI: the devicetree changes in this set depend on your other patch set
-> starting with:
->
-> https://patchwork.kernel.org/patch/6446341/
-> "arm64: dts: mt8173: Add clock controller device nodes"
->
-> This patch isn't based on top of the other set, though, so it may lead
-> to a small merge conflict when folding in the .dtsi device nodes (ie,
-> placing scpsys at 10006000 after pwrap at 1000d000).
->
-> I'm not sure how people usually resolve this or manage the ordering of
-> co-dependent patch sets upstream.
+On Thursday 21 May 2015 17:23:43 Ard Biesheuvel wrote:
+> On 21 May 2015 at 15:50, Anders Roxell <anders.roxell@gmail.com> wrote:
+> > On 2015-05-01 20:59, Ayyappa Ch wrote:
+> >> Floating point operations in arm64 should not disable preempt .
+> >> Activating realtime features with below code.
+> >
+> > I've talked with an engineer who worked on fpsimd and I was told that
+> > replacing preempt_disable with migrate_disable would leave fpsimd open
+> > to corruption.
+> >
+> > The kernel won't save the state of the simd registers when it is
+> > preempted so if another task runs on the same CPU and also uses simd, it
+> > clobbers the registers of the first task, and migrate_disable() does not
+> > prevent that.
+> >
+> > If we want to use SIMD with preemption enabled, we need to update the
+> > context switch code to do a full SIMD register state save&restore if
+> > necessary. However, this can have a noticeable cost in all task switch
+> > latencies.
+> >
+> 
+> I noticed somewhere in this thread that the culprit was ultimately a
+> call to virt_efi_set_time(), which is the UEFI Runtime Service that
+> programs the RTC. If this is a hot spot, then there is something very
+> wrong with the system which is entirely unrelated to preempt_rt.
 
-At the moment I suppose that patch-sets are based on -rc1 if not
-stated different.
+Ah, that explains a lot!
 
--- 
-motzblog.wordpress.com
+> But let's assume this is a valid UEFI Runtime Services call: since
+> UEFI Runtime Services are allowed to use the FP/SIMD register file, we
+> need the kernel_neon_begin()/kernel_neon_end() pair even though it is
+> highly unlikely that such a runtime service call would actually need
+> to use the NEON or floating point. It is simply imposed by the
+> kernel<->firmware ABI. Also, on this particular code path, preemption
+> will be disabled regardless, since the UEFI Runtime Services are
+> invoked with a UEFI specific TTBR0 mapping, which rules out preemption
+> for reasons unrelated to the FP/SIMD register file.
+
+Can we disable support for UEFI runtime services with preempt-rt
+kernels? A 'depends on !PREEMPT_RT' would seem sufficient there.
+
+	Arnd
