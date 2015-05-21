@@ -1,58 +1,60 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 21 May 2015 09:44:07 +0900
-Subject: [RFC PATCH 2/4] ARM: dts: Add SPI flash node for Peach boards
-In-Reply-To: <555C5F55.9010507@collabora.co.uk>
-References: <1432042454-19234-1-git-send-email-javier.martinez@collabora.co.uk>
- <1432042454-19234-3-git-send-email-javier.martinez@collabora.co.uk>
- <555C0179.8040102@samsung.com> <555C5F55.9010507@collabora.co.uk>
-Message-ID: <555D2A57.5090702@samsung.com>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Thu, 21 May 2015 08:45:45 +0800
+Subject: [PATCH] ARM: rockchip: restore dapswjdp after suspend
+In-Reply-To: <1432154048-19126-1-git-send-email-dianders@chromium.org>
+References: <1432154048-19126-1-git-send-email-dianders@chromium.org>
+Message-ID: <555D2AB9.1020903@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.05.2015 19:17, Javier Martinez Canillas wrote:
-> Hello Krzysztof,
-> 
-> On 05/20/2015 05:37 AM, Krzysztof Kozlowski wrote:
->> On 19.05.2015 22:34, Javier Martinez Canillas wrote:
->>> From: Simon Glass <sjg@chromium.org>
->>>
->>> Peach Pit and Pi machines have a SPI flash memory that is used to
->>> store firmware and different system parameters and data.
->>>
->>> Add information about the SPI flash chip so that user-space tools
->>> can access it.
->>>
->>> Signed-off-by: Simon Glass <sjg@chromium.org>
->>> Reviewed-by: Doug Anderson <dianders@chromium.org>
->>> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->>
->> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>
->> I assume this can go through samsung-soc tree (after documenting new
->> compatible)?
->>
-> 
-> Yes, I mentioned in the cover letter that patch #1 should go through
-> the spi tree and #2-4 through the linux-samsung tree. I can split in
-> two series once I post as proper patches to make it more clear.
+Hi Doug
 
-It is fine, don't split it. It is good to see the usage of binding in
-the same patchset.
+Thank you for pointing out.
 
->  
->> The exynos5800-peach-pi.dts and exynos5420-peach-pit.dts have a lot of
->> common nodes. I wonder if there is a common part which could have its
->> own dtsi? Like exynos4412-odroid-common.dtsi?
->>
-> 
-> We discussed in the past about having a common .dtsi [0]. I'm not a
-> huge fan of a common .dtsi and I prefer to instead split common dts
-> fragments in a .dtsi that can be included in different dts.
-> 
-> That also better reflects what happens at the hw level IMHO since a
-> board may reuse a IP block. Doug Anderson seems to agree with me [1].
+Reviewed-by: Chris Zhong <zyw@rock-chips.com>
 
-Seems reasonable.
-
-Best regards,
-Krzysztof
+On 05/21/2015 04:34 AM, Doug Anderson wrote:
+> In the commit (0ea001d ARM: rockchip: disable dapswjdp during suspend)
+> we made the assumption that we didn't need to restore dapswjdp after
+> suspend because "the MASKROM will enable it back".
+>
+> It turns out that's not a safe assumption.  In some cases (pending
+> interrupts) it's possible that the WFI might act as a no-op and the
+> MaskROM will never run.  Since we're changing the bit, we should
+> restore it ourselves.
+>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+>   arch/arm/mach-rockchip/pm.c | 5 +++++
+>   1 file changed, 5 insertions(+)
+>
+> diff --git a/arch/arm/mach-rockchip/pm.c b/arch/arm/mach-rockchip/pm.c
+> index b0dcbe2..a7be465 100644
+> --- a/arch/arm/mach-rockchip/pm.c
+> +++ b/arch/arm/mach-rockchip/pm.c
+> @@ -48,6 +48,7 @@ static struct regmap *sgrf_regmap;
+>   
+>   static u32 rk3288_pmu_pwr_mode_con;
+>   static u32 rk3288_sgrf_soc_con0;
+> +static u32 rk3288_sgrf_cpu_con0;
+>   
+>   static inline u32 rk3288_l2_config(void)
+>   {
+> @@ -70,6 +71,7 @@ static void rk3288_slp_mode_set(int level)
+>   {
+>   	u32 mode_set, mode_set1;
+>   
+> +	regmap_read(sgrf_regmap, RK3288_SGRF_CPU_CON0, &rk3288_sgrf_cpu_con0);
+>   	regmap_read(sgrf_regmap, RK3288_SGRF_SOC_CON0, &rk3288_sgrf_soc_con0);
+>   
+>   	regmap_read(pmu_regmap, RK3288_PMU_PWRMODE_CON,
+> @@ -129,6 +131,9 @@ static void rk3288_slp_mode_set(int level)
+>   
+>   static void rk3288_slp_mode_set_resume(void)
+>   {
+> +	regmap_write(sgrf_regmap, RK3288_SGRF_CPU_CON0,
+> +		     rk3288_sgrf_cpu_con0 | SGRF_DAPDEVICEEN_WRITE);
+> +
+>   	regmap_write(pmu_regmap, RK3288_PMU_PWRMODE_CON,
+>   		     rk3288_pmu_pwr_mode_con);
+>   
