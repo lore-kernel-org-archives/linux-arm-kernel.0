@@ -1,59 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 21 May 2015 08:49:57 -0700
-Subject: [GIT PULL 2/2] omap1 sparse irq support for v4.2
-In-Reply-To: <2613552.WPU8qB3AF6@wuerfel>
-References: <80194352.chs4cqVdmg@wuerfel> <20150521145840.GQ10274@atomide.com>
- <2613552.WPU8qB3AF6@wuerfel>
-Message-ID: <20150521154957.GR10274@atomide.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Thu, 21 May 2015 17:59:19 +0200
+Subject: [PATCH v2 0/2] USB OTG PHY driver for NXP LPC18xx family
+Message-ID: <1432223961-26101-1-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [150521 08:41]:
-> On Thursday 21 May 2015 07:58:41 Tony Lindgren wrote:
-> > * Arnd Bergmann <arnd@arndb.de> [150521 05:13]:
-> > > On Wednesday 20 May 2015 15:36:05 Tony Lindgren wrote:
-> > > > Add support for CONFIG_SPARSE_IRQ for omap1. This takes us a bit closer
-> > > > to making omap1 support multiarch. After this series we still need to
-> > > > make omap1 use the common clock framework and fix up the drivers to not
-> > > > rely on includes from mach and plat directories.
-> > > > 
-> > > > Note that this branch depends on a GPIO driver fix in v4.1-rc3
-> > > > d2d05c65c40e ("gpio: omap: Fix regression for MPUIO interrupts").
-> > > > 
-> > > 
-> > > I'm getting lots of build errors in linux-next, which I think are
-> > > caused by this series.
-> > 
-> > Hmm is this with make randconfig?
-> 
-> Yes, all sorts of randconfig builds hit different parts here
-> 
-> > What's the Kconfig option enabling these errors?
-> 
-> From what I can tell, this is simply a result of enabling
-> CONFIG_SPARSE_IRQ, which results in linux/irq.h no longer
-> implicitly including  mach/hardware.h through mach/irqs.h.
+This patch set adds support for the internal USB OTG PHY found
+on NXP LPC18xx and LPC43xx devices. Driver takes care of
+enabling the PHY and setting the clock rate which is need for
+USB0 support on this platform.
 
-Hmm not seeing that here, well at least not with what I've
-tried so far.
- 
-> You should be able to see these errors by just enabling
-> the respective drivers. The errors manifest as a long list
-> of undefined symbols like
-> 
-> /git/arm-soc/arch/arm/mach-omap1/io.c:33:28: error: 'OMAP1_IO_OFFSET' undeclared here (not in a function)
-> /git/arm-soc/arch/arm/mach-omap1/io.c:43:14: error: 'OMAP7XX_DSP_BASE' undeclared here (not in a function)
-> /git/arm-soc/arch/arm/mach-omap1/serial.c:114:33: note: each undeclared identifier is reported only once for each function it appears in
-> /git/arm-soc/arch/arm/mach-omap1/pm.c:217:23: error: 'ULPD_SOFT_DISABLE_REQ_REG' undeclared (first use in this function)
-> /git/arm-soc/drivers/video/fbdev/omap/sossi.c:608:17: error: 'MOD_CONF_CTRL_1' undeclared (first use in this function)
-> 
-> Then again, it is possible that I only see the errors because of
-> an interaction with another patch from my randconfig fixes
-> series.
+This version address the comments from Kishon Vijay Abraham I.
 
-I think there's something like that going on.. Maybe you're
-now enabling multiarch for omap1 in your branch?
+Changes in v2:
+ - use PTR_ERR_OR_ZERO in phy driver
+ - rename binding doc
+ - update doc commit message
 
-Regards,
+Base support for this platform can now be found in arm-soc next.
 
-Tony
+Joachim Eastwood (2):
+  phy: add lpc18xx usb otg phy driver
+  phy: dt bindings: add NXP LPC18xx/43xx USB OTG PHY bindings
+
+ .../bindings/phy/phy-lpc18xx-usb-otg.txt           |  19 +++
+ drivers/phy/Kconfig                                |  11 ++
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-lpc18xx-usb-otg.c                  | 143 +++++++++++++++++++++
+ 4 files changed, 174 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-lpc18xx-usb-otg.txt
+ create mode 100644 drivers/phy/phy-lpc18xx-usb-otg.c
+
+-- 
+1.8.0
