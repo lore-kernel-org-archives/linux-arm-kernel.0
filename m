@@ -1,94 +1,49 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 21 May 2015 16:37:49 +0100
-Subject: [PATCH REPOST] serial/amba-pl011: Unconditionally poll for FIFO space
- before each TX char
-Message-ID: <1432222669-20117-1-git-send-email-Dave.Martin@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 May 2015 17:40:03 +0200
+Subject: [GIT PULL 2/2] omap1 sparse irq support for v4.2
+In-Reply-To: <20150521145840.GQ10274@atomide.com>
+References: <80194352.chs4cqVdmg@wuerfel> <20150521145840.GQ10274@atomide.com>
+Message-ID: <2613552.WPU8qB3AF6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 734745caeb9f155ab58918834a8c70e83fa6afd3 serial/amba-pl011:
-(Activate TX IRQ passively) introduces a race which causes the driver
-sometimes to attempt to write a character to the TX FIFO when the FIFO
-is already full.
+On Thursday 21 May 2015 07:58:41 Tony Lindgren wrote:
+> * Arnd Bergmann <arnd@arndb.de> [150521 05:13]:
+> > On Wednesday 20 May 2015 15:36:05 Tony Lindgren wrote:
+> > > Add support for CONFIG_SPARSE_IRQ for omap1. This takes us a bit closer
+> > > to making omap1 support multiarch. After this series we still need to
+> > > make omap1 use the common clock framework and fix up the drivers to not
+> > > rely on includes from mach and plat directories.
+> > > 
+> > > Note that this branch depends on a GPIO driver fix in v4.1-rc3
+> > > d2d05c65c40e ("gpio: omap: Fix regression for MPUIO interrupts").
+> > > 
+> > 
+> > I'm getting lots of build errors in linux-next, which I think are
+> > caused by this series.
+> 
+> Hmm is this with make randconfig?
 
-The PL011 does not guarantee its behaviour when the FIFO is overfilled.
-In practice, this can cause duplicate and/or dropped characters to be
-output on the wire.  The problem is common enough to be readily
-observable on the ARM Juno platform when the PL011 UART is used as
-the console and DMA is not in use.
+Yes, all sorts of randconfig builds hit different parts here
 
-This patch fixes this problem by always polling for space before each
-character is written to the FIFO.
+> What's the Kconfig option enabling these errors?
 
-This will be amended to a less brute-force approach in a later commit,
-but this patch should help ensure correct behaviour for now.
+>From what I can tell, this is simply a result of enabling
+CONFIG_SPARSE_IRQ, which results in linux/irq.h no longer
+implicitly including  mach/hardware.h through mach/irqs.h.
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
+You should be able to see these errors by just enabling
+the respective drivers. The errors manifest as a long list
+of undefined symbols like
 
-The patch is based on torvalds/master (v4.1-rc4-11-g1113cdf)
+/git/arm-soc/arch/arm/mach-omap1/io.c:33:28: error: 'OMAP1_IO_OFFSET' undeclared here (not in a function)
+/git/arm-soc/arch/arm/mach-omap1/io.c:43:14: error: 'OMAP7XX_DSP_BASE' undeclared here (not in a function)
+/git/arm-soc/arch/arm/mach-omap1/serial.c:114:33: note: each undeclared identifier is reported only once for each function it appears in
+/git/arm-soc/arch/arm/mach-omap1/pm.c:217:23: error: 'ULPD_SOFT_DISABLE_REQ_REG' undeclared (first use in this function)
+/git/arm-soc/drivers/video/fbdev/omap/sossi.c:608:17: error: 'MOD_CONF_CTRL_1' undeclared (first use in this function)
 
-Please consider applying it for v4.1.  Without it, we have a
-significant functional regression compared with v4.0.
+Then again, it is possible that I only see the errors because of
+an interaction with another patch from my randconfig fixes
+series.
 
-
-I've been testing this for a couple of weeks on ARM Juno and it appears
-sound; any further testing by other people is still encouraged.
-
-*Note*
-This will cause a conflict with tty-next because it pulls forward
-some changes made by commit 1e84d22 (serial/amba-pl011: Refactor and
-simplify TX FIFO handling).
-
-The correct resolution is to take amba-pl011.c from tty-next.
-
-Cheers
----Dave
-
-
- drivers/tty/serial/amba-pl011.c |   16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 6f5a072..763eb20 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -1249,20 +1249,19 @@ __acquires(&uap->port.lock)
- 
- /*
-  * Transmit a character
-- * There must be at least one free entry in the TX FIFO to accept the char.
-  *
-- * Returns true if the FIFO might have space in it afterwards;
-- * returns false if the FIFO definitely became full.
-+ * Returns true if the character was successfully queued to the FIFO.
-+ * Returns false otherwise.
-  */
- static bool pl011_tx_char(struct uart_amba_port *uap, unsigned char c)
- {
-+	if (readw(uap->port.membase + UART01x_FR) & UART01x_FR_TXFF)
-+		return false; /* unable to transmit character */
-+
- 	writew(c, uap->port.membase + UART01x_DR);
- 	uap->port.icount.tx++;
- 
--	if (likely(uap->tx_irq_seen > 1))
--		return true;
--
--	return !(readw(uap->port.membase + UART01x_FR) & UART01x_FR_TXFF);
-+	return true;
- }
- 
- static bool pl011_tx_chars(struct uart_amba_port *uap)
-@@ -1296,7 +1295,8 @@ static bool pl011_tx_chars(struct uart_amba_port *uap)
- 		return false;
- 
- 	if (uap->port.x_char) {
--		pl011_tx_char(uap, uap->port.x_char);
-+		if (!pl011_tx_char(uap, uap->port.x_char))
-+			goto done;
- 		uap->port.x_char = 0;
- 		--count;
- 	}
--- 
-1.7.10.4
+	Arnd
