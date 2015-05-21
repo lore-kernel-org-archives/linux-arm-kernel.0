@@ -1,16 +1,18 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 21 May 2015 09:09:42 +0800
-Subject: [PATCH 01/12] ARM: mach-imx: iomux-imx31: Use DECLARE_BITMAP
-In-Reply-To: <04e6c29d921d20f6089dd5d13f2c35bbe362eb0e.1432085659.git.joe@perches.com>
-References: <cover.1432085659.git.joe@perches.com>
- <04e6c29d921d20f6089dd5d13f2c35bbe362eb0e.1432085659.git.joe@perches.com>
-Message-ID: <20150521010941.GG24844@dragon>
+Date: Thu, 21 May 2015 09:12:35 +0800
+Subject: [PATCH v2] ARM: imx: clk-v610: Add clock for I2C2 and I2C3
+In-Reply-To: <1432114683-24945-1-git-send-email-mirza.krak@hostmobility.com>
+References: <1432114683-24945-1-git-send-email-mirza.krak@hostmobility.com>
+Message-ID: <20150521011234.GH24844@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 06:37:49PM -0700, Joe Perches wrote:
-> Use the generic mechanism to declare a bitmap instead of unsigned long.
+On Wed, May 20, 2015 at 11:38:03AM +0200, Mirza Krak wrote:
+> From: Mirza Krak <mirza.krak@hostmobility.com>
 > 
-> Signed-off-by: Joe Perches <joe@perches.com>
+> Add support for clock gating of I2C2 and I2C3.
+> We use I2C2 in a (not yet mainlined) device tree.
+> 
+> Signed-off-by: Mirza Krak <mirza.krak@hostmobility.com>
 
 Applied, thanks.
