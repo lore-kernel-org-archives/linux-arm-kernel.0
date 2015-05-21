@@ -1,277 +1,302 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 21 May 2015 22:54:00 +0200
-Subject: [PATCH v2 1/7] clk: Add a basic factor clock
+Date: Thu, 21 May 2015 22:54:01 +0200
+Subject: [PATCH v2 2/7] clk: sunxi: Add a driver for the PLL2
 In-Reply-To: <1432241646-9511-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1432241646-9511-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1432241646-9511-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1432241646-9511-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some clocks are using a factor component, however, unlike their mux, gate
-or divider counterpart, these factors don't have a basic clock
-implementation.
+The PLL2 on the A10 and later SoCs is the clock used for all the audio
+related operations.
 
-This leads to code duplication across platforms that want to use that kind
-of clocks, and the impossibility to use the composite clocks with such a
-clock without defining your own rate operations.
+This clock has a somewhat complex output tree, with three outputs (2X, 4X
+and 8X) with a fixed divider from the base clock, and an output (1X) with a
+post divider.
 
-Create such a driver in order to remove these issues, and hopefully factor
-the implementations, reducing code size across platforms and consolidating
-the various implementations.
+However, we can simplify things since the 1X divider can be fixed, and we
+end up by having a base clock not exposed to any device (or at least
+directly, since the 4X output doesn't have any divider), and 4 fixed
+divider clocks that will be exposed.
+
+This clock seems to have been introduced, at least in this form, in the
+revision B of the A10, but we don't have any information on the clock used
+on the revision A.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/Makefile         |   1 +
- drivers/clk/clk-factor.c     | 176 +++++++++++++++++++++++++++++++++++++++++++
- include/linux/clk-provider.h |  41 ++++++++++
- 3 files changed, 218 insertions(+)
- create mode 100644 drivers/clk/clk-factor.c
+ drivers/clk/sunxi/Makefile                 |   1 +
+ drivers/clk/sunxi/clk-a10-pll2.c           | 189 +++++++++++++++++++++++++++++
+ include/dt-bindings/clock/sun4i-a10-pll2.h |  53 ++++++++
+ 3 files changed, 243 insertions(+)
+ create mode 100644 drivers/clk/sunxi/clk-a10-pll2.c
+ create mode 100644 include/dt-bindings/clock/sun4i-a10-pll2.h
 
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 3d00c25382c5..d38b71d15ffa 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -3,6 +3,7 @@ obj-$(CONFIG_HAVE_CLK)		+= clk-devres.o
- obj-$(CONFIG_CLKDEV_LOOKUP)	+= clkdev.o
- obj-$(CONFIG_COMMON_CLK)	+= clk.o
- obj-$(CONFIG_COMMON_CLK)	+= clk-divider.o
-+obj-$(CONFIG_COMMON_CLK)	+= clk-factor.o
- obj-$(CONFIG_COMMON_CLK)	+= clk-fixed-factor.o
- obj-$(CONFIG_COMMON_CLK)	+= clk-fixed-rate.o
- obj-$(CONFIG_COMMON_CLK)	+= clk-gate.o
-diff --git a/drivers/clk/clk-factor.c b/drivers/clk/clk-factor.c
+diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
+index 058f273d6154..eb36c38d4120 100644
+--- a/drivers/clk/sunxi/Makefile
++++ b/drivers/clk/sunxi/Makefile
+@@ -4,6 +4,7 @@
+ 
+ obj-y += clk-sunxi.o clk-factors.o
+ obj-y += clk-a10-hosc.o
++obj-y += clk-a10-pll2.o
+ obj-y += clk-a20-gmac.o
+ obj-y += clk-mod0.o
+ obj-y += clk-sun8i-mbus.o
+diff --git a/drivers/clk/sunxi/clk-a10-pll2.c b/drivers/clk/sunxi/clk-a10-pll2.c
 new file mode 100644
-index 000000000000..17f83852cdb6
+index 000000000000..8ffc3e0309cf
 --- /dev/null
-+++ b/drivers/clk/clk-factor.c
-@@ -0,0 +1,176 @@
++++ b/drivers/clk/sunxi/clk-a10-pll2.c
+@@ -0,0 +1,189 @@
 +/*
-+ * Copyright (C) 2015 Maxime Ripard <maxime.ripard@free-electrons.com>
++ * Copyright 2013 Emilio L?pez
++ * Emilio L?pez <emilio@elopez.com.ar>
++ *
++ * Copyright 2015 Maxime Ripard
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
-+#include <linux/module.h>
++
 +#include <linux/clk-provider.h>
-+#include <linux/slab.h>
-+#include <linux/err.h>
 +#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/slab.h>
 +
-+#define to_clk_factor(_hw) container_of(_hw, struct clk_factor, hw)
++#include <dt-bindings/clock/sun4i-a10-pll2.h>
 +
-+static unsigned long __get_mult(struct clk_factor *factor,
-+				unsigned long rate,
-+				unsigned long parent_rate)
++#include "clk-factors.h"
++
++#define SUN4I_PLL2_ENABLE		31
++
++#define SUN4I_PLL2_PRE_DIV_SHIFT	0
++#define SUN4I_PLL2_PRE_DIV_WIDTH	5
++#define SUN4I_PLL2_PRE_DIV_MASK		GENMASK(SUN4I_PLL2_PRE_DIV_WIDTH, 0)
++
++#define SUN4I_PLL2_N_SHIFT		8
++#define SUN4I_PLL2_N_WIDTH		7
++#define SUN4I_PLL2_N_MASK		GENMASK(SUN4I_PLL2_N_WIDTH, 0)
++
++#define SUN4I_PLL2_POST_DIV_SHIFT	26
++#define SUN4I_PLL2_POST_DIV_WIDTH	4
++#define SUN4I_PLL2_POST_DIV_MASK	GENMASK(SUN4I_PLL2_POST_DIV_WIDTH, 0)
++
++#define SUN4I_PLL2_POST_DIV_VALUE	4
++
++#define SUN4I_PLL2_OUTPUTS		4
++
++static DEFINE_SPINLOCK(sun4i_a10_pll2_lock);
++
++static void __init sun4i_pll2_setup(struct device_node *node)
 +{
-+	if (factor->flags & CLK_FACTOR_ROUND_CLOSEST)
-+		return DIV_ROUND_CLOSEST(rate, parent_rate);
-+
-+	return rate / parent_rate;
-+}
-+
-+static unsigned long clk_factor_recalc_rate(struct clk_hw *hw,
-+					    unsigned long parent_rate)
-+{
-+	struct clk_factor *factor = to_clk_factor(hw);
-+	unsigned long val;
-+	
-+	val = clk_readl(factor->reg) >> factor->shift;
-+	val &= GENMASK(factor->width, 0);
-+
-+	if (!val && factor->flags & CLK_FACTOR_ZERO_BYPASS)
-+		val = 1;
-+	
-+	return parent_rate * val;
-+}
-+
-+static bool __is_best_rate(unsigned long rate, unsigned long new,
-+			   unsigned long best, unsigned long flags)
-+{
-+	if (flags & CLK_FACTOR_ROUND_CLOSEST)
-+		return abs(rate - new) < abs(rate - best);
-+
-+	return new >= rate && new < best;
-+}
-+
-+static unsigned long clk_factor_bestmult(struct clk_hw *hw, unsigned long rate,
-+					 unsigned long *best_parent_rate,
-+					 u8 width, unsigned long flags)
-+{
-+	unsigned long orig_parent_rate = *best_parent_rate;
-+	unsigned long parent_rate, current_rate, best_rate = ~0;
-+	unsigned int i, bestmult = 0;
-+
-+	if (!(__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT))
-+		return rate / *best_parent_rate;
-+
-+	for (i = 1; i < ((1 << width) - 1); i++) {
-+		if (rate * i == orig_parent_rate) {
-+			/*
-+			 * This is the best case for us if we have a
-+			 * perfect match without changing the parent
-+			 * rate.
-+			 */
-+			*best_parent_rate = orig_parent_rate;
-+			return i;
-+		}
-+
-+		parent_rate = __clk_round_rate(__clk_get_parent(hw->clk),
-+					       rate / i);
-+		current_rate = parent_rate * i;
-+
-+		if (__is_best_rate(rate, current_rate, best_rate, flags)) {
-+			bestmult = i;
-+			best_rate = current_rate;
-+			*best_parent_rate = parent_rate;
-+		}
-+	}
-+
-+	return bestmult;
-+}
-+
-+static long clk_factor_round_rate(struct clk_hw *hw, unsigned long rate,
-+				  unsigned long *parent_rate)
-+{
-+	struct clk_factor *factor = to_clk_factor(hw);
-+	unsigned long mult = clk_factor_bestmult(hw, rate, parent_rate,
-+						 factor->width, factor->flags);
-+
-+	return *parent_rate * mult;
-+}
-+
-+static int clk_factor_set_rate(struct clk_hw *hw, unsigned long rate,
-+			       unsigned long parent_rate)
-+{
-+	struct clk_factor *factor = to_clk_factor(hw);
-+	unsigned long mult = __get_mult(factor, rate, parent_rate);
-+	unsigned long uninitialized_var(flags);
-+	struct clk *clk = hw->clk;
-+	unsigned long val;
-+
-+	if (factor->lock)
-+		spin_lock_irqsave(factor->lock, flags);
-+
-+	val = clk_readl(factor->reg);
-+	val &= ~GENMASK(factor->width + factor->shift, factor->shift);
-+	val |= mult << factor->shift;
-+	clk_writel(val, factor->reg);
-+
-+	if (factor->lock)
-+		spin_unlock_irqrestore(factor->lock, flags);
-+
-+	return 0;
-+}
-+
-+const struct clk_ops clk_factor_ops = {
-+	.recalc_rate	= clk_factor_recalc_rate,
-+	.round_rate	= clk_factor_round_rate,
-+	.set_rate	= clk_factor_set_rate,
-+};
-+EXPORT_SYMBOL_GPL(clk_factor_ops);
-+
-+struct clk *clk_register_factor(struct device *dev, const char *name,
-+				const char *parent_name, unsigned long flags,
-+				void __iomem *reg, u8 shift, u8 width,
-+				u8 clk_factor_flags, spinlock_t *lock)
-+{
-+	struct clk_init_data init;
++	const char *clk_name = node->name, *parent;
++	struct clk **clks, *base_clk, *prediv_clk;
++	struct clk_onecell_data *clk_data;
 +	struct clk_factor *factor;
-+	struct clk *clk;
++	struct clk_gate *gate;
++	void __iomem *reg;
++	u32 val;
 +
-+	factor = kmalloc(sizeof(*factor), GFP_KERNEL);
-+	if (!factor) {
-+		pr_err("%s: could not allocate fixed factor clk\n", __func__);
-+		return ERR_PTR(-ENOMEM);
-+	}
-+
-+	init.name = name;
-+	init.ops = &clk_factor_ops;
-+	init.flags = flags | CLK_IS_BASIC;
-+	init.parent_names = &parent_name;
-+	init.num_parents = 1;
-+
-+	factor->reg = reg;
-+	factor->shift = shift;
-+	factor->width = width;
-+	factor->flags = clk_factor_flags;
-+	factor->lock = lock;
-+	factor->hw.init = &init;
-+	
-+	clk = clk_register(dev, &factor->hw);
-+	if (IS_ERR(clk))
-+		kfree(factor);
-+
-+	return clk;
-+}
-+EXPORT_SYMBOL_GPL(clk_register_factor);
-+
-+void clk_unregister_factor(struct clk *clk)
-+{
-+	struct clk_factor *factor;
-+	struct clk_hw *hw;
-+
-+	hw = __clk_get_hw(clk);
-+	if (!hw)
++	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
++	if (IS_ERR(reg))
 +		return;
 +
-+	factor = to_clk_factor(hw);
++	clk_data = kzalloc(sizeof(*clk_data), GFP_KERNEL);
++	if (!clk_data)
++		goto err_unmap;
 +
-+	clk_unregister(clk);
++	clks = kcalloc(SUN4I_PLL2_OUTPUTS, sizeof(struct clk *), GFP_KERNEL);
++	if (!clks)
++		goto err_free_data;
++
++	parent = of_clk_get_parent_name(node, 0);
++	prediv_clk = clk_register_divider(NULL, "pll2-prediv",
++					  parent, 0, reg,
++					  SUN4I_PLL2_PRE_DIV_SHIFT,
++					  SUN4I_PLL2_PRE_DIV_WIDTH,
++					  CLK_DIVIDER_ONE_BASED |
++					  CLK_DIVIDER_ALLOW_ZERO,
++					  &sun4i_a10_pll2_lock);
++	if (!prediv_clk) {
++		pr_err("Couldn't register the prediv clock\n");
++		goto err_free_array;
++	}
++
++	/* Setup the gate part of the PLL2 */
++	gate = kzalloc(sizeof(struct clk_gate), GFP_KERNEL);
++	if (!gate)
++		goto err_unregister_prediv;
++
++	gate->reg = reg;
++	gate->bit_idx = SUN4I_PLL2_ENABLE;
++	gate->lock = &sun4i_a10_pll2_lock;
++
++	/* Setup the factor part of the PLL2 */
++	factor = kzalloc(sizeof(struct clk_factor), GFP_KERNEL);
++	if (!factor)
++		goto err_free_gate;
++
++	factor->reg = reg;
++	factor->shift = SUN4I_PLL2_N_SHIFT;
++	factor->width = 7;
++	factor->flags = CLK_FACTOR_ZERO_BYPASS | CLK_FACTOR_ROUND_CLOSEST;
++	factor->lock = &sun4i_a10_pll2_lock;
++
++	parent = __clk_get_name(prediv_clk);
++	base_clk = clk_register_composite(NULL, "pll2-base",
++					  &parent, 1,
++					  NULL, NULL,
++					  &factor->hw, &clk_factor_ops,
++					  &gate->hw, &clk_gate_ops,
++					  CLK_SET_RATE_PARENT);
++	if (!base_clk) {
++		pr_err("Couldn't register the base factor clock\n");
++		goto err_free_factor;
++	}
++
++	parent = __clk_get_name(base_clk);
++
++	/*
++	 * PLL2-1x
++	 *
++	 * This is supposed to have a post divider, but we won't need
++	 * to use it, we just need to initialise it to 4, and use a
++	 * fixed divider.
++	 */
++	val = readl(reg);
++	val &= ~(SUN4I_PLL2_POST_DIV_MASK << SUN4I_PLL2_POST_DIV_SHIFT);
++	val |= SUN4I_PLL2_POST_DIV_VALUE << SUN4I_PLL2_POST_DIV_SHIFT;
++	writel(val, reg);
++
++	of_property_read_string_index(node, "clock-output-names",
++				      SUN4I_A10_PLL2_1X, &clk_name);
++	clks[SUN4I_A10_PLL2_1X] = clk_register_fixed_factor(NULL, clk_name,
++							    parent,
++							    CLK_SET_RATE_PARENT,
++							    1,
++							    SUN4I_PLL2_POST_DIV_VALUE);
++	WARN_ON(IS_ERR(clks[SUN4I_A10_PLL2_1X]));
++
++	/*
++	 * PLL2-2x
++	 *
++	 * This clock doesn't use the post divider, and really is just
++	 * a fixed divider from the PLL2 base clock.
++	 */
++	of_property_read_string_index(node, "clock-output-names",
++				      SUN4I_A10_PLL2_2X, &clk_name);
++	clks[SUN4I_A10_PLL2_2X] = clk_register_fixed_factor(NULL, clk_name,
++							    parent,
++							    CLK_SET_RATE_PARENT,
++							    1, 2);
++	WARN_ON(IS_ERR(clks[SUN4I_A10_PLL2_2X]));
++
++	/* PLL2-4x */
++	of_property_read_string_index(node, "clock-output-names",
++				      SUN4I_A10_PLL2_4X, &clk_name);
++	clks[SUN4I_A10_PLL2_4X] = clk_register_fixed_factor(NULL, clk_name,
++							    parent,
++							    CLK_SET_RATE_PARENT,
++							    1, 1);
++	WARN_ON(IS_ERR(clks[SUN4I_A10_PLL2_4X]));
++
++	/* PLL2-8x */
++	of_property_read_string_index(node, "clock-output-names",
++				      SUN4I_A10_PLL2_8X, &clk_name);
++	clks[SUN4I_A10_PLL2_8X] = clk_register_fixed_factor(NULL, clk_name,
++							    parent,
++							    CLK_SET_RATE_PARENT,
++							    2, 1);
++	WARN_ON(IS_ERR(clks[SUN4I_A10_PLL2_8X]));
++
++	clk_data->clks = clks;
++	clk_data->clk_num = SUN4I_PLL2_OUTPUTS;
++	of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
++
++	return;
++
++err_free_factor:
 +	kfree(factor);
++err_free_gate:
++	kfree(gate);
++err_unregister_prediv:
++	clk_unregister_divider(prediv_clk);
++err_free_array:
++	kfree(clks);
++err_free_data:
++	kfree(clk_data);
++err_unmap:
++	iounmap(reg);
 +}
-+EXPORT_SYMBOL_GPL(clk_unregister_factor);
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index df695313f975..543918c378f5 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -493,6 +493,47 @@ struct clk *clk_register_fractional_divider(struct device *dev,
- 		void __iomem *reg, u8 mshift, u8 mwidth, u8 nshift, u8 nwidth,
- 		u8 clk_divider_flags, spinlock_t *lock);
- 
-+/**
-+ * struct clk_factor - adjustable factor clock
++CLK_OF_DECLARE(sun4i_pll2, "allwinner,sun4i-a10-b-pll2-clk", sun4i_pll2_setup);
+diff --git a/include/dt-bindings/clock/sun4i-a10-pll2.h b/include/dt-bindings/clock/sun4i-a10-pll2.h
+new file mode 100644
+index 000000000000..071c8112d531
+--- /dev/null
++++ b/include/dt-bindings/clock/sun4i-a10-pll2.h
+@@ -0,0 +1,53 @@
++/*
++ * Copyright 2015 Maxime Ripard
 + *
-+ * @hw:		handle between common and hardware-specific interfaces
-+ * @reg:	register containing the factor
-+ * @shift:	shift to the factor bit field
-+ * @width:	width of the factor bit field
-+ * @lock:	register lock
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
 + *
-+ * Clock with an adjustable factor affecting its output frequency.
-+ * Implements .recalc_rate, .set_rate and .round_rate
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
 + *
-+ * Flags:
-+ * CLK_FACTOR_ZERO_BYPASS - By default, the factor is the value read
-+ *	from the register, with 0 being a valid value effectively
-+ *	zeroing the output clock rate. If CLK_FACTOR_ZERO_BYPASS is
-+ *	set, then a null factor will be considered as a bypass,
-+ *	leaving the parent rate unmodified.
-+ * CLK_FACTOR_ROUND_CLOSEST - Makes the best calculated divider to be
-+ *	rounded to the closest integer instead of the down one.
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
 + */
-+struct clk_factor {
-+	struct clk_hw	hw;
-+	void __iomem	*reg;
-+	u8		shift;
-+	u8		width;
-+	u8		flags;
-+	spinlock_t	*lock;
-+};
 +
-+#define CLK_FACTOR_ZERO_BYPASS		BIT(0)
-+#define CLK_FACTOR_ROUND_CLOSEST	BIT(1)
++#ifndef __DT_BINDINGS_CLOCK_SUN4I_A10_PLL2_H_
++#define __DT_BINDINGS_CLOCK_SUN4I_A10_PLL2_H_
 +
-+extern const struct clk_ops clk_factor_ops;
++#define SUN4I_A10_PLL2_1X	0
++#define SUN4I_A10_PLL2_2X	1
++#define SUN4I_A10_PLL2_4X	2
++#define SUN4I_A10_PLL2_8X	3
 +
-+struct clk *clk_register_factor(struct device *dev, const char *name,
-+				const char *parent_name, unsigned long flags,
-+				void __iomem *reg, u8 shift, u8 width,
-+				u8 clk_factor_flags, spinlock_t *lock);
-+void clk_unregister_factor(struct clk *clk);
-+
- /***
-  * struct clk_composite - aggregate clock of mux, divider and gate clocks
-  *
++#endif /* __DT_BINDINGS_CLOCK_SUN4I_A10_PLL2_H_ */
 -- 
 2.4.1
