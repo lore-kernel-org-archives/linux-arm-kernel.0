@@ -1,57 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 21 May 2015 11:42:07 -0700
-Subject: [PATCH] ARM: OMAP1: Fix section mismatch warnings for omap_cfg_reg
-Message-ID: <1432233727-14311-1-git-send-email-tony@atomide.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 21 May 2015 20:45:25 +0200
+Subject: [PATCH 2/3] ARM: dts: sun7i: Add uart2 support for BananaPi
+In-Reply-To: <1432211555-25078-2-git-send-email-hdegoede@redhat.com>
+References: <1432211555-25078-1-git-send-email-hdegoede@redhat.com>
+ <1432211555-25078-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150521184525.GC8557@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is cleary used after init time too for example for
-configuring UART wake-up events during runtime.
+On Thu, May 21, 2015 at 02:32:34PM +0200, Hans de Goede wrote:
+> From: Michael Ring <mail@michael-ring.org>
+> 
+> Uart2 is available at the bananapi io-pins, add a dts node for this
+> (so that people can easily enable it) but leave it disabled as the pins
+> are primarily intended for gpio as documented here:
+> http://wiki.lemaker.org/Pin_definition
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap1/mux.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+So far the policy we had on this is only to add to the DT the primary
+purpose of these pins.
 
-diff --git a/arch/arm/mach-omap1/mux.c b/arch/arm/mach-omap1/mux.c
-index 667ce50..599490a 100644
---- a/arch/arm/mach-omap1/mux.c
-+++ b/arch/arm/mach-omap1/mux.c
-@@ -36,7 +36,7 @@
- static struct omap_mux_cfg arch_mux_cfg;
- 
- #if defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP850)
--static struct pin_config __initdata_or_module omap7xx_pins[] = {
-+static struct pin_config omap7xx_pins[] = {
- MUX_CFG_7XX("E2_7XX_KBR0",        12,   21,    0,   20,   1, 0)
- MUX_CFG_7XX("J7_7XX_KBR1",        12,   25,    0,   24,   1, 0)
- MUX_CFG_7XX("E1_7XX_KBR2",        12,   29,    0,   28,   1, 0)
-@@ -82,7 +82,7 @@ MUX_CFG_7XX("UART_7XX_2",          8,    1,    6,    0,   0, 0)
- #endif	/* CONFIG_ARCH_OMAP730 || CONFIG_ARCH_OMAP850 */
- 
- #if defined(CONFIG_ARCH_OMAP15XX) || defined(CONFIG_ARCH_OMAP16XX)
--static struct pin_config __initdata_or_module omap1xxx_pins[] = {
-+static struct pin_config omap1xxx_pins[] = {
- /*
-  *	 description		mux  mode   mux	 pull pull  pull  pu_pd	 pu  dbg
-  *				reg  offset mode reg  bit   ena	  reg
-@@ -343,7 +343,7 @@ MUX_CFG("Y14_1610_CCP_DATAM",	 9,   21,    6,   2,   3,   1,    2,     0,  0)
- #define OMAP1XXX_PINS_SZ	0
- #endif	/* CONFIG_ARCH_OMAP15XX || CONFIG_ARCH_OMAP16XX */
- 
--static int __init_or_module omap1_cfg_reg(const struct pin_config *cfg)
-+static int omap1_cfg_reg(const struct pin_config *cfg)
- {
- 	static DEFINE_SPINLOCK(mux_spin_lock);
- 	unsigned long flags;
-@@ -469,7 +469,7 @@ int __init omap_mux_register(struct omap_mux_cfg *arch_mux_cfg)
- /*
-  * Sets the Omap MUX and PULL_DWN registers based on the table
-  */
--int __init_or_module omap_cfg_reg(const unsigned long index)
-+int omap_cfg_reg(const unsigned long index)
- {
- 	struct pin_config *reg;
- 
+Even though that might seem arbitrary, it's the only way to prevent
+anyone adding their own configuration for those pins, which would be a
+mess to maintain and use. It's even more true since that sort of thing
+is exactly where the overlays shine.
+
+So, I'm ok with adding the uart4, but the uart2 should go.
+
+Maxime
+
 -- 
-2.1.4
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150521/9e4a888d/attachment.sig>
