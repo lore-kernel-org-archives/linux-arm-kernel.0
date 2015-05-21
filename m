@@ -1,64 +1,70 @@
-From: ranjit.waghmode@xilinx.com (Ranjit Abhimanyu Waghmode)
-Date: Thu, 21 May 2015 12:42:23 +0000
-Subject: [RFC PATCH 1/2] devicetree: Add devicetree bindings
- documentation for ZynqMP GQSPI
-In-Reply-To: <20150520143854.GU31550@xsjsorenbubuntu>
-References: <1432106871-27232-1-git-send-email-ranjit.waghmode@xilinx.com>
- <20150520143854.GU31550@xsjsorenbubuntu>
-Message-ID: <7CFCFE83B8145347A1D424EC939F1C3CA6F1BC@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 May 2015 14:47:13 +0200
+Subject: [GIT PULL 2/2] omap1 sparse irq support for v4.2
+In-Reply-To: <4094934.StqYY08vL5@wuerfel>
+References: <4094934.StqYY08vL5@wuerfel>
+Message-ID: <12764506.jQAKye8BGv@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Soren,
-
-On Wed, 2015-05-20 at 12:57PM +0530, Ranjit Waghmode wrote:
-> Add bindings documentation for GQSPI controller driver used by Zynq 
-> Ultrascale+ MPSoC
+On Thursday 21 May 2015 14:14:12 Arnd Bergmann wrote:
+> On Wednesday 20 May 2015 15:36:05 Tony Lindgren wrote:
+> > Add support for CONFIG_SPARSE_IRQ for omap1. This takes us a bit closer
+> > to making omap1 support multiarch. After this series we still need to
+> > make omap1 use the common clock framework and fix up the drivers to not
+> > rely on includes from mach and plat directories.
+> > 
+> > Note that this branch depends on a GPIO driver fix in v4.1-rc3
+> > d2d05c65c40e ("gpio: omap: Fix regression for MPUIO interrupts").
+> > 
 > 
-> Signed-off-by: Ranjit Waghmode <ranjit.waghmode@xilinx.com>
-> ---
->  .../devicetree/bindings/spi/spi-zynqmp-qspi.txt    | 26 ++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
->  create mode 100644 
-> Documentation/devicetree/bindings/spi/spi-zynqmp-qspi.txt
+> fwiw, I have another patch in my 'multiplatform' series that will add
+> another baby step.
 > 
-> diff --git a/Documentation/devicetree/bindings/spi/spi-zynqmp-qspi.txt 
-> b/Documentation/devicetree/bindings/spi/spi-zynqmp-qspi.txt
-> new file mode 100644
-> index 0000000..cec6330
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/spi/spi-zynqmp-qspi.txt
-> @@ -0,0 +1,26 @@
-> +Xilinx Zynq UltraScale+ MPSoC GQSPI controller Device Tree Bindings
-> +-------------------------------------------------------------------
-> +
-> +Required properties:
-> +- compatible		: Should be "xlnx,zynqmp-qspi-1.0".
-> +- reg			: Physical base address and size of GQSPI registers map.
-> +- interrupts		: Property with a value describing the interrupt
-> +			  number.
-> +- interrupt-parent	: Must be core interrupt controller.
-> +- clock-names		: List of input clock names - "ref_clk", "pclk"
-> +			  (See clock bindings for details).
-> +- clocks		: Clock phandles (see clock bindings for details).
-> +
-> +Optional properties:
-> +- num-cs		: Number of chip selects used.
-> +
-> +Example:
-> +	qspi: spi at ff0f0000 {
-> +		compatible = "xlnx,zynqmp-qspi-1.0";
-> +		clock-names = "ref_clk", "pclk";
-> +		clocks = <&misc_clk &misc_clk>;
-> +		interrupts = <0 15 4>;
-> +		interrupt-parent = <&gic>;
-> +		num-cs = <1>;
-> +		reg = <0x0 0xff0f0000 0x1000 0x0 0xc0000000 0x8000000>;
+> 8<---
+> ARM: OMAP1: make header files local if possible
+> 
+> A number of header files in mach-omap1 are never included from outside
+> of mach-omap1, so we can move them directly to that directory.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-I find things a lot easier to read when there is something separating the groups. Could this become:
-	reg = <0x0 0xff0f0000 0x1000>, <0x0 0xc0000000 0x8000000>; ?
+and three more:
 
-[Ranjit]: I will try your suggestion and send you in the next version.
-
-Regards,
-Ranjit
+diff --git a/arch/arm/mach-omap1/board-h3.h b/arch/arm/mach-omap1/board-h3.h
+index 78de535be3c5..f70c42801969 100644
+--- a/arch/arm/mach-omap1/board-h3.h
++++ b/arch/arm/mach-omap1/board-h3.h
+@@ -27,6 +27,8 @@
+ #ifndef __ASM_ARCH_OMAP_H3_H
+ #define __ASM_ARCH_OMAP_H3_H
+ 
++#include <mach/irqs.h>
++
+ #define H3_TPS_GPIO_BASE		(OMAP_MAX_GPIO_LINES + 16 /* MPUIO */)
+ #	define H3_TPS_GPIO_MMC_PWR_EN	(H3_TPS_GPIO_BASE + 4)
+ 
+diff --git a/drivers/usb/gadget/udc/omap_udc.c b/drivers/usb/gadget/udc/omap_udc.c
+index e2fcdb8e5596..8a3690b2acbd 100644
+--- a/drivers/usb/gadget/udc/omap_udc.c
++++ b/drivers/usb/gadget/udc/omap_udc.c
+@@ -45,6 +45,7 @@
+ 
+ #include <linux/omap-dma.h>
+ 
++#include <mach/hardware.h>
+ #include <mach/usb.h>
+ 
+ #include "omap_udc.h"
+diff --git a/sound/soc/omap/omap-pcm.c b/sound/soc/omap/omap-pcm.c
+index 6bb623a2a4df..1f6c8d91f738 100644
+--- a/sound/soc/omap/omap-pcm.c
++++ b/sound/soc/omap/omap-pcm.c
+@@ -34,6 +34,7 @@
+ #include <sound/omap-pcm.h>
+ 
+ #ifdef CONFIG_ARCH_OMAP1
++#include <mach/soc.h>
+ #define pcm_omap1510()	cpu_is_omap1510()
+ #else
+ #define pcm_omap1510()	0
