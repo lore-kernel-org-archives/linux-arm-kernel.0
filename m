@@ -1,40 +1,35 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 21 May 2015 23:19:47 +0200
-Subject: [RFC PATCH 1/1] pci-imx6: add speed change timeout message
-In-Reply-To: <1432233345-10160-1-git-send-email-troy.kisky@boundarydevices.com>
-References: <1432233345-10160-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <201505212319.47974.marex@denx.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 May 2015 23:23:14 +0200
+Subject: [PATCH] ASoC: qcom: remove incorrect dependencies
+In-Reply-To: <20150521205952.GA31005@kwestfie-linux.qualcomm.com>
+References: <2324031.cqS0mEEEhQ@wuerfel>
+ <20150521205952.GA31005@kwestfie-linux.qualcomm.com>
+Message-ID: <8811360.XmVQbMhHJj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, May 21, 2015 at 08:35:45 PM, Troy Kisky wrote:
-> Currently, the timeout is never detected as count
-> has a value of -1 if a timeout happens, but the code is checking
-> for 0.
+On Thursday 21 May 2015 14:00:00 Kenneth Westfield wrote:
+> > diff --git a/sound/soc/qcom/Kconfig b/sound/soc/qcom/Kconfig
+> > index 5f58e4f1bca9..b07f183fc47f 100644
+> > --- a/sound/soc/qcom/Kconfig
+> > +++ b/sound/soc/qcom/Kconfig
+> > @@ -6,12 +6,10 @@ config SND_SOC_QCOM
+> >  
+> >  config SND_SOC_LPASS_CPU
+> >       tristate
+> > -     depends on SND_SOC_QCOM
 > 
-> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> Rather than remove the dependency (which I would like to keep), would
+> the following change work for SND_SOC_LPASS_CPU and
+> SND_SOC_LPASS_PLATFORM?
+> -       depends on SND_SOC_QCOM
+> +       depends on SND_SOC_QCOM || COMPILE_TEST
 > 
-> ---
+> If so, I will submit a patch (I know this has been applied already) on
+> top of this one.
 > 
-> This patch breaks pcie for imx6sx as my board always times out.
-> So, if someone could check this on an imx6sx I'd appreciate it.
-> 
-> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
-> ---
->  drivers/pci/host/pci-imx6.c | 18 ++++++++++--------
->  1 file changed, 10 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-> index fdb9536..51be92c 100644
-> --- a/drivers/pci/host/pci-imx6.c
-> +++ b/drivers/pci/host/pci-imx6.c
-> @@ -398,20 +398,22 @@ static int imx6_pcie_start_link(struct pcie_port *pp)
->  	writel(tmp, pp->dbi_base + PCIE_LINK_WIDTH_SPEED_CONTROL);
-> 
->  	count = 200;
-> -	while (count--) {
 
-Uh, wouldn't "while (--count)" fix this as well, with a smaller patch?
+That would have the same effect, but what is the point? Do you plan
+to make these options user-visible in the future?
 
-Best regards,
-Marek Vasut
+	Arnd
