@@ -1,68 +1,112 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Thu, 21 May 2015 22:32:40 +0800
-Subject: [PATCH 5/5] ARM64: MediaTek MT8173: Add SCPSYS device node
-In-Reply-To: <1432131540-2523-6-git-send-email-s.hauer@pengutronix.de>
-References: <1432131540-2523-1-git-send-email-s.hauer@pengutronix.de>
- <1432131540-2523-6-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <CAGS+omDHEY54TzhNTJcFOeHkGbXAQwiTh9gxc=PsbzjwmpHEDA@mail.gmail.com>
+From: djkurtz@google.com (Daniel Kurtz)
+Date: Thu, 21 May 2015 22:33:13 +0800
+Subject: [PATCH v2 4/6] soc: mediatek: Add SMI driver
+In-Reply-To: <CABuKBe+FmAzr_Cu=fUDwDHYzH4mW_2p4z1SYmp7+W=Tu-MLEuA@mail.gmail.com>
+References: <1431683009-18158-1-git-send-email-yong.wu@mediatek.com>
+ <1431683009-18158-5-git-send-email-yong.wu@mediatek.com>
+ <CABuKBeJvh2PGi3i6O0uu-7ggdBzKMb3tPE_XKhT1i-+tkKc5gg@mail.gmail.com>
+ <1432188990.5092.12.camel@mhfsdcap03>
+ <CABuKBe+FmAzr_Cu=fUDwDHYzH4mW_2p4z1SYmp7+W=Tu-MLEuA@mail.gmail.com>
+Message-ID: <CAGS+omARc60i+8vO6V1ccnSnXkjAGNjMjRB1+5kg_EHrrS1NOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 10:19 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> This adds the SCPSYS device node to the MT8173 dtsi file.
+On Thu, May 21, 2015 at 3:30 PM, Matthias Brugger
+<matthias.bgg@gmail.com> wrote:
+> 2015-05-21 8:16 GMT+02:00 Yong Wu <yong.wu@mediatek.com>:
+>> Hi Matthias,
+>>      Thanks very much for your suggestion.
+>>      Abort the smi clock name, Could you help check below.
+>>      The others I will improve in next time.
+>>
+>> On Tue, 2015-05-19 at 13:14 +0200, Matthias Brugger wrote:
+>>> 2015-05-15 11:43 GMT+02:00 Yong Wu <yong.wu@mediatek.com>:
+>>> >     This patch add SMI(Smart Multimedia Interface) driver. This driver is
+>>> > responsible to enable/disable iommu and control the clocks of each local arbiter.
+>>> >
+>> [snip]
+>>> > +
+>>> > +#define SMI_LARB_MMU_EN                (0xf00)
+>>> > +#define F_SMI_MMU_EN(port)     (1 << (port))
+>>> > +
+>>> > +enum {
+>>> > +       MTK_CLK_APB,
+>>> > +       MTK_CLK_SMI,
+>>> > +       MTK_CLK_MAX,
+>>>
+>>> Maybe add something like:
+>>> MTK_CLK_FIRST = MTK_CLK_APB,
+>>> to make the for loops better readable.
+>>>
+>> Then, Is it like this? :
+>>  enum {
+>>         MTK_CLK_FIRST = MTK_CLK_APB,
+>>         MTK_CLK_SMI,
+>>         MTK_CLK_MAX,
+>>  }
+>> or the CLK_SMI also need MTK_CLK_SECOND = MTK_CLK_SMI.
 >
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 10 ++++++++++
->  1 file changed, 10 insertions(+)
 >
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> index 924fdb6..12430f0 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> @@ -125,6 +125,16 @@
->                                                 <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
->                 };
+> something like:
+> enum {
+>          MTK_CLK_FIRST,
+>          MTK_CLK_APB = MTK_CLK_FIRST,
+>          MTK_CLK_SMI,
+>          MTK_CLK_LAST,
+> }
 >
-> +               scpsys: scpsys at 10006000 {
-> +                       compatible = "mediatek,mt8173-scpsys";
-> +                       #power-domain-cells = <1>;
-> +                       reg = <0 0x10006000 0 0x1000>;
-> +                       clocks = <&clk26m>,
+> So you can rewrite the for loop:
+> if (i = MTK_CLK_FIRST; i < MTK_CLK_LAST; i++)
 
-Why is mfg using <&clk26m> and not <&topckgen CLK_TOP_MFG_SEL>?
-I saw another patch set on the list today from James Liao that adds more clocks.
-Perhaps we can move the SCPSYS set on top of that one and include more clocks?
+Actually, do we ever plan to add more clks per smi node?
+If not, perhaps the whole driver would be simpler if you just
+explicitly handle the apb & smi clocks:
 
-> +                                <&topckgen CLK_TOP_MM_SEL>;
+struct mtk_smi_larb {
+       void __iomem            *base;
+       spinlock_t              portlock; /* lock for config port */
+       struct device           *smi;
+       struct clk              *clk_apb;
+       struct clk              *clk_smi;
+};
 
-FYI: the devicetree changes in this set depend on your other patch set
-starting with:
+And then all of the loops become just a pair of clock operations.
 
-https://patchwork.kernel.org/patch/6446341/
-"arm64: dts: mt8173: Add clock controller device nodes"
-
-This patch isn't based on top of the other set, though, so it may lead
-to a small merge conflict when folding in the .dtsi device nodes (ie,
-placing scpsys at 10006000 after pwrap at 1000d000).
-
-I'm not sure how people usually resolve this or manage the ordering of
-co-dependent patch sets upstream.
-
+Best Regards,
 -Dan
 
-> +                       clock-names = "mfg", "mm";
-> +                       infracfg = <&infracfg>;
-> +               };
-> +
->                 sysirq: intpol-controller at 10200620 {
->                         compatible = "mediatek,mt8173-sysirq",
->                                         "mediatek,mt6577-sysirq";
-> --
-> 2.1.4
+>
+> Regards,
+> Matthias
+>
+>>> > +};
+>>> > +
+>>> > +struct mtk_smi_common {
+>>> > +       void __iomem            *base;
+>>>
+>>> That seems to be never used. Please delete it.
+>>>
+>>> > +       struct clk              *clk[MTK_CLK_MAX];
+>>> > +};
+>>> > +
+>>> > +struct mtk_smi_larb {
+>>> > +       void __iomem            *base;
+>>> > +       spinlock_t              portlock; /* lock for config port */
+>>> > +       struct clk              *clk[MTK_CLK_MAX];
+>>> > +       struct device           *smi;
+>>> > +};
+>>> > +
+>>> Thanks,
+>>> Matthias
+>>
+>>
+>
+>
 >
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> motzblog.wordpress.com
+
+
+
+-- 
+Daniel Kurtz | Software Engineer | djkurtz at google.com | 650.204.0722
