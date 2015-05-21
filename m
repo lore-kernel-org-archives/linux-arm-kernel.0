@@ -1,35 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 May 2015 23:23:14 +0200
-Subject: [PATCH] ASoC: qcom: remove incorrect dependencies
-In-Reply-To: <20150521205952.GA31005@kwestfie-linux.qualcomm.com>
-References: <2324031.cqS0mEEEhQ@wuerfel>
- <20150521205952.GA31005@kwestfie-linux.qualcomm.com>
-Message-ID: <8811360.XmVQbMhHJj@wuerfel>
+From: xerofoify@gmail.com (Nicholas Krause)
+Date: Thu, 21 May 2015 17:27:31 -0400
+Subject: [PATCH] mach-omap2:Remove unnessary return statement from the void
+ function, omap2_show_dma_caps
+Message-ID: <1432243651-23061-1-git-send-email-xerofoify@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 May 2015 14:00:00 Kenneth Westfield wrote:
-> > diff --git a/sound/soc/qcom/Kconfig b/sound/soc/qcom/Kconfig
-> > index 5f58e4f1bca9..b07f183fc47f 100644
-> > --- a/sound/soc/qcom/Kconfig
-> > +++ b/sound/soc/qcom/Kconfig
-> > @@ -6,12 +6,10 @@ config SND_SOC_QCOM
-> >  
-> >  config SND_SOC_LPASS_CPU
-> >       tristate
-> > -     depends on SND_SOC_QCOM
-> 
-> Rather than remove the dependency (which I would like to keep), would
-> the following change work for SND_SOC_LPASS_CPU and
-> SND_SOC_LPASS_PLATFORM?
-> -       depends on SND_SOC_QCOM
-> +       depends on SND_SOC_QCOM || COMPILE_TEST
-> 
-> If so, I will submit a patch (I know this has been applied already) on
-> top of this one.
-> 
+This removes the no longer required return statement at the end
+of the void function, omap2_show_dma_cap due to no need for a
+return statement due to this function always running successfully.
 
-That would have the same effect, but what is the point? Do you plan
-to make these options user-visible in the future?
+Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
+---
+ arch/arm/mach-omap2/dma.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-	Arnd
+diff --git a/arch/arm/mach-omap2/dma.c b/arch/arm/mach-omap2/dma.c
+index e1a56d8..1ed4be1 100644
+--- a/arch/arm/mach-omap2/dma.c
++++ b/arch/arm/mach-omap2/dma.c
+@@ -117,7 +117,6 @@ static void omap2_show_dma_caps(void)
+ 	u8 revision = dma_read(REVISION, 0) & 0xff;
+ 	printk(KERN_INFO "OMAP DMA hardware revision %d.%d\n",
+ 				revision >> 4, revision & 0xf);
+-	return;
+ }
+ 
+ static unsigned configure_dma_errata(void)
+-- 
+2.1.4
