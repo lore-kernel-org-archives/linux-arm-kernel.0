@@ -1,27 +1,33 @@
 From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Thu, 21 May 2015 09:42:32 +0200
-Subject: [PATCH v8 01/16] scripts: link-vmlinux: Don't pass page offset to
- kallsyms if XIP Kernel
-In-Reply-To: <555D6FBD.3020202@suse.cz>
+Date: Thu, 21 May 2015 09:46:34 +0200
+Subject: [PATCH v8 07/16] drivers: reset: Add STM32 reset driver
+In-Reply-To: <555D1C7D.1060205@suse.de>
 References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1431158038-3813-2-git-send-email-mcoquelin.stm32@gmail.com>
- <CALszF6B0=dgSDfLFwDi9YmEzrrNVuYbUnqMu5DmDhhy--emtpw@mail.gmail.com>
- <555D12F8.4000403@suse.de> <555D6FBD.3020202@suse.cz>
-Message-ID: <CALszF6AdNfYRhcLdc252peOcPOnzAXOKQydNcvgVdT26btAA6Q@mail.gmail.com>
+ <1431158038-3813-8-git-send-email-mcoquelin.stm32@gmail.com>
+ <555D1C7D.1060205@suse.de>
+Message-ID: <CALszF6CrouFF3oS_Qz6+qQRqa4a5PurdYNdvHnZRDb4zwOJ6mQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-21 7:40 GMT+02:00 Michal Marek <mmarek@suse.cz>:
-> Dne 21.5.2015 v 07:04 Andreas F?rber napsal(a):
->> Am 18.05.2015 um 13:47 schrieb Maxime Coquelin:
->> But this is definitely an improvement for ARMv7-M debugging,
->>
->> Tested-by: Andreas F?rber <afaerber@suse.de>
->>
->>> [Hi Michal, ...] could you consider
->>> taking it for v4.2?
+2015-05-21 1:45 GMT+02:00 Andreas F?rber <afaerber@suse.de>:
+> Am 09.05.2015 um 09:53 schrieb Maxime Coquelin:
+>> +static const struct of_device_id stm32_reset_dt_ids[] = {
+>> +      { .compatible = "st,stm32-rcc", },
+>> +      { /* sentinel */ },
+>> +};
+>> +MODULE_DEVICE_TABLE(of, sstm32_reset_dt_ids);
 >
-> I applied it to kbuild.git#kbuild now.
+> Typo.
 
-Thanks!
+Indeed, thanks for pointing this out.
+
+>
+> IIUC the timer depends on the reset controller, so it must be built in
+> anyway, and that's what's enforced in the Makefile above. Drop the line?
+>
+
+Agree it must be built-in.
+I will fix that in next version.
+
+Thanks for the review,
 Maxime
