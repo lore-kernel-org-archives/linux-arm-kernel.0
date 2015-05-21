@@ -1,44 +1,68 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 21 May 2015 17:44:25 +0100
-Subject: [PATCH v5 07/11] nvmem: Add simple nvmem-mmio consumer helper
- functions.
+Date: Thu, 21 May 2015 17:44:35 +0100
+Subject: [PATCH v5 08/11] nvmem: qfprom: Add Qualcomm QFPROM support.
 In-Reply-To: <1432226535-8640-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1432226535-8640-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1432226665-8994-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1432226675-9039-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds probe and remove helper functions for nvmems which are
-mmio based, With these helper function new nvmem consumer drivers need
-very little code add its driver.
+This patch adds QFPROM support driver which is used by other drivers
+like thermal sensor and cpufreq.
 
-This code is currently used for qfprom and sunxi-sid nvmem consumer
-drivers.
+On MSM parts there are some efuses (called qfprom) these fuses store
+things like calibration data, speed bins.. etc. Drivers like cpufreq,
+thermal sensors would read out this data for configuring the driver.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- drivers/nvmem/Makefile     |  1 +
- drivers/nvmem/nvmem-mmio.c | 69 ++++++++++++++++++++++++++++++++++++++++++++++
- drivers/nvmem/nvmem-mmio.h | 41 +++++++++++++++++++++++++++
- 3 files changed, 111 insertions(+)
- create mode 100644 drivers/nvmem/nvmem-mmio.c
- create mode 100644 drivers/nvmem/nvmem-mmio.h
+ drivers/nvmem/Kconfig  | 15 +++++++++++++++
+ drivers/nvmem/Makefile |  4 ++++
+ drivers/nvmem/qfprom.c | 51 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 70 insertions(+)
+ create mode 100644 drivers/nvmem/qfprom.c
 
+diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
+index f157b6d..e665e23 100644
+--- a/drivers/nvmem/Kconfig
++++ b/drivers/nvmem/Kconfig
+@@ -8,3 +8,18 @@ menuconfig NVMEM
+ 	  from both the Linux Kernel and the userspace.
+ 
+ 	  If unsure, say no.
++
++if NVMEM
++
++config QCOM_QFPROM
++	tristate "QCOM QFPROM Support"
++	depends on ARCH_QCOM
++	select REGMAP_MMIO
++	help
++	  Say y here to enable QFPROM support. The QFPROM provides access
++	  functions for QFPROM data to rest of the drivers via nvmem interface.
++
++	  This driver can also be built as a module. If so, the module
++	  will be called nvmem-qfprom.
++
++endif
 diff --git a/drivers/nvmem/Makefile b/drivers/nvmem/Makefile
-index 6df2c69..f694cfc 100644
+index f694cfc..caea611 100644
 --- a/drivers/nvmem/Makefile
 +++ b/drivers/nvmem/Makefile
-@@ -4,3 +4,4 @@
- 
+@@ -5,3 +5,7 @@
  obj-$(CONFIG_NVMEM)		+= nvmem_core.o
  nvmem_core-y			:= core.o
-+nvmem_core-y			+= nvmem-mmio.o
-diff --git a/drivers/nvmem/nvmem-mmio.c b/drivers/nvmem/nvmem-mmio.c
+ nvmem_core-y			+= nvmem-mmio.o
++
++# Devices
++obj-$(CONFIG_QCOM_QFPROM)	+= nvmem_qfprom.o
++nvmem_qfprom-y			:= qfprom.o
+diff --git a/drivers/nvmem/qfprom.c b/drivers/nvmem/qfprom.c
 new file mode 100644
-index 0000000..0d8131f
+index 0000000..5ea84bb
 --- /dev/null
-+++ b/drivers/nvmem/nvmem-mmio.c
-@@ -0,0 +1,69 @@
++++ b/drivers/nvmem/qfprom.c
+@@ -0,0 +1,51 @@
 +/*
 + * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 + *
@@ -52,108 +76,43 @@ index 0000000..0d8131f
 + * GNU General Public License for more details.
 + */
 +
-+#include <linux/device.h>
 +#include <linux/module.h>
-+#include <linux/err.h>
 +#include <linux/of.h>
-+#include <linux/of_device.h>
 +#include "nvmem-mmio.h"
 +
-+int nvmem_mmio_remove(struct platform_device *pdev)
-+{
-+	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
-+
-+	return nvmem_unregister(nvmem);
-+}
-+EXPORT_SYMBOL_GPL(nvmem_mmio_remove);
-+
-+int nvmem_mmio_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct resource *res;
-+	const struct nvmem_mmio_data *data;
-+	struct nvmem_device *nvmem;
-+	struct regmap *regmap;
-+	const struct of_device_id *match;
-+	void __iomem *base;
-+
-+	if (!dev || !dev->driver)
-+		return -ENODEV;
-+
-+	match = of_match_device(dev->driver->of_match_table, dev);
-+	if (!match || !match->data)
-+		return -EINVAL;
-+
-+	data = match->data;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
-+
-+	data->regmap_config->max_register = resource_size(res) - 1;
-+
-+	regmap = devm_regmap_init_mmio(dev, base, data->regmap_config);
-+	if (IS_ERR(regmap)) {
-+		dev_err(dev, "regmap init failed\n");
-+		return PTR_ERR(regmap);
-+	}
-+	data->nvmem_config->dev = dev;
-+	nvmem = nvmem_register(data->nvmem_config);
-+	if (IS_ERR(nvmem))
-+		return PTR_ERR(nvmem);
-+
-+	platform_set_drvdata(pdev, nvmem);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(nvmem_mmio_probe);
-diff --git a/drivers/nvmem/nvmem-mmio.h b/drivers/nvmem/nvmem-mmio.h
-new file mode 100644
-index 0000000..a2ad4e5
---- /dev/null
-+++ b/drivers/nvmem/nvmem-mmio.h
-@@ -0,0 +1,41 @@
-+/*
-+ * MMIO based nvmem providers.
-+ *
-+ * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#ifndef _LINUX_NVMEM_MMIO_H
-+#define _LINUX_NVMEM_MMIO_H
-+
-+#include <linux/platform_device.h>
-+#include <linux/nvmem-provider.h>
-+#include <linux/regmap.h>
-+
-+struct nvmem_mmio_data {
-+	struct regmap_config *regmap_config;
-+	struct nvmem_config *nvmem_config;
++static struct regmap_config qfprom_regmap_config = {
++	.reg_bits = 32,
++	.val_bits = 8,
++	.reg_stride = 1,
 +};
 +
-+#if IS_ENABLED(CONFIG_NVMEM)
++static struct nvmem_config econfig = {
++	.name = "qfprom",
++	.owner = THIS_MODULE,
++};
 +
-+int nvmem_mmio_probe(struct platform_device *pdev);
-+int nvmem_mmio_remove(struct platform_device *pdev);
++static struct nvmem_mmio_data qfprom_data = {
++	.nvmem_config = &econfig,
++	.regmap_config = &qfprom_regmap_config,
++};
 +
-+#else
++static const struct of_device_id qfprom_of_match[] = {
++	{ .compatible = "qcom,qfprom", .data = &qfprom_data},
++	{/* sentinel */},
++};
++MODULE_DEVICE_TABLE(of, qfprom_of_match);
 +
-+static inline int nvmem_mmio_probe(struct platform_device *pdev)
-+{
-+	return -ENOSYS;
-+}
-+
-+static inline int nvmem_mmio_remove(struct platform_device *pdev)
-+{
-+	return -ENOSYS;
-+}
-+#endif
-+
-+#endif  /* ifndef _LINUX_NVMEM_MMIO_H */
++static struct platform_driver qfprom_driver = {
++	.probe = nvmem_mmio_probe,
++	.remove = nvmem_mmio_remove,
++	.driver = {
++		.name = "qcom,qfprom",
++		.of_match_table = qfprom_of_match,
++	},
++};
++module_platform_driver(qfprom_driver);
++MODULE_AUTHOR("Srinivas Kandagatla <srinivas.kandagatla@linaro.org>");
++MODULE_DESCRIPTION("Qualcomm QFPROM driver");
++MODULE_LICENSE("GPL v2");
 -- 
 1.9.1
