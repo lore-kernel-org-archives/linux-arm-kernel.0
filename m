@@ -1,78 +1,86 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 21 May 2015 17:26:20 +0100
-Subject: [PATCH v5 07/11] drivers: PL011: move cts_event workaround into
- separate function
+Date: Thu, 21 May 2015 17:26:21 +0100
+Subject: [PATCH v5 08/11] drivers: PL011: allow avoiding UART
+ enabling/disabling
 In-Reply-To: <1432225584-4655-1-git-send-email-andre.przywara@arm.com>
 References: <1432225584-4655-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1432225584-4655-8-git-send-email-andre.przywara@arm.com>
+Message-ID: <1432225584-4655-9-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To avoid lines with more than 80 characters and to make the
-pl011_int() function more readable, move the workaround out into a
-separate function.
+The SBSA UART should not be enabled or disabled (it is always on),
+and consequently the spec lacks the UART_CR register.
+Add a vendor specific property to skip disabling or enabling of the
+UART. This will be used later by the SBSA UART support.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- drivers/tty/serial/amba-pl011.c | 33 ++++++++++++++++++++-------------
- 1 file changed, 20 insertions(+), 13 deletions(-)
+ drivers/tty/serial/amba-pl011.c | 18 ++++++++++++------
+ 1 file changed, 12 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index b66636b..7ecf3b3 100644
+index 7ecf3b3..3f6b915 100644
 --- a/drivers/tty/serial/amba-pl011.c
 +++ b/drivers/tty/serial/amba-pl011.c
-@@ -1317,6 +1317,25 @@ static void pl011_modem_status(struct uart_amba_port *uap)
- 	wake_up_interruptible(&uap->port.state->port.delta_msr_wait);
- }
+@@ -78,6 +78,7 @@ struct vendor_data {
+ 	bool			oversampling;
+ 	bool			dma_threshold;
+ 	bool			cts_event_workaround;
++	bool			always_enabled;
  
-+static void check_apply_cts_event_workaround(struct uart_amba_port *uap)
-+{
-+	unsigned int dummy_read;
-+
-+	if (!uap->vendor->cts_event_workaround)
-+		return;
-+
-+	/* workaround to make sure that all bits are unlocked.. */
-+	writew(0x00, uap->port.membase + UART011_ICR);
-+
-+	/*
-+	 * WA: introduce 26ns(1 uart clk) delay before W1C;
-+	 * single apb access will incur 2 pclk(133.12Mhz) delay,
-+	 * so add 2 dummy reads
-+	 */
-+	dummy_read = readw(uap->port.membase + UART011_ICR);
-+	dummy_read = readw(uap->port.membase + UART011_ICR);
-+}
-+
- static irqreturn_t pl011_int(int irq, void *dev_id)
+ 	unsigned int (*get_fifosize)(struct amba_device *dev);
+ };
+@@ -94,6 +95,7 @@ static struct vendor_data vendor_arm = {
+ 	.oversampling		= false,
+ 	.dma_threshold		= false,
+ 	.cts_event_workaround	= false,
++	.always_enabled		= false,
+ 	.get_fifosize		= get_fifosize_arm,
+ };
+ 
+@@ -109,6 +111,7 @@ static struct vendor_data vendor_st = {
+ 	.oversampling		= true,
+ 	.dma_threshold		= true,
+ 	.cts_event_workaround	= true,
++	.always_enabled		= false,
+ 	.get_fifosize		= get_fifosize_st,
+ };
+ 
+@@ -1958,7 +1961,7 @@ static void
+ pl011_console_write(struct console *co, const char *s, unsigned int count)
  {
- 	struct uart_amba_port *uap = dev_id;
-@@ -1324,25 +1343,13 @@ static irqreturn_t pl011_int(int irq, void *dev_id)
- 	unsigned int status, pass_counter = AMBA_ISR_PASS_LIMIT;
- 	u16 imsc;
- 	int handled = 0;
--	unsigned int dummy_read;
+ 	struct uart_amba_port *uap = amba_ports[co->index];
+-	unsigned int status, old_cr, new_cr;
++	unsigned int status, old_cr = 0, new_cr;
+ 	unsigned long flags;
+ 	int locked = 1;
  
- 	spin_lock_irqsave(&uap->port.lock, flags);
- 	imsc = readw(uap->port.membase + UART011_IMSC);
- 	status = readw(uap->port.membase + UART011_RIS) & imsc;
- 	if (status) {
- 		do {
--			if (uap->vendor->cts_event_workaround) {
--				/* workaround to make sure that all bits are unlocked.. */
--				writew(0x00, uap->port.membase + UART011_ICR);
--
--				/*
--				 * WA: introduce 26ns(1 uart clk) delay before W1C;
--				 * single apb access will incur 2 pclk(133.12Mhz) delay,
--				 * so add 2 dummy reads
--				 */
--				dummy_read = readw(uap->port.membase + UART011_ICR);
--				dummy_read = readw(uap->port.membase + UART011_ICR);
--			}
-+			check_apply_cts_event_workaround(uap);
+@@ -1975,10 +1978,12 @@ pl011_console_write(struct console *co, const char *s, unsigned int count)
+ 	/*
+ 	 *	First save the CR then disable the interrupts
+ 	 */
+-	old_cr = readw(uap->port.membase + UART011_CR);
+-	new_cr = old_cr & ~UART011_CR_CTSEN;
+-	new_cr |= UART01x_CR_UARTEN | UART011_CR_TXE;
+-	writew(new_cr, uap->port.membase + UART011_CR);
++	if (!uap->vendor->always_enabled) {
++		old_cr = readw(uap->port.membase + UART011_CR);
++		new_cr = old_cr & ~UART011_CR_CTSEN;
++		new_cr |= UART01x_CR_UARTEN | UART011_CR_TXE;
++		writew(new_cr, uap->port.membase + UART011_CR);
++	}
  
- 			writew(status & ~(UART011_TXIS|UART011_RTIS|
- 					  UART011_RXIS),
+ 	uart_console_write(&uap->port, s, count, pl011_console_putchar);
+ 
+@@ -1989,7 +1994,8 @@ pl011_console_write(struct console *co, const char *s, unsigned int count)
+ 	do {
+ 		status = readw(uap->port.membase + UART01x_FR);
+ 	} while (status & UART01x_FR_BUSY);
+-	writew(old_cr, uap->port.membase + UART011_CR);
++	if (!uap->vendor->always_enabled)
++		writew(old_cr, uap->port.membase + UART011_CR);
+ 
+ 	if (locked)
+ 		spin_unlock(&uap->port.lock);
 -- 
 2.3.5
