@@ -1,32 +1,47 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 21 May 2015 11:27:48 +0200
-Subject: [PATCH defconfig] ARM: add =?UTF-8?Q?ARM=5FSINGLE=5FARMV=37M?=
- =?UTF-8?Q?=20in=20ARMv=37-M=20defconfigs?=
-In-Reply-To: <20150521082604.GZ24769@pengutronix.de>
-References: <1432161501-2323-1-git-send-email-stefan@agner.ch>
- <20150521082604.GZ24769@pengutronix.de>
-Message-ID: <2ddf1a3a6386cf4bb692b7a202346910@agner.ch>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 May 2015 11:39:34 +0200
+Subject: [PATCH] extcon: fix phy-tahvo driver for extcon API change
+Message-ID: <4940971.fmN098LqHi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-05-21 10:26, Uwe Kleine-K?nig wrote:
-> On Thu, May 21, 2015 at 12:38:21AM +0200, Stefan Agner wrote:
->> Select ARM_SINGLE_ARMV7M in defconfigs of the converted ARMv7-M
->> platforms.
-> I assume this relates to your series that introduces this symbol. Should
-> the defconfig update happen before? (Or what is the result if
-> CONFIG_ARM_SINGLE_ARMV7M=y is missing in the defconfig while the symbol
-> already exists?) Maybe this should be squashed into the commit in
-> question?
+Today, the API for the extcon drivers was changed, along
+with all drivers in drivers/extcon. However, one extcon driver
+instead lives in drivers/usb/phy/ and did not get change.
 
-The Kconfig system defaults to versatile then, it tried yesterday and I
-think it and it compiled fine actually. However, it is of course not
-what the user wants.
+Gcc warns about the now incorrect API usage:
 
-The defconfigs of the new machines are currently in arm-soc
-next/defconfig. While testing, I just merged the defconfig branch into
-the soc branch, but then splitted the patch in two independent patches.
-Arnd, what do you think?
+drivers/usb/phy/phy-tahvo.c: In function 'tahvo_usb_probe':
+drivers/usb/phy/phy-tahvo.c:368:29: warning: assignment from incompatible pointer type [-Wincompatible-pointer-types]
+  tu->extcon.supported_cable = tahvo_cable;
 
---
-Stefan
+This changes the API in the same way as the other drivers.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 17cd440c9acc ("extcon: Update the prototype of extcon_register_notifier() with enum extcon")
+---
+As the API change is only present in the extcon tree, this patch should get
+merged there as well, not in the usb-phy tree.
+
+If possible, please fold into the original commit.
+
+diff --git a/drivers/usb/phy/phy-tahvo.c b/drivers/usb/phy/phy-tahvo.c
+index 845f658276b1..1d1bb9ad8ccf 100644
+--- a/drivers/usb/phy/phy-tahvo.c
++++ b/drivers/usb/phy/phy-tahvo.c
+@@ -60,10 +60,11 @@ struct tahvo_usb {
+ 	struct extcon_dev	extcon;
+ };
+ 
+-static const char *tahvo_cable[] = {
+-	"USB-HOST",
+-	"USB",
+-	NULL,
++static const enum extcon tahvo_cable[] = {
++	EXTCON_USB,
++	EXTCON_USB_HOST,
++
++	EXTCON_NONE,
+ };
+ 
+ static ssize_t vbus_state_show(struct device *device,
