@@ -1,60 +1,67 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Thu, 21 May 2015 08:45:45 +0800
-Subject: [PATCH] ARM: rockchip: restore dapswjdp after suspend
-In-Reply-To: <1432154048-19126-1-git-send-email-dianders@chromium.org>
-References: <1432154048-19126-1-git-send-email-dianders@chromium.org>
-Message-ID: <555D2AB9.1020903@rock-chips.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 21 May 2015 10:58:56 +1000
+Subject: linux-next: manual merge of the imx-mxs tree with the arm-soc tree
+Message-ID: <20150521105856.1a076b4a@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug
+Hi Shawn,
 
-Thank you for pointing out.
+Today's linux-next merge of the imx-mxs tree got a conflict in
+arch/arm/mach-imx/Kconfig between commit 8064887e02fd ("ARM: vf610:
+enable Cortex-M4 configuration on Vybrid SoC") from the arm-soc tree
+and commit aff62955b27b ("ARM: imx: add msl support for imx7d") from
+the imx-mxs tree.
 
-Reviewed-by: Chris Zhong <zyw@rock-chips.com>
+I fixed it up (hopefully - see below) and can carry the fix as
+necessary (no action is required).
 
-On 05/21/2015 04:34 AM, Doug Anderson wrote:
-> In the commit (0ea001d ARM: rockchip: disable dapswjdp during suspend)
-> we made the assumption that we didn't need to restore dapswjdp after
-> suspend because "the MASKROM will enable it back".
->
-> It turns out that's not a safe assumption.  In some cases (pending
-> interrupts) it's possible that the WFI might act as a no-op and the
-> MaskROM will never run.  Since we're changing the bit, we should
-> restore it ourselves.
->
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> ---
->   arch/arm/mach-rockchip/pm.c | 5 +++++
->   1 file changed, 5 insertions(+)
->
-> diff --git a/arch/arm/mach-rockchip/pm.c b/arch/arm/mach-rockchip/pm.c
-> index b0dcbe2..a7be465 100644
-> --- a/arch/arm/mach-rockchip/pm.c
-> +++ b/arch/arm/mach-rockchip/pm.c
-> @@ -48,6 +48,7 @@ static struct regmap *sgrf_regmap;
->   
->   static u32 rk3288_pmu_pwr_mode_con;
->   static u32 rk3288_sgrf_soc_con0;
-> +static u32 rk3288_sgrf_cpu_con0;
->   
->   static inline u32 rk3288_l2_config(void)
->   {
-> @@ -70,6 +71,7 @@ static void rk3288_slp_mode_set(int level)
->   {
->   	u32 mode_set, mode_set1;
->   
-> +	regmap_read(sgrf_regmap, RK3288_SGRF_CPU_CON0, &rk3288_sgrf_cpu_con0);
->   	regmap_read(sgrf_regmap, RK3288_SGRF_SOC_CON0, &rk3288_sgrf_soc_con0);
->   
->   	regmap_read(pmu_regmap, RK3288_PMU_PWRMODE_CON,
-> @@ -129,6 +131,9 @@ static void rk3288_slp_mode_set(int level)
->   
->   static void rk3288_slp_mode_set_resume(void)
->   {
-> +	regmap_write(sgrf_regmap, RK3288_SGRF_CPU_CON0,
-> +		     rk3288_sgrf_cpu_con0 | SGRF_DAPDEVICEEN_WRITE);
-> +
->   	regmap_write(pmu_regmap, RK3288_PMU_PWRMODE_CON,
->   		     rk3288_pmu_pwr_mode_con);
->   
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/mach-imx/Kconfig
+index 2e3c45832674,b8e05379311e..000000000000
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@@ -582,24 -548,17 +548,31 @@@ config SOC_IMX6S
+  	help
+  	  This enables support for Freescale i.MX6 SoloX processor.
+  
++ config SOC_IMX7D
++ 	bool "i.MX7 Dual support"
++ 	select PINCTRL_IMX7D
++ 	select ARM_GIC
++ 	help
++ 		This enables support for Freescale i.MX7 Dual processor.
++ 
+ +config SOC_LS1021A
+ +	bool "Freescale LS1021A support"
+ +	select ARM_GIC
+ +	select HAVE_ARM_ARCH_TIMER
+ +	select PCI_DOMAINS if PCI
+ +	select ZONE_DMA if ARM_LPAE
+ +	help
+ +	  This enables support for Freescale LS1021A processor.
+ +
+ +endif
+ +
+ +comment "Cortex-A/Cortex-M asymmetric multiprocessing platforms"
+ +
+ +if ARCH_MULTI_V7 || ARM_SINGLE_ARMV7M
+ +
+  config SOC_VF610
+  	bool "Vybrid Family VF610 support"
+ -	select IRQ_DOMAIN_HIERARCHY
+ -	select ARM_GIC
+ +	select ARM_GIC if ARCH_MULTI_V7
+  	select PINCTRL_VF610
+  	select PL310_ERRATA_769419 if CACHE_L2X0
+  	select SMP_ON_UP if SMP
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150521/ac598381/attachment-0001.sig>
