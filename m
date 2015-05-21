@@ -1,37 +1,68 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 May 2015 11:07:08 +0200
-Subject: [PATCH] ASoC: qcom: remove incorrect dependencies
-Message-ID: <2324031.cqS0mEEEhQ@wuerfel>
+Date: Thu, 21 May 2015 11:11:28 +0200
+Subject: [PATCH] tty: remove platform_sysrq_reset_seq
+Message-ID: <2397446.P9RRJqoFo7@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Compile-tests show a warning for the newly added SND_SOC_STORM
-symbol:
+The platform_sysrq_reset_seq code was intended as a way for an embedded
+platform to provide its own sysrq sequence at compile time. After over
+two years, nobody has started using it in an upstream kernel, and
+the platforms that were interested in it have moved on to devicetree,
+which can be used to configure the sequence without requiring kernel
+changes. The method is also incompatible with the way that most
+architectures build support for multiple platforms into a single
+kernel.
 
-warning: (SND_SOC_STORM) selects SND_SOC_LPASS_CPU which has unmet direct dependencies (SOUND && !M68K && !UML && SND && SND_SOC && SND_SOC_QCOM)
+Now the code is producing warnings when built with gcc-5.1:
 
-The problem is that it can be selected for COMPILE_TEST on non-QCOM
-builds, but the symbols it selects have a dependency.
-Dropping the dependencies makes it work without warnings and no
-other side-effects, because these are not user-visible.
+drivers/tty/sysrq.c: In function 'sysrq_init':
+drivers/tty/sysrq.c:959:33: warning: array subscript is above array bounds [-Warray-bounds]
+   key = platform_sysrq_reset_seq[i];
+
+We could fix this, but it seems unlikely that it will ever be used,
+so let's just remove the code instead. We still have the option to
+pass the sequence either in DT, using the kernel command line,
+or using the /sys/module/sysrq/parameters/reset_seq file.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: f380dd3f3cd ("ASoC: qcom: Add ability to build QCOM drivers")
+Fixes: 154b7a489a ("Input: sysrq - allow specifying alternate reset sequence")
 
-diff --git a/sound/soc/qcom/Kconfig b/sound/soc/qcom/Kconfig
-index 5f58e4f1bca9..b07f183fc47f 100644
---- a/sound/soc/qcom/Kconfig
-+++ b/sound/soc/qcom/Kconfig
-@@ -6,12 +6,10 @@ config SND_SOC_QCOM
+diff --git a/drivers/tty/sysrq.c b/drivers/tty/sysrq.c
+index 8ba52e56bb8b..9c5395db6a57 100644
+--- a/drivers/tty/sysrq.c
++++ b/drivers/tty/sysrq.c
+@@ -55,8 +55,7 @@
+ static int __read_mostly sysrq_enabled = CONFIG_MAGIC_SYSRQ_DEFAULT_ENABLE;
+ static bool __read_mostly sysrq_always_enabled;
  
- config SND_SOC_LPASS_CPU
- 	tristate
--	depends on SND_SOC_QCOM
- 	select REGMAP_MMIO
+-unsigned short platform_sysrq_reset_seq[] __weak = { KEY_RESERVED };
+-int sysrq_reset_downtime_ms __weak;
++static int sysrq_reset_downtime_ms;
  
- config SND_SOC_LPASS_PLATFORM
- 	tristate
--	depends on SND_SOC_QCOM
- 	select REGMAP_MMIO
+ static bool sysrq_on(void)
+ {
+@@ -950,23 +949,8 @@ static bool sysrq_handler_registered;
  
- config SND_SOC_STORM
+ static inline void sysrq_register_handler(void)
+ {
+-	unsigned short key;
+ 	int error;
+-	int i;
+-
+-	/* First check if a __weak interface was instantiated. */
+-	for (i = 0; i < ARRAY_SIZE(sysrq_reset_seq); i++) {
+-		key = platform_sysrq_reset_seq[i];
+-		if (key == KEY_RESERVED || key > KEY_MAX)
+-			break;
+ 
+-		sysrq_reset_seq[sysrq_reset_seq_len++] = key;
+-	}
+-
+-	/*
+-	 * DT configuration takes precedence over anything that would
+-	 * have been defined via the __weak interface.
+-	 */
+ 	sysrq_of_get_keyreset_config();
+ 
+ 	error = input_register_handler(&sysrq_handler);
