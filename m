@@ -1,68 +1,46 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 21 May 2015 20:51:22 +0200
-Subject: [PATCH v8 14/16] ARM: dts: Introduce STM32F429 MCU
-In-Reply-To: <CALszF6CK5ezrO6D=4zr6zEPC7VanzbQjnZJwKOZekEZ5L4D-Dg@mail.gmail.com>
-References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
- <2282066.NWoIT9ZyLc@wuerfel>
- <CALszF6CaO_yuNiSDuDV+4d2NRe_+32j=zcSE1HPhB1UH59cW9w@mail.gmail.com>
- <13641152.Yt4ZI3oT6L@wuerfel>
- <CALszF6CK5ezrO6D=4zr6zEPC7VanzbQjnZJwKOZekEZ5L4D-Dg@mail.gmail.com>
-Message-ID: <20150521185122.GD8557@lukather>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 21 May 2015 21:04:00 +0200
+Subject: [PATCH soc] ARM: use ARM_SINGLE_ARMV7M for ARMv7-M platforms
+In-Reply-To: <CAGhQ9VxkGh_V0ctb1U7Y5UZ36qa-7ZPPW2xsg07m4SHhXmXeJQ@mail.gmail.com>
+References: <1432161344-1930-1-git-send-email-stefan@agner.ch>
+ <CAGhQ9VxkGh_V0ctb1U7Y5UZ36qa-7ZPPW2xsg07m4SHhXmXeJQ@mail.gmail.com>
+Message-ID: <20150521190400.GD24769@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 06:17:34PM +0200, Maxime Coquelin wrote:
-> Hi Arnd, Philipp,
+On Thu, May 21, 2015 at 07:00:02PM +0200, Joachim Eastwood wrote:
+> Hi Stefan,
 > 
-> 2015-05-13 21:11 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
-> > Ideally the binding should follow closely what is documented
-> > in the data sheet.
+> On 21 May 2015 at 00:35, Stefan Agner <stefan@agner.ch> wrote:
+> > Use the new config symbol ARM_SINGLE_ARMV7M which groups config
+> > symbols used by modern ARMv7-M platforms. This allows supporting
+> > multiple ARMv7-M platforms in one kernel image. However, a common
+> > kernel image requires the combined platforms to share the same
+> > main memory layout to be bootable.
 > >
+> > Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > Signed-off-by: Stefan Agner <stefan@agner.ch>
 > 
-> Daniel and myself would like your opinion about this binding:
-> 
-> rcc: rcc at 40023800 {
->     #reset-cells = <1>;
->     #clock-cells = <2>;
->     compatible = "st,stm32-rcc";
->     reg = <0x40023800 0x10>, <0x40023810 0x20>, <0x40023830 0x20>;
->     reg-names = "clock-cfg", "reset", "clock-gates";
-> };
-> 
-> It would solve a problem Daniel is facing due to conflicting mem
-> region when clock and reset drivers are enabled, as both would reserve
-> the same region.
-> 
-> Also, it would make the reset driver very generic.
-> Doing that, we could even create a generic-reset.c driver that would
-> be used by STM32 and Sunxi (at least).
-> In the probe function, it would check the number of reg resources.
-> If a single resource is passed, it would take it, else it would look
-> the one named "reset".
-> The driver and bindings would be the same for the two families, and
-> the bindings would be backward compatible with sunxi ones.
-> 
-> Philip, Arnd, what do you think?
+> You should have your sign-off on the top and not Uwe's ack.
+I don't agree. IMHO the most sensible thing is to sign off (i.e. put
+your sob line below) all the things that come from you. So it's
 
-I lack a bit of context here, but I'd be very happy to use a generic
-driver. As a matter of fact, the sunxi reset driver is already pretty
-much there (not that it's very difficult to do).
+	Signed-off-by: author
+	Acked-by: someone
+	Signed-off-by: forwarder
+	Signed-off-by: maintainer
 
-The only thing we did that stands out a bit is that we actually need
-the reset driver much earlier than the default probe, since some of
-our timers are maintained in reset. We have some code to do just that
-already, we just need have something similar to be on board.
+if someone already acked before forwarder sent out the mail. If the ack
+is between forwarder and maintainer it was the latter who added the Ack.
+I'm not sure it's formalized this way, but like that it makes most sense
+to me and I seem to recall having read somewhere that the footers are
+supposed to tell something about the order of people involved.
 
-Maxime (the other one)
+So Stefan did it exactly as i would have done it.
+
+Best regards
+Uwe
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150521/bce7b949/attachment-0001.sig>
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
