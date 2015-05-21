@@ -1,91 +1,151 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Thu, 21 May 2015 05:48:33 -0700
-Subject: [PATCH tip/core/rcu 7/9] arm64: Use common
- outgoing-CPU-notification code
-In-Reply-To: <20150521085806.GC21920@arm.com>
-References: <20150512214945.GA813@linux.vnet.ibm.com>
- <1431467407-1223-1-git-send-email-paulmck@linux.vnet.ibm.com>
- <1431467407-1223-7-git-send-email-paulmck@linux.vnet.ibm.com>
- <20150521085806.GC21920@arm.com>
-Message-ID: <20150521124833.GJ6776@linux.vnet.ibm.com>
+From: nareshgbhat@gmail.com (Naresh Bhat)
+Date: Thu, 21 May 2015 18:19:52 +0530
+Subject: [PATCH v4 10/11] drivers: PL011: add support for the ARM SBSA
+ generic UART
+In-Reply-To: <555DBDDA.6070908@arm.com>
+References: <1431440095-5146-1-git-send-email-andre.przywara@arm.com>
+ <1431440095-5146-11-git-send-email-andre.przywara@arm.com>
+ <55536096.4020008@redhat.com> <555DBDDA.6070908@arm.com>
+Message-ID: <CAJXQGfLY5BCSgLvn2m5QDDvG8Zc8JEr9By=7Jk3swu4VERj6SA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 21, 2015 at 09:58:06AM +0100, Will Deacon wrote:
-> Hi Paul,
-> 
-> Sorry for being late on this one.
+On Thu, May 21, 2015 at 4:43 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+> Hi Mark,
+>
+> (please keep the people on CC:, I almost missed that mail)
+>
+> On 05/13/2015 03:32 PM, Mark Langsdorf wrote:
+>> On 05/12/2015 09:14 AM, Andre Przywara wrote:
+>>> The ARM Server Base System Architecture[1] document describes a
+>>> generic UART which is a subset of the PL011 UART.
+>>> It lacks DMA support, baud rate control and modem status line
+>>> control, among other things.
+>>> The idea is to move the UART initialization and setup into the
+>>> firmware (which does this job today already) and let the kernel just
+>>> use the UART for sending and receiving characters.
+>>>
+>>> We use the recent refactoring to build a new struct uart_ops
+>>> variable which points to some new functions avoiding access to the
+>>> missing registers. We reuse as much existing PL011 code as possible.
+>>>
+>>> In contrast to the PL011 the SBSA UART does not define any AMBA or
+>>> PrimeCell relations, so we go with a pretty generic probe function
+>>> which only uses platform device functions.
+>>> A DT binding is provided with this patch, ACPI support is added in a
+>>> separate one.
+>>>
+>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>>> ---
+>>>   .../devicetree/bindings/serial/arm_sbsa_uart.txt   |  10 ++
+>>>   drivers/tty/serial/amba-pl011.c                    | 168
+>>> +++++++++++++++++++++
+>>>   2 files changed, 178 insertions(+)
+>>>   create mode 100644
+>>> Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+>>>
+>>> diff --git
+>>> a/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+>>> b/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+>>> new file mode 100644
+>>> index 0000000..4163e7e
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+>>> @@ -0,0 +1,10 @@
+>>> +* ARM SBSA defined generic UART
+>>> +This UART uses a subset of the PL011 registers and consequently lives
+>>> +in the PL011 driver. It's baudrate and other communication parameters
+>>> +cannot be adjusted at runtime, so it lacks a clock specifier here.
+>>> +
+>>> +Required properties:
+>>> +- compatible: must be "arm,sbsa-uart"
+>>> +- reg: exactly one register range
+>>> +- interrupts: exactly one interrupt specifier
+>>> +- current-speed: the (fixed) baud rate set by the firmware
+>>> diff --git a/drivers/tty/serial/amba-pl011.c
+>>> b/drivers/tty/serial/amba-pl011.c
+>>> index 70e2958..cca93d9 100644
+>>> --- a/drivers/tty/serial/amba-pl011.c
+>>> +++ b/drivers/tty/serial/amba-pl011.c
+>
+> ....
+>
+>>> @@ -1872,6 +1915,24 @@ pl011_set_termios(struct uart_port *port,
+>>> struct ktermios *termios,
+>>>       spin_unlock_irqrestore(&port->lock, flags);
+>>>   }
+>>>
+>>> +static void
+>>> +sbsa_uart_set_termios(struct uart_port *port, struct ktermios *termios,
+>>> +              struct ktermios *old)
+>>> +{
+>>> +    struct uart_amba_port *uap =
+>>> +        container_of(port, struct uart_amba_port, port);
+>>> +    unsigned long flags;
+>>> +
+>>> +    if (old)
+>>> +        tty_termios_copy_hw(termios, old);
+>>
+>> This code prevented login via the serial console on our test hardware.
+>>
+>> Mark Salter suggested the following patch:
+>>
+>> -       if (old)
+>> +       /*
+>> +        * The first call to set_termios() comes when the console is
+>> +        * registered via uart_add_one_port(). The serial core will
+>> +        * pass in a dummy old termios rather than NULL. Check to make
+>> +        * sure the old termios has reasonable info before copying from
+>> +        * it.
+>> +        */
+>> +       if (old && old->c_cflag)
+>>                 tty_termios_copy_hw(termios, old);
 
-No problem!  In fact, just in time -- I was going to bug you about
-this later today.  ;-)
+Yes, this fixes the problem I was seeing with Fedora21 on ThunderX.
 
-> On Tue, May 12, 2015 at 10:50:05PM +0100, Paul E. McKenney wrote:
-> > From: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
-> > 
-> > This commit removes the open-coded CPU-offline notification with new
-> > common code.  In particular, this change avoids calling scheduler code
-> > using RCU from an offline CPU that RCU is ignoring.  This is a minimal
-> > change.  A more intrusive change might invoke the cpu_check_up_prepare()
-> > and cpu_set_state_online() functions at CPU-online time, which would
-> > allow onlining throw an error if the CPU did not go offline properly.
-> > 
-> > Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm64/kernel/smp.c | 6 ++----
-> >  1 file changed, 2 insertions(+), 4 deletions(-)
-> 
-> I don't have a better idea, so:
-> 
->   Acked-by: Will Deacon <will.deacon@arm.com>
-> 
-> Is this queued via -tip already, or can we pick it into the arm64 tree
-> for 4.2?
-
-Feel free to take it into the arm64 tree.  Just let me know, and I
-will drop it from my tree.
-
-Now I only need to bug the arm32 guys.  ;-)
-
-							Thanx, Paul
-
+>
+> That seems like a kludge to me.
+> Regardless of the reason why uart_send_options() is passing a
+> dummy variable instead of a NULL pointer (which documentation explicitly
+> declares as legal) I saw that this unconditional copying of the old
+> value being common practise in various drivers, actually the default for
+> drivers not implementing set_termios at all.
+>
+> Can you describe a setup where this issue shows up? I haven't observed
+> this issue in my testing.
+>
+> But in fact I think we actually shouldn't care about the old value at
+> all. Instead we should filter the new termios settings to avoid userland
+> configuring for instance flow control or an differing byte format which
+> the SBSA UART does not support.
+> I will cook up a patch and send out a v5 ASAP.
+>
 > Cheers,
-> 
-> Will
-> 
-> > diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> > index 2cb008177252..a899c1beff54 100644
-> > --- a/arch/arm64/kernel/smp.c
-> > +++ b/arch/arm64/kernel/smp.c
-> > @@ -253,15 +253,13 @@ static int op_cpu_kill(unsigned int cpu)
-> >  	return cpu_ops[cpu]->cpu_kill(cpu);
-> >  }
-> >  
-> > -static DECLARE_COMPLETION(cpu_died);
-> > -
-> >  /*
-> >   * called on the thread which is asking for a CPU to be shutdown -
-> >   * waits until shutdown has completed, or it is timed out.
-> >   */
-> >  void __cpu_die(unsigned int cpu)
-> >  {
-> > -	if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(5000))) {
-> > +	if (!cpu_wait_death(cpu, 5)) {
-> >  		pr_crit("CPU%u: cpu didn't die\n", cpu);
-> >  		return;
-> >  	}
-> > @@ -294,7 +292,7 @@ void cpu_die(void)
-> >  	local_irq_disable();
-> >  
-> >  	/* Tell __cpu_die() that this CPU is now safe to dispose of */
-> > -	complete(&cpu_died);
-> > +	(void)cpu_report_death();
-> >  
-> >  	/*
-> >  	 * Actually shutdown the CPU. This must never fail. The specific hotplug
-> > -- 
-> > 1.8.1.5
-> > 
-> 
+> Andre.
+>
+>>
+>> which fixed the issue.
+>>
+>>> +    tty_termios_encode_baud_rate(termios, uap->fixed_baud,
+>>> uap->fixed_baud);
+>>> +
+>>> +    spin_lock_irqsave(&port->lock, flags);
+>>> +    uart_update_timeout(port, CS8, uap->fixed_baud);
+>>> +    pl011_setup_status_masks(port, termios);
+>>> +    spin_unlock_irqrestore(&port->lock, flags);
+>>> +}
+>>> +
+>>>   static const char *pl011_type(struct uart_port *port)
+>>>   {
+>>>       struct uart_amba_port *uap =
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+
+-- 
+"For things to change, we must change"
+-Naresh Bhat
