@@ -1,23 +1,80 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 21 May 2015 18:57:40 -0400 (EDT)
-Subject: [PATCH net-next 0/4] stmmac: probe code refactoring and clean
- up part 1
-In-Reply-To: <1432144989-28283-1-git-send-email-manabian@gmail.com>
-References: <1432144989-28283-1-git-send-email-manabian@gmail.com>
-Message-ID: <20150521.185740.1825645288319421215.davem@davemloft.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 21 May 2015 15:59:38 -0700
+Subject: [GIT PULL 2.1/2] fixed up omap1 sparse irq support for v4.2
+In-Reply-To: <pull-1432161303-403113-2>
+References: <pull-1432161303-403113>
+ <pull-1432161303-403113-2>
+Message-ID: <20150521225938.GY10274@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joachim Eastwood <manabian@gmail.com>
-Date: Wed, 20 May 2015 20:03:05 +0200
+Here's this pull request updated for the randconfig errors found
+by Arnd.
 
-> This patch set refactor the code in stmmac_pci_probe and stmmac_pltfr_probe
-> and moves the common bits into stmmac_dvr_probe. Along the way some clean-
-> ups are applied to stmmac_pltfr_probe.
-> 
-> The code has been tested on the LPC18xx platform.
-> 
-> I am still working on more refactoring of the platform probe code, hence
-> part 1, but I need some more time on this.
+The following changes since commit 030bbdbf4c833bc69f502eae58498bc5572db736:
 
-Series applied, thank you.
+  Linux 4.1-rc3 (2015-05-10 15:12:29 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.2/omap1-v2
+
+for you to fetch changes up to 7bf15c4360b384e34d685616a77a8abf7dd8aea5:
+
+  ARM: OMAP1: Fix section mismatch warnings for omap_cfg_reg (2015-05-21 14:50:23 -0700)
+
+----------------------------------------------------------------
+Add support for CONFIG_SPARSE_IRQ for omap1. This takes us a bit closer
+to making omap1 support multiarch. After this series we still need to
+make omap1 use the common clock framework and fix up the drivers to not
+rely on includes from mach and plat directories.
+
+Note that this branch depends on a GPIO driver fix in v4.1-rc3
+d2d05c65c40e ("gpio: omap: Fix regression for MPUIO interrupts").
+
+----------------------------------------------------------------
+Tony Lindgren (6):
+      ARM: OMAP1: Move UART defines to prepare for sparse IRQ
+      ARM: OMAP1: Switch to use generic irqchip in preparation for sparse IRQ
+      ARM: omap1: Switch to use MULTI_IRQ
+      ARM: OMAP1: Change interrupt numbering for sparse IRQ
+      ARM: OMAP1: Fix randconfig builds if ARCH_OMAP15XX not selected
+      ARM: OMAP1: Fix section mismatch warnings for omap_cfg_reg
+
+ arch/arm/Kconfig                               |   2 +
+ arch/arm/mach-omap1/ams-delta-fiq-handler.S    |   3 +-
+ arch/arm/mach-omap1/board-ams-delta.c          |   1 +
+ arch/arm/mach-omap1/board-fsample.c            |   1 +
+ arch/arm/mach-omap1/board-generic.c            |   1 +
+ arch/arm/mach-omap1/board-h2.c                 |   1 +
+ arch/arm/mach-omap1/board-h3-mmc.c             |   1 +
+ arch/arm/mach-omap1/board-h3.c                 |   1 +
+ arch/arm/mach-omap1/board-htcherald.c          |   1 +
+ arch/arm/mach-omap1/board-innovator.c          |   1 +
+ arch/arm/mach-omap1/board-nokia770.c           |   1 +
+ arch/arm/mach-omap1/board-osk.c                |   1 +
+ arch/arm/mach-omap1/board-palmte.c             |   1 +
+ arch/arm/mach-omap1/board-palmtt.c             |   1 +
+ arch/arm/mach-omap1/board-palmz71.c            |   1 +
+ arch/arm/mach-omap1/board-perseus2.c           |   1 +
+ arch/arm/mach-omap1/board-sx1.c                |   1 +
+ arch/arm/mach-omap1/board-voiceblue.c          |   1 +
+ arch/arm/mach-omap1/common.h                   |   7 +-
+ arch/arm/mach-omap1/dma.c                      |   2 +-
+ arch/arm/mach-omap1/gpio16xx.c                 |   2 +
+ arch/arm/mach-omap1/gpio7xx.c                  |   2 +
+ arch/arm/mach-omap1/i2c.c                      |   3 +-
+ arch/arm/mach-omap1/include/mach/entry-macro.S |  39 ------
+ arch/arm/mach-omap1/include/mach/irqs.h        | 124 ++++++++++---------
+ arch/arm/mach-omap1/include/mach/memory.h      |   4 +-
+ arch/arm/mach-omap1/include/mach/serial.h      |   5 -
+ arch/arm/mach-omap1/include/mach/soc.h         |   4 +
+ arch/arm/mach-omap1/irq.c                      | 157 +++++++++++++++----------
+ arch/arm/mach-omap1/mux.c                      |   8 +-
+ arch/arm/mach-omap1/pm.c                       |   1 +
+ arch/arm/mach-omap1/serial.c                   |   1 +
+ arch/arm/mach-omap1/timer.c                    |   4 +-
+ arch/arm/plat-omap/dma.c                       |   4 +
+ include/uapi/linux/serial_reg.h                |   3 +
+ 35 files changed, 206 insertions(+), 185 deletions(-)
+ delete mode 100644 arch/arm/mach-omap1/include/mach/entry-macro.S
