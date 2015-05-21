@@ -1,42 +1,65 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 20 May 2015 21:40:54 -0700
-Subject: [PATCH v3 4/4] mtd: mxc_nand: generate nand_ecclayout for 8 bit
- ECC
-In-Reply-To: <20150521041128.GI2586@tarshish>
-References: <cover.1431504091.git.baruch@tkos.co.il>
- <95e2a17d74da5a0415ab93e060f6efc681216313.1431504091.git.baruch@tkos.co.il>
- <20150520224120.GS11598@ld-irv-0074>
- <20150521041128.GI2586@tarshish>
-Message-ID: <20150521044054.GC23718@brian-ubuntu>
+From: dave.long@linaro.org (David Long)
+Date: Thu, 21 May 2015 00:44:45 -0400
+Subject: [PATCH v6 3/6] arm64: Kprobes with single stepping support
+In-Reply-To: <20150520163946.GC29424@e104818-lin.cambridge.arm.com>
+References: <1429561187-3661-1-git-send-email-dave.long@linaro.org>
+ <1429561187-3661-4-git-send-email-dave.long@linaro.org>
+ <20150520163946.GC29424@e104818-lin.cambridge.arm.com>
+Message-ID: <555D62BD.5040403@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 21, 2015 at 07:11:28AM +0300, Baruch Siach wrote:
-> On Wed, May 20, 2015 at 03:41:20PM -0700, Brian Norris wrote:
-> > On Wed, May 13, 2015 at 11:17:39AM +0300, Baruch Siach wrote:
-> > > +		if (get_eccsize(mtd) == 8)
-> > > +			ecc_8bit_layout_4k(this->ecc.layout);
-> > 
-> > So you're overwriting an existing layout (e.g., nandv2_hw_eccoob_4k).
-> > What if you have more than one NAND chip? You might do better by
-> > dynamically allocating the memory.
-> 
-> It would take a quite a bit more code changes then that to have the mxc_nand 
-> driver support more than one NAND chip, not to mention the DT binding. As Uwe 
+On 05/20/15 12:39, Catalin Marinas wrote:
+> On Mon, Apr 20, 2015 at 04:19:44PM -0400, David Long wrote:
+>> Add support for basic kernel probes(kprobes) and jump probes
+>> (jprobes) for ARM64.
+>>
+>> Kprobes utilizes software breakpoint and single step debug
+>> exceptions supported on ARM v8.
+>>
+>> A software breakpoint is placed at the probe address to trap the
+>> kernel execution into the kprobe handler.
+>>
+>> ARM v8 supports enabling single stepping before the break exception
+>> return (ERET), with next PC in exception return address (ELR_EL1). The
+>> kprobe handler prepares an executable memory slot for out-of-line
+>> execution with a copy of the original instruction being probed, and
+>> enables single stepping. The PC is set to the out-of-line slot address
+>> before the ERET. With this scheme, the instruction is executed with the
+>> exact same register context except for the PC (and DAIF) registers.
+>
+> I wonder whether it would be simpler to use another software breakpoint
+> after the out of line instruction copy. You won't run the instructions
+> that change the PC anyway.
 
-Right. I guess there's also the case that you have more than one
-instance of this controller / driver. But I assume that's pretty
-unlikely?
+We put quite a bit of work into making single-step work.  I don't see 
+any obvious advantage to trying to switch to a software breakpoint. 
+Both are debug exceptions but SS does leave open the possibility of 
+maybe eventually running some instructions that do change the PC.
 
-> has indicated on a previous version of this series, ecclayout handling in this 
-> driver could use some cleanup. This patch just fixes bug, trying to break 
-> anything else while doing so.
+>
+> Since an unconditional branch instruction within the kernel address
+> space can reach any point in the kernel (and modules), could we go a
+> step further and avoid the software breakpoint altogether, just generate
+> a branch instruction to the original location (after the software
+> breakpoint)?
 
-Yeah, OK. Then I'll apply this patch anyway, and the rest could be
-worked out later if this driver ever supports more cases.
+Wouldn't a branch instruction have to make use of a register in order to 
+span the whole address space?  How could you do that and have all the 
+registers unmolested when you land back after the original probe point? 
+  The thing that really kills this though is the fact we need to be able 
+to run the pre and post functions before and *after* the XOL stepping.
 
-> Thanks for reviewing, and for applying the rest of this series.
+>
+> As for simulating/emulating instructions, could we actually avoid it for
+> most of them where we can generate a similar instruction with the
+> corrected offset? If the out of line slot is somewhere within the kernel
+> data section, I think many of them can be re-encoded (e.g. branches).
+>
 
-Applied, thanks.
+Again, do we get enough displacement for this to always work?  A quick 
+look at the ARMv8 ARM makes me think we get +/-128M offset for a branch 
+and only +/-1M for a load literal.  For any given instruction type I 
+don't think it works unless it works for all possible offsets.
 
-Brian
+-dl
