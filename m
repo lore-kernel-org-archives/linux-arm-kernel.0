@@ -1,68 +1,93 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 21 May 2015 09:54:14 -0700
-Subject: [GIT PULL 2/2] omap1 sparse irq support for v4.2
-In-Reply-To: <20150521154957.GR10274@atomide.com>
-References: <80194352.chs4cqVdmg@wuerfel> <20150521145840.GQ10274@atomide.com>
- <2613552.WPU8qB3AF6@wuerfel> <20150521154957.GR10274@atomide.com>
-Message-ID: <20150521165413.GS10274@atomide.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Thu, 21 May 2015 19:00:02 +0200
+Subject: [PATCH soc] ARM: use ARM_SINGLE_ARMV7M for ARMv7-M platforms
+In-Reply-To: <1432161344-1930-1-git-send-email-stefan@agner.ch>
+References: <1432161344-1930-1-git-send-email-stefan@agner.ch>
+Message-ID: <CAGhQ9VxkGh_V0ctb1U7Y5UZ36qa-7ZPPW2xsg07m4SHhXmXeJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [150521 08:52]:
-> * Arnd Bergmann <arnd@arndb.de> [150521 08:41]:
-> > On Thursday 21 May 2015 07:58:41 Tony Lindgren wrote:
-> > > * Arnd Bergmann <arnd@arndb.de> [150521 05:13]:
-> > > > On Wednesday 20 May 2015 15:36:05 Tony Lindgren wrote:
-> > > > > Add support for CONFIG_SPARSE_IRQ for omap1. This takes us a bit closer
-> > > > > to making omap1 support multiarch. After this series we still need to
-> > > > > make omap1 use the common clock framework and fix up the drivers to not
-> > > > > rely on includes from mach and plat directories.
-> > > > > 
-> > > > > Note that this branch depends on a GPIO driver fix in v4.1-rc3
-> > > > > d2d05c65c40e ("gpio: omap: Fix regression for MPUIO interrupts").
-> > > > > 
-> > > > 
-> > > > I'm getting lots of build errors in linux-next, which I think are
-> > > > caused by this series.
-> > > 
-> > > Hmm is this with make randconfig?
-> > 
-> > Yes, all sorts of randconfig builds hit different parts here
-> > 
-> > > What's the Kconfig option enabling these errors?
-> > 
-> > From what I can tell, this is simply a result of enabling
-> > CONFIG_SPARSE_IRQ, which results in linux/irq.h no longer
-> > implicitly including  mach/hardware.h through mach/irqs.h.
-> 
-> Hmm not seeing that here, well at least not with what I've
-> tried so far.
->  
-> > You should be able to see these errors by just enabling
-> > the respective drivers. The errors manifest as a long list
-> > of undefined symbols like
-> > 
-> > /git/arm-soc/arch/arm/mach-omap1/io.c:33:28: error: 'OMAP1_IO_OFFSET' undeclared here (not in a function)
-> > /git/arm-soc/arch/arm/mach-omap1/io.c:43:14: error: 'OMAP7XX_DSP_BASE' undeclared here (not in a function)
-> > /git/arm-soc/arch/arm/mach-omap1/serial.c:114:33: note: each undeclared identifier is reported only once for each function it appears in
-> > /git/arm-soc/arch/arm/mach-omap1/pm.c:217:23: error: 'ULPD_SOFT_DISABLE_REQ_REG' undeclared (first use in this function)
-> > /git/arm-soc/drivers/video/fbdev/omap/sossi.c:608:17: error: 'MOD_CONF_CTRL_1' undeclared (first use in this function)
-> > 
-> > Then again, it is possible that I only see the errors because of
-> > an interaction with another patch from my randconfig fixes
-> > series.
-> 
-> I think there's something like that going on.. Maybe you're
-> now enabling multiarch for omap1 in your branch?
+Hi Stefan,
 
-OK got it triggered here too with randconfig builds now.
-This seems to be related to not selecting some omap1 SoCs or
-boards. I'll try to do a minimal fix for it today.
+On 21 May 2015 at 00:35, Stefan Agner <stefan@agner.ch> wrote:
+> Use the new config symbol ARM_SINGLE_ARMV7M which groups config
+> symbols used by modern ARMv7-M platforms. This allows supporting
+> multiple ARMv7-M platforms in one kernel image. However, a common
+> kernel image requires the combined platforms to share the same
+> main memory layout to be bootable.
+>
+> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 
-It seems the include changes you posted would be better done
-by replacing the the dependencies to mach/irqs.h where possible
-rather than adding more includes?
+You should have your sign-off on the top and not Uwe's ack.
 
-Regards,
+> ---
+> Since this is essentially only a shift of config symbols, it
+> should not change runtime behavior, at least when selecting
+> only one platform.
+>
+> Uwe, this is essentially the same I had in my patchset, just
+> converting the other platforms too. I was bold and added your
+> Ack anyway...
+>
+> Joachim, Maxime, I test compiled with your defconfigs, compiled
+> fine on my machine.
+>
+>  arch/arm/Kconfig       | 86 ++++++++++++++++++--------------------------------
+>  arch/arm/Kconfig.debug |  5 ++-
+>  2 files changed, 32 insertions(+), 59 deletions(-)
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 75920ed..9b777e3 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -334,6 +334,7 @@ config ARM_SINGLE_ARMV7M
+>         depends on !MMU
+>         select ARCH_WANT_OPTIONAL_GPIOLIB
+>         select ARM_NVIC
+> +       select AUTO_ZRELADDR
+>         select CLKSRC_OF
+>         select COMMON_CLK
+>         select CPU_V7M
+> @@ -411,24 +412,6 @@ config ARCH_EBSA110
+>           Ethernet interface, two PCMCIA sockets, two serial ports and a
+>           parallel port.
+[...]
+> -config ARCH_LPC18XX
+> -       bool "NXP LPC18xx/LPC43xx"
+> -       depends on !MMU
+> -       select ARCH_HAS_RESET_CONTROLLER
+> -       select ARCH_REQUIRE_GPIOLIB
+> -       select ARM_AMBA
+> -       select ARM_NVIC
+> -       select AUTO_ZRELADDR
+> -       select CLKSRC_LPC32XX
+> -       select COMMON_CLK
+> -       select CPU_V7M
+> -       select GENERIC_CLOCKEVENTS
+> -       select NO_IOPORT_MAP
+> -       select PINCTRL
+> -       select SPARSE_IRQ
+> -       select USE_OF
+> -       help
+> -         Support for NXP's LPC18xx Cortex-M3 and LPC43xx Cortex-M4
+> -         high performance microcontrollers.
+> -
+[...]
+> +config ARCH_LPC18XX
+> +       bool "NXP LPC18xx/LPC43xx"
+> +       depends on ARM_SINGLE_ARMV7M
+> +       select ARCH_HAS_RESET_CONTROLLER
+> +       select ARM_AMBA
+> +       select CLKSRC_LPC32XX
+> +       select PINCTRL
+> +       help
+> +         Support for NXP's LPC18xx Cortex-M3 and LPC43xx Cortex-M4
+> +         high performance microcontrollers.
 
-Tony
+The LPC18xx parts look good and it still builds and boots on my devkit so;
+
+Acked-by: Joachim Eastwood <manabian@gmail.com>
+
+regards,
+Joachim Eastwood
