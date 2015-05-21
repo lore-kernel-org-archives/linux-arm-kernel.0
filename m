@@ -1,56 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 21 May 2015 09:19:00 +0200
-Subject: [PATCH v8 4/9] mfd: Add binding document for NVIDIA Tegra XUSB
-In-Reply-To: <20150520145227.GA3787@ulmo.nvidia.com>
-References: <1430761002-9327-1-git-send-email-abrestic@chromium.org>
- <1430761002-9327-5-git-send-email-abrestic@chromium.org>
- <20150513143954.GA3394@x1> <55544CC5.9050001@nvidia.com>
- <20150514074058.GA22418@x1>
- <CAL1qeaEqNejuGkN-ke11mtWnaaRo+XieCBkQ6+NQ-Afym6uxVA@mail.gmail.com>
- <CAL1qeaHy0h7bXhuLHh4AG2Zfu48JYeawgVo4dp_k4oX8YFw6tA@mail.gmail.com>
- <20150520063551.GD3627@x1> <20150520145227.GA3787@ulmo.nvidia.com>
-Message-ID: <CACRpkdbK4BBhs==yFWW91M_4x5f3RGDiXBV+yBYYQ78JG0mMLg@mail.gmail.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Thu, 21 May 2015 09:23:21 +0200
+Subject: [PATCH 1/2] ARM: dts: exynos4: Remove obsolete MIPI DPHY 'reg'
+ property
+In-Reply-To: <1432174713-23368-1-git-send-email-k.kozlowski@samsung.com>
+References: <1432174713-23368-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <CABxcv=mKLGVWj2swi63-AkdF_-D5eVM=-785dJ8WjUNC-D1zpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 4:52 PM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
+Hello Krzysztof,
 
-> I'm a little confused by the simple-mfd approach. The only code I see in
-> linux-next for this is a single line that adds the "simple-mfd" string
-> to the OF device ID table in drivers/of/platform.c. As far as I can tell
-> this will merely cause child devices to be created. There won't be a
-> shared regmap and resources won't be set up properly either.
+On Thu, May 21, 2015 at 4:18 AM, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
+> Since e4b3d38088df ("phy: exynos-video-mipi: Fix regression by adding
+> support for PMU regmap") the Exynos PMU driver provides regmap to access
+> the MIPI DPHY registers. The MIPI DPHY node uses a phandle to syscon to
+> get this regmap. The 'reg' field is obsolete.
+>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos4.dtsi | 1 -
+>  1 file changed, 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+> index 1c74c1296ab7..6e7f0b4afa84 100644
+> --- a/arch/arm/boot/dts/exynos4.dtsi
+> +++ b/arch/arm/boot/dts/exynos4.dtsi
+> @@ -78,7 +78,6 @@
+>
+>         mipi_phy: video-phy at 10020710 {
+>                 compatible = "samsung,s5pv210-mipi-video-phy";
+> -               reg = <0x10020710 8>;
+>                 #phy-cells = <1>;
+>                 syscon = <&pmu_system_controller>;
+>         };
 
-That is correct. The simple-mfd is a two-component approach.
+Indeed, is even removed from the DT binding so this is clearly a left over.
 
-Ideally, in the simplest case, you combine simple-mfd with syscon.
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-foo at 0 {
-    compatible = "foo", "syscon", "simple-mfd";
-    reg = <0x10000000 0x1000>;
-
-    bar at 1 {
-        compatible = "bar";
-    };
-
-    baz at 2 {
-        compatible = "baz";
-    };
-};
-
-This will instantiate bar and baz.
-
-These subdrivers then probe and:
-
-probe() {
-   struct regmap *map;
-
-   map = syscon_node_to_regmap(parent->of_node);
-   (...)
-}
-
-Simple, syscon is the MFD hub.
-
-Yours,
-Linus Walleij
+Best regards,
+Javier
