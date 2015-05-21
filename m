@@ -1,46 +1,50 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 21 May 2015 21:04:00 +0200
-Subject: [PATCH soc] ARM: use ARM_SINGLE_ARMV7M for ARMv7-M platforms
-In-Reply-To: <CAGhQ9VxkGh_V0ctb1U7Y5UZ36qa-7ZPPW2xsg07m4SHhXmXeJQ@mail.gmail.com>
-References: <1432161344-1930-1-git-send-email-stefan@agner.ch>
- <CAGhQ9VxkGh_V0ctb1U7Y5UZ36qa-7ZPPW2xsg07m4SHhXmXeJQ@mail.gmail.com>
-Message-ID: <20150521190400.GD24769@pengutronix.de>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 21 May 2015 21:55:42 +0200
+Subject: [GIT PULL] late pxa fixes for v4.1
+Message-ID: <87siapr9hd.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 21, 2015 at 07:00:02PM +0200, Joachim Eastwood wrote:
-> Hi Stefan,
-> 
-> On 21 May 2015 at 00:35, Stefan Agner <stefan@agner.ch> wrote:
-> > Use the new config symbol ARM_SINGLE_ARMV7M which groups config
-> > symbols used by modern ARMv7-M platforms. This allows supporting
-> > multiple ARMv7-M platforms in one kernel image. However, a common
-> > kernel image requires the combined platforms to share the same
-> > main memory layout to be bootable.
-> >
-> > Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > Signed-off-by: Stefan Agner <stefan@agner.ch>
-> 
-> You should have your sign-off on the top and not Uwe's ack.
-I don't agree. IMHO the most sensible thing is to sign off (i.e. put
-your sob line below) all the things that come from you. So it's
+Hello Arnd, Kevin, Olof,
 
-	Signed-off-by: author
-	Acked-by: someone
-	Signed-off-by: forwarder
-	Signed-off-by: maintainer
+I have a late trivial patch for the v4.1 cycle. Unlike regular pull request,
+given the very straightforward nature of this patch, could I ask you to
+cherry-pick it directly from this mail ?
 
-if someone already acked before forwarder sent out the mail. If the ack
-is between forwarder and maintainer it was the latter who added the Ack.
-I'm not sure it's formalized this way, but like that it makes most sense
-to me and I seem to recall having read somewhere that the footers are
-supposed to tell something about the order of people involved.
+If that doesn't work for you, I'll provide a proper pull request.
 
-So Stefan did it exactly as i would have done it.
-
-Best regards
-Uwe
+Thanks.
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Robert
+
+>From 87a3253dd948da65d53ebd83e9569510a2c7b192 Mon Sep 17 00:00:00 2001
+From: Dan Carpenter <dan.carpenter@oracle.com>
+Date: Wed, 13 May 2015 14:32:39 +0300
+Subject: [PATCH] ARM: pxa: pxa_cplds: signedness bug in probe
+
+"base_irq" needs to be signed for the error handling to work.  Also we
+can remove the initialization because we re-assign it later.
+
+Fixes: aa8d6b73ea33 ('ARM: pxa: pxa_cplds: add lubbock and mainstone IO')
+Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ arch/arm/mach-pxa/pxa_cplds_irqs.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-pxa/pxa_cplds_irqs.c b/arch/arm/mach-pxa/pxa_cplds_irqs.c
+index f1aeb54..2385052 100644
+--- a/arch/arm/mach-pxa/pxa_cplds_irqs.c
++++ b/arch/arm/mach-pxa/pxa_cplds_irqs.c
+@@ -107,7 +107,7 @@ static int cplds_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	struct cplds *fpga;
+ 	int ret;
+-	unsigned int base_irq = 0;
++	int base_irq;
+ 	unsigned long irqflags = 0;
+ 
+ 	fpga = devm_kzalloc(&pdev->dev, sizeof(*fpga), GFP_KERNEL);
+-- 
+2.1.4
