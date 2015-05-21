@@ -1,54 +1,50 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 21 May 2015 10:04:50 +0200
-Subject: [GIT PULL] ARM: rockchip: dts relicensing for 4.2
-Message-ID: <1812361.uhqE6qDILc@phil>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Thu, 21 May 2015 10:09:42 +0200
+Subject: [PATCH 1/5] soc: mediatek: Add infracfg misc driver support
+In-Reply-To: <1432131540-2523-2-git-send-email-s.hauer@pengutronix.de>
+References: <1432131540-2523-1-git-send-email-s.hauer@pengutronix.de>
+ <1432131540-2523-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1432195782.21715.123.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Just a nit: an unneeded macro.
 
-I've managed to finally aquire all the necessary acks for relicensing
-to GPL2/X11, so please pull
+On Wed, 2015-05-20 at 16:18 +0200, Sascha Hauer wrote:
+
+> --- a/drivers/soc/mediatek/Kconfig
+> +++ b/drivers/soc/mediatek/Kconfig
+
+> +config MTK_INFRACFG
+> +	bool "MediaTek INFRACFG Support"
+> +	depends on ARCH_MEDIATEK
+> +	select REGMAP
+> +	help
+> +	  Say yes here to add support for the MediaTek INFRACFG controller. The
+> +	  INFRACFG controller contains various infrastructure registers not
+> +	  directly associated to any device.
+> +
+
+> --- a/drivers/soc/mediatek/Makefile
+> +++ b/drivers/soc/mediatek/Makefile
+
+> +obj-$(CONFIG_MTK_INFRACFG) += mtk-infracfg.o
+
+> --- /dev/null
+> +++ b/drivers/soc/mediatek/mtk-infracfg.c
+
+> +#include <linux/module.h>
+
+> +MODULE_LICENSE("GPL v2");
+
+MTK_INFRACFG was changed from tristate to bool in this version.
+
+Note that for built-in code MODULE_LICENSE() will be effectively
+preprocessed away. So you can drop that macro, and the include of
+linux/module.h too. (I did a quick compile to see if nothing else
+requires module.h, and it compiled cleanly without that include.)
+
+Thanks,
 
 
-Thanks
-Heiko
-
-The following changes since commit 9ab79be0da98e371f1d2f9c01ac25745639718d1:
-
-  ARM: dts: rockchip: add system-power-controller to act8846 on radxarock (2015-05-12 22:27:05 +0200)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.2-rockchip-dts2
-
-for you to fetch changes up to cdcc8b6b241912fe0fd60e447453d87c644b1619:
-
-  ARM: dts: rockchip: relicense rk3288-evb* under GPLv2/X11 (2015-05-15 12:25:54 +0200)
-
-----------------------------------------------------------------
-Relicense all Rockchip-related devicetree files to the GPL2/X11 combo.
-I've now finally aquired necessary Acks from all contributors.
-
-----------------------------------------------------------------
-Heiko Stuebner (8):
-      ARM: dts: rockchip: relicense rk3xxx.dtsi under GPLv2/X11
-      ARM: dts: rockchip: relicense rk3066a.dtsi under GPLv2/X11
-      ARM: dts: rockchip: relicense rk3188.dtsi under GPLv2/X11
-      ARM: dts: rockchip: relicense rk3288-thermal.dtsi under GPLv2/X11
-      ARM: dts: rockchip: relicense rk3066a-bqcurie2.dts under GPLv2/X11
-      ARM: dts: rockchip: relicense rk3188-radxarock.dts under GPLv2/X11
-      ARM: dts: rockchip: relicense rk3288.dtsi under GPLv2/X11
-      ARM: dts: rockchip: relicense rk3288-evb* under GPLv2/X11
-
- arch/arm/boot/dts/rk3066a-bqcurie2.dts   | 44 ++++++++++++++++++++++++++------
- arch/arm/boot/dts/rk3066a.dtsi           | 44 ++++++++++++++++++++++++++------
- arch/arm/boot/dts/rk3188-radxarock.dts   | 44 ++++++++++++++++++++++++++------
- arch/arm/boot/dts/rk3188.dtsi            | 44 ++++++++++++++++++++++++++------
- arch/arm/boot/dts/rk3288-evb-act8846.dts | 44 ++++++++++++++++++++++++++------
- arch/arm/boot/dts/rk3288-evb-rk808.dts   | 44 ++++++++++++++++++++++++++------
- arch/arm/boot/dts/rk3288-evb.dtsi        | 44 ++++++++++++++++++++++++++------
- arch/arm/boot/dts/rk3288-thermal.dtsi    | 40 ++++++++++++++++++++++++++---
- arch/arm/boot/dts/rk3288.dtsi            | 44 ++++++++++++++++++++++++++------
- arch/arm/boot/dts/rk3xxx.dtsi            | 44 ++++++++++++++++++++++++++------
- 10 files changed, 361 insertions(+), 75 deletions(-)
+Paul Bolle
