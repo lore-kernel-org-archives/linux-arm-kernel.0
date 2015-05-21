@@ -1,87 +1,226 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 21 May 2015 17:20:55 +0200
-Subject: [PATCH v2 4/6] soc: mediatek: Add SMI driver
-In-Reply-To: <1432219778.5092.44.camel@mhfsdcap03>
-References: <1431683009-18158-1-git-send-email-yong.wu@mediatek.com>
- <1431683009-18158-5-git-send-email-yong.wu@mediatek.com>
- <CABuKBeJvh2PGi3i6O0uu-7ggdBzKMb3tPE_XKhT1i-+tkKc5gg@mail.gmail.com>
- <1432188990.5092.12.camel@mhfsdcap03>
- <CABuKBe+FmAzr_Cu=fUDwDHYzH4mW_2p4z1SYmp7+W=Tu-MLEuA@mail.gmail.com>
- <CAGS+omARc60i+8vO6V1ccnSnXkjAGNjMjRB1+5kg_EHrrS1NOw@mail.gmail.com>
- <1432219778.5092.44.camel@mhfsdcap03>
-Message-ID: <CABuKBeJgmwtH4KjfxwPXgvO9Nwaz3o3ha7h99-VdtSNmQ80N5A@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 21 May 2015 17:23:43 +0200
+Subject: [PATCH] arch/arm64 :Cyclic Test fix in ARM64 fpsimd
+In-Reply-To: <20150521135007.GC3983@localhost.localdomain>
+References: <CAPyr0yJSGqvxkUWLtNKe0q5mNanBczAfAVx0tPKuzYeDG+eJ=Q@mail.gmail.com>
+ <20150521135007.GC3983@localhost.localdomain>
+Message-ID: <CAKv+Gu_u+iYL4niHip9nzUd9p7tEt6XEvhZ4fQLJK_gVaw+FSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-21 16:49 GMT+02:00 Yong Wu <yong.wu@mediatek.com>:
-> On Thu, 2015-05-21 at 22:33 +0800, Daniel Kurtz wrote:
->> On Thu, May 21, 2015 at 3:30 PM, Matthias Brugger
->> <matthias.bgg@gmail.com> wrote:
->> > 2015-05-21 8:16 GMT+02:00 Yong Wu <yong.wu@mediatek.com>:
->> >> Hi Matthias,
->> >>      Thanks very much for your suggestion.
->> >>      Abort the smi clock name, Could you help check below.
->> >>      The others I will improve in next time.
->> >>
->> >> On Tue, 2015-05-19 at 13:14 +0200, Matthias Brugger wrote:
->> >>> 2015-05-15 11:43 GMT+02:00 Yong Wu <yong.wu@mediatek.com>:
->> >>> >     This patch add SMI(Smart Multimedia Interface) driver. This driver is
->> >>> > responsible to enable/disable iommu and control the clocks of each local arbiter.
->> >>> >
->> >> [snip]
->> >>> > +
->> >>> > +#define SMI_LARB_MMU_EN                (0xf00)
->> >>> > +#define F_SMI_MMU_EN(port)     (1 << (port))
->> >>> > +
->> >>> > +enum {
->> >>> > +       MTK_CLK_APB,
->> >>> > +       MTK_CLK_SMI,
->> >>> > +       MTK_CLK_MAX,
->> >>>
->> >>> Maybe add something like:
->> >>> MTK_CLK_FIRST = MTK_CLK_APB,
->> >>> to make the for loops better readable.
->> >>>
->> >> Then, Is it like this? :
->> >>  enum {
->> >>         MTK_CLK_FIRST = MTK_CLK_APB,
->> >>         MTK_CLK_SMI,
->> >>         MTK_CLK_MAX,
->> >>  }
->> >> or the CLK_SMI also need MTK_CLK_SECOND = MTK_CLK_SMI.
->> >
->> >
->> > something like:
->> > enum {
->> >          MTK_CLK_FIRST,
->> >          MTK_CLK_APB = MTK_CLK_FIRST,
->> >          MTK_CLK_SMI,
->> >          MTK_CLK_LAST,
->> > }
->> >
->> > So you can rewrite the for loop:
->> > if (i = MTK_CLK_FIRST; i < MTK_CLK_LAST; i++)
->>
->> Actually, do we ever plan to add more clks per smi node?
-> No.
->> If not, perhaps the whole driver would be simpler if you just
->> explicitly handle the apb & smi clocks:
->>
->> struct mtk_smi_larb {
->>        void __iomem            *base;
->>        spinlock_t              portlock; /* lock for config port */
->>        struct device           *smi;
->>        struct clk              *clk_apb;
->>        struct clk              *clk_smi;
->> };
->>
->> And then all of the loops become just a pair of clock operations.
-> Thanks. I will try this and compare whether it will add many lines.
+On 21 May 2015 at 15:50, Anders Roxell <anders.roxell@gmail.com> wrote:
+> On 2015-05-01 20:59, Ayyappa Ch wrote:
+>> Floating point operations in arm64 should not disable preempt .
+>> Activating realtime features with below code.
+>
+> I've talked with an engineer who worked on fpsimd and I was told that
+> replacing preempt_disable with migrate_disable would leave fpsimd open
+> to corruption.
+>
+> The kernel won't save the state of the simd registers when it is
+> preempted so if another task runs on the same CPU and also uses simd, it
+> clobbers the registers of the first task, and migrate_disable() does not
+> prevent that.
+>
+> If we want to use SIMD with preemption enabled, we need to update the
+> context switch code to do a full SIMD register state save&restore if
+> necessary. However, this can have a noticeable cost in all task switch
+> latencies.
+>
 
-If you don't plan to add more clocks in the future, then I think the
-suggestion Dan made is the best one.
+I noticed somewhere in this thread that the culprit was ultimately a
+call to virt_efi_set_time(), which is the UEFI Runtime Service that
+programs the RTC. If this is a hot spot, then there is something very
+wrong with the system which is entirely unrelated to preempt_rt.
 
-Regards,
-Matthias
+But let's assume this is a valid UEFI Runtime Services call: since
+UEFI Runtime Services are allowed to use the FP/SIMD register file, we
+need the kernel_neon_begin()/kernel_neon_end() pair even though it is
+highly unlikely that such a runtime service call would actually need
+to use the NEON or floating point. It is simply imposed by the
+kernel<->firmware ABI. Also, on this particular code path, preemption
+will be disabled regardless, since the UEFI Runtime Services are
+invoked with a UEFI specific TTBR0 mapping, which rules out preemption
+for reasons unrelated to the FP/SIMD register file.
+
 -- 
-motzblog.wordpress.com
+Ard.
+
+
+>>
+>> From e6a5fce9b3b55f48656240036a9354a0997c2907 Mon Sep 17 00:00:00 2001
+>> From: Ayyappa Ch <ayyappa.chandolu@amd.com>
+>> Date: Tue, 28 Apr 2015 11:53:00 +0530
+>> Subject: [PATCH ] floating point realtime fix
+>>
+>> ---
+>>  arch/arm64/kernel/fpsimd.c | 16 ++++++++--------
+>>  1 file changed, 8 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+>> index 2438497..3dca156 100644
+>> --- a/arch/arm64/kernel/fpsimd.c
+>> +++ b/arch/arm64/kernel/fpsimd.c
+>> @@ -166,10 +166,10 @@ void fpsimd_flush_thread(void)
+>>   */
+>>  void fpsimd_preserve_current_state(void)
+>>  {
+>> - preempt_disable();
+>> + migrate_disable();
+>>   if (!test_thread_flag(TIF_FOREIGN_FPSTATE))
+>>   fpsimd_save_state(&current->thread.fpsimd_state);
+>> - preempt_enable();
+>> + migrate_enable();
+>>  }
+>>
+>>  /*
+>> @@ -179,7 +179,7 @@ void fpsimd_preserve_current_state(void)
+>>   */
+>>  void fpsimd_restore_current_state(void)
+>>  {
+>> - preempt_disable();
+>> + migrate_disable();
+>>   if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+>>   struct fpsimd_state *st = &current->thread.fpsimd_state;
+>>
+>> @@ -187,7 +187,7 @@ void fpsimd_restore_current_state(void)
+>>   this_cpu_write(fpsimd_last_state, st);
+>>   st->cpu = smp_processor_id();
+>>   }
+>> - preempt_enable();
+>> + migrate_enable();
+>>  }
+>>
+>>  /*
+>> @@ -197,7 +197,7 @@ void fpsimd_restore_current_state(void)
+>>   */
+>>  void fpsimd_update_current_state(struct fpsimd_state *state)
+>>  {
+>> - preempt_disable();
+>> + migrate_disable();
+>>   fpsimd_load_state(state);
+>>   if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+>>   struct fpsimd_state *st = &current->thread.fpsimd_state;
+>> @@ -205,7 +205,7 @@ void fpsimd_update_current_state(struct fpsimd_state *state)
+>>   this_cpu_write(fpsimd_last_state, st);
+>>   st->cpu = smp_processor_id();
+>>   }
+>> - preempt_enable();
+>> + migrate_enable();
+>>  }
+>>
+>>  /*
+>> @@ -239,7 +239,7 @@ void kernel_neon_begin_partial(u32 num_regs)
+>>   * that there is no longer userland FPSIMD state in the
+>>   * registers.
+>>   */
+>> - preempt_disable();
+>> + migrate_disable();
+>>   if (current->mm &&
+>>      !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
+>>   fpsimd_save_state(&current->thread.fpsimd_state);
+>> @@ -255,7 +255,7 @@ void kernel_neon_end(void)
+>>   in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
+>>   fpsimd_load_partial_state(s);
+>>   } else {
+>> - preempt_enable();
+>> + migrate_enable();
+>>   }
+>>  }
+>>  EXPORT_SYMBOL(kernel_neon_end);
+>>
+>> On Fri, May 1, 2015 at 1:03 PM, Ayyappa Ch <ayyappa.ch.linux@gmail.com> wrote:
+>> > Following Anders Roxell  patch on "Enable PREEMPT_RT_FULL" , observed
+>> > one issue with Cyclic test while running floating point operations. So
+>> > , modified below changes for that.
+>> >
+>> > From e6a5fce9b3b55f48656240036a9354a0997c2907 Mon Sep 17 00:00:00 2001
+>> > From: Ayyappa Ch <ayyappa.chandolu@amd.com>
+>> > Date: Tue, 28 Apr 2015 11:53:00 +0530
+>> > Subject: [PATCH ] floating point realtime fix
+>> >
+>> > ---
+>> >  arch/arm64/kernel/fpsimd.c | 16 ++++++++--------
+>> >  1 file changed, 8 insertions(+), 8 deletions(-)
+>> >
+>> > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+>> > index 2438497..3dca156 100644
+>> > --- a/arch/arm64/kernel/fpsimd.c
+>> > +++ b/arch/arm64/kernel/fpsimd.c
+>> > @@ -166,10 +166,10 @@ void fpsimd_flush_thread(void)
+>> >   */
+>> >  void fpsimd_preserve_current_state(void)
+>> >  {
+>> > - preempt_disable();
+>> > + migrate_disable();
+>> >   if (!test_thread_flag(TIF_FOREIGN_FPSTATE))
+>> >   fpsimd_save_state(&current->thread.fpsimd_state);
+>> > - preempt_enable();
+>> > + migrate_enable();
+>> >  }
+>> >
+>> >  /*
+>> > @@ -179,7 +179,7 @@ void fpsimd_preserve_current_state(void)
+>> >   */
+>> >  void fpsimd_restore_current_state(void)
+>> >  {
+>> > - preempt_disable();
+>> > + migrate_disable();
+>> >   if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+>> >   struct fpsimd_state *st = &current->thread.fpsimd_state;
+>> >
+>> > @@ -187,7 +187,7 @@ void fpsimd_restore_current_state(void)
+>> >   this_cpu_write(fpsimd_last_state, st);
+>> >   st->cpu = smp_processor_id();
+>> >   }
+>> > - preempt_enable();
+>> > + migrate_enable();
+>> >  }
+>> >
+>> >  /*
+>> > @@ -197,7 +197,7 @@ void fpsimd_restore_current_state(void)
+>> >   */
+>> >  void fpsimd_update_current_state(struct fpsimd_state *state)
+>> >  {
+>> > - preempt_disable();
+>> > + migrate_disable();
+>> >   fpsimd_load_state(state);
+>> >   if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+>> >   struct fpsimd_state *st = &current->thread.fpsimd_state;
+>> > @@ -205,7 +205,7 @@ void fpsimd_update_current_state(struct fpsimd_state *state)
+>> >   this_cpu_write(fpsimd_last_state, st);
+>> >   st->cpu = smp_processor_id();
+>> >   }
+>> > - preempt_enable();
+>> > + migrate_enable();
+>> >  }
+>> >
+>> >  /*
+>> > @@ -239,7 +239,7 @@ void kernel_neon_begin_partial(u32 num_regs)
+>> >   * that there is no longer userland FPSIMD state in the
+>> >   * registers.
+>> >   */
+>> > - preempt_disable();
+>> > + migrate_disable();
+>> >   if (current->mm &&
+>> >      !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
+>> >   fpsimd_save_state(&current->thread.fpsimd_state);
+>> > @@ -255,7 +255,7 @@ void kernel_neon_end(void)
+>> >   in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
+>> >   fpsimd_load_partial_state(s);
+>> >   } else {
+>> > - preempt_enable();
+>> > + migrate_enable();
+>> >   }
+>> >  }
+>> >  EXPORT_SYMBOL(kernel_neon_end);
+>> > --
+>> > 1.9.1
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-rt-users" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+> --
+> Anders Roxell
+> 0708 22 71 05
