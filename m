@@ -1,45 +1,45 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 21 May 2015 22:54:02 +0200
-Subject: [PATCH v2 3/7] clk: sunxi: codec clock support
+Date: Thu, 21 May 2015 22:54:03 +0200
+Subject: [PATCH v2 4/7] clk: sunxi: mod1 clock support
 In-Reply-To: <1432241646-9511-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1432241646-9511-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1432241646-9511-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1432241646-9511-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Emilio L?pez <emilio@elopez.com.ar>
 
-The codec clock on sun4i, sun5i and sun7i is a simple gate with PLL2 as
-parent. Add a driver for such a clock.
+The module 1 type of clocks consist of a gate and a mux and are used on
+the audio blocks to mux and gate the PLL2 outputs for AC97, IIS or
+SPDIF. This commit adds support for them on the sunxi clock driver.
 
 Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/clk/sunxi/Makefile        |  1 +
- drivers/clk/sunxi/clk-a10-codec.c | 45 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 46 insertions(+)
- create mode 100644 drivers/clk/sunxi/clk-a10-codec.c
+ drivers/clk/sunxi/Makefile       |  1 +
+ drivers/clk/sunxi/clk-a10-mod1.c | 84 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 85 insertions(+)
+ create mode 100644 drivers/clk/sunxi/clk-a10-mod1.c
 
 diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-index eb36c38d4120..6fa845e13067 100644
+index 6fa845e13067..960eeabc375f 100644
 --- a/drivers/clk/sunxi/Makefile
 +++ b/drivers/clk/sunxi/Makefile
-@@ -3,6 +3,7 @@
- #
- 
+@@ -5,6 +5,7 @@
  obj-y += clk-sunxi.o clk-factors.o
-+obj-y += clk-a10-codec.o
+ obj-y += clk-a10-codec.o
  obj-y += clk-a10-hosc.o
++obj-y += clk-a10-mod1.o
  obj-y += clk-a10-pll2.o
  obj-y += clk-a20-gmac.o
-diff --git a/drivers/clk/sunxi/clk-a10-codec.c b/drivers/clk/sunxi/clk-a10-codec.c
+ obj-y += clk-mod0.o
+diff --git a/drivers/clk/sunxi/clk-a10-mod1.c b/drivers/clk/sunxi/clk-a10-mod1.c
 new file mode 100644
-index 000000000000..aaeccf8cde39
+index 000000000000..490f72432a1e
 --- /dev/null
-+++ b/drivers/clk/sunxi/clk-a10-codec.c
-@@ -0,0 +1,45 @@
++++ b/drivers/clk/sunxi/clk-a10-mod1.c
+@@ -0,0 +1,84 @@
 +/*
 + * Copyright 2013 Emilio L?pez
 + *
@@ -61,29 +61,68 @@ index 000000000000..aaeccf8cde39
 +#include <linux/of.h>
 +#include <linux/of_address.h>
 +
-+#define SUN4I_CODEC_GATE	31
++static DEFINE_SPINLOCK(mod1_lock);
 +
-+static void __init sun4i_codec_clk_setup(struct device_node *node)
++#define SUN4I_MOD1_ENABLE	31
++#define SUN4I_MOD1_MUX		16
++#define SUN4I_MOD1_MUX_WIDTH	2
++#define SUN4I_MOD1_MAX_PARENTS	4
++
++static void __init sun4i_mod1_clk_setup(struct device_node *node)
 +{
 +	struct clk *clk;
-+	const char *clk_name = node->name, *parent_name;
++	struct clk_mux *mux;
++	struct clk_gate *gate;
++	const char *parents[4];
++	const char *clk_name = node->name;
 +	void __iomem *reg;
++	int i = 0;
 +
 +	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
 +	if (IS_ERR(reg))
 +		return;
 +
++	mux = kzalloc(sizeof(*mux), GFP_KERNEL);
++	if (!mux)
++		goto err_unmap;
++
++	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
++	if (!gate)
++		goto err_free_mux;
++
 +	of_property_read_string(node, "clock-output-names", &clk_name);
-+	parent_name = of_clk_get_parent_name(node, 0);
 +
-+	clk = clk_register_gate(NULL, clk_name, parent_name,
-+				CLK_SET_RATE_PARENT, reg,
-+				SUN4I_CODEC_GATE, 0, NULL);
++	while (i < SUN4I_MOD1_MAX_PARENTS &&
++	       (parents[i] = of_clk_get_parent_name(node, i)) != NULL)
++		i++;
 +
-+	if (!IS_ERR(clk))
-+		of_clk_add_provider(node, of_clk_src_simple_get, clk);
++	gate->reg = reg;
++	gate->bit_idx = SUN4I_MOD1_ENABLE;
++	gate->lock = &mod1_lock;
++	mux->reg = reg;
++	mux->shift = SUN4I_MOD1_MUX;
++	mux->mask = BIT(SUN4I_MOD1_MUX_WIDTH) - 1;
++	mux->lock = &mod1_lock;
++
++	clk = clk_register_composite(NULL, clk_name, parents, i,
++				     &mux->hw, &clk_mux_ops,
++				     NULL, NULL,
++				     &gate->hw, &clk_gate_ops, 0);
++	if (IS_ERR(clk))
++		goto err_free_gate;
++
++	of_clk_add_provider(node, of_clk_src_simple_get, clk);
++
++	return;
++
++err_free_gate:
++	kfree(gate);
++err_free_mux:
++	kfree(mux);
++err_unmap:
++	iounmap(reg);
 +}
-+CLK_OF_DECLARE(sun4i_codec, "allwinner,sun4i-a10-codec-clk",
-+	       sun4i_codec_clk_setup);
++CLK_OF_DECLARE(sun4i_mod1, "allwinner,sun4i-a10-mod1-clk",
++	       sun4i_mod1_clk_setup);
 -- 
 2.4.1
