@@ -1,123 +1,38 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Thu, 21 May 2015 15:01:29 +0800
-Subject: [PATCH v8 2/3] I2C: mediatek: Add driver for MediaTek I2C
- controller
-In-Reply-To: <20150520085715.GA17078@pengutronix.de>
-References: <1431967209-5261-1-git-send-email-eddie.huang@mediatek.com>
- <1431967209-5261-3-git-send-email-eddie.huang@mediatek.com>
- <20150520085715.GA17078@pengutronix.de>
-Message-ID: <1432191689.28646.11.camel@mtksdaap41>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Thu, 21 May 2015 15:12:51 +0800
+Subject: [PATCH 0/5] Add Mediatek MT8173 subsystem clocks support
+Message-ID: <1432192376-6712-1-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patchset contains subsystem clocks support for Mediatek MT8173.
+It also contains some bug fixes before adds new clocks support.
 
-Please see my reply below (I skip comments that already reply in another
-mail).
+James Liao (4):
+  clk: mediatek: Fix apmixedsys clock registration
+  dt-bindings: ARM: Mediatek: Document devicetree bindings for clock
+    controllers
+  clk: mediatek: Add subsystem clocks of MT8173
+  clk: mediatek: Add USB clock support in MT8173 APMIXEDSYS
 
-On Wed, 2015-05-20 at 10:57 +0200, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> now that I understood the formula some more comments to the calculation.
-> 
-> On Tue, May 19, 2015 at 12:40:08AM +0800, Eddie Huang wrote:
-> > +#define I2C_DEFAUT_SPEED		100000	/* hz */
-> DEFAULT?
-> 
-Yes, will fix.
+Sascha Hauer (1):
+  clk: mediatek: mt8173: Fix enabling of critical clocks
 
-> > +#define MAX_FS_MODE_SPEED		400000
-> > +#define MAX_HS_MODE_SPEED		3400000
-> > +#define MAX_SAMPLE_CNT_DIV		8
-> > +#define MAX_STEP_CNT_DIV		64
-> > +#define MAX_HS_STEP_CNT_DIV		8
-> > [...]
-> > +/* calculate i2c port speed */
-> > +static int mtk_i2c_set_speed(struct mtk_i2c *i2c, unsigned int clk_src_in_hz)
-> > +{
-> add a comment here, that clk_src_in_hz is the parent clock already
-> divided by clock-div.
-> 
-We move parent_clk div clock-div in mtk_i2c_set_speed function, I think
-this is more clear.
+ .../bindings/arm/mediatek/mediatek,imgsys.txt      |  22 +
+ .../bindings/arm/mediatek/mediatek,mmsys.txt       |  22 +
+ .../bindings/arm/mediatek/mediatek,vdecsys.txt     |  22 +
+ .../bindings/arm/mediatek/mediatek,vencltsys.txt   |  22 +
+ .../bindings/arm/mediatek/mediatek,vencsys.txt     |  22 +
+ drivers/clk/mediatek/clk-mt8135.c                  |   2 +-
+ drivers/clk/mediatek/clk-mt8173.c                  | 454 ++++++++++++++++++++-
+ drivers/clk/mediatek/clk-pll.c                     |   7 +-
+ include/dt-bindings/clock/mt8173-clk.h             |  94 ++++-
+ 9 files changed, 652 insertions(+), 15 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vencltsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
 
-> > +	step_div = max_step_cnt;
-> > +	/* Find the best combination */
-> > +	khz = i2c->speed_hz / 1000;
-> > +	hclk = clk_src_in_hz / 1000;
-> Why are you dividing here? There shouldn't be an overflow problem and
-> you're loosing precision.
-OK, will remove div 1000.
-
-> 
-> > +	min_div = ((hclk >> 1) + khz - 1) / khz;
-> The shift accounts for the fixed divider 2 in
-> 
-> 	i2c_bus_freq = parent_clk / (clock-div * 2 * sample_cnt * step_cnt
-> 
-> ? Maybe better call this opt_div instead of min_div? 
-OK
-
-> 
-> > +	best_mul = MAX_SAMPLE_CNT_DIV * max_step_cnt;
-> > +
-> > +	for (sample_cnt = 1; sample_cnt <= MAX_SAMPLE_CNT_DIV; sample_cnt++) {
-> > +		step_cnt = (min_div + sample_cnt - 1) / sample_cnt;
-> DIV_ROUND_UP
-OK
-
-> > +
-> > +		if (cnt_mul < best_mul) {
-> > +			best_mul = cnt_mul;
-> > +			sample_div = sample_cnt;
-> > +			step_div = step_cnt;
-> I'd call these best_sample_cnt and best_step_cnt instead of sample_div
-> and step_div.
-OK
-
-> 
-> > +			if (best_mul == min_div)
-> > +				break;
-> > +		}
-> > +	}
-> > +
-> > +	sample_cnt = sample_div;
-> > +	step_cnt = step_div;
-> > +	sclk = hclk / (2 * sample_cnt * step_cnt);
-> > +	if (sclk > khz) {
-> Can this happen? A better name for "sclk" would be "bus_freq"?
-Yes, if i2c->speed_hz is too small, not able to get target_speed using
-hardware div. 
-
-> 
-> > +		dev_dbg(i2c->dev, "%s mode: unsupported speed (%ldkhz)\n",
-> > +			(i2c->speed_hz > MAX_HS_MODE_SPEED) ? "HS" : "ST/FT",
-> What is ST/FR? I would have expected FS here.
-Please skip it.The debug message is too lousy.
-
-> 
-> > +			(long int)khz);
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	step_cnt--;
-> > +	sample_cnt--;
-> > +
-> > +	if (i2c->speed_hz > MAX_FS_MODE_SPEED) {
-> > +		/* Set the hign speed mode register */
-> > +		i2c->timing_reg = I2C_FS_TIME_INIT_VALUE;
-> > +		i2c->high_speed_reg = I2C_TIME_DEFAULT_VALUE |
-> > +			(sample_cnt & I2C_TIMING_SAMPLE_COUNT_MASK) << 12 |
-> > +			(step_cnt & I2C_TIMING_SAMPLE_COUNT_MASK) << 8;
-> > +	} else {
-> > +		i2c->timing_reg =
-> > +			(sample_cnt & I2C_TIMING_SAMPLE_COUNT_MASK) << 8 |
-> > +			(step_cnt & I2C_TIMING_STEP_DIV_MASK) << 0;
-> > +		/* Disable the high speed transaction */
-> > +		i2c->high_speed_reg = I2C_TIME_CLR_VALUE;
-> > +	}
-> Would it be sensible to write these values directly into hardware here?
-No.In some error cases, we want to reinitialize hardware, keep these
-values to avoid calculate again.
-
-Eddie
+--
+1.8.1.1.dirty
