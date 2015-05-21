@@ -1,67 +1,45 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 21 May 2015 10:58:56 +1000
-Subject: linux-next: manual merge of the imx-mxs tree with the arm-soc tree
-Message-ID: <20150521105856.1a076b4a@canb.auug.org.au>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 21 May 2015 09:04:25 +0800
+Subject: [PATCH v3] arm, imx6, dts: add DT for aristainetos2 board
+In-Reply-To: <555C6C72.2060302@denx.de>
+References: <1432099863-8642-1-git-send-email-hs@denx.de>
+ <1432118319.4466.40.camel@pengutronix.de>
+ <555C6C72.2060302@denx.de>
+Message-ID: <20150521010424.GF24844@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Wed, May 20, 2015 at 01:13:54PM +0200, Heiko Schocher wrote:
+> >>+ * Copyright (C) 2015 Heiko Schocher <hs@denx.de>
+> >>+ *
+> >>+ * This file is dual-licensed: you can use it either under the terms
+> >>+ * of the GPL or the X11 license, at your option. Note that this dual
+> >>+ * licensing only applies to this file, and not this project as a
+> >>+ * whole.
+> >>+ *
+> >>+ *  a) This file is free software; you can redistribute it and/or
+> >>+ *     modify it under the terms of the GNU General Public License as
+> >>+ *     published by the Free Software Foundation; either version 2 of
+> >>+ *     the License, or (at your option) any later version.
+> >>+ *
+> >>+ *     This file is distributed in the hope that it will be useful,
+> >>+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >>+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >>+ *     GNU General Public License for more details.
+> >>+ *
+> >>+ *     You should have received a copy of the GNU General Public
+> >>+ *     License along with this file; if not, write to the Free
+> >>+ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+> >>+ *     MA 02110-1301 USA
+> >
+> >checkpatch warns that you should not include this paragraph because the
+> >mail address might change in the future and it is contained in COPYING.
+> 
+> Hmm... Shawn mentioned to change it to the "GPL/X11 dual licence"
+> as in the arch/arm/boot/dts/imx6sl-warp.dts file ... so I copied this
+> from there ... is there a better option for this?
 
-Today's linux-next merge of the imx-mxs tree got a conflict in
-arch/arm/mach-imx/Kconfig between commit 8064887e02fd ("ARM: vf610:
-enable Cortex-M4 configuration on Vybrid SoC") from the arm-soc tree
-and commit aff62955b27b ("ARM: imx: add msl support for imx7d") from
-the imx-mxs tree.
+It seems I pointed you to a bad example.  Let me try again, see
+arch/arm/boot/dts/imx6q-hummingboard.dts for example.
 
-I fixed it up (hopefully - see below) and can carry the fix as
-necessary (no action is required).
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc arch/arm/mach-imx/Kconfig
-index 2e3c45832674,b8e05379311e..000000000000
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@@ -582,24 -548,17 +548,31 @@@ config SOC_IMX6S
-  	help
-  	  This enables support for Freescale i.MX6 SoloX processor.
-  
-+ config SOC_IMX7D
-+ 	bool "i.MX7 Dual support"
-+ 	select PINCTRL_IMX7D
-+ 	select ARM_GIC
-+ 	help
-+ 		This enables support for Freescale i.MX7 Dual processor.
-+ 
- +config SOC_LS1021A
- +	bool "Freescale LS1021A support"
- +	select ARM_GIC
- +	select HAVE_ARM_ARCH_TIMER
- +	select PCI_DOMAINS if PCI
- +	select ZONE_DMA if ARM_LPAE
- +	help
- +	  This enables support for Freescale LS1021A processor.
- +
- +endif
- +
- +comment "Cortex-A/Cortex-M asymmetric multiprocessing platforms"
- +
- +if ARCH_MULTI_V7 || ARM_SINGLE_ARMV7M
- +
-  config SOC_VF610
-  	bool "Vybrid Family VF610 support"
- -	select IRQ_DOMAIN_HIERARCHY
- -	select ARM_GIC
- +	select ARM_GIC if ARCH_MULTI_V7
-  	select PINCTRL_VF610
-  	select PL310_ERRATA_769419 if CACHE_L2X0
-  	select SMP_ON_UP if SMP
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150521/ac598381/attachment-0001.sig>
+Shawn
