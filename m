@@ -1,46 +1,67 @@
-From: jonathar@broadcom.com (Jonathan Richardson)
-Date: Thu, 21 May 2015 10:48:32 -0700
-Subject: [PATCH 2/2] misc: Add initial Digital Timing Engine (DTE) driver
- for cygnus
-In-Reply-To: <20150521063303.GA1558@localhost.localdomain>
-References: <5543CD73.2030902@broadcom.com>
- <20150501203004.3add2c95@lxorguk.ukuu.org.uk> <9193036.7UYD2OGJHk@wuerfel>
- <554D1649.2030106@broadcom.com> <20150513153544.GC2065@localhost.localdomain>
- <5553AAEA.30503@broadcom.com> <20150513202716.GA15878@localhost.localdomain>
- <5553DD7D.8090905@broadcom.com> <20150514113054.GB1580@localhost.localdomain>
- <555D1ADA.8070308@broadcom.com> <20150521063303.GA1558@localhost.localdomain>
-Message-ID: <555E1A70.90305@broadcom.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 21 May 2015 19:49:16 +0200
+Subject: [PATCH 5/5] ARM64: MediaTek MT8173: Add SCPSYS device node
+In-Reply-To: <CAGS+omDHEY54TzhNTJcFOeHkGbXAQwiTh9gxc=PsbzjwmpHEDA@mail.gmail.com>
+References: <1432131540-2523-1-git-send-email-s.hauer@pengutronix.de>
+ <1432131540-2523-6-git-send-email-s.hauer@pengutronix.de>
+ <CAGS+omDHEY54TzhNTJcFOeHkGbXAQwiTh9gxc=PsbzjwmpHEDA@mail.gmail.com>
+Message-ID: <20150521174916.GQ6325@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15-05-20 11:33 PM, Richard Cochran wrote:
-> On Wed, May 20, 2015 at 04:38:02PM -0700, Jonathan Richardson wrote:
->>
->> Richard, this design isn't going to work. We need to have both kernel
->> and user space consumers.
+On Thu, May 21, 2015 at 10:32:40PM +0800, Daniel Kurtz wrote:
+> On Wed, May 20, 2015 at 10:19 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > This adds the SCPSYS device node to the MT8173 dtsi file.
+> >
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > ---
+> >  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 10 ++++++++++
+> >  1 file changed, 10 insertions(+)
+> >
+> > diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> > index 924fdb6..12430f0 100644
+> > --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> > +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> > @@ -125,6 +125,16 @@
+> >                                                 <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
+> >                 };
+> >
+> > +               scpsys: scpsys at 10006000 {
+> > +                       compatible = "mediatek,mt8173-scpsys";
+> > +                       #power-domain-cells = <1>;
+> > +                       reg = <0 0x10006000 0 0x1000>;
+> > +                       clocks = <&clk26m>,
 > 
-> But you did not implement even a single kernel consumer.
-> 
->> We don't want all GPIO's in a common timestamp
->> buffer either, as it presents problems I mentioned previously. Currently
->> the network input is a gpio.
-> 
-> That won't work.  Consider what happens when the MAC drops a packet.
-> 
->> After some discussion here I think we'll
->> have to keep this driver out of the kernel for now.
-> 
-> Fine with me.
+> Why is mfg using <&clk26m> and not <&topckgen CLK_TOP_MFG_SEL>?
 
-We'll keep this discussion and try to figure out the best interface
-keeping in mind what you've said as we move further along with it. Not a
-wasted discussion. Requirements of this need to be better defined and
-thought out also.
+Because James Liao said to me that it is derived from clk26m and not
+from mfg_sel.
 
-Thanks,
-Jon
+> I saw another patch set on the list today from James Liao that adds more clocks.
+> Perhaps we can move the SCPSYS set on top of that one and include more clocks?
+> 
+> > +                                <&topckgen CLK_TOP_MM_SEL>;
+> 
+> FYI: the devicetree changes in this set depend on your other patch set
+> starting with:
+> 
+> https://patchwork.kernel.org/patch/6446341/
+> "arm64: dts: mt8173: Add clock controller device nodes"
+> 
+> This patch isn't based on top of the other set, though, so it may lead
+> to a small merge conflict when folding in the .dtsi device nodes (ie,
+> placing scpsys at 10006000 after pwrap at 1000d000).
+> 
+> I'm not sure how people usually resolve this or manage the ordering of
+> co-dependent patch sets upstream.
 
-> 
-> Thanks,
-> Richard
-> 
+This merge conflict should be easy to solve. However, I can rebase this
+on Matthias' dts branch if desired.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
