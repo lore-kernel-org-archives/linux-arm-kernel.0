@@ -1,190 +1,37 @@
-From: davidcdueck@googlemail.com (David Dueck)
-Date: Thu, 21 May 2015 11:06:56 +0200
-Subject: [PATCH] drm: atmel_hlcdc: Add support for get_timings
-Message-ID: <1432199216-1139-1-git-send-email-davidcdueck@googlemail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 May 2015 11:07:08 +0200
+Subject: [PATCH] ASoC: qcom: remove incorrect dependencies
+Message-ID: <2324031.cqS0mEEEhQ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drm_panel supports querying timing ranges. If the supplied mode does
-not work with the hlcdc we query the panel and try to find a suitable
-mode.
+Compile-tests show a warning for the newly added SND_SOC_STORM
+symbol:
 
-Signed-off-by: David Dueck <davidcdueck@googlemail.com>
----
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 118 +++++++++++++++++++----
- 1 file changed, 98 insertions(+), 20 deletions(-)
+warning: (SND_SOC_STORM) selects SND_SOC_LPASS_CPU which has unmet direct dependencies (SOUND && !M68K && !UML && SND && SND_SOC && SND_SOC_QCOM)
 
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
-index 9c45130..ea36c24 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
-@@ -20,6 +20,7 @@
-  */
+The problem is that it can be selected for COMPILE_TEST on non-QCOM
+builds, but the symbols it selects have a dependency.
+Dropping the dependencies makes it work without warnings and no
+other side-effects, because these are not user-visible.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: f380dd3f3cd ("ASoC: qcom: Add ability to build QCOM drivers")
+
+diff --git a/sound/soc/qcom/Kconfig b/sound/soc/qcom/Kconfig
+index 5f58e4f1bca9..b07f183fc47f 100644
+--- a/sound/soc/qcom/Kconfig
++++ b/sound/soc/qcom/Kconfig
+@@ -6,12 +6,10 @@ config SND_SOC_QCOM
  
- #include <linux/of_graph.h>
-+#include <video/display_timing.h>
+ config SND_SOC_LPASS_CPU
+ 	tristate
+-	depends on SND_SOC_QCOM
+ 	select REGMAP_MMIO
  
- #include <drm/drmP.h>
- #include <drm/drm_panel.h>
-@@ -78,6 +79,8 @@ drm_encoder_to_atmel_hlcdc_rgb_output(struct drm_encoder *encoder)
- struct atmel_hlcdc_panel {
- 	struct atmel_hlcdc_rgb_output base;
- 	struct drm_panel *panel;
-+	struct display_timing *timings;
-+	unsigned int num_timings;
- };
+ config SND_SOC_LPASS_PLATFORM
+ 	tristate
+-	depends on SND_SOC_QCOM
+ 	select REGMAP_MMIO
  
- static inline struct atmel_hlcdc_panel *
-@@ -104,14 +107,6 @@ static void atmel_hlcdc_panel_encoder_disable(struct drm_encoder *encoder)
- 	drm_panel_disable(panel->panel);
- }
- 
--static bool
--atmel_hlcdc_panel_encoder_mode_fixup(struct drm_encoder *encoder,
--				     const struct drm_display_mode *mode,
--				     struct drm_display_mode *adjusted)
--{
--	return true;
--}
--
- static void
- atmel_hlcdc_rgb_encoder_mode_set(struct drm_encoder *encoder,
- 				 struct drm_display_mode *mode,
-@@ -142,8 +137,86 @@ atmel_hlcdc_rgb_encoder_mode_set(struct drm_encoder *encoder,
- 			   cfg);
- }
- 
-+/**
-+ * atmel_hlcdc_choose_parameter - choose timing parameter
-+ * @dc_min: minimum parameter value allowed by dc
-+ * @dc_max: maximum parameter value allowed by dc
-+ * @te: parameter range allowed by panel
-+ * @result: chosen parameter
-+ *
-+ * DESCRIPTION:
-+ * If there is overlap in the allowed ranges, we will pick a parameter
-+ * minimizing the distance to te.typ. If not, we return te.min or te.max.
-+ **/
-+static u32 atmel_hlcdc_choose_parameter(u32 dc_min, u32 dc_max,
-+					struct timing_entry te)
-+{
-+	if (te.typ <= dc_max && te.typ >= dc_min)
-+		return te.typ;
-+	else if (te.typ > dc_max)
-+		return max(dc_max, te.min);
-+	else
-+		return min(dc_min, te.max);
-+}
-+
-+static void atmel_hlcdc_calculate_mode(struct display_timing *timings,
-+				       struct drm_display_mode *adjusted_mode)
-+{
-+	u32 hsync_len, hfront_porch, hback_porch;
-+	u32 vsync_len, vfront_porch, vback_porch;
-+
-+	hsync_len = atmel_hlcdc_choose_parameter(1, 0x40, timings->hsync_len);
-+	vsync_len = atmel_hlcdc_choose_parameter(1, 0x40, timings->vsync_len);
-+
-+	hfront_porch = atmel_hlcdc_choose_parameter(1, 0x200,
-+						    timings->hfront_porch);
-+	hback_porch = atmel_hlcdc_choose_parameter(1, 0x200,
-+						   timings->hback_porch);
-+	vfront_porch = atmel_hlcdc_choose_parameter(1, 0x40,
-+						    timings->vfront_porch);
-+	vback_porch = atmel_hlcdc_choose_parameter(0, 0x40,
-+						   timings->vback_porch);
-+
-+	adjusted_mode->hsync_start = adjusted_mode->hdisplay + hfront_porch;
-+	adjusted_mode->hsync_end = adjusted_mode->hsync_start + hsync_len;
-+	adjusted_mode->htotal = adjusted_mode->hsync_end + hback_porch;
-+
-+	adjusted_mode->vsync_start = adjusted_mode->vdisplay + vfront_porch;
-+	adjusted_mode->vsync_end = adjusted_mode->vsync_start + vsync_len;
-+	adjusted_mode->vtotal = adjusted_mode->vsync_end + vback_porch;
-+}
-+
-+static int
-+atmel_hlcdc_panel_encoder_atomic_check(struct drm_encoder *encoder,
-+				       struct drm_crtc_state *crtc_state,
-+				       struct drm_connector_state *conn_state)
-+{
-+	struct atmel_hlcdc_rgb_output *rgb =
-+			drm_encoder_to_atmel_hlcdc_rgb_output(encoder);
-+	struct atmel_hlcdc_panel *panel = atmel_hlcdc_rgb_output_to_panel(rgb);
-+	struct drm_display_mode *mode = &crtc_state->mode;
-+	struct drm_display_mode *adjusted_mode = &crtc_state->adjusted_mode;
-+	int i;
-+
-+	if (atmel_hlcdc_dc_mode_valid(rgb->dc, mode) == MODE_OK)
-+		return 0;
-+
-+	for (i = 0; i < panel->num_timings; i++) {
-+		if (panel->timings->hactive.typ != mode->hdisplay ||
-+		    panel->timings->vactive.typ != mode->vdisplay)
-+			continue;
-+
-+		atmel_hlcdc_calculate_mode(panel->timings, adjusted_mode);
-+		if (atmel_hlcdc_dc_mode_valid(rgb->dc, adjusted_mode) ==
-+		    MODE_OK)
-+			return 0;
-+	}
-+
-+	return -EINVAL;
-+}
-+
- static struct drm_encoder_helper_funcs atmel_hlcdc_panel_encoder_helper_funcs = {
--	.mode_fixup = atmel_hlcdc_panel_encoder_mode_fixup,
-+	.atomic_check = atmel_hlcdc_panel_encoder_atomic_check,
- 	.mode_set = atmel_hlcdc_rgb_encoder_mode_set,
- 	.disable = atmel_hlcdc_panel_encoder_disable,
- 	.enable = atmel_hlcdc_panel_encoder_enable,
-@@ -168,16 +241,6 @@ static int atmel_hlcdc_panel_get_modes(struct drm_connector *connector)
- 	return panel->panel->funcs->get_modes(panel->panel);
- }
- 
--static int atmel_hlcdc_rgb_mode_valid(struct drm_connector *connector,
--				      struct drm_display_mode *mode)
--{
--	struct atmel_hlcdc_rgb_output *rgb =
--			drm_connector_to_atmel_hlcdc_rgb_output(connector);
--
--	return atmel_hlcdc_dc_mode_valid(rgb->dc, mode);
--}
--
--
- 
- static struct drm_encoder *
- atmel_hlcdc_rgb_best_encoder(struct drm_connector *connector)
-@@ -190,7 +253,6 @@ atmel_hlcdc_rgb_best_encoder(struct drm_connector *connector)
- 
- static struct drm_connector_helper_funcs atmel_hlcdc_panel_connector_helper_funcs = {
- 	.get_modes = atmel_hlcdc_panel_get_modes,
--	.mode_valid = atmel_hlcdc_rgb_mode_valid,
- 	.best_encoder = atmel_hlcdc_rgb_best_encoder,
- };
- 
-@@ -273,6 +335,22 @@ static int atmel_hlcdc_create_panel_output(struct drm_device *dev,
- 	drm_panel_attach(p, &panel->base.connector);
- 	panel->panel = p;
- 
-+	if (!panel->panel->funcs->get_timings)
-+		return 0;
-+
-+	panel->num_timings =
-+		panel->panel->funcs->get_timings(panel->panel, 0, NULL);
-+	panel->timings =
-+		devm_kzalloc(dev->dev,
-+			     panel->num_timings * sizeof(struct display_timing),
-+			     GFP_KERNEL);
-+
-+	if (!panel->timings)
-+		return 0;
-+
-+	panel->panel->funcs->get_timings(panel->panel, panel->num_timings,
-+					 panel->timings);
-+
- 	return 0;
- 
- err_encoder_cleanup:
--- 
-2.3.6
+ config SND_SOC_STORM
