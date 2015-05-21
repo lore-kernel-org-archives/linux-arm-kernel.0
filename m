@@ -1,149 +1,29 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Thu, 21 May 2015 09:41:04 +0800
-Subject: [RFC PATCH v1 2/3] PCI: hisi: Add PCIe host support for Hisilicon
- Soc Hip05
-In-Reply-To: <000101d092fb$94dde100$be99a300$@com>
-References: <000101d092fb$94dde100$be99a300$@com>
-Message-ID: <555D37B0.2080909@hisilicon.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 21 May 2015 10:57:29 +0900
+Subject: [PATCH] ARM: dts: Update video-phy node with syscon phandle for
+ Exynos3250
+In-Reply-To: <1426762587-24923-1-git-send-email-b.michalska@samsung.com>
+References: <1426762587-24923-1-git-send-email-b.michalska@samsung.com>
+Message-ID: <CAJKOXPfumy5a6A275ETy7vnztzE20qSuXD_i=ebY9Br47p93Dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/5/20 20:50, Jingoo Han wrote:
-> On Wed, 20 May 2015 14:21:40 +0800, Zhou Wang wrote:
->>
->> This patch adds PCIe host support for Hisilicon Soc Hip05.
->>
->> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
-> 
-> Hi Zhou Wang,
-> 
-> I added some minor comments.
+2015-03-19 19:56 GMT+09:00 Beata Michalska <b.michalska@samsung.com>:
+> As a follow-up to recent changes to Exynos mipi video phy
+> driver, introducing support for PMU regmap in commit
+> e4b3d38088df6f3acd40 ("phy: exynos-video-mipi: Fix regression
+> by adding support for PMU regmap") add a syscon phandle to
+> video-phy node to bring back to life both MIPI DSI displays
+> and MIPI CSIS-2 camera sensors on Exynos3250.
 >
+> Signed-off-by: Beata Michalska <b.michalska@samsung.com>
 
-Hi Jingoo,
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
->> ---
->>  drivers/pci/host/Kconfig     |   5 +
->>  drivers/pci/host/Makefile    |   1 +
->>  drivers/pci/host/pcie-hisi.c | 252 +++++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 258 insertions(+)
->>  create mode 100644 drivers/pci/host/pcie-hisi.c
->>
->> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
->> index 1dfb567..486d822 100644
->> --- a/drivers/pci/host/Kconfig
->> +++ b/drivers/pci/host/Kconfig
->> @@ -125,4 +125,9 @@ config PCIE_IPROC_PLATFORM
->>  	  Say Y here if you want to use the Broadcom iProc PCIe controller
->>  	  through the generic platform bus interface
->>  
->> +config PCI_HISI
->> +	depends on OF && ARM64
->> +	bool "Hisilicon Soc HIP05 PCIe controller"
->> +	select PCIE_DW
->> +
->>  endmenu
->> diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
->> index f733b4e..562142e 100644
->> --- a/drivers/pci/host/Makefile
->> +++ b/drivers/pci/host/Makefile
->> @@ -15,3 +15,4 @@ obj-$(CONFIG_PCI_LAYERSCAPE) += pci-layerscape.o
->>  obj-$(CONFIG_PCI_VERSATILE) += pci-versatile.o
->>  obj-$(CONFIG_PCIE_IPROC) += pcie-iproc.o
->>  obj-$(CONFIG_PCIE_IPROC_PLATFORM) += pcie-iproc-platform.o
->> +obj-$(CONFIG_PCI_HISI) += pcie-hisi.o
->> diff --git a/drivers/pci/host/pcie-hisi.c b/drivers/pci/host/pcie-hisi.c
->> new file mode 100644
->> index 0000000..3f8cb9a
->> --- /dev/null
->> +++ b/drivers/pci/host/pcie-hisi.c
->> @@ -0,0 +1,252 @@
->> +/*
->> + * PCIe host controller driver for Hisilicon Hip05 SoCs
->> + *
->> + * Copyright (C) 2014 Hisilicon Co., Ltd. http://www.hisilicon.com
-> 
-> s/2014/2015
-> 
+Tested on Gear 2 (Exynos3250) board.
 
-Thanks, forgot to change this.
+I'll queue it and send later to Kukjin.
 
->> + *
->> + * Author: Zhou Wang <wangzhou1@hisilicon.com>
->> + *         Dacai Zhu <zhudacai@hisilicon.com>
-> 
-> [.....]
-> 
->> +#define PCIE_SUBCTRL_MODE_REG                           (0x2800)
->> +#define PCIE_SUBCTRL_SYS_STATE4_REG                     (0x6818)
->> +#define PCIE_SLV_DBI_MODE                               (0x0)
->> +#define PCIE_SLV_SYSCTRL_MODE                           (0x1)
->> +#define PCIE_SLV_CONTENT_MODE                           (0x2)
->> +#define PCIE_LTSSM_LINKUP_STATE                         (0x11)
->> +#define PCIE_LTSSM_STATE_MASK                           (0x3F)
->> +#define PCIE_MSI_CONTEXT_VALUE                          (0x1011000)
->> +#define PCIE_MSI_TRANS_ENABLE                           (0x1ff0)
->> +#define PCIE_MSI_LOW_ADDRESS                            (0x1b4)
->> +#define PCIE_MSI_HIGH_ADDRESS                           (0x1c4)
-> 
-> Please remove unnecessary braces as below.
-> 
-
-Ok, will do as below.
-
-> +#define PCIE_SUBCTRL_MODE_REG                           0x2800
-> +#define PCIE_SUBCTRL_SYS_STATE4_REG                     0x6818
-> .....
-> 
-> [.....]
-> 
->> +/* Configure vmid/asid table in PCIe host */
->> +static void hisi_pcie_config_context(struct hisi_pcie *pcie)
->> +{
->> +	int i;
->> +
->> +	hisi_pcie_change_apb_mode(pcie, PCIE_SLV_CONTENT_MODE);
->> +
->> +	for (i = 0; i < 0x400; i++)
->> +		hisi_pcie_apb_writel(pcie, 0x0, i * 4);
->> +
->> +	for (i = 0x400; i < 0x800; i++)
->> +		hisi_pcie_apb_writel(pcie, 0x0, i * 4);
-> 
-> How about the following?
-> 
-> +	for (i = 0; i < 0x800; i++)
-> +		hisi_pcie_apb_writel(pcie, 0x0, i * 4);
-> 
-
-This is to configure init value of vmid and asid of each pcie device.
-
->> +
->> +	hisi_pcie_change_apb_mode(pcie, PCIE_SLV_SYSCTRL_MODE);
->> +
->> +	hisi_pcie_apb_writel(pcie, 0xb7010040, PCIE_MSI_LOW_ADDRESS);
->> +	hisi_pcie_apb_writel(pcie, 0x0, PCIE_MSI_HIGH_ADDRESS);
->> +	hisi_pcie_apb_writel(pcie, PCIE_MSI_CONTEXT_VALUE, 0x10);
->> +	hisi_pcie_apb_writel(pcie, PCIE_MSI_TRANS_ENABLE, 0x1c8);
-> 
-> Please don't use hardcoded numbers as possible.
->
-
-OK, will use macro to do this.
-
->> +
->> +	hisi_pcie_change_apb_mode(pcie, PCIE_SLV_DBI_MODE);
->> +}
-> [.....]
-> 
-> Best regards,
-> Jingoo Han
-> 
-
-Many thanks for your review and Best regards,
-Zhou Wang
-
-> 
-> 
-> .
-> 
+Best regards,
+Krzysztof
