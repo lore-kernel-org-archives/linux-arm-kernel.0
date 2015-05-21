@@ -1,32 +1,59 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 21 May 2015 20:45:25 +0200
-Subject: [PATCH 2/3] ARM: dts: sun7i: Add uart2 support for BananaPi
-In-Reply-To: <1432211555-25078-2-git-send-email-hdegoede@redhat.com>
-References: <1432211555-25078-1-git-send-email-hdegoede@redhat.com>
- <1432211555-25078-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150521184525.GC8557@lukather>
+Date: Thu, 21 May 2015 20:51:22 +0200
+Subject: [PATCH v8 14/16] ARM: dts: Introduce STM32F429 MCU
+In-Reply-To: <CALszF6CK5ezrO6D=4zr6zEPC7VanzbQjnZJwKOZekEZ5L4D-Dg@mail.gmail.com>
+References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <2282066.NWoIT9ZyLc@wuerfel>
+ <CALszF6CaO_yuNiSDuDV+4d2NRe_+32j=zcSE1HPhB1UH59cW9w@mail.gmail.com>
+ <13641152.Yt4ZI3oT6L@wuerfel>
+ <CALszF6CK5ezrO6D=4zr6zEPC7VanzbQjnZJwKOZekEZ5L4D-Dg@mail.gmail.com>
+Message-ID: <20150521185122.GD8557@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 21, 2015 at 02:32:34PM +0200, Hans de Goede wrote:
-> From: Michael Ring <mail@michael-ring.org>
+On Wed, May 20, 2015 at 06:17:34PM +0200, Maxime Coquelin wrote:
+> Hi Arnd, Philipp,
 > 
-> Uart2 is available at the bananapi io-pins, add a dts node for this
-> (so that people can easily enable it) but leave it disabled as the pins
-> are primarily intended for gpio as documented here:
-> http://wiki.lemaker.org/Pin_definition
+> 2015-05-13 21:11 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
+> > Ideally the binding should follow closely what is documented
+> > in the data sheet.
+> >
+> 
+> Daniel and myself would like your opinion about this binding:
+> 
+> rcc: rcc at 40023800 {
+>     #reset-cells = <1>;
+>     #clock-cells = <2>;
+>     compatible = "st,stm32-rcc";
+>     reg = <0x40023800 0x10>, <0x40023810 0x20>, <0x40023830 0x20>;
+>     reg-names = "clock-cfg", "reset", "clock-gates";
+> };
+> 
+> It would solve a problem Daniel is facing due to conflicting mem
+> region when clock and reset drivers are enabled, as both would reserve
+> the same region.
+> 
+> Also, it would make the reset driver very generic.
+> Doing that, we could even create a generic-reset.c driver that would
+> be used by STM32 and Sunxi (at least).
+> In the probe function, it would check the number of reg resources.
+> If a single resource is passed, it would take it, else it would look
+> the one named "reset".
+> The driver and bindings would be the same for the two families, and
+> the bindings would be backward compatible with sunxi ones.
+> 
+> Philip, Arnd, what do you think?
 
-So far the policy we had on this is only to add to the DT the primary
-purpose of these pins.
+I lack a bit of context here, but I'd be very happy to use a generic
+driver. As a matter of fact, the sunxi reset driver is already pretty
+much there (not that it's very difficult to do).
 
-Even though that might seem arbitrary, it's the only way to prevent
-anyone adding their own configuration for those pins, which would be a
-mess to maintain and use. It's even more true since that sort of thing
-is exactly where the overlays shine.
+The only thing we did that stands out a bit is that we actually need
+the reset driver much earlier than the default probe, since some of
+our timers are maintained in reset. We have some code to do just that
+already, we just need have something similar to be on board.
 
-So, I'm ok with adding the uart4, but the uart2 should go.
-
-Maxime
+Maxime (the other one)
 
 -- 
 Maxime Ripard, Free Electrons
@@ -38,4 +65,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150521/9e4a888d/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150521/bce7b949/attachment-0001.sig>
