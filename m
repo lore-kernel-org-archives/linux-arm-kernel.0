@@ -1,108 +1,66 @@
-From: ps.report@gmx.net (Peter Seiderer)
-Date: Thu, 21 May 2015 08:56:52 +0200
-Subject: Aw: Re: [PATCH v1] ARM: dts: nitrogen6x: add CAN support
-In-Reply-To: <20150521013351.GK24844@dragon>
-References: <1432158569-4415-1-git-send-email-ps.report@gmx.net>,
- <20150521013351.GK24844@dragon>
-Message-ID: <trinity-11799706-adb4-4b27-94e9-81979422dc18-1432191412447@3capp-gmx-bs69>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 21 May 2015 02:01:31 -0500
+Subject: [PATCHv2 00/27] ARM: OMAP2+: clock code migration to
+ drivers/clk/ti
+In-Reply-To: <555D7D52.8010501@ti.com>
+References: <1431334493-24455-1-git-send-email-t-kristo@ti.com>
+ <alpine.DEB.2.02.1505111747460.19833@utopia.booyaka.com>
+ <5551D178.3000904@ti.com>
+ <alpine.DEB.2.02.1505122019220.21747@utopia.booyaka.com>
+ <5552F32C.7060606@ti.com>
+ <alpine.DEB.2.02.1505131438430.7921@utopia.booyaka.com>
+ <555B8DC0.5080905@ti.com>
+ <alpine.DEB.2.02.1505202234330.7960@utopia.booyaka.com>
+ <555D7D52.8010501@ti.com>
+Message-ID: <555D82CB.5060300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn,
-
-> Gesendet: Donnerstag, 21. Mai 2015 um 03:33 Uhr
-> Von: "Shawn Guo" <shawn.guo@linaro.org>
-> An: "Peter Seiderer" <ps.report@gmx.net>
-> Cc: linux-kernel at vger.kernel.org, devicetree at vger.kernel.org, linux-arm-kernel at lists.infradead.org, "Russell King" <linux@arm.linux.org.uk>, "Kumar Gala" <galak@codeaurora.org>, "Ian Campbell" <ijc+devicetree@hellion.org.uk>, "Mark Rutland" <mark.rutland@arm.com>, "Pawel Moll" <pawel.moll@arm.com>, "Rob Herring" <robh+dt@kernel.org>, "Sascha Hauer" <kernel@pengutronix.de>
-> Betreff: Re: [PATCH v1] ARM: dts: nitrogen6x: add CAN support
->
-> On Wed, May 20, 2015 at 11:49:29PM +0200, Peter Seiderer wrote:
-> > Regulator stuff copied from imx6qdl-tx6.dtsi, pin configuration
-> > taken from Boundary Devices linux kernel tree ([1] and [2]).
-> > 
-> > [1] https://github.com/boundarydevices/linux-imx6/blob/boundary-imx_3.10.17_1.0.2_ga/arch/arm/boot/dts/imx6qdl-nitrogen6x.dts
-> > [2] https://github.com/boundarydevices/linux-imx6/blob/boundary-imx_3.10.17_1.0.2_ga/arch/arm/boot/dts/imx6qdl.dtsi
-> > 
-> > Signed-off-by: Peter Seiderer <ps.report@gmx.net>
-> > ---
-> >  arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 32 +++++++++++++++++++++++++++++++
-> >  1 file changed, 32 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-> > index fd096dc..1c415e4 100644
-> > --- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-> > +++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-> > @@ -54,6 +54,17 @@
-> >  			gpio = <&gpio3 22 0>;
-> >  			enable-active-high;
-> >  		};
-> > +
-> > +		reg_can_xcvr: regulator at 3 {
-> > +			compatible = "regulator-fixed";
-> > +			reg = <3>;
-> > +			regulator-name = "CAN XCVR";
-> > +			regulator-min-microvolt = <3300000>;
-> > +			regulator-max-microvolt = <3300000>;
-> > +			pinctrl-names = "default";
-> > +			pinctrl-0 = <&pinctrl_can_xcvr>;
-> > +			gpio = <&gpio1 2 GPIO_ACTIVE_HIGH>;
-> > +		};
-> >  	};
-> >  
-> >  	gpio-keys {
-> > @@ -138,6 +149,13 @@
-> >  	status = "okay";
-> >  };
-> >  
-> > +&can1 {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&pinctrl_can1_1>;
-> > +	xceiver-supply = <&reg_can_xcvr>;
-> > +	status = "okay";
-> > +};
-> > +
-> >  &ecspi1 {
-> >  	fsl,spi-num-chipselects = <1>;
-> >  	cs-gpios = <&gpio3 19 0>;
-> > @@ -234,6 +252,20 @@
-> >  			>;
-> >  		};
-> >  
-> > +		pinctrl_can1_1: can1grp-1 {
+On 05/21/2015 01:38 AM, Tero Kristo wrote:
+> On 05/21/2015 01:40 AM, Paul Walmsley wrote:
+>> On Tue, 19 May 2015, Tero Kristo wrote:
+>>
+>>> Any news on this? As noted previously, I am not able to reproduce the
+>>> issue
+>>> you are seeing currently, can you give DEBUG_LL a shot?
+>>
+>> Yeah I just bisected it, it was caused by this:
+>>
+>> commit cc4a5fe972ad7834e8662b49b3a5fdb597e9e15e
+>> Author: Felipe Balbi <balbi@ti.com>
+>> Date:   Fri Jan 30 11:18:56 2015 -0600
+>>
+>>      arm: config: omap2plus_defconfig: switch over to LZMA compression
+>>
+>>      LZMA compression makes about 33% smaller zImage
+>>      with just a slight extra decompression time.
+>>
+>>      Before this patch, zImage built with o2+_dc
+>>      is 4.5MiB and after it's about 3.3MiB.
+>>
+>>      Suggested-by: David Cohen <david.a.cohen@linux.intel.com>
+>>      Signed-off-by: Felipe Balbi <balbi@ti.com>
+>>      Signed-off-by: Tony Lindgren <tony@atomide.com>
+>>
+>>
+>> and the timeouts on the testbed being set to fail if a kernel takes
+>> longer
+>> than five seconds to start.  Seems that the part about a "slight extra
+>> decompression time" probably only applies to relatively recent chips.
+>>
+>>
+>> - Paul
+>>
 > 
-> The '_1' suffix is meaningless.
-> 
-> 		pinctrl_can1: can1grp {
+> Oh, so this explains why I was thinking it took very long time to boot
+> the recent kernels also. The boot lag is clearly noticeable without any
+> measurement. I wonder if we should probably revert this patch.
 
-Thanks for review, will fix it...
+we already have issues with zImage size bloating up and running headlong
+into dtb - esp on platforms like N900. Felipe spend quiet some time
+getting things into a manageable size here -> loosing 33% sounds like
+bad idea to me :(
 
+-- 
 Regards,
-Peter
-
-> 
-> Shawn
-> 
-> > +			fsl,pins = <
-> > +				MX6QDL_PAD_KEY_COL2__FLEXCAN1_TX 0x80000000
-> > +				MX6QDL_PAD_KEY_ROW2__FLEXCAN1_RX 0x80000000
-> > +			>;
-> > +		};
-> > +
-> > +		pinctrl_can_xcvr: can-xcvrgrp {
-> > +			fsl,pins = <
-> > +				/* Flexcan XCVR enable */
-> > +				MX6QDL_PAD_GPIO_2__GPIO1_IO02		0x1b0b0
-> > +			>;
-> > +		};
-> > +
-> >  		pinctrl_ecspi1: ecspi1grp {
-> >  			fsl,pins = <
-> >  				MX6QDL_PAD_EIM_D17__ECSPI1_MISO		0x100b1
-> > -- 
-> > 2.1.4
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Nishanth Menon
