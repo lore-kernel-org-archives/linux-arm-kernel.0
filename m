@@ -1,57 +1,38 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Thu, 21 May 2015 20:29:24 +0800
-Subject: [RFC PATCH v1 2/3] PCI: hisi: Add PCIe host support for Hisilicon
- Soc Hip05
-In-Reply-To: <CAErSpo7TEgY=oJvLU3jyh=FcZqgsSxLi1Cw1mo6w+5WSRkfPMQ@mail.gmail.com>
-References: <000101d092fb$94dde100$be99a300$@com>
- <555D37B0.2080909@hisilicon.com>
- <CAErSpo7TEgY=oJvLU3jyh=FcZqgsSxLi1Cw1mo6w+5WSRkfPMQ@mail.gmail.com>
-Message-ID: <555DCFA4.7090104@hisilicon.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 21 May 2015 14:32:33 +0200
+Subject: [PATCH 1/3] ARM: dts: sun7i: Add uart4_pins_b definition
+Message-ID: <1432211555-25078-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/5/21 20:09, Bjorn Helgaas wrote:
-> On Wed, May 20, 2015 at 8:41 PM, Zhou Wang <wangzhou1@hisilicon.com> wrote:
->> On 2015/5/20 20:50, Jingoo Han wrote:
->>> On Wed, 20 May 2015 14:21:40 +0800, Zhou Wang wrote:
-> 
->>>> +/* Configure vmid/asid table in PCIe host */
->>>> +static void hisi_pcie_config_context(struct hisi_pcie *pcie)
->>>> +{
->>>> +    int i;
->>>> +
->>>> +    hisi_pcie_change_apb_mode(pcie, PCIE_SLV_CONTENT_MODE);
->>>> +
->>>> +    for (i = 0; i < 0x400; i++)
->>>> +            hisi_pcie_apb_writel(pcie, 0x0, i * 4);
->>>> +
->>>> +    for (i = 0x400; i < 0x800; i++)
->>>> +            hisi_pcie_apb_writel(pcie, 0x0, i * 4);
->>>
->>> How about the following?
->>>
->>> +     for (i = 0; i < 0x800; i++)
->>> +             hisi_pcie_apb_writel(pcie, 0x0, i * 4);
->>>
->>
->> This is to configure init value of vmid and asid of each pcie device.
-> 
-> But the combined loop looks functionally equivalent, i.e., I don't
-> think the device can tell the difference.  Personally I wouldn't mind
-> if you kept the two loops separate, but if you do, each one needs a
-> comment immediately before it so the reader has a clue that they are
-> doing semantically different things.  Otherwise it just looks like a
-> mistake and the reader wonders why they are split.
-> 
-> Bjorn
+From: Michael Ring <mail@michael-ring.org>
 
-Got it. There is a vmid table and a asid table in host controll
-registers. They are just adjoining as above. I will combine above loops
-with more comments together.
+Some boards (e.g. the BananaPro) use alternative pins for uart4, add a pinmux
+entry for these.
 
-Thanks and Regards,
-Zhou
+Signed-off-by: Michael Ring <mail@michael-ring.org>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/sun7i-a20.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-> 
-> .
-> 
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index e04cdf9..99d48b4 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -844,6 +844,13 @@
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
+ 
++			uart4_pins_b: uart4 at 1 {
++				allwinner,pins = "PH4", "PH5";
++				allwinner,function = "uart4";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
+ 			uart5_pins_a: uart5 at 0 {
+ 				allwinner,pins = "PI10", "PI11";
+ 				allwinner,function = "uart5";
+-- 
+2.4.1
