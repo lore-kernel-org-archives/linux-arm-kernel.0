@@ -1,26 +1,68 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 21 May 2015 10:26:04 +0200
-Subject: [PATCH defconfig] ARM: add ARM_SINGLE_ARMV7M in ARMv7-M defconfigs
-In-Reply-To: <1432161501-2323-1-git-send-email-stefan@agner.ch>
-References: <1432161501-2323-1-git-send-email-stefan@agner.ch>
-Message-ID: <20150521082604.GZ24769@pengutronix.de>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 21 May 2015 10:30:47 +0200
+Subject: [PATCH] ARM: v7 setup function should invalidate L1 cache
+In-Reply-To: <E1Yuk8W-0001tC-IK@rmk-PC.arm.linux.org.uk>
+References: <E1Yuk8W-0001tC-IK@rmk-PC.arm.linux.org.uk>
+Message-ID: <20150521083046.GA30323@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, May 19, 2015 at 05:12:56PM +0100, Russell King wrote:
+> All ARMv5 and older CPUs invalidate their caches in the early assembly
+> setup function, prior to enabling the MMU.  This is because the L1
+> cache should not contain any data relevant to the execution of the
+> kernel at this point; all data should have been flushed out to memory.
+> 
+> This requirement should also be true for ARMv6 and ARMv7 CPUs - indeed,
+> these typically do not search their caches when caching is disabled (as
+> it needs to be when the MMU is disabled) so this change should be safe.
+> 
+> ARMv7 allows there to be CPUs which search their caches while caching is
+> disabled, and it's permitted that the cache is uninitialised at boot;
+> for these, the architecture reference manual requires that an
+> implementation specific code sequence is used immediately after reset
+> to ensure that the cache is placed into a sane state.  Such
+> functionality is definitely outside the remit of the Linux kernel, and
+> must be done by the SoC's firmware before _any_ CPU gets to the Linux
+> kernel.
+> 
+> Changing the data cache clean+invalidate to a mere invalidate allows us
+> to get rid of a lot of platform specific hacks around this issue for
+> their secondary CPU bringup paths - some of which were buggy.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+[...]
+>  arch/arm/mach-tegra/Makefile          |  2 +-
+>  arch/arm/mach-tegra/headsmp.S         | 12 ------------
+>  arch/arm/mach-tegra/reset.c           |  2 +-
+>  arch/arm/mach-tegra/reset.h           |  1 -
+[...]
 
-On Thu, May 21, 2015 at 12:38:21AM +0200, Stefan Agner wrote:
-> Select ARM_SINGLE_ARMV7M in defconfigs of the converted ARMv7-M
-> platforms.
-I assume this relates to your series that introduces this symbol. Should
-the defconfig update happen before? (Or what is the result if
-CONFIG_ARM_SINGLE_ARMV7M=y is missing in the defconfig while the symbol
-already exists?) Maybe this should be squashed into the commit in
-question?
+Russell,
 
-Best regards
-Uwe
+I saw a couple of conflicts trying to apply this to v4.1-rc1..v4.1-rc4
+or any of recent linux-next versions. I ended up applying this on top of
+your for-next branch and tested using that. The conflicts seem very
+minor and a test merge of Tegra's for-next branch resolved this fine. A
+test merge of next-20150520 shows one conflict in mach-socfpga/core.h,
+but it's a trivial one to resolve.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Anyway, the patch seems to work fine on TrimSlice (Tegra20), Beaver
+(Tegra30), Dalmore (Tegra114) and Jetson TK1 (Tegra124). Tested on
+Paul's boot farm:
+
+Tested-by: Thierry Reding <treding@nvidia.com>
+Acked-by: Thierry Reding <treding@nvidia.com>
+
+Paul, thanks for setting up the boot test infrastructure, this saved me
+a lot of time.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150521/a52aa9be/attachment-0001.sig>
