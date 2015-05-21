@@ -1,58 +1,77 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 21 May 2015 17:26:24 +0100
-Subject: [PATCH v5 11/11] drivers: PL011: add ACPI probing for SBSA UART
+Date: Thu, 21 May 2015 17:26:22 +0100
+Subject: [PATCH v5 09/11] drivers: PL011: allow to supply fixed option string
 In-Reply-To: <1432225584-4655-1-git-send-email-andre.przywara@arm.com>
 References: <1432225584-4655-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1432225584-4655-12-git-send-email-andre.przywara@arm.com>
+Message-ID: <1432225584-4655-10-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Graeme Gregory <graeme.gregory@linaro.org>
+The SBSA UART has a fixed baud rate and flow control setting, which
+cannot be changed or queried by software.
+Add a vendor specific property to always return fixed values when
+trying to read the console options.
 
-Add the necessary driver boilerplate to let the driver be used when
-the respective ACPI table is discovered by the ACPI subsystem.
-
-[Andre: change table name, add MODULE_DEVICE_TABLE entry and improve
-	commit message]
-
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- drivers/tty/serial/amba-pl011.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/tty/serial/amba-pl011.c | 17 +++++++++++++----
+ 1 file changed, 13 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index c0850f3..50cf5b1 100644
+index 3f6b915..6558400 100644
 --- a/drivers/tty/serial/amba-pl011.c
 +++ b/drivers/tty/serial/amba-pl011.c
-@@ -58,6 +58,7 @@
- #include <linux/pinctrl/consumer.h>
- #include <linux/sizes.h>
- #include <linux/io.h>
-+#include <linux/acpi.h>
+@@ -79,6 +79,7 @@ struct vendor_data {
+ 	bool			dma_threshold;
+ 	bool			cts_event_workaround;
+ 	bool			always_enabled;
++	bool			fixed_options;
  
- #define UART_NR			14
- 
-@@ -2486,12 +2487,19 @@ static const struct of_device_id sbsa_uart_of_match[] = {
+ 	unsigned int (*get_fifosize)(struct amba_device *dev);
  };
- MODULE_DEVICE_TABLE(of, sbsa_uart_of_match);
- 
-+static const struct acpi_device_id sbsa_uart_acpi_match[] = {
-+	{ "ARMH0011", 0 },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(acpi, sbsa_uart_acpi_match);
-+
- static struct platform_driver arm_sbsa_uart_platform_driver = {
- 	.probe		= sbsa_uart_probe,
- 	.remove		= sbsa_uart_remove,
- 	.driver	= {
- 		.name	= "sbsa-uart",
- 		.of_match_table = of_match_ptr(sbsa_uart_of_match),
-+		.acpi_match_table = ACPI_PTR(sbsa_uart_acpi_match),
- 	},
+@@ -96,6 +97,7 @@ static struct vendor_data vendor_arm = {
+ 	.dma_threshold		= false,
+ 	.cts_event_workaround	= false,
+ 	.always_enabled		= false,
++	.fixed_options		= false,
+ 	.get_fifosize		= get_fifosize_arm,
  };
  
+@@ -112,6 +114,7 @@ static struct vendor_data vendor_st = {
+ 	.dma_threshold		= true,
+ 	.cts_event_workaround	= true,
+ 	.always_enabled		= false,
++	.fixed_options		= false,
+ 	.get_fifosize		= get_fifosize_st,
+ };
+ 
+@@ -160,6 +163,7 @@ struct uart_amba_port {
+ 	unsigned int		lcrh_rx;	/* vendor-specific */
+ 	unsigned int		old_cr;		/* state during shutdown */
+ 	bool			autorts;
++	unsigned int		fixed_baud;	/* vendor-set fixed baud rate */
+ 	char			type[12];
+ #ifdef CONFIG_DMA_ENGINE
+ 	/* DMA stuff */
+@@ -2076,10 +2080,15 @@ static int __init pl011_console_setup(struct console *co, char *options)
+ 
+ 	uap->port.uartclk = clk_get_rate(uap->clk);
+ 
+-	if (options)
+-		uart_parse_options(options, &baud, &parity, &bits, &flow);
+-	else
+-		pl011_console_get_options(uap, &baud, &parity, &bits);
++	if (uap->vendor->fixed_options) {
++		baud = uap->fixed_baud;
++	} else {
++		if (options)
++			uart_parse_options(options,
++					   &baud, &parity, &bits, &flow);
++		else
++			pl011_console_get_options(uap, &baud, &parity, &bits);
++	}
+ 
+ 	return uart_set_options(&uap->port, co, baud, parity, bits, flow);
+ }
 -- 
 2.3.5
