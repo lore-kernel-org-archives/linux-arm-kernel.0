@@ -1,30 +1,17 @@
-From: shailendra.capricorn@gmail.com (Shailendra Verma)
-Date: Thu, 21 May 2015 23:59:41 +0530
-Subject: [PATCH] cpufreq:exynos-cpufreq - Fix for memory leak in case SOC name
- does not match.
-Message-ID: <1432232981-3917-1-git-send-email-shailendra.capricorn@gmail.com>
+From: christian.perone@gmail.com (Christian S. Perone)
+Date: Thu, 21 May 2015 15:34:06 -0300
+Subject: Hibernation on ARM64
+Message-ID: <CAMxMOAtMw3jnyrvn46m0ZeiwtWjRRZ-i21N5+riwn-3qei+szg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During probe free the memory allocated to "exynos_info" in case of unknown
-SOC type.
+Hello, I haven't found any information, road map or something like
+that for the hibernation support for ARM64, does anyone knows if there
+is something planned to support this in near future ?
 
-Signed-off-by: Shailendra Verma <shailendra.capricorn@gmail.com>
----
- drivers/cpufreq/exynos-cpufreq.c |    1 +
- 1 file changed, 1 insertion(+)
+Thanks !
 
-diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
-index 82d2fbb..b77923a 100644
---- a/drivers/cpufreq/exynos-cpufreq.c
-+++ b/drivers/cpufreq/exynos-cpufreq.c
-@@ -182,6 +182,7 @@ static int exynos_cpufreq_probe(struct platform_device *pdev)
- 		ret = exynos5250_cpufreq_init(exynos_info);
- 	} else {
- 		pr_err("%s: Unknown SoC type\n", __func__);
-+		kfree(exynos_info);
- 		return -ENODEV;
- 	}
- 
 -- 
-1.7.9.5
+Blog | Github | Twitter
+"Forgive, O Lord, my little jokes on Thee, and I'll forgive Thy great
+big joke on me."
