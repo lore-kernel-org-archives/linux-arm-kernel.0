@@ -1,38 +1,32 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 21 May 2015 10:08:42 +0800
-Subject: [PATCH] ARM: v7 setup function should invalidate L1 cache
-In-Reply-To: <E1Yuk8W-0001tC-IK@rmk-PC.arm.linux.org.uk>
-References: <E1Yuk8W-0001tC-IK@rmk-PC.arm.linux.org.uk>
-Message-ID: <20150521020841.GL24844@dragon>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 21 May 2015 11:18:32 +0900
+Subject: [PATCH 1/2] ARM: dts: exynos4: Remove obsolete MIPI DPHY 'reg'
+ property
+Message-ID: <1432174713-23368-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 05:12:56PM +0100, Russell King wrote:
-> All ARMv5 and older CPUs invalidate their caches in the early assembly
-> setup function, prior to enabling the MMU.  This is because the L1
-> cache should not contain any data relevant to the execution of the
-> kernel at this point; all data should have been flushed out to memory.
-> 
-> This requirement should also be true for ARMv6 and ARMv7 CPUs - indeed,
-> these typically do not search their caches when caching is disabled (as
-> it needs to be when the MMU is disabled) so this change should be safe.
-> 
-> ARMv7 allows there to be CPUs which search their caches while caching is
-> disabled, and it's permitted that the cache is uninitialised at boot;
-> for these, the architecture reference manual requires that an
-> implementation specific code sequence is used immediately after reset
-> to ensure that the cache is placed into a sane state.  Such
-> functionality is definitely outside the remit of the Linux kernel, and
-> must be done by the SoC's firmware before _any_ CPU gets to the Linux
-> kernel.
-> 
-> Changing the data cache clean+invalidate to a mere invalidate allows us
-> to get rid of a lot of platform specific hacks around this issue for
-> their secondary CPU bringup paths - some of which were buggy.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
-...
->  arch/arm/mach-imx/headsmp.S           |  1 -
+Since e4b3d38088df ("phy: exynos-video-mipi: Fix regression by adding
+support for PMU regmap") the Exynos PMU driver provides regmap to access
+the MIPI DPHY registers. The MIPI DPHY node uses a phandle to syscon to
+get this regmap. The 'reg' field is obsolete.
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ arch/arm/boot/dts/exynos4.dtsi | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index 1c74c1296ab7..6e7f0b4afa84 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -78,7 +78,6 @@
+ 
+ 	mipi_phy: video-phy at 10020710 {
+ 		compatible = "samsung,s5pv210-mipi-video-phy";
+-		reg = <0x10020710 8>;
+ 		#phy-cells = <1>;
+ 		syscon = <&pmu_system_controller>;
+ 	};
+-- 
+1.9.1
