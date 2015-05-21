@@ -1,71 +1,72 @@
 From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Thu, 21 May 2015 21:57:56 +0200
-Subject: [PATCH v8 07/16] drivers: reset: Add STM32 reset driver
-In-Reply-To: <555E1CC4.9090605@suse.de>
+Date: Thu, 21 May 2015 22:10:35 +0200
+Subject: [PATCH v8 14/16] ARM: dts: Introduce STM32F429 MCU
+In-Reply-To: <20150521185122.GD8557@lukather>
 References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1431158038-3813-8-git-send-email-mcoquelin.stm32@gmail.com>
- <555D1C7D.1060205@suse.de>
- <CALszF6CrouFF3oS_Qz6+qQRqa4a5PurdYNdvHnZRDb4zwOJ6mQ@mail.gmail.com>
- <555E1CC4.9090605@suse.de>
-Message-ID: <CALszF6Bhc1MkDaqM3oJ93Rrxxbsss7=FA8WUpbtwmDERUdD0KA@mail.gmail.com>
+ <2282066.NWoIT9ZyLc@wuerfel>
+ <CALszF6CaO_yuNiSDuDV+4d2NRe_+32j=zcSE1HPhB1UH59cW9w@mail.gmail.com>
+ <13641152.Yt4ZI3oT6L@wuerfel>
+ <CALszF6CK5ezrO6D=4zr6zEPC7VanzbQjnZJwKOZekEZ5L4D-Dg@mail.gmail.com>
+ <20150521185122.GD8557@lukather>
+Message-ID: <CALszF6BuvTf86k6S5UEYZs-DJSTehy=+Csb3c6jxMU90MN05zw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-21 19:58 GMT+02:00 Andreas F?rber <afaerber@suse.de>:
-> Am 21.05.2015 um 09:46 schrieb Maxime Coquelin:
->> 2015-05-21 1:45 GMT+02:00 Andreas F?rber <afaerber@suse.de>:
->>> Am 09.05.2015 um 09:53 schrieb Maxime Coquelin:
->>>> +static const struct of_device_id stm32_reset_dt_ids[] = {
->>>> +      { .compatible = "st,stm32-rcc", },
->>>> +      { /* sentinel */ },
->>>> +};
->>>> +MODULE_DEVICE_TABLE(of, sstm32_reset_dt_ids);
->>>
->>> Typo.
+2015-05-21 20:51 GMT+02:00 Maxime Ripard <maxime.ripard@free-electrons.com>:
+> On Wed, May 20, 2015 at 06:17:34PM +0200, Maxime Coquelin wrote:
+>> Hi Arnd, Philipp,
 >>
->> Indeed, thanks for pointing this out.
+>> 2015-05-13 21:11 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
+>> > Ideally the binding should follow closely what is documented
+>> > in the data sheet.
+>> >
 >>
->>>
->>> IIUC the timer depends on the reset controller, so it must be built in
->>> anyway, and that's what's enforced in the Makefile above. Drop the line?
->>>
+>> Daniel and myself would like your opinion about this binding:
 >>
->> Agree it must be built-in.
->> I will fix that in next version.
+>> rcc: rcc at 40023800 {
+>>     #reset-cells = <1>;
+>>     #clock-cells = <2>;
+>>     compatible = "st,stm32-rcc";
+>>     reg = <0x40023800 0x10>, <0x40023810 0x20>, <0x40023830 0x20>;
+>>     reg-names = "clock-cfg", "reset", "clock-gates";
+>> };
+>>
+>> It would solve a problem Daniel is facing due to conflicting mem
+>> region when clock and reset drivers are enabled, as both would reserve
+>> the same region.
+>>
+>> Also, it would make the reset driver very generic.
+>> Doing that, we could even create a generic-reset.c driver that would
+>> be used by STM32 and Sunxi (at least).
+>> In the probe function, it would check the number of reg resources.
+>> If a single resource is passed, it would take it, else it would look
+>> the one named "reset".
+>> The driver and bindings would be the same for the two families, and
+>> the bindings would be backward compatible with sunxi ones.
+>>
+>> Philip, Arnd, what do you think?
 >
-> Actually, I've updated a timer implementation of mine to invoke a reset
-> controller similar to how you do in the STM32 clocksource patch, but no
-> reset controller is getting returned.
+> I lack a bit of context here, but I'd be very happy to use a generic
+> driver. As a matter of fact, the sunxi reset driver is already pretty
+> much there (not that it's very difficult to do).
+
+Ok, good. The two drivers are almost the same, so squashing to a
+generic one would be trivial.
+
 >
-> It seems to me, you are working around that by simply ignoring the error
-> in the timer code and not doing a reset then, so the STM32 timer does in
-> fact _not_ depend on the reset controller? What happened to your efforts
-> of making the reset controller usable for the timer? In my case, my
-> timer is originally in reset state and needs to be deasserted, so I
-> can't just ignore it.
+> The only thing we did that stands out a bit is that we actually need
+> the reset driver much earlier than the default probe, since some of
+> our timers are maintained in reset. We have some code to do just that
+> already, we just need have something similar to be on board.
 
-Indeed, I made the reset optionnal in the clocksource patch since v3.
-Rob and Arnd said a lot of platform relies on such things are done by
-the bootloader [0].
-I decided to deassert timers reset at bootloader stage, and make it
-optionnal in clocksource driver.
-I made it optionnal in case we decide one day to move reset
-initialization before timer are initialized.
+We have the same problem on stm32, as just discussed with Andreas [0].
+I decided to patch the bootloader to deassert timers reset, after
+discussions with Rob Herring and Arnd.
 
-Note that for now, I still use your bootloader.
-I have done the changes to reset the timers in the afboot-stm32.
-That's the reason why I asked you under which licence it is delivered
-few months ago.
-I can share you the patch if you want, even if I understand it is more
-about the concept that you are reluctant.
+Moving to a common driver, stm32 could use the same early init method
+to initiliaze reset before timers.
 
-On my side, I plan to move to U-Boot soon, as Kamil Lulko added STM32
-support in mainline [1].
-In case of U-Boot, the timer reset should be de-asserted when jumping
-into the Kernel, as Rob mentionned [0].
-
-Kind regards,
+Regards,
 Maxime
 
-[0]: https://lkml.org/lkml/2015/3/10/737
-[1]: http://u-boot.10912.n7.nabble.com/PATCH-v2-stm32f4-fix-serial-output-td212812.html
+[0]: http://marc.info/?l=linux-arm-kernel&m=143223846802405&w=2#0
