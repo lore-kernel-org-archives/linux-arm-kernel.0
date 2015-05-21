@@ -1,39 +1,34 @@
 From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Thu, 21 May 2015 16:37:27 -0700
-Subject: [PATCH 0/3] Adding driver for Xilinx LogiCORE IP mailbox.
-Message-ID: <1432251450-26352-1-git-send-email-moritz.fischer@ettus.com>
+Date: Thu, 21 May 2015 16:37:30 -0700
+Subject: [PATCH 3/3] MAINTAINERS: Add entry for xilinx mailbox driver.
+In-Reply-To: <1432251450-26352-1-git-send-email-moritz.fischer@ettus.com>
+References: <1432251450-26352-1-git-send-email-moritz.fischer@ettus.com>
+Message-ID: <1432251450-26352-4-git-send-email-moritz.fischer@ettus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds mailbox framework integration for the Xilinx LogiCORE IP
-mailbox.  The Xilinx LogiCORE IP mailbox is a fpga softcore that allows
-interprocessor communication between AXI4 stream / memory mapped
-processors.
+Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+---
+ MAINTAINERS | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-It has been tested with the version 2.1 of the core built with
-Vivado 2014.4, running on a Zynq 7020.
-
-If Michal or S?ren could look it over that would be great.
-
-Cheers,
-
-Moritz
-
-
-
-Moritz Fischer (3):
-  mailbox: Adding driver for Xilinx LogiCORE IP mailbox.
-  dts: Adding docs for Xilinx LogiCORE IP mailbox driver.
-  MAINTAINERS: Add entry for xilinx mailbox driver.
-
- .../bindings/mailbox/xilinx-mailbox.txt         |  40 +++
- MAINTAINERS                                     |   7 +
- drivers/mailbox/Kconfig                         |   8 +
- drivers/mailbox/Makefile                        |   2 +
- drivers/mailbox/mailbox-xilinx.c                | 339 +++++++++++++++++++
- 5 files changed, 396 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt
- create mode 100644 drivers/mailbox/mailbox-xilinx.c
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index f8e0afb..f1f0d10 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -10986,6 +10986,13 @@ M:	John Linn <John.Linn@xilinx.com>
+ S:	Maintained
+ F:	drivers/net/ethernet/xilinx/xilinx_axienet*
+ 
++XILINX MAILBOX DRIVER
++M:	Moritz Fischer <moritz.fischer@ettus.com>
++L:	linux-kernel at vger.kernel.org
++S:	Maintained
++F:	drivers/mailbox/mailbox-xilinx.c
++F:	Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt
++
+ XILINX UARTLITE SERIAL DRIVER
+ M:	Peter Korsgaard <jacmet@sunsite.dk>
+ L:	linux-serial at vger.kernel.org
 -- 
 2.4.1
