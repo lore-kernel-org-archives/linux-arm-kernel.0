@@ -1,288 +1,207 @@
-From: yh.huang@mediatek.com (YH Huang)
-Date: Thu, 21 May 2015 21:29:24 +0800
-Subject: [PATCH v2 2/2] pwm: add MediaTek display PWM driver support
-In-Reply-To: <1432214964-40644-1-git-send-email-yh.huang@mediatek.com>
-References: <1432214964-40644-1-git-send-email-yh.huang@mediatek.com>
-Message-ID: <1432214964-40644-3-git-send-email-yh.huang@mediatek.com>
+From: anders.roxell@gmail.com (Anders Roxell)
+Date: Thu, 21 May 2015 15:50:07 +0200
+Subject: [PATCH] arch/arm64 :Cyclic Test fix in ARM64 fpsimd
+In-Reply-To: <CAPyr0yJSGqvxkUWLtNKe0q5mNanBczAfAVx0tPKuzYeDG+eJ=Q@mail.gmail.com>
+References: <CAPyr0yJSGqvxkUWLtNKe0q5mNanBczAfAVx0tPKuzYeDG+eJ=Q@mail.gmail.com>
+Message-ID: <20150521135007.GC3983@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add display PWM driver support to modify backlight for MT8173.
+On 2015-05-01 20:59, Ayyappa Ch wrote:
+> Floating point operations in arm64 should not disable preempt .
+> Activating realtime features with below code.
 
-Signed-off-by: YH Huang <yh.huang@mediatek.com>
----
- drivers/pwm/Kconfig        |  10 ++
- drivers/pwm/Makefile       |   1 +
- drivers/pwm/pwm-mtk-disp.c | 228 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 239 insertions(+)
- create mode 100644 drivers/pwm/pwm-mtk-disp.c
+I've talked with an engineer who worked on fpsimd and I was told that
+replacing preempt_disable with migrate_disable would leave fpsimd open
+to corruption.
 
-diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-index b1541f4..90e3c079 100644
---- a/drivers/pwm/Kconfig
-+++ b/drivers/pwm/Kconfig
-@@ -211,6 +211,16 @@ config PWM_LPSS_PLATFORM
- 	  To compile this driver as a module, choose M here: the module
- 	  will be called pwm-lpss-platform.
- 
-+config PWM_MTK_DISP
-+	tristate "MediaTek display PWM driver"
-+	depends on HAS_IOMEM
-+	help
-+	  Generic PWM framework driver for MediaTek disp-pwm device.
-+	  The PWM is used to control the backlight brightness for display.
-+
-+	  To compile this driver as a module, choose M here: the module
-+	  will be called pwm-mtk-disp.
-+
- config PWM_MXS
- 	tristate "Freescale MXS PWM support"
- 	depends on ARCH_MXS && OF
-diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-index ec50eb5..99c9e75 100644
---- a/drivers/pwm/Makefile
-+++ b/drivers/pwm/Makefile
-@@ -18,6 +18,7 @@ obj-$(CONFIG_PWM_LPC32XX)	+= pwm-lpc32xx.o
- obj-$(CONFIG_PWM_LPSS)		+= pwm-lpss.o
- obj-$(CONFIG_PWM_LPSS_PCI)	+= pwm-lpss-pci.o
- obj-$(CONFIG_PWM_LPSS_PLATFORM)	+= pwm-lpss-platform.o
-+obj-$(CONFIG_PWM_MTK_DISP)	+= pwm-mtk-disp.o
- obj-$(CONFIG_PWM_MXS)		+= pwm-mxs.o
- obj-$(CONFIG_PWM_PCA9685)	+= pwm-pca9685.o
- obj-$(CONFIG_PWM_PUV3)		+= pwm-puv3.o
-diff --git a/drivers/pwm/pwm-mtk-disp.c b/drivers/pwm/pwm-mtk-disp.c
-new file mode 100644
-index 0000000..d4e4cb6
---- /dev/null
-+++ b/drivers/pwm/pwm-mtk-disp.c
-@@ -0,0 +1,228 @@
-+/*
-+ * MediaTek display pulse-width-modulation controller driver.
-+ * Copyright (c) 2015 MediaTek Inc.
-+ * Author: YH Huang <yh.huang@mediatek.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/pwm.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+
-+#define DISP_PWM_EN		0x0
-+#define PWM_ENABLE_MASK		0x1
-+
-+#define DISP_PWM_COMMIT		0x08
-+#define PWM_COMMIT_MASK		0x1
-+
-+#define DISP_PWM_CON_0		0x10
-+#define PWM_CLKDIV_SHIFT	16
-+#define PWM_CLKDIV_MASK		(0x3ff << PWM_CLKDIV_SHIFT)
-+#define PWM_CLKDIV_MAX		0x000003ff
-+
-+#define DISP_PWM_CON_1		0x14
-+#define PWM_PERIOD_MASK		0xfff
-+#define PWM_PERIOD_MAX		0x00000fff
-+/* Shift log2(PWM_PERIOD_MAX + 1) as divisor */
-+#define PWM_PERIOD_BIT_SHIFT	12
-+
-+#define PWM_HIGH_WIDTH_SHIFT	16
-+#define PWM_HIGH_WIDTH_MASK	(0x1fff << PWM_HIGH_WIDTH_SHIFT)
-+
-+struct mtk_disp_pwm {
-+	struct pwm_chip chip;
-+	struct device *dev;
-+	struct clk *clk_main;
-+	struct clk *clk_mm;
-+	void __iomem *mmio_base;
-+};
-+
-+static inline struct mtk_disp_pwm *to_mtk_disp_pwm(struct pwm_chip *chip)
-+{
-+	return container_of(chip, struct mtk_disp_pwm, chip);
-+}
-+
-+static void mtk_disp_pwm_update_bits(void __iomem *address, u32 mask, u32 value)
-+{
-+	u32 val;
-+
-+	val = readl(address);
-+	val &= ~mask;
-+	val |= value;
-+	writel(val, address);
-+}
-+
-+static int mtk_disp_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-+			       int duty_ns, int period_ns)
-+{
-+	struct mtk_disp_pwm *mdp;
-+	u64 div, rate;
-+	u32 clk_div, period, high_width, value;
-+
-+	/*
-+	 * Find period, high_width and clk_div to suit duty_ns and period_ns.
-+	 * Calculate proper div value to keep period value in the bound.
-+	 *
-+	 * period_ns = 10^9 * (clk_div + 1) * (period +1) / PWM_CLK_RATE
-+	 * duty_ns = 10^9 * (clk_div + 1) * (high_width + 1) / PWM_CLK_RATE
-+	 *
-+	 * period = (PWM_CLK_RATE * period_ns) / (10^9 * (clk_div + 1)) - 1
-+	 * high_width = (PWM_CLK_RATE * duty_ns) / (10^9 * (clk_div + 1)) - 1
-+	 */
-+	mdp = to_mtk_disp_pwm(chip);
-+	rate = clk_get_rate(mdp->clk_main);
-+	clk_div = div_u64(rate * period_ns, NSEC_PER_SEC) >>
-+			  PWM_PERIOD_BIT_SHIFT;
-+	if (clk_div > PWM_CLKDIV_MAX)
-+		return -EINVAL;
-+
-+	div = clk_div + 1;
-+	period = div64_u64(rate * period_ns, NSEC_PER_SEC * div);
-+	if (period > 0)
-+		period--;
-+
-+	high_width = div64_u64(rate * duty_ns, NSEC_PER_SEC * div);
-+	if (high_width > 0)
-+		high_width--;
-+
-+	mtk_disp_pwm_update_bits(mdp->mmio_base + DISP_PWM_CON_0,
-+				 PWM_CLKDIV_MASK, clk_div << PWM_CLKDIV_SHIFT);
-+
-+	value = period | (high_width << PWM_HIGH_WIDTH_SHIFT);
-+	mtk_disp_pwm_update_bits(mdp->mmio_base + DISP_PWM_CON_1,
-+				 PWM_PERIOD_MASK | PWM_HIGH_WIDTH_MASK, value);
-+
-+	mtk_disp_pwm_update_bits(mdp->mmio_base + DISP_PWM_COMMIT,
-+				 PWM_COMMIT_MASK, 1);
-+	mtk_disp_pwm_update_bits(mdp->mmio_base + DISP_PWM_COMMIT,
-+				 PWM_COMMIT_MASK, 0);
-+
-+	return 0;
-+}
-+
-+static int mtk_disp_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
-+{
-+	struct mtk_disp_pwm *mdp;
-+
-+	mdp = to_mtk_disp_pwm(chip);
-+	mtk_disp_pwm_update_bits(mdp->mmio_base + DISP_PWM_EN,
-+				 PWM_ENABLE_MASK, 1);
-+
-+	return 0;
-+}
-+
-+static void mtk_disp_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
-+{
-+	struct mtk_disp_pwm *mdp;
-+
-+	mdp = to_mtk_disp_pwm(chip);
-+	mtk_disp_pwm_update_bits(mdp->mmio_base + DISP_PWM_EN,
-+				 PWM_ENABLE_MASK, 0);
-+}
-+
-+static const struct pwm_ops mtk_disp_pwm_ops = {
-+	.config = mtk_disp_pwm_config,
-+	.enable = mtk_disp_pwm_enable,
-+	.disable = mtk_disp_pwm_disable,
-+	.owner = THIS_MODULE,
-+};
-+
-+static int mtk_disp_pwm_probe(struct platform_device *pdev)
-+{
-+	struct mtk_disp_pwm *mdp;
-+	struct resource *r;
-+	int ret;
-+
-+	mdp = devm_kzalloc(&pdev->dev, sizeof(*mdp), GFP_KERNEL);
-+	if (!mdp)
-+		return -ENOMEM;
-+
-+	mdp->dev = &pdev->dev;
-+
-+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	mdp->mmio_base = devm_ioremap_resource(&pdev->dev, r);
-+	if (IS_ERR(mdp->mmio_base))
-+		return PTR_ERR(mdp->mmio_base);
-+
-+	mdp->clk_main = devm_clk_get(&pdev->dev, "main");
-+	if (IS_ERR(mdp->clk_main))
-+		return PTR_ERR(mdp->clk_main);
-+
-+	mdp->clk_mm = devm_clk_get(&pdev->dev, "mm");
-+	if (IS_ERR(mdp->clk_mm))
-+		return PTR_ERR(mdp->clk_mm);
-+
-+	ret = clk_prepare_enable(mdp->clk_main);
-+	if (ret < 0)
-+		return ret;
-+
-+	ret = clk_prepare_enable(mdp->clk_mm);
-+	if (ret < 0) {
-+		clk_disable_unprepare(mdp->clk_main);
-+		return ret;
-+	}
-+
-+	platform_set_drvdata(pdev, mdp);
-+
-+	mdp->chip.dev = &pdev->dev;
-+	mdp->chip.ops = &mtk_disp_pwm_ops;
-+	mdp->chip.base = -1;
-+	mdp->chip.npwm = 1;
-+
-+	ret = pwmchip_add(&mdp->chip);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "pwmchip_add() failed: %d\n", ret);
-+		clk_disable_unprepare(mdp->clk_main);
-+		clk_disable_unprepare(mdp->clk_mm);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static int mtk_disp_pwm_remove(struct platform_device *pdev)
-+{
-+	struct mtk_disp_pwm *mdp;
-+	int ret;
-+
-+	mdp = platform_get_drvdata(pdev);
-+	ret = pwmchip_remove(&mdp->chip);
-+	clk_disable_unprepare(mdp->clk_main);
-+	clk_disable_unprepare(mdp->clk_mm);
-+
-+	return ret;
-+}
-+
-+static const struct of_device_id mtk_disp_pwm_of_match[] = {
-+	{ .compatible = "mediatek,mt8173-disp-pwm" },
-+	{ .compatible = "mediatek,mt6595-disp-pwm" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, mtk_disp_pwm_of_match);
-+
-+static struct platform_driver mtk_disp_pwm_driver = {
-+	.driver = {
-+		.name = "mediatek-disp-pwm",
-+		.of_match_table = mtk_disp_pwm_of_match,
-+	},
-+	.probe = mtk_disp_pwm_probe,
-+	.remove = mtk_disp_pwm_remove,
-+};
-+module_platform_driver(mtk_disp_pwm_driver);
-+
-+MODULE_AUTHOR("YH Huang <yh.huang@mediatek.com>");
-+MODULE_DESCRIPTION("MediaTek SoC display PWM driver");
-+MODULE_LICENSE("GPL v2");
+The kernel won't save the state of the simd registers when it is
+preempted so if another task runs on the same CPU and also uses simd, it
+clobbers the registers of the first task, and migrate_disable() does not
+prevent that.
+
+If we want to use SIMD with preemption enabled, we need to update the
+context switch code to do a full SIMD register state save&restore if
+necessary. However, this can have a noticeable cost in all task switch
+latencies.
+
+Cheers,
+Anders
+
+> 
+> From e6a5fce9b3b55f48656240036a9354a0997c2907 Mon Sep 17 00:00:00 2001
+> From: Ayyappa Ch <ayyappa.chandolu@amd.com>
+> Date: Tue, 28 Apr 2015 11:53:00 +0530
+> Subject: [PATCH ] floating point realtime fix
+> 
+> ---
+>  arch/arm64/kernel/fpsimd.c | 16 ++++++++--------
+>  1 file changed, 8 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> index 2438497..3dca156 100644
+> --- a/arch/arm64/kernel/fpsimd.c
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -166,10 +166,10 @@ void fpsimd_flush_thread(void)
+>   */
+>  void fpsimd_preserve_current_state(void)
+>  {
+> - preempt_disable();
+> + migrate_disable();
+>   if (!test_thread_flag(TIF_FOREIGN_FPSTATE))
+>   fpsimd_save_state(&current->thread.fpsimd_state);
+> - preempt_enable();
+> + migrate_enable();
+>  }
+> 
+>  /*
+> @@ -179,7 +179,7 @@ void fpsimd_preserve_current_state(void)
+>   */
+>  void fpsimd_restore_current_state(void)
+>  {
+> - preempt_disable();
+> + migrate_disable();
+>   if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+>   struct fpsimd_state *st = &current->thread.fpsimd_state;
+> 
+> @@ -187,7 +187,7 @@ void fpsimd_restore_current_state(void)
+>   this_cpu_write(fpsimd_last_state, st);
+>   st->cpu = smp_processor_id();
+>   }
+> - preempt_enable();
+> + migrate_enable();
+>  }
+> 
+>  /*
+> @@ -197,7 +197,7 @@ void fpsimd_restore_current_state(void)
+>   */
+>  void fpsimd_update_current_state(struct fpsimd_state *state)
+>  {
+> - preempt_disable();
+> + migrate_disable();
+>   fpsimd_load_state(state);
+>   if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+>   struct fpsimd_state *st = &current->thread.fpsimd_state;
+> @@ -205,7 +205,7 @@ void fpsimd_update_current_state(struct fpsimd_state *state)
+>   this_cpu_write(fpsimd_last_state, st);
+>   st->cpu = smp_processor_id();
+>   }
+> - preempt_enable();
+> + migrate_enable();
+>  }
+> 
+>  /*
+> @@ -239,7 +239,7 @@ void kernel_neon_begin_partial(u32 num_regs)
+>   * that there is no longer userland FPSIMD state in the
+>   * registers.
+>   */
+> - preempt_disable();
+> + migrate_disable();
+>   if (current->mm &&
+>      !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
+>   fpsimd_save_state(&current->thread.fpsimd_state);
+> @@ -255,7 +255,7 @@ void kernel_neon_end(void)
+>   in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
+>   fpsimd_load_partial_state(s);
+>   } else {
+> - preempt_enable();
+> + migrate_enable();
+>   }
+>  }
+>  EXPORT_SYMBOL(kernel_neon_end);
+> 
+> On Fri, May 1, 2015 at 1:03 PM, Ayyappa Ch <ayyappa.ch.linux@gmail.com> wrote:
+> > Following Anders Roxell  patch on "Enable PREEMPT_RT_FULL" , observed
+> > one issue with Cyclic test while running floating point operations. So
+> > , modified below changes for that.
+> >
+> > From e6a5fce9b3b55f48656240036a9354a0997c2907 Mon Sep 17 00:00:00 2001
+> > From: Ayyappa Ch <ayyappa.chandolu@amd.com>
+> > Date: Tue, 28 Apr 2015 11:53:00 +0530
+> > Subject: [PATCH ] floating point realtime fix
+> >
+> > ---
+> >  arch/arm64/kernel/fpsimd.c | 16 ++++++++--------
+> >  1 file changed, 8 insertions(+), 8 deletions(-)
+> >
+> > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> > index 2438497..3dca156 100644
+> > --- a/arch/arm64/kernel/fpsimd.c
+> > +++ b/arch/arm64/kernel/fpsimd.c
+> > @@ -166,10 +166,10 @@ void fpsimd_flush_thread(void)
+> >   */
+> >  void fpsimd_preserve_current_state(void)
+> >  {
+> > - preempt_disable();
+> > + migrate_disable();
+> >   if (!test_thread_flag(TIF_FOREIGN_FPSTATE))
+> >   fpsimd_save_state(&current->thread.fpsimd_state);
+> > - preempt_enable();
+> > + migrate_enable();
+> >  }
+> >
+> >  /*
+> > @@ -179,7 +179,7 @@ void fpsimd_preserve_current_state(void)
+> >   */
+> >  void fpsimd_restore_current_state(void)
+> >  {
+> > - preempt_disable();
+> > + migrate_disable();
+> >   if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+> >   struct fpsimd_state *st = &current->thread.fpsimd_state;
+> >
+> > @@ -187,7 +187,7 @@ void fpsimd_restore_current_state(void)
+> >   this_cpu_write(fpsimd_last_state, st);
+> >   st->cpu = smp_processor_id();
+> >   }
+> > - preempt_enable();
+> > + migrate_enable();
+> >  }
+> >
+> >  /*
+> > @@ -197,7 +197,7 @@ void fpsimd_restore_current_state(void)
+> >   */
+> >  void fpsimd_update_current_state(struct fpsimd_state *state)
+> >  {
+> > - preempt_disable();
+> > + migrate_disable();
+> >   fpsimd_load_state(state);
+> >   if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+> >   struct fpsimd_state *st = &current->thread.fpsimd_state;
+> > @@ -205,7 +205,7 @@ void fpsimd_update_current_state(struct fpsimd_state *state)
+> >   this_cpu_write(fpsimd_last_state, st);
+> >   st->cpu = smp_processor_id();
+> >   }
+> > - preempt_enable();
+> > + migrate_enable();
+> >  }
+> >
+> >  /*
+> > @@ -239,7 +239,7 @@ void kernel_neon_begin_partial(u32 num_regs)
+> >   * that there is no longer userland FPSIMD state in the
+> >   * registers.
+> >   */
+> > - preempt_disable();
+> > + migrate_disable();
+> >   if (current->mm &&
+> >      !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
+> >   fpsimd_save_state(&current->thread.fpsimd_state);
+> > @@ -255,7 +255,7 @@ void kernel_neon_end(void)
+> >   in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
+> >   fpsimd_load_partial_state(s);
+> >   } else {
+> > - preempt_enable();
+> > + migrate_enable();
+> >   }
+> >  }
+> >  EXPORT_SYMBOL(kernel_neon_end);
+> > --
+> > 1.9.1
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-rt-users" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
 -- 
-1.8.1.1.dirty
+Anders Roxell
+0708 22 71 05
