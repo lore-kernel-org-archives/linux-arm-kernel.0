@@ -1,55 +1,33 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 21 May 2015 09:38:10 +0300
-Subject: [PATCHv2 00/27] ARM: OMAP2+: clock code migration to
- drivers/clk/ti
-In-Reply-To: <alpine.DEB.2.02.1505202234330.7960@utopia.booyaka.com>
-References: <1431334493-24455-1-git-send-email-t-kristo@ti.com>
- <alpine.DEB.2.02.1505111747460.19833@utopia.booyaka.com>
- <5551D178.3000904@ti.com>
- <alpine.DEB.2.02.1505122019220.21747@utopia.booyaka.com>
- <5552F32C.7060606@ti.com>
- <alpine.DEB.2.02.1505131438430.7921@utopia.booyaka.com>
- <555B8DC0.5080905@ti.com>
- <alpine.DEB.2.02.1505202234330.7960@utopia.booyaka.com>
-Message-ID: <555D7D52.8010501@ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 21 May 2015 08:43:35 +0200
+Subject: [PATCH soc] ARM: use ARM_SINGLE_ARMV7M for ARMv7-M platforms
+In-Reply-To: <1432161344-1930-1-git-send-email-stefan@agner.ch>
+References: <1432161344-1930-1-git-send-email-stefan@agner.ch>
+Message-ID: <20150521064335.GX24769@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/21/2015 01:40 AM, Paul Walmsley wrote:
-> On Tue, 19 May 2015, Tero Kristo wrote:
->
->> Any news on this? As noted previously, I am not able to reproduce the issue
->> you are seeing currently, can you give DEBUG_LL a shot?
->
-> Yeah I just bisected it, it was caused by this:
->
-> commit cc4a5fe972ad7834e8662b49b3a5fdb597e9e15e
-> Author: Felipe Balbi <balbi@ti.com>
-> Date:   Fri Jan 30 11:18:56 2015 -0600
->
->      arm: config: omap2plus_defconfig: switch over to LZMA compression
->
->      LZMA compression makes about 33% smaller zImage
->      with just a slight extra decompression time.
->
->      Before this patch, zImage built with o2+_dc
->      is 4.5MiB and after it's about 3.3MiB.
->
->      Suggested-by: David Cohen <david.a.cohen@linux.intel.com>
->      Signed-off-by: Felipe Balbi <balbi@ti.com>
->      Signed-off-by: Tony Lindgren <tony@atomide.com>
->
->
-> and the timeouts on the testbed being set to fail if a kernel takes longer
-> than five seconds to start.  Seems that the part about a "slight extra
-> decompression time" probably only applies to relatively recent chips.
->
->
-> - Paul
->
+On Thu, May 21, 2015 at 12:35:44AM +0200, Stefan Agner wrote:
+> Use the new config symbol ARM_SINGLE_ARMV7M which groups config
+> symbols used by modern ARMv7-M platforms. This allows supporting
+> multiple ARMv7-M platforms in one kernel image. However, a common
+> kernel image requires the combined platforms to share the same
+> main memory layout to be bootable.
+> 
+> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+> Since this is essentially only a shift of config symbols, it
+> should not change runtime behavior, at least when selecting
+> only one platform.
+> 
+> Uwe, this is essentially the same I had in my patchset, just
+> converting the other platforms too. I was bold and added your
+> Ack anyway...
+That's fine.
 
-Oh, so this explains why I was thinking it took very long time to boot 
-the recent kernels also. The boot lag is clearly noticeable without any 
-measurement. I wonder if we should probably revert this patch.
+Uwe
 
--Tero
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
