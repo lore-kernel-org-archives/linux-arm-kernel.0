@@ -1,50 +1,71 @@
-From: peda@lysator.liu.se (Peter Rosin)
-Date: Thu, 21 May 2015 14:35:32 +0200
-Subject: prealloc_buffer_size and buffer_bytes_max
-In-Reply-To: <555DCF69.9090008@lysator.liu.se>
-References: <555DCF69.9090008@lysator.liu.se>
-Message-ID: <555DD114.3000500@lysator.liu.se>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 21 May 2015 14:35:42 +0200
+Subject: schedule_timeout sleeps too long after dividing CPU frequency
+In-Reply-To: <2681862.SyQNaSxams@wuerfel>
+References: <20150514144239.GZ2067@n2100.arm.linux.org.uk>
+ <76003699.Oyq777txnm@wuerfel> <555D030F.8030100@free.fr>
+ <2681862.SyQNaSxams@wuerfel>
+Message-ID: <555DD11E.7080302@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-05-21 14:28, Peter Rosin wrote:
-> Hi!
-> 
-> I got my hopes up when I read the commit message for c14e2591bf54
-> ASoC: atmel-pcm-dma: increase buffer_bytes_max. Quoting it:
-> 
-> 	atmel-pcm-dma is not limited to a buffer size of 64kB like
-> 	atmel-pcm-pdc. Increase buffer_bytes_max to 512kB to allow
-> 	for higher bit rates (i.e. 32bps at 192kHz) to work correctly.
-> 	By default, keep the prealloc at 64kB.
-> 
-> However, as I (think I) request a bigger buffer it still caps out at 64kB.
-> I'm using the latency argument of snd_pcm_set_params to control the buffer:
-> 
-> 	snd_pcm_set_params(pcm,
-> 		SND_PCM_FORMAT_S32_LE,
-> 		SND_PCM_ACCESS_RW_INTERLEAVED,
-> 		2,      /* channels */
-> 		250000, /* rate */
-> 		0,      /* do not resample */
-> 		90000); /* latency in us */
-> 
-> But snd_pcm_hw_params_get_buffer_size "only" returns 8192 frames (64kB)
-> even if I request 9us * 250kHz * 2 * 4 = 180kB. If I change the prealloc
+On 21/05/2015 00:18, Arnd Bergmann wrote:
 
-Bzzzt, s/9us/90ms/
+> On Wednesday 20 May 2015 23:56:31 Mason wrote:
+>
+>> Or perhaps the other way around?
+>> i.e. feat_c3stop initialized to 0 (thus in the bss section)
+>> and set to FEAT_C3STOP if "twd_never_stops" doesn't exist...
+> 
+> yes.
 
-> from 64kB to 256kB I get a bigger buffer (and it works better too!).
+IIUC, something along these lines:
+
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index 172c6a05..e10a388 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -34,6 +34,7 @@ static unsigned long twd_timer_rate;
+ static DEFINE_PER_CPU(bool, percpu_setup_called);
+ 
+ static struct clock_event_device __percpu *twd_evt;
++static int feat_c3stop;
+ static int twd_ppi;
+ 
+ static void twd_set_mode(enum clock_event_mode mode,
+@@ -294,7 +295,7 @@ static void twd_timer_setup(void)
+ 
+ 	clk->name = "local_timer";
+ 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
+-			CLOCK_EVT_FEAT_C3STOP;
++			feat_c3stop;
+ 	clk->rating = 350;
+ 	clk->set_mode = twd_set_mode;
+ 	clk->set_next_event = twd_set_next_event;
+@@ -346,6 +347,8 @@ static int __init twd_local_timer_common_register(struct device_node *np)
+ 		goto out_irq;
+ 
+ 	twd_get_clock(np);
++	if (!of_property_read_bool(np, "twd_never_stops"))
++		feat_c3stop = CLOCK_EVT_FEAT_C3STOP;
+ 
+ 	/*
+ 	 * Immediately configure the timer on the boot CPU, unless we need
+
+
+>> Russell, when you added the FEAT_C3STOP flag unconditionally in
+>> commit 5388a6b266, didn't that potentially break platforms that
+>> didn't expect the flag to be set?
 > 
-> Admittedly I backported this patch on top of the linux-3.18-at91
-> branch from the Atmel git repo, so there might be some support
-> missing that has gone in after 3.18?
-> 
-> Or have I completely misunderstood, and these are unrelated buffers?
-> 
-> Any insight in how I can get a big enough buffer without hacking the
-> prealloc is appreciated!
-> 
-> Cheers,
-> Peter
-> 
+> To take a step back, you should first figure out whether clearing
+> this flag is actually the correct behavior for your hardware, or
+> just happens to work by accident.
+
+According to my (limited) understanding of the clockevents core,
+a "broadcast device" is required if and only if the local timers
+have CLOCK_EVT_FEAT_C3STOP. I could be wrong.
+
+Additional reference:
+https://lwn.net/Articles/574962/
+
+Regards.
