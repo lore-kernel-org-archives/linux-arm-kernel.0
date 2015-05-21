@@ -1,57 +1,29 @@
-From: kwestfie@codeaurora.org (Kenneth Westfield)
-Date: Thu, 21 May 2015 14:00:00 -0700
-Subject: [PATCH] ASoC: qcom: remove incorrect dependencies
-In-Reply-To: <2324031.cqS0mEEEhQ@wuerfel>
-References: <2324031.cqS0mEEEhQ@wuerfel>
-Message-ID: <20150521205952.GA31005@kwestfie-linux.qualcomm.com>
+From: mwelling@ieee.org (Michael Welling)
+Date: Thu, 21 May 2015 16:04:11 -0500
+Subject: [PATCH] spi: omap2-mcspi: Fix native cs with new set_cs
+In-Reply-To: <20150521101857.GR21577@sirena.org.uk>
+References: <1431452337-19280-1-git-send-email-mwelling@ieee.org>
+ <20150512191758.GX3066@sirena.org.uk>
+ <20150521020709.GA14258@deathray>
+ <20150521101857.GR21577@sirena.org.uk>
+Message-ID: <20150521210411.GA5406@deathray>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 21, 2015 at 11:07:08AM +0200, Arnd Bergmann wrote:
-> Compile-tests show a warning for the newly added SND_SOC_STORM
-> symbol:
+On Thu, May 21, 2015 at 11:18:57AM +0100, Mark Brown wrote:
+> On Wed, May 20, 2015 at 09:07:09PM -0500, Michael Welling wrote:
 > 
-> warning: (SND_SOC_STORM) selects SND_SOC_LPASS_CPU which has unmet direct dependencies (SOUND && !M68K && !UML && SND && SND_SOC && SND_SOC_QCOM)
+> > My guess is that the set_cs needs to be called even when toggling as GPIO.
 > 
-> The problem is that it can be selected for COMPILE_TEST on non-QCOM
-> builds, but the symbols it selects have a dependency.
-> Dropping the dependencies makes it work without warnings and no
-> other side-effects, because these are not user-visible.
+> > How should I handle this?
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: f380dd3f3cd ("ASoC: qcom: Add ability to build QCOM drivers")
-> 
-> diff --git a/sound/soc/qcom/Kconfig b/sound/soc/qcom/Kconfig
-> index 5f58e4f1bca9..b07f183fc47f 100644
-> --- a/sound/soc/qcom/Kconfig
-> +++ b/sound/soc/qcom/Kconfig
-> @@ -6,12 +6,10 @@ config SND_SOC_QCOM
->  
->  config SND_SOC_LPASS_CPU
->  	tristate
-> -	depends on SND_SOC_QCOM
+> It shouldn't be part of a set_cs() operation but rather part of the main
+> transfer operation.
 
-Rather than remove the dependency (which I would like to keep), would
-the following change work for SND_SOC_LPASS_CPU and
-SND_SOC_LPASS_PLATFORM?
--	depends on SND_SOC_QCOM
-+	depends on SND_SOC_QCOM || COMPILE_TEST
 
-If so, I will submit a patch (I know this has been applied already) on
-top of this one.
+Okay then this patch should be reverted.
 
->  	select REGMAP_MMIO
->  
->  config SND_SOC_LPASS_PLATFORM
->  	tristate
-> -	depends on SND_SOC_QCOM
->  	select REGMAP_MMIO
->  
->  config SND_SOC_STORM
-> 
+Do you want to revert the patch and apply a new one or should I provide a
+patch that reverts the changes and fixes it all in one?
 
--- 
-Kenneth Westfield
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum, 
-a Linux Foundation Collaborative Project
+Sorry for this mess.
