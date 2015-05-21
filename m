@@ -1,65 +1,60 @@
-From: dave.long@linaro.org (David Long)
-Date: Thu, 21 May 2015 00:44:45 -0400
-Subject: [PATCH v6 3/6] arm64: Kprobes with single stepping support
-In-Reply-To: <20150520163946.GC29424@e104818-lin.cambridge.arm.com>
-References: <1429561187-3661-1-git-send-email-dave.long@linaro.org>
- <1429561187-3661-4-git-send-email-dave.long@linaro.org>
- <20150520163946.GC29424@e104818-lin.cambridge.arm.com>
-Message-ID: <555D62BD.5040403@linaro.org>
+From: hs@denx.de (Heiko Schocher)
+Date: Thu, 21 May 2015 07:20:41 +0200
+Subject: [PATCH v3] arm, imx6, dts: add DT for aristainetos2 board
+In-Reply-To: <20150521010424.GF24844@dragon>
+References: <1432099863-8642-1-git-send-email-hs@denx.de>
+ <1432118319.4466.40.camel@pengutronix.de> <555C6C72.2060302@denx.de>
+ <20150521010424.GF24844@dragon>
+Message-ID: <555D6B29.9060202@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/20/15 12:39, Catalin Marinas wrote:
-> On Mon, Apr 20, 2015 at 04:19:44PM -0400, David Long wrote:
->> Add support for basic kernel probes(kprobes) and jump probes
->> (jprobes) for ARM64.
+Hello Shawn,
+
+Am 21.05.2015 03:04, schrieb Shawn Guo:
+> On Wed, May 20, 2015 at 01:13:54PM +0200, Heiko Schocher wrote:
+>>>> + * Copyright (C) 2015 Heiko Schocher <hs@denx.de>
+>>>> + *
+>>>> + * This file is dual-licensed: you can use it either under the terms
+>>>> + * of the GPL or the X11 license, at your option. Note that this dual
+>>>> + * licensing only applies to this file, and not this project as a
+>>>> + * whole.
+>>>> + *
+>>>> + *  a) This file is free software; you can redistribute it and/or
+>>>> + *     modify it under the terms of the GNU General Public License as
+>>>> + *     published by the Free Software Foundation; either version 2 of
+>>>> + *     the License, or (at your option) any later version.
+>>>> + *
+>>>> + *     This file is distributed in the hope that it will be useful,
+>>>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>>> + *     GNU General Public License for more details.
+>>>> + *
+>>>> + *     You should have received a copy of the GNU General Public
+>>>> + *     License along with this file; if not, write to the Free
+>>>> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+>>>> + *     MA 02110-1301 USA
+>>>
+>>> checkpatch warns that you should not include this paragraph because the
+>>> mail address might change in the future and it is contained in COPYING.
 >>
->> Kprobes utilizes software breakpoint and single step debug
->> exceptions supported on ARM v8.
->>
->> A software breakpoint is placed at the probe address to trap the
->> kernel execution into the kprobe handler.
->>
->> ARM v8 supports enabling single stepping before the break exception
->> return (ERET), with next PC in exception return address (ELR_EL1). The
->> kprobe handler prepares an executable memory slot for out-of-line
->> execution with a copy of the original instruction being probed, and
->> enables single stepping. The PC is set to the out-of-line slot address
->> before the ERET. With this scheme, the instruction is executed with the
->> exact same register context except for the PC (and DAIF) registers.
+>> Hmm... Shawn mentioned to change it to the "GPL/X11 dual licence"
+>> as in the arch/arm/boot/dts/imx6sl-warp.dts file ... so I copied this
+>> from there ... is there a better option for this?
 >
-> I wonder whether it would be simpler to use another software breakpoint
-> after the out of line instruction copy. You won't run the instructions
-> that change the PC anyway.
+> It seems I pointed you to a bad example.  Let me try again, see
+> arch/arm/boot/dts/imx6q-hummingboard.dts for example.
 
-We put quite a bit of work into making single-step work.  I don't see 
-any obvious advantage to trying to switch to a software breakpoint. 
-Both are debug exceptions but SS does leave open the possibility of 
-maybe eventually running some instructions that do change the PC.
+Ok, changed, thanks!
 
->
-> Since an unconditional branch instruction within the kernel address
-> space can reach any point in the kernel (and modules), could we go a
-> step further and avoid the software breakpoint altogether, just generate
-> a branch instruction to the original location (after the software
-> breakpoint)?
+Hmm.. why not using the SPDX license identifier? This would save a
+lot of lines ...
 
-Wouldn't a branch instruction have to make use of a register in order to 
-span the whole address space?  How could you do that and have all the 
-registers unmolested when you land back after the original probe point? 
-  The thing that really kills this though is the fact we need to be able 
-to run the pre and post functions before and *after* the XOL stepping.
+I try the changes Philipp suggested for the 7" display (using the
+panel-simple driver for it) and post a v4.
 
->
-> As for simulating/emulating instructions, could we actually avoid it for
-> most of them where we can generate a similar instruction with the
-> corrected offset? If the out of line slot is somewhere within the kernel
-> data section, I think many of them can be re-encoded (e.g. branches).
->
-
-Again, do we get enough displacement for this to always work?  A quick 
-look at the ARMv8 ARM makes me think we get +/-128M offset for a branch 
-and only +/-1M for a load literal.  For any given instruction type I 
-don't think it works unless it works for all possible offsets.
-
--dl
+bye,
+Heiko
+-- 
+DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
