@@ -1,43 +1,57 @@
-From: peda@lysator.liu.se (Peter Rosin)
-Date: Thu, 21 May 2015 14:28:25 +0200
-Subject: prealloc_buffer_size and buffer_bytes_max
-Message-ID: <555DCF69.9090008@lysator.liu.se>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Thu, 21 May 2015 20:29:24 +0800
+Subject: [RFC PATCH v1 2/3] PCI: hisi: Add PCIe host support for Hisilicon
+ Soc Hip05
+In-Reply-To: <CAErSpo7TEgY=oJvLU3jyh=FcZqgsSxLi1Cw1mo6w+5WSRkfPMQ@mail.gmail.com>
+References: <000101d092fb$94dde100$be99a300$@com>
+ <555D37B0.2080909@hisilicon.com>
+ <CAErSpo7TEgY=oJvLU3jyh=FcZqgsSxLi1Cw1mo6w+5WSRkfPMQ@mail.gmail.com>
+Message-ID: <555DCFA4.7090104@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 2015/5/21 20:09, Bjorn Helgaas wrote:
+> On Wed, May 20, 2015 at 8:41 PM, Zhou Wang <wangzhou1@hisilicon.com> wrote:
+>> On 2015/5/20 20:50, Jingoo Han wrote:
+>>> On Wed, 20 May 2015 14:21:40 +0800, Zhou Wang wrote:
+> 
+>>>> +/* Configure vmid/asid table in PCIe host */
+>>>> +static void hisi_pcie_config_context(struct hisi_pcie *pcie)
+>>>> +{
+>>>> +    int i;
+>>>> +
+>>>> +    hisi_pcie_change_apb_mode(pcie, PCIE_SLV_CONTENT_MODE);
+>>>> +
+>>>> +    for (i = 0; i < 0x400; i++)
+>>>> +            hisi_pcie_apb_writel(pcie, 0x0, i * 4);
+>>>> +
+>>>> +    for (i = 0x400; i < 0x800; i++)
+>>>> +            hisi_pcie_apb_writel(pcie, 0x0, i * 4);
+>>>
+>>> How about the following?
+>>>
+>>> +     for (i = 0; i < 0x800; i++)
+>>> +             hisi_pcie_apb_writel(pcie, 0x0, i * 4);
+>>>
+>>
+>> This is to configure init value of vmid and asid of each pcie device.
+> 
+> But the combined loop looks functionally equivalent, i.e., I don't
+> think the device can tell the difference.  Personally I wouldn't mind
+> if you kept the two loops separate, but if you do, each one needs a
+> comment immediately before it so the reader has a clue that they are
+> doing semantically different things.  Otherwise it just looks like a
+> mistake and the reader wonders why they are split.
+> 
+> Bjorn
 
-I got my hopes up when I read the commit message for c14e2591bf54
-ASoC: atmel-pcm-dma: increase buffer_bytes_max. Quoting it:
+Got it. There is a vmid table and a asid table in host controll
+registers. They are just adjoining as above. I will combine above loops
+with more comments together.
 
-	atmel-pcm-dma is not limited to a buffer size of 64kB like
-	atmel-pcm-pdc. Increase buffer_bytes_max to 512kB to allow
-	for higher bit rates (i.e. 32bps at 192kHz) to work correctly.
-	By default, keep the prealloc at 64kB.
+Thanks and Regards,
+Zhou
 
-However, as I (think I) request a bigger buffer it still caps out at 64kB.
-I'm using the latency argument of snd_pcm_set_params to control the buffer:
-
-	snd_pcm_set_params(pcm,
-		SND_PCM_FORMAT_S32_LE,
-		SND_PCM_ACCESS_RW_INTERLEAVED,
-		2,      /* channels */
-		250000, /* rate */
-		0,      /* do not resample */
-		90000); /* latency in us */
-
-But snd_pcm_hw_params_get_buffer_size "only" returns 8192 frames (64kB)
-even if I request 9us * 250kHz * 2 * 4 = 180kB. If I change the prealloc
-from 64kB to 256kB I get a bigger buffer (and it works better too!).
-
-Admittedly I backported this patch on top of the linux-3.18-at91
-branch from the Atmel git repo, so there might be some support
-missing that has gone in after 3.18?
-
-Or have I completely misunderstood, and these are unrelated buffers?
-
-Any insight in how I can get a big enough buffer without hacking the
-prealloc is appreciated!
-
-Cheers,
-Peter
+> 
+> .
+> 
