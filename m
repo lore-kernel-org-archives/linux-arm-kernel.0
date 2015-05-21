@@ -1,60 +1,203 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Thu, 21 May 2015 07:20:41 +0200
-Subject: [PATCH v3] arm, imx6, dts: add DT for aristainetos2 board
-In-Reply-To: <20150521010424.GF24844@dragon>
-References: <1432099863-8642-1-git-send-email-hs@denx.de>
- <1432118319.4466.40.camel@pengutronix.de> <555C6C72.2060302@denx.de>
- <20150521010424.GF24844@dragon>
-Message-ID: <555D6B29.9060202@denx.de>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 21 May 2015 00:27:36 -0500
+Subject: [PATCH V5 1/3] OPP: Redefine bindings to overcome shortcomings
+In-Reply-To: <51a2603050f7993643fea9e5dcd2dba7a5a3fe23.1432091956.git.viresh.kumar@linaro.org>
+References: <cover.1432091956.git.viresh.kumar@linaro.org>
+ <51a2603050f7993643fea9e5dcd2dba7a5a3fe23.1432091956.git.viresh.kumar@linaro.org>
+Message-ID: <555D6CC8.9050201@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn,
+$subject: (Rafael usually hand fixes it.. but might be nice of us not to
+save him that effort) PM / OPP: Additional binding definition to address ...
 
-Am 21.05.2015 03:04, schrieb Shawn Guo:
-> On Wed, May 20, 2015 at 01:13:54PM +0200, Heiko Schocher wrote:
->>>> + * Copyright (C) 2015 Heiko Schocher <hs@denx.de>
->>>> + *
->>>> + * This file is dual-licensed: you can use it either under the terms
->>>> + * of the GPL or the X11 license, at your option. Note that this dual
->>>> + * licensing only applies to this file, and not this project as a
->>>> + * whole.
->>>> + *
->>>> + *  a) This file is free software; you can redistribute it and/or
->>>> + *     modify it under the terms of the GNU General Public License as
->>>> + *     published by the Free Software Foundation; either version 2 of
->>>> + *     the License, or (at your option) any later version.
->>>> + *
->>>> + *     This file is distributed in the hope that it will be useful,
->>>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->>>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>>> + *     GNU General Public License for more details.
->>>> + *
->>>> + *     You should have received a copy of the GNU General Public
->>>> + *     License along with this file; if not, write to the Free
->>>> + *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
->>>> + *     MA 02110-1301 USA
->>>
->>> checkpatch warns that you should not include this paragraph because the
->>> mail address might change in the future and it is contained in COPYING.
->>
->> Hmm... Shawn mentioned to change it to the "GPL/X11 dual licence"
->> as in the arch/arm/boot/dts/imx6sl-warp.dts file ... so I copied this
->> from there ... is there a better option for this?
->
-> It seems I pointed you to a bad example.  Let me try again, see
-> arch/arm/boot/dts/imx6q-hummingboard.dts for example.
+we are not really redefining the old definitions..
 
-Ok, changed, thanks!
+On 05/19/2015 10:41 PM, Viresh Kumar wrote:
+> Current OPP (Operating performance point) DT bindings are proven to be
+Nit Pick: s/DT/device tree ; s/are/have been
 
-Hmm.. why not using the SPDX license identifier? This would save a
-lot of lines ...
+> insufficient at multiple instances.
 
-I try the changes Philipp suggested for the 7" display (using the
-panel-simple driver for it) and post a v4.
+insufficient due to the inflexible nature of the original bindings. Over
+time, we have realized that Operating Performance Point definitions and
+usage is varied depending on the SoC and a "single size (just frequency,
+voltage) fits all" model which the original bindings attempted and failed.
 
-bye,
-Heiko
+> 
+> The shortcomings we are trying to solve here:
+
+The proposed next generation of the bindings addresses by providing a
+expandable binding for OPPs and introduces the following common
+shortcomings seen with the original bindings:
+
+[...]
+
+> ---
+>  Documentation/devicetree/bindings/power/opp.txt | 379 +++++++++++++++++++++++-
+>  1 file changed, 375 insertions(+), 4 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/power/opp.txt b/Documentation/devicetree/bindings/power/opp.txt
+> index 74499e5033fc..d132e2927b21 100644
+> --- a/Documentation/devicetree/bindings/power/opp.txt
+> +++ b/Documentation/devicetree/bindings/power/opp.txt
+> @@ -1,8 +1,19 @@
+> -* Generic OPP Interface
+> +Generic OPP (Operating Performance Points) Bindings
+> +----------------------------------------------------
+>  
+> -SoCs have a standard set of tuples consisting of frequency and
+> -voltage pairs that the device will support per voltage domain. These
+> -are called Operating Performance Points or OPPs.
+> +Devices work at voltage-current-frequency combinations and some implementations
+> +have the liberty of choosing these. These combinations are called Operating
+> +Performance Points aka OPPs. This document defines bindings for these OPPs
+> +applicable across wide range of devices. For illustration purpose, this document
+> +uses CPU as a device.
+> +
+> +This document contain multiple versions of OPP binding and only one of them
+> +should be used per device.
+
+Will be nice to repeat this message in the commit message as well..
+folks just doing git log should probably not freak out that the current
+dtbs will stop working once the implementation is merged in - it might
+help deal with some of the concerns of folks not aware of the mailing
+thread discussions.
+
+> +
+> +Binding 1: operating-points
+> +============================
+> +
+> +This binding only supports voltage-frequency pairs.
+>  
+>  Properties:
+>  - operating-points: An array of 2-tuples items, and each item consists
+> @@ -23,3 +34,363 @@ cpu at 0 {
+>  		198000  850000
+>  	>;
+>  };
+> +
+> +
+
+Extra EOLs? maybe just stop at 2 EOLs to separate the sections.?
+
+> +
+> +Binding 2: operating-points-v2
+> +============================
+> +
+> +* Property: operating-points-v2
+> +
+> +Devices supporting OPPs must set their "operating-points-v2" property with
+> +phandle to a OPP descriptor in their DT node. The OPP core will use this phandle
+> +to find the operating points for the device.
+> +
+
+I would suggest adding a link to how future vendor specific extension
+docs might look like - maybe this is probably not the time to discuss
+this.. but anyways.. we could make some statement to the effect of "SoC
+vendor specfic extensions are documented as
+Documentation/devicetree/bindings/power/<vendor>,opp.txt and should
+clearly indicate that the extensions are permitted only under the
+operating-points-v2 compatible description."
+
+
+> +
+> +* OPP Descriptor Node
+> +
+> +This describes the OPPs belonging to a device. This node can have following
+> +properties:
+> +
+> +Required properties:
+> +- compatible: Allow OPPs to express their compatibility. It should be:
+> +  "operating-points-v2".
+> +
+> +- OPP nodes: One or more OPP nodes describing voltage-current-frequency
+> +  combinations. Their name isn't significant but their phandle can be used to
+> +  reference an OPP.
+
+What if this was generated data (say using an overlay)? does it have to
+be "required" or just "optional" :)
+
+> +
+> +Optional properties:
+> +- opp-shared: Indicates that device nodes using this OPP descriptor's phandle
+> +  switch their DVFS state together, i.e. they share clock/voltage/current lines.
+> +  Missing property means devices have independent clock/voltage/current lines,
+> +  but they share OPP tables.
+> +
+> +
+> +* OPP Node
+> +
+> +This defines voltage-current-frequency combinations along with other related
+> +properties.
+> +
+> +Required properties:
+> +- opp-hz: Frequency in Hz
+
+I am just being nit picky -> should we keep Heinrich Hertz respected[2]
+and name it opp-Hz ? No strong opinions either way.
+
+different angle: How about just target-freq-Hz? just drop the "opp"
+prefix for properties of an OPP node? No strong feelings here. (some
+folks did have variations of a few Hz based on clock tree - example with
+a crystal frequency of 19.2MHz you'd probably get 1001MHz exact, with a
+26MHz crystal, you'd get 1000MHz -> ofcourse round-rate is supposed to
+help with that... but anyways.. why not say we are trying to indicate
+target frequency? I do recollect during initial days of OPP
+(pre-dt-adoption days) folks did complain about this - we kinda worked
+around this with round-rated handling - but we might as well anticipate it.
+
+[...]
+
+> +Example 1: Single cluster Dual-core ARM cortex A9, switch DVFS states together.
+
+Thanks for adding the examples - My customer support team especially
+will appreciate having such examples ;).
+
+> +
+> +/ {
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		cpu at 0 {
+> +			compatible = "arm,cortex-a9";
+> +			reg = <0>;
+> +			next-level-cache = <&L2>;
+> +			clocks = <&clk_controller 0>;
+> +			clock-names = "cpu";
+> +			opp-supply = <&cpu_supply0>;
+> +			operating-points-v2 = <&cpu0_opp>;
+> +		};
+> +
+> +		cpu at 1 {
+> +			compatible = "arm,cortex-a9";
+> +			reg = <1>;
+> +			next-level-cache = <&L2>;
+> +			clocks = <&clk_controller 0>;
+
+I agree with Mike[1] here -> why not move clocks and supply to cpu0_opp?
+"
+It seems wrong to me that the clock and supply data is owned by the cpu
+node, and not the opp descriptor. Everything about the opp transition
+should belong to a provider node. Then the cpu simply needs to consume
+that via a phandle.
+"
+
+I am not sure if we discussed that point further OR if we kinda got
+hooked on to the "should it be in kernel" point of debate in V4.
+
+> +			clock-names = "cpu";
+> +			opp-supply = <&cpu_supply0>;
+> +			operating-points-v2 = <&cpu0_opp>;
+> +		};
+> +	};
+> +
+
+[...]
+
+[1] http://marc.info/?l=linux-pm&m=143146696029140&w=2
+[2] http://marc.info/?l=linux-kernel&m=143135047525313&w=2
 -- 
-DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Regards,
+Nishanth Menon
