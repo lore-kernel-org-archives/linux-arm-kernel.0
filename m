@@ -1,27 +1,64 @@
-From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
-Date: Thu, 21 May 2015 14:41:38 +0200
-Subject: at91sam9: watchdog: period
-In-Reply-To: <20150519120433.763a416e@bbrezillon>
-References: <55559D55.6020703@aksignal.cz>	<20150515172516.005e3a21@bbrezillon>	<5559865F.9010502@aksignal.cz>	<20150518092750.449d6c8c@bbrezillon>	<5559A029.9060007@aksignal.cz>	<555AA8F1.80100@atmel.com>	<20150519091442.675b1a98@bbrezillon>	<555AFBFD.3010506@aksignal.cz>	<20150519111402.747e8eb2@bbrezillon>	<555B07D0.4030000@aksignal.cz>
- <20150519120433.763a416e@bbrezillon>
-Message-ID: <555DD282.3090508@aksignal.cz>
+From: ranjit.waghmode@xilinx.com (Ranjit Abhimanyu Waghmode)
+Date: Thu, 21 May 2015 12:42:23 +0000
+Subject: [RFC PATCH 1/2] devicetree: Add devicetree bindings
+ documentation for ZynqMP GQSPI
+In-Reply-To: <20150520143854.GU31550@xsjsorenbubuntu>
+References: <1432106871-27232-1-git-send-email-ranjit.waghmode@xilinx.com>
+ <20150520143854.GU31550@xsjsorenbubuntu>
+Message-ID: <7CFCFE83B8145347A1D424EC939F1C3CA6F1BC@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.5.2015 12:04, Boris Brezillon wrote:
->
-> Anyway, that does not explain why your system takes 61 secs to trigger
-> a reset (instead of 16 secs).
-> Can you try to revert this commit [1] ?
->
->
-> [1]https://git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git/commit/drivers/watchdog/at91sam9_wdt.c?id=d677772e1358924bf487cd833bdc4d50f3f6f64d
+Hi Soren,
 
-I reverted this commit: still 61s.
-By the way, between
-# [  109.117117] at91sam9_wdt: I will reset your machine !
-and
-RomBOOT
-is another 27s.
-Whole watchdog reboot sequence is about 90s!
-Slow clock is measured by counter as 32786Hz.
+On Wed, 2015-05-20 at 12:57PM +0530, Ranjit Waghmode wrote:
+> Add bindings documentation for GQSPI controller driver used by Zynq 
+> Ultrascale+ MPSoC
+> 
+> Signed-off-by: Ranjit Waghmode <ranjit.waghmode@xilinx.com>
+> ---
+>  .../devicetree/bindings/spi/spi-zynqmp-qspi.txt    | 26 ++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+>  create mode 100644 
+> Documentation/devicetree/bindings/spi/spi-zynqmp-qspi.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/spi/spi-zynqmp-qspi.txt 
+> b/Documentation/devicetree/bindings/spi/spi-zynqmp-qspi.txt
+> new file mode 100644
+> index 0000000..cec6330
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/spi/spi-zynqmp-qspi.txt
+> @@ -0,0 +1,26 @@
+> +Xilinx Zynq UltraScale+ MPSoC GQSPI controller Device Tree Bindings
+> +-------------------------------------------------------------------
+> +
+> +Required properties:
+> +- compatible		: Should be "xlnx,zynqmp-qspi-1.0".
+> +- reg			: Physical base address and size of GQSPI registers map.
+> +- interrupts		: Property with a value describing the interrupt
+> +			  number.
+> +- interrupt-parent	: Must be core interrupt controller.
+> +- clock-names		: List of input clock names - "ref_clk", "pclk"
+> +			  (See clock bindings for details).
+> +- clocks		: Clock phandles (see clock bindings for details).
+> +
+> +Optional properties:
+> +- num-cs		: Number of chip selects used.
+> +
+> +Example:
+> +	qspi: spi at ff0f0000 {
+> +		compatible = "xlnx,zynqmp-qspi-1.0";
+> +		clock-names = "ref_clk", "pclk";
+> +		clocks = <&misc_clk &misc_clk>;
+> +		interrupts = <0 15 4>;
+> +		interrupt-parent = <&gic>;
+> +		num-cs = <1>;
+> +		reg = <0x0 0xff0f0000 0x1000 0x0 0xc0000000 0x8000000>;
+
+I find things a lot easier to read when there is something separating the groups. Could this become:
+	reg = <0x0 0xff0f0000 0x1000>, <0x0 0xc0000000 0x8000000>; ?
+
+[Ranjit]: I will try your suggestion and send you in the next version.
+
+Regards,
+Ranjit
