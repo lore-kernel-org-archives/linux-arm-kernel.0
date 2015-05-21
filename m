@@ -1,156 +1,107 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 21 May 2015 12:25:55 +0100
-Subject: [PATCH 2/3] iommu/arm-smmu: Add initial driver support for ARM
- SMMUv3 devices
-In-Reply-To: <55530C4F.5000605@huawei.com>
-References: <1431108046-9675-1-git-send-email-will.deacon@arm.com>
- <1431108046-9675-3-git-send-email-will.deacon@arm.com>
- <5551AE56.6050906@huawei.com> <20150512165500.GE2062@arm.com>
- <55530C4F.5000605@huawei.com>
-Message-ID: <20150521112555.GH21920@arm.com>
+From: mika.westerberg@linux.intel.com (Mika Westerberg)
+Date: Thu, 21 May 2015 14:40:49 +0300
+Subject: [PATCH v2] i2c: designware: Avoid unnecessary resuming during
+ system suspend
+In-Reply-To: <1432132393-693-1-git-send-email-jszhang@marvell.com>
+References: <1432132393-693-1-git-send-email-jszhang@marvell.com>
+Message-ID: <20150521114049.GY1490@lahna.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi again,
+[Adding Jarkko, just in case he has concerns about this]
 
-Sorry for the delay in replying, I've been tied up with other stuff.
-
-On Wed, May 13, 2015 at 09:33:19AM +0100, leizhen wrote:
-> On 2015/5/13 0:55, Will Deacon wrote:
-> > The purpose of the two level approach isn't to save memory; it's to remove
-> > the need for a single (large) contiguous block. Furthermore, we need all
-> > master devices in the system to come up in a state where their transactions
-> > bypass the SMMU (i.e. we don't require them to use the SMMU for
-> > translation). Achieving this necessitates a fully-populated stream-table
-> > before any DMA occurs.
+On Wed, May 20, 2015 at 10:33:13PM +0800, Jisheng Zhang wrote:
+> Commit 1fc2fe204cb9 ("i2c: designware: Add runtime PM hooks") adds
+> runtime pm support using the same ops for system pm and runtime pm.
+> When suspend to ram, the i2c host may have been runtime suspended, thus
+> i2c_dw_disable() hangs.
 > 
-> OK, but for non-pci devices(maybe pci devices also), initialize all
-> devices(StreamIDs) to bypass mode maybe incorrect. Some devices maybe
-> capable bring attributes by itself, and access different memory with
-> different attributes(device attribute or cacheable attribute); some
-> devices maybe not capable bring attributes by itself, but need access
-> memory with cacheable attribute only, so we should set STE.MTCFG = 1.
-> Provide dts configuration will be better.
-
-If we want to make use of memory overrides, then I think we should add
-that as a separate patch because it would have implications on the IOMMU
-API. I don't particularly like putting this policy information in the
-device-tree binding on a per-driver basis.
-
-> Furthermore, I don't agree initialize all devices to bypass by default.
-> Suppose a non-pci device's StreamID can be dynamic configured. We require
-> StreamID-A, but the device actually issue StreamID-B because of software
-> configuration fault. We really hope SMMU can report Bad StreamID fault.
-
-I think the default behaviour has to be to bypass by default, otherwise
-we can break DMA for any devices behind an SMMU but not attached to an
-IOMMU domain. How about I add a cmdline parameter to change the default
-behaviour?
-
-> > I suppose we could look into populating it based on the ->add_device
-> > callback, which currently does have some range checks
-> > (arm_smmu_sid_in_range). Is that what you had in mind?
+> Previously, I fixed this issue by separating ops for system pm and
+> runtime pm, then in the system suspend/resume path, runtime pm apis are
+> used to ensure the device is at correct state.
 > 
-> Yes, maybe attach_dev. But we should allocated the whole Lv1 table base on
-> SMMU_IDR1.SIDSIZE
-
-I think it needs to be in add_device so that we can implement the default
-bypass case. We could even have one L2 table per PCI bus, but I need to
-think about how big the L1 table should be.
-
-> >>> +             if (!desc->l2ptr) {
-> >>> +                     dev_err(smmu->dev,
-> >>> +                             "failed to allocate l2 stream table %u\n", i);
-> >>> +                     ret = -ENOMEM;
-> >>> +                     goto out_free_l2;
-> >>> +             }
-> >>> +
-> >>> +             arm_smmu_init_bypass_stes(desc->l2ptr, 1 << STRTAB_SPLIT);
-> >>> +             arm_smmu_write_strtab_l1_desc(strtab, desc);
-> >>> +             strtab += STRTAB_STE_DWORDS;
-> >>> +     }
-> >>> +
-> >>> +     return 0;
-> >>> +
-> >>> +out_free_l2:
-> >>> +     arm_smmu_free_l2_strtab(smmu);
-> >>> +     return ret;
-> >>> +}
-> >>> +
-> >>> +static int arm_smmu_init_strtab(struct arm_smmu_device *smmu)
-> >>> +{
-> >>> +     void *strtab;
-> >>> +     u64 reg;
-> >>> +     u32 size;
-> >>> +     int ret = 0;
-> >>> +
-> >>> +     strtab = dma_zalloc_coherent(smmu->dev, 1 << STRTAB_L1_SZ_SHIFT,
-> >>> +                                  &smmu->strtab_cfg.strtab_dma, GFP_KERNEL);
-> >>
-> >> As above, when Lv2 tables are dynamic allocation, we can create Lv1 table
-> >> base on SMMU_IDR1.SIDSIZE and support non-pic devices. Oh, if SIDSIZE is
-> >> too large, like 32. Maybe we should use 64K size Lv2 table.  But we can
-> >> only use PAGE_SIZE first, for lazy.
-> >
-> > Right now, the l2 tables are 4k and l1 table is 8k. That's (a) nice for
-> > allocation on a system with 4k pages and (b) enough to cover a PCI host
-> > controller. The problem with supporting 32-bit SIDs is that the l1 will
-> > become a sizeable contiguous chunk which we'll have to allocate
-> > regardless.
-> >
-> > So, if we keep the l2 size at 4k for the moment, how big would you like
-> > the l1? For a 32-bit numberspace, it would be 4MB, which I don't think is
-> > practical.
+> But as Mika Westerberg pointed out: it sounds a bit silly to resume the
+> device just because you want to call i2c_dw_disable() for it before
+> suspending again. He then suggested an elegant solution which keeps the
+> device runtime suspended during system suspend with the help of
+> 'dev->power.direct_complete'. This patch adopted this solution, and in
+> fact Mika provided the main code.
 > 
-> Yes, because I don't think SMMU_IDR1.SIDSIZE = 32 really exist, so I said
-> use PAGE_SIZE first.
-
-Well, I certainly wouldn't rule anything out.
-
-> But now, this patch only support SMMU_IDR1.SIDSIZE <= 16. Suppose
-> SMMU_IDR1.SIDSIZE = 25?Lv2 table size at 4K, then Lv1 table need 2^(25 -
-> 6 + 3) = 2^22 = 4M. If we pre-allocated all Lv2 table, we need 2^25 * 64 =
-> 2^31 = 2G, that's too big. So we must only allocate Lv2 table when we
-> needed.
-
-I agree that's way too big, but I have limited things to 16-bit for a reason
-;)
-
-> If SMMU_IDR1.SIDSIZE = 32 really exist(or too big), we need dynamic choose
-> Lv2 table size(4K,16K,64K).  Because Lv1 table maybe too big, and can not
-> be allocated by current API, a dts configuration should be added, like
-> lv1-table-base = <0x0 0x0>, and we use ioremap_cache get VA(maybe ioremap,
-> for non-coherent SMMU).
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> ---
+>  v2 change:
+> 	- adopt Mika's suggestion to make use of direct_complete flag
 > 
-> Oh, I can do it after your patches upstreamed, because this problem maybe
-> only I met.
-
-I'll have a think about this and see what I can come up with for version
-2 of the patch. I'd like to avoid adding additional properties to the DT
-until they're actually needed, though.
-
-> >>> +     /* Invalidate any cached configuration */
-> >>> +     cmd.opcode = CMDQ_OP_CFGI_ALL;
-> >>> +     arm_smmu_cmdq_issue_cmd(smmu, &cmd);
-> >>> +     cmd.opcode = CMDQ_OP_CMD_SYNC;
-> >>> +     arm_smmu_cmdq_issue_cmd(smmu, &cmd);
-> >>> +
-> >>> +     /* Invalidate any stale TLB entries */
-> >>> +     cmd.opcode = CMDQ_OP_TLBI_EL2_ALL;
-> >>
-> >> Do we need to execute CMDQ_OP_TLBI_EL2_ALL? Linux only run at EL1. It at
-> >> least rely on SMMU_IDR0.Hyp
-> >
-> > The SMMU isn't guaranteed to come up clean out of reset, so it's a good
-> > idea to perform this invalidation in case of junk in the TLB. Given that
-> > Linux owns the stage-2 translation, then this is the right place to do it.
+>  drivers/i2c/busses/i2c-designware-platdrv.c | 33 +++++++++++++++++++++++++----
+>  1 file changed, 29 insertions(+), 4 deletions(-)
 > 
-> OK. But it should be controled by SMMU_IDR0.Hyp. I means:
-> if (SMMU_IDR0.Hyp)
->         execute command CMDQ_OP_TLBI_EL2_ALL
-> 
-> When SMMU_IDR0.Hyp=?0?, this command causes CERROR_ILL
+> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
+> index 0a80e4a..f89650f 100644
+> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
+> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
+> @@ -298,6 +298,22 @@ static const struct of_device_id dw_i2c_of_match[] = {
+>  MODULE_DEVICE_TABLE(of, dw_i2c_of_match);
+>  #endif
+>  
+> +#ifdef CONFIG_PM_SLEEP
+> +static int dw_i2c_prepare(struct device *dev)
+> +{
+> +	return pm_runtime_suspended(dev);
+> +}
+> +
+> +static void dw_i2c_complete(struct device *dev)
+> +{
+> +	if (dev->power.direct_complete)
+> +		pm_request_resume(dev);
+> +}
+> +#else
+> +#define dw_i2c_prepare	NULL
+> +#define dw_i2c_complete	NULL
+> +#endif
+> +
+>  #ifdef CONFIG_PM
+>  static int dw_i2c_suspend(struct device *dev)
+>  {
+> @@ -322,10 +338,19 @@ static int dw_i2c_resume(struct device *dev)
+>  
+>  	return 0;
+>  }
+> -#endif
+>  
+> -static UNIVERSAL_DEV_PM_OPS(dw_i2c_dev_pm_ops, dw_i2c_suspend,
+> -			    dw_i2c_resume, NULL);
+> +static const struct dev_pm_ops dw_i2c_dev_pm_ops = {
+> +	.prepare = dw_i2c_prepare,
+> +	.complete = dw_i2c_complete,
+> +	SET_SYSTEM_SLEEP_PM_OPS(dw_i2c_suspend, dw_i2c_resume)
+> +	SET_RUNTIME_PM_OPS(dw_i2c_suspend,
+> +		dw_i2c_resume, NULL)
 
-Well spotted, thanks!
+No need to wrap here. It will fit into 80 chars limit.
 
-Will
+Otherwise looks good to me. I also tested this on Braswell and Skylake
+machines where it didn't cause any problems,
+
+Acked-by: Mika Westerberg <mika.westerberg@linux.intel.com>
+Tested-by: Mika Westerberg <mika.westerberg@linux.intel.com>
+
+> +};
+> +
+> +#define DW_I2C_DEV_PMOPS (&dw_i2c_dev_pm_ops)
+> +#else
+> +#define DW_I2C_DEV_PMOPS NULL
+> +#endif
+>  
+>  /* work with hotplug and coldplug */
+>  MODULE_ALIAS("platform:i2c_designware");
+> @@ -337,7 +362,7 @@ static struct platform_driver dw_i2c_driver = {
+>  		.name	= "i2c_designware",
+>  		.of_match_table = of_match_ptr(dw_i2c_of_match),
+>  		.acpi_match_table = ACPI_PTR(dw_i2c_acpi_match),
+> -		.pm	= &dw_i2c_dev_pm_ops,
+> +		.pm	= DW_I2C_DEV_PMOPS,
+>  	},
+>  };
+>  
+> -- 
+> 2.1.4
