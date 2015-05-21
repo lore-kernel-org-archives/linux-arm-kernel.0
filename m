@@ -1,112 +1,159 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 21 May 2015 17:44:12 +0100
-Subject: [PATCH v5 06/11] nvmem: Add bindings for simple nvmem framework
+Date: Thu, 21 May 2015 17:44:25 +0100
+Subject: [PATCH v5 07/11] nvmem: Add simple nvmem-mmio consumer helper
+ functions.
 In-Reply-To: <1432226535-8640-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1432226535-8640-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1432226652-8947-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1432226665-8994-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds bindings for simple nvmem framework which allows nvmem
-consumers to talk to nvmem providers to get access to nvmem cell data.
+This patch adds probe and remove helper functions for nvmems which are
+mmio based, With these helper function new nvmem consumer drivers need
+very little code add its driver.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-[Maxime Ripard: intial version of eeprom framework]
+This code is currently used for qfprom and sunxi-sid nvmem consumer
+drivers.
+
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- Documentation/devicetree/bindings/nvmem/nvmem.txt | 84 +++++++++++++++++++++++
- 1 file changed, 84 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/nvmem/nvmem.txt
+ drivers/nvmem/Makefile     |  1 +
+ drivers/nvmem/nvmem-mmio.c | 69 ++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/nvmem/nvmem-mmio.h | 41 +++++++++++++++++++++++++++
+ 3 files changed, 111 insertions(+)
+ create mode 100644 drivers/nvmem/nvmem-mmio.c
+ create mode 100644 drivers/nvmem/nvmem-mmio.h
 
-diff --git a/Documentation/devicetree/bindings/nvmem/nvmem.txt b/Documentation/devicetree/bindings/nvmem/nvmem.txt
+diff --git a/drivers/nvmem/Makefile b/drivers/nvmem/Makefile
+index 6df2c69..f694cfc 100644
+--- a/drivers/nvmem/Makefile
++++ b/drivers/nvmem/Makefile
+@@ -4,3 +4,4 @@
+ 
+ obj-$(CONFIG_NVMEM)		+= nvmem_core.o
+ nvmem_core-y			:= core.o
++nvmem_core-y			+= nvmem-mmio.o
+diff --git a/drivers/nvmem/nvmem-mmio.c b/drivers/nvmem/nvmem-mmio.c
 new file mode 100644
-index 0000000..ecea654
+index 0000000..0d8131f
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/nvmem/nvmem.txt
-@@ -0,0 +1,84 @@
-+= NVMEM Data Device Tree Bindings =
++++ b/drivers/nvmem/nvmem-mmio.c
+@@ -0,0 +1,69 @@
++/*
++ * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-+This binding is intended to represent the location of hardware
-+configuration data stored in NVMEMs.
++#include <linux/device.h>
++#include <linux/module.h>
++#include <linux/err.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include "nvmem-mmio.h"
 +
-+On a significant proportion of boards, the manufacturer has stored
-+some data on NVMEM, for the OS to be able to retrieve these information
-+and act upon it. Obviously, the OS has to know about where to retrieve
-+these data from, and where they are stored on the storage device.
++int nvmem_mmio_remove(struct platform_device *pdev)
++{
++	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
 +
-+This document is here to document this.
++	return nvmem_unregister(nvmem);
++}
++EXPORT_SYMBOL_GPL(nvmem_mmio_remove);
 +
-+= Data providers =
-+Contains bindings specific to provider drivers and data cells as children
-+to this node.
++int nvmem_mmio_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct resource *res;
++	const struct nvmem_mmio_data *data;
++	struct nvmem_device *nvmem;
++	struct regmap *regmap;
++	const struct of_device_id *match;
++	void __iomem *base;
 +
-+Optional properties:
-+ read-only: Mark the provider as read only.
++	if (!dev || !dev->driver)
++		return -ENODEV;
 +
-+= Data cells =
-+These are the child nodes of the provider which contain data cell
-+information like offset and size in nvmem provider.
++	match = of_match_device(dev->driver->of_match_table, dev);
++	if (!match || !match->data)
++		return -EINVAL;
 +
-+Required properties:
-+reg:	specifies the offset in byte within that storage device, start bit
-+	in the byte and the length in bits of the data we care about.
-+	There could be more then one offset-length pairs in this property.
++	data = match->data;
 +
-+Optional properties:
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(base))
++		return PTR_ERR(base);
 +
-+bit-offset: specifies the offset in bit within the address range specified
-+	by reg property. Can take values from 0-7.
-+nbits: specifies number of bits this cell occupies starting from bit-offset.
++	data->regmap_config->max_register = resource_size(res) - 1;
 +
-+For example:
++	regmap = devm_regmap_init_mmio(dev, base, data->regmap_config);
++	if (IS_ERR(regmap)) {
++		dev_err(dev, "regmap init failed\n");
++		return PTR_ERR(regmap);
++	}
++	data->nvmem_config->dev = dev;
++	nvmem = nvmem_register(data->nvmem_config);
++	if (IS_ERR(nvmem))
++		return PTR_ERR(nvmem);
 +
-+	/* Provider */
-+	qfprom: qfprom at 00700000 {
-+		...
++	platform_set_drvdata(pdev, nvmem);
 +
-+		/* Data cells */
-+		tsens_calibration: calib at 404 {
-+			reg = <0x404 0x10>;
-+		};
++	return 0;
++}
++EXPORT_SYMBOL_GPL(nvmem_mmio_probe);
+diff --git a/drivers/nvmem/nvmem-mmio.h b/drivers/nvmem/nvmem-mmio.h
+new file mode 100644
+index 0000000..a2ad4e5
+--- /dev/null
++++ b/drivers/nvmem/nvmem-mmio.h
+@@ -0,0 +1,41 @@
++/*
++ * MMIO based nvmem providers.
++ *
++ * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
-+		tsens_calibration_bckp: calib_bckp at 504 {
-+			reg = <0x504 0x11>;
-+			bit-offset = 6;
-+			nbits = 128;
-+		};
++#ifndef _LINUX_NVMEM_MMIO_H
++#define _LINUX_NVMEM_MMIO_H
 +
-+		pvs_version: pvs-version at 6 {
-+			reg = <0x6 0x2>
-+			bit-offset = 7;
-+			nbits = 2;
-+		};
++#include <linux/platform_device.h>
++#include <linux/nvmem-provider.h>
++#include <linux/regmap.h>
 +
-+		speed_bin: speed-bin at c{
-+			reg = <0xc 0x1>;
-+			bit-offset = 2;
-+			nbits	= 3;
++struct nvmem_mmio_data {
++	struct regmap_config *regmap_config;
++	struct nvmem_config *nvmem_config;
++};
 +
-+		};
-+		...
-+	};
++#if IS_ENABLED(CONFIG_NVMEM)
 +
-+= Data consumers =
-+Are device nodes which consume nvmem data cells/providers.
++int nvmem_mmio_probe(struct platform_device *pdev);
++int nvmem_mmio_remove(struct platform_device *pdev);
 +
-+Required-properties:
-+nvmem-cell: list of phandle to the nvmem data cells.
-+nvmem-cell-names: names for the each nvmem-cell specified
++#else
 +
-+Optional-properties:
-+nvmem	: list of phandles to nvmem providers.
-+nvmem-names: names for the each nvmem provider.
++static inline int nvmem_mmio_probe(struct platform_device *pdev)
++{
++	return -ENOSYS;
++}
 +
-+For example:
++static inline int nvmem_mmio_remove(struct platform_device *pdev)
++{
++	return -ENOSYS;
++}
++#endif
 +
-+	tsens {
-+		...
-+		nvmem-cell = <&tsens_calibration>;
-+		nvmem-cell-names = "calibration";
-+	};
++#endif  /* ifndef _LINUX_NVMEM_MMIO_H */
 -- 
 1.9.1
