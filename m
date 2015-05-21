@@ -1,50 +1,40 @@
-From: jun.nie@linaro.org (Jun Nie)
-Date: Thu, 21 May 2015 21:04:34 +0800
-Subject: [PATCH] ARM: zx: fix building with CONFIG_THUMB2_KERNEL
-In-Reply-To: <2771121.xOQTA4CzPC@wuerfel>
-References: <2771121.xOQTA4CzPC@wuerfel>
-Message-ID: <CABymUCP=unny8rORcm4ki-izCsaoWysUQ2gUtro0-T1RV3Ad-g@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 21 May 2015 18:52:51 +0530
+Subject: [PATCH v3 0/5] AHCI and SATA PHY support for Broadcom STB SoCs
+In-Reply-To: <1431473303-18873-1-git-send-email-computersforpeace@gmail.com>
+References: <1431473303-18873-1-git-send-email-computersforpeace@gmail.com>
+Message-ID: <555DDC2B.1040608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-21 16:36 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
-> The newly added zx platform causes a build error when
-> CONFIG_THUMB2_KERNEL is enabled:
->
-> arch/arm/mach-zx/headsmp.S:16: Error: invalid immediate for address calculation (value = 0x00000004)
->
-> I'm assuming that the ROM code that is calling these entry
-> points runs in ARM mode, so there would be another problem
-> in the same file, and we can solve both problems at once
-> by adding a '.arm' statement that will make zx_resume_jump
-> and zx_secondary_startup both be built as ARM code.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> Hi Jun,
->
-> This patch fixes a build error with mach-zx, but I don't know if it's
-> actually correct. Can you check if the machine correctly boots
-> with this patch enabled and CONFIG_THUMB2_KERNEL=y set in the .config?
->
-Arnd,
+Hi Tejun,
 
-I add CONFIG_THUMB2_KERNEL=y in defconfig and reproduce the build
-error. Your change does fix the bug and boot/cpu_hotplug works well.
-Thanks for your work!
+On Wednesday 13 May 2015 04:58 AM, Brian Norris wrote:
+> Few changes since v2, and the changes are *only* to the SATA driver, not to any
+> of the DT bindings or the PHY driver. I'm resending the whole series for
+> completeness.
+>
+> I'll list the changelog in each patch, but in summary:
+>
+> v2 -> v3:
+>   - straighten out endianness for big endian MIPS and ARM in AHCI driver
+>   - rename sata_brcmstb.c to ahci_brcmstb.c
+>   - bind ahci_brcmstb.c against the specific string, "brcm,bcm7445-ahci" instead
+>     of the generic one
+>
+> Brian
+>
+> Brian Norris (5):
+>    Documentation: devicetree: add Broadcom SATA binding
+>    Documentation: devicetree: add Broadcom SATA PHY binding
+>    ata: add Broadcom AHCI SATA3 driver for STB chips
+>    phy: add Broadcom SATA3 PHY driver for Broadcom STB SoCs
+>    ARM: dts: brcmstb: add nodes for SATA controller and PHY
 
-Jun
+I'll pick "[PATCH v3 2/5] Documentation: devicetree: add Broadcom SATA PHY 
+binding" and
+"[PATCH v4] phy: add Broadcom SATA3 PHY driver for Broadcom STB SoCs"
+in the linux-phy tree.
 
-> diff --git a/arch/arm/mach-zx/headsmp.S b/arch/arm/mach-zx/headsmp.S
-> index c0fece0c3955..a1aa4028389f 100644
-> --- a/arch/arm/mach-zx/headsmp.S
-> +++ b/arch/arm/mach-zx/headsmp.S
-> @@ -10,6 +10,7 @@
->  #include <linux/linkage.h>
->
->         .align 3
-> +       .arm
->
->  /* It runs from physical address */
->  ENTRY(zx_resume_jump)
->
+Thanks
+Kishon
