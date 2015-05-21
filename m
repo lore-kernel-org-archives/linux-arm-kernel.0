@@ -1,47 +1,25 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 21 May 2015 14:47:11 -0700
-Subject: [GIT PULL 2/2] omap1 sparse irq support for v4.2
-In-Reply-To: <6774083.RmPqVFIumd@wuerfel>
-References: <80194352.chs4cqVdmg@wuerfel> <20150521165413.GS10274@atomide.com>
- <20150521183629.GT10274@atomide.com> <6774083.RmPqVFIumd@wuerfel>
-Message-ID: <20150521214710.GX10274@atomide.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Thu, 21 May 2015 18:00:50 -0400
+Subject: [PATCH v3 0/5] AHCI and SATA PHY support for Broadcom STB SoCs
+In-Reply-To: <555DDC2B.1040608@ti.com>
+References: <1431473303-18873-1-git-send-email-computersforpeace@gmail.com>
+ <555DDC2B.1040608@ti.com>
+Message-ID: <20150521220050.GF4914@htj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [150521 14:35]:
-> On Thursday 21 May 2015 11:36:30 Tony Lindgren wrote:
-> > > 
-> > > OK got it triggered here too with randconfig builds now.
-> > > This seems to be related to not selecting some omap1 SoCs or
-> > > boards. I'll try to do a minimal fix for it today.
-> > > 
-> > > It seems the include changes you posted would be better done
-> > > by replacing the the dependencies to mach/irqs.h where possible
-> > > rather than adding more includes?
-> 
-> Yes, I guess we can do that too. FWIW, almost all the problems
-> were uses of cpu_is_omap*(), omap_read*() and omap_write*().
-> 
-> There are quite a lot of them overall, but at least they are
-> easy to grep for, and there should be an obvious fix for each
-> of them, following what you did on OMAP2 a couple of years ago.
+Hello,
 
-Yeah then that can be done one driver at a time.
- 
-> > OK figured it out. We now rely on an indirect include selected
-> > with ARCH_OMAP15XX. Here's what I suggest as a fix for this
-> > issue, obviously the real fix is to fix the legacy drivers to not 
-> > #include <mach/*.h>.
-> 
-> Ok, I've put this patch in my randconfig build setup to replace
-> my older patch, let's see if there are still some corner cases
-> left. So far, everything looks good (50 random mach-omap1 builds
-> done). Can you send an updated pull request with the fix folded in?
+On Thu, May 21, 2015 at 06:52:51PM +0530, Kishon Vijay Abraham I wrote:
+> I'll pick "[PATCH v3 2/5] Documentation: devicetree: add Broadcom SATA PHY
+> binding" and
+> "[PATCH v4] phy: add Broadcom SATA3 PHY driver for Broadcom STB SoCs"
+> in the linux-phy tree.
 
-OK will do. I'll also include the secion warning I posted earlier
-today as that seems to get triggered with some randconfigs because
-of the __init_or_module.
+Applying patch 5 to libata/for-4.2.  If more need to go through
+libata, please let me know.
 
-Regards,
+Thanks.
 
-Tony
+-- 
+tejun
