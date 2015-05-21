@@ -1,38 +1,28 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 21 May 2015 15:17:33 -0700
-Subject: [PATCHv4 2/2] clk: socfpga: add a clock driver for the Arria 10
- platform
-In-Reply-To: <1432092162-8889-3-git-send-email-dinguyen@opensource.altera.com>
-References: <1432092162-8889-1-git-send-email-dinguyen@opensource.altera.com>
- <1432092162-8889-3-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <20150521221733.GB1885@codeaurora.org>
+From: tj@kernel.org (Tejun Heo)
+Date: Thu, 21 May 2015 18:20:59 -0400
+Subject: [PATCH v3 3/5] ata: add Broadcom AHCI SATA3 driver for STB chips
+In-Reply-To: <CAOMZO5DtNa2-bgdGmiiJM4JZ7MHz2THSsNMwT=9oWO1ThNu2KA@mail.gmail.com>
+References: <1431473303-18873-1-git-send-email-computersforpeace@gmail.com>
+ <1431473303-18873-4-git-send-email-computersforpeace@gmail.com>
+ <CAOMZO5DtNa2-bgdGmiiJM4JZ7MHz2THSsNMwT=9oWO1ThNu2KA@mail.gmail.com>
+Message-ID: <20150521222059.GM4914@htj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/19, dinguyen at opensource.altera.com wrote:
-> From: Dinh Nguyen <dinguyen@opensource.altera.com>
+On Thu, May 21, 2015 at 07:16:07PM -0300, Fabio Estevam wrote:
+> On Tue, May 12, 2015 at 8:28 PM, Brian Norris
+> <computersforpeace@gmail.com> wrote:
 > 
-> The clocks on the Arria 10 platform is a bit different than the Cyclone/Arria 5
-> platform that it should just have it's own driver.
+> > +       res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ahci");
+> > +       ahci = devm_ioremap_resource(&pdev->dev, res);
+> > +       if (IS_ERR(ahci))
+> > +               return 0;
 > 
-> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
-> ---
+> You should propagate 'return PTR_ERR(ahci)' instead.
 
-Applied to clk-next. One note below.
+Brian, can you please update the patch?
 
-> +	of_property_read_string(node, "clock-output-names", &clk_name);
-> +
-> +	init.name = clk_name;
-> +	init.ops = ops;
-> +	init.flags = 0;
-> +	while (i < SOCFPGA_MAX_PARENTS && (parent_name[i] =
-> +			of_clk_get_parent_name(node, i)) != NULL)
-> +		i++;
-
-Perhaps this should be a generic clk framework helper.
-	
-	int of_clk_parent_something(node, array, size)
+Thanks.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+tejun
