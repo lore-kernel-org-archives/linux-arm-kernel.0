@@ -1,43 +1,38 @@
 From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Thu, 21 May 2015 09:24:14 +0200
-Subject: [PATCH 2/2] ARM: dts: exynos4415: Add syscon property to the MIPI
- DPHY
-In-Reply-To: <1432174713-23368-2-git-send-email-k.kozlowski@samsung.com>
-References: <1432174713-23368-1-git-send-email-k.kozlowski@samsung.com>
- <1432174713-23368-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <CABxcv==hsWSU6y2xYUVjO6WyZXYHA4=m5H3fNo3CKAX5QK5DSg@mail.gmail.com>
+Date: Thu, 21 May 2015 09:25:45 +0200
+Subject: [PATCH] ARM: dts: Update video-phy node with syscon phandle for
+ Exynos3250
+In-Reply-To: <CAJKOXPcnYq0pS-akXNDd8TE6wqeq0pg-cx4PK0jeke9z3tHsOw@mail.gmail.com>
+References: <1426762587-24923-1-git-send-email-b.michalska@samsung.com>
+ <CAJKOXPfumy5a6A275ETy7vnztzE20qSuXD_i=ebY9Br47p93Dg@mail.gmail.com>
+ <CAJKOXPcnYq0pS-akXNDd8TE6wqeq0pg-cx4PK0jeke9z3tHsOw@mail.gmail.com>
+Message-ID: <CABxcv=npaHemH_KcYgGf-_x8Bo=V2UMDJREfUY6LRmDT1iQYpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
-
-On Thu, May 21, 2015 at 4:18 AM, Krzysztof Kozlowski
+On Thu, May 21, 2015 at 4:04 AM, Krzysztof Kozlowski
 <k.kozlowski@samsung.com> wrote:
-> Since e4b3d38088df ("phy: exynos-video-mipi: Fix regression by adding
-> support for PMU regmap") the Exynos PMU driver provides regmap to access
-> the MIPI DPHY registers. The MIPI DPHY driver accesses this regmap
-> through syscon phandle.
+> 2015-05-21 10:57 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
+>> 2015-03-19 19:56 GMT+09:00 Beata Michalska <b.michalska@samsung.com>:
+>>> As a follow-up to recent changes to Exynos mipi video phy
+>>> driver, introducing support for PMU regmap in commit
+>>> e4b3d38088df6f3acd40 ("phy: exynos-video-mipi: Fix regression
+>>> by adding support for PMU regmap") add a syscon phandle to
+>>> video-phy node to bring back to life both MIPI DSI displays
+>>> and MIPI CSIS-2 camera sensors on Exynos3250.
+>>>
+>>> Signed-off-by: Beata Michalska <b.michalska@samsung.com>
+>>
+>> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>
+>> Tested on Gear 2 (Exynos3250) board.
 >
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos4415.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Oh, I was too fast. It seems that "reg" property is not needed
+> anymore. Can you remove it?
 >
-> diff --git a/arch/arm/boot/dts/exynos4415.dtsi b/arch/arm/boot/dts/exynos4415.dtsi
-> index 186cb8465683..6a83d7999d8a 100644
-> --- a/arch/arm/boot/dts/exynos4415.dtsi
-> +++ b/arch/arm/boot/dts/exynos4415.dtsi
-> @@ -124,8 +124,8 @@
->
->                 mipi_phy: video-phy at 10020710 {
->                         compatible = "samsung,s5pv210-mipi-video-phy";
-> -                       reg = <0x10020710 8>;
->                         #phy-cells = <1>;
-> +                       syscon = <&pmu_system_controller>;
->                 };
->
->                 pd_cam: cam-power-domain at 10024000 {
-> --
+
+After removing the reg property as Krzysztof suggested.
 
 Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
