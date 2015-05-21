@@ -1,57 +1,93 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Wed, 20 May 2015 20:16:11 -0500
-Subject: [PATCH v2 0/7] Change snvs rtc and poweroff to use syscon add
- pwrkey driver
-In-Reply-To: <20150521002043.GI23809@dtor-ws>
-References: <1432055082-28983-1-git-send-email-Frank.Li@freescale.com>
- <20150520015851.GB1071@dragon>
- <20150520182540.GQ2067@n2100.arm.linux.org.uk>
- <20150520183050.GR2067@n2100.arm.linux.org.uk>
- <20150521002043.GI23809@dtor-ws>
-Message-ID: <CAHrpEqT0cjujJzr9KD7qhS7F2fZaAhuct4Q8YHYFe0uvaR9_qw@mail.gmail.com>
+From: chuck.lever@oracle.com (Chuck Lever)
+Date: Wed, 20 May 2015 21:16:18 -0400
+Subject: NFS client broken in 4.1.0-rc2
+In-Reply-To: <20150520232228.GC2067@n2100.arm.linux.org.uk>
+References: <20150515142403.GL2067@n2100.arm.linux.org.uk>
+ <F423EE93-1A93-42F8-8593-9D2E4F85CB3B@oracle.com>
+ <20150515145013.GM2067@n2100.arm.linux.org.uk>
+ <20150520232228.GC2067@n2100.arm.linux.org.uk>
+Message-ID: <4DD061F4-B1A8-4CBE-A817-ACC921661A89@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 7:20 PM, Dmitry Torokhov
-<dmitry.torokhov@gmail.com> wrote:
-> On Wed, May 20, 2015 at 07:30:50PM +0100, Russell King - ARM Linux wrote:
->> On Wed, May 20, 2015 at 07:25:41PM +0100, Russell King - ARM Linux wrote:
->> > On Wed, May 20, 2015 at 09:58:51AM +0800, Shawn Guo wrote:
->> > > On Wed, May 20, 2015 at 01:04:35AM +0800, Frank.Li at freescale.com wrote:
->> > > > Frank Li (6):
->> > > >   arm: imx: power-off: change to syscon to access register
->> > > >   rtc: arm: imx: snvs: change use syscon to access register
->> > > >   Document: dt: fsl: snvs: change support syscon
->> > > >   arm: dts: imx: update snvs to use syscon access register
->> > > >   document: devicetree: input: imx: i.mx snvs power device tree bindings
->> > > >   arm: dts: imx6sx: enable snvs power key
->> > >
->> > > So, the series will break existing DTBs for RTC and poweroff, right?
->> > > If this is unavoidable, should we at least have some warning messages
->> > > telling users about his breakage?
->> >
->> > What's the justification for breaking existing DTBs?  Really, this is
->> > something we should strive to avoid, _and_ actually avoid by providing
->> > backwards compatibility.
->>
->> Looking at the RTC code, it would be pretty trivial to do.
->>
->> Rather than passing around struct regmap, pass around the private data
->> structure.
->>
->> Rename the regmap_* function calls to be private accessors.  Implement
->> a set of new accessors - if the private data has the regmap, use the
->> regmap API.  Otherwise, use the old method, and print a warning that an
->> old DT is being used.
->
-> Or maybe have drivers create regmap themselves if they see old DTS and
-> not bother with the 2 sets of accessors?
 
-Does any dt node convert to regmap regardless if there are "syscon"
-compatible string?
+On May 20, 2015, at 7:22 PM, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
->
-> Thanks.
->
-> --
-> Dmitry
+> On Fri, May 15, 2015 at 03:50:14PM +0100, Russell King - ARM Linux wrote:
+>> On Fri, May 15, 2015 at 10:26:48AM -0400, Chuck Lever wrote:
+>>> On May 15, 2015, at 10:24 AM, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+>>>> While trying to update a kernel and modules on one of my test systems,
+>>>> I was greeted by these errors:
+>>>> 
+>>>> tar: lib/modules/4.1.0-rc2+/kernel/drivers/media/platform/coda/coda.ko: Cannot utime
+>>>> tar: lib/modules/4.1.0-rc2+/kernel/drivers/media/dvb-frontends/drx39xyj/drx39xyj.ko: Cannot utime
+>>>> tar: lib/modules/4.1.0-rc2+/kernel/drivers/media/usb/em28xx/em28xx.ko: Cannot utime
+>>>> tar: lib/modules/4.1.0-rc2+/kernel/drivers/usb/serial/option.ko: Cannot utime
+>>>> tar: lib/modules/4.1.0-rc2+/kernel/drivers/usb/serial/ftdi_sio.ko: Cannot utime
+>>>> tar: lib/modules/4.1.0-rc2+/kernel/drivers/net/wireless/brcm80211/brcmfmac/brcmfmac.ko: Cannot utime
+>>>> tar: lib/modules/4.1.0-rc2+/kernel/drivers/input/mouse/psmouse.ko: Cannot utime
+>>>> tar: lib/modules/4.1.0-rc2+/kernel/fs/udf/udf.ko: Cannot utime
+>>>> tar: lib/modules/4.1.0-rc2+/kernel/fs/fuse/fuse.ko: Cannot utime
+>>>> tar: lib/modules/4.1.0-rc2+/kernel/fs/nfsd/nfsd.ko: Cannot utime
+>>>> tar: lib/modules/4.1.0-rc2+/kernel/sound/soc/codecs/snd-soc-wm8962.ko: Cannot utime
+>>>> tar: lib/modules/4.1.0-rc2+/kernel/net/bluetooth/bluetooth.ko: Cannot utime
+>>>> tar: lib/modules/4.1.0-rc2+/modules.alias.bin: Cannot utime
+>>>> tar: lib/modules/4.1.0-rc2+/modules.alias: Cannot utime
+>>>> tar: Exiting with failure status due to previous errors
+>>>> 
+>>>> Searching google wasn't helpful, as all the "Cannot utime" errors that
+>>>> google could find are followed by an errno string.
+>>>> 
+>>>> stracing at first sight didn't seem to be helpful, as no syscalls (apart
+>>>> from openat() with a pre-existing file) were failing.
+>>>> 
+>>>> Having recently updated to fc21 tar generating the archive, I thought
+>>>> maybe it was a tar format bug between fc21 tar and the target's tar.
+>>>> That was until I tried to "apt-get source tar" on the target, and was
+>>>> greeted by the same error.
+>>>> 
+>>>> So I then tried untaring the tar source archive onto a ramfs, which
+>>>> worked without complaint.  The difference being that it's a root NFS
+>>>> box, and so I was untaring onto NFS.
+>>>> 
+>>>> Here's the entry from /proc/mounts:
+>>>> 
+>>>> x.y.z.221:/var/boot/ci on / type nfs (rw,nolock,vers=4,addr=x.y.z.221,clientaddr=a.b.c.55)
+>>>> 
+>>>> Looking closer at the strace reveals this:
+>>>> 
+>>>> openat(AT_FDCWD, "lib/modules/4.1.0-rc2+/kernel/drivers/media/platform/coda/coda.ko", O_WRONLY|O_CREAT|O_EXCL|O_NOCTTY|O_NONBLOCK|O_LARGEFILE|O_CLOEXEC, 0600) = -1 EEXIST (File exists)
+>>>> unlinkat(AT_FDCWD, "lib/modules/4.1.0-rc2+/kernel/drivers/media/platform/coda/coda.ko", 0) = 0
+>>>> openat(AT_FDCWD, "lib/modules/4.1.0-rc2+/kernel/drivers/media/platform/coda/coda.ko", O_WRONLY|O_CREAT|O_EXCL|O_NOCTTY|O_NONBLOCK|O_LARGEFILE|O_CLOEXEC, 0600) = 4
+>>>> write(4, "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\1\0(\0\1\0\0\0\0\0\0\0\0\0\0\0"..., 4096) = 4096
+>>>> ...
+>>>> write(4, "\300H\0\0\34\345\1\0\314H\0\0\34\345\1\0\330H\0\0\34\345\1\0<I\0\0\34\370\1\0"..., 7312) = 7312
+>>>> dup2(4, 4)                              = 4
+>>>> fstat64(4, {st_mode=0757221, st_size=13181880119170311768, ...}) = 21
+>>>> write(2, "tar: ", 5)                    = 5
+>>>> write(2, "lib/modules/4.1.0-rc2+/kernel/dr"..., 79) = 79
+>>>> write(2, "\n", 1)                       = 1
+>>>> fchown32(4, 0, 0)                       = 0
+>>>> fchmod(4, 0664)                         = 0
+>>>> close(4)                                = 0
+>>>> 
+>>>> Look closely at that fstat64, and you'll notice that it's returning crap.
+>>> 
+>>> This is likely fixed by:
+>>> 
+>>>  http://marc.info/?l=linux-nfs&m=143095122604344&w=2
+>> 
+>> Yes, it appears to be fixed by that change.  I'll add it to my tree so
+>> my test systems work.
+> 
+> I notice NFS patches were merged by Linus recently, but this patch was not
+> in the set.  Is this patch scheduled to go in for 4.1?
+
+Trond sent Linus a pull request yesterday for 2 patches, including
+the one you are asking about. See:
+
+http://marc.info/?l=linux-nfs&m=143205093309624&w=2
+
+--
+Chuck Lever
+chuck[dot]lever[at]oracle[dot]com
