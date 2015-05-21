@@ -1,40 +1,86 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Thu, 21 May 2015 09:25:45 +0200
-Subject: [PATCH] ARM: dts: Update video-phy node with syscon phandle for
- Exynos3250
-In-Reply-To: <CAJKOXPcnYq0pS-akXNDd8TE6wqeq0pg-cx4PK0jeke9z3tHsOw@mail.gmail.com>
-References: <1426762587-24923-1-git-send-email-b.michalska@samsung.com>
- <CAJKOXPfumy5a6A275ETy7vnztzE20qSuXD_i=ebY9Br47p93Dg@mail.gmail.com>
- <CAJKOXPcnYq0pS-akXNDd8TE6wqeq0pg-cx4PK0jeke9z3tHsOw@mail.gmail.com>
-Message-ID: <CABxcv=npaHemH_KcYgGf-_x8Bo=V2UMDJREfUY6LRmDT1iQYpw@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 21 May 2015 09:30:19 +0200
+Subject: [PATCH v2 4/6] soc: mediatek: Add SMI driver
+In-Reply-To: <1432188990.5092.12.camel@mhfsdcap03>
+References: <1431683009-18158-1-git-send-email-yong.wu@mediatek.com>
+ <1431683009-18158-5-git-send-email-yong.wu@mediatek.com>
+ <CABuKBeJvh2PGi3i6O0uu-7ggdBzKMb3tPE_XKhT1i-+tkKc5gg@mail.gmail.com>
+ <1432188990.5092.12.camel@mhfsdcap03>
+Message-ID: <CABuKBe+FmAzr_Cu=fUDwDHYzH4mW_2p4z1SYmp7+W=Tu-MLEuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 21, 2015 at 4:04 AM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
-> 2015-05-21 10:57 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
->> 2015-03-19 19:56 GMT+09:00 Beata Michalska <b.michalska@samsung.com>:
->>> As a follow-up to recent changes to Exynos mipi video phy
->>> driver, introducing support for PMU regmap in commit
->>> e4b3d38088df6f3acd40 ("phy: exynos-video-mipi: Fix regression
->>> by adding support for PMU regmap") add a syscon phandle to
->>> video-phy node to bring back to life both MIPI DSI displays
->>> and MIPI CSIS-2 camera sensors on Exynos3250.
->>>
->>> Signed-off-by: Beata Michalska <b.michalska@samsung.com>
->>
->> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>
->> Tested on Gear 2 (Exynos3250) board.
+2015-05-21 8:16 GMT+02:00 Yong Wu <yong.wu@mediatek.com>:
+> Hi Matthias,
+>      Thanks very much for your suggestion.
+>      Abort the smi clock name, Could you help check below.
+>      The others I will improve in next time.
 >
-> Oh, I was too fast. It seems that "reg" property is not needed
-> anymore. Can you remove it?
+> On Tue, 2015-05-19 at 13:14 +0200, Matthias Brugger wrote:
+>> 2015-05-15 11:43 GMT+02:00 Yong Wu <yong.wu@mediatek.com>:
+>> >     This patch add SMI(Smart Multimedia Interface) driver. This driver is
+>> > responsible to enable/disable iommu and control the clocks of each local arbiter.
+>> >
+> [snip]
+>> > +
+>> > +#define SMI_LARB_MMU_EN                (0xf00)
+>> > +#define F_SMI_MMU_EN(port)     (1 << (port))
+>> > +
+>> > +enum {
+>> > +       MTK_CLK_APB,
+>> > +       MTK_CLK_SMI,
+>> > +       MTK_CLK_MAX,
+>>
+>> Maybe add something like:
+>> MTK_CLK_FIRST = MTK_CLK_APB,
+>> to make the for loops better readable.
+>>
+> Then, Is it like this? :
+>  enum {
+>         MTK_CLK_FIRST = MTK_CLK_APB,
+>         MTK_CLK_SMI,
+>         MTK_CLK_MAX,
+>  }
+> or the CLK_SMI also need MTK_CLK_SECOND = MTK_CLK_SMI.
+
+
+something like:
+enum {
+         MTK_CLK_FIRST,
+         MTK_CLK_APB = MTK_CLK_FIRST,
+         MTK_CLK_SMI,
+         MTK_CLK_LAST,
+}
+
+So you can rewrite the for loop:
+if (i = MTK_CLK_FIRST; i < MTK_CLK_LAST; i++)
+
+Regards,
+Matthias
+
+>> > +};
+>> > +
+>> > +struct mtk_smi_common {
+>> > +       void __iomem            *base;
+>>
+>> That seems to be never used. Please delete it.
+>>
+>> > +       struct clk              *clk[MTK_CLK_MAX];
+>> > +};
+>> > +
+>> > +struct mtk_smi_larb {
+>> > +       void __iomem            *base;
+>> > +       spinlock_t              portlock; /* lock for config port */
+>> > +       struct clk              *clk[MTK_CLK_MAX];
+>> > +       struct device           *smi;
+>> > +};
+>> > +
+>> Thanks,
+>> Matthias
+>
 >
 
-After removing the reg property as Krzysztof suggested.
 
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-Best regards,
-Javier
+-- 
+motzblog.wordpress.com
