@@ -1,91 +1,47 @@
 From: jamesjj.liao@mediatek.com (James Liao)
-Date: Thu, 21 May 2015 15:12:53 +0800
-Subject: [PATCH 2/5] clk: mediatek: mt8173: Fix enabling of critical clocks
+Date: Thu, 21 May 2015 15:12:52 +0800
+Subject: [PATCH 1/5] clk: mediatek: Fix apmixedsys clock registration
 In-Reply-To: <1432192376-6712-1-git-send-email-jamesjj.liao@mediatek.com>
 References: <1432192376-6712-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <1432192376-6712-3-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <1432192376-6712-2-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sascha Hauer <s.hauer@pengutronix.de>
+The size of clk_data should be the same as CLK_APMIXED_NR_CLK
+instead of ARRAY_SIZE(plls). CLK_APMIXED_* is numbered from 1, so
+CLK_APMIXED_NR_CLK will be greater than ARRAY_SIZE(plls).
 
-On the MT8173 the clocks are provided by different units. To enable
-the critical clocks we must be sure that all parent clocks are already
-registered, otherwise the parents of the critical clocks end up being
-unused and get disabled later. To find a place where all parents are
-registered we try each time after we've registered some clocks if
-all known providers are present now and only then we enable the critical
-clocks
-
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
 ---
- drivers/clk/mediatek/clk-mt8173.c | 24 +++++++++++++++++++-----
- 1 file changed, 19 insertions(+), 5 deletions(-)
+ drivers/clk/mediatek/clk-mt8135.c | 2 +-
+ drivers/clk/mediatek/clk-mt8173.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
-index 4b9e04c..eb175ac 100644
---- a/drivers/clk/mediatek/clk-mt8173.c
-+++ b/drivers/clk/mediatek/clk-mt8173.c
-@@ -700,6 +700,20 @@ static const struct mtk_composite peri_clks[] __initconst = {
- 	MUX(CLK_PERI_UART3_SEL, "uart3_ck_sel", uart_ck_sel_parents, 0x40c, 3, 1),
- };
- 
-+static struct clk_onecell_data *mt8173_top_clk_data;
-+static struct clk_onecell_data *mt8173_pll_clk_data;
-+
-+static void mtk_clk_enable_critical(void)
-+{
-+	if (!mt8173_top_clk_data || !mt8173_pll_clk_data)
-+		return;
-+
-+	clk_prepare_enable(mt8173_top_clk_data->clks[CLK_TOP_MEM_SEL]);
-+	clk_prepare_enable(mt8173_top_clk_data->clks[CLK_TOP_DDRPHYCFG_SEL]);
-+	clk_prepare_enable(mt8173_top_clk_data->clks[CLK_TOP_CCI400_SEL]);
-+	clk_prepare_enable(mt8173_top_clk_data->clks[CLK_TOP_RTC_SEL]);
-+}
-+
- static void __init mtk_topckgen_init(struct device_node *node)
- {
- 	struct clk_onecell_data *clk_data;
-@@ -712,19 +726,19 @@ static void __init mtk_topckgen_init(struct device_node *node)
- 		return;
- 	}
- 
--	clk_data = mtk_alloc_clk_data(CLK_TOP_NR_CLK);
-+	mt8173_top_clk_data = clk_data = mtk_alloc_clk_data(CLK_TOP_NR_CLK);
- 
- 	mtk_clk_register_factors(root_clk_alias, ARRAY_SIZE(root_clk_alias), clk_data);
- 	mtk_clk_register_factors(top_divs, ARRAY_SIZE(top_divs), clk_data);
- 	mtk_clk_register_composites(top_muxes, ARRAY_SIZE(top_muxes), base,
- 			&mt8173_clk_lock, clk_data);
- 
--	clk_prepare_enable(clk_data->clks[CLK_TOP_CCI400_SEL]);
--
- 	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
- 	if (r)
- 		pr_err("%s(): could not register clock provider: %d\n",
- 			__func__, r);
-+
-+	mtk_clk_enable_critical();
- }
- CLK_OF_DECLARE(mtk_topckgen, "mediatek,mt8173-topckgen", mtk_topckgen_init);
- 
-@@ -818,13 +832,13 @@ static void __init mtk_apmixedsys_init(struct device_node *node)
+diff --git a/drivers/clk/mediatek/clk-mt8135.c b/drivers/clk/mediatek/clk-mt8135.c
+index a63435b..08b4b84 100644
+--- a/drivers/clk/mediatek/clk-mt8135.c
++++ b/drivers/clk/mediatek/clk-mt8135.c
+@@ -634,7 +634,7 @@ static void __init mtk_apmixedsys_init(struct device_node *node)
  {
  	struct clk_onecell_data *clk_data;
  
--	clk_data = mtk_alloc_clk_data(CLK_APMIXED_NR_CLK);
-+	mt8173_pll_clk_data = clk_data = mtk_alloc_clk_data(CLK_APMIXED_NR_CLK);
+-	clk_data = mtk_alloc_clk_data(ARRAY_SIZE(plls));
++	clk_data = mtk_alloc_clk_data(CLK_APMIXED_NR_CLK);
  	if (!clk_data)
  		return;
  
- 	mtk_clk_register_plls(node, plls, ARRAY_SIZE(plls), clk_data);
+diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
+index 357b080..4b9e04c 100644
+--- a/drivers/clk/mediatek/clk-mt8173.c
++++ b/drivers/clk/mediatek/clk-mt8173.c
+@@ -818,7 +818,7 @@ static void __init mtk_apmixedsys_init(struct device_node *node)
+ {
+ 	struct clk_onecell_data *clk_data;
  
--	clk_prepare_enable(clk_data->clks[CLK_APMIXED_ARMCA15PLL]);
-+	mtk_clk_enable_critical();
- }
- CLK_OF_DECLARE(mtk_apmixedsys, "mediatek,mt8173-apmixedsys",
- 		mtk_apmixedsys_init);
+-	clk_data = mtk_alloc_clk_data(ARRAY_SIZE(plls));
++	clk_data = mtk_alloc_clk_data(CLK_APMIXED_NR_CLK);
+ 	if (!clk_data)
+ 		return;
+ 
 -- 
 1.8.1.1.dirty
