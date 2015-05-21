@@ -1,38 +1,88 @@
-From: Frank.Li@freescale.com (Frank.Li at freescale.com)
-Date: Fri, 22 May 2015 00:16:52 +0800
-Subject: [PATCH v3 6/6] arm: dts: imx6sx: enable snvs power key
-In-Reply-To: <1432225012-20598-1-git-send-email-Frank.Li@freescale.com>
-References: <1432225012-20598-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <1432225012-20598-7-git-send-email-Frank.Li@freescale.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 21 May 2015 17:26:14 +0100
+Subject: [PATCH v5 01/11] drivers: PL011: avoid potential unregister_driver
+ call
+In-Reply-To: <1432225584-4655-1-git-send-email-andre.przywara@arm.com>
+References: <1432225584-4655-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1432225584-4655-2-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Li <Frank.Li@freescale.com>
+Although we care about not unregistering the driver if there are
+still ports connected during the .remove callback, we do miss this
+check in the pl011_probe function. So if the current port allocation
+fails, but there are other ports already registered, we will kill
+those.
+So factor out the port removal into a separate function and use that
+in the probe function, too.
 
-enable snvs ONOFF power key support
-
-Signed-off-by: Frank Li <Frank.Li@freescale.com>
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arch/arm/boot/dts/imx6sx.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/tty/serial/amba-pl011.c | 36 ++++++++++++++++++++----------------
+ 1 file changed, 20 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index 3cb3b5b..ad38aea 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -677,6 +677,13 @@
- 					mask = <0x60>;
- 					status = "disabled";
- 				};
-+
-+				snvs_pwrkey: snvs-powerkey {
-+					compatible = "fsl,sec-v4.0-pwrkey";
-+					interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+					linux,keycode = <116>; /* KEY_POWER */
-+					wakeup;
-+				};
- 			};
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index f5bd842..b4de23c 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -2135,6 +2135,23 @@ static int pl011_probe_dt_alias(int index, struct device *dev)
+ 	return ret;
+ }
  
- 			epit1: epit at 020d0000 {
++/* unregisters the driver also if no more ports are left */
++static void pl011_unregister_port(struct uart_amba_port *uap)
++{
++	int i;
++	bool busy = false;
++
++	for (i = 0; i < ARRAY_SIZE(amba_ports); i++) {
++		if (amba_ports[i] == uap)
++			amba_ports[i] = NULL;
++		else if (amba_ports[i])
++			busy = true;
++	}
++	pl011_dma_remove(uap);
++	if (!busy)
++		uart_unregister_driver(&amba_reg);
++}
++
+ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ {
+ 	struct uart_amba_port *uap;
+@@ -2200,10 +2217,8 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ 	}
+ 
+ 	ret = uart_add_one_port(&amba_reg, &uap->port);
+-	if (ret) {
+-		amba_ports[i] = NULL;
+-		uart_unregister_driver(&amba_reg);
+-	}
++	if (ret)
++		pl011_unregister_port(uap);
+ 
+ 	return ret;
+ }
+@@ -2211,20 +2226,9 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ static int pl011_remove(struct amba_device *dev)
+ {
+ 	struct uart_amba_port *uap = amba_get_drvdata(dev);
+-	bool busy = false;
+-	int i;
+ 
+ 	uart_remove_one_port(&amba_reg, &uap->port);
+-
+-	for (i = 0; i < ARRAY_SIZE(amba_ports); i++)
+-		if (amba_ports[i] == uap)
+-			amba_ports[i] = NULL;
+-		else if (amba_ports[i])
+-			busy = true;
+-
+-	pl011_dma_remove(uap);
+-	if (!busy)
+-		uart_unregister_driver(&amba_reg);
++	pl011_unregister_port(uap);
+ 	return 0;
+ }
+ 
 -- 
-1.9.1
+2.3.5
