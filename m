@@ -1,30 +1,25 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 21 May 2015 03:02:36 +0200
-Subject: [PATCH v3] ARM: tegra: cpuidle: implement
- cpuidle_state.enter_freeze()
-In-Reply-To: <1432046953-12945-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1432046953-12945-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1773599.T1QStsTFTH@vostro.rjw.lan>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 21 May 2015 08:39:26 +0800
+Subject: [PATCH] ARM: imx: clk-vf610: enable debug access port by default
+In-Reply-To: <1431900813-5466-1-git-send-email-stefan@agner.ch>
+References: <1431900813-5466-1-git-send-email-stefan@agner.ch>
+Message-ID: <20150521003924.GE24844@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, May 19, 2015 04:49:12 PM Tomeu Vizoso wrote:
-> This callback is expected to do the same as enter() but it has to
-> guarantee that interrupts aren't enabled at any point in its execution,
-> as the tick is frozen.
+On Mon, May 18, 2015 at 12:13:33AM +0200, Stefan Agner wrote:
+> Enabled DAP (debug access port) by default. This enables the hw-
+> breakpoint framework to make use of the breakpoints and watchpoints
+> supported by hardware.
 > 
-> It will be called when the system goes to suspend-to-idle and will
-> reduce power usage because CPUs won't be awaken for unnecessary IRQs.
+> [    0.215805] hw-breakpoint: found 2 (+1 reserved) breakpoint and 1 watchpoint registers.
+> [    0.224624] hw-breakpoint: maximum watchpoint size is 4 bytes.
 > 
-> By setting the CPUIDLE_FLAG_TIMER_STOP flag, we can reuse the same code
-> for both the enter() and enter_freeze() callbacks.
+> Without this clock, the hw-breakpoint driver claims an undefined
+> instruction during initialization:
+> [    0.227380] hw-breakpoint: Debug register access (0xee003e17) caused undefined instruction on CPU 0
+> [    0.227519] hw-breakpoint: CPU 0 failed to disable vector catch
 > 
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 
-Makes sense to me, but I suppose it should go in via arm-soc.
-
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Applied, thanks.
