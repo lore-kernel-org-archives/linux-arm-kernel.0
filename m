@@ -1,112 +1,48 @@
-From: djkurtz@google.com (Daniel Kurtz)
-Date: Thu, 21 May 2015 22:33:13 +0800
-Subject: [PATCH v2 4/6] soc: mediatek: Add SMI driver
-In-Reply-To: <CABuKBe+FmAzr_Cu=fUDwDHYzH4mW_2p4z1SYmp7+W=Tu-MLEuA@mail.gmail.com>
-References: <1431683009-18158-1-git-send-email-yong.wu@mediatek.com>
- <1431683009-18158-5-git-send-email-yong.wu@mediatek.com>
- <CABuKBeJvh2PGi3i6O0uu-7ggdBzKMb3tPE_XKhT1i-+tkKc5gg@mail.gmail.com>
- <1432188990.5092.12.camel@mhfsdcap03>
- <CABuKBe+FmAzr_Cu=fUDwDHYzH4mW_2p4z1SYmp7+W=Tu-MLEuA@mail.gmail.com>
-Message-ID: <CAGS+omARc60i+8vO6V1ccnSnXkjAGNjMjRB1+5kg_EHrrS1NOw@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 21 May 2015 16:39:25 +0200 (CEST)
+Subject: [PATCH 03/11] irqchip / GIC: Add GIC version support in ACPI MADT
+In-Reply-To: <555DE98A.2000909@linaro.org>
+References: <1431953961-22706-1-git-send-email-hanjun.guo@linaro.org>
+ <1431953961-22706-4-git-send-email-hanjun.guo@linaro.org>
+ <alpine.DEB.2.11.1505202157190.4225@nanos> <555DE98A.2000909@linaro.org>
+Message-ID: <alpine.DEB.2.11.1505211632180.31710@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 21, 2015 at 3:30 PM, Matthias Brugger
-<matthias.bgg@gmail.com> wrote:
-> 2015-05-21 8:16 GMT+02:00 Yong Wu <yong.wu@mediatek.com>:
->> Hi Matthias,
->>      Thanks very much for your suggestion.
->>      Abort the smi clock name, Could you help check below.
->>      The others I will improve in next time.
->>
->> On Tue, 2015-05-19 at 13:14 +0200, Matthias Brugger wrote:
->>> 2015-05-15 11:43 GMT+02:00 Yong Wu <yong.wu@mediatek.com>:
->>> >     This patch add SMI(Smart Multimedia Interface) driver. This driver is
->>> > responsible to enable/disable iommu and control the clocks of each local arbiter.
->>> >
->> [snip]
->>> > +
->>> > +#define SMI_LARB_MMU_EN                (0xf00)
->>> > +#define F_SMI_MMU_EN(port)     (1 << (port))
->>> > +
->>> > +enum {
->>> > +       MTK_CLK_APB,
->>> > +       MTK_CLK_SMI,
->>> > +       MTK_CLK_MAX,
->>>
->>> Maybe add something like:
->>> MTK_CLK_FIRST = MTK_CLK_APB,
->>> to make the for loops better readable.
->>>
->> Then, Is it like this? :
->>  enum {
->>         MTK_CLK_FIRST = MTK_CLK_APB,
->>         MTK_CLK_SMI,
->>         MTK_CLK_MAX,
->>  }
->> or the CLK_SMI also need MTK_CLK_SECOND = MTK_CLK_SMI.
->
->
-> something like:
-> enum {
->          MTK_CLK_FIRST,
->          MTK_CLK_APB = MTK_CLK_FIRST,
->          MTK_CLK_SMI,
->          MTK_CLK_LAST,
-> }
->
-> So you can rewrite the for loop:
-> if (i = MTK_CLK_FIRST; i < MTK_CLK_LAST; i++)
+On Thu, 21 May 2015, Hanjun Guo wrote:
+> On 2015?05?21? 04:02, Thomas Gleixner wrote:
+> > On Mon, 18 May 2015, Hanjun Guo wrote:
+> > > diff --git a/drivers/acpi/irq.c b/drivers/acpi/irq.c
+> > > index 65d6b93..855ead9 100644
+> > > --- a/drivers/acpi/irq.c
+> > > +++ b/drivers/acpi/irq.c
+> > > @@ -32,6 +32,9 @@ void __init acpi_irqchip_init(void)
+> > >   	if (acpi_disabled)
+> > >   		return;
+> > > 
+> > > +	if (acpi_gic_version_init())
+> > > +		return;
+> > 
+> > This looks just wrong. acpi_irqchip_init() is a generic ACPI function
+> > and now you stick a GIC specific callback into it?
+> 
+> For now, acpi_irqchip_init() just introduced for GIC init, not for
+> APIC init for x86, and I don't see the usage in the near future.
+> 
+> > 
+> > What calls acpi_irqchip_init?
+> 
+> I renamed it as acpi_irq_init() in the later patch, which
+> is called in irqchip_init() in drivers/irqchip/irqchip.c
+> to init irqchip when DT is not available.
 
-Actually, do we ever plan to add more clks per smi node?
-If not, perhaps the whole driver would be simpler if you just
-explicitly handle the apb & smi clocks:
+Neither of those names is a good choice as they suggest that this is a
+generic acpi mechanism while in fact it is a GIC specific ACPI
+extension. And its therefor wrong to put that code into drivers/acpi.
 
-struct mtk_smi_larb {
-       void __iomem            *base;
-       spinlock_t              portlock; /* lock for config port */
-       struct device           *smi;
-       struct clk              *clk_apb;
-       struct clk              *clk_smi;
-};
+It belongs into drivers/irqchip/gic-acpi.c or some other descriptive
+name.
 
-And then all of the loops become just a pair of clock operations.
+Thanks,
 
-Best Regards,
--Dan
-
->
-> Regards,
-> Matthias
->
->>> > +};
->>> > +
->>> > +struct mtk_smi_common {
->>> > +       void __iomem            *base;
->>>
->>> That seems to be never used. Please delete it.
->>>
->>> > +       struct clk              *clk[MTK_CLK_MAX];
->>> > +};
->>> > +
->>> > +struct mtk_smi_larb {
->>> > +       void __iomem            *base;
->>> > +       spinlock_t              portlock; /* lock for config port */
->>> > +       struct clk              *clk[MTK_CLK_MAX];
->>> > +       struct device           *smi;
->>> > +};
->>> > +
->>> Thanks,
->>> Matthias
->>
->>
->
->
->
-> --
-> motzblog.wordpress.com
-
-
-
--- 
-Daniel Kurtz | Software Engineer | djkurtz at google.com | 650.204.0722
+	tglx
