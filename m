@@ -1,35 +1,57 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 21 May 2015 10:02:48 +0200
-Subject: [PATCH 08/10] ARM: dts: mt8135-evbp1: Add pinctrl/GPIO node for
- mt6397.
-In-Reply-To: <CABuKBe+=f=yM6JK8J4pDgn_t8U-rmqqNCf11hx6DqZ8_WFQiow@mail.gmail.com>
-References: <1431567346-33780-1-git-send-email-hongzhou.yang@mediatek.com>
- <1431567346-33780-9-git-send-email-hongzhou.yang@mediatek.com>
- <CACRpkdaVyfWimkQwTnrVyWz5479NFwAgsO-_DAAAjZUkQ9rDQQ@mail.gmail.com>
- <CABuKBe+=f=yM6JK8J4pDgn_t8U-rmqqNCf11hx6DqZ8_WFQiow@mail.gmail.com>
-Message-ID: <CABuKBeJg-dh3jsDgv8F1YmPrK57PKMqZSCQwDTM-MRUeZcJzyA@mail.gmail.com>
+Date: Thu, 21 May 2015 10:03:28 +0200
+Subject: [PATCH v2 10/11] arm64: dts: mt8173-evb: Add pinctrl/GPIO node
+ for mt6397.
+In-Reply-To: <1432015882-8646-11-git-send-email-hongzhou.yang@mediatek.com>
+References: <1432015882-8646-1-git-send-email-hongzhou.yang@mediatek.com>
+ <1432015882-8646-11-git-send-email-hongzhou.yang@mediatek.com>
+Message-ID: <CABuKBeJ-rW8Z7JhJtgqGw+Nt=16+LdGugTZf407w=-MD5WnL2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-21 9:53 GMT+02:00 Matthias Brugger <matthias.bgg@gmail.com>:
-> 2015-05-19 10:57 GMT+02:00 Linus Walleij <linus.walleij@linaro.org>:
->> On Thu, May 14, 2015 at 3:35 AM, Hongzhou Yang
->> <hongzhou.yang@mediatek.com> wrote:
->>
->>> Add pinctrl and GPIO node to mt8135-evbp1.dts.
->>>
->>> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
->>
->> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->>
+2015-05-19 8:11 GMT+02:00 Hongzhou Yang <hongzhou.yang@mediatek.com>:
+> Add pinctrl and GPIO node to mt8173-evb.dts.
 >
-> Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
+> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+> ---
+>  arch/arm64/boot/dts/mediatek/mt8173-evb.dts |    8 ++++++++
+>  1 file changed, 8 insertions(+)
 >
-> Linus, please take it through your tree.
-> Thanks.
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> index c9bc71b..bd473c8 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> @@ -14,6 +14,7 @@
+>
+>  /dts-v1/;
+>  #include "mt8173.dtsi"
+> +#include <dt-bindings/pinctrl/mt6397-pinfunc.h>
+>
+>  / {
+>         model = "mediatek,mt8173-evb";
+> @@ -43,6 +44,13 @@
+>                 interrupt-controller;
+>                 #interrupt-cells = <2>;
+>
+> +               pio6397: pinctrl at c000 {
+> +                       compatible = "mediatek,mt6397-pinctrl";
+> +                       pins-are-numbered;
+> +                       gpio-controller;
+> +                       #gpio-cells = <2>;
+> +               };
+> +
+>                 rtc: rtc at e000 {
+>                         compatible = "mediatek,mt6397-rtc";
+>                 };
+> --
+> 1.7.9.5
+>
 
-Wrong series, please forget about this mail.
-Sorry for the noise.
+Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
+
+Linus, please take it through your tree.
+Thanks.
+
 
 -- 
 motzblog.wordpress.com
