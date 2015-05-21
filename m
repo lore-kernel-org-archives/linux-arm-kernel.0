@@ -1,112 +1,37 @@
-From: bintian.wang@huawei.com (Bintian)
-Date: Thu, 21 May 2015 11:57:47 +0800
-Subject: [PATCH v7 6/7] clk: hi6220: Clock driver support for Hisilicon
- hi6220 SoC
-In-Reply-To: <555D09F3.7020506@codeaurora.org>
-References: <1432117752-7074-1-git-send-email-bintian.wang@huawei.com>
- <1432117752-7074-2-git-send-email-bintian.wang@huawei.com>
- <555D09F3.7020506@codeaurora.org>
-Message-ID: <555D57BB.8080702@huawei.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 21 May 2015 07:11:28 +0300
+Subject: [PATCH v3 4/4] mtd: mxc_nand: generate nand_ecclayout for 8 bit
+ ECC
+In-Reply-To: <20150520224120.GS11598@ld-irv-0074>
+References: <cover.1431504091.git.baruch@tkos.co.il>
+ <95e2a17d74da5a0415ab93e060f6efc681216313.1431504091.git.baruch@tkos.co.il>
+ <20150520224120.GS11598@ld-irv-0074>
+Message-ID: <20150521041128.GI2586@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Stephen, Arnd,
+Hi Brian,
 
-On 2015/5/21 6:25, Stephen Boyd wrote:
-> On 05/20/15 03:29, Bintian Wang wrote:
->> Add clock drivers for hi6220 SoC, this driver controls the SoC
->> registers to supply different clocks to different IPs in the SoC.
->>
->> We add one divider clock for hi6220 because the divider in hi6220
->> also has a mask bit but it doesnot obey the rule defined by flag
->> "CLK_DIVIDER_HIWORD_MASK", we can not get index of the mask bit by
->> left shift fixed bits (e.g. 16 bits), so we add this divider clock
->> to handle it.
->>
->> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
->> Signed-off-by: Bintian Wang <bintian.wang@huawei.com>
->> Acked-by: Haojian Zhuang <haojian.zhuang@linaro.org>
->> Reviewed-by: Zhangfei Gao <zhangfei.gao@linaro.org>
->> Tested-by: Will Deacon <will.deacon@arm.com>
->> Tested-by: Tyler Baker <tyler.baker@linaro.org>
->> ---
->>   drivers/clk/Kconfig                       |    2 +
->>   drivers/clk/Makefile                      |    4 +-
->>   drivers/clk/hisilicon/Kconfig             |    6 +
->>   drivers/clk/hisilicon/Makefile            |    3 +-
->>   drivers/clk/hisilicon/clk-hi6220.c        |  291 +++++++++++++++++++++++++++++
->>   drivers/clk/hisilicon/clk.c               |   29 +++
->>   drivers/clk/hisilicon/clk.h               |   17 ++
->>   drivers/clk/hisilicon/clkdivider-hi6220.c |  156 ++++++++++++++++
->>   include/dt-bindings/clock/hi6220-clock.h  |  173 +++++++++++++++++
->>   9 files changed, 677 insertions(+), 4 deletions(-)
->>   create mode 100644 drivers/clk/hisilicon/Kconfig
->>   create mode 100644 drivers/clk/hisilicon/clk-hi6220.c
->>   create mode 100644 drivers/clk/hisilicon/clkdivider-hi6220.c
->>   create mode 100644 include/dt-bindings/clock/hi6220-clock.h
->>
->> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
->> index 9897f35..18bb930 100644
->> --- a/drivers/clk/Kconfig
->> +++ b/drivers/clk/Kconfig
->> @@ -150,6 +150,8 @@ config COMMON_CLK_CDCE706
->>   	---help---
->>   	  This driver supports TI CDCE706 programmable 3-PLL clock synthesizer.
->>
->> +source "drivers/clk/hisilicon/Kconfig"
->> +
->>   source "drivers/clk/qcom/Kconfig"
->>
->
-> There's going to be a merge conflict here if this doesn't go through the
-> clk tree.
-Hello Arnd, how about the clk driver of hi6220 goes through the clk
-tree and those dts and arch patches go through arm-soc?
+On Wed, May 20, 2015 at 03:41:20PM -0700, Brian Norris wrote:
+> On Wed, May 13, 2015 at 11:17:39AM +0300, Baruch Siach wrote:
+> > +		if (get_eccsize(mtd) == 8)
+> > +			ecc_8bit_layout_4k(this->ecc.layout);
+> 
+> So you're overwriting an existing layout (e.g., nandv2_hw_eccoob_4k).
+> What if you have more than one NAND chip? You might do better by
+> dynamically allocating the memory.
 
-If there is no problem, I will split the clock header file to a
-single patch for your convenience.
->
->>
->> +
->> +static void __init hi6220_clk_sys_init(struct device_node *np)
->> +{
->> +	struct hisi_clock_data *clk_data;
->> +
->> +	clk_data = hisi_clk_init(np, HI6220_SYS_NR_CLKS);
->> +	if (!clk_data)
->> +		return;
->> +
->> +	hisi_clk_register_gate_sep(hi6220_separated_gate_clks_sys,
->> +			ARRAY_SIZE(hi6220_separated_gate_clks_sys), clk_data);
->> +
->> +	hisi_clk_register_mux(hi6220_mux_clks_sys,
->> +			ARRAY_SIZE(hi6220_mux_clks_sys), clk_data);
->> +
->> +	hi6220_clk_register_divider(hi6220_div_clks_sys,
->> +			ARRAY_SIZE(hi6220_div_clks_sys), clk_data);
->> +
->> +	if (!clk_data_ao)
->> +		return;
->> +
->> +	/* enable high speed clock on UART1 mux */
->> +	clk_set_parent(clk_data->clk_data.clks[HI6220_UART1_SRC],
->> +			clk_data_ao->clk_data.clks[HI6220_150M]);
->
-> Sorry I missed this one earlier. Can we do this clk_set_parent() through
-> assigned-parents instead?
-Uart1 has two clock parents in hi6220, and use "clk_tcxo" by default,
-we use uart1 to connect BT in HiKey, and switch to "clk_150m" for high 
-speed mode of BT, but pl011 has no code to set clock rate or set clock
-parents operation, so it's a easy way to do that here.
+It would take a quite a bit more code changes then that to have the mxc_nand 
+driver support more than one NAND chip, not to mention the DT binding. As Uwe 
+has indicated on a previous version of this series, ecclayout handling in this 
+driver could use some cleanup. This patch just fixes bug, trying to break 
+anything else while doing so.
 
-I expected an #include <linux/clk.h> for the
-> usage of clk_set_parent() here so I didn't look hard to see if consumer
-> APIs were being used.
-OK, I will add in next version 8.
+Thanks for reviewing, and for applying the rest of this series.
 
-Thanks,
+baruch
 
-Bintian
->
-> Otherwise the patch looks fine.
->
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
