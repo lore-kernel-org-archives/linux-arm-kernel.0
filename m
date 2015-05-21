@@ -1,96 +1,58 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 21 May 2015 22:54:06 +0200
-Subject: [PATCH v2 7/7] ARM: sun7i: Add mod1 clock nodes
-In-Reply-To: <1432241646-9511-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1432241646-9511-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1432241646-9511-8-git-send-email-maxime.ripard@free-electrons.com>
+Date: Thu, 21 May 2015 22:53:59 +0200
+Subject: [PATCH v2 0/7] clk: sunxi: Add support for the Audio PLL
+Message-ID: <1432241646-9511-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Emilio L?pez <emilio@elopez.com.ar>
+Hi,
 
-This commit adds all the mod1 clocks available on A20 to its device
-tree. This list was created by looking at the A20 user manual.
+This serie adds support for the PLL2 aka the Audio PLL on the
+Allwinner A10 and the later SoCs.
 
-Not-signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/sun7i-a20.dtsi | 55 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
+This is the first stepping stone to get the audio support merged.
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index b5ecfa5fa0eb..9b85e9a9ca61 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -452,6 +452,39 @@
- 			clock-output-names = "ir1";
- 		};
- 
-+		iis0_clk: clk at 01c200b8 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-mod1-clk";
-+			reg = <0x01c200b8 0x4>;
-+			clocks = <&pll2 SUN4I_A10_PLL2_1X>,
-+				 <&pll2 SUN4I_A10_PLL2_2X>,
-+				 <&pll2 SUN4I_A10_PLL2_4X>,
-+				 <&pll2 SUN4I_A10_PLL2_8X>;
-+			clock-output-names = "iis0";
-+		};
-+
-+		ac97_clk: clk at 01c200bc {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-mod1-clk";
-+			reg = <0x01c200bc 0x4>;
-+			clocks = <&pll2 SUN4I_A10_PLL2_8X>,
-+				 <&pll2 SUN4I_A10_PLL2_4X>,
-+				 <&pll2 SUN4I_A10_PLL2_2X>,
-+				 <&pll2 SUN4I_A10_PLL2_1X>;
-+			clock-output-names = "ac97";
-+		};
-+
-+		spdif_clk: clk at 01c200c0 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-mod1-clk";
-+			reg = <0x01c200c0 0x4>;
-+			clocks = <&pll2 SUN4I_A10_PLL2_8X>,
-+				 <&pll2 SUN4I_A10_PLL2_4X>,
-+				 <&pll2 SUN4I_A10_PLL2_2X>,
-+				 <&pll2 SUN4I_A10_PLL2_1X>;
-+			clock-output-names = "spdif";
-+		};
-+
- 		usb_clk: clk at 01c200cc {
- 			#clock-cells = <1>;
- 			#reset-cells = <1>;
-@@ -470,6 +503,28 @@
- 			clock-output-names = "spi3";
- 		};
- 
-+		iis1_clk: clk at 01c200d8 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-mod1-clk";
-+			reg = <0x01c200d8 0x4>;
-+			clocks = <&pll2 SUN4I_A10_PLL2_1X>,
-+				 <&pll2 SUN4I_A10_PLL2_2X>,
-+				 <&pll2 SUN4I_A10_PLL2_4X>,
-+				 <&pll2 SUN4I_A10_PLL2_8X>;
-+			clock-output-names = "iis1";
-+		};
-+
-+		iis2_clk: clk at 01c200dc {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-mod1-clk";
-+			reg = <0x01c200dc 0x4>;
-+			clocks = <&pll2 SUN4I_A10_PLL2_1X>,
-+				 <&pll2 SUN4I_A10_PLL2_2X>,
-+				 <&pll2 SUN4I_A10_PLL2_4X>,
-+				 <&pll2 SUN4I_A10_PLL2_8X>;
-+			clock-output-names = "iis2";
-+		};
-+
- 		codec_clk: clk at 01c20140 {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-a10-codec-clk";
+This serie is built on top of a generic clk-factor driver to handle
+clock that multiply their parent clock rate (mostly PLL's), in order
+to provide the driver for the PLL2 base clock, and then adds the
+drivers for the clock that derive from the Audio PLL.
+
+Thanks!
+Maxime
+
+Changes from v1:
+  - Removed a bogus of_iomap in the mod1 clock driver
+  - Wrote the clk-factor driver
+  - Converted the PLL2 clock to that driver
+
+Emilio L?pez (5):
+  clk: sunxi: codec clock support
+  clk: sunxi: mod1 clock support
+  ARM: sunxi: Add PLL2 support
+  ARM: sunxi: Add codec clock support
+  ARM: sun7i: Add mod1 clock nodes
+
+Maxime Ripard (2):
+  clk: Add a basic factor clock
+  clk: sunxi: Add a driver for the PLL2
+
+ arch/arm/boot/dts/sun4i-a10.dtsi           |  18 +++
+ arch/arm/boot/dts/sun5i.dtsi               |  18 +++
+ arch/arm/boot/dts/sun7i-a20.dtsi           |  73 +++++++++++
+ drivers/clk/Makefile                       |   1 +
+ drivers/clk/clk-factor.c                   | 176 +++++++++++++++++++++++++++
+ drivers/clk/sunxi/Makefile                 |   3 +
+ drivers/clk/sunxi/clk-a10-codec.c          |  44 +++++++
+ drivers/clk/sunxi/clk-a10-mod1.c           |  84 +++++++++++++
+ drivers/clk/sunxi/clk-a10-pll2.c           | 189 +++++++++++++++++++++++++++++
+ include/dt-bindings/clock/sun4i-a10-pll2.h |  53 ++++++++
+ include/linux/clk-provider.h               |  41 +++++++
+ 11 files changed, 700 insertions(+)
+ create mode 100644 drivers/clk/clk-factor.c
+ create mode 100644 drivers/clk/sunxi/clk-a10-codec.c
+ create mode 100644 drivers/clk/sunxi/clk-a10-mod1.c
+ create mode 100644 drivers/clk/sunxi/clk-a10-pll2.c
+ create mode 100644 include/dt-bindings/clock/sun4i-a10-pll2.h
+
 -- 
 2.4.1
