@@ -1,88 +1,97 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 21 May 2015 17:26:14 +0100
-Subject: [PATCH v5 01/11] drivers: PL011: avoid potential unregister_driver
- call
+Date: Thu, 21 May 2015 17:26:16 +0100
+Subject: [PATCH v5 03/11] drivers: PL011: refactor pl011_shutdown()
 In-Reply-To: <1432225584-4655-1-git-send-email-andre.przywara@arm.com>
 References: <1432225584-4655-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1432225584-4655-2-git-send-email-andre.przywara@arm.com>
+Message-ID: <1432225584-4655-4-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Although we care about not unregistering the driver if there are
-still ports connected during the .remove callback, we do miss this
-check in the pl011_probe function. So if the current port allocation
-fails, but there are other ports already registered, we will kill
-those.
-So factor out the port removal into a separate function and use that
-in the probe function, too.
+Split the pl011_shutdown() function into smaller chunks to allow
+easier reuse later when adding SBSA support.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- drivers/tty/serial/amba-pl011.c | 36 ++++++++++++++++++++----------------
- 1 file changed, 20 insertions(+), 16 deletions(-)
+ drivers/tty/serial/amba-pl011.c | 57 +++++++++++++++++++++++------------------
+ 1 file changed, 32 insertions(+), 25 deletions(-)
 
 diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index f5bd842..b4de23c 100644
+index 209aeb6..a43039d 100644
 --- a/drivers/tty/serial/amba-pl011.c
 +++ b/drivers/tty/serial/amba-pl011.c
-@@ -2135,6 +2135,23 @@ static int pl011_probe_dt_alias(int index, struct device *dev)
- 	return ret;
+@@ -1635,34 +1635,15 @@ static void pl011_shutdown_channel(struct uart_amba_port *uap,
+       writew(val, uap->port.membase + lcrh);
  }
  
-+/* unregisters the driver also if no more ports are left */
-+static void pl011_unregister_port(struct uart_amba_port *uap)
-+{
-+	int i;
-+	bool busy = false;
-+
-+	for (i = 0; i < ARRAY_SIZE(amba_ports); i++) {
-+		if (amba_ports[i] == uap)
-+			amba_ports[i] = NULL;
-+		else if (amba_ports[i])
-+			busy = true;
-+	}
-+	pl011_dma_remove(uap);
-+	if (!busy)
-+		uart_unregister_driver(&amba_reg);
+-static void pl011_shutdown(struct uart_port *port)
++/*
++ * disable the port. It should not disable RTS and DTR.
++ * Also RTS and DTR state should be preserved to restore
++ * it during startup().
++ */
++static void pl011_disable_uart(struct uart_amba_port *uap)
+ {
+-	struct uart_amba_port *uap =
+-	    container_of(port, struct uart_amba_port, port);
+ 	unsigned int cr;
+ 
+-	/*
+-	 * disable all interrupts
+-	 */
+-	spin_lock_irq(&uap->port.lock);
+-	uap->im = 0;
+-	writew(uap->im, uap->port.membase + UART011_IMSC);
+-	writew(0xffff, uap->port.membase + UART011_ICR);
+-	spin_unlock_irq(&uap->port.lock);
+-
+-	pl011_dma_shutdown(uap);
+-
+-	/*
+-	 * Free the interrupt
+-	 */
+-	free_irq(uap->port.irq, uap);
+-
+-	/*
+-	 * disable the port
+-	 * disable the port. It should not disable RTS and DTR.
+-	 * Also RTS and DTR state should be preserved to restore
+-	 * it during startup().
+-	 */
+ 	uap->autorts = false;
+ 	spin_lock_irq(&uap->port.lock);
+ 	cr = readw(uap->port.membase + UART011_CR);
+@@ -1678,6 +1659,32 @@ static void pl011_shutdown(struct uart_port *port)
+ 	pl011_shutdown_channel(uap, uap->lcrh_rx);
+ 	if (uap->lcrh_rx != uap->lcrh_tx)
+ 		pl011_shutdown_channel(uap, uap->lcrh_tx);
 +}
 +
- static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
- {
- 	struct uart_amba_port *uap;
-@@ -2200,10 +2217,8 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
- 	}
++static void pl011_disable_interrupts(struct uart_amba_port *uap)
++{
++	spin_lock_irq(&uap->port.lock);
++
++	/* mask all interrupts and clear all pending ones */
++	uap->im = 0;
++	writew(uap->im, uap->port.membase + UART011_IMSC);
++	writew(0xffff, uap->port.membase + UART011_ICR);
++
++	spin_unlock_irq(&uap->port.lock);
++}
++
++static void pl011_shutdown(struct uart_port *port)
++{
++	struct uart_amba_port *uap =
++		container_of(port, struct uart_amba_port, port);
++
++	pl011_disable_interrupts(uap);
++
++	pl011_dma_shutdown(uap);
++
++	free_irq(uap->port.irq, uap);
++
++	pl011_disable_uart(uap);
  
- 	ret = uart_add_one_port(&amba_reg, &uap->port);
--	if (ret) {
--		amba_ports[i] = NULL;
--		uart_unregister_driver(&amba_reg);
--	}
-+	if (ret)
-+		pl011_unregister_port(uap);
- 
- 	return ret;
- }
-@@ -2211,20 +2226,9 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
- static int pl011_remove(struct amba_device *dev)
- {
- 	struct uart_amba_port *uap = amba_get_drvdata(dev);
--	bool busy = false;
--	int i;
- 
- 	uart_remove_one_port(&amba_reg, &uap->port);
--
--	for (i = 0; i < ARRAY_SIZE(amba_ports); i++)
--		if (amba_ports[i] == uap)
--			amba_ports[i] = NULL;
--		else if (amba_ports[i])
--			busy = true;
--
--	pl011_dma_remove(uap);
--	if (!busy)
--		uart_unregister_driver(&amba_reg);
-+	pl011_unregister_port(uap);
- 	return 0;
- }
- 
+ 	/*
+ 	 * Shut down the clock producer
 -- 
 2.3.5
