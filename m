@@ -1,55 +1,148 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 21 May 2015 23:04:56 +0800
-Subject: [PATCH 03/11] irqchip / GIC: Add GIC version support in ACPI MADT
-In-Reply-To: <alpine.DEB.2.11.1505211632180.31710@nanos>
-References: <1431953961-22706-1-git-send-email-hanjun.guo@linaro.org>
- <1431953961-22706-4-git-send-email-hanjun.guo@linaro.org>
- <alpine.DEB.2.11.1505202157190.4225@nanos> <555DE98A.2000909@linaro.org>
- <alpine.DEB.2.11.1505211632180.31710@nanos>
-Message-ID: <555DF418.6050307@linaro.org>
+From: mlangsdo@redhat.com (Mark Langsdorf)
+Date: Thu, 21 May 2015 10:12:46 -0500
+Subject: [PATCH v4 10/11] drivers: PL011: add support for the ARM SBSA
+ generic UART
+In-Reply-To: <555DBDDA.6070908@arm.com>
+References: <1431440095-5146-1-git-send-email-andre.przywara@arm.com>
+ <1431440095-5146-11-git-send-email-andre.przywara@arm.com>
+ <55536096.4020008@redhat.com> <555DBDDA.6070908@arm.com>
+Message-ID: <555DF5EE.5040901@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?05?21? 22:39, Thomas Gleixner wrote:
-> On Thu, 21 May 2015, Hanjun Guo wrote:
->> On 2015?05?21? 04:02, Thomas Gleixner wrote:
->>> On Mon, 18 May 2015, Hanjun Guo wrote:
->>>> diff --git a/drivers/acpi/irq.c b/drivers/acpi/irq.c
->>>> index 65d6b93..855ead9 100644
->>>> --- a/drivers/acpi/irq.c
->>>> +++ b/drivers/acpi/irq.c
->>>> @@ -32,6 +32,9 @@ void __init acpi_irqchip_init(void)
->>>>    	if (acpi_disabled)
->>>>    		return;
->>>>
->>>> +	if (acpi_gic_version_init())
->>>> +		return;
->>>
->>> This looks just wrong. acpi_irqchip_init() is a generic ACPI function
->>> and now you stick a GIC specific callback into it?
->>
->> For now, acpi_irqchip_init() just introduced for GIC init, not for
->> APIC init for x86, and I don't see the usage in the near future.
->>
->>>
->>> What calls acpi_irqchip_init?
->>
->> I renamed it as acpi_irq_init() in the later patch, which
->> is called in irqchip_init() in drivers/irqchip/irqchip.c
->> to init irqchip when DT is not available.
+On 05/21/2015 06:13 AM, Andre Przywara wrote:
+> Hi Mark,
 >
-> Neither of those names is a good choice as they suggest that this is a
-> generic acpi mechanism while in fact it is a GIC specific ACPI
-> extension. And its therefor wrong to put that code into drivers/acpi.
-
-OK, thanks for the suggestion.
-
+> (please keep the people on CC:, I almost missed that mail)
 >
-> It belongs into drivers/irqchip/gic-acpi.c or some other descriptive
-> name.
+> On 05/13/2015 03:32 PM, Mark Langsdorf wrote:
+>> On 05/12/2015 09:14 AM, Andre Przywara wrote:
+>>> The ARM Server Base System Architecture[1] document describes a
+>>> generic UART which is a subset of the PL011 UART.
+>>> It lacks DMA support, baud rate control and modem status line
+>>> control, among other things.
+>>> The idea is to move the UART initialization and setup into the
+>>> firmware (which does this job today already) and let the kernel just
+>>> use the UART for sending and receiving characters.
+>>>
+>>> We use the recent refactoring to build a new struct uart_ops
+>>> variable which points to some new functions avoiding access to the
+>>> missing registers. We reuse as much existing PL011 code as possible.
+>>>
+>>> In contrast to the PL011 the SBSA UART does not define any AMBA or
+>>> PrimeCell relations, so we go with a pretty generic probe function
+>>> which only uses platform device functions.
+>>> A DT binding is provided with this patch, ACPI support is added in a
+>>> separate one.
+>>>
+>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>>> ---
+>>>    .../devicetree/bindings/serial/arm_sbsa_uart.txt   |  10 ++
+>>>    drivers/tty/serial/amba-pl011.c                    | 168
+>>> +++++++++++++++++++++
+>>>    2 files changed, 178 insertions(+)
+>>>    create mode 100644
+>>> Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+>>>
+>>> diff --git
+>>> a/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+>>> b/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+>>> new file mode 100644
+>>> index 0000000..4163e7e
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+>>> @@ -0,0 +1,10 @@
+>>> +* ARM SBSA defined generic UART
+>>> +This UART uses a subset of the PL011 registers and consequently lives
+>>> +in the PL011 driver. It's baudrate and other communication parameters
+>>> +cannot be adjusted at runtime, so it lacks a clock specifier here.
+>>> +
+>>> +Required properties:
+>>> +- compatible: must be "arm,sbsa-uart"
+>>> +- reg: exactly one register range
+>>> +- interrupts: exactly one interrupt specifier
+>>> +- current-speed: the (fixed) baud rate set by the firmware
+>>> diff --git a/drivers/tty/serial/amba-pl011.c
+>>> b/drivers/tty/serial/amba-pl011.c
+>>> index 70e2958..cca93d9 100644
+>>> --- a/drivers/tty/serial/amba-pl011.c
+>>> +++ b/drivers/tty/serial/amba-pl011.c
+>
+> ....
+>
+>>> @@ -1872,6 +1915,24 @@ pl011_set_termios(struct uart_port *port,
+>>> struct ktermios *termios,
+>>>        spin_unlock_irqrestore(&port->lock, flags);
+>>>    }
+>>>
+>>> +static void
+>>> +sbsa_uart_set_termios(struct uart_port *port, struct ktermios *termios,
+>>> +              struct ktermios *old)
+>>> +{
+>>> +    struct uart_amba_port *uap =
+>>> +        container_of(port, struct uart_amba_port, port);
+>>> +    unsigned long flags;
+>>> +
+>>> +    if (old)
+>>> +        tty_termios_copy_hw(termios, old);
+>>
+>> This code prevented login via the serial console on our test hardware.
+>>
+>> Mark Salter suggested the following patch:
+>>
+>> -       if (old)
+>> +       /*
+>> +        * The first call to set_termios() comes when the console is
+>> +        * registered via uart_add_one_port(). The serial core will
+>> +        * pass in a dummy old termios rather than NULL. Check to make
+>> +        * sure the old termios has reasonable info before copying from
+>> +        * it.
+>> +        */
+>> +       if (old && old->c_cflag)
+>>                  tty_termios_copy_hw(termios, old);
+>
+> That seems like a kludge to me.
+> Regardless of the reason why uart_send_options() is passing a
+> dummy variable instead of a NULL pointer (which documentation explicitly
+> declares as legal) I saw that this unconditional copying of the old
+> value being common practise in various drivers, actually the default for
+> drivers not implementing set_termios at all.
+>
+> Can you describe a setup where this issue shows up? I haven't observed
+> this issue in my testing.
 
-I already introduced a similar file named irq-gic-acpi.c under
-drivers/irqchip/, will move the code to there in next version.
+Since other people have said it:
 
-Thanks
-Hanjun
+AMD Seattle, booting with ACPI, connected via a serial console
+and running Fedora. Systems boot just fine, but when you attempt
+to log in, the first time you hit return it doesn't register
+so you can't ask for your password. If you do hit return twice,
+apparently both instances of the return are registered at the
+same time and the system rejects your invalid password (less
+sure of the mechanics here).
+
+> But in fact I think we actually shouldn't care about the old value at
+> all. Instead we should filter the new termios settings to avoid userland
+> configuring for instance flow control or an differing byte format which
+> the SBSA UART does not support.
+> I will cook up a patch and send out a v5 ASAP.
+
+Okay.
+
+--Mark Langsdorf
+
+
+>> which fixed the issue.
+>>
+>>> +    tty_termios_encode_baud_rate(termios, uap->fixed_baud,
+>>> uap->fixed_baud);
+>>> +
+>>> +    spin_lock_irqsave(&port->lock, flags);
+>>> +    uart_update_timeout(port, CS8, uap->fixed_baud);
+>>> +    pl011_setup_status_masks(port, termios);
+>>> +    spin_unlock_irqrestore(&port->lock, flags);
+>>> +}
+>>> +
+>>>    static const char *pl011_type(struct uart_port *port)
+>>>    {
+>>>        struct uart_amba_port *uap =
