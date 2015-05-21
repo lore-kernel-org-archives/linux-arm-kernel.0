@@ -1,70 +1,91 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 May 2015 14:47:13 +0200
-Subject: [GIT PULL 2/2] omap1 sparse irq support for v4.2
-In-Reply-To: <4094934.StqYY08vL5@wuerfel>
-References: <4094934.StqYY08vL5@wuerfel>
-Message-ID: <12764506.jQAKye8BGv@wuerfel>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Thu, 21 May 2015 05:48:33 -0700
+Subject: [PATCH tip/core/rcu 7/9] arm64: Use common
+ outgoing-CPU-notification code
+In-Reply-To: <20150521085806.GC21920@arm.com>
+References: <20150512214945.GA813@linux.vnet.ibm.com>
+ <1431467407-1223-1-git-send-email-paulmck@linux.vnet.ibm.com>
+ <1431467407-1223-7-git-send-email-paulmck@linux.vnet.ibm.com>
+ <20150521085806.GC21920@arm.com>
+Message-ID: <20150521124833.GJ6776@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 May 2015 14:14:12 Arnd Bergmann wrote:
-> On Wednesday 20 May 2015 15:36:05 Tony Lindgren wrote:
-> > Add support for CONFIG_SPARSE_IRQ for omap1. This takes us a bit closer
-> > to making omap1 support multiarch. After this series we still need to
-> > make omap1 use the common clock framework and fix up the drivers to not
-> > rely on includes from mach and plat directories.
-> > 
-> > Note that this branch depends on a GPIO driver fix in v4.1-rc3
-> > d2d05c65c40e ("gpio: omap: Fix regression for MPUIO interrupts").
-> > 
+On Thu, May 21, 2015 at 09:58:06AM +0100, Will Deacon wrote:
+> Hi Paul,
 > 
-> fwiw, I have another patch in my 'multiplatform' series that will add
-> another baby step.
-> 
-> 8<---
-> ARM: OMAP1: make header files local if possible
-> 
-> A number of header files in mach-omap1 are never included from outside
-> of mach-omap1, so we can move them directly to that directory.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Sorry for being late on this one.
 
-and three more:
+No problem!  In fact, just in time -- I was going to bug you about
+this later today.  ;-)
 
-diff --git a/arch/arm/mach-omap1/board-h3.h b/arch/arm/mach-omap1/board-h3.h
-index 78de535be3c5..f70c42801969 100644
---- a/arch/arm/mach-omap1/board-h3.h
-+++ b/arch/arm/mach-omap1/board-h3.h
-@@ -27,6 +27,8 @@
- #ifndef __ASM_ARCH_OMAP_H3_H
- #define __ASM_ARCH_OMAP_H3_H
- 
-+#include <mach/irqs.h>
-+
- #define H3_TPS_GPIO_BASE		(OMAP_MAX_GPIO_LINES + 16 /* MPUIO */)
- #	define H3_TPS_GPIO_MMC_PWR_EN	(H3_TPS_GPIO_BASE + 4)
- 
-diff --git a/drivers/usb/gadget/udc/omap_udc.c b/drivers/usb/gadget/udc/omap_udc.c
-index e2fcdb8e5596..8a3690b2acbd 100644
---- a/drivers/usb/gadget/udc/omap_udc.c
-+++ b/drivers/usb/gadget/udc/omap_udc.c
-@@ -45,6 +45,7 @@
- 
- #include <linux/omap-dma.h>
- 
-+#include <mach/hardware.h>
- #include <mach/usb.h>
- 
- #include "omap_udc.h"
-diff --git a/sound/soc/omap/omap-pcm.c b/sound/soc/omap/omap-pcm.c
-index 6bb623a2a4df..1f6c8d91f738 100644
---- a/sound/soc/omap/omap-pcm.c
-+++ b/sound/soc/omap/omap-pcm.c
-@@ -34,6 +34,7 @@
- #include <sound/omap-pcm.h>
- 
- #ifdef CONFIG_ARCH_OMAP1
-+#include <mach/soc.h>
- #define pcm_omap1510()	cpu_is_omap1510()
- #else
- #define pcm_omap1510()	0
+> On Tue, May 12, 2015 at 10:50:05PM +0100, Paul E. McKenney wrote:
+> > From: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
+> > 
+> > This commit removes the open-coded CPU-offline notification with new
+> > common code.  In particular, this change avoids calling scheduler code
+> > using RCU from an offline CPU that RCU is ignoring.  This is a minimal
+> > change.  A more intrusive change might invoke the cpu_check_up_prepare()
+> > and cpu_set_state_online() functions at CPU-online time, which would
+> > allow onlining throw an error if the CPU did not go offline properly.
+> > 
+> > Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm64/kernel/smp.c | 6 ++----
+> >  1 file changed, 2 insertions(+), 4 deletions(-)
+> 
+> I don't have a better idea, so:
+> 
+>   Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+> Is this queued via -tip already, or can we pick it into the arm64 tree
+> for 4.2?
+
+Feel free to take it into the arm64 tree.  Just let me know, and I
+will drop it from my tree.
+
+Now I only need to bug the arm32 guys.  ;-)
+
+							Thanx, Paul
+
+> Cheers,
+> 
+> Will
+> 
+> > diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> > index 2cb008177252..a899c1beff54 100644
+> > --- a/arch/arm64/kernel/smp.c
+> > +++ b/arch/arm64/kernel/smp.c
+> > @@ -253,15 +253,13 @@ static int op_cpu_kill(unsigned int cpu)
+> >  	return cpu_ops[cpu]->cpu_kill(cpu);
+> >  }
+> >  
+> > -static DECLARE_COMPLETION(cpu_died);
+> > -
+> >  /*
+> >   * called on the thread which is asking for a CPU to be shutdown -
+> >   * waits until shutdown has completed, or it is timed out.
+> >   */
+> >  void __cpu_die(unsigned int cpu)
+> >  {
+> > -	if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(5000))) {
+> > +	if (!cpu_wait_death(cpu, 5)) {
+> >  		pr_crit("CPU%u: cpu didn't die\n", cpu);
+> >  		return;
+> >  	}
+> > @@ -294,7 +292,7 @@ void cpu_die(void)
+> >  	local_irq_disable();
+> >  
+> >  	/* Tell __cpu_die() that this CPU is now safe to dispose of */
+> > -	complete(&cpu_died);
+> > +	(void)cpu_report_death();
+> >  
+> >  	/*
+> >  	 * Actually shutdown the CPU. This must never fail. The specific hotplug
+> > -- 
+> > 1.8.1.5
+> > 
+> 
