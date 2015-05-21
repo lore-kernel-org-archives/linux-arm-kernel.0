@@ -1,120 +1,57 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 21 May 2015 22:54:05 +0200
-Subject: [PATCH v2 6/7] ARM: sunxi: Add codec clock support
-In-Reply-To: <1432241646-9511-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1432241646-9511-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1432241646-9511-7-git-send-email-maxime.ripard@free-electrons.com>
+From: kwestfie@codeaurora.org (Kenneth Westfield)
+Date: Thu, 21 May 2015 14:00:00 -0700
+Subject: [PATCH] ASoC: qcom: remove incorrect dependencies
+In-Reply-To: <2324031.cqS0mEEEhQ@wuerfel>
+References: <2324031.cqS0mEEEhQ@wuerfel>
+Message-ID: <20150521205952.GA31005@kwestfie-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Emilio L?pez <emilio@elopez.com.ar>
+On Thu, May 21, 2015 at 11:07:08AM +0200, Arnd Bergmann wrote:
+> Compile-tests show a warning for the newly added SND_SOC_STORM
+> symbol:
+> 
+> warning: (SND_SOC_STORM) selects SND_SOC_LPASS_CPU which has unmet direct dependencies (SOUND && !M68K && !UML && SND && SND_SOC && SND_SOC_QCOM)
+> 
+> The problem is that it can be selected for COMPILE_TEST on non-QCOM
+> builds, but the symbols it selects have a dependency.
+> Dropping the dependencies makes it work without warnings and no
+> other side-effects, because these are not user-visible.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: f380dd3f3cd ("ASoC: qcom: Add ability to build QCOM drivers")
+> 
+> diff --git a/sound/soc/qcom/Kconfig b/sound/soc/qcom/Kconfig
+> index 5f58e4f1bca9..b07f183fc47f 100644
+> --- a/sound/soc/qcom/Kconfig
+> +++ b/sound/soc/qcom/Kconfig
+> @@ -6,12 +6,10 @@ config SND_SOC_QCOM
+>  
+>  config SND_SOC_LPASS_CPU
+>  	tristate
+> -	depends on SND_SOC_QCOM
 
-This commit adds the codec clock definition to the sun4i, sun5i and
-sun7i device trees. The codec clock is used in the analog codec block.
+Rather than remove the dependency (which I would like to keep), would
+the following change work for SND_SOC_LPASS_CPU and
+SND_SOC_LPASS_PLATFORM?
+-	depends on SND_SOC_QCOM
++	depends on SND_SOC_QCOM || COMPILE_TEST
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun4i-a10.dtsi  | 9 +++++++++
- arch/arm/boot/dts/sun5i.dtsi      | 9 +++++++++
- arch/arm/boot/dts/sun7i-a20.dtsi  | 9 +++++++++
- drivers/clk/sunxi/clk-a10-codec.c | 1 -
- 4 files changed, 27 insertions(+), 1 deletion(-)
+If so, I will submit a patch (I know this has been applied already) on
+top of this one.
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 235e5204742f..dfa8cd2d3ba8 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -45,6 +45,7 @@
- 
- #include <dt-bindings/thermal/thermal.h>
- 
-+#include <dt-bindings/clock/sun4i-a10-pll2.h>
- #include <dt-bindings/dma/sun4i-a10.h>
- #include <dt-bindings/pinctrl/sun4i-a10.h>
- 
-@@ -455,6 +456,14 @@
- 			clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
- 			clock-output-names = "spi3";
- 		};
-+
-+		codec_clk: clk at 01c20140 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-codec-clk";
-+			reg = <0x01c20140 0x4>;
-+			clocks = <&pll2 SUN4I_A10_PLL2_1X>;
-+			clock-output-names = "codec";
-+		};
- 	};
- 
- 	/*
-diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
-index 2f553a92a6dc..ab5184d2094d 100644
---- a/arch/arm/boot/dts/sun5i.dtsi
-+++ b/arch/arm/boot/dts/sun5i.dtsi
-@@ -44,6 +44,7 @@
- 
- #include "skeleton.dtsi"
- 
-+#include <dt-bindings/clock/sun4i-a10-pll2.h>
- #include <dt-bindings/dma/sun4i-a10.h>
- #include <dt-bindings/pinctrl/sun4i-a10.h>
- 
-@@ -293,6 +294,14 @@
- 			clock-output-names = "usb_ohci0", "usb_phy";
- 		};
- 
-+		codec_clk: clk at 01c20140 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-codec-clk";
-+			reg = <0x01c20140 0x4>;
-+			clocks = <&pll2 SUN4I_A10_PLL2_1X>;
-+			clock-output-names = "codec";
-+		};
-+
- 		mbus_clk: clk at 01c2015c {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun5i-a13-mbus-clk";
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 0141cc9876a7..b5ecfa5fa0eb 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -47,6 +47,7 @@
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/thermal/thermal.h>
- 
-+#include <dt-bindings/clock/sun4i-a10-pll2.h>
- #include <dt-bindings/dma/sun4i-a10.h>
- #include <dt-bindings/pinctrl/sun4i-a10.h>
- 
-@@ -469,6 +470,14 @@
- 			clock-output-names = "spi3";
- 		};
- 
-+		codec_clk: clk at 01c20140 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-codec-clk";
-+			reg = <0x01c20140 0x4>;
-+			clocks = <&pll2 SUN4I_A10_PLL2_1X>;
-+			clock-output-names = "codec";
-+		};
-+
- 		mbus_clk: clk at 01c2015c {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun5i-a13-mbus-clk";
-diff --git a/drivers/clk/sunxi/clk-a10-codec.c b/drivers/clk/sunxi/clk-a10-codec.c
-index aaeccf8cde39..ac321d6a0df5 100644
---- a/drivers/clk/sunxi/clk-a10-codec.c
-+++ b/drivers/clk/sunxi/clk-a10-codec.c
-@@ -15,7 +15,6 @@
-  */
- 
- #include <linux/clk-provider.h>
--#include <linux/clkdev.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- 
+>  	select REGMAP_MMIO
+>  
+>  config SND_SOC_LPASS_PLATFORM
+>  	tristate
+> -	depends on SND_SOC_QCOM
+>  	select REGMAP_MMIO
+>  
+>  config SND_SOC_STORM
+> 
+
 -- 
-2.4.1
+Kenneth Westfield
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum, 
+a Linux Foundation Collaborative Project
