@@ -1,136 +1,156 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 21 May 2015 12:13:30 +0100
-Subject: [PATCH v4 10/11] drivers: PL011: add support for the ARM SBSA
- generic UART
-In-Reply-To: <55536096.4020008@redhat.com>
-References: <1431440095-5146-1-git-send-email-andre.przywara@arm.com>
- <1431440095-5146-11-git-send-email-andre.przywara@arm.com>
- <55536096.4020008@redhat.com>
-Message-ID: <555DBDDA.6070908@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 21 May 2015 12:25:55 +0100
+Subject: [PATCH 2/3] iommu/arm-smmu: Add initial driver support for ARM
+ SMMUv3 devices
+In-Reply-To: <55530C4F.5000605@huawei.com>
+References: <1431108046-9675-1-git-send-email-will.deacon@arm.com>
+ <1431108046-9675-3-git-send-email-will.deacon@arm.com>
+ <5551AE56.6050906@huawei.com> <20150512165500.GE2062@arm.com>
+ <55530C4F.5000605@huawei.com>
+Message-ID: <20150521112555.GH21920@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi again,
 
-(please keep the people on CC:, I almost missed that mail)
+Sorry for the delay in replying, I've been tied up with other stuff.
 
-On 05/13/2015 03:32 PM, Mark Langsdorf wrote:
-> On 05/12/2015 09:14 AM, Andre Przywara wrote:
->> The ARM Server Base System Architecture[1] document describes a
->> generic UART which is a subset of the PL011 UART.
->> It lacks DMA support, baud rate control and modem status line
->> control, among other things.
->> The idea is to move the UART initialization and setup into the
->> firmware (which does this job today already) and let the kernel just
->> use the UART for sending and receiving characters.
->>
->> We use the recent refactoring to build a new struct uart_ops
->> variable which points to some new functions avoiding access to the
->> missing registers. We reuse as much existing PL011 code as possible.
->>
->> In contrast to the PL011 the SBSA UART does not define any AMBA or
->> PrimeCell relations, so we go with a pretty generic probe function
->> which only uses platform device functions.
->> A DT binding is provided with this patch, ACPI support is added in a
->> separate one.
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->>   .../devicetree/bindings/serial/arm_sbsa_uart.txt   |  10 ++
->>   drivers/tty/serial/amba-pl011.c                    | 168
->> +++++++++++++++++++++
->>   2 files changed, 178 insertions(+)
->>   create mode 100644
->> Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
->>
->> diff --git
->> a/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
->> b/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
->> new file mode 100644
->> index 0000000..4163e7e
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
->> @@ -0,0 +1,10 @@
->> +* ARM SBSA defined generic UART
->> +This UART uses a subset of the PL011 registers and consequently lives
->> +in the PL011 driver. It's baudrate and other communication parameters
->> +cannot be adjusted at runtime, so it lacks a clock specifier here.
->> +
->> +Required properties:
->> +- compatible: must be "arm,sbsa-uart"
->> +- reg: exactly one register range
->> +- interrupts: exactly one interrupt specifier
->> +- current-speed: the (fixed) baud rate set by the firmware
->> diff --git a/drivers/tty/serial/amba-pl011.c
->> b/drivers/tty/serial/amba-pl011.c
->> index 70e2958..cca93d9 100644
->> --- a/drivers/tty/serial/amba-pl011.c
->> +++ b/drivers/tty/serial/amba-pl011.c
-
-....
-
->> @@ -1872,6 +1915,24 @@ pl011_set_termios(struct uart_port *port,
->> struct ktermios *termios,
->>       spin_unlock_irqrestore(&port->lock, flags);
->>   }
->>
->> +static void
->> +sbsa_uart_set_termios(struct uart_port *port, struct ktermios *termios,
->> +              struct ktermios *old)
->> +{
->> +    struct uart_amba_port *uap =
->> +        container_of(port, struct uart_amba_port, port);
->> +    unsigned long flags;
->> +
->> +    if (old)
->> +        tty_termios_copy_hw(termios, old);
+On Wed, May 13, 2015 at 09:33:19AM +0100, leizhen wrote:
+> On 2015/5/13 0:55, Will Deacon wrote:
+> > The purpose of the two level approach isn't to save memory; it's to remove
+> > the need for a single (large) contiguous block. Furthermore, we need all
+> > master devices in the system to come up in a state where their transactions
+> > bypass the SMMU (i.e. we don't require them to use the SMMU for
+> > translation). Achieving this necessitates a fully-populated stream-table
+> > before any DMA occurs.
 > 
-> This code prevented login via the serial console on our test hardware.
+> OK, but for non-pci devices(maybe pci devices also), initialize all
+> devices(StreamIDs) to bypass mode maybe incorrect. Some devices maybe
+> capable bring attributes by itself, and access different memory with
+> different attributes(device attribute or cacheable attribute); some
+> devices maybe not capable bring attributes by itself, but need access
+> memory with cacheable attribute only, so we should set STE.MTCFG = 1.
+> Provide dts configuration will be better.
+
+If we want to make use of memory overrides, then I think we should add
+that as a separate patch because it would have implications on the IOMMU
+API. I don't particularly like putting this policy information in the
+device-tree binding on a per-driver basis.
+
+> Furthermore, I don't agree initialize all devices to bypass by default.
+> Suppose a non-pci device's StreamID can be dynamic configured. We require
+> StreamID-A, but the device actually issue StreamID-B because of software
+> configuration fault. We really hope SMMU can report Bad StreamID fault.
+
+I think the default behaviour has to be to bypass by default, otherwise
+we can break DMA for any devices behind an SMMU but not attached to an
+IOMMU domain. How about I add a cmdline parameter to change the default
+behaviour?
+
+> > I suppose we could look into populating it based on the ->add_device
+> > callback, which currently does have some range checks
+> > (arm_smmu_sid_in_range). Is that what you had in mind?
 > 
-> Mark Salter suggested the following patch:
+> Yes, maybe attach_dev. But we should allocated the whole Lv1 table base on
+> SMMU_IDR1.SIDSIZE
+
+I think it needs to be in add_device so that we can implement the default
+bypass case. We could even have one L2 table per PCI bus, but I need to
+think about how big the L1 table should be.
+
+> >>> +             if (!desc->l2ptr) {
+> >>> +                     dev_err(smmu->dev,
+> >>> +                             "failed to allocate l2 stream table %u\n", i);
+> >>> +                     ret = -ENOMEM;
+> >>> +                     goto out_free_l2;
+> >>> +             }
+> >>> +
+> >>> +             arm_smmu_init_bypass_stes(desc->l2ptr, 1 << STRTAB_SPLIT);
+> >>> +             arm_smmu_write_strtab_l1_desc(strtab, desc);
+> >>> +             strtab += STRTAB_STE_DWORDS;
+> >>> +     }
+> >>> +
+> >>> +     return 0;
+> >>> +
+> >>> +out_free_l2:
+> >>> +     arm_smmu_free_l2_strtab(smmu);
+> >>> +     return ret;
+> >>> +}
+> >>> +
+> >>> +static int arm_smmu_init_strtab(struct arm_smmu_device *smmu)
+> >>> +{
+> >>> +     void *strtab;
+> >>> +     u64 reg;
+> >>> +     u32 size;
+> >>> +     int ret = 0;
+> >>> +
+> >>> +     strtab = dma_zalloc_coherent(smmu->dev, 1 << STRTAB_L1_SZ_SHIFT,
+> >>> +                                  &smmu->strtab_cfg.strtab_dma, GFP_KERNEL);
+> >>
+> >> As above, when Lv2 tables are dynamic allocation, we can create Lv1 table
+> >> base on SMMU_IDR1.SIDSIZE and support non-pic devices. Oh, if SIDSIZE is
+> >> too large, like 32. Maybe we should use 64K size Lv2 table.  But we can
+> >> only use PAGE_SIZE first, for lazy.
+> >
+> > Right now, the l2 tables are 4k and l1 table is 8k. That's (a) nice for
+> > allocation on a system with 4k pages and (b) enough to cover a PCI host
+> > controller. The problem with supporting 32-bit SIDs is that the l1 will
+> > become a sizeable contiguous chunk which we'll have to allocate
+> > regardless.
+> >
+> > So, if we keep the l2 size at 4k for the moment, how big would you like
+> > the l1? For a 32-bit numberspace, it would be 4MB, which I don't think is
+> > practical.
 > 
-> -       if (old)
-> +       /*
-> +        * The first call to set_termios() comes when the console is
-> +        * registered via uart_add_one_port(). The serial core will
-> +        * pass in a dummy old termios rather than NULL. Check to make
-> +        * sure the old termios has reasonable info before copying from
-> +        * it.
-> +        */
-> +       if (old && old->c_cflag)
->                 tty_termios_copy_hw(termios, old);
+> Yes, because I don't think SMMU_IDR1.SIDSIZE = 32 really exist, so I said
+> use PAGE_SIZE first.
 
-That seems like a kludge to me.
-Regardless of the reason why uart_send_options() is passing a
-dummy variable instead of a NULL pointer (which documentation explicitly
-declares as legal) I saw that this unconditional copying of the old
-value being common practise in various drivers, actually the default for
-drivers not implementing set_termios at all.
+Well, I certainly wouldn't rule anything out.
 
-Can you describe a setup where this issue shows up? I haven't observed
-this issue in my testing.
+> But now, this patch only support SMMU_IDR1.SIDSIZE <= 16. Suppose
+> SMMU_IDR1.SIDSIZE = 25?Lv2 table size at 4K, then Lv1 table need 2^(25 -
+> 6 + 3) = 2^22 = 4M. If we pre-allocated all Lv2 table, we need 2^25 * 64 =
+> 2^31 = 2G, that's too big. So we must only allocate Lv2 table when we
+> needed.
 
-But in fact I think we actually shouldn't care about the old value at
-all. Instead we should filter the new termios settings to avoid userland
-configuring for instance flow control or an differing byte format which
-the SBSA UART does not support.
-I will cook up a patch and send out a v5 ASAP.
+I agree that's way too big, but I have limited things to 16-bit for a reason
+;)
 
-Cheers,
-Andre.
-
+> If SMMU_IDR1.SIDSIZE = 32 really exist(or too big), we need dynamic choose
+> Lv2 table size(4K,16K,64K).  Because Lv1 table maybe too big, and can not
+> be allocated by current API, a dts configuration should be added, like
+> lv1-table-base = <0x0 0x0>, and we use ioremap_cache get VA(maybe ioremap,
+> for non-coherent SMMU).
 > 
-> which fixed the issue.
+> Oh, I can do it after your patches upstreamed, because this problem maybe
+> only I met.
+
+I'll have a think about this and see what I can come up with for version
+2 of the patch. I'd like to avoid adding additional properties to the DT
+until they're actually needed, though.
+
+> >>> +     /* Invalidate any cached configuration */
+> >>> +     cmd.opcode = CMDQ_OP_CFGI_ALL;
+> >>> +     arm_smmu_cmdq_issue_cmd(smmu, &cmd);
+> >>> +     cmd.opcode = CMDQ_OP_CMD_SYNC;
+> >>> +     arm_smmu_cmdq_issue_cmd(smmu, &cmd);
+> >>> +
+> >>> +     /* Invalidate any stale TLB entries */
+> >>> +     cmd.opcode = CMDQ_OP_TLBI_EL2_ALL;
+> >>
+> >> Do we need to execute CMDQ_OP_TLBI_EL2_ALL? Linux only run at EL1. It at
+> >> least rely on SMMU_IDR0.Hyp
+> >
+> > The SMMU isn't guaranteed to come up clean out of reset, so it's a good
+> > idea to perform this invalidation in case of junk in the TLB. Given that
+> > Linux owns the stage-2 translation, then this is the right place to do it.
 > 
->> +    tty_termios_encode_baud_rate(termios, uap->fixed_baud,
->> uap->fixed_baud);
->> +
->> +    spin_lock_irqsave(&port->lock, flags);
->> +    uart_update_timeout(port, CS8, uap->fixed_baud);
->> +    pl011_setup_status_masks(port, termios);
->> +    spin_unlock_irqrestore(&port->lock, flags);
->> +}
->> +
->>   static const char *pl011_type(struct uart_port *port)
->>   {
->>       struct uart_amba_port *uap =
+> OK. But it should be controled by SMMU_IDR0.Hyp. I means:
+> if (SMMU_IDR0.Hyp)
+>         execute command CMDQ_OP_TLBI_EL2_ALL
+> 
+> When SMMU_IDR0.Hyp=?0?, this command causes CERROR_ILL
+
+Well spotted, thanks!
+
+Will
