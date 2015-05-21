@@ -1,66 +1,38 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 21 May 2015 14:33:24 -0700
-Subject: [PATCH 1/2 V3] clk: sirf: add CSR atlas7 clk and reset support
-In-Reply-To: <CAGsJ_4zwNQvvSwb49nwKzfke1V1nUCW-tDqbP4FxEr0SfmX9zA@mail.gmail.com>
-References: <1431675587-8637-1-git-send-email-21cnbao@gmail.com>
- <20150515183029.GL31753@codeaurora.org>
- <CAGsJ_4zwNQvvSwb49nwKzfke1V1nUCW-tDqbP4FxEr0SfmX9zA@mail.gmail.com>
-Message-ID: <20150521213324.GA1885@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 21 May 2015 23:33:36 +0200
+Subject: [GIT PULL 2/2] omap1 sparse irq support for v4.2
+In-Reply-To: <20150521183629.GT10274@atomide.com>
+References: <80194352.chs4cqVdmg@wuerfel> <20150521165413.GS10274@atomide.com>
+ <20150521183629.GT10274@atomide.com>
+Message-ID: <6774083.RmPqVFIumd@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16, Barry Song wrote:
-> 2015-05-16 2:30 GMT+08:00 Stephen Boyd <sboyd@codeaurora.org>:
-> > On 05/15, Barry Song wrote:
-> >> From: Zhiwu Song <Zhiwu.Song@csr.com>
-> >>
-> >> the hardware node includes both clock and reset support, so it
-> >> is named as "car".
-> >> this patch implements Flexible clocks(mux, divider, gate), Selectable
-> >> clock(mux, divider, gate), root clock(gate),leaf clock(gate), others.
-> >> it also implements the reset controller functionality.
-> >>
-> >> Signed-off-by: Zhiwu Song <Zhiwu.Song@csr.com>
-> >> Signed-off-by: Guo Zeng <Guo.Zeng@csr.com>
-> >> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> >> ---
-> >
+On Thursday 21 May 2015 11:36:30 Tony Lindgren wrote:
+> > 
+> > OK got it triggered here too with randconfig builds now.
+> > This seems to be related to not selecting some omap1 SoCs or
+> > boards. I'll try to do a minimal fix for it today.
+> > 
+> > It seems the include changes you posted would be better done
+> > by replacing the the dependencies to mach/irqs.h where possible
+> > rather than adding more includes?
 
-Yes this has already been applied, but replying to the last
-comment.
+Yes, I guess we can do that too. FWIW, almost all the problems
+were uses of cpu_is_omap*(), omap_read*() and omap_write*().
 
-> >> +
-> >> +
-> >> +CLK_OF_DECLARE(atlas7_clk, "sirf,atlas7-car", atlas7_clk_init);
-> >>
-> >
-> > I'm also curious if we actually need to use CLK_OF_DECLARE here
-> > or if could we use a platform device.
-> >
-> > Even if we need to use CLK_OF_DECLARE because some timer or other
-> > early device needs a clock, I wonder if we shouldn't also make
-> > these things into real platform drivers that register the other
-> > clocks that aren't necessary for the early boot process.
-> >
-> it seems it is a general question not only for this driver?
+There are quite a lot of them overall, but at least they are
+easy to grep for, and there should be an obvious fix for each
+of them, following what you did on OMAP2 a couple of years ago.
 
-Yes it is.
+> OK figured it out. We now rely on an indirect include selected
+> with ARCH_OMAP15XX. Here's what I suggest as a fix for this
+> issue, obviously the real fix is to fix the legacy drivers to not 
+> #include <mach/*.h>.
 
-> 
-> the main difficulty is maintaining the boot sequence of the platform
-> devices and other machine codes which require clocks. it seems it is
-> the easiest way to make clk ready earlier than other drivers.
-> and i don't think registering these clocks takes much boot time and
-> make boot slower at least for atlas7 platform since there is no sleep
-> and long delay in the procedure.
+Ok, I've put this patch in my randconfig build setup to replace
+my older patch, let's see if there are still some corner cases
+left. So far, everything looks good (50 random mach-omap1 builds
+done). Can you send an updated pull request with the fix folded in?
 
-It isn't really about making boot time faster, it's about using
-the proper linux device model for clock providers. That way when
-we want to support things like suspend/resume, deferred probe,
-devm_*(), sysfs, etc. we can use the device model instead of
-resorting to things like syscore_ops for suspend/resume or
-forgoing features entirely.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+	Arnd
