@@ -1,99 +1,55 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 21 May 2015 00:32:03 -0500
-Subject: [PATCH V5 3/3] OPP: Add binding for 'opp-suspend'
-In-Reply-To: <618b02107af650bcb3246e165095bbca207d511a.1432091956.git.viresh.kumar@linaro.org>
-References: <cover.1432091956.git.viresh.kumar@linaro.org>
- <618b02107af650bcb3246e165095bbca207d511a.1432091956.git.viresh.kumar@linaro.org>
-Message-ID: <555D6DD3.7000404@ti.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 21 May 2015 09:38:10 +0300
+Subject: [PATCHv2 00/27] ARM: OMAP2+: clock code migration to
+ drivers/clk/ti
+In-Reply-To: <alpine.DEB.2.02.1505202234330.7960@utopia.booyaka.com>
+References: <1431334493-24455-1-git-send-email-t-kristo@ti.com>
+ <alpine.DEB.2.02.1505111747460.19833@utopia.booyaka.com>
+ <5551D178.3000904@ti.com>
+ <alpine.DEB.2.02.1505122019220.21747@utopia.booyaka.com>
+ <5552F32C.7060606@ti.com>
+ <alpine.DEB.2.02.1505131438430.7921@utopia.booyaka.com>
+ <555B8DC0.5080905@ti.com>
+ <alpine.DEB.2.02.1505202234330.7960@utopia.booyaka.com>
+Message-ID: <555D7D52.8010501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/19/2015 10:41 PM, Viresh Kumar wrote:
-> On few platforms, for power efficiency, we want the device to be
-> configured for a specific OPP while we put the device in suspend state.
-> 
-> Add an optional property in operating-points-v2 bindings for that.
+On 05/21/2015 01:40 AM, Paul Walmsley wrote:
+> On Tue, 19 May 2015, Tero Kristo wrote:
+>
+>> Any news on this? As noted previously, I am not able to reproduce the issue
+>> you are seeing currently, can you give DEBUG_LL a shot?
+>
+> Yeah I just bisected it, it was caused by this:
+>
+> commit cc4a5fe972ad7834e8662b49b3a5fdb597e9e15e
+> Author: Felipe Balbi <balbi@ti.com>
+> Date:   Fri Jan 30 11:18:56 2015 -0600
+>
+>      arm: config: omap2plus_defconfig: switch over to LZMA compression
+>
+>      LZMA compression makes about 33% smaller zImage
+>      with just a slight extra decompression time.
+>
+>      Before this patch, zImage built with o2+_dc
+>      is 4.5MiB and after it's about 3.3MiB.
+>
+>      Suggested-by: David Cohen <david.a.cohen@linux.intel.com>
+>      Signed-off-by: Felipe Balbi <balbi@ti.com>
+>      Signed-off-by: Tony Lindgren <tony@atomide.com>
+>
+>
+> and the timeouts on the testbed being set to fail if a kernel takes longer
+> than five seconds to start.  Seems that the part about a "slight extra
+> decompression time" probably only applies to relatively recent chips.
+>
+>
+> - Paul
+>
 
-Why not just mark it as a property of an OPP rather than a phandle? just
-thinking that this might setup a precedence for future needs like
-"shutdown OPP" or "Reboot OPP" or something different that some other
-SoC might have..
+Oh, so this explains why I was thinking it took very long time to boot 
+the recent kernels also. The boot lag is clearly noticeable without any 
+measurement. I wonder if we should probably revert this patch.
 
-> 
-> Suggested-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  Documentation/devicetree/bindings/power/opp.txt | 14 ++++++++++----
->  1 file changed, 10 insertions(+), 4 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/power/opp.txt b/Documentation/devicetree/bindings/power/opp.txt
-> index 7f30d9b07db7..880f5e14b6e2 100644
-> --- a/Documentation/devicetree/bindings/power/opp.txt
-> +++ b/Documentation/devicetree/bindings/power/opp.txt
-> @@ -72,6 +72,8 @@ This describes the OPPs belonging to a device. This node can have following
->    Missing property means devices have independent clock/voltage/current lines,
->    but they share OPP tables.
->  
-> +- opp-suspend: Phandle of the OPP to set while device is suspended.
-> +
->  
->  * OPP Node
->  
-> @@ -143,9 +145,10 @@ Example 1: Single cluster Dual-core ARM cortex A9, switch DVFS states together.
->  
->  	cpu0_opp: opp0 {
->  		compatible = "operating-points-v2";
-> +		opp-suspend = <&suspend_opp>;
->  		opp-shared;
->  
-> -		entry00 {
-> +		suspend-opp: entry00 {
->  			opp-hz = <1000000000>;
->  			opp-microvolt = <970000 975000 985000>;
->  			opp-microamp = <70000>;
-> @@ -217,13 +220,14 @@ independently.
->  
->  	cpu0_opp: opp0 {
->  		compatible = "operating-points-v2";
-> +		opp-suspend = <&suspend_opp>;
->  
->  		/*
->  		 * Missing opp-shared property means CPUs switch DVFS states
->  		 * independently.
->  		 */
->  
-> -		entry00 {
-> +		suspend-opp: entry00 {
->  			opp-hz = <1000000000>;
->  			opp-microvolt = <970000 975000 985000>;
->  			opp-microamp = <70000>;
-> @@ -296,9 +300,10 @@ DVFS state together.
->  
->  	cluster0_opp: opp0 {
->  		compatible = "operating-points-v2";
-> +		opp-suspend = <&suspend_opp0>;
->  		opp-shared;
->  
-> -		entry00 {
-> +		suspend-opp0: entry00 {
->  			opp-hz = <1000000000>;
->  			opp-microvolt = <970000 975000 985000>;
->  			opp-microamp = <70000>;
-> @@ -321,9 +326,10 @@ DVFS state together.
->  
->  	cluster1_opp: opp1 {
->  		compatible = "operating-points-v2";
-> +		opp-suspend = <&suspend_opp1>;
->  		opp-shared;
->  
-> -		entry10 {
-> +		suspend-opp1: entry10 {
->  			opp-hz = <1300000000>;
->  			opp-microvolt = <1045000 1050000 1055000>;
->  			opp-microamp = <95000>;
-> 
-
-
--- 
-Regards,
-Nishanth Menon
+-Tero
