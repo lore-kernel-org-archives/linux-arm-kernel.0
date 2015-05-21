@@ -1,148 +1,87 @@
-From: mlangsdo@redhat.com (Mark Langsdorf)
-Date: Thu, 21 May 2015 10:12:46 -0500
-Subject: [PATCH v4 10/11] drivers: PL011: add support for the ARM SBSA
- generic UART
-In-Reply-To: <555DBDDA.6070908@arm.com>
-References: <1431440095-5146-1-git-send-email-andre.przywara@arm.com>
- <1431440095-5146-11-git-send-email-andre.przywara@arm.com>
- <55536096.4020008@redhat.com> <555DBDDA.6070908@arm.com>
-Message-ID: <555DF5EE.5040901@redhat.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 21 May 2015 17:20:55 +0200
+Subject: [PATCH v2 4/6] soc: mediatek: Add SMI driver
+In-Reply-To: <1432219778.5092.44.camel@mhfsdcap03>
+References: <1431683009-18158-1-git-send-email-yong.wu@mediatek.com>
+ <1431683009-18158-5-git-send-email-yong.wu@mediatek.com>
+ <CABuKBeJvh2PGi3i6O0uu-7ggdBzKMb3tPE_XKhT1i-+tkKc5gg@mail.gmail.com>
+ <1432188990.5092.12.camel@mhfsdcap03>
+ <CABuKBe+FmAzr_Cu=fUDwDHYzH4mW_2p4z1SYmp7+W=Tu-MLEuA@mail.gmail.com>
+ <CAGS+omARc60i+8vO6V1ccnSnXkjAGNjMjRB1+5kg_EHrrS1NOw@mail.gmail.com>
+ <1432219778.5092.44.camel@mhfsdcap03>
+Message-ID: <CABuKBeJgmwtH4KjfxwPXgvO9Nwaz3o3ha7h99-VdtSNmQ80N5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/21/2015 06:13 AM, Andre Przywara wrote:
-> Hi Mark,
->
-> (please keep the people on CC:, I almost missed that mail)
->
-> On 05/13/2015 03:32 PM, Mark Langsdorf wrote:
->> On 05/12/2015 09:14 AM, Andre Przywara wrote:
->>> The ARM Server Base System Architecture[1] document describes a
->>> generic UART which is a subset of the PL011 UART.
->>> It lacks DMA support, baud rate control and modem status line
->>> control, among other things.
->>> The idea is to move the UART initialization and setup into the
->>> firmware (which does this job today already) and let the kernel just
->>> use the UART for sending and receiving characters.
->>>
->>> We use the recent refactoring to build a new struct uart_ops
->>> variable which points to some new functions avoiding access to the
->>> missing registers. We reuse as much existing PL011 code as possible.
->>>
->>> In contrast to the PL011 the SBSA UART does not define any AMBA or
->>> PrimeCell relations, so we go with a pretty generic probe function
->>> which only uses platform device functions.
->>> A DT binding is provided with this patch, ACPI support is added in a
->>> separate one.
->>>
->>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>> ---
->>>    .../devicetree/bindings/serial/arm_sbsa_uart.txt   |  10 ++
->>>    drivers/tty/serial/amba-pl011.c                    | 168
->>> +++++++++++++++++++++
->>>    2 files changed, 178 insertions(+)
->>>    create mode 100644
->>> Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
->>>
->>> diff --git
->>> a/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
->>> b/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
->>> new file mode 100644
->>> index 0000000..4163e7e
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
->>> @@ -0,0 +1,10 @@
->>> +* ARM SBSA defined generic UART
->>> +This UART uses a subset of the PL011 registers and consequently lives
->>> +in the PL011 driver. It's baudrate and other communication parameters
->>> +cannot be adjusted at runtime, so it lacks a clock specifier here.
->>> +
->>> +Required properties:
->>> +- compatible: must be "arm,sbsa-uart"
->>> +- reg: exactly one register range
->>> +- interrupts: exactly one interrupt specifier
->>> +- current-speed: the (fixed) baud rate set by the firmware
->>> diff --git a/drivers/tty/serial/amba-pl011.c
->>> b/drivers/tty/serial/amba-pl011.c
->>> index 70e2958..cca93d9 100644
->>> --- a/drivers/tty/serial/amba-pl011.c
->>> +++ b/drivers/tty/serial/amba-pl011.c
->
-> ....
->
->>> @@ -1872,6 +1915,24 @@ pl011_set_termios(struct uart_port *port,
->>> struct ktermios *termios,
->>>        spin_unlock_irqrestore(&port->lock, flags);
->>>    }
->>>
->>> +static void
->>> +sbsa_uart_set_termios(struct uart_port *port, struct ktermios *termios,
->>> +              struct ktermios *old)
->>> +{
->>> +    struct uart_amba_port *uap =
->>> +        container_of(port, struct uart_amba_port, port);
->>> +    unsigned long flags;
->>> +
->>> +    if (old)
->>> +        tty_termios_copy_hw(termios, old);
+2015-05-21 16:49 GMT+02:00 Yong Wu <yong.wu@mediatek.com>:
+> On Thu, 2015-05-21 at 22:33 +0800, Daniel Kurtz wrote:
+>> On Thu, May 21, 2015 at 3:30 PM, Matthias Brugger
+>> <matthias.bgg@gmail.com> wrote:
+>> > 2015-05-21 8:16 GMT+02:00 Yong Wu <yong.wu@mediatek.com>:
+>> >> Hi Matthias,
+>> >>      Thanks very much for your suggestion.
+>> >>      Abort the smi clock name, Could you help check below.
+>> >>      The others I will improve in next time.
+>> >>
+>> >> On Tue, 2015-05-19 at 13:14 +0200, Matthias Brugger wrote:
+>> >>> 2015-05-15 11:43 GMT+02:00 Yong Wu <yong.wu@mediatek.com>:
+>> >>> >     This patch add SMI(Smart Multimedia Interface) driver. This driver is
+>> >>> > responsible to enable/disable iommu and control the clocks of each local arbiter.
+>> >>> >
+>> >> [snip]
+>> >>> > +
+>> >>> > +#define SMI_LARB_MMU_EN                (0xf00)
+>> >>> > +#define F_SMI_MMU_EN(port)     (1 << (port))
+>> >>> > +
+>> >>> > +enum {
+>> >>> > +       MTK_CLK_APB,
+>> >>> > +       MTK_CLK_SMI,
+>> >>> > +       MTK_CLK_MAX,
+>> >>>
+>> >>> Maybe add something like:
+>> >>> MTK_CLK_FIRST = MTK_CLK_APB,
+>> >>> to make the for loops better readable.
+>> >>>
+>> >> Then, Is it like this? :
+>> >>  enum {
+>> >>         MTK_CLK_FIRST = MTK_CLK_APB,
+>> >>         MTK_CLK_SMI,
+>> >>         MTK_CLK_MAX,
+>> >>  }
+>> >> or the CLK_SMI also need MTK_CLK_SECOND = MTK_CLK_SMI.
+>> >
+>> >
+>> > something like:
+>> > enum {
+>> >          MTK_CLK_FIRST,
+>> >          MTK_CLK_APB = MTK_CLK_FIRST,
+>> >          MTK_CLK_SMI,
+>> >          MTK_CLK_LAST,
+>> > }
+>> >
+>> > So you can rewrite the for loop:
+>> > if (i = MTK_CLK_FIRST; i < MTK_CLK_LAST; i++)
 >>
->> This code prevented login via the serial console on our test hardware.
+>> Actually, do we ever plan to add more clks per smi node?
+> No.
+>> If not, perhaps the whole driver would be simpler if you just
+>> explicitly handle the apb & smi clocks:
 >>
->> Mark Salter suggested the following patch:
+>> struct mtk_smi_larb {
+>>        void __iomem            *base;
+>>        spinlock_t              portlock; /* lock for config port */
+>>        struct device           *smi;
+>>        struct clk              *clk_apb;
+>>        struct clk              *clk_smi;
+>> };
 >>
->> -       if (old)
->> +       /*
->> +        * The first call to set_termios() comes when the console is
->> +        * registered via uart_add_one_port(). The serial core will
->> +        * pass in a dummy old termios rather than NULL. Check to make
->> +        * sure the old termios has reasonable info before copying from
->> +        * it.
->> +        */
->> +       if (old && old->c_cflag)
->>                  tty_termios_copy_hw(termios, old);
->
-> That seems like a kludge to me.
-> Regardless of the reason why uart_send_options() is passing a
-> dummy variable instead of a NULL pointer (which documentation explicitly
-> declares as legal) I saw that this unconditional copying of the old
-> value being common practise in various drivers, actually the default for
-> drivers not implementing set_termios at all.
->
-> Can you describe a setup where this issue shows up? I haven't observed
-> this issue in my testing.
+>> And then all of the loops become just a pair of clock operations.
+> Thanks. I will try this and compare whether it will add many lines.
 
-Since other people have said it:
+If you don't plan to add more clocks in the future, then I think the
+suggestion Dan made is the best one.
 
-AMD Seattle, booting with ACPI, connected via a serial console
-and running Fedora. Systems boot just fine, but when you attempt
-to log in, the first time you hit return it doesn't register
-so you can't ask for your password. If you do hit return twice,
-apparently both instances of the return are registered at the
-same time and the system rejects your invalid password (less
-sure of the mechanics here).
-
-> But in fact I think we actually shouldn't care about the old value at
-> all. Instead we should filter the new termios settings to avoid userland
-> configuring for instance flow control or an differing byte format which
-> the SBSA UART does not support.
-> I will cook up a patch and send out a v5 ASAP.
-
-Okay.
-
---Mark Langsdorf
-
-
->> which fixed the issue.
->>
->>> +    tty_termios_encode_baud_rate(termios, uap->fixed_baud,
->>> uap->fixed_baud);
->>> +
->>> +    spin_lock_irqsave(&port->lock, flags);
->>> +    uart_update_timeout(port, CS8, uap->fixed_baud);
->>> +    pl011_setup_status_masks(port, termios);
->>> +    spin_unlock_irqrestore(&port->lock, flags);
->>> +}
->>> +
->>>    static const char *pl011_type(struct uart_port *port)
->>>    {
->>>        struct uart_amba_port *uap =
+Regards,
+Matthias
+-- 
+motzblog.wordpress.com
