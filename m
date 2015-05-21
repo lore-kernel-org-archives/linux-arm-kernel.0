@@ -1,91 +1,109 @@
-From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Thu, 21 May 2015 09:25:31 +0300
-Subject: [GIT PULL 4/8] clk: tegra: Changes for v4.2-rc1
-In-Reply-To: <20150520195459.GU31753@codeaurora.org>
-References: <1431524980-13599-1-git-send-email-thierry.reding@gmail.com>
- <1431524980-13599-5-git-send-email-thierry.reding@gmail.com>
- <20150520195459.GU31753@codeaurora.org>
-Message-ID: <555D7A5B.1070901@nvidia.com>
+From: jchandra@broadcom.com (Jayachandran C.)
+Date: Thu, 21 May 2015 12:07:30 +0530
+Subject: [PATCH v2 1/2] PCI: generic: remove dependency on hw_pci
+In-Reply-To: <20150520172903.GJ11498@arm.com>
+References: <1430791333-26013-1-git-send-email-jchandra@broadcom.com>
+ <20150505155346.GJ1550@arm.com>
+ <20150512000746.GA31418@jayachandranc.netlogicmicro.com>
+ <20150519230918.GW31666@google.com>
+ <20150520172903.GJ11498@arm.com>
+Message-ID: <20150521063729.GB31418@jayachandranc.netlogicmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/20/2015 10:54 PM, Stephen Boyd wrote:
-> On 05/13, Thierry Reding wrote:
->> Hi Mike, Stephen,
->>
->> The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
->>
->>   Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
->>
->> are available in the git repository at:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.2-clk
->>
->> for you to fetch changes up to 36b7be6d3ea8f434f1e0723f3fb0e85c3e00ebc2:
->>
->>   clk: tegra: Fix hda2codec_2x clock name for Tegra30 (2015-05-13 15:17:14 +0200)
->>
->> I've based this pull request on top of the tegra-for-4.2-ramcode pull
->> request, so pulling only this one should be sufficient to resolve the
->> dependency.
->>
->> Thanks,
->> Thierry
->>
->> ----------------------------------------------------------------
->> clk: tegra: Changes for v4.2-rc1
->>
->> This contains the EMC clock driver that's been exhaustively reviewed and
->> tested. It also includes a change to the clock core that allows a clock
->> provider to perform low-level reparenting of clocks. This is required by
->> the EMC clock driver because the reparenting needs to be done at a very
->> specific point in time during the EMC frequency switch.
+On Wed, May 20, 2015 at 06:29:03PM +0100, Will Deacon wrote:
+> On Wed, May 20, 2015 at 12:09:18AM +0100, Bjorn Helgaas wrote:
+> > On Tue, May 12, 2015 at 05:37:47AM +0530, Jayachandran C. wrote:
+> > > On Tue, May 05, 2015 at 04:53:46PM +0100, Will Deacon wrote:
+> > > > On Tue, May 05, 2015 at 03:02:12AM +0100, Jayachandran C wrote:
+> > > > > The current code in pci-host-generic.c uses pci_common_init_dev()
+> > > > > from the arch/arm/ to do a part of the PCI initialization, and this
+> > > > > prevents it from being used on arm64.
+> > > > > 
+> > > > > The initialization done by pci_common_init_dev() that is really
+> > > > > needed by pci-host-generic.c can be done in the same file without
+> > > > > using the hw_pci API of ARM.
+> > > > > 
+> > > > > The ARM platform requires a pci_sys_data as sysdata for the PCI bus,
+> > > > > this is be handled by setting up 'struct gen_pci' to embed a
+> > > > > pci_sys_data variable as the first element on the ARM platform.
+> > > > > 
+> > > > > Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+> > > > > ---
+> > > > > Here's v2 of the patches, this enables use of pci-host-generic on
+> > > > > arm64.
+> > > > > 
+> > > > > This has been tested on both qemu and fast model for arm64, and on
+> > > > > qemu for arm32.
+> > > > > 
+> > > > > v1->v2
+> > > > >  - Address comments from Arnd Bergmann and Lorenzo Pieralisi
+> > > > >     - move contents of gen_pci_init to gen_pci_probe
+> > > > >     - assign resources only when !probe_only
+> > > > >  - tested on ARM32 with qemu option -M virt
+> > > > 
+> > > > I tried this with an arm64 kernel running under kvmtool, but I get the
+> > > > following errors (a 32-bit ARM kernel does seem to work):
+> > > > 
+> > > >   PCI host bridge /pci ranges:
+> > > >      IO 0x00000000..0x0000ffff -> 0x00000000
+> > > >     MEM 0x41000000..0x7fffffff -> 0x41000000
+> > > >   pci-host-generic 40000000.pci: PCI host bridge to bus 0000:00
+> > > >   pci_bus 0000:00: root bus resource [bus 00-01]
+> > > >   pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
+> > > >   pci_bus 0000:00: root bus resource [mem 0x41000000-0x7fffffff]
+> > > >   pci_bus 0000:00: scanning bus
+> > > >   pci 0000:00:00.0: [1af4:1009] type 00 class 0xff0000
+> > > >   pci 0000:00:00.0: reg 0x10: [mem 0x41000000-0x410003ff]
+> > > >   pci 0000:00:00.0: reg 0x14: [io  0x6200-0x65ff]
+> > > >   pci 0000:00:00.0: reg 0x18: [mem 0x41000400-0x410005ff]
+> > > >   pci 0000:00:01.0: [1af4:1009] type 00 class 0xff0000
+> > > >   pci 0000:00:01.0: reg 0x10: [mem 0x41000800-0x41000bff]
+> > > >   pci 0000:00:01.0: reg 0x14: [io  0x6600-0x69ff]
+> > > >   pci 0000:00:01.0: reg 0x18: [mem 0x41000c00-0x41000dff]
+> > > >   pci_bus 0000:00: fixups for bus
+> > > >   pci_bus 0000:00: bus scan returning with max=00
+> > > >   pci 0000:00:00.0: fixup irq: got 10
+> > > >   pci 0000:00:00.0: assigning IRQ 10
+> > > >   pci 0000:00:01.0: fixup irq: got 11
+> > > >   pci 0000:00:01.0: assigning IRQ 11
+> > > >   virtio-pci 0000:00:00.0: can't enable device: BAR 0 [mem 0x41000000-0x410003ff] not claimed
+> > > >   virtio-pci: probe of 0000:00:00.0 failed with error -22
+> > > >   virtio-pci 0000:00:01.0: can't enable device: BAR 0 [mem 0x41000800-0x41000bff] not claimed
+> > > >   virtio-pci: probe of 0000:00:01.0 failed with error -22
+> > > 
+> > > PCI_PROBE_ONLY does not work yet for arm64, this will need further changes
+> > > in either arm64 or pci as noted by Lorenzo. This is not due to a problem with
+> > > this patch per se.
+> > > 
+> > > More importantly, this does not change the current arm32 behavior and adds
+> > > support for arm64 for two very useful cases
+> > >  - we can use "pci-host-ecam-generic" for a host bridge controller that is
+> > >    initialized by firmware, without adding a custom driver.
+> > >  - qemu virt platform works on arm64
+> > > 
+> > > If you think there are any furhter changes needed in this patchset please
+> > > let me know.
+> > 
+> > I'm waiting for at least an ack from Will.
 > 
-> Can someone please describe why we need to do software
-> reparenting at a specific point in time during a frequency
-> switch? I must have missed out on the conversation somewhere and
-> looking at the commit that introduces the function, the argument
-> for why the API is exposed:
-> 
->       To be used by clock implementations for switching to a new
->       parent during rate change.
-> 
-> is lacking in any details about *why* we need it.
-> 
+> I'm not too keen on the current state of this patch. Firstly, I'd really
+> like to see the PROBE_ONLY case addressed at the same time as this port
+> (Lorenzo and Suravee are working on this).
 
-Hi Stephen,
+Fixing the PROBE-ONLY for arm64 is probably unrelated to the scope of this
+patch - so I would hope that we don't NACK this patch due to that issue. This
+patch is very useful without PROBE-ONLY like I noted above.
 
-the way the EMC clock rate is set in hardware is similar to other
-clocks, i.e. there's a register and you write the new divider and parent
-id to it. However, with EMC, you cannot just do this any time you want;
-writing to the register initiates a state machine in the clock hardware
-that changes a large number of other parameters regarding DRAM timings
-as well. These parameters need to be programmed into shadow registers
-before the rate change write is done. This means that both the new
-divisor and the parent must be written in the same register write.
+> Secondly, the hack to put pci_sys_data as the first member of gen_pci is ugly
+> at best
 
-The CCF has a callback, set_rate_and_parent, which allows for both to be
-passed to the driver at the same time. However, it also requires
-set_rate and set_parent to be implemented, which the EMC driver cannot do.
+On balance, it removes the problem of using hw_pci interface which has its own
+ugliness (Arnd's mail on this http://www.spinics.net/lists/linux-pci/msg40703.html)
 
-Furthermore, the CCF cannot help with parent selection for the EMC clock
-at all. The parent for each rate is selected by the board designer.
+> and probably makes it difficult to support MSIs on ARM.
 
-There is also the issue that sometimes, the EMC driver cannot directly
-switch to the target (rate, parent) pair; instead it is necessary to
-switch first to another pair we call a backup timing. In this situation,
-we temporarily have a parent that is neither the one we had before the
-set_rate call or the one it will be after. Especially, if the switch to
-the backup timing succeeds but the following switch to the target timing
-fails, then without the reparent call the parent in hardware would be
-left inconsistent with the software state.
+Adding parsing of msi-parent and setting it up for arm32 and arm64 can be
+added fairly easily to the current code, I can post an RFC patch for this.
 
-This is why we've decided to implement the driver with only the set_rate
-callback and decide the required transitions within the driver.
-This also means that the driver needs to have a function to tell the CCF
-that it has changed its parent.
-
-Thanks,
-Mikko.
-
-nvpublic
+JC.
