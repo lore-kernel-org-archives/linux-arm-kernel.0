@@ -1,27 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 21 May 2015 15:24:02 +0200
-Subject: [Linaro-acpi] [V4 PATCH 1/6] ACPI / scan: Parse _CCA and setup
- device coherency
-In-Reply-To: <20150521130116.GJ29424@e104818-lin.cambridge.arm.com>
-References: <1431724994-21601-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <5074701.G8z7gpKvin@wuerfel>
- <20150521130116.GJ29424@e104818-lin.cambridge.arm.com>
-Message-ID: <3038248.bRme3FQvei@wuerfel>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 21 May 2015 14:25:57 +0100
+Subject: [PATCH tip/core/rcu 7/9] arm64: Use common
+ outgoing-CPU-notification code
+In-Reply-To: <20150521124833.GJ6776@linux.vnet.ibm.com>
+References: <20150512214945.GA813@linux.vnet.ibm.com>
+ <1431467407-1223-1-git-send-email-paulmck@linux.vnet.ibm.com>
+ <1431467407-1223-7-git-send-email-paulmck@linux.vnet.ibm.com>
+ <20150521085806.GC21920@arm.com>
+ <20150521124833.GJ6776@linux.vnet.ibm.com>
+Message-ID: <20150521132557.GK29424@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 May 2015 14:01:16 Catalin Marinas wrote:
-> On Wed, May 20, 2015 at 02:04:02PM +0200, Arnd Bergmann wrote:
-> > On Wednesday 20 May 2015 06:52:03 Suravee Suthikulanit wrote:
+On Thu, May 21, 2015 at 05:48:33AM -0700, Paul E. McKenney wrote:
+> On Thu, May 21, 2015 at 09:58:06AM +0100, Will Deacon wrote:
+> > On Tue, May 12, 2015 at 10:50:05PM +0100, Paul E. McKenney wrote:
+> > > From: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
 > > > 
-> > > Ok. That seems to be what Arnd would prefer as well.  Let's just leave 
-> > > the support for _CCA=0 out until it is needed then.
+> > > This commit removes the open-coded CPU-offline notification with new
+> > > common code.  In particular, this change avoids calling scheduler code
+> > > using RCU from an offline CPU that RCU is ignoring.  This is a minimal
+> > > change.  A more intrusive change might invoke the cpu_check_up_prepare()
+> > > and cpu_set_state_online() functions at CPU-online time, which would
+> > > allow onlining throw an error if the CPU did not go offline properly.
+> > > 
+> > > Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+> > > Cc: linux-arm-kernel at lists.infradead.org
+> > > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > > Cc: Will Deacon <will.deacon@arm.com>
+> > > ---
+> > >  arch/arm64/kernel/smp.c | 6 ++----
+> > >  1 file changed, 2 insertions(+), 4 deletions(-)
 > > 
-> > Yes, that would be best (as I said repeatedly  )
+> > I don't have a better idea, so:
+> > 
+> >   Acked-by: Will Deacon <will.deacon@arm.com>
+> > 
+> > Is this queued via -tip already, or can we pick it into the arm64 tree
+> > for 4.2?
 > 
-> I'm sure it won't be long before someone asks for this feature ;).
+> Feel free to take it into the arm64 tree.  Just let me know, and I
+> will drop it from my tree.
 
-If nothing else, we get to publically shame them for building crappy
-hardware then ;-)
+Queued for 4.2. Thanks.
 
-	Arnd
+-- 
+Catalin
