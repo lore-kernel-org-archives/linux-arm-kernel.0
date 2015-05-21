@@ -1,92 +1,149 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 21 May 2015 09:33:52 +0800
-Subject: [PATCH v1] ARM: dts: nitrogen6x: add CAN support
-In-Reply-To: <1432158569-4415-1-git-send-email-ps.report@gmx.net>
-References: <1432158569-4415-1-git-send-email-ps.report@gmx.net>
-Message-ID: <20150521013351.GK24844@dragon>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Thu, 21 May 2015 09:41:04 +0800
+Subject: [RFC PATCH v1 2/3] PCI: hisi: Add PCIe host support for Hisilicon
+ Soc Hip05
+In-Reply-To: <000101d092fb$94dde100$be99a300$@com>
+References: <000101d092fb$94dde100$be99a300$@com>
+Message-ID: <555D37B0.2080909@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 11:49:29PM +0200, Peter Seiderer wrote:
-> Regulator stuff copied from imx6qdl-tx6.dtsi, pin configuration
-> taken from Boundary Devices linux kernel tree ([1] and [2]).
+On 2015/5/20 20:50, Jingoo Han wrote:
+> On Wed, 20 May 2015 14:21:40 +0800, Zhou Wang wrote:
+>>
+>> This patch adds PCIe host support for Hisilicon Soc Hip05.
+>>
+>> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
 > 
-> [1] https://github.com/boundarydevices/linux-imx6/blob/boundary-imx_3.10.17_1.0.2_ga/arch/arm/boot/dts/imx6qdl-nitrogen6x.dts
-> [2] https://github.com/boundarydevices/linux-imx6/blob/boundary-imx_3.10.17_1.0.2_ga/arch/arm/boot/dts/imx6qdl.dtsi
+> Hi Zhou Wang,
 > 
-> Signed-off-by: Peter Seiderer <ps.report@gmx.net>
-> ---
->  arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 32 +++++++++++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
+> I added some minor comments.
+>
+
+Hi Jingoo,
+
+>> ---
+>>  drivers/pci/host/Kconfig     |   5 +
+>>  drivers/pci/host/Makefile    |   1 +
+>>  drivers/pci/host/pcie-hisi.c | 252 +++++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 258 insertions(+)
+>>  create mode 100644 drivers/pci/host/pcie-hisi.c
+>>
+>> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+>> index 1dfb567..486d822 100644
+>> --- a/drivers/pci/host/Kconfig
+>> +++ b/drivers/pci/host/Kconfig
+>> @@ -125,4 +125,9 @@ config PCIE_IPROC_PLATFORM
+>>  	  Say Y here if you want to use the Broadcom iProc PCIe controller
+>>  	  through the generic platform bus interface
+>>  
+>> +config PCI_HISI
+>> +	depends on OF && ARM64
+>> +	bool "Hisilicon Soc HIP05 PCIe controller"
+>> +	select PCIE_DW
+>> +
+>>  endmenu
+>> diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
+>> index f733b4e..562142e 100644
+>> --- a/drivers/pci/host/Makefile
+>> +++ b/drivers/pci/host/Makefile
+>> @@ -15,3 +15,4 @@ obj-$(CONFIG_PCI_LAYERSCAPE) += pci-layerscape.o
+>>  obj-$(CONFIG_PCI_VERSATILE) += pci-versatile.o
+>>  obj-$(CONFIG_PCIE_IPROC) += pcie-iproc.o
+>>  obj-$(CONFIG_PCIE_IPROC_PLATFORM) += pcie-iproc-platform.o
+>> +obj-$(CONFIG_PCI_HISI) += pcie-hisi.o
+>> diff --git a/drivers/pci/host/pcie-hisi.c b/drivers/pci/host/pcie-hisi.c
+>> new file mode 100644
+>> index 0000000..3f8cb9a
+>> --- /dev/null
+>> +++ b/drivers/pci/host/pcie-hisi.c
+>> @@ -0,0 +1,252 @@
+>> +/*
+>> + * PCIe host controller driver for Hisilicon Hip05 SoCs
+>> + *
+>> + * Copyright (C) 2014 Hisilicon Co., Ltd. http://www.hisilicon.com
 > 
-> diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-> index fd096dc..1c415e4 100644
-> --- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-> @@ -54,6 +54,17 @@
->  			gpio = <&gpio3 22 0>;
->  			enable-active-high;
->  		};
-> +
-> +		reg_can_xcvr: regulator at 3 {
-> +			compatible = "regulator-fixed";
-> +			reg = <3>;
-> +			regulator-name = "CAN XCVR";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_can_xcvr>;
-> +			gpio = <&gpio1 2 GPIO_ACTIVE_HIGH>;
-> +		};
->  	};
->  
->  	gpio-keys {
-> @@ -138,6 +149,13 @@
->  	status = "okay";
->  };
->  
-> +&can1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_can1_1>;
-> +	xceiver-supply = <&reg_can_xcvr>;
-> +	status = "okay";
-> +};
-> +
->  &ecspi1 {
->  	fsl,spi-num-chipselects = <1>;
->  	cs-gpios = <&gpio3 19 0>;
-> @@ -234,6 +252,20 @@
->  			>;
->  		};
->  
-> +		pinctrl_can1_1: can1grp-1 {
-
-The '_1' suffix is meaningless.
-
-		pinctrl_can1: can1grp {
-
-Shawn
-
-> +			fsl,pins = <
-> +				MX6QDL_PAD_KEY_COL2__FLEXCAN1_TX 0x80000000
-> +				MX6QDL_PAD_KEY_ROW2__FLEXCAN1_RX 0x80000000
-> +			>;
-> +		};
-> +
-> +		pinctrl_can_xcvr: can-xcvrgrp {
-> +			fsl,pins = <
-> +				/* Flexcan XCVR enable */
-> +				MX6QDL_PAD_GPIO_2__GPIO1_IO02		0x1b0b0
-> +			>;
-> +		};
-> +
->  		pinctrl_ecspi1: ecspi1grp {
->  			fsl,pins = <
->  				MX6QDL_PAD_EIM_D17__ECSPI1_MISO		0x100b1
-> -- 
-> 2.1.4
+> s/2014/2015
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+Thanks, forgot to change this.
+
+>> + *
+>> + * Author: Zhou Wang <wangzhou1@hisilicon.com>
+>> + *         Dacai Zhu <zhudacai@hisilicon.com>
+> 
+> [.....]
+> 
+>> +#define PCIE_SUBCTRL_MODE_REG                           (0x2800)
+>> +#define PCIE_SUBCTRL_SYS_STATE4_REG                     (0x6818)
+>> +#define PCIE_SLV_DBI_MODE                               (0x0)
+>> +#define PCIE_SLV_SYSCTRL_MODE                           (0x1)
+>> +#define PCIE_SLV_CONTENT_MODE                           (0x2)
+>> +#define PCIE_LTSSM_LINKUP_STATE                         (0x11)
+>> +#define PCIE_LTSSM_STATE_MASK                           (0x3F)
+>> +#define PCIE_MSI_CONTEXT_VALUE                          (0x1011000)
+>> +#define PCIE_MSI_TRANS_ENABLE                           (0x1ff0)
+>> +#define PCIE_MSI_LOW_ADDRESS                            (0x1b4)
+>> +#define PCIE_MSI_HIGH_ADDRESS                           (0x1c4)
+> 
+> Please remove unnecessary braces as below.
+> 
+
+Ok, will do as below.
+
+> +#define PCIE_SUBCTRL_MODE_REG                           0x2800
+> +#define PCIE_SUBCTRL_SYS_STATE4_REG                     0x6818
+> .....
+> 
+> [.....]
+> 
+>> +/* Configure vmid/asid table in PCIe host */
+>> +static void hisi_pcie_config_context(struct hisi_pcie *pcie)
+>> +{
+>> +	int i;
+>> +
+>> +	hisi_pcie_change_apb_mode(pcie, PCIE_SLV_CONTENT_MODE);
+>> +
+>> +	for (i = 0; i < 0x400; i++)
+>> +		hisi_pcie_apb_writel(pcie, 0x0, i * 4);
+>> +
+>> +	for (i = 0x400; i < 0x800; i++)
+>> +		hisi_pcie_apb_writel(pcie, 0x0, i * 4);
+> 
+> How about the following?
+> 
+> +	for (i = 0; i < 0x800; i++)
+> +		hisi_pcie_apb_writel(pcie, 0x0, i * 4);
+> 
+
+This is to configure init value of vmid and asid of each pcie device.
+
+>> +
+>> +	hisi_pcie_change_apb_mode(pcie, PCIE_SLV_SYSCTRL_MODE);
+>> +
+>> +	hisi_pcie_apb_writel(pcie, 0xb7010040, PCIE_MSI_LOW_ADDRESS);
+>> +	hisi_pcie_apb_writel(pcie, 0x0, PCIE_MSI_HIGH_ADDRESS);
+>> +	hisi_pcie_apb_writel(pcie, PCIE_MSI_CONTEXT_VALUE, 0x10);
+>> +	hisi_pcie_apb_writel(pcie, PCIE_MSI_TRANS_ENABLE, 0x1c8);
+> 
+> Please don't use hardcoded numbers as possible.
+>
+
+OK, will use macro to do this.
+
+>> +
+>> +	hisi_pcie_change_apb_mode(pcie, PCIE_SLV_DBI_MODE);
+>> +}
+> [.....]
+> 
+> Best regards,
+> Jingoo Han
+> 
+
+Many thanks for your review and Best regards,
+Zhou Wang
+
+> 
+> 
+> .
+> 
