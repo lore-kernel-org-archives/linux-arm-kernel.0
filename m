@@ -1,17 +1,38 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 21 May 2015 09:26:39 +0800
-Subject: [PATCH] ARM: dts: cubox-i/hummingboard: Fix the license text
-In-Reply-To: <1432148222-12603-1-git-send-email-festevam@gmail.com>
-References: <1432148222-12603-1-git-send-email-festevam@gmail.com>
-Message-ID: <20150521012638.GJ24844@dragon>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 21 May 2015 10:29:24 +0900
+Subject: [PATCH 0/5] ARM: shmobile: dts: Replace "nor-jedec" by
+ "jedec,spi-nor"
+In-Reply-To: <20150520184150.GG11598@ld-irv-0074>
+References: <1432145814-12442-1-git-send-email-geert+renesas@glider.be>
+ <20150520184150.GG11598@ld-irv-0074>
+Message-ID: <20150521012924.GB2302@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 03:57:02PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Arrange the license text a bit to make it clear.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Hi Geert,
 
-Applied, thanks.
+On Wed, May 20, 2015 at 11:41:50AM -0700, Brian Norris wrote:
+> + linux-mtd, FYI
+> 
+> On Wed, May 20, 2015 at 08:16:49PM +0200, Geert Uytterhoeven wrote:
+> > 	Hi Simon, Magnus,
+> > 
+> > This patch series replaces the recently introduced "nor-jedec"
+> > compatible value by "jedec,spi-nor" in all shmobile dts files,
+> > cfr. commit 8947e396a8296c52 ('Documentation: dt: mtd: replace
+> > "nor-jedec" binding with "jedec,spi-nor"'), which was applied in
+> > v4.1-rc4.
+> > 
+> > As the "bad" compatible values are already in -next for v4.2, these
+> > updates should be applied and queued for v4.2, too.
+> > 
+> > Thanks for applying!
+> 
+> For the series:
+> 
+> Acked-by: Brian Norris <computersforpeace@gmail.com>
+> 
+> Thanks Geert!
+
+thanks for following up on this. I have queued these up for v4.2
+on top of the patches which add usage of the "bad" values.
