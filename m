@@ -1,282 +1,211 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 21 May 2015 17:26:23 +0100
-Subject: [PATCH v5 10/11] drivers: PL011: add support for the ARM SBSA generic
- UART
-In-Reply-To: <1432225584-4655-1-git-send-email-andre.przywara@arm.com>
-References: <1432225584-4655-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1432225584-4655-11-git-send-email-andre.przywara@arm.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu, 21 May 2015 17:42:15 +0100
+Subject: [PATCH v5 00/11] Add simple NVMEM Framework via regmap.
+In-Reply-To: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1432226535-8640-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM Server Base System Architecture[1] document describes a
-generic UART which is a subset of the PL011 UART.
-It lacks DMA support, baud rate control and modem status line
-control, among other things.
-The idea is to move the UART initialization and setup into the
-firmware (which does this job today already) and let the kernel just
-use the UART for sending and receiving characters.
+Thankyou all for providing inputs and comments on previous versions of this patchset.
+Here is the v5 of the patchset addressing all the issues raised as
+part of previous versions review.
 
-We use the recent refactoring to build a new struct uart_ops
-variable which points to some new functions avoiding access to the
-missing registers. We reuse as much existing PL011 code as possible.
+This patchset adds a new simple NVMEM framework to kernel.
 
-In contrast to the PL011 the SBSA UART does not define any AMBA or
-PrimeCell relations, so we go with a pretty generic probe function
-which only uses platform device functions.
-A DT binding is provided with this patch, ACPI support is added in a
-separate one.
+Up until now, NVMEM drivers were stored in drivers/misc, where they all had to
+duplicate pretty much the same code to register a sysfs file, allow in-kernel
+users to access the content of the devices they were driving, etc.
+    
+This was also a problem as far as other in-kernel users were involved, since
+the solutions used were pretty much different from on driver to another, there
+was a rather big abstraction leak.
+    
+Introduction of this framework aims at solving this. It also introduces DT
+representation for consumer devices to go get the data they require (MAC
+Addresses, SoC/Revision ID, part numbers, and so on) from the NVMEMs.
+    
+After learning few things about QCOM qfprom and other eeprom/efuses, which
+has packed fields at bit level. Which makes it important to add support to
+such memories. This version adds support to this type of non volatile
+memories by adding support to bit level nvmem-cells.
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- .../devicetree/bindings/serial/arm_sbsa_uart.txt   |  10 ++
- drivers/tty/serial/amba-pl011.c                    | 171 +++++++++++++++++++++
- 2 files changed, 181 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
+Having regmap interface to this framework would give much better
+abstraction for nvmems on different buses.
 
-diff --git a/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt b/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
-new file mode 100644
-index 0000000..4163e7e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/serial/arm_sbsa_uart.txt
-@@ -0,0 +1,10 @@
-+* ARM SBSA defined generic UART
-+This UART uses a subset of the PL011 registers and consequently lives
-+in the PL011 driver. It's baudrate and other communication parameters
-+cannot be adjusted at runtime, so it lacks a clock specifier here.
-+
-+Required properties:
-+- compatible: must be "arm,sbsa-uart"
-+- reg: exactly one register range
-+- interrupts: exactly one interrupt specifier
-+- current-speed: the (fixed) baud rate set by the firmware
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 6558400..c0850f3 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -101,6 +101,14 @@ static struct vendor_data vendor_arm = {
- 	.get_fifosize		= get_fifosize_arm,
- };
- 
-+static struct vendor_data vendor_sbsa = {
-+	.oversampling		= false,
-+	.dma_threshold		= false,
-+	.cts_event_workaround	= false,
-+	.always_enabled		= true,
-+	.fixed_options		= true,
-+};
-+
- static unsigned int get_fifosize_st(struct amba_device *dev)
- {
- 	return 64;
-@@ -1641,6 +1649,28 @@ static int pl011_startup(struct uart_port *port)
- 	return retval;
- }
- 
-+static int sbsa_uart_startup(struct uart_port *port)
-+{
-+	struct uart_amba_port *uap =
-+		container_of(port, struct uart_amba_port, port);
-+	int retval;
-+
-+	retval = pl011_hwinit(port);
-+	if (retval)
-+		return retval;
-+
-+	retval = pl011_allocate_irq(uap);
-+	if (retval)
-+		return retval;
-+
-+	/* The SBSA UART does not support any modem status lines. */
-+	uap->old_status = 0;
-+
-+	pl011_enable_interrupts(uap);
-+
-+	return 0;
-+}
-+
- static void pl011_shutdown_channel(struct uart_amba_port *uap,
- 					unsigned int lcrh)
- {
-@@ -1721,6 +1751,19 @@ static void pl011_shutdown(struct uart_port *port)
- 		uap->port.ops->flush_buffer(port);
- }
- 
-+static void sbsa_uart_shutdown(struct uart_port *port)
-+{
-+	struct uart_amba_port *uap =
-+		container_of(port, struct uart_amba_port, port);
-+
-+	pl011_disable_interrupts(uap);
-+
-+	free_irq(uap->port.irq, uap);
-+
-+	if (uap->port.ops->flush_buffer)
-+		uap->port.ops->flush_buffer(port);
-+}
-+
- static void
- pl011_setup_status_masks(struct uart_port *port, struct ktermios *termios)
- {
-@@ -1872,6 +1915,27 @@ pl011_set_termios(struct uart_port *port, struct ktermios *termios,
- 	spin_unlock_irqrestore(&port->lock, flags);
- }
- 
-+static void
-+sbsa_uart_set_termios(struct uart_port *port, struct ktermios *termios,
-+		      struct ktermios *old)
-+{
-+	struct uart_amba_port *uap =
-+	    container_of(port, struct uart_amba_port, port);
-+	unsigned long flags;
-+
-+	tty_termios_encode_baud_rate(termios, uap->fixed_baud, uap->fixed_baud);
-+
-+	/* The SBSA UART only supports 8n1 without hardware flow control. */
-+	termios->c_cflag &= ~(CSIZE | CSTOPB | PARENB | PARODD);
-+	termios->c_cflag &= ~(CMSPAR | CRTSCTS);
-+	termios->c_cflag |= CS8 | CLOCAL;
-+
-+	spin_lock_irqsave(&port->lock, flags);
-+	uart_update_timeout(port, CS8, uap->fixed_baud);
-+	pl011_setup_status_masks(port, termios);
-+	spin_unlock_irqrestore(&port->lock, flags);
-+}
-+
- static const char *pl011_type(struct uart_port *port)
- {
- 	struct uart_amba_port *uap =
-@@ -1947,6 +2011,37 @@ static struct uart_ops amba_pl011_pops = {
- #endif
- };
- 
-+static void sbsa_uart_set_mctrl(struct uart_port *port, unsigned int mctrl)
-+{
-+}
-+
-+static unsigned int sbsa_uart_get_mctrl(struct uart_port *port)
-+{
-+	return 0;
-+}
-+
-+static const struct uart_ops sbsa_uart_pops = {
-+	.tx_empty	= pl011_tx_empty,
-+	.set_mctrl	= sbsa_uart_set_mctrl,
-+	.get_mctrl	= sbsa_uart_get_mctrl,
-+	.stop_tx	= pl011_stop_tx,
-+	.start_tx	= pl011_start_tx,
-+	.stop_rx	= pl011_stop_rx,
-+	.startup	= sbsa_uart_startup,
-+	.shutdown	= sbsa_uart_shutdown,
-+	.set_termios	= sbsa_uart_set_termios,
-+	.type		= pl011_type,
-+	.release_port	= pl011_release_port,
-+	.request_port	= pl011_request_port,
-+	.config_port	= pl011_config_port,
-+	.verify_port	= pl011_verify_port,
-+#ifdef CONFIG_CONSOLE_POLL
-+	.poll_init     = pl011_hwinit,
-+	.poll_get_char = pl011_get_poll_char,
-+	.poll_put_char = pl011_put_poll_char,
-+#endif
-+};
-+
- static struct uart_amba_port *amba_ports[UART_NR];
- 
- #ifdef CONFIG_SERIAL_AMBA_PL011_CONSOLE
-@@ -2327,6 +2422,79 @@ static int pl011_resume(struct device *dev)
- 
- static SIMPLE_DEV_PM_OPS(pl011_dev_pm_ops, pl011_suspend, pl011_resume);
- 
-+static int sbsa_uart_probe(struct platform_device *pdev)
-+{
-+	struct uart_amba_port *uap;
-+	struct resource *r;
-+	int portnr, ret;
-+	int baudrate;
-+
-+	/*
-+	 * Check the mandatory baud rate parameter in the DT node early
-+	 * so that we can easily exit with the error.
-+	 */
-+	if (pdev->dev.of_node) {
-+		struct device_node *np = pdev->dev.of_node;
-+
-+		ret = of_property_read_u32(np, "current-speed", &baudrate);
-+		if (ret)
-+			return ret;
-+	} else {
-+		baudrate = 115200;
-+	}
-+
-+	portnr = pl011_find_free_port();
-+	if (portnr < 0)
-+		return portnr;
-+
-+	uap = devm_kzalloc(&pdev->dev, sizeof(struct uart_amba_port),
-+			   GFP_KERNEL);
-+	if (!uap)
-+		return -ENOMEM;
-+
-+	uap->vendor	= &vendor_sbsa;
-+	uap->fifosize	= 32;
-+	uap->port.irq	= platform_get_irq(pdev, 0);
-+	uap->port.ops	= &sbsa_uart_pops;
-+	uap->fixed_baud = baudrate;
-+
-+	snprintf(uap->type, sizeof(uap->type), "SBSA");
-+
-+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+
-+	ret = pl011_setup_port(&pdev->dev, uap, r, portnr);
-+	if (ret)
-+		return ret;
-+
-+	platform_set_drvdata(pdev, uap);
-+
-+	return pl011_register_port(uap);
-+}
-+
-+static int sbsa_uart_remove(struct platform_device *pdev)
-+{
-+	struct uart_amba_port *uap = platform_get_drvdata(pdev);
-+
-+	uart_remove_one_port(&amba_reg, &uap->port);
-+	pl011_unregister_port(uap);
-+	return 0;
-+}
-+
-+static const struct of_device_id sbsa_uart_of_match[] = {
-+	{ .compatible = "arm,sbsa-uart", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, sbsa_uart_of_match);
-+
-+static struct platform_driver arm_sbsa_uart_platform_driver = {
-+	.probe		= sbsa_uart_probe,
-+	.remove		= sbsa_uart_remove,
-+	.driver	= {
-+		.name	= "sbsa-uart",
-+		.of_match_table = of_match_ptr(sbsa_uart_of_match),
-+	},
-+};
-+
- static struct amba_id pl011_ids[] = {
- 	{
- 		.id	= 0x00041011,
-@@ -2357,11 +2525,14 @@ static int __init pl011_init(void)
- {
- 	printk(KERN_INFO "Serial: AMBA PL011 UART driver\n");
- 
-+	if (platform_driver_register(&arm_sbsa_uart_platform_driver))
-+		pr_warn("could not register SBSA UART platform driver\n");
- 	return amba_driver_register(&pl011_driver);
- }
- 
- static void __exit pl011_exit(void)
- {
-+	platform_driver_unregister(&arm_sbsa_uart_platform_driver);
- 	amba_driver_unregister(&pl011_driver);
- }
- 
+patch 1-2 Introduces two regmap helper functions.
+patch 3-6 Introduces the NVMEM framework.
+Patch 7 Adds helper functions for nvmems based on mmio.
+Patch 8 migrates an existing driver to nvmem framework.
+Patch 9-10 Adds Qualcomm specific qfprom driver.
+Patch 11 adds entry in MAINTAINERS.
+
+Its also possible to migrate other nvmem drivers to this framework.
+
+Providers APIs:
+	nvmem_register/unregister();
+
+Consumers APIs:
+Cell based apis for both DT/Non-DT:
+	nvmem_cell_get()/nvmem_cell_put();
+	nvmem_cell_read()/nvmem_cell_write();
+
+Raw byte access apis for both DT/non-DT.
+	nvmem_device_get()/nvmem_device_put()
+	nvmem_device_read()/nvmem_device_write();
+	nvmem_device_cell_read()/nvmem_device_cell_write();
+
+Device Tree:
+
+	/* Provider */
+	qfprom: qfprom at 00700000 {
+		...
+
+		/* Data cells */
+		tsens_calibration: calib at 404 {
+			reg = <0x404 0x10>;
+		};
+
+		tsens_calibration_bckp: calib_bckp at 504 {
+			reg = <0x504 0x11>;
+			bit-offset = 6;
+			nbits = 128;
+		};
+
+		pvs_version: pvs-version at 6 {
+			reg = <0x6 0x2>
+			bit-offset = 7;
+			nbits = 2;
+		};
+
+		speed_bin: speed-bin at c{
+			reg = <0xc 0x1>;
+			bit-offset = 2;
+			nbits	= 3;
+
+		};
+		...
+	};
+
+userspace interface: binary file in /sys/class/nvmem/*/nvmem
+
+ex:
+hexdump /sys/class/nvmem/qfprom0/nvmem
+                                                                                                                                                                                                                  
+0000000 0000 0000 0000 0000 0000 0000 0000 0000
+*
+00000a0 db10 2240 0000 e000 0c00 0c00 0000 0c00
+0000000 0000 0000 0000 0000 0000 0000 0000 0000
+...
+*
+0001000
+
+Changes since v4(https://lkml.org/lkml/2015/3/30/725)
+ * rename eeprom to nvmem suggested by Matt Porter
+ * added bit level support to nvmem cells, if not framework is
+ 	not usable for qcom platforms.
+ * removed ternary operator shortcut suggested by Mark B.
+ * unified consumer/provider apis for both DT and non-DT.
+ * added name support for cell.
+ * added bit level bindings.
+ * added read-only support suggested by Matt Porter and others.
+ * added new nvmem_device based consumer apis.
+
+Changes since v3(https://lkml.org/lkml/2015/3/24/1066)
+ * simplified logic in bin_attr_eeprom_read/write spotted by Mark Brown.
+ * moved from using regmap_bulk_read/write to regmap_raw_read/write
+ spotted by Mark Brown
+ * Fixed return error codes for the dummy wrappers spotted by Sascha Hauer
+ * Fixed various error code checks in core spotted by Sascha Hauer.
+ * Simplified consumer bindings suggested by Sascha Hauer.
+ * Added eeprom-mmio helper functions.
+
+Changes since v2(https://lkml.org/lkml/2015/3/13/168)
+ * Fixed error handling in eeprom_register spotted by Mark Brown
+ * Added new regmap_get_max_register() and regmap_get_reg_stride().
+ * Fixed module build errors reported by kbuild robot.
+ * recycle the ids when eeprom provider is released.
+
+Changes since v1(https://lkml.org/lkml/2015/3/5/153)
+ * Fix various Licencing issues spotted by Paul Bolle and Mark Brown
+ * Allow eeprom core to build as module spotted by Paul Bolle.
+ * Fix various kconfig issues spotted by Paul Bolle.
+ * remove unessary atomic varible spotted by Mark Brown.
+ * Few cleanups and common up some of the code in core.
+ * Add qfprom bindings.
+
+Changes since RFC(https://lkml.org/lkml/2015/2/19/307)
+ * Fix documentation and error checks in read/write spotted by Andrew Lunn
+ * Kconfig fix suggested by Stephen Boyd.
+ * Add module owner suggested by Stephen Boyd and others.
+ * Fix unsafe handling of eeprom in unregister spotted by Russell and Mark Brown.
+ * seperate bindings patch as suggested by Rob.
+ * Add MAINTAINERS as suggested by Rob.
+ * Added support to allow reading eeprom for things like serial number which
+ * canbe scatters across.
+ * Added eeprom data using reg property suggested by Sascha and Stephen.
+ * Added non-DT support.
+ * Move kerneldoc to the src files spotted by Mark Brown.
+ * Remove local list and do eeprom lookup by using class_find_device()
+
+
+Thanks,
+srini
+
+
+Maxime Ripard (1):
+  nvmem: sunxi: Move the SID driver to the nvmem framework
+
+Srinivas Kandagatla (10):
+  regmap: Introduce regmap_get_max_register.
+  regmap: Introduce regmap_get_reg_stride.
+  nvmem: Add a simple NVMEM framework for nvmem providers
+  nvmem: Add a simple NVMEM framework for consumers
+  nvmem: Add nvmem_device based consumer apis.
+  nvmem: Add bindings for simple nvmem framework
+  nvmem: Add simple nvmem-mmio consumer helper functions.
+  nvmem: qfprom: Add Qualcomm QFPROM support.
+  nvmem: qfprom: Add bindings for qfprom
+  nvmem: Add to MAINTAINERS for nvmem framework
+
+ Documentation/ABI/testing/sysfs-driver-sunxi-sid   |  22 -
+ .../bindings/misc/allwinner,sunxi-sid.txt          |  17 -
+ .../bindings/nvmem/allwinner,sunxi-sid.txt         |  21 +
+ Documentation/devicetree/bindings/nvmem/nvmem.txt  |  84 ++
+ Documentation/devicetree/bindings/nvmem/qfprom.txt |  35 +
+ MAINTAINERS                                        |   9 +
+ drivers/Kconfig                                    |   2 +
+ drivers/Makefile                                   |   1 +
+ drivers/base/regmap/regmap.c                       |  24 +
+ drivers/misc/eeprom/Kconfig                        |  13 -
+ drivers/misc/eeprom/Makefile                       |   1 -
+ drivers/misc/eeprom/sunxi_sid.c                    | 156 ----
+ drivers/nvmem/Kconfig                              |  36 +
+ drivers/nvmem/Makefile                             |  13 +
+ drivers/nvmem/core.c                               | 864 +++++++++++++++++++++
+ drivers/nvmem/nvmem-mmio.c                         |  69 ++
+ drivers/nvmem/nvmem-mmio.h                         |  41 +
+ drivers/nvmem/qfprom.c                             |  51 ++
+ drivers/nvmem/sunxi-sid.c                          |  64 ++
+ include/linux/nvmem-consumer.h                     | 106 +++
+ include/linux/nvmem-provider.h                     |  47 ++
+ include/linux/regmap.h                             |  14 +
+ 22 files changed, 1481 insertions(+), 209 deletions(-)
+ delete mode 100644 Documentation/ABI/testing/sysfs-driver-sunxi-sid
+ delete mode 100644 Documentation/devicetree/bindings/misc/allwinner,sunxi-sid.txt
+ create mode 100644 Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
+ create mode 100644 Documentation/devicetree/bindings/nvmem/nvmem.txt
+ create mode 100644 Documentation/devicetree/bindings/nvmem/qfprom.txt
+ delete mode 100644 drivers/misc/eeprom/sunxi_sid.c
+ create mode 100644 drivers/nvmem/Kconfig
+ create mode 100644 drivers/nvmem/Makefile
+ create mode 100644 drivers/nvmem/core.c
+ create mode 100644 drivers/nvmem/nvmem-mmio.c
+ create mode 100644 drivers/nvmem/nvmem-mmio.h
+ create mode 100644 drivers/nvmem/qfprom.c
+ create mode 100644 drivers/nvmem/sunxi-sid.c
+ create mode 100644 include/linux/nvmem-consumer.h
+ create mode 100644 include/linux/nvmem-provider.h
+
 -- 
-2.3.5
+1.9.1
