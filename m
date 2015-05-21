@@ -1,19 +1,61 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 21 May 2015 11:36:00 +0530
-Subject: [PATCH V5 1/3] OPP: Redefine bindings to overcome shortcomings
-In-Reply-To: <555D740B.6000001@ti.com>
-References: <cover.1432091956.git.viresh.kumar@linaro.org>
- <51a2603050f7993643fea9e5dcd2dba7a5a3fe23.1432091956.git.viresh.kumar@linaro.org>
- <555D6CC8.9050201@ti.com> <20150521054602.GE22904@linux>
- <555D740B.6000001@ti.com>
-Message-ID: <20150521060600.GC17553@linux>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Thu, 21 May 2015 14:16:30 +0800
+Subject: [PATCH v2 4/6] soc: mediatek: Add SMI driver
+In-Reply-To: <CABuKBeJvh2PGi3i6O0uu-7ggdBzKMb3tPE_XKhT1i-+tkKc5gg@mail.gmail.com>
+References: <1431683009-18158-1-git-send-email-yong.wu@mediatek.com>
+ <1431683009-18158-5-git-send-email-yong.wu@mediatek.com>
+ <CABuKBeJvh2PGi3i6O0uu-7ggdBzKMb3tPE_XKhT1i-+tkKc5gg@mail.gmail.com>
+Message-ID: <1432188990.5092.12.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21-05-15, 00:58, Nishanth Menon wrote:
-> I assume you meant [1] which in turn pointed to [2]. Thanks, will do so.
+Hi Matthias,
+     Thanks very much for your suggestion.
+     Abort the smi clock name, Could you help check below.
+     The others I will improve in next time.
 
-Right.
-
--- 
-viresh
+On Tue, 2015-05-19 at 13:14 +0200, Matthias Brugger wrote:
+> 2015-05-15 11:43 GMT+02:00 Yong Wu <yong.wu@mediatek.com>:
+> >     This patch add SMI(Smart Multimedia Interface) driver. This driver is
+> > responsible to enable/disable iommu and control the clocks of each local arbiter.
+> >
+[snip]
+> > +
+> > +#define SMI_LARB_MMU_EN                (0xf00)
+> > +#define F_SMI_MMU_EN(port)     (1 << (port))
+> > +
+> > +enum {
+> > +       MTK_CLK_APB,
+> > +       MTK_CLK_SMI,
+> > +       MTK_CLK_MAX,
+> 
+> Maybe add something like:
+> MTK_CLK_FIRST = MTK_CLK_APB,
+> to make the for loops better readable.
+> 
+Then, Is it like this? : 
+ enum {
+        MTK_CLK_FIRST = MTK_CLK_APB,
+        MTK_CLK_SMI,
+        MTK_CLK_MAX,
+ }
+or the CLK_SMI also need MTK_CLK_SECOND = MTK_CLK_SMI.
+> > +};
+> > +
+> > +struct mtk_smi_common {
+> > +       void __iomem            *base;
+> 
+> That seems to be never used. Please delete it.
+> 
+> > +       struct clk              *clk[MTK_CLK_MAX];
+> > +};
+> > +
+> > +struct mtk_smi_larb {
+> > +       void __iomem            *base;
+> > +       spinlock_t              portlock; /* lock for config port */
+> > +       struct clk              *clk[MTK_CLK_MAX];
+> > +       struct device           *smi;
+> > +};
+> > +
+> Thanks,
+> Matthias
