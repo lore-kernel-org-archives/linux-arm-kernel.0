@@ -1,43 +1,43 @@
-From: r.schwebel@pengutronix.de (Robert Schwebel)
-Date: Thu, 21 May 2015 14:26:44 +0200
-Subject: [PATCH v2] ARM: vexpress: Add unified-cache Device Tree property
-In-Reply-To: <20150516201301.GT14416@pengutronix.de>
-References: <5509437E.6060806@arm.com>
- <1426671298-2012-1-git-send-email-r.schwebel@pengutronix.de>
- <20150429191228.GO15254@pengutronix.de>
- <20150430110853.GN7440@e106497-lin.cambridge.arm.com>
- <20150430133011.GE15254@pengutronix.de> <55426A26.9060704@arm.com>
- <20150516201301.GT14416@pengutronix.de>
-Message-ID: <20150521122644.GP14416@pengutronix.de>
+From: peda@lysator.liu.se (Peter Rosin)
+Date: Thu, 21 May 2015 14:28:25 +0200
+Subject: prealloc_buffer_size and buffer_bytes_max
+Message-ID: <555DCF69.9090008@lysator.liu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sundeep,
+Hi!
 
-On Sat, May 16, 2015 at 10:13:01PM +0200, Robert Schwebel wrote:
-> On Thu, Apr 30, 2015 at 06:45:10PM +0100, Sudeep Holla wrote:
-> > >I still see these errors with 4.1-rc1:
-> > >
-> > >[    0.000000] L2C: platform modifies aux control register: 0x02020000 -> 0x02420000
-> > >[    0.000000] L2C: DT/platform modifies aux control register: 0x02020000 -> 0x02420000
-> > >[    0.268626] platform 10000000.sysreg: Error -2 creating of_node link
-> > >[    0.271997] platform basic-mmio-gpio.1.auto: Error -2 creating of_node link
-> > >[    0.272266] platform basic-mmio-gpio.2.auto: Error -2 creating of_node link
-> > >[    0.272681] platform basic-mmio-gpio.3.auto: Error -2 creating of_node link
-> > 
-> > OK, I was able to debug this, it boils down to initcall ordering.
-> > Both of_init where the firmware sysfs is initialized and
-> > vexpress_sysreg_init are at same core_initcall level. Needs some
-> > thinking and more time to fix this.
-> 
-> Did you find out something in the meantime?
-> I just tested 4.1-rc3 and the issues are still confirmed.
+I got my hopes up when I read the commit message for c14e2591bf54
+ASoC: atmel-pcm-dma: increase buffer_bytes_max. Quoting it:
 
-Gentle ping ...
+	atmel-pcm-dma is not limited to a buffer size of 64kB like
+	atmel-pcm-pdc. Increase buffer_bytes_max to 512kB to allow
+	for higher bit rates (i.e. 32bps at 192kHz) to work correctly.
+	By default, keep the prealloc at 64kB.
 
-rsc
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+However, as I (think I) request a bigger buffer it still caps out at 64kB.
+I'm using the latency argument of snd_pcm_set_params to control the buffer:
+
+	snd_pcm_set_params(pcm,
+		SND_PCM_FORMAT_S32_LE,
+		SND_PCM_ACCESS_RW_INTERLEAVED,
+		2,      /* channels */
+		250000, /* rate */
+		0,      /* do not resample */
+		90000); /* latency in us */
+
+But snd_pcm_hw_params_get_buffer_size "only" returns 8192 frames (64kB)
+even if I request 9us * 250kHz * 2 * 4 = 180kB. If I change the prealloc
+from 64kB to 256kB I get a bigger buffer (and it works better too!).
+
+Admittedly I backported this patch on top of the linux-3.18-at91
+branch from the Atmel git repo, so there might be some support
+missing that has gone in after 3.18?
+
+Or have I completely misunderstood, and these are unrelated buffers?
+
+Any insight in how I can get a big enough buffer without hacking the
+prealloc is appreciated!
+
+Cheers,
+Peter
