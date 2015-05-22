@@ -1,44 +1,27 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 22 May 2015 18:28:16 +0200
-Subject: [PATCH soc] ARM: use =?UTF-8?Q?ARM=5FSINGLE=5FARMV=37M=20for?=
- =?UTF-8?Q?=20ARMv=37-M=20platforms?=
-In-Reply-To: <555F5194.4040309@linaro.org>
-References: <1432161344-1930-1-git-send-email-stefan@agner.ch>
- <15864413.ed8EFg1NLl@wuerfel>
- <CALszF6D-3pXHtyVMwhO0JkT-dCSSB98UNDHNN7-LD04Wdgd2cA@mail.gmail.com>
- <555F5194.4040309@linaro.org>
-Message-ID: <1a7d1161d007f0aff2a36ce8d30f14c3@agner.ch>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 22 May 2015 17:33:27 +0100
+Subject: [PATCH] coresight: etb: Remove simple announcement message
+In-Reply-To: <CANLsYkyW44THumc5ebWnX-sa5zG7X0dv1_UEqUp9Av8c5PDegg@mail.gmail.com>
+References: <1432122101-2233-1-git-send-email-broonie@kernel.org>
+ <CANLsYkyW44THumc5ebWnX-sa5zG7X0dv1_UEqUp9Av8c5PDegg@mail.gmail.com>
+Message-ID: <20150522163327.GU21577@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-05-22 17:56, Daniel Thompson wrote:
-> On 22/05/15 16:29, Maxime Coquelin wrote:
->> 2015-05-22 16:50 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
->>> [one small request as I have four armv7-m folks on Cc already:
->>>   could one of you try to fix the warning that I get with every
->>>   single build: "/git/arm-soc/arch/arm/kernel/head-nommu.S: Assembler
->>> messages: /git/arm-soc/arch/arm/kernel/head-nommu.S:167: Warning:
->>> Use of r13 as a source register is deprecated when r15 is the
->>> destination register."]
->>
->> Moving r13 to r12 and returning r12 seems to do the job (see below).
->> But I don't know if there is a more elegant way, and if it is also
->> valid for other architectures than armv7-m.
-> 
-> Why not just s/r13/r11/?
-> 
-> (works for me but I'm only working on single core system)
+On Fri, May 22, 2015 at 08:17:21AM -0600, Mathieu Poirier wrote:
 
-For ARMv7-M this works, since r11 is not used in the processors
-PROCINFO_INITFUNC function (__cpu_flush in struct proc_info_list, which
-is __v7m_setup in proc-v7m.S).
+> Linus Walleij started doing something interesting with the initial
+> printouts [1] and I think this is a better option than not printing
+> anything at all.
 
-However, afaik, head-nommu.S can be used by different processors too,
-hence that register needs to be free to use for all possible __cpu_flush
-implementations.
-
-That said, proc-v7.S stores r11 on the stack, so it really seems that
-r11 is ok to use?
-
---
-Stefan
+It's definitely better to print information we enumerate from hardware,
+though I'm not 100% sure if AMBA does the right thing with matching here
+(most of the buses ignore hardware IDs in favour of DT information if
+things are bound via DT).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150522/08d720aa/attachment.sig>
