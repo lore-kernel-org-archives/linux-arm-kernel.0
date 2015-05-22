@@ -1,41 +1,43 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 22 May 2015 16:46:38 +0200
-Subject: [PATCH] ARM: zx: fix building with CONFIG_THUMB2_KERNEL
-In-Reply-To: <CABymUCP=unny8rORcm4ki-izCsaoWysUQ2gUtro0-T1RV3Ad-g@mail.gmail.com>
-References: <2771121.xOQTA4CzPC@wuerfel>
- <CABymUCP=unny8rORcm4ki-izCsaoWysUQ2gUtro0-T1RV3Ad-g@mail.gmail.com>
-Message-ID: <29857847.dJSqWUUsqW@wuerfel>
+Date: Fri, 22 May 2015 16:50:32 +0200
+Subject: [PATCH soc] ARM: use ARM_SINGLE_ARMV7M for ARMv7-M platforms
+In-Reply-To: <1432161344-1930-1-git-send-email-stefan@agner.ch>
+References: <1432161344-1930-1-git-send-email-stefan@agner.ch>
+Message-ID: <15864413.ed8EFg1NLl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 May 2015 21:04:34 Jun Nie wrote:
-> 2015-05-21 16:36 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
-> > The newly added zx platform causes a build error when
-> > CONFIG_THUMB2_KERNEL is enabled:
-> >
-> > arch/arm/mach-zx/headsmp.S:16: Error: invalid immediate for address calculation (value = 0x00000004)
-> >
-> > I'm assuming that the ROM code that is calling these entry
-> > points runs in ARM mode, so there would be another problem
-> > in the same file, and we can solve both problems at once
-> > by adding a '.arm' statement that will make zx_resume_jump
-> > and zx_secondary_startup both be built as ARM code.
-> >
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > ---
-> > Hi Jun,
-> >
-> > This patch fixes a build error with mach-zx, but I don't know if it's
-> > actually correct. Can you check if the machine correctly boots
-> > with this patch enabled and CONFIG_THUMB2_KERNEL=y set in the .config?
-> >
-> Arnd,
+On Thursday 21 May 2015 00:35:44 Stefan Agner wrote:
+> Use the new config symbol ARM_SINGLE_ARMV7M which groups config
+> symbols used by modern ARMv7-M platforms. This allows supporting
+> multiple ARMv7-M platforms in one kernel image. However, a common
+> kernel image requires the combined platforms to share the same
+> main memory layout to be bootable.
 > 
-> I add CONFIG_THUMB2_KERNEL=y in defconfig and reproduce the build
-> error. Your change does fix the bug and boot/cpu_hotplug works well.
-> Thanks for your work!
+> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+> Since this is essentially only a shift of config symbols, it
+> should not change runtime behavior, at least when selecting
+> only one platform.
 > 
+> Uwe, this is essentially the same I had in my patchset, just
+> converting the other platforms too. I was bold and added your
+> Ack anyway...
+> 
+> Joachim, Maxime, I test compiled with your defconfigs, compiled
+> fine on my machine.
 
-Ok, thanks for testing, I've applied the patch to next/soc now.
+I've applied the patch now with all three Acks added (and reordered
+with regard to the Signed-off-by).
+
+Thanks!
+
+[one small request as I have four armv7-m folks on Cc already:
+ could one of you try to fix the warning that I get with every
+ single build: "/git/arm-soc/arch/arm/kernel/head-nommu.S: Assembler
+messages: /git/arm-soc/arch/arm/kernel/head-nommu.S:167: Warning:
+Use of r13 as a source register is deprecated when r15 is the
+destination register."]
 
 	Arnd
