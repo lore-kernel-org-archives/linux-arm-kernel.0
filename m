@@ -1,78 +1,114 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 22 May 2015 10:07:14 -0700
-Subject: [PATCH] tty: remove platform_sysrq_reset_seq
-In-Reply-To: <2397446.P9RRJqoFo7@wuerfel>
-References: <2397446.P9RRJqoFo7@wuerfel>
-Message-ID: <20150522170714.GD40101@dtor-ws>
+From: gary.bisson@boundarydevices.com (Gary Bisson)
+Date: Fri, 22 May 2015 19:14:26 +0200
+Subject: [PATCH 1/2] ARM: dts: imx6qdl-nitrogen6x: add Okaya LCD display
+In-Reply-To: <1432314867-30888-1-git-send-email-gary.bisson@boundarydevices.com>
+References: <1432314867-30888-1-git-send-email-gary.bisson@boundarydevices.com>
+Message-ID: <1432314867-30888-2-git-send-email-gary.bisson@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 21, 2015 at 11:11:28AM +0200, Arnd Bergmann wrote:
-> The platform_sysrq_reset_seq code was intended as a way for an embedded
-> platform to provide its own sysrq sequence at compile time. After over
-> two years, nobody has started using it in an upstream kernel, and
-> the platforms that were interested in it have moved on to devicetree,
-> which can be used to configure the sequence without requiring kernel
-> changes. The method is also incompatible with the way that most
-> architectures build support for multiple platforms into a single
-> kernel.
-> 
-> Now the code is producing warnings when built with gcc-5.1:
-> 
-> drivers/tty/sysrq.c: In function 'sysrq_init':
-> drivers/tty/sysrq.c:959:33: warning: array subscript is above array bounds [-Warray-bounds]
->    key = platform_sysrq_reset_seq[i];
-> 
-> We could fix this, but it seems unlikely that it will ever be used,
-> so let's just remove the code instead. We still have the option to
-> pass the sequence either in DT, using the kernel command line,
-> or using the /sys/module/sysrq/parameters/reset_seq file.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 154b7a489a ("Input: sysrq - allow specifying alternate reset sequence")
+This patch adds support for the 7" LCD display available for Nitrogen6x:
+http://boundarydevices.com/product/7-800x480-display/
 
-Mathieu, are you OK with dropping this?
+Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
+---
+ arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 70 +++++++++++++++++++++++++++++++
+ 1 file changed, 70 insertions(+)
 
-> 
-> diff --git a/drivers/tty/sysrq.c b/drivers/tty/sysrq.c
-> index 8ba52e56bb8b..9c5395db6a57 100644
-> --- a/drivers/tty/sysrq.c
-> +++ b/drivers/tty/sysrq.c
-> @@ -55,8 +55,7 @@
->  static int __read_mostly sysrq_enabled = CONFIG_MAGIC_SYSRQ_DEFAULT_ENABLE;
->  static bool __read_mostly sysrq_always_enabled;
->  
-> -unsigned short platform_sysrq_reset_seq[] __weak = { KEY_RESERVED };
-> -int sysrq_reset_downtime_ms __weak;
-> +static int sysrq_reset_downtime_ms;
->  
->  static bool sysrq_on(void)
->  {
-> @@ -950,23 +949,8 @@ static bool sysrq_handler_registered;
->  
->  static inline void sysrq_register_handler(void)
->  {
-> -	unsigned short key;
->  	int error;
-> -	int i;
-> -
-> -	/* First check if a __weak interface was instantiated. */
-> -	for (i = 0; i < ARRAY_SIZE(sysrq_reset_seq); i++) {
-> -		key = platform_sysrq_reset_seq[i];
-> -		if (key == KEY_RESERVED || key > KEY_MAX)
-> -			break;
->  
-> -		sysrq_reset_seq[sysrq_reset_seq_len++] = key;
-> -	}
-> -
-> -	/*
-> -	 * DT configuration takes precedence over anything that would
-> -	 * have been defined via the __weak interface.
-> -	 */
->  	sysrq_of_get_keyreset_config();
->  
->  	error = input_register_handler(&sysrq_handler);
-> 
-
+diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+index 3af16df..7097593 100644
+--- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+@@ -131,6 +131,39 @@
+ 		status = "okay";
+ 	};
+ 
++	lcd_display: display at di0 {
++		compatible = "fsl,imx-parallel-display";
++		interface-pix-fmt = "bgr666";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_j15>;
++		status = "okay";
++
++		port {
++			lcd_display_in: endpoint {
++				remote-endpoint = <&ipu1_di0_disp0>;
++			};
++		};
++
++		display-timings {
++			okaya_800x480 {
++				native-mode;
++				clock-frequency = <30000000>;
++				hactive = <800>;
++				vactive = <480>;
++				hback-porch = <40>;
++				hsync-len = <48>;
++				hfront-porch = <40>;
++				vback-porch = <29>;
++				vsync-len = <3>;
++				vfront-porch = <13>;
++				hsync-active = <0>;
++				vsync-active = <0>;
++				de-active = <1>;
++				pixelclk-active = <0>;
++			};
++		};
++	};
++
+ 	panel {
+ 		compatible = "hannstar,hsd100pxn1";
+ 		backlight = <&backlight_lvds>;
+@@ -315,6 +348,39 @@
+ 			>;
+ 		};
+ 
++		pinctrl_j15: j15grp {
++			fsl,pins = <
++				MX6QDL_PAD_DI0_DISP_CLK__IPU1_DI0_DISP_CLK 0x10
++				MX6QDL_PAD_DI0_PIN15__IPU1_DI0_PIN15       0x10
++				MX6QDL_PAD_DI0_PIN2__IPU1_DI0_PIN02        0x10
++				MX6QDL_PAD_DI0_PIN3__IPU1_DI0_PIN03        0x10
++				MX6QDL_PAD_DISP0_DAT0__IPU1_DISP0_DATA00   0x10
++				MX6QDL_PAD_DISP0_DAT1__IPU1_DISP0_DATA01   0x10
++				MX6QDL_PAD_DISP0_DAT2__IPU1_DISP0_DATA02   0x10
++				MX6QDL_PAD_DISP0_DAT3__IPU1_DISP0_DATA03   0x10
++				MX6QDL_PAD_DISP0_DAT4__IPU1_DISP0_DATA04   0x10
++				MX6QDL_PAD_DISP0_DAT5__IPU1_DISP0_DATA05   0x10
++				MX6QDL_PAD_DISP0_DAT6__IPU1_DISP0_DATA06   0x10
++				MX6QDL_PAD_DISP0_DAT7__IPU1_DISP0_DATA07   0x10
++				MX6QDL_PAD_DISP0_DAT8__IPU1_DISP0_DATA08   0x10
++				MX6QDL_PAD_DISP0_DAT9__IPU1_DISP0_DATA09   0x10
++				MX6QDL_PAD_DISP0_DAT10__IPU1_DISP0_DATA10  0x10
++				MX6QDL_PAD_DISP0_DAT11__IPU1_DISP0_DATA11  0x10
++				MX6QDL_PAD_DISP0_DAT12__IPU1_DISP0_DATA12  0x10
++				MX6QDL_PAD_DISP0_DAT13__IPU1_DISP0_DATA13  0x10
++				MX6QDL_PAD_DISP0_DAT14__IPU1_DISP0_DATA14  0x10
++				MX6QDL_PAD_DISP0_DAT15__IPU1_DISP0_DATA15  0x10
++				MX6QDL_PAD_DISP0_DAT16__IPU1_DISP0_DATA16  0x10
++				MX6QDL_PAD_DISP0_DAT17__IPU1_DISP0_DATA17  0x10
++				MX6QDL_PAD_DISP0_DAT18__IPU1_DISP0_DATA18  0x10
++				MX6QDL_PAD_DISP0_DAT19__IPU1_DISP0_DATA19  0x10
++				MX6QDL_PAD_DISP0_DAT20__IPU1_DISP0_DATA20  0x10
++				MX6QDL_PAD_DISP0_DAT21__IPU1_DISP0_DATA21  0x10
++				MX6QDL_PAD_DISP0_DAT22__IPU1_DISP0_DATA22  0x10
++				MX6QDL_PAD_DISP0_DAT23__IPU1_DISP0_DATA23  0x10
++			>;
++		};
++
+ 		pinctrl_pwm1: pwm1grp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_SD1_DAT3__PWM1_OUT 0x1b0b1
+@@ -382,6 +448,10 @@
+ 	};
+ };
+ 
++&ipu1_di0_disp0 {
++	remote-endpoint = <&lcd_display_in>;
++};
++
+ &ldb {
+ 	status = "okay";
+ 
 -- 
-Dmitry
+2.1.4
