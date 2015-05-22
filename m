@@ -1,79 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 22 May 2015 21:59:36 +0200
-Subject: [PATCH v2] tty: remove platform_sysrq_reset_seq
-Message-ID: <2282979.zXytbFv124@wuerfel>
+From: cmetcalf@ezchip.com (Chris Metcalf)
+Date: Fri, 22 May 2015 16:13:22 -0400
+Subject: [RFC PATCH] EDAC: Cleanup atomic_scrub mess
+In-Reply-To: <20150521181157.GF3689@pd.tnic>
+References: <1431991481-25684-1-git-send-email-lho@apm.com>
+ <1431991481-25684-2-git-send-email-lho@apm.com>
+ <20150519170308.GL4641@pd.tnic>
+ <CAPw-ZT=mTpt_vz+e=rM5ywK8feNKkJQrpEWg=noRCziJ0840TQ@mail.gmail.com>
+ <20150519203336.GP4641@pd.tnic> <20150521180719.GE3689@pd.tnic>
+ <20150521181157.GF3689@pd.tnic>
+Message-ID: <555F8DE2.4060402@ezchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The platform_sysrq_reset_seq code was intended as a way for an embedded
-platform to provide its own sysrq sequence at compile time. After over
-two years, nobody has started using it in an upstream kernel, and
-the platforms that were interested in it have moved on to devicetree,
-which can be used to configure the sequence without requiring kernel
-changes. The method is also incompatible with the way that most
-architectures build support for multiple platforms into a single
-kernel.
+On 05/21/2015 02:11 PM, Borislav Petkov wrote:
+> From: Borislav Petkov<bp@suse.de>
+>
+> So first of all, this atomic_scrub() function's naming is bad. It looks
+> like an atomic_t helper. Change it to edac_atomic_scrub().
+>
+> The bigger problem is that this function is arch-specific and every new
+> arch which doesn't necessarily need that functionality still needs to
+> define it, otherwise EDAC doesn't compile.
+>
+> So instead of doing that and including arch-specific headers, have each
+> arch define an EDAC_ATOMIC_SCRUB symbol which can be used in edac_mc.c
+> for ifdeffery. Much cleaner.
+>
+> We already are doing this with another symbol - EDAC_SUPPORT. This is
+> also much cleaner than having CONFIG_EDAC explicitly depend on all the
+> arches which need/have EDAC support and drivers.
+>
+> This way I can kill the useless edac.h header in tile too.
+>
+> Signed-off-by: Borislav Petkov<bp@suse.de>
 
-Now the code is producing warnings when built with gcc-5.1:
+Acked-by: Chris Metcalf <cmetcalf@ezchip.com> [for tile]
 
-drivers/tty/sysrq.c: In function 'sysrq_init':
-drivers/tty/sysrq.c:959:33: warning: array subscript is above array bounds [-Warray-bounds]
-   key = platform_sysrq_reset_seq[i];
-
-We could fix this, but it seems unlikely that it will ever be used,
-so let's just remove the code instead. We still have the option to
-pass the sequence either in DT, using the kernel command line,
-or using the /sys/module/sysrq/parameters/reset_seq file.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 154b7a489a ("Input: sysrq - allow specifying alternate reset sequence")
-----
-v2: moved sysrq_reset_downtime_ms variable to avoid introducing a compile
-    warning when CONFIG_INPUT is disabled
-
-diff --git a/drivers/tty/sysrq.c b/drivers/tty/sysrq.c
-index 8ba52e56bb8b..9c69af749d48 100644
---- a/drivers/tty/sysrq.c
-+++ b/drivers/tty/sysrq.c
-@@ -55,9 +55,6 @@
- static int __read_mostly sysrq_enabled = CONFIG_MAGIC_SYSRQ_DEFAULT_ENABLE;
- static bool __read_mostly sysrq_always_enabled;
- 
--unsigned short platform_sysrq_reset_seq[] __weak = { KEY_RESERVED };
--int sysrq_reset_downtime_ms __weak;
--
- static bool sysrq_on(void)
- {
- 	return sysrq_enabled || sysrq_always_enabled;
-@@ -570,6 +567,7 @@ void handle_sysrq(int key)
- EXPORT_SYMBOL(handle_sysrq);
- 
- #ifdef CONFIG_INPUT
-+static int sysrq_reset_downtime_ms;
- 
- /* Simple translation table for the SysRq keys */
- static const unsigned char sysrq_xlate[KEY_CNT] =
-@@ -950,23 +948,8 @@ static bool sysrq_handler_registered;
- 
- static inline void sysrq_register_handler(void)
- {
--	unsigned short key;
- 	int error;
--	int i;
--
--	/* First check if a __weak interface was instantiated. */
--	for (i = 0; i < ARRAY_SIZE(sysrq_reset_seq); i++) {
--		key = platform_sysrq_reset_seq[i];
--		if (key == KEY_RESERVED || key > KEY_MAX)
--			break;
--
--		sysrq_reset_seq[sysrq_reset_seq_len++] = key;
--	}
- 
--	/*
--	 * DT configuration takes precedence over anything that would
--	 * have been defined via the __weak interface.
--	 */
- 	sysrq_of_get_keyreset_config();
- 
- 	error = input_register_handler(&sysrq_handler);
+-- 
+Chris Metcalf, EZChip Semiconductor
+http://www.ezchip.com
