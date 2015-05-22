@@ -1,48 +1,31 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 22 May 2015 21:55:42 +0800
-Subject: [Patch v3 6/7] x86/PCI/ACPI: Use common interface to support
- PCI host bridge
-In-Reply-To: <1431593803-5213-7-git-send-email-jiang.liu@linux.intel.com>
-References: <1431593803-5213-1-git-send-email-jiang.liu@linux.intel.com>
- <1431593803-5213-7-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <555F355E.7060706@linaro.org>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Fri, 22 May 2015 15:57:26 +0200
+Subject: [PATCH v8 14/16] ARM: dts: Introduce STM32F429 MCU
+In-Reply-To: <555F2A8A.5020205@suse.de>
+References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <2282066.NWoIT9ZyLc@wuerfel>
+ <CALszF6CaO_yuNiSDuDV+4d2NRe_+32j=zcSE1HPhB1UH59cW9w@mail.gmail.com>
+ <13641152.Yt4ZI3oT6L@wuerfel>
+ <CALszF6CK5ezrO6D=4zr6zEPC7VanzbQjnZJwKOZekEZ5L4D-Dg@mail.gmail.com>
+ <1432285588.3929.28.camel@pengutronix.de>
+ <20150522091822.GF8557@lukather>
+ <1432289231.3929.60.camel@pengutronix.de>
+ <CALszF6CQ1_HQXJ8=vgytvVo2t4_ue5_nsE06HPyHMzSLrntqKg@mail.gmail.com>
+ <555F2A8A.5020205@suse.de>
+Message-ID: <CALszF6A=TZ_EROrfuBOAGiY3mbydC5fepWLSWrZLLt4nV9sr4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?05?14? 16:56, Jiang Liu wrote:
-> Use common interface to simplify ACPI PCI host bridge implementation.
->
-> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
-> ---
->   arch/x86/pci/acpi.c |  292 +++++++++++++++------------------------------------
->   1 file changed, 85 insertions(+), 207 deletions(-)
->
-[...]
-> -static void release_pci_root_info(struct pci_host_bridge *bridge)
-> +static void pci_acpi_root_release_info(struct acpi_pci_root_info *ci)
->   {
-> -	struct resource *res;
-> -	struct resource_entry *entry;
-> -	struct pci_root_info *info = bridge->release_data;
-> -
-> -	resource_list_for_each_entry(entry, &bridge->windows) {
-> -		res = entry->res;
-> -		if (res->parent &&
-> -		    (res->flags & (IORESOURCE_MEM | IORESOURCE_IO)))
-> -			release_resource(res);
-> -	}
-> -
-> -	teardown_mcfg_map(info);
-> -	kfree(info);
-> +	teardown_mcfg_map(ci);
-> +	kfree(ci);
+2015-05-22 15:09 GMT+02:00 Andreas F?rber <afaerber@suse.de>:
+> As you should know, I did have an RCC clk driver, and there is no such
+> issue. The two drivers use different mechanisms for initialization. And
+> I'm pretty sure that I've already remarked that on the list, too.
 
-Implicit pointer cast? I think add a comment here that %p of ci
-is same as %p of info would be helpful for review and easy understood.
+Yes, you use of_iomap in your clock driver [0].
+Daniel, would you accept to do the same?
+That would remove one difference between stm32/sunxi/socfpga reset drivers.
 
-other than that,
+Regards,
+Maxime
 
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
-
-Thanks
-Hanjun
+[0]: https://github.com/afaerber/linux/blob/stm32/drivers/clk/clk-stm32f42xxx-rcc.c
