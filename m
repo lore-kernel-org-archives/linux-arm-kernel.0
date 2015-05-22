@@ -1,33 +1,42 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 22 May 2015 15:14:53 +0100
-Subject: [PATCH v8 14/16] ARM: dts: Introduce STM32F429 MCU
-In-Reply-To: <CALszF6A=TZ_EROrfuBOAGiY3mbydC5fepWLSWrZLLt4nV9sr4w@mail.gmail.com>
-References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>	<2282066.NWoIT9ZyLc@wuerfel>	<CALszF6CaO_yuNiSDuDV+4d2NRe_+32j=zcSE1HPhB1UH59cW9w@mail.gmail.com>	<13641152.Yt4ZI3oT6L@wuerfel>	<CALszF6CK5ezrO6D=4zr6zEPC7VanzbQjnZJwKOZekEZ5L4D-Dg@mail.gmail.com>	<1432285588.3929.28.camel@pengutronix.de>	<20150522091822.GF8557@lukather>	<1432289231.3929.60.camel@pengutronix.de>	<CALszF6CQ1_HQXJ8=vgytvVo2t4_ue5_nsE06HPyHMzSLrntqKg@mail.gmail.com>	<555F2A8A.5020205@suse.de>
- <CALszF6A=TZ_EROrfuBOAGiY3mbydC5fepWLSWrZLLt4nV9sr4w@mail.gmail.com>
-Message-ID: <555F39DD.9060209@linaro.org>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 22 May 2015 08:17:21 -0600
+Subject: [PATCH] coresight: etb: Remove simple announcement message
+In-Reply-To: <1432122101-2233-1-git-send-email-broonie@kernel.org>
+References: <1432122101-2233-1-git-send-email-broonie@kernel.org>
+Message-ID: <CANLsYkyW44THumc5ebWnX-sa5zG7X0dv1_UEqUp9Av8c5PDegg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/05/15 14:57, Maxime Coquelin wrote:
-> 2015-05-22 15:09 GMT+02:00 Andreas F?rber <afaerber@suse.de>:
->> As you should know, I did have an RCC clk driver, and there is no such
->> issue. The two drivers use different mechanisms for initialization. And
->> I'm pretty sure that I've already remarked that on the list, too.
+On 20 May 2015 at 05:41, Mark Brown <broonie@kernel.org> wrote:
+> It's generally preferred that drivers not print initialisation messages on
+> startup that don't contain information gained at runtime such as specific
+> hardware revision information. This provides a small speedup on systems
+> with serial consoles and keeps the boot less noisy.
 >
-> Yes, you use of_iomap in your clock driver [0].
-> Daniel, would you accept to do the same?
-> That would remove one difference between stm32/sunxi/socfpga reset drivers.
+> Signed-off-by: Mark Brown <broonie@kernel.org>
+> ---
+>  drivers/hwtracing/coresight/coresight-etb10.c | 1 -
+>  1 file changed, 1 deletion(-)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+> index 77d0f9c1118d..e34e34b8edfb 100644
+> --- a/drivers/hwtracing/coresight/coresight-etb10.c
+> +++ b/drivers/hwtracing/coresight/coresight-etb10.c
+> @@ -481,7 +481,6 @@ static int etb_probe(struct amba_device *adev, const struct amba_id *id)
+>         if (ret)
+>                 goto err_misc_register;
+>
+> -       dev_info(dev, "ETB initialized\n");
 
-In fact, that is exactly what I am currently doing, though I was 
-planning for it to be temporary.
+Linus Walleij started doing something interesting with the initial
+printouts [1] and I think this is a better option than not printing
+anything at all.
 
-It seems a bit weird to me that one driver (which requests too much 
-register space) only works because another driver chooses not to request 
-any.
+[1]. https://git.linaro.org/kernel/coresight.git/commitdiff/509133a2715367c2ec9f8026ff55a028d04cdae0?hp=0b81f7e469b846b1b56d19d4f8f1f476943856f6
 
-BTW in drivers/clk there are ~110 of_iomaps and only 10 
-of_io_request_and_maps... so I don't think anyone will yell at me for 
-using of_iomap().
-
-
-Daniel.
+>         return 0;
+>
+>  err_misc_register:
+> --
+> 2.1.4
+>
