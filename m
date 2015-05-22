@@ -1,101 +1,131 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Sat, 23 May 2015 01:25:48 +0200
-Subject: [PATCH v2] ARM: nommu: avoid deprecated source register on mov
-Message-ID: <1432337148-9894-1-git-send-email-stefan@agner.ch>
+From: lho@apm.com (Loc Ho)
+Date: Fri, 22 May 2015 17:32:55 -0600
+Subject: [PATCH v11 0/4] edac: Add APM X-Gene SoC EDAC driver
+Message-ID: <1432337580-3750-1-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In Thumb2 mode, the stack register r13 is deprecated if the
-destination register is the program counter (r15). Similar to
-head.S, head-nommu.S uses r13 to store the return address used
-after configuring the CPU's CP15 register. However, since we do
-not enable a MMU, there will be no address switch and it is
-possible to use branch with link instruction to call
-__after_proc_init.
+This patch adds support for the APM X-Gene SoC EDAC driver for DT.
 
-Avoid using r13 completely by using bl to call __after_proc_init
-and get rid of __secondary_switched.
+v11:
+* Update DT binding documnetation with additional memory controller and PMD
+  controller instance number
+* Move global MC variables to EDAC top level structure
+* Move EDAC support functions to top of file
+* Inlined some EDAC support functions
+* Remove define of CONFIG_EDAC_DEBUG where it is possible
+* Update driver to reflect additional memory controller and PMD controller
+  properties in DT
+* Update DT with additional memory controller and PMD instance number
+* Drop the stub scrub function for ARM64. You will need an EDAC code update
+  to compile.
 
-Beside removing unnecessary complexity, this also fixes a
-compiler warning when compiling a !MMU kernel:
-Warning: Use of r13 as a source register is deprecated when r15
-is the destination register.
+v10:
+* Move regmap for CSW, MCBA, MCBB, and efuse to top driver node and add
+  accessor support functions
+* Change retrieval OF address proerty for subnode to use of_address_to_resource
+* Add COMPILE_TEST to Kconfig for EDAC_XGENE
+* Update DT binding documentation and DT node accordingly
+* Remove DT node naming and number from nodes
 
-Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Stefan Agner <stefan@agner.ch>
+v9:
+* Update maintainer section
+* Update binding documentation to reflect update DT binding
+* Restructure the EDAC driver such that its includes subnode for MC, PMD's,
+  and future L3's and SoC.
+* Update DT node to reflect update DT binding
+* NOTE: Temporary removed L3 and SoC. They will be added back later on.
+
+v8:
+* Change ASM_EDAC_H to __ASM_EDAC_H in file edac.h
+* Add WARN_ONCE in stub function atomic_scrub
+* Update DTS binding documentation (with only memory controller node)
+* Temporary remove L1/L2, L3, and SoC driver code and update memory driver
+  code accordingly
+
+v7:
+* Update binding documentation for memory controller, PMD, L3, and SoC EDAC
+* Change resource for PCP, CSW, MCBA, MCBB, and efuse to syscon type nodes
+  and updae driver accordingly
+* Fix clearing L2 RTO register properly
+* Fix the MODULE_DEVICE_TABLE for OF
+* Update DT accordingly to binding documentation
+
+v6:
+* Rebase to 4.0.0-rc3
+* Add memory scrub stub function and enable ARM64 EDAC support patch
+* Add bit definition defines for L2RTOS registers
+* Remove un-necessary clearing of all L1/L2 software generated registers
+* Remove wrong notification of LSU un-correctable error
+* Change L2 reporting of un-correcable error to correctable error
+* Change clearing of the L2C L2RTO registers
+* Add support for L2 HW version 1 and version 2 or above
+* Add support for L3 HW version 1 and version 2 or above
+
+v5:
+* Rebase to 3.17.rc1 (next)
+* Update binding documentation for additional SoC node binding resource
+* Enable MCU correctable and uncorrectable interrupts if not enabled by
+  firmware
+* Enable top level interrupt only after all MCU registered. Otherwise,
+  error interrupt will never get cleared by the corresponding MCU.
+* Remove clearing of L1 and L2 errors during initialization time. Otherwise,
+  they will not be captured between firmware booting and error configuration.
+* Add capture and clearing SoC register bus errors
+* Add register bus resource to SoC DT node
+
+v4:
+* Fix PMD l1/l2 error reading address due to wrong variable type
+* Fix clearing of software generated and HW errors for l1/l2
+
+v3:
+* Update binding documentation for PMD DT node and exampples
+* Add binding documentation for SoC DT node
+* Change MC, PMD, and L3C driver error injection to use debugfs
+* Add missing IRQ for MC correctable error (code and DT)
+* Use true/false where appropriate instead 1/0
+* Add bit definition for L1 MMUESR register and fully decode this error
+* Remove the un-necessary dev variable from xgene_edac_pmd_ctx structure
+* Add check for disabled PMD (code and DT)
+* Switch to edac_printk instead pr_err
+* Some minor comments update
+
+v2:
+* Add EDAC entry in MAINTAINERS for APM EDAC driver
+* Remove the MC scrub patch
+* Remove the word 'Caches' from Kconfig
+* Change all MASK defines to use BIT(x)
+* Update comment or remove them
+* Wrap error injection code around CONFIG_EDAC_DEBUG
+* Change function name xgene_edac_mc_hw_init to xgene_edac_mc_irq_ctl
+* Change all function XXX_hw_init to XXX_hw_ctl
+* Fix typo 'activie'
+* Move calling function edac_mc_alloc after resource retrieval
+* Check for NULL on platform_get_resource return if reference directly
+* Add documentation for struct xgene_edac_pmd_ctx
+* Move L1 and L2 check out of function xgene_edac_pmd_check to its own
+  functions
+* Use for loop for configure each CPU of an PMD
+* Replace /2 by >> 1
+* Remove unnecessary comment on edac_device_add_device failure
+* Make mem_err_ip static const
+* Unwind EDAC register correctly if failed
 ---
-Changes in v2:
-- Load r7 outside CONFIG_ARM_MPU since its used outside later on
+Loc Ho (5):
+  arm64: Enable EDAC on ARM64
+  MAINTAINERS: Add entry for APM X-Gene SoC EDAC driver
+  Documentation: Add documentation for the APM X-Gene SoC EDAC DTS
+    binding
+  edac: Add APM X-Gene SoC EDAC driver
+  arm64: Add APM X-Gene SoC EDAC DTS entries
 
- arch/arm/kernel/head-nommu.S | 21 ++++++++-------------
- 1 file changed, 8 insertions(+), 13 deletions(-)
-
-diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-index c966016..9b8c5a1 100644
---- a/arch/arm/kernel/head-nommu.S
-+++ b/arch/arm/kernel/head-nommu.S
-@@ -77,13 +77,13 @@ ENTRY(stext)
- 	orr	r6, r6, #(1 << MPU_RSR_EN)	@ Set region enabled bit
- 	bl	__setup_mpu
- #endif
--	ldr	r13, =__mmap_switched		@ address to jump to after
--						@ initialising sctlr
-+
- 	badr	lr, 1f				@ return (PIC) address
- 	ldr	r12, [r10, #PROCINFO_INITFUNC]
- 	add	r12, r12, r10
- 	ret	r12
-- 1:	b	__after_proc_init
-+1:	bl	__after_proc_init
-+	b	__mmap_switched
- ENDPROC(stext)
- 
- #ifdef CONFIG_SMP
-@@ -106,8 +106,7 @@ ENTRY(secondary_startup)
- 	movs	r10, r5				@ invalid processor?
- 	beq	__error_p			@ yes, error 'p'
- 
--	adr	r4, __secondary_data
--	ldmia	r4, {r7, r12}
-+	ldr	r7, __secondary_data
- 
- #ifdef CONFIG_ARM_MPU
- 	/* Use MPU region info supplied by __cpu_up */
-@@ -115,23 +114,19 @@ ENTRY(secondary_startup)
- 	bl      __setup_mpu			@ Initialize the MPU
- #endif
- 
--	badr	lr, __after_proc_init		@ return address
--	mov	r13, r12			@ __secondary_switched address
-+	badr	lr, 1f				@ return (PIC) address
- 	ldr	r12, [r10, #PROCINFO_INITFUNC]
- 	add	r12, r12, r10
- 	ret	r12
--ENDPROC(secondary_startup)
--
--ENTRY(__secondary_switched)
-+1:	bl	__after_proc_init
- 	ldr	sp, [r7, #12]			@ set up the stack pointer
- 	mov	fp, #0
- 	b	secondary_start_kernel
--ENDPROC(__secondary_switched)
-+ENDPROC(secondary_startup)
- 
- 	.type	__secondary_data, %object
- __secondary_data:
- 	.long	secondary_data
--	.long	__secondary_switched
- #endif /* CONFIG_SMP */
- 
- /*
-@@ -164,7 +159,7 @@ __after_proc_init:
- #endif
- 	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
- #endif /* CONFIG_CPU_CP15 */
--	ret	r13
-+	ret	lr
- ENDPROC(__after_proc_init)
- 	.ltorg
- 
--- 
-2.4.1
+ .../devicetree/bindings/edac/apm-xgene-edac.txt    |   78 ++
+ MAINTAINERS                                        |    7 +
+ arch/arm64/Kconfig                                 |    1 +
+ arch/arm64/boot/dts/apm/apm-storm.dtsi             |   83 ++
+ drivers/edac/Kconfig                               |    7 +
+ drivers/edac/Makefile                              |    1 +
+ drivers/edac/xgene_edac.c                          | 1254 ++++++++++++++++++++
+ 7 files changed, 1431 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
+ create mode 100644 drivers/edac/xgene_edac.c
