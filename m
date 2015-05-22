@@ -1,29 +1,39 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 22 May 2015 09:49:09 -0700
-Subject: [PATCH] input: ambakmi: Fix system PM by converting to modern
- callbacks
-In-Reply-To: <CAPDyKFrhC1MCmOfoweztNtzk-Spwhj1uj7-sz3UtJhT_bHDQ+g@mail.gmail.com>
-References: <1429008108-29295-1-git-send-email-ulf.hansson@linaro.org>
- <CAPDyKFrhC1MCmOfoweztNtzk-Spwhj1uj7-sz3UtJhT_bHDQ+g@mail.gmail.com>
-Message-ID: <20150522164909.GA40101@dtor-ws>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 22 May 2015 17:54:29 +0100
+Subject: [PATCH v6 3/6] arm64: Kprobes with single stepping support
+In-Reply-To: <555F5011.90808@redhat.com>
+References: <1429561187-3661-1-git-send-email-dave.long@linaro.org>
+ <1429561187-3661-4-git-send-email-dave.long@linaro.org>
+ <20150520163946.GC29424@e104818-lin.cambridge.arm.com>
+ <555D62BD.5040403@linaro.org>
+ <20150522110007.GV29424@e104818-lin.cambridge.arm.com>
+ <555F5011.90808@redhat.com>
+Message-ID: <20150522165428.GC29424@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 22, 2015 at 04:37:12PM +0200, Ulf Hansson wrote:
-> On 14 April 2015 at 12:41, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> > The legacy system PM support has long time ago been dropped from the
-> > AMBA bus. Align to that by converting to the modern system PM
-> > callbacks.
-> >
-> > Fixes: 26825cfd90f9 (ARM: 7914/1: amba: Drop legacy PM support ...)
-> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+On Fri, May 22, 2015 at 11:49:37AM -0400, William Cohen wrote:
+> On 05/22/2015 07:00 AM, Catalin Marinas wrote:
+> > Any plans to post an updated version with the "unexpected single-step
+> > error" fixed?
 > 
-> What happened with this one? Can we queue it for 4.2?
+> The only place this issue with the "unexpected single-step error" has
+> been observed is with the arm64 kretporbe handler code calling kprobed
+> functions.  Experiments with kprobed functions being called in the
+> kprobe handlers showed that situation was handled appropriately. 
+> 
+> There is proposed fix to address the issue with the trampoline, the
+> attached patch.  This is modeled after the way that the x86 handles
+> the kretprobe.  The trampoline directly save and restores the
+> registers and uses a normal call to the kretprobe handler.  It
+> operates similarly to what you are suggesting above, but just for the
+> special case of the kretprobes.
 
-I was hoping that Russel could give it a spin since he has the
-relevant hardware.
+Thanks. I guess David will post a v7 series with this patch included and
+other comments addressed.
 
-Thanks.
+BTW, I'll be on holiday for a week, back on the 1st of June. Hopefully
+this series gets some more reviews by then ;)
 
 -- 
-Dmitry
+Catalin
