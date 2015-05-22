@@ -1,71 +1,80 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 22 May 2015 17:09:47 +0530
-Subject: [PATCH v2 1/2] phy: add lpc18xx usb otg phy driver
-In-Reply-To: <CAGhQ9Vz+6s=SJXLu_5f-9aEjrT61aKnqnd=LitxZztdA-=NOiA@mail.gmail.com>
-References: <1432223961-26101-1-git-send-email-manabian@gmail.com>	<1432223961-26101-2-git-send-email-manabian@gmail.com>	<555F109A.3030503@ti.com>	<CAGhQ9VxDNr5V+J4-7DU1EeOx3WDx7K2iea_6fXf-yowWq_wUYg@mail.gmail.com>
- <CAGhQ9Vz+6s=SJXLu_5f-9aEjrT61aKnqnd=LitxZztdA-=NOiA@mail.gmail.com>
-Message-ID: <555F1583.9060005@ti.com>
+From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
+Date: Fri, 22 May 2015 17:25:29 +0530
+Subject: [PATCH v3 2/2] soc: Add driver for Freescale Vybrid Platform
+In-Reply-To: <35561091.AtkcGa6qVG@wuerfel>
+References: <cover.1432290463.git.maitysanchayan@gmail.com>
+ <d27c4ba234cd298914676884a9604ea8472a17d0.1432290463.git.maitysanchayan@gmail.com>
+ <35561091.AtkcGa6qVG@wuerfel>
+Message-ID: <20150522115529.GA11118@Sanchayan-Arch.toradex.int>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Arnd,
 
-On Friday 22 May 2015 05:08 PM, Joachim Eastwood wrote:
-> On 22 May 2015 at 13:34, Joachim  Eastwood <manabian@gmail.com> wrote:
->> On 22 May 2015 at 13:18, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>> Hi,
->>>
->>> On Thursday 21 May 2015 09:29 PM, Joachim Eastwood wrote:
->>>>
->>>> Add PHY driver for the internal USB OTG PHY found on NXP
->>>> LPC18xx and LPC43xx devices. This driver takes care of
->>>> enabling the PHY in CREG (syscon) and setting the required
->>>> clock frequency.
->>>>
->>>> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
->>>> ---
->>>>    drivers/phy/Kconfig               |  11 +++
->>>>    drivers/phy/Makefile              |   1 +
->>>>    drivers/phy/phy-lpc18xx-usb-otg.c | 143
->>>> ++++++++++++++++++++++++++++++++++++++
->>>>    3 files changed, 155 insertions(+)
->>>>    create mode 100644 drivers/phy/phy-lpc18xx-usb-otg.c
->>>>
->>>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
->>>> index a53bd5b52df9..e11fb9e3c760 100644
->>>> --- a/drivers/phy/Kconfig
->>>> +++ b/drivers/phy/Kconfig
->>>> @@ -52,6 +52,17 @@ config PHY_EXYNOS_MIPI_VIDEO
->>>>            Support for MIPI CSI-2 and MIPI DSI DPHY found on Samsung S5P
->>>>            and EXYNOS SoCs.
->>>>
->>>> +config PHY_LPC18XX_USB_OTG
->>>> +       tristate "NXP LPC18xx/43xx SoC USB OTG PHY driver"
->>>> +       depends on OF && (ARCH_LPC18XX || COMPILE_TEST)
->>>> +       select GENERIC_PHY
->>>> +       select MFD_SYSCON
->>>
->>>
->>> using select on visible symbols should be avoided. see [1]
->>>
->>> [1] ->
->>> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/kbuild/kconfig-language.txt#n111
->>
->> For these two symbols using select is the right thing to do.
->>
->> Look at the users in kernel:
->> $ git grep -E 'depend (MFD_SYSCON|GENERIC_PHY)' | wc -l
->> 0
->> $ git grep -E 'select MFD_SYSCON' | wc -l
->> 42
->
-> Sorry, screwed up the regex for depends.
->
-> For depens we have:
-> $ git grep -E 'depends on (MFD_SYSCON|GENERIC_PHY)' | wc -l
-> 10
+On 15-05-22 13:11:46, Arnd Bergmann wrote:
+> On Friday 22 May 2015 16:21:54 Sanchayan Maity wrote:
+> > +#define OCOTP_CFG0_OFFSET      0x00000410
+> > +#define OCOTP_CFG1_OFFSET      0x00000420
+> > +#define MSCM_CPxCOUNT_OFFSET   0x0000002C
+> > +#define MSCM_CPxCFG1_OFFSET    0x00000014
+> > +#define ROM_REVISION_OFFSET    0x00000080
+> > +
+> > +static const struct of_device_id vf610_soc_bus_match[] = {
+> > +	{ .compatible = "fsl,vf610-mscm-cpucfg", },
+> > +	{ /* sentinel */ }
+> > +};
+> > +
+> > +static int __init vf610_soc_init(void)
+> > +{
+> > +	struct regmap *ocotp_regmap, *mscm_regmap, *rom_regmap;
+> > +	struct soc_device_attribute *soc_dev_attr;
+> > +	struct soc_device *soc_dev;
+> > +	struct device_node *np;
+> > +	char soc_type[] = "xx0";
+> > +	u32 cpxcount, cpxcfg1;
+> > +	u32 soc_id1, soc_id2, rom_rev;
+> > +	u64 soc_id;
+> > +	int ret;
+> > +
+> > +	np = of_find_matching_node(NULL, vf610_soc_bus_match);
+> > +	if (!np)
+> > +		return -ENODEV;
+> > +
+> 
+> Why not use module_platform_driver() and make this a probe function instead?
 
-select for GENERIC_PHY is okay but I'd prefer to have depends on for MFD_SYSCON.
+Had done that but after having a look at the existing integrator and versatile
+platform implementation, I changed it. Will switch to using that.
 
-Thanks
-Kishon
+> 
+> > +	ocotp_regmap = syscon_regmap_lookup_by_compatible("fsl,vf610-ocotp");
+> > +	if (IS_ERR(ocotp_regmap)) {
+> > +		pr_err("regmap lookup for octop failed\n");
+> > +		return PTR_ERR(ocotp_regmap);
+> > +	}
+> > +
+> > +	mscm_regmap = syscon_regmap_lookup_by_compatible("fsl,vf610-mscm-cpucfg");
+> > +	if (IS_ERR(mscm_regmap)) {
+> > +		pr_err("regmap lookup for mscm failed");
+> > +		return PTR_ERR(mscm_regmap);
+> > +	}
+> > +
+> > +	rom_regmap = syscon_regmap_lookup_by_compatible("fsl,vf610-ocrom");
+> > +	if (IS_ERR(rom_regmap)) {
+> > +		pr_err("regmap lookup for ocrom failed");
+> > +		return PTR_ERR(rom_regmap);
+> > +	}
+> 
+> Can you use syscon_regmap_lookup_by_phandle instead, and put the
+> phandles in the fsl,vf610-mscm-cpucfg node?
+
+Ok. Will do so.
+
+- Sanchayan.
+
+> 
+> Also, I'd argue that the mscm should not be a syscon device at all,
+> but instead I'd use platform_get_resource()/devm_ioremap_resource()
+> to get an __iomem pointer.
+> 
+> 	Arnd
