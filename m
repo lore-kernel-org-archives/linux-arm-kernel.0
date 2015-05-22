@@ -1,74 +1,80 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 22 May 2015 12:04:20 +0200
-Subject: [PATCH] arch/arm64 :Cyclic Test fix in ARM64 fpsimd
-In-Reply-To: <2318126.unulghvt2b@wuerfel>
-References: <CAPyr0yJSGqvxkUWLtNKe0q5mNanBczAfAVx0tPKuzYeDG+eJ=Q@mail.gmail.com>
- <4053482.VK9u0kqo8W@wuerfel>
- <CAKv+Gu-bMy29BhQJb=bap_KDWTUTKOW4JVjvFOEtHuubJWhMDQ@mail.gmail.com>
- <2318126.unulghvt2b@wuerfel>
-Message-ID: <CAKv+Gu9yX2TKxBd4VxRKq-Jt2PEQgPD6NCy6kCccQz5v_+XV2A@mail.gmail.com>
+From: ydroneaud@opteya.com (Yann Droneaud)
+Date: Fri, 22 May 2015 12:05:48 +0200
+Subject: Device Tree Blob (DTB) licence
+In-Reply-To: <CAL_Jsq+T5c7qornpRVCduEjUSCeM+0xqbtVYovtH76y=4BqhLQ@mail.gmail.com>
+References: <1430820315.19516.26.camel@opteya.com>
+ <CAL_Jsq+T5c7qornpRVCduEjUSCeM+0xqbtVYovtH76y=4BqhLQ@mail.gmail.com>
+Message-ID: <1432289148.5304.58.camel@opteya.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 May 2015 at 11:46, Arnd Bergmann <arnd@linaro.org> wrote:
-> On Thursday 21 May 2015 18:01:27 Ard Biesheuvel wrote:
->>
->> You could but I wouldn't recommend it since it may also prevent you
->> from being able to set the boot path, but more importantly, reset and
->> poweroff may also be available only via UEFI Runtime Services on UEFI
->> systems.
->
-> Right, makes sense. Another option then could be to disable fpsimd
-> support with preempt-rt on real systems, and document this as a known
-> source of latency.
->
+Hi,
 
-Unfortunately, that could result in corruption of userland FP/SIMD
-context, since the UEFI Runtime Services are allowed to use those
-registers, and only need to adhere to the normal AAPCS rules that
-stipulate that q8..q15 are callee-save. That would still result in a
-25% latency reduction if we only need to preserve q0..q7 and q16..q31
+Le mardi 05 mai 2015 ? 11:41 -0500, Rob Herring a ?crit :
+> On Tue, May 5, 2015 at 5:05 AM, Yann Droneaud <ydroneaud@opteya.com> 
+> wrote:
+> > 
+> > I believe Device Tree Blob (.dtb file) built from kernel's Device 
+> > Tree
+> > Sources (.dts, which #include .dtsi, which #include .h) using 
+> > Device
+> > Tree Compiler (dtc) are covered by GNU General Public Licence v2
+> > (GPLv2), but cannot find any reference.
+> 
+> By default yes, but we've been steering people to dual license them 
+> GPL/BSD.
+> 
 
+Can you give me the rationale behind such dual licenses requirement ?
 
+If a BSD .dts includes GPLv2 .h, the whole is covered by GPLv2,
+so I cannot find a case where a BSD covered .dts file could be used
+alone within BSD license rights.
 
->> So could someone comment on whether virt_efi_set_time() is present in
->> all the problematic traces? Or was it only chosen because it
->> illustrates the underlying problem the best? In the former case, there
->> is an hidden bug that I would like to know about: however, if some
->> time related facility that is used in a performance (or latency)
->> sensitive context ultimately ends up programming the wall clock time
->> in the RTC, then I would expect the same issue to occur on non-UEFI
->> systems as well.
->
-> But without UEFI, updating the RTC would cause much less latency,
-> because  you don't need to save/restore the fpsimd context, disable
-> preemption, or call into a potentially unknown external binary
-> blob, the only latency you'd get there is that of a readl/writel
-> accessing the RTC register.
->
+> > As most .dtsi in arch/arm/boot/dts/ are covered by GPLv2, and,
+> > as most .h in include/dt-bindings/ are also covered by GPLv2,
+> > the source code is likely covered by GPLv2.
+> > 
+> > Then this source code is translated in a different language 
+> > (flattened
+> > device tree), so the resulting translation is also likely covered 
+> > by
+> > GPLv2.
+> > 
+> > So, when I'm proposed to download a .dtb file from a random vendor,
+> > can I require to get the associated source code ?
+> 
+> I believe so yes. However, you already have the "source" for the most
+> part. Just run "dtc -I dtb -O dts <dtb file>". You loose the
+> preprocessing and include structure though (not necessarily a bad
+> thing IMO).
+> 
+> Then the question is what is the license on that generated dts!
+> 
 
-Yes, that is right. So the UEFI Runtime Service interface is
-disproportionately heavy. But that still doesn't explain why it would
-make sense to sync the RTC with the system clock often enough that it
-violates maximum latency limits, since normally, you read it on boot
-and set it on reset/poweroff.
+That's also a good question.
 
->> One thing I should point out is that this FP/SIMD save/restore is
->> implemented differently depending on whether it is called from process
->> context or from hardirq/softirq context. In the former case,
->> kernel_neon_begin() preserves the userland FP/SIMD context only once,
->> and only restores it right before returning to userland. This way,
->> only the first kernel_neon_begin() and the last kernel_neon_end() call
->> actually induce this latency, and so the average latency could be
->> quite a bit lower than the worst case (although I understand that few
->> people may care about the average in an RT context)
->
-> Just for my own interest: in what case do we save/restore the fpsimd
-> state from interrupt context?
->
+Is this a form a "reverse engineering" with all the legalese burden ?
 
-For instance, the IEEE802.11 crypto runs in softirq context, but
-typically performs a non-trivial amount of crypto work (unless the
-hardware takes care of it). Since the accelerated AES-CCM module is
-20x faster than C code, it makes sense to stack/unstack 6 NEON
-registers and run it on the NEON.
+Anyway without a clear information attached to the DTB, it's difficult
+to tell which licence cover the "decompiled" version.
+
+> > Anyway, for a .dtb file generated from kernel sources, it's rather
+> > painful to look after all .dts, .dtsi, .h, to find what kind of
+> > licences are applicables, as some are covered by BSD, dual licensed
+> > (any combination of X11, MIT, BSD, GPLv2).
+> 
+> I imagine the includes cause some licensing discrepancies if you dug 
+> into it.
+> 
+
+It's a pity, and it's probably something to sort out.
+
+DTB files produced as part of kernel compilation should have a well
+known license attached by default.
+
+Regards.
+
+-- 
+Yann Droneaud
+OPTEYA
