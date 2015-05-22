@@ -1,55 +1,53 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri, 22 May 2015 12:21:40 +0100
-Subject: [GIT PULL] arm64: Juno DT updates
-Message-ID: <20150522112140.GU2175@e106497-lin.cambridge.arm.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 22 May 2015 19:23:32 +0800
+Subject: [Patch v3 5/7] PCI/ACPI: Consolidate common PCI host bridge code
+ into ACPI core
+In-Reply-To: <555C0091.6050301@linaro.org>
+References: <1431593803-5213-1-git-send-email-jiang.liu@linux.intel.com>
+ <1431593803-5213-6-git-send-email-jiang.liu@linux.intel.com>
+ <5559E44B.2010702@linaro.org> <555BFC72.3060703@linux.intel.com>
+ <555C0091.6050301@linaro.org>
+Message-ID: <555F11B4.8000503@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof, Kevin
+On 2015?05?20? 11:33, Hanjun Guo wrote:
+> +CC Suravee,
+>
+> On 2015?05?20? 11:16, Jiang Liu wrote:
+>> On 2015/5/18 21:08, Hanjun Guo wrote:
+>>> Hi Jiang,
+>>>
+>>> On 2015?05?14? 16:56, Jiang Liu wrote:
+>>>> Introduce common interface acpi_pci_root_create() and related data
+>>>> structures to create PCI root bus for ACPI PCI host bridges. It will
+>>>> be used to kill duplicated arch specific code for IA64 and x86. It may
+>>>> also help ARM64 in future.
+>>>
+>>> As I commented in previous version, this patch will introduce
+>>> compile error on ACPI enabled ARM64 kernel because struct
+>>> pci_controller is not defined for ARM64, so how about adding
+>>> the following patch before this patch, or squash to this one,
+>>> does it make sense?
+>> Hi Hanjun,
+>>     Thanks for fixing this building issue for ARM64. The patch
+>> is really what I want:). Will merge it into next version. With this
+>> patch applied, are there any other issues from ARM64 side?
+>
+> Suravee is testing ARM64 PCI on top of your patch set, he can confirm
+> that if there are any other issues :) (Suravee has a real ARM64 hardware
+> in hand)
 
-The DT updates for Juno and Juno r1 are ready to be pulled at your earliest convenience.
+After confirmed with Suravee, this patch set works OK on ARM64
+hardware for PCI hostbridge init, and can enumerate PCI devices
+(adding some ARM64 related PCI patches) and works fine with legacy
+interrupt, so to me, this patch set is good to go :)
 
-Many thanks,
-Liviu
+For this patchset:
 
+Tested-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
 
-The following changes since commit c0655fe9b0901a968800f56687be3c62b4cce5d2:
+I will add my Reviewed-by for some of patches later.
 
-  Merge tag 'usb-4.1-rc4' of git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb (2015-05-16 21:15:59 -0700)
-
-are available in the git repository at:
-
-  git://linux-arm.org/linux-ld for-upstream/juno-dts
-
-for you to fetch changes up to 8f821c9b8ec0e82ebd10ae12a267e4397cc53566:
-
-  Documentation: bindings: Add DT bindings for ARM Juno boards. (2015-05-22 11:51:08 +0100)
-
-----------------------------------------------------------------
-Liviu Dudau (6):
-      arm64: Juno: Fix the GIC node address label and the frequency of FAXI clock.
-      arm64: Juno: Split juno.dts into juno-base.dtsi and juno.dts.
-      arm64: Juno: Add memory mapped timer node
-      arm64: Juno: Add GICv2m support in device tree.
-      arm64: Add DT support for Juno r1 board.
-      Documentation: bindings: Add DT bindings for ARM Juno boards.
-
- Documentation/devicetree/bindings/arm/arm-boards |  66 ++++++++++
- arch/arm64/boot/dts/arm/Makefile                 |   2 +-
- arch/arm64/boot/dts/arm/juno-base.dtsi           | 154 +++++++++++++++++++++++
- arch/arm64/boot/dts/arm/juno-clocks.dtsi         |   4 +-
- arch/arm64/boot/dts/arm/juno-r1.dts              | 116 +++++++++++++++++
- arch/arm64/boot/dts/arm/juno.dts                 | 129 +------------------
- 6 files changed, 340 insertions(+), 131 deletions(-)
- create mode 100644 arch/arm64/boot/dts/arm/juno-base.dtsi
- create mode 100644 arch/arm64/boot/dts/arm/juno-r1.dts
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Thanks
+Hanjun
