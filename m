@@ -1,40 +1,50 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 22 May 2015 07:44:11 +0200
-Subject: [PATCH 3/3] MAINTAINERS: Add entry for xilinx mailbox driver.
-In-Reply-To: <1432251450-26352-4-git-send-email-moritz.fischer@ettus.com>
-References: <1432251450-26352-1-git-send-email-moritz.fischer@ettus.com>
- <1432251450-26352-4-git-send-email-moritz.fischer@ettus.com>
-Message-ID: <555EC22B.1020201@xilinx.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 22 May 2015 14:43:07 +0900
+Subject: [PATCH] fixup! arm64: allow kernel Image to be loaded anywhere in
+ physical memory
+In-Reply-To: <1431328388-3051-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1431328388-3051-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1432273387-7385-1-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/22/2015 01:37 AM, Moritz Fischer wrote:
-> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
-> ---
->  MAINTAINERS | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index f8e0afb..f1f0d10 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -10986,6 +10986,13 @@ M:	John Linn <John.Linn@xilinx.com>
->  S:	Maintained
->  F:	drivers/net/ethernet/xilinx/xilinx_axienet*
->  
-> +XILINX MAILBOX DRIVER
-> +M:	Moritz Fischer <moritz.fischer@ettus.com>
-> +L:	linux-kernel at vger.kernel.org
-> +S:	Maintained
-> +F:	drivers/mailbox/mailbox-xilinx.c
-> +F:	Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt
-> +
->  XILINX UARTLITE SERIAL DRIVER
->  M:	Peter Korsgaard <jacmet@sunsite.dk>
->  L:	linux-serial at vger.kernel.org
-> 
+Ard,
 
-Add it directly to the driver patch.
+In testing my kexec/dump code, I found that your patch doesn't work
+with initrd. Since the virtual addresses of initrd are calc'ed earlier
+than map_mem(), they have bogus values and unpack_to_rootfs() will fail.
 
-Thanks,
-Michal
+This patch fixes the issue.
+Please think of taking it in your next version.
+---
+ arch/arm64/mm/mmu.c |    8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 7e3e6af..43c2317 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -21,6 +21,7 @@
+ #include <linux/kernel.h>
+ #include <linux/errno.h>
+ #include <linux/init.h>
++#include <linux/initrd.h>
+ #include <linux/libfdt.h>
+ #include <linux/mman.h>
+ #include <linux/nodemask.h>
+@@ -452,6 +453,13 @@ static void __init map_mem(void)
+ 	bootstrap_linear_mapping(new_va_offset);
+ 
+ 	kernel_va_offset = new_va_offset;
++
++	/* Recalculate virtual addresses of initrd region */
++	if (initrd_start) {
++		initrd_start += new_va_offset;
++		initrd_end += new_va_offset;
++	}
++
+ 	memstart_addr = new_memstart_addr;
+ 
+ 	/* map all the memory banks */
+-- 
+1.7.9.5
