@@ -1,65 +1,41 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 22 May 2015 11:06:28 +0200
-Subject: [PATCH v8 14/16] ARM: dts: Introduce STM32F429 MCU
-In-Reply-To: <CALszF6CK5ezrO6D=4zr6zEPC7VanzbQjnZJwKOZekEZ5L4D-Dg@mail.gmail.com>
-References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
- <2282066.NWoIT9ZyLc@wuerfel>
- <CALszF6CaO_yuNiSDuDV+4d2NRe_+32j=zcSE1HPhB1UH59cW9w@mail.gmail.com>
- <13641152.Yt4ZI3oT6L@wuerfel>
- <CALszF6CK5ezrO6D=4zr6zEPC7VanzbQjnZJwKOZekEZ5L4D-Dg@mail.gmail.com>
-Message-ID: <1432285588.3929.28.camel@pengutronix.de>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Fri, 22 May 2015 11:09:57 +0200
+Subject: [PATCH 1/2] ARM: exynos_defconfig: Enable display on Trats2 board
+In-Reply-To: <1432255718-11695-1-git-send-email-k.kozlowski@samsung.com>
+References: <1432255718-11695-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <555EF265.30608@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 20.05.2015, 18:17 +0200 schrieb Maxime Coquelin:
-> Hi Arnd, Philipp,
-> 
-> 2015-05-13 21:11 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
-> > Ideally the binding should follow closely what is documented
-> > in the data sheet.
-> >
-> 
-> Daniel and myself would like your opinion about this binding:
-> 
-> rcc: rcc at 40023800 {
->     #reset-cells = <1>;
->     #clock-cells = <2>;
->     compatible = "st,stm32-rcc";
->     reg = <0x40023800 0x10>, <0x40023810 0x20>, <0x40023830 0x20>;
->     reg-names = "clock-cfg", "reset", "clock-gates";
+Hello Krzysztof,
 
-"reset" singular, "clock-gates" plural seems inconsistent to me.
-
-> };
+On 05/22/2015 02:48 AM, Krzysztof Kozlowski wrote:
+> Enable the Exynos DSI and S6E8AA0 panel for full X11 display on Trats2.
 > 
-> It would solve a problem Daniel is facing due to conflicting mem
-> region when clock and reset drivers are enabled, as both would reserve
-> the same region.
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  arch/arm/configs/exynos_defconfig | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> Also, it would make the reset driver very generic.
-> Doing that, we could even create a generic-reset.c driver that would
-> be used by STM32 and Sunxi (at least).
-
-Adding support for providing the reset register range via of_device_id
-data and the possibility to invert set/clear ops would allow to also
-include the socfpga driver.
-
-> In the probe function, it would check the number of reg resources.
-> If a single resource is passed, it would take it, else it would look
-> the one named "reset".
-> The driver and bindings would be the same for the two families, and
-> the bindings would be backward compatible with sunxi ones.
+> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+> index d034c96c039b..e7ccec487422 100644
+> --- a/arch/arm/configs/exynos_defconfig
+> +++ b/arch/arm/configs/exynos_defconfig
+> @@ -135,9 +135,11 @@ CONFIG_DRM_BRIDGE=y
+>  CONFIG_DRM_PTN3460=y
+>  CONFIG_DRM_PS8622=y
+>  CONFIG_DRM_EXYNOS=y
+> +CONFIG_DRM_EXYNOS_DSI=y
+>  CONFIG_DRM_EXYNOS_FIMD=y
+>  CONFIG_DRM_EXYNOS_DP=y
+>  CONFIG_DRM_PANEL=y
+> +CONFIG_DRM_PANEL_S6E8AA0=y
+>  CONFIG_DRM_PANEL_SIMPLE=y
+>  CONFIG_FB=y
+>  CONFIG_FB_MODE_HELPERS=y
 > 
-> Philip, Arnd, what do you think?
 
-I'm not a fan of describing the register layout in the device tree as
-detailed as the sunxi bindings do. I'd prefer the reg property to
-describe the device's register address space with one entry per
-contiguous block of registers.
-Unifying the mostly identical drivers is a good idea though, and reusing
-preexisting bindings is better than inventing new ones. I favor the
-socfpga binding, but I still like the sunxi bindings and this proposal
-better than encoding the register offset in the reset index.
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-best regards
-Philipp
+Best regards,
+Javier
