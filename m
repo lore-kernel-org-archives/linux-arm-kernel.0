@@ -1,84 +1,87 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Fri, 22 May 2015 13:40:10 +0800
-Subject: [PATCH 5/5] ARM64: MediaTek MT8173: Add SCPSYS device node
-In-Reply-To: <CAGS+omB4j0YyTP5e4q_jXY2TOA1MTD-dPvsKJMAmj5NooWHxeQ@mail.gmail.com>
-References: <1432131540-2523-1-git-send-email-s.hauer@pengutronix.de>
- <1432131540-2523-6-git-send-email-s.hauer@pengutronix.de>
- <CAGS+omDHEY54TzhNTJcFOeHkGbXAQwiTh9gxc=PsbzjwmpHEDA@mail.gmail.com>
- <20150521174916.GQ6325@pengutronix.de>
- <1432262503.14396.14.camel@mtksdaap41>
- <CAGS+omB4j0YyTP5e4q_jXY2TOA1MTD-dPvsKJMAmj5NooWHxeQ@mail.gmail.com>
-Message-ID: <1432273210.14396.29.camel@mtksdaap41>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 22 May 2015 07:43:40 +0200
+Subject: [PATCH 2/3] dts: Adding docs for Xilinx LogiCORE IP mailbox
+ driver.
+In-Reply-To: <1432251450-26352-3-git-send-email-moritz.fischer@ettus.com>
+References: <1432251450-26352-1-git-send-email-moritz.fischer@ettus.com>
+ <1432251450-26352-3-git-send-email-moritz.fischer@ettus.com>
+Message-ID: <555EC20C.6010703@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
-
-On Fri, 2015-05-22 at 12:19 +0800, Daniel Kurtz wrote:
-> On Fri, May 22, 2015 at 10:41 AM, James Liao <jamesjj.liao@mediatek.com> wrote:
-> >
-> > Sascha is right. I had confirmed with our designer that MFG on MT8173
-> > uses clk26m to check state. I also tested MFG domain power on/off with
-> > CLK_TOP_MFG_SEL off and it worked correctly.
+On 05/22/2015 01:37 AM, Moritz Fischer wrote:
+> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+> ---
+>  .../bindings/mailbox/xilinx-mailbox.txt         | 40 ++++++++++++++++++++
+>  1 file changed, 40 insertions(+)
 > 
-> Wait - the designer said to use clk26m, but you tested with CLK_TOP_MFG_SEL.
-> Now I am even more confused.
-> Which is the correct clock to use for the mfg power domains?
 
-I tested MFG domain power on/off with MFG_SEL "OFF". If MFG domain use
-MFG_SEL as its bus clock, it will be timeout while waiting SRAM ACK. But
-in my test, MFG power domain can power on/off without MFG_SEL. That
-means it doesn't need MFG_SEL while power on/off MFG domains.
+IRC the rule was to send binding first and then the driver.
 
-> >
-> > My patch set yesterday add subsystem clocks, which are not needed by
-> > power domain on/off. So I think these 2 patch set are independent.
+> diff --git a/Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt b/Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt
+> new file mode 100644
+> index 0000000..e559743
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt
+> @@ -0,0 +1,40 @@
+> +Xilinx Mailbox Driver
+> +=====================
+> +
+> +Required properties:
+> +- compatible :	"xlnx,mailbox-2.1".
+> +- reg : 	physical base address of the mailbox and length of
+> +		memory mapped region.
+> +- #mbox-cells:	Common mailbox binding property to identify the number
+> +		of cells required for the mailbox specifier. Should be 1.
+> +
+> +Optional properties:
+> +- interrupt-parent :	interrupt source phandle.
+> +- interrupts :		interrupt number. The interrupt specifier format
+
+please be consistent with spacing around :. It doesn't look nice.
+
+> +			depends on the interrupt controller parent.
+> +
+> +Example:
+> +	mbox: mailbox at 0x40400000 {
+
+remove 0x prefix here.
+
+> +		compatible = "xlnx,axi-mailbox-2.1";
+> +		reg = <0x100 0x3c>;
+
+This is weird - it should start with 40400000.
+Or is your physical address 0x100?
+
+
+> +		interrupt-parent = <&intc>;
+> +		interrupts = <5>;
+> +		#mbox-cells = <1>;
+> +	};
+> +
+> +Mailbox client
+> +===============
+> +"mboxes" and the optional "mbox-names" (please see
+> +Documentation/devicetree/bindings/mailbox/mailbox.txt for details). Each value
+> +of the mboxes property should contain a phandle to the mailbox controller
+> +device node and second argument is the channel index. It must be 0 (hardware
+> +support only one channel).The equivalent "mbox-names" property value can be
+
+.<space>The
+
+> +used to give a name to the communication channel to be used by the client user.
+> +
+> +Example:
+> +	mclient0: mclient0 at 0x400 {
+
+ditto.
+
+> +		compatible = "client-1.0";
+> +		reg = <0x400 0x10>;
+> +		mbox-names = "mbox", "mbox-rx";
+> +		mboxes = <&mbox 0>;
+> +	};
 > 
-> In other versions of the SCPSYS patch set, the scpsys node has
-> additional "subsystem bus clocks".
 
-That's my fault because I provided wrong information to Sascha. So in
-his early version of mtk-scpsys driver, the clocks setting of power
-domains are incorrect. The correct clock setting for each power domain
-should be:
-
-POWER_DOMAIN_MFG:     clk26m (no need to enable topckgen clocks)
-POWER_DOMAIN_DISP:    mm_sel
-POWER_DOMAIN_VDEC:    mm_sel
-POWER_DOMAIN_VENC:    mm_sel
-POWER_DOMAIN_VENC_LT: mm_sel
-POWER_DOMAIN_ISP:     mm_sel
-
-> So will we need additional patches later to add back these additional
-> clocks which have been removed from the current version of this pach?
-
-No. Clocks provided by topckgen are enough for scpsys driver. Please see
-my comments below.
-
-> In other words, will there be a follow up patch like below, plus
-> another patch to add these clocks to "enum clk_id":
-> 
-> @@ -163,9 +163,12 @@
->   compatible = "mediatek,mt8173-scpsys";
->   #power-domain-cells = <1>;
->   reg = <0 0x10006000 0 0x1000>;
-> - clocks = <&clk26m>,
-> - <&topckgen CLK_TOP_MM_SEL>;
-> - clock-names = "mfg", "mm";
-> + clocks = <&topckgen CLK_TOP_MFG_SEL>,
-> + <&topckgen CLK_TOP_MM_SEL>,
-> + <&topckgen CLK_TOP_VDEC_SEL>,
-> + <&topckgen CLK_TOP_VENC_SEL>,
-> + <&topckgen CLK_TOP_VENC_LT_SEL>;
-> + clock-names = "mfg", "mm", "vdec", "venc", "venc_lt";
->   infracfg = <&infracfg>;
->   };
-
-These clocks come from topckgen. In our term, they are "top clocks".
-Subsystem clocks which mentioned in my patch set are provided by
-subsystems such as mmsys, vdecsys, vencsys and so on.
-
-
-Best regards,
-
-James
+Thanks,
+Michal
