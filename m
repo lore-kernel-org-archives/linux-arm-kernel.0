@@ -1,85 +1,65 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 22 May 2015 11:05:34 +0200
-Subject: [GIT PULL] at91: cleanup for 4.2 #1
-Message-ID: <20150522090534.GA499@piout.net>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 22 May 2015 11:06:28 +0200
+Subject: [PATCH v8 14/16] ARM: dts: Introduce STM32F429 MCU
+In-Reply-To: <CALszF6CK5ezrO6D=4zr6zEPC7VanzbQjnZJwKOZekEZ5L4D-Dg@mail.gmail.com>
+References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <2282066.NWoIT9ZyLc@wuerfel>
+ <CALszF6CaO_yuNiSDuDV+4d2NRe_+32j=zcSE1HPhB1UH59cW9w@mail.gmail.com>
+ <13641152.Yt4ZI3oT6L@wuerfel>
+ <CALszF6CK5ezrO6D=4zr6zEPC7VanzbQjnZJwKOZekEZ5L4D-Dg@mail.gmail.com>
+Message-ID: <1432285588.3929.28.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof,
+Am Mittwoch, den 20.05.2015, 18:17 +0200 schrieb Maxime Coquelin:
+> Hi Arnd, Philipp,
+> 
+> 2015-05-13 21:11 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
+> > Ideally the binding should follow closely what is documented
+> > in the data sheet.
+> >
+> 
+> Daniel and myself would like your opinion about this binding:
+> 
+> rcc: rcc at 40023800 {
+>     #reset-cells = <1>;
+>     #clock-cells = <2>;
+>     compatible = "st,stm32-rcc";
+>     reg = <0x40023800 0x10>, <0x40023810 0x20>, <0x40023830 0x20>;
+>     reg-names = "clock-cfg", "reset", "clock-gates";
 
-This is the final cleanup that didn't make it for 4.1. The mach-at91
-folder now only contains core SoC and PM support.
+"reset" singular, "clock-gates" plural seems inconsistent to me.
 
-The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+> };
+> 
+> It would solve a problem Daniel is facing due to conflicting mem
+> region when clock and reset drivers are enabled, as both would reserve
+> the same region.
+> 
+> Also, it would make the reset driver very generic.
+> Doing that, we could even create a generic-reset.c driver that would
+> be used by STM32 and Sunxi (at least).
 
-  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+Adding support for providing the reset register range via of_device_id
+data and the possibility to invert set/clear ops would allow to also
+include the socfpga driver.
 
-are available in the git repository at:
+> In the probe function, it would check the number of reg resources.
+> If a single resource is passed, it would take it, else it would look
+> the one named "reset".
+> The driver and bindings would be the same for the two families, and
+> the bindings would be backward compatible with sunxi ones.
+> 
+> Philip, Arnd, what do you think?
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-cleanup
+I'm not a fan of describing the register layout in the device tree as
+detailed as the sunxi bindings do. I'd prefer the reg property to
+describe the device's register address space with one entry per
+contiguous block of registers.
+Unifying the mostly identical drivers is a good idea though, and reusing
+preexisting bindings is better than inventing new ones. I favor the
+socfpga binding, but I still like the sunxi bindings and this proposal
+better than encoding the register offset in the reset index.
 
-for you to fetch changes up to 196b44ea0f7582290e84dbb37f10d2468f726fbf:
-
-  ARM: at91: remove useless Makefile.boot (2015-05-20 16:38:00 +0200)
-
-----------------------------------------------------------------
-First batch of cleanup for 4.2:
- - use syscon in the ata and cf drivers to configure the SMC and drop
- sam9_smc.c
- - switch the at91rm9200 memory controller to syscon
- - remove last useless headers
- - remove now useless Makefile.boot
-
-----------------------------------------------------------------
-Alexandre Belloni (8):
-      ata: at91: use syscon to configure the smc
-      ARM: at91: drop sam9_smc.c
-      ARM: at91: declare the at91rm9200 memory controller as a syscon
-      pcmcia: at91_cf: Use syscon to configure the MC/smc
-      ARM: at91/pm: use the atmel-mc syscon defines
-      ARM: at91: remove mach/at91_ramc.h and mach/at91rm9200_mc.h
-      ARM: at91: remove at91rm9200_sdramc.h
-      ARM: at91: remove useless Makefile.boot
-
-Boris Brezillon (1):
-      mfd: syscon: Add Atmel MC (Memory Controller) registers definition
-
- .../devicetree/bindings/arm/atmel-at91.txt         |   2 +-
- arch/arm/boot/dts/at91rm9200.dtsi                  |   2 +-
- arch/arm/mach-at91/Makefile                        |   5 -
- arch/arm/mach-at91/Makefile.boot                   |   8 --
- arch/arm/mach-at91/include/mach/at91_ramc.h        |  28 ----
- arch/arm/mach-at91/include/mach/at91rm9200_mc.h    | 116 -----------------
- arch/arm/mach-at91/include/mach/at91sam9_smc.h     |  98 --------------
- arch/arm/mach-at91/pm.c                            |   8 +-
- arch/arm/mach-at91/pm.h                            |  14 +-
- arch/arm/mach-at91/pm_suspend.S                    |   3 +-
- arch/arm/mach-at91/sam9_smc.c                      | 136 -------------------
- arch/arm/mach-at91/sam9_smc.h                      |  11 --
- drivers/ata/Kconfig                                |   1 -
- drivers/ata/pata_at91.c                            |  92 ++++++++++---
- drivers/pcmcia/Kconfig                             |   1 -
- drivers/pcmcia/at91_cf.c                           |  25 ++--
- include/linux/mfd/syscon/atmel-mc.h                | 144 +++++++++++++++++++++
- include/soc/at91/at91rm9200_sdramc.h               |  63 ---------
- 18 files changed, 249 insertions(+), 508 deletions(-)
- delete mode 100644 arch/arm/mach-at91/Makefile.boot
- delete mode 100644 arch/arm/mach-at91/include/mach/at91_ramc.h
- delete mode 100644 arch/arm/mach-at91/include/mach/at91rm9200_mc.h
- delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9_smc.h
- delete mode 100644 arch/arm/mach-at91/sam9_smc.c
- delete mode 100644 arch/arm/mach-at91/sam9_smc.h
- create mode 100644 include/linux/mfd/syscon/atmel-mc.h
- delete mode 100644 include/soc/at91/at91rm9200_sdramc.h
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150522/1290719b/attachment.sig>
+best regards
+Philipp
