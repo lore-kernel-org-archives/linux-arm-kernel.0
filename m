@@ -1,94 +1,77 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri, 22 May 2015 12:13:10 +0100
-Subject: [PATCH v3 6/6] Documentation: bindings: Add DT bindings for ARM Juno
- boards.
+Date: Fri, 22 May 2015 12:13:08 +0100
+Subject: [PATCH v3 4/6] arm64: Juno: Add GICv2m support in device tree.
 In-Reply-To: <1432293190-13012-1-git-send-email-Liviu.Dudau@arm.com>
 References: <1432293190-13012-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1432293190-13012-7-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1432293190-13012-5-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-List the required properties and nodes used to describe the
-ARM Juno boards.
+Juno contains a GICv2m extension for handling PCIe MSI messages.
+Add a node declaring the first frame of the extension.
 
 Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+Acked-by: Jon Medhurst <tixy@linaro.org>
+Acked-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- Documentation/devicetree/bindings/arm/arm-boards | 66 ++++++++++++++++++++++++
- 1 file changed, 66 insertions(+)
+ arch/arm64/boot/dts/arm/juno-base.dtsi | 35 ++++++++++++++++++++--------------
+ 1 file changed, 21 insertions(+), 14 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/arm-boards b/Documentation/devicetree/bindings/arm/arm-boards
-index b78564b..1a70997 100644
---- a/Documentation/devicetree/bindings/arm/arm-boards
-+++ b/Documentation/devicetree/bindings/arm/arm-boards
-@@ -157,3 +157,69 @@ Example:
- 
- 	};
- };
-+
-+ARM Versatile Express Boards
-+-----------------------------
-+For details on the device tree bindings for ARM Versatile Express boards
-+please consult the vexpress.txt file in the same directory as this file.
-+
-+ARM Juno Boards
-+----------------
-+The Juno boards are targeting development for AArch64 systems. The first
-+iteration, Juno r0, is a vehicle for evaluating big.LITTLE on AArch64,
-+with the second iteration, Juno r1, mainly aimed at development of PCIe
-+based systems. Juno r1 also has support for AXI masters placed on the TLX
-+connectors to join the coherency domain.
-+
-+Juno boards are described in a similar way to ARM Versatile Express boards,
-+with the motherboard part of the hardware being described in a separate file
-+to highlight the fact that is part of the support infrastructure for the SoC.
-+Juno device tree bindings also share the Versatile Express bindings as
-+described under the RS1 memory mapping.
-+
-+Required properties (in root node):
-+	compatible = "arm,juno";	/* For Juno r0 board */
-+	compatible = "arm,juno-r1";	/* For Juno r1 board */
-+
-+Required nodes:
-+The description for the board must include:
-+   - a "psci" node describing the boot method used for the secondary CPUs.
-+     A detailed description of the bindings used for "psci" nodes is present
-+     in the psci.txt file.
-+   - a "cpus" node describing the available cores and their associated
-+     "enable-method"s. For more details see cpus.txt file.
-+
-+Example:
-+
-+/dts-v1/;
-+/ {
-+	model = "ARM Juno development board (r0)";
-+	compatible = "arm,juno", "arm,vexpress";
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	cpus {
+diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+index b7e862f..e3ee960 100644
+--- a/arch/arm64/boot/dts/arm/juno-base.dtsi
++++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+@@ -23,10 +23,17 @@
+ 		      <0x0 0x2c02f000 0 0x2000>,
+ 		      <0x0 0x2c04f000 0 0x2000>,
+ 		      <0x0 0x2c06f000 0 0x2000>;
+-		#address-cells = <0>;
 +		#address-cells = <2>;
-+		#size-cells = <0>;
-+
-+		A57_0: cpu at 0 {
-+			compatible = "arm,cortex-a57","arm,armv8";
-+			reg = <0x0 0x0>;
-+			device_type = "cpu";
-+			enable-method = "psci";
+ 		#interrupt-cells = <3>;
++		#size-cells = <2>;
+ 		interrupt-controller;
+ 		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_HIGH)>;
++		ranges = <0 0 0 0x2c1c0000 0 0x40000>;
++		v2m_0: v2m at 0 {
++			compatible = "arm,gic-v2m-frame";
++			msi-controller;
++			reg = <0 0 0 0x1000>;
 +		};
-+
-+		.....
-+
-+		A53_0: cpu at 100 {
-+			compatible = "arm,cortex-a53","arm,armv8";
-+			reg = <0x0 0x100>;
-+			device_type = "cpu";
-+			enable-method = "psci";
-+		};
-+
-+		.....
-+	};
-+
-+};
+ 	};
+ 
+ 	timer {
+@@ -129,19 +136,19 @@
+ 
+ 		#interrupt-cells = <1>;
+ 		interrupt-map-mask = <0 0 15>;
+-		interrupt-map = <0 0  0 &gic 0  68 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  1 &gic 0  69 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  2 &gic 0  70 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  3 &gic 0 160 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  4 &gic 0 161 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  5 &gic 0 162 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  6 &gic 0 163 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  7 &gic 0 164 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  8 &gic 0 165 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0  9 &gic 0 166 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0 10 &gic 0 167 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0 11 &gic 0 168 IRQ_TYPE_LEVEL_HIGH>,
+-				<0 0 12 &gic 0 169 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-map = <0 0  0 &gic 0 0 0  68 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  1 &gic 0 0 0  69 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  2 &gic 0 0 0  70 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  3 &gic 0 0 0 160 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  4 &gic 0 0 0 161 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  5 &gic 0 0 0 162 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  6 &gic 0 0 0 163 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  7 &gic 0 0 0 164 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  8 &gic 0 0 0 165 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0  9 &gic 0 0 0 166 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 10 &gic 0 0 0 167 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 11 &gic 0 0 0 168 IRQ_TYPE_LEVEL_HIGH>,
++				<0 0 12 &gic 0 0 0 169 IRQ_TYPE_LEVEL_HIGH>;
+ 
+ 		/include/ "juno-motherboard.dtsi"
+ 	};
 -- 
 2.4.0
