@@ -1,57 +1,38 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 22 May 2015 13:05:34 +0200
-Subject: [PATCH v2] ARM: dts: nitrogen6x: add CAN support
-In-Reply-To: <1432230303-3414-1-git-send-email-ps.report@gmx.net>
-References: <1432230303-3414-1-git-send-email-ps.report@gmx.net>
-Message-ID: <1432292734.3929.64.camel@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 22 May 2015 13:06:35 +0200
+Subject: [PATCH] usb: renesas_usbhs: avoid uninitialized variable use
+Message-ID: <16028110.26u0uMKA2O@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+After the renesas_usbhs driver is enabled in ARM multi_v7_defconfig,
+we now get a new warning:
 
-Am Donnerstag, den 21.05.2015, 19:45 +0200 schrieb Peter Seiderer:
-> Regulator stuff copied from imx6qdl-tx6.dtsi, pin configuration
-> taken from Boundary Devices linux kernel tree ([1] and [2]).
-> 
-> [1] https://github.com/boundarydevices/linux-imx6/blob/boundary-imx_3.10.17_1.0.2_ga/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-> [2] https://github.com/boundarydevices/linux-imx6/blob/boundary-imx_3.10.17_1.0.2_ga/arch/arm/boot/dts/imx6qdl.dtsi
-> 
-> Signed-off-by: Peter Seiderer <ps.report@gmx.net>
-> ---
-> v2:
->  - fix imx6qdl-nitrogen6x.dtsi url
->  - use real PAD settings (suggested by Fabio Estevam)
->  - remove _1 suffix (suggested by Shawn Guo)
-> ---
->  arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 32 +++++++++++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-> index fd096dc..d40092e 100644
-> --- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-> @@ -54,6 +54,17 @@
->  			gpio = <&gpio3 22 0>;
->  			enable-active-high;
->  		};
-> +
-> +		reg_can_xcvr: regulator at 3 {
-> +			compatible = "regulator-fixed";
-> +			reg = <3>;
-> +			regulator-name = "CAN XCVR";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_can_xcvr>;
-> +			gpio = <&gpio1 2 GPIO_ACTIVE_HIGH>;
+renesas_usbhs/mod.c: In function 'usbhs_interrupt':
+renesas_usbhs/mod.c:246:7: warning: 'intenb1' may be used uninitialized in this function [-Wmaybe-uninitialized]
 
-According to
-Documentation/devicetree/bindings/regulator/fixed-regulator.txt
-this should have:
-			enable-active-high;
+gcc correctly points to a problem here, for the case that the
+device is in host mode, we use the intenb1 variable without
+having assigned it first. The state->intsts1 has a similar
+problem, but gcc cannot know that.
 
-instead of the gpio phandle flag (which is ignored). Otherwise an active
-low GPIO is assumed.
+This avoids the problem by initializing both sides of the
+comparison to zero when we don't read them from the respective
+registers.
 
-regards
-Philipp
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 88a25e02f3 ("usb: renesas_usbhs: Add access control for INTSTS1 and INTENB1 register")
+
+diff --git a/drivers/usb/renesas_usbhs/mod.c b/drivers/usb/renesas_usbhs/mod.c
+index e5ce6e6d4f51..d4be5d594896 100644
+--- a/drivers/usb/renesas_usbhs/mod.c
++++ b/drivers/usb/renesas_usbhs/mod.c
+@@ -223,6 +223,8 @@ static int usbhs_status_get_each_irq(struct usbhs_priv *priv,
+ 	if (usbhs_mod_is_host(priv)) {
+ 		state->intsts1 = usbhs_read(priv, INTSTS1);
+ 		intenb1 = usbhs_read(priv, INTENB1);
++	} else {
++		state->intsts1 = intenb1 = 0;
+ 	}
+ 
+ 	/* mask */
