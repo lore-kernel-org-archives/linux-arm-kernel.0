@@ -1,41 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 22 May 2015 14:15:35 +0100
-Subject: [alsa-devel] [PATCH 10/13] sound/core: add DRM ELD helper
-In-Reply-To: <20150522122009.GK21391@sirena.org.uk>
-References: <20150509102501.GO2067@n2100.arm.linux.org.uk>
- <E1Yr1xy-0006l8-Ft@rmk-PC.arm.linux.org.uk>
- <20150522122009.GK21391@sirena.org.uk>
-Message-ID: <20150522131534.GF2067@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 22 May 2015 15:20 +0200
+Subject: [PATCH v3 2/2] soc: Add driver for Freescale Vybrid Platform
+In-Reply-To: <61585e4449cfc1f36e16a64b9b4a54fe@agner.ch>
+References: <cover.1432290463.git.maitysanchayan@gmail.com>
+ <35561091.AtkcGa6qVG@wuerfel> <61585e4449cfc1f36e16a64b9b4a54fe@agner.ch>
+Message-ID: <3574233.JhJlJx8SSu@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 22, 2015 at 01:20:09PM +0100, Mark Brown wrote:
-> On Sat, May 09, 2015 at 11:26:42AM +0100, Russell King wrote:
-> > Add a helper for the EDID like data structure, which is typically passed
-> > from a HDMI adapter to its associated audio driver.  This informs the
-> > audio driver of the capabilities of the attached HDMI sink.
+On Friday 22 May 2015 14:02:52 Stefan Agner wrote:
+> > Can you use syscon_regmap_lookup_by_phandle instead, and put the
+> > phandles in the fsl,vf610-mscm-cpucfg node?
 > 
-> As far as I can tell people are fairly happy with the implementation
-> here and unless I'm missing something are definitely happy with the
-> interface.  If that's the case can we get this into -next?  There's a
-> lot of interest in HDMI right now (which is great) and this would be
-> helpful for that, it seems like even if there are issues with the
-> implementation it would be worth merging as is so we can start adding
-> users and then do any improvements to the interface in parallel.
+> Hm, with that we would wire up hardware modules which does nothing has
+> to do with each other. We just happen to need a driver which collects
+> information accross the SoC. I'm not sure we should put the modules
+> required into the device tree.
 > 
-> From an interface point of view:
+> I don't think its nice to have the compatible strings in the source
+> code, however it feels more appropriate than in the device tree, IMHO...
+
+I see. Another option would be to point directly to the registers
+you need:
+
+	ocotp-cfg0 = <&ocotp 0x10>;
+	ocotp-cfg1 = <&ocotp 0x20>;
+	rom-revision = <&rom 0x80>;
+
+We don't yet have an abstraction to access a register from a syscon
+reference like this, but you could either roll your own here, or 
+add a generic abstraction.
+
+> > Also, I'd argue that the mscm should not be a syscon device at all,
+> > but instead I'd use platform_get_resource()/devm_ioremap_resource()
+> > to get an __iomem pointer.
 > 
-> Reviewed-by: Mark Brown <broonie@kernel.org>
+> We need to have mscm-cpucfg to be syscon because we need to get the CPU
+> personality in the MSCM interrupt router driver (irq-vf610-mscm-ir.c). 
 
-I'd be more than happy if Takashi Iwai wants to take them - I'm not
-planning on the audio driver itself being merged just yet as we still
-need to properly hammer out the differences between the AHB audio (for
-iMX6) and I2S audio (for Rockchip) for this device.
+It can be both at the same time now.
 
-Alternatively, I could move these two patches to the beginning of my
-series, and merge that point into my for-next and/or publish it as a
-separate sub-branch... whatever people want, just let me know.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+	Arnd
