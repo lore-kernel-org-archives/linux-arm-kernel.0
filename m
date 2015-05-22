@@ -1,81 +1,55 @@
-From: wcohen@redhat.com (William Cohen)
-Date: Fri, 22 May 2015 11:49:37 -0400
-Subject: [PATCH v6 3/6] arm64: Kprobes with single stepping support
-In-Reply-To: <20150522110007.GV29424@e104818-lin.cambridge.arm.com>
-References: <1429561187-3661-1-git-send-email-dave.long@linaro.org>
- <1429561187-3661-4-git-send-email-dave.long@linaro.org>
- <20150520163946.GC29424@e104818-lin.cambridge.arm.com>
- <555D62BD.5040403@linaro.org>
- <20150522110007.GV29424@e104818-lin.cambridge.arm.com>
-Message-ID: <555F5011.90808@redhat.com>
+From: ssantosh@kernel.org (Santosh Shilimkar)
+Date: Fri, 22 May 2015 08:58:34 -0700
+Subject: [GIT PULL] ARM: Keystone updates for v4.2
+Message-ID: <1432310314-5090-1-git-send-email-ssantosh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/22/2015 07:00 AM, Catalin Marinas wrote:
-> On Thu, May 21, 2015 at 12:44:45AM -0400, David Long wrote:
->> On 05/20/15 12:39, Catalin Marinas wrote:
->>> On Mon, Apr 20, 2015 at 04:19:44PM -0400, David Long wrote:
->>>> Add support for basic kernel probes(kprobes) and jump probes
->>>> (jprobes) for ARM64.
->>>>
->>>> Kprobes utilizes software breakpoint and single step debug
->>>> exceptions supported on ARM v8.
->>>>
->>>> A software breakpoint is placed at the probe address to trap the
->>>> kernel execution into the kprobe handler.
->>>>
->>>> ARM v8 supports enabling single stepping before the break exception
->>>> return (ERET), with next PC in exception return address (ELR_EL1). The
->>>> kprobe handler prepares an executable memory slot for out-of-line
->>>> execution with a copy of the original instruction being probed, and
->>>> enables single stepping. The PC is set to the out-of-line slot address
->>>> before the ERET. With this scheme, the instruction is executed with the
->>>> exact same register context except for the PC (and DAIF) registers.
->>>
->>> I wonder whether it would be simpler to use another software breakpoint
->>> after the out of line instruction copy. You won't run the instructions
->>> that change the PC anyway.
->>
->> We put quite a bit of work into making single-step work.  I don't see any
->> obvious advantage to trying to switch to a software breakpoint. Both are
->> debug exceptions but SS does leave open the possibility of maybe eventually
->> running some instructions that do change the PC.
-> 
-> I'm not trying to get this re-written, just as a potential workaround
-> for the unexpected single-step error reported but I need to read some
-> more before I understand it properly (and I can see patches already for
-> fixing this).
-> 
->>> Since an unconditional branch instruction within the kernel address
->>> space can reach any point in the kernel (and modules), could we go a
->>> step further and avoid the software breakpoint altogether, just generate
->>> a branch instruction to the original location (after the software
->>> breakpoint)?
->>
->> Wouldn't a branch instruction have to make use of a register in order to
->> span the whole address space?  How could you do that and have all the
->> registers unmolested when you land back after the original probe point?  The
->> thing that really kills this though is the fact we need to be able to run
->> the pre and post functions before and *after* the XOL stepping.
-> 
-> A "b #imm" would be able to cover a wide range (+/-128MB), but, as you
-> said, it doesn't help with the post function call.
-> 
-> Any plans to post an updated version with the "unexpected single-step
-> error" fixed?
-> 
+Please pull keystone update for 4.2. Since there was just one
+config update, sending it along with dts changes. The MMU
+switching series which includes few keystone arch update will
+go via RMK's tree because of dependencies with core code.
 
-Hi Catalin,
+The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
 
-The only place this issue with the "unexpected single-step error" has been observed is with the arm64 kretporbe handler code calling kprobed functions.  Experiments with kprobed functions being called in the kprobe handlers showed that situation was handled appropriately. 
+  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
 
-There is proposed fix to address the issue with the trampoline, the attached patch.  This is modeled after the way that the x86 handles the kretprobe.  The trampoline directly save and restores the registers and uses a normal call to the kretprobe handler.  It operates similarly to what you are suggesting above, but just for the special case of the kretprobes.
+are available in the git repository at:
 
--Will Cohen
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-Avoid-using-kprobe-in-the-arm64-kretprobe-trampoline.patch
-Type: text/x-patch
-Size: 5995 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150522/0a7af59e/attachment.bin>
+  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-for-4.2
+
+for you to fetch changes up to b8c80afb65a0bcf55875194ce8cc9cea69aed845:
+
+  ARM: dts: k2l: fix the netcp range size (2015-05-22 08:52:15 -0700)
+
+----------------------------------------------------------------
+ARM: Keystone updates for v4.2
+
+Update contains:
+        - Keystone EVM(s) dts files updates to add NETCP driver.
+        - config update to enable NETCP driver by default.
+
+----------------------------------------------------------------
+Murali Karicheri (7):
+      ARM: keystone: defconfig: enable netcp driver by default
+      ARM: dts: k2hk-evm: Add device bindings for netcp driver
+      ARM: dts: k2e-evm: Add device bindings for netcp driver
+      ARM: dts: k2l-evm: Add device bindings for netcp driver
+      ARM: dts: k2hk: fix the netcp range size
+      ARM: dts: k2e: fix the netcp range size
+      ARM: dts: k2l: fix the netcp range size
+
+ arch/arm/boot/dts/k2e-evm.dts       |   1 +
+ arch/arm/boot/dts/k2e-netcp.dtsi    | 206 +++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/k2e.dtsi          |   1 +
+ arch/arm/boot/dts/k2hk-evm.dts      |   1 +
+ arch/arm/boot/dts/k2hk-netcp.dtsi   | 208 ++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/k2hk.dtsi         |   1 +
+ arch/arm/boot/dts/k2l-evm.dts       |   1 +
+ arch/arm/boot/dts/k2l-netcp.dtsi    | 189 ++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/k2l.dtsi          |   1 +
+ arch/arm/configs/keystone_defconfig |   6 ++
+ 10 files changed, 615 insertions(+)
+ create mode 100644 arch/arm/boot/dts/k2e-netcp.dtsi
+ create mode 100644 arch/arm/boot/dts/k2hk-netcp.dtsi
+ create mode 100644 arch/arm/boot/dts/k2l-netcp.dtsi
