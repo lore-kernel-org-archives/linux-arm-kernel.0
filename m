@@ -1,26 +1,42 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 22 May 2015 15:02:50 -0300
-Subject: [RFC PATCH 1/1] pci-imx6: add speed change timeout message
-In-Reply-To: <555F6ABE.7000000@boundarydevices.com>
-References: <1432233345-10160-1-git-send-email-troy.kisky@boundarydevices.com>
- <201505212319.47974.marex@denx.de>
- <555E6795.6090009@boundarydevices.com>
- <201505220131.23825.marex@denx.de>
- <555F6ABE.7000000@boundarydevices.com>
-Message-ID: <CAOMZO5DjKyxMEc1PaYhd2e-NBacLHGS=YksofUr1js8OoUns0g@mail.gmail.com>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Fri, 22 May 2015 11:03:09 -0700
+Subject: [PATCHv1 0/2] Adding driver for Xilinx LogiCORE IP mailbox.
+Message-ID: <1432317791-26851-1-git-send-email-moritz.fischer@ettus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Troy,
+This patchset adds mailbox framework integration for the Xilinx LogiCORE IP
+mailbox.  The Xilinx LogiCORE IP mailbox is a fpga softcore that allows
+interprocessor communication between AXI4 stream / memory mapped
+processors.
 
-On Fri, May 22, 2015 at 2:43 PM, Troy Kisky
-<troy.kisky@boundarydevices.com> wrote:
+Changes from v0:
+---------------------
 
-> This patch breaks my imx6sx board, so it shouldn't be applied until there is
-> an explanation and work around of some sort.
+- Several stylistic issues
+- Dropped superfluous intr_mode member
+- Really masking the IRQs on mailbox_shutdown
+- No longer using polling by accident in non-IRQ mode
+- Swapped doc and driver commits
 
-Do you have mx6sx PCI working with mainline or only with FSL 3.14 kernel?
+Thanks to Michal and Shubrajyoti for the feedback.
 
-Regards,
+Cheers,
 
-Fabio Estevam
+Moritz
+
+Moritz Fischer (2):
+  dts: Adding docs for Xilinx LogiCORE IP mailbox driver.
+  mailbox: Adding driver for Xilinx LogiCORE IP mailbox.
+
+ .../bindings/mailbox/xilinx-mailbox.txt         |  40 +++
+ MAINTAINERS                                     |   7 +
+ drivers/mailbox/Kconfig                         |   8 +
+ drivers/mailbox/Makefile                        |   2 +
+ drivers/mailbox/mailbox-xilinx.c                | 332 +++++++++++++++++++
+ 5 files changed, 389 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt
+ create mode 100644 drivers/mailbox/mailbox-xilinx.c
+
+-- 
+2.4.1
