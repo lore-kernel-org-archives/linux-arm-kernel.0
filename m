@@ -1,9 +1,11 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri, 22 May 2015 11:09:57 +0200
-Subject: [PATCH 1/2] ARM: exynos_defconfig: Enable display on Trats2 board
-In-Reply-To: <1432255718-11695-1-git-send-email-k.kozlowski@samsung.com>
+Date: Fri, 22 May 2015 11:11:17 +0200
+Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable display on Trats2
+ board
+In-Reply-To: <1432255718-11695-2-git-send-email-k.kozlowski@samsung.com>
 References: <1432255718-11695-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <555EF265.30608@collabora.co.uk>
+ <1432255718-11695-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <555EF2B5.1000504@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,25 +16,26 @@ On 05/22/2015 02:48 AM, Krzysztof Kozlowski wrote:
 > 
 > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > ---
->  arch/arm/configs/exynos_defconfig | 2 ++
+>  arch/arm/configs/multi_v7_defconfig | 2 ++
 >  1 file changed, 2 insertions(+)
 > 
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index d034c96c039b..e7ccec487422 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -135,9 +135,11 @@ CONFIG_DRM_BRIDGE=y
->  CONFIG_DRM_PTN3460=y
->  CONFIG_DRM_PS8622=y
->  CONFIG_DRM_EXYNOS=y
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 0848337a2a01..e9785020aab1 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -413,10 +413,12 @@ CONFIG_DRM=y
+>  CONFIG_DRM_PTN3460=m
+>  CONFIG_DRM_PS8622=m
+>  CONFIG_DRM_EXYNOS=m
 > +CONFIG_DRM_EXYNOS_DSI=y
 >  CONFIG_DRM_EXYNOS_FIMD=y
->  CONFIG_DRM_EXYNOS_DP=y
->  CONFIG_DRM_PANEL=y
-> +CONFIG_DRM_PANEL_S6E8AA0=y
+>  CONFIG_DRM_EXYNOS_HDMI=y
+>  CONFIG_DRM_RCAR_DU=m
+>  CONFIG_DRM_TEGRA=y
+> +CONFIG_DRM_PANEL_S6E8AA0=m
 >  CONFIG_DRM_PANEL_SIMPLE=y
->  CONFIG_FB=y
->  CONFIG_FB_MODE_HELPERS=y
+>  CONFIG_FB_ARMCLCD=y
+>  CONFIG_FB_WM8505=y
 > 
 
 Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
