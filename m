@@ -1,82 +1,57 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Fri, 22 May 2015 16:02:13 +0200
-Subject: [alsa-devel] [PATCH 10/13] sound/core: add DRM ELD helper
-In-Reply-To: <20150522140009.GH2067@n2100.arm.linux.org.uk>
-References: <20150509102501.GO2067@n2100.arm.linux.org.uk>
- <E1Yr1xy-0006l8-Ft@rmk-PC.arm.linux.org.uk>
- <20150522122009.GK21391@sirena.org.uk>
- <20150522131534.GF2067@n2100.arm.linux.org.uk>
- <s5hzj4weo35.wl-tiwai@suse.de>
- <20150522135331.GG2067@n2100.arm.linux.org.uk>
- <s5hsiaoemz3.wl-tiwai@suse.de>
- <20150522140009.GH2067@n2100.arm.linux.org.uk>
-Message-ID: <s5hoalcemmy.wl-tiwai@suse.de>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Fri, 22 May 2015 16:04:24 +0200
+Subject: [PATCH v8 07/16] drivers: reset: Add STM32 reset driver
+In-Reply-To: <555E559F.8040403@suse.de>
+References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1431158038-3813-8-git-send-email-mcoquelin.stm32@gmail.com>
+ <555D1C7D.1060205@suse.de>
+ <CALszF6CrouFF3oS_Qz6+qQRqa4a5PurdYNdvHnZRDb4zwOJ6mQ@mail.gmail.com>
+ <555E1CC4.9090605@suse.de>
+ <CALszF6Bhc1MkDaqM3oJ93Rrxxbsss7=FA8WUpbtwmDERUdD0KA@mail.gmail.com>
+ <555E559F.8040403@suse.de>
+Message-ID: <CALszF6BFXfjWhRgyejJHXMw+EJZUzT_7FtbKhnjS+DJS=vv11Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At Fri, 22 May 2015 15:00:10 +0100,
-Russell King - ARM Linux wrote:
-> 
-> On Fri, May 22, 2015 at 03:54:56PM +0200, Takashi Iwai wrote:
-> > At Fri, 22 May 2015 14:53:31 +0100,
-> > Russell King - ARM Linux wrote:
-> > > 
-> > > On Fri, May 22, 2015 at 03:30:54PM +0200, Takashi Iwai wrote:
-> > > > At Fri, 22 May 2015 14:15:35 +0100,
-> > > > Russell King - ARM Linux wrote:
-> > > > > 
-> > > > > On Fri, May 22, 2015 at 01:20:09PM +0100, Mark Brown wrote:
-> > > > > > On Sat, May 09, 2015 at 11:26:42AM +0100, Russell King wrote:
-> > > > > > > Add a helper for the EDID like data structure, which is typically passed
-> > > > > > > from a HDMI adapter to its associated audio driver.  This informs the
-> > > > > > > audio driver of the capabilities of the attached HDMI sink.
-> > > > > > 
-> > > > > > As far as I can tell people are fairly happy with the implementation
-> > > > > > here and unless I'm missing something are definitely happy with the
-> > > > > > interface.  If that's the case can we get this into -next?  There's a
-> > > > > > lot of interest in HDMI right now (which is great) and this would be
-> > > > > > helpful for that, it seems like even if there are issues with the
-> > > > > > implementation it would be worth merging as is so we can start adding
-> > > > > > users and then do any improvements to the interface in parallel.
-> > > > > > 
-> > > > > > From an interface point of view:
-> > > > > > 
-> > > > > > Reviewed-by: Mark Brown <broonie@kernel.org>
-> > > > > 
-> > > > > I'd be more than happy if Takashi Iwai wants to take them - I'm not
-> > > > > planning on the audio driver itself being merged just yet as we still
-> > > > > need to properly hammer out the differences between the AHB audio (for
-> > > > > iMX6) and I2S audio (for Rockchip) for this device.
-> > > > 
-> > > > Sorry, I've been on vacation in the last two weeks, so slowly
-> > > > digesting all backlogs now.
-> > > > 
-> > > > > Alternatively, I could move these two patches to the beginning of my
-> > > > > series, and merge that point into my for-next and/or publish it as a
-> > > > > separate sub-branch... whatever people want, just let me know.
-> > > > 
-> > > > I'm fine to take the sound part.  It's only patches 10 and 11, right?
-> > > > Then I can provide a branch that can be merged for the rest drm
-> > > > stuff.
-> > > 
-> > > Yep, just patches 10 and 11.  If possible, please base these patches on
-> > > v4.1-rc1, thanks.
-> > 
-> > I applied them on top of -rc4, I suppose it's OK?
-> 
-> It is, but what it means is that I'll keep my copy of the patches in my
-> tree rather than pulling your tree.  Having branches spread on different
-> start points makes it difficult to generate a patch series from the git
-> tree - which is something I continue to do for the SolidRun iMX6 platforms
-> (publishing it as separate patches, tarball of those patches and a combined
-> patch.)
-> 
-> As I say, it doesn't matter that much, I can just keep my copies of the
-> patches, and when this stuff gets rebased to 4.2-rc1, git rebase should
-> eliminate them automatically.
+2015-05-22 0:01 GMT+02:00 Andreas F?rber <afaerber@suse.de>:
+> Am 21.05.2015 um 21:57 schrieb Maxime Coquelin:
+>> Note that for now, I still use your bootloader.
+>> I have done the changes to reset the timers in the afboot-stm32.
+>> That's the reason why I asked you under which licence it is delivered
+>> few months ago.
+>
+> Sorry, too many mails... The stm32 one is GPL-2.0, as parts of it were
+> derived from a U-Boot fork. (Personally I prefer GPL-2.0+; fm4 and
+> xmc4000 are MIT/X11.)
 
-OK, if so, then I rebase on top of -rc1.  The branch isn't merged yet,
-so no big problem.
+Not a problem, thanks for providing the licence.
 
+>> I can share you the patch if you want, even if I understand it is more
+>> about the concept that you are reluctant.
+>>
+>> On my side, I plan to move to U-Boot soon, as Kamil Lulko added STM32
+>> support in mainline [1].
+>
+> You're free to use any bootloader you like, but you will find it
+> difficult to build in USB etc. drivers given the sheer size of U-Boot.
+> That was my motivation for writing the tiny one. ;)
 
-Takashi
+I think the two bootloaders make sense. Indeed, using U-Boot restricts
+the size of the Kernel.
+I also have the stm32429i-eval board, with 32MB NOR and 32MB SD-Ram.
+At least on this one I will use U-Boot, as tftp could be used to load
+Kernel since it has Ethernet port.
+
+>> In case of U-Boot, the timer reset should be de-asserted when jumping
+>> into the Kernel, as Rob mentionned [0].
+>
+> Thanks, I've updated the xmc4000 one accordingly and can do the same for
+> stm32. But you are right that I consider that an ugly workaround,
+> although on the other hand my earlyprintk patches also depend on the
+> bootloader setting up GPIOs and UART.
+
+Yes, the Kernel always need to rely on the bootloader to provide a
+minimal setup (clock/ddr/muxing...).
+
+Regards,
+Maxime
