@@ -1,110 +1,164 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 22 May 2015 14:38:00 +0100
-Subject: [PATCH 3/6] arm64: tegra: Add Tegra210 support
-In-Reply-To: <20150519151740.GA28161@ulmo.nvidia.com>
-References: <1431529065-20128-1-git-send-email-thierry.reding@gmail.com>
- <1431529065-20128-3-git-send-email-thierry.reding@gmail.com>
- <20150513171114.GA18655@e104818-lin.cambridge.arm.com>
- <20150515101913.GA20474@ulmo.nvidia.com>
- <20150519145211.GX21251@e104818-lin.cambridge.arm.com>
- <20150519151740.GA28161@ulmo.nvidia.com>
-Message-ID: <20150522133800.GY29424@e104818-lin.cambridge.arm.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 22 May 2015 21:42:23 +0800
+Subject: [Patch v3 2/7] ia64/PCI/ACPI: Use common ACPI resource parsing
+ interface for host bridge
+In-Reply-To: <1431593803-5213-3-git-send-email-jiang.liu@linux.intel.com>
+References: <1431593803-5213-1-git-send-email-jiang.liu@linux.intel.com>
+ <1431593803-5213-3-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <555F323F.3020107@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 05:17:42PM +0200, Thierry Reding wrote:
-> On Tue, May 19, 2015 at 03:52:11PM +0100, Catalin Marinas wrote:
-> > On Fri, May 15, 2015 at 12:19:16PM +0200, Thierry Reding wrote:
-> > > On Wed, May 13, 2015 at 06:11:15PM +0100, Catalin Marinas wrote:
-> > > > On Wed, May 13, 2015 at 04:57:42PM +0200, Thierry Reding wrote:
-> > > > > From: Thierry Reding <treding@nvidia.com>
-> > > > > 
-> > > > > NVIDIA Tegra210 (also known as Tegra X1) has four Cortex-A57 and four
-> > > > > Cortex-A53 CPUs. Compared to Tegra124 and Tegra132 it comes with a 256-
-> > > > > core Maxwell GPU. It supports processing videos of up to 4K resolutions
-> > > > > at 60 fps (H.265, VP9, H.264).
-> > > > > 
-> > > > > Signed-off-by: Thierry Reding <treding@nvidia.com>
-> > > > > ---
-> > > > >  arch/arm64/Kconfig                       |   9 +
-> > > > >  arch/arm64/boot/dts/nvidia/tegra210.dtsi | 998 +++++++++++++++++++++++++++++++
-> > > > >  2 files changed, 1007 insertions(+)
-> > > > >  create mode 100644 arch/arm64/boot/dts/nvidia/tegra210.dtsi
-> > > > > 
-> > > > > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> > > > > index 7796af4b1d6f..bfdf064ada66 100644
-> > > > > --- a/arch/arm64/Kconfig
-> > > > > +++ b/arch/arm64/Kconfig
-> > > > > @@ -225,6 +225,15 @@ config ARCH_TEGRA_132_SOC
-> > > > >  	  but contains an NVIDIA Denver CPU complex in place of
-> > > > >  	  Tegra124's "4+1" Cortex-A15 CPU complex.
-> > > > >  
-> > > > > +config ARCH_TEGRA_210_SOC
-> > > > > +	bool "NVIDIA Tegra210 SoC"
-> > > > > +	depends on ARCH_TEGRA
-> > > > > +	select PINCTRL_TEGRA210
-> > > > > +	select USB_ULPI if USB_PHY
-> > > > > +	select USB_ULPI_VIEWPORT if USB_PHY
-> > > > > +	help
-> > > > > +	  Enable support for the NVIDIA Tegra210 SoC.
-> > > > > +
-> > > > 
-> > > > The previous ARCH_TEGRA_132_SOC escaped me. Do we need all these
-> > > > ARCH_TEGRA_*_SOC entries? Can we not have per-driver Kconfig options?
-> > > > For example, ARCH_TEGRA_132_SOC seems to be only used in
-> > > > drivers/clk/tegra, a specific Kconfig entry in there would suffice.
-> > > 
-> > > There are actually a couple of other places where this will be used in
-> > > subsequent patches (e.g. memory controller driver). The idea behind
-> > > having these is that each one of them is used to enable the essentials
-> > > out of the box, so that people don't have to go and enable a bunch of
-> > > driver-specific Kconfig options just to get a kernel configuration that
-> > > can actually boot.
-> > 
-> > We debated whether to have ARCH_* options at all on arm64 and we settled
-> > for the middle ground - only add them for SoC families, not individual
-> > SoCs. As for the kernel configuration that actually boots, we want the
-> > arm64 defconfig to include all the supported SoCs and drivers (though
-> > longer term I'd like to see more drivers built as modules by default).
-> > 
-> > > This is also useful for integrators since they can simply omit all SoC
-> > > generations that they're not interested in. Having a per-SoC option
-> > > provides an easy way of doing so.
-> > 
-> > The integrators could just select a SoC family and trim down unwanted
-> > options, I don't think they rely on the kernel defconfig for a final
-> > product. If this becomes an issue, I would rather have per-SoC
-> > defconfigs than lots of Kconfig entries.
-> 
-> I understand the desire to start with a clean plate on a new
-> architecture, but Tegra has worked like this for the past 5 years and
-> it's worked out really well for us. So I'm reluctant to introduce these
-> inconsistencies merely because 64-bit ARM now lives in a different
-> directory.
+On 2015?05?14? 16:56, Jiang Liu wrote:
+> Use common ACPI resource parsing interface to parse ACPI resources for
+> PCI host bridge, so we could share more code between IA64 and x86.
+> Later we will consolidate arch specific implementations into ACPI core.
+>
+> Tested-by: Tony Luck <tony.luck@intel.com>
+> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+> ---
+>   arch/ia64/pci/pci.c |  414 ++++++++++++++++++++++++---------------------------
+>   1 file changed, 193 insertions(+), 221 deletions(-)
+>
+> diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
+> index d4e162d35b34..23689d4c37ae 100644
+> --- a/arch/ia64/pci/pci.c
+> +++ b/arch/ia64/pci/pci.c
+> @@ -115,29 +115,12 @@ struct pci_ops pci_root_ops = {
+>   	.write = pci_write,
+>   };
+>
+> -/* Called by ACPI when it finds a new root bus.  */
+> -
+> -static struct pci_controller *alloc_pci_controller(int seg)
+> -{
+> -	struct pci_controller *controller;
+> -
+> -	controller = kzalloc(sizeof(*controller), GFP_KERNEL);
+> -	if (!controller)
+> -		return NULL;
+> -
+> -	controller->segment = seg;
+> -	return controller;
+> -}
+> -
+>   struct pci_root_info {
+> +	struct pci_controller controller;
+>   	struct acpi_device *bridge;
+> -	struct pci_controller *controller;
+>   	struct list_head resources;
+> -	struct resource *res;
+> -	resource_size_t *res_offset;
+> -	unsigned int res_num;
+>   	struct list_head io_resources;
+> -	char *name;
+> +	char name[16];
+>   };
+>
+>   static unsigned int
+> @@ -168,11 +151,11 @@ new_space (u64 phys_base, int sparse)
+>   	return i;
+>   }
+>
+> -static u64 add_io_space(struct pci_root_info *info,
+> -			struct acpi_resource_address64 *addr)
+> +static int add_io_space(struct device *dev, struct pci_root_info *info,
+> +			struct resource_entry *entry)
+>   {
+>   	struct iospace_resource *iospace;
+> -	struct resource *resource;
+> +	struct resource *resource, *res = entry->res;
+>   	char *name;
+>   	unsigned long base, min, max, base_port;
+>   	unsigned int sparse = 0, space_nr, len;
+> @@ -180,27 +163,24 @@ static u64 add_io_space(struct pci_root_info *info,
+>   	len = strlen(info->name) + 32;
+>   	iospace = kzalloc(sizeof(*iospace) + len, GFP_KERNEL);
+>   	if (!iospace) {
+> -		dev_err(&info->bridge->dev,
+> -				"PCI: No memory for %s I/O port space\n",
+> -				info->name);
+> -		goto out;
+> +		dev_err(dev, "PCI: No memory for %s I/O port space\n",
+> +			info->name);
+> +		return -ENOMEM;
+>   	}
+>
+> -	name = (char *)(iospace + 1);
+> -
+> -	min = addr->address.minimum;
+> -	max = min + addr->address.address_length - 1;
+> -	if (addr->info.io.translation_type == ACPI_SPARSE_TRANSLATION)
+> +	if (res->flags & IORESOURCE_IO_SPARSE)
+>   		sparse = 1;
+> -
+> -	space_nr = new_space(addr->address.translation_offset, sparse);
+> +	space_nr = new_space(entry->offset, sparse);
+>   	if (space_nr == ~0)
+>   		goto free_resource;
+>
+> +	name = (char *)(iospace + 1);
+> +	min = res->start - entry->offset;
+> +	max = res->end - entry->offset;
+>   	base = __pa(io_space[space_nr].mmio_base);
+>   	base_port = IO_SPACE_BASE(space_nr);
+>   	snprintf(name, len, "%s I/O Ports %08lx-%08lx", info->name,
+> -		base_port + min, base_port + max);
+> +		 base_port + min, base_port + max);
+>
+>   	/*
+>   	 * The SDM guarantees the legacy 0-64K space is sparse, but if the
+> @@ -216,153 +196,195 @@ static u64 add_io_space(struct pci_root_info *info,
+>   	resource->start = base + (sparse ? IO_SPACE_SPARSE_ENCODING(min) : min);
+>   	resource->end   = base + (sparse ? IO_SPACE_SPARSE_ENCODING(max) : max);
+>   	if (insert_resource(&iomem_resource, resource)) {
+> -		dev_err(&info->bridge->dev,
+> -				"can't allocate host bridge io space resource  %pR\n",
+> -				resource);
+> +		dev_err(dev,
+> +			"can't allocate host bridge io space resource  %pR\n",
+> +			resource);
+>   		goto free_resource;
+>   	}
+>
+> +	entry->offset = base_port;
+> +	res->start = min + base_port;
+> +	res->end = max + base_port;
+>   	list_add_tail(&iospace->list, &info->io_resources);
+> -	return base_port;
+> +
+> +	return 0;
+>
+>   free_resource:
+>   	kfree(iospace);
+> -out:
+> -	return ~0;
+> +	return -ENOSPC;
+> +}
+> +
+> +/*
+> + * An IO port or MMIO resource assigned to a PCI host bridge may be
+> + * consumed by the host bridge itself or available to its child
+> + * bus/devices. The ACPI specification defines a bit (Producer/Consumer)
+> + * to tell whether the resource is consumed by the host bridge itself,
+> + * but firmware hasn't used that bit consistently, so we can't rely on it.
 
-That's a good time to start cleaning this up, especially since we
-mandate single image from the beginning.
+If we make the firmware obey to the ACPI spec, and
+...
 
-> Are you concerned about arch/arm64/Kconfig growing wild? If so we could
-> easily move these configuration options outside to something like
-> drivers/soc/tegra/Kconfig. While at it, we could move existing options
-> from arch/arm/mach-tegra over to that as well.
+> + *
+> + * On x86 and IA64 platforms, all IO port and MMIO resources are assumed
+> + * to be available to child bus/devices except one special case:
+> + *     IO port [0xCF8-0xCFF] is consumed by the host bridge itself
+> + *     to access PCI configuration space.
+> + *
+> + * So explicitly filter out PCI CFG IO ports[0xCF8-0xCFF].
 
-I think the whole ARCH_TEGRA_*_SOC approach is wrong. You don't bother
-introducing Kconfig entries for individual drivers but instead add an
-obj-*_SOC in various Makefiles under drivers/. If we ever get to a point
-where we can build (part of) the SoCs as modules (and I'm not talking
-about kernels shipped with end products but those distro kernel
-targeting development boards), we have to go back and add such Kconfig
-entries for specific drivers.
+This is not going to happen on ARM64, right?
 
-So if you do it properly from the beginning with per-driver Kconfig
-entry, I no longer see the point of an ARCH_TEGRA_*_SOC option. It may
-be more convenient for people building end products but they should know
-better what components are required, defconfig is rarely meant for them.
+but this question is not about the patch itself, so for this patch
 
-I'm looking forward to a patch removing ARCH_TEGRA_132_SOC as well (you
-can keep the 32-bit arm options if you'd like).
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 
--- 
-Catalin
+Thanks
+Hanjun
