@@ -1,59 +1,47 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 22 May 2015 11:28:33 +0900
-Subject: [PATCH] extcon: fix phy-tahvo driver for extcon API change
-In-Reply-To: <4940971.fmN098LqHi@wuerfel>
-References: <4940971.fmN098LqHi@wuerfel>
-Message-ID: <555E9451.2010504@samsung.com>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Fri, 22 May 2015 10:41:43 +0800
+Subject: [PATCH 5/5] ARM64: MediaTek MT8173: Add SCPSYS device node
+In-Reply-To: <20150521174916.GQ6325@pengutronix.de>
+References: <1432131540-2523-1-git-send-email-s.hauer@pengutronix.de>
+ <1432131540-2523-6-git-send-email-s.hauer@pengutronix.de>
+ <CAGS+omDHEY54TzhNTJcFOeHkGbXAQwiTh9gxc=PsbzjwmpHEDA@mail.gmail.com>
+ <20150521174916.GQ6325@pengutronix.de>
+Message-ID: <1432262503.14396.14.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Felipe,
+Hi Daniel,
 
-If you review this patch, I'll apply it on extcon tree.
+On Thu, 2015-05-21 at 19:49 +0200, Sascha Hauer wrote:
+> On Thu, May 21, 2015 at 10:32:40PM +0800, Daniel Kurtz wrote:
+> > > +               scpsys: scpsys at 10006000 {
+> > > +                       compatible = "mediatek,mt8173-scpsys";
+> > > +                       #power-domain-cells = <1>;
+> > > +                       reg = <0 0x10006000 0 0x1000>;
+> > > +                       clocks = <&clk26m>,
+> > 
+> > Why is mfg using <&clk26m> and not <&topckgen CLK_TOP_MFG_SEL>?
+> 
+> Because James Liao said to me that it is derived from clk26m and not
+> from mfg_sel.
 
-Best Regards,
-Chanwoo Choi
+Sascha is right. I had confirmed with our designer that MFG on MT8173
+uses clk26m to check state. I also tested MFG domain power on/off with
+CLK_TOP_MFG_SEL off and it worked correctly.
 
-On 05/21/2015 06:39 PM, Arnd Bergmann wrote:
-> Today, the API for the extcon drivers was changed, along
-> with all drivers in drivers/extcon. However, one extcon driver
-> instead lives in drivers/usb/phy/ and did not get change.
-> 
-> Gcc warns about the now incorrect API usage:
-> 
-> drivers/usb/phy/phy-tahvo.c: In function 'tahvo_usb_probe':
-> drivers/usb/phy/phy-tahvo.c:368:29: warning: assignment from incompatible pointer type [-Wincompatible-pointer-types]
->   tu->extcon.supported_cable = tahvo_cable;
-> 
-> This changes the API in the same way as the other drivers.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 17cd440c9acc ("extcon: Update the prototype of extcon_register_notifier() with enum extcon")
-> ---
-> As the API change is only present in the extcon tree, this patch should get
-> merged there as well, not in the usb-phy tree.
-> 
-> If possible, please fold into the original commit.
-> 
-> diff --git a/drivers/usb/phy/phy-tahvo.c b/drivers/usb/phy/phy-tahvo.c
-> index 845f658276b1..1d1bb9ad8ccf 100644
-> --- a/drivers/usb/phy/phy-tahvo.c
-> +++ b/drivers/usb/phy/phy-tahvo.c
-> @@ -60,10 +60,11 @@ struct tahvo_usb {
->  	struct extcon_dev	extcon;
->  };
->  
-> -static const char *tahvo_cable[] = {
-> -	"USB-HOST",
-> -	"USB",
-> -	NULL,
-> +static const enum extcon tahvo_cable[] = {
-> +	EXTCON_USB,
-> +	EXTCON_USB_HOST,
-> +
-> +	EXTCON_NONE,
->  };
->  
->  static ssize_t vbus_state_show(struct device *device,
-> 
-> 
+> > I saw another patch set on the list today from James Liao that adds more clocks.
+> > Perhaps we can move the SCPSYS set on top of that one and include more clocks?
+> > 
+> > > +                                <&topckgen CLK_TOP_MM_SEL>;
+
+The clocks used by scpsys driver are subsystem bus clocks that need to
+be on before power on these domains. On MT8173, subsystem bus clocks are
+come from topckgen.
+
+My patch set yesterday add subsystem clocks, which are not needed by
+power domain on/off. So I think these 2 patch set are independent.
+
+
+Best regards,
+
+James
