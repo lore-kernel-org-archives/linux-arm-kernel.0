@@ -1,224 +1,148 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 22 May 2015 23:29:50 +0800
-Subject: [PATCH v2 03/12] ARM: imx: define an enum for gpt timer device type
+Date: Fri, 22 May 2015 23:29:52 +0800
+Subject: [PATCH v2 05/12] ARM: imx: setup tctl register in device specific
+ function
 In-Reply-To: <1432308599-28643-1-git-send-email-shawn.guo@linaro.org>
 References: <1432308599-28643-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1432308599-28643-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1432308599-28643-6-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define an enum for gpt timer device type in include/soc/imx/timer.h to
-tell the gpt block differences among SoCs.  Update non-DT users (clock
-drivers) to pass the device type.
-
-As we now have include/soc/imx/timer.h, the declaration of
-mxc_timer_init() is moved into there as the best fit.
+It creates a gpt device speicific data structure and adds function hook
+gpt_setup_tctl in there to set up gpt TCTL register.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-imx/time.c    |  6 +++++-
- drivers/clk/imx/clk-imx1.c  |  3 ++-
- drivers/clk/imx/clk-imx21.c |  3 ++-
- drivers/clk/imx/clk-imx27.c |  3 ++-
- drivers/clk/imx/clk-imx31.c |  3 ++-
- drivers/clk/imx/clk-imx35.c |  3 ++-
- drivers/clk/imx/clk.h       |  7 -------
- include/soc/imx/timer.h     | 26 ++++++++++++++++++++++++++
- 8 files changed, 41 insertions(+), 13 deletions(-)
- create mode 100644 include/soc/imx/timer.h
+ arch/arm/mach-imx/time.c | 98 ++++++++++++++++++++++++++++++++++++++----------
+ 1 file changed, 78 insertions(+), 20 deletions(-)
 
 diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
-index 7c131e1b2637..307cbc7abc8e 100644
+index cf88355654dd..2fbc3022ce3f 100644
 --- a/arch/arm/mach-imx/time.c
 +++ b/arch/arm/mach-imx/time.c
-@@ -32,6 +32,7 @@
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
-+#include <soc/imx/timer.h>
- 
- #include <asm/mach/time.h>
- 
-@@ -86,6 +87,7 @@ static struct clock_event_device clockevent_mxc;
- static enum clock_event_mode clockevent_mode = CLOCK_EVT_MODE_UNUSED;
- 
- struct imx_timer {
-+	enum imx_gpt_type type;
- 	void __iomem *base;
+@@ -92,6 +92,11 @@ struct imx_timer {
  	int irq;
  	struct clk *clk_per;
-@@ -356,7 +358,7 @@ static void __init _mxc_timer_init(struct imx_timer *imxtm)
- 	setup_irq(imxtm->irq, &mxc_timer_irq);
- }
- 
--void __init mxc_timer_init(unsigned long pbase, int irq)
-+void __init mxc_timer_init(unsigned long pbase, int irq, enum imx_gpt_type type)
- {
- 	struct imx_timer *imxtm;
- 
-@@ -369,6 +371,8 @@ void __init mxc_timer_init(unsigned long pbase, int irq)
- 	imxtm->base = ioremap(pbase, SZ_4K);
- 	BUG_ON(!imxtm->base);
- 
-+	imxtm->type = type;
-+
- 	_mxc_timer_init(imxtm);
- }
- 
-diff --git a/drivers/clk/imx/clk-imx1.c b/drivers/clk/imx/clk-imx1.c
-index c9812dbacac2..c2647fa19f28 100644
---- a/drivers/clk/imx/clk-imx1.c
-+++ b/drivers/clk/imx/clk-imx1.c
-@@ -23,6 +23,7 @@
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <dt-bindings/clock/imx1-clock.h>
-+#include <soc/imx/timer.h>
- #include <asm/irq.h>
- 
- #include "clk.h"
-@@ -102,7 +103,7 @@ int __init mx1_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[IMX1_CLK_DUMMY], "ipg", "imx1-fb.0");
- 	clk_register_clkdev(clk[IMX1_CLK_DUMMY], "ahb", "imx1-fb.0");
- 
--	mxc_timer_init(MX1_TIM1_BASE_ADDR, MX1_TIM1_INT);
-+	mxc_timer_init(MX1_TIM1_BASE_ADDR, MX1_TIM1_INT, GPT_TYPE_IMX1);
- 
- 	return 0;
- }
-diff --git a/drivers/clk/imx/clk-imx21.c b/drivers/clk/imx/clk-imx21.c
-index 0ca842cf4ca7..dba987e3b89f 100644
---- a/drivers/clk/imx/clk-imx21.c
-+++ b/drivers/clk/imx/clk-imx21.c
-@@ -15,6 +15,7 @@
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <dt-bindings/clock/imx21-clock.h>
-+#include <soc/imx/timer.h>
- #include <asm/irq.h>
- 
- #include "clk.h"
-@@ -156,7 +157,7 @@ int __init mx21_clocks_init(unsigned long lref, unsigned long href)
- 	clk_register_clkdev(clk[IMX21_CLK_I2C_GATE], NULL, "imx21-i2c.0");
- 	clk_register_clkdev(clk[IMX21_CLK_OWIRE_GATE], NULL, "mxc_w1.0");
- 
--	mxc_timer_init(MX21_GPT1_BASE_ADDR, MX21_INT_GPT1);
-+	mxc_timer_init(MX21_GPT1_BASE_ADDR, MX21_INT_GPT1, GPT_TYPE_IMX21);
- 
- 	return 0;
- }
-diff --git a/drivers/clk/imx/clk-imx27.c b/drivers/clk/imx/clk-imx27.c
-index df2dfc081c71..d9d50d54ef2a 100644
---- a/drivers/clk/imx/clk-imx27.c
-+++ b/drivers/clk/imx/clk-imx27.c
-@@ -6,6 +6,7 @@
- #include <linux/of_address.h>
- #include <dt-bindings/clock/imx27-clock.h>
- #include <soc/imx/revision.h>
-+#include <soc/imx/timer.h>
- #include <asm/irq.h>
- 
- #include "clk.h"
-@@ -233,7 +234,7 @@ int __init mx27_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[IMX27_CLK_EMMA_AHB_GATE], "ahb", "m2m-emmaprp.0");
- 	clk_register_clkdev(clk[IMX27_CLK_EMMA_IPG_GATE], "ipg", "m2m-emmaprp.0");
- 
--	mxc_timer_init(MX27_GPT1_BASE_ADDR, MX27_INT_GPT1);
-+	mxc_timer_init(MX27_GPT1_BASE_ADDR, MX27_INT_GPT1, GPT_TYPE_IMX21);
- 
- 	return 0;
- }
-diff --git a/drivers/clk/imx/clk-imx31.c b/drivers/clk/imx/clk-imx31.c
-index a55290c1c264..fe66c40b7be2 100644
---- a/drivers/clk/imx/clk-imx31.c
-+++ b/drivers/clk/imx/clk-imx31.c
-@@ -22,6 +22,7 @@
- #include <linux/err.h>
- #include <linux/of.h>
- #include <soc/imx/revision.h>
-+#include <soc/imx/timer.h>
- #include <asm/irq.h>
- 
- #include "clk.h"
-@@ -198,7 +199,7 @@ int __init mx31_clocks_init(unsigned long fref)
- 	mx31_revision();
- 	clk_disable_unprepare(clk[iim_gate]);
- 
--	mxc_timer_init(MX31_GPT1_BASE_ADDR, MX31_INT_GPT);
-+	mxc_timer_init(MX31_GPT1_BASE_ADDR, MX31_INT_GPT, GPT_TYPE_IMX31);
- 
- 	return 0;
- }
-diff --git a/drivers/clk/imx/clk-imx35.c b/drivers/clk/imx/clk-imx35.c
-index f2f3b8164f7b..69138ba3dec7 100644
---- a/drivers/clk/imx/clk-imx35.c
-+++ b/drivers/clk/imx/clk-imx35.c
-@@ -14,6 +14,7 @@
- #include <linux/of.h>
- #include <linux/err.h>
- #include <soc/imx/revision.h>
-+#include <soc/imx/timer.h>
- #include <asm/irq.h>
- 
- #include "clk.h"
-@@ -293,7 +294,7 @@ int __init mx35_clocks_init(void)
- 
- 	imx_print_silicon_rev("i.MX35", mx35_revision());
- 
--	mxc_timer_init(MX35_GPT1_BASE_ADDR, MX35_INT_GPT);
-+	mxc_timer_init(MX35_GPT1_BASE_ADDR, MX35_INT_GPT, GPT_TYPE_IMX31);
- 
- 	return 0;
- }
-diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
-index 8b112182a83b..1049b0c7d818 100644
---- a/drivers/clk/imx/clk.h
-+++ b/drivers/clk/imx/clk.h
-@@ -6,13 +6,6 @@
- 
- extern spinlock_t imx_ccm_lock;
- 
--/*
-- * This is a stop-gap solution for clock drivers like imx1/imx21 which call
-- * mxc_timer_init() to initialize timer for non-DT boot.  It can be removed
-- * when these legacy non-DT support is converted or dropped.
-- */
--void mxc_timer_init(unsigned long pbase, int irq);
--
- void imx_check_clocks(struct clk *clks[], unsigned int count);
- 
- extern void imx_cscmr1_fixup(u32 *val);
-diff --git a/include/soc/imx/timer.h b/include/soc/imx/timer.h
-new file mode 100644
-index 000000000000..bbbafd65f464
---- /dev/null
-+++ b/include/soc/imx/timer.h
-@@ -0,0 +1,26 @@
-+/*
-+ * Copyright 2015 Linaro Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __SOC_IMX_TIMER_H__
-+#define __SOC_IMX_TIMER_H__
-+
-+enum imx_gpt_type {
-+	GPT_TYPE_IMX1,		/* i.MX1 */
-+	GPT_TYPE_IMX21,		/* i.MX21/27 */
-+	GPT_TYPE_IMX31,		/* i.MX31/35/25/37/51/6Q */
-+	GPT_TYPE_IMX6DL,	/* i.MX6DL/SX/SL */
+ 	struct clk *clk_ipg;
++	const struct imx_gpt_data *gpt;
 +};
 +
-+/*
-+ * This is a stop-gap solution for clock drivers like imx1/imx21 which call
-+ * mxc_timer_init() to initialize timer for non-DT boot.  It can be removed
-+ * when these legacy non-DT support is converted or dropped.
-+ */
-+void mxc_timer_init(unsigned long pbase, int irq, enum imx_gpt_type type);
++struct imx_gpt_data {
++	void (*gpt_setup_tctl)(struct imx_timer *imxtm);
+ };
+ 
+ static void __iomem *timer_base;
+@@ -307,13 +312,83 @@ static int __init mxc_clockevent_init(struct imx_timer *imxtm)
+ 	return 0;
+ }
+ 
+-static void __init _mxc_timer_init(struct imx_timer *imxtm)
++static void imx1_gpt_setup_tctl(struct imx_timer *imxtm)
++{
++	u32 tctl_val;
 +
-+#endif  /* __SOC_IMX_TIMER_H__ */
++	tctl_val = MX1_2_TCTL_FRR | MX1_2_TCTL_CLK_PCLK1 | MXC_TCTL_TEN;
++	writel_relaxed(tctl_val, imxtm->base + MXC_TCTL);
++}
++#define imx21_gpt_setup_tctl imx1_gpt_setup_tctl
++
++static void imx31_gpt_setup_tctl(struct imx_timer *imxtm)
++{
++	u32 tctl_val;
++
++	tctl_val = V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
++	if (clk_get_rate(imxtm->clk_per) == V2_TIMER_RATE_OSC_DIV8)
++		tctl_val |= V2_TCTL_CLK_OSC_DIV8;
++	else
++		tctl_val |= V2_TCTL_CLK_PER;
++
++	writel_relaxed(tctl_val, imxtm->base + MXC_TCTL);
++}
++
++static void imx6dl_gpt_setup_tctl(struct imx_timer *imxtm)
+ {
+-	uint32_t tctl_val;
++	u32 tctl_val;
++
++	tctl_val = V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
++	if (clk_get_rate(imxtm->clk_per) == V2_TIMER_RATE_OSC_DIV8) {
++		tctl_val |= V2_TCTL_CLK_OSC_DIV8;
++		/* 24 / 8 = 3 MHz */
++		writel_relaxed(7 << V2_TPRER_PRE24M, imxtm->base + MXC_TPRER);
++		tctl_val |= V2_TCTL_24MEN;
++	} else {
++		tctl_val |= V2_TCTL_CLK_PER;
++	}
++
++	writel_relaxed(tctl_val, imxtm->base + MXC_TCTL);
++}
+ 
++static const struct imx_gpt_data imx1_gpt_data = {
++	.gpt_setup_tctl = imx1_gpt_setup_tctl,
++};
++
++static const struct imx_gpt_data imx21_gpt_data = {
++	.gpt_setup_tctl = imx21_gpt_setup_tctl,
++};
++
++static const struct imx_gpt_data imx31_gpt_data = {
++	.gpt_setup_tctl = imx31_gpt_setup_tctl,
++};
++
++static const struct imx_gpt_data imx6dl_gpt_data = {
++	.gpt_setup_tctl = imx6dl_gpt_setup_tctl,
++};
++
++static void __init _mxc_timer_init(struct imx_timer *imxtm)
++{
+ 	/* Temporary */
+ 	timer_base = imxtm->base;
+ 
++	switch (imxtm->type) {
++	case GPT_TYPE_IMX1:
++		imxtm->gpt = &imx1_gpt_data;
++		break;
++	case GPT_TYPE_IMX21:
++		imxtm->gpt = &imx21_gpt_data;
++		break;
++	case GPT_TYPE_IMX31:
++		imxtm->gpt = &imx31_gpt_data;
++		break;
++	case GPT_TYPE_IMX6DL:
++		imxtm->gpt = &imx6dl_gpt_data;
++		break;
++	default:
++		BUG();
++	}
++
+ 	if (IS_ERR(imxtm->clk_per)) {
+ 		pr_err("i.MX timer: unable to get clk\n");
+ 		return;
+@@ -331,24 +406,7 @@ static void __init _mxc_timer_init(struct imx_timer *imxtm)
+ 	writel_relaxed(0, imxtm->base + MXC_TCTL);
+ 	writel_relaxed(0, imxtm->base + MXC_TPRER); /* see datasheet note */
+ 
+-	if (timer_is_v2()) {
+-		tctl_val = V2_TCTL_FRR | V2_TCTL_WAITEN | MXC_TCTL_TEN;
+-		if (clk_get_rate(imxtm->clk_per) == V2_TIMER_RATE_OSC_DIV8) {
+-			tctl_val |= V2_TCTL_CLK_OSC_DIV8;
+-			if (cpu_is_imx6dl() || cpu_is_imx6sx()) {
+-				/* 24 / 8 = 3 MHz */
+-				writel_relaxed(7 << V2_TPRER_PRE24M,
+-					imxtm->base + MXC_TPRER);
+-				tctl_val |= V2_TCTL_24MEN;
+-			}
+-		} else {
+-			tctl_val |= V2_TCTL_CLK_PER;
+-		}
+-	} else {
+-		tctl_val = MX1_2_TCTL_FRR | MX1_2_TCTL_CLK_PCLK1 | MXC_TCTL_TEN;
+-	}
+-
+-	writel_relaxed(tctl_val, imxtm->base + MXC_TCTL);
++	imxtm->gpt->gpt_setup_tctl(imxtm);
+ 
+ 	/* init and register the timer to the framework */
+ 	mxc_clocksource_init(imxtm);
 -- 
 1.9.1
