@@ -1,53 +1,58 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 22 May 2015 19:23:32 +0800
-Subject: [Patch v3 5/7] PCI/ACPI: Consolidate common PCI host bridge code
- into ACPI core
-In-Reply-To: <555C0091.6050301@linaro.org>
-References: <1431593803-5213-1-git-send-email-jiang.liu@linux.intel.com>
- <1431593803-5213-6-git-send-email-jiang.liu@linux.intel.com>
- <5559E44B.2010702@linaro.org> <555BFC72.3060703@linux.intel.com>
- <555C0091.6050301@linaro.org>
-Message-ID: <555F11B4.8000503@linaro.org>
+From: yoshihiro.shimoda.uh@renesas.com (Yoshihiro Shimoda)
+Date: Fri, 22 May 2015 11:33:57 +0000
+Subject: [PATCH] usb: renesas_usbhs: avoid uninitialized variable use
+In-Reply-To: <16028110.26u0uMKA2O@wuerfel>
+References: <16028110.26u0uMKA2O@wuerfel>
+Message-ID: <SG2PR06MB09192B9386F7E2BA5AF01D0ED8C00@SG2PR06MB0919.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?05?20? 11:33, Hanjun Guo wrote:
-> +CC Suravee,
->
-> On 2015?05?20? 11:16, Jiang Liu wrote:
->> On 2015/5/18 21:08, Hanjun Guo wrote:
->>> Hi Jiang,
->>>
->>> On 2015?05?14? 16:56, Jiang Liu wrote:
->>>> Introduce common interface acpi_pci_root_create() and related data
->>>> structures to create PCI root bus for ACPI PCI host bridges. It will
->>>> be used to kill duplicated arch specific code for IA64 and x86. It may
->>>> also help ARM64 in future.
->>>
->>> As I commented in previous version, this patch will introduce
->>> compile error on ACPI enabled ARM64 kernel because struct
->>> pci_controller is not defined for ARM64, so how about adding
->>> the following patch before this patch, or squash to this one,
->>> does it make sense?
->> Hi Hanjun,
->>     Thanks for fixing this building issue for ARM64. The patch
->> is really what I want:). Will merge it into next version. With this
->> patch applied, are there any other issues from ARM64 side?
->
-> Suravee is testing ARM64 PCI on top of your patch set, he can confirm
-> that if there are any other issues :) (Suravee has a real ARM64 hardware
-> in hand)
+Hi Arnd,
 
-After confirmed with Suravee, this patch set works OK on ARM64
-hardware for PCI hostbridge init, and can enumerate PCI devices
-(adding some ARM64 related PCI patches) and works fine with legacy
-interrupt, so to me, this patch set is good to go :)
+> Sent: Friday, May 22, 2015 8:07 PM
+> 
+> After the renesas_usbhs driver is enabled in ARM multi_v7_defconfig,
+> we now get a new warning:
+> 
+> renesas_usbhs/mod.c: In function 'usbhs_interrupt':
+> renesas_usbhs/mod.c:246:7: warning: 'intenb1' may be used uninitialized in this function [-Wmaybe-uninitialized]
+> 
+> gcc correctly points to a problem here, for the case that the
+> device is in host mode, we use the intenb1 variable without
+> having assigned it first. The state->intsts1 has a similar
+> problem, but gcc cannot know that.
+> 
+> This avoids the problem by initializing both sides of the
+> comparison to zero when we don't read them from the respective
+> registers.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 88a25e02f3 ("usb: renesas_usbhs: Add access control for INTSTS1 and INTENB1 register")
 
-For this patchset:
+Thank you very much for the patch!
 
-Tested-by: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+Acked-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 
-I will add my Reviewed-by for some of patches later.
+(I'm not sure why a toolchain I used (Linaro GCC 2014.11) doesn't show this warning...)
 
-Thanks
-Hanjun
+Best regards,
+Yoshihiro Shimoda
+
+> diff --git a/drivers/usb/renesas_usbhs/mod.c b/drivers/usb/renesas_usbhs/mod.c
+> index e5ce6e6d4f51..d4be5d594896 100644
+> --- a/drivers/usb/renesas_usbhs/mod.c
+> +++ b/drivers/usb/renesas_usbhs/mod.c
+> @@ -223,6 +223,8 @@ static int usbhs_status_get_each_irq(struct usbhs_priv *priv,
+>  	if (usbhs_mod_is_host(priv)) {
+>  		state->intsts1 = usbhs_read(priv, INTSTS1);
+>  		intenb1 = usbhs_read(priv, INTENB1);
+> +	} else {
+> +		state->intsts1 = intenb1 = 0;
+>  	}
+> 
+>  	/* mask */
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
