@@ -1,40 +1,25 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Fri, 22 May 2015 15:06:21 +0200
-Subject: [PATCH soc] ARM: use ARM_SINGLE_ARMV7M for ARMv7-M platforms
-In-Reply-To: <1432161344-1930-1-git-send-email-stefan@agner.ch>
-References: <1432161344-1930-1-git-send-email-stefan@agner.ch>
-Message-ID: <CALszF6Cc6WQoA1jKxb9nLgg1108bM4z0tTZRejZEfxS4R_JoGA@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 22 May 2015 12:18:08 +0100
+Subject: [PATCH v5 01/11] regmap: Introduce regmap_get_max_register.
+In-Reply-To: <1432226563-8689-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1432226535-8640-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1432226563-8689-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20150522111808.GC21391@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-21 0:35 GMT+02:00 Stefan Agner <stefan@agner.ch>:
-> Use the new config symbol ARM_SINGLE_ARMV7M which groups config
-> symbols used by modern ARMv7-M platforms. This allows supporting
-> multiple ARMv7-M platforms in one kernel image. However, a common
-> kernel image requires the combined platforms to share the same
-> main memory layout to be bootable.
->
-> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
-> Since this is essentially only a shift of config symbols, it
-> should not change runtime behavior, at least when selecting
-> only one platform.
->
-> Uwe, this is essentially the same I had in my patchset, just
-> converting the other platforms too. I was bold and added your
-> Ack anyway...
->
-> Joachim, Maxime, I test compiled with your defconfigs, compiled
-> fine on my machine.
->
->  arch/arm/Kconfig       | 86 ++++++++++++++++++--------------------------------
->  arch/arm/Kconfig.debug |  5 ++-
->  2 files changed, 32 insertions(+), 59 deletions(-)
->
+On Thu, May 21, 2015 at 05:42:43PM +0100, Srinivas Kandagatla wrote:
+> This patch introduces regmap_get_max_register() function which would be
+> used by the infrastructures like nvmem framework built on top of
+> regmap.
 
-For the stm32 part:
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
-
-Thanks!
-Maxime
+Applied, thanks.  If the rest of the framework is ready to get merged
+somewhere before it reaches Linus' tree let me know and we can handle it
+then.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150522/728b57a9/attachment.sig>
