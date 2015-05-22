@@ -1,102 +1,79 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Sat, 23 May 2015 00:46:52 +0200
-Subject: [PATCH] ARM: nommu: avoid deprecated source register on mov
-Message-ID: <1432334812-2892-1-git-send-email-stefan@agner.ch>
+From: Tirumalesh.Chalamarla@caviumnetworks.com (Chalamarla, Tirumalesh)
+Date: Fri, 22 May 2015 22:57:40 +0000
+Subject: [PATCH 1/4] arm64: gicv3: its: Encode domain number in PCI stream
+ id
+In-Reply-To: <555EE831.2020503@arm.com>
+References: <1430686172-18222-1-git-send-email-rric@kernel.org>
+ <1430686172-18222-2-git-send-email-rric@kernel.org>
+ <20150520131138.2c94a32a@why.wild-wind.fr.eu.org>
+ <20150520124827.GF10428@rric.localhost> <555EE831.2020503@arm.com>
+Message-ID: <34113ADB-C279-4AE6-A303-3328831CCD26@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In Thumb2 mode, the stack register r13 is deprecated if the
-destination register is the program counter (r15). Similar to
-head.S, head-nommu.S uses r13 to store the return address used
-after configuring the CPU's CP15 register. However, since we do
-not enable a MMU, there will be no address switch and it is
-possible to use branch with link instruction to call
-__after_proc_init.
 
-Avoid using r13 completely by using bl to call __after_proc_init
-and get rid of __secondary_switched.
+> On May 22, 2015, at 1:26 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> 
+> On 20/05/15 13:48, Robert Richter wrote:
+>> Mark,
+>> 
+>> thanks for review, also of the other patches of this series.
+>> 
+>> See below
+>> 
+>> On 20.05.15 13:11:38, Marc Zyngier wrote:
+>>>> -	dev_alias->dev_id = alias;
+>>>> +	dev_alias->dev_id = (pci_domain_nr(pdev->bus) << 16) | alias;
+>> 
+>>> This feels very scary. We're now assuming that the domain number will
+>>> always be presented to the doorbell. What guarantee do we have that
+>>> this is always the case, irrespective of the platform?
+>>> 
+>>> Also, domains have no PCI reality, they are a Linux thing. And they can
+>>> be "randomly" assigned, unless you force the domain in DT with a
+>>> linux,pci-domain property. This looks even more wrong, specially
+>>> considering ACPI.
+>> 
+>> The main problem here is that device ids (32 bits) are system
+>> specific. Since we have more than one PCI root complex we need the
+>> upper 16 bits in the devid for mapping. Using pci_domain_nr for this
+>> fits our needs for now and shouldn't affect systems with a single RC
+>> only as the domain nr is zero then.
+>> 
+>> The domain number is incremented during initialization beginnig with
+>> zero and the order of it is fixed since it is taken from DT or ACPI
+>> tables. So we have full controll of it. I don't see issues here.
+> 
+> This may match what you have on ThunderX (as long as the kernel doesn't
+> adopt another behaviour when allocating the domain number). But other
+> platforms may have a completely different numbering, which will mess
+> them up entirely.
+> 
+>>> It really feels like we need a way to describe how the BDF numbering is
+>>> augmented. We also need to guarantee that we get the actual bridge
+>>> number, as opposed to the domain number.
+>> 
+>> But true, the obove is just intermediate. In the end we need some sort
+>> of handler that is setup during cpu initialization that registers a
+>> callback for the gic to determine the device id of that paricular
+>> system.
+> 
+> I don't really like the idea of a callback from the GIC - I'd prefer it
+> to be standalone, and rely on the topology information to build the
+> DeviceID. Mark Rutland had some ideas for DT (he posted an RFC a while
+> ago), maybe it would be good to get back to that and find out what we
+> can do. ACPI should also have similar information (IORT?).
+> 
 
-Beside removing unnecessary complexity, this also fixes a
-compiler warning when compiling a !MMU kernel:
-Warning: Use of r13 as a source register is deprecated when r15
-is the destination register.
+How can some one pass this from DT, especially in GIC entry. i still think it is bus owner responsibility and call back is better idea. 
+but if some one has a better idea for DT and ACPI, we are fine as long as it works on ThunderX.   
 
-Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
-The patch takes the BSYM() to badr change into account and hence
-applies cleanly on Russell's for-next branch. Tested using a
-single core Cortex-M4 configuration.
+Thanks,
+Tirumalesh. 
 
- arch/arm/kernel/head-nommu.S | 22 ++++++++--------------
- 1 file changed, 8 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-index c966016..570d89a 100644
---- a/arch/arm/kernel/head-nommu.S
-+++ b/arch/arm/kernel/head-nommu.S
-@@ -77,13 +77,13 @@ ENTRY(stext)
- 	orr	r6, r6, #(1 << MPU_RSR_EN)	@ Set region enabled bit
- 	bl	__setup_mpu
- #endif
--	ldr	r13, =__mmap_switched		@ address to jump to after
--						@ initialising sctlr
-+
- 	badr	lr, 1f				@ return (PIC) address
- 	ldr	r12, [r10, #PROCINFO_INITFUNC]
- 	add	r12, r12, r10
- 	ret	r12
-- 1:	b	__after_proc_init
-+1:	bl	__after_proc_init
-+	b	__mmap_switched
- ENDPROC(stext)
- 
- #ifdef CONFIG_SMP
-@@ -106,32 +106,26 @@ ENTRY(secondary_startup)
- 	movs	r10, r5				@ invalid processor?
- 	beq	__error_p			@ yes, error 'p'
- 
--	adr	r4, __secondary_data
--	ldmia	r4, {r7, r12}
--
- #ifdef CONFIG_ARM_MPU
- 	/* Use MPU region info supplied by __cpu_up */
-+	ldr	r7, __secondary_data
- 	ldr	r6, [r7]			@ get secondary_data.mpu_szr
- 	bl      __setup_mpu			@ Initialize the MPU
- #endif
- 
--	badr	lr, __after_proc_init		@ return address
--	mov	r13, r12			@ __secondary_switched address
-+	badr	lr, 1f				@ return (PIC) address
- 	ldr	r12, [r10, #PROCINFO_INITFUNC]
- 	add	r12, r12, r10
- 	ret	r12
--ENDPROC(secondary_startup)
--
--ENTRY(__secondary_switched)
-+1:	bl	__after_proc_init
- 	ldr	sp, [r7, #12]			@ set up the stack pointer
- 	mov	fp, #0
- 	b	secondary_start_kernel
--ENDPROC(__secondary_switched)
-+ENDPROC(secondary_startup)
- 
- 	.type	__secondary_data, %object
- __secondary_data:
- 	.long	secondary_data
--	.long	__secondary_switched
- #endif /* CONFIG_SMP */
- 
- /*
-@@ -164,7 +158,7 @@ __after_proc_init:
- #endif
- 	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
- #endif /* CONFIG_CPU_CP15 */
--	ret	r13
-+	ret	lr
- ENDPROC(__after_proc_init)
- 	.ltorg
- 
--- 
-2.4.1
+> Thanks,
+> 
+> 	M.
+> -- 
+> Jazz is not dead. It just smells funny...
