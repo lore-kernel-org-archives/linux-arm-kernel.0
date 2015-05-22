@@ -1,38 +1,91 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 22 May 2015 21:41:10 +0100
-Subject: [RFC PATCH 0/3] clk: stm32: Add clock driver for STM32F4[23]xxx
- devices
-Message-ID: <1432327273-6810-1-git-send-email-daniel.thompson@linaro.org>
+Date: Fri, 22 May 2015 21:41:11 +0100
+Subject: [RFC PATCH 1/3] dt-bindings: Document the STM32F4 clock bindings
+In-Reply-To: <1432327273-6810-1-git-send-email-daniel.thompson@linaro.org>
+References: <1432327273-6810-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1432327273-6810-2-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset implements a clock driver for STM32F42xxx and STM32F43xxx
-series devices.
+This adds documentation of device tree bindings for the clock related
+portions of the STM32 RCC block.
 
-There are a few small caveats at the present:
-
- 1. Relies on "Add support to STMicroeletronics STM32 family", v8 by
-    Maxime Coquelin:
-    http://thread.gmane.org/gmane.linux.kernel.cross-arch/27569
-
- 2. Allocating ~80 clock components appears to fragment memory enough
-    to prevent busybox (.text is ~300K, non-XIP) from running getty.
-    I have to use "init=/bin/sh" to avoid OOM problems.
-
- 3. Support for I2S and SAI is not included in this patchset.
-
-Daniel Thompson (3):
-  dt-bindings: Document the STM32F4 clock bindings
-  clk: stm32: Add clock driver for STM32F4[23]xxx devices
-  ARM: dts: stm32f429: Adopt STM32F4 clock driver
-
- .../devicetree/bindings/clock/st,stm32-rcc.txt     |  65 ++++
- arch/arm/boot/dts/stm32f429.dtsi                   |  83 ++---
- drivers/clk/Makefile                               |   1 +
- drivers/clk/clk-stm32f4.c                          | 365 +++++++++++++++++++++
- 4 files changed, 457 insertions(+), 57 deletions(-)
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+---
+ .../devicetree/bindings/clock/st,stm32-rcc.txt     | 65 ++++++++++++++++++++++
+ 1 file changed, 65 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/clock/st,stm32-rcc.txt
- create mode 100644 drivers/clk/clk-stm32f4.c
 
---
+diff --git a/Documentation/devicetree/bindings/clock/st,stm32-rcc.txt b/Documentation/devicetree/bindings/clock/st,stm32-rcc.txt
+new file mode 100644
+index 0000000..9715d09
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/st,stm32-rcc.txt
+@@ -0,0 +1,65 @@
++STMicroelectronics STM32 Reset and Clock Controller
++===================================================
++
++The RCC IP is both a reset and a clock controller. This documentation only
++describes the clock part.
++
++Please also refer to clock-bindings.txt in this directory for common clock
++controller binding usage.
++
++Required properties:
++- compatible: Should be "st,stm32f42xx-rcc"
++- reg: should be register base and length as documented in the
++  datasheet
++- #clock-cells: 2, device nodes should specify the clock in their "clocks"
++  property, containing a phandle to the clock device node, an index selecting
++  between gated clocks and other clocks and an index specifying the clock to
++  use.
++
++Example:
++
++	rcc: rcc at 40023800 {
++		#clock-cells = <2>
++		compatible = "st,stm32f42xx-rcc", "st,stm32-rcc";
++		reg = <0x40023800 0x400>;
++	};
++
++Specifying gated clocks
++=======================
++
++The primary index must be set to 0.
++
++The secondary index is the bit number within the RCC register bank, starting
++from the first RCC clock enable register (RCC_AHB1ENR, address offset 0x30).
++
++It is calculated as: index = register_offset / 4 * 32 + bit_offset.
++Where bit_offset is the bit offset within the register (LSB is 0, MSB is 31).
++
++Example:
++
++	/* Gated clock, AHB1 bit 0 (GPIOA) */
++	... {
++		clocks = <&rcc 0 0>
++	};
++
++	/* Gated clock, AHB2 bit 4 (GPIOA) */
++	... {
++		clocks = <&rcc 0 36>
++	};
++
++Specifying other clocks
++=======================
++
++The primary index must be set to 1.
++
++The secondary index is bound with the following magic numbers:
++
++	0	SYSTICK
++	1	FCLK
++
++Example:
++
++	/* Misc clock, FCLK */
++	... {
++		clocks = <&rcc 1 1>
++	};
+-- 
 2.1.0
