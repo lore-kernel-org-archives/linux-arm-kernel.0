@@ -1,45 +1,75 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 22 May 2015 17:22:47 +0100
-Subject: [PATCH REPOST] serial/amba-pl011: Unconditionally poll for FIFO
- space before each TX char
-In-Reply-To: <1432222669-20117-1-git-send-email-Dave.Martin@arm.com>
-References: <1432222669-20117-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20150522162247.GC3072@arm.com>
+From: svarbanov@mm-sol.com (Stanimir Varbanov)
+Date: Fri, 22 May 2015 19:25:41 +0300
+Subject: [PATCH v2 2/5] phy: qcom: Add Qualcomm PCIe PHY
+In-Reply-To: <CAErSpo42N8YHWjrqUCj0ubqZLt4w-3g=ykPdR8ZMmWaW1GjWDw@mail.gmail.com>
+References: <1430743338-10441-1-git-send-email-svarbanov@mm-sol.com>
+ <1430743338-10441-3-git-send-email-svarbanov@mm-sol.com>
+ <554783CD.50708@ti.com> <55478F1A.3000401@mm-sol.com>
+ <20150519224143.GS31666@google.com> <555C8743.6020708@ti.com>
+ <CAErSpo42N8YHWjrqUCj0ubqZLt4w-3g=ykPdR8ZMmWaW1GjWDw@mail.gmail.com>
+Message-ID: <555F5885.70105@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
-
-On Thu, May 21, 2015 at 04:37:49PM +0100, Dave Martin wrote:
-> Commit 734745caeb9f155ab58918834a8c70e83fa6afd3 serial/amba-pl011:
-> (Activate TX IRQ passively) introduces a race which causes the driver
-> sometimes to attempt to write a character to the TX FIFO when the FIFO
-> is already full.
+On 05/20/2015 04:23 PM, Bjorn Helgaas wrote:
+> On Wed, May 20, 2015 at 8:08 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>> Hi Bjorn,
+>>
+>>
+>> On Wednesday 20 May 2015 04:11 AM, Bjorn Helgaas wrote:
+>>>
+>>> On Mon, May 04, 2015 at 06:24:10PM +0300, Stanimir Varbanov wrote:
+>>>>
+>>>> On 05/04/2015 05:35 PM, Kishon Vijay Abraham I wrote:
+>>>>>
+>>>>> Hi,
+>>>>>
+>>>>> On Monday 04 May 2015 06:12 PM, Stanimir Varbanov wrote:
+>>>>>>
+>>>>>> Add a PCIe PHY driver used by PCIe host controller driver
+>>>>>> on Qualcomm SoCs like Snapdragon 805.
+>>>>>>
+>>>>>> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
+>>>>>> ---
+>>>>>>    drivers/phy/Kconfig         |    9 ++
+>>>>>>    drivers/phy/Makefile        |    1 +
+>>>>>>    drivers/phy/phy-qcom-pcie.c |  291
+>>>>>> +++++++++++++++++++++++++++++++++++++++++++
+>>>>>
+>>>>>
+>>>>> Why do you need a new PHY driver for this? Why not use the existing QCOM
+>>>>> PHY driver. I can see the registers used here in
+>>>>> phy-qcom-ufs-qmp-14nm.h?
+>>>>
+>>>>
+>>>> I agree that on first glance there are similarities, but I'm not sure
+>>>> does the PHYs are the same IP blocks. Or at least they are different
+>>>> revisions which have too many differences. So trying to combine them
+>>>> will lead to more code than now.
+>>>>
+>>>> Either way I will try to understand how many the differences are.
+>>>
+>>>
+>>> Ping, where are we with this?  Should I wait for something else, or are
+>>> you
+>>> convinced there's enough difference to warrant a new PHY driver, Kishon?
+>>
+>>
+>> I'd like to wait to see if Stanimir can use existing driver instead of
+>> creating a new driver.
 > 
-> The PL011 does not guarantee its behaviour when the FIFO is overfilled.
-> In practice, this can cause duplicate and/or dropped characters to be
-> output on the wire.  The problem is common enough to be readily
-> observable on the ARM Juno platform when the PL011 UART is used as
-> the console and DMA is not in use.
-> 
-> This patch fixes this problem by always polling for space before each
-> character is written to the FIFO.
-> 
-> This will be amended to a less brute-force approach in a later commit,
-> but this patch should help ensure correct behaviour for now.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> ---
+> OK, I'm waiting for a v3 with either tweaks to the QCOM PHY driver, or
+> stronger justification as to why that's impossible.  It's hard to
+> quantify statements like "there are similarities, but there are too
+> many differences," so you might have to actually attempt a patch for
+> the QCOM code and we can see how ugly that would turn out to be.
 
-Do you know if this patch has been applied anywhere? Without it, poor
-old systemd has an identity crisis when run under 4.1-rc4, alternating
-between Scottish:
+Kishon,
 
-  [  OK  ] Stopped Regularr background proogram processing daemon.
+I'm still checking the differences, sorry for the delay.
 
-and Old English:
+Bjorn, is the pcie driver looks good enough to be merged?
 
-  [  OK  ] Started Tell Pllymouth To Writee Out Runtime Data.
-  Starting Copy rules geneerated while thee root was ro...
-
-Will
+-- 
+regards,
+Stan
