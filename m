@@ -1,92 +1,275 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Fri, 22 May 2015 09:49:06 -0400
-Subject: [PATCH] arm64: support ACPI tables outside of kernel RAM
-In-Reply-To: <20150522103417.GT29424@e104818-lin.cambridge.arm.com>
-References: <1431613373-10928-1-git-send-email-msalter@redhat.com>
- <20150518111143.GC21251@e104818-lin.cambridge.arm.com>
- <1431957525.9933.4.camel@deneb.redhat.com>
- <20150518164108.GH21251@e104818-lin.cambridge.arm.com>
- <CAKv+Gu8wXrCnnDEw2gpJ9e1qixkVvBCsUf0wLorsdLJwknZELA@mail.gmail.com>
- <20150522103417.GT29424@e104818-lin.cambridge.arm.com>
-Message-ID: <1432302546.9933.82.camel@deneb.redhat.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 22 May 2015 21:49:10 +0800
+Subject: [Patch v3 5/7] PCI/ACPI: Consolidate common PCI host bridge code
+ into ACPI core
+In-Reply-To: <1431593803-5213-6-git-send-email-jiang.liu@linux.intel.com>
+References: <1431593803-5213-1-git-send-email-jiang.liu@linux.intel.com>
+ <1431593803-5213-6-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <555F33D6.3030907@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-05-22 at 11:34 +0100, Catalin Marinas wrote:
-> On Mon, May 18, 2015 at 06:49:28PM +0200, Ard Biesheuvel wrote:
-> > On 18 May 2015 at 18:41, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > > On Mon, May 18, 2015 at 09:58:45AM -0400, Mark Salter wrote:
-> > >> On Mon, 2015-05-18 at 12:11 +0100, Catalin Marinas wrote:
-> > >> > On Thu, May 14, 2015 at 10:22:53AM -0400, Mark Salter wrote:
-> > >> > > There is no guarantee that ACPI tables will be located in RAM linearly
-> > >> > > mapped by the kernel. This could be because UEFI placed them below the
-> > >> > > kernel image or because mem= places them beyond the reach of the linear
-> > >> > > kernel mapping. Even though these tables are outside the linear mapped
-> > >> > > RAM, they still need to be accessed as normal memory in order to support
-> > >> > > unaligned accesses from ACPI code. In this case, the page_is_ram() test
-> > >> > > in acpi_os_ioremap() is not sufficient.
-> > >> >
-> > >> > And can we not simply add the rest of the RAM to the resource list as
-> > >> > "System RAM" without being part of memblock?
-> > >>
-> > >> If it is in "System RAM", then it needs a valid pfn and struct page.
-> > >> Parts of the kernel expect that (page_is_ram(), memory hotplug, etc).
-> > >
-> > > OK, I had the impression that we could get away with this.
-> > >
-> > >> > > Additionally, if the table spans multiple pages, it may fall partially
-> > >> > > within the linear map and partially without. If the table overlaps the
-> > >> > > end of the linear map, the test for whether or not to use the existing
-> > >> > > mapping in ioremap_cache() could lead to a panic when ACPI code tries
-> > >> > > to access the part beyond the end of the linear map. This patch
-> > >> > > attempts to address these problems.
-> > >> >
-> > >> > That's a problem with ioremap_cache() that should be fixed independently.
-> > >>
-> > >> I can submit that separately if you prefer.
-> > >
-> > > Yes, please.
-> > >
-> > >> > Ideally, I'd like to see the ACPI code use different APIs to distinguish
-> > >> > between table access in RAM and device access, so that we don't have to
-> > >> > guess whether the page is RAM or not.
-> > >>
-> > >> I don't think the ACPI code has enough info to make that decision, but
-> > >> I'm not sure honestly.
-> > >
-> > > Do we have a guarantee that UEFI tells the kernel about the whole RAM?
-> > 
-> > Yes, the UEFI memory map must describe all of RAM, no matter how it is
-> > used. I may also describe some MMIO regions, but typically only
-> > regions that it needs itself to implement the UEFI Runtime Services
-> > (e.g., RTC base address, NOR flash for the variable store)
-> > 
-> > So we could potentially query the UEFI memory map directly to find out
-> > whether some otherwise unqualified region is backed by RAM or not,
-> > although I'd prefer some intermediate data structure (such as the
-> > physmem memblock table) if we go that route.
-> 
-> OK, so my preferred options, in this order:
-> 
-> 1. Change the core ACPI kernel code to distinguish between mapping I/O
->    or RAM (could be as simple as acpi_map not using acpi_os_ioremap but
->    another API). I guess the code knows when it plans to map tables or
->    I/O registers
+On 2015?05?14? 16:56, Jiang Liu wrote:
+> Introduce common interface acpi_pci_root_create() and related data
+> structures to create PCI root bus for ACPI PCI host bridges. It will
+> be used to kill duplicated arch specific code for IA64 and x86. It may
+> also help ARM64 in future.
+>
+> Tested-by: Tony Luck <tony.luck@intel.com>
+> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+> ---
+>   drivers/acpi/pci_root.c  |  200 ++++++++++++++++++++++++++++++++++++++++++++++
+>   include/linux/pci-acpi.h |   23 ++++++
+>   2 files changed, 223 insertions(+)
+>
+> diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
+> index 1b5569c092c6..22d0cb799ef1 100644
+> --- a/drivers/acpi/pci_root.c
+> +++ b/drivers/acpi/pci_root.c
+> @@ -656,6 +656,206 @@ static void acpi_pci_root_remove(struct acpi_device *device)
+>   	kfree(root);
+>   }
+>
+> +static void acpi_pci_root_validate_resources(struct device *dev,
+> +					     struct list_head *resources,
+> +					     unsigned long type)
+> +{
+> +	LIST_HEAD(list);
+> +	struct resource *res1, *res2, *root = NULL;
+> +	struct resource_entry *tmp, *entry, *entry2;
+> +
+> +	BUG_ON((type & (IORESOURCE_MEM | IORESOURCE_IO)) == 0);
+> +	root = (type & IORESOURCE_MEM) ? &iomem_resource : &ioport_resource;
+> +
+> +	list_splice_init(resources, &list);
+> +	resource_list_for_each_entry_safe(entry, tmp, &list) {
+> +		bool free = false;
+> +		resource_size_t end;
+> +
+> +		res1 = entry->res;
+> +		if (!(res1->flags & type))
+> +			goto next;
+> +
+> +		/* Exclude non-addressable range or non-addressable portion */
+> +		end = min(res1->end, root->end);
+> +		if (end <= res1->start) {
+> +			dev_info(dev, "host bridge window %pR (ignored, not CPU addressable)\n",
+> +				 res1);
+> +			free = true;
+> +			goto next;
+> +		} else if (res1->end != end) {
+> +			dev_info(dev, "host bridge window %pR ([%#llx-%#llx] ignored, not CPU addressable)\n",
+> +				 res1, (unsigned long long)end + 1,
+> +				 (unsigned long long)res1->end);
+> +			res1->end = end;
+> +		}
+> +
+> +		resource_list_for_each_entry(entry2, resources) {
+> +			res2 = entry2->res;
+> +			if (!(res2->flags & type))
+> +				continue;
+> +
+> +			/*
+> +			 * I don't like throwing away windows because then
+> +			 * our resources no longer match the ACPI _CRS, but
+> +			 * the kernel resource tree doesn't allow overlaps.
+> +			 */
+> +			if (resource_overlaps(res1, res2)) {
+> +				res2->start = min(res1->start, res2->start);
+> +				res2->end = max(res1->end, res2->end);
+> +				dev_info(dev, "host bridge window expanded to %pR; %pR ignored\n",
+> +					 res2, res1);
+> +				free = true;
+> +				goto next;
+> +			}
+> +		}
+> +
+> +next:
+> +		resource_list_del(entry);
+> +		if (free)
+> +			resource_list_free_entry(entry);
+> +		else
+> +			resource_list_add_tail(entry, resources);
+> +	}
+> +}
+> +
+> +static int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info)
+> +{
+> +	int ret;
+> +	struct list_head *list = &info->resources;
+> +	struct acpi_device *device = info->bridge;
+> +	struct resource_entry *entry, *tmp;
+> +	unsigned long flags;
+> +
+> +	flags = IORESOURCE_IO | IORESOURCE_MEM | IORESOURCE_MEM_8AND16BIT;
+> +	ret = acpi_dev_get_resources(device, list,
+> +				     acpi_dev_filter_resource_type_cb,
+> +				     (void *)flags);
+> +	if (ret < 0)
+> +		dev_warn(&device->dev,
+> +			 "failed to parse _CRS method, error code %d\n", ret);
+> +	else if (ret == 0)
+> +		dev_dbg(&device->dev,
+> +			"no IO and memory resources present in _CRS\n");
+> +	else {
+> +		resource_list_for_each_entry_safe(entry, tmp, list) {
+> +			if (entry->res->flags & IORESOURCE_DISABLED)
+> +				resource_list_destroy_entry(entry);
+> +			else
+> +				entry->res->name = info->name;
+> +		}
+> +		acpi_pci_root_validate_resources(&device->dev, list,
+> +						 IORESOURCE_MEM);
+> +		acpi_pci_root_validate_resources(&device->dev, list,
+> +						 IORESOURCE_IO);
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +static void pci_acpi_root_add_resources(struct acpi_pci_root_info *info)
+> +{
+> +	struct resource_entry *entry, *tmp;
+> +	struct resource *res, *conflict, *root = NULL;
+> +
+> +	resource_list_for_each_entry_safe(entry, tmp, &info->resources) {
+> +		res = entry->res;
+> +		if (res->flags & IORESOURCE_MEM)
+> +			root = &iomem_resource;
+> +		else if (res->flags & IORESOURCE_IO)
+> +			root = &ioport_resource;
+> +		else
+> +			continue;
+> +
+> +		conflict = insert_resource_conflict(root, res);
+> +		if (conflict) {
+> +			dev_info(&info->bridge->dev,
+> +				 "ignoring host bridge window %pR (conflicts with %s %pR)\n",
+> +				 res, conflict->name, conflict);
+> +			resource_list_destroy_entry(entry);
+> +		}
+> +	}
+> +}
+> +
+> +static void __acpi_pci_root_release_info(struct acpi_pci_root_info *info)
+> +{
+> +	struct resource *res;
+> +	struct resource_entry *entry, *tmp;
+> +
+> +	if (!info)
+> +		return;
+> +
+> +	resource_list_for_each_entry_safe(entry, tmp, &info->resources) {
+> +		res = entry->res;
+> +		if (res->parent &&
+> +		    (res->flags & (IORESOURCE_MEM | IORESOURCE_IO)))
+> +			release_resource(res);
+> +		resource_list_destroy_entry(entry);
+> +	}
+> +
+> +	info->ops->release_info(info);
+> +}
+> +
+> +static void acpi_pci_root_release_info(struct pci_host_bridge *bridge)
+> +{
+> +	struct resource *res;
+> +	struct resource_entry *entry;
+> +
+> +	resource_list_for_each_entry(entry, &bridge->windows) {
+> +		res = entry->res;
+> +		if (res->parent &&
+> +		    (res->flags & (IORESOURCE_MEM | IORESOURCE_IO)))
+> +			release_resource(res);
+> +	}
+> +	__acpi_pci_root_release_info(bridge->release_data);
+> +}
+> +
+> +struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
+> +				     struct acpi_pci_root_ops *ops,
+> +				     struct acpi_pci_root_info *info)
+> +{
+> +	int ret, busnum = root->secondary.start;
+> +	struct acpi_device *device = root->device;
+> +	struct pci_bus *bus;
+> +
+> +	info->controller.segment = root->segment;
+> +	info->controller.node = acpi_get_node(device->handle);
+> +	info->controller.companion = device;
+> +	info->root = root;
+> +	info->bridge = device;
+> +	info->ops = ops;
+> +	INIT_LIST_HEAD(&info->resources);
+> +	snprintf(info->name, sizeof(info->name), "PCI Bus %04x:%02x",
+> +		 info->controller.segment, busnum);
+> +
+> +	if (ops->init_info && ops->init_info(info))
+> +		goto out_release_info;
+> +	ret = acpi_pci_probe_root_resources(info);
+> +	if (ops->prepare_resources)
+> +		ret = ops->prepare_resources(info, ret);
+> +	if (ret < 0)
+> +		goto out_release_info;
+> +	else if (ret > 0)
+> +		pci_acpi_root_add_resources(info);
+> +	pci_add_resource(&info->resources, &root->secondary);
+> +
+> +	bus = pci_create_root_bus(NULL, busnum, ops->pci_ops,
+> +				  &info->controller, &info->resources);
+> +	if (bus) {
+> +		pci_scan_child_bus(bus);
+> +		pci_set_host_bridge_release(to_pci_host_bridge(bus->bridge),
+> +					    acpi_pci_root_release_info, info);
+> +		if (info->controller.node != NUMA_NO_NODE)
+> +			dev_printk(KERN_DEBUG, &bus->dev, "on NUMA node %d\n",
+> +				   info->controller.node);
+> +		return bus;
+> +	}
+> +
+> +out_release_info:
+> +	__acpi_pci_root_release_info(info);
+> +	return NULL;
+> +}
+> +
+>   void __init acpi_pci_root_init(void)
+>   {
+>   	acpi_hest_init();
+> diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
+> index a965efa52152..685ccc4c3170 100644
+> --- a/include/linux/pci-acpi.h
+> +++ b/include/linux/pci-acpi.h
+> @@ -52,6 +52,29 @@ static inline acpi_handle acpi_pci_get_bridge_handle(struct pci_bus *pbus)
+>   	return ACPI_HANDLE(dev);
+>   }
+>
+> +struct acpi_pci_root;
+> +struct acpi_pci_root_ops;
+> +
+> +struct acpi_pci_root_info {
+> +	struct pci_controller		controller;
+> +	struct acpi_pci_root		*root;
+> +	struct acpi_device		*bridge;
+> +	struct acpi_pci_root_ops	*ops;
+> +	struct list_head		resources;
+> +	char				name[16];
+> +};
+> +
+> +struct acpi_pci_root_ops {
+> +	struct pci_ops *pci_ops;
+> +	int (*init_info)(struct acpi_pci_root_info *info);
+> +	void (*release_info)(struct acpi_pci_root_info *info);
+> +	int (*prepare_resources)(struct acpi_pci_root_info *info, int status);
+> +};
+> +
+> +extern struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
+> +					    struct acpi_pci_root_ops *ops,
+> +					    struct acpi_pci_root_info *info);
+> +
+>   void acpi_pci_add_bus(struct pci_bus *bus);
+>   void acpi_pci_remove_bus(struct pci_bus *bus);
 
->From my reading of the code, ACPI distinguishes a number of different
-address spaces and allows for the installation of handlers to access
-those various spaces. The problem with ACPI_ADR_SPACE_SYSTEM_MEMORY is
-that it covers both mmio and RAM and ACPI code makes no distinction
-between the two. x86 code uses page_is_ram() to decide whether to use
-kmap() or ioremap(). ia64 always uses ioremap() which sorts out the
-caching internally. For arm64, we ended up with using page_is_ram() to
-decide between ioremap_cache() an ioremap(). I don't think generic ACPI
-code has the ability to do any better than that. It really is an
-architecture decision based on address space attributes which ACPI
-doesn't know about.
+As long as you added my ARM64 struct pci_controller patch,
 
-> 
-> 2. If the above is not possible, add the extra checks as per Mark's
->    patch but I would rather call this resource "UEFI RAM" than "ACPI",
->    it's not really ACPI specific.
-> 
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+
+Thanks
+Hanjun
