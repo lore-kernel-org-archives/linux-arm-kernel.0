@@ -1,173 +1,85 @@
 From: d-gerlach@ti.com (Dave Gerlach)
-Date: Fri, 22 May 2015 15:45:27 -0500
-Subject: [PATCH v4 1/4] remoteproc: introduce rproc_get_by_phandle API
+Date: Fri, 22 May 2015 15:45:29 -0500
+Subject: [PATCH v4 3/4] Documentation: dt: add bindings for TI Wakeup M3
+ processor
 In-Reply-To: <1432327530-48032-1-git-send-email-d-gerlach@ti.com>
 References: <1432327530-48032-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <1432327530-48032-2-git-send-email-d-gerlach@ti.com>
+Message-ID: <1432327530-48032-4-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow users of remoteproc the ability to get a handle to an rproc by
-passing a phandle supplied in the user's device tree node. This is
-useful in situations that require manual booting of the rproc.
-
-This patch uses the code removed by commit 40e575b1d0b3 ("remoteproc:
-remove the get_by_name/put API") for the ref counting but is modified
-to use a simple list and locking mechanism and has rproc_get_by_name
-replaced with an rproc_get_by_phandle API.
+Add the device tree bindings document for the TI Wakeup M3 remote
+processor devices on AM33xx and AM43xx SoCs. These devices are used
+to offload low-level power management functionality, and are handled
+by the wkup_m3 remoteproc driver.
 
 Signed-off-by: Suman Anna <s-anna@ti.com>
 Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+Acked-by: Tony Lindgren <tony@atomide.com>
 ---
-v3->v4: Switch from using klist to using simple list and mutex for
-	rproc list.
+v3->v4: No changes to patch, just added Tony's Ack.
 
- Documentation/remoteproc.txt         |  6 +++++
- drivers/remoteproc/remoteproc_core.c | 50 ++++++++++++++++++++++++++++++++++++
- include/linux/remoteproc.h           |  7 ++---
- 3 files changed, 60 insertions(+), 3 deletions(-)
+ .../bindings/remoteproc/wkup_m3_rproc.txt          | 52 ++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/remoteproc/wkup_m3_rproc.txt
 
-diff --git a/Documentation/remoteproc.txt b/Documentation/remoteproc.txt
-index e6469fd..ef0219f 100644
---- a/Documentation/remoteproc.txt
-+++ b/Documentation/remoteproc.txt
-@@ -51,6 +51,12 @@ cost.
-         rproc_shutdown() returns, and users can still use it with a subsequent
-         rproc_boot(), if needed.
- 
-+  struct rproc *rproc_get_by_phandle(phandle phandle)
-+    - Find an rproc handle using a device tree phandle. Returns the rproc
-+      handle on success, and NULL on failure. This function increments
-+      the remote processor's refcount, so always use rproc_put() to
-+      decrement it back once rproc isn't needed anymore.
+diff --git a/Documentation/devicetree/bindings/remoteproc/wkup_m3_rproc.txt b/Documentation/devicetree/bindings/remoteproc/wkup_m3_rproc.txt
+new file mode 100644
+index 0000000..3a70073
+--- /dev/null
++++ b/Documentation/devicetree/bindings/remoteproc/wkup_m3_rproc.txt
+@@ -0,0 +1,52 @@
++TI Wakeup M3 Remoteproc Driver
++==============================
 +
- 3. Typical usage
- 
- #include <linux/remoteproc.h>
-diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-index 11cdb11..982f2fc 100644
---- a/drivers/remoteproc/remoteproc_core.c
-+++ b/drivers/remoteproc/remoteproc_core.c
-@@ -44,6 +44,9 @@
- 
- #include "remoteproc_internal.h"
- 
-+static DEFINE_MUTEX(rproc_list_mutex);
-+static LIST_HEAD(rproc_list);
++The TI AM33xx and AM43xx family of devices use a small Cortex M3 co-processor
++(commonly referred to as Wakeup M3 or CM3) to help with various low power tasks
++that cannot be controlled from the MPU. This CM3 processor requires a firmware
++binary to accomplish this. The wkup_m3 remoteproc driver handles the loading of
++the firmware and booting of the CM3.
 +
- typedef int (*rproc_handle_resources_t)(struct rproc *rproc,
- 				struct resource_table *table, int len);
- typedef int (*rproc_handle_resource_t)(struct rproc *rproc,
-@@ -1152,6 +1155,43 @@ out:
- EXPORT_SYMBOL(rproc_shutdown);
- 
- /**
-+ * rproc_get_by_phandle() - find a remote processor by phandle
-+ * @phandle: phandle to the rproc
-+ *
-+ * Finds an rproc handle using the remote processor's phandle, and then
-+ * return a handle to the rproc.
-+ *
-+ * This function increments the remote processor's refcount, so always
-+ * use rproc_put() to decrement it back once rproc isn't needed anymore.
-+ *
-+ * Returns the rproc handle on success, and NULL on failure.
-+ */
-+struct rproc *rproc_get_by_phandle(phandle phandle)
-+{
-+	struct rproc *rproc = NULL, *r;
-+	struct device_node *np;
++Wkup M3 Device Node:
++====================
++A wkup_m3 device node is used to represent the Wakeup M3 processor instance
++within the SoC. It is added as a child node of the parent interconnect bus
++(l4_wkup) through which it is accessible to the MPU.
 +
-+	np = of_find_node_by_phandle(phandle);
-+	if (!np)
-+		return NULL;
++Required properties:
++--------------------
++- compatible:		Should be one of,
++				"ti,am3352-wkup-m3" for AM33xx SoCs
++				"ti,am4372-wkup-m3" for AM43xx SoCs
++- reg:			Should contain the address ranges for the two internal
++			memory regions, UMEM and DMEM. The parent node should
++			provide an appropriate ranges property for properly
++			translating these into bus addresses.
++- reg-names:		Contains the corresponding names for the two memory
++			regions. These should be named "umem" & "dmem".
++- ti,hwmods:		Name of the hwmod associated with the wkupm3 device.
++- ti,pm-firmware:	Name of firmware file to be used for loading and
++			booting the wkup_m3 remote processor.
 +
-+	mutex_lock(&rproc_list_mutex);
-+	list_for_each_entry(r, &rproc_list, node) {
-+		if (r->dev.parent && r->dev.parent->of_node == np) {
-+			rproc = r;
-+			get_device(&rproc->dev);
-+			break;
-+		}
-+	}
-+	mutex_unlock(&rproc_list_mutex);
++Example:
++--------
++/* AM33xx */
++ocp {
++	 l4_wkup: l4_wkup at 44c00000 {
++		compatible = "am335-l4-wkup", "simple-bus";
++		ranges = <0 0x44c00000 0x400000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
 +
-+	of_node_put(np);
++		wkup_m3: wkup_m3 at 100000 {
++			compatible = "ti,am3352-wkup-m3";
++			reg = <0x100000 0x4000>,
++			      <0x180000 0x2000>;
++			reg-names = "umem", "dmem";
++			ti,hwmods = "wkup_m3";
++			ti,pm-firmware = "am335x-pm-firmware.elf";
++		};
++	};
 +
-+	return rproc;
-+}
-+EXPORT_SYMBOL(rproc_get_by_phandle);
-+
-+/**
-  * rproc_add() - register a remote processor
-  * @rproc: the remote processor handle to register
-  *
-@@ -1180,6 +1220,11 @@ int rproc_add(struct rproc *rproc)
- 	if (ret < 0)
- 		return ret;
- 
-+	/* expose to rproc_get_by_phandle users */
-+	mutex_lock(&rproc_list_mutex);
-+	list_add(&rproc->node, &rproc_list);
-+	mutex_unlock(&rproc_list_mutex);
-+
- 	dev_info(dev, "%s is available\n", rproc->name);
- 
- 	dev_info(dev, "Note: remoteproc is still under development and considered experimental.\n");
-@@ -1369,6 +1414,11 @@ int rproc_del(struct rproc *rproc)
- 	/* Free the copy of the resource table */
- 	kfree(rproc->cached_table);
- 
-+	/* the rproc is downref'ed as soon as it's removed from the klist */
-+	mutex_lock(&rproc_list_mutex);
-+	list_del(&rproc->node);
-+	mutex_unlock(&rproc_list_mutex);
-+
- 	device_del(&rproc->dev);
- 
- 	return 0;
-diff --git a/include/linux/remoteproc.h b/include/linux/remoteproc.h
-index 78b8a9b..56739e5 100644
---- a/include/linux/remoteproc.h
-+++ b/include/linux/remoteproc.h
-@@ -36,11 +36,11 @@
- #define REMOTEPROC_H
- 
- #include <linux/types.h>
--#include <linux/klist.h>
- #include <linux/mutex.h>
- #include <linux/virtio.h>
- #include <linux/completion.h>
- #include <linux/idr.h>
-+#include <linux/of.h>
- 
- /**
-  * struct resource_table - firmware resource table header
-@@ -375,7 +375,7 @@ enum rproc_crash_type {
- 
- /**
-  * struct rproc - represents a physical remote processor device
-- * @node: klist node of this rproc object
-+ * @node: list node of this rproc object
-  * @domain: iommu domain
-  * @name: human readable name of the rproc
-  * @firmware: name of firmware file to be loaded
-@@ -407,7 +407,7 @@ enum rproc_crash_type {
-  * @has_iommu: flag to indicate if remote processor is behind an MMU
-  */
- struct rproc {
--	struct klist_node node;
-+	struct list_head node;
- 	struct iommu_domain *domain;
- 	const char *name;
- 	const char *firmware;
-@@ -481,6 +481,7 @@ struct rproc_vdev {
- 	u32 rsc_offset;
- };
- 
-+struct rproc *rproc_get_by_phandle(phandle phandle);
- struct rproc *rproc_alloc(struct device *dev, const char *name,
- 				const struct rproc_ops *ops,
- 				const char *firmware, int len);
++	...
++};
 -- 
 2.4.1
