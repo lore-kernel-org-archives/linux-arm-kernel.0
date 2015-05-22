@@ -1,104 +1,92 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 22 May 2015 21:46:38 +0800
-Subject: [Patch v3 3/7] ia64/PCI: Use common struct resource_entry to
- replace struct iospace_resource
-In-Reply-To: <1431593803-5213-4-git-send-email-jiang.liu@linux.intel.com>
-References: <1431593803-5213-1-git-send-email-jiang.liu@linux.intel.com>
- <1431593803-5213-4-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <555F333E.10605@linaro.org>
+From: msalter@redhat.com (Mark Salter)
+Date: Fri, 22 May 2015 09:49:06 -0400
+Subject: [PATCH] arm64: support ACPI tables outside of kernel RAM
+In-Reply-To: <20150522103417.GT29424@e104818-lin.cambridge.arm.com>
+References: <1431613373-10928-1-git-send-email-msalter@redhat.com>
+ <20150518111143.GC21251@e104818-lin.cambridge.arm.com>
+ <1431957525.9933.4.camel@deneb.redhat.com>
+ <20150518164108.GH21251@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu8wXrCnnDEw2gpJ9e1qixkVvBCsUf0wLorsdLJwknZELA@mail.gmail.com>
+ <20150522103417.GT29424@e104818-lin.cambridge.arm.com>
+Message-ID: <1432302546.9933.82.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?05?14? 16:56, Jiang Liu wrote:
-> Use common struct resource_entry to replace private
-> struct iospace_resource.
->
-> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
-> ---
->   arch/ia64/include/asm/pci.h |    5 -----
->   arch/ia64/pci/pci.c         |   17 ++++++++---------
->   2 files changed, 8 insertions(+), 14 deletions(-)
->
-> diff --git a/arch/ia64/include/asm/pci.h b/arch/ia64/include/asm/pci.h
-> index 52af5ed9f60b..5c10e0ec48d4 100644
-> --- a/arch/ia64/include/asm/pci.h
-> +++ b/arch/ia64/include/asm/pci.h
-> @@ -83,11 +83,6 @@ extern int pci_mmap_legacy_page_range(struct pci_bus *bus,
->   #define pci_legacy_read platform_pci_legacy_read
->   #define pci_legacy_write platform_pci_legacy_write
->
-> -struct iospace_resource {
-> -	struct list_head list;
-> -	struct resource res;
-> -};
-> -
->   struct pci_controller {
->   	struct acpi_device *companion;
->   	void *iommu;
-> diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
-> index 23689d4c37ae..4af1b52c7a44 100644
-> --- a/arch/ia64/pci/pci.c
-> +++ b/arch/ia64/pci/pci.c
-> @@ -154,14 +154,14 @@ new_space (u64 phys_base, int sparse)
->   static int add_io_space(struct device *dev, struct pci_root_info *info,
->   			struct resource_entry *entry)
->   {
-> -	struct iospace_resource *iospace;
-> +	struct resource_entry *iospace;
->   	struct resource *resource, *res = entry->res;
->   	char *name;
->   	unsigned long base, min, max, base_port;
->   	unsigned int sparse = 0, space_nr, len;
->
->   	len = strlen(info->name) + 32;
-> -	iospace = kzalloc(sizeof(*iospace) + len, GFP_KERNEL);
-> +	iospace = resource_list_create_entry(NULL, len);
->   	if (!iospace) {
->   		dev_err(dev, "PCI: No memory for %s I/O port space\n",
->   			info->name);
-> @@ -190,7 +190,7 @@ static int add_io_space(struct device *dev, struct pci_root_info *info,
->   	if (space_nr == 0)
->   		sparse = 1;
->
-> -	resource = &iospace->res;
-> +	resource = iospace->res;
->   	resource->name  = name;
->   	resource->flags = IORESOURCE_MEM;
->   	resource->start = base + (sparse ? IO_SPACE_SPARSE_ENCODING(min) : min);
-> @@ -205,12 +205,12 @@ static int add_io_space(struct device *dev, struct pci_root_info *info,
->   	entry->offset = base_port;
->   	res->start = min + base_port;
->   	res->end = max + base_port;
-> -	list_add_tail(&iospace->list, &info->io_resources);
-> +	resource_list_add_tail(iospace, &info->io_resources);
->
->   	return 0;
->
->   free_resource:
-> -	kfree(iospace);
-> +	resource_list_free_entry(iospace);
->   	return -ENOSPC;
->   }
->
-> @@ -369,12 +369,11 @@ static void add_resources(struct pci_root_info *info, struct device *dev)
->   static void __release_pci_root_info(struct pci_root_info *info)
->   {
->   	struct resource *res;
-> -	struct iospace_resource *iospace, *tmp;
->   	struct resource_entry *entry, *tentry;
->
-> -	list_for_each_entry_safe(iospace, tmp, &info->io_resources, list) {
-> -		release_resource(&iospace->res);
-> -		kfree(iospace);
-> +	resource_list_for_each_entry_safe(entry, tentry, &info->io_resources) {
-> +		release_resource(entry->res);
-> +		resource_list_destroy_entry(entry);
->   	}
->
->   	resource_list_for_each_entry_safe(entry, tentry, &info->resources) {
+On Fri, 2015-05-22 at 11:34 +0100, Catalin Marinas wrote:
+> On Mon, May 18, 2015 at 06:49:28PM +0200, Ard Biesheuvel wrote:
+> > On 18 May 2015 at 18:41, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > > On Mon, May 18, 2015 at 09:58:45AM -0400, Mark Salter wrote:
+> > >> On Mon, 2015-05-18 at 12:11 +0100, Catalin Marinas wrote:
+> > >> > On Thu, May 14, 2015 at 10:22:53AM -0400, Mark Salter wrote:
+> > >> > > There is no guarantee that ACPI tables will be located in RAM linearly
+> > >> > > mapped by the kernel. This could be because UEFI placed them below the
+> > >> > > kernel image or because mem= places them beyond the reach of the linear
+> > >> > > kernel mapping. Even though these tables are outside the linear mapped
+> > >> > > RAM, they still need to be accessed as normal memory in order to support
+> > >> > > unaligned accesses from ACPI code. In this case, the page_is_ram() test
+> > >> > > in acpi_os_ioremap() is not sufficient.
+> > >> >
+> > >> > And can we not simply add the rest of the RAM to the resource list as
+> > >> > "System RAM" without being part of memblock?
+> > >>
+> > >> If it is in "System RAM", then it needs a valid pfn and struct page.
+> > >> Parts of the kernel expect that (page_is_ram(), memory hotplug, etc).
+> > >
+> > > OK, I had the impression that we could get away with this.
+> > >
+> > >> > > Additionally, if the table spans multiple pages, it may fall partially
+> > >> > > within the linear map and partially without. If the table overlaps the
+> > >> > > end of the linear map, the test for whether or not to use the existing
+> > >> > > mapping in ioremap_cache() could lead to a panic when ACPI code tries
+> > >> > > to access the part beyond the end of the linear map. This patch
+> > >> > > attempts to address these problems.
+> > >> >
+> > >> > That's a problem with ioremap_cache() that should be fixed independently.
+> > >>
+> > >> I can submit that separately if you prefer.
+> > >
+> > > Yes, please.
+> > >
+> > >> > Ideally, I'd like to see the ACPI code use different APIs to distinguish
+> > >> > between table access in RAM and device access, so that we don't have to
+> > >> > guess whether the page is RAM or not.
+> > >>
+> > >> I don't think the ACPI code has enough info to make that decision, but
+> > >> I'm not sure honestly.
+> > >
+> > > Do we have a guarantee that UEFI tells the kernel about the whole RAM?
+> > 
+> > Yes, the UEFI memory map must describe all of RAM, no matter how it is
+> > used. I may also describe some MMIO regions, but typically only
+> > regions that it needs itself to implement the UEFI Runtime Services
+> > (e.g., RTC base address, NOR flash for the variable store)
+> > 
+> > So we could potentially query the UEFI memory map directly to find out
+> > whether some otherwise unqualified region is backed by RAM or not,
+> > although I'd prefer some intermediate data structure (such as the
+> > physmem memblock table) if we go that route.
+> 
+> OK, so my preferred options, in this order:
+> 
+> 1. Change the core ACPI kernel code to distinguish between mapping I/O
+>    or RAM (could be as simple as acpi_map not using acpi_os_ioremap but
+>    another API). I guess the code knows when it plans to map tables or
+>    I/O registers
 
+>From my reading of the code, ACPI distinguishes a number of different
+address spaces and allows for the installation of handlers to access
+those various spaces. The problem with ACPI_ADR_SPACE_SYSTEM_MEMORY is
+that it covers both mmio and RAM and ACPI code makes no distinction
+between the two. x86 code uses page_is_ram() to decide whether to use
+kmap() or ioremap(). ia64 always uses ioremap() which sorts out the
+caching internally. For arm64, we ended up with using page_is_ram() to
+decide between ioremap_cache() an ioremap(). I don't think generic ACPI
+code has the ability to do any better than that. It really is an
+architecture decision based on address space attributes which ACPI
+doesn't know about.
 
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
-
-Thanks
-Hanjun
+> 
+> 2. If the above is not possible, add the extra checks as per Mark's
+>    patch but I would rather call this resource "UEFI RAM" than "ACPI",
+>    it's not really ACPI specific.
+> 
