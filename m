@@ -1,50 +1,84 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 22 May 2015 13:43:43 +0100
-Subject: [PATCH v8 14/16] ARM: dts: Introduce STM32F429 MCU
-In-Reply-To: <CALszF6CQ1_HQXJ8=vgytvVo2t4_ue5_nsE06HPyHMzSLrntqKg@mail.gmail.com>
-References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>	<2282066.NWoIT9ZyLc@wuerfel>	<CALszF6CaO_yuNiSDuDV+4d2NRe_+32j=zcSE1HPhB1UH59cW9w@mail.gmail.com>	<13641152.Yt4ZI3oT6L@wuerfel>	<CALszF6CK5ezrO6D=4zr6zEPC7VanzbQjnZJwKOZekEZ5L4D-Dg@mail.gmail.com>	<1432285588.3929.28.camel@pengutronix.de>	<20150522091822.GF8557@lukather>	<1432289231.3929.60.camel@pengutronix.de>
- <CALszF6CQ1_HQXJ8=vgytvVo2t4_ue5_nsE06HPyHMzSLrntqKg@mail.gmail.com>
-Message-ID: <555F247F.9060100@linaro.org>
+From: msalter@redhat.com (Mark Salter)
+Date: Fri, 22 May 2015 08:46:02 -0400
+Subject: [PATCH] arm64: support ACPI tables outside of kernel RAM
+In-Reply-To: <20150522103417.GT29424@e104818-lin.cambridge.arm.com>
+References: <1431613373-10928-1-git-send-email-msalter@redhat.com>
+ <20150518111143.GC21251@e104818-lin.cambridge.arm.com>
+ <1431957525.9933.4.camel@deneb.redhat.com>
+ <20150518164108.GH21251@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu8wXrCnnDEw2gpJ9e1qixkVvBCsUf0wLorsdLJwknZELA@mail.gmail.com>
+ <20150522103417.GT29424@e104818-lin.cambridge.arm.com>
+Message-ID: <1432298762.9933.58.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/05/15 13:32, Maxime Coquelin wrote:
-> 2015-05-22 12:07 GMT+02:00 Philipp Zabel <p.zabel@pengutronix.de>:
->> And that's how I'd expect it to be described by the device tree:
->>
->>      rcc: rcc at 40023800 {
->>          compatible = "st,stm32-rcc";
->>          reg = <0x40023800 0xc0>;
->>      };
->>
->
-> Doing that, since this register bank contains both reset and clock
-> registers, the reset device cannot get the IO resource at probe time
-> because the clock driver has already reserved it.
-> Daniel, who has started to work on the clock driver is facing this issue.
-> This is why I proposed this binding for "reg" property.
-
-Temporarily I've kept things working for me by avoiding 
-of_io_request_and_map() in the clock driver (I am using raw of_iomap() 
-instead).
-
-I view this as a hack rather than a solution!
-
-Note that, with or without the hack, I do hope to be able to post the 
-clock driver this weekend. I am acutely aware that at the moment we are 
-discussing code I haven't posted yet.
-
-
-> We could think of creating a MFD driver, but the problem is that clock
-> need to be intialized before a MFD device can be probed.
->
-> Maybe there is a way to have you binding working properly, but I
-> haven't found one for now.
-
-I guess a driver doesn't *have* to reserve all the register space 
-described in DT. The driver could replace of_io_request_and_map() with 
-lower level calls.
-
-Thus if we wanted to keep this detail out of DT then I guess the two 
-drivers could simply make an agreement not to request registers they do 
-not use.
+On Fri, 2015-05-22 at 11:34 +0100, Catalin Marinas wrote:
+> On Mon, May 18, 2015 at 06:49:28PM +0200, Ard Biesheuvel wrote:
+> > On 18 May 2015 at 18:41, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > > On Mon, May 18, 2015 at 09:58:45AM -0400, Mark Salter wrote:
+> > >> On Mon, 2015-05-18 at 12:11 +0100, Catalin Marinas wrote:
+> > >> > On Thu, May 14, 2015 at 10:22:53AM -0400, Mark Salter wrote:
+> > >> > > There is no guarantee that ACPI tables will be located in RAM linearly
+> > >> > > mapped by the kernel. This could be because UEFI placed them below the
+> > >> > > kernel image or because mem= places them beyond the reach of the linear
+> > >> > > kernel mapping. Even though these tables are outside the linear mapped
+> > >> > > RAM, they still need to be accessed as normal memory in order to support
+> > >> > > unaligned accesses from ACPI code. In this case, the page_is_ram() test
+> > >> > > in acpi_os_ioremap() is not sufficient.
+> > >> >
+> > >> > And can we not simply add the rest of the RAM to the resource list as
+> > >> > "System RAM" without being part of memblock?
+> > >>
+> > >> If it is in "System RAM", then it needs a valid pfn and struct page.
+> > >> Parts of the kernel expect that (page_is_ram(), memory hotplug, etc).
+> > >
+> > > OK, I had the impression that we could get away with this.
+> > >
+> > >> > > Additionally, if the table spans multiple pages, it may fall partially
+> > >> > > within the linear map and partially without. If the table overlaps the
+> > >> > > end of the linear map, the test for whether or not to use the existing
+> > >> > > mapping in ioremap_cache() could lead to a panic when ACPI code tries
+> > >> > > to access the part beyond the end of the linear map. This patch
+> > >> > > attempts to address these problems.
+> > >> >
+> > >> > That's a problem with ioremap_cache() that should be fixed independently.
+> > >>
+> > >> I can submit that separately if you prefer.
+> > >
+> > > Yes, please.
+> > >
+> > >> > Ideally, I'd like to see the ACPI code use different APIs to distinguish
+> > >> > between table access in RAM and device access, so that we don't have to
+> > >> > guess whether the page is RAM or not.
+> > >>
+> > >> I don't think the ACPI code has enough info to make that decision, but
+> > >> I'm not sure honestly.
+> > >
+> > > Do we have a guarantee that UEFI tells the kernel about the whole RAM?
+> > 
+> > Yes, the UEFI memory map must describe all of RAM, no matter how it is
+> > used. I may also describe some MMIO regions, but typically only
+> > regions that it needs itself to implement the UEFI Runtime Services
+> > (e.g., RTC base address, NOR flash for the variable store)
+> > 
+> > So we could potentially query the UEFI memory map directly to find out
+> > whether some otherwise unqualified region is backed by RAM or not,
+> > although I'd prefer some intermediate data structure (such as the
+> > physmem memblock table) if we go that route.
+> 
+> OK, so my preferred options, in this order:
+> 
+> 1. Change the core ACPI kernel code to distinguish between mapping I/O
+>    or RAM (could be as simple as acpi_map not using acpi_os_ioremap but
+>    another API). I guess the code knows when it plans to map tables or
+>    I/O registers
+> 
+> 2. If the above is not possible, add the extra checks as per Mark's
+>    patch but I would rather call this resource "UEFI RAM" than "ACPI",
+>    it's not really ACPI specific.
+> 
+Actually, it is ACPI specific. The patch only registers resources for
+EfiACPIReclaimMemory and EfiACPIMemoryNVS regions which are also
+marked as cacheable. On x86 these show up in /proc/iomem as
+"ACPI Tables" and "ACPI Non-volatile Storage". I used "ACPI RAM" to
+avoid having to search for two strings.
