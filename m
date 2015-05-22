@@ -1,29 +1,46 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 22 May 2015 11:35:42 +0100
-Subject: [PATCH 1/8] of/fdt: split off FDT self reservation from
- memreserve processing
-In-Reply-To: <1431326520-17331-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1431326520-17331-1-git-send-email-ard.biesheuvel@linaro.org>
- <1431326520-17331-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150522103541.GU29424@e104818-lin.cambridge.arm.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 22 May 2015 12:45:12 +0200
+Subject: [PATCH] ARM: v7 setup function should invalidate L1 cache
+In-Reply-To: <E1Yuk8W-0001tC-IK@rmk-PC.arm.linux.org.uk>
+References: <E1Yuk8W-0001tC-IK@rmk-PC.arm.linux.org.uk>
+Message-ID: <555F08B8.5060606@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 11, 2015 at 08:41:53AM +0200, Ard Biesheuvel wrote:
-> This splits off the reservation of the memory occupied by the FDT
-> binary itself from the processing of the memory reservations it
-> contains. This is necessary because the physical address of the FDT,
-> which is needed to perform the reservation, may not be known to the
-> FDT driver core, i.e., it may be mapped outside the linear direct
-> mapping, in which case __pa() returns a bogus value.
+On 05/19/2015 06:12 PM, Russell King wrote:
+> All ARMv5 and older CPUs invalidate their caches in the early assembly
+> setup function, prior to enabling the MMU.  This is because the L1
+> cache should not contain any data relevant to the execution of the
+> kernel at this point; all data should have been flushed out to memory.
 > 
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Paul Mackerras <paulus@samba.org>
-> Acked-by: Rob Herring <robh@kernel.org>
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> This requirement should also be true for ARMv6 and ARMv7 CPUs - indeed,
+> these typically do not search their caches when caching is disabled (as
+> it needs to be when the MMU is disabled) so this change should be safe.
+> 
+> ARMv7 allows there to be CPUs which search their caches while caching is
+> disabled, and it's permitted that the cache is uninitialised at boot;
+> for these, the architecture reference manual requires that an
+> implementation specific code sequence is used immediately after reset
+> to ensure that the cache is placed into a sane state.  Such
+> functionality is definitely outside the remit of the Linux kernel, and
+> must be done by the SoC's firmware before _any_ CPU gets to the Linux
+> kernel.
+> 
+> Changing the data cache clean+invalidate to a mere invalidate allows us
+> to get rid of a lot of platform specific hacks around this issue for
+> their secondary CPU bringup paths - some of which were buggy.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
 
-For the arm64 part:
+...
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>  arch/arm/mach-zynq/common.h           |  2 --
+>  arch/arm/mach-zynq/headsmp.S          |  5 -----
+>  arch/arm/mach-zynq/platsmp.c          |  5 ++---
+
+For Zynq:
+Tested-by: Michal Simek <michal.simek@xilinx.com>
+
+Thanks,
+Michal
