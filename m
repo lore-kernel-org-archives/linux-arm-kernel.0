@@ -1,65 +1,84 @@
-From: bintian.wang@huawei.com (Bintian)
-Date: Fri, 22 May 2015 13:20:36 +0800
-Subject: [PATCH v7 6/7] clk: hi6220: Clock driver support for Hisilicon
- hi6220 SoC
-In-Reply-To: <555E1D55.1050907@codeaurora.org>
-References: <1432117752-7074-1-git-send-email-bintian.wang@huawei.com>
- <1432117752-7074-2-git-send-email-bintian.wang@huawei.com>
- <555D09F3.7020506@codeaurora.org> <555D57BB.8080702@huawei.com>
- <555E1D55.1050907@codeaurora.org>
-Message-ID: <555EBCA4.9030303@huawei.com>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Fri, 22 May 2015 13:40:10 +0800
+Subject: [PATCH 5/5] ARM64: MediaTek MT8173: Add SCPSYS device node
+In-Reply-To: <CAGS+omB4j0YyTP5e4q_jXY2TOA1MTD-dPvsKJMAmj5NooWHxeQ@mail.gmail.com>
+References: <1432131540-2523-1-git-send-email-s.hauer@pengutronix.de>
+ <1432131540-2523-6-git-send-email-s.hauer@pengutronix.de>
+ <CAGS+omDHEY54TzhNTJcFOeHkGbXAQwiTh9gxc=PsbzjwmpHEDA@mail.gmail.com>
+ <20150521174916.GQ6325@pengutronix.de>
+ <1432262503.14396.14.camel@mtksdaap41>
+ <CAGS+omB4j0YyTP5e4q_jXY2TOA1MTD-dPvsKJMAmj5NooWHxeQ@mail.gmail.com>
+Message-ID: <1432273210.14396.29.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Stephen,
+Hi Daniel,
 
-On 2015/5/22 2:00, Stephen Boyd wrote:
-> On 05/20/15 20:57, Bintian wrote:
->>
->>>
->>>>
->>>> +
->>>> +static void __init hi6220_clk_sys_init(struct device_node *np)
->>>> +{
->>>> +    struct hisi_clock_data *clk_data;
->>>> +
->>>> +    clk_data = hisi_clk_init(np, HI6220_SYS_NR_CLKS);
->>>> +    if (!clk_data)
->>>> +        return;
->>>> +
->>>> +    hisi_clk_register_gate_sep(hi6220_separated_gate_clks_sys,
->>>> +            ARRAY_SIZE(hi6220_separated_gate_clks_sys), clk_data);
->>>> +
->>>> +    hisi_clk_register_mux(hi6220_mux_clks_sys,
->>>> +            ARRAY_SIZE(hi6220_mux_clks_sys), clk_data);
->>>> +
->>>> +    hi6220_clk_register_divider(hi6220_div_clks_sys,
->>>> +            ARRAY_SIZE(hi6220_div_clks_sys), clk_data);
->>>> +
->>>> +    if (!clk_data_ao)
->>>> +        return;
->>>> +
->>>> +    /* enable high speed clock on UART1 mux */
->>>> +    clk_set_parent(clk_data->clk_data.clks[HI6220_UART1_SRC],
->>>> +            clk_data_ao->clk_data.clks[HI6220_150M]);
->>>
->>> Sorry I missed this one earlier. Can we do this clk_set_parent() through
->>> assigned-parents instead?
->> Uart1 has two clock parents in hi6220, and use "clk_tcxo" by default,
->> we use uart1 to connect BT in HiKey, and switch to "clk_150m" for high
->> speed mode of BT, but pl011 has no code to set clock rate or set clock
->> parents operation, so it's a easy way to do that here.
->
-> Is pl011 the uart device? Does it have a node in DT somewhere? If it
-> does, then we could put the assigned-parents properties in that node so
-> that when the pl011 probes the uart1 clock has its parent set to
-> clk_150m. See the "Assigned clock parents and rates" section of
-> Documentation/devicetree/bindings/clock/clock-bindings.txt.
->
-I will verify this.
+On Fri, 2015-05-22 at 12:19 +0800, Daniel Kurtz wrote:
+> On Fri, May 22, 2015 at 10:41 AM, James Liao <jamesjj.liao@mediatek.com> wrote:
+> >
+> > Sascha is right. I had confirmed with our designer that MFG on MT8173
+> > uses clk26m to check state. I also tested MFG domain power on/off with
+> > CLK_TOP_MFG_SEL off and it worked correctly.
+> 
+> Wait - the designer said to use clk26m, but you tested with CLK_TOP_MFG_SEL.
+> Now I am even more confused.
+> Which is the correct clock to use for the mfg power domains?
 
-If it is OK, I will remove "clk_set_parent" from this patch.
+I tested MFG domain power on/off with MFG_SEL "OFF". If MFG domain use
+MFG_SEL as its bus clock, it will be timeout while waiting SRAM ACK. But
+in my test, MFG power domain can power on/off without MFG_SEL. That
+means it doesn't need MFG_SEL while power on/off MFG domains.
 
-Thanks,
+> >
+> > My patch set yesterday add subsystem clocks, which are not needed by
+> > power domain on/off. So I think these 2 patch set are independent.
+> 
+> In other versions of the SCPSYS patch set, the scpsys node has
+> additional "subsystem bus clocks".
 
-Bintian
+That's my fault because I provided wrong information to Sascha. So in
+his early version of mtk-scpsys driver, the clocks setting of power
+domains are incorrect. The correct clock setting for each power domain
+should be:
+
+POWER_DOMAIN_MFG:     clk26m (no need to enable topckgen clocks)
+POWER_DOMAIN_DISP:    mm_sel
+POWER_DOMAIN_VDEC:    mm_sel
+POWER_DOMAIN_VENC:    mm_sel
+POWER_DOMAIN_VENC_LT: mm_sel
+POWER_DOMAIN_ISP:     mm_sel
+
+> So will we need additional patches later to add back these additional
+> clocks which have been removed from the current version of this pach?
+
+No. Clocks provided by topckgen are enough for scpsys driver. Please see
+my comments below.
+
+> In other words, will there be a follow up patch like below, plus
+> another patch to add these clocks to "enum clk_id":
+> 
+> @@ -163,9 +163,12 @@
+>   compatible = "mediatek,mt8173-scpsys";
+>   #power-domain-cells = <1>;
+>   reg = <0 0x10006000 0 0x1000>;
+> - clocks = <&clk26m>,
+> - <&topckgen CLK_TOP_MM_SEL>;
+> - clock-names = "mfg", "mm";
+> + clocks = <&topckgen CLK_TOP_MFG_SEL>,
+> + <&topckgen CLK_TOP_MM_SEL>,
+> + <&topckgen CLK_TOP_VDEC_SEL>,
+> + <&topckgen CLK_TOP_VENC_SEL>,
+> + <&topckgen CLK_TOP_VENC_LT_SEL>;
+> + clock-names = "mfg", "mm", "vdec", "venc", "venc_lt";
+>   infracfg = <&infracfg>;
+>   };
+
+These clocks come from topckgen. In our term, they are "top clocks".
+Subsystem clocks which mentioned in my patch set are provided by
+subsystems such as mmsys, vdecsys, vencsys and so on.
+
+
+Best regards,
+
+James
