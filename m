@@ -1,53 +1,80 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Fri, 22 May 2015 15:30:54 +0200
-Subject: [alsa-devel] [PATCH 10/13] sound/core: add DRM ELD helper
-In-Reply-To: <20150522131534.GF2067@n2100.arm.linux.org.uk>
-References: <20150509102501.GO2067@n2100.arm.linux.org.uk>
- <E1Yr1xy-0006l8-Ft@rmk-PC.arm.linux.org.uk>
- <20150522122009.GK21391@sirena.org.uk>
- <20150522131534.GF2067@n2100.arm.linux.org.uk>
-Message-ID: <s5hzj4weo35.wl-tiwai@suse.de>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 22 May 2015 21:35:40 +0800
+Subject: [Patch v3 1/7] ACPI/PCI: Enhance ACPI core to support sparse
+ IO space
+In-Reply-To: <1431593803-5213-2-git-send-email-jiang.liu@linux.intel.com>
+References: <1431593803-5213-1-git-send-email-jiang.liu@linux.intel.com>
+ <1431593803-5213-2-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <555F30AC.2090904@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At Fri, 22 May 2015 14:15:35 +0100,
-Russell King - ARM Linux wrote:
-> 
-> On Fri, May 22, 2015 at 01:20:09PM +0100, Mark Brown wrote:
-> > On Sat, May 09, 2015 at 11:26:42AM +0100, Russell King wrote:
-> > > Add a helper for the EDID like data structure, which is typically passed
-> > > from a HDMI adapter to its associated audio driver.  This informs the
-> > > audio driver of the capabilities of the attached HDMI sink.
-> > 
-> > As far as I can tell people are fairly happy with the implementation
-> > here and unless I'm missing something are definitely happy with the
-> > interface.  If that's the case can we get this into -next?  There's a
-> > lot of interest in HDMI right now (which is great) and this would be
-> > helpful for that, it seems like even if there are issues with the
-> > implementation it would be worth merging as is so we can start adding
-> > users and then do any improvements to the interface in parallel.
-> > 
-> > From an interface point of view:
-> > 
-> > Reviewed-by: Mark Brown <broonie@kernel.org>
-> 
-> I'd be more than happy if Takashi Iwai wants to take them - I'm not
-> planning on the audio driver itself being merged just yet as we still
-> need to properly hammer out the differences between the AHB audio (for
-> iMX6) and I2S audio (for Rockchip) for this device.
+On 2015?05?14? 16:56, Jiang Liu wrote:
+> Enhance ACPI resource parsing interfaces to support sparse IO space,
+> which will be used to share common code between x86 and IA64 later.
+>
+> Tested-by: Tony Luck <tony.luck@intel.com>
+> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+> ---
+>   drivers/acpi/resource.c |    9 ++++++---
+>   include/linux/ioport.h  |    1 +
+>   2 files changed, 7 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/acpi/resource.c b/drivers/acpi/resource.c
+> index 8244f013f210..fdcc73dad2c1 100644
+> --- a/drivers/acpi/resource.c
+> +++ b/drivers/acpi/resource.c
+> @@ -123,7 +123,7 @@ bool acpi_dev_resource_memory(struct acpi_resource *ares, struct resource *res)
+>   EXPORT_SYMBOL_GPL(acpi_dev_resource_memory);
+>
+>   static void acpi_dev_ioresource_flags(struct resource *res, u64 len,
+> -				      u8 io_decode)
+> +				      u8 io_decode, u8 translation_type)
+>   {
+>   	res->flags = IORESOURCE_IO;
+>
+> @@ -135,6 +135,8 @@ static void acpi_dev_ioresource_flags(struct resource *res, u64 len,
+>
+>   	if (io_decode == ACPI_DECODE_16)
+>   		res->flags |= IORESOURCE_IO_16BIT_ADDR;
+> +	if (translation_type == ACPI_SPARSE_TRANSLATION)
+> +		res->flags |= IORESOURCE_IO_SPARSE;
+>   }
+>
+>   static void acpi_dev_get_ioresource(struct resource *res, u64 start, u64 len,
+> @@ -142,7 +144,7 @@ static void acpi_dev_get_ioresource(struct resource *res, u64 start, u64 len,
+>   {
+>   	res->start = start;
+>   	res->end = start + len - 1;
+> -	acpi_dev_ioresource_flags(res, len, io_decode);
+> +	acpi_dev_ioresource_flags(res, len, io_decode, 0);
+>   }
+>
+>   /**
+> @@ -227,7 +229,8 @@ static bool acpi_decode_space(struct resource_win *win,
+>   		acpi_dev_memresource_flags(res, len, wp);
+>   		break;
+>   	case ACPI_IO_RANGE:
+> -		acpi_dev_ioresource_flags(res, len, iodec);
+> +		acpi_dev_ioresource_flags(res, len, iodec,
+> +					  addr->info.io.translation_type);
+>   		break;
+>   	case ACPI_BUS_NUMBER_RANGE:
+>   		res->flags = IORESOURCE_BUS;
+> diff --git a/include/linux/ioport.h b/include/linux/ioport.h
+> index 388e3ae94f7a..24bea087e7af 100644
+> --- a/include/linux/ioport.h
+> +++ b/include/linux/ioport.h
+> @@ -94,6 +94,7 @@ struct resource {
+>   /* PnP I/O specific bits (IORESOURCE_BITS) */
+>   #define IORESOURCE_IO_16BIT_ADDR	(1<<0)
+>   #define IORESOURCE_IO_FIXED		(1<<1)
+> +#define IORESOURCE_IO_SPARSE		(1<<2)
+>
+>   /* PCI ROM control bits (IORESOURCE_BITS) */
+>   #define IORESOURCE_ROM_ENABLE		(1<<0)	/* ROM is enabled, same as PCI_ROM_ADDRESS_ENABLE */
 
-Sorry, I've been on vacation in the last two weeks, so slowly
-digesting all backlogs now.
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-> Alternatively, I could move these two patches to the beginning of my
-> series, and merge that point into my for-next and/or publish it as a
-> separate sub-branch... whatever people want, just let me know.
-
-I'm fine to take the sound part.  It's only patches 10 and 11, right?
-Then I can provide a branch that can be merged for the rest drm
-stuff.
-
-
-thanks,
-
-Takashi
+Thanks
+Hanjun
