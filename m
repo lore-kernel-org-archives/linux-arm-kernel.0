@@ -1,79 +1,51 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Fri, 22 May 2015 11:41:33 +0200
-Subject: [PATCH v8 14/16] ARM: dts: Introduce STM32F429 MCU
-In-Reply-To: <1432285588.3929.28.camel@pengutronix.de>
-References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
- <2282066.NWoIT9ZyLc@wuerfel>
- <CALszF6CaO_yuNiSDuDV+4d2NRe_+32j=zcSE1HPhB1UH59cW9w@mail.gmail.com>
- <13641152.Yt4ZI3oT6L@wuerfel>
- <CALszF6CK5ezrO6D=4zr6zEPC7VanzbQjnZJwKOZekEZ5L4D-Dg@mail.gmail.com>
- <1432285588.3929.28.camel@pengutronix.de>
-Message-ID: <CALszF6Bz91auOX-vP+_B-aY9W_gFL_CtfJN37bGwPAKy1sTcqw@mail.gmail.com>
+From: arnd@linaro.org (Arnd Bergmann)
+Date: Fri, 22 May 2015 11:46:56 +0200
+Subject: [PATCH] arch/arm64 :Cyclic Test fix in ARM64 fpsimd
+In-Reply-To: <CAKv+Gu-bMy29BhQJb=bap_KDWTUTKOW4JVjvFOEtHuubJWhMDQ@mail.gmail.com>
+References: <CAPyr0yJSGqvxkUWLtNKe0q5mNanBczAfAVx0tPKuzYeDG+eJ=Q@mail.gmail.com>
+ <4053482.VK9u0kqo8W@wuerfel>
+ <CAKv+Gu-bMy29BhQJb=bap_KDWTUTKOW4JVjvFOEtHuubJWhMDQ@mail.gmail.com>
+Message-ID: <2318126.unulghvt2b@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-22 11:06 GMT+02:00 Philipp Zabel <p.zabel@pengutronix.de>:
-> Am Mittwoch, den 20.05.2015, 18:17 +0200 schrieb Maxime Coquelin:
->> Hi Arnd, Philipp,
->>
->> 2015-05-13 21:11 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
->> > Ideally the binding should follow closely what is documented
->> > in the data sheet.
->> >
->>
->> Daniel and myself would like your opinion about this binding:
->>
->> rcc: rcc at 40023800 {
->>     #reset-cells = <1>;
->>     #clock-cells = <2>;
->>     compatible = "st,stm32-rcc";
->>     reg = <0x40023800 0x10>, <0x40023810 0x20>, <0x40023830 0x20>;
->>     reg-names = "clock-cfg", "reset", "clock-gates";
->
-> "reset" singular, "clock-gates" plural seems inconsistent to me.
-Indeed. I will change to "resets".
+On Thursday 21 May 2015 18:01:27 Ard Biesheuvel wrote:
+> 
+> You could but I wouldn't recommend it since it may also prevent you
+> from being able to set the boot path, but more importantly, reset and
+> poweroff may also be available only via UEFI Runtime Services on UEFI
+> systems.
 
-About the compatible string, any idea how could I name it?
+Right, makes sense. Another option then could be to disable fpsimd
+support with preempt-rt on real systems, and document this as a known
+source of latency.
 
->
->> };
->>
->> It would solve a problem Daniel is facing due to conflicting mem
->> region when clock and reset drivers are enabled, as both would reserve
->> the same region.
->>
->> Also, it would make the reset driver very generic.
->> Doing that, we could even create a generic-reset.c driver that would
->> be used by STM32 and Sunxi (at least).
->
-> Adding support for providing the reset register range via of_device_id
-> data and the possibility to invert set/clear ops would allow to also
-> include the socfpga driver.
+> So could someone comment on whether virt_efi_set_time() is present in
+> all the problematic traces? Or was it only chosen because it
+> illustrates the underlying problem the best? In the former case, there
+> is an hidden bug that I would like to know about: however, if some
+> time related facility that is used in a performance (or latency)
+> sensitive context ultimately ends up programming the wall clock time
+> in the RTC, then I would expect the same issue to occur on non-UEFI
+> systems as well.
 
-Ok, it sounds like a good plan.
-Should I also add a property in the bindings for the reset polarity?
-It won't be used for now, as for socfpga we have to do it via
-of_device_id data, in order not to break DT backward compatibility.
+But without UEFI, updating the RTC would cause much less latency,
+because  you don't need to save/restore the fpsimd context, disable
+preemption, or call into a potentially unknown external binary
+blob, the only latency you'd get there is that of a readl/writel
+accessing the RTC register.
 
->
->> In the probe function, it would check the number of reg resources.
->> If a single resource is passed, it would take it, else it would look
->> the one named "reset".
->> The driver and bindings would be the same for the two families, and
->> the bindings would be backward compatible with sunxi ones.
->>
->> Philip, Arnd, what do you think?
->
-> I'm not a fan of describing the register layout in the device tree as
-> detailed as the sunxi bindings do. I'd prefer the reg property to
-> describe the device's register address space with one entry per
-> contiguous block of registers.
-> Unifying the mostly identical drivers is a good idea though, and reusing
-> preexisting bindings is better than inventing new ones. I favor the
-> socfpga binding, but I still like the sunxi bindings and this proposal
-> better than encoding the register offset in the reset index.
+> One thing I should point out is that this FP/SIMD save/restore is
+> implemented differently depending on whether it is called from process
+> context or from hardirq/softirq context. In the former case,
+> kernel_neon_begin() preserves the userland FP/SIMD context only once,
+> and only restores it right before returning to userland. This way,
+> only the first kernel_neon_begin() and the last kernel_neon_end() call
+> actually induce this latency, and so the average latency could be
+> quite a bit lower than the worst case (although I understand that few
+> people may care about the average in an RT context)
 
-Ok, I will propose a RFC.
+Just for my own interest: in what case do we save/restore the fpsimd
+state from interrupt context?
 
-Thanks,
-Maxime
+	Arnd
