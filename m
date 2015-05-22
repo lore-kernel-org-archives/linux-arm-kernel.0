@@ -1,33 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 22 May 2015 16:33:01 +0200
-Subject: [GIT PULL] Broadcom SoC changes for 4.2 (take 2)
-In-Reply-To: <1432167259-3116-1-git-send-email-f.fainelli@gmail.com>
-References: <1432167259-3116-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <2336307.CfrRYyL1zr@wuerfel>
+Date: Fri, 22 May 2015 16:36:24 +0200
+Subject: [GIT PULL 2.1/2] fixed up omap1 sparse irq support for v4.2
+In-Reply-To: <20150521225938.GY10274@atomide.com>
+References: <20150521225938.GY10274@atomide.com>
+Message-ID: <39338069.RMptS8vVnc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 20 May 2015 17:14:19 Florian Fainelli wrote:
-> This pull request contains the following changes:
+On Thursday 21 May 2015 15:59:38 Tony Lindgren wrote:
+> Here's this pull request updated for the randconfig errors found
+> by Arnd.
 > 
-> - Rafal adds an additional fault code to be ignored by the kernel on BCM5301X SoC
+> The following changes since commit 030bbdbf4c833bc69f502eae58498bc5572db736:
 > 
-> - BCM63138 SMP support which:
->         * common code to control the PMB bus, to be shared with a reset
->           controller driver in drivers/reset
->         * secondary CPU initialization sequence using PMB helpers
->         * small changes suggested by Russell King to allow platforms to disable VFP
+>   Linux 4.1-rc3 (2015-05-10 15:12:29 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.2/omap1-v2
+> 
+> for you to fetch changes up to 7bf15c4360b384e34d685616a77a8abf7dd8aea5:
+> 
+>   ARM: OMAP1: Fix section mismatch warnings for omap_cfg_reg (2015-05-21 14:50:23 -0700)
 > 
 > ----------------------------------------------------------------
-> Changes in v2, based on Arnd's feedback:
-> 
-> - incorporated Rafal's change, had been missed before
-> - fix build error by including include/linux/errno.h
-> - moved bcm63xx_pmb.h to include/linux/reset/
-> - used readl/writel I/O accessors instead of __raw_{read,write}l
-> - removed comment above bcm63xx_pmb.h about spinlock
-> 
+> Add support for CONFIG_SPARSE_IRQ for omap1. This takes us a bit closer
+> to making omap1 support multiarch. After this series we still need to
+> make omap1 use the common clock framework and fix up the drivers to not
+> rely on includes from mach and plat directories.
 
-Pulled into next/soc, thanks addressing my comments!
+Pulled into next/soc
+ 
+> Note that this branch depends on a GPIO driver fix in v4.1-rc3
+> d2d05c65c40e ("gpio: omap: Fix regression for MPUIO interrupts").
+
+The branch is already based on 4.1-rc3, so we should be fine.
+
+Thanks,
 
 	Arnd
