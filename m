@@ -1,42 +1,62 @@
 From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Fri, 22 May 2015 11:03:09 -0700
-Subject: [PATCHv1 0/2] Adding driver for Xilinx LogiCORE IP mailbox.
-Message-ID: <1432317791-26851-1-git-send-email-moritz.fischer@ettus.com>
+Date: Fri, 22 May 2015 11:03:10 -0700
+Subject: [PATCHv1 1/2] dts: Adding docs for Xilinx LogiCORE IP mailbox driver.
+In-Reply-To: <1432317791-26851-1-git-send-email-moritz.fischer@ettus.com>
+References: <1432317791-26851-1-git-send-email-moritz.fischer@ettus.com>
+Message-ID: <1432317791-26851-2-git-send-email-moritz.fischer@ettus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds mailbox framework integration for the Xilinx LogiCORE IP
-mailbox.  The Xilinx LogiCORE IP mailbox is a fpga softcore that allows
-interprocessor communication between AXI4 stream / memory mapped
-processors.
+Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+---
+ .../bindings/mailbox/xilinx-mailbox.txt         | 40 ++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-Changes from v0:
----------------------
-
-- Several stylistic issues
-- Dropped superfluous intr_mode member
-- Really masking the IRQs on mailbox_shutdown
-- No longer using polling by accident in non-IRQ mode
-- Swapped doc and driver commits
-
-Thanks to Michal and Shubrajyoti for the feedback.
-
-Cheers,
-
-Moritz
-
-Moritz Fischer (2):
-  dts: Adding docs for Xilinx LogiCORE IP mailbox driver.
-  mailbox: Adding driver for Xilinx LogiCORE IP mailbox.
-
- .../bindings/mailbox/xilinx-mailbox.txt         |  40 +++
- MAINTAINERS                                     |   7 +
- drivers/mailbox/Kconfig                         |   8 +
- drivers/mailbox/Makefile                        |   2 +
- drivers/mailbox/mailbox-xilinx.c                | 332 +++++++++++++++++++
- 5 files changed, 389 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt
- create mode 100644 drivers/mailbox/mailbox-xilinx.c
-
+diff --git a/Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt b/Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt
+new file mode 100644
+index 0000000..b735105
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt
+@@ -0,0 +1,40 @@
++Xilinx Mailbox Driver
++=====================
++
++Required properties:
++- compatible       : "xlnx,mailbox-2.1".
++- reg              :  physical base address of the mailbox and length of
++                      memory mapped region.
++- #mbox-cells      :  Common mailbox binding property to identify the number
++                      of cells required for the mailbox specifier. Should be 1.
++
++Optional properties:
++- interrupt-parent : interrupt source phandle.
++- interrupts       : interrupt number. The interrupt specifier format
++                     depends on the interrupt controller parent.
++
++Example:
++	mbox: mailbox at 40400000 {
++		compatible = "xlnx,axi-mailbox-2.1";
++		reg = <0x40400000 0x3c>;
++		interrupt-parent = <&intc>;
++		interrupts = <5>;
++		#mbox-cells = <1>;
++	};
++
++Mailbox client
++===============
++"mboxes" and the optional "mbox-names" (please see
++Documentation/devicetree/bindings/mailbox/mailbox.txt for details). Each value
++of the mboxes property should contain a phandle to the mailbox controller
++device node and second argument is the channel index. It must be 0 (hardware
++support only one channel). The equivalent "mbox-names" property value can be
++used to give a name to the communication channel to be used by the client user.
++
++Example:
++	mclient0: mclient0 at 400 {
++		compatible = "client-1.0";
++		reg = <0x400 0x10>;
++		mbox-names = "mbox";
++		mboxes = <&mbox 0>;
++	};
 -- 
 2.4.1
