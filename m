@@ -1,112 +1,60 @@
-From: harinikatakamlinux@gmail.com (Harini Katakam)
-Date: Fri, 22 May 2015 20:43:54 +0530
-Subject: [RFC PATCH 2/2] spi: Add support for Zynq Ultrascale+ MPSoC GQSPI
- controller
-In-Reply-To: <20150522115854.GG21391@sirena.org.uk>
-References: <1432106871-27232-1-git-send-email-ranjit.waghmode@xilinx.com>
- <1432106871-27232-2-git-send-email-ranjit.waghmode@xilinx.com>
- <20150522115854.GG21391@sirena.org.uk>
-Message-ID: <CAFcVECJRqebzAjU+rfAtUQFG=7-KoE1GiXet5XJB-4D3i0or6A@mail.gmail.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Fri, 22 May 2015 10:13:51 -0500
+Subject: [RESEND PATCH v1 0/2] Add dw_hdmi i2s audio driver support
+Message-ID: <1432307631-7667-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
 
-On Fri, May 22, 2015 at 5:28 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Wed, May 20, 2015 at 12:57:51PM +0530, Ranjit Waghmode wrote:
->
-> This looks pretty good overall but there are a few issues below from a
-> first read through.
->
->> +static void zynqmp_gqspi_selectflash(struct zynqmp_qspi *instanceptr,
->> +                                  u8 flashcs, u8 flashbus)
->
-> Is this a SPI controller or a flash controller?  It looks like it is
-> actually a SPI controller but the above is a bit worrying.
+As Russell have send an series patches for dw_hdmi audio, it make us
+upload dw_hdmi audio patch more easier, and most important it works
+well on rockchip platform, so I make this patch that try to add another
+audio interface support in dw_hdmi driver.
 
-It is a Quad SPI controller. SPI NOR flash devices are the most common
-interface. But we hope to keep this driver generic.
-The above function name is probably misleading; it can be renamed.
+Here are the list that I have make in my series:
+- rename dw_hdmi-ahb-audio.h to dw_hdmi-audio.h
+- add dw_hdmi i2s audio driver
 
->
->> +{
->> +     /*
->> +      * Bus and CS lines selected here will be updated in the instance and
->> +      * used for subsequent GENFIFO entries during transfer.
->> +      */
->> +     /* Choose slave select line */
->
-> Coding style - at least a blank linne between the two comment blocks.
->
->> +     switch (flashcs) {
->> +     case GQSPI_SELECT_FLASH_CS_BOTH:
->> +             instanceptr->genfifocs = GQSPI_GENFIFO_CS_LOWER |
->> +                 GQSPI_GENFIFO_CS_UPPER;
->> +             break;
->> +     case GQSPI_SELECT_FLASH_CS_UPPER:
->> +             instanceptr->genfifocs = GQSPI_GENFIFO_CS_UPPER;
->> +             break;
->> +     case GQSPI_SELECT_FLASH_CS_LOWER:
->> +     default:
->> +             instanceptr->genfifocs = GQSPI_GENFIFO_CS_LOWER;
->> +     }
->
-> Why is there a default case here?  That's going to men we try to handle
-> any random chip select that gets passed in as pointing to this lower
-> device which doesn't seem right.  The fact that this is trying to handle
-> mirroring of the chip select to two devices is also raising alarm bells
-> here...
+Here are the series patches that I depends on:
+* drm: bridge/dw_hdmi: fixed codec style [Yakir Yang]
+* drm: bridge/dw_hdmi_rockchip: improve hdmi eye-diagram test
+* drm: bridge/dw_hdmi: improve hdmi single-end test
+* drm: imx/dw_hdmi: move phy comments [Russell King]
+* drm: bridge/dw_hdmi: clean up phy configuration
+* drm: bridge/dw_hdmi: combine hdmi_set_clock_regenerator_n() and hdmi_regenerate_cts()
+* drm: bridge/dw_hdmi: protect n/cts setting with a mutex
+* drm: bridge/dw_hdmi: adjust n/cts setting order
+* drm: bridge/dw_hdmi: clean up hdmi_set_clk_regenerator()
+* drm: bridge/dw_hdmi: use drm_hdmi_avi_infoframe_from_display_mode()
+* drm: bridge/dw_hdmi: simplify hdmi_config_AVI() a little
+* drm: bridge/dw_hdmi: remove mhsyncpolarity/mvsyncpolarity/minterlaced
+* drm: bridge/dw_hdmi: introduce interface to setting sample rate
+* drm: bridge/dw_hdmi: introduce interfaces to enable and disable audio
+* drm/edid: add function to help find SADs
+* sound/core: add DRM ELD helper
+* sound/core: add IEC958 channel status helper
+* drm: bridge/dw_hdmi-ahb-audio: add audio driver
+* drm: bridge/dw_hdmi-ahb-audio: parse ELD from HDMI driver
 
-This SPI controller has two CS lines and two data bus.
-Two devices can be connected to these and either the upper or the
-lower or both (Explained below) can be selected.
+Best regards,
+Yakir Yang
 
-When two flash devices are used, one of the HW configurations in
-which they can be connected is called "parallel" mode where they
-share the same CS but use separate 4 bit data bus each
-(essentially making it 8 bit bus width).
-Another configuration is "stacked" mode where the
-same 4 bit data bus is shared and lower or upper CS lines are
-used to select the flash.
 
-Nevertheless, we will deal with acceptable ways to add such features
-incrementally or maybe send an RFC separately.
-For the current patch (which is intended to support a single device),
-the above selection of "both" CS wont be necessary.
-@Ranjit, please remove it.
 
-<snip>
->> +static void zynqmp_qspi_chipselect(struct spi_device *qspi, bool is_high)
->> +{
->
->> +     if (is_high) {
->> +             /* Manually start the generic FIFO command */
->> +             zynqmp_gqspi_write(xqspi, GQSPI_CONFIG_OFST,
->> +                             zynqmp_gqspi_read(xqspi, GQSPI_CONFIG_OFST) |
->> +                             GQSPI_CFG_START_GEN_FIFO_MASK);
->
-> No, this is broken - setting the chip select should set the chip select,
-> it shouldn't have any impact on transfers.  Transfers should be started
-> in the transfer operations.
->
+Yakir Yang (2):
+  drm: bridge/dw_hdmi: rename dw_hdmi-ahb-audio.h to dw_hdmi-audio.h
+  drm: bridge/dw_hdmi-i2s-audio: add audio driver
 
-This is the only way to assert the CS. It doesn't start transferring any data.
-The controller has a Generic FIFO. All operations to be performed on the
-bus have to be given in the form of any entry in this FIFO.
-The controller fetches each entry from the FIFO and performs the operations.
-And that includes asserting and de-asserting CS. There is no dedicated
-register bit to assert or de-assert the CS.
+ drivers/gpu/drm/bridge/Kconfig                     |   9 +
+ drivers/gpu/drm/bridge/Makefile                    |   1 +
+ drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.c         |   2 +-
+ .../{dw_hdmi-ahb-audio.h => dw_hdmi-audio.h}       |   0
+ drivers/gpu/drm/bridge/dw_hdmi-i2s-audio.c         | 412 +++++++++++++++++++++
+ drivers/gpu/drm/bridge/dw_hdmi.c                   |  26 +-
+ drivers/gpu/drm/bridge/dw_hdmi.h                   |   3 +
+ 7 files changed, 442 insertions(+), 11 deletions(-)
+ rename drivers/gpu/drm/bridge/{dw_hdmi-ahb-audio.h => dw_hdmi-audio.h} (100%)
+ create mode 100644 drivers/gpu/drm/bridge/dw_hdmi-i2s-audio.c
 
-The GEN FIFO entry has fields such as:
-- TX or RX
-- CS - lower/upper
-- data bus - lower/upper
-- bytecount
-- bus width - x1 or x2 or x4
-etc.
-
-@Ranjit It might be useful to describe the GENFIFO format in
-the driver at some appropriate place.
-
-Regards,
-Harini
+-- 
+2.1.2
