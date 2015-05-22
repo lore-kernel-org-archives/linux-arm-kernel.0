@@ -1,59 +1,51 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 22 May 2015 11:15:08 +0200
-Subject: [PATCH 0/5] USB: atmel: rework clock handling
-In-Reply-To: <1426608950-31555-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1426608950-31555-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <555EF39C.9030607@atmel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 22 May 2015 11:18:22 +0200
+Subject: [PATCH v8 14/16] ARM: dts: Introduce STM32F429 MCU
+In-Reply-To: <1432285588.3929.28.camel@pengutronix.de>
+References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <2282066.NWoIT9ZyLc@wuerfel>
+ <CALszF6CaO_yuNiSDuDV+4d2NRe_+32j=zcSE1HPhB1UH59cW9w@mail.gmail.com>
+ <13641152.Yt4ZI3oT6L@wuerfel>
+ <CALszF6CK5ezrO6D=4zr6zEPC7VanzbQjnZJwKOZekEZ5L4D-Dg@mail.gmail.com>
+ <1432285588.3929.28.camel@pengutronix.de>
+Message-ID: <20150522091822.GF8557@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 17/03/2015 17:15, Boris Brezillon a ?crit :
-> Hello,
+On Fri, May 22, 2015 at 11:06:28AM +0200, Philipp Zabel wrote:
+> > In the probe function, it would check the number of reg resources.
+> > If a single resource is passed, it would take it, else it would look
+> > the one named "reset".
+> > The driver and bindings would be the same for the two families, and
+> > the bindings would be backward compatible with sunxi ones.
+> > 
+> > Philip, Arnd, what do you think?
 > 
-> This series reworks clock handling in atmel USB host drivers, and while
-> doing so fixes a regression introduced by 3440ef1 (ARM: at91/dt: fix USB
-> high-speed clock to select UTMI).
-> 
-> Best Regards,
-> 
-> Boris
-> 
-> Boris Brezillon (5):
->   USB: ehci-atmel: rework clk handling
->   USB: host: ohci-at91: remove useless uclk clock
+> I'm not a fan of describing the register layout in the device tree as
+> detailed as the sunxi bindings do. I'd prefer the reg property to
+> describe the device's register address space with one entry per
+> contiguous block of registers.
 
-Now that these ones ^^^^ are in Linus' tree...
+That's exactly what we do.
 
-...these patches vvv
+> Unifying the mostly identical drivers is a good idea though, and reusing
+> preexisting bindings is better than inventing new ones. I favor the
+> socfpga binding, but I still like the sunxi bindings and this proposal
+> better than encoding the register offset in the reset index.
 
->   USB: atmel: update DT bindings documentation
->   ARM: at91/dt: remove useless uhpck clock references from ehci
->     defintions
->   ARM: at91/dt: remove useless usb clock
+I don't really get the difference between the socfpga and our bindings
+actually. Would you mind to explain a bit further what you don't like
+about it ?
 
-^^^^^ can be queued in at91-4.2-dt. They will go through the arm-soc route.
-
-And BTW:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-
-Thanks Boris, bye.
-
->  .../devicetree/bindings/usb/atmel-usb.txt          | 25 ++++++++++++++++++
->  arch/arm/boot/dts/at91rm9200.dtsi                  |  4 +--
->  arch/arm/boot/dts/at91sam9260.dtsi                 |  4 +--
->  arch/arm/boot/dts/at91sam9261.dtsi                 |  4 +--
->  arch/arm/boot/dts/at91sam9263.dtsi                 |  4 +--
->  arch/arm/boot/dts/at91sam9g45.dtsi                 |  8 +++---
->  arch/arm/boot/dts/at91sam9n12.dtsi                 |  5 ++--
->  arch/arm/boot/dts/at91sam9x5.dtsi                  |  8 +++---
->  arch/arm/boot/dts/sama5d3.dtsi                     |  9 +++----
->  arch/arm/boot/dts/sama5d4.dtsi                     |  9 +++----
->  drivers/usb/host/ehci-atmel.c                      | 30 +++++++---------------
->  drivers/usb/host/ohci-at91.c                       | 18 +++----------
->  12 files changed, 63 insertions(+), 65 deletions(-)
-> 
-
-
+Maxime
 -- 
-Nicolas Ferre
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150522/fa7eac4f/attachment.sig>
