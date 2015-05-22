@@ -1,41 +1,69 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 22 May 2015 16:36:24 +0200
-Subject: [GIT PULL 2.1/2] fixed up omap1 sparse irq support for v4.2
-In-Reply-To: <20150521225938.GY10274@atomide.com>
-References: <20150521225938.GY10274@atomide.com>
-Message-ID: <39338069.RMptS8vVnc@wuerfel>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 22 May 2015 16:37:12 +0200
+Subject: [PATCH] input: ambakmi: Fix system PM by converting to modern
+ callbacks
+In-Reply-To: <1429008108-29295-1-git-send-email-ulf.hansson@linaro.org>
+References: <1429008108-29295-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <CAPDyKFrhC1MCmOfoweztNtzk-Spwhj1uj7-sz3UtJhT_bHDQ+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 May 2015 15:59:38 Tony Lindgren wrote:
-> Here's this pull request updated for the randconfig errors found
-> by Arnd.
-> 
-> The following changes since commit 030bbdbf4c833bc69f502eae58498bc5572db736:
-> 
->   Linux 4.1-rc3 (2015-05-10 15:12:29 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.2/omap1-v2
-> 
-> for you to fetch changes up to 7bf15c4360b384e34d685616a77a8abf7dd8aea5:
-> 
->   ARM: OMAP1: Fix section mismatch warnings for omap_cfg_reg (2015-05-21 14:50:23 -0700)
-> 
-> ----------------------------------------------------------------
-> Add support for CONFIG_SPARSE_IRQ for omap1. This takes us a bit closer
-> to making omap1 support multiarch. After this series we still need to
-> make omap1 use the common clock framework and fix up the drivers to not
-> rely on includes from mach and plat directories.
+On 14 April 2015 at 12:41, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> The legacy system PM support has long time ago been dropped from the
+> AMBA bus. Align to that by converting to the modern system PM
+> callbacks.
+>
+> Fixes: 26825cfd90f9 (ARM: 7914/1: amba: Drop legacy PM support ...)
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-Pulled into next/soc
- 
-> Note that this branch depends on a GPIO driver fix in v4.1-rc3
-> d2d05c65c40e ("gpio: omap: Fix regression for MPUIO interrupts").
+What happened with this one? Can we queue it for 4.2?
 
-The branch is already based on 4.1-rc3, so we should be fine.
+Kind regards
+Uffe
 
-Thanks,
-
-	Arnd
+> ---
+>  drivers/input/serio/ambakmi.c | 10 +++++++---
+>  1 file changed, 7 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/input/serio/ambakmi.c b/drivers/input/serio/ambakmi.c
+> index 8b748d9..058e1d8 100644
+> --- a/drivers/input/serio/ambakmi.c
+> +++ b/drivers/input/serio/ambakmi.c
+> @@ -175,15 +175,19 @@ static int amba_kmi_remove(struct amba_device *dev)
+>         return 0;
+>  }
+>
+> -static int amba_kmi_resume(struct amba_device *dev)
+> +#ifdef CONFIG_PM_SLEEP
+> +static int amba_kmi_resume(struct device *dev)
+>  {
+> -       struct amba_kmi_port *kmi = amba_get_drvdata(dev);
+> +       struct amba_kmi_port *kmi = dev_get_drvdata(dev);
+>
+>         /* kick the serio layer to rescan this port */
+>         serio_reconnect(kmi->io);
+>
+>         return 0;
+>  }
+> +#endif
+> +
+> +static SIMPLE_DEV_PM_OPS(amba_kmi_dev_pm_ops, NULL, amba_kmi_resume);
+>
+>  static struct amba_id amba_kmi_idtable[] = {
+>         {
+> @@ -199,11 +203,11 @@ static struct amba_driver ambakmi_driver = {
+>         .drv            = {
+>                 .name   = "kmi-pl050",
+>                 .owner  = THIS_MODULE,
+> +               .pm     = &amba_kmi_dev_pm_ops,
+>         },
+>         .id_table       = amba_kmi_idtable,
+>         .probe          = amba_kmi_probe,
+>         .remove         = amba_kmi_remove,
+> -       .resume         = amba_kmi_resume,
+>  };
+>
+>  module_amba_driver(ambakmi_driver);
+> --
+> 1.9.1
+>
