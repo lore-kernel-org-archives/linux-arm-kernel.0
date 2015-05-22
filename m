@@ -1,103 +1,87 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 22 May 2015 19:06:47 +0100
-Subject: [PATCH soc] ARM: use ARM_SINGLE_ARMV7M for ARMv7-M platforms
-In-Reply-To: <1a7d1161d007f0aff2a36ce8d30f14c3@agner.ch>
-References: <1432161344-1930-1-git-send-email-stefan@agner.ch>
- <15864413.ed8EFg1NLl@wuerfel>
- <CALszF6D-3pXHtyVMwhO0JkT-dCSSB98UNDHNN7-LD04Wdgd2cA@mail.gmail.com>
- <555F5194.4040309@linaro.org>
- <1a7d1161d007f0aff2a36ce8d30f14c3@agner.ch>
-Message-ID: <20150522180647.GM2067@n2100.arm.linux.org.uk>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 22 May 2015 13:06:37 -0500
+Subject: [PATCH v2 2/5] phy: qcom: Add Qualcomm PCIe PHY
+In-Reply-To: <555F5885.70105@mm-sol.com>
+References: <1430743338-10441-1-git-send-email-svarbanov@mm-sol.com>
+ <1430743338-10441-3-git-send-email-svarbanov@mm-sol.com>
+ <554783CD.50708@ti.com>
+ <55478F1A.3000401@mm-sol.com> <20150519224143.GS31666@google.com>
+ <555C8743.6020708@ti.com>
+ <CAErSpo42N8YHWjrqUCj0ubqZLt4w-3g=ykPdR8ZMmWaW1GjWDw@mail.gmail.com>
+ <555F5885.70105@mm-sol.com>
+Message-ID: <CAErSpo6Cv+XOjA+ddds4i4YXCC4f=igR4MTcRwFO5eWLg-=LVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 22, 2015 at 06:28:16PM +0200, Stefan Agner wrote:
-> On 2015-05-22 17:56, Daniel Thompson wrote:
-> > On 22/05/15 16:29, Maxime Coquelin wrote:
-> >> 2015-05-22 16:50 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
-> >>> [one small request as I have four armv7-m folks on Cc already:
-> >>>   could one of you try to fix the warning that I get with every
-> >>>   single build: "/git/arm-soc/arch/arm/kernel/head-nommu.S: Assembler
-> >>> messages: /git/arm-soc/arch/arm/kernel/head-nommu.S:167: Warning:
-> >>> Use of r13 as a source register is deprecated when r15 is the
-> >>> destination register."]
-> >>
-> >> Moving r13 to r12 and returning r12 seems to do the job (see below).
-> >> But I don't know if there is a more elegant way, and if it is also
-> >> valid for other architectures than armv7-m.
-> > 
-> > Why not just s/r13/r11/?
-> > 
-> > (works for me but I'm only working on single core system)
-> 
-> For ARMv7-M this works, since r11 is not used in the processors
-> PROCINFO_INITFUNC function (__cpu_flush in struct proc_info_list, which
-> is __v7m_setup in proc-v7m.S).
-> 
-> However, afaik, head-nommu.S can be used by different processors too,
-> hence that register needs to be free to use for all possible __cpu_flush
-> implementations.
-> 
-> That said, proc-v7.S stores r11 on the stack, so it really seems that
-> r11 is ok to use?
+[+cc Jingoo, Pratyush]
 
-Please use r3 (as I just said).  We don't need random deviations between
-MMU and noMMU stuff - that just makes maintanence of other code more
-difficult.
+On Fri, May 22, 2015 at 11:25 AM, Stanimir Varbanov
+<svarbanov@mm-sol.com> wrote:
+> On 05/20/2015 04:23 PM, Bjorn Helgaas wrote:
+>> On Wed, May 20, 2015 at 8:08 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>>> Hi Bjorn,
+>>>
+>>>
+>>> On Wednesday 20 May 2015 04:11 AM, Bjorn Helgaas wrote:
+>>>>
+>>>> On Mon, May 04, 2015 at 06:24:10PM +0300, Stanimir Varbanov wrote:
+>>>>>
+>>>>> On 05/04/2015 05:35 PM, Kishon Vijay Abraham I wrote:
+>>>>>>
+>>>>>> Hi,
+>>>>>>
+>>>>>> On Monday 04 May 2015 06:12 PM, Stanimir Varbanov wrote:
+>>>>>>>
+>>>>>>> Add a PCIe PHY driver used by PCIe host controller driver
+>>>>>>> on Qualcomm SoCs like Snapdragon 805.
+>>>>>>>
+>>>>>>> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
+>>>>>>> ---
+>>>>>>>    drivers/phy/Kconfig         |    9 ++
+>>>>>>>    drivers/phy/Makefile        |    1 +
+>>>>>>>    drivers/phy/phy-qcom-pcie.c |  291
+>>>>>>> +++++++++++++++++++++++++++++++++++++++++++
+>>>>>>
+>>>>>>
+>>>>>> Why do you need a new PHY driver for this? Why not use the existing QCOM
+>>>>>> PHY driver. I can see the registers used here in
+>>>>>> phy-qcom-ufs-qmp-14nm.h?
+>>>>>
+>>>>>
+>>>>> I agree that on first glance there are similarities, but I'm not sure
+>>>>> does the PHYs are the same IP blocks. Or at least they are different
+>>>>> revisions which have too many differences. So trying to combine them
+>>>>> will lead to more code than now.
+>>>>>
+>>>>> Either way I will try to understand how many the differences are.
+>>>>
+>>>>
+>>>> Ping, where are we with this?  Should I wait for something else, or are
+>>>> you
+>>>> convinced there's enough difference to warrant a new PHY driver, Kishon?
+>>>
+>>>
+>>> I'd like to wait to see if Stanimir can use existing driver instead of
+>>> creating a new driver.
+>>
+>> OK, I'm waiting for a v3 with either tweaks to the QCOM PHY driver, or
+>> stronger justification as to why that's impossible.  It's hard to
+>> quantify statements like "there are similarities, but there are too
+>> many differences," so you might have to actually attempt a patch for
+>> the QCOM code and we can see how ugly that would turn out to be.
+>
+> Kishon,
+>
+> I'm still checking the differences, sorry for the delay.
+>
+> Bjorn, is the pcie driver looks good enough to be merged?
 
-You can also avoid the issues of having it passed through the processor
-specific init function (which isn't guaranteed to preserve r13) by
-doing this:
+I haven't looked at that (I was waiting until I could deal with the
+whole series).  But it sounds like it would be useful to merge patches
+3-5 by themselves?  I'll take a look at those.
 
--	ldr	r13, =__mmap_switched		@ address to jump to after
--						@ initialising sctlr
-	badr	lr, 1f				@ return (PIC) address
-	ldr	r12, [r10, #PROCINFO_INITFUNC]
-	add	r12, r12, r10
-	ret	r12
-- 1:	b	__after_proc_init
-+1:	ldr	r13, =__mmap_switched		@ address to jump to after
-+						@ initialising sctlr
-	b	__after_proc_init
+It would be good to get Arnd and Rob to take a look, especially at the DT parts.
 
-However, because you have no MMU to turn on, and no address switch,
-you actually don't need any of this.  __after_proc_init can become
-a "function" which returns via the link register.
+And Jingoo and Pratyush since you use the DesignWare core.
 
-You can then do:
-
-1:	bl	__after_proc_init
-	b	__mmap_switched
-
-You'll need to fix secondary_startup in there as well:
-
--	adr	r4, __secondary_data
--	ldmia	r4, {r7, r12}
-	ldr	r7, __secondary_data
-
-#ifdef CONFIG_ARM_MPU
-	/* Use MPU region info supplied by __cpu_up */
-	ldr	r6, [r7]			@ get secondary_data.mpu_szr
-	bl	__setup_mpu			@ Initialize the MPU
-#endif
-
--	badr	lr, __after_proc_init		@ return address
--	mov	r13, r12			@ __secondary_switched address
-+	badr	lr, 1f				@ return (PIC) address
-	ldr	r12, [r10, #PROCINFO_INITFUNC]
-	add	r12, r12, r10
-	ret	r12
--ENDPROC(secondary_startup)
--
--ENTRY(__secondary_switched)
-+1:	bl	__after_proc_init
-	ldr	sp, [r7, #12]			@ set up the stack pointer
-	mov	fp, #0
-	b	secondary_start_kernel
--ENDPROC(__secondary_switched)
-+ENDPROC(secondary_startup)
-
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Bjorn
