@@ -1,58 +1,79 @@
-From: arnd@linaro.org (Arnd Bergmann)
-Date: Fri, 22 May 2015 12:31:06 +0200
-Subject: [PATCH] arch/arm64 :Cyclic Test fix in ARM64 fpsimd
-In-Reply-To: <CAKv+Gu9yX2TKxBd4VxRKq-Jt2PEQgPD6NCy6kCccQz5v_+XV2A@mail.gmail.com>
-References: <CAPyr0yJSGqvxkUWLtNKe0q5mNanBczAfAVx0tPKuzYeDG+eJ=Q@mail.gmail.com>
- <2318126.unulghvt2b@wuerfel>
- <CAKv+Gu9yX2TKxBd4VxRKq-Jt2PEQgPD6NCy6kCccQz5v_+XV2A@mail.gmail.com>
-Message-ID: <3538272.9TRSDPmMrl@wuerfel>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 22 May 2015 11:34:17 +0100
+Subject: [PATCH] arm64: support ACPI tables outside of kernel RAM
+In-Reply-To: <CAKv+Gu8wXrCnnDEw2gpJ9e1qixkVvBCsUf0wLorsdLJwknZELA@mail.gmail.com>
+References: <1431613373-10928-1-git-send-email-msalter@redhat.com>
+ <20150518111143.GC21251@e104818-lin.cambridge.arm.com>
+ <1431957525.9933.4.camel@deneb.redhat.com>
+ <20150518164108.GH21251@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu8wXrCnnDEw2gpJ9e1qixkVvBCsUf0wLorsdLJwknZELA@mail.gmail.com>
+Message-ID: <20150522103417.GT29424@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 22 May 2015 12:04:20 Ard Biesheuvel wrote:
-> On 22 May 2015 at 11:46, Arnd Bergmann <arnd@linaro.org> wrote:
-> > On Thursday 21 May 2015 18:01:27 Ard Biesheuvel wrote:
+On Mon, May 18, 2015 at 06:49:28PM +0200, Ard Biesheuvel wrote:
+> On 18 May 2015 at 18:41, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Mon, May 18, 2015 at 09:58:45AM -0400, Mark Salter wrote:
+> >> On Mon, 2015-05-18 at 12:11 +0100, Catalin Marinas wrote:
+> >> > On Thu, May 14, 2015 at 10:22:53AM -0400, Mark Salter wrote:
+> >> > > There is no guarantee that ACPI tables will be located in RAM linearly
+> >> > > mapped by the kernel. This could be because UEFI placed them below the
+> >> > > kernel image or because mem= places them beyond the reach of the linear
+> >> > > kernel mapping. Even though these tables are outside the linear mapped
+> >> > > RAM, they still need to be accessed as normal memory in order to support
+> >> > > unaligned accesses from ACPI code. In this case, the page_is_ram() test
+> >> > > in acpi_os_ioremap() is not sufficient.
+> >> >
+> >> > And can we not simply add the rest of the RAM to the resource list as
+> >> > "System RAM" without being part of memblock?
 > >>
-> >> You could but I wouldn't recommend it since it may also prevent you
-> >> from being able to set the boot path, but more importantly, reset and
-> >> poweroff may also be available only via UEFI Runtime Services on UEFI
-> >> systems.
+> >> If it is in "System RAM", then it needs a valid pfn and struct page.
+> >> Parts of the kernel expect that (page_is_ram(), memory hotplug, etc).
 > >
-> > Right, makes sense. Another option then could be to disable fpsimd
-> > support with preempt-rt on real systems, and document this as a known
-> > source of latency.
+> > OK, I had the impression that we could get away with this.
 > >
+> >> > > Additionally, if the table spans multiple pages, it may fall partially
+> >> > > within the linear map and partially without. If the table overlaps the
+> >> > > end of the linear map, the test for whether or not to use the existing
+> >> > > mapping in ioremap_cache() could lead to a panic when ACPI code tries
+> >> > > to access the part beyond the end of the linear map. This patch
+> >> > > attempts to address these problems.
+> >> >
+> >> > That's a problem with ioremap_cache() that should be fixed independently.
+> >>
+> >> I can submit that separately if you prefer.
+> >
+> > Yes, please.
+> >
+> >> > Ideally, I'd like to see the ACPI code use different APIs to distinguish
+> >> > between table access in RAM and device access, so that we don't have to
+> >> > guess whether the page is RAM or not.
+> >>
+> >> I don't think the ACPI code has enough info to make that decision, but
+> >> I'm not sure honestly.
+> >
+> > Do we have a guarantee that UEFI tells the kernel about the whole RAM?
 > 
-> Unfortunately, that could result in corruption of userland FP/SIMD
-> context, since the UEFI Runtime Services are allowed to use those
-> registers, and only need to adhere to the normal AAPCS rules that
-> stipulate that q8..q15 are callee-save. That would still result in a
-> 25% latency reduction if we only need to preserve q0..q7 and q16..q31
-
-Ah, of course. In some cases, one could probably build the entire
-user space without fpsimd support as well, but that obviously
-wouldn't be a general recommendation.
-
-> >> One thing I should point out is that this FP/SIMD save/restore is
-> >> implemented differently depending on whether it is called from process
-> >> context or from hardirq/softirq context. In the former case,
-> >> kernel_neon_begin() preserves the userland FP/SIMD context only once,
-> >> and only restores it right before returning to userland. This way,
-> >> only the first kernel_neon_begin() and the last kernel_neon_end() call
-> >> actually induce this latency, and so the average latency could be
-> >> quite a bit lower than the worst case (although I understand that few
-> >> people may care about the average in an RT context)
-> >
-> > Just for my own interest: in what case do we save/restore the fpsimd
-> > state from interrupt context?
-> >
+> Yes, the UEFI memory map must describe all of RAM, no matter how it is
+> used. I may also describe some MMIO regions, but typically only
+> regions that it needs itself to implement the UEFI Runtime Services
+> (e.g., RTC base address, NOR flash for the variable store)
 > 
-> For instance, the IEEE802.11 crypto runs in softirq context, but
-> typically performs a non-trivial amount of crypto work (unless the
-> hardware takes care of it). Since the accelerated AES-CCM module is
-> 20x faster than C code, it makes sense to stack/unstack 6 NEON
-> registers and run it on the NEON.
+> So we could potentially query the UEFI memory map directly to find out
+> whether some otherwise unqualified region is backed by RAM or not,
+> although I'd prefer some intermediate data structure (such as the
+> physmem memblock table) if we go that route.
 
-I see, thanks!
+OK, so my preferred options, in this order:
 
-	Arnd
+1. Change the core ACPI kernel code to distinguish between mapping I/O
+   or RAM (could be as simple as acpi_map not using acpi_os_ioremap but
+   another API). I guess the code knows when it plans to map tables or
+   I/O registers
+
+2. If the above is not possible, add the extra checks as per Mark's
+   patch but I would rather call this resource "UEFI RAM" than "ACPI",
+   it's not really ACPI specific.
+
+-- 
+Catalin
