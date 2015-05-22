@@ -1,35 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 22 May 2015 16:22:16 +0200
-Subject: [PATCH] video: omap/h3: fix tps65010 dependency
-Message-ID: <4416278.oVFvT3Eyqf@wuerfel>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 22 May 2015 16:33:03 +0200
+Subject: [PATCH v2 1/2] ARM: dts: sun7i: Add uart4_pins_b definition
+Message-ID: <1432305184-8589-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The h3 LCD driver fails to link when tps65010 is configured
-as a loadable module:
+From: Michael Ring <mail@michael-ring.org>
 
-drivers/built-in.o: In function `h3_panel_disable':
-debugfs.c:(.text+0x206ac): undefined reference to `tps65010_set_gpio_out_value'
-debugfs.c:(.text+0x206cc): undefined reference to `tps65010_set_gpio_out_value'
-drivers/built-in.o: In function `h3_panel_enable':
-debugfs.c:(.text+0x206e0): undefined reference to `tps65010_set_gpio_out_value'
-debugfs.c:(.text+0x20704): undefined reference to `tps65010_set_gpio_out_value'
+Some boards (e.g. the BananaPro) use alternative pins for uart4, add a pinmux
+entry for these.
 
-This clarifies the dependency so we can only select it if
-the dependnecy is built-in.
+Signed-off-by: Michael Ring <mail@michael-ring.org>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/sun7i-a20.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/drivers/video/fbdev/omap/Kconfig b/drivers/video/fbdev/omap/Kconfig
-index 18c4cb0d5690..29d250da8a3e 100644
---- a/drivers/video/fbdev/omap/Kconfig
-+++ b/drivers/video/fbdev/omap/Kconfig
-@@ -42,7 +42,7 @@ config FB_OMAP_LCD_MIPID
- config FB_OMAP_LCD_H3
- 	bool "TPS65010 LCD controller on OMAP-H3"
- 	depends on MACH_OMAP_H3
--	depends on TPS65010
-+	depends on TPS65010=y
- 	default y
- 	help
- 	  Say Y here if you want to have support for the LCD on the
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index e04cdf9..99d48b4 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -844,6 +844,13 @@
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
+ 
++			uart4_pins_b: uart4 at 1 {
++				allwinner,pins = "PH4", "PH5";
++				allwinner,function = "uart4";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
+ 			uart5_pins_a: uart5 at 0 {
+ 				allwinner,pins = "PI10", "PI11";
+ 				allwinner,function = "uart5";
+-- 
+2.4.1
