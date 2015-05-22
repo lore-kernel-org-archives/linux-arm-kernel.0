@@ -1,69 +1,50 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 22 May 2015 16:37:12 +0200
-Subject: [PATCH] input: ambakmi: Fix system PM by converting to modern
- callbacks
-In-Reply-To: <1429008108-29295-1-git-send-email-ulf.hansson@linaro.org>
-References: <1429008108-29295-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CAPDyKFrhC1MCmOfoweztNtzk-Spwhj1uj7-sz3UtJhT_bHDQ+g@mail.gmail.com>
+From: Frank.Li@freescale.com (Frank.Li at freescale.com)
+Date: Fri, 22 May 2015 22:36:33 +0800
+Subject: [PATCH v4 0/6] Change snvs rtc and poweroff to use syscon add pwrkey
+ driver
+Message-ID: <1432305399-30571-1-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 April 2015 at 12:41, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> The legacy system PM support has long time ago been dropped from the
-> AMBA bus. Align to that by converting to the modern system PM
-> callbacks.
->
-> Fixes: 26825cfd90f9 (ARM: 7914/1: amba: Drop legacy PM support ...)
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+From: Frank Li <Frank.Li@freescale.com>
 
-What happened with this one? Can we queue it for 4.2?
+Change from v3 to v4
+ - fix align
+ - change to pr_warn
 
-Kind regards
-Uffe
+Change from v2 to v3
+ - Keep snvs rtc compatiblity with old dts file
+ - use general syscon-poweroff instead of modifying snvs-poweroff.c
 
-> ---
->  drivers/input/serio/ambakmi.c | 10 +++++++---
->  1 file changed, 7 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/input/serio/ambakmi.c b/drivers/input/serio/ambakmi.c
-> index 8b748d9..058e1d8 100644
-> --- a/drivers/input/serio/ambakmi.c
-> +++ b/drivers/input/serio/ambakmi.c
-> @@ -175,15 +175,19 @@ static int amba_kmi_remove(struct amba_device *dev)
->         return 0;
->  }
->
-> -static int amba_kmi_resume(struct amba_device *dev)
-> +#ifdef CONFIG_PM_SLEEP
-> +static int amba_kmi_resume(struct device *dev)
->  {
-> -       struct amba_kmi_port *kmi = amba_get_drvdata(dev);
-> +       struct amba_kmi_port *kmi = dev_get_drvdata(dev);
->
->         /* kick the serio layer to rescan this port */
->         serio_reconnect(kmi->io);
->
->         return 0;
->  }
-> +#endif
-> +
-> +static SIMPLE_DEV_PM_OPS(amba_kmi_dev_pm_ops, NULL, amba_kmi_resume);
->
->  static struct amba_id amba_kmi_idtable[] = {
->         {
-> @@ -199,11 +203,11 @@ static struct amba_driver ambakmi_driver = {
->         .drv            = {
->                 .name   = "kmi-pl050",
->                 .owner  = THIS_MODULE,
-> +               .pm     = &amba_kmi_dev_pm_ops,
->         },
->         .id_table       = amba_kmi_idtable,
->         .probe          = amba_kmi_probe,
->         .remove         = amba_kmi_remove,
-> -       .resume         = amba_kmi_resume,
->  };
->
->  module_amba_driver(ambakmi_driver);
-> --
-> 1.9.1
->
+Change from v1 to v2
+ - Change simple-bus to simple-mfd
+ - RTC remove lock.
+ - RTC remove comments "These register offsets are relative to LP (Low Power) range"
+ - power off, remove extra space
+
+Frank Li (5):
+  rtc: arm: imx: snvs: change use syscon to access register
+  Document: dt: fsl: snvs: change support syscon
+  arm: dts: imx: update snvs to use syscon access register
+  document: devicetree: input: imx: i.mx snvs power device tree bindings
+  arm: dts: imx6sx: enable snvs power key
+
+Robin Gong (1):
+  input: keyboard: imx: add snvs power key driver
+
+ .../devicetree/bindings/crypto/fsl-sec4.txt        |  70 +++++--
+ .../devicetree/bindings/input/snvs-pwrkey.txt      |   1 +
+ arch/arm/boot/dts/imx6qdl.dtsi                     |  19 +-
+ arch/arm/boot/dts/imx6sl.dtsi                      |  19 +-
+ arch/arm/boot/dts/imx6sx.dtsi                      |  24 ++-
+ arch/arm/boot/dts/vfxxx.dtsi                       |   9 +-
+ drivers/input/keyboard/Kconfig                     |  11 +
+ drivers/input/keyboard/Makefile                    |   1 +
+ drivers/input/keyboard/snvs_pwrkey.c               | 232 +++++++++++++++++++++
+ drivers/rtc/rtc-snvs.c                             | 136 ++++++------
+ 10 files changed, 408 insertions(+), 114 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/input/snvs-pwrkey.txt
+ create mode 100644 drivers/input/keyboard/snvs_pwrkey.c
+
+-- 
+1.9.1
