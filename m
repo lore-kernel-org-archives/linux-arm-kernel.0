@@ -1,162 +1,102 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 22 May 2015 21:42:23 +0800
-Subject: [Patch v3 2/7] ia64/PCI/ACPI: Use common ACPI resource parsing
- interface for host bridge
-In-Reply-To: <1431593803-5213-3-git-send-email-jiang.liu@linux.intel.com>
+Date: Fri, 22 May 2015 21:46:38 +0800
+Subject: [Patch v3 3/7] ia64/PCI: Use common struct resource_entry to
+ replace struct iospace_resource
+In-Reply-To: <1431593803-5213-4-git-send-email-jiang.liu@linux.intel.com>
 References: <1431593803-5213-1-git-send-email-jiang.liu@linux.intel.com>
- <1431593803-5213-3-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <555F323F.3020107@linaro.org>
+ <1431593803-5213-4-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <555F333E.10605@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 2015?05?14? 16:56, Jiang Liu wrote:
-> Use common ACPI resource parsing interface to parse ACPI resources for
-> PCI host bridge, so we could share more code between IA64 and x86.
-> Later we will consolidate arch specific implementations into ACPI core.
+> Use common struct resource_entry to replace private
+> struct iospace_resource.
 >
-> Tested-by: Tony Luck <tony.luck@intel.com>
 > Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
 > ---
->   arch/ia64/pci/pci.c |  414 ++++++++++++++++++++++++---------------------------
->   1 file changed, 193 insertions(+), 221 deletions(-)
+>   arch/ia64/include/asm/pci.h |    5 -----
+>   arch/ia64/pci/pci.c         |   17 ++++++++---------
+>   2 files changed, 8 insertions(+), 14 deletions(-)
 >
+> diff --git a/arch/ia64/include/asm/pci.h b/arch/ia64/include/asm/pci.h
+> index 52af5ed9f60b..5c10e0ec48d4 100644
+> --- a/arch/ia64/include/asm/pci.h
+> +++ b/arch/ia64/include/asm/pci.h
+> @@ -83,11 +83,6 @@ extern int pci_mmap_legacy_page_range(struct pci_bus *bus,
+>   #define pci_legacy_read platform_pci_legacy_read
+>   #define pci_legacy_write platform_pci_legacy_write
+>
+> -struct iospace_resource {
+> -	struct list_head list;
+> -	struct resource res;
+> -};
+> -
+>   struct pci_controller {
+>   	struct acpi_device *companion;
+>   	void *iommu;
 > diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
-> index d4e162d35b34..23689d4c37ae 100644
+> index 23689d4c37ae..4af1b52c7a44 100644
 > --- a/arch/ia64/pci/pci.c
 > +++ b/arch/ia64/pci/pci.c
-> @@ -115,29 +115,12 @@ struct pci_ops pci_root_ops = {
->   	.write = pci_write,
->   };
->
-> -/* Called by ACPI when it finds a new root bus.  */
-> -
-> -static struct pci_controller *alloc_pci_controller(int seg)
-> -{
-> -	struct pci_controller *controller;
-> -
-> -	controller = kzalloc(sizeof(*controller), GFP_KERNEL);
-> -	if (!controller)
-> -		return NULL;
-> -
-> -	controller->segment = seg;
-> -	return controller;
-> -}
-> -
->   struct pci_root_info {
-> +	struct pci_controller controller;
->   	struct acpi_device *bridge;
-> -	struct pci_controller *controller;
->   	struct list_head resources;
-> -	struct resource *res;
-> -	resource_size_t *res_offset;
-> -	unsigned int res_num;
->   	struct list_head io_resources;
-> -	char *name;
-> +	char name[16];
->   };
->
->   static unsigned int
-> @@ -168,11 +151,11 @@ new_space (u64 phys_base, int sparse)
->   	return i;
->   }
->
-> -static u64 add_io_space(struct pci_root_info *info,
-> -			struct acpi_resource_address64 *addr)
-> +static int add_io_space(struct device *dev, struct pci_root_info *info,
-> +			struct resource_entry *entry)
+> @@ -154,14 +154,14 @@ new_space (u64 phys_base, int sparse)
+>   static int add_io_space(struct device *dev, struct pci_root_info *info,
+>   			struct resource_entry *entry)
 >   {
->   	struct iospace_resource *iospace;
-> -	struct resource *resource;
-> +	struct resource *resource, *res = entry->res;
+> -	struct iospace_resource *iospace;
+> +	struct resource_entry *iospace;
+>   	struct resource *resource, *res = entry->res;
 >   	char *name;
 >   	unsigned long base, min, max, base_port;
 >   	unsigned int sparse = 0, space_nr, len;
-> @@ -180,27 +163,24 @@ static u64 add_io_space(struct pci_root_info *info,
+>
 >   	len = strlen(info->name) + 32;
->   	iospace = kzalloc(sizeof(*iospace) + len, GFP_KERNEL);
+> -	iospace = kzalloc(sizeof(*iospace) + len, GFP_KERNEL);
+> +	iospace = resource_list_create_entry(NULL, len);
 >   	if (!iospace) {
-> -		dev_err(&info->bridge->dev,
-> -				"PCI: No memory for %s I/O port space\n",
-> -				info->name);
-> -		goto out;
-> +		dev_err(dev, "PCI: No memory for %s I/O port space\n",
-> +			info->name);
-> +		return -ENOMEM;
->   	}
->
-> -	name = (char *)(iospace + 1);
-> -
-> -	min = addr->address.minimum;
-> -	max = min + addr->address.address_length - 1;
-> -	if (addr->info.io.translation_type == ACPI_SPARSE_TRANSLATION)
-> +	if (res->flags & IORESOURCE_IO_SPARSE)
+>   		dev_err(dev, "PCI: No memory for %s I/O port space\n",
+>   			info->name);
+> @@ -190,7 +190,7 @@ static int add_io_space(struct device *dev, struct pci_root_info *info,
+>   	if (space_nr == 0)
 >   		sparse = 1;
-> -
-> -	space_nr = new_space(addr->address.translation_offset, sparse);
-> +	space_nr = new_space(entry->offset, sparse);
->   	if (space_nr == ~0)
->   		goto free_resource;
 >
-> +	name = (char *)(iospace + 1);
-> +	min = res->start - entry->offset;
-> +	max = res->end - entry->offset;
->   	base = __pa(io_space[space_nr].mmio_base);
->   	base_port = IO_SPACE_BASE(space_nr);
->   	snprintf(name, len, "%s I/O Ports %08lx-%08lx", info->name,
-> -		base_port + min, base_port + max);
-> +		 base_port + min, base_port + max);
->
->   	/*
->   	 * The SDM guarantees the legacy 0-64K space is sparse, but if the
-> @@ -216,153 +196,195 @@ static u64 add_io_space(struct pci_root_info *info,
+> -	resource = &iospace->res;
+> +	resource = iospace->res;
+>   	resource->name  = name;
+>   	resource->flags = IORESOURCE_MEM;
 >   	resource->start = base + (sparse ? IO_SPACE_SPARSE_ENCODING(min) : min);
->   	resource->end   = base + (sparse ? IO_SPACE_SPARSE_ENCODING(max) : max);
->   	if (insert_resource(&iomem_resource, resource)) {
-> -		dev_err(&info->bridge->dev,
-> -				"can't allocate host bridge io space resource  %pR\n",
-> -				resource);
-> +		dev_err(dev,
-> +			"can't allocate host bridge io space resource  %pR\n",
-> +			resource);
->   		goto free_resource;
->   	}
+> @@ -205,12 +205,12 @@ static int add_io_space(struct device *dev, struct pci_root_info *info,
+>   	entry->offset = base_port;
+>   	res->start = min + base_port;
+>   	res->end = max + base_port;
+> -	list_add_tail(&iospace->list, &info->io_resources);
+> +	resource_list_add_tail(iospace, &info->io_resources);
 >
-> +	entry->offset = base_port;
-> +	res->start = min + base_port;
-> +	res->end = max + base_port;
->   	list_add_tail(&iospace->list, &info->io_resources);
-> -	return base_port;
-> +
-> +	return 0;
+>   	return 0;
 >
 >   free_resource:
->   	kfree(iospace);
-> -out:
-> -	return ~0;
-> +	return -ENOSPC;
-> +}
-> +
-> +/*
-> + * An IO port or MMIO resource assigned to a PCI host bridge may be
-> + * consumed by the host bridge itself or available to its child
-> + * bus/devices. The ACPI specification defines a bit (Producer/Consumer)
-> + * to tell whether the resource is consumed by the host bridge itself,
-> + * but firmware hasn't used that bit consistently, so we can't rely on it.
+> -	kfree(iospace);
+> +	resource_list_free_entry(iospace);
+>   	return -ENOSPC;
+>   }
+>
+> @@ -369,12 +369,11 @@ static void add_resources(struct pci_root_info *info, struct device *dev)
+>   static void __release_pci_root_info(struct pci_root_info *info)
+>   {
+>   	struct resource *res;
+> -	struct iospace_resource *iospace, *tmp;
+>   	struct resource_entry *entry, *tentry;
+>
+> -	list_for_each_entry_safe(iospace, tmp, &info->io_resources, list) {
+> -		release_resource(&iospace->res);
+> -		kfree(iospace);
+> +	resource_list_for_each_entry_safe(entry, tentry, &info->io_resources) {
+> +		release_resource(entry->res);
+> +		resource_list_destroy_entry(entry);
+>   	}
+>
+>   	resource_list_for_each_entry_safe(entry, tentry, &info->resources) {
 
-If we make the firmware obey to the ACPI spec, and
-...
-
-> + *
-> + * On x86 and IA64 platforms, all IO port and MMIO resources are assumed
-> + * to be available to child bus/devices except one special case:
-> + *     IO port [0xCF8-0xCFF] is consumed by the host bridge itself
-> + *     to access PCI configuration space.
-> + *
-> + * So explicitly filter out PCI CFG IO ports[0xCF8-0xCFF].
-
-This is not going to happen on ARM64, right?
-
-but this question is not about the patch itself, so for this patch
 
 Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 
