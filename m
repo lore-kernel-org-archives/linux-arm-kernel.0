@@ -1,26 +1,21 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 22 May 2015 16:56:21 +0200
+Date: Fri, 22 May 2015 16:59:08 +0200
 Subject: [PATCH defconfig] ARM: add ARM_SINGLE_ARMV7M in ARMv7-M defconfigs
-In-Reply-To: <20150521082604.GZ24769@pengutronix.de>
+In-Reply-To: <1432161501-2323-1-git-send-email-stefan@agner.ch>
 References: <1432161501-2323-1-git-send-email-stefan@agner.ch>
- <20150521082604.GZ24769@pengutronix.de>
-Message-ID: <10931476.klXfLPFTLM@wuerfel>
+Message-ID: <4337752.21l0mFDl6H@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 21 May 2015 10:26:04 Uwe Kleine-K?nig wrote:
+On Thursday 21 May 2015 00:38:21 Stefan Agner wrote:
+> Select ARM_SINGLE_ARMV7M in defconfigs of the converted ARMv7-M
+> platforms.
 > 
-> On Thu, May 21, 2015 at 12:38:21AM +0200, Stefan Agner wrote:
-> > Select ARM_SINGLE_ARMV7M in defconfigs of the converted ARMv7-M
-> > platforms.
-> I assume this relates to your series that introduces this symbol. Should
-> the defconfig update happen before? (Or what is the result if
-> CONFIG_ARM_SINGLE_ARMV7M=y is missing in the defconfig while the symbol
-> already exists?) Maybe this should be squashed into the commit in
-> question?
-> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 
-I've folded the efm32_defconfig change into the patch that introduces
-the ARM_SINGLE_ARMV7M symbol now, to avoid bisection problems.
+Applied without the efm32_defconfig change, as I have moved that
+into the other patch.
+
+Thanks,
 
 	Arnd
