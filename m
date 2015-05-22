@@ -1,58 +1,60 @@
-From: yoshihiro.shimoda.uh@renesas.com (Yoshihiro Shimoda)
-Date: Fri, 22 May 2015 11:33:57 +0000
-Subject: [PATCH] usb: renesas_usbhs: avoid uninitialized variable use
-In-Reply-To: <16028110.26u0uMKA2O@wuerfel>
-References: <16028110.26u0uMKA2O@wuerfel>
-Message-ID: <SG2PR06MB09192B9386F7E2BA5AF01D0ED8C00@SG2PR06MB0919.apcprd06.prod.outlook.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Fri, 22 May 2015 13:34:26 +0200
+Subject: [PATCH v2 1/2] phy: add lpc18xx usb otg phy driver
+In-Reply-To: <555F109A.3030503@ti.com>
+References: <1432223961-26101-1-git-send-email-manabian@gmail.com>
+ <1432223961-26101-2-git-send-email-manabian@gmail.com>
+ <555F109A.3030503@ti.com>
+Message-ID: <CAGhQ9VxDNr5V+J4-7DU1EeOx3WDx7K2iea_6fXf-yowWq_wUYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 22 May 2015 at 13:18, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> Hi,
+>
+> On Thursday 21 May 2015 09:29 PM, Joachim Eastwood wrote:
+>>
+>> Add PHY driver for the internal USB OTG PHY found on NXP
+>> LPC18xx and LPC43xx devices. This driver takes care of
+>> enabling the PHY in CREG (syscon) and setting the required
+>> clock frequency.
+>>
+>> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+>> ---
+>>   drivers/phy/Kconfig               |  11 +++
+>>   drivers/phy/Makefile              |   1 +
+>>   drivers/phy/phy-lpc18xx-usb-otg.c | 143
+>> ++++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 155 insertions(+)
+>>   create mode 100644 drivers/phy/phy-lpc18xx-usb-otg.c
+>>
+>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+>> index a53bd5b52df9..e11fb9e3c760 100644
+>> --- a/drivers/phy/Kconfig
+>> +++ b/drivers/phy/Kconfig
+>> @@ -52,6 +52,17 @@ config PHY_EXYNOS_MIPI_VIDEO
+>>           Support for MIPI CSI-2 and MIPI DSI DPHY found on Samsung S5P
+>>           and EXYNOS SoCs.
+>>
+>> +config PHY_LPC18XX_USB_OTG
+>> +       tristate "NXP LPC18xx/43xx SoC USB OTG PHY driver"
+>> +       depends on OF && (ARCH_LPC18XX || COMPILE_TEST)
+>> +       select GENERIC_PHY
+>> +       select MFD_SYSCON
+>
+>
+> using select on visible symbols should be avoided. see [1]
+>
+> [1] ->
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/kbuild/kconfig-language.txt#n111
 
-> Sent: Friday, May 22, 2015 8:07 PM
-> 
-> After the renesas_usbhs driver is enabled in ARM multi_v7_defconfig,
-> we now get a new warning:
-> 
-> renesas_usbhs/mod.c: In function 'usbhs_interrupt':
-> renesas_usbhs/mod.c:246:7: warning: 'intenb1' may be used uninitialized in this function [-Wmaybe-uninitialized]
-> 
-> gcc correctly points to a problem here, for the case that the
-> device is in host mode, we use the intenb1 variable without
-> having assigned it first. The state->intsts1 has a similar
-> problem, but gcc cannot know that.
-> 
-> This avoids the problem by initializing both sides of the
-> comparison to zero when we don't read them from the respective
-> registers.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 88a25e02f3 ("usb: renesas_usbhs: Add access control for INTSTS1 and INTENB1 register")
+For these two symbols using select is the right thing to do.
 
-Thank you very much for the patch!
+Look at the users in kernel:
+$ git grep -E 'depend (MFD_SYSCON|GENERIC_PHY)' | wc -l
+0
+$ git grep -E 'select MFD_SYSCON' | wc -l
+42
 
-Acked-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-
-(I'm not sure why a toolchain I used (Linaro GCC 2014.11) doesn't show this warning...)
-
-Best regards,
-Yoshihiro Shimoda
-
-> diff --git a/drivers/usb/renesas_usbhs/mod.c b/drivers/usb/renesas_usbhs/mod.c
-> index e5ce6e6d4f51..d4be5d594896 100644
-> --- a/drivers/usb/renesas_usbhs/mod.c
-> +++ b/drivers/usb/renesas_usbhs/mod.c
-> @@ -223,6 +223,8 @@ static int usbhs_status_get_each_irq(struct usbhs_priv *priv,
->  	if (usbhs_mod_is_host(priv)) {
->  		state->intsts1 = usbhs_read(priv, INTSTS1);
->  		intenb1 = usbhs_read(priv, INTENB1);
-> +	} else {
-> +		state->intsts1 = intenb1 = 0;
->  	}
-> 
->  	/* mask */
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+regards,
+Joachim Eastwood
