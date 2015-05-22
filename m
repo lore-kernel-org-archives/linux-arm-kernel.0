@@ -1,30 +1,37 @@
 From: lho@apm.com (Loc Ho)
-Date: Fri, 22 May 2015 17:32:56 -0600
-Subject: [PATCH v11 1/5] arm64: Enable EDAC on ARM64
-In-Reply-To: <1432337580-3750-1-git-send-email-lho@apm.com>
+Date: Fri, 22 May 2015 17:32:57 -0600
+Subject: [PATCH v11 2/5] MAINTAINERS: Add entry for APM X-Gene SoC EDAC driver
+In-Reply-To: <1432337580-3750-2-git-send-email-lho@apm.com>
 References: <1432337580-3750-1-git-send-email-lho@apm.com>
-Message-ID: <1432337580-3750-2-git-send-email-lho@apm.com>
+ <1432337580-3750-2-git-send-email-lho@apm.com>
+Message-ID: <1432337580-3750-3-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Select EDAC_SUPPORT for arm64.
+This patch adds a MAINTAINERS entry for APM X-Gene SoC EDAC driver.
 
 Signed-off-by: Loc Ho <lho@apm.com>
 ---
- arch/arm64/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ MAINTAINERS |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 4269dba..577078f 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -22,6 +22,7 @@ config ARM64
- 	select BUILDTIME_EXTABLE_SORT
- 	select CLONE_BACKWARDS
- 	select COMMON_CLK
-+	select EDAC_SUPPORT
- 	select CPU_PM if (SUSPEND || CPU_IDLE)
- 	select DCACHE_WORD_ACCESS
- 	select GENERIC_ALLOCATOR
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 00a586b..0134fee 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -3735,6 +3735,13 @@ W:	bluesmoke.sourceforge.net
+ S:	Maintained
+ F:	drivers/edac/sb_edac.c
+ 
++EDAC-XGENE
++APPLIED MICRO (APM) X-GENE SOC EDAC
++M:     Loc Ho <lho@apm.com>
++S:     Supported
++F:     drivers/edac/xgene_edac.c
++F:     Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
++
+ EDIROL UA-101/UA-1000 DRIVER
+ M:	Clemens Ladisch <clemens@ladisch.de>
+ L:	alsa-devel at alsa-project.org (moderated for non-subscribers)
 -- 
 1.7.1
