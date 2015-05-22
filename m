@@ -1,41 +1,57 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Fri, 22 May 2015 17:29:20 +0200
-Subject: [PATCH soc] ARM: use ARM_SINGLE_ARMV7M for ARMv7-M platforms
-In-Reply-To: <15864413.ed8EFg1NLl@wuerfel>
-References: <1432161344-1930-1-git-send-email-stefan@agner.ch>
- <15864413.ed8EFg1NLl@wuerfel>
-Message-ID: <CALszF6D-3pXHtyVMwhO0JkT-dCSSB98UNDHNN7-LD04Wdgd2cA@mail.gmail.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Fri, 22 May 2015 16:30:03 +0100
+Subject: [GIT PULL] arm64: Juno DT updates (rebased on v4.1-rc1)
+Message-ID: <20150522153003.GX2175@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-22 16:50 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
-> [one small request as I have four armv7-m folks on Cc already:
->  could one of you try to fix the warning that I get with every
->  single build: "/git/arm-soc/arch/arm/kernel/head-nommu.S: Assembler
-> messages: /git/arm-soc/arch/arm/kernel/head-nommu.S:167: Warning:
-> Use of r13 as a source register is deprecated when r15 is the
-> destination register."]
+Hi Arnd, Olof, Kevin
 
-Moving r13 to r12 and returning r12 seems to do the job (see below).
-But I don't know if there is a more elegant way, and if it is also
-valid for other architectures than armv7-m.
-I can propose a patch if someone can confirm it is valid.
+(Take 2: rebased on top of v4.1-rc1.)
 
-Regards,
-Maxime
+The DT updates for Juno and Juno r1 are ready to be pulled at your earliest convenience.
 
--------------------------------------------------------------------------------------------------------------
+Many thanks,
+Liviu
 
-diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-index aebfbf7..e84bdad 100644
---- a/arch/arm/kernel/head-nommu.S
-+++ b/arch/arm/kernel/head-nommu.S
-@@ -164,7 +164,8 @@ __after_proc_init:
- #endif
-        mcr     p15, 0, r0, c1, c0, 0           @ write control reg
- #endif /* CONFIG_CPU_CP15 */
--       ret     r13
-+       mov     r12, r13
-+       ret     r12
- ENDPROC(__after_proc_init)
-        .ltorg
+
+The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+
+  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+
+are available in the git repository at:
+
+  git://linux-arm.org/linux-ld for-upstream/juno-dts
+
+for you to fetch changes up to 41e177b37bd558980d50609116f7810b46fe4ce0:
+
+  Documentation: bindings: Add DT bindings for ARM Juno boards. (2015-05-22 16:25:40 +0100)
+
+----------------------------------------------------------------
+Liviu Dudau (6):
+      arm64: Juno: Fix the GIC node address label and the frequency of FAXI clock.
+      arm64: Juno: Split juno.dts into juno-base.dtsi and juno.dts.
+      arm64: Juno: Add memory mapped timer node
+      arm64: Juno: Add GICv2m support in device tree.
+      arm64: Add DT support for Juno r1 board.
+      Documentation: bindings: Add DT bindings for ARM Juno boards.
+
+ Documentation/devicetree/bindings/arm/arm-boards |  66 ++++++++++
+ arch/arm64/boot/dts/arm/Makefile                 |   2 +-
+ arch/arm64/boot/dts/arm/juno-base.dtsi           | 154 +++++++++++++++++++++++
+ arch/arm64/boot/dts/arm/juno-clocks.dtsi         |   4 +-
+ arch/arm64/boot/dts/arm/juno-r1.dts              | 116 +++++++++++++++++
+ arch/arm64/boot/dts/arm/juno.dts                 | 129 +------------------
+ 6 files changed, 340 insertions(+), 131 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/arm/juno-base.dtsi
+ create mode 100644 arch/arm64/boot/dts/arm/juno-r1.dts
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
