@@ -1,96 +1,66 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 22 May 2015 13:20:28 -0700
-Subject: [GIT PULL] omap device tree changes for v4.2, part 1
-Message-ID: <20150522202028.GE10274@atomide.com>
+From: afaerber@suse.de (=?windows-1252?Q?Andreas_F=E4rber?=)
+Date: Fri, 22 May 2015 22:20:35 +0200
+Subject: [PATCH v8 01/16] scripts: link-vmlinux: Don't pass page offset
+ to kallsyms if XIP Kernel
+In-Reply-To: <555D12F8.4000403@suse.de>
+References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1431158038-3813-2-git-send-email-mcoquelin.stm32@gmail.com>
+ <CALszF6B0=dgSDfLFwDi9YmEzrrNVuYbUnqMu5DmDhhy--emtpw@mail.gmail.com>
+ <555D12F8.4000403@suse.de>
+Message-ID: <555F8F93.7000705@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+Am 21.05.2015 um 01:04 schrieb Andreas F?rber:
+> Hi,
+> 
+> Am 18.05.2015 um 13:47 schrieb Maxime Coquelin:
+>> 2015-05-09 9:53 GMT+02:00 Maxime Coquelin <mcoquelin.stm32@gmail.com>:
+>>> When Kernel is executed in place from ROM, the symbol addresses can be
+>>> lower than the page offset.
+>>>
+>>> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+[...]
+> Back then on STM32F4 I debugged that disabling KALLSYMS works around it.
+> 
+> Now on a different XIP target I have confirmed this patch to help show a
+> stacktrace (my clk driver was missing some CLK_DIVIDER_ALLOW_ZEROs) ...
+> although my earlyprintk serial output still gets stuck further down the
+> stacktrace - probably unrelated.
 
-  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+FTR confirming my suspicion: insufficient power supply. ;)
 
-are available in the git repository at:
+Andreas
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.2/dt-pt1
+> [    0.000000] ------------[ cut here ]------------
+> [    0.000000] WARNING: CPU: 0 PID: 0 at drivers/clk/clk-divider.c:126
+> divider_recalc_rate+0x2b/0x44()
+> [    0.000000] SYS: Zero divisor and CLK_DIVIDER_ALLOW_ZERO not set
+> [    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted
+> 4.1.0-rc4-next-20150519+ #23
+> [    0.000000] Hardware name: XMC4000 (Device Tree Support)
+> [    0.000000] [<0800bd5d>] (unwind_backtrace) from [<0800b0cb>]
+> (show_stack+0xb/0xc)
+> [    0.000000] [<0800b0cb>] (show_stack) from [<0800e0a5>]
+> (warn_slowpath_common+0x55/0x78)
+> [    0.000000] [<0800e0a5>] (warn_slowpath_common) from [<0800e103>]
+> (warn_slowpath_fmt+0x1b/0x24)
+> [    0.000000] [<0800e103>] (warn_slowpath_fmt) from [<080942e3>] (divide
+> 
+> But this is definitely an improvement for ARMv7-M debugging,
+> 
+> Tested-by: Andreas F?rber <afaerber@suse.de>
 
-for you to fetch changes up to 52dfcbfc94833b0192d439127ee9ff46023cdbb2:
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Dilip Upmanyu, Graham Norton; HRB
+21284 (AG N?rnberg)
 
-  ARM: dts: am335x-evm: add mmc3 and wlan definitions to dts (2015-05-21 12:05:59 -0700)
-
-----------------------------------------------------------------
-Device tree related changes for omaps:
-
-- Configure MMC data lines 4..8 for 1.8V IO on boards that
-  are using them as GPIOs instead of MMC data lines
-
-- Add support for Baltos IR5221
-
-- Add device tree support for LogicPD Torpedo devkit
-
-- Add 3717 core pinctrl region
-
-- Add gta04 1w and GSM audio support
-
-- Add wilink and ov2659 support for am437x-gp-evm
-
-- Add am335x-evm bluetooth and mmc3 support
-
-- Enable omap5-uevm uart wakeup interrupt
-
-- Enable I2C2 on BeagleBone as it's used for the capes
-
-- Use defines for LDP GPIO keys
-
-----------------------------------------------------------------
-Andrey Skvortsov (1):
-      ARM: dts: add core2 padconf region for am3517
-
-Eliad Peller (1):
-      ARM: dts: am335x-evm: add bluetooth support
-
-Eyal Reizer (2):
-      ARM: dts: am437x-gp-evm: add wilink8 support
-      ARM: dts: am335x-evm: add mmc3 and wlan definitions to dts
-
-Lad, Prabhakar (1):
-      ARM: dts: am437x-gp-evm: add DT nodes for ov2659 sensor
-
-Marek Belisko (2):
-      ARM: dts: omap3-gta04: Add hdqw1 support
-      ARM: dts: omap3-gta04: Add GSM audio support
-
-Nishanth Menon (1):
-      ARM: dts: omap5-uevm: Add Uart wakeup interrupt
-
-Pantelis Antoniou (1):
-      ARM: dts: Beaglebone i2c definitions
-
-Tony Lindgren (4):
-      ARM: OMAP3: Add support for configuring MMC pins as GPIO pins
-      ARM: dts: Add minimal support for LogicPD Torpedo DM3730 devkit
-      ARM: dts: Fix ldp gpio keys to use defines
-      ARM: dts: Enable SDIO card interrupt for 37xx-evm
-
-Yegor Yefremov (1):
-      ARM: dts: add DTS for Baltos IR5221
-
- arch/arm/boot/dts/Makefile                        |   2 +
- arch/arm/boot/dts/am335x-baltos-ir5221.dts        | 532 ++++++++++++++++++++++
- arch/arm/boot/dts/am335x-bone-common.dtsi         |  66 +++
- arch/arm/boot/dts/am335x-evm.dts                  |  81 ++++
- arch/arm/boot/dts/am3517.dtsi                     |  11 +
- arch/arm/boot/dts/am437x-gp-evm.dts               | 144 +++++-
- arch/arm/boot/dts/logicpd-torpedo-37xx-devkit.dts | 157 +++++++
- arch/arm/boot/dts/logicpd-torpedo-som.dtsi        | 162 +++++++
- arch/arm/boot/dts/omap3-evm-common.dtsi           |   1 +
- arch/arm/boot/dts/omap3-gta04.dtsi                |  37 ++
- arch/arm/boot/dts/omap3-ldp.dts                   |  18 +-
- arch/arm/boot/dts/omap5-uevm.dts                  |  14 +-
- arch/arm/mach-omap2/control.c                     |   3 +
- arch/arm/mach-omap2/control.h                     |   3 +
- arch/arm/mach-omap2/pdata-quirks.c                |  22 +
- include/dt-bindings/pinctrl/am43xx.h              |   1 +
- 16 files changed, 1237 insertions(+), 17 deletions(-)
- create mode 100644 arch/arm/boot/dts/am335x-baltos-ir5221.dts
- create mode 100644 arch/arm/boot/dts/logicpd-torpedo-37xx-devkit.dts
- create mode 100644 arch/arm/boot/dts/logicpd-torpedo-som.dtsi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150522/bb9a5ecf/attachment.sig>
