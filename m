@@ -1,37 +1,59 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 22 May 2015 07:47:30 +0530
-Subject: [PATCH] cpufreq:exynos-cpufreq - Fix for memory leak in case SOC
- name does not match.
-In-Reply-To: <1432232981-3917-1-git-send-email-shailendra.capricorn@gmail.com>
-References: <1432232981-3917-1-git-send-email-shailendra.capricorn@gmail.com>
-Message-ID: <20150522021730.GA7730@linux>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 22 May 2015 11:28:33 +0900
+Subject: [PATCH] extcon: fix phy-tahvo driver for extcon API change
+In-Reply-To: <4940971.fmN098LqHi@wuerfel>
+References: <4940971.fmN098LqHi@wuerfel>
+Message-ID: <555E9451.2010504@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21-05-15, 23:59, Shailendra Verma wrote:
-> During probe free the memory allocated to "exynos_info" in case of unknown
-> SOC type.
+Dear Felipe,
+
+If you review this patch, I'll apply it on extcon tree.
+
+Best Regards,
+Chanwoo Choi
+
+On 05/21/2015 06:39 PM, Arnd Bergmann wrote:
+> Today, the API for the extcon drivers was changed, along
+> with all drivers in drivers/extcon. However, one extcon driver
+> instead lives in drivers/usb/phy/ and did not get change.
 > 
-> Signed-off-by: Shailendra Verma <shailendra.capricorn@gmail.com>
+> Gcc warns about the now incorrect API usage:
+> 
+> drivers/usb/phy/phy-tahvo.c: In function 'tahvo_usb_probe':
+> drivers/usb/phy/phy-tahvo.c:368:29: warning: assignment from incompatible pointer type [-Wincompatible-pointer-types]
+>   tu->extcon.supported_cable = tahvo_cable;
+> 
+> This changes the API in the same way as the other drivers.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 17cd440c9acc ("extcon: Update the prototype of extcon_register_notifier() with enum extcon")
 > ---
->  drivers/cpufreq/exynos-cpufreq.c |    1 +
->  1 file changed, 1 insertion(+)
+> As the API change is only present in the extcon tree, this patch should get
+> merged there as well, not in the usb-phy tree.
 > 
-> diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
-> index 82d2fbb..b77923a 100644
-> --- a/drivers/cpufreq/exynos-cpufreq.c
-> +++ b/drivers/cpufreq/exynos-cpufreq.c
-> @@ -182,6 +182,7 @@ static int exynos_cpufreq_probe(struct platform_device *pdev)
->  		ret = exynos5250_cpufreq_init(exynos_info);
->  	} else {
->  		pr_err("%s: Unknown SoC type\n", __func__);
-> +		kfree(exynos_info);
->  		return -ENODEV;
->  	}
-
-There is no point replicating this stuff. Use labels like: err_vdd_arm
-to get this done. But you also need to make sure the right error gets
-propagated.
-
--- 
-viresh
+> If possible, please fold into the original commit.
+> 
+> diff --git a/drivers/usb/phy/phy-tahvo.c b/drivers/usb/phy/phy-tahvo.c
+> index 845f658276b1..1d1bb9ad8ccf 100644
+> --- a/drivers/usb/phy/phy-tahvo.c
+> +++ b/drivers/usb/phy/phy-tahvo.c
+> @@ -60,10 +60,11 @@ struct tahvo_usb {
+>  	struct extcon_dev	extcon;
+>  };
+>  
+> -static const char *tahvo_cable[] = {
+> -	"USB-HOST",
+> -	"USB",
+> -	NULL,
+> +static const enum extcon tahvo_cable[] = {
+> +	EXTCON_USB,
+> +	EXTCON_USB_HOST,
+> +
+> +	EXTCON_NONE,
+>  };
+>  
+>  static ssize_t vbus_state_show(struct device *device,
+> 
+> 
