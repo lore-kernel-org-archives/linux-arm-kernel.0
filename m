@@ -1,57 +1,79 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 22 May 2015 11:39:23 +0200
-Subject: [PATCH soc] ARM: use ARM_SINGLE_ARMV7M for ARMv7-M platforms
-In-Reply-To: <170b7522fb120f3afcc4b7aa1f90e341@agner.ch>
-References: <1432161344-1930-1-git-send-email-stefan@agner.ch>
- <3824169.vxchxyBt3o@wuerfel> <170b7522fb120f3afcc4b7aa1f90e341@agner.ch>
-Message-ID: <6200216.zaJV8lHmUr@wuerfel>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Fri, 22 May 2015 11:41:33 +0200
+Subject: [PATCH v8 14/16] ARM: dts: Introduce STM32F429 MCU
+In-Reply-To: <1432285588.3929.28.camel@pengutronix.de>
+References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <2282066.NWoIT9ZyLc@wuerfel>
+ <CALszF6CaO_yuNiSDuDV+4d2NRe_+32j=zcSE1HPhB1UH59cW9w@mail.gmail.com>
+ <13641152.Yt4ZI3oT6L@wuerfel>
+ <CALszF6CK5ezrO6D=4zr6zEPC7VanzbQjnZJwKOZekEZ5L4D-Dg@mail.gmail.com>
+ <1432285588.3929.28.camel@pengutronix.de>
+Message-ID: <CALszF6Bz91auOX-vP+_B-aY9W_gFL_CtfJN37bGwPAKy1sTcqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 22 May 2015 10:54:48 Stefan Agner wrote:
-> > Another option might be to consolidate these three into a single
-> > directory, if someone can come up with a good name. The machine
-> > files are all trivial, so they could even be merged into one as
-> > far as I can tell, we just need slightly different 'select'
-> > statements above.
-> > 
-> > If we do that, is it possible to merge Vybrid into that as well?
-> > I guess the main question here is how much other infrastructure
-> > (if any) from mach-imx is used on vf610, and if there is some other
-> > way to do that.
-> 
-> I think it is nice today to use the same Kconfig symbol (SOC_VF610) as
-> we use for the primary Cortex-A5 processor. After all, the kernel is
-> running on the same SoC... Its just a different processor we are running
-> on.
+2015-05-22 11:06 GMT+02:00 Philipp Zabel <p.zabel@pengutronix.de>:
+> Am Mittwoch, den 20.05.2015, 18:17 +0200 schrieb Maxime Coquelin:
+>> Hi Arnd, Philipp,
+>>
+>> 2015-05-13 21:11 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
+>> > Ideally the binding should follow closely what is documented
+>> > in the data sheet.
+>> >
+>>
+>> Daniel and myself would like your opinion about this binding:
+>>
+>> rcc: rcc at 40023800 {
+>>     #reset-cells = <1>;
+>>     #clock-cells = <2>;
+>>     compatible = "st,stm32-rcc";
+>>     reg = <0x40023800 0x10>, <0x40023810 0x20>, <0x40023830 0x20>;
+>>     reg-names = "clock-cfg", "reset", "clock-gates";
+>
+> "reset" singular, "clock-gates" plural seems inconsistent to me.
+Indeed. I will change to "resets".
 
-Yes, though you can in fact have multiple definitions of the same symbol,
-so that would still work if you define CONFIG_SOC_VF610 outside again
-outside of mach-imx. It would be a little ugly and possibly confusing
-though.
+About the compatible string, any idea how could I name it?
 
-> Today, I rely on several config symbols set by ARCH_MXC or SOC_VF610,
-> some of that quite SoC specific (PINCTRL_VF610). However, after the move
-> of the clock stuff which is in imx-next, there is really almost no
-> machine specific code required from mach-imx. However, I plan to add PM
-> support, which probably still will land in the machine folder?
+>
+>> };
+>>
+>> It would solve a problem Daniel is facing due to conflicting mem
+>> region when clock and reset drivers are enabled, as both would reserve
+>> the same region.
+>>
+>> Also, it would make the reset driver very generic.
+>> Doing that, we could even create a generic-reset.c driver that would
+>> be used by STM32 and Sunxi (at least).
+>
+> Adding support for providing the reset register range via of_device_id
+> data and the possibility to invert set/clear ops would allow to also
+> include the socfpga driver.
 
-What kind of PM support? We should have driver subsystems for most of
-it now, and the goal has always been that you're able to do it without
-platform specific code.
+Ok, it sounds like a good plan.
+Should I also add a property in the bindings for the reset polarity?
+It won't be used for now, as for socfpga we have to do it via
+of_device_id data, in order not to break DT backward compatibility.
 
-> I also think that it would a bit risky to do this for that release. So
-> maybe as first step, simply split out the machines in individual Kconfig
-> files?
-> 
-> What do you think about the defconfig dependency Uwe pointed out? Shall
-> I create a single patch on-top of a soc/defconfig merged branch?
+>
+>> In the probe function, it would check the number of reg resources.
+>> If a single resource is passed, it would take it, else it would look
+>> the one named "reset".
+>> The driver and bindings would be the same for the two families, and
+>> the bindings would be backward compatible with sunxi ones.
+>>
+>> Philip, Arnd, what do you think?
+>
+> I'm not a fan of describing the register layout in the device tree as
+> detailed as the sunxi bindings do. I'd prefer the reg property to
+> describe the device's register address space with one entry per
+> contiguous block of registers.
+> Unifying the mostly identical drivers is a good idea though, and reusing
+> preexisting bindings is better than inventing new ones. I favor the
+> socfpga binding, but I still like the sunxi bindings and this proposal
+> better than encoding the register offset in the reset index.
 
-I think for efm32, we want to change the defconfig in the same commit
-that moves the option around, to it keeps working across bisection.
+Ok, I will propose a RFC.
 
-For the other ones, it is probably easier as a separate patch, as the
-defconfigs do not exist in the next/soc branch yet and there is no
-possible regression either.
-
-	Arnd
+Thanks,
+Maxime
