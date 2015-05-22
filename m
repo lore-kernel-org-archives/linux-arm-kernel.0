@@ -1,80 +1,68 @@
-From: ydroneaud@opteya.com (Yann Droneaud)
-Date: Fri, 22 May 2015 12:05:48 +0200
-Subject: Device Tree Blob (DTB) licence
-In-Reply-To: <CAL_Jsq+T5c7qornpRVCduEjUSCeM+0xqbtVYovtH76y=4BqhLQ@mail.gmail.com>
-References: <1430820315.19516.26.camel@opteya.com>
- <CAL_Jsq+T5c7qornpRVCduEjUSCeM+0xqbtVYovtH76y=4BqhLQ@mail.gmail.com>
-Message-ID: <1432289148.5304.58.camel@opteya.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 22 May 2015 12:07:11 +0200
+Subject: [PATCH v8 14/16] ARM: dts: Introduce STM32F429 MCU
+In-Reply-To: <20150522091822.GF8557@lukather>
+References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <2282066.NWoIT9ZyLc@wuerfel>
+ <CALszF6CaO_yuNiSDuDV+4d2NRe_+32j=zcSE1HPhB1UH59cW9w@mail.gmail.com>
+ <13641152.Yt4ZI3oT6L@wuerfel>
+ <CALszF6CK5ezrO6D=4zr6zEPC7VanzbQjnZJwKOZekEZ5L4D-Dg@mail.gmail.com>
+ <1432285588.3929.28.camel@pengutronix.de> <20150522091822.GF8557@lukather>
+Message-ID: <1432289231.3929.60.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Le mardi 05 mai 2015 ? 11:41 -0500, Rob Herring a ?crit :
-> On Tue, May 5, 2015 at 5:05 AM, Yann Droneaud <ydroneaud@opteya.com> 
-> wrote:
+Am Freitag, den 22.05.2015, 11:18 +0200 schrieb Maxime Ripard:
+> On Fri, May 22, 2015 at 11:06:28AM +0200, Philipp Zabel wrote:
+> > > In the probe function, it would check the number of reg resources.
+> > > If a single resource is passed, it would take it, else it would look
+> > > the one named "reset".
+> > > The driver and bindings would be the same for the two families, and
+> > > the bindings would be backward compatible with sunxi ones.
+> > > 
+> > > Philip, Arnd, what do you think?
 > > 
-> > I believe Device Tree Blob (.dtb file) built from kernel's Device 
-> > Tree
-> > Sources (.dts, which #include .dtsi, which #include .h) using 
-> > Device
-> > Tree Compiler (dtc) are covered by GNU General Public Licence v2
-> > (GPLv2), but cannot find any reference.
+> > I'm not a fan of describing the register layout in the device tree as
+> > detailed as the sunxi bindings do. I'd prefer the reg property to
+> > describe the device's register address space with one entry per
+> > contiguous block of registers.
 > 
-> By default yes, but we've been steering people to dual license them 
-> GPL/BSD.
+> That's exactly what we do.
+
+Sorry, what I mean is 'as detailed as reusing the sunxi bindings for
+stm32xx here would do'. I don't know enough about the Allwinner register
+layouts to form an opinion.
+
+The STM32F427xx/STM32F429xx manual, Table 13. "STM32F427xx and
+STM32F429xx register boundary addresses" contains this entry:
+    Bus    Boundary address       Peripheral
+    AHB1   0x40023800-0x400238bf  RCC
+
+And that's how I'd expect it to be described by the device tree:
+
+    rcc: rcc at 40023800 {
+        compatible = "st,stm32-rcc";
+        reg = <0x40023800 0xc0>;
+    };
+
+Instead of "reg = <0x40023810 0x20>" for the resets. Where in the
+address range the reset, clock gate and clock configuration registers
+reside could be derived from the compatible value.
+
+> > Unifying the mostly identical drivers is a good idea though, and reusing
+> > preexisting bindings is better than inventing new ones. I favor the
+> > socfpga binding, but I still like the sunxi bindings and this proposal
+> > better than encoding the register offset in the reset index.
 > 
+> I don't really get the difference between the socfpga and our bindings
+> actually. Would you mind to explain a bit further what you don't like
+> about it ?
 
-Can you give me the rationale behind such dual licenses requirement ?
+The socfpga driver currently hardcodes the reset register offset (0x10)
+and number of banks (4), the sunxi driver has no register offset (0x0)
+and derives the number of banks from the resource size.
+I'd store the internal register offsets and number of banks in the
+driver, together with the compatible string.
 
-If a BSD .dts includes GPLv2 .h, the whole is covered by GPLv2,
-so I cannot find a case where a BSD covered .dts file could be used
-alone within BSD license rights.
-
-> > As most .dtsi in arch/arm/boot/dts/ are covered by GPLv2, and,
-> > as most .h in include/dt-bindings/ are also covered by GPLv2,
-> > the source code is likely covered by GPLv2.
-> > 
-> > Then this source code is translated in a different language 
-> > (flattened
-> > device tree), so the resulting translation is also likely covered 
-> > by
-> > GPLv2.
-> > 
-> > So, when I'm proposed to download a .dtb file from a random vendor,
-> > can I require to get the associated source code ?
-> 
-> I believe so yes. However, you already have the "source" for the most
-> part. Just run "dtc -I dtb -O dts <dtb file>". You loose the
-> preprocessing and include structure though (not necessarily a bad
-> thing IMO).
-> 
-> Then the question is what is the license on that generated dts!
-> 
-
-That's also a good question.
-
-Is this a form a "reverse engineering" with all the legalese burden ?
-
-Anyway without a clear information attached to the DTB, it's difficult
-to tell which licence cover the "decompiled" version.
-
-> > Anyway, for a .dtb file generated from kernel sources, it's rather
-> > painful to look after all .dts, .dtsi, .h, to find what kind of
-> > licences are applicables, as some are covered by BSD, dual licensed
-> > (any combination of X11, MIT, BSD, GPLv2).
-> 
-> I imagine the includes cause some licensing discrepancies if you dug 
-> into it.
-> 
-
-It's a pity, and it's probably something to sort out.
-
-DTB files produced as part of kernel compilation should have a well
-known license attached by default.
-
-Regards.
-
--- 
-Yann Droneaud
-OPTEYA
+regards
+Philipp
