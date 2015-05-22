@@ -1,89 +1,41 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 22 May 2015 14:51:56 +0200
-Subject: [PATCH v4 2/7] mmc: mediatek: Add Mediatek MMC driver
-In-Reply-To: <1432284000.23435.38.camel@mhfsdcap03>
-References: <1432017411-2996-1-git-send-email-chaotian.jing@mediatek.com>
- <1432017411-2996-3-git-send-email-chaotian.jing@mediatek.com>
- <CAPDyKFo5788uRqAaXUZ-OiS1XF8NPmg4tn2ipZNJdx4dci+KMQ@mail.gmail.com>
- <1432284000.23435.38.camel@mhfsdcap03>
-Message-ID: <CAPDyKFpWCvJXL-W5P83ucBM2-b5cDFEtSLnN6J6WLyR_9CuvWw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 22 May 2015 13:53:46 +0100
+Subject: [PATCH] arm64: support ACPI tables outside of kernel RAM
+In-Reply-To: <1432298762.9933.58.camel@deneb.redhat.com>
+References: <1431613373-10928-1-git-send-email-msalter@redhat.com>
+ <20150518111143.GC21251@e104818-lin.cambridge.arm.com>
+ <1431957525.9933.4.camel@deneb.redhat.com>
+ <20150518164108.GH21251@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu8wXrCnnDEw2gpJ9e1qixkVvBCsUf0wLorsdLJwknZELA@mail.gmail.com>
+ <20150522103417.GT29424@e104818-lin.cambridge.arm.com>
+ <1432298762.9933.58.camel@deneb.redhat.com>
+Message-ID: <20150522125346.GX29424@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+On Fri, May 22, 2015 at 08:46:02AM -0400, Mark Salter wrote:
+> On Fri, 2015-05-22 at 11:34 +0100, Catalin Marinas wrote:
+> > OK, so my preferred options, in this order:
+> > 
+> > 1. Change the core ACPI kernel code to distinguish between mapping I/O
+> >    or RAM (could be as simple as acpi_map not using acpi_os_ioremap but
+> >    another API). I guess the code knows when it plans to map tables or
+> >    I/O registers
+> > 
+> > 2. If the above is not possible, add the extra checks as per Mark's
+> >    patch but I would rather call this resource "UEFI RAM" than "ACPI",
+> >    it's not really ACPI specific.
+> 
+> Actually, it is ACPI specific. The patch only registers resources for
+> EfiACPIReclaimMemory and EfiACPIMemoryNVS regions which are also
+> marked as cacheable. On x86 these show up in /proc/iomem as
+> "ACPI Tables" and "ACPI Non-volatile Storage". I used "ACPI RAM" to
+> avoid having to search for two strings.
 
->> You are invoking msdc_gate_clock() and msdc_ungate_clock() in a
->> balanced manner, thus hclk_enabled is redundant. Please remove it.
->
-> on drv->probe(), already invoke the msdc_ungate_clock(), so, when the
-> runtime pm resume invoke the msdc_ungate_clock(), the hclk already
-> enabled.
+My point is more about UEFI describing the entire RAM while the kernel
+command line restricts it via "mem=". In this case, the "System RAM"
+resources is reduced as well but it does not necessarily mean that the
+rest of the RAM is only used by ACPI.
 
-
-That's why you invoke pm_runtime_set_active() during ->probe() when
-deploying PM support in patch3. It's not an issue then.
-
-[...]
-
->> I assume it's possible to gate the clock by updating a MSDC register
->> instead!? That would be prefereable since then you can leave clock
->> gating/ungating via the clk API, to be dealt from runtime PM. That
->> would also make "sclk_enabled" in the struct msdc_host redundant.
->>
->> Adopting to above, obviously requires MSDC to be able to ungate the
->> clock by also updating a MSDC register. I assume that's possible as
->> well!?
->>
-> We can set the bit1 of MSDC_CFG, when this bit is 0, the bus clock was
-> gated to 0 if no command or data is transmitted.
-> And, from our designer, when we operate the MSDC register, we need make
-> sure both HCLK and source are enabled, if source clock was disabled,
-> write some MSDC registers will have no effect(eg. send CMD, without
-> source clock, not only cannot send CMD, but also cannot get CMD timeout
-> interrupt.)
-
-Thanks, that answered my question. As I understand it you should be
-able to adopt to my propsual.
-
-[...]
-
->> > +{
->> > +       unsigned long tmo = jiffies + msecs_to_jiffies(20);
->> > +
->> > +       while ((readl(host->base + SDC_STS) & SDC_STS_CMDBUSY)
->> > +                       && time_before(jiffies, tmo))
->> > +               continue;
->> > +
->> > +       if (readl(host->base + SDC_STS) & SDC_STS_CMDBUSY) {
->> > +               dev_err(host->dev, "CMD bus busy detected\n");
->> > +               host->error |= REQ_CMD_BUSY;
->> > +               msdc_cmd_done(host, MSDC_INT_CMDTMO, mrq, cmd);
->> > +               return false;
->> > +       }
->> > +
->> > +       if (mmc_resp_type(cmd) == MMC_RSP_R1B || cmd->data) {
->> > +               /* R1B or with data, should check SDCBUSY */
->> > +               while (readl(host->base + SDC_STS) & SDC_STS_SDCBUSY)
->> > +                       cpu_relax();
->> > +       }
->>
->> MSDC seems to be handling card busy detection in HW, right?
->>
-> Do not have this ability, HW only know if CMD/DAT is low, but do not
-> have any interrupt for it,
-
-I see, but doesn't the above polling mean that msdc will not propagate
-the response until the card have stopped signal busy? That's what
-MMC_CAP_WAIT_WHILE_BUSY shall be used for.
-
-Perhaps you should remove the above polling, and rely on the MMC core
-to poll with CMD13 instead?
-
->> If so, you should enable MMC_CAP_WAIT_WHILE_BUSY and set
->> "max_busy_timeout" to DAT_TIMEOUT to inform the mmc core about it.
->>
-
-[...]
-
-Kind regards
-Uffe
+-- 
+Catalin
