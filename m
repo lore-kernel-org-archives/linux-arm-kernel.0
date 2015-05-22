@@ -1,35 +1,34 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 22 May 2015 09:48:38 +0900
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable display on Trats2 board
-In-Reply-To: <1432255718-11695-1-git-send-email-k.kozlowski@samsung.com>
-References: <1432255718-11695-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1432255718-11695-2-git-send-email-k.kozlowski@samsung.com>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Thu, 21 May 2015 20:14:00 -0500
+Subject: [PATCH] ARM: socfpga: dts: add the a9-scu node for arria10
+Message-ID: <1432257240-3509-1-git-send-email-dinh.linux@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the Exynos DSI and S6E8AA0 panel for full X11 display on Trats2.
+From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Add a dts node for the A9 SCU on the Arria10 platform.
+
+Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
 ---
- arch/arm/configs/multi_v7_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/socfpga_arria10.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 0848337a2a01..e9785020aab1 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -413,10 +413,12 @@ CONFIG_DRM=y
- CONFIG_DRM_PTN3460=m
- CONFIG_DRM_PS8622=m
- CONFIG_DRM_EXYNOS=m
-+CONFIG_DRM_EXYNOS_DSI=y
- CONFIG_DRM_EXYNOS_FIMD=y
- CONFIG_DRM_EXYNOS_HDMI=y
- CONFIG_DRM_RCAR_DU=m
- CONFIG_DRM_TEGRA=y
-+CONFIG_DRM_PANEL_S6E8AA0=m
- CONFIG_DRM_PANEL_SIMPLE=y
- CONFIG_FB_ARMCLCD=y
- CONFIG_FB_WM8505=y
+diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
+index 8a05c47..4cf0733 100644
+--- a/arch/arm/boot/dts/socfpga_arria10.dtsi
++++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
+@@ -281,6 +281,11 @@
+ 			reg = <0xffd05000 0x100>;
+ 		};
+ 
++		scu: snoop-control-unit at ffffc000 {
++			compatible = "arm,cortex-a9-scu";
++			reg = <0xffffc000 0x100>;
++		};
++
+ 		sysmgr: sysmgr at ffd06000 {
+ 			compatible = "altr,sys-mgr", "syscon";
+ 			reg = <0xffd06000 0x300>;
 -- 
-1.9.1
+1.9.1.315.g3f09db0
