@@ -1,47 +1,55 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 22 May 2015 16:48:50 +0530
-Subject: [PATCH v2 1/2] phy: add lpc18xx usb otg phy driver
-In-Reply-To: <1432223961-26101-2-git-send-email-manabian@gmail.com>
-References: <1432223961-26101-1-git-send-email-manabian@gmail.com>
- <1432223961-26101-2-git-send-email-manabian@gmail.com>
-Message-ID: <555F109A.3030503@ti.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Fri, 22 May 2015 12:21:40 +0100
+Subject: [GIT PULL] arm64: Juno DT updates
+Message-ID: <20150522112140.GU2175@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnd, Olof, Kevin
 
-On Thursday 21 May 2015 09:29 PM, Joachim Eastwood wrote:
-> Add PHY driver for the internal USB OTG PHY found on NXP
-> LPC18xx and LPC43xx devices. This driver takes care of
-> enabling the PHY in CREG (syscon) and setting the required
-> clock frequency.
->
-> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
-> ---
->   drivers/phy/Kconfig               |  11 +++
->   drivers/phy/Makefile              |   1 +
->   drivers/phy/phy-lpc18xx-usb-otg.c | 143 ++++++++++++++++++++++++++++++++++++++
->   3 files changed, 155 insertions(+)
->   create mode 100644 drivers/phy/phy-lpc18xx-usb-otg.c
->
-> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> index a53bd5b52df9..e11fb9e3c760 100644
-> --- a/drivers/phy/Kconfig
-> +++ b/drivers/phy/Kconfig
-> @@ -52,6 +52,17 @@ config PHY_EXYNOS_MIPI_VIDEO
->   	  Support for MIPI CSI-2 and MIPI DSI DPHY found on Samsung S5P
->   	  and EXYNOS SoCs.
->
-> +config PHY_LPC18XX_USB_OTG
-> +	tristate "NXP LPC18xx/43xx SoC USB OTG PHY driver"
-> +	depends on OF && (ARCH_LPC18XX || COMPILE_TEST)
-> +	select GENERIC_PHY
-> +	select MFD_SYSCON
+The DT updates for Juno and Juno r1 are ready to be pulled at your earliest convenience.
 
-using select on visible symbols should be avoided. see [1]
+Many thanks,
+Liviu
 
-[1] -> 
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/kbuild/kconfig-language.txt#n111
 
-Thanks
-Kishon
+The following changes since commit c0655fe9b0901a968800f56687be3c62b4cce5d2:
+
+  Merge tag 'usb-4.1-rc4' of git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb (2015-05-16 21:15:59 -0700)
+
+are available in the git repository at:
+
+  git://linux-arm.org/linux-ld for-upstream/juno-dts
+
+for you to fetch changes up to 8f821c9b8ec0e82ebd10ae12a267e4397cc53566:
+
+  Documentation: bindings: Add DT bindings for ARM Juno boards. (2015-05-22 11:51:08 +0100)
+
+----------------------------------------------------------------
+Liviu Dudau (6):
+      arm64: Juno: Fix the GIC node address label and the frequency of FAXI clock.
+      arm64: Juno: Split juno.dts into juno-base.dtsi and juno.dts.
+      arm64: Juno: Add memory mapped timer node
+      arm64: Juno: Add GICv2m support in device tree.
+      arm64: Add DT support for Juno r1 board.
+      Documentation: bindings: Add DT bindings for ARM Juno boards.
+
+ Documentation/devicetree/bindings/arm/arm-boards |  66 ++++++++++
+ arch/arm64/boot/dts/arm/Makefile                 |   2 +-
+ arch/arm64/boot/dts/arm/juno-base.dtsi           | 154 +++++++++++++++++++++++
+ arch/arm64/boot/dts/arm/juno-clocks.dtsi         |   4 +-
+ arch/arm64/boot/dts/arm/juno-r1.dts              | 116 +++++++++++++++++
+ arch/arm64/boot/dts/arm/juno.dts                 | 129 +------------------
+ 6 files changed, 340 insertions(+), 131 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/arm/juno-base.dtsi
+ create mode 100644 arch/arm64/boot/dts/arm/juno-r1.dts
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
