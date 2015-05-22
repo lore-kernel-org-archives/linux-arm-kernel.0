@@ -1,58 +1,26 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 22 May 2015 10:55:34 -0500
-Subject: [PATCH V5 1/3] OPP: Redefine bindings to overcome shortcomings
-In-Reply-To: <20150521054602.GE22904@linux>
-References: <cover.1432091956.git.viresh.kumar@linaro.org>
- <51a2603050f7993643fea9e5dcd2dba7a5a3fe23.1432091956.git.viresh.kumar@linaro.org>
- <555D6CC8.9050201@ti.com> <20150521054602.GE22904@linux>
-Message-ID: <CAL_JsqKhpyLgh5_1jZ_u0OP7=Piw=pgqZdQJ0K4Rm7DQ5ve+gA@mail.gmail.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Fri, 22 May 2015 16:56:04 +0100
+Subject: [PATCH soc] ARM: use ARM_SINGLE_ARMV7M for ARMv7-M platforms
+In-Reply-To: <CALszF6D-3pXHtyVMwhO0JkT-dCSSB98UNDHNN7-LD04Wdgd2cA@mail.gmail.com>
+References: <1432161344-1930-1-git-send-email-stefan@agner.ch>	<15864413.ed8EFg1NLl@wuerfel>
+ <CALszF6D-3pXHtyVMwhO0JkT-dCSSB98UNDHNN7-LD04Wdgd2cA@mail.gmail.com>
+Message-ID: <555F5194.4040309@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 21, 2015 at 12:46 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 21-05-15, 00:27, Nishanth Menon wrote:
->> > +This describes the OPPs belonging to a device. This node can have following
->> > +properties:
-
-[...]
-
->> different angle: How about just target-freq-Hz? just drop the "opp"
->> prefix for properties of an OPP node? No strong feelings here. (some
->> folks did have variations of a few Hz based on clock tree - example with
->> a crystal frequency of 19.2MHz you'd probably get 1001MHz exact, with a
->> 26MHz crystal, you'd get 1000MHz -> ofcourse round-rate is supposed to
->> help with that... but anyways.. why not say we are trying to indicate
->> target frequency? I do recollect during initial days of OPP
->> (pre-dt-adoption days) folks did complain about this - we kinda worked
->> around this with round-rated handling - but we might as well anticipate it.
+On 22/05/15 16:29, Maxime Coquelin wrote:
+> 2015-05-22 16:50 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
+>> [one small request as I have four armv7-m folks on Cc already:
+>>   could one of you try to fix the warning that I get with every
+>>   single build: "/git/arm-soc/arch/arm/kernel/head-nommu.S: Assembler
+>> messages: /git/arm-soc/arch/arm/kernel/head-nommu.S:167: Warning:
+>> Use of r13 as a source register is deprecated when r15 is the
+>> destination register."]
 >
-> Rob suggested opp- prefix and it looks good to me, lets see what
-> others have to say :)
+> Moving r13 to r12 and returning r12 seems to do the job (see below).
+> But I don't know if there is a more elegant way, and if it is also
+> valid for other architectures than armv7-m.
 
-You can decide the color of the bike shed.
+Why not just s/r13/r11/?
 
->
->> Thanks for adding the examples - My customer support team especially
->> will appreciate having such examples ;).
->
-> I can understand that :)
->
->> I agree with Mike[1] here -> why not move clocks and supply to cpu0_opp?
->> "
->> It seems wrong to me that the clock and supply data is owned by the cpu
->> node, and not the opp descriptor. Everything about the opp transition
->> should belong to a provider node. Then the cpu simply needs to consume
->> that via a phandle.
->> "
->>
->> I am not sure if we discussed that point further OR if we kinda got
->> hooked on to the "should it be in kernel" point of debate in V4.
->
-> I did send a reply to that, but no one replied after that. Probably
-> you want to reply on that ?
-
-Clock and regulator bindings describe connections in the h/w. OPPs are
-not a h/w block, but rather properties of the h/w. The connections
-here are to the cpu's.
-
-Rob
+(works for me but I'm only working on single core system)
