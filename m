@@ -1,55 +1,84 @@
-From: lho@apm.com (Loc Ho)
-Date: Fri, 22 May 2015 11:28:44 -0700
-Subject: [PATCH v10 4/5] edac: Add APM X-Gene SoC EDAC driver
-In-Reply-To: <2082687.grA49DxWyE@wuerfel>
-References: <1431991481-25684-1-git-send-email-lho@apm.com>
- <4456746.y9FVaqRogk@wuerfel> <20150522084625.GE23022@pd.tnic>
- <2082687.grA49DxWyE@wuerfel>
-Message-ID: <CAPw-ZTmaRQj740Z58Asrch3decmXA89EN9MdKg-WvWp8ftqB6w@mail.gmail.com>
+From: wangbintian@gmail.com (Brent Wang)
+Date: Sat, 23 May 2015 02:30:34 +0800
+Subject: [PATCH v7 6/7] clk: hi6220: Clock driver support for Hisilicon
+ hi6220 SoC
+In-Reply-To: <555EBCA4.9030303@huawei.com>
+References: <1432117752-7074-1-git-send-email-bintian.wang@huawei.com>
+ <1432117752-7074-2-git-send-email-bintian.wang@huawei.com>
+ <555D09F3.7020506@codeaurora.org> <555D57BB.8080702@huawei.com>
+ <555E1D55.1050907@codeaurora.org> <555EBCA4.9030303@huawei.com>
+Message-ID: <CAAS=xmgHJVThR2hVeMYZjKgJdodEG_hrs09BBA01gOXMSc8Rdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Stephen,
 
->> > > +static int edac_mc_idx;
->> > > +static int edac_mc_active_mask;
->> > > +static int edac_mc_registered_mask;
->> > > +static DEFINE_MUTEX(xgene_edac_mc_lock);
->> >
->> > It would also be best to avoid global variables, but it seems that at
->> > least the edac_mc_idx is needed to work with the EDAC subsystem.
->> > Maybe Boris has an idea for how to avoid it.
+2015-05-22 13:20 GMT+08:00 Bintian <bintian.wang@huawei.com>:
+> Hello Stephen,
+>
+>
+> On 2015/5/22 2:00, Stephen Boyd wrote:
 >>
->> Right, so AFAICT this is used in
+>> On 05/20/15 20:57, Bintian wrote:
+>>>
+>>>
+>>>>
+>>>>>
+>>>>> +
+>>>>> +static void __init hi6220_clk_sys_init(struct device_node *np)
+>>>>> +{
+>>>>> +    struct hisi_clock_data *clk_data;
+>>>>> +
+>>>>> +    clk_data = hisi_clk_init(np, HI6220_SYS_NR_CLKS);
+>>>>> +    if (!clk_data)
+>>>>> +        return;
+>>>>> +
+>>>>> +    hisi_clk_register_gate_sep(hi6220_separated_gate_clks_sys,
+>>>>> +            ARRAY_SIZE(hi6220_separated_gate_clks_sys), clk_data);
+>>>>> +
+>>>>> +    hisi_clk_register_mux(hi6220_mux_clks_sys,
+>>>>> +            ARRAY_SIZE(hi6220_mux_clks_sys), clk_data);
+>>>>> +
+>>>>> +    hi6220_clk_register_divider(hi6220_div_clks_sys,
+>>>>> +            ARRAY_SIZE(hi6220_div_clks_sys), clk_data);
+>>>>> +
+>>>>> +    if (!clk_data_ao)
+>>>>> +        return;
+>>>>> +
+>>>>> +    /* enable high speed clock on UART1 mux */
+>>>>> +    clk_set_parent(clk_data->clk_data.clks[HI6220_UART1_SRC],
+>>>>> +            clk_data_ao->clk_data.clks[HI6220_150M]);
+>>>>
+>>>>
+>>>> Sorry I missed this one earlier. Can we do this clk_set_parent() through
+>>>> assigned-parents instead?
+>>>
+>>> Uart1 has two clock parents in hi6220, and use "clk_tcxo" by default,
+>>> we use uart1 to connect BT in HiKey, and switch to "clk_150m" for high
+>>> speed mode of BT, but pl011 has no code to set clock rate or set clock
+>>> parents operation, so it's a easy way to do that here.
 >>
->>         edac_mc_alloc(edac_mc_idx++
 >>
->> and basically we're supplying the memory controller numbers in the order
->> we're calling xgene_edac_mc_add(). Perhaps we need to make the memory
->> controller numbering explicit with DT...
->
-> I see now that the number is also used in xgene_edac_mc_is_active()
-> as an index for the MCBADDRMR register, which seems very fragile,
-> as it relies on the DT nodes getting seen in the same order by the
-> driver that the hardware blocks are used in.
->
-> Better add an explicit DT property for the index that is defined
-> to be the same as MCBADDRMR bits, e.g.
->
->                        edacmc at 7e800000 {
->                              compatible = "apm,xgene-edac-mc";
->                              reg = <0x0 0x7e800000 0x0 0x1000>;
->                               memory-controller = <0>;
->                        };
->
-> or use a reference to the normal memory controller DT node
-> outside of the EDAC, and put a number in that one.
->
-> Is there a strict 1:1 relation between the DIMM slot numbering
-> on the board and the memory controller number within the EDAC
-> registers?
+>> Is pl011 the uart device? Does it have a node in DT somewhere? If it
+>> does, then we could put the assigned-parents properties in that node so
+>> that when the pl011 probes the uart1 clock has its parent set to
+>> clk_150m. See the "Assigned clock parents and rates" section of
+>> Documentation/devicetree/bindings/clock/clock-bindings.txt.
+>>
+> I will verify this.
+Currently the "assigned-clock*" doesn't work for pl011 UART device
+node, maybe we will
+do some fix for its driver later or other modules.
 
-Yes... The status active bit position is strictly tie to an
-controller. Like the suggestion with memory-controller property.
+How about keep the "clk_set_parent" in this patch now?
 
--Loc
+Thanks,
+
+Bintian
+>
+> If it is OK, I will remove "clk_set_parent" from this patch.
+>
+> Thanks,
+>
+> Bintian
+>
