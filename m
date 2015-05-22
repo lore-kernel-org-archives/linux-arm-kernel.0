@@ -1,61 +1,42 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 22 May 2015 13:25:44 +0100
-Subject: [PATCH] spi: omap2-mcspi: Fix native cs with new set_cs
-In-Reply-To: <20150521234832.GA1827@deathray>
-References: <1431452337-19280-1-git-send-email-mwelling@ieee.org>
- <20150512191758.GX3066@sirena.org.uk>
- <20150521020709.GA14258@deathray>
- <20150521101857.GR21577@sirena.org.uk>
- <20150521210411.GA5406@deathray>
- <20150521211638.GN21577@sirena.org.uk>
- <20150521234832.GA1827@deathray>
-Message-ID: <20150522122544.GL21391@sirena.org.uk>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Fri, 22 May 2015 15:09:30 +0200
+Subject: [PATCH v8 14/16] ARM: dts: Introduce STM32F429 MCU
+In-Reply-To: <CALszF6CQ1_HQXJ8=vgytvVo2t4_ue5_nsE06HPyHMzSLrntqKg@mail.gmail.com>
+References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>	<2282066.NWoIT9ZyLc@wuerfel>	<CALszF6CaO_yuNiSDuDV+4d2NRe_+32j=zcSE1HPhB1UH59cW9w@mail.gmail.com>	<13641152.Yt4ZI3oT6L@wuerfel>	<CALszF6CK5ezrO6D=4zr6zEPC7VanzbQjnZJwKOZekEZ5L4D-Dg@mail.gmail.com>	<1432285588.3929.28.camel@pengutronix.de>	<20150522091822.GF8557@lukather>	<1432289231.3929.60.camel@pengutronix.de>
+ <CALszF6CQ1_HQXJ8=vgytvVo2t4_ue5_nsE06HPyHMzSLrntqKg@mail.gmail.com>
+Message-ID: <555F2A8A.5020205@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 21, 2015 at 06:48:33PM -0500, Michael Welling wrote:
-
-> So after reverting this patch I found there is a issue in that it is difficult
-> to determine when a transfer is complete to properly drive the chipselect from
-> within the transfer_one function.
-
-Is unprepare_message() a suitable place here?  I've got a feeling the
-answer is no...
-
-> Then I figured that we could handle the case when GPIOs are being used with
-> some conditional calls to omap2_mcspi_set_cs in the omap2_mcspi_work_one
-> function.
+Am 22.05.2015 um 14:32 schrieb Maxime Coquelin:
+> 2015-05-22 12:07 GMT+02:00 Philipp Zabel <p.zabel@pengutronix.de>:
+>> The STM32F427xx/STM32F429xx manual, Table 13. "STM32F427xx and
+>> STM32F429xx register boundary addresses" contains this entry:
+>>     Bus    Boundary address       Peripheral
+>>     AHB1   0x40023800-0x400238bf  RCC
+>>
+>> And that's how I'd expect it to be described by the device tree:
+>>
+>>     rcc: rcc at 40023800 {
+>>         compatible = "st,stm32-rcc";
+>>         reg = <0x40023800 0xc0>;
+>>     };
+>>
 > 
-> Near the beginning of the function I added:
-> 	if (gpio_is_valid(spi->cs_gpio))
-> 		omap2_mcspi_set_cs(spi, 0);
-> 
-> Near the end of the function I added:
-> 	if (gpio_is_valid(spi->cs_gpio))
-> 		omap2_mcspi_set_cs(spi, 1);
-> 
-> This makes GPIO chip select support work while leaving the native working
-> as previous.
-> 
-> Is this solution acceptible?
+> Doing that, since this register bank contains both reset and clock
+> registers, the reset device cannot get the IO resource at probe time
+> because the clock driver has already reserved it.
+> Daniel, who has started to work on the clock driver is facing this issue.
+> This is why I proposed this binding for "reg" property.
 
-I think that's probably OK as well, it's not ideal though (and risky if
-the chip select is routed somewhere...).  
+As you should know, I did have an RCC clk driver, and there is no such
+issue. The two drivers use different mechanisms for initialization. And
+I'm pretty sure that I've already remarked that on the list, too.
 
-> In the process of reviewing the changes I found a few other things that
-> should be changed as well.
+Regards,
+Andreas
 
-Please send fixes for these as separate patches (ideally without any
-dependency on your new work so we can send them to Linus as fixes).
-
-> Here you will see a delay that is already handled by the core spi driver:
-> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/drivers/spi/spi-omap2-mcspi.c#n1166
-
-I can't actually see that since I have no internet access right now!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150522/9b98b8f3/attachment.sig>
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Dilip Upmanyu, Graham Norton; HRB
+21284 (AG N?rnberg)
