@@ -1,53 +1,53 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 22 May 2015 09:27:38 +0200
-Subject: [PATCH soc] ARM: use =?UTF-8?Q?ARM=5FSINGLE=5FARMV=37M=20for?=
- =?UTF-8?Q?=20ARMv=37-M=20platforms?=
-In-Reply-To: <20150521190400.GD24769@pengutronix.de>
-References: <1432161344-1930-1-git-send-email-stefan@agner.ch>
- <CAGhQ9VxkGh_V0ctb1U7Y5UZ36qa-7ZPPW2xsg07m4SHhXmXeJQ@mail.gmail.com>
- <20150521190400.GD24769@pengutronix.de>
-Message-ID: <1890f941dfa59138442da3e80a6b492a@agner.ch>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 22 May 2015 09:36:32 +0200
+Subject: [PATCH] ARM: v7 setup function should invalidate L1 cache
+In-Reply-To: <E1Yuk8W-0001tC-IK@rmk-PC.arm.linux.org.uk>
+References: <E1Yuk8W-0001tC-IK@rmk-PC.arm.linux.org.uk>
+Message-ID: <CAMuHMdX=T3CsLTT95H_07Si6Kd8SRraBfxADpn+VtAF4GmZ=mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-05-21 21:04, Uwe Kleine-K?nig wrote:
-> On Thu, May 21, 2015 at 07:00:02PM +0200, Joachim Eastwood wrote:
->> Hi Stefan,
->>
->> On 21 May 2015 at 00:35, Stefan Agner <stefan@agner.ch> wrote:
->> > Use the new config symbol ARM_SINGLE_ARMV7M which groups config
->> > symbols used by modern ARMv7-M platforms. This allows supporting
->> > multiple ARMv7-M platforms in one kernel image. However, a common
->> > kernel image requires the combined platforms to share the same
->> > main memory layout to be bootable.
->> >
->> > Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->> > Signed-off-by: Stefan Agner <stefan@agner.ch>
->>
->> You should have your sign-off on the top and not Uwe's ack.
-> I don't agree. IMHO the most sensible thing is to sign off (i.e. put
-> your sob line below) all the things that come from you. So it's
-> 
-> 	Signed-off-by: author
-> 	Acked-by: someone
-> 	Signed-off-by: forwarder
-> 	Signed-off-by: maintainer
-> 
-> if someone already acked before forwarder sent out the mail. If the ack
-> is between forwarder and maintainer it was the latter who added the Ack.
-> I'm not sure it's formalized this way, but like that it makes most sense
-> to me and I seem to recall having read somewhere that the footers are
-> supposed to tell something about the order of people involved.
-> 
-> So Stefan did it exactly as i would have done it.
+On Tue, May 19, 2015 at 6:12 PM, Russell King
+<rmk+kernel@arm.linux.org.uk> wrote:
+> All ARMv5 and older CPUs invalidate their caches in the early assembly
+> setup function, prior to enabling the MMU.  This is because the L1
+> cache should not contain any data relevant to the execution of the
+> kernel at this point; all data should have been flushed out to memory.
+>
+> This requirement should also be true for ARMv6 and ARMv7 CPUs - indeed,
+> these typically do not search their caches when caching is disabled (as
+> it needs to be when the MMU is disabled) so this change should be safe.
+>
+> ARMv7 allows there to be CPUs which search their caches while caching is
+> disabled, and it's permitted that the cache is uninitialised at boot;
+> for these, the architecture reference manual requires that an
+> implementation specific code sequence is used immediately after reset
+> to ensure that the cache is placed into a sane state.  Such
+> functionality is definitely outside the remit of the Linux kernel, and
+> must be done by the SoC's firmware before _any_ CPU gets to the Linux
+> kernel.
+>
+> Changing the data cache clean+invalidate to a mere invalidate allows us
+> to get rid of a lot of platform specific hacks around this issue for
+> their secondary CPU bringup paths - some of which were buggy.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Hm, never give much thoughts about that order, its quite development
-process driven here: I use git format-patch with --signoff. When I send
-out v1, and get a Ack or Review, I add that to my commit. Hence, when I
-send v2 of the patch, my sob line ends up below the Ack (that is what
-happened in that case). If its the last revision, and the patch gets
-picked up, the forwarder/maintainer will add the Ack and then it would
-land after my sob...
+For various shmobile:
+  - sh73a0/kzm9g
+  - r8a7740/armadillo
+  - r8a73a4/ape6evm
+  - r8a7791/koelsch
+
+Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Gr{oetje,eeting}s,
+
+                        Geert
 
 --
-Stefan
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
