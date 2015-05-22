@@ -1,87 +1,42 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 22 May 2015 13:06:37 -0500
-Subject: [PATCH v2 2/5] phy: qcom: Add Qualcomm PCIe PHY
-In-Reply-To: <555F5885.70105@mm-sol.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 22 May 2015 11:22:52 -0700
+Subject: [PATCH v2 5/5] ARM: qcom: Add Qualcomm APQ8084 SoC
+In-Reply-To: <1430743338-10441-6-git-send-email-svarbanov@mm-sol.com>
 References: <1430743338-10441-1-git-send-email-svarbanov@mm-sol.com>
- <1430743338-10441-3-git-send-email-svarbanov@mm-sol.com>
- <554783CD.50708@ti.com>
- <55478F1A.3000401@mm-sol.com> <20150519224143.GS31666@google.com>
- <555C8743.6020708@ti.com>
- <CAErSpo42N8YHWjrqUCj0ubqZLt4w-3g=ykPdR8ZMmWaW1GjWDw@mail.gmail.com>
- <555F5885.70105@mm-sol.com>
-Message-ID: <CAErSpo6Cv+XOjA+ddds4i4YXCC4f=igR4MTcRwFO5eWLg-=LVA@mail.gmail.com>
+ <1430743338-10441-6-git-send-email-svarbanov@mm-sol.com>
+Message-ID: <555F73FC.1030102@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Jingoo, Pratyush]
-
-On Fri, May 22, 2015 at 11:25 AM, Stanimir Varbanov
-<svarbanov@mm-sol.com> wrote:
-> On 05/20/2015 04:23 PM, Bjorn Helgaas wrote:
->> On Wed, May 20, 2015 at 8:08 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>> Hi Bjorn,
->>>
->>>
->>> On Wednesday 20 May 2015 04:11 AM, Bjorn Helgaas wrote:
->>>>
->>>> On Mon, May 04, 2015 at 06:24:10PM +0300, Stanimir Varbanov wrote:
->>>>>
->>>>> On 05/04/2015 05:35 PM, Kishon Vijay Abraham I wrote:
->>>>>>
->>>>>> Hi,
->>>>>>
->>>>>> On Monday 04 May 2015 06:12 PM, Stanimir Varbanov wrote:
->>>>>>>
->>>>>>> Add a PCIe PHY driver used by PCIe host controller driver
->>>>>>> on Qualcomm SoCs like Snapdragon 805.
->>>>>>>
->>>>>>> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
->>>>>>> ---
->>>>>>>    drivers/phy/Kconfig         |    9 ++
->>>>>>>    drivers/phy/Makefile        |    1 +
->>>>>>>    drivers/phy/phy-qcom-pcie.c |  291
->>>>>>> +++++++++++++++++++++++++++++++++++++++++++
->>>>>>
->>>>>>
->>>>>> Why do you need a new PHY driver for this? Why not use the existing QCOM
->>>>>> PHY driver. I can see the registers used here in
->>>>>> phy-qcom-ufs-qmp-14nm.h?
->>>>>
->>>>>
->>>>> I agree that on first glance there are similarities, but I'm not sure
->>>>> does the PHYs are the same IP blocks. Or at least they are different
->>>>> revisions which have too many differences. So trying to combine them
->>>>> will lead to more code than now.
->>>>>
->>>>> Either way I will try to understand how many the differences are.
->>>>
->>>>
->>>> Ping, where are we with this?  Should I wait for something else, or are
->>>> you
->>>> convinced there's enough difference to warrant a new PHY driver, Kishon?
->>>
->>>
->>> I'd like to wait to see if Stanimir can use existing driver instead of
->>> creating a new driver.
->>
->> OK, I'm waiting for a v3 with either tweaks to the QCOM PHY driver, or
->> stronger justification as to why that's impossible.  It's hard to
->> quantify statements like "there are similarities, but there are too
->> many differences," so you might have to actually attempt a patch for
->> the QCOM code and we can see how ugly that would turn out to be.
+On 05/04/15 05:42, Stanimir Varbanov wrote:
+> This adds Snapdragon 805 ARM-based SoC as multiplatform
+> compatible platform.
 >
-> Kishon,
+> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
+> ---
+>  arch/arm/mach-qcom/Kconfig |    7 +++++++
+>  1 files changed, 7 insertions(+), 0 deletions(-)
 >
-> I'm still checking the differences, sorry for the delay.
+> diff --git a/arch/arm/mach-qcom/Kconfig b/arch/arm/mach-qcom/Kconfig
+> index 2256cd1..9cfebee 100644
+> --- a/arch/arm/mach-qcom/Kconfig
+> +++ b/arch/arm/mach-qcom/Kconfig
+> @@ -22,4 +22,11 @@ config ARCH_MSM8974
+>  	bool "Enable support for MSM8974"
+>  	select HAVE_ARM_ARCH_TIMER
+>  
+> +config ARCH_APQ8084
+> +	bool "Enable support for APQ8084"
+> +	select HAVE_ARM_ARCH_TIMER
+> +	select MIGHT_HAVE_PCI
+> +	select PCI_DOMAINS if PCI
+> +	select PCI_MSI if PCI
+> +
 >
-> Bjorn, is the pcie driver looks good enough to be merged?
 
-I haven't looked at that (I was waiting until I could deal with the
-whole series).  But it sounds like it would be useful to merge patches
-3-5 by themselves?  I'll take a look at those.
+Can we move these PCI selects up to ARCH_QCOM directly? Let's try to
+avoid adding more SoC specific options under ARCH_QCOM.
 
-It would be good to get Arnd and Rob to take a look, especially at the DT parts.
-
-And Jingoo and Pratyush since you use the DesignWare core.
-
-Bjorn
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
