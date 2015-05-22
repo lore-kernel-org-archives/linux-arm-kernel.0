@@ -1,43 +1,41 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 22 May 2015 21:24:40 +0200
-Subject: [PATCH v2 2/2] ARM: dts: sun7i: Add uart4 support for BananaPro,
- disable uart2
-In-Reply-To: <1432305184-8589-2-git-send-email-hdegoede@redhat.com>
-References: <1432305184-8589-1-git-send-email-hdegoede@redhat.com>
- <1432305184-8589-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150522192440.GH8557@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 22 May 2015 21:26:14 +0200
+Subject: [PATCH v2 5/5] ARM: qcom: Add Qualcomm APQ8084 SoC
+In-Reply-To: <555F73FC.1030102@codeaurora.org>
+References: <1430743338-10441-1-git-send-email-svarbanov@mm-sol.com>
+ <1430743338-10441-6-git-send-email-svarbanov@mm-sol.com>
+ <555F73FC.1030102@codeaurora.org>
+Message-ID: <2504338.ikNh5XCYe2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 22, 2015 at 04:33:04PM +0200, Hans de Goede wrote:
-> From: Michael Ring <mail@michael-ring.org>
+On Friday 22 May 2015 11:22:52 Stephen Boyd wrote:
+> > diff --git a/arch/arm/mach-qcom/Kconfig b/arch/arm/mach-qcom/Kconfig
+> > index 2256cd1..9cfebee 100644
+> > --- a/arch/arm/mach-qcom/Kconfig
+> > +++ b/arch/arm/mach-qcom/Kconfig
+> > @@ -22,4 +22,11 @@ config ARCH_MSM8974
+> >       bool "Enable support for MSM8974"
+> >       select HAVE_ARM_ARCH_TIMER
+> >  
+> > +config ARCH_APQ8084
+> > +     bool "Enable support for APQ8084"
+> > +     select HAVE_ARM_ARCH_TIMER
+> > +     select MIGHT_HAVE_PCI
+> > +     select PCI_DOMAINS if PCI
+> > +     select PCI_MSI if PCI
+> > +
+> >
 > 
-> The BananaPro uses uart4 for the default rx/tx pins on the 40 pins connector,
-> so enable uart4.
-> 
-> Uart2 is also available at the bananapro io-pins, but like on the bananapi
-> the primary function of the pins is to act as gpios, see:
-> http://forum.lemaker.org/forum.php?mod=viewthread&tid=10852
-> 
-> Remove the uart2 node, people who want to use uart2 can do so with a
-> devicetree-overlay.
-> 
-> Signed-off-by: Michael Ring <mail@michael-ring.org>
-> [hdegoede at redhat.com: Remove uart2 node]
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Can we move these PCI selects up to ARCH_QCOM directly? Let's try to
+> avoid adding more SoC specific options under ARCH_QCOM.
 
-Applied both, thanks!
+I thought we already select 'MIGHT_HAVE_PCI' and 'PCI_DOMAINS' for
+all ARMv7 platforms. If not, we probably should.
 
-Maxime
+For PCI_MSI, I would leave that as user-selectable, there is no
+need to enforce that as far as I can tell. If the driver needs
+PCI_MSI support at compile-time, a dependency for that driver
+would make sense.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150522/93eda0c6/attachment.sig>
+	Arnd
