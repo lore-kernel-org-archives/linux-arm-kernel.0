@@ -1,42 +1,35 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 22 May 2015 08:17:21 -0600
-Subject: [PATCH] coresight: etb: Remove simple announcement message
-In-Reply-To: <1432122101-2233-1-git-send-email-broonie@kernel.org>
-References: <1432122101-2233-1-git-send-email-broonie@kernel.org>
-Message-ID: <CANLsYkyW44THumc5ebWnX-sa5zG7X0dv1_UEqUp9Av8c5PDegg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 22 May 2015 16:22:16 +0200
+Subject: [PATCH] video: omap/h3: fix tps65010 dependency
+Message-ID: <4416278.oVFvT3Eyqf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 May 2015 at 05:41, Mark Brown <broonie@kernel.org> wrote:
-> It's generally preferred that drivers not print initialisation messages on
-> startup that don't contain information gained at runtime such as specific
-> hardware revision information. This provides a small speedup on systems
-> with serial consoles and keeps the boot less noisy.
->
-> Signed-off-by: Mark Brown <broonie@kernel.org>
-> ---
->  drivers/hwtracing/coresight/coresight-etb10.c | 1 -
->  1 file changed, 1 deletion(-)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-> index 77d0f9c1118d..e34e34b8edfb 100644
-> --- a/drivers/hwtracing/coresight/coresight-etb10.c
-> +++ b/drivers/hwtracing/coresight/coresight-etb10.c
-> @@ -481,7 +481,6 @@ static int etb_probe(struct amba_device *adev, const struct amba_id *id)
->         if (ret)
->                 goto err_misc_register;
->
-> -       dev_info(dev, "ETB initialized\n");
+The h3 LCD driver fails to link when tps65010 is configured
+as a loadable module:
 
-Linus Walleij started doing something interesting with the initial
-printouts [1] and I think this is a better option than not printing
-anything at all.
+drivers/built-in.o: In function `h3_panel_disable':
+debugfs.c:(.text+0x206ac): undefined reference to `tps65010_set_gpio_out_value'
+debugfs.c:(.text+0x206cc): undefined reference to `tps65010_set_gpio_out_value'
+drivers/built-in.o: In function `h3_panel_enable':
+debugfs.c:(.text+0x206e0): undefined reference to `tps65010_set_gpio_out_value'
+debugfs.c:(.text+0x20704): undefined reference to `tps65010_set_gpio_out_value'
 
-[1]. https://git.linaro.org/kernel/coresight.git/commitdiff/509133a2715367c2ec9f8026ff55a028d04cdae0?hp=0b81f7e469b846b1b56d19d4f8f1f476943856f6
+This clarifies the dependency so we can only select it if
+the dependnecy is built-in.
 
->         return 0;
->
->  err_misc_register:
-> --
-> 2.1.4
->
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/drivers/video/fbdev/omap/Kconfig b/drivers/video/fbdev/omap/Kconfig
+index 18c4cb0d5690..29d250da8a3e 100644
+--- a/drivers/video/fbdev/omap/Kconfig
++++ b/drivers/video/fbdev/omap/Kconfig
+@@ -42,7 +42,7 @@ config FB_OMAP_LCD_MIPID
+ config FB_OMAP_LCD_H3
+ 	bool "TPS65010 LCD controller on OMAP-H3"
+ 	depends on MACH_OMAP_H3
+-	depends on TPS65010
++	depends on TPS65010=y
+ 	default y
+ 	help
+ 	  Say Y here if you want to have support for the LCD on the
