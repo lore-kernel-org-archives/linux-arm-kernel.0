@@ -1,67 +1,48 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Fri, 22 May 2015 15:54:56 +0200
-Subject: [alsa-devel] [PATCH 10/13] sound/core: add DRM ELD helper
-In-Reply-To: <20150522135331.GG2067@n2100.arm.linux.org.uk>
-References: <20150509102501.GO2067@n2100.arm.linux.org.uk>
- <E1Yr1xy-0006l8-Ft@rmk-PC.arm.linux.org.uk>
- <20150522122009.GK21391@sirena.org.uk>
- <20150522131534.GF2067@n2100.arm.linux.org.uk>
- <s5hzj4weo35.wl-tiwai@suse.de>
- <20150522135331.GG2067@n2100.arm.linux.org.uk>
-Message-ID: <s5hsiaoemz3.wl-tiwai@suse.de>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 22 May 2015 21:55:42 +0800
+Subject: [Patch v3 6/7] x86/PCI/ACPI: Use common interface to support
+ PCI host bridge
+In-Reply-To: <1431593803-5213-7-git-send-email-jiang.liu@linux.intel.com>
+References: <1431593803-5213-1-git-send-email-jiang.liu@linux.intel.com>
+ <1431593803-5213-7-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <555F355E.7060706@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At Fri, 22 May 2015 14:53:31 +0100,
-Russell King - ARM Linux wrote:
-> 
-> On Fri, May 22, 2015 at 03:30:54PM +0200, Takashi Iwai wrote:
-> > At Fri, 22 May 2015 14:15:35 +0100,
-> > Russell King - ARM Linux wrote:
-> > > 
-> > > On Fri, May 22, 2015 at 01:20:09PM +0100, Mark Brown wrote:
-> > > > On Sat, May 09, 2015 at 11:26:42AM +0100, Russell King wrote:
-> > > > > Add a helper for the EDID like data structure, which is typically passed
-> > > > > from a HDMI adapter to its associated audio driver.  This informs the
-> > > > > audio driver of the capabilities of the attached HDMI sink.
-> > > > 
-> > > > As far as I can tell people are fairly happy with the implementation
-> > > > here and unless I'm missing something are definitely happy with the
-> > > > interface.  If that's the case can we get this into -next?  There's a
-> > > > lot of interest in HDMI right now (which is great) and this would be
-> > > > helpful for that, it seems like even if there are issues with the
-> > > > implementation it would be worth merging as is so we can start adding
-> > > > users and then do any improvements to the interface in parallel.
-> > > > 
-> > > > From an interface point of view:
-> > > > 
-> > > > Reviewed-by: Mark Brown <broonie@kernel.org>
-> > > 
-> > > I'd be more than happy if Takashi Iwai wants to take them - I'm not
-> > > planning on the audio driver itself being merged just yet as we still
-> > > need to properly hammer out the differences between the AHB audio (for
-> > > iMX6) and I2S audio (for Rockchip) for this device.
-> > 
-> > Sorry, I've been on vacation in the last two weeks, so slowly
-> > digesting all backlogs now.
-> > 
-> > > Alternatively, I could move these two patches to the beginning of my
-> > > series, and merge that point into my for-next and/or publish it as a
-> > > separate sub-branch... whatever people want, just let me know.
-> > 
-> > I'm fine to take the sound part.  It's only patches 10 and 11, right?
-> > Then I can provide a branch that can be merged for the rest drm
-> > stuff.
-> 
-> Yep, just patches 10 and 11.  If possible, please base these patches on
-> v4.1-rc1, thanks.
+On 2015?05?14? 16:56, Jiang Liu wrote:
+> Use common interface to simplify ACPI PCI host bridge implementation.
+>
+> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+> ---
+>   arch/x86/pci/acpi.c |  292 +++++++++++++++------------------------------------
+>   1 file changed, 85 insertions(+), 207 deletions(-)
+>
+[...]
+> -static void release_pci_root_info(struct pci_host_bridge *bridge)
+> +static void pci_acpi_root_release_info(struct acpi_pci_root_info *ci)
+>   {
+> -	struct resource *res;
+> -	struct resource_entry *entry;
+> -	struct pci_root_info *info = bridge->release_data;
+> -
+> -	resource_list_for_each_entry(entry, &bridge->windows) {
+> -		res = entry->res;
+> -		if (res->parent &&
+> -		    (res->flags & (IORESOURCE_MEM | IORESOURCE_IO)))
+> -			release_resource(res);
+> -	}
+> -
+> -	teardown_mcfg_map(info);
+> -	kfree(info);
+> +	teardown_mcfg_map(ci);
+> +	kfree(ci);
 
-I applied them on top of -rc4, I suppose it's OK?
+Implicit pointer cast? I think add a comment here that %p of ci
+is same as %p of info would be helpful for review and easy understood.
 
-Now pushed as topic/hdmi branch of sound git tree.
-Let me know if anything else needed.
+other than that,
 
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-thanks,
-
-Takashi
+Thanks
+Hanjun
