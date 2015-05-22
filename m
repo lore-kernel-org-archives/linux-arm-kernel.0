@@ -1,38 +1,33 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 22 May 2015 11:04:49 -0500
-Subject: [PATCH V4 1/3] OPP: Redefine bindings to overcome shortcomings
-In-Reply-To: <20150522140457.GB7730@linux>
-References: <cover.1430394884.git.viresh.kumar@linaro.org>
- <d225e73f183e01fa0b71e4b9248b6a19a3f7d697.1430394884.git.viresh.kumar@linaro.org>
- <20150512214224.16410.15922@quantum> <20150513085528.GA6994@linux>
- <555D750F.80304@ti.com> <20150522140457.GB7730@linux>
-Message-ID: <CAL_JsqK-P=mMsgH27==Mjs2_Ji=uLcYDrecnT7rsDVYk62zmpA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 22 May 2015 17:12:59 +0100
+Subject: [alsa-devel] [PATCH 10/13] sound/core: add DRM ELD helper
+In-Reply-To: <s5hmw0wemhp.wl-tiwai@suse.de>
+References: <20150509102501.GO2067@n2100.arm.linux.org.uk>
+ <E1Yr1xy-0006l8-Ft@rmk-PC.arm.linux.org.uk>
+ <20150522122009.GK21391@sirena.org.uk>
+ <20150522131534.GF2067@n2100.arm.linux.org.uk>
+ <s5hzj4weo35.wl-tiwai@suse.de>
+ <20150522135331.GG2067@n2100.arm.linux.org.uk>
+ <s5hsiaoemz3.wl-tiwai@suse.de>
+ <20150522140009.GH2067@n2100.arm.linux.org.uk>
+ <s5hoalcemmy.wl-tiwai@suse.de> <s5hmw0wemhp.wl-tiwai@suse.de>
+Message-ID: <20150522161259.GK2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 22, 2015 at 9:04 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 21-05-15, 01:02, Nishanth Menon wrote:
->> This argues that clock is an input to the cpu, this is not in-correct,
->> but, it could also be argued that OPP tables are clock dependent.
+On Fri, May 22, 2015 at 04:05:22PM +0200, Takashi Iwai wrote:
+> At Fri, 22 May 2015 16:02:13 +0200,
+> Takashi Iwai wrote:
+> > OK, if so, then I rebase on top of -rc1.  The branch isn't merged yet,
+> > so no big problem.
+> 
+> Now the rebased branch is pushed.
+> 
+> I also merged this branch now to for-next branch, so that it'll be
+> tested through linux-next.
 
-What piece of h/w is the clock an input to then?
+Thanks!
 
->> For example, with multiple clock source options that a device might
->> choose to select from internally(by some means.. lets not just restrict
->> ourselves to just CPUs here for a moment), the tables might be
->> different. We can always debate that this then is the responsibility of
->> the driver handling the description for that device and we might want
->> possibility of vice versa as well - same OPP table used by different
->> clock source selections as well.
->
-> @Rob: Any inputs ?
-
-If you are going to describe this clock mux in DT, then that mux
-should be part of the h/w block that controls it. You could always add
-entries that describe what parent clock must be used for a given OPP,
-but that is a new binding and not part of the existing clock binding.
-
-If things get too complicated, then don't try to describe this in DT.
-That is always an option.
-
-Rob
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
