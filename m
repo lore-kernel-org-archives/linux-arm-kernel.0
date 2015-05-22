@@ -1,380 +1,111 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Fri, 22 May 2015 15:45:30 -0500
-Subject: [PATCH v4 4/4] remoteproc/wkup_m3: add a remoteproc driver for TI
- Wakeup M3
-In-Reply-To: <1432327530-48032-1-git-send-email-d-gerlach@ti.com>
-References: <1432327530-48032-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <1432327530-48032-5-git-send-email-d-gerlach@ti.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Fri, 22 May 2015 23:03:31 +0200
+Subject: [PATCH v9 0/5] Add support to STMicroelectronics STM32 family
+Message-ID: <1432328616-16964-1-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a remoteproc driver to load the firmware and boot a small
-Wakeup M3 processor present on TI AM33xx and AM43xx SoCs. This
-Wakeup M3 remote processor is an integrated Cortex M3 that allows
-the SoC to enter the lowest possible power state by taking control
-from the MPU after it has gone into its own low power state and
-shutting off any additional peripherals.
+This ninth round counts less patches as some have already been applied,
+and the reset driver will be part of another series because it will
+introduce a generic reset driver to be used by several SoCs (sunxi, socfpga).
+Main change in remaining patches is the rework of the STM32 clocksource 
+Kconfig entry.
 
-The Wakeup M3 processor has two internal memory regions - 16 kB of
-unified instruction memory called UMEM used to store executable
-code, and 8 kB of data memory called DMEM used for all data sections.
-The Wakeup M3 processor executes its code entirely from within the
-UMEM and uses the DMEM for any data. It does not use any external
-memory or any other external resources. The device address view has
-the UMEM at address 0x0 and DMEM at address 0x80000, and these are
-computed automatically within the driver based on relative address
-calculation from the corresponding device tree IOMEM resources.
-These device addresses are used to aid the core remoteproc ELF
-loader code to properly translate and load the firmware segments
-through the .rproc_da_to_va ops.
+STM32 MCUs are Cortex-M CPU, used in various applications (consumer
+electronics, industrial applications, hobbyists...).
+Datasheets, user and programming manuals are publicly available on
+STMicroelectronics website.
 
-Signed-off-by: Suman Anna <s-anna@ti.com>
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
-v3->v4: Added explanation of memory management and regions in the
-	changelog, added a few additional comments to explain use
-	of __force and memory region probe order.
+Changes since v8:
+-----------------
+ - Rework clocksource driver Kconfig entry.
+ - Remove reset driver from the series.
 
- drivers/remoteproc/Kconfig            |  13 ++
- drivers/remoteproc/Makefile           |   1 +
- drivers/remoteproc/wkup_m3_rproc.c    | 257 ++++++++++++++++++++++++++++++++++
- include/linux/platform_data/wkup_m3.h |  30 ++++
- 4 files changed, 301 insertions(+)
- create mode 100644 drivers/remoteproc/wkup_m3_rproc.c
- create mode 100644 include/linux/platform_data/wkup_m3.h
+Changes since v7:
+-----------------
+ - Add DT-bindings header file for RCC IP (Daniel)
+ - Fix uninitialized variables in serial driver
+ - Enable CONFIG_NO_HZ in stm32_defconfig
 
-diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
-index 5e343ba..28c711f 100644
---- a/drivers/remoteproc/Kconfig
-+++ b/drivers/remoteproc/Kconfig
-@@ -41,6 +41,19 @@ config STE_MODEM_RPROC
- 	  This can be either built-in or a loadable module.
- 	  If unsure say N.
- 
-+config WKUP_M3_RPROC
-+	tristate "AMx3xx Wakeup M3 remoteproc support"
-+	depends on SOC_AM33XX || SOC_AM43XX
-+	select REMOTEPROC
-+	help
-+	  Say y here to support Wakeup M3 remote processor on TI AM33xx
-+	  and AM43xx family of SoCs.
-+
-+	  Required for Suspend-to-RAM on AM33xx and AM43xx SoCs. Also needed
-+	  for deep CPUIdle states on AM33xx SoCs. Allows for loading of the
-+	  firmware onto these remote processors.
-+	  If unsure say N.
-+
- config DA8XX_REMOTEPROC
- 	tristate "DA8xx/OMAP-L13x remoteproc support"
- 	depends on ARCH_DAVINCI_DA8XX
-diff --git a/drivers/remoteproc/Makefile b/drivers/remoteproc/Makefile
-index ac2ff75..81b04d1 100644
---- a/drivers/remoteproc/Makefile
-+++ b/drivers/remoteproc/Makefile
-@@ -9,4 +9,5 @@ remoteproc-y				+= remoteproc_virtio.o
- remoteproc-y				+= remoteproc_elf_loader.o
- obj-$(CONFIG_OMAP_REMOTEPROC)		+= omap_remoteproc.o
- obj-$(CONFIG_STE_MODEM_RPROC)	 	+= ste_modem_rproc.o
-+obj-$(CONFIG_WKUP_M3_RPROC)		+= wkup_m3_rproc.o
- obj-$(CONFIG_DA8XX_REMOTEPROC)		+= da8xx_remoteproc.o
-diff --git a/drivers/remoteproc/wkup_m3_rproc.c b/drivers/remoteproc/wkup_m3_rproc.c
-new file mode 100644
-index 0000000..edf8181
---- /dev/null
-+++ b/drivers/remoteproc/wkup_m3_rproc.c
-@@ -0,0 +1,257 @@
-+/*
-+ * TI AMx3 Wakeup M3 Remote Processor driver
-+ *
-+ * Copyright (C) 2014-2015 Texas Instruments, Inc.
-+ *
-+ * Dave Gerlach <d-gerlach@ti.com>
-+ * Suman Anna <s-anna@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/err.h>
-+#include <linux/interrupt.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of_device.h>
-+#include <linux/of_address.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm_runtime.h>
-+#include <linux/remoteproc.h>
-+
-+#include <linux/platform_data/wkup_m3.h>
-+
-+#include "remoteproc_internal.h"
-+
-+#define WKUPM3_MEM_MAX	2
-+
-+/**
-+ * struct wkup_m3_mem - WkupM3 internal memory structure
-+ * @cpu_addr: MPU virtual address of the memory region
-+ * @bus_addr: Bus address used to access the memory region
-+ * @dev_addr: Device address from Wakeup M3 view
-+ * @size: Size of the memory region
-+ */
-+struct wkup_m3_mem {
-+	void __iomem *cpu_addr;
-+	phys_addr_t bus_addr;
-+	u32 dev_addr;
-+	size_t size;
-+};
-+
-+/**
-+ * struct wkup_m3_rproc - WkupM3 remote processor state
-+ * @rproc: rproc handle
-+ * @pdev: pointer to platform device
-+ * @mem: WkupM3 memory information
-+ */
-+struct wkup_m3_rproc {
-+	struct rproc *rproc;
-+	struct platform_device *pdev;
-+	struct wkup_m3_mem mem[WKUPM3_MEM_MAX];
-+};
-+
-+static int wkup_m3_rproc_start(struct rproc *rproc)
-+{
-+	struct wkup_m3_rproc *wkupm3 = rproc->priv;
-+	struct platform_device *pdev = wkupm3->pdev;
-+	struct device *dev = &pdev->dev;
-+	struct wkup_m3_platform_data *pdata = dev_get_platdata(dev);
-+
-+	if (pdata->deassert_reset(pdev, pdata->reset_name)) {
-+		dev_err(dev, "Unable to reset wkup_m3!\n");
-+		return -ENODEV;
-+	}
-+
-+	return 0;
-+}
-+
-+static int wkup_m3_rproc_stop(struct rproc *rproc)
-+{
-+	struct wkup_m3_rproc *wkupm3 = rproc->priv;
-+	struct platform_device *pdev = wkupm3->pdev;
-+	struct device *dev = &pdev->dev;
-+	struct wkup_m3_platform_data *pdata = dev_get_platdata(dev);
-+
-+	if (pdata->assert_reset(pdev, pdata->reset_name)) {
-+		dev_err(dev, "Unable to assert reset of wkup_m3!\n");
-+		return -ENODEV;
-+	}
-+
-+	return 0;
-+}
-+
-+static void *wkup_m3_rproc_da_to_va(struct rproc *rproc, u64 da, int len)
-+{
-+	struct wkup_m3_rproc *wkupm3 = rproc->priv;
-+	void *va = NULL;
-+	int i;
-+	u32 offset;
-+
-+	if (len <= 0)
-+		return NULL;
-+
-+	for (i = 0; i < WKUPM3_MEM_MAX; i++) {
-+		if (da >= wkupm3->mem[i].dev_addr && da + len <=
-+		    wkupm3->mem[i].dev_addr +  wkupm3->mem[i].size) {
-+			offset = da -  wkupm3->mem[i].dev_addr;
-+			/* __force to make sparse happy with type conversion */
-+			va = (__force void *)(wkupm3->mem[i].cpu_addr + offset);
-+			break;
-+		}
-+	}
-+
-+	return va;
-+}
-+
-+static struct rproc_ops wkup_m3_rproc_ops = {
-+	.start		= wkup_m3_rproc_start,
-+	.stop		= wkup_m3_rproc_stop,
-+	.da_to_va	= wkup_m3_rproc_da_to_va,
-+};
-+
-+static const struct of_device_id wkup_m3_rproc_of_match[] = {
-+	{ .compatible = "ti,am3352-wkup-m3", },
-+	{ .compatible = "ti,am4372-wkup-m3", },
-+	{},
-+};
-+
-+static int wkup_m3_rproc_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct wkup_m3_platform_data *pdata = dev->platform_data;
-+	/* umem always needs to be processed first */
-+	const char *mem_names[WKUPM3_MEM_MAX] = { "umem", "dmem" };
-+	struct wkup_m3_rproc *wkupm3;
-+	const char *fw_name;
-+	struct rproc *rproc;
-+	struct resource *res;
-+	const __be32 *addrp;
-+	u32 l4_offset = 0;
-+	u64 size;
-+	int ret;
-+	int i;
-+
-+	if (!(pdata && pdata->deassert_reset && pdata->assert_reset &&
-+	      pdata->reset_name)) {
-+		dev_err(dev, "Platform data missing!\n");
-+		return -ENODEV;
-+	}
-+
-+	ret = of_property_read_string(dev->of_node, "ti,pm-firmware",
-+				      &fw_name);
-+	if (ret) {
-+		dev_err(dev, "No firmware filename given\n");
-+		return -ENODEV;
-+	}
-+
-+	pm_runtime_enable(&pdev->dev);
-+	ret = pm_runtime_get_sync(&pdev->dev);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "pm_runtime_get_sync() failed\n");
-+		goto err;
-+	}
-+
-+	rproc = rproc_alloc(dev, "wkup_m3", &wkup_m3_rproc_ops,
-+			    fw_name, sizeof(*wkupm3));
-+	if (!rproc) {
-+		ret = -ENOMEM;
-+		goto err;
-+	}
-+
-+	wkupm3 = rproc->priv;
-+	wkupm3->rproc = rproc;
-+	wkupm3->pdev = pdev;
-+
-+	for (i = 0; i < ARRAY_SIZE(mem_names); i++) {
-+		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-+						   mem_names[i]);
-+		wkupm3->mem[i].cpu_addr = devm_ioremap_resource(dev, res);
-+		if (IS_ERR(wkupm3->mem[i].cpu_addr)) {
-+			dev_err(&pdev->dev, "devm_ioremap_resource failed for resource %d\n",
-+				i);
-+			ret = PTR_ERR(wkupm3->mem[i].cpu_addr);
-+			goto err;
-+		}
-+		wkupm3->mem[i].bus_addr = res->start;
-+		wkupm3->mem[i].size = resource_size(res);
-+		addrp = of_get_address(dev->of_node, i, &size, NULL);
-+		/*
-+		 * The wkupm3 has umem at address 0 in its view, so the device
-+		 * addresses for each memory region is computed as a relative
-+		 * offset of the bus address for umem, and therefore needs to be
-+		 * processed first.
-+		 */
-+		if (!strcmp(mem_names[i], "umem"))
-+			l4_offset = be32_to_cpu(*addrp);
-+		wkupm3->mem[i].dev_addr = be32_to_cpu(*addrp) - l4_offset;
-+	}
-+
-+	dev_set_drvdata(dev, rproc);
-+
-+	ret = rproc_add(rproc);
-+	if (ret) {
-+		dev_err(dev, "rproc_add failed\n");
-+		goto err_put_rproc;
-+	}
-+
-+	return 0;
-+
-+err_put_rproc:
-+	rproc_put(rproc);
-+err:
-+	pm_runtime_put_noidle(dev);
-+	pm_runtime_disable(dev);
-+	return ret;
-+}
-+
-+static int wkup_m3_rproc_remove(struct platform_device *pdev)
-+{
-+	struct rproc *rproc = platform_get_drvdata(pdev);
-+
-+	rproc_del(rproc);
-+	rproc_put(rproc);
-+	pm_runtime_put_sync(&pdev->dev);
-+	pm_runtime_disable(&pdev->dev);
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_PM
-+static int wkup_m3_rpm_suspend(struct device *dev)
-+{
-+	return -EBUSY;
-+}
-+
-+static int wkup_m3_rpm_resume(struct device *dev)
-+{
-+	return 0;
-+}
-+#endif
-+
-+static const struct dev_pm_ops wkup_m3_rproc_pm_ops = {
-+	SET_RUNTIME_PM_OPS(wkup_m3_rpm_suspend, wkup_m3_rpm_resume, NULL)
-+};
-+
-+static struct platform_driver wkup_m3_rproc_driver = {
-+	.probe = wkup_m3_rproc_probe,
-+	.remove = wkup_m3_rproc_remove,
-+	.driver = {
-+		.name = "wkup_m3_rproc",
-+		.of_match_table = wkup_m3_rproc_of_match,
-+		.pm = &wkup_m3_rproc_pm_ops,
-+	},
-+};
-+
-+module_platform_driver(wkup_m3_rproc_driver);
-+
-+MODULE_LICENSE("GPL v2");
-+MODULE_DESCRIPTION("TI Wakeup M3 remote processor control driver");
-+MODULE_AUTHOR("Dave Gerlach <d-gerlach@ti.com>");
-diff --git a/include/linux/platform_data/wkup_m3.h b/include/linux/platform_data/wkup_m3.h
-new file mode 100644
-index 0000000..3f1d77e
---- /dev/null
-+++ b/include/linux/platform_data/wkup_m3.h
-@@ -0,0 +1,30 @@
-+/*
-+ * TI Wakeup M3 remote processor platform data
-+ *
-+ * Copyright (C) 2014-2015 Texas Instruments, Inc.
-+ *
-+ * Dave Gerlach <d-gerlach@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef _LINUX_PLATFORM_DATA_WKUP_M3_H
-+#define _LINUX_PLATFORM_DATA_WKUP_M3_H
-+
-+struct platform_device;
-+
-+struct wkup_m3_platform_data {
-+	const char *reset_name;
-+
-+	int (*assert_reset)(struct platform_device *pdev, const char *name);
-+	int (*deassert_reset)(struct platform_device *pdev, const char *name);
-+};
-+
-+#endif /* _LINUX_PLATFORM_DATA_WKUP_M3_H */
+Changes since v6:
+-----------------
+ - serial: Fix locking in case of sysrq (Vladimir)
+ - Rebase on top of v4.1-rc1
+ - Apply Acked-by and Reviewed-by
+ - Clean-up stm32_defconfig
+
+Changes since v5:
+-----------------
+ - Change st,hw-flow-ctrl property to auto-flow-control (Rob)
+ - Constify stm32_uart_ops (Joe)
+ - Propagate request_irq error in USART driver (Andy)
+ - Applies Acked-by and Reviewed-by (Rob, Peter)
+
+Changes since v4:
+-----------------
+ - Cosmetic changes in USART driver (Andy)
+ - Apply Acks on reset driver & bindings (Philipp & Rob)
+
+Changes since v3:
+-----------------
+ - Fix and simplify error path in ARMv7-M Systick driver (Daniel)
+ - Improve reset bindings documentation (Philipp)
+ - Fix trailing lines anf typos in reset driver & doc (Philipp & Chanwoo)
+ - Fix MODULE_LICENCE in USART driver (Paul)
+ - Refactor USART baudrate calculation (Peter & Andy)
+ - Fix error path in USART init (Peter & Russell)
+ - Fix HW flow control in USART driver (Peter)
+ - Fix serial port type number to unused one (Peter)
+ - Applies Chanwoo's Tested-by on the series
+
+Changes since v2:
+-----------------
+ - Remove pinctrl driver from the series. 
+ - Remove reset_controller_of_init(), and reset the timers in the bootloader
+ - Add HW flow contrl property for serial driver
+ - Lots of changes in the DTS file, as per Andreas recommendations
+ - Some Kconfig clean-ups
+ - Adapt the config to be compatible with Andreas' bootwrapper, except UART port.
+ - Various fixes in documentation
+
+Changes since v1:
+-----------------
+ - Move bindings documentation in their own patches (Andreas)
+ - Rename ARM System timer to armv7m-systick (Rob)
+ - Add clock-frequency property handling in armv7m-systick (Rob)
+ - Re-factor the reset controllers into a single controller (Philipp)
+ - Add kerneldoc to reset_controller_of_init (Philipp)
+ - Add named constants in include/dt-bindings/reset/ (Philipp)
+ - Make pinctrl driver to depend on ARCH_STM32 or COMPILE_TEST (Geert)
+ - Introduce CPUV7M_NUM_IRQ config flag to indicate the number of interrupts
+supported by the MCU, in order to limit memory waste in vectors' table (Uwe)
+
+Maxime Coquelin (5):
+  dt-bindings: Document the STM32 timer bindings
+  clockevents/drivers: Add STM32 Timer driver
+  dt-bindings: Document the STM32 USART bindings
+  serial: stm32-usart: Add STM32 USART Driver
+  ARM: dts: Introduce STM32F429 MCU
+
+ .../devicetree/bindings/serial/st,stm32-usart.txt  |  32 +
+ .../devicetree/bindings/timer/st,stm32-timer.txt   |  22 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/stm32f429-disco.dts              |  71 ++
+ arch/arm/boot/dts/stm32f429.dtsi                   | 214 ++++++
+ drivers/clocksource/Kconfig                        |   5 +
+ drivers/clocksource/Makefile                       |   1 +
+ drivers/clocksource/timer-stm32.c                  | 184 +++++
+ drivers/tty/serial/Kconfig                         |  17 +
+ drivers/tty/serial/Makefile                        |   1 +
+ drivers/tty/serial/stm32-usart.c                   | 739 +++++++++++++++++++++
+ include/uapi/linux/serial_core.h                   |   3 +
+ 12 files changed, 1290 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/serial/st,stm32-usart.txt
+ create mode 100644 Documentation/devicetree/bindings/timer/st,stm32-timer.txt
+ create mode 100644 arch/arm/boot/dts/stm32f429-disco.dts
+ create mode 100644 arch/arm/boot/dts/stm32f429.dtsi
+ create mode 100644 drivers/clocksource/timer-stm32.c
+ create mode 100644 drivers/tty/serial/stm32-usart.c
+
 -- 
-2.4.1
+1.9.1
