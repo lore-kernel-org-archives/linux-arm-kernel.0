@@ -1,51 +1,86 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 22 May 2015 10:55:19 +0200
-Subject: [PATCH v10 4/5] edac: Add APM X-Gene SoC EDAC driver
-In-Reply-To: <20150522084625.GE23022@pd.tnic>
-References: <1431991481-25684-1-git-send-email-lho@apm.com>
- <4456746.y9FVaqRogk@wuerfel> <20150522084625.GE23022@pd.tnic>
-Message-ID: <2082687.grA49DxWyE@wuerfel>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 22 May 2015 10:54:48 +0200
+Subject: [PATCH soc] ARM: use =?UTF-8?Q?ARM=5FSINGLE=5FARMV=37M=20for?=
+ =?UTF-8?Q?=20ARMv=37-M=20platforms?=
+In-Reply-To: <3824169.vxchxyBt3o@wuerfel>
+References: <1432161344-1930-1-git-send-email-stefan@agner.ch>
+ <3824169.vxchxyBt3o@wuerfel>
+Message-ID: <170b7522fb120f3afcc4b7aa1f90e341@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 22 May 2015 10:46:25 Borislav Petkov wrote:
-> On Fri, May 22, 2015 at 10:23:11AM +0200, Arnd Bergmann wrote:
-> > > +static int edac_mc_idx;
-> > > +static int edac_mc_active_mask;
-> > > +static int edac_mc_registered_mask;
-> > > +static DEFINE_MUTEX(xgene_edac_mc_lock);
-> > 
-> > It would also be best to avoid global variables, but it seems that at
-> > least the edac_mc_idx is needed to work with the EDAC subsystem.
-> > Maybe Boris has an idea for how to avoid it.
+On 2015-05-22 09:53, Arnd Bergmann wrote:
+> On Thursday 21 May 2015 00:35:44 Stefan Agner wrote:
+<snip>
+>> +# ARMv7-M architecture
+>> +config ARCH_EFM32
+>> +	bool "Energy Micro efm32"
+>> +	depends on ARM_SINGLE_ARMV7M
+>> +	select ARCH_REQUIRE_GPIOLIB
+>> +	help
+>> +	  Support for Energy Micro's (now Silicon Labs) efm32 Giant Gecko
+>> +	  processors.
+>> +
+>> +config ARCH_LPC18XX
+>> +	bool "NXP LPC18xx/LPC43xx"
+>> +	depends on ARM_SINGLE_ARMV7M
+>> +	select ARCH_HAS_RESET_CONTROLLER
+>> +	select ARM_AMBA
+>> +	select CLKSRC_LPC32XX
+>> +	select PINCTRL
+>> +	help
+>> +	  Support for NXP's LPC18xx Cortex-M3 and LPC43xx Cortex-M4
+>> +	  high performance microcontrollers.
+>> +
+>> +config ARCH_STM32
+>> +	bool "STMicrolectronics STM32"
+>> +	depends on ARM_SINGLE_ARMV7M
+>> +	select ARCH_HAS_RESET_CONTROLLER
+>> +	select ARMV7M_SYSTICK
+>> +	select RESET_CONTROLLER
+>> +	help
+>> +	  Support for STMicroelectronics STM32 processors.
+>> +
 > 
-> Right, so AFAICT this is used in
+> Should we move those options into the respective subdirectories,
+> for consistency with the other platforms?
 > 
->         edac_mc_alloc(edac_mc_idx++
+> The current top-level Kconfig file is much too large at the moment,
+> so that would reduce the clutter a bit, but then again, all three
+> of these currently don't need a Kconfig file for themselves, so
+> that might be a bit silly as well.
+
+But their machine folder is there anyway, so it wouldn't clutter
+arch/arm/ more than it is today.
+
+> Another option might be to consolidate these three into a single
+> directory, if someone can come up with a good name. The machine
+> files are all trivial, so they could even be merged into one as
+> far as I can tell, we just need slightly different 'select'
+> statements above.
 > 
-> and basically we're supplying the memory controller numbers in the order
-> we're calling xgene_edac_mc_add(). Perhaps we need to make the memory
-> controller numbering explicit with DT...
+> If we do that, is it possible to merge Vybrid into that as well?
+> I guess the main question here is how much other infrastructure
+> (if any) from mach-imx is used on vf610, and if there is some other
+> way to do that.
 
-I see now that the number is also used in xgene_edac_mc_is_active()
-as an index for the MCBADDRMR register, which seems very fragile,
-as it relies on the DT nodes getting seen in the same order by the
-driver that the hardware blocks are used in.
+I think it is nice today to use the same Kconfig symbol (SOC_VF610) as
+we use for the primary Cortex-A5 processor. After all, the kernel is
+running on the same SoC... Its just a different processor we are running
+on.
 
-Better add an explicit DT property for the index that is defined
-to be the same as MCBADDRMR bits, e.g. 
+Today, I rely on several config symbols set by ARCH_MXC or SOC_VF610,
+some of that quite SoC specific (PINCTRL_VF610). However, after the move
+of the clock stuff which is in imx-next, there is really almost no
+machine specific code required from mach-imx. However, I plan to add PM
+support, which probably still will land in the machine folder?
 
-                       edacmc at 7e800000 {
-                             compatible = "apm,xgene-edac-mc";
-                             reg = <0x0 0x7e800000 0x0 0x1000>;
-			      memory-controller = <0>;
-                       };
+I also think that it would a bit risky to do this for that release. So
+maybe as first step, simply split out the machines in individual Kconfig
+files?
 
-or use a reference to the normal memory controller DT node
-outside of the EDAC, and put a number in that one.
+What do you think about the defconfig dependency Uwe pointed out? Shall
+I create a single patch on-top of a soc/defconfig merged branch?
 
-Is there a strict 1:1 relation between the DIMM slot numbering
-on the board and the memory controller number within the EDAC
-registers?
-
-	Arnd
+--
+Stefan
