@@ -1,48 +1,433 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 22 May 2015 09:27:07 +0300
-Subject: [PATCHv3 10/10] CLK: TI: always enable DESHDCP clock
-In-Reply-To: <alpine.DEB.2.02.1505210254330.7960@utopia.booyaka.com>
-References: <1430906938-26128-1-git-send-email-tomi.valkeinen@ti.com>
- <1430906938-26128-11-git-send-email-tomi.valkeinen@ti.com>
- <555C744C.6070901@ti.com> <555C74E8.5010105@ti.com>
- <555CE1BF.4050506@codeaurora.org>
- <alpine.DEB.2.02.1505210254330.7960@utopia.booyaka.com>
-Message-ID: <555ECC3B.6000701@ti.com>
+From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
+Date: Fri, 22 May 2015 12:02:27 +0530
+Subject: [PATCH 1/3] mailbox: Adding driver for Xilinx LogiCORE IP mailbox.
+In-Reply-To: <1432251450-26352-2-git-send-email-moritz.fischer@ettus.com>
+References: <1432251450-26352-1-git-send-email-moritz.fischer@ettus.com>
+ <1432251450-26352-2-git-send-email-moritz.fischer@ettus.com>
+Message-ID: <CAM=Q2cvvTeLauQiZzQx6OuvE6o6deUpoM43kHt_wbsmSzxhQjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Moritz,
+
+Overall looks good some  nitpicks below.
+
+On Fri, May 22, 2015 at 5:07 AM, Moritz Fischer
+<moritz.fischer@ettus.com> wrote:
+> The Xilinx LogiCORE IP mailbox is a FPGA core that allows for
+> interprocessor communication via AXI4 memory mapped / AXI4 stream
+> interfaces.
+>
+> It is single channel per core and allows for transmit and receive.
+>
+> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+> ---
+>  drivers/mailbox/Kconfig          |   8 +
+>  drivers/mailbox/Makefile         |   2 +
+>  drivers/mailbox/mailbox-xilinx.c | 339 ++++++++++++++++++++++++++++++++++
+>  3 files changed, 349 insertions(+)
+>
+> diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
+> index 84b0a2d..e11e4b2 100644
+> --- a/drivers/mailbox/Kconfig
+> +++ b/drivers/mailbox/Kconfig
+> @@ -60,4 +60,12 @@ config ALTERA_MBOX
+>           An implementation of the Altera Mailbox soft core. It is used
+>           to send message between processors. Say Y here if you want to use the
+>           Altera mailbox support.
+> +
+> +config XILINX_MBOX
+> +       tristate "Xilinx Mailbox"
+> +       help
+> +         An implementation of the Xilinx Mailbox soft core. It is used
+> +         to send message between processors. Say Y here if you want to use the
+> +         Xilinx mailbox support.
+> +
+>  endif
+> diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
+> index b18201e..d28a028 100644
+> --- a/drivers/mailbox/Makefile
+> +++ b/drivers/mailbox/Makefile
+> @@ -11,3 +11,5 @@ obj-$(CONFIG_OMAP2PLUS_MBOX)  += omap-mailbox.o
+>  obj-$(CONFIG_PCC)              += pcc.o
+>
+>  obj-$(CONFIG_ALTERA_MBOX)      += mailbox-altera.o
+> +
+> +obj-$(CONFIG_XILINX_MBOX)      += mailbox-xilinx.o
+> diff --git a/drivers/mailbox/mailbox-xilinx.c b/drivers/mailbox/mailbox-xilinx.c
+> new file mode 100644
+> index 0000000..8d8aa17
+> --- /dev/null
+> +++ b/drivers/mailbox/mailbox-xilinx.c
+> @@ -0,0 +1,339 @@
+> +/*
+> + * Copyright (c) 2015, National Instruments Corp. All rights reserved.
+> + *
+> + * Driver for the Xilinx Logicore mailbox IP block
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; version 2 of the License.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/device.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/mailbox_controller.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +
+> +#define DRIVER_NAME "xilinx-mailbox"
+> +
+> +/* register offsets */
+> +#define MAILBOX_REG_WRDATA 0x00
+> +#define MAILBOX_REG_RDDATA 0x08
+> +#define MAILBOX_REG_STATUS 0x10
+> +#define MAILBOX_REG_ERROR 0x14
+> +#define MAILBOX_REG_SIT 0x18
+> +#define MAILBOX_REG_RIT 0x1c
+> +#define MAILBOX_REG_IS 0x20
+> +#define MAILBOX_REG_IE 0x24
+> +#define MAILBOX_REG_IP 0x28
+> +
+> +/* status register */
+> +#define STS_RTA BIT(3)
+> +#define STS_STA BIT(2)
+> +#define STS_FULL BIT(1)
+> +#define STS_EMPTY BIT(0)
+> +
+> +/* error register */
+> +#define ERR_FULL BIT(1)
+> +#define ERR_EMPTY BIT(0)
+> +
+> +/* mailbox interrupt status register */
+> +#define INT_STATUS_ERR BIT(2)
+> +#define INT_STATUS_RTI BIT(1)
+> +#define INT_STATUS_STI BIT(0)
+> +
+> +/* mailbox interrupt enable register */
+> +#define INT_ENABLE_ERR BIT(2)
+> +#define INT_ENABLE_RTI BIT(1)
+> +#define INT_ENABLE_STI BIT(0)
+> +
+> +#define MBOX_POLLING_MS                5       /* polling interval 5ms */
+> +
+> +struct xilinx_mbox {
+> +       bool intr_mode;
+> +       int irq;
+> +       void __iomem *mbox_base;
+> +       struct device *dev;
+> +       struct mbox_controller controller;
+> +
+> +       /* if the controller supports only RX polling mode */
+> +       struct timer_list rxpoll_timer;
+> +};
+> +
+> +static struct xilinx_mbox *mbox_chan_to_xilinx_mbox(struct mbox_chan *chan)
+> +{
+> +       if (!chan || !chan->con_priv)
+> +               return NULL;
+> +
+> +       return (struct xilinx_mbox *)chan->con_priv;
+> +}
+> +
+> +static inline int xilinx_mbox_full(struct xilinx_mbox *mbox)
+
+Should this be a bool ?
+
+> +{
+> +       u32 status;
+> +
+> +       status = readl_relaxed(mbox->mbox_base + MAILBOX_REG_STATUS);
+> +       return status & STS_FULL;
+> +}
+> +
+> +static inline int xilinx_mbox_pending(struct xilinx_mbox *mbox)
+> +{
+> +       u32 status;
+> +
+> +       status = readl_relaxed(mbox->mbox_base + MAILBOX_REG_STATUS);
+> +       return !(status & STS_EMPTY);
+> +}
+> +
+> +static void xilinx_mbox_rx_intmask(struct xilinx_mbox *mbox, bool enable)
+> +{
+> +       u32 mask;
+> +
+> +       mask = readl_relaxed(mbox->mbox_base + MAILBOX_REG_IE);
+> +       if (enable)
+> +               mask |= INT_ENABLE_RTI;
+> +       else
+> +               mask &= ~INT_ENABLE_RTI;
+> +       writel_relaxed(mask, mbox->mbox_base + MAILBOX_REG_IE);
+> +}
+> +
+> +static void xilinx_mbox_tx_intmask(struct xilinx_mbox *mbox, bool enable)
+> +{
+> +       u32 mask;
+> +
+> +       mask = readl_relaxed(mbox->mbox_base + MAILBOX_REG_IE);
+> +       if (enable)
+> +               mask |= INT_ENABLE_STI;
+> +       else
+> +               mask &= ~INT_ENABLE_STI;
+> +       writel_relaxed(mask, mbox->mbox_base + MAILBOX_REG_IE);
+> +}
+
+May be the two functions xilinx_mbox_rx_intmask / xilinx_mbox_tx_intmask
+could be combined.
+That way if the err also needs to be enabled another function will not
+be needed.
 
 
-On 21/05/15 06:06, Paul Walmsley wrote:
+> +
+> +static void xilinx_mbox_rx_data(struct mbox_chan *chan)
+> +{
+> +       struct xilinx_mbox *mbox = mbox_chan_to_xilinx_mbox(chan);
+> +       u32 data;
+> +
+> +       if (xilinx_mbox_pending(mbox)) {
+> +               data = readl_relaxed(mbox->mbox_base + MAILBOX_REG_RDDATA);
+> +               mbox_chan_received_data(chan, (void *)data);
+> +       }
+> +}
+> +
+> +static void xilinx_mbox_poll_rx(unsigned long data)
+> +{
+> +       struct mbox_chan *chan = (struct mbox_chan *)data;
+> +       struct xilinx_mbox *mbox = mbox_chan_to_xilinx_mbox(chan);
+> +
+> +       xilinx_mbox_rx_data(chan);
+> +
+> +       mod_timer(&mbox->rxpoll_timer,
+> +                 jiffies + msecs_to_jiffies(MBOX_POLLING_MS));
+> +}
+> +
+> +static irqreturn_t xilinx_mbox_interrupt(int irq, void *p)
+> +{
+> +       u32 mask;
+> +       struct mbox_chan *chan = (struct mbox_chan *)p;
+> +       struct xilinx_mbox *mbox = mbox_chan_to_xilinx_mbox(chan);
+> +
+> +       mask = readl_relaxed(mbox->mbox_base + MAILBOX_REG_IS);
+> +       if (mask & INT_STATUS_RTI)
+> +               xilinx_mbox_rx_data(chan);
+> +
+> +       /* mask irqs *before* notifying done, require tx_block=true */
+> +       if (mask & INT_STATUS_STI) {
+> +               xilinx_mbox_tx_intmask(mbox, false);
+> +               mbox_chan_txdone(chan, 0);
+> +       }
+> +
+> +       if (mask & INT_STATUS_ERR)
+> +               dev_err(mbox->dev, "Got error IRQ!\n");
 
->> Enable falls under the "critical clocks" discussion that is ongoing. I
->> assume that this is some sort of critical clock that can't be turned off?
-> 
-> It only needs to be enabled for this particular display IP subsystem to 
-> function:
-> 
-> http://marc.info/?l=linux-omap&m=142071550111482&w=2
-> 
-> I believe Tomi is taking this approach (enabling it unconditionally) to 
-> avoid adding support for a secondary IP block "main clock" to the hwmod 
+I think we never enabled the status error.
 
-Right. I don't think that would be a simple task (correct me if I'm
-wrong), and that would all be only for this one IP on this particular
-SoC type.
 
-> code.  Apparently, the chips that contain this clock gating bit are not 
-> intended to be used for power-critical use cases, so there's not much 
-> motivation to switch it on and off with the display controller.
+> +
+> +       writel_relaxed(mask, mbox->mbox_base + MAILBOX_REG_IS);
+> +       return IRQ_HANDLED;
+> +}
+> +
+> +static int xilinx_mbox_startup(struct mbox_chan *chan)
+> +{
+> +       int ret;
+> +       struct xilinx_mbox *mbox = mbox_chan_to_xilinx_mbox(chan);
+> +
+> +       if (mbox->intr_mode) {
+> +               ret = request_irq(mbox->irq, xilinx_mbox_interrupt, 0,
+> +                                 dev_name(mbox->dev), chan);
+> +               if (unlikely(ret)) {
+> +                       dev_err(mbox->dev,
+> +                               "failed to register mailbox interrupt:%d\n",
+> +                               ret);
+> +                       mbox->intr_mode = false;
+> +                       goto polling; /* use polling if failed */
+> +               }
+> +
+> +               xilinx_mbox_rx_intmask(mbox, true);
+> +       }
+> +
+> +polling:
+> +       /* setup polling timer */
+> +       setup_timer(&mbox->rxpoll_timer, xilinx_mbox_poll_rx,
+> +                   (unsigned long)chan);
+> +       mod_timer(&mbox->rxpoll_timer,
+> +                 jiffies + msecs_to_jiffies(MBOX_POLLING_MS));
+> +
+> +       return 0;
+> +}
+> +
+> +static int xilinx_mbox_send_data(struct mbox_chan *chan, void *data)
+> +{
+> +       struct xilinx_mbox *mbox = mbox_chan_to_xilinx_mbox(chan);
+> +       u32 *udata = (u32 *)data;
+> +
+> +       if (!mbox || !data)
+> +               return -EINVAL;
+> +
+> +       if (xilinx_mbox_full(mbox))
+> +               return -EBUSY;
+> +
+> +       /* enable interrupt before send */
+> +       if (mbox->intr_mode)
+> +               xilinx_mbox_tx_intmask(mbox, true);
+> +
+> +       writel_relaxed(*udata, mbox->mbox_base + MAILBOX_REG_WRDATA);
+> +
+> +       return 0;
+> +}
+> +
+> +static bool xilinx_mbox_last_tx_done(struct mbox_chan *chan)
+> +{
+> +       struct xilinx_mbox *mbox = mbox_chan_to_xilinx_mbox(chan);
+> +
+> +       /* return false if mailbox is full */
+> +       return xilinx_mbox_full(mbox) ? false : true;
 
-Even in power-critical use cases the the power use difference should be
-negligible.
+A complement would have been  consistent with the other places
 
- Tomi
+> +}
+> +
+> +static bool xilinx_mbox_peek_data(struct mbox_chan *chan)
+> +{
+> +       struct xilinx_mbox *mbox = mbox_chan_to_xilinx_mbox(chan);
+> +
+> +       return xilinx_mbox_pending(mbox) ? true : false;
+> +}
+> +
+> +static void xilinx_mbox_shutdown(struct mbox_chan *chan)
+> +{
+> +       struct xilinx_mbox *mbox = mbox_chan_to_xilinx_mbox(chan);
+> +
+> +       if (mbox->intr_mode) {
+> +               /* unmask all interrupt masks */
+> +               writel_relaxed(~0, mbox->mbox_base + MAILBOX_REG_IE);
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150522/ab09ead1/attachment.sig>
+Not sure why we unmask the interrupts and free the irq.
+Am I missing something.
+
+> +               free_irq(mbox->irq, chan);
+> +       } else
+> +               del_timer_sync(&mbox->rxpoll_timer);
+> +}
+> +
+> +static struct mbox_chan_ops xilinx_mbox_ops = {
+> +       .send_data = xilinx_mbox_send_data,
+> +       .startup = xilinx_mbox_startup,
+> +       .shutdown = xilinx_mbox_shutdown,
+> +       .last_tx_done = xilinx_mbox_last_tx_done,
+> +       .peek_data = xilinx_mbox_peek_data,
+> +};
+> +
+> +static int xilinx_mbox_probe(struct platform_device *pdev)
+> +{
+> +       struct xilinx_mbox *mbox;
+> +       struct resource *regs;
+> +       struct mbox_chan *chans;
+> +       int ret;
+> +
+> +       mbox = devm_kzalloc(&pdev->dev, sizeof(*mbox),
+> +                           GFP_KERNEL);
+> +       if (!mbox)
+> +               return -ENOMEM;
+> +
+> +       /* allocated one channel */
+> +       chans = devm_kzalloc(&pdev->dev, sizeof(*chans), GFP_KERNEL);
+> +       if (!chans)
+> +               return -ENOMEM;
+> +
+> +       regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +
+> +       mbox->mbox_base = devm_ioremap_resource(&pdev->dev, regs);
+> +       if (IS_ERR(mbox->mbox_base))
+> +               return PTR_ERR(mbox->mbox_base);
+> +
+> +       mbox->irq = platform_get_irq(pdev, 0);
+> +       /* if irq is present, we can use it, otherwise, poll */
+> +       if (mbox->irq >= 0)
+> +               mbox->intr_mode = true;
+> +       else
+> +               dev_info(&pdev->dev, "IRQ not found, fallback to polling.\n");
+> +
+> +       mbox->dev = &pdev->dev;
+> +
+> +       /* Hardware supports only one channel. */
+> +       chans[0].con_priv = mbox;
+> +       mbox->controller.dev = mbox->dev;
+> +       mbox->controller.num_chans = 1;
+> +       mbox->controller.chans = chans;
+> +       mbox->controller.ops = &xilinx_mbox_ops;
+> +
+> +       if (mbox->intr_mode) {
+> +               mbox->controller.txdone_irq = true;
+> +       } else {
+> +               mbox->controller.txdone_poll = true;
+> +               mbox->controller.txpoll_period = MBOX_POLLING_MS;
+> +       }
+> +
+> +       ret = mbox_controller_register(&mbox->controller);
+> +       if (ret) {
+> +               dev_err(&pdev->dev, "Register mailbox failed\n");
+> +               goto err;
+
+the goto could be avoided.
+
+> +       }
+> +
+> +       platform_set_drvdata(pdev, mbox);
+> +err:
+> +       return ret;
+> +}
+> +
+> +
+> +static int xilinx_mbox_remove(struct platform_device *pdev)
+> +{
+> +       struct xilinx_mbox *mbox = platform_get_drvdata(pdev);
+> +
+> +       if (!mbox)
+> +               return -EINVAL;
+> +
+> +       mbox_controller_unregister(&mbox->controller);
+> +
+> +       return 0;
+> +}
+> +
+> +static const struct of_device_id xilinx_mbox_match[] = {
+> +       { .compatible = "xlnx,mailbox-2.1" },
+> +       { /* Sentinel */ }
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, xilinx_mbox_match);
+> +
+> +static struct platform_driver xilinx_mbox_driver = {
+> +       .probe  = xilinx_mbox_probe,
+> +       .remove = xilinx_mbox_remove,
+> +       .driver = {
+> +               .name   = DRIVER_NAME,
+> +               .of_match_table = xilinx_mbox_match,
+> +       },
+> +};
+> +
+> +module_platform_driver(xilinx_mbox_driver);
+> +
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_DESCRIPTION("Xilinx mailbox specific functions");
+> +MODULE_AUTHOR("Moritz Fischer <moritz.fischer@ettus.com>");
+> +MODULE_ALIAS("platform:xilinx-mailbox");
+> --
+> 2.4.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
