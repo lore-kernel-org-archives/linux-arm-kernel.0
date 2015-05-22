@@ -1,206 +1,66 @@
-From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Fri, 22 May 2015 16:21:54 +0530
-Subject: [PATCH v3 2/2] soc: Add driver for Freescale Vybrid Platform
-In-Reply-To: <cover.1432290463.git.maitysanchayan@gmail.com>
-References: <cover.1432290463.git.maitysanchayan@gmail.com>
-Message-ID: <d27c4ba234cd298914676884a9604ea8472a17d0.1432290463.git.maitysanchayan@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 22 May 2015 12:00:08 +0100
+Subject: [PATCH v6 3/6] arm64: Kprobes with single stepping support
+In-Reply-To: <555D62BD.5040403@linaro.org>
+References: <1429561187-3661-1-git-send-email-dave.long@linaro.org>
+ <1429561187-3661-4-git-send-email-dave.long@linaro.org>
+ <20150520163946.GC29424@e104818-lin.cambridge.arm.com>
+ <555D62BD.5040403@linaro.org>
+Message-ID: <20150522110007.GV29424@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a SoC driver to be used by the Freescale Vybrid SoC's.
-We create the "fsl" directory for holding the different Freescale
-designs. Driver utilises syscon to get the various register values
-needed. After this sysfs exposes some SoC specific properties as
-below:
+On Thu, May 21, 2015 at 12:44:45AM -0400, David Long wrote:
+> On 05/20/15 12:39, Catalin Marinas wrote:
+> >On Mon, Apr 20, 2015 at 04:19:44PM -0400, David Long wrote:
+> >>Add support for basic kernel probes(kprobes) and jump probes
+> >>(jprobes) for ARM64.
+> >>
+> >>Kprobes utilizes software breakpoint and single step debug
+> >>exceptions supported on ARM v8.
+> >>
+> >>A software breakpoint is placed at the probe address to trap the
+> >>kernel execution into the kprobe handler.
+> >>
+> >>ARM v8 supports enabling single stepping before the break exception
+> >>return (ERET), with next PC in exception return address (ELR_EL1). The
+> >>kprobe handler prepares an executable memory slot for out-of-line
+> >>execution with a copy of the original instruction being probed, and
+> >>enables single stepping. The PC is set to the out-of-line slot address
+> >>before the ERET. With this scheme, the instruction is executed with the
+> >>exact same register context except for the PC (and DAIF) registers.
+> >
+> >I wonder whether it would be simpler to use another software breakpoint
+> >after the out of line instruction copy. You won't run the instructions
+> >that change the PC anyway.
+> 
+> We put quite a bit of work into making single-step work.  I don't see any
+> obvious advantage to trying to switch to a software breakpoint. Both are
+> debug exceptions but SS does leave open the possibility of maybe eventually
+> running some instructions that do change the PC.
 
-> cd /sys/devices/soc0
-> ls
-family     machine    power      revision   soc_id     subsystem  uevent
-> cat family
-Freescale Vybrid VF610
-> cat machine
-Freescale Vybrid
-> cat revision
-00000013
-> cat soc_id
-df6472a60c1c39d4
+I'm not trying to get this re-written, just as a potential workaround
+for the unexpected single-step error reported but I need to read some
+more before I understand it properly (and I can see patches already for
+fixing this).
 
-Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
----
- drivers/soc/Kconfig         |   1 +
- drivers/soc/Makefile        |   1 +
- drivers/soc/fsl/Kconfig     |   9 ++++
- drivers/soc/fsl/Makefile    |   1 +
- drivers/soc/fsl/soc-vf610.c | 113 ++++++++++++++++++++++++++++++++++++++++++++
- 5 files changed, 125 insertions(+)
- create mode 100644 drivers/soc/fsl/Kconfig
- create mode 100644 drivers/soc/fsl/Makefile
- create mode 100644 drivers/soc/fsl/soc-vf610.c
+> >Since an unconditional branch instruction within the kernel address
+> >space can reach any point in the kernel (and modules), could we go a
+> >step further and avoid the software breakpoint altogether, just generate
+> >a branch instruction to the original location (after the software
+> >breakpoint)?
+> 
+> Wouldn't a branch instruction have to make use of a register in order to
+> span the whole address space?  How could you do that and have all the
+> registers unmolested when you land back after the original probe point?  The
+> thing that really kills this though is the fact we need to be able to run
+> the pre and post functions before and *after* the XOL stepping.
 
-diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
-index d8bde82..8b4dd2b 100644
---- a/drivers/soc/Kconfig
-+++ b/drivers/soc/Kconfig
-@@ -1,5 +1,6 @@
- menu "SOC (System On Chip) specific Drivers"
- 
-+source "drivers/soc/fsl/Kconfig"
- source "drivers/soc/mediatek/Kconfig"
- source "drivers/soc/qcom/Kconfig"
- source "drivers/soc/ti/Kconfig"
-diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
-index 70042b2..142676e 100644
---- a/drivers/soc/Makefile
-+++ b/drivers/soc/Makefile
-@@ -2,6 +2,7 @@
- # Makefile for the Linux Kernel SOC specific device drivers.
- #
- 
-+obj-$(CONFIG_SOC_VF610)         += fsl/
- obj-$(CONFIG_ARCH_MEDIATEK)	+= mediatek/
- obj-$(CONFIG_ARCH_QCOM)		+= qcom/
- obj-$(CONFIG_ARCH_TEGRA)	+= tegra/
-diff --git a/drivers/soc/fsl/Kconfig b/drivers/soc/fsl/Kconfig
-new file mode 100644
-index 0000000..d0ac671
---- /dev/null
-+++ b/drivers/soc/fsl/Kconfig
-@@ -0,0 +1,9 @@
-+#
-+# Freescale SoC drivers
-+
-+config SOC_VF610
-+	   bool "SoC bus device for the Freescale Vybrid platform"
-+	   select SOC_BUS
-+	   help
-+	     Include support for the SoC bus on the Freescale Vybrid platform
-+		 providing some sysfs information about the module variant.
-\ No newline at end of file
-diff --git a/drivers/soc/fsl/Makefile b/drivers/soc/fsl/Makefile
-new file mode 100644
-index 0000000..5fccbba
---- /dev/null
-+++ b/drivers/soc/fsl/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_SOC_VF610)		+= soc-vf610.o
-diff --git a/drivers/soc/fsl/soc-vf610.c b/drivers/soc/fsl/soc-vf610.c
-new file mode 100644
-index 0000000..faeb567
---- /dev/null
-+++ b/drivers/soc/fsl/soc-vf610.c
-@@ -0,0 +1,113 @@
-+/*
-+ * Copyright 2015 Toradex AG
-+ *
-+ * Author: Sanchayan Maity <sanchayan.maity@toradex.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2, as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+#include <linux/mfd/syscon.h>
-+#include <linux/module.h>
-+#include <linux/of_platform.h>
-+#include <linux/regmap.h>
-+#include <linux/random.h>
-+#include <linux/slab.h>
-+#include <linux/sys_soc.h>
-+
-+#define OCOTP_CFG0_OFFSET      0x00000410
-+#define OCOTP_CFG1_OFFSET      0x00000420
-+#define MSCM_CPxCOUNT_OFFSET   0x0000002C
-+#define MSCM_CPxCFG1_OFFSET    0x00000014
-+#define ROM_REVISION_OFFSET    0x00000080
-+
-+static const struct of_device_id vf610_soc_bus_match[] = {
-+	{ .compatible = "fsl,vf610-mscm-cpucfg", },
-+	{ /* sentinel */ }
-+};
-+
-+static int __init vf610_soc_init(void)
-+{
-+	struct regmap *ocotp_regmap, *mscm_regmap, *rom_regmap;
-+	struct soc_device_attribute *soc_dev_attr;
-+	struct soc_device *soc_dev;
-+	struct device_node *np;
-+	char soc_type[] = "xx0";
-+	u32 cpxcount, cpxcfg1;
-+	u32 soc_id1, soc_id2, rom_rev;
-+	u64 soc_id;
-+	int ret;
-+
-+	np = of_find_matching_node(NULL, vf610_soc_bus_match);
-+	if (!np)
-+		return -ENODEV;
-+
-+	ocotp_regmap = syscon_regmap_lookup_by_compatible("fsl,vf610-ocotp");
-+	if (IS_ERR(ocotp_regmap)) {
-+		pr_err("regmap lookup for octop failed\n");
-+		return PTR_ERR(ocotp_regmap);
-+	}
-+
-+	mscm_regmap = syscon_regmap_lookup_by_compatible("fsl,vf610-mscm-cpucfg");
-+	if (IS_ERR(mscm_regmap)) {
-+		pr_err("regmap lookup for mscm failed");
-+		return PTR_ERR(mscm_regmap);
-+	}
-+
-+	rom_regmap = syscon_regmap_lookup_by_compatible("fsl,vf610-ocrom");
-+	if (IS_ERR(rom_regmap)) {
-+		pr_err("regmap lookup for ocrom failed");
-+		return PTR_ERR(rom_regmap);
-+	}
-+
-+	ret = regmap_read(ocotp_regmap, OCOTP_CFG0_OFFSET, &soc_id1);
-+	if (ret)
-+		return -ENODEV;
-+
-+	ret = regmap_read(ocotp_regmap, OCOTP_CFG1_OFFSET, &soc_id2);
-+	if (ret)
-+		return -ENODEV;
-+
-+	soc_id = (u64) soc_id1 << 32 | soc_id2;
-+	add_device_randomness(&soc_id, sizeof(soc_id));
-+
-+	ret = regmap_read(mscm_regmap, MSCM_CPxCOUNT_OFFSET, &cpxcount);
-+	if (ret)
-+		return -ENODEV;
-+
-+	ret = regmap_read(mscm_regmap, MSCM_CPxCFG1_OFFSET, &cpxcfg1);
-+	if (ret)
-+		return -ENODEV;
-+
-+	soc_type[0] = cpxcount ? '6' : '5'; /* Dual Core => VF6x0 */
-+	soc_type[1] = cpxcfg1 ? '1' : '0'; /* L2 Cache => VFx10 */
-+
-+	ret = regmap_read(rom_regmap, ROM_REVISION_OFFSET, &rom_rev);
-+	if (ret)
-+		return -ENODEV;
-+
-+	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-+	if (!soc_dev_attr)
-+		return -ENOMEM;
-+
-+	soc_dev_attr->machine = kasprintf(GFP_KERNEL, "Freescale Vybrid");
-+	soc_dev_attr->soc_id = kasprintf(GFP_KERNEL, "%016llx", soc_id);
-+	soc_dev_attr->family = kasprintf(GFP_KERNEL, "Freescale Vybrid VF%s",
-+								 soc_type);
-+	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%08x", rom_rev);
-+
-+	soc_dev = soc_device_register(soc_dev_attr);
-+	if (IS_ERR(soc_dev)) {
-+		kfree(soc_dev_attr->revision);
-+		kfree(soc_dev_attr->family);
-+		kfree(soc_dev_attr->soc_id);
-+		kfree(soc_dev_attr->machine);
-+		kfree(soc_dev_attr);
-+		return -ENODEV;
-+	}
-+
-+	return 0;
-+}
-+device_initcall(vf610_soc_init);
+A "b #imm" would be able to cover a wide range (+/-128MB), but, as you
+said, it doesn't help with the post function call.
+
+Any plans to post an updated version with the "unexpected single-step
+error" fixed?
+
 -- 
-2.4.1
+Catalin
