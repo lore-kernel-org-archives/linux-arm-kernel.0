@@ -1,108 +1,81 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 22 May 2015 09:37:04 -0600
-Subject: [PATCH 3/6] arm64: tegra: Add Tegra210 support
-In-Reply-To: <20150522133800.GY29424@e104818-lin.cambridge.arm.com>
-References: <1431529065-20128-1-git-send-email-thierry.reding@gmail.com>
- <1431529065-20128-3-git-send-email-thierry.reding@gmail.com>
- <20150513171114.GA18655@e104818-lin.cambridge.arm.com>
- <20150515101913.GA20474@ulmo.nvidia.com>
- <20150519145211.GX21251@e104818-lin.cambridge.arm.com>
- <20150519151740.GA28161@ulmo.nvidia.com>
- <20150522133800.GY29424@e104818-lin.cambridge.arm.com>
-Message-ID: <555F4D20.2060408@wwwdotorg.org>
+From: wcohen@redhat.com (William Cohen)
+Date: Fri, 22 May 2015 11:49:37 -0400
+Subject: [PATCH v6 3/6] arm64: Kprobes with single stepping support
+In-Reply-To: <20150522110007.GV29424@e104818-lin.cambridge.arm.com>
+References: <1429561187-3661-1-git-send-email-dave.long@linaro.org>
+ <1429561187-3661-4-git-send-email-dave.long@linaro.org>
+ <20150520163946.GC29424@e104818-lin.cambridge.arm.com>
+ <555D62BD.5040403@linaro.org>
+ <20150522110007.GV29424@e104818-lin.cambridge.arm.com>
+Message-ID: <555F5011.90808@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/22/2015 07:38 AM, Catalin Marinas wrote:
-> On Tue, May 19, 2015 at 05:17:42PM +0200, Thierry Reding wrote:
->> On Tue, May 19, 2015 at 03:52:11PM +0100, Catalin Marinas wrote:
->>> On Fri, May 15, 2015 at 12:19:16PM +0200, Thierry Reding wrote:
->>>> On Wed, May 13, 2015 at 06:11:15PM +0100, Catalin Marinas wrote:
->>>>> On Wed, May 13, 2015 at 04:57:42PM +0200, Thierry Reding wrote:
->>>>>> From: Thierry Reding <treding@nvidia.com>
->>>>>>
->>>>>> NVIDIA Tegra210 (also known as Tegra X1) has four Cortex-A57 and four
->>>>>> Cortex-A53 CPUs. Compared to Tegra124 and Tegra132 it comes with a 256-
->>>>>> core Maxwell GPU. It supports processing videos of up to 4K resolutions
->>>>>> at 60 fps (H.265, VP9, H.264).
->>>>>>
->>>>>> Signed-off-by: Thierry Reding <treding@nvidia.com>
->>>>>> ---
->>>>>>   arch/arm64/Kconfig                       |   9 +
->>>>>>   arch/arm64/boot/dts/nvidia/tegra210.dtsi | 998 +++++++++++++++++++++++++++++++
->>>>>>   2 files changed, 1007 insertions(+)
->>>>>>   create mode 100644 arch/arm64/boot/dts/nvidia/tegra210.dtsi
->>>>>>
->>>>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->>>>>> index 7796af4b1d6f..bfdf064ada66 100644
->>>>>> --- a/arch/arm64/Kconfig
->>>>>> +++ b/arch/arm64/Kconfig
->>>>>> @@ -225,6 +225,15 @@ config ARCH_TEGRA_132_SOC
->>>>>>   	  but contains an NVIDIA Denver CPU complex in place of
->>>>>>   	  Tegra124's "4+1" Cortex-A15 CPU complex.
->>>>>>
->>>>>> +config ARCH_TEGRA_210_SOC
->>>>>> +	bool "NVIDIA Tegra210 SoC"
->>>>>> +	depends on ARCH_TEGRA
->>>>>> +	select PINCTRL_TEGRA210
->>>>>> +	select USB_ULPI if USB_PHY
->>>>>> +	select USB_ULPI_VIEWPORT if USB_PHY
->>>>>> +	help
->>>>>> +	  Enable support for the NVIDIA Tegra210 SoC.
->>>>>> +
->>>>>
->>>>> The previous ARCH_TEGRA_132_SOC escaped me. Do we need all these
->>>>> ARCH_TEGRA_*_SOC entries? Can we not have per-driver Kconfig options?
->>>>> For example, ARCH_TEGRA_132_SOC seems to be only used in
->>>>> drivers/clk/tegra, a specific Kconfig entry in there would suffice.
+On 05/22/2015 07:00 AM, Catalin Marinas wrote:
+> On Thu, May 21, 2015 at 12:44:45AM -0400, David Long wrote:
+>> On 05/20/15 12:39, Catalin Marinas wrote:
+>>> On Mon, Apr 20, 2015 at 04:19:44PM -0400, David Long wrote:
+>>>> Add support for basic kernel probes(kprobes) and jump probes
+>>>> (jprobes) for ARM64.
 >>>>
->>>> There are actually a couple of other places where this will be used in
->>>> subsequent patches (e.g. memory controller driver). The idea behind
->>>> having these is that each one of them is used to enable the essentials
->>>> out of the box, so that people don't have to go and enable a bunch of
->>>> driver-specific Kconfig options just to get a kernel configuration that
->>>> can actually boot.
+>>>> Kprobes utilizes software breakpoint and single step debug
+>>>> exceptions supported on ARM v8.
+>>>>
+>>>> A software breakpoint is placed at the probe address to trap the
+>>>> kernel execution into the kprobe handler.
+>>>>
+>>>> ARM v8 supports enabling single stepping before the break exception
+>>>> return (ERET), with next PC in exception return address (ELR_EL1). The
+>>>> kprobe handler prepares an executable memory slot for out-of-line
+>>>> execution with a copy of the original instruction being probed, and
+>>>> enables single stepping. The PC is set to the out-of-line slot address
+>>>> before the ERET. With this scheme, the instruction is executed with the
+>>>> exact same register context except for the PC (and DAIF) registers.
 >>>
->>> We debated whether to have ARCH_* options at all on arm64 and we settled
->>> for the middle ground - only add them for SoC families, not individual
->>> SoCs. As for the kernel configuration that actually boots, we want the
->>> arm64 defconfig to include all the supported SoCs and drivers (though
->>> longer term I'd like to see more drivers built as modules by default).
->>>
->>>> This is also useful for integrators since they can simply omit all SoC
->>>> generations that they're not interested in. Having a per-SoC option
->>>> provides an easy way of doing so.
->>>
->>> The integrators could just select a SoC family and trim down unwanted
->>> options, I don't think they rely on the kernel defconfig for a final
->>> product. If this becomes an issue, I would rather have per-SoC
->>> defconfigs than lots of Kconfig entries.
+>>> I wonder whether it would be simpler to use another software breakpoint
+>>> after the out of line instruction copy. You won't run the instructions
+>>> that change the PC anyway.
 >>
->> I understand the desire to start with a clean plate on a new
->> architecture, but Tegra has worked like this for the past 5 years and
->> it's worked out really well for us. So I'm reluctant to introduce these
->> inconsistencies merely because 64-bit ARM now lives in a different
->> directory.
->
-> That's a good time to start cleaning this up, especially since we
-> mandate single image from the beginning.
->
->> Are you concerned about arch/arm64/Kconfig growing wild? If so we could
->> easily move these configuration options outside to something like
->> drivers/soc/tegra/Kconfig. While at it, we could move existing options
->> from arch/arm/mach-tegra over to that as well.
->
-> I think the whole ARCH_TEGRA_*_SOC approach is wrong. You don't bother
-> introducing Kconfig entries for individual drivers but instead add an
-> obj-*_SOC in various Makefiles under drivers/. If we ever get to a point
-> where we can build (part of) the SoCs as modules (and I'm not talking
-> about kernels shipped with end products but those distro kernel
-> targeting development boards), we have to go back and add such Kconfig
-> entries for specific drivers.
+>> We put quite a bit of work into making single-step work.  I don't see any
+>> obvious advantage to trying to switch to a software breakpoint. Both are
+>> debug exceptions but SS does leave open the possibility of maybe eventually
+>> running some instructions that do change the PC.
+> 
+> I'm not trying to get this re-written, just as a potential workaround
+> for the unexpected single-step error reported but I need to read some
+> more before I understand it properly (and I can see patches already for
+> fixing this).
+> 
+>>> Since an unconditional branch instruction within the kernel address
+>>> space can reach any point in the kernel (and modules), could we go a
+>>> step further and avoid the software breakpoint altogether, just generate
+>>> a branch instruction to the original location (after the software
+>>> breakpoint)?
+>>
+>> Wouldn't a branch instruction have to make use of a register in order to
+>> span the whole address space?  How could you do that and have all the
+>> registers unmolested when you land back after the original probe point?  The
+>> thing that really kills this though is the fact we need to be able to run
+>> the pre and post functions before and *after* the XOL stepping.
+> 
+> A "b #imm" would be able to cover a wide range (+/-128MB), but, as you
+> said, it doesn't help with the post function call.
+> 
+> Any plans to post an updated version with the "unexpected single-step
+> error" fixed?
+> 
 
-Just as an aside, long long ago I tried to remove the ARCH_TEGRA_* usage 
-from anywhere outside arch/arm/mach-tegra, but was shot down because 
-that would not allow the driver Kconfig files to only show the drivers 
-that were relevant for the particular Tegra SoCs we had enabled. It's 
-really frustrating to have to deal with the situation of different 
-people pushing in completely the opposite directions on this kind of topic.
+Hi Catalin,
+
+The only place this issue with the "unexpected single-step error" has been observed is with the arm64 kretporbe handler code calling kprobed functions.  Experiments with kprobed functions being called in the kprobe handlers showed that situation was handled appropriately. 
+
+There is proposed fix to address the issue with the trampoline, the attached patch.  This is modeled after the way that the x86 handles the kretprobe.  The trampoline directly save and restores the registers and uses a normal call to the kretprobe handler.  It operates similarly to what you are suggesting above, but just for the special case of the kretprobes.
+
+-Will Cohen
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-Avoid-using-kprobe-in-the-arm64-kretprobe-trampoline.patch
+Type: text/x-patch
+Size: 5995 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150522/0a7af59e/attachment.bin>
