@@ -1,42 +1,54 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Fri, 22 May 2015 15:09:30 +0200
-Subject: [PATCH v8 14/16] ARM: dts: Introduce STM32F429 MCU
-In-Reply-To: <CALszF6CQ1_HQXJ8=vgytvVo2t4_ue5_nsE06HPyHMzSLrntqKg@mail.gmail.com>
-References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>	<2282066.NWoIT9ZyLc@wuerfel>	<CALszF6CaO_yuNiSDuDV+4d2NRe_+32j=zcSE1HPhB1UH59cW9w@mail.gmail.com>	<13641152.Yt4ZI3oT6L@wuerfel>	<CALszF6CK5ezrO6D=4zr6zEPC7VanzbQjnZJwKOZekEZ5L4D-Dg@mail.gmail.com>	<1432285588.3929.28.camel@pengutronix.de>	<20150522091822.GF8557@lukather>	<1432289231.3929.60.camel@pengutronix.de>
- <CALszF6CQ1_HQXJ8=vgytvVo2t4_ue5_nsE06HPyHMzSLrntqKg@mail.gmail.com>
-Message-ID: <555F2A8A.5020205@suse.de>
+From: msalter@redhat.com (Mark Salter)
+Date: Fri, 22 May 2015 09:13:24 -0400
+Subject: [PATCH] arm64: support ACPI tables outside of kernel RAM
+In-Reply-To: <20150522125346.GX29424@e104818-lin.cambridge.arm.com>
+References: <1431613373-10928-1-git-send-email-msalter@redhat.com>
+ <20150518111143.GC21251@e104818-lin.cambridge.arm.com>
+ <1431957525.9933.4.camel@deneb.redhat.com>
+ <20150518164108.GH21251@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu8wXrCnnDEw2gpJ9e1qixkVvBCsUf0wLorsdLJwknZELA@mail.gmail.com>
+ <20150522103417.GT29424@e104818-lin.cambridge.arm.com>
+ <1432298762.9933.58.camel@deneb.redhat.com>
+ <20150522125346.GX29424@e104818-lin.cambridge.arm.com>
+Message-ID: <1432300404.9933.69.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 22.05.2015 um 14:32 schrieb Maxime Coquelin:
-> 2015-05-22 12:07 GMT+02:00 Philipp Zabel <p.zabel@pengutronix.de>:
->> The STM32F427xx/STM32F429xx manual, Table 13. "STM32F427xx and
->> STM32F429xx register boundary addresses" contains this entry:
->>     Bus    Boundary address       Peripheral
->>     AHB1   0x40023800-0x400238bf  RCC
->>
->> And that's how I'd expect it to be described by the device tree:
->>
->>     rcc: rcc at 40023800 {
->>         compatible = "st,stm32-rcc";
->>         reg = <0x40023800 0xc0>;
->>     };
->>
+On Fri, 2015-05-22 at 13:53 +0100, Catalin Marinas wrote:
+> On Fri, May 22, 2015 at 08:46:02AM -0400, Mark Salter wrote:
+> > On Fri, 2015-05-22 at 11:34 +0100, Catalin Marinas wrote:
+> > > OK, so my preferred options, in this order:
+> > > 
+> > > 1. Change the core ACPI kernel code to distinguish between mapping I/O
+> > >    or RAM (could be as simple as acpi_map not using acpi_os_ioremap but
+> > >    another API). I guess the code knows when it plans to map tables or
+> > >    I/O registers
+> > > 
+> > > 2. If the above is not possible, add the extra checks as per Mark's
+> > >    patch but I would rather call this resource "UEFI RAM" than "ACPI",
+> > >    it's not really ACPI specific.
+> > 
+> > Actually, it is ACPI specific. The patch only registers resources for
+> > EfiACPIReclaimMemory and EfiACPIMemoryNVS regions which are also
+> > marked as cacheable. On x86 these show up in /proc/iomem as
+> > "ACPI Tables" and "ACPI Non-volatile Storage". I used "ACPI RAM" to
+> > avoid having to search for two strings.
 > 
-> Doing that, since this register bank contains both reset and clock
-> registers, the reset device cannot get the IO resource at probe time
-> because the clock driver has already reserved it.
-> Daniel, who has started to work on the clock driver is facing this issue.
-> This is why I proposed this binding for "reg" property.
+> My point is more about UEFI describing the entire RAM while the kernel
+> command line restricts it via "mem=". In this case, the "System RAM"
+> resources is reduced as well but it does not necessarily mean that the
+> rest of the RAM is only used by ACPI.
+> 
 
-As you should know, I did have an RCC clk driver, and there is no such
-issue. The two drivers use different mechanisms for initialization. And
-I'm pretty sure that I've already remarked that on the list, too.
+Ah okay. But I'm not sure we want the kernel to access other areas
+cut off by mem=. The case I'm dealing with which led to this patch
+was a kdump dump-collection kernel. For that kernel, we really don't
+want it accessing any general purpose memory outside of its system
+ram. For the dump collection, it already uses ioremap_cache to get
+to crash-kernel memory. The reason for the iomem resources added
+for the UEFI ACPI regions was so the dump-collection kernel could
+boot using ACPI.
 
-Regards,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Dilip Upmanyu, Graham Norton; HRB
-21284 (AG N?rnberg)
+That being said, I could rework the patch to add all "UEFI RAM" and
+that would let us just check that one string for acpi_os_ioremap()
+purposes rather than checking "System RAM" and "ACPI RAM".
