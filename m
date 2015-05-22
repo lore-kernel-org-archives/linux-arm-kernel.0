@@ -1,27 +1,29 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 22 May 2015 17:33:27 +0100
-Subject: [PATCH] coresight: etb: Remove simple announcement message
-In-Reply-To: <CANLsYkyW44THumc5ebWnX-sa5zG7X0dv1_UEqUp9Av8c5PDegg@mail.gmail.com>
-References: <1432122101-2233-1-git-send-email-broonie@kernel.org>
- <CANLsYkyW44THumc5ebWnX-sa5zG7X0dv1_UEqUp9Av8c5PDegg@mail.gmail.com>
-Message-ID: <20150522163327.GU21577@sirena.org.uk>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Fri, 22 May 2015 09:49:09 -0700
+Subject: [PATCH] input: ambakmi: Fix system PM by converting to modern
+ callbacks
+In-Reply-To: <CAPDyKFrhC1MCmOfoweztNtzk-Spwhj1uj7-sz3UtJhT_bHDQ+g@mail.gmail.com>
+References: <1429008108-29295-1-git-send-email-ulf.hansson@linaro.org>
+ <CAPDyKFrhC1MCmOfoweztNtzk-Spwhj1uj7-sz3UtJhT_bHDQ+g@mail.gmail.com>
+Message-ID: <20150522164909.GA40101@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 22, 2015 at 08:17:21AM -0600, Mathieu Poirier wrote:
+On Fri, May 22, 2015 at 04:37:12PM +0200, Ulf Hansson wrote:
+> On 14 April 2015 at 12:41, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> > The legacy system PM support has long time ago been dropped from the
+> > AMBA bus. Align to that by converting to the modern system PM
+> > callbacks.
+> >
+> > Fixes: 26825cfd90f9 (ARM: 7914/1: amba: Drop legacy PM support ...)
+> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> 
+> What happened with this one? Can we queue it for 4.2?
 
-> Linus Walleij started doing something interesting with the initial
-> printouts [1] and I think this is a better option than not printing
-> anything at all.
+I was hoping that Russel could give it a spin since he has the
+relevant hardware.
 
-It's definitely better to print information we enumerate from hardware,
-though I'm not 100% sure if AMBA does the right thing with matching here
-(most of the buses ignore hardware IDs in favour of DT information if
-things are bound via DT).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150522/08d720aa/attachment.sig>
+Thanks.
+
+-- 
+Dmitry
