@@ -1,39 +1,46 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Sat, 23 May 2015 11:16:36 +0900
-Subject: [GIT PULL] Samsung related to updating multi_v7_defconfig
-In-Reply-To: <2227456.dXyEpqfCYe@wuerfel>
-References: <555D4BF5.20008@kernel.org> <2227456.dXyEpqfCYe@wuerfel>
-Message-ID: <555FE304.5090706@kernel.org>
+Date: Sat, 23 May 2015 11:17:43 +0900
+Subject: [PATCH 1/2] ARM: exynos_defconfig: Enable display on Trats2 board
+In-Reply-To: <555EF265.30608@collabora.co.uk>
+References: <1432255718-11695-1-git-send-email-k.kozlowski@samsung.com>
+ <555EF265.30608@collabora.co.uk>
+Message-ID: <555FE347.6060908@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/23/15 00:15, Arnd Bergmann wrote:
-> On Thursday 21 May 2015 12:07:33 Kukjin Kim wrote:
->>
->> Here is multi_v7_defconfig update and mostly including regarding exynos
->> stuff based on savedefconfig which could remove useless configs based on
->> checking of dependencies.
->>
->> This series is based on v4.1-rc1 and I can provide resolution of
->> conflicts with arm-soc/next/defconfig. See below.
->>
->> Note that, IMHO we need to check 'savedefconfig when defconfig is
->> updated so that we could remove useless lines and avoid to miss some
->> defconfigs because of dependency.
->>
->> Anyway please pull and if any concerns, please kindly let me know.
->>
+On 05/22/15 18:09, Javier Martinez Canillas wrote:
+> Hello Krzysztof,
+> 
 Hi,
 
-> The conflict got a little too wild for my taste, so I dropped your
-> 'savedefconfig' commit and rebased the other ones on top of the
-> branch I already had.
+> On 05/22/2015 02:48 AM, Krzysztof Kozlowski wrote:
+>> Enable the Exynos DSI and S6E8AA0 panel for full X11 display on Trats2.
+>>
+>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> ---
+>>  arch/arm/configs/exynos_defconfig | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+>> index d034c96c039b..e7ccec487422 100644
+>> --- a/arch/arm/configs/exynos_defconfig
+>> +++ b/arch/arm/configs/exynos_defconfig
+>> @@ -135,9 +135,11 @@ CONFIG_DRM_BRIDGE=y
+>>  CONFIG_DRM_PTN3460=y
+>>  CONFIG_DRM_PS8622=y
+>>  CONFIG_DRM_EXYNOS=y
+>> +CONFIG_DRM_EXYNOS_DSI=y
+>>  CONFIG_DRM_EXYNOS_FIMD=y
+>>  CONFIG_DRM_EXYNOS_DP=y
+>>  CONFIG_DRM_PANEL=y
+>> +CONFIG_DRM_PANEL_S6E8AA0=y
+>>  CONFIG_DRM_PANEL_SIMPLE=y
+>>  CONFIG_FB=y
+>>  CONFIG_FB_MODE_HELPERS=y
+>>
 > 
-OK, no problem :-)
-
-> Please check that the result is still ok for you.
+> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 > 
-When I checked, I didn't find any missing stuff from my side. Looks
-good, thanks.
+Thanks, applied.
 
 - Kukjin
