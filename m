@@ -1,91 +1,37 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sat, 23 May 2015 03:25:21 +0200
-Subject: [V5 PATCH 1/5] ACPI / scan: Parse _CCA and setup device coherency
-In-Reply-To: <555FC695.1000404@amd.com>
-References: <1432159758-4486-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <2939517.7sXtxU6TkU@vostro.rjw.lan> <555FC695.1000404@amd.com>
-Message-ID: <9319342.HPcAml3MbA@vostro.rjw.lan>
+From: aleksey.makarov@caviumnetworks.com (Aleksey Makarov)
+Date: Fri, 22 May 2015 18:28:15 -0700
+Subject: [PATCH net-next v5 1/2] pci: Add Cavium PCI vendor id
+In-Reply-To: <1432344498-17131-1-git-send-email-aleksey.makarov@caviumnetworks.com>
+References: <1432344498-17131-1-git-send-email-aleksey.makarov@caviumnetworks.com>
+Message-ID: <1432344498-17131-2-git-send-email-aleksey.makarov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, May 22, 2015 07:15:17 PM Suravee Suthikulanit wrote:
-> On 5/22/2015 6:05 PM, Rafael J. Wysocki wrote:
-> > On Friday, May 22, 2015 05:24:15 PM Suravee Suthikulanit wrote:
-> >> Not sure if this went out earlier. So I am resending.
-> >>
-> >> On 5/22/15 16:56, Rafael J. Wysocki wrote:
-> >>>> diff --git a/drivers/acpi/glue.c b/drivers/acpi/glue.c
-> >>>>> index 39c485b..b9657af 100644
-> >>>>> --- a/drivers/acpi/glue.c
-> >>>>> +++ b/drivers/acpi/glue.c
-> >>>>> @@ -13,6 +13,7 @@
-> >>>>>   #include <linux/slab.h>
-> >>>>>   #include <linux/rwsem.h>
-> >>>>>   #include <linux/acpi.h>
-> >>>>> +#include <linux/dma-mapping.h>
-> >>>>>
-> >>>>>   #include "internal.h"
-> >>>>>
-> >>>>> @@ -167,6 +168,7 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
-> >>>>>   	struct list_head *physnode_list;
-> >>>>>   	unsigned int node_id;
-> >>>>>   	int retval = -EINVAL;
-> >>>>> +	bool coherent;
-> >>>>>
-> >>>>>   	if (has_acpi_companion(dev)) {
-> >>>>>   		if (acpi_dev) {
-> >>>>> @@ -223,6 +225,9 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
-> >>>>>   	if (!has_acpi_companion(dev))
-> >>>>>   		ACPI_COMPANION_SET(dev, acpi_dev);
-> >>>>>
-> >>>>> +	if (acpi_check_dma(acpi_dev, &coherent))
-> >>>>> +		arch_setup_dma_ops(dev, 0, 0, NULL, coherent);
-> >>>>> +
-> >>> Well, so is this going to work for PCI too after all?
-> >>>
-> >>
-> >> No, as Bjorn suggested, PCI changes for setting DMA coherent from _CCA
-> >> (patch 3/6 in V4) will be submitted separately. We are working on
-> >> cleaning up and up-streaming the PCI ACPI support for ARM64.
-> >
-> > OK, but acpi_bind_one() is called for PCI devices too.  Won't that be a problem?
-> >
-> >
->  >
-> In this case, we would be going through the following call path:
-> 
->    --> pci_device_add()
->     |--> pci_dma_configure() ** 1 **
->     |--> device_add()
->       |--> platform_notify()
->         |--> acpi_platform_notify()
->          |--> acpi_bind_one() ** 2 **
-> 
-> At (1), we would be calling arch_setup_dma_ops() with the PCI host 
-> bridge _CCA information. So, it should have already taken care of 
-> setting up device coherency here.
-> 
-> At (2), if there is no acpi_dev for endpoint devices (which I believe 
-> this is normally the case), it would return early and skip 
-> arch_setup_dma_ops().
+From: Sunil Goutham <sgoutham@cavium.com>
 
-That's not correct.  There may be ACPI companions for endpoint devices too.
+This vendor id will be used by network (vNIC), USB (xHCI),
+SATA (AHCI), GPIO, I2C, MMC and maybe other drivers
+for ThunderX SoC.
 
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+Signed-off-by: Aleksey Makarov <aleksey.makarov@caviumnetworks.com>
+---
+ include/linux/pci_ids.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-> At (2), if there is an acpi_dev, the coherent_dma flag should have 
-> already been setup by the acpi_init_device_object during ACPI scan.
-
-That one sets the flag for the *ACPI* *companion* of the device, which
-I'm still thinking is pointless, isn't it?
-
-
-> However, I am not certain about this case since I don't have the DSDT 
-> containing  PCI endpoint devices to test with.
-
-Every x86 PC has them (as far as I can say), but in that case there's no
-_CCA and they are all coherent.
-
-
+diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
+index 1fa99a3..80bd333 100644
+--- a/include/linux/pci_ids.h
++++ b/include/linux/pci_ids.h
+@@ -2324,6 +2324,8 @@
+ #define PCI_DEVICE_ID_ALTIMA_AC9100	0x03ea
+ #define PCI_DEVICE_ID_ALTIMA_AC1003	0x03eb
+ 
++#define PCI_VENDOR_ID_CAVIUM		0x177d
++
+ #define PCI_VENDOR_ID_BELKIN		0x1799
+ #define PCI_DEVICE_ID_BELKIN_F5D7010V7	0x701f
+ 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+2.4.1
