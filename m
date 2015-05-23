@@ -1,50 +1,22 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 23 May 2015 12:36:17 +0100
-Subject: [PATCH] iio: adc: xilinx-xadc: Convert to raw spinlock
-In-Reply-To: <20150518211728.GC4275@linutronix.de>
-References: <1431013090-18996-1-git-send-email-xander.huff@ni.com>
- <20150514171038.GG13442@linutronix.de> <55552570.5050407@ni.com>
- <20150518211728.GC4275@linutronix.de>
-Message-ID: <55606631.6080201@kernel.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Sat, 23 May 2015 20:41:29 +0900
+Subject: [PATCH] ARM: exynos_defconfig: savedefconfig
+In-Reply-To: <555FF55E.7020701@kernel.org>
+References: <555FF55E.7020701@kernel.org>
+Message-ID: <CAJKOXPcaK8B3oJw=qaJhgHFH3XfYNmmkGa3MFEbdBnsokZyhDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/05/15 22:17, Sebastian Andrzej Siewior wrote:
-> * Xander Huff | 2015-05-14 17:45:04 [-0500]:
-> 
->> With no other processes running, I got the following results after a
->> couple of hours on one of our devices:
->>
->> admin at Xander-roboRIO:~# cyclictest -S -m -p 98
->> # /dev/cpu_dma_latency set to 0us
->> policy: fifo: loadavg: 0.01 0.07 0.12 1/176 1473
->>
->> T: 0 ( 1373) P:98 I:1000 C:6503872 Min:      9 Act:   13 Avg:   13 Max:      51
->> T: 1 ( 1374) P:98 I:1500 C:4335914 Min:      9 Act:   12 Avg:   13 Max:      49
->>
->> With a VI reading all default handles (raw, offset, scale,
->> sampling_frequency) in /sys/bus/iio/devices/iio:device0 constantly in
->> a while loop, I got the following results after a couple hours on the
->> same device:
->>
->> admin at Xander-roboRIO:~# cyclictest -S -m -p 98
->> # /dev/cpu_dma_latency set to 0us
->> policy: fifo: loadavg: 6.93 7.30 7.47 3/182 1530
->>
->> T: 0 ( 1487) P:98 I:1000 C:4497008 Min:     11 Act:   20 Avg:   21 Max:      69
->> T: 1 ( 1488) P:98 I:1500 C:2998005 Min:     11 Act:   20 Avg:   22 Max:      59
-> 
-> So there is an increase. And there is even a for-loop and I don't know
-> how deep it is nested. Anyway, do you think it is worth it or would it
-> be better to get rid of the raw-locks and simply push everything into
-> threaded context?
-Certainly looks like that wants to be tried out...
+2015-05-23 12:34 GMT+09:00 Kukjin Kim <kgene@kernel.org>:
+> This patch does 'savedefconfig' for exynos_defconfig to remove useless
+> configs and check its dependencies. Sometimes some configs could be
+> ignored because of the dependencies even they are enabled in defconfig
+> file manually. So checking the dependencies would be better.
+>
+> Signed-off-by: Kukjin Kim <kgene@kernel.org>
 
-Jonathan
-> 
-> Sebastian
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Generated autoconf.h is almost the same as previously, so:
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+Best regards,
+Krzysztof
