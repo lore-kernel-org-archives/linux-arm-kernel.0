@@ -1,179 +1,42 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Sat, 23 May 2015 12:34:54 +0900
-Subject: [PATCH] ARM: exynos_defconfig: savedefconfig
-Message-ID: <555FF55E.7020701@kernel.org>
+Date: Sat, 23 May 2015 12:53:16 +0900
+Subject: [PATCH] ARM: dts: Update video-phy node with syscon phandle for
+ Exynos3250
+In-Reply-To: <CABxcv=npaHemH_KcYgGf-_x8Bo=V2UMDJREfUY6LRmDT1iQYpw@mail.gmail.com>
+References: <1426762587-24923-1-git-send-email-b.michalska@samsung.com>	<CAJKOXPfumy5a6A275ETy7vnztzE20qSuXD_i=ebY9Br47p93Dg@mail.gmail.com>	<CAJKOXPcnYq0pS-akXNDd8TE6wqeq0pg-cx4PK0jeke9z3tHsOw@mail.gmail.com>
+ <CABxcv=npaHemH_KcYgGf-_x8Bo=V2UMDJREfUY6LRmDT1iQYpw@mail.gmail.com>
+Message-ID: <555FF9AC.1060909@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch does 'savedefconfig' for exynos_defconfig to remove useless
-configs and check its dependencies. Sometimes some configs could be
-ignored because of the dependencies even they are enabled in defconfig
-file manually. So checking the dependencies would be better.
+On 05/21/15 16:25, Javier Martinez Canillas wrote:
+> On Thu, May 21, 2015 at 4:04 AM, Krzysztof Kozlowski
+> <k.kozlowski@samsung.com> wrote:
+>> 2015-05-21 10:57 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
+>>> 2015-03-19 19:56 GMT+09:00 Beata Michalska <b.michalska@samsung.com>:
+>>>> As a follow-up to recent changes to Exynos mipi video phy
+>>>> driver, introducing support for PMU regmap in commit
+>>>> e4b3d38088df6f3acd40 ("phy: exynos-video-mipi: Fix regression
+>>>> by adding support for PMU regmap") add a syscon phandle to
+>>>> video-phy node to bring back to life both MIPI DSI displays
+>>>> and MIPI CSIS-2 camera sensors on Exynos3250.
+>>>>
+>>>> Signed-off-by: Beata Michalska <b.michalska@samsung.com>
+>>>
+>>> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>> Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>>
+>>> Tested on Gear 2 (Exynos3250) board.
+>>
+>> Oh, I was too fast. It seems that "reg" property is not needed
+>> anymore. Can you remove it?
+>>
+> 
+> After removing the reg property as Krzysztof suggested.
+> 
+> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> 
+will apply with changing as per you guys' review comment ;-)
 
-Signed-off-by: Kukjin Kim <kgene@kernel.org>
----
- arch/arm/configs/exynos_defconfig | 50
-+++++++++++----------------------------
- 1 file changed, 14 insertions(+), 36 deletions(-)
-
-diff --git a/arch/arm/configs/exynos_defconfig
-b/arch/arm/configs/exynos_defconfig
-index e7ccec4..6cecd69 100644
---- a/arch/arm/configs/exynos_defconfig
-+++ b/arch/arm/configs/exynos_defconfig
-@@ -26,11 +26,11 @@ CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_ARM_APPENDED_DTB=y
- CONFIG_ARM_ATAG_DTB_COMPAT=y
- CONFIG_CMDLINE="root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M
-console=ttySAC1,115200 init=/linuxrc mem=256M"
-+CONFIG_CPU_FREQ=y
- CONFIG_CPU_IDLE=y
- CONFIG_ARM_EXYNOS_CPUIDLE=y
- CONFIG_VFP=y
- CONFIG_NEON=y
--CONFIG_PM=y
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
-@@ -40,15 +40,11 @@ CONFIG_IP_PNP=y
- CONFIG_IP_PNP_DHCP=y
- CONFIG_IP_PNP_BOOTP=y
- CONFIG_IP_PNP_RARP=y
--CONFIG_WIRELESS=y
- CONFIG_CFG80211=y
--CONFIG_MWIFIEX=y
--CONFIG_MWIFIEX_SDIO=y
- CONFIG_RFKILL_REGULATOR=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
--CONFIG_PROC_DEVICETREE=y
- CONFIG_DMA_CMA=y
- CONFIG_CMA_SIZE_MBYTES=64
- CONFIG_BLK_DEV_LOOP=y
-@@ -66,7 +62,8 @@ CONFIG_SMSC911X=y
- CONFIG_USB_USBNET=y
- CONFIG_USB_NET_SMSC75XX=y
- CONFIG_USB_NET_SMSC95XX=y
--CONFIG_USB_GADGET=y
-+CONFIG_MWIFIEX=y
-+CONFIG_MWIFIEX_SDIO=y
- CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_GPIO=y
- CONFIG_KEYBOARD_CROS_EC=y
-@@ -81,16 +78,13 @@ CONFIG_SERIAL_OF_PLATFORM=y
- CONFIG_HW_RANDOM=y
- CONFIG_TCG_TPM=y
- CONFIG_TCG_TIS_I2C_INFINEON=y
--CONFIG_I2C=y
- CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_MUX=y
- CONFIG_I2C_ARB_GPIO_CHALLENGE=y
--CONFIG_I2C_EXYNOS5=y
- CONFIG_I2C_GPIO=y
- CONFIG_I2C_CROS_EC_TUNNEL=y
- CONFIG_SPI=y
- CONFIG_SPI_S3C64XX=y
--CONFIG_I2C_S3C2410=y
- CONFIG_DEBUG_GPIO=y
- CONFIG_POWER_SUPPLY=y
- CONFIG_BATTERY_SBS=y
-@@ -99,13 +93,11 @@ CONFIG_BATTERY_MAX17042=y
- CONFIG_CHARGER_MAX14577=y
- CONFIG_CHARGER_MAX77693=y
- CONFIG_CHARGER_TPS65090=y
--CONFIG_HWMON=y
- CONFIG_SENSORS_LM90=y
--CONFIG_CPU_FREQ=y
--CONFIG_CPU_THERMAL=y
- CONFIG_THERMAL=y
--CONFIG_EXYNOS_THERMAL=y
-+CONFIG_CPU_THERMAL=y
- CONFIG_THERMAL_EMULATION=y
-+CONFIG_EXYNOS_THERMAL=y
- CONFIG_WATCHDOG=y
- CONFIG_S3C2410_WATCHDOG=y
- CONFIG_MFD_CROS_EC=y
-@@ -123,38 +115,27 @@ CONFIG_REGULATOR_GPIO=y
- CONFIG_REGULATOR_MAX14577=y
- CONFIG_REGULATOR_MAX8997=y
- CONFIG_REGULATOR_MAX77686=y
--CONFIG_REGULATOR_MAX77802=y
- CONFIG_REGULATOR_MAX77693=y
-+CONFIG_REGULATOR_MAX77802=y
- CONFIG_REGULATOR_S2MPA01=y
- CONFIG_REGULATOR_S2MPS11=y
- CONFIG_REGULATOR_S5M8767=y
- CONFIG_REGULATOR_TPS65090=y
- CONFIG_DRM=y
--CONFIG_DRM_EXYNOS_HDMI=y
--CONFIG_DRM_BRIDGE=y
- CONFIG_DRM_PTN3460=y
- CONFIG_DRM_PS8622=y
- CONFIG_DRM_EXYNOS=y
--CONFIG_DRM_EXYNOS_DSI=y
- CONFIG_DRM_EXYNOS_FIMD=y
--CONFIG_DRM_EXYNOS_DP=y
--CONFIG_DRM_PANEL=y
--CONFIG_DRM_PANEL_S6E8AA0=y
-+CONFIG_DRM_EXYNOS_DSI=y
-+CONFIG_DRM_EXYNOS_HDMI=y
- CONFIG_DRM_PANEL_SIMPLE=y
--CONFIG_FB=y
--CONFIG_FB_MODE_HELPERS=y
-+CONFIG_DRM_PANEL_S6E8AA0=y
- CONFIG_FB_SIMPLE=y
- CONFIG_EXYNOS_VIDEO=y
- CONFIG_EXYNOS_MIPI_DSI=y
--CONFIG_BACKLIGHT_LCD_SUPPORT=y
- CONFIG_LCD_CLASS_DEVICE=y
- CONFIG_LCD_PLATFORM=y
--CONFIG_BACKLIGHT_CLASS_DEVICE=y
--CONFIG_BACKLIGHT_GENERIC=y
- CONFIG_BACKLIGHT_PWM=y
--CONFIG_FRAMEBUFFER_CONSOLE=y
--CONFIG_FONTS=y
--CONFIG_FONT_7x14=y
- CONFIG_LOGO=y
- CONFIG_SOUND=y
- CONFIG_SND=y
-@@ -171,6 +152,7 @@ CONFIG_USB_OHCI_EXYNOS=y
- CONFIG_USB_STORAGE=y
- CONFIG_USB_DWC3=y
- CONFIG_USB_HSIC_USB3503=y
-+CONFIG_USB_GADGET=y
- CONFIG_MMC=y
- CONFIG_MMC_BLOCK_MINORS=16
- CONFIG_MMC_SDHCI=y
-@@ -199,11 +181,6 @@ CONFIG_EXYNOS_ADC=y
- CONFIG_PWM=y
- CONFIG_PWM_SAMSUNG=y
- CONFIG_PHY_EXYNOS5250_SATA=y
--CONFIG_PHY_SAMSUNG_USB2=y
--CONFIG_PHY_EXYNOS4210_USB2=y
--CONFIG_PHY_EXYNOS4X12_USB2=y
--CONFIG_PHY_EXYNOS5250_USB2=y
--CONFIG_PHY_EXYNOS5_USBDRD=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
- CONFIG_EXT4_FS=y
-@@ -219,15 +196,16 @@ CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ASCII=y
- CONFIG_NLS_ISO8859_1=y
- CONFIG_PRINTK_TIME=y
-+CONFIG_DEBUG_INFO=y
- CONFIG_DEBUG_FS=y
- CONFIG_MAGIC_SYSRQ=y
- CONFIG_DEBUG_KERNEL=y
--CONFIG_DETECT_HUNG_TASK=y
-+CONFIG_LOCKUP_DETECTOR=y
- CONFIG_DEBUG_RT_MUTEXES=y
- CONFIG_DEBUG_SPINLOCK=y
- CONFIG_DEBUG_MUTEXES=y
--CONFIG_LOCKUP_DETECTOR=y
--CONFIG_DEBUG_INFO=y
- CONFIG_DEBUG_USER=y
- CONFIG_CRYPTO_SHA256=y
- CONFIG_CRC_CCITT=y
-+CONFIG_FONTS=y
-+CONFIG_FONT_7x14=y
+Thanks,
+Kukjin
