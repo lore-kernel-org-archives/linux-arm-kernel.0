@@ -1,108 +1,91 @@
-From: wangbintian@gmail.com (Brent Wang)
-Date: Sat, 23 May 2015 08:45:31 +0800
-Subject: [PATCH v7 6/7] clk: hi6220: Clock driver support for Hisilicon
- hi6220 SoC
-In-Reply-To: <555F80BE.8070204@codeaurora.org>
-References: <1432117752-7074-1-git-send-email-bintian.wang@huawei.com>
- <1432117752-7074-2-git-send-email-bintian.wang@huawei.com>
- <555D09F3.7020506@codeaurora.org> <555D57BB.8080702@huawei.com>
- <555E1D55.1050907@codeaurora.org> <555EBCA4.9030303@huawei.com>
- <CAAS=xmgHJVThR2hVeMYZjKgJdodEG_hrs09BBA01gOXMSc8Rdg@mail.gmail.com>
- <555F76D9.10308@codeaurora.org>
- <20150522184131.GD1885@codeaurora.org>
- <CAAS=xmi98pvXR_qXREnpMfG+Tuh1d8ZdTmhJSvoMNJ0=iOoPpA@mail.gmail.com>
- <555F80BE.8070204@codeaurora.org>
-Message-ID: <CAAS=xmgZ4GoKXY+yzqA0Sbf=D8gNi6kazXrbZH-4pY6wBDpzLA@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sat, 23 May 2015 03:25:21 +0200
+Subject: [V5 PATCH 1/5] ACPI / scan: Parse _CCA and setup device coherency
+In-Reply-To: <555FC695.1000404@amd.com>
+References: <1432159758-4486-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <2939517.7sXtxU6TkU@vostro.rjw.lan> <555FC695.1000404@amd.com>
+Message-ID: <9319342.HPcAml3MbA@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Stephen,
+On Friday, May 22, 2015 07:15:17 PM Suravee Suthikulanit wrote:
+> On 5/22/2015 6:05 PM, Rafael J. Wysocki wrote:
+> > On Friday, May 22, 2015 05:24:15 PM Suravee Suthikulanit wrote:
+> >> Not sure if this went out earlier. So I am resending.
+> >>
+> >> On 5/22/15 16:56, Rafael J. Wysocki wrote:
+> >>>> diff --git a/drivers/acpi/glue.c b/drivers/acpi/glue.c
+> >>>>> index 39c485b..b9657af 100644
+> >>>>> --- a/drivers/acpi/glue.c
+> >>>>> +++ b/drivers/acpi/glue.c
+> >>>>> @@ -13,6 +13,7 @@
+> >>>>>   #include <linux/slab.h>
+> >>>>>   #include <linux/rwsem.h>
+> >>>>>   #include <linux/acpi.h>
+> >>>>> +#include <linux/dma-mapping.h>
+> >>>>>
+> >>>>>   #include "internal.h"
+> >>>>>
+> >>>>> @@ -167,6 +168,7 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
+> >>>>>   	struct list_head *physnode_list;
+> >>>>>   	unsigned int node_id;
+> >>>>>   	int retval = -EINVAL;
+> >>>>> +	bool coherent;
+> >>>>>
+> >>>>>   	if (has_acpi_companion(dev)) {
+> >>>>>   		if (acpi_dev) {
+> >>>>> @@ -223,6 +225,9 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
+> >>>>>   	if (!has_acpi_companion(dev))
+> >>>>>   		ACPI_COMPANION_SET(dev, acpi_dev);
+> >>>>>
+> >>>>> +	if (acpi_check_dma(acpi_dev, &coherent))
+> >>>>> +		arch_setup_dma_ops(dev, 0, 0, NULL, coherent);
+> >>>>> +
+> >>> Well, so is this going to work for PCI too after all?
+> >>>
+> >>
+> >> No, as Bjorn suggested, PCI changes for setting DMA coherent from _CCA
+> >> (patch 3/6 in V4) will be submitted separately. We are working on
+> >> cleaning up and up-streaming the PCI ACPI support for ARM64.
+> >
+> > OK, but acpi_bind_one() is called for PCI devices too.  Won't that be a problem?
+> >
+> >
+>  >
+> In this case, we would be going through the following call path:
+> 
+>    --> pci_device_add()
+>     |--> pci_dma_configure() ** 1 **
+>     |--> device_add()
+>       |--> platform_notify()
+>         |--> acpi_platform_notify()
+>          |--> acpi_bind_one() ** 2 **
+> 
+> At (1), we would be calling arch_setup_dma_ops() with the PCI host 
+> bridge _CCA information. So, it should have already taken care of 
+> setting up device coherency here.
+> 
+> At (2), if there is no acpi_dev for endpoint devices (which I believe 
+> this is normally the case), it would return early and skip 
+> arch_setup_dma_ops().
 
-2015-05-23 3:17 GMT+08:00 Stephen Boyd <sboyd@codeaurora.org>:
-> On 05/22/15 11:57, Brent Wang wrote:
->> Hello Stephen,
->>
->> 2015-05-23 2:41 GMT+08:00 Stephen Boyd <sboyd@codeaurora.org>:
->>> On 05/22, Stephen Boyd wrote:
->>>> On 05/22/15 11:30, Brent Wang wrote:
->>>>> Hello Stephen,
->>>>>
->>>>> 2015-05-22 13:20 GMT+08:00 Bintian <bintian.wang@huawei.com>:
->>>>>>> Is pl011 the uart device? Does it have a node in DT somewhere? If it
->>>>>>> does, then we could put the assigned-parents properties in that node so
->>>>>>> that when the pl011 probes the uart1 clock has its parent set to
->>>>>>> clk_150m. See the "Assigned clock parents and rates" section of
->>>>>>> Documentation/devicetree/bindings/clock/clock-bindings.txt.
->>>>>>>
->>>>>> I will verify this.
->>>>> Currently the "assigned-clock*" doesn't work for pl011 UART device
->>>>> node, maybe we will
->>>>> do some fix for its driver later or other modules.
->>>> Why doesn't it work?
->>>>
->>> Does this patch help?
->> Yes, it works!
->>
->> I also tested adding  "of_clk_set_defaults" to "pl011_probe()", and
->> "assigned-clock*"
->> also works.
->>
->> So you will submit another patch to fix this problem and I can revove
->> the "clk_set_parent"
->> from my patch, right ?
->>
->>
->
-> How about you take it as part of your series? Or if you're planning on
-> splitting out the clk patch to go through clk-tree I can apply it before
-> applying the clock driver patch.
-It's better you take it and I split my patch :)
+That's not correct.  There may be ACPI companions for endpoint devices too.
 
->
->
-> ----8<-----
->
-> From: Stephen Boyd <sboyd@codeaurora.org>
-> Subject: [PATCH] amba: Support clk parents and rates assigned in DT
->
-> Add the call to of_clk_set_defaults() into the amba probe path so
-> that devices on the amba bus can use the assigned rates and
-> parents feature of the common clock framework.
->
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  drivers/amba/bus.c | 5 +++++
->  1 file changed, 5 insertions(+)
->
-> diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-> index f0099360039e..350ed93d4281 100644
-> --- a/drivers/amba/bus.c
-> +++ b/drivers/amba/bus.c
-> @@ -19,6 +19,7 @@
->  #include <linux/amba/bus.h>
->  #include <linux/sizes.h>
->  #include <linux/limits.h>
-> +#include <linux/clk/clk-conf.h>
->
->  #include <asm/irq.h>
->
-> @@ -237,6 +238,10 @@ static int amba_probe(struct device *dev)
->         int ret;
->
->         do {
-> +               ret = of_clk_set_defaults(dev->of_node, false);
-> +               if (ret < 0)
-> +                       break;
-> +
->                 ret = dev_pm_domain_attach(dev, true);
->                 if (ret == -EPROBE_DEFER)
->                         break;
->
-Tested-by: Bintian Wang <bintian.wang@huawei.com>
 
-Thanks,
+> At (2), if there is an acpi_dev, the coherent_dma flag should have 
+> already been setup by the acpi_init_device_object during ACPI scan.
 
-Bintian
-> --
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+That one sets the flag for the *ACPI* *companion* of the device, which
+I'm still thinking is pointless, isn't it?
+
+
+> However, I am not certain about this case since I don't have the DSDT 
+> containing  PCI endpoint devices to test with.
+
+Every x86 PC has them (as far as I can say), but in that case there's no
+_CCA and they are all coherent.
+
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
