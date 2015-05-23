@@ -1,51 +1,25 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 23 May 2015 10:48:53 +0100
-Subject: [PATCH v5 2/3] Documentation: bindings: document the Berlin ADC
- driver
-In-Reply-To: <1431940760-23896-3-git-send-email-antoine.tenart@free-electrons.com>
-References: <1431940760-23896-1-git-send-email-antoine.tenart@free-electrons.com>
- <1431940760-23896-3-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <55604D05.1050809@kernel.org>
+Date: Sat, 23 May 2015 12:23:44 +0100
+Subject: [PATCH 2/2] iio: adc: xilinx-xadc: Add xlnx,extend-name as an
+ optional argument for aux channels
+In-Reply-To: <555B78A3.2030202@metafoo.de>
+References: <1431038644-41600-1-git-send-email-xander.huff@ni.com>
+ <1431038644-41600-2-git-send-email-xander.huff@ni.com>
+ <555B78A3.2030202@metafoo.de>
+Message-ID: <55606340.1090403@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/05/15 10:19, Antoine Tenart wrote:
-> Following the addition of a Berlin ADC driver, this patch adds the
-> corresponding bindings documentation.
+On 19/05/15 18:53, Lars-Peter Clausen wrote:
+> On 05/08/2015 12:44 AM, Xander Huff wrote:
+>> To better facilitate user-mode access to optional aux channels, allow
+>> device trees to specify a custom extended name for defined channels.
 > 
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> Acked-by: Jonathan Cameron <jic23@kernel.org>
-Applied and pushed out as the togreg branch of iio.git.
+> Hi,
+> 
+> 'extend-name' is kind of a IIO specific term. I think a better name in the devicetree context would be 'label'. That's used everywhere else when giving a short description string to a node.
+> 
+Hi Lars,
 
-Thanks,
-> ---
->  .../devicetree/bindings/iio/adc/berlin2_adc.txt       | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iio/adc/berlin2_adc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/iio/adc/berlin2_adc.txt b/Documentation/devicetree/bindings/iio/adc/berlin2_adc.txt
-> new file mode 100644
-> index 000000000000..908334c6b07f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/iio/adc/berlin2_adc.txt
-> @@ -0,0 +1,19 @@
-> +* Berlin Analog to Digital Converter (ADC)
-> +
-> +The Berlin ADC has 8 channels, with one connected to a temperature sensor.
-> +It is part of the system controller register set. The ADC node should be a
-> +sub-node of the system controller node.
-> +
-> +Required properties:
-> +- compatible: must be "marvell,berlin2-adc"
-> +- interrupts: the interrupts for the ADC and the temperature sensor
-> +- interrupt-names: should be "adc" and "tsen"
-> +
-> +Example:
-> +
-> +adc: adc {
-> +	compatible = "marvell,berlin2-adc";
-> +	interrupt-parent = <&sic>;
-> +	interrupts = <12>, <14>;
-> +	interrupt-names = "adc", "tsen";
-> +};
-> 
+What do you think of the general idea?  I'm unconvinced we want to do this in channel naming.
+Perhaps we want an additional attribute giving access to this sort of 'semantic' information?
