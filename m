@@ -1,46 +1,36 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Sat, 23 May 2015 13:00:58 +0900
-Subject: [PATCH v4 0/8] ARM: dts: exynos5: labels for overriding nodes
-In-Reply-To: <1431851175-32624-1-git-send-email-k.kozlowski.k@gmail.com>
-References: <1431851175-32624-1-git-send-email-k.kozlowski.k@gmail.com>
-Message-ID: <555FFB7A.7040300@kernel.org>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Fri, 22 May 2015 23:28:50 -0500
+Subject: [PATCH 0/3] ARM: socfpga: enable SMP for Arria10
+Message-ID: <1432355333-15515-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/17/15 17:26, Krzysztof Kozlowski wrote:
-> Hi,
-> 
-> 
-> Changes since v3
-> ================
-> 1. Rebased on current Kukjin's for-next branch:
->    v4.1-rc3-34-gfcfae6b049cf
-> 
-> Changes since v2
-> ================
-> 1. New patch 8/8: ARM: dts: Use labels for overriding nodes
->    in exynos5422-odroidxu3
-> 2. To avoid conflicts rebased on my "for-next" branch of
->    https://github.com/krzk/linux
->    The branch above contains some patches for Exynos5 boards
->    applied from LKML.
-> 
-> Changes since v1
-> ================
-> 1. Re-phrased the description (phandle->label). Suggested by Arnd.
-> 
-> 
-> Description
-> ===========
-> The label-based notation reduces possible mistakes when overriding
-> nodes by child DTSI and board files and reduces duplication
-> of addresses.
-> 
-> The patchset refactors Exynos5 boards to use labels for overriding nodes.
-> 
-> Tested by comparison of decompiled DTB for each commit.
-> 
-Same, will sort out.
+From: Dinh Nguyen <dinguyen@opensource.altera.com>
+
+Hi,
+
+The goal of these 3 patches is to enable SMP on the Arria10 platform. During
+the process, I found it would be much cleaner to convert the Cyclone5/Arria5
+platform to use CPU_METHOD_OF_DECLARE instead of the machine descriptor.
+
+The procedure to enable SMP on the Arria10 platform is similar to the Cyclone5/
+Arria5 with the exception of a few differences in the register offset of the
+reset manager designed to bring the secondary core out of reset. So instead of
+littering the code with machine lookups, just use CPU_METHOD_OF_DECLARE.
 
 Thanks,
-Kukjin
+
+Dinh Nguyen (3):
+  ARM: socfpga: use CPU_METHOD_OF_DECLARE for socfpga_cyclone5
+  ARM: socfpga: add CPU_METHOD_OF_DECLARE for Arria 10
+  ARM: socfpga: dts: add enable-method property for cpu nodes
+
+ arch/arm/boot/dts/socfpga.dtsi         |  1 +
+ arch/arm/boot/dts/socfpga_arria10.dtsi |  1 +
+ arch/arm/mach-socfpga/core.h           |  2 ++
+ arch/arm/mach-socfpga/platsmp.c        | 32 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-socfpga/socfpga.c        |  1 -
+ 5 files changed, 36 insertions(+), 1 deletion(-)
+
+-- 
+2.2.1
