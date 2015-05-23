@@ -1,49 +1,46 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Sat, 23 May 2015 11:18:58 +0900
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable display on Trats2board
-In-Reply-To: <555EF2B5.1000504@collabora.co.uk>
-References: <1432255718-11695-1-git-send-email-k.kozlowski@samsung.com>
- <1432255718-11695-2-git-send-email-k.kozlowski@samsung.com>
- <555EF2B5.1000504@collabora.co.uk>
-Message-ID: <555FE392.5030409@kernel.org>
+Date: Sat, 23 May 2015 11:20:06 +0900
+Subject: [PATCH 1/2] ARM: dts: exynos4: Remove obsolete MIPI DPHY 'reg'
+ property
+In-Reply-To: <CABxcv=mKLGVWj2swi63-AkdF_-D5eVM=-785dJ8WjUNC-D1zpg@mail.gmail.com>
+References: <1432174713-23368-1-git-send-email-k.kozlowski@samsung.com>
+ <CABxcv=mKLGVWj2swi63-AkdF_-D5eVM=-785dJ8WjUNC-D1zpg@mail.gmail.com>
+Message-ID: <555FE3D6.7030009@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/22/15 18:11, Javier Martinez Canillas wrote:
+On 05/21/15 16:23, Javier Martinez Canillas wrote:
 > Hello Krzysztof,
 > 
-> On 05/22/2015 02:48 AM, Krzysztof Kozlowski wrote:
->> Enable the Exynos DSI and S6E8AA0 panel for full X11 display on Trats2.
+> On Thu, May 21, 2015 at 4:18 AM, Krzysztof Kozlowski
+> <k.kozlowski@samsung.com> wrote:
+>> Since e4b3d38088df ("phy: exynos-video-mipi: Fix regression by adding
+>> support for PMU regmap") the Exynos PMU driver provides regmap to access
+>> the MIPI DPHY registers. The MIPI DPHY node uses a phandle to syscon to
+>> get this regmap. The 'reg' field is obsolete.
 >>
 >> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 >> ---
->>  arch/arm/configs/multi_v7_defconfig | 2 ++
->>  1 file changed, 2 insertions(+)
+>>  arch/arm/boot/dts/exynos4.dtsi | 1 -
+>>  1 file changed, 1 deletion(-)
 >>
->> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
->> index 0848337a2a01..e9785020aab1 100644
->> --- a/arch/arm/configs/multi_v7_defconfig
->> +++ b/arch/arm/configs/multi_v7_defconfig
->> @@ -413,10 +413,12 @@ CONFIG_DRM=y
->>  CONFIG_DRM_PTN3460=m
->>  CONFIG_DRM_PS8622=m
->>  CONFIG_DRM_EXYNOS=m
->> +CONFIG_DRM_EXYNOS_DSI=y
->>  CONFIG_DRM_EXYNOS_FIMD=y
->>  CONFIG_DRM_EXYNOS_HDMI=y
->>  CONFIG_DRM_RCAR_DU=m
->>  CONFIG_DRM_TEGRA=y
->> +CONFIG_DRM_PANEL_S6E8AA0=m
->>  CONFIG_DRM_PANEL_SIMPLE=y
->>  CONFIG_FB_ARMCLCD=y
->>  CONFIG_FB_WM8505=y
+>> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+>> index 1c74c1296ab7..6e7f0b4afa84 100644
+>> --- a/arch/arm/boot/dts/exynos4.dtsi
+>> +++ b/arch/arm/boot/dts/exynos4.dtsi
+>> @@ -78,7 +78,6 @@
 >>
+>>         mipi_phy: video-phy at 10020710 {
+>>                 compatible = "samsung,s5pv210-mipi-video-phy";
+>> -               reg = <0x10020710 8>;
+>>                 #phy-cells = <1>;
+>>                 syscon = <&pmu_system_controller>;
+>>         };
+> 
+> Indeed, is even removed from the DT binding so this is clearly a left over.
 > 
 > Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 > 
-Looks good to me and this would be handled by arm-soc guys directly :-)
+Thanks, applied this series.
 
-Acked-by: Kukjin Kim <kgene@kernel.org>
-
-Thanks,
-Kukjin
+- Kukjin
