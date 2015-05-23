@@ -1,71 +1,36 @@
-From: shailendra.capricorn@gmail.com (Shailendra Verma)
-Date: Sat, 23 May 2015 08:32:51 +0530
-Subject: [PATCH] cpufreq:exynos-cpufreq - Fix for memory leak in case SOC name
- does not match.
-Message-ID: <1432350171-2414-1-git-send-email-shailendra.capricorn@gmail.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Sat, 23 May 2015 12:08:42 +0900
+Subject: [GIT PULL] Samsung 3rd fixes for v4.1
+Message-ID: <555FEF3A.303@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During probe free the memory allocated to "exynos_info" in case of
-unknown SOC type.
+The following changes since commit 030bbdbf4c833bc69f502eae58498bc5572db736:
 
-Signed-off-by: Shailendra Verma <shailendra.capricorn@gmail.com>
----
- drivers/cpufreq/exynos-cpufreq.c |   15 +++++++++++----
- 1 file changed, 11 insertions(+), 4 deletions(-)
+  Linux 4.1-rc3 (2015-05-10 15:12:29 -0700)
 
-diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
-index 82d2fbb..5b57a0f 100644
---- a/drivers/cpufreq/exynos-cpufreq.c
-+++ b/drivers/cpufreq/exynos-cpufreq.c
-@@ -182,20 +182,25 @@ static int exynos_cpufreq_probe(struct platform_device *pdev)
- 		ret = exynos5250_cpufreq_init(exynos_info);
- 	} else {
- 		pr_err("%s: Unknown SoC type\n", __func__);
--		return -ENODEV;
-+		ret = -ENODEV;
-+		goto err_vdd_arm;
- 	}
- 
--	if (ret)
-+	if (ret) {
-+		ret = -EINVAL;
- 		goto err_vdd_arm;
-+	}
- 
- 	if (exynos_info->set_freq == NULL) {
- 		dev_err(&pdev->dev, "No set_freq function (ERR)\n");
-+		ret = -EINVAL;
- 		goto err_vdd_arm;
- 	}
- 
- 	arm_regulator = regulator_get(NULL, "vdd_arm");
- 	if (IS_ERR(arm_regulator)) {
- 		dev_err(&pdev->dev, "failed to get resource vdd_arm\n");
-+		ret = -EINVAL;
- 		goto err_vdd_arm;
- 	}
- 
-@@ -203,8 +208,10 @@ static int exynos_cpufreq_probe(struct platform_device *pdev)
- 	locking_frequency = clk_get_rate(exynos_info->cpu_clk) / 1000;
- 
- 	ret = cpufreq_register_driver(&exynos_driver);
--	if (ret)
-+	if (ret) {
-+		ret = -EINVAL;
- 		goto err_cpufreq_reg;
-+	}
- 
- 	cpu0 = of_get_cpu_node(0, NULL);
- 	if (!cpu0) {
-@@ -227,7 +234,7 @@ err_cpufreq_reg:
- 	regulator_put(arm_regulator);
- err_vdd_arm:
- 	kfree(exynos_info);
--	return -EINVAL;
-+	return ret;
- }
- 
- static struct platform_driver exynos_cpufreq_platdrv = {
--- 
-1.7.9.5
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+tags/samsung-fixes-3
+
+for you to fetch changes up to 242ddf04297f2c4768bd8eb7593ab911910c5f76:
+
+  ARM: dts: set display clock correctly for exynos4412-trats2
+(2015-05-23 11:46:55 +0900)
+
+----------------------------------------------------------------
+Samsung fix for v4.1
+
+- Set display clock correctly for exynos4412-trats2
+  : fix the following error
+
+    exynos-drm: No connectors reported connected with modes
+    [drm] Cannot find any crtc or sizes - going 1024x768
+
+----------------------------------------------------------------
+Inki Dae (1):
+      ARM: dts: set display clock correctly for exynos4412-trats2
+
+ arch/arm/boot/dts/exynos4412-trats2.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
