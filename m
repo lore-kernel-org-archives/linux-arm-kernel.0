@@ -1,46 +1,97 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 23 May 2015 10:28:20 +0200
-Subject: [PATCH v8 14/16] ARM: dts: Introduce STM32F429 MCU
-In-Reply-To: <CALszF6BuvTf86k6S5UEYZs-DJSTehy=+Csb3c6jxMU90MN05zw@mail.gmail.com>
-References: <1431158038-3813-1-git-send-email-mcoquelin.stm32@gmail.com>
- <2282066.NWoIT9ZyLc@wuerfel>
- <CALszF6CaO_yuNiSDuDV+4d2NRe_+32j=zcSE1HPhB1UH59cW9w@mail.gmail.com>
- <13641152.Yt4ZI3oT6L@wuerfel>
- <CALszF6CK5ezrO6D=4zr6zEPC7VanzbQjnZJwKOZekEZ5L4D-Dg@mail.gmail.com>
- <20150521185122.GD8557@lukather>
- <CALszF6BuvTf86k6S5UEYZs-DJSTehy=+Csb3c6jxMU90MN05zw@mail.gmail.com>
-Message-ID: <20150523082820.GK8557@lukather>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sat, 23 May 2015 21:55:35 +0900
+Subject: [PATCH v3] serial: 8250_uniphier: add UniPhier serial driver
+In-Reply-To: <1432126581.28073.87.camel@linux.intel.com>
+References: <1431997900-18390-1-git-send-email-yamada.masahiro@socionext.com>
+ <1432126581.28073.87.camel@linux.intel.com>
+Message-ID: <CAK7LNARuczTPCwJ9gZMoUU3f7o++8vMnVuqeZyjFY1BAdmbgXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi Andy,
 
-On Thu, May 21, 2015 at 10:10:35PM +0200, Maxime Coquelin wrote:
-> > The only thing we did that stands out a bit is that we actually need
-> > the reset driver much earlier than the default probe, since some of
-> > our timers are maintained in reset. We have some code to do just that
-> > already, we just need have something similar to be on board.
-> 
-> We have the same problem on stm32, as just discussed with Andreas [0].
-> I decided to patch the bootloader to deassert timers reset, after
-> discussions with Rob Herring and Arnd.
+Thanks for reviewing my patch.
 
-That seems like the best solution, but we don't have control over the
-bootloader in most cases. We have an alternative implementation (ie
-mainline u-boot) that is required for a few things already, but I'd
-really like to still be able to at least boot the kernel on a "legacy"
-bootloader (that is the one flashed on the device).
 
-Maxime
+2015-05-20 21:56 GMT+09:00 Andy Shevchenko <andriy.shevchenko@linux.intel.com>:
+> On Tue, 2015-05-19 at 10:11 +0900, Masahiro Yamada wrote:
+>> Add the driver for on-chip UART used on UniPhier SoCs.
+>>
+>> This hardware is similar to 8250 with a slightly different register
+>> mapping, so it should go into drivers/tty/serial/8250 directory.
+>
+> Few comments below.
+>
+> First of all what is the differences with the original 8250? It worth to
+> list them here in the changelog.
+>
+
+I noted this in the git-log
+
+
+>> +
+>> +#include <linux/clk.h>
+>> +#include <linux/io.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/serial_8250.h>
+>> +#include <linux/serial_core.h>
+>> +#include <linux/serial_reg.h>
+>
+> Shouldn't be enough to have only serial_8250.h here?
+>
+> + empty line between #include <> and "".
+
+
+I did so in v4.
+
+
+
+
+>> +static int uniphier_uart_probe(struct platform_device *pdev)
+>> +{
+>> +     struct resource *regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +     struct resource *irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+>
+> Please use platform_get_irq().
+
+OK. Fixed.
+
+
+>> +     struct device *dev = &pdev->dev;
+>> +     struct uniphier8250_priv *priv;
+>> +     struct uart_8250_port up;
+>> +     int ret;
+>> +     void __iomem *membase;
+>> +
+>> +     if (!regs || !irq) {
+>> +             dev_err(dev, "missing registers or irq\n");
+>> +             return -EINVAL;
+>> +     }
+>> +
+>> +     priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+>> +     if (!priv)
+>> +             return -ENOMEM;
+>> +
+>> +     membase = devm_ioremap(dev, regs->start, resource_size(regs));
+>
+> Shouldn't be devm_ioremap_resource() ?
+
+
+I tried this, but it broke my driver.
+
+It looks like the cause of error is in the devm_request_mem_region()
+called from that function,
+
+
+8250_core.c also calls request_mem_region().
+I think it fails if the memory region is already reserved
+before calling serial8250_register_8250_port().
+
+So, I am sticking to devm_ioremap().
+
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150523/f4e4f7d0/attachment.sig>
+Best Regards
+Masahiro Yamada
