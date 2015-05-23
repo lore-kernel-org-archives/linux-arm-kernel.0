@@ -1,34 +1,52 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Sat, 23 May 2015 19:41:49 +0200
-Subject: [PATCH V2 3/6] power: mxs_power: add driver for mxs power
- subsystem
-In-Reply-To: <1430346747-28728-4-git-send-email-stefan.wahren@i2se.com>
-References: <1430346747-28728-1-git-send-email-stefan.wahren@i2se.com>
- <1430346747-28728-4-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <20150523174149.GA16004@earth>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 23 May 2015 22:27:31 +0200
+Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable display on Trats2board
+In-Reply-To: <555FE392.5030409@kernel.org>
+References: <1432255718-11695-1-git-send-email-k.kozlowski@samsung.com>
+ <555EF2B5.1000504@collabora.co.uk> <555FE392.5030409@kernel.org>
+Message-ID: <6222475.TyjQftkmuB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Saturday 23 May 2015 11:18:58 Kukjin Kim wrote:
+> On 05/22/15 18:11, Javier Martinez Canillas wrote:
+> > Hello Krzysztof,
+> > 
+> > On 05/22/2015 02:48 AM, Krzysztof Kozlowski wrote:
+> >> Enable the Exynos DSI and S6E8AA0 panel for full X11 display on Trats2.
+> >>
+> >> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> >> ---
+> >>  arch/arm/configs/multi_v7_defconfig | 2 ++
+> >>  1 file changed, 2 insertions(+)
+> >>
+> >> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> >> index 0848337a2a01..e9785020aab1 100644
+> >> --- a/arch/arm/configs/multi_v7_defconfig
+> >> +++ b/arch/arm/configs/multi_v7_defconfig
+> >> @@ -413,10 +413,12 @@ CONFIG_DRM=y
+> >>  CONFIG_DRM_PTN3460=m
+> >>  CONFIG_DRM_PS8622=m
+> >>  CONFIG_DRM_EXYNOS=m
+> >> +CONFIG_DRM_EXYNOS_DSI=y
+> >>  CONFIG_DRM_EXYNOS_FIMD=y
+> >>  CONFIG_DRM_EXYNOS_HDMI=y
+> >>  CONFIG_DRM_RCAR_DU=m
+> >>  CONFIG_DRM_TEGRA=y
+> >> +CONFIG_DRM_PANEL_S6E8AA0=m
+> >>  CONFIG_DRM_PANEL_SIMPLE=y
+> >>  CONFIG_FB_ARMCLCD=y
+> >>  CONFIG_FB_WM8505=y
+> >>
+> > 
+> > Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> > 
+> Looks good to me and this would be handled by arm-soc guys directly 
+> 
+> Acked-by: Kukjin Kim <kgene@kernel.org>
+> 
 
-On Wed, Apr 29, 2015 at 10:32:24PM +0000, Stefan Wahren wrote:
-> This patch adds a minimal driver for the Freescale i.MX23, i.MX28
-> power subsystem. It's required to trigger the probing of the underlying
-> drivers like on-chip regulators.
+I'd actually prefer if you could put this into the same branch as your
+other defconfig changes. We'll handle any conflicts when merging that in.
 
-I'm not sure what you need the power supply class for. I see only
-one property (ac connected), which is constant. Maybe just drop
-the power supply stuff?
-
-This would leave an almost empty driver, which just sets a single
-register at probe time and probes more drivers. That would probably
-be more fitting for the MFD subsystem.
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150523/d2e569a5/attachment.sig>
+	Arnd
