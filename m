@@ -1,339 +1,443 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 23 May 2015 17:31:55 +0900
-Subject: [PATCH v4] serial: 8250_uniphier: add UniPhier serial driver
-Message-ID: <1432369915-30453-1-git-send-email-yamada.masahiro@socionext.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 23 May 2015 10:48:25 +0100
+Subject: [PATCH v5 1/3] iio: adc: add support for Berlin
+In-Reply-To: <1431940760-23896-2-git-send-email-antoine.tenart@free-electrons.com>
+References: <1431940760-23896-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1431940760-23896-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <55604CE9.9030800@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the driver for on-chip UART used on UniPhier SoCs.
-
-This hardware is similar to 8250, but the register mapping is
-slightly different:
-  - The offset to FCR, MCR is different.
-  - The divisor latch access bit does not exist.  Instead, the
-    divisor latch register is available at offset 9.
-
-This driver overrides serial_{in,out}, dl_{read,write} callbacks,
-but wants to borrow most of code from 8250_core.c.
-
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
----
-
-Changes in v4:
-  - Use spin_lock for read-modify-write register access
-  - Add /* fall through */ comments where I intentionally
-    did not add "break";
-  - Drop unnecessary #include <linux/serial_core.h>
-  - Drop unnecessary #include <linux/serial_reg.h>
-  - Add an empty line between #include <> and ""
-  - Use platform_get_irq() instead of platform_get_resource()
-
-Changes in v3:
-  - Just add *_SHIFT macro for the special case
-
-Changes in v2:
-  - Drop unnecessary #include <linux/init.h>
-  - Sort includes in alphabetical order
-  - Use devm_clk_get() rather than of_clk_get()
-  - Delete unneeded clk_put() from uniphier_uart_remove callback
-  - Delete unneeded IS_ERR_OR_NULL check from uniphier_uart_remove callback
-  - Use UNIPHIER_UART_*_SHIFT instead of hard-coded shift values
-  - Change the first argument type of uniphier_of_serial_setup()
-    from (struct platform_device *) to (struct device *) for code-cleanup.
-
- drivers/tty/serial/8250/8250_uniphier.c | 257 ++++++++++++++++++++++++++++++++
- drivers/tty/serial/8250/Kconfig         |   7 +
- drivers/tty/serial/8250/Makefile        |   1 +
- 3 files changed, 265 insertions(+)
- create mode 100644 drivers/tty/serial/8250/8250_uniphier.c
-
-diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
-new file mode 100644
-index 0000000..f2522e9
---- /dev/null
-+++ b/drivers/tty/serial/8250/8250_uniphier.c
-@@ -0,0 +1,257 @@
-+/*
-+ * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/serial_8250.h>
-+
-+#include "8250.h"
-+
-+/* Most (but not all) of UniPhier UART devices have 64-depth FIFO. */
-+#define UNIPHIER_UART_DEFAULT_FIFO_SIZE	64
-+
-+#define UNIPHIER_UART_CHAR_FCR	3	/* Character / FIFO Control Register */
-+#define UNIPHIER_UART_LCR_MCR	4	/* Line/Modem Control Register */
-+#define   UNIPHIER_UART_LCR_SHIFT	8
-+#define UNIPHIER_UART_DLR	9	/* Divisor Latch Register */
-+
-+struct uniphier8250_priv {
-+	int line;
-+	struct clk *clk;
-+	spinlock_t atomic_write_lock;
-+};
-+
-+/*
-+ * The register map is slightly different from that of 8250.
-+ * IO callbacks must be overridden for correct access to FCR, LCR, and MCR.
-+ */
-+static unsigned int uniphier_serial_in(struct uart_port *p, int offset)
-+{
-+	int valshift = 0;
-+
-+	switch (offset) {
-+	case UART_LCR:
-+		valshift = UNIPHIER_UART_LCR_SHIFT;
-+		/* fall through */
-+	case UART_MCR:
-+		offset = UNIPHIER_UART_LCR_MCR;
-+		break;
-+	default:
-+		break;
-+	}
-+
-+	offset <<= p->regshift;
-+
-+	/*
-+	 * The return value must be masked with 0xff because LCR and MCR reside
-+	 * in the same register that must be accessed by 32-bit write/read.
-+	 * 8 or 16 bit access to this hardware result in unexpected behavior.
-+	 */
-+	return (readl(p->membase + offset) >> valshift) & 0xff;
-+}
-+
-+static void uniphier_serial_out(struct uart_port *p, int offset, int value)
-+{
-+	int valshift = 0;
-+	bool normal = false;
-+
-+	switch (offset) {
-+	case UART_FCR:
-+		offset = UNIPHIER_UART_CHAR_FCR;
-+		break;
-+	case UART_LCR:
-+		valshift = UNIPHIER_UART_LCR_SHIFT;
-+		/* Divisor latch access bit does not exist. */
-+		value &= ~(UART_LCR_DLAB << valshift);
-+		/* fall through */
-+	case UART_MCR:
-+		offset = UNIPHIER_UART_LCR_MCR;
-+		break;
-+	default:
-+		normal = true;
-+		break;
-+	}
-+
-+	offset <<= p->regshift;
-+
-+	if (normal) {
-+		writel(value, p->membase + offset);
-+	} else {
-+		/*
-+		 * Special case: two registers share the same address that
-+		 * must be 32-bit accessed.  As this is not longer atomic safe,
-+		 * take a lock just in case.
-+		 */
-+		struct uniphier8250_priv *priv = p->private_data;
-+		unsigned long flags;
-+		u32 tmp;
-+
-+		spin_lock_irqsave(&priv->atomic_write_lock, flags);
-+		tmp = readl(p->membase + offset);
-+		tmp &= ~(0xff << valshift);
-+		tmp |= value << valshift;
-+		writel(tmp, p->membase + offset);
-+		spin_unlock_irqrestore(&priv->atomic_write_lock, flags);
-+	}
-+}
-+
-+/*
-+ * This hardware does not have the divisor latch access bit.
-+ * The divisor latch register exists at different address.
-+ * Override dl_read/write callbacks.
-+ */
-+static int uniphier_serial_dl_read(struct uart_8250_port *up)
-+{
-+	return readl(up->port.membase + UNIPHIER_UART_DLR);
-+}
-+
-+static void uniphier_serial_dl_write(struct uart_8250_port *up, int value)
-+{
-+	writel(value, up->port.membase + UNIPHIER_UART_DLR);
-+}
-+
-+static int uniphier_of_serial_setup(struct device *dev, struct uart_port *port,
-+				    struct uniphier8250_priv *priv)
-+{
-+	int ret;
-+	u32 prop;
-+	struct device_node *np = dev->of_node;
-+
-+	ret = of_alias_get_id(np, "serial");
-+	if (ret < 0) {
-+		dev_err(dev, "failed to get alias id\n");
-+		return ret;
-+	}
-+	port->line = priv->line = ret;
-+
-+	/* Get clk rate through clk driver */
-+	priv->clk = devm_clk_get(dev, 0);
-+	if (IS_ERR(priv->clk)) {
-+		dev_err(dev, "failed to get clock\n");
-+		return PTR_ERR(priv->clk);
-+	}
-+
-+	ret = clk_prepare_enable(priv->clk);
-+	if (ret < 0)
-+		return ret;
-+
-+	port->uartclk = clk_get_rate(priv->clk);
-+
-+	/* Check for fifo size */
-+	if (of_property_read_u32(np, "fifo-size", &prop) == 0)
-+		port->fifosize = prop;
-+	else
-+		port->fifosize = UNIPHIER_UART_DEFAULT_FIFO_SIZE;
-+
-+	return 0;
-+}
-+
-+static int uniphier_uart_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct uart_8250_port up;
-+	struct uniphier8250_priv *priv;
-+	struct resource *regs;
-+	void __iomem *membase;
-+	int irq;
-+	int ret;
-+
-+	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!regs) {
-+		dev_err(dev, "failed to get memory resource");
-+		return -EINVAL;
-+	}
-+
-+	membase = devm_ioremap(dev, regs->start, resource_size(regs));
-+	if (!membase)
-+		return -ENOMEM;
-+
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq < 0) {
-+		dev_err(dev, "failed to get IRQ number");
-+		return irq;
-+	}
-+
-+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	memset(&up, 0, sizeof(up));
-+
-+	ret = uniphier_of_serial_setup(dev, &up.port, priv);
-+	if (ret < 0)
-+		return ret;
-+
-+	spin_lock_init(&priv->atomic_write_lock);
-+
-+	up.port.dev = dev;
-+	up.port.private_data = priv;
-+	up.port.mapbase = regs->start;
-+	up.port.membase = membase;
-+	up.port.irq = irq;
-+
-+	up.port.type = PORT_16550A;
-+	up.port.iotype = UPIO_MEM32;
-+	up.port.regshift = 2;
-+	up.port.flags = UPF_FIXED_PORT | UPF_FIXED_TYPE;
-+	up.capabilities = UART_CAP_FIFO;
-+
-+	up.port.serial_in = uniphier_serial_in;
-+	up.port.serial_out = uniphier_serial_out;
-+	up.dl_read = uniphier_serial_dl_read;
-+	up.dl_write = uniphier_serial_dl_write;
-+
-+	ret = serial8250_register_8250_port(&up);
-+	if (ret < 0) {
-+		dev_err(dev, "failed to register 8250 port\n");
-+		return ret;
-+	}
-+
-+	platform_set_drvdata(pdev, priv);
-+
-+	return 0;
-+}
-+
-+static int uniphier_uart_remove(struct platform_device *pdev)
-+{
-+	struct uniphier8250_priv *priv = platform_get_drvdata(pdev);
-+
-+	serial8250_unregister_port(priv->line);
-+	clk_disable_unprepare(priv->clk);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id uniphier_uart_match[] = {
-+	{ .compatible = "socionext,uniphier-uart" },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, uniphier_uart_match);
-+
-+static struct platform_driver uniphier_uart_platform_driver = {
-+	.probe		= uniphier_uart_probe,
-+	.remove		= uniphier_uart_remove,
-+	.driver = {
-+		.name	= "uniphier-uart",
-+		.of_match_table = uniphier_uart_match,
-+	},
-+};
-+module_platform_driver(uniphier_uart_platform_driver);
-+
-+MODULE_AUTHOR("Masahiro Yamada <yamada.masahiro@socionext.com>");
-+MODULE_DESCRIPTION("UniPhier UART driver");
-+MODULE_LICENSE("GPL");
-diff --git a/drivers/tty/serial/8250/Kconfig b/drivers/tty/serial/8250/Kconfig
-index c350703..3e1ae446 100644
---- a/drivers/tty/serial/8250/Kconfig
-+++ b/drivers/tty/serial/8250/Kconfig
-@@ -342,3 +342,10 @@ config SERIAL_8250_MT6577
- 	help
- 	  If you have a Mediatek based board and want to use the
- 	  serial port, say Y to this option. If unsure, say N.
-+
-+config SERIAL_8250_UNIPHIER
-+	tristate "Support for UniPhier on-chip UART"
-+	depends on SERIAL_8250 && ARCH_UNIPHIER
-+	help
-+	  If you have a UniPhier based board and want to use the on-chip
-+	  serial ports, say Y to this option. If unsure, say N.
-diff --git a/drivers/tty/serial/8250/Makefile b/drivers/tty/serial/8250/Makefile
-index 31e7cdc..f7ca8c3 100644
---- a/drivers/tty/serial/8250/Makefile
-+++ b/drivers/tty/serial/8250/Makefile
-@@ -23,3 +23,4 @@ obj-$(CONFIG_SERIAL_8250_EM)		+= 8250_em.o
- obj-$(CONFIG_SERIAL_8250_OMAP)		+= 8250_omap.o
- obj-$(CONFIG_SERIAL_8250_FINTEK)	+= 8250_fintek.o
- obj-$(CONFIG_SERIAL_8250_MT6577)	+= 8250_mtk.o
-+obj-$(CONFIG_SERIAL_8250_UNIPHIER)	+= 8250_uniphier.o
--- 
-1.9.1
+On 18/05/15 10:19, Antoine Tenart wrote:
+> This patch adds the support of the Berlin ADC, available on Berlin SoCs.
+> This ADC has 8 channels available, with one connected to a temperature
+> sensor.
+> 
+> The particularity here, is that the temperature sensor connected to the
+> ADC has its own registers, and both the ADC and the temperature sensor
+> must be configured when using it.
+> 
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+Applied and pushed out as togreg.
+> ---
+>  drivers/iio/adc/Kconfig       |   7 +
+>  drivers/iio/adc/Makefile      |   1 +
+>  drivers/iio/adc/berlin2-adc.c | 378 ++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 386 insertions(+)
+>  create mode 100644 drivers/iio/adc/berlin2-adc.c
+> 
+> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
+> index e36a73e7c3a8..cee50de76fb1 100644
+> --- a/drivers/iio/adc/Kconfig
+> +++ b/drivers/iio/adc/Kconfig
+> @@ -135,6 +135,13 @@ config AXP288_ADC
+>  	  device. Depending on platform configuration, this general purpose ADC can
+>  	  be used for sampling sensors such as thermal resistors.
+>  
+> +config BERLIN2_ADC
+> +	tristate "Marvell Berlin2 ADC driver"
+> +	depends on ARCH_BERLIN
+> +	help
+> +	  Marvell Berlin2 ADC driver. This ADC has 8 channels, with one used for
+> +	  temperature measurement.
+> +
+>  config DA9150_GPADC
+>  	tristate "Dialog DA9150 GPADC driver support"
+>  	depends on MFD_DA9150
+> diff --git a/drivers/iio/adc/Makefile b/drivers/iio/adc/Makefile
+> index 3930e63e84bc..a0962103e866 100644
+> --- a/drivers/iio/adc/Makefile
+> +++ b/drivers/iio/adc/Makefile
+> @@ -15,6 +15,7 @@ obj-$(CONFIG_AD7887) += ad7887.o
+>  obj-$(CONFIG_AD799X) += ad799x.o
+>  obj-$(CONFIG_AT91_ADC) += at91_adc.o
+>  obj-$(CONFIG_AXP288_ADC) += axp288_adc.o
+> +obj-$(CONFIG_BERLIN2_ADC) += berlin2-adc.o
+>  obj-$(CONFIG_DA9150_GPADC) += da9150-gpadc.o
+>  obj-$(CONFIG_CC10001_ADC) += cc10001_adc.o
+>  obj-$(CONFIG_EXYNOS_ADC) += exynos_adc.o
+> diff --git a/drivers/iio/adc/berlin2-adc.c b/drivers/iio/adc/berlin2-adc.c
+> new file mode 100644
+> index 000000000000..aecc9ad995ad
+> --- /dev/null
+> +++ b/drivers/iio/adc/berlin2-adc.c
+> @@ -0,0 +1,378 @@
+> +/*
+> + * Marvell Berlin2 ADC driver
+> + *
+> + * Copyright (C) 2015 Marvell Technology Group Ltd.
+> + *
+> + * Antoine Tenart <antoine.tenart@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/iio/iio.h>
+> +#include <linux/iio/driver.h>
+> +#include <linux/iio/machine.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/regmap.h>
+> +#include <linux/sched.h>
+> +#include <linux/wait.h>
+> +
+> +#define BERLIN2_SM_CTRL				0x14
+> +#define  BERLIN2_SM_CTRL_SM_SOC_INT		BIT(1)
+> +#define  BERLIN2_SM_CTRL_SOC_SM_INT		BIT(2)
+> +#define  BERLIN2_SM_CTRL_ADC_SEL(x)		(BIT(x) << 5)	/* 0-15 */
+> +#define  BERLIN2_SM_CTRL_ADC_SEL_MASK		(0xf << 5)
+> +#define  BERLIN2_SM_CTRL_ADC_POWER		BIT(9)
+> +#define  BERLIN2_SM_CTRL_ADC_CLKSEL_DIV2	(0x0 << 10)
+> +#define  BERLIN2_SM_CTRL_ADC_CLKSEL_DIV3	(0x1 << 10)
+> +#define  BERLIN2_SM_CTRL_ADC_CLKSEL_DIV4	(0x2 << 10)
+> +#define  BERLIN2_SM_CTRL_ADC_CLKSEL_DIV8	(0x3 << 10)
+> +#define  BERLIN2_SM_CTRL_ADC_CLKSEL_MASK	(0x3 << 10)
+> +#define  BERLIN2_SM_CTRL_ADC_START		BIT(12)
+> +#define  BERLIN2_SM_CTRL_ADC_RESET		BIT(13)
+> +#define  BERLIN2_SM_CTRL_ADC_BANDGAP_RDY	BIT(14)
+> +#define  BERLIN2_SM_CTRL_ADC_CONT_SINGLE	(0x0 << 15)
+> +#define  BERLIN2_SM_CTRL_ADC_CONT_CONTINUOUS	(0x1 << 15)
+> +#define  BERLIN2_SM_CTRL_ADC_BUFFER_EN		BIT(16)
+> +#define  BERLIN2_SM_CTRL_ADC_VREF_EXT		(0x0 << 17)
+> +#define  BERLIN2_SM_CTRL_ADC_VREF_INT		(0x1 << 17)
+> +#define  BERLIN2_SM_CTRL_ADC_ROTATE		BIT(19)
+> +#define  BERLIN2_SM_CTRL_TSEN_EN		BIT(20)
+> +#define  BERLIN2_SM_CTRL_TSEN_CLK_SEL_125	(0x0 << 21)	/* 1.25 MHz */
+> +#define  BERLIN2_SM_CTRL_TSEN_CLK_SEL_250	(0x1 << 21)	/* 2.5 MHz */
+> +#define  BERLIN2_SM_CTRL_TSEN_MODE_0_125	(0x0 << 22)	/* 0-125 C */
+> +#define  BERLIN2_SM_CTRL_TSEN_MODE_10_50	(0x1 << 22)	/* 10-50 C */
+> +#define  BERLIN2_SM_CTRL_TSEN_RESET		BIT(29)
+> +#define BERLIN2_SM_ADC_DATA			0x20
+> +#define  BERLIN2_SM_ADC_MASK			0x3ff
+> +#define BERLIN2_SM_ADC_STATUS			0x1c
+> +#define  BERLIN2_SM_ADC_STATUS_DATA_RDY(x)	BIT(x)		/* 0-15 */
+> +#define  BERLIN2_SM_ADC_STATUS_DATA_RDY_MASK	0xf
+> +#define  BERLIN2_SM_ADC_STATUS_INT_EN(x)	(BIT(x) << 16)	/* 0-15 */
+> +#define  BERLIN2_SM_ADC_STATUS_INT_EN_MASK	(0xf << 16)
+> +#define BERLIN2_SM_TSEN_STATUS			0x24
+> +#define  BERLIN2_SM_TSEN_STATUS_DATA_RDY	BIT(0)
+> +#define  BERLIN2_SM_TSEN_STATUS_INT_EN		BIT(1)
+> +#define BERLIN2_SM_TSEN_DATA			0x28
+> +#define  BERLIN2_SM_TSEN_MASK			0xfff
+> +#define BERLIN2_SM_TSEN_CTRL			0x74
+> +#define  BERLIN2_SM_TSEN_CTRL_START		BIT(8)
+> +#define  BERLIN2_SM_TSEN_CTRL_SETTLING_4	(0x0 << 21)	/* 4 us */
+> +#define  BERLIN2_SM_TSEN_CTRL_SETTLING_12	(0x1 << 21)	/* 12 us */
+> +#define  BERLIN2_SM_TSEN_CTRL_SETTLING_MASK	(0x1 << 21)
+> +#define  BERLIN2_SM_TSEN_CTRL_TRIM(x)		((x) << 22)
+> +#define  BERLIN2_SM_TSEN_CTRL_TRIM_MASK		(0xf << 22)
+> +
+> +struct berlin2_adc_priv {
+> +	struct regmap		*regmap;
+> +	struct mutex		lock;
+> +	wait_queue_head_t	wq;
+> +	bool			data_available;
+> +	int			data;
+> +};
+> +
+> +#define BERLIN2_ADC_CHANNEL(n, t)					\
+> +		{							\
+> +			.channel	= n,				\
+> +			.datasheet_name	= "channel"#n,			\
+> +			.type		= t,				\
+> +			.indexed	= 1,				\
+> +			.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),	\
+> +		}
+> +
+> +static struct iio_chan_spec berlin2_adc_channels[] = {
+> +	BERLIN2_ADC_CHANNEL(0, IIO_VOLTAGE),	/* external input */
+> +	BERLIN2_ADC_CHANNEL(1, IIO_VOLTAGE),	/* external input */
+> +	BERLIN2_ADC_CHANNEL(2, IIO_VOLTAGE),	/* external input */
+> +	BERLIN2_ADC_CHANNEL(3, IIO_VOLTAGE),	/* external input */
+> +	BERLIN2_ADC_CHANNEL(4, IIO_VOLTAGE),	/* reserved */
+> +	BERLIN2_ADC_CHANNEL(5, IIO_VOLTAGE),	/* reserved */
+> +	{					/* temperature sensor */
+> +		.channel		= 6,
+> +		.datasheet_name		= "channel6",
+> +		.type			= IIO_TEMP,
+> +		.indexed		= 0,
+> +		.info_mask_separate	= BIT(IIO_CHAN_INFO_PROCESSED),
+> +	},
+> +	BERLIN2_ADC_CHANNEL(7, IIO_VOLTAGE),	/* reserved */
+> +	IIO_CHAN_SOFT_TIMESTAMP(8),		/* timestamp */
+> +};
+> +#define BERLIN2_N_CHANNELS	ARRAY_SIZE(berlin2_adc_channels)
+> +
+> +static int berlin2_adc_read(struct iio_dev *indio_dev, int channel)
+> +{
+> +	struct berlin2_adc_priv *priv = iio_priv(indio_dev);
+> +	int data, ret;
+> +
+> +	mutex_lock(&priv->lock);
+> +
+> +	/* Configure the ADC */
+> +	regmap_update_bits(priv->regmap, BERLIN2_SM_CTRL,
+> +			BERLIN2_SM_CTRL_ADC_RESET | BERLIN2_SM_CTRL_ADC_SEL_MASK
+> +			| BERLIN2_SM_CTRL_ADC_START,
+> +			BERLIN2_SM_CTRL_ADC_SEL(channel) | BERLIN2_SM_CTRL_ADC_START);
+> +
+> +	ret = wait_event_interruptible_timeout(priv->wq, priv->data_available,
+> +			msecs_to_jiffies(1000));
+> +
+> +	/* Disable the interrupts */
+> +	regmap_update_bits(priv->regmap, BERLIN2_SM_ADC_STATUS,
+> +			BERLIN2_SM_ADC_STATUS_INT_EN(channel), 0);
+> +
+> +	if (ret == 0)
+> +		ret = -ETIMEDOUT;
+> +	if (ret < 0) {
+> +		mutex_unlock(&priv->lock);
+> +		return ret;
+> +	}
+> +
+> +	regmap_update_bits(priv->regmap, BERLIN2_SM_CTRL,
+> +			BERLIN2_SM_CTRL_ADC_START, 0);
+> +
+> +	data = priv->data;
+> +	priv->data_available = false;
+> +
+> +	mutex_unlock(&priv->lock);
+> +
+> +	return data;
+> +}
+> +
+> +static int berlin2_adc_tsen_read(struct iio_dev *indio_dev)
+> +{
+> +	struct berlin2_adc_priv *priv = iio_priv(indio_dev);
+> +	int data, ret;
+> +
+> +	mutex_lock(&priv->lock);
+> +
+> +	/* Configure the ADC */
+> +	regmap_update_bits(priv->regmap, BERLIN2_SM_CTRL,
+> +			BERLIN2_SM_CTRL_TSEN_RESET | BERLIN2_SM_CTRL_ADC_ROTATE,
+> +			BERLIN2_SM_CTRL_ADC_ROTATE);
+> +
+> +	/* Configure the temperature sensor */
+> +	regmap_update_bits(priv->regmap, BERLIN2_SM_TSEN_CTRL,
+> +			BERLIN2_SM_TSEN_CTRL_TRIM_MASK | BERLIN2_SM_TSEN_CTRL_SETTLING_MASK
+> +			| BERLIN2_SM_TSEN_CTRL_START,
+> +			BERLIN2_SM_TSEN_CTRL_TRIM(3) | BERLIN2_SM_TSEN_CTRL_SETTLING_12
+> +			| BERLIN2_SM_TSEN_CTRL_START);
+> +
+> +	ret = wait_event_interruptible_timeout(priv->wq, priv->data_available,
+> +			msecs_to_jiffies(1000));
+> +
+> +	/* Disable interrupts */
+> +	regmap_update_bits(priv->regmap, BERLIN2_SM_TSEN_STATUS,
+> +			BERLIN2_SM_TSEN_STATUS_INT_EN, 0);
+> +
+> +	if (ret == 0)
+> +		ret = -ETIMEDOUT;
+> +	if (ret < 0) {
+> +		mutex_unlock(&priv->lock);
+> +		return ret;
+> +	}
+> +
+> +	regmap_update_bits(priv->regmap, BERLIN2_SM_TSEN_CTRL,
+> +			BERLIN2_SM_TSEN_CTRL_START, 0);
+> +
+> +	data = priv->data;
+> +	priv->data_available = false;
+> +
+> +	mutex_unlock(&priv->lock);
+> +
+> +	return data;
+> +}
+> +
+> +static int berlin2_adc_read_raw(struct iio_dev *indio_dev,
+> +		struct iio_chan_spec const *chan, int *val, int *val2,
+> +		long mask)
+> +{
+> +	struct berlin2_adc_priv *priv = iio_priv(indio_dev);
+> +	int temp;
+> +
+> +	switch (mask) {
+> +	case IIO_CHAN_INFO_RAW:
+> +		if (chan->type != IIO_VOLTAGE)
+> +			return -EINVAL;
+> +
+> +		/* Enable the interrupts */
+> +		regmap_write(priv->regmap, BERLIN2_SM_ADC_STATUS,
+> +				BERLIN2_SM_ADC_STATUS_INT_EN(chan->channel));
+> +
+> +		*val = berlin2_adc_read(indio_dev, chan->channel);
+> +		if (*val < 0)
+> +			return *val;
+> +
+> +		return IIO_VAL_INT;
+> +	case IIO_CHAN_INFO_PROCESSED:
+> +		if (chan->type != IIO_TEMP)
+> +			return -EINVAL;
+> +
+> +		/* Enable interrupts */
+> +		regmap_write(priv->regmap, BERLIN2_SM_TSEN_STATUS,
+> +				BERLIN2_SM_TSEN_STATUS_INT_EN);
+> +
+> +		temp = berlin2_adc_tsen_read(indio_dev);
+> +		if (temp < 0)
+> +			return temp;
+> +
+> +		if (temp > 2047)
+> +			temp = -(4096 - temp);
+> +
+> +		/* Convert to milli Celsius */
+> +		*val = ((temp * 100000) / 264 - 270000);
+> +		return IIO_VAL_INT;
+> +	default:
+> +		break;
+> +	}
+> +
+> +	return -EINVAL;
+> +}
+> +
+> +static irqreturn_t berlin2_adc_irq(int irq, void *private)
+> +{
+> +	struct berlin2_adc_priv *priv = iio_priv(private);
+> +	unsigned val;
+> +
+> +	regmap_read(priv->regmap, BERLIN2_SM_ADC_STATUS, &val);
+> +	if (val & BERLIN2_SM_ADC_STATUS_DATA_RDY_MASK) {
+> +		regmap_read(priv->regmap, BERLIN2_SM_ADC_DATA, &priv->data);
+> +		priv->data &= BERLIN2_SM_ADC_MASK;
+> +
+> +		val &= ~BERLIN2_SM_ADC_STATUS_DATA_RDY_MASK;
+> +		regmap_write(priv->regmap, BERLIN2_SM_ADC_STATUS, val);
+> +
+> +		priv->data_available = true;
+> +		wake_up_interruptible(&priv->wq);
+> +	}
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static irqreturn_t berlin2_adc_tsen_irq(int irq, void *private)
+> +{
+> +	struct berlin2_adc_priv *priv = iio_priv(private);
+> +	unsigned val;
+> +
+> +	regmap_read(priv->regmap, BERLIN2_SM_TSEN_STATUS, &val);
+> +	if (val & BERLIN2_SM_TSEN_STATUS_DATA_RDY) {
+> +		regmap_read(priv->regmap, BERLIN2_SM_TSEN_DATA, &priv->data);
+> +		priv->data &= BERLIN2_SM_TSEN_MASK;
+> +
+> +		val &= ~BERLIN2_SM_TSEN_STATUS_DATA_RDY;
+> +		regmap_write(priv->regmap, BERLIN2_SM_TSEN_STATUS, val);
+> +
+> +		priv->data_available = true;
+> +		wake_up_interruptible(&priv->wq);
+> +	}
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static const struct iio_info berlin2_adc_info = {
+> +	.driver_module	= THIS_MODULE,
+> +	.read_raw	= berlin2_adc_read_raw,
+> +};
+> +
+> +static int berlin2_adc_probe(struct platform_device *pdev)
+> +{
+> +	struct iio_dev *indio_dev;
+> +	struct berlin2_adc_priv *priv;
+> +	struct device_node *parent_np = of_get_parent(pdev->dev.of_node);
+> +	int irq, tsen_irq;
+> +	int ret;
+> +
+> +	indio_dev = devm_iio_device_alloc(&pdev->dev,
+> +					  sizeof(struct berlin2_adc_priv));
+> +	if (!indio_dev)
+> +		return -ENOMEM;
+> +
+> +	priv = iio_priv(indio_dev);
+> +	platform_set_drvdata(pdev, indio_dev);
+> +
+> +	priv->regmap = syscon_node_to_regmap(parent_np);
+> +	of_node_put(parent_np);
+> +	if (IS_ERR(priv->regmap))
+> +		return PTR_ERR(priv->regmap);
+> +
+> +	irq = platform_get_irq_byname(pdev, "adc");
+> +	if (irq < 0)
+> +		return -ENODEV;
+> +
+> +	tsen_irq = platform_get_irq_byname(pdev, "tsen");
+> +	if (tsen_irq < 0)
+> +		return -ENODEV;
+> +
+> +	ret = devm_request_irq(&pdev->dev, irq, berlin2_adc_irq, 0,
+> +			pdev->dev.driver->name, indio_dev);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = devm_request_irq(&pdev->dev, tsen_irq, berlin2_adc_tsen_irq,
+> +			0, pdev->dev.driver->name, indio_dev);
+> +	if (ret)
+> +		return ret;
+> +
+> +	init_waitqueue_head(&priv->wq);
+> +	mutex_init(&priv->lock);
+> +
+> +	indio_dev->dev.parent = &pdev->dev;
+> +	indio_dev->name = dev_name(&pdev->dev);
+> +	indio_dev->modes = INDIO_DIRECT_MODE;
+> +	indio_dev->info = &berlin2_adc_info;
+> +
+> +	indio_dev->num_channels = BERLIN2_N_CHANNELS;
+> +	indio_dev->channels = berlin2_adc_channels;
+> +
+> +	/* Power up the ADC */
+> +	regmap_update_bits(priv->regmap, BERLIN2_SM_CTRL,
+> +			BERLIN2_SM_CTRL_ADC_POWER, BERLIN2_SM_CTRL_ADC_POWER);
+> +
+> +	ret = iio_device_register(indio_dev);
+> +	if (ret) {
+> +		/* Power down the ADC */
+> +		regmap_update_bits(priv->regmap, BERLIN2_SM_CTRL,
+> +				BERLIN2_SM_CTRL_ADC_POWER, 0);
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int berlin2_adc_remove(struct platform_device *pdev)
+> +{
+> +	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
+> +	struct berlin2_adc_priv *priv = iio_priv(indio_dev);
+> +
+> +	iio_device_unregister(indio_dev);
+> +
+> +	/* Power down the ADC */
+> +	regmap_update_bits(priv->regmap, BERLIN2_SM_CTRL,
+> +			BERLIN2_SM_CTRL_ADC_POWER, 0);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id berlin2_adc_match[] = {
+> +	{ .compatible = "marvell,berlin2-adc", },
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, berlin2_adc_match);
+> +
+> +static struct platform_driver berlin2_adc_driver = {
+> +	.driver	= {
+> +		.name		= "berlin2-adc",
+> +		.of_match_table	= berlin2_adc_match,
+> +	},
+> +	.probe	= berlin2_adc_probe,
+> +	.remove	= berlin2_adc_remove,
+> +};
+> +module_platform_driver(berlin2_adc_driver);
+> +
+> +MODULE_AUTHOR("Antoine Tenart <antoine.tenart@free-electrons.com>");
+> +MODULE_DESCRIPTION("Marvell Berlin2 ADC driver");
+> +MODULE_LICENSE("GPL v2");
+> 
