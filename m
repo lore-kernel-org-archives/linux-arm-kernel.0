@@ -1,83 +1,43 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sat, 23 May 2015 10:12:02 +0530
-Subject: [PATCH] cpufreq:exynos-cpufreq - Fix for memory leak in case SOC
- name does not match.
-In-Reply-To: <1432350171-2414-1-git-send-email-shailendra.capricorn@gmail.com>
-References: <1432350171-2414-1-git-send-email-shailendra.capricorn@gmail.com>
-Message-ID: <20150523044202.GA5751@linux>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 23 May 2015 09:49:30 +0200
+Subject: [PATCH v2 1/7] clk: Add a basic factor clock
+In-Reply-To: <CAGb2v64rqRC24wPWz5xYZv=w2QAtsCb-pd76Qynkb5NBCptXhQ@mail.gmail.com>
+References: <1432241646-9511-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1432241646-9511-2-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v64rqRC24wPWz5xYZv=w2QAtsCb-pd76Qynkb5NBCptXhQ@mail.gmail.com>
+Message-ID: <20150523074930.GI8557@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23-05-15, 08:32, Shailendra Verma wrote:
-> During probe free the memory allocated to "exynos_info" in case of
-> unknown SOC type.
+On Fri, May 22, 2015 at 12:35:35PM +0800, Chen-Yu Tsai wrote:
+> Hi,
 > 
-> Signed-off-by: Shailendra Verma <shailendra.capricorn@gmail.com>
-> ---
->  drivers/cpufreq/exynos-cpufreq.c |   15 +++++++++++----
->  1 file changed, 11 insertions(+), 4 deletions(-)
+> On Fri, May 22, 2015 at 4:54 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Some clocks are using a factor component, however, unlike their mux, gate
+> > or divider counterpart, these factors don't have a basic clock
+> > implementation.
 > 
-> diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
-> index 82d2fbb..5b57a0f 100644
-> --- a/drivers/cpufreq/exynos-cpufreq.c
-> +++ b/drivers/cpufreq/exynos-cpufreq.c
-> @@ -182,20 +182,25 @@ static int exynos_cpufreq_probe(struct platform_device *pdev)
->  		ret = exynos5250_cpufreq_init(exynos_info);
->  	} else {
->  		pr_err("%s: Unknown SoC type\n", __func__);
-> -		return -ENODEV;
-> +		ret = -ENODEV;
-> +		goto err_vdd_arm;
+> I think "multiplier" would be a better name here, considering it is the
+> counterpart of "divider". "factor" implies you can multiply and/or divide
+> the clock rate.
 
-Because we are going to check ret again, don't add the goto here. The
-below code will take care of this.
+You're probably right, I didn't though of it that way :)
 
->  	}
->  
-> -	if (ret)
-> +	if (ret) {
-> +		ret = -EINVAL;
+> Unless of course you plan to add that? :)
 
-Why update ret here ?
+Hmmm, no, not really.
 
->  		goto err_vdd_arm;
-> +	}
->  
->  	if (exynos_info->set_freq == NULL) {
->  		dev_err(&pdev->dev, "No set_freq function (ERR)\n");
-> +		ret = -EINVAL;
->  		goto err_vdd_arm;
->  	}
->  
->  	arm_regulator = regulator_get(NULL, "vdd_arm");
->  	if (IS_ERR(arm_regulator)) {
->  		dev_err(&pdev->dev, "failed to get resource vdd_arm\n");
-> +		ret = -EINVAL;
->  		goto err_vdd_arm;
->  	}
->  
-> @@ -203,8 +208,10 @@ static int exynos_cpufreq_probe(struct platform_device *pdev)
->  	locking_frequency = clk_get_rate(exynos_info->cpu_clk) / 1000;
->  
->  	ret = cpufreq_register_driver(&exynos_driver);
-> -	if (ret)
-> +	if (ret) {
-> +		ret = -EINVAL;
-
-Wrong again.
-
->  		goto err_cpufreq_reg;
-> +	}
->  
->  	cpu0 = of_get_cpu_node(0, NULL);
->  	if (!cpu0) {
-> @@ -227,7 +234,7 @@ err_cpufreq_reg:
->  	regulator_put(arm_regulator);
->  err_vdd_arm:
->  	kfree(exynos_info);
-> -	return -EINVAL;
-> +	return ret;
->  }
+Maxime
 
 -- 
-viresh
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150523/e78aa35e/attachment.sig>
