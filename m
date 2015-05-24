@@ -1,53 +1,32 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Sun, 24 May 2015 21:08:14 +0200
-Subject: [PATCH] ARM: BCM5301X: add IRQ numbers for PCIe controller
-Message-ID: <1432494494-13361-1-git-send-email-hauke@hauke-m.de>
+From: lorenx4@gmail.com (Lorenzo Nava)
+Date: Sun, 24 May 2015 21:30:57 +0200
+Subject: [PATCH] arm DMA: Fix allocation from CMA for coherent DMA
+Message-ID: <1432495857-10630-1-git-send-email-lorenx4@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver for the PCIe controller was just added, this adds the
-missing definition of the IRQ numbers to device tree. The driver itself
-will be automatically detected by bcma.
+This patch is to allow the use of CMA for DMA coherent memory allocation.
+At the moment if "is_coherent" is set to true the allocation can't use the CMA, which I think is not the desired behaviour.  
 
-Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
 ---
- arch/arm/boot/dts/bcm5301x.dtsi | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ arch/arm/mm/dma-mapping.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
-index 78aec62..51c6a8b 100644
---- a/arch/arm/boot/dts/bcm5301x.dtsi
-+++ b/arch/arm/boot/dts/bcm5301x.dtsi
-@@ -108,6 +108,30 @@
- 			/* ChipCommon */
- 			<0x00000000 0 &gic GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>,
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 7e7583d..cc9382a 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -645,9 +645,9 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+ 	size = PAGE_ALIGN(size);
+ 	want_vaddr = !dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs);
  
-+			/* PCIe Controller 0 */
-+			<0x00012000 0 &gic GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00012000 1 &gic GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00012000 2 &gic GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00012000 3 &gic GIC_SPI 129 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00012000 4 &gic GIC_SPI 130 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00012000 5 &gic GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>,
-+
-+			/* PCIe Controller 1 */
-+			<0x00013000 0 &gic GIC_SPI 132 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00013000 1 &gic GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00013000 2 &gic GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00013000 3 &gic GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00013000 4 &gic GIC_SPI 136 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00013000 5 &gic GIC_SPI 137 IRQ_TYPE_LEVEL_HIGH>,
-+
-+			/* PCIe Controller 2 */
-+			<0x00014000 0 &gic GIC_SPI 138 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00014000 1 &gic GIC_SPI 138 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00014000 2 &gic GIC_SPI 140 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00014000 3 &gic GIC_SPI 141 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00014000 4 &gic GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00014000 5 &gic GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>,
-+
- 			/* USB 2.0 Controller */
- 			<0x00021000 0 &gic GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>,
- 
+-	if (is_coherent || nommu())
++	if (nommu())
+ 		addr = __alloc_simple_buffer(dev, size, gfp, &page);
+-	else if (!(gfp & __GFP_WAIT))
++	else if (!is_coherent && !(gfp & __GFP_WAIT))
+ 		addr = __alloc_from_pool(size, &page);
+ 	else if (!dev_get_cma_area(dev))
+ 		addr = __alloc_remap_buffer(dev, size, gfp, prot, &page, caller, want_vaddr);
 -- 
-2.1.4
+1.7.10.4
