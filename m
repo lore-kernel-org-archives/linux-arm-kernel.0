@@ -1,35 +1,52 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Sun, 24 May 2015 11:32:53 +0800
-Subject: [PATCH v9 4/4] crypto: Add Allwinner Security System crypto
- accelerator
-In-Reply-To: <20150523163536.2d64ef8d@bbrezillon>
-References: <1431608341-10936-1-git-send-email-clabbe.montjoie@gmail.com>
- <1431608341-10936-5-git-send-email-clabbe.montjoie@gmail.com>
- <20150517104508.468b032f@bbrezillon> <55607CB7.8020505@gmail.com>
- <20150523163536.2d64ef8d@bbrezillon>
-Message-ID: <20150524033253.GB20656@gondor.apana.org.au>
+From: bintian.wang@huawei.com (Bintian Wang)
+Date: Sun, 24 May 2015 12:11:09 +0800
+Subject: [PATCH v8 4/7] clk: hisilicon: Remove __init for marking function
+ prototypes
+Message-ID: <1432440671-25235-1-git-send-email-bintian.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 23, 2015 at 04:35:36PM +0200, Boris Brezillon wrote:
->
-> > Since all SG I get was always a multiple of 16 (AES BLOCK SIZE) it was a sort of confirmation.
-> > 
-> > Herbert ? does am I right or a chunking test is missing for cbc(aes) in testmgr.h
-> 
-> Okay, just sharing my vision of this thing (I'll let Herbert comment on
-> this aspect): I'd say that theoretically nothing prevents one from
-> splitting its sg list in chunks smaller than the block size, so I'd
-> say you should use the same trick for AES. 
+__init markings on function prototypes are useless, so remove
+them.
 
-Indeed, you must be able to handle a block that straddles two SG
-entries.  If the hardware is not capable then you have to linearise
-it by copying or use a fallback.
+Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Bintian Wang <bintian.wang@huawei.com>
+---
+ drivers/clk/hisilicon/clk.h | 22 +++++++++++-----------
+ 1 file changed, 11 insertions(+), 11 deletions(-)
 
-I can't believe we don't have a generic test for this in testmgr.
-
-Cheers,
+diff --git a/drivers/clk/hisilicon/clk.h b/drivers/clk/hisilicon/clk.h
+index 31083ff..6b6f994 100644
+--- a/drivers/clk/hisilicon/clk.h
++++ b/drivers/clk/hisilicon/clk.h
+@@ -95,17 +95,17 @@ struct clk *hisi_register_clkgate_sep(struct device *, const char *,
+ 				void __iomem *, u8,
+ 				u8, spinlock_t *);
+ 
+-struct hisi_clock_data __init *hisi_clk_init(struct device_node *, int);
+-void __init hisi_clk_register_fixed_rate(struct hisi_fixed_rate_clock *,
+-					int, struct hisi_clock_data *);
+-void __init hisi_clk_register_fixed_factor(struct hisi_fixed_factor_clock *,
+-					int, struct hisi_clock_data *);
+-void __init hisi_clk_register_mux(struct hisi_mux_clock *, int,
++struct hisi_clock_data *hisi_clk_init(struct device_node *, int);
++void hisi_clk_register_fixed_rate(struct hisi_fixed_rate_clock *,
++				int, struct hisi_clock_data *);
++void hisi_clk_register_fixed_factor(struct hisi_fixed_factor_clock *,
++				int, struct hisi_clock_data *);
++void hisi_clk_register_mux(struct hisi_mux_clock *, int,
+ 				struct hisi_clock_data *);
+-void __init hisi_clk_register_divider(struct hisi_divider_clock *,
++void hisi_clk_register_divider(struct hisi_divider_clock *,
++				int, struct hisi_clock_data *);
++void hisi_clk_register_gate(struct hisi_gate_clock *,
++				int, struct hisi_clock_data *);
++void hisi_clk_register_gate_sep(struct hisi_gate_clock *,
+ 				int, struct hisi_clock_data *);
+-void __init hisi_clk_register_gate(struct hisi_gate_clock *,
+-					int, struct hisi_clock_data *);
+-void __init hisi_clk_register_gate_sep(struct hisi_gate_clock *,
+-					int, struct hisi_clock_data *);
+ #endif	/* __HISI_CLK_H */
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+1.9.1
