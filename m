@@ -1,58 +1,44 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sun, 24 May 2015 23:55:22 +0800
-Subject: [linux-sunxi] Re: [RFC 7/7] ARM: dts: sun9i: Add secure SRAM node
- used for MCPM SMP hotplug
-In-Reply-To: <20150520100831.GE4004@lukather>
-References: <1431583811-25780-1-git-send-email-wens@csie.org>
- <1431583811-25780-8-git-send-email-wens@csie.org>
- <20150520100831.GE4004@lukather>
-Message-ID: <CAGb2v67+F_cnjHXgGwbewPODG=mLMPGaZCzvvLfXL=A3huceew@mail.gmail.com>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Mon, 25 May 2015 01:00:31 +0900
+Subject: [RFC PATCH 0/2] vmalloc based thread_info allocator
+Message-ID: <1432483231-23061-1-git-send-email-jungseoklee85@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 6:08 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Thu, May 14, 2015 at 02:10:11PM +0800, Chen-Yu Tsai wrote:
->> The A80 stores some magic flags in a portion of the secure SRAM. The
->> BROM jumps directly to the software entry point set by the SMP code
->> if the flags are set. This is required for CPU0 hotplugging.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  arch/arm/boot/dts/sun9i-a80.dtsi | 20 ++++++++++++++++++++
->>  1 file changed, 20 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
->> index 1507bd2a88f0..0695215634d4 100644
->> --- a/arch/arm/boot/dts/sun9i-a80.dtsi
->> +++ b/arch/arm/boot/dts/sun9i-a80.dtsi
->> @@ -366,6 +366,26 @@
->>                */
->>               ranges = <0 0 0 0x20000000>;
->>
->> +             sram_b: sram at 00020000 {
->> +                     /* 256 KiB secure SRAM at 0x20000 */
->> +                     compatible = "mmio-sram";
->> +                     reg = <0x00020000 0x40000>;
->> +
->
-> We should probably add a property to that SRAM to tell the driver not
-> to access it if we're not booted in secure mode.
+ARM64 kernel tries to get physically contiguous 16KB for thread_info
+when creating a process. The allocation is sometimes failed on low
+memory platforms due to memory fragmentation, not a lack of free memory.
 
-(CC-ing Heiko...)
+The first approach is to improve memory compaction logic, but the work should
+consider a lot of different factors and scenarios. Instead, Sungjinn Chung
+suggests a vmalloc based thread_info allocator which can address the issue
+by memory fragmentation without touching any internal memory management codes.
 
-That kind of puts architecture (ARM) dependent code into a platform
-driver. Furthermore, AFAIK there isn't a safe way to check if we're
-in secure mode or not. Checking SCR raises an undefined instruction
-exception in non-secure mode. Can the kernel handle that? I really
-don't understand this bit well.
+The patches implement the idea as allocating the memory from vmalloc space
+instead of 1:1 mapping area. The idea is accompanied by another observation:
+vmalloc space is large enough to handle allocation request on ARM64 kernel.
+It is ~240GB under a combination of 39-bit VA and 4KB page.
 
-> Otherwise, bad things might happen.
+If a 64-bit kernel with low system memory is not an unusual option on other
+architectures, the idea could be expaneded into them.
 
-The kernel (or rather the bootloader) boots in secure mode by default,
-and we don't have any bootloader support to boot into non-secure mode
-ATM. Couldn't we have the bootloader mark the SRAM as disabled when
-booting into non-secure when we add that support?
+All works are based on the following branch:
+https://git.kernel.org/cgit/linux/kernel/git/arm64/linux.git/log/?h=for-next/core
 
+Any feedback or comment very welcome!
 
-ChenYu
+Thanks in advance!
+
+Jungseok Lee (2):
+  kernel/fork.c: add a function to calculate page address from
+    thread_info
+  arm64: Implement vmalloc based thread_info allocator
+
+ arch/arm64/Kconfig                   | 12 ++++++++++++
+ arch/arm64/include/asm/thread_info.h |  9 +++++++++
+ arch/arm64/kernel/process.c          |  7 +++++++
+ kernel/fork.c                        |  7 ++++++-
+ 4 files changed, 34 insertions(+), 1 deletion(-)
+
+-- 
+1.9.1
