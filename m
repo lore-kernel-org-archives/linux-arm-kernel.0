@@ -1,38 +1,98 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 24 May 2015 21:34:04 +0200
-Subject: [BUG] Read-Only THP causes stalls (commit 10359213d)
-Message-ID: <20150524193404.GD16910@cbox>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Sun, 24 May 2015 22:37:02 +0200
+Subject: [PATCH 1/2] PCI: iproc: directly add pci resources
+Message-ID: <1432499823-27369-1-git-send-email-hauke@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+The resources member in the struct was pointing to a stack variable and
+is invalid after the the registration function returned. Remove this
+pointer and add it a a parameter to the function.
 
-I noticed a regression on my arm64 APM X-Gene system a couple
-of weeks back.  I would occassionally see the system lock up and see RCU
-stalls during the caching phase of kernbench.  I then wrote a small
-script that does nothing but cache the files
-(http://paste.ubuntu.com/11324767/) and ran that in a loop.  On a known
-bad commit (v4.1-rc2), out of 25 boots, I never saw it get past 21
-iterations of the loop.  I have since tried to run a bisect from v3.19 to
-v4.0 using 100 iterations as my criteria for a good commit.
+Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+---
+ drivers/pci/host/pcie-iproc-bcma.c     | 4 +---
+ drivers/pci/host/pcie-iproc-platform.c | 4 +---
+ drivers/pci/host/pcie-iproc.c          | 4 ++--
+ drivers/pci/host/pcie-iproc.h          | 3 +--
+ 4 files changed, 5 insertions(+), 10 deletions(-)
 
-This resulted in the following first bad commit:
-
-10359213d05acf804558bda7cc9b8422a828d1cd
-(mm: incorporate read-only pages into transparent huge pages, 2015-02-11)
-
-Indeed, running the workload on v4.1-rc4 still produced the behavior,
-but reverting the above commit gets me through 100 iterations of the
-loop.
-
-I have not tried to reproduce on an x86 system.  Turning on a bunch
-of kernel debugging features *seems* to hide the problem.  My config for
-the XGene system is defconfig + CONFIG_BRIDGE and
-CONFIG_POWER_RESET_XGENE.
-
-Please let me know if I can help test patches or other things I can
-do to help.  I'm afraid that by simply reading the patch I didn't see
-anything obviously wrong with it which would cause this behavior.
-
-Thanks,
--Christoffer
+diff --git a/drivers/pci/host/pcie-iproc-bcma.c b/drivers/pci/host/pcie-iproc-bcma.c
+index c318f19..f96b39e 100644
+--- a/drivers/pci/host/pcie-iproc-bcma.c
++++ b/drivers/pci/host/pcie-iproc-bcma.c
+@@ -62,11 +62,9 @@ static int iproc_pcie_bcma_probe(struct bcma_device *bdev)
+ 	res_mem.flags = IORESOURCE_MEM;
+ 	pci_add_resource(&res, &res_mem);
+ 
+-	pcie->resources = &res;
+-
+ 	pcie->map_irq = iproc_pcie_bcma_map_irq;
+ 
+-	ret = iproc_pcie_setup(pcie);
++	ret = iproc_pcie_setup(pcie, &res);
+ 	if (ret) {
+ 		dev_err(pcie->dev, "PCIe controller setup failed\n");
+ 		return ret;
+diff --git a/drivers/pci/host/pcie-iproc-platform.c b/drivers/pci/host/pcie-iproc-platform.c
+index c8aa06f..c5fe4c1 100644
+--- a/drivers/pci/host/pcie-iproc-platform.c
++++ b/drivers/pci/host/pcie-iproc-platform.c
+@@ -69,11 +69,9 @@ static int iproc_pcie_pltfm_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
+-	pcie->resources = &res;
+-
+ 	pcie->map_irq = of_irq_parse_and_map_pci;
+ 
+-	ret = iproc_pcie_setup(pcie);
++	ret = iproc_pcie_setup(pcie, &res);
+ 	if (ret) {
+ 		dev_err(pcie->dev, "PCIe controller setup failed\n");
+ 		return ret;
+diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
+index cef31f6..d77481e 100644
+--- a/drivers/pci/host/pcie-iproc.c
++++ b/drivers/pci/host/pcie-iproc.c
+@@ -183,7 +183,7 @@ static void iproc_pcie_enable(struct iproc_pcie *pcie)
+ 	writel(SYS_RC_INTX_MASK, pcie->base + SYS_RC_INTX_EN);
+ }
+ 
+-int iproc_pcie_setup(struct iproc_pcie *pcie)
++int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
+ {
+ 	int ret;
+ 	struct pci_bus *bus;
+@@ -211,7 +211,7 @@ int iproc_pcie_setup(struct iproc_pcie *pcie)
+ 	pcie->sysdata.private_data = pcie;
+ 
+ 	bus = pci_create_root_bus(pcie->dev, 0, &iproc_pcie_ops,
+-				  &pcie->sysdata, pcie->resources);
++				  &pcie->sysdata, res);
+ 	if (!bus) {
+ 		dev_err(pcie->dev, "unable to create PCI root bus\n");
+ 		ret = -ENOMEM;
+diff --git a/drivers/pci/host/pcie-iproc.h b/drivers/pci/host/pcie-iproc.h
+index a333d4b..ba0a108 100644
+--- a/drivers/pci/host/pcie-iproc.h
++++ b/drivers/pci/host/pcie-iproc.h
+@@ -29,7 +29,6 @@
+ struct iproc_pcie {
+ 	struct device *dev;
+ 	void __iomem *base;
+-	struct list_head *resources;
+ 	struct pci_sys_data sysdata;
+ 	struct pci_bus *root_bus;
+ 	struct phy *phy;
+@@ -37,7 +36,7 @@ struct iproc_pcie {
+ 	int (*map_irq)(const struct pci_dev *, u8, u8);
+ };
+ 
+-int iproc_pcie_setup(struct iproc_pcie *pcie);
++int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res);
+ int iproc_pcie_remove(struct iproc_pcie *pcie);
+ 
+ #endif /* _PCIE_IPROC_H */
+-- 
+2.1.4
