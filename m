@@ -1,52 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 23 May 2015 22:27:31 +0200
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable display on Trats2board
-In-Reply-To: <555FE392.5030409@kernel.org>
-References: <1432255718-11695-1-git-send-email-k.kozlowski@samsung.com>
- <555EF2B5.1000504@collabora.co.uk> <555FE392.5030409@kernel.org>
-Message-ID: <6222475.TyjQftkmuB@wuerfel>
+From: mwelling@ieee.org (Michael Welling)
+Date: Sat, 23 May 2015 21:13:41 -0500
+Subject: [PATCH 0/4] spi: omap2-mcspi: Fixes for recent updates
+In-Reply-To: <20150522122544.GL21391@sirena.org.uk>
+References: <20150522122544.GL21391@sirena.org.uk>
+Message-ID: <1432433625-23407-1-git-send-email-mwelling@ieee.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 23 May 2015 11:18:58 Kukjin Kim wrote:
-> On 05/22/15 18:11, Javier Martinez Canillas wrote:
-> > Hello Krzysztof,
-> > 
-> > On 05/22/2015 02:48 AM, Krzysztof Kozlowski wrote:
-> >> Enable the Exynos DSI and S6E8AA0 panel for full X11 display on Trats2.
-> >>
-> >> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> >> ---
-> >>  arch/arm/configs/multi_v7_defconfig | 2 ++
-> >>  1 file changed, 2 insertions(+)
-> >>
-> >> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> >> index 0848337a2a01..e9785020aab1 100644
-> >> --- a/arch/arm/configs/multi_v7_defconfig
-> >> +++ b/arch/arm/configs/multi_v7_defconfig
-> >> @@ -413,10 +413,12 @@ CONFIG_DRM=y
-> >>  CONFIG_DRM_PTN3460=m
-> >>  CONFIG_DRM_PS8622=m
-> >>  CONFIG_DRM_EXYNOS=m
-> >> +CONFIG_DRM_EXYNOS_DSI=y
-> >>  CONFIG_DRM_EXYNOS_FIMD=y
-> >>  CONFIG_DRM_EXYNOS_HDMI=y
-> >>  CONFIG_DRM_RCAR_DU=m
-> >>  CONFIG_DRM_TEGRA=y
-> >> +CONFIG_DRM_PANEL_S6E8AA0=m
-> >>  CONFIG_DRM_PANEL_SIMPLE=y
-> >>  CONFIG_FB_ARMCLCD=y
-> >>  CONFIG_FB_WM8505=y
-> >>
-> > 
-> > Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> > 
-> Looks good to me and this would be handled by arm-soc guys directly 
-> 
-> Acked-by: Kukjin Kim <kgene@kernel.org>
-> 
+The recent update of the OMAP2 McSPI driver left some unresolved issues.
+These patches should take care them and again allow for GPIO chip selects
+and native chip selects.
 
-I'd actually prefer if you could put this into the same branch as your
-other defconfig changes. We'll handle any conflicts when merging that in.
+Michael Welling (4):
+  spi: omap2-mcspi: Remove unnecessary delay
+  spi: omap2-mcspi: Fix set_cs function for active high
+  spi: omap2-mcspi: Fix GPIO chip select support
+  spi: omap2-mcspi: Handle error on gpio_request
 
-	Arnd
+ drivers/spi/spi-omap2-mcspi.c |   25 +++++++++++++++++++------
+ 1 file changed, 19 insertions(+), 6 deletions(-)
+
+-- 
+1.7.9.5
