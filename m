@@ -1,46 +1,29 @@
-From: der.herr@hofr.at (Nicholas Mc Guire)
-Date: Sun, 24 May 2015 10:13:07 +0200
-Subject: [PATCH 4/4] spi: omap2-mcspi: Handle error on gpio_request
-In-Reply-To: <1432433625-23407-5-git-send-email-mwelling@ieee.org>
-References: <20150522122544.GL21391@sirena.org.uk>
- <1432433625-23407-1-git-send-email-mwelling@ieee.org>
- <1432433625-23407-5-git-send-email-mwelling@ieee.org>
-Message-ID: <20150524081307.GC17508@opentech.at>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Sun, 24 May 2015 16:12:10 +0800
+Subject: [linux-sunxi] Re: [PATCH v9 4/4] crypto: Add Allwinner Security
+ System crypto accelerator
+In-Reply-To: <55618600.6040904@gmail.com>
+References: <1431608341-10936-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1431608341-10936-5-git-send-email-clabbe.montjoie@gmail.com>
+ <20150517104508.468b032f@bbrezillon> <55607CB7.8020505@gmail.com>
+ <20150523163536.2d64ef8d@bbrezillon>
+ <20150524033253.GB20656@gondor.apana.org.au>
+ <55618600.6040904@gmail.com>
+Message-ID: <20150524081210.GA21979@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 23 May 2015, Michael Welling wrote:
-
-> If a valid GPIO is specified but cannot be requested by the driver, print a
-> message and error out of omap2_mcspi_setup.
+On Sun, May 24, 2015 at 10:04:16AM +0200, Corentin LABBE wrote:
 > 
-> Signed-off-by: Michael Welling <mwelling@ieee.org>
-> ---
->  drivers/spi/spi-omap2-mcspi.c |    9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
+> For aes_cbc it exists a test with 3 SG with .tap = { 496 - 20, 4, 16 }
+> But my driver handle that. (multiple of 4)
 > 
-> diff --git a/drivers/spi/spi-omap2-mcspi.c b/drivers/spi/spi-omap2-mcspi.c
-> index c4e21ad..5867384 100644
-> --- a/drivers/spi/spi-omap2-mcspi.c
-> +++ b/drivers/spi/spi-omap2-mcspi.c
-> @@ -1023,9 +1023,12 @@ static int omap2_mcspi_setup(struct spi_device *spi)
->  	}
->  
->  	if (gpio_is_valid(spi->cs_gpio)) {
-> -		if (gpio_request(spi->cs_gpio, dev_name(&spi->dev)) == 0)
-> -			gpio_direction_output(spi->cs_gpio,
-> -			!(spi->mode & SPI_CS_HIGH));
-> +		ret = gpio_request(spi->cs_gpio, dev_name(&spi->dev));
-> +		if (ret) {
-> +			dev_err(&spi->dev, "failed to request gpio\n");
-> +			return ret;
-> +		}
-> +		gpio_direction_output(spi->cs_gpio, !(spi->mode & SPI_CS_HIGH));
->  	}
+> What do you think about adding a test with 16 SG of 1 byte ? (or 3 + 2 + 3 + 8 * 1)
 
-just wondering if the outer gpio_is_valid is actually needed as it seems
-gpio_request() is actually calling gpio_is_valid() anyway and would return
-non 0 if it were not,
+Sure please send a patch.
 
-thx!
-hofrat
+Thanks,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
