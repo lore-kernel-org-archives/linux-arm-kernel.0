@@ -1,30 +1,30 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sun, 24 May 2015 19:38:43 +0200
-Subject: [PATCH v9 0/3] ARM: mediatek: Add driver for Mediatek I2C
-In-Reply-To: <1432483752.8089.10.camel@mtksdaap41>
-References: <1432198410-6576-1-git-send-email-eddie.huang@mediatek.com>
- <CAGS+omB7UMrEdZiJXVK78ENEqH6fL_25-Q5Fj1Z0Buzjwp60JA@mail.gmail.com>
- <1432483752.8089.10.camel@mtksdaap41>
-Message-ID: <20150524173843.GA4162@schokonusskuchen.bad>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 24 May 2015 19:49:01 +0200
+Subject: [RFC PATCH 2/2] arm64: Implement vmalloc based thread_info
+ allocator
+In-Reply-To: <1432483340-23157-1-git-send-email-jungseoklee85@gmail.com>
+References: <1432483340-23157-1-git-send-email-jungseoklee85@gmail.com>
+Message-ID: <5992243.NYDGjLH37z@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Monday 25 May 2015 01:02:20 Jungseok Lee wrote:
+> Fork-routine sometimes fails to get a physically contiguous region for
+> thread_info on 4KB page system although free memory is enough. That is,
+> a physically contiguous region, which is currently 16KB, is not available
+> since system memory is fragmented.
+> 
+> This patch tries to solve the problem as allocating thread_info memory
+> from vmalloc space, not 1:1 mapping one. The downside is one additional
+> page allocation in case of vmalloc. However, vmalloc space is large enough,
+> around 240GB, under a combination of 39-bit VA and 4KB page. Thus, it is
+> not a big tradeoff for fork-routine service.
 
-> This series already reviewed in public more than six months. In the
-> early version, 8173 CCF and Pinctrl not be accepted yet, so we don't put
-> device node with this series. Now both CCF and pinctrl have been
-> accepted, maybe it's time to add device node.I am glad that if this I2C
-> version can be accepted, If not, I will send new series with device node
-> in next round.
+vmalloc has a rather large runtime cost. I'd argue that failing to allocate
+thread_info structures means something has gone very wrong.
 
-I think this is good to go. Further changes should probably done as
-incremental patches. I am just waiting a little so people can add tags
-to the patches.
+Can you describe the scenario that leads to fragmentation this bad?
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150524/78b24dd9/attachment.sig>
+Could the stack size be reduced to 8KB perhaps?
+
+	Arnd
