@@ -1,32 +1,38 @@
-From: lorenx4@gmail.com (Lorenzo Nava)
-Date: Sun, 24 May 2015 21:30:57 +0200
-Subject: [PATCH] arm DMA: Fix allocation from CMA for coherent DMA
-Message-ID: <1432495857-10630-1-git-send-email-lorenx4@gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sun, 24 May 2015 21:34:04 +0200
+Subject: [BUG] Read-Only THP causes stalls (commit 10359213d)
+Message-ID: <20150524193404.GD16910@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is to allow the use of CMA for DMA coherent memory allocation.
-At the moment if "is_coherent" is set to true the allocation can't use the CMA, which I think is not the desired behaviour.  
+Hi all,
 
----
- arch/arm/mm/dma-mapping.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+I noticed a regression on my arm64 APM X-Gene system a couple
+of weeks back.  I would occassionally see the system lock up and see RCU
+stalls during the caching phase of kernbench.  I then wrote a small
+script that does nothing but cache the files
+(http://paste.ubuntu.com/11324767/) and ran that in a loop.  On a known
+bad commit (v4.1-rc2), out of 25 boots, I never saw it get past 21
+iterations of the loop.  I have since tried to run a bisect from v3.19 to
+v4.0 using 100 iterations as my criteria for a good commit.
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 7e7583d..cc9382a 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -645,9 +645,9 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
- 	size = PAGE_ALIGN(size);
- 	want_vaddr = !dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs);
- 
--	if (is_coherent || nommu())
-+	if (nommu())
- 		addr = __alloc_simple_buffer(dev, size, gfp, &page);
--	else if (!(gfp & __GFP_WAIT))
-+	else if (!is_coherent && !(gfp & __GFP_WAIT))
- 		addr = __alloc_from_pool(size, &page);
- 	else if (!dev_get_cma_area(dev))
- 		addr = __alloc_remap_buffer(dev, size, gfp, prot, &page, caller, want_vaddr);
--- 
-1.7.10.4
+This resulted in the following first bad commit:
+
+10359213d05acf804558bda7cc9b8422a828d1cd
+(mm: incorporate read-only pages into transparent huge pages, 2015-02-11)
+
+Indeed, running the workload on v4.1-rc4 still produced the behavior,
+but reverting the above commit gets me through 100 iterations of the
+loop.
+
+I have not tried to reproduce on an x86 system.  Turning on a bunch
+of kernel debugging features *seems* to hide the problem.  My config for
+the XGene system is defconfig + CONFIG_BRIDGE and
+CONFIG_POWER_RESET_XGENE.
+
+Please let me know if I can help test patches or other things I can
+do to help.  I'm afraid that by simply reading the patch I didn't see
+anything obviously wrong with it which would cause this behavior.
+
+Thanks,
+-Christoffer
