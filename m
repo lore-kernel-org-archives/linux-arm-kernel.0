@@ -1,98 +1,63 @@
 From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Sun, 24 May 2015 22:37:02 +0200
-Subject: [PATCH 1/2] PCI: iproc: directly add pci resources
-Message-ID: <1432499823-27369-1-git-send-email-hauke@hauke-m.de>
+Date: Sun, 24 May 2015 22:37:03 +0200
+Subject: [PATCH 2/2] PCI: iproc: free resource list after registration
+In-Reply-To: <1432499823-27369-1-git-send-email-hauke@hauke-m.de>
+References: <1432499823-27369-1-git-send-email-hauke@hauke-m.de>
+Message-ID: <1432499823-27369-2-git-send-email-hauke@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The resources member in the struct was pointing to a stack variable and
-is invalid after the the registration function returned. Remove this
-pointer and add it a a parameter to the function.
+The resource list is only used in the setup process and was never
+freed. pci_add_resource() allocates a memory area to store the list
+item. This patch fixes the memory leak.
 
 Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
 ---
- drivers/pci/host/pcie-iproc-bcma.c     | 4 +---
- drivers/pci/host/pcie-iproc-platform.c | 4 +---
- drivers/pci/host/pcie-iproc.c          | 4 ++--
- drivers/pci/host/pcie-iproc.h          | 3 +--
- 4 files changed, 5 insertions(+), 10 deletions(-)
+ drivers/pci/host/pcie-iproc-bcma.c     | 8 ++++----
+ drivers/pci/host/pcie-iproc-platform.c | 8 ++++----
+ 2 files changed, 8 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/pci/host/pcie-iproc-bcma.c b/drivers/pci/host/pcie-iproc-bcma.c
-index c318f19..f96b39e 100644
+index f96b39e..2e4f2d6 100644
 --- a/drivers/pci/host/pcie-iproc-bcma.c
 +++ b/drivers/pci/host/pcie-iproc-bcma.c
-@@ -62,11 +62,9 @@ static int iproc_pcie_bcma_probe(struct bcma_device *bdev)
- 	res_mem.flags = IORESOURCE_MEM;
- 	pci_add_resource(&res, &res_mem);
- 
--	pcie->resources = &res;
--
+@@ -65,12 +65,12 @@ static int iproc_pcie_bcma_probe(struct bcma_device *bdev)
  	pcie->map_irq = iproc_pcie_bcma_map_irq;
  
--	ret = iproc_pcie_setup(pcie);
-+	ret = iproc_pcie_setup(pcie, &res);
- 	if (ret) {
+ 	ret = iproc_pcie_setup(pcie, &res);
+-	if (ret) {
++	if (ret)
  		dev_err(pcie->dev, "PCIe controller setup failed\n");
- 		return ret;
-diff --git a/drivers/pci/host/pcie-iproc-platform.c b/drivers/pci/host/pcie-iproc-platform.c
-index c8aa06f..c5fe4c1 100644
---- a/drivers/pci/host/pcie-iproc-platform.c
-+++ b/drivers/pci/host/pcie-iproc-platform.c
-@@ -69,11 +69,9 @@ static int iproc_pcie_pltfm_probe(struct platform_device *pdev)
- 		return ret;
- 	}
+-		return ret;
+-	}
  
--	pcie->resources = &res;
--
- 	pcie->map_irq = of_irq_parse_and_map_pci;
- 
--	ret = iproc_pcie_setup(pcie);
-+	ret = iproc_pcie_setup(pcie, &res);
- 	if (ret) {
- 		dev_err(pcie->dev, "PCIe controller setup failed\n");
- 		return ret;
-diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
-index cef31f6..d77481e 100644
---- a/drivers/pci/host/pcie-iproc.c
-+++ b/drivers/pci/host/pcie-iproc.c
-@@ -183,7 +183,7 @@ static void iproc_pcie_enable(struct iproc_pcie *pcie)
- 	writel(SYS_RC_INTX_MASK, pcie->base + SYS_RC_INTX_EN);
+-	return 0;
++	pci_free_resource_list(&res);
++
++	return ret;
  }
  
--int iproc_pcie_setup(struct iproc_pcie *pcie)
-+int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
- {
- 	int ret;
- 	struct pci_bus *bus;
-@@ -211,7 +211,7 @@ int iproc_pcie_setup(struct iproc_pcie *pcie)
- 	pcie->sysdata.private_data = pcie;
+ static void iproc_pcie_bcma_remove(struct bcma_device *bdev)
+diff --git a/drivers/pci/host/pcie-iproc-platform.c b/drivers/pci/host/pcie-iproc-platform.c
+index c5fe4c1..9aedc8e 100644
+--- a/drivers/pci/host/pcie-iproc-platform.c
++++ b/drivers/pci/host/pcie-iproc-platform.c
+@@ -72,12 +72,12 @@ static int iproc_pcie_pltfm_probe(struct platform_device *pdev)
+ 	pcie->map_irq = of_irq_parse_and_map_pci;
  
- 	bus = pci_create_root_bus(pcie->dev, 0, &iproc_pcie_ops,
--				  &pcie->sysdata, pcie->resources);
-+				  &pcie->sysdata, res);
- 	if (!bus) {
- 		dev_err(pcie->dev, "unable to create PCI root bus\n");
- 		ret = -ENOMEM;
-diff --git a/drivers/pci/host/pcie-iproc.h b/drivers/pci/host/pcie-iproc.h
-index a333d4b..ba0a108 100644
---- a/drivers/pci/host/pcie-iproc.h
-+++ b/drivers/pci/host/pcie-iproc.h
-@@ -29,7 +29,6 @@
- struct iproc_pcie {
- 	struct device *dev;
- 	void __iomem *base;
--	struct list_head *resources;
- 	struct pci_sys_data sysdata;
- 	struct pci_bus *root_bus;
- 	struct phy *phy;
-@@ -37,7 +36,7 @@ struct iproc_pcie {
- 	int (*map_irq)(const struct pci_dev *, u8, u8);
- };
+ 	ret = iproc_pcie_setup(pcie, &res);
+-	if (ret) {
++	if (ret)
+ 		dev_err(pcie->dev, "PCIe controller setup failed\n");
+-		return ret;
+-	}
  
--int iproc_pcie_setup(struct iproc_pcie *pcie);
-+int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res);
- int iproc_pcie_remove(struct iproc_pcie *pcie);
+-	return 0;
++	pci_free_resource_list(&res);
++
++	return ret;
+ }
  
- #endif /* _PCIE_IPROC_H */
+ static int iproc_pcie_pltfm_remove(struct platform_device *pdev)
 -- 
 2.1.4
