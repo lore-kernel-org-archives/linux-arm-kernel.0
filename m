@@ -1,49 +1,19 @@
-From: shailendra.capricorn@gmail.com (Shailendra Verma)
-Date: Tue, 26 May 2015 01:11:03 +0530
-Subject: [PATCH] char:xilinx_hwicap:buffer_icap - change 1/0 to true/false for
- bool type variable in function buffer_icap_set_configuration().
-Message-ID: <1432582863-5012-1-git-send-email-shailendra.capricorn@gmail.com>
+From: w@1wt.eu (Willy Tarreau)
+Date: Mon, 25 May 2015 22:04:10 +0200
+Subject: Device Tree Blob (DTB) licence
+In-Reply-To: <CAOS_Y6Q37ps+VEnzUZ_uwX++qrRm9Hgx45Q_pmiZSLSNjmKwZg@mail.gmail.com>
+References: <1430820315.19516.26.camel@opteya.com>
+ <CAL_Jsq+T5c7qornpRVCduEjUSCeM+0xqbtVYovtH76y=4BqhLQ@mail.gmail.com>
+ <1432289148.5304.58.camel@opteya.com> <1432322832.5304.63.camel@opteya.com>
+ <CAOS_Y6Q37ps+VEnzUZ_uwX++qrRm9Hgx45Q_pmiZSLSNjmKwZg@mail.gmail.com>
+Message-ID: <20150525200410.GC22292@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The variable dirty is bool type. Hence assign the variable with
-bool value true/false instead of 1/0.
+On Mon, May 25, 2015 at 02:14:28AM -0500, Rob Landley wrote:
+> Personally, I'm sad we're starting to get ACPI for arm
 
-Signed-off-by: Shailendra Verma <shailendra.capricorn@gmail.com>
----
- drivers/char/xilinx_hwicap/buffer_icap.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Maybe it was the only solution found to make this platform start to
+misbehave like a regular PC and get it even more widely adopted :-)
 
-diff --git a/drivers/char/xilinx_hwicap/buffer_icap.c b/drivers/char/xilinx_hwicap/buffer_icap.c
-index 05d8977..53c3882 100644
---- a/drivers/char/xilinx_hwicap/buffer_icap.c
-+++ b/drivers/char/xilinx_hwicap/buffer_icap.c
-@@ -270,7 +270,7 @@ int buffer_icap_set_configuration(struct hwicap_drvdata *drvdata, u32 *data,
- 	int status;
- 	s32 buffer_count = 0;
- 	s32 num_writes = 0;
--	bool dirty = 0;
-+	bool dirty = false;
- 	u32 i;
- 	void __iomem *base_address = drvdata->base_address;
- 
-@@ -279,7 +279,7 @@ int buffer_icap_set_configuration(struct hwicap_drvdata *drvdata, u32 *data,
- 
- 		/* Copy data to bram */
- 		buffer_icap_set_bram(base_address, buffer_count, data[i]);
--		dirty = 1;
-+		dirty = true;
- 
- 		if (buffer_count < XHI_MAX_BUFFER_INTS - 1) {
- 			buffer_count++;
-@@ -299,7 +299,7 @@ int buffer_icap_set_configuration(struct hwicap_drvdata *drvdata, u32 *data,
- 
- 		buffer_count = 0;
- 		num_writes++;
--		dirty = 0;
-+		dirty = false;
- 	}
- 
- 	/* Write unwritten data to ICAP */
--- 
-1.7.9.5
+Willy
