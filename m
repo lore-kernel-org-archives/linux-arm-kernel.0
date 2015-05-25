@@ -1,49 +1,117 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Mon, 25 May 2015 17:51:55 +0200
-Subject: [RFC PATCH v1 1/3] PCI: designware: Add ARM64 support
-In-Reply-To: <000001d096f1$93dca4e0$bb95eea0$@com>
-References: <000001d096a9$27bf43f0$773dcbd0$@com>
- <5562F0C9.4090007@hisilicon.com> <000001d096f1$93dca4e0$bb95eea0$@com>
-Message-ID: <5563451B.4050609@st.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 25 May 2015 18:11:49 +0200
+Subject: [PATCHv2 2/2] PWM: atmel: fix incorrect CDTY value after disabling
+In-Reply-To: <1432559996-4415-2-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1432559996-4415-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1432570309-17819-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Zhou,
+pwm-leds calls .config() and .disable() in a row. This exhibits that it may
+happen that the channel gets disabled before CDTY has been updated with CUPD.
+The issue gets quite worse with long periods.
+So, ensure that at least one period has past before disabling the channel by
+polling ISR.
 
-On 05/25/2015 03:48 PM, Jingoo Han wrote:
->> >so how about we set 0 as default value of pp->root_bus_nr, then use
->> >pci_create_root_bus(pp->dev, pp->root_bus_nr, &dw_pcie_ops, pp, &res);
->> >to create root bus?
-> I agree with your opinion. However, I still want to wait for other
-> people's opinions. They will give good comments.
-> Thank you.
->
-> Best regards,
-> Jingoo Han
->
-I did a quick test with your patch in the context of another driver on 
-arm32.
-Just to confirm I added as well pp->root_bus_nr = 0;
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+I had the previous patch tested on a multicolor LED and unfortunately, the delay
+is not nice in that case. I wanted to avoid a mutex.
+This version uses a variable to store the state of the update of the pwm. This
+is reset everytime is gets a new configuration and updated when it is disabled
+or another pwm is configured.
+When disabling a multicolor LED, we only wait for the first pwm to update then
+we remember that we already seen the other one having their period expire and it
+looks much better.
 
-Then, I needed to add dummy pci_sys_data as suggested by Arnd in the 
-first review :
-http://www.spinics.net/lists/linux-pci/msg40445.html
+ drivers/pwm/pwm-atmel.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-  struct pcie_port {
-+#ifdef CONFIG_ARM
+
+diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
+index 89f9ca41d9af..a947c9095d9d 100644
+--- a/drivers/pwm/pwm-atmel.c
++++ b/drivers/pwm/pwm-atmel.c
+@@ -8,9 +8,11 @@
+  */
+ 
+ #include <linux/clk.h>
++#include <linux/delay.h>
+ #include <linux/err.h>
+ #include <linux/io.h>
+ #include <linux/module.h>
++#include <linux/mutex.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+ #include <linux/platform_device.h>
+@@ -21,6 +23,7 @@
+ #define PWM_ENA			0x04
+ #define PWM_DIS			0x08
+ #define PWM_SR			0x0C
++#define PWM_ISR			0x1C
+ /* Bit field in SR */
+ #define PWM_SR_ALL_CH_ON	0x0F
+ 
+@@ -60,6 +63,9 @@ struct atmel_pwm_chip {
+ 	struct clk *clk;
+ 	void __iomem *base;
+ 
++	unsigned int updated_pwms;
++	struct mutex isr_lock; /* ISR is cleared when read, ensure only one thread does that */
++
+ 	void (*config)(struct pwm_chip *chip, struct pwm_device *pwm,
+ 		       unsigned long dty, unsigned long prd);
+ };
+@@ -144,6 +150,10 @@ static int atmel_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	val = (val & ~PWM_CMR_CPRE_MSK) | (pres & PWM_CMR_CPRE_MSK);
+ 	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
+ 	atmel_pwm->config(chip, pwm, dty, prd);
++	mutex_lock(&atmel_pwm->isr_lock);
++	atmel_pwm->updated_pwms |= atmel_pwm_readl(atmel_pwm, PWM_ISR);
++	atmel_pwm->updated_pwms &= ~(1 << pwm->hwpwm);
++	mutex_unlock(&atmel_pwm->isr_lock);
+ 
+ 	clk_disable(atmel_pwm->clk);
+ 	return ret;
+@@ -243,7 +253,22 @@ static int atmel_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+ static void atmel_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ {
+ 	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
++	unsigned long timeout = jiffies + 2 * HZ;
++
 +	/*
-+	 * this is a temporary hack to let the driver work on
-+	 * both arm32 and arm64. it can be removed after the
-+	 * arm32 cleanup is complete and bios32.c has stopped
-+	 * referencing host->pci_sys_data.
++	 * Wait for at least a complete period to have passed before disabling a
++	 * channel to be sure that CDTY has been updated
 +	 */
-+	struct pci_sys_data	dummy;
-+#endif
-  	struct device		*dev;
-
-
-This looks like necessary as bios32 is dereferencing sysdata:
-struct pci_sys_data *sysdata = dev->bus->sysdata;
-
-Best Regards,
-Fabrice
++	mutex_lock(&atmel_pwm->isr_lock);
++	atmel_pwm->updated_pwms |= atmel_pwm_readl(atmel_pwm, PWM_ISR);
++
++	while (!(atmel_pwm->updated_pwms & (1 << pwm->hwpwm)) &&
++	       time_before(jiffies, timeout)) {
++		usleep_range(10, 100);
++		atmel_pwm->updated_pwms |= atmel_pwm_readl(atmel_pwm, PWM_ISR);
++	}
+ 
++	mutex_unlock(&atmel_pwm->isr_lock);
+ 	atmel_pwm_writel(atmel_pwm, PWM_DIS, 1 << pwm->hwpwm);
+ 
+ 	clk_disable(atmel_pwm->clk);
+@@ -358,6 +383,8 @@ static int atmel_pwm_probe(struct platform_device *pdev)
+ 	atmel_pwm->chip.npwm = 4;
+ 	atmel_pwm->chip.can_sleep = true;
+ 	atmel_pwm->config = data->config;
++	atmel_pwm->updated_pwms = 0;
++	mutex_init(&atmel_pwm->isr_lock);
+ 
+ 	ret = pwmchip_add(&atmel_pwm->chip);
+ 	if (ret < 0) {
+@@ -379,6 +406,7 @@ static int atmel_pwm_remove(struct platform_device *pdev)
+ 	struct atmel_pwm_chip *atmel_pwm = platform_get_drvdata(pdev);
+ 
+ 	clk_unprepare(atmel_pwm->clk);
++	mutex_destroy(&atmel_pwm->isr_lock);
+ 
+ 	return pwmchip_remove(&atmel_pwm->chip);
+ }
+-- 
+2.1.4
