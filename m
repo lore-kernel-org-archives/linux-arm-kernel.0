@@ -1,47 +1,34 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 25 May 2015 22:11:15 +0200 (CEST)
-Subject: [PATCH] clockevents: don't suspend/resume if unused
-In-Reply-To: <20150525190641.GA7542@gradator.net>
-References: <1421399151-26800-1-git-send-email-alexandre.belloni@free-electrons.com>
- <alpine.DEB.2.11.1505252046400.5457@nanos>
- <20150525190641.GA7542@gradator.net>
-Message-ID: <alpine.DEB.2.11.1505252208140.5457@nanos>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 25 May 2015 22:29:40 +0200
+Subject: [RFC PATCH 2/2] arm64: Implement vmalloc based thread_info
+ allocator
+In-Reply-To: <F68D2983-226C-4704-A1E0-E79C9425B822@foss.arm.com>
+References: <1432483340-23157-1-git-send-email-jungseoklee85@gmail.com>
+ <B873B881-4972-4524-B1D9-4BB05D7248A4@gmail.com>
+ <F68D2983-226C-4704-A1E0-E79C9425B822@foss.arm.com>
+Message-ID: <5601369.jDWtB6nFJC@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 25 May 2015, Sylvain Rochet wrote:
-> On Mon, May 25, 2015 at 08:48:06PM +0200, Thomas Gleixner wrote:
-> > On Fri, 16 Jan 2015, Alexandre Belloni wrote:
-> > 
-> > > There is no point in calling suspend/resume for unused
-> > > clockevents as they are already stopped and disabled.
-> > > 
-> > > Furthermore, it can take some time to wait for some IPs to stop counting.
-> > 
-> > While I agree with the patch itself, I really can't understand that
-> > last sentence.
-> > 
-> > If stuff is stopped and disabled, what takes time to stop counting?
+On Monday 25 May 2015 19:47:15 Catalin Marinas wrote:
+> On 25 May 2015, at 13:01, Jungseok Lee <jungseoklee85@gmail.com> wrote:
 > 
-> Atmel PIT is a bit weird, writing to AT91_PIT_MR restarts the timer even 
-> if you just want to stop it and then the only way to stop the timer is 
-> to wait for a complete timer cycle.
+> >> Could the stack size be reduced to 8KB perhaps?
+> > 
+> > I guess probably not.
+> > 
+> > A commit, 845ad05e, says that 8KB is not enough to cover SpecWeb benchmark.
 > 
-> The problem is not when suspending, restarting the timer just before 
-> suspending is not such a problem because is will eventually stop at 
-> some point in the future.
-> 
-> However it can takes a very long time if the system switchs to slow 
-> clock, therefore when resuming the timer is still running and we have to 
-> wait for the PIT to stop counting because we re-enabled it for one cycle 
-> when suspending, which is weird, it adds about ~128ms resumt time for 
-> Atmel SoC.
- 
-That's a reasonable explanation.
+> We could go back to 8KB stacks if we implement support for separate IRQ 
+> stack on arm64. It's not too complicated, we would have to use SP0 for (kernel) threads 
+> and SP1 for IRQ handlers.
 
-While timer IPs seem to be designed by janitors in general, this one
-has an extraordinary level of stupidity.
+I think most architectures that see a lot of benchmarks have moved to
+irqstacks at some point, that definitely sounds like a useful idea,
+even if the implementation turns out to be a bit more tricky than
+what you describe.
 
-Thanks,
+There are a lot of workloads that would benefit from having lower
+per-thread memory cost.
 
-	tglx
+	Arnd
