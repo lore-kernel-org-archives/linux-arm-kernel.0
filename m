@@ -1,55 +1,107 @@
-From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
-Date: Mon, 25 May 2015 15:47:49 +0530
-Subject: [PATCH v3 2/2] soc: Add driver for Freescale Vybrid Platform
-In-Reply-To: <3574233.JhJlJx8SSu@wuerfel>
-References: <cover.1432290463.git.maitysanchayan@gmail.com>
- <35561091.AtkcGa6qVG@wuerfel>
- <61585e4449cfc1f36e16a64b9b4a54fe@agner.ch>
- <3574233.JhJlJx8SSu@wuerfel>
-Message-ID: <20150525101749.GB5725@Sanchayan-Arch.toradex.int>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 25 May 2015 11:38:10 +0100
+Subject: [PATCH 1/4] arm64: gicv3: its: Encode domain number in PCI
+ stream id
+In-Reply-To: <34113ADB-C279-4AE6-A303-3328831CCD26@caviumnetworks.com>
+References: <1430686172-18222-1-git-send-email-rric@kernel.org>
+ <1430686172-18222-2-git-send-email-rric@kernel.org>
+ <20150520131138.2c94a32a@why.wild-wind.fr.eu.org>
+ <20150520124827.GF10428@rric.localhost> <555EE831.2020503@arm.com>
+ <34113ADB-C279-4AE6-A303-3328831CCD26@caviumnetworks.com>
+Message-ID: <20150525113810.76c965e2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
+On Fri, 22 May 2015 23:57:40 +0100
+"Chalamarla, Tirumalesh" <Tirumalesh.Chalamarla@caviumnetworks.com>
+wrote:
 
-On 15-05-22 15:20:00, Arnd Bergmann wrote:
-> On Friday 22 May 2015 14:02:52 Stefan Agner wrote:
-> > > Can you use syscon_regmap_lookup_by_phandle instead, and put the
-> > > phandles in the fsl,vf610-mscm-cpucfg node?
+Hi Tirumalesh,
+
+> 
+> > On May 22, 2015, at 1:26 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
 > > 
-> > Hm, with that we would wire up hardware modules which does nothing has
-> > to do with each other. We just happen to need a driver which collects
-> > information accross the SoC. I'm not sure we should put the modules
-> > required into the device tree.
+> > On 20/05/15 13:48, Robert Richter wrote:
+> >> Mark,
+> >> 
+> >> thanks for review, also of the other patches of this series.
+> >> 
+> >> See below
+> >> 
+> >> On 20.05.15 13:11:38, Marc Zyngier wrote:
+> >>>> -	dev_alias->dev_id = alias;
+> >>>> +	dev_alias->dev_id = (pci_domain_nr(pdev->bus) << 16) | alias;
+> >> 
+> >>> This feels very scary. We're now assuming that the domain number will
+> >>> always be presented to the doorbell. What guarantee do we have that
+> >>> this is always the case, irrespective of the platform?
+> >>> 
+> >>> Also, domains have no PCI reality, they are a Linux thing. And they can
+> >>> be "randomly" assigned, unless you force the domain in DT with a
+> >>> linux,pci-domain property. This looks even more wrong, specially
+> >>> considering ACPI.
+> >> 
+> >> The main problem here is that device ids (32 bits) are system
+> >> specific. Since we have more than one PCI root complex we need the
+> >> upper 16 bits in the devid for mapping. Using pci_domain_nr for this
+> >> fits our needs for now and shouldn't affect systems with a single RC
+> >> only as the domain nr is zero then.
+> >> 
+> >> The domain number is incremented during initialization beginnig with
+> >> zero and the order of it is fixed since it is taken from DT or ACPI
+> >> tables. So we have full controll of it. I don't see issues here.
 > > 
-> > I don't think its nice to have the compatible strings in the source
-> > code, however it feels more appropriate than in the device tree, IMHO...
-> 
-> I see. Another option would be to point directly to the registers
-> you need:
-> 
-> 	ocotp-cfg0 = <&ocotp 0x10>;
-> 	ocotp-cfg1 = <&ocotp 0x20>;
-> 	rom-revision = <&rom 0x80>;
-> 
-> We don't yet have an abstraction to access a register from a syscon
-> reference like this, but you could either roll your own here, or 
-> add a generic abstraction.
-
-Can you tell me a little about how can I start implementing it? I am not
-clear on how to approach this.
-
-> 
-> > > Also, I'd argue that the mscm should not be a syscon device at all,
-> > > but instead I'd use platform_get_resource()/devm_ioremap_resource()
-> > > to get an __iomem pointer.
+> > This may match what you have on ThunderX (as long as the kernel doesn't
+> > adopt another behaviour when allocating the domain number). But other
+> > platforms may have a completely different numbering, which will mess
+> > them up entirely.
 > > 
-> > We need to have mscm-cpucfg to be syscon because we need to get the CPU
-> > personality in the MSCM interrupt router driver (irq-vf610-mscm-ir.c). 
+> >>> It really feels like we need a way to describe how the BDF numbering is
+> >>> augmented. We also need to guarantee that we get the actual bridge
+> >>> number, as opposed to the domain number.
+> >> 
+> >> But true, the obove is just intermediate. In the end we need some sort
+> >> of handler that is setup during cpu initialization that registers a
+> >> callback for the gic to determine the device id of that paricular
+> >> system.
+> > 
+> > I don't really like the idea of a callback from the GIC - I'd prefer it
+> > to be standalone, and rely on the topology information to build the
+> > DeviceID. Mark Rutland had some ideas for DT (he posted an RFC a while
+> > ago), maybe it would be good to get back to that and find out what we
+> > can do. ACPI should also have similar information (IORT?).
+> > 
 > 
-> It can be both at the same time now.
-> 
-> 	Arnd
+> How can some one pass this from DT, especially in GIC entry. i still
+> think it is bus owner responsibility and call back is better idea.
+> but if some one has a better idea for DT and ACPI, we are fine as
+> long as it works on ThunderX.   
 
-Regards,
-Sanchayan.
+A callback would have to be bus-specific, and depends from the observer
+of the access. There is strictly no guarantee that a single write from
+the device is performed using the same ID to the IOMMU and to the MSI
+doorbell. Actually, they are very likely to be different. A generic
+callback would have to know about the point where this access is
+observed, and expressing this is a nightmare.
+
+Also, I'm really opposed to having platform-specific code that has for
+sole purpose to describe the hardware. This is why we have DT (and to a
+lesser extent ACPI). We've been there on 32bit, and learned our lesson.
+It doesn't scale, it leads to a bunch of hacks in all corners, and I
+don't feel like being on the receiving end of something like this.
+
+I really suggest you look at Mark's suggestion:
+
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/333199.html
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/341584.html
+
+because so far, this is the only proposal that makes any sense to me in
+the long run. Feel free to comment on it and help us making something
+that also work for your favorite SoC.
+
+Thanks,
+
+        M.
+-- 
+Without deviation from the norm, progress is not possible.
