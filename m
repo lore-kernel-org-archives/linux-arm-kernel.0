@@ -1,37 +1,45 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 25 May 2015 14:29:00 +0200
-Subject: [PATCH 1/2] of: Add vendor prefix for Hardkernel
-In-Reply-To: <1432556810-11597-1-git-send-email-k.kozlowski.k@gmail.com>
-References: <1432556810-11597-1-git-send-email-k.kozlowski.k@gmail.com>
-Message-ID: <5563158C.2040404@collabora.co.uk>
+From: pavel@denx.de (Pavel Machek)
+Date: Mon, 25 May 2015 14:39:02 +0200
+Subject: [PATCH v4 2/2] ARM: socfpga: dts: add sdram controller dt
+ binding doc
+In-Reply-To: <1432317735-29413-3-git-send-email-atull@opensource.altera.com>
+References: <1432317735-29413-1-git-send-email-atull@opensource.altera.com>
+ <1432317735-29413-3-git-send-email-atull@opensource.altera.com>
+Message-ID: <20150525123902.GE9943@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
-
-On 05/25/2015 02:26 PM, Krzysztof Kozlowski wrote:
-> Add Hardkernel Co., Ltd. to the list of device tree vendor prefixes.
+On Fri 2015-05-22 13:02:15, Alan Tull wrote:
+> Add binding doc for Altera SOCFPGA SDRAM controller.
 > 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+> Signed-off-by: Alan Tull <atull@opensource.altera.com>
 > ---
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->  1 file changed, 1 insertion(+)
+> v4: Add bindings doc
+> ---
+>  .../arm/altera/socfpga-sdram-controller.txt        |   12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram-controller.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index 80339192c93e..e8a00b74d8fe 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -90,6 +90,7 @@ gumstix	Gumstix, Inc.
->  gw	Gateworks Corporation
->  hannstar	HannStar Display Corporation
->  haoyu	Haoyu Microelectronic Co. Ltd.
-> +hardkernel	Hardkernel Co., Ltd
->  himax	Himax Technologies, Inc.
->  hisilicon	Hisilicon Limited.
->  hit	Hitachi Ltd.
-> 
+> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-controller.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-controller.txt
+> new file mode 100644
+> index 0000000..77ca635
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-controller.txt
+> @@ -0,0 +1,12 @@
+> +Altera SOCFPGA SDRAM Controller
+> +
+> +Required properties:
+> +- compatible : Should contain "altr,sdr-ctl" and "syscon".
+> +  syscon is required by the Altera SOCFPGA SDRAM EDAC.
+> +- reg : Should contain 1 register range (address and length)
+> +
+> +Example:
+> +	sdr: sdr at ffc25000 {
+> +		compatible = "altr,sdr-ctl", "syscon";
 
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-
-Best regards,
-Javier
+Is the syscon binding good idea? Should the EDAC driver be fixed to
+accept altr,sdr-ctl binding, instead?
+							Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
