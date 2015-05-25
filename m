@@ -1,91 +1,47 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 25 May 2015 12:04:09 -0700
-Subject: [PATCH 2/3] dts: Adding docs for Xilinx LogiCORE IP mailbox
- driver.
-In-Reply-To: <555EC20C.6010703@xilinx.com>
-References: <1432251450-26352-1-git-send-email-moritz.fischer@ettus.com>
- <1432251450-26352-3-git-send-email-moritz.fischer@ettus.com>
- <555EC20C.6010703@xilinx.com>
-Message-ID: <20150525190409.GS18303@xsjsorenbubuntu>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Mon, 25 May 2015 21:06:42 +0200
+Subject: [PATCH] clockevents: don't suspend/resume if unused
+In-Reply-To: <alpine.DEB.2.11.1505252046400.5457@nanos>
+References: <1421399151-26800-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <alpine.DEB.2.11.1505252046400.5457@nanos>
+Message-ID: <20150525190641.GA7542@gradator.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-05-22 at 07:43AM +0200, Michal Simek wrote:
-> On 05/22/2015 01:37 AM, Moritz Fischer wrote:
-> > Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
-> > ---
-> >  .../bindings/mailbox/xilinx-mailbox.txt         | 40 ++++++++++++++++++++
-> >  1 file changed, 40 insertions(+)
+Hello Thomas,
+
+On Mon, May 25, 2015 at 08:48:06PM +0200, Thomas Gleixner wrote:
+> On Fri, 16 Jan 2015, Alexandre Belloni wrote:
+> 
+> > There is no point in calling suspend/resume for unused
+> > clockevents as they are already stopped and disabled.
 > > 
+> > Furthermore, it can take some time to wait for some IPs to stop counting.
 > 
-> IRC the rule was to send binding first and then the driver.
+> While I agree with the patch itself, I really can't understand that
+> last sentence.
 > 
-> > diff --git a/Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt b/Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt
-> > new file mode 100644
-> > index 0000000..e559743
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt
-> > @@ -0,0 +1,40 @@
-> > +Xilinx Mailbox Driver
-> > +=====================
-> > +
-> > +Required properties:
-> > +- compatible :	"xlnx,mailbox-2.1".
-> > +- reg : 	physical base address of the mailbox and length of
-> > +		memory mapped region.
-> > +- #mbox-cells:	Common mailbox binding property to identify the number
-> > +		of cells required for the mailbox specifier. Should be 1.
-> > +
-> > +Optional properties:
-> > +- interrupt-parent :	interrupt source phandle.
-> > +- interrupts :		interrupt number. The interrupt specifier format
-> 
-> please be consistent with spacing around :. It doesn't look nice.
-> 
-> > +			depends on the interrupt controller parent.
-> > +
-> > +Example:
-> > +	mbox: mailbox at 0x40400000 {
-> 
-> remove 0x prefix here.
-> 
-> > +		compatible = "xlnx,axi-mailbox-2.1";
-> > +		reg = <0x100 0x3c>;
-> 
-> This is weird - it should start with 40400000.
-> Or is your physical address 0x100?
-> 
-> 
-> > +		interrupt-parent = <&intc>;
-> > +		interrupts = <5>;
-> > +		#mbox-cells = <1>;
-> > +	};
-> > +
-> > +Mailbox client
-> > +===============
-> > +"mboxes" and the optional "mbox-names" (please see
-> > +Documentation/devicetree/bindings/mailbox/mailbox.txt for details). Each value
-> > +of the mboxes property should contain a phandle to the mailbox controller
-> > +device node and second argument is the channel index. It must be 0 (hardware
-> > +support only one channel).The equivalent "mbox-names" property value can be
-> 
-> .<space>The
-> 
-> > +used to give a name to the communication channel to be used by the client user.
-> > +
-> > +Example:
-> > +	mclient0: mclient0 at 0x400 {
-> 
-> ditto.
-> 
-> > +		compatible = "client-1.0";
-> > +		reg = <0x400 0x10>;
-> > +		mbox-names = "mbox", "mbox-rx";
+> If stuff is stopped and disabled, what takes time to stop counting?
 
-This seems to consume two mailboxes but...
+Atmel PIT is a bit weird, writing to AT91_PIT_MR restarts the timer even 
+if you just want to stop it and then the only way to stop the timer is 
+to wait for a complete timer cycle.
 
-> > +		mboxes = <&mbox 0>;
+The problem is not when suspending, restarting the timer just before 
+suspending is not such a problem because is will eventually stop at 
+some point in the future.
 
-... this seems to describe only one, or am I mistaken?
+However it can takes a very long time if the system switchs to slow 
+clock, therefore when resuming the timer is still running and we have to 
+wait for the PIT to stop counting because we re-enabled it for one cycle 
+when suspending, which is weird, it adds about ~128ms resumt time for 
+Atmel SoC.
 
-	S?ren
+The previous proposed patch was to do nothing in PIT suspend and resume 
+callbacks if PIT is unused[1], which fixed the PIT problem, but we 
+decided to put the condition in the upper level because other drivers 
+might be interested too.
+
+Sylvain
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/311496.html
