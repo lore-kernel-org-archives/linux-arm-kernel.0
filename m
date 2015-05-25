@@ -1,199 +1,198 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Mon, 25 May 2015 14:41:46 +0300
-Subject: [PATCH v4 11/18] i2c: add locomo i2c driver
+Date: Mon, 25 May 2015 14:41:44 +0300
+Subject: [PATCH v4 09/18] gpio: locomo: implement per-pin irq handling
 In-Reply-To: <1432554113-26280-1-git-send-email-dbaryshkov@gmail.com>
 References: <1432554113-26280-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1432554113-26280-12-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1432554113-26280-10-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LoCoMo chip contains a tiny i2c controller destined to control
-M62332 DAC. Provide a separate I2C driver for this cell.
+LoCoMo has a possibility to generate per-GPIO edge irqs. Support for
+that was there in old locomo driver, got 'cleaned up' during old driver
+IRQ cascading cleanup and is now reimplemented. It is expected that
+SL-5500 (collie) will use locomo gpio irqs for mmc detection irq.
 
-Reviewed-by: Wolfram Sang <wsa@the-dreams.de>
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/i2c/busses/Kconfig      |  12 ++++
- drivers/i2c/busses/Makefile     |   1 +
- drivers/i2c/busses/i2c-locomo.c | 135 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 148 insertions(+)
- create mode 100644 drivers/i2c/busses/i2c-locomo.c
+ drivers/gpio/Kconfig       |   1 +
+ drivers/gpio/gpio-locomo.c | 117 ++++++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 117 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-index 2255af2..114d9da 100644
---- a/drivers/i2c/busses/Kconfig
-+++ b/drivers/i2c/busses/Kconfig
-@@ -602,6 +602,18 @@ config I2C_KEMPLD
- 	  This driver can also be built as a module. If so, the module
- 	  will be called i2c-kempld.
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index 4542684..6b77614 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -737,6 +737,7 @@ config GPIO_KEMPLD
+ config GPIO_LOCOMO
+ 	bool "Sharp LoCoMo GPIO support"
+ 	depends on MFD_LOCOMO
++	select GPIOLIB_IRQCHIP
+ 	help
+ 	  Select this to support GPIO pins on Sharp LoCoMo Grid Array found
+ 	  in Sharp Zaurus collie and poodle models.
+diff --git a/drivers/gpio/gpio-locomo.c b/drivers/gpio/gpio-locomo.c
+index dd9a1ca..75dbf6b 100644
+--- a/drivers/gpio/gpio-locomo.c
++++ b/drivers/gpio/gpio-locomo.c
+@@ -16,13 +16,15 @@
+ #include <linux/slab.h>
+ #include <linux/bitops.h>
+ #include <linux/err.h>
+-#include <linux/gpio.h>
++#include <linux/gpio/driver.h>
+ #include <linux/io.h>
++#include <linux/irq.h>
+ #include <linux/regmap.h>
+ #include <linux/mfd/locomo.h>
  
-+config I2C_LOCOMO
-+	tristate "I2C bus support for LoCoMo chips"
-+	depends on MFD_LOCOMO
-+	select I2C_ALGOBIT
-+	help
-+	  Say yes if you will run the kernel on Sharp SL-5x00 family of devices.
+ struct locomo_gpio {
+ 	struct regmap *regmap;
++	int irq;
+ 
+ 	struct gpio_chip gpio;
+ 
+@@ -79,6 +81,99 @@ static int locomo_gpio_direction_output(struct gpio_chip *chip,
+ 	return 0;
+ }
+ 
++static void
++locomo_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
++{
++	struct gpio_chip *chip = irq_get_handler_data(irq);
++	struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
++	struct irq_chip *irqchip = irq_desc_get_chip(desc);
++	unsigned int gir;
++	unsigned int gpd;
++	unsigned int req;
 +
-+	  If you don't know what to do here, say N.
++	chained_irq_enter(irqchip, desc);
 +
-+	  This driver can also be built as a module.  If so, the module
-+	  will be called i2c-locomo.
++	while (1) {
++		regmap_read(lg->regmap, LOCOMO_GIR, &gir);
++		regmap_read(lg->regmap, LOCOMO_GPD, &gpd);
++		req = gir & gpd;
 +
- config I2C_MESON
- 	tristate "Amlogic Meson I2C controller"
- 	depends on ARCH_MESON
-diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
-index cdf941d..e09dcf6 100644
---- a/drivers/i2c/busses/Makefile
-+++ b/drivers/i2c/busses/Makefile
-@@ -58,6 +58,7 @@ obj-$(CONFIG_I2C_IMX)		+= i2c-imx.o
- obj-$(CONFIG_I2C_IOP3XX)	+= i2c-iop3xx.o
- obj-$(CONFIG_I2C_JZ4780)	+= i2c-jz4780.o
- obj-$(CONFIG_I2C_KEMPLD)	+= i2c-kempld.o
-+obj-$(CONFIG_I2C_LOCOMO)	+= i2c-locomo.o
- obj-$(CONFIG_I2C_MESON)		+= i2c-meson.o
- obj-$(CONFIG_I2C_MPC)		+= i2c-mpc.o
- obj-$(CONFIG_I2C_MV64XXX)	+= i2c-mv64xxx.o
-diff --git a/drivers/i2c/busses/i2c-locomo.c b/drivers/i2c/busses/i2c-locomo.c
-new file mode 100644
-index 0000000..d520513
---- /dev/null
-+++ b/drivers/i2c/busses/i2c-locomo.c
-@@ -0,0 +1,135 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/i2c.h>
-+#include <linux/i2c-algo-bit.h>
-+#include <linux/kernel.h>
-+#include <linux/mfd/locomo.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+#include <linux/slab.h>
++		if (!req)
++			break;
 +
-+struct locomo_i2c {
-+	struct regmap		*regmap;
-+	struct i2c_adapter	 adap;
-+	struct i2c_algo_bit_data bit;
++		generic_handle_irq(irq_find_mapping(lg->gpio.irqdomain,
++					ffs(req) - 1));
++	}
++
++	chained_irq_exit(irqchip, desc);
++}
++
++static void locomo_gpio_ack_irq(struct irq_data *d)
++{
++	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
++	struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
++	unsigned int mask = BIT(d->hwirq);
++
++	regmap_update_bits(lg->regmap, LOCOMO_GWE, mask, mask);
++	regmap_update_bits(lg->regmap, LOCOMO_GIS, mask, 0);
++	regmap_update_bits(lg->regmap, LOCOMO_GWE, mask, 0);
++}
++
++static void locomo_gpio_mask_irq(struct irq_data *d)
++{
++	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
++	struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
++	unsigned int mask = BIT(d->hwirq);
++
++	regmap_update_bits(lg->regmap, LOCOMO_GIE, mask, 0);
++}
++
++static void locomo_gpio_unmask_irq(struct irq_data *d)
++{
++	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
++	struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
++	unsigned int mask = BIT(d->hwirq);
++
++	regmap_update_bits(lg->regmap, LOCOMO_GIE, mask, mask);
++}
++
++static int locomo_gpio_type_irq(struct irq_data *d, unsigned int type)
++{
++	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
++	struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
++	unsigned int mask;
++
++	mask = BIT(d->hwirq);
++
++	if (type == IRQ_TYPE_PROBE) {
++		if ((lg->rising_edge | lg->falling_edge) & mask)
++			return 0;
++		type = IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING;
++	}
++
++	if (type & IRQ_TYPE_EDGE_RISING)
++		lg->rising_edge |= mask;
++	else
++		lg->rising_edge &= ~mask;
++	if (type & IRQ_TYPE_EDGE_FALLING)
++		lg->falling_edge |= mask;
++	else
++		lg->falling_edge &= ~mask;
++
++	regmap_write(lg->regmap, LOCOMO_GRIE, lg->rising_edge);
++	regmap_write(lg->regmap, LOCOMO_GFIE, lg->falling_edge);
++
++	return 0;
++}
++
++static struct irq_chip locomo_gpio_irq_chip = {
++	.name		= "locomo-GPIO",
++	.irq_ack	= locomo_gpio_ack_irq,
++	.irq_mask	= locomo_gpio_mask_irq,
++	.irq_unmask	= locomo_gpio_unmask_irq,
++	.irq_set_type	= locomo_gpio_type_irq,
 +};
 +
-+static void locomo_i2c_setsda(void *data, int state)
-+{
-+	struct locomo_i2c *li2c = data;
+ #ifdef CONFIG_PM_SLEEP
+ static int locomo_gpio_suspend(struct device *dev)
+ {
+@@ -119,6 +214,10 @@ static int locomo_gpio_probe(struct platform_device *pdev)
+ 	if (!lg)
+ 		return -ENOMEM;
+ 
++	lg->irq = platform_get_irq(pdev, 0);
++	if (lg->irq < 0)
++		return -ENXIO;
 +
-+	regmap_update_bits(li2c->regmap, LOCOMO_DAC,
-+			LOCOMO_DAC_SDAOEB,
-+			state ? LOCOMO_DAC_SDAOEB : 0);
-+}
+ 	lg->regmap = dev_get_regmap(pdev->dev.parent, NULL);
+ 	if (!lg->regmap)
+ 		return -EINVAL;
+@@ -130,6 +229,7 @@ static int locomo_gpio_probe(struct platform_device *pdev)
+ 	regmap_write(lg->regmap, LOCOMO_GPD, 0x00);
+ 	regmap_write(lg->regmap, LOCOMO_GIE, 0x00);
+ 
++	lg->gpio.dev = &pdev->dev;
+ 	lg->gpio.base = pdata ? pdata->gpio_base : -1;
+ 	lg->gpio.label = "locomo-gpio";
+ 	lg->gpio.ngpio = 16;
+@@ -142,7 +242,22 @@ static int locomo_gpio_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
++	ret = gpiochip_irqchip_add(&lg->gpio, &locomo_gpio_irq_chip, 0,
++				   handle_level_irq, IRQ_TYPE_NONE);
++	if (ret) {
++		dev_err(&pdev->dev, "Failed to add irq chip\n");
++		goto err_rm_gpiochip;
++	}
 +
-+static void locomo_i2c_setscl(void *data, int state)
-+{
-+	struct locomo_i2c *li2c = data;
++	gpiochip_set_chained_irqchip(&lg->gpio, &locomo_gpio_irq_chip, lg->irq,
++				     locomo_gpio_irq_handler);
 +
-+	regmap_update_bits(li2c->regmap, LOCOMO_DAC,
-+			LOCOMO_DAC_SCLOEB,
-+			state ? LOCOMO_DAC_SCLOEB : 0);
-+}
+ 	return 0;
 +
-+static int locomo_i2c_getsda(void *data)
-+{
-+	struct locomo_i2c *li2c = data;
-+	unsigned int r;
++err_rm_gpiochip:
++	gpiochip_remove(&lg->gpio);
 +
-+	regmap_read(li2c->regmap, LOCOMO_DAC, &r);
-+
-+	return !!(r & LOCOMO_DAC_SDA);
-+}
-+
-+static int locomo_i2c_probe(struct platform_device *dev)
-+{
-+	struct locomo_i2c *li2c;
-+	int ret;
-+
-+	li2c = devm_kzalloc(&dev->dev, sizeof(struct locomo_i2c), GFP_KERNEL);
-+	if (li2c == NULL)
-+		return -ENOMEM;
-+
-+	li2c->regmap = dev_get_regmap(dev->dev.parent, NULL);
-+	if (!li2c->regmap)
-+		return -ENODEV;
-+
-+	li2c->adap.owner = THIS_MODULE;
-+	li2c->adap.dev.parent = &dev->dev;
-+	li2c->adap.dev.of_node = dev->dev.of_node;
-+	li2c->adap.algo_data = &li2c->bit;
-+	li2c->adap.nr = 1; /* On poodle, 0 is pxa internal bus */
-+
-+	strlcpy(li2c->adap.name, "LoCoMo I2C", sizeof(li2c->adap.name));
-+
-+	li2c->bit.data = li2c;
-+	li2c->bit.setsda = locomo_i2c_setsda;
-+	li2c->bit.setscl = locomo_i2c_setscl;
-+	li2c->bit.getsda = locomo_i2c_getsda;
-+	li2c->bit.udelay = 6;
-+	li2c->bit.timeout = HZ;
-+
-+	ret = i2c_bit_add_numbered_bus(&li2c->adap);
-+	if (ret)
-+		return ret;
-+
-+	platform_set_drvdata(dev, li2c);
-+
-+	return 0;
-+}
-+
-+static int locomo_i2c_remove(struct platform_device *dev)
-+{
-+	struct locomo_i2c *li2c = platform_get_drvdata(dev);
-+
-+	i2c_del_adapter(&li2c->adap);
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_PM_SLEEP
-+static int locomo_i2c_suspend(struct device *dev)
-+{
-+	struct locomo_i2c *li2c = dev_get_drvdata(dev);
-+
-+	regmap_write(li2c->regmap, LOCOMO_DAC, 0x00);
-+
-+	return 0;
-+}
-+
-+static int locomo_i2c_resume(struct device *dev)
-+{
-+	struct locomo_i2c *li2c = dev_get_drvdata(dev);
-+
-+	regmap_write(li2c->regmap, LOCOMO_DAC,
-+			LOCOMO_DAC_SDAOEB | LOCOMO_DAC_SCLOEB);
-+
-+	return 0;
-+}
-+static SIMPLE_DEV_PM_OPS(locomo_i2c_pm, locomo_i2c_suspend, locomo_i2c_resume);
-+#define LOCOMO_I2C_PM	(&locomo_i2c_pm)
-+#else
-+#define LOCOMO_I2C_PM	NULL
-+#endif
-+
-+
-+static struct platform_driver locomo_i2c_driver = {
-+	.driver		= {
-+		.name	= "locomo-i2c",
-+		.pm	= LOCOMO_I2C_PM,
-+	},
-+	.probe		= locomo_i2c_probe,
-+	.remove		= locomo_i2c_remove,
-+};
-+
-+module_platform_driver(locomo_i2c_driver);
-+
-+MODULE_DESCRIPTION("LoCoMo i2c bus driver");
-+MODULE_AUTHOR("Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:locomo-i2c");
++	return ret;
+ }
+ 
+ static int locomo_gpio_remove(struct platform_device *pdev)
 -- 
 2.1.4
