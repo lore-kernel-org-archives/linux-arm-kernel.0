@@ -1,76 +1,61 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 25 May 2015 09:28:37 +0200
-Subject: [PATCH v7 03/25] iommu: Init iommu-groups support earlier,
- in core_initcall
-In-Reply-To: <2209337.hhg3lyvUbi@avalon>
-References: <1432041645-11172-1-git-send-email-m.szyprowski@samsung.com>
- <1432041645-11172-4-git-send-email-m.szyprowski@samsung.com>
- <2209337.hhg3lyvUbi@avalon>
-Message-ID: <5562CF25.2070602@samsung.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 25 May 2015 13:01:49 +0530
+Subject: [PATCH] cpufreq:exynos-cpufreq - Fix for memory leak in case SOC
+ name does not match.
+In-Reply-To: <1432519780-2910-1-git-send-email-shailendra.capricorn@gmail.com>
+References: <1432519780-2910-1-git-send-email-shailendra.capricorn@gmail.com>
+Message-ID: <20150525073149.GF9992@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 25-05-15, 07:39, Shailendra Verma wrote:
+> During probe free the memory allocated to "exynos_info" in case of
+> unknown SOC type.
+> 
+> Signed-off-by: Shailendra Verma <shailendra.capricorn@gmail.com>
+> ---
+>  drivers/cpufreq/exynos-cpufreq.c |    6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
+> index 82d2fbb..8682378 100644
+> --- a/drivers/cpufreq/exynos-cpufreq.c
+> +++ b/drivers/cpufreq/exynos-cpufreq.c
+> @@ -182,7 +182,7 @@ static int exynos_cpufreq_probe(struct platform_device *pdev)
+>  		ret = exynos5250_cpufreq_init(exynos_info);
+>  	} else {
+>  		pr_err("%s: Unknown SoC type\n", __func__);
+> -		return -ENODEV;
+> +		ret = -ENODEV;
+>  	}
+>  
+>  	if (ret)
+> @@ -190,12 +190,14 @@ static int exynos_cpufreq_probe(struct platform_device *pdev)
+>  
+>  	if (exynos_info->set_freq == NULL) {
+>  		dev_err(&pdev->dev, "No set_freq function (ERR)\n");
+> +		ret = -EINVAL;
+>  		goto err_vdd_arm;
+>  	}
+>  
+>  	arm_regulator = regulator_get(NULL, "vdd_arm");
+>  	if (IS_ERR(arm_regulator)) {
+>  		dev_err(&pdev->dev, "failed to get resource vdd_arm\n");
+> +		ret = -EINVAL;
+>  		goto err_vdd_arm;
+>  	}
+>  
+> @@ -227,7 +229,7 @@ err_cpufreq_reg:
+>  	regulator_put(arm_regulator);
+>  err_vdd_arm:
+>  	kfree(exynos_info);
+> -	return -EINVAL;
+> +	return ret;
+>  }
+>  
+>  static struct platform_driver exynos_cpufreq_platdrv = {
 
-On 2015-05-23 18:23, Laurent Pinchart wrote:
-> Hi Marek,
->
-> Thank you for the patch.
->
-> On Tuesday 19 May 2015 15:20:23 Marek Szyprowski wrote:
->> iommu_group_alloc might be called very early in case of iommu controllers
->> activated from of_iommu, so ensure that this part of subsystem is ready
->> when devices are being populated from device-tree (core_initcall seems to
->> be okay for this case).
->>
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> ---
->>   drivers/iommu/iommu.c | 2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
->> index d4f527e56679..37a6aa8f318b 100644
->> --- a/drivers/iommu/iommu.c
->> +++ b/drivers/iommu/iommu.c
->> @@ -1207,7 +1207,7 @@ static int __init iommu_init(void)
->>
->>   	return 0;
->>   }
->> -arch_initcall(iommu_init);
->> +core_initcall(iommu_init);
-> I'll let Joerg comment on this, but this initcall ordering dance always makes
-> me feel that something isn't quite right. Have you had a chance to look at the
-> patch series I posted about a week ago to implement IOMMU probe deferral
-> support ?
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-I will try to check your IOMMU probe deferal, but for the time being 
-changing the
-initcall priority was the simplest way to get everything working with 
-iommu_groups
-(what was a requirement from Joerg).
-
-I also don't like the initcall ordering hacks, but this change seems to 
-be the
-right approach. Probe deferal is convenient for development purpose and 
-all king of
-hotpluggable solutions, but imho for typical cases system should be 
-tuned to avoid
-deferal to reduce overhead on boot.
-
-If possible I would like to avoid having dependency on your 
-deferal-probe patches
-and get the basic Exynos IOMMU support finally merged. There are still other
-enhancements to Exynos IOMMU driver that depend on it and need real 
-discussion
-(like real runtime pm and exposing particular iommu controllers via dma 
-api).
-
->
->>   int iommu_domain_get_attr(struct iommu_domain *domain,
->>   			  enum iommu_attr attr, void *data)
->
-
-Best regards
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+viresh
