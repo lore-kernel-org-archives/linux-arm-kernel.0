@@ -1,346 +1,168 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Mon, 25 May 2015 14:41:42 +0300
-Subject: [PATCH v4 07/18] video: lcd: add LoCoMo LCD driver
+Date: Mon, 25 May 2015 14:41:50 +0300
+Subject: [PATCH v4 15/18] ARM: pxa: poodle: use new LoCoMo driver
 In-Reply-To: <1432554113-26280-1-git-send-email-dbaryshkov@gmail.com>
 References: <1432554113-26280-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1432554113-26280-8-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1432554113-26280-16-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LoCoMo has some special handling for TFT screens attached to Collie and
-Poodle. Implement that as a separate driver.
+Convert poodle to use new mfd-based LoCoMo driver.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/video/backlight/Kconfig      |  10 ++
- drivers/video/backlight/Makefile     |   1 +
- drivers/video/backlight/locomo_lcd.c | 285 +++++++++++++++++++++++++++++++++++
- 3 files changed, 296 insertions(+)
- create mode 100644 drivers/video/backlight/locomo_lcd.c
+ arch/arm/mach-pxa/Kconfig               |  1 -
+ arch/arm/mach-pxa/include/mach/poodle.h |  6 ----
+ arch/arm/mach-pxa/poodle.c              | 58 ++++++++++++++++++++++++++++++---
+ 3 files changed, 54 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/video/backlight/Kconfig b/drivers/video/backlight/Kconfig
-index 6c093e2..b2f995c 100644
---- a/drivers/video/backlight/Kconfig
-+++ b/drivers/video/backlight/Kconfig
-@@ -48,6 +48,16 @@ config LCD_LMS283GF05
- 	  SPI driver for Samsung LMS283GF05. This provides basic support
- 	  for powering the LCD up/down through a sysfs interface.
+diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
+index 8896e71..a2756b0 100644
+--- a/arch/arm/mach-pxa/Kconfig
++++ b/arch/arm/mach-pxa/Kconfig
+@@ -481,7 +481,6 @@ config MACH_POODLE
+ 	bool "Enable Sharp SL-5600 (Poodle) Support"
+ 	depends on PXA_SHARPSL
+ 	select PXA25x
+-	select SHARP_LOCOMO
  
-+config LCD_LOCOMO
-+	tristate "Sharp LOCOMO LCD Driver"
-+	depends on MFD_LOCOMO
-+	select IIO
-+	help
-+	  If you have a Sharp Zaurus SL-5500 (Collie) or SL-5600 (Poodle) say y to
-+	  enable the LCD driver.  The panel starts up in power
-+	  off state, so you need this driver in order to see any
-+	  output.
-+
- config LCD_LTV350QV
- 	tristate "Samsung LTV350QV LCD Panel"
- 	depends on SPI_MASTER
-diff --git a/drivers/video/backlight/Makefile b/drivers/video/backlight/Makefile
-index 2de73d2..686cf1a 100644
---- a/drivers/video/backlight/Makefile
-+++ b/drivers/video/backlight/Makefile
-@@ -11,6 +11,7 @@ obj-$(CONFIG_LCD_L4F00242T03)		+= l4f00242t03.o
- obj-$(CONFIG_LCD_LD9040)		+= ld9040.o
- obj-$(CONFIG_LCD_LMS283GF05)		+= lms283gf05.o
- obj-$(CONFIG_LCD_LMS501KF03)		+= lms501kf03.o
-+obj-$(CONFIG_LCD_LOCOMO)		+= locomo_lcd.o
- obj-$(CONFIG_LCD_LTV350QV)		+= ltv350qv.o
- obj-$(CONFIG_LCD_PLATFORM)		+= platform_lcd.o
- obj-$(CONFIG_LCD_S6E63M0)		+= s6e63m0.o
-diff --git a/drivers/video/backlight/locomo_lcd.c b/drivers/video/backlight/locomo_lcd.c
-new file mode 100644
-index 0000000..dc316cb
---- /dev/null
-+++ b/drivers/video/backlight/locomo_lcd.c
-@@ -0,0 +1,285 @@
-+/*
-+ * Backlight control code for Sharp Zaurus SL-5500
-+ *
-+ * Copyright 2005 John Lenz <lenz@cs.wisc.edu>
-+ * Maintainer: Pavel Machek <pavel@ucw.cz> (unless John wants to :-)
-+ * GPL v2
-+ *
-+ * This driver assumes single CPU. That's okay, because collie is
-+ * slightly old hardware, and no one is going to retrofit second CPU to
-+ * old PDA.
-+ */
-+
-+#include <linux/delay.h>
-+#include <linux/fb.h>
-+#include <linux/gpio/consumer.h>
-+#include <linux/iio/consumer.h>
-+#include <linux/lcd.h>
+ config MACH_CORGI
+ 	bool "Enable Sharp SL-C700 (Corgi) Support"
+diff --git a/arch/arm/mach-pxa/include/mach/poodle.h b/arch/arm/mach-pxa/include/mach/poodle.h
+index b56b193..5905cf1 100644
+--- a/arch/arm/mach-pxa/include/mach/poodle.h
++++ b/arch/arm/mach-pxa/include/mach/poodle.h
+@@ -81,12 +81,6 @@
+ #define POODLE_GPIO_L_LCLK	(POODLE_SCOOP_GPIO_BASE + 10)
+ #define POODLE_GPIO_HS_OUT	(POODLE_SCOOP_GPIO_BASE + 11)
+ 
+-#define POODLE_LOCOMO_GPIO_AMP_ON      LOCOMO_GPIO(8)
+-#define POODLE_LOCOMO_GPIO_MUTE_L      LOCOMO_GPIO(10)
+-#define POODLE_LOCOMO_GPIO_MUTE_R      LOCOMO_GPIO(11)
+-#define POODLE_LOCOMO_GPIO_232VCC_ON   LOCOMO_GPIO(12)
+-#define POODLE_LOCOMO_GPIO_JK_B        LOCOMO_GPIO(13)
+-
+ #define POODLE_NR_IRQS		(IRQ_BOARD_START + 4)	/* 4 for LoCoMo */
+ 
+ extern struct platform_device poodle_locomo_device;
+diff --git a/arch/arm/mach-pxa/poodle.c b/arch/arm/mach-pxa/poodle.c
+index 195b112..0236ee8 100644
+--- a/arch/arm/mach-pxa/poodle.c
++++ b/arch/arm/mach-pxa/poodle.c
+@@ -23,6 +23,7 @@
+ #include <linux/delay.h>
+ #include <linux/mtd/physmap.h>
+ #include <linux/gpio.h>
++#include <linux/gpio/machine.h>
+ #include <linux/i2c.h>
+ #include <linux/i2c/pxa-i2c.h>
+ #include <linux/regulator/machine.h>
+@@ -31,6 +32,8 @@
+ #include <linux/spi/pxa2xx_spi.h>
+ #include <linux/mtd/sharpsl.h>
+ #include <linux/memblock.h>
++#include <linux/iio/machine.h>
 +#include <linux/mfd/locomo.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+
-+struct locomo_lcd {
-+	struct regmap *regmap;
-+	struct platform_device *dev;
-+	struct locomo_lcd_platform_data *data;
-+	int power;
-+	struct iio_channel *comadj;
-+	struct gpio_desc *vsha, *vshd, *vee, *mod;
-+};
-+
-+static void locomo_lcd_on(struct locomo_lcd *lcd)
-+{
-+	gpiod_set_value(lcd->vsha, 1);
-+	usleep_range(2000, 3000);
-+
-+	gpiod_set_value(lcd->vshd, 1);
-+	usleep_range(2000, 3000);
-+
-+	iio_write_channel_raw(lcd->comadj, lcd->data->comadj);
-+	usleep_range(5000, 6000);
-+
-+	gpiod_set_value(lcd->vee, 1);
-+	usleep_range(10000, 11000);
-+
-+	/* TFTCRST | CPSOUT=0 | CPSEN */
-+	regmap_write(lcd->regmap, LOCOMO_TC, 0x01);
-+
-+	/* Set CPSD */
-+	regmap_write(lcd->regmap, LOCOMO_CPSD, 6);
-+
-+	/* TFTCRST | CPSOUT=0 | CPSEN */
-+	regmap_write(lcd->regmap, LOCOMO_TC, 0x04 | 0x01);
-+	usleep_range(10000, 11000);
-+
-+	gpiod_set_value(lcd->mod, 1);
-+}
-+
-+static void locomo_lcd_off(struct locomo_lcd *lcd)
-+{
-+	/* TFTCRST=1 | CPSOUT=1 | CPSEN = 0 */
-+	regmap_write(lcd->regmap, LOCOMO_TC, 0x06);
-+	usleep_range(1000, 2000);
-+
-+	gpiod_set_value(lcd->vsha, 0);
-+	msleep(110);
-+
-+	gpiod_set_value(lcd->vee, 0);
-+	msleep(700);
-+
-+	iio_write_channel_raw(lcd->comadj, 0);
-+	usleep_range(5000, 6000);
-+
-+	/* TFTCRST=0 | CPSOUT=0 | CPSEN = 0 */
-+	regmap_write(lcd->regmap, LOCOMO_TC, 0);
-+	gpiod_set_value(lcd->mod, 0);
-+	gpiod_set_value(lcd->vshd, 0);
-+}
-+
-+static void locomo_lcd_program_adsync(struct locomo_lcd *lcd)
-+{
-+	regmap_write(lcd->regmap, LOCOMO_ASD,
-+			6 + 8 + 320 + 30 - 10);
-+	regmap_update_bits(lcd->regmap, LOCOMO_ASD,
-+		0x8000,
-+		0x8000);
-+
-+	regmap_write(lcd->regmap, LOCOMO_HSD,
-+			6 + 8 + 320 + 30 - 10 - 128 + 4);
-+	regmap_update_bits(lcd->regmap, LOCOMO_HSD,
-+		0x8000,
-+		0x8000);
-+
-+	regmap_write(lcd->regmap, LOCOMO_HSC, 128 / 8);
-+
-+	/* XON */
-+	regmap_write(lcd->regmap, LOCOMO_TADC, 0x80);
-+	usleep_range(1000, 1100);
-+
-+	/* CLK9MEN */
-+	regmap_update_bits(lcd->regmap, LOCOMO_TADC,
-+		0x10,
-+		0x10);
-+	usleep_range(100, 200);
-+}
-+
-+static void locomo_lcd_disable_adsync(struct locomo_lcd *lcd)
-+{
-+	/* ADSTART */
-+	regmap_write(lcd->regmap, LOCOMO_ASD, 0x00);
-+
-+	/* 18MHz clock off*/
-+	regmap_write(lcd->regmap, LOCOMO_TADC, 0x00);
-+}
-+
-+int locomo_lcd_set_power(struct lcd_device *ldev, int power)
-+{
-+	struct locomo_lcd *lcd = lcd_get_data(ldev);
-+
-+	dev_dbg(&ldev->dev, "LCD power %d (is %d)\n", power, lcd->power);
-+
-+	if (!power && lcd->power)
-+		locomo_lcd_on(lcd);
-+
-+	if (power && !lcd->power)
-+		locomo_lcd_off(lcd);
-+
-+	lcd->power = power;
-+
-+	return 0;
-+}
-+
-+static int locomo_lcd_get_power(struct lcd_device *ldev)
-+{
-+	struct locomo_lcd *lcd = lcd_get_data(ldev);
-+
-+	return lcd->power;
-+}
-+
-+static struct lcd_ops locomo_lcd_ops = {
-+	.set_power = locomo_lcd_set_power,
-+	.get_power = locomo_lcd_get_power,
-+};
-+
-+#ifdef CONFIG_PM_SLEEP
-+static int locomo_lcd_suspend(struct device *dev)
-+{
-+	struct lcd_device *ldev = dev_get_drvdata(dev);
-+	struct locomo_lcd *lcd = lcd_get_data(ldev);
-+
-+	locomo_lcd_off(lcd);
-+
-+	locomo_lcd_disable_adsync(lcd);
-+
-+	return 0;
-+}
-+
-+static int locomo_lcd_resume(struct device *dev)
-+{
-+	struct lcd_device *ldev = dev_get_drvdata(dev);
-+	struct locomo_lcd *lcd = lcd_get_data(ldev);
-+
-+	locomo_lcd_program_adsync(lcd);
-+
-+	if (!lcd->power)
-+		locomo_lcd_on(lcd);
-+
-+	return 0;
-+}
-+
-+static SIMPLE_DEV_PM_OPS(locomo_lcd_pm, locomo_lcd_suspend, locomo_lcd_resume);
-+#define LOCOMOLCD_PM	(&locomo_lcd_pm)
-+#else
-+#define LOCOMOLCD_PM	NULL
-+#endif
-+
-+static int locomo_lcd_probe(struct platform_device *dev)
-+{
-+	struct lcd_device *lcd_dev;
-+	struct locomo_lcd *lcd;
-+	int rc;
-+
-+	lcd = devm_kmalloc(&dev->dev, sizeof(struct locomo_lcd), GFP_KERNEL);
-+	if (!lcd)
-+		return -ENOMEM;
-+
-+	lcd->dev = dev;
-+	lcd->power = FB_BLANK_NORMAL;
-+
-+	lcd->regmap = dev_get_regmap(dev->dev.parent, NULL);
-+	if (!lcd->regmap)
-+		return -ENODEV;
-+
-+	lcd->data = dev_get_platdata(&dev->dev);
-+	if (!lcd->data)
-+		return -EINVAL;
-+
-+	lcd->vsha = devm_gpiod_get(&dev->dev, "VSHA", GPIOD_OUT_LOW);
-+	if (IS_ERR(lcd->vsha))
-+		return PTR_ERR(lcd->vsha);
-+
-+	lcd->vshd = devm_gpiod_get(&dev->dev, "VSHD", GPIOD_OUT_LOW);
-+	if (IS_ERR(lcd->vshd))
-+		return PTR_ERR(lcd->vshd);
-+
-+	lcd->vee = devm_gpiod_get(&dev->dev, "Vee", GPIOD_OUT_LOW);
-+	if (IS_ERR(lcd->vee))
-+		return PTR_ERR(lcd->vee);
-+
-+	lcd->mod = devm_gpiod_get(&dev->dev, "MOD", GPIOD_OUT_LOW);
-+	if (IS_ERR(lcd->mod))
-+		return PTR_ERR(lcd->mod);
-+
-+	lcd->comadj = iio_channel_get(&dev->dev, "comadj");
-+	if (IS_ERR(lcd->comadj)) {
-+		rc = PTR_ERR(lcd->comadj);
-+		if (rc == -ENODEV)
-+			rc = -EPROBE_DEFER;
-+
-+		return rc;
-+	}
-+
-+	locomo_lcd_program_adsync(lcd);
-+
-+	lcd_dev = devm_lcd_device_register(&dev->dev, "locomo", &dev->dev, lcd,
-+			&locomo_lcd_ops);
-+	if (IS_ERR(lcd_dev)) {
-+		rc = PTR_ERR(lcd_dev);
-+		goto err;
-+	}
-+
-+	platform_set_drvdata(dev, lcd_dev);
-+
-+	lcd_set_power(lcd_dev, FB_BLANK_UNBLANK);
-+
-+	return 0;
-+
-+err:
-+	locomo_lcd_disable_adsync(lcd);
-+	iio_channel_release(lcd->comadj);
-+
-+	return rc;
-+}
-+
-+static int locomo_lcd_remove(struct platform_device *dev)
-+{
-+	struct lcd_device *ldev = platform_get_drvdata(dev);
-+	struct locomo_lcd *lcd = lcd_get_data(ldev);
-+
-+	locomo_lcd_off(lcd);
-+
-+	locomo_lcd_disable_adsync(lcd);
-+
-+	iio_channel_release(lcd->comadj);
-+
-+	return 0;
-+}
-+
-+static void locomo_lcd_shutdown(struct platform_device *dev)
-+{
-+	struct lcd_device *ldev = platform_get_drvdata(dev);
-+	struct locomo_lcd *lcd = lcd_get_data(ldev);
-+
-+	locomo_lcd_off(lcd);
-+
-+	locomo_lcd_disable_adsync(lcd);
-+}
-+
-+static struct platform_driver locomo_lcd_driver = {
-+	.driver = {
-+		.name	= "locomo-lcd",
-+		.pm	= LOCOMOLCD_PM,
+ 
+ #include <mach/hardware.h>
+ #include <asm/mach-types.h>
+@@ -49,7 +52,6 @@
+ #include <linux/platform_data/video-pxafb.h>
+ 
+ #include <asm/hardware/scoop.h>
+-#include <asm/hardware/locomo.h>
+ #include <asm/mach/sharpsl_param.h>
+ 
+ #include "generic.h"
+@@ -179,7 +181,8 @@ static struct resource locomo_resources[] = {
+ };
+ 
+ static struct locomo_platform_data locomo_info = {
+-	.irq_base	= IRQ_BOARD_START,
++	.gpio_base	  = -1,
++	.comadj	          = 118,
+ };
+ 
+ struct platform_device poodle_locomo_device = {
+@@ -192,8 +195,6 @@ struct platform_device poodle_locomo_device = {
+ 	},
+ };
+ 
+-EXPORT_SYMBOL(poodle_locomo_device);
+-
+ #if defined(CONFIG_SPI_PXA2XX) || defined(CONFIG_SPI_PXA2XX_MODULE)
+ static struct pxa2xx_spi_master poodle_spi_info = {
+ 	.num_chipselect	= 1,
+@@ -424,6 +425,47 @@ static struct i2c_board_info __initdata poodle_i2c_devices[] = {
+ 	{ I2C_BOARD_INFO("wm8731", 0x1b) },
+ };
+ 
++static struct iio_map locomo_iio_map[] = {
++	{
++		.consumer_dev_name = "locomo-lcd.0",
++		.consumer_channel = "comadj",
++		.adc_channel_label = "CH0",
 +	},
-+	.probe	= locomo_lcd_probe,
-+	.remove	= locomo_lcd_remove,
-+	.shutdown = locomo_lcd_shutdown,
++	{ }
 +};
 +
-+module_platform_driver(locomo_lcd_driver);
++static struct i2c_board_info locomo_i2c_devs[] __initdata = {
++	{
++		I2C_BOARD_INFO("m62332", 0x4e),
++		.platform_data = locomo_iio_map,
++	},
++};
 +
-+MODULE_AUTHOR("John Lenz <lenz@cs.wisc.edu>");
-+MODULE_AUTHOR("Pavel Machek <pavel@ucw.cz>");
-+MODULE_DESCRIPTION("LoCoMo LCD driver");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:locomo-lcd");
++static struct gpiod_lookup_table poodle_audio_gpios_table = {
++	.dev_id = "poodle-audio",
++	.table = {
++		GPIO_LOOKUP("locomo-gpio", 10, "mute-l", GPIO_ACTIVE_LOW),
++		GPIO_LOOKUP("locomo-gpio", 11, "mute-r", GPIO_ACTIVE_LOW),
++		GPIO_LOOKUP("locomo-gpio", 8, "amp-on", GPIO_ACTIVE_LOW),
++		{ },
++	},
++}, poodle_bl_gpios_table = {
++	.dev_id = "locomo-backlight.0",
++	.table = {
++		GPIO_LOOKUP("locomo-gpio", 9, "flvr", GPIO_ACTIVE_HIGH),
++		{ },
++	},
++}, poodle_lcd_gpios_table = {
++	.dev_id = "locomo-lcd.0",
++	.table = {
++		GPIO_LOOKUP("locomo-gpio", 4, "VSHA", GPIO_ACTIVE_HIGH),
++		GPIO_LOOKUP("locomo-gpio", 5, "VSHD", GPIO_ACTIVE_HIGH),
++		GPIO_LOOKUP("locomo-gpio", 6, "Vee", GPIO_ACTIVE_HIGH),
++		GPIO_LOOKUP("locomo-gpio", 7, "MOD", GPIO_ACTIVE_HIGH),
++		{ },
++	},
++};
++
+ static void poodle_poweroff(void)
+ {
+ 	pxa_restart(REBOOT_HARD, NULL);
+@@ -445,6 +487,13 @@ static void __init poodle_init(void)
+ 
+ 	platform_scoop_config = &poodle_pcmcia_config;
+ 
++	if (sharpsl_param.comadj != -1)
++		locomo_info.comadj = sharpsl_param.comadj;
++
++	gpiod_add_lookup_table(&poodle_audio_gpios_table);
++	gpiod_add_lookup_table(&poodle_bl_gpios_table);
++	gpiod_add_lookup_table(&poodle_lcd_gpios_table);
++
+ 	ret = platform_add_devices(devices, ARRAY_SIZE(devices));
+ 	if (ret)
+ 		pr_warn("poodle: Unable to register LoCoMo device\n");
+@@ -455,6 +504,7 @@ static void __init poodle_init(void)
+ 	pxa_set_ficp_info(&poodle_ficp_platform_data);
+ 	pxa_set_i2c_info(NULL);
+ 	i2c_register_board_info(0, ARRAY_AND_SIZE(poodle_i2c_devices));
++	i2c_register_board_info(1, ARRAY_AND_SIZE(locomo_i2c_devs));
+ 	poodle_init_spi();
+ 	regulator_has_full_constraints();
+ }
 -- 
 2.1.4
