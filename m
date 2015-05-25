@@ -1,118 +1,34 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 25 May 2015 01:41:42 +0300
-Subject: [RFC/PATCH 6/9] drivers: platform: Configure dma operations at
- probe time
-In-Reply-To: <555B12D5.5080608@arm.com>
-References: <1431644410-2997-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1431644410-2997-7-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <555B12D5.5080608@arm.com>
-Message-ID: <6368894.049YN38x4u@avalon>
+From: tj@kernel.org (Tejun Heo)
+Date: Sun, 24 May 2015 20:08:33 -0400
+Subject: [PATCH v3 0/5] AHCI and SATA PHY support for Broadcom STB SoCs
+In-Reply-To: <20150521223825.GA27753@ld-irv-0074>
+References: <1431473303-18873-1-git-send-email-computersforpeace@gmail.com>
+ <555DDC2B.1040608@ti.com> <20150521220050.GF4914@htj.duckdns.org>
+ <20150521220138.GG4914@htj.duckdns.org>
+ <20150521220328.GE11598@ld-irv-0074>
+ <20150521220430.GI4914@htj.duckdns.org>
+ <20150521221306.GF11598@ld-irv-0074>
+ <20150521222350.GN4914@htj.duckdns.org>
+ <20150521223825.GA27753@ld-irv-0074>
+Message-ID: <20150525000833.GF7099@htj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+Hello, Brian.
 
-On Tuesday 19 May 2015 11:39:17 Robin Murphy wrote:
-> On 15/05/15 00:00, Laurent Pinchart wrote:
-> > Configuring DMA ops at probe time will allow deferring device probe when
-> > the IOMMU isn't available yet.
-> 
-> This is great, as I think it also subtly solves the ordering problem the
-> current domain allocation has with platform devices. WRT to your comment
-> on the other thread, this actually makes things slightly saner for IOMMU
-> groups - the group assignment has to happen after device creation or
-> else some sysfs stuff blows up, so of_xlate is far too early and the
-> add_device callback is a reasonable place for it to be (until we can
-> move it out of every driver and into bus code). However, we're currently
-> attaching the device to the automatic domain long before that, so things
-> happen logically backwards and drivers like the ARM SMMU which actually
-> use the group to store relevant data get all confused.
-> 
-> With this change, the existing attach_device call in arch_setup_dma_ops
-> will actually work far more reliably, and I might be able to revive my
-> attempt to port the ARM SMMU driver over to of_xlate :D
+On Thu, May 21, 2015 at 03:38:25PM -0700, Brian Norris wrote:
+> It's possible you're confusing binding documentation with .dts source
+> files? The DTS files (arch/*/boot/dts/) go through arch trees. For
+> instance, the arm-soc maintainers have a structured process by which
+> sub-architecture maintainers track .dts(i) file updates for their
+> boards/chips and filter them up to Arnd, Olof, etc., via their separate
+> 'dts' branches. That's why Florian took patch 5 to his tree.
 
-Please do :-) I second IOMMU driver using the of_xlate + probe deferral 
-mechanism would help validate this patch series.
+Yeah, I think that's why I'm constantly getting confused, so the
+binding documentation and actual libata changes through libata and the
+rest through arch trees.  Got it.
 
-> > Signed-off-by: Laurent Pinchart
-> > <laurent.pinchart+renesas@ideasonboard.com>
-> > ---
-> > 
-> >   drivers/base/platform.c | 9 +++++++++
-> >   drivers/of/platform.c   | 7 +++----
-> >   2 files changed, 12 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/base/platform.c b/drivers/base/platform.c
-> > index ebf034b97278..508a866859dc 100644
-> > --- a/drivers/base/platform.c
-> > +++ b/drivers/base/platform.c
-> > @@ -516,6 +516,10 @@ static int platform_drv_probe(struct device *_dev)
-> >   	if (ret < 0)
-> >   		return ret;
-> > 
-> > +	ret = of_dma_configure_ops(_dev, _dev->of_node);
-> > +	if (ret < 0)
-> > +		goto done;
-> > +
-> >   	ret = dev_pm_domain_attach(_dev, true);
-> >   	if (ret != -EPROBE_DEFER) {
-> >   		ret = drv->probe(dev);
-> > @@ -523,6 +527,10 @@ static int platform_drv_probe(struct device *_dev)
-> >   			dev_pm_domain_detach(_dev, true);
-> >   	}
-> > 
-> > +	if (ret)
-> > +		of_dma_deconfigure(_dev);
-> > +
-> > 
-> > +done:
-> >   	if (drv->prevent_deferred_probe && ret == -EPROBE_DEFER) {
-> >   		dev_warn(_dev, "probe deferral not supported\n");
-> >   		ret = -ENXIO;
-> > @@ -544,6 +552,7 @@ static int platform_drv_remove(struct device *_dev)
-> > 
-> >   	ret = drv->remove(dev);
-> >   	dev_pm_domain_detach(_dev, true);
-> > +	of_dma_deconfigure(_dev);
-> >   	return ret;
-> >   }
-> > 
-> > diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> > index 9a29f09b7723..fc939bec799e 100644
-> > --- a/drivers/of/platform.c
-> > +++ b/drivers/of/platform.c
-> > @@ -178,10 +178,8 @@ static struct platform_device
-> > *of_platform_device_create_pdata(
-> >   	dev->dev.bus = &platform_bus_type;
-> >   	dev->dev.platform_data = platform_data;
-> >   	of_dma_configure_masks(&dev->dev, dev->dev.of_node);
-> > -	of_dma_configure_ops(&dev->dev, dev->dev.of_node);
-> > 
-> >   	if (of_device_add(dev) != 0) {
-> > -		of_dma_deconfigure(&dev->dev);
-> >   		platform_device_put(dev);
-> >   		goto err_clear_flag;
-> >   	}
-> > @@ -465,11 +463,12 @@ static int of_platform_device_destroy(struct device
-> > *dev, void *data)
-> >   	if (dev->bus == &platform_bus_type)
-> >   		platform_device_unregister(to_platform_device(dev));
-> >   
-> >   #ifdef CONFIG_ARM_AMBA
-> > -	else if (dev->bus == &amba_bustype)
-> > +	else if (dev->bus == &amba_bustype) {
-> >   		amba_device_unregister(to_amba_device(dev));
-> > +		of_dma_deconfigure(dev);
-> > +	}
-> >   #endif
-> > 
-> > -	of_dma_deconfigure(dev);
-> >   	of_node_clear_flag(dev->of_node, OF_POPULATED);
-> >   	of_node_clear_flag(dev->of_node, OF_POPULATED_BUS);
-> >   	return 0;
+Thanks for the explanation.
 
 -- 
-Regards,
-
-Laurent Pinchart
+tejun
