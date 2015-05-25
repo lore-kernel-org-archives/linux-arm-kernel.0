@@ -1,55 +1,30 @@
-From: shailendra.capricorn@gmail.com (Shailendra Verma)
-Date: Mon, 25 May 2015 07:39:40 +0530
-Subject: [PATCH] cpufreq:exynos-cpufreq - Fix for memory leak in case SOC name
- does not match.
-Message-ID: <1432519780-2910-1-git-send-email-shailendra.capricorn@gmail.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Mon, 25 May 2015 10:14:51 +0800
+Subject: [PATCH v2 0/2] Add MediaTek display PWM driver
+In-Reply-To: <1432214964-40644-1-git-send-email-yh.huang@mediatek.com>
+References: <1432214964-40644-1-git-send-email-yh.huang@mediatek.com>
+Message-ID: <1432520091.23308.5.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During probe free the memory allocated to "exynos_info" in case of
-unknown SOC type.
+On Thu, 2015-05-21 at 21:29 +0800, YH Huang wrote:
+> YH Huang (2):
+>   dt-bindings: pwm: add MediaTek display PWM bindings
+>   pwm: add MediaTek display PWM driver support
+> 
+>  .../devicetree/bindings/pwm/pwm-mtk-disp.txt       |  25 +++
+>  drivers/pwm/Kconfig                                |  10 +
+>  drivers/pwm/Makefile                               |   1 +
+>  drivers/pwm/pwm-mtk-disp.c                         | 228 +++++++++++++++++++++
+>  4 files changed, 264 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+>  create mode 100644 drivers/pwm/pwm-mtk-disp.c
 
-Signed-off-by: Shailendra Verma <shailendra.capricorn@gmail.com>
----
- drivers/cpufreq/exynos-cpufreq.c |    6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+Hi YH,
 
-diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
-index 82d2fbb..8682378 100644
---- a/drivers/cpufreq/exynos-cpufreq.c
-+++ b/drivers/cpufreq/exynos-cpufreq.c
-@@ -182,7 +182,7 @@ static int exynos_cpufreq_probe(struct platform_device *pdev)
- 		ret = exynos5250_cpufreq_init(exynos_info);
- 	} else {
- 		pr_err("%s: Unknown SoC type\n", __func__);
--		return -ENODEV;
-+		ret = -ENODEV;
- 	}
- 
- 	if (ret)
-@@ -190,12 +190,14 @@ static int exynos_cpufreq_probe(struct platform_device *pdev)
- 
- 	if (exynos_info->set_freq == NULL) {
- 		dev_err(&pdev->dev, "No set_freq function (ERR)\n");
-+		ret = -EINVAL;
- 		goto err_vdd_arm;
- 	}
- 
- 	arm_regulator = regulator_get(NULL, "vdd_arm");
- 	if (IS_ERR(arm_regulator)) {
- 		dev_err(&pdev->dev, "failed to get resource vdd_arm\n");
-+		ret = -EINVAL;
- 		goto err_vdd_arm;
- 	}
- 
-@@ -227,7 +229,7 @@ err_cpufreq_reg:
- 	regulator_put(arm_regulator);
- err_vdd_arm:
- 	kfree(exynos_info);
--	return -EINVAL;
-+	return ret;
- }
- 
- static struct platform_driver exynos_cpufreq_platdrv = {
--- 
-1.7.9.5
+It would be easier for reviewer if you have a summary here on what you
+have changed compare to last version.
+Also, please add patch series summary even for v2, it remind reviewer
+what this series is about.
+
+Joe.C
