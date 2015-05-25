@@ -1,96 +1,26 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 25 May 2015 22:55:28 +0200
-Subject: [PATCH v3 3/6] dmaengine: pxa: add pxa dmaengine driver
-In-Reply-To: <20150525165022.GH3140@localhost> (Vinod Koul's message of "Mon,
- 25 May 2015 22:20:22 +0530")
+Date: Mon, 25 May 2015 22:57:10 +0200
+Subject: [PATCH v3 6/6] Documentation: dmaengine: document DMA_CTRL_ACK
+In-Reply-To: <20150525165257.GI3140@localhost> (Vinod Koul's message of "Mon,
+ 25 May 2015 22:22:57 +0530")
 References: <1431626006-1708-1-git-send-email-robert.jarzmik@free.fr>
- <1431626006-1708-3-git-send-email-robert.jarzmik@free.fr>
- <20150525165022.GH3140@localhost>
-Message-ID: <87vbfg1inz.fsf@belgarion.home>
+ <1431626006-1708-6-git-send-email-robert.jarzmik@free.fr>
+ <20150514183853.GN4004@lukather> <87twvekij8.fsf@belgarion.home>
+ <20150525165257.GI3140@localhost>
+Message-ID: <87r3q41il5.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Vinod Koul <vinod.koul@intel.com> writes:
 
->> +#define DCSR_RUN	BIT(31)	/* Run Bit (read / write) */
->> +#define DCSR_NODESC	BIT(30)	/* No-Descriptor Fetch (read / write) */
->> +#define DCSR_STOPIRQEN	BIT(29)	/* Stop Interrupt Enable (read / write) */
->> +#define DCSR_REQPEND	BIT(8)	/* Request Pending (read-only) */
->> +#define DCSR_STOPSTATE	BIT(3)	/* Stop State (read-only) */
->> +#define DCSR_ENDINTR	BIT(2)	/* End Interrupt (read / write) */
->> +#define DCSR_STARTINTR	BIT(1)	/* Start Interrupt (read / write) */
->> +#define DCSR_BUSERR	BIT(0)	/* Bus Error Interrupt (read / write) */
->> +
->> +#define DCSR_EORIRQEN	BIT(28)	/* End of Receive Interrupt Enable (R/W) */
->> +#define DCSR_EORJMPEN	BIT(27)	/* Jump to next descriptor on EOR */
->> +#define DCSR_EORSTOPEN	BIT(26)	/* STOP on an EOR */
->> +#define DCSR_SETCMPST	BIT(25)	/* Set Descriptor Compare Status */
->> +#define DCSR_CLRCMPST	BIT(24)	/* Clear Descriptor Compare Status */
->> +#define DCSR_CMPST	BIT(10)	/* The Descriptor Compare Status */
->> +#define DCSR_EORINTR	BIT(9)	/* The end of Receive */
-> would help if these are PXA_xxx
-OK, for v4.
+>> > Also, we should still mention that it's !slave API only.
+>> Certainly not, it's fully slave API, that's the purpose of this patch.
+> Its is not dependent on slave, it cna be used by slave as well as other
+> users
+You're right Vinod. I will rephrase that : this applies for both slave and
+!slave.
 
->> +
->> +/*
->> + * Requestor lines are mapped as :
->> + *  - lines 0 to 63   : DRCMR(line) = 0x100 + line * 4
->> + *  - lines 64 to +oo : DRCMR(line) = 0x1000 + line * 4
->> + */
->> +#define DRCMR(n)	((((n) < 64) ? 0x0100 : 0x1100) + (((n) & 0x3f) << 2))
-> This is hard to read, why not make this a function?
-Yes, why not. For v4.
-
->> +static int pxad_alloc_chan_resources(struct dma_chan *dchan)
->> +{
->> +	struct pxad_chan *chan = to_pxad_chan(dchan);
->> +	struct pxad_device *pdev = to_pxad_dev(chan->vc.chan.device);
->> +
->> +	if (chan->desc_pool)
->> +		return 1;
->> +
->> +	chan->desc_pool = dma_pool_create(dma_chan_name(dchan),
->> +					  pdev->slave.dev,
->> +					  sizeof(struct pxad_desc_hw),
->> +					  __alignof__(struct pxad_desc_hw),
-> why __alignof__ and why not simple say sizeof(struct pxad_desc_hw) to align
-> the pool for this struct.
-Because it's not the size of the struct which makes its alignement requirement,
-but it's declared alignement (see pxad_desc_hw declaration, especially the
-__aligned((16)) part). Would the requirement have been of 32 bytes for the same
-structure size (because of a IP hardware designer whim), I would only need to
-modify the pxad_desc_hw structure declaration.
-
-> Also you have given the descriptor size here for pool size, which sounds odd
-> and ideally you would like to request a large pool for channel for allocating
-> multiple desc
-Euh how so ? dma_pool_create() takes as its third argument the size of one
-unitary block, ie. one pxad_desc_hw, which is of sizeof(struct pxad_desc_hw) bytes.
-You probably know that dma_pool_create() allocates per pages, ie. multiple
-pxad_desc_hw will be allocated at once.
-
->> +static struct pxad_desc_sw *
->> +pxad_alloc_desc(struct pxad_chan *chan, unsigned int nb_hw_desc)
->> +{
->> +	struct pxad_desc_sw *sw_desc;
->> +	dma_addr_t dma;
->> +	int i;
->> +
->> +	sw_desc = kzalloc(sizeof(*sw_desc) +
->> +			  nb_hw_desc * sizeof(struct pxad_desc_hw *),
->> +			  GFP_ATOMIC);
-> GFP_NOWAIT
-Ok.
-
->> +	if (!sw_desc)
->> +		return NULL;
->> +	sw_desc->desc_pool = chan->desc_pool;
->> +
->> +	for (i = 0; i < nb_hw_desc; i++) {
->> +		sw_desc->hw_desc[i] = dma_pool_alloc(sw_desc->desc_pool,
->> +						     GFP_ATOMIC, &dma);
-> GFP_NOWAIT
-Ok.
+Cheers.
 
 -- 
 Robert
