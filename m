@@ -1,70 +1,64 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 25 May 2015 10:12:54 +0900
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable shmobile
- r8a7778/bockw platform
-In-Reply-To: <20150304225522.GB2470@verge.net.au>
-References: <1425471261-25110-1-git-send-email-geert+renesas@glider.be>
- <1425471261-25110-3-git-send-email-geert+renesas@glider.be>
- <20150304225522.GB2470@verge.net.au>
-Message-ID: <20150525011253.GF24690@verge.net.au>
+Date: Mon, 25 May 2015 10:14:32 +0900
+Subject: [PATCH] ARM: multi_v7_defconfig: Enable shmobile r8a7778 (M1A)
+In-Reply-To: <CAMuHMdW4=ZA5STuUm1zBypRtfuQtrD=2rBDW5GBGRS--zGMbzw@mail.gmail.com>
+References: <1429196897-18822-1-git-send-email-ulrich.hecht+renesas@gmail.com>
+ <552FDD73.70805@cogentembedded.com>
+ <CAMuHMdW4=ZA5STuUm1zBypRtfuQtrD=2rBDW5GBGRS--zGMbzw@mail.gmail.com>
+Message-ID: <20150525011431.GG24690@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
-
-On Thu, Mar 05, 2015 at 07:55:23AM +0900, Simon Horman wrote:
-> On Wed, Mar 04, 2015 at 01:14:21PM +0100, Geert Uytterhoeven wrote:
-> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+On Thu, Apr 16, 2015 at 06:08:08PM +0200, Geert Uytterhoeven wrote:
+> On Thu, Apr 16, 2015 at 6:04 PM, Sergei Shtylyov
+> <sergei.shtylyov@cogentembedded.com> wrote:
+> > On 04/16/2015 06:08 PM, Ulrich Hecht wrote:
+> >
+> >> Also enables RTC (RX8581) and camera (ML86V7667) drivers as modules.
 > 
-> Acked-by: Simon Horman <horms+renesas@verge.net.au>
+> I think this is identical to
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/327624.html?
 
-Quite some time has passed and during that time I have come to
-understand from Arnd that it is appropriate for me to take changes like
-this one.
+I think so too. And I also now understand that it is appropriate for me
+to take such patches. Accordingly I have queued up the patch at the link
+above for v4.2.
 
-I have queued this up for 4.2 accordingly.
-
-> > ---
-> >   - Derived from r8a7778-bockw.dtb using
-> >     https://github.com/geertu/linux-scripts/blob/master/linux-config-from-dt
-> >   - Not tested on bockw due to lack of hardware
-> > ---
-> >  arch/arm/configs/multi_v7_defconfig | 3 +++
-> >  1 file changed, 3 insertions(+)
-> > 
-> > diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> > index b7e6b6fba5e0f0d6..fa1ecbcfe08cb127 100644
-> > --- a/arch/arm/configs/multi_v7_defconfig
-> > +++ b/arch/arm/configs/multi_v7_defconfig
-> > @@ -67,6 +67,7 @@ CONFIG_ARCH_EMEV2=y
-> >  CONFIG_ARCH_R7S72100=y
-> >  CONFIG_ARCH_R8A73A4=y
-> >  CONFIG_ARCH_R8A7740=y
-> > +CONFIG_ARCH_R8A7778=y
-> >  CONFIG_ARCH_R8A7779=y
-> >  CONFIG_ARCH_R8A7790=y
-> >  CONFIG_ARCH_R8A7791=y
-> > @@ -377,6 +378,7 @@ CONFIG_V4L_MEM2MEM_DRIVERS=y
-> >  CONFIG_VIDEO_RENESAS_VSP1=m
-> >  # CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
-> >  CONFIG_VIDEO_ADV7180=m
-> > +CONFIG_VIDEO_ML86V7667=m
-> >  CONFIG_DRM=y
-> >  CONFIG_DRM_RCAR_DU=m
-> >  CONFIG_DRM_TEGRA=y
-> > @@ -493,6 +495,7 @@ CONFIG_RTC_DRV_TWL4030=y
-> >  CONFIG_RTC_DRV_TPS6586X=y
-> >  CONFIG_RTC_DRV_TPS65910=y
-> >  CONFIG_RTC_DRV_S35390A=m
-> > +CONFIG_RTC_DRV_RX8581=m
-> >  CONFIG_RTC_DRV_EM3027=y
-> >  CONFIG_RTC_DRV_PL031=y
-> >  CONFIG_RTC_DRV_VT8500=y
-> > -- 
-> > 1.9.1
-> > 
+> >> Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+> >> ---
+> >>   arch/arm/configs/multi_v7_defconfig | 3 +++
+> >>   1 file changed, 3 insertions(+)
+> >
+> >
+> >> diff --git a/arch/arm/configs/multi_v7_defconfig
+> >> b/arch/arm/configs/multi_v7_defconfig
+> >> index 06075b6..212199a 100644
+> >> --- a/arch/arm/configs/multi_v7_defconfig
+> >> +++ b/arch/arm/configs/multi_v7_defconfig
+> >
+> > [...]
+> >>
+> >> @@ -500,6 +502,7 @@ CONFIG_RTC_DRV_SUN6I=y
+> >>   CONFIG_RTC_DRV_SUNXI=y
+> >>   CONFIG_RTC_DRV_MV=y
+> >>   CONFIG_RTC_DRV_TEGRA=y
+> >> +CONFIG_RTC_DRV_RX8581=m
+> >
+> >    The other RTC drivers seem to be built-in.
+> 
+> The current trend is to make "non-core" functionalities modular, to
+> reduce kernel size.
+> 
+> Yes, this means many of the existing options should be changed from
+> y to m.
+> 
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
+> 
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
 > 
