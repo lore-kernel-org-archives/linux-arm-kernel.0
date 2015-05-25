@@ -1,66 +1,55 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 25 May 2015 12:19:44 +0200
-Subject: [BUG] Read-Only THP causes stalls (commit 10359213d)
-In-Reply-To: <20150525100515.GA8275@node.dhcp.inet.fi>
-References: <20150524193404.GD16910@cbox>
- <20150525100515.GA8275@node.dhcp.inet.fi>
-Message-ID: <20150525101944.GA14095@cbox>
+From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
+Date: Mon, 25 May 2015 15:47:49 +0530
+Subject: [PATCH v3 2/2] soc: Add driver for Freescale Vybrid Platform
+In-Reply-To: <3574233.JhJlJx8SSu@wuerfel>
+References: <cover.1432290463.git.maitysanchayan@gmail.com>
+ <35561091.AtkcGa6qVG@wuerfel>
+ <61585e4449cfc1f36e16a64b9b4a54fe@agner.ch>
+ <3574233.JhJlJx8SSu@wuerfel>
+Message-ID: <20150525101749.GB5725@Sanchayan-Arch.toradex.int>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 25, 2015 at 01:05:15PM +0300, Kirill A. Shutemov wrote:
-> On Sun, May 24, 2015 at 09:34:04PM +0200, Christoffer Dall wrote:
-> > Hi all,
-> > 
-> > I noticed a regression on my arm64 APM X-Gene system a couple
-> > of weeks back.  I would occassionally see the system lock up and see RCU
-> > stalls during the caching phase of kernbench.  I then wrote a small
-> > script that does nothing but cache the files
-> > (http://paste.ubuntu.com/11324767/) and ran that in a loop.  On a known
-> > bad commit (v4.1-rc2), out of 25 boots, I never saw it get past 21
-> > iterations of the loop.  I have since tried to run a bisect from v3.19 to
-> > v4.0 using 100 iterations as my criteria for a good commit.
-> > 
-> > This resulted in the following first bad commit:
-> > 
-> > 10359213d05acf804558bda7cc9b8422a828d1cd
-> > (mm: incorporate read-only pages into transparent huge pages, 2015-02-11)
-> > 
-> > Indeed, running the workload on v4.1-rc4 still produced the behavior,
-> > but reverting the above commit gets me through 100 iterations of the
-> > loop.
-> > 
-> > I have not tried to reproduce on an x86 system.  Turning on a bunch
-> > of kernel debugging features *seems* to hide the problem.  My config for
-> > the XGene system is defconfig + CONFIG_BRIDGE and
-> > CONFIG_POWER_RESET_XGENE.
-> > 
-> > Please let me know if I can help test patches or other things I can
-> > do to help.  I'm afraid that by simply reading the patch I didn't see
-> > anything obviously wrong with it which would cause this behavior.
-> 
-> I don't see the problem on x86.
+Hello Arnd,
 
-I'm wondering if we could have some weird combination of how the
-specific architecture works along with these patches...
+On 15-05-22 15:20:00, Arnd Bergmann wrote:
+> On Friday 22 May 2015 14:02:52 Stefan Agner wrote:
+> > > Can you use syscon_regmap_lookup_by_phandle instead, and put the
+> > > phandles in the fsl,vf610-mscm-cpucfg node?
+> > 
+> > Hm, with that we would wire up hardware modules which does nothing has
+> > to do with each other. We just happen to need a driver which collects
+> > information accross the SoC. I'm not sure we should put the modules
+> > required into the device tree.
+> > 
+> > I don't think its nice to have the compatible strings in the source
+> > code, however it feels more appropriate than in the device tree, IMHO...
+> 
+> I see. Another option would be to point directly to the registers
+> you need:
+> 
+> 	ocotp-cfg0 = <&ocotp 0x10>;
+> 	ocotp-cfg1 = <&ocotp 0x20>;
+> 	rom-revision = <&rom 0x80>;
+> 
+> We don't yet have an abstraction to access a register from a syscon
+> reference like this, but you could either roll your own here, or 
+> add a generic abstraction.
+
+Can you tell me a little about how can I start implementing it? I am not
+clear on how to approach this.
 
 > 
-> Some backtraces could help to track it down.
+> > > Also, I'd argue that the mscm should not be a syscon device at all,
+> > > but instead I'd use platform_get_resource()/devm_ioremap_resource()
+> > > to get an __iomem pointer.
+> > 
+> > We need to have mscm-cpucfg to be syscon because we need to get the CPU
+> > personality in the MSCM interrupt router driver (irq-vf610-mscm-ir.c). 
 > 
-I don't really get backtraces as the sytem just locks up.  But here are
-some of the RCU stalls as I've observed them on the console:
+> It can be both at the same time now.
+> 
+> 	Arnd
 
-http://paste.ubuntu.com/11014701/
-http://paste.ubuntu.com/11023143/
-http://paste.ubuntu.com/11023261/
-
-
-Occasionally, I also get this error from the SATA system at the moment
-when I power off the device, but not sure if it is related:
-
-  ata1: exception Emask 0x10 SAct 0x0 SErr 0x180000 action 0xe frozen
-  ata1: irq_stat 0x00400000, PHY RDY changed
-  ata1: SError: { 10B8B Dispar }
-
-Thanks,
--Christoffer
+Regards,
+Sanchayan.
