@@ -1,108 +1,95 @@
-From: tfiga@google.com (Tomasz Figa)
-Date: Mon, 25 May 2015 15:48:36 +0900
-Subject: [PATCH v2 2/6] dt-bindings: mediatek: Add smi dts binding
-In-Reply-To: <1431683009-18158-3-git-send-email-yong.wu@mediatek.com>
-References: <1431683009-18158-1-git-send-email-yong.wu@mediatek.com>
- <1431683009-18158-3-git-send-email-yong.wu@mediatek.com>
-Message-ID: <CAAFQd5D_-FrVNNPfMTwaWgDHfOPWVnRCvBCV2JS6Q2xPUiEScA@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 25 May 2015 08:58:02 +0200
+Subject: [PATCH 1/2] mmc: sunxi: fix timeout in sunxi_mmc_oclk_onoff
+In-Reply-To: <4011290915a42fce8b9c19d59f3ca9c3289a6817.1432491958.git.hramrach@gmail.com>
+References: <cover.1432491958.git.hramrach@gmail.com>
+ <4011290915a42fce8b9c19d59f3ca9c3289a6817.1432491958.git.hramrach@gmail.com>
+Message-ID: <5562C7FA.4050905@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Please see my comments inline.
-
-On Fri, May 15, 2015 at 6:43 PM, Yong Wu <yong.wu@mediatek.com> wrote:
-> This patch add smi binding document.
+On 24-05-15 20:07, Michal Suchanek wrote:
+> The 250ms timeout is too short.
 >
-> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+> On my system enabling the oclk takes under 50ms and disabling slightly
+> over 100ms when idle. Under load disabling the clock can take over
+> 350ms.
+>
+> This does not make mmc clock gating look like good option to have on
+> sunxi but the system should not crash with mmc clock gating enabled
+> nonetheless.
+>
+> This patch sets the timeout to 750ms and adds debug prints which show
+> how long enabling/disabling the clock took so more data can be collected
+> from other systems.
+>
+> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
+
+Looks good: Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+
+Regards,
+
+Hans
+
+
 > ---
->  .../bindings/soc/mediatek/mediatek,smi-larb.txt    | 24 ++++++++++++++++++++++
->  .../bindings/soc/mediatek/mediatek,smi.txt         | 22 ++++++++++++++++++++
->  2 files changed, 46 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/mediatek/mediatek,smi-larb.txt
->  create mode 100644 Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt
+>   drivers/mmc/host/sunxi-mmc.c | 22 +++++++++++++++++++---
+>   1 file changed, 19 insertions(+), 3 deletions(-)
 >
-> diff --git a/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi-larb.txt b/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi-larb.txt
-> new file mode 100644
-> index 0000000..c06c5b6
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi-larb.txt
-> @@ -0,0 +1,24 @@
-> +SMI(Smart Multimedia Interface) Local Arbiter
+> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> index 4d3e1ff..7cdeecd 100644
+> --- a/drivers/mmc/host/sunxi-mmc.c
+> +++ b/drivers/mmc/host/sunxi-mmc.c
+> @@ -595,7 +595,7 @@ static irqreturn_t sunxi_mmc_handle_manual_stop(int irq, void *dev_id)
+>
+>   static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
+>   {
+> -	unsigned long expire = jiffies + msecs_to_jiffies(250);
+> +	unsigned long start, end;
+>   	u32 rval;
+>
+>   	rval = mmc_readl(host, REG_CLKCR);
+> @@ -604,6 +604,8 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
+>   	if (oclk_en)
+>   		rval |= SDXC_CARD_CLOCK_ON;
+>
+> +	start = jiffies;
+> +	end = start + msecs_to_jiffies(750);
+>   	mmc_writel(host, REG_CLKCR, rval);
+>
+>   	rval = SDXC_START | SDXC_UPCLK_ONLY | SDXC_WAIT_PRE_OVER;
+> @@ -611,15 +613,29 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
+>
+>   	do {
+>   		rval = mmc_readl(host, REG_CMDR);
+> -	} while (time_before(jiffies, expire) && (rval & SDXC_START));
+> +	} while (time_before(jiffies, end) && (rval & SDXC_START));
+> +	end = jiffies;
+>
+>   	/* clear irq status bits set by the command */
+>   	mmc_writel(host, REG_RINTR,
+>   		   mmc_readl(host, REG_RINTR) & ~SDXC_SDIO_INTERRUPT);
+>
+>   	if (rval & SDXC_START) {
+> -		dev_err(mmc_dev(host->mmc), "fatal err update clk timeout\n");
+> +		dev_err(mmc_dev(host->mmc),
+> +			"fatal err update oclk timeout. Could not %s in %ims.\n",
+> +			oclk_en ? "enable" : "disable",
+> +			jiffies_to_msecs(end-start));
+>   		return -EIO;
+> +	} else {
+> +		int msecs = jiffies_to_msecs(end-start);
+> +		const char *ing = oclk_en ? "enabling" : "disabling";
 > +
-> +The hardware block diagram please check bindings/iommu/mediatek,iommu.txt
-> +
-> +Required properties:
-> +- compatible : must be "mediatek,mt8173-smi-larb"
-> +- reg : the register and size of each local arbiter.
-
-Shouldn't it be "of this local arbiter"?
-
-> +- smi : must be "&smi_common". Refer to bindings/soc/mediatek,smi.txt.
-
-This is incorrect. Device tree source authors are free to use any
-labels for their nodes and documentation should not rely on the fact
-that there is some node with some particular label. This should be
-something like:
-
-- smi : a phandle to node of XYZ
-
-with proper description of that node in place of XYZ.
-
-> +- clocks : must contain one entry for each clock-names.
-> +       There are 2 clockes:
-> +       APB clock : Advanced Peripheral Bus clock, It's the clock for setting
-> +               the register.
-> +       SMI clock : It's the clock for transfer data and command.
-
-The description of each clock should go to "clock-names" property.
-Please use some of already existing bindings as an example.
-
-> +- clock-name: must be "apb" and "smi".
-
-typo: Should be "clock-names".
-
-I'd recommend describing this property as below:
-
-- clock-names: must contain 2 entries, as follows:
-  - "apb" : <here comes the description of APB clock>,
-  - "smi" : <here comes the description of SMI clock>.
-
-> +
-> +Example:
-> +       larb0:larb at 14021000 {
-> +               compatible = "mediatek,mt8173-smi-larb";
-> +               reg = <0 0x14021000 0 0x1000>;
-> +               smi = <&smi_common>;
-> +               clocks = <&mmsys MM_SMI_LARB0>,
-> +                        <&mmsys MM_SMI_LARB0>;
-> +               clock-names = "apb", "smi";
-> +       };
-> diff --git a/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt b/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt
-> new file mode 100644
-> index 0000000..c2389b4
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt
-> @@ -0,0 +1,22 @@
-> +SMI(Smart Multimedia Interface)
-> +
-> +The hardware block diagram please check bindings/iommu/mediatek,iommu.txt
-> +
-> +Required properties:
-> +- compatible : must be "mediatek,mt8173-smi"
-> +- reg : the register and size of the smi.
-
-nit: s/smi/SMI block/
-
-> +- clocks : must contain one entry for each clock-names.
-> +       There are 2 clockes:
-> +       APB clock : Advanced Peripheral Bus clock, It's the clock for setting
-> +               the register.
-> +       SMI clock : It's the clock for transfer data and command.
-> +- clock-name: must be "apb" and "smi".
-
-See my comment for those properties in the first binding.
-
-Best regards,
-Tomasz
+> +		if ((msecs > 150) || (oclk_en && (msecs > 50)))
+> +			dev_warn(mmc_dev(host->mmc),
+> +				 "%s oclk took %ims", ing, msecs);
+> +		else
+> +			dev_dbg(mmc_dev(host->mmc),
+> +				 "%s oclk took %ims", ing, msecs);
+>   	}
+>
+>   	return 0;
+>
