@@ -1,19 +1,47 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Mon, 25 May 2015 22:04:10 +0200
-Subject: Device Tree Blob (DTB) licence
-In-Reply-To: <CAOS_Y6Q37ps+VEnzUZ_uwX++qrRm9Hgx45Q_pmiZSLSNjmKwZg@mail.gmail.com>
-References: <1430820315.19516.26.camel@opteya.com>
- <CAL_Jsq+T5c7qornpRVCduEjUSCeM+0xqbtVYovtH76y=4BqhLQ@mail.gmail.com>
- <1432289148.5304.58.camel@opteya.com> <1432322832.5304.63.camel@opteya.com>
- <CAOS_Y6Q37ps+VEnzUZ_uwX++qrRm9Hgx45Q_pmiZSLSNjmKwZg@mail.gmail.com>
-Message-ID: <20150525200410.GC22292@1wt.eu>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 25 May 2015 22:11:15 +0200 (CEST)
+Subject: [PATCH] clockevents: don't suspend/resume if unused
+In-Reply-To: <20150525190641.GA7542@gradator.net>
+References: <1421399151-26800-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <alpine.DEB.2.11.1505252046400.5457@nanos>
+ <20150525190641.GA7542@gradator.net>
+Message-ID: <alpine.DEB.2.11.1505252208140.5457@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 25, 2015 at 02:14:28AM -0500, Rob Landley wrote:
-> Personally, I'm sad we're starting to get ACPI for arm
+On Mon, 25 May 2015, Sylvain Rochet wrote:
+> On Mon, May 25, 2015 at 08:48:06PM +0200, Thomas Gleixner wrote:
+> > On Fri, 16 Jan 2015, Alexandre Belloni wrote:
+> > 
+> > > There is no point in calling suspend/resume for unused
+> > > clockevents as they are already stopped and disabled.
+> > > 
+> > > Furthermore, it can take some time to wait for some IPs to stop counting.
+> > 
+> > While I agree with the patch itself, I really can't understand that
+> > last sentence.
+> > 
+> > If stuff is stopped and disabled, what takes time to stop counting?
+> 
+> Atmel PIT is a bit weird, writing to AT91_PIT_MR restarts the timer even 
+> if you just want to stop it and then the only way to stop the timer is 
+> to wait for a complete timer cycle.
+> 
+> The problem is not when suspending, restarting the timer just before 
+> suspending is not such a problem because is will eventually stop at 
+> some point in the future.
+> 
+> However it can takes a very long time if the system switchs to slow 
+> clock, therefore when resuming the timer is still running and we have to 
+> wait for the PIT to stop counting because we re-enabled it for one cycle 
+> when suspending, which is weird, it adds about ~128ms resumt time for 
+> Atmel SoC.
+ 
+That's a reasonable explanation.
 
-Maybe it was the only solution found to make this platform start to
-misbehave like a regular PC and get it even more widely adopted :-)
+While timer IPs seem to be designed by janitors in general, this one
+has an extraordinary level of stupidity.
 
-Willy
+Thanks,
+
+	tglx
