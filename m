@@ -1,44 +1,167 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Mon, 25 May 2015 08:37:00 +0200
-Subject: [PATCH v2] ARM: nommu: avoid deprecated source register on mov
-In-Reply-To: <1432337148-9894-1-git-send-email-stefan@agner.ch>
-References: <1432337148-9894-1-git-send-email-stefan@agner.ch>
-Message-ID: <5562C30C.20900@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 25 May 2015 14:39:14 +0800
+Subject: [PATCH v4 3/6] arm: dts: imx: update snvs to use syscon access
+ register
+In-Reply-To: <1432305399-30571-4-git-send-email-Frank.Li@freescale.com>
+References: <1432305399-30571-1-git-send-email-Frank.Li@freescale.com>
+ <1432305399-30571-4-git-send-email-Frank.Li@freescale.com>
+Message-ID: <20150525063913.GF3264@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
-
-On 05/23/2015 01:25 AM, Stefan Agner wrote:
-> In Thumb2 mode, the stack register r13 is deprecated if the
-> destination register is the program counter (r15). Similar to
-> head.S, head-nommu.S uses r13 to store the return address used
-> after configuring the CPU's CP15 register. However, since we do
-> not enable a MMU, there will be no address switch and it is
-> possible to use branch with link instruction to call
-> __after_proc_init.
->
-> Avoid using r13 completely by using bl to call __after_proc_init
-> and get rid of __secondary_switched.
->
-> Beside removing unnecessary complexity, this also fixes a
-> compiler warning when compiling a !MMU kernel:
-> Warning: Use of r13 as a source register is deprecated when r15
-> is the destination register.
->
-> Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+On Fri, May 22, 2015 at 10:36:36PM +0800, Frank.Li at freescale.com wrote:
+> From: Frank Li <Frank.Li@freescale.com>
+> 
+> snvs is MFP device. Change dts to use syscon to allocate register resource.
+> snvs power off also switch to common syscon-poweroff
+> 
+> Signed-off-by: Frank Li <Frank.Li@freescale.com>
 > ---
-> Changes in v2:
-> - Load r7 outside CONFIG_ARM_MPU since its used outside later on
->
->   arch/arm/kernel/head-nommu.S | 21 ++++++++-------------
->   1 file changed, 8 insertions(+), 13 deletions(-)
->
->
+>  arch/arm/boot/dts/imx6qdl.dtsi | 19 +++++++++----------
+>  arch/arm/boot/dts/imx6sl.dtsi  | 19 +++++++++----------
+>  arch/arm/boot/dts/imx6sx.dtsi  | 17 ++++++++---------
+>  arch/arm/boot/dts/vfxxx.dtsi   |  9 +++------
+>  4 files changed, 29 insertions(+), 35 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index 0482a66..4f3f5f4 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -686,22 +686,21 @@
+>  				fsl,anatop = <&anatop>;
+>  			};
+>  
+> -			snvs at 020cc000 {
+> -				compatible = "fsl,sec-v4.0-mon", "simple-bus";
+> -				#address-cells = <1>;
+> -				#size-cells = <1>;
+> -				ranges = <0 0x020cc000 0x4000>;
+> +			snvs:snvs at 020cc000 {
 
-You can add my:
-Tested-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+There should be a space between label and node.
 
-Thanks!
-Maxime
+> +				compatible = "fsl,sec-v4.0-mon", "syscon",  "simple-mfd";
+
+One space is enough in between.
+
+> +				reg = <0x020cc000 0x4000>;
+>  
+> -				snvs_rtc: snvs-rtc-lp at 34 {
+> +				snvs_rtc: snvs-rtc-lp {
+>  					compatible = "fsl,sec-v4.0-mon-rtc-lp";
+> -					reg = <0x34 0x58>;
+
+I think rtc node should have a similar property list like snvs-poweroff,
+i.e. regmap and offset.
+
+Shawn
+
+>  					interrupts = <0 19 IRQ_TYPE_LEVEL_HIGH>,
+>  						     <0 20 IRQ_TYPE_LEVEL_HIGH>;
+>  				};
+>  
+> -				snvs_poweroff: snvs-poweroff at 38 {
+> -					compatible = "fsl,sec-v4.0-poweroff";
+> -					reg = <0x38 0x4>;
+> +				snvs_poweroff: snvs-poweroff {
+> +					compatible = "syscon-poweroff";
+> +					regmap = <&snvs>;
+> +					offset = <0x38>;
+> +					mask = <0x60>;
+>  					status = "disabled";
+>  				};
+>  			};
+> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+> index a78e715..2de6d46 100644
+> --- a/arch/arm/boot/dts/imx6sl.dtsi
+> +++ b/arch/arm/boot/dts/imx6sl.dtsi
+> @@ -563,22 +563,21 @@
+>  				fsl,anatop = <&anatop>;
+>  			};
+>  
+> -			snvs at 020cc000 {
+> -				compatible = "fsl,sec-v4.0-mon", "simple-bus";
+> -				#address-cells = <1>;
+> -				#size-cells = <1>;
+> -				ranges = <0 0x020cc000 0x4000>;
+> +			snvs:snvs at 020cc000 {
+> +				compatible = "fsl,sec-v4.0-mon", "syscon", "simple-mfd";
+> +				reg = <0x020cc000 0x4000>;
+>  
+> -				snvs_rtc: snvs-rtc-lp at 34 {
+> +				snvs_rtc: snvs-rtc-lp {
+>  					compatible = "fsl,sec-v4.0-mon-rtc-lp";
+> -					reg = <0x34 0x58>;
+>  					interrupts = <0 19 IRQ_TYPE_LEVEL_HIGH>,
+>  						     <0 20 IRQ_TYPE_LEVEL_HIGH>;
+>  				};
+>  
+> -				snvs_poweroff: snvs-poweroff at 38 {
+> -					compatible = "fsl,sec-v4.0-poweroff";
+> -					reg = <0x38 0x4>;
+> +				snvs_poweroff: snvs-poweroff {
+> +					compatible = "syscon-poweroff";
+> +					regmap = <&snvs>;
+> +					offset = <0x38>;
+> +					mask = <0x60>;
+>  					status = "disabled";
+>  				};
+>  			};
+> diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+> index 708175d..3cb3b5b 100644
+> --- a/arch/arm/boot/dts/imx6sx.dtsi
+> +++ b/arch/arm/boot/dts/imx6sx.dtsi
+> @@ -662,20 +662,19 @@
+>  			};
+>  
+>  			snvs: snvs at 020cc000 {
+> -				compatible = "fsl,sec-v4.0-mon", "simple-bus";
+> -				#address-cells = <1>;
+> -				#size-cells = <1>;
+> -				ranges = <0 0x020cc000 0x4000>;
+> +				compatible = "fsl,sec-v4.0-mon", "syscon", "simple-mfd";
+> +				reg = <0x020cc000 0x4000>;
+>  
+> -				snvs_rtc: snvs-rtc-lp at 34 {
+> +				snvs_rtc: snvs-rtc-lp {
+>  					compatible = "fsl,sec-v4.0-mon-rtc-lp";
+> -					reg = <0x34 0x58>;
+>  					interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>, <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
+>  				};
+>  
+> -				snvs_poweroff: snvs-poweroff at 38 {
+> -					compatible = "fsl,sec-v4.0-poweroff";
+> -					reg = <0x38 0x4>;
+> +				snvs_poweroff: snvs-poweroff {
+> +					compatible = "syscon-poweroff";
+> +					regmap = <&snvs>;
+> +					offset = <0x38>;
+> +					mask = <0x60>;
+>  					status = "disabled";
+>  				};
+>  			};
+> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+> index 4aa3351..fccfc01 100644
+> --- a/arch/arm/boot/dts/vfxxx.dtsi
+> +++ b/arch/arm/boot/dts/vfxxx.dtsi
+> @@ -404,14 +404,11 @@
+>  			};
+>  
+>  			snvs0: snvs at 400a7000 {
+> -			    compatible = "fsl,sec-v4.0-mon", "simple-bus";
+> -				#address-cells = <1>;
+> -				#size-cells = <1>;
+> -				ranges = <0 0x400a7000 0x2000>;
+> +			    compatible = "fsl,sec-v4.0-mon", "syscon", "simple-mfd";
+> +				reg = <0x400a7000 0x2000>;
+>  
+> -				snvsrtc: snvs-rtc-lp at 34 {
+> +				snvsrtc: snvs-rtc-lp {
+>  					compatible = "fsl,sec-v4.0-mon-rtc-lp";
+> -					reg = <0x34 0x58>;
+>  					interrupts = <100 IRQ_TYPE_LEVEL_HIGH>;
+>  					clocks = <&clks VF610_CLK_SNVS>;
+>  					clock-names = "snvs-rtc";
+> -- 
+> 1.9.1
+> 
