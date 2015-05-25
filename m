@@ -1,121 +1,112 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 25 May 2015 19:05:10 +0200 (CEST)
-Subject: [PATCH v2 1/3] media: atmel-isi: remove the useless code which
- disable isi
-In-Reply-To: <55516CB5.5020601@atmel.com>
-References: <1428570108-4961-1-git-send-email-josh.wu@atmel.com>
- <1428570108-4961-2-git-send-email-josh.wu@atmel.com>
- <Pine.LNX.4.64.1505112147540.12198@axis700.grange>
- <55516CB5.5020601@atmel.com>
-Message-ID: <Pine.LNX.4.64.1505251904450.26358@axis700.grange>
+From: rjui@broadcom.com (Ray Jui)
+Date: Mon, 25 May 2015 10:10:54 -0700
+Subject: [PATCH 1/2] PCI: iproc: directly add pci resources
+In-Reply-To: <1432499823-27369-1-git-send-email-hauke@hauke-m.de>
+References: <1432499823-27369-1-git-send-email-hauke@hauke-m.de>
+Message-ID: <5563579E.80608@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
+Hi Hauke,
 
-On Tue, 12 May 2015, Josh Wu wrote:
-
-> Hi, Guennadi
+On 5/24/2015 1:37 PM, Hauke Mehrtens wrote:
+> The resources member in the struct was pointing to a stack variable and
+> is invalid after the the registration function returned. Remove this
+> pointer and add it a a parameter to the function.
 > 
-> On 5/12/2015 4:16 AM, Guennadi Liakhovetski wrote:
-> > Hi Josh,
-> > 
-> > Thanks for the patch. I'm afraid I don't quite understand why it is
-> > needed, could you maybe explain a bit more? Is it because
-> > 
-> > (1) during ISI configuration the pixel clock from the sensor is (usually)
-> > anyway disabled, so, we don't have to additionally disable the ISI,
-> > without the pixel clock the ISI is anyway already disabled.
-> > 
-> > or
-> > 
-> > (2) disabling the ISI at those locations below breaks something, because
-> > when the ISI is disabled, the functionality, that's later used isn't
-> > available.
-> > 
-> > I assume it's (1), but if that's the case, then this patch is just
-> > cosmetic, right?
-> Right, it is (1). This patch doesn't impact the function of isi.
+> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+> ---
+>  drivers/pci/host/pcie-iproc-bcma.c     | 4 +---
+>  drivers/pci/host/pcie-iproc-platform.c | 4 +---
+>  drivers/pci/host/pcie-iproc.c          | 4 ++--
+>  drivers/pci/host/pcie-iproc.h          | 3 +--
+>  4 files changed, 5 insertions(+), 10 deletions(-)
 > 
-> The point is when we disable the ISI, we need make sure ISI peripheral clock
-> and pixel clock is enabled. And also need to check the status register or irq
-> to know whether the disable operation is successful. So best way to disable
-> ISI is to call atmel_isi_wait_status(isi, WAIT_ISI_DISABLE).
-> 
-> From this point, the isi_write(isi, ISI_CTRL, ISI_CTRL_DIS) in
-> atmel_isi_probe() is not useful as ISI peripheral clock is not enable yet.
-> but the other two in configure_geometry(), isi_camera_set_bus_param() can work
-> and may protect the case the ISI is not in off state.
+> diff --git a/drivers/pci/host/pcie-iproc-bcma.c b/drivers/pci/host/pcie-iproc-bcma.c
+> index c318f19..f96b39e 100644
+> --- a/drivers/pci/host/pcie-iproc-bcma.c
+> +++ b/drivers/pci/host/pcie-iproc-bcma.c
+> @@ -62,11 +62,9 @@ static int iproc_pcie_bcma_probe(struct bcma_device *bdev)
+>  	res_mem.flags = IORESOURCE_MEM;
+>  	pci_add_resource(&res, &res_mem);
+>  
+> -	pcie->resources = &res;
+> -
+>  	pcie->map_irq = iproc_pcie_bcma_map_irq;
+>  
+> -	ret = iproc_pcie_setup(pcie);
+> +	ret = iproc_pcie_setup(pcie, &res);
+>  	if (ret) {
+>  		dev_err(pcie->dev, "PCIe controller setup failed\n");
+>  		return ret;
+> diff --git a/drivers/pci/host/pcie-iproc-platform.c b/drivers/pci/host/pcie-iproc-platform.c
+> index c8aa06f..c5fe4c1 100644
+> --- a/drivers/pci/host/pcie-iproc-platform.c
+> +++ b/drivers/pci/host/pcie-iproc-platform.c
+> @@ -69,11 +69,9 @@ static int iproc_pcie_pltfm_probe(struct platform_device *pdev)
+>  		return ret;
+>  	}
+>  
+> -	pcie->resources = &res;
+> -
+>  	pcie->map_irq = of_irq_parse_and_map_pci;
+>  
+> -	ret = iproc_pcie_setup(pcie);
+> +	ret = iproc_pcie_setup(pcie, &res);
+>  	if (ret) {
+>  		dev_err(pcie->dev, "PCIe controller setup failed\n");
+>  		return ret;
+> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
+> index cef31f6..d77481e 100644
+> --- a/drivers/pci/host/pcie-iproc.c
+> +++ b/drivers/pci/host/pcie-iproc.c
+> @@ -183,7 +183,7 @@ static void iproc_pcie_enable(struct iproc_pcie *pcie)
+>  	writel(SYS_RC_INTX_MASK, pcie->base + SYS_RC_INTX_EN);
+>  }
+>  
+> -int iproc_pcie_setup(struct iproc_pcie *pcie)
+> +int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
+>  {
+>  	int ret;
+>  	struct pci_bus *bus;
+> @@ -211,7 +211,7 @@ int iproc_pcie_setup(struct iproc_pcie *pcie)
+>  	pcie->sysdata.private_data = pcie;
+>  
+>  	bus = pci_create_root_bus(pcie->dev, 0, &iproc_pcie_ops,
+> -				  &pcie->sysdata, pcie->resources);
+> +				  &pcie->sysdata, res);
+>  	if (!bus) {
+>  		dev_err(pcie->dev, "unable to create PCI root bus\n");
+>  		ret = -ENOMEM;
+> diff --git a/drivers/pci/host/pcie-iproc.h b/drivers/pci/host/pcie-iproc.h
+> index a333d4b..ba0a108 100644
+> --- a/drivers/pci/host/pcie-iproc.h
+> +++ b/drivers/pci/host/pcie-iproc.h
+> @@ -29,7 +29,6 @@
+>  struct iproc_pcie {
+>  	struct device *dev;
+>  	void __iomem *base;
+> -	struct list_head *resources;
 
-Ok, thanks for the explanation.
+This means we do not want to keep a copy of the resources. In the
+future, if we need to add support to explicitly set up the
+inbound/outbound mapping window, we need to do it in iproc_pcie_setup.
+Is that the intention?
 
-> 
-> > The ISI is anyway disabled, so, that operation simply has
-> > no effect, but also doesn't hurt. OTOH, if some sensor keeps its master
-> > clock running all the time, then switching the ISI off as in the current
-> > version helps save some power, unless it breaks anything?
-> So what about to keep the isi_write(isi, ISI_CTRL, ISI_CTRL_DIS) in
-> configure_geometry() and isi_camera_set_bus_param().
-> Only remove it from atmel_isi_probe()?
+Thanks,
 
-Good, let's do that.
+Ray
 
-Thanks
-Guennadi
-
-> 
-> Best Regards,
-> Josh Wu
-> 
-> > 
-> > Thanks
-> > Guennadi
-> > 
-> > On Thu, 9 Apr 2015, Josh Wu wrote:
-> > 
-> > > To program ISI control register, the pixel clock should be enabled.
-> > > So without pixel clock (from sensor) enabled, disable ISI controller is
-> > > not make sense. So this patch remove those code.
-> > > 
-> > > Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> > > ---
-> > > 
-> > > Changes in v2:
-> > > - this file is new added.
-> > > 
-> > >   drivers/media/platform/soc_camera/atmel-isi.c | 5 -----
-> > >   1 file changed, 5 deletions(-)
-> > > 
-> > > diff --git a/drivers/media/platform/soc_camera/atmel-isi.c
-> > > b/drivers/media/platform/soc_camera/atmel-isi.c
-> > > index c125b1d..31254b4 100644
-> > > --- a/drivers/media/platform/soc_camera/atmel-isi.c
-> > > +++ b/drivers/media/platform/soc_camera/atmel-isi.c
-> > > @@ -131,8 +131,6 @@ static int configure_geometry(struct atmel_isi *isi,
-> > > u32 width,
-> > >   		return -EINVAL;
-> > >   	}
-> > >   -	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
-> > > -
-> > >   	cfg2 = isi_readl(isi, ISI_CFG2);
-> > >   	/* Set YCC swap mode */
-> > >   	cfg2 &= ~ISI_CFG2_YCC_SWAP_MODE_MASK;
-> > > @@ -843,7 +841,6 @@ static int isi_camera_set_bus_param(struct
-> > > soc_camera_device *icd)
-> > >     	cfg1 |= ISI_CFG1_THMASK_BEATS_16;
-> > >   -	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
-> > >   	isi_writel(isi, ISI_CFG1, cfg1);
-> > >     	return 0;
-> > > @@ -1022,8 +1019,6 @@ static int atmel_isi_probe(struct platform_device
-> > > *pdev)
-> > >   	if (isi->pdata.data_width_flags & ISI_DATAWIDTH_10)
-> > >   		isi->width_flags |= 1 << 9;
-> > >   -	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
-> > > -
-> > >   	irq = platform_get_irq(pdev, 0);
-> > >   	if (IS_ERR_VALUE(irq)) {
-> > >   		ret = irq;
-> > > -- 
-> > > 1.9.1
-> > > 
+>  	struct pci_sys_data sysdata;
+>  	struct pci_bus *root_bus;
+>  	struct phy *phy;
+> @@ -37,7 +36,7 @@ struct iproc_pcie {
+>  	int (*map_irq)(const struct pci_dev *, u8, u8);
+>  };
+>  
+> -int iproc_pcie_setup(struct iproc_pcie *pcie);
+> +int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res);
+>  int iproc_pcie_remove(struct iproc_pcie *pcie);
+>  
+>  #endif /* _PCIE_IPROC_H */
 > 
