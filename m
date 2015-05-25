@@ -1,60 +1,29 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 25 May 2015 09:02:37 +0200
-Subject: [PATCH 2/2] mmc: sunxi: Also set SDXC_LOW_POWER_ON
-In-Reply-To: <29e003a6fb8253b1e103f341405d4e8322e3edc2.1432491958.git.hramrach@gmail.com>
-References: <cover.1432491958.git.hramrach@gmail.com>
- <29e003a6fb8253b1e103f341405d4e8322e3edc2.1432491958.git.hramrach@gmail.com>
-Message-ID: <5562C90D.8070507@redhat.com>
+From: rob@landley.net (Rob Landley)
+Date: Mon, 25 May 2015 02:14:28 -0500
+Subject: Device Tree Blob (DTB) licence
+In-Reply-To: <1432322832.5304.63.camel@opteya.com>
+References: <1430820315.19516.26.camel@opteya.com>
+ <CAL_Jsq+T5c7qornpRVCduEjUSCeM+0xqbtVYovtH76y=4BqhLQ@mail.gmail.com>
+ <1432289148.5304.58.camel@opteya.com>
+ <1432322832.5304.63.camel@opteya.com>
+Message-ID: <CAOS_Y6Q37ps+VEnzUZ_uwX++qrRm9Hgx45Q_pmiZSLSNjmKwZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 24-05-15 20:04, Michal Suchanek wrote:
-> The function sunxi_mmc_oclk_onoff filters out the SDXC_LOW_POWER_ON flag
-> but never sets it.
+On Fri, May 22, 2015 at 2:27 PM, Yann Droneaud <ydroneaud@opteya.com> wrote:
+> I've added licensing at fsf.ogrg in Cc: in my previous message to have an
+> advice on this subject, but I failed to notice licensing at fsf.org
+> is not a mailing list: I was assigned request ID [gnu.org #1017262].
 >
-> Set SDXC_LOW_POWER_ON when oclk is disabled.
+> Regards.
 
-Nack, looking at the datasheet I do not thing this patch actually
-does anything, according to the datasheet setting this bit to 1 results
-in: "Turn off card clock when FSM in IDLE state", iow this does mmc clock
-gating on idle automatically in hardware, since we completely disable the
-clock on clock-off by clearing SDXC_CARD_CLOCK_ON setting this bit on
-clock-off is a nop.
+They're also not an unbiased source. Their job is to reply "you should
+license it under GPLv3" without actually looking at your message.
+(This is a slight oversimplification, they may instead recomend the
+GFDL. They will never _not_ recommend one of their licenses.)
 
-We could consider actually setting this to safe power when setting the clock
-on, for doing that it would be good to look at the android code and see if
-it ever sets this bit and if so when.
+Personally, I'm sad we're starting to get ACPI for arm but if device
+tree data files are only available under GPL, people will hold their
+nose and deploy ACPI.
 
-WRT CONFIG_MMC_CLKGATE we are probably better off using SDXC_LOW_POWER_ON
-then that when it is enabled. So maybe we should set SDXC_LOW_POWER_ON
-based on #ifdef WRT CONFIG_MMC_CLKGATE, and have some way to tell the
-mmc core to not do clock gating on this host ?
-
-Regards,
-
-Hans
-
-
-
->
-> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
-> ---
->   drivers/mmc/host/sunxi-mmc.c | 2 ++
->   1 file changed, 2 insertions(+)
->
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index 7cdeecd..e957888 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -603,6 +603,8 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
->
->   	if (oclk_en)
->   		rval |= SDXC_CARD_CLOCK_ON;
-> +	else
-> +		rval |= SDXC_LOW_POWER_ON;
->
->   	start = jiffies;
->   	end = start + msecs_to_jiffies(750);
->
+Rob
