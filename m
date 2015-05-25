@@ -1,28 +1,40 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 25 May 2015 13:19:41 +0800
-Subject: [PATCH v2 12/12] ARM: imx: move timer driver into
- drivers/clocksource
-In-Reply-To: <BL2PR03MB3702177604C473A9473AAC183C00@BL2PR03MB370.namprd03.prod.outlook.com>
-References: <1432308599-28643-1-git-send-email-shawn.guo@linaro.org>
- <1432308599-28643-13-git-send-email-shawn.guo@linaro.org>
- <BL2PR03MB3702177604C473A9473AAC183C00@BL2PR03MB370.namprd03.prod.outlook.com>
-Message-ID: <20150525051940.GB3264@dragon>
+From: cbz@baozis.org (Chen Baozi)
+Date: Mon, 25 May 2015 13:33:46 +0800
+Subject: Hibernation on ARM64
+In-Reply-To: <20150522110218.GC5623@red-moon>
+References: <CAMxMOAtMw3jnyrvn46m0ZeiwtWjRRZ-i21N5+riwn-3qei+szg@mail.gmail.com>
+ <20150522110218.GC5623@red-moon>
+Message-ID: <20150525053346.GB17561@cbz-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 22, 2015 at 06:28:59PM +0000, Shenwei Wang wrote:
-> > @@ -52,3 +52,4 @@ obj-$(CONFIG_ARCH_INTEGRATOR_AP)	+=
-> > timer-integrator-ap.o
-> >  obj-$(CONFIG_CLKSRC_VERSATILE)		+= versatile.o
-> >  obj-$(CONFIG_CLKSRC_MIPS_GIC)		+= mips-gic-timer.o
-> >  obj-$(CONFIG_ASM9260_TIMER)		+= asm9260_timer.o
-> > +obj-$(CONFIG_ARCH_MXC)			+= timer-imx.o
+Hi Lorenzo,
+
+On Fri, May 22, 2015 at 12:02:18PM +0100, Lorenzo Pieralisi wrote:
+> Hi Christian,
 > 
-> Because there are several types of timers on imx family socs, and this is the driver for the GPT block only, so it would be better to change the file name to timer-gpt.c
+> On Thu, May 21, 2015 at 07:34:06PM +0100, Christian S. Perone wrote:
+> > Hello, I haven't found any information, road map or something like
+> > that for the hibernation support for ARM64, does anyone knows if there
+> > is something planned to support this in near future ?
+> 
+> Adding arch support for hibernation to arm64 should be fairly simple,
+> it is not top priority at the moment simply because there are not
+> compelling use-cases (on the PM side most features revolve around
+> CPUidle and suspend-to-idle and S2R).
+> 
+> To answer your question, yes I have planned to support it, I just
+> do not want to add it to the kernel for no particular reason, if there
+> are compelling requirements (I guess you are asking for a specific
+> reason) it can be done fairly quickly.
 > 
 
-Okay, I decided to name it timer-imx-gpt.c, so that when people try to
-find the timer driver for i.MX in drivers/clocksource folder, it will be
-easier.
+I am also looking forward the hibernation support on arm64. Thanks for
+the information.
 
-Shawn
+Could you please CCed me the hiberation patches when you send them to
+list. I can help test it. :-)
+
+Cheers,
+
+Baozi.
