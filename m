@@ -1,207 +1,92 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 25 May 2015 16:51:35 +0200
-Subject: [PATCH] ARM: kirkwood: add "jedec,
- spi-nor" flash compatible binding
-In-Reply-To: <1432035616-14783-1-git-send-email-zajec5@gmail.com>
-References: <1432035616-14783-1-git-send-email-zajec5@gmail.com>
-Message-ID: <556336F7.8070804@free-electrons.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Mon, 25 May 2015 16:53:04 +0200
+Subject: [PATCH 00/21] On-demand device registration
+Message-ID: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafa?,
+Hello,
 
-On 19/05/2015 13:40, Rafa? Mi?ecki wrote:
-> Starting with commit 8947e396a829 ("Documentation: dt: mtd: replace
-> "nor-jedec" binding with "jedec, spi-nor"") we have "jedec,spi-nor"
-> binding indicating support for JEDEC identification.
-> 
-> Use it for all flashes that are supposed to support READ ID op according
-> to the datasheets.
-> 
-> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
-As now thre was a agreement about the binding,
-applied on mvebu/dt
+I have a problem with the panel on my Tegra Chromebook taking longer than
+expected to be ready during boot (St?phane Marchesin reported what is
+basically the same issue in [0]), and have looked into ordered probing as a
+better way of solving this than moving nodes around in the DT or playing with
+initcall levels.
 
-Thanks,
+While reading the thread [1] that Alexander Holler started with his series to
+make probing order deterministic, it occurred to me that it should be possible
+to achieve the same by registering devices as they are referenced by other
+devices.
 
-Gregory
+This basically reuses the information that is already implicit in the probe()
+implementations, saving us from refactoring existing drivers or adding
+information to DTBs.
 
-> ---
->  arch/arm/boot/dts/kirkwood-b3.dts              | 2 +-
->  arch/arm/boot/dts/kirkwood-cloudbox.dts        | 2 +-
->  arch/arm/boot/dts/kirkwood-dir665.dts          | 2 +-
->  arch/arm/boot/dts/kirkwood-dreamplug.dts       | 2 +-
->  arch/arm/boot/dts/kirkwood-lsxl.dtsi           | 2 +-
->  arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts | 2 +-
->  arch/arm/boot/dts/kirkwood-netxbig.dtsi        | 2 +-
->  arch/arm/boot/dts/kirkwood-ns2-common.dtsi     | 2 +-
->  arch/arm/boot/dts/kirkwood-rd88f6192.dts       | 2 +-
->  arch/arm/boot/dts/kirkwood-synology.dtsi       | 2 +-
->  arch/arm/boot/dts/kirkwood-t5325.dts           | 2 +-
->  arch/arm/boot/dts/kirkwood-ts219.dtsi          | 2 +-
->  12 files changed, 12 insertions(+), 12 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/kirkwood-b3.dts b/arch/arm/boot/dts/kirkwood-b3.dts
-> index c9247f8..d2936ad 100644
-> --- a/arch/arm/boot/dts/kirkwood-b3.dts
-> +++ b/arch/arm/boot/dts/kirkwood-b3.dts
-> @@ -74,7 +74,7 @@
->  			m25p16 at 0 {
->  				#address-cells = <1>;
->  				#size-cells = <1>;
-> -				compatible = "st,m25p16";
-> +				compatible = "st,m25p16", "jedec,spi-nor";
->  				reg = <0>;
->  				spi-max-frequency = <40000000>;
->  				mode = <0>;
-> diff --git a/arch/arm/boot/dts/kirkwood-cloudbox.dts b/arch/arm/boot/dts/kirkwood-cloudbox.dts
-> index ab6ab49..7ec7656 100644
-> --- a/arch/arm/boot/dts/kirkwood-cloudbox.dts
-> +++ b/arch/arm/boot/dts/kirkwood-cloudbox.dts
-> @@ -42,7 +42,7 @@
->  			flash at 0 {
->  				#address-cells = <1>;
->  				#size-cells = <1>;
-> -				compatible = "mxicy,mx25l4005a";
-> +				compatible = "mxicy,mx25l4005a", "jedec,spi-nor";
->  				reg = <0>;
->  				spi-max-frequency = <20000000>;
->  				mode = <0>;
-> diff --git a/arch/arm/boot/dts/kirkwood-dir665.dts b/arch/arm/boot/dts/kirkwood-dir665.dts
-> index 786959e..0473fcc 100644
-> --- a/arch/arm/boot/dts/kirkwood-dir665.dts
-> +++ b/arch/arm/boot/dts/kirkwood-dir665.dts
-> @@ -93,7 +93,7 @@
->  			m25p80 at 0 {
->  				#address-cells = <1>;
->  				#size-cells = <1>;
-> -				compatible = "mxicy,mx25l12805d";
-> +				compatible = "mxicy,mx25l12805d", "jedec,spi-nor";
->  				spi-max-frequency = <50000000>;
->  				reg = <0>;
->  
-> diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-> index 6467c79..e2abc82 100644
-> --- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
-> +++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-> @@ -42,7 +42,7 @@
->  			m25p40 at 0 {
->  				#address-cells = <1>;
->  				#size-cells = <1>;
-> -				compatible = "mxicy,mx25l1606e";
-> +				compatible = "mxicy,mx25l1606e", "jedec,spi-nor";
->  				reg = <0>;
->  				spi-max-frequency = <50000000>;
->  				mode = <0>;
-> diff --git a/arch/arm/boot/dts/kirkwood-lsxl.dtsi b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-> index 5348447..1d6528d 100644
-> --- a/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-> @@ -74,7 +74,7 @@
->  			m25p40 at 0 {
->  				#address-cells = <1>;
->  				#size-cells = <1>;
-> -				compatible = "m25p40";
-> +				compatible = "m25p40", "jedec,spi-nor";
->  				reg = <0>;
->  				spi-max-frequency = <25000000>;
->  				mode = <0>;
-> diff --git a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
-> index f82827d..b7e7d78 100644
-> --- a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
-> +++ b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
-> @@ -65,7 +65,7 @@
->  			flash at 0 {
->  				#address-cells = <1>;
->  				#size-cells = <1>;
-> -				compatible = "mxicy,mx25l12805d";
-> +				compatible = "mxicy,mx25l12805d", "jedec,spi-nor";
->  				reg = <0>;
->  				spi-max-frequency = <50000000>;
->  				mode = <0>;
-> diff --git a/arch/arm/boot/dts/kirkwood-netxbig.dtsi b/arch/arm/boot/dts/kirkwood-netxbig.dtsi
-> index b0cfb7c..1508b121 100644
-> --- a/arch/arm/boot/dts/kirkwood-netxbig.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood-netxbig.dtsi
-> @@ -33,7 +33,7 @@
->  			flash at 0 {
->  				#address-cells = <1>;
->  				#size-cells = <1>;
-> -				compatible = "mxicy,mx25l4005a";
-> +				compatible = "mxicy,mx25l4005a", "jedec,spi-nor";
->  				reg = <0>;
->  				spi-max-frequency = <20000000>;
->  				mode = <0>;
-> diff --git a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-> index fe6c024..e832b63 100644
-> --- a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-> @@ -29,7 +29,7 @@
->  			flash at 0 {
->  				#address-cells = <1>;
->  				#size-cells = <1>;
-> -				compatible = "mxicy,mx25l4005a";
-> +				compatible = "mxicy,mx25l4005a", "jedec,spi-nor";
->  				reg = <0>;
->  				spi-max-frequency = <20000000>;
->  				mode = <0>;
-> diff --git a/arch/arm/boot/dts/kirkwood-rd88f6192.dts b/arch/arm/boot/dts/kirkwood-rd88f6192.dts
-> index 35a29de..e0b9593 100644
-> --- a/arch/arm/boot/dts/kirkwood-rd88f6192.dts
-> +++ b/arch/arm/boot/dts/kirkwood-rd88f6192.dts
-> @@ -61,7 +61,7 @@
->  			m25p128 at 0 {
->  				#address-cells = <1>;
->  				#size-cells = <1>;
-> -				compatible = "st,m25p128";
-> +				compatible = "st,m25p128", "jedec,spi-nor";
->  				reg = <0>;
->  				spi-max-frequency = <20000000>;
->  				mode = <0>;
-> diff --git a/arch/arm/boot/dts/kirkwood-synology.dtsi b/arch/arm/boot/dts/kirkwood-synology.dtsi
-> index 8be5b2e..04015c17 100644
-> --- a/arch/arm/boot/dts/kirkwood-synology.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood-synology.dtsi
-> @@ -217,7 +217,7 @@
->  			m25p80 at 0 {
->  				#address-cells = <1>;
->  				#size-cells = <1>;
-> -				compatible = "st,m25p80";
-> +				compatible = "st,m25p80", "jedec,spi-nor";
->  				reg = <0>;
->  				spi-max-frequency = <20000000>;
->  				mode = <0>;
-> diff --git a/arch/arm/boot/dts/kirkwood-t5325.dts b/arch/arm/boot/dts/kirkwood-t5325.dts
-> index 610ec0f..ed956b8 100644
-> --- a/arch/arm/boot/dts/kirkwood-t5325.dts
-> +++ b/arch/arm/boot/dts/kirkwood-t5325.dts
-> @@ -88,7 +88,7 @@
->  			flash at 0 {
->  				#address-cells = <1>;
->  				#size-cells = <1>;
-> -				compatible = "st,m25p80";
-> +				compatible = "st,m25p80", "jedec,spi-nor";
->  				spi-max-frequency = <86000000>;
->  				reg = <0>;
->  				mode = <0>;
-> diff --git a/arch/arm/boot/dts/kirkwood-ts219.dtsi b/arch/arm/boot/dts/kirkwood-ts219.dtsi
-> index df7f152..c56ab6b 100644
-> --- a/arch/arm/boot/dts/kirkwood-ts219.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood-ts219.dtsi
-> @@ -49,7 +49,7 @@
->  			m25p128 at 0 {
->  				#address-cells = <1>;
->  				#size-cells = <1>;
-> -				compatible = "m25p128";
-> +				compatible = "m25p128", "jedec,spi-nor";
->  				reg = <0>;
->  				spi-max-frequency = <20000000>;
->  				mode = <0>;
-> 
+Something I'm not completely happy with is that I have had to move the call to
+of_platform_populate after all platform drivers have been registered.
+Otherwise I don't see how I could register drivers on demand as we don't have
+yet each driver's compatible strings.
 
+For machs that don't move of_platform_populate() to a later point, these
+patches shouldn't cause any problems but it's not guaranteed that we'll avoid
+all the deferred probes as some drivers may not be registered yet.
+
+I have tested this on boards with Tegra, iMX.6 and Exynos SoCs, and these
+patches were enough to eliminate all the deferred probes.
+
+With this series I get the kernel to output to the panel in 0.5s, instead of 2.8s.
+
+Regards,
+
+Tomeu
+
+[0] http://lists.freedesktop.org/archives/dri-devel/2014-August/066527.html
+
+[1] https://lkml.org/lkml/2014/5/12/452
+
+Tomeu Vizoso (21):
+  regulator: core: Reduce critical area in _regulator_get
+  ARM: tegra: Add gpio-ranges property
+  ARM: tegra: Register drivers before devices
+  ARM: EXYNOS: Register drivers before devices
+  ARM i.MX6q: Register drivers before devices
+  of/platform: Add of_platform_device_ensure()
+  of/platform: Ensure device registration on lookup
+  gpio: Probe GPIO drivers on demand
+  gpio: Probe pinctrl devices on demand
+  regulator: core: Probe regulators on demand
+  drm: Probe panels on demand
+  drm/tegra: Probe dpaux devices on demand
+  i2c: core: Probe i2c master devices on demand
+  pwm: Probe PWM chip devices on demand
+  backlight: Probe backlight devices on demand
+  usb: phy: Probe phy devices on demand
+  clk: Probe clk providers on demand
+  pinctrl: Probe pinctrl devices on demand
+  phy: core: Probe phy providers on demand
+  dma: of: Probe DMA controllers on demand
+  power-supply: Probe power supplies on demand
+
+ arch/arm/boot/dts/tegra124.dtsi     |  1 +
+ arch/arm/mach-exynos/exynos.c       |  4 +--
+ arch/arm/mach-imx/mach-imx6q.c      | 12 ++++-----
+ arch/arm/mach-tegra/tegra.c         | 21 ++++++---------
+ drivers/clk/clk.c                   |  3 +++
+ drivers/dma/of-dma.c                |  3 +++
+ drivers/gpio/gpiolib-of.c           |  5 ++++
+ drivers/gpu/drm/drm_panel.c         |  3 +++
+ drivers/gpu/drm/tegra/dpaux.c       |  3 +++
+ drivers/i2c/i2c-core.c              |  3 +++
+ drivers/of/platform.c               | 53 +++++++++++++++++++++++++++++++++++++
+ drivers/phy/phy-core.c              |  3 +++
+ drivers/pinctrl/devicetree.c        |  2 ++
+ drivers/power/power_supply_core.c   |  3 +++
+ drivers/pwm/core.c                  |  3 +++
+ drivers/regulator/core.c            | 45 +++++++++++++++----------------
+ drivers/usb/phy/phy.c               |  3 +++
+ drivers/video/backlight/backlight.c |  3 +++
+ include/linux/of_platform.h         |  2 ++
+ 19 files changed, 130 insertions(+), 45 deletions(-)
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.4.1
