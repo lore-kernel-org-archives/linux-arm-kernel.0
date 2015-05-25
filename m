@@ -1,30 +1,31 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 25 May 2015 18:56:58 +0200 (CEST)
-Subject: [PATCH] clockevents: don't suspend/resume if unused
-In-Reply-To: <20150116165914.GS3843@piout.net>
-References: <1421399151-26800-1-git-send-email-alexandre.belloni@free-electrons.com>
- <20150116092014.GA27945@gradator.net> <20150116165914.GS3843@piout.net>
-Message-ID: <alpine.DEB.2.11.1505251854380.5457@nanos>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 25 May 2015 10:59:43 -0600
+Subject: [PATCH] coresight: etb: Remove simple announcement message
+In-Reply-To: <20150522163327.GU21577@sirena.org.uk>
+References: <1432122101-2233-1-git-send-email-broonie@kernel.org>
+ <CANLsYkyW44THumc5ebWnX-sa5zG7X0dv1_UEqUp9Av8c5PDegg@mail.gmail.com>
+ <20150522163327.GU21577@sirena.org.uk>
+Message-ID: <CANLsYkwT3WR7Wxy_biWwXdzSsWjMptNdr38d+_1OhiTTnzm5NQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Jan 2015, Alexandre Belloni wrote:
-> Hi,
-> 
-> On 16/01/2015 at 10:20:14 +0100, Sylvain Rochet wrote :
-> > > +		if (dev->suspend && dev->mode != CLOCK_EVT_MODE_UNUSED)
-> > 
-> > I wonder if we should use > CLOCK_EVT_MODE_SHUTDOWN
-> > (or CLOCK_EVT_MODE_UNUSED || CLOCK_EVT_MODE_SHUTDOWN) instead of 
-> > !CLOCK_EVT_MODE_UNUSED.
-> > 
-> 
-> I'll let Thomas or Daniel decide :) But I'm open to that.
+On 22 May 2015 at 10:33, Mark Brown <broonie@kernel.org> wrote:
+> On Fri, May 22, 2015 at 08:17:21AM -0600, Mathieu Poirier wrote:
+>
+>> Linus Walleij started doing something interesting with the initial
+>> printouts [1] and I think this is a better option than not printing
+>> anything at all.
+>
+> It's definitely better to print information we enumerate from hardware,
+> though I'm not 100% sure if AMBA does the right thing with matching here
+> (most of the buses ignore hardware IDs in favour of DT information if
+> things are bound via DT).
 
-I'm unsure about the shutdown part. shutdown can be an intermediate
-state where its not a given, that the clocks are disabled. I pick it
-up as is.
+AMBA has been done properly - bypassing the initial ID lookup with the
+"arm,primecell-periphid" binding only prevent the HW from being
+accessed when the DT is parsed.  At driver init time the peripheral ID
+from the DT is checked against the list of AMBA IDs supported by the
+driver and fails if a match is not found.
 
-Thanks,
-
-	tglx
+One can always force things with the "driver-override" sysfs property
+but that's another story.
