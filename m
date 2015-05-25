@@ -1,37 +1,67 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Mon, 25 May 2015 14:41:33 +0200
-Subject: [PATCH v4 1/2] ARM: socfpga: support suspend to ram
-In-Reply-To: <1432317735-29413-2-git-send-email-atull@opensource.altera.com>
-References: <1432317735-29413-1-git-send-email-atull@opensource.altera.com>
- <1432317735-29413-2-git-send-email-atull@opensource.altera.com>
-Message-ID: <20150525124133.GF9943@amd>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 25 May 2015 14:58:22 +0200
+Subject: [PATCHv2] ARM: mvebu: add support for the new Aramda 385 based
+ Linksys boards
+In-Reply-To: <1432156456-440-1-git-send-email-kaloz@openwrt.org>
+References: <1432156456-440-1-git-send-email-kaloz@openwrt.org>
+Message-ID: <55631C6E.8050700@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Imre,
 
-> Suspend-to-RAM and EDAC support are mutually exclusive on SOCFPGA
-> platforms.  CONFIG_SOCFPGA_SUSPEND enables suspend-to-RAM and
-> prevents selecting CONFIG_EDAC_ALTERA_MC.
+On 20/05/2015 23:14, Imre Kaloz wrote:
+> This patch adds support for the Linksys WRT1200AC (Caiman) and
+> the Linksys WRT1900AC v2 (Cobra).
+> 
+> Both boards have:
+> 
+> - 2 Marvell 88W8864 radios
+> - 1 USB 3.0 port
+> - 1 USB 2.0/eSATAp port
+> - 2 Ethernet interfaces connected to a 88E6176 switch (1x WAN + 4x LAN)
+> - 128MB NAND flash
+> - 512MB RAM
+> 
+> Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
+> 
+> ---
+> Changes since v1: added DSA support
+> ---
+> The only difference between the two boards is the radio configuration
+> (2x2 vs 3x3), so everything except the leds (to be named properly)
+> is in the dtsi file. When the wireless driver will be submitted
+> upstream, the powertables (calibration data) will end up in the board
+> specific files, tho.
 
-Do we went to have the dependency at the .config time? We would like
-to do generic kernels booting on many machines, this kind of breaks
-that...
+it seems that you missed my comment about removing bootargs and just using
+stdout-path = "serial0:115200n8";
 
-> +	/*
-> +	 * This code assumes that the bootloader has already
-> +	 * properly configured the sdram controller:
+If you agree and if there is no remark about the DSA part from Andrew, I can
+take car of it while applying your patch on mvebu/dt.
 
-Which bootloaders can do that? 
-
-> +	 * sdr.ctrlcfg.lowpwreq.selfrfshmask = 3
-> +	 * sdr.ctrlcfg.lowpwrtiming.clkdisablecycles = 8
-> +	 * sdr.ctrlcfg.dramtiming4.selfrfshexit = 512
-
-Would it make sense to configure it in Linux?
 
 Thanks,
-									Pavel
+
+Gregory
+
+[...]
+
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/armada-385-linksys.dtsi
+
+[...]
+
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200";
+> +		stdout-path = &uart0;
+Just here
+> +	};
+
+
+[...]
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
