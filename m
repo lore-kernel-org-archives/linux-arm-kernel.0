@@ -1,118 +1,39 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Mon, 25 May 2015 10:33:46 -0700
-Subject: [PATCH v7 0/6] Add common clock support for Broadcom iProc
- architecture
-In-Reply-To: <55511DB5.9090201@broadcom.com>
-References: <1430849603-15849-1-git-send-email-rjui@broadcom.com>
- <55511DB5.9090201@broadcom.com>
-Message-ID: <55635CFA.8010703@broadcom.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 25 May 2015 18:45:28 +0100
+Subject: [PATCH 01/21] regulator: core: Reduce critical area in
+ _regulator_get
+In-Reply-To: <1432565608-26036-2-git-send-email-tomeu.vizoso@collabora.com>
+References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1432565608-26036-2-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <20150525174528.GG21577@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike/Stephen,
+On Mon, May 25, 2015 at 04:53:05PM +0200, Tomeu Vizoso wrote:
 
-Ping. Do you think you will be able to review this patch set some time
-in the near future?
+> ...by moving the locking to regulator_dev_lookup.
 
-Thanks!
+This breaks the locking.
 
-Ray
+> +	mutex_lock(&regulator_list_mutex);
+>  	list_for_each_entry(r, &regulator_list, list)
+> -		if (strcmp(rdev_get_name(r), supply) == 0)
+> +		if (strcmp(rdev_get_name(r), supply) == 0) {
+> +			mutex_unlock(&regulator_list_mutex);
+>  			return r;
+> +		}
+> +	mutex_unlock(&regulator_list_mutex);
 
-On 5/11/2015 2:23 PM, Ray Jui wrote:
-> Hi Mike,
-> 
-> Have you had a chance to review the iProc clock patches? If possible,
-> I'd like to get feedback from you as early as possible so I can make
-> changes if required. It would be really nice if we can get the iProc
-> clock patches going into v4.2.
-> 
-> A lot of our iProc drivers depend on these clock patches.
-> 
-> Thanks,
-> 
-> Ray
-> 
-> On 5/5/2015 11:13 AM, Ray Jui wrote:
->> This patchset contains the initial common clock support for Broadcom's iProc
->> family of SoCs. The iProc clock architecture comprises of various PLLs, e.g.,
->> ARMPLL, GENPLL, LCPLL0, MIPIPLL, and etc. An onboard crystal serves as the
->> basic reference clock for these PLLs. Each PLL may have several leaf clocks.
->> One special group of clocks is the ASIU clocks, which are dervied directly
->> from the crystal reference clock.
->>
->> This patchset also contains the basic clock support for the Broadcom Cygnus
->> SoC, which implements the iProc clock architecture
->>
->> Changes from v6:
->>  - Rebase to v4.1-rc2
->>  - Consolidate iProc PLL and its leaf clocks into a single device node, based
->>    on feedback from Mike Turquette. The PLL and its leaf clocks are now exposed
->>    a clock consumer through indices of the same device node phandle
->>  - Update iProc device tree binding document based on the above change
->>  - Add SW override support to iProc PLL clocks
->>
->> Changes from v5:
->>  - Rebase to v4.0-rc4
->>  - Drop of_clk_get_parent_rate helper function from the clock framework
->>  - Get rid of custom "clock-frequency" support in iProc PLL code. Instead, add
->>    standard clock set_rate and round_rate support and make use of DT properties
->>    "assigned-clocks" and "assigned-clock-rates" to initialize PLL to the
->>    desired rate when registering to the clock framework
->>  - Add SW workaround for ASIC bug on MIPI PLL to always read back the same
->>    register following a write transaction, to ensure value is written to the
->>    correct register
->>
->> Changes from v4:
->>  - Add of_clk_get_parent_rate helper function into the clock framework
->>  - Switch to use of_clk_get_parent_rate in the iProc PLL clock driver
->>
->> Changes from v3:
->>  - Fix incorrect use of passing in of_clk_src_onecell_get when adding ARM PLL
->>    and other iProc PLLs as clock provider. These PLLs have zero cells in DT and
->>    thefore of_clk_src_simple_get should be used instead
->>  - Rename Cygnus MIPI PLL Channel 2 clock from BCM_CYGNUS_MIPIPLL_CH2_UNUSED
->>    to BCM_CYGNUS_MIPIPLL_CH2_V3D, since a 3D graphic rendering engine has been
->>    integrated into Cygnus revision B0 and has its core clock running off
->>    MIPI PLL Channel 2
->>  - Changed default MIPI PLL VCO frequency from 1.75 GHz to 2.1 GHz. This allows
->>    us to derive 300 MHz V3D clock from channel 2 through the post divisor
->>
->> Changes from v2:
->>  - Re-arrange Cygnus clock/pll init functions so each init function is right
->>    next to its clock table
->>  - Removed #defines for number of clocks in Cygnus. Have the number of clocks
->>    automatically determined based on array size of the clock table
->>
->> Changes from v1:
->>  - Separate drivers/clk/Makefile change for drivers/clk/bcm out to a standalone patch
->>
->> Ray Jui (6):
->>   clk: iproc: define Broadcom iProc clock binding
->>   clk: iproc: add initial common clock support
->>   clk: Change bcm clocks build dependency
->>   clk: cygnus: add clock support for Broadcom Cygnus
->>   ARM: dts: enable clock support for Broadcom Cygnus
->>   clk: cygnus: remove Cygnus dummy clock binding
->>
->>  .../devicetree/bindings/clock/bcm-cygnus-clock.txt |   34 -
->>  .../bindings/clock/brcm,iproc-clocks.txt           |  132 ++++
->>  arch/arm/boot/dts/bcm-cygnus-clock.dtsi            |   89 ++-
->>  drivers/clk/Makefile                               |    2 +-
->>  drivers/clk/bcm/Kconfig                            |    9 +
->>  drivers/clk/bcm/Makefile                           |    2 +
->>  drivers/clk/bcm/clk-cygnus.c                       |  265 ++++++++
->>  drivers/clk/bcm/clk-iproc-armpll.c                 |  282 ++++++++
->>  drivers/clk/bcm/clk-iproc-asiu.c                   |  276 ++++++++
->>  drivers/clk/bcm/clk-iproc-pll.c                    |  716 ++++++++++++++++++++
->>  drivers/clk/bcm/clk-iproc.h                        |  178 +++++
->>  include/dt-bindings/clock/bcm-cygnus.h             |   68 ++
->>  12 files changed, 1990 insertions(+), 63 deletions(-)
->>  delete mode 100644 Documentation/devicetree/bindings/clock/bcm-cygnus-clock.txt
->>  create mode 100644 Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
->>  create mode 100644 drivers/clk/bcm/clk-cygnus.c
->>  create mode 100644 drivers/clk/bcm/clk-iproc-armpll.c
->>  create mode 100644 drivers/clk/bcm/clk-iproc-asiu.c
->>  create mode 100644 drivers/clk/bcm/clk-iproc-pll.c
->>  create mode 100644 drivers/clk/bcm/clk-iproc.h
->>  create mode 100644 include/dt-bindings/clock/bcm-cygnus.h
->>
+This means that we hold the lock while we walk the list but then return
+a pointer to a regulator device that we don't have a reference to.  This
+then means that something else can unregister the regulator we're
+holding a pointer to which means that it is unsafe to use that pointer.
+We need to ensure that any objects we look up via the list remain valid
+while we're working with them.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150525/0781f5e8/attachment.sig>
