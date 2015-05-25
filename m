@@ -1,146 +1,118 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Mon, 25 May 2015 16:28:55 +0200
-Subject: [PATCH v3 4/5] pci: designware: remove pci_common_init_dev()
-In-Reply-To: <20150506192201.GF24643@google.com>
-References: <1428657168-12495-1-git-send-email-gabriel.fernandez@linaro.org>
- <1428657168-12495-5-git-send-email-gabriel.fernandez@linaro.org>
- <20150506192201.GF24643@google.com>
-Message-ID: <556331A7.60909@st.com>
+From: minchan@kernel.org (Minchan Kim)
+Date: Mon, 25 May 2015 23:40:45 +0900
+Subject: [RFC PATCH 2/2] arm64: Implement vmalloc based thread_info
+ allocator
+In-Reply-To: <1432483340-23157-1-git-send-email-jungseoklee85@gmail.com>
+References: <1432483340-23157-1-git-send-email-jungseoklee85@gmail.com>
+Message-ID: <20150525144045.GE14922@blaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Hello Jungseok,
 
-On 05/06/2015 09:22 PM, Bjorn Helgaas wrote:
-> It's not completely obvious that replacing pci_common_init_dev() with
-> dw_pcie_setup() is equivalent.  Here are my notes from trying to convince
-> myself that this is correct.  I think your changelog could stand some
-> enhancement.  It would be ideal if you could break this into a few smaller
-> patches that were more obviously correct, but I suspect it's too
-> intertwined to do that.
+On Mon, May 25, 2015 at 01:02:20AM +0900, Jungseok Lee wrote:
+> Fork-routine sometimes fails to get a physically contiguous region for
+> thread_info on 4KB page system although free memory is enough. That is,
+> a physically contiguous region, which is currently 16KB, is not available
+> since system memory is fragmented.
 
-Thanks you for your review !
+Order less than PAGE_ALLOC_COSTLY_ORDER should not fail in current
+mm implementation. If you saw the order-2,3 high-order allocation fail
+maybe your application received SIGKILL by someone. LMK?
 
-Sorry for the late reply, from your detailed analysis bellow, yes, it 
-looks like pci_common_init_dev isn't
-completely equivalent.
-I'm wondering about PCI_PROBE_ONLY flag...
+> 
+> This patch tries to solve the problem as allocating thread_info memory
+> from vmalloc space, not 1:1 mapping one. The downside is one additional
+> page allocation in case of vmalloc. However, vmalloc space is large enough,
 
-The idea in the first place, to move to generic probing directly, instead of
-pci_common_init_dev() was to avoid being assigned default I/O (e.g. in 
-bios32.c).
-Please refer to discussion with Arnd :
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/317726.html
-But, I don't see how to be fully compatible (e.g. ARM specific option 
-like PCI_PROBE_ONLY)
-without calling pci_common_init_dev() or duplicating code from bios32.c.
+The size you want to allocate is 16KB in here but additional 4K?
+It increases 25% memory footprint, which is huge downside.
 
-Maybe should I fall back to the first idea of using specifc handling of 
-an "empty" IO space, and keep pci_common_init_dev() ?
+> around 240GB, under a combination of 39-bit VA and 4KB page. Thus, it is
+> not a big tradeoff for fork-routine service.
+> 
+> Suggested-by: Sungjinn Chung <barami97@gmail.com>
+> Signed-off-by: Jungseok Lee <jungseoklee85@gmail.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-mm at kvack.org
+> ---
+>  arch/arm64/Kconfig                   | 12 ++++++++++++
+>  arch/arm64/include/asm/thread_info.h |  9 +++++++++
+>  arch/arm64/kernel/process.c          |  7 +++++++
+>  3 files changed, 28 insertions(+)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 99930cf..93c236a 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -536,6 +536,18 @@ config ARCH_SELECT_MEMORY_MODEL
+>  config HAVE_ARCH_PFN_VALID
+>  	def_bool ARCH_HAS_HOLES_MEMORYMODEL || !SPARSEMEM
+>  
+> +config ARCH_THREAD_INFO_ALLOCATOR
+> +	bool "Enable vmalloc based thread_info allocator (EXPERIMENTAL)"
+> +	depends on ARM64_4K_PAGES
+> +	default n
+> +	help
+> +	  This feature enables vmalloc based thread_info allocator. It
+> +	  prevents fork-routine from begin failed to obtain physically
+> +	  contiguour region due to memory fragmentation on low system
+> +	  memory platforms.
+> +
+> +	  If unsure, say N
+> +
+>  config HW_PERF_EVENTS
+>  	bool "Enable hardware performance counter support for perf events"
+>  	depends on PERF_EVENTS
+> diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+> index dcd06d1..e753e59 100644
+> --- a/arch/arm64/include/asm/thread_info.h
+> +++ b/arch/arm64/include/asm/thread_info.h
+> @@ -61,6 +61,15 @@ struct thread_info {
+>  #define init_thread_info	(init_thread_union.thread_info)
+>  #define init_stack		(init_thread_union.stack)
+>  
+> +#ifdef CONFIG_ARCH_THREAD_INFO_ALLOCATOR
+> +#define alloc_thread_info_node(tsk, node)				\
+> +({									\
+> +	__vmalloc_node_range(THREAD_SIZE, THREAD_SIZE, VMALLOC_START,	\
+> +			VMALLOC_END, GFP_KERNEL, PAGE_KERNEL, 0,	\
+> +			NUMA_NO_NODE, __builtin_return_address(0));	\
+> +})
+> +#define free_thread_info(ti)	vfree(ti)
+> +#endif
+>  /*
+>   * how to get the current stack pointer from C
+>   */
+> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> index c506bee..c4b6aae 100644
+> --- a/arch/arm64/kernel/process.c
+> +++ b/arch/arm64/kernel/process.c
+> @@ -238,6 +238,13 @@ int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
+>  	return 0;
+>  }
+>  
+> +#ifdef CONFIG_ARCH_THREAD_INFO_ALLOCATOR
+> +struct page *arch_thread_info_to_page(struct thread_info *ti)
+> +{
+> +	return vmalloc_to_page(ti);
+> +}
+> +#endif
+> +
+>  asmlinkage void ret_from_fork(void) asm("ret_from_fork");
+>  
+>  int copy_thread(unsigned long clone_flags, unsigned long stack_start,
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
 
-Please advise,
-
-BR,
-Fabrice
-
-> Here's an outline of pci_common_init_dev():
->
->    pci_common_init_dev(parent, hw)
->      pci_add_flags(PCI_REASSIGN_ALL_RSRC)           # [1]
->      if (hw->preinit)
->        hw->preinit                                  # [2]
->      pcibios_init_hw
->        for (nr = 0; nr < hw->nr_controllers;        # [3]
->            sys = kzalloc                            # [4]
->            sys->msi_ctrl = hw->msi_ctrl             # [5]
->            sys->busnr = busnr                       # [6]
->            sys->swizzle = hw->swizzle               # [7]
->            sys->map_irq = hw->map_irq               # [8]
->            sys->align_resource = hw->align_resource # [9]
->            INIT_LIST_HEAD(&sys->resources)          # [10]
->            sys->private_data = hw->private_data     # [11]
->            hw->setup                                # [12]
->            pcibios_init_resources                   # [13]
->            hw->scan                                 # [14]
->      if (hw->postinit)
->        hw->postinit                                 # [15]
->      pci_fixup_irqs                                 # [16]
->      list_for_each_entry(sys, &head,                # [17]
->        if (!pci_has_flag(PCI_PROBE_ONLY))           # [18]
->          pci_bus_size_bridges                       # [19]
->          pci_bus_assign_resources
->        pci_bus_add_devices
->      list_for_each_entry(sys, &head,
->        ...
->          pcie_bus_configure_settings                # [20]
->
-> [1] You don't set PCI_REASSIGN_ALL_RSRC; have you verified that nobody
-> cares about that?
->
-> [2] dw_pci.preinit was NULL, so skipping this doesn't matter; looks OK.
->
-> [3] dw_pci.nr_controllers was always 1, so skipping the loop doesn't
-> matter; looks OK.
->
-> [4] You added struct pci_sys_data sysdata as a member of struct
-> pcie_port, so it is now allocated by dw_pcie_host_init() callers, e.g.,
-> st_pcie_probe(); looks OK.
->
-> [5] You set pp->sysdata.msi_ctrl in dw_pcie_host_init() instead of
-> pcibios_init_hw(); looks OK.
->
-> [6] Since dw_pci.nr_controllers was always 1, sys->busnr was always 0.
-> You don't set sys->busnr, so it will retain its initial zero value.  OK, I
-> guess.  It's still a little broken that we have both pp->busn and
-> pp->sysdata.busnr, but you didn't break it and it's OK that you didn't
-> change anything in this regard.
->
-> [7] dw_pci.swizzle was NULL, so pcibios_swizzle() would default to
-> pci_common_swizzle(), which is what you use when you call pci_fixup_irqs()
-> in dw_pcie_scan_bus(); looks OK.
->
-> [8] dw_pci.map_irq was dw_pcie_map_irq() (which used
-> of_irq_parse_and_map_pci()) and sys->map_irq was used by pcibios_map_irq().
-> You call pci_fixup_irqs() and pass a pointer to of_irq_parse_and_map_pci();
-> looks OK.
->
-> [9] dw_pci.align_resource was NULL, and I assume
-> pcie_port.sysdata.align_resource was initialized to zeroes; looks OK.
->
-> [10] You call INIT_LIST_HEAD() in dw_pcie_host_init() instead of
-> pcibios_init_hw(); looks OK.
->
-> [11] You set sys->private_data in dw_pcie_host_init() instead of
-> pcibios_init_hw(); looks OK.
->
-> [12] dw_pci.setup was dw_pcie_setup(), and you call that from
-> dw_pcie_host_init(); looks OK.
->
-> [13] You no longer call pcibios_init_resources().  You don't want the
-> default I/O space, which makes sense; looks OK (but you need to audit other
-> users and make sure they don't need it either).
->
-> [14] dw_pci.scan was dw_pcie_scan_bus(), and you call that from
-> dw_pcie_host_init(); looks OK.
->
-> [15] dw_pci.postinit was NULL, so skipping this doesn't matter; looks OK.
->
-> [16] You call pci_fixup_irqs() from dw_pcie_scan_bus() instead of
-> pci_common_init_dev(); looks OK.
->
-> [17] "head" is a local list in pci_common_init_dev(), and you don't need
-> anything similar because dw_pcie_host_init() is called once per host
-> bridge; looks OK.
->
-> [18] You don't test PCI_PROBE_ONLY; it looks like it can still be set by
-> booting with "pci=firmware".  So previously, "pci=firmware" prevented
-> resource assignment, but it no longer does.  Is that right?  Is that what
-> you intend?
->
-> [19] Instead of pci_bus_size_bridges() and pci_bus_assign_resources(), you
-> call pci_assign_unassigned_bus_resources() from dw_pcie_scan_bus().  That
-> seems like an improvement because it holds pci_bus_sem and supplies
-> add_list; looks OK.
->
-> [20] I think you no longer call pcie_bus_configure_settings().  That
-> configured MPS settings, and I think you still want to do that, don't you?
+-- 
+Kind regards,
+Minchan Kim
