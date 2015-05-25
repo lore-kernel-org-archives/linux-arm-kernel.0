@@ -1,34 +1,59 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Mon, 25 May 2015 14:41:51 +0300
-Subject: [PATCH v4 16/18] ARM: pxa: poodle: don't preallocate IRQ space for
- locomo
-In-Reply-To: <1432554113-26280-1-git-send-email-dbaryshkov@gmail.com>
-References: <1432554113-26280-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1432554113-26280-17-git-send-email-dbaryshkov@gmail.com>
+From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
+Date: Mon, 25 May 2015 20:44:13 +0900
+Subject: [PATCH] ARM: dts: odroidxu3: Enable wake alarm of S2MPS11 RTC
+Message-ID: <1432554253-25886-1-git-send-email-k.kozlowski.k@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As new locomo driver supports SPARSE_IRQ, don't preallocate NR_IRQS
-space for it on poodle.
+The IRQB of S2MPS11 PMIC is wired to XEINT4 (GPX0-4) through pull-up
+resistor.
 
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+Add interrupt properties and pinctrl configuration to enable RTC wake
+alarm of rtc-s5m driver. This also removes a warning:
+sec_pmic 4-0066: No interrupt specified, no interrupts
+
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
 ---
- arch/arm/mach-pxa/include/mach/poodle.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/exynos5422-odroidxu3.dts | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/mach-pxa/include/mach/poodle.h b/arch/arm/mach-pxa/include/mach/poodle.h
-index 5905cf1..71b6383 100644
---- a/arch/arm/mach-pxa/include/mach/poodle.h
-+++ b/arch/arm/mach-pxa/include/mach/poodle.h
-@@ -81,7 +81,7 @@
- #define POODLE_GPIO_L_LCLK	(POODLE_SCOOP_GPIO_BASE + 10)
- #define POODLE_GPIO_HS_OUT	(POODLE_SCOOP_GPIO_BASE + 11)
+diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+index c16987950aa1..27014bb0c586 100644
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+@@ -12,6 +12,7 @@
  
--#define POODLE_NR_IRQS		(IRQ_BOARD_START + 4)	/* 4 for LoCoMo */
-+#define POODLE_NR_IRQS		IRQ_BOARD_START
+ /dts-v1/;
+ #include <dt-bindings/clock/samsung,s2mps11.h>
++#include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/sound/samsung-i2s.h>
+ #include "exynos5800.dtsi"
+@@ -153,6 +154,11 @@
+ 		s2mps11,buck3-ramp-enable = <1>;
+ 		s2mps11,buck4-ramp-enable = <1>;
  
- extern struct platform_device poodle_locomo_device;
++		interrupt-parent = <&gpx0>;
++		interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&s2mps11_irq>;
++
+ 		s2mps11_osc: clocks {
+ 			#clock-cells = <1>;
+ 			clock-output-names = "s2mps11_ap",
+@@ -473,6 +479,13 @@
+ 		samsung,pin-pud = <0>;
+ 		samsung,pin-drv = <0>;
+ 	};
++
++	s2mps11_irq: s2mps11-irq {
++		samsung,pins = "gpx0-4";
++		samsung,pin-function = <0xf>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
+ };
  
+ &pwm {
 -- 
 2.1.4
