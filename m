@@ -1,454 +1,233 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Mon, 25 May 2015 14:41:38 +0300
-Subject: [PATCH v4 03/18] input: convert LoCoMo keyboard driver to use new
- locomo core
+Date: Mon, 25 May 2015 14:41:43 +0300
+Subject: [PATCH v4 08/18] gpio: port LoCoMo gpio support from old driver
 In-Reply-To: <1432554113-26280-1-git-send-email-dbaryshkov@gmail.com>
 References: <1432554113-26280-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1432554113-26280-4-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1432554113-26280-9-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As LoCoMo is switching to new device model, adapt keyboard driver to
-support new locomo core driver.
+Add gpiolib driver for gpio pins placed on the LoCoMo GA.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/input/keyboard/Kconfig     |   2 +-
- drivers/input/keyboard/locomokbd.c | 252 ++++++++++++++++++-------------------
- 2 files changed, 121 insertions(+), 133 deletions(-)
+ drivers/gpio/Kconfig       |  12 ++++
+ drivers/gpio/Makefile      |   1 +
+ drivers/gpio/gpio-locomo.c | 170 +++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 183 insertions(+)
+ create mode 100644 drivers/gpio/gpio-locomo.c
 
-diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
-index 106fbac..9a20487 100644
---- a/drivers/input/keyboard/Kconfig
-+++ b/drivers/input/keyboard/Kconfig
-@@ -337,7 +337,7 @@ config KEYBOARD_LM8333
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index caefe80..4542684 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -734,6 +734,18 @@ config GPIO_KEMPLD
+ 	  This driver can also be built as a module. If so, the module will be
+ 	  called gpio-kempld.
  
- config KEYBOARD_LOCOMO
- 	tristate "LoCoMo Keyboard Support"
--	depends on SHARP_LOCOMO
++config GPIO_LOCOMO
++	bool "Sharp LoCoMo GPIO support"
 +	depends on MFD_LOCOMO
- 	help
- 	  Say Y here if you are running Linux on a Sharp Zaurus Collie or Poodle based PDA
- 
-diff --git a/drivers/input/keyboard/locomokbd.c b/drivers/input/keyboard/locomokbd.c
-index c94d610..9742c79 100644
---- a/drivers/input/keyboard/locomokbd.c
-+++ b/drivers/input/keyboard/locomokbd.c
-@@ -23,28 +23,25 @@
-  *
-  */
- 
--#include <linux/slab.h>
--#include <linux/module.h>
-+#include <linux/delay.h>
- #include <linux/init.h>
- #include <linux/input.h>
--#include <linux/delay.h>
--#include <linux/device.h>
- #include <linux/interrupt.h>
--#include <linux/ioport.h>
--
--#include <asm/hardware/locomo.h>
--#include <asm/irq.h>
--
--MODULE_AUTHOR("John Lenz <lenz@cs.wisc.edu>");
--MODULE_DESCRIPTION("LoCoMo keyboard driver");
--MODULE_LICENSE("GPL");
--
--#define LOCOMOKBD_NUMKEYS	128
++	help
++	  Select this to support GPIO pins on Sharp LoCoMo Grid Array found
++	  in Sharp Zaurus collie and poodle models.
++
++	  Sat Yes if you have such PDA, say No otherwise.
++
++	  This driver can also be built as a module. If so, the module will be
++	  called gpio-locomo.
++
+ config GPIO_LP3943
+ 	tristate "TI/National Semiconductor LP3943 GPIO expander"
+ 	depends on MFD_LP3943
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index f71bb97..98655ae 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -42,6 +42,7 @@ obj-$(CONFIG_GPIO_JANZ_TTL)	+= gpio-janz-ttl.o
+ obj-$(CONFIG_GPIO_KEMPLD)	+= gpio-kempld.o
+ obj-$(CONFIG_ARCH_KS8695)	+= gpio-ks8695.o
+ obj-$(CONFIG_GPIO_INTEL_MID)	+= gpio-intel-mid.o
++obj-$(CONFIG_GPIO_LOCOMO)	+= gpio-locomo.o
+ obj-$(CONFIG_GPIO_LOONGSON)	+= gpio-loongson.o
+ obj-$(CONFIG_GPIO_LP3943)	+= gpio-lp3943.o
+ obj-$(CONFIG_ARCH_LPC32XX)	+= gpio-lpc32xx.o
+diff --git a/drivers/gpio/gpio-locomo.c b/drivers/gpio/gpio-locomo.c
+new file mode 100644
+index 0000000..dd9a1ca
+--- /dev/null
++++ b/drivers/gpio/gpio-locomo.c
+@@ -0,0 +1,170 @@
++/*
++ * Sharp LoCoMo support for GPIO
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This file contains all generic LoCoMo support.
++ *
++ * All initialization functions provided here are intended to be called
++ * from machine specific code with proper arguments when required.
++ */
 +#include <linux/module.h>
++#include <linux/kernel.h>
 +#include <linux/platform_device.h>
-+#include <linux/regmap.h>
 +#include <linux/slab.h>
++#include <linux/bitops.h>
++#include <linux/err.h>
++#include <linux/gpio.h>
++#include <linux/io.h>
++#include <linux/regmap.h>
 +#include <linux/mfd/locomo.h>
- 
- #define KEY_ACTIVITY		KEY_F16
- #define KEY_CONTACT		KEY_F18
- #define KEY_CENTER		KEY_F15
- 
-+#define KB_ROWS			16
-+#define KB_COLS			8
-+#define LOCOMOKBD_NUMKEYS	(KB_ROWS * KB_COLS)
-+#define SCANCODE(c, r)		(((c)<<4) + (r) + 1)
 +
- static const unsigned char
- locomokbd_keycode[LOCOMOKBD_NUMKEYS] = {
- 	0, KEY_ESC, KEY_ACTIVITY, 0, 0, 0, 0, 0, 0, 0,				/* 0 - 9 */
-@@ -62,20 +59,14 @@ locomokbd_keycode[LOCOMOKBD_NUMKEYS] = {
- 	KEY_M, KEY_SPACE, KEY_V, KEY_APOSTROPHE, KEY_SLASH, 0, 0, 0		/* 120 - 128 */
- };
- 
--#define KB_ROWS			16
--#define KB_COLS			8
--#define KB_ROWMASK(r)		(1 << (r))
--#define SCANCODE(c,r)		( ((c)<<4) + (r) + 1 )
--
- #define KB_DELAY		8
--#define SCAN_INTERVAL		(HZ/10)
- 
- struct locomokbd {
- 	unsigned char keycode[LOCOMOKBD_NUMKEYS];
- 	struct input_dev *input;
--	char phys[32];
- 
--	unsigned long base;
++struct locomo_gpio {
 +	struct regmap *regmap;
-+	int irq;
- 	spinlock_t lock;
- 
- 	struct timer_list timer;
-@@ -84,37 +75,33 @@ struct locomokbd {
- };
- 
- /* helper functions for reading the keyboard matrix */
--static inline void locomokbd_charge_all(unsigned long membase)
-+static void locomokbd_charge_all(struct locomokbd *locomokbd)
- {
--	locomo_writel(0x00FF, membase + LOCOMO_KSC);
-+	regmap_write(locomokbd->regmap, LOCOMO_KSC, 0x00ff);
- }
- 
--static inline void locomokbd_activate_all(unsigned long membase)
-+static void locomokbd_activate_all(struct locomokbd *locomokbd)
- {
--	unsigned long r;
--
--	locomo_writel(0, membase + LOCOMO_KSC);
--	r = locomo_readl(membase + LOCOMO_KIC);
--	r &= 0xFEFF;
--	locomo_writel(r, membase + LOCOMO_KIC);
-+	regmap_write(locomokbd->regmap, LOCOMO_KSC, 0);
-+	regmap_update_bits(locomokbd->regmap, LOCOMO_KIC, 0x100, 0);
- }
- 
--static inline void locomokbd_activate_col(unsigned long membase, int col)
-+static void locomokbd_activate_col(struct locomokbd *locomokbd, int col)
- {
- 	unsigned short nset;
- 	unsigned short nbset;
- 
--	nset = 0xFF & ~(1 << col);
-+	nset = 0xFF & ~BIT(col);
- 	nbset = (nset << 8) + nset;
--	locomo_writel(nbset, membase + LOCOMO_KSC);
-+	regmap_write(locomokbd->regmap, LOCOMO_KSC, nbset);
- }
- 
--static inline void locomokbd_reset_col(unsigned long membase, int col)
-+static void locomokbd_reset_col(struct locomokbd *locomokbd, int col)
- {
- 	unsigned short nbset;
- 
--	nbset = ((0xFF & ~(1 << col)) << 8) + 0xFF;
--	locomo_writel(nbset, membase + LOCOMO_KSC);
-+	nbset = ((0xFF & ~BIT(col)) << 8) + 0xFF;
-+	regmap_write(locomokbd->regmap, LOCOMO_KSC, nbset);
- }
- 
- /*
-@@ -129,24 +116,25 @@ static void locomokbd_scankeyboard(struct locomokbd *locomokbd)
- 	unsigned int row, col, rowd;
- 	unsigned long flags;
- 	unsigned int num_pressed;
--	unsigned long membase = locomokbd->base;
-+	bool esc_pressed = false;
- 
- 	spin_lock_irqsave(&locomokbd->lock, flags);
- 
--	locomokbd_charge_all(membase);
-+	locomokbd_charge_all(locomokbd);
- 
- 	num_pressed = 0;
- 	for (col = 0; col < KB_COLS; col++) {
--
--		locomokbd_activate_col(membase, col);
-+		udelay(KB_DELAY);
-+		locomokbd_activate_col(locomokbd, col);
- 		udelay(KB_DELAY);
- 
--		rowd = ~locomo_readl(membase + LOCOMO_KIB);
-+		regmap_read(locomokbd->regmap, LOCOMO_KIB, &rowd);
-+		rowd = ~rowd;
- 		for (row = 0; row < KB_ROWS; row++) {
- 			unsigned int scancode, pressed, key;
- 
- 			scancode = SCANCODE(col, row);
--			pressed = rowd & KB_ROWMASK(row);
-+			pressed = rowd & BIT(row);
- 			key = locomokbd->keycode[scancode];
- 
- 			input_report_key(locomokbd->input, key, pressed);
-@@ -158,30 +146,32 @@ static void locomokbd_scankeyboard(struct locomokbd *locomokbd)
- 			/* The "Cancel/ESC" key is labeled "On/Off" on
- 			 * Collie and Poodle and should suspend the device
- 			 * if it was pressed for more than a second. */
--			if (unlikely(key == KEY_ESC)) {
--				if (!time_after(jiffies,
--					locomokbd->suspend_jiffies + HZ))
--					continue;
--				if (locomokbd->count_cancel++
--					!= (HZ/SCAN_INTERVAL + 1))
--					continue;
--				input_event(locomokbd->input, EV_PWR,
--					KEY_SUSPEND, 1);
--				locomokbd->suspend_jiffies = jiffies;
--			} else
--				locomokbd->count_cancel = 0;
-+			if (unlikely(key == KEY_ESC))
-+				esc_pressed = true;
- 		}
--		locomokbd_reset_col(membase, col);
-+		locomokbd_reset_col(locomokbd, col);
- 	}
--	locomokbd_activate_all(membase);
-+	locomokbd_activate_all(locomokbd);
- 
- 	input_sync(locomokbd->input);
- 
- 	/* if any keys are pressed, enable the timer */
- 	if (num_pressed)
--		mod_timer(&locomokbd->timer, jiffies + SCAN_INTERVAL);
-+		mod_timer(&locomokbd->timer, jiffies + msecs_to_jiffies(100));
- 	else
-+		regmap_update_bits(locomokbd->regmap, LOCOMO_KIC, 0x10, 0x10);
 +
++	struct gpio_chip gpio;
 +
-+	if (esc_pressed && time_after(jiffies,
-+		    locomokbd->suspend_jiffies + msecs_to_jiffies(1000))) {
-+		if (locomokbd->count_cancel++ > 20) {
-+			input_event(locomokbd->input, EV_PWR,
-+					KEY_SUSPEND, 1);
-+			locomokbd->suspend_jiffies = jiffies;
-+		}
-+	} else {
- 		locomokbd->count_cancel = 0;
-+	}
- 
- 	spin_unlock_irqrestore(&locomokbd->lock, flags);
- }
-@@ -192,18 +182,17 @@ static void locomokbd_scankeyboard(struct locomokbd *locomokbd)
- static irqreturn_t locomokbd_interrupt(int irq, void *dev_id)
- {
- 	struct locomokbd *locomokbd = dev_id;
--	u16 r;
-+	unsigned int r;
- 
--	r = locomo_readl(locomokbd->base + LOCOMO_KIC);
-+	regmap_read(locomokbd->regmap, LOCOMO_KIC, &r);
- 	if ((r & 0x0001) == 0)
- 		return IRQ_HANDLED;
- 
--	locomo_writel(r & ~0x0100, locomokbd->base + LOCOMO_KIC); /* Ack */
-+	/* Mask and Ack */
-+	regmap_write(locomokbd->regmap, LOCOMO_KIC, r & ~0x110);
- 
--	/** wait chattering delay **/
--	udelay(100);
-+	mod_timer(&locomokbd->timer, jiffies + msecs_to_jiffies(1));
- 
--	locomokbd_scankeyboard(locomokbd);
- 	return IRQ_HANDLED;
- }
- 
-@@ -220,47 +209,39 @@ static void locomokbd_timer_callback(unsigned long data)
- static int locomokbd_open(struct input_dev *dev)
- {
- 	struct locomokbd *locomokbd = input_get_drvdata(dev);
--	u16 r;
--	
--	r = locomo_readl(locomokbd->base + LOCOMO_KIC) | 0x0010;
--	locomo_writel(r, locomokbd->base + LOCOMO_KIC);
--	return 0;
++	u16 rising_edge;
++	u16 falling_edge;
 +
-+	return regmap_update_bits(locomokbd->regmap, LOCOMO_KIC, 0x10, 0x10);
- }
- 
- static void locomokbd_close(struct input_dev *dev)
- {
- 	struct locomokbd *locomokbd = input_get_drvdata(dev);
--	u16 r;
--	
--	r = locomo_readl(locomokbd->base + LOCOMO_KIC) & ~0x0010;
--	locomo_writel(r, locomokbd->base + LOCOMO_KIC);
++	unsigned int save_gpo;
++	unsigned int save_gpe;
++};
 +
-+	regmap_update_bits(locomokbd->regmap, LOCOMO_KIC, 0x10, 0x0);
++static int locomo_gpio_get(struct gpio_chip *chip,
++		unsigned offset)
++{
++	struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
++	unsigned int gpl;
 +
-+	del_timer_sync(&locomokbd->timer);
- }
- 
--static int locomokbd_probe(struct locomo_dev *dev)
-+static int locomokbd_probe(struct platform_device *dev)
- {
- 	struct locomokbd *locomokbd;
- 	struct input_dev *input_dev;
- 	int i, err;
- 
--	locomokbd = kzalloc(sizeof(struct locomokbd), GFP_KERNEL);
--	input_dev = input_allocate_device();
--	if (!locomokbd || !input_dev) {
--		err = -ENOMEM;
--		goto err_free_mem;
--	}
-+	locomokbd = devm_kzalloc(&dev->dev, sizeof(struct locomokbd),
-+			GFP_KERNEL);
-+	if (!locomokbd)
-+		return -ENOMEM;
- 
--	/* try and claim memory region */
--	if (!request_mem_region((unsigned long) dev->mapbase,
--				dev->length,
--				LOCOMO_DRIVER_NAME(dev))) {
--		err = -EBUSY;
--		printk(KERN_ERR "locomokbd: Can't acquire access to io memory for keyboard\n");
--		goto err_free_mem;
--	}
-+	locomokbd->regmap = dev_get_regmap(dev->dev.parent, NULL);
-+	if (!locomokbd->regmap)
-+		return -EINVAL;
- 
--	locomo_set_drvdata(dev, locomokbd);
-+	locomokbd->irq = platform_get_irq(dev, 0);
-+	if (locomokbd->irq < 0)
-+		return -ENXIO;
- 
--	locomokbd->base = (unsigned long) dev->mapbase;
-+	platform_set_drvdata(dev, locomokbd);
- 
- 	spin_lock_init(&locomokbd->lock);
- 
-@@ -270,11 +251,13 @@ static int locomokbd_probe(struct locomo_dev *dev)
- 
- 	locomokbd->suspend_jiffies = jiffies;
- 
--	locomokbd->input = input_dev;
--	strcpy(locomokbd->phys, "locomokbd/input0");
-+	input_dev = devm_input_allocate_device(&dev->dev);
-+	if (!input_dev)
-+		return -ENOMEM;
- 
-+	locomokbd->input = input_dev;
- 	input_dev->name = "LoCoMo keyboard";
--	input_dev->phys = locomokbd->phys;
-+	input_dev->phys = "locomokbd/input0";
- 	input_dev->id.bustype = BUS_HOST;
- 	input_dev->id.vendor = 0x0001;
- 	input_dev->id.product = 0x0001;
-@@ -291,72 +274,77 @@ static int locomokbd_probe(struct locomo_dev *dev)
- 
- 	input_set_drvdata(input_dev, locomokbd);
- 
--	memcpy(locomokbd->keycode, locomokbd_keycode, sizeof(locomokbd->keycode));
-+	memcpy(locomokbd->keycode,
-+			locomokbd_keycode,
-+			sizeof(locomokbd->keycode));
++	regmap_read(lg->regmap, LOCOMO_GPL, &gpl);
 +
- 	for (i = 0; i < LOCOMOKBD_NUMKEYS; i++)
--		set_bit(locomokbd->keycode[i], input_dev->keybit);
--	clear_bit(0, input_dev->keybit);
-+		input_set_capability(input_dev, EV_KEY, locomokbd->keycode[i]);
-+	input_set_capability(input_dev, EV_PWR, KEY_SUSPEND);
-+	__set_bit(EV_REP, input_dev->evbit);
++	return gpl & BIT(offset);
++}
 +
-+	regmap_write(locomokbd->regmap, LOCOMO_KCMD, 1);
-+	regmap_write(locomokbd->regmap, LOCOMO_KSC, 0x0);
-+	regmap_write(locomokbd->regmap, LOCOMO_KIC, 0x0);
- 
- 	/* attempt to get the interrupt */
--	err = request_irq(dev->irq[0], locomokbd_interrupt, 0, "locomokbd", locomokbd);
-+	err = devm_request_irq(&dev->dev, locomokbd->irq, locomokbd_interrupt,
-+			0, "locomokbd", locomokbd);
- 	if (err) {
--		printk(KERN_ERR "locomokbd: Can't get irq for keyboard\n");
--		goto err_release_region;
-+		dev_err(&dev->dev, "Could not get keyboard IRQ\n");
-+		return err;
- 	}
- 
- 	err = input_register_device(locomokbd->input);
- 	if (err)
--		goto err_free_irq;
-+		return err;
- 
- 	return 0;
- 
-- err_free_irq:
--	free_irq(dev->irq[0], locomokbd);
-- err_release_region:
--	release_mem_region((unsigned long) dev->mapbase, dev->length);
--	locomo_set_drvdata(dev, NULL);
-- err_free_mem:
--	input_free_device(input_dev);
--	kfree(locomokbd);
--
- 	return err;
- }
- 
--static int locomokbd_remove(struct locomo_dev *dev)
-+static int __maybe_unused locomokbd_suspend(struct device *dev)
- {
--	struct locomokbd *locomokbd = locomo_get_drvdata(dev);
-+	struct locomokbd *locomokbd = dev_get_drvdata(dev);
- 
--	free_irq(dev->irq[0], locomokbd);
-+	regmap_update_bits(locomokbd->regmap, LOCOMO_KIC, 0x10, 0x0);
- 
- 	del_timer_sync(&locomokbd->timer);
- 
--	input_unregister_device(locomokbd->input);
--	locomo_set_drvdata(dev, NULL);
++static void locomo_gpio_set(struct gpio_chip *chip,
++		unsigned offset, int value)
++{
++	struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
++
++	regmap_update_bits(lg->regmap, LOCOMO_GPO,
++			BIT(offset),
++			value ? BIT(offset) : 0);
++}
++
++static int locomo_gpio_direction_input(struct gpio_chip *chip,
++			unsigned offset)
++{
++	struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
++
++	regmap_update_bits(lg->regmap, LOCOMO_GPD, BIT(offset), BIT(offset));
++	regmap_update_bits(lg->regmap, LOCOMO_GPE, BIT(offset), BIT(offset));
++
 +	return 0;
 +}
 +
-+static int __maybe_unused locomokbd_resume(struct device *dev)
++static int locomo_gpio_direction_output(struct gpio_chip *chip,
++			unsigned offset, int value)
 +{
-+	struct locomokbd *locomokbd = dev_get_drvdata(dev);
- 
--	release_mem_region((unsigned long) dev->mapbase, dev->length);
-+	regmap_write(locomokbd->regmap, LOCOMO_KCMD, 1);
-+	regmap_write(locomokbd->regmap, LOCOMO_KSC, 0);
-+	regmap_write(locomokbd->regmap, LOCOMO_KIC, 0x0);
- 
--	kfree(locomokbd);
-+	/* Rescan keyboard only if we are open by somebody */
-+	mutex_lock(&locomokbd->input->mutex);
-+	if (locomokbd->input->users)
-+		locomokbd_scankeyboard(locomokbd);
-+	mutex_unlock(&locomokbd->input->mutex);
- 
- 	return 0;
- }
- 
--static struct locomo_driver keyboard_driver = {
--	.drv = {
--		.name = "locomokbd"
-+static SIMPLE_DEV_PM_OPS(locomo_kbd_pm, locomokbd_suspend, locomokbd_resume);
++	struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
 +
-+static struct platform_driver locomokbd_driver = {
-+	.driver = {
-+		.name	= "locomo-kbd",
-+		.pm	= &locomo_kbd_pm,
- 	},
--	.devid	= LOCOMO_DEVID_KEYBOARD,
- 	.probe	= locomokbd_probe,
--	.remove	= locomokbd_remove,
- };
- 
--static int __init locomokbd_init(void)
--{
--	return locomo_driver_register(&keyboard_driver);
--}
-+module_platform_driver(locomokbd_driver);
- 
--static void __exit locomokbd_exit(void)
--{
--	locomo_driver_unregister(&keyboard_driver);
--}
--
--module_init(locomokbd_init);
--module_exit(locomokbd_exit);
-+MODULE_AUTHOR("John Lenz <lenz@cs.wisc.edu>");
-+MODULE_DESCRIPTION("LoCoMo keyboard driver");
++	regmap_update_bits(lg->regmap, LOCOMO_GPO,
++			BIT(offset),
++			value ? BIT(offset) : 0);
++	regmap_update_bits(lg->regmap, LOCOMO_GPD, BIT(offset), 0);
++	regmap_update_bits(lg->regmap, LOCOMO_GPE, BIT(offset), 0);
++
++	return 0;
++}
++
++#ifdef CONFIG_PM_SLEEP
++static int locomo_gpio_suspend(struct device *dev)
++{
++	struct locomo_gpio *lg = dev_get_drvdata(dev);
++
++	regmap_read(lg->regmap, LOCOMO_GPO, &lg->save_gpo);
++	regmap_write(lg->regmap, LOCOMO_GPO, 0x00);
++	regmap_read(lg->regmap, LOCOMO_GPE, &lg->save_gpe);
++	regmap_write(lg->regmap, LOCOMO_GPE, 0x00);
++
++	return 0;
++}
++
++static int locomo_gpio_resume(struct device *dev)
++{
++	struct locomo_gpio *lg = dev_get_drvdata(dev);
++
++	regmap_write(lg->regmap, LOCOMO_GPO, lg->save_gpo);
++	regmap_write(lg->regmap, LOCOMO_GPE, lg->save_gpe);
++
++	return 0;
++}
++static SIMPLE_DEV_PM_OPS(locomo_gpio_pm,
++		locomo_gpio_suspend, locomo_gpio_resume);
++#define LOCOMO_GPIO_PM	(&locomo_gpio_pm)
++#else
++#define LOCOMO_GPIO_PM	NULL
++#endif
++
++static int locomo_gpio_probe(struct platform_device *pdev)
++{
++	struct locomo_gpio *lg;
++	int ret;
++	struct locomo_gpio_platform_data *pdata = dev_get_platdata(&pdev->dev);
++
++	lg = devm_kzalloc(&pdev->dev, sizeof(struct locomo_gpio),
++			GFP_KERNEL);
++	if (!lg)
++		return -ENOMEM;
++
++	lg->regmap = dev_get_regmap(pdev->dev.parent, NULL);
++	if (!lg->regmap)
++		return -EINVAL;
++
++	platform_set_drvdata(pdev, lg);
++
++	regmap_write(lg->regmap, LOCOMO_GPO, 0x00);
++	regmap_write(lg->regmap, LOCOMO_GPE, 0x00);
++	regmap_write(lg->regmap, LOCOMO_GPD, 0x00);
++	regmap_write(lg->regmap, LOCOMO_GIE, 0x00);
++
++	lg->gpio.base = pdata ? pdata->gpio_base : -1;
++	lg->gpio.label = "locomo-gpio";
++	lg->gpio.ngpio = 16;
++	lg->gpio.set = locomo_gpio_set;
++	lg->gpio.get = locomo_gpio_get;
++	lg->gpio.direction_input = locomo_gpio_direction_input;
++	lg->gpio.direction_output = locomo_gpio_direction_output;
++
++	ret = gpiochip_add(&lg->gpio);
++	if (ret)
++		return ret;
++
++	return 0;
++}
++
++static int locomo_gpio_remove(struct platform_device *pdev)
++{
++	struct locomo_gpio *lg = platform_get_drvdata(pdev);
++
++	gpiochip_remove(&lg->gpio);
++
++	return 0;
++}
++
++static struct platform_driver locomo_gpio_driver = {
++	.probe		= locomo_gpio_probe,
++	.remove		= locomo_gpio_remove,
++	.driver		= {
++		.name	= "locomo-gpio",
++		.pm	= LOCOMO_GPIO_PM,
++	},
++};
++module_platform_driver(locomo_gpio_driver);
++
++MODULE_DESCRIPTION("Sharp LoCoMo GPIO driver");
 +MODULE_LICENSE("GPL");
-+MODULE_ALIAS("platform:locomo-kbd");
++MODULE_AUTHOR("John Lenz <lenz@cs.wisc.edu>");
++MODULE_ALIAS("platform:locomo-gpio");
 -- 
 2.1.4
