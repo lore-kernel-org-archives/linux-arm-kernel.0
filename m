@@ -1,233 +1,393 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Mon, 25 May 2015 14:41:43 +0300
-Subject: [PATCH v4 08/18] gpio: port LoCoMo gpio support from old driver
+Date: Mon, 25 May 2015 14:41:45 +0300
+Subject: [PATCH v4 10/18] spi: add locomo SPI driver
 In-Reply-To: <1432554113-26280-1-git-send-email-dbaryshkov@gmail.com>
 References: <1432554113-26280-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1432554113-26280-9-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1432554113-26280-11-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add gpiolib driver for gpio pins placed on the LoCoMo GA.
+LoCoMo chip has a built-in simple SPI controller. On Sharp SL-5500 PDDAs
+it is connected to external MMC slot.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/gpio/Kconfig       |  12 ++++
- drivers/gpio/Makefile      |   1 +
- drivers/gpio/gpio-locomo.c | 170 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 183 insertions(+)
- create mode 100644 drivers/gpio/gpio-locomo.c
+ drivers/spi/Kconfig      |  10 ++
+ drivers/spi/Makefile     |   1 +
+ drivers/spi/spi-locomo.c | 332 +++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 343 insertions(+)
+ create mode 100644 drivers/spi/spi-locomo.c
 
-diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index caefe80..4542684 100644
---- a/drivers/gpio/Kconfig
-+++ b/drivers/gpio/Kconfig
-@@ -734,6 +734,18 @@ config GPIO_KEMPLD
- 	  This driver can also be built as a module. If so, the module will be
- 	  called gpio-kempld.
+diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+index 198f96b..c9e3176 100644
+--- a/drivers/spi/Kconfig
++++ b/drivers/spi/Kconfig
+@@ -258,6 +258,16 @@ config SPI_LM70_LLP
+ 	  which interfaces to an LM70 temperature sensor using
+ 	  a parallel port.
  
-+config GPIO_LOCOMO
-+	bool "Sharp LoCoMo GPIO support"
++config SPI_LOCOMO
++	tristate "Locomo SPI master"
 +	depends on MFD_LOCOMO
 +	help
-+	  Select this to support GPIO pins on Sharp LoCoMo Grid Array found
-+	  in Sharp Zaurus collie and poodle models.
++	  This enables using the SPI controller as present in the LoCoMo
++	  chips. It is probably only useful on the Sharp SL-5x00 PDA family.
 +
-+	  Sat Yes if you have such PDA, say No otherwise.
++	  On SL-5500 and SL-5000 devices this controller is used for
++	  MMC/SD cards.
 +
-+	  This driver can also be built as a module. If so, the module will be
-+	  called gpio-locomo.
-+
- config GPIO_LP3943
- 	tristate "TI/National Semiconductor LP3943 GPIO expander"
- 	depends on MFD_LP3943
-diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-index f71bb97..98655ae 100644
---- a/drivers/gpio/Makefile
-+++ b/drivers/gpio/Makefile
-@@ -42,6 +42,7 @@ obj-$(CONFIG_GPIO_JANZ_TTL)	+= gpio-janz-ttl.o
- obj-$(CONFIG_GPIO_KEMPLD)	+= gpio-kempld.o
- obj-$(CONFIG_ARCH_KS8695)	+= gpio-ks8695.o
- obj-$(CONFIG_GPIO_INTEL_MID)	+= gpio-intel-mid.o
-+obj-$(CONFIG_GPIO_LOCOMO)	+= gpio-locomo.o
- obj-$(CONFIG_GPIO_LOONGSON)	+= gpio-loongson.o
- obj-$(CONFIG_GPIO_LP3943)	+= gpio-lp3943.o
- obj-$(CONFIG_ARCH_LPC32XX)	+= gpio-lpc32xx.o
-diff --git a/drivers/gpio/gpio-locomo.c b/drivers/gpio/gpio-locomo.c
+ config SPI_MPC52xx
+ 	tristate "Freescale MPC52xx SPI (non-PSC) controller support"
+ 	depends on PPC_MPC52xx
+diff --git a/drivers/spi/Makefile b/drivers/spi/Makefile
+index d8cbf65..623c463 100644
+--- a/drivers/spi/Makefile
++++ b/drivers/spi/Makefile
+@@ -44,6 +44,7 @@ obj-$(CONFIG_SPI_GPIO)			+= spi-gpio.o
+ obj-$(CONFIG_SPI_IMG_SPFI)		+= spi-img-spfi.o
+ obj-$(CONFIG_SPI_IMX)			+= spi-imx.o
+ obj-$(CONFIG_SPI_LM70_LLP)		+= spi-lm70llp.o
++obj-$(CONFIG_SPI_LOCOMO)		+= spi-locomo.o
+ obj-$(CONFIG_SPI_MESON_SPIFC)		+= spi-meson-spifc.o
+ obj-$(CONFIG_SPI_MPC512x_PSC)		+= spi-mpc512x-psc.o
+ obj-$(CONFIG_SPI_MPC52xx_PSC)		+= spi-mpc52xx-psc.o
+diff --git a/drivers/spi/spi-locomo.c b/drivers/spi/spi-locomo.c
 new file mode 100644
-index 0000000..dd9a1ca
+index 0000000..bef0354
 --- /dev/null
-+++ b/drivers/gpio/gpio-locomo.c
-@@ -0,0 +1,170 @@
++++ b/drivers/spi/spi-locomo.c
+@@ -0,0 +1,332 @@
 +/*
-+ * Sharp LoCoMo support for GPIO
-+ *
 + * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
 + *
-+ * This file contains all generic LoCoMo support.
-+ *
-+ * All initialization functions provided here are intended to be called
-+ * from machine specific code with proper arguments when required.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
++#include <linux/delay.h>
 +#include <linux/module.h>
 +#include <linux/kernel.h>
 +#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+#include <linux/bitops.h>
-+#include <linux/err.h>
-+#include <linux/gpio.h>
-+#include <linux/io.h>
 +#include <linux/regmap.h>
++#include <linux/spi/spi.h>
 +#include <linux/mfd/locomo.h>
 +
-+struct locomo_gpio {
++struct locomospi_dev {
 +	struct regmap *regmap;
 +
-+	struct gpio_chip gpio;
++	int clock_base;
++	int clock_div;
++	unsigned nsecs;
 +
-+	u16 rising_edge;
-+	u16 falling_edge;
-+
-+	unsigned int save_gpo;
-+	unsigned int save_gpe;
++	unsigned int save_ct;
++	unsigned int save_md;
 +};
 +
-+static int locomo_gpio_get(struct gpio_chip *chip,
-+		unsigned offset)
++static void locomospi_chipselect(struct spi_device *spi, bool enable)
 +{
-+	struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
-+	unsigned int gpl;
++	struct locomospi_dev *spidev;
 +
-+	regmap_read(lg->regmap, LOCOMO_GPL, &gpl);
++	dev_dbg(&spi->dev, "SPI cs: %s\n", enable ? "enable" : "disable");
 +
-+	return gpl & BIT(offset);
++	spidev = spi_master_get_devdata(spi->master);
++
++	regmap_update_bits(spidev->regmap, LOCOMO_SPICT, LOCOMO_SPICT_CS,
++			enable ? LOCOMO_SPICT_CS : 0);
 +}
 +
-+static void locomo_gpio_set(struct gpio_chip *chip,
-+		unsigned offset, int value)
++static u32 locomospi_txrx_word(struct spi_device *spi,
++		unsigned nsecs,
++		u32 word)
 +{
-+	struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
++	struct locomospi_dev *spidev;
++	int wait;
++	int j;
++	unsigned int rx;
++	unsigned int r;
 +
-+	regmap_update_bits(lg->regmap, LOCOMO_GPO,
-+			BIT(offset),
-+			value ? BIT(offset) : 0);
++	spidev = spi_master_get_devdata(spi->master);
++
++	if (spidev->clock_div == DIV_64)
++		wait = 0x10000;
++	else
++		wait = 8;
++
++	for (j = 0; j < wait; j++) {
++		regmap_read(spidev->regmap, LOCOMO_SPIST, &r);
++		if (r & LOCOMO_SPI_RFW)
++			break;
++	}
++	if (j == wait)
++		dev_err_ratelimited(&spi->dev, "rfw timeout\n");
++
++	regmap_write(spidev->regmap, LOCOMO_SPITD, word);
++	ndelay(nsecs);
++
++	for (j = 0; j < wait; j++) {
++		regmap_read(spidev->regmap, LOCOMO_SPIST, &r);
++		if (r & LOCOMO_SPI_RFR)
++			break;
++	}
++	if (j == wait)
++		dev_err_ratelimited(&spi->dev, "rfr timeout\n");
++
++	regmap_read(spidev->regmap, LOCOMO_SPIRD, &rx);
++	ndelay(nsecs);
++
++	dev_dbg(&spi->dev, "SPI txrx: %02x/%02x\n", word, rx);
++
++	return rx;
 +}
 +
-+static int locomo_gpio_direction_input(struct gpio_chip *chip,
-+			unsigned offset)
++static void locomo_spi_set_speed(struct locomospi_dev *spidev, u32 hz)
 +{
-+	struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
++	spidev->nsecs = (1000000000/2) / hz;
 +
-+	regmap_update_bits(lg->regmap, LOCOMO_GPD, BIT(offset), BIT(offset));
-+	regmap_update_bits(lg->regmap, LOCOMO_GPE, BIT(offset), BIT(offset));
++	if (hz >= 24576000) {
++		spidev->clock_base = CLOCK_25MHZ;
++		spidev->clock_div = DIV_1;
++	} else if (hz >= 22579200) {
++		spidev->clock_base = CLOCK_22MHZ;
++		spidev->clock_div = DIV_1;
++	} else if (hz >= 18432000) {
++		spidev->clock_base = CLOCK_18MHZ;
++		spidev->clock_div = DIV_1;
++	} else if (hz >= 12288000) {
++		spidev->clock_base = CLOCK_25MHZ;
++		spidev->clock_div = DIV_2;
++	} else if (hz >= 11289600) {
++		spidev->clock_base = CLOCK_22MHZ;
++		spidev->clock_div = DIV_2;
++	} else if (hz >= 9216000) {
++		spidev->clock_base = CLOCK_18MHZ;
++		spidev->clock_div = DIV_2;
++	} else if (hz >= 6144000) {
++		spidev->clock_base = CLOCK_25MHZ;
++		spidev->clock_div = DIV_4;
++	} else if (hz >= 5644800) {
++		spidev->clock_base = CLOCK_22MHZ;
++		spidev->clock_div = DIV_4;
++	} else if (hz >= 4608000) {
++		spidev->clock_base = CLOCK_18MHZ;
++		spidev->clock_div = DIV_4;
++	} else if (hz >= 3072000) {
++		spidev->clock_base = CLOCK_25MHZ;
++		spidev->clock_div = DIV_8;
++	} else if (hz >= 2822400) {
++		spidev->clock_base = CLOCK_22MHZ;
++		spidev->clock_div = DIV_8;
++	} else if (hz >= 2304000) {
++		spidev->clock_base = CLOCK_18MHZ;
++		spidev->clock_div = DIV_8;
++	} else if (hz >= 384000) {
++		spidev->clock_base = CLOCK_25MHZ;
++		spidev->clock_div = DIV_64;
++	} else if (hz >= 352800) {
++		spidev->clock_base = CLOCK_22MHZ;
++		spidev->clock_div = DIV_64;
++	} else {		/* set to 288 Khz */
++		spidev->clock_base = CLOCK_18MHZ;
++		spidev->clock_div = DIV_64;
++	}
++
++	regmap_update_bits(spidev->regmap, LOCOMO_SPIMD,
++			LOCOMO_SPIMD_XSEL | LOCOMO_SPIMD_CLKSEL |
++				LOCOMO_SPIMD_XEN,
++			0);
++	regmap_update_bits(spidev->regmap, LOCOMO_SPIMD,
++			LOCOMO_SPIMD_XSEL | LOCOMO_SPIMD_CLKSEL |
++				LOCOMO_SPIMD_XEN,
++			spidev->clock_div | (spidev->clock_base << 3) |
++				LOCOMO_SPIMD_XEN);
++
++	usleep_range(300, 400);
++}
++
++static int locomo_spi_setup_transfer(struct spi_device *spi,
++		struct spi_transfer *t)
++{
++	struct locomospi_dev *spidev;
++
++	spidev = spi_master_get_devdata(spi->master);
++
++	regmap_update_bits(spidev->regmap, LOCOMO_SPIMD,
++			LOCOMO_SPIMD_XON,
++			LOCOMO_SPIMD_XON);
++
++	locomo_spi_set_speed(spidev, t->speed_hz);
 +
 +	return 0;
 +}
 +
-+static int locomo_gpio_direction_output(struct gpio_chip *chip,
-+			unsigned offset, int value)
++static int locomospi_transfer_one(struct spi_master *master,
++		struct spi_device *spi,
++		struct spi_transfer *t)
 +{
-+	struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
++	struct locomospi_dev *spidev = spi_master_get_devdata(spi->master);
++	int rc;
++	unsigned count;
++	const u8 *tx = t->tx_buf;
++	u8 *rx = t->rx_buf;
 +
-+	regmap_update_bits(lg->regmap, LOCOMO_GPO,
-+			BIT(offset),
-+			value ? BIT(offset) : 0);
-+	regmap_update_bits(lg->regmap, LOCOMO_GPD, BIT(offset), 0);
-+	regmap_update_bits(lg->regmap, LOCOMO_GPE, BIT(offset), 0);
++	rc = locomo_spi_setup_transfer(spi, t);
++	if (rc < 0)
++		return rc;
++
++	if (!t->len)
++		return 0;
++
++	for (count = t->len; likely(count > 0); count--) {
++		u8 word = 0;
++
++		if (tx)
++			word = *tx++;
++		word = locomospi_txrx_word(spi, spidev->nsecs, word);
++
++		if (rx)
++			*rx++ = word;
++	}
 +
 +	return 0;
 +}
 +
 +#ifdef CONFIG_PM_SLEEP
-+static int locomo_gpio_suspend(struct device *dev)
++static int locomo_spi_suspend(struct device *dev)
 +{
-+	struct locomo_gpio *lg = dev_get_drvdata(dev);
++	struct spi_master *master = dev_get_drvdata(dev);
++	struct locomospi_dev *spidev = spi_master_get_devdata(master);
++	int ret;
 +
-+	regmap_read(lg->regmap, LOCOMO_GPO, &lg->save_gpo);
-+	regmap_write(lg->regmap, LOCOMO_GPO, 0x00);
-+	regmap_read(lg->regmap, LOCOMO_GPE, &lg->save_gpe);
-+	regmap_write(lg->regmap, LOCOMO_GPE, 0x00);
++	/* Stop the queue running */
++	ret = spi_master_suspend(master);
++	if (ret) {
++		dev_warn(dev, "cannot suspend master\n");
++		return ret;
++	}
++
++	regmap_read(spidev->regmap, LOCOMO_SPICT, &spidev->save_ct);
++	regmap_write(spidev->regmap, LOCOMO_SPICT, LOCOMO_SPICT_CS);
++	regmap_read(spidev->regmap, LOCOMO_SPIMD, &spidev->save_md);
++	regmap_write(spidev->regmap, LOCOMO_SPIMD,
++			LOCOMO_SPIMD_MSB1ST | LOCOMO_SPIMD_DOSTAT |
++			LOCOMO_SPIMD_RCPOL | LOCOMO_SPIMD_TCPOL |
++			(CLOCK_25MHZ << 3) | DIV_64);
 +
 +	return 0;
 +}
 +
-+static int locomo_gpio_resume(struct device *dev)
++static int locomo_spi_resume(struct device *dev)
 +{
-+	struct locomo_gpio *lg = dev_get_drvdata(dev);
++	struct spi_master *master = dev_get_drvdata(dev);
++	struct locomospi_dev *spidev = spi_master_get_devdata(master);
++	int ret;
 +
-+	regmap_write(lg->regmap, LOCOMO_GPO, lg->save_gpo);
-+	regmap_write(lg->regmap, LOCOMO_GPE, lg->save_gpe);
++	regmap_write(spidev->regmap, LOCOMO_SPIMD, spidev->save_md);
++	regmap_write(spidev->regmap, LOCOMO_SPICT, spidev->save_ct);
 +
-+	return 0;
++	/* Start the queue running */
++	ret = spi_master_resume(master);
++	if (ret)
++		dev_err(dev, "problem starting queue (%d)\n", ret);
++
++	return ret;
 +}
-+static SIMPLE_DEV_PM_OPS(locomo_gpio_pm,
-+		locomo_gpio_suspend, locomo_gpio_resume);
-+#define LOCOMO_GPIO_PM	(&locomo_gpio_pm)
++
++static SIMPLE_DEV_PM_OPS(locomo_spi_pm_ops,
++		locomo_spi_suspend, locomo_spi_resume);
++
++#define LOCOMO_SPI_PM_OPS	(&locomo_spi_pm_ops)
 +#else
-+#define LOCOMO_GPIO_PM	NULL
++#define LOCOMO_SPI_PM_OPS	NULL
 +#endif
 +
-+static int locomo_gpio_probe(struct platform_device *pdev)
++static int locomo_spi_probe(struct platform_device *pdev)
 +{
-+	struct locomo_gpio *lg;
-+	int ret;
-+	struct locomo_gpio_platform_data *pdata = dev_get_platdata(&pdev->dev);
++	struct spi_master *master;
++	struct locomospi_dev *spidev;
++	int ret = -ENODEV;
 +
-+	lg = devm_kzalloc(&pdev->dev, sizeof(struct locomo_gpio),
-+			GFP_KERNEL);
-+	if (!lg)
++	master = spi_alloc_master(&pdev->dev, sizeof(struct locomospi_dev));
++	if (!master)
 +		return -ENOMEM;
 +
-+	lg->regmap = dev_get_regmap(pdev->dev.parent, NULL);
-+	if (!lg->regmap)
-+		return -EINVAL;
++	master->bus_num = 0;
++	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_CS_HIGH;
++	master->bits_per_word_mask = SPI_BPW_RANGE_MASK(8, 8);
++	master->max_speed_hz = 24576000;
++	master->num_chipselect = 1;
++	master->set_cs = locomospi_chipselect;
++	master->transfer_one = locomospi_transfer_one;
 +
-+	platform_set_drvdata(pdev, lg);
++	spidev = spi_master_get_devdata(master);
 +
-+	regmap_write(lg->regmap, LOCOMO_GPO, 0x00);
-+	regmap_write(lg->regmap, LOCOMO_GPE, 0x00);
-+	regmap_write(lg->regmap, LOCOMO_GPD, 0x00);
-+	regmap_write(lg->regmap, LOCOMO_GIE, 0x00);
++	spidev->regmap = dev_get_regmap(pdev->dev.parent, NULL);
++	if (!spidev->regmap)
++		goto out_put;
 +
-+	lg->gpio.base = pdata ? pdata->gpio_base : -1;
-+	lg->gpio.label = "locomo-gpio";
-+	lg->gpio.ngpio = 16;
-+	lg->gpio.set = locomo_gpio_set;
-+	lg->gpio.get = locomo_gpio_get;
-+	lg->gpio.direction_input = locomo_gpio_direction_input;
-+	lg->gpio.direction_output = locomo_gpio_direction_output;
++	spidev->clock_div = DIV_1;
++	spidev->clock_base = CLOCK_25MHZ;
 +
-+	ret = gpiochip_add(&lg->gpio);
-+	if (ret)
-+		return ret;
++	platform_set_drvdata(pdev, master);
++
++	regmap_write(spidev->regmap, LOCOMO_SPIMD,
++			LOCOMO_SPIMD_MSB1ST | LOCOMO_SPIMD_DOSTAT |
++			LOCOMO_SPIMD_RCPOL | LOCOMO_SPIMD_TCPOL |
++			LOCOMO_SPIMD_XON);
++
++	regmap_write(spidev->regmap, LOCOMO_SPIMD,
++			LOCOMO_SPIMD_MSB1ST | LOCOMO_SPIMD_DOSTAT |
++			LOCOMO_SPIMD_RCPOL | LOCOMO_SPIMD_TCPOL |
++			LOCOMO_SPIMD_XON | LOCOMO_SPIMD_XEN |
++			(spidev->clock_base << 3) | spidev->clock_div);
++
++	regmap_write(spidev->regmap, LOCOMO_SPICT, LOCOMO_SPICT_CS |
++			LOCOMO_SPICT_CEN | LOCOMO_SPICT_RXUEN |
++			LOCOMO_SPICT_ALIGNEN);
++
++	ret = devm_spi_register_master(&pdev->dev, master);
++	if (ret) {
++		dev_err(&pdev->dev, "bitbang start failed with %d\n", ret);
++		goto out_put;
++	}
 +
 +	return 0;
++
++out_put:
++	spi_master_put(master);
++	return ret;
 +}
 +
-+static int locomo_gpio_remove(struct platform_device *pdev)
++static int locomo_spi_remove(struct platform_device *pdev)
 +{
-+	struct locomo_gpio *lg = platform_get_drvdata(pdev);
++	struct spi_master *master = platform_get_drvdata(pdev);
++	struct locomospi_dev *spidev = spi_master_get_devdata(master);
 +
-+	gpiochip_remove(&lg->gpio);
++	regmap_update_bits(spidev->regmap, LOCOMO_SPICT, LOCOMO_SPICT_CEN, 0);
++	regmap_update_bits(spidev->regmap, LOCOMO_SPIMD, LOCOMO_SPIMD_XEN, 0);
++	regmap_update_bits(spidev->regmap, LOCOMO_SPIMD, LOCOMO_SPIMD_XON, 0);
++	regmap_update_bits(spidev->regmap, LOCOMO_SPICT,
++			LOCOMO_SPICT_CS,
++			LOCOMO_SPICT_CS);
 +
 +	return 0;
 +}
 +
-+static struct platform_driver locomo_gpio_driver = {
-+	.probe		= locomo_gpio_probe,
-+	.remove		= locomo_gpio_remove,
-+	.driver		= {
-+		.name	= "locomo-gpio",
-+		.pm	= LOCOMO_GPIO_PM,
++static struct platform_driver locomo_spi_driver = {
++	.probe = locomo_spi_probe,
++	.remove = locomo_spi_remove,
++	.driver = {
++		.name = "locomo-spi",
++		.pm = LOCOMO_SPI_PM_OPS,
 +	},
 +};
-+module_platform_driver(locomo_gpio_driver);
++module_platform_driver(locomo_spi_driver);
 +
-+MODULE_DESCRIPTION("Sharp LoCoMo GPIO driver");
++MODULE_AUTHOR("Thomas Kunze thommy at tabao.de");
++MODULE_DESCRIPTION("LoCoMo SPI driver");
 +MODULE_LICENSE("GPL");
-+MODULE_AUTHOR("John Lenz <lenz@cs.wisc.edu>");
-+MODULE_ALIAS("platform:locomo-gpio");
++MODULE_ALIAS("platform:locomo-spi");
 -- 
 2.1.4
