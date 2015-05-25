@@ -1,64 +1,70 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 25 May 2015 09:53:46 +0900
-Subject: [PATCH] usb: renesas_usbhs: avoid uninitialized variable use
-In-Reply-To: <SG2PR06MB09192B9386F7E2BA5AF01D0ED8C00@SG2PR06MB0919.apcprd06.prod.outlook.com>
-References: <16028110.26u0uMKA2O@wuerfel>
- <SG2PR06MB09192B9386F7E2BA5AF01D0ED8C00@SG2PR06MB0919.apcprd06.prod.outlook.com>
-Message-ID: <20150525005346.GA24690@verge.net.au>
+Date: Mon, 25 May 2015 10:12:54 +0900
+Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable shmobile
+ r8a7778/bockw platform
+In-Reply-To: <20150304225522.GB2470@verge.net.au>
+References: <1425471261-25110-1-git-send-email-geert+renesas@glider.be>
+ <1425471261-25110-3-git-send-email-geert+renesas@glider.be>
+ <20150304225522.GB2470@verge.net.au>
+Message-ID: <20150525011253.GF24690@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 22, 2015 at 11:33:57AM +0000, Yoshihiro Shimoda wrote:
-> Hi Arnd,
-> 
-> > Sent: Friday, May 22, 2015 8:07 PM
-> > 
-> > After the renesas_usbhs driver is enabled in ARM multi_v7_defconfig,
-> > we now get a new warning:
-> > 
-> > renesas_usbhs/mod.c: In function 'usbhs_interrupt':
-> > renesas_usbhs/mod.c:246:7: warning: 'intenb1' may be used uninitialized in this function [-Wmaybe-uninitialized]
-> > 
-> > gcc correctly points to a problem here, for the case that the
-> > device is in host mode, we use the intenb1 variable without
-> > having assigned it first. The state->intsts1 has a similar
-> > problem, but gcc cannot know that.
-> > 
-> > This avoids the problem by initializing both sides of the
-> > comparison to zero when we don't read them from the respective
-> > registers.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Fixes: 88a25e02f3 ("usb: renesas_usbhs: Add access control for INTSTS1 and INTENB1 register")
-> 
-> Thank you very much for the patch!
-> 
-> Acked-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-> 
-> (I'm not sure why a toolchain I used (Linaro GCC 2014.11) doesn't show this warning...)
-> 
-> Best regards,
-> Yoshihiro Shimoda
+Hi Geert,
 
-Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
-
+On Thu, Mar 05, 2015 at 07:55:23AM +0900, Simon Horman wrote:
+> On Wed, Mar 04, 2015 at 01:14:21PM +0100, Geert Uytterhoeven wrote:
+> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 > 
-> > diff --git a/drivers/usb/renesas_usbhs/mod.c b/drivers/usb/renesas_usbhs/mod.c
-> > index e5ce6e6d4f51..d4be5d594896 100644
-> > --- a/drivers/usb/renesas_usbhs/mod.c
-> > +++ b/drivers/usb/renesas_usbhs/mod.c
-> > @@ -223,6 +223,8 @@ static int usbhs_status_get_each_irq(struct usbhs_priv *priv,
-> >  	if (usbhs_mod_is_host(priv)) {
-> >  		state->intsts1 = usbhs_read(priv, INTSTS1);
-> >  		intenb1 = usbhs_read(priv, INTENB1);
-> > +	} else {
-> > +		state->intsts1 = intenb1 = 0;
-> >  	}
+> Acked-by: Simon Horman <horms+renesas@verge.net.au>
+
+Quite some time has passed and during that time I have come to
+understand from Arnd that it is appropriate for me to take changes like
+this one.
+
+I have queued this up for 4.2 accordingly.
+
+> > ---
+> >   - Derived from r8a7778-bockw.dtb using
+> >     https://github.com/geertu/linux-scripts/blob/master/linux-config-from-dt
+> >   - Not tested on bockw due to lack of hardware
+> > ---
+> >  arch/arm/configs/multi_v7_defconfig | 3 +++
+> >  1 file changed, 3 insertions(+)
 > > 
-> >  	/* mask */
+> > diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> > index b7e6b6fba5e0f0d6..fa1ecbcfe08cb127 100644
+> > --- a/arch/arm/configs/multi_v7_defconfig
+> > +++ b/arch/arm/configs/multi_v7_defconfig
+> > @@ -67,6 +67,7 @@ CONFIG_ARCH_EMEV2=y
+> >  CONFIG_ARCH_R7S72100=y
+> >  CONFIG_ARCH_R8A73A4=y
+> >  CONFIG_ARCH_R8A7740=y
+> > +CONFIG_ARCH_R8A7778=y
+> >  CONFIG_ARCH_R8A7779=y
+> >  CONFIG_ARCH_R8A7790=y
+> >  CONFIG_ARCH_R8A7791=y
+> > @@ -377,6 +378,7 @@ CONFIG_V4L_MEM2MEM_DRIVERS=y
+> >  CONFIG_VIDEO_RENESAS_VSP1=m
+> >  # CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
+> >  CONFIG_VIDEO_ADV7180=m
+> > +CONFIG_VIDEO_ML86V7667=m
+> >  CONFIG_DRM=y
+> >  CONFIG_DRM_RCAR_DU=m
+> >  CONFIG_DRM_TEGRA=y
+> > @@ -493,6 +495,7 @@ CONFIG_RTC_DRV_TWL4030=y
+> >  CONFIG_RTC_DRV_TPS6586X=y
+> >  CONFIG_RTC_DRV_TPS65910=y
+> >  CONFIG_RTC_DRV_S35390A=m
+> > +CONFIG_RTC_DRV_RX8581=m
+> >  CONFIG_RTC_DRV_EM3027=y
+> >  CONFIG_RTC_DRV_PL031=y
+> >  CONFIG_RTC_DRV_VT8500=y
+> > -- 
+> > 1.9.1
 > > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
