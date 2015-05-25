@@ -1,44 +1,105 @@
-From: catalin.marinas@foss.arm.com (Catalin Marinas)
-Date: Tue, 26 May 2015 01:36:29 +0300
-Subject: [RFC PATCH 2/2] arm64: Implement vmalloc based thread_info
- allocator
-In-Reply-To: <5601369.jDWtB6nFJC@wuerfel>
-References: <1432483340-23157-1-git-send-email-jungseoklee85@gmail.com>
- <B873B881-4972-4524-B1D9-4BB05D7248A4@gmail.com>
- <F68D2983-226C-4704-A1E0-E79C9425B822@foss.arm.com>
- <5601369.jDWtB6nFJC@wuerfel>
-Message-ID: <1CD6E4BA-95AF-420C-8270-6AAF783B6F60@foss.arm.com>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Tue, 26 May 2015 00:48:19 +0200
+Subject: [PATCH 1/2] PCI: iproc: directly add pci resources
+In-Reply-To: <5563579E.80608@broadcom.com>
+References: <1432499823-27369-1-git-send-email-hauke@hauke-m.de>
+ <5563579E.80608@broadcom.com>
+Message-ID: <5563A6B3.2030600@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 May 2015, at 23:29, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 25 May 2015 19:47:15 Catalin Marinas wrote:
->> On 25 May 2015, at 13:01, Jungseok Lee <jungseoklee85@gmail.com> wrote:
->>>> Could the stack size be reduced to 8KB perhaps?
->>> 
->>> I guess probably not.
->>> 
->>> A commit, 845ad05e, says that 8KB is not enough to cover SpecWeb benchmark.
->> 
->> We could go back to 8KB stacks if we implement support for separate IRQ 
->> stack on arm64. It's not too complicated, we would have to use SP0 for (kernel) threads 
->> and SP1 for IRQ handlers.
+On 05/25/2015 07:10 PM, Ray Jui wrote:
+> Hi Hauke,
 > 
-> I think most architectures that see a lot of benchmarks have moved to
-> irqstacks at some point, that definitely sounds like a useful idea,
-> even if the implementation turns out to be a bit more tricky than
-> what you describe.
+> On 5/24/2015 1:37 PM, Hauke Mehrtens wrote:
+>> The resources member in the struct was pointing to a stack variable and
+>> is invalid after the the registration function returned. Remove this
+>> pointer and add it a a parameter to the function.
+>>
+>> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+>> ---
+>>  drivers/pci/host/pcie-iproc-bcma.c     | 4 +---
+>>  drivers/pci/host/pcie-iproc-platform.c | 4 +---
+>>  drivers/pci/host/pcie-iproc.c          | 4 ++--
+>>  drivers/pci/host/pcie-iproc.h          | 3 +--
+>>  4 files changed, 5 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/drivers/pci/host/pcie-iproc-bcma.c b/drivers/pci/host/pcie-iproc-bcma.c
+>> index c318f19..f96b39e 100644
+>> --- a/drivers/pci/host/pcie-iproc-bcma.c
+>> +++ b/drivers/pci/host/pcie-iproc-bcma.c
+>> @@ -62,11 +62,9 @@ static int iproc_pcie_bcma_probe(struct bcma_device *bdev)
+>>  	res_mem.flags = IORESOURCE_MEM;
+>>  	pci_add_resource(&res, &res_mem);
+>>  
+>> -	pcie->resources = &res;
+>> -
+>>  	pcie->map_irq = iproc_pcie_bcma_map_irq;
+>>  
+>> -	ret = iproc_pcie_setup(pcie);
+>> +	ret = iproc_pcie_setup(pcie, &res);
+>>  	if (ret) {
+>>  		dev_err(pcie->dev, "PCIe controller setup failed\n");
+>>  		return ret;
+>> diff --git a/drivers/pci/host/pcie-iproc-platform.c b/drivers/pci/host/pcie-iproc-platform.c
+>> index c8aa06f..c5fe4c1 100644
+>> --- a/drivers/pci/host/pcie-iproc-platform.c
+>> +++ b/drivers/pci/host/pcie-iproc-platform.c
+>> @@ -69,11 +69,9 @@ static int iproc_pcie_pltfm_probe(struct platform_device *pdev)
+>>  		return ret;
+>>  	}
+>>  
+>> -	pcie->resources = &res;
+>> -
+>>  	pcie->map_irq = of_irq_parse_and_map_pci;
+>>  
+>> -	ret = iproc_pcie_setup(pcie);
+>> +	ret = iproc_pcie_setup(pcie, &res);
+>>  	if (ret) {
+>>  		dev_err(pcie->dev, "PCIe controller setup failed\n");
+>>  		return ret;
+>> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
+>> index cef31f6..d77481e 100644
+>> --- a/drivers/pci/host/pcie-iproc.c
+>> +++ b/drivers/pci/host/pcie-iproc.c
+>> @@ -183,7 +183,7 @@ static void iproc_pcie_enable(struct iproc_pcie *pcie)
+>>  	writel(SYS_RC_INTX_MASK, pcie->base + SYS_RC_INTX_EN);
+>>  }
+>>  
+>> -int iproc_pcie_setup(struct iproc_pcie *pcie)
+>> +int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
+>>  {
+>>  	int ret;
+>>  	struct pci_bus *bus;
+>> @@ -211,7 +211,7 @@ int iproc_pcie_setup(struct iproc_pcie *pcie)
+>>  	pcie->sysdata.private_data = pcie;
+>>  
+>>  	bus = pci_create_root_bus(pcie->dev, 0, &iproc_pcie_ops,
+>> -				  &pcie->sysdata, pcie->resources);
+>> +				  &pcie->sysdata, res);
+>>  	if (!bus) {
+>>  		dev_err(pcie->dev, "unable to create PCI root bus\n");
+>>  		ret = -ENOMEM;
+>> diff --git a/drivers/pci/host/pcie-iproc.h b/drivers/pci/host/pcie-iproc.h
+>> index a333d4b..ba0a108 100644
+>> --- a/drivers/pci/host/pcie-iproc.h
+>> +++ b/drivers/pci/host/pcie-iproc.h
+>> @@ -29,7 +29,6 @@
+>>  struct iproc_pcie {
+>>  	struct device *dev;
+>>  	void __iomem *base;
+>> -	struct list_head *resources;
+> 
+> This means we do not want to keep a copy of the resources. In the
+> future, if we need to add support to explicitly set up the
+> inbound/outbound mapping window, we need to do it in iproc_pcie_setup.
+> Is that the intention?
 
-Of course, it's more complicated than just setting up two stacks (but I'm away for a 
-week and writing from a phone). We would need to deal with the initial per-CPU setup, 
-rescheduling following an IRQ, CPU on following power management and maybe 
-other issues. However, the architecture helps us a bit by allowing both SP0 and SP1 to be 
-used at EL1. 
+I haven't really thought about where to configure the memory mapping,
+but I thought it would be somewhere in iproc_pcie_setup() or an method
+called from there.
+If you need it after iproc_pcie_setup() finished we should embed the
+list into the struct iproc_pcie, because currently this pointer points
+to the stack.
 
-> There are a lot of workloads that would benefit from having lower
-> per-thread memory cost.
-
-If we keep the 16KB stack, is there any advantage in a separate IRQ one (assuming 
-that we won't overflow 16KB)?
-
-Catalin
+Hauke
