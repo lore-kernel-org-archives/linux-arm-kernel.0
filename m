@@ -1,45 +1,37 @@
 From: pavel@denx.de (Pavel Machek)
-Date: Mon, 25 May 2015 14:39:02 +0200
-Subject: [PATCH v4 2/2] ARM: socfpga: dts: add sdram controller dt
- binding doc
-In-Reply-To: <1432317735-29413-3-git-send-email-atull@opensource.altera.com>
+Date: Mon, 25 May 2015 14:41:33 +0200
+Subject: [PATCH v4 1/2] ARM: socfpga: support suspend to ram
+In-Reply-To: <1432317735-29413-2-git-send-email-atull@opensource.altera.com>
 References: <1432317735-29413-1-git-send-email-atull@opensource.altera.com>
- <1432317735-29413-3-git-send-email-atull@opensource.altera.com>
-Message-ID: <20150525123902.GE9943@amd>
+ <1432317735-29413-2-git-send-email-atull@opensource.altera.com>
+Message-ID: <20150525124133.GF9943@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2015-05-22 13:02:15, Alan Tull wrote:
-> Add binding doc for Altera SOCFPGA SDRAM controller.
-> 
-> Signed-off-by: Alan Tull <atull@opensource.altera.com>
-> ---
-> v4: Add bindings doc
-> ---
->  .../arm/altera/socfpga-sdram-controller.txt        |   12 ++++++++++++
->  1 file changed, 12 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram-controller.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-controller.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-controller.txt
-> new file mode 100644
-> index 0000000..77ca635
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-controller.txt
-> @@ -0,0 +1,12 @@
-> +Altera SOCFPGA SDRAM Controller
-> +
-> +Required properties:
-> +- compatible : Should contain "altr,sdr-ctl" and "syscon".
-> +  syscon is required by the Altera SOCFPGA SDRAM EDAC.
-> +- reg : Should contain 1 register range (address and length)
-> +
-> +Example:
-> +	sdr: sdr at ffc25000 {
-> +		compatible = "altr,sdr-ctl", "syscon";
+Hi!
 
-Is the syscon binding good idea? Should the EDAC driver be fixed to
-accept altr,sdr-ctl binding, instead?
-							Pavel
+> Suspend-to-RAM and EDAC support are mutually exclusive on SOCFPGA
+> platforms.  CONFIG_SOCFPGA_SUSPEND enables suspend-to-RAM and
+> prevents selecting CONFIG_EDAC_ALTERA_MC.
+
+Do we went to have the dependency at the .config time? We would like
+to do generic kernels booting on many machines, this kind of breaks
+that...
+
+> +	/*
+> +	 * This code assumes that the bootloader has already
+> +	 * properly configured the sdram controller:
+
+Which bootloaders can do that? 
+
+> +	 * sdr.ctrlcfg.lowpwreq.selfrfshmask = 3
+> +	 * sdr.ctrlcfg.lowpwrtiming.clkdisablecycles = 8
+> +	 * sdr.ctrlcfg.dramtiming4.selfrfshexit = 512
+
+Would it make sense to configure it in Linux?
+
+Thanks,
+									Pavel
 -- 
 (english) http://www.livejournal.com/~pavelmachek
 (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
