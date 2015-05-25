@@ -1,40 +1,53 @@
-From: cbz@baozis.org (Chen Baozi)
-Date: Mon, 25 May 2015 13:33:46 +0800
-Subject: Hibernation on ARM64
-In-Reply-To: <20150522110218.GC5623@red-moon>
-References: <CAMxMOAtMw3jnyrvn46m0ZeiwtWjRRZ-i21N5+riwn-3qei+szg@mail.gmail.com>
- <20150522110218.GC5623@red-moon>
-Message-ID: <20150525053346.GB17561@cbz-thinkpad>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 25 May 2015 08:43:38 +0300
+Subject: [PATCH] video: omap/h3: fix tps65010 dependency
+In-Reply-To: <4416278.oVFvT3Eyqf@wuerfel>
+References: <4416278.oVFvT3Eyqf@wuerfel>
+Message-ID: <5562B68A.6030608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
 
-On Fri, May 22, 2015 at 12:02:18PM +0100, Lorenzo Pieralisi wrote:
-> Hi Christian,
+
+On 22/05/15 17:22, Arnd Bergmann wrote:
+> The h3 LCD driver fails to link when tps65010 is configured
+> as a loadable module:
 > 
-> On Thu, May 21, 2015 at 07:34:06PM +0100, Christian S. Perone wrote:
-> > Hello, I haven't found any information, road map or something like
-> > that for the hibernation support for ARM64, does anyone knows if there
-> > is something planned to support this in near future ?
+> drivers/built-in.o: In function `h3_panel_disable':
+> debugfs.c:(.text+0x206ac): undefined reference to `tps65010_set_gpio_out_value'
+> debugfs.c:(.text+0x206cc): undefined reference to `tps65010_set_gpio_out_value'
+> drivers/built-in.o: In function `h3_panel_enable':
+> debugfs.c:(.text+0x206e0): undefined reference to `tps65010_set_gpio_out_value'
+> debugfs.c:(.text+0x20704): undefined reference to `tps65010_set_gpio_out_value'
 > 
-> Adding arch support for hibernation to arm64 should be fairly simple,
-> it is not top priority at the moment simply because there are not
-> compelling use-cases (on the PM side most features revolve around
-> CPUidle and suspend-to-idle and S2R).
+> This clarifies the dependency so we can only select it if
+> the dependnecy is built-in.
 > 
-> To answer your question, yes I have planned to support it, I just
-> do not want to add it to the kernel for no particular reason, if there
-> are compelling requirements (I guess you are asking for a specific
-> reason) it can be done fairly quickly.
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> diff --git a/drivers/video/fbdev/omap/Kconfig b/drivers/video/fbdev/omap/Kconfig
+> index 18c4cb0d5690..29d250da8a3e 100644
+> --- a/drivers/video/fbdev/omap/Kconfig
+> +++ b/drivers/video/fbdev/omap/Kconfig
+> @@ -42,7 +42,7 @@ config FB_OMAP_LCD_MIPID
+>  config FB_OMAP_LCD_H3
+>  	bool "TPS65010 LCD controller on OMAP-H3"
+>  	depends on MACH_OMAP_H3
+> -	depends on TPS65010
+> +	depends on TPS65010=y
+>  	default y
+>  	help
+>  	  Say Y here if you want to have support for the LCD on the
 > 
 
-I am also looking forward the hibernation support on arm64. Thanks for
-the information.
+Thanks, queued for 4.2.
 
-Could you please CCed me the hiberation patches when you send them to
-list. I can help test it. :-)
+ Tomi
 
-Cheers,
-
-Baozi.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150525/e9ff5ed6/attachment.sig>
