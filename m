@@ -1,54 +1,34 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Mon, 25 May 2015 13:00:41 +0200
-Subject: [PATCH 2/2] pinctrl: dt-binding: Extend meson documentation with GPIO
- IRQs support
-In-Reply-To: <1432551641-3256-1-git-send-email-carlo@caione.org>
-References: <1432551641-3256-1-git-send-email-carlo@caione.org>
-Message-ID: <1432551641-3256-3-git-send-email-carlo@caione.org>
+Date: Mon, 25 May 2015 13:00:39 +0200
+Subject: [PATCH 0/2] pinctrl: Enable support for external GPIO interrupts
+Message-ID: <1432551641-3256-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Beniamino Galvani <b.galvani@gmail.com>
+From: Carlo Caione <carlo@endlessm.com>
 
-Extend the pinctrl binding documentation with the support for external
-GPIO interrupts.
+In Meson SoCs we have 8 independent GPIO interrupts that can be programmed to
+use any of the GPIOs in the chip as interrupt source.
 
-Signed-off-by: Carlo Caione <carlo@endlessm.com>
-Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
----
- Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+These GPIOs are managed by GIC but they can be conditioned (and enabled) by
+some registers external to the GIC.
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
-index 3f6a524..56743eb 100644
---- a/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
-@@ -3,6 +3,12 @@
- Required properties for the root node:
-  - compatible: "amlogic,meson8-pinctrl" or "amlogic,meson8b-pinctrl"
-  - reg: address and size of registers controlling irq functionality
-+ - reg-names: should be "irq"
-+ - interrupt-controller: marks the device node as an interrupt controller
-+ - #interrupt-cells: should be 2. The first cell is the GPIO number. The
-+		     second cell is used to specify trigger type.
-+ - interrupts: specifies the GPIO IRQ numbers on the GIC (GPIO_IRQ#)
-+ - interrupt-parent: specifies the parent interrupt controller.
- 
- === GPIO sub-nodes ===
- 
-@@ -46,7 +52,13 @@ pinctrl-bindings.txt
- 
- 	pinctrl: pinctrl at c1109880 {
- 		compatible = "amlogic,meson8-pinctrl";
-+		reg-names = "irq";
- 		reg = <0xc1109880 0x10>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 64 1>, <0 65 1>, <0 66 1>, <0 67 1>,
-+			     <0 68 1>, <0 69 1>, <0 70 1>, <0 71 1>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 		ranges;
+GPIOs |--[mux1 or mux2]--[polarity]--[filter]--[edge_select]--> GIC
+
+The original work has been done by Beniamino. I cleaned it up, fixed a couple
+of bugs, added support for Meson8b and the fix for the .to_irq hook.
+
+Beniamino Galvani (2):
+  pinctrl: meson: Enable GPIO IRQs
+  pinctrl: dt-binding: Extend meson documentation with GPIO IRQs support
+
+ .../devicetree/bindings/pinctrl/meson,pinctrl.txt  |  12 +
+ drivers/pinctrl/Kconfig                            |   1 +
+ drivers/pinctrl/meson/pinctrl-meson.c              | 254 +++++++++++++++++++++
+ drivers/pinctrl/meson/pinctrl-meson.h              |  18 +-
+ drivers/pinctrl/meson/pinctrl-meson8.c             |  36 +--
+ drivers/pinctrl/meson/pinctrl-meson8b.c            |  36 +--
+ 6 files changed, 326 insertions(+), 31 deletions(-)
+
 -- 
 1.9.1
