@@ -1,83 +1,118 @@
-From: minchan@kernel.org (Minchan Kim)
-Date: Mon, 25 May 2015 23:58:57 +0900
-Subject: [RFC PATCH 2/2] arm64: Implement vmalloc based thread_info
- allocator
-In-Reply-To: <B873B881-4972-4524-B1D9-4BB05D7248A4@gmail.com>
-References: <1432483340-23157-1-git-send-email-jungseoklee85@gmail.com>
- <5992243.NYDGjLH37z@wuerfel>
- <B873B881-4972-4524-B1D9-4BB05D7248A4@gmail.com>
-Message-ID: <20150525145857.GF14922@blaptop>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 25 May 2015 18:00:05 +0300
+Subject: [PATCHv3 00/27] ARM: OMAP2+: clock code move under clk driver
+Message-ID: <1432566032-10860-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 25, 2015 at 07:01:33PM +0900, Jungseok Lee wrote:
-> On May 25, 2015, at 2:49 AM, Arnd Bergmann wrote:
-> > On Monday 25 May 2015 01:02:20 Jungseok Lee wrote:
-> >> Fork-routine sometimes fails to get a physically contiguous region for
-> >> thread_info on 4KB page system although free memory is enough. That is,
-> >> a physically contiguous region, which is currently 16KB, is not available
-> >> since system memory is fragmented.
-> >> 
-> >> This patch tries to solve the problem as allocating thread_info memory
-> >> from vmalloc space, not 1:1 mapping one. The downside is one additional
-> >> page allocation in case of vmalloc. However, vmalloc space is large enough,
-> >> around 240GB, under a combination of 39-bit VA and 4KB page. Thus, it is
-> >> not a big tradeoff for fork-routine service.
-> > 
-> > vmalloc has a rather large runtime cost. I'd argue that failing to allocate
-> > thread_info structures means something has gone very wrong.
-> 
-> That is why the feature is marked "N" by default.
-> I focused on fork-routine stability rather than performance.
+Hi,
 
-If VM has trouble with order-2 allocation, your system would be
-trouble soon although fork at the moment manages to be successful
-because such small high-order(ex, order <= PAGE_ALLOC_COSTLY_ORDER)
-allocation is common in the kernel so VM should handle it smoothly.
-If VM didn't, it means we should fix VM itself, not a specific
-allocation site. Fork is one of victim by that.
+As requested, posting v3 with somewhat changed diff parameters and
+diffstat attached. Just some minor Makefile changes compared to v2,
+these were discussed under that set.
 
-> 
-> Could you give me an idea how to evaluate performance degradation?
-> Running some benchmarks would be helpful, but I would like to try to
-> gather data based on meaningful methodology.
-> 
-> > Can you describe the scenario that leads to fragmentation this bad?
-> 
-> Android, but I could not describe an exact reproduction procedure step
-> by step since it's behaved and reproduced randomly. As reading the following
-> thread from mm mailing list, a similar symptom is observed on other systems. 
-> 
-> https://lkml.org/lkml/2015/4/28/59
-> 
-> Although I do not know the details of a system mentioned in the thread,
-> even order-2 page allocation is not smoothly operated due to fragmentation on
-> low memory system.
+Set has been pushed to:
+- tree: https://github.com/t-kristo/linux-pm.git
+- branch: for-4.2/ti-clk-move
 
-What Joonsoo have tackle is generic fragmentation problem, not *a* fork fail,
-which is more right approach to handle small high-order allocation problem.
+Previous testing results still valid for this branch.
 
-> 
-> I think the point is *low memory system*. 64-bit kernel is usually a feasible
-> option when system memory is enough, but 64-bit kernel and low memory system
-> combo is not unusual in case of ARM64.
-> 
-> > Could the stack size be reduced to 8KB perhaps?
-> 
-> I guess probably not.
-> 
-> A commit, 845ad05e, says that 8KB is not enough to cover SpecWeb benchmark.
-> The stack size is 16KB on x86_64. I am not sure whether all applications,
-> which work fine on x86_64 machine, run very well on ARM64 with 8KB stack size.
-> 
-> Best Regards
-> Jungseok Lee
-> --
-> To unsubscribe, send a message with 'unsubscribe linux-mm' in
-> the body to majordomo at kvack.org.  For more info on Linux MM,
-> see: http://www.linux-mm.org/ .
-> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+-Tero
+
+Tero Kristo (27):
+  ARM: OMAP2+: clock: export driver API to setup/get clock features
+  clk: ti: move generic OMAP DPLL implementation under drivers/clk
+  clk: ti: move OMAP4+ DPLL implementation under drivers/clk
+  clk: ti: move interface clock implementation under drivers/clk
+  ARM: OMAP3: dpll3-m2: get rid of obsolete clksel access
+  ARM: OMAP2+: clk: remove obsolete clksel support code
+  ARM: OMAP2+: clock: remove clock_common_data.c file
+  ARM: OMAP36xx: remove clock36xx.c/.h files
+  clk: ti: autoidle: move generic autoidle handling code to clock
+    driver
+  clk: ti: move omap2_clk_enable_init_clocks under clock driver
+  ARM: OMAP2+: clock: remove support for legacy mpurate command line
+    param
+  ARM: OMAP2+: clock: add support for clkdm ops to the low level clk
+    ops
+  ARM: OMAP2+: clock: add support for specific CM ops to ti_clk_ll_ops
+  clk: ti: dpll: move omap3 DPLL functionality to clock driver
+  ARM: OMAP3: clock: remove clock3xxx.c file
+  ARM: OMAP2+: clock: remove clkdm_control static boolean from code
+  clk: ti: dflt: move support for default gate clock to clock driver
+  clk: ti: omap2430: move clock support code under clock driver
+  clk: ti: clkdm: move clkdm gate clock support code to clock driver
+  clk: ti: omap34xx: move omap34xx clock type support code to clock
+    driver
+  ARM: OMAP4: clock: remove clock44xx.h header
+  clk: ti: am3517: move remaining am3517 clock support code to clock
+    driver
+  clk: ti: move some public definitions to private header
+  ARM: OMAP2+: clock: remove dead definitions from the clock header
+    file
+  clk: ti: remove exported ll_ops struct, instead add an API for
+    registration
+  ARM: OMAP2+: clock: remove legacy omap2_clk_readl/writel APIs
+  clk: ti: move low-level access and init code under clock driver
+
+ arch/arm/mach-omap2/Makefile                       |   22 +-
+ arch/arm/mach-omap2/clkt34xx_dpll3m2.c             |    7 +-
+ arch/arm/mach-omap2/clkt_clksel.c                  |  466 --------------
+ arch/arm/mach-omap2/clkt_iclk.c                    |   68 --
+ arch/arm/mach-omap2/clock.c                        |  675 +-------------------
+ arch/arm/mach-omap2/clock.h                        |  205 +-----
+ arch/arm/mach-omap2/clock2430.c                    |   57 --
+ arch/arm/mach-omap2/clock2xxx.c                    |   57 --
+ arch/arm/mach-omap2/clock34xx.c                    |  138 ----
+ arch/arm/mach-omap2/clock34xx.h                    |   18 -
+ arch/arm/mach-omap2/clock3517.c                    |  118 ----
+ arch/arm/mach-omap2/clock3517.h                    |   14 -
+ arch/arm/mach-omap2/clock36xx.c                    |   69 --
+ arch/arm/mach-omap2/clock36xx.h                    |   13 -
+ arch/arm/mach-omap2/clock3xxx.c                    |  135 ----
+ arch/arm/mach-omap2/clock44xx.h                    |   20 -
+ arch/arm/mach-omap2/clock_common_data.c            |  115 ----
+ arch/arm/mach-omap2/io.c                           |    3 +-
+ drivers/clk/ti/Makefile                            |   10 +-
+ drivers/clk/ti/apll.c                              |    2 +
+ drivers/clk/ti/autoidle.c                          |  121 +++-
+ drivers/clk/ti/clk-2xxx.c                          |    2 +
+ drivers/clk/ti/clk-33xx.c                          |    2 +
+ drivers/clk/ti/clk-3xxx.c                          |  244 +++++++
+ drivers/clk/ti/clk-43xx.c                          |    2 +
+ drivers/clk/ti/clk-44xx.c                          |    2 +
+ drivers/clk/ti/clk-54xx.c                          |    2 +
+ drivers/clk/ti/clk-7xx.c                           |    3 +-
+ drivers/clk/ti/clk-816x.c                          |    2 +
+ drivers/clk/ti/clk.c                               |  145 ++++-
+ drivers/clk/ti/clkt_dflt.c                         |  316 +++++++++
+ .../arm/mach-omap2 => drivers/clk/ti}/clkt_dpll.c  |   27 +-
+ drivers/clk/ti/clkt_iclk.c                         |  101 +++
+ drivers/clk/ti/clock.h                             |  113 ++++
+ drivers/clk/ti/clockdomain.c                       |   78 +++
+ {arch/arm/mach-omap2 => drivers/clk/ti}/dpll3xxx.c |  157 ++---
+ {arch/arm/mach-omap2 => drivers/clk/ti}/dpll44xx.c |   23 +-
+ drivers/clk/ti/fixed-factor.c                      |    2 +
+ include/linux/clk/ti.h                             |  157 ++---
+ 39 files changed, 1324 insertions(+), 2387 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/clkt_clksel.c
+ delete mode 100644 arch/arm/mach-omap2/clkt_iclk.c
+ delete mode 100644 arch/arm/mach-omap2/clock2430.c
+ delete mode 100644 arch/arm/mach-omap2/clock2xxx.c
+ delete mode 100644 arch/arm/mach-omap2/clock34xx.c
+ delete mode 100644 arch/arm/mach-omap2/clock34xx.h
+ delete mode 100644 arch/arm/mach-omap2/clock3517.c
+ delete mode 100644 arch/arm/mach-omap2/clock3517.h
+ delete mode 100644 arch/arm/mach-omap2/clock36xx.c
+ delete mode 100644 arch/arm/mach-omap2/clock36xx.h
+ delete mode 100644 arch/arm/mach-omap2/clock3xxx.c
+ delete mode 100644 arch/arm/mach-omap2/clock44xx.h
+ delete mode 100644 arch/arm/mach-omap2/clock_common_data.c
+ create mode 100644 drivers/clk/ti/clkt_dflt.c
+ rename {arch/arm/mach-omap2 => drivers/clk/ti}/clkt_dpll.c (94%)
+ create mode 100644 drivers/clk/ti/clkt_iclk.c
+ rename {arch/arm/mach-omap2 => drivers/clk/ti}/dpll3xxx.c (84%)
+ rename {arch/arm/mach-omap2 => drivers/clk/ti}/dpll44xx.c (91%)
 
 -- 
-Kind regards,
-Minchan Kim
+1.7.9.5
