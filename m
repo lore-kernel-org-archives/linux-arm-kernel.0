@@ -1,112 +1,29 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Mon, 25 May 2015 10:10:54 -0700
-Subject: [PATCH 1/2] PCI: iproc: directly add pci resources
-In-Reply-To: <1432499823-27369-1-git-send-email-hauke@hauke-m.de>
-References: <1432499823-27369-1-git-send-email-hauke@hauke-m.de>
-Message-ID: <5563579E.80608@broadcom.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 25 May 2015 18:18:46 +0100
+Subject: [PATCH 01/21] regulator: core: Reduce critical area in
+ _regulator_get
+In-Reply-To: <1432565608-26036-2-git-send-email-tomeu.vizoso@collabora.com>
+References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1432565608-26036-2-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <20150525171846.GD21577@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hauke,
+On Mon, May 25, 2015 at 04:53:05PM +0200, Tomeu Vizoso wrote:
+> ...by moving the locking to regulator_dev_lookup.
 
-On 5/24/2015 1:37 PM, Hauke Mehrtens wrote:
-> The resources member in the struct was pointing to a stack variable and
-> is invalid after the the registration function returned. Remove this
-> pointer and add it a a parameter to the function.
-> 
-> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
-> ---
->  drivers/pci/host/pcie-iproc-bcma.c     | 4 +---
->  drivers/pci/host/pcie-iproc-platform.c | 4 +---
->  drivers/pci/host/pcie-iproc.c          | 4 ++--
->  drivers/pci/host/pcie-iproc.h          | 3 +--
->  4 files changed, 5 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pcie-iproc-bcma.c b/drivers/pci/host/pcie-iproc-bcma.c
-> index c318f19..f96b39e 100644
-> --- a/drivers/pci/host/pcie-iproc-bcma.c
-> +++ b/drivers/pci/host/pcie-iproc-bcma.c
-> @@ -62,11 +62,9 @@ static int iproc_pcie_bcma_probe(struct bcma_device *bdev)
->  	res_mem.flags = IORESOURCE_MEM;
->  	pci_add_resource(&res, &res_mem);
->  
-> -	pcie->resources = &res;
-> -
->  	pcie->map_irq = iproc_pcie_bcma_map_irq;
->  
-> -	ret = iproc_pcie_setup(pcie);
-> +	ret = iproc_pcie_setup(pcie, &res);
->  	if (ret) {
->  		dev_err(pcie->dev, "PCIe controller setup failed\n");
->  		return ret;
-> diff --git a/drivers/pci/host/pcie-iproc-platform.c b/drivers/pci/host/pcie-iproc-platform.c
-> index c8aa06f..c5fe4c1 100644
-> --- a/drivers/pci/host/pcie-iproc-platform.c
-> +++ b/drivers/pci/host/pcie-iproc-platform.c
-> @@ -69,11 +69,9 @@ static int iproc_pcie_pltfm_probe(struct platform_device *pdev)
->  		return ret;
->  	}
->  
-> -	pcie->resources = &res;
-> -
->  	pcie->map_irq = of_irq_parse_and_map_pci;
->  
-> -	ret = iproc_pcie_setup(pcie);
-> +	ret = iproc_pcie_setup(pcie, &res);
->  	if (ret) {
->  		dev_err(pcie->dev, "PCIe controller setup failed\n");
->  		return ret;
-> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
-> index cef31f6..d77481e 100644
-> --- a/drivers/pci/host/pcie-iproc.c
-> +++ b/drivers/pci/host/pcie-iproc.c
-> @@ -183,7 +183,7 @@ static void iproc_pcie_enable(struct iproc_pcie *pcie)
->  	writel(SYS_RC_INTX_MASK, pcie->base + SYS_RC_INTX_EN);
->  }
->  
-> -int iproc_pcie_setup(struct iproc_pcie *pcie)
-> +int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
->  {
->  	int ret;
->  	struct pci_bus *bus;
-> @@ -211,7 +211,7 @@ int iproc_pcie_setup(struct iproc_pcie *pcie)
->  	pcie->sysdata.private_data = pcie;
->  
->  	bus = pci_create_root_bus(pcie->dev, 0, &iproc_pcie_ops,
-> -				  &pcie->sysdata, pcie->resources);
-> +				  &pcie->sysdata, res);
->  	if (!bus) {
->  		dev_err(pcie->dev, "unable to create PCI root bus\n");
->  		ret = -ENOMEM;
-> diff --git a/drivers/pci/host/pcie-iproc.h b/drivers/pci/host/pcie-iproc.h
-> index a333d4b..ba0a108 100644
-> --- a/drivers/pci/host/pcie-iproc.h
-> +++ b/drivers/pci/host/pcie-iproc.h
-> @@ -29,7 +29,6 @@
->  struct iproc_pcie {
->  	struct device *dev;
->  	void __iomem *base;
-> -	struct list_head *resources;
+I appear to have only patches 1 and 10 of a 21 patch series.  It is
+difficult to tell what the series might be about or how any of the
+patches in it might be related to each other, it doesn't look like the
+sort of obviously repetitive series which is easily understandable.
+Please don't do things like this, if you're sending a series people need
+to be able to tell what it is.
 
-This means we do not want to keep a copy of the resources. In the
-future, if we need to add support to explicitly set up the
-inbound/outbound mapping window, we need to do it in iproc_pcie_setup.
-Is that the intention?
-
-Thanks,
-
-Ray
-
->  	struct pci_sys_data sysdata;
->  	struct pci_bus *root_bus;
->  	struct phy *phy;
-> @@ -37,7 +36,7 @@ struct iproc_pcie {
->  	int (*map_irq)(const struct pci_dev *, u8, u8);
->  };
->  
-> -int iproc_pcie_setup(struct iproc_pcie *pcie);
-> +int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res);
->  int iproc_pcie_remove(struct iproc_pcie *pcie);
->  
->  #endif /* _PCIE_IPROC_H */
-> 
+What's going on here?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150525/7b62f9b0/attachment-0001.sig>
