@@ -1,56 +1,31 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 25 May 2015 16:19:29 +0800
-Subject: [PATCH v2 1/2] ARM: imx: enable smp for i.MX7D
-In-Reply-To: <1432147961-3547-1-git-send-email-Frank.Li@freescale.com>
-References: <1432147961-3547-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20150525081928.GK3264@dragon>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 25 May 2015 10:24:07 +0200
+Subject: [RESEND PATCH v1 2/2] drm: bridge/dw_hdmi-i2s-audio: add audio
+ driver
+In-Reply-To: <1432307696-7806-1-git-send-email-ykk@rock-chips.com>
+References: <1432307631-7667-1-git-send-email-ykk@rock-chips.com>
+ <1432307696-7806-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1432542247.27695.137.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 21, 2015 at 02:52:40AM +0800, Frank.Li at freescale.com wrote:
-> From: Frank Li <Frank.Li@freescale.com>
-> 
-> i.MX7D have two cores.
-> enable multicore support.
-> enable cpu hotplug support.
-> 
-> Signed-off-by: Frank Li <Frank.Li@freescale.com>
-> Signed-off-by: Anson Huang <b20788@freescale.com>
-> ---
-> 
-> This patch is based on Russel king's
-> ARM: v7 setup function should invalidate L1 cache
+Just a nit: a license mismatch.
 
-So we will need to wait for Russell's patch to land on mainline first.
+On Fri, 2015-05-22 at 10:14 -0500, Yakir Yang wrote:
+> --- /dev/null
+> +++ b/drivers/gpu/drm/bridge/dw_hdmi-i2s-audio.c
 
-> 
-> Change from V1 to V2
->  - base on ARM: v7 setup function should invalidate L1 cache
->  - remove unused define in gpcv2.c
->  - change name imx_gpcv2_set_core1_pdn_pup_by_software to imx_gpcv2_set_core1_power
->  - add timeout check.
->  - Change to BUG_ON
->  - Change use enable-method
-> 
->  arch/arm/mach-imx/Kconfig      |  6 ++++
->  arch/arm/mach-imx/Makefile     |  1 +
->  arch/arm/mach-imx/common.h     |  4 +++
->  arch/arm/mach-imx/gpcv2.c      | 67 ++++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-imx/hotplug.c    | 18 ++++++++++++
->  arch/arm/mach-imx/mach-imx7d.c |  1 +
->  arch/arm/mach-imx/platsmp.c    | 18 ++++++++++++
->  arch/arm/mach-imx/src.c        | 35 ++++++++++++++++++++--
->  8 files changed, 147 insertions(+), 3 deletions(-)
->  create mode 100644 arch/arm/mach-imx/gpcv2.c
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
 
-Honestly, I do not like the software version numbering which is quite
-arbitrary and may conflict with hardware one some day.
+This states the license is GPL v2.
 
-More importantly, is i.MX7 GPC block really so different from i.MX6 one
-and worth a new driver for it?  If you check the latest GPC driver, you
-will find that it evolves a lot recently and becomes a driver handles
-not only core power but also PU power domains, and also we have
-implemented stacked IRQ domain for it.   Are you going to redo all these
-for this gpcv2 driver?
+> +MODULE_LICENSE("GPL");
 
-Shawn
+And, according to include/linux/module.h, this states the license is GPL
+v2 or later. So I think that either the comment at the top of this file
+or the ident used in the MODULE_LICENSE() macro should change.
+
+
+Paul Bolle
