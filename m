@@ -1,47 +1,49 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Mon, 25 May 2015 21:06:42 +0200
-Subject: [PATCH] clockevents: don't suspend/resume if unused
-In-Reply-To: <alpine.DEB.2.11.1505252046400.5457@nanos>
-References: <1421399151-26800-1-git-send-email-alexandre.belloni@free-electrons.com>
- <alpine.DEB.2.11.1505252046400.5457@nanos>
-Message-ID: <20150525190641.GA7542@gradator.net>
+From: shailendra.capricorn@gmail.com (Shailendra Verma)
+Date: Tue, 26 May 2015 01:11:03 +0530
+Subject: [PATCH] char:xilinx_hwicap:buffer_icap - change 1/0 to true/false for
+ bool type variable in function buffer_icap_set_configuration().
+Message-ID: <1432582863-5012-1-git-send-email-shailendra.capricorn@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Thomas,
+The variable dirty is bool type. Hence assign the variable with
+bool value true/false instead of 1/0.
 
-On Mon, May 25, 2015 at 08:48:06PM +0200, Thomas Gleixner wrote:
-> On Fri, 16 Jan 2015, Alexandre Belloni wrote:
-> 
-> > There is no point in calling suspend/resume for unused
-> > clockevents as they are already stopped and disabled.
-> > 
-> > Furthermore, it can take some time to wait for some IPs to stop counting.
-> 
-> While I agree with the patch itself, I really can't understand that
-> last sentence.
-> 
-> If stuff is stopped and disabled, what takes time to stop counting?
+Signed-off-by: Shailendra Verma <shailendra.capricorn@gmail.com>
+---
+ drivers/char/xilinx_hwicap/buffer_icap.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Atmel PIT is a bit weird, writing to AT91_PIT_MR restarts the timer even 
-if you just want to stop it and then the only way to stop the timer is 
-to wait for a complete timer cycle.
-
-The problem is not when suspending, restarting the timer just before 
-suspending is not such a problem because is will eventually stop at 
-some point in the future.
-
-However it can takes a very long time if the system switchs to slow 
-clock, therefore when resuming the timer is still running and we have to 
-wait for the PIT to stop counting because we re-enabled it for one cycle 
-when suspending, which is weird, it adds about ~128ms resumt time for 
-Atmel SoC.
-
-The previous proposed patch was to do nothing in PIT suspend and resume 
-callbacks if PIT is unused[1], which fixed the PIT problem, but we 
-decided to put the condition in the upper level because other drivers 
-might be interested too.
-
-Sylvain
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/311496.html
+diff --git a/drivers/char/xilinx_hwicap/buffer_icap.c b/drivers/char/xilinx_hwicap/buffer_icap.c
+index 05d8977..53c3882 100644
+--- a/drivers/char/xilinx_hwicap/buffer_icap.c
++++ b/drivers/char/xilinx_hwicap/buffer_icap.c
+@@ -270,7 +270,7 @@ int buffer_icap_set_configuration(struct hwicap_drvdata *drvdata, u32 *data,
+ 	int status;
+ 	s32 buffer_count = 0;
+ 	s32 num_writes = 0;
+-	bool dirty = 0;
++	bool dirty = false;
+ 	u32 i;
+ 	void __iomem *base_address = drvdata->base_address;
+ 
+@@ -279,7 +279,7 @@ int buffer_icap_set_configuration(struct hwicap_drvdata *drvdata, u32 *data,
+ 
+ 		/* Copy data to bram */
+ 		buffer_icap_set_bram(base_address, buffer_count, data[i]);
+-		dirty = 1;
++		dirty = true;
+ 
+ 		if (buffer_count < XHI_MAX_BUFFER_INTS - 1) {
+ 			buffer_count++;
+@@ -299,7 +299,7 @@ int buffer_icap_set_configuration(struct hwicap_drvdata *drvdata, u32 *data,
+ 
+ 		buffer_count = 0;
+ 		num_writes++;
+-		dirty = 0;
++		dirty = false;
+ 	}
+ 
+ 	/* Write unwritten data to ICAP */
+-- 
+1.7.9.5
