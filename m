@@ -1,34 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 25 May 2015 22:29:40 +0200
-Subject: [RFC PATCH 2/2] arm64: Implement vmalloc based thread_info
- allocator
-In-Reply-To: <F68D2983-226C-4704-A1E0-E79C9425B822@foss.arm.com>
-References: <1432483340-23157-1-git-send-email-jungseoklee85@gmail.com>
- <B873B881-4972-4524-B1D9-4BB05D7248A4@gmail.com>
- <F68D2983-226C-4704-A1E0-E79C9425B822@foss.arm.com>
-Message-ID: <5601369.jDWtB6nFJC@wuerfel>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Mon, 25 May 2015 22:53:59 +0200
+Subject: [PATCH] clockevents: don't suspend/resume if unused
+In-Reply-To: <alpine.DEB.2.11.1505252208140.5457@nanos>
+References: <1421399151-26800-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <alpine.DEB.2.11.1505252046400.5457@nanos>
+ <20150525190641.GA7542@gradator.net>
+ <alpine.DEB.2.11.1505252208140.5457@nanos>
+Message-ID: <20150525205359.GA9302@gradator.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 May 2015 19:47:15 Catalin Marinas wrote:
-> On 25 May 2015, at 13:01, Jungseok Lee <jungseoklee85@gmail.com> wrote:
+Hello Thomas,
+
+On Mon, May 25, 2015 at 10:11:15PM +0200, Thomas Gleixner wrote:
+>  
+> That's a reasonable explanation.
 > 
-> >> Could the stack size be reduced to 8KB perhaps?
-> > 
-> > I guess probably not.
-> > 
-> > A commit, 845ad05e, says that 8KB is not enough to cover SpecWeb benchmark.
-> 
-> We could go back to 8KB stacks if we implement support for separate IRQ 
-> stack on arm64. It's not too complicated, we would have to use SP0 for (kernel) threads 
-> and SP1 for IRQ handlers.
+> While timer IPs seem to be designed by janitors in general, this one
+> has an extraordinary level of stupidity.
 
-I think most architectures that see a lot of benchmarks have moved to
-irqstacks at some point, that definitely sounds like a useful idea,
-even if the implementation turns out to be a bit more tricky than
-what you describe.
+Yes, that's quite a stupid design, however I wasn't totally right from 
+looking at the datasheet again, the timer does not restart when asked to 
+stop while it is already stopped, my bad. But it doesn't change 
+anything, the issue is still that this timer cannot be stopped right 
+now, you have to ask for it to stop then wait the overflow.
 
-There are a lot of workloads that would benefit from having lower
-per-thread memory cost.
+1. suspend PIT[1] -> ask to stop
 
-	Arnd
+2. suspended, timer is still counting and will eventually reaches the 
+overflow condition then stop, that's probably not going to happen if 
+system switched to slow clock
+
+3. resume PIT[2] -> wait for PIT to stop counting (up to 126ms) because 
+we need it to be synched back if we want to use it at some point in the 
+future, that's also the only way to clear pending interrupts.
+
+Sylvain
+
+
+[1] http://lxr.free-electrons.com/source/drivers/clocksource/timer-atmel-pit.c#L122
+[2] http://lxr.free-electrons.com/source/drivers/clocksource/timer-atmel-pit.c#L130
