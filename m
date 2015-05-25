@@ -1,50 +1,39 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 25 May 2015 15:39:05 +0800
-Subject: [PATCH v4 6/6] arm: dts: imx6sx: enable snvs power key
-In-Reply-To: <1432305399-30571-7-git-send-email-Frank.Li@freescale.com>
-References: <1432305399-30571-1-git-send-email-Frank.Li@freescale.com>
- <1432305399-30571-7-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20150525073904.GJ3264@dragon>
+From: ivan.ivanov@linaro.org (Ivan T. Ivanov)
+Date: Mon, 25 May 2015 11:15:17 +0300
+Subject: [PATCH v2] coresight-etm3x: Add Qualcomm PTM v1.1 peripheral ID
+Message-ID: <1432541717-32211-1-git-send-email-ivan.ivanov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 22, 2015 at 10:36:39PM +0800, Frank.Li at freescale.com wrote:
-> From: Frank Li <Frank.Li@freescale.com>
-> 
-> enable snvs ONOFF power key support
-> 
-> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+Add Qualcomm's PTM v1.1 peripheral ID to supported devices.
+This device could be found at least in MSM8974 and APQ8064
+chipsets.
 
-Please use 'ARM: dts: imx6sx: ...' for the patch subject.
+Signed-off-by: Ivan T. Ivanov <ivan.ivanov@linaro.org>
+---
 
-> ---
->  arch/arm/boot/dts/imx6sx.dtsi | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-> index 3cb3b5b..ad38aea 100644
-> --- a/arch/arm/boot/dts/imx6sx.dtsi
-> +++ b/arch/arm/boot/dts/imx6sx.dtsi
-> @@ -677,6 +677,13 @@
->  					mask = <0x60>;
->  					status = "disabled";
->  				};
-> +
-> +				snvs_pwrkey: snvs-powerkey {
-> +					compatible = "fsl,sec-v4.0-pwrkey";
-> +					interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-> +					linux,keycode = <116>; /* KEY_POWER */
+Changes since v1:
 
-With include/dt-bindings/input/input.h, you can use KEY_POWER directly
-and save the comment.
+- s/PFT/PTM/ to describe device and not protocol implementation
 
-Shawn
+ drivers/hwtracing/coresight/coresight-etm3x.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-> +					wakeup;
-> +				};
->  			};
->  
->  			epit1: epit at 020d0000 {
-> -- 
-> 1.9.1
-> 
+diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+index 018a00f..cca98a8 100644
+--- a/drivers/hwtracing/coresight/coresight-etm3x.c
++++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+@@ -1912,6 +1912,11 @@ static struct amba_id etm_ids[] = {
+ 		.mask	= 0x0003ffff,
+ 		.data	= "PTM 1.1",
+ 	},
++	{	/* PTM 1.1 Qualcomm */
++		.id	= 0x0003006f,
++		.mask	= 0x0003ffff,
++		.data	= "PTM 1.1",
++	},
+ 	{ 0, 0},
+ };
+
+--
+1.9.1
