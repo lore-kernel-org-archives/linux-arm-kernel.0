@@ -1,107 +1,131 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 25 May 2015 11:38:10 +0100
-Subject: [PATCH 1/4] arm64: gicv3: its: Encode domain number in PCI
- stream id
-In-Reply-To: <34113ADB-C279-4AE6-A303-3328831CCD26@caviumnetworks.com>
-References: <1430686172-18222-1-git-send-email-rric@kernel.org>
- <1430686172-18222-2-git-send-email-rric@kernel.org>
- <20150520131138.2c94a32a@why.wild-wind.fr.eu.org>
- <20150520124827.GF10428@rric.localhost> <555EE831.2020503@arm.com>
- <34113ADB-C279-4AE6-A303-3328831CCD26@caviumnetworks.com>
-Message-ID: <20150525113810.76c965e2@arm.com>
+From: vigneshr@codeaurora.org (vigneshr at codeaurora.org)
+Date: Mon, 25 May 2015 10:56:31 -0000
+Subject: [PATCH] ARM: module: Add ".ref.text" to arm unwind tables
+In-Reply-To: <55551249.6020904@redhat.com>
+References: <1431530457-19909-1-git-send-email-vigneshr@codeaurora.org>
+ <55551249.6020904@redhat.com>
+Message-ID: <bab9fde91a015c5a9dbc5823a086e826.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 22 May 2015 23:57:40 +0100
-"Chalamarla, Tirumalesh" <Tirumalesh.Chalamarla@caviumnetworks.com>
-wrote:
+Forgot to add Maintainers. Adding them now.
 
-Hi Tirumalesh,
+> On 05/13/2015 08:20 AM, Vignesh Radhakrishnan wrote:
+>> Functions inside kernel modules that use __ref
+>> will end up being placed in .ARM.exidx.ref.text
+>> section by gcc.
+>>
+>> Currently we don't consider adding these functions
+>> to arm unwind tables.
+>>
+>> Hence, if we turn slub debug on by default we end up
+>> with the messages of this sort:
+>>
+>> 	unwind: Index not found bf0011e0
+>>
+>> This is because slub debug saves stack trace of
+>> allocation's and free's. Therefore, we end up seeing
+>> a flood of these messages in dmesg since its not
+>> able to locate these functions.
+>>
+>> Fix this by adding .ref.text section to arm unwind tables.
+>>
+>
+> With this patch, I go from
+>
+>   ------------[ cut here ]------------
+> WARNING: CPU: 0 PID: 63 at drivers/misc/test.c:12 that_function+0x10/0x2c
+> [test]()
+> Modules linked in: test(P+)
+> CPU: 0 PID: 63 Comm: insmod Tainted: P                4.1.0-rc2+ #28
+> Hardware name: ARM-Versatile PB
+> [<c001a590>] (unwind_backtrace) from [<c0017b84>] (show_stack+0x10/0x14)
+> [<c0017b84>] (show_stack) from [<c0022370>]
+> (warn_slowpath_common+0x78/0xb0)
+> [<c0022370>] (warn_slowpath_common) from [<c0022444>]
+> (warn_slowpath_null+0x1c/0x24)
+> [<c0022444>] (warn_slowpath_null) from [<bf000048>]
+> (that_function+0x10/0x2c [test])
+> unwind: Index not found bf000048
+> ---[ end trace 3e24f8edd90f3b27 ]---
+>
+> to
+>
+> ------------[ cut here ]------------
+> WARNING: CPU: 0 PID: 63 at drivers/misc/test.c:12 that_function+0x10/0x2c
+> [test]()
+> Modules linked in: test(P+)
+> CPU: 0 PID: 63 Comm: insmod Tainted: P                4.1.0-rc2+ #30
+> Hardware name: ARM-Versatile PB
+> [<c001a5d0>] (unwind_backtrace) from [<c0017b84>] (show_stack+0x10/0x14)
+> [<c0017b84>] (show_stack) from [<c0022770>]
+> (warn_slowpath_common+0x78/0xb0)
+> [<c0022770>] (warn_slowpath_common) from [<c0022844>]
+> (warn_slowpath_null+0x1c/0x24)
+> [<c0022844>] (warn_slowpath_null) from [<bf000048>]
+> (that_function+0x10/0x2c [test])
+> [<bf000048>] (that_function [test]) from [<bf002010>]
+> (awesome_module+0x10/0x1c [test])
+> [<bf002010>] (awesome_module [test]) from [<c0009710>]
+> (do_one_initcall+0x80/0x1dc)
+> [<c0009710>] (do_one_initcall) from [<c02d14e0>]
+> (do_init_module+0x58/0x1a8)
+> [<c02d14e0>] (do_init_module) from [<c0063940>]
+> (load_module+0x170c/0x1c38)
+> [<c0063940>] (load_module) from [<c0063f38>] (SyS_init_module+0xcc/0x124)
+> [<c0063f38>] (SyS_init_module) from [<c0014900>]
+> (ret_fast_syscall+0x0/0x30)
+> ---[ end trace 554c9ff461eb2505 ]---
+>
+> Tested-by: Laura Abbott <labbott@redhat.com>
+>
+>> Signed-off-by: Vignesh Radhakrishnan <vigneshr@codeaurora.org>
+>> ---
+>>   arch/arm/include/asm/module.h | 1 +
+>>   arch/arm/kernel/module.c      | 4 ++++
+>>   2 files changed, 5 insertions(+)
+>>
+>> diff --git a/arch/arm/include/asm/module.h
+>> b/arch/arm/include/asm/module.h
+>> index ed690c4..17640c9 100644
+>> --- a/arch/arm/include/asm/module.h
+>> +++ b/arch/arm/include/asm/module.h
+>> @@ -14,6 +14,7 @@ enum {
+>>   	ARM_SEC_DEVEXIT,
+>>   	ARM_SEC_HOT,
+>>   	ARM_SEC_UNLIKELY,
+>> +	ARM_SEC_REF,
+>>   	ARM_SEC_MAX,
+>>   };
+>>
+>> diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+>> index 2e11961..846b888 100644
+>> --- a/arch/arm/kernel/module.c
+>> +++ b/arch/arm/kernel/module.c
+>> @@ -308,6 +308,8 @@ int module_finalize(const Elf32_Ehdr *hdr, const
+>> Elf_Shdr *sechdrs,
+>>   			maps[ARM_SEC_UNLIKELY].unw_sec = s;
+>>   		else if (strcmp(".ARM.exidx.text.hot", secname) == 0)
+>>   			maps[ARM_SEC_HOT].unw_sec = s;
+>> +		else if (strcmp(".ARM.exidx.ref.text", secname) == 0)
+>> +			maps[ARM_SEC_REF].unw_sec = s;
+>>   		else if (strcmp(".init.text", secname) == 0)
+>>   			maps[ARM_SEC_INIT].txt_sec = s;
+>>   		else if (strcmp(".text", secname) == 0)
+>> @@ -318,6 +320,8 @@ int module_finalize(const Elf32_Ehdr *hdr, const
+>> Elf_Shdr *sechdrs,
+>>   			maps[ARM_SEC_UNLIKELY].txt_sec = s;
+>>   		else if (strcmp(".text.hot", secname) == 0)
+>>   			maps[ARM_SEC_HOT].txt_sec = s;
+>> +		else if (strcmp(".ref.text", secname) == 0)
+>> +			maps[ARM_SEC_REF].txt_sec = s;
+>>   	}
+>>
+>>   	for (i = 0; i < ARM_SEC_MAX; i++)
+>>
+>
+>
 
-> 
-> > On May 22, 2015, at 1:26 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > 
-> > On 20/05/15 13:48, Robert Richter wrote:
-> >> Mark,
-> >> 
-> >> thanks for review, also of the other patches of this series.
-> >> 
-> >> See below
-> >> 
-> >> On 20.05.15 13:11:38, Marc Zyngier wrote:
-> >>>> -	dev_alias->dev_id = alias;
-> >>>> +	dev_alias->dev_id = (pci_domain_nr(pdev->bus) << 16) | alias;
-> >> 
-> >>> This feels very scary. We're now assuming that the domain number will
-> >>> always be presented to the doorbell. What guarantee do we have that
-> >>> this is always the case, irrespective of the platform?
-> >>> 
-> >>> Also, domains have no PCI reality, they are a Linux thing. And they can
-> >>> be "randomly" assigned, unless you force the domain in DT with a
-> >>> linux,pci-domain property. This looks even more wrong, specially
-> >>> considering ACPI.
-> >> 
-> >> The main problem here is that device ids (32 bits) are system
-> >> specific. Since we have more than one PCI root complex we need the
-> >> upper 16 bits in the devid for mapping. Using pci_domain_nr for this
-> >> fits our needs for now and shouldn't affect systems with a single RC
-> >> only as the domain nr is zero then.
-> >> 
-> >> The domain number is incremented during initialization beginnig with
-> >> zero and the order of it is fixed since it is taken from DT or ACPI
-> >> tables. So we have full controll of it. I don't see issues here.
-> > 
-> > This may match what you have on ThunderX (as long as the kernel doesn't
-> > adopt another behaviour when allocating the domain number). But other
-> > platforms may have a completely different numbering, which will mess
-> > them up entirely.
-> > 
-> >>> It really feels like we need a way to describe how the BDF numbering is
-> >>> augmented. We also need to guarantee that we get the actual bridge
-> >>> number, as opposed to the domain number.
-> >> 
-> >> But true, the obove is just intermediate. In the end we need some sort
-> >> of handler that is setup during cpu initialization that registers a
-> >> callback for the gic to determine the device id of that paricular
-> >> system.
-> > 
-> > I don't really like the idea of a callback from the GIC - I'd prefer it
-> > to be standalone, and rely on the topology information to build the
-> > DeviceID. Mark Rutland had some ideas for DT (he posted an RFC a while
-> > ago), maybe it would be good to get back to that and find out what we
-> > can do. ACPI should also have similar information (IORT?).
-> > 
-> 
-> How can some one pass this from DT, especially in GIC entry. i still
-> think it is bus owner responsibility and call back is better idea.
-> but if some one has a better idea for DT and ACPI, we are fine as
-> long as it works on ThunderX.   
-
-A callback would have to be bus-specific, and depends from the observer
-of the access. There is strictly no guarantee that a single write from
-the device is performed using the same ID to the IOMMU and to the MSI
-doorbell. Actually, they are very likely to be different. A generic
-callback would have to know about the point where this access is
-observed, and expressing this is a nightmare.
-
-Also, I'm really opposed to having platform-specific code that has for
-sole purpose to describe the hardware. This is why we have DT (and to a
-lesser extent ACPI). We've been there on 32bit, and learned our lesson.
-It doesn't scale, it leads to a bunch of hacks in all corners, and I
-don't feel like being on the receiving end of something like this.
-
-I really suggest you look at Mark's suggestion:
-
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/333199.html
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/341584.html
-
-because so far, this is the only proposal that makes any sense to me in
-the long run. Feel free to comment on it and help us making something
-that also work for your favorite SoC.
-
-Thanks,
-
-        M.
--- 
-Without deviation from the norm, progress is not possible.
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of the Code Aurora Forum, hosted by The Linux Foundation.
+again
