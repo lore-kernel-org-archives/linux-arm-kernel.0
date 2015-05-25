@@ -1,45 +1,40 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 25 May 2015 11:27:18 +0200
-Subject: [PATCH] backlight: pwm: handle EPROBE_DEFER while requesting
- the PWM
-In-Reply-To: <20150312090224.GC3314@x1>
-References: <1424338214-24236-1-git-send-email-nicolas.ferre@atmel.com>
- <20150312090224.GC3314@x1>
-Message-ID: <20150525112718.5f7e2d7d@bbrezillon>
+From: ykk@rock-chips.com (Yakir)
+Date: Mon, 25 May 2015 17:38:48 +0800
+Subject: [RESEND PATCH v1 2/2] drm: bridge/dw_hdmi-i2s-audio: add audio
+ driver
+In-Reply-To: <1432542247.27695.137.camel@x220>
+References: <1432307631-7667-1-git-send-email-ykk@rock-chips.com>	
+ <1432307696-7806-1-git-send-email-ykk@rock-chips.com>
+ <1432542247.27695.137.camel@x220>
+Message-ID: <5562EDA8.1000609@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Hi Paul,
 
-On Thu, 12 Mar 2015 09:02:24 +0000
-Lee Jones <lee.jones@linaro.org> wrote:
+? 2015/5/25 16:24, Paul Bolle ??:
+> Just a nit: a license mismatch.
+>
+> On Fri, 2015-05-22 at 10:14 -0500, Yakir Yang wrote:
+>> --- /dev/null
+>> +++ b/drivers/gpu/drm/bridge/dw_hdmi-i2s-audio.c
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+> This states the license is GPL v2.
+>
+>> +MODULE_LICENSE("GPL");
+> And, according to include/linux/module.h, this states the license is GPL
+> v2 or later. So I think that either the comment at the top of this file
+> or the ident used in the MODULE_LICENSE() macro should change.
 
-> On Thu, 19 Feb 2015, Nicolas Ferre wrote:
-> 
-> > When trying to request the PWM device with devm_pwm_get(), the EPROBE_DEFER
-> > flag is not handled properly. It can lead to the PWM not being found.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > ---
-> >  drivers/video/backlight/pwm_bl.c | 4 ++++
-> >  1 file changed, 4 insertions(+)
-> 
-> Applied, thanks.
+Thanks for your catch, got it  :-)
 
-I don't see this patch in Linus' tree (actually, it's not even in
-linux-next).
-I don't know where it's stuck, but could you make sure it reaches
-mainline for 4.2 (or 4.1 if it's not to late) ?
+Yakir Yang
 
-Best Regards,
-
-Boris
-
-
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+>
+> Paul Bolle
+>
+>
+>
+>
