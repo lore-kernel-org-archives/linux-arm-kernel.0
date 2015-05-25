@@ -1,198 +1,48 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Mon, 25 May 2015 14:41:44 +0300
-Subject: [PATCH v4 09/18] gpio: locomo: implement per-pin irq handling
+Date: Mon, 25 May 2015 14:41:48 +0300
+Subject: [PATCH v4 13/18] ARM: sa1100: don't preallocate IRQ space for locomo
 In-Reply-To: <1432554113-26280-1-git-send-email-dbaryshkov@gmail.com>
 References: <1432554113-26280-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1432554113-26280-10-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1432554113-26280-14-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LoCoMo has a possibility to generate per-GPIO edge irqs. Support for
-that was there in old locomo driver, got 'cleaned up' during old driver
-IRQ cascading cleanup and is now reimplemented. It is expected that
-SL-5500 (collie) will use locomo gpio irqs for mmc detection irq.
+As new locomo driver properly supports SPARSE_IRQ, stop playing with
+NR_IRQS on sa1100 (locomo was the last chip requiring NR_IRQ tricks).
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/gpio/Kconfig       |   1 +
- drivers/gpio/gpio-locomo.c | 117 ++++++++++++++++++++++++++++++++++++++++++++-
- 2 files changed, 117 insertions(+), 1 deletion(-)
+ arch/arm/mach-sa1100/include/mach/irqs.h | 19 ++-----------------
+ 1 file changed, 2 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index 4542684..6b77614 100644
---- a/drivers/gpio/Kconfig
-+++ b/drivers/gpio/Kconfig
-@@ -737,6 +737,7 @@ config GPIO_KEMPLD
- config GPIO_LOCOMO
- 	bool "Sharp LoCoMo GPIO support"
- 	depends on MFD_LOCOMO
-+	select GPIOLIB_IRQCHIP
- 	help
- 	  Select this to support GPIO pins on Sharp LoCoMo Grid Array found
- 	  in Sharp Zaurus collie and poodle models.
-diff --git a/drivers/gpio/gpio-locomo.c b/drivers/gpio/gpio-locomo.c
-index dd9a1ca..75dbf6b 100644
---- a/drivers/gpio/gpio-locomo.c
-+++ b/drivers/gpio/gpio-locomo.c
-@@ -16,13 +16,15 @@
- #include <linux/slab.h>
- #include <linux/bitops.h>
- #include <linux/err.h>
--#include <linux/gpio.h>
-+#include <linux/gpio/driver.h>
- #include <linux/io.h>
-+#include <linux/irq.h>
- #include <linux/regmap.h>
- #include <linux/mfd/locomo.h>
+diff --git a/arch/arm/mach-sa1100/include/mach/irqs.h b/arch/arm/mach-sa1100/include/mach/irqs.h
+index 734e30e..b4b9608 100644
+--- a/arch/arm/mach-sa1100/include/mach/irqs.h
++++ b/arch/arm/mach-sa1100/include/mach/irqs.h
+@@ -79,22 +79,7 @@
+ #define IRQ_BOARD_START		61
+ #define IRQ_BOARD_END		77
  
- struct locomo_gpio {
- 	struct regmap *regmap;
-+	int irq;
- 
- 	struct gpio_chip gpio;
- 
-@@ -79,6 +81,99 @@ static int locomo_gpio_direction_output(struct gpio_chip *chip,
- 	return 0;
- }
- 
-+static void
-+locomo_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
-+{
-+	struct gpio_chip *chip = irq_get_handler_data(irq);
-+	struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
-+	struct irq_chip *irqchip = irq_desc_get_chip(desc);
-+	unsigned int gir;
-+	unsigned int gpd;
-+	unsigned int req;
-+
-+	chained_irq_enter(irqchip, desc);
-+
-+	while (1) {
-+		regmap_read(lg->regmap, LOCOMO_GIR, &gir);
-+		regmap_read(lg->regmap, LOCOMO_GPD, &gpd);
-+		req = gir & gpd;
-+
-+		if (!req)
-+			break;
-+
-+		generic_handle_irq(irq_find_mapping(lg->gpio.irqdomain,
-+					ffs(req) - 1));
-+	}
-+
-+	chained_irq_exit(irqchip, desc);
-+}
-+
-+static void locomo_gpio_ack_irq(struct irq_data *d)
-+{
-+	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
-+	struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
-+	unsigned int mask = BIT(d->hwirq);
-+
-+	regmap_update_bits(lg->regmap, LOCOMO_GWE, mask, mask);
-+	regmap_update_bits(lg->regmap, LOCOMO_GIS, mask, 0);
-+	regmap_update_bits(lg->regmap, LOCOMO_GWE, mask, 0);
-+}
-+
-+static void locomo_gpio_mask_irq(struct irq_data *d)
-+{
-+	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
-+	struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
-+	unsigned int mask = BIT(d->hwirq);
-+
-+	regmap_update_bits(lg->regmap, LOCOMO_GIE, mask, 0);
-+}
-+
-+static void locomo_gpio_unmask_irq(struct irq_data *d)
-+{
-+	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
-+	struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
-+	unsigned int mask = BIT(d->hwirq);
-+
-+	regmap_update_bits(lg->regmap, LOCOMO_GIE, mask, mask);
-+}
-+
-+static int locomo_gpio_type_irq(struct irq_data *d, unsigned int type)
-+{
-+	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
-+	struct locomo_gpio *lg = container_of(chip, struct locomo_gpio, gpio);
-+	unsigned int mask;
-+
-+	mask = BIT(d->hwirq);
-+
-+	if (type == IRQ_TYPE_PROBE) {
-+		if ((lg->rising_edge | lg->falling_edge) & mask)
-+			return 0;
-+		type = IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING;
-+	}
-+
-+	if (type & IRQ_TYPE_EDGE_RISING)
-+		lg->rising_edge |= mask;
-+	else
-+		lg->rising_edge &= ~mask;
-+	if (type & IRQ_TYPE_EDGE_FALLING)
-+		lg->falling_edge |= mask;
-+	else
-+		lg->falling_edge &= ~mask;
-+
-+	regmap_write(lg->regmap, LOCOMO_GRIE, lg->rising_edge);
-+	regmap_write(lg->regmap, LOCOMO_GFIE, lg->falling_edge);
-+
-+	return 0;
-+}
-+
-+static struct irq_chip locomo_gpio_irq_chip = {
-+	.name		= "locomo-GPIO",
-+	.irq_ack	= locomo_gpio_ack_irq,
-+	.irq_mask	= locomo_gpio_mask_irq,
-+	.irq_unmask	= locomo_gpio_unmask_irq,
-+	.irq_set_type	= locomo_gpio_type_irq,
-+};
-+
- #ifdef CONFIG_PM_SLEEP
- static int locomo_gpio_suspend(struct device *dev)
- {
-@@ -119,6 +214,10 @@ static int locomo_gpio_probe(struct platform_device *pdev)
- 	if (!lg)
- 		return -ENOMEM;
- 
-+	lg->irq = platform_get_irq(pdev, 0);
-+	if (lg->irq < 0)
-+		return -ENXIO;
-+
- 	lg->regmap = dev_get_regmap(pdev->dev.parent, NULL);
- 	if (!lg->regmap)
- 		return -EINVAL;
-@@ -130,6 +229,7 @@ static int locomo_gpio_probe(struct platform_device *pdev)
- 	regmap_write(lg->regmap, LOCOMO_GPD, 0x00);
- 	regmap_write(lg->regmap, LOCOMO_GIE, 0x00);
- 
-+	lg->gpio.dev = &pdev->dev;
- 	lg->gpio.base = pdata ? pdata->gpio_base : -1;
- 	lg->gpio.label = "locomo-gpio";
- 	lg->gpio.ngpio = 16;
-@@ -142,7 +242,22 @@ static int locomo_gpio_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
-+	ret = gpiochip_irqchip_add(&lg->gpio, &locomo_gpio_irq_chip, 0,
-+				   handle_level_irq, IRQ_TYPE_NONE);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Failed to add irq chip\n");
-+		goto err_rm_gpiochip;
-+	}
-+
-+	gpiochip_set_chained_irqchip(&lg->gpio, &locomo_gpio_irq_chip, lg->irq,
-+				     locomo_gpio_irq_handler);
-+
- 	return 0;
-+
-+err_rm_gpiochip:
-+	gpiochip_remove(&lg->gpio);
-+
-+	return ret;
- }
- 
- static int locomo_gpio_remove(struct platform_device *pdev)
+-/*
+- * Figure out the MAX IRQ number.
+- *
+- * Neponset, SA1111 and UCB1x00 are sparse IRQ aware, so can dynamically
+- * allocate their IRQs above NR_IRQS.
+- *
+- * LoCoMo has 4 additional IRQs, but is not sparse IRQ aware, and so has
+- * to be included in the NR_IRQS calculation.
+- */
+-#ifdef CONFIG_SHARP_LOCOMO
+-#define NR_IRQS_LOCOMO		4
+-#else
+-#define NR_IRQS_LOCOMO		0
+-#endif
+-
+ #ifndef NR_IRQS
+-#define NR_IRQS (IRQ_BOARD_START + NR_IRQS_LOCOMO)
++#define NR_IRQS IRQ_BOARD_START
+ #endif
+-#define SA1100_NR_IRQS (IRQ_BOARD_START + NR_IRQS_LOCOMO)
++#define SA1100_NR_IRQS IRQ_BOARD_START
 -- 
 2.1.4
