@@ -1,54 +1,64 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 25 May 2015 15:18:52 +0200
-Subject: [PATCH] ARM: mvebu: armada-xp-linksys-mamba: Disable internal RTC
-In-Reply-To: <1432156924-1030-1-git-send-email-kaloz@openwrt.org>
-References: <1432156924-1030-1-git-send-email-kaloz@openwrt.org>
-Message-ID: <5563213C.8090305@free-electrons.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 25 May 2015 15:19:55 +0200
+Subject: [PATCH 1/2] PWM: atmel: fix incorrect CDTY value after enabling
+Message-ID: <1432559996-4415-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Imre,
+CUPD is not flushed before enabling the channel so it will update CDTY/CPRD just
+after one period. So we always set CUPD, even when the channel is not enabled.
 
-On 20/05/2015 23:22, Imre Kaloz wrote:
-> The Mamba (like the OpenBlocks AX3) doesn't have a crystal
-> connected to the internal RTC - let's prevent the kernel from
-> probing it.
-> 
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/pwm/pwm-atmel.c | 35 ++++++++++++++++++-----------------
+ 1 file changed, 18 insertions(+), 17 deletions(-)
 
-applied on mvebu/fixes
-
-Thanks,
-
-Gregory
-
-
-> Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
-> Cc: <stable@vger.kernel.org> # v4.0 +
-> ---
->  arch/arm/boot/dts/armada-xp-linksys-mamba.dts | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-> index a2cf215..fdd187c 100644
-> --- a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-> +++ b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-> @@ -95,6 +95,11 @@
->  
->  		internal-regs {
->  
-> +			rtc at 10300 {
-> +				/* No crystal connected to the internal RTC */
-> +				status = "disabled";
-> +			};
-> +
->  			/* J10: VCC, NC, RX, NC, TX, GND  */
->  			serial at 12000 {
->  				status = "okay";
-> 
-
-
+diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
+index d3c22de9ee47..89f9ca41d9af 100644
+--- a/drivers/pwm/pwm-atmel.c
++++ b/drivers/pwm/pwm-atmel.c
+@@ -155,24 +155,25 @@ static void atmel_pwm_config_v1(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+ 	unsigned int val;
+ 
+-	if (test_bit(PWMF_ENABLED, &pwm->flags)) {
+-		/*
+-		 * If the PWM channel is enabled, using the update register,
+-		 * it needs to set bit 10 of CMR to 0
+-		 */
+-		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CUPD, dty);
+ 
+-		val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
+-		val &= ~PWM_CMR_UPD_CDTY;
+-		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
+-	} else {
+-		/*
+-		 * If the PWM channel is disabled, write value to duty and
+-		 * period registers directly.
+-		 */
+-		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CDTY, dty);
+-		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CPRD, prd);
+-	}
++	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CUPD, dty);
++
++	val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
++	val &= ~PWM_CMR_UPD_CDTY;
++	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
++
++	/*
++	 * If the PWM channel is enabled, only update CDTY by using the update
++	 * register, it needs to set bit 10 of CMR to 0
++	 */
++	if (test_bit(PWMF_ENABLED, &pwm->flags))
++		return;
++	/*
++	 * If the PWM channel is disabled, write value to duty and period
++	 * registers directly.
++	 */
++	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CDTY, dty);
++	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CPRD, prd);
+ }
+ 
+ static void atmel_pwm_config_v2(struct pwm_chip *chip, struct pwm_device *pwm,
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.1.4
