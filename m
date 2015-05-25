@@ -1,100 +1,40 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 25 May 2015 16:47:28 +0200
-Subject: [PATCHv2] ARM: mvebu: add support for the new Aramda 385 based
- Linksys boards
-In-Reply-To: <20150525140840.GA8883@lunn.ch>
-References: <1432156456-440-1-git-send-email-kaloz@openwrt.org>
- <55631C6E.8050700@free-electrons.com> <20150525140840.GA8883@lunn.ch>
-Message-ID: <55633600.6040407@free-electrons.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 25 May 2015 16:49:26 +0200
+Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable shmobile
+ r8a7778/bockw platform
+In-Reply-To: <20150525011253.GF24690@verge.net.au>
+References: <1425471261-25110-1-git-send-email-geert+renesas@glider.be>
+ <1425471261-25110-3-git-send-email-geert+renesas@glider.be>
+ <20150304225522.GB2470@verge.net.au>
+ <20150525011253.GF24690@verge.net.au>
+Message-ID: <CAMuHMdXtkgyAQZPigZaqBnFnadBG+43_mLb+GHo78ApUdsgz+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew, Imre,
+Hi Simon,
 
-On 25/05/2015 16:08, Andrew Lunn wrote:
-> On Mon, May 25, 2015 at 02:58:22PM +0200, Gregory CLEMENT wrote:
->> Hi Imre,
+On Mon, May 25, 2015 at 3:12 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Thu, Mar 05, 2015 at 07:55:23AM +0900, Simon Horman wrote:
+>> On Wed, Mar 04, 2015 at 01:14:21PM +0100, Geert Uytterhoeven wrote:
+>> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 >>
->> On 20/05/2015 23:14, Imre Kaloz wrote:
->>> This patch adds support for the Linksys WRT1200AC (Caiman) and
->>> the Linksys WRT1900AC v2 (Cobra).
->>>
->>> Both boards have:
->>>
->>> - 2 Marvell 88W8864 radios
->>> - 1 USB 3.0 port
->>> - 1 USB 2.0/eSATAp port
->>> - 2 Ethernet interfaces connected to a 88E6176 switch (1x WAN + 4x LAN)
->>> - 128MB NAND flash
->>> - 512MB RAM
->>>
->>> Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
->>>
->>> ---
->>> Changes since v1: added DSA support
->>> ---
->>> The only difference between the two boards is the radio configuration
->>> (2x2 vs 3x3), so everything except the leds (to be named properly)
->>> is in the dtsi file. When the wireless driver will be submitted
->>> upstream, the powertables (calibration data) will end up in the board
->>> specific files, tho.
->>
->> it seems that you missed my comment about removing bootargs and just using
->> stdout-path = "serial0:115200n8";
->>
->> If you agree and if there is no remark about the DSA part from Andrew, I can
->> take car of it while applying your patch on mvebu/dt.
-> 
-> DSA looks fine
-> 
-> Acked-by: Andrew Lunn <andrew@lunn.ch>
+>> Acked-by: Simon Horman <horms+renesas@verge.net.au>
+>
+> Quite some time has passed and during that time I have come to
+> understand from Arnd that it is appropriate for me to take changes like
+> this one.
+>
+> I have queued this up for 4.2 accordingly.
 
-applied on mvebu/dt. I also fixed the title: s/Aramda/Armada/
+Thanks!
 
-Thanks,
+Gr{oetje,eeting}s,
 
-Gregory
+                        Geert
 
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-> 
-> Thanks
-> 	Andrew
-> 
->>
->>
->> Thanks,
->>
->> Gregory
->>
->> [...]
->>
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/armada-385-linksys.dtsi
->>
->> [...]
->>
->>> +	chosen {
->>> +		bootargs = "console=ttyS0,115200";
->>> +		stdout-path = &uart0;
->> Just here
->>> +	};
->>
->>
->> [...]
->> -- 
->> Gregory Clement, Free Electrons
->> Kernel, drivers, real-time and embedded Linux
->> development, consulting, training and support.
->> http://free-electrons.com
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
