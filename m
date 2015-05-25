@@ -1,50 +1,30 @@
-From: pantelis.antoniou@konsulko.com (Pantelis Antoniou)
-Date: Mon, 25 May 2015 19:51:45 +0300
-Subject: [PATCH v5 00/11] Add simple NVMEM Framework via regmap.
-In-Reply-To: <1432226535-8640-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1432226535-8640-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <E5772084-6CF5-41DE-B68B-073D9F75F0BC@konsulko.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 25 May 2015 18:56:58 +0200 (CEST)
+Subject: [PATCH] clockevents: don't suspend/resume if unused
+In-Reply-To: <20150116165914.GS3843@piout.net>
+References: <1421399151-26800-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20150116092014.GA27945@gradator.net> <20150116165914.GS3843@piout.net>
+Message-ID: <alpine.DEB.2.11.1505251854380.5457@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srinivas,
-
-> On May 21, 2015, at 19:42 , Srinivas Kandagatla <srinivas.kandagatla@linaro.org> wrote:
+On Fri, 16 Jan 2015, Alexandre Belloni wrote:
+> Hi,
 > 
-> Thankyou all for providing inputs and comments on previous versions of this patchset.
-> Here is the v5 of the patchset addressing all the issues raised as
-> part of previous versions review.
+> On 16/01/2015 at 10:20:14 +0100, Sylvain Rochet wrote :
+> > > +		if (dev->suspend && dev->mode != CLOCK_EVT_MODE_UNUSED)
+> > 
+> > I wonder if we should use > CLOCK_EVT_MODE_SHUTDOWN
+> > (or CLOCK_EVT_MODE_UNUSED || CLOCK_EVT_MODE_SHUTDOWN) instead of 
+> > !CLOCK_EVT_MODE_UNUSED.
+> > 
 > 
+> I'll let Thomas or Daniel decide :) But I'm open to that.
 
-> 
+I'm unsure about the shutdown part. shutdown can be an intermediate
+state where its not a given, that the clocks are disabled. I pick it
+up as is.
 
-[snip]
+Thanks,
 
-I tried to use the updated patchset with my at24 & beaglebone capemanager patches.
-
-I have a big problem with the removal of the raw of_* access APIs.
-
-Take for instance the case where you have multiple slot accessing different EEPROMs.
-
-> slots {
-> 	slot at 0 {
-> 		eeprom = <&cape0_data>;
-> 	};
-> 
-> 	slot at 1 {
-> 		eeprom = <&cape1_data>;
-> 	};
-> };
-
-In that case there is no per-device node mapping; it?s a per-sub node.
-
-For now I?m exporting the of_* accessors again, please consider exposing the of_* API again.
-
-> -- 
-> 1.9.1
-> 
-
-Regards
-
-? Pantelis
+	tglx
