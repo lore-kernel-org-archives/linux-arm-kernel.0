@@ -1,35 +1,40 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Mon, 25 May 2015 16:53:11 +0200
-Subject: [PATCH 07/21] of/platform: Ensure device registration on lookup
+Date: Mon, 25 May 2015 16:53:18 +0200
+Subject: [PATCH 14/21] pwm: Probe PWM chip devices on demand
 In-Reply-To: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1432565608-26036-8-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1432565608-26036-15-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When looking up a platform device from its device node, ensure that the
-device has been registered before doing the actual search.
-
-This increases the chances of the device having been probed by that
-time, reducing deferred probes.
+When looking up a PWM chip through its DT node, ensure that the
+corresponding device has been registered.
 
 Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 ---
- drivers/of/platform.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/pwm/core.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index cc5d808..af2bc75 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -46,6 +46,8 @@ struct platform_device *of_find_device_by_node(struct device_node *np)
+diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+index ba34c7d..31f486c 100644
+--- a/drivers/pwm/core.c
++++ b/drivers/pwm/core.c
+@@ -24,6 +24,7 @@
+ #include <linux/radix-tree.h>
+ #include <linux/list.h>
+ #include <linux/mutex.h>
++#include <linux/of_platform.h>
+ #include <linux/err.h>
+ #include <linux/slab.h>
+ #include <linux/device.h>
+@@ -479,6 +480,8 @@ static struct pwm_chip *of_node_to_pwmchip(struct device_node *np)
  {
- 	struct device *dev;
+ 	struct pwm_chip *chip;
  
 +	of_platform_device_ensure(np);
 +
- 	dev = bus_find_device(&platform_bus_type, NULL, np, of_dev_node_match);
- 	return dev ? to_platform_device(dev) : NULL;
- }
+ 	mutex_lock(&pwm_lock);
+ 
+ 	list_for_each_entry(chip, &pwm_chips, list)
 -- 
 2.4.1
