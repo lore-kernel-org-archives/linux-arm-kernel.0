@@ -1,86 +1,53 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 25 May 2015 22:20:22 +0530
-Subject: [PATCH v3 3/6] dmaengine: pxa: add pxa dmaengine driver
-In-Reply-To: <1431626006-1708-3-git-send-email-robert.jarzmik@free.fr>
+Date: Mon, 25 May 2015 22:22:57 +0530
+Subject: [PATCH v3 6/6] Documentation: dmaengine: document DMA_CTRL_ACK
+In-Reply-To: <87twvekij8.fsf@belgarion.home>
 References: <1431626006-1708-1-git-send-email-robert.jarzmik@free.fr>
- <1431626006-1708-3-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <20150525165022.GH3140@localhost>
+ <1431626006-1708-6-git-send-email-robert.jarzmik@free.fr>
+ <20150514183853.GN4004@lukather> <87twvekij8.fsf@belgarion.home>
+Message-ID: <20150525165257.GI3140@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 14, 2015 at 07:53:23PM +0200, Robert Jarzmik wrote:
-
-> +#define DCSR(n)		(0x0000 + ((n) << 2))
-> +#define DALGN(n)	0x00a0
-> +#define DINT		0x00f0
-> +#define DDADR(n)	(0x0200 + ((n) << 4))
-> +#define DSADR(n)	(0x0204 + ((n) << 4))
-> +#define DTADR(n)	(0x0208 + ((n) << 4))
-> +#define DCMD(n)		(0x020c + ((n) << 4))
-> +
-> +#define DCSR_RUN	BIT(31)	/* Run Bit (read / write) */
-> +#define DCSR_NODESC	BIT(30)	/* No-Descriptor Fetch (read / write) */
-> +#define DCSR_STOPIRQEN	BIT(29)	/* Stop Interrupt Enable (read / write) */
-> +#define DCSR_REQPEND	BIT(8)	/* Request Pending (read-only) */
-> +#define DCSR_STOPSTATE	BIT(3)	/* Stop State (read-only) */
-> +#define DCSR_ENDINTR	BIT(2)	/* End Interrupt (read / write) */
-> +#define DCSR_STARTINTR	BIT(1)	/* Start Interrupt (read / write) */
-> +#define DCSR_BUSERR	BIT(0)	/* Bus Error Interrupt (read / write) */
-> +
-> +#define DCSR_EORIRQEN	BIT(28)	/* End of Receive Interrupt Enable (R/W) */
-> +#define DCSR_EORJMPEN	BIT(27)	/* Jump to next descriptor on EOR */
-> +#define DCSR_EORSTOPEN	BIT(26)	/* STOP on an EOR */
-> +#define DCSR_SETCMPST	BIT(25)	/* Set Descriptor Compare Status */
-> +#define DCSR_CLRCMPST	BIT(24)	/* Clear Descriptor Compare Status */
-> +#define DCSR_CMPST	BIT(10)	/* The Descriptor Compare Status */
-> +#define DCSR_EORINTR	BIT(9)	/* The end of Receive */
-would help if these are PXA_xxx
-> +
-> +/*
-> + * Requestor lines are mapped as :
-> + *  - lines 0 to 63   : DRCMR(line) = 0x100 + line * 4
-> + *  - lines 64 to +oo : DRCMR(line) = 0x1000 + line * 4
-> + */
-> +#define DRCMR(n)	((((n) < 64) ? 0x0100 : 0x1100) + (((n) & 0x3f) << 2))
-This is hard to read, why not make this a function?
-
-> +static int pxad_alloc_chan_resources(struct dma_chan *dchan)
-> +{
-> +	struct pxad_chan *chan = to_pxad_chan(dchan);
-> +	struct pxad_device *pdev = to_pxad_dev(chan->vc.chan.device);
-> +
-> +	if (chan->desc_pool)
-> +		return 1;
-> +
-> +	chan->desc_pool = dma_pool_create(dma_chan_name(dchan),
-> +					  pdev->slave.dev,
-> +					  sizeof(struct pxad_desc_hw),
-> +					  __alignof__(struct pxad_desc_hw),
-why __alignof__ and why not simple say sizeof(struct pxad_desc_hw) to align
-the pool for this struct. Also you have given the descriptor size here for
-pool size, which sounds odd and ideally you would like to request a large
-pool for channel for allocating multiple desc
-
-
-> +static struct pxad_desc_sw *
-> +pxad_alloc_desc(struct pxad_chan *chan, unsigned int nb_hw_desc)
-> +{
-> +	struct pxad_desc_sw *sw_desc;
-> +	dma_addr_t dma;
-> +	int i;
-> +
-> +	sw_desc = kzalloc(sizeof(*sw_desc) +
-> +			  nb_hw_desc * sizeof(struct pxad_desc_hw *),
-> +			  GFP_ATOMIC);
-GFP_NOWAIT
-> +	if (!sw_desc)
-> +		return NULL;
-> +	sw_desc->desc_pool = chan->desc_pool;
-> +
-> +	for (i = 0; i < nb_hw_desc; i++) {
-> +		sw_desc->hw_desc[i] = dma_pool_alloc(sw_desc->desc_pool,
-> +						     GFP_ATOMIC, &dma);
-GFP_NOWAIT
+On Thu, May 14, 2015 at 10:31:39PM +0200, Robert Jarzmik wrote:
+> Maxime Ripard <maxime.ripard@free-electrons.com> writes:
+> 
+> > Hi Robert,
+> >
+> >>    * DMA_CTRL_ACK
+> >> -    - Undocumented feature
+> >> -    - No one really has an idea of what it's about, besides being
+> >> -      related to reusing the DMA transaction descriptors or having
+> >> -      additional transactions added to it in the async-tx API
+> >> -    - Useless in the case of the slave API
+> >> +    - if set, the TX transfer can be reused after being completed.
+> >
+> > Your sentences should start with an upper-case letter.
+> Ack.
+> 
+> >> +    - there is a guarantee the TX won't be freed until it is acked
+> >> +      by async_tx_ack()
+> >
+> > We never talked about what a "TX transfer" is in the
+> > documentation. That should be documented.
+> I'll remove the "TX", the transfer is widely used in this documentation.
+> 
+> >
+> >> +    - as a consequence, if a device driver wants to skip the dma_map_sg() and
+> >> +      dma_unmap_sg() because the DMA'd data wasn't used, it can resubmit the
+> >> +      transfer right after its completion.
+> >
+> > From a provider PoV, the data should always be mapped and / or
+> > allocated in coherent way, so I'm not sure how does that's relevant in
+> > the provider doc.
+> It's relevant because it says the mapping/unmapping is not necessary _between_ 2
+> submission of a transfer. This implies it is mapped, as it is a requirement for
+> the very first submission.
+> 
+> > Also, we should still mention that it's !slave API only.
+> Certainly not, it's fully slave API, that's the purpose of this patch.
+Its is not dependent on slave, it cna be used by slave as well as other
+users
 
 -- 
 ~Vinod
