@@ -1,121 +1,44 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Mon, 25 May 2015 15:31:48 +0900
-Subject: [PATCH v2 1/6] dt-bindings: iommu: Add binding for mediatek IOMMU
-In-Reply-To: <1431683009-18158-2-git-send-email-yong.wu@mediatek.com>
-References: <1431683009-18158-1-git-send-email-yong.wu@mediatek.com>
- <1431683009-18158-2-git-send-email-yong.wu@mediatek.com>
-Message-ID: <CAAFQd5AF5UVb35PEg+GjzLAqqr0q=Wg+XONRmK4XR=HLuJv2rA@mail.gmail.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Mon, 25 May 2015 08:37:00 +0200
+Subject: [PATCH v2] ARM: nommu: avoid deprecated source register on mov
+In-Reply-To: <1432337148-9894-1-git-send-email-stefan@agner.ch>
+References: <1432337148-9894-1-git-send-email-stefan@agner.ch>
+Message-ID: <5562C30C.20900@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Stefan,
 
-Please see my comments inline.
-
-On Fri, May 15, 2015 at 6:43 PM, Yong Wu <yong.wu@mediatek.com> wrote:
-> This patch add mediatek iommu dts binding document.
+On 05/23/2015 01:25 AM, Stefan Agner wrote:
+> In Thumb2 mode, the stack register r13 is deprecated if the
+> destination register is the program counter (r15). Similar to
+> head.S, head-nommu.S uses r13 to store the return address used
+> after configuring the CPU's CP15 register. However, since we do
+> not enable a MMU, there will be no address switch and it is
+> possible to use branch with link instruction to call
+> __after_proc_init.
 >
-> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+> Avoid using r13 completely by using bl to call __after_proc_init
+> and get rid of __secondary_switched.
+>
+> Beside removing unnecessary complexity, this also fixes a
+> compiler warning when compiling a !MMU kernel:
+> Warning: Use of r13 as a source register is deprecated when r15
+> is the destination register.
+>
+> Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 > ---
->  .../devicetree/bindings/iommu/mediatek,iommu.txt   |  51 ++++++++++
->  include/dt-bindings/iommu/mt8173-iommu-port.h      | 112 +++++++++++++++++++++
->  2 files changed, 163 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
->  create mode 100644 include/dt-bindings/iommu/mt8173-iommu-port.h
+> Changes in v2:
+> - Load r7 outside CONFIG_ARM_MPU since its used outside later on
 >
-> diff --git a/Documentation/devicetree/bindings/iommu/mediatek,iommu.txt b/Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
-> new file mode 100644
-> index 0000000..f2cc7c0
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
-> @@ -0,0 +1,51 @@
-> +/******************************************************/
-> +/*    Mediatek IOMMU Hardware Block Diagram           */
-> +/******************************************************/
+>   arch/arm/kernel/head-nommu.S | 21 ++++++++-------------
+>   1 file changed, 8 insertions(+), 13 deletions(-)
+>
+>
 
-nit: Could you follow one of existing styles of DT binding
-documentation? You might be able to use [1] as an example.
+You can add my:
+Tested-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 
-[1] http://lxr.free-electrons.com/source/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-.
-
-> +              EMI (External Memory Interface)
-> +               |
-> +              m4u (Multimedia Memory Management Unit)
-> +               |
-> +              smi (Smart Multimedia Interface)
-> +               |
-> +        +---------------+-------
-> +        |               |
-> +        |               |
-> +    vdec larb       disp larb      ... SoCs have different local arbiter(larb).
-> +        |               |
-> +        |               |
-> +   +----+----+    +-----+-----+
-> +   |    |    |    |     |     |    ...
-> +   |    |    |    |     |     |    ...
-> +   |    |    |    |     |     |    ...
-> +  MC   PP   VLD  OVL0 RDMA0 WDMA0  ... There are different ports in each larb.
-> +
-
-This diagram is still quite meaningless without proper description of
-all the functionality off all the blocks and interfaces between them.
-
-> +Required properties:
-> +- compatible : must be "mediatek,mt8173-m4u".
-> +- reg : m4u register base and size.
-> +- interrupts : the interrupt of m4u.
-> +- clocks : must contain one entry for each clock-names.
-> +- clock-names : must be "bclk", It is the block clock of m4u.
-> +- larb-portes-nr : must contain the number of the portes for each larb(local
-> +       arbiter). The number is defined in dt-binding/iommu/mt8173-iommu-port.h.
-
-typo: Should it be "ports" instead of "portes"?
-
-Anyway, shouldn't this be a property of larb nodes? I.e. the larb0
-node would have a port-count property set to M4U_LARB0_PORT_NR.
-
-> +- larb : must contain the local arbiters of the current platform. Refer to
-> +       bindings/soc/mediatek/mediatek,smi.txt. It must sort according to the
-> +       local arbiter index, like larb0, larb1, larb2...
-> +- iommu-cells : must be 1. Specifies the client PortID as defined in
-> +       dt-binding/iommu/mt8173-iommu-port.h
-
-Looking at the driver, wouldn't a 2 cell system be more appropriate
-here? With first cell indexing the larbs and second the ports within
-that larb.
-
-[snip]
-
-> +#define M4U_LARB0_PORT_NR      8
-> +#define M4U_LARB1_PORT_NR      10
-> +#define M4U_LARB2_PORT_NR      21
-> +#define M4U_LARB3_PORT_NR      15
-> +#define M4U_LARB4_PORT_NR      6
-> +#define M4U_LARB5_PORT_NR      9
-> +
-> +#define M4U_LARB0_PORT(n)      (n)
-> +#define M4U_LARB1_PORT(n)      ((n) + M4U_LARB0_PORT_NR + M4U_LARB0_PORT(0))
-> +#define M4U_LARB2_PORT(n)      ((n) + M4U_LARB1_PORT_NR + M4U_LARB1_PORT(0))
-> +#define M4U_LARB3_PORT(n)      ((n) + M4U_LARB2_PORT_NR + M4U_LARB2_PORT(0))
-> +#define M4U_LARB4_PORT(n)      ((n) + M4U_LARB3_PORT_NR + M4U_LARB3_PORT(0))
-> +#define M4U_LARB5_PORT(n)      ((n) + M4U_LARB4_PORT_NR + M4U_LARB4_PORT(0))
-
-This looks like some artificial indexing. Does it have any
-correspondence with actual hardware configuration?
-
-> +
-> +/* larb0 */
-> +#define        M4U_PORT_DISP_OVL0              M4U_LARB0_PORT(0)
-> +#define        M4U_PORT_DISP_RDMA0             M4U_LARB0_PORT(1)
-> +#define        M4U_PORT_DISP_WDMA0             M4U_LARB0_PORT(2)
-[snip]
-> +#define        M4U_PORT_VENC_CUR_CHROMA_SET2   M4U_LARB5_PORT(6)
-> +#define        M4U_PORT_VENC_RD_COMA_SET2      M4U_LARB5_PORT(7)
-> +#define        M4U_PORT_VENC_SV_COMA_SET2      M4U_LARB5_PORT(8)
-
-This convinces me even more that this binding actually needs
-#iommu-cells to be 2 and the indexing system I described above.
-
-Best regards,
-Tomasz
+Thanks!
+Maxime
