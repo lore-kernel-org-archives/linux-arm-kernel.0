@@ -1,34 +1,44 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Mon, 25 May 2015 13:00:39 +0200
-Subject: [PATCH 0/2] pinctrl: Enable support for external GPIO interrupts
-Message-ID: <1432551641-3256-1-git-send-email-carlo@caione.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 25 May 2015 13:03:26 +0200
+Subject: [PATCH v3 1/6] Documentation: dmaengine: pxa-dma design
+References: <1431626006-1708-1-git-send-email-robert.jarzmik@free.fr>
+ <87egmhk65w.fsf@belgarion.home> <87y4kkieok.fsf@belgarion.home>
+Message-ID: <87zj4s2a2p.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Carlo Caione <carlo@endlessm.com>
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-In Meson SoCs we have 8 independent GPIO interrupts that can be programmed to
-use any of the GPIOs in the chip as interrupt source.
+> Robert Jarzmik <robert.jarzmik@free.fr> writes:
+>
+>> Robert Jarzmik <robert.jarzmik@free.fr> writes:
+>>
+>> Hi Vinod,
+>>
+>> ... removed most of the people as this is a non-technical mail ...
+>>
+>> I hope to land this in the upcoming merge window. We're at -rc3, so time is
+>> short. Apart from patch 6/6 where I still have Maxime's review to apply, are you
+>> satisfied with the v3 of this serie which I hope addresses all your comments so
+>> far ?
+>
+> Vinod, we're at -rc4 now, ping ?
 
-These GPIOs are managed by GIC but they can be conditioned (and enabled) by
-some registers external to the GIC.
+Hello Vinod,
 
-GPIOs |--[mux1 or mux2]--[polarity]--[filter]--[edge_select]--> GIC
+I still didn't receive any answer. I feeling I'm gonna miss the merge window
+again if nothing moves.
 
-The original work has been done by Beniamino. I cleaned it up, fixed a couple
-of bugs, added support for Meson8b and the fix for the .to_irq hook.
+If I miss again this merge window, I'll take that through the pxa tree. Arnd
+might not be pleased, but this serie was submitted more than 2 monthes ago [1],
+and missing a merge window is really getting to be tiring, especially when
+nothing can be broken in an existing support platform.
 
-Beniamino Galvani (2):
-  pinctrl: meson: Enable GPIO IRQs
-  pinctrl: dt-binding: Extend meson documentation with GPIO IRQs support
+I hope you'll be able to include it in the upcoming window.
 
- .../devicetree/bindings/pinctrl/meson,pinctrl.txt  |  12 +
- drivers/pinctrl/Kconfig                            |   1 +
- drivers/pinctrl/meson/pinctrl-meson.c              | 254 +++++++++++++++++++++
- drivers/pinctrl/meson/pinctrl-meson.h              |  18 +-
- drivers/pinctrl/meson/pinctrl-meson8.c             |  36 +--
- drivers/pinctrl/meson/pinctrl-meson8b.c            |  36 +--
- 6 files changed, 326 insertions(+), 31 deletions(-)
+Thanks.
 
 -- 
-1.9.1
+Robert
+
+[1] https://lwn.net/Articles/637500/
