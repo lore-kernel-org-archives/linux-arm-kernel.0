@@ -1,187 +1,1198 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Mon, 25 May 2015 14:41:37 +0300
-Subject: [PATCH v4 02/18] leds: port locomo leds driver to new locomo core
+Date: Mon, 25 May 2015 14:41:53 +0300
+Subject: [PATCH v4 18/18] ARM: drop old LoCoMo driver
 In-Reply-To: <1432554113-26280-1-git-send-email-dbaryshkov@gmail.com>
 References: <1432554113-26280-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1432554113-26280-3-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1432554113-26280-19-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adapt locomo leds driver to new locomo core setup.
+As there are no in-kernel users of old locomo driver, drop all
+alltogether. Remove Kconfig entry, driver and header.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-Acked-by: Jacek Anaszewski <j.anaszewski@samsung.com>
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/leds/Kconfig       |   2 +-
- drivers/leds/leds-locomo.c | 117 +++++++++++++++++++++++----------------------
- 2 files changed, 61 insertions(+), 58 deletions(-)
+ arch/arm/common/Kconfig                |   3 -
+ arch/arm/common/Makefile               |   1 -
+ arch/arm/common/locomo.c               | 914 ---------------------------------
+ arch/arm/include/asm/hardware/locomo.h | 221 --------
+ 4 files changed, 1139 deletions(-)
+ delete mode 100644 arch/arm/common/locomo.c
+ delete mode 100644 arch/arm/include/asm/hardware/locomo.h
 
-diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
-index 966b960..d086aac 100644
---- a/drivers/leds/Kconfig
-+++ b/drivers/leds/Kconfig
-@@ -79,7 +79,7 @@ config LEDS_LM3642
- config LEDS_LOCOMO
- 	tristate "LED Support for Locomo device"
- 	depends on LEDS_CLASS
--	depends on SHARP_LOCOMO
-+	depends on MFD_LOCOMO
- 	help
- 	  This option enables support for the LEDs on Sharp Locomo.
- 	  Zaurus models SL-5500 and SL-5600.
-diff --git a/drivers/leds/leds-locomo.c b/drivers/leds/leds-locomo.c
-index 80ba048..a4286e9 100644
---- a/drivers/leds/leds-locomo.c
-+++ b/drivers/leds/leds-locomo.c
-@@ -9,89 +9,92 @@
-  */
+diff --git a/arch/arm/common/Kconfig b/arch/arm/common/Kconfig
+index c3a4e9c..76c9970 100644
+--- a/arch/arm/common/Kconfig
++++ b/arch/arm/common/Kconfig
+@@ -9,9 +9,6 @@ config DMABOUNCE
+ 	bool
+ 	select ZONE_DMA
  
- #include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/module.h>
--#include <linux/device.h>
- #include <linux/leds.h>
-+#include <linux/mfd/locomo.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
- 
--#include <mach/hardware.h>
--#include <asm/hardware/locomo.h>
-+struct locomo_led {
-+	struct led_classdev led;
-+	struct regmap *regmap;
-+	unsigned int reg;
-+};
- 
- static void locomoled_brightness_set(struct led_classdev *led_cdev,
--				enum led_brightness value, int offset)
--{
--	struct locomo_dev *locomo_dev = LOCOMO_DEV(led_cdev->dev->parent);
--	unsigned long flags;
+-config SHARP_LOCOMO
+-	bool
 -
--	local_irq_save(flags);
--	if (value)
--		locomo_writel(LOCOMO_LPT_TOFH, locomo_dev->mapbase + offset);
--	else
--		locomo_writel(LOCOMO_LPT_TOFL, locomo_dev->mapbase + offset);
--	local_irq_restore(flags);
+ config SHARP_PARAM
+ 	bool
+ 
+diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+index 70b1eff..437c79a 100644
+--- a/arch/arm/common/Makefile
++++ b/arch/arm/common/Makefile
+@@ -7,7 +7,6 @@ obj-y				+= firmware.o
+ obj-$(CONFIG_ICST)		+= icst.o
+ obj-$(CONFIG_SA1111)		+= sa1111.o
+ obj-$(CONFIG_DMABOUNCE)		+= dmabounce.o
+-obj-$(CONFIG_SHARP_LOCOMO)	+= locomo.o
+ obj-$(CONFIG_SHARP_PARAM)	+= sharpsl_param.o
+ obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
+ obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
+diff --git a/arch/arm/common/locomo.c b/arch/arm/common/locomo.c
+deleted file mode 100644
+index b55c362..0000000
+--- a/arch/arm/common/locomo.c
++++ /dev/null
+@@ -1,914 +0,0 @@
+-/*
+- * linux/arch/arm/common/locomo.c
+- *
+- * Sharp LoCoMo support
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This file contains all generic LoCoMo support.
+- *
+- * All initialization functions provided here are intended to be called
+- * from machine specific code with proper arguments when required.
+- *
+- * Based on sa1111.c
+- */
+-
+-#include <linux/module.h>
+-#include <linux/init.h>
+-#include <linux/kernel.h>
+-#include <linux/delay.h>
+-#include <linux/errno.h>
+-#include <linux/ioport.h>
+-#include <linux/platform_device.h>
+-#include <linux/slab.h>
+-#include <linux/spinlock.h>
+-#include <linux/io.h>
+-
+-#include <mach/hardware.h>
+-#include <asm/irq.h>
+-#include <asm/mach/irq.h>
+-
+-#include <asm/hardware/locomo.h>
+-
+-/* LoCoMo Interrupts */
+-#define IRQ_LOCOMO_KEY		(0)
+-#define IRQ_LOCOMO_GPIO		(1)
+-#define IRQ_LOCOMO_LT		(2)
+-#define IRQ_LOCOMO_SPI		(3)
+-
+-/* M62332 output channel selection */
+-#define M62332_EVR_CH	1	/* M62332 volume channel number  */
+-				/*   0 : CH.1 , 1 : CH. 2        */
+-/* DAC send data */
+-#define	M62332_SLAVE_ADDR	0x4e	/* Slave address  */
+-#define	M62332_W_BIT		0x00	/* W bit (0 only) */
+-#define	M62332_SUB_ADDR		0x00	/* Sub address    */
+-#define	M62332_A_BIT		0x00	/* A bit (0 only) */
+-
+-/* DAC setup and hold times (expressed in us) */
+-#define DAC_BUS_FREE_TIME	5	/*   4.7 us */
+-#define DAC_START_SETUP_TIME	5	/*   4.7 us */
+-#define DAC_STOP_SETUP_TIME	4	/*   4.0 us */
+-#define DAC_START_HOLD_TIME	5	/*   4.7 us */
+-#define DAC_SCL_LOW_HOLD_TIME	5	/*   4.7 us */
+-#define DAC_SCL_HIGH_HOLD_TIME	4	/*   4.0 us */
+-#define DAC_DATA_SETUP_TIME	1	/*   250 ns */
+-#define DAC_DATA_HOLD_TIME	1	/*   300 ns */
+-#define DAC_LOW_SETUP_TIME	1	/*   300 ns */
+-#define DAC_HIGH_SETUP_TIME	1	/*  1000 ns */
+-
+-/* the following is the overall data for the locomo chip */
+-struct locomo {
+-	struct device *dev;
+-	unsigned long phys;
+-	unsigned int irq;
+-	int irq_base;
+-	spinlock_t lock;
+-	void __iomem *base;
+-#ifdef CONFIG_PM
+-	void *saved_state;
+-#endif
+-};
+-
+-struct locomo_dev_info {
+-	unsigned long	offset;
+-	unsigned long	length;
+-	unsigned int	devid;
+-	unsigned int	irq[1];
+-	const char *	name;
+-};
+-
+-/* All the locomo devices.  If offset is non-zero, the mapbase for the
+- * locomo_dev will be set to the chip base plus offset.  If offset is
+- * zero, then the mapbase for the locomo_dev will be set to zero.  An
+- * offset of zero means the device only uses GPIOs or other helper
+- * functions inside this file */
+-static struct locomo_dev_info locomo_devices[] = {
+-	{
+-		.devid 		= LOCOMO_DEVID_KEYBOARD,
+-		.irq		= { IRQ_LOCOMO_KEY },
+-		.name		= "locomo-keyboard",
+-		.offset		= LOCOMO_KEYBOARD,
+-		.length		= 16,
+-	},
+-	{
+-		.devid		= LOCOMO_DEVID_FRONTLIGHT,
+-		.irq		= {},
+-		.name		= "locomo-frontlight",
+-		.offset		= LOCOMO_FRONTLIGHT,
+-		.length		= 8,
+-
+-	},
+-	{
+-		.devid		= LOCOMO_DEVID_BACKLIGHT,
+-		.irq		= {},
+-		.name		= "locomo-backlight",
+-		.offset		= LOCOMO_BACKLIGHT,
+-		.length		= 8,
+-	},
+-	{
+-		.devid		= LOCOMO_DEVID_AUDIO,
+-		.irq		= {},
+-		.name		= "locomo-audio",
+-		.offset		= LOCOMO_AUDIO,
+-		.length		= 4,
+-	},
+-	{
+-		.devid		= LOCOMO_DEVID_LED,
+-		.irq 		= {},
+-		.name		= "locomo-led",
+-		.offset		= LOCOMO_LED,
+-		.length		= 8,
+-	},
+-	{
+-		.devid		= LOCOMO_DEVID_UART,
+-		.irq		= {},
+-		.name		= "locomo-uart",
+-		.offset		= 0,
+-		.length		= 0,
+-	},
+-	{
+-		.devid		= LOCOMO_DEVID_SPI,
+-		.irq		= {},
+-		.name		= "locomo-spi",
+-		.offset		= LOCOMO_SPI,
+-		.length		= 0x30,
+-	},
+-};
+-
+-static void locomo_handler(unsigned int irq, struct irq_desc *desc)
+-{
+-	struct locomo *lchip = irq_get_chip_data(irq);
+-	int req, i;
+-
+-	/* Acknowledge the parent IRQ */
+-	desc->irq_data.chip->irq_ack(&desc->irq_data);
+-
+-	/* check why this interrupt was generated */
+-	req = locomo_readl(lchip->base + LOCOMO_ICR) & 0x0f00;
+-
+-	if (req) {
+-		/* generate the next interrupt(s) */
+-		irq = lchip->irq_base;
+-		for (i = 0; i <= 3; i++, irq++) {
+-			if (req & (0x0100 << i)) {
+-				generic_handle_irq(irq);
+-			}
+-
+-		}
+-	}
 -}
 -
--static void locomoled_brightness_set0(struct led_classdev *led_cdev,
- 				enum led_brightness value)
- {
--	locomoled_brightness_set(led_cdev, value, LOCOMO_LPT0);
-+	struct locomo_led *led = container_of(led_cdev, struct locomo_led, led);
-+
-+	regmap_write(led->regmap, led->reg,
-+			value ? LOCOMO_LPT_TOFH : LOCOMO_LPT_TOFL);
- }
- 
--static void locomoled_brightness_set1(struct led_classdev *led_cdev,
--				enum led_brightness value)
-+static int locomo_led_register(
-+		struct device *dev,
-+		struct locomo_led *led,
-+		const char *name,
-+		const char *trigger,
-+		struct regmap *regmap,
-+		unsigned int reg)
- {
--	locomoled_brightness_set(led_cdev, value, LOCOMO_LPT1);
-+	led->led.name = name;
-+	led->led.flags = LED_CORE_SUSPENDRESUME;
-+	led->led.default_trigger = trigger;
-+	led->led.brightness_set = locomoled_brightness_set;
-+	led->regmap = regmap;
-+	led->reg = reg;
-+
-+	return devm_led_classdev_register(dev, &led->led);
- }
- 
--static struct led_classdev locomo_led0 = {
--	.name			= "locomo:amber:charge",
--	.default_trigger	= "main-battery-charging",
--	.brightness_set		= locomoled_brightness_set0,
+-static void locomo_ack_irq(struct irq_data *d)
+-{
+-}
+-
+-static void locomo_mask_irq(struct irq_data *d)
+-{
+-	struct locomo *lchip = irq_data_get_irq_chip_data(d);
+-	unsigned int r;
+-	r = locomo_readl(lchip->base + LOCOMO_ICR);
+-	r &= ~(0x0010 << (d->irq - lchip->irq_base));
+-	locomo_writel(r, lchip->base + LOCOMO_ICR);
+-}
+-
+-static void locomo_unmask_irq(struct irq_data *d)
+-{
+-	struct locomo *lchip = irq_data_get_irq_chip_data(d);
+-	unsigned int r;
+-	r = locomo_readl(lchip->base + LOCOMO_ICR);
+-	r |= (0x0010 << (d->irq - lchip->irq_base));
+-	locomo_writel(r, lchip->base + LOCOMO_ICR);
+-}
+-
+-static struct irq_chip locomo_chip = {
+-	.name		= "LOCOMO",
+-	.irq_ack	= locomo_ack_irq,
+-	.irq_mask	= locomo_mask_irq,
+-	.irq_unmask	= locomo_unmask_irq,
 -};
 -
--static struct led_classdev locomo_led1 = {
--	.name			= "locomo:green:mail",
--	.default_trigger	= "nand-disk",
--	.brightness_set		= locomoled_brightness_set1,
--};
+-static void locomo_setup_irq(struct locomo *lchip)
+-{
+-	int irq = lchip->irq_base;
 -
--static int locomoled_probe(struct locomo_dev *ldev)
-+static int locomoled_probe(struct platform_device *pdev)
- {
- 	int ret;
+-	/*
+-	 * Install handler for IRQ_LOCOMO_HW.
+-	 */
+-	irq_set_irq_type(lchip->irq, IRQ_TYPE_EDGE_FALLING);
+-	irq_set_chip_data(lchip->irq, lchip);
+-	irq_set_chained_handler(lchip->irq, locomo_handler);
 -
--	ret = led_classdev_register(&ldev->dev, &locomo_led0);
-+	struct locomo_led *leds;
-+	struct regmap *regmap;
-+
-+	leds = devm_kzalloc(&pdev->dev, 2 * sizeof(*leds), GFP_KERNEL);
-+	if (!leds)
-+		return -ENOMEM;
-+
-+	regmap = dev_get_regmap(pdev->dev.parent, NULL);
-+	if (!regmap)
-+		return -ENODEV;
-+
-+	ret = locomo_led_register(
-+			&pdev->dev,
-+			leds,
-+			"locomo:amber:charge",
-+			"main-battery-charging",
-+			regmap,
-+			LOCOMO_LPT0);
- 	if (ret < 0)
- 		return ret;
- 
--	ret = led_classdev_register(&ldev->dev, &locomo_led1);
-+	ret = locomo_led_register(
-+			&pdev->dev,
-+			leds + 1,
-+			"locomo:green:mail",
-+			"mmc0",
-+			regmap,
-+			LOCOMO_LPT1);
- 	if (ret < 0)
--		led_classdev_unregister(&locomo_led0);
+-	/* Install handlers for IRQ_LOCOMO_* */
+-	for ( ; irq <= lchip->irq_base + 3; irq++) {
+-		irq_set_chip_and_handler(irq, &locomo_chip, handle_level_irq);
+-		irq_set_chip_data(irq, lchip);
+-		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+-	}
+-}
 -
+-
+-static void locomo_dev_release(struct device *_dev)
+-{
+-	struct locomo_dev *dev = LOCOMO_DEV(_dev);
+-
+-	kfree(dev);
+-}
+-
+-static int
+-locomo_init_one_child(struct locomo *lchip, struct locomo_dev_info *info)
+-{
+-	struct locomo_dev *dev;
+-	int ret;
+-
+-	dev = kzalloc(sizeof(struct locomo_dev), GFP_KERNEL);
+-	if (!dev) {
+-		ret = -ENOMEM;
+-		goto out;
+-	}
+-
+-	/*
+-	 * If the parent device has a DMA mask associated with it,
+-	 * propagate it down to the children.
+-	 */
+-	if (lchip->dev->dma_mask) {
+-		dev->dma_mask = *lchip->dev->dma_mask;
+-		dev->dev.dma_mask = &dev->dma_mask;
+-	}
+-
+-	dev_set_name(&dev->dev, "%s", info->name);
+-	dev->devid	 = info->devid;
+-	dev->dev.parent  = lchip->dev;
+-	dev->dev.bus     = &locomo_bus_type;
+-	dev->dev.release = locomo_dev_release;
+-	dev->dev.coherent_dma_mask = lchip->dev->coherent_dma_mask;
+-
+-	if (info->offset)
+-		dev->mapbase = lchip->base + info->offset;
+-	else
+-		dev->mapbase = 0;
+-	dev->length = info->length;
+-
+-	dev->irq[0] = (lchip->irq_base == NO_IRQ) ?
+-			NO_IRQ : lchip->irq_base + info->irq[0];
+-
+-	ret = device_register(&dev->dev);
+-	if (ret) {
+- out:
+-		kfree(dev);
+-	}
 -	return ret;
 -}
-+		return ret;
- 
--static int locomoled_remove(struct locomo_dev *dev)
+-
+-#ifdef CONFIG_PM
+-
+-struct locomo_save_data {
+-	u16	LCM_GPO;
+-	u16	LCM_SPICT;
+-	u16	LCM_GPE;
+-	u16	LCM_ASD;
+-	u16	LCM_SPIMD;
+-};
+-
+-static int locomo_suspend(struct platform_device *dev, pm_message_t state)
 -{
--	led_classdev_unregister(&locomo_led0);
--	led_classdev_unregister(&locomo_led1);
- 	return 0;
- }
- 
--static struct locomo_driver locomoled_driver = {
--	.drv = {
--		.name = "locomoled"
-+static struct platform_driver locomoled_driver = {
-+	.driver = {
-+		.name = "locomo-led"
- 	},
--	.devid	= LOCOMO_DEVID_LED,
- 	.probe	= locomoled_probe,
--	.remove	= locomoled_remove,
- };
- 
--static int __init locomoled_init(void)
--{
--	return locomo_driver_register(&locomoled_driver);
+-	struct locomo *lchip = platform_get_drvdata(dev);
+-	struct locomo_save_data *save;
+-	unsigned long flags;
+-
+-	save = kmalloc(sizeof(struct locomo_save_data), GFP_KERNEL);
+-	if (!save)
+-		return -ENOMEM;
+-
+-	lchip->saved_state = save;
+-
+-	spin_lock_irqsave(&lchip->lock, flags);
+-
+-	save->LCM_GPO     = locomo_readl(lchip->base + LOCOMO_GPO);	/* GPIO */
+-	locomo_writel(0x00, lchip->base + LOCOMO_GPO);
+-	save->LCM_SPICT   = locomo_readl(lchip->base + LOCOMO_SPI + LOCOMO_SPICT);	/* SPI */
+-	locomo_writel(0x40, lchip->base + LOCOMO_SPI + LOCOMO_SPICT);
+-	save->LCM_GPE     = locomo_readl(lchip->base + LOCOMO_GPE);	/* GPIO */
+-	locomo_writel(0x00, lchip->base + LOCOMO_GPE);
+-	save->LCM_ASD     = locomo_readl(lchip->base + LOCOMO_ASD);	/* ADSTART */
+-	locomo_writel(0x00, lchip->base + LOCOMO_ASD);
+-	save->LCM_SPIMD   = locomo_readl(lchip->base + LOCOMO_SPI + LOCOMO_SPIMD);	/* SPI */
+-	locomo_writel(0x3C14, lchip->base + LOCOMO_SPI + LOCOMO_SPIMD);
+-
+-	locomo_writel(0x00, lchip->base + LOCOMO_PAIF);
+-	locomo_writel(0x00, lchip->base + LOCOMO_DAC);
+-	locomo_writel(0x00, lchip->base + LOCOMO_BACKLIGHT + LOCOMO_TC);
+-
+-	if ((locomo_readl(lchip->base + LOCOMO_LED + LOCOMO_LPT0) & 0x88) && (locomo_readl(lchip->base + LOCOMO_LED + LOCOMO_LPT1) & 0x88))
+-		locomo_writel(0x00, lchip->base + LOCOMO_C32K); 	/* CLK32 off */
+-	else
+-		/* 18MHz already enabled, so no wait */
+-		locomo_writel(0xc1, lchip->base + LOCOMO_C32K); 	/* CLK32 on */
+-
+-	locomo_writel(0x00, lchip->base + LOCOMO_TADC);		/* 18MHz clock off*/
+-	locomo_writel(0x00, lchip->base + LOCOMO_AUDIO + LOCOMO_ACC);			/* 22MHz/24MHz clock off */
+-	locomo_writel(0x00, lchip->base + LOCOMO_FRONTLIGHT + LOCOMO_ALS);			/* FL */
+-
+-	spin_unlock_irqrestore(&lchip->lock, flags);
+-
+-	return 0;
 -}
--module_init(locomoled_init);
-+module_platform_driver(locomoled_driver);
- 
- MODULE_AUTHOR("John Lenz <lenz@cs.wisc.edu>");
- MODULE_DESCRIPTION("Locomo LED driver");
- MODULE_LICENSE("GPL");
-+MODULE_ALIAS("platform:locomo-led");
+-
+-static int locomo_resume(struct platform_device *dev)
+-{
+-	struct locomo *lchip = platform_get_drvdata(dev);
+-	struct locomo_save_data *save;
+-	unsigned long r;
+-	unsigned long flags;
+-
+-	save = lchip->saved_state;
+-	if (!save)
+-		return 0;
+-
+-	spin_lock_irqsave(&lchip->lock, flags);
+-
+-	locomo_writel(save->LCM_GPO, lchip->base + LOCOMO_GPO);
+-	locomo_writel(save->LCM_SPICT, lchip->base + LOCOMO_SPI + LOCOMO_SPICT);
+-	locomo_writel(save->LCM_GPE, lchip->base + LOCOMO_GPE);
+-	locomo_writel(save->LCM_ASD, lchip->base + LOCOMO_ASD);
+-	locomo_writel(save->LCM_SPIMD, lchip->base + LOCOMO_SPI + LOCOMO_SPIMD);
+-
+-	locomo_writel(0x00, lchip->base + LOCOMO_C32K);
+-	locomo_writel(0x90, lchip->base + LOCOMO_TADC);
+-
+-	locomo_writel(0, lchip->base + LOCOMO_KEYBOARD + LOCOMO_KSC);
+-	r = locomo_readl(lchip->base + LOCOMO_KEYBOARD + LOCOMO_KIC);
+-	r &= 0xFEFF;
+-	locomo_writel(r, lchip->base + LOCOMO_KEYBOARD + LOCOMO_KIC);
+-	locomo_writel(0x1, lchip->base + LOCOMO_KEYBOARD + LOCOMO_KCMD);
+-
+-	spin_unlock_irqrestore(&lchip->lock, flags);
+-
+-	lchip->saved_state = NULL;
+-	kfree(save);
+-
+-	return 0;
+-}
+-#endif
+-
+-
+-/**
+- *	locomo_probe - probe for a single LoCoMo chip.
+- *	@phys_addr: physical address of device.
+- *
+- *	Probe for a LoCoMo chip.  This must be called
+- *	before any other locomo-specific code.
+- *
+- *	Returns:
+- *	%-ENODEV	device not found.
+- *	%-EBUSY		physical address already marked in-use.
+- *	%0		successful.
+- */
+-static int
+-__locomo_probe(struct device *me, struct resource *mem, int irq)
+-{
+-	struct locomo_platform_data *pdata = me->platform_data;
+-	struct locomo *lchip;
+-	unsigned long r;
+-	int i, ret = -ENODEV;
+-
+-	lchip = kzalloc(sizeof(struct locomo), GFP_KERNEL);
+-	if (!lchip)
+-		return -ENOMEM;
+-
+-	spin_lock_init(&lchip->lock);
+-
+-	lchip->dev = me;
+-	dev_set_drvdata(lchip->dev, lchip);
+-
+-	lchip->phys = mem->start;
+-	lchip->irq = irq;
+-	lchip->irq_base = (pdata) ? pdata->irq_base : NO_IRQ;
+-
+-	/*
+-	 * Map the whole region.  This also maps the
+-	 * registers for our children.
+-	 */
+-	lchip->base = ioremap(mem->start, PAGE_SIZE);
+-	if (!lchip->base) {
+-		ret = -ENOMEM;
+-		goto out;
+-	}
+-
+-	/* locomo initialize */
+-	locomo_writel(0, lchip->base + LOCOMO_ICR);
+-	/* KEYBOARD */
+-	locomo_writel(0, lchip->base + LOCOMO_KEYBOARD + LOCOMO_KIC);
+-
+-	/* GPIO */
+-	locomo_writel(0, lchip->base + LOCOMO_GPO);
+-	locomo_writel((LOCOMO_GPIO(1) | LOCOMO_GPIO(2) | LOCOMO_GPIO(13) | LOCOMO_GPIO(14))
+-			, lchip->base + LOCOMO_GPE);
+-	locomo_writel((LOCOMO_GPIO(1) | LOCOMO_GPIO(2) | LOCOMO_GPIO(13) | LOCOMO_GPIO(14))
+-			, lchip->base + LOCOMO_GPD);
+-	locomo_writel(0, lchip->base + LOCOMO_GIE);
+-
+-	/* Frontlight */
+-	locomo_writel(0, lchip->base + LOCOMO_FRONTLIGHT + LOCOMO_ALS);
+-	locomo_writel(0, lchip->base + LOCOMO_FRONTLIGHT + LOCOMO_ALD);
+-
+-	/* Longtime timer */
+-	locomo_writel(0, lchip->base + LOCOMO_LTINT);
+-	/* SPI */
+-	locomo_writel(0, lchip->base + LOCOMO_SPI + LOCOMO_SPIIE);
+-
+-	locomo_writel(6 + 8 + 320 + 30 - 10, lchip->base + LOCOMO_ASD);
+-	r = locomo_readl(lchip->base + LOCOMO_ASD);
+-	r |= 0x8000;
+-	locomo_writel(r, lchip->base + LOCOMO_ASD);
+-
+-	locomo_writel(6 + 8 + 320 + 30 - 10 - 128 + 4, lchip->base + LOCOMO_HSD);
+-	r = locomo_readl(lchip->base + LOCOMO_HSD);
+-	r |= 0x8000;
+-	locomo_writel(r, lchip->base + LOCOMO_HSD);
+-
+-	locomo_writel(128 / 8, lchip->base + LOCOMO_HSC);
+-
+-	/* XON */
+-	locomo_writel(0x80, lchip->base + LOCOMO_TADC);
+-	udelay(1000);
+-	/* CLK9MEN */
+-	r = locomo_readl(lchip->base + LOCOMO_TADC);
+-	r |= 0x10;
+-	locomo_writel(r, lchip->base + LOCOMO_TADC);
+-	udelay(100);
+-
+-	/* init DAC */
+-	r = locomo_readl(lchip->base + LOCOMO_DAC);
+-	r |= LOCOMO_DAC_SCLOEB | LOCOMO_DAC_SDAOEB;
+-	locomo_writel(r, lchip->base + LOCOMO_DAC);
+-
+-	r = locomo_readl(lchip->base + LOCOMO_VER);
+-	printk(KERN_INFO "LoCoMo Chip: %lu%lu\n", (r >> 8), (r & 0xff));
+-
+-	/*
+-	 * The interrupt controller must be initialised before any
+-	 * other device to ensure that the interrupts are available.
+-	 */
+-	if (lchip->irq != NO_IRQ && lchip->irq_base != NO_IRQ)
+-		locomo_setup_irq(lchip);
+-
+-	for (i = 0; i < ARRAY_SIZE(locomo_devices); i++)
+-		locomo_init_one_child(lchip, &locomo_devices[i]);
+-	return 0;
+-
+- out:
+-	kfree(lchip);
+-	return ret;
+-}
+-
+-static int locomo_remove_child(struct device *dev, void *data)
+-{
+-	device_unregister(dev);
+-	return 0;
+-} 
+-
+-static void __locomo_remove(struct locomo *lchip)
+-{
+-	device_for_each_child(lchip->dev, NULL, locomo_remove_child);
+-
+-	if (lchip->irq != NO_IRQ) {
+-		irq_set_chained_handler(lchip->irq, NULL);
+-		irq_set_handler_data(lchip->irq, NULL);
+-	}
+-
+-	iounmap(lchip->base);
+-	kfree(lchip);
+-}
+-
+-static int locomo_probe(struct platform_device *dev)
+-{
+-	struct resource *mem;
+-	int irq;
+-
+-	mem = platform_get_resource(dev, IORESOURCE_MEM, 0);
+-	if (!mem)
+-		return -EINVAL;
+-	irq = platform_get_irq(dev, 0);
+-	if (irq < 0)
+-		return -ENXIO;
+-
+-	return __locomo_probe(&dev->dev, mem, irq);
+-}
+-
+-static int locomo_remove(struct platform_device *dev)
+-{
+-	struct locomo *lchip = platform_get_drvdata(dev);
+-
+-	if (lchip) {
+-		__locomo_remove(lchip);
+-		platform_set_drvdata(dev, NULL);
+-	}
+-
+-	return 0;
+-}
+-
+-/*
+- *	Not sure if this should be on the system bus or not yet.
+- *	We really want some way to register a system device at
+- *	the per-machine level, and then have this driver pick
+- *	up the registered devices.
+- */
+-static struct platform_driver locomo_device_driver = {
+-	.probe		= locomo_probe,
+-	.remove		= locomo_remove,
+-#ifdef CONFIG_PM
+-	.suspend	= locomo_suspend,
+-	.resume		= locomo_resume,
+-#endif
+-	.driver		= {
+-		.name	= "locomo",
+-	},
+-};
+-
+-/*
+- *	Get the parent device driver (us) structure
+- *	from a child function device
+- */
+-static inline struct locomo *locomo_chip_driver(struct locomo_dev *ldev)
+-{
+-	return (struct locomo *)dev_get_drvdata(ldev->dev.parent);
+-}
+-
+-void locomo_gpio_set_dir(struct device *dev, unsigned int bits, unsigned int dir)
+-{
+-	struct locomo *lchip = dev_get_drvdata(dev);
+-	unsigned long flags;
+-	unsigned int r;
+-
+-	if (!lchip)
+-		return;
+-
+-	spin_lock_irqsave(&lchip->lock, flags);
+-
+-	r = locomo_readl(lchip->base + LOCOMO_GPD);
+-	if (dir)
+-		r |= bits;
+-	else
+-		r &= ~bits;
+-	locomo_writel(r, lchip->base + LOCOMO_GPD);
+-
+-	r = locomo_readl(lchip->base + LOCOMO_GPE);
+-	if (dir)
+-		r |= bits;
+-	else
+-		r &= ~bits;
+-	locomo_writel(r, lchip->base + LOCOMO_GPE);
+-
+-	spin_unlock_irqrestore(&lchip->lock, flags);
+-}
+-EXPORT_SYMBOL(locomo_gpio_set_dir);
+-
+-int locomo_gpio_read_level(struct device *dev, unsigned int bits)
+-{
+-	struct locomo *lchip = dev_get_drvdata(dev);
+-	unsigned long flags;
+-	unsigned int ret;
+-
+-	if (!lchip)
+-		return -ENODEV;
+-
+-	spin_lock_irqsave(&lchip->lock, flags);
+-	ret = locomo_readl(lchip->base + LOCOMO_GPL);
+-	spin_unlock_irqrestore(&lchip->lock, flags);
+-
+-	ret &= bits;
+-	return ret;
+-}
+-EXPORT_SYMBOL(locomo_gpio_read_level);
+-
+-int locomo_gpio_read_output(struct device *dev, unsigned int bits)
+-{
+-	struct locomo *lchip = dev_get_drvdata(dev);
+-	unsigned long flags;
+-	unsigned int ret;
+-
+-	if (!lchip)
+-		return -ENODEV;
+-
+-	spin_lock_irqsave(&lchip->lock, flags);
+-	ret = locomo_readl(lchip->base + LOCOMO_GPO);
+-	spin_unlock_irqrestore(&lchip->lock, flags);
+-
+-	ret &= bits;
+-	return ret;
+-}
+-EXPORT_SYMBOL(locomo_gpio_read_output);
+-
+-void locomo_gpio_write(struct device *dev, unsigned int bits, unsigned int set)
+-{
+-	struct locomo *lchip = dev_get_drvdata(dev);
+-	unsigned long flags;
+-	unsigned int r;
+-
+-	if (!lchip)
+-		return;
+-
+-	spin_lock_irqsave(&lchip->lock, flags);
+-
+-	r = locomo_readl(lchip->base + LOCOMO_GPO);
+-	if (set)
+-		r |= bits;
+-	else
+-		r &= ~bits;
+-	locomo_writel(r, lchip->base + LOCOMO_GPO);
+-
+-	spin_unlock_irqrestore(&lchip->lock, flags);
+-}
+-EXPORT_SYMBOL(locomo_gpio_write);
+-
+-static void locomo_m62332_sendbit(void *mapbase, int bit)
+-{
+-	unsigned int r;
+-
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
+-	r &=  ~(LOCOMO_DAC_SCLOEB);
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
+-	udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+-	udelay(DAC_DATA_HOLD_TIME);	/* 300 nsec */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
+-	r &=  ~(LOCOMO_DAC_SCLOEB);
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
+-	udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+-	udelay(DAC_SCL_LOW_HOLD_TIME);	/* 4.7 usec */
+-
+-	if (bit & 1) {
+-		r = locomo_readl(mapbase + LOCOMO_DAC);
+-		r |=  LOCOMO_DAC_SDAOEB;
+-		locomo_writel(r, mapbase + LOCOMO_DAC);
+-		udelay(DAC_HIGH_SETUP_TIME);	/* 1000 nsec */
+-	} else {
+-		r = locomo_readl(mapbase + LOCOMO_DAC);
+-		r &=  ~(LOCOMO_DAC_SDAOEB);
+-		locomo_writel(r, mapbase + LOCOMO_DAC);
+-		udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+-	}
+-
+-	udelay(DAC_DATA_SETUP_TIME);	/* 250 nsec */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
+-	r |=  LOCOMO_DAC_SCLOEB;
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
+-	udelay(DAC_HIGH_SETUP_TIME);	/* 1000 nsec */
+-	udelay(DAC_SCL_HIGH_HOLD_TIME);	/*  4.0 usec */
+-}
+-
+-void locomo_m62332_senddata(struct locomo_dev *ldev, unsigned int dac_data, int channel)
+-{
+-	struct locomo *lchip = locomo_chip_driver(ldev);
+-	int i;
+-	unsigned char data;
+-	unsigned int r;
+-	void *mapbase = lchip->base;
+-	unsigned long flags;
+-
+-	spin_lock_irqsave(&lchip->lock, flags);
+-
+-	/* Start */
+-	udelay(DAC_BUS_FREE_TIME);	/* 5.0 usec */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
+-	r |=  LOCOMO_DAC_SCLOEB | LOCOMO_DAC_SDAOEB;
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
+-	udelay(DAC_HIGH_SETUP_TIME);	/* 1000 nsec */
+-	udelay(DAC_SCL_HIGH_HOLD_TIME);	/* 4.0 usec */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
+-	r &=  ~(LOCOMO_DAC_SDAOEB);
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
+-	udelay(DAC_START_HOLD_TIME);	/* 5.0 usec */
+-	udelay(DAC_DATA_HOLD_TIME);	/* 300 nsec */
+-
+-	/* Send slave address and W bit (LSB is W bit) */
+-	data = (M62332_SLAVE_ADDR << 1) | M62332_W_BIT;
+-	for (i = 1; i <= 8; i++) {
+-		locomo_m62332_sendbit(mapbase, data >> (8 - i));
+-	}
+-
+-	/* Check A bit */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
+-	r &=  ~(LOCOMO_DAC_SCLOEB);
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
+-	udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+-	udelay(DAC_SCL_LOW_HOLD_TIME);	/* 4.7 usec */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
+-	r &=  ~(LOCOMO_DAC_SDAOEB);
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
+-	udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
+-	r |=  LOCOMO_DAC_SCLOEB;
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
+-	udelay(DAC_HIGH_SETUP_TIME);	/* 1000 nsec */
+-	udelay(DAC_SCL_HIGH_HOLD_TIME);	/* 4.7 usec */
+-	if (locomo_readl(mapbase + LOCOMO_DAC) & LOCOMO_DAC_SDAOEB) {	/* High is error */
+-		printk(KERN_WARNING "locomo: m62332_senddata Error 1\n");
+-		goto out;
+-	}
+-
+-	/* Send Sub address (LSB is channel select) */
+-	/*    channel = 0 : ch1 select              */
+-	/*            = 1 : ch2 select              */
+-	data = M62332_SUB_ADDR + channel;
+-	for (i = 1; i <= 8; i++) {
+-		locomo_m62332_sendbit(mapbase, data >> (8 - i));
+-	}
+-
+-	/* Check A bit */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
+-	r &=  ~(LOCOMO_DAC_SCLOEB);
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
+-	udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+-	udelay(DAC_SCL_LOW_HOLD_TIME);	/* 4.7 usec */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
+-	r &=  ~(LOCOMO_DAC_SDAOEB);
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
+-	udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
+-	r |=  LOCOMO_DAC_SCLOEB;
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
+-	udelay(DAC_HIGH_SETUP_TIME);	/* 1000 nsec */
+-	udelay(DAC_SCL_HIGH_HOLD_TIME);	/* 4.7 usec */
+-	if (locomo_readl(mapbase + LOCOMO_DAC) & LOCOMO_DAC_SDAOEB) {	/* High is error */
+-		printk(KERN_WARNING "locomo: m62332_senddata Error 2\n");
+-		goto out;
+-	}
+-
+-	/* Send DAC data */
+-	for (i = 1; i <= 8; i++) {
+-		locomo_m62332_sendbit(mapbase, dac_data >> (8 - i));
+-	}
+-
+-	/* Check A bit */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
+-	r &=  ~(LOCOMO_DAC_SCLOEB);
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
+-	udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+-	udelay(DAC_SCL_LOW_HOLD_TIME);	/* 4.7 usec */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
+-	r &=  ~(LOCOMO_DAC_SDAOEB);
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
+-	udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
+-	r |=  LOCOMO_DAC_SCLOEB;
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
+-	udelay(DAC_HIGH_SETUP_TIME);	/* 1000 nsec */
+-	udelay(DAC_SCL_HIGH_HOLD_TIME);	/* 4.7 usec */
+-	if (locomo_readl(mapbase + LOCOMO_DAC) & LOCOMO_DAC_SDAOEB) {	/* High is error */
+-		printk(KERN_WARNING "locomo: m62332_senddata Error 3\n");
+-	}
+-
+-out:
+-	/* stop */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
+-	r &=  ~(LOCOMO_DAC_SCLOEB);
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
+-	udelay(DAC_LOW_SETUP_TIME);	/* 300 nsec */
+-	udelay(DAC_SCL_LOW_HOLD_TIME);	/* 4.7 usec */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
+-	r |=  LOCOMO_DAC_SCLOEB;
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
+-	udelay(DAC_HIGH_SETUP_TIME);	/* 1000 nsec */
+-	udelay(DAC_SCL_HIGH_HOLD_TIME);	/* 4 usec */
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
+-	r |=  LOCOMO_DAC_SDAOEB;
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
+-	udelay(DAC_HIGH_SETUP_TIME);	/* 1000 nsec */
+-	udelay(DAC_SCL_HIGH_HOLD_TIME);	/* 4 usec */
+-
+-	r = locomo_readl(mapbase + LOCOMO_DAC);
+-	r |=  LOCOMO_DAC_SCLOEB | LOCOMO_DAC_SDAOEB;
+-	locomo_writel(r, mapbase + LOCOMO_DAC);
+-	udelay(DAC_LOW_SETUP_TIME);	/* 1000 nsec */
+-	udelay(DAC_SCL_LOW_HOLD_TIME);	/* 4.7 usec */
+-
+-	spin_unlock_irqrestore(&lchip->lock, flags);
+-}
+-EXPORT_SYMBOL(locomo_m62332_senddata);
+-
+-/*
+- *	Frontlight control
+- */
+-
+-void locomo_frontlight_set(struct locomo_dev *dev, int duty, int vr, int bpwf)
+-{
+-	unsigned long flags;
+-	struct locomo *lchip = locomo_chip_driver(dev);
+-
+-	if (vr)
+-		locomo_gpio_write(dev->dev.parent, LOCOMO_GPIO_FL_VR, 1);
+-	else
+-		locomo_gpio_write(dev->dev.parent, LOCOMO_GPIO_FL_VR, 0);
+-
+-	spin_lock_irqsave(&lchip->lock, flags);
+-	locomo_writel(bpwf, lchip->base + LOCOMO_FRONTLIGHT + LOCOMO_ALS);
+-	udelay(100);
+-	locomo_writel(duty, lchip->base + LOCOMO_FRONTLIGHT + LOCOMO_ALD);
+-	locomo_writel(bpwf | LOCOMO_ALC_EN, lchip->base + LOCOMO_FRONTLIGHT + LOCOMO_ALS);
+-	spin_unlock_irqrestore(&lchip->lock, flags);
+-}
+-EXPORT_SYMBOL(locomo_frontlight_set);
+-
+-/*
+- *	LoCoMo "Register Access Bus."
+- *
+- *	We model this as a regular bus type, and hang devices directly
+- *	off this.
+- */
+-static int locomo_match(struct device *_dev, struct device_driver *_drv)
+-{
+-	struct locomo_dev *dev = LOCOMO_DEV(_dev);
+-	struct locomo_driver *drv = LOCOMO_DRV(_drv);
+-
+-	return dev->devid == drv->devid;
+-}
+-
+-static int locomo_bus_suspend(struct device *dev, pm_message_t state)
+-{
+-	struct locomo_dev *ldev = LOCOMO_DEV(dev);
+-	struct locomo_driver *drv = LOCOMO_DRV(dev->driver);
+-	int ret = 0;
+-
+-	if (drv && drv->suspend)
+-		ret = drv->suspend(ldev, state);
+-	return ret;
+-}
+-
+-static int locomo_bus_resume(struct device *dev)
+-{
+-	struct locomo_dev *ldev = LOCOMO_DEV(dev);
+-	struct locomo_driver *drv = LOCOMO_DRV(dev->driver);
+-	int ret = 0;
+-
+-	if (drv && drv->resume)
+-		ret = drv->resume(ldev);
+-	return ret;
+-}
+-
+-static int locomo_bus_probe(struct device *dev)
+-{
+-	struct locomo_dev *ldev = LOCOMO_DEV(dev);
+-	struct locomo_driver *drv = LOCOMO_DRV(dev->driver);
+-	int ret = -ENODEV;
+-
+-	if (drv->probe)
+-		ret = drv->probe(ldev);
+-	return ret;
+-}
+-
+-static int locomo_bus_remove(struct device *dev)
+-{
+-	struct locomo_dev *ldev = LOCOMO_DEV(dev);
+-	struct locomo_driver *drv = LOCOMO_DRV(dev->driver);
+-	int ret = 0;
+-
+-	if (drv->remove)
+-		ret = drv->remove(ldev);
+-	return ret;
+-}
+-
+-struct bus_type locomo_bus_type = {
+-	.name		= "locomo-bus",
+-	.match		= locomo_match,
+-	.probe		= locomo_bus_probe,
+-	.remove		= locomo_bus_remove,
+-	.suspend	= locomo_bus_suspend,
+-	.resume		= locomo_bus_resume,
+-};
+-
+-int locomo_driver_register(struct locomo_driver *driver)
+-{
+-	driver->drv.bus = &locomo_bus_type;
+-	return driver_register(&driver->drv);
+-}
+-EXPORT_SYMBOL(locomo_driver_register);
+-
+-void locomo_driver_unregister(struct locomo_driver *driver)
+-{
+-	driver_unregister(&driver->drv);
+-}
+-EXPORT_SYMBOL(locomo_driver_unregister);
+-
+-static int __init locomo_init(void)
+-{
+-	int ret = bus_register(&locomo_bus_type);
+-	if (ret == 0)
+-		platform_driver_register(&locomo_device_driver);
+-	return ret;
+-}
+-
+-static void __exit locomo_exit(void)
+-{
+-	platform_driver_unregister(&locomo_device_driver);
+-	bus_unregister(&locomo_bus_type);
+-}
+-
+-module_init(locomo_init);
+-module_exit(locomo_exit);
+-
+-MODULE_DESCRIPTION("Sharp LoCoMo core driver");
+-MODULE_LICENSE("GPL");
+-MODULE_AUTHOR("John Lenz <lenz@cs.wisc.edu>");
+diff --git a/arch/arm/include/asm/hardware/locomo.h b/arch/arm/include/asm/hardware/locomo.h
+deleted file mode 100644
+index 74e51d6b..0000000
+--- a/arch/arm/include/asm/hardware/locomo.h
++++ /dev/null
+@@ -1,221 +0,0 @@
+-/*
+- * arch/arm/include/asm/hardware/locomo.h
+- *
+- * This file contains the definitions for the LoCoMo G/A Chip
+- *
+- * (C) Copyright 2004 John Lenz
+- *
+- * May be copied or modified under the terms of the GNU General Public
+- * License.  See linux/COPYING for more information.
+- *
+- * Based on sa1111.h
+- */
+-#ifndef _ASM_ARCH_LOCOMO
+-#define _ASM_ARCH_LOCOMO
+-
+-#define locomo_writel(val,addr)	({ *(volatile u16 *)(addr) = (val); })
+-#define locomo_readl(addr)	(*(volatile u16 *)(addr))
+-
+-/* LOCOMO version */
+-#define LOCOMO_VER	0x00
+-
+-/* Pin status */
+-#define LOCOMO_ST	0x04
+-
+-/* Pin status */
+-#define LOCOMO_C32K	0x08
+-
+-/* Interrupt controller */
+-#define LOCOMO_ICR	0x0C
+-
+-/* MCS decoder for boot selecting */
+-#define LOCOMO_MCSX0	0x10
+-#define LOCOMO_MCSX1	0x14
+-#define LOCOMO_MCSX2	0x18
+-#define LOCOMO_MCSX3	0x1c
+-
+-/* Touch panel controller */
+-#define LOCOMO_ASD	0x20		/* AD start delay */
+-#define LOCOMO_HSD	0x28		/* HSYS delay */
+-#define LOCOMO_HSC	0x2c		/* HSYS period */
+-#define LOCOMO_TADC	0x30		/* tablet ADC clock */
+-
+-
+-/* Long time timer */
+-#define LOCOMO_LTC	0xd8		/* LTC interrupt setting */
+-#define LOCOMO_LTINT	0xdc		/* LTC interrupt */
+-
+-/* DAC control signal for LCD (COMADJ ) */
+-#define LOCOMO_DAC		0xe0
+-/* DAC control */
+-#define	LOCOMO_DAC_SCLOEB	0x08	/* SCL pin output data       */
+-#define	LOCOMO_DAC_TEST		0x04	/* Test bit                  */
+-#define	LOCOMO_DAC_SDA		0x02	/* SDA pin level (read-only) */
+-#define	LOCOMO_DAC_SDAOEB	0x01	/* SDA pin output data       */
+-
+-/* SPI interface */
+-#define LOCOMO_SPI	0x60
+-#define LOCOMO_SPIMD	0x00		/* SPI mode setting */
+-#define LOCOMO_SPICT	0x04		/* SPI mode control */
+-#define LOCOMO_SPIST	0x08		/* SPI status */
+-#define	LOCOMO_SPI_TEND	(1 << 3)	/* Transfer end bit */
+-#define	LOCOMO_SPI_REND	(1 << 2)	/* Receive end bit */
+-#define	LOCOMO_SPI_RFW	(1 << 1)	/* write buffer bit */
+-#define	LOCOMO_SPI_RFR	(1)		/* read buffer bit */
+-
+-#define LOCOMO_SPIIS	0x10		/* SPI interrupt status */
+-#define LOCOMO_SPIWE	0x14		/* SPI interrupt status write enable */
+-#define LOCOMO_SPIIE	0x18		/* SPI interrupt enable */
+-#define LOCOMO_SPIIR	0x1c		/* SPI interrupt request */
+-#define LOCOMO_SPITD	0x20		/* SPI transfer data write */
+-#define LOCOMO_SPIRD	0x24		/* SPI receive data read */
+-#define LOCOMO_SPITS	0x28		/* SPI transfer data shift */
+-#define LOCOMO_SPIRS	0x2C		/* SPI receive data shift */
+-
+-/* GPIO */
+-#define LOCOMO_GPD		0x90	/* GPIO direction */
+-#define LOCOMO_GPE		0x94	/* GPIO input enable */
+-#define LOCOMO_GPL		0x98	/* GPIO level */
+-#define LOCOMO_GPO		0x9c	/* GPIO out data setting */
+-#define LOCOMO_GRIE		0xa0	/* GPIO rise detection */
+-#define LOCOMO_GFIE		0xa4	/* GPIO fall detection */
+-#define LOCOMO_GIS		0xa8	/* GPIO edge detection status */
+-#define LOCOMO_GWE		0xac	/* GPIO status write enable */
+-#define LOCOMO_GIE		0xb0	/* GPIO interrupt enable */
+-#define LOCOMO_GIR		0xb4	/* GPIO interrupt request */
+-#define	LOCOMO_GPIO(Nb)		(0x01 << (Nb))
+-#define LOCOMO_GPIO_RTS		LOCOMO_GPIO(0)
+-#define LOCOMO_GPIO_CTS		LOCOMO_GPIO(1)
+-#define LOCOMO_GPIO_DSR		LOCOMO_GPIO(2)
+-#define LOCOMO_GPIO_DTR		LOCOMO_GPIO(3)
+-#define LOCOMO_GPIO_LCD_VSHA_ON	LOCOMO_GPIO(4)
+-#define LOCOMO_GPIO_LCD_VSHD_ON	LOCOMO_GPIO(5)
+-#define LOCOMO_GPIO_LCD_VEE_ON	LOCOMO_GPIO(6)
+-#define LOCOMO_GPIO_LCD_MOD	LOCOMO_GPIO(7)
+-#define LOCOMO_GPIO_DAC_ON	LOCOMO_GPIO(8)
+-#define LOCOMO_GPIO_FL_VR	LOCOMO_GPIO(9)
+-#define LOCOMO_GPIO_DAC_SDATA	LOCOMO_GPIO(10)
+-#define LOCOMO_GPIO_DAC_SCK	LOCOMO_GPIO(11)
+-#define LOCOMO_GPIO_DAC_SLOAD	LOCOMO_GPIO(12)
+-#define LOCOMO_GPIO_CARD_DETECT LOCOMO_GPIO(13)
+-#define LOCOMO_GPIO_WRITE_PROT  LOCOMO_GPIO(14)
+-#define LOCOMO_GPIO_CARD_POWER  LOCOMO_GPIO(15)
+-
+-/* Start the definitions of the devices.  Each device has an initial
+- * base address and a series of offsets from that base address. */
+-
+-/* Keyboard controller */
+-#define LOCOMO_KEYBOARD		0x40
+-#define LOCOMO_KIB		0x00	/* KIB level */
+-#define LOCOMO_KSC		0x04	/* KSTRB control */
+-#define LOCOMO_KCMD		0x08	/* KSTRB command */
+-#define LOCOMO_KIC		0x0c	/* Key interrupt */
+-
+-/* Front light adjustment controller */
+-#define LOCOMO_FRONTLIGHT	0xc8
+-#define LOCOMO_ALS		0x00	/* Adjust light cycle */
+-#define LOCOMO_ALD		0x04	/* Adjust light duty */
+-
+-#define LOCOMO_ALC_EN		0x8000
+-
+-/* Backlight controller: TFT signal */
+-#define LOCOMO_BACKLIGHT	0x38
+-#define LOCOMO_TC		0x00		/* TFT control signal */
+-#define LOCOMO_CPSD		0x04		/* CPS delay */
+-
+-/* Audio controller */
+-#define LOCOMO_AUDIO		0x54
+-#define LOCOMO_ACC		0x00	/* Audio clock */
+-#define LOCOMO_PAIF		0xD0	/* PCM audio interface */
+-/* Audio clock */
+-#define	LOCOMO_ACC_XON		0x80
+-#define	LOCOMO_ACC_XEN		0x40
+-#define	LOCOMO_ACC_XSEL0	0x00
+-#define	LOCOMO_ACC_XSEL1	0x20
+-#define	LOCOMO_ACC_MCLKEN	0x10
+-#define	LOCOMO_ACC_64FSEN	0x08
+-#define	LOCOMO_ACC_CLKSEL000	0x00	/* mclk  2 */
+-#define	LOCOMO_ACC_CLKSEL001	0x01	/* mclk  3 */
+-#define	LOCOMO_ACC_CLKSEL010	0x02	/* mclk  4 */
+-#define	LOCOMO_ACC_CLKSEL011	0x03	/* mclk  6 */
+-#define	LOCOMO_ACC_CLKSEL100	0x04	/* mclk  8 */
+-#define	LOCOMO_ACC_CLKSEL101	0x05	/* mclk 12 */
+-/* PCM audio interface */
+-#define	LOCOMO_PAIF_SCINV	0x20
+-#define	LOCOMO_PAIF_SCEN	0x10
+-#define	LOCOMO_PAIF_LRCRST	0x08
+-#define	LOCOMO_PAIF_LRCEVE	0x04
+-#define	LOCOMO_PAIF_LRCINV	0x02
+-#define	LOCOMO_PAIF_LRCEN	0x01
+-
+-/* LED controller */
+-#define LOCOMO_LED		0xe8
+-#define LOCOMO_LPT0		0x00
+-#define LOCOMO_LPT1		0x04
+-/* LED control */
+-#define LOCOMO_LPT_TOFH		0x80
+-#define LOCOMO_LPT_TOFL		0x08
+-#define LOCOMO_LPT_TOH(TOH)	((TOH & 0x7) << 4)
+-#define LOCOMO_LPT_TOL(TOL)	((TOL & 0x7))
+-
+-extern struct bus_type locomo_bus_type;
+-
+-#define LOCOMO_DEVID_KEYBOARD	0
+-#define LOCOMO_DEVID_FRONTLIGHT	1
+-#define LOCOMO_DEVID_BACKLIGHT	2
+-#define LOCOMO_DEVID_AUDIO	3
+-#define LOCOMO_DEVID_LED	4
+-#define LOCOMO_DEVID_UART	5
+-#define LOCOMO_DEVID_SPI	6
+-
+-struct locomo_dev {
+-	struct device	dev;
+-	unsigned int	devid;
+-	unsigned int	irq[1];
+-
+-	void		*mapbase;
+-	unsigned long	length;
+-
+-	u64		dma_mask;
+-};
+-
+-#define LOCOMO_DEV(_d)	container_of((_d), struct locomo_dev, dev)
+-
+-#define locomo_get_drvdata(d)	dev_get_drvdata(&(d)->dev)
+-#define locomo_set_drvdata(d,p)	dev_set_drvdata(&(d)->dev, p)
+-
+-struct locomo_driver {
+-	struct device_driver	drv;
+-	unsigned int		devid;
+-	int (*probe)(struct locomo_dev *);
+-	int (*remove)(struct locomo_dev *);
+-	int (*suspend)(struct locomo_dev *, pm_message_t);
+-	int (*resume)(struct locomo_dev *);
+-};
+-
+-#define LOCOMO_DRV(_d)	container_of((_d), struct locomo_driver, drv)
+-
+-#define LOCOMO_DRIVER_NAME(_ldev) ((_ldev)->dev.driver->name)
+-
+-void locomo_lcd_power(struct locomo_dev *, int, unsigned int);
+-
+-int locomo_driver_register(struct locomo_driver *);
+-void locomo_driver_unregister(struct locomo_driver *);
+-
+-/* GPIO control functions */
+-void locomo_gpio_set_dir(struct device *dev, unsigned int bits, unsigned int dir);
+-int locomo_gpio_read_level(struct device *dev, unsigned int bits);
+-int locomo_gpio_read_output(struct device *dev, unsigned int bits);
+-void locomo_gpio_write(struct device *dev, unsigned int bits, unsigned int set);
+-
+-/* M62332 control function */
+-void locomo_m62332_senddata(struct locomo_dev *ldev, unsigned int dac_data, int channel);
+-
+-/* Frontlight control */
+-void locomo_frontlight_set(struct locomo_dev *dev, int duty, int vr, int bpwf);
+-
+-struct locomo_platform_data {
+-	int	irq_base;	/* IRQ base for cascaded on-chip IRQs */
+-};
+-
+-#endif
 -- 
 2.1.4
