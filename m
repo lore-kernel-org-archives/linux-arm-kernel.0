@@ -1,31 +1,121 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 25 May 2015 10:59:43 -0600
-Subject: [PATCH] coresight: etb: Remove simple announcement message
-In-Reply-To: <20150522163327.GU21577@sirena.org.uk>
-References: <1432122101-2233-1-git-send-email-broonie@kernel.org>
- <CANLsYkyW44THumc5ebWnX-sa5zG7X0dv1_UEqUp9Av8c5PDegg@mail.gmail.com>
- <20150522163327.GU21577@sirena.org.uk>
-Message-ID: <CANLsYkwT3WR7Wxy_biWwXdzSsWjMptNdr38d+_1OhiTTnzm5NQ@mail.gmail.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Mon, 25 May 2015 19:05:10 +0200 (CEST)
+Subject: [PATCH v2 1/3] media: atmel-isi: remove the useless code which
+ disable isi
+In-Reply-To: <55516CB5.5020601@atmel.com>
+References: <1428570108-4961-1-git-send-email-josh.wu@atmel.com>
+ <1428570108-4961-2-git-send-email-josh.wu@atmel.com>
+ <Pine.LNX.4.64.1505112147540.12198@axis700.grange>
+ <55516CB5.5020601@atmel.com>
+Message-ID: <Pine.LNX.4.64.1505251904450.26358@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 May 2015 at 10:33, Mark Brown <broonie@kernel.org> wrote:
-> On Fri, May 22, 2015 at 08:17:21AM -0600, Mathieu Poirier wrote:
->
->> Linus Walleij started doing something interesting with the initial
->> printouts [1] and I think this is a better option than not printing
->> anything at all.
->
-> It's definitely better to print information we enumerate from hardware,
-> though I'm not 100% sure if AMBA does the right thing with matching here
-> (most of the buses ignore hardware IDs in favour of DT information if
-> things are bound via DT).
+Hi Josh,
 
-AMBA has been done properly - bypassing the initial ID lookup with the
-"arm,primecell-periphid" binding only prevent the HW from being
-accessed when the DT is parsed.  At driver init time the peripheral ID
-from the DT is checked against the list of AMBA IDs supported by the
-driver and fails if a match is not found.
+On Tue, 12 May 2015, Josh Wu wrote:
 
-One can always force things with the "driver-override" sysfs property
-but that's another story.
+> Hi, Guennadi
+> 
+> On 5/12/2015 4:16 AM, Guennadi Liakhovetski wrote:
+> > Hi Josh,
+> > 
+> > Thanks for the patch. I'm afraid I don't quite understand why it is
+> > needed, could you maybe explain a bit more? Is it because
+> > 
+> > (1) during ISI configuration the pixel clock from the sensor is (usually)
+> > anyway disabled, so, we don't have to additionally disable the ISI,
+> > without the pixel clock the ISI is anyway already disabled.
+> > 
+> > or
+> > 
+> > (2) disabling the ISI at those locations below breaks something, because
+> > when the ISI is disabled, the functionality, that's later used isn't
+> > available.
+> > 
+> > I assume it's (1), but if that's the case, then this patch is just
+> > cosmetic, right?
+> Right, it is (1). This patch doesn't impact the function of isi.
+> 
+> The point is when we disable the ISI, we need make sure ISI peripheral clock
+> and pixel clock is enabled. And also need to check the status register or irq
+> to know whether the disable operation is successful. So best way to disable
+> ISI is to call atmel_isi_wait_status(isi, WAIT_ISI_DISABLE).
+> 
+> From this point, the isi_write(isi, ISI_CTRL, ISI_CTRL_DIS) in
+> atmel_isi_probe() is not useful as ISI peripheral clock is not enable yet.
+> but the other two in configure_geometry(), isi_camera_set_bus_param() can work
+> and may protect the case the ISI is not in off state.
+
+Ok, thanks for the explanation.
+
+> 
+> > The ISI is anyway disabled, so, that operation simply has
+> > no effect, but also doesn't hurt. OTOH, if some sensor keeps its master
+> > clock running all the time, then switching the ISI off as in the current
+> > version helps save some power, unless it breaks anything?
+> So what about to keep the isi_write(isi, ISI_CTRL, ISI_CTRL_DIS) in
+> configure_geometry() and isi_camera_set_bus_param().
+> Only remove it from atmel_isi_probe()?
+
+Good, let's do that.
+
+Thanks
+Guennadi
+
+> 
+> Best Regards,
+> Josh Wu
+> 
+> > 
+> > Thanks
+> > Guennadi
+> > 
+> > On Thu, 9 Apr 2015, Josh Wu wrote:
+> > 
+> > > To program ISI control register, the pixel clock should be enabled.
+> > > So without pixel clock (from sensor) enabled, disable ISI controller is
+> > > not make sense. So this patch remove those code.
+> > > 
+> > > Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> > > ---
+> > > 
+> > > Changes in v2:
+> > > - this file is new added.
+> > > 
+> > >   drivers/media/platform/soc_camera/atmel-isi.c | 5 -----
+> > >   1 file changed, 5 deletions(-)
+> > > 
+> > > diff --git a/drivers/media/platform/soc_camera/atmel-isi.c
+> > > b/drivers/media/platform/soc_camera/atmel-isi.c
+> > > index c125b1d..31254b4 100644
+> > > --- a/drivers/media/platform/soc_camera/atmel-isi.c
+> > > +++ b/drivers/media/platform/soc_camera/atmel-isi.c
+> > > @@ -131,8 +131,6 @@ static int configure_geometry(struct atmel_isi *isi,
+> > > u32 width,
+> > >   		return -EINVAL;
+> > >   	}
+> > >   -	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
+> > > -
+> > >   	cfg2 = isi_readl(isi, ISI_CFG2);
+> > >   	/* Set YCC swap mode */
+> > >   	cfg2 &= ~ISI_CFG2_YCC_SWAP_MODE_MASK;
+> > > @@ -843,7 +841,6 @@ static int isi_camera_set_bus_param(struct
+> > > soc_camera_device *icd)
+> > >     	cfg1 |= ISI_CFG1_THMASK_BEATS_16;
+> > >   -	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
+> > >   	isi_writel(isi, ISI_CFG1, cfg1);
+> > >     	return 0;
+> > > @@ -1022,8 +1019,6 @@ static int atmel_isi_probe(struct platform_device
+> > > *pdev)
+> > >   	if (isi->pdata.data_width_flags & ISI_DATAWIDTH_10)
+> > >   		isi->width_flags |= 1 << 9;
+> > >   -	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
+> > > -
+> > >   	irq = platform_get_irq(pdev, 0);
+> > >   	if (IS_ERR_VALUE(irq)) {
+> > >   		ret = irq;
+> > > -- 
+> > > 1.9.1
+> > > 
+> 
