@@ -1,66 +1,44 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 26 May 2015 00:04:19 +0200
-Subject: [PATCH 2/2] ASoC: atmel: compile pcm driver in snd-soc-atmel_ssc_dai
-In-Reply-To: <1432591459-22613-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1432591459-22613-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1432591459-22613-2-git-send-email-alexandre.belloni@free-electrons.com>
+From: catalin.marinas@foss.arm.com (Catalin Marinas)
+Date: Tue, 26 May 2015 01:36:29 +0300
+Subject: [RFC PATCH 2/2] arm64: Implement vmalloc based thread_info
+ allocator
+In-Reply-To: <5601369.jDWtB6nFJC@wuerfel>
+References: <1432483340-23157-1-git-send-email-jungseoklee85@gmail.com>
+ <B873B881-4972-4524-B1D9-4BB05D7248A4@gmail.com>
+ <F68D2983-226C-4704-A1E0-E79C9425B822@foss.arm.com>
+ <5601369.jDWtB6nFJC@wuerfel>
+Message-ID: <1CD6E4BA-95AF-420C-8270-6AAF783B6F60@foss.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is currently possible to have CONFIG_SND_ATMEL_SOC_SSC=y with either
-CONFIG_SND_ATMEL_SOC_PDC=m or CONFIG_SND_ATMEL_SOC_DMA=m. This results in a
-driver that compiles but does not link with this kind of error:
+On 25 May 2015, at 23:29, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 25 May 2015 19:47:15 Catalin Marinas wrote:
+>> On 25 May 2015, at 13:01, Jungseok Lee <jungseoklee85@gmail.com> wrote:
+>>>> Could the stack size be reduced to 8KB perhaps?
+>>> 
+>>> I guess probably not.
+>>> 
+>>> A commit, 845ad05e, says that 8KB is not enough to cover SpecWeb benchmark.
+>> 
+>> We could go back to 8KB stacks if we implement support for separate IRQ 
+>> stack on arm64. It's not too complicated, we would have to use SP0 for (kernel) threads 
+>> and SP1 for IRQ handlers.
+> 
+> I think most architectures that see a lot of benchmarks have moved to
+> irqstacks at some point, that definitely sounds like a useful idea,
+> even if the implementation turns out to be a bit more tricky than
+> what you describe.
 
-sound/built-in.o: In function `atmel_ssc_set_audio':
-(.text+0x87d90): undefined reference to `atmel_pcm_pdc_platform_register'
-sound/built-in.o: In function `atmel_ssc_put_audio':
-(.text+0x8879a): undefined reference to `atmel_pcm_pdc_platform_unregister'
+Of course, it's more complicated than just setting up two stacks (but I'm away for a 
+week and writing from a phone). We would need to deal with the initial per-CPU setup, 
+rescheduling following an IRQ, CPU on following power management and maybe 
+other issues. However, the architecture helps us a bit by allowing both SP0 and SP1 to be 
+used at EL1. 
 
-Solve that by compiling the selected PCM driver (PDC, DMA or both) in the
-Atmel SSC DAI driver.
+> There are a lot of workloads that would benefit from having lower
+> per-thread memory cost.
 
-Reported-by: Randy Dunlap <rdunlap@infradead.org>
+If we keep the 16KB stack, is there any advantage in a separate IRQ one (assuming 
+that we won't overflow 16KB)?
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- sound/soc/atmel/Kconfig  | 4 ++--
- sound/soc/atmel/Makefile | 8 +++-----
- 2 files changed, 5 insertions(+), 7 deletions(-)
-
-diff --git a/sound/soc/atmel/Kconfig b/sound/soc/atmel/Kconfig
-index 93abe4e6d596..c3152072d682 100644
---- a/sound/soc/atmel/Kconfig
-+++ b/sound/soc/atmel/Kconfig
-@@ -9,10 +9,10 @@ config SND_ATMEL_SOC
- if SND_ATMEL_SOC
- 
- config SND_ATMEL_SOC_PDC
--	tristate
-+	bool
- 
- config SND_ATMEL_SOC_DMA
--	tristate
-+	bool
- 	select SND_SOC_GENERIC_DMAENGINE_PCM
- 
- config SND_ATMEL_SOC_SSC
-diff --git a/sound/soc/atmel/Makefile b/sound/soc/atmel/Makefile
-index b327e5cc8de3..4fa7ac91f972 100644
---- a/sound/soc/atmel/Makefile
-+++ b/sound/soc/atmel/Makefile
-@@ -1,10 +1,8 @@
- # AT91 Platform Support
--snd-soc-atmel-pcm-pdc-objs := atmel-pcm-pdc.o
--snd-soc-atmel-pcm-dma-objs := atmel-pcm-dma.o
--snd-soc-atmel_ssc_dai-objs := atmel_ssc_dai.o
-+snd-soc-atmel-pcm-$(CONFIG_SND_ATMEL_SOC_PDC) := atmel-pcm-pdc.o
-+snd-soc-atmel-pcm-$(CONFIG_SND_ATMEL_SOC_DMA) += atmel-pcm-dma.o
-+snd-soc-atmel_ssc_dai-objs := atmel_ssc_dai.o $(snd-soc-atmel-pcm-y)
- 
--obj-$(CONFIG_SND_ATMEL_SOC_PDC) += snd-soc-atmel-pcm-pdc.o
--obj-$(CONFIG_SND_ATMEL_SOC_DMA) += snd-soc-atmel-pcm-dma.o
- obj-$(CONFIG_SND_ATMEL_SOC_SSC) += snd-soc-atmel_ssc_dai.o
- 
- # AT91 Machine Support
--- 
-2.1.4
+Catalin
