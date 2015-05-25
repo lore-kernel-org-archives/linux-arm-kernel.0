@@ -1,233 +1,145 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 25 May 2015 18:00:08 +0300
-Subject: [PATCHv3 03/27] clk: ti: move OMAP4+ DPLL implementation under
+Date: Mon, 25 May 2015 18:00:07 +0300
+Subject: [PATCHv3 02/27] clk: ti: move generic OMAP DPLL implementation under
  drivers/clk
 In-Reply-To: <1432566032-10860-1-git-send-email-t-kristo@ti.com>
 References: <1432566032-10860-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1432566032-10860-4-git-send-email-t-kristo@ti.com>
+Message-ID: <1432566032-10860-3-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the legacy clock support gone, the OMAP4 specific DPLL implementations
-can be moved under the clock driver. Change some of the function prototypes
-to be static at the same time, and remove some exports from the global TI
-clock driver header.
+With the legacy clock data now gone, we can start moving OMAP clock
+type implementations under clock driver. Start this with moving the
+generic OMAP DPLL clock type under TI clock driver.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/Makefile                       |    6 ++---
- arch/arm/mach-omap2/clock.h                        |    4 ----
- drivers/clk/ti/Makefile                            |    6 ++---
- drivers/clk/ti/clock.h                             |   14 ++++++++++++
- {arch/arm/mach-omap2 => drivers/clk/ti}/dpll44xx.c |   23 ++++++++++----------
- include/linux/clk/ti.h                             |   13 +----------
- 6 files changed, 33 insertions(+), 33 deletions(-)
- rename {arch/arm/mach-omap2 => drivers/clk/ti}/dpll44xx.c (91%)
+ arch/arm/mach-omap2/Makefile                       |    2 +-
+ drivers/clk/ti/Makefile                            |    3 ++-
+ .../arm/mach-omap2 => drivers/clk/ti}/clkt_dpll.c  |   13 ++++++-------
+ drivers/clk/ti/clock.h                             |    2 ++
+ include/linux/clk/ti.h                             |    1 -
+ 5 files changed, 11 insertions(+), 10 deletions(-)
+ rename {arch/arm/mach-omap2 => drivers/clk/ti}/clkt_dpll.c (97%)
 
 diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index fcb5d47..5bcd282 100644
+index ec002bd..fcb5d47 100644
 --- a/arch/arm/mach-omap2/Makefile
 +++ b/arch/arm/mach-omap2/Makefile
-@@ -193,12 +193,12 @@ obj-$(CONFIG_ARCH_OMAP3)		+= clock3517.o clock36xx.o
- obj-$(CONFIG_ARCH_OMAP3)		+= dpll3xxx.o
- obj-$(CONFIG_ARCH_OMAP3)		+= clkt_iclk.o
- obj-$(CONFIG_ARCH_OMAP4)		+= $(clock-common)
--obj-$(CONFIG_ARCH_OMAP4)		+= dpll3xxx.o dpll44xx.o
-+obj-$(CONFIG_ARCH_OMAP4)		+= dpll3xxx.o
- obj-$(CONFIG_SOC_AM33XX)		+= $(clock-common) dpll3xxx.o
- obj-$(CONFIG_SOC_OMAP5)			+= $(clock-common)
--obj-$(CONFIG_SOC_OMAP5)			+= dpll3xxx.o dpll44xx.o
-+obj-$(CONFIG_SOC_OMAP5)			+= dpll3xxx.o
- obj-$(CONFIG_SOC_DRA7XX)		+= $(clock-common)
--obj-$(CONFIG_SOC_DRA7XX)		+= dpll3xxx.o dpll44xx.o
-+obj-$(CONFIG_SOC_DRA7XX)		+= dpll3xxx.o
- obj-$(CONFIG_SOC_AM43XX)		+= $(clock-common) dpll3xxx.o
+@@ -13,7 +13,7 @@ obj-y := id.o io.o control.o mux.o devices.o fb.o serial.o timer.o pm.o \
+ hwmod-common				= omap_hwmod.o omap_hwmod_reset.o \
+ 					  omap_hwmod_common_data.o
+ clock-common				= clock.o clock_common_data.o \
+-					  clkt_dpll.o clkt_clksel.o
++					  clkt_clksel.o
+ secure-common				= omap-smc.o omap-secure.o
  
- # OMAP2 clock rate set data (old "OPP" data)
-diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
-index ac21856..d7ed244 100644
---- a/arch/arm/mach-omap2/clock.h
-+++ b/arch/arm/mach-omap2/clock.h
-@@ -183,8 +183,6 @@ struct clksel {
- u32 omap3_dpll_autoidle_read(struct clk_hw_omap *clk);
- void omap3_dpll_allow_idle(struct clk_hw_omap *clk);
- void omap3_dpll_deny_idle(struct clk_hw_omap *clk);
--void omap4_dpllmx_allow_gatectrl(struct clk_hw_omap *clk);
--void omap4_dpllmx_deny_gatectrl(struct clk_hw_omap *clk);
- 
- void __init omap2_clk_disable_clkdm_control(void);
- 
-@@ -204,8 +202,6 @@ int omap2_clksel_set_parent(struct clk_hw *hw, u8 field_val);
- extern void omap2_clkt_iclk_allow_idle(struct clk_hw_omap *clk);
- extern void omap2_clkt_iclk_deny_idle(struct clk_hw_omap *clk);
- 
--unsigned long omap2_get_dpll_rate(struct clk_hw_omap *clk);
--
- void omap2_clk_dflt_find_companion(struct clk_hw_omap *clk,
- 				   void __iomem **other_reg,
- 				   u8 *other_bit);
+ obj-$(CONFIG_ARCH_OMAP2) += $(omap-2-3-common) $(hwmod-common)
 diff --git a/drivers/clk/ti/Makefile b/drivers/clk/ti/Makefile
-index 62dae2a..c3ec301 100644
+index 105ffd0..62dae2a 100644
 --- a/drivers/clk/ti/Makefile
 +++ b/drivers/clk/ti/Makefile
-@@ -7,10 +7,10 @@ obj-$(CONFIG_SOC_TI81XX)		+= $(clk-common) fapll.o clk-816x.o
+@@ -1,6 +1,7 @@
+ obj-y					+= clk.o autoidle.o clockdomain.o
+ clk-common				= dpll.o composite.o divider.o gate.o \
+-					  fixed-factor.o mux.o apll.o
++					  fixed-factor.o mux.o apll.o \
++					  clkt_dpll.o
+ obj-$(CONFIG_SOC_AM33XX)		+= $(clk-common) clk-33xx.o
+ obj-$(CONFIG_SOC_TI81XX)		+= $(clk-common) fapll.o clk-816x.o
  obj-$(CONFIG_ARCH_OMAP2)		+= $(clk-common) interface.o clk-2xxx.o
- obj-$(CONFIG_ARCH_OMAP3)		+= $(clk-common) interface.o \
- 					   clk-3xxx.o
--obj-$(CONFIG_ARCH_OMAP4)		+= $(clk-common) clk-44xx.o
--obj-$(CONFIG_SOC_OMAP5)			+= $(clk-common) clk-54xx.o
-+obj-$(CONFIG_ARCH_OMAP4)		+= $(clk-common) clk-44xx.o dpll44xx.o
-+obj-$(CONFIG_SOC_OMAP5)			+= $(clk-common) clk-54xx.o dpll44xx.o
- obj-$(CONFIG_SOC_DRA7XX)		+= $(clk-common) clk-7xx.o \
--					   clk-dra7-atl.o
-+					   clk-dra7-atl.o dpll44xx.o
- obj-$(CONFIG_SOC_AM43XX)		+= $(clk-common) clk-43xx.o
+diff --git a/arch/arm/mach-omap2/clkt_dpll.c b/drivers/clk/ti/clkt_dpll.c
+similarity index 97%
+rename from arch/arm/mach-omap2/clkt_dpll.c
+rename to drivers/clk/ti/clkt_dpll.c
+index 82f0600..a01fc7f 100644
+--- a/arch/arm/mach-omap2/clkt_dpll.c
++++ b/drivers/clk/ti/clkt_dpll.c
+@@ -18,6 +18,7 @@
+ #include <linux/errno.h>
+ #include <linux/clk-provider.h>
+ #include <linux/io.h>
++#include <linux/clk/ti.h>
  
- ifdef CONFIG_ATAGS
+ #include <asm/div64.h>
+ 
+@@ -211,7 +212,7 @@ u8 omap2_init_dpll_parent(struct clk_hw *hw)
+ 	if (!dd)
+ 		return -EINVAL;
+ 
+-	v = omap2_clk_readl(clk, dd->control_reg);
++	v = ti_clk_ll_ops->clk_readl(dd->control_reg);
+ 	v &= dd->enable_mask;
+ 	v >>= __ffs(dd->enable_mask);
+ 
+@@ -247,20 +248,20 @@ unsigned long omap2_get_dpll_rate(struct clk_hw_omap *clk)
+ 		return 0;
+ 
+ 	/* Return bypass rate if DPLL is bypassed */
+-	v = omap2_clk_readl(clk, dd->control_reg);
++	v = ti_clk_ll_ops->clk_readl(dd->control_reg);
+ 	v &= dd->enable_mask;
+ 	v >>= __ffs(dd->enable_mask);
+ 
+ 	if (_omap2_dpll_is_in_bypass(v))
+ 		return __clk_get_rate(dd->clk_bypass);
+ 
+-	v = omap2_clk_readl(clk, dd->mult_div1_reg);
++	v = ti_clk_ll_ops->clk_readl(dd->mult_div1_reg);
+ 	dpll_mult = v & dd->mult_mask;
+ 	dpll_mult >>= __ffs(dd->mult_mask);
+ 	dpll_div = v & dd->div1_mask;
+ 	dpll_div >>= __ffs(dd->div1_mask);
+ 
+-	dpll_clk = (long long) __clk_get_rate(dd->clk_ref) * dpll_mult;
++	dpll_clk = (long long)__clk_get_rate(dd->clk_ref) * dpll_mult;
+ 	do_div(dpll_clk, dpll_div + 1);
+ 
+ 	return dpll_clk;
+@@ -281,7 +282,7 @@ unsigned long omap2_get_dpll_rate(struct clk_hw_omap *clk)
+  * be rounded, or the rounded rate upon success.
+  */
+ long omap2_dpll_round_rate(struct clk_hw *hw, unsigned long target_rate,
+-		unsigned long *parent_rate)
++			   unsigned long *parent_rate)
+ {
+ 	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
+ 	int m, n, r, scaled_max_m;
+@@ -310,7 +311,6 @@ long omap2_dpll_round_rate(struct clk_hw *hw, unsigned long target_rate,
+ 	dd->last_rounded_rate = 0;
+ 
+ 	for (n = dd->min_divider; n <= dd->max_divider; n++) {
+-
+ 		/* Is the (input clk, divider) pair valid for the DPLL? */
+ 		r = _dpll_test_fint(clk, n);
+ 		if (r == DPLL_FINT_UNDERFLOW)
+@@ -367,4 +367,3 @@ long omap2_dpll_round_rate(struct clk_hw *hw, unsigned long target_rate,
+ 
+ 	return dd->last_rounded_rate;
+ }
+-
 diff --git a/drivers/clk/ti/clock.h b/drivers/clk/ti/clock.h
-index 05ed10a..c75d4b4 100644
+index 404158d..05ed10a 100644
 --- a/drivers/clk/ti/clock.h
 +++ b/drivers/clk/ti/clock.h
-@@ -169,6 +169,20 @@ void ti_clk_patch_legacy_clks(struct ti_clk **patch);
+@@ -169,4 +169,6 @@ void ti_clk_patch_legacy_clks(struct ti_clk **patch);
  struct clk *ti_clk_register_clk(struct ti_clk *setup);
  int ti_clk_register_legacy_clks(struct ti_clk_alias *clks);
  
-+extern const struct clk_hw_omap_ops clkhwops_omap4_dpllmx;
-+
- u8 omap2_init_dpll_parent(struct clk_hw *hw);
- 
-+unsigned long omap4_dpll_regm4xen_recalc(struct clk_hw *hw,
-+					 unsigned long parent_rate);
-+long omap4_dpll_regm4xen_round_rate(struct clk_hw *hw,
-+				    unsigned long target_rate,
-+				    unsigned long *parent_rate);
-+long omap4_dpll_regm4xen_determine_rate(struct clk_hw *hw,
-+					unsigned long rate,
-+					unsigned long min_rate,
-+					unsigned long max_rate,
-+					unsigned long *best_parent_rate,
-+					struct clk_hw **best_parent_clk);
++u8 omap2_init_dpll_parent(struct clk_hw *hw);
 +
  #endif
-diff --git a/arch/arm/mach-omap2/dpll44xx.c b/drivers/clk/ti/dpll44xx.c
-similarity index 91%
-rename from arch/arm/mach-omap2/dpll44xx.c
-rename to drivers/clk/ti/dpll44xx.c
-index f231be0..ef1a5b4 100644
---- a/arch/arm/mach-omap2/dpll44xx.c
-+++ b/drivers/clk/ti/dpll44xx.c
-@@ -14,6 +14,7 @@
- #include <linux/clk.h>
- #include <linux/io.h>
- #include <linux/bitops.h>
-+#include <linux/clk/ti.h>
- 
- #include "clock.h"
- 
-@@ -29,14 +30,14 @@
- /*
-  * Bitfield declarations
-  */
--#define OMAP4430_DPLL_CLKOUT_GATE_CTRL_MASK		(1 << 8)
--#define OMAP4430_DPLL_CLKOUTX2_GATE_CTRL_MASK		(1 << 10)
--#define OMAP4430_DPLL_REGM4XEN_MASK			(1 << 11)
-+#define OMAP4430_DPLL_CLKOUT_GATE_CTRL_MASK		BIT(8)
-+#define OMAP4430_DPLL_CLKOUTX2_GATE_CTRL_MASK		BIT(10)
-+#define OMAP4430_DPLL_REGM4XEN_MASK			BIT(11)
- 
- /* Static rate multiplier for OMAP4 REGM4XEN clocks */
- #define OMAP4430_REGM4XEN_MULT				4
- 
--void omap4_dpllmx_allow_gatectrl(struct clk_hw_omap *clk)
-+static void omap4_dpllmx_allow_gatectrl(struct clk_hw_omap *clk)
- {
- 	u32 v;
- 	u32 mask;
-@@ -48,13 +49,13 @@ void omap4_dpllmx_allow_gatectrl(struct clk_hw_omap *clk)
- 			OMAP4430_DPLL_CLKOUTX2_GATE_CTRL_MASK :
- 			OMAP4430_DPLL_CLKOUT_GATE_CTRL_MASK;
- 
--	v = omap2_clk_readl(clk, clk->clksel_reg);
-+	v = ti_clk_ll_ops->clk_readl(clk->clksel_reg);
- 	/* Clear the bit to allow gatectrl */
- 	v &= ~mask;
--	omap2_clk_writel(v, clk, clk->clksel_reg);
-+	ti_clk_ll_ops->clk_writel(v, clk->clksel_reg);
- }
- 
--void omap4_dpllmx_deny_gatectrl(struct clk_hw_omap *clk)
-+static void omap4_dpllmx_deny_gatectrl(struct clk_hw_omap *clk)
- {
- 	u32 v;
- 	u32 mask;
-@@ -66,10 +67,10 @@ void omap4_dpllmx_deny_gatectrl(struct clk_hw_omap *clk)
- 			OMAP4430_DPLL_CLKOUTX2_GATE_CTRL_MASK :
- 			OMAP4430_DPLL_CLKOUT_GATE_CTRL_MASK;
- 
--	v = omap2_clk_readl(clk, clk->clksel_reg);
-+	v = ti_clk_ll_ops->clk_readl(clk->clksel_reg);
- 	/* Set the bit to deny gatectrl */
- 	v |= mask;
--	omap2_clk_writel(v, clk, clk->clksel_reg);
-+	ti_clk_ll_ops->clk_writel(v, clk->clksel_reg);
- }
- 
- const struct clk_hw_omap_ops clkhwops_omap4_dpllmx = {
-@@ -112,7 +113,7 @@ static void omap4_dpll_lpmode_recalc(struct dpll_data *dd)
-  * upon success, or 0 upon error.
-  */
- unsigned long omap4_dpll_regm4xen_recalc(struct clk_hw *hw,
--			unsigned long parent_rate)
-+					 unsigned long parent_rate)
- {
- 	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
- 	u32 v;
-@@ -127,7 +128,7 @@ unsigned long omap4_dpll_regm4xen_recalc(struct clk_hw *hw,
- 	rate = omap2_get_dpll_rate(clk);
- 
- 	/* regm4xen adds a multiplier of 4 to DPLL calculations */
--	v = omap2_clk_readl(clk, dd->control_reg);
-+	v = ti_clk_ll_ops->clk_readl(dd->control_reg);
- 	if (v & OMAP4430_DPLL_REGM4XEN_MASK)
- 		rate *= OMAP4430_REGM4XEN_MULT;
- 
 diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
-index f2436b2..89deddf 100644
+index b066835..f2436b2 100644
 --- a/include/linux/clk/ti.h
 +++ b/include/linux/clk/ti.h
-@@ -275,17 +275,6 @@ long omap3_noncore_dpll_determine_rate(struct clk_hw *hw,
- 				       unsigned long max_rate,
- 				       unsigned long *best_parent_rate,
- 				       struct clk_hw **best_parent_clk);
--unsigned long omap4_dpll_regm4xen_recalc(struct clk_hw *hw,
--					 unsigned long parent_rate);
--long omap4_dpll_regm4xen_round_rate(struct clk_hw *hw,
--				    unsigned long target_rate,
--				    unsigned long *parent_rate);
--long omap4_dpll_regm4xen_determine_rate(struct clk_hw *hw,
--					unsigned long rate,
--					unsigned long min_rate,
--					unsigned long max_rate,
--					unsigned long *best_parent_rate,
--					struct clk_hw **best_parent_clk);
+@@ -286,7 +286,6 @@ long omap4_dpll_regm4xen_determine_rate(struct clk_hw *hw,
+ 					unsigned long max_rate,
+ 					unsigned long *best_parent_rate,
+ 					struct clk_hw **best_parent_clk);
+-u8 omap2_init_dpll_parent(struct clk_hw *hw);
  unsigned long omap3_dpll_recalc(struct clk_hw *hw, unsigned long parent_rate);
  long omap2_dpll_round_rate(struct clk_hw *hw, unsigned long target_rate,
  			   unsigned long *parent_rate);
-@@ -314,6 +303,7 @@ int omap2_reprogram_dpllcore(struct clk_hw *clk, unsigned long rate,
- 			     unsigned long parent_rate);
- void omap2xxx_clkt_dpllcore_init(struct clk_hw *hw);
- void omap2xxx_clkt_vps_init(void);
-+unsigned long omap2_get_dpll_rate(struct clk_hw_omap *clk);
- 
- void __iomem *ti_clk_get_reg_addr(struct device_node *node, int index);
- void ti_dt_clocks_register(struct ti_dt_clk *oclks);
-@@ -364,7 +354,6 @@ static inline void of_ti_clk_deny_autoidle_all(void) { }
- extern const struct clk_hw_omap_ops clkhwops_omap2xxx_dpll;
- extern const struct clk_hw_omap_ops clkhwops_omap2430_i2chs_wait;
- extern const struct clk_hw_omap_ops clkhwops_omap3_dpll;
--extern const struct clk_hw_omap_ops clkhwops_omap4_dpllmx;
- extern const struct clk_hw_omap_ops clkhwops_wait;
- extern const struct clk_hw_omap_ops clkhwops_omap3430es2_dss_usbhost_wait;
- extern const struct clk_hw_omap_ops clkhwops_am35xx_ipss_module_wait;
 -- 
 1.7.9.5
