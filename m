@@ -1,40 +1,208 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 25 May 2015 16:49:26 +0200
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable shmobile
- r8a7778/bockw platform
-In-Reply-To: <20150525011253.GF24690@verge.net.au>
-References: <1425471261-25110-1-git-send-email-geert+renesas@glider.be>
- <1425471261-25110-3-git-send-email-geert+renesas@glider.be>
- <20150304225522.GB2470@verge.net.au>
- <20150525011253.GF24690@verge.net.au>
-Message-ID: <CAMuHMdXtkgyAQZPigZaqBnFnadBG+43_mLb+GHo78ApUdsgz+A@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 25 May 2015 16:50:31 +0200
+Subject: [PATCH] ARM: mvebu: add "jedec,spi-nor" flash compatible binding
+In-Reply-To: <1432035046-12888-1-git-send-email-zajec5@gmail.com>
+References: <1432035046-12888-1-git-send-email-zajec5@gmail.com>
+Message-ID: <556336B7.7070308@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Rafa?,
 
-On Mon, May 25, 2015 at 3:12 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Mar 05, 2015 at 07:55:23AM +0900, Simon Horman wrote:
->> On Wed, Mar 04, 2015 at 01:14:21PM +0100, Geert Uytterhoeven wrote:
->> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->>
->> Acked-by: Simon Horman <horms+renesas@verge.net.au>
->
-> Quite some time has passed and during that time I have come to
-> understand from Arnd that it is appropriate for me to take changes like
-> this one.
->
-> I have queued this up for 4.2 accordingly.
+On 19/05/2015 13:30, Rafa? Mi?ecki wrote:
+> Starting with commit 8947e396a829 ("Documentation: dt: mtd: replace
+> "nor-jedec" binding with "jedec, spi-nor"") we have "jedec,spi-nor"
+> binding indicating support for JEDEC identification.
+> 
+> Use it for all flashes that are supposed to support READ ID op according
+> to the datasheets.
 
-Thanks!
+As now there is an agreement about the binding,
+applied on mvebu/dt
 
-Gr{oetje,eeting}s,
+Thanks,
 
-                        Geert
+Gregory
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> 
+> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+> ---
+>  arch/arm/boot/dts/armada-370-db.dts              | 2 +-
+>  arch/arm/boot/dts/armada-370-synology-ds213j.dts | 2 +-
+>  arch/arm/boot/dts/armada-375-db.dts              | 2 +-
+>  arch/arm/boot/dts/armada-385-db-ap.dts           | 2 +-
+>  arch/arm/boot/dts/armada-388-db.dts              | 2 +-
+>  arch/arm/boot/dts/armada-388-gp.dts              | 2 +-
+>  arch/arm/boot/dts/armada-388-rd.dts              | 2 +-
+>  arch/arm/boot/dts/armada-398-db.dts              | 2 +-
+>  arch/arm/boot/dts/armada-xp-axpwifiap.dts        | 2 +-
+>  arch/arm/boot/dts/armada-xp-db.dts               | 2 +-
+>  arch/arm/boot/dts/armada-xp-gp.dts               | 2 +-
+>  arch/arm/boot/dts/armada-xp-synology-ds414.dts   | 2 +-
+>  12 files changed, 12 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
+> index 19f3bf2..03542f7 100644
+> --- a/arch/arm/boot/dts/armada-370-db.dts
+> +++ b/arch/arm/boot/dts/armada-370-db.dts
+> @@ -162,7 +162,7 @@
+>  				spi-flash at 0 {
+>  					#address-cells = <1>;
+>  					#size-cells = <1>;
+> -					compatible = "mx25l25635e";
+> +					compatible = "mx25l25635e", "jedec,spi-nor";
+>  					reg = <0>; /* Chip select 0 */
+>  					spi-max-frequency = <50000000>;
+>  				};
+> diff --git a/arch/arm/boot/dts/armada-370-synology-ds213j.dts b/arch/arm/boot/dts/armada-370-synology-ds213j.dts
+> index b42b767..4f49243 100644
+> --- a/arch/arm/boot/dts/armada-370-synology-ds213j.dts
+> +++ b/arch/arm/boot/dts/armada-370-synology-ds213j.dts
+> @@ -92,7 +92,7 @@
+>  				spi-flash at 0 {
+>  					#address-cells = <1>;
+>  					#size-cells = <1>;
+> -					compatible = "micron,n25q064";
+> +					compatible = "micron,n25q064", "jedec,spi-nor";
+>  					reg = <0>; /* Chip select 0 */
+>  					spi-max-frequency = <20000000>;
+>  
+> diff --git a/arch/arm/boot/dts/armada-375-db.dts b/arch/arm/boot/dts/armada-375-db.dts
+> index 4eabc9c..5711b97 100644
+> --- a/arch/arm/boot/dts/armada-375-db.dts
+> +++ b/arch/arm/boot/dts/armada-375-db.dts
+> @@ -81,7 +81,7 @@
+>  				spi-flash at 0 {
+>  					#address-cells = <1>;
+>  					#size-cells = <1>;
+> -					compatible = "n25q128a13";
+> +					compatible = "n25q128a13", "jedec,spi-nor";
+>  					reg = <0>; /* Chip select 0 */
+>  					spi-max-frequency = <108000000>;
+>  				};
+> diff --git a/arch/arm/boot/dts/armada-385-db-ap.dts b/arch/arm/boot/dts/armada-385-db-ap.dts
+> index 7219ac3..89f5a95 100644
+> --- a/arch/arm/boot/dts/armada-385-db-ap.dts
+> +++ b/arch/arm/boot/dts/armada-385-db-ap.dts
+> @@ -70,7 +70,7 @@
+>  				spi-flash at 0 {
+>  					#address-cells = <1>;
+>  					#size-cells = <1>;
+> -					compatible = "st,m25p128";
+> +					compatible = "st,m25p128", "jedec,spi-nor";
+>  					reg = <0>; /* Chip select 0 */
+>  					spi-max-frequency = <54000000>;
+>  				};
+> diff --git a/arch/arm/boot/dts/armada-388-db.dts b/arch/arm/boot/dts/armada-388-db.dts
+> index 51d1623..91ac8c1 100644
+> --- a/arch/arm/boot/dts/armada-388-db.dts
+> +++ b/arch/arm/boot/dts/armada-388-db.dts
+> @@ -73,7 +73,7 @@
+>  				spi-flash at 0 {
+>  					#address-cells = <1>;
+>  					#size-cells = <1>;
+> -					compatible = "w25q32";
+> +					compatible = "w25q32", "jedec,spi-nor";
+>  					reg = <0>; /* Chip select 0 */
+>  					spi-max-frequency = <108000000>;
+>  				};
+> diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
+> index 78514ab..fd4f6fd 100644
+> --- a/arch/arm/boot/dts/armada-388-gp.dts
+> +++ b/arch/arm/boot/dts/armada-388-gp.dts
+> @@ -69,7 +69,7 @@
+>  				spi-flash at 0 {
+>  					#address-cells = <1>;
+>  					#size-cells = <1>;
+> -					compatible = "st,m25p128";
+> +					compatible = "st,m25p128", "jedec,spi-nor";
+>  					reg = <0>; /* Chip select 0 */
+>  					spi-max-frequency = <50000000>;
+>  					m25p,fast-read;
+> diff --git a/arch/arm/boot/dts/armada-388-rd.dts b/arch/arm/boot/dts/armada-388-rd.dts
+> index 1dc6e23..b657b16 100644
+> --- a/arch/arm/boot/dts/armada-388-rd.dts
+> +++ b/arch/arm/boot/dts/armada-388-rd.dts
+> @@ -74,7 +74,7 @@
+>  				spi-flash at 0 {
+>  					#address-cells = <1>;
+>  					#size-cells = <1>;
+> -					compatible = "st,m25p128";
+> +					compatible = "st,m25p128", "jedec,spi-nor";
+>  					reg = <0>; /* Chip select 0 */
+>  					spi-max-frequency = <108000000>;
+>  				};
+> diff --git a/arch/arm/boot/dts/armada-398-db.dts b/arch/arm/boot/dts/armada-398-db.dts
+> index bbf8375..788c3ba 100644
+> --- a/arch/arm/boot/dts/armada-398-db.dts
+> +++ b/arch/arm/boot/dts/armada-398-db.dts
+> @@ -73,7 +73,7 @@
+>  				spi-flash at 0 {
+>  					#address-cells = <1>;
+>  					#size-cells = <0>;
+> -					compatible = "n25q128a13";
+> +					compatible = "n25q128a13", "jedec,spi-nor";
+>  					reg = <0>;
+>  					spi-max-frequency = <108000000>;
+>  
+> diff --git a/arch/arm/boot/dts/armada-xp-axpwifiap.dts b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+> index dfd782b..60bbfe3 100644
+> --- a/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+> +++ b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+> @@ -140,7 +140,7 @@
+>  				spi-flash at 0 {
+>  					#address-cells = <1>;
+>  					#size-cells = <1>;
+> -					compatible = "n25q128a13";
+> +					compatible = "n25q128a13", "jedec,spi-nor";
+>  					reg = <0>; /* Chip select 0 */
+>  					spi-max-frequency = <108000000>;
+>  				};
+> diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
+> index 1037824..7dd900f 100644
+> --- a/arch/arm/boot/dts/armada-xp-db.dts
+> +++ b/arch/arm/boot/dts/armada-xp-db.dts
+> @@ -222,7 +222,7 @@
+>  				spi-flash at 0 {
+>  					#address-cells = <1>;
+>  					#size-cells = <1>;
+> -					compatible = "m25p64";
+> +					compatible = "m25p64", "jedec,spi-nor";
+>  					reg = <0>; /* Chip select 0 */
+>  					spi-max-frequency = <20000000>;
+>  				};
+> diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+> index 565227e..bf724ca 100644
+> --- a/arch/arm/boot/dts/armada-xp-gp.dts
+> +++ b/arch/arm/boot/dts/armada-xp-gp.dts
+> @@ -227,7 +227,7 @@
+>  				spi-flash at 0 {
+>  					#address-cells = <1>;
+>  					#size-cells = <1>;
+> -					compatible = "n25q128a13";
+> +					compatible = "n25q128a13", "jedec,spi-nor";
+>  					reg = <0>; /* Chip select 0 */
+>  					spi-max-frequency = <108000000>;
+>  				};
+> diff --git a/arch/arm/boot/dts/armada-xp-synology-ds414.dts b/arch/arm/boot/dts/armada-xp-synology-ds414.dts
+> index 6063428..20267ad 100644
+> --- a/arch/arm/boot/dts/armada-xp-synology-ds414.dts
+> +++ b/arch/arm/boot/dts/armada-xp-synology-ds414.dts
+> @@ -114,7 +114,7 @@
+>  				spi-flash at 0 {
+>  					#address-cells = <1>;
+>  					#size-cells = <1>;
+> -					compatible = "micron,n25q064";
+> +					compatible = "micron,n25q064", "jedec,spi-nor";
+>  					reg = <0>; /* Chip select 0 */
+>  					spi-max-frequency = <20000000>;
+>  
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
