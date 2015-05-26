@@ -1,62 +1,66 @@
-From: xander.huff@ni.com (Xander Huff)
-Date: Tue, 26 May 2015 14:05:59 -0500
-Subject: [PATCH 2/2] iio: adc: xilinx-xadc: Add xlnx,extend-name as an
- optional argument for aux channels
-In-Reply-To: <55643F20.4080306@metafoo.de>
-References: <1431038644-41600-1-git-send-email-xander.huff@ni.com>
- <1431038644-41600-2-git-send-email-xander.huff@ni.com>
- <555B78A3.2030202@metafoo.de> <55606340.1090403@kernel.org>
- <55643F20.4080306@metafoo.de>
-Message-ID: <5564C417.3010707@ni.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 26 May 2015 14:17:45 -0500 (CDT)
+Subject: [GIT PULL] qcom dt changes for 4.2
+Message-ID: <alpine.DEB.2.02.1505261415380.24694@galak-ubuntu.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/26/2015 4:38 AM, Lars-Peter Clausen wrote:
-> On 05/23/2015 01:23 PM, Jonathan Cameron wrote:
->> On 19/05/15 18:53, Lars-Peter Clausen wrote:
->>> On 05/08/2015 12:44 AM, Xander Huff wrote:
->>>> To better facilitate user-mode access to optional aux channels, allow
->>>> device trees to specify a custom extended name for defined channels.
->>>
->>> Hi,
->>>
->>> 'extend-name' is kind of a IIO specific term. I think a better name in the
->>> devicetree context would be 'label'. That's used everywhere else when giving
->>> a short description string to a node.
->>>
->> Hi Lars,
->>
->> What do you think of the general idea?  I'm unconvinced we want to do this in
->> channel naming.
->> Perhaps we want an additional attribute giving access to this sort of
->> 'semantic' information?
->
-> I'm not convinced about it either. My gut feeling is that this is not the right
-> approach, but I don't really have any better ideas at the moment.
->
-> Xander can you give a short description of how this information will be used by
-> an application? Would having a label property for the channel also work for you
-> (e.g. in_voltage0_label)?
->
-> - Lars
->
-We use 10 of the optional aux channels available in the XADC and have them wired 
-up to specific power supplies. For example, channel 9 is connected to the 
-current of a 6V power supply and channel 12 is connected to the voltage of that 
-same supply, channel 4 is connected to the current of a 3.3V power supply and 
-channel 5 is connected to its voltage.
+The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
 
-Without adding extended names to distinguish these aux channels, the handles 
-available inside /sys/bus/iio/devices/[device] are generic: in_voltage10_raw, 
-in_voltage10_scale, for example. If I added the label 'user5v_v', then these 
-handles would be in_voltage10_user5v_v_raw and in_voltage10_user5v_v_scale. This 
-makes it a lot easier to get started and let the handles describe themselves, 
-rather than having to look up which channels are connected to which things.
+   Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
 
-As far as using 'label' instead of 'extend-name', that's fine with me. I've 
-already sent out a v2 using 'label' instead.
+are available in the git repository at:
 
--- 
-Xander Huff
-Staff Software Engineer
-National Instruments
+   git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-dt-for-4.2
+
+for you to fetch changes up to b73b31577f70a1d03aee21d0127da44862b7b08e:
+
+   ARM: dts: qcom: Add msm8660 PMU node (2015-04-27 16:15:28 -0500)
+
+----------------------------------------------------------------
+Qualcomm ARM Based Device Tree Updates for v4.2
+
+* Added support for regulators, USB Host & OTG, SATA, and i2c
+   controllers on APQ8064 based platforms
+* Added PM8841/PM8941/PMA8084 device nodes
+* Added PMU support on MSM8660
+
+----------------------------------------------------------------
+Ivan T. Ivanov (3):
+       ARM: dts: qcom: Add PM8841 functions device nodes
+       ARM: dts: qcom: Add PM8941 functions device nodes
+       ARM: dts: qcom: Add PMA8084 functions device nodes
+
+Nicolas Dechesne (2):
+       ARM: dts: qcom: apq8064 - Add usb host support to CM QS-600
+       ARM: dts: qcom: apq8064 - Add USB OTG support for CM QS-600
+
+Pramod Gurav (1):
+       ARM: dts: qcom: apq8064-ifc6410 - Add DT alias for serial port
+
+Srinivas Kandagatla (8):
+       ARM: dts: qcom: apq8064 - add RPM regulators support
+       ARM: dts: qcom: apq8064-ifc6410 - Add basic regulators
+       ARM: dts: qcom: apq8064 - Add usb host support.
+       ARM: dts: qcom: apq8064 - Add USB OTG support
+       ARM: dts: qcom: apq8064 - Add SATA controller support
+       ARM: dts: qcom: apq8064-cm-qs600 - Add basic regulators
+       ARM: dts: qcom: apq8064 - Move i2c1 pinctrl to apq8064.dtsi
+       ARM: dts: qcom: apq8064 - add i2c3 node for panel.
+
+Stephen Boyd (1):
+       ARM: dts: qcom: Add msm8660 PMU node
+
+  arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts | 100 ++++++++++++++++
+  arch/arm/boot/dts/qcom-apq8064-ifc6410.dts  | 136 +++++++++++++++++++--
+  arch/arm/boot/dts/qcom-apq8064.dtsi         | 175 +++++++++++++++++++++++++++-
+  arch/arm/boot/dts/qcom-msm8660.dtsi         |   5 +
+  arch/arm/boot/dts/qcom-pm8841.dtsi          |  18 +++
+  arch/arm/boot/dts/qcom-pm8941.dtsi          | 133 ++++++++++++++++++++-
+  arch/arm/boot/dts/qcom-pma8084.dtsi         |  92 +++++++++++++++
+  7 files changed, 649 insertions(+), 10 deletions(-)
+
+--
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
