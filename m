@@ -1,122 +1,50 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Tue, 26 May 2015 15:48:46 +0100
-Subject: [BUG] Read-Only THP causes stalls (commit 10359213d)
-In-Reply-To: <20150526143547.GA22363@cbox>
-References: <20150524193404.GD16910@cbox> <20150525141525.GB26958@redhat.com>
- <20150526080848.GA27075@cbox>
- <CAPvkgC3kTgP720CawpfvLbm90FCs9UGNP3WOAamOD=UEgKoQCw@mail.gmail.com>
- <20150526143547.GA22363@cbox>
-Message-ID: <CAPvkgC0h+pYFfcuNh7f-b44mktR+CX6UYa2OXouDB8ZmZtroPQ@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 26 May 2015 16:49:34 +0200
+Subject: sdhci(imx6): misbehaves while installing debian jessie, "Got data
+ interrupt 0x00100000"
+In-Reply-To: <20150519222320.GM2067@n2100.arm.linux.org.uk>
+References: <20150519222320.GM2067@n2100.arm.linux.org.uk>
+Message-ID: <CAPDyKFqR3NwBd9O40BPzHG7Y4wyyJwgdB4NsA_GUO=YEyqFSXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 May 2015 at 15:35, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> Hi Steve,
+On 20 May 2015 at 00:23, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> iMX6 with a Samsung EVO UHS-1 16GB card.
 >
-> On Tue, May 26, 2015 at 03:24:20PM +0100, Steve Capper wrote:
->> >> On Sun, May 24, 2015 at 09:34:04PM +0200, Christoffer Dall wrote:
->> >> > Hi all,
->> >> >
->> >> > I noticed a regression on my arm64 APM X-Gene system a couple
->> >> > of weeks back.  I would occassionally see the system lock up and see RCU
->> >> > stalls during the caching phase of kernbench.  I then wrote a small
->> >> > script that does nothing but cache the files
->> >> > (http://paste.ubuntu.com/11324767/) and ran that in a loop.  On a known
->> >> > bad commit (v4.1-rc2), out of 25 boots, I never saw it get past 21
->> >> > iterations of the loop.  I have since tried to run a bisect from v3.19 to
->> >> > v4.0 using 100 iterations as my criteria for a good commit.
->> >> >
->> >> > This resulted in the following first bad commit:
->> >> >
->> >> > 10359213d05acf804558bda7cc9b8422a828d1cd
->> >> > (mm: incorporate read-only pages into transparent huge pages, 2015-02-11)
->> >> >
->> >> > Indeed, running the workload on v4.1-rc4 still produced the behavior,
->> >> > but reverting the above commit gets me through 100 iterations of the
->> >> > loop.
->> >> >
->> >> > I have not tried to reproduce on an x86 system.  Turning on a bunch
->> >> > of kernel debugging features *seems* to hide the problem.  My config for
->> >> > the XGene system is defconfig + CONFIG_BRIDGE and
->> >> > CONFIG_POWER_RESET_XGENE.
->> >> >
->> >> > Please let me know if I can help test patches or other things I can
->> >> > do to help.  I'm afraid that by simply reading the patch I didn't see
->> >> > anything obviously wrong with it which would cause this behavior.
->> >>
->> >> As further confirmation, could you try:
->> >>
->> >> echo 0 > /sys/kernel/mm/transparent_hugepage/khugepaged/pages_to_scan
->> >
->> > this returns -EINVAL.
->> >
->> > But I'm trying now with:
->> >
->> > echo never > /sys/kernel/mm/transparent_hugepage/enabled
->> >
->> >>
->> >> and verify the problem goes away without having to revert the patch?
->> >
->> > will let you know, so far so good...
->> >
->> >>
->> >> Accordingly you should reproduce much eaiser this way (setting
->> >> $largevalue to 8192 or something, it doesn't matter).
->> >>
->> >> echo $largevalue > /sys/kernel/mm/transparent_hugepage/khugepaged/pages_to_scan
->> >> echo 0 > /sys/kernel/mm/transparent_hugepage/khugepaged/alloc_sleep_millisecs
->> >> echo 0 > /sys/kernel/mm/transparent_hugepage/khugepaged/scan_sleep_millisecs
->> >>
->> >> Then push the system into swap with some memhog -r1000 xG.
->> >
->> > what is memhog?  I couldn't find the utility in Google...
->> >
->> > I did try with the above settings and just push a bunch of data into
->> > ramfs and tmpfs and indeed the sytem died very quickly (on v4.0-rc4).
->> >
->> >>
->> >> The patch just allows readonly anon pages to be collapsed along with
->> >> read-write ones, the vma permissions allows it, so they have to be
->> >> swapcache pages, this is why swap shall be required.
->> >>
->> >> Perhaps there's some arch detail that needs fixing but it'll be easier
->> >> to track it down once you have a way to reproduce fast.
->> >>
->> > Yes, would be great to be able to reproduce quickly.
->> >
+> There's actually two problems here.
 >
->> I'm trying to reproduce this on hardware here; but have been unable to
->> thus far with 4.1-rc2 on a Xgene and Seattle systems.
+> 1. SDHCI chooses to impose a 10 second timeout on any data operation.
+>    This magic value of 10 seconds is rediculous.  Consider that SD
+>    cards are typically slower than ATA, and ATA has a timeout of more
+>    than one minute for a stuck command...  And yes, I've had this fire
+>    a good 10 seconds before I then got...
 >
-> Really?  That's concerning.  I think Andre mentioned he could
-> reproduce...
+> 2. "Got data interrupt 0x00100000 even though no data operation was in progress."
 >
-> How many iterations have you run the caching loop for?
+>    That's SDHCI_INT_DATA_TIMEOUT.
 >
-> Are you using defconfig?  I noticed that turning on debugging features
-> was hiding the problem.
+>    Unfortunately, I have no other information, as the registers are
+>    dumped at pr_debug() level, which means that they're all compiled
+>    out in normal kernel builds.  In any case, I have no way to copy
+>    information off of the installing system; debian does not start up
+>    a ssh daemon during the install, so remote login is not possible.
+>    Nor can I photograph the rather reflective TV screen.
 >
->> Also, I tried the memhog + pages_to_scan suggestion from Andrea.
->
-> Any chance you could send me the memhog tool?
->
->>
->> Maybe a silly question, where is your root filesystem located? Is
->> there anything network mounted?
->>
-> It's a regular ext4 on the local SATA disk.  Ubuntu Trusty.
->
-> Thanks,
-> -Christoffer
+> The side-effect of this is that the entire MMC IO subsystem locks up
+> and I'm left with lots of processes stuck in IO-wait state, with the
+> hungtask detector spewing onto the console.
 
-Sending an email to lakml appears to have been enough to make it hang
-on the Xgene :-).
-The system is completely frozen, not even the serial port works.
+Sorry, I can't tell much around the host driver and HW as such. I
+don't have any iMX6 boards at hand.
 
-On Seattle, I've hit 100 iterations multiple times without any problems.
+Though, the side-effect you are describing isn't very nice. Even if it
+doesn't solve you problem, perhaps we should discuss about converting
+from wait_for_completion() to wait_for_completion_timeout(), when the
+mmc core waits for the host driver to return the result for the
+request.
 
-Investigating...
+I guess the tricky part is to find a decent value for the "timeout".
 
-Cheers,
---
-Steve
+Kind regards
+Uffe
