@@ -1,48 +1,49 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Tue, 26 May 2015 14:49:51 -0500 (CDT)
-Subject: [GIT PULL] qcom SoC changes for 4.2
-Message-ID: <alpine.DEB.2.02.1505261449220.26936@galak-ubuntu.qualcomm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 26 May 2015 20:55:27 +0100
+Subject: [PATCH 10/21] regulator: core: Probe regulators on demand
+In-Reply-To: <CAAObsKDDMxHPH+QB+SAPUwVa3WGrud61F+_ToB1mrY_FyFfZYw@mail.gmail.com>
+References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1432565608-26036-11-git-send-email-tomeu.vizoso@collabora.com>
+ <20150525173244.GE21577@sirena.org.uk>
+ <CAAObsKDzKzYAx4_xsNm0reXzgSrJi7Q+aZGifmVxvSEQ=Qxjkw@mail.gmail.com>
+ <20150526093601.GH21577@sirena.org.uk>
+ <CAAObsKA_59z0qYmUqux7dMO38vOrLBUM_eWZ-QeJxEEmunq2ZQ@mail.gmail.com>
+ <20150526165458.GV21577@sirena.org.uk>
+ <CAAObsKDDMxHPH+QB+SAPUwVa3WGrud61F+_ToB1mrY_FyFfZYw@mail.gmail.com>
+Message-ID: <20150526195527.GZ21577@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+On Tue, May 26, 2015 at 07:53:33PM +0200, Tomeu Vizoso wrote:
+> On 26 May 2015 at 18:54, Mark Brown <broonie@kernel.org> wrote:
 
-   Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+> >> My understanding is that the problem I'm addressing is specific of
+> >> machines in which the kernel is in charge of pretty much everything
+> >> and that the information about what devices are present is given in an
+> >> arbitrary order.
 
-are available in the git repository at:
+> > I don't think you've fully understood the problem space here.
+> 
+> Fair enough, what's your understanding of it?
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-soc-for-4.2
+Basically what I said in the e-mail you quoted fully in your reply,
+especially this section:
 
-for you to fetch changes up to b6a1dfbc7d57409accf213e78db7b059c206be9e:
+> > No, not in the least.  Quite aside from anything else as soon as you
+> > allow things to be built as modules userspace is free to load things in
+> > whatever order amuses it.  Think about what's going on here - it's not
+> > just registration of devices, it's also about the order in which
+> > subsystems and drivers register themselves.
 
-   firmware: qcom: scm: Split out 32-bit specific SCM code (2015-04-28 14:20:40 -0500)
-
-----------------------------------------------------------------
-Qualcomm ARM Based SoC Updates for v4.2
-
-* Added Subsystem Power Manager (SPM) driver
-* Split out 32-bit specific SCM code
-
-----------------------------------------------------------------
-Kumar Gala (1):
-       firmware: qcom: scm: Split out 32-bit specific SCM code
-
-Lina Iyer (1):
-       ARM: qcom: Add Subsystem Power Manager (SPM) driver
-
-  drivers/firmware/Makefile      |   3 +-
-  drivers/firmware/qcom_scm-32.c | 480 +++++++++++++++++++++++++++++++++++++++++
-  drivers/firmware/qcom_scm.c    | 442 +------------------------------------
-  drivers/firmware/qcom_scm.h    |  38 ++++
-  drivers/soc/qcom/Kconfig       |   7 +
-  drivers/soc/qcom/Makefile      |   1 +
-  drivers/soc/qcom/spm.c         | 385 +++++++++++++++++++++++++++++++++
-  7 files changed, 920 insertions(+), 436 deletions(-)
-  create mode 100644 drivers/firmware/qcom_scm-32.c
-  create mode 100644 drivers/firmware/qcom_scm.h
-  create mode 100644 drivers/soc/qcom/spm.c
-
---
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Probe ordering is fairly weakly related to the interface used to
+register devices, you're going to get dependencies more often the more
+detail is exposed to the kernel but it's not specific to that.  It's
+definitely not something that we have a solution to for board files,
+they rely on deferred probing just as much as device tree does.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150526/0fbb9b47/attachment.sig>
