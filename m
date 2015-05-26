@@ -1,157 +1,328 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 26 May 2015 20:49:20 +0800
-Subject: [PATCH 07/11] x86, pci: mmconfig_{32,
- 64}.c code refactoring - remove code duplication.
+Date: Tue, 26 May 2015 20:49:21 +0800
+Subject: [PATCH 08/11] x86, pci,
+ ecam: mmconfig_64.c becomes default implementation for ECAM driver.
 In-Reply-To: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
 References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1432644564-24746-8-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1432644564-24746-9-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 
-mmconfig_64.c version is going to be default implementation for arch
-agnostic low-level direct PCI config space accessors for ECAM dirver.
-However, now it initialize raw_pci_ext_ops pointer which is x86 specific
-code only. Moreover, mmconfig_32.c is doing the same thing at the same time.
-
-Move it to mmconfig_shared.c so it becomes common for both and
-mmconfig_64.c turns out to be purely arch agnostic.
+Host which want to take advantage of ECAM generic goodness
+should select CONFIG_PCI_ECAM_GENERIC. Otherwise, machines like 32bits x86,
+are obligated to provide own low-level ECAM calls.
 
 Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 ---
- arch/x86/pci/mmconfig-shared.c | 10 ++++++++--
- arch/x86/pci/mmconfig_32.c     | 10 ++--------
- arch/x86/pci/mmconfig_64.c     | 11 ++---------
- include/linux/ecam.h           |  5 +++++
- 4 files changed, 17 insertions(+), 19 deletions(-)
+ arch/x86/Kconfig           |   1 +
+ arch/x86/pci/Makefile      |   4 +-
+ arch/x86/pci/mmconfig_64.c | 127 ---------------------------------------------
+ drivers/pci/Kconfig        |   3 ++
+ drivers/pci/ecam.c         | 113 ++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 120 insertions(+), 128 deletions(-)
+ delete mode 100644 arch/x86/pci/mmconfig_64.c
 
-diff --git a/arch/x86/pci/mmconfig-shared.c b/arch/x86/pci/mmconfig-shared.c
-index 6fa3080..8938db3 100644
---- a/arch/x86/pci/mmconfig-shared.c
-+++ b/arch/x86/pci/mmconfig-shared.c
-@@ -29,6 +29,11 @@
- static bool pci_mmcfg_running_state;
- static bool pci_mmcfg_arch_init_failed;
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index 4e3dcb3..87a6393 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -144,6 +144,7 @@ config X86
+ 	select X86_FEATURE_NAMES if PROC_FS
+ 	select SRCU
+ 	select HAVE_PCI_ECAM
++	select GENERIC_PCI_ECAM if X86_64
  
-+const struct pci_raw_ops pci_mmcfg = {
-+	.read =		pci_mmcfg_read,
-+	.write =	pci_mmcfg_write,
-+};
+ config INSTRUCTION_DECODER
+ 	def_bool y
+diff --git a/arch/x86/pci/Makefile b/arch/x86/pci/Makefile
+index 5c6fc35..efc193d 100644
+--- a/arch/x86/pci/Makefile
++++ b/arch/x86/pci/Makefile
+@@ -1,7 +1,9 @@
+ obj-y				:= i386.o init.o
+ 
+ obj-$(CONFIG_PCI_BIOS)		+= pcbios.o
+-obj-$(CONFIG_PCI_MMCONFIG)	+= mmconfig_$(BITS).o direct.o mmconfig-shared.o
++mmconfig-y			:= direct.o mmconfig-shared.o
++mmconfig-$(CONFIG_X86_32)	+= mmconfig_32.o
++obj-$(CONFIG_PCI_MMCONFIG)	+= $(mmconfig-y)
+ obj-$(CONFIG_PCI_DIRECT)	+= direct.o
+ obj-$(CONFIG_PCI_OLPC)		+= olpc.o
+ obj-$(CONFIG_PCI_XEN)		+= xen.o
+diff --git a/arch/x86/pci/mmconfig_64.c b/arch/x86/pci/mmconfig_64.c
+deleted file mode 100644
+index fd857ea..0000000
+--- a/arch/x86/pci/mmconfig_64.c
++++ /dev/null
+@@ -1,127 +0,0 @@
+-/*
+- * mmconfig.c - Low-level direct PCI config space access via MMCONFIG
+- *
+- * This is an 64bit optimized version that always keeps the full mmconfig
+- * space mapped. This allows lockless config space operation.
+- */
+-
+-#include <linux/pci.h>
+-#include <linux/init.h>
+-#include <linux/acpi.h>
+-#include <linux/bitmap.h>
+-#include <linux/rcupdate.h>
+-#include <linux/ecam.h>
+-#include <asm/e820.h>
+-#include <asm/pci_x86.h>
+-
+-#define PREFIX "PCI: "
+-
+-static char __iomem *pci_dev_base(unsigned int seg, unsigned int bus, unsigned int devfn)
+-{
+-	struct pci_mmcfg_region *cfg = pci_mmconfig_lookup(seg, bus);
+-
+-	if (cfg && cfg->virt)
+-		return cfg->virt + (PCI_MMCFG_BUS_OFFSET(bus) | (devfn << 12));
+-	return NULL;
+-}
+-
+-int pci_mmcfg_read(unsigned int seg, unsigned int bus,
+-			  unsigned int devfn, int reg, int len, u32 *value)
+-{
+-	char __iomem *addr;
+-
+-	/* Why do we have this when nobody checks it. How about a BUG()!? -AK */
+-	if (unlikely((bus > 255) || (devfn > 255) || (reg > 4095))) {
+-err:		*value = -1;
+-		return -EINVAL;
+-	}
+-
+-	rcu_read_lock();
+-	addr = pci_dev_base(seg, bus, devfn);
+-	if (!addr) {
+-		rcu_read_unlock();
+-		goto err;
+-	}
+-
+-	*value = pci_mmio_read(len, addr + reg);
+-	rcu_read_unlock();
+-
+-	return 0;
+-}
+-
+-int pci_mmcfg_write(unsigned int seg, unsigned int bus,
+-			   unsigned int devfn, int reg, int len, u32 value)
+-{
+-	char __iomem *addr;
+-
+-	/* Why do we have this when nobody checks it. How about a BUG()!? -AK */
+-	if (unlikely((bus > 255) || (devfn > 255) || (reg > 4095)))
+-		return -EINVAL;
+-
+-	rcu_read_lock();
+-	addr = pci_dev_base(seg, bus, devfn);
+-	if (!addr) {
+-		rcu_read_unlock();
+-		return -EINVAL;
+-	}
+-
+-	pci_mmio_write(len, addr + reg, value);
+-	rcu_read_unlock();
+-
+-	return 0;
+-}
+-
+-static void __iomem *mcfg_ioremap(struct pci_mmcfg_region *cfg)
+-{
+-	void __iomem *addr;
+-	u64 start, size;
+-	int num_buses;
+-
+-	start = cfg->address + PCI_MMCFG_BUS_OFFSET(cfg->start_bus);
+-	num_buses = cfg->end_bus - cfg->start_bus + 1;
+-	size = PCI_MMCFG_BUS_OFFSET(num_buses);
+-	addr = ioremap_nocache(start, size);
+-	if (addr)
+-		addr -= PCI_MMCFG_BUS_OFFSET(cfg->start_bus);
+-	return addr;
+-}
+-
+-int __init pci_mmcfg_arch_init(void)
+-{
+-	struct pci_mmcfg_region *cfg;
+-
+-	list_for_each_entry(cfg, &pci_mmcfg_list, list)
+-		if (pci_mmcfg_arch_map(cfg)) {
+-			pci_mmcfg_arch_free();
+-			return 0;
+-		}
+-
+-	return 1;
+-}
+-
+-void __init pci_mmcfg_arch_free(void)
+-{
+-	struct pci_mmcfg_region *cfg;
+-
+-	list_for_each_entry(cfg, &pci_mmcfg_list, list)
+-		pci_mmcfg_arch_unmap(cfg);
+-}
+-
+-int pci_mmcfg_arch_map(struct pci_mmcfg_region *cfg)
+-{
+-	cfg->virt = mcfg_ioremap(cfg);
+-	if (!cfg->virt) {
+-		pr_err(PREFIX "can't map MMCONFIG at %pR\n", &cfg->res);
+-		return -ENOMEM;
+-	}
+-
+-	return 0;
+-}
+-
+-void pci_mmcfg_arch_unmap(struct pci_mmcfg_region *cfg)
+-{
+-	if (cfg && cfg->virt) {
+-		iounmap(cfg->virt + PCI_MMCFG_BUS_OFFSET(cfg->start_bus));
+-		cfg->virt = NULL;
+-	}
+-}
+diff --git a/drivers/pci/Kconfig b/drivers/pci/Kconfig
+index 90a5fb9..fae4aa7 100644
+--- a/drivers/pci/Kconfig
++++ b/drivers/pci/Kconfig
+@@ -29,6 +29,9 @@ config PCI_ECAM
+ config HAVE_PCI_ECAM
+ 	bool
+ 
++config GENERIC_PCI_ECAM
++	bool
++
+ config PCI_DEBUG
+ 	bool "PCI Debugging"
+ 	depends on PCI && DEBUG_KERNEL
+diff --git a/drivers/pci/ecam.c b/drivers/pci/ecam.c
+index c588234..796b6e7 100644
+--- a/drivers/pci/ecam.c
++++ b/drivers/pci/ecam.c
+@@ -23,6 +23,119 @@ static DEFINE_MUTEX(pci_mmcfg_lock);
+ 
+ LIST_HEAD(pci_mmcfg_list);
+ 
++#ifdef CONFIG_GENERIC_PCI_ECAM
++static char __iomem *pci_dev_base(unsigned int seg, unsigned int bus,
++				  unsigned int devfn)
++{
++	struct pci_mmcfg_region *cfg = pci_mmconfig_lookup(seg, bus);
++
++	if (cfg && cfg->virt)
++		return cfg->virt + (PCI_MMCFG_BUS_OFFSET(bus) | (devfn << 12));
++	return NULL;
++}
++
++int pci_mmcfg_read(unsigned int seg, unsigned int bus,
++			  unsigned int devfn, int reg, int len, u32 *value)
++{
++	char __iomem *addr;
++
++	/* Why do we have this when nobody checks it. How about a BUG()!? -AK */
++	if (unlikely((bus > 255) || (devfn > 255) || (reg > 4095))) {
++err:		*value = -1;
++		return -EINVAL;
++	}
++
++	rcu_read_lock();
++	addr = pci_dev_base(seg, bus, devfn);
++	if (!addr) {
++		rcu_read_unlock();
++		goto err;
++	}
++
++	*value = pci_mmio_read(len, addr + reg);
++	rcu_read_unlock();
++
++	return 0;
++}
++
++int pci_mmcfg_write(unsigned int seg, unsigned int bus,
++			   unsigned int devfn, int reg, int len, u32 value)
++{
++	char __iomem *addr;
++
++	/* Why do we have this when nobody checks it. How about a BUG()!? -AK */
++	if (unlikely((bus > 255) || (devfn > 255) || (reg > 4095)))
++		return -EINVAL;
++
++	rcu_read_lock();
++	addr = pci_dev_base(seg, bus, devfn);
++	if (!addr) {
++		rcu_read_unlock();
++		return -EINVAL;
++	}
++
++	pci_mmio_write(len, addr + reg, value);
++	rcu_read_unlock();
++
++	return 0;
++}
++
++static void __iomem *mcfg_ioremap(struct pci_mmcfg_region *cfg)
++{
++	void __iomem *addr;
++	u64 start, size;
++	int num_buses;
++
++	start = cfg->address + PCI_MMCFG_BUS_OFFSET(cfg->start_bus);
++	num_buses = cfg->end_bus - cfg->start_bus + 1;
++	size = PCI_MMCFG_BUS_OFFSET(num_buses);
++	addr = ioremap_nocache(start, size);
++	if (addr)
++		addr -= PCI_MMCFG_BUS_OFFSET(cfg->start_bus);
++	return addr;
++}
++
++int __init pci_mmcfg_arch_init(void)
++{
++	struct pci_mmcfg_region *cfg;
++
++	list_for_each_entry(cfg, &pci_mmcfg_list, list)
++		if (pci_mmcfg_arch_map(cfg)) {
++			pci_mmcfg_arch_free();
++			return 0;
++		}
++
++	return 1;
++}
++
++void __init pci_mmcfg_arch_free(void)
++{
++	struct pci_mmcfg_region *cfg;
++
++	list_for_each_entry(cfg, &pci_mmcfg_list, list)
++		pci_mmcfg_arch_unmap(cfg);
++}
++
++int pci_mmcfg_arch_map(struct pci_mmcfg_region *cfg)
++{
++	cfg->virt = mcfg_ioremap(cfg);
++	if (!cfg->virt) {
++		pr_err(PREFIX "can't map MMCONFIG at %pR\n", &cfg->res);
++		return -ENOMEM;
++	}
++
++	return 0;
++}
++
++void pci_mmcfg_arch_unmap(struct pci_mmcfg_region *cfg)
++{
++	if (cfg && cfg->virt) {
++		iounmap(cfg->virt + PCI_MMCFG_BUS_OFFSET(cfg->start_bus));
++		cfg->virt = NULL;
++	}
++}
++#endif
 +
  static u32
- pci_mmconfig_amd_read(int len, void __iomem *addr)
+ pci_mmconfig_generic_read(int len, void __iomem *addr)
  {
-@@ -555,9 +560,10 @@ static void __init __pci_mmcfg_init(int early)
- 		}
- 	}
- 
--	if (pci_mmcfg_arch_init())
-+	if (pci_mmcfg_arch_init()) {
-+		raw_pci_ext_ops = &pci_mmcfg;
- 		pci_probe = (pci_probe & ~PCI_PROBE_MASK) | PCI_PROBE_MMCONF;
--	else {
-+	} else {
- 		free_all_mmcfg();
- 		pci_mmcfg_arch_init_failed = true;
- 	}
-diff --git a/arch/x86/pci/mmconfig_32.c b/arch/x86/pci/mmconfig_32.c
-index 5cf6291..7a050cb 100644
---- a/arch/x86/pci/mmconfig_32.c
-+++ b/arch/x86/pci/mmconfig_32.c
-@@ -50,7 +50,7 @@ static void pci_exp_set_dev_base(unsigned int base, int bus, int devfn)
- 	}
- }
- 
--static int pci_mmcfg_read(unsigned int seg, unsigned int bus,
-+int pci_mmcfg_read(unsigned int seg, unsigned int bus,
- 			  unsigned int devfn, int reg, int len, u32 *value)
- {
- 	unsigned long flags;
-@@ -79,7 +79,7 @@ err:		*value = -1;
- 	return 0;
- }
- 
--static int pci_mmcfg_write(unsigned int seg, unsigned int bus,
-+int pci_mmcfg_write(unsigned int seg, unsigned int bus,
- 			   unsigned int devfn, int reg, int len, u32 value)
- {
- 	unsigned long flags;
-@@ -106,15 +106,9 @@ static int pci_mmcfg_write(unsigned int seg, unsigned int bus,
- 	return 0;
- }
- 
--const struct pci_raw_ops pci_mmcfg = {
--	.read =		pci_mmcfg_read,
--	.write =	pci_mmcfg_write,
--};
--
- int __init pci_mmcfg_arch_init(void)
- {
- 	printk(KERN_INFO "PCI: Using MMCONFIG for extended config space\n");
--	raw_pci_ext_ops = &pci_mmcfg;
- 	return 1;
- }
- 
-diff --git a/arch/x86/pci/mmconfig_64.c b/arch/x86/pci/mmconfig_64.c
-index b62ff18..fd857ea 100644
---- a/arch/x86/pci/mmconfig_64.c
-+++ b/arch/x86/pci/mmconfig_64.c
-@@ -25,7 +25,7 @@ static char __iomem *pci_dev_base(unsigned int seg, unsigned int bus, unsigned i
- 	return NULL;
- }
- 
--static int pci_mmcfg_read(unsigned int seg, unsigned int bus,
-+int pci_mmcfg_read(unsigned int seg, unsigned int bus,
- 			  unsigned int devfn, int reg, int len, u32 *value)
- {
- 	char __iomem *addr;
-@@ -49,7 +49,7 @@ err:		*value = -1;
- 	return 0;
- }
- 
--static int pci_mmcfg_write(unsigned int seg, unsigned int bus,
-+int pci_mmcfg_write(unsigned int seg, unsigned int bus,
- 			   unsigned int devfn, int reg, int len, u32 value)
- {
- 	char __iomem *addr;
-@@ -71,11 +71,6 @@ static int pci_mmcfg_write(unsigned int seg, unsigned int bus,
- 	return 0;
- }
- 
--const struct pci_raw_ops pci_mmcfg = {
--	.read =		pci_mmcfg_read,
--	.write =	pci_mmcfg_write,
--};
--
- static void __iomem *mcfg_ioremap(struct pci_mmcfg_region *cfg)
- {
- 	void __iomem *addr;
-@@ -101,8 +96,6 @@ int __init pci_mmcfg_arch_init(void)
- 			return 0;
- 		}
- 
--	raw_pci_ext_ops = &pci_mmcfg;
--
- 	return 1;
- }
- 
-diff --git a/include/linux/ecam.h b/include/linux/ecam.h
-index 2387df5..fba5d6b 100644
---- a/include/linux/ecam.h
-+++ b/include/linux/ecam.h
-@@ -47,5 +47,10 @@ extern struct list_head pci_mmcfg_list;
- 
- #define PCI_MMCFG_BUS_OFFSET(bus)      ((bus) << 20)
- 
-+int pci_mmcfg_read(unsigned int seg, unsigned int bus,
-+		   unsigned int devfn, int reg, int len, u32 *value);
-+int pci_mmcfg_write(unsigned int seg, unsigned int bus,
-+		    unsigned int devfn, int reg, int len, u32 value);
-+
- #endif  /* __KERNEL__ */
- #endif  /* __ECAM_H */
 -- 
 1.9.1
