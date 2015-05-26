@@ -1,38 +1,42 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Tue, 26 May 2015 22:02:46 +0900
-Subject: [RFC PATCH 2/2] arm64: Implement vmalloc based thread_info
- allocator
-In-Reply-To: <F68D2983-226C-4704-A1E0-E79C9425B822@foss.arm.com>
-References: <1432483340-23157-1-git-send-email-jungseoklee85@gmail.com>
- <5992243.NYDGjLH37z@wuerfel> <B873B881-4972-4524-B1D9-4BB05D7248A4@gmail.com>
- <F68D2983-226C-4704-A1E0-E79C9425B822@foss.arm.com>
-Message-ID: <E71E3520-FCE5-4DAE-969D-F59F6A331611@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 26 May 2015 15:07:35 +0200
+Subject: [PATCH v2 4/5] dmaengine: mv_xor: Enlarge descriptor pool size
+In-Reply-To: <1432645656-20504-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1432645656-20504-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1432645656-20504-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On May 26, 2015, at 1:47 AM, Catalin Marinas wrote:
-> On 25 May 2015, at 13:01, Jungseok Lee <jungseoklee85@gmail.com> wrote:
-> 
->>> Could the stack size be reduced to 8KB perhaps?
->> 
->> I guess probably not.
->> 
->> A commit, 845ad05e, says that 8KB is not enough to cover SpecWeb benchmark.
-> 
-> We could go back to 8KB stacks if we implement support for separate IRQ 
-> stack on arm64. It's not too complicated, we would have to use SP0 for (kernel) threads 
-> and SP1 for IRQ handlers.
+From: Lior Amsalem <alior@marvell.com>
 
-Definitely interesting.
+Now that we have 2 channels assigned to 2 CPUs and all requests are chained
+on same channels, we need much more descriptors available to satisfy
+async_tx workload.
 
-It looks like there are two options based on discussion.
-1) Reduce the stack size with separate IRQ stack scheme
-2) Figure out a generic anti-fragmentation solution
+3072 descriptors was found in our lab as the number of descriptors which
+allow the async_tx stack to work without waiting for free descriptors on
+submission of new requests.
 
-Do I miss anything?
+Signed-off-by: Lior Amsalem <alior@marvell.com>
+Reviewed-by: Nadav Haklai <nadavh@marvell.com>
+Tested-by: Nadav Haklai <nadavh@marvell.com>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/dma/mv_xor.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I am still not sure about the first scheme as reviewing Minchan's findings repeatedly,
-but I agree that the item should be worked actively.
-
-Best Regards
-Jungseok Lee
+diff --git a/drivers/dma/mv_xor.h b/drivers/dma/mv_xor.h
+index ac1ce87935de..6b10c8c647b9 100644
+--- a/drivers/dma/mv_xor.h
++++ b/drivers/dma/mv_xor.h
+@@ -19,7 +19,7 @@
+ #include <linux/dmaengine.h>
+ #include <linux/interrupt.h>
+ 
+-#define MV_XOR_POOL_SIZE		PAGE_SIZE
++#define MV_XOR_POOL_SIZE		(MV_XOR_SLOT_SIZE * 3072)
+ #define MV_XOR_SLOT_SIZE		64
+ #define MV_XOR_THRESHOLD		1
+ #define MV_XOR_MAX_CHANNELS             2
+-- 
+2.4.1
