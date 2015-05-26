@@ -1,65 +1,44 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 26 May 2015 12:06:02 -0500
-Subject: [PATCH v2 06/13] musb: Add support for the Allwinner sunxi musb
- controller
-In-Reply-To: <5564A10E.3040402@redhat.com>
-References: <1426878682-14521-1-git-send-email-hdegoede@redhat.com>
- <1426878682-14521-7-git-send-email-hdegoede@redhat.com>
- <20150526154802.GL26599@saruman.tx.rr.com>
- <5564A10E.3040402@redhat.com>
-Message-ID: <20150526170602.GQ26599@saruman.tx.rr.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 26 May 2015 18:08:18 +0100
+Subject: [PATCH 05/11] x86, pci, acpi: Move arch-agnostic MMCONFIG (aka
+ ECAM) and ACPI code out of arch/x86/ directory
+In-Reply-To: <1432644564-24746-6-git-send-email-hanjun.guo@linaro.org>
+References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
+ <1432644564-24746-6-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20150526170817.GU1565@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 26, 2015 at 06:36:30PM +0200, Hans de Goede wrote:
-> Hi,
+On Tue, May 26, 2015 at 01:49:18PM +0100, Hanjun Guo wrote:
+> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 > 
-> On 05/26/2015 05:48 PM, Felipe Balbi wrote:
-> >On Fri, Mar 20, 2015 at 08:11:15PM +0100, Hans de Goede wrote:
-> >>This is based on initial code to get the Allwinner sunxi musb controller
-> >>supported by Chen-Yu Tsai and Roman Byshko.
-> >>
-> >>This adds support for the Allwinner sunxi musb controller in both host only
-> >>and otg mode. Peripheral only mode is not supported, as no boards use that.
-> >>
-> >>This has been tested on a cubietruck (A20 SoC) and an UTOO P66 tablet
-> >>(A13 SoC) with a variety of devices in host mode and with the g_serial gadget
-> >>driver in peripheral mode, plugging otg / host cables in/out a lot of times
-> >>in all possible imaginable plug orders.
-> >>
-> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >
-> >drivers/usb/musb/sunxi.c:28:11: error: unable to open 'linux/soc/sunxi/sunxi_sram.h'
-> >scripts/Makefile.build:264: recipe for target 'drivers/usb/musb/sunxi.o' failed
-> >make[2]: *** [drivers/usb/musb/sunxi.o] Error 1
-> >make[2]: *** Waiting for unfinished jobs....
-> >scripts/Makefile.build:403: recipe for target 'drivers/usb/musb' failed
-> >make[1]: *** [drivers/usb/musb] Error 2
-> >Makefile:1548: recipe for target 'drivers/usb/' failed
-> >make: *** [drivers/usb/] Error 2
-> >
-> >What is the dependency ?
+> ECAM standard and MCFG table are architecture independent and it makes
+> sense to share common code across all architectures. Both are going to
+> corresponding files - ecam.c and mcfg.c
 > 
-> Thanks you that you're working on this, the dependency is the sunxi sram
-> controller driver which was supposed to get pulled for 4.1, but like many
-> other ARM related pull-reqs did not get pulled. And now for 4.2 Arnd
-> has decided that he does not like the driver even though it was
-> ok for 4.1, and has not yet answered how else we should solve this...
+> While we are here, rename pci_parse_mcfg to acpi_parse_mcfg.
+> We already have acpi_parse_mcfg prototype which is used nowhere.
+> At the same time, we need pci_parse_mcfg been global so acpi_parse_mcfg
+> can be used perfectly here.
 > 
-> Arnd, we would really like to move forward with musb support for sunxi
-> which means we need a solution for the sram controller, can you please
-> answer Maxime's latest mails on this, or accept the driver as is ?
+> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> ---
+>  arch/x86/Kconfig               |   3 +
+>  arch/x86/include/asm/pci_x86.h |  33 ------
+>  arch/x86/pci/acpi.c            |   1 +
+>  arch/x86/pci/mmconfig-shared.c | 244 +---------------------------------------
+>  arch/x86/pci/mmconfig_32.c     |   1 +
+>  arch/x86/pci/mmconfig_64.c     |   1 +
+>  arch/x86/pci/numachip.c        |   1 +
+>  drivers/acpi/Makefile          |   1 +
+>  drivers/acpi/mcfg.c            |  57 ++++++++++
+>  drivers/pci/Kconfig            |   7 ++
+>  drivers/pci/Makefile           |   5 +
+>  drivers/pci/ecam.c             | 245 +++++++++++++++++++++++++++++++++++++++++
 
-all right, most of the other patches are in my testing/next (please have
-a look when you have some extra time) so ony this patch will be pending
-for v4.2.
+Why can't we make use of the ECAM implementation used by pci-host-generic
+and drivers/pci/access.c?
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150526/18104f36/attachment.sig>
+Will
