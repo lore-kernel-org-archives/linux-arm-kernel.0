@@ -1,450 +1,152 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 26 May 2015 17:31:11 +0100
-Subject: [PATCH 1/6] arm64: perf: factor out callchain code
+Date: Tue, 26 May 2015 17:31:14 +0100
+Subject: [PATCH 4/6] arm64: perf: add Cortex-A53 support
 In-Reply-To: <1432657876-1362-1-git-send-email-mark.rutland@arm.com>
 References: <1432657876-1362-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1432657876-1362-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <1432657876-1362-5-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently bundle the callchain handling code with the PMU code,
-despite the fact the two are distinct, and the former can be useful even
-in the absence of the latter.
+The Cortex-A53 PMU supports a few events outside of the required PMUv3
+set that are rather useful.
 
-Follow the example of arch/arm and factor the callchain handling into
-its own file dependent on CONFIG_PERF_EVENTS rather than
-CONFIG_HW_PERF_EVENTS.
+This patch adds the event map data for said events.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/perf_event.h |   2 +-
- arch/arm64/kernel/Makefile          |   2 +-
- arch/arm64/kernel/perf_callchain.c  | 196 ++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/perf_event.c      | 178 --------------------------------
- 4 files changed, 198 insertions(+), 180 deletions(-)
- create mode 100644 arch/arm64/kernel/perf_callchain.c
+ Documentation/devicetree/bindings/arm/pmu.txt |  1 +
+ arch/arm64/kernel/perf_event_pmuv3.c          | 64 ++++++++++++++++++++++++++-
+ 2 files changed, 63 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/perf_event.h b/arch/arm64/include/asm/perf_event.h
-index d26d1d5..dc4cf4e 100644
---- a/arch/arm64/include/asm/perf_event.h
-+++ b/arch/arm64/include/asm/perf_event.h
-@@ -17,7 +17,7 @@
- #ifndef __ASM_PERF_EVENT_H
- #define __ASM_PERF_EVENT_H
+diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
+index 3b5f5d1..a65e5cf 100644
+--- a/Documentation/devicetree/bindings/arm/pmu.txt
++++ b/Documentation/devicetree/bindings/arm/pmu.txt
+@@ -8,6 +8,7 @@ Required properties:
  
--#ifdef CONFIG_HW_PERF_EVENTS
-+#ifdef CONFIG_PERF_EVENTS
- struct pt_regs;
- extern unsigned long perf_instruction_pointer(struct pt_regs *regs);
- extern unsigned long perf_misc_flags(struct pt_regs *regs);
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 426d076..e89063e 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -25,7 +25,7 @@ arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
- arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
- arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
- arm64-obj-$(CONFIG_SMP)			+= smp.o smp_spin_table.o topology.o
--arm64-obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o
-+arm64-obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o perf_callchain.o
- arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
- arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
- arm64-obj-$(CONFIG_CPU_PM)		+= sleep.o suspend.o
-diff --git a/arch/arm64/kernel/perf_callchain.c b/arch/arm64/kernel/perf_callchain.c
-new file mode 100644
-index 0000000..3aa7483
---- /dev/null
-+++ b/arch/arm64/kernel/perf_callchain.c
-@@ -0,0 +1,196 @@
-+/*
-+ * arm64 callchain support
-+ *
-+ * Copyright (C) 2015 ARM Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#include <linux/perf_event.h>
-+#include <linux/uaccess.h>
-+
-+#include <asm/stacktrace.h>
-+
-+struct frame_tail {
-+	struct frame_tail	__user *fp;
-+	unsigned long		lr;
-+} __attribute__((packed));
-+
-+/*
-+ * Get the return address for a single stackframe and return a pointer to the
-+ * next frame tail.
-+ */
-+static struct frame_tail __user *
-+user_backtrace(struct frame_tail __user *tail,
-+	       struct perf_callchain_entry *entry)
-+{
-+	struct frame_tail buftail;
-+	unsigned long err;
-+
-+	/* Also check accessibility of one struct frame_tail beyond */
-+	if (!access_ok(VERIFY_READ, tail, sizeof(buftail)))
-+		return NULL;
-+
-+	pagefault_disable();
-+	err = __copy_from_user_inatomic(&buftail, tail, sizeof(buftail));
-+	pagefault_enable();
-+
-+	if (err)
-+		return NULL;
-+
-+	perf_callchain_store(entry, buftail.lr);
-+
-+	/*
-+	 * Frame pointers should strictly progress back up the stack
-+	 * (towards higher addresses).
-+	 */
-+	if (tail >= buftail.fp)
-+		return NULL;
-+
-+	return buftail.fp;
-+}
-+
-+#ifdef CONFIG_COMPAT
-+/*
-+ * The registers we're interested in are at the end of the variable
-+ * length saved register structure. The fp points at the end of this
-+ * structure so the address of this struct is:
-+ * (struct compat_frame_tail *)(xxx->fp)-1
-+ *
-+ * This code has been adapted from the ARM OProfile support.
-+ */
-+struct compat_frame_tail {
-+	compat_uptr_t	fp; /* a (struct compat_frame_tail *) in compat mode */
-+	u32		sp;
-+	u32		lr;
-+} __attribute__((packed));
-+
-+static struct compat_frame_tail __user *
-+compat_user_backtrace(struct compat_frame_tail __user *tail,
-+		      struct perf_callchain_entry *entry)
-+{
-+	struct compat_frame_tail buftail;
-+	unsigned long err;
-+
-+	/* Also check accessibility of one struct frame_tail beyond */
-+	if (!access_ok(VERIFY_READ, tail, sizeof(buftail)))
-+		return NULL;
-+
-+	pagefault_disable();
-+	err = __copy_from_user_inatomic(&buftail, tail, sizeof(buftail));
-+	pagefault_enable();
-+
-+	if (err)
-+		return NULL;
-+
-+	perf_callchain_store(entry, buftail.lr);
-+
-+	/*
-+	 * Frame pointers should strictly progress back up the stack
-+	 * (towards higher addresses).
-+	 */
-+	if (tail + 1 >= (struct compat_frame_tail __user *)
-+			compat_ptr(buftail.fp))
-+		return NULL;
-+
-+	return (struct compat_frame_tail __user *)compat_ptr(buftail.fp) - 1;
-+}
-+#endif /* CONFIG_COMPAT */
-+
-+void perf_callchain_user(struct perf_callchain_entry *entry,
-+			 struct pt_regs *regs)
-+{
-+	if (perf_guest_cbs && perf_guest_cbs->is_in_guest()) {
-+		/* We don't support guest os callchain now */
-+		return;
-+	}
-+
-+	perf_callchain_store(entry, regs->pc);
-+
-+	if (!compat_user_mode(regs)) {
-+		/* AARCH64 mode */
-+		struct frame_tail __user *tail;
-+
-+		tail = (struct frame_tail __user *)regs->regs[29];
-+
-+		while (entry->nr < PERF_MAX_STACK_DEPTH &&
-+		       tail && !((unsigned long)tail & 0xf))
-+			tail = user_backtrace(tail, entry);
-+	} else {
-+#ifdef CONFIG_COMPAT
-+		/* AARCH32 compat mode */
-+		struct compat_frame_tail __user *tail;
-+
-+		tail = (struct compat_frame_tail __user *)regs->compat_fp - 1;
-+
-+		while ((entry->nr < PERF_MAX_STACK_DEPTH) &&
-+			tail && !((unsigned long)tail & 0x3))
-+			tail = compat_user_backtrace(tail, entry);
-+#endif
-+	}
-+}
-+
-+/*
-+ * Gets called by walk_stackframe() for every stackframe. This will be called
-+ * whist unwinding the stackframe and is like a subroutine return so we use
-+ * the PC.
-+ */
-+static int callchain_trace(struct stackframe *frame, void *data)
-+{
-+	struct perf_callchain_entry *entry = data;
-+	perf_callchain_store(entry, frame->pc);
-+	return 0;
-+}
-+
-+void perf_callchain_kernel(struct perf_callchain_entry *entry,
-+			   struct pt_regs *regs)
-+{
-+	struct stackframe frame;
-+
-+	if (perf_guest_cbs && perf_guest_cbs->is_in_guest()) {
-+		/* We don't support guest os callchain now */
-+		return;
-+	}
-+
-+	frame.fp = regs->regs[29];
-+	frame.sp = regs->sp;
-+	frame.pc = regs->pc;
-+
-+	walk_stackframe(&frame, callchain_trace, entry);
-+}
-+
-+unsigned long perf_instruction_pointer(struct pt_regs *regs)
-+{
-+	if (perf_guest_cbs && perf_guest_cbs->is_in_guest())
-+		return perf_guest_cbs->get_guest_ip();
-+
-+	return instruction_pointer(regs);
-+}
-+
-+unsigned long perf_misc_flags(struct pt_regs *regs)
-+{
-+	int misc = 0;
-+
-+	if (perf_guest_cbs && perf_guest_cbs->is_in_guest()) {
-+		if (perf_guest_cbs->is_user_mode())
-+			misc |= PERF_RECORD_MISC_GUEST_USER;
-+		else
-+			misc |= PERF_RECORD_MISC_GUEST_KERNEL;
-+	} else {
-+		if (user_mode(regs))
-+			misc |= PERF_RECORD_MISC_USER;
-+		else
-+			misc |= PERF_RECORD_MISC_KERNEL;
-+	}
-+
-+	return misc;
-+}
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 23f25ac..a55a69a 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -36,7 +36,6 @@
- #include <asm/irq.h>
- #include <asm/irq_regs.h>
- #include <asm/pmu.h>
--#include <asm/stacktrace.h>
+ - compatible : should be one of
+ 	"arm,armv8-pmuv3"
++	"arm.cortex-a53-pmu"
+ 	"arm,cortex-a17-pmu"
+ 	"arm,cortex-a15-pmu"
+ 	"arm,cortex-a12-pmu"
+diff --git a/arch/arm64/kernel/perf_event_pmuv3.c b/arch/arm64/kernel/perf_event_pmuv3.c
+index 1cc7206..ea27db0 100644
+--- a/arch/arm64/kernel/perf_event_pmuv3.c
++++ b/arch/arm64/kernel/perf_event_pmuv3.c
+@@ -69,6 +69,11 @@ enum armv8_pmuv3_perf_types {
+ 	ARMV8_PMUV3_PERFCTR_BUS_CYCLES				= 0x1D,
+ };
  
++/* ARMv8 Cortex-A53 specific event types. */
++enum armv8_a53_pmu_perf_types {
++	ARMV8_A53_PERFCTR_PREFETCH_LINEFILL			= 0xC2,
++};
++
+ /* PMUv3 HW events mapping. */
+ static const unsigned armv8_pmuv3_perf_map[PERF_COUNT_HW_MAX] = {
+ 	PERF_MAP_ALL_UNSUPPORTED,
+@@ -79,6 +84,18 @@ static const unsigned armv8_pmuv3_perf_map[PERF_COUNT_HW_MAX] = {
+ 	[PERF_COUNT_HW_BRANCH_MISSES]		= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
+ };
+ 
++/* ARM Cortex-A53 HW events mapping. */
++static const unsigned armv8_a53_perf_map[PERF_COUNT_HW_MAX] = {
++	PERF_MAP_ALL_UNSUPPORTED,
++	[PERF_COUNT_HW_CPU_CYCLES]		= ARMV8_PMUV3_PERFCTR_CLOCK_CYCLES,
++	[PERF_COUNT_HW_INSTRUCTIONS]		= ARMV8_PMUV3_PERFCTR_INSTR_EXECUTED,
++	[PERF_COUNT_HW_CACHE_REFERENCES]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS,
++	[PERF_COUNT_HW_CACHE_MISSES]		= ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL,
++	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS]	= ARMV8_PMUV3_PERFCTR_PC_WRITE,
++	[PERF_COUNT_HW_BRANCH_MISSES]		= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
++	[PERF_COUNT_HW_BUS_CYCLES]		= ARMV8_PMUV3_PERFCTR_BUS_CYCLES,
++};
++
+ static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+ 						[PERF_COUNT_HW_CACHE_OP_MAX]
+ 						[PERF_COUNT_HW_CACHE_RESULT_MAX] = {
+@@ -95,6 +112,28 @@ static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+ 	[C(BPU)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
+ };
+ 
++static const unsigned armv8_a53_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
++					      [PERF_COUNT_HW_CACHE_OP_MAX]
++					      [PERF_COUNT_HW_CACHE_RESULT_MAX] = {
++	PERF_CACHE_MAP_ALL_UNSUPPORTED,
++
++	[C(L1D)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS,
++	[C(L1D)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL,
++	[C(L1D)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS,
++	[C(L1D)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL,
++	[C(L1D)][C(OP_PREFETCH)][C(RESULT_MISS)] = ARMV8_A53_PERFCTR_PREFETCH_LINEFILL,
++
++	[C(L1I)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1_ICACHE_ACCESS,
++	[C(L1I)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1_ICACHE_REFILL,
++
++	[C(ITLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_ITLB_REFILL,
++
++	[C(BPU)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_PRED,
++	[C(BPU)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
++	[C(BPU)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_PRED,
++	[C(BPU)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
++};
++
  /*
-  * ARMv8 supports a maximum of 32 events.
-@@ -1413,180 +1412,3 @@ static int __init init_hw_perf_events(void)
+  * Perf Events' indices
+  */
+@@ -502,6 +541,13 @@ static int armv8_pmuv3_map_event(struct perf_event *event)
+ 				ARMV8_EVTYPE_EVENT);
  }
- early_initcall(init_hw_perf_events);
  
--/*
-- * Callchain handling code.
-- */
--struct frame_tail {
--	struct frame_tail	__user *fp;
--	unsigned long		lr;
--} __attribute__((packed));
--
--/*
-- * Get the return address for a single stackframe and return a pointer to the
-- * next frame tail.
-- */
--static struct frame_tail __user *
--user_backtrace(struct frame_tail __user *tail,
--	       struct perf_callchain_entry *entry)
--{
--	struct frame_tail buftail;
--	unsigned long err;
--
--	/* Also check accessibility of one struct frame_tail beyond */
--	if (!access_ok(VERIFY_READ, tail, sizeof(buftail)))
--		return NULL;
--
--	pagefault_disable();
--	err = __copy_from_user_inatomic(&buftail, tail, sizeof(buftail));
--	pagefault_enable();
--
--	if (err)
--		return NULL;
--
--	perf_callchain_store(entry, buftail.lr);
--
--	/*
--	 * Frame pointers should strictly progress back up the stack
--	 * (towards higher addresses).
--	 */
--	if (tail >= buftail.fp)
--		return NULL;
--
--	return buftail.fp;
--}
--
--#ifdef CONFIG_COMPAT
--/*
-- * The registers we're interested in are at the end of the variable
-- * length saved register structure. The fp points at the end of this
-- * structure so the address of this struct is:
-- * (struct compat_frame_tail *)(xxx->fp)-1
-- *
-- * This code has been adapted from the ARM OProfile support.
-- */
--struct compat_frame_tail {
--	compat_uptr_t	fp; /* a (struct compat_frame_tail *) in compat mode */
--	u32		sp;
--	u32		lr;
--} __attribute__((packed));
--
--static struct compat_frame_tail __user *
--compat_user_backtrace(struct compat_frame_tail __user *tail,
--		      struct perf_callchain_entry *entry)
--{
--	struct compat_frame_tail buftail;
--	unsigned long err;
--
--	/* Also check accessibility of one struct frame_tail beyond */
--	if (!access_ok(VERIFY_READ, tail, sizeof(buftail)))
--		return NULL;
--
--	pagefault_disable();
--	err = __copy_from_user_inatomic(&buftail, tail, sizeof(buftail));
--	pagefault_enable();
--
--	if (err)
--		return NULL;
--
--	perf_callchain_store(entry, buftail.lr);
--
--	/*
--	 * Frame pointers should strictly progress back up the stack
--	 * (towards higher addresses).
--	 */
--	if (tail + 1 >= (struct compat_frame_tail __user *)
--			compat_ptr(buftail.fp))
--		return NULL;
--
--	return (struct compat_frame_tail __user *)compat_ptr(buftail.fp) - 1;
--}
--#endif /* CONFIG_COMPAT */
--
--void perf_callchain_user(struct perf_callchain_entry *entry,
--			 struct pt_regs *regs)
--{
--	if (perf_guest_cbs && perf_guest_cbs->is_in_guest()) {
--		/* We don't support guest os callchain now */
--		return;
--	}
--
--	perf_callchain_store(entry, regs->pc);
--
--	if (!compat_user_mode(regs)) {
--		/* AARCH64 mode */
--		struct frame_tail __user *tail;
--
--		tail = (struct frame_tail __user *)regs->regs[29];
--
--		while (entry->nr < PERF_MAX_STACK_DEPTH &&
--		       tail && !((unsigned long)tail & 0xf))
--			tail = user_backtrace(tail, entry);
--	} else {
--#ifdef CONFIG_COMPAT
--		/* AARCH32 compat mode */
--		struct compat_frame_tail __user *tail;
--
--		tail = (struct compat_frame_tail __user *)regs->compat_fp - 1;
--
--		while ((entry->nr < PERF_MAX_STACK_DEPTH) &&
--			tail && !((unsigned long)tail & 0x3))
--			tail = compat_user_backtrace(tail, entry);
--#endif
--	}
--}
--
--/*
-- * Gets called by walk_stackframe() for every stackframe. This will be called
-- * whist unwinding the stackframe and is like a subroutine return so we use
-- * the PC.
-- */
--static int callchain_trace(struct stackframe *frame, void *data)
--{
--	struct perf_callchain_entry *entry = data;
--	perf_callchain_store(entry, frame->pc);
--	return 0;
--}
--
--void perf_callchain_kernel(struct perf_callchain_entry *entry,
--			   struct pt_regs *regs)
--{
--	struct stackframe frame;
--
--	if (perf_guest_cbs && perf_guest_cbs->is_in_guest()) {
--		/* We don't support guest os callchain now */
--		return;
--	}
--
--	frame.fp = regs->regs[29];
--	frame.sp = regs->sp;
--	frame.pc = regs->pc;
--
--	walk_stackframe(&frame, callchain_trace, entry);
--}
--
--unsigned long perf_instruction_pointer(struct pt_regs *regs)
--{
--	if (perf_guest_cbs && perf_guest_cbs->is_in_guest())
--		return perf_guest_cbs->get_guest_ip();
--
--	return instruction_pointer(regs);
--}
--
--unsigned long perf_misc_flags(struct pt_regs *regs)
--{
--	int misc = 0;
--
--	if (perf_guest_cbs && perf_guest_cbs->is_in_guest()) {
--		if (perf_guest_cbs->is_user_mode())
--			misc |= PERF_RECORD_MISC_GUEST_USER;
--		else
--			misc |= PERF_RECORD_MISC_GUEST_KERNEL;
--	} else {
--		if (user_mode(regs))
--			misc |= PERF_RECORD_MISC_USER;
--		else
--			misc |= PERF_RECORD_MISC_KERNEL;
--	}
--
--	return misc;
--}
++static int armv8_a53_map_event(struct perf_event *event)
++{
++	return armpmu_map_event(event, &armv8_a53_perf_map,
++				&armv8_a53_perf_cache_map,
++				ARMV8_EVTYPE_EVENT);
++}
++
+ static void armv8pmu_read_num_pmnc_events(void *info)
+ {
+ 	int *nb_cnt = info;
+@@ -520,7 +566,7 @@ static int armv8pmu_probe_num_events(struct arm_pmu *arm_pmu)
+ 				    &arm_pmu->num_events, 1);
+ }
+ 
+-static int armv8_pmuv3_init(struct arm_pmu *cpu_pmu)
++static void armv8_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+ 	cpu_pmu->handle_irq		= armv8pmu_handle_irq,
+ 	cpu_pmu->enable			= armv8pmu_enable_event,
+@@ -532,14 +578,28 @@ static int armv8_pmuv3_init(struct arm_pmu *cpu_pmu)
+ 	cpu_pmu->stop			= armv8pmu_stop,
+ 	cpu_pmu->reset			= armv8pmu_reset,
+ 	cpu_pmu->max_period		= (1LLU << 32) - 1,
++	cpu_pmu->set_event_filter	= armv8pmu_set_event_filter;
++}
++
++static int armv8_pmuv3_init(struct arm_pmu *cpu_pmu)
++{
++	armv8_pmu_init(cpu_pmu);
+ 	cpu_pmu->name			= "armv8_pmuv3";
+ 	cpu_pmu->map_event		= armv8_pmuv3_map_event;
+-	cpu_pmu->set_event_filter	= armv8pmu_set_event_filter;
++	return armv8pmu_probe_num_events(cpu_pmu);
++}
++
++static int armv8_a53_pmu_init(struct arm_pmu *cpu_pmu)
++{
++	armv8_pmu_init(cpu_pmu);
++	cpu_pmu->name			= "armv8_cortex_a53";
++	cpu_pmu->map_event		= armv8_a53_map_event;
+ 	return armv8pmu_probe_num_events(cpu_pmu);
+ }
+ 
+ static const struct of_device_id armv8_pmu_of_device_ids[] = {
+ 	{.compatible = "arm,armv8-pmuv3",	.data = armv8_pmuv3_init},
++	{.compatible = "arm,cortex-a53-pmu",	.data = armv8_a53_pmu_init},
+ 	{},
+ };
+ 
 -- 
 1.9.1
