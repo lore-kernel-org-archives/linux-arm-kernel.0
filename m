@@ -1,764 +1,238 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 26 May 2015 17:23:39 +0100
-Subject: [PATCH 6/7] arm: perf: unify perf_event{,_cpu}.c
+Date: Tue, 26 May 2015 17:23:40 +0100
+Subject: [PATCH 7/7] arm: perf: factor arm_pmu core out to drivers
 In-Reply-To: <1432657420-887-1-git-send-email-mark.rutland@arm.com>
 References: <1432657420-887-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1432657420-887-7-git-send-email-mark.rutland@arm.com>
+Message-ID: <1432657420-887-8-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the arm_pmu framework is only used for CPU PMUs, there's no
-reason to keep the pseudo-generic and CPU-specific framework portions
-separate.
-
-This patch folds the two into perf_event.c.
+To enable sharing of the arm_pmu code with arm64, this patch factors it
+out to drivers/perf/. A new drivers/perf directory is added for
+performance monitor drivers to live under.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Paul Mackerras <paulus@samba.org>
+Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/Makefile         |   2 +-
- arch/arm/kernel/perf_event.c     | 335 ++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/perf_event_cpu.c | 363 ---------------------------------------
- 3 files changed, 336 insertions(+), 364 deletions(-)
- delete mode 100644 arch/arm/kernel/perf_event_cpu.c
+ arch/arm/Kconfig                                           |  8 ++------
+ arch/arm/kernel/Makefile                                   |  3 +--
+ arch/arm/kernel/perf_event_v6.c                            |  2 +-
+ arch/arm/kernel/perf_event_v7.c                            |  2 +-
+ arch/arm/kernel/perf_event_xscale.c                        |  2 +-
+ arch/arm/mach-ux500/cpu-db8500.c                           |  2 +-
+ drivers/Kconfig                                            |  2 ++
+ drivers/Makefile                                           |  1 +
+ drivers/perf/Kconfig                                       | 14 ++++++++++++++
+ drivers/perf/Makefile                                      |  1 +
+ arch/arm/kernel/perf_event.c => drivers/perf/arm_pmu.c     |  2 +-
+ arch/arm/include/asm/pmu.h => include/linux/perf/arm_pmu.h |  4 ++--
+ 12 files changed, 28 insertions(+), 15 deletions(-)
+ create mode 100644 drivers/perf/Kconfig
+ create mode 100644 drivers/perf/Makefile
+ rename arch/arm/kernel/perf_event.c => drivers/perf/arm_pmu.c (99%)
+ rename arch/arm/include/asm/pmu.h => include/linux/perf/arm_pmu.h (98%)
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 45df48b..74864d9 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1663,12 +1663,8 @@ config HIGHPTE
+ 	depends on HIGHMEM
+ 
+ config HW_PERF_EVENTS
+-	bool "Enable hardware performance counter support for perf events"
+-	depends on PERF_EVENTS
+-	default y
+-	help
+-	  Enable hardware performance counter support for perf events. If
+-	  disabled, perf events will use software events only.
++	def_bool y
++	depends on ARM_PMU
+ 
+ config SYS_SUPPORTS_HUGETLBFS
+        def_bool y
 diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 26de378..d274a1f 100644
+index d274a1f..f4db513 100644
 --- a/arch/arm/kernel/Makefile
 +++ b/arch/arm/kernel/Makefile
-@@ -70,7 +70,7 @@ obj-$(CONFIG_CPU_PJ4)		+= pj4-cp0.o
+@@ -70,8 +70,7 @@ obj-$(CONFIG_CPU_PJ4)		+= pj4-cp0.o
  obj-$(CONFIG_CPU_PJ4B)		+= pj4-cp0.o
  obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
  obj-$(CONFIG_PERF_EVENTS)	+= perf_regs.o perf_callchain.o
--obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o perf_event_cpu.o \
-+obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o \
- 				   perf_event_xscale.o perf_event_v6.o \
+-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o \
+-				   perf_event_xscale.o perf_event_v6.o \
++obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event_xscale.o perf_event_v6.o \
  				   perf_event_v7.o
  CFLAGS_pj4-cp0.o		:= -marm
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index 0072e8b..355c969 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -11,12 +11,18 @@
-  */
- #define pr_fmt(fmt) "hw perfevents: " fmt
+ AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
+diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v6.c
+index 09f83e4..09413e7 100644
+--- a/arch/arm/kernel/perf_event_v6.c
++++ b/arch/arm/kernel/perf_event_v6.c
+@@ -34,9 +34,9 @@
  
-+#include <linux/bitmap.h>
- #include <linux/cpumask.h>
-+#include <linux/export.h>
- #include <linux/kernel.h>
-+#include <linux/of.h>
- #include <linux/platform_device.h>
-+#include <linux/slab.h>
-+#include <linux/spinlock.h>
- #include <linux/irq.h>
- #include <linux/irqdesc.h>
- 
-+#include <asm/cputype.h>
+ #include <asm/cputype.h>
  #include <asm/irq_regs.h>
- #include <asm/pmu.h>
- 
-@@ -553,3 +559,332 @@ int armpmu_register(struct arm_pmu *armpmu, int type)
- 	return perf_pmu_register(&armpmu->pmu, armpmu->name, type);
- }
- 
-+/* Set at runtime when we know what CPU type we are. */
-+static struct arm_pmu *__oprofile_cpu_pmu;
-+
-+/*
-+ * Despite the names, these two functions are CPU-specific and are used
-+ * by the OProfile/perf code.
-+ */
-+const char *perf_pmu_name(void)
-+{
-+	if (!__oprofile_cpu_pmu)
-+		return NULL;
-+
-+	return __oprofile_cpu_pmu->name;
-+}
-+EXPORT_SYMBOL_GPL(perf_pmu_name);
-+
-+int perf_num_counters(void)
-+{
-+	int max_events = 0;
-+
-+	if (__oprofile_cpu_pmu != NULL)
-+		max_events = __oprofile_cpu_pmu->num_events;
-+
-+	return max_events;
-+}
-+EXPORT_SYMBOL_GPL(perf_num_counters);
-+
-+static void cpu_pmu_enable_percpu_irq(void *data)
-+{
-+	int irq = *(int *)data;
-+
-+	enable_percpu_irq(irq, IRQ_TYPE_NONE);
-+}
-+
-+static void cpu_pmu_disable_percpu_irq(void *data)
-+{
-+	int irq = *(int *)data;
-+
-+	disable_percpu_irq(irq);
-+}
-+
-+static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
-+{
-+	int i, irq, irqs;
-+	struct platform_device *pmu_device = cpu_pmu->plat_device;
-+	struct pmu_hw_events __percpu *hw_events = cpu_pmu->hw_events;
-+
-+	irqs = min(pmu_device->num_resources, num_possible_cpus());
-+
-+	irq = platform_get_irq(pmu_device, 0);
-+	if (irq >= 0 && irq_is_percpu(irq)) {
-+		on_each_cpu(cpu_pmu_disable_percpu_irq, &irq, 1);
-+		free_percpu_irq(irq, &hw_events->percpu_pmu);
-+	} else {
-+		for (i = 0; i < irqs; ++i) {
-+			int cpu = i;
-+
-+			if (cpu_pmu->irq_affinity)
-+				cpu = cpu_pmu->irq_affinity[i];
-+
-+			if (!cpumask_test_and_clear_cpu(cpu, &cpu_pmu->active_irqs))
-+				continue;
-+			irq = platform_get_irq(pmu_device, i);
-+			if (irq >= 0)
-+				free_irq(irq, per_cpu_ptr(&hw_events->percpu_pmu, cpu));
-+		}
-+	}
-+}
-+
-+static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
-+{
-+	int i, err, irq, irqs;
-+	struct platform_device *pmu_device = cpu_pmu->plat_device;
-+	struct pmu_hw_events __percpu *hw_events = cpu_pmu->hw_events;
-+
-+	if (!pmu_device)
-+		return -ENODEV;
-+
-+	irqs = min(pmu_device->num_resources, num_possible_cpus());
-+	if (irqs < 1) {
-+		pr_warn_once("perf/ARM: No irqs for PMU defined, sampling events not supported\n");
-+		return 0;
-+	}
-+
-+	irq = platform_get_irq(pmu_device, 0);
-+	if (irq >= 0 && irq_is_percpu(irq)) {
-+		err = request_percpu_irq(irq, handler, "arm-pmu",
-+					 &hw_events->percpu_pmu);
-+		if (err) {
-+			pr_err("unable to request IRQ%d for ARM PMU counters\n",
-+				irq);
-+			return err;
-+		}
-+		on_each_cpu(cpu_pmu_enable_percpu_irq, &irq, 1);
-+	} else {
-+		for (i = 0; i < irqs; ++i) {
-+			int cpu = i;
-+
-+			err = 0;
-+			irq = platform_get_irq(pmu_device, i);
-+			if (irq < 0)
-+				continue;
-+
-+			if (cpu_pmu->irq_affinity)
-+				cpu = cpu_pmu->irq_affinity[i];
-+
-+			/*
-+			 * If we have a single PMU interrupt that we can't shift,
-+			 * assume that we're running on a uniprocessor machine and
-+			 * continue. Otherwise, continue without this interrupt.
-+			 */
-+			if (irq_set_affinity(irq, cpumask_of(cpu)) && irqs > 1) {
-+				pr_warn("unable to set irq affinity (irq=%d, cpu=%u)\n",
-+					irq, cpu);
-+				continue;
-+			}
-+
-+			err = request_irq(irq, handler,
-+					  IRQF_NOBALANCING | IRQF_NO_THREAD, "arm-pmu",
-+					  per_cpu_ptr(&hw_events->percpu_pmu, cpu));
-+			if (err) {
-+				pr_err("unable to request IRQ%d for ARM PMU counters\n",
-+					irq);
-+				return err;
-+			}
-+
-+			cpumask_set_cpu(cpu, &cpu_pmu->active_irqs);
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+/*
-+ * PMU hardware loses all context when a CPU goes offline.
-+ * When a CPU is hotplugged back in, since some hardware registers are
-+ * UNKNOWN at reset, the PMU must be explicitly reset to avoid reading
-+ * junk values out of them.
-+ */
-+static int cpu_pmu_notify(struct notifier_block *b, unsigned long action,
-+			  void *hcpu)
-+{
-+	int cpu = (unsigned long)hcpu;
-+	struct arm_pmu *pmu = container_of(b, struct arm_pmu, hotplug_nb);
-+
-+	if ((action & ~CPU_TASKS_FROZEN) != CPU_STARTING)
-+		return NOTIFY_DONE;
-+
-+	if (!cpumask_test_cpu(cpu, &pmu->supported_cpus))
-+		return NOTIFY_DONE;
-+
-+	if (pmu->reset)
-+		pmu->reset(pmu);
-+	else
-+		return NOTIFY_DONE;
-+
-+	return NOTIFY_OK;
-+}
-+
-+static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
-+{
-+	int err;
-+	int cpu;
-+	struct pmu_hw_events __percpu *cpu_hw_events;
-+
-+	cpu_hw_events = alloc_percpu(struct pmu_hw_events);
-+	if (!cpu_hw_events)
-+		return -ENOMEM;
-+
-+	cpu_pmu->hotplug_nb.notifier_call = cpu_pmu_notify;
-+	err = register_cpu_notifier(&cpu_pmu->hotplug_nb);
-+	if (err)
-+		goto out_hw_events;
-+
-+	for_each_possible_cpu(cpu) {
-+		struct pmu_hw_events *events = per_cpu_ptr(cpu_hw_events, cpu);
-+		raw_spin_lock_init(&events->pmu_lock);
-+		events->percpu_pmu = cpu_pmu;
-+	}
-+
-+	cpu_pmu->hw_events	= cpu_hw_events;
-+	cpu_pmu->request_irq	= cpu_pmu_request_irq;
-+	cpu_pmu->free_irq	= cpu_pmu_free_irq;
-+
-+	/* Ensure the PMU has sane values out of reset. */
-+	if (cpu_pmu->reset)
-+		on_each_cpu_mask(&cpu_pmu->supported_cpus, cpu_pmu->reset,
-+			 cpu_pmu, 1);
-+
-+	/* If no interrupts available, set the corresponding capability flag */
-+	if (!platform_get_irq(cpu_pmu->plat_device, 0))
-+		cpu_pmu->pmu.capabilities |= PERF_PMU_CAP_NO_INTERRUPT;
-+
-+	return 0;
-+
-+out_hw_events:
-+	free_percpu(cpu_hw_events);
-+	return err;
-+}
-+
-+static void cpu_pmu_destroy(struct arm_pmu *cpu_pmu)
-+{
-+	unregister_cpu_notifier(&cpu_pmu->hotplug_nb);
-+	free_percpu(cpu_pmu->hw_events);
-+}
-+
-+/*
-+ * CPU PMU identification and probing.
-+ */
-+static int probe_current_pmu(struct arm_pmu *pmu,
-+			     const struct pmu_probe_info *info)
-+{
-+	int cpu = get_cpu();
-+	unsigned int cpuid = read_cpuid_id();
-+	int ret = -ENODEV;
-+
-+	pr_info("probing PMU on CPU %d\n", cpu);
-+
-+	for (; info->init != NULL; info++) {
-+		if ((cpuid & info->mask) != info->cpuid)
-+			continue;
-+		ret = info->init(pmu);
-+		break;
-+	}
-+
-+	put_cpu();
-+	return ret;
-+}
-+
-+static int of_pmu_irq_cfg(struct arm_pmu *pmu)
-+{
-+	int i;
-+	struct platform_device *pdev = pmu->plat_device;
-+	int *irqs = kcalloc(pdev->num_resources, sizeof(*irqs), GFP_KERNEL);
-+
-+	if (!irqs)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < pdev->num_resources; ++i) {
-+		struct device_node *dn;
-+		int cpu;
-+
-+		dn = of_parse_phandle(pdev->dev.of_node, "interrupt-affinity",
-+				      i);
-+		if (!dn) {
-+			pr_warn("Failed to parse %s/interrupt-affinity[%d]\n",
-+				of_node_full_name(dn), i);
-+			break;
-+		}
-+
-+		for_each_possible_cpu(cpu)
-+			if (arch_find_n_match_cpu_physical_id(dn, cpu, NULL))
-+				break;
-+
-+		of_node_put(dn);
-+		if (cpu >= nr_cpu_ids) {
-+			pr_warn("Failed to find logical CPU for %s\n",
-+				dn->name);
-+			break;
-+		}
-+
-+		irqs[i] = cpu;
-+		cpumask_set_cpu(cpu, &pmu->supported_cpus);
-+	}
-+
-+	if (i == pdev->num_resources) {
-+		pmu->irq_affinity = irqs;
-+	} else {
-+		kfree(irqs);
-+		cpumask_setall(&pmu->supported_cpus);
-+	}
-+
-+	return 0;
-+}
-+
-+int arm_pmu_device_probe(struct platform_device *pdev,
-+			 const struct of_device_id *of_table,
-+			 const struct pmu_probe_info *probe_table)
-+{
-+	const struct of_device_id *of_id;
-+	const int (*init_fn)(struct arm_pmu *);
-+	struct device_node *node = pdev->dev.of_node;
-+	struct arm_pmu *pmu;
-+	int ret = -ENODEV;
-+
-+	pmu = kzalloc(sizeof(struct arm_pmu), GFP_KERNEL);
-+	if (!pmu) {
-+		pr_info("failed to allocate PMU device!\n");
-+		return -ENOMEM;
-+	}
-+
-+	if (!__oprofile_cpu_pmu)
-+		__oprofile_cpu_pmu = pmu;
-+
-+	pmu->plat_device = pdev;
-+
-+	if (node && (of_id = of_match_node(of_table, pdev->dev.of_node))) {
-+		init_fn = of_id->data;
-+
-+		ret = of_pmu_irq_cfg(pmu);
-+		if (!ret)
-+			ret = init_fn(pmu);
-+	} else {
-+		ret = probe_current_pmu(pmu, probe_table);
-+		cpumask_setall(&pmu->supported_cpus);
-+	}
-+
-+	if (ret) {
-+		pr_info("failed to probe PMU!\n");
-+		goto out_free;
-+	}
-+
-+	ret = cpu_pmu_init(pmu);
-+	if (ret)
-+		goto out_free;
-+
-+	ret = armpmu_register(pmu, -1);
-+	if (ret)
-+		goto out_destroy;
-+
-+	return 0;
-+
-+out_destroy:
-+	cpu_pmu_destroy(pmu);
-+out_free:
-+	pr_info("failed to register PMU devices!\n");
-+	kfree(pmu);
-+	return ret;
-+}
-diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-deleted file mode 100644
-index 261b639..0000000
---- a/arch/arm/kernel/perf_event_cpu.c
-+++ /dev/null
-@@ -1,363 +0,0 @@
--/*
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
-- *
-- * Copyright (C) 2012 ARM Limited
-- *
-- * Author: Will Deacon <will.deacon@arm.com>
-- */
--#define pr_fmt(fmt) "CPU PMU: " fmt
--
--#include <linux/bitmap.h>
--#include <linux/export.h>
--#include <linux/kernel.h>
--#include <linux/of.h>
--#include <linux/platform_device.h>
--#include <linux/slab.h>
--#include <linux/spinlock.h>
--#include <linux/irq.h>
--#include <linux/irqdesc.h>
--
--#include <asm/cputype.h>
--#include <asm/irq_regs.h>
 -#include <asm/pmu.h>
--
--/* Set at runtime when we know what CPU type we are. */
--static struct arm_pmu *__oprofile_cpu_pmu;
--
--/*
-- * Despite the names, these two functions are CPU-specific and are used
-- * by the OProfile/perf code.
-- */
--const char *perf_pmu_name(void)
--{
--	if (!__oprofile_cpu_pmu)
--		return NULL;
--
--	return __oprofile_cpu_pmu->name;
--}
--EXPORT_SYMBOL_GPL(perf_pmu_name);
--
--int perf_num_counters(void)
--{
--	int max_events = 0;
--
--	if (__oprofile_cpu_pmu != NULL)
--		max_events = __oprofile_cpu_pmu->num_events;
--
--	return max_events;
--}
--EXPORT_SYMBOL_GPL(perf_num_counters);
--
--static void cpu_pmu_enable_percpu_irq(void *data)
--{
--	int irq = *(int *)data;
--
--	enable_percpu_irq(irq, IRQ_TYPE_NONE);
--}
--
--static void cpu_pmu_disable_percpu_irq(void *data)
--{
--	int irq = *(int *)data;
--
--	disable_percpu_irq(irq);
--}
--
--static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
--{
--	int i, irq, irqs;
--	struct platform_device *pmu_device = cpu_pmu->plat_device;
--	struct pmu_hw_events __percpu *hw_events = cpu_pmu->hw_events;
--
--	irqs = min(pmu_device->num_resources, num_possible_cpus());
--
--	irq = platform_get_irq(pmu_device, 0);
--	if (irq >= 0 && irq_is_percpu(irq)) {
--		on_each_cpu(cpu_pmu_disable_percpu_irq, &irq, 1);
--		free_percpu_irq(irq, &hw_events->percpu_pmu);
--	} else {
--		for (i = 0; i < irqs; ++i) {
--			int cpu = i;
--
--			if (cpu_pmu->irq_affinity)
--				cpu = cpu_pmu->irq_affinity[i];
--
--			if (!cpumask_test_and_clear_cpu(cpu, &cpu_pmu->active_irqs))
--				continue;
--			irq = platform_get_irq(pmu_device, i);
--			if (irq >= 0)
--				free_irq(irq, per_cpu_ptr(&hw_events->percpu_pmu, cpu));
--		}
--	}
--}
--
--static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
--{
--	int i, err, irq, irqs;
--	struct platform_device *pmu_device = cpu_pmu->plat_device;
--	struct pmu_hw_events __percpu *hw_events = cpu_pmu->hw_events;
--
--	if (!pmu_device)
--		return -ENODEV;
--
--	irqs = min(pmu_device->num_resources, num_possible_cpus());
--	if (irqs < 1) {
--		pr_warn_once("perf/ARM: No irqs for PMU defined, sampling events not supported\n");
--		return 0;
--	}
--
--	irq = platform_get_irq(pmu_device, 0);
--	if (irq >= 0 && irq_is_percpu(irq)) {
--		err = request_percpu_irq(irq, handler, "arm-pmu",
--					 &hw_events->percpu_pmu);
--		if (err) {
--			pr_err("unable to request IRQ%d for ARM PMU counters\n",
--				irq);
--			return err;
--		}
--		on_each_cpu(cpu_pmu_enable_percpu_irq, &irq, 1);
--	} else {
--		for (i = 0; i < irqs; ++i) {
--			int cpu = i;
--
--			err = 0;
--			irq = platform_get_irq(pmu_device, i);
--			if (irq < 0)
--				continue;
--
--			if (cpu_pmu->irq_affinity)
--				cpu = cpu_pmu->irq_affinity[i];
--
--			/*
--			 * If we have a single PMU interrupt that we can't shift,
--			 * assume that we're running on a uniprocessor machine and
--			 * continue. Otherwise, continue without this interrupt.
--			 */
--			if (irq_set_affinity(irq, cpumask_of(cpu)) && irqs > 1) {
--				pr_warn("unable to set irq affinity (irq=%d, cpu=%u)\n",
--					irq, cpu);
--				continue;
--			}
--
--			err = request_irq(irq, handler,
--					  IRQF_NOBALANCING | IRQF_NO_THREAD, "arm-pmu",
--					  per_cpu_ptr(&hw_events->percpu_pmu, cpu));
--			if (err) {
--				pr_err("unable to request IRQ%d for ARM PMU counters\n",
--					irq);
--				return err;
--			}
--
--			cpumask_set_cpu(cpu, &cpu_pmu->active_irqs);
--		}
--	}
--
--	return 0;
--}
--
--/*
-- * PMU hardware loses all context when a CPU goes offline.
-- * When a CPU is hotplugged back in, since some hardware registers are
-- * UNKNOWN at reset, the PMU must be explicitly reset to avoid reading
-- * junk values out of them.
-- */
--static int cpu_pmu_notify(struct notifier_block *b, unsigned long action,
--			  void *hcpu)
--{
--	int cpu = (unsigned long)hcpu;
--	struct arm_pmu *pmu = container_of(b, struct arm_pmu, hotplug_nb);
--
--	if ((action & ~CPU_TASKS_FROZEN) != CPU_STARTING)
--		return NOTIFY_DONE;
--
--	if (!cpumask_test_cpu(cpu, &pmu->supported_cpus))
--		return NOTIFY_DONE;
--
--	if (pmu->reset)
--		pmu->reset(pmu);
--	else
--		return NOTIFY_DONE;
--
--	return NOTIFY_OK;
--}
--
--static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
--{
--	int err;
--	int cpu;
--	struct pmu_hw_events __percpu *cpu_hw_events;
--
--	cpu_hw_events = alloc_percpu(struct pmu_hw_events);
--	if (!cpu_hw_events)
--		return -ENOMEM;
--
--	cpu_pmu->hotplug_nb.notifier_call = cpu_pmu_notify;
--	err = register_cpu_notifier(&cpu_pmu->hotplug_nb);
--	if (err)
--		goto out_hw_events;
--
--	for_each_possible_cpu(cpu) {
--		struct pmu_hw_events *events = per_cpu_ptr(cpu_hw_events, cpu);
--		raw_spin_lock_init(&events->pmu_lock);
--		events->percpu_pmu = cpu_pmu;
--	}
--
--	cpu_pmu->hw_events	= cpu_hw_events;
--	cpu_pmu->request_irq	= cpu_pmu_request_irq;
--	cpu_pmu->free_irq	= cpu_pmu_free_irq;
--
--	/* Ensure the PMU has sane values out of reset. */
--	if (cpu_pmu->reset)
--		on_each_cpu_mask(&cpu_pmu->supported_cpus, cpu_pmu->reset,
--			 cpu_pmu, 1);
--
--	/* If no interrupts available, set the corresponding capability flag */
--	if (!platform_get_irq(cpu_pmu->plat_device, 0))
--		cpu_pmu->pmu.capabilities |= PERF_PMU_CAP_NO_INTERRUPT;
--
--	return 0;
--
--out_hw_events:
--	free_percpu(cpu_hw_events);
--	return err;
--}
--
--static void cpu_pmu_destroy(struct arm_pmu *cpu_pmu)
--{
--	unregister_cpu_notifier(&cpu_pmu->hotplug_nb);
--	free_percpu(cpu_pmu->hw_events);
--}
--
--/*
-- * CPU PMU identification and probing.
-- */
--static int probe_current_pmu(struct arm_pmu *pmu,
--			     const struct pmu_probe_info *info)
--{
--	int cpu = get_cpu();
--	unsigned int cpuid = read_cpuid_id();
--	int ret = -ENODEV;
--
--	pr_info("probing PMU on CPU %d\n", cpu);
--
--	for (; info->init != NULL; info++) {
--		if ((cpuid & info->mask) != info->cpuid)
--			continue;
--		ret = info->init(pmu);
--		break;
--	}
--
--	put_cpu();
--	return ret;
--}
--
--static int of_pmu_irq_cfg(struct arm_pmu *pmu)
--{
--	int i;
--	struct platform_device *pdev = pmu->plat_device;
--	int *irqs = kcalloc(pdev->num_resources, sizeof(*irqs), GFP_KERNEL);
--
--	if (!irqs)
--		return -ENOMEM;
--
--	for (i = 0; i < pdev->num_resources; ++i) {
--		struct device_node *dn;
--		int cpu;
--
--		dn = of_parse_phandle(pdev->dev.of_node, "interrupt-affinity",
--				      i);
--		if (!dn) {
--			pr_warn("Failed to parse %s/interrupt-affinity[%d]\n",
--				of_node_full_name(dn), i);
--			break;
--		}
--
--		for_each_possible_cpu(cpu)
--			if (arch_find_n_match_cpu_physical_id(dn, cpu, NULL))
--				break;
--
--		of_node_put(dn);
--		if (cpu >= nr_cpu_ids) {
--			pr_warn("Failed to find logical CPU for %s\n",
--				dn->name);
--			break;
--		}
--
--		irqs[i] = cpu;
--		cpumask_set_cpu(cpu, &pmu->supported_cpus);
--	}
--
--	if (i == pdev->num_resources) {
--		pmu->irq_affinity = irqs;
--	} else {
--		kfree(irqs);
--		cpumask_setall(&pmu->supported_cpus);
--	}
--
--	return 0;
--}
--
--int arm_pmu_device_probe(struct platform_device *pdev,
--			 const struct of_device_id *of_table,
--			 const struct pmu_probe_info *probe_table)
--{
--	const struct of_device_id *of_id;
--	const int (*init_fn)(struct arm_pmu *);
--	struct device_node *node = pdev->dev.of_node;
--	struct arm_pmu *pmu;
--	int ret = -ENODEV;
--
--	pmu = kzalloc(sizeof(struct arm_pmu), GFP_KERNEL);
--	if (!pmu) {
--		pr_info("failed to allocate PMU device!\n");
--		return -ENOMEM;
--	}
--
--	if (!__oprofile_cpu_pmu)
--		__oprofile_cpu_pmu = pmu;
--
--	pmu->plat_device = pdev;
--
--	if (node && (of_id = of_match_node(of_table, pdev->dev.of_node))) {
--		init_fn = of_id->data;
--
--		ret = of_pmu_irq_cfg(pmu);
--		if (!ret)
--			ret = init_fn(pmu);
--	} else {
--		ret = probe_current_pmu(pmu, probe_table);
--		cpumask_setall(&pmu->supported_cpus);
--	}
--
--	if (ret) {
--		pr_info("failed to probe PMU!\n");
--		goto out_free;
--	}
--
--	ret = cpu_pmu_init(pmu);
--	if (ret)
--		goto out_free;
--
--	ret = armpmu_register(pmu, -1);
--	if (ret)
--		goto out_destroy;
--
--	return 0;
--
--out_destroy:
--	cpu_pmu_destroy(pmu);
--out_free:
--	pr_info("failed to register PMU devices!\n");
--	kfree(pmu);
--	return ret;
--}
+ 
+ #include <linux/of.h>
++#include <linux/perf/arm_pmu.h>
+ #include <linux/platform_device.h>
+ 
+ enum armv6_perf_types {
+diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+index f9b37f8..126dc67 100644
+--- a/arch/arm/kernel/perf_event_v7.c
++++ b/arch/arm/kernel/perf_event_v7.c
+@@ -21,11 +21,11 @@
+ #include <asm/cp15.h>
+ #include <asm/cputype.h>
+ #include <asm/irq_regs.h>
+-#include <asm/pmu.h>
+ #include <asm/vfp.h>
+ #include "../vfp/vfpinstr.h"
+ 
+ #include <linux/of.h>
++#include <linux/perf/arm_pmu.h>
+ #include <linux/platform_device.h>
+ 
+ /*
+diff --git a/arch/arm/kernel/perf_event_xscale.c b/arch/arm/kernel/perf_event_xscale.c
+index 304d056..aa0499e 100644
+--- a/arch/arm/kernel/perf_event_xscale.c
++++ b/arch/arm/kernel/perf_event_xscale.c
+@@ -16,9 +16,9 @@
+ 
+ #include <asm/cputype.h>
+ #include <asm/irq_regs.h>
+-#include <asm/pmu.h>
+ 
+ #include <linux/of.h>
++#include <linux/perf/arm_pmu.h>
+ #include <linux/platform_device.h>
+ 
+ enum xscale_perf_types {
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index 6f63954..281d4cd 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -20,10 +20,10 @@
+ #include <linux/mfd/dbx500-prcmu.h>
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
++#include <linux/perf/arm_pmu.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/random.h>
+ 
+-#include <asm/pmu.h>
+ #include <asm/mach/map.h>
+ 
+ #include "setup.h"
+diff --git a/drivers/Kconfig b/drivers/Kconfig
+index c0cc96b..feffb33 100644
+--- a/drivers/Kconfig
++++ b/drivers/Kconfig
+@@ -176,6 +176,8 @@ source "drivers/powercap/Kconfig"
+ 
+ source "drivers/mcb/Kconfig"
+ 
++source "drivers/perf/Kconfig"
++
+ source "drivers/ras/Kconfig"
+ 
+ source "drivers/thunderbolt/Kconfig"
+diff --git a/drivers/Makefile b/drivers/Makefile
+index 46d2554..fbdfe07 100644
+--- a/drivers/Makefile
++++ b/drivers/Makefile
+@@ -161,6 +161,7 @@ obj-$(CONFIG_NTB)		+= ntb/
+ obj-$(CONFIG_FMC)		+= fmc/
+ obj-$(CONFIG_POWERCAP)		+= powercap/
+ obj-$(CONFIG_MCB)		+= mcb/
++obj-$(CONFIG_PERF_EVENTS)	+= perf/
+ obj-$(CONFIG_RAS)		+= ras/
+ obj-$(CONFIG_THUNDERBOLT)	+= thunderbolt/
+ obj-$(CONFIG_CORESIGHT)		+= hwtracing/coresight/
+diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
+new file mode 100644
+index 0000000..f556b92ae
+--- /dev/null
++++ b/drivers/perf/Kconfig
+@@ -0,0 +1,14 @@
++#
++# Performance Monitor Drivers
++#
++
++menu "Performance monitor support"
++
++config ARM_PMU
++	depends on PERF_EVENTS && ARM
++	bool "ARM PMU framework"
++	default y
++	help
++	  Say y if you want to use performance monitors on ARM systems.
++
++endmenu
+diff --git a/drivers/perf/Makefile b/drivers/perf/Makefile
+new file mode 100644
+index 0000000..acd2397
+--- /dev/null
++++ b/drivers/perf/Makefile
+@@ -0,0 +1 @@
++obj-$(CONFIG_ARM_PMU) += arm_pmu.o
+diff --git a/arch/arm/kernel/perf_event.c b/drivers/perf/arm_pmu.c
+similarity index 99%
+rename from arch/arm/kernel/perf_event.c
+rename to drivers/perf/arm_pmu.c
+index 355c969..be9dd5a 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/drivers/perf/arm_pmu.c
+@@ -16,6 +16,7 @@
+ #include <linux/export.h>
+ #include <linux/kernel.h>
+ #include <linux/of.h>
++#include <linux/perf/arm_pmu.h>
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+ #include <linux/spinlock.h>
+@@ -24,7 +25,6 @@
+ 
+ #include <asm/cputype.h>
+ #include <asm/irq_regs.h>
+-#include <asm/pmu.h>
+ 
+ static int
+ armpmu_map_cache_event(const unsigned (*cache_map)
+diff --git a/arch/arm/include/asm/pmu.h b/include/linux/perf/arm_pmu.h
+similarity index 98%
+rename from arch/arm/include/asm/pmu.h
+rename to include/linux/perf/arm_pmu.h
+index 3fc87df..bfa673b 100644
+--- a/arch/arm/include/asm/pmu.h
++++ b/include/linux/perf/arm_pmu.h
+@@ -30,7 +30,7 @@ struct arm_pmu_platdata {
+ 				  irq_handler_t pmu_handler);
+ };
+ 
+-#ifdef CONFIG_HW_PERF_EVENTS
++#ifdef CONFIG_ARM_PMU
+ 
+ /*
+  * The ARMv7 CPU PMU supports up to 32 event counters.
+@@ -149,6 +149,6 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ 			 const struct of_device_id *of_table,
+ 			 const struct pmu_probe_info *probe_table);
+ 
+-#endif /* CONFIG_HW_PERF_EVENTS */
++#endif /* CONFIG_ARM_PMU */
+ 
+ #endif /* __ARM_PMU_H__ */
 -- 
 1.9.1
