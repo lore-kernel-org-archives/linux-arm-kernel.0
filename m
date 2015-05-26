@@ -1,100 +1,20 @@
-From: Frank.Li@freescale.com (Frank.Li at freescale.com)
-Date: Wed, 27 May 2015 00:26:01 +0800
-Subject: [PATCH v5 5/6] Document: devicetree: input: imx: i.mx snvs power
- device tree bindings
-In-Reply-To: <1432657562-5592-1-git-send-email-Frank.Li@freescale.com>
-References: <1432657562-5592-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <1432657562-5592-6-git-send-email-Frank.Li@freescale.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Tue, 26 May 2015 09:27:21 -0700
+Subject: [PATCH v8 0/9] Tegra xHCI support
+In-Reply-To: <CABb+yY2WhH2gGbCr4n=m9HOa_843MuZDp=QWNDHbtB8AMYYwYA@mail.gmail.com>
+References: <1430761002-9327-1-git-send-email-abrestic@chromium.org>
+ <CABb+yY2WhH2gGbCr4n=m9HOa_843MuZDp=QWNDHbtB8AMYYwYA@mail.gmail.com>
+Message-ID: <CAL1qeaFT5qH3D5Lu8UZpwx-RY6FJUu74vfhsztToPi_zg1-1dQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Li <Frank.Li@freescale.com>
+Hi Jassi,
 
-The snvs-pwrkey is designed to enable POWER key function which controlled
-by SNVS ONOFF. the driver can report the status of POWER key and wakeup
-system if pressed after system suspend.
+On Mon, May 11, 2015 at 8:56 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+> Applied patches 2, 3, 6 & 7
 
-Signed-off-by: Frank Li <Frank.Li@freescale.com>
-Signed-off-by: Robin Gong <b38343@freescale.com>
----
- .../devicetree/bindings/crypto/fsl-sec4.txt        | 49 ++++++++++++++++++++++
- .../devicetree/bindings/input/snvs-pwrkey.txt      |  1 +
- 2 files changed, 50 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/input/snvs-pwrkey.txt
+Please drop patches 6 and 7.  Lee Jones has NAK'ed the MFD driver, so
+I'll have to re-spin this series without using an MFD.
 
-diff --git a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
-index b21e7c2..71a39c5 100644
---- a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
-+++ b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
-@@ -387,6 +387,47 @@ EXAMPLE
- 	};
- 
- =====================================================================
-+System ON/OFF key driver
-+
-+  The snvs-pwrkey is designed to enable POWER key function which controlled
-+  by SNVS ONOFF, the driver can report the status of POWER key and wakeup
-+  system if pressed after system suspend.
-+
-+  - compatible:
-+      Usage: required
-+      Value type: <string>
-+      Definition: Mush include "fsl,sec-v4.0-pwrkey".
-+
-+  - interrupts:
-+      Usage: required
-+      Value type: <prop_encoded-array>
-+      Definition: The SNVS ON/OFF interrupt number to the CPU(s).
-+
-+  - linux,keycode:
-+      Usage: option
-+      Value type: <int>
-+      Definition: Keycode to emit, KEY_POWER by default.
-+
-+  - wakeup:
-+      Usage: option
-+      Value type: <boo>
-+      Definition: Button can wake-up the system.
-+
-+ - regmap:
-+      Usage: required:
-+      Value type: <phandle>
-+      Definition: this is phandle to the register map node.
-+
-+EXAMPLE:
-+	snvs-pwrkey at 0x020cc000 {
-+		compatible = "fsl,sec-v4.0-pwrkey";
-+		regmap = <&snvs>;
-+		interrupts = <0 4 0x4>
-+	        linux,keycode = <116>; /* KEY_POWER */
-+		wakeup;
-+	};
-+
-+=====================================================================
- FULL EXAMPLE
- 
- 	crypto: crypto at 300000 {
-@@ -466,6 +507,14 @@ FULL EXAMPLE
- 			offset = <0x34>;
- 			interrupts = <93 2>;
- 		};
-+
-+		snvs-pwrkey at 0x020cc000 {
-+			compatible = "fsl,sec-v4.0-pwrkey";
-+			regmap = <&sec_mon>;
-+			interrupts = <0 4 0x4>;
-+			linux,keycode = <116>; /* KEY_POWER */
-+			wakeup;
-+		};
- 	};
- 
- =====================================================================
-diff --git a/Documentation/devicetree/bindings/input/snvs-pwrkey.txt b/Documentation/devicetree/bindings/input/snvs-pwrkey.txt
-new file mode 100644
-index 0000000..70c1425
---- /dev/null
-+++ b/Documentation/devicetree/bindings/input/snvs-pwrkey.txt
-@@ -0,0 +1 @@
-+See Documentation/devicetree/bindings/crypto/fsl-sec4.txt
--- 
-1.9.1
+Thanks,
+andrew
