@@ -1,39 +1,60 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 26 May 2015 14:52:19 +0100
-Subject: [PATCHv3 01/12] arm/arm64: kvm: add missing PSCI include
+Date: Tue, 26 May 2015 14:52:20 +0100
+Subject: [PATCHv3 02/12] arm64: smp_plat: add get_logical_index
 In-Reply-To: <1432648350-5454-1-git-send-email-mark.rutland@arm.com>
 References: <1432648350-5454-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1432648350-5454-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <1432648350-5454-3-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We make use of the PSCI function IDs, but don't explicitly include the
-header which defines them. Relying on transitive header includes is
-fragile and will be broken as headers are refactored.
+The PSCI MIGRATE_INFO_UP_CPU call returns a physical ID, which we will
+need to map back to a Linux logical ID.
 
-This patch includes the relevant header file directly so as to avoid
-future breakage.
+Implement a reusable get_logical_index to map from a physical ID to a
+logical ID.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kvm/psci.c | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/include/asm/smp_plat.h | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-index 02fa8ef..7e9398c 100644
---- a/arch/arm/kvm/psci.c
-+++ b/arch/arm/kvm/psci.c
-@@ -24,6 +24,8 @@
- #include <asm/kvm_psci.h>
- #include <asm/kvm_host.h>
+diff --git a/arch/arm64/include/asm/smp_plat.h b/arch/arm64/include/asm/smp_plat.h
+index 8dcd61e..7abf757 100644
+--- a/arch/arm64/include/asm/smp_plat.h
++++ b/arch/arm64/include/asm/smp_plat.h
+@@ -19,6 +19,8 @@
+ #ifndef __ASM_SMP_PLAT_H
+ #define __ASM_SMP_PLAT_H
  
-+#include <uapi/linux/psci.h>
++#include <linux/cpumask.h>
 +
- /*
-  * This is an implementation of the Power State Coordination Interface
-  * as described in ARM document number ARM DEN 0022A.
+ #include <asm/types.h>
+ 
+ struct mpidr_hash {
+@@ -39,6 +41,20 @@ static inline u32 mpidr_hash_size(void)
+  */
+ extern u64 __cpu_logical_map[NR_CPUS];
+ #define cpu_logical_map(cpu)    __cpu_logical_map[cpu]
++/*
++ * Retrieve logical cpu index corresponding to a given MPIDR.Aff*
++ *  - mpidr: MPIDR.Aff* bits to be used for the look-up
++ *
++ * Returns the cpu logical index or -EINVAL on look-up error
++ */
++static inline int get_logical_index(u64 mpidr)
++{
++	int cpu;
++	for (cpu = 0; cpu < nr_cpu_ids; cpu++)
++		if (cpu_logical_map(cpu) == mpidr)
++			return cpu;
++	return -EINVAL;
++}
+ 
+ void __init do_post_cpus_up_work(void);
+ 
 -- 
 1.9.1
