@@ -1,126 +1,80 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 26 May 2015 15:26:40 +0300
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Make USB support modular
-In-Reply-To: <1432637918-8946-2-git-send-email-geert+renesas@glider.be>
-References: <1432637918-8946-1-git-send-email-geert+renesas@glider.be>
- <1432637918-8946-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <11285144.SLyHNBFeg0@avalon>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 26 May 2015 14:33:41 +0200
+Subject: [PATCH v4 2/7] mmc: mediatek: Add Mediatek MMC driver
+In-Reply-To: <1432620991.647.6.camel@mhfsdcap03>
+References: <1432017411-2996-1-git-send-email-chaotian.jing@mediatek.com>
+ <1432017411-2996-3-git-send-email-chaotian.jing@mediatek.com>
+ <CAPDyKFo5788uRqAaXUZ-OiS1XF8NPmg4tn2ipZNJdx4dci+KMQ@mail.gmail.com>
+ <1432284000.23435.38.camel@mhfsdcap03>
+ <CAPDyKFpWCvJXL-W5P83ucBM2-b5cDFEtSLnN6J6WLyR_9CuvWw@mail.gmail.com>
+ <1432620991.647.6.camel@mhfsdcap03>
+Message-ID: <CAPDyKFrNQ6E4cU1_gK56ZNYgb=9EzHoJ=vXyraYoKNnRL=Umyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+[...]
 
-Thank you for the patch.
+>> >> > +{
+>> >> > +       unsigned long tmo = jiffies + msecs_to_jiffies(20);
+>> >> > +
+>> >> > +       while ((readl(host->base + SDC_STS) & SDC_STS_CMDBUSY)
+>> >> > +                       && time_before(jiffies, tmo))
+>> >> > +               continue;
+>> >> > +
+>> >> > +       if (readl(host->base + SDC_STS) & SDC_STS_CMDBUSY) {
+>> >> > +               dev_err(host->dev, "CMD bus busy detected\n");
+>> >> > +               host->error |= REQ_CMD_BUSY;
+>> >> > +               msdc_cmd_done(host, MSDC_INT_CMDTMO, mrq, cmd);
+>> >> > +               return false;
+>> >> > +       }
+>> >> > +
+>> >> > +       if (mmc_resp_type(cmd) == MMC_RSP_R1B || cmd->data) {
+>> >> > +               /* R1B or with data, should check SDCBUSY */
+>> >> > +               while (readl(host->base + SDC_STS) & SDC_STS_SDCBUSY)
+>> >> > +                       cpu_relax();
+>> >> > +       }
+>> >>
+>> >> MSDC seems to be handling card busy detection in HW, right?
+>> >>
+>> > Do not have this ability, HW only know if CMD/DAT is low, but do not
+>> > have any interrupt for it,
+>>
+>> I see, but doesn't the above polling mean that msdc will not propagate
+>> the response until the card have stopped signal busy? That's what
+>> MMC_CAP_WAIT_WHILE_BUSY shall be used for.
+>>
+> As you see, we only check the "busy state" BEFORE issue a R1B command or
+> with data command, but do not check if AFTER the request was done, that
+> would do not match the "MMC_CAP_WAIT_WHILE_BUSY"(eg. CMD5 to sleep)
 
-On Tuesday 26 May 2015 12:58:38 Geert Uytterhoeven wrote:
-> Make USB support modular to reduce kernel size:
+Okay, fair enough. Still, I don't understand why you want to do that?
 
-This means we lose support for NFS root on USB-based ethernet controllers. I'm 
-not sure that's a very good idea.
+> In addition, about CMD5, I find that the suspend/resume flow of EMMC is
+> stranger in new kernel version, when suspend, it may issue CMD5 to enter
+> sleep mode, then power off MMC, but when resume, it will
+> re-initialization, So that why need do the redundant CMD5 in suspend ?
 
->        text    data     bss     dec     hex   filename
->     12979266 1433908  335640 14748814  e10c8e vmlinux.before
->     12237024 1386396  333592 13957012  d4f794 vmlinux.after
-> 
-> USB_GSPCA, USB_EHCI_HCD_PLATFORM, USB_OHCI_HCD_PLATFORM, and
-> PHY_SAMSUNG_USB2 are now enabled automatically by Kconfig logic, so they
-> are dropped.
-> 
-> Tested on r8a7791/koelsch, which can't boot vmlinux.before anymore.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> Against next-20150526
-> ---
->  arch/arm/configs/multi_v7_defconfig | 40  ++++++++++++++++-----------------
->  1 file changed, 18 insertions(+), 22 deletions(-)
-> 
-> diff --git a/arch/arm/configs/multi_v7_defconfig
-> b/arch/arm/configs/multi_v7_defconfig index
-> e3fc9799972367c3..5df66b3671946378 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -215,10 +215,10 @@ CONFIG_SMSC_PHY=y
->  CONFIG_BROADCOM_PHY=y
->  CONFIG_ICPLUS_PHY=y
->  CONFIG_MICREL_PHY=y
-> -CONFIG_USB_PEGASUS=y
-> -CONFIG_USB_USBNET=y
-> -CONFIG_USB_NET_SMSC75XX=y
-> -CONFIG_USB_NET_SMSC95XX=y
-> +CONFIG_USB_PEGASUS=m
-> +CONFIG_USB_USBNET=m
-> +CONFIG_USB_NET_SMSC75XX=m
-> +CONFIG_USB_NET_SMSC95XX=m
->  CONFIG_BRCMFMAC=m
->  CONFIG_RT2X00=m
->  CONFIG_RT2800USB=m
-> @@ -417,8 +417,7 @@ CONFIG_MEDIA_CAMERA_SUPPORT=y
->  CONFIG_MEDIA_CONTROLLER=y
->  CONFIG_VIDEO_V4L2_SUBDEV_API=y
->  CONFIG_MEDIA_USB_SUPPORT=y
-> -CONFIG_USB_VIDEO_CLASS=y
-> -CONFIG_USB_GSPCA=y
-> +CONFIG_USB_VIDEO_CLASS=m
->  CONFIG_V4L_PLATFORM_DRIVERS=y
->  CONFIG_SOC_CAMERA=m
->  CONFIG_SOC_CAMERA_PLATFORM=m
-> @@ -452,7 +451,7 @@ CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
->  CONFIG_SOUND=y
->  CONFIG_SND=y
->  CONFIG_SND_DYNAMIC_MINORS=y
-> -CONFIG_SND_USB_AUDIO=y
-> +CONFIG_SND_USB_AUDIO=m
->  CONFIG_SND_SOC=y
->  CONFIG_SND_ATMEL_SOC=m
->  CONFIG_SND_ATMEL_SOC_WM8904=m
-> @@ -467,24 +466,22 @@ CONFIG_SND_SOC_TEGRA_ALC5632=y
->  CONFIG_SND_SOC_TEGRA_MAX98090=y
->  CONFIG_SND_SOC_AK4642=m
->  CONFIG_SND_SOC_WM8978=m
-> -CONFIG_USB=y
-> -CONFIG_USB_XHCI_HCD=y
-> -CONFIG_USB_XHCI_MVEBU=y
-> -CONFIG_USB_EHCI_HCD=y
-> -CONFIG_USB_EHCI_EXYNOS=y
-> -CONFIG_USB_EHCI_TEGRA=y
-> -CONFIG_USB_EHCI_HCD_STI=y
-> -CONFIG_USB_EHCI_HCD_PLATFORM=y
-> -CONFIG_USB_ISP1760=y
-> -CONFIG_USB_OHCI_HCD=y
-> -CONFIG_USB_OHCI_HCD_STI=y
-> -CONFIG_USB_OHCI_HCD_PLATFORM=y
-> +CONFIG_USB=m
-> +CONFIG_USB_XHCI_HCD=m
-> +CONFIG_USB_XHCI_MVEBU=m
-> +CONFIG_USB_EHCI_HCD=m
-> +CONFIG_USB_EHCI_HCD_STI=m
-> +CONFIG_USB_EHCI_TEGRA=m
-> +CONFIG_USB_EHCI_EXYNOS=m
-> +CONFIG_USB_ISP1760=m
-> +CONFIG_USB_OHCI_HCD=m
-> +CONFIG_USB_OHCI_HCD_STI=m
->  CONFIG_USB_OHCI_EXYNOS=m
->  CONFIG_USB_R8A66597_HCD=m
->  CONFIG_USB_RENESAS_USBHS=m
-> -CONFIG_USB_STORAGE=y
-> +CONFIG_USB_STORAGE=m
->  CONFIG_USB_DWC3=y
-> -CONFIG_USB_CHIPIDEA=y
-> +CONFIG_USB_CHIPIDEA=m
->  CONFIG_USB_CHIPIDEA_HOST=y
->  CONFIG_AB8500_USB=y
->  CONFIG_KEYSTONE_USB_PHY=y
-> @@ -632,7 +629,6 @@ CONFIG_PHY_STIH41X_USB=y
->  CONFIG_PHY_STIH407_USB=y
->  CONFIG_PHY_SUN4I_USB=y
->  CONFIG_PHY_SUN9I_USB=y
-> -CONFIG_PHY_SAMSUNG_USB2=m
->  CONFIG_EXT4_FS=y
->  CONFIG_AUTOFS4_FS=y
->  CONFIG_MSDOS_FS=y
+Both CMD0 and CMD5 are valid as wakeup commands.
 
--- 
-Regards,
+To be able to use CMD5, the VCCQ regulator must be kept enabled in the
+sleep state. That's when it becomes a bit tricky, due to the range of
+different host drivers and SoCs for how VCCQ is managed.
 
-Laurent Pinchart
+To be safe we have chosen to use CMD0, since it works for *all* cases
+no matter if VCCQ get gated or not.
+
+Moreover, using CMD5 as the wakeup command would require added
+complexity in the code dealing with suspend/resume. I don't think the
+effort is worth it, at least until someone has proven that the resume
+time is greatly decreased by using CMD5.
+
+>
+>> Perhaps you should remove the above polling, and rely on the MMC core
+>> to poll with CMD13 instead?
+> before any read/write command, core will issue CMD13 to confirm card
+> status, here is just only do double confirm to avoid HW issue.
+
+What HW issue and why do you need to double confirm? It seems strange.
+
+Kind regards
+Uffe
