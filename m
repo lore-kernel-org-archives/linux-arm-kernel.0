@@ -1,29 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 May 2015 10:02:29 +0200
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Tue, 26 May 2015 10:03:21 +0200
 Subject: [RFC PATCH v1 1/3] PCI: designware: Add ARM64 support
 In-Reply-To: <5563DF4F.4080601@hisilicon.com>
-References: <000001d096a9$27bf43f0$773dcbd0$@com> <5563451B.4050609@st.com>
- <5563DF4F.4080601@hisilicon.com>
-Message-ID: <3340422.95mKZ6cYUI@wuerfel>
+References: <000001d096a9$27bf43f0$773dcbd0$@com>
+ <5562F0C9.4090007@hisilicon.com> <000001d096f1$93dca4e0$bb95eea0$@com>
+ <5563451B.4050609@st.com> <5563DF4F.4080601@hisilicon.com>
+Message-ID: <556428C9.9080202@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 26 May 2015 10:49:51 Zhou Wang wrote:
-> 
+Hi zhou,
+
+On 05/26/2015 04:49 AM, Zhou Wang wrote:
+>>   struct pcie_port {
+>> >+#ifdef CONFIG_ARM
+>> >+    /*
+>> >+     * this is a temporary hack to let the driver work on
+>> >+     * both arm32 and arm64. it can be removed after the
+>> >+     * arm32 cleanup is complete and bios32.c has stopped
+>> >+     * referencing host->pci_sys_data.
+>> >+     */
+>> >+    struct pci_sys_data    dummy;
+>> >+#endif
+>> >      struct device        *dev;
+>> >
+>> >
+>> >This looks like necessary as bios32 is dereferencing sysdata:
+>> >struct pci_sys_data *sysdata = dev->bus->sysdata;
+>> >
+>> >Best Regards,
+>> >Fabrice
+>> >
+> Hi Fabrice,
+>
+> Firstly, many thanks for your test:)
+>
 > I am a little confused that pci_sys_data is still needed as we don't use the code
 > in bios32. What was the problem you met? Could you share me more information? Then
 > let's see how to solve the problem.
-> 
 
-The PCI core code still calls pcibios_align_resource(), which will try to
-use the dev->sysdata pointer as 'struct pci_sys_data'. To solve this, we
-need to change the pci-mvebu driver and the core code first to let the
-driver override pcibios_align_resource() through an operation in 
-struct pci_host_bridge.
+This is not completely true: there is still code in bios32 that requires 
+pci_sys_data.
+No matters pci_common_init_dev() is being called or not :
 
-The other remaining use of dev->sysdata is the ARM pcibios_msi_controller()
-function that overrides the generic implementation.  To solve this, we need
-to change the five remaining drivers that set hw_pci->msi_ctrl to use
-the new generic method, and remove the ARM specific implementation.
+You can see pcibios_msi_controller() has a weak definition (in 
+drivers/pci/msi.c).
+But bios32 defines it for arm. Then it's being used.
+So, basically, pci_sys_data is still needed on arm. This is how above 
+workaround proposed by Arnd takes care of it.
+Without this, dereferencing the pointer as done in bios32, makes it 
+hazardous and lead to crashes...
+e.g. in pcibios_msi_controller(), pci_sys_data will point to 
+"dev->bus->sysdata", aka "struct device *dev" above.
 
-	Arnd
+Best Regards,
+Fabrice
+>
+> Thanks again and Best Regards,
+> Zhou
+>
