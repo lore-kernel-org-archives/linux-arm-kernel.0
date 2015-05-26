@@ -1,118 +1,41 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 26 May 2015 11:45:11 +0200
-Subject: [PATCH 0/8] ARM: mvebu: Add support for RAID6 PQ offloading
-In-Reply-To: <CAPcyv4jbW=B_mYfx5HfKckLYeWctfC-9jYeDf0Z1APvQZfHj6Q@mail.gmail.com>
-References: <1431445063-20226-1-git-send-email-maxime.ripard@free-electrons.com>
- <CAPcyv4gshyaji2HarAeOg3XOiNnmGwnSOMuFGWpuDu8ZTGg=jw@mail.gmail.com>
- <20150513091733.GW10961@lukather>
- <CAPcyv4jv=xWHbrO=rKhnWt9zFn8vkhS2J5mJiCBKKwESdUk5tg@mail.gmail.com>
- <20150518091454.GP4004@lukather>
- <CAPcyv4jbW=B_mYfx5HfKckLYeWctfC-9jYeDf0Z1APvQZfHj6Q@mail.gmail.com>
-Message-ID: <20150526094511.GP8557@lukather>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Tue, 26 May 2015 17:54:44 +0800
+Subject: [PATCH v5 0/3] media: atmel-isi: rework on the clock part and add
+ runtime pm support
+Message-ID: <1432634087-3356-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 18, 2015 at 10:06:55AM -0700, Dan Williams wrote:
-> On Mon, May 18, 2015 at 2:14 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi Dan,
-> >
-> > On Wed, May 13, 2015 at 09:00:46AM -0700, Dan Williams wrote:
-> >> On Wed, May 13, 2015 at 2:17 AM, Maxime Ripard
-> >> <maxime.ripard@free-electrons.com> wrote:
-> >> > Hi Dan,
-> >> >
-> >> > On Tue, May 12, 2015 at 09:05:41AM -0700, Dan Williams wrote:
-> >> >> On Tue, May 12, 2015 at 8:37 AM, Maxime Ripard
-> >> >> <maxime.ripard@free-electrons.com> wrote:
-> >> >> > Hi,
-> >> >> >
-> >> >> > This serie refactors the mv_xor in order to support the latest Armada
-> >> >> > 38x features, including the PQ support in order to offload the RAID6
-> >> >> > PQ operations.
-> >> >> >
-> >> >> > Not all the PQ operations are supported by the XOR engine, so we had
-> >> >> > to introduce new async_tx flags in the process to identify
-> >> >> > un-supported operations.
-> >> >> >
-> >> >> > Please note that this is currently not usable because of a possible
-> >> >> > regression in the RAID stack in 4.1 that is being discussed at the
-> >> >> > moment here: https://lkml.org/lkml/2015/5/7/527
-> >> >>
-> >> >> This is problematic as async_tx is a wart on the dmaengine subsystem
-> >> >> and needs to be deprecated, I just have yet to find the time to do
-> >> >> that work.  It turns out it was a mistake to hide the device details
-> >> >> from md, it should be explicitly managing the dma channels, not
-> >> >> relying on a abstraction api.  The async_tx api usage of the
-> >> >> dma-mapping api is broken in that it relies on overlapping mappings of
-> >> >> the same address.  This happens to work on x86, but on arm it needs
-> >> >> explicit non-overlapping mappings.  I started the work to reference
-> >> >> count dma-mappings in 3.13, and we need to teach md to use
-> >> >> dmaengine_unmap_data explicitly.  Yielding dma channel management to
-> >> >> md also results in a more efficient implementation as we can dma_map()
-> >> >> the stripe cache once rather than per-io.  The  "async_tx_ack()"
-> >> >> disaster can also go away when md is explicitly handling channel
-> >> >> switching.
-> >> >
-> >> > Even though I'd be very much in favor of deprecating / removing
-> >> > async_tx, is it something likely to happen soon?
-> >>
-> >> Not unless someone else takes it on, I'm actively asking for help.
-> >>
-> >> > I remember discussing this with Vinod at Plumbers back in October, but
-> >> > haven't seen anything since then.
-> >>
-> >> Right, "help!" :)
-> >>
-> >> > If not, I think that we shouldn't really hold back patches to
-> >> > async_tx, even though we know than in a year from now, it's going to
-> >> > be gone.
-> >>
-> >> We definitely should block new usages, because they make a bad
-> >> situation worse.  Russell already warned that the dma_mapping api
-> >> abuse could lead to data corruption on ARM (speculative pre-fetching).
-> >> We need to mark ASYNC_TX_DMA as "depends on !ARM" or even "depends on
-> >> BROKEN" until we can get this resolved.
-> >
-> > I'm not sure what the issues exactly are with async_tx and ARM, but
-> > these patches have been tested on ARM and are working quite well.
-> 
-> https://lkml.org/lkml/2011/7/8/363
-> 
-> > What I'm doing here is merely using the existing API, I'm not making
-> > it worse, just using the API that is used by numerous drivers
-> > already. So I'm not sure this is really reasonable to ask for such a
-> > huge rework (with a huge potential of regressions) before merging my
-> > patches.
-> 
-> It happens.
-> 
-> https://lwn.net/Articles/641443/
+This patch series fix the peripheral clock code and enable runtime support.
+Also it clean up the code which is for the compatiblity of mck.
 
-It really depends on what you mean by "help". If you mean "undertake
-all by yourself the removal of async tx", then no, sorry, I won't,
-especially when you ask to do that for a patch that just enables a
-feature of an API already used on that platform.
+Changes in v5:
+- add new patch to fix the condition that codec request still in work.
+- fix the error path in start_streaming() thanks to Laurent.
 
-If you mean, "give me a hand, you can start there", then yeah, I can
-do that.
+Changes in v4:
+- need to call pm_runtime_disable() in atmel_isi_remove().
+- merged the patch which remove isi disable code in atmel_isi_probe() as
+  isi peripherial clock is not enabled in this moment.
+- refine the commit log
 
-> I'm not happy about not having had the time to do this rework myself.
-> Linux is better off with this api deprecated.
+Changes in v3:
+- remove useless definition: ISI_DEFAULT_MCLK_FREQ
 
-You're not talking about deprecating it, you're talking about removing
-it entirely.
+Changes in v2:
+- merged v1 two patch into one.
+- use runtime_pm_put() instead of runtime_pm_put_sync()
+- enable peripheral clock before access ISI registers.
+- totally remove clock_start()/clock_stop() as they are optional.
 
-Maxime
+Josh Wu (3):
+  media: atmel-isi: disable ISI even it has codec request in
+    stop_streaming()
+  media: atmel-isi: add runtime pm support
+  media: atmel-isi: remove mck back compatiable code as it's not need
+
+ drivers/media/platform/soc_camera/atmel-isi.c | 105 ++++++++++++--------------
+ 1 file changed, 48 insertions(+), 57 deletions(-)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150526/401d4c0a/attachment.sig>
+1.9.1
