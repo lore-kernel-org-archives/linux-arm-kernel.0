@@ -1,73 +1,26 @@
-From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
-Date: Tue, 26 May 2015 09:54:42 -0400
-Subject: [PATCH 10/11] XEN / PCI: Remove the dependence on arch x86 when
- PCI_MMCONFIG=y
-In-Reply-To: <1432644564-24746-11-git-send-email-hanjun.guo@linaro.org>
-References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
- <1432644564-24746-11-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <55647B22.3010801@oracle.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Tue, 26 May 2015 10:00:30 -0400
+Subject: [PATCH] serial: samsung: only use earlycon for console
+In-Reply-To: <3397068.2Doeo7zeZ1@wuerfel>
+References: <3397068.2Doeo7zeZ1@wuerfel>
+Message-ID: <55647C7E.6010907@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/26/2015 08:49 AM, Hanjun Guo wrote:
-> In drivers/xen/pci.c, there are arch x86 dependent codes when
-> CONFIG_PCI_MMCONFIG is enabled, since CONFIG_PCI_MMCONFIG
-> depends on ACPI, so this will prevent XEN PCI running on other
-> architectures using ACPI with PCI_MMCONFIG enabled (such as ARM64).
->
-> Fortunatly, it can be sloved in a simple way. In drivers/xen/pci.c,
-> the only x86 dependent code is if ((pci_probe & PCI_PROBE_MMCONF) == 0),
-> and it's defined in asm/pci_x86.h, the code means that
-> if the PCI resource is not probed in PCI_PROBE_MMCONF way, just
-> ingnore the xen mcfg init. Actually this is duplicate, because
-> if PCI resource is not probed in PCI_PROBE_MMCONF way, the
-> pci_mmconfig_list will be empty, and the if (list_empty())
-> after it will do the same job.
->
-> So just remove the arch related code and the head file, this
-> will be no functional change for x86, and also makes xen/pci.c
-> usable for other architectures.
->
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> CC: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-> ---
->   drivers/xen/pci.c | 6 ------
->   1 file changed, 6 deletions(-)
->
-> diff --git a/drivers/xen/pci.c b/drivers/xen/pci.c
-> index 6785ebb..9a8dbe3 100644
-> --- a/drivers/xen/pci.c
-> +++ b/drivers/xen/pci.c
-> @@ -28,9 +28,6 @@
->   #include <asm/xen/hypervisor.h>
->   #include <asm/xen/hypercall.h>
->   #include "../pci/pci.h"
-> -#ifdef CONFIG_PCI_MMCONFIG
-> -#include <asm/pci_x86.h>
-> -#endif
->
->   static bool __read_mostly pci_seg_supported = true;
->
-> @@ -222,9 +219,6 @@ static int __init xen_mcfg_late(void)
->   	if (!xen_initial_domain())
->   		return 0;
->
-> -	if ((pci_probe & PCI_PROBE_MMCONF) == 0)
-> -		return 0;
-> -
->   	if (list_empty(&pci_mmcfg_list))
->   		return 0;
->
+On 05/19/2015 04:26 PM, Arnd Bergmann wrote:
+> A configuration that enables earlycon but not the core console
+> code causes a link error:
+> 
+>   drivers/built-in.o: In function `setup_earlycon':
+>   drivers/tty/serial/earlycon.c:70: undefined reference to `uart_parse_earlycon'
+> 
+> That error can be triggered by the newly added samsung earlycon support,
+> which is missing a 'select' statement.
+> 
+> As suggested by Peter Hurley, solves the problem by moving the
+> 'select SERIAL_EARLYCON' statement to the samsung console driver
+> option, as it is done by all other console drivers.
 
-(+Stefano who is Xen ARM maintainer)
+Thanks.
 
-This will not build on x86 since pci_mmcfg_list since, for example, 
-pci_mmcfg_list is declared in pci_x86.h.
-
-And I am not sure I understand why you are trying to do this since AFAIK 
-CONFIG_PCI_MMCONFIG is only defined on x86 so neither pci_x86.h will be 
-included nor xen_mcfg_late() will be defined on ARM.
-
-
--boris
+Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
