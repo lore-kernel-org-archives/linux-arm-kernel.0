@@ -1,50 +1,46 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 26 May 2015 16:49:34 +0200
-Subject: sdhci(imx6): misbehaves while installing debian jessie, "Got data
- interrupt 0x00100000"
-In-Reply-To: <20150519222320.GM2067@n2100.arm.linux.org.uk>
-References: <20150519222320.GM2067@n2100.arm.linux.org.uk>
-Message-ID: <CAPDyKFqR3NwBd9O40BPzHG7Y4wyyJwgdB4NsA_GUO=YEyqFSXQ@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 26 May 2015 09:51:18 -0500
+Subject: MUSB dual-role on AM335x behaving weirdly
+In-Reply-To: <CADYTM3baVqoEBdWoQb5JFyGR2_GKm1FHMYWST1YkZV=m=ZdycQ@mail.gmail.com>
+References: <20150514174907.GQ24269@saruman.tx.rr.com>
+ <20150514190429.GT24269@saruman.tx.rr.com>
+ <CADYTM3Zso8bV_8yFyx1-ATbL5AgkKBjvWWR4AsoZUNuLvFe1bQ@mail.gmail.com>
+ <20150514192125.GU24269@saruman.tx.rr.com>
+ <CADYTM3bbEAVefFZtivJf5Z+2Q+1zDZEvNhqE5ytsOxDX7hjbdA@mail.gmail.com>
+ <20150514192946.GV24269@saruman.tx.rr.com>
+ <CADYTM3Zk2iD8YMj75CoLJn=4kpoXoXEKUWj2QzdXKGCJjtfG2A@mail.gmail.com>
+ <CADYTM3a1QWnec1D=wT=fgZ-RCXAx_qZYYoFg5gWOy0yT4vovHA@mail.gmail.com>
+ <20150514212653.GC3338@piout.net>
+ <CADYTM3baVqoEBdWoQb5JFyGR2_GKm1FHMYWST1YkZV=m=ZdycQ@mail.gmail.com>
+Message-ID: <20150526145118.GD26599@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 May 2015 at 00:23, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> iMX6 with a Samsung EVO UHS-1 16GB card.
->
-> There's actually two problems here.
->
-> 1. SDHCI chooses to impose a 10 second timeout on any data operation.
->    This magic value of 10 seconds is rediculous.  Consider that SD
->    cards are typically slower than ATA, and ATA has a timeout of more
->    than one minute for a stuck command...  And yes, I've had this fire
->    a good 10 seconds before I then got...
->
-> 2. "Got data interrupt 0x00100000 even though no data operation was in progress."
->
->    That's SDHCI_INT_DATA_TIMEOUT.
->
->    Unfortunately, I have no other information, as the registers are
->    dumped at pr_debug() level, which means that they're all compiled
->    out in normal kernel builds.  In any case, I have no way to copy
->    information off of the installing system; debian does not start up
->    a ssh daemon during the install, so remote login is not possible.
->    Nor can I photograph the rather reflective TV screen.
->
-> The side-effect of this is that the entire MMC IO subsystem locks up
-> and I'm left with lots of processes stuck in IO-wait state, with the
-> hungtask detector spewing onto the console.
+On Thu, May 14, 2015 at 04:36:33PM -0500, Bin Liu wrote:
+> Alexandre,
+> 
+> On Thu, May 14, 2015 at 4:26 PM, Alexandre Belloni
+> <alexandre.belloni@free-electrons.com> wrote:
+> > On 14/05/2015 at 16:16:12 -0500, Bin Liu wrote :
+> >> I think I found the root cause of the problem: board design issue - I
+> >> bet the custom board has too much cap on VBUS line. It should be <
+> >> 10uF.
+> >>
+> >
+> > We have a custom board that exhibits the issue but it only has a 100nF
+> > cap on VBUS.
+> 
+> Have you measured the VBUS discharging? Is there any way to share your
+> schematics?
 
-Sorry, I can't tell much around the host driver and HW as such. I
-don't have any iMX6 boards at hand.
+Alexandre, any further comments ?
 
-Though, the side-effect you are describing isn't very nice. Even if it
-doesn't solve you problem, perhaps we should discuss about converting
-from wait_for_completion() to wait_for_completion_timeout(), when the
-mmc core waits for the host driver to return the result for the
-request.
-
-I guess the tricky part is to find a decent value for the "timeout".
-
-Kind regards
-Uffe
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150526/3e70a928/attachment.sig>
