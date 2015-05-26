@@ -1,7 +1,7 @@
 From: galak@codeaurora.org (Kumar Gala)
-Date: Tue, 26 May 2015 14:23:24 -0500 (CDT)
-Subject: [GIT PULL] qcom arm64 dt changes for 4.2
-Message-ID: <alpine.DEB.2.02.1505261421580.24858@galak-ubuntu.qualcomm.com>
+Date: Tue, 26 May 2015 14:35:22 -0500 (CDT)
+Subject: [GIT PULL] qcom defconfig changes for 4.2
+Message-ID: <alpine.DEB.2.02.1505261426120.25082@galak-ubuntu.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,37 +11,25 @@ The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
 
 are available in the git repository at:
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-arm64-for-4.2
+   git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-defconfig-for-4.2
 
-for you to fetch changes up to a190a1ce9a51d3edd52de1b721276d780e0906bb:
+for you to fetch changes up to e3db12b94ed4e70b7f8703a0c7396d6b9028b58a:
 
-   arm64: dts: qcom: Add initial set of PMIC and SoC pins for APQ8016 SBC board (2015-04-27 16:09:12 -0500)
-
-----------------------------------------------------------------
-Qualcomm ARM64 Updates for v4.2
-
-* Added SPMI PMIC Arbiter device tree node for MSM8916
-* Added 8x16 chipset SPMI PMIC's nodes
-* Added MSM8916 restart device node
-* Added initial set of PMIC and SoC pins for APQ8016 SBC board
+   ARM: config: multi_v7: Update to enable cpuidle for QCOM SoCs (2015-04-28 14:29:09 -0500)
 
 ----------------------------------------------------------------
-Ivan T. Ivanov (4):
-       arm64: dts: qcom: Add SPMI PMIC Arbiter node for MSM8916
-       arm64: dts: qcom: Add 8x16 chipset SPMI PMIC's nodes
-       arm64: dts: qcom: Add MSM8916 restart device node
-       arm64: dts: qcom: Add initial set of PMIC and SoC pins for APQ8016 SBC board
+Qualcomm ARM Based defconfig Updates for v4.2
 
-  .../arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi | 30 +++++++
-  arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi | 21 +++++
-  arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi          |  3 +
-  arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi          |  1 +
-  arch/arm64/boot/dts/qcom/msm8916.dtsi              | 25 +++++-
-  arch/arm64/boot/dts/qcom/pm8916.dtsi               | 99 ++++++++++++++++++++++
-  6 files changed, 178 insertions(+), 1 deletion(-)
-  create mode 100644 arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
-  create mode 100644 arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi
-  create mode 100644 arch/arm64/boot/dts/qcom/pm8916.dtsi
+* Enable cpuidle for QCOM SoCs in qcom & multi_v7_defconfig
+
+----------------------------------------------------------------
+Lina Iyer (2):
+       ARM: config: Update qcom_defconfig to enable cpuidle
+       ARM: config: multi_v7: Update to enable cpuidle for QCOM SoCs
+
+  arch/arm/configs/multi_v7_defconfig | 2 ++
+  arch/arm/configs/qcom_defconfig     | 2 ++
+  2 files changed, 4 insertions(+)
 
 --
 Qualcomm Innovation Center, Inc.
