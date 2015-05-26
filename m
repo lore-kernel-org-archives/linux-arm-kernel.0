@@ -1,24 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 26 May 2015 10:44:26 +0100
-Subject: [PATCH] ARM64: kasan: print memory assignment
-In-Reply-To: <1432632464-12248-1-git-send-email-linus.walleij@linaro.org>
-References: <1432632464-12248-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20150526094425.GD1565@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 26 May 2015 11:44:41 +0200
+Subject: [PATCH 0/3] Fix baud rate for Armada SoCs
+Message-ID: <1432633484-18758-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 26, 2015 at 10:27:44AM +0100, Linus Walleij wrote:
-> This prints out the virtual memory assigned to KASan in the
-> boot crawl along with other memory assignments, if and only
-> if KASan is activated.
-> 
-> Example dmesg from the Juno Development board:
-> 
-> Memory: 1691156K/2080768K available (5465K kernel code, 444K rwdata,
-> 2160K rodata, 340K init, 217K bss, 373228K reserved, 16384K cma-reserved)
-> Virtual kernel memory layout:
->     kasan   : 0xffffff8000000000 - 0xffffff9000000000   (    64 MB)
+Hi,
 
-Unfortunately, that's a *lot* bigger than 64MB!
+The commit df59fa7f4bca "spi: orion: support armada extended baud
+rates" was too optimistic for the maximum baud rate that the Armada
+SoCs can support. Fixing it is the purpose of the 1st patch.
 
-Will
+Actually the Armada SoCs do not have the same constraints, some of
+them have maximum absolute values whereas for the other it is linked
+to the TCLK value. The second patch takes care of managing all these
+cases.
+
+Then the third patch updates the dtsi in order to use the accurate
+value.
+
+Only the first patch fixes a bug observed on the board by using a too
+high frequency on the SPI bus. The other ones allow using the best
+maximum frequency available.
+
+Thanks,
+
+Gregory
+
+
+Gregory CLEMENT (3):
+  spi: orion: Fix maximum baud rates for Armada 370/XP
+  spi: orion: Fix extended baud rates for each Armada SoCs
+  ARM: mvebu: use improved armada spi device tree compatible name for
+    each SoC
+
+ .../devicetree/bindings/spi/spi-orion.txt          |  8 ++-
+ arch/arm/boot/dts/armada-370-xp.dtsi               |  2 -
+ arch/arm/boot/dts/armada-370.dtsi                  |  4 ++
+ arch/arm/boot/dts/armada-375.dtsi                  |  6 +-
+ arch/arm/boot/dts/armada-38x.dtsi                  |  6 +-
+ arch/arm/boot/dts/armada-39x.dtsi                  |  6 +-
+ arch/arm/boot/dts/armada-xp.dtsi                   |  8 +++
+ drivers/spi/spi-orion.c                            | 70 ++++++++++++++++++++--
+ 8 files changed, 96 insertions(+), 14 deletions(-)
+
+-- 
+2.1.0
