@@ -1,15 +1,28 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 26 May 2015 12:13:43 +0200
-Subject: [PATCH 1/2] ASoC: atmel: simplify Kconfig
-In-Reply-To: <1432591459-22613-1-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Tue, 26 May 2015 12:14:06 +0200
+Subject: [PATCH 2/2] ASoC: atmel: compile pcm driver in
+ snd-soc-atmel_ssc_dai
+In-Reply-To: <1432591459-22613-2-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1432591459-22613-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <55644757.7060602@atmel.com>
+ <1432591459-22613-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <5564476E.5000505@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Le 26/05/2015 00:04, Alexandre Belloni a ?crit :
-> Enclose the options in if SND_ATMEL_SOC ... endif to remove the dependency.
-> Also remove the useless description for SND_ATMEL_SOC_SSC.
+> It is currently possible to have CONFIG_SND_ATMEL_SOC_SSC=y with either
+> CONFIG_SND_ATMEL_SOC_PDC=m or CONFIG_SND_ATMEL_SOC_DMA=m. This results in a
+> driver that compiles but does not link with this kind of error:
+> 
+> sound/built-in.o: In function `atmel_ssc_set_audio':
+> (.text+0x87d90): undefined reference to `atmel_pcm_pdc_platform_register'
+> sound/built-in.o: In function `atmel_ssc_put_audio':
+> (.text+0x8879a): undefined reference to `atmel_pcm_pdc_platform_unregister'
+> 
+> Solve that by compiling the selected PCM driver (PDC, DMA or both) in the
+> Atmel SSC DAI driver.
+> 
+> Reported-by: Randy Dunlap <rdunlap@infradead.org>
 > 
 > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
@@ -17,66 +30,45 @@ For the record:
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
 > ---
->  sound/soc/atmel/Kconfig | 16 ++++++----------
->  1 file changed, 6 insertions(+), 10 deletions(-)
+>  sound/soc/atmel/Kconfig  | 4 ++--
+>  sound/soc/atmel/Makefile | 8 +++-----
+>  2 files changed, 5 insertions(+), 7 deletions(-)
 > 
 > diff --git a/sound/soc/atmel/Kconfig b/sound/soc/atmel/Kconfig
-> index e7d08806f3e9..93abe4e6d596 100644
+> index 93abe4e6d596..c3152072d682 100644
 > --- a/sound/soc/atmel/Kconfig
 > +++ b/sound/soc/atmel/Kconfig
-> @@ -6,27 +6,22 @@ config SND_ATMEL_SOC
->  	  the ATMEL SSC interface. You will also need
->  	  to select the audio interfaces to support below.
+> @@ -9,10 +9,10 @@ config SND_ATMEL_SOC
+>  if SND_ATMEL_SOC
 >  
-> +if SND_ATMEL_SOC
-> +
 >  config SND_ATMEL_SOC_PDC
->  	tristate
-> -	depends on SND_ATMEL_SOC
+> -	tristate
+> +	bool
 >  
 >  config SND_ATMEL_SOC_DMA
->  	tristate
-> -	depends on SND_ATMEL_SOC
+> -	tristate
+> +	bool
 >  	select SND_SOC_GENERIC_DMAENGINE_PCM
 >  
 >  config SND_ATMEL_SOC_SSC
->  	tristate
-> -	depends on SND_ATMEL_SOC
-> -	help
-> -	  Say Y or M if you want to add support for codecs the
-> -	  ATMEL SSC interface. You will also needs to select the individual
-> -	  machine drivers to support below.
+> diff --git a/sound/soc/atmel/Makefile b/sound/soc/atmel/Makefile
+> index b327e5cc8de3..4fa7ac91f972 100644
+> --- a/sound/soc/atmel/Makefile
+> +++ b/sound/soc/atmel/Makefile
+> @@ -1,10 +1,8 @@
+>  # AT91 Platform Support
+> -snd-soc-atmel-pcm-pdc-objs := atmel-pcm-pdc.o
+> -snd-soc-atmel-pcm-dma-objs := atmel-pcm-dma.o
+> -snd-soc-atmel_ssc_dai-objs := atmel_ssc_dai.o
+> +snd-soc-atmel-pcm-$(CONFIG_SND_ATMEL_SOC_PDC) := atmel-pcm-pdc.o
+> +snd-soc-atmel-pcm-$(CONFIG_SND_ATMEL_SOC_DMA) += atmel-pcm-dma.o
+> +snd-soc-atmel_ssc_dai-objs := atmel_ssc_dai.o $(snd-soc-atmel-pcm-y)
 >  
->  config SND_AT91_SOC_SAM9G20_WM8731
->  	tristate "SoC Audio support for WM8731-based At91sam9g20 evaluation board"
->  	depends on ARCH_AT91 || COMPILE_TEST
-> -	depends on ATMEL_SSC && SND_ATMEL_SOC && SND_SOC_I2C_AND_SPI
-> +	depends on ATMEL_SSC && SND_SOC_I2C_AND_SPI
->  	select SND_ATMEL_SOC_PDC
->  	select SND_ATMEL_SOC_SSC
->  	select SND_SOC_WM8731
-> @@ -37,7 +32,7 @@ config SND_AT91_SOC_SAM9G20_WM8731
->  config SND_ATMEL_SOC_WM8904
->  	tristate "Atmel ASoC driver for boards using WM8904 codec"
->  	depends on ARCH_AT91 || COMPILE_TEST
-> -	depends on ATMEL_SSC && SND_ATMEL_SOC && I2C
-> +	depends on ATMEL_SSC && I2C
->  	select SND_ATMEL_SOC_SSC
->  	select SND_ATMEL_SOC_DMA
->  	select SND_SOC_WM8904
-> @@ -48,10 +43,11 @@ config SND_ATMEL_SOC_WM8904
->  config SND_AT91_SOC_SAM9X5_WM8731
->  	tristate "SoC Audio support for WM8731-based at91sam9x5 board"
->  	depends on ARCH_AT91 || COMPILE_TEST
-> -	depends on ATMEL_SSC && SND_ATMEL_SOC && SND_SOC_I2C_AND_SPI
-> +	depends on ATMEL_SSC && SND_SOC_I2C_AND_SPI
->  	select SND_ATMEL_SOC_SSC
->  	select SND_ATMEL_SOC_DMA
->  	select SND_SOC_WM8731
->  	help
->  	  Say Y if you want to add support for audio SoC on an
->  	  at91sam9x5 based board that is using WM8731 codec.
-> +endif
+> -obj-$(CONFIG_SND_ATMEL_SOC_PDC) += snd-soc-atmel-pcm-pdc.o
+> -obj-$(CONFIG_SND_ATMEL_SOC_DMA) += snd-soc-atmel-pcm-dma.o
+>  obj-$(CONFIG_SND_ATMEL_SOC_SSC) += snd-soc-atmel_ssc_dai.o
+>  
+>  # AT91 Machine Support
 > 
 
 
