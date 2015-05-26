@@ -1,54 +1,53 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 26 May 2015 09:32:16 -0700
-Subject: [PATCHv3 00/27] ARM: OMAP2+: clock code move under clk driver
-In-Reply-To: <20150526160557.GD16525@atomide.com>
-References: <1432566032-10860-1-git-send-email-t-kristo@ti.com>
- <20150526160557.GD16525@atomide.com>
-Message-ID: <20150526163216.GF16525@atomide.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 26 May 2015 18:36:30 +0200
+Subject: [PATCH v2 06/13] musb: Add support for the Allwinner sunxi musb
+ controller
+In-Reply-To: <20150526154802.GL26599@saruman.tx.rr.com>
+References: <1426878682-14521-1-git-send-email-hdegoede@redhat.com>
+ <1426878682-14521-7-git-send-email-hdegoede@redhat.com>
+ <20150526154802.GL26599@saruman.tx.rr.com>
+Message-ID: <5564A10E.3040402@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [150526 09:08]:
-> * Tero Kristo <t-kristo@ti.com> [150525 08:01]:
-> > Hi,
-> > 
-> > As requested, posting v3 with somewhat changed diff parameters and
-> > diffstat attached. Just some minor Makefile changes compared to v2,
-> > these were discussed under that set.
-> > 
-> > Set has been pushed to:
-> > - tree: https://github.com/t-kristo/linux-pm.git
-> > - branch: for-4.2/ti-clk-move
-> 
-> Looks like this causes a build error for at least omap2 only .config:
-> 
-> drivers/clk/ti/dpll3xxx.o:(.rodata+0x1c): multiple definition of `clkhwops_omap3_dpll'
-> drivers/clk/ti/dpll.o:(.rodata+0x0): first defined here
-> 
-> You may want to create a file selecting ARCH_OMAP2PLUS=y, then point
-> KCONFIG_ALLCONFIG to that file for make randconfig. Then just build
-> randconfigs :) Usually the issues like this are exposed within few
-> randconfig builds, some take longer if the options have dependencies.
+Hi,
 
-Found more similar issues for omap3 only and omap4 only configs:
+On 05/26/2015 05:48 PM, Felipe Balbi wrote:
+> On Fri, Mar 20, 2015 at 08:11:15PM +0100, Hans de Goede wrote:
+>> This is based on initial code to get the Allwinner sunxi musb controller
+>> supported by Chen-Yu Tsai and Roman Byshko.
+>>
+>> This adds support for the Allwinner sunxi musb controller in both host only
+>> and otg mode. Peripheral only mode is not supported, as no boards use that.
+>>
+>> This has been tested on a cubietruck (A20 SoC) and an UTOO P66 tablet
+>> (A13 SoC) with a variety of devices in host mode and with the g_serial gadget
+>> driver in peripheral mode, plugging otg / host cables in/out a lot of times
+>> in all possible imaginable plug orders.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>
+> drivers/usb/musb/sunxi.c:28:11: error: unable to open 'linux/soc/sunxi/sunxi_sram.h'
+> scripts/Makefile.build:264: recipe for target 'drivers/usb/musb/sunxi.o' failed
+> make[2]: *** [drivers/usb/musb/sunxi.o] Error 1
+> make[2]: *** Waiting for unfinished jobs....
+> scripts/Makefile.build:403: recipe for target 'drivers/usb/musb' failed
+> make[1]: *** [drivers/usb/musb] Error 2
+> Makefile:1548: recipe for target 'drivers/usb/' failed
+> make: *** [drivers/usb/] Error 2
+>
+> What is the dependency ?
 
-drivers/built-in.o: In function `omap2_clkops_enable_clkdm':
-omap-gpmc.c:(.text+0x202e0): undefined reference to `ti_clk_get_features'
-drivers/built-in.o: In function `omap2_clkops_disable_clkdm':
-omap-gpmc.c:(.text+0x20374): undefined reference to `ti_clk_get_features'
-drivers/built-in.o: In function `_omap2_dpll_is_in_bypass':
-omap-gpmc.c:(.text+0x21678): undefined reference to `ti_clk_get_features'
-drivers/built-in.o: In function `omap2_dpll_round_rate':
-omap-gpmc.c:(.text+0x218ac): undefined reference to `ti_clk_get_features'
-omap-gpmc.c:(.text+0x218ec): undefined reference to `ti_clk_get_features'
+Thanks you that you're working on this, the dependency is the sunxi sram
+controller driver which was supposed to get pulled for 4.1, but like many
+other ARM related pull-reqs did not get pulled. And now for 4.2 Arnd
+has decided that he does not like the driver even though it was
+ok for 4.1, and has not yet answered how else we should solve this...
 
-drivers/built-in.o: In function `omap3xxx_dt_clk_init':
-omap-gpmc.c:(.init.text+0x4d60): undefined reference to `omap2_clk_enable_init_clocks'
-arch/arm/mach-omap2/built-in.o: In function `ti_clk_init_features':
-
-arch/arm/mach-omap2/built-in.o: In function `ti_clk_init_features':
-dss-common.c:(.init.text+0x4368): undefined reference to `ti_clk_setup_features'
+Arnd, we would really like to move forward with musb support for sunxi
+which means we need a solution for the sram controller, can you please
+answer Maxime's latest mails on this, or accept the driver as is ?
 
 Regards,
 
-Tony
+Hans
