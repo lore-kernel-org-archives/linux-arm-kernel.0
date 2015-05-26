@@ -1,165 +1,54 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 26 May 2015 17:31:13 +0100
-Subject: [PATCH 3/6] arm64: perf: condense event number maps
+Date: Tue, 26 May 2015 17:31:16 +0100
+Subject: [PATCH 6/6] arm64: dts: juno: describe PMUs separately
 In-Reply-To: <1432657876-1362-1-git-send-email-mark.rutland@arm.com>
 References: <1432657876-1362-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1432657876-1362-4-git-send-email-mark.rutland@arm.com>
+Message-ID: <1432657876-1362-7-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most of the cache events an architecture might support do not map well
-to those provided by the ARM architecture, and as such most entries in
-the event number maps are *_UNSUPPORTED. Unfortuantely as 0 is a valid
-physical event identifier, the *_UNSUPPORTED macros expand to a non-zero
-value and thus each unsupported event must be explicitly intiailised as
-such. This leads to large diffs when adding support for a new CPU, and
-makes it difficult to spot the important information.
-
-This patch makes use of the new PERF_*_ALL_UNSUPORTED macros to
-intiailise all entries to *_UNSUPPORTED before overriding this for the
-specific events we actually support, resulting in a significant source
-code reduction.
+The A57 and A53 PMUs in Juno support different events, so describe them
+separately.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Liviu Dudau <liviu.dudau@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/perf_event_pmuv3.c | 114 ++++-------------------------------
- 1 file changed, 12 insertions(+), 102 deletions(-)
+ arch/arm64/boot/dts/arm/juno.dts | 18 +++++++++++-------
+ 1 file changed, 11 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/kernel/perf_event_pmuv3.c b/arch/arm64/kernel/perf_event_pmuv3.c
-index 1f3bbf6..1cc7206 100644
---- a/arch/arm64/kernel/perf_event_pmuv3.c
-+++ b/arch/arm64/kernel/perf_event_pmuv3.c
-@@ -71,118 +71,28 @@ enum armv8_pmuv3_perf_types {
+diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+index 5e9110a..015be74 100644
+--- a/arch/arm64/boot/dts/arm/juno.dts
++++ b/arch/arm64/boot/dts/arm/juno.dts
+@@ -118,17 +118,21 @@
+ 			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>;
+ 	};
  
- /* PMUv3 HW events mapping. */
- static const unsigned armv8_pmuv3_perf_map[PERF_COUNT_HW_MAX] = {
-+	PERF_MAP_ALL_UNSUPPORTED,
- 	[PERF_COUNT_HW_CPU_CYCLES]		= ARMV8_PMUV3_PERFCTR_CLOCK_CYCLES,
- 	[PERF_COUNT_HW_INSTRUCTIONS]		= ARMV8_PMUV3_PERFCTR_INSTR_EXECUTED,
- 	[PERF_COUNT_HW_CACHE_REFERENCES]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS,
- 	[PERF_COUNT_HW_CACHE_MISSES]		= ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL,
--	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS]	= HW_OP_UNSUPPORTED,
- 	[PERF_COUNT_HW_BRANCH_MISSES]		= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
--	[PERF_COUNT_HW_BUS_CYCLES]		= HW_OP_UNSUPPORTED,
--	[PERF_COUNT_HW_STALLED_CYCLES_FRONTEND]	= HW_OP_UNSUPPORTED,
--	[PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= HW_OP_UNSUPPORTED,
- };
- 
- static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
- 						[PERF_COUNT_HW_CACHE_OP_MAX]
- 						[PERF_COUNT_HW_CACHE_RESULT_MAX] = {
--	[C(L1D)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS,
--			[C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS,
--			[C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(L1I)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(LL)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(DTLB)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(ITLB)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(BPU)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_PRED,
--			[C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_PRED,
--			[C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
--	[C(NODE)] = {
--		[C(OP_READ)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_WRITE)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--		[C(OP_PREFETCH)] = {
--			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
--			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
--		},
--	},
-+	PERF_CACHE_MAP_ALL_UNSUPPORTED,
+-	pmu {
+-		compatible = "arm,armv8-pmuv3";
++	pmu_a57 {
++		compatible = "arm,cortex-a57-pmu";
+ 		interrupts = <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>,
+-			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>,
+-			     <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-affinity = <&A57_0>,
++				     <&A57_1>;
++	};
 +
-+	[C(L1D)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS,
-+	[C(L1D)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL,
-+	[C(L1D)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS,
-+	[C(L1D)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL,
-+
-+	[C(BPU)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_PRED,
-+	[C(BPU)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
-+	[C(BPU)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_PRED,
-+	[C(BPU)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
- };
- 
- /*
++	pmu_a53 {
++		compatible = "arm,cortex-a53-pmu";
++		interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
+-		interrupt-affinity = <&A57_0>,
+-				     <&A57_1>,
+-				     <&A53_0>,
++		interrupt-affinity = <&A53_0>,
+ 				     <&A53_1>,
+ 				     <&A53_2>,
+ 				     <&A53_3>;
 -- 
 1.9.1
