@@ -1,62 +1,71 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Tue, 26 May 2015 14:24:37 -0700
-Subject: [PATCH v2] imx: thermal: use CPU temperature grade info for
- thresholds
-In-Reply-To: <CALHpu34OpsfrWLZmrBB5mTVoiyAiEpsnuq7rSf95c9xHYrqzJQ@mail.gmail.com>
-References: <1430409757-16195-1-git-send-email-tharvey@gateworks.com>
- <1432251947-13335-1-git-send-email-tharvey@gateworks.com>
- <20150524024836.GA3264@dragon>
- <CALHpu34OpsfrWLZmrBB5mTVoiyAiEpsnuq7rSf95c9xHYrqzJQ@mail.gmail.com>
-Message-ID: <CAJ+vNU0t70Df8t+zv=vqaL_uzv=TQ8EHxKm67FNGSKMmq6Lfkw@mail.gmail.com>
+From: atull@opensource.altera.com (atull)
+Date: Tue, 26 May 2015 16:37:55 -0500
+Subject: [PATCH v4 2/2] ARM: socfpga: dts: add sdram controller dt binding
+ doc
+In-Reply-To: <20150525123902.GE9943@amd>
+References: <1432317735-29413-1-git-send-email-atull@opensource.altera.com>
+ <1432317735-29413-3-git-send-email-atull@opensource.altera.com>
+ <20150525123902.GE9943@amd>
+Message-ID: <alpine.DEB.2.02.1505261637120.19205@linuxheads99>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 23, 2015 at 10:19 PM, Jon Nettleton <jon.nettleton@gmail.com> wrote:
-> On Sun, May 24, 2015 at 4:48 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
->> On Thu, May 21, 2015 at 04:45:47PM -0700, Tim Harvey wrote:
->>> The IMX6Q/IMX6DL SoC's have a 2-bit temperature grade stored in OTP which
->>> is valid for all IMX6 SoC's (despite the fact that the IMXSDLRM and
->>> IMXSXRM do not document this - this has been proven via tests as well as
->>> verified by Freescale FAE).
->>>
->>> Instead of assuming a fixed 85C for passive cooling threshold and 105C for
->>> critical use the thermal grade for these configurations.
->>>
->>> We will set the critical to maxT - 5C and passive to maxT - 10C.
->
-> I would like to chime in here if you don't mind.  I have been carrying
-> a patch similar to this in the SolidRun repo to fix cooling issues
-> that we have had.  I would recommend keeping the passive temp at maxT
-> - 20C due to the thermal properties of the chip.  I have found that
-> around 85-90C we can maintain a relatively steady thermal state with
-> only passive cooling.  Generally with a hard non-NEON based cpu
-> workload the iMX6 will level off at about 87C with all the cores
-> clocked to 1Ghz, and sometimes dipping down to 800Mhz periodically.
-> With a NEON based workload on all the cores it will push beyond this
-> and generally end up finding steady state at about 800Mhz right around
-> 90C.
->
-> If you raise the initial passive threshold by 10C it will allow enough
-> heat to build up in the chip that the only way to avoid reaching
-> critical temps is by dropping the CPU down to its lowest frequency.
-> This is not the best experience as then you have a much warmer chip
-> and if the workload doesn't change you will just be switching between
-> running at the highest cpu frequency or lowest which makes for a
-> choppy experience.  A longer passive cooling zone allows the
-> temperature of the chip to be regulated using only passive methods but
-> without drastic performance drops.
->
-> I am doing things a bit differently in my implementation as I setup a
-> passive cooling zone for each cpu frequency, but that is just so you
-> can have more control from userspace by changing the different passive
-> trip points.
->
-> -Jon
+On Mon, 25 May 2015, Pavel Machek wrote:
 
-Jon,
+> On Fri 2015-05-22 13:02:15, Alan Tull wrote:
+> > Add binding doc for Altera SOCFPGA SDRAM controller.
+> > 
+> > Signed-off-by: Alan Tull <atull@opensource.altera.com>
+> > ---
+> > v4: Add bindings doc
+> > ---
+> >  .../arm/altera/socfpga-sdram-controller.txt        |   12 ++++++++++++
+> >  1 file changed, 12 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram-controller.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-controller.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-controller.txt
+> > new file mode 100644
+> > index 0000000..77ca635
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-controller.txt
+> > @@ -0,0 +1,12 @@
+> > +Altera SOCFPGA SDRAM Controller
+> > +
+> > +Required properties:
+> > +- compatible : Should contain "altr,sdr-ctl" and "syscon".
+> > +  syscon is required by the Altera SOCFPGA SDRAM EDAC.
+> > +- reg : Should contain 1 register range (address and length)
+> > +
+> > +Example:
+> > +	sdr: sdr at ffc25000 {
+> > +		compatible = "altr,sdr-ctl", "syscon";
+> 
+> Is the syscon binding good idea? Should the EDAC driver be fixed to
+> accept altr,sdr-ctl binding, instead?
+> 							Pavel
 
-I can agree with leaving a Max-20C passive delta. What do you think
-about the critical threshold of Max-5C and rule of not allowing it to
-be changed?
+What problems do you see here?  I'd like to avoid changing the
+EDAC if possible.
 
-Tim
+We have 3 things (EDAC, fpga bridges, suspend) that need access
+to the sdc.  They access 3 nonoverlapping sets of registers
+within the sdc to get at 3 different sets of functionality.
+Both EDAC and the fpga bridge are using syscon.  The suspend
+code can't use syscon because it has to be assembly running
+in OCRAM to enable self-refresh for the DDR.
+
+Thor Thayer ended up using syscon for the EDAC after a thorough
+discussion on lkml and several revisions of the EDAC driver that
+tried it several different ways before finally ending up back
+where he started.
+
+Alan Tull
+
+> -- 
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
