@@ -1,57 +1,47 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 26 May 2015 18:43:36 +0200
-Subject: [PATCH] ARM: imx6: allow booting with old DT
-Message-ID: <1432658616-13733-1-git-send-email-l.stach@pengutronix.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 26 May 2015 18:47:23 +0200
+Subject: [PATCH] ata: ahci_mvebu: Fix wrongly set base address for the MBus
+ window setting
+Message-ID: <1432658843-27622-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPC rewrite to IRQ domains has been on the premise that it may break
-suspend/resume for new kernels on old DT, but otherwise keep things working
-from a user perspective. This was an accepted compromise to be able to move
-the GIC cleanup forward.
+From: Nadav Haklai <nadavh@marvell.com>
 
-What actually happened was that booting a new kernel on an old DT crashes
-before even the console is up, so the user does not even see the warning
-that the DT is too old. The warning message suggests that this has been
-known before, which is clearly unacceptable.
+According to the Armada 38x datasheet, the window base address
+registers value is set in bits [31:4] of the register and corresponds
+to the transaction address bits [47:20].
 
-Fix the early crash by mapping the GPC memory space if the IRQ controller
-doesn't claim it. This keeps at least CPUidle and the needed CPU wakeup
-workarounds working. With this fixed the system is able to boot up
-properly minus the expected suspend/resume breakage.
+Therefore, the 32bit base address value should be shifted right by
+20bits and left by 4bits, resulting in 16 bit shift right.
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+The bug as not been noticed yet because if the memory available on
+the platform is less than 2GB, then the base address is zero.
+
+[gregory.clement at free-electrons.com: add extra-explanation]
+
+Fixes: a3464ed2f14 (ata: ahci_mvebu: new driver for Marvell Armada 380
+AHCI interfaces)
+Signed-off-by: Nadav Haklai <nadavh@marvell.com>
+Reviewed-by: Omri Itach <omrii@marvell.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Cc: <stable@vger.kernel.org>
 ---
-Shawn, this is a critical fix for 4.1, to keep the combination of old
-DT + new kernel at least somewhat working, to allow users to resolve
-the situation on their systems. Please make sure this gets forwarded
-ASAP.
----
- arch/arm/mach-imx/gpc.c | 12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+ drivers/ata/ahci_mvebu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
-index 4d60005e9277..bbf015056221 100644
---- a/arch/arm/mach-imx/gpc.c
-+++ b/arch/arm/mach-imx/gpc.c
-@@ -280,9 +280,15 @@ void __init imx_gpc_check_dt(void)
- 	struct device_node *np;
- 
- 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpc");
--	if (WARN_ON(!np ||
--		    !of_find_property(np, "interrupt-controller", NULL)))
--		pr_warn("Outdated DT detected, system is about to crash!!!\n");
-+	if (WARN_ON(!np))
-+		return;
-+
-+	if (WARN_ON(!of_find_property(np, "interrupt-controller", NULL))) {
-+		pr_warn("Outdated DT detected, suspend/resume will NOT work\n");
-+
-+		/* map GPC, so that at least CPUidle and WARs keep working */
-+		gpc_base = of_iomap(np, 0);
-+	}
- }
- 
- #ifdef CONFIG_PM_GENERIC_DOMAINS
+diff --git a/drivers/ata/ahci_mvebu.c b/drivers/ata/ahci_mvebu.c
+index 23716dd8a7ec..5928d0746a27 100644
+--- a/drivers/ata/ahci_mvebu.c
++++ b/drivers/ata/ahci_mvebu.c
+@@ -45,7 +45,7 @@ static void ahci_mvebu_mbus_config(struct ahci_host_priv *hpriv,
+ 		writel((cs->mbus_attr << 8) |
+ 		       (dram->mbus_dram_target_id << 4) | 1,
+ 		       hpriv->mmio + AHCI_WINDOW_CTRL(i));
+-		writel(cs->base, hpriv->mmio + AHCI_WINDOW_BASE(i));
++		writel(cs->base >> 16, hpriv->mmio + AHCI_WINDOW_BASE(i));
+ 		writel(((cs->size - 1) & 0xffff0000),
+ 		       hpriv->mmio + AHCI_WINDOW_SIZE(i));
+ 	}
 -- 
-2.1.4
+2.1.0
