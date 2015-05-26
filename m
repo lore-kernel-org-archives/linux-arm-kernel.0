@@ -1,412 +1,253 @@
-From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 26 May 2015 10:53:16 +0100
-Subject: [PATCH 7/7] arm-cci: Add aliases for PMU events
-In-Reply-To: <1432633996-7229-1-git-send-email-suzuki.poulose@arm.com>
-References: <1432633996-7229-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1432633996-7229-8-git-send-email-suzuki.poulose@arm.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Tue, 26 May 2015 17:58:14 +0800
+Subject: [PATCH v4 1/2] media: atmel-isi: add runtime pm support
+In-Reply-To: <55643980.6090101@atmel.com>
+References: <1432627211-4338-1-git-send-email-josh.wu@atmel.com>
+ <1432627211-4338-2-git-send-email-josh.wu@atmel.com>
+ <3343948.3GpRNgsx2G@avalon> <55643980.6090101@atmel.com>
+Message-ID: <556443B6.5050209@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+On 5/26/2015 5:14 PM, Josh Wu wrote:
+> Hi, Laurent
+>
+> On 5/26/2015 4:16 PM, Laurent Pinchart wrote:
+>> Hi Josh,
+>>
+>> Thank you for the patch.
+>>
+>> On Tuesday 26 May 2015 16:00:09 Josh Wu wrote:
+>>> The runtime pm resume/suspend will enable/disable pclk (ISI peripheral
+>>> clock).
+>>> And we need to call runtime_pm_get_sync()/runtime_pm_put() when we need
+>>> access ISI registers. In atmel_isi_probe(), remove the isi disable code
+>>> as in the moment ISI peripheral clock is not enable yet.
+>>>
+>>> In the meantime, as clock_start()/clock_stop() is used to control the
+>>> mclk not ISI peripheral clock. So move this to start[stop]_streaming()
+>>> function.
+>>>
+>>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>>> ---
+>>>
+>>> Changes in v4:
+>>> - need to call pm_runtime_disable() in atmel_isi_remove().
+>>> - merged the patch which remove isi disable code in 
+>>> atmel_isi_probe() as
+>>>    isi peripherial clock is not enabled in this moment.
+>>> - refine the commit log
+>>>
+>>> Changes in v3: None
+>>> Changes in v2:
+>>> - merged v1 two patch into one.
+>>> - use runtime_pm_put() instead of runtime_pm_put_sync()
+>>> - enable peripheral clock before access ISI registers.
+>>>
+>>>   drivers/media/platform/soc_camera/atmel-isi.c | 54 
+>>> ++++++++++++++++++++----
+>>>   1 file changed, 46 insertions(+), 8 deletions(-)
+>>>
+>>> diff --git a/drivers/media/platform/soc_camera/atmel-isi.c
+>>> b/drivers/media/platform/soc_camera/atmel-isi.c index 2879026..194e875
+>>> 100644
+>>> --- a/drivers/media/platform/soc_camera/atmel-isi.c
+>>> +++ b/drivers/media/platform/soc_camera/atmel-isi.c
+>>> @@ -20,6 +20,7 @@
+>>>   #include <linux/kernel.h>
+>>>   #include <linux/module.h>
+>>>   #include <linux/platform_device.h>
+>>> +#include <linux/pm_runtime.h>
+>>>   #include <linux/slab.h>
+>>>
+>>>   #include <media/atmel-isi.h>
+>>> @@ -386,6 +387,8 @@ static int start_streaming(struct vb2_queue *vq,
+>>> unsigned int count) struct atmel_isi *isi = ici->priv;
+>>>       int ret;
+>>>
+>>> +    pm_runtime_get_sync(ici->v4l2_dev.dev);
+>>> +
+>>>       /* Reset ISI */
+>>>       ret = atmel_isi_wait_status(isi, WAIT_ISI_RESET);
+>>>       if (ret < 0) {
+>> You need to call pm_runtime_put() in the error path, otherwise an
+>> atmel_isi_wait_status() failure will keep the device enabled.
+>
+> Nice catch. Thanks.
+>
+>>
+>>> @@ -445,6 +448,8 @@ static void stop_streaming(struct vb2_queue *vq)
+>>>       ret = atmel_isi_wait_status(isi, WAIT_ISI_DISABLE);
+>>>       if (ret < 0)
+>>>           dev_err(icd->parent, "Disable ISI timed out\n");
+>>> +
+>>> +    pm_runtime_put(ici->v4l2_dev.dev);
+>>>   }
+>>>
+>>>   static struct vb2_ops isi_video_qops = {
+>>> @@ -516,7 +521,13 @@ static int isi_camera_set_fmt(struct 
+>>> soc_camera_device
+>>> *icd, if (mf->code != xlate->code)
+>>>           return -EINVAL;
+>>>
+>>> +    /* Enable PM and peripheral clock before operate isi registers */
+>>> +    pm_runtime_get_sync(ici->v4l2_dev.dev);
+>>> +
+>>>       ret = configure_geometry(isi, pix->width, pix->height, 
+>>> xlate->code);
+>>> +
+>>> +    pm_runtime_put(ici->v4l2_dev.dev);
+>> I think it would simplify the code to move the configure_geometry() 
+>> call to
+>> start_streaming() as you already call pm_runtime_get_sync() there. 
+>> That can be
+>> done in a separate patch though.
+>
+> I think it's a good idea. I would like to make this in a separate 
+> patch and not include in this series.
+>
+> In summary, I'll resend this patch just with the fix you mentioned in 
+> above (fix the error path in start_streaming).
+> Is that okay for you?
 
-Each CCI model have different event/source codes and formats. This
-patch exports this information via the sysfs, which includes the
-aliases for the events. The aliases are listed by 'perf list', helping
-the users to specify the name of the event instead of the binary
-config values.
+As I found another issue on stop_streaming(), so I sent a v5 series for 
+this whole patch set with a new fix.
+Please check it.
 
-Each event alias must accompany the 'source' code except for the
-following cases :
+BTW: I don't include the simplify method: move configure_geometry() into 
+start_streaming(), I perfer do that after this series is merged.
 
-1) CCI-400 - cycles event, doesn't relate to an interface.
-2) CCI-500 - Global events to the CCI. (Fixed source code = 0xf)
+Best Regards,
+Josh Wu
 
-Each CCI model provides two sets of attributes(format and event),
-which are dynamically populated before registering the PMU, to
-allow for the appropriate information.
-
-Cc: Punit Agrawal <punit.agrawal@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-Acked-by: Punit Agrawal <punit.agrawal@arm.com>
----
- drivers/bus/arm-cci.c |  296 ++++++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 295 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index 1475eaf..577cc4b 100644
---- a/drivers/bus/arm-cci.c
-+++ b/drivers/bus/arm-cci.c
-@@ -121,6 +121,10 @@ struct cci_pmu_model {
- 	u32 fixed_hw_cntrs;
- 	u32 num_hw_cntrs;
- 	u32 cntr_size;
-+	u64 nformat_attrs;
-+	u64 nevent_attrs;
-+	struct dev_ext_attribute *format_attrs;
-+	struct dev_ext_attribute *event_attrs;
- 	struct event_range event_ranges[CCI_IF_MAX];
- 	int (*validate_hw_event)(struct cci_pmu *, unsigned long);
- 	int (*get_event_idx)(struct cci_pmu *, struct cci_pmu_hw_events *, unsigned long);
-@@ -157,6 +161,19 @@ enum cci_models {
- 	CCI_MODEL_MAX
- };
- 
-+static ssize_t cci_pmu_format_show(struct device *dev,
-+			struct device_attribute *attr, char *buf);
-+static ssize_t cci_pmu_event_show(struct device *dev,
-+			struct device_attribute *attr, char *buf);
-+
-+#define CCI_EXT_ATTR_ENTRY(_name, _func, _config) \
-+	{ __ATTR(_name, S_IRUGO, _func, NULL), (void *)_config }
-+
-+#define CCI_FORMAT_EXT_ATTR_ENTRY(_name, _config) \
-+	CCI_EXT_ATTR_ENTRY(_name, cci_pmu_format_show, (char *)_config)
-+#define CCI_EVENT_EXT_ATTR_ENTRY(_name, _config) \
-+	CCI_EXT_ATTR_ENTRY(_name, cci_pmu_event_show, (unsigned long)_config)
-+
- /* CCI400 PMU Specific definitions */
- 
- #ifdef CONFIG_ARM_CCI400_PMU
-@@ -218,6 +235,106 @@ enum cci400_perf_events {
- #define CCI400_R1_MASTER_PORT_MIN_EV	0x00
- #define CCI400_R1_MASTER_PORT_MAX_EV	0x11
- 
-+#define CCI400_CYCLE_EVENT_EXT_ATTR_ENTRY(_name, _config) \
-+	CCI_EXT_ATTR_ENTRY(_name, cci400_pmu_cycle_event_show, \
-+					(unsigned long)_config)
-+
-+static ssize_t cci400_pmu_cycle_event_show(struct device *dev,
-+			struct device_attribute *attr, char *buf);
-+
-+static struct dev_ext_attribute cci400_pmu_format_attrs[] = {
-+	CCI_FORMAT_EXT_ATTR_ENTRY(event, "config:0-4"),
-+	CCI_FORMAT_EXT_ATTR_ENTRY(source, "config:5-7"),
-+};
-+
-+static struct dev_ext_attribute cci400_r0_pmu_event_attrs[] = {
-+	/* Slave events */
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_any, 0x0),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_device, 0x01),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_normal_or_nonshareable, 0x2),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_inner_or_outershareable, 0x3),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_cache_maintenance, 0x4),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_mem_barrier, 0x5),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_sync_barrier, 0x6),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_dvm_msg, 0x7),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_dvm_msg_sync, 0x8),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_stall_tt_full, 0x9),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_r_data_last_hs_snoop, 0xA),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_r_data_stall_rvalids_h_rready_l, 0xB),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_wrq_hs_any, 0xC),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_wrq_hs_device, 0xD),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_wrq_hs_normal_or_nonshareable, 0xE),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_wrq_hs_inner_or_outershare_wback_wclean, 0xF),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_wrq_hs_write_unique, 0x10),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_wrq_hs_write_line_unique, 0x11),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_wrq_hs_evict, 0x12),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_wrq_stall_tt_full, 0x13),
-+	/* Master events */
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_retry_speculative_fetch, 0x14),
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_rrq_stall_addr_hazard, 0x15),
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_rrq_stall_id_hazard, 0x16),
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_rrq_stall_tt_full, 0x17),
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_rrq_stall_barrier_hazard, 0x18),
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_wrq_stall_barrier_hazard, 0x19),
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_wrq_stall_tt_full, 0x1A),
-+	/* Special event for cycles counter */
-+	CCI400_CYCLE_EVENT_EXT_ATTR_ENTRY(cycles, 0xff),
-+};
-+
-+static struct dev_ext_attribute cci400_r1_pmu_event_attrs[] = {
-+	/* Slave events */
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_any, 0x0),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_device, 0x01),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_normal_or_nonshareable, 0x2),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_inner_or_outershareable, 0x3),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_cache_maintenance, 0x4),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_mem_barrier, 0x5),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_sync_barrier, 0x6),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_dvm_msg, 0x7),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_dvm_msg_sync, 0x8),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_stall_tt_full, 0x9),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_r_data_last_hs_snoop, 0xA),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_r_data_stall_rvalids_h_rready_l, 0xB),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_wrq_hs_any, 0xC),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_wrq_hs_device, 0xD),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_wrq_hs_normal_or_nonshareable, 0xE),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_wrq_hs_inner_or_outershare_wback_wclean, 0xF),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_wrq_hs_write_unique, 0x10),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_wrq_hs_write_line_unique, 0x11),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_wrq_hs_evict, 0x12),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_wrq_stall_tt_full, 0x13),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_stall_slave_id_hazard, 0x14),
-+	/* Master events */
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_retry_speculative_fetch, 0x0),
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_stall_cycle_addr_hazard, 0x1),
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_rrq_stall_master_id_hazard, 0x2),
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_rrq_stall_hi_prio_rtq_full, 0x3),
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_rrq_stall_barrier_hazard, 0x4),
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_wrq_stall_barrier_hazard, 0x5),
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_wrq_stall_wtq_full, 0x6),
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_rrq_stall_low_prio_rtq_full, 0x7),
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_rrq_stall_mid_prio_rtq_full, 0x8),
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_rrq_stall_qvn_vn0, 0x9),
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_rrq_stall_qvn_vn1, 0xA),
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_rrq_stall_qvn_vn2, 0xB),
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_rrq_stall_qvn_vn3, 0xC),
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_wrq_stall_qvn_vn0, 0xD),
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_wrq_stall_qvn_vn1, 0xE),
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_wrq_stall_qvn_vn2, 0xF),
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_wrq_stall_qvn_vn3, 0x10),
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_wrq_unique_or_line_unique_addr_hazard, 0x11),
-+	/* Special event for cycles counter */
-+	CCI400_CYCLE_EVENT_EXT_ATTR_ENTRY(cycles, 0xff),
-+};
-+
-+static ssize_t cci400_pmu_cycle_event_show(struct device *dev,
-+			struct device_attribute *attr, char *buf)
-+{
-+	struct dev_ext_attribute *eattr = container_of(attr,
-+				struct dev_ext_attribute, attr);
-+	return snprintf(buf, PAGE_SIZE, "config=0x%lx\n", (unsigned long)eattr->var);
-+}
-+
- static int cci400_get_event_idx(struct cci_pmu *cci_pmu,
- 				struct cci_pmu_hw_events *hw,
- 				unsigned long cci_event)
-@@ -355,6 +472,92 @@ static inline struct cci_pmu_model *probe_cci_model(struct platform_device *pdev
- #define CCI500_GLOBAL_PORT_MIN_EV	0x00
- #define CCI500_GLOBAL_PORT_MAX_EV	0x0f
- 
-+
-+#define CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(_name, _config) \
-+	CCI_EXT_ATTR_ENTRY(_name, cci500_pmu_global_event_show, \
-+					(unsigned long) _config)
-+
-+static ssize_t cci500_pmu_global_event_show(struct device *dev,
-+				struct device_attribute *attr, char *buf);
-+
-+static struct dev_ext_attribute cci500_pmu_format_attrs[] = {
-+	CCI_FORMAT_EXT_ATTR_ENTRY(event, "config:0-4"),
-+	CCI_FORMAT_EXT_ATTR_ENTRY(source, "config:5-8"),
-+};
-+
-+static struct dev_ext_attribute cci500_pmu_event_attrs[] = {
-+	/* Slave events */
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_arvalid, 0x0),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_dev, 0x1),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_nonshareable, 0x2),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_shareable_non_alloc, 0x3),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_shareable_alloc, 0x4),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_invalidate, 0x5),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_cache_maint, 0x6),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_dvm_msg, 0x7),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_rval, 0x8),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_rlast_snoop, 0x9),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_wrq_hs_awalid, 0xA),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_wrq_dev, 0xB),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_wrq_non_shareable, 0xC),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_wrq_share_wb, 0xD),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_wrq_share_wlu, 0xE),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_wrq_share_wunique, 0xF),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_wrq_evict, 0x10),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_wrq_wrevict, 0x11),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_w_data_beat, 0x12),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_srq_acvalid, 0x13),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_srq_read, 0x14),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_srq_clean, 0x15),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_srq_data_transfer_low, 0x16),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_stall_arvalid, 0x17),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_r_data_stall, 0x18),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_wrq_stall, 0x19),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_w_data_stall, 0x1A),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_w_resp_stall, 0x1B),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_srq_stall, 0x1C),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_s_data_stall, 0x1D),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_rq_stall_ot_limit, 0x1E),
-+	CCI_EVENT_EXT_ATTR_ENTRY(si_r_stall_arbit, 0x1F),
-+
-+	/* Master events */
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_r_data_beat_any, 0x0),
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_w_data_beat_any, 0x1),
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_rrq_stall, 0x2),
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_r_data_stall, 0x3),
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_wrq_stall, 0x4),
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_w_data_stall, 0x5),
-+	CCI_EVENT_EXT_ATTR_ENTRY(mi_w_resp_stall, 0x6),
-+
-+	/* Global events */
-+	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_access_filter_bank_0_1, 0x0),
-+	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_access_filter_bank_2_3, 0x1),
-+	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_access_filter_bank_4_5, 0x2),
-+	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_access_filter_bank_6_7, 0x3),
-+	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_access_miss_filter_bank_0_1, 0x4),
-+	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_access_miss_filter_bank_2_3, 0x5),
-+	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_access_miss_filter_bank_4_5, 0x6),
-+	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_access_miss_filter_bank_6_7, 0x7),
-+	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_back_invalidation, 0x8),
-+	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_stall_alloc_busy, 0x9),
-+	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_stall_tt_full, 0xA),
-+	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_wrq, 0xB),
-+	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_cd_hs, 0xC),
-+	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_rq_stall_addr_hazard, 0xD),
-+	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snopp_rq_stall_tt_full, 0xE),
-+	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_rq_tzmp1_prot, 0xF),
-+};
-+
-+static ssize_t cci500_pmu_global_event_show(struct device *dev,
-+				struct device_attribute *attr, char *buf)
-+{
-+	struct dev_ext_attribute *eattr = container_of(attr,
-+					struct dev_ext_attribute, attr);
-+	/* Global events have single fixed source code */
-+	return snprintf(buf, PAGE_SIZE, "event=0x%lx,source=0x%x\n",
-+				(unsigned long)eattr->var, CCI500_PORT_GLOBAL);
-+}
-+
- static int cci500_validate_hw_event(struct cci_pmu *cci_pmu,
- 					unsigned long hw_event)
- {
-@@ -398,6 +601,24 @@ static int cci500_validate_hw_event(struct cci_pmu *cci_pmu,
- }
- #endif	/* CONFIG_ARM_CCI500_PMU */
- 
-+static ssize_t cci_pmu_format_show(struct device *dev,
-+			struct device_attribute *attr, char *buf)
-+{
-+	struct dev_ext_attribute *eattr = container_of(attr,
-+				struct dev_ext_attribute, attr);
-+	return snprintf(buf, PAGE_SIZE, "%s\n", (char *)eattr->var);
-+}
-+
-+static ssize_t cci_pmu_event_show(struct device *dev,
-+			struct device_attribute *attr, char *buf)
-+{
-+	struct dev_ext_attribute *eattr = container_of(attr,
-+				struct dev_ext_attribute, attr);
-+	/* source parameter is mandatory for normal PMU events */
-+	return snprintf(buf, PAGE_SIZE, "source=?,event=0x%lx\n",
-+					 (unsigned long)eattr->var);
-+}
-+
- static int pmu_is_valid_counter(struct cci_pmu *cci_pmu, int idx)
- {
- 	return 0 <= idx && idx <= CCI_PMU_CNTR_LAST(cci_pmu);
-@@ -980,17 +1201,78 @@ static struct attribute_group pmu_attr_group = {
- 	.attrs = pmu_attrs,
- };
- 
-+static struct attribute_group pmu_format_attr_group = {
-+	.name = "format",
-+	.attrs = NULL,		/* Filled in cci_pmu_init_attrs */
-+};
-+
-+static struct attribute_group pmu_event_attr_group = {
-+	.name = "events",
-+	.attrs = NULL,		/* Filled in cci_pmu_init_attrs */
-+};
-+
- static const struct attribute_group *pmu_attr_groups[] = {
- 	&pmu_attr_group,
-+	&pmu_format_attr_group,
-+	&pmu_event_attr_group,
- 	NULL
- };
- 
-+static struct attribute **alloc_attrs(struct platform_device *pdev,
-+				int n, struct dev_ext_attribute *source)
-+{
-+	int i;
-+	struct attribute **attrs;
-+
-+	/* Alloc n + 1 (for terminating NULL) */
-+	attrs  = devm_kcalloc(&pdev->dev, n + 1, sizeof(struct attribute *),
-+								GFP_KERNEL);
-+	if (!attrs)
-+		return attrs;
-+	for(i = 0; i < n; i++)
-+		attrs[i] = &source[i].attr.attr;
-+	return attrs;
-+}
-+
-+static int cci_pmu_init_attrs(struct cci_pmu *cci_pmu, struct platform_device *pdev)
-+{
-+	const struct cci_pmu_model *model = cci_pmu->model;
-+	struct attribute **attrs;
-+
-+	/*
-+	 * All allocations below are managed, hence doesn't need to be
-+	 * free'd explicitly in case of an error.
-+	 */
-+
-+	if (model->nevent_attrs) {
-+		attrs = alloc_attrs(pdev, model->nevent_attrs,
-+						model->event_attrs);
-+		if (!attrs)
-+			return -ENOMEM;
-+		pmu_event_attr_group.attrs = attrs;
-+	}
-+	if (model->nformat_attrs) {
-+		attrs = alloc_attrs(pdev, model->nformat_attrs,
-+						 model->format_attrs);
-+		if (!attrs)
-+			return -ENOMEM;
-+		pmu_format_attr_group.attrs = attrs;
-+	}
-+	pmu_cpumask_attr.var = cci_pmu;
-+
-+	return 0;
-+}
-+
- static int cci_pmu_init(struct cci_pmu *cci_pmu, struct platform_device *pdev)
- {
- 	char *name = cci_pmu->model->name;
- 	u32 num_cntrs;
-+	int rc;
-+
-+	rc = cci_pmu_init_attrs(cci_pmu, pdev);
-+	if (rc)
-+		return rc;
- 
--	pmu_cpumask_attr.var = cci_pmu;
- 	cci_pmu->pmu = (struct pmu) {
- 		.name		= cci_pmu->model->name,
- 		.task_ctx_nr	= perf_invalid_context,
-@@ -1053,6 +1335,10 @@ static struct cci_pmu_model cci_pmu_models[] = {
- 		.fixed_hw_cntrs = 1,	/* Cycle counter */
- 		.num_hw_cntrs = 4,
- 		.cntr_size = SZ_4K,
-+		.format_attrs = cci400_pmu_format_attrs,
-+		.nformat_attrs = ARRAY_SIZE(cci400_pmu_format_attrs),
-+		.event_attrs = cci400_r0_pmu_event_attrs,
-+		.nevent_attrs = ARRAY_SIZE(cci400_r0_pmu_event_attrs),
- 		.event_ranges = {
- 			[CCI_IF_SLAVE] = {
- 				CCI400_R0_SLAVE_PORT_MIN_EV,
-@@ -1071,6 +1357,10 @@ static struct cci_pmu_model cci_pmu_models[] = {
- 		.fixed_hw_cntrs = 1,	/* Cycle counter */
- 		.num_hw_cntrs = 4,
- 		.cntr_size = SZ_4K,
-+		.format_attrs = cci400_pmu_format_attrs,
-+		.nformat_attrs = ARRAY_SIZE(cci400_pmu_format_attrs),
-+		.event_attrs = cci400_r1_pmu_event_attrs,
-+		.nevent_attrs = ARRAY_SIZE(cci400_r1_pmu_event_attrs),
- 		.event_ranges = {
- 			[CCI_IF_SLAVE] = {
- 				CCI400_R1_SLAVE_PORT_MIN_EV,
-@@ -1091,6 +1381,10 @@ static struct cci_pmu_model cci_pmu_models[] = {
- 		.fixed_hw_cntrs = 0,
- 		.num_hw_cntrs = 8,
- 		.cntr_size = SZ_64K,
-+		.format_attrs = cci500_pmu_format_attrs,
-+		.nformat_attrs = ARRAY_SIZE(cci500_pmu_format_attrs),
-+		.event_attrs = cci500_pmu_event_attrs,
-+		.nevent_attrs = ARRAY_SIZE(cci500_pmu_event_attrs),
- 		.event_ranges = {
- 			[CCI_IF_SLAVE] = {
- 				CCI500_SLAVE_PORT_MIN_EV,
--- 
-1.7.9.5
+>
+> Best Regards,
+> Josh Wu
+>
+>>
+>>> +
+>>>       if (ret < 0)
+>>>           return ret;
+>>>
+>>> @@ -736,14 +747,9 @@ static int isi_camera_clock_start(struct
+>>> soc_camera_host *ici) struct atmel_isi *isi = ici->priv;
+>>>       int ret;
+>>>
+>>> -    ret = clk_prepare_enable(isi->pclk);
+>>> -    if (ret)
+>>> -        return ret;
+>>> -
+>>>       if (!IS_ERR(isi->mck)) {
+>>>           ret = clk_prepare_enable(isi->mck);
+>>>           if (ret) {
+>>> -            clk_disable_unprepare(isi->pclk);
+>>>               return ret;
+>>>           }
+>>>       }
+>>> @@ -758,7 +764,6 @@ static void isi_camera_clock_stop(struct 
+>>> soc_camera_host
+>>> *ici)
+>>>
+>>>       if (!IS_ERR(isi->mck))
+>>>           clk_disable_unprepare(isi->mck);
+>>> -    clk_disable_unprepare(isi->pclk);
+>>>   }
+>>>
+>>>   static unsigned int isi_camera_poll(struct file *file, poll_table 
+>>> *pt)
+>>> @@ -855,9 +860,14 @@ static int isi_camera_set_bus_param(struct
+>>> soc_camera_device *icd)
+>>>
+>>>       cfg1 |= ISI_CFG1_THMASK_BEATS_16;
+>>>
+>>> +    /* Enable PM and peripheral clock before operate isi registers */
+>>> +    pm_runtime_get_sync(ici->v4l2_dev.dev);
+>>> +
+>>>       isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
+>>>       isi_writel(isi, ISI_CFG1, cfg1);
+>>>
+>>> +    pm_runtime_put(ici->v4l2_dev.dev);
+>>> +
+>>>       return 0;
+>>>   }
+>>>
+>>> @@ -889,6 +899,7 @@ static int atmel_isi_remove(struct platform_device
+>>> *pdev) sizeof(struct fbd) * MAX_BUFFER_NUM,
+>>>               isi->p_fb_descriptors,
+>>>               isi->fb_descriptors_phys);
+>>> +    pm_runtime_disable(&pdev->dev);
+>>>
+>>>       return 0;
+>>>   }
+>>> @@ -1027,8 +1038,6 @@ static int atmel_isi_probe(struct platform_device
+>>> *pdev) if (isi->pdata.data_width_flags & ISI_DATAWIDTH_10)
+>>>           isi->width_flags |= 1 << 9;
+>>>
+>>> -    isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
+>>> -
+>>>       irq = platform_get_irq(pdev, 0);
+>>>       if (IS_ERR_VALUE(irq)) {
+>>>           ret = irq;
+>>> @@ -1049,6 +1058,9 @@ static int atmel_isi_probe(struct platform_device
+>>> *pdev) soc_host->v4l2_dev.dev    = &pdev->dev;
+>>>       soc_host->nr        = pdev->id;
+>>>
+>>> +    pm_suspend_ignore_children(&pdev->dev, true);
+>>> +    pm_runtime_enable(&pdev->dev);
+>>> +
+>>>       if (isi->pdata.asd_sizes) {
+>>>           soc_host->asd = isi->pdata.asd;
+>>>           soc_host->asd_sizes = isi->pdata.asd_sizes;
+>>> @@ -1062,6 +1074,7 @@ static int atmel_isi_probe(struct platform_device
+>>> *pdev) return 0;
+>>>
+>>>   err_register_soc_camera_host:
+>>> +    pm_runtime_disable(&pdev->dev);
+>>>   err_req_irq:
+>>>   err_ioremap:
+>>>       vb2_dma_contig_cleanup_ctx(isi->alloc_ctx);
+>>> @@ -1074,6 +1087,30 @@ err_alloc_ctx:
+>>>       return ret;
+>>>   }
+>>>
+>>> +static int atmel_isi_runtime_suspend(struct device *dev)
+>>> +{
+>>> +    struct soc_camera_host *soc_host = to_soc_camera_host(dev);
+>>> +    struct atmel_isi *isi = container_of(soc_host,
+>>> +                    struct atmel_isi, soc_host);
+>>> +
+>>> +    clk_disable_unprepare(isi->pclk);
+>>> +
+>>> +    return 0;
+>>> +}
+>>> +static int atmel_isi_runtime_resume(struct device *dev)
+>>> +{
+>>> +    struct soc_camera_host *soc_host = to_soc_camera_host(dev);
+>>> +    struct atmel_isi *isi = container_of(soc_host,
+>>> +                    struct atmel_isi, soc_host);
+>>> +
+>>> +    return clk_prepare_enable(isi->pclk);
+>>> +}
+>>> +
+>>> +static const struct dev_pm_ops atmel_isi_dev_pm_ops = {
+>>> +    SET_RUNTIME_PM_OPS(atmel_isi_runtime_suspend,
+>>> +                atmel_isi_runtime_resume, NULL)
+>>> +};
+>>> +
+>>>   static const struct of_device_id atmel_isi_of_match[] = {
+>>>       { .compatible = "atmel,at91sam9g45-isi" },
+>>>       { }
+>>> @@ -1085,6 +1122,7 @@ static struct platform_driver atmel_isi_driver 
+>>> = {
+>>>       .driver        = {
+>>>           .name = "atmel_isi",
+>>>           .of_match_table = of_match_ptr(atmel_isi_of_match),
+>>> +        .pm    = &atmel_isi_dev_pm_ops,
+>>>       },
+>>>   };
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
