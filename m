@@ -1,34 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 May 2015 12:53:52 +0200
-Subject: [PATCH 2/2] ASoC: atmel: compile pcm driver in
- snd-soc-atmel_ssc_dai
-In-Reply-To: <1432591459-22613-2-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1432591459-22613-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1432591459-22613-2-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <4338609.rFs5DCIUWR@wuerfel>
+From: kvalo@codeaurora.org (Kalle Valo)
+Date: Tue, 26 May 2015 10:54:10 +0000 (UTC)
+Subject: brcmfmac: avoid gcc-5.1 warning
+In-Reply-To: <2201884.BixNBcLJhn@wuerfel>
+Message-ID: <20150526105410.13F6F1416C2@smtp.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 26 May 2015 00:04:19 Alexandre Belloni wrote:
-> index b327e5cc8de3..4fa7ac91f972 100644
-> --- a/sound/soc/atmel/Makefile
-> +++ b/sound/soc/atmel/Makefile
-> @@ -1,10 +1,8 @@
->  # AT91 Platform Support
-> -snd-soc-atmel-pcm-pdc-objs := atmel-pcm-pdc.o
-> -snd-soc-atmel-pcm-dma-objs := atmel-pcm-dma.o
-> -snd-soc-atmel_ssc_dai-objs := atmel_ssc_dai.o
-> +snd-soc-atmel-pcm-$(CONFIG_SND_ATMEL_SOC_PDC) := atmel-pcm-pdc.o
-> +snd-soc-atmel-pcm-$(CONFIG_SND_ATMEL_SOC_DMA) += atmel-pcm-dma.o
-> +snd-soc-atmel_ssc_dai-objs := atmel_ssc_dai.o $(snd-soc-atmel-pcm-y)
 
-While technically correct, you could have written this (slightly)
-simpler as:
+> gcc-5.0 gained a new warning in the fwsignal portion of the brcmfmac
+> driver:
+> 
+> drivers/net/wireless/brcm80211/brcmfmac/fwsignal.c: In function 'brcmf_fws_txs_process':
+> drivers/net/wireless/brcm80211/brcmfmac/fwsignal.c:1478:8: warning: 'skb' may be used uninitialized in this function [-Wmaybe-uninitialized]
+> 
+> This is a false positive, and marking the brcmf_fws_hanger_poppkt function
+> as 'static inline' makes the warning go away. I have checked the object
+> file output and while a little code gets moved around, the size of
+> the binary remains identical.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-snd-soc-atmel_ssc_dai-objs := atmel_ssc_dai.o
-snd-soc-atmel-ssc_dai-$(CONFIG_SND_ATMEL_SOC_PDC) += atmel-pcm-pdc.o
-snd-soc-atmel-ssc_dai-$(CONFIG_SND_ATMEL_SOC_DMA) += atmel-pcm-dma.o
+Thanks, applied to wireless-drivers-next.git.
 
-No need to change the patch again after it's applied now.
-
-	Arnd
+Kalle Valo
