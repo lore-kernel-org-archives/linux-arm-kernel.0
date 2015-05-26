@@ -1,121 +1,198 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Tue, 26 May 2015 17:54:47 +0800
-Subject: [PATCH v5 3/3] media: atmel-isi: remove mck back compatiable code as
- it's not need
-In-Reply-To: <1432634087-3356-1-git-send-email-josh.wu@atmel.com>
-References: <1432634087-3356-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1432634087-3356-4-git-send-email-josh.wu@atmel.com>
+From: suzuki.poulose@arm.com (Suzuki K. Poulose)
+Date: Tue, 26 May 2015 10:53:13 +0100
+Subject: [PATCH 4/7] arm-cci: Abstract handling for CCI events
+In-Reply-To: <1432633996-7229-1-git-send-email-suzuki.poulose@arm.com>
+References: <1432633996-7229-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1432633996-7229-5-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The master clock should handled by sensor itself.
+From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Given that each CCI has different set of interfaces and
+its associated events, it is good to abstract the validation of the
+event codes to make it easier to add support for a new CCI model.
+
+This patch also abstracts the mapping of a given event to a counter,
+as there are some special counters for certain specific events.
+
+We assume that the fixed hardware counters are always at the beginning,
+so that we can use cci_model->fixed_hw_events as an upper bound to given
+idx to check if we need to program the counter for an event.
+
+Cc: Punit Agrawal <punit.agrawal@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+Acked-by: Punit Agrawal <punit.agrawal@arm.com>
 ---
+ drivers/bus/arm-cci.c |   78 ++++++++++++++++++++++++++++++++++---------------
+ 1 file changed, 55 insertions(+), 23 deletions(-)
 
-Changes in v5: None
-Changes in v4: None
-Changes in v3:
-- remove useless definition: ISI_DEFAULT_MCLK_FREQ
-
-Changes in v2:
-- totally remove clock_start()/clock_stop() as they are optional.
-
- drivers/media/platform/soc_camera/atmel-isi.c | 46 ---------------------------
- 1 file changed, 46 deletions(-)
-
-diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
-index 0ea360a..9070172 100644
---- a/drivers/media/platform/soc_camera/atmel-isi.c
-+++ b/drivers/media/platform/soc_camera/atmel-isi.c
-@@ -35,7 +35,6 @@
- #define VID_LIMIT_BYTES			(16 * 1024 * 1024)
- #define MIN_FRAME_RATE			15
- #define FRAME_INTERVAL_MILLI_SEC	(1000 / MIN_FRAME_RATE)
--#define ISI_DEFAULT_MCLK_FREQ		25000000
+diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+index 602bf64..9b71c57 100644
+--- a/drivers/bus/arm-cci.c
++++ b/drivers/bus/arm-cci.c
+@@ -107,6 +107,7 @@ struct cci_pmu_hw_events {
+ 	raw_spinlock_t pmu_lock;
+ };
  
- /* Frame buffer descriptor */
- struct fbd {
-@@ -83,8 +82,6 @@ struct atmel_isi {
- 	struct completion		complete;
- 	/* ISI peripherial clock */
- 	struct clk			*pclk;
--	/* ISI_MCK, feed to camera sensor to generate pixel clock */
--	struct clk			*mck;
- 	unsigned int			irq;
++struct cci_pmu;
+ /*
+  * struct cci_pmu_model:
+  * @fixed_hw_cntrs - Number of fixed event counters
+@@ -119,6 +120,8 @@ struct cci_pmu_model {
+ 	u32 num_hw_cntrs;
+ 	u32 cntr_size;
+ 	struct event_range event_ranges[CCI_IF_MAX];
++	int (*validate_hw_event)(struct cci_pmu *, unsigned long);
++	int (*get_event_idx)(struct cci_pmu *, struct cci_pmu_hw_events *, unsigned long);
+ };
  
- 	struct isi_platform_data	pdata;
-@@ -740,31 +737,6 @@ static void isi_camera_remove_device(struct soc_camera_device *icd)
- 		 icd->devnum);
+ static struct cci_pmu_model cci_pmu_models[];
+@@ -189,7 +192,29 @@ enum cci400_perf_events {
+ #define CCI_REV_R1_MASTER_PORT_MIN_EV	0x00
+ #define CCI_REV_R1_MASTER_PORT_MAX_EV	0x11
+ 
+-static int pmu_validate_hw_event(struct cci_pmu *cci_pmu, unsigned long hw_event)
++static int cci400_get_event_idx(struct cci_pmu *cci_pmu,
++				struct cci_pmu_hw_events *hw,
++				unsigned long cci_event)
++{
++	int idx;
++
++	/* cycles event idx is fixed */
++	if (cci_event == CCI_PMU_CYCLES) {
++		if (test_and_set_bit(CCI_PMU_CYCLE_CNTR_IDX, hw->used_mask))
++			return -EAGAIN;
++
++		return CCI_PMU_CYCLE_CNTR_IDX;
++	}
++
++	for (idx = CCI_PMU_CNTR0_IDX; idx <= CCI_PMU_CNTR_LAST(cci_pmu); ++idx)
++		if (!test_and_set_bit(idx, hw->used_mask))
++			return idx;
++
++	/* No counters available */
++	return -EAGAIN;
++}
++
++static int cci400_validate_hw_event(struct cci_pmu *cci_pmu, unsigned long hw_event)
+ {
+ 	u8 ev_source = CCI_PMU_EVENT_SOURCE(hw_event);
+ 	u8 ev_code = CCI_PMU_EVENT_CODE(hw_event);
+@@ -198,6 +223,9 @@ static int pmu_validate_hw_event(struct cci_pmu *cci_pmu, unsigned long hw_event
+ 	if (hw_event & ~CCI_PMU_EVENT_MASK)
+ 		return -ENOENT;
+ 
++	if (hw_event == CCI_PMU_CYCLES)
++		return hw_event;
++
+ 	switch (ev_source) {
+ 	case CCI_PORT_S0:
+ 	case CCI_PORT_S1:
+@@ -289,18 +317,14 @@ static u32 pmu_get_max_counters(void)
+ static int pmu_get_event_idx(struct cci_pmu_hw_events *hw, struct perf_event *event)
+ {
+ 	struct cci_pmu *cci_pmu = to_cci_pmu(event->pmu);
+-	struct hw_perf_event *hw_event = &event->hw;
+-	unsigned long cci_event = hw_event->config_base;
++	unsigned long cci_event = event->hw.config_base;
+ 	int idx;
+ 
+-	if (cci_event == CCI_PMU_CYCLES) {
+-		if (test_and_set_bit(CCI_PMU_CYCLE_CNTR_IDX, hw->used_mask))
+-			return -EAGAIN;
++	if (cci_pmu->model->get_event_idx)
++		return cci_pmu->model->get_event_idx(cci_pmu, hw, cci_event);
+ 
+-		return CCI_PMU_CYCLE_CNTR_IDX;
+-	}
+-
+-	for (idx = CCI_PMU_CNTR0_IDX; idx <= CCI_PMU_CNTR_LAST(cci_pmu); ++idx)
++	/* Generic code to find an unused idx from the mask */
++	for(idx = 0; idx <= CCI_PMU_CNTR_LAST(cci_pmu); idx++)
+ 		if (!test_and_set_bit(idx, hw->used_mask))
+ 			return idx;
+ 
+@@ -310,19 +334,13 @@ static int pmu_get_event_idx(struct cci_pmu_hw_events *hw, struct perf_event *ev
+ 
+ static int pmu_map_event(struct perf_event *event)
+ {
+-	int mapping;
+-	unsigned long config = event->attr.config;
++	struct cci_pmu *cci_pmu = to_cci_pmu(event->pmu);
+ 
+-	if (event->attr.type < PERF_TYPE_MAX)
++	if (event->attr.type < PERF_TYPE_MAX ||
++			!cci_pmu->model->validate_hw_event)
+ 		return -ENOENT;
+ 
+-	if (config == CCI_PMU_CYCLES)
+-		mapping = config;
+-	else
+-		mapping = pmu_validate_hw_event(to_cci_pmu(event->pmu),
+-							config);
+-
+-	return mapping;
++	return	cci_pmu->model->validate_hw_event(cci_pmu, event->attr.config);
  }
  
--/* Called with .host_lock held */
--static int isi_camera_clock_start(struct soc_camera_host *ici)
--{
--	struct atmel_isi *isi = ici->priv;
--	int ret;
--
--	if (!IS_ERR(isi->mck)) {
--		ret = clk_prepare_enable(isi->mck);
--		if (ret) {
--			return ret;
--		}
--	}
--
--	return 0;
--}
--
--/* Called with .host_lock held */
--static void isi_camera_clock_stop(struct soc_camera_host *ici)
--{
--	struct atmel_isi *isi = ici->priv;
--
--	if (!IS_ERR(isi->mck))
--		clk_disable_unprepare(isi->mck);
--}
--
- static unsigned int isi_camera_poll(struct file *file, poll_table *pt)
+ static int pmu_request_irq(struct cci_pmu *cci_pmu, irq_handler_t handler)
+@@ -450,7 +468,7 @@ static irqreturn_t pmu_handle_irq(int irq_num, void *dev)
+ 	 * This should work regardless of whether we have per-counter overflow
+ 	 * interrupt or a combined overflow interrupt.
+ 	 */
+-	for (idx = CCI_PMU_CYCLE_CNTR_IDX; idx <= CCI_PMU_CNTR_LAST(cci_pmu); idx++) {
++	for (idx = 0; idx <= CCI_PMU_CNTR_LAST(cci_pmu); idx++) {
+ 		struct perf_event *event = events->events[idx];
+ 		struct hw_perf_event *hw_counter;
+ 
+@@ -538,6 +556,16 @@ static void cci_pmu_disable(struct pmu *pmu)
+ 	raw_spin_unlock_irqrestore(&hw_events->pmu_lock, flags);
+ }
+ 
++/*
++ * Check if the idx represents a non-programmable counter.
++ * All the fixed event counters are mapped before the programmable
++ * counters.
++ */
++static bool pmu_fixed_hw_idx(struct cci_pmu *cci_pmu, int idx)
++{
++	return (idx >= 0) && (idx < cci_pmu->model->fixed_hw_cntrs);
++}
++
+ static void cci_pmu_start(struct perf_event *event, int pmu_flags)
  {
- 	struct soc_camera_device *icd = file->private_data;
-@@ -874,8 +846,6 @@ static struct soc_camera_host_ops isi_soc_camera_host_ops = {
- 	.owner		= THIS_MODULE,
- 	.add		= isi_camera_add_device,
- 	.remove		= isi_camera_remove_device,
--	.clock_start	= isi_camera_clock_start,
--	.clock_stop	= isi_camera_clock_stop,
- 	.set_fmt	= isi_camera_set_fmt,
- 	.try_fmt	= isi_camera_try_fmt,
- 	.get_formats	= isi_camera_get_formats,
-@@ -912,7 +882,6 @@ static int atmel_isi_probe_dt(struct atmel_isi *isi,
+ 	struct cci_pmu *cci_pmu = to_cci_pmu(event->pmu);
+@@ -562,8 +590,8 @@ static void cci_pmu_start(struct perf_event *event, int pmu_flags)
  
- 	/* Default settings for ISI */
- 	isi->pdata.full_mode = 1;
--	isi->pdata.mck_hz = ISI_DEFAULT_MCLK_FREQ;
- 	isi->pdata.frate = ISI_CFG1_FRATE_CAPTURE_ALL;
+ 	raw_spin_lock_irqsave(&hw_events->pmu_lock, flags);
  
- 	np = of_graph_get_next_endpoint(np, NULL);
-@@ -988,21 +957,6 @@ static int atmel_isi_probe(struct platform_device *pdev)
- 	INIT_LIST_HEAD(&isi->video_buffer_list);
- 	INIT_LIST_HEAD(&isi->dma_desc_head);
+-	/* Configure the event to count, unless you are counting cycles */
+-	if (idx != CCI_PMU_CYCLE_CNTR_IDX)
++	/* Configure the counter unless you are counting a fixed event */
++	if (!pmu_fixed_hw_idx(cci_pmu, idx))
+ 		pmu_set_event(cci_pmu, idx, hwc->config_base);
  
--	/* ISI_MCK is the sensor master clock. It should be handled by the
--	 * sensor driver directly, as the ISI has no use for that clock. Make
--	 * the clock optional here while platforms transition to the correct
--	 * model.
--	 */
--	isi->mck = devm_clk_get(dev, "isi_mck");
--	if (!IS_ERR(isi->mck)) {
--		/* Set ISI_MCK's frequency, it should be faster than pixel
--		 * clock.
--		 */
--		ret = clk_set_rate(isi->mck, isi->pdata.mck_hz);
--		if (ret < 0)
--			return ret;
--	}
--
- 	isi->p_fb_descriptors = dma_alloc_coherent(&pdev->dev,
- 				sizeof(struct fbd) * MAX_BUFFER_NUM,
- 				&isi->fb_descriptors_phys,
+ 	pmu_event_set_period(event);
+@@ -907,6 +935,8 @@ static struct cci_pmu_model cci_pmu_models[] = {
+ 				CCI_REV_R0_MASTER_PORT_MAX_EV,
+ 			},
+ 		},
++		.validate_hw_event = cci400_validate_hw_event,
++		.get_event_idx = cci400_get_event_idx,
+ 	},
+ 	[CCI_REV_R1] = {
+ 		.name = "CCI_400_r1",
+@@ -923,6 +953,8 @@ static struct cci_pmu_model cci_pmu_models[] = {
+ 				CCI_REV_R1_MASTER_PORT_MAX_EV,
+ 			},
+ 		},
++		.validate_hw_event = cci400_validate_hw_event,
++		.get_event_idx = cci400_get_event_idx,
+ 	},
+ };
+ 
 -- 
-1.9.1
+1.7.9.5
