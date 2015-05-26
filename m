@@ -1,67 +1,40 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 26 May 2015 14:01:42 +0200
-Subject: [PATCH 15/21] backlight: Probe backlight devices on demand
-In-Reply-To: <20150526083931.GC11677@x1>
-References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
- <1432565608-26036-16-git-send-email-tomeu.vizoso@collabora.com>
- <20150526071850.GA11677@x1> <20150526072526.GB6325@pengutronix.de>
- <20150526083931.GC11677@x1>
-Message-ID: <CAAObsKCBLVOph2DzeQqph+teiFq=uZtjShBOf+G-U2UxRAJ7jw@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 26 May 2015 14:08:43 +0200
+Subject: [PATCH 1/3] spi: orion: Fix maximum baud rates for Armada 370/XP
+In-Reply-To: <20150526103650.GM21577@sirena.org.uk>
+References: <1432633484-18758-1-git-send-email-gregory.clement@free-electrons.com>
+ <1432633484-18758-2-git-send-email-gregory.clement@free-electrons.com>
+ <20150526103650.GM21577@sirena.org.uk>
+Message-ID: <5564624B.1030503@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 May 2015 at 10:39, Lee Jones <lee.jones@linaro.org> wrote:
-> On Tue, 26 May 2015, Sascha Hauer wrote:
->> On Tue, May 26, 2015 at 08:18:50AM +0100, Lee Jones wrote:
->> > On Mon, 25 May 2015, Tomeu Vizoso wrote:
->> >
->> > > When looking up a backlight device through its DT node, ensure that the
->> > > corresponding device has been registered.
->> > >
->> > > Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->> > > ---
->> > >  drivers/video/backlight/backlight.c | 3 +++
->> > >  1 file changed, 3 insertions(+)
->> >
->> > Looks reasonable.
->> >
->> > Until anyone screams at me, applied thanks.
->>
->> The compiler will scream at you when it realizes that
->> of_platform_device_ensure() doesn't exist in your kernel...
->
-> Yup, indeed it did.
->
-> I assumed this was *only* enabling subsystems and that the
-> framework/API was already accepted.
->
-> So the advice I'd give to Tomeu when sending full enablement
-> patch-sets i.e. ones which provide the framework/API *and* enable
-> subsystems in the same set, is to send the entire set to everyone, so
-> we can see what the aim of the set is and how to deal with it.
+Hi Mark,
 
-Yeah, but get_maintainer.pl outputs 33 maintainer addresses, plus 1
-reviewer plus 14 mailing lists, so to avoid rejects because of too
-many recipients I went with the advice in [0] and sent each patch to
-their maintainers and list(s) and the cover letter to all lists. Also
-sent the whole series to lakml to make sure that it's at least indexed
-there.
+On 26/05/2015 12:36, Mark Brown wrote:
+> On Tue, May 26, 2015 at 11:44:42AM +0200, Gregory CLEMENT wrote:
+> 
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> Reported-by: Kostya Porotchkin <kostap@marvell.com>
+>> Cc: <stable@vger.kernel.org> #Fixes df59fa7f4bca
+> 
+> Applied, but please format this stuff in a standard fashion - use a
+> Fixes: tag to reference commits you're fixing.  This makes it easier for
+> tooling to work with the information you're providing.
 
-Any advice on what to do with series that span so many subsystems?
+Yes, sure, I will do. I followed the Documentation/stable_kernel_rules.txt
+file and I missed the new information in Documentation/SubmittingPatches
+about this tag.
 
 Thanks,
 
-Tomeu
+Gregory
 
-[0] http://lwn.net/Articles/585782/
 
-> --
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
