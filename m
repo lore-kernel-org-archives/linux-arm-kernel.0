@@ -1,41 +1,36 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Tue, 26 May 2015 16:29:03 +0800
-Subject: [PATCH 2/2] pwm: add Mediatek display PWM driver support
-In-Reply-To: <20150526060533.GW6325@pengutronix.de>
-References: <1431336382-13167-1-git-send-email-yh.huang@mediatek.com>
- <1431336382-13167-3-git-send-email-yh.huang@mediatek.com>
- <CAGS+omBX1fMBHa-4GLTjQUq5VPR2JRvhJRJ4qBX8hvDF9ihbLA@mail.gmail.com>
- <1432196551.15653.2.camel@mtksdaap41>
- <20150526060533.GW6325@pengutronix.de>
-Message-ID: <1432628943.11070.2.camel@mtksdaap41>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Tue, 26 May 2015 16:36:03 +0800
+Subject: [PATCH 2/5] clk: mediatek: mt8173: Fix enabling of critical clocks
+In-Reply-To: <20150526074608.GE6325@pengutronix.de>
+References: <1432192376-6712-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1432192376-6712-3-git-send-email-jamesjj.liao@mediatek.com>
+ <20150526074608.GE6325@pengutronix.de>
+Message-ID: <1432629363.15597.5.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-05-26 at 08:05 +0200, Sascha Hauer wrote:
-> On Thu, May 21, 2015 at 04:22:31PM +0800, YH Huang wrote:
-> > On Mon, 2015-05-18 at 11:42 +0800, Daniel Kurtz wrote:
-<...>
-> > > On Mon, May 11, 2015 at 5:26 PM, YH Huang <yh.huang@mediatek.com> wrote:
-> > > > +
-> > > > +static const struct of_device_id mtk_disp_pwm_of_match[] = {
-> > > > +       { .compatible = "mediatek,mt6595-disp-pwm" },
-> > > 
-> > > Does this driver support the PWM in mt8173?
-> > > If so, don't you need this, too:
-> > > 
-> > >   { .compatible = "mediatek,mt8173-disp-pwm" },
-> > 
-> > Yes, it supports mt8173.
-> > I will add it.
+On Tue, 2015-05-26 at 09:46 +0200, Sascha Hauer wrote:
+> > +static struct clk_onecell_data *mt8173_top_clk_data;
+> > +static struct clk_onecell_data *mt8173_pll_clk_data;
+> > +
+> > +static void mtk_clk_enable_critical(void)
+> > +{
+> > +	if (!mt8173_top_clk_data || !mt8173_pll_clk_data)
+> > +		return;
+> > +
+> > +	clk_prepare_enable(mt8173_top_clk_data->clks[CLK_TOP_MEM_SEL]);
+> > +	clk_prepare_enable(mt8173_top_clk_data->clks[CLK_TOP_DDRPHYCFG_SEL]);
+> > +	clk_prepare_enable(mt8173_top_clk_data->clks[CLK_TOP_CCI400_SEL]);
+> > +	clk_prepare_enable(mt8173_top_clk_data->clks[CLK_TOP_RTC_SEL]);
 > 
-> If both yre compatible you don't need to add it since you have a
-> "mediatek,mt6595-disp-pwm" in the mt8173 device tree.
+> Is CLK_TOP_RTC_SEL really a critical clock?
 
-Hi Sascha,
+CLK_TOP_RTC_SEL is the main 32k clock used by some system hardware such
+sleep controller on MT8173. This clock should not be turned off even
+when software/CPU is sleeping. So it's a better way to set
+CLK_TOP_RTC_SEL as a critical clock (an always on clock).
 
-We got a similar discussion about this with Mark Brown for spi driver,
-please see:
 
-http://lists.infradead.org/pipermail/linux-mediatek/2015-May/000673.html
+Best regards,
 
-Joe.C
+James
