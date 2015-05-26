@@ -1,66 +1,208 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 26 May 2015 11:27:44 +0200
-Subject: [PATCH] ARM64: kasan: print memory assignment
-Message-ID: <1432632464-12248-1-git-send-email-linus.walleij@linaro.org>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 26 May 2015 11:28:53 +0200
+Subject: [PATCH] drm: atmel_hlcdc: Add support for get_timings
+In-Reply-To: <1432199216-1139-1-git-send-email-davidcdueck@googlemail.com>
+References: <1432199216-1139-1-git-send-email-davidcdueck@googlemail.com>
+Message-ID: <20150526112853.688d26b7@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This prints out the virtual memory assigned to KASan in the
-boot crawl along with other memory assignments, if and only
-if KASan is activated.
+Hi David,
 
-Example dmesg from the Juno Development board:
+On Thu, 21 May 2015 11:06:56 +0200
+David Dueck <davidcdueck@googlemail.com> wrote:
 
-Memory: 1691156K/2080768K available (5465K kernel code, 444K rwdata,
-2160K rodata, 340K init, 217K bss, 373228K reserved, 16384K cma-reserved)
-Virtual kernel memory layout:
-    kasan   : 0xffffff8000000000 - 0xffffff9000000000   (    64 MB)
-    vmalloc : 0xffffff9000000000 - 0xffffffbdbfff0000   (   182 GB)
-    vmemmap : 0xffffffbdc0000000 - 0xffffffbfc0000000   (     8 GB maximum)
-              0xffffffbdc2000000 - 0xffffffbdc3fc0000   (    31 MB actual)
-    fixed   : 0xffffffbffabfd000 - 0xffffffbffac00000   (    12 KB)
-    PCI I/O : 0xffffffbffae00000 - 0xffffffbffbe00000   (    16 MB)
-    modules : 0xffffffbffc000000 - 0xffffffc000000000   (    64 MB)
-    memory  : 0xffffffc000000000 - 0xffffffc07f000000   (  2032 MB)
-      .init : 0xffffffc0007f5000 - 0xffffffc00084a000   (   340 KB)
-      .text : 0xffffffc000080000 - 0xffffffc0007f45b4   (  7634 KB)
-      .data : 0xffffffc000850000 - 0xffffffc0008bf200   (   445 KB)
+> drm_panel supports querying timing ranges. If the supplied mode does
+> not work with the hlcdc we query the panel and try to find a suitable
+> mode.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-Done on top of Andrey's patch set obviously.
+This patch looks good to me.
 
-Andrey: do what you want with this, I think it's kinda nice,
-you can harvest this patch for your patch series if you like,
-or squash into the ARM64 enablement patch, I have no preference.
-I'm testing out KASan on the Juno hardware.
----
- arch/arm64/mm/init.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+Philip, Thierry, could you confirm this is the correct way of dealing
+with timing ranges.
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 597831bdddf3..066dc5e15c48 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -298,6 +298,9 @@ void __init mem_init(void)
- #define MLK_ROUNDUP(b, t) b, t, DIV_ROUND_UP(((t) - (b)), SZ_1K)
- 
- 	pr_notice("Virtual kernel memory layout:\n"
-+#ifdef CONFIG_KASAN
-+		  "    kasan   : 0x%16lx - 0x%16lx   (%6ld MB)\n"
-+#endif
- 		  "    vmalloc : 0x%16lx - 0x%16lx   (%6ld GB)\n"
- #ifdef CONFIG_SPARSEMEM_VMEMMAP
- 		  "    vmemmap : 0x%16lx - 0x%16lx   (%6ld GB maximum)\n"
-@@ -310,6 +313,9 @@ void __init mem_init(void)
- 		  "      .init : 0x%p" " - 0x%p" "   (%6ld KB)\n"
- 		  "      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n"
- 		  "      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
-+#ifdef CONFIG_KASAN
-+		  MLG(KASAN_SHADOW_START, KASAN_SHADOW_END),
-+#endif
- 		  MLG(VMALLOC_START, VMALLOC_END),
- #ifdef CONFIG_SPARSEMEM_VMEMMAP
- 		  MLG((unsigned long)vmemmap,
+> 
+> Signed-off-by: David Dueck <davidcdueck@googlemail.com>
+> ---
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 118 +++++++++++++++++++----
+>  1 file changed, 98 insertions(+), 20 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
+> index 9c45130..ea36c24 100644
+> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
+> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
+> @@ -20,6 +20,7 @@
+>   */
+>  
+>  #include <linux/of_graph.h>
+> +#include <video/display_timing.h>
+>  
+>  #include <drm/drmP.h>
+>  #include <drm/drm_panel.h>
+> @@ -78,6 +79,8 @@ drm_encoder_to_atmel_hlcdc_rgb_output(struct drm_encoder *encoder)
+>  struct atmel_hlcdc_panel {
+>  	struct atmel_hlcdc_rgb_output base;
+>  	struct drm_panel *panel;
+> +	struct display_timing *timings;
+> +	unsigned int num_timings;
+>  };
+>  
+>  static inline struct atmel_hlcdc_panel *
+> @@ -104,14 +107,6 @@ static void atmel_hlcdc_panel_encoder_disable(struct drm_encoder *encoder)
+>  	drm_panel_disable(panel->panel);
+>  }
+>  
+> -static bool
+> -atmel_hlcdc_panel_encoder_mode_fixup(struct drm_encoder *encoder,
+> -				     const struct drm_display_mode *mode,
+> -				     struct drm_display_mode *adjusted)
+> -{
+> -	return true;
+> -}
+> -
+>  static void
+>  atmel_hlcdc_rgb_encoder_mode_set(struct drm_encoder *encoder,
+>  				 struct drm_display_mode *mode,
+> @@ -142,8 +137,86 @@ atmel_hlcdc_rgb_encoder_mode_set(struct drm_encoder *encoder,
+>  			   cfg);
+>  }
+>  
+> +/**
+> + * atmel_hlcdc_choose_parameter - choose timing parameter
+> + * @dc_min: minimum parameter value allowed by dc
+> + * @dc_max: maximum parameter value allowed by dc
+> + * @te: parameter range allowed by panel
+> + * @result: chosen parameter
+> + *
+> + * DESCRIPTION:
+> + * If there is overlap in the allowed ranges, we will pick a parameter
+> + * minimizing the distance to te.typ. If not, we return te.min or te.max.
+> + **/
+> +static u32 atmel_hlcdc_choose_parameter(u32 dc_min, u32 dc_max,
+> +					struct timing_entry te)
+> +{
+> +	if (te.typ <= dc_max && te.typ >= dc_min)
+> +		return te.typ;
+> +	else if (te.typ > dc_max)
+> +		return max(dc_max, te.min);
+> +	else
+> +		return min(dc_min, te.max);
+> +}
+> +
+> +static void atmel_hlcdc_calculate_mode(struct display_timing *timings,
+> +				       struct drm_display_mode *adjusted_mode)
+> +{
+> +	u32 hsync_len, hfront_porch, hback_porch;
+> +	u32 vsync_len, vfront_porch, vback_porch;
+> +
+> +	hsync_len = atmel_hlcdc_choose_parameter(1, 0x40, timings->hsync_len);
+> +	vsync_len = atmel_hlcdc_choose_parameter(1, 0x40, timings->vsync_len);
+> +
+> +	hfront_porch = atmel_hlcdc_choose_parameter(1, 0x200,
+> +						    timings->hfront_porch);
+> +	hback_porch = atmel_hlcdc_choose_parameter(1, 0x200,
+> +						   timings->hback_porch);
+> +	vfront_porch = atmel_hlcdc_choose_parameter(1, 0x40,
+> +						    timings->vfront_porch);
+> +	vback_porch = atmel_hlcdc_choose_parameter(0, 0x40,
+> +						   timings->vback_porch);
+> +
+> +	adjusted_mode->hsync_start = adjusted_mode->hdisplay + hfront_porch;
+> +	adjusted_mode->hsync_end = adjusted_mode->hsync_start + hsync_len;
+> +	adjusted_mode->htotal = adjusted_mode->hsync_end + hback_porch;
+> +
+> +	adjusted_mode->vsync_start = adjusted_mode->vdisplay + vfront_porch;
+> +	adjusted_mode->vsync_end = adjusted_mode->vsync_start + vsync_len;
+> +	adjusted_mode->vtotal = adjusted_mode->vsync_end + vback_porch;
+> +}
+> +
+> +static int
+> +atmel_hlcdc_panel_encoder_atomic_check(struct drm_encoder *encoder,
+> +				       struct drm_crtc_state *crtc_state,
+> +				       struct drm_connector_state *conn_state)
+> +{
+> +	struct atmel_hlcdc_rgb_output *rgb =
+> +			drm_encoder_to_atmel_hlcdc_rgb_output(encoder);
+> +	struct atmel_hlcdc_panel *panel = atmel_hlcdc_rgb_output_to_panel(rgb);
+> +	struct drm_display_mode *mode = &crtc_state->mode;
+> +	struct drm_display_mode *adjusted_mode = &crtc_state->adjusted_mode;
+> +	int i;
+> +
+> +	if (atmel_hlcdc_dc_mode_valid(rgb->dc, mode) == MODE_OK)
+> +		return 0;
+> +
+> +	for (i = 0; i < panel->num_timings; i++) {
+> +		if (panel->timings->hactive.typ != mode->hdisplay ||
+> +		    panel->timings->vactive.typ != mode->vdisplay)
+> +			continue;
+> +
+> +		atmel_hlcdc_calculate_mode(panel->timings, adjusted_mode);
+> +		if (atmel_hlcdc_dc_mode_valid(rgb->dc, adjusted_mode) ==
+> +		    MODE_OK)
+> +			return 0;
+> +	}
+> +
+> +	return -EINVAL;
+> +}
+> +
+>  static struct drm_encoder_helper_funcs atmel_hlcdc_panel_encoder_helper_funcs = {
+> -	.mode_fixup = atmel_hlcdc_panel_encoder_mode_fixup,
+> +	.atomic_check = atmel_hlcdc_panel_encoder_atomic_check,
+>  	.mode_set = atmel_hlcdc_rgb_encoder_mode_set,
+>  	.disable = atmel_hlcdc_panel_encoder_disable,
+>  	.enable = atmel_hlcdc_panel_encoder_enable,
+> @@ -168,16 +241,6 @@ static int atmel_hlcdc_panel_get_modes(struct drm_connector *connector)
+>  	return panel->panel->funcs->get_modes(panel->panel);
+>  }
+>  
+> -static int atmel_hlcdc_rgb_mode_valid(struct drm_connector *connector,
+> -				      struct drm_display_mode *mode)
+> -{
+> -	struct atmel_hlcdc_rgb_output *rgb =
+> -			drm_connector_to_atmel_hlcdc_rgb_output(connector);
+> -
+> -	return atmel_hlcdc_dc_mode_valid(rgb->dc, mode);
+> -}
+> -
+> -
+>  
+>  static struct drm_encoder *
+>  atmel_hlcdc_rgb_best_encoder(struct drm_connector *connector)
+> @@ -190,7 +253,6 @@ atmel_hlcdc_rgb_best_encoder(struct drm_connector *connector)
+>  
+>  static struct drm_connector_helper_funcs atmel_hlcdc_panel_connector_helper_funcs = {
+>  	.get_modes = atmel_hlcdc_panel_get_modes,
+> -	.mode_valid = atmel_hlcdc_rgb_mode_valid,
+>  	.best_encoder = atmel_hlcdc_rgb_best_encoder,
+>  };
+>  
+> @@ -273,6 +335,22 @@ static int atmel_hlcdc_create_panel_output(struct drm_device *dev,
+>  	drm_panel_attach(p, &panel->base.connector);
+>  	panel->panel = p;
+>  
+> +	if (!panel->panel->funcs->get_timings)
+> +		return 0;
+> +
+> +	panel->num_timings =
+> +		panel->panel->funcs->get_timings(panel->panel, 0, NULL);
+> +	panel->timings =
+> +		devm_kzalloc(dev->dev,
+> +			     panel->num_timings * sizeof(struct display_timing),
+> +			     GFP_KERNEL);
+> +
+> +	if (!panel->timings)
+> +		return 0;
+> +
+> +	panel->panel->funcs->get_timings(panel->panel, panel->num_timings,
+> +					 panel->timings);
+> +
+>  	return 0;
+>  
+>  err_encoder_cleanup:
+
+
+
 -- 
-1.9.3
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
