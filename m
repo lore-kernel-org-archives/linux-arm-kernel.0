@@ -1,52 +1,41 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 26 May 2015 17:20:24 +0900
-Subject: [PATCH] pinctrl: zynq: change error code for pinctrl_register
- failure
-In-Reply-To: <4437293.G26yCXqFQH@wuerfel>
-References: <1432613909-13457-1-git-send-email-yamada.masahiro@socionext.com>
- <4437293.G26yCXqFQH@wuerfel>
-Message-ID: <CAK7LNAQ3GbG0BCiESOnO1=qViXOer0StEEbjxUYumbGa73VgZw@mail.gmail.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Tue, 26 May 2015 16:29:03 +0800
+Subject: [PATCH 2/2] pwm: add Mediatek display PWM driver support
+In-Reply-To: <20150526060533.GW6325@pengutronix.de>
+References: <1431336382-13167-1-git-send-email-yh.huang@mediatek.com>
+ <1431336382-13167-3-git-send-email-yh.huang@mediatek.com>
+ <CAGS+omBX1fMBHa-4GLTjQUq5VPR2JRvhJRJ4qBX8hvDF9ihbLA@mail.gmail.com>
+ <1432196551.15653.2.camel@mtksdaap41>
+ <20150526060533.GW6325@pengutronix.de>
+Message-ID: <1432628943.11070.2.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Tue, 2015-05-26 at 08:05 +0200, Sascha Hauer wrote:
+> On Thu, May 21, 2015 at 04:22:31PM +0800, YH Huang wrote:
+> > On Mon, 2015-05-18 at 11:42 +0800, Daniel Kurtz wrote:
+<...>
+> > > On Mon, May 11, 2015 at 5:26 PM, YH Huang <yh.huang@mediatek.com> wrote:
+> > > > +
+> > > > +static const struct of_device_id mtk_disp_pwm_of_match[] = {
+> > > > +       { .compatible = "mediatek,mt6595-disp-pwm" },
+> > > 
+> > > Does this driver support the PWM in mt8173?
+> > > If so, don't you need this, too:
+> > > 
+> > >   { .compatible = "mediatek,mt8173-disp-pwm" },
+> > 
+> > Yes, it supports mt8173.
+> > I will add it.
+> 
+> If both yre compatible you don't need to add it since you have a
+> "mediatek,mt6595-disp-pwm" in the mt8173 device tree.
 
+Hi Sascha,
 
-2015-05-26 17:12 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
-> On Tuesday 26 May 2015 13:18:29 Masahiro Yamada wrote:
->> diff --git a/drivers/pinctrl/pinctrl-zynq.c b/drivers/pinctrl/pinctrl-zynq.c
->> index 04748a4..0ff653c 100644
->> --- a/drivers/pinctrl/pinctrl-zynq.c
->> +++ b/drivers/pinctrl/pinctrl-zynq.c
->> @@ -1141,7 +1141,7 @@ static int zynq_pinctrl_probe(struct platform_device *pdev)
->>
->>         pctrl->pctrl = pinctrl_register(&zynq_desc, &pdev->dev, pctrl);
->>         if (!pctrl->pctrl)
->> -               return -ENOMEM;
->> +               return -EINVAL;
->>
->>         platform_set_drvdata(pdev, pctrl);
->>
->>
->
-> One choice seems as bad as the other to me ;-)
->
-> Could we add a pinctrl_register_reason() variant that returns a meaningful
-> error code as ERR_PTR?
+We got a similar discussion about this with Mark Brown for spi driver,
+please see:
 
+http://lists.infradead.org/pipermail/linux-mediatek/2015-May/000673.html
 
-I also thought of it.
-I was wondering why pinctrl_register() did not return ERR_PTR.
-
-Can we migrate to ERR_PTR in the long run?
-
- [1] Add pinctrl_register_reason()
- [2] Replace pinctrl_register() in each driver with
-pinctrl_register_reason() one by one
- [3] Eventually, pinctrl_register will disappear
- [4] Rename pinctrl_register_reason() into pinctrl_register()
-
-
--- 
-Best Regards
-Masahiro Yamada
+Joe.C
