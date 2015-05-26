@@ -1,133 +1,38 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 26 May 2015 13:39:55 -0500
-Subject: [PATCHv3 1/4] phy: phy-core: Make GENERIC_PHY an invisible option
-In-Reply-To: <5564BD5D.1070601@broadcom.com>
-References: <1429743853-10254-1-git-send-email-arun.ramamurthy@broadcom.com>
- <1429743853-10254-2-git-send-email-arun.ramamurthy@broadcom.com>
- <20150515005210.GA31534@saruman.tx.rr.com>
- <556391FE.1020503@broadcom.com>
- <20150526141938.GA25686@saruman.tx.rr.com>
- <5564BD5D.1070601@broadcom.com>
-Message-ID: <20150526183955.GW26599@saruman.tx.rr.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Tue, 26 May 2015 14:47:28 -0400
+Subject: [PATCH] ata: ahci_mvebu: Fix wrongly set base address for the
+ MBus window setting
+In-Reply-To: <1432658843-27622-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1432658843-27622-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20150526184728.GJ7099@htj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 26, 2015 at 11:37:17AM -0700, Arun Ramamurthy wrote:
-> Hi
+On Tue, May 26, 2015 at 06:47:23PM +0200, Gregory CLEMENT wrote:
+> From: Nadav Haklai <nadavh@marvell.com>
 > 
-> On 15-05-26 07:19 AM, Felipe Balbi wrote:
-> >HI,
-> >
-> >On Mon, May 25, 2015 at 02:19:58PM -0700, Arun Ramamurthy wrote:
-> >>
-> >>
-> >>On 15-05-14 05:52 PM, Felipe Balbi wrote:
-> >>>Hi,
-> >>>
-> >>>On Wed, Apr 22, 2015 at 04:04:10PM -0700, Arun Ramamurthy wrote:
-> >>>>Most of the phy providers use "select" to enable GENERIC_PHY. Since select
-> >>>>is only recommended when the config is not visible, GENERIC_PHY is changed
-> >>>>an invisible option. To maintain consistency, all phy providers are changed
-> >>>>to "select" GENERIC_PHY and all non-phy drivers use "depends on" when the
-> >>>>phy framework is explicity required. USB_MUSB_OMAP2PLUS has a cyclic
-> >>>>dependency, so it is left as "select".
-> >>>>
-> >>>>Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
-> >>>>---
-> >>>>  drivers/ata/Kconfig                       | 1 -
-> >>>>  drivers/media/platform/exynos4-is/Kconfig | 2 +-
-> >>>>  drivers/phy/Kconfig                       | 4 ++--
-> >>>>  drivers/usb/host/Kconfig                  | 4 ++--
-> >>>>  drivers/video/fbdev/exynos/Kconfig        | 2 +-
-> >>>>  5 files changed, 6 insertions(+), 7 deletions(-)
-> >>>>
-> >>>>diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
-> >>>>index 5f60155..6d2e881 100644
-> >>>>--- a/drivers/ata/Kconfig
-> >>>>+++ b/drivers/ata/Kconfig
-> >>>>@@ -301,7 +301,6 @@ config SATA_MV
-> >>>>  	tristate "Marvell SATA support"
-> >>>>  	depends on PCI || ARCH_DOVE || ARCH_MV78XX0 || \
-> >>>>  		   ARCH_MVEBU || ARCH_ORION5X || COMPILE_TEST
-> >>>>-	select GENERIC_PHY
-> >>>>  	help
-> >>>>  	  This option enables support for the Marvell Serial ATA family.
-> >>>>  	  Currently supports 88SX[56]0[48][01] PCI(-X) chips,
-> >>>>diff --git a/drivers/media/platform/exynos4-is/Kconfig b/drivers/media/platform/exynos4-is/Kconfig
-> >>>>index b7b2e47..b6f3eaa 100644
-> >>>>--- a/drivers/media/platform/exynos4-is/Kconfig
-> >>>>+++ b/drivers/media/platform/exynos4-is/Kconfig
-> >>>>@@ -31,7 +31,7 @@ config VIDEO_S5P_FIMC
-> >>>>  config VIDEO_S5P_MIPI_CSIS
-> >>>>  	tristate "S5P/EXYNOS MIPI-CSI2 receiver (MIPI-CSIS) driver"
-> >>>>  	depends on REGULATOR
-> >>>>-	select GENERIC_PHY
-> >>>>+	depends on GENERIC_PHY
-> >>>>  	help
-> >>>>  	  This is a V4L2 driver for Samsung S5P and EXYNOS4 SoC MIPI-CSI2
-> >>>>  	  receiver (MIPI-CSIS) devices.
-> >>>>diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> >>>>index 2962de2..edecdb1 100644
-> >>>>--- a/drivers/phy/Kconfig
-> >>>>+++ b/drivers/phy/Kconfig
-> >>>>@@ -5,7 +5,7 @@
-> >>>>  menu "PHY Subsystem"
-> >>>>
-> >>>>  config GENERIC_PHY
-> >>>>-	bool "PHY Core"
-> >>>>+	bool
-> >>>>  	help
-> >>>>  	  Generic PHY support.
-> >>>>
-> >>>>@@ -72,7 +72,7 @@ config PHY_MIPHY365X
-> >>>>  config PHY_RCAR_GEN2
-> >>>>  	tristate "Renesas R-Car generation 2 USB PHY driver"
-> >>>>  	depends on ARCH_SHMOBILE
-> >>>>-	depends on GENERIC_PHY
-> >>>>+	select GENERIC_PHY
-> >>>
-> >>>so some you changed from depends to select...
-> >>>
-> >>>>  	help
-> >>>>  	  Support for USB PHY found on Renesas R-Car generation 2 SoCs.
-> >>>>
-> >>>>diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-> >>>>index 5ad60e4..e2197e2 100644
-> >>>>--- a/drivers/usb/host/Kconfig
-> >>>>+++ b/drivers/usb/host/Kconfig
-> >>>>@@ -182,7 +182,7 @@ config USB_EHCI_HCD_SPEAR
-> >>>>  config USB_EHCI_HCD_STI
-> >>>>  	tristate "Support for ST STiHxxx on-chip EHCI USB controller"
-> >>>>  	depends on ARCH_STI && OF
-> >>>>-	select GENERIC_PHY
-> >>>>+	depends on GENERIC_PHY
-> >>>
-> >>>while others you changed from select to depends.
-> >>>
-> >>>NAK.
-> >>>
-> >>Felipe, I dont understand your concern, could you please explain it more
-> >>detail?  The logic behind the changes is that in cases where there was an
-> >>explicit dependency, I changed it to "depends on" and in other cases I
-> >>changed it to "selects". Thanks
-> >
-> >Since GENERIC_PHY is visible from Kconfig, it would be much nicer to
-> >avoid select altogether.
-> >
-> Felipe, after discussion with the maintainers, I have made GENERIC_PHY an
-> invisible option as part of this change. Thanks
+> According to the Armada 38x datasheet, the window base address
+> registers value is set in bits [31:4] of the register and corresponds
+> to the transaction address bits [47:20].
+> 
+> Therefore, the 32bit base address value should be shifted right by
+> 20bits and left by 4bits, resulting in 16 bit shift right.
+> 
+> The bug as not been noticed yet because if the memory available on
+> the platform is less than 2GB, then the base address is zero.
+> 
+> [gregory.clement at free-electrons.com: add extra-explanation]
+> 
+> Fixes: a3464ed2f14 (ata: ahci_mvebu: new driver for Marvell Armada 380
+> AHCI interfaces)
+> Signed-off-by: Nadav Haklai <nadavh@marvell.com>
+> Reviewed-by: Omri Itach <omrii@marvell.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Cc: <stable@vger.kernel.org>
 
-Then, if the option is invisible, how can you "depend" on it ? It can
-never be selected by poking around in Kconfig. IMO, it's
-counterintuitive that you need to enable a PHY driver before you can see
-your EHCI/OHCI/whatever controller listed in Kconfig.
+Applied to libata/for-4.1-fixes.
+
+Thank you.
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150526/9139baa1/attachment.sig>
+tejun
