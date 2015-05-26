@@ -1,56 +1,122 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 26 May 2015 09:44:27 -0500
-Subject: [PATCH 16/21] usb: phy: Probe phy devices on demand
-In-Reply-To: <1432565608-26036-17-git-send-email-tomeu.vizoso@collabora.com>
-References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
- <1432565608-26036-17-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <20150526144427.GA26599@saruman.tx.rr.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Tue, 26 May 2015 15:48:46 +0100
+Subject: [BUG] Read-Only THP causes stalls (commit 10359213d)
+In-Reply-To: <20150526143547.GA22363@cbox>
+References: <20150524193404.GD16910@cbox> <20150525141525.GB26958@redhat.com>
+ <20150526080848.GA27075@cbox>
+ <CAPvkgC3kTgP720CawpfvLbm90FCs9UGNP3WOAamOD=UEgKoQCw@mail.gmail.com>
+ <20150526143547.GA22363@cbox>
+Message-ID: <CAPvkgC0h+pYFfcuNh7f-b44mktR+CX6UYa2OXouDB8ZmZtroPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 25, 2015 at 04:53:20PM +0200, Tomeu Vizoso wrote:
-> When looking up a phy through its DT node, ensure that the corresponding
-> device has been registered.
-> 
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+On 26 May 2015 at 15:35, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> Hi Steve,
+>
+> On Tue, May 26, 2015 at 03:24:20PM +0100, Steve Capper wrote:
+>> >> On Sun, May 24, 2015 at 09:34:04PM +0200, Christoffer Dall wrote:
+>> >> > Hi all,
+>> >> >
+>> >> > I noticed a regression on my arm64 APM X-Gene system a couple
+>> >> > of weeks back.  I would occassionally see the system lock up and see RCU
+>> >> > stalls during the caching phase of kernbench.  I then wrote a small
+>> >> > script that does nothing but cache the files
+>> >> > (http://paste.ubuntu.com/11324767/) and ran that in a loop.  On a known
+>> >> > bad commit (v4.1-rc2), out of 25 boots, I never saw it get past 21
+>> >> > iterations of the loop.  I have since tried to run a bisect from v3.19 to
+>> >> > v4.0 using 100 iterations as my criteria for a good commit.
+>> >> >
+>> >> > This resulted in the following first bad commit:
+>> >> >
+>> >> > 10359213d05acf804558bda7cc9b8422a828d1cd
+>> >> > (mm: incorporate read-only pages into transparent huge pages, 2015-02-11)
+>> >> >
+>> >> > Indeed, running the workload on v4.1-rc4 still produced the behavior,
+>> >> > but reverting the above commit gets me through 100 iterations of the
+>> >> > loop.
+>> >> >
+>> >> > I have not tried to reproduce on an x86 system.  Turning on a bunch
+>> >> > of kernel debugging features *seems* to hide the problem.  My config for
+>> >> > the XGene system is defconfig + CONFIG_BRIDGE and
+>> >> > CONFIG_POWER_RESET_XGENE.
+>> >> >
+>> >> > Please let me know if I can help test patches or other things I can
+>> >> > do to help.  I'm afraid that by simply reading the patch I didn't see
+>> >> > anything obviously wrong with it which would cause this behavior.
+>> >>
+>> >> As further confirmation, could you try:
+>> >>
+>> >> echo 0 > /sys/kernel/mm/transparent_hugepage/khugepaged/pages_to_scan
+>> >
+>> > this returns -EINVAL.
+>> >
+>> > But I'm trying now with:
+>> >
+>> > echo never > /sys/kernel/mm/transparent_hugepage/enabled
+>> >
+>> >>
+>> >> and verify the problem goes away without having to revert the patch?
+>> >
+>> > will let you know, so far so good...
+>> >
+>> >>
+>> >> Accordingly you should reproduce much eaiser this way (setting
+>> >> $largevalue to 8192 or something, it doesn't matter).
+>> >>
+>> >> echo $largevalue > /sys/kernel/mm/transparent_hugepage/khugepaged/pages_to_scan
+>> >> echo 0 > /sys/kernel/mm/transparent_hugepage/khugepaged/alloc_sleep_millisecs
+>> >> echo 0 > /sys/kernel/mm/transparent_hugepage/khugepaged/scan_sleep_millisecs
+>> >>
+>> >> Then push the system into swap with some memhog -r1000 xG.
+>> >
+>> > what is memhog?  I couldn't find the utility in Google...
+>> >
+>> > I did try with the above settings and just push a bunch of data into
+>> > ramfs and tmpfs and indeed the sytem died very quickly (on v4.0-rc4).
+>> >
+>> >>
+>> >> The patch just allows readonly anon pages to be collapsed along with
+>> >> read-write ones, the vma permissions allows it, so they have to be
+>> >> swapcache pages, this is why swap shall be required.
+>> >>
+>> >> Perhaps there's some arch detail that needs fixing but it'll be easier
+>> >> to track it down once you have a way to reproduce fast.
+>> >>
+>> > Yes, would be great to be able to reproduce quickly.
+>> >
+>
+>> I'm trying to reproduce this on hardware here; but have been unable to
+>> thus far with 4.1-rc2 on a Xgene and Seattle systems.
+>
+> Really?  That's concerning.  I think Andre mentioned he could
+> reproduce...
+>
+> How many iterations have you run the caching loop for?
+>
+> Are you using defconfig?  I noticed that turning on debugging features
+> was hiding the problem.
+>
+>> Also, I tried the memhog + pages_to_scan suggestion from Andrea.
+>
+> Any chance you could send me the memhog tool?
+>
+>>
+>> Maybe a silly question, where is your root filesystem located? Is
+>> there anything network mounted?
+>>
+> It's a regular ext4 on the local SATA disk.  Ubuntu Trusty.
+>
+> Thanks,
+> -Christoffer
 
-Acked-by: Felipe Balbi <balbi@ti.com>
+Sending an email to lakml appears to have been enough to make it hang
+on the Xgene :-).
+The system is completely frozen, not even the serial port works.
 
-> ---
->  drivers/usb/phy/phy.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/drivers/usb/phy/phy.c b/drivers/usb/phy/phy.c
-> index d1cd6b5..7084f21 100644
-> --- a/drivers/usb/phy/phy.c
-> +++ b/drivers/usb/phy/phy.c
-> @@ -13,6 +13,7 @@
->  #include <linux/err.h>
->  #include <linux/device.h>
->  #include <linux/module.h>
-> +#include <linux/of_platform.h>
->  #include <linux/slab.h>
->  #include <linux/of.h>
->  
-> @@ -192,6 +193,8 @@ struct usb_phy *devm_usb_get_phy_by_phandle(struct device *dev,
->  		goto err0;
->  	}
->  
-> +	of_platform_device_ensure(node);
-> +
->  	spin_lock_irqsave(&phy_lock, flags);
->  
->  	phy = __of_usb_find_phy(node);
-> -- 
-> 2.4.1
-> 
+On Seattle, I've hit 100 iterations multiple times without any problems.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150526/6060e029/attachment.sig>
+Investigating...
+
+Cheers,
+--
+Steve
