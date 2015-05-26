@@ -1,40 +1,70 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Tue, 26 May 2015 16:13:03 +0300
-Subject: [PATCH] ARM64: kasan: print memory assignment
-In-Reply-To: <1432632464-12248-1-git-send-email-linus.walleij@linaro.org>
-References: <1432632464-12248-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <5564715F.8000209@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 26 May 2015 14:34:23 +0100
+Subject: [PATCH 15/21] backlight: Probe backlight devices on demand
+In-Reply-To: <CAAObsKCBLVOph2DzeQqph+teiFq=uZtjShBOf+G-U2UxRAJ7jw@mail.gmail.com>
+References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1432565608-26036-16-git-send-email-tomeu.vizoso@collabora.com>
+ <20150526071850.GA11677@x1> <20150526072526.GB6325@pengutronix.de>
+ <20150526083931.GC11677@x1>
+ <CAAObsKCBLVOph2DzeQqph+teiFq=uZtjShBOf+G-U2UxRAJ7jw@mail.gmail.com>
+Message-ID: <20150526133423.GK11677@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/26/2015 12:27 PM, Linus Walleij wrote:
-> This prints out the virtual memory assigned to KASan in the
-> boot crawl along with other memory assignments, if and only
-> if KASan is activated.
-> 
-> Example dmesg from the Juno Development board:
-> 
-> Memory: 1691156K/2080768K available (5465K kernel code, 444K rwdata,
-> 2160K rodata, 340K init, 217K bss, 373228K reserved, 16384K cma-reserved)
-> Virtual kernel memory layout:
->     kasan   : 0xffffff8000000000 - 0xffffff9000000000   (    64 MB)
->     vmalloc : 0xffffff9000000000 - 0xffffffbdbfff0000   (   182 GB)
->     vmemmap : 0xffffffbdc0000000 - 0xffffffbfc0000000   (     8 GB maximum)
->               0xffffffbdc2000000 - 0xffffffbdc3fc0000   (    31 MB actual)
->     fixed   : 0xffffffbffabfd000 - 0xffffffbffac00000   (    12 KB)
->     PCI I/O : 0xffffffbffae00000 - 0xffffffbffbe00000   (    16 MB)
->     modules : 0xffffffbffc000000 - 0xffffffc000000000   (    64 MB)
->     memory  : 0xffffffc000000000 - 0xffffffc07f000000   (  2032 MB)
->       .init : 0xffffffc0007f5000 - 0xffffffc00084a000   (   340 KB)
->       .text : 0xffffffc000080000 - 0xffffffc0007f45b4   (  7634 KB)
->       .data : 0xffffffc000850000 - 0xffffffc0008bf200   (   445 KB)
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Done on top of Andrey's patch set obviously.
-> 
-> Andrey: do what you want with this, I think it's kinda nice,
-> you can harvest this patch for your patch series if you like,
-> or squash into the ARM64 enablement patch, I have no preference.
+On Tue, 26 May 2015, Tomeu Vizoso wrote:
 
-Thanks. I'll fix s/MB/GB and grab it.
+> On 26 May 2015 at 10:39, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Tue, 26 May 2015, Sascha Hauer wrote:
+> >> On Tue, May 26, 2015 at 08:18:50AM +0100, Lee Jones wrote:
+> >> > On Mon, 25 May 2015, Tomeu Vizoso wrote:
+> >> >
+> >> > > When looking up a backlight device through its DT node, ensure that the
+> >> > > corresponding device has been registered.
+> >> > >
+> >> > > Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> >> > > ---
+> >> > >  drivers/video/backlight/backlight.c | 3 +++
+> >> > >  1 file changed, 3 insertions(+)
+> >> >
+> >> > Looks reasonable.
+> >> >
+> >> > Until anyone screams at me, applied thanks.
+> >>
+> >> The compiler will scream at you when it realizes that
+> >> of_platform_device_ensure() doesn't exist in your kernel...
+> >
+> > Yup, indeed it did.
+> >
+> > I assumed this was *only* enabling subsystems and that the
+> > framework/API was already accepted.
+> >
+> > So the advice I'd give to Tomeu when sending full enablement
+> > patch-sets i.e. ones which provide the framework/API *and* enable
+> > subsystems in the same set, is to send the entire set to everyone, so
+> > we can see what the aim of the set is and how to deal with it.
+> 
+> Yeah, but get_maintainer.pl outputs 33 maintainer addresses, plus 1
+> reviewer plus 14 mailing lists, so to avoid rejects because of too
+> many recipients I went with the advice in [0] and sent each patch to
+> their maintainers and list(s) and the cover letter to all lists. Also
+> sent the whole series to lakml to make sure that it's at least indexed
+> there.
+
+Mails aren't usually rejected because they have too many recipients,
+rather they require approval.  This isn't a blocker, especially for
+patch-sets like this.
+
+> Any advice on what to do with series that span so many subsystems?
+
+I would either ensure everyone is informed, split into two choices;
+either CC everyone on every patch, or at least everyone on the
+cover-letter and the core API changes.  The other method is to have
+the API changes accepted first, then once accepted send out the
+subsystem changes [FWIW: this is the method I (wrongly) assumed you
+used].
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
