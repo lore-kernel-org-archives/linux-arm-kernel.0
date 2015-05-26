@@ -1,43 +1,56 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Tue, 26 May 2015 19:39:46 +0200
-Subject: [PATCH] ARM: lpc18xx: remove DEBUG_LL_UART_8250 from defconfig
-Message-ID: <1432661986-4118-1-git-send-email-manabian@gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 26 May 2015 20:41:34 +0300
+Subject: [PATCHv3 00/27] ARM: OMAP2+: clock code move under clk driver
+In-Reply-To: <20150526163216.GF16525@atomide.com>
+References: <1432566032-10860-1-git-send-email-t-kristo@ti.com>
+ <20150526160557.GD16525@atomide.com> <20150526163216.GF16525@atomide.com>
+Message-ID: <5564B04E.3000300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the generic 8250 config option so that the LPC18xx
-specific option gets picked instead.
+On 05/26/2015 07:32 PM, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [150526 09:08]:
+>> * Tero Kristo <t-kristo@ti.com> [150525 08:01]:
+>>> Hi,
+>>>
+>>> As requested, posting v3 with somewhat changed diff parameters and
+>>> diffstat attached. Just some minor Makefile changes compared to v2,
+>>> these were discussed under that set.
+>>>
+>>> Set has been pushed to:
+>>> - tree: https://github.com/t-kristo/linux-pm.git
+>>> - branch: for-4.2/ti-clk-move
+>>
+>> Looks like this causes a build error for at least omap2 only .config:
+>>
+>> drivers/clk/ti/dpll3xxx.o:(.rodata+0x1c): multiple definition of `clkhwops_omap3_dpll'
+>> drivers/clk/ti/dpll.o:(.rodata+0x0): first defined here
+>>
+>> You may want to create a file selecting ARCH_OMAP2PLUS=y, then point
+>> KCONFIG_ALLCONFIG to that file for make randconfig. Then just build
+>> randconfigs :) Usually the issues like this are exposed within few
+>> randconfig builds, some take longer if the options have dependencies.
+>
+> Found more similar issues for omap3 only and omap4 only configs:
+>
+> drivers/built-in.o: In function `omap2_clkops_enable_clkdm':
+> omap-gpmc.c:(.text+0x202e0): undefined reference to `ti_clk_get_features'
+> drivers/built-in.o: In function `omap2_clkops_disable_clkdm':
+> omap-gpmc.c:(.text+0x20374): undefined reference to `ti_clk_get_features'
+> drivers/built-in.o: In function `_omap2_dpll_is_in_bypass':
+> omap-gpmc.c:(.text+0x21678): undefined reference to `ti_clk_get_features'
+> drivers/built-in.o: In function `omap2_dpll_round_rate':
+> omap-gpmc.c:(.text+0x218ac): undefined reference to `ti_clk_get_features'
+> omap-gpmc.c:(.text+0x218ec): undefined reference to `ti_clk_get_features'
+>
+> drivers/built-in.o: In function `omap3xxx_dt_clk_init':
+> omap-gpmc.c:(.init.text+0x4d60): undefined reference to `omap2_clk_enable_init_clocks'
+> arch/arm/mach-omap2/built-in.o: In function `ti_clk_init_features':
+>
+> arch/arm/mach-omap2/built-in.o: In function `ti_clk_init_features':
+> dss-common.c:(.init.text+0x4368): undefined reference to `ti_clk_setup_features'
 
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
----
-Hi Arnd,
+Argh, that same issue crept back with a merge issue again. I fixed this 
+already once.
 
-Please apply this to the next/defconfig branch.
-
-After LPC18XX was converted to use the DEBUG_LPC18XX_UART0 config
-symbol there is now a mismatch in defconfig for this platform.
-
-On a clean defconfig the following warnings appear.
-.config:2073:warning: symbol value '' invalid for DEBUG_UART_PHYS
-.config:2074:warning: symbol value '' invalid for DEBUG_UART_VIRT
-
-Since the default value now depends on DEBUG_LPC18XX_UART0 and not
-ARCH_LPC18XX.
-
- arch/arm/configs/lpc18xx_defconfig | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/configs/lpc18xx_defconfig b/arch/arm/configs/lpc18xx_defconfig
-index d4320a7e433f..1c47f86c3970 100644
---- a/arch/arm/configs/lpc18xx_defconfig
-+++ b/arch/arm/configs/lpc18xx_defconfig
-@@ -146,7 +146,6 @@ CONFIG_MAGIC_SYSRQ=y
- # CONFIG_RCU_CPU_STALL_INFO is not set
- # CONFIG_FTRACE is not set
- CONFIG_DEBUG_LL=y
--CONFIG_DEBUG_LL_UART_8250=y
- CONFIG_EARLY_PRINTK=y
- CONFIG_CRC_ITU_T=y
- CONFIG_CRC7=y
--- 
-1.8.0
+-Tero
