@@ -1,64 +1,157 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 26 May 2015 20:49:19 +0800
-Subject: [PATCH 06/11] pci, acpi,
- mcfg: Provide generic implementation of MCFG code initialization.
+Date: Tue, 26 May 2015 20:49:20 +0800
+Subject: [PATCH 07/11] x86, pci: mmconfig_{32,
+ 64}.c code refactoring - remove code duplication.
 In-Reply-To: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
 References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1432644564-24746-7-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1432644564-24746-8-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 
-First function acpi_mcfg_check_entry() does not apply any quirks by default.
+mmconfig_64.c version is going to be default implementation for arch
+agnostic low-level direct PCI config space accessors for ECAM dirver.
+However, now it initialize raw_pci_ext_ops pointer which is x86 specific
+code only. Moreover, mmconfig_32.c is doing the same thing at the same time.
 
-Last two functions are required by ACPI subsystem to make PCI config
-space accessible. Generic code assume to do nothing for early init call but
-late init call does as follow:
-- parse MCFG table and add regions to ECAM resource list
-- map regions
-- add regions to iomem_resource
+Move it to mmconfig_shared.c so it becomes common for both and
+mmconfig_64.c turns out to be purely arch agnostic.
 
 Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 ---
- drivers/acpi/mcfg.c | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ arch/x86/pci/mmconfig-shared.c | 10 ++++++++--
+ arch/x86/pci/mmconfig_32.c     | 10 ++--------
+ arch/x86/pci/mmconfig_64.c     | 11 ++---------
+ include/linux/ecam.h           |  5 +++++
+ 4 files changed, 17 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/acpi/mcfg.c b/drivers/acpi/mcfg.c
-index 63775af..745b83e 100644
---- a/drivers/acpi/mcfg.c
-+++ b/drivers/acpi/mcfg.c
-@@ -55,3 +55,29 @@ int __init acpi_parse_mcfg(struct acpi_table_header *header)
+diff --git a/arch/x86/pci/mmconfig-shared.c b/arch/x86/pci/mmconfig-shared.c
+index 6fa3080..8938db3 100644
+--- a/arch/x86/pci/mmconfig-shared.c
++++ b/arch/x86/pci/mmconfig-shared.c
+@@ -29,6 +29,11 @@
+ static bool pci_mmcfg_running_state;
+ static bool pci_mmcfg_arch_init_failed;
  
++const struct pci_raw_ops pci_mmcfg = {
++	.read =		pci_mmcfg_read,
++	.write =	pci_mmcfg_write,
++};
++
+ static u32
+ pci_mmconfig_amd_read(int len, void __iomem *addr)
+ {
+@@ -555,9 +560,10 @@ static void __init __pci_mmcfg_init(int early)
+ 		}
+ 	}
+ 
+-	if (pci_mmcfg_arch_init())
++	if (pci_mmcfg_arch_init()) {
++		raw_pci_ext_ops = &pci_mmcfg;
+ 		pci_probe = (pci_probe & ~PCI_PROBE_MASK) | PCI_PROBE_MMCONF;
+-	else {
++	} else {
+ 		free_all_mmcfg();
+ 		pci_mmcfg_arch_init_failed = true;
+ 	}
+diff --git a/arch/x86/pci/mmconfig_32.c b/arch/x86/pci/mmconfig_32.c
+index 5cf6291..7a050cb 100644
+--- a/arch/x86/pci/mmconfig_32.c
++++ b/arch/x86/pci/mmconfig_32.c
+@@ -50,7 +50,7 @@ static void pci_exp_set_dev_base(unsigned int base, int bus, int devfn)
+ 	}
+ }
+ 
+-static int pci_mmcfg_read(unsigned int seg, unsigned int bus,
++int pci_mmcfg_read(unsigned int seg, unsigned int bus,
+ 			  unsigned int devfn, int reg, int len, u32 *value)
+ {
+ 	unsigned long flags;
+@@ -79,7 +79,7 @@ err:		*value = -1;
  	return 0;
  }
+ 
+-static int pci_mmcfg_write(unsigned int seg, unsigned int bus,
++int pci_mmcfg_write(unsigned int seg, unsigned int bus,
+ 			   unsigned int devfn, int reg, int len, u32 value)
+ {
+ 	unsigned long flags;
+@@ -106,15 +106,9 @@ static int pci_mmcfg_write(unsigned int seg, unsigned int bus,
+ 	return 0;
+ }
+ 
+-const struct pci_raw_ops pci_mmcfg = {
+-	.read =		pci_mmcfg_read,
+-	.write =	pci_mmcfg_write,
+-};
+-
+ int __init pci_mmcfg_arch_init(void)
+ {
+ 	printk(KERN_INFO "PCI: Using MMCONFIG for extended config space\n");
+-	raw_pci_ext_ops = &pci_mmcfg;
+ 	return 1;
+ }
+ 
+diff --git a/arch/x86/pci/mmconfig_64.c b/arch/x86/pci/mmconfig_64.c
+index b62ff18..fd857ea 100644
+--- a/arch/x86/pci/mmconfig_64.c
++++ b/arch/x86/pci/mmconfig_64.c
+@@ -25,7 +25,7 @@ static char __iomem *pci_dev_base(unsigned int seg, unsigned int bus, unsigned i
+ 	return NULL;
+ }
+ 
+-static int pci_mmcfg_read(unsigned int seg, unsigned int bus,
++int pci_mmcfg_read(unsigned int seg, unsigned int bus,
+ 			  unsigned int devfn, int reg, int len, u32 *value)
+ {
+ 	char __iomem *addr;
+@@ -49,7 +49,7 @@ err:		*value = -1;
+ 	return 0;
+ }
+ 
+-static int pci_mmcfg_write(unsigned int seg, unsigned int bus,
++int pci_mmcfg_write(unsigned int seg, unsigned int bus,
+ 			   unsigned int devfn, int reg, int len, u32 value)
+ {
+ 	char __iomem *addr;
+@@ -71,11 +71,6 @@ static int pci_mmcfg_write(unsigned int seg, unsigned int bus,
+ 	return 0;
+ }
+ 
+-const struct pci_raw_ops pci_mmcfg = {
+-	.read =		pci_mmcfg_read,
+-	.write =	pci_mmcfg_write,
+-};
+-
+ static void __iomem *mcfg_ioremap(struct pci_mmcfg_region *cfg)
+ {
+ 	void __iomem *addr;
+@@ -101,8 +96,6 @@ int __init pci_mmcfg_arch_init(void)
+ 			return 0;
+ 		}
+ 
+-	raw_pci_ext_ops = &pci_mmcfg;
+-
+ 	return 1;
+ }
+ 
+diff --git a/include/linux/ecam.h b/include/linux/ecam.h
+index 2387df5..fba5d6b 100644
+--- a/include/linux/ecam.h
++++ b/include/linux/ecam.h
+@@ -47,5 +47,10 @@ extern struct list_head pci_mmcfg_list;
+ 
+ #define PCI_MMCFG_BUS_OFFSET(bus)      ((bus) << 20)
+ 
++int pci_mmcfg_read(unsigned int seg, unsigned int bus,
++		   unsigned int devfn, int reg, int len, u32 *value);
++int pci_mmcfg_write(unsigned int seg, unsigned int bus,
++		    unsigned int devfn, int reg, int len, u32 value);
 +
-+int __init __weak acpi_mcfg_check_entry(struct acpi_table_mcfg *mcfg,
-+					struct acpi_mcfg_allocation *cfg)
-+{
-+	return 0;
-+}
-+
-+void __init __weak pci_mmcfg_early_init(void)
-+{
-+
-+}
-+
-+void __init __weak pci_mmcfg_late_init(void)
-+{
-+	struct pci_mmcfg_region *cfg;
-+
-+	acpi_table_parse(ACPI_SIG_MCFG, acpi_parse_mcfg);
-+
-+	if (list_empty(&pci_mmcfg_list))
-+		return;
-+	if (!pci_mmcfg_arch_init())
-+		free_all_mmcfg();
-+
-+	list_for_each_entry(cfg, &pci_mmcfg_list, list)
-+		insert_resource(&iomem_resource, &cfg->res);
-+}
+ #endif  /* __KERNEL__ */
+ #endif  /* __ECAM_H */
 -- 
 1.9.1
