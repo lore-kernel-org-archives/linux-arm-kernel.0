@@ -1,33 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 26 May 2015 09:05:58 -0700
-Subject: [PATCHv3 00/27] ARM: OMAP2+: clock code move under clk driver
-In-Reply-To: <1432566032-10860-1-git-send-email-t-kristo@ti.com>
-References: <1432566032-10860-1-git-send-email-t-kristo@ti.com>
-Message-ID: <20150526160557.GD16525@atomide.com>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Tue, 26 May 2015 09:12:48 -0700
+Subject: [PATCHv1 0/2] Adding driver for Xilinx LogiCORE IP mailbox.
+In-Reply-To: <000101d096f2$97457cf0$c5d076d0$@com>
+References: <1432317791-26851-1-git-send-email-moritz.fischer@ettus.com>
+ <5562BB92.60808@xilinx.com> <000101d096f2$97457cf0$c5d076d0$@com>
+Message-ID: <CAAtXAHfFfeJtjHvVTG7r0DNg_LNgVD2RCR4B6VxB5afh39ndhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [150525 08:01]:
-> Hi,
-> 
-> As requested, posting v3 with somewhat changed diff parameters and
-> diffstat attached. Just some minor Makefile changes compared to v2,
-> these were discussed under that set.
-> 
-> Set has been pushed to:
-> - tree: https://github.com/t-kristo/linux-pm.git
-> - branch: for-4.2/ti-clk-move
+On Mon, May 25, 2015 at 6:56 AM, Jingoo Han <jingoohan1@gmail.com> wrote:
+> On Monday, May 25, 2015 3:05 PM, Michal Simek wrote:
+>> On 05/22/2015 08:03 PM, Moritz Fischer wrote:
+>> > This patchset adds mailbox framework integration for the Xilinx LogiCORE IP
+>> > mailbox.  The Xilinx LogiCORE IP mailbox is a fpga softcore that allows
+>> > interprocessor communication between AXI4 stream / memory mapped
+>> > processors.
+>> >
+>> > Changes from v0:
+>> > ---------------------
+>> >
+>> > - Several stylistic issues
+>> > - Dropped superfluous intr_mode member
+>> > - Really masking the IRQs on mailbox_shutdown
+>> > - No longer using polling by accident in non-IRQ mode
+>> > - Swapped doc and driver commits
+>>
+>> Changes update should be in every particular patch.
+>> Also v1 is used to the first version that's why this one should be v2.
 
-Looks like this causes a build error for at least omap2 only .config:
 
-drivers/clk/ti/dpll3xxx.o:(.rodata+0x1c): multiple definition of `clkhwops_omap3_dpll'
-drivers/clk/ti/dpll.o:(.rodata+0x0): first defined here
+Thanks for the feedback. I guess making the next round v2 would be
+less confusing,
+than restarting the entire patchset from v1?
 
-You may want to create a file selecting ARCH_OMAP2PLUS=y, then point
-KCONFIG_ALLCONFIG to that file for make randconfig. Then just build
-randconfigs :) Usually the issues like this are exposed within few
-randconfig builds, some take longer if the options have dependencies.
+> Right, I agree with Michal Simek's opinion.
+> If there are 'Changes update' in each patch, it makes people review
+> the patches more easily. In addition, normally, 'v0' is not used.
 
-Regards,
+Sorry about that again.
+>
+> Best regards,
+> Jingoo Han
+>
+>>
+>> Thanks,
+>> Michal
+>
 
-Tony
+Thanks,
+Moritz
