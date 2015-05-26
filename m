@@ -1,29 +1,38 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Tue, 26 May 2015 19:15:58 +0100
-Subject: [PATCH 4/8] efi: move FDT handling to separate object file
-In-Reply-To: <1431326520-17331-5-git-send-email-ard.biesheuvel@linaro.org>
-References: <1431326520-17331-1-git-send-email-ard.biesheuvel@linaro.org>
- <1431326520-17331-5-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150526181558.GB3030@codeblueprint.co.uk>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Tue, 26 May 2015 11:17:22 -0700
+Subject: [PATCH v9 07/17] clk: tegra: Add Tegra124 DFLL clocksource
+ platform driver
+In-Reply-To: <1431529131-16710-8-git-send-email-mikko.perttunen@kapsi.fi>
+References: <1431529131-16710-1-git-send-email-mikko.perttunen@kapsi.fi>
+ <1431529131-16710-8-git-send-email-mikko.perttunen@kapsi.fi>
+Message-ID: <CAMAWPa8PQgNWbajvrxMiD4qcUBg+Q1xsOU5hhhFQbxE4VxW_uQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 11 May, at 08:41:56AM, Ard Biesheuvel wrote:
-> The EFI specific FDT handling is compiled conditionally, and is
-> logically independent of the rest of efi.o. So move it to a separate
-> file before making changes to it in subsequent patches.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  drivers/firmware/efi/Makefile  |  1 +
->  drivers/firmware/efi/efi-fdt.c | 93 ++++++++++++++++++++++++++++++++++++++++++
->  drivers/firmware/efi/efi.c     | 86 --------------------------------------
->  3 files changed, 94 insertions(+), 86 deletions(-)
->  create mode 100644 drivers/firmware/efi/efi-fdt.c
+On Wed, May 13, 2015 at 7:58 AM, Mikko Perttunen
+<mikko.perttunen@kapsi.fi> wrote:
+> From: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+>
+> Add basic platform driver support for the fast CPU cluster DFLL
+> clocksource found on Tegra124 SoCs. This small driver selects the
+> appropriate Tegra124-specific characterization data and integration
+> code. It relies on the DFLL common code to do most of the work.
+>
+> Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+> Signed-off-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
+> Acked-by: Michael Turquette <mturquette@linaro.org>
 
-Sorry for the delay,
+Various boot failures on non-tegra platforms (sunxi, omap) started
+showing up in next-20150522, and still exist in next-20150525[1] and
+today I bisected them down to this patch.
 
-Acked-by: Matt Fleming <matt.fleming@intel.com>
+I didn't look closely, but I"m guessing the module_init() function
+here needs some compatible checking so it's not actually executed on
+non-tegra platforms.
 
--- 
-Matt Fleming, Intel Open Source Technology Center
+I confirmed that reverting this patch on top of next-20150525 gets
+both the sunxi and omap platforms booting again.
+
+Kevin
+
+[1] http://kernelci.org/boot/all/job/next/kernel/next-20150525/
