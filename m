@@ -1,39 +1,40 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 26 May 2015 15:07:31 +0200
-Subject: [PATCH v2 0/5] dmaengine: mv_xor: Fixes and enhancements
-Message-ID: <1432645656-20504-1-git-send-email-maxime.ripard@free-electrons.com>
+From: a.ryabinin@samsung.com (Andrey Ryabinin)
+Date: Tue, 26 May 2015 16:13:03 +0300
+Subject: [PATCH] ARM64: kasan: print memory assignment
+In-Reply-To: <1432632464-12248-1-git-send-email-linus.walleij@linaro.org>
+References: <1432632464-12248-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <5564715F.8000209@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 05/26/2015 12:27 PM, Linus Walleij wrote:
+> This prints out the virtual memory assigned to KASan in the
+> boot crawl along with other memory assignments, if and only
+> if KASan is activated.
+> 
+> Example dmesg from the Juno Development board:
+> 
+> Memory: 1691156K/2080768K available (5465K kernel code, 444K rwdata,
+> 2160K rodata, 340K init, 217K bss, 373228K reserved, 16384K cma-reserved)
+> Virtual kernel memory layout:
+>     kasan   : 0xffffff8000000000 - 0xffffff9000000000   (    64 MB)
+>     vmalloc : 0xffffff9000000000 - 0xffffffbdbfff0000   (   182 GB)
+>     vmemmap : 0xffffffbdc0000000 - 0xffffffbfc0000000   (     8 GB maximum)
+>               0xffffffbdc2000000 - 0xffffffbdc3fc0000   (    31 MB actual)
+>     fixed   : 0xffffffbffabfd000 - 0xffffffbffac00000   (    12 KB)
+>     PCI I/O : 0xffffffbffae00000 - 0xffffffbffbe00000   (    16 MB)
+>     modules : 0xffffffbffc000000 - 0xffffffc000000000   (    64 MB)
+>     memory  : 0xffffffc000000000 - 0xffffffc07f000000   (  2032 MB)
+>       .init : 0xffffffc0007f5000 - 0xffffffc00084a000   (   340 KB)
+>       .text : 0xffffffc000080000 - 0xffffffc0007f45b4   (  7634 KB)
+>       .data : 0xffffffc000850000 - 0xffffffc0008bf200   (   445 KB)
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> Done on top of Andrey's patch set obviously.
+> 
+> Andrey: do what you want with this, I think it's kinda nice,
+> you can harvest this patch for your patch series if you like,
+> or squash into the ARM64 enablement patch, I have no preference.
 
-This serie is about various fixes and enhancements that were
-previously submitted as part of the "ARM: mvebu: Add support for RAID6
-PQ offloading" serie.
-
-Seems the RAID6 PQ stuff seems more controversial than what I
-expected, we took out the various bugs and enhancements patches, and
-will submit the other patches as a separate set.
-
-Changes from v1:
-  - Moved the bugfix commit as the first commit and cc'd stable
-  - Changed the Armada 38x compatible to armada-380-xor
-  - Made some misc cleanups
-
-Lior Amsalem (4):
-  dmaengine: mv_xor: bug fix for racing condition in descriptors cleanup
-  dmaengine: mv_xor: add support for a38x command in descriptor mode
-  dmaengine: mv_xor: Enlarge descriptor pool size
-  dmaengine: mv_xor: improve descriptors list handling and reduce
-    locking
-
-Maxime Ripard (1):
-  dmaengine: mv_xor: Rename function for consistent naming
-
- Documentation/devicetree/bindings/dma/mv-xor.txt |   2 +-
- drivers/dma/mv_xor.c                             | 352 ++++++++++++-----------
- drivers/dma/mv_xor.h                             |  27 +-
- 3 files changed, 206 insertions(+), 175 deletions(-)
-
--- 
-2.4.1
+Thanks. I'll fix s/MB/GB and grab it.
