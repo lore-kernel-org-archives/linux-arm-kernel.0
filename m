@@ -1,178 +1,58 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 26 May 2015 13:39:43 +0100
-Subject: [PATCH v2.1 02/12] clocksource: sti: Provide support for the ST LPC
- Clocksource IP
-In-Reply-To: <1431435500-22899-3-git-send-email-lee.jones@linaro.org>
-References: <1431435500-22899-1-git-send-email-lee.jones@linaro.org>
- <1431435500-22899-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <20150526123943.GI11677@x1>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 26 May 2015 14:42:57 +0200
+Subject: [PATCH v2] clk: mvebu: add missing CESA gate clk
+Message-ID: <1432644177-16152-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clocksource: sti: Provide support for the ST LPC Clocksource IP
+Even if not documented in the datasheet, the Armada 370 SoC can actually
+gate the CESA (crypto engine) clock.
+Add an entry in the gating_desc table to be able to reference the CESA
+gateclk in the crypto node.
 
-This IP is shared with Watchdog and RTC functionality.  All 3 of
-these devices are mutually exclusive from one another i.e. Only 1
-IP can be used at any given time.  We use the device-driver model
-combined with a DT 'mode' property to enforce this.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+Hi,
 
-The ST LPC Clocksource IP can be used as the system (tick) timer.
+Sorry for the noise, but since the changes in this patch are quite
+straightforward, I'm directly sending a v2 addressing Gregory's comments
+(instead of waiting for more reviews).
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Best Regards,
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 68161f7..01a07a6 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -250,4 +250,13 @@ config CLKSRC_PXA
- 	help
- 	  This enables OST0 support available on PXA and SA-11x0
- 	  platforms.
-+
-+config CLKSRC_ST_LPC
-+	bool
-+	depends on ARCH_STI
-+	select CLKSRC_OF if OF
-+	help
-+	  Enable this option to use the Low Power controller timer
-+	  as clocksource.
-+
- endmenu
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 752d5c7..e08da4d 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -51,3 +51,4 @@ obj-$(CONFIG_ARCH_INTEGRATOR_AP)	+= timer-integrator-ap.o
- obj-$(CONFIG_CLKSRC_VERSATILE)		+= versatile.o
- obj-$(CONFIG_CLKSRC_MIPS_GIC)		+= mips-gic-timer.o
- obj-$(CONFIG_ASM9260_TIMER)		+= asm9260_timer.o
-+obj-$(CONFIG_CLKSRC_ST_LPC)		+= clksrc_st_lpc.o
-diff --git a/drivers/clocksource/clksrc_st_lpc.c b/drivers/clocksource/clksrc_st_lpc.c
-new file mode 100644
-index 0000000..f38cf33
---- /dev/null
-+++ b/drivers/clocksource/clksrc_st_lpc.c
-@@ -0,0 +1,123 @@
-+/*
-+ * Clocksource using the Low Power Timer found in the Low Power Controller (LPC)
-+ *
-+ * Copyright (C) 2015 STMicroelectronics ? All Rights Reserved
-+ *
-+ * Author(s): Francesco Virlinzi <francesco.virlinzi@st.com>
-+ *	      Ajit Pal Singh <ajitpal.singh@st.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/clocksource.h>
-+#include <linux/init.h>
-+#include <linux/of_address.h>
-+#include <linux/slab.h>
-+
-+#include <dt-bindings/mfd/st-lpc.h>
-+
-+/* Low Power Timer */
-+#define LPC_LPT_LSB_OFF		0x400
-+#define LPC_LPT_MSB_OFF		0x404
-+#define LPC_LPT_START_OFF	0x408
-+
-+static struct st_clksrc_ddata {
-+	struct clk		*clk;
-+	void __iomem		*base;
-+} ddata;
-+
-+static void __init st_clksrc_reset(void)
-+{
-+	writel_relaxed(0, ddata.base + LPC_LPT_START_OFF);
-+	writel_relaxed(0, ddata.base + LPC_LPT_MSB_OFF);
-+	writel_relaxed(0, ddata.base + LPC_LPT_LSB_OFF);
-+	writel_relaxed(1, ddata.base + LPC_LPT_START_OFF);
-+}
-+
-+static int __init st_clksrc_init(void)
-+{
-+	unsigned long rate;
-+	int ret;
-+
-+	st_clksrc_reset();
-+
-+	rate = clk_get_rate(ddata.clk);
-+
-+	ret = clocksource_mmio_init(ddata.base + LPC_LPT_LSB_OFF,
-+				    "clksrc-st-lpc", rate, 300, 32,
-+				    clocksource_mmio_readl_up);
-+	if (ret) {
-+		pr_err("clksrc-st-lpc: Failed to register clocksource\n");
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static int __init st_clksrc_setup_clk(struct device_node *np)
-+{
-+	struct clk *clk;
-+
-+	clk = of_clk_get(np, 0);
-+	if (IS_ERR(clk)) {
-+		pr_err("clksrc-st-lpc: Failed to get LPC clock\n");
-+		return PTR_ERR(clk);
-+	}
-+
-+	if (clk_prepare_enable(clk)) {
-+		pr_err("clksrc-st-lpc: Failed to enable LPC clock\n");
-+		return -EINVAL;
-+	}
-+
-+	if (!clk_get_rate(clk)) {
-+		pr_err("clksrc-st-lpc: Failed to get LPC clock rate\n");
-+		clk_disable_unprepare(clk);
-+		return -EINVAL;
-+	}
-+
-+	ddata.clk = clk;
-+
-+	return 0;
-+}
-+
-+static void __init st_clksrc_of_register(struct device_node *np)
-+{
-+	int ret;
-+	uint32_t mode;
-+
-+	ret = of_property_read_u32(np, "st,lpc-mode", &mode);
-+	if (ret) {
-+		pr_err("clksrc-st-lpc: An LPC mode must be provided\n");
-+		return;
-+	}
-+
-+	/* LPC can either run as a Clocksource or in RTC or WDT mode */
-+	if (mode != ST_LPC_MODE_CLKSRC)
-+		return;
-+
-+	ddata.base = of_iomap(np, 0);
-+	if (!ddata.base) {
-+		pr_err("clksrc-st-lpc: Unable to map iomem\n");
-+		return;
-+	}
-+
-+	if (st_clksrc_setup_clk(np)) {
-+		iounmap(ddata.base);
-+		return;
-+	}
-+
-+	if (st_clksrc_init()) {
-+		clk_disable_unprepare(ddata.clk);
-+		clk_put(ddata.clk);
-+		iounmap(ddata.base);
-+		return;
-+	}
-+
-+	pr_info("clksrc-st-lpc: clocksource initialised - running @ %luHz\n",
-+		clk_get_rate(ddata.clk));
-+}
-+CLOCKSOURCE_OF_DECLARE(ddata, "st,stih407-lpc", st_clksrc_of_register);
+Boris
+
+Changes since v1:
+ - update the DT bindings doc
+ - change the clock name to be consistent with other SoCs
+
+ Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt | 1 +
+ drivers/clk/mvebu/armada-370.c                                | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
+index 31c7c0c..660e649 100644
+--- a/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
++++ b/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
+@@ -19,6 +19,7 @@ ID	Clock	Peripheral
+ 9	pex1	PCIe Cntrl 1
+ 15	sata0	SATA Host 0
+ 17	sdio	SDHCI Host
++23	crypto	CESA (crypto engine)
+ 25	tdm	Time Division Mplx
+ 28	ddr	DDR Cntrl
+ 30	sata1	SATA Host 0
+diff --git a/drivers/clk/mvebu/armada-370.c b/drivers/clk/mvebu/armada-370.c
+index 756f0f3..c19fd77 100644
+--- a/drivers/clk/mvebu/armada-370.c
++++ b/drivers/clk/mvebu/armada-370.c
+@@ -163,6 +163,7 @@ static const struct clk_gating_soc_desc a370_gating_desc[] __initconst = {
+ 	{ "pex1", "pex1_en", 9, 0 },
+ 	{ "sata0", NULL, 15, 0 },
+ 	{ "sdio", NULL, 17, 0 },
++	{ "crypto", NULL, 23, 0 },
+ 	{ "tdm", NULL, 25, 0 },
+ 	{ "ddr", NULL, 28, CLK_IGNORE_UNUSED },
+ 	{ "sata1", NULL, 30, 0 },
+-- 
+1.9.1
