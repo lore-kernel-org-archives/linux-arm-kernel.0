@@ -1,75 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 26 May 2015 16:01:22 +0100
-Subject: sdhci(imx6): misbehaves while installing debian jessie, "Got
- data interrupt 0x00100000"
-In-Reply-To: <CAPDyKFqR3NwBd9O40BPzHG7Y4wyyJwgdB4NsA_GUO=YEyqFSXQ@mail.gmail.com>
-References: <20150519222320.GM2067@n2100.arm.linux.org.uk>
- <CAPDyKFqR3NwBd9O40BPzHG7Y4wyyJwgdB4NsA_GUO=YEyqFSXQ@mail.gmail.com>
-Message-ID: <20150526150122.GP2067@n2100.arm.linux.org.uk>
+From: andriy.shevchenko@intel.com (Shevchenko, Andriy)
+Date: Tue, 26 May 2015 15:08:27 +0000
+Subject: [PATCH v6] serial: 8250_uniphier: add UniPhier serial driver
+In-Reply-To: <1432650518.13900.72.camel@linux.intel.com>
+References: <1432525477-14051-1-git-send-email-yamada.masahiro@socionext.com>
+ <1432545245.8736.5.camel@intel.com>
+ <1432650518.13900.72.camel@linux.intel.com>
+Message-ID: <1432652906.8736.44.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 26, 2015 at 04:49:34PM +0200, Ulf Hansson wrote:
-> On 20 May 2015 at 00:23, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > iMX6 with a Samsung EVO UHS-1 16GB card.
-> >
-> > There's actually two problems here.
-> >
-> > 1. SDHCI chooses to impose a 10 second timeout on any data operation.
-> >    This magic value of 10 seconds is rediculous.  Consider that SD
-> >    cards are typically slower than ATA, and ATA has a timeout of more
-> >    than one minute for a stuck command...  And yes, I've had this fire
-> >    a good 10 seconds before I then got...
-> >
-> > 2. "Got data interrupt 0x00100000 even though no data operation was in progress."
-> >
-> >    That's SDHCI_INT_DATA_TIMEOUT.
-> >
-> >    Unfortunately, I have no other information, as the registers are
-> >    dumped at pr_debug() level, which means that they're all compiled
-> >    out in normal kernel builds.  In any case, I have no way to copy
-> >    information off of the installing system; debian does not start up
-> >    a ssh daemon during the install, so remote login is not possible.
-> >    Nor can I photograph the rather reflective TV screen.
-> >
-> > The side-effect of this is that the entire MMC IO subsystem locks up
-> > and I'm left with lots of processes stuck in IO-wait state, with the
-> > hungtask detector spewing onto the console.
+On Tue, 2015-05-26 at 15:28 +0100, Alan Cox wrote:
+> > > +
+> > > +#define UNIPHIER_UART_CHAR_FCR	3	/* Character / FIFO Control Register */
+> > > +#define UNIPHIER_UART_LCR_MCR	4	/* Line/Modem Control Register */
+> > > +#define   UNIPHIER_UART_LCR_SHIFT	8
+> > 
+> > Indentation problem, needs to be fixed.
 > 
-> Sorry, I can't tell much around the host driver and HW as such. I
-> don't have any iMX6 boards at hand.
+> If you are going to review a patch set at least look at the previous
+> reviews - the indentation was already discussed and is done that way to
+> show (as many drivers do) which are fields for which registers
+
+This is not exactly the field, the way how to get the field.
+In some cases it is even better to define something like
+_LCR(x)  ((x) << 8)
+
+
 > 
-> Though, the side-effect you are describing isn't very nice. Even if it
-> doesn't solve you problem, perhaps we should discuss about converting
-> from wait_for_completion() to wait_for_completion_timeout(), when the
-> mmc core waits for the host driver to return the result for the
-> request.
+> > > +static unsigned int uniphier_serial_in(struct uart_port *p, int offset)
+> > > +{
+> > > +	int valshift = 0;
+> > 
+> > Perhaps unsigned int?
 > 
-> I guess the tricky part is to find a decent value for the "timeout".
+> Why ? even if it mattered gcc is already realising that the value can
+> only be 0 or 8 and will be generating whatever works best for that.
 
-There's two issues which would need solving for that:
-
-1. The only sane timeout is one which will never trigger under normal
-   operating circumstances, and abnormal load conditions.
-
-2. When the timeout occurs, the core would need some way to reset the
-   host driver back to a sane state before retrying the command.
-
-However, the better question to ask is what's causing this.  It seemed
-to lock up at the same point in the installation - after the base system
-had been installed, but while it was installing additional stuff (for
-xfce.)  From what I remember, it was exactly the same package that the
-MMC host failed at.
-
-I suppose it's entirely possible that the Debian install is running
-some package scripts which end up poking about in memory, which are
-screwing up the MMC host - nothing would surprise me... the Debian
-Jessie install is screwed in other ways (if you select Gnome instead,
-the installer aborts because it discovers that the distro packages
-are missing some dependencies, though I had put that down to the UK
-mirror possibly being out of date...)
+It's not about how gcc does, it's about what assumptions can be made
+from the reading of the source code. I think if we do a counter of shift
+value it would be nice to set an unsigned type explicitly.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Andy Shevchenko <andriy.shevchenko@intel.com>
+Intel Finland Oy
+---------------------------------------------------------------------
+Intel Finland Oy
+Registered Address: PL 281, 00181 Helsinki 
+Business Identity Code: 0357606 - 4 
+Domiciled in Helsinki 
+
+This e-mail and any attachments may contain confidential material for
+the sole use of the intended recipient(s). Any review or distribution
+by others is strictly prohibited. If you are not the intended
+recipient, please contact the sender and delete all copies.
