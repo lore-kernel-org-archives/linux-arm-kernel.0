@@ -1,56 +1,121 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Tue, 26 May 2015 20:29:59 +0900
-Subject: [RFC PATCH 2/2] arm64: Implement vmalloc based thread_info
- allocator
-In-Reply-To: <20150525144045.GE14922@blaptop>
-References: <1432483340-23157-1-git-send-email-jungseoklee85@gmail.com>
- <20150525144045.GE14922@blaptop>
-Message-ID: <D5CD4D44-77BC-4817-B9A7-60C0F4AE444F@gmail.com>
+From: maitysanchayan@gmail.com (Sanchayan Maity)
+Date: Tue, 26 May 2015 17:06:45 +0530
+Subject: [PATCH v4 0/2] Implement SoC bus support for Vybrid
+Message-ID: <cover.1432637313.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On May 25, 2015, at 11:40 PM, Minchan Kim wrote:
-> Hello Jungseok,
+Hello,
 
-Hi, Minchan,
+This patchset implements SoC bus support for Freescale Vybrid platform,
+implementing the following
+https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-devices-soc
+and is the third revision.
 
-> On Mon, May 25, 2015 at 01:02:20AM +0900, Jungseok Lee wrote:
->> Fork-routine sometimes fails to get a physically contiguous region for
->> thread_info on 4KB page system although free memory is enough. That is,
->> a physically contiguous region, which is currently 16KB, is not available
->> since system memory is fragmented.
-> 
-> Order less than PAGE_ALLOC_COSTLY_ORDER should not fail in current
-> mm implementation. If you saw the order-2,3 high-order allocation fail
-> maybe your application received SIGKILL by someone. LMK?
+Version 3 of the patchset can be found here
+http://www.spinics.net/lists/arm-kernel/msg420847.html
 
-Exactly right. The allocation is failed via the following path.
+Version 2 of the patchset can be found here
+http://www.spinics.net/lists/devicetree/msg80654.html
 
-if (test_thread_flag(TIF_MEMDIE) && !(gfp_mask & __GFP_NOFAIL))
-	goto nopage;
+Version 1 of the patchset can be found here
+http://www.spinics.net/lists/devicetree/msg80257.html
 
-IMHO, a reclaim operation would be not needed in this context if memory is
-allocated from vmalloc space. It means there is no need to traverse shrinker list. 
+The RFC version can be found here
+https://lkml.org/lkml/2015/5/11/13
 
->> This patch tries to solve the problem as allocating thread_info memory
->> from vmalloc space, not 1:1 mapping one. The downside is one additional
->> page allocation in case of vmalloc. However, vmalloc space is large enough,
-> 
-> The size you want to allocate is 16KB in here but additional 4K?
-> It increases 25% memory footprint, which is huge downside.
+Changes since v3:
+- Instead of using the syscon_regmap_lookup_by_compatible function
+  use a phandle in the device tree along with offsets specified in
+  this phandle node and then read the offset along with the device
+  node in the driver for reading from the required region.
 
-I agree with the point, and most people who try to use vmalloc might know the number.
-However, an interoperation on the number depends on a point of view.
+Changes since v2:
+- Implement the SoC bus code as a driver in drivers/soc
+  by registering with fsl,mscm-cpucfg as per Arnd's feedback
 
-Vmalloc is large enough and not fully utilized in case of ARM64.
-With the considerations, there is a room to do math as follows.
+Changes since v1:
+- Sort the headers in alphabetical order
 
-4KB / 240GB = 1.5e-8 (4KB page + 3 level combo)
+Changes since RFC:
+- Use a DT entry for the ROM area while specifying it as syscon.
 
-It would be not a huge downside if fork-routine is not damaged due to fragmentation.
+One question I had in comparison to the previous implementation is, the
+previous patch also resulted in exposing the DT devices in the subdirectory
+soc under soc0/ which happened due to the of_platform_populate call. With
+the current implementation this does not happen anymore. I am not too
+thorough on all this, but I guess that of_platform_populate needs to be
+called early with the right arguments. With the current implementation is
+it possible to get that soc0/soc directory exposed in any way? Am I missing
+something trivial in all this?
 
-However, this is one of reasons to add "RFC" prefix in the patch set. How is the
-additional 4KB interpreted and considered?
+I guess we are OK, even if the above cannot be achived with the current
+implementation. The main aim of this exercise was to expose the SoC specific
+attributes. However it did be nice, if it could still be done. Perhaps that
+part of the implementation can go in later in a separate patch.
 
-Best Regards
-Jungseok Lee
+Arnd are you ok with this implementation?
+
+Notes same since v1 and v2:
+Currently the required information is more or less read across the whole
+SoC, but I guess we cannot change that since these are the locations
+with the required information.
+
+There seem to be three options for the revision field:
+- ROM revision (see https://community.freescale.com/docs/DOC-94802)
+- ANADIG revision (ANADIG_DIGIPROC, as used for the i.MX SoC's)
+- OCOTP revision
+
+Some numbers:
+
+Colibri VF61 1.1A (2N02G)
+- 0x00000013
+- 0x00610000
+- 0x01000000
+- 0x410000c8
+
+Colibri VF61 V1.0B (1N02G)
+- 0x00000011
+- 0x00610000
+- 0x01000000
+- 0x410000c8
+
+Colibri VF61 V1.0A (which is actually a VF600 SoC, no L2 cache, since
+that was the only one we could buy back then, 1N02G printed on it)
+- 0x00000011
+- 0x00610000
+- 0x01000000
+- none...
+
+Colibri VF50 V1.0A (1N02G)
+- 0x00000011
+- 0x00610000
+- 0x01000000
+- none...
+
+Vybrid Tower Rev J (1N02G)
+- 0x00000011
+- 0x00610000
+- 0x01000000
+- 0x410000c8
+
+The ROM revision differs the most, so we would like to go with the
+revision information from the ROM register 0x80.
+
+Sanchayan Maity (2):
+  ARM: dts: vfxxx: Add OCOTP and OCROM nodes
+  soc: Add driver for Freescale Vybrid Platform
+
+ arch/arm/boot/dts/vfxxx.dtsi |  12 ++++
+ drivers/soc/Kconfig          |   1 +
+ drivers/soc/Makefile         |   1 +
+ drivers/soc/fsl/Kconfig      |   9 +++
+ drivers/soc/fsl/Makefile     |   1 +
+ drivers/soc/fsl/soc-vf610.c  | 168 +++++++++++++++++++++++++++++++++++++++++++
+ 6 files changed, 192 insertions(+)
+ create mode 100644 drivers/soc/fsl/Kconfig
+ create mode 100644 drivers/soc/fsl/Makefile
+ create mode 100644 drivers/soc/fsl/soc-vf610.c
+
+-- 
+2.4.1
