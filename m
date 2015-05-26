@@ -1,31 +1,126 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 26 May 2015 14:26:39 +0200
-Subject: [PATCH] clk: mvebu: add missing CESA gate clk
-Message-ID: <1432643199-15507-1-git-send-email-boris.brezillon@free-electrons.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 26 May 2015 15:26:40 +0300
+Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Make USB support modular
+In-Reply-To: <1432637918-8946-2-git-send-email-geert+renesas@glider.be>
+References: <1432637918-8946-1-git-send-email-geert+renesas@glider.be>
+ <1432637918-8946-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <11285144.SLyHNBFeg0@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Even if not documented in the datasheet, the Armada 370 SoC can actually
-gate the CESA (crypto engine) clock.
-Add an entry in the gating_desc table to be able to reference the CESA
-gateclk in the crypto node.
+Hi Geert,
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/clk/mvebu/armada-370.c | 1 +
- 1 file changed, 1 insertion(+)
+Thank you for the patch.
 
-diff --git a/drivers/clk/mvebu/armada-370.c b/drivers/clk/mvebu/armada-370.c
-index 756f0f3..989c704 100644
---- a/drivers/clk/mvebu/armada-370.c
-+++ b/drivers/clk/mvebu/armada-370.c
-@@ -163,6 +163,7 @@ static const struct clk_gating_soc_desc a370_gating_desc[] __initconst = {
- 	{ "pex1", "pex1_en", 9, 0 },
- 	{ "sata0", NULL, 15, 0 },
- 	{ "sdio", NULL, 17, 0 },
-+	{ "cesa", NULL, 23, 0 },
- 	{ "tdm", NULL, 25, 0 },
- 	{ "ddr", NULL, 28, CLK_IGNORE_UNUSED },
- 	{ "sata1", NULL, 30, 0 },
+On Tuesday 26 May 2015 12:58:38 Geert Uytterhoeven wrote:
+> Make USB support modular to reduce kernel size:
+
+This means we lose support for NFS root on USB-based ethernet controllers. I'm 
+not sure that's a very good idea.
+
+>        text    data     bss     dec     hex   filename
+>     12979266 1433908  335640 14748814  e10c8e vmlinux.before
+>     12237024 1386396  333592 13957012  d4f794 vmlinux.after
+> 
+> USB_GSPCA, USB_EHCI_HCD_PLATFORM, USB_OHCI_HCD_PLATFORM, and
+> PHY_SAMSUNG_USB2 are now enabled automatically by Kconfig logic, so they
+> are dropped.
+> 
+> Tested on r8a7791/koelsch, which can't boot vmlinux.before anymore.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> Against next-20150526
+> ---
+>  arch/arm/configs/multi_v7_defconfig | 40  ++++++++++++++++-----------------
+>  1 file changed, 18 insertions(+), 22 deletions(-)
+> 
+> diff --git a/arch/arm/configs/multi_v7_defconfig
+> b/arch/arm/configs/multi_v7_defconfig index
+> e3fc9799972367c3..5df66b3671946378 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -215,10 +215,10 @@ CONFIG_SMSC_PHY=y
+>  CONFIG_BROADCOM_PHY=y
+>  CONFIG_ICPLUS_PHY=y
+>  CONFIG_MICREL_PHY=y
+> -CONFIG_USB_PEGASUS=y
+> -CONFIG_USB_USBNET=y
+> -CONFIG_USB_NET_SMSC75XX=y
+> -CONFIG_USB_NET_SMSC95XX=y
+> +CONFIG_USB_PEGASUS=m
+> +CONFIG_USB_USBNET=m
+> +CONFIG_USB_NET_SMSC75XX=m
+> +CONFIG_USB_NET_SMSC95XX=m
+>  CONFIG_BRCMFMAC=m
+>  CONFIG_RT2X00=m
+>  CONFIG_RT2800USB=m
+> @@ -417,8 +417,7 @@ CONFIG_MEDIA_CAMERA_SUPPORT=y
+>  CONFIG_MEDIA_CONTROLLER=y
+>  CONFIG_VIDEO_V4L2_SUBDEV_API=y
+>  CONFIG_MEDIA_USB_SUPPORT=y
+> -CONFIG_USB_VIDEO_CLASS=y
+> -CONFIG_USB_GSPCA=y
+> +CONFIG_USB_VIDEO_CLASS=m
+>  CONFIG_V4L_PLATFORM_DRIVERS=y
+>  CONFIG_SOC_CAMERA=m
+>  CONFIG_SOC_CAMERA_PLATFORM=m
+> @@ -452,7 +451,7 @@ CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
+>  CONFIG_SOUND=y
+>  CONFIG_SND=y
+>  CONFIG_SND_DYNAMIC_MINORS=y
+> -CONFIG_SND_USB_AUDIO=y
+> +CONFIG_SND_USB_AUDIO=m
+>  CONFIG_SND_SOC=y
+>  CONFIG_SND_ATMEL_SOC=m
+>  CONFIG_SND_ATMEL_SOC_WM8904=m
+> @@ -467,24 +466,22 @@ CONFIG_SND_SOC_TEGRA_ALC5632=y
+>  CONFIG_SND_SOC_TEGRA_MAX98090=y
+>  CONFIG_SND_SOC_AK4642=m
+>  CONFIG_SND_SOC_WM8978=m
+> -CONFIG_USB=y
+> -CONFIG_USB_XHCI_HCD=y
+> -CONFIG_USB_XHCI_MVEBU=y
+> -CONFIG_USB_EHCI_HCD=y
+> -CONFIG_USB_EHCI_EXYNOS=y
+> -CONFIG_USB_EHCI_TEGRA=y
+> -CONFIG_USB_EHCI_HCD_STI=y
+> -CONFIG_USB_EHCI_HCD_PLATFORM=y
+> -CONFIG_USB_ISP1760=y
+> -CONFIG_USB_OHCI_HCD=y
+> -CONFIG_USB_OHCI_HCD_STI=y
+> -CONFIG_USB_OHCI_HCD_PLATFORM=y
+> +CONFIG_USB=m
+> +CONFIG_USB_XHCI_HCD=m
+> +CONFIG_USB_XHCI_MVEBU=m
+> +CONFIG_USB_EHCI_HCD=m
+> +CONFIG_USB_EHCI_HCD_STI=m
+> +CONFIG_USB_EHCI_TEGRA=m
+> +CONFIG_USB_EHCI_EXYNOS=m
+> +CONFIG_USB_ISP1760=m
+> +CONFIG_USB_OHCI_HCD=m
+> +CONFIG_USB_OHCI_HCD_STI=m
+>  CONFIG_USB_OHCI_EXYNOS=m
+>  CONFIG_USB_R8A66597_HCD=m
+>  CONFIG_USB_RENESAS_USBHS=m
+> -CONFIG_USB_STORAGE=y
+> +CONFIG_USB_STORAGE=m
+>  CONFIG_USB_DWC3=y
+> -CONFIG_USB_CHIPIDEA=y
+> +CONFIG_USB_CHIPIDEA=m
+>  CONFIG_USB_CHIPIDEA_HOST=y
+>  CONFIG_AB8500_USB=y
+>  CONFIG_KEYSTONE_USB_PHY=y
+> @@ -632,7 +629,6 @@ CONFIG_PHY_STIH41X_USB=y
+>  CONFIG_PHY_STIH407_USB=y
+>  CONFIG_PHY_SUN4I_USB=y
+>  CONFIG_PHY_SUN9I_USB=y
+> -CONFIG_PHY_SAMSUNG_USB2=m
+>  CONFIG_EXT4_FS=y
+>  CONFIG_AUTOFS4_FS=y
+>  CONFIG_MSDOS_FS=y
+
 -- 
-1.9.1
+Regards,
+
+Laurent Pinchart
