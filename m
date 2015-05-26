@@ -1,55 +1,42 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Tue, 26 May 2015 09:28:34 +0200
-Subject: [PATCH v4 3/5] dmaengine: pxa: add pxa dmaengine driver
-In-Reply-To: <1432589362-23241-3-git-send-email-robert.jarzmik@free.fr>
-References: <1432589362-23241-1-git-send-email-robert.jarzmik@free.fr>
- <1432589362-23241-3-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1432625314.27695.200.camel@x220>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 26 May 2015 08:36:48 +0100
+Subject: [NEXT REQUEST][PATCH] backlight: pwm: handle EPROBE_DEFER while
+ requesting the PWM
+In-Reply-To: <20150525112718.5f7e2d7d@bbrezillon>
+References: <1424338214-24236-1-git-send-email-nicolas.ferre@atmel.com>
+ <20150312090224.GC3314@x1> <20150525112718.5f7e2d7d@bbrezillon>
+Message-ID: <20150526073648.GB11677@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vinod already applied this, so my remarks, if valid, should probably be
-handled in a follow up patch.
+Stephen, Boris,
 
-On Mon, 2015-05-25 at 23:29 +0200, Robert Jarzmik wrote:
-> --- a/drivers/dma/Kconfig
-> +++ b/drivers/dma/Kconfig
- 
-> +config PXA_DMA
-> +	bool "PXA DMA support"
-> +	depends on (ARCH_MMP || ARCH_PXA)
-> +	select DMA_ENGINE
-> +	select DMA_VIRTUAL_CHANNELS
-> +	help
-> +	  Support the DMA engine for PXA. It is also compatible with MMP PDMA
-> +	  platform. The internal DMA IP of all PXA variants is supported, with
-> +	  16 to 32 channels for peripheral to memory or memory to memory
-> +	  transfers.
+> > > When trying to request the PWM device with devm_pwm_get(), the EPROBE_DEFER
+> > > flag is not handled properly. It can lead to the PWM not being found.
+> > > 
+> > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > > ---
+> > >  drivers/video/backlight/pwm_bl.c | 4 ++++
+> > >  1 file changed, 4 insertions(+)
+> > 
+> > Applied, thanks.
+> 
+> I don't see this patch in Linus' tree (actually, it's not even in
+> linux-next).
+> I don't know where it's stuck, but could you make sure it reaches
+> mainline for 4.2 (or 4.1 if it's not to late) ?
 
-> --- a/drivers/dma/Makefile
-> +++ b/drivers/dma/Makefile
+Sorry for the confusion.
 
-> +obj-$(CONFIG_PXA_DMA) += pxa_dma.o
+It looks like my for-backlight-fixes branch isn't in -next.
 
-> --- /dev/null
-> +++ b/drivers/dma/pxa_dma.c
+Stephen, could you rectify that please?
 
-> +#include <linux/module.h>
+M: git://git.kernel.org/pub/scm/linux/kernel/git/lee/backlight.git
 
-> +MODULE_DEVICE_TABLE(of, pxad_dt_ids);
-
-> +module_platform_driver(pxad_driver);
-
-(The series starting at https://lkml.org/lkml/2015/5/10/131 would allow
-to use builtin_platform_driver() for built-in only code.)
-
-> +MODULE_DESCRIPTION("Marvell PXA Peripheral DMA Driver");
-> +MODULE_AUTHOR("Robert Jarzmik <robert.jarzmik@free.fr>");
-> +MODULE_LICENSE("GPL v2");
-
-This patch added a bool Kconfig symbol. So pxa_dma.c will never be part
-of a module. Its code contains a few module specific macros. Was it
-actually intended for PXA_DMA to be tristate?
-
-
-Paul Bolle
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
