@@ -1,81 +1,39 @@
-From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
-Date: Tue, 26 May 2015 16:54:51 +0200
-Subject: [PATCH 10/11] XEN / PCI: Remove the dependence on arch x86 when
- PCI_MMCONFIG=y
-In-Reply-To: <55647C94.9080606@oracle.com>
-References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
- <1432644564-24746-11-git-send-email-hanjun.guo@linaro.org>
- <55647B22.3010801@oracle.com> <55647C94.9080606@oracle.com>
-Message-ID: <5564893B.2070102@linaro.org>
+From: aarcange@redhat.com (Andrea Arcangeli)
+Date: Tue, 26 May 2015 16:58:46 +0200
+Subject: [BUG] Read-Only THP causes stalls (commit 10359213d)
+In-Reply-To: <20150526143547.GA22363@cbox>
+References: <20150524193404.GD16910@cbox> <20150525141525.GB26958@redhat.com>
+ <20150526080848.GA27075@cbox>
+ <CAPvkgC3kTgP720CawpfvLbm90FCs9UGNP3WOAamOD=UEgKoQCw@mail.gmail.com>
+ <20150526143547.GA22363@cbox>
+Message-ID: <20150526145846.GK26958@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26.05.2015 16:00, Boris Ostrovsky wrote:
-> On 05/26/2015 09:54 AM, Boris Ostrovsky wrote:
->> On 05/26/2015 08:49 AM, Hanjun Guo wrote:
->>> In drivers/xen/pci.c, there are arch x86 dependent codes when
->>> CONFIG_PCI_MMCONFIG is enabled, since CONFIG_PCI_MMCONFIG
->>> depends on ACPI, so this will prevent XEN PCI running on other
->>> architectures using ACPI with PCI_MMCONFIG enabled (such as ARM64).
->>>
->>> Fortunatly, it can be sloved in a simple way. In drivers/xen/pci.c,
->>> the only x86 dependent code is if ((pci_probe & PCI_PROBE_MMCONF) == 0),
->>> and it's defined in asm/pci_x86.h, the code means that
->>> if the PCI resource is not probed in PCI_PROBE_MMCONF way, just
->>> ingnore the xen mcfg init. Actually this is duplicate, because
->>> if PCI resource is not probed in PCI_PROBE_MMCONF way, the
->>> pci_mmconfig_list will be empty, and the if (list_empty())
->>> after it will do the same job.
->>>
->>> So just remove the arch related code and the head file, this
->>> will be no functional change for x86, and also makes xen/pci.c
->>> usable for other architectures.
->>>
->>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->>> CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
->>> CC: Boris Ostrovsky <boris.ostrovsky@oracle.com>
->>> ---
->>>   drivers/xen/pci.c | 6 ------
->>>   1 file changed, 6 deletions(-)
->>>
->>> diff --git a/drivers/xen/pci.c b/drivers/xen/pci.c
->>> index 6785ebb..9a8dbe3 100644
->>> --- a/drivers/xen/pci.c
->>> +++ b/drivers/xen/pci.c
->>> @@ -28,9 +28,6 @@
->>>   #include <asm/xen/hypervisor.h>
->>>   #include <asm/xen/hypercall.h>
->>>   #include "../pci/pci.h"
->>> -#ifdef CONFIG_PCI_MMCONFIG
->>> -#include <asm/pci_x86.h>
->>> -#endif
->>>
->>>   static bool __read_mostly pci_seg_supported = true;
->>>
->>> @@ -222,9 +219,6 @@ static int __init xen_mcfg_late(void)
->>>       if (!xen_initial_domain())
->>>           return 0;
->>>
->>> -    if ((pci_probe & PCI_PROBE_MMCONF) == 0)
->>> -        return 0;
->>> -
->>>       if (list_empty(&pci_mmcfg_list))
->>>           return 0;
->>>
->>
->> (+Stefano who is Xen ARM maintainer)
->>
->> This will not build on x86 since pci_mmcfg_list since, for example,
->> pci_mmcfg_list is declared in pci_x86.h.
->
->
-> And now really with Stefano and with parsable first sentence, sorry:
->
->
-> This will not build on x86 since pci_mmcfg_list, for example, is
-> declared in pci_x86.h.
+On Tue, May 26, 2015 at 04:35:47PM +0200, Christoffer Dall wrote:
+> Any chance you could send me the memhog tool?
 
-With this patch set, not any more. Please see preceding patches.
+memhog is just the first that come to mind because I got it
+preinstalled everywhere (I only miss it on cyanogenmod as there's no
+numactl there... yet).
 
-Regards,
-Tomasz
+Anything else would do as well, as long as you allocate lots of
+anonymous memory (malloc(); bzero() or just write 1 byte every
+4k). The tmpfs trick was fine as well as you'd end up swapping the
+anonymous memory allocated by the running apps.
+
+This would be the python version which I actually used sometime if I
+couldn't find something preinstalled and I didn't want to install
+packages.
+
+echo 1 >/proc/sys/vm/overcommit_memory
+python
+a = "a"
+while True:
+	a += a
+
+This is the more polished way, I just happen to have it installed
+everywhere (except the cellphone) so I tend to use it, I think it's
+simpler to install the numactl package.
+
+https://github.com/numactl/numactl/blob/master/memhog.c
