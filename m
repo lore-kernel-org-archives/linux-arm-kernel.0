@@ -1,61 +1,119 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Tue, 26 May 2015 17:12:39 +0300
-Subject: [PATCH v2 5/5] arm64: add KASan support
-In-Reply-To: <CACRpkda3Pe9L14_iyKEfeCx1F3XJSLbz_OVHLxX0Lzy9Gt9t9Q@mail.gmail.com>
-References: <1431698344-28054-1-git-send-email-a.ryabinin@samsung.com>
- <1431698344-28054-6-git-send-email-a.ryabinin@samsung.com>
- <CACRpkda3Pe9L14_iyKEfeCx1F3XJSLbz_OVHLxX0Lzy9Gt9t9Q@mail.gmail.com>
-Message-ID: <55647F57.8010008@samsung.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 26 May 2015 09:19:38 -0500
+Subject: [PATCHv3 1/4] phy: phy-core: Make GENERIC_PHY an invisible option
+In-Reply-To: <556391FE.1020503@broadcom.com>
+References: <1429743853-10254-1-git-send-email-arun.ramamurthy@broadcom.com>
+ <1429743853-10254-2-git-send-email-arun.ramamurthy@broadcom.com>
+ <20150515005210.GA31534@saruman.tx.rr.com>
+ <556391FE.1020503@broadcom.com>
+Message-ID: <20150526141938.GA25686@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/26/2015 04:35 PM, Linus Walleij wrote:
-> On Fri, May 15, 2015 at 3:59 PM, Andrey Ryabinin <a.ryabinin@samsung.com> wrote:
-> 
-> And then at boot I just get this:
-> 
-> kasan test: kmalloc_oob_right out-of-bounds to right
-> kasan test: kmalloc_oob_left out-of-bounds to left
-> kasan test: kmalloc_node_oob_right kmalloc_node(): out-of-bounds to right
-> kasan test: kmalloc_large_oob_rigth kmalloc large allocation:
-> out-of-bounds to right
-> kasan test: kmalloc_oob_krealloc_more out-of-bounds after krealloc more
-> kasan test: kmalloc_oob_krealloc_less out-of-bounds after krealloc less
-> kasan test: kmalloc_oob_16 kmalloc out-of-bounds for 16-bytes access
-> kasan test: kmalloc_oob_in_memset out-of-bounds in memset
-> kasan test: kmalloc_uaf use-after-free
-> kasan test: kmalloc_uaf_memset use-after-free in memset
-> kasan test: kmalloc_uaf2 use-after-free after another kmalloc
-> kasan test: kmem_cache_oob out-of-bounds in kmem_cache_alloc
-> kasan test: kasan_stack_oob out-of-bounds on stack
-> kasan test: kasan_global_oob out-of-bounds global variable
-> 
-> W00t no nice KASan warnings (which is what I expect).
-> 
-> This is my compiler by the way:
-> $ arm-linux-gnueabihf-gcc --version
-> arm-linux-gnueabihf-gcc (crosstool-NG linaro-1.13.1-4.9-2014.09 -
-> Linaro GCC 4.9-2014.09) 4.9.2 20140904 (prerelease)
-> 
-> I did the same exercise on the foundation model (FVP) and I guess
-> that is what you developed the patch set on because there I got
-> nice KASan dumps:
-> 
+HI,
 
-That's not kasan dumps. That is slub debug output.
-KASan warnings starts with
-	"BUG: KASan: use after free/out of bounds access "
-line.
-
-> I wonder were the problem lies, any hints where to start looking
-> to fix this?
+On Mon, May 25, 2015 at 02:19:58PM -0700, Arun Ramamurthy wrote:
 > 
-
-I suspect that your compiler lack -fsantize=kernel-address support.
-It seems that GCC 4.9.2 doesn't supports -fsanitize=address/kernel-address on aarch64.
-
-I tested this patchset on Cavium Thunder-x and on FVP also and didn't observe any problems.
-
-> Yours,
-> Linus Walleij
 > 
+> On 15-05-14 05:52 PM, Felipe Balbi wrote:
+> >Hi,
+> >
+> >On Wed, Apr 22, 2015 at 04:04:10PM -0700, Arun Ramamurthy wrote:
+> >>Most of the phy providers use "select" to enable GENERIC_PHY. Since select
+> >>is only recommended when the config is not visible, GENERIC_PHY is changed
+> >>an invisible option. To maintain consistency, all phy providers are changed
+> >>to "select" GENERIC_PHY and all non-phy drivers use "depends on" when the
+> >>phy framework is explicity required. USB_MUSB_OMAP2PLUS has a cyclic
+> >>dependency, so it is left as "select".
+> >>
+> >>Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
+> >>---
+> >>  drivers/ata/Kconfig                       | 1 -
+> >>  drivers/media/platform/exynos4-is/Kconfig | 2 +-
+> >>  drivers/phy/Kconfig                       | 4 ++--
+> >>  drivers/usb/host/Kconfig                  | 4 ++--
+> >>  drivers/video/fbdev/exynos/Kconfig        | 2 +-
+> >>  5 files changed, 6 insertions(+), 7 deletions(-)
+> >>
+> >>diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+> >>index 5f60155..6d2e881 100644
+> >>--- a/drivers/ata/Kconfig
+> >>+++ b/drivers/ata/Kconfig
+> >>@@ -301,7 +301,6 @@ config SATA_MV
+> >>  	tristate "Marvell SATA support"
+> >>  	depends on PCI || ARCH_DOVE || ARCH_MV78XX0 || \
+> >>  		   ARCH_MVEBU || ARCH_ORION5X || COMPILE_TEST
+> >>-	select GENERIC_PHY
+> >>  	help
+> >>  	  This option enables support for the Marvell Serial ATA family.
+> >>  	  Currently supports 88SX[56]0[48][01] PCI(-X) chips,
+> >>diff --git a/drivers/media/platform/exynos4-is/Kconfig b/drivers/media/platform/exynos4-is/Kconfig
+> >>index b7b2e47..b6f3eaa 100644
+> >>--- a/drivers/media/platform/exynos4-is/Kconfig
+> >>+++ b/drivers/media/platform/exynos4-is/Kconfig
+> >>@@ -31,7 +31,7 @@ config VIDEO_S5P_FIMC
+> >>  config VIDEO_S5P_MIPI_CSIS
+> >>  	tristate "S5P/EXYNOS MIPI-CSI2 receiver (MIPI-CSIS) driver"
+> >>  	depends on REGULATOR
+> >>-	select GENERIC_PHY
+> >>+	depends on GENERIC_PHY
+> >>  	help
+> >>  	  This is a V4L2 driver for Samsung S5P and EXYNOS4 SoC MIPI-CSI2
+> >>  	  receiver (MIPI-CSIS) devices.
+> >>diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> >>index 2962de2..edecdb1 100644
+> >>--- a/drivers/phy/Kconfig
+> >>+++ b/drivers/phy/Kconfig
+> >>@@ -5,7 +5,7 @@
+> >>  menu "PHY Subsystem"
+> >>
+> >>  config GENERIC_PHY
+> >>-	bool "PHY Core"
+> >>+	bool
+> >>  	help
+> >>  	  Generic PHY support.
+> >>
+> >>@@ -72,7 +72,7 @@ config PHY_MIPHY365X
+> >>  config PHY_RCAR_GEN2
+> >>  	tristate "Renesas R-Car generation 2 USB PHY driver"
+> >>  	depends on ARCH_SHMOBILE
+> >>-	depends on GENERIC_PHY
+> >>+	select GENERIC_PHY
+> >
+> >so some you changed from depends to select...
+> >
+> >>  	help
+> >>  	  Support for USB PHY found on Renesas R-Car generation 2 SoCs.
+> >>
+> >>diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+> >>index 5ad60e4..e2197e2 100644
+> >>--- a/drivers/usb/host/Kconfig
+> >>+++ b/drivers/usb/host/Kconfig
+> >>@@ -182,7 +182,7 @@ config USB_EHCI_HCD_SPEAR
+> >>  config USB_EHCI_HCD_STI
+> >>  	tristate "Support for ST STiHxxx on-chip EHCI USB controller"
+> >>  	depends on ARCH_STI && OF
+> >>-	select GENERIC_PHY
+> >>+	depends on GENERIC_PHY
+> >
+> >while others you changed from select to depends.
+> >
+> >NAK.
+> >
+> Felipe, I dont understand your concern, could you please explain it more
+> detail?  The logic behind the changes is that in cases where there was an
+> explicit dependency, I changed it to "depends on" and in other cases I
+> changed it to "selects". Thanks
+
+Since GENERIC_PHY is visible from Kconfig, it would be much nicer to
+avoid select altogether.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150526/6b216a7c/attachment.sig>
