@@ -1,87 +1,61 @@
-From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
-Date: Tue, 26 May 2015 10:00:52 -0400
-Subject: [PATCH 10/11] XEN / PCI: Remove the dependence on arch x86 when
- PCI_MMCONFIG=y
-In-Reply-To: <55647B22.3010801@oracle.com>
-References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
- <1432644564-24746-11-git-send-email-hanjun.guo@linaro.org>
- <55647B22.3010801@oracle.com>
-Message-ID: <55647C94.9080606@oracle.com>
+From: a.ryabinin@samsung.com (Andrey Ryabinin)
+Date: Tue, 26 May 2015 17:12:39 +0300
+Subject: [PATCH v2 5/5] arm64: add KASan support
+In-Reply-To: <CACRpkda3Pe9L14_iyKEfeCx1F3XJSLbz_OVHLxX0Lzy9Gt9t9Q@mail.gmail.com>
+References: <1431698344-28054-1-git-send-email-a.ryabinin@samsung.com>
+ <1431698344-28054-6-git-send-email-a.ryabinin@samsung.com>
+ <CACRpkda3Pe9L14_iyKEfeCx1F3XJSLbz_OVHLxX0Lzy9Gt9t9Q@mail.gmail.com>
+Message-ID: <55647F57.8010008@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/26/2015 09:54 AM, Boris Ostrovsky wrote:
-> On 05/26/2015 08:49 AM, Hanjun Guo wrote:
->> In drivers/xen/pci.c, there are arch x86 dependent codes when
->> CONFIG_PCI_MMCONFIG is enabled, since CONFIG_PCI_MMCONFIG
->> depends on ACPI, so this will prevent XEN PCI running on other
->> architectures using ACPI with PCI_MMCONFIG enabled (such as ARM64).
->>
->> Fortunatly, it can be sloved in a simple way. In drivers/xen/pci.c,
->> the only x86 dependent code is if ((pci_probe & PCI_PROBE_MMCONF) == 0),
->> and it's defined in asm/pci_x86.h, the code means that
->> if the PCI resource is not probed in PCI_PROBE_MMCONF way, just
->> ingnore the xen mcfg init. Actually this is duplicate, because
->> if PCI resource is not probed in PCI_PROBE_MMCONF way, the
->> pci_mmconfig_list will be empty, and the if (list_empty())
->> after it will do the same job.
->>
->> So just remove the arch related code and the head file, this
->> will be no functional change for x86, and also makes xen/pci.c
->> usable for other architectures.
->>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
->> CC: Boris Ostrovsky <boris.ostrovsky@oracle.com>
->> ---
->>   drivers/xen/pci.c | 6 ------
->>   1 file changed, 6 deletions(-)
->>
->> diff --git a/drivers/xen/pci.c b/drivers/xen/pci.c
->> index 6785ebb..9a8dbe3 100644
->> --- a/drivers/xen/pci.c
->> +++ b/drivers/xen/pci.c
->> @@ -28,9 +28,6 @@
->>   #include <asm/xen/hypervisor.h>
->>   #include <asm/xen/hypercall.h>
->>   #include "../pci/pci.h"
->> -#ifdef CONFIG_PCI_MMCONFIG
->> -#include <asm/pci_x86.h>
->> -#endif
->>
->>   static bool __read_mostly pci_seg_supported = true;
->>
->> @@ -222,9 +219,6 @@ static int __init xen_mcfg_late(void)
->>       if (!xen_initial_domain())
->>           return 0;
->>
->> -    if ((pci_probe & PCI_PROBE_MMCONF) == 0)
->> -        return 0;
->> -
->>       if (list_empty(&pci_mmcfg_list))
->>           return 0;
->>
->
-> (+Stefano who is Xen ARM maintainer)
->
-> This will not build on x86 since pci_mmcfg_list since, for example, 
-> pci_mmcfg_list is declared in pci_x86.h.
+On 05/26/2015 04:35 PM, Linus Walleij wrote:
+> On Fri, May 15, 2015 at 3:59 PM, Andrey Ryabinin <a.ryabinin@samsung.com> wrote:
+> 
+> And then at boot I just get this:
+> 
+> kasan test: kmalloc_oob_right out-of-bounds to right
+> kasan test: kmalloc_oob_left out-of-bounds to left
+> kasan test: kmalloc_node_oob_right kmalloc_node(): out-of-bounds to right
+> kasan test: kmalloc_large_oob_rigth kmalloc large allocation:
+> out-of-bounds to right
+> kasan test: kmalloc_oob_krealloc_more out-of-bounds after krealloc more
+> kasan test: kmalloc_oob_krealloc_less out-of-bounds after krealloc less
+> kasan test: kmalloc_oob_16 kmalloc out-of-bounds for 16-bytes access
+> kasan test: kmalloc_oob_in_memset out-of-bounds in memset
+> kasan test: kmalloc_uaf use-after-free
+> kasan test: kmalloc_uaf_memset use-after-free in memset
+> kasan test: kmalloc_uaf2 use-after-free after another kmalloc
+> kasan test: kmem_cache_oob out-of-bounds in kmem_cache_alloc
+> kasan test: kasan_stack_oob out-of-bounds on stack
+> kasan test: kasan_global_oob out-of-bounds global variable
+> 
+> W00t no nice KASan warnings (which is what I expect).
+> 
+> This is my compiler by the way:
+> $ arm-linux-gnueabihf-gcc --version
+> arm-linux-gnueabihf-gcc (crosstool-NG linaro-1.13.1-4.9-2014.09 -
+> Linaro GCC 4.9-2014.09) 4.9.2 20140904 (prerelease)
+> 
+> I did the same exercise on the foundation model (FVP) and I guess
+> that is what you developed the patch set on because there I got
+> nice KASan dumps:
+> 
 
+That's not kasan dumps. That is slub debug output.
+KASan warnings starts with
+	"BUG: KASan: use after free/out of bounds access "
+line.
 
-And now really with Stefano and with parsable first sentence, sorry:
+> I wonder were the problem lies, any hints where to start looking
+> to fix this?
+> 
 
+I suspect that your compiler lack -fsantize=kernel-address support.
+It seems that GCC 4.9.2 doesn't supports -fsanitize=address/kernel-address on aarch64.
 
-This will not build on x86 since pci_mmcfg_list, for example, is 
-declared in pci_x86.h.
+I tested this patchset on Cavium Thunder-x and on FVP also and didn't observe any problems.
 
-
->
-> And I am not sure I understand why you are trying to do this since 
-> AFAIK CONFIG_PCI_MMCONFIG is only defined on x86 so neither pci_x86.h 
-> will be included nor xen_mcfg_late() will be defined on ARM.
->
->
-> -boris
->
->
->
+> Yours,
+> Linus Walleij
+> 
