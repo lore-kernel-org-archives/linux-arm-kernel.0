@@ -1,122 +1,118 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 26 May 2015 11:44:43 +0200
-Subject: [PATCH 2/3] spi: orion: Fix extended baud rates for each Armada SoCs
-In-Reply-To: <1432633484-18758-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1432633484-18758-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1432633484-18758-3-git-send-email-gregory.clement@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 26 May 2015 11:45:11 +0200
+Subject: [PATCH 0/8] ARM: mvebu: Add support for RAID6 PQ offloading
+In-Reply-To: <CAPcyv4jbW=B_mYfx5HfKckLYeWctfC-9jYeDf0Z1APvQZfHj6Q@mail.gmail.com>
+References: <1431445063-20226-1-git-send-email-maxime.ripard@free-electrons.com>
+ <CAPcyv4gshyaji2HarAeOg3XOiNnmGwnSOMuFGWpuDu8ZTGg=jw@mail.gmail.com>
+ <20150513091733.GW10961@lukather>
+ <CAPcyv4jv=xWHbrO=rKhnWt9zFn8vkhS2J5mJiCBKKwESdUk5tg@mail.gmail.com>
+ <20150518091454.GP4004@lukather>
+ <CAPcyv4jbW=B_mYfx5HfKckLYeWctfC-9jYeDf0Z1APvQZfHj6Q@mail.gmail.com>
+Message-ID: <20150526094511.GP8557@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit df59fa7f4bca "spi: orion: support armada extended baud
-rates" made the assumptions that all the Armada SoCs supported the
-same maximum frequency. However, according the hardware datasheet, the
-maximum frequency supported by the Armada 370 SoC is tclk/4, for the
-Armada XP, Armada 38x and Armada 39x SoCs the limitation is 50MHz and
-for the Armada 375 it is tclk/15.
+On Mon, May 18, 2015 at 10:06:55AM -0700, Dan Williams wrote:
+> On Mon, May 18, 2015 at 2:14 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Hi Dan,
+> >
+> > On Wed, May 13, 2015 at 09:00:46AM -0700, Dan Williams wrote:
+> >> On Wed, May 13, 2015 at 2:17 AM, Maxime Ripard
+> >> <maxime.ripard@free-electrons.com> wrote:
+> >> > Hi Dan,
+> >> >
+> >> > On Tue, May 12, 2015 at 09:05:41AM -0700, Dan Williams wrote:
+> >> >> On Tue, May 12, 2015 at 8:37 AM, Maxime Ripard
+> >> >> <maxime.ripard@free-electrons.com> wrote:
+> >> >> > Hi,
+> >> >> >
+> >> >> > This serie refactors the mv_xor in order to support the latest Armada
+> >> >> > 38x features, including the PQ support in order to offload the RAID6
+> >> >> > PQ operations.
+> >> >> >
+> >> >> > Not all the PQ operations are supported by the XOR engine, so we had
+> >> >> > to introduce new async_tx flags in the process to identify
+> >> >> > un-supported operations.
+> >> >> >
+> >> >> > Please note that this is currently not usable because of a possible
+> >> >> > regression in the RAID stack in 4.1 that is being discussed at the
+> >> >> > moment here: https://lkml.org/lkml/2015/5/7/527
+> >> >>
+> >> >> This is problematic as async_tx is a wart on the dmaengine subsystem
+> >> >> and needs to be deprecated, I just have yet to find the time to do
+> >> >> that work.  It turns out it was a mistake to hide the device details
+> >> >> from md, it should be explicitly managing the dma channels, not
+> >> >> relying on a abstraction api.  The async_tx api usage of the
+> >> >> dma-mapping api is broken in that it relies on overlapping mappings of
+> >> >> the same address.  This happens to work on x86, but on arm it needs
+> >> >> explicit non-overlapping mappings.  I started the work to reference
+> >> >> count dma-mappings in 3.13, and we need to teach md to use
+> >> >> dmaengine_unmap_data explicitly.  Yielding dma channel management to
+> >> >> md also results in a more efficient implementation as we can dma_map()
+> >> >> the stripe cache once rather than per-io.  The  "async_tx_ack()"
+> >> >> disaster can also go away when md is explicitly handling channel
+> >> >> switching.
+> >> >
+> >> > Even though I'd be very much in favor of deprecating / removing
+> >> > async_tx, is it something likely to happen soon?
+> >>
+> >> Not unless someone else takes it on, I'm actively asking for help.
+> >>
+> >> > I remember discussing this with Vinod at Plumbers back in October, but
+> >> > haven't seen anything since then.
+> >>
+> >> Right, "help!" :)
+> >>
+> >> > If not, I think that we shouldn't really hold back patches to
+> >> > async_tx, even though we know than in a year from now, it's going to
+> >> > be gone.
+> >>
+> >> We definitely should block new usages, because they make a bad
+> >> situation worse.  Russell already warned that the dma_mapping api
+> >> abuse could lead to data corruption on ARM (speculative pre-fetching).
+> >> We need to mark ASYNC_TX_DMA as "depends on !ARM" or even "depends on
+> >> BROKEN" until we can get this resolved.
+> >
+> > I'm not sure what the issues exactly are with async_tx and ARM, but
+> > these patches have been tested on ARM and are working quite well.
+> 
+> https://lkml.org/lkml/2011/7/8/363
+> 
+> > What I'm doing here is merely using the existing API, I'm not making
+> > it worse, just using the API that is used by numerous drivers
+> > already. So I'm not sure this is really reasonable to ask for such a
+> > huge rework (with a huge potential of regressions) before merging my
+> > patches.
+> 
+> It happens.
+> 
+> https://lwn.net/Articles/641443/
 
-This patch introduces new compatible strings to handle all these
-case. In order to be future proof a compatible was created for each
-SoC even if currently some SoCs seem using the same IP.
+It really depends on what you mean by "help". If you mean "undertake
+all by yourself the removal of async tx", then no, sorry, I won't,
+especially when you ask to do that for a patch that just enables a
+feature of an API already used on that platform.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- .../devicetree/bindings/spi/spi-orion.txt          |  8 +++-
- drivers/spi/spi-orion.c                            | 47 ++++++++++++++++++++--
- 2 files changed, 50 insertions(+), 5 deletions(-)
+If you mean, "give me a hand, you can start there", then yeah, I can
+do that.
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-orion.txt b/Documentation/devicetree/bindings/spi/spi-orion.txt
-index 50c3a3de61c1..51d63df3d99d 100644
---- a/Documentation/devicetree/bindings/spi/spi-orion.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-orion.txt
-@@ -1,7 +1,13 @@
- Marvell Orion SPI device
- 
- Required properties:
--- compatible : should be "marvell,orion-spi" or "marvell,armada-370-spi".
-+- compatible : should be on of the following:
-+    - "marvell,orion-spi" for the Orion, mv78x00, Kirkwood and Dove SoCs
-+    - "marvell,armada-370-spi", for the Armada 370 SoCs
-+    - "marvell,armada-375-spi", for the Armada 375 SoCs
-+    - "marvell,armada-380-spi", for the Armada 38x SoCs
-+    - "marvell,armada-390-spi", for the Armada 38x SoCs
-+    - "marvell,armada-xp-spi", for the Armada XP SoCs
- - reg : offset and length of the register set for the device
- - cell-index : Which of multiple SPI controllers is this.
- Optional properties:
-diff --git a/drivers/spi/spi-orion.c b/drivers/spi/spi-orion.c
-index ff97cabdaa81..8cad107a5b3f 100644
---- a/drivers/spi/spi-orion.c
-+++ b/drivers/spi/spi-orion.c
-@@ -391,7 +391,7 @@ static const struct orion_spi_dev orion_spi_dev_data = {
- 	.prescale_mask = ORION_SPI_CLK_PRESCALE_MASK,
- };
- 
--static const struct orion_spi_dev armada_spi_dev_data = {
-+static const struct orion_spi_dev armada_370_spi_dev_data = {
- 	.typ = ARMADA_SPI,
- 	.min_divisor = 4,
- 	.max_divisor = 1920,
-@@ -399,9 +399,46 @@ static const struct orion_spi_dev armada_spi_dev_data = {
- 	.prescale_mask = ARMADA_SPI_CLK_PRESCALE_MASK,
- };
- 
-+static const struct orion_spi_dev armada_xp_spi_dev_data = {
-+	.typ = ARMADA_SPI,
-+	.max_hz = 50000000,
-+	.max_divisor = 1920,
-+	.prescale_mask = ARMADA_SPI_CLK_PRESCALE_MASK,
-+};
-+
-+static const struct orion_spi_dev armada_375_spi_dev_data = {
-+	.typ = ARMADA_SPI,
-+	.min_divisor = 15,
-+	.max_divisor = 1920,
-+	.prescale_mask = ARMADA_SPI_CLK_PRESCALE_MASK,
-+};
-+
- static const struct of_device_id orion_spi_of_match_table[] = {
--	{ .compatible = "marvell,orion-spi", .data = &orion_spi_dev_data, },
--	{ .compatible = "marvell,armada-370-spi", .data = &armada_spi_dev_data, },
-+	{
-+		.compatible = "marvell,orion-spi",
-+		.data = &orion_spi_dev_data,
-+	},
-+	{
-+		.compatible = "marvell,armada-370-spi",
-+		.data = &armada_370_spi_dev_data,
-+	},
-+	{
-+		.compatible = "marvell,armada-375-spi",
-+		.data = &armada_375_spi_dev_data,
-+	},
-+	{
-+		.compatible = "marvell,armada-380-spi",
-+		.data = &armada_xp_spi_dev_data,
-+	},
-+	{
-+		.compatible = "marvell,armada-390-spi",
-+		.data = &armada_xp_spi_dev_data,
-+	},
-+	{
-+		.compatible = "marvell,armada-xp-spi",
-+		.data = &armada_xp_spi_dev_data,
-+	},
-+
- 	{}
- };
- MODULE_DEVICE_TABLE(of, orion_spi_of_match_table);
-@@ -473,9 +510,11 @@ static int orion_spi_probe(struct platform_device *pdev)
- 					"marvell,armada-370-spi"))
- 		master->max_speed_hz = min(devdata->max_hz,
- 				DIV_ROUND_UP(tclk_hz, devdata->min_divisor));
--	else
-+	else if (devdata->min_divisor)
- 		master->max_speed_hz =
- 			DIV_ROUND_UP(tclk_hz, devdata->min_divisor);
-+	else
-+		master->max_speed_hz = devdata->max_hz;
- 	master->min_speed_hz = DIV_ROUND_UP(tclk_hz, devdata->max_divisor);
- 
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> I'm not happy about not having had the time to do this rework myself.
+> Linux is better off with this api deprecated.
+
+You're not talking about deprecating it, you're talking about removing
+it entirely.
+
+Maxime
+
 -- 
-2.1.0
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150526/401d4c0a/attachment.sig>
