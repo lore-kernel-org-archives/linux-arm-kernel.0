@@ -1,30 +1,80 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 26 May 2015 15:36:04 +0200
-Subject: [PATCH] ARM64: kasan: print memory assignment
-In-Reply-To: <20150526094425.GD1565@arm.com>
-References: <1432632464-12248-1-git-send-email-linus.walleij@linaro.org>
- <20150526094425.GD1565@arm.com>
-Message-ID: <CACRpkdbVe9bY-iAxtnAh49bKKJu_Rmc-ovHoUjxnDM1+AcFTyQ@mail.gmail.com>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Tue, 26 May 2015 08:48:57 -0500
+Subject: [PATCH v4 1/2] ARM: socfpga: support suspend to ram
+In-Reply-To: <1432317735-29413-2-git-send-email-atull@opensource.altera.com>
+References: <1432317735-29413-1-git-send-email-atull@opensource.altera.com>
+ <1432317735-29413-2-git-send-email-atull@opensource.altera.com>
+Message-ID: <556479C9.5070208@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 26, 2015 at 11:44 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, May 26, 2015 at 10:27:44AM +0100, Linus Walleij wrote:
->> This prints out the virtual memory assigned to KASan in the
->> boot crawl along with other memory assignments, if and only
->> if KASan is activated.
->>
->> Example dmesg from the Juno Development board:
->>
->> Memory: 1691156K/2080768K available (5465K kernel code, 444K rwdata,
->> 2160K rodata, 340K init, 217K bss, 373228K reserved, 16384K cma-reserved)
->> Virtual kernel memory layout:
->>     kasan   : 0xffffff8000000000 - 0xffffff9000000000   (    64 MB)
->
-> Unfortunately, that's a *lot* bigger than 64MB!
+Hi Alan,
 
-Grrr copy/paste error.
+On 5/22/15 1:02 PM, Alan Tull wrote:
+> Add code that requests that the sdr controller go into
+> self-refresh mode.  This code is run from ocram.
+> 
+> This patch assumes that u-boot has already configured sdr:
+>   sdr.ctrlcfg.lowpwreq.selfrfshmask = 3
+>   sdr.ctrlcfg.lowpwrtiming.clkdisablecycles = 8
+>   sdr.ctrlcfg.dramtiming4.selfrfshexit = 512
+> 
+> Suspend-to-RAM and EDAC support are mutually exclusive on SOCFPGA
+> platforms.  CONFIG_SOCFPGA_SUSPEND enables suspend-to-RAM and
+> prevents selecting CONFIG_EDAC_ALTERA_MC.
+> 
+> How to suspend to ram:
+>  $ echo enabled > \
+> /sys/devices/soc/ffc02000.serial0/tty/ttyS0/power/wakeup
+> 
+>  $ echo -n mem > /sys/power/state
+> 
+> Signed-off-by: Alan Tull <atull@opensource.altera.com>
+> Cc: Pavel Machek <pavel@denx.de>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
+> Cc: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> ---
+> v2: use Generic on-chip SRAM driver to allocate ocram
+>     rm fncpy_align since generic allocator handles alignment
+>     check __arm_ioremap_exec return code
+>     check for NULL pointers
+>     add a comment regarding sdram controller configuration
+> v3: fix renamed #define
+>     propagate socfpga_setup_ocram_self_refresh error code
+> v4: Kconfig: don't need to select GENERIC_ALLOCATER
+>     add CONFIG_SOCFPGA_SUSPEND
+>     make s2r and EDAC support mutually exclusive
+>     socfpga.c: add sdr_ctl_base_addr
+>     return error if ocram not available in device tree
+>     update copyright years
+> ---
 
-Thanks Will.
+<snip>
 
-Linus Walleij
+> +
+> +static int socfpga_pm_suspend(unsigned long arg)
+> +{
+> +	u32 ret;
+> +
+> +	if (!sdr_ctl_base_addr || !socfpga_scu_base_addr)
+> +		return -EFAULT;
+> +
+> +	ret = socfpga_sdram_self_refresh_in_ocram(
+> +		(u32)sdr_ctl_base_addr, (u32)socfpga_scu_base_addr);
+> +
+
+I had a patch that removed socfpga_scu_base_addr from being a global and
+just a local variable in:
+
+f6e14376fb20 ARM: socfpga: use of_iomap to map the SCU
+
+This patch will be in v4.2 and is currently in arm-soc/next or
+at my fork: kernel/git/dinguyen/linux.git socfpga_for_next_arria10
+
+So you will either need to make socfpga_scu_base_addr global again, or
+you can use the asm instruction to get the SCU base addr.
+
+Sorry about that..
+
+Dinh
