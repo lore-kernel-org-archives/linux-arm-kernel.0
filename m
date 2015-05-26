@@ -1,91 +1,45 @@
-From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
-Date: Tue, 26 May 2015 11:44:25 -0400
-Subject: [PATCH 10/11] XEN / PCI: Remove the dependence on arch x86 when
- PCI_MMCONFIG=y
-In-Reply-To: <5564893B.2070102@linaro.org>
-References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
- <1432644564-24746-11-git-send-email-hanjun.guo@linaro.org>
- <55647B22.3010801@oracle.com> <55647C94.9080606@oracle.com>
- <5564893B.2070102@linaro.org>
-Message-ID: <556494D9.9090007@oracle.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 26 May 2015 10:48:02 -0500
+Subject: [PATCH v2 06/13] musb: Add support for the Allwinner sunxi musb
+ controller
+In-Reply-To: <1426878682-14521-7-git-send-email-hdegoede@redhat.com>
+References: <1426878682-14521-1-git-send-email-hdegoede@redhat.com>
+ <1426878682-14521-7-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150526154802.GL26599@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/26/2015 10:54 AM, Tomasz Nowicki wrote:
-> On 26.05.2015 16:00, Boris Ostrovsky wrote:
->> On 05/26/2015 09:54 AM, Boris Ostrovsky wrote:
->>> On 05/26/2015 08:49 AM, Hanjun Guo wrote:
->>>> In drivers/xen/pci.c, there are arch x86 dependent codes when
->>>> CONFIG_PCI_MMCONFIG is enabled, since CONFIG_PCI_MMCONFIG
->>>> depends on ACPI, so this will prevent XEN PCI running on other
->>>> architectures using ACPI with PCI_MMCONFIG enabled (such as ARM64).
->>>>
->>>> Fortunatly, it can be sloved in a simple way. In drivers/xen/pci.c,
->>>> the only x86 dependent code is if ((pci_probe & PCI_PROBE_MMCONF) ==
->>>> 0),
->>>> and it's defined in asm/pci_x86.h, the code means that
->>>> if the PCI resource is not probed in PCI_PROBE_MMCONF way, just
->>>> ingnore the xen mcfg init. Actually this is duplicate, because
->>>> if PCI resource is not probed in PCI_PROBE_MMCONF way, the
->>>> pci_mmconfig_list will be empty, and the if (list_empty())
->>>> after it will do the same job.
->>>>
->>>> So just remove the arch related code and the head file, this
->>>> will be no functional change for x86, and also makes xen/pci.c
->>>> usable for other architectures.
->>>>
->>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->>>> CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
->>>> CC: Boris Ostrovsky <boris.ostrovsky@oracle.com>
->>>> ---
->>>>   drivers/xen/pci.c | 6 ------
->>>>   1 file changed, 6 deletions(-)
->>>>
->>>> diff --git a/drivers/xen/pci.c b/drivers/xen/pci.c
->>>> index 6785ebb..9a8dbe3 100644
->>>> --- a/drivers/xen/pci.c
->>>> +++ b/drivers/xen/pci.c
->>>> @@ -28,9 +28,6 @@
->>>>   #include <asm/xen/hypervisor.h>
->>>>   #include <asm/xen/hypercall.h>
->>>>   #include "../pci/pci.h"
->>>> -#ifdef CONFIG_PCI_MMCONFIG
->>>> -#include <asm/pci_x86.h>
->>>> -#endif
->>>>
->>>>   static bool __read_mostly pci_seg_supported = true;
->>>>
->>>> @@ -222,9 +219,6 @@ static int __init xen_mcfg_late(void)
->>>>       if (!xen_initial_domain())
->>>>           return 0;
->>>>
->>>> -    if ((pci_probe & PCI_PROBE_MMCONF) == 0)
->>>> -        return 0;
->>>> -
->>>>       if (list_empty(&pci_mmcfg_list))
->>>>           return 0;
->>>>
->>>
->>> (+Stefano who is Xen ARM maintainer)
->>>
->>> This will not build on x86 since pci_mmcfg_list since, for example,
->>> pci_mmcfg_list is declared in pci_x86.h.
->>
->>
->> And now really with Stefano and with parsable first sentence, sorry:
->>
->>
->> This will not build on x86 since pci_mmcfg_list, for example, is
->> declared in pci_x86.h.
->
-> With this patch set, not any more. Please see preceding patches.
+On Fri, Mar 20, 2015 at 08:11:15PM +0100, Hans de Goede wrote:
+> This is based on initial code to get the Allwinner sunxi musb controller
+> supported by Chen-Yu Tsai and Roman Byshko.
+> 
+> This adds support for the Allwinner sunxi musb controller in both host only
+> and otg mode. Peripheral only mode is not supported, as no boards use that.
+> 
+> This has been tested on a cubietruck (A20 SoC) and an UTOO P66 tablet
+> (A13 SoC) with a variety of devices in host mode and with the g_serial gadget
+> driver in peripheral mode, plugging otg / host cables in/out a lot of times
+> in all possible imaginable plug orders.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
+drivers/usb/musb/sunxi.c:28:11: error: unable to open 'linux/soc/sunxi/sunxi_sram.h'
+scripts/Makefile.build:264: recipe for target 'drivers/usb/musb/sunxi.o' failed
+make[2]: *** [drivers/usb/musb/sunxi.o] Error 1
+make[2]: *** Waiting for unfinished jobs....
+scripts/Makefile.build:403: recipe for target 'drivers/usb/musb' failed
+make[1]: *** [drivers/usb/musb] Error 2
+Makefile:1548: recipe for target 'drivers/usb/' failed
+make: *** [drivers/usb/] Error 2
 
-OK, I didn't notice this was part of a series.
+What is the dependency ?
 
-Then if not having PCI_PROBE_MMCONF bit set is indeed equivalent to 
-list_empty(&pci_mmcfg_list), is there any reason for this flag to 
-(continue to) exist? (and also for pci_mmcfg_arch_init_failed.)
-
-
--boris
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150526/c800a34a/attachment.sig>
