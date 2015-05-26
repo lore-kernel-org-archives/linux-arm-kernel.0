@@ -1,42 +1,26 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 26 May 2015 08:36:48 +0100
-Subject: [NEXT REQUEST][PATCH] backlight: pwm: handle EPROBE_DEFER while
- requesting the PWM
-In-Reply-To: <20150525112718.5f7e2d7d@bbrezillon>
-References: <1424338214-24236-1-git-send-email-nicolas.ferre@atmel.com>
- <20150312090224.GC3314@x1> <20150525112718.5f7e2d7d@bbrezillon>
-Message-ID: <20150526073648.GB11677@x1>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 26 May 2015 09:42:55 +0200
+Subject: [PATCH 1/5] clk: mediatek: Fix apmixedsys clock registration
+In-Reply-To: <1432192376-6712-2-git-send-email-jamesjj.liao@mediatek.com>
+References: <1432192376-6712-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1432192376-6712-2-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <20150526074255.GD6325@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen, Boris,
-
-> > > When trying to request the PWM device with devm_pwm_get(), the EPROBE_DEFER
-> > > flag is not handled properly. It can lead to the PWM not being found.
-> > > 
-> > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > > ---
-> > >  drivers/video/backlight/pwm_bl.c | 4 ++++
-> > >  1 file changed, 4 insertions(+)
-> > 
-> > Applied, thanks.
+On Thu, May 21, 2015 at 03:12:52PM +0800, James Liao wrote:
+> The size of clk_data should be the same as CLK_APMIXED_NR_CLK
+> instead of ARRAY_SIZE(plls). CLK_APMIXED_* is numbered from 1, so
+> CLK_APMIXED_NR_CLK will be greater than ARRAY_SIZE(plls).
 > 
-> I don't see this patch in Linus' tree (actually, it's not even in
-> linux-next).
-> I don't know where it's stuck, but could you make sure it reaches
-> mainline for 4.2 (or 4.1 if it's not to late) ?
+> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
 
-Sorry for the confusion.
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-It looks like my for-backlight-fixes branch isn't in -next.
-
-Stephen, could you rectify that please?
-
-M: git://git.kernel.org/pub/scm/linux/kernel/git/lee/backlight.git
+Sascha
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
