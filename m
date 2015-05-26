@@ -1,30 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 May 2015 11:51:17 +0200
-Subject: [RFC PATCH 2/2] arm64: Implement vmalloc based thread_info
- allocator
-In-Reply-To: <1CD6E4BA-95AF-420C-8270-6AAF783B6F60@foss.arm.com>
-References: <1432483340-23157-1-git-send-email-jungseoklee85@gmail.com>
- <5601369.jDWtB6nFJC@wuerfel>
- <1CD6E4BA-95AF-420C-8270-6AAF783B6F60@foss.arm.com>
-Message-ID: <3076059.95sGQMhV87@wuerfel>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Tue, 26 May 2015 17:54:45 +0800
+Subject: [PATCH v5 1/3] media: atmel-isi: disable ISI even it has codec
+ request in stop_streaming()
+In-Reply-To: <1432634087-3356-1-git-send-email-josh.wu@atmel.com>
+References: <1432634087-3356-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1432634087-3356-2-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 26 May 2015 01:36:29 Catalin Marinas wrote:
-> 
-> > There are a lot of workloads that would benefit from having lower
-> > per-thread memory cost.
-> 
-> If we keep the 16KB stack, is there any advantage in a separate IRQ one (assuming 
-> that we won't overflow 16KB)?
+In current code, stop_streaming() will just return if ISI is still
+working in the codec. But this is incorrect, we need to disable ISI even
+it is working on the codec. otherwise stop_streaming() will not work as
+we expected.
 
-It makes possible errors more reproducible: we already know that we need over
-8kb for normal stacks based on Minchan's findings, and the chance that an interrupt
-happens at a time when the stack is the highest is very low, but that just makes
-the bug much harder to find if you ever run into it.
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+---
 
-If we overflow the stack (independent of its size) with a process stack by itself,
-it will always happen in the same call chain, not a combination of a call chain
-an a particularly bad interrupt.
+Changes in v5:
+- add new patch to fix the condition that codec request still in work.
 
-	Arnd
+Changes in v4: None
+Changes in v3: None
+Changes in v2: None
+
+ drivers/media/platform/soc_camera/atmel-isi.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/drivers/media/platform/soc_camera/atmel-isi.c b/drivers/media/platform/soc_camera/atmel-isi.c
+index 2879026..2227022 100644
+--- a/drivers/media/platform/soc_camera/atmel-isi.c
++++ b/drivers/media/platform/soc_camera/atmel-isi.c
+@@ -431,11 +431,9 @@ static void stop_streaming(struct vb2_queue *vq)
+ 			time_before(jiffies, timeout))
+ 		msleep(1);
+ 
+-	if (time_after(jiffies, timeout)) {
++	if (time_after(jiffies, timeout))
+ 		dev_err(icd->parent,
+ 			"Timeout waiting for finishing codec request\n");
+-		return;
+-	}
+ 
+ 	/* Disable interrupts */
+ 	isi_writel(isi, ISI_INTDIS,
+-- 
+1.9.1
