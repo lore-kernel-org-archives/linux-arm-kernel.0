@@ -1,7 +1,7 @@
 From: galak@codeaurora.org (Kumar Gala)
-Date: Tue, 26 May 2015 14:17:45 -0500 (CDT)
-Subject: [GIT PULL] qcom dt changes for 4.2
-Message-ID: <alpine.DEB.2.02.1505261415380.24694@galak-ubuntu.qualcomm.com>
+Date: Tue, 26 May 2015 14:23:24 -0500 (CDT)
+Subject: [GIT PULL] qcom arm64 dt changes for 4.2
+Message-ID: <alpine.DEB.2.02.1505261421580.24858@galak-ubuntu.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,54 +11,37 @@ The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
 
 are available in the git repository at:
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-dt-for-4.2
+   git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-arm64-for-4.2
 
-for you to fetch changes up to b73b31577f70a1d03aee21d0127da44862b7b08e:
+for you to fetch changes up to a190a1ce9a51d3edd52de1b721276d780e0906bb:
 
-   ARM: dts: qcom: Add msm8660 PMU node (2015-04-27 16:15:28 -0500)
-
-----------------------------------------------------------------
-Qualcomm ARM Based Device Tree Updates for v4.2
-
-* Added support for regulators, USB Host & OTG, SATA, and i2c
-   controllers on APQ8064 based platforms
-* Added PM8841/PM8941/PMA8084 device nodes
-* Added PMU support on MSM8660
+   arm64: dts: qcom: Add initial set of PMIC and SoC pins for APQ8016 SBC board (2015-04-27 16:09:12 -0500)
 
 ----------------------------------------------------------------
-Ivan T. Ivanov (3):
-       ARM: dts: qcom: Add PM8841 functions device nodes
-       ARM: dts: qcom: Add PM8941 functions device nodes
-       ARM: dts: qcom: Add PMA8084 functions device nodes
+Qualcomm ARM64 Updates for v4.2
 
-Nicolas Dechesne (2):
-       ARM: dts: qcom: apq8064 - Add usb host support to CM QS-600
-       ARM: dts: qcom: apq8064 - Add USB OTG support for CM QS-600
+* Added SPMI PMIC Arbiter device tree node for MSM8916
+* Added 8x16 chipset SPMI PMIC's nodes
+* Added MSM8916 restart device node
+* Added initial set of PMIC and SoC pins for APQ8016 SBC board
 
-Pramod Gurav (1):
-       ARM: dts: qcom: apq8064-ifc6410 - Add DT alias for serial port
+----------------------------------------------------------------
+Ivan T. Ivanov (4):
+       arm64: dts: qcom: Add SPMI PMIC Arbiter node for MSM8916
+       arm64: dts: qcom: Add 8x16 chipset SPMI PMIC's nodes
+       arm64: dts: qcom: Add MSM8916 restart device node
+       arm64: dts: qcom: Add initial set of PMIC and SoC pins for APQ8016 SBC board
 
-Srinivas Kandagatla (8):
-       ARM: dts: qcom: apq8064 - add RPM regulators support
-       ARM: dts: qcom: apq8064-ifc6410 - Add basic regulators
-       ARM: dts: qcom: apq8064 - Add usb host support.
-       ARM: dts: qcom: apq8064 - Add USB OTG support
-       ARM: dts: qcom: apq8064 - Add SATA controller support
-       ARM: dts: qcom: apq8064-cm-qs600 - Add basic regulators
-       ARM: dts: qcom: apq8064 - Move i2c1 pinctrl to apq8064.dtsi
-       ARM: dts: qcom: apq8064 - add i2c3 node for panel.
-
-Stephen Boyd (1):
-       ARM: dts: qcom: Add msm8660 PMU node
-
-  arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts | 100 ++++++++++++++++
-  arch/arm/boot/dts/qcom-apq8064-ifc6410.dts  | 136 +++++++++++++++++++--
-  arch/arm/boot/dts/qcom-apq8064.dtsi         | 175 +++++++++++++++++++++++++++-
-  arch/arm/boot/dts/qcom-msm8660.dtsi         |   5 +
-  arch/arm/boot/dts/qcom-pm8841.dtsi          |  18 +++
-  arch/arm/boot/dts/qcom-pm8941.dtsi          | 133 ++++++++++++++++++++-
-  arch/arm/boot/dts/qcom-pma8084.dtsi         |  92 +++++++++++++++
-  7 files changed, 649 insertions(+), 10 deletions(-)
+  .../arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi | 30 +++++++
+  arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi | 21 +++++
+  arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi          |  3 +
+  arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi          |  1 +
+  arch/arm64/boot/dts/qcom/msm8916.dtsi              | 25 +++++-
+  arch/arm64/boot/dts/qcom/pm8916.dtsi               | 99 ++++++++++++++++++++++
+  6 files changed, 178 insertions(+), 1 deletion(-)
+  create mode 100644 arch/arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi
+  create mode 100644 arch/arm64/boot/dts/qcom/apq8016-sbc-soc-pins.dtsi
+  create mode 100644 arch/arm64/boot/dts/qcom/pm8916.dtsi
 
 --
 Qualcomm Innovation Center, Inc.
