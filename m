@@ -1,117 +1,74 @@
 From: rjui@broadcom.com (Ray Jui)
-Date: Mon, 25 May 2015 17:32:48 -0700
-Subject: [PATCH 1/2] PCI: iproc: directly add pci resources
-In-Reply-To: <5563A6B3.2030600@hauke-m.de>
+Date: Mon, 25 May 2015 17:35:31 -0700
+Subject: [PATCH 2/2] PCI: iproc: free resource list after registration
+In-Reply-To: <1432499823-27369-2-git-send-email-hauke@hauke-m.de>
 References: <1432499823-27369-1-git-send-email-hauke@hauke-m.de>
- <5563579E.80608@broadcom.com> <5563A6B3.2030600@hauke-m.de>
-Message-ID: <5563BF30.2040106@broadcom.com>
+ <1432499823-27369-2-git-send-email-hauke@hauke-m.de>
+Message-ID: <5563BFD3.5050902@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Hauke,
 
-On 15-05-25 03:48 PM, Hauke Mehrtens wrote:
-> On 05/25/2015 07:10 PM, Ray Jui wrote:
->> Hi Hauke,
->>
->> On 5/24/2015 1:37 PM, Hauke Mehrtens wrote:
->>> The resources member in the struct was pointing to a stack variable and
->>> is invalid after the the registration function returned. Remove this
->>> pointer and add it a a parameter to the function.
->>>
->>> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
->>> ---
->>>   drivers/pci/host/pcie-iproc-bcma.c     | 4 +---
->>>   drivers/pci/host/pcie-iproc-platform.c | 4 +---
->>>   drivers/pci/host/pcie-iproc.c          | 4 ++--
->>>   drivers/pci/host/pcie-iproc.h          | 3 +--
->>>   4 files changed, 5 insertions(+), 10 deletions(-)
->>>
->>> diff --git a/drivers/pci/host/pcie-iproc-bcma.c b/drivers/pci/host/pcie-iproc-bcma.c
->>> index c318f19..f96b39e 100644
->>> --- a/drivers/pci/host/pcie-iproc-bcma.c
->>> +++ b/drivers/pci/host/pcie-iproc-bcma.c
->>> @@ -62,11 +62,9 @@ static int iproc_pcie_bcma_probe(struct bcma_device *bdev)
->>>   	res_mem.flags = IORESOURCE_MEM;
->>>   	pci_add_resource(&res, &res_mem);
->>>
->>> -	pcie->resources = &res;
->>> -
->>>   	pcie->map_irq = iproc_pcie_bcma_map_irq;
->>>
->>> -	ret = iproc_pcie_setup(pcie);
->>> +	ret = iproc_pcie_setup(pcie, &res);
->>>   	if (ret) {
->>>   		dev_err(pcie->dev, "PCIe controller setup failed\n");
->>>   		return ret;
->>> diff --git a/drivers/pci/host/pcie-iproc-platform.c b/drivers/pci/host/pcie-iproc-platform.c
->>> index c8aa06f..c5fe4c1 100644
->>> --- a/drivers/pci/host/pcie-iproc-platform.c
->>> +++ b/drivers/pci/host/pcie-iproc-platform.c
->>> @@ -69,11 +69,9 @@ static int iproc_pcie_pltfm_probe(struct platform_device *pdev)
->>>   		return ret;
->>>   	}
->>>
->>> -	pcie->resources = &res;
->>> -
->>>   	pcie->map_irq = of_irq_parse_and_map_pci;
->>>
->>> -	ret = iproc_pcie_setup(pcie);
->>> +	ret = iproc_pcie_setup(pcie, &res);
->>>   	if (ret) {
->>>   		dev_err(pcie->dev, "PCIe controller setup failed\n");
->>>   		return ret;
->>> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
->>> index cef31f6..d77481e 100644
->>> --- a/drivers/pci/host/pcie-iproc.c
->>> +++ b/drivers/pci/host/pcie-iproc.c
->>> @@ -183,7 +183,7 @@ static void iproc_pcie_enable(struct iproc_pcie *pcie)
->>>   	writel(SYS_RC_INTX_MASK, pcie->base + SYS_RC_INTX_EN);
->>>   }
->>>
->>> -int iproc_pcie_setup(struct iproc_pcie *pcie)
->>> +int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
->>>   {
->>>   	int ret;
->>>   	struct pci_bus *bus;
->>> @@ -211,7 +211,7 @@ int iproc_pcie_setup(struct iproc_pcie *pcie)
->>>   	pcie->sysdata.private_data = pcie;
->>>
->>>   	bus = pci_create_root_bus(pcie->dev, 0, &iproc_pcie_ops,
->>> -				  &pcie->sysdata, pcie->resources);
->>> +				  &pcie->sysdata, res);
->>>   	if (!bus) {
->>>   		dev_err(pcie->dev, "unable to create PCI root bus\n");
->>>   		ret = -ENOMEM;
->>> diff --git a/drivers/pci/host/pcie-iproc.h b/drivers/pci/host/pcie-iproc.h
->>> index a333d4b..ba0a108 100644
->>> --- a/drivers/pci/host/pcie-iproc.h
->>> +++ b/drivers/pci/host/pcie-iproc.h
->>> @@ -29,7 +29,6 @@
->>>   struct iproc_pcie {
->>>   	struct device *dev;
->>>   	void __iomem *base;
->>> -	struct list_head *resources;
->>
->> This means we do not want to keep a copy of the resources. In the
->> future, if we need to add support to explicitly set up the
->> inbound/outbound mapping window, we need to do it in iproc_pcie_setup.
->> Is that the intention?
+On 15-05-24 01:37 PM, Hauke Mehrtens wrote:
+> The resource list is only used in the setup process and was never
+> freed. pci_add_resource() allocates a memory area to store the list
+> item. This patch fixes the memory leak.
 >
-> I haven't really thought about where to configure the memory mapping,
-> but I thought it would be somewhere in iproc_pcie_setup() or an method
-> called from there.
-> If you need it after iproc_pcie_setup() finished we should embed the
-> list into the struct iproc_pcie, because currently this pointer points
-> to the stack.
+> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+> ---
+>   drivers/pci/host/pcie-iproc-bcma.c     | 8 ++++----
+>   drivers/pci/host/pcie-iproc-platform.c | 8 ++++----
+>   2 files changed, 8 insertions(+), 8 deletions(-)
 >
-> Hauke
+> diff --git a/drivers/pci/host/pcie-iproc-bcma.c b/drivers/pci/host/pcie-iproc-bcma.c
+> index f96b39e..2e4f2d6 100644
+> --- a/drivers/pci/host/pcie-iproc-bcma.c
+> +++ b/drivers/pci/host/pcie-iproc-bcma.c
+> @@ -65,12 +65,12 @@ static int iproc_pcie_bcma_probe(struct bcma_device *bdev)
+>   	pcie->map_irq = iproc_pcie_bcma_map_irq;
+>
+>   	ret = iproc_pcie_setup(pcie, &res);
+> -	if (ret) {
+> +	if (ret)
+>   		dev_err(pcie->dev, "PCIe controller setup failed\n");
+> -		return ret;
+> -	}
+>
+> -	return 0;
+> +	pci_free_resource_list(&res);
+> +
+> +	return ret;
+>   }
+>
+>   static void iproc_pcie_bcma_remove(struct bcma_device *bdev)
+> diff --git a/drivers/pci/host/pcie-iproc-platform.c b/drivers/pci/host/pcie-iproc-platform.c
+> index c5fe4c1..9aedc8e 100644
+> --- a/drivers/pci/host/pcie-iproc-platform.c
+> +++ b/drivers/pci/host/pcie-iproc-platform.c
+> @@ -72,12 +72,12 @@ static int iproc_pcie_pltfm_probe(struct platform_device *pdev)
+>   	pcie->map_irq = of_irq_parse_and_map_pci;
+>
+>   	ret = iproc_pcie_setup(pcie, &res);
+> -	if (ret) {
+> +	if (ret)
+>   		dev_err(pcie->dev, "PCIe controller setup failed\n");
+> -		return ret;
+> -	}
+>
+> -	return 0;
+> +	pci_free_resource_list(&res);
+> +
+> +	return ret;
+>   }
+>
+>   static int iproc_pcie_pltfm_remove(struct platform_device *pdev)
 >
 
-I think most likely I'll be adding the memory mapping logic in 
-iproc_pcie_setup(), so your current patch should be fine.
+This looks good to me and I sanity tested it on a BCM958300K Cygnus 
+combo board.
+
+Thanks,
 
 Reviewed-by: Ray Jui <rjui@broadcom.com>
 Tested-by: Ray Jui <rjui@broadcom.com>
-
-Thanks.
