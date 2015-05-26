@@ -1,48 +1,57 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 26 May 2015 11:39:31 -0500
-Subject: [PATCHv3 00/27] ARM: OMAP2+: clock code move under clk driver
-In-Reply-To: <20150526163216.GF16525@atomide.com>
-References: <1432566032-10860-1-git-send-email-t-kristo@ti.com>
- <20150526160557.GD16525@atomide.com>
- <20150526163216.GF16525@atomide.com>
-Message-ID: <20150526163931.GO26599@saruman.tx.rr.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 26 May 2015 18:43:36 +0200
+Subject: [PATCH] ARM: imx6: allow booting with old DT
+Message-ID: <1432658616-13733-1-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 26, 2015 at 09:32:16AM -0700, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [150526 09:08]:
-> > * Tero Kristo <t-kristo@ti.com> [150525 08:01]:
-> > > Hi,
-> > > 
-> > > As requested, posting v3 with somewhat changed diff parameters and
-> > > diffstat attached. Just some minor Makefile changes compared to v2,
-> > > these were discussed under that set.
-> > > 
-> > > Set has been pushed to:
-> > > - tree: https://github.com/t-kristo/linux-pm.git
-> > > - branch: for-4.2/ti-clk-move
-> > 
-> > Looks like this causes a build error for at least omap2 only .config:
-> > 
-> > drivers/clk/ti/dpll3xxx.o:(.rodata+0x1c): multiple definition of `clkhwops_omap3_dpll'
-> > drivers/clk/ti/dpll.o:(.rodata+0x0): first defined here
-> > 
-> > You may want to create a file selecting ARCH_OMAP2PLUS=y, then point
-> > KCONFIG_ALLCONFIG to that file for make randconfig. Then just build
-> > randconfigs :) Usually the issues like this are exposed within few
-> > randconfig builds, some take longer if the options have dependencies.
+The GPC rewrite to IRQ domains has been on the premise that it may break
+suspend/resume for new kernels on old DT, but otherwise keep things working
+from a user perspective. This was an accepted compromise to be able to move
+the GIC cleanup forward.
 
-alternatively, just clone the repository at [1] and use the example
-script provided in README.md.
+What actually happened was that booting a new kernel on an old DT crashes
+before even the console is up, so the user does not even see the warning
+that the DT is too old. The warning message suggests that this has been
+known before, which is clearly unacceptable.
 
-[1] https://github.com/felipebalbi/omap-seeds
+Fix the early crash by mapping the GPC memory space if the IRQ controller
+doesn't claim it. This keeps at least CPUidle and the needed CPU wakeup
+workarounds working. With this fixed the system is able to boot up
+properly minus the expected suspend/resume breakage.
 
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+Shawn, this is a critical fix for 4.1, to keep the combination of old
+DT + new kernel at least somewhat working, to allow users to resolve
+the situation on their systems. Please make sure this gets forwarded
+ASAP.
+---
+ arch/arm/mach-imx/gpc.c | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+index 4d60005e9277..bbf015056221 100644
+--- a/arch/arm/mach-imx/gpc.c
++++ b/arch/arm/mach-imx/gpc.c
+@@ -280,9 +280,15 @@ void __init imx_gpc_check_dt(void)
+ 	struct device_node *np;
+ 
+ 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpc");
+-	if (WARN_ON(!np ||
+-		    !of_find_property(np, "interrupt-controller", NULL)))
+-		pr_warn("Outdated DT detected, system is about to crash!!!\n");
++	if (WARN_ON(!np))
++		return;
++
++	if (WARN_ON(!of_find_property(np, "interrupt-controller", NULL))) {
++		pr_warn("Outdated DT detected, suspend/resume will NOT work\n");
++
++		/* map GPC, so that at least CPUidle and WARs keep working */
++		gpc_base = of_iomap(np, 0);
++	}
+ }
+ 
+ #ifdef CONFIG_PM_GENERIC_DOMAINS
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150526/4c08735d/attachment.sig>
+2.1.4
