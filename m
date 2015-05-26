@@ -1,38 +1,44 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Tue, 26 May 2015 14:47:28 -0400
-Subject: [PATCH] ata: ahci_mvebu: Fix wrongly set base address for the
- MBus window setting
-In-Reply-To: <1432658843-27622-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1432658843-27622-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20150526184728.GJ7099@htj.duckdns.org>
+From: lorenx4@gmail.com (Lorenzo Nava)
+Date: Tue, 26 May 2015 20:55:30 +0200
+Subject: [RFC PATCH v2] arm DMA: Fix allocation from CMA for coherent DMA
+Message-ID: <1432666530-4210-1-git-send-email-lorenx4@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 26, 2015 at 06:47:23PM +0200, Gregory CLEMENT wrote:
-> From: Nadav Haklai <nadavh@marvell.com>
-> 
-> According to the Armada 38x datasheet, the window base address
-> registers value is set in bits [31:4] of the register and corresponds
-> to the transaction address bits [47:20].
-> 
-> Therefore, the 32bit base address value should be shifted right by
-> 20bits and left by 4bits, resulting in 16 bit shift right.
-> 
-> The bug as not been noticed yet because if the memory available on
-> the platform is less than 2GB, then the base address is zero.
-> 
-> [gregory.clement at free-electrons.com: add extra-explanation]
-> 
-> Fixes: a3464ed2f14 (ata: ahci_mvebu: new driver for Marvell Armada 380
-> AHCI interfaces)
-> Signed-off-by: Nadav Haklai <nadavh@marvell.com>
-> Reviewed-by: Omri Itach <omrii@marvell.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Cc: <stable@vger.kernel.org>
+This patch allows the use of CMA for DMA coherent memory allocation.
+At the moment if "is_coherent" is set to true the allocation can't use the CMA, which I think is not the desired behaviour.
 
-Applied to libata/for-4.1-fixes.
+Changes in v2:
+ correct __arm_dma_free() according to __dma_alloc() allocation
 
-Thank you.
+---
+ arch/arm/mm/dma-mapping.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 7e7583d..15643b9 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -645,9 +645,9 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+ 	size = PAGE_ALIGN(size);
+ 	want_vaddr = !dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, attrs);
+ 
+-	if (is_coherent || nommu())
++	if (nommu())
+ 		addr = __alloc_simple_buffer(dev, size, gfp, &page);
+-	else if (!(gfp & __GFP_WAIT))
++	else if (!is_coherent && !(gfp & __GFP_WAIT))
+ 		addr = __alloc_from_pool(size, &page);
+ 	else if (!dev_get_cma_area(dev))
+ 		addr = __alloc_remap_buffer(dev, size, gfp, prot, &page, caller, want_vaddr);
+@@ -735,7 +735,7 @@ static void __arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
+ 
+ 	size = PAGE_ALIGN(size);
+ 
+-	if (is_coherent || nommu()) {
++	if (nommu()) {
+ 		__dma_free_buffer(page, size);
+ 	} else if (__free_from_pool(cpu_addr, size)) {
+ 		return;
 -- 
-tejun
+1.7.10.4
