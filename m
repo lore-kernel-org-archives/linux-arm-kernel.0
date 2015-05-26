@@ -1,112 +1,52 @@
-From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Tue, 26 May 2015 11:06:15 -0500
-Subject: [PATCH] ARM: socfpga: dts: enable ethernet for Arria10 devkit
-Message-ID: <1432656375-26950-1-git-send-email-dinguyen@opensource.altera.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 26 May 2015 17:23:33 +0100
+Subject: [PATCH 0/7] ARM: perf: rework core into library
+Message-ID: <1432657420-887-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@opensource.altera.com>
+This patch series refactors the ARM perf code, splitting out the various
+PMU architecture variants and refactoring the core into a reusable
+library that may be shared with arm64 in future. These patches alone
+should not result in any functional change, though due to header file
+changes a small amount of platform code needs to be updated.
 
-Update the arria10 gmac nodes with all the necessary properties for ethernet
-to function on the Arria10 devkit.
+This series applies atop of the series titled "ARM: perf: heterogeneous
+PMU support", previously posted to lakml [1].
 
-Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
----
- arch/arm/boot/dts/socfpga_arria10.dtsi       | 11 +++++++++++
- arch/arm/boot/dts/socfpga_arria10_socdk.dtsi | 28 ++++++++++++++++++++++++++++
- 2 files changed, 39 insertions(+)
+Thanks,
+Mark.
 
-diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
-index 6ceb26e..f5bebdd 100644
---- a/arch/arm/boot/dts/socfpga_arria10.dtsi
-+++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
-@@ -397,6 +397,7 @@
- 
- 		gmac0: ethernet at ff800000 {
- 			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.72a", "snps,dwmac";
-+			altr,sysmgr-syscon = <&sysmgr 0x44 0>;
- 			reg = <0xff800000 0x2000>;
- 			interrupts = <0 92 IRQ_TYPE_LEVEL_HIGH>;
- 			interrupt-names = "macirq";
-@@ -404,11 +405,16 @@
- 			mac-address = [00 00 00 00 00 00];
- 			snps,multicast-filter-bins = <256>;
- 			snps,perfect-filter-entries = <128>;
-+			tx-fifo-depth = <4096>;
-+			rx-fifo-depth = <16384>;
-+			clocks = <&l4_mp_clk>;
-+			clock-names = "stmmaceth";
- 			status = "disabled";
- 		};
- 
- 		gmac1: ethernet at ff802000 {
- 			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.72a", "snps,dwmac";
-+			altr,sysmgr-syscon = <&sysmgr 0x48 0>;
- 		        reg = <0xff802000 0x2000>;
- 			interrupts = <0 93 IRQ_TYPE_LEVEL_HIGH>;
- 			interrupt-names = "macirq";
-@@ -418,11 +424,14 @@
- 			snps,perfect-filter-entries = <128>;
- 			tx-fifo-depth = <4096>;
- 			rx-fifo-depth = <16384>;
-+			clocks = <&l4_mp_clk>;
-+			clock-names = "stmmaceth";
- 			status = "disabled";
- 		};
- 
- 		gmac2: ethernet at ff804000 {
- 			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.72a", "snps,dwmac";
-+			altr,sysmgr-syscon = <&sysmgr 0x4C 0>;
- 			reg = <0xff804000 0x2000>;
- 			interrupts = <0 94 IRQ_TYPE_LEVEL_HIGH>;
- 			interrupt-names = "macirq";
-@@ -432,6 +441,8 @@
- 			snps,perfect-filter-entries = <128>;
- 			tx-fifo-depth = <4096>;
- 			rx-fifo-depth = <16384>;
-+			clocks = <&l4_mp_clk>;
-+			clock-names = "stmmaceth";
- 			status = "disabled";
- 		};
- 
-diff --git a/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi b/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
-index 347ca4e..94a0709 100644
---- a/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
-+++ b/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
-@@ -41,6 +41,34 @@
- 	};
- };
- 
-+&gmac0 {
-+	phy-mode = "rgmii";
-+	phy-addr = <0xffffffff>; /* probe for phy addr */
-+
-+	/*
-+	 * These skews assume the user's FPGA design is adding 600ps of delay
-+	 * for TX_CLK on Arria 10.
-+	 *
-+	 * All skews are offset since hardware skew values for the ksz9031
-+	 * range from a negative skew to a positive skew.
-+	 * See the micrel-ksz90x1.txt Documentation file for details.
-+	 */
-+	txd0-skew-ps = <0>; /* -420ps */
-+	txd1-skew-ps = <0>; /* -420ps */
-+	txd2-skew-ps = <0>; /* -420ps */
-+	txd3-skew-ps = <0>; /* -420ps */
-+	rxd0-skew-ps = <420>; /* 0ps */
-+	rxd1-skew-ps = <420>; /* 0ps */
-+	rxd2-skew-ps = <420>; /* 0ps */
-+	rxd3-skew-ps = <420>; /* 0ps */
-+	txen-skew-ps = <0>; /* -420ps */
-+	txc-skew-ps = <1860>; /* 960ps */
-+	rxdv-skew-ps = <420>; /* 0ps */
-+	rxc-skew-ps = <1680>; /* 780ps */
-+	max-frame-size = <3800>;
-+	status = "okay";
-+};
-+
- &uart1 {
- 	status = "okay";
- };
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/343144.html
+
+Mark Rutland (7):
+  arm: perf: kill off unused pm callbacks
+  arm: perf: share arm_pmu_device_probe
+  arm: perf: factor out xscale pmu driver
+  arm: perf: factor out armv6 pmu driver
+  arm: perf: factor out armv7 pmu driver
+  arm: perf: unify perf_event{,_cpu}.c
+  arm: perf: factor arm_pmu core out to drivers
+
+ arch/arm/Kconfig                                   |   8 +-
+ arch/arm/kernel/Makefile                           |   3 +-
+ arch/arm/kernel/perf_event_cpu.c                   | 422 ---------------------
+ arch/arm/kernel/perf_event_v6.c                    |  49 ++-
+ arch/arm/kernel/perf_event_v7.c                    |  77 ++--
+ arch/arm/kernel/perf_event_xscale.c                |  32 +-
+ arch/arm/mach-ux500/cpu-db8500.c                   |   2 +-
+ drivers/Kconfig                                    |   2 +
+ drivers/Makefile                                   |   1 +
+ drivers/perf/Kconfig                               |  14 +
+ drivers/perf/Makefile                              |   1 +
+ .../kernel/perf_event.c => drivers/perf/arm_pmu.c  | 375 ++++++++++++++++--
+ .../asm/pmu.h => include/linux/perf/arm_pmu.h      |  22 +-
+ 13 files changed, 466 insertions(+), 542 deletions(-)
+ delete mode 100644 arch/arm/kernel/perf_event_cpu.c
+ create mode 100644 drivers/perf/Kconfig
+ create mode 100644 drivers/perf/Makefile
+ rename arch/arm/kernel/perf_event.c => drivers/perf/arm_pmu.c (64%)
+ rename arch/arm/include/asm/pmu.h => include/linux/perf/arm_pmu.h (84%)
+
 -- 
-2.2.1
+1.9.1
