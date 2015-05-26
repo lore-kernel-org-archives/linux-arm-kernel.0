@@ -1,40 +1,77 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 26 May 2015 14:08:43 +0200
-Subject: [PATCH 1/3] spi: orion: Fix maximum baud rates for Armada 370/XP
-In-Reply-To: <20150526103650.GM21577@sirena.org.uk>
-References: <1432633484-18758-1-git-send-email-gregory.clement@free-electrons.com>
- <1432633484-18758-2-git-send-email-gregory.clement@free-electrons.com>
- <20150526103650.GM21577@sirena.org.uk>
-Message-ID: <5564624B.1030503@free-electrons.com>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Tue, 26 May 2015 21:10:11 +0900
+Subject: [RFC PATCH 2/2] arm64: Implement vmalloc based thread_info
+ allocator
+In-Reply-To: <20150525145857.GF14922@blaptop>
+References: <1432483340-23157-1-git-send-email-jungseoklee85@gmail.com>
+ <5992243.NYDGjLH37z@wuerfel> <B873B881-4972-4524-B1D9-4BB05D7248A4@gmail.com>
+ <20150525145857.GF14922@blaptop>
+Message-ID: <BA18E3D0-A487-4E74-8DCA-49F36A4F08E2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On 26/05/2015 12:36, Mark Brown wrote:
-> On Tue, May 26, 2015 at 11:44:42AM +0200, Gregory CLEMENT wrote:
+On May 25, 2015, at 11:58 PM, Minchan Kim wrote:
+> On Mon, May 25, 2015 at 07:01:33PM +0900, Jungseok Lee wrote:
+>> On May 25, 2015, at 2:49 AM, Arnd Bergmann wrote:
+>>> On Monday 25 May 2015 01:02:20 Jungseok Lee wrote:
+>>>> Fork-routine sometimes fails to get a physically contiguous region for
+>>>> thread_info on 4KB page system although free memory is enough. That is,
+>>>> a physically contiguous region, which is currently 16KB, is not available
+>>>> since system memory is fragmented.
+>>>> 
+>>>> This patch tries to solve the problem as allocating thread_info memory
+>>>> from vmalloc space, not 1:1 mapping one. The downside is one additional
+>>>> page allocation in case of vmalloc. However, vmalloc space is large enough,
+>>>> around 240GB, under a combination of 39-bit VA and 4KB page. Thus, it is
+>>>> not a big tradeoff for fork-routine service.
+>>> 
+>>> vmalloc has a rather large runtime cost. I'd argue that failing to allocate
+>>> thread_info structures means something has gone very wrong.
+>> 
+>> That is why the feature is marked "N" by default.
+>> I focused on fork-routine stability rather than performance.
 > 
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> Reported-by: Kostya Porotchkin <kostap@marvell.com>
->> Cc: <stable@vger.kernel.org> #Fixes df59fa7f4bca
+> If VM has trouble with order-2 allocation, your system would be
+> trouble soon although fork at the moment manages to be successful
+> because such small high-order(ex, order <= PAGE_ALLOC_COSTLY_ORDER)
+> allocation is common in the kernel so VM should handle it smoothly.
+> If VM didn't, it means we should fix VM itself, not a specific
+> allocation site. Fork is one of victim by that.
+
+A problem I observed is an user space, not a kernel side. As user applications
+fail to create threads in order to distribute their jobs properly, they are getting
+in trouble slowly and then gone.
+
+Yes, fork is one of victim, but damages user applications seriously.
+At this snapshot, free memory is enough.
+
+>> Could you give me an idea how to evaluate performance degradation?
+>> Running some benchmarks would be helpful, but I would like to try to
+>> gather data based on meaningful methodology.
+>> 
+>>> Can you describe the scenario that leads to fragmentation this bad?
+>> 
+>> Android, but I could not describe an exact reproduction procedure step
+>> by step since it's behaved and reproduced randomly. As reading the following
+>> thread from mm mailing list, a similar symptom is observed on other systems. 
+>> 
+>> https://lkml.org/lkml/2015/4/28/59
+>> 
+>> Although I do not know the details of a system mentioned in the thread,
+>> even order-2 page allocation is not smoothly operated due to fragmentation on
+>> low memory system.
 > 
-> Applied, but please format this stuff in a standard fashion - use a
-> Fixes: tag to reference commits you're fixing.  This makes it easier for
-> tooling to work with the information you're providing.
+> What Joonsoo have tackle is generic fragmentation problem, not *a* fork fail,
+> which is more right approach to handle small high-order allocation problem.
 
-Yes, sure, I will do. I followed the Documentation/stable_kernel_rules.txt
-file and I missed the new information in Documentation/SubmittingPatches
-about this tag.
+I totally agree with that point. One of the best ways is to figure out a generic
+anti-fragmentation with VM system improvement. Reducing the stack size to 8KB is also
+a really great approach. My intention is not to overlook them or figure out a workaround.
 
-Thanks,
+IMHO, vmalloc would be a different option in case of ARM64 on low memory systems since
+*fork failure from fragmentation* is a nontrivial issue.
 
-Gregory
+Do you think the patch set doesn't need to be considered?
 
-
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Best Regards
+Jungseok Lee
