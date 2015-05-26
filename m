@@ -1,38 +1,115 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Tue, 26 May 2015 11:17:22 -0700
-Subject: [PATCH v9 07/17] clk: tegra: Add Tegra124 DFLL clocksource
- platform driver
-In-Reply-To: <1431529131-16710-8-git-send-email-mikko.perttunen@kapsi.fi>
-References: <1431529131-16710-1-git-send-email-mikko.perttunen@kapsi.fi>
- <1431529131-16710-8-git-send-email-mikko.perttunen@kapsi.fi>
-Message-ID: <CAMAWPa8PQgNWbajvrxMiD4qcUBg+Q1xsOU5hhhFQbxE4VxW_uQ@mail.gmail.com>
+From: arun.ramamurthy@broadcom.com (Arun Ramamurthy)
+Date: Tue, 26 May 2015 11:37:17 -0700
+Subject: [PATCHv3 1/4] phy: phy-core: Make GENERIC_PHY an invisible option
+In-Reply-To: <20150526141938.GA25686@saruman.tx.rr.com>
+References: <1429743853-10254-1-git-send-email-arun.ramamurthy@broadcom.com>
+ <1429743853-10254-2-git-send-email-arun.ramamurthy@broadcom.com>
+ <20150515005210.GA31534@saruman.tx.rr.com> <556391FE.1020503@broadcom.com>
+ <20150526141938.GA25686@saruman.tx.rr.com>
+Message-ID: <5564BD5D.1070601@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 13, 2015 at 7:58 AM, Mikko Perttunen
-<mikko.perttunen@kapsi.fi> wrote:
-> From: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+Hi
+
+On 15-05-26 07:19 AM, Felipe Balbi wrote:
+> HI,
 >
-> Add basic platform driver support for the fast CPU cluster DFLL
-> clocksource found on Tegra124 SoCs. This small driver selects the
-> appropriate Tegra124-specific characterization data and integration
-> code. It relies on the DFLL common code to do most of the work.
+> On Mon, May 25, 2015 at 02:19:58PM -0700, Arun Ramamurthy wrote:
+>>
+>>
+>> On 15-05-14 05:52 PM, Felipe Balbi wrote:
+>>> Hi,
+>>>
+>>> On Wed, Apr 22, 2015 at 04:04:10PM -0700, Arun Ramamurthy wrote:
+>>>> Most of the phy providers use "select" to enable GENERIC_PHY. Since select
+>>>> is only recommended when the config is not visible, GENERIC_PHY is changed
+>>>> an invisible option. To maintain consistency, all phy providers are changed
+>>>> to "select" GENERIC_PHY and all non-phy drivers use "depends on" when the
+>>>> phy framework is explicity required. USB_MUSB_OMAP2PLUS has a cyclic
+>>>> dependency, so it is left as "select".
+>>>>
+>>>> Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
+>>>> ---
+>>>>   drivers/ata/Kconfig                       | 1 -
+>>>>   drivers/media/platform/exynos4-is/Kconfig | 2 +-
+>>>>   drivers/phy/Kconfig                       | 4 ++--
+>>>>   drivers/usb/host/Kconfig                  | 4 ++--
+>>>>   drivers/video/fbdev/exynos/Kconfig        | 2 +-
+>>>>   5 files changed, 6 insertions(+), 7 deletions(-)
+>>>>
+>>>> diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+>>>> index 5f60155..6d2e881 100644
+>>>> --- a/drivers/ata/Kconfig
+>>>> +++ b/drivers/ata/Kconfig
+>>>> @@ -301,7 +301,6 @@ config SATA_MV
+>>>>   	tristate "Marvell SATA support"
+>>>>   	depends on PCI || ARCH_DOVE || ARCH_MV78XX0 || \
+>>>>   		   ARCH_MVEBU || ARCH_ORION5X || COMPILE_TEST
+>>>> -	select GENERIC_PHY
+>>>>   	help
+>>>>   	  This option enables support for the Marvell Serial ATA family.
+>>>>   	  Currently supports 88SX[56]0[48][01] PCI(-X) chips,
+>>>> diff --git a/drivers/media/platform/exynos4-is/Kconfig b/drivers/media/platform/exynos4-is/Kconfig
+>>>> index b7b2e47..b6f3eaa 100644
+>>>> --- a/drivers/media/platform/exynos4-is/Kconfig
+>>>> +++ b/drivers/media/platform/exynos4-is/Kconfig
+>>>> @@ -31,7 +31,7 @@ config VIDEO_S5P_FIMC
+>>>>   config VIDEO_S5P_MIPI_CSIS
+>>>>   	tristate "S5P/EXYNOS MIPI-CSI2 receiver (MIPI-CSIS) driver"
+>>>>   	depends on REGULATOR
+>>>> -	select GENERIC_PHY
+>>>> +	depends on GENERIC_PHY
+>>>>   	help
+>>>>   	  This is a V4L2 driver for Samsung S5P and EXYNOS4 SoC MIPI-CSI2
+>>>>   	  receiver (MIPI-CSIS) devices.
+>>>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+>>>> index 2962de2..edecdb1 100644
+>>>> --- a/drivers/phy/Kconfig
+>>>> +++ b/drivers/phy/Kconfig
+>>>> @@ -5,7 +5,7 @@
+>>>>   menu "PHY Subsystem"
+>>>>
+>>>>   config GENERIC_PHY
+>>>> -	bool "PHY Core"
+>>>> +	bool
+>>>>   	help
+>>>>   	  Generic PHY support.
+>>>>
+>>>> @@ -72,7 +72,7 @@ config PHY_MIPHY365X
+>>>>   config PHY_RCAR_GEN2
+>>>>   	tristate "Renesas R-Car generation 2 USB PHY driver"
+>>>>   	depends on ARCH_SHMOBILE
+>>>> -	depends on GENERIC_PHY
+>>>> +	select GENERIC_PHY
+>>>
+>>> so some you changed from depends to select...
+>>>
+>>>>   	help
+>>>>   	  Support for USB PHY found on Renesas R-Car generation 2 SoCs.
+>>>>
+>>>> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+>>>> index 5ad60e4..e2197e2 100644
+>>>> --- a/drivers/usb/host/Kconfig
+>>>> +++ b/drivers/usb/host/Kconfig
+>>>> @@ -182,7 +182,7 @@ config USB_EHCI_HCD_SPEAR
+>>>>   config USB_EHCI_HCD_STI
+>>>>   	tristate "Support for ST STiHxxx on-chip EHCI USB controller"
+>>>>   	depends on ARCH_STI && OF
+>>>> -	select GENERIC_PHY
+>>>> +	depends on GENERIC_PHY
+>>>
+>>> while others you changed from select to depends.
+>>>
+>>> NAK.
+>>>
+>> Felipe, I dont understand your concern, could you please explain it more
+>> detail?  The logic behind the changes is that in cases where there was an
+>> explicit dependency, I changed it to "depends on" and in other cases I
+>> changed it to "selects". Thanks
 >
-> Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
-> Signed-off-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
-> Acked-by: Michael Turquette <mturquette@linaro.org>
-
-Various boot failures on non-tegra platforms (sunxi, omap) started
-showing up in next-20150522, and still exist in next-20150525[1] and
-today I bisected them down to this patch.
-
-I didn't look closely, but I"m guessing the module_init() function
-here needs some compatible checking so it's not actually executed on
-non-tegra platforms.
-
-I confirmed that reverting this patch on top of next-20150525 gets
-both the sunxi and omap platforms booting again.
-
-Kevin
-
-[1] http://kernelci.org/boot/all/job/next/kernel/next-20150525/
+> Since GENERIC_PHY is visible from Kconfig, it would be much nicer to
+> avoid select altogether.
+>
+Felipe, after discussion with the maintainers, I have made GENERIC_PHY 
+an invisible option as part of this change. Thanks
