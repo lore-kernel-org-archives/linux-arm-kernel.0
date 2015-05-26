@@ -1,54 +1,102 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 26 May 2015 17:12:45 +0100
-Subject: [PATCH 2/3] iommu/arm-smmu: Add initial driver support for ARM
- SMMUv3 devices
-In-Reply-To: <556283D5.4030901@huawei.com>
-References: <1431108046-9675-1-git-send-email-will.deacon@arm.com>
- <1431108046-9675-3-git-send-email-will.deacon@arm.com>
- <5551AE56.6050906@huawei.com> <20150512165500.GE2062@arm.com>
- <55530C4F.5000605@huawei.com> <20150521112555.GH21920@arm.com>
- <556283D5.4030901@huawei.com>
-Message-ID: <20150526161245.GR1565@arm.com>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Tue, 26 May 2015 09:15:31 -0700
+Subject: [PATCH 2/3] dts: Adding docs for Xilinx LogiCORE IP mailbox
+ driver.
+In-Reply-To: <20150525190409.GS18303@xsjsorenbubuntu>
+References: <1432251450-26352-1-git-send-email-moritz.fischer@ettus.com>
+ <1432251450-26352-3-git-send-email-moritz.fischer@ettus.com>
+ <555EC20C.6010703@xilinx.com>
+ <20150525190409.GS18303@xsjsorenbubuntu>
+Message-ID: <CAAtXAHcb2LeTH_qMBhxE+JgX=TktYJpswdteBnydDuRPsODgWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 25, 2015 at 03:07:17AM +0100, leizhen wrote:
-> On 2015/5/21 19:25, Will Deacon wrote:
-> > On Wed, May 13, 2015 at 09:33:19AM +0100, leizhen wrote:
-> >> If SMMU_IDR1.SIDSIZE = 32 really exist(or too big), we need dynamic choose
-> >> Lv2 table size(4K,16K,64K).  Because Lv1 table maybe too big, and can not
-> >> be allocated by current API, a dts configuration should be added, like
-> >> lv1-table-base = <0x0 0x0>, and we use ioremap_cache get VA(maybe ioremap,
-> >> for non-coherent SMMU).
-> >>
-> >> Oh, I can do it after your patches upstreamed, because this problem maybe
-> >> only I met.
-> > 
-> > I'll have a think about this and see what I can come up with for version
-> > 2 of the patch. I'd like to avoid adding additional properties to the DT
-> > until they're actually needed, though.
-> 
-> OK. Will you support non-pci devices in patch version 2?
+On Mon, May 25, 2015 at 12:04 PM, S?ren Brinkmann
+<soren.brinkmann@xilinx.com> wrote:
+> On Fri, 2015-05-22 at 07:43AM +0200, Michal Simek wrote:
+>> On 05/22/2015 01:37 AM, Moritz Fischer wrote:
+>> > Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+>> > ---
+>> >  .../bindings/mailbox/xilinx-mailbox.txt         | 40 ++++++++++++++++++++
+>> >  1 file changed, 40 insertions(+)
+>> >
+>>
+>> IRC the rule was to send binding first and then the driver.
+>>
+>> > diff --git a/Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt b/Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt
+>> > new file mode 100644
+>> > index 0000000..e559743
+>> > --- /dev/null
+>> > +++ b/Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt
+>> > @@ -0,0 +1,40 @@
+>> > +Xilinx Mailbox Driver
+>> > +=====================
+>> > +
+>> > +Required properties:
+>> > +- compatible :     "xlnx,mailbox-2.1".
+>> > +- reg :    physical base address of the mailbox and length of
+>> > +           memory mapped region.
+>> > +- #mbox-cells:     Common mailbox binding property to identify the number
+>> > +           of cells required for the mailbox specifier. Should be 1.
+>> > +
+>> > +Optional properties:
+>> > +- interrupt-parent :       interrupt source phandle.
+>> > +- interrupts :             interrupt number. The interrupt specifier format
+>>
+>> please be consistent with spacing around :. It doesn't look nice.
+>>
+>> > +                   depends on the interrupt controller parent.
+>> > +
+>> > +Example:
+>> > +   mbox: mailbox at 0x40400000 {
+>>
+>> remove 0x prefix here.
+>>
+>> > +           compatible = "xlnx,axi-mailbox-2.1";
+>> > +           reg = <0x100 0x3c>;
+>>
+>> This is weird - it should start with 40400000.
+>> Or is your physical address 0x100?
+>>
+>>
+>> > +           interrupt-parent = <&intc>;
+>> > +           interrupts = <5>;
+>> > +           #mbox-cells = <1>;
+>> > +   };
+>> > +
+>> > +Mailbox client
+>> > +===============
+>> > +"mboxes" and the optional "mbox-names" (please see
+>> > +Documentation/devicetree/bindings/mailbox/mailbox.txt for details). Each value
+>> > +of the mboxes property should contain a phandle to the mailbox controller
+>> > +device node and second argument is the channel index. It must be 0 (hardware
+>> > +support only one channel).The equivalent "mbox-names" property value can be
+>>
+>> .<space>The
+>>
+>> > +used to give a name to the communication channel to be used by the client user.
+>> > +
+>> > +Example:
+>> > +   mclient0: mclient0 at 0x400 {
+>>
+>> ditto.
+>>
+>> > +           compatible = "client-1.0";
+>> > +           reg = <0x400 0x10>;
+>> > +           mbox-names = "mbox", "mbox-rx";
+>
+> This seems to consume two mailboxes but...
+>
+>> > +           mboxes = <&mbox 0>;
+>
+> ... this seems to describe only one, or am I mistaken?
 
-I don't (yet) plan to support non-PCI devices, for two reasons:
+Yes.
+>
+>         S?ren
 
-  (1) The support should be based on top of Laurent's RFC series here:
+Thanks for your feedback, these were addressed in the v1 (should've been v2).
 
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/343686.html
+Thanks,
 
-      which needs some review etc.
-
-  (2) My simulator only has PCI endpoints
-
-Of course, if you have something that you can test with, then I'm more
-than happy to review patches adding this support providing that they're
-based on the series above.
-
-On the table front, my current v2 patch uses 16k level-2 tables allocated
-lazily (so each one has 256 entries and covers a single PCI bus). I've
-also capped the SIDSIZE to 21 for the moment, which means we get a 64k
-table there.
-
-Sound reasonable for the time being?
-
-Will
+Moritz
