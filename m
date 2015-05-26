@@ -1,41 +1,73 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 26 May 2015 14:52:30 +0100
-Subject: [PATCHv3 12/12] MAINTAINERS: add PSCI entry
-In-Reply-To: <1432648350-5454-1-git-send-email-mark.rutland@arm.com>
-References: <1432648350-5454-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1432648350-5454-13-git-send-email-mark.rutland@arm.com>
+From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
+Date: Tue, 26 May 2015 09:54:42 -0400
+Subject: [PATCH 10/11] XEN / PCI: Remove the dependence on arch x86 when
+ PCI_MMCONFIG=y
+In-Reply-To: <1432644564-24746-11-git-send-email-hanjun.guo@linaro.org>
+References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
+ <1432644564-24746-11-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <55647B22.3010801@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add myself and Lorenzo as maintainers of the PSCI client code.
+On 05/26/2015 08:49 AM, Hanjun Guo wrote:
+> In drivers/xen/pci.c, there are arch x86 dependent codes when
+> CONFIG_PCI_MMCONFIG is enabled, since CONFIG_PCI_MMCONFIG
+> depends on ACPI, so this will prevent XEN PCI running on other
+> architectures using ACPI with PCI_MMCONFIG enabled (such as ARM64).
+>
+> Fortunatly, it can be sloved in a simple way. In drivers/xen/pci.c,
+> the only x86 dependent code is if ((pci_probe & PCI_PROBE_MMCONF) == 0),
+> and it's defined in asm/pci_x86.h, the code means that
+> if the PCI resource is not probed in PCI_PROBE_MMCONF way, just
+> ingnore the xen mcfg init. Actually this is duplicate, because
+> if PCI resource is not probed in PCI_PROBE_MMCONF way, the
+> pci_mmconfig_list will be empty, and the if (list_empty())
+> after it will do the same job.
+>
+> So just remove the arch related code and the head file, this
+> will be no functional change for x86, and also makes xen/pci.c
+> usable for other architectures.
+>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> CC: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+> ---
+>   drivers/xen/pci.c | 6 ------
+>   1 file changed, 6 deletions(-)
+>
+> diff --git a/drivers/xen/pci.c b/drivers/xen/pci.c
+> index 6785ebb..9a8dbe3 100644
+> --- a/drivers/xen/pci.c
+> +++ b/drivers/xen/pci.c
+> @@ -28,9 +28,6 @@
+>   #include <asm/xen/hypervisor.h>
+>   #include <asm/xen/hypercall.h>
+>   #include "../pci/pci.h"
+> -#ifdef CONFIG_PCI_MMCONFIG
+> -#include <asm/pci_x86.h>
+> -#endif
+>
+>   static bool __read_mostly pci_seg_supported = true;
+>
+> @@ -222,9 +219,6 @@ static int __init xen_mcfg_late(void)
+>   	if (!xen_initial_domain())
+>   		return 0;
+>
+> -	if ((pci_probe & PCI_PROBE_MMCONF) == 0)
+> -		return 0;
+> -
+>   	if (list_empty(&pci_mmcfg_list))
+>   		return 0;
+>
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- MAINTAINERS | 9 +++++++++
- 1 file changed, 9 insertions(+)
+(+Stefano who is Xen ARM maintainer)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index f8e0afb..ae3e1c2 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -7789,6 +7789,15 @@ S:	Maintained
- F:	include/linux/power_supply.h
- F:	drivers/power/
- 
-+POWER STATE COORDINATION INTERFACE (PSCI)
-+M:	Mark Rutland <mark.rutland@arm.com>
-+M:	Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-+L:	linux-arm-kernel at lists.infradead.org
-+S:	Maintained
-+F:	drivers/firmware/psci.c
-+F:	include/linux/psci.h
-+F:	include/uapi/linux/psci.h
-+
- PNP SUPPORT
- M:	Rafael J. Wysocki <rafael.j.wysocki@intel.com>
- S:	Maintained
--- 
-1.9.1
+This will not build on x86 since pci_mmcfg_list since, for example, 
+pci_mmcfg_list is declared in pci_x86.h.
+
+And I am not sure I understand why you are trying to do this since AFAIK 
+CONFIG_PCI_MMCONFIG is only defined on x86 so neither pci_x86.h will be 
+included nor xen_mcfg_late() will be defined on ARM.
+
+
+-boris
