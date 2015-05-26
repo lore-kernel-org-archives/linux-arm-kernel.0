@@ -1,47 +1,100 @@
 From: Frank.Li@freescale.com (Frank.Li at freescale.com)
-Date: Wed, 27 May 2015 00:26:02 +0800
-Subject: [PATCH v5 6/6] ARM: dts: imx6sx: enable snvs power key
+Date: Wed, 27 May 2015 00:26:01 +0800
+Subject: [PATCH v5 5/6] Document: devicetree: input: imx: i.mx snvs power
+ device tree bindings
 In-Reply-To: <1432657562-5592-1-git-send-email-Frank.Li@freescale.com>
 References: <1432657562-5592-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <1432657562-5592-7-git-send-email-Frank.Li@freescale.com>
+Message-ID: <1432657562-5592-6-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Frank Li <Frank.Li@freescale.com>
 
-enable snvs ONOFF power key support
+The snvs-pwrkey is designed to enable POWER key function which controlled
+by SNVS ONOFF. the driver can report the status of POWER key and wakeup
+system if pressed after system suspend.
 
 Signed-off-by: Frank Li <Frank.Li@freescale.com>
+Signed-off-by: Robin Gong <b38343@freescale.com>
 ---
- arch/arm/boot/dts/imx6sx.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ .../devicetree/bindings/crypto/fsl-sec4.txt        | 49 ++++++++++++++++++++++
+ .../devicetree/bindings/input/snvs-pwrkey.txt      |  1 +
+ 2 files changed, 50 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/snvs-pwrkey.txt
 
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index f8f0819..e391d63 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -8,6 +8,7 @@
+diff --git a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
+index b21e7c2..71a39c5 100644
+--- a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
++++ b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
+@@ -387,6 +387,47 @@ EXAMPLE
+ 	};
  
- #include <dt-bindings/clock/imx6sx-clock.h>
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include "imx6sx-pinfunc.h"
- #include "skeleton.dtsi"
-@@ -679,6 +680,14 @@
- 					mask = <0x60>;
- 					status = "disabled";
- 				};
+ =====================================================================
++System ON/OFF key driver
 +
-+				snvs_pwrkey: snvs-powerkey {
-+					compatible = "fsl,sec-v4.0-pwrkey";
-+					regmap = <&snvs>;
-+					interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+					linux,keycode = <KEY_POWER>;
-+					wakeup;
-+				};
- 			};
++  The snvs-pwrkey is designed to enable POWER key function which controlled
++  by SNVS ONOFF, the driver can report the status of POWER key and wakeup
++  system if pressed after system suspend.
++
++  - compatible:
++      Usage: required
++      Value type: <string>
++      Definition: Mush include "fsl,sec-v4.0-pwrkey".
++
++  - interrupts:
++      Usage: required
++      Value type: <prop_encoded-array>
++      Definition: The SNVS ON/OFF interrupt number to the CPU(s).
++
++  - linux,keycode:
++      Usage: option
++      Value type: <int>
++      Definition: Keycode to emit, KEY_POWER by default.
++
++  - wakeup:
++      Usage: option
++      Value type: <boo>
++      Definition: Button can wake-up the system.
++
++ - regmap:
++      Usage: required:
++      Value type: <phandle>
++      Definition: this is phandle to the register map node.
++
++EXAMPLE:
++	snvs-pwrkey at 0x020cc000 {
++		compatible = "fsl,sec-v4.0-pwrkey";
++		regmap = <&snvs>;
++		interrupts = <0 4 0x4>
++	        linux,keycode = <116>; /* KEY_POWER */
++		wakeup;
++	};
++
++=====================================================================
+ FULL EXAMPLE
  
- 			epit1: epit at 020d0000 {
+ 	crypto: crypto at 300000 {
+@@ -466,6 +507,14 @@ FULL EXAMPLE
+ 			offset = <0x34>;
+ 			interrupts = <93 2>;
+ 		};
++
++		snvs-pwrkey at 0x020cc000 {
++			compatible = "fsl,sec-v4.0-pwrkey";
++			regmap = <&sec_mon>;
++			interrupts = <0 4 0x4>;
++			linux,keycode = <116>; /* KEY_POWER */
++			wakeup;
++		};
+ 	};
+ 
+ =====================================================================
+diff --git a/Documentation/devicetree/bindings/input/snvs-pwrkey.txt b/Documentation/devicetree/bindings/input/snvs-pwrkey.txt
+new file mode 100644
+index 0000000..70c1425
+--- /dev/null
++++ b/Documentation/devicetree/bindings/input/snvs-pwrkey.txt
+@@ -0,0 +1 @@
++See Documentation/devicetree/bindings/crypto/fsl-sec4.txt
 -- 
 1.9.1
