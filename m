@@ -1,83 +1,114 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 26 May 2015 14:52:22 +0100
-Subject: [PATCHv3 04/12] arm64: psci: remove unnecessary id indirection
+Date: Tue, 26 May 2015 14:52:23 +0100
+Subject: [PATCHv3 05/12] arm64: psci: support unsigned return values
 In-Reply-To: <1432648350-5454-1-git-send-email-mark.rutland@arm.com>
 References: <1432648350-5454-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1432648350-5454-5-git-send-email-mark.rutland@arm.com>
+Message-ID: <1432648350-5454-6-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PSCI 0.1 did not define canonical IDs for CPU_ON, CPU_OFF, CPU_SUSPEND,
-or MIGRATE, and so these need to be provided when using firmware
-compliant to PSCI 0.1.
+PSCI_VERSION and MIGRATE_INFO_TYPE_UP_CPU return unsigned values, with
+the latter returning a 64-bit value. However, the PSCI invocation
+functions have prototypes returning int.
 
-However, functions introduced in 0.2 or later have canonical IDs, and
-these cannot be provided via DT. There's no need to indirect the IDs via
-a table; they can be used directly at callsites (and already are for
-SYSTEM_OFF and SYSTEM_RESET).
+This patch upgrades the invocation functions to return unsigned long,
+with a new typedef to keep things legible. As PSCI_VERSION cannot return
+a negative value, the erroneous check against PSCI_RET_NOT_SUPPORTED is
+also removed. The unrelated psci_initcall_t typedef is moved closer to
+its first user, to avoid confusion with the invocation functions.
 
-This patch removes the unnecessary function ID indirection for
-AFFINITY_INFO and MIGRATE_INFO_TYPE.
+In preparation for sharing the code with ARM, unsigned long is used in
+preference of u64. In the SMC32 calling convention, the relevant fields
+will be 32 bits wide.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/psci.c | 20 +++-----------------
- 1 file changed, 3 insertions(+), 17 deletions(-)
+ arch/arm64/kernel/psci.c | 47 ++++++++++++++++++-----------------------------
+ 1 file changed, 18 insertions(+), 29 deletions(-)
 
 diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-index 17e717c..0c1efb6 100644
+index 0c1efb6..7d441b3 100644
 --- a/arch/arm64/kernel/psci.c
 +++ b/arch/arm64/kernel/psci.c
-@@ -67,8 +67,6 @@ enum psci_function {
- 	PSCI_FN_CPU_ON,
- 	PSCI_FN_CPU_OFF,
- 	PSCI_FN_MIGRATE,
--	PSCI_FN_AFFINITY_INFO,
--	PSCI_FN_MIGRATE_INFO_TYPE,
- 	PSCI_FN_MAX,
- };
+@@ -56,11 +56,11 @@ struct psci_operations {
  
-@@ -168,22 +166,13 @@ static int psci_migrate(unsigned long cpuid)
- static int psci_affinity_info(unsigned long target_affinity,
- 		unsigned long lowest_affinity_level)
- {
--	int err;
--	u32 fn;
+ static struct psci_operations psci_ops;
+ 
+-static int (*invoke_psci_fn)(u64, u64, u64, u64);
+-typedef int (*psci_initcall_t)(const struct device_node *);
 -
--	fn = psci_function_id[PSCI_FN_AFFINITY_INFO];
--	err = invoke_psci_fn(fn, target_affinity, lowest_affinity_level, 0);
--	return err;
-+	return invoke_psci_fn(PSCI_0_2_FN64_AFFINITY_INFO, target_affinity,
-+			      lowest_affinity_level, 0);
+-asmlinkage int __invoke_psci_fn_hvc(u64, u64, u64, u64);
+-asmlinkage int __invoke_psci_fn_smc(u64, u64, u64, u64);
++typedef unsigned long (psci_fn)(unsigned long, unsigned long,
++				unsigned long, unsigned long);
++asmlinkage psci_fn __invoke_psci_fn_hvc;
++asmlinkage psci_fn __invoke_psci_fn_smc;
++static psci_fn *invoke_psci_fn;
+ 
+ enum psci_function {
+ 	PSCI_FN_CPU_SUSPEND,
+@@ -112,12 +112,9 @@ static void psci_power_state_unpack(u32 power_state,
+ 			PSCI_0_2_POWER_STATE_AFFL_SHIFT;
  }
  
- static int psci_migrate_info_type(void)
+-static int psci_get_version(void)
++static u32 psci_get_version(void)
  {
 -	int err;
--	u32 fn;
 -
--	fn = psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE];
--	err = invoke_psci_fn(fn, 0, 0, 0);
+-	err = invoke_psci_fn(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
 -	return err;
-+	return invoke_psci_fn(PSCI_0_2_FN_MIGRATE_INFO_TYPE, 0, 0, 0);
++	return invoke_psci_fn(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
  }
  
- static int __maybe_unused cpu_psci_cpu_init_idle(unsigned int cpu)
-@@ -293,11 +282,8 @@ static void __init psci_0_2_set_functions(void)
- 	psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN64_MIGRATE;
- 	psci_ops.migrate = psci_migrate;
+ static int psci_cpu_suspend(struct psci_power_state state,
+@@ -296,25 +293,15 @@ static void __init psci_0_2_set_functions(void)
+  */
+ static int __init psci_probe(void)
+ {
+-	int ver = psci_get_version();
+-
+-	if (ver == PSCI_RET_NOT_SUPPORTED) {
+-		/*
+-		 * PSCI versions >=0.2 mandates implementation of
+-		 * PSCI_VERSION.
+-		 */
+-		pr_err("PSCI firmware does not comply with the v0.2 spec.\n");
+-		return -EOPNOTSUPP;
+-	} else {
+-		pr_info("PSCIv%d.%d detected in firmware.\n",
+-				PSCI_VERSION_MAJOR(ver),
+-				PSCI_VERSION_MINOR(ver));
+-
+-		if (PSCI_VERSION_MAJOR(ver) == 0 &&
+-				PSCI_VERSION_MINOR(ver) < 2) {
+-			pr_err("Conflicting PSCI version detected.\n");
+-			return -EINVAL;
+-		}
++	u32 ver = psci_get_version();
++
++	pr_info("PSCIv%d.%d detected in firmware.\n",
++			PSCI_VERSION_MAJOR(ver),
++			PSCI_VERSION_MINOR(ver));
++
++	if (PSCI_VERSION_MAJOR(ver) == 0 && PSCI_VERSION_MINOR(ver) < 2) {
++		pr_err("Conflicting PSCI version detected.\n");
++		return -EINVAL;
+ 	}
  
--	psci_function_id[PSCI_FN_AFFINITY_INFO] = PSCI_0_2_FN64_AFFINITY_INFO;
- 	psci_ops.affinity_info = psci_affinity_info;
+ 	psci_0_2_set_functions();
+@@ -322,6 +309,8 @@ static int __init psci_probe(void)
+ 	return 0;
+ }
  
--	psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE] =
--		PSCI_0_2_FN_MIGRATE_INFO_TYPE;
- 	psci_ops.migrate_info_type = psci_migrate_info_type;
- 
- 	arm_pm_restart = psci_sys_reset;
++typedef int (*psci_initcall_t)(const struct device_node *);
++
+ /*
+  * PSCI init function for PSCI versions >=0.2
+  *
 -- 
 1.9.1
