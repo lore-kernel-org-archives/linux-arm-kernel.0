@@ -1,75 +1,42 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 26 May 2015 11:01:33 +0200
-Subject: [PATCH 1/2] PWM: atmel: fix incorrect CDTY value after enabling
-In-Reply-To: <1432559996-4415-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1432559996-4415-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <5564366D.9090707@atmel.com>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Tue, 26 May 2015 17:11:15 +0800
+Subject: [PATCH 5/5] clk: mediatek: Add USB clock support in MT8173
+ APMIXEDSYS
+In-Reply-To: <20150526080516.GG6325@pengutronix.de>
+References: <1432192376-6712-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1432192376-6712-6-git-send-email-jamesjj.liao@mediatek.com>
+ <20150526080516.GG6325@pengutronix.de>
+Message-ID: <1432631475.15597.29.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 25/05/2015 15:19, Alexandre Belloni a ?crit :
-> CUPD is not flushed before enabling the channel so it will update CDTY/CPRD just
-> after one period. So we always set CUPD, even when the channel is not enabled.
+Hi Sascha,
+
+On Tue, 2015-05-26 at 10:05 +0200, Sascha Hauer wrote:
+> On Thu, May 21, 2015 at 03:12:56PM +0800, James Liao wrote:
+> > +static void __init mtk_clk_register_apmixedsys_special(struct device_node *node,
+> > +			struct clk_onecell_data *clk_data)
+> > +{
+> > +	void __iomem *base;
+> > +	struct clk *clk;
+> > +
+> > +	base = of_iomap(node, 0);
+> > +	if (!base) {
+> > +		pr_err("%s(): ioremap failed\n", __func__);
+> > +		return;
+> > +	}
+> > +
+> > +	clk = mtk_clk_register_ref2usb_tx("ref2usb_tx", base + 0x8);
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> The function seems to be for one special clock only. Why do you pass the
+> name to it? They will never be called with another name, right?
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-BTW, is a "stable tag" needed for this one?
-
-> ---
->  drivers/pwm/pwm-atmel.c | 35 ++++++++++++++++++-----------------
->  1 file changed, 18 insertions(+), 17 deletions(-)
-> 
-> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
-> index d3c22de9ee47..89f9ca41d9af 100644
-> --- a/drivers/pwm/pwm-atmel.c
-> +++ b/drivers/pwm/pwm-atmel.c
-> @@ -155,24 +155,25 @@ static void atmel_pwm_config_v1(struct pwm_chip *chip, struct pwm_device *pwm,
->  	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
->  	unsigned int val;
->  
-> -	if (test_bit(PWMF_ENABLED, &pwm->flags)) {
-> -		/*
-> -		 * If the PWM channel is enabled, using the update register,
-> -		 * it needs to set bit 10 of CMR to 0
-> -		 */
-> -		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CUPD, dty);
->  
-> -		val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
-> -		val &= ~PWM_CMR_UPD_CDTY;
-> -		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
-> -	} else {
-> -		/*
-> -		 * If the PWM channel is disabled, write value to duty and
-> -		 * period registers directly.
-> -		 */
-> -		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CDTY, dty);
-> -		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CPRD, prd);
-> -	}
-> +	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CUPD, dty);
-> +
-> +	val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
-> +	val &= ~PWM_CMR_UPD_CDTY;
-> +	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
-> +
-> +	/*
-> +	 * If the PWM channel is enabled, only update CDTY by using the update
-> +	 * register, it needs to set bit 10 of CMR to 0
-> +	 */
-> +	if (test_bit(PWMF_ENABLED, &pwm->flags))
-> +		return;
-> +	/*
-> +	 * If the PWM channel is disabled, write value to duty and period
-> +	 * registers directly.
-> +	 */
-> +	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CDTY, dty);
-> +	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CPRD, prd);
->  }
->  
->  static void atmel_pwm_config_v2(struct pwm_chip *chip, struct pwm_device *pwm,
-> 
+This function decides clock name and associates clock ID for special
+clocks. In fact there may be another "special clocks" need to add into
+apmixedsys. I think it's a better way to group clock names and clock IDs
+in the same function for maintenance.
 
 
--- 
-Nicolas Ferre
+Best regards,
+
+James 
