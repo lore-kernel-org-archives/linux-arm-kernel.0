@@ -1,45 +1,75 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Tue, 26 May 2015 16:55:36 +0800
-Subject: [PATCH 3/5] dt-bindings: ARM: Mediatek: Document devicetree
- bindings for clock controllers
-In-Reply-To: <20150526075643.GF6325@pengutronix.de>
-References: <1432192376-6712-1-git-send-email-jamesjj.liao@mediatek.com>
- <1432192376-6712-4-git-send-email-jamesjj.liao@mediatek.com>
- <20150526075643.GF6325@pengutronix.de>
-Message-ID: <1432630536.15597.16.camel@mtksdaap41>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 26 May 2015 11:01:33 +0200
+Subject: [PATCH 1/2] PWM: atmel: fix incorrect CDTY value after enabling
+In-Reply-To: <1432559996-4415-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1432559996-4415-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <5564366D.9090707@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
-
-On Tue, 2015-05-26 at 09:56 +0200, Sascha Hauer wrote:
-> On Thu, May 21, 2015 at 03:12:54PM +0800, James Liao wrote:
-> > This adds the binding documentation for the mmsys, imgsys, vdecsys,
-> > vencsys and vencltsys controllers found on Mediatek SoCs.
-> > 
-> > index 0000000..a5b94a7
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
-> > +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencltsys.txt
-> > +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
+Le 25/05/2015 15:19, Alexandre Belloni a ?crit :
+> CUPD is not flushed before enabling the channel so it will update CDTY/CPRD just
+> after one period. So we always set CUPD, even when the channel is not enabled.
 > 
-> Do these really become multiple drivers so that it's worth abstracting
-> them in the clock framework?
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-These clocks need to be controlled among several drivers. For example,
-vdecsys clocks will be controlled by VDEC driver (not ready yet) and
-MT8173 SMI driver [1]. That means these clocks need a mechanism to share
-between these 2 drivers. CCF share clocks by using of reference count,
-so I think it's suitable to implement these subsystem clocks.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-As I know SMI driver need to access clocks among mmsys, imgsys, vdecsys,
-vencsys and vencltsys. So in this patch I added clocks of these
-subsystems into CCF.
+BTW, is a "stable tag" needed for this one?
 
-[1]
-http://lists.infradead.org/pipermail/linux-mediatek/2015-March/000058.html
+> ---
+>  drivers/pwm/pwm-atmel.c | 35 ++++++++++++++++++-----------------
+>  1 file changed, 18 insertions(+), 17 deletions(-)
+> 
+> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
+> index d3c22de9ee47..89f9ca41d9af 100644
+> --- a/drivers/pwm/pwm-atmel.c
+> +++ b/drivers/pwm/pwm-atmel.c
+> @@ -155,24 +155,25 @@ static void atmel_pwm_config_v1(struct pwm_chip *chip, struct pwm_device *pwm,
+>  	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+>  	unsigned int val;
+>  
+> -	if (test_bit(PWMF_ENABLED, &pwm->flags)) {
+> -		/*
+> -		 * If the PWM channel is enabled, using the update register,
+> -		 * it needs to set bit 10 of CMR to 0
+> -		 */
+> -		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CUPD, dty);
+>  
+> -		val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
+> -		val &= ~PWM_CMR_UPD_CDTY;
+> -		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
+> -	} else {
+> -		/*
+> -		 * If the PWM channel is disabled, write value to duty and
+> -		 * period registers directly.
+> -		 */
+> -		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CDTY, dty);
+> -		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CPRD, prd);
+> -	}
+> +	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CUPD, dty);
+> +
+> +	val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
+> +	val &= ~PWM_CMR_UPD_CDTY;
+> +	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
+> +
+> +	/*
+> +	 * If the PWM channel is enabled, only update CDTY by using the update
+> +	 * register, it needs to set bit 10 of CMR to 0
+> +	 */
+> +	if (test_bit(PWMF_ENABLED, &pwm->flags))
+> +		return;
+> +	/*
+> +	 * If the PWM channel is disabled, write value to duty and period
+> +	 * registers directly.
+> +	 */
+> +	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CDTY, dty);
+> +	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CPRD, prd);
+>  }
+>  
+>  static void atmel_pwm_config_v2(struct pwm_chip *chip, struct pwm_device *pwm,
+> 
 
 
-Best regards,
-
-James
+-- 
+Nicolas Ferre
