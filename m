@@ -1,78 +1,97 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 26 May 2015 14:47:12 +0200
-Subject: [PATCH v2] clk: mvebu: add missing CESA gate clk
-In-Reply-To: <1432644177-16152-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1432644177-16152-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <55646B50.9060709@free-electrons.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 26 May 2015 20:49:13 +0800
+Subject: [PATCH 00/11] ARM64 PCI hostbridge init based on ACPI
+Message-ID: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+This patch set is introducing ARM64 PCI hostbridge init based on ACPI,
+which based on Jiang Liu's patch set "Consolidate ACPI PCI root common
+code into ACPI core":
 
-On 26/05/2015 14:42, Boris Brezillon wrote:
-> Even if not documented in the datasheet, the Armada 370 SoC can actually
-> gate the CESA (crypto engine) clock.
-> Add an entry in the gating_desc table to be able to reference the CESA
-> gateclk in the crypto node.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+https://lkml.org/lkml/2015/5/14/98
+
+This patch set including three parts:
+
+  - the first part is PATCH 1, which should be merged into Jiang Liu's 
+    patch set to fix the compile error on ARM64 when ACPI enabled.
+
+  - the senconed part is the refactoring of mmconfig to let that mechanism
+    can be used for ARM64 too, it's Tomasz's work but he is moving to other
+    work and pretty busy for now, so I will take care of those patches, 
+    Tomasz will show up when some comments need to be addressed :)
+
+    In this version of mmconfig refactor patches, I removed the rename
+    of mmconfig -> ecam patch, because mmconfig is in multi places, and need
+    much more effort to convert them all to ecam, Bjorn, if you don't
+    like it, I can add them back.
+
+  - The third part is about the ARM64 PCI hostbridge init based on ACPI,
+    first I fixed a compile error for XEN PCI on ARM64 when PCI_MMCONFIG=y,
+    and then introduce PCI init based on Jiang Liu and Tomasz's patch set.
+
+patch for ARM64 ACPI PCI still reserve the bus sysdata to get the domain
+number, because Yijing's patch set is still under review, will be removed
+when Yijing's patch set hits upstream.
+
+This patch set was tested by Suravee on Seattle board with legacy interrupt
+(not MSI), and it works, also tested on qemu by Graeme.
+
+You can get the code from:
+git://git.linaro.org/leg/acpi/acpi.git, devel branch
+
+Comments are welcomed.
+
+Thanks
+Hanjun
 
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Hanjun Guo (3):
+  ARM64 / PCI: introduce struct pci_controller for ACPI
+  XEN / PCI: Remove the dependence on arch x86 when PCI_MMCONFIG=y
+  ARM64 / PCI / ACPI: support for ACPI based PCI hostbridge init
 
+Tomasz Nowicki (8):
+  x86, pci: Clean up comment about buggy MMIO config space access for
+    AMD Fam10h CPUs.
+  x86, pci: Abstract PCI config accessors and use AMD Fam10h workaround
+    exclusively.
+  x86, pci: Reorder logic of pci_mmconfig_insert() function
+  x86, pci, acpi: Move arch-agnostic MMCONFIG (aka ECAM) and ACPI code
+    out of arch/x86/ directory
+  pci, acpi, mcfg: Provide generic implementation of MCFG code
+    initialization.
+  x86, pci: mmconfig_{32,64}.c code refactoring - remove code
+    duplication.
+  x86, pci, ecam: mmconfig_64.c becomes default implementation for ECAM
+    driver.
+  pci, acpi, mcfg: Share ACPI PCI config space accessors.
 
-Thanks,
-
-Gregory
-
-> ---
-> Hi,
-> 
-> Sorry for the noise, but since the changes in this patch are quite
-> straightforward, I'm directly sending a v2 addressing Gregory's comments
-> (instead of waiting for more reviews).
-> 
-> Best Regards,
-> 
-> Boris
-> 
-> Changes since v1:
->  - update the DT bindings doc
->  - change the clock name to be consistent with other SoCs
-> 
->  Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt | 1 +
->  drivers/clk/mvebu/armada-370.c                                | 1 +
->  2 files changed, 2 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
-> index 31c7c0c..660e649 100644
-> --- a/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
-> +++ b/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
-> @@ -19,6 +19,7 @@ ID	Clock	Peripheral
->  9	pex1	PCIe Cntrl 1
->  15	sata0	SATA Host 0
->  17	sdio	SDHCI Host
-> +23	crypto	CESA (crypto engine)
->  25	tdm	Time Division Mplx
->  28	ddr	DDR Cntrl
->  30	sata1	SATA Host 0
-> diff --git a/drivers/clk/mvebu/armada-370.c b/drivers/clk/mvebu/armada-370.c
-> index 756f0f3..c19fd77 100644
-> --- a/drivers/clk/mvebu/armada-370.c
-> +++ b/drivers/clk/mvebu/armada-370.c
-> @@ -163,6 +163,7 @@ static const struct clk_gating_soc_desc a370_gating_desc[] __initconst = {
->  	{ "pex1", "pex1_en", 9, 0 },
->  	{ "sata0", NULL, 15, 0 },
->  	{ "sdio", NULL, 17, 0 },
-> +	{ "crypto", NULL, 23, 0 },
->  	{ "tdm", NULL, 25, 0 },
->  	{ "ddr", NULL, 28, CLK_IGNORE_UNUSED },
->  	{ "sata1", NULL, 30, 0 },
-> 
-
+ arch/arm64/Kconfig             |   7 +
+ arch/arm64/include/asm/pci.h   |  10 ++
+ arch/arm64/kernel/pci.c        | 245 ++++++++++++++++++++++++++--
+ arch/x86/Kconfig               |   4 +
+ arch/x86/include/asm/pci_x86.h |  34 +---
+ arch/x86/pci/Makefile          |   4 +-
+ arch/x86/pci/acpi.c            |   1 +
+ arch/x86/pci/mmconfig-shared.c | 301 +++++++++++-----------------------
+ arch/x86/pci/mmconfig_32.c     |  35 +---
+ arch/x86/pci/mmconfig_64.c     | 153 ------------------
+ arch/x86/pci/numachip.c        |  25 +--
+ drivers/acpi/Makefile          |   1 +
+ drivers/acpi/mcfg.c            | 103 ++++++++++++
+ drivers/pci/Kconfig            |  10 ++
+ drivers/pci/Makefile           |   5 +
+ drivers/pci/ecam.c             | 358 +++++++++++++++++++++++++++++++++++++++++
+ drivers/pci/pci.c              |  26 +--
+ drivers/xen/pci.c              |   7 +-
+ include/linux/acpi.h           |   2 +
+ include/linux/ecam.h           |  56 +++++++
+ 20 files changed, 923 insertions(+), 464 deletions(-)
+ delete mode 100644 arch/x86/pci/mmconfig_64.c
+ create mode 100644 drivers/acpi/mcfg.c
+ create mode 100644 drivers/pci/ecam.c
+ create mode 100644 include/linux/ecam.h
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.9.1
