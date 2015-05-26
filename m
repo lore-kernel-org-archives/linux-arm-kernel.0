@@ -1,160 +1,86 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 26 May 2015 11:44:44 +0200
-Subject: [PATCH 3/3] ARM: mvebu: use improved armada spi device tree
- compatible name for each SoC
+Date: Tue, 26 May 2015 11:44:42 +0200
+Subject: [PATCH 1/3] spi: orion: Fix maximum baud rates for Armada 370/XP
 In-Reply-To: <1432633484-18758-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1432633484-18758-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1432633484-18758-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1432633484-18758-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the new compatible introduced in rder to beneficiate of a wider
-and more accurate range of baud rates to be used.
+The commit df59fa7f4bca "spi: orion: support armada extended baud
+rates" was too optimistic for the maximum baud rate that the Armada
+SoCs can support. According to the hardware datasheet the maximum
+frequency supported by the Armada 370 SoC is tclk/4. But for the
+Armada XP, Armada 38x and Armada 39x SoCs the limitation is 50MHz and
+for the Armada 375 it is tclk/15.
+
+Currently the armada-370-spi compatible is only used by the Armada 370
+and the Armada XP device tree. On Armada 370, tclk cannot be higher
+than 200MHz. In order to be able to handle both SoCs, we can take the
+minimum of 50MHz and tclk/4.
+
+A proper solution is adding a compatible string for each SoC, but it
+can't be done as a fix for compatibility reason (we can't modify
+device tree that have been already released) and it will be part of a
+separate patch.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Reported-by: Kostya Porotchkin <kostap@marvell.com>
+Cc: <stable@vger.kernel.org> #Fixes df59fa7f4bca
 ---
- arch/arm/boot/dts/armada-370-xp.dtsi | 2 --
- arch/arm/boot/dts/armada-370.dtsi    | 4 ++++
- arch/arm/boot/dts/armada-375.dtsi    | 6 ++++--
- arch/arm/boot/dts/armada-38x.dtsi    | 6 ++++--
- arch/arm/boot/dts/armada-39x.dtsi    | 6 ++++--
- arch/arm/boot/dts/armada-xp.dtsi     | 8 ++++++++
- 6 files changed, 24 insertions(+), 8 deletions(-)
+ drivers/spi/spi-orion.c | 25 +++++++++++++++++++++++--
+ 1 file changed, 23 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index ec96f0b36346..7f0252c580e4 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -149,7 +149,6 @@
- 			};
+diff --git a/drivers/spi/spi-orion.c b/drivers/spi/spi-orion.c
+index 861664776672..ff97cabdaa81 100644
+--- a/drivers/spi/spi-orion.c
++++ b/drivers/spi/spi-orion.c
+@@ -61,6 +61,12 @@ enum orion_spi_type {
  
- 			spi0: spi at 10600 {
--				compatible = "marvell,armada-370-spi", "marvell,orion-spi";
- 				reg = <0x10600 0x28>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-@@ -160,7 +159,6 @@
- 			};
+ struct orion_spi_dev {
+ 	enum orion_spi_type	typ;
++	/*
++	 * min_divisor and max_hz should be exclusive, the only we can
++	 * have both is for managing the armada-370-spi case with old
++	 * device tree
++	 */
++	unsigned long		max_hz;
+ 	unsigned int		min_divisor;
+ 	unsigned int		max_divisor;
+ 	u32			prescale_mask;
+@@ -387,8 +393,9 @@ static const struct orion_spi_dev orion_spi_dev_data = {
  
- 			spi1: spi at 10680 {
--				compatible = "marvell,armada-370-spi", "marvell,orion-spi";
- 				reg = <0x10680 0x28>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index 00b50db57c9c..3f036bd635f4 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -139,11 +139,15 @@
- 			 * board level if a different configuration is used.
- 			 */
- 			spi0: spi at 10600 {
-+				compatible = "marvell,armada-370-spi",
-+						"marvell,orion-spi";
- 				pinctrl-0 = <&spi0_pins1>;
- 				pinctrl-names = "default";
- 			};
+ static const struct orion_spi_dev armada_spi_dev_data = {
+ 	.typ = ARMADA_SPI,
+-	.min_divisor = 1,
++	.min_divisor = 4,
+ 	.max_divisor = 1920,
++	.max_hz = 50000000,
+ 	.prescale_mask = ARMADA_SPI_CLK_PRESCALE_MASK,
+ };
  
- 			spi1: spi at 10680 {
-+				compatible = "marvell,armada-370-spi",
-+						"marvell,orion-spi";
- 				pinctrl-0 = <&spi1_pins>;
- 				pinctrl-names = "default";
- 			};
-diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-index f076ff856d8b..67a0ab0f71e0 100644
---- a/arch/arm/boot/dts/armada-375.dtsi
-+++ b/arch/arm/boot/dts/armada-375.dtsi
-@@ -238,7 +238,8 @@
- 			};
+@@ -454,7 +461,21 @@ static int orion_spi_probe(struct platform_device *pdev)
+ 		goto out;
  
- 			spi0: spi at 10600 {
--				compatible = "marvell,orion-spi";
-+				compatible = "marvell,armada-375-spi",
-+						"marvell,orion-spi";
- 				reg = <0x10600 0x50>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-@@ -249,7 +250,8 @@
- 			};
- 
- 			spi1: spi at 10680 {
--				compatible = "marvell,orion-spi";
-+				compatible = "marvell,armada-375-spi",
-+						"marvell,orion-spi";
- 				reg = <0x10680 0x50>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index 218a2acd36e5..eace85db7c8c 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -167,7 +167,8 @@
- 			};
- 
- 			spi0: spi at 10600 {
--				compatible = "marvell,orion-spi";
-+				compatible = "marvell,armada-380-spi",
-+						"marvell,orion-spi";
- 				reg = <0x10600 0x50>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-@@ -178,7 +179,8 @@
- 			};
- 
- 			spi1: spi at 10680 {
--				compatible = "marvell,orion-spi";
-+				compatible = "marvell,armada-380-spi",
-+						"marvell,orion-spi";
- 				reg = <0x10680 0x50>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/armada-39x.dtsi b/arch/arm/boot/dts/armada-39x.dtsi
-index ecd1318109ba..fc9864f85fc2 100644
---- a/arch/arm/boot/dts/armada-39x.dtsi
-+++ b/arch/arm/boot/dts/armada-39x.dtsi
-@@ -128,7 +128,8 @@
- 			};
- 
- 			spi0: spi at 10600 {
--				compatible = "marvell,orion-spi";
-+				compatible = "marvell,armada-390-spi",
-+						"marvell,orion-spi";
- 				reg = <0x10600 0x50>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-@@ -139,7 +140,8 @@
- 			};
- 
- 			spi1: spi at 10680 {
--				compatible = "marvell,orion-spi";
-+				compatible = "marvell,armada-390-spi",
-+						"marvell,orion-spi";
- 				reg = <0x10680 0x50>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 013d63f69e36..e78ce4ab6b75 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -85,10 +85,18 @@
- 			};
- 
- 			spi0: spi at 10600 {
-+				compatible = "marvell,armada-xp-spi",
-+						"marvell,orion-spi";
- 				pinctrl-0 = <&spi0_pins>;
- 				pinctrl-names = "default";
- 			};
- 
-+			spi1: spi at 10680 {
-+				compatible = "marvell,armada-xp-spi",
-+						"marvell,orion-spi";
-+			};
+ 	tclk_hz = clk_get_rate(spi->clk);
+-	master->max_speed_hz = DIV_ROUND_UP(tclk_hz, devdata->min_divisor);
 +
-+
- 			i2c0: i2c at 11000 {
- 				compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
- 				reg = <0x11000 0x100>;
++	/*
++	 * With old device tree, armada-370-spi could be used with
++	 * Armada XP, however for this SoC the maximum frequency is
++	 * 50MHz instead of tclk/4. On Armada 370, tclk cannot be
++	 * higher than 200MHz. So, in order to be able to handle both
++	 * SoCs, we can take the minimum of 50MHz and tclk/4.
++	 */
++	if (of_device_is_compatible(pdev->dev.of_node,
++					"marvell,armada-370-spi"))
++		master->max_speed_hz = min(devdata->max_hz,
++				DIV_ROUND_UP(tclk_hz, devdata->min_divisor));
++	else
++		master->max_speed_hz =
++			DIV_ROUND_UP(tclk_hz, devdata->min_divisor);
+ 	master->min_speed_hz = DIV_ROUND_UP(tclk_hz, devdata->max_divisor);
+ 
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 -- 
 2.1.0
