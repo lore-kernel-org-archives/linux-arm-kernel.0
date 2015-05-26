@@ -1,102 +1,51 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Tue, 26 May 2015 14:16:31 +0800
-Subject: [PATCH v4 2/7] mmc: mediatek: Add Mediatek MMC driver
-In-Reply-To: <CAPDyKFpWCvJXL-W5P83ucBM2-b5cDFEtSLnN6J6WLyR_9CuvWw@mail.gmail.com>
-References: <1432017411-2996-1-git-send-email-chaotian.jing@mediatek.com>
- <1432017411-2996-3-git-send-email-chaotian.jing@mediatek.com>
- <CAPDyKFo5788uRqAaXUZ-OiS1XF8NPmg4tn2ipZNJdx4dci+KMQ@mail.gmail.com>
- <1432284000.23435.38.camel@mhfsdcap03>
- <CAPDyKFpWCvJXL-W5P83ucBM2-b5cDFEtSLnN6J6WLyR_9CuvWw@mail.gmail.com>
-Message-ID: <1432620991.647.6.camel@mhfsdcap03>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Tue, 26 May 2015 08:17:23 +0200
+Subject: [PATCH 10/21] regulator: core: Probe regulators on demand
+In-Reply-To: <20150525173244.GE21577@sirena.org.uk>
+References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1432565608-26036-11-git-send-email-tomeu.vizoso@collabora.com>
+ <20150525173244.GE21577@sirena.org.uk>
+Message-ID: <CAAObsKDzKzYAx4_xsNm0reXzgSrJi7Q+aZGifmVxvSEQ=Qxjkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-05-22 at 14:51 +0200, Ulf Hansson wrote:
-> [...]
-> 
-> >> You are invoking msdc_gate_clock() and msdc_ungate_clock() in a
-> >> balanced manner, thus hclk_enabled is redundant. Please remove it.
-> >
-> > on drv->probe(), already invoke the msdc_ungate_clock(), so, when the
-> > runtime pm resume invoke the msdc_ungate_clock(), the hclk already
-> > enabled.
-> 
-> 
-> That's why you invoke pm_runtime_set_active() during ->probe() when
-> deploying PM support in patch3. It's not an issue then.
-OK, then I can remove the hclk_enabled and sclk_enabled.
-> 
-> [...]
-> 
-> >> I assume it's possible to gate the clock by updating a MSDC register
-> >> instead!? That would be prefereable since then you can leave clock
-> >> gating/ungating via the clk API, to be dealt from runtime PM. That
-> >> would also make "sclk_enabled" in the struct msdc_host redundant.
-> >>
-> >> Adopting to above, obviously requires MSDC to be able to ungate the
-> >> clock by also updating a MSDC register. I assume that's possible as
-> >> well!?
-> >>
-> > We can set the bit1 of MSDC_CFG, when this bit is 0, the bus clock was
-> > gated to 0 if no command or data is transmitted.
-> > And, from our designer, when we operate the MSDC register, we need make
-> > sure both HCLK and source are enabled, if source clock was disabled,
-> > write some MSDC registers will have no effect(eg. send CMD, without
-> > source clock, not only cannot send CMD, but also cannot get CMD timeout
-> > interrupt.)
-> 
-> Thanks, that answered my question. As I understand it you should be
-> able to adopt to my propsual.
-> 
-> [...]
-> 
-> >> > +{
-> >> > +       unsigned long tmo = jiffies + msecs_to_jiffies(20);
-> >> > +
-> >> > +       while ((readl(host->base + SDC_STS) & SDC_STS_CMDBUSY)
-> >> > +                       && time_before(jiffies, tmo))
-> >> > +               continue;
-> >> > +
-> >> > +       if (readl(host->base + SDC_STS) & SDC_STS_CMDBUSY) {
-> >> > +               dev_err(host->dev, "CMD bus busy detected\n");
-> >> > +               host->error |= REQ_CMD_BUSY;
-> >> > +               msdc_cmd_done(host, MSDC_INT_CMDTMO, mrq, cmd);
-> >> > +               return false;
-> >> > +       }
-> >> > +
-> >> > +       if (mmc_resp_type(cmd) == MMC_RSP_R1B || cmd->data) {
-> >> > +               /* R1B or with data, should check SDCBUSY */
-> >> > +               while (readl(host->base + SDC_STS) & SDC_STS_SDCBUSY)
-> >> > +                       cpu_relax();
-> >> > +       }
-> >>
-> >> MSDC seems to be handling card busy detection in HW, right?
-> >>
-> > Do not have this ability, HW only know if CMD/DAT is low, but do not
-> > have any interrupt for it,
-> 
-> I see, but doesn't the above polling mean that msdc will not propagate
-> the response until the card have stopped signal busy? That's what
-> MMC_CAP_WAIT_WHILE_BUSY shall be used for.
-> 
-As you see, we only check the "busy state" BEFORE issue a R1B command or
-with data command, but do not check if AFTER the request was done, that
-would do not match the "MMC_CAP_WAIT_WHILE_BUSY"(eg. CMD5 to sleep)
-In addition, about CMD5, I find that the suspend/resume flow of EMMC is
-stranger in new kernel version, when suspend, it may issue CMD5 to enter
-sleep mode, then power off MMC, but when resume, it will
-re-initialization, So that why need do the redundant CMD5 in suspend ?
+On 25 May 2015 at 19:32, Mark Brown <broonie@kernel.org> wrote:
+> On Mon, May 25, 2015 at 04:53:14PM +0200, Tomeu Vizoso wrote:
+>
+>> When looking up a regulator through its DT node, ensure that the
+>> corresponding device has been registered.
+>
+> I'm sorry but I'm going to need a much better changelog to review this
+> patch.  I can't entirely tell what the intended effect is supposed to
+> be, the subject line says we're probing things and the body says we're
+> registering things which aren't the same thing at all.
 
-> Perhaps you should remove the above polling, and rely on the MMC core
-> to poll with CMD13 instead?
-before any read/write command, core will issue CMD13 to confirm card
-status, here is just only do double confirm to avoid HW issue.
-> 
-> >> If so, you should enable MMC_CAP_WAIT_WHILE_BUSY and set
-> >> "max_busy_timeout" to DAT_TIMEOUT to inform the mmc core about it.
-> >>
-> 
-> [...]
-> 
-> Kind regards
-> Uffe
+Agreed, it would be more appropriate to say that we are registering
+devices, I will make it clearer in the next revision. It ends up
+probing the device at that point because we have made sure with an
+earlier patch that all built-in drivers have been registered already.
+
+>>               if (node) {
+>> +                     of_platform_device_ensure(node);
+>
+> This function doesn't appear in git so I'm guessing that some other
+> patch in the series adds it.  See my reply to the first patch...
+
+Sorry about that, the series touches so many subsystems that I would
+have reached the maximum number of recipients on the mailing lists I'm
+sending it to. I will send it next with you and Krzysztof on CC on the
+whole series.
+
+> The obvious questions here based on the name are why we're doing
+> something specific to platform devices and why this isn't something
+> we're abstracting in the driver core (or at least generic firmware code)
+> - we're going to have the same thing with ACPI.
+
+I don't know how useful this is going to be in systems with ACPI. My
+experience is limited to 32bit ARM, where the kernel has to manage
+every regulator, clock, gpio, etc so the dependency tree is so big. Is
+deferred probing a problem with ACPI as well?
+
+Thanks,
+
+Tomeu
