@@ -1,55 +1,62 @@
-From: andriy.shevchenko@intel.com (Shevchenko, Andriy)
-Date: Tue, 26 May 2015 15:08:27 +0000
-Subject: [PATCH v6] serial: 8250_uniphier: add UniPhier serial driver
-In-Reply-To: <1432650518.13900.72.camel@linux.intel.com>
-References: <1432525477-14051-1-git-send-email-yamada.masahiro@socionext.com>
- <1432545245.8736.5.camel@intel.com>
- <1432650518.13900.72.camel@linux.intel.com>
-Message-ID: <1432652906.8736.44.camel@intel.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Tue, 26 May 2015 17:08:38 +0200
+Subject: [PATCH 10/21] regulator: core: Probe regulators on demand
+In-Reply-To: <20150526093601.GH21577@sirena.org.uk>
+References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1432565608-26036-11-git-send-email-tomeu.vizoso@collabora.com>
+ <20150525173244.GE21577@sirena.org.uk>
+ <CAAObsKDzKzYAx4_xsNm0reXzgSrJi7Q+aZGifmVxvSEQ=Qxjkw@mail.gmail.com>
+ <20150526093601.GH21577@sirena.org.uk>
+Message-ID: <CAAObsKA_59z0qYmUqux7dMO38vOrLBUM_eWZ-QeJxEEmunq2ZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-05-26 at 15:28 +0100, Alan Cox wrote:
-> > > +
-> > > +#define UNIPHIER_UART_CHAR_FCR	3	/* Character / FIFO Control Register */
-> > > +#define UNIPHIER_UART_LCR_MCR	4	/* Line/Modem Control Register */
-> > > +#define   UNIPHIER_UART_LCR_SHIFT	8
-> > 
-> > Indentation problem, needs to be fixed.
-> 
-> If you are going to review a patch set at least look at the previous
-> reviews - the indentation was already discussed and is done that way to
-> show (as many drivers do) which are fields for which registers
+On 26 May 2015 at 11:36, Mark Brown <broonie@kernel.org> wrote:
+> On Tue, May 26, 2015 at 08:17:23AM +0200, Tomeu Vizoso wrote:
+>> On 25 May 2015 at 19:32, Mark Brown <broonie@kernel.org> wrote:
+>
+>> > The obvious questions here based on the name are why we're doing
+>> > something specific to platform devices and why this isn't something
+>> > we're abstracting in the driver core (or at least generic firmware code)
+>> > - we're going to have the same thing with ACPI.
+>
+>> I don't know how useful this is going to be in systems with ACPI. My
+>> experience is limited to 32bit ARM, where the kernel has to manage
+>> every regulator, clock, gpio, etc so the dependency tree is so big. Is
+>> deferred probing a problem with ACPI as well?
+>
+> Yes, x86 based embedded systems use ACPI (and we really ought to be
+> trying to help systems using board files too for that matter).
 
-This is not exactly the field, the way how to get the field.
-In some cases it is even better to define something like
-_LCR(x)  ((x) << 8)
+Yes, I see how registering devices on-demand could be implemented for
+all those, but what I don't see is how they would benefit from it.
 
+I can see an hypothetical maintenance benefit in sharing as much code
+as possible between these different scenarios, but in this case,
+because this feature is so closely tied to machine description I think
+complexity would be actually bigger.
 
-> 
-> > > +static unsigned int uniphier_serial_in(struct uart_port *p, int offset)
-> > > +{
-> > > +	int valshift = 0;
-> > 
-> > Perhaps unsigned int?
-> 
-> Why ? even if it mattered gcc is already realising that the value can
-> only be 0 or 8 and will be generating whatever works best for that.
+The problem I'm trying to address only manifests on systems with
+dozens of devices that are currently registered in an arbitrary order
+(as they are in the DT).
 
-It's not about how gcc does, it's about what assumptions can be made
-from the reading of the source code. I think if we do a counter of shift
-value it would be nice to set an unsigned type explicitly.
+On machines that have ACPI, most of those devices aren't exposed to
+the kernel and few or no deferred probes happen (though I have only
+tested on qemu and Minnowboard MAX, both with no deferred probes).
 
--- 
-Andy Shevchenko <andriy.shevchenko@intel.com>
-Intel Finland Oy
----------------------------------------------------------------------
-Intel Finland Oy
-Registered Address: PL 281, 00181 Helsinki 
-Business Identity Code: 0357606 - 4 
-Domiciled in Helsinki 
+On machines with board files, devices are registered in a
+predetermined order, presumably without any deferred probes.
 
-This e-mail and any attachments may contain confidential material for
-the sole use of the intended recipient(s). Any review or distribution
-by others is strictly prohibited. If you are not the intended
-recipient, please contact the sender and delete all copies.
+My understanding is that the problem I'm addressing is specific of
+machines in which the kernel is in charge of pretty much everything
+and that the information about what devices are present is given in an
+arbitrary order.
+
+Deferred probe gives us reliably a working system at the end for these
+machines, but in the meantime some devices will have been deferred
+several times and when they get to probe the user will have noticed
+the delay.
+
+Regards,
+
+Tomeu
