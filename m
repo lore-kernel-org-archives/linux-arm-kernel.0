@@ -1,222 +1,161 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 26 May 2015 14:52:25 +0100
-Subject: [PATCHv3 07/12] arm64: psci: kill psci_power_state
+Date: Tue, 26 May 2015 14:52:26 +0100
+Subject: [PATCHv3 08/12] arm64: psci: remove ACPI coupling
 In-Reply-To: <1432648350-5454-1-git-send-email-mark.rutland@arm.com>
 References: <1432648350-5454-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1432648350-5454-8-git-send-email-mark.rutland@arm.com>
+Message-ID: <1432648350-5454-9-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A PSCI 1.0 implementation may choose to use the new extended StateID
-format, the presence of which may be queried via the PSCI_FEATURES call.
-The layout of this new StateID format is incompatible with the existing
-format, and so to handle both we must abstract attempts to parse the
-fields.
+The 32-bit ARM port doesn't have ACPI headers, and conditionally
+including them is going to look horrendous. In preparation for sharing
+the PSCI invocation code with 32-bit, move the acpi_psci_* function
+declarations and definitions such that the PSCI client code need not
+include ACPI headers.
 
-In preparation for PSCI 1.0 support, this patch introduces
-psci_power_state_loses_context and psci_power_state_is_valid functions
-to query information from a PSCI power state, which is no longer
-decomposed (and hence the pack/unpack functions are removed). As it is
-no longer decomposed, it is now passed round as an opaque u32 token.
+While it would seem like we could simply hide the ACPI includes in
+psci.h, the ACPI headers have hilarious circular dependencies which make
+this infeasible without reorganising most of ACPICA. So rather than
+doing that, move the acpi_psci_* prototypes into psci.h.
+
+The psci_acpi_init function is made dependent on CONFIG_ACPI (with a
+stub implementation in asm/psci.h) such that it need not be built for
+32-bit ARM or kernels without ACPI support. The currently missing __init
+annotations are added to the prototypes in the header.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
+Reviewed-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+Cc: Al Stone <al.stone@linaro.org>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/psci.c | 89 ++++++++++++++++++++----------------------------
- 1 file changed, 37 insertions(+), 52 deletions(-)
+ arch/arm64/include/asm/acpi.h | 15 +--------------
+ arch/arm64/include/asm/psci.h | 12 ++++++++++--
+ arch/arm64/kernel/acpi.c      | 11 +++++++++++
+ arch/arm64/kernel/psci.c      |  4 ++--
+ 4 files changed, 24 insertions(+), 18 deletions(-)
 
+diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+index 1240b86..39248d3 100644
+--- a/arch/arm64/include/asm/acpi.h
++++ b/arch/arm64/include/asm/acpi.h
+@@ -16,6 +16,7 @@
+ #include <linux/irqchip/arm-gic-acpi.h>
+ 
+ #include <asm/cputype.h>
++#include <asm/psci.h>
+ #include <asm/smp_plat.h>
+ 
+ /* Basic configuration for ACPI */
+@@ -39,18 +40,6 @@ extern int acpi_disabled;
+ extern int acpi_noirq;
+ extern int acpi_pci_disabled;
+ 
+-/* 1 to indicate PSCI 0.2+ is implemented */
+-static inline bool acpi_psci_present(void)
+-{
+-	return acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_COMPLIANT;
+-}
+-
+-/* 1 to indicate HVC must be used instead of SMC as the PSCI conduit */
+-static inline bool acpi_psci_use_hvc(void)
+-{
+-	return acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_USE_HVC;
+-}
+-
+ static inline void disable_acpi(void)
+ {
+ 	acpi_disabled = 1;
+@@ -88,8 +77,6 @@ static inline void arch_fix_phys_package_id(int num, u32 slot) { }
+ void __init acpi_init_cpus(void);
+ 
+ #else
+-static inline bool acpi_psci_present(void) { return false; }
+-static inline bool acpi_psci_use_hvc(void) { return false; }
+ static inline void acpi_init_cpus(void) { }
+ #endif /* CONFIG_ACPI */
+ 
+diff --git a/arch/arm64/include/asm/psci.h b/arch/arm64/include/asm/psci.h
+index 2454bc5..49d7e1a 100644
+--- a/arch/arm64/include/asm/psci.h
++++ b/arch/arm64/include/asm/psci.h
+@@ -14,7 +14,15 @@
+ #ifndef __ASM_PSCI_H
+ #define __ASM_PSCI_H
+ 
+-int psci_dt_init(void);
+-int psci_acpi_init(void);
++int __init psci_dt_init(void);
++
++#ifdef CONFIG_ACPI
++int __init psci_acpi_init(void);
++bool __init acpi_psci_present(void);
++bool __init acpi_psci_use_hvc(void);
++#else
++static inline int psci_acpi_init(void) { return 0; }
++static inline bool acpi_psci_present(void) { return false; }
++#endif
+ 
+ #endif /* __ASM_PSCI_H */
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index 732f57b..19de753 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -89,6 +89,17 @@ void __init __acpi_unmap_table(char *map, unsigned long size)
+ 	early_memunmap(map, size);
+ }
+ 
++bool __init acpi_psci_present(void)
++{
++	return acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_COMPLIANT;
++}
++
++/* Whether HVC must be used instead of SMC as the PSCI conduit */
++bool __init acpi_psci_use_hvc(void)
++{
++	return acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_USE_HVC;
++}
++
+ /*
+  * acpi_fadt_sanity_check() - Check FADT presence and carry out sanity
+  *			      checks on it
 diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-index ffa17d1..0e2a440 100644
+index 0e2a440..cba05d9 100644
 --- a/arch/arm64/kernel/psci.c
 +++ b/arch/arm64/kernel/psci.c
-@@ -38,11 +38,19 @@
- #define PSCI_POWER_STATE_TYPE_STANDBY		0
- #define PSCI_POWER_STATE_TYPE_POWER_DOWN	1
+@@ -15,7 +15,6 @@
  
--struct psci_power_state {
--	u16	id;
--	u8	type;
--	u8	affinity_level;
--};
-+static bool psci_power_state_loses_context(u32 state)
-+{
-+	return state & PSCI_0_2_POWER_STATE_TYPE_MASK;
-+}
-+
-+static bool psci_power_state_is_valid(u32 state)
-+{
-+	const u32 valid_mask = PSCI_0_2_POWER_STATE_ID_MASK |
-+			       PSCI_0_2_POWER_STATE_TYPE_MASK |
-+			       PSCI_0_2_POWER_STATE_AFFL_MASK;
-+
-+	return !(state & ~valid_mask);
-+}
+ #define pr_fmt(fmt) "psci: " fmt
  
+-#include <linux/acpi.h>
+ #include <linux/init.h>
+ #include <linux/of.h>
+ #include <linux/smp.h>
+@@ -25,7 +24,6 @@
+ #include <linux/slab.h>
+ #include <uapi/linux/psci.h>
+ 
+-#include <asm/acpi.h>
+ #include <asm/compiler.h>
+ #include <asm/cputype.h>
+ #include <asm/cpu_ops.h>
+@@ -446,6 +444,7 @@ int __init psci_dt_init(void)
+ 	return init_fn(np);
+ }
+ 
++#ifdef CONFIG_ACPI
  /*
-  * The CPU any Trusted OS is resident on. The trusted OS may reject CPU_OFF
-@@ -58,9 +66,8 @@ static bool psci_tos_resident_on(int cpu)
+  * We use PSCI 0.2+ when ACPI is deployed on ARM64 and it's
+  * explicitly clarified in SBBR
+@@ -466,6 +465,7 @@ int __init psci_acpi_init(void)
+ 
+ 	return psci_probe();
  }
++#endif
  
- struct psci_operations {
--	int (*cpu_suspend)(struct psci_power_state state,
--			   unsigned long entry_point);
--	int (*cpu_off)(struct psci_power_state state);
-+	int (*cpu_suspend)(u32 state, unsigned long entry_point);
-+	int (*cpu_off)(u32 state);
- 	int (*cpu_on)(unsigned long cpuid, unsigned long entry_point);
- 	int (*migrate)(unsigned long cpuid);
- 	int (*affinity_info)(unsigned long target_affinity,
-@@ -84,7 +91,7 @@ enum psci_function {
- 	PSCI_FN_MAX,
- };
+ #ifdef CONFIG_SMP
  
--static DEFINE_PER_CPU_READ_MOSTLY(struct psci_power_state *, psci_power_state);
-+static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
- 
- static u32 psci_function_id[PSCI_FN_MAX];
- 
-@@ -104,53 +111,28 @@ static int psci_to_linux_errno(int errno)
- 	return -EINVAL;
- }
- 
--static u32 psci_power_state_pack(struct psci_power_state state)
--{
--	return ((state.id << PSCI_0_2_POWER_STATE_ID_SHIFT)
--			& PSCI_0_2_POWER_STATE_ID_MASK) |
--		((state.type << PSCI_0_2_POWER_STATE_TYPE_SHIFT)
--		 & PSCI_0_2_POWER_STATE_TYPE_MASK) |
--		((state.affinity_level << PSCI_0_2_POWER_STATE_AFFL_SHIFT)
--		 & PSCI_0_2_POWER_STATE_AFFL_MASK);
--}
--
--static void psci_power_state_unpack(u32 power_state,
--				    struct psci_power_state *state)
--{
--	state->id = (power_state & PSCI_0_2_POWER_STATE_ID_MASK) >>
--			PSCI_0_2_POWER_STATE_ID_SHIFT;
--	state->type = (power_state & PSCI_0_2_POWER_STATE_TYPE_MASK) >>
--			PSCI_0_2_POWER_STATE_TYPE_SHIFT;
--	state->affinity_level =
--			(power_state & PSCI_0_2_POWER_STATE_AFFL_MASK) >>
--			PSCI_0_2_POWER_STATE_AFFL_SHIFT;
--}
--
- static u32 psci_get_version(void)
- {
- 	return invoke_psci_fn(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
- }
- 
--static int psci_cpu_suspend(struct psci_power_state state,
--			    unsigned long entry_point)
-+static int psci_cpu_suspend(u32 state, unsigned long entry_point)
- {
- 	int err;
--	u32 fn, power_state;
-+	u32 fn;
- 
- 	fn = psci_function_id[PSCI_FN_CPU_SUSPEND];
--	power_state = psci_power_state_pack(state);
--	err = invoke_psci_fn(fn, power_state, entry_point, 0);
-+	err = invoke_psci_fn(fn, state, entry_point, 0);
- 	return psci_to_linux_errno(err);
- }
- 
--static int psci_cpu_off(struct psci_power_state state)
-+static int psci_cpu_off(u32 state)
- {
- 	int err;
--	u32 fn, power_state;
-+	u32 fn;
- 
- 	fn = psci_function_id[PSCI_FN_CPU_OFF];
--	power_state = psci_power_state_pack(state);
--	err = invoke_psci_fn(fn, power_state, 0, 0);
-+	err = invoke_psci_fn(fn, state, 0, 0);
- 	return psci_to_linux_errno(err);
- }
- 
-@@ -194,7 +176,7 @@ static unsigned long psci_migrate_info_up_cpu(void)
- static int __maybe_unused cpu_psci_cpu_init_idle(unsigned int cpu)
- {
- 	int i, ret, count = 0;
--	struct psci_power_state *psci_states;
-+	u32 *psci_states;
- 	struct device_node *state_node, *cpu_node;
- 
- 	cpu_node = of_get_cpu_node(cpu, NULL);
-@@ -223,13 +205,13 @@ static int __maybe_unused cpu_psci_cpu_init_idle(unsigned int cpu)
- 		return -ENOMEM;
- 
- 	for (i = 0; i < count; i++) {
--		u32 psci_power_state;
-+		u32 state;
- 
- 		state_node = of_parse_phandle(cpu_node, "cpu-idle-states", i);
- 
- 		ret = of_property_read_u32(state_node,
- 					   "arm,psci-suspend-param",
--					   &psci_power_state);
-+					   &state);
- 		if (ret) {
- 			pr_warn(" * %s missing arm,psci-suspend-param property\n",
- 				state_node->full_name);
-@@ -238,9 +220,13 @@ static int __maybe_unused cpu_psci_cpu_init_idle(unsigned int cpu)
- 		}
- 
- 		of_node_put(state_node);
--		pr_debug("psci-power-state %#x index %d\n", psci_power_state,
--							    i);
--		psci_power_state_unpack(psci_power_state, &psci_states[i]);
-+		pr_debug("psci-power-state %#x index %d\n", state, i);
-+		if (!psci_power_state_is_valid(state)) {
-+			pr_warn("Invalid PSCI power state %#x\n", state);
-+			ret = -EINVAL;
-+			goto free_mem;
-+		}
-+		psci_states[i] = state;
- 	}
- 	/* Idle states parsed correctly, initialize per-cpu pointer */
- 	per_cpu(psci_power_state, cpu) = psci_states;
-@@ -528,9 +514,8 @@ static void cpu_psci_cpu_die(unsigned int cpu)
- 	 * There are no known implementations of PSCI actually using the
- 	 * power state field, pass a sensible default for now.
- 	 */
--	struct psci_power_state state = {
--		.type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
--	};
-+	u32 state = PSCI_POWER_STATE_TYPE_POWER_DOWN <<
-+		    PSCI_0_2_POWER_STATE_TYPE_SHIFT;
- 
- 	ret = psci_ops.cpu_off(state);
- 
-@@ -569,7 +554,7 @@ static int cpu_psci_cpu_kill(unsigned int cpu)
- 
- static int psci_suspend_finisher(unsigned long index)
- {
--	struct psci_power_state *state = __this_cpu_read(psci_power_state);
-+	u32 *state = __this_cpu_read(psci_power_state);
- 
- 	return psci_ops.cpu_suspend(state[index - 1],
- 				    virt_to_phys(cpu_resume));
-@@ -578,7 +563,7 @@ static int psci_suspend_finisher(unsigned long index)
- static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
- {
- 	int ret;
--	struct psci_power_state *state = __this_cpu_read(psci_power_state);
-+	u32 *state = __this_cpu_read(psci_power_state);
- 	/*
- 	 * idle state index 0 corresponds to wfi, should never be called
- 	 * from the cpu_suspend operations
-@@ -586,7 +571,7 @@ static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
- 	if (WARN_ON_ONCE(!index))
- 		return -EINVAL;
- 
--	if (state[index - 1].type == PSCI_POWER_STATE_TYPE_STANDBY)
-+	if (!psci_power_state_loses_context(state[index - 1]))
- 		ret = psci_ops.cpu_suspend(state[index - 1], 0);
- 	else
- 		ret = __cpu_suspend(index, psci_suspend_finisher);
 -- 
 1.9.1
