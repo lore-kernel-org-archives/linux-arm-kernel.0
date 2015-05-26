@@ -1,88 +1,32 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 26 May 2015 10:09:17 +0200
-Subject: [RFC PATCH v1 1/3] PCI: designware: Add ARM64 support
-In-Reply-To: <000001d096a9$27bf43f0$773dcbd0$@com>
-References: <000001d096a9$27bf43f0$773dcbd0$@com>
-Message-ID: <3203781.NTEqUP6iLy@wuerfel>
+Date: Tue, 26 May 2015 10:12:13 +0200
+Subject: [PATCH] pinctrl: zynq: change error code for pinctrl_register
+ failure
+In-Reply-To: <1432613909-13457-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1432613909-13457-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <4437293.G26yCXqFQH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 25 May 2015 14:10:37 Jingoo Han wrote:
-> 'pp->root_bus_nr' is initialized as '-1' at some soc-specific drivers
-> However, 'sys->busnr' is set as '0, 1, 2 ...' by pcibios_init_hw()
-> in arch/arm/kernel/bios32.c. '0, 1, 2 ...' means the number of
-> each host controller.
-> 
-> So, without setting 'pp->root_bus_nr' as '0, 1, 2, ...',
-> it makes the problem.
-> 
-> Thus, we need to come up with the way to resolve this.
-> 
-> 1. Setting 'pp->root_bus_nr' as '0, 1, 2 ..' by each soc-specific driver.
-> 
-> e.g)
-> 
-> ./drivers/pci/host/pci-exynos.c
-> @@ -534,7 +534,7 @@ static int __init exynos_add_pcie_port(struct pcie_port *pp,
->                 }
->         }
+On Tuesday 26 May 2015 13:18:29 Masahiro Yamada wrote:
+> diff --git a/drivers/pinctrl/pinctrl-zynq.c b/drivers/pinctrl/pinctrl-zynq.c
+> index 04748a4..0ff653c 100644
+> --- a/drivers/pinctrl/pinctrl-zynq.c
+> +++ b/drivers/pinctrl/pinctrl-zynq.c
+> @@ -1141,7 +1141,7 @@ static int zynq_pinctrl_probe(struct platform_device *pdev)
 >  
-> -       pp->root_bus_nr = -1;
-> +       pp->root_bus_nr++;
->         pp->ops = &exynos_pcie_host_ops;
-> 
-> ./drivers/pci/host/pci-imx6.c
-> @@ -541,7 +541,7 @@ static int __init imx6_add_pcie_port(struct pcie_port *pp,
->                 }
->         }
+>         pctrl->pctrl = pinctrl_register(&zynq_desc, &pdev->dev, pctrl);
+>         if (!pctrl->pctrl)
+> -               return -ENOMEM;
+> +               return -EINVAL;
 >  
-> -       pp->root_bus_nr = -1;
-> +       pp->root_bus_nr++;
->         pp->ops = &imx6_pcie_host_ops;
+>         platform_set_drvdata(pdev, pctrl);
 >  
-> ./drivers/pci/host/pci-keystone.c
-> @@ -312,7 +312,7 @@ static int __init ks_add_pcie_port(struct keystone_pcie *ks_pcie,
->                         return ret;
->         }
->  
-> -       pp->root_bus_nr = -1;
-> +       pp->root_bus_nr++;
->         pp->ops = &keystone_pcie_host_ops;
 > 
-> ./drivers/pci/host/pci-layerscape.c
-> @@ -101,7 +101,7 @@ static int ls_add_pcie_port(struct ls_pcie *pcie)
->         pp = &pcie->pp;
->         pp->dev = pcie->dev;
->         pp->dbi_base = pcie->dbi;
-> -       pp->root_bus_nr = -1;
-> +       pp->root_bus_nr++;
->         pp->ops = &ls_pcie_host_ops;
->  
-> ./drivers/pci/host/pcie-spear13xx.c
-> @@ -287,7 +287,7 @@ static int spear13xx_add_pcie_port(struct pcie_port *pp,
->                 return ret;
->         }
->  
-> -       pp->root_bus_nr = -1;
-> +       pp->root_bus_nr++;
->         pp->ops = &spear13xx_pcie_host_ops;
-> 
-> 
-> 2. Setting 'pp->root_bus_nr' as '0, 1, 2 ..' by pcie-designware.c
-> 
-> I believe that someone will give better idea. 
 
-Assigning the root bus number through hw_pci is a historic artifact
-from drivers that probe multiple host bridges at the same time.
-Some legacy ARM platforms still do that (specifically all the ones
-that set nr_controllers to >1: dove, mv78xx0, orion5x, and iop),
-but all modern platforms should probe each host bridge separately,
-either from a platform driver probe function, or they only have
-one and hardcode that fact in the ARM platform code.
+One choice seems as bad as the other to me ;-)
 
-For the drivers in drivers/pci/host, we give each host controller
-its own PCI domain, which means we can have overlapping bus numbers
-and do not need the heuristic to split the available 255 bus numbers
-across the present host bridges.
+Could we add a pinctrl_register_reason() variant that returns a meaningful
+error code as ERR_PTR?
 
 	Arnd
