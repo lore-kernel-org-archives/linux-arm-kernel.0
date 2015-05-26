@@ -1,51 +1,79 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 26 May 2015 08:17:23 +0200
-Subject: [PATCH 10/21] regulator: core: Probe regulators on demand
-In-Reply-To: <20150525173244.GE21577@sirena.org.uk>
-References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
- <1432565608-26036-11-git-send-email-tomeu.vizoso@collabora.com>
- <20150525173244.GE21577@sirena.org.uk>
-Message-ID: <CAAObsKDzKzYAx4_xsNm0reXzgSrJi7Q+aZGifmVxvSEQ=Qxjkw@mail.gmail.com>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Tue, 26 May 2015 14:27:37 +0800
+Subject: [PATCH v4 1/7] mmc: dt-bindings: add Mediatek MMC bindings
+In-Reply-To: <CAPDyKFq+YAz2pt1820YnqWaVKO6sn5eB+NxuM2dhP236FSKa9g@mail.gmail.com>
+References: <1432017411-2996-1-git-send-email-chaotian.jing@mediatek.com>
+ <1432017411-2996-2-git-send-email-chaotian.jing@mediatek.com>
+ <CAPDyKFq+YAz2pt1820YnqWaVKO6sn5eB+NxuM2dhP236FSKa9g@mail.gmail.com>
+Message-ID: <1432621657.647.9.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 May 2015 at 19:32, Mark Brown <broonie@kernel.org> wrote:
-> On Mon, May 25, 2015 at 04:53:14PM +0200, Tomeu Vizoso wrote:
->
->> When looking up a regulator through its DT node, ensure that the
->> corresponding device has been registered.
->
-> I'm sorry but I'm going to need a much better changelog to review this
-> patch.  I can't entirely tell what the intended effect is supposed to
-> be, the subject line says we're probing things and the body says we're
-> registering things which aren't the same thing at all.
+Dear Ulf,
 
-Agreed, it would be more appropriate to say that we are registering
-devices, I will make it clearer in the next revision. It ends up
-probing the device at that point because we have made sure with an
-earlier patch that all built-in drivers have been registered already.
-
->>               if (node) {
->> +                     of_platform_device_ensure(node);
->
-> This function doesn't appear in git so I'm guessing that some other
-> patch in the series adds it.  See my reply to the first patch...
-
-Sorry about that, the series touches so many subsystems that I would
-have reached the maximum number of recipients on the mailing lists I'm
-sending it to. I will send it next with you and Krzysztof on CC on the
-whole series.
-
-> The obvious questions here based on the name are why we're doing
-> something specific to platform devices and why this isn't something
-> we're abstracting in the driver core (or at least generic firmware code)
-> - we're going to have the same thing with ACPI.
-
-I don't know how useful this is going to be in systems with ACPI. My
-experience is limited to 32bit ARM, where the kernel has to manage
-every regulator, clock, gpio, etc so the dependency tree is so big. Is
-deferred probing a problem with ACPI as well?
-
-Thanks,
-
-Tomeu
+Thanks for your review!
+Please see my comment:
+On Tue, 2015-05-19 at 11:41 +0200, Ulf Hansson wrote:
+> On 19 May 2015 at 08:36, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> > Document the device-tree binding of Mediatek MMC host
+> >
+> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> > ---
+> >  Documentation/devicetree/bindings/mmc/mtk-sd.txt | 33 ++++++++++++++++++++++++
+> >  1 file changed, 33 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/mmc/mtk-sd.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+> > new file mode 100644
+> > index 0000000..ba6d668
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+> > @@ -0,0 +1,33 @@
+> > +* MTK MMC controller
+> > +
+> > +The MTK  MSDC can act as a MMC controller
+> > +to support MMC, SD, and SDIO types of memory cards.
+> > +
+> > +This file documents differences between the core properties in mmc.txt
+> > +and the properties used by the msdc driver.
+> > +
+> > +Required properties:
+> > +- compatible: Should be "mediatek,mt8173-mmc","mediatek,mt8135-mmc".
+> > +- interrupts: Should contain MSDC interrupt number
+> > +- clocks: MSDC source clock, HCLK, HCLK is mandatory when it is not controlled by Infra
+> 
+> This seems strange. Either it's mandatory since it's under the
+> "Required properties" section or it should be moved to the "Optional
+> properties" section.
+> 
+Yes, as you see, the "HCLK" is mandatory for MSDC0 & MSDC3, but MSDC1 &
+MSDC2 do not have corresponding HCLK.
+By the way, I will make the vqmmc-supply to mandatory, As the pinctrl
+select depend on it.
+> > +- clock-names: "source", "hclk"
+> > +- pinctrl-names: should be "default", "state_uhs"
+> > +- pinctrl-0: should contain default/high speed pin ctrl
+> > +- pinctrl-1: should contain uhs mode pin ctrl
+> > +- vmmc-supply: power to the Core
+> > +
+> > +Optional properties:
+> > +- vqmmc-supply: power to the IO(for SD/SDIO)
+> > +
+> > +Examples:
+> > +mmc0: mmc at 11230000 {
+> > +       compatible = "mediatek,mt8173-mmc", "mediatek,mt8135-mmc";
+> > +       reg = <0 0x11230000 0 0x108>;
+> > +       interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_LOW>;
+> > +       vmmc-supply = <&mt6397_vemc_3v3_reg>;
+> > +       clocks = <&pericfg CLK_PERI_MSDC30_0>, <&topckgen CLK_TOP_MSDC50_0_H_SEL>;
+> > +       clock-names = "source", "hclk";
+> > +       pinctrl-names = "default", "state_uhs";
+> > +       pinctrl-0 = <&mmc0_pins_default>;
+> > +       pinctrl-1 = <&mmc0_pins_uhs>;
+> > +};
+> > --
+> > 1.8.1.1.dirty
+> >
+> 
+> Kind regards
+> Uffe
