@@ -1,55 +1,61 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 26 May 2015 20:49:22 +0800
-Subject: [PATCH 09/11] pci, acpi, mcfg: Share ACPI PCI config space accessors.
+Date: Tue, 26 May 2015 20:49:23 +0800
+Subject: [PATCH 10/11] XEN / PCI: Remove the dependence on arch x86 when
+ PCI_MMCONFIG=y
 In-Reply-To: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
 References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1432644564-24746-10-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1432644564-24746-11-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+In drivers/xen/pci.c, there are arch x86 dependent codes when
+CONFIG_PCI_MMCONFIG is enabled, since CONFIG_PCI_MMCONFIG
+depends on ACPI, so this will prevent XEN PCI running on other
+architectures using ACPI with PCI_MMCONFIG enabled (such as ARM64).
 
-MCFG can be used perfectly for all architectures which support ACPI.
-ACPI mandates MCFG to describe PCI config space ranges which means
-we should use MMCONFIG accessors by default.
+Fortunatly, it can be sloved in a simple way. In drivers/xen/pci.c,
+the only x86 dependent code is if ((pci_probe & PCI_PROBE_MMCONF) == 0),
+and it's defined in asm/pci_x86.h, the code means that
+if the PCI resource is not probed in PCI_PROBE_MMCONF way, just
+ingnore the xen mcfg init. Actually this is duplicate, because
+if PCI resource is not probed in PCI_PROBE_MMCONF way, the
+pci_mmconfig_list will be empty, and the if (list_empty())
+after it will do the same job.
 
-Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+So just remove the arch related code and the head file, this
+will be no functional change for x86, and also makes xen/pci.c
+usable for other architectures.
+
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+CC: Boris Ostrovsky <boris.ostrovsky@oracle.com>
 ---
- drivers/acpi/mcfg.c | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ drivers/xen/pci.c | 6 ------
+ 1 file changed, 6 deletions(-)
 
-diff --git a/drivers/acpi/mcfg.c b/drivers/acpi/mcfg.c
-index 745b83e..90c81fa 100644
---- a/drivers/acpi/mcfg.c
-+++ b/drivers/acpi/mcfg.c
-@@ -12,6 +12,26 @@
+diff --git a/drivers/xen/pci.c b/drivers/xen/pci.c
+index 6785ebb..9a8dbe3 100644
+--- a/drivers/xen/pci.c
++++ b/drivers/xen/pci.c
+@@ -28,9 +28,6 @@
+ #include <asm/xen/hypervisor.h>
+ #include <asm/xen/hypercall.h>
+ #include "../pci/pci.h"
+-#ifdef CONFIG_PCI_MMCONFIG
+-#include <asm/pci_x86.h>
+-#endif
  
- #define	PREFIX	"MCFG: "
+ static bool __read_mostly pci_seg_supported = true;
  
-+/*
-+ * raw_pci_read/write - ACPI PCI config space accessors.
-+ *
-+ * ACPI spec defines MCFG table as the way we can describe access to PCI config
-+ * space, so let MCFG be default (__weak).
-+ *
-+ * If platform needs more fancy stuff, should provides its own implementation.
-+ */
-+int __weak raw_pci_read(unsigned int domain, unsigned int bus,
-+			unsigned int devfn, int reg, int len, u32 *val)
-+{
-+	return pci_mmcfg_read(domain, bus, devfn, reg, len, val);
-+}
-+
-+int __weak raw_pci_write(unsigned int domain, unsigned int bus,
-+			 unsigned int devfn, int reg, int len, u32 val)
-+{
-+	return pci_mmcfg_write(domain, bus, devfn, reg, len, val);
-+}
-+
- int __init acpi_parse_mcfg(struct acpi_table_header *header)
- {
- 	struct acpi_table_mcfg *mcfg;
+@@ -222,9 +219,6 @@ static int __init xen_mcfg_late(void)
+ 	if (!xen_initial_domain())
+ 		return 0;
+ 
+-	if ((pci_probe & PCI_PROBE_MMCONF) == 0)
+-		return 0;
+-
+ 	if (list_empty(&pci_mmcfg_list))
+ 		return 0;
+ 
 -- 
 1.9.1
