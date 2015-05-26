@@ -1,80 +1,37 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Tue, 26 May 2015 08:48:57 -0500
-Subject: [PATCH v4 1/2] ARM: socfpga: support suspend to ram
-In-Reply-To: <1432317735-29413-2-git-send-email-atull@opensource.altera.com>
-References: <1432317735-29413-1-git-send-email-atull@opensource.altera.com>
- <1432317735-29413-2-git-send-email-atull@opensource.altera.com>
-Message-ID: <556479C9.5070208@opensource.altera.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 26 May 2015 15:50:12 +0200
+Subject: [PATCH] input: ambakmi: Fix system PM by converting to modern
+ callbacks
+In-Reply-To: <20150522143933.GI2067@n2100.arm.linux.org.uk>
+References: <1429008108-29295-1-git-send-email-ulf.hansson@linaro.org>
+ <CAPDyKFrhC1MCmOfoweztNtzk-Spwhj1uj7-sz3UtJhT_bHDQ+g@mail.gmail.com>
+ <20150522143933.GI2067@n2100.arm.linux.org.uk>
+Message-ID: <CAPDyKFpbTx5rRuewziGzsqSHp1z7PO2-9VWV6DUTDytnWwUbpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alan,
+On 22 May 2015 at 16:39, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, May 22, 2015 at 04:37:12PM +0200, Ulf Hansson wrote:
+>> On 14 April 2015 at 12:41, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> > The legacy system PM support has long time ago been dropped from the
+>> > AMBA bus. Align to that by converting to the modern system PM
+>> > callbacks.
+>> >
+>> > Fixes: 26825cfd90f9 (ARM: 7914/1: amba: Drop legacy PM support ...)
+>> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>>
+>> What happened with this one? Can we queue it for 4.2?
+>
+> Why does it have a Fixes: tag?  Is it fixing a real bug, or is it just
+> fixing a warning that the kernel prints?
 
-On 5/22/15 1:02 PM, Alan Tull wrote:
-> Add code that requests that the sdr controller go into
-> self-refresh mode.  This code is run from ocram.
-> 
-> This patch assumes that u-boot has already configured sdr:
->   sdr.ctrlcfg.lowpwreq.selfrfshmask = 3
->   sdr.ctrlcfg.lowpwrtiming.clkdisablecycles = 8
->   sdr.ctrlcfg.dramtiming4.selfrfshexit = 512
-> 
-> Suspend-to-RAM and EDAC support are mutually exclusive on SOCFPGA
-> platforms.  CONFIG_SOCFPGA_SUSPEND enables suspend-to-RAM and
-> prevents selecting CONFIG_EDAC_ALTERA_MC.
-> 
-> How to suspend to ram:
->  $ echo enabled > \
-> /sys/devices/soc/ffc02000.serial0/tty/ttyS0/power/wakeup
-> 
->  $ echo -n mem > /sys/power/state
-> 
-> Signed-off-by: Alan Tull <atull@opensource.altera.com>
-> Cc: Pavel Machek <pavel@denx.de>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
-> Cc: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> ---
-> v2: use Generic on-chip SRAM driver to allocate ocram
->     rm fncpy_align since generic allocator handles alignment
->     check __arm_ioremap_exec return code
->     check for NULL pointers
->     add a comment regarding sdram controller configuration
-> v3: fix renamed #define
->     propagate socfpga_setup_ocram_self_refresh error code
-> v4: Kconfig: don't need to select GENERIC_ALLOCATER
->     add CONFIG_SOCFPGA_SUSPEND
->     make s2r and EDAC support mutually exclusive
->     socfpga.c: add sdr_ctl_base_addr
->     return error if ocram not available in device tree
->     update copyright years
-> ---
+I would expect it to fix a real bug, but I am not able to test this on HW.
 
-<snip>
+Since the commit 26825cfd90f9, the amba bus doesn't invoke the legacy
+system PM callbacks any more. Instead it uses pm_generic_resume() as
+its ->resume() callback which means amba_kmi_resume() won't be invoked
+during system PM resume.
 
-> +
-> +static int socfpga_pm_suspend(unsigned long arg)
-> +{
-> +	u32 ret;
-> +
-> +	if (!sdr_ctl_base_addr || !socfpga_scu_base_addr)
-> +		return -EFAULT;
-> +
-> +	ret = socfpga_sdram_self_refresh_in_ocram(
-> +		(u32)sdr_ctl_base_addr, (u32)socfpga_scu_base_addr);
-> +
-
-I had a patch that removed socfpga_scu_base_addr from being a global and
-just a local variable in:
-
-f6e14376fb20 ARM: socfpga: use of_iomap to map the SCU
-
-This patch will be in v4.2 and is currently in arm-soc/next or
-at my fork: kernel/git/dinguyen/linux.git socfpga_for_next_arria10
-
-So you will either need to make socfpga_scu_base_addr global again, or
-you can use the asm instruction to get the SCU base addr.
-
-Sorry about that..
-
-Dinh
+Kind regards
+Uffe
