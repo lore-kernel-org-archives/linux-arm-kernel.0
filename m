@@ -1,77 +1,75 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Tue, 26 May 2015 10:01:00 -0500
-Subject: [PATCH v2 1/2] ARM: imx: enable smp for i.MX7D
-In-Reply-To: <20150525081928.GK3264@dragon>
-References: <1432147961-3547-1-git-send-email-Frank.Li@freescale.com>
- <20150525081928.GK3264@dragon>
-Message-ID: <CAHrpEqS1ESjTdAq-ncm597kAt3D6GbmTSAtNchu-aTwFatKpdg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 26 May 2015 16:01:22 +0100
+Subject: sdhci(imx6): misbehaves while installing debian jessie, "Got
+ data interrupt 0x00100000"
+In-Reply-To: <CAPDyKFqR3NwBd9O40BPzHG7Y4wyyJwgdB4NsA_GUO=YEyqFSXQ@mail.gmail.com>
+References: <20150519222320.GM2067@n2100.arm.linux.org.uk>
+ <CAPDyKFqR3NwBd9O40BPzHG7Y4wyyJwgdB4NsA_GUO=YEyqFSXQ@mail.gmail.com>
+Message-ID: <20150526150122.GP2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 25, 2015 at 3:19 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Thu, May 21, 2015 at 02:52:40AM +0800, Frank.Li at freescale.com wrote:
->> From: Frank Li <Frank.Li@freescale.com>
->>
->> i.MX7D have two cores.
->> enable multicore support.
->> enable cpu hotplug support.
->>
->> Signed-off-by: Frank Li <Frank.Li@freescale.com>
->> Signed-off-by: Anson Huang <b20788@freescale.com>
->> ---
->>
->> This patch is based on Russel king's
->> ARM: v7 setup function should invalidate L1 cache
->
-> So we will need to wait for Russell's patch to land on mainline first.
->
->>
->> Change from V1 to V2
->>  - base on ARM: v7 setup function should invalidate L1 cache
->>  - remove unused define in gpcv2.c
->>  - change name imx_gpcv2_set_core1_pdn_pup_by_software to imx_gpcv2_set_core1_power
->>  - add timeout check.
->>  - Change to BUG_ON
->>  - Change use enable-method
->>
->>  arch/arm/mach-imx/Kconfig      |  6 ++++
->>  arch/arm/mach-imx/Makefile     |  1 +
->>  arch/arm/mach-imx/common.h     |  4 +++
->>  arch/arm/mach-imx/gpcv2.c      | 67 ++++++++++++++++++++++++++++++++++++++++++
->>  arch/arm/mach-imx/hotplug.c    | 18 ++++++++++++
->>  arch/arm/mach-imx/mach-imx7d.c |  1 +
->>  arch/arm/mach-imx/platsmp.c    | 18 ++++++++++++
->>  arch/arm/mach-imx/src.c        | 35 ++++++++++++++++++++--
->>  8 files changed, 147 insertions(+), 3 deletions(-)
->>  create mode 100644 arch/arm/mach-imx/gpcv2.c
->
-> Honestly, I do not like the software version numbering which is quite
-> arbitrary and may conflict with hardware one some day.
+On Tue, May 26, 2015 at 04:49:34PM +0200, Ulf Hansson wrote:
+> On 20 May 2015 at 00:23, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > iMX6 with a Samsung EVO UHS-1 16GB card.
+> >
+> > There's actually two problems here.
+> >
+> > 1. SDHCI chooses to impose a 10 second timeout on any data operation.
+> >    This magic value of 10 seconds is rediculous.  Consider that SD
+> >    cards are typically slower than ATA, and ATA has a timeout of more
+> >    than one minute for a stuck command...  And yes, I've had this fire
+> >    a good 10 seconds before I then got...
+> >
+> > 2. "Got data interrupt 0x00100000 even though no data operation was in progress."
+> >
+> >    That's SDHCI_INT_DATA_TIMEOUT.
+> >
+> >    Unfortunately, I have no other information, as the registers are
+> >    dumped at pr_debug() level, which means that they're all compiled
+> >    out in normal kernel builds.  In any case, I have no way to copy
+> >    information off of the installing system; debian does not start up
+> >    a ssh daemon during the install, so remote login is not possible.
+> >    Nor can I photograph the rather reflective TV screen.
+> >
+> > The side-effect of this is that the entire MMC IO subsystem locks up
+> > and I'm left with lots of processes stuck in IO-wait state, with the
+> > hungtask detector spewing onto the console.
+> 
+> Sorry, I can't tell much around the host driver and HW as such. I
+> don't have any iMX6 boards at hand.
+> 
+> Though, the side-effect you are describing isn't very nice. Even if it
+> doesn't solve you problem, perhaps we should discuss about converting
+> from wait_for_completion() to wait_for_completion_timeout(), when the
+> mmc core waits for the host driver to return the result for the
+> request.
+> 
+> I guess the tricky part is to find a decent value for the "timeout".
 
-what's name do you prefer?
+There's two issues which would need solving for that:
 
->
-> More importantly, is i.MX7 GPC block really so different from i.MX6 one
-> and worth a new driver for it?  If you check the latest GPC driver, you
-> will find that it evolves a lot recently and becomes a driver handles
-> not only core power but also PU power domains, and also we have
-> implemented stacked IRQ domain for it.   Are you going to redo all these
-> for this gpcv2 driver?
+1. The only sane timeout is one which will never trigger under normal
+   operating circumstances, and abnormal load conditions.
 
-Totally difference.
+2. When the timeout occurs, the core would need some way to reset the
+   host driver back to a sane state before retrying the command.
 
-http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/tree/arch/arm/mach-imx/gpcv2.c?h=imx_3.14.28_7d_alpha&id=a34e259cc0a4e86ccb993c947991d2823d81eb14
+However, the better question to ask is what's causing this.  It seemed
+to lock up at the same point in the installation - after the base system
+had been installed, but while it was installing additional stuff (for
+xfce.)  From what I remember, it was exactly the same package that the
+MMC host failed at.
 
-Only simular part is that GPC irq mask, which only bit possition and
-register offfset change.
+I suppose it's entirely possible that the Debian install is running
+some package scripts which end up poking about in memory, which are
+screwing up the MMC host - nothing would surprise me... the Debian
+Jessie install is screwed in other ways (if you select Gnome instead,
+the installer aborts because it discovers that the distro packages
+are missing some dependencies, though I had put that down to the UK
+mirror possibly being out of date...)
 
-Suspend/Resume flow also changed.
-
-shenwei is working on that.
-
-
-best regards
-Frank Li
-
->
-> Shawn
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
