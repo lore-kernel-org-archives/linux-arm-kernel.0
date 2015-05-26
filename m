@@ -1,60 +1,56 @@
-From: aarcange@redhat.com (Andrea Arcangeli)
-Date: Tue, 26 May 2015 16:42:47 +0200
-Subject: [BUG] Read-Only THP causes stalls (commit 10359213d)
-In-Reply-To: <20150526080848.GA27075@cbox>
-References: <20150524193404.GD16910@cbox> <20150525141525.GB26958@redhat.com>
- <20150526080848.GA27075@cbox>
-Message-ID: <20150526144247.GJ26958@redhat.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 26 May 2015 09:44:27 -0500
+Subject: [PATCH 16/21] usb: phy: Probe phy devices on demand
+In-Reply-To: <1432565608-26036-17-git-send-email-tomeu.vizoso@collabora.com>
+References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1432565608-26036-17-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <20150526144427.GA26599@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 26, 2015 at 10:08:48AM +0200, Christoffer Dall wrote:
-> > echo 0 > /sys/kernel/mm/transparent_hugepage/khugepaged/pages_to_scan
+On Mon, May 25, 2015 at 04:53:20PM +0200, Tomeu Vizoso wrote:
+> When looking up a phy through its DT node, ensure that the corresponding
+> device has been registered.
 > 
-> this returns -EINVAL.
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+
+Acked-by: Felipe Balbi <balbi@ti.com>
+
+> ---
+>  drivers/usb/phy/phy.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/drivers/usb/phy/phy.c b/drivers/usb/phy/phy.c
+> index d1cd6b5..7084f21 100644
+> --- a/drivers/usb/phy/phy.c
+> +++ b/drivers/usb/phy/phy.c
+> @@ -13,6 +13,7 @@
+>  #include <linux/err.h>
+>  #include <linux/device.h>
+>  #include <linux/module.h>
+> +#include <linux/of_platform.h>
+>  #include <linux/slab.h>
+>  #include <linux/of.h>
+>  
+> @@ -192,6 +193,8 @@ struct usb_phy *devm_usb_get_phy_by_phandle(struct device *dev,
+>  		goto err0;
+>  	}
+>  
+> +	of_platform_device_ensure(node);
+> +
+>  	spin_lock_irqsave(&phy_lock, flags);
+>  
+>  	phy = __of_usb_find_phy(node);
+> -- 
+> 2.4.1
 > 
 
-Oops sorry, I haven't re-read the code, pages_to_scan 0 does not make
-sense, it would only be useful for debugging purposes because it
-doesn't shut off khugepaged entirely, so it is ok that it returns
--EINVAL, just it won't allow this debug tweak...
-
-> But I'm trying now with:
-> 
-> echo never > /sys/kernel/mm/transparent_hugepage/enabled
-> 
-> > 
-> > and verify the problem goes away without having to revert the patch?
-> 
-> will let you know, so far so good...
-
-I only intended to disable khugepaged, to validate the theory it was
-that patch that made the difference.
-
-Increasing the sleep time is equivalent to set pages_to_scan to 0, so
-you can use this instead:
-
-echo 3600000 >/sys/kernel/mm/transparent_hugepage/khugepaged/scan_sleep_millisecs
-echo 3600000 >/sys/kernel/mm/transparent_hugepage/khugepaged/alloc_sleep_millisecs
-
-In addition to knowing if it still happens with THP disables, it's
-interesting to know also if it happens with THP enabled but khugepaged
-disabled.
-
-> what is memhog?  I couldn't find the utility in Google...
-
-Somebody answered, yes it's from numactl.
-
-> I did try with the above settings and just push a bunch of data into
-> ramfs and tmpfs and indeed the sytem died very quickly (on v4.0-rc4).
-
-That's fine, memhog just was a way to hit swap. tmpfs pages aren't
-candidate for khugepaged THP collapsing, so it'd be perhaps quicker to
-reproduce with something like memhog that uses anonymous memory but it
-still happens, as long as you hit swap it's ok.
-
-If other arm don't exhibit this problem, perhaps it has to do with
-some difference in THP, I recall there were two models for arm.
-
-Thanks,
-Andrea
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150526/6060e029/attachment.sig>
