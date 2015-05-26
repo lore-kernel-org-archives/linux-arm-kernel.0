@@ -1,25 +1,26 @@
-From: kvalo@codeaurora.org (Kalle Valo)
-Date: Tue, 26 May 2015 10:54:10 +0000 (UTC)
-Subject: brcmfmac: avoid gcc-5.1 warning
-In-Reply-To: <2201884.BixNBcLJhn@wuerfel>
-Message-ID: <20150526105410.13F6F1416C2@smtp.codeaurora.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 26 May 2015 11:57:58 +0100
+Subject: [BUG] Read-Only THP causes stalls (commit 10359213d)
+In-Reply-To: <20150526080848.GA27075@cbox>
+References: <20150524193404.GD16910@cbox> <20150525141525.GB26958@redhat.com>
+ <20150526080848.GA27075@cbox>
+Message-ID: <556451B6.6080303@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 26/05/15 09:08, Christoffer Dall wrote:
 
-> gcc-5.0 gained a new warning in the fwsignal portion of the brcmfmac
-> driver:
-> 
-> drivers/net/wireless/brcm80211/brcmfmac/fwsignal.c: In function 'brcmf_fws_txs_process':
-> drivers/net/wireless/brcm80211/brcmfmac/fwsignal.c:1478:8: warning: 'skb' may be used uninitialized in this function [-Wmaybe-uninitialized]
-> 
-> This is a false positive, and marking the brcmf_fws_hanger_poppkt function
-> as 'static inline' makes the warning go away. I have checked the object
-> file output and while a little code gets moved around, the size of
-> the binary remains identical.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+[...]
 
-Thanks, applied to wireless-drivers-next.git.
+>> Then push the system into swap with some memhog -r1000 xG.
+> 
+> what is memhog?  I couldn't find the utility in Google...
 
-Kalle Valo
+This looks to be part of the numactl suite, though Debian doesn't seem
+to include it in its numactl package...
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
