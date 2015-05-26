@@ -1,38 +1,88 @@
-From: k.kozlowski@outlook.com (=?UTF-8?Q?Krzysztof_Koz=C5=82owski?=)
-Date: Tue, 26 May 2015 17:08:31 +0900
-Subject: [PATCH RESEND] ARM: dts: exynos4412: Enable AX88760 USB hub on
- Origen board
-In-Reply-To: <1428944566-17132-1-git-send-email-matthew@mattleach.net>
-References: <1428944566-17132-1-git-send-email-matthew@mattleach.net>
-Message-ID: <BLU436-SMTP64BEEAC702E695B18320ACE2CC0@phx.gbl>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 26 May 2015 10:09:17 +0200
+Subject: [RFC PATCH v1 1/3] PCI: designware: Add ARM64 support
+In-Reply-To: <000001d096a9$27bf43f0$773dcbd0$@com>
+References: <000001d096a9$27bf43f0$773dcbd0$@com>
+Message-ID: <3203781.NTEqUP6iLy@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-04-14 2:02 GMT+09:00 Matthew Leach <matthew@mattleach.net>:
-> Enable the Origen's usb phy and ohci devices in the device tree.  Also
-> add the "samsung,vbus-gpio" property to enable the GPX3(5) gpio pin so
-> the AX88760 hub is powered.
->
-> Signed-off-by: Matthew Leach <matthew@mattleach.net>
-> ---
->  arch/arm/boot/dts/exynos4412-origen.dts | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/exynos4412-origen.dts b/arch/arm/boot/dts/exynos4412-origen.dts
-> index bd8b730..c810ca3 100644
-> --- a/arch/arm/boot/dts/exynos4412-origen.dts
-> +++ b/arch/arm/boot/dts/exynos4412-origen.dts
-> @@ -531,4 +531,19 @@
->                         clock-frequency = <24000000>;
->                 };
->         };
-> +
-> +       exynos-usbphy at 125B0000 {
+On Monday 25 May 2015 14:10:37 Jingoo Han wrote:
+> 'pp->root_bus_nr' is initialized as '-1' at some soc-specific drivers
+> However, 'sys->busnr' is set as '0, 1, 2 ...' by pcibios_init_hw()
+> in arch/arm/kernel/bios32.c. '0, 1, 2 ...' means the number of
+> each host controller.
+> 
+> So, without setting 'pp->root_bus_nr' as '0, 1, 2, ...',
+> it makes the problem.
+> 
+> Thus, we need to come up with the way to resolve this.
+> 
+> 1. Setting 'pp->root_bus_nr' as '0, 1, 2 ..' by each soc-specific driver.
+> 
+> e.g)
+> 
+> ./drivers/pci/host/pci-exynos.c
+> @@ -534,7 +534,7 @@ static int __init exynos_add_pcie_port(struct pcie_port *pp,
+>                 }
+>         }
+>  
+> -       pp->root_bus_nr = -1;
+> +       pp->root_bus_nr++;
+>         pp->ops = &exynos_pcie_host_ops;
+> 
+> ./drivers/pci/host/pci-imx6.c
+> @@ -541,7 +541,7 @@ static int __init imx6_add_pcie_port(struct pcie_port *pp,
+>                 }
+>         }
+>  
+> -       pp->root_bus_nr = -1;
+> +       pp->root_bus_nr++;
+>         pp->ops = &imx6_pcie_host_ops;
+>  
+> ./drivers/pci/host/pci-keystone.c
+> @@ -312,7 +312,7 @@ static int __init ks_add_pcie_port(struct keystone_pcie *ks_pcie,
+>                         return ret;
+>         }
+>  
+> -       pp->root_bus_nr = -1;
+> +       pp->root_bus_nr++;
+>         pp->ops = &keystone_pcie_host_ops;
+> 
+> ./drivers/pci/host/pci-layerscape.c
+> @@ -101,7 +101,7 @@ static int ls_add_pcie_port(struct ls_pcie *pcie)
+>         pp = &pcie->pp;
+>         pp->dev = pcie->dev;
+>         pp->dbi_base = pcie->dbi;
+> -       pp->root_bus_nr = -1;
+> +       pp->root_bus_nr++;
+>         pp->ops = &ls_pcie_host_ops;
+>  
+> ./drivers/pci/host/pcie-spear13xx.c
+> @@ -287,7 +287,7 @@ static int spear13xx_add_pcie_port(struct pcie_port *pp,
+>                 return ret;
+>         }
+>  
+> -       pp->root_bus_nr = -1;
+> +       pp->root_bus_nr++;
+>         pp->ops = &spear13xx_pcie_host_ops;
+> 
+> 
+> 2. Setting 'pp->root_bus_nr' as '0, 1, 2 ..' by pcie-designware.c
+> 
+> I believe that someone will give better idea. 
 
-Could you use label notation here?
-&exynos_usbphy {
-...
-}
+Assigning the root bus number through hw_pci is a historic artifact
+from drivers that probe multiple host bridges at the same time.
+Some legacy ARM platforms still do that (specifically all the ones
+that set nr_controllers to >1: dove, mv78xx0, orion5x, and iop),
+but all modern platforms should probe each host bridge separately,
+either from a platform driver probe function, or they only have
+one and hardcode that fact in the ARM platform code.
 
-Best regards,
-Krzysztof
+For the drivers in drivers/pci/host, we give each host controller
+its own PCI domain, which means we can have overlapping bus numbers
+and do not need the heuristic to split the available 255 bus numbers
+across the present host bridges.
+
+	Arnd
