@@ -1,38 +1,62 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 26 May 2015 11:56:54 -0700
-Subject: [PATCH 06/21] of/platform: Add of_platform_device_ensure()
-In-Reply-To: <1432565608-26036-7-git-send-email-tomeu.vizoso@collabora.com>
-References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
- <1432565608-26036-7-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <20150526185654.GE10571@dtor-ws>
+From: xander.huff@ni.com (Xander Huff)
+Date: Tue, 26 May 2015 14:05:59 -0500
+Subject: [PATCH 2/2] iio: adc: xilinx-xadc: Add xlnx,extend-name as an
+ optional argument for aux channels
+In-Reply-To: <55643F20.4080306@metafoo.de>
+References: <1431038644-41600-1-git-send-email-xander.huff@ni.com>
+ <1431038644-41600-2-git-send-email-xander.huff@ni.com>
+ <555B78A3.2030202@metafoo.de> <55606340.1090403@kernel.org>
+ <55643F20.4080306@metafoo.de>
+Message-ID: <5564C417.3010707@ni.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomeu,
+On 5/26/2015 4:38 AM, Lars-Peter Clausen wrote:
+> On 05/23/2015 01:23 PM, Jonathan Cameron wrote:
+>> On 19/05/15 18:53, Lars-Peter Clausen wrote:
+>>> On 05/08/2015 12:44 AM, Xander Huff wrote:
+>>>> To better facilitate user-mode access to optional aux channels, allow
+>>>> device trees to specify a custom extended name for defined channels.
+>>>
+>>> Hi,
+>>>
+>>> 'extend-name' is kind of a IIO specific term. I think a better name in the
+>>> devicetree context would be 'label'. That's used everywhere else when giving
+>>> a short description string to a node.
+>>>
+>> Hi Lars,
+>>
+>> What do you think of the general idea?  I'm unconvinced we want to do this in
+>> channel naming.
+>> Perhaps we want an additional attribute giving access to this sort of
+>> 'semantic' information?
+>
+> I'm not convinced about it either. My gut feeling is that this is not the right
+> approach, but I don't really have any better ideas at the moment.
+>
+> Xander can you give a short description of how this information will be used by
+> an application? Would having a label property for the channel also work for you
+> (e.g. in_voltage0_label)?
+>
+> - Lars
+>
+We use 10 of the optional aux channels available in the XADC and have them wired 
+up to specific power supplies. For example, channel 9 is connected to the 
+current of a 6V power supply and channel 12 is connected to the voltage of that 
+same supply, channel 4 is connected to the current of a 3.3V power supply and 
+channel 5 is connected to its voltage.
 
-On Mon, May 25, 2015 at 04:53:10PM +0200, Tomeu Vizoso wrote:
-> This function ensures that the device that encloses the passed device
-> node is registered, and thus probed if the corresponding driver has been
-> registered already.
+Without adding extended names to distinguish these aux channels, the handles 
+available inside /sys/bus/iio/devices/[device] are generic: in_voltage10_raw, 
+in_voltage10_scale, for example. If I added the label 'user5v_v', then these 
+handles would be in_voltage10_user5v_v_raw and in_voltage10_user5v_v_scale. This 
+makes it a lot easier to get started and let the handles describe themselves, 
+rather than having to look up which channels are connected to which things.
 
-Even if the driver has already been registered this code will not
-guarantee that the device has been probed if driver enabled asynchronous
-probing (async probing should appear in 4.2 and the end goal is to have
-async probing enabled by default for most drivers).
-
-Also, why are we concentrating on platform drivers only? What about
-other devices, for example a gpio expander behind i2c bus?
-
-I am also concerned about adding OF-specific hooks into every subsystem
-out there. Can we make process of instantiating OF devices iterative
-instead and add them only if their parent has been already probed and
-also devices corresponding to all phandles they reference have also been
-probed? We could repeat scanning of the device tree every time we bind
-a driver and bulk-add leftovers at late_initcall time. This would
-mean that we could keep all logic in OF code (and maybe ACPI will add
-their own implementation) and keep other subsystems unaware.
-
-Thanks.
+As far as using 'label' instead of 'extend-name', that's fine with me. I've 
+already sent out a v2 using 'label' instead.
 
 -- 
-Dmitry
+Xander Huff
+Staff Software Engineer
+National Instruments
