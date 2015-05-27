@@ -1,56 +1,34 @@
-From: sophian.yoma@gmail.com (yoma sophian)
-Date: Wed, 27 May 2015 20:09:39 +0800
-Subject: some question about arm64 smp_spin_table.c
-In-Reply-To: <2349133.7jIxnW0uLz@wuerfel>
-References: <CADUS3o=4b9zfKtyiZ2CKgC2AA9ntkFLo91pJug17t1Xz2jM34w@mail.gmail.com>
- <2349133.7jIxnW0uLz@wuerfel>
-Message-ID: <CADUS3o=c6SXULSguCN57gNLMzxmLh2ZHZEpLhe9i2Ks=JA1NUg@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 27 May 2015 17:39:40 +0530
+Subject: [PATCH 1/3] phy-sun4i-usb: Add a sunxi specific function for
+ setting squelch-detect
+In-Reply-To: <20150526153816.GK26599@saruman.tx.rr.com>
+References: <1427626248-6257-1-git-send-email-hdegoede@redhat.com>
+ <1427626248-6257-2-git-send-email-hdegoede@redhat.com>
+ <20150526153816.GK26599@saruman.tx.rr.com>
+Message-ID: <5565B404.1050003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Arnd:
+Felipe,
 
-2015-05-27 18:06 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
-> On Wednesday 27 May 2015 17:47:09 yoma sophian wrote:
->> And in Arm64, once other platform use different area, such as register
->> or device memory, to put cpu_release_addr[cpu], shall we use ioremap
->> to get the va like below patch?
+On Tuesday 26 May 2015 09:08 PM, Felipe Balbi wrote:
+> On Sun, Mar 29, 2015 at 12:50:46PM +0200, Hans de Goede wrote:
+>> The sunxi otg phy has a bug where it wrongly detects a high speed squelch
+>> when reset on the root port gets de-asserted with a lo-speed device.
 >>
->> @@ -47,10 +48,9 @@ static int __init smp_spin_table_prepare_cpu(int cpu)
->>         if (!cpu_release_addr[cpu])
->>                 return -ENODEV;
+>> The workaround for this is to disable squelch detect before de-asserting
+>> reset, and re-enabling it after the reset de-assert is done. Add a sunxi
+>> specific phy function to allow the sunxi-musb glue to do this.
 >>
->> -       release_addr = __va(cpu_release_addr[cpu]);
->> +       release_addr = ioremap(cpu_release_addr[cpu], SZ_4K);
->>         release_addr[0] = (void *)__pa(secondary_holding_pen);
->> -       __flush_dcache_area(release_addr, sizeof(release_addr[0]));
->> -
->> +       iounmap(release_addr);
->>         /*
->>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 >
-> I believe that won't work: The other CPU is spinning on its L1 cache,
-> and with ioremap, you would be bypassing the cache.
-I am not quite understand "The other CPU is spinning on its L1 cache,"
-As far as I know,
-1. cpu_release_addr[cpu] is where other core spin to
-2. Before other cores jump to their kernel entry,
-secondary_holding_pen, shouldn't they follow the booting.txt
-mentioned:
-- Caches, MMUs
-  The MMU must be off.
-  Instruction cache may be on or off.
-  The address range corresponding to the loaded kernel image must be
-  cleaned to the PoC. In the presence of a system cache or other
-  coherent masters with caches enabled, this will typically require
-  cache maintenance by VA rather than set/way operations.
+> Kishon, do you want to take this patch?
 
-Why you say The other CPU is spinning on its L1 cache?
-And even it is it is spinning on its L1 cache,
-"The address range corresponding to the loaded kernel image must be
-  cleaned to the PoC."
+This patch should go along with the other patch in the series. So I think it's 
+better you take this series along with the musb sunxi patch series.
 
-And the other cpu will make sure before polling the spin address
-before invalidate it, right?
+Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-Appreciate your kind help,
+Thanks
+Kishon
