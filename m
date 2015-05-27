@@ -1,94 +1,84 @@
-From: atull@opensource.altera.com (atull)
-Date: Wed, 27 May 2015 15:25:24 -0500
-Subject: [PATCH v4 1/2] ARM: socfpga: support suspend to ram
-In-Reply-To: <556479C9.5070208@opensource.altera.com>
-References: <1432317735-29413-1-git-send-email-atull@opensource.altera.com>
- <1432317735-29413-2-git-send-email-atull@opensource.altera.com>
- <556479C9.5070208@opensource.altera.com>
-Message-ID: <alpine.DEB.2.02.1505271520570.19205@linuxheads99>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 27 May 2015 22:58:01 +0200 (CEST)
+Subject: [PATCH V2 5/6] regulator: add mxs on-chip regulator driver
+In-Reply-To: <20150527173321.GH21577@sirena.org.uk>
+References: <1430346747-28728-1-git-send-email-stefan.wahren@i2se.com>
+ <1430346747-28728-6-git-send-email-stefan.wahren@i2se.com>
+ <20150504123648.GU15510@sirena.org.uk>
+ <1693367404.879766.1430771695242.JavaMail.open-xchange@oxbaltgw08.schlund.de>
+ <1875749167.82542.1431023838932.JavaMail.open-xchange@oxbsltgw04.schlund.de>
+ <20150507185216.GP22845@sirena.org.uk>
+ <535744342.64563.1431026719818.JavaMail.open-xchange@oxbsltgw09.schlund.de>
+ <20150507193236.GS22845@sirena.org.uk>
+ <1290103954.26573.1432642616013.JavaMail.open-xchange@oxbsltgw08.schlund.de>
+ <20150527173321.GH21577@sirena.org.uk>
+Message-ID: <1973961885.66028.1432760281554.JavaMail.open-xchange@oxbsltgw06.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 26 May 2015, Dinh Nguyen wrote:
 
-> Hi Alan,
-> 
-> On 5/22/15 1:02 PM, Alan Tull wrote:
-> > Add code that requests that the sdr controller go into
-> > self-refresh mode.  This code is run from ocram.
-> > 
-> > This patch assumes that u-boot has already configured sdr:
-> >   sdr.ctrlcfg.lowpwreq.selfrfshmask = 3
-> >   sdr.ctrlcfg.lowpwrtiming.clkdisablecycles = 8
-> >   sdr.ctrlcfg.dramtiming4.selfrfshexit = 512
-> > 
-> > Suspend-to-RAM and EDAC support are mutually exclusive on SOCFPGA
-> > platforms.  CONFIG_SOCFPGA_SUSPEND enables suspend-to-RAM and
-> > prevents selecting CONFIG_EDAC_ALTERA_MC.
-> > 
-> > How to suspend to ram:
-> >  $ echo enabled > \
-> > /sys/devices/soc/ffc02000.serial0/tty/ttyS0/power/wakeup
-> > 
-> >  $ echo -n mem > /sys/power/state
-> > 
-> > Signed-off-by: Alan Tull <atull@opensource.altera.com>
-> > Cc: Pavel Machek <pavel@denx.de>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
-> > Cc: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> > ---
-> > v2: use Generic on-chip SRAM driver to allocate ocram
-> >     rm fncpy_align since generic allocator handles alignment
-> >     check __arm_ioremap_exec return code
-> >     check for NULL pointers
-> >     add a comment regarding sdram controller configuration
-> > v3: fix renamed #define
-> >     propagate socfpga_setup_ocram_self_refresh error code
-> > v4: Kconfig: don't need to select GENERIC_ALLOCATER
-> >     add CONFIG_SOCFPGA_SUSPEND
-> >     make s2r and EDAC support mutually exclusive
-> >     socfpga.c: add sdr_ctl_base_addr
-> >     return error if ocram not available in device tree
-> >     update copyright years
-> > ---
-> 
-> <snip>
-> 
-> > +
-> > +static int socfpga_pm_suspend(unsigned long arg)
-> > +{
-> > +	u32 ret;
-> > +
-> > +	if (!sdr_ctl_base_addr || !socfpga_scu_base_addr)
-> > +		return -EFAULT;
-> > +
-> > +	ret = socfpga_sdram_self_refresh_in_ocram(
-> > +		(u32)sdr_ctl_base_addr, (u32)socfpga_scu_base_addr);
-> > +
-> 
-> I had a patch that removed socfpga_scu_base_addr from being a global and
-> just a local variable in:
-> 
-> f6e14376fb20 ARM: socfpga: use of_iomap to map the SCU
-> 
-> This patch will be in v4.2 and is currently in arm-soc/next or
-> at my fork: kernel/git/dinguyen/linux.git socfpga_for_next_arria10
-> 
-> So you will either need to make socfpga_scu_base_addr global again, or
-> you can use the asm instruction to get the SCU base addr.
-> 
-> Sorry about that..
-> 
-> Dinh
-> 
+> Mark Brown <broonie@kernel.org> hat am 27. Mai 2015 um 19:33 geschrieben:
+>
+>
+> On Tue, May 26, 2015 at 02:16:55PM +0200, Stefan Wahren wrote:
+> > > Mark Brown <broonie@kernel.org> hat am 7. Mai 2015 um 21:32 geschrieben:
+>
+> > > > > > In the bootloader code enabling the DC-DC is critical. There is a
+> > > > > > known
+> > > > > > issue
+> > > > > > which falsely triggers the brownout detection.
+>
+> > > > > Why would the driver not provide these operations?
+>
+> > > > I didn't implement this operation because the suggested workaround for
+> > > > the
+> > > > hardware issue isn't very nice
+> > > > (disable brownout detection during enabling DC-DC). I was afraid of the
+> > > > implementation.
+>
+> > > That doesn't sound too complicated?
+>
+> > Okay, i think i managed the brownout handling.
+> >
+> > Unfortunately i'm stuck at the next step. The DC-DC (3 way output) can
+> > supply 3
+> > LDOs vddd, vdda, vddio. In case of a DC-DC state change the 3 regulators
+> > needs
+> > to be reconfigured before.
+>
+> > I tought of REGULATOR_EVENT_PRE_DISABLE and REGULATOR_EVENT_PRE_ENABLE
+> > events,
+> > but i'm not sure that's the right way to achieve a synchronization between
+> > DC-DC
+> > and consuming LDOs.
+>
+> OK, that's possibly sounding a bit complicated. Is it just a case of
+> writing some value, doing a reconfiguration and rewriting the original
+> value or is it something more?
 
-I can't make socfpga_scu_base_addr a global from platsmp.c since that file
-may or may not be compiled in.
+In case of a single driver instance instead of 4 ones (vddd, vddio, vdda,
+dc-dc), things would be much easier.
 
-That leaves me with the option of adding the code that was removed from
-socfpga.c back where it was or taking that same code moving it to pm.c
+Here are the steps for disabling DC-DC:
 
-What's your preference?
+1. configure vddio to work without DC-DC
+2. configure vdda to work without DC-DC
+3. configure vddd to work without DC-DC
+4. backup DC-DC settings
+5. disable brownout detection
+6. disable DC-DC
+7. restore DC-DC settings
 
-Alan
+My problem is that step 1 to 3 must be done step by step through the other
+regulator instances.
+
+> If it's much more complicated than that
+> then I think putting a comment in the driver explaining what the issue
+> is would be the right step, that would address the issue with the driver
+> looking strange.
+
+Enabling or disabling DC-DC is only needed internally by the power subsystem
+(e.g. in case of handoff AC to battery), because the DC-DC only supplys the
+regulator daisy. From my understanding hardware components could use only the
+regulator outputs. In the end a state change is necessary, but it shouldn't be a
+public.
