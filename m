@@ -1,50 +1,55 @@
-From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
-Date: Wed, 27 May 2015 10:06:26 +0200
-Subject: [PATCH 05/11] x86, pci, acpi: Move arch-agnostic MMCONFIG (aka
- ECAM) and ACPI code out of arch/x86/ directory
-In-Reply-To: <20150526170817.GU1565@arm.com>
-References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
- <1432644564-24746-6-git-send-email-hanjun.guo@linaro.org>
- <20150526170817.GU1565@arm.com>
-Message-ID: <55657B02.5090805@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 27 May 2015 09:07:44 +0100
+Subject: [PATCH] ARM: imx6: allow booting with old DT
+In-Reply-To: <1432713148.3011.6.camel@pengutronix.de>
+References: <1432658616-13733-1-git-send-email-l.stach@pengutronix.de>	
+ <20150527073408.GD16165@dragon> <1432713148.3011.6.camel@pengutronix.de>
+Message-ID: <55657B50.7000006@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26.05.2015 19:08, Will Deacon wrote:
-> On Tue, May 26, 2015 at 01:49:18PM +0100, Hanjun Guo wrote:
->> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+On 27/05/15 08:52, Lucas Stach wrote:
+> Am Mittwoch, den 27.05.2015, 15:34 +0800 schrieb Shawn Guo:
+>> On Tue, May 26, 2015 at 06:43:36PM +0200, Lucas Stach wrote:
+>>> The GPC rewrite to IRQ domains has been on the premise that it may break
+>>> suspend/resume for new kernels on old DT, but otherwise keep things working
+>>> from a user perspective. This was an accepted compromise to be able to move
+>>> the GIC cleanup forward.
+>>>
+>>> What actually happened was that booting a new kernel on an old DT crashes
+>>> before even the console is up, so the user does not even see the warning
+>>> that the DT is too old. The warning message suggests that this has been
+>>> known before, which is clearly unacceptable.
 >>
->> ECAM standard and MCFG table are architecture independent and it makes
->> sense to share common code across all architectures. Both are going to
->> corresponding files - ecam.c and mcfg.c
+>> To see any early message like this one, low-level debug support is
+>> expected to be turned on.
 >>
->> While we are here, rename pci_parse_mcfg to acpi_parse_mcfg.
->> We already have acpi_parse_mcfg prototype which is used nowhere.
->> At the same time, we need pci_parse_mcfg been global so acpi_parse_mcfg
->> can be used perfectly here.
->>
->> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->> ---
->>   arch/x86/Kconfig               |   3 +
->>   arch/x86/include/asm/pci_x86.h |  33 ------
->>   arch/x86/pci/acpi.c            |   1 +
->>   arch/x86/pci/mmconfig-shared.c | 244 +---------------------------------------
->>   arch/x86/pci/mmconfig_32.c     |   1 +
->>   arch/x86/pci/mmconfig_64.c     |   1 +
->>   arch/x86/pci/numachip.c        |   1 +
->>   drivers/acpi/Makefile          |   1 +
->>   drivers/acpi/mcfg.c            |  57 ++++++++++
->>   drivers/pci/Kconfig            |   7 ++
->>   drivers/pci/Makefile           |   5 +
->>   drivers/pci/ecam.c             | 245 +++++++++++++++++++++++++++++++++++++++++
->
-> Why can't we make use of the ECAM implementation used by pci-host-generic
-> and drivers/pci/access.c?
+> Using low-level debug might be acceptable for a developer.
+> 
+> From a user perspective a kernel update without a corresponding DT
+> update should never render the machine completely broken. Keep in mind
+> that i.MX6 isn't only used in deeply embedded system, but is already in
+> devices where non-developer users might update the kernel. They might
+> even use prebuilt kernels where enabling low-level debug is not an
+> option.
 
-We had that question when I had posted MMCFG patch set separately, 
-please see:
-https://lkml.org/lkml/2015/3/11/492
+I'd imagine that whoever provides this pre-build kernel would also
+deliver some form of release notes indicating the procedure. Even
+better, an installation script.
 
-Tomasz
+> We are not free to break the existing DT stability rules in such a
+> drastic way, especially if keeping things working to some extent is
+> easily done.
+
+That would be on the condition that the DT was correct the first place,
+and accurately described the hardware. It didn't, breaking the contract
+we have the first place.
+
+We can argue for years about DT stability, history proves that it
+doesn't lead anywhere.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
