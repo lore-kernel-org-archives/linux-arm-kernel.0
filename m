@@ -1,60 +1,72 @@
-From: tinamdar@apm.com (Tanmay Inamdar)
-Date: Wed, 27 May 2015 10:21:40 -0700
-Subject: [PATCH Part1 v11 4/5] PCI: xgene: Use pci_scan_root_bus() instead
- of pci_create_root_bus()
-In-Reply-To: <20150527154758.GU32152@google.com>
-References: <1430204499-19571-1-git-send-email-wangyijing@huawei.com>
- <1430204499-19571-5-git-send-email-wangyijing@huawei.com>
- <20150527154758.GU32152@google.com>
-Message-ID: <CACoXjcnZG9+oyc43G2NM1tvrZycMGiQFHm2E27+1Q_8_Vu9aEQ@mail.gmail.com>
+From: afaerber@suse.de (=?windows-1252?Q?Andreas_F=E4rber?=)
+Date: Wed, 27 May 2015 19:28:46 +0200
+Subject: [PATCH v4 2/2] soc: Add driver for Freescale Vybrid Platform
+In-Reply-To: <20150527130727.GA3374@Sanchayan-Arch.toradex.int>
+References: <cover.1432637313.git.maitysanchayan@gmail.com>
+ <7df753efff77a96da285f0571f1316512787e83c.1432637313.git.maitysanchayan@gmail.com>
+ <1432711910.27695.223.camel@x220>
+ <20150527130727.GA3374@Sanchayan-Arch.toradex.int>
+Message-ID: <5565FECE.3000104@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 27, 2015 at 8:47 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
-> On Tue, Apr 28, 2015 at 03:01:38PM +0800, Yijing Wang wrote:
->> Pci_bus_add_devices() was ripped out of pci_scan_root_bus().
->> Now pci_scan_root_bus() == pci_create_root_bus() +
->> pci_scan_child_bus() if busn resource is supplied.
->> Xgene added the busn resource to resources list
->> in of_pci_get_host_bridge_resources(). So it should be safe
->> to use pci_scan_root_bus() instead.
->>
->> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
->> CC: Tanmay Inamdar <tinamdar@apm.com>
->
-> Tanmay, any comments on this?
->
+Hi,
 
-Looks good to me.
+Am 27.05.2015 um 15:07 schrieb maitysanchayan at gmail.com:
+> On 15-05-27 09:31:50, Paul Bolle wrote:
+>> On Tue, 2015-05-26 at 17:06 +0530, Sanchayan Maity wrote:
+>>> --- /dev/null
+>>> +++ b/drivers/soc/fsl/Kconfig
+>>
+>>> +config SOC_VF610
+>>> +	   bool "SoC bus device for the Freescale Vybrid platform"
+>>> +	   select SOC_BUS
+>>> +	   help
+>>> +	     Include support for the SoC bus on the Freescale Vybrid platform
+>>> +	     providing some sysfs information about the module variant.
+>>> \ No newline at end of file
+[...]
+>>> --- /dev/null
+>>> +++ b/drivers/soc/fsl/Makefile
+>>
+>>> +obj-$(CONFIG_SOC_VF610)		+= soc-vf610.o
+>>
+>>> --- /dev/null
+>>> +++ b/drivers/soc/fsl/soc-vf610.c
+>>
+>>> +MODULE_DEVICE_TABLE(of, vf610_soc_bus_match);
+>>
+>>> +module_platform_driver(vf610_soc_driver);
+>>
+>> (The series starting at https://lkml.org/lkml/2015/5/10/131 would allow
+>> to use builtin_platform_driver() for built-in only code.)
+[...]
+>>> +MODULE_DESCRIPTION("Freescale VF610 SoC bus driver");
+>>> +MODULE_LICENSE("GPL v2");
+>>
+>> I think soc-vf610.o can only be built-in. But its code contains a few
+>> module specific macros. Was it perhaps intended for SOC_VF610 to be
+>> tristate?
+> 
+> I too think that should be built-in.
 
-Acked-by: Tanmay Inamdar <tinamdar@apm.com>
+Why? For a generic distro kernel it'd be unfortunate to not allow
+putting such a driver into an initrd, if needed early, or into the
+rootfs otherwise.
 
->> ---
->>  drivers/pci/host/pci-xgene.c |    3 +--
->>  1 files changed, 1 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
->> index ee082c0..87e3962 100644
->> --- a/drivers/pci/host/pci-xgene.c
->> +++ b/drivers/pci/host/pci-xgene.c
->> @@ -499,12 +499,11 @@ static int xgene_pcie_probe_bridge(struct platform_device *pdev)
->>       if (ret)
->>               return ret;
->>
->> -     bus = pci_create_root_bus(&pdev->dev, 0,
->> +     bus = pci_scan_root_bus(&pdev->dev, 0,
->>                                       &xgene_pcie_ops, port, &res);
->>       if (!bus)
->>               return -ENOMEM;
->>
->> -     pci_scan_child_bus(bus);
->>       pci_assign_unassigned_bus_resources(bus);
->>       pci_bus_add_devices(bus);
->>
->> --
->> 1.7.1
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Regards,
+Andreas
+
+> Did not have an intention of making
+> it tristate, however while using other drivers as references, the perhaps
+> unneccessary stuff crept in.
+> 
+> The MODULE_* references can be removed along with the corresponding header
+> file. However that series has not been merged yet, so I can't use builtin_*
+> yet?
+[snip]
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Dilip Upmanyu, Graham Norton; HRB
+21284 (AG N?rnberg)
