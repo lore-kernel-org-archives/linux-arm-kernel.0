@@ -1,44 +1,43 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 27 May 2015 20:56:01 +0900
-Subject: [PATCH 2/5] ARM: EXYNOS: Remove SROM related register settings
- from mach-exynos
-In-Reply-To: <1430296712-10287-3-git-send-email-pankaj.dubey@samsung.com>
-References: <1430296712-10287-1-git-send-email-pankaj.dubey@samsung.com>
- <1430296712-10287-3-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <5565B0D1.80004@samsung.com>
+From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
+Date: Wed, 27 May 2015 08:01:23 -0400
+Subject: [PATCHv3 11/12] ARM: migrate to common PSCI client code
+In-Reply-To: <1432648350-5454-12-git-send-email-mark.rutland@arm.com>
+References: <1432648350-5454-1-git-send-email-mark.rutland@arm.com>
+ <1432648350-5454-12-git-send-email-mark.rutland@arm.com>
+Message-ID: <CAJ5Y-eYpPXWEZpVxdnAytjHS0D+ufDoYQUo3yKqLbysCSGswSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 29.04.2015 o 17:38, Pankaj Dubey pisze:
-> As now we have dedicated driver for SROM controller, it will take care
-> of saving register banks during S2R so we can safely remove these
-> settings from mach-exynos.
-> 
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+On 26 May 2015 at 09:52, Mark Rutland <mark.rutland@arm.com> wrote:
+> Now that the common PSCI client code has been factored out to
+> drivers/firmware, and made safe for 32-bit use, move the 32-bit ARM code
+> over to it. This results in a moderate reduction of duplicated lines,
+> and will prevent further duplication as the PSCI client code is updated
+> for PSCI 1.0 and beyond.
+>
+> The two legacy platform users of the PSCI invocation code are updated to
+> account for interface changes. In both cases the power state parameter
+> is changed to an opaque u32 token in preparation for PSCI 1.0 power
+> state changes.
+>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> Cc: Will Deacon <will.deacon@arm.com>
 > ---
->  arch/arm/mach-exynos/Kconfig                   |  2 +
->  arch/arm/mach-exynos/exynos.c                  | 10 -----
->  arch/arm/mach-exynos/include/mach/map.h        |  3 --
->  arch/arm/mach-exynos/suspend.c                 | 20 +---------
->  arch/arm/plat-samsung/include/plat/map-s5p.h   |  1 -
->  arch/arm/plat-samsung/include/plat/regs-srom.h | 54 --------------------------
->  6 files changed, 4 insertions(+), 86 deletions(-)
->  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-srom.h
-> 
-> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-> index 603820e..e842b23 100644
-> --- a/arch/arm/mach-exynos/Kconfig
-> +++ b/arch/arm/mach-exynos/Kconfig
-> @@ -25,6 +25,8 @@ menuconfig ARCH_EXYNOS
->  	select S5P_DEV_MFC
->  	select SRAM
->  	select MFD_SYSCON
-> +	select SOC_SAMSUNG
-> +	select EXYNOS_SROM
+>  arch/arm/Kconfig                  |   1 +
+>  arch/arm/include/asm/psci.h       |  23 ---
+>  arch/arm/kernel/Makefile          |   2 +-
+>  arch/arm/kernel/psci.c            | 299 --------------------------------------
+>  arch/arm/kernel/psci_smp.c        |  29 +++-
+>  arch/arm/kernel/setup.c           |   3 +-
+>  arch/arm/mach-highbank/highbank.c |   2 +-
+>  arch/arm/mach-highbank/pm.c       |   8 +-
+>  drivers/cpuidle/cpuidle-calxeda.c |   7 +-
+>  9 files changed, 32 insertions(+), 342 deletions(-)
+>  delete mode 100644 arch/arm/kernel/psci.c
 
-What about the difference of execution time? The suspend/resume of
-device may not be called in the same time as previous syscore ops. Does
-this have any impact?
-
-Best regards,
-Krzysztof
+Reviewed-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
