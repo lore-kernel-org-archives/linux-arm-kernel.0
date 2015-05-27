@@ -1,84 +1,52 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 27 May 2015 22:58:01 +0200 (CEST)
-Subject: [PATCH V2 5/6] regulator: add mxs on-chip regulator driver
-In-Reply-To: <20150527173321.GH21577@sirena.org.uk>
-References: <1430346747-28728-1-git-send-email-stefan.wahren@i2se.com>
- <1430346747-28728-6-git-send-email-stefan.wahren@i2se.com>
- <20150504123648.GU15510@sirena.org.uk>
- <1693367404.879766.1430771695242.JavaMail.open-xchange@oxbaltgw08.schlund.de>
- <1875749167.82542.1431023838932.JavaMail.open-xchange@oxbsltgw04.schlund.de>
- <20150507185216.GP22845@sirena.org.uk>
- <535744342.64563.1431026719818.JavaMail.open-xchange@oxbsltgw09.schlund.de>
- <20150507193236.GS22845@sirena.org.uk>
- <1290103954.26573.1432642616013.JavaMail.open-xchange@oxbsltgw08.schlund.de>
- <20150527173321.GH21577@sirena.org.uk>
-Message-ID: <1973961885.66028.1432760281554.JavaMail.open-xchange@oxbsltgw06.schlund.de>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 27 May 2015 23:23:40 +0200
+Subject: [PATCH] fixup! dmaengine: pxa_dma: add debug information
+Message-ID: <1432761820-32072-1-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This fixes the following error:
+drivers/dma/pxa_dma.c: In function ?dbg_show_requester_chan?:
+drivers/dma/pxa_dma.c:192:2: error: void value not ignored as it ought to be
+  pos += seq_printf(s, "DMA channel %d requester :\n", phy->idx);
+  ^
+drivers/dma/pxa_dma.c:197:8: error: void value not ignored as it ought to be
+        !!(drcmr & DRCMR_MAPVLD));
+        ^
+scripts/Makefile.build:258: recipe for target 'drivers/dma/pxa_dma.o' failed
 
-> Mark Brown <broonie@kernel.org> hat am 27. Mai 2015 um 19:33 geschrieben:
->
->
-> On Tue, May 26, 2015 at 02:16:55PM +0200, Stefan Wahren wrote:
-> > > Mark Brown <broonie@kernel.org> hat am 7. Mai 2015 um 21:32 geschrieben:
->
-> > > > > > In the bootloader code enabling the DC-DC is critical. There is a
-> > > > > > known
-> > > > > > issue
-> > > > > > which falsely triggers the brownout detection.
->
-> > > > > Why would the driver not provide these operations?
->
-> > > > I didn't implement this operation because the suggested workaround for
-> > > > the
-> > > > hardware issue isn't very nice
-> > > > (disable brownout detection during enabling DC-DC). I was afraid of the
-> > > > implementation.
->
-> > > That doesn't sound too complicated?
->
-> > Okay, i think i managed the brownout handling.
-> >
-> > Unfortunately i'm stuck at the next step. The DC-DC (3 way output) can
-> > supply 3
-> > LDOs vddd, vdda, vddio. In case of a DC-DC state change the 3 regulators
-> > needs
-> > to be reconfigured before.
->
-> > I tought of REGULATOR_EVENT_PRE_DISABLE and REGULATOR_EVENT_PRE_ENABLE
-> > events,
-> > but i'm not sure that's the right way to achieve a synchronization between
-> > DC-DC
-> > and consuming LDOs.
->
-> OK, that's possibly sounding a bit complicated. Is it just a case of
-> writing some value, doing a reconfiguration and rewriting the original
-> value or is it something more?
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ drivers/dma/pxa_dma.c | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
-In case of a single driver instance instead of 4 ones (vddd, vddio, vdda,
-dc-dc), things would be much easier.
-
-Here are the steps for disabling DC-DC:
-
-1. configure vddio to work without DC-DC
-2. configure vdda to work without DC-DC
-3. configure vddd to work without DC-DC
-4. backup DC-DC settings
-5. disable brownout detection
-6. disable DC-DC
-7. restore DC-DC settings
-
-My problem is that step 1 to 3 must be done step by step through the other
-regulator instances.
-
-> If it's much more complicated than that
-> then I think putting a comment in the driver explaining what the issue
-> is would be the right step, that would address the issue with the driver
-> looking strange.
-
-Enabling or disabling DC-DC is only needed internally by the power subsystem
-(e.g. in case of handoff AC to battery), because the DC-DC only supplys the
-regulator daisy. From my understanding hardware components could use only the
-regulator outputs. In the end a state change is necessary, but it shouldn't be a
-public.
+diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
+index ddcbbf5..be5b524 100644
+--- a/drivers/dma/pxa_dma.c
++++ b/drivers/dma/pxa_dma.c
+@@ -184,19 +184,18 @@ static unsigned int pxad_drcmr(unsigned int line)
+ 
+ static int dbg_show_requester_chan(struct seq_file *s, void *p)
+ {
+-	int pos = 0;
+ 	struct pxad_phy *phy = s->private;
+ 	int i;
+ 	u32 drcmr;
+ 
+-	pos += seq_printf(s, "DMA channel %d requester :\n", phy->idx);
++	seq_printf(s, "DMA channel %d requester :\n", phy->idx);
+ 	for (i = 0; i < 70; i++) {
+ 		drcmr = readl_relaxed(phy->base + pxad_drcmr(i));
+ 		if ((drcmr & DRCMR_CHLNUM) == phy->idx)
+-			pos += seq_printf(s, "\tRequester %d (MAPVLD=%d)\n", i,
+-					  !!(drcmr & DRCMR_MAPVLD));
++			seq_printf(s, "\tRequester %d (MAPVLD=%d)\n", i,
++				   !!(drcmr & DRCMR_MAPVLD));
+ 	}
+-	return pos;
++	return 0;
+ }
+ 
+ static inline int dbg_burst_from_dcmd(u32 dcmd)
+-- 
+2.1.4
