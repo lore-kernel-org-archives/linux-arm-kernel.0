@@ -1,435 +1,174 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 27 May 2015 12:01:39 +0200
-Subject: [PATCH v5 1/1] ARM: mvebu: dts: Add dts file for DLink DNS-327L
-In-Reply-To: <20150526155042.GD7856@lunn.ch>
-References: <1432655471-16212-1-git-send-email-andrew@ncrmnt.org>
- <1432655471-16212-2-git-send-email-andrew@ncrmnt.org>
- <20150526155042.GD7856@lunn.ch>
-Message-ID: <55659603.4030509@free-electrons.com>
+Date: Wed, 27 May 2015 12:04:34 +0200
+Subject: [PATCH 3/3] ARM: mvebu: use improved armada spi device tree
+ compatible name for each SoC
+In-Reply-To: <1432633484-18758-4-git-send-email-gregory.clement@free-electrons.com>
+References: <1432633484-18758-1-git-send-email-gregory.clement@free-electrons.com>
+ <1432633484-18758-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <556596B2.4060300@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Hi,
 
-On 26/05/2015 17:50, Andrew Lunn wrote:
-> On Tue, May 26, 2015 at 06:51:11PM +0300, Andrew Andrianov wrote:
->> DNS-327L is a 2-bay NAS with the following specs:
->>      - 512MiB RAM
->>      - 128MiB NAND Flash
->>      - 1 GbE interface (Marvell PHY)
->>      - 1 rear USB 3.0 port (via PCIe USB 3.0 controller)
->>      - 2 internal SATA ports handled by the Armada 370:
->>        	 uses 2 gpios for power control
->>      - two front 2-color leds (amber + white) for both discs,
->>         controlled by the SoC
->>      - One white LED handled by SoC (USB)
->>      - 3 buttons. Power handled by weltrend, USB and
->>        RESET (on the bottom) are wired via GPIOs
->>      - Unidentified i2c device at address 0x13 (via i2cdetect)
->>      - UART0 providing serial console
->>      - Weltrend MCU serving for RTC, temperature, fan control,
->>        and power button handling interfaced via UART1
->>        (Handled via userspace dns320l-daemon)
->>
->> Signed-off-by: Andrew Andrianov <andrew@ncrmnt.org>
->> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+On 26/05/2015 11:44, Gregory CLEMENT wrote:
+> Use the new compatible introduced in rder to beneficiate of a wider
+> and more accurate range of baud rates to be used.
 > 
-> Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-applied on mvebu/dt
-
+As the driver part was applied, I applied this patch
+on mvebu/dt
 Thanks,
 
 Gregory
 
 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/armada-370-xp.dtsi | 2 --
+>  arch/arm/boot/dts/armada-370.dtsi    | 4 ++++
+>  arch/arm/boot/dts/armada-375.dtsi    | 6 ++++--
+>  arch/arm/boot/dts/armada-38x.dtsi    | 6 ++++--
+>  arch/arm/boot/dts/armada-39x.dtsi    | 6 ++++--
+>  arch/arm/boot/dts/armada-xp.dtsi     | 8 ++++++++
+>  6 files changed, 24 insertions(+), 8 deletions(-)
 > 
-> 	  Andrew
+> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+> index ec96f0b36346..7f0252c580e4 100644
+> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
+> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+> @@ -149,7 +149,6 @@
+>  			};
+>  
+>  			spi0: spi at 10600 {
+> -				compatible = "marvell,armada-370-spi", "marvell,orion-spi";
+>  				reg = <0x10600 0x28>;
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+> @@ -160,7 +159,6 @@
+>  			};
+>  
+>  			spi1: spi at 10680 {
+> -				compatible = "marvell,armada-370-spi", "marvell,orion-spi";
+>  				reg = <0x10680 0x28>;
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+> diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+> index 00b50db57c9c..3f036bd635f4 100644
+> --- a/arch/arm/boot/dts/armada-370.dtsi
+> +++ b/arch/arm/boot/dts/armada-370.dtsi
+> @@ -139,11 +139,15 @@
+>  			 * board level if a different configuration is used.
+>  			 */
+>  			spi0: spi at 10600 {
+> +				compatible = "marvell,armada-370-spi",
+> +						"marvell,orion-spi";
+>  				pinctrl-0 = <&spi0_pins1>;
+>  				pinctrl-names = "default";
+>  			};
+>  
+>  			spi1: spi at 10680 {
+> +				compatible = "marvell,armada-370-spi",
+> +						"marvell,orion-spi";
+>  				pinctrl-0 = <&spi1_pins>;
+>  				pinctrl-names = "default";
+>  			};
+> diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+> index f076ff856d8b..67a0ab0f71e0 100644
+> --- a/arch/arm/boot/dts/armada-375.dtsi
+> +++ b/arch/arm/boot/dts/armada-375.dtsi
+> @@ -238,7 +238,8 @@
+>  			};
+>  
+>  			spi0: spi at 10600 {
+> -				compatible = "marvell,orion-spi";
+> +				compatible = "marvell,armada-375-spi",
+> +						"marvell,orion-spi";
+>  				reg = <0x10600 0x50>;
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+> @@ -249,7 +250,8 @@
+>  			};
+>  
+>  			spi1: spi at 10680 {
+> -				compatible = "marvell,orion-spi";
+> +				compatible = "marvell,armada-375-spi",
+> +						"marvell,orion-spi";
+>  				reg = <0x10680 0x50>;
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+> index 218a2acd36e5..eace85db7c8c 100644
+> --- a/arch/arm/boot/dts/armada-38x.dtsi
+> +++ b/arch/arm/boot/dts/armada-38x.dtsi
+> @@ -167,7 +167,8 @@
+>  			};
+>  
+>  			spi0: spi at 10600 {
+> -				compatible = "marvell,orion-spi";
+> +				compatible = "marvell,armada-380-spi",
+> +						"marvell,orion-spi";
+>  				reg = <0x10600 0x50>;
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+> @@ -178,7 +179,8 @@
+>  			};
+>  
+>  			spi1: spi at 10680 {
+> -				compatible = "marvell,orion-spi";
+> +				compatible = "marvell,armada-380-spi",
+> +						"marvell,orion-spi";
+>  				reg = <0x10680 0x50>;
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+> diff --git a/arch/arm/boot/dts/armada-39x.dtsi b/arch/arm/boot/dts/armada-39x.dtsi
+> index ecd1318109ba..fc9864f85fc2 100644
+> --- a/arch/arm/boot/dts/armada-39x.dtsi
+> +++ b/arch/arm/boot/dts/armada-39x.dtsi
+> @@ -128,7 +128,8 @@
+>  			};
+>  
+>  			spi0: spi at 10600 {
+> -				compatible = "marvell,orion-spi";
+> +				compatible = "marvell,armada-390-spi",
+> +						"marvell,orion-spi";
+>  				reg = <0x10600 0x50>;
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+> @@ -139,7 +140,8 @@
+>  			};
+>  
+>  			spi1: spi at 10680 {
+> -				compatible = "marvell,orion-spi";
+> +				compatible = "marvell,armada-390-spi",
+> +						"marvell,orion-spi";
+>  				reg = <0x10680 0x50>;
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+> index 013d63f69e36..e78ce4ab6b75 100644
+> --- a/arch/arm/boot/dts/armada-xp.dtsi
+> +++ b/arch/arm/boot/dts/armada-xp.dtsi
+> @@ -85,10 +85,18 @@
+>  			};
+>  
+>  			spi0: spi at 10600 {
+> +				compatible = "marvell,armada-xp-spi",
+> +						"marvell,orion-spi";
+>  				pinctrl-0 = <&spi0_pins>;
+>  				pinctrl-names = "default";
+>  			};
+>  
+> +			spi1: spi at 10680 {
+> +				compatible = "marvell,armada-xp-spi",
+> +						"marvell,orion-spi";
+> +			};
+> +
+> +
+>  			i2c0: i2c at 11000 {
+>  				compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
+>  				reg = <0x11000 0x100>;
 > 
->> ---
->>  arch/arm/boot/dts/Makefile                     |   1 +
->>  arch/arm/boot/dts/armada-370-dlink-dns327l.dts | 357 +++++++++++++++++++++++++
->>  2 files changed, 358 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/armada-370-dlink-dns327l.dts
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index 86217db..58fa9f6 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -624,6 +624,7 @@ dtb-$(CONFIG_ARCH_ZYNQ) += \
->>  	zynq-zybo.dtb
->>  dtb-$(CONFIG_MACH_ARMADA_370) += \
->>  	armada-370-db.dtb \
->> +	armada-370-dlink-dns327l.dtb \
->>  	armada-370-mirabox.dtb \
->>  	armada-370-netgear-rn102.dtb \
->>  	armada-370-netgear-rn104.dtb \
->> diff --git a/arch/arm/boot/dts/armada-370-dlink-dns327l.dts b/arch/arm/boot/dts/armada-370-dlink-dns327l.dts
->> new file mode 100644
->> index 0000000..af4dc54
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/armada-370-dlink-dns327l.dts
->> @@ -0,0 +1,357 @@
->> +/*
->> + * Device Tree file for D-Link DNS-327L
->> + *
->> + * Copyright (C) 2015, Andrew Andrianov <andrew@ncrmnt.org>
->> + *
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
->> + *
->> + *  a) This file is free software; you can redistribute it and/or
->> + *     modify it under the terms of the GNU General Public License as
->> + *     published by the Free Software Foundation; either version 2 of the
->> + *     License, or (at your option) any later version.
->> + *
->> + *     This file is distributed in the hope that it will be useful
->> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + *     GNU General Public License for more details.
->> + *
->> + * Or, alternatively
->> + *
->> + *  b) Permission is hereby granted, free of charge, to any person
->> + *     obtaining a copy of this software and associated documentation
->> + *     files (the "Software"), to deal in the Software without
->> + *     restriction, including without limitation the rights to use
->> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> + *     sell copies of the Software, and to permit persons to whom the
->> + *     Software is furnished to do so, subject to the following
->> + *     conditions:
->> + *
->> + *     The above copyright notice and this permission notice shall be
->> + *     included in all copies or substantial portions of the Software.
->> + *
->> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
->> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
->> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> + *     OTHER DEALINGS IN THE SOFTWARE.
->> + */
->> +
->> +/* Remaining unsolved:
->> + * There's still some unknown device on i2c address 0x13
->> + */
->> +
->> +/dts-v1/;
->> +
->> +#include <dt-bindings/input/input.h>
->> +#include <dt-bindings/gpio/gpio.h>
->> +#include "armada-370.dtsi"
->> +
->> +/ {
->> +	model = "D-Link DNS-327L";
->> +	compatible = "dlink,dns327l",
->> +		"marvell,armada370",
->> +		"marvell,armada-370-xp";
->> +
->> +	chosen {
->> +		stdout-path = &uart0;
->> +	};
->> +
->> +	memory {
->> +		device_type = "memory";
->> +		reg = <0x00000000 0x20000000>; /* 512 MiB */
->> +	};
->> +
->> +	soc {
->> +		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000
->> +			MBUS_ID(0x01, 0xe0) 0 0xfff00000 0x100000>;
->> +
->> +		pcie-controller {
->> +			status = "okay";
->> +
->> +			pcie at 1,0 {
->> +				/* Port 0, Lane 0 */
->> +				status = "okay";
->> +			};
->> +
->> +			pcie at 2,0 {
->> +				/* Port 1, Lane 0 */
->> +				status = "okay";
->> +			};
->> +		};
->> +
->> +		internal-regs {
->> +			sata at a0000 {
->> +				nr-ports = <2>;
->> +				status = "okay";
->> +			};
->> +
->> +			usb at 50000 {
->> +				status = "okay";
->> +			};
->> +
->> +			nand at d0000 {
->> +				status = "okay";
->> +				num-cs = <1>;
->> +				marvell,nand-keep-config;
->> +				marvell,nand-enable-arbiter;
->> +				nand-on-flash-bbt;
->> +				nand-ecc-strength = <4>;
->> +				nand-ecc-step-size = <512>;
->> +
->> +				partition at 0 {
->> +					label = "u-boot";
->> +					/* 1.0 MiB */
->> +					reg = <0x0000000 0x100000>;
->> +					read-only;
->> +				};
->> +
->> +				partition at 100000 {
->> +					label = "u-boot-env";
->> +					/* 128 KiB */
->> +					reg = <0x100000 0x20000>;
->> +					read-only;
->> +				};
->> +
->> +				partition at 120000 {
->> +					label = "uImage";
->> +					/* 7 MiB */
->> +					reg = <0x120000 0x700000>;
->> +				};
->> +
->> +				partition at 820000 {
->> +					label = "ubifs";
->> +					/* ~ 84 MiB */
->> +					reg = <0x820000 0x54e0000>;
->> +				};
->> +
->> +				/* Hardcoded into stock bootloader */
->> +				partition at 5d00000 {
->> +					label = "failsafe-uImage";
->> +					/* 5 MiB */
->> +					reg = <0x5d00000 0x500000>;
->> +				};
->> +
->> +				partition at 6200000 {
->> +					label = "failsafe-fs";
->> +					/* 29 MiB */
->> +					reg = <0x6200000 0x1d00000>;
->> +				};
->> +
->> +				partition at 7f00000 {
->> +					label = "bbt";
->> +					/* 1 MiB for BBT */
->> +					reg = <0x7f00000 0x100000>;
->> +				};
->> +			};
->> +		};
->> +	};
->> +
->> +	gpio-keys {
->> +		compatible = "gpio-keys";
->> +		pinctrl-0 = <
->> +			&backup_button_pin
->> +			&power_button_pin
->> +			&reset_button_pin>;
->> +		pinctrl-names = "default";
->> +
->> +		power-button {
->> +			label = "Power Button";
->> +			linux,code = <KEY_POWER>;
->> +			gpios = <&gpio2 1 GPIO_ACTIVE_LOW>;
->> +		};
->> +
->> +		backup-button {
->> +			label = "Backup Button";
->> +			linux,code = <KEY_COPY>;
->> +			gpios = <&gpio1 31 GPIO_ACTIVE_LOW>;
->> +		};
->> +
->> +		reset-button {
->> +			label = "Reset Button";
->> +			linux,code = <KEY_RESTART>;
->> +			gpios = <&gpio2 0 GPIO_ACTIVE_LOW>;
->> +		};
->> +	};
->> +
->> +	gpio-leds {
->> +		compatible = "gpio-leds";
->> +		pinctrl-0 = <
->> +			&sata_l_amber_pin
->> +			&sata_r_amber_pin
->> +			&backup_led_pin
->> +			/* Ensure these are managed by hardware */
->> +			&sata_l_white_pin
->> +			&sata_r_white_pin>;
->> +
->> +		pinctrl-names = "default";
->> +
->> +		sata-r-amber-pin {
->> +			label = "dns327l:amber:sata-r";
->> +			gpios = <&gpio1 20 GPIO_ACTIVE_HIGH>;
->> +			default-state = "keep";
->> +		};
->> +
->> +		sata-l-amber-pin {
->> +			label = "dns327l:amber:sata-l";
->> +			gpios = <&gpio1 21 GPIO_ACTIVE_HIGH>;
->> +			default-state = "keep";
->> +		};
->> +
->> +		backup-led-pin {
->> +			label = "dns327l:white:usb";
->> +			gpios = <&gpio1 29 GPIO_ACTIVE_HIGH>;
->> +			default-state = "keep";
->> +		};
->> +	};
->> +
->> +	regulators {
->> +		compatible = "simple-bus";
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +
->> +		usb_power: regulator at 1 {
->> +			compatible = "regulator-fixed";
->> +			reg = <1>;
->> +			pinctrl-0 = <&xhci_pwr_pin>;
->> +			pinctrl-names = "default";
->> +			regulator-name = "USB3.0 Port Power";
->> +			regulator-min-microvolt = <5000000>;
->> +			regulator-max-microvolt = <5000000>;
->> +			enable-active-high;
->> +			regulator-boot-on;
->> +			regulator-always-on;
->> +			gpio = <&gpio0 13 GPIO_ACTIVE_HIGH>;
->> +		};
->> +
->> +		sata_r_power: regulator at 2 {
->> +			compatible = "regulator-fixed";
->> +			reg = <2>;
->> +			pinctrl-0 = <&sata_r_pwr_pin>;
->> +			pinctrl-names = "default";
->> +			regulator-name = "SATA-R Power";
->> +			regulator-min-microvolt = <5000000>;
->> +			regulator-max-microvolt = <5000000>;
->> +			startup-delay-us = <2000000>;
->> +			enable-active-high;
->> +			regulator-always-on;
->> +			regulator-boot-on;
->> +			gpio = <&gpio1 22 GPIO_ACTIVE_HIGH>;
->> +		};
->> +
->> +		sata_l_power: regulator at 3 {
->> +			compatible = "regulator-fixed";
->> +			reg = <3>;
->> +			pinctrl-0 = <&sata_l_pwr_pin>;
->> +			pinctrl-names = "default";
->> +			regulator-name = "SATA-L Power";
->> +			regulator-min-microvolt = <5000000>;
->> +			regulator-max-microvolt = <5000000>;
->> +			startup-delay-us = <4000000>;
->> +			enable-active-high;
->> +			regulator-always-on;
->> +			regulator-boot-on;
->> +			gpio = <&gpio1 24 GPIO_ACTIVE_HIGH>;
->> +		};
->> +	};
->> +};
->> +
->> +&pinctrl {
->> +	sata_l_white_pin: sata-l-white-pin {
->> +		marvell,pins = "mpp57";
->> +		marvell,function = "sata0";
->> +	};
->> +
->> +	sata_r_white_pin: sata-r-white-pin {
->> +		marvell,pins = "mpp55";
->> +		marvell,function = "sata1";
->> +	};
->> +
->> +	sata_r_amber_pin: sata-r-amber-pin {
->> +		marvell,pins = "mpp52";
->> +		marvell,function = "gpio";
->> +	};
->> +
->> +	sata_l_amber_pin: sata-l-amber-pin {
->> +		marvell,pins = "mpp53";
->> +		marvell,function = "gpio";
->> +	};
->> +
->> +	backup_led_pin: backup-led-pin {
->> +		marvell,pins = "mpp61";
->> +		marvell,function = "gpo";
->> +	};
->> +
->> +	xhci_pwr_pin: xhci-pwr-pin {
->> +		marvell,pins = "mpp13";
->> +		marvell,function = "gpio";
->> +	};
->> +
->> +	sata_r_pwr_pin: sata-r-pwr-pin {
->> +		marvell,pins = "mpp54";
->> +		marvell,function = "gpio";
->> +	};
->> +
->> +	sata_l_pwr_pin: sata-l-pwr-pin {
->> +		marvell,pins = "mpp56";
->> +		marvell,function = "gpio";
->> +	};
->> +
->> +	uart1_pins: uart1-pins {
->> +		marvell,pins = "mpp60", "mpp61";
->> +		marvell,function = "uart1";
->> +	};
->> +
->> +	power_button_pin: power-button-pin {
->> +		marvell,pins = "mpp65";
->> +		marvell,function = "gpio";
->> +	};
->> +
->> +	backup_button_pin: backup-button-pin {
->> +		marvell,pins = "mpp63";
->> +		marvell,function = "gpio";
->> +	};
->> +
->> +	reset_button_pin: reset-button-pin {
->> +		marvell,pins = "mpp64";
->> +		marvell,function = "gpio";
->> +	};
->> +};
->> +
->> +/* Serial console */
->> +&uart0 {
->> +	status = "okay";
->> +};
->> +
->> +/* Connected to Weltrend MCU */
->> +&uart1 {
->> +	pinctrl-0 = <&uart1_pins>;
->> +	pinctrl-names = "default";
->> +	status = "okay";
->> +};
->> +
->> +&mdio {
->> +	phy0: ethernet-phy at 0 { /* Marvell 88E1318 */
->> +		reg = <0>;
->> +		marvell,reg-init = <0x0 0x16 0x0 0x0002>,
->> +				<0x0 0x19 0x0 0x0077>,
->> +				<0x0 0x18 0x0 0x5747>;
->> +	};
->> +};
->> +
->> +&eth1 {
->> +	phy = <&phy0>;
->> +	phy-mode = "rgmii-id";
->> +	status = "okay";
->> +};
->> +
->> +&i2c0 {
->> +	compatible = "marvell,mv64xxx-i2c";
->> +	clock-frequency = <100000>;
->> +	status = "okay";
->> +};
->> -- 
->> 2.1.4
->>
 
 
 -- 
