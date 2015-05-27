@@ -1,28 +1,22 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Tue, 26 May 2015 16:12:06 -0700
-Subject: [PATCH 1/5] soc: mediatek: Add infracfg misc driver support
-In-Reply-To: <1431372206-1237-2-git-send-email-s.hauer@pengutronix.de> (Sascha
- Hauer's message of "Mon, 11 May 2015 21:23:22 +0200")
-References: <1431372206-1237-1-git-send-email-s.hauer@pengutronix.de>
- <1431372206-1237-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <7hfv6jorw9.fsf@deeprootsystems.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 27 May 2015 02:30:06 +0200
+Subject: [PATCH 00/11] ARM64 PCI hostbridge init based on ACPI
+In-Reply-To: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
+References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1951882.p8DdrcurkC@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sascha Hauer <s.hauer@pengutronix.de> writes:
+On Tuesday, May 26, 2015 08:49:13 PM Hanjun Guo wrote:
+> This patch set is introducing ARM64 PCI hostbridge init based on ACPI,
+> which based on Jiang Liu's patch set "Consolidate ACPI PCI root common
+> code into ACPI core":
+> 
+> https://lkml.org/lkml/2015/5/14/98
 
-> This adds support for some miscellaneous bits of the infracfg controller.
-> The mtk_infracfg_set/clear_bus_protection functions are necessary for
-> the scpsys power domain driver to handle the bus protection bits which
-> are contained in the infacfg register space.
->
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+I'll be regarding this patchset as an RFC until the one from Jiang Liu goes in.
 
-IMO, this feature still needs more documentation.  From an earlier
-exchange with James Liao, he was able to get some more details from the
-HW designer[1] which I think belong in comments somewhere in this
-driver.
 
-Kevin
- 
-[1] http://lists.infradead.org/pipermail/linux-mediatek/2015-March/000142.html
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
