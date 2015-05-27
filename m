@@ -1,32 +1,37 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 27 May 2015 09:36:17 +0100
-Subject: [RFC PATCH 0/3] clk: stm32: Add clock driver for STM32F4[23]xxx
- devices
-In-Reply-To: <CALszF6BTu_8SCE9hEiLYuvQg8J9eG5xktaVV7_LvnG3r20+wtw@mail.gmail.com>
-References: <1432327273-6810-1-git-send-email-daniel.thompson@linaro.org>
- <CALszF6BTu_8SCE9hEiLYuvQg8J9eG5xktaVV7_LvnG3r20+wtw@mail.gmail.com>
-Message-ID: <55658201.5090208@linaro.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 27 May 2015 10:36:25 +0200
+Subject: [PATCH] ARM: berlin: add SPI nodes for BG2Q
+In-Reply-To: <20150525090100.GC29660@kwain>
+References: <1432126385-27402-1-git-send-email-antoine.tenart@free-electrons.com>
+ <555D1706.7040309@gmail.com> <20150525090100.GC29660@kwain>
+Message-ID: <55658209.4000904@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/05/15 17:41, Maxime Coquelin wrote:
->>   2. Allocating ~80 clock components appears to fragment memory enough
->>      to prevent busybox (.text is ~300K, non-XIP) from running getty.
->>      I have to use "init=/bin/sh" to avoid OOM problems.
+On 25.05.2015 11:01, Antoine Tenart wrote:
+> On Thu, May 21, 2015 at 01:21:42AM +0200, Sebastian Hesselbarth wrote:
+>> On 20.05.2015 14:53, Antoine Tenart wrote:
+>>> +
+>>> +				spi0_pmux: spi0-pmux {
+>>> +					groups = "G8", "G9", "G10", "G11";
+>>> +					function = "spi1";
+>>> +				};
+>>
+>> ... can you check which of G8-G11 are actually clock/data and which
+>> are CSn lines?
+>>
+>> CSn lines should all be optional and per-board pinmux - same for the
+>> other spi pinmux.
 >
-> Yes, I reproduced the same issue while testing your work.
->
-> Could you try with:
-> CONFIG_NOMMU_INITIAL_TRIM_EXCESS=0
->
-> It solves (hides) the problem on my side.
-> You can eventually setting it once booted to 1 via procfs.
+> G8 and GSM3 are for clock/data, the other groups (G9-11 and GSM0-2)
+> control the CSn lines. I'll update.
 
-That works for me too. Thanks.
+Re-reading this mail after you published v2, I thought it would
+be a good idea to add this information to the pinmux driver. We
+already have some /* comments */ about the actual function, why
+not add the above, too?
 
-Incidentally switching to SLOB also reduced the problem for me. It was 
-OK whilst I had ~20 clocks (and debugfs) but not enough for me to run 
-with all the clocks registered.
+Also, I guess G8/GSM3 are for clk/data _and_ cs0n while
+G9-G11/GSM0-GSM2 add cs{1,2,3}n ?
 
-
-Daniel.
+Sebastian
