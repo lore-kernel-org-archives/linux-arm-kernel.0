@@ -1,106 +1,60 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 27 May 2015 18:17:47 +0100
-Subject: [PATCHv3 11/12] ARM: migrate to common PSCI client code
-In-Reply-To: <CAL_JsqJG=k=z5+p55YVzmdFBjcGSX2t3ct337kYRd6c5HG5H3g@mail.gmail.com>
-References: <1432648350-5454-1-git-send-email-mark.rutland@arm.com>
- <1432648350-5454-12-git-send-email-mark.rutland@arm.com>
- <CAL_JsqJG=k=z5+p55YVzmdFBjcGSX2t3ct337kYRd6c5HG5H3g@mail.gmail.com>
-Message-ID: <20150527171747.GB23176@leverpostej>
+From: tinamdar@apm.com (Tanmay Inamdar)
+Date: Wed, 27 May 2015 10:21:40 -0700
+Subject: [PATCH Part1 v11 4/5] PCI: xgene: Use pci_scan_root_bus() instead
+ of pci_create_root_bus()
+In-Reply-To: <20150527154758.GU32152@google.com>
+References: <1430204499-19571-1-git-send-email-wangyijing@huawei.com>
+ <1430204499-19571-5-git-send-email-wangyijing@huawei.com>
+ <20150527154758.GU32152@google.com>
+Message-ID: <CACoXjcnZG9+oyc43G2NM1tvrZycMGiQFHm2E27+1Q_8_Vu9aEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 27, 2015 at 05:46:47PM +0100, Rob Herring wrote:
-> On Tue, May 26, 2015 at 8:52 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > Now that the common PSCI client code has been factored out to
-> > drivers/firmware, and made safe for 32-bit use, move the 32-bit ARM code
-> > over to it. This results in a moderate reduction of duplicated lines,
-> > and will prevent further duplication as the PSCI client code is updated
-> > for PSCI 1.0 and beyond.
-> >
-> > The two legacy platform users of the PSCI invocation code are updated to
-> > account for interface changes. In both cases the power state parameter
-> > is changed to an opaque u32 token in preparation for PSCI 1.0 power
-> > state changes.
-> 
-> [...]
-> 
-> > diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-> > index 231fba0..6050a14 100644
-> > --- a/arch/arm/mach-highbank/highbank.c
-> > +++ b/arch/arm/mach-highbank/highbank.c
-> > @@ -28,8 +28,8 @@
-> >  #include <linux/reboot.h>
-> >  #include <linux/amba/bus.h>
-> >  #include <linux/platform_device.h>
-> > +#include <linux/psci.h>
-> >
-> > -#include <asm/psci.h>
-> >  #include <asm/hardware/cache-l2x0.h>
-> >  #include <asm/mach/arch.h>
-> >  #include <asm/mach/map.h>
-> > diff --git a/arch/arm/mach-highbank/pm.c b/arch/arm/mach-highbank/pm.c
-> > index 7f2bd85..014e96d 100644
-> > --- a/arch/arm/mach-highbank/pm.c
-> > +++ b/arch/arm/mach-highbank/pm.c
-> > @@ -16,18 +16,14 @@
-> >
-> >  #include <linux/cpu_pm.h>
-> >  #include <linux/init.h>
-> > +#include <linux/psci.h>
-> >  #include <linux/suspend.h>
-> >
-> >  #include <asm/suspend.h>
-> > -#include <asm/psci.h>
-> >
-> >  static int highbank_suspend_finish(unsigned long val)
-> >  {
-> > -       const struct psci_power_state ps = {
-> > -               .type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
-> > -               .affinity_level = 1,
-> > -       };
-> > -
-> > +       u32 ps = 0x01010000; /* Aff1 power down */
-> 
-> Why not just pass directly instead of sticking in a variable first.
+On Wed, May 27, 2015 at 8:47 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> On Tue, Apr 28, 2015 at 03:01:38PM +0800, Yijing Wang wrote:
+>> Pci_bus_add_devices() was ripped out of pci_scan_root_bus().
+>> Now pci_scan_root_bus() == pci_create_root_bus() +
+>> pci_scan_child_bus() if busn resource is supplied.
+>> Xgene added the busn resource to resources list
+>> in of_pci_get_host_bridge_resources(). So it should be safe
+>> to use pci_scan_root_bus() instead.
+>>
+>> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+>> CC: Tanmay Inamdar <tinamdar@apm.com>
+>
+> Tanmay, any comments on this?
+>
 
-No particular reason. I'll fold it in.
- 
-> >         return psci_ops.cpu_suspend(ps, __pa(cpu_resume));
-> >  }
-> >
-> > diff --git a/drivers/cpuidle/cpuidle-calxeda.c b/drivers/cpuidle/cpuidle-calxeda.c
-> > index 9445e6c..d010da8f 100644
-> > --- a/drivers/cpuidle/cpuidle-calxeda.c
-> > +++ b/drivers/cpuidle/cpuidle-calxeda.c
-> > @@ -25,15 +25,14 @@
-> >  #include <linux/init.h>
-> >  #include <linux/mm.h>
-> >  #include <linux/platform_device.h>
-> > +#include <linux/psci.h>
-> > +
-> >  #include <asm/cpuidle.h>
-> >  #include <asm/suspend.h>
-> > -#include <asm/psci.h>
-> >
-> >  static int calxeda_idle_finish(unsigned long val)
-> >  {
-> > -       const struct psci_power_state ps = {
-> > -               .type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
-> > -       };
-> > +       u32 ps = 0x00010000; /* Aff0 power down */
-> 
-> ditto.
+Looks good to me.
 
-Likewise.
+Acked-by: Tanmay Inamdar <tinamdar@apm.com>
 
-Thanks,
-Mark.
-
-> 
-> >         return psci_ops.cpu_suspend(ps, __pa(cpu_resume));
-> >  }
-> >
-> > --
-> > 1.9.1
-> >
-> 
+>> ---
+>>  drivers/pci/host/pci-xgene.c |    3 +--
+>>  1 files changed, 1 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+>> index ee082c0..87e3962 100644
+>> --- a/drivers/pci/host/pci-xgene.c
+>> +++ b/drivers/pci/host/pci-xgene.c
+>> @@ -499,12 +499,11 @@ static int xgene_pcie_probe_bridge(struct platform_device *pdev)
+>>       if (ret)
+>>               return ret;
+>>
+>> -     bus = pci_create_root_bus(&pdev->dev, 0,
+>> +     bus = pci_scan_root_bus(&pdev->dev, 0,
+>>                                       &xgene_pcie_ops, port, &res);
+>>       if (!bus)
+>>               return -ENOMEM;
+>>
+>> -     pci_scan_child_bus(bus);
+>>       pci_assign_unassigned_bus_resources(bus);
+>>       pci_bus_add_devices(bus);
+>>
+>> --
+>> 1.7.1
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
