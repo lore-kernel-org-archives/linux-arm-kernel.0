@@ -1,302 +1,142 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 27 May 2015 14:21:52 +0900
-Subject: [v4 1/4] arm64: kvm: add a cpu tear-down function
-In-Reply-To: <55643C56.5040600@arm.com>
+Date: Wed, 27 May 2015 14:29:27 +0900
+Subject: [v4 2/4] arm64: kvm: add kvm cpu hotplug
+In-Reply-To: <55643E4F.2000806@arm.com>
 References: <1431047884-5637-1-git-send-email-takahiro.akashi@linaro.org>
- <1431047884-5637-2-git-send-email-takahiro.akashi@linaro.org>
- <55643C56.5040600@arm.com>
-Message-ID: <55655470.4020807@linaro.org>
+ <1431047884-5637-3-git-send-email-takahiro.akashi@linaro.org>
+ <55643E4F.2000806@arm.com>
+Message-ID: <55655637.30505@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc,
-
-Thank you for your reviews:
-
-On 05/26/2015 06:26 PM, Marc Zyngier wrote:
-> Hi Takahiro,
->
+On 05/26/2015 06:35 PM, Marc Zyngier wrote:
 > On 08/05/15 02:18, AKASHI Takahiro wrote:
->> Cpu must be put back into its initial state, at least, in the
->> following cases in order to shutdown the system and/or re-initialize cpus
->> later on:
->> 1) kexec/kdump
->> 2) cpu hotplug (offline)
->> 3) removing kvm as a module
->>
->> To address those issues in later patches, this patch adds a tear-down
->> function, kvm_cpu_reset(), that disables D-cache & MMU and restore a vector
->> table to the initial stub at EL2.
+>> This patch allows cpu cores to be up and down by adding
+>> kvm_arch_hardware_enable/isable(). This way, especially in kexec case,
+>> cores are reset to initial states and kexec can gracefully shutdown the
+>> system and reboot a new kernel from EL2.
 >>
 >> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 >> ---
->>   arch/arm/kvm/arm.c                |   15 +++++++++++++++
->>   arch/arm/kvm/mmu.c                |    5 +++++
->>   arch/arm64/include/asm/kvm_asm.h  |    1 +
->>   arch/arm64/include/asm/kvm_host.h |   11 +++++++++++
->>   arch/arm64/include/asm/kvm_mmu.h  |    7 +++++++
->>   arch/arm64/include/asm/virt.h     |   11 +++++++++++
->>   arch/arm64/kvm/hyp-init.S         |   32 ++++++++++++++++++++++++++++++++
->>   arch/arm64/kvm/hyp.S              |   16 +++++++++++++---
->>   8 files changed, 95 insertions(+), 3 deletions(-)
+>>   arch/arm/include/asm/kvm_host.h   |    1 -
+>>   arch/arm/kvm/arm.c                |   29 +++++++++++++++++++----------
+>>   arch/arm64/include/asm/kvm_host.h |    1 -
+>>   3 files changed, 19 insertions(+), 12 deletions(-)
 >>
+>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+>> index 41008cd..ca97764 100644
+>> --- a/arch/arm/include/asm/kvm_host.h
+>> +++ b/arch/arm/include/asm/kvm_host.h
+>> @@ -237,7 +237,6 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
+>>
+>>   struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
+>>
+>> -static inline void kvm_arch_hardware_disable(void) {}
+>>   static inline void kvm_arch_hardware_unsetup(void) {}
+>>   static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+>>   static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
 >> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> index 07e7eb1..251ab9e 100644
+>> index 251ab9e..e989925 100644
 >> --- a/arch/arm/kvm/arm.c
 >> +++ b/arch/arm/kvm/arm.c
->> @@ -897,6 +897,21 @@ static void cpu_init_hyp_mode(void *dummy)
->>   	__cpu_init_hyp_mode(boot_pgd_ptr, pgd_ptr, hyp_stack_ptr, vector_ptr);
+>> @@ -87,11 +87,6 @@ struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void)
+>>   	return &kvm_arm_running_vcpu;
 >>   }
 >>
->> +static void kvm_cpu_reset(void *dummy)
+>> -int kvm_arch_hardware_enable(void)
+>> -{
+>> -	return 0;
+>> -}
+>> -
+>>   int kvm_arch_vcpu_should_kick(struct kvm_vcpu *vcpu)
+>>   {
+>>   	return kvm_vcpu_exiting_guest_mode(vcpu) == IN_GUEST_MODE;
+>> @@ -885,6 +880,9 @@ static void cpu_init_hyp_mode(void *dummy)
 >
-> It looks like you can entirely loose the "dummy" parameter. The only
-> reason some function have this is when they are used from an IPI call.
+> Since you removed the IPI, why do you keep the dummy argument?
 
-OK. I will remove all of them.
+Yeah, will remove it.
 
->> +{
->> +	phys_addr_t boot_pgd_ptr;
->> +	phys_addr_t phys_idmap_start;
->> +
->> +	if (__hyp_get_vectors() == hyp_default_vectors)
+>>   	unsigned long stack_page;
+>>   	unsigned long vector_ptr;
+>>
+>> +	if (__hyp_get_vectors() != hyp_default_vectors)
 >> +		return;
 >> +
->> +	boot_pgd_ptr = kvm_mmu_get_boot_httbr();
->> +	phys_idmap_start = kvm_get_idmap_start();
->> +	__cpu_reset_hyp_mode(boot_pgd_ptr, phys_idmap_start,
->> +			     hyp_default_vectors,
->> +			     kvm_virt_to_trampoline(__kvm_hyp_reset));
->> +}
->> +
->>   static int hyp_init_cpu_notify(struct notifier_block *self,
->>   			       unsigned long action, void *cpu)
+>>   	/* Switch from the HYP stub to our own HYP init vector */
+>>   	__hyp_set_vectors(kvm_get_idmap_vector());
+>>
+>> @@ -921,6 +919,10 @@ static int hyp_init_cpu_notify(struct notifier_block *self,
+>>   		if (__hyp_get_vectors() == hyp_default_vectors)
+>>   			cpu_init_hyp_mode(NULL);
+>>   		break;
+>> +	case CPU_DYING:
+>> +	case CPU_DYING_FROZEN:
+>> +		kvm_cpu_reset(NULL);
+>> +		break;
+>>   	}
+>>
+>>   	return NOTIFY_OK;
+>> @@ -936,6 +938,7 @@ static int hyp_init_cpu_pm_notifier(struct notifier_block *self,
+>>   				    void *v)
 >>   {
->> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
->> index 3e6859b..3631a37 100644
->> --- a/arch/arm/kvm/mmu.c
->> +++ b/arch/arm/kvm/mmu.c
->> @@ -1490,6 +1490,11 @@ phys_addr_t kvm_get_idmap_vector(void)
->>   	return hyp_idmap_vector;
+>>   	if (cmd == CPU_PM_EXIT &&
+>> +	    kvm_arm_get_running_vcpu() &&
+>>   	    __hyp_get_vectors() == hyp_default_vectors) {
+>>   		cpu_init_hyp_mode(NULL);
+>>   		return NOTIFY_OK;
+>> @@ -1039,11 +1042,6 @@ static int init_hyp_mode(void)
+>>   	}
+>>
+>>   	/*
+>> -	 * Execute the init code on each CPU.
+>> -	 */
+>> -	on_each_cpu(cpu_init_hyp_mode, NULL, 1);
+>> -
+>> -	/*
+>>   	 * Init HYP view of VGIC
+>>   	 */
+>>   	err = kvm_vgic_hyp_init();
+>> @@ -1144,6 +1142,17 @@ out_err:
+>>   	return err;
 >>   }
 >>
->> +phys_addr_t kvm_get_idmap_start(void)
+>> +int kvm_arch_hardware_enable(void)
 >> +{
->> +	return hyp_idmap_start;
+>> +	cpu_init_hyp_mode(NULL);
+>> +	return 0;
 >> +}
 >> +
->>   int kvm_mmu_init(void)
->>   {
->>   	int err;
->> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
->> index 4f7310f..f1c16e2 100644
->> --- a/arch/arm64/include/asm/kvm_asm.h
->> +++ b/arch/arm64/include/asm/kvm_asm.h
->> @@ -118,6 +118,7 @@ struct kvm_vcpu;
->>
->>   extern char __kvm_hyp_init[];
->>   extern char __kvm_hyp_init_end[];
->> +extern char __kvm_hyp_reset[];
->>
->>   extern char __kvm_hyp_vector[];
->>
->> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->> index 8ac3c70..6a8da9c 100644
->> --- a/arch/arm64/include/asm/kvm_host.h
->> +++ b/arch/arm64/include/asm/kvm_host.h
->> @@ -199,6 +199,8 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
->>   struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void);
->>
->>   u64 kvm_call_hyp(void *hypfn, ...);
->> +void kvm_call_reset(phys_addr_t boot_pgd_ptr, phys_addr_t phys_idmap_start,
->> +		    unsigned long stub_vector_ptr, unsigned long reset_func);
->>   void force_vm_exit(const cpumask_t *mask);
->>   void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
->>
->> @@ -223,6 +225,15 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
->>   		     hyp_stack_ptr, vector_ptr);
->>   }
->>
->> +static inline void __cpu_reset_hyp_mode(phys_addr_t boot_pgd_ptr,
->> +					phys_addr_t phys_idmap_start,
->> +					unsigned long stub_vector_ptr,
->> +					unsigned long reset_func)
+>> +void kvm_arch_hardware_disable(void)
 >> +{
->> +	kvm_call_reset(boot_pgd_ptr, phys_idmap_start, stub_vector_ptr,
->> +		       reset_func);
+>> +	kvm_cpu_reset(NULL);
 >> +}
 >> +
->>   struct vgic_sr_vectors {
->>   	void	*save_vgic;
->>   	void	*restore_vgic;
->> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
->> index 6458b53..facfd6d 100644
->> --- a/arch/arm64/include/asm/kvm_mmu.h
->> +++ b/arch/arm64/include/asm/kvm_mmu.h
->> @@ -96,6 +96,7 @@ void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
->>   phys_addr_t kvm_mmu_get_httbr(void);
->>   phys_addr_t kvm_mmu_get_boot_httbr(void);
->>   phys_addr_t kvm_get_idmap_vector(void);
->> +phys_addr_t kvm_get_idmap_start(void);
->>   int kvm_mmu_init(void);
->>   void kvm_clear_hyp_idmap(void);
->>
->> @@ -305,5 +306,11 @@ static inline void __kvm_flush_dcache_pud(pud_t pud)
->>   void kvm_set_way_flush(struct kvm_vcpu *vcpu);
->>   void kvm_toggle_cache(struct kvm_vcpu *vcpu, bool was_enabled);
->>
->> +extern char __hyp_idmap_text_start[];
 >
-> If you're defining it here, then it worth considering removing the
-> similar declaration from mmu.c.
+> Bahhh... Just rename cpu_init_hyp_mode to kvm_arch_hardware_enable, and
+> kvM_cpu_reset to kvm_arch_hardware_disable. I don't see the point of
+> keeping this indirection.
 
-Yes. I will remove them from mmu.c.
+Historical reason ...
+Anyway, if we don't have to add anything else here, yes, I will rename them.
 
->> +#define kvm_virt_to_trampoline(x)	\
->> +		(TRAMPOLINE_VA		\
->> +		+ ((unsigned long)(x)	\
->> +		  - ((unsigned long)__hyp_idmap_text_start & PAGE_MASK)))
->> +
->>   #endif /* __ASSEMBLY__ */
->>   #endif /* __ARM64_KVM_MMU_H__ */
->> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
->> index 3070096..7fcd087 100644
->> --- a/arch/arm64/include/asm/virt.h
->> +++ b/arch/arm64/include/asm/virt.h
->> @@ -61,6 +61,17 @@
->>   #define BOOT_CPU_MODE_EL1	(0xe11)
->>   #define BOOT_CPU_MODE_EL2	(0xe12)
->>
->> +/*
->> + * HVC_RESET - Reset cpu in EL2 to initial state.
->> + *
->> + * @x0: entry address in trampoline code in va
->> + * @x1: identical mapping page table in pa
->> + * @x2: start address of identical mapping in pa
->> + * @x3: initial stub vector in pa
->> + */
->> +
->> +#define HVC_RESET 5
->> +
->>   #ifndef __ASSEMBLY__
->>
->>   /*
->> diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
->> index c319116..2614cfc 100644
->> --- a/arch/arm64/kvm/hyp-init.S
->> +++ b/arch/arm64/kvm/hyp-init.S
->> @@ -115,6 +115,38 @@ target: /* We're now in the trampoline code, switch page tables */
->>   	eret
->>   ENDPROC(__kvm_hyp_init)
->>
->> +	/*
->> +	 * x0: HYP boot pgd
->> +	 * x1: HYP phys_idmap_start
->> +	 * x2: HYP stub vectors
->> +	 */
->> +ENTRY(__kvm_hyp_reset)
->> +	/* We're in trampoline code in VA, switch back to boot page tables */
->> +	msr	ttbr0_el2, x0
->> +	isb
->> +
->> +	/* Invalidate the old TLBs */
->> +	tlbi	alle2
->> +	dsb	sy
->> +
->> +	/* Branch into PA space */
->> +	adr	x0, 1f
->> +	bfi	x1, x0, #0, #PAGE_SHIFT
->> +	br	x1
->> +
->> +	/* We're now in idmap, disable MMU */
->> +1:	mrs	x0, sctlr_el2
->> +	ldr	x1, =SCTLR_EL2_FLAGS
->> +	bic	x0, x0, x1		// Clear SCTL_M and etc
->> +	msr	sctlr_el2, x0
->> +	isb
->> +
->> +	/* Install stub vectors */
->> +	msr	vbar_el2, x2
->
-> Instead of using a parameter, can't you just do
->
-> 	adr	x2, __hyp_stub_vectors
-> 	msr	vbar_el2, x2
->
-> ? I can't imagine a case where we don't want this behaviour, and this
-> would slightly simplify the calling convention.
-
-Yeah, but it will also enforces kvm to be statically linked to the kernel.
-(not module-capable) Is that OK?
-
->> +
->> +	eret
->> +ENDPROC(__kvm_hyp_reset)
->> +
->>   	.ltorg
->>
->>   	.popsection
->> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
->> index fd085ec..7c3bdee 100644
->> --- a/arch/arm64/kvm/hyp.S
->> +++ b/arch/arm64/kvm/hyp.S
->> @@ -1136,6 +1136,11 @@ ENTRY(kvm_call_hyp)
->>   	ret
->>   ENDPROC(kvm_call_hyp)
->>
->> +ENTRY(kvm_call_reset)
->> +	hvc	#HVC_RESET
->> +	ret
->> +ENDPROC(kvm_call_reset)
->> +
->>   .macro invalid_vector	label, target
->>   	.align	2
->>   \label:
->> @@ -1179,10 +1184,14 @@ el1_sync:					// Guest trapped into EL2
->>   	cmp	x18, #HVC_GET_VECTORS
->>   	b.ne	1f
->>   	mrs	x0, vbar_el2
->> -	b	2f
->> +	b	3f
->
-> How about renaming this to something like "do_eret" once and for all so
-> that we stop this dance each time someone adds a new entry point?
-
-Good point. I will take it.
-
->> -1:	/* Default to HVC_CALL_HYP. */
->> +	/* jump into trampoline code */
->> +1:	cmp	x18, #HVC_RESET
->> +	b.ne	2f
->> +	br	x3				// no return
->
-> Same here. If we're always jumping to the trampoline code, why do we
-> have to pass it as a parameter?
-
-We need here a physical address of reset function. It seems easy to call
-kvm_virt_to_trampoline() in C code. But, yes, we can also do it in asm.
-
-Thanks,
 -Takahiro AKASHI
 
+>>   /* NOP: Compiling as a module not supported */
+>>   void kvm_arch_exit(void)
+>>   {
+>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>> index 6a8da9c..831e6a4 100644
+>> --- a/arch/arm64/include/asm/kvm_host.h
+>> +++ b/arch/arm64/include/asm/kvm_host.h
+>> @@ -262,7 +262,6 @@ static inline void vgic_arch_setup(const struct vgic_params *vgic)
+>>   	}
+>>   }
 >>
->> +2:	/* Default to HVC_CALL_HYP. */
->>   	push	lr, xzr
->>
->>   	/*
->> @@ -1196,7 +1205,8 @@ el1_sync:					// Guest trapped into EL2
->>   	blr	lr
->>
->>   	pop	lr, xzr
->> -2:	eret
->> +
->> +3:	eret
->>
->>   el1_trap:
->>   	/*
+>> -static inline void kvm_arch_hardware_disable(void) {}
+>>   static inline void kvm_arch_hardware_unsetup(void) {}
+>>   static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+>>   static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
 >>
 >
-> Thanks,
->
-> 	M.
 >
