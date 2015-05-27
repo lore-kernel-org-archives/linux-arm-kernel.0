@@ -1,64 +1,45 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 27 May 2015 10:39:51 +0200
-Subject: [PATCH v2] ARM: berlin: add SPI nodes for BG2Q
-In-Reply-To: <20150527083305.GD27202@kwain>
-References: <1432713573-32147-1-git-send-email-antoine.tenart@free-electrons.com>
- <55657A35.2090402@gmail.com> <20150527083305.GD27202@kwain>
-Message-ID: <556582D7.9040501@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 27 May 2015 16:40:23 +0800
+Subject: [PATCH] ARM: imx6: gpc: don't register power domain if DT data
+ is missing
+In-Reply-To: <1432714226-6333-1-git-send-email-l.stach@pengutronix.de>
+References: <1432714226-6333-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <20150527084022.GE16165@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27.05.2015 10:33, Antoine Tenart wrote:
-> On Wed, May 27, 2015 at 10:03:01AM +0200, Sebastian Hesselbarth wrote:
->> On 27.05.2015 09:59, Antoine Tenart wrote:
->>> The BG2Q SoC has two SPI controllers. Add the corresponding nodes.
->>>
->>> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
->>> ---
->>>
->>> Changes since v1:
->>> 	- reworked the pinmux
->>> 	- removed useless interrupt-parent properties
->>> 	- typo
->>>
->>>   arch/arm/boot/dts/berlin2q.dtsi | 36 ++++++++++++++++++++++++++++++++++++
->>>   1 file changed, 36 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
->>> index 187d056f7ad2..9f42ebfa50f2 100644
->>> --- a/arch/arm/boot/dts/berlin2q.dtsi
->>> +++ b/arch/arm/boot/dts/berlin2q.dtsi
->>> @@ -286,6 +286,19 @@
->>>   				status = "disabled";
->>>   			};
->>>
->>> +			spi0: spi at 1c00 {
->>> +				compatible = "snps,dw-apb-ssi";
->>> +				reg = <0x1c00 0x100>;
->>> +				interrupts = <7>;
->>> +				clocks = <&chip_clk CLKID_CFG>;
->>> +				pinctrl-0 = <&spi1_pmux>;
->>
->> Antoine,
->>
->> you missed s/spi0/spi1/ and the same for the node below?
->
-> I think we had a misunderstanding then :) You would like to have spi1
-> and spi2 nodes, without having an spi0 one?
+On Wed, May 27, 2015 at 10:10:26AM +0200, Lucas Stach wrote:
+> If the devicetree is too old and does not provide the regulator and clocks
+> for the power domain, we need to avoid registering the power domain.
+> Otherwise runtime PM will try to control the domain, which will lead to
+> machine hangs without the proper DT configuration data.
+> 
+> This restores functionality to the kernel 4.0 level if an old DT is
+> detected, where the power domain is constantly powered on.
+> 
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 
-Yes, sorry if I was unclear. I would have _preferred_ to start counting
-with 0 _but_ pinctrl driver already uses spi{1,2} and if the DS also
-suggests this numbering we should start with spi1.
+Applied, thanks.
 
-In any way, match up the DT numbering with datasheet numbering.
-
->> BTW, you have any SPI device to test this? If you are brave
->> enough you could read the flash from the Berlin secure boot
->> SPI key ;)
->
-> Until now, I tested it using spidev and connecting SDI to SDO.
-
-Ok. I haven't checked in detail but except the optional SPI key,
-there is no other SPI device on BG2Q DMP, right?
-
-Sebastian
+> ---
+>  arch/arm/mach-imx/gpc.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+> index bbf015056221..6d0893a3828e 100644
+> --- a/arch/arm/mach-imx/gpc.c
+> +++ b/arch/arm/mach-imx/gpc.c
+> @@ -449,6 +449,10 @@ static int imx_gpc_probe(struct platform_device *pdev)
+>  	struct regulator *pu_reg;
+>  	int ret;
+>  
+> +	/* bail out if DT too old and doesn't provide the necessary info */
+> +	if (!of_property_read_bool(pdev->dev.of_node, "#power-domain-cells"))
+> +		return 0;
+> +
+>  	pu_reg = devm_regulator_get_optional(&pdev->dev, "pu");
+>  	if (PTR_ERR(pu_reg) == -ENODEV)
+>  		pu_reg = NULL;
+> -- 
+> 2.1.4
+> 
