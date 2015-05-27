@@ -1,53 +1,50 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 26 May 2015 19:12:46 -0500
-Subject: [PATCH Part1 v11 3/5] PCI: designware: Use pci_scan_root_bus()
- for simplicity
-In-Reply-To: <1430204499-19571-4-git-send-email-wangyijing@huawei.com>
-References: <1430204499-19571-1-git-send-email-wangyijing@huawei.com>
- <1430204499-19571-4-git-send-email-wangyijing@huawei.com>
-Message-ID: <20150527001246.GT32152@google.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 27 May 2015 10:18:27 +0900
+Subject: [PATCH] pinctrl: zynq: change error code for pinctrl_register
+ failure
+In-Reply-To: <20150526183734.GA31081@xsjsorenbubuntu>
+References: <1432613909-13457-1-git-send-email-yamada.masahiro@socionext.com>
+ <4437293.G26yCXqFQH@wuerfel>
+ <20150526183734.GA31081@xsjsorenbubuntu>
+Message-ID: <CAK7LNATGJRuk+VDMg0pcD7Mi79vkzXJZVU8c6zeAf2w=z2X9tQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Pratyush]
+Hi S?ren,
 
-On Tue, Apr 28, 2015 at 03:01:37PM +0800, Yijing Wang wrote:
-> Pci_bus_add_devices() was ripped out of pci_scan_root_bus().
-> Now pci_scan_root_bus() == pci_create_root_bus() +
-> pci_scan_child_bus() if busn resource is supplied.
-> Designware added the busn resource to resources list
-> in dw_pcie_setup(). So it should be safe to use
-> pci_scan_root_bus() instead.
-> 
-> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-> CC: Mohit Kumar <mohit.kumar@st.com>
-> CC: Jingoo Han <jg1.han@samsung.com>
+2015-05-27 3:37 GMT+09:00 S?ren Brinkmann <soren.brinkmann@xilinx.com>:
+> On Tue, 2015-05-26 at 10:12AM +0200, Arnd Bergmann wrote:
+>> On Tuesday 26 May 2015 13:18:29 Masahiro Yamada wrote:
+>> > diff --git a/drivers/pinctrl/pinctrl-zynq.c b/drivers/pinctrl/pinctrl-zynq.c
+>> > index 04748a4..0ff653c 100644
+>> > --- a/drivers/pinctrl/pinctrl-zynq.c
+>> > +++ b/drivers/pinctrl/pinctrl-zynq.c
+>> > @@ -1141,7 +1141,7 @@ static int zynq_pinctrl_probe(struct platform_device *pdev)
+>> >
+>> >         pctrl->pctrl = pinctrl_register(&zynq_desc, &pdev->dev, pctrl);
+>> >         if (!pctrl->pctrl)
+>> > -               return -ENOMEM;
+>> > +               return -EINVAL;
+>> >
+>> >         platform_set_drvdata(pdev, pctrl);
+>> >
+>> >
+>>
+>> One choice seems as bad as the other to me ;-)
+>>
+>> Could we add a pinctrl_register_reason() variant that returns a meaningful
+>> error code as ERR_PTR?
+>
+> I agree with Arnd. As long as we don't get a precise error code we can
+> just keep the current one.
 
-Jingoo, Pratyush?
+OK. Let's not do this way.
 
-> ---
->  drivers/pci/host/pcie-designware.c |    4 +---
->  1 files changed, 1 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index 2e9f84f..8c80f38 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -728,13 +728,11 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
->  	struct pcie_port *pp = sys_to_pcie(sys);
->  
->  	pp->root_bus_nr = sys->busnr;
-> -	bus = pci_create_root_bus(pp->dev, sys->busnr,
-> +	bus = pci_scan_root_bus(pp->dev, sys->busnr,
->  				  &dw_pcie_ops, sys, &sys->resources);
->  	if (!bus)
->  		return NULL;
->  
-> -	pci_scan_child_bus(bus);
-> -
->  	if (bus && pp->ops->scan_bus)
->  		pp->ops->scan_bus(pp);
->  
-> -- 
-> 1.7.1
-> 
+
+I will try pinctrl_register_reason().
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
