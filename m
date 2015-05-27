@@ -1,26 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 27 May 2015 18:39:39 +0200
-Subject: ARM64 kexec/kdump timeline
-In-Reply-To: <55653538.8020206@codeaurora.org>
-References: <555E37FC.9020800@codeaurora.org>
- <1432239334.1922.7.camel@infradead.org> <55653538.8020206@codeaurora.org>
-Message-ID: <2420285.dn5MbvMKXS@wuerfel>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 27 May 2015 11:45:44 -0500
+Subject: [PATCH Part1 v11 0/5] Some cleanup for pcie host drivers
+In-Reply-To: <1430204499-19571-1-git-send-email-wangyijing@huawei.com>
+References: <1430204499-19571-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <20150527164544.GV32152@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 26 May 2015 22:08:40 Timur Tabi wrote:
-> On 05/21/2015 03:15 PM, Geoff Levand wrote:
-> > I feel kexec was ready to merge nine months ago.  Users have only sent
-> > private e-mails like yourself, so there has been no public inquiries,
-> > and so, the arm64 maintainers think kexec is not of interest to users.
+On Tue, Apr 28, 2015 at 03:01:34PM +0800, Yijing Wang wrote:
+> These patches are split out from patchset(patch 5 is new)
+> "Refine PCI scan interfaces and make generic pci host bridge".
+> They are independent of the series, pci_bus_add_devices()
+> has been ripped out from pci_scan_root_bus(), so we could
+> use pci_scan_root_bus() instead of pci_create_root_bus() + 
+> pci_scan_child_bus() for simplicity. Also this is the preparation
+> for the series.
 > 
-> Does kexec on ARM64 support ACPI?  In some of our initial tests, it 
-> appears that the kexec'd kernel won't boot because it's expecting a 
-> device tree, and we don't have one.
+> Yijing Wang (5):
+>   PCI: mvebu: Use pci_common_init_dev() to simplify code
+>   PCI: tegra: Remove redundant tegra_pcie_scan_bus()
+>   PCI: designware: Use pci_scan_root_bus() for simplicity
+>   PCI: xgene: Use pci_scan_root_bus() instead of pci_create_root_bus()
 
-ACPI support has just been merged and is still experimental. You
-should be able to boot your system by passing a DT blob at the
-initial boot that matches your hardware. Can you try if that
-makes kexec work?
+I applied the four patches above to pci/enumeration for v4.2, thanks.
 
-	Arnd
+>   PCI: iproc: Use pci_scan_root_bus() instead of pci_create_root_bus()
+> 
+>  drivers/pci/host/pci-mvebu.c       |   18 +-----------------
+>  drivers/pci/host/pci-tegra.c       |   16 ----------------
+>  drivers/pci/host/pci-xgene.c       |    3 +--
+>  drivers/pci/host/pcie-designware.c |    4 +---
+>  drivers/pci/host/pcie-iproc.c      |    5 ++---
+>  5 files changed, 5 insertions(+), 41 deletions(-)
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
