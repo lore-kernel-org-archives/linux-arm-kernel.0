@@ -1,75 +1,195 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 27 May 2015 08:49:19 -0600
-Subject: [PATCH 02/21] ARM: tegra: Add gpio-ranges property
-In-Reply-To: <CAAObsKD7YbZX01A=SS7z_PxAMPweHy6sw5ut=50h50C=j9y0zA@mail.gmail.com>
-References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
- <1432565608-26036-3-git-send-email-tomeu.vizoso@collabora.com>
- <5564CC84.1030700@wwwdotorg.org>
- <CAAObsKD7YbZX01A=SS7z_PxAMPweHy6sw5ut=50h50C=j9y0zA@mail.gmail.com>
-Message-ID: <5565D96F.3000600@wwwdotorg.org>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 27 May 2015 15:52:37 +0100
+Subject: [PATCH v3 1/5] Documentation: add DT binding for ARM System
+ Control and Power Interface(SCPI) protocol
+In-Reply-To: <20150527133700.GK8439@leverpostej>
+References: <1432720398-5701-1-git-send-email-sudeep.holla@arm.com>
+ <1432720398-5701-2-git-send-email-sudeep.holla@arm.com>
+ <20150527133700.GK8439@leverpostej>
+Message-ID: <5565DA35.8030902@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/27/2015 08:18 AM, Tomeu Vizoso wrote:
-> On 26 May 2015 at 21:41, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 05/25/2015 08:53 AM, Tomeu Vizoso wrote:
->>>
->>> Specify how the GPIOs map to the pins in T124, so the dependency is
->>> explicit.
->>>
->>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->>> ---
->>>    arch/arm/boot/dts/tegra124.dtsi | 1 +
->>>    1 file changed, 1 insertion(+)
->>>
->>> diff --git a/arch/arm/boot/dts/tegra124.dtsi
->>> b/arch/arm/boot/dts/tegra124.dtsi
->>> index 13cc7ca..5d1d35f 100644
->>> --- a/arch/arm/boot/dts/tegra124.dtsi
->>> +++ b/arch/arm/boot/dts/tegra124.dtsi
->>> @@ -254,6 +254,7 @@
->>>                  gpio-controller;
->>>                  #interrupt-cells = <2>;
->>>                  interrupt-controller;
->>> +               gpio-ranges = <&pinmux 0 0 250>;
->>
->>
->> We should be consistent between SoCs. Why not make the same change for all
->> Tegra SoCs?
->>
->> I think this change will cause the GPIO subsystem to call into the pinctrl
->> subsystem and create/add/register a new GPIO<->pinctrl range structure. The
->> pinctrl driver already does this, so I think we'll end up with two duplicate
->> entries in the pinctrl device's gpio_ranges list. This probably won't cause
->> a problem, but I wanted to make sure you'd thought about it to make sure.
->
-> Actually, I have checked and see that gpio-tegra.c registers 256
-> gpios, but pinctrl-tegra124.c adds a range of only 251. I don't really
-> remember where I got the 250 value from, sorry :(
->
-> I don't see how that would cause any concrete problems, but maybe we
-> should have a single authoritative source (not sure we can do so
-> without breaking DT ABI though).
->
->> Right now, I think we get lucky and pinctrl ends up probing first (or at
->> least very early) anyway. Somewhat related to this series, I wonder if we
->> shouldn't add pinctrl client properties to every node in the Tegra DT that
->> describes a controller that makes use of external pins that are affected by
->> the pinmux. Such a change would guarantee this desired probing order. In
->> order to preserve the "program the entire pinmux at once" semantics, these
->> new pinctrl client properties would all need to reference empty states, yet
->> would still need to exist to represent the dependency.
->
-> I think so, but aren't almost all those pins used as gpios? If so,
-> then such a controller's driver will request the gpio it wants which
-> will cause the gpio driver to be registered (and hopefully probed) if
-> needed, which in turn will check that the corresponding pinctrl device
-> has been registered. Or am I missing something?
+Hi Mark,
 
-As you say this probably works out fine for pins that are used as GPIOs. 
-I was thinking more about SFIOs. Take an I2C controller, which doesn't 
-use any GPIOs itself. The pinctrl device should be probed before the I2C 
-device, so that the I2C driver can initiate transactions on the I2C bus 
-during its probe if it wanted to (or at least, clients could initiate 
-transactions at any completely arbitrary time as soon as probe was 
-complete).
+Thanks for the review.
+
+On 27/05/15 14:37, Mark Rutland wrote:
+> On Wed, May 27, 2015 at 10:53:14AM +0100, Sudeep Holla wrote:
+>> This patch adds devicetree binding for System Control and Power
+>> Interface (SCPI) Message Protocol used between the Application Cores(AP)
+>> and the System Control Processor(SCP). The MHU peripheral provides a
+>> mechanism for inter-processor communication between SCP's M3 processor
+>> and AP.
+>>
+>> SCP offers control and management of the core/cluster power states,
+>> various power domain DVFS including the core/cluster, certain system
+>> clocks configuration, thermal sensors and many others.
+>>
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> CC: Jassi Brar <jassisinghbrar@gmail.com>
+>> Cc: Liviu Dudau <Liviu.Dudau@arm.com>
+>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Cc: Jon Medhurst (Tixy) <tixy@linaro.org>
+>> Cc: devicetree at vger.kernel.org
+>> ---
+>>   Documentation/devicetree/bindings/arm/arm,scpi.txt | 121 +++++++++++++++++++++
+>>   1 file changed, 121 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/arm/arm,scpi.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+>> new file mode 100644
+>> index 000000000000..5db235f69e54
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+>> @@ -0,0 +1,121 @@
+>> +System Control and Power Interface (SCPI) Message Protocol
+>> +----------------------------------------------------------
+>
+> Could we refer to the documentation for SCPI similarly to what we do
+> in the PSCI binding (i.e. give the document number and title so people
+> can search for it)?
+>
+
+Yes that's the plan but was waiting for a stable URL(currently it's not
+in ARM Infocenter and simple google search for document/title doesn't
+seem to work). For now I will include the URL too and may be remove or
+fix it in future.
+
+>> +
+>> +Required properties:
+>> +
+>> +- compatible : should be "arm,scpi"
+>> +- mboxes: List of phandle and mailbox channel specifiers
+>
+> How many, in which order, and what are they used for?
+>
+
+Ok will update.
+
+>> +- shmem : List of phandle pointing to the shared memory(SHM) area between the
+>> +	  processors using these mailboxes for IPC, one for each mailbox
+>
+> When you say "shared memory", what exactly are we referring to? It looks
+> like we refer to SRAM areas?
+>
+
+It can be any memory reserved for the purpose of this communication via
+MHU between the Application Processors and the remote System Control
+Processor. On most platforms with MHU it happens to be SRAM like in Juno
+and Fijitsu MB86S7X
+
+>> +
+>> +See Documentation/devicetree/bindings/mailbox/mailbox.txt
+>> +for more details about the generic mailbox controller and
+>> +client driver bindings.
+>> +
+>> +Clock bindings for the clocks based on SCPI Message Protocol
+>> +------------------------------------------------------------
+>> +
+>> +This binding uses the common clock binding[1].
+>> +
+>> +Required properties:
+>> +- compatible : shall be one of the following:
+>
+> Nit: s/be/include/
+>
+>> +	"arm,scpi-clocks" - for the container node with all the clocks
+>> +		based on the SCPI protocol
+>
+> Please separate this from the description of its sub-nodes (e.g. have a
+> sub-nodes heading under "arm,scpi-clocks").
+>
+
+OK, I will update.
+
+> Is there any reason to have this container if we're only going to place
+> the two clock controllers described below within it? Can't we just place
+> them directly under the SCPI node?
+>
+
+SCP also supports power domains, sensors and other misc features. I
+wanted to avoid parsing through all the nodes in the clock driver once
+they are added. Is that not recommended ?
+
+>> +	"arm,scpi-dvfs" - all the clocks that are variable and index based.
+>> +		These clocks don't provide the full range between the limits
+>> +		but only discrete points within the range. The firmware
+>> +		provides the mapping for each such operating frequency and the
+>> +		index associated with it. The firmware also manages the
+>> +		voltage scaling appropriately with the clock scaling.
+>
+> Could this be "arm,scpi-dvfs-clocks"?
+>
+>> +	"arm,scpi-clk" - all the clocks that are variable and provide full
+>> +		range within the specified range. The firmware provides the
+>> +		supported range for each clock.
+>
+> Likewise "arm,scpi-variable-clocks"?
+>
+> Using "arm,scpi-clk" makes it sound like there's a single clock output.
+>
+>> +
+>> +Required properties for all clocks(all from common clock binding):
+>> +- #clock-cells : should be set to 1 as each of the SCPI clocks have multiple
+>> +	outputs. The clock specifier will be the index to an entry in the list
+>> +	of output clocks.
+>> +- clock-output-names : shall be the corresponding names of the outputs.
+>> +- clock-indices: The identifyng number for the clocks(clock_id) in the node as
+>> +	expected by the firmware. It can be non linear and hence provide the
+>> +	mapping	of identifiers into the clock-output-names array.
+>> +
+>> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+>> +
+>> +Example:
+>> +
+>> +sram: sram at 50000000 {
+>> +	compatible = "arm,juno-sram-ns", "mmio-sram";
+>
+> Nit: undocumented compatible string.
+>
+>> +	reg = <0x0 0x50000000 0x0 0x10000>;
+>> +
+>> +	#address-cells = <1>;
+>> +	#size-cells = <1>;
+>> +	ranges = <0 0x0 0x50000000 0x10000>;
+>> +
+>> +	cpu_scp_lpri: scp-shmem at 0 {
+>> +		compatible = "arm,juno-scp-shmem";
+>
+> Nit: undocumented compatible string.
+>
+
+Will fix all the above compatible strings and add missing document.
+
+[...]
+
+>> +cpu at 0 {
+>> +	...
+>> +	reg = <0 0>;
+>> +	clocks = <&scpi_dvfs 0>;
+>> +	clock-names = "big";
+>
+> This isn't documented anywhere, and I can't see any code in this series
+> using it. The Juno dts doesn't seem to have CPU clocks, and nothing in
+> this series adds them -- have I missed a series?
+>
+
+No, you didn't miss anything, I didn't post the DTS changes to avoid
+churn when the binding is still under discussion, will post in the next
+version.
+
+> Also, I'm not keen on using software-defined names (e.g. "big") for CPU
+> clocks, as it doesn't stictly relate to the hardware. That said, the set
+> of clocks, their names, and how they related to CPUs is
+> implementation-specific, which is somewhat painful. I'm not sure how
+> we cater for that with generic software.
+>
+
+Sorry for the confusion, it should be "vbig" in the above example. These
+names are derived from the SCPI document and yes it may vary with platforms.
+
+Regards,
+Sudeep
