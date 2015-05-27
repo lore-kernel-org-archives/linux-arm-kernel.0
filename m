@@ -1,48 +1,65 @@
 From: chunfeng.yun@mediatek.com (chunfeng.yun at mediatek.com)
-Date: Wed, 27 May 2015 19:47:59 +0800
-Subject: [PATCH 2/6] dt-bindings: Add a binding for Mediatek xHCI host
- controller
+Date: Wed, 27 May 2015 19:47:58 +0800
+Subject: [PATCH 1/6] dt-bindings: Add usb3.0 phy binding for MT65xx SoCs
 In-Reply-To: <1432727283-20303-1-git-send-email-chunfeng.yun@mediatek.com>
 References: <1432727283-20303-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1432727283-20303-3-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1432727283-20303-2-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Chunfeng Yun <chunfeng.yun@mediatek.com>
 
-add a DT binding documentation of xHCI host controller for
-the MT8173 SoC from Mediatek.
+add a DT binding documentation of usb3.0 phy for MT65xx
+SoCs from Mediatek.
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- Documentation/devicetree/bindings/usb/mt8173-xhci.txt | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+ .../devicetree/bindings/usb/mt65xx-u3phy.txt       | 37 ++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/usb/mt65xx-u3phy.txt
 
-diff --git a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+diff --git a/Documentation/devicetree/bindings/usb/mt65xx-u3phy.txt b/Documentation/devicetree/bindings/usb/mt65xx-u3phy.txt
 new file mode 100644
-index 0000000..da28570
+index 0000000..b0b91b0
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
-@@ -0,0 +1,19 @@
-+MT65XX xhci
++++ b/Documentation/devicetree/bindings/usb/mt65xx-u3phy.txt
+@@ -0,0 +1,37 @@
++MT65xx U3PHY
 +
-+The device node for Mediatek SOC usb3.0 host controller
++The device node for Mediatek SOC usb3.0 phy
 +
 +Required properties:
-+ - compatible : supports "mediatek,mt8173-xhci", "generic-xhci"
-+ - reg        : Offset and length of registers
-+ - interrupts : Interrupt; mode, number and trigger
-+ - usb-phy : the phy that xhci will bind
-+ - usb3-lpm-capable: suppots USB3 LPM
++ - compatible : Should be "mediatek,mt8173-u3phy"
++ - reg        : Offset and length of registers, the first is for mac domain,
++	another for phy domain
++ - power-domains: to enable usb's mtcmos
++ - reg-vusb33-supply:  regulator of usb avdd3.3v
++ - clocks     : must support all clocks that phy need
++ - clock-names: should be "wakeup_deb_p0", "wakeup_deb_p1" for wakeup
++	debounce control clocks, "sys_mac" for sys and mac clocks and
++	"u3phya_ref" for u3phya reference clock.
++
++Optional properties:
++ - disable-usb2-p1 : disable port1 of usb2.0 which has two ports.
++ - reg-p1-vbus-supply : regulator of port1's vbus;
 +
 +Example:
-+usb: usb30 at 11270000 {
-+	compatible = "mediatek,mt8173-xhci", "generic-xhci";
-+	reg = <0 0x11270000 0 0x1000>;
-+	interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
-+	usb-phy = <&u3phy>;
-+	usb3-lpm-capable;
++
++u3phy: usb-phy at 11271000 {
++	compatible = "mediatek,mt8173-u3phy";
++	reg = <0 0x11271000 0 0x3000>,
++	      <0 0x11280000 0 0x20000>;
++	power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
++	reg-vusb33-supply = <&mt6397_usb_reg>;
++	clocks = <&perisys PERI_USB0>,
++		 <&perisys PERI_USB1>,
++		 <&topckgen CLK_TOP_USB30_SEL>,
++		 <&apmixedsys CLK_APMIXED_REF2USB_TX>;
++	clock-names = "wakeup_deb_p0",
++		      "wakeup_deb_p1",
++		      "sys_mac",
++		      "u3phya_ref";
++	disable-usb2-p1;
 +};
 -- 
 1.8.1.1.dirty
