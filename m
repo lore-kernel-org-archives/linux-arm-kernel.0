@@ -1,36 +1,56 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 27 May 2015 11:38:33 +0200
-Subject: ARM64 kexec/kdump timeline
-In-Reply-To: <55653538.8020206@codeaurora.org>
-References: <555E37FC.9020800@codeaurora.org>
- <1432239334.1922.7.camel@infradead.org>
- <55653538.8020206@codeaurora.org>
-Message-ID: <CAKv+Gu8U1SWPb-GJ-3u9t_EX3g18AvOWisK3FycvRWsEdyjpzQ@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 27 May 2015 11:42:05 +0200
+Subject: MUSB dual-role on AM335x behaving weirdly
+In-Reply-To: <20150526145118.GD26599@saruman.tx.rr.com>
+References: <20150514190429.GT24269@saruman.tx.rr.com>
+ <CADYTM3Zso8bV_8yFyx1-ATbL5AgkKBjvWWR4AsoZUNuLvFe1bQ@mail.gmail.com>
+ <20150514192125.GU24269@saruman.tx.rr.com>
+ <CADYTM3bbEAVefFZtivJf5Z+2Q+1zDZEvNhqE5ytsOxDX7hjbdA@mail.gmail.com>
+ <20150514192946.GV24269@saruman.tx.rr.com>
+ <CADYTM3Zk2iD8YMj75CoLJn=4kpoXoXEKUWj2QzdXKGCJjtfG2A@mail.gmail.com>
+ <CADYTM3a1QWnec1D=wT=fgZ-RCXAx_qZYYoFg5gWOy0yT4vovHA@mail.gmail.com>
+ <20150514212653.GC3338@piout.net>
+ <CADYTM3baVqoEBdWoQb5JFyGR2_GKm1FHMYWST1YkZV=m=ZdycQ@mail.gmail.com>
+ <20150526145118.GD26599@saruman.tx.rr.com>
+Message-ID: <20150527094205.GO3199@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 May 2015 at 05:08, Timur Tabi <timur@codeaurora.org> wrote:
-> On 05/21/2015 03:15 PM, Geoff Levand wrote:
->>
->> I feel kexec was ready to merge nine months ago.  Users have only sent
->> private e-mails like yourself, so there has been no public inquiries,
->> and so, the arm64 maintainers think kexec is not of interest to users.
->
->
-> Does kexec on ARM64 support ACPI?  In some of our initial tests, it appears
-> that the kexec'd kernel won't boot because it's expecting a device tree, and
-> we don't have one.
->
-> ARM64 servers are supposed to use ACPI instead of a device tree.
->
+Hi,
 
-The latest arm64 kexec patches support booting via UEFI, and when
-booting via UEFI, the ACPI root pointer is retrieved from a UEFI
-configuration table if the FDT contains no system description. So ACPI
-support should not depend at all on how kexec is implemented (unless
-your FDT does contain a system description, in which case you should
-pass along the 'acpi=xxx' param that was given to the cold booted
-kernel)
+On 26/05/2015 at 09:51:18 -0500, Felipe Balbi wrote :
+> On Thu, May 14, 2015 at 04:36:33PM -0500, Bin Liu wrote:
+> > Alexandre,
+> > 
+> > On Thu, May 14, 2015 at 4:26 PM, Alexandre Belloni
+> > <alexandre.belloni@free-electrons.com> wrote:
+> > > On 14/05/2015 at 16:16:12 -0500, Bin Liu wrote :
+> > >> I think I found the root cause of the problem: board design issue - I
+> > >> bet the custom board has too much cap on VBUS line. It should be <
+> > >> 10uF.
+> > >>
+> > >
+> > > We have a custom board that exhibits the issue but it only has a 100nF
+> > > cap on VBUS.
+> > 
+> > Have you measured the VBUS discharging? Is there any way to share your
+> > schematics?
+> 
+> Alexandre, any further comments ?
+> 
+
+Yeah, I have just got more info.
+
+This is the relevant part of the schematic:
+http://free-electrons.com/~alexandre/usb.png
+
+The total VBUS capacitance is 200nF and the USB0 pins are connected
+directly to the AM3358 pins. U1 is actually not fitted.
+
+We didn't measure VBUS discharging but we observe the OTG pin sensing
+stops when plugging an OTG cable without any device.
 
 -- 
-Ard.
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
