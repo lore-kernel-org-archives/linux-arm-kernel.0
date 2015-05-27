@@ -1,28 +1,44 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 27 May 2015 19:54:19 +0800
-Subject: [PATCH v2 1/2] ARM: imx: enable smp for i.MX7D
-In-Reply-To: <CAHrpEqS1ESjTdAq-ncm597kAt3D6GbmTSAtNchu-aTwFatKpdg@mail.gmail.com>
-References: <1432147961-3547-1-git-send-email-Frank.Li@freescale.com>
- <20150525081928.GK3264@dragon>
- <CAHrpEqS1ESjTdAq-ncm597kAt3D6GbmTSAtNchu-aTwFatKpdg@mail.gmail.com>
-Message-ID: <20150527115418.GG16165@dragon>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 27 May 2015 20:56:01 +0900
+Subject: [PATCH 2/5] ARM: EXYNOS: Remove SROM related register settings
+ from mach-exynos
+In-Reply-To: <1430296712-10287-3-git-send-email-pankaj.dubey@samsung.com>
+References: <1430296712-10287-1-git-send-email-pankaj.dubey@samsung.com>
+ <1430296712-10287-3-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <5565B0D1.80004@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 26, 2015 at 10:01:00AM -0500, Zhi Li wrote:
-> what's name do you prefer?
-
-If we have to create a new driver, I prefer to name it after imx7.
-
-> Totally difference.
+W dniu 29.04.2015 o 17:38, Pankaj Dubey pisze:
+> As now we have dedicated driver for SROM controller, it will take care
+> of saving register banks during S2R so we can safely remove these
+> settings from mach-exynos.
 > 
-> http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/tree/arch/arm/mach-imx/gpcv2.c?h=imx_3.14.28_7d_alpha&id=a34e259cc0a4e86ccb993c947991d2823d81eb14
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  arch/arm/mach-exynos/Kconfig                   |  2 +
+>  arch/arm/mach-exynos/exynos.c                  | 10 -----
+>  arch/arm/mach-exynos/include/mach/map.h        |  3 --
+>  arch/arm/mach-exynos/suspend.c                 | 20 +---------
+>  arch/arm/plat-samsung/include/plat/map-s5p.h   |  1 -
+>  arch/arm/plat-samsung/include/plat/regs-srom.h | 54 --------------------------
+>  6 files changed, 4 insertions(+), 86 deletions(-)
+>  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-srom.h
 > 
-> Only simular part is that GPC irq mask, which only bit possition and
-> register offfset change.
+> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+> index 603820e..e842b23 100644
+> --- a/arch/arm/mach-exynos/Kconfig
+> +++ b/arch/arm/mach-exynos/Kconfig
+> @@ -25,6 +25,8 @@ menuconfig ARCH_EXYNOS
+>  	select S5P_DEV_MFC
+>  	select SRAM
+>  	select MFD_SYSCON
+> +	select SOC_SAMSUNG
+> +	select EXYNOS_SROM
 
-So at least GPC needs to be initialized as stacked IRQ domain.  Please
-check out commit b923ff6af0d5 (ARM: imx6: convert GPC to stacked
-domains) for how it should be done.
+What about the difference of execution time? The suspend/resume of
+device may not be called in the same time as previous syscore ops. Does
+this have any impact?
 
-Shawn
+Best regards,
+Krzysztof
