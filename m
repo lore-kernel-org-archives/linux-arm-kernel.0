@@ -1,30 +1,58 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 27 May 2015 14:32:35 +0200
-Subject: [PATCH 2/2] soc: mediatek: PMIC wrap: Fix register state machine
- handling
-In-Reply-To: <1432633064-16839-3-git-send-email-s.hauer@pengutronix.de>
-References: <1432633064-16839-1-git-send-email-s.hauer@pengutronix.de>
- <1432633064-16839-3-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <CABuKBeK2_-_FQ2g3qZ=u-VuEK3AtXaWA_1XTXLd_HvqBc+hLiw@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 27 May 2015 14:33:59 +0200
+Subject: [PATCH] char:xilinx_hwicap:buffer_icap - change 1/0 to true/false
+ for bool type variable in function buffer_icap_set_configuration().
+In-Reply-To: <1432582863-5012-1-git-send-email-shailendra.capricorn@gmail.com>
+References: <1432582863-5012-1-git-send-email-shailendra.capricorn@gmail.com>
+Message-ID: <5565B9B7.8080506@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-26 11:37 GMT+02:00 Sascha Hauer <s.hauer@pengutronix.de>:
-> When the PMIC wrapper state machine has read a register it goes into the
-> "wait for valid clear" (vldclr) state. The state machine stays in this
-> state until the VLDCLR bit is written to. We should write this bit after
-> reading a register because the SCPSYS won't let the system go into
-> suspend as long as the state machine waits for valid clear.
->
-> Since now we never leave the state machine in vldclr state we no longer
-> have to check for this state on pwrap_read/pwrap_write entry and can
-> remove the corresponding code.
->
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  drivers/soc/mediatek/mtk-pmic-wrap.c | 12 ++----------
->  1 file changed, 2 insertions(+), 10 deletions(-)
->
++Greg
 
-Applied, thanks.
-Matthias
+On 05/25/2015 09:41 PM, Shailendra Verma wrote:
+> The variable dirty is bool type. Hence assign the variable with
+> bool value true/false instead of 1/0.
+> 
+> Signed-off-by: Shailendra Verma <shailendra.capricorn@gmail.com>
+> ---
+>  drivers/char/xilinx_hwicap/buffer_icap.c |    6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/char/xilinx_hwicap/buffer_icap.c b/drivers/char/xilinx_hwicap/buffer_icap.c
+> index 05d8977..53c3882 100644
+> --- a/drivers/char/xilinx_hwicap/buffer_icap.c
+> +++ b/drivers/char/xilinx_hwicap/buffer_icap.c
+> @@ -270,7 +270,7 @@ int buffer_icap_set_configuration(struct hwicap_drvdata *drvdata, u32 *data,
+>  	int status;
+>  	s32 buffer_count = 0;
+>  	s32 num_writes = 0;
+> -	bool dirty = 0;
+> +	bool dirty = false;
+>  	u32 i;
+>  	void __iomem *base_address = drvdata->base_address;
+>  
+> @@ -279,7 +279,7 @@ int buffer_icap_set_configuration(struct hwicap_drvdata *drvdata, u32 *data,
+>  
+>  		/* Copy data to bram */
+>  		buffer_icap_set_bram(base_address, buffer_count, data[i]);
+> -		dirty = 1;
+> +		dirty = true;
+>  
+>  		if (buffer_count < XHI_MAX_BUFFER_INTS - 1) {
+>  			buffer_count++;
+> @@ -299,7 +299,7 @@ int buffer_icap_set_configuration(struct hwicap_drvdata *drvdata, u32 *data,
+>  
+>  		buffer_count = 0;
+>  		num_writes++;
+> -		dirty = 0;
+> +		dirty = false;
+>  	}
+>  
+>  	/* Write unwritten data to ICAP */
+> 
+
+Tested-by: Michal Simek <michal.simek@xilinx.com>
+
+Thanks,
+Michal
