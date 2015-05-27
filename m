@@ -1,106 +1,47 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Wed, 27 May 2015 10:47:02 +0100
-Subject: [PATCH 01/11] ARM64 / PCI: introduce struct pci_controller for
- ACPI
-In-Reply-To: <5564AB68.6080502@linux.intel.com>
-References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
- <1432644564-24746-2-git-send-email-hanjun.guo@linaro.org>
- <20150526165844.GD2175@e106497-lin.cambridge.arm.com>
- <5564AB68.6080502@linux.intel.com>
-Message-ID: <20150527094702.GE2175@e106497-lin.cambridge.arm.com>
+From: sophian.yoma@gmail.com (yoma sophian)
+Date: Wed, 27 May 2015 17:47:09 +0800
+Subject: some question about arm64 smp_spin_table.c
+Message-ID: <CADUS3o=4b9zfKtyiZ2CKgC2AA9ntkFLo91pJug17t1Xz2jM34w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 26, 2015 at 06:20:40PM +0100, Jiang Liu wrote:
-> On 2015/5/27 0:58, Liviu Dudau wrote:
-> > On Tue, May 26, 2015 at 01:49:14PM +0100, Hanjun Guo wrote:
-> >> ARM64 ACPI based PCI host bridge init needs a arch dependent
-> >> struct pci_controller to accommodate common PCI host bridge
-> >> code which is introduced later, or it will lead to compile
-> >> errors on ARM64.
-> > 
-> > Hi Hanjun,
-> > 
-> > Two questions: why don't you introduce this patch next to the
-> > one that is going to make use of it (or even merge it there)?
-> > Second, why is the whole struct pci_controller not surrounded
-> > by #ifdef CONFIG_ACPI as you are implying that this is needed
-> > only for ACPI?
-> > 
-> > Btw, looking through the whole series I'm not (yet) convinced
-> > that this is needed at all.
-> Hi Liviu,
-> 	This structure is required by the requested patch set
-> at http://patchwork.ozlabs.org/patch/472249/, which consolidates
-> the common code to support PCI host bridge into ACPI core.
-> Thanks!
-> Gerry
+hi all:
+in arm64/kernel/smp_spin_table.c
+    --> smp_spin_table_prepare_cpu,
+we suppose the cpu_release_addr[cpu] is located in kernel logical memory.
 
-Hi Jiang,
+in Arm plarform, this part is implement by each platform driver, since
+they register its own smp_operations.
 
-Thanks for pointing me on the right answer, I've missed that series!
-Probably not the best place to comment on that series here, but I
-wonder why did you not made the pci_controller structure available
-in a more generic header file that can be included so that arches
-don't have to redefine the structure every time. After all, you are
-trying to consolidate things.
+And in Arm64, once other platform use different area, such as register
+or device memory, to put cpu_release_addr[cpu], shall we use ioremap
+to get the va like below patch?
 
-Oh, and pci_controller name throws a lot of false negatives, maybe
-a more specific one (acpi_pci_controller?) would make things clear?
+Appreciate your kind in advance,
 
-Best regards,
-Liviu
+diff --git a/arch/arm64/kernel/smp_spin_table.c
+b/arch/arm64/kernel/smp_spin_table.c
+index 7c35fa6..9d945bd 100644
+--- a/arch/arm64/kernel/smp_spin_table.c
++++ b/arch/arm64/kernel/smp_spin_table.c
+@@ -21,6 +21,7 @@
+ #include <linux/smp.h>
 
-> 
-> > 
-> > Best regards,
-> > Liviu
-> > 
-> >>
-> >> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> >> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> >> CC: Arnd Bergmann <arnd@arndb.de>
-> >> CC: Catalin Marinas <catalin.marinas@arm.com>
-> >> CC: Liviu Dudau <Liviu.Dudau@arm.com>
-> >> CC: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
-> >> CC: Will Deacon <will.deacon@arm.com>
-> >> ---
-> >>  arch/arm64/include/asm/pci.h | 10 ++++++++++
-> >>  1 file changed, 10 insertions(+)
-> >>
-> >> diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
-> >> index b008a72..7088495 100644
-> >> --- a/arch/arm64/include/asm/pci.h
-> >> +++ b/arch/arm64/include/asm/pci.h
-> >> @@ -10,6 +10,16 @@
-> >>  #include <asm-generic/pci-bridge.h>
-> >>  #include <asm-generic/pci-dma-compat.h>
-> >>  
-> >> +struct acpi_device;
-> >> +
-> >> +struct pci_controller {
-> >> +#ifdef CONFIG_ACPI
-> >> +	struct acpi_device *companion;	/* ACPI companion device */
-> >> +#endif
-> >> +	int		segment;	/* PCI domain */
-> >> +	int		node;		/* NUMA node */
-> >> +};
-> >> +
-> >>  #define PCIBIOS_MIN_IO		0x1000
-> >>  #define PCIBIOS_MIN_MEM		0
-> >>  
-> >> -- 
-> >> 1.9.1
-> >>
-> > 
-> 
+ #include <asm/cacheflush.h>
++#include <linux/io.h>
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+ static phys_addr_t cpu_release_addr[NR_CPUS];
+
+@@ -47,10 +48,9 @@ static int __init smp_spin_table_prepare_cpu(int cpu)
+        if (!cpu_release_addr[cpu])
+                return -ENODEV;
+
+-       release_addr = __va(cpu_release_addr[cpu]);
++       release_addr = ioremap(cpu_release_addr[cpu], SZ_4K);
+        release_addr[0] = (void *)__pa(secondary_holding_pen);
+-       __flush_dcache_area(release_addr, sizeof(release_addr[0]));
+-
++       iounmap(release_addr);
+        /*
+         * Send an event to wake up the secondary CPU.
+         */
