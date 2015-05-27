@@ -1,32 +1,24 @@
-From: weigelt@melag.de (Enrico Weigelt, metux IT consult)
-Date: Wed, 27 May 2015 16:20:27 +0200
-Subject: hardware aac codec on imx53 ?
-In-Reply-To: <CAOMZO5C6YQrqh9L7_-j0kesC203x7h-LGEZxNsMHotu_rzt1XA@mail.gmail.com>
-References: <555B236B.10506@melag.de>	<CAOMZO5CxSOVNcJSxLQcu0nKM=abEXfxK3CQve5JYXVQ7dTTGDg@mail.gmail.com>	<555C8056.4090300@melag.de>
- <CAOMZO5C6YQrqh9L7_-j0kesC203x7h-LGEZxNsMHotu_rzt1XA@mail.gmail.com>
-Message-ID: <5565D2AB.5050705@melag.de>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 27 May 2015 16:27:47 +0200
+Subject: [PATCH] soc: mediatek: Add compile dependency to pmic-wrapper
+In-Reply-To: <1432729865-32319-1-git-send-email-matthias.bgg@gmail.com>
+References: <1432729865-32319-1-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <CABuKBeLD9wpMqErGmFD6c_LTem_DXxu19CEvu0DJ4c6R4CeotQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 20.05.2015 um 14:49 schrieb Fabio Estevam:
-> On Wed, May 20, 2015 at 9:38 AM, Enrico Weigelt, metux IT consult
-> <weigelt@melag.de> wrote:
+2015-05-27 14:31 GMT+02:00 Matthias Brugger <matthias.bgg@gmail.com>:
+> The pmic-wrapper calls the reset controller. If CONFIG_RESET_CONTROLLER
+> is not set, compilation fails with:
+> drivers/soc/mediatek/mtk-pmic-wrap.c: In function ?pwrap_probe?:
+> drivers/soc/mediatek/mtk-pmic-wrap.c:836:2: error: implicit declaration of function ?devm_reset_control_get? [-Werror=implicit-function-declaration]
 >
->> Any idea what their proprietary / binary-only aac codec library is for ?
->> Just an software codec ?
+> This patch sets the dependency in the Kconfig file.
 >
-> Yes, it is a software codec.
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+> ---
+>  drivers/soc/mediatek/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+>
 
-Okay. Does it have any benefit over libfaac/libfaad ?
-
-
-
---mtx
-
---
-Enrico Weigelt, metux IT consult
-+49-151-27565287
-MELAG Medizintechnik oHG Sitz Berlin Registergericht AG Charlottenburg HRA 21333 B
-
-Wichtiger Hinweis: Diese Nachricht kann vertrauliche oder nur f?r einen begrenzten Personenkreis bestimmte Informationen enthalten. Sie ist ausschlie?lich f?r denjenigen bestimmt, an den sie gerichtet worden ist. Wenn Sie nicht der Adressat dieser E-Mail sind, d?rfen Sie diese nicht kopieren, weiterleiten, weitergeben oder sie ganz oder teilweise in irgendeiner Weise nutzen. Sollten Sie diese E-Mail irrt?mlich erhalten haben, so benachrichtigen Sie bitte den Absender, indem Sie auf diese Nachricht antworten. Bitte l?schen Sie in diesem Fall diese Nachricht und alle Anh?nge, ohne eine Kopie zu behalten.
-Important Notice: This message may contain confidential or privileged information. It is intended only for the person it was addressed to. If you are not the intended recipient of this email you may not copy, forward, disclose or otherwise use it or any part of it in any form whatsoever. If you received this email in error please notify the sender by replying and delete this message and any attachments without retaining a copy.
+Applied to v4.1-next/soc
