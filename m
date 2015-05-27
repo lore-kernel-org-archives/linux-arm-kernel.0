@@ -1,27 +1,28 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 27 May 2015 14:50:27 +0200
-Subject: [PATCH v3 12/12] ARM: imx: move timer driver into
- drivers/clocksource
-In-Reply-To: <1432530849-12312-1-git-send-email-shawn.guo@linaro.org>
-References: <1432308599-28643-13-git-send-email-shawn.guo@linaro.org>
- <1432530849-12312-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <5565BD93.50600@linaro.org>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Wed, 27 May 2015 15:00:13 +0200
+Subject: [PATCH 1/2] ARM: cache-l2c: Detect whether it's safe to unlock
+In-Reply-To: <20150515113448.GI2067@n2100.arm.linux.org.uk>
+References: <1431416355-7693-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <1431416355-7693-2-git-send-email-sjoerd.simons@collabora.co.uk>
+ <20150515113448.GI2067@n2100.arm.linux.org.uk>
+Message-ID: <1432731613.2781.13.camel@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/25/2015 07:14 AM, Shawn Guo wrote:
-> After the cleanup on imx timer driver, now it's ready to be moved into
-> drivers/clocksource/.  Let's do it.
->
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Hey Russell,
 
-I don't see the Kconfig change.
+On Fri, 2015-05-15 at 12:34 +0100, Russell King - ARM Linux wrote:
+> On Tue, May 12, 2015 at 09:39:14AM +0200, Sjoerd Simons wrote:
+> > To handle that, for caches where special configuration is needed to allow
+> > unlocking, check whether this has been setup before unlocking.
+> 
+> I've come up with a different solution to this, which of course I prefer.
+> I'll post the patches later today, thanks.
 
-
+Did you get round to create/posting those patches? If not, i'm happy to
+do a set with your suggested solution as well if you can point me in the
+right direction :)
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Collabora Ltd.
