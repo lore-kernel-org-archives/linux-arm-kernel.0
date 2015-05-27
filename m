@@ -1,90 +1,106 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 27 May 2015 16:19:23 -0700
-Subject: [RFC] Fix omap3 booting with thumb2 compiled kernel
-In-Reply-To: <20150527225553.GC30984@atomide.com> (Tony Lindgren's message of
- "Wed, 27 May 2015 15:55:53 -0700")
-References: <20150527215545.GA30984@atomide.com>
- <7h7frtmzoh.fsf@deeprootsystems.com>
- <20150527225553.GC30984@atomide.com>
-Message-ID: <7hy4k9libo.fsf@deeprootsystems.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 27 May 2015 18:35:19 -0500
+Subject: [PATCH 1/2] PCI: iproc: directly add pci resources
+In-Reply-To: <1432499823-27369-1-git-send-email-hauke@hauke-m.de>
+References: <1432499823-27369-1-git-send-email-hauke@hauke-m.de>
+Message-ID: <20150527233519.GH10210@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
+On Sun, May 24, 2015 at 10:37:02PM +0200, Hauke Mehrtens wrote:
+> The resources member in the struct was pointing to a stack variable and
+> is invalid after the the registration function returned. Remove this
+> pointer and add it a a parameter to the function.
+> 
+> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
 
-> * Kevin Hilman <khilman@kernel.org> [150527 15:20]:
->> [ fix email for Dave Martin, +Tyler ]
->> 
->> Tony Lindgren <tony@atomide.com> writes:
->> 
->> > The power management related assembly needs to interact with
->> > ARM mode bootrom code, so we need to keep most of the related
->> > assembly in ARM mode.
->> >
->> > Currently we are entering into and ARM mode assembly function
->> > from thumb2 mode, so we need to make sure we switch to ARM
->> > mode. And we need to do that again after the cache flush.
->> >
->> > ---
->> >
->> > Kevin told me about this earlier today.. 
->> 
->> 
->> And for full boot log/panics, see the kernelci.org thumb2 kernel boots
->> that fail: http://kernelci.org/boot/?THUMB2_KERNEL&fail
->> 
->> > Anybody got better ideas for a fix here?
->> 
->> FWIW, a quick test of this patch makes my omap3-beagle-xm pass a simple
->> boot test, but it fails with off idle.
->
-> Thanks to Stephen Boyd's suggestion of checking the missing ENDPROC,
-> here's a better fix :) Now off idle works too.
->
-> Regards,
->
-> Tony
->
-> 8 <----------------------
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Wed, 27 May 2015 15:33:57 -0700
-> Subject: [PATCH] ARM: OMAP3: Fix booting with thumb2 kernel
->
-> We get a NULL pointer dereference on omap3 for thumb2 compiled kernels:
->
-> Internal error: Oops: 80000005 [#1] SMP THUMB2
-> ...
-> [<c046497b>] (_raw_spin_unlock_irqrestore) from [<c0024375>]
-> (omap3_enter_idle_bm+0xc5/0x178)
-> [<c0024375>] (omap3_enter_idle_bm) from [<c0374e63>]
-> (cpuidle_enter_state+0x77/0x27c)
-> [<c0374e63>] (cpuidle_enter_state) from [<c00627f1>]
-> (cpu_startup_entry+0x155/0x23c)
-> [<c00627f1>] (cpu_startup_entry) from [<c06b9a47>]
-> (start_kernel+0x32f/0x338)
-> [<c06b9a47>] (start_kernel) from [<8000807f>] (0x8000807f)
->
-> The power management related assembly on moaps needs to interact with
-> ARM mode bootrom code, so we need to keep most of the related assembly
-> in ARM mode.
->
-> Turns out this error is because of missing ENDPROC for assembly code
-> as suggested by Stephen Boyd <sboyd@codeaurora.org>. Let's add the
-> missing ENDPROC in two places to sleep34xx.S, and also remove the
-> earlier mystery code that was probably also caused by missing ENDPROC
-> for earlier kernels.
->
-> Reported-by: Kevin Hilman <khilman@kernel.org>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+Applied both patches with Ray's Reviewed-by to pci/host-iproc for v4.2,
+thanks!
 
-Yup, boot test is now passing for me on omap3-beagle, omap3-beagle-xm,
-omap3-n900, omap3-overo-tobi, omap3-overo-storm-tobi.
-
-Tested-by: Kevin Hilman <khilman@linaro.org>
-
-Thanks for the quick fix.
-
-Next step is to look at the exynos4412-odroidu3 failure which probably
-has a similar cause.
-
-Kevin
+> ---
+>  drivers/pci/host/pcie-iproc-bcma.c     | 4 +---
+>  drivers/pci/host/pcie-iproc-platform.c | 4 +---
+>  drivers/pci/host/pcie-iproc.c          | 4 ++--
+>  drivers/pci/host/pcie-iproc.h          | 3 +--
+>  4 files changed, 5 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pcie-iproc-bcma.c b/drivers/pci/host/pcie-iproc-bcma.c
+> index c318f19..f96b39e 100644
+> --- a/drivers/pci/host/pcie-iproc-bcma.c
+> +++ b/drivers/pci/host/pcie-iproc-bcma.c
+> @@ -62,11 +62,9 @@ static int iproc_pcie_bcma_probe(struct bcma_device *bdev)
+>  	res_mem.flags = IORESOURCE_MEM;
+>  	pci_add_resource(&res, &res_mem);
+>  
+> -	pcie->resources = &res;
+> -
+>  	pcie->map_irq = iproc_pcie_bcma_map_irq;
+>  
+> -	ret = iproc_pcie_setup(pcie);
+> +	ret = iproc_pcie_setup(pcie, &res);
+>  	if (ret) {
+>  		dev_err(pcie->dev, "PCIe controller setup failed\n");
+>  		return ret;
+> diff --git a/drivers/pci/host/pcie-iproc-platform.c b/drivers/pci/host/pcie-iproc-platform.c
+> index c8aa06f..c5fe4c1 100644
+> --- a/drivers/pci/host/pcie-iproc-platform.c
+> +++ b/drivers/pci/host/pcie-iproc-platform.c
+> @@ -69,11 +69,9 @@ static int iproc_pcie_pltfm_probe(struct platform_device *pdev)
+>  		return ret;
+>  	}
+>  
+> -	pcie->resources = &res;
+> -
+>  	pcie->map_irq = of_irq_parse_and_map_pci;
+>  
+> -	ret = iproc_pcie_setup(pcie);
+> +	ret = iproc_pcie_setup(pcie, &res);
+>  	if (ret) {
+>  		dev_err(pcie->dev, "PCIe controller setup failed\n");
+>  		return ret;
+> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
+> index cef31f6..d77481e 100644
+> --- a/drivers/pci/host/pcie-iproc.c
+> +++ b/drivers/pci/host/pcie-iproc.c
+> @@ -183,7 +183,7 @@ static void iproc_pcie_enable(struct iproc_pcie *pcie)
+>  	writel(SYS_RC_INTX_MASK, pcie->base + SYS_RC_INTX_EN);
+>  }
+>  
+> -int iproc_pcie_setup(struct iproc_pcie *pcie)
+> +int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
+>  {
+>  	int ret;
+>  	struct pci_bus *bus;
+> @@ -211,7 +211,7 @@ int iproc_pcie_setup(struct iproc_pcie *pcie)
+>  	pcie->sysdata.private_data = pcie;
+>  
+>  	bus = pci_create_root_bus(pcie->dev, 0, &iproc_pcie_ops,
+> -				  &pcie->sysdata, pcie->resources);
+> +				  &pcie->sysdata, res);
+>  	if (!bus) {
+>  		dev_err(pcie->dev, "unable to create PCI root bus\n");
+>  		ret = -ENOMEM;
+> diff --git a/drivers/pci/host/pcie-iproc.h b/drivers/pci/host/pcie-iproc.h
+> index a333d4b..ba0a108 100644
+> --- a/drivers/pci/host/pcie-iproc.h
+> +++ b/drivers/pci/host/pcie-iproc.h
+> @@ -29,7 +29,6 @@
+>  struct iproc_pcie {
+>  	struct device *dev;
+>  	void __iomem *base;
+> -	struct list_head *resources;
+>  	struct pci_sys_data sysdata;
+>  	struct pci_bus *root_bus;
+>  	struct phy *phy;
+> @@ -37,7 +36,7 @@ struct iproc_pcie {
+>  	int (*map_irq)(const struct pci_dev *, u8, u8);
+>  };
+>  
+> -int iproc_pcie_setup(struct iproc_pcie *pcie);
+> +int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res);
+>  int iproc_pcie_remove(struct iproc_pcie *pcie);
+>  
+>  #endif /* _PCIE_IPROC_H */
+> -- 
+> 2.1.4
+> 
