@@ -1,25 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 27 May 2015 12:09:41 +0200
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Make USB support modular
-In-Reply-To: <CAMuHMdUFMLGHAYT06s6Twt+1jvhAHyCk2p0xv6xntiVjffvdug@mail.gmail.com>
-References: <1432637918-8946-1-git-send-email-geert+renesas@glider.be>
- <11285144.SLyHNBFeg0@avalon>
- <CAMuHMdUFMLGHAYT06s6Twt+1jvhAHyCk2p0xv6xntiVjffvdug@mail.gmail.com>
-Message-ID: <5189919.ZVDQH3Bp17@wuerfel>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Wed, 27 May 2015 18:13:25 +0800
+Subject: [PATCH 0/6]  mmc: imx: a few clean up and fixes
+Message-ID: <1432721611-31214-1-git-send-email-aisheng.dong@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 May 2015 11:07:15 Geert Uytterhoeven wrote:
-> 
-> P.S. Strange, USB_NET_DRIVERS is tristate, but setting it to "y" doesn't
->      mean all USB network drivers become builtin, as USB_NET_DRIVERS is never
->      used in a "depends" construct...
-> 
+Patch 1 is a small clean up.
+Patch 2-4 and 6 are small fixes.
+Patch 5 add mx6sx support.
 
-The 'if USB_NET_DRIVERS' has the same effect as putting a 'depends on' in
-each Kconfig option within.
+Dong Aisheng (6):
+  mmc: sdhci-esdhc-imx: merge the same register check into one place
+  mmc: sdhci-esdhc-imx: usdhc does not have missing card interrupt issue
+  mmc: sdhci-esdhc-imx: add ADMA Length Mismatch errata fix
+  mmc: sdhci-esdhc-imx: using specific compatible string in binding doc
+  mmc: sdhci-esdhc-imx: add imx6sx support
+  mmc: sdhci-esdhc-imx: add quirk SDHCI_QUIRK2_BROKEN_HS200 for imx6qdl
 
-However, it works the opposite way: if USB_NET_DRIVERS=m, the individual
-drivers cannot by 'y', but if USB_NET_DRIVERS=y, they can be 'y', 'm' or 'n'.
+ .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |  9 ++++-
+ drivers/mmc/host/sdhci-esdhc-imx.c                 | 44 +++++++++++++++++-----
+ 2 files changed, 43 insertions(+), 10 deletions(-)
 
-	Arnd
+-- 
+1.9.1
