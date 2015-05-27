@@ -1,100 +1,75 @@
 From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Wed, 27 May 2015 21:28:13 +0800
+Date: Wed, 27 May 2015 21:24:40 +0800
 Subject: [RFC PATCH v1 1/3] PCI: designware: Add ARM64 support
-In-Reply-To: <3203781.NTEqUP6iLy@wuerfel>
-References: <000001d096a9$27bf43f0$773dcbd0$@com> <3203781.NTEqUP6iLy@wuerfel>
-Message-ID: <5565C66D.10800@hisilicon.com>
+In-Reply-To: <556428C9.9080202@st.com>
+References: <000001d096a9$27bf43f0$773dcbd0$@com>
+ <5562F0C9.4090007@hisilicon.com> <000001d096f1$93dca4e0$bb95eea0$@com>
+ <5563451B.4050609@st.com> <5563DF4F.4080601@hisilicon.com>
+ <556428C9.9080202@st.com>
+Message-ID: <5565C598.7020809@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/5/26 16:09, Arnd Bergmann wrote:
-> On Monday 25 May 2015 14:10:37 Jingoo Han wrote:
->> 'pp->root_bus_nr' is initialized as '-1' at some soc-specific drivers
->> However, 'sys->busnr' is set as '0, 1, 2 ...' by pcibios_init_hw()
->> in arch/arm/kernel/bios32.c. '0, 1, 2 ...' means the number of
->> each host controller.
->>
->> So, without setting 'pp->root_bus_nr' as '0, 1, 2, ...',
->> it makes the problem.
->>
->> Thus, we need to come up with the way to resolve this.
->>
->> 1. Setting 'pp->root_bus_nr' as '0, 1, 2 ..' by each soc-specific driver.
->>
->> e.g)
->>
->> ./drivers/pci/host/pci-exynos.c
->> @@ -534,7 +534,7 @@ static int __init exynos_add_pcie_port(struct pcie_port *pp,
->>                 }
->>         }
->>  
->> -       pp->root_bus_nr = -1;
->> +       pp->root_bus_nr++;
->>         pp->ops = &exynos_pcie_host_ops;
->>
->> ./drivers/pci/host/pci-imx6.c
->> @@ -541,7 +541,7 @@ static int __init imx6_add_pcie_port(struct pcie_port *pp,
->>                 }
->>         }
->>  
->> -       pp->root_bus_nr = -1;
->> +       pp->root_bus_nr++;
->>         pp->ops = &imx6_pcie_host_ops;
->>  
->> ./drivers/pci/host/pci-keystone.c
->> @@ -312,7 +312,7 @@ static int __init ks_add_pcie_port(struct keystone_pcie *ks_pcie,
->>                         return ret;
->>         }
->>  
->> -       pp->root_bus_nr = -1;
->> +       pp->root_bus_nr++;
->>         pp->ops = &keystone_pcie_host_ops;
->>
->> ./drivers/pci/host/pci-layerscape.c
->> @@ -101,7 +101,7 @@ static int ls_add_pcie_port(struct ls_pcie *pcie)
->>         pp = &pcie->pp;
->>         pp->dev = pcie->dev;
->>         pp->dbi_base = pcie->dbi;
->> -       pp->root_bus_nr = -1;
->> +       pp->root_bus_nr++;
->>         pp->ops = &ls_pcie_host_ops;
->>  
->> ./drivers/pci/host/pcie-spear13xx.c
->> @@ -287,7 +287,7 @@ static int spear13xx_add_pcie_port(struct pcie_port *pp,
->>                 return ret;
->>         }
->>  
->> -       pp->root_bus_nr = -1;
->> +       pp->root_bus_nr++;
->>         pp->ops = &spear13xx_pcie_host_ops;
->>
->>
->> 2. Setting 'pp->root_bus_nr' as '0, 1, 2 ..' by pcie-designware.c
->>
->> I believe that someone will give better idea. 
+On 2015/5/26 16:03, Fabrice Gasnier wrote:
+> Hi zhou,
 > 
-> Assigning the root bus number through hw_pci is a historic artifact
-> from drivers that probe multiple host bridges at the same time.
-> Some legacy ARM platforms still do that (specifically all the ones
-> that set nr_controllers to >1: dove, mv78xx0, orion5x, and iop),
-> but all modern platforms should probe each host bridge separately,
-> either from a platform driver probe function, or they only have
-> one and hardcode that fact in the ARM platform code.
+> On 05/26/2015 04:49 AM, Zhou Wang wrote:
+>>>   struct pcie_port {
+>>> >+#ifdef CONFIG_ARM
+>>> >+    /*
+>>> >+     * this is a temporary hack to let the driver work on
+>>> >+     * both arm32 and arm64. it can be removed after the
+>>> >+     * arm32 cleanup is complete and bios32.c has stopped
+>>> >+     * referencing host->pci_sys_data.
+>>> >+     */
+>>> >+    struct pci_sys_data    dummy;
+>>> >+#endif
+>>> >      struct device        *dev;
+>>> >
+>>> >
+>>> >This looks like necessary as bios32 is dereferencing sysdata:
+>>> >struct pci_sys_data *sysdata = dev->bus->sysdata;
+>>> >
+>>> >Best Regards,
+>>> >Fabrice
+>>> >
+>> Hi Fabrice,
+>>
+>> Firstly, many thanks for your test:)
+>>
+>> I am a little confused that pci_sys_data is still needed as we don't use the code
+>> in bios32. What was the problem you met? Could you share me more information? Then
+>> let's see how to solve the problem.
 > 
-> For the drivers in drivers/pci/host, we give each host controller
-> its own PCI domain, which means we can have overlapping bus numbers
-> and do not need the heuristic to split the available 255 bus numbers
-> across the present host bridges.
-> 
-> 	Arnd
+> This is not completely true: there is still code in bios32 that requires pci_sys_data.
 
-Hi Arnd,
+Right.
 
-Thanks for your explanation about this.
+> No matters pci_common_init_dev() is being called or not :
+> 
+> You can see pcibios_msi_controller() has a weak definition (in drivers/pci/msi.c).
+> But bios32 defines it for arm. Then it's being used.
+
+But here in dw_pcie_host_init, I directly set bus->msi = &dw_pcie_msi_chip. So in
+drivers/pci/msi.c, we will get the msi controller by dev->bus->msi in pci_msi_controller.
+It will not run into pcibios_msi_controller().
+
+Maybe there is still something I miss understood, if so, please let me know.
 
 Best Regards,
 Zhou
 
+> So, basically, pci_sys_data is still needed on arm. This is how above workaround proposed by Arnd takes care of it.
+> Without this, dereferencing the pointer as done in bios32, makes it hazardous and lead to crashes...
+> e.g. in pcibios_msi_controller(), pci_sys_data will point to "dev->bus->sysdata", aka "struct device *dev" above.
+> 
+> Best Regards,
+> Fabrice
+>>
+>> Thanks again and Best Regards,
+>> Zhou
+>>
+> 
 > 
 > .
 > 
