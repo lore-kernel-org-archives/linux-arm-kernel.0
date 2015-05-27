@@ -1,70 +1,117 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 27 May 2015 11:19:02 +0200
-Subject: [PATCH 2/2] ASoC: atmel: compile pcm driver in
- snd-soc-atmel_ssc_dai
-In-Reply-To: <1432713024.27695.235.camel@x220>
-References: <1432591459-22613-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1432591459-22613-2-git-send-email-alexandre.belloni@free-electrons.com>
- <1432713024.27695.235.camel@x220>
-Message-ID: <20150527091902.GN3199@piout.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 27 May 2015 10:24:17 +0100
+Subject: [PATCH] ARM: imx6: allow booting with old DT
+In-Reply-To: <1432717538.3011.28.camel@pengutronix.de>
+References: <1432658616-13733-1-git-send-email-l.stach@pengutronix.de>			
+ <20150527073408.GD16165@dragon> <1432713148.3011.6.camel@pengutronix.de>		
+ <55657B50.7000006@arm.com> <1432714807.3011.15.camel@pengutronix.de>	
+ <5565815E.2040400@arm.com> <1432717538.3011.28.camel@pengutronix.de>
+Message-ID: <55658D41.9070709@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/05/2015 at 09:50:24 +0200, Paul Bolle wrote :
-> Now that this patch is already applied my remarks can only be addressed
-> in a follow up patch. (Perhaps such a patch is already queued.)
+On 27/05/15 10:05, Lucas Stach wrote:
+> Am Mittwoch, den 27.05.2015, 09:33 +0100 schrieb Marc Zyngier:
+>> On 27/05/15 09:20, Lucas Stach wrote:
+>>> Am Mittwoch, den 27.05.2015, 09:07 +0100 schrieb Marc Zyngier:
+>>>> On 27/05/15 08:52, Lucas Stach wrote:
+>>>>> Am Mittwoch, den 27.05.2015, 15:34 +0800 schrieb Shawn Guo:
+>>>>>> On Tue, May 26, 2015 at 06:43:36PM +0200, Lucas Stach wrote:
+>>>>>>> The GPC rewrite to IRQ domains has been on the premise that it may break
+>>>>>>> suspend/resume for new kernels on old DT, but otherwise keep things working
+>>>>>>> from a user perspective. This was an accepted compromise to be able to move
+>>>>>>> the GIC cleanup forward.
+>>>>>>>
+>>>>>>> What actually happened was that booting a new kernel on an old DT crashes
+>>>>>>> before even the console is up, so the user does not even see the warning
+>>>>>>> that the DT is too old. The warning message suggests that this has been
+>>>>>>> known before, which is clearly unacceptable.
+>>>>>>
+>>>>>> To see any early message like this one, low-level debug support is
+>>>>>> expected to be turned on.
+>>>>>>
+>>>>> Using low-level debug might be acceptable for a developer.
+>>>>>
+>>>>> From a user perspective a kernel update without a corresponding DT
+>>>>> update should never render the machine completely broken. Keep in mind
+>>>>> that i.MX6 isn't only used in deeply embedded system, but is already in
+>>>>> devices where non-developer users might update the kernel. They might
+>>>>> even use prebuilt kernels where enabling low-level debug is not an
+>>>>> option.
+>>>>
+>>>> I'd imagine that whoever provides this pre-build kernel would also
+>>>> deliver some form of release notes indicating the procedure. Even
+>>>> better, an installation script.
+>>>>
+>>>>> We are not free to break the existing DT stability rules in such a
+>>>>> drastic way, especially if keeping things working to some extent is
+>>>>> easily done.
+>>>>
+>>>> That would be on the condition that the DT was correct the first place,
+>>>> and accurately described the hardware. It didn't, breaking the contract
+>>>> we have the first place.
+>>>>
+>>>> We can argue for years about DT stability, history proves that it
+>>>> doesn't lead anywhere.
+>>>>
+>>> The fact that we are still in a learning phase with regard to DT and
+>>> have made mistakes in the past (and I'm sure we will still do some in
+>>> the future) isn't an excuse for not even trying to keep the stability.
+>>>
+>>> In this case there was a clear consent that we break DT stability by
+>>> rendering suspend/resume broken. This was the accepted compromise
+>>> between DT stability and the highly needed GIC cleanup.
+>>> Completely breaking an entire SoC family in early boot was not part of
+>>> the the compromise! Especially as it isn't really hard to keep things
+>>> working to the specified extent, as this patch proves.
+>>
+>> This patch series has been on the list for months, in -next for several
+>> weeks, and now in mainline for about a month. I would have appreciated
+>> your input and your patch during that time so that your pet platform
+>> would have been kept in an acceptable shape. Others have done so, you
+>> didn't.
+>>
+> We are still in the RC phase of 4.1, so no harm has been done other than
+> upsetting some developers and potential adventurous users. So we are
+> still right in time to fix this.
 > 
-> On Tue, 2015-05-26 at 00:04 +0200, Alexandre Belloni wrote:
-> > --- a/sound/soc/atmel/Kconfig
-> > +++ b/sound/soc/atmel/Kconfig
->  
-> >  config SND_ATMEL_SOC_PDC
-> > -	tristate
-> > +	bool
-> >  
-> >  config SND_ATMEL_SOC_DMA
-> > -	tristate
-> > +	bool
-> >  	select SND_SOC_GENERIC_DMAENGINE_PCM
-> 
-> > --- a/sound/soc/atmel/Makefile
-> > +++ b/sound/soc/atmel/Makefile
-> 
-> > -snd-soc-atmel-pcm-pdc-objs := atmel-pcm-pdc.o
-> > -snd-soc-atmel-pcm-dma-objs := atmel-pcm-dma.o
-> > -snd-soc-atmel_ssc_dai-objs := atmel_ssc_dai.o
-> > +snd-soc-atmel-pcm-$(CONFIG_SND_ATMEL_SOC_PDC) := atmel-pcm-pdc.o
-> > +snd-soc-atmel-pcm-$(CONFIG_SND_ATMEL_SOC_DMA) += atmel-pcm-dma.o
-> > +snd-soc-atmel_ssc_dai-objs := atmel_ssc_dai.o $(snd-soc-atmel-pcm-y)
-> >  
-> > -obj-$(CONFIG_SND_ATMEL_SOC_PDC) += snd-soc-atmel-pcm-pdc.o
-> > -obj-$(CONFIG_SND_ATMEL_SOC_DMA) += snd-soc-atmel-pcm-dma.o
-> >  obj-$(CONFIG_SND_ATMEL_SOC_SSC) += snd-soc-atmel_ssc_dai.o
-> 
-> The code in atmel-pcm-pdc.c and atmel-pcm-dma.c will now either be part
-> of the snd-soc-atmel_ssc_dai.ko or be built-in. That means, I think,
-> that:
-> - the (in total) four uses of EXPORT_SYMBOL() in these two files can be
->   dropped;
-> - MODULE_AUTHOR() and friends, and probably also the include of
->   linux/module.h, can be dropped from these two files.
-> 
+> I don't have the bandwidth to test every patchset flying by and while I
+> didn't provide an explicit ack, I was okay with it by looking at it.
+> Honestly I trusted you that the patchset does what was stated in the
+> commit message, which is break suspend/resume but otherwise keep things
+> working. 
 
-Yeah, I as not sure how to merge those MODULE_AUTHOR but I checked and
-the information is correctly included.
+The cover letter explicitly said that I didn't test it on such HW (only
+OMAP4/5 and Tegra-2). I don't have any FSL board in my zoo.
 
-> Furthermore, the references to CONFIG_SND_ATMEL_SOC_PDC_MODULE and
-> CONFIG_SND_ATMEL_SOC_DMA_MODULE in atmel-pcm.h can be removed now.
-> 
+>> If you have such a vested interest in keeping this SoC on a smooth
+>> upgrade path, then I suggest you at least follow the various patch
+>> series potentially touching it, and contribute in a timely manner.
+>> Understand that people don't necessarily have access to your favourite
+>> piece of HW, and may overlook that kind of detail. I rely on others to
+>> let me know about it, and I encourage you to do so.
+>>
+> I'm fine with fixing things at the RC stages and I did not blame anyone
+> personally. What is not okay is that the commit messages of the series
+> didn't provide a hint for this kind of breakage.
+> Until v6 of this series the warning message read "Outdated DT detected,
+> suspend/resume will NOT work", only later it was changed to "Outdated DT
+> detected, system is about to crash!!!", which seems to indicate that you
+> were aware of the breakage, but neglected to explicitly state this in a
+> commit message where it is easily accessible for other developers
+> looking at the patches or resolve the problem.
 
-Indeed.
+You really are reading *way* too much into a message. I would have
+happily happily inserted a quote by Frank Zappa instead, but the meaning
+could have been slightly obscure. As to know about such a breakage, do
+you really think I care that little about the kernel to deliberately
+leave a bug in and paper over it? Please give me a break...
 
-However, the Kconfig maintainer found a way to do the right thing so we
-may as well drop that patch and keep those as modules.
+> Also the attitude of saying "DT stability has been broken in the past so
+> why bother with it in the future" is troubling IMHO.
 
-Nicolas, what do you think?
+Yes, this is a conspiracy. Read all about it.
 
+	M.
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
