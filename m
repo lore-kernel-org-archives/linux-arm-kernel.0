@@ -1,118 +1,192 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 27 May 2015 12:50:21 -0700
-Subject: [GIT PULL 4/8] clk: tegra: Changes for v4.2-rc1
-In-Reply-To: <555D7A5B.1070901@nvidia.com>
-References: <1431524980-13599-1-git-send-email-thierry.reding@gmail.com>
- <1431524980-13599-5-git-send-email-thierry.reding@gmail.com>
- <20150520195459.GU31753@codeaurora.org>
- <555D7A5B.1070901@nvidia.com>
-Message-ID: <20150527195021.GA24204@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 May 2015 21:51:52 +0200
+Subject: [RFC PATCH v1 1/3] PCI: designware: Add ARM64 support
+In-Reply-To: <5565EEAD.9070003@st.com>
+References: <000001d096a9$27bf43f0$773dcbd0$@com> <2095085.CuXXeGT0Wg@wuerfel>
+ <5565EEAD.9070003@st.com>
+Message-ID: <16371687.jmfn381VuV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/21, Mikko Perttunen wrote:
-> On 05/20/2015 10:54 PM, Stephen Boyd wrote:
-> > On 05/13, Thierry Reding wrote:
-> >> Hi Mike, Stephen,
+On Wednesday 27 May 2015 18:19:57 Fabrice Gasnier wrote:
+> On 05/27/2015 05:43 PM, Arnd Bergmann wrote:
+> > On Wednesday 27 May 2015 17:31:46 Arnd Bergmann wrote:
+> >> Yes, that works. However there are two problems with the approach:
 > >>
-> >> The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
-> >>
-> >>   Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
-> >>
-> >> are available in the git repository at:
-> >>
-> >>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.2-clk
-> >>
-> >> for you to fetch changes up to 36b7be6d3ea8f434f1e0723f3fb0e85c3e00ebc2:
-> >>
-> >>   clk: tegra: Fix hda2codec_2x clock name for Tegra30 (2015-05-13 15:17:14 +0200)
-> >>
-> >> I've based this pull request on top of the tegra-for-4.2-ramcode pull
-> >> request, so pulling only this one should be sufficient to resolve the
-> >> dependency.
-> >>
-> >> Thanks,
-> >> Thierry
-> >>
-> >> ----------------------------------------------------------------
-> >> clk: tegra: Changes for v4.2-rc1
-> >>
-> >> This contains the EMC clock driver that's been exhaustively reviewed and
-> >> tested. It also includes a change to the clock core that allows a clock
-> >> provider to perform low-level reparenting of clocks. This is required by
-> >> the EMC clock driver because the reparenting needs to be done at a very
-> >> specific point in time during the EMC frequency switch.
-> > 
-> > Can someone please describe why we need to do software
-> > reparenting at a specific point in time during a frequency
-> > switch? I must have missed out on the conversation somewhere and
-> > looking at the commit that introduces the function, the argument
-> > for why the API is exposed:
-> > 
-> >       To be used by clock implementations for switching to a new
-> >       parent during rate change.
-> > 
-> > is lacking in any details about *why* we need it.
-> > 
+> >> - we have to change all PCI host drivers on ARM to do this in order to remove
+> >>    the ARM-specific pcibios_msi_controller() function
+> >> - it's possible that there are dw_pcie implementations that do not include
+> >>    an MSI controller, so that pointer would be NULL, which leads to the
+> >>    core code to still call the ARM-specific pcibios_msi_controller() function
+> >>    unless we remove it.
+> > I wonder if this simple patch would be sufficient to kill off
+> > pcibios_msi_controller().
+> >
+> > Can one of you try it?
+> >
+> >       Arnd
 > 
-> Hi Stephen,
+> Hi Arnd,
+> I tested it quickly on my platform, with and without CONFIG_PCI_MSI.
+> In both case it seems to run fine with dw pcie.
 > 
-> the way the EMC clock rate is set in hardware is similar to other
-> clocks, i.e. there's a register and you write the new divider and parent
-> id to it. However, with EMC, you cannot just do this any time you want;
-> writing to the register initiates a state machine in the clock hardware
-> that changes a large number of other parameters regarding DRAM timings
-> as well. These parameters need to be programmed into shadow registers
-> before the rate change write is done. This means that both the new
-> divisor and the parent must be written in the same register write.
-> 
-> The CCF has a callback, set_rate_and_parent, which allows for both to be
-> passed to the driver at the same time. However, it also requires
-> set_rate and set_parent to be implemented, which the EMC driver cannot do.
 
-Ok so we should change the framework to allow drivers to only
-implement set_rate_and_parent and use that in set_rate and
-set_parent implementations if it's the only option available. Or
-is there a problem if CCF allows clk_set_parent() on the EMC
-clock by calling set_rate_and_parent() with the new parent and
-whatever recalc_rate returns for the new parent's rate going into
-the clock?
+Awesome. Now we just need to find a way to move the align_resource callback.
+I wonder if the approach below would be acceptable.
 
-> 
-> Furthermore, the CCF cannot help with parent selection for the EMC clock
-> at all. The parent for each rate is selected by the board designer.
+	Arnd
 
-I'm not following this part. The CCF mostly asks clock providers
-what parent should be used when clk_set_rate() is called.
-
-> 
-> There is also the issue that sometimes, the EMC driver cannot directly
-> switch to the target (rate, parent) pair; instead it is necessary to
-> switch first to another pair we call a backup timing. In this situation,
-> we temporarily have a parent that is neither the one we had before the
-> set_rate call or the one it will be after. Especially, if the switch to
-> the backup timing succeeds but the following switch to the target timing
-> fails, then without the reparent call the parent in hardware would be
-> left inconsistent with the software state.
-
-Yes, I've sent a patch a while ago to support an idea of a "safe
-parent" or a backup timing that can be used while a clock is
-reprogrammed. Mike has also proposed the concept of "coordinated
-clock rates" which would do something similar and allow clock
-providers to control complicated rate transitions themselves. It
-seems that we may be able to use the "safe parent" concept here,
-where first we switch to some other parent, call the set_rate*
-op, and then switch the parent back if we're not already using
-the parent that we should be using.
-
-This sort of thing becomes important for things like per-clock
-locking where we need to know how the clock tree is going to
-change *before* we modify the clock tree. If we go back and forth
-between the clock providers and the clock tree while we're in the
-middle of making irreversible changes to the hardware, we may get
-stuck in a situation where we need to lock more clocks and then
-we may need to undo hardware changes.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index fcbbbb1b9e95..20839d26a490 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -597,9 +588,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+ 
+ 	start = (start + align - 1) & ~(align - 1);
+ 
+-	if (sys->align_resource)
+-		return sys->align_resource(dev, res, start, size, align);
+-
+ 	return start;
+ }
+ 
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index 1ab863551920..74216c9c2822 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -751,27 +751,20 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
+ 	return 1;
+ }
+ 
+-static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
++static resource_size_t mvebu_pcie_align_resource(void *data,
++						 const struct resource *res,
++						 resource_size_t size,
++						 resource_size_t align)
+ {
+-	struct mvebu_pcie *pcie = sys_to_pcie(sys);
+-	struct pci_bus *bus;
++	struct device *dev = data;
+ 
+-	bus = pci_create_root_bus(&pcie->pdev->dev, sys->busnr,
+-				  &mvebu_pcie_ops, sys, &sys->resources);
+-	if (!bus)
+-		return NULL;
++	resource_size_t start = res->start;
+ 
+-	pci_scan_child_bus(bus);
++	if (res->flags & IORESOURCE_IO && start & 0x300)
++		start = (start + 0x3ff) & ~0x3ff;
+ 
+-	return bus;
+-}
++	start = (start + align - 1) & ~(align - 1);
+ 
+-static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
+-						 const struct resource *res,
+-						 resource_size_t start,
+-						 resource_size_t size,
+-						 resource_size_t align)
+-{
+ 	if (dev->bus->number != 0)
+ 		return start;
+ 
+@@ -796,6 +789,25 @@ static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
+ 		return start;
+ }
+ 
++static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
++{
++	struct mvebu_pcie *pcie = sys_to_pcie(sys);
++	struct pci_host_bridge *phb;
++	struct pci_bus *bus;
++
++	bus = pci_create_root_bus(&pcie->pdev->dev, sys->busnr,
++				  &mvebu_pcie_ops, sys, &sys->resources);
++	if (!bus)
++		return NULL;
++
++	phb = pci_find_host_bridge(bus);
++	phb->align_resource = mvebu_pcie_align_resource;
++
++	pci_scan_child_bus(bus);
++
++	return bus;
++}
++
+ static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
+ {
+ 	struct hw_pci hw;
+@@ -812,7 +824,6 @@ static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
+ 	hw.scan           = mvebu_pcie_scan_bus;
+ 	hw.map_irq        = of_irq_parse_and_map_pci;
+ 	hw.ops            = &mvebu_pcie_ops;
+-	hw.align_resource = mvebu_pcie_align_resource;
+ 
+ 	pci_common_init(&hw);
+ }
+diff --git a/drivers/pci/setup-res.c b/drivers/pci/setup-res.c
+index 232f9254c11a..e1f5e13c4636 100644
+--- a/drivers/pci/setup-res.c
++++ b/drivers/pci/setup-res.c
+@@ -200,7 +200,11 @@ static int pci_revert_fw_address(struct resource *res, struct pci_dev *dev,
+ }
+ 
+ static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
+-		int resno, resource_size_t size, resource_size_t align)
++		int resno, resource_size_t size, resource_size_t align,
++		resource_size_t (*alignf)(void *,
++					  const struct resource *,
++					  resource_size_t,
++					  resource_size_t))
+ {
+ 	struct resource *res = dev->resource + resno;
+ 	resource_size_t min;
+@@ -217,7 +221,7 @@ static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
+ 	 */
+ 	ret = pci_bus_alloc_resource(bus, res, size, align, min,
+ 				     IORESOURCE_PREFETCH | IORESOURCE_MEM_64,
+-				     pcibios_align_resource, dev);
++				     alignf, dev);
+ 	if (ret == 0)
+ 		return 0;
+ 
+@@ -229,7 +233,7 @@ static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
+ 	     (IORESOURCE_PREFETCH | IORESOURCE_MEM_64)) {
+ 		ret = pci_bus_alloc_resource(bus, res, size, align, min,
+ 					     IORESOURCE_PREFETCH,
+-					     pcibios_align_resource, dev);
++					     alignf, dev);
+ 		if (ret == 0)
+ 			return 0;
+ 	}
+@@ -242,7 +246,7 @@ static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
+ 	 */
+ 	if (res->flags & (IORESOURCE_PREFETCH | IORESOURCE_MEM_64))
+ 		ret = pci_bus_alloc_resource(bus, res, size, align, min, 0,
+-					     pcibios_align_resource, dev);
++					     alignf, dev);
+ 
+ 	return ret;
+ }
+@@ -251,10 +255,19 @@ static int _pci_assign_resource(struct pci_dev *dev, int resno,
+ 				resource_size_t size, resource_size_t min_align)
+ {
+ 	struct pci_bus *bus;
++	struct pci_host_bridge *phb;
+ 	int ret;
+ 
+ 	bus = dev->bus;
+-	while ((ret = __pci_assign_resource(bus, dev, resno, size, min_align))) {
++	phb = pci_find_host_bridge(bus);
++
++	if (phb->align_resource)
++		alignf = phb->align_resource;
++	else
++		alignf = pcibios_align_resource;
++
++	while ((ret = __pci_assign_resource(bus, dev, resno, size,
++					    min_align, alignf))) {
+ 		if (!bus->parent || !bus->self->transparent)
+ 			break;
+ 		bus = bus->parent;
