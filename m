@@ -1,36 +1,69 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 27 May 2015 17:09:35 +0100
-Subject: [PATCH 2/2] iommu/arm-smmu: Make force_stage module param read-only
- in sysfs
-In-Reply-To: <1432742975-24801-1-git-send-email-will.deacon@arm.com>
-References: <1432742975-24801-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1432742975-24801-2-git-send-email-will.deacon@arm.com>
+Date: Wed, 27 May 2015 17:09:34 +0100
+Subject: [PATCH 1/2] iommu/arm-smmu: Fix ATS1* register writes
+Message-ID: <1432742975-24801-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changing force_stage dynamically isn't supported by the driver and it
-also doesn't make a whole lot of sense to change it once the SMMU is up
-and running.
+From: Robin Murphy <Robin.Murphy@arm.com>
 
-This patch makes the sysfs entry for the parameter read-only.
+The ATS1* address translation registers only support being written
+atomically - in SMMUv2 where they are 64 bits wide, 32-bit writes to
+the lower half are automatically zero-extended, whilst 32-bit writes
+to the upper half are ignored. Thus, the current logic of performing
+64-bit writes as two 32-bit accesses is wrong.
 
+Since we already limit IOVAs to 32 bits on 32-bit ARM, the lack of a
+suitable writeq() implementation there is not an issue, and we only
+need a little preprocessor ugliness to safely hide the 64-bit case.
+
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- drivers/iommu/arm-smmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/iommu/arm-smmu.c | 21 ++++++++++-----------
+ 1 file changed, 10 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index e2a788eea5ed..dce041b1c139 100644
+index 66a803b9dd3a..e2a788eea5ed 100644
 --- a/drivers/iommu/arm-smmu.c
 +++ b/drivers/iommu/arm-smmu.c
-@@ -246,7 +246,7 @@
- #define FSYNR0_WNR			(1 << 4)
+@@ -202,8 +202,7 @@
+ #define ARM_SMMU_CB_S1_TLBIVAL		0x620
+ #define ARM_SMMU_CB_S2_TLBIIPAS2	0x630
+ #define ARM_SMMU_CB_S2_TLBIIPAS2L	0x638
+-#define ARM_SMMU_CB_ATS1PR_LO		0x800
+-#define ARM_SMMU_CB_ATS1PR_HI		0x804
++#define ARM_SMMU_CB_ATS1PR		0x800
+ #define ARM_SMMU_CB_ATSR		0x8f0
  
- static int force_stage;
--module_param_named(force_stage, force_stage, int, S_IRUGO | S_IWUSR);
-+module_param_named(force_stage, force_stage, int, S_IRUGO);
- MODULE_PARM_DESC(force_stage,
- 	"Force SMMU mappings to be installed@a particular stage of translation. A value of '1' or '2' forces the corresponding stage. All other values are ignored (i.e. no stage is forced). Note that selecting a specific stage will disable support for nested translation.");
+ #define SCTLR_S1_ASIDPNE		(1 << 12)
+@@ -1229,18 +1228,18 @@ static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
+ 	void __iomem *cb_base;
+ 	u32 tmp;
+ 	u64 phys;
++	unsigned long va;
  
+ 	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
+ 
+-	if (smmu->version == 1) {
+-		u32 reg = iova & ~0xfff;
+-		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
+-	} else {
+-		u32 reg = iova & ~0xfff;
+-		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_LO);
+-		reg = ((u64)iova & ~0xfff) >> 32;
+-		writel_relaxed(reg, cb_base + ARM_SMMU_CB_ATS1PR_HI);
+-	}
++	/* ATS1 registers can only be written atomically */
++	va = iova & ~0xfffUL;
++#ifdef CONFIG_64BIT
++	if (smmu->version == ARM_SMMU_V2)
++		writeq_relaxed(va, cb_base + ARM_SMMU_CB_ATS1PR);
++	else
++#endif
++		writel_relaxed(va, cb_base + ARM_SMMU_CB_ATS1PR);
+ 
+ 	if (readl_poll_timeout_atomic(cb_base + ARM_SMMU_CB_ATSR, tmp,
+ 				      !(tmp & ATSR_ACTIVE), 5, 50)) {
 -- 
 2.1.4
