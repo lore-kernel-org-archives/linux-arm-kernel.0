@@ -1,93 +1,319 @@
-From: chunfeng.yun@mediatek.com (chunfeng.yun at mediatek.com)
-Date: Wed, 27 May 2015 19:48:03 +0800
-Subject: [PATCH 6/6] arm64: dts: mediatek: add xHCI & usb phy for mt8173
-In-Reply-To: <1432727283-20303-1-git-send-email-chunfeng.yun@mediatek.com>
-References: <1432727283-20303-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1432727283-20303-7-git-send-email-chunfeng.yun@mediatek.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 27 May 2015 20:52:06 +0900
+Subject: [PATCH 1/5] drivers: soc: add support for exynos SROM driver
+In-Reply-To: <1430296712-10287-2-git-send-email-pankaj.dubey@samsung.com>
+References: <1430296712-10287-1-git-send-email-pankaj.dubey@samsung.com>
+ <1430296712-10287-2-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <5565AFE6.5030106@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chunfeng Yun <chunfeng.yun@mediatek.com>
+W dniu 29.04.2015 o 17:38, Pankaj Dubey pisze:
+> This patch adds Exynos SROM controller driver which will handle
+> save restore of SROM registers during S2R.
+> 
+> Change-Id: Iaddaaebc1d7090c9889e948e68e886519562c43c
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 14 ++++++++++++++
- arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 24 ++++++++++++++++++++++++
- 2 files changed, 38 insertions(+)
+Please remove it.
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-index b1560c9..3adcdbf 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-+++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-@@ -13,6 +13,7 @@
-  */
- 
- /dts-v1/;
-+#include <dt-bindings/gpio/gpio.h>
- #include "mt8173.dtsi"
- 
- / {
-@@ -31,6 +32,15 @@
- 	};
- 
- 	chosen { };
-+
-+	usb_p1_vbus: fixedregulator at 0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&pio 130 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
- };
- 
- &pwrap {
-@@ -257,6 +267,10 @@
- 	};
- };
- 
-+&u3phy {
-+	reg-p1-vbus-supply = <&usb_p1_vbus>;
-+};
-+
- &uart0 {
- 	status = "okay";
- };
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 512e4eb..cd36bf3 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -259,6 +259,30 @@
- 			status = "disabled";
- 		};
- 
-+		usb: usb30 at 11270000 {
-+			compatible = "mediatek,mt8173-xhci", "generic-xhci";
-+			reg = <0 0x11270000 0 0x1000>;
-+			interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
-+			usb-phy = <&u3phy>;
-+			usb3-lpm-capable;
-+		};
-+
-+		u3phy: usb-phy at 11271000 {
-+			compatible = "mediatek,mt8173-u3phy";
-+			reg = <0 0x11271000 0 0x3000>,
-+			      <0 0x11280000 0 0x20000>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
-+			reg-vusb33-supply = <&mt6397_vusb_reg>;
-+			clocks = <&pericfg CLK_PERI_USB0>,
-+				 <&pericfg CLK_PERI_USB1>,
-+				 <&topckgen CLK_TOP_USB30_SEL>,
-+				 <&apmixedsys CLK_APMIXED_REF2USB_TX>;
-+			clock-names = "wakeup_deb_p0",
-+				      "wakeup_deb_p1",
-+				      "sys_mac",
-+				      "u3phya_ref";
-+		};
-+
- 		mmsys: mmsys at 14000000 {
- 			compatible = "mediatek,mt8173-mmsys", "syscon";
- 			reg = <0 0x14000000 0 0x1000>;
--- 
-1.8.1.1.dirty
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  drivers/soc/Kconfig               |   1 +
+>  drivers/soc/Makefile              |   1 +
+>  drivers/soc/samsung/Kconfig       |  14 ++++
+>  drivers/soc/samsung/Makefile      |   1 +
+>  drivers/soc/samsung/exynos-srom.c | 142 ++++++++++++++++++++++++++++++++++++++
+>  drivers/soc/samsung/exynos-srom.h |  51 ++++++++++++++
+>  6 files changed, 210 insertions(+)
+>  create mode 100644 drivers/soc/samsung/Kconfig
+>  create mode 100644 drivers/soc/samsung/Makefile
+>  create mode 100644 drivers/soc/samsung/exynos-srom.c
+>  create mode 100644 drivers/soc/samsung/exynos-srom.h
+> 
+> diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
+> index 76d6bd4..c3abfbe 100644
+> --- a/drivers/soc/Kconfig
+> +++ b/drivers/soc/Kconfig
+> @@ -1,6 +1,7 @@
+>  menu "SOC (System On Chip) specific Drivers"
+>  
+>  source "drivers/soc/qcom/Kconfig"
+> +source "drivers/soc/samsung/Kconfig"
+>  source "drivers/soc/ti/Kconfig"
+>  source "drivers/soc/versatile/Kconfig"
+>  
+> diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
+> index 063113d..620366f 100644
+> --- a/drivers/soc/Makefile
+> +++ b/drivers/soc/Makefile
+> @@ -3,6 +3,7 @@
+>  #
+>  
+>  obj-$(CONFIG_ARCH_QCOM)		+= qcom/
+> +obj-$(CONFIG_SOC_SAMSUNG)	+= samsung/
+>  obj-$(CONFIG_ARCH_TEGRA)	+= tegra/
+>  obj-$(CONFIG_SOC_TI)		+= ti/
+>  obj-$(CONFIG_PLAT_VERSATILE)	+= versatile/
+> diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
+> new file mode 100644
+> index 0000000..b6fa4e6
+> --- /dev/null
+> +++ b/drivers/soc/samsung/Kconfig
+> @@ -0,0 +1,14 @@
+> +#
+> +# SAMSUNG SoC drivers
+> +#
+> +menu "Samsung SOC driver support"
+> +
+> +config SOC_SAMSUNG
+> +	bool
+
+Any reason for not using menuconfig?
+
+> +
+> +config EXYNOS_SROM
+> +	bool
+> +	depends on ARM && ARCH_EXYNOS
+> +	select SOC_BUS
+
+Why we need to select SOC_BUS?
+
+> +
+> +endmenu
+> diff --git a/drivers/soc/samsung/Makefile b/drivers/soc/samsung/Makefile
+> new file mode 100644
+> index 0000000..9c554d5
+> --- /dev/null
+> +++ b/drivers/soc/samsung/Makefile
+> @@ -0,0 +1 @@
+> +obj-$(CONFIG_EXYNOS_SROM)	+= exynos-srom.o
+> diff --git a/drivers/soc/samsung/exynos-srom.c b/drivers/soc/samsung/exynos-srom.c
+> new file mode 100644
+> index 0000000..8aae762
+> --- /dev/null
+> +++ b/drivers/soc/samsung/exynos-srom.c
+> @@ -0,0 +1,142 @@
+> +/*
+> + * Copyright (c) 2015 Samsung Electronics Co., Ltd.
+> + *	      http://www.samsung.com/
+> + *
+> + * EXYNOS - SROM Controller support
+> + * Author: Pankaj Dubey <pankaj.dubey@samsung.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +#include "exynos-srom.h"
+> +
+> +static void __iomem *exynos_srom_base;
+> +
+> +static unsigned long exynos_srom_offsets[] = {
+
+static const
+
+> +	/* SROM side */
+> +	S5P_SROM_BW,
+> +	S5P_SROM_BC0,
+> +	S5P_SROM_BC1,
+> +	S5P_SROM_BC2,
+> +	S5P_SROM_BC3,
+> +};
+> +
+> +/**
+> + * struct exynos_srom_reg_dump: register dump of SROM Controller registers.
+> + * @offset: srom register offset from the controller base address.
+> + * @value: the value to be register at offset.
+
+Maybe:
+@value: the value of register under the offset
+
+> + */
+> +struct exynos_srom_reg_dump {
+> +	u32     offset;
+> +	u32     value;
+> +};
+> +
+> +static struct exynos_srom_reg_dump *exynos_srom_regs;
+> +
+> +static struct exynos_srom_reg_dump *exynos_srom_alloc_reg_dump(
+> +		const unsigned long *rdump,
+> +		unsigned long nr_rdump)
+> +{
+> +	struct exynos_srom_reg_dump *rd;
+> +	unsigned int i;
+> +
+> +	rd = kcalloc(nr_rdump, sizeof(*rd), GFP_KERNEL);
+> +	if (!rd)
+> +		return NULL;
+> +
+> +	for (i = 0; i < nr_rdump; ++i)
+> +		rd[i].offset = rdump[i];
+> +
+> +	return rd;
+> +}
+> +
+> +static void exynos_srom_save(void __iomem *base,
+> +				    struct exynos_srom_reg_dump *rd,
+> +				    unsigned int num_regs)
+> +{
+> +	for (; num_regs > 0; --num_regs, ++rd)
+> +		rd->value = readl(base + rd->offset);
+> +
+> +}
+> +
+> +static void exynos_srom_restore(void __iomem *base,
+> +				      const struct exynos_srom_reg_dump *rd,
+> +				      unsigned int num_regs)
+> +{
+> +	for (; num_regs > 0; --num_regs, ++rd)
+> +		writel(rd->value, base + rd->offset);
+> +
+> +}
+> +
+> +static const struct of_device_id of_exynos_srom_ids[] = {
+> +	{
+> +		.compatible	= "samsung,exynos-srom",
+> +	},
+> +	{},
+> +};
+> +
+> +static int exynos_srom_probe(struct platform_device *pdev)
+> +{
+> +	struct device_node *np;
+> +	struct device *dev = &pdev->dev;
+> +
+> +	np = dev->of_node;
+> +	exynos_srom_base = of_iomap(np, 0);
+> +
+> +	if (!exynos_srom_base)
+> +		return PTR_ERR(exynos_srom_base);
+
+This looks wrong. If this is NULL, do not convert it to ERR. What will
+be the value of PTR_ERR(NULL)?
+
+> +
+> +	exynos_srom_regs = exynos_srom_alloc_reg_dump(exynos_srom_offsets,
+> +			sizeof(exynos_srom_offsets));
+
+if (NULL) then what? Have you tested the error paths in the probe?
+
+> +
+> +	return 0;
+> +}
+> +
+> +#ifdef CONFIG_PM_SLEEP
+> +static int exynos_srom_suspend(struct device *dev)
+> +{
+> +	exynos_srom_save(exynos_srom_base, exynos_srom_regs,
+> +				ARRAY_SIZE(exynos_srom_offsets));
+> +
+> +	return 0;
+> +}
+> +
+> +static int exynos_srom_resume(struct device *dev)
+> +{
+> +	exynos_srom_restore(exynos_srom_base, exynos_srom_regs,
+> +				ARRAY_SIZE(exynos_srom_offsets));
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct dev_pm_ops exynos_srom_dev_pm_ops = {
+> +	SET_SYSTEM_SLEEP_PM_OPS(exynos_srom_suspend, exynos_srom_resume)
+> +};
+> +
+> +#define DEV_PM_OPS	(&exynos_srom_dev_pm_ops)
+> +#else
+> +#define DEV_PM_OPS	NULL
+> +#endif /* CONFIG_PM_SLEEP */
+
+That look like an old code. Please use SIMPLE_DEV_PM_OPS unless there is
+a reason not to.
+
+> +
+> +static struct platform_driver exynos_srom_driver = {
+> +	.probe = exynos_srom_probe,
+> +	.driver = {
+> +		.name = "exynos-srom",
+> +		.of_match_table = of_exynos_srom_ids,
+> +		.pm = DEV_PM_OPS,
+> +	},
+> +};
+> +
+> +static int __init exynos_srom_init(void)
+> +{
+> +	return platform_driver_register(&exynos_srom_driver);
+> +}
+> +device_initcall(exynos_srom_init);
+> diff --git a/drivers/soc/samsung/exynos-srom.h b/drivers/soc/samsung/exynos-srom.h
+> new file mode 100644
+> index 0000000..e6ee438
+> --- /dev/null
+> +++ b/drivers/soc/samsung/exynos-srom.h
+> @@ -0,0 +1,51 @@
+> +/*
+> + * Copyright (c) 2015 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + *
+> + * Exynos SROMC register definitions
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +#ifndef __SAMSUNG_REGS_SROM_H
+> +#define __SAMSUNG_REGS_SROM_H __FILE__
+
+The double-inclusion protection looks different than file path and name.
+Please make it similar.
+
+> +#define S5P_SROMREG(x)		(x)
+> +
+> +#define S5P_SROM_BW		S5P_SROMREG(0x0)
+> +#define S5P_SROM_BC0		S5P_SROMREG(0x4)
+> +#define S5P_SROM_BC1		S5P_SROMREG(0x8)
+> +#define S5P_SROM_BC2		S5P_SROMREG(0xc)
+> +#define S5P_SROM_BC3		S5P_SROMREG(0x10)
+> +#define S5P_SROM_BC4		S5P_SROMREG(0x14)
+> +#define S5P_SROM_BC5		S5P_SROMREG(0x18)
+> +
+> +/* one register BW holds 4 x 4-bit packed settings for NCS0 - NCS3 */
+> +
+> +#define S5P_SROM_BW__DATAWIDTH__SHIFT		0
+> +#define S5P_SROM_BW__ADDRMODE__SHIFT		1
+> +#define S5P_SROM_BW__WAITENABLE__SHIFT		2
+> +#define S5P_SROM_BW__BYTEENABLE__SHIFT		3
+> +
+> +#define S5P_SROM_BW__CS_MASK			0xf
+> +
+> +#define S5P_SROM_BW__NCS0__SHIFT		0
+> +#define S5P_SROM_BW__NCS1__SHIFT		4
+> +#define S5P_SROM_BW__NCS2__SHIFT		8
+> +#define S5P_SROM_BW__NCS3__SHIFT		12
+> +#define S5P_SROM_BW__NCS4__SHIFT		16
+> +#define S5P_SROM_BW__NCS5__SHIFT		20
+> +
+> +/* applies to same to BCS0 - BCS3 */
+> +
+> +#define S5P_SROM_BCX__PMC__SHIFT		0
+> +#define S5P_SROM_BCX__TACP__SHIFT		4
+> +#define S5P_SROM_BCX__TCAH__SHIFT		8
+> +#define S5P_SROM_BCX__TCOH__SHIFT		12
+> +#define S5P_SROM_BCX__TACC__SHIFT		16
+> +#define S5P_SROM_BCX__TCOS__SHIFT		24
+> +#define S5P_SROM_BCX__TACS__SHIFT		28
+
+s/S5P/EXYNOS/
+
+> +
+> +#endif /* __SAMSUNG_REGS_SROM_H */
+> 
