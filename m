@@ -1,34 +1,60 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 27 May 2015 10:53:39 +0100
-Subject: [PATCH RFC] ARM: use -marm unconditionally for THUMB2_KERNEL=n
- builds
-In-Reply-To: <1432719727-28860-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1432719727-28860-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20150527095339.GQ2067@n2100.arm.linux.org.uk>
+Date: Wed, 27 May 2015 10:59:03 +0100
+Subject: sdhci(imx6): misbehaves while installing debian jessie, "Got
+ data interrupt 0x00100000"
+In-Reply-To: <CAPDyKFp57ucUa5r+6RW1hDS2tci+xerc27ga5eoSwO6Wq57gig@mail.gmail.com>
+References: <20150519222320.GM2067@n2100.arm.linux.org.uk>
+ <CAPDyKFqR3NwBd9O40BPzHG7Y4wyyJwgdB4NsA_GUO=YEyqFSXQ@mail.gmail.com>
+ <20150526150122.GP2067@n2100.arm.linux.org.uk>
+ <CAPDyKFp57ucUa5r+6RW1hDS2tci+xerc27ga5eoSwO6Wq57gig@mail.gmail.com>
+Message-ID: <20150527095903.GR2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 27, 2015 at 11:42:07AM +0200, Uwe Kleine-K?nig wrote:
-> The only possible culprit is a compiler that doesn't understand -marm.
-> My compiler collection only goes back to 4.0.3 which does work with this
-> option. The use of cc-option to test for -marm was introduced in commit
-> 5636810d6f17 ([ARM] 3982/2: Explicitly select 32-bit ARM ISA (-marm))
-> back in 2006 when the minimal compiler version was already 3.3.
+On Wed, May 27, 2015 at 11:44:59AM +0200, Ulf Hansson wrote:
+> [...]
+> 
+> >> Though, the side-effect you are describing isn't very nice. Even if it
+> >> doesn't solve you problem, perhaps we should discuss about converting
+> >> from wait_for_completion() to wait_for_completion_timeout(), when the
+> >> mmc core waits for the host driver to return the result for the
+> >> request.
+> >>
+> >> I guess the tricky part is to find a decent value for the "timeout".
+> >
+> > There's two issues which would need solving for that:
+> >
+> > 1. The only sane timeout is one which will never trigger under normal
+> >    operating circumstances, and abnormal load conditions.
+> 
+> Perhaps we could have the timeout calculated per request?
+> 
+> By using the current bus-speed and bus-width we can calculate the
+> available bandwidth. Obviously we need to also account for overhead
+> both at host and card side. Probably that overhead is taken from "best
+> guesses", not sure.
+> 
+> Finally considering the amount of data for the request, we can
+> calculate a value for the timeout.
 
-According to gcc 3.3's --target-help, it supports -mthumb, but not -marm.
+The MMC specs already have this: cards specify exactly that in the
+data.  However, that doesn't stop a card being buggy and supplying
+incorrect values (hey, it works for Windows, ship it!)
 
-What we could possibly do is to change the := to a plain =, and then
-evaluate all the options together via:
+The host is responsible for that part already (many hosts need to
+have that programmed.)  So it doesn't make sense to use this.
 
-KBUILD_CFLAGS :=$(KBUILD_CFLAGS)
+What we're after here is something rather different: failure of the
+host itself.  That should be a much longer timeout, one which we can
+be sure will never trigger unless something has definitely gone wrong.
+That's why I'd suggest something along the lines of ATA, around 60 to
+120 seconds.  If the host has been dead for that long, it's definitely
+dead.
 
-after their final +=.
-
-In any case, please don't add a after the =, I've found that certain gnu
-make flavours like to collect all that white space up into the executed
-command, which makes reading the verbose make output more annoying.  Rule
-number one of modification: stick to the established style in the file,
-even if it's wrong.  Do style modifications separately and uniformly.
+(I know ATA's timeout very well, each time I put my very old Thinkpad
+into standby mode, its APM talks to the drive, which then upsets Linux,
+triggering that timeout... because it has disabled BM-DMA in one of the
+control registers without Linux knowing.)
 
 -- 
 FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
