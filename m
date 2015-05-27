@@ -1,57 +1,120 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Wed, 27 May 2015 17:52:19 +0200
-Subject: [RFC PATCH] EDAC: Cleanup atomic_scrub mess
-In-Reply-To: <555F8DE2.4060402@ezchip.com>
-References: <1431991481-25684-1-git-send-email-lho@apm.com>
- <1431991481-25684-2-git-send-email-lho@apm.com>
- <20150519170308.GL4641@pd.tnic>
- <CAPw-ZT=mTpt_vz+e=rM5ywK8feNKkJQrpEWg=noRCziJ0840TQ@mail.gmail.com>
- <20150519203336.GP4641@pd.tnic> <20150521180719.GE3689@pd.tnic>
- <20150521181157.GF3689@pd.tnic> <555F8DE2.4060402@ezchip.com>
-Message-ID: <20150527155219.GB19407@pd.tnic>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Thu, 28 May 2015 01:00:13 +0900
+Subject: [RFC PATCH 2/2] arm64: Implement vmalloc based thread_info
+ allocator
+In-Reply-To: <20150527042416.GC11609@blaptop>
+References: <1432483340-23157-1-git-send-email-jungseoklee85@gmail.com>
+ <5992243.NYDGjLH37z@wuerfel> <B873B881-4972-4524-B1D9-4BB05D7248A4@gmail.com>
+ <20150525145857.GF14922@blaptop>
+ <BA18E3D0-A487-4E74-8DCA-49F36A4F08E2@gmail.com>
+ <20150527042416.GC11609@blaptop>
+Message-ID: <E35C2C89-8D5C-4A6C-8750-3D6C3432EF4F@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 22, 2015 at 04:13:22PM -0400, Chris Metcalf wrote:
-> On 05/21/2015 02:11 PM, Borislav Petkov wrote:
-> >From: Borislav Petkov<bp@suse.de>
-> >
-> >So first of all, this atomic_scrub() function's naming is bad. It looks
-> >like an atomic_t helper. Change it to edac_atomic_scrub().
-> >
-> >The bigger problem is that this function is arch-specific and every new
-> >arch which doesn't necessarily need that functionality still needs to
-> >define it, otherwise EDAC doesn't compile.
-> >
-> >So instead of doing that and including arch-specific headers, have each
-> >arch define an EDAC_ATOMIC_SCRUB symbol which can be used in edac_mc.c
-> >for ifdeffery. Much cleaner.
-> >
-> >We already are doing this with another symbol - EDAC_SUPPORT. This is
-> >also much cleaner than having CONFIG_EDAC explicitly depend on all the
-> >arches which need/have EDAC support and drivers.
-> >
-> >This way I can kill the useless edac.h header in tile too.
-> >
-> >Signed-off-by: Borislav Petkov<bp@suse.de>
+On May 27, 2015, at 1:24 PM, Minchan Kim wrote:
+
+Hi, Minchan,
+
+> On Tue, May 26, 2015 at 09:10:11PM +0900, Jungseok Lee wrote:
+>> On May 25, 2015, at 11:58 PM, Minchan Kim wrote:
+>>> On Mon, May 25, 2015 at 07:01:33PM +0900, Jungseok Lee wrote:
+>>>> On May 25, 2015, at 2:49 AM, Arnd Bergmann wrote:
+>>>>> On Monday 25 May 2015 01:02:20 Jungseok Lee wrote:
+>>>>>> Fork-routine sometimes fails to get a physically contiguous region for
+>>>>>> thread_info on 4KB page system although free memory is enough. That is,
+>>>>>> a physically contiguous region, which is currently 16KB, is not available
+>>>>>> since system memory is fragmented.
+>>>>>> 
+>>>>>> This patch tries to solve the problem as allocating thread_info memory
+>>>>>> from vmalloc space, not 1:1 mapping one. The downside is one additional
+>>>>>> page allocation in case of vmalloc. However, vmalloc space is large enough,
+>>>>>> around 240GB, under a combination of 39-bit VA and 4KB page. Thus, it is
+>>>>>> not a big tradeoff for fork-routine service.
+>>>>> 
+>>>>> vmalloc has a rather large runtime cost. I'd argue that failing to allocate
+>>>>> thread_info structures means something has gone very wrong.
+>>>> 
+>>>> That is why the feature is marked "N" by default.
+>>>> I focused on fork-routine stability rather than performance.
+>>> 
+>>> If VM has trouble with order-2 allocation, your system would be
+>>> trouble soon although fork at the moment manages to be successful
+>>> because such small high-order(ex, order <= PAGE_ALLOC_COSTLY_ORDER)
+>>> allocation is common in the kernel so VM should handle it smoothly.
+>>> If VM didn't, it means we should fix VM itself, not a specific
+>>> allocation site. Fork is one of victim by that.
+>> 
+>> A problem I observed is an user space, not a kernel side. As user applications
+>> fail to create threads in order to distribute their jobs properly, they are getting
+>> in trouble slowly and then gone.
+>> 
+>> Yes, fork is one of victim, but damages user applications seriously.
+>> At this snapshot, free memory is enough.
 > 
-> Acked-by: Chris Metcalf <cmetcalf@ezchip.com> [for tile]
+> Yes, it's the one you found.
+> 
+>        *Free memory is enough but why forking was failed*
+> 
+> You should find the exact reason for it rather than papering over by
+> hiding forking fail.
+> 
+> 1. Investigate how many of movable/unmovable page ratio at the moment
+> 2. Investigate why compaction doesn't work
+> 3. Investigate why reclaim couldn't make order-2 page
+> 
+> 
+>> 
+>>>> Could you give me an idea how to evaluate performance degradation?
+>>>> Running some benchmarks would be helpful, but I would like to try to
+>>>> gather data based on meaningful methodology.
+>>>> 
+>>>>> Can you describe the scenario that leads to fragmentation this bad?
+>>>> 
+>>>> Android, but I could not describe an exact reproduction procedure step
+>>>> by step since it's behaved and reproduced randomly. As reading the following
+>>>> thread from mm mailing list, a similar symptom is observed on other systems. 
+>>>> 
+>>>> https://lkml.org/lkml/2015/4/28/59
+>>>> 
+>>>> Although I do not know the details of a system mentioned in the thread,
+>>>> even order-2 page allocation is not smoothly operated due to fragmentation on
+>>>> low memory system.
+>>> 
+>>> What Joonsoo have tackle is generic fragmentation problem, not *a* fork fail,
+>>> which is more right approach to handle small high-order allocation problem.
+>> 
+>> I totally agree with that point. One of the best ways is to figure out a generic
+>> anti-fragmentation with VM system improvement. Reducing the stack size to 8KB is also
+>> a really great approach. My intention is not to overlook them or figure out a workaround.
+>> 
+>> IMHO, vmalloc would be a different option in case of ARM64 on low memory systems since
+>> *fork failure from fragmentation* is a nontrivial issue.
+>> 
+>> Do you think the patch set doesn't need to be considered?
+> 
+> I don't know because the changelog doesn't have full description
+> about your problem. You just wrote "forking was failed so we want
+> to avoid that by vmalloc because forking is important".
 
-Thanks.
+A technical feedback is always welcome.
+I really thank everyone who leaves comments in this thread.
 
-Just to clarify after today's discussion on IRC: this patch doesn't
-change current DRAM scrubbing behavior on the relevant arches - it
-simply makes the definition of that atomic_scrub thing non-mandatory on
-new arches or on those which don't need it.
+However, it is pretty disappointing that my commit log is distorted like that.
 
-In the meantime, patch has been build-tested on arm and ppc - the two
-I'm missing an ACK for.
+[Fork-routine sometimes fails to get a physically contiguous region for
+thread_info on 4KB page system although free memory is enough. That is,
+a physically contiguous region, which is currently 16KB, is not available
+since system memory is fragmented.
 
-:-)
+This patch tries to solve the problem as allocating thread_info memory
+from vmalloc space, not 1:1 mapping one. The downside is one additional
+page allocation in case of vmalloc. However, vmalloc space is large enough,
+around 240GB, under a combination of 39-bit VA and 4KB page. Thus, it is
+not a big tradeoff for fork-routine service.]
 
--- 
-Regards/Gruss,
-    Boris.
+Is "forking was failed so we want to avoid that by vmalloc because forking is
+important" your paraphrase of the above paragraphs?
 
-ECO tip #101: Trim your mails when you reply.
---
+Best Regards
+Jungseok Lee
