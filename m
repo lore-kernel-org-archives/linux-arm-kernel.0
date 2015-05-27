@@ -1,65 +1,88 @@
 From: chunfeng.yun@mediatek.com (chunfeng.yun at mediatek.com)
-Date: Wed, 27 May 2015 19:47:58 +0800
-Subject: [PATCH 1/6] dt-bindings: Add usb3.0 phy binding for MT65xx SoCs
+Date: Wed, 27 May 2015 19:48:00 +0800
+Subject: [PATCH 3/6] xhci: probe phy before add usb_hcd
 In-Reply-To: <1432727283-20303-1-git-send-email-chunfeng.yun@mediatek.com>
 References: <1432727283-20303-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1432727283-20303-2-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1432727283-20303-4-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Chunfeng Yun <chunfeng.yun@mediatek.com>
 
-add a DT binding documentation of usb3.0 phy for MT65xx
-SoCs from Mediatek.
+find the phy driver before add primary usb_hcd to avoid acessing
+xHCI register which may hangup the system when the phy is not loaded
+yet and the related powers or clocks put in phy driver are not
+enabled.
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- .../devicetree/bindings/usb/mt65xx-u3phy.txt       | 37 ++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/usb/mt65xx-u3phy.txt
+ drivers/usb/host/xhci-plat.c | 34 +++++++++++++++++-----------------
+ 1 file changed, 17 insertions(+), 17 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/mt65xx-u3phy.txt b/Documentation/devicetree/bindings/usb/mt65xx-u3phy.txt
-new file mode 100644
-index 0000000..b0b91b0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/usb/mt65xx-u3phy.txt
-@@ -0,0 +1,37 @@
-+MT65xx U3PHY
+diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+index 783e819..c10f5fa 100644
+--- a/drivers/usb/host/xhci-plat.c
++++ b/drivers/usb/host/xhci-plat.c
+@@ -127,9 +127,21 @@ static int xhci_plat_probe(struct platform_device *pdev)
+ 			goto disable_clk;
+ 	}
+ 
++	hcd->usb_phy = devm_usb_get_phy_by_phandle(&pdev->dev, "usb-phy", 0);
++	if (IS_ERR(hcd->usb_phy)) {
++		ret = PTR_ERR(hcd->usb_phy);
++		if (ret == -EPROBE_DEFER)
++			goto disable_clk;
++		hcd->usb_phy = NULL;
++	} else {
++		ret = usb_phy_init(hcd->usb_phy);
++		if (ret)
++			goto disable_clk;
++	}
 +
-+The device node for Mediatek SOC usb3.0 phy
+ 	ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
+ 	if (ret)
+-		goto disable_clk;
++		goto disable_usb_phy;
+ 
+ 	device_wakeup_enable(hcd->self.controller);
+ 
+@@ -156,33 +168,21 @@ static int xhci_plat_probe(struct platform_device *pdev)
+ 	if (HCC_MAX_PSA(xhci->hcc_params) >= 4)
+ 		xhci->shared_hcd->can_do_streams = 1;
+ 
+-	hcd->usb_phy = devm_usb_get_phy_by_phandle(&pdev->dev, "usb-phy", 0);
+-	if (IS_ERR(hcd->usb_phy)) {
+-		ret = PTR_ERR(hcd->usb_phy);
+-		if (ret == -EPROBE_DEFER)
+-			goto put_usb3_hcd;
+-		hcd->usb_phy = NULL;
+-	} else {
+-		ret = usb_phy_init(hcd->usb_phy);
+-		if (ret)
+-			goto put_usb3_hcd;
+-	}
+-
+ 	ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
+ 	if (ret)
+-		goto disable_usb_phy;
++		goto put_usb3_hcd;
+ 
+ 	return 0;
+ 
+-disable_usb_phy:
+-	usb_phy_shutdown(hcd->usb_phy);
+-
+ put_usb3_hcd:
+ 	usb_put_hcd(xhci->shared_hcd);
+ 
+ dealloc_usb2_hcd:
+ 	usb_remove_hcd(hcd);
+ 
++disable_usb_phy:
++	usb_phy_shutdown(hcd->usb_phy);
 +
-+Required properties:
-+ - compatible : Should be "mediatek,mt8173-u3phy"
-+ - reg        : Offset and length of registers, the first is for mac domain,
-+	another for phy domain
-+ - power-domains: to enable usb's mtcmos
-+ - reg-vusb33-supply:  regulator of usb avdd3.3v
-+ - clocks     : must support all clocks that phy need
-+ - clock-names: should be "wakeup_deb_p0", "wakeup_deb_p1" for wakeup
-+	debounce control clocks, "sys_mac" for sys and mac clocks and
-+	"u3phya_ref" for u3phya reference clock.
-+
-+Optional properties:
-+ - disable-usb2-p1 : disable port1 of usb2.0 which has two ports.
-+ - reg-p1-vbus-supply : regulator of port1's vbus;
-+
-+Example:
-+
-+u3phy: usb-phy at 11271000 {
-+	compatible = "mediatek,mt8173-u3phy";
-+	reg = <0 0x11271000 0 0x3000>,
-+	      <0 0x11280000 0 0x20000>;
-+	power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
-+	reg-vusb33-supply = <&mt6397_usb_reg>;
-+	clocks = <&perisys PERI_USB0>,
-+		 <&perisys PERI_USB1>,
-+		 <&topckgen CLK_TOP_USB30_SEL>,
-+		 <&apmixedsys CLK_APMIXED_REF2USB_TX>;
-+	clock-names = "wakeup_deb_p0",
-+		      "wakeup_deb_p1",
-+		      "sys_mac",
-+		      "u3phya_ref";
-+	disable-usb2-p1;
-+};
+ disable_clk:
+ 	if (!IS_ERR(clk))
+ 		clk_disable_unprepare(clk);
 -- 
 1.8.1.1.dirty
