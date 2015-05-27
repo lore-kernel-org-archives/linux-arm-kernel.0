@@ -1,64 +1,78 @@
 From: chunfeng.yun@mediatek.com (chunfeng.yun at mediatek.com)
-Date: Wed, 27 May 2015 19:48:01 +0800
-Subject: [PATCH 4/6] usb: phy: add usb3.0 phy driver for mt65xx SoCs
+Date: Wed, 27 May 2015 19:48:02 +0800
+Subject: [PATCH 5/6] xhci: mediatek: support MTK xHCI host controller
 In-Reply-To: <1432727283-20303-1-git-send-email-chunfeng.yun@mediatek.com>
 References: <1432727283-20303-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1432727283-20303-5-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1432727283-20303-6-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Chunfeng Yun <chunfeng.yun@mediatek.com>
 
+MTK xhci host controller defines some extra SW scheduling
+parameters for HW to minimize the scheduling effort for
+synchronous and interrupt endpoints. The parameters are
+put into reseved DWs of slot context and endpoint context.
+
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- drivers/usb/phy/Kconfig           |  10 +
- drivers/usb/phy/Makefile          |   1 +
- drivers/usb/phy/phy-mt65xx-usb3.c | 724 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 735 insertions(+)
- create mode 100644 drivers/usb/phy/phy-mt65xx-usb3.c
+ drivers/usb/host/Kconfig     |   9 +
+ drivers/usb/host/Makefile    |   3 +
+ drivers/usb/host/xhci-mtk.c  | 470 +++++++++++++++++++++++++++++++++++++++++++
+ drivers/usb/host/xhci-mtk.h  | 119 +++++++++++
+ drivers/usb/host/xhci-plat.c |  22 +-
+ drivers/usb/host/xhci-ring.c |  35 +++-
+ drivers/usb/host/xhci.c      |  16 +-
+ drivers/usb/host/xhci.h      |   1 +
+ 8 files changed, 667 insertions(+), 8 deletions(-)
+ create mode 100644 drivers/usb/host/xhci-mtk.c
+ create mode 100644 drivers/usb/host/xhci-mtk.h
 
-diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig
-index 2175678..dfca566 100644
---- a/drivers/usb/phy/Kconfig
-+++ b/drivers/usb/phy/Kconfig
-@@ -151,6 +151,16 @@ config USB_MSM_OTG
- 	  This driver is not supported on boards like trout which
- 	  has an external PHY.
+diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+index 197a6a3..d6af6b2 100644
+--- a/drivers/usb/host/Kconfig
++++ b/drivers/usb/host/Kconfig
+@@ -34,6 +34,15 @@ config USB_XHCI_PCI
+ config USB_XHCI_PLATFORM
+ 	tristate
  
-+config USB_MT65XX_USB3_PHY
-+	tristate "Mediatek USB3.0 PHY controller Driver"
++config USB_XHCI_MTK
++	tristate "xHCI support for Mediatek MT65xx"
++	select USB_XHCI_PLATFORM
 +	depends on ARCH_MEDIATEK || COMPILE_TEST
-+	select USB_PHY
-+	help
-+	  Say 'Y' here to add support for Mediatek USB3.0 PHY driver
-+	  for mt65xx SoCs. it supports two usb2.0 ports and
-+	  one usb3.0 port.
-+	  To compile this driver as a module, choose M here
++	---help---
++	  Say 'Y' to enable the support for the xHCI host controller
++	  found in Mediatek MT65xx SoCs.
++	  If unsure, say N.
 +
- config USB_MV_OTG
- 	tristate "Marvell USB OTG support"
- 	depends on USB_EHCI_MV && USB_MV_UDC && PM
-diff --git a/drivers/usb/phy/Makefile b/drivers/usb/phy/Makefile
-index 75f2bba..d6113a4 100644
---- a/drivers/usb/phy/Makefile
-+++ b/drivers/usb/phy/Makefile
-@@ -20,6 +20,7 @@ obj-$(CONFIG_USB_EHCI_TEGRA)		+= phy-tegra-usb.o
- obj-$(CONFIG_USB_GPIO_VBUS)		+= phy-gpio-vbus-usb.o
- obj-$(CONFIG_USB_ISP1301)		+= phy-isp1301.o
- obj-$(CONFIG_USB_MSM_OTG)		+= phy-msm-usb.o
-+obj-$(CONFIG_USB_MT65XX_USB3_PHY)	+= phy-mt65xx-usb3.o
- obj-$(CONFIG_USB_MV_OTG)		+= phy-mv-usb.o
- obj-$(CONFIG_USB_MXS_PHY)		+= phy-mxs-usb.o
- obj-$(CONFIG_USB_RCAR_PHY)		+= phy-rcar-usb.o
-diff --git a/drivers/usb/phy/phy-mt65xx-usb3.c b/drivers/usb/phy/phy-mt65xx-usb3.c
+ config USB_XHCI_MVEBU
+ 	tristate "xHCI support for Marvell Armada 375/38x"
+ 	select USB_XHCI_PLATFORM
+diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
+index 65b0b6a..e17eeaf 100644
+--- a/drivers/usb/host/Makefile
++++ b/drivers/usb/host/Makefile
+@@ -15,6 +15,9 @@ xhci-hcd-y += xhci-ring.o xhci-hub.o xhci-dbg.o
+ xhci-hcd-y += xhci-trace.o
+ 
+ xhci-plat-hcd-y := xhci-plat.o
++ifneq ($(CONFIG_USB_XHCI_MTK), )
++	xhci-plat-hcd-y		+= xhci-mtk.o
++endif
+ ifneq ($(CONFIG_USB_XHCI_MVEBU), )
+ 	xhci-plat-hcd-y		+= xhci-mvebu.o
+ endif
+diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
 new file mode 100644
-index 0000000..ec5cf24
+index 0000000..4ef8551
 --- /dev/null
-+++ b/drivers/usb/phy/phy-mt65xx-usb3.c
-@@ -0,0 +1,724 @@
++++ b/drivers/usb/host/xhci-mtk.c
+@@ -0,0 +1,470 @@
 +/*
 + * Copyright (c) 2015 MediaTek Inc.
-+ * Author: Chunfeng.Yun <chunfeng.yun@mediatek.com>
++ * Author:
++ *  Zhigang.Wei <zhigang.wei@mediatek.com>
++ *  Chunfeng.Yun <chunfeng.yun@mediatek.com>
 + *
 + * This software is licensed under the terms of the GNU General Public
 + * License version 2, as published by the Free Software Foundation, and
@@ -71,714 +85,783 @@ index 0000000..ec5cf24
 + *
 + */
 +
-+#include <linux/resource.h>
-+#include <linux/delay.h>
++#include <linux/kernel.h>
 +#include <linux/slab.h>
-+#include <linux/err.h>
-+#include <linux/export.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/regulator/consumer.h>
-+#include <linux/pm_runtime.h>
-+#include <linux/io.h>
-+#include <linux/gpio.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/of_gpio.h>
-+#include <linux/of_address.h>
-+#include <linux/usb/otg.h>
-+#include <linux/usb/of.h>
-+#include <linux/usb/phy.h>
-+#include <linux/clk.h>
-+#include <linux/iopoll.h>
-+
-+/*
-+ * relative to MAC base address
-+ */
-+#define SSUSB_USB3_MAC_CSR_BASE	(0x1400)
-+#define SSUSB_USB3_SYS_CSR_BASE	(0x1400)
-+#define SSUSB_USB2_CSR_BASE		(0x2400)
-+
-+/*
-+ * for sifslv1 register
-+ * relative to USB3_SIF_BASE base address
-+ */
-+#define SSUSB_SIFSLV_IPPC_BASE		(0x700)
-+
-+/*
-+ * for sifslv2 register
-+ * relative to USB3_SIF_BASE base address
-+ */
-+#define SSUSB_SIFSLV_U2PHY_COM_BASE	(0x10800)
-+#define SSUSB_SIFSLV_U3PHYD_BASE	(0x10900)
-+#define SSUSB_SIFSLV_U2FREQ_BASE	(0x10f00)
-+#define SSUSB_USB30_PHYA_SIV_B_BASE		(0x10b00)
-+#define SSUSB_SIFSLV_U3PHYA_DA_BASE		(0x10c00)
-+#define SSUSB_SIFSLV_SPLLC		(0x10000)
-+
-+/*port1 refs. +0x800(refer to port0)*/
-+#define U3P_PORT_OFFSET (0x800)	/*based on port0 */
-+#define U3P_PHY_BASE(index) ((U3P_PORT_OFFSET) * (index))
-+
-+#define U3P_IP_PW_CTRL0	(SSUSB_SIFSLV_IPPC_BASE+0x0000)
-+#define CTRL0_IP_SW_RST			(0x1<<0)
-+
-+#define U3P_IP_PW_CTRL1	(SSUSB_SIFSLV_IPPC_BASE+0x0004)
-+#define CTRL1_IP_HOST_PDN		(0x1<<0)
-+
-+#define U3P_IP_PW_STS1		(SSUSB_SIFSLV_IPPC_BASE+0x0010)
-+#define STS1_U3_MAC_RST		(0x1 << 16)
-+#define STS1_SYS125_RST		(0x1 << 10)
-+#define STS1_REF_RST		(0x1 << 8)
-+#define STS1_SYSPLL_STABLE	(0x1 << 0)
-+
-+#define U3P_IP_PW_STS2	(SSUSB_SIFSLV_IPPC_BASE+0x0014)
-+#define STS2_U2_MAC_RST	(0x1 << 0)
-+
-+#define U3P_IP_XHCI_CAP	(SSUSB_SIFSLV_IPPC_BASE + 0x24)
-+#define CAP_U3_PORT_NUM(p)	((p) & 0xff)
-+#define CAP_U2_PORT_NUM(p)	(((p) >> 8) & 0xff)
-+
-+#define U3P_U3_CTRL_0P	(SSUSB_SIFSLV_IPPC_BASE+0x0030)
-+#define CTRL_U3_PORT_HOST_SEL	(0x1<<2)
-+#define CTRL_U3_PORT_PDN		(0x1<<1)
-+#define CTRL_U3_PORT_DIS		(0x1<<0)
-+
-+#define U3P_U2_CTRL_0P	(SSUSB_SIFSLV_IPPC_BASE+0x0050)
-+#define CTRL_U2_PORT_HOST_SEL	(0x1<<2)
-+#define CTRL_U2_PORT_PDN		(0x1<<1)
-+#define CTRL_U2_PORT_DIS		(0x1<<0)
-+
-+#define U3P_U3_CTRL(p)	(U3P_U3_CTRL_0P + ((p) * 0x08))
-+#define U3P_U2_CTRL(p)	(U3P_U2_CTRL_0P + ((p) * 0x08))
-+
-+#define U3P_USBPHYACR5      (SSUSB_SIFSLV_U2PHY_COM_BASE+0x0014)
-+#define PA5_RG_U2_HSTX_SRCTRL			(0x7<<12)
-+#define PA5_RG_U2_HSTX_SRCTRL_VAL(x)	((0x7 & (x)) << 12)
-+#define PA5_RG_U2_HS_100U_U3_EN			(0x1<<11)
-+
-+#define U3P_USBPHYACR6      (SSUSB_SIFSLV_U2PHY_COM_BASE+0x0018)
-+#define PA6_RG_U2_ISO_EN			(0x1<<31)
-+#define PA6_RG_U2_BC11_SW_EN		(0x1<<23)
-+#define PA6_RG_U2_OTG_VBUSCMP_EN	(0x1<<20)
-+
-+#define U3P_U2PHYACR4       (SSUSB_SIFSLV_U2PHY_COM_BASE+0x0020)
-+#define P2C_RG_USB20_GPIO_CTL	(0x1<<9)
-+#define P2C_USB20_GPIO_MODE		(0x1<<8)
-+#define P2C_U2_GPIO_CTR_MSK  (P2C_RG_USB20_GPIO_CTL | P2C_USB20_GPIO_MODE)
-+
-+#define U3P_U2PHYDTM0       (SSUSB_SIFSLV_U2PHY_COM_BASE+0x0068)
-+#define P2C_FORCE_UART_EN		(0x1<<26)
-+#define P2C_FORCE_DATAIN		(0x1<<23)
-+#define P2C_FORCE_DM_PULLDOWN	(0x1<<21)
-+#define P2C_FORCE_DP_PULLDOWN	(0x1<<20)
-+#define P2C_FORCE_XCVRSEL		(0x1<<19)
-+#define P2C_FORCE_SUSPENDM		(0x1<<18)
-+#define P2C_FORCE_TERMSEL		(0x1<<17)
-+#define P2C_RG_DATAIN			(0xf<<10)
-+#define P2C_RG_DATAIN_VAL(x)	((0xf & (x)) << 10)
-+#define P2C_RG_DMPULLDOWN		(0x1<<7)
-+#define P2C_RG_DPPULLDOWN		(0x1<<6)
-+#define P2C_RG_XCVRSEL			(0x3<<4)
-+#define P2C_RG_XCVRSEL_VAL(x)	((0x3 & (x)) << 4)
-+#define P2C_RG_SUSPENDM			(0x1<<3)
-+#define P2C_RG_TERMSEL			(0x1<<2)
-+#define P2C_DTM0_PART_MASK \
-+		(P2C_FORCE_DATAIN | P2C_FORCE_DM_PULLDOWN | \
-+		P2C_FORCE_DP_PULLDOWN | P2C_FORCE_XCVRSEL | \
-+		P2C_FORCE_TERMSEL | P2C_RG_DMPULLDOWN | \
-+		P2C_RG_TERMSEL)
-+
-+#define U3P_U2PHYDTM1       (SSUSB_SIFSLV_U2PHY_COM_BASE+0x006C)
-+#define P2C_RG_UART_EN		(0x1<<16)
-+#define P2C_RG_VBUSVALID	(0x1<<5)
-+#define P2C_RG_SESSEND		(0x1<<4)
-+#define P2C_RG_AVALID		(0x1<<2)
-+
-+#define U3P_U3_PHYA_REG0	(SSUSB_USB30_PHYA_SIV_B_BASE+0x0000)
-+#define P3A_RG_U3_VUSB10_ON			(1<<5)
-+
-+#define U3P_U3_PHYA_REG6	(SSUSB_USB30_PHYA_SIV_B_BASE+0x0018)
-+#define P3A_RG_TX_EIDLE_CM			(0xf<<28)
-+#define P3A_RG_TX_EIDLE_CM_VAL(x)	((0xf & (x)) << 28)
-+
-+#define U3P_U3_PHYA_REG9	(SSUSB_USB30_PHYA_SIV_B_BASE+0x0024)
-+#define P3A_RG_RX_DAC_MUX			(0x1f<<1)
-+#define P3A_RG_RX_DAC_MUX_VAL(x)	((0x1f & (x)) << 1)
-+
-+#define U3P_U3PHYA_DA_REG0	(SSUSB_SIFSLV_U3PHYA_DA_BASE + 0x0)
-+#define P3A_RG_XTAL_EXT_EN_U3			(0x3<<10)
-+#define P3A_RG_XTAL_EXT_EN_U3_VAL(x)	((0x3 & (x)) << 10)
-+
-+#define U3P_PHYD_CDR1		(SSUSB_SIFSLV_U3PHYD_BASE+0x5c)
-+#define P3D_RG_CDR_BIR_LTD1				(0x1f<<24)
-+#define P3D_RG_CDR_BIR_LTD1_VAL(x)		((0x1f & (x)) << 24)
-+#define P3D_RG_CDR_BIR_LTD0				(0x1f<<8)
-+#define P3D_RG_CDR_BIR_LTD0_VAL(x)		((0x1f & (x)) << 8)
-+
-+#define U3P_XTALCTL3		(SSUSB_SIFSLV_SPLLC + 0x18)
-+#define XC3_RG_U3_XTAL_RX_PWD			(0x1<<9)
-+#define XC3_RG_U3_FRC_XTAL_RX_PWD		(0x1<<8)
-+
-+#define U3P_UX_EXIT_LFPS_PARAM	(SSUSB_USB3_MAC_CSR_BASE+0x00A0)
-+#define RX_UX_EXIT_REF		(0xff<<8)
-+#define RX_UX_EXIT_REF_VAL	(0x3 << 8)
-+
-+#define U3P_REF_CLK_PARAM	(SSUSB_USB3_MAC_CSR_BASE+0x00B0)
-+#define REF_CLK_1000NS		(0xff << 0)
-+#define REF_CLK_VAL_DEF		(0xa << 0)
-+
-+#define U3P_LINK_PM_TIMER			(SSUSB_USB3_SYS_CSR_BASE+0x0208)
-+#define PM_LC_TIMEOUT			(0xf<<0)
-+#define PM_LC_TIMEOUT_VAL		(0x3 << 0)
-+
-+#define U3P_TIMING_PULSE_CTRL	(SSUSB_USB3_SYS_CSR_BASE+0x02B4)
-+#define U3T_CNT_1US			(0xff << 0)
-+#define U3T_CNT_1US_VAL		(0x3f << 0)	/* 62.5MHz: 63 */
-+
-+#define U3P_U2_TIMING_PARAM		(SSUSB_USB2_CSR_BASE+0x0040)
-+#define U2T_VAL_1US			(0xff<<0)
-+#define U2T_VAL_1US_VAL		(0x3f << 0)	/* 62.5MHz: 63 */
++#include "xhci-mtk.h"
 +
 +
-+struct mt65xx_u3phy {
-+	struct usb_phy phy;
-+	struct device *dev;
-+	struct regulator *vusb33;
-+	struct regulator *p1_vbus;
-+	void __iomem *mac_base;	/* only device-mac regs, exclude xhci's */
-+	void __iomem *sif_base;	/* include sif & sif2 */
-+	struct clk *wk_deb_p0;	/* port0's wakeup debounce clock */
-+	struct clk *wk_deb_p1;
-+	struct clk *sys_mac;	/* sys and mac clock */
-+	struct clk *u3phya_ref;	/* reference clock of usb3 anolog phy */
-+	bool enable_usb2_p1;
-+};
++#define SS_BW_BOUNDARY	51000
++/* table 5-5. High-speed Isoc Transaction Limits in usb_20 spec */
++#define HS_BW_BOUNDARY	6144
++/* usb2 spec section11.18.1: at most 188 FS bytes per microframe */
++#define FS_PAYLOAD_MAX 188
 +
++/* mtk scheduler bitmasks */
++#define EP_BPKTS(p)	((p) & 0x3f)
++#define EP_BCSCOUNT(p)	(((p) & 0x7) << 8)
++#define EP_BBM(p)	((p) << 11)
++#define EP_BOFFSET(p)	((p) & 0x3fff)
++#define EP_BREPEAT(p)	(((p) & 0x7fff) << 16)
 +
-+static void u3p_writel(void __iomem *base, u32 offset, u32 data)
++static int is_fs_or_ls(enum usb_device_speed speed)
 +{
-+	writel(data, base + offset);
++	return speed == USB_SPEED_FULL || speed == USB_SPEED_LOW;
 +}
 +
-+static u32 u3p_readl(void __iomem *base, u32 offset)
++static int get_bw_index(struct xhci_hcd *xhci, struct usb_device *udev,
++	struct usb_host_endpoint *ep)
 +{
-+	return readl(base + offset);
-+}
++	int bw_index;
++	int port_id;
++	struct xhci_virt_device *virt_dev;
 +
-+static void u3p_setmsk(void __iomem *base, u32 offset, u32 msk)
-+{
-+	void __iomem *addr = base + offset;
++	virt_dev = xhci->devs[udev->slot_id];
++	port_id = virt_dev->real_port;
 +
-+	writel((readl(addr) | msk), addr);
-+}
-+
-+static void u3p_clrmsk(void __iomem *base, u32 offset, u32 msk)
-+{
-+	void __iomem *addr = base + offset;
-+
-+	writel((readl(addr) & ~msk), addr);
-+}
-+
-+static void u3p_setval(void __iomem *base, u32 offset,
-+	u32 mask, u32 value)
-+{
-+	void __iomem *addr = base + offset;
-+	unsigned int new_value;
-+
-+	new_value = (readl(addr) & ~mask) | value;
-+	writel(new_value, addr);
-+}
-+
-+static void phy_index_power_on(struct mt65xx_u3phy *u3phy, int index)
-+{
-+	void __iomem *sif_base = u3phy->sif_base + U3P_PHY_BASE(index);
-+
-+	if (!index) {
-+		/* Set RG_SSUSB_VUSB10_ON as 1 after VUSB10 ready */
-+		u3p_setmsk(sif_base, U3P_U3_PHYA_REG0, P3A_RG_U3_VUSB10_ON);
-+		/* power domain iso disable */
-+		u3p_clrmsk(sif_base, U3P_USBPHYACR6, PA6_RG_U2_ISO_EN);
++	if (udev->speed == USB_SPEED_SUPER) {
++		if (usb_endpoint_dir_out(&ep->desc))
++			bw_index = (port_id - 1) * 2;
++		else
++			bw_index = (port_id - 1) * 2 + 1;
++	} else {
++		bw_index = port_id + xhci->num_usb3_ports - 1;
 +	}
 +
-+	/* switch to USB function. (system register, force ip into usb mode) */
-+	u3p_clrmsk(sif_base, U3P_U2PHYDTM0, P2C_FORCE_UART_EN);
-+	u3p_clrmsk(sif_base, U3P_U2PHYDTM1, P2C_RG_UART_EN);
-+	if (!index)
-+		u3p_clrmsk(sif_base, U3P_U2PHYACR4, P2C_U2_GPIO_CTR_MSK);
-+
-+	/* (force_suspendm=0) (let suspendm=1, enable usb 480MHz pll) */
-+	u3p_clrmsk(sif_base, U3P_U2PHYDTM0, P2C_FORCE_SUSPENDM);
-+	u3p_clrmsk(sif_base, U3P_U2PHYDTM0,
-+			P2C_RG_XCVRSEL | P2C_RG_DATAIN | P2C_DTM0_PART_MASK);
-+
-+	/* DP/DM BC1.1 path Disable */
-+	u3p_clrmsk(sif_base, U3P_USBPHYACR6, PA6_RG_U2_BC11_SW_EN);
-+	/* OTG Enable */
-+	u3p_setmsk(sif_base, U3P_USBPHYACR6, PA6_RG_U2_OTG_VBUSCMP_EN);
-+	u3p_setval(sif_base, U3P_U3PHYA_DA_REG0, P3A_RG_XTAL_EXT_EN_U3,
-+			P3A_RG_XTAL_EXT_EN_U3_VAL(2));
-+	u3p_setval(sif_base, U3P_U3_PHYA_REG9, P3A_RG_RX_DAC_MUX,
-+			P3A_RG_RX_DAC_MUX_VAL(4));
-+
-+	if (!index) {
-+		u3p_setmsk(sif_base, U3P_XTALCTL3, XC3_RG_U3_XTAL_RX_PWD);
-+		u3p_setmsk(sif_base, U3P_XTALCTL3, XC3_RG_U3_FRC_XTAL_RX_PWD);
-+		/* [mt8173]disable Change 100uA current from SSUSB */
-+		u3p_clrmsk(sif_base, U3P_USBPHYACR5, PA5_RG_U2_HS_100U_U3_EN);
-+	}
-+	u3p_setval(sif_base, U3P_U3_PHYA_REG6, P3A_RG_TX_EIDLE_CM,
-+			P3A_RG_TX_EIDLE_CM_VAL(0xe));
-+	u3p_setval(sif_base, U3P_PHYD_CDR1, P3D_RG_CDR_BIR_LTD0,
-+			P3D_RG_CDR_BIR_LTD0_VAL(0xc));
-+	u3p_setval(sif_base, U3P_PHYD_CDR1, P3D_RG_CDR_BIR_LTD1,
-+			P3D_RG_CDR_BIR_LTD1_VAL(0x3));
-+
-+	udelay(800);
-+	u3p_setmsk(sif_base, U3P_U2PHYDTM1, P2C_RG_VBUSVALID | P2C_RG_AVALID);
-+	u3p_clrmsk(sif_base, U3P_U2PHYDTM1, P2C_RG_SESSEND);
-+
-+	/* USB 2.0 slew rate calibration */
-+	u3p_setval(sif_base, U3P_USBPHYACR5, PA5_RG_U2_HSTX_SRCTRL,
-+			PA5_RG_U2_HSTX_SRCTRL_VAL(4));
-+
-+	dev_dbg(u3phy->dev, "%s(%d)\n", __func__, index);
++	return bw_index;
 +}
 +
 +
-+static void phy_index_power_off(struct mt65xx_u3phy *u3phy, int index)
++static void setup_sch_info(struct usb_device *udev,
++		struct xhci_ep_ctx *ep_ctx, struct mu3h_sch_ep_info *sch_ep)
 +{
-+	void __iomem *sif_base = u3phy->sif_base + U3P_PHY_BASE(index);
++	u32 ep_type;
++	u32 ep_interval;
++	u32 max_packet_size;
++	u32 max_burst;
++	u32 mult;
++	u32 esit_pkts;
 +
-+	/* switch to USB function. (system register, force ip into usb mode) */
-+	u3p_clrmsk(sif_base, U3P_U2PHYDTM0, P2C_FORCE_UART_EN);
-+	u3p_clrmsk(sif_base, U3P_U2PHYDTM1, P2C_RG_UART_EN);
-+	if (!index)
-+		u3p_clrmsk(sif_base, U3P_U2PHYACR4, P2C_U2_GPIO_CTR_MSK);
++	ep_type = CTX_TO_EP_TYPE(le32_to_cpu(ep_ctx->ep_info2));
++	ep_interval = CTX_TO_EP_INTERVAL(le32_to_cpu(ep_ctx->ep_info));
++	max_packet_size = MAX_PACKET_DECODED(le32_to_cpu(ep_ctx->ep_info2));
++	max_burst = CTX_TO_MAX_BURST(le32_to_cpu(ep_ctx->ep_info2));
++	mult = CTX_TO_EP_MULT(le32_to_cpu(ep_ctx->ep_info));
++	pr_debug("%s: max_burst = %d, mult = %d\n", __func__, max_burst, mult);
 +
-+	u3p_setmsk(sif_base, U3P_U2PHYDTM0, P2C_FORCE_SUSPENDM);
-+	u3p_setval(sif_base, U3P_U2PHYDTM0,
-+			P2C_RG_XCVRSEL, P2C_RG_XCVRSEL_VAL(1));
-+	u3p_setval(sif_base, U3P_U2PHYDTM0,
-+			P2C_RG_DATAIN, P2C_RG_DATAIN_VAL(0));
-+	u3p_setmsk(sif_base, U3P_U2PHYDTM0, P2C_DTM0_PART_MASK);
-+	/* DP/DM BC1.1 path Disable */
-+	u3p_clrmsk(sif_base, U3P_USBPHYACR6, PA6_RG_U2_BC11_SW_EN);
-+	/* OTG Disable */
-+	u3p_clrmsk(sif_base, U3P_USBPHYACR6, PA6_RG_U2_OTG_VBUSCMP_EN);
-+	if (!index) {
-+		/* Change 100uA current switch to USB2.0 */
-+		u3p_clrmsk(sif_base, U3P_USBPHYACR5, PA5_RG_U2_HS_100U_U3_EN);
-+	}
-+	udelay(800);
++	sch_ep->ep_type = ep_type;
++	sch_ep->max_packet_size = max_packet_size;
++	sch_ep->esit = 1 << ep_interval;
++	sch_ep->offset = 0;
++	sch_ep->burst_mode = 0;
 +
-+	/* let suspendm=0, set utmi into analog power down */
-+	u3p_clrmsk(sif_base, U3P_U2PHYDTM0, P2C_RG_SUSPENDM);
-+	udelay(1);
++	if (udev->speed == USB_SPEED_HIGH) {
++		sch_ep->cs_count = 0;
++		/*
++		 * usb_20 spec section5.9
++		 * a single microframe is enough for HS synchromous endpoints
++		 * in a interval
++		 */
++		sch_ep->num_budget_microframes = 1;
++		sch_ep->repeat = 0;
++		/*
++		 * xHCI spec section6.2.3.4
++		 * @max_busrt is the number of additional transactions opportunities
++		 * per microframe
++		 */
++		sch_ep->pkts = max_burst + 1;
++		sch_ep->bw_cost_per_microframe = max_packet_size * sch_ep->pkts;
++	} else if (udev->speed == USB_SPEED_SUPER) {
++		/* usb3_r1 spec section4.4.7 & 4.4.8 */
++		sch_ep->cs_count = 0;
++		esit_pkts = (mult + 1) * (max_burst + 1);
++		if (ep_type == INT_IN_EP || ep_type == INT_OUT_EP) {
++			sch_ep->pkts = esit_pkts;
++			sch_ep->num_budget_microframes = 1;
++			sch_ep->repeat = 0;
++		}
 +
-+	u3p_clrmsk(sif_base, U3P_U2PHYDTM1, P2C_RG_VBUSVALID | P2C_RG_AVALID);
-+	u3p_setmsk(sif_base, U3P_U2PHYDTM1, P2C_RG_SESSEND);
-+	if (!index) {
-+		/* Set RG_SSUSB_VUSB10_ON as 1 after VUSB10 ready */
-+		u3p_clrmsk(sif_base, U3P_U3_PHYA_REG0, P3A_RG_U3_VUSB10_ON);
-+	}
-+	dev_dbg(u3phy->dev, "%s(%d)\n", __func__, index);
-+}
++		if (ep_type == ISOC_IN_EP || ep_type == ISOC_OUT_EP) {
++			if (esit_pkts <= sch_ep->esit)
++				sch_ep->pkts = 1;
++			else
++				sch_ep->pkts = roundup_pow_of_two(esit_pkts)
++					/ sch_ep->esit;
 +
++			sch_ep->num_budget_microframes =
++				DIV_ROUND_UP(esit_pkts, sch_ep->pkts);
 +
-+static int check_ip_clk_status(struct mt65xx_u3phy *u3phy)
-+{
-+	int ret;
-+	int u3_port_num;
-+	int u2_port_num;
-+	u32 xhci_cap;
-+	u32 val;
-+	void __iomem *sif_base = u3phy->sif_base;
-+
-+	xhci_cap = u3p_readl(sif_base, U3P_IP_XHCI_CAP);
-+	u3_port_num = CAP_U3_PORT_NUM(xhci_cap);
-+	u2_port_num = CAP_U2_PORT_NUM(xhci_cap);
-+
-+	ret = readl_poll_timeout(sif_base + U3P_IP_PW_STS1, val,
-+			  (val & STS1_SYSPLL_STABLE), 100, 10000);
-+	if (ret) {
-+		dev_err(u3phy->dev, "sypll is not stable!!!\n");
-+		return ret;
-+	}
-+
-+	ret = readl_poll_timeout(sif_base + U3P_IP_PW_STS1, val,
-+			  (val & STS1_REF_RST), 100, 10000);
-+	if (ret) {
-+		dev_err(u3phy->dev, "ref_clk is still active!!!\n");
-+		return ret;
-+	}
-+
-+	ret = readl_poll_timeout(sif_base + U3P_IP_PW_STS1, val,
-+			   (val & STS1_SYS125_RST), 100, 10000);
-+	if (ret) {
-+		dev_err(u3phy->dev, "sys125_ck is still active!!!\n");
-+		return ret;
-+	}
-+
-+	if (u3_port_num) {
-+		ret = readl_poll_timeout(sif_base + U3P_IP_PW_STS1, val,
-+				   (val & STS1_U3_MAC_RST), 100, 10000);
-+		if (ret) {
-+			dev_err(u3phy->dev, "mac3_mac_ck is still active!!!\n");
-+			return ret;
++			if (sch_ep->num_budget_microframes > 1)
++				sch_ep->repeat = 1;
++			else
++				sch_ep->repeat = 0;
++		}
++		sch_ep->bw_cost_per_microframe = max_packet_size * sch_ep->pkts;
++	} else if (is_fs_or_ls(udev->speed)) {
++		/*
++		 * usb_20 spec section11.18.4
++		 * assume worst cases
++		 */
++		sch_ep->repeat = 0;
++		sch_ep->pkts = 1; /* at most one packet for each microframe */
++		if (ep_type == INT_IN_EP || ep_type == INT_OUT_EP) {
++			sch_ep->cs_count = 3; /* at most need 3 CS*/
++			/* one for SS and one for budgeted transaction */
++			sch_ep->num_budget_microframes = sch_ep->cs_count + 2;
++			sch_ep->bw_cost_per_microframe = max_packet_size;
++		}
++		if (ep_type == ISOC_OUT_EP) {
++			/* must never schedule a cs ISOC OUT ep */
++			sch_ep->cs_count = 0;
++			/*
++			 * the best case FS budget assumes that 188 FS bytes
++			 * occur in each microframe
++			 */
++			sch_ep->num_budget_microframes = DIV_ROUND_UP(
++				sch_ep->max_packet_size, FS_PAYLOAD_MAX);
++			sch_ep->bw_cost_per_microframe = FS_PAYLOAD_MAX;
++		}
++		if (ep_type == ISOC_IN_EP) {
++			/* at most need additional two CS. */
++			sch_ep->cs_count = DIV_ROUND_UP(
++				sch_ep->max_packet_size, FS_PAYLOAD_MAX) + 2;
++			sch_ep->num_budget_microframes = sch_ep->cs_count + 2;
++			sch_ep->bw_cost_per_microframe = FS_PAYLOAD_MAX;
 +		}
 +	}
++}
 +
-+	if (u2_port_num) {
-+		ret = readl_poll_timeout(sif_base + U3P_IP_PW_STS2, val,
-+				   (val & STS2_U2_MAC_RST), 100, 10000);
-+		if (ret) {
-+			dev_err(u3phy->dev, "mac2_sys_ck is still active!!!\n");
-+			return ret;
++/* Get maximum bandwidth when we schedule at offset slot. */
++static u32 get_max_bw(struct mu3h_sch_bw_info *sch_bw,
++	struct mu3h_sch_ep_info *sch_ep, u32 offset)
++{
++	u32 num_esit;
++	u32 max_bw = 0;
++	int i;
++	int j;
++
++	num_esit = XHCI_MTK_MAX_ESIT / sch_ep->esit;
++	for (i = 0; i < num_esit; i++) {
++		u32 base = offset + i * sch_ep->esit;
++
++		for (j = 0; j < sch_ep->num_budget_microframes; j++) {
++			if (sch_bw->bus_bw[base + j] > max_bw)
++				max_bw = sch_bw->bus_bw[base + j];
 +		}
 +	}
++	return max_bw;
++}
++
++static void update_bus_bw(struct mu3h_sch_bw_info *sch_bw,
++	struct mu3h_sch_ep_info *sch_ep, int bw_cost)
++{
++	u32 num_esit;
++	u32 base;
++	int i;
++	int j;
++
++	num_esit = XHCI_MTK_MAX_ESIT / sch_ep->esit;
++	for (i = 0; i < num_esit; i++) {
++		base = sch_ep->offset + i * sch_ep->esit;
++		for (j = 0; j < sch_ep->num_budget_microframes; j++)
++			sch_bw->bus_bw[base + j] += bw_cost;
++	}
++
++}
++
++static void debug_sch_ep(struct mu3h_sch_ep_info *sch_ep)
++{
++	pr_debug("sch_ep->ep_type = %d\n", sch_ep->ep_type);
++	pr_debug("sch_ep->max_packet_size = %d\n", sch_ep->max_packet_size);
++	pr_debug("sch_ep->esit = %d\n", sch_ep->esit);
++	pr_debug("sch_ep->num_budget_microframes = %d\n",
++			sch_ep->num_budget_microframes);
++	pr_debug("sch_ep->bw_cost_per_microframe = %d\n",
++			sch_ep->bw_cost_per_microframe);
++	pr_debug("sch_ep->ep = %p\n", sch_ep->ep);
++	pr_debug("sch_ep->offset = %d\n", sch_ep->offset);
++	pr_debug("sch_ep->repeat = %d\n", sch_ep->repeat);
++	pr_debug("sch_ep->pkts = %d\n", sch_ep->pkts);
++	pr_debug("sch_ep->cs_count = %d\n", sch_ep->cs_count);
++}
++
++static int check_sch_bw(struct usb_device *udev,
++	struct mu3h_sch_bw_info *sch_bw, struct mu3h_sch_ep_info *sch_ep)
++{
++	u32 offset;
++	u32 esit;
++	u32 num_budget_microframes;
++	u32 min_bw;
++	u32 min_index;
++	u32 worst_bw;
++	u32 bw_boundary;
++
++	if (sch_ep->esit > XHCI_MTK_MAX_ESIT)
++		sch_ep->esit = XHCI_MTK_MAX_ESIT;
++
++	esit = sch_ep->esit;
++	num_budget_microframes = sch_ep->num_budget_microframes;
++
++	/*
++	 * Search through all possible schedule microframes.
++	 * and find a microframe where its worst bandwidth is minimum.
++	 */
++	min_bw = ~0;
++	min_index = 0;
++	for (offset = 0; offset < esit; offset++) {
++		if ((offset + num_budget_microframes) > sch_ep->esit)
++			break;
++		/*
++		 * usb_20 spec section11.18:
++		 * must never schedule Start-Split in Y6
++		 */
++		if (is_fs_or_ls(udev->speed) && (offset % 8 == 6))
++			continue;
++
++		worst_bw = get_max_bw(sch_bw, sch_ep, offset);
++		if (min_bw > worst_bw) {
++			min_bw = worst_bw;
++			min_index = offset;
++		}
++		if (min_bw == 0)
++			break;
++	}
++	sch_ep->offset = min_index;
++
++	debug_sch_ep(sch_ep);
++
++	bw_boundary = (udev->speed == USB_SPEED_SUPER)
++				? SS_BW_BOUNDARY : HS_BW_BOUNDARY;
++
++	/* check bandwidth */
++	if (min_bw + sch_ep->bw_cost_per_microframe > bw_boundary)
++		return -1;
++
++	/* update bus bandwidth info */
++	update_bus_bw(sch_bw, sch_ep, sch_ep->bw_cost_per_microframe);
 +
 +	return 0;
 +}
 +
-+static int u3phy_ports_enable(struct mt65xx_u3phy *u3phy)
++static void debug_sch_bw(struct mu3h_sch_bw_info *sch_bw)
 +{
 +	int i;
-+	u32 temp;
-+	int u3_port_num;
-+	int u2_port_num;
-+	void __iomem *sif_base = u3phy->sif_base;
 +
-+	temp = u3p_readl(sif_base, U3P_IP_XHCI_CAP);
-+	u3_port_num = CAP_U3_PORT_NUM(temp);
-+	u2_port_num = CAP_U2_PORT_NUM(temp);
-+	dev_dbg(u3phy->dev, "%s u2p:%d, u3p:%d\n",
-+		__func__, u2_port_num, u3_port_num);
++	pr_debug("xhci_mtk_scheduler :bus_bw_info\n");
++	for (i = 0; i < XHCI_MTK_MAX_ESIT; i++)
++		pr_debug("%d  ", sch_bw->bus_bw[i]);
 +
-+	/* power on host ip */
-+	u3p_clrmsk(sif_base, U3P_IP_PW_CTRL1, CTRL1_IP_HOST_PDN);
-+
-+	/* power on and enable all u3 ports */
-+	for (i = 0; i < u3_port_num; i++) {
-+		temp = u3p_readl(sif_base, U3P_U3_CTRL(i));
-+		temp &= ~(CTRL_U3_PORT_PDN | CTRL_U3_PORT_DIS);
-+		temp |= CTRL_U3_PORT_HOST_SEL;
-+		u3p_writel(sif_base, U3P_U3_CTRL(i), temp);
-+	}
-+
-+	/* power on and enable all u2 ports */
-+	for (i = 0; i < u2_port_num; i++) {
-+		temp = u3p_readl(sif_base, U3P_U2_CTRL(i));
-+		temp &= ~(CTRL_U2_PORT_PDN | CTRL_U2_PORT_DIS);
-+		temp |= CTRL_U2_PORT_HOST_SEL;
-+		u3p_writel(sif_base, U3P_U2_CTRL(i), temp);
-+	}
-+	return check_ip_clk_status(u3phy);
++	pr_debug("\n");
 +}
 +
 +
-+static void u3phy_timing_init(struct mt65xx_u3phy *u3phy)
++static int need_bw_sch(struct usb_host_endpoint *ep,
++	enum usb_device_speed speed, int has_tt)
 +{
-+	void __iomem *mbase = u3phy->mac_base;
-+	int u3_port_num;
-+	u32 temp;
-+
-+	temp = u3p_readl(u3phy->sif_base, U3P_IP_XHCI_CAP);
-+	u3_port_num = CAP_U3_PORT_NUM(temp);
-+
-+	if (u3_port_num) {
-+		/* set MAC reference clock speed */
-+		u3p_setval(mbase, U3P_UX_EXIT_LFPS_PARAM,
-+				RX_UX_EXIT_REF, RX_UX_EXIT_REF_VAL);
-+		/* set REF_CLK */
-+		u3p_setval(mbase, U3P_REF_CLK_PARAM,
-+				REF_CLK_1000NS, REF_CLK_VAL_DEF);
-+		/* set SYS_CLK */
-+		u3p_setval(mbase, U3P_TIMING_PULSE_CTRL,
-+				U3T_CNT_1US, U3T_CNT_1US_VAL);
-+		/* set LINK_PM_TIMER=3 */
-+		u3p_setval(mbase, U3P_LINK_PM_TIMER,
-+				PM_LC_TIMEOUT, PM_LC_TIMEOUT_VAL);
-+	}
-+	u3p_setval(mbase, U3P_U2_TIMING_PARAM, U2T_VAL_1US, U2T_VAL_1US_VAL);
-+}
-+
-+
-+static int u3phy_clks_enable(struct mt65xx_u3phy *u3phy)
-+{
-+	int ret;
-+
-+	ret = clk_prepare_enable(u3phy->sys_mac);
-+	if (ret) {
-+		dev_err(u3phy->dev, "failed to enable sys_mac\n");
-+		goto sys_mac_err;
-+	}
-+
-+	ret = clk_prepare_enable(u3phy->u3phya_ref);
-+	if (ret) {
-+		dev_err(u3phy->dev, "failed to enable u3phya_ref\n");
-+		goto u3phya_ref_err;
-+	}
-+	ret = clk_prepare_enable(u3phy->wk_deb_p0);
-+	if (ret) {
-+		dev_err(u3phy->dev, "failed to enable wk_deb_p0\n");
-+		goto usb_p0_err;
-+	}
-+	if (u3phy->enable_usb2_p1) {
-+		ret = clk_prepare_enable(u3phy->wk_deb_p1);
-+		if (ret) {
-+			dev_err(u3phy->dev, "failed to enable wk_deb_p1\n");
-+			goto usb_p1_err;
-+		}
-+	}
-+	udelay(50);
-+
-+	return 0;
-+
-+usb_p1_err:
-+	clk_disable_unprepare(u3phy->wk_deb_p0);
-+usb_p0_err:
-+	clk_disable_unprepare(u3phy->u3phya_ref);
-+u3phya_ref_err:
-+	clk_disable_unprepare(u3phy->sys_mac);
-+sys_mac_err:
-+	return -EINVAL;
-+}
-+
-+static void u3phy_clks_disable(struct mt65xx_u3phy *u3phy)
-+{
-+	if (u3phy->enable_usb2_p1)
-+		clk_disable_unprepare(u3phy->wk_deb_p1);
-+	clk_disable_unprepare(u3phy->wk_deb_p0);
-+	clk_disable_unprepare(u3phy->u3phya_ref);
-+	clk_disable_unprepare(u3phy->sys_mac);
-+}
-+
-+
-+static int mt65xx_u3phy_init(struct usb_phy *phy)
-+{
-+	struct mt65xx_u3phy *u3phy;
-+	int ret;
-+
-+	u3phy = container_of(phy, struct mt65xx_u3phy, phy);
-+	dev_dbg(u3phy->dev, "%s+\n", __func__);
-+
-+	if (u3phy->enable_usb2_p1) {
-+		ret = regulator_enable(u3phy->p1_vbus);
-+		if (ret) {
-+			dev_err(u3phy->dev, "failed to enable p1-vbus\n");
-+			goto reg_p1_err;
-+		}
-+	}
-+
-+	ret = regulator_enable(u3phy->vusb33);
-+	if (ret) {
-+		dev_err(u3phy->dev, "failed to enable vusb33\n");
-+		goto reg_err;
-+	}
-+
-+	ret = pm_runtime_get_sync(u3phy->dev);
-+	if (ret < 0)
-+		goto pm_err;
-+
-+	ret = u3phy_clks_enable(u3phy);
-+	if (ret) {
-+		dev_err(u3phy->dev, "failed to enable clks\n");
-+		goto clks_err;
-+	}
-+
-+	/* reset whole ip */
-+	u3p_setmsk(u3phy->sif_base, U3P_IP_PW_CTRL0, CTRL0_IP_SW_RST);
-+	u3p_clrmsk(u3phy->sif_base, U3P_IP_PW_CTRL0, CTRL0_IP_SW_RST);
-+
-+	ret = u3phy_ports_enable(u3phy);
-+	if (ret) {
-+		dev_err(u3phy->dev, "failed to enable ports\n");
-+		goto port_err;
-+	}
-+	u3phy_timing_init(u3phy);
-+	phy_index_power_on(u3phy, 0);
-+	if (u3phy->enable_usb2_p1)
-+		phy_index_power_on(u3phy, 1);
-+
-+	return 0;
-+
-+port_err:
-+	u3phy_clks_disable(u3phy);
-+clks_err:
-+	pm_runtime_put_sync(u3phy->dev);
-+pm_err:
-+	regulator_disable(u3phy->vusb33);
-+reg_err:
-+	if (u3phy->enable_usb2_p1)
-+		regulator_disable(u3phy->p1_vbus);
-+reg_p1_err:
-+	return ret;
-+}
-+
-+
-+static void mt65xx_u3phy_shutdown(struct usb_phy *phy)
-+{
-+	struct mt65xx_u3phy *u3phy;
-+
-+	u3phy = container_of(phy, struct mt65xx_u3phy, phy);
-+	dev_dbg(u3phy->dev, "%s+\n", __func__);
-+
-+	phy_index_power_off(u3phy, 0);
-+	if (u3phy->enable_usb2_p1) {
-+		phy_index_power_off(u3phy, 1);
-+		regulator_disable(u3phy->p1_vbus);
-+	}
-+	u3phy_clks_disable(u3phy);
-+	pm_runtime_put_sync(u3phy->dev);
-+	regulator_disable(u3phy->vusb33);
-+}
-+
-+
-+static int mt65xx_u3phy_suspend(struct usb_phy *x, int suspend)
-+{
-+	struct mt65xx_u3phy *u3phy = container_of(x, struct mt65xx_u3phy, phy);
-+
-+	if (suspend) {
-+		mt65xx_u3phy_shutdown(&u3phy->phy);
++	/* only for synchronous endpoints */
++	if (usb_endpoint_xfer_control(&ep->desc)
++		|| usb_endpoint_xfer_bulk(&ep->desc))
 +		return 0;
-+	} else {
-+		return mt65xx_u3phy_init(&u3phy->phy);
-+	}
++	/*
++	 * for LS & FS synchronous endpoints which its device don't attach
++	 * to TT are also ignored, root-hub will schedule them directly
++	 */
++	if (is_fs_or_ls(speed) && !has_tt)
++		return 0;
++
++	return 1;
 +}
 +
-+
-+static const struct of_device_id mt65xx_u3phy_id_table[] = {
-+	{ .compatible = "mediatek,mt8173-u3phy",},
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(of, mt65xx_u3phy_id_table);
-+
-+
-+static int mt65xx_u3phy_probe(struct platform_device *pdev)
++int xhci_mtk_init_quirk(struct xhci_hcd *xhci)
 +{
-+	struct device *dev = &pdev->dev;
-+	struct device_node *np = dev->of_node;
-+	struct resource *mac_res;
-+	struct resource *sif_res;
-+	struct mt65xx_u3phy *u3phy;
-+	int retval = -ENOMEM;
++	struct usb_hcd *hcd = xhci_to_hcd(xhci);
++	struct device *dev = hcd->self.controller;
++	struct mu3h_sch_bw_info *sch_array;
++	size_t array_size;
++	int num_usb_bus;
++	int i;
 +
-+	u3phy = devm_kzalloc(&pdev->dev, sizeof(*u3phy), GFP_KERNEL);
-+	if (!u3phy)
-+		goto err;
++	/* ss IN and OUT are separated */
++	num_usb_bus = xhci->num_usb3_ports * 2 + xhci->num_usb2_ports;
++	array_size = sizeof(*sch_array) * num_usb_bus;
 +
-+	u3phy->dev = &pdev->dev;
++	sch_array = kzalloc(array_size, GFP_KERNEL);
++	if (sch_array == NULL)
++		return -ENOMEM;
 +
-+	mac_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	u3phy->mac_base = devm_ioremap_resource(dev, mac_res);
-+	if (IS_ERR(u3phy->mac_base)) {
-+		dev_err(dev, "failed to remap mac regs\n");
-+		retval = PTR_ERR(u3phy->mac_base);
-+		goto err;
-+	}
++	for (i = 0; i < num_usb_bus; i++)
++		INIT_LIST_HEAD(&sch_array[i].bw_ep_list);
 +
-+	sif_res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	u3phy->sif_base = devm_ioremap_resource(dev, sif_res);
-+	if (IS_ERR(u3phy->sif_base)) {
-+		dev_err(dev, "failed to remap sif regs\n");
-+		retval = PTR_ERR(u3phy->sif_base);
-+		goto err;
-+	}
-+
-+	u3phy->enable_usb2_p1 = !of_property_read_bool(np, "disable-usb2-p1");
-+	dev_dbg(dev, "enable_usb2_p1 - %d\n", u3phy->enable_usb2_p1);
-+
-+	u3phy->sys_mac = devm_clk_get(u3phy->dev, "sys_mac");
-+	if (IS_ERR(u3phy->sys_mac)) {
-+		dev_err(dev, "error to get sys_mac\n");
-+		retval = PTR_ERR(u3phy->sys_mac);
-+		goto err;
-+	}
-+
-+	u3phy->u3phya_ref = devm_clk_get(u3phy->dev, "u3phya_ref");
-+	if (IS_ERR(u3phy->u3phya_ref)) {
-+		dev_err(dev, "error to get u3phya_ref\n");
-+		retval = PTR_ERR(u3phy->u3phya_ref);
-+		goto err;
-+	}
-+
-+	u3phy->wk_deb_p0 = devm_clk_get(u3phy->dev, "wakeup_deb_p0");
-+	if (IS_ERR(u3phy->wk_deb_p0)) {
-+		dev_err(dev, "error to get wakeup_deb_p0\n");
-+		retval = PTR_ERR(u3phy->wk_deb_p0);
-+		goto err;
-+	}
-+
-+	if (u3phy->enable_usb2_p1) {
-+		u3phy->wk_deb_p1 = devm_clk_get(u3phy->dev, "wakeup_deb_p1");
-+		if (IS_ERR(u3phy->wk_deb_p1)) {
-+			dev_err(dev, "error to get wakeup_deb_p1\n");
-+			retval = PTR_ERR(u3phy->wk_deb_p1);
-+			goto err;
-+		}
-+
-+		u3phy->p1_vbus = devm_regulator_get(u3phy->dev, "reg-p1-vbus");
-+		if (IS_ERR_OR_NULL(u3phy->p1_vbus)) {
-+			dev_err(dev, "fail to get p1-vbus\n");
-+			retval = PTR_ERR(u3phy->p1_vbus);
-+			goto err;
-+		}
-+	}
-+
-+	u3phy->vusb33 = devm_regulator_get(u3phy->dev, "reg-vusb33");
-+	if (IS_ERR_OR_NULL(u3phy->vusb33)) {
-+		dev_err(dev, "fail to get vusb33\n");
-+		retval = PTR_ERR(u3phy->vusb33);
-+		goto err;
-+	}
-+
-+	pm_runtime_enable(dev);
-+	u3phy->phy.dev = u3phy->dev;
-+	u3phy->phy.label = "mt65xx-usb3phy";
-+	u3phy->phy.type = USB_PHY_TYPE_USB3;
-+	u3phy->phy.init = mt65xx_u3phy_init;
-+	u3phy->phy.shutdown = mt65xx_u3phy_shutdown;
-+	u3phy->phy.set_suspend = mt65xx_u3phy_suspend;
-+
-+	platform_set_drvdata(pdev, u3phy);
-+	retval = usb_add_phy_dev(&u3phy->phy);
-+	if (retval) {
-+		dev_err(dev, "failed to add phy\n");
-+		goto add_phy_err;
-+	}
-+
-+	return 0;
-+
-+add_phy_err:
-+	pm_runtime_disable(dev);
-+err:
-+	return retval;
-+}
-+
-+static int mt65xx_u3phy_remove(struct platform_device *pdev)
-+{
-+	struct mt65xx_u3phy *u3phy = platform_get_drvdata(pdev);
-+
-+	mt65xx_u3phy_shutdown(&u3phy->phy);
-+	pm_runtime_disable(&pdev->dev);
-+	usb_remove_phy(&u3phy->phy);
++	dev->platform_data = sch_array;
++	xhci->quirks |= XHCI_MTK_HOST;
++	/*
++	 * MTK host controller gives a spurious successful event after a
++	 * short transfer. Ignore it.
++	 */
++	xhci->quirks |= XHCI_SPURIOUS_SUCCESS;
 +
 +	return 0;
 +}
 +
-+static struct platform_driver mt65xx_u3phy_driver = {
-+	.probe		= mt65xx_u3phy_probe,
-+	.remove		= mt65xx_u3phy_remove,
-+	.driver		= {
-+		.name	= "mt65xx-u3phy",
-+		.of_match_table = mt65xx_u3phy_id_table,
-+	},
++
++void xhci_mtk_exit_quirk(struct xhci_hcd *xhci)
++{
++	struct usb_hcd *hcd = xhci_to_hcd(xhci);
++	struct mu3h_sch_bw_info *sch_array;
++
++	sch_array = dev_get_platdata(hcd->self.controller);
++	kfree(sch_array);
++}
++
++
++int xhci_mtk_add_ep_quirk(struct usb_hcd *hcd, struct usb_device *udev,
++		struct usb_host_endpoint *ep)
++{
++	int ret = 0;
++	int port_id;
++	int bw_index;
++	struct xhci_hcd *xhci;
++	unsigned int ep_index;
++	struct xhci_ep_ctx *ep_ctx;
++	struct xhci_slot_ctx *slot_ctx;
++	struct xhci_virt_device *virt_dev;
++	struct mu3h_sch_bw_info *sch_bw;
++	struct mu3h_sch_ep_info *sch_ep;
++	struct mu3h_sch_bw_info *sch_array;
++
++	xhci = hcd_to_xhci(hcd);
++	virt_dev = xhci->devs[udev->slot_id];
++	ep_index = xhci_get_endpoint_index(&ep->desc);
++	slot_ctx = xhci_get_slot_ctx(xhci, virt_dev->in_ctx);
++	ep_ctx = xhci_get_ep_ctx(xhci, virt_dev->in_ctx, ep_index);
++	sch_array = dev_get_platdata(hcd->self.controller);
++
++	port_id = virt_dev->real_port;
++	xhci_dbg(xhci, "%s() xfer_type: %d, speed:%d, ep:%p\n", __func__,
++		usb_endpoint_type(&ep->desc), udev->speed, ep);
++
++	if (!need_bw_sch(ep, udev->speed, slot_ctx->tt_info & TT_SLOT))
++		return 0;
++
++	bw_index = get_bw_index(xhci, udev, ep);
++	sch_bw = &sch_array[bw_index];
++
++	sch_ep = kzalloc(sizeof(struct mu3h_sch_ep_info), GFP_KERNEL);
++	if (!sch_ep)
++		return -ENOMEM;
++
++	setup_sch_info(udev, ep_ctx, sch_ep);
++
++	ret = check_sch_bw(udev, sch_bw, sch_ep);
++	if (ret) {
++		xhci_err(xhci, "Not enough bandwidth!\n");
++		kfree(sch_ep);
++		return -ENOSPC;
++	}
++
++	list_add_tail(&sch_ep->endpoint, &sch_bw->bw_ep_list);
++	sch_ep->ep = ep;
++
++	ep_ctx->reserved[0] |= cpu_to_le32(EP_BPKTS(sch_ep->pkts)
++		| EP_BCSCOUNT(sch_ep->cs_count) | EP_BBM(sch_ep->burst_mode));
++	ep_ctx->reserved[1] |= cpu_to_le32(EP_BOFFSET(sch_ep->offset)
++		| EP_BREPEAT(sch_ep->repeat));
++
++	debug_sch_bw(sch_bw);
++	return 0;
++}
++
++void xhci_mtk_drop_ep_quirk(struct usb_hcd *hcd, struct usb_device *udev,
++		struct usb_host_endpoint *ep)
++{
++	int bw_index;
++	struct xhci_hcd *xhci;
++	struct xhci_slot_ctx *slot_ctx;
++	struct xhci_virt_device *virt_dev;
++	struct mu3h_sch_bw_info *sch_array;
++	struct mu3h_sch_bw_info *sch_bw;
++	struct mu3h_sch_ep_info *sch_ep;
++
++	xhci = hcd_to_xhci(hcd);
++	virt_dev = xhci->devs[udev->slot_id];
++	slot_ctx = xhci_get_slot_ctx(xhci, virt_dev->in_ctx);
++	sch_array = dev_get_platdata(hcd->self.controller);
++
++	xhci_dbg(xhci, "%s() xfer_type: %d, speed:%d, ep:%p\n", __func__,
++		usb_endpoint_type(&ep->desc), udev->speed, ep);
++
++	if (!need_bw_sch(ep, udev->speed, slot_ctx->tt_info & TT_SLOT))
++		return;
++
++	bw_index = get_bw_index(xhci, udev, ep);
++	sch_bw = &sch_array[bw_index];
++
++	list_for_each_entry(sch_ep, &sch_bw->bw_ep_list, endpoint) {
++		if (sch_ep->ep == ep) {
++			update_bus_bw(sch_bw, sch_ep,
++				-sch_ep->bw_cost_per_microframe);
++			list_del(&sch_ep->endpoint);
++			kfree(sch_ep);
++			break;
++		}
++	}
++	debug_sch_bw(sch_bw);
++}
++
++
++/*
++ * The TD size is the number of bytes remaining in the TD (including this TRB),
++ * right shifted by 10.
++ * It must fit in bits 21:17, so it can't be bigger than 31.
++ */
++u32 xhci_mtk_td_remainder_quirk(unsigned int td_running_total,
++	unsigned trb_buffer_length, struct urb *urb)
++{
++	u32 max = 31;
++	int remainder, td_packet_count, packet_transferred;
++	unsigned int td_transfer_size = urb->transfer_buffer_length;
++	unsigned int maxp;
++
++	maxp = GET_MAX_PACKET(usb_endpoint_maxp(&urb->ep->desc));
++
++	/* 0 for the last TRB */
++	if (td_running_total + trb_buffer_length == td_transfer_size)
++		return 0;
++
++	packet_transferred = td_running_total / maxp;
++	td_packet_count = DIV_ROUND_UP(td_transfer_size, maxp);
++	remainder = td_packet_count - packet_transferred;
++
++	if (remainder > max)
++		return max << 17;
++	else
++		return remainder << 17;
++}
++
++
+diff --git a/drivers/usb/host/xhci-mtk.h b/drivers/usb/host/xhci-mtk.h
+new file mode 100644
+index 0000000..cbefffc
+--- /dev/null
++++ b/drivers/usb/host/xhci-mtk.h
+@@ -0,0 +1,119 @@
++/*
++ * Copyright (c) 2015 MediaTek Inc.
++ * Author:
++ *  Zhigang.Wun <zhigang.wei@mediatek.com>
++ *  Chunfeng.Yun <chunfeng.yun@mediatek.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef _XHCI_MTK_H_
++#define _XHCI_MTK_H_
++
++#include "xhci.h"
++
++/**
++ * To simplify scheduler algorithm, set a upper limit for ESIT,
++ * if a synchromous ep's ESIT is larger than @XHCI_MTK_MAX_ESIT,
++ * round down to the limit value, that means allocating more
++ * bandwidth to it.
++ */
++#define XHCI_MTK_MAX_ESIT	64
++
++/**
++ * struct mu3h_sch_bw_info
++ * @bus_bw: array to keep track of bandwidth already used at each uframes
++ * @bw_ep_list: eps in the bandwidth domain
++ *
++ * treat a HS root port as a bandwidth domain, but treat a SS root port as
++ * two bandwidth domains, one for IN eps and another for OUT eps.
++ */
++struct mu3h_sch_bw_info {
++	u32 bus_bw[XHCI_MTK_MAX_ESIT];
++	struct list_head bw_ep_list;
 +};
 +
-+module_platform_driver(mt65xx_u3phy_driver);
++/**
++ * struct mu3h_sch_ep_info
++ * @esit: unit is 125us, equal to 2 << Interval field in ep-context
++ * @num_budget_microframes: number of continuous uframes
++ *		(@repeat==1) scheduled within the interval
++ * @ep: address of usb_host_endpoint
++ * @offset: which uframe of the interval that transfer should be
++ *		scheduled first time within the interval
++ * @repeat: the time gap between two uframes that transfers are
++ *		scheduled within a interval. in the simple algorithm, only
++ *		assign 0 or 1 to it; 0 means using only one uframe in a
++ *		interval, and1 means using @num_budget_microframes
++ *		continuous uframes
++ * @pkts: number of packets to be transferred in the scheduled uframes
++ * @cs_count: number of CS that host will trigger
++ */
++struct mu3h_sch_ep_info {
++	u32 ep_type;
++	u32 max_packet_size;
++	u32 esit;
++	u32 num_budget_microframes;
++	u32 bw_cost_per_microframe;
++	void *ep;
++	struct list_head endpoint;
 +
-+MODULE_DESCRIPTION("Mt65xx USB PHY driver");
-+MODULE_LICENSE("GPL v2");
++	/* mtk xhci scheduling info */
++	u32 offset;
++	u32 repeat;
++	u32 pkts;
++	u32 cs_count;
++	u32 burst_mode;
++};
++
++
++#if IS_ENABLED(CONFIG_USB_XHCI_MTK)
++
++int xhci_mtk_init_quirk(struct xhci_hcd *xhci);
++void xhci_mtk_exit_quirk(struct xhci_hcd *xhci);
++int xhci_mtk_add_ep_quirk(struct usb_hcd *hcd, struct usb_device *udev,
++		struct usb_host_endpoint *ep);
++void xhci_mtk_drop_ep_quirk(struct usb_hcd *hcd, struct usb_device *udev,
++		struct usb_host_endpoint *ep);
++u32 xhci_mtk_td_remainder_quirk(unsigned int td_running_total,
++	unsigned trb_buffer_length, struct urb *urb);
++
++#else
++static inline int xhci_mtk_init_quirk(struct xhci_hcd *xhci)
++{
++	return 0;
++}
++
++static inline void xhci_mtk_exit_quirk(struct xhci_hcd *xhci)
++{
++}
++
++static inline int xhci_mtk_add_ep_quirk(struct usb_hcd *hcd,
++	struct usb_device *udev, struct usb_host_endpoint *ep)
++{
++	return 0;
++}
++
++static inline void xhci_mtk_drop_ep_quirk(struct usb_hcd *hcd,
++	struct usb_device *udev, struct usb_host_endpoint *ep)
++{
++	return 0;
++}
++
++static inline u32 xhci_mtk_td_remainder_quirk(unsigned int td_running_total,
++	unsigned trb_buffer_length, struct urb *urb)
++{
++	return 0;
++}
++
++#endif
++
++#endif		/* _XHCI_MTK_H_ */
+diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+index c10f5fa..2fe76a8 100644
+--- a/drivers/usb/host/xhci-plat.c
++++ b/drivers/usb/host/xhci-plat.c
+@@ -23,6 +23,7 @@
+ #include "xhci.h"
+ #include "xhci-mvebu.h"
+ #include "xhci-rcar.h"
++#include "xhci-mtk.h"
+ 
+ static struct hc_driver __read_mostly xhci_plat_hc_driver;
+ 
+@@ -49,7 +50,23 @@ static int xhci_plat_setup(struct usb_hcd *hcd)
+ 			return ret;
+ 	}
+ 
+-	return xhci_gen_setup(hcd, xhci_plat_quirks);
++	ret = xhci_gen_setup(hcd, xhci_plat_quirks);
++	if (ret)
++		return ret;
++
++	if (of_device_is_compatible(of_node, "mediatek,mt8173-xhci")) {
++		struct xhci_hcd *xhci = hcd_to_xhci(hcd);
++
++		if (!usb_hcd_is_primary_hcd(hcd))
++			return 0;
++		ret = xhci_mtk_init_quirk(xhci);
++		if (ret) {
++			kfree(xhci);
++			return ret;
++		}
++	}
++
++	return ret;
+ }
+ 
+ static int xhci_plat_start(struct usb_hcd *hcd)
+@@ -207,6 +224,8 @@ static int xhci_plat_remove(struct platform_device *dev)
+ 	if (!IS_ERR(clk))
+ 		clk_disable_unprepare(clk);
+ 	usb_put_hcd(hcd);
++	if (xhci->quirks & XHCI_MTK_HOST)
++		xhci_mtk_exit_quirk(xhci);
+ 	kfree(xhci);
+ 
+ 	return 0;
+@@ -253,6 +272,7 @@ static const struct of_device_id usb_xhci_of_match[] = {
+ 	{ .compatible = "marvell,armada-380-xhci"},
+ 	{ .compatible = "renesas,xhci-r8a7790"},
+ 	{ .compatible = "renesas,xhci-r8a7791"},
++	{ .compatible = "mediatek,mt8173-xhci"},
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(of, usb_xhci_of_match);
+diff --git a/drivers/usb/host/xhci-ring.c b/drivers/usb/host/xhci-ring.c
+index f5397a5..71cc653 100644
+--- a/drivers/usb/host/xhci-ring.c
++++ b/drivers/usb/host/xhci-ring.c
+@@ -68,6 +68,7 @@
+ #include <linux/slab.h>
+ #include "xhci.h"
+ #include "xhci-trace.h"
++#include "xhci-mtk.h"
+ 
+ /*
+  * Returns zero if the TRB isn't in this segment, otherwise it returns the DMA
+@@ -3126,9 +3127,14 @@ static int queue_bulk_sg_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
+ 
+ 		/* Set the TRB length, TD size, and interrupter fields. */
+ 		if (xhci->hci_version < 0x100) {
+-			remainder = xhci_td_remainder(
++			if (xhci->quirks & XHCI_MTK_HOST) {
++				remainder = xhci_mtk_td_remainder_quirk(
++					running_total, trb_buff_len, urb);
++			} else {
++				remainder = xhci_td_remainder(
+ 					urb->transfer_buffer_length -
+ 					running_total);
++			}
+ 		} else {
+ 			remainder = xhci_v1_0_td_remainder(running_total,
+ 					trb_buff_len, total_packet_count, urb,
+@@ -3281,9 +3287,14 @@ int xhci_queue_bulk_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
+ 
+ 		/* Set the TRB length, TD size, and interrupter fields. */
+ 		if (xhci->hci_version < 0x100) {
+-			remainder = xhci_td_remainder(
++			if (xhci->quirks & XHCI_MTK_HOST) {
++				remainder = xhci_mtk_td_remainder_quirk(
++					running_total, trb_buff_len, urb);
++			} else {
++				remainder = xhci_td_remainder(
+ 					urb->transfer_buffer_length -
+ 					running_total);
++			}
+ 		} else {
+ 			remainder = xhci_v1_0_td_remainder(running_total,
+ 					trb_buff_len, total_packet_count, urb,
+@@ -3378,7 +3389,7 @@ int xhci_queue_ctrl_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
+ 		field |= 0x1;
+ 
+ 	/* xHCI 1.0 6.4.1.2.1: Transfer Type field */
+-	if (xhci->hci_version == 0x100) {
++	if ((xhci->hci_version == 0x100) || (xhci->quirks & XHCI_MTK_HOST)) {
+ 		if (urb->transfer_buffer_length > 0) {
+ 			if (setup->bRequestType & USB_DIR_IN)
+ 				field |= TRB_TX_TYPE(TRB_DATA_IN);
+@@ -3402,8 +3413,14 @@ int xhci_queue_ctrl_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
+ 		field = TRB_TYPE(TRB_DATA);
+ 
+ 	length_field = TRB_LEN(urb->transfer_buffer_length) |
+-		xhci_td_remainder(urb->transfer_buffer_length) |
+ 		TRB_INTR_TARGET(0);
++
++	if (xhci->quirks & XHCI_MTK_HOST)
++		length_field |= xhci_mtk_td_remainder_quirk(0,
++				urb->transfer_buffer_length, urb);
++	else
++		length_field |= xhci_td_remainder(urb->transfer_buffer_length);
++
+ 	if (urb->transfer_buffer_length > 0) {
+ 		if (setup->bRequestType & USB_DIR_IN)
+ 			field |= TRB_DIR_IN;
+@@ -3627,8 +3644,14 @@ static int xhci_queue_isoc_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
+ 
+ 			/* Set the TRB length, TD size, & interrupter fields. */
+ 			if (xhci->hci_version < 0x100) {
+-				remainder = xhci_td_remainder(
+-						td_len - running_total);
++				if (xhci->quirks & XHCI_MTK_HOST) {
++					remainder = xhci_mtk_td_remainder_quirk(
++						running_total, trb_buff_len,
++						urb);
++				} else {
++					remainder = xhci_td_remainder(
++							td_len - running_total);
++				}
+ 			} else {
+ 				remainder = xhci_v1_0_td_remainder(
+ 						running_total, trb_buff_len,
+diff --git a/drivers/usb/host/xhci.c b/drivers/usb/host/xhci.c
+index ec8ac16..7f013bb 100644
+--- a/drivers/usb/host/xhci.c
++++ b/drivers/usb/host/xhci.c
+@@ -31,6 +31,7 @@
+ 
+ #include "xhci.h"
+ #include "xhci-trace.h"
++#include "xhci-mtk.h"
+ 
+ #define DRIVER_AUTHOR "Sarah Sharp"
+ #define DRIVER_DESC "'eXtensible' Host Controller (xHC) Driver"
+@@ -623,7 +624,11 @@ int xhci_run(struct usb_hcd *hcd)
+ 			"// Set the interrupt modulation register");
+ 	temp = readl(&xhci->ir_set->irq_control);
+ 	temp &= ~ER_IRQ_INTERVAL_MASK;
+-	temp |= (u32) 160;
++	/*
++	 * the increment interval is 8 times as much as that defined
++	 * in xHCI spec on MTK's controller
++	 */
++	temp |= (u32) ((xhci->quirks & XHCI_MTK_HOST) ? 20 : 160);
+ 	writel(temp, &xhci->ir_set->irq_control);
+ 
+ 	/* Set the HCD state before we enable the irqs */
+@@ -1688,6 +1693,9 @@ int xhci_drop_endpoint(struct usb_hcd *hcd, struct usb_device *udev,
+ 
+ 	xhci_endpoint_zero(xhci, xhci->devs[udev->slot_id], ep);
+ 
++	if (xhci->quirks & XHCI_MTK_HOST)
++		xhci_mtk_drop_ep_quirk(hcd, udev, ep);
++
+ 	xhci_dbg(xhci, "drop ep 0x%x, slot id %d, new drop flags = %#x, new add flags = %#x\n",
+ 			(unsigned int) ep->desc.bEndpointAddress,
+ 			udev->slot_id,
+@@ -1783,6 +1791,12 @@ int xhci_add_endpoint(struct usb_hcd *hcd, struct usb_device *udev,
+ 		return -ENOMEM;
+ 	}
+ 
++	if (xhci->quirks & XHCI_MTK_HOST) {
++		ret = xhci_mtk_add_ep_quirk(hcd, udev, ep);
++		if (ret < 0)
++			return ret;
++	}
++
+ 	ctrl_ctx->add_flags |= cpu_to_le32(added_ctxs);
+ 	new_add_flags = le32_to_cpu(ctrl_ctx->add_flags);
+ 
+diff --git a/drivers/usb/host/xhci.h b/drivers/usb/host/xhci.h
+index 8e421b8..4b9fa6d 100644
+--- a/drivers/usb/host/xhci.h
++++ b/drivers/usb/host/xhci.h
+@@ -1565,6 +1565,7 @@ struct xhci_hcd {
+ /* For controllers with a broken beyond repair streams implementation */
+ #define XHCI_BROKEN_STREAMS	(1 << 19)
+ #define XHCI_PME_STUCK_QUIRK	(1 << 20)
++#define XHCI_MTK_HOST		(1 << 21)
+ 	unsigned int		num_active_eps;
+ 	unsigned int		limit_active_eps;
+ 	/* There are two roothubs to keep track of bus suspend info for */
 -- 
 1.8.1.1.dirty
