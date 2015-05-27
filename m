@@ -1,137 +1,33 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Wed, 27 May 2015 18:40:58 +0100
-Subject: [PATCH 5/5] ARM: l2c: avoid passing auxiliary control register
- through enable method
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 27 May 2015 18:41:10 +0100
+Subject: [PATCH 1/2] ARM: cache-l2c: Detect whether it's safe to unlock
 In-Reply-To: <1432731613.2781.13.camel@collabora.co.uk>
-References: <1432731613.2781.13.camel@collabora.co.uk>
-Message-ID: <E1YxfK6-00047u-6U@rmk-PC.arm.linux.org.uk>
+References: <1431416355-7693-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <1431416355-7693-2-git-send-email-sjoerd.simons@collabora.co.uk>
+ <20150515113448.GI2067@n2100.arm.linux.org.uk>
+ <1432731613.2781.13.camel@collabora.co.uk>
+Message-ID: <20150527174110.GU2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoid passing the auxiliary control register value through the enable
-method.  In the resume path, we have to read the value stored in
-l2x0_saved_regs.aux_ctrl, only to have it immediately written back by
-l2c_enable().  We can avoid this if we have __l2c_init() save the value
-directly to l2x0_saved_regs.aux_ctrl before calling the specific enable
-method.
+On Wed, May 27, 2015 at 03:00:13PM +0200, Sjoerd Simons wrote:
+> Hey Russell,
+> 
+> On Fri, 2015-05-15 at 12:34 +0100, Russell King - ARM Linux wrote:
+> > On Tue, May 12, 2015 at 09:39:14AM +0200, Sjoerd Simons wrote:
+> > > To handle that, for caches where special configuration is needed to allow
+> > > unlocking, check whether this has been setup before unlocking.
+> > 
+> > I've come up with a different solution to this, which of course I prefer.
+> > I'll post the patches later today, thanks.
+> 
+> Did you get round to create/posting those patches? If not, i'm happy to
+> do a set with your suggested solution as well if you can point me in the
+> right direction :)
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mm/cache-l2x0.c | 32 +++++++++++++++++---------------
- 1 file changed, 17 insertions(+), 15 deletions(-)
+Expect some to fall into your mailbox imminently.  Sorry, once an email
+gets buried, it gets forgotten about. :p
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 95f33620353b..90599f60ff02 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -38,7 +38,7 @@ struct l2c_init_data {
- 	unsigned way_size_0;
- 	unsigned num_lock;
- 	void (*of_parse)(const struct device_node *, u32 *, u32 *);
--	void (*enable)(void __iomem *, u32, unsigned);
-+	void (*enable)(void __iomem *, unsigned);
- 	void (*fixup)(void __iomem *, u32, struct outer_cache_fns *);
- 	void (*save)(void __iomem *);
- 	void (*configure)(void __iomem *);
-@@ -118,12 +118,10 @@ static void l2c_configure(void __iomem *base)
-  * Enable the L2 cache controller.  This function must only be
-  * called when the cache controller is known to be disabled.
-  */
--static void l2c_enable(void __iomem *base, u32 aux, unsigned num_lock)
-+static void l2c_enable(void __iomem *base, unsigned num_lock)
- {
- 	unsigned long flags;
- 
--	l2x0_saved_regs.aux_ctrl = aux;
--
- 	if (outer_cache.configure)
- 		outer_cache.configure(&l2x0_saved_regs);
- 	else
-@@ -160,7 +158,7 @@ static void l2c_resume(void)
- 
- 	/* Do not touch the controller if already enabled. */
- 	if (!(readl_relaxed(base + L2X0_CTRL) & L2X0_CTRL_EN))
--		l2c_enable(base, l2x0_saved_regs.aux_ctrl, l2x0_data->num_lock);
-+		l2c_enable(base, l2x0_data->num_lock);
- }
- 
- /*
-@@ -390,16 +388,16 @@ static void l2c220_sync(void)
- 	raw_spin_unlock_irqrestore(&l2x0_lock, flags);
- }
- 
--static void l2c220_enable(void __iomem *base, u32 aux, unsigned num_lock)
-+static void l2c220_enable(void __iomem *base, unsigned num_lock)
- {
- 	/*
- 	 * Always enable non-secure access to the lockdown registers -
- 	 * we write to them as part of the L2C enable sequence so they
- 	 * need to be accessible.
- 	 */
--	aux |= L220_AUX_CTRL_NS_LOCKDOWN;
-+	l2x0_saved_regs.aux_ctrl |= L220_AUX_CTRL_NS_LOCKDOWN;
- 
--	l2c_enable(base, aux, num_lock);
-+	l2c_enable(base, num_lock);
- }
- 
- static void l2c220_unlock(void __iomem *base, unsigned num_lock)
-@@ -612,10 +610,11 @@ static int l2c310_cpu_enable_flz(struct notifier_block *nb, unsigned long act, v
- 	return NOTIFY_OK;
- }
- 
--static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
-+static void __init l2c310_enable(void __iomem *base, unsigned num_lock)
- {
- 	unsigned rev = readl_relaxed(base + L2X0_CACHE_ID) & L2X0_CACHE_ID_RTL_MASK;
- 	bool cortex_a9 = read_cpuid_part() == ARM_CPU_PART_CORTEX_A9;
-+	u32 aux = l2x0_saved_regs.aux_ctrl;
- 
- 	if (rev >= L310_CACHE_ID_RTL_R2P0) {
- 		if (cortex_a9) {
-@@ -658,9 +657,9 @@ static void __init l2c310_enable(void __iomem *base, u32 aux, unsigned num_lock)
- 	 * we write to them as part of the L2C enable sequence so they
- 	 * need to be accessible.
- 	 */
--	aux |= L310_AUX_CTRL_NS_LOCKDOWN;
-+	l2x0_saved_regs.aux_ctrl = aux | L310_AUX_CTRL_NS_LOCKDOWN;
- 
--	l2c_enable(base, aux, num_lock);
-+	l2c_enable(base, num_lock);
- 
- 	/* Read back resulting AUX_CTRL value as it could have been altered. */
- 	aux = readl_relaxed(base + L2X0_AUX_CTRL);
-@@ -872,8 +871,11 @@ static int __init __l2c_init(const struct l2c_init_data *data,
- 	 * Check if l2x0 controller is already enabled.  If we are booting
- 	 * in non-secure mode accessing the below registers will fault.
- 	 */
--	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN))
--		data->enable(l2x0_base, aux, data->num_lock);
-+	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)) {
-+		l2x0_saved_regs.aux_ctrl = aux;
-+
-+		data->enable(l2x0_base, data->num_lock);
-+	}
- 
- 	outer_cache = fns;
- 
-@@ -1388,7 +1390,7 @@ static void aurora_save(void __iomem *base)
-  * For Aurora cache in no outer mode, enable via the CP15 coprocessor
-  * broadcasting of cache commands to L2.
-  */
--static void __init aurora_enable_no_outer(void __iomem *base, u32 aux,
-+static void __init aurora_enable_no_outer(void __iomem *base,
- 	unsigned num_lock)
- {
- 	u32 u;
-@@ -1399,7 +1401,7 @@ static void __init aurora_enable_no_outer(void __iomem *base, u32 aux,
- 
- 	isb();
- 
--	l2c_enable(base, aux, num_lock);
-+	l2c_enable(base, num_lock);
- }
- 
- static void __init aurora_fixup(void __iomem *base, u32 cache_id,
 -- 
-2.1.0
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
