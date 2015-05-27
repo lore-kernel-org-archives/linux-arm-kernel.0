@@ -1,29 +1,104 @@
-From: kosaki.motohiro@jp.fujitsu.com (KOSAKI Motohiro)
-Date: Tue, 26 May 2015 23:49:03 -0400
-Subject: [RFC PATCH 1/2] kernel/fork.c: add a function to calculate page
- address from thread_info
-In-Reply-To: <1432483292-23109-1-git-send-email-jungseoklee85@gmail.com>
-References: <1432483292-23109-1-git-send-email-jungseoklee85@gmail.com>
-Message-ID: <CAHGf_=oMDPscgJ0bdr+QrV24n3KL3BC5qe8KGa=dePxg4tc4Zg@mail.gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 27 May 2015 11:55:45 +0800
+Subject: [PATCH 10/11] XEN / PCI: Remove the dependence on arch x86 when
+ PCI_MMCONFIG=y
+In-Reply-To: <556494D9.9090007@oracle.com>
+References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
+ <1432644564-24746-11-git-send-email-hanjun.guo@linaro.org>
+ <55647B22.3010801@oracle.com> <55647C94.9080606@oracle.com>
+ <5564893B.2070102@linaro.org> <556494D9.9090007@oracle.com>
+Message-ID: <55654041.2040902@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 24, 2015 at 12:01 PM, Jungseok Lee <jungseoklee85@gmail.com> wrote:
-> A current implementation assumes thread_info address is always correctly
-> calculated via virt_to_page. It restricts a different approach, such as
-> thread_info allocation from vmalloc space.
+On 2015?05?26? 23:44, Boris Ostrovsky wrote:
+> On 05/26/2015 10:54 AM, Tomasz Nowicki wrote:
+>> On 26.05.2015 16:00, Boris Ostrovsky wrote:
+>>> On 05/26/2015 09:54 AM, Boris Ostrovsky wrote:
+>>>> On 05/26/2015 08:49 AM, Hanjun Guo wrote:
+>>>>> In drivers/xen/pci.c, there are arch x86 dependent codes when
+>>>>> CONFIG_PCI_MMCONFIG is enabled, since CONFIG_PCI_MMCONFIG
+>>>>> depends on ACPI, so this will prevent XEN PCI running on other
+>>>>> architectures using ACPI with PCI_MMCONFIG enabled (such as ARM64).
+>>>>>
+>>>>> Fortunatly, it can be sloved in a simple way. In drivers/xen/pci.c,
+>>>>> the only x86 dependent code is if ((pci_probe & PCI_PROBE_MMCONF) ==
+>>>>> 0),
+>>>>> and it's defined in asm/pci_x86.h, the code means that
+>>>>> if the PCI resource is not probed in PCI_PROBE_MMCONF way, just
+>>>>> ingnore the xen mcfg init. Actually this is duplicate, because
+>>>>> if PCI resource is not probed in PCI_PROBE_MMCONF way, the
+>>>>> pci_mmconfig_list will be empty, and the if (list_empty())
+>>>>> after it will do the same job.
+>>>>>
+>>>>> So just remove the arch related code and the head file, this
+>>>>> will be no functional change for x86, and also makes xen/pci.c
+>>>>> usable for other architectures.
+>>>>>
+>>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>>>> CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+>>>>> CC: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+>>>>> ---
+>>>>>   drivers/xen/pci.c | 6 ------
+>>>>>   1 file changed, 6 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/xen/pci.c b/drivers/xen/pci.c
+>>>>> index 6785ebb..9a8dbe3 100644
+>>>>> --- a/drivers/xen/pci.c
+>>>>> +++ b/drivers/xen/pci.c
+>>>>> @@ -28,9 +28,6 @@
+>>>>>   #include <asm/xen/hypervisor.h>
+>>>>>   #include <asm/xen/hypercall.h>
+>>>>>   #include "../pci/pci.h"
+>>>>> -#ifdef CONFIG_PCI_MMCONFIG
+>>>>> -#include <asm/pci_x86.h>
+>>>>> -#endif
+>>>>>
+>>>>>   static bool __read_mostly pci_seg_supported = true;
+>>>>>
+>>>>> @@ -222,9 +219,6 @@ static int __init xen_mcfg_late(void)
+>>>>>       if (!xen_initial_domain())
+>>>>>           return 0;
+>>>>>
+>>>>> -    if ((pci_probe & PCI_PROBE_MMCONF) == 0)
+>>>>> -        return 0;
+>>>>> -
+>>>>>       if (list_empty(&pci_mmcfg_list))
+>>>>>           return 0;
+>>>>>
+>>>>
+>>>> (+Stefano who is Xen ARM maintainer)
+>>>>
+>>>> This will not build on x86 since pci_mmcfg_list since, for example,
+>>>> pci_mmcfg_list is declared in pci_x86.h.
+>>>
+>>>
+>>> And now really with Stefano and with parsable first sentence, sorry:
+>>>
+>>>
+>>> This will not build on x86 since pci_mmcfg_list, for example, is
+>>> declared in pci_x86.h.
+>>
+>> With this patch set, not any more. Please see preceding patches.
 >
-> This patch, thus, introduces an independent function to calculate page
-> address from thread_info one.
 >
-> Suggested-by: Sungjinn Chung <barami97@gmail.com>
-> Signed-off-by: Jungseok Lee <jungseoklee85@gmail.com>
-> Cc: KOSAKI Motohiro <kosaki.motohiro@jp.fujitsu.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->  kernel/fork.c | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
+> OK, I didn't notice this was part of a series.
 
-I haven't receive a path [2/2] and haven't review whole patches. But
-this patch itself is OK to me.
-Acked-by: KOSAKI Motohiro <kosaki.motohiro@fujitsu.com>
+Sorry, I didn't cc you all of those patches.
+
+>
+> Then if not having PCI_PROBE_MMCONF bit set is indeed equivalent to
+> list_empty(&pci_mmcfg_list), is there any reason for this flag to
+> (continue to) exist? (and also for pci_mmcfg_arch_init_failed.)
+
+I think PCI_PROBE_MMCONF bit is needed for early init of pci mmconfig in
+the x86 arch related code, but for xen_mcfg_late(), it's called after
+acpi_init() which the mmconfig is ready for use if it's available (the
+pci_mmcfg_list is empty or not), so not having PCI_PROBE_MMCONF bit set
+is equivalent list_empty(&pci_mmcfg_list) is not suitable for all cases,
+but I think it will be ok after mmconfig is initialized.
+
+I think my change log is misleading and needs updating :)
+
+Thanks
+Hanjun
