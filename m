@@ -1,52 +1,45 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 27 May 2015 17:14:08 +0200
-Subject: [GIT PULL] ARM: mediatek: arm64 updates for v4.2
-Message-ID: <CABuKBeLhFR=94cF301wL7J8hJVTtyseoD7g45PLE6znQkPAFGQ@mail.gmail.com>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Thu, 28 May 2015 00:19:44 +0900
+Subject: [RFC PATCH 1/2] kernel/fork.c: add a function to calculate page
+ address from thread_info
+In-Reply-To: <CAHGf_=oMDPscgJ0bdr+QrV24n3KL3BC5qe8KGa=dePxg4tc4Zg@mail.gmail.com>
+References: <1432483292-23109-1-git-send-email-jungseoklee85@gmail.com>
+ <CAHGf_=oMDPscgJ0bdr+QrV24n3KL3BC5qe8KGa=dePxg4tc4Zg@mail.gmail.com>
+Message-ID: <A747CC27-C3AB-4322-827D-FBC10A69A5D2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+On May 27, 2015, at 12:49 PM, KOSAKI Motohiro wrote:
 
-Please take the following changes into account.
+Hello, KOSAKI,
 
-Thanks,
-Matthias
+> On Sun, May 24, 2015 at 12:01 PM, Jungseok Lee <jungseoklee85@gmail.com> wrote:
+>> A current implementation assumes thread_info address is always correctly
+>> calculated via virt_to_page. It restricts a different approach, such as
+>> thread_info allocation from vmalloc space.
+>> 
+>> This patch, thus, introduces an independent function to calculate page
+>> address from thread_info one.
+>> 
+>> Suggested-by: Sungjinn Chung <barami97@gmail.com>
+>> Signed-off-by: Jungseok Lee <jungseoklee85@gmail.com>
+>> Cc: KOSAKI Motohiro <kosaki.motohiro@jp.fujitsu.com>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> ---
+>> kernel/fork.c | 7 ++++++-
+>> 1 file changed, 6 insertions(+), 1 deletion(-)
+> 
+> I haven't receive a path [2/2] and haven't review whole patches. But
+> this patch itself is OK to me.
+> Acked-by: KOSAKI Motohiro <kosaki.motohiro@fujitsu.com>
 
----
+Thanks!
 
-The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+I didn't add you to Cc list since [PATCH 2/2] is architecture specific.
+According to the feedbacks, it is needed to figure out fundamental solutions:
+1) reduce stack size and 2) focus on a generic anti-fragmentation logic.
 
-  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+Please refer to https://lkml.org/lkml/2015/5/24/121 for [PATCH 2/2].
 
-are available in the git repository at:
-
-  https://github.com/mbgg/linux-mediatek.git tags/v4.1-next-arm64
-
-for you to fetch changes up to d211193d4ddeab0327f4b571ec34f641ae59eb89:
-
-  arm64: dts: mt8173: Add PMIC wrapper device node (2015-05-27 13:41:18 +0200)
-
-----------------------------------------------------------------
-- dts: fixup pinctrl mt8173
-- dts: mt8173-evb fix model name
-- dts: mt8173 fix identation
-- dts: mt8173 add clock controller
-- dts: mt8173 change uart clocks
-- dts: mt8173 add pmic wrapper
-
-----------------------------------------------------------------
-Daniel Kurtz (1):
-      arm64: dts: mt8173: fix some indentation
-
-Sascha Hauer (3):
-      arm64: dts: mt8173: Add clock controller device nodes
-      arm64: dts: mt8173: Use real clock for UARTs
-      arm64: dts: mt8173: Add PMIC wrapper device node
-
-Yingjoe Chen (2):
-      arm64: dts: mt8173: Fixup pinctrl nodes
-      arm64: dts: mt8173-evb: fix model name
-
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts |  3 +-
- arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 98 ++++++++++++++++++++++-------
- 2 files changed, 78 insertions(+), 23 deletions(-)
+Best Regards
+Jungseok Lee
