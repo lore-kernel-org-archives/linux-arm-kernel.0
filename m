@@ -1,174 +1,51 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 27 May 2015 18:39:53 +0100
-Subject: Master-aware devices and sideband ID data
-In-Reply-To: <26BE36EF-2C5B-4DA6-8950-8FEBB031ED1B@caviumnetworks.com>
-References: <20150324155007.GC23005@leverpostej>
- <26BE36EF-2C5B-4DA6-8950-8FEBB031ED1B@caviumnetworks.com>
-Message-ID: <20150527173953.GC23176@leverpostej>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Wed, 27 May 2015 18:40:37 +0100
+Subject: [PATCH 1/5] ARM: l2c: restore the behaviour documented above
+ l2c_enable()
+In-Reply-To: <1432731613.2781.13.camel@collabora.co.uk>
+References: <1432731613.2781.13.camel@collabora.co.uk>
+Message-ID: <E1YxfJl-00047U-IZ@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 26, 2015 at 11:20:59PM +0100, Chalamarla, Tirumalesh wrote:
-> This is some thing we also like to see in ITS and SMMU drivers. 
-> > On Mar 24, 2015, at 8:50 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > 
-> > Hi all,
-> > 
-> > For some devices, identification of particular masters is critical to
-> > their operation (e.g. IOMMUs, MSI controllers). The identity of masters
-> > is determined from sideband signals on the bus, and it may or may not be
-> > possible to probe and/or configure this information. Worse still, these
-> > information may be rewritten by intermediate buses, so the
-> > information for a given master may differ at different points in the bus
-> > hierarchy.
-> > 
-> > We currently describe this master information for devices attached to
-> > IOMMUs, with a master ID being encoded in the iommu-cells. However this
-> > only covers the ID between the master and its IOMMU(s), and we don't
-> > currently have a mechanism to describe the master IDs as they are seen
-> > by devices beyond the IOMMU(s), or in the absence of any IOMMU(s).
-> > 
-> > The following are example of master IDs:
-> > * PCIe Requester IDs (RIDs) (bus:device.function AKA BDF)
-> > * SMMU Stream IDs (SIDs)
-> > * GICv3 ITS Device IDs (DIDs)
-> > 
-> > In the case of a system with PCIe, SMMU and GICv3, the master IDs are
-> > rewritten in a chain of RID=>SID=>DID, as in the following diagram:
-> > 
-> > +-------------+
-> > | PCIe master |
-> > +-------------+
-> >    ||
-> >    || Requester ID (RID)
-> >    || Probeable from RC.
-> >    \/
-> > +-------------------+
-> > | PCIe Root Complex |
-> > +-------------------+
-> >    ||
-> >    || SMMU Stream ID (SID)
-> >    || Derived from RID, static non-probeable mapping.
-> >    \/
-> > +--------------+
-> > | SMMU (IOMMU) |
-> > +--------------+
-> >    ||
-> >    || ITS Device ID (DID)
-> >    || Derived from SID, static non-probeable mapping.
-> >    \/
-> > +----------------------------+
-> > | GICv3 ITS (MSI controller) |
-> > +----------------------------+
-> > 
-> > In simpler cases, you might have a simpler set of master ID
-> > translations, e.g. just a DID:
-> > 
-> > +-----------------+
-> > | Platform device |
-> > +-----------------+
-> >    ||
-> >    || ITS Device ID (DID)
-> >    || Hard-wired on the bus.
-> >    \/
-> > +----------------------------+
-> > | GICv3 ITS (MSI controller) |
-> > +----------------------------+
-> > 
-> > Ignoring current bindings for the moment, I can see how we can describe
-> > this with a generic master id-binding, with master-id-map along the
-> > lines of interrupt-map, with a tuple format like:
-> > <child-id-base child-id-length parent parent-id-base>
-> > 
-> > For the PCIe example, this would look something like the following (with
-> > properties omitted for brevity):
-> > 
-> > PCI: pci at af000000 {
-> > 	...
-> > 	
-> > 	/* Requester ID of PCIe endpoints, implicit at runtime */
-> > 	master-id-cells = <1>;
-> > 
-> > 	/* RIDS idmapped to SIDS @ SMMU */
-> > 	master-id-map = <0 0x10000 &SMMU 0>;
-> > }
-> > 
-> > SMMU: iommu at bf000000 {
-> > 	...
-> > 
-> > 	/* SID, derived from RID */
-> > 	master-id-cells = <1>;
-> > 
-> > 	/* 
-> > 	 * For some reason the high bit of the ID was negated.
-> > 	 */
-> > 	master-id-map = <0x0000 0x8000 &ITS 0x0 0x8000>,
-> > 	                <0x8000 0x8000 &ITS 0x0 0x0000>;
-> > 
-> > };
-> > 
-> > ITS: its at cf000000 {
-> > 	...
-> > 
-> > 	/* DID, derived from SID */
-> > 	master-id-cells = <2>;
-> > 
-> > 	/* 
-> > 	 * Master traffic not propagated beyond this point, so no
-> > 	 * master-id-ranges
-> > 	 */
-> > };
-> 
-> I think it is nice to have max IDs supported by masters. so that drivers can check and enforce.  
+l2c_enable() is documented that it must not be called if the cache has
+already been enabled.  Unfortunately, commit 6b49241ac252 ("ARM: 8259/1:
+l2c: Refactor the driver to use commit-like interface") changed this
+without updating the comment, for very little reason.  Revert this
+change and restore the expected behaviour.
 
-The set of IDs that we expect to transform (i.e. those masters use)
-would be implicit in the first master-id-map from a master. In the PCI
-example above, no master is expected to generate an ID outside of the
-range 0-0x10000 inclusive (and that's all the SMMU would see).
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/mm/cache-l2x0.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-For devices which are not hotpluggable, the nodes for those devices
-would describe the specific set of IDs they use.
-
-Generally, between a master and a slave there might not be one
-contiguous set of valid IDs as these may be rewritten along the way (as
-happens at the SMMU between the PCI root complex and the ITS in the
-example above).
-
-Which drivers do you think need this information? What exactly are they
-trying to check and enforce?
-
-> > For the simpler case, this would look something like:
-> > 
-> > DEV: device at af000000 {
-> > 	master-id-cells = <1>;
-> > 	master-ids = <0xf>, <0xb>;
-> > 	master-id-map = <0 0xf &ITS 0 0>;
-> > };
-> > 
-> > ITS: its at cf000000 {
-> > 	...
-> > 
-> > 	/* DID */
-> > 	master-id-cells = <2>;
-> > };
-> > 
-> Is this is not depending heavily on discover order, how do drivers
-> know which device to get which ID. is it implicitly assumed in
-> discovery order? 
-
-I'm not sure I follow the question. Could you elaborate?
-
-> what happens to hot pluggable devices.  
-
-It would be necessary to be able to discover the ID assigned to the
-device by the hotpluggable bus. For example, this could depend on which
-slot the device is plugged into.
-
-If you can't discover the ID associated with a hotpluggable device from
-the bus it is plugged into I can't see how hotplug could work.
-
->From that point on I would expect the ID transformations to be static as
-in the example.
-
-Thanks,
-Mark.
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index e309c8f35af5..1471c0f29bd3 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -129,10 +129,6 @@ static void l2c_enable(void __iomem *base, u32 aux, unsigned num_lock)
+ {
+ 	unsigned long flags;
+ 
+-	/* Do not touch the controller if already enabled. */
+-	if (readl_relaxed(base + L2X0_CTRL) & L2X0_CTRL_EN)
+-		return;
+-
+ 	l2x0_saved_regs.aux_ctrl = aux;
+ 	l2c_configure(base);
+ 
+@@ -163,7 +159,11 @@ static void l2c_save(void __iomem *base)
+ 
+ static void l2c_resume(void)
+ {
+-	l2c_enable(l2x0_base, l2x0_saved_regs.aux_ctrl, l2x0_data->num_lock);
++	void __iomem *base = l2x0_base;
++
++	/* Do not touch the controller if already enabled. */
++	if (!(readl_relaxed(base + L2X0_CTRL) & L2X0_CTRL_EN))
++		l2c_enable(base, l2x0_saved_regs.aux_ctrl, l2x0_data->num_lock);
+ }
+ 
+ /*
+-- 
+2.1.0
