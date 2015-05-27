@@ -1,43 +1,41 @@
-From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Wed, 27 May 2015 08:01:23 -0400
-Subject: [PATCHv3 11/12] ARM: migrate to common PSCI client code
-In-Reply-To: <1432648350-5454-12-git-send-email-mark.rutland@arm.com>
-References: <1432648350-5454-1-git-send-email-mark.rutland@arm.com>
- <1432648350-5454-12-git-send-email-mark.rutland@arm.com>
-Message-ID: <CAJ5Y-eYpPXWEZpVxdnAytjHS0D+ufDoYQUo3yKqLbysCSGswSw@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 27 May 2015 21:02:23 +0900
+Subject: [PATCH 3/5] ARM: EXYNOS: DTS: add SROM device node for exynos4
+In-Reply-To: <1430296712-10287-4-git-send-email-pankaj.dubey@samsung.com>
+References: <1430296712-10287-1-git-send-email-pankaj.dubey@samsung.com>
+ <1430296712-10287-4-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <5565B24F.9060601@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 May 2015 at 09:52, Mark Rutland <mark.rutland@arm.com> wrote:
-> Now that the common PSCI client code has been factored out to
-> drivers/firmware, and made safe for 32-bit use, move the 32-bit ARM code
-> over to it. This results in a moderate reduction of duplicated lines,
-> and will prevent further duplication as the PSCI client code is updated
-> for PSCI 1.0 and beyond.
->
-> The two legacy platform users of the PSCI invocation code are updated to
-> account for interface changes. In both cases the power state parameter
-> is changed to an opaque u32 token in preparation for PSCI 1.0 power
-> state changes.
->
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Rob Herring <robh@kernel.org>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/Kconfig                  |   1 +
->  arch/arm/include/asm/psci.h       |  23 ---
->  arch/arm/kernel/Makefile          |   2 +-
->  arch/arm/kernel/psci.c            | 299 --------------------------------------
->  arch/arm/kernel/psci_smp.c        |  29 +++-
->  arch/arm/kernel/setup.c           |   3 +-
->  arch/arm/mach-highbank/highbank.c |   2 +-
->  arch/arm/mach-highbank/pm.c       |   8 +-
->  drivers/cpuidle/cpuidle-calxeda.c |   7 +-
->  9 files changed, 32 insertions(+), 342 deletions(-)
->  delete mode 100644 arch/arm/kernel/psci.c
+W dniu 29.04.2015 o 17:38, Pankaj Dubey pisze:
+> Add SROM device node for exynos4.
 
-Reviewed-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+Subject prefix: "ARM: dts:"
+
+> 
+> CC: Rob Herring <robh+dt@kernel.org>
+> CC: Mark Rutland <mark.rutland@arm.com>
+> CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos4.dtsi | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+> index 77ea547..48490ea 100644
+> --- a/arch/arm/boot/dts/exynos4.dtsi
+> +++ b/arch/arm/boot/dts/exynos4.dtsi
+> @@ -76,6 +76,11 @@
+>  		reg = <0x10000000 0x100>;
+>  	};
+>  
+> +	sromc at 12570000 {
+> +		compatible = "samsung,exynos-srom";
+> +		reg = <0x12570000 0x100>;
+
+There are 5 registers, so size of 0x100 seems to be bigger than needed.
+Maybe limit it to actual length?
+
+Best regards,
+Krzysztof
