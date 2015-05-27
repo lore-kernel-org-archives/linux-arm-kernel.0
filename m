@@ -1,31 +1,54 @@
 From: hongzhou.yang@mediatek.com (Hongzhou Yang)
-Date: Wed, 27 May 2015 02:43:53 -0700
-Subject: [PATH] Fix ies/smt and register irq fail bug.
-Message-ID: <1432719835-18939-1-git-send-email-hongzhou.yang@mediatek.com>
+Date: Wed, 27 May 2015 02:43:54 -0700
+Subject: [PATCH 1/2] pinctrl: mediatek: Fix bug of ies/smt setting for mt8173.
+In-Reply-To: <1432719835-18939-1-git-send-email-hongzhou.yang@mediatek.com>
+References: <1432719835-18939-1-git-send-email-hongzhou.yang@mediatek.com>
+Message-ID: <1432719835-18939-2-git-send-email-hongzhou.yang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-After integration test, we found some bugs in the code you just merged.
-The first is that I missed ies/smt configuration for MSDC3.
-The seconed is the if judgement for "interrupt-controller" I added last
-time should on the contrary. So adding these two patches to fix them.
-Sorry about this. And please help to merge them, many thanks.
+Add ies/smt support for MSDC3.
+Also fix ies bug for pin 106 and 107.
 
-These patches include below changes:
-- Adding MSDC3 ies/smt support for mt8173.
-- Since mt6397 is no need to support interrupt controller,
-I judged "interrupt-controller" property to skip it last time,
-but the if judgement should on the contrary, this is a bug.
-so adding this patch to fix it. 
- 
-Hongzhou Yang (2):
-  pinctrl: mediatek: Fix bug of ies/smt setting for mt8173.
-  pinctrl: mediatek: Fix pinctrl register irq fail bug.
+Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+---
+ drivers/pinctrl/mediatek/pinctrl-mt8173.c |   10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
- drivers/pinctrl/mediatek/pinctrl-mt8173.c     |   10 +++++++++-
- drivers/pinctrl/mediatek/pinctrl-mtk-common.c |    4 ++--
- 2 files changed, 11 insertions(+), 3 deletions(-)
-
---
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mt8173.c b/drivers/pinctrl/mediatek/pinctrl-mt8173.c
+index cf4ed6e..d0c811d 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mt8173.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mt8173.c
+@@ -84,6 +84,10 @@ static const struct mtk_pin_ies_smt_set mt8173_smt_set[] = {
+ 	MTK_PIN_IES_SMT_SPEC(16, 16, 0x930, 0),
+ 	MTK_PIN_IES_SMT_SPEC(17, 17, 0x950, 2),
+ 	MTK_PIN_IES_SMT_SPEC(18, 21, 0x940, 3),
++	MTK_PIN_IES_SMT_SPEC(22, 25, 0xce0, 13),
++	MTK_PIN_IES_SMT_SPEC(26, 26, 0xcc0, 13),
++	MTK_PIN_IES_SMT_SPEC(27, 27, 0xcd0, 13),
++	MTK_PIN_IES_SMT_SPEC(28, 28, 0xd70, 13),
+ 	MTK_PIN_IES_SMT_SPEC(29, 32, 0x930, 3),
+ 	MTK_PIN_IES_SMT_SPEC(33, 33, 0x930, 4),
+ 	MTK_PIN_IES_SMT_SPEC(34, 36, 0x930, 5),
+@@ -133,6 +137,10 @@ static const struct mtk_pin_ies_smt_set mt8173_ies_set[] = {
+ 	MTK_PIN_IES_SMT_SPEC(16, 16, 0x900, 0),
+ 	MTK_PIN_IES_SMT_SPEC(17, 17, 0x920, 2),
+ 	MTK_PIN_IES_SMT_SPEC(18, 21, 0x910, 3),
++	MTK_PIN_IES_SMT_SPEC(22, 25, 0xce0, 14),
++	MTK_PIN_IES_SMT_SPEC(26, 26, 0xcc0, 14),
++	MTK_PIN_IES_SMT_SPEC(27, 27, 0xcd0, 14),
++	MTK_PIN_IES_SMT_SPEC(28, 28, 0xd70, 14),
+ 	MTK_PIN_IES_SMT_SPEC(29, 32, 0x900, 3),
+ 	MTK_PIN_IES_SMT_SPEC(33, 33, 0x900, 4),
+ 	MTK_PIN_IES_SMT_SPEC(34, 36, 0x900, 5),
+@@ -161,7 +169,7 @@ static const struct mtk_pin_ies_smt_set mt8173_ies_set[] = {
+ 	MTK_PIN_IES_SMT_SPEC(100, 103, 0xca0, 14),
+ 	MTK_PIN_IES_SMT_SPEC(104, 104, 0xc80, 14),
+ 	MTK_PIN_IES_SMT_SPEC(105, 105, 0xc90, 14),
+-	MTK_PIN_IES_SMT_SPEC(106, 107, 0x91, 4),
++	MTK_PIN_IES_SMT_SPEC(106, 107, 0x910, 4),
+ 	MTK_PIN_IES_SMT_SPEC(108, 112, 0x910, 1),
+ 	MTK_PIN_IES_SMT_SPEC(113, 116, 0x910, 2),
+ 	MTK_PIN_IES_SMT_SPEC(117, 118, 0x910, 5),
+-- 
 1.7.9.5
