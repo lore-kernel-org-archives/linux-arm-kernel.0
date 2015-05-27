@@ -1,310 +1,37 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Wed, 27 May 2015 09:07:04 -0500
-Subject: [PATCH v5 4/6] input: keyboard: imx: add snvs power key driver
-In-Reply-To: <1432657562-5592-5-git-send-email-Frank.Li@freescale.com>
-References: <1432657562-5592-1-git-send-email-Frank.Li@freescale.com>
- <1432657562-5592-5-git-send-email-Frank.Li@freescale.com>
-Message-ID: <CAHrpEqTZa4YOvogH_tUtSdiD0uoY5ikDN=5qB9fL_csnauC+zw@mail.gmail.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Wed, 27 May 2015 15:52:51 +0200
+Subject: [RFC PATCH v1 1/3] PCI: designware: Add ARM64 support
+In-Reply-To: <5565C598.7020809@hisilicon.com>
+References: <000001d096a9$27bf43f0$773dcbd0$@com>
+ <5562F0C9.4090007@hisilicon.com> <000001d096f1$93dca4e0$bb95eea0$@com>
+ <5563451B.4050609@st.com> <5563DF4F.4080601@hisilicon.com>
+ <556428C9.9080202@st.com> <5565C598.7020809@hisilicon.com>
+Message-ID: <5565CC33.3070301@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 26, 2015 at 11:26 AM,  <Frank.Li@freescale.com> wrote:
-> From: Robin Gong <b38343@freescale.com>
+On 05/27/2015 03:24 PM, Zhou Wang wrote:
+>> there is still code in bios32 that requires pci_sys_data.
+> Right.
 >
-> add snvs power key driver.
-> It work in imx chips after i.mx6sx
+>> >No matters pci_common_init_dev() is being called or not :
+>> >
+>> >You can see pcibios_msi_controller() has a weak definition (in drivers/pci/msi.c).
+>> >But bios32 defines it for arm. Then it's being used.
+> But here in dw_pcie_host_init, I directly set bus->msi = &dw_pcie_msi_chip. So in
+> drivers/pci/msi.c, we will get the msi controller by dev->bus->msi in pci_msi_controller.
+> It will not run into pcibios_msi_controller().
 >
-> ON/OFF key used power on/off whole system.
-> This driver make it wakeup from suspend state when short press
-> ON/OFF key.
->
-> Long time press will trig SNVS power off chip without software
-> intervention.
->
-> Signed-off-by: Robin Gong <b38343@freescale.com>
-> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+> Maybe there is still something I miss understood, if so, please let me know.
+Hi Zhou,
 
-Dmitry Torokhov:
+Sorry, my mistake, you're right.
+I double checked, issue I'm seeing is in pcibios_align_resource...
+Please refer to Arnd's answer.
 
-I think you can merge this patch now because Guo shawn already Acked.
-
-best regards
-Frank Li
-
-> ---
->  drivers/input/keyboard/Kconfig       |  11 ++
->  drivers/input/keyboard/Makefile      |   1 +
->  drivers/input/keyboard/snvs_pwrkey.c | 227 +++++++++++++++++++++++++++++++++++
->  3 files changed, 239 insertions(+)
->  create mode 100644 drivers/input/keyboard/snvs_pwrkey.c
+Best Regards,
+Fabrice
 >
-> diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
-> index 106fbac..61b3fab 100644
-> --- a/drivers/input/keyboard/Kconfig
-> +++ b/drivers/input/keyboard/Kconfig
-> @@ -400,6 +400,17 @@ config KEYBOARD_MPR121
->           To compile this driver as a module, choose M here: the
->           module will be called mpr121_touchkey.
->
-> +config KEYBOARD_SNVS_PWRKEY
-> +       tristate "IMX SNVS Power Key Driver"
-> +       depends on SOC_IMX6SX
-> +       depends on OF
-> +       help
-> +         This is the snvs powerkey driver for the Freescale i.MX application
-> +         processors that are newer than i.MX6 SX.
-> +
-> +         To compile this driver as a module, choose M here; the
-> +         module will be called snvs_pwrkey.
-> +
->  config KEYBOARD_IMX
->         tristate "IMX keypad support"
->         depends on ARCH_MXC
-> diff --git a/drivers/input/keyboard/Makefile b/drivers/input/keyboard/Makefile
-> index df28d55..1d416dd 100644
-> --- a/drivers/input/keyboard/Makefile
-> +++ b/drivers/input/keyboard/Makefile
-> @@ -51,6 +51,7 @@ obj-$(CONFIG_KEYBOARD_QT1070)           += qt1070.o
->  obj-$(CONFIG_KEYBOARD_QT2160)          += qt2160.o
->  obj-$(CONFIG_KEYBOARD_SAMSUNG)         += samsung-keypad.o
->  obj-$(CONFIG_KEYBOARD_SH_KEYSC)                += sh_keysc.o
-> +obj-$(CONFIG_KEYBOARD_SNVS_PWRKEY)     += snvs_pwrkey.o
->  obj-$(CONFIG_KEYBOARD_SPEAR)           += spear-keyboard.o
->  obj-$(CONFIG_KEYBOARD_STMPE)           += stmpe-keypad.o
->  obj-$(CONFIG_KEYBOARD_STOWAWAY)                += stowaway.o
-> diff --git a/drivers/input/keyboard/snvs_pwrkey.c b/drivers/input/keyboard/snvs_pwrkey.c
-> new file mode 100644
-> index 0000000..512a1fc
-> --- /dev/null
-> +++ b/drivers/input/keyboard/snvs_pwrkey.c
-> @@ -0,0 +1,227 @@
-> +/*
-> + * Driver for the IMX SNVS ON/OFF Power Key
-> + * Copyright (C) 2015 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +#include <linux/device.h>
-> +#include <linux/err.h>
-> +#include <linux/init.h>
-> +#include <linux/input.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/jiffies.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/regmap.h>
-> +
-> +#define SNVS_LPSR_REG  0x4C    /* LP Status Register */
-> +#define SNVS_LPCR_REG  0x38    /* LP Control Register */
-> +#define SNVS_HPSR_REG  0x14
-> +#define SNVS_HPSR_BTN  BIT(6)
-> +#define SNVS_LPSR_SPO  BIT(18)
-> +#define SNVS_LPCR_DEP_EN BIT(5)
-> +
-> +#define DEBOUNCE_TIME 30
-> +#define REPEAT_INTERVAL 60
-> +
-> +struct pwrkey_drv_data {
-> +       struct regmap *snvs;
-> +       int irq;
-> +       int keycode;
-> +       int keystate;  /* 1:pressed */
-> +       int wakeup;
-> +       struct timer_list check_timer;
-> +       struct input_dev *input;
-> +};
-> +
-> +static void imx_imx_snvs_check_for_events(unsigned long data)
-> +{
-> +       struct pwrkey_drv_data *pdata = (struct pwrkey_drv_data *) data;
-> +       struct input_dev *input = pdata->input;
-> +       u32 state;
-> +
-> +       regmap_read(pdata->snvs, SNVS_HPSR_REG, &state);
-> +       state = state & SNVS_HPSR_BTN ? 1 : 0;
-> +
-> +       /* only report new event if status changed */
-> +       if (state ^ pdata->keystate) {
-> +               pdata->keystate = state;
-> +               input_event(input, EV_KEY, pdata->keycode, state);
-> +               input_sync(input);
-> +               pm_relax(pdata->input->dev.parent);
-> +       }
-> +
-> +       /* repeat check if pressed long */
-> +       if (state) {
-> +               mod_timer(&pdata->check_timer,
-> +                         jiffies + msecs_to_jiffies(REPEAT_INTERVAL));
-> +       }
-> +}
-> +
-> +static irqreturn_t imx_snvs_pwrkey_interrupt(int irq, void *dev_id)
-> +{
-> +       struct platform_device *pdev = dev_id;
-> +       struct pwrkey_drv_data *pdata = platform_get_drvdata(pdev);
-> +       u32 lp_status;
-> +
-> +       pm_wakeup_event(pdata->input->dev.parent, 0);
-> +
-> +       regmap_read(pdata->snvs, SNVS_LPSR_REG, &lp_status);
-> +       if (lp_status & SNVS_LPSR_SPO)
-> +               mod_timer(&pdata->check_timer, jiffies + msecs_to_jiffies(DEBOUNCE_TIME));
-> +
-> +       /* clear SPO status */
-> +       regmap_write(pdata->snvs, SNVS_LPSR_REG, SNVS_LPSR_SPO);
-> +
-> +       return IRQ_HANDLED;
-> +}
-> +
-> +static void imx_snvs_pwrkey_act(void *pdata)
-> +{
-> +       struct pwrkey_drv_data *pd = pdata;
-> +
-> +       del_timer_sync(&pd->check_timer);
-> +}
-> +
-> +static int imx_snvs_pwrkey_probe(struct platform_device *pdev)
-> +{
-> +       struct pwrkey_drv_data *pdata = NULL;
-> +       struct input_dev *input = NULL;
-> +       struct device_node *np;
-> +       int error;
-> +
-> +       /* Get SNVS register Page */
-> +       np = pdev->dev.of_node;
-> +       if (!np)
-> +               return -ENODEV;
-> +
-> +       pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-> +       if (!pdata)
-> +               return -ENOMEM;
-> +
-> +       pdata->snvs = syscon_regmap_lookup_by_phandle(np, "regmap");;
-> +
-> +       if (!pdata->snvs) {
-> +               dev_err(&pdev->dev, "Can't get snvs syscon\n");
-> +               return -ENODEV;
-> +       }
-> +
-> +       if (of_property_read_u32(np, "linux,keycode", &pdata->keycode)) {
-> +               pdata->keycode = KEY_POWER;
-> +               dev_warn(&pdev->dev, "KEY_POWER without setting in dts\n");
-> +       }
-> +
-> +       pdata->wakeup = of_property_read_bool(np, "wakeup");
-> +
-> +       pdata->irq = platform_get_irq(pdev, 0);
-> +       if (pdata->irq < 0) {
-> +               dev_err(&pdev->dev, "no irq defined in platform data\n");
-> +               return -EINVAL;
-> +       }
-> +
-> +       regmap_update_bits(pdata->snvs, SNVS_LPCR_REG, SNVS_LPCR_DEP_EN, SNVS_LPCR_DEP_EN);
-> +
-> +       /* clear the unexpected interrupt before driver ready */
-> +       regmap_write(pdata->snvs, SNVS_LPSR_REG, SNVS_LPSR_SPO);
-> +
-> +       setup_timer(&pdata->check_timer,
-> +                   imx_imx_snvs_check_for_events, (unsigned long) pdata);
-> +
-> +       input = devm_input_allocate_device(&pdev->dev);
-> +       if (!input) {
-> +               dev_err(&pdev->dev, "failed to allocate the input device\n");
-> +               return -ENOMEM;
-> +       }
-> +
-> +       input->name = pdev->name;
-> +       input->phys = "snvs-pwrkey/input0";
-> +       input->id.bustype = BUS_HOST;
-> +
-> +       input_set_capability(input, EV_KEY, pdata->keycode);
-> +
-> +       /* input customer action to cancel release timer */
-> +       error = devm_add_action(&pdev->dev, imx_snvs_pwrkey_act, pdata);
-> +       if (error) {
-> +               dev_err(&pdev->dev, "failed to register remove action\n");
-> +               return error;
-> +       }
-> +
-> +       error = devm_request_irq(&pdev->dev, pdata->irq,
-> +                              imx_snvs_pwrkey_interrupt,
-> +                              0, pdev->name, pdev);
-> +
-> +       if (error) {
-> +               dev_err(&pdev->dev, "interrupt not available.\n");
-> +               return error;
-> +       }
-> +
-> +       error = input_register_device(input);
-> +       if (error < 0) {
-> +               dev_err(&pdev->dev, "failed to register input device\n");
-> +               input_free_device(input);
-> +               return error;
-> +       }
-> +
-> +       pdata->input = input;
-> +       platform_set_drvdata(pdev, pdata);
-> +
-> +       device_init_wakeup(&pdev->dev, pdata->wakeup);
-> +
-> +       return 0;
-> +}
-> +
-> +static int imx_snvs_pwrkey_suspend(struct device *dev)
-> +{
-> +       struct platform_device *pdev = to_platform_device(dev);
-> +       struct pwrkey_drv_data *pdata = platform_get_drvdata(pdev);
-> +
-> +       if (device_may_wakeup(&pdev->dev))
-> +               enable_irq_wake(pdata->irq);
-> +
-> +       return 0;
-> +}
-> +
-> +static int imx_snvs_pwrkey_resume(struct device *dev)
-> +{
-> +       struct platform_device *pdev = to_platform_device(dev);
-> +       struct pwrkey_drv_data *pdata = platform_get_drvdata(pdev);
-> +
-> +       if (device_may_wakeup(&pdev->dev))
-> +               disable_irq_wake(pdata->irq);
-> +
-> +       return 0;
-> +}
-> +
-> +static const struct of_device_id imx_snvs_pwrkey_ids[] = {
-> +       { .compatible = "fsl,sec-v4.0-pwrkey" },
-> +       { /* sentinel */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, imx_snvs_pwrkey_ids);
-> +
-> +static SIMPLE_DEV_PM_OPS(imx_snvs_pwrkey_pm_ops, imx_snvs_pwrkey_suspend,
-> +                               imx_snvs_pwrkey_resume);
-> +
-> +static struct platform_driver imx_snvs_pwrkey_driver = {
-> +       .driver = {
-> +               .name = "snvs_pwrkey",
-> +               .pm     = &imx_snvs_pwrkey_pm_ops,
-> +               .of_match_table = imx_snvs_pwrkey_ids,
-> +       },
-> +       .probe = imx_snvs_pwrkey_probe,
-> +};
-> +module_platform_driver(imx_snvs_pwrkey_driver);
-> +
-> +MODULE_AUTHOR("Freescale Semiconductor");
-> +MODULE_DESCRIPTION("i.MX snvs power key Driver");
-> +MODULE_LICENSE("GPL");
-> --
-> 1.9.1
+> Best Regards,
+> Zhou
 >
