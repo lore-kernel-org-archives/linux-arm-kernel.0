@@ -1,61 +1,48 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 27 May 2015 15:31:51 +0800
-Subject: [PATCH 11/11] ARM64 / PCI / ACPI: support for ACPI based PCI
- hostbridge init
-In-Reply-To: <55648D52.4000809@linaro.org>
-References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
- <1432644564-24746-12-git-send-email-hanjun.guo@linaro.org>
- <55648D52.4000809@linaro.org>
-Message-ID: <556572E7.1090802@linaro.org>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Wed, 27 May 2015 09:31:50 +0200
+Subject: [PATCH v4 2/2] soc: Add driver for Freescale Vybrid Platform
+In-Reply-To: <7df753efff77a96da285f0571f1316512787e83c.1432637313.git.maitysanchayan@gmail.com>
+References: <cover.1432637313.git.maitysanchayan@gmail.com>
+ <7df753efff77a96da285f0571f1316512787e83c.1432637313.git.maitysanchayan@gmail.com>
+Message-ID: <1432711910.27695.223.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?05?26? 23:12, Tomasz Nowicki wrote:
-> On 26.05.2015 14:49, Hanjun Guo wrote:
->> Based on Jiang Liu's common interface to support PCI host bridge
->> init and refactoring of MMCONFIG, this patch using information
->> from ACPI MCFG table and IO/irq resources from _CRS to init
->> ARM64 PCI hostbridge, then PCI will work on ARM64.
->>
->> This patch is based on Mark Salter and Tomasz Nowicki's work.
->>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->> CC: Arnd Bergmann <arnd@arndb.de>
->> CC: Catalin Marinas <catalin.marinas@arm.com>
->> CC: Liviu Dudau <Liviu.Dudau@arm.com>
->> CC: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
->> CC: Will Deacon <will.deacon@arm.com>
->> ---
->>   arch/arm64/Kconfig      |   7 ++
->>   arch/arm64/kernel/pci.c | 245
->> +++++++++++++++++++++++++++++++++++++++++++++---
->>   drivers/pci/pci.c       |  26 +++--
->>   3 files changed, 257 insertions(+), 21 deletions(-)
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 9b80428..8e4b789 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -276,6 +276,13 @@ config PCI_DOMAINS_GENERIC
->>   config PCI_SYSCALL
->>       def_bool PCI
->>
->> +config PCI_MMCONFIG
->> +    def_bool y
->> +    select PCI_ECAM
->> +    select HAVE_PCI_ECAM
->> +    select GENERIC_PCI_ECAM
-> HAVE_PCI_ECAM and GENERIC_PCI_ECAM should be selected by platform.
+On Tue, 2015-05-26 at 17:06 +0530, Sanchayan Maity wrote:
+> --- /dev/null
+> +++ b/drivers/soc/fsl/Kconfig
 
-OK.
+> +config SOC_VF610
+> +	   bool "SoC bus device for the Freescale Vybrid platform"
+> +	   select SOC_BUS
+> +	   help
+> +	     Include support for the SoC bus on the Freescale Vybrid platform
+> +	     providing some sysfs information about the module variant.
+> \ No newline at end of file
 
->
->> +    depends on ACPI
-> I think we should depend on PCI too.
+(That review comment is courtesy of git.)
 
-Since ACPI depends on PCI, denpends on
-PCI is duplicate I think.
+> --- /dev/null
+> +++ b/drivers/soc/fsl/Makefile
 
-Thanks
-Hanjun
+> +obj-$(CONFIG_SOC_VF610)		+= soc-vf610.o
+
+> --- /dev/null
+> +++ b/drivers/soc/fsl/soc-vf610.c
+
+> +MODULE_DEVICE_TABLE(of, vf610_soc_bus_match);
+
+> +module_platform_driver(vf610_soc_driver);
+
+(The series starting at https://lkml.org/lkml/2015/5/10/131 would allow
+to use builtin_platform_driver() for built-in only code.)
+
+> +MODULE_DESCRIPTION("Freescale VF610 SoC bus driver");
+> +MODULE_LICENSE("GPL v2");
+
+I think soc-vf610.o can only be built-in. But its code contains a few
+module specific macros. Was it perhaps intended for SOC_VF610 to be
+tristate?
+
+
+Paul Bolle
