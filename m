@@ -1,45 +1,53 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Thu, 28 May 2015 00:19:44 +0900
-Subject: [RFC PATCH 1/2] kernel/fork.c: add a function to calculate page
- address from thread_info
-In-Reply-To: <CAHGf_=oMDPscgJ0bdr+QrV24n3KL3BC5qe8KGa=dePxg4tc4Zg@mail.gmail.com>
-References: <1432483292-23109-1-git-send-email-jungseoklee85@gmail.com>
- <CAHGf_=oMDPscgJ0bdr+QrV24n3KL3BC5qe8KGa=dePxg4tc4Zg@mail.gmail.com>
-Message-ID: <A747CC27-C3AB-4322-827D-FBC10A69A5D2@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 May 2015 17:31:46 +0200
+Subject: [RFC PATCH v1 1/3] PCI: designware: Add ARM64 support
+In-Reply-To: <5565CD0B.6020206@hisilicon.com>
+References: <000001d096a9$27bf43f0$773dcbd0$@com> <3340422.95mKZ6cYUI@wuerfel>
+ <5565CD0B.6020206@hisilicon.com>
+Message-ID: <2378629.Ocol8HRDqD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On May 27, 2015, at 12:49 PM, KOSAKI Motohiro wrote:
-
-Hello, KOSAKI,
-
-> On Sun, May 24, 2015 at 12:01 PM, Jungseok Lee <jungseoklee85@gmail.com> wrote:
->> A current implementation assumes thread_info address is always correctly
->> calculated via virt_to_page. It restricts a different approach, such as
->> thread_info allocation from vmalloc space.
->> 
->> This patch, thus, introduces an independent function to calculate page
->> address from thread_info one.
->> 
->> Suggested-by: Sungjinn Chung <barami97@gmail.com>
->> Signed-off-by: Jungseok Lee <jungseoklee85@gmail.com>
->> Cc: KOSAKI Motohiro <kosaki.motohiro@jp.fujitsu.com>
->> Cc: linux-arm-kernel at lists.infradead.org
->> ---
->> kernel/fork.c | 7 ++++++-
->> 1 file changed, 6 insertions(+), 1 deletion(-)
+On Wednesday 27 May 2015 21:56:27 Zhou Wang wrote:
+> On 2015/5/26 16:02, Arnd Bergmann wrote:
+> > On Tuesday 26 May 2015 10:49:51 Zhou Wang wrote:
+> >>
+> >> I am a little confused that pci_sys_data is still needed as we don't use the code
+> >> in bios32. What was the problem you met? Could you share me more information? Then
+> >> let's see how to solve the problem.
+> >>
+> > 
+> > The PCI core code still calls pcibios_align_resource(), which will try to
+> > use the dev->sysdata pointer as 'struct pci_sys_data'. To solve this, we
 > 
-> I haven't receive a path [2/2] and haven't review whole patches. But
-> this patch itself is OK to me.
-> Acked-by: KOSAKI Motohiro <kosaki.motohiro@fujitsu.com>
+> Thanks for reminding.
+> 
+> > need to change the pci-mvebu driver and the core code first to let the
+> 
+> It seams that only pci-mvebu implemented align_resource callback in ARM ?
 
-Thanks!
+Correct. The pointer in struct pci_sys_data was added for this driver, and
+no other driver has needed it so far.
 
-I didn't add you to Cc list since [PATCH 2/2] is architecture specific.
-According to the feedbacks, it is needed to figure out fundamental solutions:
-1) reduce stack size and 2) focus on a generic anti-fragmentation logic.
+> > driver override pcibios_align_resource() through an operation in 
+> > struct pci_host_bridge.
+> > 
+> > The other remaining use of dev->sysdata is the ARM pcibios_msi_controller()
+> > function that overrides the generic implementation.  To solve this, we need
+> > to change the five remaining drivers that set hw_pci->msi_ctrl to use
+> > the new generic method, and remove the ARM specific implementation.
+> 
+> Yes, that is better if we can do like this. But for pcie-designware, can we
+> just set bus->msi = &dw_pcie_msi_chip and get msi controller using dev->bus->msi
+> in pci_msi_controller()?
 
-Please refer to https://lkml.org/lkml/2015/5/24/121 for [PATCH 2/2].
+Yes, that works. However there are two problems with the approach:
 
-Best Regards
-Jungseok Lee
+- we have to change all PCI host drivers on ARM to do this in order to remove
+  the ARM-specific pcibios_msi_controller() function
+- it's possible that there are dw_pcie implementations that do not include
+  an MSI controller, so that pointer would be NULL, which leads to the
+  core code to still call the ARM-specific pcibios_msi_controller() function
+  unless we remove it.
+
+	Arnd
