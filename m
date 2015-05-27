@@ -1,31 +1,95 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 27 May 2015 18:46:47 +0200
-Subject: [PATCH v4 2/2] soc: Add driver for Freescale Vybrid Platform
-In-Reply-To: <20150527130727.GA3374@Sanchayan-Arch.toradex.int>
-References: <cover.1432637313.git.maitysanchayan@gmail.com>
- <7df753efff77a96da285f0571f1316512787e83c.1432637313.git.maitysanchayan@gmail.com>
- <1432711910.27695.223.camel@x220>
- <20150527130727.GA3374@Sanchayan-Arch.toradex.int>
-Message-ID: <1432745207.27695.282.camel@x220>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 27 May 2015 11:46:47 -0500
+Subject: [PATCHv3 11/12] ARM: migrate to common PSCI client code
+In-Reply-To: <1432648350-5454-12-git-send-email-mark.rutland@arm.com>
+References: <1432648350-5454-1-git-send-email-mark.rutland@arm.com>
+ <1432648350-5454-12-git-send-email-mark.rutland@arm.com>
+Message-ID: <CAL_JsqJG=k=z5+p55YVzmdFBjcGSX2t3ct337kYRd6c5HG5H3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-05-27 at 18:37 +0530, maitysanchayan at gmail.com wrote:
-> > > +module_platform_driver(vf610_soc_driver);
-> > 
-> > (The series starting at https://lkml.org/lkml/2015/5/10/131 would allow
-> > to use builtin_platform_driver() for built-in only code.)
-> 
-> Thanks for bringing this to my attention. I am subscribed to the mailing
-> list however this skipped me.
+On Tue, May 26, 2015 at 8:52 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> Now that the common PSCI client code has been factored out to
+> drivers/firmware, and made safe for 32-bit use, move the 32-bit ARM code
+> over to it. This results in a moderate reduction of duplicated lines,
+> and will prevent further duplication as the PSCI client code is updated
+> for PSCI 1.0 and beyond.
+>
+> The two legacy platform users of the PSCI invocation code are updated to
+> account for interface changes. In both cases the power state parameter
+> is changed to an opaque u32 token in preparation for PSCI 1.0 power
+> state changes.
 
-> However that series has not been merged yet, so I can't use builtin_*
-> yet?
+[...]
 
-Correct.
+> diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+> index 231fba0..6050a14 100644
+> --- a/arch/arm/mach-highbank/highbank.c
+> +++ b/arch/arm/mach-highbank/highbank.c
+> @@ -28,8 +28,8 @@
+>  #include <linux/reboot.h>
+>  #include <linux/amba/bus.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/psci.h>
+>
+> -#include <asm/psci.h>
+>  #include <asm/hardware/cache-l2x0.h>
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/map.h>
+> diff --git a/arch/arm/mach-highbank/pm.c b/arch/arm/mach-highbank/pm.c
+> index 7f2bd85..014e96d 100644
+> --- a/arch/arm/mach-highbank/pm.c
+> +++ b/arch/arm/mach-highbank/pm.c
+> @@ -16,18 +16,14 @@
+>
+>  #include <linux/cpu_pm.h>
+>  #include <linux/init.h>
+> +#include <linux/psci.h>
+>  #include <linux/suspend.h>
+>
+>  #include <asm/suspend.h>
+> -#include <asm/psci.h>
+>
+>  static int highbank_suspend_finish(unsigned long val)
+>  {
+> -       const struct psci_power_state ps = {
+> -               .type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
+> -               .affinity_level = 1,
+> -       };
+> -
+> +       u32 ps = 0x01010000; /* Aff1 power down */
 
-If that series get merged, which is not certain at all, you might
-consider changing this. Probably no one will notice if you don't.
+Why not just pass directly instead of sticking in a variable first.
 
+>         return psci_ops.cpu_suspend(ps, __pa(cpu_resume));
+>  }
+>
+> diff --git a/drivers/cpuidle/cpuidle-calxeda.c b/drivers/cpuidle/cpuidle-calxeda.c
+> index 9445e6c..d010da8f 100644
+> --- a/drivers/cpuidle/cpuidle-calxeda.c
+> +++ b/drivers/cpuidle/cpuidle-calxeda.c
+> @@ -25,15 +25,14 @@
+>  #include <linux/init.h>
+>  #include <linux/mm.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/psci.h>
+> +
+>  #include <asm/cpuidle.h>
+>  #include <asm/suspend.h>
+> -#include <asm/psci.h>
+>
+>  static int calxeda_idle_finish(unsigned long val)
+>  {
+> -       const struct psci_power_state ps = {
+> -               .type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
+> -       };
+> +       u32 ps = 0x00010000; /* Aff0 power down */
 
-Paul Bolle
+ditto.
+
+>         return psci_ops.cpu_suspend(ps, __pa(cpu_resume));
+>  }
+>
+> --
+> 1.9.1
+>
