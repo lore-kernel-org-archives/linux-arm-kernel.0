@@ -1,189 +1,60 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 27 May 2015 14:37:00 +0100
-Subject: [PATCH v3 1/5] Documentation: add DT binding for ARM System
- Control and Power Interface(SCPI) protocol
-In-Reply-To: <1432720398-5701-2-git-send-email-sudeep.holla@arm.com>
-References: <1432720398-5701-1-git-send-email-sudeep.holla@arm.com>
- <1432720398-5701-2-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20150527133700.GK8439@leverpostej>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Wed, 27 May 2015 15:42:52 +0200
+Subject: [PATCH] ARM: berlin: add SPI nodes for BG2Q
+In-Reply-To: <55658209.4000904@gmail.com>
+References: <1432126385-27402-1-git-send-email-antoine.tenart@free-electrons.com>
+ <555D1706.7040309@gmail.com> <20150525090100.GC29660@kwain>
+ <55658209.4000904@gmail.com>
+Message-ID: <20150527134252.GG27202@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 27, 2015 at 10:53:14AM +0100, Sudeep Holla wrote:
-> This patch adds devicetree binding for System Control and Power
-> Interface (SCPI) Message Protocol used between the Application Cores(AP)
-> and the System Control Processor(SCP). The MHU peripheral provides a
-> mechanism for inter-processor communication between SCP's M3 processor
-> and AP.
+On Wed, May 27, 2015 at 10:36:25AM +0200, Sebastian Hesselbarth wrote:
+> On 25.05.2015 11:01, Antoine Tenart wrote:
+> >On Thu, May 21, 2015 at 01:21:42AM +0200, Sebastian Hesselbarth wrote:
+> >>On 20.05.2015 14:53, Antoine Tenart wrote:
+> >>>+
+> >>>+				spi0_pmux: spi0-pmux {
+> >>>+					groups = "G8", "G9", "G10", "G11";
+> >>>+					function = "spi1";
+> >>>+				};
+> >>
+> >>... can you check which of G8-G11 are actually clock/data and which
+> >>are CSn lines?
+> >>
+> >>CSn lines should all be optional and per-board pinmux - same for the
+> >>other spi pinmux.
+> >
+> >G8 and GSM3 are for clock/data, the other groups (G9-11 and GSM0-2)
+> >control the CSn lines. I'll update.
 > 
-> SCP offers control and management of the core/cluster power states,
-> various power domain DVFS including the core/cluster, certain system
-> clocks configuration, thermal sensors and many others.
-> 
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> CC: Jassi Brar <jassisinghbrar@gmail.com>
-> Cc: Liviu Dudau <Liviu.Dudau@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Jon Medhurst (Tixy) <tixy@linaro.org>
-> Cc: devicetree at vger.kernel.org
-> ---
->  Documentation/devicetree/bindings/arm/arm,scpi.txt | 121 +++++++++++++++++++++
->  1 file changed, 121 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/arm,scpi.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
-> new file mode 100644
-> index 000000000000..5db235f69e54
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
-> @@ -0,0 +1,121 @@
-> +System Control and Power Interface (SCPI) Message Protocol
-> +----------------------------------------------------------
+> Re-reading this mail after you published v2, I thought it would
+> be a good idea to add this information to the pinmux driver. We
+> already have some /* comments */ about the actual function, why
+> not add the above, too?
 
-Could we refer to the documentation for SCPI similarly to what we do
-in the PSCI binding (i.e. give the document number and title so people
-can search for it)?
+Good idea, I'll prepare a patch.
 
-> +
-> +Required properties:
-> +
-> +- compatible : should be "arm,scpi"
-> +- mboxes: List of phandle and mailbox channel specifiers
+> Also, I guess G8/GSM3 are for clk/data _and_ cs0n while
+> G9-G11/GSM0-GSM2 add cs{1,2,3}n ?
 
-How many, in which order, and what are they used for?
+After re-reading carefully the documentation,
 
-> +- shmem : List of phandle pointing to the shared memory(SHM) area between the
-> +	  processors using these mailboxes for IPC, one for each mailbox
+G8  -> CLK, SDI, SDO
+G9  -> S0n, S1n
+G10 -> S2n
+G10 -> S3n
 
-When you say "shared memory", what exactly are we referring to? It looks
-like we refer to SRAM areas?
+GSM0 -> S0n
+GSM1 -> S1n
+GSM2 -> S2n, S3n
+GSM3 -> CLK, SDO
 
-> +
-> +See Documentation/devicetree/bindings/mailbox/mailbox.txt
-> +for more details about the generic mailbox controller and
-> +client driver bindings.
-> +
-> +Clock bindings for the clocks based on SCPI Message Protocol
-> +------------------------------------------------------------
-> +
-> +This binding uses the common clock binding[1].
-> +
-> +Required properties:
-> +- compatible : shall be one of the following:
+and have no entry for the SPI2 SDI pinmux in my documentation.
 
-Nit: s/be/include/
+Antoine
 
-> +	"arm,scpi-clocks" - for the container node with all the clocks
-> +		based on the SCPI protocol
-
-Please separate this from the description of its sub-nodes (e.g. have a
-sub-nodes heading under "arm,scpi-clocks").
-
-Is there any reason to have this container if we're only going to place
-the two clock controllers described below within it? Can't we just place
-them directly under the SCPI node?
-
-> +	"arm,scpi-dvfs" - all the clocks that are variable and index based.
-> +		These clocks don't provide the full range between the limits
-> +		but only discrete points within the range. The firmware
-> +		provides the mapping for each such operating frequency and the
-> +		index associated with it. The firmware also manages the
-> +		voltage scaling appropriately with the clock scaling.
-
-Could this be "arm,scpi-dvfs-clocks"?
-
-> +	"arm,scpi-clk" - all the clocks that are variable and provide full
-> +		range within the specified range. The firmware provides the
-> +		supported range for each clock.
-
-Likewise "arm,scpi-variable-clocks"?
-
-Using "arm,scpi-clk" makes it sound like there's a single clock output.
-
-> +
-> +Required properties for all clocks(all from common clock binding):
-> +- #clock-cells : should be set to 1 as each of the SCPI clocks have multiple
-> +	outputs. The clock specifier will be the index to an entry in the list
-> +	of output clocks.
-> +- clock-output-names : shall be the corresponding names of the outputs.
-> +- clock-indices: The identifyng number for the clocks(clock_id) in the node as
-> +	expected by the firmware. It can be non linear and hence provide the
-> +	mapping	of identifiers into the clock-output-names array.
-> +
-> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +
-> +Example:
-> +
-> +sram: sram at 50000000 {
-> +	compatible = "arm,juno-sram-ns", "mmio-sram";
-
-Nit: undocumented compatible string.
-
-> +	reg = <0x0 0x50000000 0x0 0x10000>;
-> +
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +	ranges = <0 0x0 0x50000000 0x10000>;
-> +
-> +	cpu_scp_lpri: scp-shmem at 0 {
-> +		compatible = "arm,juno-scp-shmem";
-
-Nit: undocumented compatible string.
-
-> +		reg = <0x0 0x200>;
-> +	};
-> +
-> +	cpu_scp_hpri: scp-shmem at 200 {
-> +		compatible = "arm,juno-scp-shmem";
-> +		reg = <0x200 0x200>;
-> +	};
-> +};
-> +
-> +mailbox: mailbox0 at 40000000 {
-> +	....
-> +	#mbox-cells = <1>;
-> +};
-> +
-> +scpi_protocol: scpi at 2e000000 {
-> +	compatible = "arm,scpi";
-> +	mboxes = <&mailbox 0 &mailbox 1>;
-> +	shmem = <&cpu_scp_lpri &cpu_scp_hpri>;
-> +
-> +	clocks {
-> +		compatible = "arm,scpi-clocks";
-> +
-> +		scpi_dvfs: scpi_clocks at 0 {
-> +			compatible = "arm,scpi-dvfs";
-> +			#clock-cells = <1>;
-> +			clock-indices = <0>, <1>, <2>;
-> +			clock-output-names = "vbig", "vlittle", "vgpu";
-> +		};
-> +		scpi_clk: scpi_clocks at 3 {
-> +			compatible = "arm,scpi-clk";
-> +			#clock-cells = <1>;
-> +			clock-indices = <3>, <4>;
-> +			clock-output-names = "pxlclk0", "pxlclk1";
-> +		};
-> +	};
-> +};
-> +
-> +cpu at 0 {
-> +	...
-> +	reg = <0 0>;
-> +	clocks = <&scpi_dvfs 0>;
-> +	clock-names = "big";
-
-This isn't documented anywhere, and I can't see any code in this series
-using it. The Juno dts doesn't seem to have CPU clocks, and nothing in
-this series adds them -- have I missed a series?
-
-Also, I'm not keen on using software-defined names (e.g. "big") for CPU
-clocks, as it doesn't stictly relate to the hardware. That said, the set
-of clocks, their names, and how they related to CPUs is
-implementation-specific, which is somewhat painful. I'm not sure how
-we cater for that with generic software.
-
-Thanks,
-Mark.
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
