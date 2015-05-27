@@ -1,49 +1,90 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 27 May 2015 09:57:19 +0200
-Subject: [PATCH 0/2] ARM: dts: add Okaya LCD display for Nitrogen and
- Sabrelite
-In-Reply-To: <CAAMH-yt_4HE_HWHVvb1QFZLgtGCNdoxB=BwTBHcW2JToeuC_6w@mail.gmail.com>
-References: <1432314867-30888-1-git-send-email-gary.bisson@boundarydevices.com>
- <20150527030636.GB16165@dragon>
- <CAAMH-yt_4HE_HWHVvb1QFZLgtGCNdoxB=BwTBHcW2JToeuC_6w@mail.gmail.com>
-Message-ID: <1432713439.4884.6.camel@pengutronix.de>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Wed, 27 May 2015 09:59:33 +0200
+Subject: [PATCH v2] ARM: berlin: add SPI nodes for BG2Q
+Message-ID: <1432713573-32147-1-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gary, Shawn,
+The BG2Q SoC has two SPI controllers. Add the corresponding nodes.
 
-Am Mittwoch, den 27.05.2015, 09:38 +0200 schrieb Gary Bisson:
-> Philipp, Shawn, All,
-> 
-> On Wed, May 27, 2015 at 5:06 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> > On Fri, May 22, 2015 at 07:14:25PM +0200, Gary Bisson wrote:
-> >> This series adds the Okaya 7" LCD display that is a WVGA (800x480) panel with
-> >> a 18-bit parallel interface for both Nitrogen and Sabrelite.
-> >>
-> >> A U-Boot script to configure the displays based on detection of the
-> >> touch controller is available for reference here:
-> >> https://github.com/boundarydevices/u-boot-imx6/blob/staging/board/boundary/nitrogen6x/6x_bootscript-mainline.txt
-> >>
-> >> Gary Bisson (2):
-> >>   ARM: dts: imx6qdl-nitrogen6x: add Okaya LCD display
-> >>   ARM: dts: imx6qdl-sabrelite: add Okaya LCD display
-> >
-> > Philipp,
-> >
-> > Are you okay with these two patches?
-> 
-> I've actually just ran into Philipp's patch on drm_panel support for
-> parallel-display driver.
-> https://patchwork.kernel.org/patch/6438311/
-> 
-> If the above patch is merged soon, maybe mine should be reworked to
-> use the panel as well (and add the Okaya timings to the simple panel
-> driver).
-> 
-> Let me know what would be the best.
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
 
-Yes, please add Okaya LCD support to the simple-panel driver instead.
-I'll send a pull request with the panel patch.
+Changes since v1:
+	- reworked the pinmux
+	- removed useless interrupt-parent properties
+	- typo
 
-regards
-Philipp
+ arch/arm/boot/dts/berlin2q.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+
+diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
+index 187d056f7ad2..9f42ebfa50f2 100644
+--- a/arch/arm/boot/dts/berlin2q.dtsi
++++ b/arch/arm/boot/dts/berlin2q.dtsi
+@@ -286,6 +286,19 @@
+ 				status = "disabled";
+ 			};
+ 
++			spi0: spi at 1c00 {
++				compatible = "snps,dw-apb-ssi";
++				reg = <0x1c00 0x100>;
++				interrupts = <7>;
++				clocks = <&chip_clk CLKID_CFG>;
++				pinctrl-0 = <&spi1_pmux>;
++				pinctrl-names = "default";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				num-cs = <4>;
++				status = "disabled";
++			};
++
+ 			timer0: timer at 2c00 {
+ 				compatible = "snps,dw-apb-timer";
+ 				reg = <0x2c00 0x14>;
+@@ -383,6 +396,11 @@
+ 					groups = "G7";
+ 					function = "twsi1";
+ 				};
++
++				spi1_pmux: spi1-pmux {
++					groups = "G8";
++					function = "spi1";
++				};
+ 			};
+ 
+ 			chip_rst: reset {
+@@ -473,6 +491,19 @@
+ 				};
+ 			};
+ 
++			spi1: spi at 6000 {
++				compatible = "snps,dw-apb-ssi";
++				reg = <0x6000 0x100>;
++				interrupts = <5>;
++				clocks = <&refclk>;
++				pinctrl-0 = <&spi2_pmux>;
++				pinctrl-names = "default";
++				#address-cells = <1>;
++				#size-cells = <0>;
++				num-cs = <4>;
++				status = "disabled";
++			};
++
+ 			i2c2: i2c at 7000 {
+ 				compatible = "snps,designware-i2c";
+ 				#address-cells = <1>;
+@@ -564,6 +595,11 @@
+ 						groups = "GSM14";
+ 						function = "twsi3";
+ 					};
++
++					spi2_pmux: spi2-pmux {
++						groups = "GSM3";
++						function = "spi2";
++					};
+ 				};
+ 			};
+ 
+-- 
+2.4.1
