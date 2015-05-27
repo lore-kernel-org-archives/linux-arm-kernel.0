@@ -1,263 +1,41 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 27 May 2015 23:42:18 +0200
-Subject: [PATCH v4 2/2] soc: Add driver for Freescale Vybrid Platform
-In-Reply-To: <7df753efff77a96da285f0571f1316512787e83c.1432637313.git.maitysanchayan@gmail.com>
-References: <cover.1432637313.git.maitysanchayan@gmail.com>
- <7df753efff77a96da285f0571f1316512787e83c.1432637313.git.maitysanchayan@gmail.com>
-Message-ID: <24142c6afd14661145517f298599c865@agner.ch>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 27 May 2015 22:44:40 +0100
+Subject: [PATCH 13/13] drm: bridge/dw_hdmi-ahb-audio: parse ELD from HDMI
+ driver
+In-Reply-To: <CAKMK7uFgqyHR4b+Q=_55S2Ojt-9+B-BRM4pKCRNwbRZ7kskpfA@mail.gmail.com>
+References: <20150509102501.GO2067@n2100.arm.linux.org.uk>
+ <E1Yr1yD-0006lK-RC@rmk-PC.arm.linux.org.uk>
+ <20150527104308.GA8341@phenom.ffwll.local>
+ <20150527173125.GS2067@n2100.arm.linux.org.uk>
+ <CAKMK7uFgqyHR4b+Q=_55S2Ojt-9+B-BRM4pKCRNwbRZ7kskpfA@mail.gmail.com>
+Message-ID: <20150527214439.GW2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-05-26 13:36, Sanchayan Maity wrote:
-> This adds a SoC driver to be used by the Freescale Vybrid SoC's.
-> We create the "fsl" directory for holding the different Freescale
-> designs. Driver utilises syscon to get the various register values
-> needed. After this sysfs exposes some SoC specific properties as
-> below:
-> 
->> cd /sys/devices/soc0
->> ls
-> family     machine    power      revision   soc_id     subsystem  uevent
->> cat family
-> Freescale Vybrid VF610
->> cat machine
-> Freescale Vybrid
->> cat revision
-> 00000013
->> cat soc_id
-> df6472a60c1c39d4
-> 
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> ---
->  drivers/soc/Kconfig         |   1 +
->  drivers/soc/Makefile        |   1 +
->  drivers/soc/fsl/Kconfig     |   9 +++
->  drivers/soc/fsl/Makefile    |   1 +
->  drivers/soc/fsl/soc-vf610.c | 168 ++++++++++++++++++++++++++++++++++++++++++++
->  5 files changed, 180 insertions(+)
->  create mode 100644 drivers/soc/fsl/Kconfig
->  create mode 100644 drivers/soc/fsl/Makefile
->  create mode 100644 drivers/soc/fsl/soc-vf610.c
-> 
-> diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
-> index d8bde82..8b4dd2b 100644
-> --- a/drivers/soc/Kconfig
-> +++ b/drivers/soc/Kconfig
-> @@ -1,5 +1,6 @@
->  menu "SOC (System On Chip) specific Drivers"
->  
-> +source "drivers/soc/fsl/Kconfig"
->  source "drivers/soc/mediatek/Kconfig"
->  source "drivers/soc/qcom/Kconfig"
->  source "drivers/soc/ti/Kconfig"
-> diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
-> index 70042b2..142676e 100644
-> --- a/drivers/soc/Makefile
-> +++ b/drivers/soc/Makefile
-> @@ -2,6 +2,7 @@
->  # Makefile for the Linux Kernel SOC specific device drivers.
->  #
->  
-> +obj-$(CONFIG_SOC_VF610)         += fsl/
->  obj-$(CONFIG_ARCH_MEDIATEK)	+= mediatek/
->  obj-$(CONFIG_ARCH_QCOM)		+= qcom/
->  obj-$(CONFIG_ARCH_TEGRA)	+= tegra/
-> diff --git a/drivers/soc/fsl/Kconfig b/drivers/soc/fsl/Kconfig
-> new file mode 100644
-> index 0000000..d0ac671
-> --- /dev/null
-> +++ b/drivers/soc/fsl/Kconfig
-> @@ -0,0 +1,9 @@
-> +#
-> +# Freescale SoC drivers
-> +
-> +config SOC_VF610
-> +	   bool "SoC bus device for the Freescale Vybrid platform"
-> +	   select SOC_BUS
-> +	   help
-> +	     Include support for the SoC bus on the Freescale Vybrid platform
-> +	     providing some sysfs information about the module variant.
-> \ No newline at end of file
-> diff --git a/drivers/soc/fsl/Makefile b/drivers/soc/fsl/Makefile
-> new file mode 100644
-> index 0000000..5fccbba
-> --- /dev/null
-> +++ b/drivers/soc/fsl/Makefile
-> @@ -0,0 +1 @@
-> +obj-$(CONFIG_SOC_VF610)		+= soc-vf610.o
-> diff --git a/drivers/soc/fsl/soc-vf610.c b/drivers/soc/fsl/soc-vf610.c
-> new file mode 100644
-> index 0000000..6425cfb
-> --- /dev/null
-> +++ b/drivers/soc/fsl/soc-vf610.c
-> @@ -0,0 +1,168 @@
-> +/*
-> + * Copyright 2015 Toradex AG
-> + *
-> + * Author: Sanchayan Maity <sanchayan.maity@toradex.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2, as
-> + * published by the Free Software Foundation.
-> + *
-> + */
-> +
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/module.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/regmap.h>
-> +#include <linux/random.h>
-> +#include <linux/slab.h>
-> +#include <linux/sys_soc.h>
-> +
-> +#define DRIVER_NAME "vf610-soc-bus"
-> +
-> +#define MSCM_CPxCOUNT_OFFSET   0x0000002C
-> +#define MSCM_CPxCFG1_OFFSET    0x00000014
-> +
-> +static struct soc_device_attribute *soc_dev_attr;
-> +static struct soc_device *soc_dev;
-> +
-> +static int vf610_soc_probe(struct platform_device *pdev)
-> +{
-> +	struct regmap *ocotp_regmap, *mscm_regmap, *rom_regmap;
-> +	struct device *dev = &pdev->dev;
-> +	struct device_node *node = pdev->dev.of_node;
-> +	struct device_node *soc_node;
-> +	struct of_phandle_args pargs;
-> +	char soc_type[] = "xx0";
-> +	u32 cfg0_offset, cfg1_offset, rom_rev_offset;
-> +	u32 soc_id1, soc_id2, rom_rev;
-> +	u32 cpxcount, cpxcfg1;
-> +	u64 soc_id;
-> +	int ret;
-> +
-> +	mscm_regmap = syscon_node_to_regmap(node);
-> +	if (IS_ERR(mscm_regmap)) {
-> +		dev_err(dev, "regmap lookup for mscm failed\n");
-> +		return PTR_ERR(mscm_regmap);
-> +	}
-> +
-> +	soc_node = of_find_node_by_path("/soc");
-> +
-> +	ret = of_parse_phandle_with_fixed_args(soc_node,
-> +					"ocotp-cfg", 2, 0, &pargs);
-> +	if (ret) {
-> +		dev_err(dev, "lookup failed for ocotp-cfg node %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	ocotp_regmap = syscon_node_to_regmap(pargs.np);
-> +	if (IS_ERR(ocotp_regmap)) {
-> +		of_node_put(pargs.np);
-> +		dev_err(dev, "regmap lookup for ocotp failed\n");
-> +		return PTR_ERR(ocotp_regmap);
-> +	}
-> +
-> +	cfg0_offset = pargs.args[0];
-> +	cfg1_offset = pargs.args[1];
-> +	of_node_put(pargs.np);
-> +
-> +	ret = of_parse_phandle_with_fixed_args(soc_node,
-> +					"rom-revision", 1, 0, &pargs);
-> +	if (ret) {
-> +		dev_err(dev, "lookup failed for rom-revision node %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	rom_regmap = syscon_node_to_regmap(pargs.np);
-> +	if (IS_ERR(rom_regmap)) {
-> +		of_node_put(pargs.np);
-> +		dev_err(dev, "regmap lookup for ocrom failed\n");
-> +		return PTR_ERR(rom_regmap);
-> +	}
-> +
-> +	rom_rev_offset = pargs.args[0];
-> +	of_node_put(pargs.np);
-> +
-> +	ret = regmap_read(ocotp_regmap, cfg0_offset, &soc_id1);
-> +	if (ret)
-> +		return -ENODEV;
-> +
-> +	ret = regmap_read(ocotp_regmap, cfg1_offset, &soc_id2);
-> +	if (ret)
-> +		return -ENODEV;
-> +
-> +	soc_id = (u64) soc_id1 << 32 | soc_id2;
-> +	add_device_randomness(&soc_id, sizeof(soc_id));
-> +
-> +	ret = regmap_read(mscm_regmap, MSCM_CPxCOUNT_OFFSET, &cpxcount);
-> +	if (ret)
-> +		return -ENODEV;
-> +
-> +	ret = regmap_read(mscm_regmap, MSCM_CPxCFG1_OFFSET, &cpxcfg1);
-> +	if (ret)
-> +		return -ENODEV;
-> +
-> +	soc_type[0] = cpxcount ? '6' : '5'; /* Dual Core => VF6x0 */
-> +	soc_type[1] = cpxcfg1 ? '1' : '0'; /* L2 Cache => VFx10 */
-> +
-> +	ret = regmap_read(rom_regmap, rom_rev_offset, &rom_rev);
-> +	if (ret)
-> +		return -ENODEV;
-> +
-> +	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-> +	if (!soc_dev_attr)
-> +		return -ENOMEM;
-> +
-> +	soc_dev_attr->machine = kasprintf(GFP_KERNEL, "Freescale Vybrid");
-> +	soc_dev_attr->soc_id = kasprintf(GFP_KERNEL, "%016llx", soc_id);
-> +	soc_dev_attr->family = kasprintf(GFP_KERNEL, "Freescale Vybrid VF%s",
-> +								 soc_type);
-> +	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%08x", rom_rev);
-> +
-> +	soc_dev = soc_device_register(soc_dev_attr);
-> +	if (IS_ERR(soc_dev)) {
-> +		kfree(soc_dev_attr->revision);
-> +		kfree(soc_dev_attr->family);
-> +		kfree(soc_dev_attr->soc_id);
-> +		kfree(soc_dev_attr->machine);
-> +		kfree(soc_dev_attr);
-> +		return -ENODEV;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int vf610_soc_remove(struct platform_device *pdev)
-> +{
-> +	if (soc_dev_attr) {
-> +		kfree(soc_dev_attr->revision);
-> +		kfree(soc_dev_attr->family);
-> +		kfree(soc_dev_attr->soc_id);
-> +		kfree(soc_dev_attr->machine);
-> +		kfree(soc_dev_attr);
-> +	}
-> +
-> +	if (soc_dev)
-> +		soc_device_unregister(soc_dev);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id vf610_soc_bus_match[] = {
-> +	{ .compatible = "fsl,vf610-mscm-cpucfg", },
+On Wed, May 27, 2015 at 11:29:52PM +0200, Daniel Vetter wrote:
+> The only issue that might be
+> there with your sw approach is that a concurrent probe/hotplug in drm
+> might free the edid and hence the eld, while the snd side is trying to
+> copy that.
 
-IMHO that is a mix and match now. We still bind this driver to a
-specific device, while we point directly to the registers from the SoC
-level (in the device tree).
+Talking only about the particular case of dw-hdmi-ahb-audio...
 
-I'm not sure if the suggestion I made in v2 is acceptable: Couldn't we
-add compatible nodes to the SoC level and bind this driver to the SoC
-directly? I think if we point to the registers at SoC level, we should
-also bind this driver to the SoC level. Of course, then we additionally
-need to point to the mscm-cpucfg register to get the SoC type
-information.
+The worst that may happen is that the ELD will be overwritten with an
+update on hotplug - it won't be freed unless the underlying connector
+is freed, as the eld is stored as an array inside struct drm_connector.
+Before the DRM connector is freed, we pull the audio driver's struct
+device, which will destroy the ALSA device.
 
-If we keep this driver bound to "fsl,vf610-mscm-cpucfg", then I think we
-should also point from this node to the other nodes/registers...
+Hopefully ALSA already copes gracefully with the removal of an in-use
+device... it should do, it's no different from having a USB audio device
+and you pull it out of the USB socket while the device is in-use.
 
-Arnd, where did you meant to put the pointers?
+(It's also worth noting as we're talking about this, that as the audio
+struct device is a child of the HDMI device, any PM activity will be
+correctly ordered: the child gets suspended before the parent... the
+audio device gets suspended before the video, and resume is of course
+the reverse order.)
 
---
-Stefan
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
