@@ -1,94 +1,62 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Wed, 27 May 2015 19:47:00 +0200
-Subject: [PATCH v4 2/2] soc: Add driver for Freescale Vybrid Platform
-In-Reply-To: <7df753efff77a96da285f0571f1316512787e83c.1432637313.git.maitysanchayan@gmail.com>
-References: <cover.1432637313.git.maitysanchayan@gmail.com>
- <7df753efff77a96da285f0571f1316512787e83c.1432637313.git.maitysanchayan@gmail.com>
-Message-ID: <CAGhQ9VxzpPP0+YiVcwE2to_8Ajm1r4659HuWM8pfxUk0jdOzcw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 27 May 2015 18:46:57 +0100
+Subject: [PATCH RFC] ARM: use -marm unconditionally for THUMB2_KERNEL=n
+ builds
+In-Reply-To: <20150527145921.GT24769@pengutronix.de>
+References: <1432719727-28860-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20150527095339.GQ2067@n2100.arm.linux.org.uk>
+ <20150527145921.GT24769@pengutronix.de>
+Message-ID: <20150527174657.GV2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 May 2015 at 13:36, Sanchayan Maity <maitysanchayan@gmail.com> wrote:
-> This adds a SoC driver to be used by the Freescale Vybrid SoC's.
-> We create the "fsl" directory for holding the different Freescale
-> designs. Driver utilises syscon to get the various register values
-> needed. After this sysfs exposes some SoC specific properties as
-> below:
->
->> cd /sys/devices/soc0
->> ls
-> family     machine    power      revision   soc_id     subsystem  uevent
->> cat family
-> Freescale Vybrid VF610
->> cat machine
-> Freescale Vybrid
->> cat revision
-> 00000013
->> cat soc_id
-> df6472a60c1c39d4
->
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> ---
-[...]
-> +static struct soc_device_attribute *soc_dev_attr;
-> +static struct soc_device *soc_dev;
+On Wed, May 27, 2015 at 04:59:21PM +0200, Uwe Kleine-K?nig wrote:
+> Hello Russell,
+> 
+> On Wed, May 27, 2015 at 10:53:39AM +0100, Russell King - ARM Linux wrote:
+> > On Wed, May 27, 2015 at 11:42:07AM +0200, Uwe Kleine-K?nig wrote:
+> > > The only possible culprit is a compiler that doesn't understand -marm.
+> > > My compiler collection only goes back to 4.0.3 which does work with this
+> > > option. The use of cc-option to test for -marm was introduced in commit
+> > > 5636810d6f17 ([ARM] 3982/2: Explicitly select 32-bit ARM ISA (-marm))
+> > > back in 2006 when the minimal compiler version was already 3.3.
+> > 
+> > According to gcc 3.3's --target-help, it supports -mthumb, but not -marm.
+> > 
+> > What we could possibly do is to change the := to a plain =, and then
+> > evaluate all the options together via:
+> > 
+> > KBUILD_CFLAGS :=$(KBUILD_CFLAGS)
+> You mean
+> 
+> 	KBUILD_CFLAGS += $(arch-y)
+> 
+> as soon as arch-y is defined to assert it's already present when -marm
+> is tested for, right? I will give that a try.
 
-Now that this is a proper platform device consider putting these in a
-struct and allocated it in probe to get rid of the global variables.
+I mean:
 
-> +static int vf610_soc_probe(struct platform_device *pdev)
-> +{
-> +       struct regmap *ocotp_regmap, *mscm_regmap, *rom_regmap;
-> +       struct device *dev = &pdev->dev;
-> +       struct device_node *node = pdev->dev.of_node;
-[...]
-> +       soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-> +       if (!soc_dev_attr)
-> +               return -ENOMEM;
-> +
-> +       soc_dev_attr->machine = kasprintf(GFP_KERNEL, "Freescale Vybrid");
-> +       soc_dev_attr->soc_id = kasprintf(GFP_KERNEL, "%016llx", soc_id);
-> +       soc_dev_attr->family = kasprintf(GFP_KERNEL, "Freescale Vybrid VF%s",
-> +                                                                soc_type);
-> +       soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%08x", rom_rev);
-> +
-> +       soc_dev = soc_device_register(soc_dev_attr);
-> +       if (IS_ERR(soc_dev)) {
-> +               kfree(soc_dev_attr->revision);
-> +               kfree(soc_dev_attr->family);
-> +               kfree(soc_dev_attr->soc_id);
-> +               kfree(soc_dev_attr->machine);
-> +               kfree(soc_dev_attr);
+ else
+-CFLAGS_ISA	:=$(call cc-option,-marm,)
+-AFLAGS_ISA	:=$(CFLAGS_ISA)
++CFLAGS_ISA	=$(call cc-option,-marm,)
++AFLAGS_ISA	=$(CFLAGS_ISA)
+ endif
+...
+-KBUILD_CFLAGS	+=$(CFLAGS_ABI) $(CFLAGS_ISA) $(arch-y) $(tune-y) $(call cc-option,-mshort-load-bytes,$(call cc-option,-malignment-traps,)) -msoft-float -Uarm
+-KBUILD_AFLAGS	+=$(CFLAGS_ABI) $(AFLAGS_ISA) $(arch-y) $(tune-y) -include asm/unified.h -msoft-float
++CFLAGS_TRAPS	:=$(call cc-option,-mshort-load-bytes,$(call cc-option,-malignment-traps,))
++
++KBUILD_CFLAGS	+=$(CFLAGS_ABI) $(arch-y) $(tune-y) $(CFLAGS_TRAPS) -msoft-float -Uarm
++KBUILD_AFLAGS	+=$(CFLAGS_ABI) $(arch-y) $(tune-y) -include asm/unified.h -msoft-float
 
-Since you now have a device pointer you can now uses all the devm_*
-functions to allocate your memory.
-There is also a devm_kasprintf function.
++# Ensures that all previous $(call ...) options are evaluated once
++KBUILD_CFLAGS	:=$(CFLAGS_ISA) $(KBUILD_CFLAGS)
++KBUILD_AFLAGS	:=$(CFLAGS_ISA) $(KBUILD_AFLAGS)
 
-> +               return -ENODEV;
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +static int vf610_soc_remove(struct platform_device *pdev)
-> +{
-> +       if (soc_dev_attr) {
-> +               kfree(soc_dev_attr->revision);
-> +               kfree(soc_dev_attr->family);
-> +               kfree(soc_dev_attr->soc_id);
-> +               kfree(soc_dev_attr->machine);
-> +               kfree(soc_dev_attr);
+This has the effect that "-marm" will be evaluated with all the other
+KBUILD_CFLAGS options already set.  (I think I have this right...)
 
-With devm_* you can remove this stuff.
-
-> +       }
-> +
-> +       if (soc_dev)
-> +               soc_device_unregister(soc_dev);
-> +
-> +       return 0;
-> +}
-
-
-regards,
-Joachim Eastwood
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
