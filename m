@@ -1,50 +1,40 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 27 May 2015 14:43:46 +0200
-Subject: [PATCH v2] clocksource: exynos_mct: fix for sleeping in atomic
- ctx handling cpu hotplug notif.
-In-Reply-To: <1432567470.13951.2.camel@AMDC1552.digital.local>
-References: <1426151496-5509-1-git-send-email-d.eppel@samsung.com>
- <55509013.3040901@linaro.org>
- <1432567470.13951.2.camel@AMDC1552.digital.local>
-Message-ID: <5565BC02.7010101@linaro.org>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 27 May 2015 14:47:50 +0200
+Subject: [PATCH v5 0/2] iio: adc: vf610: respect ADC clocking limitations
+Message-ID: <1432730872-14325-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/25/2015 05:24 PM, Damian Eppel wrote:
-> On Mon, 2015-05-11 at 13:18 +0200, Daniel Lezcano wrote:
+This revision is basically the same as v4, just some wording
+improvements. I would appriciate an Ack for the device tree part.
+The clock limit values are defined in the data sheet and could
+be different per SoC, hence descirbe the hardware limitation...
 
-[ ... ]
+Changes since v4:
+- Remove fussy english
+- Drop "iio: adc: vf610: use ADC clock within specification" since
+  that patch is already applied
 
->> The code sounds very complex for what it is supposed to do.
->>
->> Perhaps I am missing something but you have more or less the same
->> functionality than the smp_twd timers and these ones don't look so complex.
->>
->> Could you please look at the smp_twd.c implementation ?
->
-> Hi Daniel,
->
-> exynos_mct.c driver looks more complex as it supports two types of timer
-> interrupts - private and shared peripheral interrupts (for exynos4412
-> and exynos4210 accordingly). In smp_twd.c driver I can see only PPI type
-> of irqs supported. SPI and PPI irqs differs slightly in setup - thus two
-> different code paths appears in the driver in initialization and
-> handling of CPU notifications. The fix is addressing issue that appears
-> only for hardware using SPI irqs so it is hard to compare it to
-> smp_twd.c.
-> BTW, If we remove support for SPI irqs in exynos_mct.c it would look
-> almost the same as smp_twd.c.
+Changes since v3:
+- Move device tree bindings to driver changes
 
-Ok, thanks.
+Changes since v2:
+- Add sysfs ABI documentation
+- Fix commit message spelling errors
 
-I will have a deeper look this afternoon.
+Changes since v1:
+- Use ext_info for conversion mode
 
-   -- Daniel
+Stefan Agner (2):
+  iio: adc: vf610: implement configurable conversion modes
+  ARM: dts: add property for maximum ADC clock frequencies
 
+ Documentation/ABI/testing/sysfs-bus-iio-vf610      |   7 +
+ .../devicetree/bindings/iio/adc/vf610-adc.txt      |   9 ++
+ arch/arm/boot/dts/vfxxx.dtsi                       |   4 +
+ drivers/iio/adc/vf610_adc.c                        | 146 +++++++++++++++------
+ 4 files changed, 124 insertions(+), 42 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-vf610
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+2.4.1
