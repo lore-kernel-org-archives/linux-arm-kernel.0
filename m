@@ -1,49 +1,34 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 27 May 2015 13:41:55 +0100
-Subject: [PATCHv3 11/12] ARM: migrate to common PSCI client code
-In-Reply-To: <CAJ5Y-eYpPXWEZpVxdnAytjHS0D+ufDoYQUo3yKqLbysCSGswSw@mail.gmail.com>
-References: <1432648350-5454-1-git-send-email-mark.rutland@arm.com>
- <1432648350-5454-12-git-send-email-mark.rutland@arm.com>
- <CAJ5Y-eYpPXWEZpVxdnAytjHS0D+ufDoYQUo3yKqLbysCSGswSw@mail.gmail.com>
-Message-ID: <20150527124155.GI8439@leverpostej>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 27 May 2015 14:42:58 +0200
+Subject: [PATCH 1/2 v2] ARM64: juno: add GPIO keys
+In-Reply-To: <20150526093734.GB2175@e106497-lin.cambridge.arm.com>
+References: <1432629650-19559-1-git-send-email-linus.walleij@linaro.org>
+ <20150526093734.GB2175@e106497-lin.cambridge.arm.com>
+Message-ID: <CACRpkdbm9LxaWQa=SQAhOKYVncPoFiKv_M6cN1oUEqctiR5=pQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 27, 2015 at 01:01:23PM +0100, Ashwin Chaugule wrote:
-> On 26 May 2015 at 09:52, Mark Rutland <mark.rutland@arm.com> wrote:
-> > Now that the common PSCI client code has been factored out to
-> > drivers/firmware, and made safe for 32-bit use, move the 32-bit ARM code
-> > over to it. This results in a moderate reduction of duplicated lines,
-> > and will prevent further duplication as the PSCI client code is updated
-> > for PSCI 1.0 and beyond.
-> >
-> > The two legacy platform users of the PSCI invocation code are updated to
-> > account for interface changes. In both cases the power state parameter
-> > is changed to an opaque u32 token in preparation for PSCI 1.0 power
-> > state changes.
-> >
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Ashwin Chaugule <ashwin.chaugule@linaro.org>
-> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: Rob Herring <robh@kernel.org>
-> > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm/Kconfig                  |   1 +
-> >  arch/arm/include/asm/psci.h       |  23 ---
-> >  arch/arm/kernel/Makefile          |   2 +-
-> >  arch/arm/kernel/psci.c            | 299 --------------------------------------
-> >  arch/arm/kernel/psci_smp.c        |  29 +++-
-> >  arch/arm/kernel/setup.c           |   3 +-
-> >  arch/arm/mach-highbank/highbank.c |   2 +-
-> >  arch/arm/mach-highbank/pm.c       |   8 +-
-> >  drivers/cpuidle/cpuidle-calxeda.c |   7 +-
-> >  9 files changed, 32 insertions(+), 342 deletions(-)
-> >  delete mode 100644 arch/arm/kernel/psci.c
-> 
-> Reviewed-by: Ashwin Chaugule <ashwin.chaugule@linaro.org>
+On Tue, May 26, 2015 at 11:37 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
 
-Cheers!
+> I'm going to do a test on my board once I find a bit of spare time
+> as I have some in-house reports that the handling of the GPIO
+> buttons is not reliable and on some boards it led to board reset.
+> Firmware might have been updated since (last year) so it would be
+> useful if you can tell me the version(s) of firmware that you are
+> using.
 
-Mark.
+ARM V2M-Juno Boot loader v1.0.0
+HBI0262 build 616
+
+ARM V2M_Juno Firmware v1.1.8
+Build Date: Jun 17 2014
+
+Time :  12:23:19
+Date :  27:05:2015
+
+Cmd> reboot
+
+This?
+
+Yours,
+Linus Walleij
