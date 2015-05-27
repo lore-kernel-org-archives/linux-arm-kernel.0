@@ -1,106 +1,46 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 27 May 2015 18:35:19 -0500
-Subject: [PATCH 1/2] PCI: iproc: directly add pci resources
-In-Reply-To: <1432499823-27369-1-git-send-email-hauke@hauke-m.de>
-References: <1432499823-27369-1-git-send-email-hauke@hauke-m.de>
-Message-ID: <20150527233519.GH10210@google.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 28 May 2015 01:39:38 +0200
+Subject: [PATCH v3 12/12] ARM: imx: move timer driver into
+ drivers/clocksource
+In-Reply-To: <20150527140448.GJ16165@dragon>
+References: <1432308599-28643-13-git-send-email-shawn.guo@linaro.org>
+ <1432530849-12312-1-git-send-email-shawn.guo@linaro.org>
+ <5565BD93.50600@linaro.org> <20150527140448.GJ16165@dragon>
+Message-ID: <556655BA.3020903@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 24, 2015 at 10:37:02PM +0200, Hauke Mehrtens wrote:
-> The resources member in the struct was pointing to a stack variable and
-> is invalid after the the registration function returned. Remove this
-> pointer and add it a a parameter to the function.
-> 
-> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+On 05/27/2015 04:04 PM, Shawn Guo wrote:
+> On Wed, May 27, 2015 at 02:50:27PM +0200, Daniel Lezcano wrote:
+>> On 05/25/2015 07:14 AM, Shawn Guo wrote:
+>>> After the cleanup on imx timer driver, now it's ready to be moved into
+>>> drivers/clocksource/.  Let's do it.
+>>>
+>>> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+>>
+>> I don't see the Kconfig change.
+>
+> As timer-imx-gpt is the only supported timer for i.MX, we use
+> architecture option CONFIG_ARCH_MXC to control it for now.
 
-Applied both patches with Ray's Reviewed-by to pci/host-iproc for v4.2,
-thanks!
+Hi Shawn,
 
-> ---
->  drivers/pci/host/pcie-iproc-bcma.c     | 4 +---
->  drivers/pci/host/pcie-iproc-platform.c | 4 +---
->  drivers/pci/host/pcie-iproc.c          | 4 ++--
->  drivers/pci/host/pcie-iproc.h          | 3 +--
->  4 files changed, 5 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pcie-iproc-bcma.c b/drivers/pci/host/pcie-iproc-bcma.c
-> index c318f19..f96b39e 100644
-> --- a/drivers/pci/host/pcie-iproc-bcma.c
-> +++ b/drivers/pci/host/pcie-iproc-bcma.c
-> @@ -62,11 +62,9 @@ static int iproc_pcie_bcma_probe(struct bcma_device *bdev)
->  	res_mem.flags = IORESOURCE_MEM;
->  	pci_add_resource(&res, &res_mem);
->  
-> -	pcie->resources = &res;
-> -
->  	pcie->map_irq = iproc_pcie_bcma_map_irq;
->  
-> -	ret = iproc_pcie_setup(pcie);
-> +	ret = iproc_pcie_setup(pcie, &res);
->  	if (ret) {
->  		dev_err(pcie->dev, "PCIe controller setup failed\n");
->  		return ret;
-> diff --git a/drivers/pci/host/pcie-iproc-platform.c b/drivers/pci/host/pcie-iproc-platform.c
-> index c8aa06f..c5fe4c1 100644
-> --- a/drivers/pci/host/pcie-iproc-platform.c
-> +++ b/drivers/pci/host/pcie-iproc-platform.c
-> @@ -69,11 +69,9 @@ static int iproc_pcie_pltfm_probe(struct platform_device *pdev)
->  		return ret;
->  	}
->  
-> -	pcie->resources = &res;
-> -
->  	pcie->map_irq = of_irq_parse_and_map_pci;
->  
-> -	ret = iproc_pcie_setup(pcie);
-> +	ret = iproc_pcie_setup(pcie, &res);
->  	if (ret) {
->  		dev_err(pcie->dev, "PCIe controller setup failed\n");
->  		return ret;
-> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
-> index cef31f6..d77481e 100644
-> --- a/drivers/pci/host/pcie-iproc.c
-> +++ b/drivers/pci/host/pcie-iproc.c
-> @@ -183,7 +183,7 @@ static void iproc_pcie_enable(struct iproc_pcie *pcie)
->  	writel(SYS_RC_INTX_MASK, pcie->base + SYS_RC_INTX_EN);
->  }
->  
-> -int iproc_pcie_setup(struct iproc_pcie *pcie)
-> +int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
->  {
->  	int ret;
->  	struct pci_bus *bus;
-> @@ -211,7 +211,7 @@ int iproc_pcie_setup(struct iproc_pcie *pcie)
->  	pcie->sysdata.private_data = pcie;
->  
->  	bus = pci_create_root_bus(pcie->dev, 0, &iproc_pcie_ops,
-> -				  &pcie->sysdata, pcie->resources);
-> +				  &pcie->sysdata, res);
->  	if (!bus) {
->  		dev_err(pcie->dev, "unable to create PCI root bus\n");
->  		ret = -ENOMEM;
-> diff --git a/drivers/pci/host/pcie-iproc.h b/drivers/pci/host/pcie-iproc.h
-> index a333d4b..ba0a108 100644
-> --- a/drivers/pci/host/pcie-iproc.h
-> +++ b/drivers/pci/host/pcie-iproc.h
-> @@ -29,7 +29,6 @@
->  struct iproc_pcie {
->  	struct device *dev;
->  	void __iomem *base;
-> -	struct list_head *resources;
->  	struct pci_sys_data sysdata;
->  	struct pci_bus *root_bus;
->  	struct phy *phy;
-> @@ -37,7 +36,7 @@ struct iproc_pcie {
->  	int (*map_irq)(const struct pci_dev *, u8, u8);
->  };
->  
-> -int iproc_pcie_setup(struct iproc_pcie *pcie);
-> +int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res);
->  int iproc_pcie_remove(struct iproc_pcie *pcie);
->  
->  #endif /* _PCIE_IPROC_H */
-> -- 
-> 2.1.4
-> 
+please use the same as:
+
+https://lkml.org/lkml/2015/5/22/855
+
+and then add in the platform's Kconfig the timer option as:
+
+https://lkml.org/lkml/2015/5/22/937
+
+Thanks
+
+   -- Daniel
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
