@@ -1,183 +1,306 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 27 May 2015 16:01:53 +0200
-Subject: [PATCH 2/2] dmaengine: hdmac: Implement interleaved transfers
-In-Reply-To: <1432735313-481-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1432735313-481-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1432735313-481-3-git-send-email-maxime.ripard@free-electrons.com>
+From: lznuaa@gmail.com (Zhi Li)
+Date: Wed, 27 May 2015 09:05:11 -0500
+Subject: [PATCH v5 1/6] rtc: arm: imx: snvs: change use syscon to access
+ register
+In-Reply-To: <1432657562-5592-2-git-send-email-Frank.Li@freescale.com>
+References: <1432657562-5592-1-git-send-email-Frank.Li@freescale.com>
+ <1432657562-5592-2-git-send-email-Frank.Li@freescale.com>
+Message-ID: <CAHrpEqQXQGLf48X3k6D5cOaHCMCwzZHcFZHqbg9=zU+nr4tvbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AT91 HDMAC controller supports interleaved transfers through what's
-called the Picture-in-Picture mode, which allows to transfer a squared
-portion of a framebuffer.
+On Tue, May 26, 2015 at 11:25 AM,  <Frank.Li@freescale.com> wrote:
+> From: Frank Li <Frank.Li@freescale.com>
+>
+> snvs included rtc, on/off key, power-off module
+> change to syscon to access register
+>
+> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+> ---
+>  drivers/rtc/rtc-snvs.c | 132 +++++++++++++++++++++++++------------------------
+>  1 file changed, 67 insertions(+), 65 deletions(-)
 
-This means that this interleaved transfer only supports interleaved
-transfers which have a transfer size and ICGs that are fixed across all the
-chunks.
+Alexandre Belloni
 
-While this is a quite drastic restriction of the interleaved transfers
-compared to what the dmaengine API allows, this is still useful, and our
-driver will only reject transfers that do not conform to this.
+I think you merge this patch because shawn guo already Acked.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/dma/at_hdmac.c      | 106 ++++++++++++++++++++++++++++++++++++++++++++
- drivers/dma/at_hdmac_regs.h |   5 +++
- 2 files changed, 111 insertions(+)
+best regards
+Frank Li
 
-diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-index 57b2141ddddc..59892126d175 100644
---- a/drivers/dma/at_hdmac.c
-+++ b/drivers/dma/at_hdmac.c
-@@ -247,6 +247,10 @@ static void atc_dostart(struct at_dma_chan *atchan, struct at_desc *first)
- 	channel_writel(atchan, CTRLA, 0);
- 	channel_writel(atchan, CTRLB, 0);
- 	channel_writel(atchan, DSCR, first->txd.phys);
-+	channel_writel(atchan, SPIP, ATC_SPIP_HOLE(first->src_hole) |
-+		       ATC_SPIP_BOUNDARY(first->boundary));
-+	channel_writel(atchan, DPIP, ATC_DPIP_HOLE(first->dst_hole) |
-+		       ATC_DPIP_BOUNDARY(first->boundary));
- 	dma_writel(atdma, CHER, atchan->mask);
- 
- 	vdbg_dump_regs(atchan);
-@@ -635,6 +639,104 @@ static dma_cookie_t atc_tx_submit(struct dma_async_tx_descriptor *tx)
- }
- 
- /**
-+ * atc_prep_dma_interleaved - prepare memory to memory interleaved operation
-+ * @chan: the channel to prepare operation on
-+ * @xt: Interleaved transfer template
-+ * @flags: tx descriptor status flags
-+ */
-+static struct dma_async_tx_descriptor *
-+atc_prep_dma_interleaved(struct dma_chan *chan,
-+			 struct dma_interleaved_template *xt,
-+			 unsigned long flags)
-+{
-+	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
-+	struct data_chunk	*first = xt->sgl;
-+	struct at_desc		*desc = NULL;
-+	size_t			xfer_count;
-+	unsigned int		dwidth;
-+	u32			ctrla;
-+	u32			ctrlb;
-+	size_t			len = 0;
-+	int			i;
-+
-+	dev_info(chan2dev(chan),
-+		 "%s: src=0x%08x, dest=0x%08x, numf=%d, frame_size=%d, flags=0x%lx\n",
-+		__func__, xt->src_start, xt->dst_start, xt->numf,
-+		xt->frame_size, flags);
-+
-+	if (unlikely(!xt || xt->numf != 1 || !xt->frame_size))
-+		return NULL;
-+
-+	/*
-+	 * The controller can only "skip" X bytes every Y bytes, so we
-+	 * need to make sure we are given a template that fit that
-+	 * description, ie a template with chunks that always have the
-+	 * same size, with the same ICGs.
-+	 */
-+	for (i = 0; i < xt->frame_size; i++) {
-+		struct data_chunk *chunk = xt->sgl + i;
-+
-+		if ((chunk->size != xt->sgl->size) ||
-+		    (dmaengine_get_dst_icg(xt, chunk) != dmaengine_get_dst_icg(xt, first)) ||
-+		    (dmaengine_get_src_icg(xt, chunk) != dmaengine_get_src_icg(xt, first))) {
-+			dev_err(chan2dev(chan),
-+				"%s: the controller can transfer only identical chunks\n",
-+				__func__);
-+			return NULL;
-+		}
-+
-+		len += chunk->size;
-+	}
-+
-+	dwidth = atc_get_xfer_width(xt->src_start,
-+				    xt->dst_start, len);
-+
-+	xfer_count = len >> dwidth;
-+	if (xfer_count > ATC_BTSIZE_MAX) {
-+		dev_err(chan2dev(chan), "%s: buffer is too big\n", __func__);
-+		return NULL;
-+	}
-+
-+	ctrla = ATC_SRC_WIDTH(dwidth) |
-+		ATC_DST_WIDTH(dwidth);
-+
-+	ctrlb =   ATC_DEFAULT_CTRLB | ATC_IEN
-+		| ATC_SRC_ADDR_MODE_INCR
-+		| ATC_DST_ADDR_MODE_INCR
-+		| ATC_SRC_PIP
-+		| ATC_DST_PIP
-+		| ATC_FC_MEM2MEM;
-+
-+	/* create the transfer */
-+	desc = atc_desc_get(atchan);
-+	if (!desc) {
-+		dev_err(chan2dev(chan),
-+			"%s: couldn't allocate our descriptor\n", __func__);
-+		return NULL;
-+	}
-+
-+	desc->lli.saddr = xt->src_start;
-+	desc->lli.daddr = xt->dst_start;
-+	desc->lli.ctrla = ctrla | xfer_count;
-+	desc->lli.ctrlb = ctrlb;
-+
-+	desc->boundary = first->size >> dwidth;
-+	desc->dst_hole = (dmaengine_get_dst_icg(xt, first) >> dwidth) + 1;
-+	desc->src_hole = (dmaengine_get_src_icg(xt, first) >> dwidth) + 1;
-+
-+	desc->txd.cookie = -EBUSY;
-+	desc->total_len = desc->len = len;
-+	desc->tx_width = dwidth;
-+
-+	/* set end-of-link to the last link descriptor of list*/
-+	set_desc_eol(desc);
-+
-+	desc->txd.flags = flags; /* client is in control of this ack */
-+
-+	return &desc->txd;
-+}
-+
-+/**
-  * atc_prep_dma_memcpy - prepare a memcpy operation
-  * @chan: the channel to prepare operation on
-  * @dest: operation virtual destination address
-@@ -1609,6 +1711,7 @@ static int __init at_dma_probe(struct platform_device *pdev)
- 	/* setup platform data for each SoC */
- 	dma_cap_set(DMA_MEMCPY, at91sam9rl_config.cap_mask);
- 	dma_cap_set(DMA_SG, at91sam9rl_config.cap_mask);
-+	dma_cap_set(DMA_INTERLEAVE, at91sam9g45_config.cap_mask);
- 	dma_cap_set(DMA_MEMCPY, at91sam9g45_config.cap_mask);
- 	dma_cap_set(DMA_SLAVE, at91sam9g45_config.cap_mask);
- 	dma_cap_set(DMA_SG, at91sam9g45_config.cap_mask);
-@@ -1713,6 +1816,9 @@ static int __init at_dma_probe(struct platform_device *pdev)
- 	atdma->dma_common.dev = &pdev->dev;
- 
- 	/* set prep routines based on capability */
-+	if (dma_has_cap(DMA_INTERLEAVE, atdma->dma_common.cap_mask))
-+		atdma->dma_common.device_prep_interleaved_dma = atc_prep_dma_interleaved;
-+
- 	if (dma_has_cap(DMA_MEMCPY, atdma->dma_common.cap_mask))
- 		atdma->dma_common.device_prep_dma_memcpy = atc_prep_dma_memcpy;
- 
-diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
-index 2727ca560572..bc8d5ebedd19 100644
---- a/drivers/dma/at_hdmac_regs.h
-+++ b/drivers/dma/at_hdmac_regs.h
-@@ -196,6 +196,11 @@ struct at_desc {
- 	size_t				len;
- 	u32				tx_width;
- 	size_t				total_len;
-+
-+	/* Interleaved data */
-+	size_t				boundary;
-+	size_t				dst_hole;
-+	size_t				src_hole;
- };
- 
- static inline struct at_desc *
--- 
-2.4.1
+>
+> diff --git a/drivers/rtc/rtc-snvs.c b/drivers/rtc/rtc-snvs.c
+> index 0479e80..fa67d7c 100644
+> --- a/drivers/rtc/rtc-snvs.c
+> +++ b/drivers/rtc/rtc-snvs.c
+> @@ -18,6 +18,10 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/rtc.h>
+>  #include <linux/clk.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/regmap.h>
+> +
+> +#define SNVS_LPREGISTER_OFFSET 0x34
+>
+>  /* These register offsets are relative to LP (Low Power) range */
+>  #define SNVS_LPCR              0x04
+> @@ -37,31 +41,36 @@
+>
+>  struct snvs_rtc_data {
+>         struct rtc_device *rtc;
+> -       void __iomem *ioaddr;
+> +       struct regmap *regmap;
+> +       int offset;
+>         int irq;
+> -       spinlock_t lock;
+>         struct clk *clk;
+>  };
+>
+> -static u32 rtc_read_lp_counter(void __iomem *ioaddr)
+> +static u32 rtc_read_lp_counter(struct snvs_rtc_data *data)
+>  {
+>         u64 read1, read2;
+> +       u32 val;
+>
+>         do {
+> -               read1 = readl(ioaddr + SNVS_LPSRTCMR);
+> +               regmap_read(data->regmap, data->offset + SNVS_LPSRTCMR, &val);
+> +               read1 = val;
+>                 read1 <<= 32;
+> -               read1 |= readl(ioaddr + SNVS_LPSRTCLR);
+> +               regmap_read(data->regmap, data->offset + SNVS_LPSRTCLR, &val);
+> +               read1 |= val;
+>
+> -               read2 = readl(ioaddr + SNVS_LPSRTCMR);
+> +               regmap_read(data->regmap, data->offset + SNVS_LPSRTCMR, &val);
+> +               read2 = val;
+>                 read2 <<= 32;
+> -               read2 |= readl(ioaddr + SNVS_LPSRTCLR);
+> +               regmap_read(data->regmap, data->offset + SNVS_LPSRTCLR, &val);
+> +               read2 |= val;
+>         } while (read1 != read2);
+>
+>         /* Convert 47-bit counter to 32-bit raw second count */
+>         return (u32) (read1 >> CNTR_TO_SECS_SH);
+>  }
+>
+> -static void rtc_write_sync_lp(void __iomem *ioaddr)
+> +static void rtc_write_sync_lp(struct snvs_rtc_data *data)
+>  {
+>         u32 count1, count2, count3;
+>         int i;
+> @@ -69,15 +78,15 @@ static void rtc_write_sync_lp(void __iomem *ioaddr)
+>         /* Wait for 3 CKIL cycles */
+>         for (i = 0; i < 3; i++) {
+>                 do {
+> -                       count1 = readl(ioaddr + SNVS_LPSRTCLR);
+> -                       count2 = readl(ioaddr + SNVS_LPSRTCLR);
+> +                       regmap_read(data->regmap, data->offset + SNVS_LPSRTCLR, &count1);
+> +                       regmap_read(data->regmap, data->offset + SNVS_LPSRTCLR, &count2);
+>                 } while (count1 != count2);
+>
+>                 /* Now wait until counter value changes */
+>                 do {
+>                         do {
+> -                               count2 = readl(ioaddr + SNVS_LPSRTCLR);
+> -                               count3 = readl(ioaddr + SNVS_LPSRTCLR);
+> +                               regmap_read(data->regmap, data->offset + SNVS_LPSRTCLR, &count2);
+> +                               regmap_read(data->regmap, data->offset + SNVS_LPSRTCLR, &count3);
+>                         } while (count2 != count3);
+>                 } while (count3 == count1);
+>         }
+> @@ -85,23 +94,14 @@ static void rtc_write_sync_lp(void __iomem *ioaddr)
+>
+>  static int snvs_rtc_enable(struct snvs_rtc_data *data, bool enable)
+>  {
+> -       unsigned long flags;
+>         int timeout = 1000;
+>         u32 lpcr;
+>
+> -       spin_lock_irqsave(&data->lock, flags);
+> -
+> -       lpcr = readl(data->ioaddr + SNVS_LPCR);
+> -       if (enable)
+> -               lpcr |= SNVS_LPCR_SRTC_ENV;
+> -       else
+> -               lpcr &= ~SNVS_LPCR_SRTC_ENV;
+> -       writel(lpcr, data->ioaddr + SNVS_LPCR);
+> -
+> -       spin_unlock_irqrestore(&data->lock, flags);
+> +       regmap_update_bits(data->regmap, data->offset + SNVS_LPCR, SNVS_LPCR_SRTC_ENV,
+> +                          enable ? SNVS_LPCR_SRTC_ENV : 0);
+>
+>         while (--timeout) {
+> -               lpcr = readl(data->ioaddr + SNVS_LPCR);
+> +               regmap_read(data->regmap, data->offset + SNVS_LPCR, &lpcr);
+>
+>                 if (enable) {
+>                         if (lpcr & SNVS_LPCR_SRTC_ENV)
+> @@ -121,7 +121,7 @@ static int snvs_rtc_enable(struct snvs_rtc_data *data, bool enable)
+>  static int snvs_rtc_read_time(struct device *dev, struct rtc_time *tm)
+>  {
+>         struct snvs_rtc_data *data = dev_get_drvdata(dev);
+> -       unsigned long time = rtc_read_lp_counter(data->ioaddr);
+> +       unsigned long time = rtc_read_lp_counter(data);
+>
+>         rtc_time_to_tm(time, tm);
+>
+> @@ -139,8 +139,8 @@ static int snvs_rtc_set_time(struct device *dev, struct rtc_time *tm)
+>         snvs_rtc_enable(data, false);
+>
+>         /* Write 32-bit time to 47-bit timer, leaving 15 LSBs blank */
+> -       writel(time << CNTR_TO_SECS_SH, data->ioaddr + SNVS_LPSRTCLR);
+> -       writel(time >> (32 - CNTR_TO_SECS_SH), data->ioaddr + SNVS_LPSRTCMR);
+> +       regmap_write(data->regmap, data->offset + SNVS_LPSRTCLR, time << CNTR_TO_SECS_SH);
+> +       regmap_write(data->regmap, data->offset + SNVS_LPSRTCMR, time >> (32 - CNTR_TO_SECS_SH));
+>
+>         /* Enable RTC again */
+>         snvs_rtc_enable(data, true);
+> @@ -153,10 +153,10 @@ static int snvs_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
+>         struct snvs_rtc_data *data = dev_get_drvdata(dev);
+>         u32 lptar, lpsr;
+>
+> -       lptar = readl(data->ioaddr + SNVS_LPTAR);
+> +       regmap_read(data->regmap, data->offset + SNVS_LPTAR, &lptar);
+>         rtc_time_to_tm(lptar, &alrm->time);
+>
+> -       lpsr = readl(data->ioaddr + SNVS_LPSR);
+> +       regmap_read(data->regmap, data->offset + SNVS_LPSR, &lpsr);
+>         alrm->pending = (lpsr & SNVS_LPSR_LPTA) ? 1 : 0;
+>
+>         return 0;
+> @@ -165,21 +165,12 @@ static int snvs_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
+>  static int snvs_rtc_alarm_irq_enable(struct device *dev, unsigned int enable)
+>  {
+>         struct snvs_rtc_data *data = dev_get_drvdata(dev);
+> -       u32 lpcr;
+> -       unsigned long flags;
+> -
+> -       spin_lock_irqsave(&data->lock, flags);
+>
+> -       lpcr = readl(data->ioaddr + SNVS_LPCR);
+> -       if (enable)
+> -               lpcr |= (SNVS_LPCR_LPTA_EN | SNVS_LPCR_LPWUI_EN);
+> -       else
+> -               lpcr &= ~(SNVS_LPCR_LPTA_EN | SNVS_LPCR_LPWUI_EN);
+> -       writel(lpcr, data->ioaddr + SNVS_LPCR);
+> +       regmap_update_bits(data->regmap, data->offset + SNVS_LPCR,
+> +                          (SNVS_LPCR_LPTA_EN | SNVS_LPCR_LPWUI_EN),
+> +                          enable ? (SNVS_LPCR_LPTA_EN | SNVS_LPCR_LPWUI_EN) : 0);
+>
+> -       spin_unlock_irqrestore(&data->lock, flags);
+> -
+> -       rtc_write_sync_lp(data->ioaddr);
+> +       rtc_write_sync_lp(data);
+>
+>         return 0;
+>  }
+> @@ -189,24 +180,14 @@ static int snvs_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
+>         struct snvs_rtc_data *data = dev_get_drvdata(dev);
+>         struct rtc_time *alrm_tm = &alrm->time;
+>         unsigned long time;
+> -       unsigned long flags;
+> -       u32 lpcr;
+>
+>         rtc_tm_to_time(alrm_tm, &time);
+>
+> -       spin_lock_irqsave(&data->lock, flags);
+> -
+> -       /* Have to clear LPTA_EN before programming new alarm time in LPTAR */
+> -       lpcr = readl(data->ioaddr + SNVS_LPCR);
+> -       lpcr &= ~SNVS_LPCR_LPTA_EN;
+> -       writel(lpcr, data->ioaddr + SNVS_LPCR);
+> -
+> -       spin_unlock_irqrestore(&data->lock, flags);
+> -
+> -       writel(time, data->ioaddr + SNVS_LPTAR);
+> +       regmap_update_bits(data->regmap, data->offset + SNVS_LPCR, SNVS_LPCR_LPTA_EN, 0);
+> +       regmap_write(data->regmap, data->offset + SNVS_LPTAR, time);
+>
+>         /* Clear alarm interrupt status bit */
+> -       writel(SNVS_LPSR_LPTA, data->ioaddr + SNVS_LPSR);
+> +       regmap_write(data->regmap, data->offset + SNVS_LPSR, SNVS_LPSR_LPTA);
+>
+>         return snvs_rtc_alarm_irq_enable(dev, alrm->enabled);
+>  }
+> @@ -226,7 +207,7 @@ static irqreturn_t snvs_rtc_irq_handler(int irq, void *dev_id)
+>         u32 lpsr;
+>         u32 events = 0;
+>
+> -       lpsr = readl(data->ioaddr + SNVS_LPSR);
+> +       regmap_read(data->regmap, data->offset + SNVS_LPSR, &lpsr);
+>
+>         if (lpsr & SNVS_LPSR_LPTA) {
+>                 events |= (RTC_AF | RTC_IRQF);
+> @@ -238,25 +219,48 @@ static irqreturn_t snvs_rtc_irq_handler(int irq, void *dev_id)
+>         }
+>
+>         /* clear interrupt status */
+> -       writel(lpsr, data->ioaddr + SNVS_LPSR);
+> +       regmap_write(data->regmap, data->offset + SNVS_LPSR, lpsr);
+>
+>         return events ? IRQ_HANDLED : IRQ_NONE;
+>  }
+>
+> +static const struct regmap_config snvs_rtc_config = {
+> +       .reg_bits = 32,
+> +       .val_bits = 32,
+> +       .reg_stride = 4,
+> +};
+> +
+>  static int snvs_rtc_probe(struct platform_device *pdev)
+>  {
+>         struct snvs_rtc_data *data;
+>         struct resource *res;
+>         int ret;
+> +       void __iomem *mmio;
+>
+>         data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+>         if (!data)
+>                 return -ENOMEM;
+>
+> -       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -       data->ioaddr = devm_ioremap_resource(&pdev->dev, res);
+> -       if (IS_ERR(data->ioaddr))
+> -               return PTR_ERR(data->ioaddr);
+> +       data->regmap = syscon_regmap_lookup_by_phandle(pdev->dev.of_node, "regmap");
+> +
+> +       if (IS_ERR(data->regmap)) {
+> +               dev_warn(&pdev->dev, "snvs rtc: you use old dts file, please update it\n");
+> +               res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +
+> +               mmio = devm_ioremap_resource(&pdev->dev, res);
+> +               if (IS_ERR(mmio))
+> +                       return PTR_ERR(mmio);
+> +
+> +               data->regmap = devm_regmap_init_mmio(&pdev->dev, mmio, &snvs_rtc_config);
+> +       } else {
+> +               data->offset = SNVS_LPREGISTER_OFFSET;
+> +               of_property_read_u32(pdev->dev.of_node, "offset", &data->offset);
+> +       }
+> +
+> +       if (!data->regmap) {
+> +               dev_err(&pdev->dev, "Can't find snvs syscon\n");
+> +               return -ENODEV;
+> +       }
+>
+>         data->irq = platform_get_irq(pdev, 0);
+>         if (data->irq < 0)
+> @@ -276,13 +280,11 @@ static int snvs_rtc_probe(struct platform_device *pdev)
+>
+>         platform_set_drvdata(pdev, data);
+>
+> -       spin_lock_init(&data->lock);
+> -
+>         /* Initialize glitch detect */
+> -       writel(SNVS_LPPGDR_INIT, data->ioaddr + SNVS_LPPGDR);
+> +       regmap_write(data->regmap, data->offset + SNVS_LPPGDR, SNVS_LPPGDR_INIT);
+>
+>         /* Clear interrupt status */
+> -       writel(0xffffffff, data->ioaddr + SNVS_LPSR);
+> +       regmap_write(data->regmap, data->offset + SNVS_LPSR, 0xffffffff);
+>
+>         /* Enable RTC */
+>         snvs_rtc_enable(data, true);
+> --
+> 1.9.1
+>
