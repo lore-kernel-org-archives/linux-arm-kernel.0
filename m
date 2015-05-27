@@ -1,28 +1,73 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Wed, 27 May 2015 15:00:13 +0200
-Subject: [PATCH 1/2] ARM: cache-l2c: Detect whether it's safe to unlock
-In-Reply-To: <20150515113448.GI2067@n2100.arm.linux.org.uk>
-References: <1431416355-7693-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <1431416355-7693-2-git-send-email-sjoerd.simons@collabora.co.uk>
- <20150515113448.GI2067@n2100.arm.linux.org.uk>
-Message-ID: <1432731613.2781.13.camel@collabora.co.uk>
+From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
+Date: Wed, 27 May 2015 18:37:27 +0530
+Subject: [PATCH v4 2/2] soc: Add driver for Freescale Vybrid Platform
+In-Reply-To: <1432711910.27695.223.camel@x220>
+References: <cover.1432637313.git.maitysanchayan@gmail.com>
+ <7df753efff77a96da285f0571f1316512787e83c.1432637313.git.maitysanchayan@gmail.com>
+ <1432711910.27695.223.camel@x220>
+Message-ID: <20150527130727.GA3374@Sanchayan-Arch.toradex.int>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Russell,
+Hello,
 
-On Fri, 2015-05-15 at 12:34 +0100, Russell King - ARM Linux wrote:
-> On Tue, May 12, 2015 at 09:39:14AM +0200, Sjoerd Simons wrote:
-> > To handle that, for caches where special configuration is needed to allow
-> > unlocking, check whether this has been setup before unlocking.
+On 15-05-27 09:31:50, Paul Bolle wrote:
+> On Tue, 2015-05-26 at 17:06 +0530, Sanchayan Maity wrote:
+> > --- /dev/null
+> > +++ b/drivers/soc/fsl/Kconfig
 > 
-> I've come up with a different solution to this, which of course I prefer.
-> I'll post the patches later today, thanks.
+> > +config SOC_VF610
+> > +	   bool "SoC bus device for the Freescale Vybrid platform"
+> > +	   select SOC_BUS
+> > +	   help
+> > +	     Include support for the SoC bus on the Freescale Vybrid platform
+> > +	     providing some sysfs information about the module variant.
+> > \ No newline at end of file
+> 
+> (That review comment is courtesy of git.)
 
-Did you get round to create/posting those patches? If not, i'm happy to
-do a set with your suggested solution as well if you can point me in the
-right direction :)
+Will fix it.
 
--- 
-Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-Collabora Ltd.
+> 
+> > --- /dev/null
+> > +++ b/drivers/soc/fsl/Makefile
+> 
+> > +obj-$(CONFIG_SOC_VF610)		+= soc-vf610.o
+> 
+> > --- /dev/null
+> > +++ b/drivers/soc/fsl/soc-vf610.c
+> 
+> > +MODULE_DEVICE_TABLE(of, vf610_soc_bus_match);
+> 
+> > +module_platform_driver(vf610_soc_driver);
+> 
+> (The series starting at https://lkml.org/lkml/2015/5/10/131 would allow
+> to use builtin_platform_driver() for built-in only code.)
+
+Thanks for bringing this to my attention. I am subscribed to the mailing
+list however this skipped me.
+
+> 
+> > +MODULE_DESCRIPTION("Freescale VF610 SoC bus driver");
+> > +MODULE_LICENSE("GPL v2");
+> 
+> I think soc-vf610.o can only be built-in. But its code contains a few
+> module specific macros. Was it perhaps intended for SOC_VF610 to be
+> tristate?
+
+I too think that should be built-in. Did not have an intention of making
+it tristate, however while using other drivers as references, the perhaps
+unneccessary stuff crept in.
+
+The MODULE_* references can be removed along with the corresponding header
+file. However that series has not been merged yet, so I can't use builtin_*
+yet?
+
+@Arnd
+
+Are you ok with the patch in general? I can take care of the above changes
+and send a new version. And once the builtin_driver stuff gets merged, I
+can send a minor patch to change this module one to builtin?
+
+Regards,
+Sanchayan.
