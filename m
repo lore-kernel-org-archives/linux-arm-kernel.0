@@ -1,33 +1,54 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 27 May 2015 19:39:08 +0100
-Subject: [PATCH 2/3] spi: orion: Fix extended baud rates for each Armada
- SoCs
-In-Reply-To: <55660343.9060200@free-electrons.com>
-References: <1432633484-18758-1-git-send-email-gregory.clement@free-electrons.com>
- <1432633484-18758-3-git-send-email-gregory.clement@free-electrons.com>
- <20150526120853.GB28523@lunn.ch>
- <556464F8.1020707@free-electrons.com>
- <20150527174547.GI21577@sirena.org.uk>
- <55660343.9060200@free-electrons.com>
-Message-ID: <20150527183908.GN21577@sirena.org.uk>
+From: christian.perone@gmail.com (Christian S. Perone)
+Date: Wed, 27 May 2015 15:51:39 -0300
+Subject: Hibernation on ARM64
+In-Reply-To: <20150525053346.GB17561@cbz-thinkpad>
+References: <CAMxMOAtMw3jnyrvn46m0ZeiwtWjRRZ-i21N5+riwn-3qei+szg@mail.gmail.com>
+ <20150522110218.GC5623@red-moon> <20150525053346.GB17561@cbz-thinkpad>
+Message-ID: <CAMxMOAuvs_n8g=D2g0aYVUWYnpr0YTkbc6+MHdi+eQEaMqm1uQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 27, 2015 at 07:47:47PM +0200, Gregory CLEMENT wrote:
-> On 27/05/2015 19:45, Mark Brown wrote:
+Thanks for the reply Lorenzo and Chen. I asked because it seems that
+someone tried before and failed [1] due to some page faults while
+calling copy_page(). I'm also interested in testing the patches.
 
-> > I fixed it up locally (in general it's easier to just send the patch
-> > though).
+[1] https://lkml.org/lkml/2015/1/10/120
 
-> Thanks! And next time I will send a v2 then if it is easier for you.
+On Mon, May 25, 2015 at 2:33 AM, Chen Baozi <cbz@baozis.org> wrote:
+> Hi Lorenzo,
+>
+> On Fri, May 22, 2015 at 12:02:18PM +0100, Lorenzo Pieralisi wrote:
+>> Hi Christian,
+>>
+>> On Thu, May 21, 2015 at 07:34:06PM +0100, Christian S. Perone wrote:
+>> > Hello, I haven't found any information, road map or something like
+>> > that for the hibernation support for ARM64, does anyone knows if there
+>> > is something planned to support this in near future ?
+>>
+>> Adding arch support for hibernation to arm64 should be fairly simple,
+>> it is not top priority at the moment simply because there are not
+>> compelling use-cases (on the PM side most features revolve around
+>> CPUidle and suspend-to-idle and S2R).
+>>
+>> To answer your question, yes I have planned to support it, I just
+>> do not want to add it to the kernel for no particular reason, if there
+>> are compelling requirements (I guess you are asking for a specific
+>> reason) it can be done fairly quickly.
+>>
+>
+> I am also looking forward the hibernation support on arm64. Thanks for
+> the information.
+>
+> Could you please CCed me the hiberation patches when you send them to
+> list. I can help test it. :-)
+>
+> Cheers,
+>
+> Baozi.
 
-I'd say it's just easier in general - "can you please either fix this up
-locally or apply this patch" means that whatever the answer is it can be
-acted on immediately.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150527/71e1ddc6/attachment-0001.sig>
+
+
+-- 
+Blog | Github | Twitter
+"Forgive, O Lord, my little jokes on Thee, and I'll forgive Thy great
+big joke on me."
