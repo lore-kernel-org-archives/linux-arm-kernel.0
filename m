@@ -1,57 +1,51 @@
-From: sophian.yoma@gmail.com (yoma sophian)
-Date: Wed, 27 May 2015 20:24:04 +0800
-Subject: some question about arm64 smp_spin_table.c
-In-Reply-To: <20150527103644.GE8439@leverpostej>
-References: <CADUS3o=4b9zfKtyiZ2CKgC2AA9ntkFLo91pJug17t1Xz2jM34w@mail.gmail.com>
- <20150527103644.GE8439@leverpostej>
-Message-ID: <CADUS3okgaMGYfKkY7eBWjVvdKyfGjyp5hx0uaRWj5a1Y98+ocQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 27 May 2015 13:23:58 +0100
+Subject: [PATCHv3 00/12] arm/arm64: Unify PSCI client support
+In-Reply-To: <55657B9B.5010206@linaro.org>
+References: <1432648350-5454-1-git-send-email-mark.rutland@arm.com>
+ <55657B9B.5010206@linaro.org>
+Message-ID: <20150527122358.GG8439@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Mark:
+On Wed, May 27, 2015 at 09:08:59AM +0100, Hanjun Guo wrote:
+> On 2015?05?26? 21:52, Mark Rutland wrote:
+> > This series unifies the 32-bit and 64-bit PSCI client code, moving the bulk of
+> > the FW invocation and probing out to a common location in drivers/firmware.
+> > As part of this, the remaining edge cases for PSCI 0.2 (Trusted OSs rejecting
+> > CPU_OFF) are accounted for, making both 32-bit adn 64-bit clients more robust.
+> >
+> > This results in a reasonable saving in terms of lines of code, and will allow
+> > for PSCI 1.0 support to be unified form the beginning, avoiding further
+> > duplication.
+> >
+> > The series is based on the arm64 for-next/cpu-init branch [3] due to conflicts
+> > with that series.
+> >
+> > Since v1 [1]:
+> > * Fix build when PSCI isn't selected
+> > * Don't indirect migrate_info_up_cpu
+> > * Fix ver to u32 in psci_get_version
+> >
+> > Since v2: [2]:
+> > * Rebase atop of Lorenzo's cpu init cleanup series [3]
+> > * Use the correct native function IDs
+> > * Fix cpu_disable return values
+> > * Report invalid MIGRATE_INFO_UP_CPU return values
+> >
+> > Many thanks to those who have reviewed and tested so far! Unfortunately, due to
+> > the volume of changes in the rebase I've dropped all Tested-by tags. I've
+> > locally tested 32-bit and 64-bit kernels with DT.
+> 
+> I tested this patch set on ARM64 kernel with ACPI as I did in previous
+> version, compile this patch set ok with CONFIG_ACPI=y/n, and CPU
+> hotplug works with PSCI (CPU_ON/OFF),
+> 
+> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-2015-05-27 18:36 GMT+08:00 Mark Rutland <mark.rutland@arm.com>:
-> On Wed, May 27, 2015 at 10:47:09AM +0100, yoma sophian wrote:
->> hi all:
->
-> Hi,
->
->> in arm64/kernel/smp_spin_table.c
->>     --> smp_spin_table_prepare_cpu,
->> we suppose the cpu_release_addr[cpu] is located in kernel logical memory.
->>
->> in Arm plarform, this part is implement by each platform driver, since
->> they register its own smp_operations.
->>
->> And in Arm64, once other platform use different area, such as register
->> or device memory, to put cpu_release_addr[cpu], shall we use ioremap
->> to get the va like below patch?
->
-> Platforms need to place the release address in memory which can be
-> mapped with cacheable attributes. That is required by the semantics of
-> memreserve (which implies a cacheable mapping is fine).
->
-> Since commit 113954c6463d1d80 ("arm64: spin-table: handle unmapped
-> cpu-release-addrs") we allowed for cpu-release-addrs which did not fall
-> in the linear mapping, by using ioremap_cache. This still requires that
-> the memory can be mapped cacheable.
-Oops, I use kernel 3.10 and that is why I didn't see your patch before :)
+Thanks!
 
-BTW, as I explained to Arnd, in booting.txt, it didn't mentioned the
-cpu-release-addrs has to be cacheable.
-why we need the address mapped as cacheable?
+I've applied that to the first 10 patches, but not to the patch
+affecting 32-bit ARM nor the patch updating MAINTAINERS.
 
-> As Arnd says, if the cpu-release-addr is not in memory which can be
-> mapped as cacheable, then you're arguably not implementing spin-table.
-> There are a whole slew of coherency issues that the current
-> implementation avoids by being very simple, and I'm not keen about
-> prospect of changing that.
-is there any special requirement we need to follow when using spin-table mode?
->
-> Is there any particular reason that you do not wish to place your
-> cpu-release-addrs in memory?
-for not make address with a hole to put spin address and put that area
-as seperate power domain.
-we use registers for other core spin jumping address.
-
-Appreciate your kind help,
+Mark.
