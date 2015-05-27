@@ -1,62 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 27 May 2015 18:46:57 +0100
-Subject: [PATCH RFC] ARM: use -marm unconditionally for THUMB2_KERNEL=n
- builds
-In-Reply-To: <20150527145921.GT24769@pengutronix.de>
-References: <1432719727-28860-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20150527095339.GQ2067@n2100.arm.linux.org.uk>
- <20150527145921.GT24769@pengutronix.de>
-Message-ID: <20150527174657.GV2067@n2100.arm.linux.org.uk>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 27 May 2015 19:47:47 +0200
+Subject: [PATCH 2/3] spi: orion: Fix extended baud rates for each Armada
+ SoCs
+In-Reply-To: <20150527174547.GI21577@sirena.org.uk>
+References: <1432633484-18758-1-git-send-email-gregory.clement@free-electrons.com>
+ <1432633484-18758-3-git-send-email-gregory.clement@free-electrons.com>
+ <20150526120853.GB28523@lunn.ch> <556464F8.1020707@free-electrons.com>
+ <20150527174547.GI21577@sirena.org.uk>
+Message-ID: <55660343.9060200@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 27, 2015 at 04:59:21PM +0200, Uwe Kleine-K?nig wrote:
-> Hello Russell,
+Hi Mark,
+
+On 27/05/2015 19:45, Mark Brown wrote:
+> On Tue, May 26, 2015 at 02:20:08PM +0200, Gregory CLEMENT wrote:
 > 
-> On Wed, May 27, 2015 at 10:53:39AM +0100, Russell King - ARM Linux wrote:
-> > On Wed, May 27, 2015 at 11:42:07AM +0200, Uwe Kleine-K?nig wrote:
-> > > The only possible culprit is a compiler that doesn't understand -marm.
-> > > My compiler collection only goes back to 4.0.3 which does work with this
-> > > option. The use of cc-option to test for -marm was introduced in commit
-> > > 5636810d6f17 ([ARM] 3982/2: Explicitly select 32-bit ARM ISA (-marm))
-> > > back in 2006 when the minimal compiler version was already 3.3.
-> > 
-> > According to gcc 3.3's --target-help, it supports -mthumb, but not -marm.
-> > 
-> > What we could possibly do is to change the := to a plain =, and then
-> > evaluate all the options together via:
-> > 
-> > KBUILD_CFLAGS :=$(KBUILD_CFLAGS)
-> You mean
+>> Mark do you want a new patch or do you prefer fixing the typo
+>> yourself ? it should be
 > 
-> 	KBUILD_CFLAGS += $(arch-y)
+> I fixed it up locally (in general it's easier to just send the patch
+> though).
 > 
-> as soon as arch-y is defined to assert it's already present when -marm
-> is tested for, right? I will give that a try.
 
-I mean:
+Thanks! And next time I will send a v2 then if it is easier for you.
 
- else
--CFLAGS_ISA	:=$(call cc-option,-marm,)
--AFLAGS_ISA	:=$(CFLAGS_ISA)
-+CFLAGS_ISA	=$(call cc-option,-marm,)
-+AFLAGS_ISA	=$(CFLAGS_ISA)
- endif
-...
--KBUILD_CFLAGS	+=$(CFLAGS_ABI) $(CFLAGS_ISA) $(arch-y) $(tune-y) $(call cc-option,-mshort-load-bytes,$(call cc-option,-malignment-traps,)) -msoft-float -Uarm
--KBUILD_AFLAGS	+=$(CFLAGS_ABI) $(AFLAGS_ISA) $(arch-y) $(tune-y) -include asm/unified.h -msoft-float
-+CFLAGS_TRAPS	:=$(call cc-option,-mshort-load-bytes,$(call cc-option,-malignment-traps,))
-+
-+KBUILD_CFLAGS	+=$(CFLAGS_ABI) $(arch-y) $(tune-y) $(CFLAGS_TRAPS) -msoft-float -Uarm
-+KBUILD_AFLAGS	+=$(CFLAGS_ABI) $(arch-y) $(tune-y) -include asm/unified.h -msoft-float
+Gregory
 
-+# Ensures that all previous $(call ...) options are evaluated once
-+KBUILD_CFLAGS	:=$(CFLAGS_ISA) $(KBUILD_CFLAGS)
-+KBUILD_AFLAGS	:=$(CFLAGS_ISA) $(KBUILD_AFLAGS)
-
-This has the effect that "-marm" will be evaluated with all the other
-KBUILD_CFLAGS options already set.  (I think I have this right...)
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
