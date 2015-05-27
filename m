@@ -1,45 +1,61 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 27 May 2015 16:40:23 +0800
-Subject: [PATCH] ARM: imx6: gpc: don't register power domain if DT data
- is missing
-In-Reply-To: <1432714226-6333-1-git-send-email-l.stach@pengutronix.de>
-References: <1432714226-6333-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <20150527084022.GE16165@dragon>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Wed, 27 May 2015 10:51:13 +0200
+Subject: [PATCH 1/7] perf: allow for PMU-specific event filtering
+In-Reply-To: <20150522140844.GA1619@arm.com>
+References: <1431533549-27715-1-git-send-email-mark.rutland@arm.com>
+ <1431533549-27715-2-git-send-email-mark.rutland@arm.com>
+ <20150522140844.GA1619@arm.com>
+Message-ID: <20150527085113.GV3644@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 27, 2015 at 10:10:26AM +0200, Lucas Stach wrote:
-> If the devicetree is too old and does not provide the regulator and clocks
-> for the power domain, we need to avoid registering the power domain.
-> Otherwise runtime PM will try to control the domain, which will lead to
-> machine hangs without the proper DT configuration data.
+On Fri, May 22, 2015 at 03:08:44PM +0100, Will Deacon wrote:
+> Hi Mark,
 > 
-> This restores functionality to the kernel 4.0 level if an old DT is
-> detected, where the power domain is constantly powered on.
+> On Wed, May 13, 2015 at 05:12:23PM +0100, Mark Rutland wrote:
+> > In certain circumstances it may not be possible to schedule particular
+> > events due to constraints other than a lack of hardware counters (e.g.
+> > on big.LITTLE systems where CPUs support different events). The core
+> > perf event code does not distinguish these cases and pessimistically
+> > assumes that any failure to schedule an event means that it is not worth
+> > attempting to schedule later events, even if some hardware counters are
+> > still unused.
+> > 
+> > When an event a pmu cannot schedule exists in a flexible group list it
+> > can unnecessarily prevent event groups following it in the list from
+> > being scheduled (until it is rotated to the end of the list). This means
+> > some events are scheduled for only a portion of the time they could be,
+> > and for short running programs no events may be scheduled if the list is
+> > initially sorted in an unfortunate order.
+> > 
+> > This patch adds a new (optional) filter_match function pointer to struct
+> > pmu which a pmu driver can use to tell perf core when an event matches
+> > pmu-specific scheduling requirements. This plugs into the existing
+> > event_filter_match logic, and makes it possible to avoid the scheduling
+> > problem described above. When no filter is provided by the PMU, the
+> > existing behaviour is retained.
+> > 
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Acked-by: Will Deacon <will.deacon@arm.com>
+> > Cc: Peter Zijlstra <peterz@infradead.org>
+> > Cc: Paul Mackerras <paulus@samba.org>
+> > Cc: Ingo Molnar <mingo@redhat.com>
+> > Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
+> > ---
+> >  include/linux/perf_event.h | 5 +++++
+> >  kernel/events/core.c       | 8 +++++++-
+> >  2 files changed, 12 insertions(+), 1 deletion(-)
 > 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> Whilst I'm really keen to merge the architecture-specific parts of this
+> series, I'm going to need an Ack from one of the perf core maintainers
+> on this patch.
+> 
+> Peter, can you take a look please? (and I assume this is self-contained
+> enough not to conflict heavily with the current perf queue?).
 
-Applied, thanks.
+Acked-by: Peter Zijlstra (Intel) <peterz@infradead.org>
 
-> ---
->  arch/arm/mach-imx/gpc.c | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
-> index bbf015056221..6d0893a3828e 100644
-> --- a/arch/arm/mach-imx/gpc.c
-> +++ b/arch/arm/mach-imx/gpc.c
-> @@ -449,6 +449,10 @@ static int imx_gpc_probe(struct platform_device *pdev)
->  	struct regulator *pu_reg;
->  	int ret;
->  
-> +	/* bail out if DT too old and doesn't provide the necessary info */
-> +	if (!of_property_read_bool(pdev->dev.of_node, "#power-domain-cells"))
-> +		return 0;
-> +
->  	pu_reg = devm_regulator_get_optional(&pdev->dev, "pu");
->  	if (PTR_ERR(pu_reg) == -ENODEV)
->  		pu_reg = NULL;
-> -- 
-> 2.1.4
-> 
+Merge it however you like, but test merge against tip/perf/core or
+something of that nature, if a conflict pops up, maybe keep this one
+patch in a separate branch such that it can also be pulled into
+tip/perf/core -- but as you say, I don't really suspect a conflict.
