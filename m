@@ -1,29 +1,27 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Wed, 27 May 2015 10:32:45 -0400
-Subject: [PATCH v3 0/3] AHCI: Add generic MSI-X interrupt support to SATA
- PCI driver
-In-Reply-To: <1432713693-4282-1-git-send-email-rric@kernel.org>
-References: <1432713693-4282-1-git-send-email-rric@kernel.org>
-Message-ID: <20150527143245.GN7099@htj.duckdns.org>
+From: carlo@caione.org (Carlo Caione)
+Date: Wed, 27 May 2015 16:36:36 +0200
+Subject: [PATCH v2 0/3] clk: meson: Add clock controller
+In-Reply-To: <1431773333-23567-1-git-send-email-carlo@caione.org>
+References: <1431773333-23567-1-git-send-email-carlo@caione.org>
+Message-ID: <CAOQ7t2YNXBEtWnTWSM5Wc3DEP434DcpE5ZpTqPfzAaQsL=5cJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 27, 2015 at 10:01:30AM +0200, Robert Richter wrote:
-> From: Robert Richter <rrichter@cavium.com>
-> 
-> This patch set adds generic support for MSI-X interrupts to the SATA
-> PCI driver.
-> 
-> The first 2 patches rework the code, one splits msi and intx code into
-> separate functions, the other changes interrupt initialization to
-> store the irq number in the ahci data structure (struct
-> ahci_host_priv). Both changes are needed to implement MSI-X support in
-> the last 3rd patch.
+On Sat, May 16, 2015 at 12:48 PM, Carlo Caione <carlo@caione.org> wrote:
+> From: Carlo Caione <carlo@endlessm.com>
+>
+> This patchset introduces preliminary support for the clock controller
+> found on Amlogic MesonX SoCs and enables it for the Meson8b.
+>
+> DTS patches with support for Meson8b SoCs will follow.
+>
+> Changelog:
+>
+> v1->v2:
+>    * fix double CLK_IGNORE_UNUSED in clk-pll.c
+>    * fix comment in meson8b-clkc.h
 
-Patch #2 doesn't apply to libata/for-4.2 due to the recently added
-edge triggered irq support.  Can you please refresh the patch series?
-
-Thank you.
+Gentle ping
 
 -- 
-tejun
+Carlo Caione
