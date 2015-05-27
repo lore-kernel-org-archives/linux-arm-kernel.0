@@ -1,104 +1,24 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 27 May 2015 11:55:45 +0800
-Subject: [PATCH 10/11] XEN / PCI: Remove the dependence on arch x86 when
- PCI_MMCONFIG=y
-In-Reply-To: <556494D9.9090007@oracle.com>
+Date: Wed, 27 May 2015 11:57:59 +0800
+Subject: [PATCH 00/11] ARM64 PCI hostbridge init based on ACPI
+In-Reply-To: <1951882.p8DdrcurkC@vostro.rjw.lan>
 References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
- <1432644564-24746-11-git-send-email-hanjun.guo@linaro.org>
- <55647B22.3010801@oracle.com> <55647C94.9080606@oracle.com>
- <5564893B.2070102@linaro.org> <556494D9.9090007@oracle.com>
-Message-ID: <55654041.2040902@linaro.org>
+ <1951882.p8DdrcurkC@vostro.rjw.lan>
+Message-ID: <556540C7.6080301@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?05?26? 23:44, Boris Ostrovsky wrote:
-> On 05/26/2015 10:54 AM, Tomasz Nowicki wrote:
->> On 26.05.2015 16:00, Boris Ostrovsky wrote:
->>> On 05/26/2015 09:54 AM, Boris Ostrovsky wrote:
->>>> On 05/26/2015 08:49 AM, Hanjun Guo wrote:
->>>>> In drivers/xen/pci.c, there are arch x86 dependent codes when
->>>>> CONFIG_PCI_MMCONFIG is enabled, since CONFIG_PCI_MMCONFIG
->>>>> depends on ACPI, so this will prevent XEN PCI running on other
->>>>> architectures using ACPI with PCI_MMCONFIG enabled (such as ARM64).
->>>>>
->>>>> Fortunatly, it can be sloved in a simple way. In drivers/xen/pci.c,
->>>>> the only x86 dependent code is if ((pci_probe & PCI_PROBE_MMCONF) ==
->>>>> 0),
->>>>> and it's defined in asm/pci_x86.h, the code means that
->>>>> if the PCI resource is not probed in PCI_PROBE_MMCONF way, just
->>>>> ingnore the xen mcfg init. Actually this is duplicate, because
->>>>> if PCI resource is not probed in PCI_PROBE_MMCONF way, the
->>>>> pci_mmconfig_list will be empty, and the if (list_empty())
->>>>> after it will do the same job.
->>>>>
->>>>> So just remove the arch related code and the head file, this
->>>>> will be no functional change for x86, and also makes xen/pci.c
->>>>> usable for other architectures.
->>>>>
->>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->>>>> CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
->>>>> CC: Boris Ostrovsky <boris.ostrovsky@oracle.com>
->>>>> ---
->>>>>   drivers/xen/pci.c | 6 ------
->>>>>   1 file changed, 6 deletions(-)
->>>>>
->>>>> diff --git a/drivers/xen/pci.c b/drivers/xen/pci.c
->>>>> index 6785ebb..9a8dbe3 100644
->>>>> --- a/drivers/xen/pci.c
->>>>> +++ b/drivers/xen/pci.c
->>>>> @@ -28,9 +28,6 @@
->>>>>   #include <asm/xen/hypervisor.h>
->>>>>   #include <asm/xen/hypercall.h>
->>>>>   #include "../pci/pci.h"
->>>>> -#ifdef CONFIG_PCI_MMCONFIG
->>>>> -#include <asm/pci_x86.h>
->>>>> -#endif
->>>>>
->>>>>   static bool __read_mostly pci_seg_supported = true;
->>>>>
->>>>> @@ -222,9 +219,6 @@ static int __init xen_mcfg_late(void)
->>>>>       if (!xen_initial_domain())
->>>>>           return 0;
->>>>>
->>>>> -    if ((pci_probe & PCI_PROBE_MMCONF) == 0)
->>>>> -        return 0;
->>>>> -
->>>>>       if (list_empty(&pci_mmcfg_list))
->>>>>           return 0;
->>>>>
->>>>
->>>> (+Stefano who is Xen ARM maintainer)
->>>>
->>>> This will not build on x86 since pci_mmcfg_list since, for example,
->>>> pci_mmcfg_list is declared in pci_x86.h.
->>>
->>>
->>> And now really with Stefano and with parsable first sentence, sorry:
->>>
->>>
->>> This will not build on x86 since pci_mmcfg_list, for example, is
->>> declared in pci_x86.h.
+On 2015?05?27? 08:30, Rafael J. Wysocki wrote:
+> On Tuesday, May 26, 2015 08:49:13 PM Hanjun Guo wrote:
+>> This patch set is introducing ARM64 PCI hostbridge init based on ACPI,
+>> which based on Jiang Liu's patch set "Consolidate ACPI PCI root common
+>> code into ACPI core":
 >>
->> With this patch set, not any more. Please see preceding patches.
+>> https://lkml.org/lkml/2015/5/14/98
 >
->
-> OK, I didn't notice this was part of a series.
+> I'll be regarding this patchset as an RFC until the one from Jiang Liu goes in.
 
-Sorry, I didn't cc you all of those patches.
-
->
-> Then if not having PCI_PROBE_MMCONF bit set is indeed equivalent to
-> list_empty(&pci_mmcfg_list), is there any reason for this flag to
-> (continue to) exist? (and also for pci_mmcfg_arch_init_failed.)
-
-I think PCI_PROBE_MMCONF bit is needed for early init of pci mmconfig in
-the x86 arch related code, but for xen_mcfg_late(), it's called after
-acpi_init() which the mmconfig is ready for use if it's available (the
-pci_mmcfg_list is empty or not), so not having PCI_PROBE_MMCONF bit set
-is equivalent list_empty(&pci_mmcfg_list) is not suitable for all cases,
-but I think it will be ok after mmconfig is initialized.
-
-I think my change log is misleading and needs updating :)
+Yes, please, Jiang Liu's patch set should go in first.
 
 Thanks
 Hanjun
