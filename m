@@ -1,73 +1,119 @@
-From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
-Date: Wed, 27 May 2015 18:37:27 +0530
-Subject: [PATCH v4 2/2] soc: Add driver for Freescale Vybrid Platform
-In-Reply-To: <1432711910.27695.223.camel@x220>
-References: <cover.1432637313.git.maitysanchayan@gmail.com>
- <7df753efff77a96da285f0571f1316512787e83c.1432637313.git.maitysanchayan@gmail.com>
- <1432711910.27695.223.camel@x220>
-Message-ID: <20150527130727.GA3374@Sanchayan-Arch.toradex.int>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 27 May 2015 15:26:13 +0200
+Subject: [RFC/PATCH 0/9] IOMMU probe deferral support
+In-Reply-To: <1431644410-2997-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1431644410-2997-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <5565C5F5.1000000@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-On 15-05-27 09:31:50, Paul Bolle wrote:
-> On Tue, 2015-05-26 at 17:06 +0530, Sanchayan Maity wrote:
-> > --- /dev/null
-> > +++ b/drivers/soc/fsl/Kconfig
-> 
-> > +config SOC_VF610
-> > +	   bool "SoC bus device for the Freescale Vybrid platform"
-> > +	   select SOC_BUS
-> > +	   help
-> > +	     Include support for the SoC bus on the Freescale Vybrid platform
-> > +	     providing some sysfs information about the module variant.
-> > \ No newline at end of file
-> 
-> (That review comment is courtesy of git.)
+On 2015-05-15 01:00, Laurent Pinchart wrote:
+> This patch series attempts to implement support for deferring probe of both
+> IOMMU drivers and bus master drivers.
+>
+> The relationship between bus masters and IOMMUs creates a strong ordering
+> during initialization of devices. As in the general case IOMMUs are hidden
+> behind the DMA mapping API, IOMMU support relies on the automatic setup of DMA
+> operations without any direct intervention of bus master drivers.
+>
+> DMA operations are set up when platform devices are added to the system. This
+> requires IOMMUs to be available at that time. On systems where ordering of
+> device add and probe can't be guaranteed (such as, but not limited to,
+> DT-based systems) this caused incorrect DMA operation setup. This has been
+> addressed by a patches series [1] that introduced a DT-based early
+> registration mechanism for IOMMUs.
+>
+> However, that mechanism fails to address all issues. Various dependencies
+> exist between IOMMU devices and other devices, in particular on clocks and on
+> power domains (as mentioned by Marek in [2]). While there are mechanisms to
+> handle some of them without probe deferral (for instance by using the
+> OF_DECLARE macros to register clock drivers), generalizing those mechanisms
+> would essentially recreate a probe ordering mechanism similar to link order
+> probe ordering and couldn't really scale.
+>
+> Additionally, IOMMUs could also be present hot-pluggable devices and depend on
+> resources that are thus hot-plugged. OF_DECLARE wouldn't help in that case.
+> For all those reasons probe deferral for IOMMUs has been considered as desired
+> if it can be implemented cleanly. For more in-depth information see [3].
+>
+> This RFC series is a first attempt at implementing IOMMU probe deferral
+> support cleanly.
+>
+> The core idea is to move setup of DMA operations from device add time to
+> device probe time, implemented in patch 6/9. It could be possible to move
+> setup of other DMA parameters (namely masks and offset) to probe time as well,
+> but that change would be more intrusive and has a higher risk of introducing
+> regressions. For that reason I've decided to keep DMA masks and offset setup
+> at device add time and thus split DMA configuration in masks and operations
+> (patch 5/9). This can be revisited if we decide that the DMA mapping API
+> shouldn't require masks and offset to be set before probe time.
+>
+> Patch 8/9 then defers probe of bus master drivers when required IOMMUs are not
+> available yet. This requires knowing when a failed IOMMU lookup should be
+> considered as permanent or temporary. I've reused the OF_DECLARE_IOMMU for
+> this purpose, considering that the presence of a driver compatible with the
+> IOMMU DT node indicates that the failure is temporary and probing of the bus
+> master device should be deferred.
+>
+> Note that only IOMMU drivers using the recent .of_xlate() mechanism for
+> DT-based IOMMU reference can cause probe deferral of bus master devices. The
+> .add_device() mechanism isn't supported in this case.
+>
+> As an example I've converted the ipmmu-vmsa driver to the new API in patch 9/9.
+>
+> At this point many enhancements are possible, but I'd like to receive feedback
+> on the proposed approach before basing more patches on this series. One
+> particular point I would like to address (or see being addressed) in the
+> future is the use of struct iommu_ops with of_iommu_get_ops() and
+> of_iommu_set_ops(). I believe we should introduct a struct iommu and register
+> IOMMU instances instead of IOMMU operations. That should bring us one step
+> closer to removing bus_set_iommu().
 
-Will fix it.
+I've checked this patchset with my recent updates to Exynos IOMMU driver. It
+works fine. Then I removed my exynos_iommu_of_setup() callback and 
+relied only
+on proper initialization from platform device probe() of all iommu 
+controllers.
+The driver also worked fine in such case.
 
-> 
-> > --- /dev/null
-> > +++ b/drivers/soc/fsl/Makefile
-> 
-> > +obj-$(CONFIG_SOC_VF610)		+= soc-vf610.o
-> 
-> > --- /dev/null
-> > +++ b/drivers/soc/fsl/soc-vf610.c
-> 
-> > +MODULE_DEVICE_TABLE(of, vf610_soc_bus_match);
-> 
-> > +module_platform_driver(vf610_soc_driver);
-> 
-> (The series starting at https://lkml.org/lkml/2015/5/10/131 would allow
-> to use builtin_platform_driver() for built-in only code.)
+The other change I had to make to get everything working was removal of some
+hackery in dma-mapping internal structures in Exynos DRM driver, but this is
+completely different story.
 
-Thanks for bringing this to my attention. I am subscribed to the mailing
-list however this skipped me.
+You can add the following tag for the of/iommu/dma-mapping patches:
+Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-> 
-> > +MODULE_DESCRIPTION("Freescale VF610 SoC bus driver");
-> > +MODULE_LICENSE("GPL v2");
-> 
-> I think soc-vf610.o can only be built-in. But its code contains a few
-> module specific macros. Was it perhaps intended for SOC_VF610 to be
-> tristate?
+> [1] http://www.spinics.net/lists/arm-kernel/msg382787.html
+> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/323238.html
+> [3] https://lkml.org/lkml/2015/2/16/345
+>
+> Laurent Pinchart (9):
+>    arm: dma-mapping: Don't override dma_ops in arch_setup_dma_ops()
+>    arm: dma-mapping: Support IOMMU mappings spanning the full 32 bits
+>      range
+>    of: dma: Move range size workaround to of_dma_get_range()
+>    of: dma: Make of_dma_deconfigure() public
+>    of: dma: Split of_configure_dma() into mask and ops configuration
+>    drivers: platform: Configure dma operations at probe time
+>    iommu: of: Document the of_iommu_configure() function
+>    iommu: of: Handle IOMMU lookup failure with deferred probing or error
+>    iommu/ipmmu-vmsa: Use DT-based instantiation
+>
+>   arch/arm/include/asm/dma-iommu.h |   2 +-
+>   arch/arm/mm/dma-mapping.c        |  21 +++--
+>   drivers/base/platform.c          |   9 ++
+>   drivers/iommu/ipmmu-vmsa.c       | 189 +++++++++++++--------------------------
+>   drivers/iommu/of_iommu.c         |  29 +++++-
+>   drivers/of/address.c             |  20 ++++-
+>   drivers/of/device.c              |  77 ++++++++++------
+>   drivers/of/of_pci.c              |   3 +-
+>   drivers/of/platform.c            |  16 ++--
+>   include/linux/of_device.h        |  14 ++-
+>   10 files changed, 195 insertions(+), 185 deletions(-)
 
-I too think that should be built-in. Did not have an intention of making
-it tristate, however while using other drivers as references, the perhaps
-unneccessary stuff crept in.
-
-The MODULE_* references can be removed along with the corresponding header
-file. However that series has not been merged yet, so I can't use builtin_*
-yet?
-
-@Arnd
-
-Are you ok with the patch in general? I can take care of the above changes
-and send a new version. And once the builtin_driver stuff gets merged, I
-can send a minor patch to change this module one to builtin?
-
-Regards,
-Sanchayan.
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
