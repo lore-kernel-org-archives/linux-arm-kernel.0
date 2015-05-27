@@ -1,82 +1,32 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 27 May 2015 09:33:34 +0100
-Subject: [PATCH] ARM: imx6: allow booting with old DT
-In-Reply-To: <1432714807.3011.15.camel@pengutronix.de>
-References: <1432658616-13733-1-git-send-email-l.stach@pengutronix.de>		
- <20150527073408.GD16165@dragon> <1432713148.3011.6.camel@pengutronix.de>	
- <55657B50.7000006@arm.com> <1432714807.3011.15.camel@pengutronix.de>
-Message-ID: <5565815E.2040400@arm.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Wed, 27 May 2015 09:36:17 +0100
+Subject: [RFC PATCH 0/3] clk: stm32: Add clock driver for STM32F4[23]xxx
+ devices
+In-Reply-To: <CALszF6BTu_8SCE9hEiLYuvQg8J9eG5xktaVV7_LvnG3r20+wtw@mail.gmail.com>
+References: <1432327273-6810-1-git-send-email-daniel.thompson@linaro.org>
+ <CALszF6BTu_8SCE9hEiLYuvQg8J9eG5xktaVV7_LvnG3r20+wtw@mail.gmail.com>
+Message-ID: <55658201.5090208@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/05/15 09:20, Lucas Stach wrote:
-> Am Mittwoch, den 27.05.2015, 09:07 +0100 schrieb Marc Zyngier:
->> On 27/05/15 08:52, Lucas Stach wrote:
->>> Am Mittwoch, den 27.05.2015, 15:34 +0800 schrieb Shawn Guo:
->>>> On Tue, May 26, 2015 at 06:43:36PM +0200, Lucas Stach wrote:
->>>>> The GPC rewrite to IRQ domains has been on the premise that it may break
->>>>> suspend/resume for new kernels on old DT, but otherwise keep things working
->>>>> from a user perspective. This was an accepted compromise to be able to move
->>>>> the GIC cleanup forward.
->>>>>
->>>>> What actually happened was that booting a new kernel on an old DT crashes
->>>>> before even the console is up, so the user does not even see the warning
->>>>> that the DT is too old. The warning message suggests that this has been
->>>>> known before, which is clearly unacceptable.
->>>>
->>>> To see any early message like this one, low-level debug support is
->>>> expected to be turned on.
->>>>
->>> Using low-level debug might be acceptable for a developer.
->>>
->>> From a user perspective a kernel update without a corresponding DT
->>> update should never render the machine completely broken. Keep in mind
->>> that i.MX6 isn't only used in deeply embedded system, but is already in
->>> devices where non-developer users might update the kernel. They might
->>> even use prebuilt kernels where enabling low-level debug is not an
->>> option.
->>
->> I'd imagine that whoever provides this pre-build kernel would also
->> deliver some form of release notes indicating the procedure. Even
->> better, an installation script.
->>
->>> We are not free to break the existing DT stability rules in such a
->>> drastic way, especially if keeping things working to some extent is
->>> easily done.
->>
->> That would be on the condition that the DT was correct the first place,
->> and accurately described the hardware. It didn't, breaking the contract
->> we have the first place.
->>
->> We can argue for years about DT stability, history proves that it
->> doesn't lead anywhere.
->>
-> The fact that we are still in a learning phase with regard to DT and
-> have made mistakes in the past (and I'm sure we will still do some in
-> the future) isn't an excuse for not even trying to keep the stability.
-> 
-> In this case there was a clear consent that we break DT stability by
-> rendering suspend/resume broken. This was the accepted compromise
-> between DT stability and the highly needed GIC cleanup.
-> Completely breaking an entire SoC family in early boot was not part of
-> the the compromise! Especially as it isn't really hard to keep things
-> working to the specified extent, as this patch proves.
+On 26/05/15 17:41, Maxime Coquelin wrote:
+>>   2. Allocating ~80 clock components appears to fragment memory enough
+>>      to prevent busybox (.text is ~300K, non-XIP) from running getty.
+>>      I have to use "init=/bin/sh" to avoid OOM problems.
+>
+> Yes, I reproduced the same issue while testing your work.
+>
+> Could you try with:
+> CONFIG_NOMMU_INITIAL_TRIM_EXCESS=0
+>
+> It solves (hides) the problem on my side.
+> You can eventually setting it once booted to 1 via procfs.
 
-This patch series has been on the list for months, in -next for several
-weeks, and now in mainline for about a month. I would have appreciated
-your input and your patch during that time so that your pet platform
-would have been kept in an acceptable shape. Others have done so, you
-didn't.
+That works for me too. Thanks.
 
-If you have such a vested interest in keeping this SoC on a smooth
-upgrade path, then I suggest you at least follow the various patch
-series potentially touching it, and contribute in a timely manner.
-Understand that people don't necessarily have access to your favourite
-piece of HW, and may overlook that kind of detail. I rely on others to
-let me know about it, and I encourage you to do so.
+Incidentally switching to SLOB also reduced the problem for me. It was 
+OK whilst I had ~20 clocks (and debugfs) but not enough for me to run 
+with all the clocks registered.
 
-Thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Daniel.
