@@ -1,96 +1,69 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 27 May 2015 09:27:59 +0200
-Subject: [PATCH 3/5] dt-bindings: ARM: Mediatek: Document devicetree
- bindings for clock controllers
-In-Reply-To: <1432707169.721.81.camel@mhfsdcap03>
-References: <1432192376-6712-1-git-send-email-jamesjj.liao@mediatek.com>
- <1432192376-6712-4-git-send-email-jamesjj.liao@mediatek.com>
- <20150526075643.GF6325@pengutronix.de>
- <1432630536.15597.16.camel@mtksdaap41>
- <20150526110819.GI6325@pengutronix.de>
- <1432707169.721.81.camel@mhfsdcap03>
-Message-ID: <20150527072759.GS6325@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 27 May 2015 09:31:26 +0200
+Subject: [RFC PATCH 2/2] arm64: Implement vmalloc based thread_info
+ allocator
+In-Reply-To: <20150527062250.GD3928@swordfish>
+References: <1432483340-23157-1-git-send-email-jungseoklee85@gmail.com>
+ <20150527041015.GB11609@blaptop> <20150527062250.GD3928@swordfish>
+Message-ID: <3176422.FWpfrlzXOV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 27, 2015 at 02:12:49PM +0800, Yong Wu wrote:
-> On Tue, 2015-05-26 at 13:08 +0200, Sascha Hauer wrote:
-> > On Tue, May 26, 2015 at 04:55:36PM +0800, James Liao wrote:
-> > > Hi Sascha,
+On Wednesday 27 May 2015 15:22:50 Sergey Senozhatsky wrote:
+> On (05/27/15 13:10), Minchan Kim wrote:
+> > On Tue, May 26, 2015 at 08:29:59PM +0900, Jungseok Lee wrote:
 > > > 
-> > > On Tue, 2015-05-26 at 09:56 +0200, Sascha Hauer wrote:
-> > > > On Thu, May 21, 2015 at 03:12:54PM +0800, James Liao wrote:
-> > > > > This adds the binding documentation for the mmsys, imgsys, vdecsys,
-> > > > > vencsys and vencltsys controllers found on Mediatek SoCs.
-> > > > > 
-> > > > > index 0000000..a5b94a7
-> > > > > --- /dev/null
-> > > > > +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
-> > > > > +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencltsys.txt
-> > > > > +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
+> > > if (test_thread_flag(TIF_MEMDIE) && !(gfp_mask & __GFP_NOFAIL))
+> > >     goto nopage;
+> > > 
+> > > IMHO, a reclaim operation would be not needed in this context if memory is
+> > > allocated from vmalloc space. It means there is no need to traverse shrinker list. 
+> > 
+> > For making fork successful with using vmalloc, it's bandaid.
+
+Right.
+
+> > > >> This patch tries to solve the problem as allocating thread_info memory
+> > > >> from vmalloc space, not 1:1 mapping one. The downside is one additional
+> > > >> page allocation in case of vmalloc. However, vmalloc space is large enough,
 > > > > 
-> > > > Do these really become multiple drivers so that it's worth abstracting
-> > > > them in the clock framework?
+> > > > The size you want to allocate is 16KB in here but additional 4K?
+> > > > It increases 25% memory footprint, which is huge downside.
 > > > 
-> > > These clocks need to be controlled among several drivers. For example,
-> > > vdecsys clocks will be controlled by VDEC driver (not ready yet) and
-> > > MT8173 SMI driver [1]. That means these clocks need a mechanism to share
-> > > between these 2 drivers. CCF share clocks by using of reference count,
-> > > so I think it's suitable to implement these subsystem clocks.
+> > > I agree with the point, and most people who try to use vmalloc might know the number.
+> > > However, an interoperation on the number depends on a point of view.
 > > > 
-> > > As I know SMI driver need to access clocks among mmsys, imgsys, vdecsys,
-> > > vencsys and vencltsys. So in this patch I added clocks of these
-> > > subsystems into CCF.
+> > > Vmalloc is large enough and not fully utilized in case of ARM64.
+> > > With the considerations, there is a room to do math as follows.
 > > > 
-> > > [1]
-> > > http://lists.infradead.org/pipermail/linux-mediatek/2015-March/000058.html
+> > > 4KB / 240GB = 1.5e-8 (4KB page + 3 level combo)
+> > > 
+> > > It would be not a huge downside if fork-routine is not damaged due to fragmentation.
 > > 
-> > Looking at the 3.18 tree we have this:
+> > Okay, address size point of view, it wouldn't be significant problem.
+> > Then, let's see it performance as point of view.
 > > 
-> > 	vdecsys: vdecsys at 16000000 {
-> > 		compatible = "mediatek,mt8173-vdecsys", "syscon";
-> > 		reg = <0 0x16000000 0 0x1000>;
-> > 		#clock-cells = <1>;
-> > 	};
-> > 
-> > 	larb1:larb at 16010000 {
-> > 		compatible = "mediatek,mt8173-smi-larb";
-> > 		reg = <0 0x16010000 0 0x1000>;
-> > 		clocks = <&mmsys MM_SMI_COMMON>,
-> > 			 <&vdecsys VDEC_CKEN>,
-> > 			 <&vdecsys VDEC_LARB_CKEN>;
-> > 		clock-names = "larb_sub0", "larb_sub1", "larb_sub2";
-> > 	};
-> > 
-> > I believe that the larb needs the MM_SMI_COMMON clock to modify the larb
-> > registers, but is it really necessary to enable VDEC_CKEN and
-> > VDEC_LARB_CKEN just to set the F_SMI_MMU_EN bit in the larb?
-> Yes. SMI need the two clock while smi work.
-> the lastest smi binding is [1].
-> smi need "apb" and "smi" clocks.
-> 
-> [1]http://lists.linuxfoundation.org/pipermail/iommu/2015-May/013025.html
-> 
-> > 
-> > With the above we have the situation that the vdec driver calls into the
-> > iommu driver which then calls into the larb driver which calls back into
-> > the vdec driver via the clk API. This seems very suspicious.
-> iommu driver will call into the larb driver.
-> but I don't think the larb driver will call into the vdec driver. is it
-> right?
+> > If we use vmalloc, it needs additional data structure for vmalloc
+> > management, several additional allocation request, page table hanlding
+> > and TLB flush.
 
-When the larb has clocks from the vdec like in the above example from
-the 3.18 kernel then the larb indirectly via the clk API writes to the
-vdec register space.
-In the latest code you referenced the vdec clocks are no longer assigned
-to the larbs. This means we no longer need the vdec clocks abstracted in
-CCF.
+One upside of it is that we could in theory make THREAD_SIZE 12KB or
+20KB instead of 16KB if we wanted to, as vmalloc does not have the
+power-of-two requirement.
 
-Sascha
+The downsides of vmalloc that you list are probably much stronger.
 
+Another one is that /proc/vmallocinfo would become completely unreadable
+on systems with lots of threads.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Finally, accessing data in vmalloc memory requires 4KB TLBs, while the
+linear mapping usually uses hugepages, so we get extra page table walks
+in the kernel for accessing the kernel stack, or for any kernel code
+that looks at the thread_info of another thread.
+
+> plus a guard page. I don't see VM_NO_GUARD being passed.
+
+That's only a virtual page, which is virtually free here, it does not
+consume any real memory.
+
+	Arnd
