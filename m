@@ -1,55 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 27 May 2015 09:07:44 +0100
-Subject: [PATCH] ARM: imx6: allow booting with old DT
-In-Reply-To: <1432713148.3011.6.camel@pengutronix.de>
-References: <1432658616-13733-1-git-send-email-l.stach@pengutronix.de>	
- <20150527073408.GD16165@dragon> <1432713148.3011.6.camel@pengutronix.de>
-Message-ID: <55657B50.7000006@arm.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 27 May 2015 16:08:59 +0800
+Subject: [PATCHv3 00/12] arm/arm64: Unify PSCI client support
+In-Reply-To: <1432648350-5454-1-git-send-email-mark.rutland@arm.com>
+References: <1432648350-5454-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <55657B9B.5010206@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/05/15 08:52, Lucas Stach wrote:
-> Am Mittwoch, den 27.05.2015, 15:34 +0800 schrieb Shawn Guo:
->> On Tue, May 26, 2015 at 06:43:36PM +0200, Lucas Stach wrote:
->>> The GPC rewrite to IRQ domains has been on the premise that it may break
->>> suspend/resume for new kernels on old DT, but otherwise keep things working
->>> from a user perspective. This was an accepted compromise to be able to move
->>> the GIC cleanup forward.
->>>
->>> What actually happened was that booting a new kernel on an old DT crashes
->>> before even the console is up, so the user does not even see the warning
->>> that the DT is too old. The warning message suggests that this has been
->>> known before, which is clearly unacceptable.
->>
->> To see any early message like this one, low-level debug support is
->> expected to be turned on.
->>
-> Using low-level debug might be acceptable for a developer.
-> 
-> From a user perspective a kernel update without a corresponding DT
-> update should never render the machine completely broken. Keep in mind
-> that i.MX6 isn't only used in deeply embedded system, but is already in
-> devices where non-developer users might update the kernel. They might
-> even use prebuilt kernels where enabling low-level debug is not an
-> option.
+On 2015?05?26? 21:52, Mark Rutland wrote:
+> This series unifies the 32-bit and 64-bit PSCI client code, moving the bulk of
+> the FW invocation and probing out to a common location in drivers/firmware.
+> As part of this, the remaining edge cases for PSCI 0.2 (Trusted OSs rejecting
+> CPU_OFF) are accounted for, making both 32-bit adn 64-bit clients more robust.
+>
+> This results in a reasonable saving in terms of lines of code, and will allow
+> for PSCI 1.0 support to be unified form the beginning, avoiding further
+> duplication.
+>
+> The series is based on the arm64 for-next/cpu-init branch [3] due to conflicts
+> with that series.
+>
+> Since v1 [1]:
+> * Fix build when PSCI isn't selected
+> * Don't indirect migrate_info_up_cpu
+> * Fix ver to u32 in psci_get_version
+>
+> Since v2: [2]:
+> * Rebase atop of Lorenzo's cpu init cleanup series [3]
+> * Use the correct native function IDs
+> * Fix cpu_disable return values
+> * Report invalid MIGRATE_INFO_UP_CPU return values
+>
+> Many thanks to those who have reviewed and tested so far! Unfortunately, due to
+> the volume of changes in the rebase I've dropped all Tested-by tags. I've
+> locally tested 32-bit and 64-bit kernels with DT.
 
-I'd imagine that whoever provides this pre-build kernel would also
-deliver some form of release notes indicating the procedure. Even
-better, an installation script.
+I tested this patch set on ARM64 kernel with ACPI as I did in previous
+version, compile this patch set ok with CONFIG_ACPI=y/n, and CPU
+hotplug works with PSCI (CPU_ON/OFF),
 
-> We are not free to break the existing DT stability rules in such a
-> drastic way, especially if keeping things working to some extent is
-> easily done.
+Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-That would be on the condition that the DT was correct the first place,
-and accurately described the hardware. It didn't, breaking the contract
-we have the first place.
-
-We can argue for years about DT stability, history proves that it
-doesn't lead anywhere.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thanks
+Hanjun
