@@ -1,74 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 27 May 2015 18:31:25 +0100
-Subject: [PATCH 13/13] drm: bridge/dw_hdmi-ahb-audio: parse ELD from HDMI
- driver
-In-Reply-To: <20150527104308.GA8341@phenom.ffwll.local>
-References: <20150509102501.GO2067@n2100.arm.linux.org.uk>
- <E1Yr1yD-0006lK-RC@rmk-PC.arm.linux.org.uk>
- <20150527104308.GA8341@phenom.ffwll.local>
-Message-ID: <20150527173125.GS2067@n2100.arm.linux.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 27 May 2015 18:33:21 +0100
+Subject: [PATCH V2 5/6] regulator: add mxs on-chip regulator driver
+In-Reply-To: <1290103954.26573.1432642616013.JavaMail.open-xchange@oxbsltgw08.schlund.de>
+References: <1430346747-28728-1-git-send-email-stefan.wahren@i2se.com>
+ <1430346747-28728-6-git-send-email-stefan.wahren@i2se.com>
+ <20150504123648.GU15510@sirena.org.uk>
+ <1693367404.879766.1430771695242.JavaMail.open-xchange@oxbaltgw08.schlund.de>
+ <1875749167.82542.1431023838932.JavaMail.open-xchange@oxbsltgw04.schlund.de>
+ <20150507185216.GP22845@sirena.org.uk>
+ <535744342.64563.1431026719818.JavaMail.open-xchange@oxbsltgw09.schlund.de>
+ <20150507193236.GS22845@sirena.org.uk>
+ <1290103954.26573.1432642616013.JavaMail.open-xchange@oxbsltgw08.schlund.de>
+Message-ID: <20150527173321.GH21577@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 27, 2015 at 12:43:08PM +0200, Daniel Vetter wrote:
-> On Sat, May 09, 2015 at 11:26:57AM +0100, Russell King wrote:
-> > Parse the ELD (EDID like data) stored from the HDMI driver to restrict
-> > the sample rates and channels which are available to ALSA.  This causes
-> > the ALSA device to reflect the capabilities of the overall audio path,
-> > not just what is supported at the HDMI source interface level.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On Tue, May 26, 2015 at 02:16:55PM +0200, Stefan Wahren wrote:
+> > Mark Brown <broonie@kernel.org> hat am 7. Mai 2015 um 21:32 geschrieben:
+
+> > > > > In the bootloader code enabling the DC-DC is critical. There is a known
+> > > > > issue
+> > > > > which falsely triggers the brownout detection.
+
+> > > > Why would the driver not provide these operations?
+
+> > > I didn't implement this operation because the suggested workaround for the
+> > > hardware issue isn't very nice
+> > > (disable brownout detection during enabling DC-DC). I was afraid of the
+> > > implementation.
+
+> > That doesn't sound too complicated?
+
+> Okay, i think i managed the brownout handling.
 > 
-> I completely missed the new eld helpers in this series, so fairly late
-> with a few questions here.
-> 
-> In x86/desktop gpus we pass around the eld in hw, and there's an interrupt
-> on the snd side every time that materially changes. Same goes for other
-> state changes like the display pipe getting lit up/disabled again.
-> 
-> How is hotplug handling done here? You update the eld in get_modes, but I
-> don't see any notification from hdmi->audio (it only seems to get updated
-> at open time, no idea whether that's enough). And it looks like there's a
-> potential use-after-free when the drm side updates the eld and frees the
-> old one, while the snd side tries to access this.
+> Unfortunately i'm stuck at the next step. The DC-DC (3 way output) can supply 3
+> LDOs vddd, vdda, vddio. In case of a DC-DC state change the 3 regulators needs
+> to be reconfigured before.
 
-It doesn't handle hotplug at all, per se.
+> I tought of REGULATOR_EVENT_PRE_DISABLE and REGULATOR_EVENT_PRE_ENABLE events,
+> but i'm not sure that's the right way to achieve a synchronization between DC-DC
+> and consuming LDOs.
 
-The problem with hotplug is that (afaik) ALSA has no way to notify
-userspace that something has changed: if I were to add such a
-notification from the DRM side of the driver to the audio side, I
-wouldn't know what to do with it when the audio side received it.
-
-In any case, I tend to think of unplugging the display as being much
-like unplugging the 3.5mm line out jack to your hifi system - just
-because you've disconnected the speakers does not stop the audio
-playing - the audio continues despite you not being able to hear it.
-
-Sure, there's the problem that if you plug in a display with different
-capabilities, the existing format may not be supported, but I don't
-see a reasonable method which could provoke what effectively would be
-a restart on the ALSA side.
-
-In any case, hotplug is kind-of outside of the remit of these helpers -
-these helpers are more to do with decoding an existing ELD and limiting
-the capabilities of the audio side to that specified in the ELD.  It's
-up to the driver how it gets the ELD, and it's left to the driver to
-determine how to handle the change-of-ELD notification.
-
-Given your description of i915 hardware above, I think this makes sense
-anyway: if you have a hardware notification system, it makes sense to use
-that rather than some software implementation, and requiring a software
-implementation for everything to me sounds too limiting.
-
-That's not to say that we couldn't have a software implementation in the
-future: right now, I merely concentrated on the parsing issue.
-
-The dw-hdmi audio driver isn't ready for mainlining yet - there's two
-variants of this at the moment (one for iMX6 and a different one for
-Rockchip - same IP but configured with different interfaces for getting
-the audio data into the HDMI block.)  There's still some work to be done
-to properly unify the two approaches into something sane.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+OK, that's possibly sounding a bit complicated.  Is it just a case of
+writing some value, doing a reconfiguration and rewriting the original
+value or is it something more?  If it's much more complicated than that
+then I think putting a comment in the driver explaining what the issue
+is would be the right step, that would address the issue with the driver
+looking strange.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150527/8fce3acb/attachment.sig>
