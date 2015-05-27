@@ -1,45 +1,38 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 27 May 2015 16:08:59 +0800
-Subject: [PATCHv3 00/12] arm/arm64: Unify PSCI client support
-In-Reply-To: <1432648350-5454-1-git-send-email-mark.rutland@arm.com>
-References: <1432648350-5454-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <55657B9B.5010206@linaro.org>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 27 May 2015 10:10:26 +0200
+Subject: [PATCH] ARM: imx6: gpc: don't register power domain if DT data is
+ missing
+Message-ID: <1432714226-6333-1-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?05?26? 21:52, Mark Rutland wrote:
-> This series unifies the 32-bit and 64-bit PSCI client code, moving the bulk of
-> the FW invocation and probing out to a common location in drivers/firmware.
-> As part of this, the remaining edge cases for PSCI 0.2 (Trusted OSs rejecting
-> CPU_OFF) are accounted for, making both 32-bit adn 64-bit clients more robust.
->
-> This results in a reasonable saving in terms of lines of code, and will allow
-> for PSCI 1.0 support to be unified form the beginning, avoiding further
-> duplication.
->
-> The series is based on the arm64 for-next/cpu-init branch [3] due to conflicts
-> with that series.
->
-> Since v1 [1]:
-> * Fix build when PSCI isn't selected
-> * Don't indirect migrate_info_up_cpu
-> * Fix ver to u32 in psci_get_version
->
-> Since v2: [2]:
-> * Rebase atop of Lorenzo's cpu init cleanup series [3]
-> * Use the correct native function IDs
-> * Fix cpu_disable return values
-> * Report invalid MIGRATE_INFO_UP_CPU return values
->
-> Many thanks to those who have reviewed and tested so far! Unfortunately, due to
-> the volume of changes in the rebase I've dropped all Tested-by tags. I've
-> locally tested 32-bit and 64-bit kernels with DT.
+If the devicetree is too old and does not provide the regulator and clocks
+for the power domain, we need to avoid registering the power domain.
+Otherwise runtime PM will try to control the domain, which will lead to
+machine hangs without the proper DT configuration data.
 
-I tested this patch set on ARM64 kernel with ACPI as I did in previous
-version, compile this patch set ok with CONFIG_ACPI=y/n, and CPU
-hotplug works with PSCI (CPU_ON/OFF),
+This restores functionality to the kernel 4.0 level if an old DT is
+detected, where the power domain is constantly powered on.
 
-Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+ arch/arm/mach-imx/gpc.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Thanks
-Hanjun
+diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+index bbf015056221..6d0893a3828e 100644
+--- a/arch/arm/mach-imx/gpc.c
++++ b/arch/arm/mach-imx/gpc.c
+@@ -449,6 +449,10 @@ static int imx_gpc_probe(struct platform_device *pdev)
+ 	struct regulator *pu_reg;
+ 	int ret;
+ 
++	/* bail out if DT too old and doesn't provide the necessary info */
++	if (!of_property_read_bool(pdev->dev.of_node, "#power-domain-cells"))
++		return 0;
++
+ 	pu_reg = devm_regulator_get_optional(&pdev->dev, "pu");
+ 	if (PTR_ERR(pu_reg) == -ENODEV)
+ 		pu_reg = NULL;
+-- 
+2.1.4
