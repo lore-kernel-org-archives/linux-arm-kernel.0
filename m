@@ -1,33 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 27 May 2015 18:41:10 +0100
-Subject: [PATCH 1/2] ARM: cache-l2c: Detect whether it's safe to unlock
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Wed, 27 May 2015 18:40:42 +0100
+Subject: [PATCH 2/5] ARM: l2c: write auxiliary control register first
 In-Reply-To: <1432731613.2781.13.camel@collabora.co.uk>
-References: <1431416355-7693-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <1431416355-7693-2-git-send-email-sjoerd.simons@collabora.co.uk>
- <20150515113448.GI2067@n2100.arm.linux.org.uk>
- <1432731613.2781.13.camel@collabora.co.uk>
-Message-ID: <20150527174110.GU2067@n2100.arm.linux.org.uk>
+References: <1432731613.2781.13.camel@collabora.co.uk>
+Message-ID: <E1YxfJq-00047a-OR@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 27, 2015 at 03:00:13PM +0200, Sjoerd Simons wrote:
-> Hey Russell,
-> 
-> On Fri, 2015-05-15 at 12:34 +0100, Russell King - ARM Linux wrote:
-> > On Tue, May 12, 2015 at 09:39:14AM +0200, Sjoerd Simons wrote:
-> > > To handle that, for caches where special configuration is needed to allow
-> > > unlocking, check whether this has been setup before unlocking.
-> > 
-> > I've come up with a different solution to this, which of course I prefer.
-> > I'll post the patches later today, thanks.
-> 
-> Did you get round to create/posting those patches? If not, i'm happy to
-> do a set with your suggested solution as well if you can point me in the
-> right direction :)
+Before calling the controller specific configuration function, write
+the auxiliary control register first, so that bits shared with other
+registers (such as the prefetch control register) are not overwritten
+by the later write to the auxctrl register.
 
-Expect some to fall into your mailbox imminently.  Sorry, once an email
-gets buried, it gets forgotten about. :p
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/mm/cache-l2x0.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 1471c0f29bd3..977eb9f4f77e 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -115,10 +115,10 @@ static void l2c_configure(void __iomem *base)
+ 		return;
+ 	}
+ 
++	l2c_write_sec(l2x0_saved_regs.aux_ctrl, base, L2X0_AUX_CTRL);
++
+ 	if (l2x0_data->configure)
+ 		l2x0_data->configure(base);
+-
+-	l2c_write_sec(l2x0_saved_regs.aux_ctrl, base, L2X0_AUX_CTRL);
+ }
+ 
+ /*
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.1.0
