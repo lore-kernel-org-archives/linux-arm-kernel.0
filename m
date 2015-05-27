@@ -1,97 +1,29 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 27 May 2015 18:59:23 +0100
-Subject: [RFC/PATCH 3/9] of: dma: Move range size workaround to
- of_dma_get_range()
-In-Reply-To: <1431644410-2997-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1431644410-2997-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1431644410-2997-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20150527175922.GE4232@arm.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Wed, 27 May 2015 14:09:20 -0400
+Subject: [PATCH v3 1/3] ahci: Move interrupt enablement code to separate
+ functions
+In-Reply-To: <1432713693-4282-2-git-send-email-rric@kernel.org>
+References: <1432713693-4282-1-git-send-email-rric@kernel.org>
+ <1432713693-4282-2-git-send-email-rric@kernel.org>
+Message-ID: <20150527180920.GR7099@htj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 15, 2015 at 12:00:04AM +0100, Laurent Pinchart wrote:
-> Invalid dma-ranges values should be worked around when retrieving the
-> DMA range in of_dma_get_range(), not by all callers of the function.
-> This isn't much of a problem now that we have a single caller, but that
-> situation will change when moving DMA configuration to device probe
-> time.
-> 
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> ---
->  drivers/of/address.c | 20 ++++++++++++++++++--
->  drivers/of/device.c  | 15 ---------------
->  2 files changed, 18 insertions(+), 17 deletions(-)
+Hello,
 
-Looks good to me:
-
-  Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
-
-> diff --git a/drivers/of/address.c b/drivers/of/address.c
-> index 78a7dcbec7d8..75eebd19ebfa 100644
-> --- a/drivers/of/address.c
-> +++ b/drivers/of/address.c
-> @@ -924,8 +924,8 @@ EXPORT_SYMBOL(of_io_request_and_map);
->   *	CPU addr (phys_addr_t)	: pna cells
->   *	size			: nsize cells
->   *
-> - * It returns -ENODEV if "dma-ranges" property was not found
-> - * for this device in DT.
-> + * Return 0 on success, -ENODEV if the "dma-ranges" property was not found for
-> + * this device in DT, or -EINVAL if the CPU address or size is invalid.
->   */
->  int of_dma_get_range(struct device_node *np, u64 *dma_addr, u64 *paddr, u64 *size)
->  {
-> @@ -986,6 +986,22 @@ int of_dma_get_range(struct device_node *np, u64 *dma_addr, u64 *paddr, u64 *siz
->  	*dma_addr = dmaaddr;
->  
->  	*size = of_read_number(ranges + naddr + pna, nsize);
-> +	/*
-> +	 * DT nodes sometimes incorrectly set the size as a mask. Work around
-> +	 * those incorrect DT by computing the size as mask + 1.
-> +	 */
-> +	if (*size & 1) {
-> +		pr_warn("%s: size 0x%llx for dma-range in node(%s) set as mask\n",
-> +			__func__, *size, np->full_name);
-> +		*size = *size + 1;
-> +	}
+On Wed, May 27, 2015 at 10:01:31AM +0200, Robert Richter wrote:
+> +static int ahci_init_intx(struct pci_dev *pdev, unsigned int n_ports,
+> +			struct ahci_host_priv *hpriv)
+> +{
+>  	pci_intx(pdev, 1);
 > +
-> +	if (!*size) {
-> +		pr_err("%s: invalid size zero for dma-range in node(%s)\n",
-> +		       __func__, np->full_name);
-> +		ret = -EINVAL;
-> +		goto out;
-> +	}
->  
->  	pr_debug("dma_addr(%llx) cpu_addr(%llx) size(%llx)\n",
->  		 *dma_addr, *paddr, *size);
-> diff --git a/drivers/of/device.c b/drivers/of/device.c
-> index 20c1332a0018..530aa1ed3e1b 100644
-> --- a/drivers/of/device.c
-> +++ b/drivers/of/device.c
-> @@ -109,21 +109,6 @@ void of_dma_configure(struct device *dev, struct device_node *np)
->  		size = dev->coherent_dma_mask + 1;
->  	} else {
->  		offset = PFN_DOWN(paddr - dma_addr);
-> -
-> -		/*
-> -		 * Add a work around to treat the size as mask + 1 in case
-> -		 * it is defined in DT as a mask.
-> -		 */
-> -		if (size & 1) {
-> -			dev_warn(dev, "Invalid size 0x%llx for dma-range\n",
-> -				 size);
-> -			size = size + 1;
-> -		}
-> -
-> -		if (!size) {
-> -			dev_err(dev, "Adjusted size 0x%llx invalid\n", size);
-> -			return;
-> -		}
->  		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
->  	}
->  
-> -- 
-> 2.3.6
-> 
+>  	return 0;
+>  }
+
+Let's please not factor out the above as a separate function.  An one
+lin function which always returns 0 doesn't really serve any purpose.
+
+Thanks.
+
+-- 
+tejun
