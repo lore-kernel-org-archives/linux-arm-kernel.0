@@ -1,48 +1,90 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 27 May 2015 08:15:00 +0200
-Subject: [PATCH v4 3/5] dmaengine: pxa: add pxa dmaengine driver
-In-Reply-To: <1432625314.27695.200.camel@x220> (Paul Bolle's message of "Tue,
- 26 May 2015 09:28:34 +0200")
-References: <1432589362-23241-1-git-send-email-robert.jarzmik@free.fr>
- <1432589362-23241-3-git-send-email-robert.jarzmik@free.fr>
- <1432625314.27695.200.camel@x220>
-Message-ID: <87siaizguz.fsf@belgarion.home>
+From: sergey.senozhatsky.work@gmail.com (Sergey Senozhatsky)
+Date: Wed, 27 May 2015 15:22:50 +0900
+Subject: [RFC PATCH 2/2] arm64: Implement vmalloc based thread_info
+ allocator
+In-Reply-To: <20150527041015.GB11609@blaptop>
+References: <1432483340-23157-1-git-send-email-jungseoklee85@gmail.com>
+ <20150525144045.GE14922@blaptop>
+ <D5CD4D44-77BC-4817-B9A7-60C0F4AE444F@gmail.com>
+ <20150527041015.GB11609@blaptop>
+Message-ID: <20150527062250.GD3928@swordfish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Bolle <pebolle@tiscali.nl> writes:
+On (05/27/15 13:10), Minchan Kim wrote:
+> On Tue, May 26, 2015 at 08:29:59PM +0900, Jungseok Lee wrote:
+> > On May 25, 2015, at 11:40 PM, Minchan Kim wrote:
+> > > Hello Jungseok,
+> > 
+> > Hi, Minchan,
+> > 
+> > > On Mon, May 25, 2015 at 01:02:20AM +0900, Jungseok Lee wrote:
+> > >> Fork-routine sometimes fails to get a physically contiguous region for
+> > >> thread_info on 4KB page system although free memory is enough. That is,
+> > >> a physically contiguous region, which is currently 16KB, is not available
+> > >> since system memory is fragmented.
+> > > 
+> > > Order less than PAGE_ALLOC_COSTLY_ORDER should not fail in current
+> > > mm implementation. If you saw the order-2,3 high-order allocation fail
+> > > maybe your application received SIGKILL by someone. LMK?
+> > 
+> > Exactly right. The allocation is failed via the following path.
+> > 
+> > if (test_thread_flag(TIF_MEMDIE) && !(gfp_mask & __GFP_NOFAIL))
+> > 	goto nopage;
+> > 
+> > IMHO, a reclaim operation would be not needed in this context if memory is
+> > allocated from vmalloc space. It means there is no need to traverse shrinker list. 
+> 
+> For making fork successful with using vmalloc, it's bandaid.
+> 
+> > 
+> > >> This patch tries to solve the problem as allocating thread_info memory
+> > >> from vmalloc space, not 1:1 mapping one. The downside is one additional
+> > >> page allocation in case of vmalloc. However, vmalloc space is large enough,
+> > > 
+> > > The size you want to allocate is 16KB in here but additional 4K?
+> > > It increases 25% memory footprint, which is huge downside.
+> > 
+> > I agree with the point, and most people who try to use vmalloc might know the number.
+> > However, an interoperation on the number depends on a point of view.
+> > 
+> > Vmalloc is large enough and not fully utilized in case of ARM64.
+> > With the considerations, there is a room to do math as follows.
+> > 
+> > 4KB / 240GB = 1.5e-8 (4KB page + 3 level combo)
+> > 
+> > It would be not a huge downside if fork-routine is not damaged due to fragmentation.
+> 
+> Okay, address size point of view, it wouldn't be significant problem.
+> Then, let's see it performance as point of view.
+> 
+> If we use vmalloc, it needs additional data structure for vmalloc
+> management, several additional allocation request, page table hanlding
+> and TLB flush.
 
-> Vinod already applied this, so my remarks, if valid, should probably be
-> handled in a follow up patch.
->
->> +module_platform_driver(pxad_driver);
->
-> (The series starting at https://lkml.org/lkml/2015/5/10/131 would allow
-> to use builtin_platform_driver() for built-in only code.)
-I won't be that way for forever, see next comment.
+plus a guard page. I don't see VM_NO_GUARD being passed.
 
->> +MODULE_DESCRIPTION("Marvell PXA Peripheral DMA Driver");
->> +MODULE_AUTHOR("Robert Jarzmik <robert.jarzmik@free.fr>");
->> +MODULE_LICENSE("GPL v2");
->
-> This patch added a bool Kconfig symbol. So pxa_dma.c will never be part
-> of a module.
-> Its code contains a few module specific macros. Was it actually intended for
-> PXA_DMA to be tristate?
-It is designed to be a module, and in the "end" it will be a module.
+	-ss
 
-What is important to understand is the 3 phases which are going to happen :
- - phase 1 : state after this is merged
-             pxa_dma must be builtin, for legacy support (see
-             pxad_toggle_reserved_channel()).
- - phase 2 : slowly, all the pxa drivers are converted to dmaengine
- - phase 3 : after full conversion, the patch "add support for legacy
-             transition" is reverted.
-             There pxa_dma will become modular, and the tristate will appear.
-
-In conclusion, it cannot be a module yet, but it will in the future.
-
-Cheers.
-
--- 
-Robert
+> 
+> Normally, forking is very frequent operation so we shouldn't do
+> make it slow and memory consumption bigger if there isn't big reason.
+> 
+> > 
+> > However, this is one of reasons to add "RFC" prefix in the patch set. How is the
+> > additional 4KB interpreted and considered?
+> > 
+> > Best Regards
+> > Jungseok Lee
+> 
+> -- 
+> Kind regards,
+> Minchan Kim
+> 
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+> 
