@@ -1,70 +1,124 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 27 May 2015 15:34:10 +0800
-Subject: [PATCH] ARM: imx6: allow booting with old DT
-In-Reply-To: <1432658616-13733-1-git-send-email-l.stach@pengutronix.de>
-References: <1432658616-13733-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <20150527073408.GD16165@dragon>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Wed, 27 May 2015 15:36:04 +0800
+Subject: [PATCH v2 2/6] dt-bindings: mediatek: Add smi dts binding
+In-Reply-To: <CAAFQd5D_-FrVNNPfMTwaWgDHfOPWVnRCvBCV2JS6Q2xPUiEScA@mail.gmail.com>
+References: <1431683009-18158-1-git-send-email-yong.wu@mediatek.com>
+ <1431683009-18158-3-git-send-email-yong.wu@mediatek.com>
+ <CAAFQd5D_-FrVNNPfMTwaWgDHfOPWVnRCvBCV2JS6Q2xPUiEScA@mail.gmail.com>
+Message-ID: <1432712164.721.135.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 26, 2015 at 06:43:36PM +0200, Lucas Stach wrote:
-> The GPC rewrite to IRQ domains has been on the premise that it may break
-> suspend/resume for new kernels on old DT, but otherwise keep things working
-> from a user perspective. This was an accepted compromise to be able to move
-> the GIC cleanup forward.
+Hi Tomasz,
+	
+On Mon, 2015-05-25 at 15:48 +0900, Tomasz Figa wrote:
+> Hi,
 > 
-> What actually happened was that booting a new kernel on an old DT crashes
-> before even the console is up, so the user does not even see the warning
-> that the DT is too old. The warning message suggests that this has been
-> known before, which is clearly unacceptable.
+> Please see my comments inline.
+> 
+> On Fri, May 15, 2015 at 6:43 PM, Yong Wu <yong.wu@mediatek.com> wrote:
+> > This patch add smi binding document.
+> >
+> > Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+> > ---
+> >  .../bindings/soc/mediatek/mediatek,smi-larb.txt    | 24 ++++++++++++++++++++++
+> >  .../bindings/soc/mediatek/mediatek,smi.txt         | 22 ++++++++++++++++++++
+> >  2 files changed, 46 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/soc/mediatek/mediatek,smi-larb.txt
+> >  create mode 100644 Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi-larb.txt b/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi-larb.txt
+> > new file mode 100644
+> > index 0000000..c06c5b6
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi-larb.txt
+> > @@ -0,0 +1,24 @@
+> > +SMI(Smart Multimedia Interface) Local Arbiter
+> > +
+> > +The hardware block diagram please check bindings/iommu/mediatek,iommu.txt
+> > +
+> > +Required properties:
+> > +- compatible : must be "mediatek,mt8173-smi-larb"
+> > +- reg : the register and size of each local arbiter.
+> 
+> Shouldn't it be "of this local arbiter"?
+> 
+> > +- smi : must be "&smi_common". Refer to bindings/soc/mediatek,smi.txt.
+> 
+> This is incorrect. Device tree source authors are free to use any
+> labels for their nodes and documentation should not rely on the fact
+> that there is some node with some particular label. This should be
+> something like:
+> 
+> - smi : a phandle to node of XYZ
+> 
+> with proper description of that node in place of XYZ.
+Thanks. how about this?
+smi : a phandle to the smi_common node 
+> 
+> > +- clocks : must contain one entry for each clock-names.
+> > +       There are 2 clockes:
+> > +       APB clock : Advanced Peripheral Bus clock, It's the clock for setting
+> > +               the register.
+> > +       SMI clock : It's the clock for transfer data and command.
+> 
+> The description of each clock should go to "clock-names" property.
+> Please use some of already existing bindings as an example.
+> 
+> > +- clock-name: must be "apb" and "smi".
+> 
+> typo: Should be "clock-names".
+> 
+> I'd recommend describing this property as below:
+> 
+> - clock-names: must contain 2 entries, as follows:
+>   - "apb" : <here comes the description of APB clock>,
+>   - "smi" : <here comes the description of SMI clock>.
+Thanks. I will follow this.
 
-To see any early message like this one, low-level debug support is
-expected to be turned on.
+> > +
+> > +Example:
+> > +       larb0:larb at 14021000 {
+> > +               compatible = "mediatek,mt8173-smi-larb";
+> > +               reg = <0 0x14021000 0 0x1000>;
+> > +               smi = <&smi_common>;
+> > +               clocks = <&mmsys MM_SMI_LARB0>,
+> > +                        <&mmsys MM_SMI_LARB0>;
+> > +               clock-names = "apb", "smi";
+And another question,
+Could I add a item(port-count) in larb node. like:
+	          port-count = M4U_PORT_LARB0_NR;
+This item will only check the portid in client dsti is right or not?
+                   iommu = <&iommu larbid portid>
 
-But anyway, with your change, we get a much better situation.  Will send
-it to arm-soc soon.  Thanks for the patch.
+Then, the port-count is necessary to add? or we could assume all the
+input is correct.
 
-Shawn
-
+> > +       };
+> > diff --git a/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt b/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt
+> > new file mode 100644
+> > index 0000000..c2389b4
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/soc/mediatek/mediatek,smi.txt
+> > @@ -0,0 +1,22 @@
+> > +SMI(Smart Multimedia Interface)
+> > +
+> > +The hardware block diagram please check bindings/iommu/mediatek,iommu.txt
+> > +
+> > +Required properties:
+> > +- compatible : must be "mediatek,mt8173-smi"
+> > +- reg : the register and size of the smi.
 > 
-> Fix the early crash by mapping the GPC memory space if the IRQ controller
-> doesn't claim it. This keeps at least CPUidle and the needed CPU wakeup
-> workarounds working. With this fixed the system is able to boot up
-> properly minus the expected suspend/resume breakage.
+> nit: s/smi/SMI block/
 > 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> ---
-> Shawn, this is a critical fix for 4.1, to keep the combination of old
-> DT + new kernel at least somewhat working, to allow users to resolve
-> the situation on their systems. Please make sure this gets forwarded
-> ASAP.
-> ---
->  arch/arm/mach-imx/gpc.c | 12 +++++++++---
->  1 file changed, 9 insertions(+), 3 deletions(-)
+> > +- clocks : must contain one entry for each clock-names.
+> > +       There are 2 clockes:
+> > +       APB clock : Advanced Peripheral Bus clock, It's the clock for setting
+> > +               the register.
+> > +       SMI clock : It's the clock for transfer data and command.
+> > +- clock-name: must be "apb" and "smi".
 > 
-> diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
-> index 4d60005e9277..bbf015056221 100644
-> --- a/arch/arm/mach-imx/gpc.c
-> +++ b/arch/arm/mach-imx/gpc.c
-> @@ -280,9 +280,15 @@ void __init imx_gpc_check_dt(void)
->  	struct device_node *np;
->  
->  	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpc");
-> -	if (WARN_ON(!np ||
-> -		    !of_find_property(np, "interrupt-controller", NULL)))
-> -		pr_warn("Outdated DT detected, system is about to crash!!!\n");
-> +	if (WARN_ON(!np))
-> +		return;
-> +
-> +	if (WARN_ON(!of_find_property(np, "interrupt-controller", NULL))) {
-> +		pr_warn("Outdated DT detected, suspend/resume will NOT work\n");
-> +
-> +		/* map GPC, so that at least CPUidle and WARs keep working */
-> +		gpc_base = of_iomap(np, 0);
-> +	}
->  }
->  
->  #ifdef CONFIG_PM_GENERIC_DOMAINS
-> -- 
-> 2.1.4
+> See my comment for those properties in the first binding.
 > 
+> Best regards,
+> Tomasz
