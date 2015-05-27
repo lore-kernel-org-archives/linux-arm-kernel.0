@@ -1,91 +1,50 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Wed, 27 May 2015 10:04:35 +0200
-Subject: [PATCH 06/21] of/platform: Add of_platform_device_ensure()
-In-Reply-To: <20150526185654.GE10571@dtor-ws>
-References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
- <1432565608-26036-7-git-send-email-tomeu.vizoso@collabora.com>
- <20150526185654.GE10571@dtor-ws>
-Message-ID: <CAAObsKBbh3cG5MqMGEXp3heoJPHGLmpEefmRxdx_pXEFkDT5eQ@mail.gmail.com>
+From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
+Date: Wed, 27 May 2015 10:06:26 +0200
+Subject: [PATCH 05/11] x86, pci, acpi: Move arch-agnostic MMCONFIG (aka
+ ECAM) and ACPI code out of arch/x86/ directory
+In-Reply-To: <20150526170817.GU1565@arm.com>
+References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
+ <1432644564-24746-6-git-send-email-hanjun.guo@linaro.org>
+ <20150526170817.GU1565@arm.com>
+Message-ID: <55657B02.5090805@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 May 2015 at 20:56, Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
-> Hi Tomeu,
+On 26.05.2015 19:08, Will Deacon wrote:
+> On Tue, May 26, 2015 at 01:49:18PM +0100, Hanjun Guo wrote:
+>> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>>
+>> ECAM standard and MCFG table are architecture independent and it makes
+>> sense to share common code across all architectures. Both are going to
+>> corresponding files - ecam.c and mcfg.c
+>>
+>> While we are here, rename pci_parse_mcfg to acpi_parse_mcfg.
+>> We already have acpi_parse_mcfg prototype which is used nowhere.
+>> At the same time, we need pci_parse_mcfg been global so acpi_parse_mcfg
+>> can be used perfectly here.
+>>
+>> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>> ---
+>>   arch/x86/Kconfig               |   3 +
+>>   arch/x86/include/asm/pci_x86.h |  33 ------
+>>   arch/x86/pci/acpi.c            |   1 +
+>>   arch/x86/pci/mmconfig-shared.c | 244 +---------------------------------------
+>>   arch/x86/pci/mmconfig_32.c     |   1 +
+>>   arch/x86/pci/mmconfig_64.c     |   1 +
+>>   arch/x86/pci/numachip.c        |   1 +
+>>   drivers/acpi/Makefile          |   1 +
+>>   drivers/acpi/mcfg.c            |  57 ++++++++++
+>>   drivers/pci/Kconfig            |   7 ++
+>>   drivers/pci/Makefile           |   5 +
+>>   drivers/pci/ecam.c             | 245 +++++++++++++++++++++++++++++++++++++++++
 >
-> On Mon, May 25, 2015 at 04:53:10PM +0200, Tomeu Vizoso wrote:
->> This function ensures that the device that encloses the passed device
->> node is registered, and thus probed if the corresponding driver has been
->> registered already.
->
-> Even if the driver has already been registered this code will not
-> guarantee that the device has been probed if driver enabled asynchronous
-> probing (async probing should appear in 4.2 and the end goal is to have
-> async probing enabled by default for most drivers).
+> Why can't we make use of the ECAM implementation used by pci-host-generic
+> and drivers/pci/access.c?
 
-Ok, I will look at that. Do you know if there's any board plugged into
-kernelci.org in which most drivers have async probing enabled already
-in linux-next?
+We had that question when I had posted MMCFG patch set separately, 
+please see:
+https://lkml.org/lkml/2015/3/11/492
 
-> Also, why are we concentrating on platform drivers only? What about
-> other devices, for example a gpio expander behind i2c bus?
-
-The current code will register the i2c master device when a device
-requests one of those gpios, and the gpio master device will be
-registered when the i2c master is probed.
-
-> I am also concerned about adding OF-specific hooks into every subsystem
-> out there.
-
-Well, those hooks are in the OF-specific code that we already added in
-every subsystem out there. But yeah, it would be great if we didn't
-had to add them.
-
-> Can we make process of instantiating OF devices iterative
-> instead and add them only if their parent has been already probed and
-
-This is what happens today when the mach code calls
-of_platform_populate on the root node, right? Or are you thinking of
-something different?
-
-> also devices corresponding to all phandles they reference have also been
-> probed? We could repeat scanning of the device tree every time we bind
-> a driver and bulk-add leftovers at late_initcall time.
-
-Yeah, this possibility was discussed in the thread linked from the
-cover letter. The main problem is that the knowledge required to infer
-from the phandles what devices are dependencies is in the DT bindings
-documentation.
-
-That knowledge is already codified in both each driver's probe
-function (for example when regulator_get_optional(dev, "phy") is
-called) and the functions that resolve dependencies when a device
-requests them (of_get_regulator(dev, "phy") in this example).
-
-That's why I thought of this approach, the main advantage of which is
-that it makes use of all that existing code without having to modify
-each driver and subsystem core.
-
-There's several ways to address this problem but require substantial
-refactoring. I just wanted to propose this alternative because it
-hadn't been discussed before and because I think it brings an
-interesting cost/benefit ratio.
-
-> This would
-> mean that we could keep all logic in OF code (and maybe ACPI will add
-> their own implementation) and keep other subsystems unaware.
-
-Yeah, that would be cool to have, but TBH I don't know if it's worth it.
-
-Regards,
-
-Tomeu
-
-> Thanks.
->
-> --
-> Dmitry
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Tomasz
