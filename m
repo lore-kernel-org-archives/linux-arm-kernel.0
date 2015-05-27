@@ -1,60 +1,65 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 27 May 2015 15:42:52 +0200
-Subject: [PATCH] ARM: berlin: add SPI nodes for BG2Q
-In-Reply-To: <55658209.4000904@gmail.com>
-References: <1432126385-27402-1-git-send-email-antoine.tenart@free-electrons.com>
- <555D1706.7040309@gmail.com> <20150525090100.GC29660@kwain>
- <55658209.4000904@gmail.com>
-Message-ID: <20150527134252.GG27202@kwain>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Wed, 27 May 2015 15:51:50 +0200
+Subject: [PATCH V2 3/6] power: mxs_power: add driver for mxs power
+ subsystem
+In-Reply-To: <55656E70.6030906@i2se.com>
+References: <1430346747-28728-1-git-send-email-stefan.wahren@i2se.com>
+ <1430346747-28728-4-git-send-email-stefan.wahren@i2se.com>
+ <20150523174149.GA16004@earth> <55656E70.6030906@i2se.com>
+Message-ID: <20150527135150.GA9205@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 27, 2015 at 10:36:25AM +0200, Sebastian Hesselbarth wrote:
-> On 25.05.2015 11:01, Antoine Tenart wrote:
-> >On Thu, May 21, 2015 at 01:21:42AM +0200, Sebastian Hesselbarth wrote:
-> >>On 20.05.2015 14:53, Antoine Tenart wrote:
-> >>>+
-> >>>+				spi0_pmux: spi0-pmux {
-> >>>+					groups = "G8", "G9", "G10", "G11";
-> >>>+					function = "spi1";
-> >>>+				};
-> >>
-> >>... can you check which of G8-G11 are actually clock/data and which
-> >>are CSn lines?
-> >>
-> >>CSn lines should all be optional and per-board pinmux - same for the
-> >>other spi pinmux.
-> >
-> >G8 and GSM3 are for clock/data, the other groups (G9-11 and GSM0-2)
-> >control the CSn lines. I'll update.
+Hi Stefan,
+
+On Wed, May 27, 2015 at 09:12:48AM +0200, Stefan Wahren wrote:
+> Am 23.05.2015 um 19:41 schrieb Sebastian Reichel:
+> > On Wed, Apr 29, 2015 at 10:32:24PM +0000, Stefan Wahren wrote:
+> >> This patch adds a minimal driver for the Freescale i.MX23, i.MX28
+> >> power subsystem. It's required to trigger the probing of the underlying
+> >> drivers like on-chip regulators.
+> > I'm not sure what you need the power supply class for. I see only
+> > one property (ac connected), which is constant. Maybe just drop
+> > the power supply stuff?
 > 
-> Re-reading this mail after you published v2, I thought it would
-> be a good idea to add this information to the pinmux driver. We
-> already have some /* comments */ about the actual function, why
-> not add the above, too?
+> those SoCs could be powered by 3 different sources:
+> - 5V wall
+> - USB
+> - battery
+> 
+> I choose the first one as a base, because it's the simplest one.
+> Unfortunately i don't have the time to implement all of them.
 
-Good idea, I'll prepare a patch.
+>From what I can see the driver does not implement the 5V wall
+charger handling. It simply assumes, that the 5V wall charger
+is there.
 
-> Also, I guess G8/GSM3 are for clk/data _and_ cs0n while
-> G9-G11/GSM0-GSM2 add cs{1,2,3}n ?
+While you can skip implementation of battery connection check
+you should make sure, that AC is actually connected.
 
-After re-reading carefully the documentation,
+> The Freescale downstream kernel (based on 2.6.35) [1] has a driver to
+> handle all MXS power sources. But i think a clean implementation from
+> the scratch would be necessary for mainline.
+>
+> > This would leave an almost empty driver, which just sets a single
+> > register at probe time and probes more drivers. That would probably
+> > be more fitting for the MFD subsystem.
+> 
+> I don't have any problems with fitting the driver to MFD.
 
-G8  -> CLK, SDI, SDO
-G9  -> S0n, S1n
-G10 -> S2n
-G10 -> S3n
+You can keep in in drivers/power. From your code I assumed there
+would simply be a fixed AC connection and nothing else.
 
-GSM0 -> S0n
-GSM1 -> S1n
-GSM2 -> S2n, S3n
-GSM3 -> CLK, SDO
+> > -- Sebastian
+> 
+> [1] -
+> http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/tree/drivers/power/mxs/linux.c?h=imx_2.6.35_maintain
 
-and have no entry for the SPI2 SDI pinmux in my documentation.
-
-Antoine
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150527/9c91ac42/attachment.sig>
