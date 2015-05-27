@@ -1,68 +1,54 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 27 May 2015 10:20:07 +0200
-Subject: [PATCH] ARM: imx6: allow booting with old DT
-In-Reply-To: <55657B50.7000006@arm.com>
-References: <1432658616-13733-1-git-send-email-l.stach@pengutronix.de>
- <20150527073408.GD16165@dragon> <1432713148.3011.6.camel@pengutronix.de>
- <55657B50.7000006@arm.com>
-Message-ID: <1432714807.3011.15.camel@pengutronix.de>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 27 May 2015 16:21:55 +0800
+Subject: [PATCH 01/11] ARM64 / PCI: introduce struct pci_controller for
+ ACPI
+In-Reply-To: <5564AB68.6080502@linux.intel.com>
+References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
+ <1432644564-24746-2-git-send-email-hanjun.guo@linaro.org>
+ <20150526165844.GD2175@e106497-lin.cambridge.arm.com>
+ <5564AB68.6080502@linux.intel.com>
+Message-ID: <55657EA3.5000601@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 27.05.2015, 09:07 +0100 schrieb Marc Zyngier:
-> On 27/05/15 08:52, Lucas Stach wrote:
-> > Am Mittwoch, den 27.05.2015, 15:34 +0800 schrieb Shawn Guo:
-> >> On Tue, May 26, 2015 at 06:43:36PM +0200, Lucas Stach wrote:
-> >>> The GPC rewrite to IRQ domains has been on the premise that it may break
-> >>> suspend/resume for new kernels on old DT, but otherwise keep things working
-> >>> from a user perspective. This was an accepted compromise to be able to move
-> >>> the GIC cleanup forward.
-> >>>
-> >>> What actually happened was that booting a new kernel on an old DT crashes
-> >>> before even the console is up, so the user does not even see the warning
-> >>> that the DT is too old. The warning message suggests that this has been
-> >>> known before, which is clearly unacceptable.
-> >>
-> >> To see any early message like this one, low-level debug support is
-> >> expected to be turned on.
-> >>
-> > Using low-level debug might be acceptable for a developer.
-> > 
-> > From a user perspective a kernel update without a corresponding DT
-> > update should never render the machine completely broken. Keep in mind
-> > that i.MX6 isn't only used in deeply embedded system, but is already in
-> > devices where non-developer users might update the kernel. They might
-> > even use prebuilt kernels where enabling low-level debug is not an
-> > option.
-> 
-> I'd imagine that whoever provides this pre-build kernel would also
-> deliver some form of release notes indicating the procedure. Even
-> better, an installation script.
-> 
-> > We are not free to break the existing DT stability rules in such a
-> > drastic way, especially if keeping things working to some extent is
-> > easily done.
-> 
-> That would be on the condition that the DT was correct the first place,
-> and accurately described the hardware. It didn't, breaking the contract
-> we have the first place.
-> 
-> We can argue for years about DT stability, history proves that it
-> doesn't lead anywhere.
-> 
-The fact that we are still in a learning phase with regard to DT and
-have made mistakes in the past (and I'm sure we will still do some in
-the future) isn't an excuse for not even trying to keep the stability.
+Hi Liviu,
 
-In this case there was a clear consent that we break DT stability by
-rendering suspend/resume broken. This was the accepted compromise
-between DT stability and the highly needed GIC cleanup.
-Completely breaking an entire SoC family in early boot was not part of
-the the compromise! Especially as it isn't really hard to keep things
-working to the specified extent, as this patch proves.
+On 2015?05?27? 01:20, Jiang Liu wrote:
+> On 2015/5/27 0:58, Liviu Dudau wrote:
+>> On Tue, May 26, 2015 at 01:49:14PM +0100, Hanjun Guo wrote:
+>>> ARM64 ACPI based PCI host bridge init needs a arch dependent
+>>> struct pci_controller to accommodate common PCI host bridge
+>>> code which is introduced later, or it will lead to compile
+>>> errors on ARM64.
+>>
+>> Hi Hanjun,
+>>
+>> Two questions: why don't you introduce this patch next to the
+>> one that is going to make use of it (or even merge it there)?
 
-Regards,
-Lucas
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+this is because of this patch is needed by Jiang Liu's patch set
+to fix the compile error on ARM64, I'd rather do that, but It's
+better to let Jiang Liu's patch goes in, and then this one, that's
+why I prepared a single patch for the struct. (I mentioned it
+in the cover letter)
+
+>> Second, why is the whole struct pci_controller not surrounded
+>> by #ifdef CONFIG_ACPI as you are implying that this is needed
+>> only for ACPI?
+
+I hope it can be reused, since the NUMA node and segment (domain)
+is both needed for DT and ACPI, if it's not the case foe now, I
+can surrounded them all by #ifdef CONFIG_ACPI.
+
+>>
+>> Btw, looking through the whole series I'm not (yet) convinced
+>> that this is needed at all.
+> Hi Liviu,
+> 	This structure is required by the requested patch set
+> at http://patchwork.ozlabs.org/patch/472249/, which consolidates
+> the common code to support PCI host bridge into ACPI core.
+
+Jiang, thanks for the explanation :)
+
+Thanks
+Hanjun
