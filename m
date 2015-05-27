@@ -1,52 +1,92 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 27 May 2015 23:23:40 +0200
-Subject: [PATCH] fixup! dmaengine: pxa_dma: add debug information
-Message-ID: <1432761820-32072-1-git-send-email-robert.jarzmik@free.fr>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Wed, 27 May 2015 23:29:52 +0200
+Subject: [PATCH 13/13] drm: bridge/dw_hdmi-ahb-audio: parse ELD from HDMI
+ driver
+In-Reply-To: <20150527173125.GS2067@n2100.arm.linux.org.uk>
+References: <20150509102501.GO2067@n2100.arm.linux.org.uk>
+ <E1Yr1yD-0006lK-RC@rmk-PC.arm.linux.org.uk>
+ <20150527104308.GA8341@phenom.ffwll.local>
+ <20150527173125.GS2067@n2100.arm.linux.org.uk>
+Message-ID: <CAKMK7uFgqyHR4b+Q=_55S2Ojt-9+B-BRM4pKCRNwbRZ7kskpfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes the following error:
-drivers/dma/pxa_dma.c: In function ?dbg_show_requester_chan?:
-drivers/dma/pxa_dma.c:192:2: error: void value not ignored as it ought to be
-  pos += seq_printf(s, "DMA channel %d requester :\n", phy->idx);
-  ^
-drivers/dma/pxa_dma.c:197:8: error: void value not ignored as it ought to be
-        !!(drcmr & DRCMR_MAPVLD));
-        ^
-scripts/Makefile.build:258: recipe for target 'drivers/dma/pxa_dma.o' failed
+On Wed, May 27, 2015 at 7:31 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, May 27, 2015 at 12:43:08PM +0200, Daniel Vetter wrote:
+>> On Sat, May 09, 2015 at 11:26:57AM +0100, Russell King wrote:
+>> > Parse the ELD (EDID like data) stored from the HDMI driver to restrict
+>> > the sample rates and channels which are available to ALSA.  This causes
+>> > the ALSA device to reflect the capabilities of the overall audio path,
+>> > not just what is supported at the HDMI source interface level.
+>> >
+>> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>>
+>> I completely missed the new eld helpers in this series, so fairly late
+>> with a few questions here.
+>>
+>> In x86/desktop gpus we pass around the eld in hw, and there's an interrupt
+>> on the snd side every time that materially changes. Same goes for other
+>> state changes like the display pipe getting lit up/disabled again.
+>>
+>> How is hotplug handling done here? You update the eld in get_modes, but I
+>> don't see any notification from hdmi->audio (it only seems to get updated
+>> at open time, no idea whether that's enough). And it looks like there's a
+>> potential use-after-free when the drm side updates the eld and frees the
+>> old one, while the snd side tries to access this.
+>
+> It doesn't handle hotplug at all, per se.
+>
+> The problem with hotplug is that (afaik) ALSA has no way to notify
+> userspace that something has changed: if I were to add such a
+> notification from the DRM side of the driver to the audio side, I
+> wouldn't know what to do with it when the audio side received it.
+>
+> In any case, I tend to think of unplugging the display as being much
+> like unplugging the 3.5mm line out jack to your hifi system - just
+> because you've disconnected the speakers does not stop the audio
+> playing - the audio continues despite you not being able to hear it.
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- drivers/dma/pxa_dma.c | 9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
+Yeah, afaik that's the same that happens on intel.
 
-diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
-index ddcbbf5..be5b524 100644
---- a/drivers/dma/pxa_dma.c
-+++ b/drivers/dma/pxa_dma.c
-@@ -184,19 +184,18 @@ static unsigned int pxad_drcmr(unsigned int line)
- 
- static int dbg_show_requester_chan(struct seq_file *s, void *p)
- {
--	int pos = 0;
- 	struct pxad_phy *phy = s->private;
- 	int i;
- 	u32 drcmr;
- 
--	pos += seq_printf(s, "DMA channel %d requester :\n", phy->idx);
-+	seq_printf(s, "DMA channel %d requester :\n", phy->idx);
- 	for (i = 0; i < 70; i++) {
- 		drcmr = readl_relaxed(phy->base + pxad_drcmr(i));
- 		if ((drcmr & DRCMR_CHLNUM) == phy->idx)
--			pos += seq_printf(s, "\tRequester %d (MAPVLD=%d)\n", i,
--					  !!(drcmr & DRCMR_MAPVLD));
-+			seq_printf(s, "\tRequester %d (MAPVLD=%d)\n", i,
-+				   !!(drcmr & DRCMR_MAPVLD));
- 	}
--	return pos;
-+	return 0;
- }
- 
- static inline int dbg_burst_from_dcmd(u32 dcmd)
+> Sure, there's the problem that if you plug in a display with different
+> capabilities, the existing format may not be supported, but I don't
+> see a reasonable method which could provoke what effectively would be
+> a restart on the ALSA side.
+>
+> In any case, hotplug is kind-of outside of the remit of these helpers -
+> these helpers are more to do with decoding an existing ELD and limiting
+> the capabilities of the audio side to that specified in the ELD.  It's
+> up to the driver how it gets the ELD, and it's left to the driver to
+> determine how to handle the change-of-ELD notification.
+>
+> Given your description of i915 hardware above, I think this makes sense
+> anyway: if you have a hardware notification system, it makes sense to use
+> that rather than some software implementation, and requiring a software
+> implementation for everything to me sounds too limiting.
+>
+> That's not to say that we couldn't have a software implementation in the
+> future: right now, I merely concentrated on the parsing issue.
+>
+> The dw-hdmi audio driver isn't ready for mainlining yet - there's two
+> variants of this at the moment (one for iMX6 and a different one for
+> Rockchip - same IP but configured with different interfaces for getting
+> the audio data into the HDMI block.)  There's still some work to be done
+> to properly unify the two approaches into something sane.
+
+I agree that it makes sense to start with the parsing issues. And some
+of the reconfiguration work we need to do in i915 like retuning
+derived clocks when the master display clock changes is definitely
+solved better already in the arm world I think ;-) I also don't think
+that hotplug handling is all that important, at least a quick read
+through the intel snd stuff suggest it doesn't handle any of the
+reconfiguration all that well at all. The only issue that might be
+there with your sw approach is that a concurrent probe/hotplug in drm
+might free the edid and hence the eld, while the snd side is trying to
+copy that. I'm not sure how that's prevented. Not really a problem
+with the helpers though.
+-Daniel
 -- 
-2.1.4
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
