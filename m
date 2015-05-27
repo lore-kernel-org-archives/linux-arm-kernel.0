@@ -1,65 +1,75 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Wed, 27 May 2015 15:40:52 +0100
-Subject: [PATCH 1/2 v2] ARM64: juno: add GPIO keys
-In-Reply-To: <CACRpkdbm9LxaWQa=SQAhOKYVncPoFiKv_M6cN1oUEqctiR5=pQ@mail.gmail.com>
-References: <1432629650-19559-1-git-send-email-linus.walleij@linaro.org>
- <20150526093734.GB2175@e106497-lin.cambridge.arm.com>
- <CACRpkdbm9LxaWQa=SQAhOKYVncPoFiKv_M6cN1oUEqctiR5=pQ@mail.gmail.com>
-Message-ID: <20150527144052.GF2175@e106497-lin.cambridge.arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 27 May 2015 08:49:19 -0600
+Subject: [PATCH 02/21] ARM: tegra: Add gpio-ranges property
+In-Reply-To: <CAAObsKD7YbZX01A=SS7z_PxAMPweHy6sw5ut=50h50C=j9y0zA@mail.gmail.com>
+References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1432565608-26036-3-git-send-email-tomeu.vizoso@collabora.com>
+ <5564CC84.1030700@wwwdotorg.org>
+ <CAAObsKD7YbZX01A=SS7z_PxAMPweHy6sw5ut=50h50C=j9y0zA@mail.gmail.com>
+Message-ID: <5565D96F.3000600@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 27, 2015 at 01:42:58PM +0100, Linus Walleij wrote:
-> On Tue, May 26, 2015 at 11:37 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> 
-> > I'm going to do a test on my board once I find a bit of spare time
-> > as I have some in-house reports that the handling of the GPIO
-> > buttons is not reliable and on some boards it led to board reset.
-> > Firmware might have been updated since (last year) so it would be
-> > useful if you can tell me the version(s) of firmware that you are
-> > using.
-> 
-> ARM V2M-Juno Boot loader v1.0.0
-> HBI0262 build 616
-> 
-> ARM V2M_Juno Firmware v1.1.8
-> Build Date: Jun 17 2014
-> 
-> Time :  12:23:19
-> Date :  27:05:2015
-> 
-> Cmd> reboot
-> 
-> This?
+On 05/27/2015 08:18 AM, Tomeu Vizoso wrote:
+> On 26 May 2015 at 21:41, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 05/25/2015 08:53 AM, Tomeu Vizoso wrote:
+>>>
+>>> Specify how the GPIOs map to the pins in T124, so the dependency is
+>>> explicit.
+>>>
+>>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>>> ---
+>>>    arch/arm/boot/dts/tegra124.dtsi | 1 +
+>>>    1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/tegra124.dtsi
+>>> b/arch/arm/boot/dts/tegra124.dtsi
+>>> index 13cc7ca..5d1d35f 100644
+>>> --- a/arch/arm/boot/dts/tegra124.dtsi
+>>> +++ b/arch/arm/boot/dts/tegra124.dtsi
+>>> @@ -254,6 +254,7 @@
+>>>                  gpio-controller;
+>>>                  #interrupt-cells = <2>;
+>>>                  interrupt-controller;
+>>> +               gpio-ranges = <&pinmux 0 0 250>;
+>>
+>>
+>> We should be consistent between SoCs. Why not make the same change for all
+>> Tegra SoCs?
+>>
+>> I think this change will cause the GPIO subsystem to call into the pinctrl
+>> subsystem and create/add/register a new GPIO<->pinctrl range structure. The
+>> pinctrl driver already does this, so I think we'll end up with two duplicate
+>> entries in the pinctrl device's gpio_ranges list. This probably won't cause
+>> a problem, but I wanted to make sure you'd thought about it to make sure.
+>
+> Actually, I have checked and see that gpio-tegra.c registers 256
+> gpios, but pinctrl-tegra124.c adds a range of only 251. I don't really
+> remember where I got the 250 value from, sorry :(
+>
+> I don't see how that would cause any concrete problems, but maybe we
+> should have a single authoritative source (not sure we can do so
+> without breaking DT ABI though).
+>
+>> Right now, I think we get lucky and pinctrl ends up probing first (or at
+>> least very early) anyway. Somewhat related to this series, I wonder if we
+>> shouldn't add pinctrl client properties to every node in the Tegra DT that
+>> describes a controller that makes use of external pins that are affected by
+>> the pinmux. Such a change would guarantee this desired probing order. In
+>> order to preserve the "program the entire pinmux at once" semantics, these
+>> new pinctrl client properties would all need to reference empty states, yet
+>> would still need to exist to represent the dependency.
+>
+> I think so, but aren't almost all those pins used as gpios? If so,
+> then such a controller's driver will request the gpio it wants which
+> will cause the gpio driver to be registered (and hopefully probed) if
+> needed, which in turn will check that the corresponding pinctrl device
+> has been registered. Or am I missing something?
 
-Also useful if you can capture the text printed by BL1 when booting (depending
-on which version you have there might not be much).
-
-NOTICE:  Booting Trusted Firmware
-NOTICE:  BL1: v1.0(release):a3a41cc
-NOTICE:  BL1: Built : 16:15:48, Jan 23 2015
-NOTICE:  BL1: Booting BL2
-NOTICE:  BL2: v1.0(release):1c73ffb
-NOTICE:  BL2: Built : 15:19:28, Jan 26 2015
-NOTICE:  BL1: Booting BL3-1
-NOTICE:  BL3-1: v1.0(release):1c73ffb
-NOTICE:  BL3-1: Built : 15:19:30, Jan 26 2015
-UEFI firmware (version a4c2dfb284a55e73f34c48f5944a438006384f04 built at 17:44:48 on Jan 13 2015)
-
-Best regards,
-Liviu
-
-> 
-> Yours,
-> Linus Walleij
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+As you say this probably works out fine for pins that are used as GPIOs. 
+I was thinking more about SFIOs. Take an I2C controller, which doesn't 
+use any GPIOs itself. The pinctrl device should be probed before the I2C 
+device, so that the I2C driver can initiate transactions on the I2C bus 
+during its probe if it wanted to (or at least, clients could initiate 
+transactions at any completely arbitrary time as soon as probe was 
+complete).
