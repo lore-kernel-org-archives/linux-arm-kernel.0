@@ -1,24 +1,78 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 27 May 2015 11:57:59 +0800
-Subject: [PATCH 00/11] ARM64 PCI hostbridge init based on ACPI
-In-Reply-To: <1951882.p8DdrcurkC@vostro.rjw.lan>
-References: <1432644564-24746-1-git-send-email-hanjun.guo@linaro.org>
- <1951882.p8DdrcurkC@vostro.rjw.lan>
-Message-ID: <556540C7.6080301@linaro.org>
+From: minchan@kernel.org (Minchan Kim)
+Date: Wed, 27 May 2015 13:10:15 +0900
+Subject: [RFC PATCH 2/2] arm64: Implement vmalloc based thread_info
+ allocator
+In-Reply-To: <D5CD4D44-77BC-4817-B9A7-60C0F4AE444F@gmail.com>
+References: <1432483340-23157-1-git-send-email-jungseoklee85@gmail.com>
+ <20150525144045.GE14922@blaptop>
+ <D5CD4D44-77BC-4817-B9A7-60C0F4AE444F@gmail.com>
+Message-ID: <20150527041015.GB11609@blaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?05?27? 08:30, Rafael J. Wysocki wrote:
-> On Tuesday, May 26, 2015 08:49:13 PM Hanjun Guo wrote:
->> This patch set is introducing ARM64 PCI hostbridge init based on ACPI,
->> which based on Jiang Liu's patch set "Consolidate ACPI PCI root common
->> code into ACPI core":
->>
->> https://lkml.org/lkml/2015/5/14/98
->
-> I'll be regarding this patchset as an RFC until the one from Jiang Liu goes in.
+Hello Jungseok,
 
-Yes, please, Jiang Liu's patch set should go in first.
+On Tue, May 26, 2015 at 08:29:59PM +0900, Jungseok Lee wrote:
+> On May 25, 2015, at 11:40 PM, Minchan Kim wrote:
+> > Hello Jungseok,
+> 
+> Hi, Minchan,
+> 
+> > On Mon, May 25, 2015 at 01:02:20AM +0900, Jungseok Lee wrote:
+> >> Fork-routine sometimes fails to get a physically contiguous region for
+> >> thread_info on 4KB page system although free memory is enough. That is,
+> >> a physically contiguous region, which is currently 16KB, is not available
+> >> since system memory is fragmented.
+> > 
+> > Order less than PAGE_ALLOC_COSTLY_ORDER should not fail in current
+> > mm implementation. If you saw the order-2,3 high-order allocation fail
+> > maybe your application received SIGKILL by someone. LMK?
+> 
+> Exactly right. The allocation is failed via the following path.
+> 
+> if (test_thread_flag(TIF_MEMDIE) && !(gfp_mask & __GFP_NOFAIL))
+> 	goto nopage;
+> 
+> IMHO, a reclaim operation would be not needed in this context if memory is
+> allocated from vmalloc space. It means there is no need to traverse shrinker list. 
 
-Thanks
-Hanjun
+For making fork successful with using vmalloc, it's bandaid.
+
+> 
+> >> This patch tries to solve the problem as allocating thread_info memory
+> >> from vmalloc space, not 1:1 mapping one. The downside is one additional
+> >> page allocation in case of vmalloc. However, vmalloc space is large enough,
+> > 
+> > The size you want to allocate is 16KB in here but additional 4K?
+> > It increases 25% memory footprint, which is huge downside.
+> 
+> I agree with the point, and most people who try to use vmalloc might know the number.
+> However, an interoperation on the number depends on a point of view.
+> 
+> Vmalloc is large enough and not fully utilized in case of ARM64.
+> With the considerations, there is a room to do math as follows.
+> 
+> 4KB / 240GB = 1.5e-8 (4KB page + 3 level combo)
+> 
+> It would be not a huge downside if fork-routine is not damaged due to fragmentation.
+
+Okay, address size point of view, it wouldn't be significant problem.
+Then, let's see it performance as point of view.
+
+If we use vmalloc, it needs additional data structure for vmalloc
+management, several additional allocation request, page table hanlding
+and TLB flush.
+
+Normally, forking is very frequent operation so we shouldn't do
+make it slow and memory consumption bigger if there isn't big reason.
+
+> 
+> However, this is one of reasons to add "RFC" prefix in the patch set. How is the
+> additional 4KB interpreted and considered?
+> 
+> Best Regards
+> Jungseok Lee
+
+-- 
+Kind regards,
+Minchan Kim
