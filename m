@@ -1,34 +1,50 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 27 May 2015 14:42:58 +0200
-Subject: [PATCH 1/2 v2] ARM64: juno: add GPIO keys
-In-Reply-To: <20150526093734.GB2175@e106497-lin.cambridge.arm.com>
-References: <1432629650-19559-1-git-send-email-linus.walleij@linaro.org>
- <20150526093734.GB2175@e106497-lin.cambridge.arm.com>
-Message-ID: <CACRpkdbm9LxaWQa=SQAhOKYVncPoFiKv_M6cN1oUEqctiR5=pQ@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 27 May 2015 14:43:46 +0200
+Subject: [PATCH v2] clocksource: exynos_mct: fix for sleeping in atomic
+ ctx handling cpu hotplug notif.
+In-Reply-To: <1432567470.13951.2.camel@AMDC1552.digital.local>
+References: <1426151496-5509-1-git-send-email-d.eppel@samsung.com>
+ <55509013.3040901@linaro.org>
+ <1432567470.13951.2.camel@AMDC1552.digital.local>
+Message-ID: <5565BC02.7010101@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 26, 2015 at 11:37 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+On 05/25/2015 05:24 PM, Damian Eppel wrote:
+> On Mon, 2015-05-11 at 13:18 +0200, Daniel Lezcano wrote:
 
-> I'm going to do a test on my board once I find a bit of spare time
-> as I have some in-house reports that the handling of the GPIO
-> buttons is not reliable and on some boards it led to board reset.
-> Firmware might have been updated since (last year) so it would be
-> useful if you can tell me the version(s) of firmware that you are
-> using.
+[ ... ]
 
-ARM V2M-Juno Boot loader v1.0.0
-HBI0262 build 616
+>> The code sounds very complex for what it is supposed to do.
+>>
+>> Perhaps I am missing something but you have more or less the same
+>> functionality than the smp_twd timers and these ones don't look so complex.
+>>
+>> Could you please look at the smp_twd.c implementation ?
+>
+> Hi Daniel,
+>
+> exynos_mct.c driver looks more complex as it supports two types of timer
+> interrupts - private and shared peripheral interrupts (for exynos4412
+> and exynos4210 accordingly). In smp_twd.c driver I can see only PPI type
+> of irqs supported. SPI and PPI irqs differs slightly in setup - thus two
+> different code paths appears in the driver in initialization and
+> handling of CPU notifications. The fix is addressing issue that appears
+> only for hardware using SPI irqs so it is hard to compare it to
+> smp_twd.c.
+> BTW, If we remove support for SPI irqs in exynos_mct.c it would look
+> almost the same as smp_twd.c.
 
-ARM V2M_Juno Firmware v1.1.8
-Build Date: Jun 17 2014
+Ok, thanks.
 
-Time :  12:23:19
-Date :  27:05:2015
+I will have a deeper look this afternoon.
 
-Cmd> reboot
+   -- Daniel
 
-This?
 
-Yours,
-Linus Walleij
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
