@@ -1,48 +1,36 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 27 May 2015 09:31:50 +0200
-Subject: [PATCH v4 2/2] soc: Add driver for Freescale Vybrid Platform
-In-Reply-To: <7df753efff77a96da285f0571f1316512787e83c.1432637313.git.maitysanchayan@gmail.com>
-References: <cover.1432637313.git.maitysanchayan@gmail.com>
- <7df753efff77a96da285f0571f1316512787e83c.1432637313.git.maitysanchayan@gmail.com>
-Message-ID: <1432711910.27695.223.camel@x220>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 27 May 2015 09:33:41 +0200
+Subject: [PATCH 1/5] soc: mediatek: Add infracfg misc driver support
+In-Reply-To: <7hfv6jorw9.fsf@deeprootsystems.com>
+References: <1431372206-1237-1-git-send-email-s.hauer@pengutronix.de>
+ <1431372206-1237-2-git-send-email-s.hauer@pengutronix.de>
+ <7hfv6jorw9.fsf@deeprootsystems.com>
+Message-ID: <20150527073341.GU6325@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-05-26 at 17:06 +0530, Sanchayan Maity wrote:
-> --- /dev/null
-> +++ b/drivers/soc/fsl/Kconfig
+On Tue, May 26, 2015 at 04:12:06PM -0700, Kevin Hilman wrote:
+> Sascha Hauer <s.hauer@pengutronix.de> writes:
+> 
+> > This adds support for some miscellaneous bits of the infracfg controller.
+> > The mtk_infracfg_set/clear_bus_protection functions are necessary for
+> > the scpsys power domain driver to handle the bus protection bits which
+> > are contained in the infacfg register space.
+> >
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> 
+> IMO, this feature still needs more documentation.  From an earlier
+> exchange with James Liao, he was able to get some more details from the
+> HW designer[1] which I think belong in comments somewhere in this
+> driver.
 
-> +config SOC_VF610
-> +	   bool "SoC bus device for the Freescale Vybrid platform"
-> +	   select SOC_BUS
-> +	   help
-> +	     Include support for the SoC bus on the Freescale Vybrid platform
-> +	     providing some sysfs information about the module variant.
-> \ No newline at end of file
+Ok, I'll add something like this.
 
-(That review comment is courtesy of git.)
-
-> --- /dev/null
-> +++ b/drivers/soc/fsl/Makefile
-
-> +obj-$(CONFIG_SOC_VF610)		+= soc-vf610.o
-
-> --- /dev/null
-> +++ b/drivers/soc/fsl/soc-vf610.c
-
-> +MODULE_DEVICE_TABLE(of, vf610_soc_bus_match);
-
-> +module_platform_driver(vf610_soc_driver);
-
-(The series starting at https://lkml.org/lkml/2015/5/10/131 would allow
-to use builtin_platform_driver() for built-in only code.)
-
-> +MODULE_DESCRIPTION("Freescale VF610 SoC bus driver");
-> +MODULE_LICENSE("GPL v2");
-
-I think soc-vf610.o can only be built-in. But its code contains a few
-module specific macros. Was it perhaps intended for SOC_VF610 to be
-tristate?
+Sascha
 
 
-Paul Bolle
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
