@@ -1,75 +1,32 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Wed, 27 May 2015 16:18:29 +0200
-Subject: [PATCH 02/21] ARM: tegra: Add gpio-ranges property
-In-Reply-To: <5564CC84.1030700@wwwdotorg.org>
-References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
- <1432565608-26036-3-git-send-email-tomeu.vizoso@collabora.com>
- <5564CC84.1030700@wwwdotorg.org>
-Message-ID: <CAAObsKD7YbZX01A=SS7z_PxAMPweHy6sw5ut=50h50C=j9y0zA@mail.gmail.com>
+From: weigelt@melag.de (Enrico Weigelt, metux IT consult)
+Date: Wed, 27 May 2015 16:20:27 +0200
+Subject: hardware aac codec on imx53 ?
+In-Reply-To: <CAOMZO5C6YQrqh9L7_-j0kesC203x7h-LGEZxNsMHotu_rzt1XA@mail.gmail.com>
+References: <555B236B.10506@melag.de>	<CAOMZO5CxSOVNcJSxLQcu0nKM=abEXfxK3CQve5JYXVQ7dTTGDg@mail.gmail.com>	<555C8056.4090300@melag.de>
+ <CAOMZO5C6YQrqh9L7_-j0kesC203x7h-LGEZxNsMHotu_rzt1XA@mail.gmail.com>
+Message-ID: <5565D2AB.5050705@melag.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 May 2015 at 21:41, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 05/25/2015 08:53 AM, Tomeu Vizoso wrote:
->>
->> Specify how the GPIOs map to the pins in T124, so the dependency is
->> explicit.
->>
->> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->> ---
->>   arch/arm/boot/dts/tegra124.dtsi | 1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/arch/arm/boot/dts/tegra124.dtsi
->> b/arch/arm/boot/dts/tegra124.dtsi
->> index 13cc7ca..5d1d35f 100644
->> --- a/arch/arm/boot/dts/tegra124.dtsi
->> +++ b/arch/arm/boot/dts/tegra124.dtsi
->> @@ -254,6 +254,7 @@
->>                 gpio-controller;
->>                 #interrupt-cells = <2>;
->>                 interrupt-controller;
->> +               gpio-ranges = <&pinmux 0 0 250>;
+Am 20.05.2015 um 14:49 schrieb Fabio Estevam:
+> On Wed, May 20, 2015 at 9:38 AM, Enrico Weigelt, metux IT consult
+> <weigelt@melag.de> wrote:
 >
+>> Any idea what their proprietary / binary-only aac codec library is for ?
+>> Just an software codec ?
 >
-> We should be consistent between SoCs. Why not make the same change for all
-> Tegra SoCs?
->
-> I think this change will cause the GPIO subsystem to call into the pinctrl
-> subsystem and create/add/register a new GPIO<->pinctrl range structure. The
-> pinctrl driver already does this, so I think we'll end up with two duplicate
-> entries in the pinctrl device's gpio_ranges list. This probably won't cause
-> a problem, but I wanted to make sure you'd thought about it to make sure.
+> Yes, it is a software codec.
 
-Actually, I have checked and see that gpio-tegra.c registers 256
-gpios, but pinctrl-tegra124.c adds a range of only 251. I don't really
-remember where I got the 250 value from, sorry :(
+Okay. Does it have any benefit over libfaac/libfaad ?
 
-I don't see how that would cause any concrete problems, but maybe we
-should have a single authoritative source (not sure we can do so
-without breaking DT ABI though).
 
-> Right now, I think we get lucky and pinctrl ends up probing first (or at
-> least very early) anyway. Somewhat related to this series, I wonder if we
-> shouldn't add pinctrl client properties to every node in the Tegra DT that
-> describes a controller that makes use of external pins that are affected by
-> the pinmux. Such a change would guarantee this desired probing order. In
-> order to preserve the "program the entire pinmux at once" semantics, these
-> new pinctrl client properties would all need to reference empty states, yet
-> would still need to exist to represent the dependency.
 
-I think so, but aren't almost all those pins used as gpios? If so,
-then such a controller's driver will request the gpio it wants which
-will cause the gpio driver to be registered (and hopefully probed) if
-needed, which in turn will check that the corresponding pinctrl device
-has been registered. Or am I missing something?
+--mtx
 
-Regards,
+--
+Enrico Weigelt, metux IT consult
++49-151-27565287
+MELAG Medizintechnik oHG Sitz Berlin Registergericht AG Charlottenburg HRA 21333 B
 
-Tomeu
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Wichtiger Hinweis: Diese Nachricht kann vertrauliche oder nur f?r einen begrenzten Personenkreis bestimmte Informationen enthalten. Sie ist ausschlie?lich f?r denjenigen bestimmt, an den sie gerichtet worden ist. Wenn Sie nicht der Adressat dieser E-Mail sind, d?rfen Sie diese nicht kopieren, weiterleiten, weitergeben oder sie ganz oder teilweise in irgendeiner Weise nutzen. Sollten Sie diese E-Mail irrt?mlich erhalten haben, so benachrichtigen Sie bitte den Absender, indem Sie auf diese Nachricht antworten. Bitte l?schen Sie in diesem Fall diese Nachricht und alle Anh?nge, ohne eine Kopie zu behalten.
+Important Notice: This message may contain confidential or privileged information. It is intended only for the person it was addressed to. If you are not the intended recipient of this email you may not copy, forward, disclose or otherwise use it or any part of it in any form whatsoever. If you received this email in error please notify the sender by replying and delete this message and any attachments without retaining a copy.
