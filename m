@@ -1,40 +1,61 @@
-From: jiri.prchal@aksignal.cz (=?UTF-8?B?SmnFmcOtIFByY2hhbA==?=)
-Date: Wed, 27 May 2015 08:27:26 +0200
-Subject: [BUG] at91: serial: is it using DMA?
-In-Reply-To: <555C8B79.4030900@aksignal.cz>
-References: <555C8B79.4030900@aksignal.cz>
-Message-ID: <556563CE.3090506@aksignal.cz>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Wed, 27 May 2015 08:45:38 +0200
+Subject: [PATCH] ARM: cns3xxx: pci: avoid potential stack overflow
+In-Reply-To: <2273145.0Ls8cProhs@wuerfel> (Arnd Bergmann's message of "Tue, 19
+ May 2015 17:14:59 +0200")
+References: <2273145.0Ls8cProhs@wuerfel>
+Message-ID: <m3fv6i8qnh.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-just to write what's new.
-It doesn't work in 3.18.0-linux4sam too.
-It looks like select or poll function has some problem with it, it goes through after 25ms timeout for a while without 
-anything received and then it receives about 2000 chars. Physically it receives about 30 chars every 25ms.
-3.18.13 is the latest kernel where it works correctly.
+Arnd Bergmann <arnd@arndb.de> writes:
 
-On 20.5.2015 15:26, Ji?? Prchal wrote:
-> Hi all,
-> I discovered problem with serial driver in kernel 4.0.4 on at91sam9g25 at 400MHz.
-> When I want receive frames on UART at 115200kb/s I get many errors caused by loss of some bytes.
-> These errors were there if no DMA was used in previous version.
-> Dmesg says DMA us used:
-> [    0.000000] Linux version 4.0.4_cpm9g25 (prchal at prchal) (gcc version 4.7.3 (Ubuntu/Linaro 4.7.3-12ubuntu1) ) #5
-> PREEMPT Wed May 20 12:19:37 CEST 2015
-> ...
-> [   16.090090] atmel_usart f801c000.serial: using dma0chan4 for rx DMA transfers
-> [   16.105105] atmel_usart f801c000.serial: using dma0chan5 for tx DMA transfers
+> The cns3xxx_pcie_hw_init function uses excessive kernel
+> stack space because of a hack that puts a fake struct
+> pci_sys_data and struct pci_bus on the stack in order to
+> call the generic pci_bus_read_config accessors, which causes
+> a warning in ARM allmodconfig builds:
 >
-> In 3.18.13 it works properly and dmesg says the same:
-> [    0.000000] Linux version 3.18.13_cpm9g25 (prchal at prchal) (gcc version 4.7.3 (Ubuntu/Linaro 4.7.3-12ubuntu1) ) #3
-> PREEMPT Wed May 20 14:29:26 CEST 2015
-> ...
-> [   14.936936] atmel_usart f801c000.serial: using dma0chan4 for rx DMA transfers
-> [   14.954954] atmel_usart f801c000.serial: using dma0chan5 for tx DMA transfers
+> arch/arm/mach-cns3xxx/pcie.c:266:1: warning: the frame size of 1080 bytes is larger than 1024 bytes
 >
-> I made diff of drivers/tty/serial/atmel_serial.c and I see many changes in function atmel_rx_from_dma witch I don't
-> understand. Could it bee there?
-> All other DMAs work fine.
->
-> Jiri
+> This rewrites the code in question to use a private
+> implementation of the config space access for the same
+> purpose, getting rid of the local variables and the
+> warning in the process. As part of this, we have to
+> use an open-coded version of pci_bus_find_capability(),
+> which unfortunately complicates the implementation.
+
+Wouldn't it be better to simply use static structs for this purpose?
+The hack isn't pretty, though.
+
+> +	regs = cnspci->cfg0_regs + (PCI_DEVFN(1, 0) << 12);
+> +
+
+Some comment about would be helpful. Such as this:
+
+
+> -	bus.number = 1; /* directly connected PCIe device */
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+> +	pos = cns3xxx_pci_raw_read_config(regs, PCI_CAPABILITY_LIST, 1);
+> +	while (cns3xxx_pci_raw_read_config(regs, pos, 1) != PCI_CAP_ID_EXP)
+> +		pos = cns3xxx_pci_raw_read_config(regs, pos + PCI_CAP_LIST_NEXT, 1);
+> +
+
+I wonder if this can fail (i.e., no PCI_CAP_ID_EXP capability).
+
+> +	dc = cns3xxx_pci_raw_read_config(regs, pos + PCI_EXP_DEVCTL, 2);
+> +	dc &= ~(0x3 << 12);	/* Clear Device Control Register [14:12] */
+> +	cns3xxx_pci_raw_write_config(regs, pos + PCI_EXP_DEVCTL, 2, dc);
+> +	dc = cns3xxx_pci_raw_read_config(regs, pos + PCI_EXP_DEVCTL, 2);
+> +	if (!(dc & (0x3 << 12)))
+> +		pr_info("PCIe: Set Device Max_Read_Request_Size to 128 byte\n");
+> +
+
+This seems to revert 367dc4b75f4349d5363bc3ebdc030939db944786. Why do
+you want to do it?
+-- 
+Krzysztof Halasa
+
+Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
