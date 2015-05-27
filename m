@@ -1,7 +1,7 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 27 May 2015 17:11:10 +0200
-Subject: [GIT PULL] ARM: mediatek: dts updates for v4.2
-Message-ID: <CABuKBeLETR3n2nExzd=BC_DvED_hehRd_04TvFbKPDQK+6rWGg@mail.gmail.com>
+Date: Wed, 27 May 2015 17:14:08 +0200
+Subject: [GIT PULL] ARM: mediatek: arm64 updates for v4.2
+Message-ID: <CABuKBeLhFR=94cF301wL7J8hJVTtyseoD7g45PLE6znQkPAFGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,25 +20,33 @@ The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
 
 are available in the git repository at:
 
-  https://github.com/mbgg/linux-mediatek.git tags/v4.1-next-dts
+  https://github.com/mbgg/linux-mediatek.git tags/v4.1-next-arm64
 
-for you to fetch changes up to 7d580545387b20735d31b7307aa39483526a19cd:
+for you to fetch changes up to d211193d4ddeab0327f4b571ec34f641ae59eb89:
 
-  ARM: dts: mt8127: correct uart instance address (2015-05-16 10:21:15 +0200)
-
-----------------------------------------------------------------
-- dts: add pinctrl/GPIO/EINT to mt8135
-- dts: fix uart address for mt8127
+  arm64: dts: mt8173: Add PMIC wrapper device node (2015-05-27 13:41:18 +0200)
 
 ----------------------------------------------------------------
-Hongzhou Yang (1):
-      ARM: dts: mt8135: Add pinctrl/GPIO/EINT node for mt8135.
+- dts: fixup pinctrl mt8173
+- dts: mt8173-evb fix model name
+- dts: mt8173 fix identation
+- dts: mt8173 add clock controller
+- dts: mt8173 change uart clocks
+- dts: mt8173 add pmic wrapper
 
-Yingjoe Chen (1):
-      ARM: dts: mt8127: correct uart instance address
+----------------------------------------------------------------
+Daniel Kurtz (1):
+      arm64: dts: mt8173: fix some indentation
 
- arch/arm/boot/dts/mt8127.dtsi      |    8 +-
- arch/arm/boot/dts/mt8135-pinfunc.h | 1302 ++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/mt8135.dtsi      |   29 +
- 3 files changed, 1335 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/boot/dts/mt8135-pinfunc.h
+Sascha Hauer (3):
+      arm64: dts: mt8173: Add clock controller device nodes
+      arm64: dts: mt8173: Use real clock for UARTs
+      arm64: dts: mt8173: Add PMIC wrapper device node
+
+Yingjoe Chen (2):
+      arm64: dts: mt8173: Fixup pinctrl nodes
+      arm64: dts: mt8173-evb: fix model name
+
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts |  3 +-
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 98 ++++++++++++++++++++++-------
+ 2 files changed, 78 insertions(+), 23 deletions(-)
