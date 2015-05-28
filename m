@@ -1,105 +1,50 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 28 May 2015 20:41:47 +0200
-Subject: [PATCH 2/3] clk: mediatek: Add support for clk-mux using regmap
-In-Reply-To: <1432838508-5184-1-git-send-email-matthias.bgg@gmail.com>
-References: <1432838508-5184-1-git-send-email-matthias.bgg@gmail.com>
-Message-ID: <1432838508-5184-3-git-send-email-matthias.bgg@gmail.com>
+From: nerv@dawncrow.de (=?windows-1252?Q?Andr=E9_Hentschel?=)
+Date: Thu, 28 May 2015 20:43:30 +0200
+Subject: [PATCH v2] arm64: Preserve the user r/w register tpidr_el0 on
+ context switch and fork in compat mode
+In-Reply-To: <20150527143648.GA4232@arm.com>
+References: <555CB3D5.7000307@dawncrow.de> <20150527143648.GA4232@arm.com>
+Message-ID: <556761D2.9040908@dawncrow.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patches adds support for the mediatek clocks to be able to register
-and use a clk-mux wich relies on regmap.
+Am 27.05.2015 um 16:36 schrieb Will Deacon:
+> Hi Andr?,
+> 
+> On Wed, May 20, 2015 at 05:18:29PM +0100, Andr? Hentschel wrote:
+>> From: Andr? Hentschel <nerv@dawncrow.de>
+>>
+>> Since commit a4780adeefd042482f624f5e0d577bf9cdcbb760 the user writeable TLS
+>> register on ARM is preserved per thread.
+>>
+>> This patch does it analogous to the ARM patch, but for compat mode on ARM64.
+>>
+>> Signed-off-by: Andr? Hentschel <nerv@dawncrow.de>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>>
+>> ---
+>> This patch is against Linux 4.1-rc1 (b787f68c36d49bb1d9236f403813641efa74a031)
+>>
+>> v2: Trying to address suggestions by Will Deacon
+>>
+>> @Will Deacon: 	The macro you suggested is not helpful it seems, instead i introduced
+>> 		static functions. They also could be macros i guess, but it seems
+>> 		much cleaner to me to use functions as it only affects one file.
+> 
+> I wanted to understand in more detail why the macro didn't work out for
+> you, so I trued hacking together my own version of the patch (see below).
+> It seems to hold up to light testing, so it would be good to know where
+> you ran into problems.
+> 
+>> Should the final version be send to rmk's patchtracker or will someone
+>> else pick it up?
+> 
+> This is an arm64 patch, so either Catalin or me will pick it up directly
+> when it's ready to be merged.
+> 
+> Will
 
-Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
----
- drivers/clk/mediatek/clk-mtk.c | 37 +++++++++++++++++++++++++++++++++++++
- drivers/clk/mediatek/clk-mtk.h | 26 ++++++++++++++++++++++++++
- 2 files changed, 63 insertions(+)
-
-diff --git a/drivers/clk/mediatek/clk-mtk.c b/drivers/clk/mediatek/clk-mtk.c
-index 18444ae..cf953a8 100644
---- a/drivers/clk/mediatek/clk-mtk.c
-+++ b/drivers/clk/mediatek/clk-mtk.c
-@@ -111,6 +111,43 @@ int mtk_clk_register_gates(struct device_node *node, const struct mtk_gate *clks
- 	return 0;
- }
- 
-+int mtk_clk_regm_register_mux(struct device_node *node,
-+		const struct mtk_regm_mux *clks, int num,
-+		struct clk_onecell_data *clk_data)
-+{
-+	int i;
-+	struct clk *clk;
-+	struct regmap *regmap;
-+
-+	if (!clk_data)
-+		return -ENOMEM;
-+
-+	regmap = syscon_node_to_regmap(node);
-+	if (IS_ERR(regmap)) {
-+		pr_err("Cannot find regmap for %s: %ld\n", node->full_name,
-+				PTR_ERR(regmap));
-+		return PTR_ERR(regmap);
-+	}
-+
-+	for (i = 0; i < num; i++) {
-+		const struct mtk_regm_mux *mux = &clks[i];
-+
-+		clk = clk_regm_register_mux(NULL, mux->name, mux->parent_names,
-+					mux->num_parents, 0, regmap,
-+					mux->mux_offset, mux->mux_shift,
-+					mux->mux_width, mux->flags, NULL);
-+		if (IS_ERR(clk)) {
-+			pr_err("Failed to register clk mux %s: %ld\n",
-+					mux->name, PTR_ERR(clk));
-+			continue;
-+		}
-+
-+		clk_data->clks[mux->id] = clk;
-+	}
-+
-+	return 0;
-+}
-+
- struct clk *mtk_clk_register_composite(const struct mtk_composite *mc,
- 		void __iomem *base, spinlock_t *lock)
- {
-diff --git a/drivers/clk/mediatek/clk-mtk.h b/drivers/clk/mediatek/clk-mtk.h
-index 61035b9..3f41725 100644
---- a/drivers/clk/mediatek/clk-mtk.h
-+++ b/drivers/clk/mediatek/clk-mtk.h
-@@ -156,6 +156,32 @@ void __init mtk_clk_register_plls(struct device_node *node,
- 		const struct mtk_pll_data *plls, int num_plls,
- 		struct clk_onecell_data *clk_data);
- 
-+struct mtk_regm_mux {
-+	int id;
-+	const char *name;
-+	const char * const *parent_names;
-+	u8 num_parents;
-+	unsigned flags;
-+	uint32_t mux_offset;
-+	uint32_t mux_shift;
-+	uint32_t mux_width;
-+};
-+
-+int __init mtk_clk_regm_register_mux(struct device_node *node,
-+		const struct mtk_regm_mux *clks, int num,
-+		struct clk_onecell_data *clk_data);
-+
-+#define MUX_REGMAP(_id, _name, _parents, _offset, _shift, _width) {	\
-+		.id = _id,						\
-+		.name = _name,						\
-+		.parent_names = _parents,				\
-+		.num_parents = ARRAY_SIZE(_parents),			\
-+		.flags = CLK_SET_RATE_PARENT,				\
-+		.mux_offset = _offset,					\
-+		.mux_shift = _shift,					\
-+		.mux_width = _width,					\
-+	}
-+
- #ifdef CONFIG_RESET_CONTROLLER
- void mtk_register_reset_controller(struct device_node *np,
- 			unsigned int num_regs, int regofs);
--- 
-1.9.1
+Your patch works, you can add me as Tested-by. :)
+My bad was that i didn't know that macro style (returning a variable conditionally with c code)
+Sadly no new commit by me :(
