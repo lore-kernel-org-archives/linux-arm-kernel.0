@@ -1,70 +1,87 @@
-From: weigelt@melag.de (Enrico Weigelt, metux IT consult)
-Date: Thu, 28 May 2015 18:52:52 +0200
-Subject: Device Tree Blob (DTB) licence
-In-Reply-To: <20150528133429.GD2067@n2100.arm.linux.org.uk>
-References: <1430820315.19516.26.camel@opteya.com>
- <CAL_Jsq+T5c7qornpRVCduEjUSCeM+0xqbtVYovtH76y=4BqhLQ@mail.gmail.com>
- <1432289148.5304.58.camel@opteya.com> <1432322832.5304.63.camel@opteya.com>
- <CAOS_Y6Q37ps+VEnzUZ_uwX++qrRm9Hgx45Q_pmiZSLSNjmKwZg@mail.gmail.com>
- <55670AD4.8020705@melag.de> <20150528133429.GD2067@n2100.arm.linux.org.uk>
-Message-ID: <556747E4.6070403@melag.de>
+From: juhl@gai-tronics.com (Uhl, Joe)
+Date: Thu, 28 May 2015 17:04:57 +0000
+Subject: imx6 fsl,fiq-stream-filter
+Message-ID: <A34315704930CF44BA74E64F19E02E917DEEE3FC@S1P5DAG1A.EXCHPROD.USA.NET>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 28.05.2015 um 15:34 schrieb Russell King - ARM Linux:
+Hello,
+Is it possible to disable dma transfers on ssi1 using FIQ instead?  I am able to 
+transfer data out successfully to an SGTL5000 codec (using imx-sgtl5000.c as 
+machine driver) with dma enabled.  In the devicetree I added "fsl,fiq-stream-filter" 
+which I see in fsl_ssi.c is checked for and set's  the variable use_dma to false.  
+Are there any additional things to do besides changing the devicetree to get this 
+to work?  Doing this produces alsa underruns and no sound.  Thank you for any advice.
+I'm using freescale linux version 3.14.28 although I updated all the way to mainline 
+4.0 with the same results.
 
->> What's the big deal with having DTS/DTB under GPL ?
->
-> It's really quite simple.  Other open source projects won't touch
-> _our_ DTB with a barge pole through fear of GPL contamination.
+imx6qdl.dtsi =
+ssi1: ssi at 02028000 {
+  compatible = "fsl,imx6q-ssi","fsl,imx21-ssi";
+  reg = <0x02028000 0x4000>;
+  interrupts = <0 46 IRQ_TYPE_LEVEL_HIGH>;
+  clocks = <&clks IMX6QDL_CLK_SSI1_IPG>,
+  <&clks IMX6QDL_CLK_SSI1>;	
+  clock-names = "ipg", "baud";	
+  fsl,fiq-stream-filter;					
+  dmas = <&sdma 37 1 0>,					
+  <&sdma 38 1 0>;					
+  dma-names = "rx", "tx";					
+  fsl,fifo-depth = <15>;					
+  fsl,ssi-dma-events = <38 37>;					
+  status = "okay";					
+};
+						
+Here is my /proc/interrupts output:
+Interrupt 78 is blank and increments by 11 during each attempt at running aplay so I 
+assume this is somehow related to ssi.
+root at cgtqmx6:/proc# cat interrupts
+           CPU0
+34:          0       GIC  34  sdma
+37:          0       GIC  37  2400000.ipu
+38:          4       GIC  38  2400000.ipu
+50:          0       GIC  50  vdoa
+51:          0       GIC  51  rtc alarm
+55:          0       GIC  55  mmc1
+56:        528       GIC  56  mmc2
+57:          0       GIC  57  mmc3
+59:       2300       GIC  59  21e8000.serial
+63:          4       GIC  63  2008000.ecspi
+65:          0       GIC  65  2010000.ecspi
+68:        545       GIC  68  21a0000.i2c
+69:        284       GIC  69  21a4000.i2c
+70:         78       GIC  70  21a8000.i2c
+72:         30       GIC  72  2184200.usb
+**78:         22       GIC  78
+81:          0       GIC  81  imx_thermal
+82:          0       GIC  82  asrc
+87:      13566       GIC  87  i.MX Timer Tick
+112:          0       GIC 112  20bc000.wdog
+139:          0       GIC 139  mmdc_1
+150:      49111       GIC 150  2188000.ethernet
+151:          0       GIC 151  2188000.ethernet
+156:          0       GIC 156  20e4000.dcic
+157:          0       GIC 157  20e8000.dcic
+164:          0  gpio-mxc   4  2194000.usdhc cd
+193:          0  gpio-mxc   1  key-menu
+194:          0  gpio-mxc   2  key-back
+195:          0  gpio-mxc   3  key-search
+196:          0  gpio-mxc   4  key-home
+198:          0  gpio-mxc   6  219c000.usdhc cd
+253:          0  gpio-mxc  29  Power Button
+261:          0  gpio-mxc   5  Volume Down
+263:          0  gpio-mxc   7  Sleep Button
+365:          0  gpio-mxc  13  Volume Up
+**FIQ:              imx-ssi
+IPI0:          0  CPU wakeup interrupts
+IPI1:          0  Timer broadcast interrupts
+IPI2:          0  Rescheduling interrupts
+IPI3:          0  Function call interrupts
+IPI4:          0  Single function call interrupts
+IPI5:          0  CPU stop interrupts
+IPI6:          0  IRQ work interrupts
+IPI7:          0  completion interrupts
+Err:          0
 
-Which other foss projects do you have in mind ?
-And why should they fear "poisoning" ?
-
-The DTB is an entirely separate file. Just like various firmware
-blobs, startup scripts, etc, etc. Just shipping that file (be it in
-some source tarball or in the flash of some device) doesn't make
-everything else an derived work.
-
-Of course, the viral effect of the GPL could catch in if somebody
-directly compiles-in the dtb into something else (so it cant be
-easily separated / replaced) - but why should anybody wanna do that ?
-Sounds to me like defeating the whole purpose of DTB.
-
-> So what we'll end up with is other projects creating their own DTB
-> descriptions for the same hardware, with different properties (which
-> they'll do in an effort to ensure that it isn't a "derived work" of
-> the GPL version) and the whole thing turning into a right mess - and
-> a poor experience for users because they then end up with OS specific
-> DT files.
-
-Anybody is free do to everything on his own. Same as everybody is free
-to write his own kernel, etc.
-
-But I dont see a practical usecase where the GPL's viral effect could
-catch in here in the first place.
-
-> Alternatively, as Rob points out, people will just go the ACPI route
-> to avoid the GPL contamination problem.
-
-If they really wanna go that ugly route ... just let them go.
-I don't see where I could care at all.
-
-As I'm primarily concerned w/ embedded systems, I'll need full
-documentation and control over the device, I won't trust vendor DTBs
-anyways. And I won't help people doing crippled proprietary stuff,
-not at this critical point.
-
-Even for larger systems - except the crippled x86 world - I won't even
-allow any proprietary bootloader/firmware.
-
-
-
-cu
---
-Enrico Weigelt, metux IT consult
-+49-151-27565287
-MELAG Medizintechnik oHG Sitz Berlin Registergericht AG Charlottenburg HRA 21333 B
-
-Wichtiger Hinweis: Diese Nachricht kann vertrauliche oder nur f?r einen begrenzten Personenkreis bestimmte Informationen enthalten. Sie ist ausschlie?lich f?r denjenigen bestimmt, an den sie gerichtet worden ist. Wenn Sie nicht der Adressat dieser E-Mail sind, d?rfen Sie diese nicht kopieren, weiterleiten, weitergeben oder sie ganz oder teilweise in irgendeiner Weise nutzen. Sollten Sie diese E-Mail irrt?mlich erhalten haben, so benachrichtigen Sie bitte den Absender, indem Sie auf diese Nachricht antworten. Bitte l?schen Sie in diesem Fall diese Nachricht und alle Anh?nge, ohne eine Kopie zu behalten.
-Important Notice: This message may contain confidential or privileged information. It is intended only for the person it was addressed to. If you are not the intended recipient of this email you may not copy, forward, disclose or otherwise use it or any part of it in any form whatsoever. If you received this email in error please notify the sender by replying and delete this message and any attachments without retaining a copy.
+---------------------------------------------------------------------------------------------------------------------------- 
+Confidentiality Requirement: This communication, including any attachment(s), may contain confidential information and is for the sole use of the intended recipient(s). If you are not the intended recipient, you are hereby notified that you have received this communication in error and any unauthorized review, use, disclosure, dissemination, distribution or copying of it or its contents is strictly prohibited.  If you have received this communication in error, please notify the sender immediately by telephone or e-mail and destroy all copies of this communication and any attachments.
