@@ -1,14 +1,40 @@
-From: ralf@linux-mips.org (Ralf Baechle)
-Date: Thu, 28 May 2015 15:59:06 +0200
-Subject: [PATCH 3/5] mm/hugetlb: remove arch_prepare/release_hugepage
- from arch headers
-In-Reply-To: <1432813957-46874-4-git-send-email-dingel@linux.vnet.ibm.com>
-References: <1432813957-46874-1-git-send-email-dingel@linux.vnet.ibm.com>
- <1432813957-46874-4-git-send-email-dingel@linux.vnet.ibm.com>
-Message-ID: <20150528135905.GD1179@linux-mips.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 28 May 2015 16:08:02 +0200
+Subject: [PATCH] usb: phy: add static inline wrapper for
+ devm_usb_get_phy_by_node
+Message-ID: <2411449.AC4sAk3Y8u@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 28, 2015 at 01:52:35PM +0200, Dominik Dingel wrote:
+The newly introduced devm_usb_get_phy_by_node function only has
+an extern declaration, but no alternative for the case that
+CONFIG_USB_PHY is disabled, which leads to a build error when
+it is used anyway:
 
-Acked-by: Ralf Baechle <ralf@linux-mips.org>
+drivers/power/twl4030_charger.c: In function 'twl4030_bci_probe':
+drivers/power/twl4030_charger.c:648:23: error: implicit declaration of function 'devm_usb_get_phy_by_node' [-Werror=implicit-function-declaration]
+    bci->transceiver = devm_usb_get_phy_by_node(
+
+This adds the wrapper in the same way that we have one for
+all other usb-phy API functions.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: e842b84c8e7 ("usb: phy: Add interface to get phy give of device_node.")
+
+diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
+index 8ed1e29ef329..e39f251cf861 100644
+--- a/include/linux/usb/phy.h
++++ b/include/linux/usb/phy.h
+@@ -240,6 +240,12 @@ static inline struct usb_phy *devm_usb_get_phy_by_phandle(struct device *dev,
+ 	return ERR_PTR(-ENXIO);
+ }
+ 
++static inline struct usb_phy *devm_usb_get_phy_by_node(struct device *dev,
++	struct device_node *node, struct notifier_block *nb)
++{
++	return ERR_PTR(-ENXIO);
++}
++
+ static inline void usb_put_phy(struct usb_phy *x)
+ {
+ }
