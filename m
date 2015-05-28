@@ -1,60 +1,130 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 28 May 2015 15:26:55 +0100
-Subject: [PATCH V2 5/6] regulator: add mxs on-chip regulator driver
-In-Reply-To: <1973961885.66028.1432760281554.JavaMail.open-xchange@oxbsltgw06.schlund.de>
-References: <1430346747-28728-6-git-send-email-stefan.wahren@i2se.com>
- <20150504123648.GU15510@sirena.org.uk>
- <1693367404.879766.1430771695242.JavaMail.open-xchange@oxbaltgw08.schlund.de>
- <1875749167.82542.1431023838932.JavaMail.open-xchange@oxbsltgw04.schlund.de>
- <20150507185216.GP22845@sirena.org.uk>
- <535744342.64563.1431026719818.JavaMail.open-xchange@oxbsltgw09.schlund.de>
- <20150507193236.GS22845@sirena.org.uk>
- <1290103954.26573.1432642616013.JavaMail.open-xchange@oxbsltgw08.schlund.de>
- <20150527173321.GH21577@sirena.org.uk>
- <1973961885.66028.1432760281554.JavaMail.open-xchange@oxbsltgw06.schlund.de>
-Message-ID: <20150528142655.GX21577@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 28 May 2015 16:35:42 +0200
+Subject: [PATCH] staging/wilc1000: fix Kconfig dependencies
+Message-ID: <2619913.NOTkkZWJir@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 27, 2015 at 10:58:01PM +0200, Stefan Wahren wrote:
+The newly added wilc1000 driver lacks several Kconfig dependencies,
+resulting in a multitude of randconfig build errors, e.g.:
 
-> In case of a single driver instance instead of 4 ones (vddd, vddio, vdda,
-> dc-dc), things would be much easier.
+drivers/built-in.o: In function `WILC_WFI_mgmt_tx_cancel_wait':
+binder.c:(.text+0x12bd28): undefined reference to `cfg80211_remain_on_channel_expired'
+drivers/built-in.o: In function `WILC_WFI_CfgSetChannel':
+binder.c:(.text+0x12c9d8): undefined reference to `ieee80211_frequency_to_channel'
+drivers/built-in.o: In function `WILC_WFI_CfgAlloc':
+binder.c:(.text+0x132530): undefined reference to `wiphy_new_nm'
+drivers/built-in.o: In function `wilc_netdev_init':
+binder.c:(.text+0x1356d0): undefined reference to `register_inetaddr_notifier'
+drivers/built-in.o: In function `linux_spi_init':
+binder.c:(.text+0x210a68): undefined reference to `spi_register_driver'
 
-> Here are the steps for disabling DC-DC:
+This change ensures that we always have at least one of SPI or MMC
+enabled, and are only able to pick an interface that works. It also
+adds all the missing dependencies for networking infrastructure
+(cfg80211, wext, and ipv4).
 
-> 1. configure vddio to work without DC-DC
-> 2. configure vdda to work without DC-DC
-> 3. configure vddd to work without DC-DC
-> 4. backup DC-DC settings
-> 5. disable brownout detection
-> 6. disable DC-DC
-> 7. restore DC-DC settings
+In order to make it readable, I also took the liberty of re-indenting
+the Kconfig file to the normal conventions.
 
-> My problem is that step 1 to 3 must be done step by step through the other
-> regulator instances.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-For the regulator API steps 1-3 aren't going to be needed since
-dependency management means that we won't try to disable a regulator
-that we think is in use.
-
-> > If it's much more complicated than that
-> > then I think putting a comment in the driver explaining what the issue
-> > is would be the right step, that would address the issue with the driver
-> > looking strange.
-
-> Enabling or disabling DC-DC is only needed internally by the power subsystem
-> (e.g. in case of handoff AC to battery), because the DC-DC only supplys the
-> regulator daisy. From my understanding hardware components could use only the
-> regulator outputs. In the end a state change is necessary, but it shouldn't be a
-> public.
-
-Should this actually be shown as a regulator then and not as part of the
-power controller?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150528/3b54f5a5/attachment.sig>
+diff --git a/drivers/staging/wilc1000/Kconfig b/drivers/staging/wilc1000/Kconfig
+index 101f908bc9ed..02381521ff7f 100644
+--- a/drivers/staging/wilc1000/Kconfig
++++ b/drivers/staging/wilc1000/Kconfig
+@@ -1,55 +1,57 @@
+ config WILC1000
+ 	tristate "WILC1000 support (WiFi only)"
++	depends on CFG80211 && WEXT_CORE && INET
++	depends on MMC || SPI
+ 	---help---
+-		This module only support IEEE 802.11n WiFi.
++	  This module only support IEEE 802.11n WiFi.
+ 
+ choice
+         prompt "Memory Allocation"
+         depends on WILC1000
+         default WILC1000_PREALLOCATE_AT_LOADING_DRIVER
+ 
+-        config WILC1000_PREALLOCATE_AT_LOADING_DRIVER
+-                bool "Preallocate memory at loading driver"
+-                ---help---
+-                        This choice supports static allocation of the memory
+-                        for the receive buffer. The driver will allocate the RX buffer 
+-                        during initial time. The driver will also free the buffer
+-                        by calling network device stop.
+-
+-        config WILC1000_DYNAMICALLY_ALLOCATE_MEMROY
+-                bool "Dynamically allocate memory in real time"
+-                ---help---
+-                        This choice supports dynamic allocation of the memory
+-                        for the receive buffer. The driver will allocate the RX buffer
+-                        when it is required.
++config WILC1000_PREALLOCATE_AT_LOADING_DRIVER
++	bool "Preallocate memory at loading driver"
++	---help---
++	  This choice supports static allocation of the memory
++	  for the receive buffer. The driver will allocate the RX buffer
++	  during initial time. The driver will also free the buffer
++	  by calling network device stop.
++
++config WILC1000_DYNAMICALLY_ALLOCATE_MEMROY
++        bool "Dynamically allocate memory in real time"
++        ---help---
++	  This choice supports dynamic allocation of the memory
++	  for the receive buffer. The driver will allocate the RX buffer
++	  when it is required.
+ endchoice
+ 
+-
+ choice
+-    prompt "Bus Type"
+-    depends on WILC1000 
+-    default WILC1000_SDIO
+-    
++	prompt "Bus Type"
++	depends on WILC1000
++	default WILC1000_SDIO
++
+ 	config WILC1000_SDIO
+-	    bool "SDIO support"
+-	    depends on MMC
+-		---help---
+-			This module adds support for the SDIO interface of adapters using
+-			WILC chipset. Select this if your platform is using the SDIO bus. 
++	bool "SDIO support"
++	depends on MMC
++	---help---
++	  This module adds support for the SDIO interface
++	  of adapters using WILC chipset. Select this if
++	  your platform is using the SDIO bus.
+ 
+ 	config WILC1000_SPI
+-	    bool "SPI support"
+-		---help---
+-			This module adds support for the SPI interface of adapters using
+-			WILC chipset. Select this if your platform is using the SPI bus. 
++	depends on SPI
++	bool "SPI support"
++	---help---
++	  This module adds support for the SPI interface
++	  of adapters using WILC chipset. Select this if
++	  your platform is using the SPI bus.
+ endchoice
+ 
+-
+ config WILC1000_HW_OOB_INTR
+-    bool "Use out of band interrupt"
+-    depends on WILC1000 && WILC1000_SDIO
+-    default n
+-    ---help---
+-		If your platform don't recognize SDIO IRQ, connect chipset external IRQ pin
+-		and check this option. Or, Use this to get all interrupts including SDIO interrupts.
+-
++	bool "Use out of band interrupt"
++	depends on WILC1000 && WILC1000_SDIO
++	default n
++	---help---
++	  If your platform don't recognize SDIO IRQ, connect chipset external IRQ pin
++	  and check this option. Or, Use this to get all interrupts including SDIO interrupts.
