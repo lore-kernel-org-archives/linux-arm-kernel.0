@@ -1,67 +1,76 @@
-From: yvo@apm.com (Y Vo)
-Date: Thu, 28 May 2015 13:46:28 +0700
-Subject: [PATCH v0] gpio: xgene: add ACPI support for APM X-Gene GPIO standby
- driver
-Message-ID: <1432795588-17476-1-git-send-email-yvo@apm.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Thu, 28 May 2015 08:53:45 +0200
+Subject: [GIT PULL]Xilinx Zynq DT changes for v4.2
+Message-ID: <5566BB79.4010901@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ACPI support for APM X-Gene GPIO standby driver.
+Hi,
 
-Signed-off-by: Y Vo <yvo@apm.com>
----
- drivers/gpio/gpio-xgene-sb.c |   19 +++++++++++++++++++
- 1 files changed, 19 insertions(+), 0 deletions(-)
+please pull these patches to your tree.
+I have added patch which add CEVA to vendor-prefixes after my IRC with Arnd.
 
-diff --git a/drivers/gpio/gpio-xgene-sb.c b/drivers/gpio/gpio-xgene-sb.c
-index b6a15c3..50aaae5 100644
---- a/drivers/gpio/gpio-xgene-sb.c
-+++ b/drivers/gpio/gpio-xgene-sb.c
-@@ -25,8 +25,11 @@
- #include <linux/of_gpio.h>
- #include <linux/gpio.h>
- #include <linux/gpio/driver.h>
-+#include <linux/acpi.h>
- #include <linux/basic_mmio_gpio.h>
- 
-+#include "gpiolib.h"
-+
- #define XGENE_MAX_GPIO_DS		22
- #define XGENE_MAX_GPIO_DS_IRQ		6
- 
-@@ -129,6 +132,13 @@ static int xgene_gpio_sb_probe(struct platform_device *pdev)
- 	else
- 		dev_info(&pdev->dev, "X-Gene GPIO Standby driver registered\n");
- 
-+#ifdef CONFIG_ACPI
-+	if (priv->nirq > 0) {
-+		/* Register interrupt handlers for gpio signaled acpi events */
-+		acpi_gpiochip_request_interrupts(&priv->bgc.gc);
-+	}
-+#endif
-+
- 	return ret;
- }
- 
-@@ -145,10 +155,19 @@ static const struct of_device_id xgene_gpio_sb_of_match[] = {
- };
- MODULE_DEVICE_TABLE(of, xgene_gpio_sb_of_match);
- 
-+#ifdef CONFIG_ACPI
-+static const struct acpi_device_id xgene_gpio_sb_acpi_match[] = {
-+	{"APMC0D15", 0},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(acpi, xgene_gpio_sb_acpi_match);
-+#endif
-+
- static struct platform_driver xgene_gpio_sb_driver = {
- 	.driver = {
- 		   .name = "xgene-gpio-sb",
- 		   .of_match_table = xgene_gpio_sb_of_match,
-+		   .acpi_match_table = ACPI_PTR(xgene_gpio_sb_acpi_match),
- 		   },
- 	.probe = xgene_gpio_sb_probe,
- 	.remove = xgene_gpio_sb_remove,
+Thanks,
+Michal
+
+
+The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+
+  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+
+are available in the git repository at:
+
+  https://github.com/Xilinx/linux-xlnx.git tags/zynq-dt-for-4.2
+
+for you to fetch changes up to 4481b18b7cf023c57085b3c7db762dc4d7f1873b:
+
+  ARM: zynq: DT: Use the zynq binding with macb (2015-05-28 08:47:28 +0200)
+
+----------------------------------------------------------------
+arm: Xilinx Zynq dt patches for v4.2
+
+- Fix aliases and stdout properties
+- Document current TTC binding
+- Add Ceva to prefixes
+- Use new compatible string for MACB
+
+----------------------------------------------------------------
+Michal Simek (4):
+      ARM: dts: zynq: Add missing alias node for zybo and parallella
+      ARM: dts: zynq: Fix stdout-path and bootargs
+      PCI: xilinx: Trivial fix in DT example
+      of: Add vendor prefix for Ceva
+
+Nathan Sullivan (1):
+      ARM: zynq: DT: Use the zynq binding with macb
+
+Peter Crosthwaite (1):
+      devicetree: cadence_ttc: Document binding for timer width
+
+ Documentation/devicetree/bindings/pci/xilinx-pcie.txt         | 2 +-
+ Documentation/devicetree/bindings/timer/cadence,ttc-timer.txt | 4 ++++
+ Documentation/devicetree/bindings/vendor-prefixes.txt         | 1 +
+ arch/arm/boot/dts/zynq-7000.dtsi                              | 4 ++--
+ arch/arm/boot/dts/zynq-parallella.dts                         | 9 +++++++--
+ arch/arm/boot/dts/zynq-zc702.dts                              | 3 ++-
+ arch/arm/boot/dts/zynq-zc706.dts                              | 3 ++-
+ arch/arm/boot/dts/zynq-zed.dts                                | 3 ++-
+ arch/arm/boot/dts/zynq-zybo.dts                               | 8 +++++++-
+ 9 files changed, 28 insertions(+), 9 deletions(-)
+
+
 -- 
-1.7.1
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150528/17a22494/attachment.sig>
