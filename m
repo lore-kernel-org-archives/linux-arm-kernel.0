@@ -1,10 +1,10 @@
 From: huawei.libin@huawei.com (Li Bin)
-Date: Thu, 28 May 2015 14:06:48 +0800
+Date: Thu, 28 May 2015 14:08:42 +0800
 Subject: [RFC 0/4] arm64: add livepatch support
 In-Reply-To: <alpine.LNX.2.00.1504241126430.3695@pobox.suse.cz>
 References: <1429843449-7388-1-git-send-email-takahiro.akashi@linaro.org>
  <alpine.LNX.2.00.1504241126430.3695@pobox.suse.cz>
-Message-ID: <5566B078.9090204@huawei.com>
+Message-ID: <5566B0EA.1020007@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
