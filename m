@@ -1,88 +1,176 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Thu, 28 May 2015 19:40:05 +0800
-Subject: [RFC PATCH v1 1/3] PCI: designware: Add ARM64 support
-In-Reply-To: <5565EEAD.9070003@st.com>
-References: <000001d096a9$27bf43f0$773dcbd0$@com>
- <5565CD0B.6020206@hisilicon.com> <2378629.Ocol8HRDqD@wuerfel>
- <2095085.CuXXeGT0Wg@wuerfel> <5565EEAD.9070003@st.com>
-Message-ID: <5566FE95.6000501@hisilicon.com>
+From: ranjit.waghmode@xilinx.com (Ranjit Abhimanyu Waghmode)
+Date: Thu, 28 May 2015 11:51:46 +0000
+Subject: [RFC PATCH 2/2] spi: Add support for Zynq Ultrascale+ MPSoC
+ GQSPI controller
+In-Reply-To: <20150520145552.GV31550@xsjsorenbubuntu>
+References: <1432106871-27232-1-git-send-email-ranjit.waghmode@xilinx.com>
+ <1432106871-27232-2-git-send-email-ranjit.waghmode@xilinx.com>
+ <20150520145552.GV31550@xsjsorenbubuntu>
+Message-ID: <7CFCFE83B8145347A1D424EC939F1C3CA6FAD0@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/5/28 0:19, Fabrice Gasnier wrote:
-> On 05/27/2015 05:43 PM, Arnd Bergmann wrote:
->> On Wednesday 27 May 2015 17:31:46 Arnd Bergmann wrote:
->>> Yes, that works. However there are two problems with the approach:
->>>
->>> - we have to change all PCI host drivers on ARM to do this in order to remove
->>>    the ARM-specific pcibios_msi_controller() function
->>> - it's possible that there are dw_pcie implementations that do not include
->>>    an MSI controller, so that pointer would be NULL, which leads to the
->>>    core code to still call the ARM-specific pcibios_msi_controller() function
->>>    unless we remove it.
->> I wonder if this simple patch would be sufficient to kill off
->> pcibios_msi_controller().
->>
->> Can one of you try it?
->>
->>     Arnd
-> 
-> Hi Arnd,
-> I tested it quickly on my platform, with and without CONFIG_PCI_MSI.
-> In both case it seems to run fine with dw pcie.
->
+Hi Soren,
 
-Hi Fabrice,
+Sorry for being late for this reply as this thread is moved a step ahead.
 
-Thanks for testing. But if you applied this patch, the code will not go into
-pcibios_init_hw(), so it did not touch what Arnd modified.
+On Wed, 2015-05-20 at 12:57PM +0530, Ranjit Waghmode wrote:
+> This patch adds support for GQSPI controller driver used by Zynq 
+> Ultrascale+ MPSoC
+> 
+> Signed-off-by: Ranjit Waghmode <ranjit.waghmode@xilinx.com>
+> ---
+[...]
+> +/**
+> + * zynqmp_gqspi_read:	For GQSPI controller read operation
+> + * @xqspi:	Pointer to the zynqmp_qspi structure
+> + * @offset:	Offset from where to read
+> + */
+> +static u32 zynqmp_gqspi_read(struct zynqmp_qspi *xqspi, u32 offset) {
+> +	return readl_relaxed(xqspi->regs + offset); }
+> +
+> +/**
+> + * zynqmp_gqspi_write:	For GQSPI controller write operation
+> + * @xqspi:	Pointer to the zynqmp_qspi structure
+> + * @offset:	Offset where to write
+> + * @val:	Value to be written
+> + */
+> +static inline void zynqmp_gqspi_write(struct zynqmp_qspi *xqspi, u32 offset,
+> +				      u32 val)
+> +{
+> +	writel_relaxed(val, (xqspi->regs + offset)); }
 
-Best Regards,
-Zhou
+why are you wrapping (readl|writel)_relaxed?
 
->>
->> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
->> index fcbbbb1b9e95..7afb6d253162 100644
->> --- a/arch/arm/kernel/bios32.c
->> +++ b/arch/arm/kernel/bios32.c
->> @@ -18,15 +18,6 @@
->>     static int debug_pci;
->>   -#ifdef CONFIG_PCI_MSI
->> -struct msi_controller *pcibios_msi_controller(struct pci_dev *dev)
->> -{
->> -    struct pci_sys_data *sysdata = dev->bus->sysdata;
->> -
->> -    return sysdata->msi_ctrl;
->> -}
->> -#endif
->> -
->>   /*
->>    * We can't use pci_get_device() here since we are
->>    * called from interrupt context.
->> @@ -462,9 +453,6 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
->>           if (!sys)
->>               panic("PCI: unable to allocate sys data!");
->>   -#ifdef CONFIG_PCI_MSI
->> -        sys->msi_ctrl = hw->msi_ctrl;
->> -#endif
->>           sys->busnr   = busnr;
->>           sys->swizzle = hw->swizzle;
->>           sys->map_irq = hw->map_irq;
->> @@ -493,6 +481,9 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
->>                   panic("PCI: unable to scan bus!");
->>                 busnr = sys->bus->busn_res.end + 1;
->> +#ifdef CONFIG_PCI_MSI
->> +            bus->msi = hw->msi_ctrl;
-> 
-> (with small adaptation here: s/bus->msi/sys->bus->msi)
-> 
-> BR,
-> Fabrice
->> +#endif
->>                 list_add(&sys->node, head);
->>           } else {
->>
-> 
-> 
-> .
-> 
+[...]
+> +/**
+> + * zynqmp_qspi_copy_read_data:	Copy data to RX buffer
+> + * @xqspi:	Pointer to the zynqmp_qspi structure
+> + * @data:	The 32 bit variable where data is stored
+> + * @size:	Number of bytes to be copied from data to RX buffer
+> + */
+> +static void zynqmp_qspi_copy_read_data(struct zynqmp_qspi *xqspi,
+> +				       u32 data, u8 size)
+> +{
+> +	memcpy(xqspi->rxbuf, ((u8 *) &data), size);
+
+Is this cast really needed? IIRC, memcpy takes (void *). The outer parentheses for that argument are not needed.
+[Ranjit] : taken care
+
+> +	xqspi->rxbuf += size;
+> +	xqspi->bytes_to_receive -= size;
+> +}
+> +
+> +/**
+> + * zynqmp_prepare_transfer_hardware:	Prepares hardware for transfer.
+> + * @master:	Pointer to the spi_master structure which provides
+> + *		information about the controller.
+> + *
+> + * This function enables SPI master controller.
+> + *
+> + * Return:	Always 0
+> + */
+> +static int zynqmp_prepare_transfer_hardware(struct spi_master 
+> +*master) {
+> +	struct zynqmp_qspi *xqspi = spi_master_get_devdata(master);
+> +
+> +	clk_enable(xqspi->refclk);
+> +	clk_enable(xqspi->pclk);
+
+Did you consider using runtime_pm? Then this would just bit
+pm_runtime_get_sync(...)
+
+> +	zynqmp_gqspi_write(xqspi, GQSPI_EN_OFST, GQSPI_EN_MASK);
+> +	return 0;
+> +}
+> +
+> +/**
+> + * zynqmp_unprepare_transfer_hardware:	Relaxes hardware after transfer
+> + * @master:	Pointer to the spi_master structure which provides
+> + *		information about the controller.
+> + *
+> + * This function disables the SPI master controller.
+> + *
+> + * Return:	Always 0
+> + */
+> +static int zynqmp_unprepare_transfer_hardware(struct spi_master 
+> +*master) {
+> +	struct zynqmp_qspi *xqspi = spi_master_get_devdata(master);
+> +
+> +	zynqmp_gqspi_write(xqspi, GQSPI_EN_OFST, 0x0);
+> +	clk_disable(xqspi->refclk);
+> +	clk_disable(xqspi->pclk);
+
+and this would become pm_runtime_put()
+
+[...]
+> +/**
+> + * zynqmp_qspi_filltxfifo:	Fills the TX FIFO as long as there is room in
+> + *				the FIFO or the bytes required to be
+> + *				transmitted.
+> + * @xqspi:	Pointer to the zynqmp_qspi structure
+> + * @size:	Number of bytes to be copied from TX buffer to TX FIFO
+> + */
+> +static void zynqmp_qspi_filltxfifo(struct zynqmp_qspi *xqspi, int 
+> +size) {
+> +	u32 count = 0;
+> +
+> +	while ((xqspi->bytes_to_transfer > 0) && (count < size)) {
+> +		writel(*((u32 *) xqspi->txbuf), xqspi->regs + GQSPI_TXD_OFST);
+
+Here the writel wrapper is not used. Is there a reason, then it would probably  deserve a comment.
+
+[...]
+> +/**
+> + * zynqmp_process_dma_irq:	Handler for DMA done interrupt of QSPI
+> + *				controller
+> + * @xqspi:	zynqmp_qspi instance pointer
+> + *
+> + * This function handles DMA interrupt only.
+> + */
+> +static void zynqmp_process_dma_irq(struct zynqmp_qspi *xqspi) {
+> +	u32 config_reg, genfifoentry;
+> +
+> +	dma_unmap_single(xqspi->dev, xqspi->dma_addr,
+> +				xqspi->dma_rx_bytes, DMA_FROM_DEVICE);
+> +	xqspi->rxbuf += xqspi->dma_rx_bytes;
+> +	xqspi->bytes_to_receive -= xqspi->dma_rx_bytes;
+> +	xqspi->dma_rx_bytes = 0;
+> +
+> +	/* Disabling the DMA interrupts */
+> +	writel(GQSPI_QSPIDMA_DST_I_EN_DONE_MASK,
+> +			xqspi->regs + GQSPI_QSPIDMA_DST_I_DIS_OFST);
+> +
+> +	if (xqspi->bytes_to_receive > 0) {
+> +		/* Switch to IO mode,for remaining bytes to receive */
+> +		config_reg = readl(xqspi->regs + GQSPI_CONFIG_OFST);
+> +		config_reg &= ~GQSPI_CFG_MODE_EN_MASK;
+> +		writel(config_reg, xqspi->regs + GQSPI_CONFIG_OFST);
+> +
+> +		/* Initiate the transfer of remaining bytes */
+> +		genfifoentry = xqspi->genfifoentry;
+> +		genfifoentry |= xqspi->bytes_to_receive;
+> +		writel(genfifoentry,
+> +				xqspi->regs + GQSPI_GEN_FIFO_OFST);
+> +
+> +		/* Dummy generic FIFO entry */
+> +		writel(0x0, xqspi->regs + GQSPI_GEN_FIFO_OFST);
+
+not using wrapper?
+
+> +
+> +		/* Manual start */
+> +		zynqmp_gqspi_write(xqspi, GQSPI_CONFIG_OFST,
+> +			(readl(xqspi->regs + GQSPI_CONFIG_OFST) |
+
+not using wrapper?
+
+Overall:
+The usage of those readl/writel wrappers seems inconsistent to me. I usually prefer not wrapping things like that at all but at least it should be consistent.
+[Ranjit]: Removing all inconsistencies by using wrapper function everywhere.
+
+And I believe the handling of clocks would benefit from using of the runtime_pm framework.
+[Ranjit]: Will add above suggestion and send next version.
+
+Thanks & Regards,
+Ranjit Waghmode
