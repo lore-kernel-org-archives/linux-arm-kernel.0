@@ -1,55 +1,39 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Thu, 28 May 2015 22:31:43 +0200
-Subject: [PATCH v4 1/5] clk: add lpc18xx cgu clk driver
+Date: Thu, 28 May 2015 22:31:45 +0200
+Subject: [PATCH v4 3/5] clk: add lpc18xx ccu clk driver
 In-Reply-To: <1432845107-12458-1-git-send-email-manabian@gmail.com>
 References: <1432845107-12458-1-git-send-email-manabian@gmail.com>
-Message-ID: <1432845107-12458-2-git-send-email-manabian@gmail.com>
+Message-ID: <1432845107-12458-4-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add driver for NXP LPC18xx/43xx Clock Generation Unit (CGU). The CGU
-contains several clock generators and output stages that route the
-clocks either directly to peripherals or to a Clock Control Unit
-(CCU).
+Add driver for NXP LPC18xx/43xx Clock Control Unit (CCU). The CCU
+provides fine grained gating of most clocks present in the SoC.
 
 Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 ---
- drivers/clk/Makefile                    |   1 +
  drivers/clk/nxp/Makefile                |   1 +
- drivers/clk/nxp/clk-lpc18xx-cgu.c       | 635 ++++++++++++++++++++++++++++++++
- include/dt-bindings/clock/lpc18xx-cgu.h |  41 +++
- 4 files changed, 678 insertions(+)
- create mode 100644 drivers/clk/nxp/Makefile
- create mode 100644 drivers/clk/nxp/clk-lpc18xx-cgu.c
- create mode 100644 include/dt-bindings/clock/lpc18xx-cgu.h
+ drivers/clk/nxp/clk-lpc18xx-ccu.c       | 293 ++++++++++++++++++++++++++++++++
+ include/dt-bindings/clock/lpc18xx-ccu.h |  74 ++++++++
+ 3 files changed, 368 insertions(+)
+ create mode 100644 drivers/clk/nxp/clk-lpc18xx-ccu.c
+ create mode 100644 include/dt-bindings/clock/lpc18xx-ccu.h
 
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 3d00c25382c5..4a34419c1da1 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -56,6 +56,7 @@ obj-$(CONFIG_ARCH_MMP)			+= mmp/
- endif
- obj-$(CONFIG_PLAT_ORION)		+= mvebu/
- obj-$(CONFIG_ARCH_MXS)			+= mxs/
-+obj-$(CONFIG_ARCH_LPC18XX)		+= nxp/
- obj-$(CONFIG_MACH_PISTACHIO)		+= pistachio/
- obj-$(CONFIG_COMMON_CLK_PXA)		+= pxa/
- obj-$(CONFIG_COMMON_CLK_QCOM)		+= qcom/
 diff --git a/drivers/clk/nxp/Makefile b/drivers/clk/nxp/Makefile
-new file mode 100644
-index 000000000000..aca9d3e4f7fe
---- /dev/null
+index aca9d3e4f7fe..7f608b0ad7b4 100644
+--- a/drivers/clk/nxp/Makefile
 +++ b/drivers/clk/nxp/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_ARCH_LPC18XX)	+= clk-lpc18xx-cgu.o
-diff --git a/drivers/clk/nxp/clk-lpc18xx-cgu.c b/drivers/clk/nxp/clk-lpc18xx-cgu.c
+@@ -1 +1,2 @@
+ obj-$(CONFIG_ARCH_LPC18XX)	+= clk-lpc18xx-cgu.o
++obj-$(CONFIG_ARCH_LPC18XX)	+= clk-lpc18xx-ccu.o
+diff --git a/drivers/clk/nxp/clk-lpc18xx-ccu.c b/drivers/clk/nxp/clk-lpc18xx-ccu.c
 new file mode 100644
-index 000000000000..81e9e1c788f4
+index 000000000000..eeaee97da110
 --- /dev/null
-+++ b/drivers/clk/nxp/clk-lpc18xx-cgu.c
-@@ -0,0 +1,635 @@
++++ b/drivers/clk/nxp/clk-lpc18xx-ccu.c
+@@ -0,0 +1,293 @@
 +/*
-+ * Clk driver for NXP LPC18xx/LPC43xx Clock Generation Unit (CGU)
++ * Clk driver for NXP LPC18xx/LPC43xx Clock Control Unit (CCU)
 + *
 + * Copyright (C) 2015 Joachim Eastwood <manabian@gmail.com>
 + *
@@ -60,616 +44,254 @@ index 000000000000..81e9e1c788f4
 +
 +#include <linux/clk.h>
 +#include <linux/clk-provider.h>
-+#include <linux/delay.h>
 +#include <linux/kernel.h>
 +#include <linux/of.h>
 +#include <linux/of_address.h>
++#include <linux/slab.h>
++#include <linux/string.h>
 +
-+#include <dt-bindings/clock/lpc18xx-cgu.h>
++#include <dt-bindings/clock/lpc18xx-ccu.h>
 +
-+/* Clock Generation Unit (CGU) registers */
-+#define LPC18XX_CGU_XTAL_OSC_CTRL	0x018
-+#define LPC18XX_CGU_PLL0USB_STAT	0x01c
-+#define LPC18XX_CGU_PLL0USB_CTRL	0x020
-+#define LPC18XX_CGU_PLL0USB_MDIV	0x024
-+#define LPC18XX_CGU_PLL0USB_NP_DIV	0x028
-+#define LPC18XX_CGU_PLL0AUDIO_STAT	0x02c
-+#define LPC18XX_CGU_PLL0AUDIO_CTRL	0x030
-+#define LPC18XX_CGU_PLL0AUDIO_MDIV	0x034
-+#define LPC18XX_CGU_PLL0AUDIO_NP_DIV	0x038
-+#define LPC18XX_CGU_PLL0AUDIO_FRAC	0x03c
-+#define LPC18XX_CGU_PLL1_STAT		0x040
-+#define LPC18XX_CGU_PLL1_CTRL		0x044
-+#define  LPC18XX_PLL1_CTRL_FBSEL	BIT(6)
-+#define  LPC18XX_PLL1_CTRL_DIRECT	BIT(7)
-+#define LPC18XX_CGU_IDIV_CTRL(n)	(0x048 + (n) * sizeof(u32))
-+#define LPC18XX_CGU_BASE_CLK(id)	(0x05c + (id) * sizeof(u32))
-+#define LPC18XX_CGU_PLL_CTRL_OFFSET	0x4
++/* Bit defines for CCU branch configuration register */
++#define LPC18XX_CCU_RUN		BIT(0)
++#define LPC18XX_CCU_AUTO	BIT(1)
++#define LPC18XX_CCU_DIV		BIT(5)
++#define LPC18XX_CCU_DIVSTAT	BIT(27)
 +
-+/* PLL0 bits common to both audio and USB PLL */
-+#define LPC18XX_PLL0_STAT_LOCK		BIT(0)
-+#define LPC18XX_PLL0_CTRL_PD		BIT(0)
-+#define LPC18XX_PLL0_CTRL_BYPASS	BIT(1)
-+#define LPC18XX_PLL0_CTRL_DIRECTI	BIT(2)
-+#define LPC18XX_PLL0_CTRL_DIRECTO	BIT(3)
-+#define LPC18XX_PLL0_CTRL_CLKEN		BIT(4)
-+#define LPC18XX_PLL0_MDIV_MDEC_MASK	0x1ffff
-+#define LPC18XX_PLL0_MDIV_SELP_SHIFT	17
-+#define LPC18XX_PLL0_MDIV_SELI_SHIFT	22
-+#define LPC18XX_PLL0_MSEL_MAX		BIT(15)
++/* CCU branch feature bits */
++#define CCU_BRANCH_IS_BUS	BIT(0)
++#define CCU_BRANCH_HAVE_DIV2	BIT(1)
 +
-+/* Register value that gives PLL0 post/pre dividers equal to 1 */
-+#define LPC18XX_PLL0_NP_DIVS_1		0x00302062
++#define to_clk_gate(_hw) container_of(_hw, struct clk_gate, hw)
 +
-+enum {
-+	CLK_SRC_OSC32,
-+	CLK_SRC_IRC,
-+	CLK_SRC_ENET_RX_CLK,
-+	CLK_SRC_ENET_TX_CLK,
-+	CLK_SRC_GP_CLKIN,
-+	CLK_SRC_RESERVED1,
-+	CLK_SRC_OSC,
-+	CLK_SRC_PLL0USB,
-+	CLK_SRC_PLL0AUDIO,
-+	CLK_SRC_PLL1,
-+	CLK_SRC_RESERVED2,
-+	CLK_SRC_RESERVED3,
-+	CLK_SRC_IDIVA,
-+	CLK_SRC_IDIVB,
-+	CLK_SRC_IDIVC,
-+	CLK_SRC_IDIVD,
-+	CLK_SRC_IDIVE,
-+	CLK_SRC_MAX
++struct lpc18xx_branch_clk_data {
++	const char **name;
++	int num;
 +};
 +
-+static const char *clk_src_names[CLK_SRC_MAX] = {
-+	[CLK_SRC_OSC32]		= "osc32",
-+	[CLK_SRC_IRC]		= "irc",
-+	[CLK_SRC_ENET_RX_CLK]	= "enet_rx_clk",
-+	[CLK_SRC_ENET_TX_CLK]	= "enet_tx_clk",
-+	[CLK_SRC_GP_CLKIN]	= "gp_clkin",
-+	[CLK_SRC_OSC]		= "osc",
-+	[CLK_SRC_PLL0USB]	= "pll0usb",
-+	[CLK_SRC_PLL0AUDIO]	= "pll0audio",
-+	[CLK_SRC_PLL1]		= "pll1",
-+	[CLK_SRC_IDIVA]		= "idiva",
-+	[CLK_SRC_IDIVB]		= "idivb",
-+	[CLK_SRC_IDIVC]		= "idivc",
-+	[CLK_SRC_IDIVD]		= "idivd",
-+	[CLK_SRC_IDIVE]		= "idive",
-+};
-+
-+static const char *clk_base_names[BASE_CLK_MAX] = {
-+	[BASE_SAFE_CLK]		= "base_safe_clk",
-+	[BASE_USB0_CLK]		= "base_usb0_clk",
-+	[BASE_PERIPH_CLK]	= "base_periph_clk",
-+	[BASE_USB1_CLK]		= "base_usb1_clk",
-+	[BASE_CPU_CLK]		= "base_cpu_clk",
-+	[BASE_SPIFI_CLK]	= "base_spifi_clk",
-+	[BASE_SPI_CLK]		= "base_spi_clk",
-+	[BASE_PHY_RX_CLK]	= "base_phy_rx_clk",
-+	[BASE_PHY_TX_CLK]	= "base_phy_tx_clk",
-+	[BASE_APB1_CLK]		= "base_apb1_clk",
-+	[BASE_APB3_CLK]		= "base_apb3_clk",
-+	[BASE_LCD_CLK]		= "base_lcd_clk",
-+	[BASE_ADCHS_CLK]	= "base_adchs_clk",
-+	[BASE_SDIO_CLK]		= "base_sdio_clk",
-+	[BASE_SSP0_CLK]		= "base_ssp0_clk",
-+	[BASE_SSP1_CLK]		= "base_ssp1_clk",
-+	[BASE_UART0_CLK]	= "base_uart0_clk",
-+	[BASE_UART1_CLK]	= "base_uart1_clk",
-+	[BASE_UART2_CLK]	= "base_uart2_clk",
-+	[BASE_UART3_CLK]	= "base_uart3_clk",
-+	[BASE_OUT_CLK]		= "base_out_clk",
-+	[BASE_AUDIO_CLK]	= "base_audio_clk",
-+	[BASE_CGU_OUT0_CLK]	= "base_cgu_out0_clk",
-+	[BASE_CGU_OUT1_CLK]	= "base_cgu_out1_clk",
-+};
-+
-+static u32 lpc18xx_cgu_pll0_src_ids[] = {
-+	CLK_SRC_OSC32, CLK_SRC_IRC, CLK_SRC_ENET_RX_CLK,
-+	CLK_SRC_ENET_TX_CLK, CLK_SRC_GP_CLKIN, CLK_SRC_OSC,
-+	CLK_SRC_PLL1, CLK_SRC_IDIVA, CLK_SRC_IDIVB, CLK_SRC_IDIVC,
-+	CLK_SRC_IDIVD, CLK_SRC_IDIVE,
-+};
-+
-+static u32 lpc18xx_cgu_pll1_src_ids[] = {
-+	CLK_SRC_OSC32, CLK_SRC_IRC, CLK_SRC_ENET_RX_CLK,
-+	CLK_SRC_ENET_TX_CLK, CLK_SRC_GP_CLKIN, CLK_SRC_OSC,
-+	CLK_SRC_PLL0USB, CLK_SRC_PLL0AUDIO, CLK_SRC_IDIVA,
-+	CLK_SRC_IDIVB, CLK_SRC_IDIVC, CLK_SRC_IDIVD, CLK_SRC_IDIVE,
-+};
-+
-+static u32 lpc18xx_cgu_idiva_src_ids[] = {
-+	CLK_SRC_OSC32, CLK_SRC_IRC, CLK_SRC_ENET_RX_CLK,
-+	CLK_SRC_ENET_TX_CLK, CLK_SRC_GP_CLKIN, CLK_SRC_OSC,
-+	CLK_SRC_PLL0USB, CLK_SRC_PLL0AUDIO, CLK_SRC_PLL1
-+};
-+
-+static u32 lpc18xx_cgu_idivbcde_src_ids[] = {
-+	CLK_SRC_OSC32, CLK_SRC_IRC, CLK_SRC_ENET_RX_CLK,
-+	CLK_SRC_ENET_TX_CLK, CLK_SRC_GP_CLKIN, CLK_SRC_OSC,
-+	CLK_SRC_PLL0AUDIO, CLK_SRC_PLL1, CLK_SRC_IDIVA,
-+};
-+
-+static u32 lpc18xx_cgu_base_irc_src_ids[] = {CLK_SRC_IRC};
-+
-+static u32 lpc18xx_cgu_base_usb0_src_ids[] = {CLK_SRC_PLL0USB};
-+
-+static u32 lpc18xx_cgu_base_common_src_ids[] = {
-+	CLK_SRC_OSC32, CLK_SRC_IRC, CLK_SRC_ENET_RX_CLK,
-+	CLK_SRC_ENET_TX_CLK, CLK_SRC_GP_CLKIN, CLK_SRC_OSC,
-+	CLK_SRC_PLL0AUDIO, CLK_SRC_PLL1, CLK_SRC_IDIVA,
-+	CLK_SRC_IDIVB, CLK_SRC_IDIVC, CLK_SRC_IDIVD, CLK_SRC_IDIVE,
-+};
-+
-+static u32 lpc18xx_cgu_base_all_src_ids[] = {
-+	CLK_SRC_OSC32, CLK_SRC_IRC, CLK_SRC_ENET_RX_CLK,
-+	CLK_SRC_ENET_TX_CLK, CLK_SRC_GP_CLKIN, CLK_SRC_OSC,
-+	CLK_SRC_PLL0USB, CLK_SRC_PLL0AUDIO, CLK_SRC_PLL1,
-+	CLK_SRC_IDIVA, CLK_SRC_IDIVB, CLK_SRC_IDIVC,
-+	CLK_SRC_IDIVD, CLK_SRC_IDIVE,
-+};
-+
-+struct lpc18xx_cgu_src_clk_div {
-+	u8 clk_id;
-+	u8 n_parents;
-+	struct clk_divider	div;
-+	struct clk_mux		mux;
-+	struct clk_gate		gate;
-+};
-+
-+#define LPC1XX_CGU_SRC_CLK_DIV(_id, _width, _table)	\
-+{							\
-+	.clk_id = CLK_SRC_ ##_id,			\
-+	.n_parents = ARRAY_SIZE(lpc18xx_cgu_ ##_table),	\
-+	.div = {					\
-+		.shift = 2,				\
-+		.width = _width,			\
-+	},						\
-+	.mux = {					\
-+		.mask = 0x1f,				\
-+		.shift = 24,				\
-+		.table = lpc18xx_cgu_ ##_table,		\
-+	},						\
-+	.gate = {					\
-+		.bit_idx = 0,				\
-+		.flags = CLK_GATE_SET_TO_DISABLE,	\
-+	},						\
-+}
-+
-+static struct lpc18xx_cgu_src_clk_div lpc18xx_cgu_src_clk_divs[] = {
-+	LPC1XX_CGU_SRC_CLK_DIV(IDIVA, 2, idiva_src_ids),
-+	LPC1XX_CGU_SRC_CLK_DIV(IDIVB, 4, idivbcde_src_ids),
-+	LPC1XX_CGU_SRC_CLK_DIV(IDIVC, 4, idivbcde_src_ids),
-+	LPC1XX_CGU_SRC_CLK_DIV(IDIVD, 4, idivbcde_src_ids),
-+	LPC1XX_CGU_SRC_CLK_DIV(IDIVE, 8, idivbcde_src_ids),
-+};
-+
-+struct lpc18xx_cgu_base_clk {
-+	u8 clk_id;
-+	u8 n_parents;
-+	struct clk_mux mux;
++struct lpc18xx_clk_branch {
++	const char *base_name;
++	const char *name;
++	u16 offset;
++	u16 flags;
++	struct clk *clk;
 +	struct clk_gate gate;
 +};
 +
-+#define LPC1XX_CGU_BASE_CLK(_id, _table, _flags)	\
-+{							\
-+	.clk_id = BASE_ ##_id ##_CLK,			\
-+	.n_parents = ARRAY_SIZE(lpc18xx_cgu_ ##_table),	\
-+	.mux = {					\
-+		.mask = 0x1f,				\
-+		.shift = 24,				\
-+		.table = lpc18xx_cgu_ ##_table,		\
-+		.flags = _flags,			\
-+	},						\
-+	.gate = {					\
-+		.bit_idx = 0,				\
-+		.flags = CLK_GATE_SET_TO_DISABLE,	\
-+	},						\
-+}
++static struct lpc18xx_clk_branch clk_branches[] = {
++	{"base_apb3_clk", "apb3_bus",		CLK_APB3_BUS,		CCU_BRANCH_IS_BUS},
++	{"base_apb3_clk", "apb3_i2c1",		CLK_APB3_I2C1,		0},
++	{"base_apb3_clk", "apb3_dac",		CLK_APB3_DAC,		0},
++	{"base_apb3_clk", "apb3_adc0",		CLK_APB3_ADC0,		0},
++	{"base_apb3_clk", "apb3_adc1",		CLK_APB3_ADC1,		0},
++	{"base_apb3_clk", "apb3_can0",		CLK_APB3_CAN0,		0},
 +
-+static struct lpc18xx_cgu_base_clk lpc18xx_cgu_base_clks[] = {
-+	LPC1XX_CGU_BASE_CLK(SAFE,	base_irc_src_ids, CLK_MUX_READ_ONLY),
-+	LPC1XX_CGU_BASE_CLK(USB0,	base_usb0_src_ids,   0),
-+	LPC1XX_CGU_BASE_CLK(PERIPH,	base_common_src_ids, 0),
-+	LPC1XX_CGU_BASE_CLK(USB1,	base_all_src_ids,    0),
-+	LPC1XX_CGU_BASE_CLK(CPU,	base_common_src_ids, 0),
-+	LPC1XX_CGU_BASE_CLK(SPIFI,	base_common_src_ids, 0),
-+	LPC1XX_CGU_BASE_CLK(SPI,	base_common_src_ids, 0),
-+	LPC1XX_CGU_BASE_CLK(PHY_RX,	base_common_src_ids, 0),
-+	LPC1XX_CGU_BASE_CLK(PHY_TX,	base_common_src_ids, 0),
-+	LPC1XX_CGU_BASE_CLK(APB1,	base_common_src_ids, 0),
-+	LPC1XX_CGU_BASE_CLK(APB3,	base_common_src_ids, 0),
-+	LPC1XX_CGU_BASE_CLK(LCD,	base_common_src_ids, 0),
-+	LPC1XX_CGU_BASE_CLK(ADCHS,	base_common_src_ids, 0),
-+	LPC1XX_CGU_BASE_CLK(SDIO,	base_common_src_ids, 0),
-+	LPC1XX_CGU_BASE_CLK(SSP0,	base_common_src_ids, 0),
-+	LPC1XX_CGU_BASE_CLK(SSP1,	base_common_src_ids, 0),
-+	LPC1XX_CGU_BASE_CLK(UART0,	base_common_src_ids, 0),
-+	LPC1XX_CGU_BASE_CLK(UART1,	base_common_src_ids, 0),
-+	LPC1XX_CGU_BASE_CLK(UART2,	base_common_src_ids, 0),
-+	LPC1XX_CGU_BASE_CLK(UART3,	base_common_src_ids, 0),
-+	LPC1XX_CGU_BASE_CLK(OUT,	base_all_src_ids,    0),
-+	{ /* 21 reserved */ },
-+	{ /* 22 reserved */ },
-+	{ /* 23 reserved */ },
-+	{ /* 24 reserved */ },
-+	LPC1XX_CGU_BASE_CLK(AUDIO,	base_common_src_ids, 0),
-+	LPC1XX_CGU_BASE_CLK(CGU_OUT0,	base_all_src_ids,    0),
-+	LPC1XX_CGU_BASE_CLK(CGU_OUT1,	base_all_src_ids,    0),
++	{"base_apb1_clk", "apb1_bus",		CLK_APB1_BUS,		CCU_BRANCH_IS_BUS},
++	{"base_apb1_clk", "apb1_mc_pwm",	CLK_APB1_MOTOCON_PWM,	0},
++	{"base_apb1_clk", "apb1_i2c0",		CLK_APB1_I2C0,		0},
++	{"base_apb1_clk", "apb1_i2s",		CLK_APB1_I2S,		0},
++	{"base_apb1_clk", "apb1_can1",		CLK_APB1_CAN1,		0},
++
++	{"base_spifi_clk", "spifi",		CLK_SPIFI,		0},
++
++	{"base_cpu_clk", "cpu_bus",		CLK_CPU_BUS,		CCU_BRANCH_IS_BUS},
++	{"base_cpu_clk", "cpu_spifi",		CLK_CPU_SPIFI,		0},
++	{"base_cpu_clk", "cpu_gpio",		CLK_CPU_GPIO,		0},
++	{"base_cpu_clk", "cpu_lcd",		CLK_CPU_LCD,		0},
++	{"base_cpu_clk", "cpu_ethernet",	CLK_CPU_ETHERNET,	0},
++	{"base_cpu_clk", "cpu_usb0",		CLK_CPU_USB0,		0},
++	{"base_cpu_clk", "cpu_emc",		CLK_CPU_EMC,		0},
++	{"base_cpu_clk", "cpu_sdio",		CLK_CPU_SDIO,		0},
++	{"base_cpu_clk", "cpu_dma",		CLK_CPU_DMA,		0},
++	{"base_cpu_clk", "cpu_core",		CLK_CPU_CORE,		0},
++	{"base_cpu_clk", "cpu_sct",		CLK_CPU_SCT,		0},
++	{"base_cpu_clk", "cpu_usb1",		CLK_CPU_USB1,		0},
++	{"base_cpu_clk", "cpu_emcdiv",		CLK_CPU_EMCDIV,		CCU_BRANCH_HAVE_DIV2},
++	{"base_cpu_clk", "cpu_flasha",		CLK_CPU_FLASHA,		CCU_BRANCH_HAVE_DIV2},
++	{"base_cpu_clk", "cpu_flashb",		CLK_CPU_FLASHB,		CCU_BRANCH_HAVE_DIV2},
++	{"base_cpu_clk", "cpu_m0app",		CLK_CPU_M0APP,		CCU_BRANCH_HAVE_DIV2},
++	{"base_cpu_clk", "cpu_adchs",		CLK_CPU_ADCHS,		CCU_BRANCH_HAVE_DIV2},
++	{"base_cpu_clk", "cpu_eeprom",		CLK_CPU_EEPROM,		CCU_BRANCH_HAVE_DIV2},
++	{"base_cpu_clk", "cpu_wwdt",		CLK_CPU_WWDT,		0},
++	{"base_cpu_clk", "cpu_uart0",		CLK_CPU_UART0,		0},
++	{"base_cpu_clk", "cpu_uart1",		CLK_CPU_UART1,		0},
++	{"base_cpu_clk", "cpu_ssp0",		CLK_CPU_SSP0,		0},
++	{"base_cpu_clk", "cpu_timer0",		CLK_CPU_TIMER0,		0},
++	{"base_cpu_clk", "cpu_timer1",		CLK_CPU_TIMER1,		0},
++	{"base_cpu_clk", "cpu_scu",		CLK_CPU_SCU,		0},
++	{"base_cpu_clk", "cpu_creg",		CLK_CPU_CREG,		0},
++	{"base_cpu_clk", "cpu_ritimer",		CLK_CPU_RITIMER,	0},
++	{"base_cpu_clk", "cpu_uart2",		CLK_CPU_UART2,		0},
++	{"base_cpu_clk", "cpu_uart3",		CLK_CPU_UART3,		0},
++	{"base_cpu_clk", "cpu_timer2",		CLK_CPU_TIMER2,		0},
++	{"base_cpu_clk", "cpu_timer3",		CLK_CPU_TIMER3,		0},
++	{"base_cpu_clk", "cpu_ssp1",		CLK_CPU_SSP1,		0},
++	{"base_cpu_clk", "cpu_qei",		CLK_CPU_QEI,		0},
++
++	{"base_periph_clk", "periph_bus",	CLK_PERIPH_BUS,		CCU_BRANCH_IS_BUS},
++	{"base_periph_clk", "periph_core",	CLK_PERIPH_CORE,	0},
++	{"base_periph_clk", "periph_sgpio",	CLK_PERIPH_SGPIO,	0},
++
++	{"base_usb0_clk",  "usb0",		CLK_USB0,		0},
++	{"base_usb1_clk",  "usb1",		CLK_USB1,		0},
++	{"base_spi_clk",   "spi",		CLK_SPI,		0},
++	{"base_adchs_clk", "adchs",		CLK_ADCHS,		0},
++
++	{"base_audio_clk", "audio",		CLK_AUDIO,		0},
++	{"base_uart3_clk", "apb2_uart3",	CLK_APB2_UART3,		0},
++	{"base_uart2_clk", "apb2_uart2",	CLK_APB2_UART2,		0},
++	{"base_uart1_clk", "apb0_uart1",	CLK_APB0_UART1,		0},
++	{"base_uart0_clk", "apb0_uart0",	CLK_APB0_UART0,		0},
++	{"base_ssp1_clk",  "apb2_ssp1",		CLK_APB2_SSP1,		0},
++	{"base_ssp0_clk",  "apb0_ssp0",		CLK_APB0_SSP0,		0},
++	{"base_sdio_clk",  "sdio",		CLK_SDIO,		0},
 +};
 +
-+struct lpc18xx_pll {
-+	struct		clk_hw hw;
-+	void __iomem	*reg;
-+	spinlock_t	*lock;
-+	u8		flags;
-+};
-+
-+#define to_lpc_pll(hw) container_of(hw, struct lpc18xx_pll, hw)
-+
-+struct lpc18xx_cgu_pll_clk {
-+	u8 clk_id;
-+	u8 n_parents;
-+	u8 reg_offset;
-+	struct clk_mux mux;
-+	struct clk_gate gate;
-+	struct lpc18xx_pll pll;
-+	const struct clk_ops *pll_ops;
-+};
-+
-+#define LPC1XX_CGU_CLK_PLL(_id, _table, _pll_ops)	\
-+{							\
-+	.clk_id = CLK_SRC_ ##_id,			\
-+	.n_parents = ARRAY_SIZE(lpc18xx_cgu_ ##_table),	\
-+	.reg_offset = LPC18XX_CGU_ ##_id ##_STAT,	\
-+	.mux = {					\
-+		.mask = 0x1f,				\
-+		.shift = 24,				\
-+		.table = lpc18xx_cgu_ ##_table,		\
-+	},						\
-+	.gate = {					\
-+		.bit_idx = 0,				\
-+		.flags = CLK_GATE_SET_TO_DISABLE,	\
-+	},						\
-+	.pll_ops = &lpc18xx_ ##_pll_ops,		\
-+}
-+
-+/*
-+ * PLL0 uses a special register value encoding. The compute functions below
-+ * are taken or derived from the LPC1850 user manual (section 12.6.3.3).
-+ */
-+
-+/* Compute PLL0 multiplier from decoded version */
-+static u32 lpc18xx_pll0_mdec2msel(u32 x)
++static struct clk *lpc18xx_ccu_branch_clk_get(struct of_phandle_args *clkspec,
++					      void *data)
 +{
-+	int i;
++	struct lpc18xx_branch_clk_data *clk_data = data;
++	unsigned int offset = clkspec->args[0];
++	int i, j;
 +
-+	switch (x) {
-+	case 0x18003: return 1;
-+	case 0x10003: return 2;
-+	default:
-+		for (i = LPC18XX_PLL0_MSEL_MAX + 1; x != 0x4000 && i > 0; i--)
-+			x = ((x ^ x >> 14) & 1) | (x << 1 & 0x7fff);
-+		return i;
-+	}
-+}
-+/* Compute PLL0 decoded multiplier from binary version */
-+static u32 lpc18xx_pll0_msel2mdec(u32 msel)
-+{
-+	u32 i, x = 0x4000;
++	for (i = 0; i < ARRAY_SIZE(clk_branches); i++) {
++		if (clk_branches[i].offset != offset)
++			continue;
 +
-+	switch (msel) {
-+	case 0: return 0;
-+	case 1: return 0x18003;
-+	case 2: return 0x10003;
-+	default:
-+		for (i = msel; i <= LPC18XX_PLL0_MSEL_MAX; i++)
-+			x = ((x ^ x >> 1) & 1) << 14 | (x >> 1 & 0xffff);
-+		return x;
-+	}
-+}
-+
-+/* Compute PLL0 bandwidth SELI reg from multiplier */
-+static u32 lpc18xx_pll0_msel2seli(u32 msel)
-+{
-+	u32 tmp;
-+
-+	if (msel > 16384) return 1;
-+	if (msel >  8192) return 2;
-+	if (msel >  2048) return 4;
-+	if (msel >=  501) return 8;
-+	if (msel >=   60) {
-+		tmp = 1024 / (msel + 9);
-+		return ((1024 == (tmp * (msel + 9))) == 0) ? tmp * 4 : (tmp + 1) * 4;
++		for (j = 0; j < clk_data->num; j++) {
++			if (!strcmp(clk_branches[i].base_name, clk_data->name[j]))
++				return clk_branches[i].clk;
++		}
 +	}
 +
-+	return (msel & 0x3c) + 4;
++	pr_err("%s: invalid clock offset %d\n", __func__, offset);
++
++	return ERR_PTR(-EINVAL);
 +}
 +
-+/* Compute PLL0 bandwidth SELP reg from multiplier */
-+static u32 lpc18xx_pll0_msel2selp(u32 msel)
++static int lpc18xx_ccu_gate_endisable(struct clk_hw *hw, bool enable)
 +{
-+	if (msel < 60)
-+		return (msel >> 1) + 1;
++	struct clk_gate *gate = to_clk_gate(hw);
++	u32 val;
 +
-+	return 31;
-+}
++	/*
++	 * Divider field is write only, so divider stat field must
++	 * be read so divider field can be set accordingly.
++	 */
++	val = clk_readl(gate->reg);
++	if (val & LPC18XX_CCU_DIVSTAT)
++		val |= LPC18XX_CCU_DIV;
 +
-+static unsigned long lpc18xx_pll0_recalc_rate(struct clk_hw *hw,
-+					      unsigned long parent_rate)
-+{
-+	struct lpc18xx_pll *pll = to_lpc_pll(hw);
-+	u32 ctrl, mdiv, msel, npdiv;
++	if (enable) {
++		val |= LPC18XX_CCU_RUN;
++	} else {
++		/*
++		 * To safely disable a branch clock a squence of two separate
++		 * writes must be used. First write should set the AUTO bit
++		 * and the next write should clear the RUN bit.
++		 */
++		val |= LPC18XX_CCU_AUTO;
++		clk_writel(val, gate->reg);
 +
-+	ctrl = clk_readl(pll->reg + LPC18XX_CGU_PLL0USB_CTRL);
-+	mdiv = clk_readl(pll->reg + LPC18XX_CGU_PLL0USB_MDIV);
-+	npdiv = clk_readl(pll->reg + LPC18XX_CGU_PLL0USB_NP_DIV);
-+
-+	if (ctrl & LPC18XX_PLL0_CTRL_BYPASS)
-+		return parent_rate;
-+
-+	if (npdiv != LPC18XX_PLL0_NP_DIVS_1) {
-+		pr_warn("%s: pre/post dividers not supported\n", __func__);
-+		return 0;
++		val &= ~LPC18XX_CCU_RUN;
 +	}
 +
-+	msel = lpc18xx_pll0_mdec2msel(mdiv & LPC18XX_PLL0_MDIV_MDEC_MASK);
-+	if (msel)
-+		return 2 * msel * parent_rate;
-+
-+	pr_warn("%s: unable to calculate rate\n", __func__);
++	clk_writel(val, gate->reg);
 +
 +	return 0;
 +}
 +
-+static long lpc18xx_pll0_round_rate(struct clk_hw *hw, unsigned long rate,
-+				    unsigned long *prate)
++static int lpc18xx_ccu_gate_enable(struct clk_hw *hw)
 +{
-+	unsigned long m;
-+
-+	if (*prate < rate) {
-+		pr_warn("%s: pll dividers not supported\n", __func__);
-+		return -EINVAL;
-+	}
-+
-+	m = DIV_ROUND_UP_ULL(*prate, rate * 2);
-+	if (m <= 0 && m > LPC18XX_PLL0_MSEL_MAX) {
-+		pr_warn("%s: unable to support rate %lu\n", __func__, rate);
-+		return -EINVAL;
-+	}
-+
-+	return 2 * *prate * m;
++	return lpc18xx_ccu_gate_endisable(hw, true);
 +}
 +
-+static int lpc18xx_pll0_set_rate(struct clk_hw *hw, unsigned long rate,
-+				 unsigned long parent_rate)
++static void lpc18xx_ccu_gate_disable(struct clk_hw *hw)
 +{
-+	struct lpc18xx_pll *pll = to_lpc_pll(hw);
-+	u32 ctrl, stat, m;
-+	int retry = 3;
-+
-+	if (parent_rate < rate) {
-+		pr_warn("%s: pll dividers not supported\n", __func__);
-+		return -EINVAL;
-+	}
-+
-+	m = DIV_ROUND_UP_ULL(parent_rate, rate * 2);
-+	if (m <= 0 && m > LPC18XX_PLL0_MSEL_MAX) {
-+		pr_warn("%s: unable to support rate %lu\n", __func__, rate);
-+		return -EINVAL;
-+	}
-+
-+	m  = lpc18xx_pll0_msel2mdec(m);
-+	m |= lpc18xx_pll0_msel2selp(m) << LPC18XX_PLL0_MDIV_SELP_SHIFT;
-+	m |= lpc18xx_pll0_msel2seli(m) << LPC18XX_PLL0_MDIV_SELI_SHIFT;
-+
-+	/* Power down PLL, disable clk output and dividers */
-+	ctrl = clk_readl(pll->reg + LPC18XX_CGU_PLL0USB_CTRL);
-+	ctrl |= LPC18XX_PLL0_CTRL_PD;
-+	ctrl &= ~(LPC18XX_PLL0_CTRL_BYPASS | LPC18XX_PLL0_CTRL_DIRECTI |
-+		  LPC18XX_PLL0_CTRL_DIRECTO | LPC18XX_PLL0_CTRL_CLKEN);
-+	clk_writel(ctrl, pll->reg + LPC18XX_CGU_PLL0USB_CTRL);
-+
-+	/* Configure new PLL settings */
-+	clk_writel(m, pll->reg + LPC18XX_CGU_PLL0USB_MDIV);
-+	clk_writel(LPC18XX_PLL0_NP_DIVS_1, pll->reg + LPC18XX_CGU_PLL0USB_NP_DIV);
-+
-+	/* Power up PLL and wait for lock */
-+	ctrl &= ~LPC18XX_PLL0_CTRL_PD;
-+	clk_writel(ctrl, pll->reg + LPC18XX_CGU_PLL0USB_CTRL);
-+	do {
-+		udelay(10);
-+		stat = clk_readl(pll->reg + LPC18XX_CGU_PLL0USB_STAT);
-+		if (stat & LPC18XX_PLL0_STAT_LOCK) {
-+			ctrl |= LPC18XX_PLL0_CTRL_CLKEN;
-+			clk_writel(ctrl, pll->reg + LPC18XX_CGU_PLL0USB_CTRL);
-+
-+			return 0;
-+		}
-+	} while (retry--);
-+
-+	pr_warn("%s: unable to lock pll\n", __func__);
-+
-+	return -EINVAL;
++	lpc18xx_ccu_gate_endisable(hw, false);
 +}
 +
-+static const struct clk_ops lpc18xx_pll0_ops = {
-+	.recalc_rate	= lpc18xx_pll0_recalc_rate,
-+	.round_rate	= lpc18xx_pll0_round_rate,
-+	.set_rate	= lpc18xx_pll0_set_rate,
-+};
-+
-+static unsigned long lpc18xx_pll1_recalc_rate(struct clk_hw *hw,
-+					      unsigned long parent_rate)
++static int lpc18xx_ccu_gate_is_enabled(struct clk_hw *hw)
 +{
-+	struct lpc18xx_pll *pll = to_lpc_pll(hw);
-+	u16 msel, nsel, psel;
-+	bool direct, fbsel;
-+	u32 stat, ctrl;
++	struct clk_gate *gate = to_clk_gate(hw);
 +
-+	stat = clk_readl(pll->reg + LPC18XX_CGU_PLL1_STAT);
-+	ctrl = clk_readl(pll->reg + LPC18XX_CGU_PLL1_CTRL);
-+
-+	direct = (ctrl & LPC18XX_PLL1_CTRL_DIRECT) ? true : false;
-+	fbsel = (ctrl & LPC18XX_PLL1_CTRL_FBSEL) ? true : false;
-+
-+	msel = ((ctrl >> 16) & 0xff) + 1;
-+	nsel = ((ctrl >> 12) & 0x3) + 1;
-+
-+	if (direct || fbsel)
-+		return msel * (parent_rate / nsel);
-+
-+	psel = (ctrl >>  8) & 0x3;
-+	psel = 1 << psel;
-+
-+	return (msel / (2 * psel)) * (parent_rate / nsel);
++	return clk_readl(gate->reg) & LPC18XX_CCU_RUN;
 +}
 +
-+static const struct clk_ops lpc18xx_pll1_ops = {
-+	.recalc_rate = lpc18xx_pll1_recalc_rate,
++static const struct clk_ops lpc18xx_ccu_gate_ops = {
++	.enable		= lpc18xx_ccu_gate_enable,
++	.disable	= lpc18xx_ccu_gate_disable,
++	.is_enabled	= lpc18xx_ccu_gate_is_enabled,
 +};
 +
-+static struct lpc18xx_cgu_pll_clk lpc18xx_cgu_src_clk_plls[] = {
-+	LPC1XX_CGU_CLK_PLL(PLL0USB,	pll0_src_ids, pll0_ops),
-+	LPC1XX_CGU_CLK_PLL(PLL0AUDIO,	pll0_src_ids, pll0_ops),
-+	LPC1XX_CGU_CLK_PLL(PLL1,	pll1_src_ids, pll1_ops),
-+};
-+
-+static void lpc18xx_fill_parent_names(const char **parent, u32 *id, int size)
++static void lpc18xx_ccu_register_branch_gate_div(struct lpc18xx_clk_branch *branch,
++						 void __iomem *reg_base,
++						 const char *parent)
 +{
++	const struct clk_ops *div_ops = NULL;
++	struct clk_divider *div = NULL;
++	struct clk_hw *div_hw = NULL;
++
++	if (branch->flags & CCU_BRANCH_HAVE_DIV2) {
++		div = kzalloc(sizeof(*div), GFP_KERNEL);
++		if (!div)
++			return;
++
++		div->reg = branch->offset + reg_base;
++		div->flags = CLK_DIVIDER_READ_ONLY;
++		div->shift = 27;
++		div->width = 1;
++
++		div_hw = &div->hw;
++		div_ops = &clk_divider_ops;
++	}
++
++	branch->gate.reg = branch->offset + reg_base;
++	branch->gate.bit_idx = 0;
++
++	branch->clk = clk_register_composite(NULL, branch->name, &parent, 1,
++					     NULL, NULL,
++					     div_hw, div_ops,
++					     &branch->gate.hw, &lpc18xx_ccu_gate_ops, 0);
++	if (IS_ERR(branch->clk)) {
++		kfree(div);
++		pr_warn("%s: failed to register %s\n", __func__, branch->name);
++		return;
++	}
++
++	/* Grab essential branch clocks for CPU and SDRAM */
++	switch (branch->offset) {
++	case CLK_CPU_EMC:
++	case CLK_CPU_CORE:
++	case CLK_CPU_CREG:
++	case CLK_CPU_EMCDIV:
++		clk_prepare_enable(branch->clk);
++	}
++}
++
++static void lpc18xx_ccu_register_branch_clks(void __iomem *reg_base,
++					     const char *base_name)
++{
++	const char *parent = base_name;
 +	int i;
 +
-+	for (i = 0; i < size; i++)
-+		parent[i] = clk_src_names[id[i]];
-+}
++	for (i = 0; i < ARRAY_SIZE(clk_branches); i++) {
++		if (strcmp(clk_branches[i].base_name, base_name))
++			continue;
 +
-+static struct clk *lpc18xx_cgu_register_div(struct lpc18xx_cgu_src_clk_div *clk,
-+					    void __iomem *base, int n)
-+{
-+	void __iomem *reg = base + LPC18XX_CGU_IDIV_CTRL(n);
-+	const char *name = clk_src_names[clk->clk_id];
-+	const char *parents[CLK_SRC_MAX];
++		lpc18xx_ccu_register_branch_gate_div(&clk_branches[i], reg_base,
++						     parent);
 +
-+	clk->div.reg = reg;
-+	clk->mux.reg = reg;
-+	clk->gate.reg = reg;
-+
-+	lpc18xx_fill_parent_names(parents, clk->mux.table, clk->n_parents);
-+
-+	return clk_register_composite(NULL, name, parents, clk->n_parents,
-+				      &clk->mux.hw, &clk_mux_ops,
-+				      &clk->div.hw, &clk_divider_ops,
-+				      &clk->gate.hw, &clk_gate_ops, 0);
-+}
-+
-+
-+static struct clk *lpc18xx_register_base_clk(struct lpc18xx_cgu_base_clk *clk,
-+					     void __iomem *reg_base, int n)
-+{
-+	void __iomem *reg = reg_base + LPC18XX_CGU_BASE_CLK(n);
-+	const char *name = clk_base_names[clk->clk_id];
-+	const char *parents[CLK_SRC_MAX];
-+
-+	if (clk->n_parents == 0)
-+		return ERR_PTR(-ENOENT);
-+
-+	clk->mux.reg = reg;
-+	clk->gate.reg = reg;
-+
-+	lpc18xx_fill_parent_names(parents, clk->mux.table, clk->n_parents);
-+
-+	/* SAFE_CLK can not be turned off */
-+	if (n == BASE_SAFE_CLK)
-+		return clk_register_composite(NULL, name, parents, clk->n_parents,
-+					      &clk->mux.hw, &clk_mux_ops,
-+					      NULL, NULL, NULL, NULL, 0);
-+
-+	return clk_register_composite(NULL, name, parents, clk->n_parents,
-+				      &clk->mux.hw, &clk_mux_ops,
-+				      NULL,  NULL,
-+				      &clk->gate.hw, &clk_gate_ops, 0);
-+}
-+
-+
-+static struct clk *lpc18xx_cgu_register_pll(struct lpc18xx_cgu_pll_clk *clk,
-+					    void __iomem *base)
-+{
-+	const char *name = clk_src_names[clk->clk_id];
-+	const char *parents[CLK_SRC_MAX];
-+
-+	clk->pll.reg  = base;
-+	clk->mux.reg  = base + clk->reg_offset + LPC18XX_CGU_PLL_CTRL_OFFSET;
-+	clk->gate.reg = base + clk->reg_offset + LPC18XX_CGU_PLL_CTRL_OFFSET;
-+
-+	lpc18xx_fill_parent_names(parents, clk->mux.table, clk->n_parents);
-+
-+	return clk_register_composite(NULL, name, parents, clk->n_parents,
-+				      &clk->mux.hw, &clk_mux_ops,
-+				      &clk->pll.hw, clk->pll_ops,
-+				      &clk->gate.hw, &clk_gate_ops, 0);
-+}
-+
-+static void __init lpc18xx_cgu_register_source_clks(struct device_node *np,
-+						    void __iomem *base)
-+{
-+	const char *parents[CLK_SRC_MAX];
-+	struct clk *clk;
-+	int i;
-+
-+	/* Register the internal 12 MHz RC oscillator (IRC) */
-+	clk = clk_register_fixed_rate(NULL, clk_src_names[CLK_SRC_IRC],
-+				      NULL, CLK_IS_ROOT, 12000000);
-+	if (IS_ERR(clk))
-+		pr_warn("%s: failed to register irc clk\n", __func__);
-+
-+	/* Register crystal oscillator controlller */
-+	parents[0] = of_clk_get_parent_name(np, 0);
-+	clk = clk_register_gate(NULL, clk_src_names[CLK_SRC_OSC], parents[0],
-+				0, base + LPC18XX_CGU_XTAL_OSC_CTRL,
-+				0, CLK_GATE_SET_TO_DISABLE, NULL);
-+	if (IS_ERR(clk))
-+		pr_warn("%s: failed to register osc clk\n", __func__);
-+
-+	/* Register all PLLs */
-+	for (i = 0; i < ARRAY_SIZE(lpc18xx_cgu_src_clk_plls); i++) {
-+		clk = lpc18xx_cgu_register_pll(&lpc18xx_cgu_src_clk_plls[i],
-+						   base);
-+		if (IS_ERR(clk))
-+			pr_warn("%s: failed to register pll (%d)\n", __func__, i);
-+	}
-+
-+	/* Register all clock dividers A-E */
-+	for (i = 0; i < ARRAY_SIZE(lpc18xx_cgu_src_clk_divs); i++) {
-+		clk = lpc18xx_cgu_register_div(&lpc18xx_cgu_src_clk_divs[i],
-+					       base, i);
-+		if (IS_ERR(clk))
-+			pr_warn("%s: failed to register div %d\n", __func__, i);
++		if (clk_branches[i].flags & CCU_BRANCH_IS_BUS)
++			parent = clk_branches[i].name;
 +	}
 +}
 +
-+static struct clk *clk_base[BASE_CLK_MAX];
-+static struct clk_onecell_data clk_base_data = {
-+	.clks = clk_base,
-+	.clk_num = BASE_CLK_MAX,
-+};
-+
-+static void __init lpc18xx_cgu_register_base_clks(void __iomem *reg_base)
++static void __init lpc18xx_ccu_init(struct device_node *np)
 +{
-+	int i;
-+
-+	for (i = BASE_SAFE_CLK; i < BASE_CLK_MAX; i++) {
-+		clk_base[i] = lpc18xx_register_base_clk(&lpc18xx_cgu_base_clks[i],
-+							reg_base, i);
-+		if (IS_ERR(clk_base[i]) && PTR_ERR(clk_base[i]) != -ENOENT)
-+			pr_warn("%s: register base clk %d failed\n", __func__, i);
-+	}
-+}
-+
-+static void __init lpc18xx_cgu_init(struct device_node *np)
-+{
++	struct lpc18xx_branch_clk_data *clk_data;
 +	void __iomem *reg_base;
++	int i, ret;
 +
 +	reg_base = of_iomap(np, 0);
 +	if (!reg_base) {
@@ -677,18 +299,38 @@ index 000000000000..81e9e1c788f4
 +		return;
 +	}
 +
-+	lpc18xx_cgu_register_source_clks(np, reg_base);
-+	lpc18xx_cgu_register_base_clks(reg_base);
++	clk_data = kzalloc(sizeof(*clk_data), GFP_KERNEL);
++	if (!clk_data)
++		return;
 +
-+	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_base_data);
++	clk_data->num = of_property_count_strings(np, "clock-names");
++	clk_data->name = kcalloc(clk_data->num, sizeof(char *), GFP_KERNEL);
++	if (!clk_data->name) {
++		kfree(clk_data);
++		return;
++	}
++
++	for (i = 0; i < clk_data->num; i++) {
++		ret = of_property_read_string_index(np, "clock-names", i,
++						    &clk_data->name[i]);
++		if (ret) {
++			pr_warn("%s: failed to get clock name at idx %d\n",
++				__func__, i);
++			continue;
++		}
++
++		lpc18xx_ccu_register_branch_clks(reg_base, clk_data->name[i]);
++	}
++
++	of_clk_add_provider(np, lpc18xx_ccu_branch_clk_get, clk_data);
 +}
-+CLK_OF_DECLARE(lpc18xx_cgu, "nxp,lpc1850-cgu", lpc18xx_cgu_init);
-diff --git a/include/dt-bindings/clock/lpc18xx-cgu.h b/include/dt-bindings/clock/lpc18xx-cgu.h
++CLK_OF_DECLARE(lpc18xx_ccu, "nxp,lpc1850-ccu", lpc18xx_ccu_init);
+diff --git a/include/dt-bindings/clock/lpc18xx-ccu.h b/include/dt-bindings/clock/lpc18xx-ccu.h
 new file mode 100644
-index 000000000000..6e57c6d2ca66
+index 000000000000..bbfe00b6ab7d
 --- /dev/null
-+++ b/include/dt-bindings/clock/lpc18xx-cgu.h
-@@ -0,0 +1,41 @@
++++ b/include/dt-bindings/clock/lpc18xx-ccu.h
+@@ -0,0 +1,74 @@
 +/*
 + * Copyright (c) 2015 Joachim Eastwood <manabian@gmail.com>
 + *
@@ -700,35 +342,68 @@ index 000000000000..6e57c6d2ca66
 + *
 + */
 +
-+/* LPC18xx/43xx base clock ids */
-+#define BASE_SAFE_CLK		0
-+#define BASE_USB0_CLK		1
-+#define BASE_PERIPH_CLK		2
-+#define BASE_USB1_CLK		3
-+#define BASE_CPU_CLK		4
-+#define BASE_SPIFI_CLK		5
-+#define BASE_SPI_CLK		6
-+#define BASE_PHY_RX_CLK		7
-+#define BASE_PHY_TX_CLK		8
-+#define BASE_APB1_CLK		9
-+#define BASE_APB3_CLK		10
-+#define BASE_LCD_CLK		11
-+#define BASE_ADCHS_CLK		12
-+#define BASE_SDIO_CLK		13
-+#define BASE_SSP0_CLK		14
-+#define BASE_SSP1_CLK		15
-+#define BASE_UART0_CLK		16
-+#define BASE_UART1_CLK		17
-+#define BASE_UART2_CLK		18
-+#define BASE_UART3_CLK		19
-+#define BASE_OUT_CLK		20
-+#define BASE_RES1_CLK		21
-+#define BASE_RES2_CLK		22
-+#define BASE_RES3_CLK		23
-+#define BASE_RES4_CLK		24
-+#define BASE_AUDIO_CLK		25
-+#define BASE_CGU_OUT0_CLK	26
-+#define BASE_CGU_OUT1_CLK	27
-+#define BASE_CLK_MAX		(BASE_CGU_OUT1_CLK + 1)
++/* Clock Control Unit 1 (CCU1) clock offsets */
++#define CLK_APB3_BUS		0x100
++#define CLK_APB3_I2C1		0x108
++#define CLK_APB3_DAC		0x110
++#define CLK_APB3_ADC0		0x118
++#define CLK_APB3_ADC1		0x120
++#define CLK_APB3_CAN0		0x128
++#define CLK_APB1_BUS		0x200
++#define CLK_APB1_MOTOCON_PWM	0x208
++#define CLK_APB1_I2C0		0x210
++#define CLK_APB1_I2S		0x218
++#define CLK_APB1_CAN1		0x220
++#define CLK_SPIFI		0x300
++#define CLK_CPU_BUS		0x400
++#define CLK_CPU_SPIFI		0x408
++#define CLK_CPU_GPIO		0x410
++#define CLK_CPU_LCD		0x418
++#define CLK_CPU_ETHERNET	0x420
++#define CLK_CPU_USB0		0x428
++#define CLK_CPU_EMC		0x430
++#define CLK_CPU_SDIO		0x438
++#define CLK_CPU_DMA		0x440
++#define CLK_CPU_CORE		0x448
++#define CLK_CPU_SCT		0x468
++#define CLK_CPU_USB1		0x470
++#define CLK_CPU_EMCDIV		0x478
++#define CLK_CPU_FLASHA		0x480
++#define CLK_CPU_FLASHB		0x488
++#define CLK_CPU_M0APP		0x490
++#define CLK_CPU_ADCHS		0x498
++#define CLK_CPU_EEPROM		0x4a0
++#define CLK_CPU_WWDT		0x500
++#define CLK_CPU_UART0		0x508
++#define CLK_CPU_UART1		0x510
++#define CLK_CPU_SSP0		0x518
++#define CLK_CPU_TIMER0		0x520
++#define CLK_CPU_TIMER1		0x528
++#define CLK_CPU_SCU		0x530
++#define CLK_CPU_CREG		0x538
++#define CLK_CPU_RITIMER		0x600
++#define CLK_CPU_UART2		0x608
++#define CLK_CPU_UART3		0x610
++#define CLK_CPU_TIMER2		0x618
++#define CLK_CPU_TIMER3		0x620
++#define CLK_CPU_SSP1		0x628
++#define CLK_CPU_QEI		0x630
++#define CLK_PERIPH_BUS		0x700
++#define CLK_PERIPH_CORE		0x710
++#define CLK_PERIPH_SGPIO	0x718
++#define CLK_USB0		0x800
++#define CLK_USB1		0x900
++#define CLK_SPI			0xA00
++#define CLK_ADCHS		0xB00
++
++/* Clock Control Unit 2 (CCU2) clock offsets */
++#define CLK_AUDIO		0x100
++#define CLK_APB2_UART3		0x200
++#define CLK_APB2_UART2		0x300
++#define CLK_APB0_UART1		0x400
++#define CLK_APB0_UART0		0x500
++#define CLK_APB2_SSP1		0x600
++#define CLK_APB0_SSP0		0x700
++#define CLK_SDIO		0x800
 -- 
 1.8.0
