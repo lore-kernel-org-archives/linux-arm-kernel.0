@@ -1,67 +1,103 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Thu, 28 May 2015 16:25:01 +0800
-Subject: [PATCH v2 1/5] clk: remove duplicated code with
- __clk_set_parent_after
-In-Reply-To: <20150528040919.22384.79189@quantum>
-References: <1431610143-21853-1-git-send-email-aisheng.dong@freescale.com>
- <1431610143-21853-2-git-send-email-aisheng.dong@freescale.com>
- <20150528040919.22384.79189@quantum>
-Message-ID: <20150528082459.GA4489@shlinux1.ap.freescale.net>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu, 28 May 2015 10:26:46 +0200
+Subject: [PATCH 02/21] ARM: tegra: Add gpio-ranges property
+In-Reply-To: <5565D96F.3000600@wwwdotorg.org>
+References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1432565608-26036-3-git-send-email-tomeu.vizoso@collabora.com>
+ <5564CC84.1030700@wwwdotorg.org>
+ <CAAObsKD7YbZX01A=SS7z_PxAMPweHy6sw5ut=50h50C=j9y0zA@mail.gmail.com>
+ <5565D96F.3000600@wwwdotorg.org>
+Message-ID: <CAAObsKB-ayRd7OB1W9nYBJzvBDK0RZk1U56Gqxn08sHPT5FvzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 27, 2015 at 09:09:19PM -0700, Michael Turquette wrote:
-> Quoting Dong Aisheng (2015-05-14 06:28:59)
-> > __clk_set_parent_after() actually used the second argument then we
-> > could put this duplicate logic in there and call it with a different
-> > order of arguments in the success vs. error paths in this function.
-> > 
-> > Cc: Mike Turquette <mturquette@linaro.org>
-> > Cc: Stephen Boyd <sboyd@codeaurora.org>
-> > Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
-> > Signed-off-by: Dong Aisheng <aisheng.dong@freescale.com>
-> 
-> Patch looks good to me.
-> 
+On 27 May 2015 at 16:49, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 05/27/2015 08:18 AM, Tomeu Vizoso wrote:
+>>
+>> On 26 May 2015 at 21:41, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>>
+>>> On 05/25/2015 08:53 AM, Tomeu Vizoso wrote:
+>>>>
+>>>>
+>>>> Specify how the GPIOs map to the pins in T124, so the dependency is
+>>>> explicit.
+>>>>
+>>>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>>>> ---
+>>>>    arch/arm/boot/dts/tegra124.dtsi | 1 +
+>>>>    1 file changed, 1 insertion(+)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/tegra124.dtsi
+>>>> b/arch/arm/boot/dts/tegra124.dtsi
+>>>> index 13cc7ca..5d1d35f 100644
+>>>> --- a/arch/arm/boot/dts/tegra124.dtsi
+>>>> +++ b/arch/arm/boot/dts/tegra124.dtsi
+>>>> @@ -254,6 +254,7 @@
+>>>>                  gpio-controller;
+>>>>                  #interrupt-cells = <2>;
+>>>>                  interrupt-controller;
+>>>> +               gpio-ranges = <&pinmux 0 0 250>;
+>>>
+>>>
+>>>
+>>> We should be consistent between SoCs. Why not make the same change for
+>>> all
+>>> Tegra SoCs?
+>>>
+>>> I think this change will cause the GPIO subsystem to call into the
+>>> pinctrl
+>>> subsystem and create/add/register a new GPIO<->pinctrl range structure.
+>>> The
+>>> pinctrl driver already does this, so I think we'll end up with two
+>>> duplicate
+>>> entries in the pinctrl device's gpio_ranges list. This probably won't
+>>> cause
+>>> a problem, but I wanted to make sure you'd thought about it to make sure.
+>>
+>>
+>> Actually, I have checked and see that gpio-tegra.c registers 256
+>> gpios, but pinctrl-tegra124.c adds a range of only 251. I don't really
+>> remember where I got the 250 value from, sorry :(
+>>
+>> I don't see how that would cause any concrete problems, but maybe we
+>> should have a single authoritative source (not sure we can do so
+>> without breaking DT ABI though).
+>>
+>>> Right now, I think we get lucky and pinctrl ends up probing first (or at
+>>> least very early) anyway. Somewhat related to this series, I wonder if we
+>>> shouldn't add pinctrl client properties to every node in the Tegra DT
+>>> that
+>>> describes a controller that makes use of external pins that are affected
+>>> by
+>>> the pinmux. Such a change would guarantee this desired probing order. In
+>>> order to preserve the "program the entire pinmux at once" semantics,
+>>> these
+>>> new pinctrl client properties would all need to reference empty states,
+>>> yet
+>>> would still need to exist to represent the dependency.
+>>
+>>
+>> I think so, but aren't almost all those pins used as gpios? If so,
+>> then such a controller's driver will request the gpio it wants which
+>> will cause the gpio driver to be registered (and hopefully probed) if
+>> needed, which in turn will check that the corresponding pinctrl device
+>> has been registered. Or am I missing something?
+>
+>
+> As you say this probably works out fine for pins that are used as GPIOs. I
+> was thinking more about SFIOs. Take an I2C controller, which doesn't use any
+> GPIOs itself. The pinctrl device should be probed before the I2C device, so
+> that the I2C driver can initiate transactions on the I2C bus during its
+> probe if it wanted to (or at least, clients could initiate transactions at
+> any completely arbitrary time as soon as probe was complete).
 
-Thanks for the review.
+What is using the SFIO in this case, the I2C master or the I2C client?
 
-> Also just noticed that the second argument to __clk_set_parent_after is
-> never used :-(
-> 
+In any case, is the problem you are referring to that ICs may rely on
+a specific pinmux configuration but that's not currently reflected on
+the DT because pinmux configuration happened so early that things just
+worked?
 
-Yes, before this patch series, it's never used. :)
+Thanks,
 
-Regards
-Dong Aisheng
-
-> Regards,
-> Mike
-> 
-> > ---
-> >  drivers/clk/clk.c | 8 +-------
-> >  1 file changed, 1 insertion(+), 7 deletions(-)
-> > 
-> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > index 659f2b0..0e813ea 100644
-> > --- a/drivers/clk/clk.c
-> > +++ b/drivers/clk/clk.c
-> > @@ -1159,14 +1159,8 @@ static int __clk_set_parent(struct clk_core *core, struct clk_core *parent,
-> >                 flags = clk_enable_lock();
-> >                 clk_reparent(core, old_parent);
-> >                 clk_enable_unlock(flags);
-> > +               __clk_set_parent_after(core, old_parent, parent);
-> >  
-> > -               if (core->prepare_count) {
-> > -                       flags = clk_enable_lock();
-> > -                       clk_core_disable(core);
-> > -                       clk_core_disable(parent);
-> > -                       clk_enable_unlock(flags);
-> > -                       clk_core_unprepare(parent);
-> > -               }
-> >                 return ret;
-> >         }
-> >  
-> > -- 
-> > 1.9.1
-> > 
+Tomeu
