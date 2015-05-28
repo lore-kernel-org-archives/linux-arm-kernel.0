@@ -1,44 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 May 2015 14:34:29 +0100
-Subject: Device Tree Blob (DTB) licence
-In-Reply-To: <55670AD4.8020705@melag.de>
-References: <1430820315.19516.26.camel@opteya.com>
- <CAL_Jsq+T5c7qornpRVCduEjUSCeM+0xqbtVYovtH76y=4BqhLQ@mail.gmail.com>
- <1432289148.5304.58.camel@opteya.com>
- <1432322832.5304.63.camel@opteya.com>
- <CAOS_Y6Q37ps+VEnzUZ_uwX++qrRm9Hgx45Q_pmiZSLSNjmKwZg@mail.gmail.com>
- <55670AD4.8020705@melag.de>
-Message-ID: <20150528133429.GD2067@n2100.arm.linux.org.uk>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Thu, 28 May 2015 19:02:45 +0530
+Subject: [PATCH 0/3] i2c: core/pxa: Add support for hardware lock
+Message-ID: <1432819968-17515-1-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 28, 2015 at 02:32:20PM +0200, Enrico Weigelt, metux IT consult wrote:
-> Am 25.05.2015 um 09:14 schrieb Rob Landley:
-> 
-> >Personally, I'm sad we're starting to get ACPI for arm but if device
-> >tree data files are only available under GPL, people will hold their
-> >nose and deploy ACPI.
-> 
-> What's the big deal with having DTS/DTB under GPL ?
+To justify the need for hardware lock, lets take a real usecase scenario -
+    
+In case of Marvell SoC, PXA910 silicon, both AP and CP are present and
+these two ARM cores are sharing one pair of I2C pins.
+    
+In order to keep I2C transaction operated with atomic, hardware lock
+(RIPC) is required.
+    
+This patch extends support for atomic operation by adding hardware lock support
+to the i2c-core.
 
-It's really quite simple.  Other open source projects won't touch
-_our_ DTB with a barge pole through fear of GPL contamination.
+PATCH[1/3] : Core changes for hardware lock
+PATCH[2/3 & 3/3] : hardware lock support to i2c-pxa bus driver.
 
-So what we'll end up with is other projects creating their own DTB
-descriptions for the same hardware, with different properties (which
-they'll do in an effort to ensure that it isn't a "derived work" of
-the GPL version) and the whole thing turning into a right mess - and
-a poor experience for users because they then end up with OS specific
-DT files.
+Link to previous post:
+http://lkml.iu.edu/hypermail/linux/kernel/1104.3/02352.html
+http://lkml.iu.edu/hypermail/linux/kernel/1104.3/02353.html
+http://lkml.iu.edu/hypermail/linux/kernel/1104.3/02354.html
 
-Alternatively, as Rob points out, people will just go the ACPI route
-to avoid the GPL contamination problem.
+TODO:
+  - DT node addition
+    I am using PXA1928 based platform which is still not available
+    in Mainline, once the base dts file gets merged, will submit patch
+    for I2C support. Hopefully by that time I should have PMIC client driver
+    support available.
+    Link to Rob's patches:
+     https://lkml.org/lkml/2015/5/1/14
+     https://lkml.org/lkml/2015/5/19/1206
+     
+ 
 
-It doesn't matter what the legal issues actually are: if people think
-that there is the possibility of GPL contamination - even across to
-other differently licensed open source software, they won't touch the
-GPL'd code/data and they'll come up with an alternative solution.
+Vaibhav Hiremath (3):
+  i2c: core: append hardware lock with bus lock
+  i2c: pxa: Add support for hardware lock
+  i2c: pxa: Add pin ctrl support for CP core access
+
+ drivers/i2c/busses/i2c-pxa.c | 92 ++++++++++++++++++++++++++++++++++++++++++++
+ drivers/i2c/i2c-core.c       | 22 +++++++++--
+ include/linux/i2c.h          |  5 +++
+ include/linux/i2c/pxa-i2c.h  |  4 ++
+ 4 files changed, 119 insertions(+), 4 deletions(-)
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
