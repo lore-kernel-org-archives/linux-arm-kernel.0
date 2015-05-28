@@ -1,45 +1,49 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 28 May 2015 15:16:29 +0200
-Subject: [PATCH] clk: at91: fix h32mx prototype inclusion in pmc header
-In-Reply-To: <1432818441-17278-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1432818441-17278-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20150528151629.5606bda3@bbrezillon>
+From: lznuaa@gmail.com (Zhi Li)
+Date: Thu, 28 May 2015 08:18:24 -0500
+Subject: [PATCH v5 0/6] Change snvs rtc and poweroff to use syscon add
+ pwrkey driver
+In-Reply-To: <20150528121353.GP2185@piout.net>
+References: <1432657562-5592-1-git-send-email-Frank.Li@freescale.com>
+ <20150527121052.GH16165@dragon> <20150528121353.GP2185@piout.net>
+Message-ID: <CAHrpEqShyPKeKYdVZ05_qsbx0cC387a2QPCdbhR5C968n=ED0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 28 May 2015 15:07:21 +0200
-Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+On Thu, May 28, 2015 at 7:13 AM, Alexandre Belloni
+<alexandre.belloni@free-electrons.com> wrote:
+> On 27/05/2015 at 20:10:53 +0800, Shawn Guo wrote :
+>> On Wed, May 27, 2015 at 12:25:56AM +0800, Frank.Li at freescale.com wrote:
+>> > Frank Li (5):
+>> >   rtc: arm: imx: snvs: change use syscon to access register
+>> >   Document: dt: fsl: snvs: change support syscon
+>> >   ARM: dts: imx: update snvs to use syscon access register
+>> >   Document: devicetree: input: imx: i.mx snvs power device tree bindings
+>> >   ARM: dts: imx6sx: enable snvs power key
+>> >
+>> > Robin Gong (1):
+>> >   input: keyboard: imx: add snvs power key driver
+>>
+>> The series looks fine to me now.  But I can only apply those two dts
+>> patches after the driver and binding parts get landed on mainline.
+>> Hopefully, you can get them in during the coming merge window through
+>> subsystem trees, so that I can pick up dts part after v4.2-rc1 comes
+>> out.
+>>
+>
+> Actually, I was thinking you could take the whole series in your tree
+> (at least, I'm speaking for the RTC part).
+> Else, I'm wondering who should take the documentation changes.
+>
 
-> Trivial fix that prevents to compile this pmc clock driver if h32mx clock is
-> present but smd clock isn't.
-> 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Dmitry Torokhov:
 
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+what's your opinion about input part?
 
-> Fixes: bcc5fd49a0fd ("clk: at91: add a driver for the h32mx clock")
-> Cc: <stable@vger.kernel.org> # 3.18+
-> ---
->  drivers/clk/at91/pmc.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
-> index 69abb08cf146..eb8e5dc9076d 100644
-> --- a/drivers/clk/at91/pmc.h
-> +++ b/drivers/clk/at91/pmc.h
-> @@ -121,7 +121,7 @@ extern void __init of_at91sam9x5_clk_smd_setup(struct device_node *np,
->  					       struct at91_pmc *pmc);
->  #endif
->  
-> -#if defined(CONFIG_HAVE_AT91_SMD)
-> +#if defined(CONFIG_HAVE_AT91_H32MX)
->  extern void __init of_sama5d4_clk_h32mx_setup(struct device_node *np,
->  					      struct at91_pmc *pmc);
->  #endif
+best regards
+Frank Li
 
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+>
+> --
+> Alexandre Belloni, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
