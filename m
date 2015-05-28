@@ -1,20 +1,27 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Thu, 28 May 2015 09:49:42 -0700
-Subject: ARM64 kexec/kdump timeline
-In-Reply-To: <55668A11.1010304@linaro.org>
-References: <555E37FC.9020800@codeaurora.org>
- <1432239334.1922.7.camel@infradead.org> <55653538.8020206@codeaurora.org>
- <CAKv+Gu8U1SWPb-GJ-3u9t_EX3g18AvOWisK3FycvRWsEdyjpzQ@mail.gmail.com>
- <55668A11.1010304@linaro.org>
-Message-ID: <1432831782.1922.25.camel@infradead.org>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 28 May 2015 09:50:33 -0700
+Subject: [PATCH v8 4/7] clk: hisilicon: Remove __init for marking function
+ prototypes
+In-Reply-To: <1432440671-25235-1-git-send-email-bintian.wang@huawei.com>
+ (Bintian Wang's message of "Sun, 24 May 2015 12:11:09 +0800")
+References: <1432440671-25235-1-git-send-email-bintian.wang@huawei.com>
+Message-ID: <7hr3q0k5nq.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-05-28 at 11:22 +0800, Hanjun Guo wrote:
-> Timur, can you provide more detailed information then we can debug
-> into it?
+Bintian Wang <bintian.wang@huawei.com> writes:
 
-Please post the output of kexec with the --debug option set, and also
-the output of the kernel, maybe with 'loglevel=9'.
+> __init markings on function prototypes are useless, so remove
+> them.
+>
+> Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: Bintian Wang <bintian.wang@huawei.com>
 
--Geoff
+Can you repost the whole series please?  
+
+The number of patches has increased and it's not terribly obvious how to
+combine your v7 or v8 patches with the v8 patches for proper testing.
+
+Thanks,
+
+Kevin
