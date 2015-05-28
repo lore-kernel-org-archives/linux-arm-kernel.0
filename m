@@ -1,43 +1,133 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 28 May 2015 10:40:50 +0100
-Subject: [PATCH 0/3] arm64: alternative patching rework
-Message-ID: <1432806053-987-1-git-send-email-marc.zyngier@arm.com>
+Date: Thu, 28 May 2015 10:40:52 +0100
+Subject: [PATCH 2/3] arm64: alternative: Allow immediate branch as alternative
+ instruction
+In-Reply-To: <1432806053-987-1-git-send-email-marc.zyngier@arm.com>
+References: <1432806053-987-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1432806053-987-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current alternative instruction framework is not kind to branches,
-potentially leading to all kind of hacks in the code that uses
-alternatives. This series expands it to deal with immediate and
-conditional branches.
+Since all branches are PC-relative on AArch64, these instructions
+cannot be used as an alternative with the simplistic approach
+we currently have (the immediate has been computed from
+the .altinstr_replacement section, and end-up being completely off
+if the target is outside of the replacement sequence).
 
-This is a rewrite of fef7f2b20103, which got reverted in b9a95e85bbc
-as it was breaking unsuspecting branches inside an alternate
-sequence. It now also deals with conditional branches (instead of just
-asserting a BUG).
+This patch handles the branch instructions in a different way,
+using the insn framework to recompute the immediate, and generate
+the right displacement in the above case.
 
-Another nit is addressed by the last patch, where GAS gets confused by
-the combinaison of a .inst directive (as used by the msr_s/mrs_s
-pseudo-instruction), a label, and a .if directive evaluating said
-label. As this is exactly what the alternative framework uses to
-detect length mismatch, this patch reverts to using a pair .org
-directives in a creative way.
+Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kernel/alternative.c | 71 ++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 66 insertions(+), 5 deletions(-)
 
-This has been tested on v4.1-rc5.
-
-Marc Zyngier (3):
-  arm64: insn: Add aarch64_{get,set}_branch_offset
-  arm64: alternative: Allow immediate branch as alternative instruction
-  arm64: alternative: Work around .inst assembler bugs
-
- arch/arm64/include/asm/alternative-asm.h | 29 -------------
- arch/arm64/include/asm/alternative.h     | 52 +++++++++++++++++++++--
- arch/arm64/include/asm/insn.h            |  3 ++
- arch/arm64/kernel/alternative.c          | 71 +++++++++++++++++++++++++++++---
- arch/arm64/kernel/entry.S                |  2 +-
- arch/arm64/kernel/insn.c                 | 60 +++++++++++++++++++++++++++
- arch/arm64/mm/cache.S                    |  2 +-
- 7 files changed, 179 insertions(+), 40 deletions(-)
- delete mode 100644 arch/arm64/include/asm/alternative-asm.h
-
+diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
+index 28f8365..df4bf15 100644
+--- a/arch/arm64/kernel/alternative.c
++++ b/arch/arm64/kernel/alternative.c
+@@ -24,8 +24,13 @@
+ #include <asm/cacheflush.h>
+ #include <asm/alternative.h>
+ #include <asm/cpufeature.h>
++#include <asm/insn.h>
+ #include <linux/stop_machine.h>
+ 
++#define __ALT_PTR(a,f)		(u32 *)((void *)&(a)->f + (a)->f)
++#define ALT_ORIG_PTR(a)		__ALT_PTR(a, orig_offset)
++#define ALT_REPL_PTR(a)		__ALT_PTR(a, alt_offset)
++
+ extern struct alt_instr __alt_instructions[], __alt_instructions_end[];
+ 
+ struct alt_region {
+@@ -33,13 +38,63 @@ struct alt_region {
+ 	struct alt_instr *end;
+ };
+ 
++/*
++ * Check if the target PC is within an alternative block.
++ */
++static bool branch_insn_requires_update(struct alt_instr *alt, unsigned long pc)
++{
++	unsigned long replptr;
++
++	if (kernel_text_address(pc))
++		return 1;
++
++	replptr = (unsigned long)ALT_REPL_PTR(alt);
++	if (pc >= replptr && pc < (replptr + alt->alt_len))
++		return 0;
++
++	/*
++	 * Branching into *another* alternate sequence is doomed, and
++	 * we're not even trying to fix it up.
++	 */
++	BUG();
++}
++
++static u32 get_alt_insn(struct alt_instr *alt, u32 *insnptr, u32 *altinsnptr)
++{
++	u32 insn;
++
++	insn = le32_to_cpu(*altinsnptr);
++
++	if (aarch64_insn_is_branch_imm(insn)) {
++		s32 offset = aarch64_get_branch_offset(insn);
++		unsigned long target;
++
++		target = (unsigned long)altinsnptr + offset;
++
++		/*
++		 * If we're branching inside the alternate sequence,
++		 * do not rewrite the instruction, as it is already
++		 * correct. Otherwise, generate the new instruction.
++		 */
++		if (branch_insn_requires_update(alt, target)) {
++			offset = target - (unsigned long)insnptr;
++			insn = aarch64_set_branch_offset(insn, offset);
++		}
++	}
++
++	return insn;
++}
++
+ static int __apply_alternatives(void *alt_region)
+ {
+ 	struct alt_instr *alt;
+ 	struct alt_region *region = alt_region;
+-	u8 *origptr, *replptr;
++	u32 *origptr, *replptr;
+ 
+ 	for (alt = region->begin; alt < region->end; alt++) {
++		u32 insn;
++		int i, nr_inst;
++
+ 		if (!cpus_have_cap(alt->cpufeature))
+ 			continue;
+ 
+@@ -47,11 +102,17 @@ static int __apply_alternatives(void *alt_region)
+ 
+ 		pr_info_once("patching kernel code\n");
+ 
+-		origptr = (u8 *)&alt->orig_offset + alt->orig_offset;
+-		replptr = (u8 *)&alt->alt_offset + alt->alt_offset;
+-		memcpy(origptr, replptr, alt->alt_len);
++		origptr = ALT_ORIG_PTR(alt);
++		replptr = ALT_REPL_PTR(alt);
++		nr_inst = alt->alt_len / sizeof(insn);
++
++		for (i = 0; i < nr_inst; i++) {
++			insn = get_alt_insn(alt, origptr + i, replptr + i);
++			*(origptr + i) = cpu_to_le32(insn);
++		}
++
+ 		flush_icache_range((uintptr_t)origptr,
+-				   (uintptr_t)(origptr + alt->alt_len));
++				   (uintptr_t)(origptr + nr_inst));
+ 	}
+ 
+ 	return 0;
 -- 
 2.1.4
