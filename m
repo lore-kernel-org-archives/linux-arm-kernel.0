@@ -1,68 +1,101 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 28 May 2015 20:53:39 +0200
-Subject: [PATCH v2 14/14] ARM: shmobile: R-Mobile: Use CPG Clock Domain
- attach/detach helpers
+Date: Thu, 28 May 2015 20:53:29 +0200
+Subject: [PATCH v2 04/14] clk: shmobile: rcar-gen2: Add CPG Clock Domain
+ support
 In-Reply-To: <1432839219-475-1-git-send-email-geert+renesas@glider.be>
 References: <1432839219-475-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1432839219-475-15-git-send-email-geert+renesas@glider.be>
+Message-ID: <1432839219-475-5-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The R-Mobile PM Domain driver manages both power domains and a clock
-domain.
+Add Clock Domain support to the R-Car Gen2 Clock Pulse Generator (CPG)
+driver using the generic PM Domain.  This allows to power-manage the
+module clocks of SoC devices that are part of the CPG Clock Domain using
+Runtime PM, or for system suspend/resume.
 
-The clock domain part is very similar to the CPG Clock Domain, which is
-used on shmobile SoCs without device power domains, except for the way
-how clocks suitable for power management are selected:
-  - The former uses the first clock tied to the device through the NULL
-    con_id, which is a relic from the legacy pm_clk_notifier-based
-    method in drivers/sh/pm_runtime.c,
-  - The latter looks for suitable clocks in DT, which is more
-    future-proof.
-
-Hence switch to using the CPG Clock Domain helpers for DT-based
-multi-platform builds.
-
-The old method, using a NULL con_id, is still used for legacy builds.
+SoC devices that are part of the CPG Clock Domain and can be
+power-managed through an MSTP clock should be tagged in DT with a proper
+"power-domains" property.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
 v2:
-  - New.
+  - Add Acked-by and Reviewed-by,
+  - Move core CPG Clock Domain code from the R-Car Gen2 driver to the
+    CPG MSTP Clocks driver, as it's generic, and can be used on other
+    Renesas SoCs that have a CPG/MSTP block,
+  - Scan for an MSTP clock instead of using the first clock tied to the
+    device (con_id NULL),
+  - Extract R-Car Gen2 specifics from "[PATCH/RFC 1/5] clk: shmobile:
+    rcar-gen2: Add CPG Clock Domain support" into this patch.
 ---
- arch/arm/mach-shmobile/pm-rmobile.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ .../clock/renesas,rcar-gen2-cpg-clocks.txt         | 26 ++++++++++++++++++++--
+ drivers/clk/shmobile/clk-rcar-gen2.c               |  2 ++
+ 2 files changed, 26 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
-index 747d557b7016ec6d..cac564c5348cd851 100644
---- a/arch/arm/mach-shmobile/pm-rmobile.c
-+++ b/arch/arm/mach-shmobile/pm-rmobile.c
-@@ -12,6 +12,7 @@
-  * License.  See the file "COPYING" in the main directory of this archive
-  * for more details.
-  */
-+#include <linux/clk/shmobile.h>
- #include <linux/console.h>
- #include <linux/delay.h>
- #include <linux/of.h>
-@@ -118,6 +119,7 @@ static bool rmobile_pd_active_wakeup(struct device *dev)
- 	return true;
- }
+diff --git a/Documentation/devicetree/bindings/clock/renesas,rcar-gen2-cpg-clocks.txt b/Documentation/devicetree/bindings/clock/renesas,rcar-gen2-cpg-clocks.txt
+index b02944fba9de4f86..aa2b94511f4d9e05 100644
+--- a/Documentation/devicetree/bindings/clock/renesas,rcar-gen2-cpg-clocks.txt
++++ b/Documentation/devicetree/bindings/clock/renesas,rcar-gen2-cpg-clocks.txt
+@@ -2,6 +2,8 @@
  
-+#ifdef CONFIG_ARCH_SHMOBILE_LEGACY
- static int rmobile_pd_attach_dev(struct generic_pm_domain *domain,
- 				 struct device *dev)
- {
-@@ -147,6 +149,10 @@ static void rmobile_pd_detach_dev(struct generic_pm_domain *domain,
- {
- 	pm_clk_destroy(dev);
- }
-+#else /* CONFIG_ARCH_SHMOBILE_LEGACY */
-+#define rmobile_pd_attach_dev	cpg_mstp_attach_dev
-+#define rmobile_pd_detach_dev	cpg_mstp_detach_dev
-+#endif /* CONFIG_ARCH_SHMOBILE_LEGACY */
+ The CPG generates core clocks for the R-Car Gen2 SoCs. It includes three PLLs
+ and several fixed ratio dividers.
++The CPG also provides a Clock Domain for SoC devices, in combination with the
++CPG Module Stop (MSTP) Clocks.
  
- static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
- {
+ Required Properties:
+ 
+@@ -20,10 +22,18 @@ Required Properties:
+   - clock-output-names: The names of the clocks. Supported clocks are "main",
+     "pll0", "pll1", "pll3", "lb", "qspi", "sdh", "sd0", "sd1", "z", "rcan", and
+     "adsp"
++  - #power-domain-cells: Must be 0
+ 
++SoC devices that are part of the CPG Clock Domain and can be power-managed
++through an MSTP clock should refer to the CPG device node in their
++"power-domains" property, as documented by the generic PM domain bindings in
++Documentation/devicetree/bindings/power/power_domain.txt.
+ 
+-Example
+--------
++
++Examples
++--------
++
++  - CPG device node:
+ 
+ 	cpg_clocks: cpg_clocks at e6150000 {
+ 		compatible = "renesas,r8a7790-cpg-clocks",
+@@ -34,4 +44,16 @@ Example
+ 		clock-output-names = "main", "pll0, "pll1", "pll3",
+ 				     "lb", "qspi", "sdh", "sd0", "sd1", "z",
+ 				     "rcan", "adsp";
++		#power-domain-cells = <0>;
++	};
++
++
++  - CPG Clock Domain member device node:
++
++	thermal at e61f0000 {
++		compatible = "renesas,thermal-r8a7790", "renesas,rcar-thermal";
++		reg = <0 0xe61f0000 0 0x14>, <0 0xe61f0100 0 0x38>;
++		interrupts = <0 69 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp5_clks R8A7790_CLK_THERMAL>;
++		power-domains = <&cpg_clocks>;
+ 	};
+diff --git a/drivers/clk/shmobile/clk-rcar-gen2.c b/drivers/clk/shmobile/clk-rcar-gen2.c
+index c7fde69d455e38c4..9612e3145b7ea370 100644
+--- a/drivers/clk/shmobile/clk-rcar-gen2.c
++++ b/drivers/clk/shmobile/clk-rcar-gen2.c
+@@ -417,6 +417,8 @@ static void __init rcar_gen2_cpg_clocks_init(struct device_node *np)
+ 	}
+ 
+ 	of_clk_add_provider(np, of_clk_src_onecell_get, &cpg->data);
++
++	cpg_mstp_add_clk_domain(np);
+ }
+ CLK_OF_DECLARE(rcar_gen2_cpg_clks, "renesas,rcar-gen2-cpg-clocks",
+ 	       rcar_gen2_cpg_clocks_init);
 -- 
 1.9.1
