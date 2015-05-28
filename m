@@ -1,21 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 May 2015 12:15:51 +0200
-Subject: [PATCHv2] bus: mvebu-mbus: add mv_mbus_dram_info_nooverlap()
-In-Reply-To: <5566EA8E.1020905@free-electrons.com>
-References: <1432806054-17128-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <5566EA8E.1020905@free-electrons.com>
-Message-ID: <2253455.mai05VvJcX@wuerfel>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 28 May 2015 11:16:48 +0100
+Subject: [PATCH] arm: tcm: Don't crash when TCM banks are protected by
+ TrustZone
+In-Reply-To: <1432805760-4590-1-git-send-email-michael@smart-africa.com>
+References: <1432805760-4590-1-git-send-email-michael@smart-africa.com>
+Message-ID: <20150528101641.GA3657@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 28 May 2015 12:14:38 Gregory CLEMENT wrote:
-> this patch depend on the previous one to apply. However the previous one
-> is in the branch mvebu/fixes and this one will be in mvebu/drivers. How
-> I should handle it?
+On Thu, May 28, 2015 at 11:36:00AM +0200, Michael van der Westhuizen wrote:
+> Fixes the TCM initialisation code to handle TCM banks that are
+> present but inaccessible due to TrustZone configuration.  This is
+> the default case when enabling the non-secure world.  It may also
+> be the case that that the user decided to use TCM for TrustZone.
 > 
-> Currently I applied the previous patch on the mvebu/drivers.
+> This change has exposed a bug in handling of TCM where no TCM bank
+> was usable (the 0 size TCM case).  This change addresses the
+> resulting hang.
 
-Please merge the mvebu/fixes branch into mvebu/drivers and apply it on
-top of the merge.
+The TCM registers in CP15 are not part of the architecture -- behaviour
+is IMP DEF in v7.
 
-	Arnd
+This is a problem for multiplatform kernels in particular.  In a v6/v7
+multiplatform kernel with a TCM-enabled platform built in, it is
+unsafe to probe for TCM by accessing these registers if we are running
+on v7.  No Undef exception is guaranteed -- anything might happen.
+
+We could add a DT binding for TCM, but it should only describe whether
+the CP15 TCM registers are accessible (node present in DT) or not (node
+present, but disabled).
+
+For backwards compatiblity with old DTs we could maybe fall back to
+unconditional probing for single-platform kernels only, when no tcm
+node is present in the DT.
+
+Cheers
+---Dave
+
+[...]
