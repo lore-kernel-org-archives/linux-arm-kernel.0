@@ -1,116 +1,60 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 28 May 2015 20:53:30 +0200
-Subject: [PATCH v2 05/14] clk: shmobile: rz: Add CPG Clock Domain support
-In-Reply-To: <1432839219-475-1-git-send-email-geert+renesas@glider.be>
-References: <1432839219-475-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1432839219-475-6-git-send-email-geert+renesas@glider.be>
+From: Frank.Li@freescale.com (Frank.Li at freescale.com)
+Date: Fri, 29 May 2015 03:40:57 +0800
+Subject: [PATCH 1/1] ARM: dts: imx7d: add watch dog support
+Message-ID: <1432842057-21102-1-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Clock Domain support to the RZ Clock Pulse Generator (CPG) driver
-using the generic PM Domain.  This allows to power-manage the module
-clocks of SoC devices that are part of the CPG Clock Domain using
-Runtime PM, or for system suspend/resume.
+From: Frank Li <Frank.Li@freescale.com>
 
-SoC devices that are part of the CPG Clock Domain and can be
-power-managed through an MSTP clock should be tagged in DT with a proper
-"power-domains" property.
+Enable watchdog support
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
 ---
-v2:
-  - New.
----
- .../bindings/clock/renesas,rz-cpg-clocks.txt       | 29 ++++++++++++++++++++--
- arch/arm/mach-shmobile/Kconfig                     |  1 +
- drivers/clk/shmobile/clk-rz.c                      |  3 +++
- 3 files changed, 31 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/imx7d.dtsi | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/clock/renesas,rz-cpg-clocks.txt b/Documentation/devicetree/bindings/clock/renesas,rz-cpg-clocks.txt
-index 98a257492522cd45..c5666288e409ebd2 100644
---- a/Documentation/devicetree/bindings/clock/renesas,rz-cpg-clocks.txt
-+++ b/Documentation/devicetree/bindings/clock/renesas,rz-cpg-clocks.txt
-@@ -2,6 +2,8 @@
+diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+index c42cf8d..b4cd8fd 100644
+--- a/arch/arm/boot/dts/imx7d.dtsi
++++ b/arch/arm/boot/dts/imx7d.dtsi
+@@ -212,6 +212,37 @@
+ 				#interrupt-cells = <2>;
+ 			};
  
- The CPG generates core clocks for the RZ SoCs. It includes the PLL, variable
- CPU and GPU clocks, and several fixed ratio dividers.
-+The CPG also provides a Clock Domain for SoC devices, in combination with the
-+CPG Module Stop (MSTP) Clocks.
- 
- Required Properties:
- 
-@@ -14,10 +16,18 @@ Required Properties:
-   - #clock-cells: Must be 1
-   - clock-output-names: The names of the clocks. Supported clocks are "pll",
-     "i", and "g"
-+  - #power-domain-cells: Must be 0
- 
-+SoC devices that are part of the CPG Clock Domain and can be power-managed
-+through an MSTP clock should refer to the CPG device node in their
-+"power-domains" property, as documented by the generic PM domain bindings in
-+Documentation/devicetree/bindings/power/power_domain.txt.
- 
--Example
---------
++			wdog1: wdog at 30280000 {
++				compatible = "fsl,imx7d-wdt", "fsl,imx21-wdt";
++				reg = <0x30280000 0x10000>;
++				interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX7D_WDOG1_ROOT_CLK>;
++			};
 +
-+Examples
-+--------
++			wdog2: wdog at 30290000 {
++				compatible = "fsl,imx7d-wdt", "fsl,imx21-wdt";
++				reg = <0x30290000 0x10000>;
++				interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX7D_WDOG2_ROOT_CLK>;
++				status = "disabled";
++			};
 +
-+  - CPG device node:
- 
- 	cpg_clocks: cpg_clocks at fcfe0000 {
- 		#clock-cells = <1>;
-@@ -26,4 +36,19 @@ Example
- 		reg = <0xfcfe0000 0x18>;
- 		clocks = <&extal_clk>, <&usb_x1_clk>;
- 		clock-output-names = "pll", "i", "g";
-+		#power-domain-cells = <0>;
-+	};
++			wdog3: wdog at 302a0000 {
++				compatible = "fsl,imx7d-wdt", "fsl,imx21-wdt";
++				reg = <0x302a0000 0x10000>;
++				interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX7D_WDOG3_ROOT_CLK>;
++				status = "disabled";
++			};
 +
++			wdog4: wdog at 302b0000 {
++				compatible = "fsl,imx7d-wdt", "fsl,imx21-wdt";
++				reg = <0x302b0000 0x10000>;
++				interrupts = <GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX7D_WDOG4_ROOT_CLK>;
++				status = "disabled";
++			};
 +
-+  - CPG Clock Domain member device node:
-+
-+	mtu2: timer at fcff0000 {
-+		compatible = "renesas,mtu2-r7s72100", "renesas,mtu2";
-+		reg = <0xfcff0000 0x400>;
-+		interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "tgi0a";
-+		clocks = <&mstp3_clks R7S72100_CLK_MTU2>;
-+		clock-names = "fck";
-+		power-domains = <&cpg_clocks>;
-+		status = "disabled";
- 	};
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index e14fa5e87475a0d1..34eac88a98896b63 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -51,6 +51,7 @@ config ARCH_EMEV2
- 
- config ARCH_R7S72100
- 	bool "RZ/A1H (R7S72100)"
-+	select PM_GENERIC_DOMAINS if PM
- 	select SYS_SUPPORTS_SH_MTU2
- 
- config ARCH_R8A73A4
-diff --git a/drivers/clk/shmobile/clk-rz.c b/drivers/clk/shmobile/clk-rz.c
-index 7e68e86309625c9e..9766e3cb595fd257 100644
---- a/drivers/clk/shmobile/clk-rz.c
-+++ b/drivers/clk/shmobile/clk-rz.c
-@@ -10,6 +10,7 @@
-  */
- 
- #include <linux/clk-provider.h>
-+#include <linux/clk/shmobile.h>
- #include <linux/init.h>
- #include <linux/kernel.h>
- #include <linux/of.h>
-@@ -99,5 +100,7 @@ static void __init rz_cpg_clocks_init(struct device_node *np)
- 	}
- 
- 	of_clk_add_provider(np, of_clk_src_onecell_get, &cpg->data);
-+
-+	cpg_mstp_add_clk_domain(np);
- }
- CLK_OF_DECLARE(rz_cpg_clks, "renesas,rz-cpg-clocks", rz_cpg_clocks_init);
+ 			gpt1: gpt at 302d0000 {
+ 				compatible = "fsl,imx7d-gpt", "fsl,imx6sx-gpt";
+ 				reg = <0x302d0000 0x10000>;
 -- 
 1.9.1
