@@ -1,115 +1,67 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 27 May 2015 23:33:34 -0500
-Subject: [PATCH 00/21] On-demand device registration
-In-Reply-To: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <CAL_Jsq+EWLEJhRudTGAwYsOg4tX2-pGhygeQGHae9RL8rBpMiA@mail.gmail.com>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Thu, 28 May 2015 06:56:28 +0200
+Subject: [alsa-devel] [PATCH 13/13] drm: bridge/dw_hdmi-ahb-audio: parse
+ ELD from HDMI driver
+In-Reply-To: <20150527173125.GS2067@n2100.arm.linux.org.uk>
+References: <20150509102501.GO2067@n2100.arm.linux.org.uk>
+ <E1Yr1yD-0006lK-RC@rmk-PC.arm.linux.org.uk>
+ <20150527104308.GA8341@phenom.ffwll.local>
+ <20150527173125.GS2067@n2100.arm.linux.org.uk>
+Message-ID: <s5hh9qxcnb7.wl-tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 25, 2015 at 9:53 AM, Tomeu Vizoso
-<tomeu.vizoso@collabora.com> wrote:
-> Hello,
->
-> I have a problem with the panel on my Tegra Chromebook taking longer than
-> expected to be ready during boot (St?phane Marchesin reported what is
-> basically the same issue in [0]), and have looked into ordered probing as a
-> better way of solving this than moving nodes around in the DT or playing with
-> initcall levels.
->
-> While reading the thread [1] that Alexander Holler started with his series to
-> make probing order deterministic, it occurred to me that it should be possible
-> to achieve the same by registering devices as they are referenced by other
-> devices.
+At Wed, 27 May 2015 18:31:25 +0100,
+Russell King - ARM Linux wrote:
+> 
+> On Wed, May 27, 2015 at 12:43:08PM +0200, Daniel Vetter wrote:
+> > On Sat, May 09, 2015 at 11:26:57AM +0100, Russell King wrote:
+> > > Parse the ELD (EDID like data) stored from the HDMI driver to restrict
+> > > the sample rates and channels which are available to ALSA.  This causes
+> > > the ALSA device to reflect the capabilities of the overall audio path,
+> > > not just what is supported at the HDMI source interface level.
+> > > 
+> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > 
+> > I completely missed the new eld helpers in this series, so fairly late
+> > with a few questions here.
+> > 
+> > In x86/desktop gpus we pass around the eld in hw, and there's an interrupt
+> > on the snd side every time that materially changes. Same goes for other
+> > state changes like the display pipe getting lit up/disabled again.
+> > 
+> > How is hotplug handling done here? You update the eld in get_modes, but I
+> > don't see any notification from hdmi->audio (it only seems to get updated
+> > at open time, no idea whether that's enough). And it looks like there's a
+> > potential use-after-free when the drm side updates the eld and frees the
+> > old one, while the snd side tries to access this.
+> 
+> It doesn't handle hotplug at all, per se.
+> 
+> The problem with hotplug is that (afaik) ALSA has no way to notify
+> userspace that something has changed: if I were to add such a
+> notification from the DRM side of the driver to the audio side, I
+> wouldn't know what to do with it when the audio side received it.
 
-I like the concept and novel approach.
+The notification itself is present.  For HD-audio HDMI/DP, the driver
+creates jack kctl for each port for notifying the monitor/ELD change.
+The recent PA actually listens to it and handles accordingly.
 
-> This basically reuses the information that is already implicit in the probe()
-> implementations, saving us from refactoring existing drivers or adding
-> information to DTBs.
->
-> Something I'm not completely happy with is that I have had to move the call to
-> of_platform_populate after all platform drivers have been registered.
-> Otherwise I don't see how I could register drivers on demand as we don't have
-> yet each driver's compatible strings.
+But it doesn't mean that the PCM and other state changes are
+proactively dealt inside the driver.  Rather it gives the
+notification, keeps running and waits for the further action from
+user-space.
 
-Yeah, this is the opposite of what we'd really like. Ideally, we would
-have a solution that works for modules too. However, we're no worse
-off. We pretty much build-in dependencies to avoid module ordering
-problems.
+> In any case, I tend to think of unplugging the display as being much
+> like unplugging the 3.5mm line out jack to your hifi system - just
+> because you've disconnected the speakers does not stop the audio
+> playing - the audio continues despite you not being able to hear it.
 
-Perhaps we need to make the probing on-demand rather than simply on
-device<->driver match occurring.
+Ditto for HD-audio.  The interface is still present, even playable,
+without the connection.  Maybe we should return an error explicitly
+when played during unconnected?  The handling of HDMI/DP hotplug has
+been discussed many times, and I vaguely remember of pros/cons with
+the above shown in past threads.
 
-> For machs that don't move of_platform_populate() to a later point, these
-> patches shouldn't cause any problems but it's not guaranteed that we'll avoid
-> all the deferred probes as some drivers may not be registered yet.
 
-Ideally, of_platform_populate is not explicitly called by each
-platform. So I think we need to make this work for the default case.
-
-> I have tested this on boards with Tegra, iMX.6 and Exynos SoCs, and these
-> patches were enough to eliminate all the deferred probes.
->
-> With this series I get the kernel to output to the panel in 0.5s, instead of 2.8s.
-
-That's certainly compelling.
-
-Rob
-
->
-> Regards,
->
-> Tomeu
->
-> [0] http://lists.freedesktop.org/archives/dri-devel/2014-August/066527.html
->
-> [1] https://lkml.org/lkml/2014/5/12/452
->
-> Tomeu Vizoso (21):
->   regulator: core: Reduce critical area in _regulator_get
->   ARM: tegra: Add gpio-ranges property
->   ARM: tegra: Register drivers before devices
->   ARM: EXYNOS: Register drivers before devices
->   ARM i.MX6q: Register drivers before devices
->   of/platform: Add of_platform_device_ensure()
->   of/platform: Ensure device registration on lookup
->   gpio: Probe GPIO drivers on demand
->   gpio: Probe pinctrl devices on demand
->   regulator: core: Probe regulators on demand
->   drm: Probe panels on demand
->   drm/tegra: Probe dpaux devices on demand
->   i2c: core: Probe i2c master devices on demand
->   pwm: Probe PWM chip devices on demand
->   backlight: Probe backlight devices on demand
->   usb: phy: Probe phy devices on demand
->   clk: Probe clk providers on demand
->   pinctrl: Probe pinctrl devices on demand
->   phy: core: Probe phy providers on demand
->   dma: of: Probe DMA controllers on demand
->   power-supply: Probe power supplies on demand
->
->  arch/arm/boot/dts/tegra124.dtsi     |  1 +
->  arch/arm/mach-exynos/exynos.c       |  4 +--
->  arch/arm/mach-imx/mach-imx6q.c      | 12 ++++-----
->  arch/arm/mach-tegra/tegra.c         | 21 ++++++---------
->  drivers/clk/clk.c                   |  3 +++
->  drivers/dma/of-dma.c                |  3 +++
->  drivers/gpio/gpiolib-of.c           |  5 ++++
->  drivers/gpu/drm/drm_panel.c         |  3 +++
->  drivers/gpu/drm/tegra/dpaux.c       |  3 +++
->  drivers/i2c/i2c-core.c              |  3 +++
->  drivers/of/platform.c               | 53 +++++++++++++++++++++++++++++++++++++
->  drivers/phy/phy-core.c              |  3 +++
->  drivers/pinctrl/devicetree.c        |  2 ++
->  drivers/power/power_supply_core.c   |  3 +++
->  drivers/pwm/core.c                  |  3 +++
->  drivers/regulator/core.c            | 45 +++++++++++++++----------------
->  drivers/usb/phy/phy.c               |  3 +++
->  drivers/video/backlight/backlight.c |  3 +++
->  include/linux/of_platform.h         |  2 ++
->  19 files changed, 130 insertions(+), 45 deletions(-)
->
-> --
-> 2.4.1
->
+Takashi
