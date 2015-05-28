@@ -1,49 +1,55 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Thu, 28 May 2015 18:59:21 +0530
-Subject: [PATCH 08/12] i2c: pxa: enable/disable irq across message xfer
-In-Reply-To: <20150528131707.GB2067@n2100.arm.linux.org.uk>
-References: <1432818224-17070-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1432818224-17070-9-git-send-email-vaibhav.hiremath@linaro.org>
- <20150528131707.GB2067@n2100.arm.linux.org.uk>
-Message-ID: <55671831.7010903@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 28 May 2015 14:31:09 +0100
+Subject: [RFC/PATCH 8/9] iommu: of: Handle IOMMU lookup failure with
+ deferred probing or error
+In-Reply-To: <1431644410-2997-9-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1431644410-2997-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1431644410-2997-9-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20150528133109.GJ31001@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Laurent,
 
+On Fri, May 15, 2015 at 12:00:09AM +0100, Laurent Pinchart wrote:
+> Failures to look up an IOMMU when parsing the DT iommus property need to
+> be handled separately from the .of_xlate() failures to support deferred
+> probing.
+> 
+> The lack of a registered IOMMU can be caused by the lack of a driver for
+> the IOMMU, the IOMMU device probe not having been performed yet, having
+> been deferred, or having failed.
+> 
+> The first case occurs when the device tree describes the bus master and
+> IOMMU topology correctly but no device driver exists for the IOMMU yet
+> or the device driver has not been compiled in. Return NULL, the caller
+> will configure the device without an IOMMU.
+> 
+> The second and third cases are handled by deferring the probe of the bus
+> master device which will eventually get reprobed after the IOMMU.
+> 
+> The last case is currently handled by deferring the probe of the bus
+> master device as well. A mechanism to either configure the bus master
+> device without an IOMMU or to fail the bus master device probe depending
+> on whether the IOMMU is optional or mandatory would be a good
+> enhancement.
 
-On Thursday 28 May 2015 06:47 PM, Russell King - ARM Linux wrote:
-> On Thu, May 28, 2015 at 06:33:40PM +0530, Vaibhav Hiremath wrote:
->> In order to avoid "spurious irq" caused by CP polling mode,
->> enable irq at the entry of i2c_pxa_xfer() fn and disable it
->> again before exit.
->
-> NAK.
->
-> It's really not nice for drivers to disable a potentially shared interrupt.
-> If the interrupt is shared, you disable the interrupt for other users of
-> that interrupt as well.  See:
->
-> commit c66dc529194be374556d166ee7ddb84a7d1d302b
-> Author: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> Date:   Wed Feb 23 12:38:18 2011 +0100
->
->      i2c-pxa2xx: add support for shared IRQ handler
->
->      Sodaville has three of them on a single IRQ. IRQF_DISABLED is removed
->      because it is a NOP allready and scheduled for removal.
->
->      Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
->      Signed-off-by: Dirk Brandewie <dirk.brandewie@gmail.com>
->      Signed-off-by: Ben Dooks <ben-linux@fluff.org>
->
-> So you're breaking Sodaville.
->
+I appreciate that you're just looking to handle early initialisation
+failures here, but do you have any thoughts on how to deal with failures
+later on when e.g. the DMA-mapping API is trying to create IOMMU domains.
 
-Got it.
+One potential problem I foresee is if we try to add all devices to a common
+DMA domain, we may get -ENOSPC-style failures due to limited resources on
+the IOMMU. In this case, we'd probably want to fall-back to non-IOMMU DMA
+ops, but that in-turn could have consequences on things like dma-coherent.
 
-I will drop this patch from the series.
+It's all a bit murky, so I'd be glad to hear any thoughts you might have
+around this.
 
-Before submitting next version, will wait for review on other patches.
+Anyway, this patch looks fine:
 
-Thanks,
-Vaibhav
+  Acked-by: Will Deacon <will.deacon@arm.com>
+
+but we should consider how all of this will get used too.
+
+Will
