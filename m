@@ -1,131 +1,44 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 28 May 2015 10:40:51 +0100
-Subject: [PATCH 1/3] arm64: insn: Add aarch64_{get,set}_branch_offset
-In-Reply-To: <1432806053-987-1-git-send-email-marc.zyngier@arm.com>
-References: <1432806053-987-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1432806053-987-2-git-send-email-marc.zyngier@arm.com>
+From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
+Date: Thu, 28 May 2015 10:43:06 +0100
+Subject: [PATCH] KVM: arm64: fix misleading comments in save/restore
+Message-ID: <1432806186-27993-1-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to deal with branches located in alternate sequences,
-but pointing to the main kernel text, it is required to extract
-the relative displacement encoded in the instruction, and to be
-able to update said instruction with a new offset (once it is
-known).
+The elr_el2 and spsr_el2 registers in fact contain the processor state
+before entry into the hypervisor code. In the case of guest state it
+could be in either el0 or el1.
 
-For this, we introduce three new helpers:
-- aarch64_insn_is_branch_imm is a predicate indicating if the
-  instruction is an immediate branch
-- aarch64_get_branch_offset returns a signed value representing
-  the byte offset encoded in a branch instruction
-- aarch64_set_branch_offset takes an instruction and an offset,
-  and returns the corresponding updated instruction.
-
-Acked-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 ---
- arch/arm64/include/asm/insn.h |  3 +++
- arch/arm64/kernel/insn.c      | 60 +++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 63 insertions(+)
+ arch/arm64/kvm/hyp.S | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-index f81b328..30e50eb 100644
---- a/arch/arm64/include/asm/insn.h
-+++ b/arch/arm64/include/asm/insn.h
-@@ -281,6 +281,7 @@ __AARCH64_INSN_FUNCS(ret,	0xFFFFFC1F, 0xD65F0000)
- #undef	__AARCH64_INSN_FUNCS
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index d755922..1940a4c 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -50,8 +50,8 @@
+ 	stp	x29, lr, [x3, #80]
  
- bool aarch64_insn_is_nop(u32 insn);
-+bool aarch64_insn_is_branch_imm(u32 insn);
+ 	mrs	x19, sp_el0
+-	mrs	x20, elr_el2		// EL1 PC
+-	mrs	x21, spsr_el2		// EL1 pstate
++	mrs	x20, elr_el2		// PC before hyp entry
++	mrs	x21, spsr_el2		// pstate before hyp entry
  
- int aarch64_insn_read(void *addr, u32 *insnp);
- int aarch64_insn_write(void *addr, u32 insn);
-@@ -351,6 +352,8 @@ u32 aarch64_insn_gen_logical_shifted_reg(enum aarch64_insn_register dst,
- 					 int shift,
- 					 enum aarch64_insn_variant variant,
- 					 enum aarch64_insn_logic_type type);
-+s32 aarch64_get_branch_offset(u32 insn);
-+u32 aarch64_set_branch_offset(u32 insn, s32 offset);
+ 	stp	x19, x20, [x3, #96]
+ 	str	x21, [x3, #112]
+@@ -82,8 +82,8 @@
+ 	ldr	x21, [x3, #16]
  
- bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
+ 	msr	sp_el0, x19
+-	msr	elr_el2, x20 				// EL1 PC
+-	msr	spsr_el2, x21 				// EL1 pstate
++	msr	elr_el2, x20 		// PC to restore
++	msr	spsr_el2, x21 		// pstate to restore
  
-diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-index 9249020..dd9671c 100644
---- a/arch/arm64/kernel/insn.c
-+++ b/arch/arm64/kernel/insn.c
-@@ -77,6 +77,14 @@ bool __kprobes aarch64_insn_is_nop(u32 insn)
- 	}
- }
- 
-+bool aarch64_insn_is_branch_imm(u32 insn)
-+{
-+	return (aarch64_insn_is_b(insn) || aarch64_insn_is_bl(insn) ||
-+		aarch64_insn_is_tbz(insn) || aarch64_insn_is_tbnz(insn) ||
-+		aarch64_insn_is_cbz(insn) || aarch64_insn_is_cbnz(insn) ||
-+		aarch64_insn_is_bcond(insn));
-+}
-+
- static DEFINE_SPINLOCK(patch_lock);
- 
- static void __kprobes *patch_map(void *addr, int fixmap)
-@@ -1057,6 +1065,58 @@ u32 aarch64_insn_gen_logical_shifted_reg(enum aarch64_insn_register dst,
- 	return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_6, insn, shift);
- }
- 
-+/*
-+ * Decode the imm field of a branch, and return the byte offset as a
-+ * signed value (so it can be used when computing a new branch
-+ * target).
-+ */
-+s32 aarch64_get_branch_offset(u32 insn)
-+{
-+	s32 imm;
-+
-+	if (aarch64_insn_is_b(insn) || aarch64_insn_is_bl(insn)) {
-+		imm = aarch64_insn_decode_immediate(AARCH64_INSN_IMM_26, insn);
-+		return (imm << 6) >> 4;
-+	}
-+
-+	if (aarch64_insn_is_cbz(insn) || aarch64_insn_is_cbnz(insn) ||
-+	    aarch64_insn_is_bcond(insn)) {
-+		imm = aarch64_insn_decode_immediate(AARCH64_INSN_IMM_19, insn);
-+		return (imm << 13) >> 11;
-+	}
-+
-+	if (aarch64_insn_is_tbz(insn) || aarch64_insn_is_tbnz(insn)) {
-+		imm = aarch64_insn_decode_immediate(AARCH64_INSN_IMM_14, insn);
-+		return (imm << 18) >> 16;
-+	}
-+
-+	/* Unhandled instruction */
-+	BUG();
-+}
-+
-+/*
-+ * Encode the displacement of a branch in the imm field and return the
-+ * updated instruction.
-+ */
-+u32 aarch64_set_branch_offset(u32 insn, s32 offset)
-+{
-+	if (aarch64_insn_is_b(insn) || aarch64_insn_is_bl(insn))
-+		return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_26, insn,
-+						     offset >> 2);
-+
-+	if (aarch64_insn_is_cbz(insn) || aarch64_insn_is_cbnz(insn) ||
-+	    aarch64_insn_is_bcond(insn))
-+		return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_19, insn,
-+						     offset >> 2);
-+
-+	if (aarch64_insn_is_tbz(insn) || aarch64_insn_is_tbnz(insn))
-+		return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_14, insn,
-+						     offset >> 2);
-+
-+	/* Unhandled instruction */
-+	BUG();
-+}
-+
- bool aarch32_insn_is_wide(u32 insn)
- {
- 	return insn >= 0xe800;
+ 	add	x3, x2, #CPU_XREG_OFFSET(19)
+ 	ldp	x19, x20, [x3]
 -- 
-2.1.4
+2.4.1
