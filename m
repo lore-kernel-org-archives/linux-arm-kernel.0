@@ -1,34 +1,94 @@
-From: weigelt@melag.de (Enrico Weigelt, metux IT consult)
-Date: Thu, 28 May 2015 14:35:37 +0200
-Subject: imx53 IPU support on 4.0.4
-In-Reply-To: <CAOMZO5CTz4DOdB6xvrw1=i4DRsukQjtzyDMJn50znXd6uXMBUA@mail.gmail.com>
-References: <555C86A5.2030007@melag.de>
- <CAOMZO5CTz4DOdB6xvrw1=i4DRsukQjtzyDMJn50znXd6uXMBUA@mail.gmail.com>
-Message-ID: <55670B99.30103@melag.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 28 May 2015 13:42:22 +0100
+Subject: [RFC/PATCH 4/9] of: dma: Make of_dma_deconfigure() public
+In-Reply-To: <1431644410-2997-5-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1431644410-2997-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1431644410-2997-5-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20150528124222.GF31001@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 20.05.2015 um 15:21 schrieb Fabio Estevam:
+(sorry for the mid-review delay, I got side-tracked yesterday evening)
 
-Hi,
+On Fri, May 15, 2015 at 12:00:05AM +0100, Laurent Pinchart wrote:
+> As part of moving DMA initializing to probe time the
+> of_dma_deconfigure() function will need to be called from different
+> source files. Make it public and move it to drivers/of/device.c where
+> the of_dma_configure() function is.
+> 
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> ---
+>  drivers/of/device.c       | 12 ++++++++++++
+>  drivers/of/platform.c     |  5 -----
+>  include/linux/of_device.h |  3 +++
+>  3 files changed, 15 insertions(+), 5 deletions(-)
 
->> (Haven't 4.1rc* yet, as it broke some other things for me.)
->
-> What are the regressions you see?
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-Trouble w/ emmc/sd suddenly being ro.
-Guess, something in with the corresponding APIs changed and I
-didn't rebase correctly.
+Cheers,
 
-It's now several weeks ago (IIRC, on rc1) - I'm currently rebasing
-everything again to the recent master.
+Will
 
-
-cu
---
-Enrico Weigelt, metux IT consult
-+49-151-27565287
-MELAG Medizintechnik oHG Sitz Berlin Registergericht AG Charlottenburg HRA 21333 B
-
-Wichtiger Hinweis: Diese Nachricht kann vertrauliche oder nur f?r einen begrenzten Personenkreis bestimmte Informationen enthalten. Sie ist ausschlie?lich f?r denjenigen bestimmt, an den sie gerichtet worden ist. Wenn Sie nicht der Adressat dieser E-Mail sind, d?rfen Sie diese nicht kopieren, weiterleiten, weitergeben oder sie ganz oder teilweise in irgendeiner Weise nutzen. Sollten Sie diese E-Mail irrt?mlich erhalten haben, so benachrichtigen Sie bitte den Absender, indem Sie auf diese Nachricht antworten. Bitte l?schen Sie in diesem Fall diese Nachricht und alle Anh?nge, ohne eine Kopie zu behalten.
-Important Notice: This message may contain confidential or privileged information. It is intended only for the person it was addressed to. If you are not the intended recipient of this email you may not copy, forward, disclose or otherwise use it or any part of it in any form whatsoever. If you received this email in error please notify the sender by replying and delete this message and any attachments without retaining a copy.
+> diff --git a/drivers/of/device.c b/drivers/of/device.c
+> index 530aa1ed3e1b..f1b84f464fe1 100644
+> --- a/drivers/of/device.c
+> +++ b/drivers/of/device.c
+> @@ -135,6 +135,18 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+>  }
+>  EXPORT_SYMBOL_GPL(of_dma_configure);
+>  
+> +/**
+> + * of_dma_deconfigure - Clean up DMA configuration
+> + * @dev:	Device for which to clean up DMA configuration
+> + *
+> + * Clean up all configuration performed by of_dma_configure_ops() and free all
+> + * resources that have been allocated.
+> + */
+> +void of_dma_deconfigure(struct device *dev)
+> +{
+> +	arch_teardown_dma_ops(dev);
+> +}
+> +
+>  int of_device_register(struct platform_device *pdev)
+>  {
+>  	device_initialize(&pdev->dev);
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index a01f57c9e34e..7a660c79ff84 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -149,11 +149,6 @@ struct platform_device *of_device_alloc(struct device_node *np,
+>  }
+>  EXPORT_SYMBOL(of_device_alloc);
+>  
+> -static void of_dma_deconfigure(struct device *dev)
+> -{
+> -	arch_teardown_dma_ops(dev);
+> -}
+> -
+>  /**
+>   * of_platform_device_create_pdata - Alloc, initialize and register an of_device
+>   * @np: pointer to node to create device for
+> diff --git a/include/linux/of_device.h b/include/linux/of_device.h
+> index 22801b10cef5..6710807b0653 100644
+> --- a/include/linux/of_device.h
+> +++ b/include/linux/of_device.h
+> @@ -54,6 +54,7 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
+>  }
+>  
+>  void of_dma_configure(struct device *dev, struct device_node *np);
+> +void of_dma_deconfigure(struct device *dev);
+>  #else /* CONFIG_OF */
+>  
+>  static inline int of_driver_match_device(struct device *dev,
+> @@ -93,6 +94,8 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
+>  }
+>  static inline void of_dma_configure(struct device *dev, struct device_node *np)
+>  {}
+> +static inline void of_dma_deconfigure(struct device *dev)
+> +{}
+>  #endif /* CONFIG_OF */
+>  
+>  #endif /* _LINUX_OF_DEVICE_H */
+> -- 
+> 2.3.6
+> 
