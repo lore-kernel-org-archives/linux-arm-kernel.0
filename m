@@ -1,57 +1,101 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 28 May 2015 12:58:23 +0100
-Subject: [PATCH v4 01/18] mfd: add new driver for Sharp LoCoMo
-In-Reply-To: <CALT56yO5Eu4Bk+_4sn2WgURh9YTsym9inWkvJftKUi_aLy5XXw@mail.gmail.com>
-References: <1432554113-26280-1-git-send-email-dbaryshkov@gmail.com>
- <1432554113-26280-2-git-send-email-dbaryshkov@gmail.com>
- <20150527102756.GH11677@x1>
- <CALT56yO5Eu4Bk+_4sn2WgURh9YTsym9inWkvJftKUi_aLy5XXw@mail.gmail.com>
-Message-ID: <20150528115823.GQ11677@x1>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 28 May 2015 14:06:01 +0200
+Subject: [PATCH 2/2] rtc: mxc: add support of device tree
+In-Reply-To: <1431729330-7625-3-git-send-email-tremyfr@gmail.com>
+References: <1431729330-7625-1-git-send-email-tremyfr@gmail.com>
+ <1431729330-7625-3-git-send-email-tremyfr@gmail.com>
+Message-ID: <20150528120601.GO2185@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 27 May 2015, Dmitry Eremin-Solenikov wrote:
+Hi,
 
-> 2015-05-27 13:27 GMT+03:00 Lee Jones <lee.jones@linaro.org>:
-> > On Mon, 25 May 2015, Dmitry Eremin-Solenikov wrote:
-> >
-> >> LoCoMo is a GA used on Sharp Zaurus SL-5x00. Current driver does has
-> >> several design issues (special bus instead of platform bus, doesn't use
-> >> mfd-core, etc).
-> >>
-> >> Implement 'core' parts of locomo support as an mfd driver.
-> >>
-> >> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> >> ---
-> >
-> > These things are much easier to re-review if you keep a change-log
-> > here.
-> >
-> >>  drivers/mfd/Kconfig        |  10 ++
-> >>  drivers/mfd/Makefile       |   1 +
-> >>  drivers/mfd/locomo.c       | 336 +++++++++++++++++++++++++++++++++++++++++++++
-> >>  include/linux/mfd/locomo.h | 169 +++++++++++++++++++++++
-> >>  4 files changed, 516 insertions(+)
-> >>  create mode 100644 drivers/mfd/locomo.c
-> >>  create mode 100644 include/linux/mfd/locomo.h
-> >
-> > Looks good now though:
-> >   Acked-by: Lee Jones <lee.jones@linaro.org>
-> >
-> > How do you plan for this to be merged?
+On 16/05/2015 at 00:35:30 +0200, Philippe Reynes wrote :
 > 
-> I'd like for this to be merged either through mfd tree or through the
-> arm-soc (or rmk's ARM) tree.
-> Some of the respective maintainers already gave their blessing for
-> this patchset to be merged
-> not through their subsystem trees.
 
-I can take it through MFD.  Once you have all the required Acks,
-resubmit the set with them all applied with a note in the cover-letter
-to that affect and I'll apply.
+Please always include a commit message.
+
+> Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
+> ---
+>  Documentation/devicetree/bindings/rtc/rtc-mxc.txt |   27 +++++++++++++++++++++
+>  drivers/rtc/rtc-mxc.c                             |   22 ++++++++++++++++-
+>  2 files changed, 48 insertions(+), 1 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/rtc/rtc-mxc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/rtc/rtc-mxc.txt b/Documentation/devicetree/bindings/rtc/rtc-mxc.txt
+> new file mode 100644
+> index 0000000..5505493
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/rtc/rtc-mxc.txt
+> @@ -0,0 +1,27 @@
+> +* Real Time Clock of the i.MX SoCs
+> +
+> +RTC controller for the i.MX SoCs
+> +
+> +Required properties:
+> +- compatible: Should be "fsl,imx1-rtc" or "fsl,imx21-rtc".
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +- interrupts: IRQ line for the RTC.
+> +- clocks: should contain two entries:
+> +  * one for the input reference
+> +  * one for the the SoC RTC
+> +- clock-names: should contain:
+> +  * "rtc" for the input reference clock
+> +  * "ipg" for the SoC RTC clock
+> +
+> +Example:
+> +
+> +rtc at 10007000 {
+> +	compatible = "fsl,imx21-rtc";
+> +	reg = <0x10007000 0x1000>;
+> +	interrupts = <22>;
+> +	clocks = <&clks IMX27_CLK_CKIL>,
+> +	       	 <&clks IMX27_CLK_RTC_IPG_GATE>;
+> +	clock-names = "rtc, "ipg";
+> +	status = "disabled";
+> +};
+> diff --git a/drivers/rtc/rtc-mxc.c b/drivers/rtc/rtc-mxc.c
+> index e916a91..df6483d 100644
+> --- a/drivers/rtc/rtc-mxc.c
+> +++ b/drivers/rtc/rtc-mxc.c
+> @@ -16,6 +16,8 @@
+>  #include <linux/interrupt.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/clk.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+>  
+>  #define RTC_INPUT_CLK_32768HZ	(0x00 << 5)
+>  #define RTC_INPUT_CLK_32000HZ	(0x01 << 5)
+> @@ -98,6 +100,15 @@ static struct platform_device_id imx_rtc_devtype[] = {
+>  };
+>  MODULE_DEVICE_TABLE(platform, imx_rtc_devtype);
+>  
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id imx_rtc_dt_ids[] = {
+> +	{ .compatible = "fsl,imx1-rtc", .data = &imx_rtc_devtype[IMX1_RTC] },
+> +	{ .compatible = "fsl,imx21-rtc", .data = &imx_rtc_devtype[IMX21_RTC] },
+
+Maybe you can use directly IMX1_RTC and IMX21_RTC which...
+
+
+>  
+> -	pdata->devtype = pdev->id_entry->driver_data;
+> +	of_id = of_match_device(imx_rtc_dt_ids, &pdev->dev);
+> +	if (of_id) {
+> +		struct platform_device_id *id_entry;
+> +
+> +		id_entry = (struct platform_device_id *)of_id->data;
+> +		pdata->devtype = id_entry->driver_data;
+
+... also simplifies that part.
+
+> +	} else
+> +		pdata->devtype = pdev->id_entry->driver_data;
+>  
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
