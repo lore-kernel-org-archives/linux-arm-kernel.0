@@ -1,54 +1,87 @@
 From: huawei.libin@huawei.com (Li Bin)
-Date: Thu, 28 May 2015 13:51:00 +0800
-Subject: [RFC PATCH 0/5] livepatch: add support on arm64
-Message-ID: <1432792265-24076-1-git-send-email-huawei.libin@huawei.com>
+Date: Thu, 28 May 2015 13:51:02 +0800
+Subject: [RFC PATCH 2/5] livepatch: ftrace: add ftrace_function_stub_ip
+ function
+In-Reply-To: <1432792265-24076-1-git-send-email-huawei.libin@huawei.com>
+References: <1432792265-24076-1-git-send-email-huawei.libin@huawei.com>
+Message-ID: <1432792265-24076-3-git-send-email-huawei.libin@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset propose a method for gcc -mfentry feature(profile
-before prologue) implementation for arm64, and propose the livepatch
-implementation for arm64 based on this feature.
-The gcc implementation about this feature will be post to the gcc 
-community soon.
+The function of ftrace_function_stub_ip is to convert the function
+address to the ftrace stub calling instruction address.
 
-With this -mfentry feature, the entry of each function like:
+This is needed for the platform that the complier does not support
+"profile before prologue" feature and the profile calling instruction
+is not at begin of the function.
 
-foo:
-    mov x9, x30 
-    bl __fentry__
-    mov x30, x9
-    [prologue]
-    ... 
+EXAMPLES:
+...
+stub_ip = ftrace_function_stub_ip(func_addr);
+ftrace_set_filter_ip(&ftrace_ops, stub_ip, 0, 0);
+register_ftrace_function(&ftrace_ops);
+...
 
-The x9 is a callee corruptible register, and the __fentry__ function
-is responsible to protect all registers, so it can be used to protect
-the x30. And the added two instructions which is register mov operation
-have ralatively small impact on performance.
+Signed-off-by: Li Bin <huawei.libin@huawei.com>
+---
+ include/linux/ftrace.h |    1 +
+ kernel/trace/ftrace.c  |   32 ++++++++++++++++++++++++++++++++
+ 2 files changed, 33 insertions(+), 0 deletions(-)
 
-This patchset has been tested on arm64 platform.
-
-Li Bin (4):
-  livepatch: ftrace: arm64: Add support for DYNAMIC_FTRACE_WITH_REGS
-  livepatch: ftrace: add ftrace_function_stub_ip function
-  livepatch: ftrace: arm64: Add support for -mfentry on arm64
-  livepatch: arm64: add support for livepatch on arm64
-
-Xie XiuQi (1):
-  livepatch: arm64: support relocation in a module
-
- arch/arm64/Kconfig                 |    5 +
- arch/arm64/include/asm/ftrace.h    |    9 +
- arch/arm64/include/asm/livepatch.h |   45 +++++
- arch/arm64/kernel/Makefile         |    1 +
- arch/arm64/kernel/arm64ksyms.c     |    4 +
- arch/arm64/kernel/entry-ftrace.S   |  154 +++++++++++++++-
- arch/arm64/kernel/ftrace.c         |   28 +++-
- arch/arm64/kernel/livepatch.c      |   41 ++++
- arch/arm64/kernel/module.c         |  355 ++++++++++++++++++------------------
- include/linux/ftrace.h             |    1 +
- kernel/livepatch/core.c            |   17 ++-
- kernel/trace/ftrace.c              |   32 ++++
- scripts/recordmcount.pl            |    2 +-
- 13 files changed, 508 insertions(+), 186 deletions(-)
- create mode 100644 arch/arm64/include/asm/livepatch.h
- create mode 100644 arch/arm64/kernel/livepatch.c
+diff --git a/include/linux/ftrace.h b/include/linux/ftrace.h
+index 1da6029..38a2811 100644
+--- a/include/linux/ftrace.h
++++ b/include/linux/ftrace.h
+@@ -360,6 +360,7 @@ struct dyn_ftrace {
+ int ftrace_force_update(void);
+ int ftrace_set_filter_ip(struct ftrace_ops *ops, unsigned long ip,
+ 			 int remove, int reset);
++unsigned long ftrace_function_stub_ip(unsigned long addr);
+ int ftrace_set_filter(struct ftrace_ops *ops, unsigned char *buf,
+ 		       int len, int reset);
+ int ftrace_set_notrace(struct ftrace_ops *ops, unsigned char *buf,
+diff --git a/kernel/trace/ftrace.c b/kernel/trace/ftrace.c
+index 02bece4..4d8692c 100644
+--- a/kernel/trace/ftrace.c
++++ b/kernel/trace/ftrace.c
+@@ -4161,6 +4161,38 @@ int ftrace_set_filter_ip(struct ftrace_ops *ops, unsigned long ip,
+ }
+ EXPORT_SYMBOL_GPL(ftrace_set_filter_ip);
+ 
++/**
++ * ftrace_function_stub_ip - get the profile stub calling location by the
++ * function address. It is useful for the platform that doesn't place the
++ * function profiling call at the start of the function.
++ * @addr - the function address to get the stub ip
++ *
++ * It returns the corresponding profile stub calling location if founded, else
++ * return zero.
++ */
++unsigned long ftrace_function_stub_ip(unsigned long addr)
++{
++	struct ftrace_page *pg;
++	struct dyn_ftrace *rec;
++	unsigned long ret = 0;
++
++	mutex_lock(&ftrace_lock);
++
++	do_for_each_ftrace_rec(pg, rec) {
++		unsigned long offset;
++
++		if (kallsyms_lookup_size_offset(rec->ip, NULL, &offset)
++				&& addr + offset == rec->ip) {
++			ret = rec->ip;
++			goto out_unlock;
++		}
++	} while_for_each_ftrace_rec()
++out_unlock:
++	mutex_unlock(&ftrace_lock);
++	return ret;
++}
++EXPORT_SYMBOL_GPL(ftrace_function_stub_ip);
++
+ static int
+ ftrace_set_regex(struct ftrace_ops *ops, unsigned char *buf, int len,
+ 		 int reset, int enable)
+-- 
+1.7.1
