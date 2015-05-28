@@ -1,35 +1,477 @@
 From: atull@opensource.altera.com (Alan Tull)
-Date: Thu, 28 May 2015 16:19:35 -0500
-Subject: [PATCHv5 0/2] socfpga: support suspend to ram
-Message-ID: <1432847977-18880-1-git-send-email-atull@opensource.altera.com>
+Date: Thu, 28 May 2015 16:19:36 -0500
+Subject: [PATCHv5 1/2] ARM: socfpga: support suspend to ram
+In-Reply-To: <1432847977-18880-1-git-send-email-atull@opensource.altera.com>
+References: <1432847977-18880-1-git-send-email-atull@opensource.altera.com>
+Message-ID: <1432847977-18880-2-git-send-email-atull@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support suspend to ram on socfpga.
-  * allocate space in ocram using sram driver.
-  * Add a function in ocram to place DDR in self-refresh
-    and suspend.
-  * Prevent suspend if EDAC is enabled.
-  * Add a device tree binding document for the Altera
-    SOCFPGA SDRAM controller that is used to put DDR in
-    self-refresh mode.
+Add code that requests that the sdr controller go into
+self-refresh mode.  This code is run from ocram.
 
-Alan Tull (2):
-  ARM: socfpga: support suspend to ram
-  ARM: socfpga: dts: add sdram controller dt binding doc
+Suspend-to-RAM and EDAC support are mutually exclusive on
+SOCFPGA.  If the EDAC is enabled, it will prevent the
+platform from going into suspend.
 
- .../arm/altera/socfpga-sdram-controller.txt        |   12 ++
- arch/arm/mach-socfpga/Kconfig                      |   10 +-
- arch/arm/mach-socfpga/Makefile                     |    1 +
- arch/arm/mach-socfpga/core.h                       |    6 +-
- arch/arm/mach-socfpga/pm.c                         |  149 ++++++++++++++++++++
- arch/arm/mach-socfpga/self-refresh.S               |  136 ++++++++++++++++++
- arch/arm/mach-socfpga/socfpga.c                    |    6 +-
- drivers/edac/altera_edac.c                         |   20 +++
- 8 files changed, 337 insertions(+), 3 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram-controller.txt
+Example of how to request to suspend to ram:
+ $ echo enabled > \
+/sys/devices/soc/ffc02000.serial0/tty/ttyS0/power/wakeup
+
+ $ echo -n mem > /sys/power/state
+
+Signed-off-by: Alan Tull <atull@opensource.altera.com>
+Cc: Pavel Machek <pavel@denx.de>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
+Cc: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+---
+v2: use Generic on-chip SRAM driver to allocate ocram
+    rm fncpy_align since generic allocator handles alignment
+    check __arm_ioremap_exec return code
+    check for NULL pointers
+    add a comment regarding sdram controller configuration
+v3: fix renamed #define
+    propagate socfpga_setup_ocram_self_refresh error code
+v4: Kconfig: don't need to select GENERIC_ALLOCATER
+    add CONFIG_SOCFPGA_SUSPEND
+    make s2r and EDAC support mutually exclusive
+    socfpga.c: add sdr_ctl_base_addr
+    return error if ocram not available in device tree
+    update copyright years
+v5: remove compile time dependency
+    edac driver will prevent suspend
+    don't configure scu standby mode; done in enable_scu().
+    fix comments about required sdram controller configuration
+---
+ arch/arm/mach-socfpga/Kconfig        |   10 ++-
+ arch/arm/mach-socfpga/Makefile       |    1 +
+ arch/arm/mach-socfpga/core.h         |    6 +-
+ arch/arm/mach-socfpga/pm.c           |  149 ++++++++++++++++++++++++++++++++++
+ arch/arm/mach-socfpga/self-refresh.S |  136 +++++++++++++++++++++++++++++++
+ arch/arm/mach-socfpga/socfpga.c      |    6 +-
+ drivers/edac/altera_edac.c           |   20 +++++
+ 7 files changed, 325 insertions(+), 3 deletions(-)
  create mode 100644 arch/arm/mach-socfpga/pm.c
  create mode 100644 arch/arm/mach-socfpga/self-refresh.S
 
+diff --git a/arch/arm/mach-socfpga/Kconfig b/arch/arm/mach-socfpga/Kconfig
+index b5f8d75..b26a684 100644
+--- a/arch/arm/mach-socfpga/Kconfig
++++ b/arch/arm/mach-socfpga/Kconfig
+@@ -1,4 +1,4 @@
+-config ARCH_SOCFPGA
++menuconfig ARCH_SOCFPGA
+ 	bool "Altera SOCFPGA family" if ARCH_MULTI_V7
+ 	select ARM_AMBA
+ 	select ARM_GIC
+@@ -8,3 +8,11 @@ config ARCH_SOCFPGA
+ 	select HAVE_ARM_SCU
+ 	select HAVE_ARM_TWD if SMP
+ 	select MFD_SYSCON
++
++if ARCH_SOCFPGA
++config SOCFPGA_SUSPEND
++	bool "Suspend to RAM on SOCFPGA"
++	help
++	  Select this if you want to enable Suspend-to-RAM on SOCFPGA
++	  platforms.
++endif
+diff --git a/arch/arm/mach-socfpga/Makefile b/arch/arm/mach-socfpga/Makefile
+index 6dd7a93..b8f9e23 100644
+--- a/arch/arm/mach-socfpga/Makefile
++++ b/arch/arm/mach-socfpga/Makefile
+@@ -4,3 +4,4 @@
+ 
+ obj-y					:= socfpga.o
+ obj-$(CONFIG_SMP)	+= headsmp.o platsmp.o
++obj-$(CONFIG_SOCFPGA_SUSPEND)	+= pm.o self-refresh.o
+diff --git a/arch/arm/mach-socfpga/core.h b/arch/arm/mach-socfpga/core.h
+index 7637b7f..35472f2 100644
+--- a/arch/arm/mach-socfpga/core.h
++++ b/arch/arm/mach-socfpga/core.h
+@@ -1,6 +1,6 @@
+ /*
+  * Copyright 2012 Pavel Machek <pavel@denx.de>
+- * Copyright (C) 2012 Altera Corporation
++ * Copyright (C) 2012-2015 Altera Corporation
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+@@ -40,6 +40,10 @@ extern void socfpga_sysmgr_init(void);
+ 
+ extern void __iomem *sys_manager_base_addr;
+ extern void __iomem *rst_manager_base_addr;
++extern void __iomem *sdr_ctl_base_addr;
++
++u32 socfpga_sdram_self_refresh(u32 sdr_base);
++extern unsigned int socfpga_sdram_self_refresh_sz;
+ 
+ extern struct smp_operations socfpga_smp_ops;
+ extern char secondary_trampoline, secondary_trampoline_end;
+diff --git a/arch/arm/mach-socfpga/pm.c b/arch/arm/mach-socfpga/pm.c
+new file mode 100644
+index 0000000..1ed89fc
+--- /dev/null
++++ b/arch/arm/mach-socfpga/pm.c
+@@ -0,0 +1,149 @@
++/*
++ *  arch/arm/mach-socfpga/pm.c
++ *
++ * Copyright (C) 2014-2015 Altera Corporation. All rights reserved.
++ *
++ * with code from pm-imx6.c
++ * Copyright 2011-2014 Freescale Semiconductor, Inc.
++ * Copyright 2011 Linaro Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/bitops.h>
++#include <linux/genalloc.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/of_platform.h>
++#include <linux/suspend.h>
++#include <asm/suspend.h>
++#include <asm/fncpy.h>
++#include "core.h"
++
++/* Pointer to function copied to ocram */
++static u32 (*socfpga_sdram_self_refresh_in_ocram)(u32 sdr_base);
++
++static int socfpga_setup_ocram_self_refresh(void)
++{
++	struct platform_device *pdev;
++	phys_addr_t ocram_pbase;
++	struct device_node *np;
++	struct gen_pool *ocram_pool;
++	unsigned long ocram_base;
++	void __iomem *suspend_ocram_base;
++	int ret = 0;
++
++	np = of_find_compatible_node(NULL, NULL, "mmio-sram");
++	if (!np) {
++		pr_err("%s: Unable to find mmio-sram in dtb\n", __func__);
++		return -ENODEV;
++	}
++
++	pdev = of_find_device_by_node(np);
++	if (!pdev) {
++		pr_warn("%s: failed to find ocram device!\n", __func__);
++		ret = -ENODEV;
++		goto put_node;
++	}
++
++	ocram_pool = dev_get_gen_pool(&pdev->dev);
++	if (!ocram_pool) {
++		pr_warn("%s: ocram pool unavailable!\n", __func__);
++		ret = -ENODEV;
++		goto put_node;
++	}
++
++	ocram_base = gen_pool_alloc(ocram_pool, socfpga_sdram_self_refresh_sz);
++	if (!ocram_base) {
++		pr_warn("%s: unable to alloc ocram!\n", __func__);
++		ret = -ENOMEM;
++		goto put_node;
++	}
++
++	ocram_pbase = gen_pool_virt_to_phys(ocram_pool, ocram_base);
++
++	suspend_ocram_base = __arm_ioremap_exec(ocram_pbase,
++						socfpga_sdram_self_refresh_sz,
++						false);
++	if (!suspend_ocram_base) {
++		pr_warn("%s: __arm_ioremap_exec failed!\n", __func__);
++		ret = -ENOMEM;
++		goto put_node;
++	}
++
++	/* Copy the code that puts DDR in self refresh to ocram */
++	socfpga_sdram_self_refresh_in_ocram =
++		(void *)fncpy(suspend_ocram_base,
++			      &socfpga_sdram_self_refresh,
++			      socfpga_sdram_self_refresh_sz);
++
++	WARN(!socfpga_sdram_self_refresh_in_ocram,
++	     "could not copy function to ocram");
++	if (!socfpga_sdram_self_refresh_in_ocram)
++		ret = -EFAULT;
++
++put_node:
++	of_node_put(np);
++
++	return ret;
++}
++
++static int socfpga_pm_suspend(unsigned long arg)
++{
++	u32 ret;
++
++	if (!sdr_ctl_base_addr)
++		return -EFAULT;
++
++	ret = socfpga_sdram_self_refresh_in_ocram((u32)sdr_ctl_base_addr);
++
++	pr_debug("%s self-refresh loops request=%d exit=%d\n", __func__,
++		 ret & 0xffff, (ret >> 16) & 0xffff);
++
++	return 0;
++}
++
++static int socfpga_pm_enter(suspend_state_t state)
++{
++	switch (state) {
++	case PM_SUSPEND_STANDBY:
++	case PM_SUSPEND_MEM:
++		outer_disable();
++		cpu_suspend(0, socfpga_pm_suspend);
++		outer_resume();
++		break;
++	default:
++		return -EINVAL;
++	}
++	return 0;
++}
++
++static const struct platform_suspend_ops socfpga_pm_ops = {
++	.valid	= suspend_valid_only_mem,
++	.enter	= socfpga_pm_enter,
++};
++
++static int __init socfpga_pm_init(void)
++{
++	int ret;
++
++	ret = socfpga_setup_ocram_self_refresh();
++	if (ret)
++		return ret;
++
++	suspend_set_ops(&socfpga_pm_ops);
++	pr_info("SoCFPGA initialized for DDR self-refresh during suspend.\n");
++
++	return 0;
++}
++arch_initcall(socfpga_pm_init);
+diff --git a/arch/arm/mach-socfpga/self-refresh.S b/arch/arm/mach-socfpga/self-refresh.S
+new file mode 100644
+index 0000000..f2d7f88
+--- /dev/null
++++ b/arch/arm/mach-socfpga/self-refresh.S
+@@ -0,0 +1,136 @@
++/*
++ * Copyright (C) 2014-2015 Altera Corporation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#include <linux/linkage.h>
++#include <asm/assembler.h>
++
++#define MAX_LOOP_COUNT		1000
++
++/* Register offset */
++#define SDR_CTRLGRP_LOWPWREQ_ADDR       0x54
++#define SDR_CTRLGRP_LOWPWRACK_ADDR      0x58
++
++/* Bitfield positions */
++#define SELFRSHREQ_POS                  3
++#define SELFRSHREQ_MASK                 0x8
++
++#define SELFRFSHACK_POS                 1
++#define SELFRFSHACK_MASK                0x2
++
++	/*
++	 * This code assumes that when the bootloader configured
++	 * the sdram controller for the DDR on the board it
++	 * configured the following fields depending on the DDR
++	 * vendor/configuration:
++	 *
++	 * sdr.ctrlcfg.lowpwreq.selfrfshmask
++	 * sdr.ctrlcfg.lowpwrtiming.clkdisablecycles
++	 * sdr.ctrlcfg.dramtiming4.selfrfshexit
++	 */
++
++	.arch   armv7-a
++	.text
++	.align 3
++
++	/*
++	 * socfpga_sdram_self_refresh
++	 *
++	 *  r0 : sdr_ctl_base_addr
++	 *  r1 : temp storage of return value
++	 *  r2 : temp storage of register values
++	 *  r3 : loop counter
++	 *
++	 *  return value: lower 16 bits: loop count going into self refresh
++	 *                upper 16 bits: loop count exiting self refresh
++	 */
++ENTRY(socfpga_sdram_self_refresh)
++	/* Enable dynamic clock gating in the Power Control Register. */
++	mrc	p15, 0, r2, c15, c0, 0
++	orr	r2, r2, #1
++	mcr	p15, 0, r2, c15, c0, 0
++
++	/* Enable self refresh: set sdr.ctrlgrp.lowpwreq.selfrshreq = 1 */
++	ldr	r2, [r0, #SDR_CTRLGRP_LOWPWREQ_ADDR]
++	orr	r2, r2, #SELFRSHREQ_MASK
++	str	r2, [r0, #SDR_CTRLGRP_LOWPWREQ_ADDR]
++
++	/* Poll until sdr.ctrlgrp.lowpwrack.selfrfshack == 1 or hit max loops */
++	mov	r3, #0
++while_ack_0:
++	ldr	r2, [r0, #SDR_CTRLGRP_LOWPWRACK_ADDR]
++	and	r2, r2, #SELFRFSHACK_MASK
++	cmp	r2, #SELFRFSHACK_MASK
++	beq	ack_1
++
++	add	r3, #1
++	cmp	r3, #MAX_LOOP_COUNT
++	bne	while_ack_0
++
++ack_1:
++	mov	r1, r3
++
++	/*
++	 * Execute an ISB instruction to ensure that all of the
++	 * CP15 register changes have been committed.
++	 */
++	isb
++
++	/*
++	 * Execute a barrier instruction to ensure that all cache,
++	 * TLB and branch predictor maintenance operations issued
++	 * by any CPU in the cluster have completed.
++	 */
++	dsb
++	dmb
++
++	wfi
++
++	/* Disable self-refresh: set sdr.ctrlgrp.lowpwreq.selfrshreq = 0 */
++	ldr	r2, [r0, #SDR_CTRLGRP_LOWPWREQ_ADDR]
++	bic	r2, r2, #SELFRSHREQ_MASK
++	str	r2, [r0, #SDR_CTRLGRP_LOWPWREQ_ADDR]
++
++	/* Poll until sdr.ctrlgrp.lowpwrack.selfrfshack == 0 or hit max loops */
++	mov	r3, #0
++while_ack_1:
++	ldr	r2, [r0, #SDR_CTRLGRP_LOWPWRACK_ADDR]
++	and	r2, r2, #SELFRFSHACK_MASK
++	cmp	r2, #SELFRFSHACK_MASK
++	bne	ack_0
++
++	add	r3, #1
++	cmp	r3, #MAX_LOOP_COUNT
++	bne	while_ack_1
++
++ack_0:
++	/*
++	 * Prepare return value:
++	 * Shift loop count for exiting self refresh into upper 16 bits.
++	 * Leave loop count for requesting self refresh in lower 16 bits.
++	 */
++	mov	r3, r3, lsl #16
++	add	r1, r1, r3
++
++	/* Disable dynamic clock gating in the Power Control Register. */
++	mrc	p15, 0, r2, c15, c0, 0
++	bic	r2, r2, #1
++	mcr	p15, 0, r2, c15, c0, 0
++
++	mov     r0, r1                  @ return value
++	bx	lr			@ return
++
++ENDPROC(socfpga_sdram_self_refresh)
++ENTRY(socfpga_sdram_self_refresh_sz)
++	.word	. - socfpga_sdram_self_refresh
+diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+index a154920..19643a7 100644
+--- a/arch/arm/mach-socfpga/socfpga.c
++++ b/arch/arm/mach-socfpga/socfpga.c
+@@ -1,5 +1,5 @@
+ /*
+- *  Copyright (C) 2012 Altera Corporation
++ *  Copyright (C) 2012-2015 Altera Corporation
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+@@ -29,6 +29,7 @@
+ 
+ void __iomem *sys_manager_base_addr;
+ void __iomem *rst_manager_base_addr;
++void __iomem *sdr_ctl_base_addr;
+ unsigned long socfpga_cpu1start_addr;
+ 
+ void __init socfpga_sysmgr_init(void)
+@@ -49,6 +50,9 @@ void __init socfpga_sysmgr_init(void)
+ 
+ 	np = of_find_compatible_node(NULL, NULL, "altr,rst-mgr");
+ 	rst_manager_base_addr = of_iomap(np, 0);
++
++	np = of_find_compatible_node(NULL, NULL, "altr,sdr-ctl");
++	sdr_ctl_base_addr = of_iomap(np, 0);
+ }
+ 
+ static void __init socfpga_init_irq(void)
+diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
+index 3c4929f..806b63b 100644
+--- a/drivers/edac/altera_edac.c
++++ b/drivers/edac/altera_edac.c
+@@ -388,6 +388,23 @@ static int altr_sdram_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++/*
++ * If you want to suspend, need to disable EDAC by removing it
++ * from the device tree or defconfig.
++ */
++#ifdef CONFIG_PM
++static int altr_sdram_prepare(struct device *dev)
++{
++	pr_err("Suspend not allowed when EDAC is enabled.\n");
++
++	return -EPERM;
++}
++
++const struct dev_pm_ops altr_sdram_pm_ops = {
++	.prepare = altr_sdram_prepare,
++};
++#endif
++
+ static const struct of_device_id altr_sdram_ctrl_of_match[] = {
+ 	{ .compatible = "altr,sdram-edac", },
+ 	{},
+@@ -399,6 +416,9 @@ static struct platform_driver altr_sdram_edac_driver = {
+ 	.remove = altr_sdram_remove,
+ 	.driver = {
+ 		.name = "altr_sdram_edac",
++#ifdef CONFIG_PM
++		.pm = &altr_sdram_pm_ops,
++#endif
+ 		.of_match_table = altr_sdram_ctrl_of_match,
+ 	},
+ };
 -- 
 1.7.9.5
