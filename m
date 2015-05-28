@@ -1,48 +1,93 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 28 May 2015 11:01:02 +0200
-Subject: [PATCH 2/3] Revert "bus: mvebu-mbus: make sure SDRAM CS for DMA
- don't overlap the MBus bridge window"
-In-Reply-To: <2099675.EoA8CYtzXr@wuerfel>
-References: <1432802414-12355-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1432802414-12355-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <2099675.EoA8CYtzXr@wuerfel>
-Message-ID: <20150528110102.10cb2e85@free-electrons.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 28 May 2015 11:02:27 +0200
+Subject: [PATCH v14 1/3] dt-bindings: add document of Rockchip power domain
+In-Reply-To: <1429862868-14218-2-git-send-email-wxt@rock-chips.com>
+References: <1429862868-14218-1-git-send-email-wxt@rock-chips.com>
+ <1429862868-14218-2-git-send-email-wxt@rock-chips.com>
+Message-ID: <CAPDyKFr544A46Z7kod8EVUYKV1=G6+t4d4ZRdOvskPT4pYL7+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+On 24 April 2015 at 10:07, Caesar Wang <wxt@rock-chips.com> wrote:
+> This add the necessary binding documentation for the power domain
+> found on Rockchip Socs.
+>
+> Signed-off-by: jinkun.hong <jinkun.hong@rock-chips.com>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> ---
+>
+>  .../bindings/arm/rockchip/power_domain.txt         | 48 ++++++++++++++++++++++
+>  1 file changed, 48 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/rockchip/power_domain.txt
+>
+> diff --git a/Documentation/devicetree/bindings/arm/rockchip/power_domain.txt b/Documentation/devicetree/bindings/arm/rockchip/power_domain.txt
+> new file mode 100644
+> index 0000000..3e74e6d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/rockchip/power_domain.txt
+> @@ -0,0 +1,48 @@
+> +* Rockchip Power Domains
+> +
+> +Rockchip processors include support for multiple power domains which can be
+> +powered up/down by software based on different application scenes to save power.
+> +
+> +Required properties for power domain controller:
+> +- compatible: should be one of the following.
+> +    * rockchip,rk3288-power-controller - for rk3288 type power domain.
+> +- #power-domain-cells: Number of cells in a power-domain specifier.
+> +                      should be 1.
+> +- rockchip,pmu: phandle referencing a syscon providing the pmu registers
+> +- #address-cells: should be 1.
+> +- #size-cells: should be 0.
+> +
+> +Required properties for power domain sub nodes:
+> +- reg: index of the power domain, should use macros in:
+> +    *  include/dt-bindings/power-domain/rk3288.h - for rk3288 type power domain.
 
-On Thu, 28 May 2015 10:49:46 +0200, Arnd Bergmann wrote:
-> On Thursday 28 May 2015 10:40:13 Thomas Petazzoni wrote:
-> > Fixes: 1737cac69369 ("bus: mvebu-mbus: make sure SDRAM CS for DMA don't overlap the MBus bridge window")
-> > Cc: <stable@vger.kernel.org> # v4.0+
-> > ---
-> >  drivers/bus/mvebu-mbus.c | 105 ++++++++---------------------------------------
-> >  1 file changed, 16 insertions(+), 89 deletions(-)
-> 
-> Hmm, the stable kernel rules say that a patch cannot exceed 100
-> lines with context, so this one is technically too large.
+I can't find the above file, nor is it being adding in $subject patch.
 
-Ah, okay, I didn't know about this specific rule.
+Moreover, there are already
+"include/dt-bindings/arm/ux500_pm_domains.h".  I suppose we could move
+that file into your suggested path, since it seems more generic?
 
-> Maybe Greg has a suggestion about what to do here. Is it possible
-> to make an exception for a revert? In theory you could make a
-> smaller version of the patch that adds an #if 0 instead of removing
-> some of the code that was added, in order to get below the limit,
-> but that seems counterproductive for minimizing the possible risk.
+> +- clocks (optional): phandles to clocks which need to be enabled while power domain
+> +          switches state.
+> +
+> +Example:
+> +
+> +       power: power-controller {
+> +              compatible = "rockchip,rk3288-power-controller";
+> +              #power-domain-cells = <1>;
+> +              rockchip,pmu = <&pmu>;
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +              pd_gpu {
+> +                      reg = <RK3288_PD_GPU>;
+> +                      clocks = <&cru ACLK_GPU>;
+> +              };
+> +       };
+> +
+> +Node of a device using power domains must have a power-domains property,
+> +containing a phandle to the power device node and an index specifying which
+> +power domain to use.
+> +The index should use macros in:
+> +   * include/dt-bindings/power-domain/rk3288.h - for rk3288 type power domain.
 
-In the specific case of such an exact revert, isn't it possible to make
-an exception? I guess the very reason we have rules is to have
-exceptions for such rules, no? :-)
+Same comment as above.
 
-It would really be more logical to have a revert than a different patch
-just disabling the change, since it would actually be more risky than
-just reverting to the previous situation.
+> +
+> +Example of the node using power domain:
+> +
+> +       node {
+> +               /* ... */
+> +               power-domains = <&power RK3288_PD_GPU>;
+> +               /* ... */
+> +       };
+> --
+> 1.9.1
+>
+>
 
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Kind regards
+Uffe
