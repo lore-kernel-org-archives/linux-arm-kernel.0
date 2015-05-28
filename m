@@ -1,69 +1,44 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 28 May 2015 14:32:20 +0100
-Subject: [PATCH] arm: tcm: Don't crash when TCM banks are protected by
- TrustZone
-In-Reply-To: <5D4F3868-BF10-47D9-94C1-A8EDE97621AE@smart-africa.com>
-References: <1432805760-4590-1-git-send-email-michael@smart-africa.com>
- <20150528101641.GA3657@e103592.cambridge.arm.com>
- <5D4F3868-BF10-47D9-94C1-A8EDE97621AE@smart-africa.com>
-Message-ID: <20150528133219.GD3657@e103592.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 28 May 2015 14:34:29 +0100
+Subject: Device Tree Blob (DTB) licence
+In-Reply-To: <55670AD4.8020705@melag.de>
+References: <1430820315.19516.26.camel@opteya.com>
+ <CAL_Jsq+T5c7qornpRVCduEjUSCeM+0xqbtVYovtH76y=4BqhLQ@mail.gmail.com>
+ <1432289148.5304.58.camel@opteya.com>
+ <1432322832.5304.63.camel@opteya.com>
+ <CAOS_Y6Q37ps+VEnzUZ_uwX++qrRm9Hgx45Q_pmiZSLSNjmKwZg@mail.gmail.com>
+ <55670AD4.8020705@melag.de>
+Message-ID: <20150528133429.GD2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 28, 2015 at 01:32:10PM +0200, Michael van der Westhuizen wrote:
+On Thu, May 28, 2015 at 02:32:20PM +0200, Enrico Weigelt, metux IT consult wrote:
+> Am 25.05.2015 um 09:14 schrieb Rob Landley:
 > 
-> > On 28 May 2015, at 12:16 PM, Dave Martin <Dave.Martin@arm.com> wrote:
-> > 
-> > On Thu, May 28, 2015 at 11:36:00AM +0200, Michael van der Westhuizen wrote:
-> >> Fixes the TCM initialisation code to handle TCM banks that are
-> >> present but inaccessible due to TrustZone configuration.  This is
-> >> the default case when enabling the non-secure world.  It may also
-> >> be the case that that the user decided to use TCM for TrustZone.
-> >> 
-> >> This change has exposed a bug in handling of TCM where no TCM bank
-> >> was usable (the 0 size TCM case).  This change addresses the
-> >> resulting hang.
-> > 
-> > The TCM registers in CP15 are not part of the architecture -- behaviour
-> > is IMP DEF in v7.
+> >Personally, I'm sad we're starting to get ACPI for arm but if device
+> >tree data files are only available under GPL, people will hold their
+> >nose and deploy ACPI.
 > 
-> My reading of DDI0406C_C is that the register is defined (CP15, c0,
-> c0, 2), but the format is either v6 format or implementation defined.
-> 
-> The manual explicitly states that in v7 the register must be
-> implemented and that when v7 format is used that the meaning of bits
-> 28:0 is implementation defined (this is all in B4.1.132).
-> 
-> The ARM goes on to state that when no TCMs are implemented the TCMTR
-> register must be implemented in ARMv6 format, indicating no TCM banks
-> (i.e. all defined bits must be 0).
-> 
-> So, since this code assumes v6 format should I just add a check that
-> bits 31:29 or 0b000?  If I do this, then my reading is that this will
-> continue to work reliably in the face of v7 implementations that use
-> v7 (implementation defined) format.
+> What's the big deal with having DTS/DTB under GPL ?
 
-You're right, that looks sound.
+It's really quite simple.  Other open source projects won't touch
+_our_ DTB with a barge pole through fear of GPL contamination.
 
-Providing that TCMTR is read first and reports v6 format, then access
-to the region registers will either succeed safely, or Undef (when
-disallowed by the Secure World).
+So what we'll end up with is other projects creating their own DTB
+descriptions for the same hardware, with different properties (which
+they'll do in an effort to ensure that it isn't a "derived work" of
+the GPL version) and the whole thing turning into a right mess - and
+a poor experience for users because they then end up with OS specific
+DT files.
 
-TCMTR itself is guaranteed to be readable even in the ARMv6 base
-architecture.
+Alternatively, as Rob points out, people will just go the ACPI route
+to avoid the GPL contamination problem.
 
-ARMv8 gives mixed messages on this point[1], but it appears[2] that
-the intention is for the above check to continue to work.
+It doesn't matter what the legal issues actually are: if people think
+that there is the possibility of GPL contamination - even across to
+other differently licensed open source software, they won't touch the
+GPL'd code/data and they'll come up with an alternative solution.
 
-[1] DDI0487A.e, G6.2.126 (TCMTR, TCM Type Register)
-[2] DDI0487A.e, G3.5 (System register support for IMPLEMENTATION DEFINED
-memory features)
-
-
-It would be good to see testing of this in a multiplatform kernel,
-assuming you haven't tried it already.
-
-[...]
-
-Cheers
----Dave
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
