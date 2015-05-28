@@ -1,106 +1,43 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Thu, 28 May 2015 10:36:46 -0700
-Subject: [RFC/PATCH 0/9] IOMMU probe deferral support
-In-Reply-To: <1431644410-2997-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1431644410-2997-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <5567522E.3080003@redhat.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Thu, 28 May 2015 19:38:29 +0200
+Subject: [PATCH V2 3/6] power: mxs_power: add driver for mxs power
+ subsystem
+In-Reply-To: <5565F1F9.2010801@i2se.com>
+References: <1430346747-28728-1-git-send-email-stefan.wahren@i2se.com>
+ <1430346747-28728-4-git-send-email-stefan.wahren@i2se.com>
+ <20150523174149.GA16004@earth> <55656E70.6030906@i2se.com>
+ <20150527135150.GA9205@earth> <5565F1F9.2010801@i2se.com>
+Message-ID: <20150528173828.GA31619@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2015 04:00 PM, Laurent Pinchart wrote:
-> Hello,
->
-> This patch series attempts to implement support for deferring probe of both
-> IOMMU drivers and bus master drivers.
->
-> The relationship between bus masters and IOMMUs creates a strong ordering
-> during initialization of devices. As in the general case IOMMUs are hidden
-> behind the DMA mapping API, IOMMU support relies on the automatic setup of DMA
-> operations without any direct intervention of bus master drivers.
->
-> DMA operations are set up when platform devices are added to the system. This
-> requires IOMMUs to be available at that time. On systems where ordering of
-> device add and probe can't be guaranteed (such as, but not limited to,
-> DT-based systems) this caused incorrect DMA operation setup. This has been
-> addressed by a patches series [1] that introduced a DT-based early
-> registration mechanism for IOMMUs.
->
-> However, that mechanism fails to address all issues. Various dependencies
-> exist between IOMMU devices and other devices, in particular on clocks and on
-> power domains (as mentioned by Marek in [2]). While there are mechanisms to
-> handle some of them without probe deferral (for instance by using the
-> OF_DECLARE macros to register clock drivers), generalizing those mechanisms
-> would essentially recreate a probe ordering mechanism similar to link order
-> probe ordering and couldn't really scale.
->
-> Additionally, IOMMUs could also be present hot-pluggable devices and depend on
-> resources that are thus hot-plugged. OF_DECLARE wouldn't help in that case.
-> For all those reasons probe deferral for IOMMUs has been considered as desired
-> if it can be implemented cleanly. For more in-depth information see [3].
->
-> This RFC series is a first attempt at implementing IOMMU probe deferral
-> support cleanly.
->
-> The core idea is to move setup of DMA operations from device add time to
-> device probe time, implemented in patch 6/9. It could be possible to move
-> setup of other DMA parameters (namely masks and offset) to probe time as well,
-> but that change would be more intrusive and has a higher risk of introducing
-> regressions. For that reason I've decided to keep DMA masks and offset setup
-> at device add time and thus split DMA configuration in masks and operations
-> (patch 5/9). This can be revisited if we decide that the DMA mapping API
-> shouldn't require masks and offset to be set before probe time.
->
-> Patch 8/9 then defers probe of bus master drivers when required IOMMUs are not
-> available yet. This requires knowing when a failed IOMMU lookup should be
-> considered as permanent or temporary. I've reused the OF_DECLARE_IOMMU for
-> this purpose, considering that the presence of a driver compatible with the
-> IOMMU DT node indicates that the failure is temporary and probing of the bus
-> master device should be deferred.
->
-> Note that only IOMMU drivers using the recent .of_xlate() mechanism for
-> DT-based IOMMU reference can cause probe deferral of bus master devices. The
-> .add_device() mechanism isn't supported in this case.
->
-> As an example I've converted the ipmmu-vmsa driver to the new API in patch 9/9.
->
-> At this point many enhancements are possible, but I'd like to receive feedback
-> on the proposed approach before basing more patches on this series. One
-> particular point I would like to address (or see being addressed) in the
-> future is the use of struct iommu_ops with of_iommu_get_ops() and
-> of_iommu_set_ops(). I believe we should introduct a struct iommu and register
-> IOMMU instances instead of IOMMU operations. That should bring us one step
-> closer to removing bus_set_iommu().
->
-> [1] http://www.spinics.net/lists/arm-kernel/msg382787.html
-> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/323238.html
-> [3] https://lkml.org/lkml/2015/2/16/345
->
-> Laurent Pinchart (9):
->    arm: dma-mapping: Don't override dma_ops in arch_setup_dma_ops()
->    arm: dma-mapping: Support IOMMU mappings spanning the full 32 bits
->      range
->    of: dma: Move range size workaround to of_dma_get_range()
->    of: dma: Make of_dma_deconfigure() public
->    of: dma: Split of_configure_dma() into mask and ops configuration
->    drivers: platform: Configure dma operations at probe time
->    iommu: of: Document the of_iommu_configure() function
->    iommu: of: Handle IOMMU lookup failure with deferred probing or error
->    iommu/ipmmu-vmsa: Use DT-based instantiation
->
->   arch/arm/include/asm/dma-iommu.h |   2 +-
->   arch/arm/mm/dma-mapping.c        |  21 +++--
->   drivers/base/platform.c          |   9 ++
->   drivers/iommu/ipmmu-vmsa.c       | 189 +++++++++++++--------------------------
->   drivers/iommu/of_iommu.c         |  29 +++++-
->   drivers/of/address.c             |  20 ++++-
->   drivers/of/device.c              |  77 ++++++++++------
->   drivers/of/of_pci.c              |   3 +-
->   drivers/of/platform.c            |  16 ++--
->   include/linux/of_device.h        |  14 ++-
->   10 files changed, 195 insertions(+), 185 deletions(-)
->
+Hi,
 
-I no longer have hardware to test this on but the entire approach looks
-reasonable to me.
+On Wed, May 27, 2015 at 06:34:01PM +0200, Stefan Wahren wrote:
+> the driver consists of multiple files in the mxs sub directory.
+> I linked to the main file to reduce search effort. The battery
+> handling incl. charging should be implemented in ddi_power_battery.c
+>
+> From my understanding it's not possible to determine where the 5V
+> exactly come from (either 5V wall plug or USB). The driver simply uses
+> the USB PHY state.
 
-Reviewed-by: Laura Abbott <labbott@redhat.com>
+Yes, but your driver does not even check, that there is 5V. It even
+reports AC online if neither USB nor wall charger is connected.
+
+> > While you can skip implementation of battery connection check
+> > you should make sure, that AC is actually connected.
+> 
+> Do you refer to the right state of property
+> POWER_SUPPLY_PROP_ONLINE or driver probing?
+
+I'm referring to the right state.
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150528/0c12a62a/attachment.sig>
