@@ -1,116 +1,133 @@
 From: mturquette@linaro.org (Michael Turquette)
-Date: Wed, 27 May 2015 20:45:55 -0700
-Subject: [PATCH v3 5/6] doc: dt: add documentation for lpc1850-ccu clk
- driver
-In-Reply-To: <1431988559-23338-6-git-send-email-manabian@gmail.com>
+Date: Wed, 27 May 2015 20:51:43 -0700
+Subject: [PATCH v3 4/6] clk: add lpc18xx ccu clk driver
+In-Reply-To: <20150528034424.22384.83956@quantum>
 References: <1431988559-23338-1-git-send-email-manabian@gmail.com>
- <1431988559-23338-6-git-send-email-manabian@gmail.com>
-Message-ID: <20150528034555.22384.65723@quantum>
+ <1431988559-23338-5-git-send-email-manabian@gmail.com>
+ <20150528034424.22384.83956@quantum>
+Message-ID: <20150528035143.22384.88862@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Joachim Eastwood (2015-05-18 15:35:58)
-> Add DT binding documentation for lpc1850-ccu clk driver.
+Quoting Michael Turquette (2015-05-27 20:44:24)
+> Hi Joachim,
 > 
-> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
-> ---
->  .../devicetree/bindings/clock/lpc1850-ccu.txt      | 146 +++++++++++++++++++++
->  1 file changed, 146 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/lpc1850-ccu.txt
+> Quoting Joachim Eastwood (2015-05-18 15:35:57)
+> <snip>
+> > +static void lpc18xx_ccu_register_branch_clks(void __iomem *reg_base,
+> > +                                            int base_clk_id,
+> > +                                            const char *parent)
+> > +{
+> > +       int i;
+> > +
+> > +       for (i = 0; i < ARRAY_SIZE(clk_branches); i++) {
+> > +               if (clk_branches[i].base_id != base_clk_id)
+> > +                       continue;
+> > +
+> > +               lpc18xx_ccu_register_branch_gate_div(&clk_branches[i], reg_base,
+> > +                                                    parent);
+> > +
+> > +               if (clk_branches[i].flags & CCU_BRANCH_IS_BUS)
+> > +                       parent = clk_branches[i].name;
+> > +       }
+> > +}
+> > +
+> > +static void __init lpc18xx_ccu_init(struct device_node *np)
+> > +{
+> > +       struct lpc18xx_branch_clk_data *clk_data;
+> > +       int num_base_ids, *base_ids;
+> > +       void __iomem *reg_base;
+> > +       const char *parent;
+> > +       int base_clk_id;
+> > +       int i;
+> > +
+> > +       reg_base = of_iomap(np, 0);
+> > +       if (!reg_base) {
+> > +               pr_warn("%s: failed to map address range\n", __func__);
+> > +               return;
+> > +       }
+> > +
+> > +       clk_data = kzalloc(sizeof(*clk_data), GFP_KERNEL);
+> > +       if (!clk_data)
+> > +               return;
+> > +
+> > +       num_base_ids = of_clk_get_parent_count(np);
+> > +
+> > +       base_ids = kcalloc(num_base_ids, sizeof(int), GFP_KERNEL);
+> > +       if (!base_ids) {
+> > +               kfree(clk_data);
+> > +               return;
+> > +       }
+> > +
+> > +       clk_data->base_ids = base_ids;
+> > +       clk_data->num_base_ids = num_base_ids;
+> > +
+> > +       for (i = 0; i < num_base_ids; i++) {
+> > +               struct clk *clk = of_clk_get(np, i);
+> > +               if (IS_ERR(clk)) {
+> > +                       pr_warn("%s: failed to get clock at idx %d\n",
+> > +                               __func__, i);
+> > +                       continue;
+> > +               }
+> > +
+> > +               parent = __clk_get_name(clk);
+> > +               base_clk_id = of_clk_get_index(np, i);
+> > +
+> > +               clk_data->base_ids[i] = base_clk_id;
+> > +               lpc18xx_ccu_register_branch_clks(reg_base, base_clk_id,
+> > +                                                parent);
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/lpc1850-ccu.txt b/Documentation/devicetree/bindings/clock/lpc1850-ccu.txt
-> new file mode 100644
-> index 000000000000..aca46805c10a
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/lpc1850-ccu.txt
-> @@ -0,0 +1,146 @@
-> +* NXP LPC1850 Clock Control Unit (CCU)
-> +
-> +Each CGU base clock has several clock branches which can be turned on
-> +or off independently by the Clock Control Units CCU1 or CCU2. The
-> +branch clocks are distributed between CCU1 and CCU2.
-> +
-> + - Above text taken from NXP LPC1850 User Manual.
-> +
-> +This binding uses the common clock binding:
-> +    Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +
-> +Required properties:
-> +- compatible:
-> +       Should be "nxp,lpc1850-ccu"
-> +- reg:
-> +       Shall define the base and range of the address space
-> +       containing clock control registers
-> +- #clock-cells:
-> +       Shall have value <1>.  The permitted clock-specifier values
-> +       are the branch clock names defined in table below.
-> +- clocks:
-> +       Shall contain a list of phandles for the base clocks routed
-> +       from the CGU to the specific CCU. See mapping of base clocks
-> +       and CCU in table below.
-> +
-> +Which brach clocks that are available on the CCU depends on the
-> +specific LPC part.
-> +
-> +CCU1 branch clocks:
-> +Base clock     Branch clock            Description
-> +BASE_APB3_CLK  CLK_APB3_BUS            APB3 bus clock.
-> +               CLK_APB3_I2C1           Clock to the I2C1 register interface
-> +                                       and I2C1 peripheral clock.
+> Thanks for sending V3. This driver is getting close!
+> 
+> So the main thing I don't understand is why you do not encode the CGU
+> clock parent string names into this CCU driver. If I understand your
+> approach correctly, you do the following in lpc18xx_ccu_init:
 
-You don't need to make these explicit here. Just specify that the header
-containing these constants is located at
-nclude/dt-bindings/clock/lpc18xx-ccu.h
+Ugh, I just saw that you mentioned this approach in your cover letter.
+No need for you to answer all of my questions then.
 
-(DT people please correct me if this is bad etiquette)
+Please make the change to encode the parent string names directly. V4
+should be good to go after that.
 
-> +
-> +Not all branch clocks are available on all LPC parts. Check the user
-> +manual for your specific part.
-
-How many varieties of LPC part are there? Should these varieties each
-have their own .dtsi that make it clear which branch clocks are
-available on that part?
-
-Regards,
+Thanks,
 Mike
 
-> +
-> +Note that CLK_M3_x and CLK_M4_x have been renamed to CLK_CPU_x here
-> +be more generic since both LPC18xx (M3) and LPC43xx (M4) are
-> +supported.
-> +
-> +
-> +Example board file:
-> +
-> +soc {
-> +       ccu1: clock-controller at 40051000 {
-> +               compatible = "nxp,lpc1850-ccu";
-> +               reg = <0x40051000 0x1000>;
-> +               #clock-cells = <1>;
-> +               clocks = <&cgu BASE_APB3_CLK>,   <&cgu BASE_APB1_CLK>,
-> +                        <&cgu BASE_SPIFI_CLK>,  <&cgu BASE_CPU_CLK>,
-> +                        <&cgu BASE_PERIPH_CLK>, <&cgu BASE_USB0_CLK>,
-> +                        <&cgu BASE_USB1_CLK>,   <&cgu BASE_SPI_CLK>;
-> +       };
-> +
-> +       ccu2: clock-controller at 40052000 {
-> +               compatible = "nxp,lpc1850-ccu";
-> +               reg = <0x40052000 0x1000>;
-> +               #clock-cells = <1>;
-> +               clocks = <&cgu BASE_AUDIO_CLK>, <&cgu BASE_UART3_CLK>,
-> +                        <&cgu BASE_UART2_CLK>, <&cgu BASE_UART1_CLK>,
-> +                        <&cgu BASE_UART0_CLK>, <&cgu BASE_SSP1_CLK>,
-> +                        <&cgu BASE_SSP0_CLK>,  <&cgu BASE_SDIO_CLK>;
-> +       };
-> +
-> +       /* A user of CCU brach clocks */
-> +       uart1: serial at 40082000 {
-> +               ...
-> +               clocks = <&ccu2 CLK_APB0_UART1>, <&ccu1 CLK_CPU_UART1>;
-> +               ...
-> +       };
-> +};
-> -- 
-> 1.8.0
 > 
+> 1) count the number of parent clocks (ostensibly CGU clocks)
+> 2) iterate through all of those CGU clocks, extracting a base_id value
+> (loop #1)
+> 3) using this base_id as a key you walk through an array in the CCU
+> driver trying to find a matching base_id value
+> (loop #2)
+> 4) after finding the corresponding CCU clocks you get the parent clock
+> with of_clk_get
+> 5) using of_clk_get you fetch its name with __clk_get_name
+> 6) you pass this parent name into a fairly typical looking registration
+> function
+> 
+> Assuming I got all of that right, I hope we can simplify it
+> considerably.
+> 
+> You already have an array of CCU clock information in this driver,
+> clk_branches[]. Why not encode the parent string name here? This would
+> involve adding a "parent_name" member to struct lpc18xx_clk_branch.
+> 
+> Doing the above, your O(n^2)-ish registration function becomes O(n):
+> 
+> 1) iterate through the array of the CCU clocks (clk_branchs[])
+> 2) register them
+> 3) profit
+> 
+> I'm starting to think any reference to base_id is sign that things are
+> wrong in your driver. I am unconvinced that you need to "share" this
+> base_id across CGU and CCU drivers in the way you do. If I'm wrong
+> please help me to understand.
+> 
+> As a wild thought, if you do not want to encode parent string names into
+> this driver, have you tried to use the clock-names property in the CCU
+> blob? You do not need clock-output-names in the CGU blob either. But
+> this is just an idea. It is far for straightforward for you t encode the
+> parent names in your clk_branches[] array.
+> 
+> Thanks,
+> Mike
