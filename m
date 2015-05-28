@@ -1,64 +1,43 @@
 From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Thu, 28 May 2015 18:33:32 +0530
-Subject: [PATCH 00/12] i2c: pxa: Fixes, cleanup and support for pxa910 family
-Message-ID: <1432818224-17070-1-git-send-email-vaibhav.hiremath@linaro.org>
+Date: Thu, 28 May 2015 18:33:34 +0530
+Subject: [PATCH 02/12] i2c: pxa: No need to set slave addr for i2c master mode
+ reset
+In-Reply-To: <1432818224-17070-1-git-send-email-vaibhav.hiremath@linaro.org>
+References: <1432818224-17070-1-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <1432818224-17070-3-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series fixes bugs/warnings, cleans up the code and adds
-support for PXA910 family of devices to PXA I2C bus driver.
+From: "Jett.Zhou" <jtzhou@marvell.com>
 
-There has been one attempt made sometime back in 2012 to upstream
-some of the patches from below list, but did not get follow up later.
-I have consolidated all the patches, cleaned them up, splited into
-logical changes, added new patches and submitting it now.
+Normally i2c controller works as master, so slave addr is not needed, or it
+will impact some slave device (eg. ST NFC chip) i2c accesses, because it has
+the same i2c address with controller.
 
-I tried to maintain authorship & Signoff except where I did some
-significant changes to the code/logic.
+Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
+[vaibhav.hiremath at linaro.org: Updated Changelog]
+Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+Cc: Wolfram Sang <wsa@the-dreams.de>
 
-Link to previous post:
-http://permalink.gmane.org/gmane.linux.drivers.i2c/13557
+Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+---
+ drivers/i2c/busses/i2c-pxa.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Testing:
-  - Boot tested on platform based on PXA1928
-  - Probe is successfully passing
-
-TODO:
-  - Due to lack of client driver support as of now, could not
-    able to do functionality testing from client. I am working
-    on PMIC driver support which is over I2C, so will have good
-    meaningful testing then.
-
-Jett.Zhou (3):
-  i2c: pxa: No need to set slave addr for i2c master mode reset
-  i2c: pxa: Add reset operation when i2c bus busy
-  i2c: pxa: Add support for pxa910/988 & new configuration features
-
-Leilei Shang (1):
-  i2c: pxa: keep i2c irq ON in suspend
-
-Rob Herring (1):
-  i2c: pxa: Add bus reset functionality
-
-Shouming Wang (1):
-  i2c: pxa: Return I2C_RETRY when timeout in pio mode
-
-Vaibhav Hiremath (4):
-  i2c: pxa: Reset i2c controller on timeout in interrupt and pio mode
-  i2c: pxa: enable/disable irq across message xfer
-  i2c: pxa: Update debug function to dump more info on error
-  i2c:pxa: Use devm_ variants in probe function
-
-Yi Zhang (1):
-  i2c: pxa: enable/disable i2c module across msg xfer
-
-Yipeng Yao (1):
-  i2c: pxa: Remove compile warnning in 64bit mode
-
- Documentation/devicetree/bindings/i2c/i2c-pxa.txt |   7 +
- drivers/i2c/busses/i2c-pxa.c                      | 272 +++++++++++++++++-----
- include/linux/i2c/pxa-i2c.h                       |   2 +
- 3 files changed, 225 insertions(+), 56 deletions(-)
-
+diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
+index f4ac8c5..d4c798a 100644
+--- a/drivers/i2c/busses/i2c-pxa.c
++++ b/drivers/i2c/busses/i2c-pxa.c
+@@ -459,8 +459,10 @@ static void i2c_pxa_reset(struct pxa_i2c *i2c)
+ 	writel(I2C_ISR_INIT, _ISR(i2c));
+ 	writel(readl(_ICR(i2c)) & ~ICR_UR, _ICR(i2c));
+ 
++#ifdef CONFIG_I2C_PXA_SLAVE
+ 	if (i2c->reg_isar)
+ 		writel(i2c->slave_addr, _ISAR(i2c));
++#endif
+ 
+ 	/* set control register values */
+ 	writel(I2C_ICR_INIT | (i2c->fast_mode ? ICR_FM : 0), _ICR(i2c));
 -- 
 1.9.1
