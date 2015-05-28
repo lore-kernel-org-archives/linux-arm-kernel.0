@@ -1,47 +1,35 @@
 From: dingel@linux.vnet.ibm.com (Dominik Dingel)
-Date: Thu, 28 May 2015 13:52:32 +0200
-Subject: [PATCH 0/5] Remove s390 sw-emulated hugepages and cleanup 
-Message-ID: <1432813957-46874-1-git-send-email-dingel@linux.vnet.ibm.com>
+Date: Thu, 28 May 2015 13:52:37 +0200
+Subject: [PATCH 5/5] s390/mm: forward check for huge pmds to pmd_large()
+In-Reply-To: <1432813957-46874-1-git-send-email-dingel@linux.vnet.ibm.com>
+References: <1432813957-46874-1-git-send-email-dingel@linux.vnet.ibm.com>
+Message-ID: <1432813957-46874-6-git-send-email-dingel@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+We already do the check in pmd_large, so we can just forward the call.
 
-there is a potential bug with KVM and hugetlbfs if the hardware does not
-support hugepages (EDAT1).
-We fix this by making EDAT1 a hard requirement for hugepages and 
-therefore removing and simplifying code.
+Acked-by: Martin Schwidefsky <schwidefsky@de.ibm.com>
+Signed-off-by: Dominik Dingel <dingel@linux.vnet.ibm.com>
+---
+ arch/s390/mm/hugetlbpage.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
-As s390, with the sw-emulated hugepages, was the only user of arch_prepare/release_hugepage
-I also removed theses calls from common and other architecture code.
-
-Thanks,
-    Dominik
-
-Dominik Dingel (5):
-  s390/mm: make hugepages_supported a boot time decision
-  mm/hugetlb: remove unused arch hook prepare/release_hugepage
-  mm/hugetlb: remove arch_prepare/release_hugepage from arch headers
-  s390/hugetlb: remove dead code for sw emulated huge pages
-  s390/mm: forward check for huge pmds to pmd_large()
-
- arch/arm/include/asm/hugetlb.h     |  9 ------
- arch/arm64/include/asm/hugetlb.h   |  9 ------
- arch/ia64/include/asm/hugetlb.h    |  9 ------
- arch/metag/include/asm/hugetlb.h   |  9 ------
- arch/mips/include/asm/hugetlb.h    |  9 ------
- arch/powerpc/include/asm/hugetlb.h |  9 ------
- arch/s390/include/asm/hugetlb.h    |  3 --
- arch/s390/include/asm/page.h       |  8 ++---
- arch/s390/kernel/setup.c           |  2 ++
- arch/s390/mm/hugetlbpage.c         | 65 +++-----------------------------------
- arch/s390/mm/pgtable.c             |  2 ++
- arch/sh/include/asm/hugetlb.h      |  9 ------
- arch/sparc/include/asm/hugetlb.h   |  9 ------
- arch/tile/include/asm/hugetlb.h    |  9 ------
- arch/x86/include/asm/hugetlb.h     |  9 ------
- mm/hugetlb.c                       | 10 ------
- 16 files changed, 12 insertions(+), 168 deletions(-)
-
+diff --git a/arch/s390/mm/hugetlbpage.c b/arch/s390/mm/hugetlbpage.c
+index 999616b..a4b2f5e 100644
+--- a/arch/s390/mm/hugetlbpage.c
++++ b/arch/s390/mm/hugetlbpage.c
+@@ -135,10 +135,7 @@ pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
+ 
+ int pmd_huge(pmd_t pmd)
+ {
+-	if (!MACHINE_HAS_HPAGE)
+-		return 0;
+-
+-	return !!(pmd_val(pmd) & _SEGMENT_ENTRY_LARGE);
++	return pmd_large(pmd);
+ }
+ 
+ int pud_huge(pud_t pud)
 -- 
 2.3.7
