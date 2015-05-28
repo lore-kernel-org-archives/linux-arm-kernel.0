@@ -1,34 +1,20 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 28 May 2015 09:48:16 -0700
-Subject: [PATCH v5 0/6] arm64,hi6220: Enable Hisilicon Hi6220 SoC
-In-Reply-To: <1431007225-8513-1-git-send-email-bintian.wang@huawei.com>
- (Bintian Wang's message of "Thu, 7 May 2015 22:00:19 +0800")
-References: <1431007225-8513-1-git-send-email-bintian.wang@huawei.com>
-Message-ID: <7hy4k8k5rj.fsf@deeprootsystems.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Thu, 28 May 2015 09:49:42 -0700
+Subject: ARM64 kexec/kdump timeline
+In-Reply-To: <55668A11.1010304@linaro.org>
+References: <555E37FC.9020800@codeaurora.org>
+ <1432239334.1922.7.camel@infradead.org> <55653538.8020206@codeaurora.org>
+ <CAKv+Gu8U1SWPb-GJ-3u9t_EX3g18AvOWisK3FycvRWsEdyjpzQ@mail.gmail.com>
+ <55668A11.1010304@linaro.org>
+Message-ID: <1432831782.1922.25.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bintian Wang <bintian.wang@huawei.com> writes:
+On Thu, 2015-05-28 at 11:22 +0800, Hanjun Guo wrote:
+> Timur, can you provide more detailed information then we can debug
+> into it?
 
-> Hi6220 is one mobile solution of Hisilicon, this patchset contains
-> initial support for Hi6220 SoC and HiKey development board, which
-> supports octal ARM Cortex A53 cores. Initial support is minimal and
-> includes just the arch configuration, clock driver, device tree
-> configuration.
->
-> PSCI is enabled in device tree and there is no problem to boot all the
-> octal cores, and the CPU hotplug is also working now, you can download
-> and compile the latest firmware based on the following link to run this
-> patch set:
-> https://github.com/96boards/documentation/wiki/UEFI 
+Please post the output of kexec with the --debug option set, and also
+the output of the kernel, maybe with 'loglevel=9'.
 
-Tested-by: Kevin Hilman <khilman@linaro.org>
-
-I've now tested this version on top of v4.1-rc5 using the mainline
-u-boot port[1], and confirm that all 8 cores are booting.
-
-No UEFI required... yay!
-
-Kevin
-
-[1] http://lists.denx.de/pipermail/u-boot/2015-May/214006.html
+-Geoff
