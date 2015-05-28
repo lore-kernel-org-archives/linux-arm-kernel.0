@@ -1,56 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 28 May 2015 22:42:56 +0100
-Subject: Kernel oops on 32-bit arm with syscall with invalid sysno
-In-Reply-To: <55677D6A.1060008@redhat.com>
-References: <55677D6A.1060008@redhat.com>
-Message-ID: <20150528214256.GF2067@n2100.arm.linux.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 28 May 2015 15:46:46 -0600
+Subject: [PATCH 1/7] dt/bindings: Add binding for the Raspberry Pi clock
+ provider
+In-Reply-To: <1431978219-14226-2-git-send-email-eric@anholt.net>
+References: <1431978219-14226-1-git-send-email-eric@anholt.net>
+ <1431978219-14226-2-git-send-email-eric@anholt.net>
+Message-ID: <55678CC6.8060300@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 28, 2015 at 04:41:14PM -0400, William Cohen wrote:
-> When reviewing testsuite failures for systemtap I found that the
-> 32-bit arm kernels (both 4.1.0-rc5 and 3.19.8) were not handling the
-> libc syscall with invalid sysno in the manner described by
-> http://www.gnu.org/software/libc/manual/html_node/System-Calls.html.
-> Rather than returning -1 and setting errno to ENOSYS the invalid
-> syscall gives segfault and a kernel oops.
+On 05/18/2015 01:43 PM, Eric Anholt wrote:
+> The hardware clocks are not controllable by the ARM, so we have to
+> make requests to the firmware to do so from the VPU side.  This will
+> let us replace fixed clocks in our DT with actual clock control (and
+> correct frequency information).
 
-Looking at this, it seems that we're triggering this:
+> diff --git a/Documentation/devicetree/bindings/clock/raspberrypi,firmware-clocks.txt b/Documentation/devicetree/bindings/clock/raspberrypi,firmware-clocks.txt
 
-        BUG_ON(context->in_syscall || context->name_count);
+> +Required properties:
+...
+> +- #clock-cells:	Shall have value <1>.  The permitted clock-specifier values
+> +		  can be found in include/dt-bindings/clk/raspberrypi.h.
 
-which seems to imply that we've called audit_syscall_entry() twice
-without a call to audit_syscall_exit().  That is something we can
-fix - and something which only happens with the syscall of "-1"
-(which is our "syscall was cancelled" value.)
+That file is explicitly part of the binding; any driver that implements
+this binding needs to use the same values. As such, that file would
+typically be part of the patch that adds the binding doc, not part of
+the patch that implements the driver.
 
-If I have diagnosed this correctly, the following patch should fix
-it.  However, as you're asking for the "cancelled" syscall value,
-what you'll get returned from the syscall is the r0 value preserved
-as the result of the syscall.  In other words, you won't get -1 and
-errno set to ENOSYS.  Not much can be done about that without breaking
-syscall cancelling, so expect your test case to continue failing.
+No need to respin the series just because of that though.
 
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index f8ccc21fa032..2c40c1214a72 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -241,11 +241,11 @@ __sys_trace:
- 	cmp	scno, #-1			@ skip the syscall?
- 	bne	2b
- 	add	sp, sp, #S_OFF			@ restore stack
--	b	ret_slow_syscall
-+	b	3f
- 
- __sys_trace_return:
- 	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
--	mov	r0, sp
-+3:	mov	r0, sp
- 	bl	syscall_trace_exit
- 	b	ret_slow_syscall
- 
+> +- firmware:	Phandle to the firmware driver node.
 
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+"firmware" is rather generic. I'd suggest a vendor prefix for the
+property name; raspberrypi,firmware.
