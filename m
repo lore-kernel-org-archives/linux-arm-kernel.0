@@ -1,186 +1,130 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 28 May 2015 15:01:00 -0700
-Subject: [PATCH v2 3/3] clk: meson8b: Add support for Meson8b clocks
-In-Reply-To: <1431773333-23567-4-git-send-email-carlo@caione.org>
-References: <1431773333-23567-1-git-send-email-carlo@caione.org>
- <1431773333-23567-4-git-send-email-carlo@caione.org>
-Message-ID: <20150528220100.GE24204@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 28 May 2015 16:02:45 -0600
+Subject: [PATCH 2/7] ARM: bcm2835: Add a Raspberry Pi-specific clock
+ driver.
+In-Reply-To: <1431978219-14226-3-git-send-email-eric@anholt.net>
+References: <1431978219-14226-1-git-send-email-eric@anholt.net>
+ <1431978219-14226-3-git-send-email-eric@anholt.net>
+Message-ID: <55679085.6040402@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16, Carlo Caione wrote:
-> diff --git a/drivers/clk/meson/meson8b-clkc.c b/drivers/clk/meson/meson8b-clkc.c
-> new file mode 100644
-> index 0000000..b8be5c7
-> --- /dev/null
-> +++ b/drivers/clk/meson/meson8b-clkc.c
-> @@ -0,0 +1,182 @@
-> +/*
-> + * Copyright (c) 2015 Endless Mobile, Inc.
-> + * Author: Carlo Caione <carlo@endlessm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/clk.h>
+On 05/18/2015 01:43 PM, Eric Anholt wrote:
+> Unfortunately, the clock manager's registers are not accessible by the
+> ARM, so we have to request that the firmware modify our clocks for us.
+> 
+> This driver only registers the clocks at the point they are requested
+> by a client driver.  This is partially to support returning
+> -EPROBE_DEFER when the firmware driver isn't supported yet, but it
+> also avoids issues with disabling "unused" clocks due to them not yet
+> being connected to their consumers in the DT.
 
-Do you need this include?
+It looks like you forgot to CC the clock subsystem maintainers:
 
-> +#include <linux/clk-provider.h>
-> +#include <linux/kernel.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/slab.h>
-> +#include <dt-bindings/clock/meson8b-clkc.h>
-> +
-> +#include "clkc.h"
-> +
-> +#define MESON8B_REG_CTL0_ADDR		0x0000
-> +#define MESON8B_REG_SYS_CPU_CNTL1	0x015c
-> +#define MESON8B_REG_HHI_MPEG		0x0174
-> +#define MESON8B_REG_MALI		0x01b0
-> +#define MESON8B_REG_PLL_FIXED		0x0280
-> +#define MESON8B_REG_PLL_SYS		0x0300
-> +#define MESON8B_REG_PLL_VID		0x0320
-> +
-> +static struct pll_rate_table sys_pll_rate_table[] = {
+M:      Mike Turquette <mturquette@linaro.org>
+M:      Stephen Boyd <sboyd@codeaurora.org>
 
-const?
+The description above sounds like a neat solution, but has the
+disadvantage that the clocks without a client won't show up in debugfs.
+I wonder if the clock maintainers know of a better way?
 
-> +	PLL_RATE(312000000, 52, 1, 2),
-> +	PLL_RATE(336000000, 56, 1, 2),
-> +	PLL_RATE(360000000, 60, 1, 2),
-> +	PLL_RATE(384000000, 64, 1, 2),
-> +	PLL_RATE(408000000, 68, 1, 2),
-> +	PLL_RATE(432000000, 72, 1, 2),
-> +	PLL_RATE(456000000, 76, 1, 2),
-> +	PLL_RATE(480000000, 80, 1, 2),
-> +	PLL_RATE(504000000, 84, 1, 2),
-> +	PLL_RATE(528000000, 88, 1, 2),
-> +	PLL_RATE(552000000, 92, 1, 2),
-> +	PLL_RATE(576000000, 96, 1, 2),
-> +	PLL_RATE(600000000, 50, 1, 1),
-> +	PLL_RATE(624000000, 52, 1, 1),
-> +	PLL_RATE(648000000, 54, 1, 1),
-> +	PLL_RATE(672000000, 56, 1, 1),
-> +	PLL_RATE(696000000, 58, 1, 1),
-> +	PLL_RATE(720000000, 60, 1, 1),
-> +	PLL_RATE(744000000, 62, 1, 1),
-> +	PLL_RATE(768000000, 64, 1, 1),
-> +	PLL_RATE(792000000, 66, 1, 1),
-> +	PLL_RATE(816000000, 68, 1, 1),
-> +	PLL_RATE(840000000, 70, 1, 1),
-> +	PLL_RATE(864000000, 72, 1, 1),
-> +	PLL_RATE(888000000, 74, 1, 1),
-> +	PLL_RATE(912000000, 76, 1, 1),
-> +	PLL_RATE(936000000, 78, 1, 1),
-> +	PLL_RATE(960000000, 80, 1, 1),
-> +	PLL_RATE(984000000, 82, 1, 1),
-> +	PLL_RATE(1008000000, 84, 1, 1),
-> +	PLL_RATE(1032000000, 86, 1, 1),
-> +	PLL_RATE(1056000000, 88, 1, 1),
-> +	PLL_RATE(1080000000, 90, 1, 1),
-> +	PLL_RATE(1104000000, 92, 1, 1),
-> +	PLL_RATE(1128000000, 94, 1, 1),
-> +	PLL_RATE(1152000000, 96, 1, 1),
-> +	PLL_RATE(1176000000, 98, 1, 1),
-> +	PLL_RATE(1200000000, 50, 1, 0),
-> +	PLL_RATE(1224000000, 51, 1, 0),
-> +	PLL_RATE(1248000000, 52, 1, 0),
-> +	PLL_RATE(1272000000, 53, 1, 0),
-> +	PLL_RATE(1296000000, 54, 1, 0),
-> +	PLL_RATE(1320000000, 55, 1, 0),
-> +	PLL_RATE(1344000000, 56, 1, 0),
-> +	PLL_RATE(1368000000, 57, 1, 0),
-> +	PLL_RATE(1392000000, 58, 1, 0),
-> +	PLL_RATE(1416000000, 59, 1, 0),
-> +	PLL_RATE(1440000000, 60, 1, 0),
-> +	PLL_RATE(1464000000, 61, 1, 0),
-> +	PLL_RATE(1488000000, 62, 1, 0),
-> +	PLL_RATE(1512000000, 63, 1, 0),
-> +	PLL_RATE(1536000000, 64, 1, 0),
-> +	{ /* sentinel */ },
-> +};
-> +
-> +PNAME(p_xtal)		= { "xtal" };
-> +PNAME(p_fclk_div)	= { "fixed_pll" };
-> +PNAME(p_cpu_clk)	= { "sys_pll" };
-> +PNAME(p_clk81)		= { "fclk_div3", "fclk_div4", "fclk_div5" };
-> +PNAME(p_mali)		= { "fclk_div3", "fclk_div4", "fclk_div5",
-> +			    "fclk_div7", "zero" };
-> +
-> +static u32 mux_table_clk81[]	= { 6, 5, 7 };
-> +static u32 mux_table_mali[]	= { 6, 5, 7, 4, 0 };
-> +
-> +static struct pll_conf pll_confs = {
-> +	.m		= PARM(0x00, 0,  9),
-> +	.n		= PARM(0x00, 9,  5),
-> +	.od		= PARM(0x00, 16, 2),
-> +};
-> +
-> +static struct pll_conf sys_pll_conf = {
-> +	.m		= PARM(0x00, 0,  9),
-> +	.n		= PARM(0x00, 9,  5),
-> +	.od		= PARM(0x00, 16, 2),
-> +	.rate_table	= sys_pll_rate_table,
-> +};
-> +
-> +static struct composite_conf clk81_conf __initdata = {
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
 
-Can this be __initconstdata?
+>  obj-$(CONFIG_ARCH_BCM2835)		+= clk-bcm2835.o
+> +obj-$(CONFIG_ARCH_BCM2835)		+= clk-raspberrypi.o
 
-> +	.mux_table		= mux_table_clk81,
-> +	.mux_flags		= CLK_MUX_READ_ONLY,
-> +	.mux_parm		= PARM(0x00, 12, 3),
-> +	.div_parm		= PARM(0x00, 0, 7),
-> +	.gate_parm		= PARM(0x00, 7, 1),
-> +};
+Shouldn't this replace the old legacy code in clk-bcm2835.c?
+
+I wonder if a separate Kconfig symbol is warranted for the clock driver.
+Looking at the context in the patch, it's common not to do that though.
+
+> diff --git a/drivers/clk/clk-raspberrypi.c b/drivers/clk/clk-raspberrypi.c
+
+> +struct rpi_firmware_clock {
+> +	/* Clock definitions in our static struct. */
+> +	int clock_id;
+
+Why not just use the raw HW IDs (from the mailbox protocol) as the ID in
+DT and the driver? The only thing that would need to change is to add a
+error check for "clkspec->args[0] == 0" in
+rpi_firmware_delayed_get_clk(). The advantage would be that
+include/dt-bindings/clk/raspberrypi.h would exactly match the firmware
+protocol, and hence be easily correlated with the documentation.
+
+> +static int rpi_clk_set_rate(struct clk_hw *hw,
+> +			    unsigned long rate, unsigned long parent_rate)
+> +{
+> +	struct rpi_firmware_clock *rpi_clk =
+> +		container_of(hw, struct rpi_firmware_clock, hw);
+> +	u32 packet[2];
+> +	int ret;
 > +
-> +static struct composite_conf mali_conf __initdata = {
-> +	.mux_table		= mux_table_mali,
-> +	.mux_parm		= PARM(0x00, 9, 3),
-> +	.div_parm		= PARM(0x00, 0, 7),
-> +	.gate_parm		= PARM(0x00, 8, 1),
-> +};
+> +	packet[0] = rpi_clk->clock_id;
+> +	packet[1] = rate;
+> +	ret = rpi_firmware_property(rpi_clk->firmware_node,
+
+The docs indicate there's a third word here "skip setting turbo". Is
+that optional?
+
+https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
+
+> +static long rpi_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+> +			       unsigned long *parent_rate)
+> +{
+> +	/*
+> +	 * The firmware will end up rounding our rate to something,
+> +	 * but we don't have an interface for it.  Just return the
+> +	 * requested value, and it'll get updated after the clock gets
+> +	 * set.
+> +	 */
+> +	return rate;
+> +}
+
+Hmm. I wonder if that will confuse things; I thought the purpose of
+round_rate() was so code could know exactly what would happen ahead of time?
+
+> +static struct clk *rpi_firmware_delayed_get_clk(struct of_phandle_args *clkspec,
+> +						void *_data)
+
+> +	rpi_clk = &rpi_clocks[clkspec->args[0]];
 > +
-> +static struct clk_conf meson8b_xtal_conf __initdata =
-> +	FIXED_RATE_P(MESON8B_REG_CTL0_ADDR, CLKID_XTAL, "xtal",
-> +		     CLK_IS_ROOT, PARM(0x00, 4, 7));
+> +	firmware_node = of_parse_phandle(of_node, "firmware", 0);
+> +	if (!firmware_node) {
+> +		dev_err(dev, "%s: Missing firmware node\n", rpi_clk->name);
+> +		return ERR_PTR(-ENODEV);
+> +	}
 > +
-> +static struct clk_conf meson8b_clk_confs[] __initdata = {
+> +	/* Try a no-op transaction to see if the driver is loaded yet. */
+> +	ret = rpi_firmware_property_list(firmware_node, NULL, 0);
+> +	if (ret)
+> +		return ERR_PTR(ret);
 
-const?
+I would move all that into this driver's probe().
 
-> +	FIXED_RATE(CLKID_ZERO, "zero", CLK_IS_ROOT, 0),
-> +	PLL(MESON8B_REG_PLL_FIXED, CLKID_PLL_FIXED, "fixed_pll",
-> +	    p_xtal, 0, &pll_confs),
-> +	PLL(MESON8B_REG_PLL_VID, CLKID_PLL_VID, "vid_pll",
-> +	    p_xtal, 0, &pll_confs),
-> +	PLL(MESON8B_REG_PLL_SYS, CLKID_PLL_SYS, "sys_pll",
-> +	    p_xtal, 0, &sys_pll_conf),
-> +	FIXED_FACTOR_DIV(CLKID_FCLK_DIV2, "fclk_div2", p_fclk_div, 0, 2),
-> +	FIXED_FACTOR_DIV(CLKID_FCLK_DIV3, "fclk_div3", p_fclk_div, 0, 3),
-> +	FIXED_FACTOR_DIV(CLKID_FCLK_DIV4, "fclk_div4", p_fclk_div, 0, 4),
-> +	FIXED_FACTOR_DIV(CLKID_FCLK_DIV5, "fclk_div5", p_fclk_div, 0, 5),
-> +	FIXED_FACTOR_DIV(CLKID_FCLK_DIV7, "fclk_div7", p_fclk_div, 0, 7),
-> +	CPU(MESON8B_REG_SYS_CPU_CNTL1, CLKID_CPUCLK, "a5_clk", p_cpu_clk),
-> +	COMPOSITE(MESON8B_REG_HHI_MPEG, CLKID_CLK81, "clk81", p_clk81,
-> +		  CLK_SET_RATE_NO_REPARENT | CLK_IGNORE_UNUSED, &clk81_conf),
-> +	COMPOSITE(MESON8B_REG_MALI, CLKID_MALI, "mali", p_mali,
-> +		  CLK_IGNORE_UNUSED, &mali_conf),
+> +	init.flags = CLK_IS_ROOT;
 
-Ah here we see the defines used.
+Is it possible to add clock parent information to the driver, so the
+clocks are all hooked together into the correct tree, rather than all
+looking like root clocks?
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+One of the many reasons I didn't do anything FW-wise for the kernel was
+the hope that such information would be forthcoming, and hence we could
+have complete kernel drivers.
+
+> +void __init rpi_firmware_init_clock_provider(struct device_node *node)
+> +{
+> +	/* We delay construction of our struct clks until get time,
+> +	 * because we need to be able to return -EPROBE_DEFER if the
+> +	 * firmware driver isn't up yet.  clk core doesn't support
+> +	 * re-probing on -EPROBE_DEFER, but callers of clk_get can.
+
+Oh, that's nasty. What would it take to fix the clock core to support
+deferred probe? It really should.
+
+> +CLK_OF_DECLARE(rpi_firmware_clocks, "raspberrypi,firmware-clocks",
+> +	       rpi_firmware_init_clock_provider);
+
+Oh, I guess the same comment as for the firmware node applies re: the
+over-genericity of the DT compatible value applies here too. Perhaps
+raspberrypi,bcm2835-firmware-clocks to match Lee's proposal for the
+firmware node?
