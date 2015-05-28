@@ -1,183 +1,87 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 28 May 2015 20:53:31 +0200
-Subject: [PATCH v2 06/14] ARM: shmobile: r7s72100 dtsi: Add CPG Clock Domain
+Date: Thu, 28 May 2015 20:53:37 +0200
+Subject: [PATCH v2 12/14] drivers: sh: Stop using pm_runtime.c for
+ multi-platform shmobile with genpd
 In-Reply-To: <1432839219-475-1-git-send-email-geert+renesas@glider.be>
 References: <1432839219-475-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1432839219-475-7-git-send-email-geert+renesas@glider.be>
+Message-ID: <1432839219-475-13-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an appropriate "#power-domain-cells" property to the cpg_clocks
-device node, to create the CPG Clock Domain.
+Now most multi-platform ARM shmobile platforms (SH-Mobile, R-Mobile,
+R-Car, RZ) use the CPG Clock Domain to take care of PM runtime
+management of the module clocks, we no longer need the legacy default PM
+domain hack, which also prevented registering the real PM domain.
 
-Add "power-domains" properties to all device nodes for devices that are
-part of the CPG Clock Domain and can be power-managed through an MSTP
-clock.  This applies to most on-SoC devices, which have a one-to-one
-mapping from SoC device to DT device node.
+EMMA Mobile EV2 doesn't have MSTP clocks and doesn't use the CPG Clock
+Domain. But all its device drivers manage clocks explicitly, without
+relying on Runtime PM, so it doesn't need the legacy default PM hack
+neither.
+
+Hence do not compile it when running an ARM multi-platform kernel with
+genpd support.
+
+The default PM domain is still needed:
+  - for legacy SuperH,
+  - for legacy (non-DT) ARM/shmobile platforms
+      - without genpd support (r8a7778, r8a7779),
+      - with genpd support, for devices in the "C5" always-on power
+	area (r8a7740, sh73a0),
+  - for the CONFIG_PM=n case.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
 v2:
-  - New.
+  - Add Reviewed-by,
+  - Just stop compiling pm_runtime.c instead of using a runtime check,
+    as no multi-platform ARM platforms need this anymore.
 ---
- arch/arm/boot/dts/r7s72100.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ drivers/sh/Makefile     |  4 ++++
+ drivers/sh/pm_runtime.c | 18 ------------------
+ 2 files changed, 4 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
-index 277e73c110e5d40c..060c32cbd66923ed 100644
---- a/arch/arm/boot/dts/r7s72100.dtsi
-+++ b/arch/arm/boot/dts/r7s72100.dtsi
-@@ -86,6 +86,7 @@
- 			reg = <0xfcfe0000 0x18>;
- 			clocks = <&extal_clk>, <&usb_x1_clk>;
- 			clock-output-names = "pll", "i", "g";
-+			#power-domain-cells = <0>;
- 		};
+diff --git a/drivers/sh/Makefile b/drivers/sh/Makefile
+index 114203f32843216f..786924c34436085e 100644
+--- a/drivers/sh/Makefile
++++ b/drivers/sh/Makefile
+@@ -8,4 +8,8 @@ endif
+ obj-$(CONFIG_MAPLE)			+= maple/
+ obj-$(CONFIG_SUPERHYWAY)		+= superhyway/
  
- 		/* MSTP clocks */
-@@ -157,6 +158,7 @@
- 			     <0 189 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp4_clks R7S72100_CLK_SCIF0>;
- 		clock-names = "sci_ick";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
++obj-$(CONFIG_ARCH_SHMOBILE_LEGACY)	+= pm_runtime.o
++obj-$(CONFIG_SUPERH)			+= pm_runtime.o
++ifneq ($(CONFIG_PM),y)
+ obj-y					+= pm_runtime.o
++endif
+diff --git a/drivers/sh/pm_runtime.c b/drivers/sh/pm_runtime.c
+index d3d1891cda3cf9a8..c887ecdaf19b7c10 100644
+--- a/drivers/sh/pm_runtime.c
++++ b/drivers/sh/pm_runtime.c
+@@ -34,24 +34,6 @@ static struct pm_clk_notifier_block platform_bus_notifier = {
  
-@@ -169,6 +171,7 @@
- 			     <0 193 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp4_clks R7S72100_CLK_SCIF1>;
- 		clock-names = "sci_ick";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -181,6 +184,7 @@
- 			     <0 197 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp4_clks R7S72100_CLK_SCIF2>;
- 		clock-names = "sci_ick";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -193,6 +197,7 @@
- 			     <0 201 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp4_clks R7S72100_CLK_SCIF3>;
- 		clock-names = "sci_ick";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -205,6 +210,7 @@
- 			     <0 205 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp4_clks R7S72100_CLK_SCIF4>;
- 		clock-names = "sci_ick";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -217,6 +223,7 @@
- 			     <0 209 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp4_clks R7S72100_CLK_SCIF5>;
- 		clock-names = "sci_ick";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -229,6 +236,7 @@
- 			     <0 213 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp4_clks R7S72100_CLK_SCIF6>;
- 		clock-names = "sci_ick";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -241,6 +249,7 @@
- 			     <0 217 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp4_clks R7S72100_CLK_SCIF7>;
- 		clock-names = "sci_ick";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -252,6 +261,7 @@
- 			     <0 240 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-names = "error", "rx", "tx";
- 		clocks = <&mstp10_clks R7S72100_CLK_SPI0>;
-+		power-domains = <&cpg_clocks>;
- 		num-cs = <1>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -266,6 +276,7 @@
- 			     <0 243 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-names = "error", "rx", "tx";
- 		clocks = <&mstp10_clks R7S72100_CLK_SPI1>;
-+		power-domains = <&cpg_clocks>;
- 		num-cs = <1>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -280,6 +291,7 @@
- 			     <0 246 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-names = "error", "rx", "tx";
- 		clocks = <&mstp10_clks R7S72100_CLK_SPI2>;
-+		power-domains = <&cpg_clocks>;
- 		num-cs = <1>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -294,6 +306,7 @@
- 			     <0 249 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-names = "error", "rx", "tx";
- 		clocks = <&mstp10_clks R7S72100_CLK_SPI3>;
-+		power-domains = <&cpg_clocks>;
- 		num-cs = <1>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -308,6 +321,7 @@
- 			     <0 252 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-names = "error", "rx", "tx";
- 		clocks = <&mstp10_clks R7S72100_CLK_SPI4>;
-+		power-domains = <&cpg_clocks>;
- 		num-cs = <1>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -338,6 +352,7 @@
- 			     <0 164 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R7S72100_CLK_I2C0>;
- 		clock-frequency = <100000>;
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -356,6 +371,7 @@
- 			     <0 172 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R7S72100_CLK_I2C1>;
- 		clock-frequency = <100000>;
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -374,6 +390,7 @@
- 			     <0 180 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R7S72100_CLK_I2C2>;
- 		clock-frequency = <100000>;
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -392,6 +409,7 @@
- 			     <0 188 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R7S72100_CLK_I2C3>;
- 		clock-frequency = <100000>;
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- 
-@@ -402,6 +420,7 @@
- 		interrupt-names = "tgi0a";
- 		clocks = <&mstp3_clks R7S72100_CLK_MTU2>;
- 		clock-names = "fck";
-+		power-domains = <&cpg_clocks>;
- 		status = "disabled";
- 	};
- };
+ static int __init sh_pm_runtime_init(void)
+ {
+-	if (IS_ENABLED(CONFIG_ARCH_SHMOBILE_MULTI)) {
+-		if (!of_machine_is_compatible("renesas,emev2") &&
+-		    !of_machine_is_compatible("renesas,r7s72100") &&
+-#ifndef CONFIG_PM_GENERIC_DOMAINS_OF
+-		    !of_machine_is_compatible("renesas,r8a73a4") &&
+-		    !of_machine_is_compatible("renesas,r8a7740") &&
+-		    !of_machine_is_compatible("renesas,sh73a0") &&
+-#endif
+-		    !of_machine_is_compatible("renesas,r8a7778") &&
+-		    !of_machine_is_compatible("renesas,r8a7779") &&
+-		    !of_machine_is_compatible("renesas,r8a7790") &&
+-		    !of_machine_is_compatible("renesas,r8a7791") &&
+-		    !of_machine_is_compatible("renesas,r8a7792") &&
+-		    !of_machine_is_compatible("renesas,r8a7793") &&
+-		    !of_machine_is_compatible("renesas,r8a7794"))
+-			return 0;
+-	}
+-
+ 	pm_clk_add_notifier(&platform_bus_type, &platform_bus_notifier);
+ 	return 0;
+ }
 -- 
 1.9.1
