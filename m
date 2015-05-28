@@ -1,27 +1,39 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 28 May 2015 09:39:08 +0900
-Subject: [PATCH 1/2] ARM: multi_v7_defconfig: Replace
- CONFIG_USB_ISP1760_HCD by CONFIG_USB_ISP1760
-In-Reply-To: <1432637918-8946-1-git-send-email-geert+renesas@glider.be>
-References: <1432637918-8946-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20150528003903.GB9384@verge.net.au>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 28 May 2015 10:05:48 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Updates for v4.2
+Message-ID: <cover.1432773909.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 26, 2015 at 12:58:37PM +0200, Geert Uytterhoeven wrote:
-> Since commit 100832abf065bc18 ("usb: isp1760: Make HCD support
-> optional"), CONFIG_USB_ISP1760_HCD is automatically selected when
-> needed.  Enabling that option in the defconfig is now a no-op, and no
-> longer enables ISP1760 HCD support.
-> 
-> Re-enable the ISP1760 driver in the defconfig by enabling
-> USB_ISP1760_HOST_ROLE instead.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Thanks, I have queued this up for v4.3.
+Please consider these Renesas ARM based SoC updates for v4.2.
 
-I would not object at all if the ARM SoC maintainers wish to
-take this earlier and I'd be happy to prepare a pull request
-to that effect once the change has sat in next. Unfortunately
-I anticipate that will be after the standard rc6 deadline.
+This small pull-request consists of a Kconfig fix from Arnd.
+>From my point of view does not seem severe enough to go through
+a fixes channel.
+
+
+The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+
+  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v4.2
+
+for you to fetch changes up to 66f72f0c8e0d37339b6be1373c61d2a133c8b422:
+
+  ARM: shmobile: only select sound drivers that build (2015-05-25 10:36:01 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Updates for v4.2
+
+* Only select sound drivers that build
+
+----------------------------------------------------------------
+Arnd Bergmann (1):
+      ARM: shmobile: only select sound drivers that build
+
+ arch/arm/mach-shmobile/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
