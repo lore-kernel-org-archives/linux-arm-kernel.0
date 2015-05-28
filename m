@@ -1,34 +1,56 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 28 May 2015 11:52:59 +0800
-Subject: ARM64 kexec/kdump timeline
-In-Reply-To: <55664FD9.1090808@codeaurora.org>
-References: <555E37FC.9020800@codeaurora.org>
- <1432239334.1922.7.camel@infradead.org> <55653538.8020206@codeaurora.org>
- <2420285.dn5MbvMKXS@wuerfel> <55664FD9.1090808@codeaurora.org>
-Message-ID: <5566911B.6060506@linaro.org>
+From: mturquette@linaro.org (Michael Turquette)
+Date: Wed, 27 May 2015 21:09:19 -0700
+Subject: [PATCH v2 1/5] clk: remove duplicated code with
+ __clk_set_parent_after
+In-Reply-To: <1431610143-21853-2-git-send-email-aisheng.dong@freescale.com>
+References: <1431610143-21853-1-git-send-email-aisheng.dong@freescale.com>
+ <1431610143-21853-2-git-send-email-aisheng.dong@freescale.com>
+Message-ID: <20150528040919.22384.79189@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?05?28? 07:14, Timur Tabi wrote:
-> On 05/27/2015 11:39 AM, Arnd Bergmann wrote:
->> ACPI support has just been merged and is still experimental. You
->> should be able to boot your system by passing a DT blob at the
->> initial boot that matches your hardware. Can you try if that
->> makes kexec work?
->
-> If I had an initial DT blob that matched by hardware, I wouldn't need
-> ACPI support!  This is an ARM64 Server system.  There is no device tree
-> for the hardware.  Everything is in ACPI.
->
-> What does x86 do?  They don't have device trees, but they do use ACPI,
-> so how does kexec work there?
+Quoting Dong Aisheng (2015-05-14 06:28:59)
+> __clk_set_parent_after() actually used the second argument then we
+> could put this duplicate logic in there and call it with a different
+> order of arguments in the success vs. error paths in this function.
+> 
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: Dong Aisheng <aisheng.dong@freescale.com>
 
-So the key point is that we need to get the root pointer to the
-ACPI tables (RSDP), which is in the UEFI configuration table as
-Ard said, I think this part is the same for ARM64 and x86.
+Patch looks good to me.
 
-ACPI provide an early param "acpi_rsdp" for kexec use as a option,
-you can refer to Documentation/kernel-parameters.txt.
+Also just noticed that the second argument to __clk_set_parent_after is
+never used :-(
 
-Thanks
-Hanjun
+Regards,
+Mike
+
+> ---
+>  drivers/clk/clk.c | 8 +-------
+>  1 file changed, 1 insertion(+), 7 deletions(-)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 659f2b0..0e813ea 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -1159,14 +1159,8 @@ static int __clk_set_parent(struct clk_core *core, struct clk_core *parent,
+>                 flags = clk_enable_lock();
+>                 clk_reparent(core, old_parent);
+>                 clk_enable_unlock(flags);
+> +               __clk_set_parent_after(core, old_parent, parent);
+>  
+> -               if (core->prepare_count) {
+> -                       flags = clk_enable_lock();
+> -                       clk_core_disable(core);
+> -                       clk_core_disable(parent);
+> -                       clk_enable_unlock(flags);
+> -                       clk_core_unprepare(parent);
+> -               }
+>                 return ret;
+>         }
+>  
+> -- 
+> 1.9.1
+> 
