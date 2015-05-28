@@ -1,55 +1,69 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 28 May 2015 14:31:09 +0100
-Subject: [RFC/PATCH 8/9] iommu: of: Handle IOMMU lookup failure with
- deferred probing or error
-In-Reply-To: <1431644410-2997-9-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1431644410-2997-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1431644410-2997-9-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20150528133109.GJ31001@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 28 May 2015 14:32:20 +0100
+Subject: [PATCH] arm: tcm: Don't crash when TCM banks are protected by
+ TrustZone
+In-Reply-To: <5D4F3868-BF10-47D9-94C1-A8EDE97621AE@smart-africa.com>
+References: <1432805760-4590-1-git-send-email-michael@smart-africa.com>
+ <20150528101641.GA3657@e103592.cambridge.arm.com>
+ <5D4F3868-BF10-47D9-94C1-A8EDE97621AE@smart-africa.com>
+Message-ID: <20150528133219.GD3657@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
-
-On Fri, May 15, 2015 at 12:00:09AM +0100, Laurent Pinchart wrote:
-> Failures to look up an IOMMU when parsing the DT iommus property need to
-> be handled separately from the .of_xlate() failures to support deferred
-> probing.
+On Thu, May 28, 2015 at 01:32:10PM +0200, Michael van der Westhuizen wrote:
 > 
-> The lack of a registered IOMMU can be caused by the lack of a driver for
-> the IOMMU, the IOMMU device probe not having been performed yet, having
-> been deferred, or having failed.
+> > On 28 May 2015, at 12:16 PM, Dave Martin <Dave.Martin@arm.com> wrote:
+> > 
+> > On Thu, May 28, 2015 at 11:36:00AM +0200, Michael van der Westhuizen wrote:
+> >> Fixes the TCM initialisation code to handle TCM banks that are
+> >> present but inaccessible due to TrustZone configuration.  This is
+> >> the default case when enabling the non-secure world.  It may also
+> >> be the case that that the user decided to use TCM for TrustZone.
+> >> 
+> >> This change has exposed a bug in handling of TCM where no TCM bank
+> >> was usable (the 0 size TCM case).  This change addresses the
+> >> resulting hang.
+> > 
+> > The TCM registers in CP15 are not part of the architecture -- behaviour
+> > is IMP DEF in v7.
 > 
-> The first case occurs when the device tree describes the bus master and
-> IOMMU topology correctly but no device driver exists for the IOMMU yet
-> or the device driver has not been compiled in. Return NULL, the caller
-> will configure the device without an IOMMU.
+> My reading of DDI0406C_C is that the register is defined (CP15, c0,
+> c0, 2), but the format is either v6 format or implementation defined.
 > 
-> The second and third cases are handled by deferring the probe of the bus
-> master device which will eventually get reprobed after the IOMMU.
+> The manual explicitly states that in v7 the register must be
+> implemented and that when v7 format is used that the meaning of bits
+> 28:0 is implementation defined (this is all in B4.1.132).
 > 
-> The last case is currently handled by deferring the probe of the bus
-> master device as well. A mechanism to either configure the bus master
-> device without an IOMMU or to fail the bus master device probe depending
-> on whether the IOMMU is optional or mandatory would be a good
-> enhancement.
+> The ARM goes on to state that when no TCMs are implemented the TCMTR
+> register must be implemented in ARMv6 format, indicating no TCM banks
+> (i.e. all defined bits must be 0).
+> 
+> So, since this code assumes v6 format should I just add a check that
+> bits 31:29 or 0b000?  If I do this, then my reading is that this will
+> continue to work reliably in the face of v7 implementations that use
+> v7 (implementation defined) format.
 
-I appreciate that you're just looking to handle early initialisation
-failures here, but do you have any thoughts on how to deal with failures
-later on when e.g. the DMA-mapping API is trying to create IOMMU domains.
+You're right, that looks sound.
 
-One potential problem I foresee is if we try to add all devices to a common
-DMA domain, we may get -ENOSPC-style failures due to limited resources on
-the IOMMU. In this case, we'd probably want to fall-back to non-IOMMU DMA
-ops, but that in-turn could have consequences on things like dma-coherent.
+Providing that TCMTR is read first and reports v6 format, then access
+to the region registers will either succeed safely, or Undef (when
+disallowed by the Secure World).
 
-It's all a bit murky, so I'd be glad to hear any thoughts you might have
-around this.
+TCMTR itself is guaranteed to be readable even in the ARMv6 base
+architecture.
 
-Anyway, this patch looks fine:
+ARMv8 gives mixed messages on this point[1], but it appears[2] that
+the intention is for the above check to continue to work.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+[1] DDI0487A.e, G6.2.126 (TCMTR, TCM Type Register)
+[2] DDI0487A.e, G3.5 (System register support for IMPLEMENTATION DEFINED
+memory features)
 
-but we should consider how all of this will get used too.
 
-Will
+It would be good to see testing of this in a multiplatform kernel,
+assuming you haven't tried it already.
+
+[...]
+
+Cheers
+---Dave
