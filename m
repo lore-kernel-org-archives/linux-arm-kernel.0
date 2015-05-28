@@ -1,80 +1,77 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 28 May 2015 14:45:55 +0200
-Subject: [PATCH] drm: atmel_hlcdc: Add support for get_timings
-In-Reply-To: <1432811608.3228.43.camel@pengutronix.de>
-References: <1432199216-1139-1-git-send-email-davidcdueck@googlemail.com>
- <20150526112853.688d26b7@bbrezillon>
- <1432811608.3228.43.camel@pengutronix.de>
-Message-ID: <20150528144555.13cd755a@bbrezillon>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 28 May 2015 14:49:09 +0200
+Subject: [PATCH] arm/arm64: KVM: Propertly account for guest CPU time
+Message-ID: <1432817349-17917-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philip,
+Until now we have been calling kvm_guest_exit after re-enabling
+interrupts when we come back from the guest, but this has the
+unfortunate effect that CPU time accounting done in the context of timer
+interrupts doesn't properly notice that the time since the last tick was
+spent in the guest.
 
-On Thu, 28 May 2015 13:13:28 +0200
-Philipp Zabel <p.zabel@pengutronix.de> wrote:
+Inspired by the comment in the x86 code, simply move the
+kvm_guest_exit() call below the local_irq_enable() call and change
+__kvm_guest_exit() to kvm_guest_exit(), because we are now calling this
+function with interrupts enabled.  Note that AFAIU we don't need an
+explicit barrier like x86 because the arm/arm64 implementation of
+local_irq_(en/dis)able has an implicit barrier.
 
-> Hi Boris,
-> 
-> Am Dienstag, den 26.05.2015, 11:28 +0200 schrieb Boris Brezillon:
-> > Hi David,
-> > 
-> > On Thu, 21 May 2015 11:06:56 +0200
-> > David Dueck <davidcdueck@googlemail.com> wrote:
-> > 
-> > > drm_panel supports querying timing ranges. If the supplied mode does
-> > > not work with the hlcdc we query the panel and try to find a suitable
-> > > mode.
-> > 
-> > This patch looks good to me.
-> > 
-> > Philip, Thierry, could you confirm this is the correct way of dealing
-> > with timing ranges.
-> 
-> I wonder about two things:
-> 
-> This implementation minimizes the sum of absolute differences between
-> chosen and typical values. I wonder if it would be better to try and
-> minimize the difference between the chosen and nominal vertical refresh
-> rate.
+At the same time, move the trace_kvm_exit() call outside of the atomic
+section, since there is no reason for us to do that with interrupts
+disabled.
 
-I'm not sure to understand what you mean.
-Are you suggesting that we should try keeping the vtotal (and maybe the
-htotal too) value unchanged by adapting the timing values ?
-Something like that:
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+This patch is based on kvm/queue, because it has the kvm_guest_enter/exit
+rework recently posted by Christian Borntraeger.  I hope I got the logic
+of this wrong, there were 2 slightly worrying facts about this:
 
-	vfront_porch = atmel_hlcdc_choose_parameter(1, 0x40,
-						    timings->vfront_porch);
-	
-	adjusted_mode->vsync_start = adjusted_mode->vdisplay + vfront_porch;
+First, we now enable and disable and enable interrupts on each exit
+path, but I couldn't see any performance overhead on hackbench - yes the
+only benchmark we care abotu.
 
-	vsync_len = atmel_hlcdc_choose_parameter(1, 0x40,
-						 adjusted_mode->vsync_end -
-						 adjusted_mode->vsync_start);
-	adjusted_mode->vsync_end = adjusted_mode->vsync_start + vsync_len;
-	vback_porch = atmel_hlcdc_choose_parameter(0, 0x40,
-						   timings->vtotal -
-						   adjusted_mode->vsync_end);
-	adjusted_mode->vtotal = adjusted_mode->vsync_end + vback_porch;
-	/* ... */
+Second, looking at the power and mips code, they seem to also call
+kvm_guest_exit() before enabling interrupts, so I don't understand how
+guest CPU time accounting works on those architectures.
 
-If that's the case, then I definitely agree.
+ arch/arm/kvm/arm.c | 16 ++++++++++++----
+ 1 file changed, 12 insertions(+), 4 deletions(-)
 
-> 
-> Is this something that should be done earlier, in create_panel_output,
-> so that the connector's modes already contain the corrected settings?
-
-You mean creating our own drm_display modes (and taking the timing
-constraints when creating those modes) instead of calling drm_panel's
-->get_modes().
-That sounds reasonable. David, what's your opinion.
-
-Best Regards,
-
-Boris
-
-
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index e41cb11..bd0e463 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -559,8 +559,10 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
+ 
+ 		vcpu->mode = OUTSIDE_GUEST_MODE;
+-		__kvm_guest_exit();
+-		trace_kvm_exit(kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
++		/*
++		 * Back from guest
++		 *************************************************************/
++
+ 		/*
+ 		 * We may have taken a host interrupt in HYP mode (ie
+ 		 * while executing the guest). This interrupt is still
+@@ -574,8 +576,14 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		local_irq_enable();
+ 
+ 		/*
+-		 * Back from guest
+-		 *************************************************************/
++		 * We do local_irq_enable() before calling kvm_guest_exit so
++		 * that the cputime accounting done in the context of timer
++		 * interrupts properly accounts time spent in the guest as
++		 * guest time.
++		 */
++		kvm_guest_exit();
++		trace_kvm_exit(kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
++
+ 
+ 		kvm_timer_sync_hwstate(vcpu);
+ 		kvm_vgic_sync_hwstate(vcpu);
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.1.2.330.g565301e.dirty
