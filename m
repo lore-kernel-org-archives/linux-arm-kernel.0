@@ -1,133 +1,188 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 28 May 2015 10:40:52 +0100
-Subject: [PATCH 2/3] arm64: alternative: Allow immediate branch as alternative
- instruction
+Date: Thu, 28 May 2015 10:40:53 +0100
+Subject: [PATCH 3/3] arm64: alternative: Work around .inst assembler bugs
 In-Reply-To: <1432806053-987-1-git-send-email-marc.zyngier@arm.com>
 References: <1432806053-987-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1432806053-987-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1432806053-987-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since all branches are PC-relative on AArch64, these instructions
-cannot be used as an alternative with the simplistic approach
-we currently have (the immediate has been computed from
-the .altinstr_replacement section, and end-up being completely off
-if the target is outside of the replacement sequence).
+AArch64 toolchains suffer from the following bug:
 
-This patch handles the branch instructions in a different way,
-using the insn framework to recompute the immediate, and generate
-the right displacement in the above case.
+$ cat blah.S
+1:
+	.inst	0x01020304
+	.if ((. - 1b) != 4)
+		.error	blah
+	.endif
+$ aarch64-linux-gnu-gcc -c blah.S
+blah.S: Assembler messages:
+blah.S:3: Error: non-constant expression in ".if" statement
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+which precludes the use of msr_s and co as part of alternatives.
+
+We workaround this issue by not directly testing the labels
+themselves, but by moving the current output pointer by a value
+that should always be zero. if this value is not null, then
+we will trigger a backward move, which is expclicitely forbidden.
+This trigger the error we're after:
+
+  AS      arch/arm64/kvm/hyp.o
+arch/arm64/kvm/hyp.S: Assembler messages:
+arch/arm64/kvm/hyp.S:1377: Error: attempt to move .org backwards
+scripts/Makefile.build:294: recipe for target 'arch/arm64/kvm/hyp.o' failed
+make[1]: *** [arch/arm64/kvm/hyp.o] Error 1
+Makefile:946: recipe for target 'arch/arm64/kvm' failed
+
+Not pretty, but at least works on the current toolchains.
+Also merge asm/alternative-asm.h into alternative.h so that we
+slightly limit the duplication of this mess.
+
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kernel/alternative.c | 71 ++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 66 insertions(+), 5 deletions(-)
+ arch/arm64/include/asm/alternative-asm.h | 29 ------------------
+ arch/arm64/include/asm/alternative.h     | 52 +++++++++++++++++++++++++++++---
+ arch/arm64/kernel/entry.S                |  2 +-
+ arch/arm64/mm/cache.S                    |  2 +-
+ 4 files changed, 50 insertions(+), 35 deletions(-)
+ delete mode 100644 arch/arm64/include/asm/alternative-asm.h
 
-diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
-index 28f8365..df4bf15 100644
---- a/arch/arm64/kernel/alternative.c
-+++ b/arch/arm64/kernel/alternative.c
-@@ -24,8 +24,13 @@
- #include <asm/cacheflush.h>
- #include <asm/alternative.h>
- #include <asm/cpufeature.h>
-+#include <asm/insn.h>
- #include <linux/stop_machine.h>
+diff --git a/arch/arm64/include/asm/alternative-asm.h b/arch/arm64/include/asm/alternative-asm.h
+deleted file mode 100644
+index 919a678..0000000
+--- a/arch/arm64/include/asm/alternative-asm.h
++++ /dev/null
+@@ -1,29 +0,0 @@
+-#ifndef __ASM_ALTERNATIVE_ASM_H
+-#define __ASM_ALTERNATIVE_ASM_H
+-
+-#ifdef __ASSEMBLY__
+-
+-.macro altinstruction_entry orig_offset alt_offset feature orig_len alt_len
+-	.word \orig_offset - .
+-	.word \alt_offset - .
+-	.hword \feature
+-	.byte \orig_len
+-	.byte \alt_len
+-.endm
+-
+-.macro alternative_insn insn1 insn2 cap
+-661:	\insn1
+-662:	.pushsection .altinstructions, "a"
+-	altinstruction_entry 661b, 663f, \cap, 662b-661b, 664f-663f
+-	.popsection
+-	.pushsection .altinstr_replacement, "ax"
+-663:	\insn2
+-664:	.popsection
+-	.if ((664b-663b) != (662b-661b))
+-		.error "Alternatives instruction length mismatch"
+-	.endif
+-.endm
+-
+-#endif  /*  __ASSEMBLY__  */
+-
+-#endif /* __ASM_ALTERNATIVE_ASM_H */
+diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
+index d261f01..5195cca 100644
+--- a/arch/arm64/include/asm/alternative.h
++++ b/arch/arm64/include/asm/alternative.h
+@@ -1,6 +1,8 @@
+ #ifndef __ASM_ALTERNATIVE_H
+ #define __ASM_ALTERNATIVE_H
  
-+#define __ALT_PTR(a,f)		(u32 *)((void *)&(a)->f + (a)->f)
-+#define ALT_ORIG_PTR(a)		__ALT_PTR(a, orig_offset)
-+#define ALT_REPL_PTR(a)		__ALT_PTR(a, alt_offset)
++#ifndef __ASSEMBLY__
 +
- extern struct alt_instr __alt_instructions[], __alt_instructions_end[];
+ #include <linux/types.h>
+ #include <linux/stddef.h>
+ #include <linux/stringify.h>
+@@ -24,7 +26,20 @@ void free_alternatives_memory(void);
+ 	" .byte 662b-661b\n"				/* source len      */ \
+ 	" .byte 664f-663f\n"				/* replacement len */
  
- struct alt_region {
-@@ -33,13 +38,63 @@ struct alt_region {
- 	struct alt_instr *end;
- };
- 
+-/* alternative assembly primitive: */
 +/*
-+ * Check if the target PC is within an alternative block.
++ * alternative assembly primitive:
++ *
++ * If any of these .org directive fail, it means that insn1 and insn2
++ * don't have the same length. This used to be written as
++ *
++ * .if ((664b-663b) != (662b-661b))
++ * 	.error "Alternatives instruction length mismatch"
++ * .endif
++ *
++ * but most assemblers die if insn1 or insn2 have a .inst. This should
++ * be fixed in a binutils release posterior to 2.25.51.0.2 (anything
++ * containing commit 4e4d08cf7399b606 or c1baaddf8861).
 + */
-+static bool branch_insn_requires_update(struct alt_instr *alt, unsigned long pc)
-+{
-+	unsigned long replptr;
+ #define ALTERNATIVE(oldinstr, newinstr, feature)			\
+ 	"661:\n\t"							\
+ 	oldinstr "\n"							\
+@@ -37,8 +52,37 @@ void free_alternatives_memory(void);
+ 	newinstr "\n"							\
+ 	"664:\n\t"							\
+ 	".popsection\n\t"						\
+-	".if ((664b-663b) != (662b-661b))\n\t"				\
+-	"	.error \"Alternatives instruction length mismatch\"\n\t"\
+-	".endif\n"
++	".org	. - (664b-663b) + (662b-661b)\n\t"			\
++	".org	. - (662b-661b) + (664b-663b)\n"
 +
-+	if (kernel_text_address(pc))
-+		return 1;
++#else
 +
-+	replptr = (unsigned long)ALT_REPL_PTR(alt);
-+	if (pc >= replptr && pc < (replptr + alt->alt_len))
-+		return 0;
++.macro altinstruction_entry orig_offset alt_offset feature orig_len alt_len
++	.word \orig_offset - .
++	.word \alt_offset - .
++	.hword \feature
++	.byte \orig_len
++	.byte \alt_len
++.endm
 +
-+	/*
-+	 * Branching into *another* alternate sequence is doomed, and
-+	 * we're not even trying to fix it up.
-+	 */
-+	BUG();
-+}
++.macro alternative_insn insn1 insn2 cap
++661:	\insn1
++662:	.pushsection .altinstructions, "a"
++	altinstruction_entry 661b, 663f, \cap, 662b-661b, 664f-663f
++	.popsection
++	.pushsection .altinstr_replacement, "ax"
++663:	\insn2
++664:	.popsection
++	 // If any of these .org fail, it means that insn1 and insn2
++	 // don't have the same lenght. This used to be written as
++	 // .if ((664b-663b) != (662b-661b))
++	 //	.error "Alternatives instruction length mismatch"
++	 // .endif
++	 // but most assemblers die if insn1 or insn2 have a .inst.
++	.org	. - (664b-663b) + (662b-661b)
++	.org	. - (662b-661b) + (664b-663b)
++.endm
 +
-+static u32 get_alt_insn(struct alt_instr *alt, u32 *insnptr, u32 *altinsnptr)
-+{
-+	u32 insn;
-+
-+	insn = le32_to_cpu(*altinsnptr);
-+
-+	if (aarch64_insn_is_branch_imm(insn)) {
-+		s32 offset = aarch64_get_branch_offset(insn);
-+		unsigned long target;
-+
-+		target = (unsigned long)altinsnptr + offset;
-+
-+		/*
-+		 * If we're branching inside the alternate sequence,
-+		 * do not rewrite the instruction, as it is already
-+		 * correct. Otherwise, generate the new instruction.
-+		 */
-+		if (branch_insn_requires_update(alt, target)) {
-+			offset = target - (unsigned long)insnptr;
-+			insn = aarch64_set_branch_offset(insn, offset);
-+		}
-+	}
-+
-+	return insn;
-+}
-+
- static int __apply_alternatives(void *alt_region)
- {
- 	struct alt_instr *alt;
- 	struct alt_region *region = alt_region;
--	u8 *origptr, *replptr;
-+	u32 *origptr, *replptr;
++#endif  /*  __ASSEMBLY__  */
  
- 	for (alt = region->begin; alt < region->end; alt++) {
-+		u32 insn;
-+		int i, nr_inst;
-+
- 		if (!cpus_have_cap(alt->cpufeature))
- 			continue;
+ #endif /* __ASM_ALTERNATIVE_H */
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 959fe87..00df926 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -21,7 +21,7 @@
+ #include <linux/init.h>
+ #include <linux/linkage.h>
  
-@@ -47,11 +102,17 @@ static int __apply_alternatives(void *alt_region)
+-#include <asm/alternative-asm.h>
++#include <asm/alternative.h>
+ #include <asm/assembler.h>
+ #include <asm/asm-offsets.h>
+ #include <asm/cpufeature.h>
+diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+index 2560e1e..70a79cb 100644
+--- a/arch/arm64/mm/cache.S
++++ b/arch/arm64/mm/cache.S
+@@ -22,7 +22,7 @@
+ #include <linux/init.h>
+ #include <asm/assembler.h>
+ #include <asm/cpufeature.h>
+-#include <asm/alternative-asm.h>
++#include <asm/alternative.h>
  
- 		pr_info_once("patching kernel code\n");
+ #include "proc-macros.S"
  
--		origptr = (u8 *)&alt->orig_offset + alt->orig_offset;
--		replptr = (u8 *)&alt->alt_offset + alt->alt_offset;
--		memcpy(origptr, replptr, alt->alt_len);
-+		origptr = ALT_ORIG_PTR(alt);
-+		replptr = ALT_REPL_PTR(alt);
-+		nr_inst = alt->alt_len / sizeof(insn);
-+
-+		for (i = 0; i < nr_inst; i++) {
-+			insn = get_alt_insn(alt, origptr + i, replptr + i);
-+			*(origptr + i) = cpu_to_le32(insn);
-+		}
-+
- 		flush_icache_range((uintptr_t)origptr,
--				   (uintptr_t)(origptr + alt->alt_len));
-+				   (uintptr_t)(origptr + nr_inst));
- 	}
- 
- 	return 0;
 -- 
 2.1.4
