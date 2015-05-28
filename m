@@ -1,151 +1,101 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 28 May 2015 17:06:04 +0200
-Subject: [PATCH] staging/wilc1000: fix Kconfig dependencies
-In-Reply-To: <2619913.NOTkkZWJir@wuerfel>
-References: <2619913.NOTkkZWJir@wuerfel>
-Message-ID: <55672EDC.40908@atmel.com>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Thu, 28 May 2015 10:07:30 -0500
+Subject: [PATCH v4 1/2] ARM: socfpga: support suspend to ram
+In-Reply-To: <alpine.DEB.2.02.1505271520570.19205@linuxheads99>
+References: <1432317735-29413-1-git-send-email-atull@opensource.altera.com>
+ <1432317735-29413-2-git-send-email-atull@opensource.altera.com>
+ <556479C9.5070208@opensource.altera.com>
+ <alpine.DEB.2.02.1505271520570.19205@linuxheads99>
+Message-ID: <55672F32.3050506@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 28/05/2015 16:35, Arnd Bergmann a ?crit :
-> The newly added wilc1000 driver lacks several Kconfig dependencies,
-> resulting in a multitude of randconfig build errors, e.g.:
+On 05/27/2015 03:25 PM, atull wrote:
+> On Tue, 26 May 2015, Dinh Nguyen wrote:
 > 
-> drivers/built-in.o: In function `WILC_WFI_mgmt_tx_cancel_wait':
-> binder.c:(.text+0x12bd28): undefined reference to `cfg80211_remain_on_channel_expired'
-> drivers/built-in.o: In function `WILC_WFI_CfgSetChannel':
-> binder.c:(.text+0x12c9d8): undefined reference to `ieee80211_frequency_to_channel'
-> drivers/built-in.o: In function `WILC_WFI_CfgAlloc':
-> binder.c:(.text+0x132530): undefined reference to `wiphy_new_nm'
-> drivers/built-in.o: In function `wilc_netdev_init':
-> binder.c:(.text+0x1356d0): undefined reference to `register_inetaddr_notifier'
-> drivers/built-in.o: In function `linux_spi_init':
-> binder.c:(.text+0x210a68): undefined reference to `spi_register_driver'
+>> Hi Alan,
+>>
+>> On 5/22/15 1:02 PM, Alan Tull wrote:
+>>> Add code that requests that the sdr controller go into
+>>> self-refresh mode.  This code is run from ocram.
+>>>
+>>> This patch assumes that u-boot has already configured sdr:
+>>>   sdr.ctrlcfg.lowpwreq.selfrfshmask = 3
+>>>   sdr.ctrlcfg.lowpwrtiming.clkdisablecycles = 8
+>>>   sdr.ctrlcfg.dramtiming4.selfrfshexit = 512
+>>>
+>>> Suspend-to-RAM and EDAC support are mutually exclusive on SOCFPGA
+>>> platforms.  CONFIG_SOCFPGA_SUSPEND enables suspend-to-RAM and
+>>> prevents selecting CONFIG_EDAC_ALTERA_MC.
+>>>
+>>> How to suspend to ram:
+>>>  $ echo enabled > \
+>>> /sys/devices/soc/ffc02000.serial0/tty/ttyS0/power/wakeup
+>>>
+>>>  $ echo -n mem > /sys/power/state
+>>>
+>>> Signed-off-by: Alan Tull <atull@opensource.altera.com>
+>>> Cc: Pavel Machek <pavel@denx.de>
+>>> Cc: Arnd Bergmann <arnd@arndb.de>
+>>> Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
+>>> Cc: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+>>> ---
+>>> v2: use Generic on-chip SRAM driver to allocate ocram
+>>>     rm fncpy_align since generic allocator handles alignment
+>>>     check __arm_ioremap_exec return code
+>>>     check for NULL pointers
+>>>     add a comment regarding sdram controller configuration
+>>> v3: fix renamed #define
+>>>     propagate socfpga_setup_ocram_self_refresh error code
+>>> v4: Kconfig: don't need to select GENERIC_ALLOCATER
+>>>     add CONFIG_SOCFPGA_SUSPEND
+>>>     make s2r and EDAC support mutually exclusive
+>>>     socfpga.c: add sdr_ctl_base_addr
+>>>     return error if ocram not available in device tree
+>>>     update copyright years
+>>> ---
+>>
+>> <snip>
+>>
+>>> +
+>>> +static int socfpga_pm_suspend(unsigned long arg)
+>>> +{
+>>> +	u32 ret;
+>>> +
+>>> +	if (!sdr_ctl_base_addr || !socfpga_scu_base_addr)
+>>> +		return -EFAULT;
+>>> +
+>>> +	ret = socfpga_sdram_self_refresh_in_ocram(
+>>> +		(u32)sdr_ctl_base_addr, (u32)socfpga_scu_base_addr);
+>>> +
+>>
+>> I had a patch that removed socfpga_scu_base_addr from being a global and
+>> just a local variable in:
+>>
+>> f6e14376fb20 ARM: socfpga: use of_iomap to map the SCU
+>>
+>> This patch will be in v4.2 and is currently in arm-soc/next or
+>> at my fork: kernel/git/dinguyen/linux.git socfpga_for_next_arria10
+>>
+>> So you will either need to make socfpga_scu_base_addr global again, or
+>> you can use the asm instruction to get the SCU base addr.
+>>
+>> Sorry about that..
+>>
+>> Dinh
+>>
 > 
-> This change ensures that we always have at least one of SPI or MMC
-> enabled, and are only able to pick an interface that works. It also
-> adds all the missing dependencies for networking infrastructure
-> (cfg80211, wext, and ipv4).
-> 
-> In order to make it readable, I also took the liberty of re-indenting
-> the Kconfig file to the normal conventions.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> I can't make socfpga_scu_base_addr a global from platsmp.c since that file
+> may or may not be compiled in.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-Thanks a lot Arnd!
-
-Bye,
-
-> diff --git a/drivers/staging/wilc1000/Kconfig b/drivers/staging/wilc1000/Kconfig
-> index 101f908bc9ed..02381521ff7f 100644
-> --- a/drivers/staging/wilc1000/Kconfig
-> +++ b/drivers/staging/wilc1000/Kconfig
-> @@ -1,55 +1,57 @@
->  config WILC1000
->  	tristate "WILC1000 support (WiFi only)"
-> +	depends on CFG80211 && WEXT_CORE && INET
-> +	depends on MMC || SPI
->  	---help---
-> -		This module only support IEEE 802.11n WiFi.
-> +	  This module only support IEEE 802.11n WiFi.
->  
->  choice
->          prompt "Memory Allocation"
->          depends on WILC1000
->          default WILC1000_PREALLOCATE_AT_LOADING_DRIVER
->  
-> -        config WILC1000_PREALLOCATE_AT_LOADING_DRIVER
-> -                bool "Preallocate memory at loading driver"
-> -                ---help---
-> -                        This choice supports static allocation of the memory
-> -                        for the receive buffer. The driver will allocate the RX buffer 
-> -                        during initial time. The driver will also free the buffer
-> -                        by calling network device stop.
-> -
-> -        config WILC1000_DYNAMICALLY_ALLOCATE_MEMROY
-> -                bool "Dynamically allocate memory in real time"
-> -                ---help---
-> -                        This choice supports dynamic allocation of the memory
-> -                        for the receive buffer. The driver will allocate the RX buffer
-> -                        when it is required.
-> +config WILC1000_PREALLOCATE_AT_LOADING_DRIVER
-> +	bool "Preallocate memory at loading driver"
-> +	---help---
-> +	  This choice supports static allocation of the memory
-> +	  for the receive buffer. The driver will allocate the RX buffer
-> +	  during initial time. The driver will also free the buffer
-> +	  by calling network device stop.
-> +
-> +config WILC1000_DYNAMICALLY_ALLOCATE_MEMROY
-> +        bool "Dynamically allocate memory in real time"
-> +        ---help---
-> +	  This choice supports dynamic allocation of the memory
-> +	  for the receive buffer. The driver will allocate the RX buffer
-> +	  when it is required.
->  endchoice
->  
-> -
->  choice
-> -    prompt "Bus Type"
-> -    depends on WILC1000 
-> -    default WILC1000_SDIO
-> -    
-> +	prompt "Bus Type"
-> +	depends on WILC1000
-> +	default WILC1000_SDIO
-> +
->  	config WILC1000_SDIO
-> -	    bool "SDIO support"
-> -	    depends on MMC
-> -		---help---
-> -			This module adds support for the SDIO interface of adapters using
-> -			WILC chipset. Select this if your platform is using the SDIO bus. 
-> +	bool "SDIO support"
-> +	depends on MMC
-> +	---help---
-> +	  This module adds support for the SDIO interface
-> +	  of adapters using WILC chipset. Select this if
-> +	  your platform is using the SDIO bus.
->  
->  	config WILC1000_SPI
-> -	    bool "SPI support"
-> -		---help---
-> -			This module adds support for the SPI interface of adapters using
-> -			WILC chipset. Select this if your platform is using the SPI bus. 
-> +	depends on SPI
-> +	bool "SPI support"
-> +	---help---
-> +	  This module adds support for the SPI interface
-> +	  of adapters using WILC chipset. Select this if
-> +	  your platform is using the SPI bus.
->  endchoice
->  
-> -
->  config WILC1000_HW_OOB_INTR
-> -    bool "Use out of band interrupt"
-> -    depends on WILC1000 && WILC1000_SDIO
-> -    default n
-> -    ---help---
-> -		If your platform don't recognize SDIO IRQ, connect chipset external IRQ pin
-> -		and check this option. Or, Use this to get all interrupts including SDIO interrupts.
-> -
-> +	bool "Use out of band interrupt"
-> +	depends on WILC1000 && WILC1000_SDIO
-> +	default n
-> +	---help---
-> +	  If your platform don't recognize SDIO IRQ, connect chipset external IRQ pin
-> +	  and check this option. Or, Use this to get all interrupts including SDIO interrupts.
+Ah, okay..
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> That leaves me with the option of adding the code that was removed from
+> socfpga.c back where it was or taking that same code moving it to pm.c
 > 
 
+I think you only need the scu base address in
+socfpga_sdram_self_refresh(), so you can probably just use the single
+line assembly code to get it there.
 
--- 
-Nicolas Ferre
+Dinh
