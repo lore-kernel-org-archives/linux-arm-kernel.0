@@ -1,121 +1,235 @@
-From: michael@smart-africa.com (Michael van der Westhuizen)
-Date: Thu, 28 May 2015 11:36:00 +0200
-Subject: [PATCH] arm: tcm: Don't crash when TCM banks are protected by
- TrustZone
-Message-ID: <1432805760-4590-1-git-send-email-michael@smart-africa.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 28 May 2015 11:40:54 +0200
+Subject: [PATCHv2] bus: mvebu-mbus: add mv_mbus_dram_info_nooverlap()
+Message-ID: <1432806054-17128-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes the TCM initialisation code to handle TCM banks that are
-present but inaccessible due to TrustZone configuration.  This is
-the default case when enabling the non-secure world.  It may also
-be the case that that the user decided to use TCM for TrustZone.
+This commit introduces a variant of the mv_mbus_dram_info() function
+called mv_mbus_dram_info_nooverlap(). Both functions are used by
+Marvell drivers supporting devices doing DMA, and provide them a
+description the DRAM ranges that they need to configure their DRAM
+windows.
 
-This change has exposed a bug in handling of TCM where no TCM bank
-was usable (the 0 size TCM case).  This change addresses the
-resulting hang.
+The ranges provided by the mv_mbus_dram_info() function may overlap
+with the I/O windows if there is a lot (>= 4 GB) of RAM
+installed. This is not a problem for most of the DMA masters, except
+for the upcoming new CESA crypto driver because it does DMA to the
+SRAM, which is mapped through an I/O window. For this unit, we need to
+have DRAM ranges that do not overlap with the I/O windows.
 
-Signed-off-by: Michael van der Westhuizen <michael@smart-africa.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+A first implementation done in commit 1737cac69369 ("bus: mvebu-mbus:
+make sure SDRAM CS for DMA don't overlap the MBus bridge window"),
+changed the information returned by mv_mbus_dram_info() to match this
+requirement. However, it broke the requirement of the other DMA
+masters than the DRAM ranges should have power of two sizes.
+
+To solve this situation, this commit introduces a new
+mv_mbus_dram_info_nooverlap() function, which returns the same
+information as mv_mbus_dram_info(), but guaranteed to not overlap with
+the I/O windows.
+
+In the end, it gives us two variants of the mv_mbus_dram_info*()
+functions:
+
+ - The normal one, mv_mbus_dram_info(), which has been around for many
+   years. This function returns the raw DRAM ranges, which are
+   guaranteed to use power of two sizes, but will overlap with I/O
+   windows. This function will therefore be used by all DMA masters
+   (SATA, XOR, Ethernet, etc.) except the CESA crypto driver.
+
+ - The new 'nooverlap' variant, mv_mbus_dram_info_nooverlap(). This
+   function returns DRAM ranges after they have been "tweaked" to make
+   sure they don't overlap with I/O windows. By doing this tweaking,
+   we remove the power of two size guarantee. This variant will be
+   used by the new CESA crypto driver.
+
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/kernel/tcm.c | 35 ++++++++++++++++++++++++++++++++---
- 1 file changed, 32 insertions(+), 3 deletions(-)
+Changes v1 -> v2:
+ - Add the missing stub for mv_mbus_dram_info_nooverlap() in mbus.h,
+   when CONFIG_PLAT_ORION is not defined.
+---
+ drivers/bus/mvebu-mbus.c | 117 +++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/mbus.h     |   5 ++
+ 2 files changed, 122 insertions(+)
 
-diff --git a/arch/arm/kernel/tcm.c b/arch/arm/kernel/tcm.c
-index 7a3be1d..af1dd5a 100644
---- a/arch/arm/kernel/tcm.c
-+++ b/arch/arm/kernel/tcm.c
-@@ -17,6 +17,7 @@
- #include <asm/mach/map.h>
- #include <asm/memory.h>
- #include <asm/system_info.h>
-+#include <asm/traps.h>
+diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+index 6f047dc..c43c3d2 100644
+--- a/drivers/bus/mvebu-mbus.c
++++ b/drivers/bus/mvebu-mbus.c
+@@ -57,6 +57,7 @@
+ #include <linux/of_address.h>
+ #include <linux/debugfs.h>
+ #include <linux/log2.h>
++#include <linux/memblock.h>
+ #include <linux/syscore_ops.h>
  
- static struct gen_pool *tcm_pool;
- static bool dtcm_present;
-@@ -175,6 +176,21 @@ static int __init setup_tcm_bank(u8 type, u8 bank, u8 banks,
- 	return 0;
+ /*
+@@ -152,13 +153,39 @@ struct mvebu_mbus_state {
+ 
+ static struct mvebu_mbus_state mbus_state;
+ 
++/*
++ * We provide two variants of the mv_mbus_dram_info() function:
++ *
++ * - The normal one, where the described DRAM ranges may overlap with
++ *   the I/O windows, but for which the DRAM ranges are guaranteed to
++ *   have a power of two size. Such ranges are suitable for the DMA
++ *   masters that only DMA between the RAM and the device, which is
++ *   actually all devices except the crypto engines.
++ *
++ * - The 'nooverlap' one, where the described DRAM ranges are
++ *   guaranteed to not overlap with the I/O windows, but for which the
++ *   DRAM ranges will not have power of two sizes. They will only be
++ *   aligned on a 64 KB boundary, and have a size multiple of 64
++ *   KB. Such ranges are suitable for the DMA masters that DMA between
++ *   the crypto SRAM (which is mapped through an I/O window) and a
++ *   device. This is the case for the crypto engines.
++ */
++
+ static struct mbus_dram_target_info mvebu_mbus_dram_info;
++static struct mbus_dram_target_info mvebu_mbus_dram_info_nooverlap;
++
+ const struct mbus_dram_target_info *mv_mbus_dram_info(void)
+ {
+ 	return &mvebu_mbus_dram_info;
+ }
+ EXPORT_SYMBOL_GPL(mv_mbus_dram_info);
+ 
++const struct mbus_dram_target_info *mv_mbus_dram_info_nooverlap(void)
++{
++	return &mvebu_mbus_dram_info_nooverlap;
++}
++EXPORT_SYMBOL_GPL(mv_mbus_dram_info_nooverlap);
++
+ /* Checks whether the given window has remap capability */
+ static bool mvebu_mbus_window_is_remappable(struct mvebu_mbus_state *mbus,
+ 					    const int win)
+@@ -576,6 +603,95 @@ static unsigned int armada_xp_mbus_win_remap_offset(int win)
+ 		return MVEBU_MBUS_NO_REMAP;
  }
  
-+static int __init tcm_handler(struct pt_regs *regs, unsigned int instr)
++/*
++ * Use the memblock information to find the MBus bridge hole in the
++ * physical address space.
++ */
++static void __init
++mvebu_mbus_find_bridge_hole(uint64_t *start, uint64_t *end)
 +{
-+	regs->uregs[(instr >> 12) & 0xf] = 0;
-+	regs->ARM_pc += 4;
-+	return 0;
++	struct memblock_region *r;
++	uint64_t s = 0;
++
++	for_each_memblock(memory, r) {
++		/*
++		 * This part of the memory is above 4 GB, so we don't
++		 * care for the MBus bridge hole.
++		 */
++		if (r->base >= 0x100000000ULL)
++			continue;
++
++		/*
++		 * The MBus bridge hole is at the end of the RAM under
++		 * the 4 GB limit.
++		 */
++		if (r->base + r->size > s)
++			s = r->base + r->size;
++	}
++
++	*start = s;
++	*end = 0x100000000ULL;
 +}
 +
-+static const struct undef_hook tcm_hook __initconst = {
-+	.instr_mask	= 0xffff0fdf,
-+	.instr_val	= 0xee190f11,
-+	.cpsr_mask	= MODE_MASK,
-+	.cpsr_val	= SVC_MODE,
-+	.fn		= tcm_handler
-+};
++/*
++ * This function fills in the mvebu_mbus_dram_info_nooverlap data
++ * structure, by looking at the mvebu_mbus_dram_info data, and
++ * removing the parts of it that overlap with I/O windows.
++ */
++static void __init
++mvebu_mbus_setup_cpu_target_nooverlap(struct mvebu_mbus_state *mbus)
++{
++	uint64_t mbus_bridge_base, mbus_bridge_end;
++	int cs_nooverlap = 0;
++	int i;
 +
- /*
-  * This initializes the TCM memory
++	mvebu_mbus_find_bridge_hole(&mbus_bridge_base, &mbus_bridge_end);
++
++	for (i = 0; i < mvebu_mbus_dram_info.num_cs; i++) {
++		struct mbus_dram_window *w;
++		u64 base, size, end;
++
++		w = &mvebu_mbus_dram_info.cs[i];
++		base = w->base;
++		size = w->size;
++		end = base + size;
++
++		/*
++		 * The CS is fully enclosed inside the MBus bridge
++		 * area, so ignore it.
++		 */
++		if (base >= mbus_bridge_base && end <= mbus_bridge_end)
++			continue;
++
++		/*
++		 * Beginning of CS overlaps with end of MBus, raise CS
++		 * base address, and shrink its size.
++		 */
++		if (base >= mbus_bridge_base && end > mbus_bridge_end) {
++			size -= mbus_bridge_end - base;
++			base = mbus_bridge_end;
++		}
++
++		/*
++		 * End of CS overlaps with beginning of MBus, shrink
++		 * CS size.
++		 */
++		if (base < mbus_bridge_base && end > mbus_bridge_base)
++			size -= end - mbus_bridge_base;
++
++		w = &mvebu_mbus_dram_info_nooverlap.cs[cs_nooverlap++];
++		w->cs_index = i;
++		w->mbus_attr = 0xf & ~(1 << i);
++		if (mbus->hw_io_coherency)
++			w->mbus_attr |= ATTR_HW_COHERENCY;
++		w->base = base;
++		w->size = size;
++	}
++
++	mvebu_mbus_dram_info_nooverlap.mbus_dram_target_id = TARGET_DDR;
++	mvebu_mbus_dram_info_nooverlap.num_cs = cs_nooverlap;
++}
++
+ static void __init
+ mvebu_mbus_default_setup_cpu_target(struct mvebu_mbus_state *mbus)
+ {
+@@ -964,6 +1080,7 @@ static int __init mvebu_mbus_common_init(struct mvebu_mbus_state *mbus,
+ 		mvebu_mbus_disable_window(mbus, win);
+ 
+ 	mbus->soc->setup_cpu_target(mbus);
++	mvebu_mbus_setup_cpu_target_nooverlap(mbus);
+ 
+ 	if (is_coherent)
+ 		writel(UNIT_SYNC_BARRIER_ALL,
+diff --git a/include/linux/mbus.h b/include/linux/mbus.h
+index 611b69f..1f7bc63 100644
+--- a/include/linux/mbus.h
++++ b/include/linux/mbus.h
+@@ -54,11 +54,16 @@ struct mbus_dram_target_info
   */
-@@ -207,6 +223,8 @@ void __init tcm_init(void)
- 	dtcm_banks = (tcm_status >> 16) & 0x03;
- 	itcm_banks = (tcm_status & 0x03);
- 
-+	register_undef_hook(&tcm_hook);
-+
- 	/* Values greater than 2 for D/ITCM banks are "reserved" */
- 	if (dtcm_banks > 2)
- 		dtcm_banks = 0;
-@@ -218,7 +236,7 @@ void __init tcm_init(void)
- 		for (i = 0; i < dtcm_banks; i++) {
- 			ret = setup_tcm_bank(0, i, dtcm_banks, &dtcm_end);
- 			if (ret)
--				return;
-+				goto unregister;
- 		}
- 		/* This means you compiled more code than fits into DTCM */
- 		if (dtcm_code_sz > (dtcm_end - DTCM_OFFSET)) {
-@@ -227,6 +245,10 @@ void __init tcm_init(void)
- 				dtcm_code_sz, (dtcm_end - DTCM_OFFSET));
- 			goto no_dtcm;
- 		}
-+		/* This means that the DTCM sizes were 0 or the DTCM banks
-+		 * were inaccessible due to TrustZone configuration */
-+		if (!(dtcm_end - DTCM_OFFSET))
-+			goto no_dtcm;
- 		dtcm_res.end = dtcm_end - 1;
- 		request_resource(&iomem_resource, &dtcm_res);
- 		dtcm_iomap[0].length = dtcm_end - DTCM_OFFSET;
-@@ -250,15 +272,19 @@ no_dtcm:
- 		for (i = 0; i < itcm_banks; i++) {
- 			ret = setup_tcm_bank(1, i, itcm_banks, &itcm_end);
- 			if (ret)
--				return;
-+				goto unregister;
- 		}
- 		/* This means you compiled more code than fits into ITCM */
- 		if (itcm_code_sz > (itcm_end - ITCM_OFFSET)) {
- 			pr_info("CPU ITCM: %u bytes of code compiled to "
- 				"ITCM but only %lu bytes of ITCM present\n",
- 				itcm_code_sz, (itcm_end - ITCM_OFFSET));
--			return;
-+			goto unregister;
- 		}
-+		/* This means that the ITCM sizes were 0 or the ITCM banks
-+		 * were inaccessible due to TrustZone configuration */
-+		if (!(itcm_end - ITCM_OFFSET))
-+			goto unregister;
- 		itcm_res.end = itcm_end - 1;
- 		request_resource(&iomem_resource, &itcm_res);
- 		itcm_iomap[0].length = itcm_end - ITCM_OFFSET;
-@@ -275,6 +301,9 @@ no_dtcm:
- 		pr_info("CPU ITCM: %u bytes of code compiled to ITCM but no "
- 			"ITCM banks present in CPU\n", itcm_code_sz);
- 	}
-+
-+unregister:
-+	unregister_undef_hook(&tcm_hook);
+ #ifdef CONFIG_PLAT_ORION
+ extern const struct mbus_dram_target_info *mv_mbus_dram_info(void);
++extern const struct mbus_dram_target_info *mv_mbus_dram_info_nooverlap(void);
+ #else
+ static inline const struct mbus_dram_target_info *mv_mbus_dram_info(void)
+ {
+ 	return NULL;
  }
++static inline const struct mbus_dram_target_info *mv_mbus_dram_info_nooverlap(void)
++{
++	return NULL;
++}
+ #endif
  
- /*
+ int mvebu_mbus_save_cpu_target(u32 *store_addr);
 -- 
-2.1.4
+2.1.0
