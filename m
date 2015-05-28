@@ -1,66 +1,90 @@
-From: noralf@tronnes.org (=?windows-1252?Q?Noralf_Tr=F8nnes?=)
-Date: Fri, 29 May 2015 00:43:46 +0200
-Subject: [PATCH 2/3 v4] ARM: bcm2835: Add the Raspberry Pi firmware driver
-In-Reply-To: <87r3q072gl.fsf@eliezer.anholt.net>
-References: <20150528114500.GP11677@x1>
- <1432837987-22861-1-git-send-email-eric@anholt.net>
- <55678BBC.5090507@tronnes.org> <87r3q072gl.fsf@eliezer.anholt.net>
-Message-ID: <55679A22.2090909@tronnes.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 28 May 2015 15:48:28 -0700
+Subject: [PATCH 2/7] ARM: bcm2835: Add a Raspberry Pi-specific clock
+ driver.
+In-Reply-To: <55679085.6040402@wwwdotorg.org>
+References: <1431978219-14226-1-git-send-email-eric@anholt.net>
+ <1431978219-14226-3-git-send-email-eric@anholt.net>
+ <55679085.6040402@wwwdotorg.org>
+Message-ID: <20150528224828.GI24204@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 05/28, Stephen Warren wrote:
+> On 05/18/2015 01:43 PM, Eric Anholt wrote:
+> > Unfortunately, the clock manager's registers are not accessible by the
+> > ARM, so we have to request that the firmware modify our clocks for us.
+> > 
+> > This driver only registers the clocks at the point they are requested
+> > by a client driver.  This is partially to support returning
+> > -EPROBE_DEFER when the firmware driver isn't supported yet, but it
+> > also avoids issues with disabling "unused" clocks due to them not yet
+> > being connected to their consumers in the DT.
+> 
+> It looks like you forgot to CC the clock subsystem maintainers:
+> 
+> M:      Mike Turquette <mturquette@linaro.org>
+> M:      Stephen Boyd <sboyd@codeaurora.org>
+> 
 
+Thanks, except I don't have the full patch context here to review
+the patch.
 
-Den 29.05.2015 00:38, skrev Eric Anholt:
-> Noralf Tr?nnes <noralf@tronnes.org> writes:
->
->> Den 28.05.2015 20:33, skrev Eric Anholt:
->>> This gives us a function for making mailbox property channel requests
->>> of the firmware, which is most notable in that it will let us get and
->>> set clock rates.
->>>
->>> Signed-off-by: Eric Anholt <eric@anholt.net>
->> ...
->>> +static int rpi_firmware_probe(struct platform_device *pdev)
->>> +{
->>> +	struct device *dev = &pdev->dev;
->>> +	struct rpi_firmware *fw;
->>> +
->>> +	fw = devm_kzalloc(dev, sizeof(*fw), GFP_KERNEL);
->>> +	if (!fw)
->>> +		return -ENOMEM;
->>> +
->>> +	fw->cl.dev = dev;
->>> +	fw->cl.rx_callback = response_callback;
->>> +	fw->cl.tx_block = true;
->>> +
->>> +	fw->chan = mbox_request_channel(&fw->cl, 0);
->>> +	if (IS_ERR(fw->chan)) {
->>> +		int ret = PTR_ERR(fw->chan);
->>> +		if (ret != -EPROBE_DEFER)
->>> +			dev_err(dev, "Failed to get mbox channel: %d\n", ret);
->>> +		return ret;
->>> +	}
->>> +
->>> +	init_completion(&fw->c);
->>> +
->>> +	platform_set_drvdata(pdev, fw);
->>> +
->>> +	rpi_firmware_print_firmware_revision(dev);
->>> +
->>> +	return 0;
->>> +}
->>> +
->>> +static int rpi_firmware_remove(struct platform_device *pdev)
->>> +{
->>> +	struct rpi_firmware *fw = platform_get_drvdata(pdev);
->>> +
->>> +	mbox_free_channel(fw->chan);
->> I guess driver data has to be reset here:
->> platform_set_drvdata(pdev, NULL);
-> Fixed.
->
+> The description above sounds like a neat solution, but has the
+> disadvantage that the clocks without a client won't show up in debugfs.
+> I wonder if the clock maintainers know of a better way?
 
-I was wrong about this one as Stephen pointed out.
-My point became mute now that rpi_firmware_property_list() doesn't look 
-up driver data anymore.
+Can you mark them as CLK_IGNORE_UNUSED? The probe defer problem
+has a solution in sight (see more below).
+
+> > +static long rpi_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+> > +			       unsigned long *parent_rate)
+> > +{
+> > +	/*
+> > +	 * The firmware will end up rounding our rate to something,
+> > +	 * but we don't have an interface for it.  Just return the
+> > +	 * requested value, and it'll get updated after the clock gets
+> > +	 * set.
+> > +	 */
+> > +	return rate;
+> > +}
+> 
+> Hmm. I wonder if that will confuse things; I thought the purpose of
+> round_rate() was so code could know exactly what would happen ahead of time?
+
+We have to do the same thing on Qualcomm platforms for FW
+controlled clocks. We don't have any insight to what the rate is
+going to be. We can only ask the firmware to set a rate and the
+firmware guarantees it will be at least that rate.
+
+> 
+> > +	init.flags = CLK_IS_ROOT;
+> 
+> Is it possible to add clock parent information to the driver, so the
+> clocks are all hooked together into the correct tree, rather than all
+> looking like root clocks?
+> 
+> One of the many reasons I didn't do anything FW-wise for the kernel was
+> the hope that such information would be forthcoming, and hence we could
+> have complete kernel drivers.
+> 
+> > +void __init rpi_firmware_init_clock_provider(struct device_node *node)
+> > +{
+> > +	/* We delay construction of our struct clks until get time,
+> > +	 * because we need to be able to return -EPROBE_DEFER if the
+> > +	 * firmware driver isn't up yet.  clk core doesn't support
+> > +	 * re-probing on -EPROBE_DEFER, but callers of clk_get can.
+> 
+> Oh, that's nasty. What would it take to fix the clock core to support
+> deferred probe? It really should.
+
+There are patches to support probe defer from clk_get() but they
+stalled because sunxi is needs to keep clocks on from their
+providing driver (termed "critical clocks"). If we can resolve
+the "critical clocks" thing then we should be able to support
+probe defer, unless we find other users of orphaned clk
+pointers.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
