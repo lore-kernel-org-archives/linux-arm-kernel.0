@@ -1,210 +1,120 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Thu, 28 May 2015 19:48:37 +0800
-Subject: [RFC PATCH v1 1/3] PCI: designware: Add ARM64 support
-In-Reply-To: <16371687.jmfn381VuV@wuerfel>
-References: <000001d096a9$27bf43f0$773dcbd0$@com> <2095085.CuXXeGT0Wg@wuerfel>
- <5565EEAD.9070003@st.com> <16371687.jmfn381VuV@wuerfel>
-Message-ID: <55670095.7020203@hisilicon.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 28 May 2015 13:57:31 +0200
+Subject: [PATCH 1/2] rtc: mxc: add a second clock
+In-Reply-To: <1431729330-7625-2-git-send-email-tremyfr@gmail.com>
+References: <1431729330-7625-1-git-send-email-tremyfr@gmail.com>
+ <1431729330-7625-2-git-send-email-tremyfr@gmail.com>
+Message-ID: <20150528115731.GN2185@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/5/28 3:51, Arnd Bergmann wrote:
-> On Wednesday 27 May 2015 18:19:57 Fabrice Gasnier wrote:
->> On 05/27/2015 05:43 PM, Arnd Bergmann wrote:
->>> On Wednesday 27 May 2015 17:31:46 Arnd Bergmann wrote:
->>>> Yes, that works. However there are two problems with the approach:
->>>>
->>>> - we have to change all PCI host drivers on ARM to do this in order to remove
->>>>    the ARM-specific pcibios_msi_controller() function
->>>> - it's possible that there are dw_pcie implementations that do not include
->>>>    an MSI controller, so that pointer would be NULL, which leads to the
->>>>    core code to still call the ARM-specific pcibios_msi_controller() function
->>>>    unless we remove it.
->>> I wonder if this simple patch would be sufficient to kill off
->>> pcibios_msi_controller().
->>>
->>> Can one of you try it?
->>>
->>>       Arnd
->>
->> Hi Arnd,
->> I tested it quickly on my platform, with and without CONFIG_PCI_MSI.
->> In both case it seems to run fine with dw pcie.
->>
-> 
-> Awesome. Now we just need to find a way to move the align_resource callback.
-> I wonder if the approach below would be acceptable.
-> 
-> 	Arnd
-> 
+Hi,
 
-Hi Arnd,
+On 16/05/2015 at 00:35:29 +0200, Philippe Reynes wrote :
+> The mxc RTC needs two clocks, one for the input
+> reference, and one for the IP. But this driver
+> was only using one clock (for the reference).
+> This patch add the second clock (for the IP).
+> 
+> Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
+> ---
+>  arch/arm/mach-imx/clk-imx31.c |    3 ++-
+>  drivers/rtc/rtc-mxc.c         |   26 +++++++++++++++++---------
+>  2 files changed, 19 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/clk-imx31.c b/arch/arm/mach-imx/clk-imx31.c
+> index 286ef42..480c54f 100644
+> --- a/arch/arm/mach-imx/clk-imx31.c
+> +++ b/arch/arm/mach-imx/clk-imx31.c
+> @@ -130,7 +130,8 @@ int __init mx31_clocks_init(unsigned long fref)
+>  	clk_register_clkdev(clk[cspi3_gate], NULL, "imx31-cspi.2");
+>  	clk_register_clkdev(clk[pwm_gate], "pwm", NULL);
+>  	clk_register_clkdev(clk[wdog_gate], NULL, "imx2-wdt.0");
+> -	clk_register_clkdev(clk[rtc_gate], NULL, "imx21-rtc");
+> +	clk_register_clkdev(clk[ckil], "rtc", "imx21-rtc");
+> +	clk_register_clkdev(clk[rtc_gate], "ipg", "imx21-rtc");
+>  	clk_register_clkdev(clk[epit1_gate], "epit", NULL);
+>  	clk_register_clkdev(clk[epit2_gate], "epit", NULL);
+>  	clk_register_clkdev(clk[nfc], NULL, "imx27-nand.0");
 
-Many thanks for your kindly suggestions.
+This should probably go in a separate patch so that Shawn can apply it.
 
-> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> index fcbbbb1b9e95..20839d26a490 100644
-> --- a/arch/arm/kernel/bios32.c
-> +++ b/arch/arm/kernel/bios32.c
-> @@ -597,9 +588,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+
+> diff --git a/drivers/rtc/rtc-mxc.c b/drivers/rtc/rtc-mxc.c
+> index 09d422b..e916a91 100644
+> --- a/drivers/rtc/rtc-mxc.c
+> +++ b/drivers/rtc/rtc-mxc.c
+> @@ -79,7 +79,8 @@ struct rtc_plat_data {
+>  	struct rtc_device *rtc;
+>  	void __iomem *ioaddr;
+>  	int irq;
+> -	struct clk *clk;
+> +	struct clk *clk_rtc;
+> +	struct clk *clk_ipg;
+>  	struct rtc_time g_rtc_alarm;
+>  	enum imx_rtc_type devtype;
+>  };
+> @@ -373,17 +374,24 @@ static int mxc_rtc_probe(struct platform_device *pdev)
+>  	if (IS_ERR(pdata->ioaddr))
+>  		return PTR_ERR(pdata->ioaddr);
 >  
->  	start = (start + align - 1) & ~(align - 1);
->  
-> -	if (sys->align_resource)
-> -		return sys->align_resource(dev, res, start, size, align);
-> -
->  	return start;
->  }
->  
-> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-> index 1ab863551920..74216c9c2822 100644
-> --- a/drivers/pci/host/pci-mvebu.c
-> +++ b/drivers/pci/host/pci-mvebu.c
-> @@ -751,27 +751,20 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
->  	return 1;
->  }
->  
-> -static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
-> +static resource_size_t mvebu_pcie_align_resource(void *data,
-> +						 const struct resource *res,
-> +						 resource_size_t size,
-> +						 resource_size_t align)
->  {
-> -	struct mvebu_pcie *pcie = sys_to_pcie(sys);
-> -	struct pci_bus *bus;
-> +	struct device *dev = data;
->  
-> -	bus = pci_create_root_bus(&pcie->pdev->dev, sys->busnr,
-> -				  &mvebu_pcie_ops, sys, &sys->resources);
-> -	if (!bus)
-> -		return NULL;
-> +	resource_size_t start = res->start;
->  
-> -	pci_scan_child_bus(bus);
-> +	if (res->flags & IORESOURCE_IO && start & 0x300)
-> +		start = (start + 0x3ff) & ~0x3ff;
->  
-> -	return bus;
-> -}
-> +	start = (start + align - 1) & ~(align - 1);
->  
-> -static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
-> -						 const struct resource *res,
-> -						 resource_size_t start,
-> -						 resource_size_t size,
-> -						 resource_size_t align)
-> -{
->  	if (dev->bus->number != 0)
->  		return start;
->  
-> @@ -796,6 +789,25 @@ static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
->  		return start;
->  }
->  
-> +static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
-> +{
-> +	struct mvebu_pcie *pcie = sys_to_pcie(sys);
-> +	struct pci_host_bridge *phb;
-> +	struct pci_bus *bus;
-> +
-> +	bus = pci_create_root_bus(&pcie->pdev->dev, sys->busnr,
-> +				  &mvebu_pcie_ops, sys, &sys->resources);
-> +	if (!bus)
-> +		return NULL;
-> +
-> +	phb = pci_find_host_bridge(bus);
-> +	phb->align_resource = mvebu_pcie_align_resource;
-> +
-> +	pci_scan_child_bus(bus);
-> +
-> +	return bus;
-> +}
-> +
->  static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
->  {
->  	struct hw_pci hw;
-> @@ -812,7 +824,6 @@ static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
->  	hw.scan           = mvebu_pcie_scan_bus;
->  	hw.map_irq        = of_irq_parse_and_map_pci;
->  	hw.ops            = &mvebu_pcie_ops;
-> -	hw.align_resource = mvebu_pcie_align_resource;
->  
->  	pci_common_init(&hw);
->  }
-> diff --git a/drivers/pci/setup-res.c b/drivers/pci/setup-res.c
-> index 232f9254c11a..e1f5e13c4636 100644
-> --- a/drivers/pci/setup-res.c
-> +++ b/drivers/pci/setup-res.c
-> @@ -200,7 +200,11 @@ static int pci_revert_fw_address(struct resource *res, struct pci_dev *dev,
->  }
->  
->  static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
-> -		int resno, resource_size_t size, resource_size_t align)
-> +		int resno, resource_size_t size, resource_size_t align,
-> +		resource_size_t (*alignf)(void *,
-> +					  const struct resource *,
-> +					  resource_size_t,
-> +					  resource_size_t))
->  {
->  	struct resource *res = dev->resource + resno;
->  	resource_size_t min;
-> @@ -217,7 +221,7 @@ static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
->  	 */
->  	ret = pci_bus_alloc_resource(bus, res, size, align, min,
->  				     IORESOURCE_PREFETCH | IORESOURCE_MEM_64,
-> -				     pcibios_align_resource, dev);
-> +				     alignf, dev);
->  	if (ret == 0)
->  		return 0;
->  
-> @@ -229,7 +233,7 @@ static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
->  	     (IORESOURCE_PREFETCH | IORESOURCE_MEM_64)) {
->  		ret = pci_bus_alloc_resource(bus, res, size, align, min,
->  					     IORESOURCE_PREFETCH,
-> -					     pcibios_align_resource, dev);
-> +					     alignf, dev);
->  		if (ret == 0)
->  			return 0;
+> -	pdata->clk = devm_clk_get(&pdev->dev, NULL);
+> -	if (IS_ERR(pdata->clk)) {
+> -		dev_err(&pdev->dev, "unable to get clock!\n");
+> -		return PTR_ERR(pdata->clk);
+> +	pdata->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
+> +	if (IS_ERR(pdata->clk_ipg)) {
+> +		dev_err(&pdev->dev, "unable to get ipg clock!\n");
+> +		return PTR_ERR(pdata->clk_ipg);
 >  	}
-> @@ -242,7 +246,7 @@ static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
->  	 */
->  	if (res->flags & (IORESOURCE_PREFETCH | IORESOURCE_MEM_64))
->  		ret = pci_bus_alloc_resource(bus, res, size, align, min, 0,
-> -					     pcibios_align_resource, dev);
-> +					     alignf, dev);
+>  
+> -	ret = clk_prepare_enable(pdata->clk);
+> +	ret = clk_prepare_enable(pdata->clk_ipg);
+>  	if (ret)
+>  		return ret;
+>  
+> -	rate = clk_get_rate(pdata->clk);
+> +	pdata->clk_rtc = devm_clk_get(&pdev->dev, "rtc");
+> +	if (IS_ERR(pdata->clk_rtc)) {
+> +		dev_err(&pdev->dev, "unable to get rtc clock!\n");
+> +		ret = PTR_ERR(pdata->clk_rtc);
+> +		goto exit_put_clk;
+> +	}
+> +
+> +	rate = clk_get_rate(pdata->clk_rtc);
+
+You are getting the rate but don't you need to clk_prepare_enable()?
+
+Also, aren't those devm_clk_get now failing on i.mx35? Maybe it was
+already failing before that patch as I don't see any rtc clock being
+registeres in clk-imx35.c
+
+>  
+>  	if (rate == 32768)
+>  		reg = RTC_INPUT_CLK_32768HZ;
+> @@ -432,7 +440,7 @@ static int mxc_rtc_probe(struct platform_device *pdev)
+>  	return 0;
+>  
+>  exit_put_clk:
+> -	clk_disable_unprepare(pdata->clk);
+> +	clk_disable_unprepare(pdata->clk_ipg);
 >  
 >  	return ret;
 >  }
-> @@ -251,10 +255,19 @@ static int _pci_assign_resource(struct pci_dev *dev, int resno,
->  				resource_size_t size, resource_size_t min_align)
+> @@ -441,7 +449,7 @@ static int mxc_rtc_remove(struct platform_device *pdev)
 >  {
->  	struct pci_bus *bus;
-> +	struct pci_host_bridge *phb;
->  	int ret;
+>  	struct rtc_plat_data *pdata = platform_get_drvdata(pdev);
 >  
->  	bus = dev->bus;
-> -	while ((ret = __pci_assign_resource(bus, dev, resno, size, min_align))) {
-> +	phb = pci_find_host_bridge(bus);
-> +
-> +	if (phb->align_resource)
-> +		alignf = phb->align_resource;
-> +	else
-> +		alignf = pcibios_align_resource;
-> +
-> +	while ((ret = __pci_assign_resource(bus, dev, resno, size,
-> +					    min_align, alignf))) {
->  		if (!bus->parent || !bus->self->transparent)
->  			break;
->  		bus = bus->parent;
+> -	clk_disable_unprepare(pdata->clk);
+> +	clk_disable_unprepare(pdata->clk_ipg);
+>  
+>  	return 0;
+>  }
+> -- 
+> 1.7.4.4
 > 
 
-I think this code is fine, and we also should add a funtion point in struct pci_host_bridge to
-store mvebu_pcie_align_resource. How about I make a new version patchset with above codes for
-further reviewing ?
-
-Best Regards,
-Zhou
-
-> 
-> .
-> 
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
