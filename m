@@ -1,94 +1,80 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 28 May 2015 13:42:22 +0100
-Subject: [RFC/PATCH 4/9] of: dma: Make of_dma_deconfigure() public
-In-Reply-To: <1431644410-2997-5-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1431644410-2997-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1431644410-2997-5-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20150528124222.GF31001@arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 28 May 2015 14:45:55 +0200
+Subject: [PATCH] drm: atmel_hlcdc: Add support for get_timings
+In-Reply-To: <1432811608.3228.43.camel@pengutronix.de>
+References: <1432199216-1139-1-git-send-email-davidcdueck@googlemail.com>
+ <20150526112853.688d26b7@bbrezillon>
+ <1432811608.3228.43.camel@pengutronix.de>
+Message-ID: <20150528144555.13cd755a@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(sorry for the mid-review delay, I got side-tracked yesterday evening)
+Hi Philip,
 
-On Fri, May 15, 2015 at 12:00:05AM +0100, Laurent Pinchart wrote:
-> As part of moving DMA initializing to probe time the
-> of_dma_deconfigure() function will need to be called from different
-> source files. Make it public and move it to drivers/of/device.c where
-> the of_dma_configure() function is.
+On Thu, 28 May 2015 13:13:28 +0200
+Philipp Zabel <p.zabel@pengutronix.de> wrote:
+
+> Hi Boris,
 > 
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> ---
->  drivers/of/device.c       | 12 ++++++++++++
->  drivers/of/platform.c     |  5 -----
->  include/linux/of_device.h |  3 +++
->  3 files changed, 15 insertions(+), 5 deletions(-)
-
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-Cheers,
-
-Will
-
-> diff --git a/drivers/of/device.c b/drivers/of/device.c
-> index 530aa1ed3e1b..f1b84f464fe1 100644
-> --- a/drivers/of/device.c
-> +++ b/drivers/of/device.c
-> @@ -135,6 +135,18 @@ void of_dma_configure(struct device *dev, struct device_node *np)
->  }
->  EXPORT_SYMBOL_GPL(of_dma_configure);
->  
-> +/**
-> + * of_dma_deconfigure - Clean up DMA configuration
-> + * @dev:	Device for which to clean up DMA configuration
-> + *
-> + * Clean up all configuration performed by of_dma_configure_ops() and free all
-> + * resources that have been allocated.
-> + */
-> +void of_dma_deconfigure(struct device *dev)
-> +{
-> +	arch_teardown_dma_ops(dev);
-> +}
-> +
->  int of_device_register(struct platform_device *pdev)
->  {
->  	device_initialize(&pdev->dev);
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index a01f57c9e34e..7a660c79ff84 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -149,11 +149,6 @@ struct platform_device *of_device_alloc(struct device_node *np,
->  }
->  EXPORT_SYMBOL(of_device_alloc);
->  
-> -static void of_dma_deconfigure(struct device *dev)
-> -{
-> -	arch_teardown_dma_ops(dev);
-> -}
-> -
->  /**
->   * of_platform_device_create_pdata - Alloc, initialize and register an of_device
->   * @np: pointer to node to create device for
-> diff --git a/include/linux/of_device.h b/include/linux/of_device.h
-> index 22801b10cef5..6710807b0653 100644
-> --- a/include/linux/of_device.h
-> +++ b/include/linux/of_device.h
-> @@ -54,6 +54,7 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
->  }
->  
->  void of_dma_configure(struct device *dev, struct device_node *np);
-> +void of_dma_deconfigure(struct device *dev);
->  #else /* CONFIG_OF */
->  
->  static inline int of_driver_match_device(struct device *dev,
-> @@ -93,6 +94,8 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
->  }
->  static inline void of_dma_configure(struct device *dev, struct device_node *np)
->  {}
-> +static inline void of_dma_deconfigure(struct device *dev)
-> +{}
->  #endif /* CONFIG_OF */
->  
->  #endif /* _LINUX_OF_DEVICE_H */
-> -- 
-> 2.3.6
+> Am Dienstag, den 26.05.2015, 11:28 +0200 schrieb Boris Brezillon:
+> > Hi David,
+> > 
+> > On Thu, 21 May 2015 11:06:56 +0200
+> > David Dueck <davidcdueck@googlemail.com> wrote:
+> > 
+> > > drm_panel supports querying timing ranges. If the supplied mode does
+> > > not work with the hlcdc we query the panel and try to find a suitable
+> > > mode.
+> > 
+> > This patch looks good to me.
+> > 
+> > Philip, Thierry, could you confirm this is the correct way of dealing
+> > with timing ranges.
 > 
+> I wonder about two things:
+> 
+> This implementation minimizes the sum of absolute differences between
+> chosen and typical values. I wonder if it would be better to try and
+> minimize the difference between the chosen and nominal vertical refresh
+> rate.
+
+I'm not sure to understand what you mean.
+Are you suggesting that we should try keeping the vtotal (and maybe the
+htotal too) value unchanged by adapting the timing values ?
+Something like that:
+
+	vfront_porch = atmel_hlcdc_choose_parameter(1, 0x40,
+						    timings->vfront_porch);
+	
+	adjusted_mode->vsync_start = adjusted_mode->vdisplay + vfront_porch;
+
+	vsync_len = atmel_hlcdc_choose_parameter(1, 0x40,
+						 adjusted_mode->vsync_end -
+						 adjusted_mode->vsync_start);
+	adjusted_mode->vsync_end = adjusted_mode->vsync_start + vsync_len;
+	vback_porch = atmel_hlcdc_choose_parameter(0, 0x40,
+						   timings->vtotal -
+						   adjusted_mode->vsync_end);
+	adjusted_mode->vtotal = adjusted_mode->vsync_end + vback_porch;
+	/* ... */
+
+If that's the case, then I definitely agree.
+
+> 
+> Is this something that should be done earlier, in create_panel_output,
+> so that the connector's modes already contain the corrected settings?
+
+You mean creating our own drm_display modes (and taking the timing
+constraints when creating those modes) instead of calling drm_panel's
+->get_modes().
+That sounds reasonable. David, what's your opinion.
+
+Best Regards,
+
+Boris
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
