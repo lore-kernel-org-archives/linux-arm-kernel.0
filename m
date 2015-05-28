@@ -1,50 +1,67 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Thu, 28 May 2015 08:43:13 +0200
-Subject: [PATCH 13/13] drm: bridge/dw_hdmi-ahb-audio: parse ELD from HDMI
+From: yvo@apm.com (Y Vo)
+Date: Thu, 28 May 2015 13:46:28 +0700
+Subject: [PATCH v0] gpio: xgene: add ACPI support for APM X-Gene GPIO standby
  driver
-In-Reply-To: <20150527214439.GW2067@n2100.arm.linux.org.uk>
-References: <20150509102501.GO2067@n2100.arm.linux.org.uk>
- <E1Yr1yD-0006lK-RC@rmk-PC.arm.linux.org.uk>
- <20150527104308.GA8341@phenom.ffwll.local>
- <20150527173125.GS2067@n2100.arm.linux.org.uk>
- <CAKMK7uFgqyHR4b+Q=_55S2Ojt-9+B-BRM4pKCRNwbRZ7kskpfA@mail.gmail.com>
- <20150527214439.GW2067@n2100.arm.linux.org.uk>
-Message-ID: <20150528064313.GR8341@phenom.ffwll.local>
+Message-ID: <1432795588-17476-1-git-send-email-yvo@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 27, 2015 at 10:44:40PM +0100, Russell King - ARM Linux wrote:
-> On Wed, May 27, 2015 at 11:29:52PM +0200, Daniel Vetter wrote:
-> > The only issue that might be
-> > there with your sw approach is that a concurrent probe/hotplug in drm
-> > might free the edid and hence the eld, while the snd side is trying to
-> > copy that.
-> 
-> Talking only about the particular case of dw-hdmi-ahb-audio...
-> 
-> The worst that may happen is that the ELD will be overwritten with an
-> update on hotplug - it won't be freed unless the underlying connector
-> is freed, as the eld is stored as an array inside struct drm_connector.
-> Before the DRM connector is freed, we pull the audio driver's struct
-> device, which will destroy the ALSA device.
+Add ACPI support for APM X-Gene GPIO standby driver.
 
-Oh right I've forgotten that eld is stored as a full array and only the
-edid floats around as a pointer in drm_connector. 
+Signed-off-by: Y Vo <yvo@apm.com>
+---
+ drivers/gpio/gpio-xgene-sb.c |   19 +++++++++++++++++++
+ 1 files changed, 19 insertions(+), 0 deletions(-)
 
-> Hopefully ALSA already copes gracefully with the removal of an in-use
-> device... it should do, it's no different from having a USB audio device
-> and you pull it out of the USB socket while the device is in-use.
-> 
-> (It's also worth noting as we're talking about this, that as the audio
-> struct device is a child of the HDMI device, any PM activity will be
-> correctly ordered: the child gets suspended before the parent... the
-> audio device gets suspended before the video, and resume is of course
-> the reverse order.)
-
-Yeah, being able to control the nesting with DT seems so nice compared to
-intel ...
--Daniel
+diff --git a/drivers/gpio/gpio-xgene-sb.c b/drivers/gpio/gpio-xgene-sb.c
+index b6a15c3..50aaae5 100644
+--- a/drivers/gpio/gpio-xgene-sb.c
++++ b/drivers/gpio/gpio-xgene-sb.c
+@@ -25,8 +25,11 @@
+ #include <linux/of_gpio.h>
+ #include <linux/gpio.h>
+ #include <linux/gpio/driver.h>
++#include <linux/acpi.h>
+ #include <linux/basic_mmio_gpio.h>
+ 
++#include "gpiolib.h"
++
+ #define XGENE_MAX_GPIO_DS		22
+ #define XGENE_MAX_GPIO_DS_IRQ		6
+ 
+@@ -129,6 +132,13 @@ static int xgene_gpio_sb_probe(struct platform_device *pdev)
+ 	else
+ 		dev_info(&pdev->dev, "X-Gene GPIO Standby driver registered\n");
+ 
++#ifdef CONFIG_ACPI
++	if (priv->nirq > 0) {
++		/* Register interrupt handlers for gpio signaled acpi events */
++		acpi_gpiochip_request_interrupts(&priv->bgc.gc);
++	}
++#endif
++
+ 	return ret;
+ }
+ 
+@@ -145,10 +155,19 @@ static const struct of_device_id xgene_gpio_sb_of_match[] = {
+ };
+ MODULE_DEVICE_TABLE(of, xgene_gpio_sb_of_match);
+ 
++#ifdef CONFIG_ACPI
++static const struct acpi_device_id xgene_gpio_sb_acpi_match[] = {
++	{"APMC0D15", 0},
++	{},
++};
++MODULE_DEVICE_TABLE(acpi, xgene_gpio_sb_acpi_match);
++#endif
++
+ static struct platform_driver xgene_gpio_sb_driver = {
+ 	.driver = {
+ 		   .name = "xgene-gpio-sb",
+ 		   .of_match_table = xgene_gpio_sb_of_match,
++		   .acpi_match_table = ACPI_PTR(xgene_gpio_sb_acpi_match),
+ 		   },
+ 	.probe = xgene_gpio_sb_probe,
+ 	.remove = xgene_gpio_sb_remove,
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+1.7.1
