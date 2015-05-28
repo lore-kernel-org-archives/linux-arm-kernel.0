@@ -1,128 +1,265 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 28 May 2015 13:13:09 +0300
-Subject: [GIT PULL 4/8] clk: tegra: Changes for v4.2-rc1
-In-Reply-To: <20150527195021.GA24204@codeaurora.org>
-References: <1431524980-13599-1-git-send-email-thierry.reding@gmail.com>
- <1431524980-13599-5-git-send-email-thierry.reding@gmail.com>
- <20150520195459.GU31753@codeaurora.org>
- <555D7A5B.1070901@nvidia.com>
- <20150527195021.GA24204@codeaurora.org>
-Message-ID: <20150528101309.GV11343@tbergstrom-lnx.Nvidia.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 28 May 2015 12:14:38 +0200
+Subject: [PATCHv2] bus: mvebu-mbus: add mv_mbus_dram_info_nooverlap()
+In-Reply-To: <1432806054-17128-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1432806054-17128-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <5566EA8E.1020905@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 27, 2015 at 12:50:21PM -0700, Stephen Boyd wrote:
-> On 05/21, Mikko Perttunen wrote:
-> > On 05/20/2015 10:54 PM, Stephen Boyd wrote:
-> > > On 05/13, Thierry Reding wrote:
-> > >> Hi Mike, Stephen,
-> > >>
-> > >> The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
-> > >>
-> > >>   Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
-> > >>
-> > >> are available in the git repository at:
-> > >>
-> > >>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.2-clk
-> > >>
-> > >> for you to fetch changes up to 36b7be6d3ea8f434f1e0723f3fb0e85c3e00ebc2:
-> > >>
-> > >>   clk: tegra: Fix hda2codec_2x clock name for Tegra30 (2015-05-13 15:17:14 +0200)
-> > >>
-> > >> I've based this pull request on top of the tegra-for-4.2-ramcode pull
-> > >> request, so pulling only this one should be sufficient to resolve the
-> > >> dependency.
-> > >>
-> > >> Thanks,
-> > >> Thierry
-> > >>
-> > >> ----------------------------------------------------------------
-> > >> clk: tegra: Changes for v4.2-rc1
-> > >>
-> > >> This contains the EMC clock driver that's been exhaustively reviewed and
-> > >> tested. It also includes a change to the clock core that allows a clock
-> > >> provider to perform low-level reparenting of clocks. This is required by
-> > >> the EMC clock driver because the reparenting needs to be done at a very
-> > >> specific point in time during the EMC frequency switch.
-> > > 
-> > > Can someone please describe why we need to do software
-> > > reparenting at a specific point in time during a frequency
-> > > switch? I must have missed out on the conversation somewhere and
-> > > looking at the commit that introduces the function, the argument
-> > > for why the API is exposed:
-> > > 
-> > >       To be used by clock implementations for switching to a new
-> > >       parent during rate change.
-> > > 
-> > > is lacking in any details about *why* we need it.
-> > > 
-> > 
-> > Hi Stephen,
-> > 
-> > the way the EMC clock rate is set in hardware is similar to other
-> > clocks, i.e. there's a register and you write the new divider and parent
-> > id to it. However, with EMC, you cannot just do this any time you want;
-> > writing to the register initiates a state machine in the clock hardware
-> > that changes a large number of other parameters regarding DRAM timings
-> > as well. These parameters need to be programmed into shadow registers
-> > before the rate change write is done. This means that both the new
-> > divisor and the parent must be written in the same register write.
-> > 
-> > The CCF has a callback, set_rate_and_parent, which allows for both to be
-> > passed to the driver at the same time. However, it also requires
-> > set_rate and set_parent to be implemented, which the EMC driver cannot do.
+Hi Thomas,
+
+On 28/05/2015 11:40, Thomas Petazzoni wrote:
+> This commit introduces a variant of the mv_mbus_dram_info() function
+> called mv_mbus_dram_info_nooverlap(). Both functions are used by
+> Marvell drivers supporting devices doing DMA, and provide them a
+> description the DRAM ranges that they need to configure their DRAM
+> windows.
 > 
-> Ok so we should change the framework to allow drivers to only
-> implement set_rate_and_parent and use that in set_rate and
-> set_parent implementations if it's the only option available. Or
-> is there a problem if CCF allows clk_set_parent() on the EMC
-> clock by calling set_rate_and_parent() with the new parent and
-> whatever recalc_rate returns for the new parent's rate going into
-> the clock?
+> The ranges provided by the mv_mbus_dram_info() function may overlap
+> with the I/O windows if there is a lot (>= 4 GB) of RAM
+> installed. This is not a problem for most of the DMA masters, except
+> for the upcoming new CESA crypto driver because it does DMA to the
+> SRAM, which is mapped through an I/O window. For this unit, we need to
+> have DRAM ranges that do not overlap with the I/O windows.
 > 
-> > 
-> > Furthermore, the CCF cannot help with parent selection for the EMC clock
-> > at all. The parent for each rate is selected by the board designer.
+> A first implementation done in commit 1737cac69369 ("bus: mvebu-mbus:
+> make sure SDRAM CS for DMA don't overlap the MBus bridge window"),
+> changed the information returned by mv_mbus_dram_info() to match this
+> requirement. However, it broke the requirement of the other DMA
+> masters than the DRAM ranges should have power of two sizes.
 > 
-> I'm not following this part. The CCF mostly asks clock providers
-> what parent should be used when clk_set_rate() is called.
+> To solve this situation, this commit introduces a new
+> mv_mbus_dram_info_nooverlap() function, which returns the same
+> information as mv_mbus_dram_info(), but guaranteed to not overlap with
+> the I/O windows.
+> 
+> In the end, it gives us two variants of the mv_mbus_dram_info*()
+> functions:
+> 
+>  - The normal one, mv_mbus_dram_info(), which has been around for many
+>    years. This function returns the raw DRAM ranges, which are
+>    guaranteed to use power of two sizes, but will overlap with I/O
+>    windows. This function will therefore be used by all DMA masters
+>    (SATA, XOR, Ethernet, etc.) except the CESA crypto driver.
+> 
+>  - The new 'nooverlap' variant, mv_mbus_dram_info_nooverlap(). This
+>    function returns DRAM ranges after they have been "tweaked" to make
+>    sure they don't overlap with I/O windows. By doing this tweaking,
+>    we remove the power of two size guarantee. This variant will be
+>    used by the new CESA crypto driver.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+
+This patch looks OK for me.
+
+Just to be sure: With the revert done by the previous patch that means that
+the crypto driver must be updated to use the new variant, right?
+
+Arnd,
+
+this patch depend on the previous one to apply. However the previous one
+is in the branch mvebu/fixes and this one will be in mvebu/drivers. How
+I should handle it?
+
+Currently I applied the previous patch on the mvebu/drivers.
+
+
+Thanks,
+
+Gregory
+
+> ---
+> Changes v1 -> v2:
+>  - Add the missing stub for mv_mbus_dram_info_nooverlap() in mbus.h,
+>    when CONFIG_PLAT_ORION is not defined.
+> ---
+>  drivers/bus/mvebu-mbus.c | 117 +++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/mbus.h     |   5 ++
+>  2 files changed, 122 insertions(+)
+> 
+> diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+> index 6f047dc..c43c3d2 100644
+> --- a/drivers/bus/mvebu-mbus.c
+> +++ b/drivers/bus/mvebu-mbus.c
+> @@ -57,6 +57,7 @@
+>  #include <linux/of_address.h>
+>  #include <linux/debugfs.h>
+>  #include <linux/log2.h>
+> +#include <linux/memblock.h>
+>  #include <linux/syscore_ops.h>
+>  
+>  /*
+> @@ -152,13 +153,39 @@ struct mvebu_mbus_state {
+>  
+>  static struct mvebu_mbus_state mbus_state;
+>  
+> +/*
+> + * We provide two variants of the mv_mbus_dram_info() function:
+> + *
+> + * - The normal one, where the described DRAM ranges may overlap with
+> + *   the I/O windows, but for which the DRAM ranges are guaranteed to
+> + *   have a power of two size. Such ranges are suitable for the DMA
+> + *   masters that only DMA between the RAM and the device, which is
+> + *   actually all devices except the crypto engines.
+> + *
+> + * - The 'nooverlap' one, where the described DRAM ranges are
+> + *   guaranteed to not overlap with the I/O windows, but for which the
+> + *   DRAM ranges will not have power of two sizes. They will only be
+> + *   aligned on a 64 KB boundary, and have a size multiple of 64
+> + *   KB. Such ranges are suitable for the DMA masters that DMA between
+> + *   the crypto SRAM (which is mapped through an I/O window) and a
+> + *   device. This is the case for the crypto engines.
+> + */
+> +
+>  static struct mbus_dram_target_info mvebu_mbus_dram_info;
+> +static struct mbus_dram_target_info mvebu_mbus_dram_info_nooverlap;
+> +
+>  const struct mbus_dram_target_info *mv_mbus_dram_info(void)
+>  {
+>  	return &mvebu_mbus_dram_info;
+>  }
+>  EXPORT_SYMBOL_GPL(mv_mbus_dram_info);
+>  
+> +const struct mbus_dram_target_info *mv_mbus_dram_info_nooverlap(void)
+> +{
+> +	return &mvebu_mbus_dram_info_nooverlap;
+> +}
+> +EXPORT_SYMBOL_GPL(mv_mbus_dram_info_nooverlap);
+> +
+>  /* Checks whether the given window has remap capability */
+>  static bool mvebu_mbus_window_is_remappable(struct mvebu_mbus_state *mbus,
+>  					    const int win)
+> @@ -576,6 +603,95 @@ static unsigned int armada_xp_mbus_win_remap_offset(int win)
+>  		return MVEBU_MBUS_NO_REMAP;
+>  }
+>  
+> +/*
+> + * Use the memblock information to find the MBus bridge hole in the
+> + * physical address space.
+> + */
+> +static void __init
+> +mvebu_mbus_find_bridge_hole(uint64_t *start, uint64_t *end)
+> +{
+> +	struct memblock_region *r;
+> +	uint64_t s = 0;
+> +
+> +	for_each_memblock(memory, r) {
+> +		/*
+> +		 * This part of the memory is above 4 GB, so we don't
+> +		 * care for the MBus bridge hole.
+> +		 */
+> +		if (r->base >= 0x100000000ULL)
+> +			continue;
+> +
+> +		/*
+> +		 * The MBus bridge hole is at the end of the RAM under
+> +		 * the 4 GB limit.
+> +		 */
+> +		if (r->base + r->size > s)
+> +			s = r->base + r->size;
+> +	}
+> +
+> +	*start = s;
+> +	*end = 0x100000000ULL;
+> +}
+> +
+> +/*
+> + * This function fills in the mvebu_mbus_dram_info_nooverlap data
+> + * structure, by looking at the mvebu_mbus_dram_info data, and
+> + * removing the parts of it that overlap with I/O windows.
+> + */
+> +static void __init
+> +mvebu_mbus_setup_cpu_target_nooverlap(struct mvebu_mbus_state *mbus)
+> +{
+> +	uint64_t mbus_bridge_base, mbus_bridge_end;
+> +	int cs_nooverlap = 0;
+> +	int i;
+> +
+> +	mvebu_mbus_find_bridge_hole(&mbus_bridge_base, &mbus_bridge_end);
+> +
+> +	for (i = 0; i < mvebu_mbus_dram_info.num_cs; i++) {
+> +		struct mbus_dram_window *w;
+> +		u64 base, size, end;
+> +
+> +		w = &mvebu_mbus_dram_info.cs[i];
+> +		base = w->base;
+> +		size = w->size;
+> +		end = base + size;
+> +
+> +		/*
+> +		 * The CS is fully enclosed inside the MBus bridge
+> +		 * area, so ignore it.
+> +		 */
+> +		if (base >= mbus_bridge_base && end <= mbus_bridge_end)
+> +			continue;
+> +
+> +		/*
+> +		 * Beginning of CS overlaps with end of MBus, raise CS
+> +		 * base address, and shrink its size.
+> +		 */
+> +		if (base >= mbus_bridge_base && end > mbus_bridge_end) {
+> +			size -= mbus_bridge_end - base;
+> +			base = mbus_bridge_end;
+> +		}
+> +
+> +		/*
+> +		 * End of CS overlaps with beginning of MBus, shrink
+> +		 * CS size.
+> +		 */
+> +		if (base < mbus_bridge_base && end > mbus_bridge_base)
+> +			size -= end - mbus_bridge_base;
+> +
+> +		w = &mvebu_mbus_dram_info_nooverlap.cs[cs_nooverlap++];
+> +		w->cs_index = i;
+> +		w->mbus_attr = 0xf & ~(1 << i);
+> +		if (mbus->hw_io_coherency)
+> +			w->mbus_attr |= ATTR_HW_COHERENCY;
+> +		w->base = base;
+> +		w->size = size;
+> +	}
+> +
+> +	mvebu_mbus_dram_info_nooverlap.mbus_dram_target_id = TARGET_DDR;
+> +	mvebu_mbus_dram_info_nooverlap.num_cs = cs_nooverlap;
+> +}
+> +
+>  static void __init
+>  mvebu_mbus_default_setup_cpu_target(struct mvebu_mbus_state *mbus)
+>  {
+> @@ -964,6 +1080,7 @@ static int __init mvebu_mbus_common_init(struct mvebu_mbus_state *mbus,
+>  		mvebu_mbus_disable_window(mbus, win);
+>  
+>  	mbus->soc->setup_cpu_target(mbus);
+> +	mvebu_mbus_setup_cpu_target_nooverlap(mbus);
+>  
+>  	if (is_coherent)
+>  		writel(UNIT_SYNC_BARRIER_ALL,
+> diff --git a/include/linux/mbus.h b/include/linux/mbus.h
+> index 611b69f..1f7bc63 100644
+> --- a/include/linux/mbus.h
+> +++ b/include/linux/mbus.h
+> @@ -54,11 +54,16 @@ struct mbus_dram_target_info
+>   */
+>  #ifdef CONFIG_PLAT_ORION
+>  extern const struct mbus_dram_target_info *mv_mbus_dram_info(void);
+> +extern const struct mbus_dram_target_info *mv_mbus_dram_info_nooverlap(void);
+>  #else
+>  static inline const struct mbus_dram_target_info *mv_mbus_dram_info(void)
+>  {
+>  	return NULL;
+>  }
+> +static inline const struct mbus_dram_target_info *mv_mbus_dram_info_nooverlap(void)
+> +{
+> +	return NULL;
+> +}
+>  #endif
+>  
+>  int mvebu_mbus_save_cpu_target(u32 *store_addr);
 > 
 
-There are a fixed number of allowed EMC OPPs per board. For each OPP there is
-a set of EMC parameters, the parent clock and the rate for the parent clock
-defined. Due to jitter requirements these settings have to be used. It's
-not allowed to choose a different parent even when that would result in the
-same clock rate.
 
-> > 
-> > There is also the issue that sometimes, the EMC driver cannot directly
-> > switch to the target (rate, parent) pair; instead it is necessary to
-> > switch first to another pair we call a backup timing. In this situation,
-> > we temporarily have a parent that is neither the one we had before the
-> > set_rate call or the one it will be after. Especially, if the switch to
-> > the backup timing succeeds but the following switch to the target timing
-> > fails, then without the reparent call the parent in hardware would be
-> > left inconsistent with the software state.
-> 
-> Yes, I've sent a patch a while ago to support an idea of a "safe
-> parent" or a backup timing that can be used while a clock is
-> reprogrammed. Mike has also proposed the concept of "coordinated
-> clock rates" which would do something similar and allow clock
-> providers to control complicated rate transitions themselves. It
-> seems that we may be able to use the "safe parent" concept here,
-> where first we switch to some other parent, call the set_rate*
-> op, and then switch the parent back if we're not already using
-> the parent that we should be using.
-> 
-
-Due to the interlock between the CAR block and the EMC controller, there
-is a precise sequence of register accesses to be followed when doing a EMC
-frequency switch. Changing the EMC clock parent or divider in CAR triggers
-a state machine in the EMC controller which causes a bunch of shadow registers
-to take effect and a FIFO of commands to be send to the SDRAM chips.
-Because of this precise sequence, I think a single entity should be responsible
-for handling this. Splitting the sequence in multiple parts maintained by
-different people, will greatly increase the risk of difficult to trace
-stability regressions.
-
-Peter.
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
