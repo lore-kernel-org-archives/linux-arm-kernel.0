@@ -1,102 +1,201 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Thu, 28 May 2015 22:31:46 +0200
-Subject: [PATCH v4 4/5] doc: dt: add documentation for lpc1850-ccu clk driver
+Date: Thu, 28 May 2015 22:31:47 +0200
+Subject: [PATCH v4 5/5] ARM: dts: lpc18xx: add clock nodes for cgu and ccu
 In-Reply-To: <1432845107-12458-1-git-send-email-manabian@gmail.com>
 References: <1432845107-12458-1-git-send-email-manabian@gmail.com>
-Message-ID: <1432845107-12458-5-git-send-email-manabian@gmail.com>
+Message-ID: <1432845107-12458-6-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT binding documentation for lpc1850-ccu clk driver.
-
 Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 ---
- .../devicetree/bindings/clock/lpc1850-ccu.txt      | 77 ++++++++++++++++++++++
- 1 file changed, 77 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/lpc1850-ccu.txt
+ arch/arm/boot/dts/lpc18xx.dtsi           | 85 ++++++++++++++++++++++++++------
+ arch/arm/boot/dts/lpc4350-hitex-eval.dts |  4 --
+ 2 files changed, 71 insertions(+), 18 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/lpc1850-ccu.txt b/Documentation/devicetree/bindings/clock/lpc1850-ccu.txt
-new file mode 100644
-index 000000000000..fa97c12014ac
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/lpc1850-ccu.txt
-@@ -0,0 +1,77 @@
-+* NXP LPC1850 Clock Control Unit (CCU)
+diff --git a/arch/arm/boot/dts/lpc18xx.dtsi b/arch/arm/boot/dts/lpc18xx.dtsi
+index 204da5b52ef9..78292d0cb263 100644
+--- a/arch/arm/boot/dts/lpc18xx.dtsi
++++ b/arch/arm/boot/dts/lpc18xx.dtsi
+@@ -13,6 +13,9 @@
+ 
+ #include "armv7-m.dtsi"
+ 
++#include "dt-bindings/clock/lpc18xx-cgu.h"
++#include "dt-bindings/clock/lpc18xx-ccu.h"
 +
-+Each CGU base clock has several clock branches which can be turned on
-+or off independently by the Clock Control Units CCU1 or CCU2. The
-+branch clocks are distributed between CCU1 and CCU2.
+ / {
+ 	cpus {
+ 		#address-cells = <1>;
+@@ -22,6 +25,7 @@
+ 			compatible = "arm,cortex-m3";
+ 			device_type = "cpu";
+ 			reg = <0x0>;
++			clocks = <&ccu1 CLK_CPU_CORE>;
+ 		};
+ 	};
+ 
+@@ -32,23 +36,76 @@
+ 			clock-frequency = <12000000>;
+ 		};
+ 
+-		/* Temporary hardcode PLL1 until clk drivers are merged */
+-		pll1: pll1 {
+-			compatible = "fixed-factor-clock";
+-			clocks = <&xtal>;
++		xtal32: xtal32 {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <32768>;
++		};
 +
-+ - Above text taken from NXP LPC1850 User Manual.
++		enet_rx_clk: enet_rx_clk {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <0>;
++			clock-output-names = "enet_rx_clk";
++		};
 +
-+This binding uses the common clock binding:
-+    Documentation/devicetree/bindings/clock/clock-bindings.txt
++		enet_tx_clk: enet_tx_clk {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <0>;
++			clock-output-names = "enet_tx_clk";
++		};
 +
-+Required properties:
-+- compatible:
-+	Should be "nxp,lpc1850-ccu"
-+- reg:
-+	Shall define the base and range of the address space
-+	containing clock control registers
-+- #clock-cells:
-+	Shall have value <1>.  The permitted clock-specifier values
-+	are the branch clock names defined in table below.
-+- clocks:
-+	Shall contain a list of phandles for the base clocks routed
-+	from the CGU to the specific CCU. See mapping of base clocks
-+	and CCU in table below.
-+- clock-names:
-+	Shall contain a list of names for the base clock routed
-+	from the CGU to the specific CCU. Valid CCU clock names:
-+	"base_usb0_clk",  "base_periph_clk", "base_usb1_clk",
-+	"base_cpu_clk",   "base_spifi_clk",  "base_spi_clk",
-+	"base_apb1_clk",  "base_apb3_clk",   "base_adchs_clk",
-+	"base_sdio_clk",  "base_ssp0_clk",   "base_ssp1_clk",
-+	"base_uart0_clk", "base_uart1_clk",  "base_uart2_clk",
-+	"base_uart3_clk", "base_audio_clk"
++		gp_clkin: gp_clkin {
++			compatible = "fixed-clock";
+ 			#clock-cells = <0>;
+-			clock-div = <1>;
+-			clock-mult = <12>;
++			clock-frequency = <0>;
++			clock-output-names = "gp_clkin";
+ 		};
+ 	};
+ 
+ 	soc {
++		cgu: clock-controller at 40050000 {
++			compatible = "nxp,lpc1850-cgu";
++			reg = <0x40050000 0x1000>;
++			#clock-cells = <1>;
++			clocks = <&xtal>, <&xtal32>, <&enet_rx_clk>, <&enet_tx_clk>, <&gp_clkin>;
++		};
 +
-+Which branch clocks that are available on the CCU depends on the
-+specific LPC part. Check the user manual for your specific part.
++		ccu1: clock-controller at 40051000 {
++			compatible = "nxp,lpc1850-ccu";
++			reg = <0x40051000 0x1000>;
++			#clock-cells = <1>;
++			clocks = <&cgu BASE_APB3_CLK>,   <&cgu BASE_APB1_CLK>,
++				 <&cgu BASE_SPIFI_CLK>,  <&cgu BASE_CPU_CLK>,
++				 <&cgu BASE_PERIPH_CLK>, <&cgu BASE_USB0_CLK>,
++				 <&cgu BASE_USB1_CLK>,   <&cgu BASE_SPI_CLK>;
++			clock-names = "base_apb3_clk",   "base_apb1_clk",
++				      "base_spifi_clk",  "base_cpu_clk",
++				      "base_periph_clk", "base_usb0_clk",
++				      "base_usb1_clk",   "base_spi_clk";
++		};
 +
-+A list of CCU clocks can be found in dt-bindings/clock/lpc18xx-ccu.h.
++		ccu2: clock-controller at 40052000 {
++			compatible = "nxp,lpc1850-ccu";
++			reg = <0x40052000 0x1000>;
++			#clock-cells = <1>;
++			clocks = <&cgu BASE_AUDIO_CLK>, <&cgu BASE_UART3_CLK>,
++				 <&cgu BASE_UART2_CLK>, <&cgu BASE_UART1_CLK>,
++				 <&cgu BASE_UART0_CLK>, <&cgu BASE_SSP1_CLK>,
++				 <&cgu BASE_SSP0_CLK>,  <&cgu BASE_SDIO_CLK>;
++			clock-names = "base_audio_clk", "base_uart3_clk",
++				      "base_uart2_clk", "base_uart1_clk",
++				      "base_uart0_clk", "base_ssp1_clk",
++				      "base_ssp0_clk",  "base_sdio_clk";
++		};
 +
-+Example board file:
-+
-+soc {
-+	ccu1: clock-controller at 40051000 {
-+		compatible = "nxp,lpc1850-ccu";
-+		reg = <0x40051000 0x1000>;
-+		#clock-cells = <1>;
-+		clocks = <&cgu BASE_APB3_CLK>,   <&cgu BASE_APB1_CLK>,
-+			 <&cgu BASE_SPIFI_CLK>,  <&cgu BASE_CPU_CLK>,
-+			 <&cgu BASE_PERIPH_CLK>, <&cgu BASE_USB0_CLK>,
-+			 <&cgu BASE_USB1_CLK>,   <&cgu BASE_SPI_CLK>;
-+		clock-names = "base_apb3_clk",   "base_apb1_clk",
-+			      "base_spifi_clk",  "base_cpu_clk",
-+			      "base_periph_clk", "base_usb0_clk",
-+			      "base_usb1_clk",   "base_spi_clk";
-+	};
-+
-+	ccu2: clock-controller at 40052000 {
-+		compatible = "nxp,lpc1850-ccu";
-+		reg = <0x40052000 0x1000>;
-+		#clock-cells = <1>;
-+		clocks = <&cgu BASE_AUDIO_CLK>, <&cgu BASE_UART3_CLK>,
-+			 <&cgu BASE_UART2_CLK>, <&cgu BASE_UART1_CLK>,
-+			 <&cgu BASE_UART0_CLK>, <&cgu BASE_SSP1_CLK>,
-+			 <&cgu BASE_SSP0_CLK>,  <&cgu BASE_SDIO_CLK>;
-+		clock-names = "base_audio_clk", "base_uart3_clk",
-+			      "base_uart2_clk", "base_uart1_clk",
-+			      "base_uart0_clk", "base_ssp1_clk",
-+			      "base_ssp0_clk",  "base_sdio_clk";
-+	};
-+
-+	/* A user of CCU brach clocks */
-+	uart1: serial at 40082000 {
-+		...
-+		clocks = <&ccu2 CLK_APB0_UART1>, <&ccu1 CLK_CPU_UART1>;
-+		...
-+	};
-+};
+ 		uart0: serial at 40081000 {
+ 			compatible = "ns16550a";
+ 			reg = <0x40081000 0x1000>;
+ 			reg-shift = <2>;
+ 			interrupts = <24>;
+-			clocks = <&pll1>;
++			clocks = <&ccu2 CLK_APB0_UART0>, <&ccu1 CLK_CPU_UART0>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -57,7 +114,7 @@
+ 			reg = <0x40082000 0x1000>;
+ 			reg-shift = <2>;
+ 			interrupts = <25>;
+-			clocks = <&pll1>;
++			clocks = <&ccu2 CLK_APB0_UART1>, <&ccu1 CLK_CPU_UART1>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -65,7 +122,7 @@
+ 			compatible = "nxp,lpc3220-timer";
+ 			reg = <0x40084000 0x1000>;
+ 			interrupts = <12>;
+-			clocks = <&pll1>;
++			clocks = <&ccu1 CLK_CPU_TIMER0>;
+ 			clock-names = "timerclk";
+ 		};
+ 
+@@ -73,7 +130,7 @@
+ 			compatible = "nxp,lpc3220-timer";
+ 			reg = <0x40085000 0x1000>;
+ 			interrupts = <13>;
+-			clocks = <&pll1>;
++			clocks = <&ccu1 CLK_CPU_TIMER1>;
+ 			clock-names = "timerclk";
+ 		};
+ 
+@@ -82,7 +139,7 @@
+ 			reg = <0x400c1000 0x1000>;
+ 			reg-shift = <2>;
+ 			interrupts = <26>;
+-			clocks = <&pll1>;
++			clocks = <&ccu2 CLK_APB2_UART2>, <&ccu1 CLK_CPU_UART2>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -91,7 +148,7 @@
+ 			reg = <0x400c2000 0x1000>;
+ 			reg-shift = <2>;
+ 			interrupts = <27>;
+-			clocks = <&pll1>;
++			clocks = <&ccu2 CLK_APB2_UART3>, <&ccu1 CLK_CPU_UART3>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -99,7 +156,7 @@
+ 			compatible = "nxp,lpc3220-timer";
+ 			reg = <0x400c3000 0x1000>;
+ 			interrupts = <14>;
+-			clocks = <&pll1>;
++			clocks = <&ccu1 CLK_CPU_TIMER2>;
+ 			clock-names = "timerclk";
+ 		};
+ 
+@@ -107,7 +164,7 @@
+ 			compatible = "nxp,lpc3220-timer";
+ 			reg = <0x400c4000 0x1000>;
+ 			interrupts = <15>;
+-			clocks = <&pll1>;
++			clocks = <&ccu1 CLK_CPU_TIMER3>;
+ 			clock-names = "timerclk";
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/lpc4350-hitex-eval.dts b/arch/arm/boot/dts/lpc4350-hitex-eval.dts
+index d04072f40817..4ebdb54cc9ce 100644
+--- a/arch/arm/boot/dts/lpc4350-hitex-eval.dts
++++ b/arch/arm/boot/dts/lpc4350-hitex-eval.dts
+@@ -36,10 +36,6 @@
+ 	};
+ };
+ 
+-&pll1 {
+-	clock-mult = <15>;
+-};
+-
+ &uart0 {
+ 	status = "okay";
+ };
 -- 
 1.8.0
