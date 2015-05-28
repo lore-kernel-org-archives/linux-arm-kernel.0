@@ -1,435 +1,223 @@
 From: huawei.libin@huawei.com (Li Bin)
-Date: Thu, 28 May 2015 13:51:05 +0800
-Subject: [RFC PATCH 5/5] livepatch: arm64: support relocation in a module
+Date: Thu, 28 May 2015 13:51:04 +0800
+Subject: [RFC PATCH 4/5] livepatch: arm64: add support for livepatch on arm64
 In-Reply-To: <1432792265-24076-1-git-send-email-huawei.libin@huawei.com>
 References: <1432792265-24076-1-git-send-email-huawei.libin@huawei.com>
-Message-ID: <1432792265-24076-6-git-send-email-huawei.libin@huawei.com>
+Message-ID: <1432792265-24076-5-git-send-email-huawei.libin@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Xie XiuQi <xiexiuqi@huawei.com>
+This patch add support for livepatch on arm64 based on the gcc -mfentry
+feature and the ftrace DYNAMIC_FTRACE_WITH_REGS feature.
 
-This patch implement klp_write_module_reloc on arm64 platform.
-
-Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
 Signed-off-by: Li Bin <huawei.libin@huawei.com>
 ---
- arch/arm64/kernel/livepatch.c |    7 +-
- arch/arm64/kernel/module.c    |  355 +++++++++++++++++++++--------------------
- 2 files changed, 186 insertions(+), 176 deletions(-)
+ arch/arm64/Kconfig                 |    3 ++
+ arch/arm64/include/asm/livepatch.h |   45 ++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/Makefile         |    1 +
+ arch/arm64/kernel/livepatch.c      |   38 ++++++++++++++++++++++++++++++
+ kernel/livepatch/core.c            |   17 +++++++++----
+ 5 files changed, 99 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm64/include/asm/livepatch.h
+ create mode 100644 arch/arm64/kernel/livepatch.c
 
-diff --git a/arch/arm64/kernel/livepatch.c b/arch/arm64/kernel/livepatch.c
-index 2a55532..ad674f0 100644
---- a/arch/arm64/kernel/livepatch.c
-+++ b/arch/arm64/kernel/livepatch.c
-@@ -18,8 +18,11 @@
-  */
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 7bb2468..8a3845c 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -85,6 +85,7 @@ config ARM64
+ 	select SPARSE_IRQ
+ 	select SYSCTL_EXCEPTION_TRACE
+ 	select HAVE_CONTEXT_TRACKING
++	select HAVE_LIVEPATCH
+ 	help
+ 	  ARM 64-bit (AArch64) Linux support.
  
- #include <linux/module.h>
-+#include <linux/uaccess.h>
- #include <asm/livepatch.h>
+@@ -159,6 +160,8 @@ source "init/Kconfig"
  
-+extern int static_relocate(struct module *mod, unsigned long type,
-+			   void * loc, unsigned long value);
- /**
-  * klp_write_module_reloc() - write a relocation in a module
-  * @mod:	module in which the section to be modified is found
-@@ -33,6 +36,6 @@
- int klp_write_module_reloc(struct module *mod, unsigned long type,
- 			   unsigned long loc, unsigned long value)
- {
--	pr_err("lpc_write_module_reloc has not supported now\n");
--	return -ENOSYS;
-+	/* Perform the static relocation. */
-+	return static_relocate(mod, type, (void *)loc, value);
- }
-diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
-index 67bf410..7781241 100644
---- a/arch/arm64/kernel/module.c
-+++ b/arch/arm64/kernel/module.c
-@@ -193,6 +193,182 @@ static int reloc_insn_imm(enum aarch64_reloc_op op, void *place, u64 val,
- 	return 0;
- }
+ source "kernel/Kconfig.freezer"
  
-+int static_relocate(struct module *me, unsigned long type, void *loc,
-+		    unsigned long val)
++source "kernel/livepatch/Kconfig"
++
+ menu "Platform selection"
+ 
+ config ARCH_EXYNOS
+diff --git a/arch/arm64/include/asm/livepatch.h b/arch/arm64/include/asm/livepatch.h
+new file mode 100644
+index 0000000..1890413
+--- /dev/null
++++ b/arch/arm64/include/asm/livepatch.h
+@@ -0,0 +1,45 @@
++/*
++ * livepatch.h - arm64-specific Kernel Live Patching Core
++ *
++ * Copyright (C) 2014 Li Bin <huawei.libin@huawei.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef _ASM_ARM64_LIVEPATCH_H
++#define _ASM_ARM64_LIVEPATCH_H
++
++#include <linux/module.h>
++#include <linux/ftrace.h>
++
++#ifdef CONFIG_LIVEPATCH
++static inline int klp_check_compiler_support(void)
 +{
-+	int ovf = 0;
-+	bool overflow_check = true;
-+	/* Perform the static relocation. */
-+	switch (type) {
-+	/* Null relocations. */
-+	case R_ARM_NONE:
-+	case R_AARCH64_NONE:
-+		ovf = 0;
-+		break;
-+
-+		/* Data relocations. */
-+	case R_AARCH64_ABS64:
-+		overflow_check = false;
-+		ovf = reloc_data(RELOC_OP_ABS, loc, val, 64);
-+		break;
-+	case R_AARCH64_ABS32:
-+		ovf = reloc_data(RELOC_OP_ABS, loc, val, 32);
-+		break;
-+	case R_AARCH64_ABS16:
-+		ovf = reloc_data(RELOC_OP_ABS, loc, val, 16);
-+		break;
-+	case R_AARCH64_PREL64:
-+		overflow_check = false;
-+		ovf = reloc_data(RELOC_OP_PREL, loc, val, 64);
-+		break;
-+	case R_AARCH64_PREL32:
-+		ovf = reloc_data(RELOC_OP_PREL, loc, val, 32);
-+		break;
-+	case R_AARCH64_PREL16:
-+		ovf = reloc_data(RELOC_OP_PREL, loc, val, 16);
-+		break;
-+
-+		/* MOVW instruction relocations. */
-+	case R_AARCH64_MOVW_UABS_G0_NC:
-+		overflow_check = false;
-+	case R_AARCH64_MOVW_UABS_G0:
-+		ovf = reloc_insn_movw(RELOC_OP_ABS, loc, val, 0,
-+				      AARCH64_INSN_IMM_16);
-+		break;
-+	case R_AARCH64_MOVW_UABS_G1_NC:
-+		overflow_check = false;
-+	case R_AARCH64_MOVW_UABS_G1:
-+		ovf = reloc_insn_movw(RELOC_OP_ABS, loc, val, 16,
-+				      AARCH64_INSN_IMM_16);
-+		break;
-+	case R_AARCH64_MOVW_UABS_G2_NC:
-+		overflow_check = false;
-+	case R_AARCH64_MOVW_UABS_G2:
-+		ovf = reloc_insn_movw(RELOC_OP_ABS, loc, val, 32,
-+				      AARCH64_INSN_IMM_16);
-+		break;
-+	case R_AARCH64_MOVW_UABS_G3:
-+		/* We're using the top bits so we can't overflow. */
-+		overflow_check = false;
-+		ovf = reloc_insn_movw(RELOC_OP_ABS, loc, val, 48,
-+				      AARCH64_INSN_IMM_16);
-+		break;
-+	case R_AARCH64_MOVW_SABS_G0:
-+		ovf = reloc_insn_movw(RELOC_OP_ABS, loc, val, 0,
-+				      AARCH64_INSN_IMM_MOVNZ);
-+		break;
-+	case R_AARCH64_MOVW_SABS_G1:
-+		ovf = reloc_insn_movw(RELOC_OP_ABS, loc, val, 16,
-+				      AARCH64_INSN_IMM_MOVNZ);
-+		break;
-+	case R_AARCH64_MOVW_SABS_G2:
-+		ovf = reloc_insn_movw(RELOC_OP_ABS, loc, val, 32,
-+				      AARCH64_INSN_IMM_MOVNZ);
-+		break;
-+	case R_AARCH64_MOVW_PREL_G0_NC:
-+		overflow_check = false;
-+		ovf = reloc_insn_movw(RELOC_OP_PREL, loc, val, 0,
-+				      AARCH64_INSN_IMM_MOVK);
-+		break;
-+	case R_AARCH64_MOVW_PREL_G0:
-+		ovf = reloc_insn_movw(RELOC_OP_PREL, loc, val, 0,
-+				      AARCH64_INSN_IMM_MOVNZ);
-+		break;
-+	case R_AARCH64_MOVW_PREL_G1_NC:
-+		overflow_check = false;
-+		ovf = reloc_insn_movw(RELOC_OP_PREL, loc, val, 16,
-+				      AARCH64_INSN_IMM_MOVK);
-+		break;
-+	case R_AARCH64_MOVW_PREL_G1:
-+		ovf = reloc_insn_movw(RELOC_OP_PREL, loc, val, 16,
-+				      AARCH64_INSN_IMM_MOVNZ);
-+		break;
-+	case R_AARCH64_MOVW_PREL_G2_NC:
-+		overflow_check = false;
-+		ovf = reloc_insn_movw(RELOC_OP_PREL, loc, val, 32,
-+				      AARCH64_INSN_IMM_MOVK);
-+		break;
-+	case R_AARCH64_MOVW_PREL_G2:
-+		ovf = reloc_insn_movw(RELOC_OP_PREL, loc, val, 32,
-+				      AARCH64_INSN_IMM_MOVNZ);
-+		break;
-+	case R_AARCH64_MOVW_PREL_G3:
-+		/* We're using the top bits so we can't overflow. */
-+		overflow_check = false;
-+		ovf = reloc_insn_movw(RELOC_OP_PREL, loc, val, 48,
-+				      AARCH64_INSN_IMM_MOVNZ);
-+		break;
-+
-+		/* Immediate instruction relocations. */
-+	case R_AARCH64_LD_PREL_LO19:
-+		ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2, 19,
-+				     AARCH64_INSN_IMM_19);
-+		break;
-+	case R_AARCH64_ADR_PREL_LO21:
-+		ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 0, 21,
-+				     AARCH64_INSN_IMM_ADR);
-+		break;
-+	case R_AARCH64_ADR_PREL_PG_HI21_NC:
-+		overflow_check = false;
-+	case R_AARCH64_ADR_PREL_PG_HI21:
-+		ovf = reloc_insn_imm(RELOC_OP_PAGE, loc, val, 12, 21,
-+				     AARCH64_INSN_IMM_ADR);
-+		break;
-+	case R_AARCH64_ADD_ABS_LO12_NC:
-+	case R_AARCH64_LDST8_ABS_LO12_NC:
-+		overflow_check = false;
-+		ovf = reloc_insn_imm(RELOC_OP_ABS, loc, val, 0, 12,
-+				     AARCH64_INSN_IMM_12);
-+		break;
-+	case R_AARCH64_LDST16_ABS_LO12_NC:
-+		overflow_check = false;
-+		ovf = reloc_insn_imm(RELOC_OP_ABS, loc, val, 1, 11,
-+				     AARCH64_INSN_IMM_12);
-+		break;
-+	case R_AARCH64_LDST32_ABS_LO12_NC:
-+		overflow_check = false;
-+		ovf = reloc_insn_imm(RELOC_OP_ABS, loc, val, 2, 10,
-+				     AARCH64_INSN_IMM_12);
-+		break;
-+	case R_AARCH64_LDST64_ABS_LO12_NC:
-+		overflow_check = false;
-+		ovf = reloc_insn_imm(RELOC_OP_ABS, loc, val, 3, 9,
-+				     AARCH64_INSN_IMM_12);
-+		break;
-+	case R_AARCH64_LDST128_ABS_LO12_NC:
-+		overflow_check = false;
-+		ovf = reloc_insn_imm(RELOC_OP_ABS, loc, val, 4, 8,
-+				     AARCH64_INSN_IMM_12);
-+		break;
-+	case R_AARCH64_TSTBR14:
-+		ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2, 14,
-+				     AARCH64_INSN_IMM_14);
-+		break;
-+	case R_AARCH64_CONDBR19:
-+		ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2, 19,
-+				     AARCH64_INSN_IMM_19);
-+		break;
-+	case R_AARCH64_JUMP26:
-+	case R_AARCH64_CALL26:
-+		ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2, 26,
-+				     AARCH64_INSN_IMM_26);
-+		break;
-+
-+	default:
-+		pr_err("module %s: unsupported RELA relocation: %lu\n",
-+			me->name, type);
-+		return -ENOEXEC;
-+	}
-+
-+	if (overflow_check && ovf == -ERANGE) {
-+		pr_err("module %s: overflow in relocation type %lu val %lx\n",
-+			me->name, type, val);
-+		return -ENOEXEC;
-+	}
-+
++#ifndef CC_USING_FENTRY
++	return 1;
++#endif
 +	return 0;
 +}
++extern int klp_write_module_reloc(struct module *mod, unsigned long type,
++				  unsigned long loc, unsigned long value);
 +
- int apply_relocate_add(Elf64_Shdr *sechdrs,
- 		       const char *strtab,
- 		       unsigned int symindex,
-@@ -200,12 +376,11 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
- 		       struct module *me)
++static inline void klp_arch_set_pc(struct pt_regs *regs, unsigned long pc)
++{
++	regs->pc = pc;
++}
++#else
++#error Live patching support is disabled; check CONFIG_LIVEPATCH
++#endif
++
++#endif /* _ASM_ARM64_LIVEPATCH_H */
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 426d076..30d307b 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -23,6 +23,7 @@ arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
+ 					   sys_compat.o entry32.o		\
+ 					   ../../arm/kernel/opcodes.o
+ arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
++arm64-obj-$(CONFIG_LIVEPATCH) += livepatch.o
+ arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
+ arm64-obj-$(CONFIG_SMP)			+= smp.o smp_spin_table.o topology.o
+ arm64-obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o
+diff --git a/arch/arm64/kernel/livepatch.c b/arch/arm64/kernel/livepatch.c
+new file mode 100644
+index 0000000..2a55532
+--- /dev/null
++++ b/arch/arm64/kernel/livepatch.c
+@@ -0,0 +1,38 @@
++/*
++ * livepatch.c - arm64-specific Kernel Live Patching Core
++ *
++ * Copyright (C) 2014 Li Bin <huawei.libin@huawei.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/module.h>
++#include <asm/livepatch.h>
++
++/**
++ * klp_write_module_reloc() - write a relocation in a module
++ * @mod:	module in which the section to be modified is found
++ * @type:	ELF relocation type (see asm/elf.h)
++ * @loc:	address that the relocation should be written to
++ * @value:	relocation value (sym address + addend)
++ *
++ * This function writes a relocation to the specified location for
++ * a particular module.
++ */
++int klp_write_module_reloc(struct module *mod, unsigned long type,
++			   unsigned long loc, unsigned long value)
++{
++	pr_err("lpc_write_module_reloc has not supported now\n");
++	return -ENOSYS;
++}
+diff --git a/kernel/livepatch/core.c b/kernel/livepatch/core.c
+index 284e269..945065f 100644
+--- a/kernel/livepatch/core.c
++++ b/kernel/livepatch/core.c
+@@ -321,6 +321,7 @@ static void notrace klp_ftrace_handler(unsigned long ip,
  {
- 	unsigned int i;
--	int ovf;
--	bool overflow_check;
- 	Elf64_Sym *sym;
- 	void *loc;
- 	u64 val;
- 	Elf64_Rela *rel = (void *)sechdrs[relsec].sh_addr;
-+	int type, ret;
+ 	struct klp_ops *ops;
+ 	struct klp_func *func;
++	unsigned long new_ip;
  
- 	for (i = 0; i < sechdrs[relsec].sh_size / sizeof(*rel); i++) {
- 		/* loc corresponds to P in the AArch64 ELF document. */
-@@ -219,182 +394,14 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
- 		/* val corresponds to (S + A) in the AArch64 ELF document. */
- 		val = sym->st_value + rel[i].r_addend;
+ 	ops = container_of(fops, struct klp_ops, fops);
  
-+		type = ELF64_R_TYPE(rel[i].r_info);
- 		/* Check for overflow by default. */
--		overflow_check = true;
--
--		/* Perform the static relocation. */
--		switch (ELF64_R_TYPE(rel[i].r_info)) {
--		/* Null relocations. */
--		case R_ARM_NONE:
--		case R_AARCH64_NONE:
--			ovf = 0;
--			break;
--
--		/* Data relocations. */
--		case R_AARCH64_ABS64:
--			overflow_check = false;
--			ovf = reloc_data(RELOC_OP_ABS, loc, val, 64);
--			break;
--		case R_AARCH64_ABS32:
--			ovf = reloc_data(RELOC_OP_ABS, loc, val, 32);
--			break;
--		case R_AARCH64_ABS16:
--			ovf = reloc_data(RELOC_OP_ABS, loc, val, 16);
--			break;
--		case R_AARCH64_PREL64:
--			overflow_check = false;
--			ovf = reloc_data(RELOC_OP_PREL, loc, val, 64);
--			break;
--		case R_AARCH64_PREL32:
--			ovf = reloc_data(RELOC_OP_PREL, loc, val, 32);
--			break;
--		case R_AARCH64_PREL16:
--			ovf = reloc_data(RELOC_OP_PREL, loc, val, 16);
--			break;
--
--		/* MOVW instruction relocations. */
--		case R_AARCH64_MOVW_UABS_G0_NC:
--			overflow_check = false;
--		case R_AARCH64_MOVW_UABS_G0:
--			ovf = reloc_insn_movw(RELOC_OP_ABS, loc, val, 0,
--					      AARCH64_INSN_IMM_16);
--			break;
--		case R_AARCH64_MOVW_UABS_G1_NC:
--			overflow_check = false;
--		case R_AARCH64_MOVW_UABS_G1:
--			ovf = reloc_insn_movw(RELOC_OP_ABS, loc, val, 16,
--					      AARCH64_INSN_IMM_16);
--			break;
--		case R_AARCH64_MOVW_UABS_G2_NC:
--			overflow_check = false;
--		case R_AARCH64_MOVW_UABS_G2:
--			ovf = reloc_insn_movw(RELOC_OP_ABS, loc, val, 32,
--					      AARCH64_INSN_IMM_16);
--			break;
--		case R_AARCH64_MOVW_UABS_G3:
--			/* We're using the top bits so we can't overflow. */
--			overflow_check = false;
--			ovf = reloc_insn_movw(RELOC_OP_ABS, loc, val, 48,
--					      AARCH64_INSN_IMM_16);
--			break;
--		case R_AARCH64_MOVW_SABS_G0:
--			ovf = reloc_insn_movw(RELOC_OP_ABS, loc, val, 0,
--					      AARCH64_INSN_IMM_MOVNZ);
--			break;
--		case R_AARCH64_MOVW_SABS_G1:
--			ovf = reloc_insn_movw(RELOC_OP_ABS, loc, val, 16,
--					      AARCH64_INSN_IMM_MOVNZ);
--			break;
--		case R_AARCH64_MOVW_SABS_G2:
--			ovf = reloc_insn_movw(RELOC_OP_ABS, loc, val, 32,
--					      AARCH64_INSN_IMM_MOVNZ);
--			break;
--		case R_AARCH64_MOVW_PREL_G0_NC:
--			overflow_check = false;
--			ovf = reloc_insn_movw(RELOC_OP_PREL, loc, val, 0,
--					      AARCH64_INSN_IMM_MOVK);
--			break;
--		case R_AARCH64_MOVW_PREL_G0:
--			ovf = reloc_insn_movw(RELOC_OP_PREL, loc, val, 0,
--					      AARCH64_INSN_IMM_MOVNZ);
--			break;
--		case R_AARCH64_MOVW_PREL_G1_NC:
--			overflow_check = false;
--			ovf = reloc_insn_movw(RELOC_OP_PREL, loc, val, 16,
--					      AARCH64_INSN_IMM_MOVK);
--			break;
--		case R_AARCH64_MOVW_PREL_G1:
--			ovf = reloc_insn_movw(RELOC_OP_PREL, loc, val, 16,
--					      AARCH64_INSN_IMM_MOVNZ);
--			break;
--		case R_AARCH64_MOVW_PREL_G2_NC:
--			overflow_check = false;
--			ovf = reloc_insn_movw(RELOC_OP_PREL, loc, val, 32,
--					      AARCH64_INSN_IMM_MOVK);
--			break;
--		case R_AARCH64_MOVW_PREL_G2:
--			ovf = reloc_insn_movw(RELOC_OP_PREL, loc, val, 32,
--					      AARCH64_INSN_IMM_MOVNZ);
--			break;
--		case R_AARCH64_MOVW_PREL_G3:
--			/* We're using the top bits so we can't overflow. */
--			overflow_check = false;
--			ovf = reloc_insn_movw(RELOC_OP_PREL, loc, val, 48,
--					      AARCH64_INSN_IMM_MOVNZ);
--			break;
--
--		/* Immediate instruction relocations. */
--		case R_AARCH64_LD_PREL_LO19:
--			ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2, 19,
--					     AARCH64_INSN_IMM_19);
--			break;
--		case R_AARCH64_ADR_PREL_LO21:
--			ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 0, 21,
--					     AARCH64_INSN_IMM_ADR);
--			break;
--		case R_AARCH64_ADR_PREL_PG_HI21_NC:
--			overflow_check = false;
--		case R_AARCH64_ADR_PREL_PG_HI21:
--			ovf = reloc_insn_imm(RELOC_OP_PAGE, loc, val, 12, 21,
--					     AARCH64_INSN_IMM_ADR);
--			break;
--		case R_AARCH64_ADD_ABS_LO12_NC:
--		case R_AARCH64_LDST8_ABS_LO12_NC:
--			overflow_check = false;
--			ovf = reloc_insn_imm(RELOC_OP_ABS, loc, val, 0, 12,
--					     AARCH64_INSN_IMM_12);
--			break;
--		case R_AARCH64_LDST16_ABS_LO12_NC:
--			overflow_check = false;
--			ovf = reloc_insn_imm(RELOC_OP_ABS, loc, val, 1, 11,
--					     AARCH64_INSN_IMM_12);
--			break;
--		case R_AARCH64_LDST32_ABS_LO12_NC:
--			overflow_check = false;
--			ovf = reloc_insn_imm(RELOC_OP_ABS, loc, val, 2, 10,
--					     AARCH64_INSN_IMM_12);
--			break;
--		case R_AARCH64_LDST64_ABS_LO12_NC:
--			overflow_check = false;
--			ovf = reloc_insn_imm(RELOC_OP_ABS, loc, val, 3, 9,
--					     AARCH64_INSN_IMM_12);
--			break;
--		case R_AARCH64_LDST128_ABS_LO12_NC:
--			overflow_check = false;
--			ovf = reloc_insn_imm(RELOC_OP_ABS, loc, val, 4, 8,
--					     AARCH64_INSN_IMM_12);
--			break;
--		case R_AARCH64_TSTBR14:
--			ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2, 14,
--					     AARCH64_INSN_IMM_14);
--			break;
--		case R_AARCH64_CONDBR19:
--			ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2, 19,
--					     AARCH64_INSN_IMM_19);
--			break;
--		case R_AARCH64_JUMP26:
--		case R_AARCH64_CALL26:
--			ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 2, 26,
--					     AARCH64_INSN_IMM_26);
--			break;
--
--		default:
--			pr_err("module %s: unsupported RELA relocation: %llu\n",
--			       me->name, ELF64_R_TYPE(rel[i].r_info));
--			return -ENOEXEC;
--		}
--
--		if (overflow_check && ovf == -ERANGE)
--			goto overflow;
--
-+		ret = static_relocate(me, type, loc, val);
-+		if (ret)
-+			return ret;
- 	}
+@@ -330,7 +331,8 @@ static void notrace klp_ftrace_handler(unsigned long ip,
+ 	if (WARN_ON_ONCE(!func))
+ 		goto unlock;
  
- 	return 0;
--
--overflow:
--	pr_err("module %s: overflow in relocation type %d val %Lx\n",
--	       me->name, (int)ELF64_R_TYPE(rel[i].r_info), val);
--	return -ENOEXEC;
+-	klp_arch_set_pc(regs, (unsigned long)func->new_func);
++	new_ip = ftrace_function_stub_ip((unsigned long)func->new_func);
++	klp_arch_set_pc(regs, new_ip);
+ unlock:
+ 	rcu_read_unlock();
  }
+@@ -338,6 +340,8 @@ unlock:
+ static void klp_disable_func(struct klp_func *func)
+ {
+ 	struct klp_ops *ops;
++	int ret;
++	unsigned long ip;
  
- int module_finalize(const Elf_Ehdr *hdr,
+ 	WARN_ON(func->state != KLP_ENABLED);
+ 	WARN_ON(!func->old_addr);
+@@ -347,8 +351,9 @@ static void klp_disable_func(struct klp_func *func)
+ 		return;
+ 
+ 	if (list_is_singular(&ops->func_stack)) {
+-		WARN_ON(unregister_ftrace_function(&ops->fops));
+-		WARN_ON(ftrace_set_filter_ip(&ops->fops, func->old_addr, 1, 0));
++		ip = ftrace_function_stub_ip(func->old_addr);
++	 	WARN_ON(unregister_ftrace_function(&ops->fops));
++		WARN_ON(ftrace_set_filter_ip(&ops->fops, ip, 1, 0));
+ 
+ 		list_del_rcu(&func->stack_node);
+ 		list_del(&ops->node);
+@@ -364,6 +369,7 @@ static int klp_enable_func(struct klp_func *func)
+ {
+ 	struct klp_ops *ops;
+ 	int ret;
++	unsigned long ip;
+ 
+ 	if (WARN_ON(!func->old_addr))
+ 		return -EINVAL;
+@@ -387,7 +393,8 @@ static int klp_enable_func(struct klp_func *func)
+ 		INIT_LIST_HEAD(&ops->func_stack);
+ 		list_add_rcu(&func->stack_node, &ops->func_stack);
+ 
+-		ret = ftrace_set_filter_ip(&ops->fops, func->old_addr, 0, 0);
++		ip = ftrace_function_stub_ip(func->old_addr);
++		ret = ftrace_set_filter_ip(&ops->fops, ip, 0, 0);
+ 		if (ret) {
+ 			pr_err("failed to set ftrace filter for function '%s' (%d)\n",
+ 			       func->old_name, ret);
+@@ -398,7 +405,7 @@ static int klp_enable_func(struct klp_func *func)
+ 		if (ret) {
+ 			pr_err("failed to register ftrace handler for function '%s' (%d)\n",
+ 			       func->old_name, ret);
+-			ftrace_set_filter_ip(&ops->fops, func->old_addr, 1, 0);
++			ftrace_set_filter_ip(&ops->fops, ip, 1, 0);
+ 			goto err;
+ 		}
+ 
 -- 
 1.7.1
