@@ -1,56 +1,104 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Thu, 28 May 2015 12:27:22 +1000
-Subject: [RFC PATCH] EDAC: Cleanup atomic_scrub mess
-In-Reply-To: <20150527155219.GB19407@pd.tnic>
-References: <1431991481-25684-1-git-send-email-lho@apm.com>
- <1431991481-25684-2-git-send-email-lho@apm.com>
- <20150519170308.GL4641@pd.tnic>
- <CAPw-ZT=mTpt_vz+e=rM5ywK8feNKkJQrpEWg=noRCziJ0840TQ@mail.gmail.com>
- <20150519203336.GP4641@pd.tnic> <20150521180719.GE3689@pd.tnic>
- <20150521181157.GF3689@pd.tnic> <555F8DE2.4060402@ezchip.com>
- <20150527155219.GB19407@pd.tnic>
-Message-ID: <1432780042.4979.0.camel@ellerman.id.au>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 27 May 2015 21:37:33 -0500
+Subject: [RFC/PATCH 3/9] of: dma: Move range size workaround to
+ of_dma_get_range()
+In-Reply-To: <1431644410-2997-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1431644410-2997-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1431644410-2997-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <CAL_JsqKdhrBX4VUvfEdkK8AeYpLq7332i3YG38P9ije_vOh0GQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-05-27 at 17:52 +0200, Borislav Petkov wrote:
-> On Fri, May 22, 2015 at 04:13:22PM -0400, Chris Metcalf wrote:
-> > On 05/21/2015 02:11 PM, Borislav Petkov wrote:
-> > >From: Borislav Petkov<bp@suse.de>
-> > >
-> > >So first of all, this atomic_scrub() function's naming is bad. It looks
-> > >like an atomic_t helper. Change it to edac_atomic_scrub().
-> > >
-> > >The bigger problem is that this function is arch-specific and every new
-> > >arch which doesn't necessarily need that functionality still needs to
-> > >define it, otherwise EDAC doesn't compile.
-> > >
-> > >So instead of doing that and including arch-specific headers, have each
-> > >arch define an EDAC_ATOMIC_SCRUB symbol which can be used in edac_mc.c
-> > >for ifdeffery. Much cleaner.
-> > >
-> > >We already are doing this with another symbol - EDAC_SUPPORT. This is
-> > >also much cleaner than having CONFIG_EDAC explicitly depend on all the
-> > >arches which need/have EDAC support and drivers.
-> > >
-> > >This way I can kill the useless edac.h header in tile too.
-> > >
-> > >Signed-off-by: Borislav Petkov<bp@suse.de>
-> > 
-> > Acked-by: Chris Metcalf <cmetcalf@ezchip.com> [for tile]
-> 
-> Thanks.
-> 
-> Just to clarify after today's discussion on IRC: this patch doesn't
-> change current DRAM scrubbing behavior on the relevant arches - it
-> simply makes the definition of that atomic_scrub thing non-mandatory on
-> new arches or on those which don't need it.
-> 
-> In the meantime, patch has been build-tested on arm and ppc - the two
-> I'm missing an ACK for.
+On Thu, May 14, 2015 at 6:00 PM, Laurent Pinchart
+<laurent.pinchart+renesas@ideasonboard.com> wrote:
+> Invalid dma-ranges values should be worked around when retrieving the
+> DMA range in of_dma_get_range(), not by all callers of the function.
+> This isn't much of a problem now that we have a single caller, but that
+> situation will change when moving DMA configuration to device probe
+> time.
+>
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> ---
+>  drivers/of/address.c | 20 ++++++++++++++++++--
+>  drivers/of/device.c  | 15 ---------------
 
-I haven't tested it but it looks sane:
+Please use get_maintainers.pl. Anyway, looks fine to me:
 
-Acked-by: Michael Ellerman <mpe@ellerman.id.au>
+Acked-by: Rob Herring <robh@kernel.org>
 
-cheers
+Rob
+
+>  2 files changed, 18 insertions(+), 17 deletions(-)
+>
+> diff --git a/drivers/of/address.c b/drivers/of/address.c
+> index 78a7dcbec7d8..75eebd19ebfa 100644
+> --- a/drivers/of/address.c
+> +++ b/drivers/of/address.c
+> @@ -924,8 +924,8 @@ EXPORT_SYMBOL(of_io_request_and_map);
+>   *     CPU addr (phys_addr_t)  : pna cells
+>   *     size                    : nsize cells
+>   *
+> - * It returns -ENODEV if "dma-ranges" property was not found
+> - * for this device in DT.
+> + * Return 0 on success, -ENODEV if the "dma-ranges" property was not found for
+> + * this device in DT, or -EINVAL if the CPU address or size is invalid.
+>   */
+>  int of_dma_get_range(struct device_node *np, u64 *dma_addr, u64 *paddr, u64 *size)
+>  {
+> @@ -986,6 +986,22 @@ int of_dma_get_range(struct device_node *np, u64 *dma_addr, u64 *paddr, u64 *siz
+>         *dma_addr = dmaaddr;
+>
+>         *size = of_read_number(ranges + naddr + pna, nsize);
+> +       /*
+> +        * DT nodes sometimes incorrectly set the size as a mask. Work around
+> +        * those incorrect DT by computing the size as mask + 1.
+> +        */
+> +       if (*size & 1) {
+> +               pr_warn("%s: size 0x%llx for dma-range in node(%s) set as mask\n",
+> +                       __func__, *size, np->full_name);
+> +               *size = *size + 1;
+> +       }
+> +
+> +       if (!*size) {
+> +               pr_err("%s: invalid size zero for dma-range in node(%s)\n",
+> +                      __func__, np->full_name);
+> +               ret = -EINVAL;
+> +               goto out;
+> +       }
+>
+>         pr_debug("dma_addr(%llx) cpu_addr(%llx) size(%llx)\n",
+>                  *dma_addr, *paddr, *size);
+> diff --git a/drivers/of/device.c b/drivers/of/device.c
+> index 20c1332a0018..530aa1ed3e1b 100644
+> --- a/drivers/of/device.c
+> +++ b/drivers/of/device.c
+> @@ -109,21 +109,6 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+>                 size = dev->coherent_dma_mask + 1;
+>         } else {
+>                 offset = PFN_DOWN(paddr - dma_addr);
+> -
+> -               /*
+> -                * Add a work around to treat the size as mask + 1 in case
+> -                * it is defined in DT as a mask.
+> -                */
+> -               if (size & 1) {
+> -                       dev_warn(dev, "Invalid size 0x%llx for dma-range\n",
+> -                                size);
+> -                       size = size + 1;
+> -               }
+> -
+> -               if (!size) {
+> -                       dev_err(dev, "Adjusted size 0x%llx invalid\n", size);
+> -                       return;
+> -               }
+>                 dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
+>         }
+>
+> --
+> 2.3.6
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
