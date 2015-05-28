@@ -1,56 +1,62 @@
 From: mturquette@linaro.org (Michael Turquette)
-Date: Wed, 27 May 2015 21:09:19 -0700
-Subject: [PATCH v2 1/5] clk: remove duplicated code with
- __clk_set_parent_after
-In-Reply-To: <1431610143-21853-2-git-send-email-aisheng.dong@freescale.com>
-References: <1431610143-21853-1-git-send-email-aisheng.dong@freescale.com>
- <1431610143-21853-2-git-send-email-aisheng.dong@freescale.com>
-Message-ID: <20150528040919.22384.79189@quantum>
+Date: Wed, 27 May 2015 21:22:13 -0700
+Subject: [PATCHv3 10/10] CLK: TI: always enable DESHDCP clock
+In-Reply-To: <555CE1BF.4050506@codeaurora.org>
+References: <1430906938-26128-1-git-send-email-tomi.valkeinen@ti.com>
+ <1430906938-26128-11-git-send-email-tomi.valkeinen@ti.com>
+ <555C744C.6070901@ti.com> <555C74E8.5010105@ti.com>
+ <555CE1BF.4050506@codeaurora.org>
+Message-ID: <20150528042213.22384.12243@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Dong Aisheng (2015-05-14 06:28:59)
-> __clk_set_parent_after() actually used the second argument then we
-> could put this duplicate logic in there and call it with a different
-> order of arguments in the success vs. error paths in this function.
+Quoting Stephen Boyd (2015-05-20 12:34:23)
+> On 05/20/15 04:50, Tero Kristo wrote:
+> >
+> >>>
+> >>> @@ -348,5 +348,10 @@ int __init dra7xx_dt_clk_init(void)
+> >>>       if (rc)
+> >>>           pr_err("%s: failed to set USB_DPLL M2 OUT\n", __func__);
+> >>>
+> >>> +    hdcp_ck = clk_get_sys(NULL, "dss_deshdcp_clk");
+> >>> +    rc = clk_prepare_enable(hdcp_ck);
+> >>> +    if (rc)
+> >>> +        pr_err("%s: failed to set dss_deshdcp_clk\n", __func__);
+> >>> +
+> >>>       return rc;
+> >>>   }
+> >>>
+> >>
+> >> You should rather use the assigned-clock properties in DT to accomplish
+> >> this, the manual clock tweaks under the drivers/clk/ti/clk-* files
+> >> should be converted to DT setup also.
+> >
+> > Now that I sent this, I realize we only have support to set_parent /
+> > set_rate through the assigned-clock props, no enable. Any plans to
+> > extend this support Mike/Stephen?
+> >
+> >
 > 
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
-> Signed-off-by: Dong Aisheng <aisheng.dong@freescale.com>
+> Enable falls under the "critical clocks" discussion that is ongoing. I
+> assume that this is some sort of critical clock that can't be turned off?
 
-Patch looks good to me.
+Just chiming in on the "critical clock" discussion. I'm not planning to
+merge something that lets Devicetree nodes call clk_enable on a clock.
+That's what drivers are for.
 
-Also just noticed that the second argument to __clk_set_parent_after is
-never used :-(
+The assigned-rate and assigned-parent stuff that Tero mentioned is more
+like configuration data for a downstream clock consumer. Clock
+gating/ungating does not fall under this type of configuration data in
+my opinion.
+
+I think that Tomi's patch to call clk_prepare_enable from
+dra7xx_dt_clk_init is a reasonable solution to the problem.
 
 Regards,
 Mike
 
-> ---
->  drivers/clk/clk.c | 8 +-------
->  1 file changed, 1 insertion(+), 7 deletions(-)
 > 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 659f2b0..0e813ea 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -1159,14 +1159,8 @@ static int __clk_set_parent(struct clk_core *core, struct clk_core *parent,
->                 flags = clk_enable_lock();
->                 clk_reparent(core, old_parent);
->                 clk_enable_unlock(flags);
-> +               __clk_set_parent_after(core, old_parent, parent);
->  
-> -               if (core->prepare_count) {
-> -                       flags = clk_enable_lock();
-> -                       clk_core_disable(core);
-> -                       clk_core_disable(parent);
-> -                       clk_enable_unlock(flags);
-> -                       clk_core_unprepare(parent);
-> -               }
->                 return ret;
->         }
->  
 > -- 
-> 1.9.1
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
 > 
