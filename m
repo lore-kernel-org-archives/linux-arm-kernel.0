@@ -1,31 +1,59 @@
-From: xerofoify@gmail.com (Nicholas Krause)
-Date: Thu, 28 May 2015 11:00:05 -0400
-Subject: [PATCH RESEND] mach-omap2:Remove unnessary return statement from the
- void function, omap2_show_dma_caps
-Message-ID: <1432825205-4663-1-git-send-email-xerofoify@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 28 May 2015 16:03:56 +0100
+Subject: [RFC PATCH 2/2] spi: Add support for Zynq Ultrascale+ MPSoC
+ GQSPI controller
+In-Reply-To: <CAFcVECJRqebzAjU+rfAtUQFG=7-KoE1GiXet5XJB-4D3i0or6A@mail.gmail.com>
+References: <1432106871-27232-1-git-send-email-ranjit.waghmode@xilinx.com>
+ <1432106871-27232-2-git-send-email-ranjit.waghmode@xilinx.com>
+ <20150522115854.GG21391@sirena.org.uk>
+ <CAFcVECJRqebzAjU+rfAtUQFG=7-KoE1GiXet5XJB-4D3i0or6A@mail.gmail.com>
+Message-ID: <20150528150356.GA21577@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This removes the no longer required return statement at the end
-of the void function, omap2_show_dma_cap due to no need for a
-return statement due to this function always running successfully.
+On Fri, May 22, 2015 at 08:43:54PM +0530, Harini Katakam wrote:
+> On Fri, May 22, 2015 at 5:28 PM, Mark Brown <broonie@kernel.org> wrote:
+> > On Wed, May 20, 2015 at 12:57:51PM +0530, Ranjit Waghmode wrote:
 
-Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
----
- arch/arm/mach-omap2/dma.c | 1 -
- 1 file changed, 1 deletion(-)
+> > Why is there a default case here?  That's going to men we try to handle
+> > any random chip select that gets passed in as pointing to this lower
+> > device which doesn't seem right.  The fact that this is trying to handle
+> > mirroring of the chip select to two devices is also raising alarm bells
+> > here...
 
-diff --git a/arch/arm/mach-omap2/dma.c b/arch/arm/mach-omap2/dma.c
-index e1a56d8..1ed4be1 100644
---- a/arch/arm/mach-omap2/dma.c
-+++ b/arch/arm/mach-omap2/dma.c
-@@ -117,7 +117,6 @@ static void omap2_show_dma_caps(void)
- 	u8 revision = dma_read(REVISION, 0) & 0xff;
- 	printk(KERN_INFO "OMAP DMA hardware revision %d.%d\n",
- 				revision >> 4, revision & 0xf);
--	return;
- }
- 
- static unsigned configure_dma_errata(void)
--- 
-2.1.4
+> This SPI controller has two CS lines and two data bus.
+> Two devices can be connected to these and either the upper or the
+> lower or both (Explained below) can be selected.
+
+> When two flash devices are used, one of the HW configurations in
+> which they can be connected is called "parallel" mode where they
+
+I know what wiring chip selects in parallel is but that's not the
+question - the question is about the handling of the default case.
+
+> >> +static void zynqmp_qspi_chipselect(struct spi_device *qspi, bool is_high)
+> >> +{
+
+> >> +     if (is_high) {
+> >> +             /* Manually start the generic FIFO command */
+> >> +             zynqmp_gqspi_write(xqspi, GQSPI_CONFIG_OFST,
+> >> +                             zynqmp_gqspi_read(xqspi, GQSPI_CONFIG_OFST) |
+> >> +                             GQSPI_CFG_START_GEN_FIFO_MASK);
+
+> > No, this is broken - setting the chip select should set the chip select,
+> > it shouldn't have any impact on transfers.  Transfers should be started
+> > in the transfer operations.
+
+> This is the only way to assert the CS. It doesn't start transferring any data.
+
+OK, then you can't implement a separate set_cs() operation and shouldn't
+be trying to do so.  This will break in multiple ways when the framework
+tries to use the operations separately.  You probably need to implement
+a single flat transfer() operation.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150528/5119c1dc/attachment.sig>
