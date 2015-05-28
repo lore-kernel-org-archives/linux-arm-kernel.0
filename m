@@ -1,235 +1,43 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 28 May 2015 11:40:54 +0200
-Subject: [PATCHv2] bus: mvebu-mbus: add mv_mbus_dram_info_nooverlap()
-Message-ID: <1432806054-17128-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 28 May 2015 10:40:50 +0100
+Subject: [PATCH 0/3] arm64: alternative patching rework
+Message-ID: <1432806053-987-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit introduces a variant of the mv_mbus_dram_info() function
-called mv_mbus_dram_info_nooverlap(). Both functions are used by
-Marvell drivers supporting devices doing DMA, and provide them a
-description the DRAM ranges that they need to configure their DRAM
-windows.
+The current alternative instruction framework is not kind to branches,
+potentially leading to all kind of hacks in the code that uses
+alternatives. This series expands it to deal with immediate and
+conditional branches.
 
-The ranges provided by the mv_mbus_dram_info() function may overlap
-with the I/O windows if there is a lot (>= 4 GB) of RAM
-installed. This is not a problem for most of the DMA masters, except
-for the upcoming new CESA crypto driver because it does DMA to the
-SRAM, which is mapped through an I/O window. For this unit, we need to
-have DRAM ranges that do not overlap with the I/O windows.
+This is a rewrite of fef7f2b20103, which got reverted in b9a95e85bbc
+as it was breaking unsuspecting branches inside an alternate
+sequence. It now also deals with conditional branches (instead of just
+asserting a BUG).
 
-A first implementation done in commit 1737cac69369 ("bus: mvebu-mbus:
-make sure SDRAM CS for DMA don't overlap the MBus bridge window"),
-changed the information returned by mv_mbus_dram_info() to match this
-requirement. However, it broke the requirement of the other DMA
-masters than the DRAM ranges should have power of two sizes.
+Another nit is addressed by the last patch, where GAS gets confused by
+the combinaison of a .inst directive (as used by the msr_s/mrs_s
+pseudo-instruction), a label, and a .if directive evaluating said
+label. As this is exactly what the alternative framework uses to
+detect length mismatch, this patch reverts to using a pair .org
+directives in a creative way.
 
-To solve this situation, this commit introduces a new
-mv_mbus_dram_info_nooverlap() function, which returns the same
-information as mv_mbus_dram_info(), but guaranteed to not overlap with
-the I/O windows.
+This has been tested on v4.1-rc5.
 
-In the end, it gives us two variants of the mv_mbus_dram_info*()
-functions:
+Marc Zyngier (3):
+  arm64: insn: Add aarch64_{get,set}_branch_offset
+  arm64: alternative: Allow immediate branch as alternative instruction
+  arm64: alternative: Work around .inst assembler bugs
 
- - The normal one, mv_mbus_dram_info(), which has been around for many
-   years. This function returns the raw DRAM ranges, which are
-   guaranteed to use power of two sizes, but will overlap with I/O
-   windows. This function will therefore be used by all DMA masters
-   (SATA, XOR, Ethernet, etc.) except the CESA crypto driver.
+ arch/arm64/include/asm/alternative-asm.h | 29 -------------
+ arch/arm64/include/asm/alternative.h     | 52 +++++++++++++++++++++--
+ arch/arm64/include/asm/insn.h            |  3 ++
+ arch/arm64/kernel/alternative.c          | 71 +++++++++++++++++++++++++++++---
+ arch/arm64/kernel/entry.S                |  2 +-
+ arch/arm64/kernel/insn.c                 | 60 +++++++++++++++++++++++++++
+ arch/arm64/mm/cache.S                    |  2 +-
+ 7 files changed, 179 insertions(+), 40 deletions(-)
+ delete mode 100644 arch/arm64/include/asm/alternative-asm.h
 
- - The new 'nooverlap' variant, mv_mbus_dram_info_nooverlap(). This
-   function returns DRAM ranges after they have been "tweaked" to make
-   sure they don't overlap with I/O windows. By doing this tweaking,
-   we remove the power of two size guarantee. This variant will be
-   used by the new CESA crypto driver.
-
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
-Changes v1 -> v2:
- - Add the missing stub for mv_mbus_dram_info_nooverlap() in mbus.h,
-   when CONFIG_PLAT_ORION is not defined.
----
- drivers/bus/mvebu-mbus.c | 117 +++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/mbus.h     |   5 ++
- 2 files changed, 122 insertions(+)
-
-diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-index 6f047dc..c43c3d2 100644
---- a/drivers/bus/mvebu-mbus.c
-+++ b/drivers/bus/mvebu-mbus.c
-@@ -57,6 +57,7 @@
- #include <linux/of_address.h>
- #include <linux/debugfs.h>
- #include <linux/log2.h>
-+#include <linux/memblock.h>
- #include <linux/syscore_ops.h>
- 
- /*
-@@ -152,13 +153,39 @@ struct mvebu_mbus_state {
- 
- static struct mvebu_mbus_state mbus_state;
- 
-+/*
-+ * We provide two variants of the mv_mbus_dram_info() function:
-+ *
-+ * - The normal one, where the described DRAM ranges may overlap with
-+ *   the I/O windows, but for which the DRAM ranges are guaranteed to
-+ *   have a power of two size. Such ranges are suitable for the DMA
-+ *   masters that only DMA between the RAM and the device, which is
-+ *   actually all devices except the crypto engines.
-+ *
-+ * - The 'nooverlap' one, where the described DRAM ranges are
-+ *   guaranteed to not overlap with the I/O windows, but for which the
-+ *   DRAM ranges will not have power of two sizes. They will only be
-+ *   aligned on a 64 KB boundary, and have a size multiple of 64
-+ *   KB. Such ranges are suitable for the DMA masters that DMA between
-+ *   the crypto SRAM (which is mapped through an I/O window) and a
-+ *   device. This is the case for the crypto engines.
-+ */
-+
- static struct mbus_dram_target_info mvebu_mbus_dram_info;
-+static struct mbus_dram_target_info mvebu_mbus_dram_info_nooverlap;
-+
- const struct mbus_dram_target_info *mv_mbus_dram_info(void)
- {
- 	return &mvebu_mbus_dram_info;
- }
- EXPORT_SYMBOL_GPL(mv_mbus_dram_info);
- 
-+const struct mbus_dram_target_info *mv_mbus_dram_info_nooverlap(void)
-+{
-+	return &mvebu_mbus_dram_info_nooverlap;
-+}
-+EXPORT_SYMBOL_GPL(mv_mbus_dram_info_nooverlap);
-+
- /* Checks whether the given window has remap capability */
- static bool mvebu_mbus_window_is_remappable(struct mvebu_mbus_state *mbus,
- 					    const int win)
-@@ -576,6 +603,95 @@ static unsigned int armada_xp_mbus_win_remap_offset(int win)
- 		return MVEBU_MBUS_NO_REMAP;
- }
- 
-+/*
-+ * Use the memblock information to find the MBus bridge hole in the
-+ * physical address space.
-+ */
-+static void __init
-+mvebu_mbus_find_bridge_hole(uint64_t *start, uint64_t *end)
-+{
-+	struct memblock_region *r;
-+	uint64_t s = 0;
-+
-+	for_each_memblock(memory, r) {
-+		/*
-+		 * This part of the memory is above 4 GB, so we don't
-+		 * care for the MBus bridge hole.
-+		 */
-+		if (r->base >= 0x100000000ULL)
-+			continue;
-+
-+		/*
-+		 * The MBus bridge hole is at the end of the RAM under
-+		 * the 4 GB limit.
-+		 */
-+		if (r->base + r->size > s)
-+			s = r->base + r->size;
-+	}
-+
-+	*start = s;
-+	*end = 0x100000000ULL;
-+}
-+
-+/*
-+ * This function fills in the mvebu_mbus_dram_info_nooverlap data
-+ * structure, by looking at the mvebu_mbus_dram_info data, and
-+ * removing the parts of it that overlap with I/O windows.
-+ */
-+static void __init
-+mvebu_mbus_setup_cpu_target_nooverlap(struct mvebu_mbus_state *mbus)
-+{
-+	uint64_t mbus_bridge_base, mbus_bridge_end;
-+	int cs_nooverlap = 0;
-+	int i;
-+
-+	mvebu_mbus_find_bridge_hole(&mbus_bridge_base, &mbus_bridge_end);
-+
-+	for (i = 0; i < mvebu_mbus_dram_info.num_cs; i++) {
-+		struct mbus_dram_window *w;
-+		u64 base, size, end;
-+
-+		w = &mvebu_mbus_dram_info.cs[i];
-+		base = w->base;
-+		size = w->size;
-+		end = base + size;
-+
-+		/*
-+		 * The CS is fully enclosed inside the MBus bridge
-+		 * area, so ignore it.
-+		 */
-+		if (base >= mbus_bridge_base && end <= mbus_bridge_end)
-+			continue;
-+
-+		/*
-+		 * Beginning of CS overlaps with end of MBus, raise CS
-+		 * base address, and shrink its size.
-+		 */
-+		if (base >= mbus_bridge_base && end > mbus_bridge_end) {
-+			size -= mbus_bridge_end - base;
-+			base = mbus_bridge_end;
-+		}
-+
-+		/*
-+		 * End of CS overlaps with beginning of MBus, shrink
-+		 * CS size.
-+		 */
-+		if (base < mbus_bridge_base && end > mbus_bridge_base)
-+			size -= end - mbus_bridge_base;
-+
-+		w = &mvebu_mbus_dram_info_nooverlap.cs[cs_nooverlap++];
-+		w->cs_index = i;
-+		w->mbus_attr = 0xf & ~(1 << i);
-+		if (mbus->hw_io_coherency)
-+			w->mbus_attr |= ATTR_HW_COHERENCY;
-+		w->base = base;
-+		w->size = size;
-+	}
-+
-+	mvebu_mbus_dram_info_nooverlap.mbus_dram_target_id = TARGET_DDR;
-+	mvebu_mbus_dram_info_nooverlap.num_cs = cs_nooverlap;
-+}
-+
- static void __init
- mvebu_mbus_default_setup_cpu_target(struct mvebu_mbus_state *mbus)
- {
-@@ -964,6 +1080,7 @@ static int __init mvebu_mbus_common_init(struct mvebu_mbus_state *mbus,
- 		mvebu_mbus_disable_window(mbus, win);
- 
- 	mbus->soc->setup_cpu_target(mbus);
-+	mvebu_mbus_setup_cpu_target_nooverlap(mbus);
- 
- 	if (is_coherent)
- 		writel(UNIT_SYNC_BARRIER_ALL,
-diff --git a/include/linux/mbus.h b/include/linux/mbus.h
-index 611b69f..1f7bc63 100644
---- a/include/linux/mbus.h
-+++ b/include/linux/mbus.h
-@@ -54,11 +54,16 @@ struct mbus_dram_target_info
-  */
- #ifdef CONFIG_PLAT_ORION
- extern const struct mbus_dram_target_info *mv_mbus_dram_info(void);
-+extern const struct mbus_dram_target_info *mv_mbus_dram_info_nooverlap(void);
- #else
- static inline const struct mbus_dram_target_info *mv_mbus_dram_info(void)
- {
- 	return NULL;
- }
-+static inline const struct mbus_dram_target_info *mv_mbus_dram_info_nooverlap(void)
-+{
-+	return NULL;
-+}
- #endif
- 
- int mvebu_mbus_save_cpu_target(u32 *store_addr);
 -- 
-2.1.0
+2.1.4
