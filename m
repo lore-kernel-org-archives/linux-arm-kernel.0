@@ -1,84 +1,44 @@
-From: punnaiah.choudary.kalluri@xilinx.com (Punnaiah Choudary Kalluri)
-Date: Thu, 28 May 2015 15:41:04 +0000
-Subject: [RFC PATCH 2/2] spi: Add support for Zynq Ultrascale+ MPSoC
- GQSPI controller
-In-Reply-To: <20150528150356.GA21577@sirena.org.uk>
-References: <1432106871-27232-1-git-send-email-ranjit.waghmode@xilinx.com>
- <1432106871-27232-2-git-send-email-ranjit.waghmode@xilinx.com>
- <20150522115854.GG21391@sirena.org.uk>
- <CAFcVECJRqebzAjU+rfAtUQFG=7-KoE1GiXet5XJB-4D3i0or6A@mail.gmail.com>
- <20150528150356.GA21577@sirena.org.uk>
-Message-ID: <03CA77BA8AF6F1469AEDFBDA1322A7B7495AA317@XAP-PVEXMBX02.xlnx.xilinx.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 28 May 2015 16:47:10 +0100
+Subject: [PATCH 7/7] arm: perf: factor arm_pmu core out to drivers
+In-Reply-To: <1432657420-887-8-git-send-email-mark.rutland@arm.com>
+References: <1432657420-887-1-git-send-email-mark.rutland@arm.com>
+ <1432657420-887-8-git-send-email-mark.rutland@arm.com>
+Message-ID: <20150528154709.GL31001@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Tue, May 26, 2015 at 05:23:40PM +0100, Mark Rutland wrote:
+> To enable sharing of the arm_pmu code with arm64, this patch factors it
+> out to drivers/perf/. A new drivers/perf directory is added for
+> performance monitor drivers to live under.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Ingo Molnar <mingo@redhat.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Paul Mackerras <paulus@samba.org>
+> Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/Kconfig                                           |  8 ++------
+>  arch/arm/kernel/Makefile                                   |  3 +--
+>  arch/arm/kernel/perf_event_v6.c                            |  2 +-
+>  arch/arm/kernel/perf_event_v7.c                            |  2 +-
+>  arch/arm/kernel/perf_event_xscale.c                        |  2 +-
+>  arch/arm/mach-ux500/cpu-db8500.c                           |  2 +-
+>  drivers/Kconfig                                            |  2 ++
+>  drivers/Makefile                                           |  1 +
+>  drivers/perf/Kconfig                                       | 14 ++++++++++++++
+>  drivers/perf/Makefile                                      |  1 +
+>  arch/arm/kernel/perf_event.c => drivers/perf/arm_pmu.c     |  2 +-
+>  arch/arm/include/asm/pmu.h => include/linux/perf/arm_pmu.h |  4 ++--
 
-> -----Original Message-----
-> From: Mark Brown [mailto:broonie at kernel.org]
-> Sent: Thursday, May 28, 2015 8:34 PM
-> To: Harini Katakam
-> Cc: Ranjit Abhimanyu Waghmode; Rob Herring; Pawel Moll; Mark Rutland;
-> ijc+devicetree at hellion.org.uk; Kumar Gala; Michal Simek; Soren Brinkmann;
-> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; linux-spi; Punnaiah Choudary Kalluri;
-> ran27jit at gmail.com
-> Subject: Re: [RFC PATCH 2/2] spi: Add support for Zynq Ultrascale+ MPSoC
-> GQSPI controller
-> 
-> On Fri, May 22, 2015 at 08:43:54PM +0530, Harini Katakam wrote:
-> > On Fri, May 22, 2015 at 5:28 PM, Mark Brown <broonie@kernel.org> wrote:
-> > > On Wed, May 20, 2015 at 12:57:51PM +0530, Ranjit Waghmode wrote:
-> 
-> > > Why is there a default case here?  That's going to men we try to handle
-> > > any random chip select that gets passed in as pointing to this lower
-> > > device which doesn't seem right.  The fact that this is trying to handle
-> > > mirroring of the chip select to two devices is also raising alarm bells
-> > > here...
-> 
-> > This SPI controller has two CS lines and two data bus.
-> > Two devices can be connected to these and either the upper or the
-> > lower or both (Explained below) can be selected.
-> 
-> > When two flash devices are used, one of the HW configurations in
-> > which they can be connected is called "parallel" mode where they
-> 
-> I know what wiring chip selects in parallel is but that's not the
-> question - the question is about the handling of the default case.
+Can you also update MAINTAINERS ("ARM PMU PROFILING AND DEBUGGING") to
+reflect the effective file moves, please? I'm also more than happy for
+you to add yourself as a reviewer ("R:") entry, if you feel that way
+inclined.
 
-Yes, we should not handle default case here. We will change this. 
-
-> 
-> > >> +static void zynqmp_qspi_chipselect(struct spi_device *qspi, bool
-> is_high)
-> > >> +{
-> 
-> > >> +     if (is_high) {
-> > >> +             /* Manually start the generic FIFO command */
-> > >> +             zynqmp_gqspi_write(xqspi, GQSPI_CONFIG_OFST,
-> > >> +                             zynqmp_gqspi_read(xqspi, GQSPI_CONFIG_OFST) |
-> > >> +                             GQSPI_CFG_START_GEN_FIFO_MASK);
-> 
-> > > No, this is broken - setting the chip select should set the chip select,
-> > > it shouldn't have any impact on transfers.  Transfers should be started
-> > > in the transfer operations.
-> 
-> > This is the only way to assert the CS. It doesn't start transferring any data.
-> 
-> OK, then you can't implement a separate set_cs() operation and shouldn't
-> be trying to do so.  This will break in multiple ways when the framework
-> tries to use the operations separately.  You probably need to implement
-> a single flat transfer() operation.
-
-As we said it will not start any data transfer. In order to set chip select (chip select only) we need to
-1. Frame a control word with following parameters like the chip select that we would like to set and hold time
- 2. Update the control word to fifo 
-
-To have a performance advantage (may be not trivial) we are executing this fifo entry along with the first
- Data transfer entry in transfer function so that we can avoid waiting for fifo empty in set_cs function.
-
- We will ensure CS assert by waiting till the fifo empty in set_cs function and justify the what the 
-Function supposed do.
-
-Regards,
-Punnaiah
+Will
