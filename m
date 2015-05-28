@@ -1,104 +1,43 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 27 May 2015 21:37:33 -0500
-Subject: [RFC/PATCH 3/9] of: dma: Move range size workaround to
- of_dma_get_range()
-In-Reply-To: <1431644410-2997-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1431644410-2997-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1431644410-2997-4-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <CAL_JsqKdhrBX4VUvfEdkK8AeYpLq7332i3YG38P9ije_vOh0GQ@mail.gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 28 May 2015 11:22:57 +0800
+Subject: ARM64 kexec/kdump timeline
+In-Reply-To: <CAKv+Gu8U1SWPb-GJ-3u9t_EX3g18AvOWisK3FycvRWsEdyjpzQ@mail.gmail.com>
+References: <555E37FC.9020800@codeaurora.org>
+ <1432239334.1922.7.camel@infradead.org> <55653538.8020206@codeaurora.org>
+ <CAKv+Gu8U1SWPb-GJ-3u9t_EX3g18AvOWisK3FycvRWsEdyjpzQ@mail.gmail.com>
+Message-ID: <55668A11.1010304@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 14, 2015 at 6:00 PM, Laurent Pinchart
-<laurent.pinchart+renesas@ideasonboard.com> wrote:
-> Invalid dma-ranges values should be worked around when retrieving the
-> DMA range in of_dma_get_range(), not by all callers of the function.
-> This isn't much of a problem now that we have a single caller, but that
-> situation will change when moving DMA configuration to device probe
-> time.
+On 2015?05?27? 17:38, Ard Biesheuvel wrote:
+> On 27 May 2015 at 05:08, Timur Tabi <timur@codeaurora.org> wrote:
+>> On 05/21/2015 03:15 PM, Geoff Levand wrote:
+>>>
+>>> I feel kexec was ready to merge nine months ago.  Users have only sent
+>>> private e-mails like yourself, so there has been no public inquiries,
+>>> and so, the arm64 maintainers think kexec is not of interest to users.
+>>
+>>
+>> Does kexec on ARM64 support ACPI?  In some of our initial tests, it appears
+>> that the kexec'd kernel won't boot because it's expecting a device tree, and
+>> we don't have one.
+>>
+>> ARM64 servers are supposed to use ACPI instead of a device tree.
+>>
 >
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> ---
->  drivers/of/address.c | 20 ++++++++++++++++++--
->  drivers/of/device.c  | 15 ---------------
+> The latest arm64 kexec patches support booting via UEFI, and when
+> booting via UEFI, the ACPI root pointer is retrieved from a UEFI
+> configuration table if the FDT contains no system description. So ACPI
+> support should not depend at all on how kexec is implemented (unless
+> your FDT does contain a system description, in which case you should
+> pass along the 'acpi=xxx' param that was given to the cold booted
+> kernel)
 
-Please use get_maintainers.pl. Anyway, looks fine to me:
+Thanks for the clarify. Geoff also tested kexec on FVP with ACPI
+enabled and it works as far as I know.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Timur, can you provide more detailed information then we can debug
+into it?
 
-Rob
-
->  2 files changed, 18 insertions(+), 17 deletions(-)
->
-> diff --git a/drivers/of/address.c b/drivers/of/address.c
-> index 78a7dcbec7d8..75eebd19ebfa 100644
-> --- a/drivers/of/address.c
-> +++ b/drivers/of/address.c
-> @@ -924,8 +924,8 @@ EXPORT_SYMBOL(of_io_request_and_map);
->   *     CPU addr (phys_addr_t)  : pna cells
->   *     size                    : nsize cells
->   *
-> - * It returns -ENODEV if "dma-ranges" property was not found
-> - * for this device in DT.
-> + * Return 0 on success, -ENODEV if the "dma-ranges" property was not found for
-> + * this device in DT, or -EINVAL if the CPU address or size is invalid.
->   */
->  int of_dma_get_range(struct device_node *np, u64 *dma_addr, u64 *paddr, u64 *size)
->  {
-> @@ -986,6 +986,22 @@ int of_dma_get_range(struct device_node *np, u64 *dma_addr, u64 *paddr, u64 *siz
->         *dma_addr = dmaaddr;
->
->         *size = of_read_number(ranges + naddr + pna, nsize);
-> +       /*
-> +        * DT nodes sometimes incorrectly set the size as a mask. Work around
-> +        * those incorrect DT by computing the size as mask + 1.
-> +        */
-> +       if (*size & 1) {
-> +               pr_warn("%s: size 0x%llx for dma-range in node(%s) set as mask\n",
-> +                       __func__, *size, np->full_name);
-> +               *size = *size + 1;
-> +       }
-> +
-> +       if (!*size) {
-> +               pr_err("%s: invalid size zero for dma-range in node(%s)\n",
-> +                      __func__, np->full_name);
-> +               ret = -EINVAL;
-> +               goto out;
-> +       }
->
->         pr_debug("dma_addr(%llx) cpu_addr(%llx) size(%llx)\n",
->                  *dma_addr, *paddr, *size);
-> diff --git a/drivers/of/device.c b/drivers/of/device.c
-> index 20c1332a0018..530aa1ed3e1b 100644
-> --- a/drivers/of/device.c
-> +++ b/drivers/of/device.c
-> @@ -109,21 +109,6 @@ void of_dma_configure(struct device *dev, struct device_node *np)
->                 size = dev->coherent_dma_mask + 1;
->         } else {
->                 offset = PFN_DOWN(paddr - dma_addr);
-> -
-> -               /*
-> -                * Add a work around to treat the size as mask + 1 in case
-> -                * it is defined in DT as a mask.
-> -                */
-> -               if (size & 1) {
-> -                       dev_warn(dev, "Invalid size 0x%llx for dma-range\n",
-> -                                size);
-> -                       size = size + 1;
-> -               }
-> -
-> -               if (!size) {
-> -                       dev_err(dev, "Adjusted size 0x%llx invalid\n", size);
-> -                       return;
-> -               }
->                 dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
->         }
->
-> --
-> 2.3.6
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks
+Hanjun
