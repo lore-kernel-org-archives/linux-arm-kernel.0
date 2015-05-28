@@ -1,110 +1,106 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Thu, 28 May 2015 18:33:44 +0530
-Subject: [PATCH 12/12] i2c: pxa: enable/disable i2c module across msg xfer
-In-Reply-To: <1432818224-17070-1-git-send-email-vaibhav.hiremath@linaro.org>
-References: <1432818224-17070-1-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <1432818224-17070-13-git-send-email-vaibhav.hiremath@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 28 May 2015 14:12:55 +0100
+Subject: [PATCH v3 4/5] arm64: alternative: Introduce feature for GICv3
+ CPU interface
+In-Reply-To: <20150528130225.GD18009@cbox>
+References: <1427461765-14462-1-git-send-email-marc.zyngier@arm.com>
+ <1427461765-14462-5-git-send-email-marc.zyngier@arm.com>
+ <20150514112523.GQ32765@cbox> <5566DF72.4050507@arm.com>
+ <20150528130225.GD18009@cbox>
+Message-ID: <55671457.5010909@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yi Zhang <yizhang@marvell.com>
+On 28/05/15 14:02, Christoffer Dall wrote:
+> On Thu, May 28, 2015 at 10:27:14AM +0100, Marc Zyngier wrote:
+>> On 14/05/15 12:25, Christoffer Dall wrote:
+>>> On Fri, Mar 27, 2015 at 01:09:24PM +0000, Marc Zyngier wrote:
+>>>> Add a new item to the feature set (ARM64_HAS_SYSREG_GIC_CPUIF)
+>>>> to indicate that we have a system register GIC CPU interface
+>>>>
+>>>> This will help KVM switching to alternative instruction patching.
+>>>>
+>>>> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+>>>> Acked-by: Will Deacon <will.deacon@arm.com>
+>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>> ---
+>>>>  arch/arm64/include/asm/cpufeature.h |  8 +++++++-
+>>>>  arch/arm64/kernel/cpufeature.c      | 16 ++++++++++++++++
+>>>>  2 files changed, 23 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+>>>> index 6ae35d1..d9e57b5 100644
+>>>> --- a/arch/arm64/include/asm/cpufeature.h
+>>>> +++ b/arch/arm64/include/asm/cpufeature.h
+>>>> @@ -23,8 +23,9 @@
+>>>>  
+>>>>  #define ARM64_WORKAROUND_CLEAN_CACHE		0
+>>>>  #define ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE	1
+>>>> +#define ARM64_HAS_SYSREG_GIC_CPUIF		2
+>>>>  
+>>>> -#define ARM64_NCAPS				2
+>>>> +#define ARM64_NCAPS				3
+>>>>  
+>>>>  #ifndef __ASSEMBLY__
+>>>>  
+>>>> @@ -37,6 +38,11 @@ struct arm64_cpu_capabilities {
+>>>>  			u32 midr_model;
+>>>>  			u32 midr_range_min, midr_range_max;
+>>>>  		};
+>>>> +
+>>>> +		struct {	/* Feature register checking */
+>>>> +			u64 register_mask;
+>>>> +			u64 register_value;
+>>>> +		};
+>>>>  	};
+>>>>  };
+>>>>  
+>>>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+>>>> index 3d9967e..b0bea2b3 100644
+>>>> --- a/arch/arm64/kernel/cpufeature.c
+>>>> +++ b/arch/arm64/kernel/cpufeature.c
+>>>> @@ -22,7 +22,23 @@
+>>>>  #include <asm/cpu.h>
+>>>>  #include <asm/cpufeature.h>
+>>>>  
+>>>> +static bool
+>>>> +has_id_aa64pfr0_feature(const struct arm64_cpu_capabilities *entry)
+>>>> +{
+>>>> +	u64 val;
+>>>> +
+>>>> +	val = read_cpuid(id_aa64pfr0_el1);
+>>>
+>>> is this preferred compared to fishing it out of cpuinfo ?
+>>
+>> Probably for the moment, yes. At some point, we should be able to have a
+>> consolidated set of features, consistent across all CPUs in the system.
+>> Once we have that, we should revisit this detection mecanism.
+>>
+>>>> +	return (val & entry->register_mask) == entry->register_value;
+>>>> +}
+>>>> +
+>>>>  static const struct arm64_cpu_capabilities arm64_features[] = {
+>>>> +	{
+>>>> +		.desc = "system register GIC CPU interface",
+>>>> +		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
+>>>> +		.matches = has_id_aa64pfr0_feature,
+>>>> +		.register_mask = (0xf << 24),
+>>>> +		.register_value = (1 << 24),
+>>>
+>>> I don't know if it's worth defining these masks in some header file.
+>>> The only other place I could see them used was in head.S.
+>>
+>> Mark was looking at this a while ago. Maybe a task for a sleepless
+>> night? ;-)
+>>
+> 
+> yeah, you can add this to the patch if it helps:
+> 
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Enable i2c module/unit before transmission and disable when it finishes.
+Thanks. I'll look at getting these two patches in once the dependencies
+are merged.
 
-why?
-It's because the i2c bus may be distrubed if the slave device,
-typically a touch, powers on.
-
-Signed-off-by: Yi Zhang <yizhang@marvell.com>
-[vaibhav.hiremath at linaro.org: ported to latest kernel & also improved changelog]
-Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
-
-Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
----
- drivers/i2c/busses/i2c-pxa.c | 29 +++++++++++++++++++++++++++--
- 1 file changed, 27 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-index 844e1fc..f51d512 100644
---- a/drivers/i2c/busses/i2c-pxa.c
-+++ b/drivers/i2c/busses/i2c-pxa.c
-@@ -368,6 +368,16 @@ static void i2c_pxa_scream_blue_murder(struct pxa_i2c *i2c, const char *why)
- static void i2c_pxa_master_complete(struct pxa_i2c *i2c, int ret);
- static irqreturn_t i2c_pxa_handler(int this_irq, void *dev_id);
- 
-+/* enable/disable i2c unit */
-+static inline void i2c_pxa_enable(struct pxa_i2c *i2c, bool enable)
-+{
-+	if (enable)
-+		writel(readl(_ICR(i2c)) | ICR_IUE, _ICR(i2c));
-+	else
-+		writel(readl(_ICR(i2c)) & ~ICR_IUE, _ICR(i2c));
-+	udelay(100);
-+}
-+
- static inline int i2c_pxa_is_slavemode(struct pxa_i2c *i2c)
- {
- 	return !(readl(_ICR(i2c)) & ICR_SCLE);
-@@ -575,8 +585,7 @@ static void i2c_pxa_reset(struct pxa_i2c *i2c)
- 	i2c_pxa_set_slave(i2c, 0);
- 
- 	/* enable unit */
--	writel(readl(_ICR(i2c)) | ICR_IUE, _ICR(i2c));
--	udelay(100);
-+	i2c_pxa_enable(i2c, true);
- }
- 
- 
-@@ -933,6 +942,9 @@ static int i2c_pxa_pio_xfer(struct i2c_adapter *adap,
- 	struct pxa_i2c *i2c = adap->algo_data;
- 	int ret, i;
- 
-+	/* Enable i2c unit */
-+	i2c_pxa_enable(i2c, true);
-+
- 	/* If the I2C controller is disabled we need to reset it
- 	  (probably due to a suspend/resume destroying state). We do
- 	  this here as we can then avoid worrying about resuming the
-@@ -953,6 +965,10 @@ static int i2c_pxa_pio_xfer(struct i2c_adapter *adap,
- 	ret = -EREMOTEIO;
-  out:
- 	i2c_pxa_set_slave(i2c, ret);
-+
-+	/* disable i2c unit */
-+	i2c_pxa_enable(i2c, false);
-+
- 	return ret;
- }
- 
-@@ -1168,6 +1184,9 @@ static int i2c_pxa_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num
- 	struct pxa_i2c *i2c = adap->algo_data;
- 	int ret, i;
- 
-+	/* Enable i2c unit */
-+	i2c_pxa_enable(i2c, true);
-+
- 	enable_irq(i2c->irq);
- 	for (i = adap->retries; i >= 0; i--) {
- 		ret = i2c_pxa_do_xfer(i2c, msgs, num);
-@@ -1183,6 +1202,9 @@ static int i2c_pxa_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num
-  out:
- 	i2c_pxa_set_slave(i2c, ret);
- 	disable_irq(i2c->irq);
-+	/* disable i2c unit */
-+	i2c_pxa_enable(i2c, false);
-+
- 	return ret;
- }
- 
-@@ -1407,6 +1429,9 @@ static int i2c_pxa_probe(struct platform_device *dev)
- 			ret = 0;
- 		}
- 	}
-+
-+	i2c_pxa_enable(i2c, false);
-+
- #ifdef CONFIG_I2C_PXA_SLAVE
- 	pr_info("I2C: %s: PXA I2C adapter, slave address %d\n",
- 	       dev_name(&i2c->adap.dev), i2c->slave_addr);
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
