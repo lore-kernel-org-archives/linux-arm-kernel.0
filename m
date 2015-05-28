@@ -1,245 +1,279 @@
 From: huawei.libin@huawei.com (Li Bin)
-Date: Thu, 28 May 2015 13:51:03 +0800
-Subject: [RFC PATCH 3/5] livepatch: ftrace: arm64: Add support for -mfentry on
- arm64
+Date: Thu, 28 May 2015 13:51:01 +0800
+Subject: [RFC PATCH 1/5] livepatch: ftrace: arm64: Add support for
+ DYNAMIC_FTRACE_WITH_REGS
 In-Reply-To: <1432792265-24076-1-git-send-email-huawei.libin@huawei.com>
 References: <1432792265-24076-1-git-send-email-huawei.libin@huawei.com>
-Message-ID: <1432792265-24076-4-git-send-email-huawei.libin@huawei.com>
+Message-ID: <1432792265-24076-2-git-send-email-huawei.libin@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch depends on the compiler's mfentry feature for arm64 that
-proposed by this patchset. If the kernel is compiled with this feature,
-the entry of each function like:
-   foo:
-       mov x9, x30
-       bl __fentry__
-       mov x30, x9
-When -mfentry is used, the call is to '__fentry__' and not '_mcount'
-and is done before the function's stack frame is set up. So __fentry__
-is responsibel to protect parameter registers and corruptible registers.
+If ftrace_ops is registered with flag FTRACE_OPS_FL_SAVE_REGS, the
+arch that support DYNAMIC_FTRACE_WITH_REGS will pass a full set of
+pt_regs to the ftrace_ops callback function, which may read or change
+the value of the pt_regs and the pt_regs will be restored to support
+work flow redirection such as kernel live patching.
+
+This patch adds DYNAMIC_FTRACE_WITH_REGS feature support for arm64
+architecture.
 
 Signed-off-by: Li Bin <huawei.libin@huawei.com>
 ---
  arch/arm64/Kconfig               |    1 +
- arch/arm64/include/asm/ftrace.h  |    5 +++
- arch/arm64/kernel/arm64ksyms.c   |    4 ++
- arch/arm64/kernel/entry-ftrace.S |   59 +++++++++++++++++++++++++++++++++++--
- scripts/recordmcount.pl          |    2 +-
- 5 files changed, 66 insertions(+), 5 deletions(-)
+ arch/arm64/include/asm/ftrace.h  |    4 ++
+ arch/arm64/kernel/entry-ftrace.S |   95 ++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/ftrace.c       |   28 ++++++++++-
+ 4 files changed, 126 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index ea435c9..7bb2468 100644
+index 7796af4..ea435c9 100644
 --- a/arch/arm64/Kconfig
 +++ b/arch/arm64/Kconfig
-@@ -60,6 +60,7 @@ config ARM64
- 	select HAVE_DYNAMIC_FTRACE_WITH_REGS if HAVE_DYNAMIC_FTRACE
+@@ -57,6 +57,7 @@ config ARM64
+ 	select HAVE_DMA_ATTRS
+ 	select HAVE_DMA_CONTIGUOUS
+ 	select HAVE_DYNAMIC_FTRACE
++	select HAVE_DYNAMIC_FTRACE_WITH_REGS if HAVE_DYNAMIC_FTRACE
  	select HAVE_EFFICIENT_UNALIGNED_ACCESS
  	select HAVE_FTRACE_MCOUNT_RECORD
-+	select HAVE_FENTRY
  	select HAVE_FUNCTION_TRACER
- 	select HAVE_FUNCTION_GRAPH_TRACER
- 	select HAVE_GENERIC_DMA_COHERENT
 diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
-index a7722b9..08eab52 100644
+index c5534fa..a7722b9 100644
 --- a/arch/arm64/include/asm/ftrace.h
 +++ b/arch/arm64/include/asm/ftrace.h
-@@ -13,7 +13,11 @@
- 
- #include <asm/insn.h>
- 
-+#ifdef CC_USING_FENTRY
-+#define MCOUNT_ADDR		((unsigned long)__fentry__)
-+#else
+@@ -16,6 +16,10 @@
  #define MCOUNT_ADDR		((unsigned long)_mcount)
-+#endif
  #define MCOUNT_INSN_SIZE	AARCH64_INSN_SIZE
  
- #ifdef CONFIG_DYNAMIC_FTRACE
-@@ -24,6 +28,7 @@
++#ifdef CONFIG_DYNAMIC_FTRACE
++#define ARCH_SUPPORTS_FTRACE_OPS 1
++#endif
++
+ #ifndef __ASSEMBLY__
  #include <linux/compat.h>
  
- extern void _mcount(unsigned long);
-+extern void __fentry__(unsigned long);
- extern void *return_address(unsigned int);
- 
- struct dyn_arch_ftrace {
-diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
-index a85843d..f0455d3 100644
---- a/arch/arm64/kernel/arm64ksyms.c
-+++ b/arch/arm64/kernel/arm64ksyms.c
-@@ -63,5 +63,9 @@ EXPORT_SYMBOL(change_bit);
- EXPORT_SYMBOL(test_and_change_bit);
- 
- #ifdef CONFIG_FUNCTION_TRACER
-+#ifdef CC_USING_FENTRY
-+EXPORT_SYMBOL(__fentry__);
-+#else
- EXPORT_SYMBOL(_mcount);
- #endif
-+#endif
 diff --git a/arch/arm64/kernel/entry-ftrace.S b/arch/arm64/kernel/entry-ftrace.S
-index fde793b..18cfe5b 100644
+index 08cafc5..fde793b 100644
 --- a/arch/arm64/kernel/entry-ftrace.S
 +++ b/arch/arm64/kernel/entry-ftrace.S
-@@ -93,27 +93,57 @@
- 	ldr	\reg, [\reg]
- 	.endm
+@@ -12,6 +12,8 @@
+ #include <linux/linkage.h>
+ #include <asm/ftrace.h>
+ #include <asm/insn.h>
++#include <asm/asm-offsets.h>
++#include <asm/assembler.h>
  
-+	/* for instrumented function's parent */
-+	.macro fentry_get_parent_fp reg
-+	ldr	\reg, [x29]
-+	.endm
-+
- 	/* for instrumented function */
- 	.macro mcount_get_pc0 reg
- 	mcount_adjust_addr	\reg, x30
- 	.endm
- 
-+	/* for instrumented function */
-+	.macro fentry_get_pc0 reg
-+	mcount_adjust_addr	\reg, x30
-+	.endm
-+
- 	.macro mcount_get_pc reg
- 	ldr	\reg, [x29, #8]
- 	mcount_adjust_addr	\reg, \reg
- 	.endm
- 
-+	.macro fentry_get_pc reg
-+	ldr	\reg, [x29, #8]
-+	mcount_adjust_addr	\reg, \reg
-+	.endm
-+
- 	.macro mcount_get_lr reg
- 	ldr	\reg, [x29]
- 	ldr	\reg, [\reg, #8]
- 	mcount_adjust_addr	\reg, \reg
- 	.endm
- 
-+	.macro fentry_get_lr reg, base
-+	ldr	\reg, [\base, #72]	//S_X9
-+	mcount_adjust_addr	\reg, \reg
-+	.endm
-+
- 	.macro mcount_get_lr_addr reg
- 	ldr	\reg, [x29]
- 	add	\reg, \reg, #8
- 	.endm
- 
-+	.macro fentry_get_lr_addr reg, base
-+	add	\reg, \base, #72	//S_X9
-+	.endm
-+
-+#ifdef	CC_USING_FENTRY
-+#define	function_hook	__fentry__
-+#else
-+#define	function_hook	_mcount
-+#endif
-+
- #ifndef CONFIG_DYNAMIC_FTRACE
  /*
-  * void _mcount(unsigned long return_address)
-@@ -123,7 +153,7 @@
-  *     - tracer function to probe instrumented function's entry,
-  *     - ftrace_graph_caller to set up an exit hook
+  * Gcc with -pg will put the following code in the beginning of each function:
+@@ -50,11 +52,37 @@
+ 	mov	x29, sp
+ 	.endm
+ 
++	/* save parameter registers & corruptible registers */
++	.macro save_mcount_regs
++	sub	sp, sp, #S_FRAME_SIZE
++	stp	x0, x1, [sp]
++	stp	x2, x3, [sp, #16]
++	stp	x4, x5, [sp, #32]
++	stp	x6, x7, [sp, #48]
++	stp	x8, x9, [sp, #64]
++	stp	x10, x11, [sp, #80]
++	stp	x12, x13, [sp, #96]
++	stp	x14, x15, [sp, #112]
++	.endm
++
+ 	.macro mcount_exit
+ 	ldp	x29, x30, [sp], #16
+ 	ret
+ 	.endm
+ 
++	/* restore parameter registers & corruptible registers */
++	.macro restore_mcount_regs
++	ldp	x0, x1, [sp]
++	ldp	x2, x3, [sp, #16]
++	ldp	x4, x5, [sp, #32]
++	ldp	x6, x7, [sp, #48]
++	ldp	x8, x9, [sp, #64]
++	ldp	x10, x11, [sp, #80]
++	ldp	x12, x13, [sp, #96]
++	ldp	x14, x15, [sp, #112]
++	add	sp, sp, #S_FRAME_SIZE
++	.endm
++
+ 	.macro mcount_adjust_addr rd, rn
+ 	sub	\rd, \rn, #AARCH64_INSN_SIZE
+ 	.endm
+@@ -97,6 +125,7 @@
   */
--ENTRY(_mcount)
-+ENTRY(function_hook)
+ ENTRY(_mcount)
  	mcount_enter
- 	save_mcount_regs
++	save_mcount_regs
  
-@@ -133,8 +163,13 @@ ENTRY(_mcount)
- 	cmp	x0, x2			// if (ftrace_trace_function
- 	b.eq	skip_ftrace_call	//     != ftrace_stub) {
- 
-+#ifdef CC_USING_FENTRY
-+	fentry_get_pc	x0		//       function's pc
-+	fentry_get_lr	x1, sp		//       function's lr (= parent's pc)
-+#else
- 	mcount_get_pc	x0		//       function's pc
- 	mcount_get_lr	x1		//       function's lr (= parent's pc)
-+#endif
- 	blr	x2			//   (*ftrace_trace_function)(pc, lr);
+ 	adrp	x0, ftrace_trace_function
+ 	ldr	x2, [x0, #:lo12:ftrace_trace_function]
+@@ -110,8 +139,10 @@ ENTRY(_mcount)
  
  #ifndef CONFIG_FUNCTION_GRAPH_TRACER
-@@ -161,7 +196,7 @@ skip_ftrace_call:
- 	restore_mcount_regs
+ skip_ftrace_call:			//   return;
++	restore_mcount_regs
+ 	mcount_exit			// }
+ #else
++	restore_mcount_regs
+ 	mcount_exit			//   return;
+ 					// }
+ skip_ftrace_call:
+@@ -127,6 +158,7 @@ skip_ftrace_call:
+ 	cmp	x0, x2
+ 	b.ne	ftrace_graph_caller	//     ftrace_graph_caller();
+ 
++	restore_mcount_regs
  	mcount_exit
  #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
--ENDPROC(_mcount)
-+ENDPROC(function_hook)
- 
- #else /* CONFIG_DYNAMIC_FTRACE */
- /*
-@@ -170,9 +205,9 @@ ENDPROC(_mcount)
-  * and later on, NOP to branch to ftrace_caller() when enabled or branch to
-  * NOP when disabled per-function base.
+ ENDPROC(_mcount)
+@@ -153,15 +185,20 @@ ENDPROC(_mcount)
   */
--ENTRY(_mcount)
-+ENTRY(function_hook)
- 	ret
--ENDPROC(_mcount)
-+ENDPROC(function_hook)
+ ENTRY(ftrace_caller)
+ 	mcount_enter
++	save_mcount_regs
  
- /*
-  * void ftrace_caller(unsigned long return_address)
-@@ -189,8 +224,13 @@ ENTRY(ftrace_caller)
- 
- 	adrp	x0, function_trace_op
- 	ldr	x2, [x0, #:lo12:function_trace_op]
-+#ifdef CC_USING_FENTRY
-+	fentry_get_pc0	x0		//     function's pc
-+	fentry_get_lr	x1, sp		//     function's lr
-+#else
++	adrp	x0, function_trace_op
++	ldr	x2, [x0, #:lo12:function_trace_op]
  	mcount_get_pc0	x0		//     function's pc
  	mcount_get_lr	x1		//     function's lr
-+#endif
- 	mov	x3, #0
++	mov	x3, #0
  
  	.global ftrace_call
-@@ -237,8 +277,13 @@ ENTRY(ftrace_regs_caller)
+ ftrace_call:				// tracer(pc, lr);
+ 	nop				// This will be replaced with "bl xxx"
+ 					// where xxx can be any kind of tracer.
  
- 	adrp	x0, function_trace_op
- 	ldr	x2, [x0, #:lo12:function_trace_op]
-+#ifdef CC_USING_FENTRY
-+	fentry_get_pc0	x0		//     function's pc
-+	fentry_get_lr	x1, sp		//     function's lr
-+#else
- 	mcount_get_pc0	x0		//     function's pc
- 	mcount_get_lr	x1		//     function's lr
-+#endif
- 	mov	x3, sp
++ftrace_return:
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+ 	.global ftrace_graph_call
+ ftrace_graph_call:			// ftrace_graph_caller();
+@@ -169,8 +206,65 @@ ftrace_graph_call:			// ftrace_graph_caller();
+ 					// "b ftrace_graph_caller"
+ #endif
  
- 	.global ftrace_regs_call
-@@ -282,9 +327,15 @@ ENDPROC(ftrace_stub)
-  * and run return_to_handler() later on its exit.
-  */
- ENTRY(ftrace_graph_caller)
-+#ifdef CC_USING_FENTRY
-+	fentry_get_lr_addr	x0, sp	//     pointer to function's saved lr
-+	fentry_get_pc		x1	//     function's pc
-+	fentry_get_parent_fp	x2	//     parent's fp
-+#else
- 	mcount_get_lr_addr	  x0	//     pointer to function's saved lr
- 	mcount_get_pc		  x1	//     function's pc
++	restore_mcount_regs
+ 	mcount_exit
+ ENDPROC(ftrace_caller)
++
++ENTRY(ftrace_regs_caller)
++	mcount_enter
++	save_mcount_regs
++
++	/* Save the rest of pt_regs */
++	stp	x16, x17, [sp, #128]
++	stp	x18, x19, [sp, #144]
++	stp	x20, x21, [sp, #160]
++	stp	x22, x23, [sp, #176]
++	stp	x24, x25, [sp, #192]
++	stp	x26, x27, [sp, #208]
++	stp	x28, x29, [sp, #224]
++	str	x30, [sp, #S_LR]
++
++	/* Save sp before profile calling */
++	add	x9, sp, #S_FRAME_SIZE + 16
++	str	x9, [sp, #S_SP]
++
++	/* PC of pt_regs saving lr, and can be changed by handler */
++	str x30, [sp, #S_PC]
++
++	/* Save flags */
++	mrs	x9, spsr_el1
++	str	x9, [sp, #S_PSTATE]
++
++	adrp	x0, function_trace_op
++	ldr	x2, [x0, #:lo12:function_trace_op]
++	mcount_get_pc0	x0		//     function's pc
++	mcount_get_lr	x1		//     function's lr
++	mov	x3, sp
++
++	.global ftrace_regs_call
++ftrace_regs_call:			// tracer(pc, lr);
++	nop				// This will be replaced with "bl xxx"
++					// where xxx can be any kind of tracer.
++	/* Handlers can change the PC */
++	ldr	x9, [sp, #S_PC]
++	str	x9, [x29, #8]
++
++	/* Restore the rest of pt_regs */
++	ldp	x16, x17, [sp, #128]
++	ldp	x18, x19, [sp, #144]
++	ldp	x20, x21, [sp, #160]
++	ldp	x22, x23, [sp, #176]
++	ldp	x24, x25, [sp, #192]
++	ldp	x26, x27, [sp, #208]
++	ldr	x28, [sp, #224]
++	/* x29 & x30 should be restored by mcount_exit*/
++
++	/* Restore flags */
++	ldr	x9, [sp, #S_PSTATE]
++	msr	spsr_el1, x9
++
++	b	ftrace_return
++ENDPROC(ftrace_regs_caller)
+ #endif /* CONFIG_DYNAMIC_FTRACE */
+ 
+ ENTRY(ftrace_stub)
+@@ -193,6 +287,7 @@ ENTRY(ftrace_graph_caller)
  	mcount_get_parent_fp	  x2	//     parent's fp
-+#endif
  	bl	prepare_ftrace_return	// prepare_ftrace_return(&lr, pc, fp)
  
- 	restore_mcount_regs
-diff --git a/scripts/recordmcount.pl b/scripts/recordmcount.pl
-index 826470d..5020d96 100755
---- a/scripts/recordmcount.pl
-+++ b/scripts/recordmcount.pl
-@@ -279,7 +279,7 @@ if ($arch eq "x86_64") {
- } elsif ($arch eq "arm64") {
-     $alignment = 3;
-     $section_type = '%progbits';
--    $mcount_regex = "^\\s*([0-9a-fA-F]+):\\s*R_AARCH64_CALL26\\s+_mcount\$";
-+    $mcount_regex = "^\\s*([0-9a-fA-F]+):\\s*R_AARCH64_CALL26\\s+(_mcount|__fentry__)\$";
-     $type = ".quad";
- } elsif ($arch eq "ia64") {
-     $mcount_regex = "^\\s*([0-9a-fA-F]+):.*\\s_mcount\$";
++	restore_mcount_regs
+ 	mcount_exit
+ ENDPROC(ftrace_graph_caller)
+ 
+diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
+index c851be7..07175bd 100644
+--- a/arch/arm64/kernel/ftrace.c
++++ b/arch/arm64/kernel/ftrace.c
+@@ -56,12 +56,24 @@ int ftrace_update_ftrace_func(ftrace_func_t func)
+ {
+ 	unsigned long pc;
+ 	u32 new;
++	int ret;
+ 
+ 	pc = (unsigned long)&ftrace_call;
+ 	new = aarch64_insn_gen_branch_imm(pc, (unsigned long)func,
+-					  AARCH64_INSN_BRANCH_LINK);
++			AARCH64_INSN_BRANCH_LINK);
+ 
+-	return ftrace_modify_code(pc, 0, new, false);
++	ret = ftrace_modify_code(pc, 0, new, false);
++
++#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
++	if (!ret) {
++		pc = (unsigned long)&ftrace_regs_call;
++		new = aarch64_insn_gen_branch_imm(pc, (unsigned long)func,
++				AARCH64_INSN_BRANCH_LINK);
++
++		ret = ftrace_modify_code(pc, 0, new, false);
++	}
++#endif
++	return ret;
+ }
+ 
+ /*
+@@ -78,6 +90,18 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
+ 	return ftrace_modify_code(pc, old, new, true);
+ }
+ 
++int ftrace_modify_call(struct dyn_ftrace *rec, unsigned long old_addr,
++		unsigned long addr)
++{
++	unsigned long pc = rec->ip;
++	u32 old, new;
++
++	old = aarch64_insn_gen_branch_imm(pc, old_addr, true);
++	new = aarch64_insn_gen_branch_imm(pc, addr, true);
++
++	return ftrace_modify_code(pc, old, new, true);
++}
++
+ /*
+  * Turn off the call to ftrace_caller() in instrumented function
+  */
 -- 
 1.7.1
