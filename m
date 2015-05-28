@@ -1,80 +1,66 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 28 May 2015 10:14:02 +0200
-Subject: [PATCH] pinctrl: improve debugfs for strict controllers
-Message-ID: <1432800842-19318-1-git-send-email-linus.walleij@linaro.org>
+From: bintian.wang@huawei.com (Bintian)
+Date: Thu, 28 May 2015 16:17:23 +0800
+Subject: [PATCH v8 6/7] clk: hi6220: Clock driver support for Hisilicon
+ hi6220 SoC
+In-Reply-To: <20150528052608.22384.96747@quantum>
+References: <1432440671-25235-1-git-send-email-bintian.wang@huawei.com>
+ <1432440671-25235-3-git-send-email-bintian.wang@huawei.com>
+ <20150528052608.22384.96747@quantum>
+Message-ID: <5566CF13.8060806@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we know we are using a strict pin controller (one that cannot
-mix device functions+group use and GPIO) we can be a bit more
-specific in debugfs, just print either device-function-group
-or GPIO consumer for the pin. Let's do that to be helpful.
+Hello Mike,
 
-Cc: Sonic Zhang <sonic.zhang@analog.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/pinmux.c | 41 +++++++++++++++++++++++++++++++++--------
- 1 file changed, 33 insertions(+), 8 deletions(-)
+On 2015/5/28 13:26, Michael Turquette wrote:
+> Quoting Bintian Wang (2015-05-23 21:11:11)
+>> Add clock drivers for hi6220 SoC, this driver controls the SoC
+>> registers to supply different clocks to different IPs in the SoC.
+>>
+>> We add one divider clock for hi6220 because the divider in hi6220
+>> also has a mask bit but it doesnot obey the rule defined by flag
+>> "CLK_DIVIDER_HIWORD_MASK", we can not get index of the mask bit by
+>> left shift fixed bits (e.g. 16 bits), so we add this divider clock
+>> to handle it.
+>>
+>> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
+>> Signed-off-by: Bintian Wang <bintian.wang@huawei.com>
+>> Acked-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>> Reviewed-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>> Tested-by: Will Deacon <will.deacon@arm.com>
+>> Tested-by: Tyler Baker <tyler.baker@linaro.org>
+>
+> Hi Bintian,
+>
+> Thanks for making the changes requested by Stephen. I've taken his patch
+> to add assigned-clock-rate/parent support for AMBA interconnects and
+> applied it to 4.1-rc1, and then I've applied your v8 patches #4-6 on top
+> of that. You can find it at:
+>
+> git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next-hi6220
+Thank you very much!
 
-diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
-index c58c168b06c2..77f82b23f7be 100644
---- a/drivers/pinctrl/pinmux.c
-+++ b/drivers/pinctrl/pinmux.c
-@@ -585,7 +585,12 @@ static int pinmux_pins_show(struct seq_file *s, void *what)
- 		return 0;
- 
- 	seq_puts(s, "Pinmux settings per pin\n");
--	seq_puts(s, "Format: pin (name): mux_owner gpio_owner hog?\n");
-+	if (pmxops->strict)
-+		seq_puts(s,
-+		 "Format: pin (name): mux_owner|gpio_owner (strict) hog?\n");
-+	else
-+		seq_puts(s,
-+		"Format: pin (name): mux_owner gpio_owner hog?\n");
- 
- 	mutex_lock(&pctldev->mutex);
- 
-@@ -604,14 +609,34 @@ static int pinmux_pins_show(struct seq_file *s, void *what)
- 		    !strcmp(desc->mux_owner, pinctrl_dev_get_name(pctldev)))
- 			is_hog = true;
- 
--		seq_printf(s, "pin %d (%s): %s %s%s", pin,
--			   desc->name ? desc->name : "unnamed",
--			   desc->mux_owner ? desc->mux_owner
--				: "(MUX UNCLAIMED)",
--			   desc->gpio_owner ? desc->gpio_owner
--				: "(GPIO UNCLAIMED)",
--			   is_hog ? " (HOG)" : "");
-+		if (pmxops->strict) {
-+			if (desc->mux_owner)
-+				seq_printf(s, "pin %d (%s): device %s%s",
-+					   pin,
-+					   desc->name ? desc->name : "unnamed",
-+					   desc->mux_owner,
-+					   is_hog ? " (HOG)" : "");
-+			else if (desc->gpio_owner)
-+				seq_printf(s, "pin %d (%s): GPIO %s",
-+					   pin,
-+					   desc->name ? desc->name : "unnamed",
-+					   desc->gpio_owner);
-+			else
-+				seq_printf(s, "pin %d (%s): UNCLAIMED",
-+					   pin,
-+					   desc->name ? desc->name : "unnamed");
-+		} else {
-+			/* For non-strict controllers */
-+			seq_printf(s, "pin %d (%s): %s %s%s", pin,
-+				   desc->name ? desc->name : "unnamed",
-+				   desc->mux_owner ? desc->mux_owner
-+				   : "(MUX UNCLAIMED)",
-+				   desc->gpio_owner ? desc->gpio_owner
-+				   : "(GPIO UNCLAIMED)",
-+				   is_hog ? " (HOG)" : "");
-+		}
- 
-+		/* If mux: print function+group claiming the pin */
- 		if (desc->mux_setting)
- 			seq_printf(s, " function %s group %s\n",
- 				   pmxops->get_function_name(pctldev,
--- 
-1.9.3
+I think you also need to pick patch "[PATCH v5 3/6] clk: hi6220: 
+Document devicetree bindings for hi6220 clock",  which described the dt 
+binding of clk, and it is also acked by Stephen(v4 is the same to v5).
+
+> I have merged this into clk-next so it can get some cycles in
+> linux-next.
+>
+> Stephen,
+>
+> Can you send your patch out to Russell properly? It needs his ack (or
+> for him to take it outright) in order to unblock the hi6220 clock driver
+> from being merged.
+It doesn't block hi6220 clock driver now, because the UART1 is not
+enabled in hi6220 dts now.
+
+Thanks!
+
+Bintian
+>
+> Regards,
+> Mike
+>
+> .
+>
