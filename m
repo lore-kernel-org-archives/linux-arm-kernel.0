@@ -1,87 +1,94 @@
-From: juhl@gai-tronics.com (Uhl, Joe)
-Date: Thu, 28 May 2015 17:04:57 +0000
-Subject: imx6 fsl,fiq-stream-filter
-Message-ID: <A34315704930CF44BA74E64F19E02E917DEEE3FC@S1P5DAG1A.EXCHPROD.USA.NET>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Thu, 28 May 2015 19:13:32 +0200
+Subject: [PATCH v3 4/6] clk: add lpc18xx ccu clk driver
+In-Reply-To: <20150528034424.22384.83956@quantum>
+References: <1431988559-23338-1-git-send-email-manabian@gmail.com>
+ <1431988559-23338-5-git-send-email-manabian@gmail.com>
+ <20150528034424.22384.83956@quantum>
+Message-ID: <CAGhQ9VyQV0gZQx4V+AMM6T-38x6UiL+atVro9LyTbrHqEYntfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-Is it possible to disable dma transfers on ssi1 using FIQ instead?  I am able to 
-transfer data out successfully to an SGTL5000 codec (using imx-sgtl5000.c as 
-machine driver) with dma enabled.  In the devicetree I added "fsl,fiq-stream-filter" 
-which I see in fsl_ssi.c is checked for and set's  the variable use_dma to false.  
-Are there any additional things to do besides changing the devicetree to get this 
-to work?  Doing this produces alsa underruns and no sound.  Thank you for any advice.
-I'm using freescale linux version 3.14.28 although I updated all the way to mainline 
-4.0 with the same results.
+Hi Michael,
 
-imx6qdl.dtsi =
-ssi1: ssi at 02028000 {
-  compatible = "fsl,imx6q-ssi","fsl,imx21-ssi";
-  reg = <0x02028000 0x4000>;
-  interrupts = <0 46 IRQ_TYPE_LEVEL_HIGH>;
-  clocks = <&clks IMX6QDL_CLK_SSI1_IPG>,
-  <&clks IMX6QDL_CLK_SSI1>;	
-  clock-names = "ipg", "baud";	
-  fsl,fiq-stream-filter;					
-  dmas = <&sdma 37 1 0>,					
-  <&sdma 38 1 0>;					
-  dma-names = "rx", "tx";					
-  fsl,fifo-depth = <15>;					
-  fsl,ssi-dma-events = <38 37>;					
-  status = "okay";					
-};
-						
-Here is my /proc/interrupts output:
-Interrupt 78 is blank and increments by 11 during each attempt at running aplay so I 
-assume this is somehow related to ssi.
-root at cgtqmx6:/proc# cat interrupts
-           CPU0
-34:          0       GIC  34  sdma
-37:          0       GIC  37  2400000.ipu
-38:          4       GIC  38  2400000.ipu
-50:          0       GIC  50  vdoa
-51:          0       GIC  51  rtc alarm
-55:          0       GIC  55  mmc1
-56:        528       GIC  56  mmc2
-57:          0       GIC  57  mmc3
-59:       2300       GIC  59  21e8000.serial
-63:          4       GIC  63  2008000.ecspi
-65:          0       GIC  65  2010000.ecspi
-68:        545       GIC  68  21a0000.i2c
-69:        284       GIC  69  21a4000.i2c
-70:         78       GIC  70  21a8000.i2c
-72:         30       GIC  72  2184200.usb
-**78:         22       GIC  78
-81:          0       GIC  81  imx_thermal
-82:          0       GIC  82  asrc
-87:      13566       GIC  87  i.MX Timer Tick
-112:          0       GIC 112  20bc000.wdog
-139:          0       GIC 139  mmdc_1
-150:      49111       GIC 150  2188000.ethernet
-151:          0       GIC 151  2188000.ethernet
-156:          0       GIC 156  20e4000.dcic
-157:          0       GIC 157  20e8000.dcic
-164:          0  gpio-mxc   4  2194000.usdhc cd
-193:          0  gpio-mxc   1  key-menu
-194:          0  gpio-mxc   2  key-back
-195:          0  gpio-mxc   3  key-search
-196:          0  gpio-mxc   4  key-home
-198:          0  gpio-mxc   6  219c000.usdhc cd
-253:          0  gpio-mxc  29  Power Button
-261:          0  gpio-mxc   5  Volume Down
-263:          0  gpio-mxc   7  Sleep Button
-365:          0  gpio-mxc  13  Volume Up
-**FIQ:              imx-ssi
-IPI0:          0  CPU wakeup interrupts
-IPI1:          0  Timer broadcast interrupts
-IPI2:          0  Rescheduling interrupts
-IPI3:          0  Function call interrupts
-IPI4:          0  Single function call interrupts
-IPI5:          0  CPU stop interrupts
-IPI6:          0  IRQ work interrupts
-IPI7:          0  completion interrupts
-Err:          0
+On 28 May 2015 at 05:44, Michael Turquette <mturquette@linaro.org> wrote:
+> Thanks for sending V3. This driver is getting close!
 
----------------------------------------------------------------------------------------------------------------------------- 
-Confidentiality Requirement: This communication, including any attachment(s), may contain confidential information and is for the sole use of the intended recipient(s). If you are not the intended recipient, you are hereby notified that you have received this communication in error and any unauthorized review, use, disclosure, dissemination, distribution or copying of it or its contents is strictly prohibited.  If you have received this communication in error, please notify the sender immediately by telephone or e-mail and destroy all copies of this communication and any attachments.
+Thanks for your patience.
+
+> So the main thing I don't understand is why you do not encode the CGU
+> clock parent string names into this CCU driver. If I understand your
+> approach correctly, you do the following in lpc18xx_ccu_init:
+>
+> 1) count the number of parent clocks (ostensibly CGU clocks)
+> 2) iterate through all of those CGU clocks, extracting a base_id value
+> (loop #1)
+> 3) using this base_id as a key you walk through an array in the CCU
+> driver trying to find a matching base_id value
+> (loop #2)
+> 4) after finding the corresponding CCU clocks you get the parent clock
+> with of_clk_get
+> 5) using of_clk_get you fetch its name with __clk_get_name
+> 6) you pass this parent name into a fairly typical looking registration
+> function
+>
+> Assuming I got all of that right, I hope we can simplify it
+> considerably.
+>
+> You already have an array of CCU clock information in this driver,
+> clk_branches[]. Why not encode the parent string name here? This would
+> involve adding a "parent_name" member to struct lpc18xx_clk_branch.
+>
+> Doing the above, your O(n^2)-ish registration function becomes O(n):
+>
+> 1) iterate through the array of the CCU clocks (clk_branchs[])
+> 2) register them
+> 3) profit
+
+Since there are two instances of the CCU IP block and the clk_branchs[]
+table contain branch clocks from both of them the driver needs to know
+on which CCU instance the clocks belong.
+
+So just registering all clocks in clk_branchs[] we would end up with
+all the clocks on both CCU nodes and some clock ids would conflict.
+
+An alternative approach could be to split the clk_branchs[]. Each one
+with branch clocks for the respective CCU. But the driver would still
+need to know which of the tables to register. This could be done either
+by using two DT compac strings; like "nxp,lpc1850-ccu1" and "...-ccu2"
+or by having a 'id' propery in DT. I don't find these two approaches
+very appealing.
+
+So the reason for some of the complexity in the driver is to keep it
+generic and work on multiple CCU instances by looking at the connected
+clocks.
+
+I hope this make it more understandable. Sorry for failing to describe the
+hardware properly.
+
+Either way I'll send out a v4 with parent clocks in the clk_branchs[]
+and which use a clock-names property to match the clocks between the
+CCU. Let me know what you think when you get a chance to look at it.
+
+> I'm starting to think any reference to base_id is sign that things are
+> wrong in your driver. I am unconvinced that you need to "share" this
+> base_id across CGU and CCU drivers in the way you do. If I'm wrong
+> please help me to understand.
+
+I don't mind putting the parent clock names in the clk_branches[] but
+the driver still needs to distinguish between the CCUs in the system
+and register the correct clocks on them.
+
+If you have a another good way of doing so I am all ears.
+
+
+I have put up the full DT in the link if you would like to take a look.
+http://slexy.org/raw/s21h9lCxQa
+
+You may also find the data sheet at the link below. There is a figure
+of the CGU and both CCUs at page 161, Figure 34.
+http://www.nxp.com/documents/user_manual/UM10503.pdf
+
+
+regards,
+Joachim Eastwood
