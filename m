@@ -1,55 +1,22 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 28 May 2015 10:05:55 +0900
-Subject: [PATCH] ARM: shmobile: only select sound drivers that build
-In-Reply-To: <cover.1432773909.git.horms+renesas@verge.net.au>
-References: <cover.1432773909.git.horms+renesas@verge.net.au>
-Message-ID: <66f72f0c8e0d37339b6be1373c61d2a133c8b422.1432773909.git.horms+renesas@verge.net.au>
+From: axel.lin@ingics.com (Axel Lin)
+Date: Thu, 28 May 2015 09:11:43 +0800
+Subject: [PATCH 2/2] pinctrl: mediatek: Fix pinctrl register irq fail bug.
+In-Reply-To: <1432719835-18939-3-git-send-email-hongzhou.yang@mediatek.com>
+References: <1432719835-18939-1-git-send-email-hongzhou.yang@mediatek.com>
+ <1432719835-18939-3-git-send-email-hongzhou.yang@mediatek.com>
+Message-ID: <CAFRkauDrWCme5WDxsEW-HSGrNmJRVftVBP6qPLq3Lux-09BHbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-
-A couple of codec drivers are selected by shmobile platform code,
-but depend on I2C, which results in a build error:
-
-sound/soc/codecs/ak4642.c:638:1: warning: data definition has no type or storage class
- module_i2c_driver(ak4642_i2c_driver);
- ^
-sound/soc/codecs/ak4642.c:638:1: error: type defaults to 'int' in declaration of 'module_i2c_driver' [-Werror=implicit-int]
-sound/soc/codecs/ak4642.c:638:1: warning: parameter names (without types) in function declaration
-sound/soc/codecs/ak4642.c:627:26: warning: 'ak4642_i2c_driver' defined but not used [-Wunused-variable]
-
-This ensures that we do not enable the respective drivers when I2C
-is disabled.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/Kconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 0fb484221c90..45006479d461 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -139,7 +139,7 @@ config MACH_ARMADILLO800EVA
- 	select ARCH_REQUIRE_GPIOLIB
- 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
- 	select SMSC_PHY if SH_ETH
--	select SND_SOC_WM8978 if SND_SIMPLE_CARD
-+	select SND_SOC_WM8978 if SND_SIMPLE_CARD && I2C
- 	select USE_OF
- 
- config MACH_BOCKW
-@@ -148,7 +148,7 @@ config MACH_BOCKW
- 	select ARCH_REQUIRE_GPIOLIB
- 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
- 	select SND_SOC_AK4554 if SND_SIMPLE_CARD
--	select SND_SOC_AK4642 if SND_SIMPLE_CARD
-+	select SND_SOC_AK4642 if SND_SIMPLE_CARD && I2C
- 	select USE_OF
- 
- config MACH_BOCKW_REFERENCE
--- 
-2.1.4
+2015-05-27 17:43 GMT+08:00 Hongzhou Yang <hongzhou.yang@mediatek.com>:
+> Since mt6397 is no need to support interrupt controller,
+> I judged "interrupt-controller" property to skip it last patch.
+> But the if judgement should on the contrary, this is a bug.
+>
+> And find of_property_read_bool is better for this case.
+> So using of_property_read_bool instead of of_find_property.
+>
+> Also fix bug of misuse pointer.
+>
+> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+Reviewed-by: Axel Lin <axel.lin@ingics.com>
