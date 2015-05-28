@@ -1,257 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 28 May 2015 14:25:28 +0200
-Subject: [RFC PATCH v1 1/3] PCI: designware: Add ARM64 support
-In-Reply-To: <55670095.7020203@hisilicon.com>
-References: <000001d096a9$27bf43f0$773dcbd0$@com>
- <16371687.jmfn381VuV@wuerfel> <55670095.7020203@hisilicon.com>
-Message-ID: <2146536.Pxut7UQbDl@wuerfel>
+From: weigelt@melag.de (Enrico Weigelt, metux IT consult)
+Date: Thu, 28 May 2015 14:31:02 +0200
+Subject: Device Tree Blob (DTB) licence
+In-Reply-To: <CAL_JsqKLmePHHe+4n4xwiFhjo+wZ+V774i3eY9Z07+61SDHyYQ@mail.gmail.com>
+References: <1430820315.19516.26.camel@opteya.com>
+ <CAL_Jsq+T5c7qornpRVCduEjUSCeM+0xqbtVYovtH76y=4BqhLQ@mail.gmail.com>
+ <1432289148.5304.58.camel@opteya.com>
+ <CAL_JsqKLmePHHe+4n4xwiFhjo+wZ+V774i3eY9Z07+61SDHyYQ@mail.gmail.com>
+Message-ID: <55670A86.2060502@melag.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 28 May 2015 19:48:37 Zhou Wang wrote:
-> 
-> I think this code is fine, and we also should add a funtion point in struct pci_host_bridge to
-> store mvebu_pcie_align_resource. How about I make a new version patchset with above codes for
-> further reviewing ?
-> 
+Am 22.05.2015 um 18:26 schrieb Rob Herring:
 
-Yes, that would be nice. I've run into a few build errors with the first version,
-see below for a version that actually builds. You can base on top of that.
+Hi,
 
-We also need to do something about pci_find_host_bridge() here, possibly just
-storing a pointer to the host bridge in pci_bus to avoid the function call.
+ > Ideally, dtb files are shipped with firmware separately from the OS.
+ > You should be able to run multiple OS's with that dtb. There is often
+> desire or "requirements" to not have GPL code in firmware.
 
-A few of the other members in pci_bus (ops, msi, sysdata, domain_nr, and
-maybe more) could eventually be moved into pci_host_bridge as well, but
-that requires changing all code accessing those fields of course.
+I dont see that begin shipped *with* the firmware (but still as a
+separate object/file) automatically means a derived work.
 
-	Arnd
+And I actually wouldn't want dtb strictly so interewoven with the
+firmware/bootloader, that it can be easily extracted or replaced
+anymore. IMHO, we shouldn't support such vendors.
+(freedom is more than just $0 price)
 
-commit 8140432e10b7cd59ec6246c2b7268abfccdeaaae
-Author: Arnd Bergmann <arnd@arndb.de>
-Date:   Thu May 28 12:21:27 2015 +0200
+And there shouldn't be any proprietary firmware anyways.
 
-    [HACK] try to get rid of pci_sys_data dependency in bios32
-    
-    This is an experimental patch to remove the last two dependencies
-    we have.
-    
-    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+cu
+--
+Enrico Weigelt, metux IT consult
++49-151-27565287
+MELAG Medizintechnik oHG Sitz Berlin Registergericht AG Charlottenburg HRA 21333 B
 
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index fcbbbb1b9e95..20839d26a490 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -18,15 +18,6 @@
- 
- static int debug_pci;
- 
--#ifdef CONFIG_PCI_MSI
--struct msi_controller *pcibios_msi_controller(struct pci_dev *dev)
--{
--	struct pci_sys_data *sysdata = dev->bus->sysdata;
--
--	return sysdata->msi_ctrl;
--}
--#endif
--
- /*
-  * We can't use pci_get_device() here since we are
-  * called from interrupt context.
-@@ -462,9 +453,6 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
- 		if (!sys)
- 			panic("PCI: unable to allocate sys data!");
- 
--#ifdef CONFIG_PCI_MSI
--		sys->msi_ctrl = hw->msi_ctrl;
--#endif
- 		sys->busnr   = busnr;
- 		sys->swizzle = hw->swizzle;
- 		sys->map_irq = hw->map_irq;
-@@ -493,6 +481,9 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
- 				panic("PCI: unable to scan bus!");
- 
- 			busnr = sys->bus->busn_res.end + 1;
-+#ifdef CONFIG_PCI_MSI
-+			sys->bus->msi = hw->msi_ctrl;
-+#endif
- 
- 			list_add(&sys->node, head);
- 		} else {
-@@ -597,9 +588,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
- 
- 	start = (start + align - 1) & ~(align - 1);
- 
--	if (sys->align_resource)
--		return sys->align_resource(dev, res, start, size, align);
--
- 	return start;
- }
- 
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 1ab863551920..155d05fc11b9 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -22,6 +22,8 @@
- #include <linux/of_pci.h>
- #include <linux/of_platform.h>
- 
-+#include "../pci.h" /* HACK to see pci_find_host_bridge */
-+
- /*
-  * PCIe unit register offsets.
-  */
-@@ -751,27 +753,20 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
- 	return 1;
- }
- 
--static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
-+static resource_size_t mvebu_pcie_align_resource(void *data,
-+						 const struct resource *res,
-+						 resource_size_t size,
-+						 resource_size_t align)
- {
--	struct mvebu_pcie *pcie = sys_to_pcie(sys);
--	struct pci_bus *bus;
-+	struct pci_dev *dev = data;
- 
--	bus = pci_create_root_bus(&pcie->pdev->dev, sys->busnr,
--				  &mvebu_pcie_ops, sys, &sys->resources);
--	if (!bus)
--		return NULL;
-+	resource_size_t start = res->start;
- 
--	pci_scan_child_bus(bus);
-+	if (res->flags & IORESOURCE_IO && start & 0x300)
-+		start = (start + 0x3ff) & ~0x3ff;
- 
--	return bus;
--}
-+	start = (start + align - 1) & ~(align - 1);
- 
--static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
--						 const struct resource *res,
--						 resource_size_t start,
--						 resource_size_t size,
--						 resource_size_t align)
--{
- 	if (dev->bus->number != 0)
- 		return start;
- 
-@@ -796,6 +791,25 @@ static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
- 		return start;
- }
- 
-+static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
-+{
-+	struct mvebu_pcie *pcie = sys_to_pcie(sys);
-+	struct pci_host_bridge *phb;
-+	struct pci_bus *bus;
-+
-+	bus = pci_create_root_bus(&pcie->pdev->dev, sys->busnr,
-+				  &mvebu_pcie_ops, sys, &sys->resources);
-+	if (!bus)
-+		return NULL;
-+
-+	phb = pci_find_host_bridge(bus);
-+	phb->align_resource = mvebu_pcie_align_resource;
-+
-+	pci_scan_child_bus(bus);
-+
-+	return bus;
-+}
-+
- static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
- {
- 	struct hw_pci hw;
-@@ -812,7 +826,6 @@ static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
- 	hw.scan           = mvebu_pcie_scan_bus;
- 	hw.map_irq        = of_irq_parse_and_map_pci;
- 	hw.ops            = &mvebu_pcie_ops;
--	hw.align_resource = mvebu_pcie_align_resource;
- 
- 	pci_common_init(&hw);
- }
-diff --git a/drivers/pci/setup-res.c b/drivers/pci/setup-res.c
-index 232f9254c11a..73abca7ccc7a 100644
---- a/drivers/pci/setup-res.c
-+++ b/drivers/pci/setup-res.c
-@@ -200,7 +200,11 @@ static int pci_revert_fw_address(struct resource *res, struct pci_dev *dev,
- }
- 
- static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
--		int resno, resource_size_t size, resource_size_t align)
-+		int resno, resource_size_t size, resource_size_t align,
-+		resource_size_t (*alignf)(void *,
-+					  const struct resource *,
-+					  resource_size_t,
-+					  resource_size_t))
- {
- 	struct resource *res = dev->resource + resno;
- 	resource_size_t min;
-@@ -217,7 +221,7 @@ static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
- 	 */
- 	ret = pci_bus_alloc_resource(bus, res, size, align, min,
- 				     IORESOURCE_PREFETCH | IORESOURCE_MEM_64,
--				     pcibios_align_resource, dev);
-+				     alignf, dev);
- 	if (ret == 0)
- 		return 0;
- 
-@@ -229,7 +233,7 @@ static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
- 	     (IORESOURCE_PREFETCH | IORESOURCE_MEM_64)) {
- 		ret = pci_bus_alloc_resource(bus, res, size, align, min,
- 					     IORESOURCE_PREFETCH,
--					     pcibios_align_resource, dev);
-+					     alignf, dev);
- 		if (ret == 0)
- 			return 0;
- 	}
-@@ -242,7 +246,7 @@ static int __pci_assign_resource(struct pci_bus *bus, struct pci_dev *dev,
- 	 */
- 	if (res->flags & (IORESOURCE_PREFETCH | IORESOURCE_MEM_64))
- 		ret = pci_bus_alloc_resource(bus, res, size, align, min, 0,
--					     pcibios_align_resource, dev);
-+					     alignf, dev);
- 
- 	return ret;
- }
-@@ -251,10 +255,23 @@ static int _pci_assign_resource(struct pci_dev *dev, int resno,
- 				resource_size_t size, resource_size_t min_align)
- {
- 	struct pci_bus *bus;
-+	struct pci_host_bridge *phb;
-+	resource_size_t (*alignf)(void *,
-+				  const struct resource *,
-+				  resource_size_t,
-+				  resource_size_t);
- 	int ret;
- 
- 	bus = dev->bus;
--	while ((ret = __pci_assign_resource(bus, dev, resno, size, min_align))) {
-+	phb = pci_find_host_bridge(bus);
-+
-+	if (phb->align_resource)
-+		alignf = phb->align_resource;
-+	else
-+		alignf = pcibios_align_resource;
-+
-+	while ((ret = __pci_assign_resource(bus, dev, resno, size,
-+					    min_align, alignf))) {
- 		if (!bus->parent || !bus->self->transparent)
- 			break;
- 		bus = bus->parent;
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index bc50bb05f0ab..3aad084f12ad 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -404,6 +404,9 @@ struct pci_host_bridge {
- 	struct device dev;
- 	struct pci_bus *bus;		/* root bus */
- 	struct list_head windows;	/* resource_entry */
-+	resource_size_t (*align_resource)(void *data,
-+			 const struct resource *res,
-+			 resource_size_t size, resource_size_t align);
- 	void (*release_fn)(struct pci_host_bridge *);
- 	void *release_data;
- 	unsigned int ignore_reset_delay:1;	/* for entire hierarchy */
+Wichtiger Hinweis: Diese Nachricht kann vertrauliche oder nur f?r einen begrenzten Personenkreis bestimmte Informationen enthalten. Sie ist ausschlie?lich f?r denjenigen bestimmt, an den sie gerichtet worden ist. Wenn Sie nicht der Adressat dieser E-Mail sind, d?rfen Sie diese nicht kopieren, weiterleiten, weitergeben oder sie ganz oder teilweise in irgendeiner Weise nutzen. Sollten Sie diese E-Mail irrt?mlich erhalten haben, so benachrichtigen Sie bitte den Absender, indem Sie auf diese Nachricht antworten. Bitte l?schen Sie in diesem Fall diese Nachricht und alle Anh?nge, ohne eine Kopie zu behalten.
+Important Notice: This message may contain confidential or privileged information. It is intended only for the person it was addressed to. If you are not the intended recipient of this email you may not copy, forward, disclose or otherwise use it or any part of it in any form whatsoever. If you received this email in error please notify the sender by replying and delete this message and any attachments without retaining a copy.
