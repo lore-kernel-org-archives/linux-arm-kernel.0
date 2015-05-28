@@ -1,88 +1,124 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 28 May 2015 12:59:57 +0530
-Subject: [PATCH V6 3/3] OPP: Add binding for 'opp-suspend'
-In-Reply-To: <cover.1432797343.git.viresh.kumar@linaro.org>
-References: <cover.1432797343.git.viresh.kumar@linaro.org>
-Message-ID: <52320ac3032de17cbb0aaf518d542ebfbac4b1a4.1432797343.git.viresh.kumar@linaro.org>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Thu, 28 May 2015 09:37:40 +0200
+Subject: runtime check for omap-aes bus access permission (was: Re:
+ 3.13-rc3 (commit 7ce93f3) breaks Nokia N900 DT boot)
+In-Reply-To: <CAGo_u6oZxi7O6re30L2-wVyxTeahhyMb4qVcrE3tSCV9sBvrnw@mail.gmail.com>
+References: <20131206213613.GA19648@earth.universe> <201502111339.54480@pali>
+ <CAALWOA_ngoSKjB=ZQ264Va37bBK7v41Ei45SyoYLiMdanTKnxQ@mail.gmail.com>
+ <201502112128.44852@pali>
+ <CAGo_u6oZxi7O6re30L2-wVyxTeahhyMb4qVcrE3tSCV9sBvrnw@mail.gmail.com>
+Message-ID: <20150528073740.GD16509@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On few platforms, for power efficiency, we want the device to be
-configured for a specific OPP while we put the device in suspend state.
+On Wednesday 11 February 2015 14:40:33 Nishanth Menon wrote:
+> On Wed, Feb 11, 2015 at 2:28 PM, Pali Roh?r <pali.rohar@gmail.com> wrote:
+> > On Wednesday 11 February 2015 16:22:51 Matthijs van Duin wrote:
+> >> On 11 February 2015 at 13:39, Pali Roh?r <pali.rohar@gmail.com>
+> > wrote:
+> >> >> Anyhow, since checking the firewalls/APs to see if you have
+> >> >> permission will probably only get you yet another fault if
+> >> >> things are walled off, the robust way of dealing with this
+> >> >> sort of situation is by probing the device with a read
+> >> >> while trapping bus faults. This also handles modules that
+> >> >> are unreachable for other reasons, e.g. being disabled by
+> >> >> eFuse.
+> >> >
+> >> > It is possible to patch kernel code to mask or ignore that
+> >> > fault? Can you help me with something like that?
+> >>
+> >> As I mentioned, I'm still learning my way around the kernel,
+> >> so I don't feel very comfortable suggesting a concrete patch
+> >> just yet. I've been browsing arch/arm/mm/ however and my
+> >> impression is that all that would be required is editing
+> >> fault.c by making a copy of do_bad but containing
+> >>     return user_mode(regs) || !fixup_exception(regs);
+> >> and hook it onto the appropriate fault codes.  However, this
+> >> really needs the opinion of someone more familiar with this
+> >> code.
+> >>
+> >> I do have an observation to make on the issue of fault
+> >> decoding: the list in fsr-2level.c may be "standard ARMv3 and
+> >> ARMv4 aborts" but they are quite wrong for ARMv7 which has:
+> >>
+> >> [ 0] -
+> >> [ 1] alignment fault
+> >> [ 2] debug event
+> >> [ 3] section access flag fault
+> >> [ 4] instruction cache maintainance fault (reported via data
+> >> abort) [ 5] section translation fault
+> >> [ 6] page access flag fault
+> >> [ 7] page translation fault
+> >> [ 8] bus error on access
+> >> [ 9] section domain fault
+> >> [10] -
+> >> [11] page domain fault
+> >> [12] bus error on section table walk
+> >> [13] section permission fault
+> >> [14] bus error on page table walk
+> >> [15] page permission fault
+> >> [16] (TLB conflict abort)
+> >> [17] -
+> >> [18] -
+> >> [19] -
+> >> [20] (lockdown abort)
+> >> [21] -
+> >> [22] async bus error (reported via data abort)
+> >> [23] -
+> >> [24] async parity/ECC error (reported via data abort)
+> >> [25] parity/ECC error on access
+> >> [26] (coprocessor abort)
+> >> [27] -
+> >> [28] parity/ECC error on section table walk
+> >> [29] -
+> >> [30] parity/ECC error on page table walk
+> >> [31] -
+> >>
+> >> Some entries are patched up near the bottom of fault.c but
+> >> many bogus messages remain, for example the "on linefetch" vs
+> >> "on non-linefetch" is misleading since no such thing can be
+> >> inferred from the fault status on v7.  Also, the i-cache
+> >> maintenance fault handling looks wrong to me: it should fetch
+> >> the actual fault status from IFSR (even though the address
+> >> still comes from DFSR) and dispatch based on that.
+> >>
+> >> Async external aborts (async bus error and async parity/ECC
+> >> error) give you basically no info. DFAR will contain garbage
+> >> hence displaying it will confuse rather than enlighten, a
+> >> traceback is pointless since the instruction that caused the
+> >> access is long retired, likewise user_mode() doesn't matter
+> >> since a transition to kernel space may have happened after
+> >> the access that cause the abort. Basically they should be
+> >> treated more as an IRQ than as a fault (note they can also be
+> >> masked just like irqs). In case of a bus error, it may be
+> >> appropriate to just warn about it, or perhaps send a signal
+> >> to the current process, although in the latter case it should
+> >> have some means to distinguish it from a synchronous bus
+> >> error.
+> >>
+> >> At least on the cortex-a8, a parity/ECC error (whether async
+> >> or not) is to be regarded as absolutely fatal.  Quoth the
+> >> TRM: "No recovery is possible. The abort handler must disable
+> >> the caches, communicate the fail directly with the external
+> >> system, request a reboot."
+> >>
+> >> Bit 10 no longer indicates an asynchronous (let alone
+> >> imprecise) fault.  Apart from the debug events and async
+> >> aborts (and possibly some implementation-defined aborts), all
+> >> aborts listed are synchronous, and DFAR/IFAR is valid.
+> >> There's no technical obstruction to make these trappable via
+> >> the kernel exception handling mechanism. (Though at least in
+> >> case of parity/ECC errors one shouldn't.)
+> >
+> > Tony, Nishanth, or somebody else... can you help with memory
+> > management? Or do you know some expert for arch/arm/mm/ code?
+> 
+> Folks in linux-arm-kernel are probably the right people, I suppose.
+> Looping them in.
+> 
 
-Add an optional property in operating-points-v2 bindings for that.
+So pinging linux-arm-kernel again. Any idea how to handle that fault?
 
-Acked-by: Nishanth Menon <nm@ti.com>
-Suggested-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- Documentation/devicetree/bindings/power/opp.txt | 14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/power/opp.txt b/Documentation/devicetree/bindings/power/opp.txt
-index f6f75545149e..e56c74824a8c 100644
---- a/Documentation/devicetree/bindings/power/opp.txt
-+++ b/Documentation/devicetree/bindings/power/opp.txt
-@@ -74,6 +74,8 @@ This describes the OPPs belonging to a device. This node can have following
-   Missing property means devices have independent clock/voltage/current lines,
-   but they share OPP tables.
- 
-+- opp-suspend: Phandle of the OPP to set while device is suspended.
-+
- 
- * OPP Node
- 
-@@ -145,9 +147,10 @@ Example 1: Single cluster Dual-core ARM cortex A9, switch DVFS states together.
- 
- 	cpu0_opp_table: opp_table0 {
- 		compatible = "operating-points-v2";
-+		opp-suspend = <&suspend_opp>;
- 		opp-shared;
- 
--		opp00 {
-+		suspend-opp: opp00 {
- 			opp-hz = <1000000000>;
- 			opp-microvolt = <970000 975000 985000>;
- 			opp-microamp = <70000>;
-@@ -219,13 +222,14 @@ independently.
- 
- 	cpu_opp_table: opp_table {
- 		compatible = "operating-points-v2";
-+		opp-suspend = <&suspend_opp>;
- 
- 		/*
- 		 * Missing opp-shared property means CPUs switch DVFS states
- 		 * independently.
- 		 */
- 
--		opp00 {
-+		suspend-opp: opp00 {
- 			opp-hz = <1000000000>;
- 			opp-microvolt = <970000 975000 985000>;
- 			opp-microamp = <70000>;
-@@ -298,9 +302,10 @@ DVFS state together.
- 
- 	cluster0_opp: opp_table0 {
- 		compatible = "operating-points-v2";
-+		opp-suspend = <&suspend_opp0>;
- 		opp-shared;
- 
--		opp00 {
-+		suspend-opp: opp00 {
- 			opp-hz = <1000000000>;
- 			opp-microvolt = <970000 975000 985000>;
- 			opp-microamp = <70000>;
-@@ -323,9 +328,10 @@ DVFS state together.
- 
- 	cluster1_opp: opp_table1 {
- 		compatible = "operating-points-v2";
-+		opp-suspend = <&suspend_opp1>;
- 		opp-shared;
- 
--		opp10 {
-+		suspend-opp: opp10 {
- 			opp-hz = <1300000000>;
- 			opp-microvolt = <1045000 1050000 1055000>;
- 			opp-microamp = <95000>;
 -- 
-2.4.0
+Pali Roh?r
+pali.rohar at gmail.com
