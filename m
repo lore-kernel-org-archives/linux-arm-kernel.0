@@ -1,51 +1,33 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 28 May 2015 13:52:12 -0700
-Subject: [PATCH] amba: Support clk parents and rates assigned in DT
-Message-ID: <1432846332-17692-1-git-send-email-sboyd@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 28 May 2015 22:05:20 +0100
+Subject: [PATCH] ARM: footbridge: enable dc21285 mtd map in defconfig
+In-Reply-To: <20150528195558.GR27753@ld-irv-0074>
+References: <20150528192238.GQ27753@ld-irv-0074>
+ <1432842380-4187-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20150528195558.GR27753@ld-irv-0074>
+Message-ID: <20150528210520.GE2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the call to of_clk_set_defaults() into the amba probe path so
-that devices on the amba bus can use the assigned rates and
-parents feature of the common clock framework.
+On Thu, May 28, 2015 at 12:55:58PM -0700, Brian Norris wrote:
+> On Thu, May 28, 2015 at 09:46:20PM +0200, Uwe Kleine-K?nig wrote:
+> > This driver fails to build since release 3.2. Improve compile coverage
+> > by enabling this driver in the footbridge defconfig
+> 
+> Actually, it did build, but it just had alarming warnings. I don't think
+> those warnings actually affected anything at runtime, except for lock
+> debugging (if enabled).
+> 
+> But anyway, the change looks good, and I'm doing this in my local build
+> tests now, so:
+> 
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> 
+> Acked-by: Brian Norris <computersforpeace@gmail.com>
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
+I'd say no to this - some boards have old (28F008) flash on them, which
+(iirc) doesn't take kindly to being probed by MTD.
 
-Russell,
-
-Can you please ack this change? We're going to send it through the clk tree
-because hisi clock requires it.
-
-Thanks,
-Stephen
-
- drivers/amba/bus.c | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-index f0099360039e..350ed93d4281 100644
---- a/drivers/amba/bus.c
-+++ b/drivers/amba/bus.c
-@@ -19,6 +19,7 @@
- #include <linux/amba/bus.h>
- #include <linux/sizes.h>
- #include <linux/limits.h>
-+#include <linux/clk/clk-conf.h>
- 
- #include <asm/irq.h>
- 
-@@ -237,6 +238,10 @@ static int amba_probe(struct device *dev)
- 	int ret;
- 
- 	do {
-+		ret = of_clk_set_defaults(dev->of_node, false);
-+		if (ret < 0)
-+			break;
-+
- 		ret = dev_pm_domain_attach(dev, true);
- 		if (ret == -EPROBE_DEFER)
- 			break;
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
