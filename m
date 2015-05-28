@@ -1,188 +1,131 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 28 May 2015 10:40:53 +0100
-Subject: [PATCH 3/3] arm64: alternative: Work around .inst assembler bugs
+Date: Thu, 28 May 2015 10:40:51 +0100
+Subject: [PATCH 1/3] arm64: insn: Add aarch64_{get,set}_branch_offset
 In-Reply-To: <1432806053-987-1-git-send-email-marc.zyngier@arm.com>
 References: <1432806053-987-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1432806053-987-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1432806053-987-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AArch64 toolchains suffer from the following bug:
+In order to deal with branches located in alternate sequences,
+but pointing to the main kernel text, it is required to extract
+the relative displacement encoded in the instruction, and to be
+able to update said instruction with a new offset (once it is
+known).
 
-$ cat blah.S
-1:
-	.inst	0x01020304
-	.if ((. - 1b) != 4)
-		.error	blah
-	.endif
-$ aarch64-linux-gnu-gcc -c blah.S
-blah.S: Assembler messages:
-blah.S:3: Error: non-constant expression in ".if" statement
+For this, we introduce three new helpers:
+- aarch64_insn_is_branch_imm is a predicate indicating if the
+  instruction is an immediate branch
+- aarch64_get_branch_offset returns a signed value representing
+  the byte offset encoded in a branch instruction
+- aarch64_set_branch_offset takes an instruction and an offset,
+  and returns the corresponding updated instruction.
 
-which precludes the use of msr_s and co as part of alternatives.
-
-We workaround this issue by not directly testing the labels
-themselves, but by moving the current output pointer by a value
-that should always be zero. if this value is not null, then
-we will trigger a backward move, which is expclicitely forbidden.
-This trigger the error we're after:
-
-  AS      arch/arm64/kvm/hyp.o
-arch/arm64/kvm/hyp.S: Assembler messages:
-arch/arm64/kvm/hyp.S:1377: Error: attempt to move .org backwards
-scripts/Makefile.build:294: recipe for target 'arch/arm64/kvm/hyp.o' failed
-make[1]: *** [arch/arm64/kvm/hyp.o] Error 1
-Makefile:946: recipe for target 'arch/arm64/kvm' failed
-
-Not pretty, but at least works on the current toolchains.
-Also merge asm/alternative-asm.h into alternative.h so that we
-slightly limit the duplication of this mess.
-
+Acked-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/alternative-asm.h | 29 ------------------
- arch/arm64/include/asm/alternative.h     | 52 +++++++++++++++++++++++++++++---
- arch/arm64/kernel/entry.S                |  2 +-
- arch/arm64/mm/cache.S                    |  2 +-
- 4 files changed, 50 insertions(+), 35 deletions(-)
- delete mode 100644 arch/arm64/include/asm/alternative-asm.h
+ arch/arm64/include/asm/insn.h |  3 +++
+ arch/arm64/kernel/insn.c      | 60 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 63 insertions(+)
 
-diff --git a/arch/arm64/include/asm/alternative-asm.h b/arch/arm64/include/asm/alternative-asm.h
-deleted file mode 100644
-index 919a678..0000000
---- a/arch/arm64/include/asm/alternative-asm.h
-+++ /dev/null
-@@ -1,29 +0,0 @@
--#ifndef __ASM_ALTERNATIVE_ASM_H
--#define __ASM_ALTERNATIVE_ASM_H
--
--#ifdef __ASSEMBLY__
--
--.macro altinstruction_entry orig_offset alt_offset feature orig_len alt_len
--	.word \orig_offset - .
--	.word \alt_offset - .
--	.hword \feature
--	.byte \orig_len
--	.byte \alt_len
--.endm
--
--.macro alternative_insn insn1 insn2 cap
--661:	\insn1
--662:	.pushsection .altinstructions, "a"
--	altinstruction_entry 661b, 663f, \cap, 662b-661b, 664f-663f
--	.popsection
--	.pushsection .altinstr_replacement, "ax"
--663:	\insn2
--664:	.popsection
--	.if ((664b-663b) != (662b-661b))
--		.error "Alternatives instruction length mismatch"
--	.endif
--.endm
--
--#endif  /*  __ASSEMBLY__  */
--
--#endif /* __ASM_ALTERNATIVE_ASM_H */
-diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
-index d261f01..5195cca 100644
---- a/arch/arm64/include/asm/alternative.h
-+++ b/arch/arm64/include/asm/alternative.h
-@@ -1,6 +1,8 @@
- #ifndef __ASM_ALTERNATIVE_H
- #define __ASM_ALTERNATIVE_H
+diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+index f81b328..30e50eb 100644
+--- a/arch/arm64/include/asm/insn.h
++++ b/arch/arm64/include/asm/insn.h
+@@ -281,6 +281,7 @@ __AARCH64_INSN_FUNCS(ret,	0xFFFFFC1F, 0xD65F0000)
+ #undef	__AARCH64_INSN_FUNCS
  
-+#ifndef __ASSEMBLY__
+ bool aarch64_insn_is_nop(u32 insn);
++bool aarch64_insn_is_branch_imm(u32 insn);
+ 
+ int aarch64_insn_read(void *addr, u32 *insnp);
+ int aarch64_insn_write(void *addr, u32 insn);
+@@ -351,6 +352,8 @@ u32 aarch64_insn_gen_logical_shifted_reg(enum aarch64_insn_register dst,
+ 					 int shift,
+ 					 enum aarch64_insn_variant variant,
+ 					 enum aarch64_insn_logic_type type);
++s32 aarch64_get_branch_offset(u32 insn);
++u32 aarch64_set_branch_offset(u32 insn, s32 offset);
+ 
+ bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
+ 
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+index 9249020..dd9671c 100644
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -77,6 +77,14 @@ bool __kprobes aarch64_insn_is_nop(u32 insn)
+ 	}
+ }
+ 
++bool aarch64_insn_is_branch_imm(u32 insn)
++{
++	return (aarch64_insn_is_b(insn) || aarch64_insn_is_bl(insn) ||
++		aarch64_insn_is_tbz(insn) || aarch64_insn_is_tbnz(insn) ||
++		aarch64_insn_is_cbz(insn) || aarch64_insn_is_cbnz(insn) ||
++		aarch64_insn_is_bcond(insn));
++}
 +
- #include <linux/types.h>
- #include <linux/stddef.h>
- #include <linux/stringify.h>
-@@ -24,7 +26,20 @@ void free_alternatives_memory(void);
- 	" .byte 662b-661b\n"				/* source len      */ \
- 	" .byte 664f-663f\n"				/* replacement len */
+ static DEFINE_SPINLOCK(patch_lock);
  
--/* alternative assembly primitive: */
+ static void __kprobes *patch_map(void *addr, int fixmap)
+@@ -1057,6 +1065,58 @@ u32 aarch64_insn_gen_logical_shifted_reg(enum aarch64_insn_register dst,
+ 	return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_6, insn, shift);
+ }
+ 
 +/*
-+ * alternative assembly primitive:
-+ *
-+ * If any of these .org directive fail, it means that insn1 and insn2
-+ * don't have the same length. This used to be written as
-+ *
-+ * .if ((664b-663b) != (662b-661b))
-+ * 	.error "Alternatives instruction length mismatch"
-+ * .endif
-+ *
-+ * but most assemblers die if insn1 or insn2 have a .inst. This should
-+ * be fixed in a binutils release posterior to 2.25.51.0.2 (anything
-+ * containing commit 4e4d08cf7399b606 or c1baaddf8861).
++ * Decode the imm field of a branch, and return the byte offset as a
++ * signed value (so it can be used when computing a new branch
++ * target).
 + */
- #define ALTERNATIVE(oldinstr, newinstr, feature)			\
- 	"661:\n\t"							\
- 	oldinstr "\n"							\
-@@ -37,8 +52,37 @@ void free_alternatives_memory(void);
- 	newinstr "\n"							\
- 	"664:\n\t"							\
- 	".popsection\n\t"						\
--	".if ((664b-663b) != (662b-661b))\n\t"				\
--	"	.error \"Alternatives instruction length mismatch\"\n\t"\
--	".endif\n"
-+	".org	. - (664b-663b) + (662b-661b)\n\t"			\
-+	".org	. - (662b-661b) + (664b-663b)\n"
++s32 aarch64_get_branch_offset(u32 insn)
++{
++	s32 imm;
 +
-+#else
++	if (aarch64_insn_is_b(insn) || aarch64_insn_is_bl(insn)) {
++		imm = aarch64_insn_decode_immediate(AARCH64_INSN_IMM_26, insn);
++		return (imm << 6) >> 4;
++	}
 +
-+.macro altinstruction_entry orig_offset alt_offset feature orig_len alt_len
-+	.word \orig_offset - .
-+	.word \alt_offset - .
-+	.hword \feature
-+	.byte \orig_len
-+	.byte \alt_len
-+.endm
++	if (aarch64_insn_is_cbz(insn) || aarch64_insn_is_cbnz(insn) ||
++	    aarch64_insn_is_bcond(insn)) {
++		imm = aarch64_insn_decode_immediate(AARCH64_INSN_IMM_19, insn);
++		return (imm << 13) >> 11;
++	}
 +
-+.macro alternative_insn insn1 insn2 cap
-+661:	\insn1
-+662:	.pushsection .altinstructions, "a"
-+	altinstruction_entry 661b, 663f, \cap, 662b-661b, 664f-663f
-+	.popsection
-+	.pushsection .altinstr_replacement, "ax"
-+663:	\insn2
-+664:	.popsection
-+	 // If any of these .org fail, it means that insn1 and insn2
-+	 // don't have the same lenght. This used to be written as
-+	 // .if ((664b-663b) != (662b-661b))
-+	 //	.error "Alternatives instruction length mismatch"
-+	 // .endif
-+	 // but most assemblers die if insn1 or insn2 have a .inst.
-+	.org	. - (664b-663b) + (662b-661b)
-+	.org	. - (662b-661b) + (664b-663b)
-+.endm
++	if (aarch64_insn_is_tbz(insn) || aarch64_insn_is_tbnz(insn)) {
++		imm = aarch64_insn_decode_immediate(AARCH64_INSN_IMM_14, insn);
++		return (imm << 18) >> 16;
++	}
 +
-+#endif  /*  __ASSEMBLY__  */
- 
- #endif /* __ASM_ALTERNATIVE_H */
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 959fe87..00df926 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -21,7 +21,7 @@
- #include <linux/init.h>
- #include <linux/linkage.h>
- 
--#include <asm/alternative-asm.h>
-+#include <asm/alternative.h>
- #include <asm/assembler.h>
- #include <asm/asm-offsets.h>
- #include <asm/cpufeature.h>
-diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-index 2560e1e..70a79cb 100644
---- a/arch/arm64/mm/cache.S
-+++ b/arch/arm64/mm/cache.S
-@@ -22,7 +22,7 @@
- #include <linux/init.h>
- #include <asm/assembler.h>
- #include <asm/cpufeature.h>
--#include <asm/alternative-asm.h>
-+#include <asm/alternative.h>
- 
- #include "proc-macros.S"
- 
++	/* Unhandled instruction */
++	BUG();
++}
++
++/*
++ * Encode the displacement of a branch in the imm field and return the
++ * updated instruction.
++ */
++u32 aarch64_set_branch_offset(u32 insn, s32 offset)
++{
++	if (aarch64_insn_is_b(insn) || aarch64_insn_is_bl(insn))
++		return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_26, insn,
++						     offset >> 2);
++
++	if (aarch64_insn_is_cbz(insn) || aarch64_insn_is_cbnz(insn) ||
++	    aarch64_insn_is_bcond(insn))
++		return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_19, insn,
++						     offset >> 2);
++
++	if (aarch64_insn_is_tbz(insn) || aarch64_insn_is_tbnz(insn))
++		return aarch64_insn_encode_immediate(AARCH64_INSN_IMM_14, insn,
++						     offset >> 2);
++
++	/* Unhandled instruction */
++	BUG();
++}
++
+ bool aarch32_insn_is_wide(u32 insn)
+ {
+ 	return insn >= 0xe800;
 -- 
 2.1.4
