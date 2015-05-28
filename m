@@ -1,102 +1,99 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 28 May 2015 14:01:19 +0100
-Subject: [RFC/PATCH 5/9] of: dma: Split of_configure_dma() into mask and
- ops configuration
-In-Reply-To: <1431644410-2997-6-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1431644410-2997-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1431644410-2997-6-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20150528130119.GG31001@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 28 May 2015 15:02:25 +0200
+Subject: [PATCH v3 4/5] arm64: alternative: Introduce feature for GICv3
+ CPU interface
+In-Reply-To: <5566DF72.4050507@arm.com>
+References: <1427461765-14462-1-git-send-email-marc.zyngier@arm.com>
+ <1427461765-14462-5-git-send-email-marc.zyngier@arm.com>
+ <20150514112523.GQ32765@cbox> <5566DF72.4050507@arm.com>
+Message-ID: <20150528130225.GD18009@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 15, 2015 at 12:00:06AM +0100, Laurent Pinchart wrote:
-> The of_configure_dma() function configures both the DMA masks and ops.
-> Moving DMA ops configuration to probe time would thus also delay
-> configuration of the DMA masks, which might not be safe. To avoid issues
-> split the configuration in two to allow keeping masks configuration at
-> device add time and move ops configuration to device probe time.
+On Thu, May 28, 2015 at 10:27:14AM +0100, Marc Zyngier wrote:
+> On 14/05/15 12:25, Christoffer Dall wrote:
+> > On Fri, Mar 27, 2015 at 01:09:24PM +0000, Marc Zyngier wrote:
+> >> Add a new item to the feature set (ARM64_HAS_SYSREG_GIC_CPUIF)
+> >> to indicate that we have a system register GIC CPU interface
+> >>
+> >> This will help KVM switching to alternative instruction patching.
+> >>
+> >> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+> >> Acked-by: Will Deacon <will.deacon@arm.com>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >>  arch/arm64/include/asm/cpufeature.h |  8 +++++++-
+> >>  arch/arm64/kernel/cpufeature.c      | 16 ++++++++++++++++
+> >>  2 files changed, 23 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+> >> index 6ae35d1..d9e57b5 100644
+> >> --- a/arch/arm64/include/asm/cpufeature.h
+> >> +++ b/arch/arm64/include/asm/cpufeature.h
+> >> @@ -23,8 +23,9 @@
+> >>  
+> >>  #define ARM64_WORKAROUND_CLEAN_CACHE		0
+> >>  #define ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE	1
+> >> +#define ARM64_HAS_SYSREG_GIC_CPUIF		2
+> >>  
+> >> -#define ARM64_NCAPS				2
+> >> +#define ARM64_NCAPS				3
+> >>  
+> >>  #ifndef __ASSEMBLY__
+> >>  
+> >> @@ -37,6 +38,11 @@ struct arm64_cpu_capabilities {
+> >>  			u32 midr_model;
+> >>  			u32 midr_range_min, midr_range_max;
+> >>  		};
+> >> +
+> >> +		struct {	/* Feature register checking */
+> >> +			u64 register_mask;
+> >> +			u64 register_value;
+> >> +		};
+> >>  	};
+> >>  };
+> >>  
+> >> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> >> index 3d9967e..b0bea2b3 100644
+> >> --- a/arch/arm64/kernel/cpufeature.c
+> >> +++ b/arch/arm64/kernel/cpufeature.c
+> >> @@ -22,7 +22,23 @@
+> >>  #include <asm/cpu.h>
+> >>  #include <asm/cpufeature.h>
+> >>  
+> >> +static bool
+> >> +has_id_aa64pfr0_feature(const struct arm64_cpu_capabilities *entry)
+> >> +{
+> >> +	u64 val;
+> >> +
+> >> +	val = read_cpuid(id_aa64pfr0_el1);
+> > 
+> > is this preferred compared to fishing it out of cpuinfo ?
 > 
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> ---
->  drivers/of/device.c       | 48 ++++++++++++++++++++++++++++++++++-------------
->  drivers/of/of_pci.c       |  3 ++-
->  drivers/of/platform.c     |  6 ++++--
->  include/linux/of_device.h | 11 +++++++++--
->  4 files changed, 50 insertions(+), 18 deletions(-)
+> Probably for the moment, yes. At some point, we should be able to have a
+> consolidated set of features, consistent across all CPUs in the system.
+> Once we have that, we should revisit this detection mecanism.
 > 
-> diff --git a/drivers/of/device.c b/drivers/of/device.c
-> index f1b84f464fe1..3cb3f78a6d13 100644
-> --- a/drivers/of/device.c
-> +++ b/drivers/of/device.c
-> @@ -70,7 +70,7 @@ int of_device_add(struct platform_device *ofdev)
->  }
->  
->  /**
-> - * of_dma_configure - Setup DMA configuration
-> + * of_dma_configure - Setup DMA masks and offset
->   * @dev:	Device to apply DMA configuration
->   * @np:		Pointer to OF node having DMA configuration
->   *
-> @@ -81,13 +81,11 @@ int of_device_add(struct platform_device *ofdev)
->   * can use a platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE events
->   * to fix up DMA configuration.
->   */
-> -void of_dma_configure(struct device *dev, struct device_node *np)
-> +void of_dma_configure_masks(struct device *dev, struct device_node *np)
->  {
-> -	u64 dma_addr, paddr, size;
-> -	int ret;
-> -	bool coherent;
-> +	u64 dma_addr, paddr, size, range_mask;
->  	unsigned long offset;
-> -	struct iommu_ops *iommu;
-> +	int ret;
->  
->  	/*
->  	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
-> @@ -105,9 +103,10 @@ void of_dma_configure(struct device *dev, struct device_node *np)
->  
->  	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
->  	if (ret < 0) {
-> -		dma_addr = offset = 0;
-> -		size = dev->coherent_dma_mask + 1;
-> +		range_mask = dev->coherent_dma_mask + 1;
+> >> +	return (val & entry->register_mask) == entry->register_value;
+> >> +}
+> >> +
+> >>  static const struct arm64_cpu_capabilities arm64_features[] = {
+> >> +	{
+> >> +		.desc = "system register GIC CPU interface",
+> >> +		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
+> >> +		.matches = has_id_aa64pfr0_feature,
+> >> +		.register_mask = (0xf << 24),
+> >> +		.register_value = (1 << 24),
+> > 
+> > I don't know if it's worth defining these masks in some header file.
+> > The only other place I could see them used was in head.S.
+> 
+> Mark was looking at this a while ago. Maybe a task for a sleepless
+> night? ;-)
+> 
 
-Hmm, do we still want this '+ 1'...
+yeah, you can add this to the patch if it helps:
 
-> +		offset = 0;
->  	} else {
-> +		range_mask = DMA_BIT_MASK(ilog2(dma_addr + size));
->  		offset = PFN_DOWN(paddr - dma_addr);
->  		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
->  	}
-> @@ -118,10 +117,31 @@ void of_dma_configure(struct device *dev, struct device_node *np)
->  	 * Limit coherent and dma mask based on size and default mask
->  	 * set by the driver.
->  	 */
-> -	dev->coherent_dma_mask = min(dev->coherent_dma_mask,
-> -				     DMA_BIT_MASK(ilog2(dma_addr + size)));
-> -	*dev->dma_mask = min((*dev->dma_mask),
-> -			     DMA_BIT_MASK(ilog2(dma_addr + size)));
-> +	dev->coherent_dma_mask = min(dev->coherent_dma_mask, range_mask);
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-... if we now compare directly with the mask here? In fact, this setting
-of the coherent_dma_mask could just belong in the else clause, no?
-
-> +	*dev->dma_mask = min((*dev->dma_mask), range_mask);
-
-Similar comment here, but we need to do this for both cases I guess.
-
-> +}
-> +EXPORT_SYMBOL_GPL(of_dma_configure_masks);
-> +
-> +/**
-> + * of_dma_configure_ops - Setup DMA operations
-> + * @dev:	Device to apply DMA configuration
-> + * @np:		Pointer to OF node having DMA configuration
-> + *
-> + * Try to get devices's DMA configuration from DT and update it
-
-Weird spelling.
-
-Will
+-Christoffer
