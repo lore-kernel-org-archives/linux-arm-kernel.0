@@ -1,140 +1,50 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 28 May 2015 17:17:30 +0100
-Subject: [RFC] Fix omap3 booting with thumb2 compiled kernel
-In-Reply-To: <20150528142125.GE30984@atomide.com>
-References: <20150527215545.GA30984@atomide.com>
- <7h7frtmzoh.fsf@deeprootsystems.com>
- <20150527225553.GC30984@atomide.com>
- <CANOLnOMYBFAr_t_tOs8ifo=ngtCrpyogtf_7hBDc4rmbC_-BQQ@mail.gmail.com>
- <20150528142125.GE30984@atomide.com>
-Message-ID: <20150528161730.GE3657@e103592.cambridge.arm.com>
+From: weigelt@melag.de (Enrico Weigelt, metux IT consult)
+Date: Thu, 28 May 2015 18:28:50 +0200
+Subject: imx53 IPU support on 4.0.4
+In-Reply-To: <20150520205554.GY2067@n2100.arm.linux.org.uk>
+References: <555C86A5.2030007@melag.de>
+ <20150520205554.GY2067@n2100.arm.linux.org.uk>
+Message-ID: <55674242.5040102@melag.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 28, 2015 at 07:21:25AM -0700, Tony Lindgren wrote:
-> * Grazvydas Ignotas <notasas@gmail.com> [150528 04:45]:
-> > On Thu, May 28, 2015 at 1:55 AM, Tony Lindgren <tony@atomide.com> wrote:
-> > > 8 <----------------------
-> > > From: Tony Lindgren <tony@atomide.com>
-> > > Date: Wed, 27 May 2015 15:33:57 -0700
-> > > Subject: [PATCH] ARM: OMAP3: Fix booting with thumb2 kernel
-> > >
-> > > We get a NULL pointer dereference on omap3 for thumb2 compiled kernels:
-> > >
-> > > Internal error: Oops: 80000005 [#1] SMP THUMB2
-> > > ...
-> > > [<c046497b>] (_raw_spin_unlock_irqrestore) from [<c0024375>]
-> > > (omap3_enter_idle_bm+0xc5/0x178)
-> > > [<c0024375>] (omap3_enter_idle_bm) from [<c0374e63>]
-> > > (cpuidle_enter_state+0x77/0x27c)
-> > > [<c0374e63>] (cpuidle_enter_state) from [<c00627f1>]
-> > > (cpu_startup_entry+0x155/0x23c)
-> > > [<c00627f1>] (cpu_startup_entry) from [<c06b9a47>]
-> > > (start_kernel+0x32f/0x338)
-> > > [<c06b9a47>] (start_kernel) from [<8000807f>] (0x8000807f)
-> > >
-> > > The power management related assembly on moaps needs to interact with
-> > 
-> > moaps -> omaps
-> 
-> Thanks, fixed now. I also added a link for why ENDPROC is needed to the
-> description. I'll apply the patch below into fixes today.
-> 
-> Regards,
-> 
-> Tony
-> 
-> 8< ----------------------
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Wed, 27 May 2015 15:33:57 -0700
-> Subject: [PATCH] ARM: OMAP3: Fix booting with thumb2 kernel
-> 
-> We get a NULL pointer dereference on omap3 for thumb2 compiled kernels:
-> 
-> Internal error: Oops: 80000005 [#1] SMP THUMB2
-> ...
-> [<c046497b>] (_raw_spin_unlock_irqrestore) from [<c0024375>]
-> (omap3_enter_idle_bm+0xc5/0x178)
-> [<c0024375>] (omap3_enter_idle_bm) from [<c0374e63>]
-> (cpuidle_enter_state+0x77/0x27c)
-> [<c0374e63>] (cpuidle_enter_state) from [<c00627f1>]
-> (cpu_startup_entry+0x155/0x23c)
-> [<c00627f1>] (cpu_startup_entry) from [<c06b9a47>]
-> (start_kernel+0x32f/0x338)
-> [<c06b9a47>] (start_kernel) from [<8000807f>] (0x8000807f)
-> 
-> The power management related assembly on omaps needs to interact with
-> ARM mode bootrom code, so we need to keep most of the related assembly
-> in ARM mode.
-> 
-> Turns out this error is because of missing ENDPROC for assembly code
-> as suggested by Stephen Boyd <sboyd@codeaurora.org>. Let's add the
-> missing ENDPROC in two places to sleep34xx.S, and also remove the
-> earlier mystery code that was probably also caused by missing ENDPROC
-> for earlier kernels.
-> 
-> The reason why ENDPROC makes a difference is it sets .type and then
-> the compiler knows what to do with the thumb bit as explained at:
-> 
-> https://wiki.ubuntu.com/ARM/Thumb2PortingHowto
-> 
-> Reported-by: Kevin Hilman <khilman@kernel.org>
-> Tested-by: Kevin Hilman <khilman@linaro.org>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> --- a/arch/arm/mach-omap2/sleep34xx.S
-> +++ b/arch/arm/mach-omap2/sleep34xx.S
-> @@ -203,23 +203,8 @@ save_context_wfi:
->  	 */
->  	ldr	r1, kernel_flush
->  	blx	r1
-> -	/*
-> -	 * The kernel doesn't interwork: v7_flush_dcache_all in particluar will
-> -	 * always return in Thumb state when CONFIG_THUMB2_KERNEL is enabled.
-> -	 * This sequence switches back to ARM.  Note that .align may insert a
-> -	 * nop: bx pc needs to be word-aligned in order to work.
-> -	 */
-> - THUMB(	.thumb		)
-> - THUMB(	.align		)
-> - THUMB(	bx	pc	)
-> - THUMB(	nop		)
-> -	.arm
-> -
+Am 20.05.2015 um 22:55 schrieb Russell King - ARM Linux:
 
-^ This looks unrelated to the issue?  This code is simply unnecessary
-after Russell introduced the "ret" macro in commit 6ebbf2ce43.  That
-made v7_flush_dcache_all do a proper interworking return.
+Hi,
 
-It should probably be in a separate commit, or at least mentioned
-explicitly in the commit log.
+ > The way kernel development works is that patches are sent to mailing
+> lists for review.  Kernel developers review the patches and provide
+> comments back.  The comments are discussed and actioned, and a new
+> set of patches posted for further review.  This cycle repeats.
+
+Okay. I just wanted to prevent too much traffic.
+But I'll use git-send-email, if you prefer.
+
+> When everyone is happy, the patches can be applied, or pulled from
+> a non-github git tree.  (Kernel people generally don't like github.)
+
+Why so ?
+
+> This is so that upstream kernel developers don't get too overloaded
+> with work that really should be done by downstream folk (imagine if
+> they had to rewrite every patch that came their way...)
+
+Of course. I wasn't aware of the separate linux-media maillist at that
+time.
+
+By the way: I've now moved to Phillip's recent ipuv3 patches, but still
+have lots of others (about 30) for my tqma53-based board, which might
+be generic enough for going into mainline someday (many of them by
+ptx folks).
+
+Should I post them to lkml or somewhere else ?
 
 
->  	b	omap3_do_wfi
-> -
-> -/*
-> - * Local variables
-> - */
+cu
+--
+Enrico Weigelt, metux IT consult
++49-151-27565287
+MELAG Medizintechnik oHG Sitz Berlin Registergericht AG Charlottenburg HRA 21333 B
 
-^ Likewise this is just tidyup, not bug fixing.
-
-
-> +ENDPROC(omap34xx_cpu_suspend)
->  omap3_do_wfi_sram_addr:
->  	.word omap3_do_wfi_sram
->  kernel_flush:
-> @@ -364,10 +349,7 @@ exit_nonoff_modes:
->   * ===================================
->   */
->  	ldmfd	sp!, {r4 - r11, pc}	@ restore regs and return
-> -
-> -/*
-> - * Local variables
-> - */
-> +ENDPROC(omap3_do_wfi)
-
-The ENDPROC()s look appropriate here.
-
-[...]
-
-Cheers
----Dave
+Wichtiger Hinweis: Diese Nachricht kann vertrauliche oder nur f?r einen begrenzten Personenkreis bestimmte Informationen enthalten. Sie ist ausschlie?lich f?r denjenigen bestimmt, an den sie gerichtet worden ist. Wenn Sie nicht der Adressat dieser E-Mail sind, d?rfen Sie diese nicht kopieren, weiterleiten, weitergeben oder sie ganz oder teilweise in irgendeiner Weise nutzen. Sollten Sie diese E-Mail irrt?mlich erhalten haben, so benachrichtigen Sie bitte den Absender, indem Sie auf diese Nachricht antworten. Bitte l?schen Sie in diesem Fall diese Nachricht und alle Anh?nge, ohne eine Kopie zu behalten.
+Important Notice: This message may contain confidential or privileged information. It is intended only for the person it was addressed to. If you are not the intended recipient of this email you may not copy, forward, disclose or otherwise use it or any part of it in any form whatsoever. If you received this email in error please notify the sender by replying and delete this message and any attachments without retaining a copy.
