@@ -1,121 +1,60 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 28 May 2015 07:21:25 -0700
-Subject: [RFC] Fix omap3 booting with thumb2 compiled kernel
-In-Reply-To: <CANOLnOMYBFAr_t_tOs8ifo=ngtCrpyogtf_7hBDc4rmbC_-BQQ@mail.gmail.com>
-References: <20150527215545.GA30984@atomide.com>
- <7h7frtmzoh.fsf@deeprootsystems.com>
- <20150527225553.GC30984@atomide.com>
- <CANOLnOMYBFAr_t_tOs8ifo=ngtCrpyogtf_7hBDc4rmbC_-BQQ@mail.gmail.com>
-Message-ID: <20150528142125.GE30984@atomide.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 28 May 2015 15:26:55 +0100
+Subject: [PATCH V2 5/6] regulator: add mxs on-chip regulator driver
+In-Reply-To: <1973961885.66028.1432760281554.JavaMail.open-xchange@oxbsltgw06.schlund.de>
+References: <1430346747-28728-6-git-send-email-stefan.wahren@i2se.com>
+ <20150504123648.GU15510@sirena.org.uk>
+ <1693367404.879766.1430771695242.JavaMail.open-xchange@oxbaltgw08.schlund.de>
+ <1875749167.82542.1431023838932.JavaMail.open-xchange@oxbsltgw04.schlund.de>
+ <20150507185216.GP22845@sirena.org.uk>
+ <535744342.64563.1431026719818.JavaMail.open-xchange@oxbsltgw09.schlund.de>
+ <20150507193236.GS22845@sirena.org.uk>
+ <1290103954.26573.1432642616013.JavaMail.open-xchange@oxbsltgw08.schlund.de>
+ <20150527173321.GH21577@sirena.org.uk>
+ <1973961885.66028.1432760281554.JavaMail.open-xchange@oxbsltgw06.schlund.de>
+Message-ID: <20150528142655.GX21577@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grazvydas Ignotas <notasas@gmail.com> [150528 04:45]:
-> On Thu, May 28, 2015 at 1:55 AM, Tony Lindgren <tony@atomide.com> wrote:
-> > 8 <----------------------
-> > From: Tony Lindgren <tony@atomide.com>
-> > Date: Wed, 27 May 2015 15:33:57 -0700
-> > Subject: [PATCH] ARM: OMAP3: Fix booting with thumb2 kernel
-> >
-> > We get a NULL pointer dereference on omap3 for thumb2 compiled kernels:
-> >
-> > Internal error: Oops: 80000005 [#1] SMP THUMB2
-> > ...
-> > [<c046497b>] (_raw_spin_unlock_irqrestore) from [<c0024375>]
-> > (omap3_enter_idle_bm+0xc5/0x178)
-> > [<c0024375>] (omap3_enter_idle_bm) from [<c0374e63>]
-> > (cpuidle_enter_state+0x77/0x27c)
-> > [<c0374e63>] (cpuidle_enter_state) from [<c00627f1>]
-> > (cpu_startup_entry+0x155/0x23c)
-> > [<c00627f1>] (cpu_startup_entry) from [<c06b9a47>]
-> > (start_kernel+0x32f/0x338)
-> > [<c06b9a47>] (start_kernel) from [<8000807f>] (0x8000807f)
-> >
-> > The power management related assembly on moaps needs to interact with
-> 
-> moaps -> omaps
+On Wed, May 27, 2015 at 10:58:01PM +0200, Stefan Wahren wrote:
 
-Thanks, fixed now. I also added a link for why ENDPROC is needed to the
-description. I'll apply the patch below into fixes today.
+> In case of a single driver instance instead of 4 ones (vddd, vddio, vdda,
+> dc-dc), things would be much easier.
 
-Regards,
+> Here are the steps for disabling DC-DC:
 
-Tony
+> 1. configure vddio to work without DC-DC
+> 2. configure vdda to work without DC-DC
+> 3. configure vddd to work without DC-DC
+> 4. backup DC-DC settings
+> 5. disable brownout detection
+> 6. disable DC-DC
+> 7. restore DC-DC settings
 
-8< ----------------------
-From: Tony Lindgren <tony@atomide.com>
-Date: Wed, 27 May 2015 15:33:57 -0700
-Subject: [PATCH] ARM: OMAP3: Fix booting with thumb2 kernel
+> My problem is that step 1 to 3 must be done step by step through the other
+> regulator instances.
 
-We get a NULL pointer dereference on omap3 for thumb2 compiled kernels:
+For the regulator API steps 1-3 aren't going to be needed since
+dependency management means that we won't try to disable a regulator
+that we think is in use.
 
-Internal error: Oops: 80000005 [#1] SMP THUMB2
-...
-[<c046497b>] (_raw_spin_unlock_irqrestore) from [<c0024375>]
-(omap3_enter_idle_bm+0xc5/0x178)
-[<c0024375>] (omap3_enter_idle_bm) from [<c0374e63>]
-(cpuidle_enter_state+0x77/0x27c)
-[<c0374e63>] (cpuidle_enter_state) from [<c00627f1>]
-(cpu_startup_entry+0x155/0x23c)
-[<c00627f1>] (cpu_startup_entry) from [<c06b9a47>]
-(start_kernel+0x32f/0x338)
-[<c06b9a47>] (start_kernel) from [<8000807f>] (0x8000807f)
+> > If it's much more complicated than that
+> > then I think putting a comment in the driver explaining what the issue
+> > is would be the right step, that would address the issue with the driver
+> > looking strange.
 
-The power management related assembly on omaps needs to interact with
-ARM mode bootrom code, so we need to keep most of the related assembly
-in ARM mode.
+> Enabling or disabling DC-DC is only needed internally by the power subsystem
+> (e.g. in case of handoff AC to battery), because the DC-DC only supplys the
+> regulator daisy. From my understanding hardware components could use only the
+> regulator outputs. In the end a state change is necessary, but it shouldn't be a
+> public.
 
-Turns out this error is because of missing ENDPROC for assembly code
-as suggested by Stephen Boyd <sboyd@codeaurora.org>. Let's add the
-missing ENDPROC in two places to sleep34xx.S, and also remove the
-earlier mystery code that was probably also caused by missing ENDPROC
-for earlier kernels.
-
-The reason why ENDPROC makes a difference is it sets .type and then
-the compiler knows what to do with the thumb bit as explained at:
-
-https://wiki.ubuntu.com/ARM/Thumb2PortingHowto
-
-Reported-by: Kevin Hilman <khilman@kernel.org>
-Tested-by: Kevin Hilman <khilman@linaro.org>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/arch/arm/mach-omap2/sleep34xx.S
-+++ b/arch/arm/mach-omap2/sleep34xx.S
-@@ -203,23 +203,8 @@ save_context_wfi:
- 	 */
- 	ldr	r1, kernel_flush
- 	blx	r1
--	/*
--	 * The kernel doesn't interwork: v7_flush_dcache_all in particluar will
--	 * always return in Thumb state when CONFIG_THUMB2_KERNEL is enabled.
--	 * This sequence switches back to ARM.  Note that .align may insert a
--	 * nop: bx pc needs to be word-aligned in order to work.
--	 */
-- THUMB(	.thumb		)
-- THUMB(	.align		)
-- THUMB(	bx	pc	)
-- THUMB(	nop		)
--	.arm
--
- 	b	omap3_do_wfi
--
--/*
-- * Local variables
-- */
-+ENDPROC(omap34xx_cpu_suspend)
- omap3_do_wfi_sram_addr:
- 	.word omap3_do_wfi_sram
- kernel_flush:
-@@ -364,10 +349,7 @@ exit_nonoff_modes:
-  * ===================================
-  */
- 	ldmfd	sp!, {r4 - r11, pc}	@ restore regs and return
--
--/*
-- * Local variables
-- */
-+ENDPROC(omap3_do_wfi)
- sdrc_power:
- 	.word	SDRC_POWER_V
- cm_idlest1_core:
+Should this actually be shown as a regulator then and not as part of the
+power controller?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150528/3b54f5a5/attachment.sig>
