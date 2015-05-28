@@ -1,71 +1,92 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Fri, 29 May 2015 00:27:21 +0200
-Subject: runtime check for omap-aes bus access permission (was: Re:
- 3.13-rc3 (commit 7ce93f3) breaks Nokia N900 DT boot)
-In-Reply-To: <20150528222412.GM30984@atomide.com>
-References: <20131206213613.GA19648@earth.universe>
- <CAALWOA8Pfc_zbN9MoHwR=njPBpFU56WObYMbGv9N7ktzy+RSeQ@mail.gmail.com>
- <20150528222412.GM30984@atomide.com>
-Message-ID: <201505290027.21231@pali>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 28 May 2015 15:36:36 -0700
+Subject: [PATCH 2/3 v4] ARM: bcm2835: Add the Raspberry Pi firmware driver
+In-Reply-To: <5567886F.5080108@wwwdotorg.org>
+References: <20150528114500.GP11677@x1>
+ <1432837987-22861-1-git-send-email-eric@anholt.net>
+ <5567886F.5080108@wwwdotorg.org>
+Message-ID: <87twuw72iz.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 May 2015 00:24:13 Tony Lindgren wrote:
-> * Matthijs van Duin <matthijsvanduin@gmail.com> [150528 13:28]:
-> > On 28 May 2015 at 18:01, Tony Lindgren <tony@atomide.com> wrote:
-> > > For failed device access you get an interrupt
-> > 
-> > Well for failed reads you get a bus error, and "catching" those
-> > (e.g. using the existing exception mechanism used to catch MMU
-> > faults) is the whole issue.
-> > 
-> > Though now that you mention it, it is true that for writes you
-> > won't get any fault (at least on the DM814x and AM335x the posting
-> > point appears to be the async bridge from MPUSS to the L3
-> > interconnect) but an interconnect error irq instead. It may be
-> > easier to make some kind of harmless write (e.g. to the version
-> > register), wait a bit, and check if the write triggered an
-> > interconnect error.
-> > 
-> > Feels hackish though: you'd need to be sure you waited long enough
-> > (though using a read from another device on the same L4
-> > interconnect should be a reliable barrier in this case), and
-> > drivers for receiving/interpreting interconnect errors are not
-> > implemented yet on all SoCs (for some, like the AM335x, TI didn't
-> > even bother publishing the relevant data in its TRM). Interconnect
-> > errors can also be lost in some cases (multiple errors involving
-> > the same target in a short time window) though that problem
-> > shouldn't arise in this particular case.
-> 
-> Hmm I believe the interrupt happens immediately trying to access an
-> invalid device. But maybe I'm thinking about just errors if a device
-> is not powered or clocked. So obviously some experiments need to be
-> done :)
-> 
-> The advantage here would be that the l3 driver actually already knows
-> quite a bit about the devices on the bus.
-> 
-> > Also, presumably interconnect error reporting is unavailable on HS
-> > devices given the fact that all interconnect registers seemed to be
-> > inaccessible?
-> 
-> Oh OK yeah then that would not work for Pali's case. I guess it just
-> needs to be tested.
-> 
-> Regards,
-> 
-> Tony
+Stephen Warren <swarren@wwwdotorg.org> writes:
 
-Ok, thanks for info. Do you have some quick small patches for testing? 
-Or some pointers what is needed to modify and how?
+> On 05/28/2015 12:33 PM, Eric Anholt wrote:
+>> This gives us a function for making mailbox property channel requests
+>> of the firmware, which is most notable in that it will let us get and
+>> set clock rates.
+>
+> This thread was rather hard to follow since updated versions of patches
+> were sent "in response" to the original posting rather than as a new
+> thread. Generally it's best to post a complete copy of each new version
+> of the series, and as a completely standalone thread.
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
+Will do.
+
+>> diff --git a/drivers/firmware/Makefile b/drivers/firmware/Makefile
+>
+>> +obj-$(CONFIG_BCM2835_MBOX)	+= raspberrypi.o
+>
+> I think this warrants its own Kconfig option that depends on _MBOX.
+
+Done, called it RASPBERRPI_FIRMWARE
+
+>> diff --git a/drivers/firmware/raspberrypi.c b/drivers/firmware/raspberrypi.c
+>
+>> +int rpi_firmware_property_list(struct device_node *of_node,
+>> +			       void *data, size_t tag_size)
+>> +{
+>> +	struct platform_device *pdev = of_find_device_by_node(of_node);
+>
+> I would expect the of_node -> pdev mapping to happen at client device
+> probe time. Simplest for this driver would be if the
+> client-probe-time-mapping function returned the "struct rpi_firmware"
+> and the client passed that to this function.
+
+Done.
+
+>> +	struct rpi_firmware *fw = platform_get_drvdata(pdev);
+>> +	size_t size = tag_size + 12;
+>> +	u32 *buf;
+>> +	dma_addr_t bus_addr;
+>> +	int ret;
+>> +
+>> +	if (!fw)
+>> +		return -EPROBE_DEFER;
+>
+> That return code should only be used in functions called at probe time.
+> While I do see the expectation is that clients call this function once
+> at probe time and hence guarantee to see -EPROBE_DEFER at probe time (if
+> at all), it's rather odd for a function that's intended to be called at
+> times other that probe() to ever have the possibility of returning
+> -EPROBE_DEFER. If somehow that values gets returned at another time,
+> it's going to be rather confusing to the client.
+
+Dropped now that I'm passing fw in.
+
+>> +	buf[0] = size;
+>> +	buf[1] = RPI_FIRMWARE_STATUS_REQUEST;
+>> +	memcpy(&buf[2], data, tag_size);
+>> +	buf[size / 4 - 1] = RPI_FIRMWARE_PROPERTY_END;
+>
+> Out of curiosity, why not require the client to format the entire
+> message itself? In theory at least, the client could submit a whole
+> "string" of tags at once, so it really seems like the client should be
+> constructing the whole message.
+
+Because it's something extra for the client to screw up?  I mean, if we
+were going for super high performance, we'd have the client asking us
+for a DMA buffer to write into, and they'd write the whole thing, and
+submit that back to us.  But we don't need that, because the property
+channel is used so rarely.
+
+I briefly used multi-tag in a not-for-upstream KMS-using-the-firmware
+branch, but it turned out the FB MBOX channel was strictly better (once
+I worked around a fw bug).
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150529/f1493a36/attachment-0001.sig>
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150528/c3a5e414/attachment.sig>
