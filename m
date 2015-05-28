@@ -1,46 +1,27 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 28 May 2015 01:39:38 +0200
-Subject: [PATCH v3 12/12] ARM: imx: move timer driver into
- drivers/clocksource
-In-Reply-To: <20150527140448.GJ16165@dragon>
-References: <1432308599-28643-13-git-send-email-shawn.guo@linaro.org>
- <1432530849-12312-1-git-send-email-shawn.guo@linaro.org>
- <5565BD93.50600@linaro.org> <20150527140448.GJ16165@dragon>
-Message-ID: <556655BA.3020903@linaro.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 28 May 2015 09:39:08 +0900
+Subject: [PATCH 1/2] ARM: multi_v7_defconfig: Replace
+ CONFIG_USB_ISP1760_HCD by CONFIG_USB_ISP1760
+In-Reply-To: <1432637918-8946-1-git-send-email-geert+renesas@glider.be>
+References: <1432637918-8946-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20150528003903.GB9384@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/27/2015 04:04 PM, Shawn Guo wrote:
-> On Wed, May 27, 2015 at 02:50:27PM +0200, Daniel Lezcano wrote:
->> On 05/25/2015 07:14 AM, Shawn Guo wrote:
->>> After the cleanup on imx timer driver, now it's ready to be moved into
->>> drivers/clocksource/.  Let's do it.
->>>
->>> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
->>
->> I don't see the Kconfig change.
->
-> As timer-imx-gpt is the only supported timer for i.MX, we use
-> architecture option CONFIG_ARCH_MXC to control it for now.
+On Tue, May 26, 2015 at 12:58:37PM +0200, Geert Uytterhoeven wrote:
+> Since commit 100832abf065bc18 ("usb: isp1760: Make HCD support
+> optional"), CONFIG_USB_ISP1760_HCD is automatically selected when
+> needed.  Enabling that option in the defconfig is now a no-op, and no
+> longer enables ISP1760 HCD support.
+> 
+> Re-enable the ISP1760 driver in the defconfig by enabling
+> USB_ISP1760_HOST_ROLE instead.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Hi Shawn,
+Thanks, I have queued this up for v4.3.
 
-please use the same as:
-
-https://lkml.org/lkml/2015/5/22/855
-
-and then add in the platform's Kconfig the timer option as:
-
-https://lkml.org/lkml/2015/5/22/937
-
-Thanks
-
-   -- Daniel
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+I would not object at all if the ARM SoC maintainers wish to
+take this earlier and I'd be happy to prepare a pull request
+to that effect once the change has sat in next. Unfortunately
+I anticipate that will be after the standard rc6 deadline.
