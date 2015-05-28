@@ -1,11 +1,11 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 28 May 2015 21:57:23 +0900
-Subject: [PATCH] pinctrl: zynq: add static to zynq_pins
-Message-ID: <1432817843-6038-1-git-send-email-yamada.masahiro@socionext.com>
+Date: Thu, 28 May 2015 21:57:53 +0900
+Subject: [PATCH] pinctrl: zynq: add static const to zynq_pctrl_groups
+Message-ID: <1432817873-6106-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This array is only referenced in this file.
+This array is only referenced in this file and never updated.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
@@ -14,17 +14,17 @@ Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/pinctrl/pinctrl-zynq.c b/drivers/pinctrl/pinctrl-zynq.c
-index 0ff653c..a687f24 100644
+index a687f24..93d3774 100644
 --- a/drivers/pinctrl/pinctrl-zynq.c
 +++ b/drivers/pinctrl/pinctrl-zynq.c
-@@ -123,7 +123,7 @@ enum zynq_pinmux_functions {
- 	ZYNQ_PMUX_MAX_FUNC
- };
+@@ -369,7 +369,7 @@ static const unsigned int usb1_0_pins[] = {40, 41, 42, 43, 44, 45, 46, 47, 48,
+ 		.npins = ARRAY_SIZE(nm ## _pins), \
+ 	}
  
--const struct pinctrl_pin_desc zynq_pins[] = {
-+static const struct pinctrl_pin_desc zynq_pins[] = {
- 	PINCTRL_PIN(0,  "MIO0"),
- 	PINCTRL_PIN(1,  "MIO1"),
- 	PINCTRL_PIN(2,  "MIO2"),
+-struct zynq_pctrl_group zynq_pctrl_groups[] = {
++static const struct zynq_pctrl_group zynq_pctrl_groups[] = {
+ 	DEFINE_ZYNQ_PINCTRL_GRP(ethernet0_0),
+ 	DEFINE_ZYNQ_PINCTRL_GRP(ethernet1_0),
+ 	DEFINE_ZYNQ_PINCTRL_GRP(mdio0_0),
 -- 
 1.9.1
