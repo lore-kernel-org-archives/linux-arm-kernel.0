@@ -1,120 +1,57 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 28 May 2015 13:57:31 +0200
-Subject: [PATCH 1/2] rtc: mxc: add a second clock
-In-Reply-To: <1431729330-7625-2-git-send-email-tremyfr@gmail.com>
-References: <1431729330-7625-1-git-send-email-tremyfr@gmail.com>
- <1431729330-7625-2-git-send-email-tremyfr@gmail.com>
-Message-ID: <20150528115731.GN2185@piout.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 28 May 2015 12:58:23 +0100
+Subject: [PATCH v4 01/18] mfd: add new driver for Sharp LoCoMo
+In-Reply-To: <CALT56yO5Eu4Bk+_4sn2WgURh9YTsym9inWkvJftKUi_aLy5XXw@mail.gmail.com>
+References: <1432554113-26280-1-git-send-email-dbaryshkov@gmail.com>
+ <1432554113-26280-2-git-send-email-dbaryshkov@gmail.com>
+ <20150527102756.GH11677@x1>
+ <CALT56yO5Eu4Bk+_4sn2WgURh9YTsym9inWkvJftKUi_aLy5XXw@mail.gmail.com>
+Message-ID: <20150528115823.GQ11677@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 27 May 2015, Dmitry Eremin-Solenikov wrote:
 
-On 16/05/2015 at 00:35:29 +0200, Philippe Reynes wrote :
-> The mxc RTC needs two clocks, one for the input
-> reference, and one for the IP. But this driver
-> was only using one clock (for the reference).
-> This patch add the second clock (for the IP).
+> 2015-05-27 13:27 GMT+03:00 Lee Jones <lee.jones@linaro.org>:
+> > On Mon, 25 May 2015, Dmitry Eremin-Solenikov wrote:
+> >
+> >> LoCoMo is a GA used on Sharp Zaurus SL-5x00. Current driver does has
+> >> several design issues (special bus instead of platform bus, doesn't use
+> >> mfd-core, etc).
+> >>
+> >> Implement 'core' parts of locomo support as an mfd driver.
+> >>
+> >> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> >> ---
+> >
+> > These things are much easier to re-review if you keep a change-log
+> > here.
+> >
+> >>  drivers/mfd/Kconfig        |  10 ++
+> >>  drivers/mfd/Makefile       |   1 +
+> >>  drivers/mfd/locomo.c       | 336 +++++++++++++++++++++++++++++++++++++++++++++
+> >>  include/linux/mfd/locomo.h | 169 +++++++++++++++++++++++
+> >>  4 files changed, 516 insertions(+)
+> >>  create mode 100644 drivers/mfd/locomo.c
+> >>  create mode 100644 include/linux/mfd/locomo.h
+> >
+> > Looks good now though:
+> >   Acked-by: Lee Jones <lee.jones@linaro.org>
+> >
+> > How do you plan for this to be merged?
 > 
-> Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
-> ---
->  arch/arm/mach-imx/clk-imx31.c |    3 ++-
->  drivers/rtc/rtc-mxc.c         |   26 +++++++++++++++++---------
->  2 files changed, 19 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx31.c b/arch/arm/mach-imx/clk-imx31.c
-> index 286ef42..480c54f 100644
-> --- a/arch/arm/mach-imx/clk-imx31.c
-> +++ b/arch/arm/mach-imx/clk-imx31.c
-> @@ -130,7 +130,8 @@ int __init mx31_clocks_init(unsigned long fref)
->  	clk_register_clkdev(clk[cspi3_gate], NULL, "imx31-cspi.2");
->  	clk_register_clkdev(clk[pwm_gate], "pwm", NULL);
->  	clk_register_clkdev(clk[wdog_gate], NULL, "imx2-wdt.0");
-> -	clk_register_clkdev(clk[rtc_gate], NULL, "imx21-rtc");
-> +	clk_register_clkdev(clk[ckil], "rtc", "imx21-rtc");
-> +	clk_register_clkdev(clk[rtc_gate], "ipg", "imx21-rtc");
->  	clk_register_clkdev(clk[epit1_gate], "epit", NULL);
->  	clk_register_clkdev(clk[epit2_gate], "epit", NULL);
->  	clk_register_clkdev(clk[nfc], NULL, "imx27-nand.0");
+> I'd like for this to be merged either through mfd tree or through the
+> arm-soc (or rmk's ARM) tree.
+> Some of the respective maintainers already gave their blessing for
+> this patchset to be merged
+> not through their subsystem trees.
 
-This should probably go in a separate patch so that Shawn can apply it.
-
-
-> diff --git a/drivers/rtc/rtc-mxc.c b/drivers/rtc/rtc-mxc.c
-> index 09d422b..e916a91 100644
-> --- a/drivers/rtc/rtc-mxc.c
-> +++ b/drivers/rtc/rtc-mxc.c
-> @@ -79,7 +79,8 @@ struct rtc_plat_data {
->  	struct rtc_device *rtc;
->  	void __iomem *ioaddr;
->  	int irq;
-> -	struct clk *clk;
-> +	struct clk *clk_rtc;
-> +	struct clk *clk_ipg;
->  	struct rtc_time g_rtc_alarm;
->  	enum imx_rtc_type devtype;
->  };
-> @@ -373,17 +374,24 @@ static int mxc_rtc_probe(struct platform_device *pdev)
->  	if (IS_ERR(pdata->ioaddr))
->  		return PTR_ERR(pdata->ioaddr);
->  
-> -	pdata->clk = devm_clk_get(&pdev->dev, NULL);
-> -	if (IS_ERR(pdata->clk)) {
-> -		dev_err(&pdev->dev, "unable to get clock!\n");
-> -		return PTR_ERR(pdata->clk);
-> +	pdata->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
-> +	if (IS_ERR(pdata->clk_ipg)) {
-> +		dev_err(&pdev->dev, "unable to get ipg clock!\n");
-> +		return PTR_ERR(pdata->clk_ipg);
->  	}
->  
-> -	ret = clk_prepare_enable(pdata->clk);
-> +	ret = clk_prepare_enable(pdata->clk_ipg);
->  	if (ret)
->  		return ret;
->  
-> -	rate = clk_get_rate(pdata->clk);
-> +	pdata->clk_rtc = devm_clk_get(&pdev->dev, "rtc");
-> +	if (IS_ERR(pdata->clk_rtc)) {
-> +		dev_err(&pdev->dev, "unable to get rtc clock!\n");
-> +		ret = PTR_ERR(pdata->clk_rtc);
-> +		goto exit_put_clk;
-> +	}
-> +
-> +	rate = clk_get_rate(pdata->clk_rtc);
-
-You are getting the rate but don't you need to clk_prepare_enable()?
-
-Also, aren't those devm_clk_get now failing on i.mx35? Maybe it was
-already failing before that patch as I don't see any rtc clock being
-registeres in clk-imx35.c
-
->  
->  	if (rate == 32768)
->  		reg = RTC_INPUT_CLK_32768HZ;
-> @@ -432,7 +440,7 @@ static int mxc_rtc_probe(struct platform_device *pdev)
->  	return 0;
->  
->  exit_put_clk:
-> -	clk_disable_unprepare(pdata->clk);
-> +	clk_disable_unprepare(pdata->clk_ipg);
->  
->  	return ret;
->  }
-> @@ -441,7 +449,7 @@ static int mxc_rtc_remove(struct platform_device *pdev)
->  {
->  	struct rtc_plat_data *pdata = platform_get_drvdata(pdev);
->  
-> -	clk_disable_unprepare(pdata->clk);
-> +	clk_disable_unprepare(pdata->clk_ipg);
->  
->  	return 0;
->  }
-> -- 
-> 1.7.4.4
-> 
+I can take it through MFD.  Once you have all the required Acks,
+resubmit the set with them all applied with a note in the cover-letter
+to that affect and I'll apply.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
