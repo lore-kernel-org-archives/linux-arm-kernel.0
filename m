@@ -1,65 +1,185 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 28 May 2015 14:57:31 -0700
-Subject: [PATCH v2 2/3] clk: meson: Document bindings for Meson8b clock
- controller
-In-Reply-To: <1431773333-23567-3-git-send-email-carlo@caione.org>
+Date: Thu, 28 May 2015 15:01:00 -0700
+Subject: [PATCH v2 3/3] clk: meson8b: Add support for Meson8b clocks
+In-Reply-To: <1431773333-23567-4-git-send-email-carlo@caione.org>
 References: <1431773333-23567-1-git-send-email-carlo@caione.org>
- <1431773333-23567-3-git-send-email-carlo@caione.org>
-Message-ID: <20150528215731.GD24204@codeaurora.org>
+ <1431773333-23567-4-git-send-email-carlo@caione.org>
+Message-ID: <20150528220100.GE24204@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 05/16, Carlo Caione wrote:
-> From: Carlo Caione <carlo@endlessm.com>
-> 
-> Add documentation for  the clock controller.
-> 
-> Signed-off-by: Carlo Caione <carlo@endlessm.com>
-> ---
->  .../bindings/clock/amlogic,meson8b-clkc.txt        | 40 ++++++++++++++++++++++
->  1 file changed, 40 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt b/Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt
+> diff --git a/drivers/clk/meson/meson8b-clkc.c b/drivers/clk/meson/meson8b-clkc.c
 > new file mode 100644
-> index 0000000..2b7b3fa
+> index 0000000..b8be5c7
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt
-> @@ -0,0 +1,40 @@
-> +* Amlogic Meson8b Clock and Reset Unit
+> +++ b/drivers/clk/meson/meson8b-clkc.c
+> @@ -0,0 +1,182 @@
+> +/*
+> + * Copyright (c) 2015 Endless Mobile, Inc.
+> + * Author: Carlo Caione <carlo@endlessm.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
 > +
-> +The Amlogic Meson8b clock controller generates and supplies clock to various
-> +controllers within the SoC.
-> +
-> +Required Properties:
-> +
-> +- compatible: should be "amlogic,meson8b-clkc"
-> +- reg: it must be composed by two tuples:
-> +	0) physical base address of the xtal register and length of memory
-> +	   mapped region.
-> +	1) physical base address of the clock controller and length of memory
-> +	   mapped region.
-> +
-> +- #clock-cells: should be 1.
-> +
-> +Each clock is assigned an identifier and client nodes can use this identifier
-> +to specify the clock which they consume. All available clocks are defined as
-> +preprocessor macros in the dt-bindings/clock/meson8b-clkc.h header and can be
-> +used in device tree sources.
-> +
-> +Example: Clock controller node:
-> +
-> +	clkc: clock-controller at c1104000 {
+> +#include <linux/clk.h>
 
-The address after the '@' should be the first reg property.
+Do you need this include?
 
-> +		#clock-cells = <1>;
-> +		compatible = "amlogic,meson8b-clkc";
-> +		reg = <0xc1108000 0x4>, <0xc1104000 0x460>;
+> +#include <linux/clk-provider.h>
+> +#include <linux/kernel.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/slab.h>
+> +#include <dt-bindings/clock/meson8b-clkc.h>
+> +
+> +#include "clkc.h"
+> +
+> +#define MESON8B_REG_CTL0_ADDR		0x0000
+> +#define MESON8B_REG_SYS_CPU_CNTL1	0x015c
+> +#define MESON8B_REG_HHI_MPEG		0x0174
+> +#define MESON8B_REG_MALI		0x01b0
+> +#define MESON8B_REG_PLL_FIXED		0x0280
+> +#define MESON8B_REG_PLL_SYS		0x0300
+> +#define MESON8B_REG_PLL_VID		0x0320
+> +
+> +static struct pll_rate_table sys_pll_rate_table[] = {
 
-And a reg property of length 0x4 looks like it may be part of
-some other "device". Should the xtal register be part of a syscon
-that this node has a phandle to?
+const?
+
+> +	PLL_RATE(312000000, 52, 1, 2),
+> +	PLL_RATE(336000000, 56, 1, 2),
+> +	PLL_RATE(360000000, 60, 1, 2),
+> +	PLL_RATE(384000000, 64, 1, 2),
+> +	PLL_RATE(408000000, 68, 1, 2),
+> +	PLL_RATE(432000000, 72, 1, 2),
+> +	PLL_RATE(456000000, 76, 1, 2),
+> +	PLL_RATE(480000000, 80, 1, 2),
+> +	PLL_RATE(504000000, 84, 1, 2),
+> +	PLL_RATE(528000000, 88, 1, 2),
+> +	PLL_RATE(552000000, 92, 1, 2),
+> +	PLL_RATE(576000000, 96, 1, 2),
+> +	PLL_RATE(600000000, 50, 1, 1),
+> +	PLL_RATE(624000000, 52, 1, 1),
+> +	PLL_RATE(648000000, 54, 1, 1),
+> +	PLL_RATE(672000000, 56, 1, 1),
+> +	PLL_RATE(696000000, 58, 1, 1),
+> +	PLL_RATE(720000000, 60, 1, 1),
+> +	PLL_RATE(744000000, 62, 1, 1),
+> +	PLL_RATE(768000000, 64, 1, 1),
+> +	PLL_RATE(792000000, 66, 1, 1),
+> +	PLL_RATE(816000000, 68, 1, 1),
+> +	PLL_RATE(840000000, 70, 1, 1),
+> +	PLL_RATE(864000000, 72, 1, 1),
+> +	PLL_RATE(888000000, 74, 1, 1),
+> +	PLL_RATE(912000000, 76, 1, 1),
+> +	PLL_RATE(936000000, 78, 1, 1),
+> +	PLL_RATE(960000000, 80, 1, 1),
+> +	PLL_RATE(984000000, 82, 1, 1),
+> +	PLL_RATE(1008000000, 84, 1, 1),
+> +	PLL_RATE(1032000000, 86, 1, 1),
+> +	PLL_RATE(1056000000, 88, 1, 1),
+> +	PLL_RATE(1080000000, 90, 1, 1),
+> +	PLL_RATE(1104000000, 92, 1, 1),
+> +	PLL_RATE(1128000000, 94, 1, 1),
+> +	PLL_RATE(1152000000, 96, 1, 1),
+> +	PLL_RATE(1176000000, 98, 1, 1),
+> +	PLL_RATE(1200000000, 50, 1, 0),
+> +	PLL_RATE(1224000000, 51, 1, 0),
+> +	PLL_RATE(1248000000, 52, 1, 0),
+> +	PLL_RATE(1272000000, 53, 1, 0),
+> +	PLL_RATE(1296000000, 54, 1, 0),
+> +	PLL_RATE(1320000000, 55, 1, 0),
+> +	PLL_RATE(1344000000, 56, 1, 0),
+> +	PLL_RATE(1368000000, 57, 1, 0),
+> +	PLL_RATE(1392000000, 58, 1, 0),
+> +	PLL_RATE(1416000000, 59, 1, 0),
+> +	PLL_RATE(1440000000, 60, 1, 0),
+> +	PLL_RATE(1464000000, 61, 1, 0),
+> +	PLL_RATE(1488000000, 62, 1, 0),
+> +	PLL_RATE(1512000000, 63, 1, 0),
+> +	PLL_RATE(1536000000, 64, 1, 0),
+> +	{ /* sentinel */ },
+> +};
+> +
+> +PNAME(p_xtal)		= { "xtal" };
+> +PNAME(p_fclk_div)	= { "fixed_pll" };
+> +PNAME(p_cpu_clk)	= { "sys_pll" };
+> +PNAME(p_clk81)		= { "fclk_div3", "fclk_div4", "fclk_div5" };
+> +PNAME(p_mali)		= { "fclk_div3", "fclk_div4", "fclk_div5",
+> +			    "fclk_div7", "zero" };
+> +
+> +static u32 mux_table_clk81[]	= { 6, 5, 7 };
+> +static u32 mux_table_mali[]	= { 6, 5, 7, 4, 0 };
+> +
+> +static struct pll_conf pll_confs = {
+> +	.m		= PARM(0x00, 0,  9),
+> +	.n		= PARM(0x00, 9,  5),
+> +	.od		= PARM(0x00, 16, 2),
+> +};
+> +
+> +static struct pll_conf sys_pll_conf = {
+> +	.m		= PARM(0x00, 0,  9),
+> +	.n		= PARM(0x00, 9,  5),
+> +	.od		= PARM(0x00, 16, 2),
+> +	.rate_table	= sys_pll_rate_table,
+> +};
+> +
+> +static struct composite_conf clk81_conf __initdata = {
+
+Can this be __initconstdata?
+
+> +	.mux_table		= mux_table_clk81,
+> +	.mux_flags		= CLK_MUX_READ_ONLY,
+> +	.mux_parm		= PARM(0x00, 12, 3),
+> +	.div_parm		= PARM(0x00, 0, 7),
+> +	.gate_parm		= PARM(0x00, 7, 1),
+> +};
+> +
+> +static struct composite_conf mali_conf __initdata = {
+> +	.mux_table		= mux_table_mali,
+> +	.mux_parm		= PARM(0x00, 9, 3),
+> +	.div_parm		= PARM(0x00, 0, 7),
+> +	.gate_parm		= PARM(0x00, 8, 1),
+> +};
+> +
+> +static struct clk_conf meson8b_xtal_conf __initdata =
+> +	FIXED_RATE_P(MESON8B_REG_CTL0_ADDR, CLKID_XTAL, "xtal",
+> +		     CLK_IS_ROOT, PARM(0x00, 4, 7));
+> +
+> +static struct clk_conf meson8b_clk_confs[] __initdata = {
+
+const?
+
+> +	FIXED_RATE(CLKID_ZERO, "zero", CLK_IS_ROOT, 0),
+> +	PLL(MESON8B_REG_PLL_FIXED, CLKID_PLL_FIXED, "fixed_pll",
+> +	    p_xtal, 0, &pll_confs),
+> +	PLL(MESON8B_REG_PLL_VID, CLKID_PLL_VID, "vid_pll",
+> +	    p_xtal, 0, &pll_confs),
+> +	PLL(MESON8B_REG_PLL_SYS, CLKID_PLL_SYS, "sys_pll",
+> +	    p_xtal, 0, &sys_pll_conf),
+> +	FIXED_FACTOR_DIV(CLKID_FCLK_DIV2, "fclk_div2", p_fclk_div, 0, 2),
+> +	FIXED_FACTOR_DIV(CLKID_FCLK_DIV3, "fclk_div3", p_fclk_div, 0, 3),
+> +	FIXED_FACTOR_DIV(CLKID_FCLK_DIV4, "fclk_div4", p_fclk_div, 0, 4),
+> +	FIXED_FACTOR_DIV(CLKID_FCLK_DIV5, "fclk_div5", p_fclk_div, 0, 5),
+> +	FIXED_FACTOR_DIV(CLKID_FCLK_DIV7, "fclk_div7", p_fclk_div, 0, 7),
+> +	CPU(MESON8B_REG_SYS_CPU_CNTL1, CLKID_CPUCLK, "a5_clk", p_cpu_clk),
+> +	COMPOSITE(MESON8B_REG_HHI_MPEG, CLKID_CLK81, "clk81", p_clk81,
+> +		  CLK_SET_RATE_NO_REPARENT | CLK_IGNORE_UNUSED, &clk81_conf),
+> +	COMPOSITE(MESON8B_REG_MALI, CLKID_MALI, "mali", p_mali,
+> +		  CLK_IGNORE_UNUSED, &mali_conf),
+
+Ah here we see the defines used.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
