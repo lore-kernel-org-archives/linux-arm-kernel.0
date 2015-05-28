@@ -1,44 +1,76 @@
 From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Thu, 28 May 2015 14:52:06 -0700
-Subject: [PATCHv3 0/2] Adding driver for Xilinx LogiCORE IP mailbox.
-Message-ID: <1432849928-25457-1-git-send-email-moritz.fischer@ettus.com>
+Date: Thu, 28 May 2015 14:52:07 -0700
+Subject: [PATCHv3 1/2] dts: Adding docs for Xilinx LogiCORE IP mailbox driver.
+In-Reply-To: <1432849928-25457-1-git-send-email-moritz.fischer@ettus.com>
+References: <1432849928-25457-1-git-send-email-moritz.fischer@ettus.com>
+Message-ID: <1432849928-25457-2-git-send-email-moritz.fischer@ettus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds mailbox framework integration for the Xilinx LogiCORE IP
-mailbox.  The Xilinx LogiCORE IP mailbox is a fpga softcore that allows
-interprocessor communication between AXI4 stream / memory mapped
-processors.
-
-Changes from v1:
-- Fixed error condition for IRQ from >= 0 to > 0
-- Fixed clock enable
-- Cleaned up docs
+Changes from v2:
+- Addressed Michal's stylistic comments
+- Fixed typo in compatible string
 
 Changes from v1:
 - Added common clock framework support
-- Deal with IRQs that happend before driver load,
-  since HW will not let us know about them when we enable IRQs
 
 Changes from v0:
-- Several stylistic issues
-- Dropped superfluous intr_mode member
-- Really masking the IRQs on mailbox_shutdown
-- No longer using polling by accident in non-IRQ mode
-- Swapped doc and driver commits
+- Fixed example bindings
 
-Moritz Fischer (2):
-  dts: Adding docs for Xilinx LogiCORE IP mailbox driver.
-  mailbox: Adding driver for Xilinx LogiCORE IP mailbox.
+Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+---
+ .../bindings/mailbox/xilinx-mailbox.txt         | 44 ++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
 
- .../bindings/mailbox/xilinx-mailbox.txt         |  44 +++
- MAINTAINERS                                     |   7 +
- drivers/mailbox/Kconfig                         |   8 +
- drivers/mailbox/Makefile                        |   2 +
- drivers/mailbox/mailbox-xilinx.c                | 353 +++++++++++++++++++
- 5 files changed, 414 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt
- create mode 100644 drivers/mailbox/mailbox-xilinx.c
-
+diff --git a/Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt b/Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt
+new file mode 100644
+index 0000000..ca76efd
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt
+@@ -0,0 +1,44 @@
++Xilinx Mailbox Driver
++=====================
++
++Required properties:
++- compatible       : "xlnx,mailbox-2.1".
++- reg              :  physical base address of the mailbox and length of
++                      memory mapped region.
++- #mbox-cells      :  common mailbox binding property to identify the number
++                      of cells required for the mailbox specifier, should be 1
++- clocks           :  phandle to clock provider
++- clock-names      :  must be 'mbox'
++
++Optional properties:
++- interrupt-parent : interrupt source phandle
++- interrupts       : interrupt number, The interrupt specifier format
++                     depends on the interrupt controller parent.
++
++Example:
++	mbox: mailbox at 40400000 {
++		compatible = "xlnx,mailbox-2.1";
++		reg = <0x40400000 0x3c>;
++		interrupt-parent = <&intc>;
++		interrupts = <5>;
++		#mbox-cells = <1>;
++		clocks = <&clkc 15>;
++		clock-names = "mbox";
++	};
++
++Mailbox client
++===============
++"mboxes" and the optional "mbox-names" (please see
++Documentation/devicetree/bindings/mailbox/mailbox.txt for details). Each value
++of the mboxes property should contain a phandle to the mailbox controller
++device node and second argument is the channel index. It must be 0 (hardware
++support only one channel). The equivalent "mbox-names" property value can be
++used to give a name to the communication channel to be used by the client user.
++
++Example:
++	mclient0: mclient0 at 400 {
++		compatible = "client-1.0";
++		reg = <0x400 0x10>;
++		mbox-names = "mbox";
++		mboxes = <&mbox 0>;
++	};
 -- 
 2.4.1
