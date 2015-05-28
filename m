@@ -1,101 +1,44 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 28 May 2015 20:49:10 +0200
-Subject: [PATCH v2] arm/arm64: KVM: Properly account for guest CPU time
-Message-ID: <1432838950-28774-1-git-send-email-christoffer.dall@linaro.org>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Thu, 28 May 2015 20:53:38 +0200
+Subject: [PATCH v2 13/14] clk: shmobile: mstp: Consider "zb_clk" suitable for
+ power management
+In-Reply-To: <1432839219-475-1-git-send-email-geert+renesas@glider.be>
+References: <1432839219-475-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1432839219-475-14-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Until now we have been calling kvm_guest_exit after re-enabling
-interrupts when we come back from the guest, but this has the
-unfortunate effect that CPU time accounting done in the context of timer
-interrupts occurring while the guest is running doesn't properly notice
-that the time since the last tick was spent in the guest.
+Currently the CPG Clock Domain code looks for MSTP clocks to power
+manage a device.
 
-Inspired by the comment in the x86 code, move the kvm_guest_exit() call
-below the local_irq_enable() call and change __kvm_guest_exit() to
-kvm_guest_exit(), because we are now calling this function with
-interrupts enabled.  We have to now explicitly disable preemption and
-not enable preemption before we've called kvm_guest_exit(), since
-otherwise we could be preempted and everything happening before we
-eventually get scheduled again would be accounted for as guest time.
+Unfortunately, on R-Mobile APE6 (r8a73a4) and SH-Mobile AG5 (sh73a0),
+the Bus State Controller (BSC) is not power-managed by an MSTP clock,
+but by a plain CPG clock (zb_clk).  Add a special case to handle this,
+so the clock is properly managed, and devices connected to the BSC work
+as expected.
 
-At the same time, move the trace_kvm_exit() call outside of the atomic
-section, since there is no reason for us to do that with interrupts
-disabled.
-
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
-This patch is based on kvm/queue, because it has the kvm_guest_enter/exit
-rework recently posted by Christian Borntraeger.  I hope I got the logic
-of this right, there were 2 slightly worrying facts about this:
+v2:
+  - New.
+---
+ drivers/clk/shmobile/clk-mstp.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-First, we now enable and disable and enable interrupts on each exit
-path, but I couldn't see any performance overhead on hackbench - yes the
-only benchmark we care about.
-
-Second, looking at the ppc and mips code, they seem to also call
-kvm_guest_exit() before enabling interrupts, so I don't understand how
-guest CPU time accounting works on those architectures.
-
-Changes since v1:
- - Tweak comment and commit text based on Marc's feedback.
- - Explicitly disable preemption and enable it only after kvm_guest_exit().
-
- arch/arm/kvm/arm.c | 21 +++++++++++++++++----
- 1 file changed, 17 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index e41cb11..fe8028d 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -532,6 +532,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		kvm_vgic_flush_hwstate(vcpu);
- 		kvm_timer_flush_hwstate(vcpu);
+diff --git a/drivers/clk/shmobile/clk-mstp.c b/drivers/clk/shmobile/clk-mstp.c
+index 619f3eccefd4884f..19e2b11953383587 100644
+--- a/drivers/clk/shmobile/clk-mstp.c
++++ b/drivers/clk/shmobile/clk-mstp.c
+@@ -258,6 +258,10 @@ int cpg_mstp_attach_dev(struct generic_pm_domain *domain, struct device *dev)
+ 					    "renesas,cpg-mstp-clocks"))
+ 			goto found;
  
-+		preempt_disable();
- 		local_irq_disable();
- 
- 		/*
-@@ -544,6 +545,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 
- 		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm)) {
- 			local_irq_enable();
-+			preempt_enable();
- 			kvm_timer_sync_hwstate(vcpu);
- 			kvm_vgic_sync_hwstate(vcpu);
- 			continue;
-@@ -559,8 +561,10 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
- 
- 		vcpu->mode = OUTSIDE_GUEST_MODE;
--		__kvm_guest_exit();
--		trace_kvm_exit(kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
-+		/*
-+		 * Back from guest
-+		 *************************************************************/
++		/* BSC on r8a73a4/sh73a0 uses zb_clk instead of an mstp clock*/
++		if (!strcmp(clkspec.np->name, "zb_clk"))
++			goto found;
 +
- 		/*
- 		 * We may have taken a host interrupt in HYP mode (ie
- 		 * while executing the guest). This interrupt is still
-@@ -574,8 +578,17 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		local_irq_enable();
- 
- 		/*
--		 * Back from guest
--		 *************************************************************/
-+		 * We do local_irq_enable() before calling kvm_guest_exit() so
-+		 * that if a timer interrupt hits while running the guest we
-+		 * account that tick as being spent in the guest.  We enable
-+		 * preemption after calling kvm_guest_exit() so that if we get
-+		 * preempted we make sure ticks after that is not counted as
-+		 * guest time.
-+		 */
-+		kvm_guest_exit();
-+		trace_kvm_exit(kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
-+		preempt_enable();
-+
- 
- 		kvm_timer_sync_hwstate(vcpu);
- 		kvm_vgic_sync_hwstate(vcpu);
+ 		of_node_put(clkspec.np);
+ 		i++;
+ 	}
 -- 
-2.1.2.330.g565301e.dirty
+1.9.1
