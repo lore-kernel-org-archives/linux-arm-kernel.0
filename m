@@ -1,38 +1,35 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 28 May 2015 15:17:12 -0600
-Subject: [PATCH 2/3 v2] ARM: bcm2835: Add the Raspberry Pi firmware driver
-In-Reply-To: <1431543609-19646-3-git-send-email-eric@anholt.net>
-References: <1431543609-19646-1-git-send-email-eric@anholt.net>
- <1431543609-19646-3-git-send-email-eric@anholt.net>
-Message-ID: <556785D8.2090709@wwwdotorg.org>
+From: atull@opensource.altera.com (Alan Tull)
+Date: Thu, 28 May 2015 16:19:35 -0500
+Subject: [PATCHv5 0/2] socfpga: support suspend to ram
+Message-ID: <1432847977-18880-1-git-send-email-atull@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/13/2015 01:00 PM, Eric Anholt wrote:
-> This gives us a function for making mailbox property channel requests
-> of the firmware, which is most notable in that it will let us get and
-> set clock rates.
-...
-> Note that I don't think I've done what srwarren wanted for
-> -EPROBE_DEFER, because I'm not clear what he wants.  I think he might
-> just be asking for a function that does:
-> 
-> /*
->  * Returns 0 if the firmware device is probed and available, otherwise
->  * -EPROBE_DEFER.
->  */
-> int rpi_firmware_get(struct device_node *firmware_node)
-> {
-> 	struct platform_device *pdev = of_find_device_by_node(of_node);
-> 	if (!platform_get_drvdata(pdev))
-> 		return -EPROBE_DEFER;
-> 	return 0;
-> }
-> EXPORT_SYMBOL(rpi_firmware_get)
-> 
-> If that's all, I'm happy to add it.
+Support suspend to ram on socfpga.
+  * allocate space in ocram using sram driver.
+  * Add a function in ocram to place DDR in self-refresh
+    and suspend.
+  * Prevent suspend if EDAC is enabled.
+  * Add a device tree binding document for the Altera
+    SOCFPGA SDRAM controller that is used to put DDR in
+    self-refresh mode.
 
-Yes, there definitely needs to be something that clients can call at
-probe() time to make sure the firmware driver is there already. That
-check is quite different from actually sending a request to the FW, so
-I'd certainly expect a separate function for that.
+Alan Tull (2):
+  ARM: socfpga: support suspend to ram
+  ARM: socfpga: dts: add sdram controller dt binding doc
+
+ .../arm/altera/socfpga-sdram-controller.txt        |   12 ++
+ arch/arm/mach-socfpga/Kconfig                      |   10 +-
+ arch/arm/mach-socfpga/Makefile                     |    1 +
+ arch/arm/mach-socfpga/core.h                       |    6 +-
+ arch/arm/mach-socfpga/pm.c                         |  149 ++++++++++++++++++++
+ arch/arm/mach-socfpga/self-refresh.S               |  136 ++++++++++++++++++
+ arch/arm/mach-socfpga/socfpga.c                    |    6 +-
+ drivers/edac/altera_edac.c                         |   20 +++
+ 8 files changed, 337 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram-controller.txt
+ create mode 100644 arch/arm/mach-socfpga/pm.c
+ create mode 100644 arch/arm/mach-socfpga/self-refresh.S
+
+-- 
+1.7.9.5
