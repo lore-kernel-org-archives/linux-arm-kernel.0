@@ -1,49 +1,69 @@
-From: mturquette@linaro.org (Michael Turquette)
-Date: Wed, 27 May 2015 23:16:43 -0700
-Subject: [PATCH 17/21] clk: Probe clk providers on demand
-In-Reply-To: <1432565608-26036-18-git-send-email-tomeu.vizoso@collabora.com>
-References: <1432565608-26036-1-git-send-email-tomeu.vizoso@collabora.com>
- <1432565608-26036-18-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <20150528061643.22384.27268@quantum>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 28 May 2015 09:25:21 +0300
+Subject: [PATCHv3 10/10] CLK: TI: always enable DESHDCP clock
+In-Reply-To: <20150528042213.22384.12243@quantum>
+References: <1430906938-26128-1-git-send-email-tomi.valkeinen@ti.com>
+ <1430906938-26128-11-git-send-email-tomi.valkeinen@ti.com>
+ <555C744C.6070901@ti.com> <555C74E8.5010105@ti.com>
+ <555CE1BF.4050506@codeaurora.org> <20150528042213.22384.12243@quantum>
+Message-ID: <5566B4D1.3050707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tomeu Vizoso (2015-05-25 07:53:21)
-> When looking up a clk through its DT node, ensure that the corresponding
-> device has been registered.
-> 
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+On 05/28/2015 07:22 AM, Michael Turquette wrote:
+> Quoting Stephen Boyd (2015-05-20 12:34:23)
+>> On 05/20/15 04:50, Tero Kristo wrote:
+>>>
+>>>>>
+>>>>> @@ -348,5 +348,10 @@ int __init dra7xx_dt_clk_init(void)
+>>>>>        if (rc)
+>>>>>            pr_err("%s: failed to set USB_DPLL M2 OUT\n", __func__);
+>>>>>
+>>>>> +    hdcp_ck = clk_get_sys(NULL, "dss_deshdcp_clk");
+>>>>> +    rc = clk_prepare_enable(hdcp_ck);
+>>>>> +    if (rc)
+>>>>> +        pr_err("%s: failed to set dss_deshdcp_clk\n", __func__);
+>>>>> +
+>>>>>        return rc;
+>>>>>    }
+>>>>>
+>>>>
+>>>> You should rather use the assigned-clock properties in DT to accomplish
+>>>> this, the manual clock tweaks under the drivers/clk/ti/clk-* files
+>>>> should be converted to DT setup also.
+>>>
+>>> Now that I sent this, I realize we only have support to set_parent /
+>>> set_rate through the assigned-clock props, no enable. Any plans to
+>>> extend this support Mike/Stephen?
+>>>
+>>>
+>>
+>> Enable falls under the "critical clocks" discussion that is ongoing. I
+>> assume that this is some sort of critical clock that can't be turned off?
+>
+> Just chiming in on the "critical clock" discussion. I'm not planning to
+> merge something that lets Devicetree nodes call clk_enable on a clock.
+> That's what drivers are for.
+>
+> The assigned-rate and assigned-parent stuff that Tero mentioned is more
+> like configuration data for a downstream clock consumer. Clock
+> gating/ungating does not fall under this type of configuration data in
+> my opinion.
+>
+> I think that Tomi's patch to call clk_prepare_enable from
+> dra7xx_dt_clk_init is a reasonable solution to the problem.
 
-Ack.
+Yea, after this discussion I am fine with this approach also, seeing it 
+apparently doesn't cause any ill side-effects.
 
-Regards,
-Mike
+-Tero
 
-> ---
->  drivers/clk/clk.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 5b0f418..f9e8a8d 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -18,6 +18,7 @@
->  #include <linux/list.h>
->  #include <linux/slab.h>
->  #include <linux/of.h>
-> +#include <linux/of_platform.h>
->  #include <linux/device.h>
->  #include <linux/init.h>
->  #include <linux/sched.h>
-> @@ -2985,6 +2986,8 @@ struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec,
->         if (!clkspec)
->                 return ERR_PTR(-EINVAL);
->  
-> +       of_platform_device_ensure(clkspec->np);
-> +
->         /* Check if we have such a provider in our array */
->         mutex_lock(&of_clk_mutex);
->         list_for_each_entry(provider, &of_clk_providers, link) {
-> -- 
-> 2.4.1
-> 
+>
+> Regards,
+> Mike
+>
+>>
+>> --
+>> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+>> a Linux Foundation Collaborative Project
+>>
