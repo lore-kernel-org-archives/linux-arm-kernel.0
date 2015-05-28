@@ -1,112 +1,121 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 28 May 2015 11:36:14 +0200
-Subject: [PATCH 2/2] ASoC: atmel: compile pcm driver in
- snd-soc-atmel_ssc_dai
-In-Reply-To: <1432718749.27695.254.camel@x220>
-References: <1432591459-22613-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1432591459-22613-2-git-send-email-alexandre.belloni@free-electrons.com>
- <1432713024.27695.235.camel@x220> <20150527091902.GN3199@piout.net>
- <1432718749.27695.254.camel@x220>
-Message-ID: <20150528093614.GL2185@piout.net>
+From: michael@smart-africa.com (Michael van der Westhuizen)
+Date: Thu, 28 May 2015 11:36:00 +0200
+Subject: [PATCH] arm: tcm: Don't crash when TCM banks are protected by
+ TrustZone
+Message-ID: <1432805760-4590-1-git-send-email-michael@smart-africa.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Fixes the TCM initialisation code to handle TCM banks that are
+present but inaccessible due to TrustZone configuration.  This is
+the default case when enabling the non-secure world.  It may also
+be the case that that the user decided to use TCM for TrustZone.
 
-On 27/05/2015 at 11:25:49 +0200, Paul Bolle wrote :
-> On Wed, 2015-05-27 at 11:19 +0200, Alexandre Belloni wrote:
-> > However, the Kconfig maintainer found a way to do the right thing so we
-> > may as well drop that patch and keep those as modules.
-> 
-> Perhaps I missed a message: do you have a link?
-> 
+This change has exposed a bug in handling of TCM where no TCM bank
+was usable (the 0 size TCM case).  This change addresses the
+resulting hang.
 
-It was part of a private discussion. This would give that (replaces my
-other patch) if you want to test:
-
->From b93ca1a4d9fa63c37e3d2b0aecbd1ec691a40922 Mon Sep 17 00:00:00 2001
-From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Date: Mon, 25 May 2015 23:42:17 +0200
-Subject: [PATCH] ASoC: atmel: properly select dma driver state
-
-It is currently possible to have CONFIG_SND_ATMEL_SOC_SSC=y with either
-CONFIG_SND_ATMEL_SOC_PDC=m or CONFIG_SND_ATMEL_SOC_DMA=m. This results in a
-driver that compiles but does not link with this kind of error:
-
-sound/built-in.o: In function `atmel_ssc_set_audio':
-(.text+0x87d90): undefined reference to `atmel_pcm_pdc_platform_register'
-sound/built-in.o: In function `atmel_ssc_put_audio':
-(.text+0x8879a): undefined reference to `atmel_pcm_pdc_platform_unregister'
-
-Introduce new config options SND_ATMEL_SOC_SSC_PDC and
-SND_ATMEL_SOC_SSC_DMA which should be used by the board drivers and the
-correct logic to properly select the SND_ATMEL_SOC_PDC and
-SND_ATMEL_SOC_DMA states.
-
-Reported-by: Randy Dunlap <rdunlap@infradead.org>
-
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Signed-off-by: Michael van der Westhuizen <michael@smart-africa.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- sound/soc/atmel/Kconfig | 21 +++++++++++++++------
- 1 file changed, 15 insertions(+), 6 deletions(-)
+ arch/arm/kernel/tcm.c | 35 ++++++++++++++++++++++++++++++++---
+ 1 file changed, 32 insertions(+), 3 deletions(-)
 
-diff --git a/sound/soc/atmel/Kconfig b/sound/soc/atmel/Kconfig
-index 93abe4e6d596..1489cd461aec 100644
---- a/sound/soc/atmel/Kconfig
-+++ b/sound/soc/atmel/Kconfig
-@@ -10,20 +10,31 @@ if SND_ATMEL_SOC
+diff --git a/arch/arm/kernel/tcm.c b/arch/arm/kernel/tcm.c
+index 7a3be1d..af1dd5a 100644
+--- a/arch/arm/kernel/tcm.c
++++ b/arch/arm/kernel/tcm.c
+@@ -17,6 +17,7 @@
+ #include <asm/mach/map.h>
+ #include <asm/memory.h>
+ #include <asm/system_info.h>
++#include <asm/traps.h>
  
- config SND_ATMEL_SOC_PDC
- 	tristate
-+	default m if SND_ATMEL_SOC_SSC_PDC=m && SND_ATMEL_SOC_SSC=m
-+	default y if SND_ATMEL_SOC_SSC_PDC=y || (SND_ATMEL_SOC_SSC_PDC=m && SND_ATMEL_SOC_SSC=y)
+ static struct gen_pool *tcm_pool;
+ static bool dtcm_present;
+@@ -175,6 +176,21 @@ static int __init setup_tcm_bank(u8 type, u8 bank, u8 banks,
+ 	return 0;
+ }
+ 
++static int __init tcm_handler(struct pt_regs *regs, unsigned int instr)
++{
++	regs->uregs[(instr >> 12) & 0xf] = 0;
++	regs->ARM_pc += 4;
++	return 0;
++}
 +
-+config SND_ATMEL_SOC_SSC_PDC
-+	tristate
- 
- config SND_ATMEL_SOC_DMA
- 	tristate
- 	select SND_SOC_GENERIC_DMAENGINE_PCM
-+	default m if SND_ATMEL_SOC_SSC_DMA=m && SND_ATMEL_SOC_SSC=m
-+	default y if SND_ATMEL_SOC_SSC_DMA=y || (SND_ATMEL_SOC_SSC_DMA=m && SND_ATMEL_SOC_SSC=y)
++static const struct undef_hook tcm_hook __initconst = {
++	.instr_mask	= 0xffff0fdf,
++	.instr_val	= 0xee190f11,
++	.cpsr_mask	= MODE_MASK,
++	.cpsr_val	= SVC_MODE,
++	.fn		= tcm_handler
++};
 +
-+config SND_ATMEL_SOC_SSC_DMA
-+	tristate
+ /*
+  * This initializes the TCM memory
+  */
+@@ -207,6 +223,8 @@ void __init tcm_init(void)
+ 	dtcm_banks = (tcm_status >> 16) & 0x03;
+ 	itcm_banks = (tcm_status & 0x03);
  
- config SND_ATMEL_SOC_SSC
- 	tristate
-+	default y if SND_ATMEL_SOC_SSC_DMA=y || SND_ATMEL_SOC_SSC_PDC=y
-+	default m if SND_ATMEL_SOC_SSC_DMA=m || SND_ATMEL_SOC_SSC_PDC=m
++	register_undef_hook(&tcm_hook);
++
+ 	/* Values greater than 2 for D/ITCM banks are "reserved" */
+ 	if (dtcm_banks > 2)
+ 		dtcm_banks = 0;
+@@ -218,7 +236,7 @@ void __init tcm_init(void)
+ 		for (i = 0; i < dtcm_banks; i++) {
+ 			ret = setup_tcm_bank(0, i, dtcm_banks, &dtcm_end);
+ 			if (ret)
+-				return;
++				goto unregister;
+ 		}
+ 		/* This means you compiled more code than fits into DTCM */
+ 		if (dtcm_code_sz > (dtcm_end - DTCM_OFFSET)) {
+@@ -227,6 +245,10 @@ void __init tcm_init(void)
+ 				dtcm_code_sz, (dtcm_end - DTCM_OFFSET));
+ 			goto no_dtcm;
+ 		}
++		/* This means that the DTCM sizes were 0 or the DTCM banks
++		 * were inaccessible due to TrustZone configuration */
++		if (!(dtcm_end - DTCM_OFFSET))
++			goto no_dtcm;
+ 		dtcm_res.end = dtcm_end - 1;
+ 		request_resource(&iomem_resource, &dtcm_res);
+ 		dtcm_iomap[0].length = dtcm_end - DTCM_OFFSET;
+@@ -250,15 +272,19 @@ no_dtcm:
+ 		for (i = 0; i < itcm_banks; i++) {
+ 			ret = setup_tcm_bank(1, i, itcm_banks, &itcm_end);
+ 			if (ret)
+-				return;
++				goto unregister;
+ 		}
+ 		/* This means you compiled more code than fits into ITCM */
+ 		if (itcm_code_sz > (itcm_end - ITCM_OFFSET)) {
+ 			pr_info("CPU ITCM: %u bytes of code compiled to "
+ 				"ITCM but only %lu bytes of ITCM present\n",
+ 				itcm_code_sz, (itcm_end - ITCM_OFFSET));
+-			return;
++			goto unregister;
+ 		}
++		/* This means that the ITCM sizes were 0 or the ITCM banks
++		 * were inaccessible due to TrustZone configuration */
++		if (!(itcm_end - ITCM_OFFSET))
++			goto unregister;
+ 		itcm_res.end = itcm_end - 1;
+ 		request_resource(&iomem_resource, &itcm_res);
+ 		itcm_iomap[0].length = itcm_end - ITCM_OFFSET;
+@@ -275,6 +301,9 @@ no_dtcm:
+ 		pr_info("CPU ITCM: %u bytes of code compiled to ITCM but no "
+ 			"ITCM banks present in CPU\n", itcm_code_sz);
+ 	}
++
++unregister:
++	unregister_undef_hook(&tcm_hook);
+ }
  
- config SND_AT91_SOC_SAM9G20_WM8731
- 	tristate "SoC Audio support for WM8731-based At91sam9g20 evaluation board"
- 	depends on ARCH_AT91 || COMPILE_TEST
- 	depends on ATMEL_SSC && SND_SOC_I2C_AND_SPI
--	select SND_ATMEL_SOC_PDC
--	select SND_ATMEL_SOC_SSC
-+	select SND_ATMEL_SOC_SSC_PDC
- 	select SND_SOC_WM8731
- 	help
- 	  Say Y if you want to add support for SoC audio on WM8731-based
-@@ -33,8 +44,7 @@ config SND_ATMEL_SOC_WM8904
- 	tristate "Atmel ASoC driver for boards using WM8904 codec"
- 	depends on ARCH_AT91 || COMPILE_TEST
- 	depends on ATMEL_SSC && I2C
--	select SND_ATMEL_SOC_SSC
--	select SND_ATMEL_SOC_DMA
-+	select SND_ATMEL_SOC_SSC_DMA
- 	select SND_SOC_WM8904
- 	help
- 	  Say Y if you want to add support for Atmel ASoC driver for boards using
-@@ -44,8 +54,7 @@ config SND_AT91_SOC_SAM9X5_WM8731
- 	tristate "SoC Audio support for WM8731-based at91sam9x5 board"
- 	depends on ARCH_AT91 || COMPILE_TEST
- 	depends on ATMEL_SSC && SND_SOC_I2C_AND_SPI
--	select SND_ATMEL_SOC_SSC
--	select SND_ATMEL_SOC_DMA
-+	select SND_ATMEL_SOC_SSC_DMA
- 	select SND_SOC_WM8731
- 	help
- 	  Say Y if you want to add support for audio SoC on an
+ /*
 -- 
 2.1.4
