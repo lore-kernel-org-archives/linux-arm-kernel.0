@@ -1,66 +1,216 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 28 May 2015 11:15:53 +0200
-Subject: [PATCH 1/3] bus: mvebu-mbus: do not set WIN_CTRL_SYNCBARRIER
- on non io-coherent platforms.
-In-Reply-To: <1432802414-12355-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Thu, 28 May 2015 11:17:10 +0200
+Subject: [PATCH 2/3] Revert "bus: mvebu-mbus: make sure SDRAM CS for DMA
+ don't overlap the MBus bridge window"
+In-Reply-To: <1432802414-12355-3-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1432802414-12355-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1432802414-12355-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <5566DCC9.4010800@free-electrons.com>
+ <1432802414-12355-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <5566DD16.9030706@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Thomas,
 
 On 28/05/2015 10:40, Thomas Petazzoni wrote:
-> From: Nicolas Schichan <nschichan@freebox.fr>
+> This reverts commit 1737cac69369 ("bus: mvebu-mbus: make sure SDRAM CS
+> for DMA don't overlap the MBus bridge window"), because it breaks DMA
+> on platforms having more than 2 GB of RAM.
 > 
-> Commit a0b5cd4ac2d6 ("bus: mvebu-mbus: use automatic I/O
-> synchronization barriers") enabled the usage of automatic I/O
-> synchronization barriers by enabling bit WIN_CTRL_SYNCBARRIER in the
-> control registers of MBus windows, but on non io-coherent platforms
-> (orion5x, kirkwood and dove) the WIN_CTRL_SYNCBARRIER bit in
-> the window control register is either reserved (all windows except 6
-> and 7) or enables read-only protection (windows 6 and 7).
+> This commit changed the information reported to DMA masters device
+> drivers through the mv_mbus_dram_info() function so that the returned
+> DRAM ranges do not overlap with I/O windows.
 > 
-> Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
-> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: <stable@vger.kernel.org> # v4.0+
-> Fixes: a0b5cd4ac2d6 ("bus: mvebu-mbus: use automatic I/O synchronization barriers")
+> This was necessary as a preparation to support the new CESA Crypto
+> Engine driver, which will use DMA for cryptographic operations. But
+> since it does DMA with the SRAM which is mapped as an I/O window,
+> having DRAM ranges overlapping with I/O windows was problematic.
+> 
+> To solve this, the above mentioned commit changed the mvebu-mbus to
+> adjust the DRAM ranges so that they don't overlap with the I/O
+> windows. However, by doing this, we re-adjust the DRAM ranges in a way
+> that makes them have a size that is no longer a power of two. While
+> this is perfectly fine for the Crypto Engine, which supports DRAM
+> ranges with a granularity of 64 KB, it breaks basically all other DMA
+> masters, which expect power of two sizes for the DRAM ranges.
+> 
+> Due to this, if the installed system memory is 4 GB, in two
+> chip-selects of 2 GB, the second DRAM range will be reduced from 2 GB
+> to a little bit less than 2 GB to not overlap with the I/O windows, in
+> a way that results in a DRAM range that doesn't have a power of two
+> size. This means that whenever you do a DMA transfer with an address
+> located in the [ 2 GB ; 4 GB ] area, it will freeze the system. Any
+> serious DMA activity like simply running:
+> 
+>   for i in $(seq 1 64) ; do dd if=/dev/urandom of=file$i bs=1M count=16 ; done
+> 
+> in an ext3 partition mounted over a SATA drive will freeze the system.
+> 
+> Since the new CESA crypto driver that uses DMA has not been merged
+> yet, the easiest fix is to simply revert this commit. A follow-up
+> commit will introduce a different solution for the CESA crypto driver.
+> 
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Fixes: 1737cac69369 ("bus: mvebu-mbus: make sure SDRAM CS for DMA don't overlap the MBus bridge window")
+> Cc: <stable@vger.kernel.org> # v4.0+
 
 applied on mvebu/fixes
+
+I hope that the 100 lines rules will be not a problem for this case
 
 Thanks,
 
 Gregory
 
+
 > ---
->  drivers/bus/mvebu-mbus.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+>  drivers/bus/mvebu-mbus.c | 105 ++++++++---------------------------------------
+>  1 file changed, 16 insertions(+), 89 deletions(-)
 > 
 > diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-> index fb9ec62..7fa4510 100644
+> index 7fa4510..6f047dc 100644
 > --- a/drivers/bus/mvebu-mbus.c
 > +++ b/drivers/bus/mvebu-mbus.c
-> @@ -70,6 +70,7 @@
->   */
->  #define WIN_CTRL_OFF		0x0000
->  #define   WIN_CTRL_ENABLE       BIT(0)
-> +/* Only on HW I/O coherency capable platforms */
->  #define   WIN_CTRL_SYNCBARRIER  BIT(1)
->  #define   WIN_CTRL_TGT_MASK     0xf0
->  #define   WIN_CTRL_TGT_SHIFT    4
-> @@ -323,8 +324,9 @@ static int mvebu_mbus_setup_window(struct mvebu_mbus_state *mbus,
->  	ctrl = ((size - 1) & WIN_CTRL_SIZE_MASK) |
->  		(attr << WIN_CTRL_ATTR_SHIFT)    |
->  		(target << WIN_CTRL_TGT_SHIFT)   |
-> -		WIN_CTRL_SYNCBARRIER             |
->  		WIN_CTRL_ENABLE;
-> +	if (mbus->hw_io_coherency)
-> +		ctrl |= WIN_CTRL_SYNCBARRIER;
+> @@ -58,7 +58,6 @@
+>  #include <linux/debugfs.h>
+>  #include <linux/log2.h>
+>  #include <linux/syscore_ops.h>
+> -#include <linux/memblock.h>
 >  
->  	writel(base & WIN_BASE_LOW, addr + WIN_BASE_OFF);
->  	writel(ctrl, addr + WIN_CTRL_OFF);
+>  /*
+>   * DDR target is the same on all platforms.
+> @@ -103,9 +102,7 @@
+>  
+>  /* Relative to mbusbridge_base */
+>  #define MBUS_BRIDGE_CTRL_OFF	0x0
+> -#define  MBUS_BRIDGE_SIZE_MASK  0xffff0000
+>  #define MBUS_BRIDGE_BASE_OFF	0x4
+> -#define  MBUS_BRIDGE_BASE_MASK  0xffff0000
+>  
+>  /* Maximum number of windows, for all known platforms */
+>  #define MBUS_WINS_MAX           20
+> @@ -579,106 +576,36 @@ static unsigned int armada_xp_mbus_win_remap_offset(int win)
+>  		return MVEBU_MBUS_NO_REMAP;
+>  }
+>  
+> -/*
+> - * Use the memblock information to find the MBus bridge hole in the
+> - * physical address space.
+> - */
+> -static void __init
+> -mvebu_mbus_find_bridge_hole(uint64_t *start, uint64_t *end)
+> -{
+> -	struct memblock_region *r;
+> -	uint64_t s = 0;
+> -
+> -	for_each_memblock(memory, r) {
+> -		/*
+> -		 * This part of the memory is above 4 GB, so we don't
+> -		 * care for the MBus bridge hole.
+> -		 */
+> -		if (r->base >= 0x100000000)
+> -			continue;
+> -
+> -		/*
+> -		 * The MBus bridge hole is at the end of the RAM under
+> -		 * the 4 GB limit.
+> -		 */
+> -		if (r->base + r->size > s)
+> -			s = r->base + r->size;
+> -	}
+> -
+> -	*start = s;
+> -	*end = 0x100000000;
+> -}
+> -
+>  static void __init
+>  mvebu_mbus_default_setup_cpu_target(struct mvebu_mbus_state *mbus)
+>  {
+>  	int i;
+>  	int cs;
+> -	uint64_t mbus_bridge_base, mbus_bridge_end;
+>  
+>  	mvebu_mbus_dram_info.mbus_dram_target_id = TARGET_DDR;
+>  
+> -	mvebu_mbus_find_bridge_hole(&mbus_bridge_base, &mbus_bridge_end);
+> -
+>  	for (i = 0, cs = 0; i < 4; i++) {
+> -		u64 base = readl(mbus->sdramwins_base + DDR_BASE_CS_OFF(i));
+> -		u64 size = readl(mbus->sdramwins_base + DDR_SIZE_CS_OFF(i));
+> -		u64 end;
+> -		struct mbus_dram_window *w;
+> -
+> -		/* Ignore entries that are not enabled */
+> -		if (!(size & DDR_SIZE_ENABLED))
+> -			continue;
+> -
+> -		/*
+> -		 * Ignore entries whose base address is above 2^32,
+> -		 * since devices cannot DMA to such high addresses
+> -		 */
+> -		if (base & DDR_BASE_CS_HIGH_MASK)
+> -			continue;
+> -
+> -		base = base & DDR_BASE_CS_LOW_MASK;
+> -		size = (size | ~DDR_SIZE_MASK) + 1;
+> -		end = base + size;
+> -
+> -		/*
+> -		 * Adjust base/size of the current CS to make sure it
+> -		 * doesn't overlap with the MBus bridge hole. This is
+> -		 * particularly important for devices that do DMA from
+> -		 * DRAM to a SRAM mapped in a MBus window, such as the
+> -		 * CESA cryptographic engine.
+> -		 */
+> +		u32 base = readl(mbus->sdramwins_base + DDR_BASE_CS_OFF(i));
+> +		u32 size = readl(mbus->sdramwins_base + DDR_SIZE_CS_OFF(i));
+>  
+>  		/*
+> -		 * The CS is fully enclosed inside the MBus bridge
+> -		 * area, so ignore it.
+> +		 * We only take care of entries for which the chip
+> +		 * select is enabled, and that don't have high base
+> +		 * address bits set (devices can only access the first
+> +		 * 32 bits of the memory).
+>  		 */
+> -		if (base >= mbus_bridge_base && end <= mbus_bridge_end)
+> -			continue;
+> +		if ((size & DDR_SIZE_ENABLED) &&
+> +		    !(base & DDR_BASE_CS_HIGH_MASK)) {
+> +			struct mbus_dram_window *w;
+>  
+> -		/*
+> -		 * Beginning of CS overlaps with end of MBus, raise CS
+> -		 * base address, and shrink its size.
+> -		 */
+> -		if (base >= mbus_bridge_base && end > mbus_bridge_end) {
+> -			size -= mbus_bridge_end - base;
+> -			base = mbus_bridge_end;
+> +			w = &mvebu_mbus_dram_info.cs[cs++];
+> +			w->cs_index = i;
+> +			w->mbus_attr = 0xf & ~(1 << i);
+> +			if (mbus->hw_io_coherency)
+> +				w->mbus_attr |= ATTR_HW_COHERENCY;
+> +			w->base = base & DDR_BASE_CS_LOW_MASK;
+> +			w->size = (size | ~DDR_SIZE_MASK) + 1;
+>  		}
+> -
+> -		/*
+> -		 * End of CS overlaps with beginning of MBus, shrink
+> -		 * CS size.
+> -		 */
+> -		if (base < mbus_bridge_base && end > mbus_bridge_base)
+> -			size -= end - mbus_bridge_base;
+> -
+> -		w = &mvebu_mbus_dram_info.cs[cs++];
+> -		w->cs_index = i;
+> -		w->mbus_attr = 0xf & ~(1 << i);
+> -		if (mbus->hw_io_coherency)
+> -			w->mbus_attr |= ATTR_HW_COHERENCY;
+> -		w->base = base;
+> -		w->size = size;
+>  	}
+>  	mvebu_mbus_dram_info.num_cs = cs;
+>  }
 > 
 
 
