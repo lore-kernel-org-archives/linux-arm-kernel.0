@@ -1,63 +1,54 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 28 May 2015 10:40:11 +0200
-Subject: [PATCH 0/3] bus: mvebu-mbus: important fixes and improvements
-Message-ID: <1432802414-12355-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Thu, 28 May 2015 10:40:12 +0200
+Subject: [PATCH 1/3] bus: mvebu-mbus: do not set WIN_CTRL_SYNCBARRIER on non
+ io-coherent platforms.
+In-Reply-To: <1432802414-12355-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1432802414-12355-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1432802414-12355-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear mvebu maintainers,
+From: Nicolas Schichan <nschichan@freebox.fr>
 
-This set of patches contain two very important fixes to the mvebu-mbus
-driver fixing significant regressions introduced during the 4.0 cycle,
-and one patch re-implementing in a different a feature that caused one
-of the two regressions.
+Commit a0b5cd4ac2d6 ("bus: mvebu-mbus: use automatic I/O
+synchronization barriers") enabled the usage of automatic I/O
+synchronization barriers by enabling bit WIN_CTRL_SYNCBARRIER in the
+control registers of MBus windows, but on non io-coherent platforms
+(orion5x, kirkwood and dove) the WIN_CTRL_SYNCBARRIER bit in
+the window control register is either reserved (all windows except 6
+and 7) or enables read-only protection (windows 6 and 7).
 
- * The first patch, provided by Nicolas Schichan, fixed a regression
-    introduced in 4.0 by commit a0b5cd4ac2d6 ("bus: mvebu-mbus: use
-    automatic I/O synchronization barriers"). This commit didn't take
-    into account non-HW I/O coherent platforms such as Kirkwood or
-    Orion, for which the new special bit being set causes problems. It
-    makes some of the MBus I/O windows unusable on these SoCs.
+Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: <stable@vger.kernel.org> # v4.0+
+Fixes: a0b5cd4ac2d6 ("bus: mvebu-mbus: use automatic I/O synchronization barriers")
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/bus/mvebu-mbus.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-    Therefore, this patch is marked for stable and should be merged
-    for 4.1-rc.
-
- * The second patch is a simple revert of commit "bus: mvebu-mbus:
-    make sure SDRAM CS for DMA don't overlap the MBus bridge window"
-    introduced in 4.0. This commit was added in preparation for the
-    merge of the new DMA-capable CESA crypto driver submitted by Boris
-    Brezillon. However, it breaks DMA for all the other units if your
-    platform has 4 GB of RAM or more. Of course, by reverting it, the
-    functionality needed for the crypto driver is no longer present,
-    but this is OK since the crypto driver isn't merged yet, and will
-    not be merged for 4.1.
-
-    Therefore, this patch is marked for stable and should be merged
-    for 4.1-rc.
-
-  * The last re-implements the mechanism originally implemented by
-    "bus: mvebu-mbus: make sure SDRAM CS for DMA don't overlap the
-    MBus bridge window", but in a completely different way. This patch
-    will be needed for the CESA driver.
-
-    This patch is not a fix, and should therefore be merged in 4.2.
-
-Thanks,
-
-Thomas
-
-Nicolas Schichan (1):
-  bus: mvebu-mbus: do not set WIN_CTRL_SYNCBARRIER on non io-coherent
-    platforms.
-
-Thomas Petazzoni (2):
-  Revert "bus: mvebu-mbus: make sure SDRAM CS for DMA don't overlap the
-    MBus bridge window"
-  bus: mvebu-mbus: add mv_mbus_dram_info_nooverlap()
-
- drivers/bus/mvebu-mbus.c | 120 ++++++++++++++++++++++++++++++++---------------
- include/linux/mbus.h     |   1 +
- 2 files changed, 84 insertions(+), 37 deletions(-)
-
+diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+index fb9ec62..7fa4510 100644
+--- a/drivers/bus/mvebu-mbus.c
++++ b/drivers/bus/mvebu-mbus.c
+@@ -70,6 +70,7 @@
+  */
+ #define WIN_CTRL_OFF		0x0000
+ #define   WIN_CTRL_ENABLE       BIT(0)
++/* Only on HW I/O coherency capable platforms */
+ #define   WIN_CTRL_SYNCBARRIER  BIT(1)
+ #define   WIN_CTRL_TGT_MASK     0xf0
+ #define   WIN_CTRL_TGT_SHIFT    4
+@@ -323,8 +324,9 @@ static int mvebu_mbus_setup_window(struct mvebu_mbus_state *mbus,
+ 	ctrl = ((size - 1) & WIN_CTRL_SIZE_MASK) |
+ 		(attr << WIN_CTRL_ATTR_SHIFT)    |
+ 		(target << WIN_CTRL_TGT_SHIFT)   |
+-		WIN_CTRL_SYNCBARRIER             |
+ 		WIN_CTRL_ENABLE;
++	if (mbus->hw_io_coherency)
++		ctrl |= WIN_CTRL_SYNCBARRIER;
+ 
+ 	writel(base & WIN_BASE_LOW, addr + WIN_BASE_OFF);
+ 	writel(ctrl, addr + WIN_CTRL_OFF);
 -- 
 2.1.0
