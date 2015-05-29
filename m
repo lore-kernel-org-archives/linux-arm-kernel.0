@@ -1,41 +1,70 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 29 May 2015 08:49:42 +0200
-Subject: [PATCH] ARM: footbridge: enable dc21285 mtd map in defconfig
-In-Reply-To: <20150528210520.GE2067@n2100.arm.linux.org.uk>
-References: <20150528192238.GQ27753@ld-irv-0074>
- <1432842380-4187-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20150528195558.GR27753@ld-irv-0074>
- <20150528210520.GE2067@n2100.arm.linux.org.uk>
-Message-ID: <20150529064942.GB18985@pengutronix.de>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Fri, 29 May 2015 08:57:55 +0200
+Subject: [PATCH 1/3] clk: mux: Add regmap support for simple mux
+In-Reply-To: <1432838508-5184-2-git-send-email-matthias.bgg@gmail.com>
+References: <1432838508-5184-1-git-send-email-matthias.bgg@gmail.com>
+ <1432838508-5184-2-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <CAGhQ9VysJ4O2uOc4LxdN_bFY42fP=ugLp=Sh2rtFEaaavf3yOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 28, 2015 at 10:05:20PM +0100, Russell King - ARM Linux wrote:
-> On Thu, May 28, 2015 at 12:55:58PM -0700, Brian Norris wrote:
-> > On Thu, May 28, 2015 at 09:46:20PM +0200, Uwe Kleine-K?nig wrote:
-> > > This driver fails to build since release 3.2. Improve compile coverage
-> > > by enabling this driver in the footbridge defconfig
-> > 
-> > Actually, it did build, but it just had alarming warnings. I don't think
-> > those warnings actually affected anything at runtime, except for lock
-> > debugging (if enabled).
-> > 
-> > But anyway, the change looks good, and I'm doing this in my local build
-> > tests now, so:
-> > 
-> > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > 
-> > Acked-by: Brian Norris <computersforpeace@gmail.com>
-> 
-> I'd say no to this - some boards have old (28F008) flash on them, which
-> (iirc) doesn't take kindly to being probed by MTD.
-Is this a bug? I'd say keeping the driver disabled in the defconfig just
-papers over a problem.
-Maybe modify the driver to not probe unless a kernel parameter is given?
+Hi Matthias,
 
-Best regards
-Uwe
+On 28 May 2015 at 20:41, Matthias Brugger <matthias.bgg@gmail.com> wrote:
+> Some devices like SoCs from Mediatek need to use the clock muxes
+> through a regmap interface.
+> This patch adds regmap support for simple the simple multiplexer
+> clock code.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Nice to see regmap support. This something I would also like to see
+added to the clk framework.
+And if the approach is agreed upon I would like to see support on
+gates and dividers also.
+
+> +static void clk_mux_writel(struct clk_mux *mux, u32 val)
+> +{
+> +       if (mux->flags && CLK_MUX_USE_REGMAP)
+
+Assume you mean &.
+
+> +               regmap_write(mux->regmap, mux->offset, val);
+> +       else
+> +               clk_writel(val, mux->reg);
+> +}
+> +
+> +static u32 clk_mux_readl(struct clk_mux *mux)
+> +{
+> +       u32 val;
+> +
+> +       if (mux->flags && CLK_MUX_USE_REGMAP)
+
+And here.
+
+> +               regmap_read(mux->regmap, mux->offset, &val);
+> +       else
+> +               val = clk_readl(mux->reg);
+> +
+> +       return val;
+> +}
+> +
+[...]
+> @@ -409,7 +410,9 @@ void clk_unregister_divider(struct clk *clk);
+>  struct clk_mux {
+>         struct clk_hw   hw;
+
+>         void __iomem    *reg;
+> +       struct regmap   *regmap;
+
+Since it not possible to have both iomem and regmap at the same time.
+Could this be put in a union or does that make registration more
+difficult?
+
+>         u32             *table;
+> +       u32             offset;
+>         u32             mask;
+>         u8              shift;
+>         u8              flags;
+
+
+regards,
+Joachim Eastwood
