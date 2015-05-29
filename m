@@ -1,76 +1,66 @@
-From: wcohen@redhat.com (William Cohen)
-Date: Fri, 29 May 2015 11:50:15 -0400
-Subject: Kernel oops on 32-bit arm with syscall with invalid sysno
-In-Reply-To: <20150528214256.GF2067@n2100.arm.linux.org.uk>
-References: <55677D6A.1060008@redhat.com>
- <20150528214256.GF2067@n2100.arm.linux.org.uk>
-Message-ID: <55688AB7.7000101@redhat.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 29 May 2015 08:50:31 -0700
+Subject: runtime check for omap-aes bus access permission (was: Re:
+ 3.13-rc3 (commit 7ce93f3) breaks Nokia N900 DT boot)
+In-Reply-To: <CAALWOA82=QmTpCeiceOFQOjqXKdSBjB3Z+jL-mi0vYF=QaL4sA@mail.gmail.com>
+References: <201502111339.54480@pali>
+ <CAALWOA_ngoSKjB=ZQ264Va37bBK7v41Ei45SyoYLiMdanTKnxQ@mail.gmail.com>
+ <201502112128.44852@pali>
+ <CAGo_u6oZxi7O6re30L2-wVyxTeahhyMb4qVcrE3tSCV9sBvrnw@mail.gmail.com>
+ <20150528073740.GD16509@pali> <20150528160113.GH30984@atomide.com>
+ <CAALWOA8Pfc_zbN9MoHwR=njPBpFU56WObYMbGv9N7ktzy+RSeQ@mail.gmail.com>
+ <20150528222412.GM30984@atomide.com>
+ <CAALWOA9qJHUST0JQxA6MBohMfbTYAP9+NbSXGYHZY4Xa3nSFvw@mail.gmail.com>
+ <CAALWOA82=QmTpCeiceOFQOjqXKdSBjB3Z+jL-mi0vYF=QaL4sA@mail.gmail.com>
+Message-ID: <20150529155030.GO30984@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/28/2015 05:42 PM, Russell King - ARM Linux wrote:
-> On Thu, May 28, 2015 at 04:41:14PM -0400, William Cohen wrote:
->> When reviewing testsuite failures for systemtap I found that the
->> 32-bit arm kernels (both 4.1.0-rc5 and 3.19.8) were not handling the
->> libc syscall with invalid sysno in the manner described by
->> http://www.gnu.org/software/libc/manual/html_node/System-Calls.html.
->> Rather than returning -1 and setting errno to ENOSYS the invalid
->> syscall gives segfault and a kernel oops.
+* Matthijs van Duin <matthijsvanduin@gmail.com> [150528 18:37]:
+> On 29 May 2015 at 02:58, Matthijs van Duin <matthijsvanduin@gmail.com> wrote:
+> > It is only guaranteed to happen immediately (before the next
+> > instruction is executed) if the error occurs before the posting-point
+> > of the write. However, in that case the error is reported in-band to
+> > the cpu, resulting in a (synchronous) bus error which takes precedence
+> > over the out-of-band error irq (if any is signalled).
 > 
-> Looking at this, it seems that we're triggering this:
+> OK, all this was actually assuming linux uses device-type mappings for
+> device mappings, which was also the impression I got from
+> build_mem_type_table() in arch/arm/mm/mmu.c (although it's a bit of a
+> maze). A quick test however seems to imply otherwise:
 > 
->         BUG_ON(context->in_syscall || context->name_count);
+> ~# ./bogus-dev-write
+> Bus error
 > 
-> which seems to imply that we've called audit_syscall_entry() twice
-> without a call to audit_syscall_exit().  That is something we can
-> fix - and something which only happens with the syscall of "-1"
-> (which is our "syscall was cancelled" value.)
+> So... linux actually uses strongly-ordered mappings? I really didn't
+> expect that, given the performance implications (especially on a
+> strictly in-order cpu like the Cortex-A8 which will really just sit
+> there picking its nose until the write completes) and I think I recall
+> having seen an OCP barrier being used somewhere in driver code...
 
-Hi Russell,
+I believe some TI kernels use strongly-ordered mappings, mainline
+kernel does not. Which kernel version are you using?
+ 
+> Well, in that case everything I said is technically still true, except
+> the posting point is the peripheral itself. That also means the
+> interconnect error reporting mechanism is not really useful for
+> probing since you'll get a bus error before any error irq is
+> delivered.
 
-The patch below does eliminate the kernel oops for -1, but it breaks things for other invalid/unimplemented syscalls.  For the attached test, invalid_syscall_plus.c:
+Hmm if that's the case then yes we can't use the error irq. However,
+what I've seen so far is that we only get the bus error if the
+l3_* drivers are configured. I guess some more testing is needed.
+ 
+> So I'd say you're back at having to trap that bus error using the
+> exception handling mechanism, which I still suspect shouldn't be hard
+> to do.
 
+And in that case it makes sense to do that in the bootloader to
+avoid adding any custom early boot code to Linux kernel.
+ 
+> Or perhaps you could probe the device using a DMA access and combine
+> that with the interconnect error reporting irq... ;-)
 
-$ gcc -g -o invalid_syscall_plus invalid_syscall_plus.c
-$ ./invalid_syscall_plus 
-Illegal instruction (core dumped)
+Heh too many dependencies :)
 
-Previously this would print out the expected messages.
-
--Will
-> 
-> If I have diagnosed this correctly, the following patch should fix
-> it.  However, as you're asking for the "cancelled" syscall value,
-> what you'll get returned from the syscall is the r0 value preserved
-> as the result of the syscall.  In other words, you won't get -1 and
-> errno set to ENOSYS.  Not much can be done about that without breaking
-> syscall cancelling, so expect your test case to continue failing.
-> 
-> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-> index f8ccc21fa032..2c40c1214a72 100644
-> --- a/arch/arm/kernel/entry-common.S
-> +++ b/arch/arm/kernel/entry-common.S
-> @@ -241,11 +241,11 @@ __sys_trace:
->  	cmp	scno, #-1			@ skip the syscall?
->  	bne	2b
->  	add	sp, sp, #S_OFF			@ restore stack
-> -	b	ret_slow_syscall
-> +	b	3f
->  
->  __sys_trace_return:
->  	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
-> -	mov	r0, sp
-> +3:	mov	r0, sp
->  	bl	syscall_trace_exit
->  	b	ret_slow_syscall
->  
-> 
-> 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: invalid_syscall_plus.c
-Type: text/x-csrc
-Size: 586 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150529/c835618a/attachment.bin>
+Tony
