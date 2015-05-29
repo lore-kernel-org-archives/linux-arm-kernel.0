@@ -1,115 +1,83 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Fri, 29 May 2015 15:34:47 -0700
-Subject: [PATCH v2] arm/arm64: KVM: Properly account for guest CPU time
-In-Reply-To: <1432838950-28774-1-git-send-email-christoffer.dall@linaro.org>
-References: <1432838950-28774-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <5568E987.5010702@samsung.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 29 May 2015 16:00:41 -0700
+Subject: [PATCH v8 0/7] arm64,hi6220: Enable Hisilicon Hi6220 SoC
+In-Reply-To: <1432865319-20413-1-git-send-email-bintian.wang@huawei.com>
+ (Bintian Wang's message of "Fri, 29 May 2015 10:08:32 +0800")
+References: <1432865319-20413-1-git-send-email-bintian.wang@huawei.com>
+Message-ID: <7hwpzrdm5i.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/28/2015 11:49 AM, Christoffer Dall wrote:
-> Until now we have been calling kvm_guest_exit after re-enabling
-> interrupts when we come back from the guest, but this has the
-> unfortunate effect that CPU time accounting done in the context of timer
-> interrupts occurring while the guest is running doesn't properly notice
-> that the time since the last tick was spent in the guest.
-> 
-> Inspired by the comment in the x86 code, move the kvm_guest_exit() call
-> below the local_irq_enable() call and change __kvm_guest_exit() to
-> kvm_guest_exit(), because we are now calling this function with
-> interrupts enabled.  We have to now explicitly disable preemption and
-> not enable preemption before we've called kvm_guest_exit(), since
-> otherwise we could be preempted and everything happening before we
-> eventually get scheduled again would be accounted for as guest time.
-> 
-> At the same time, move the trace_kvm_exit() call outside of the atomic
-> section, since there is no reason for us to do that with interrupts
-> disabled.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
-> This patch is based on kvm/queue, because it has the kvm_guest_enter/exit
-> rework recently posted by Christian Borntraeger.  I hope I got the logic
-> of this right, there were 2 slightly worrying facts about this:
-> 
-> First, we now enable and disable and enable interrupts on each exit
-> path, but I couldn't see any performance overhead on hackbench - yes the
-> only benchmark we care about.
-> 
-> Second, looking at the ppc and mips code, they seem to also call
-> kvm_guest_exit() before enabling interrupts, so I don't understand how
-> guest CPU time accounting works on those architectures.
-> 
-> Changes since v1:
->  - Tweak comment and commit text based on Marc's feedback.
->  - Explicitly disable preemption and enable it only after kvm_guest_exit().
-> 
->  arch/arm/kvm/arm.c | 21 +++++++++++++++++----
->  1 file changed, 17 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index e41cb11..fe8028d 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -532,6 +532,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  		kvm_vgic_flush_hwstate(vcpu);
->  		kvm_timer_flush_hwstate(vcpu);
->  
-> +		preempt_disable();
->  		local_irq_disable();
->  
->  		/*
-> @@ -544,6 +545,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  
->  		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm)) {
->  			local_irq_enable();
-> +			preempt_enable();
->  			kvm_timer_sync_hwstate(vcpu);
->  			kvm_vgic_sync_hwstate(vcpu);
->  			continue;
-> @@ -559,8 +561,10 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  		ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
->  
->  		vcpu->mode = OUTSIDE_GUEST_MODE;
-> -		__kvm_guest_exit();
-> -		trace_kvm_exit(kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
-> +		/*
-> +		 * Back from guest
-> +		 *************************************************************/
-> +
->  		/*
->  		 * We may have taken a host interrupt in HYP mode (ie
->  		 * while executing the guest). This interrupt is still
-> @@ -574,8 +578,17 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  		local_irq_enable();
->  
->  		/*
-> -		 * Back from guest
-> -		 *************************************************************/
-> +		 * We do local_irq_enable() before calling kvm_guest_exit() so
-> +		 * that if a timer interrupt hits while running the guest we
-> +		 * account that tick as being spent in the guest.  We enable
-> +		 * preemption after calling kvm_guest_exit() so that if we get
-> +		 * preempted we make sure ticks after that is not counted as
-> +		 * guest time.
-> +		 */
-> +		kvm_guest_exit();
-> +		trace_kvm_exit(kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
-> +		preempt_enable();
-> +
->  
->  		kvm_timer_sync_hwstate(vcpu);
->  		kvm_vgic_sync_hwstate(vcpu);
-> 
+Hi Bintian,
 
-Hi Christoffer,
- so currently we take a snap shot when we enter the guest
-(tsk->vtime_snap) and upon exit add the time we spent in
-the guest and update accrued time, which appears correct.
+Bintian Wang <bintian.wang@huawei.com> writes:
 
-With this patch it appears that interrupts running
-in host mode are accrued to Guest time, and additional preemption
-latency is added.
+> From: Bintian Wang <wangbintian@gmail.com>
+>
+> Hi6220 is one mobile solution of Hisilicon, this patchset contains
+> initial support for Hi6220 SoC and HiKey development board, which
+> supports octal ARM Cortex A53 cores. Initial support is minimal and
+> includes just the arch configuration, clock driver, device tree
+> configuration.
+>
+> PSCI is enabled in device tree and there is no problem to boot all the
+> octal cores, and the CPU hotplug is also working now, you can download
+> and compile the latest firmware based on the following link to run this
+> patch set:
+> https://github.com/96boards/documentation/wiki/UEFI
+>
+> Changes v6~v8:
+> This three versions only modified the clock drivers based on the
+> Stephen's review advices.
+> * clk-hi6220.c:
+>   ** Split the clock header file from clock driver
+>   ** Delete setting the parents clock of UART1 to HI6220_150M in clock
+>      driver, we can do that using assigned-clock in dts when enable
+>      UART1 in the future.
+> * clkdivider-hi6220.c: 
+>   ** Reuse some functions exported by clk-divider.c
+>   ** Remove "pr_err" and CLK_IS_BASIC flag
+>   ** Fix some programing style problems
+> * hisilicon/clk.h: remove the "__init" markings on some funcition
+>   prototypes.
+
+It's not clear what kernel this series is meant to apply to.  It doesn't
+apply cleanly to v4.1-rc2 (the version stated for v5) or the current -rc
+(v4.1-rc5) it also doesn't apply cleanly to linus/master or linux-next.
+
+If the series doesn't apply to Linus tree, please state clearly in the
+changelog what tree it should apply to as well as any dependncies.
+
+Also, this version is missing patch 1 from the v6 series, which adds the
+Kconfig/defconfig changes. Without that patch, nothing in this series is
+even compiled (clk driver or DTS files.)
+
+So my recommendation, since the clock driver is very close to being
+merged:
+
+Please create a v9 series with *only* the patches that are not already
+queued up on the clk tree[1].  That should be patches 1-3 and 7 of this
+series, plus patch 1 from v6.
+
+That series should apply cleanly to v4.1-rc1 (or a newer -rc if there
+are dependencies.)  In the changelog to that series, state the version
+that it applies to, and also state that it depends on the clk-next
+branch where the clock maintainers have queued up the driver[1].
+
+Then all that's left is to collect an ack from a DT maintainer, and
+these can be queued up via the arm-soc tree.
+
+FWIW, I've boot tested patches 1-3 and 7 of this series, plus patch 1
+from v6 combined with the clk-next-hi6220 branch[1] on my board (which
+uses ATF + mainline u-boot) and all 8 A53 cores are coming up, so feel
+free to add:
+
+Tested-by: Kevin Hilman <khilman@linaro.org>
+
+to your v9 series.
 
 Thanks,
-- Mario
+
+Kevin
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next-hi6220
