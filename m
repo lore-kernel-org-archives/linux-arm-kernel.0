@@ -1,60 +1,36 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 29 May 2015 14:04:49 +0100
-Subject: [PATCH 1/6] ARM: kvm: psci: fix handling of unimplemented
- functions
-In-Reply-To: <1432901799-18359-2-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1432901799-18359-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1432901799-18359-2-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <556863F1.10902@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Fri, 29 May 2015 14:04:54 +0100
+Subject: [PATCH 0/7] ARM CCI PMU updates for 4.2
+In-Reply-To: <6358728.LNEaZj8aeb@wuerfel>
+References: <1432633996-7229-1-git-send-email-suzuki.poulose@arm.com>
+ <55683163.7050103@arm.com> <6358728.LNEaZj8aeb@wuerfel>
+Message-ID: <556863F6.5050204@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 29/05/15 13:16, Lorenzo Pieralisi wrote:
-> According to the PSCI specification and the SMC/HVC calling
-> convention, PSCI function_ids that are not implemented must
-> return NOT_SUPPORTED as return value.
+On 29/05/15 13:49, Arnd Bergmann wrote:
+> On Friday 29 May 2015 10:29:07 Suzuki K. Poulose wrote:
+>> Hi arm-soc folk,
+>>
+>> On 26/05/15 10:53, Suzuki K. Poulose wrote:
+>>> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+>>>
+>>> Here is the series which adds support for the CCI-500
+>>> PMU. Could you please apply this for 4.2 ?
+>>>
+>>> Please let me know if you need a pull request, I could ask Will to
+>>> setup one.
+>>
+>> Gentle ping on this series for 4.2.
 >
-> Current KVM implementation takes an unhandled PSCI function_id
-> as an error and injects an undefined instruction into the guest
-> if PSCI implementation is called with a function_id that is not
-> handled by the resident PSCI version (ie it is not implemented),
-> which is not the behaviour expected by a guest when calling a
-> PSCI function_id that is not implemented.
+> I missed this at first because  you're not on my mental list of people
+> that normally send pull requests (i.e. platform maintainers). Feel
+> free to reach out to me on IRC when you send more of this, so I don't
+> easily skip over it.
+Sure.
 >
-> This patch fixes this issue by returning NOT_SUPPORTED whenever
-> the kvm PSCI call is executed for a function_id that is not
-> implemented by the PSCI kvm layer.
+> I've applied it to next/drivers now, thanks!
 >
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Reported-by: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Anup Patel <anup.patel@linaro.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->   arch/arm/kvm/psci.c | 6 +++---
->   1 file changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-> index 7e9398c..ec5943b 100644
-> --- a/arch/arm/kvm/psci.c
-> +++ b/arch/arm/kvm/psci.c
-> @@ -273,7 +273,8 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
->   		ret = 0;
->   		break;
->   	default:
-> -		return -EINVAL;
-> +		val = PSCI_RET_NOT_SUPPORTED;
-> +		break;
+Thanks !
 
-IMO we can remove all the other optional non-implemented PSCI functions
-(e.g. KVM_PSCI_FN_MIGRATE, KVM_PSCI_FN_CPU_SUSPEND, ..etc) returning
-PSCI_RET_NOT_SUPPORTED here as they will be then automatically covered
-by default case.
-
-Otherwise looks good to me:
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-
-Regards,
-Sudeep
+Suzuki
