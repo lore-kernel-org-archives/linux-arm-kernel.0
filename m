@@ -1,42 +1,46 @@
-From: lho@apm.com (Loc Ho)
-Date: Fri, 29 May 2015 16:04:35 -0600
-Subject: [PATCH 3/3] arm64: Add L3/SoC DT subnodes to the APM X-Gene SoC EDAC
- node
-In-Reply-To: <1432937075-16558-3-git-send-email-lho@apm.com>
-References: <1432937075-16558-1-git-send-email-lho@apm.com>
- <1432937075-16558-2-git-send-email-lho@apm.com>
- <1432937075-16558-3-git-send-email-lho@apm.com>
-Message-ID: <1432937075-16558-4-git-send-email-lho@apm.com>
+From: david@lang.hm (David Lang)
+Date: Fri, 29 May 2015 15:16:42 -0700 (PDT)
+Subject: Device Tree Blob (DTB) licence
+In-Reply-To: <55684F07.7050402@melag.de>
+References: <1430820315.19516.26.camel@opteya.com>
+ <CAL_Jsq+T5c7qornpRVCduEjUSCeM+0xqbtVYovtH76y=4BqhLQ@mail.gmail.com>
+ <1432289148.5304.58.camel@opteya.com> <1432322832.5304.63.camel@opteya.com>
+ <CAOS_Y6Q37ps+VEnzUZ_uwX++qrRm9Hgx45Q_pmiZSLSNjmKwZg@mail.gmail.com>
+ <55670AD4.8020705@melag.de> <20150528133429.GD2067@n2100.arm.linux.org.uk>
+ <556747E4.6070403@melag.de> <20150529064741.GB25351@1wt.eu>
+ <55684F07.7050402@melag.de>
+Message-ID: <alpine.DEB.2.02.1505291512000.4429@nftneq.ynat.uz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds L3/SoC DT subnodes to the APM X-Gene SoC EDAC node.
+On Fri, 29 May 2015, Enrico Weigelt, metux IT consult wrote:
 
-Signed-off-by: Loc Ho <lho@apm.com>
----
- arch/arm64/boot/dts/apm/apm-storm.dtsi |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+>>> And why should they fear "poisoning" ?
+>> 
+>> Search for "GPL contamination", the problem is quite common, GPL
+>> can turn anything GPL-compatible into GPL. So for a non-GPL project
+>> it's very hard to adopt GPL code.
+>
+> Yes, that's the whole purpose of the GPL. The deal is pretty simple:
+> if you take some GPL'ed software and change it, you'll have to publish
+> your changes under the same rules. For entirely separate entities
+> (eg. dedicated programs) that's not an big issue. And for libraries,
+> we have LGPL.
+>
+> If the DTS license would be a problem, it would be worse w/ ACPI
+> and any proprietary firmware/BIOSes.
 
-diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-index 577799f..9ebc0d4 100644
---- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-@@ -455,6 +455,16 @@
- 				reg = <0x0 0x7c600000 0x0 0x200000>;
- 				pmd-controller = <3>;
- 			};
-+
-+			edacl3 at 7e600000 {
-+				compatible = "apm,xgene-edac-l3";
-+				reg = <0x0 0x7e600000 0x0 0x1000>;
-+			};
-+
-+			edacsoc at 7e930000 {
-+				compatible = "apm,xgene-edac-soc";
-+				reg = <0x0 0x7e930000 0x0 0x1000>;
-+			};
- 		};
- 
- 		pcie0: pcie at 1f2b0000 {
--- 
-1.7.1
+not true, with a proprietary bios it's a clear "pay this much money and don't 
+worry about it" while with GPL there's a nagging fear that someone you never 
+heard of may sue you a decade from now claiming you need to give them the source 
+to your OS.
+
+Is having the DTB GPL so impartant that you would rather let things fall into 
+the windows trap ("well it booted windows, so it must be right") instead of 
+allowing a proprietary OS to use your description of the hardware?
+
+note, this whole discussion assumes that the DTB is even copyrightable. Since 
+it's intended to be strictly a functional description of what the hardware is 
+able to do, that could be questioned
+
+David Lang
