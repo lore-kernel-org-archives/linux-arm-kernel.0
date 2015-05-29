@@ -1,27 +1,35 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Sat, 30 May 2015 03:56:46 +0900
-Subject: [PATCH v2] drm/rockchip: Add BGR formats to VOP
-In-Reply-To: <1431341739-12523-1-git-send-email-tfiga@chromium.org>
-References: <1431341739-12523-1-git-send-email-tfiga@chromium.org>
-Message-ID: <CAAFQd5A1HTV+LdkTSeQrjX=MpQEseY9-NF5PySJq_B+rrmTMkw@mail.gmail.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 29 May 2015 20:59:26 +0200
+Subject: [PATCH v11 0/4] edac: Add APM X-Gene SoC EDAC driver
+In-Reply-To: <CAPw-ZTnLqx0KsQkmv++zQRQ7hroaKML1rWgVafisENam0J17Mg@mail.gmail.com>
+References: <1432337580-3750-1-git-send-email-lho@apm.com>
+ <20150529094654.GD31435@pd.tnic>
+ <CAPw-ZTnLqx0KsQkmv++zQRQ7hroaKML1rWgVafisENam0J17Mg@mail.gmail.com>
+Message-ID: <20150529185926.GP31435@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 11, 2015 at 7:55 PM, Tomasz Figa <tfiga@chromium.org> wrote:
-> VOP can support BGR formats in all windows thanks to red/blue swap option
-> provided in WINx_CTRL0 registers. This patch enables support for
-> ABGR8888, XBGR8888, BGR888 and BGR565 formats by using this feature.
->
-> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
-> ---
->  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 33 +++++++++++++++++++++++++++++
->  1 file changed, 33 insertions(+)
->
-> Changes since v1:
-> (https://patchwork.kernel.org/patch/6369531/)
->  - Fixed register addresses for win2/3 and hwc (reported by Mark Yao).
+On Fri, May 29, 2015 at 11:06:35AM -0700, Loc Ho wrote:
+> I pull this and got this error:
+> 
+> /projects/svdc/P4sbSW/lho/xgene2/processor/git.lho/edac-next/drivers/edac/edac_stub.c:19:22:
+> fatal error: asm/edac.h: No such file or directory
+>  #include <asm/edac.h>
+>                       ^
+> compilation terminated.
 
-Gentle ping.
+Aah, that arch-specific header is only for the atomic_scrub thing and
+arm64 doesn't have it.
 
-Best regards,
-Tomasz
+But that header is actually not really needed in that file.
+
+Does it build when you remove it?
+
+Thanks.
+
+-- 
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
+--
