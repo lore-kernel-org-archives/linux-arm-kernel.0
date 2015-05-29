@@ -1,36 +1,49 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 29 May 2015 09:40:13 +0900
-Subject: [PATCH 1/2] ARM: multi_v7_defconfig: Replace
- CONFIG_USB_ISP1760_HCD by CONFIG_USB_ISP1760
-In-Reply-To: <2413647.WLsQ0T21gS@wuerfel>
-References: <1432637918-8946-1-git-send-email-geert+renesas@glider.be>
- <20150528003903.GB9384@verge.net.au> <2413647.WLsQ0T21gS@wuerfel>
-Message-ID: <20150529004013.GA23322@verge.net.au>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Thu, 28 May 2015 20:48:13 -0400
+Subject: [PATCH 15/15] drivers/clk: don't use module_init in clk-nomadik.c
+ which is non-modular
+In-Reply-To: <1432860493-23831-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1432860493-23831-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <1432860493-23831-16-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 28, 2015 at 10:07:20AM +0200, Arnd Bergmann wrote:
-> On Thursday 28 May 2015 09:39:08 Simon Horman wrote:
-> > On Tue, May 26, 2015 at 12:58:37PM +0200, Geert Uytterhoeven wrote:
-> > > Since commit 100832abf065bc18 ("usb: isp1760: Make HCD support
-> > > optional"), CONFIG_USB_ISP1760_HCD is automatically selected when
-> > > needed.  Enabling that option in the defconfig is now a no-op, and no
-> > > longer enables ISP1760 HCD support.
-> > > 
-> > > Re-enable the ISP1760 driver in the defconfig by enabling
-> > > USB_ISP1760_HOST_ROLE instead.
-> > > 
-> > > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > 
-> > Thanks, I have queued this up for v4.3.
-> > 
-> > I would not object at all if the ARM SoC maintainers wish to
-> > take this earlier and I'd be happy to prepare a pull request
-> > to that effect once the change has sat in next. Unfortunately
-> > I anticipate that will be after the standard rc6 deadline.
-> 
-> I would consider patch 1 as a bug-fix, and put that into 4.1 or
-> 4.2, depending on timing. Patch 2 looks like 4.3 material.
+The clk-nomadik.o is built for ARCH_NOMADIK -- which is bool, and
+hence this code is either present or absent.  It will never be
+modular, so using module_init as an alias for __initcall can be
+somewhat misleading.
 
-Thanks Arnd, would you care to take pick it up directly for 4.1 (or 4.2)?
-If so I'll drop it from my tree.
+Fix this up now, so that we can relocate module_init from
+init.h into module.h in the future.  If we don't do this, we'd
+have to add module.h to obviously non-modular code, and that
+would be a worse thing.
+
+Note that direct use of __initcall is discouraged, vs. one
+of the priority categorized subgroups.  As __initcall gets
+mapped onto device_initcall, our use of device_initcall
+directly in this change means that the runtime impact is
+zero -- it will remain at level 6 in initcall ordering.
+
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+---
+ drivers/clk/clk-nomadik.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/drivers/clk/clk-nomadik.c b/drivers/clk/clk-nomadik.c
+index 05e04ce0f148..c9487179f25f 100644
+--- a/drivers/clk/clk-nomadik.c
++++ b/drivers/clk/clk-nomadik.c
+@@ -503,8 +503,7 @@ static int __init nomadik_src_clk_init_debugfs(void)
+ 			    NULL, NULL, &nomadik_src_clk_debugfs_ops);
+ 	return 0;
+ }
+-
+-module_init(nomadik_src_clk_init_debugfs);
++device_initcall(nomadik_src_clk_init_debugfs);
+ 
+ #endif
+ 
+-- 
+2.2.1
