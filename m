@@ -1,936 +1,324 @@
 From: jun.nie@linaro.org (Jun Nie)
-Date: Fri, 29 May 2015 10:39:36 +0800
-Subject: [PATCH v5 2/4] clk: zx: add clock support to zx296702
-Message-ID: <1432867178-5913-1-git-send-email-jun.nie@linaro.org>
+Date: Fri, 29 May 2015 10:39:37 +0800
+Subject: [PATCH v5 3/4] ARM: dts: zx: add an initial zx296702 dts and doc
+In-Reply-To: <1432867178-5913-1-git-send-email-jun.nie@linaro.org>
+References: <1432867178-5913-1-git-send-email-jun.nie@linaro.org>
+Message-ID: <1432867178-5913-2-git-send-email-jun.nie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds a clock driver for zx296702 SoC to register the clock tree to
-Common Clock Framework.  All the clocks of bus topology and some the
-peripheral clocks are ready with this commit. Some missing leaf clocks
-for peripherals will be added later when needed.
+Add initial dts file and document for ZX296702 and board ZX296702-AD1.
+More peripherals will be added later.
 
 Signed-off-by: Jun Nie <jun.nie@linaro.org>
 ---
- drivers/clk/Makefile           |   1 +
- drivers/clk/zte/Makefile       |   2 +
- drivers/clk/zte/clk-pll.c      | 184 ++++++++++++
- drivers/clk/zte/clk-zx296702.c | 657 +++++++++++++++++++++++++++++++++++++++++
- drivers/clk/zte/clk.h          |  32 ++
- 5 files changed, 876 insertions(+)
- create mode 100644 drivers/clk/zte/Makefile
- create mode 100644 drivers/clk/zte/clk-pll.c
- create mode 100644 drivers/clk/zte/clk-zx296702.c
- create mode 100644 drivers/clk/zte/clk.h
+ Documentation/devicetree/bindings/arm/zte.txt      |  15 +++
+ .../devicetree/bindings/clock/zx296702-clk.txt     |  35 ++++++
+ Documentation/devicetree/bindings/serial/pl011.txt |   2 +-
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/zx296702-ad1.dts                 |  48 +++++++
+ arch/arm/boot/dts/zx296702.dtsi                    | 139 +++++++++++++++++++++
+ 7 files changed, 240 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/zte.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/zx296702-clk.txt
+ create mode 100644 arch/arm/boot/dts/zx296702-ad1.dts
+ create mode 100644 arch/arm/boot/dts/zx296702.dtsi
 
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 3d00c25..f4c68be 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -72,4 +72,5 @@ obj-$(CONFIG_ARCH_OMAP2PLUS)		+= ti/
- obj-$(CONFIG_ARCH_U8500)		+= ux500/
- obj-$(CONFIG_COMMON_CLK_VERSATILE)	+= versatile/
- obj-$(CONFIG_X86)			+= x86/
-+obj-$(CONFIG_ARCH_ZX)			+= zte/
- obj-$(CONFIG_ARCH_ZYNQ)			+= zynq/
-diff --git a/drivers/clk/zte/Makefile b/drivers/clk/zte/Makefile
+diff --git a/Documentation/devicetree/bindings/arm/zte.txt b/Documentation/devicetree/bindings/arm/zte.txt
 new file mode 100644
-index 0000000..95b707c
+index 0000000..3ff5c9e
 --- /dev/null
-+++ b/drivers/clk/zte/Makefile
-@@ -0,0 +1,2 @@
-+obj-y := clk-pll.o
-+obj-$(CONFIG_SOC_ZX296702) += clk-zx296702.o
-diff --git a/drivers/clk/zte/clk-pll.c b/drivers/clk/zte/clk-pll.c
++++ b/Documentation/devicetree/bindings/arm/zte.txt
+@@ -0,0 +1,15 @@
++ZTE platforms device tree bindings
++---------------------------------------
++
++-  ZX296702 board:
++    Required root node properties:
++      - compatible = "zte,zx296702-ad1", "zte,zx296702"
++
++System management required properties:
++      - compatible = "zte,sysctrl"
++
++Low power management required properties:
++      - compatible = "zte,zx296702-pcu"
++
++Bus matrix required properties:
++      - compatible = "zte,zx-bus-matrix"
+diff --git a/Documentation/devicetree/bindings/clock/zx296702-clk.txt b/Documentation/devicetree/bindings/clock/zx296702-clk.txt
 new file mode 100644
-index 0000000..422ef25
+index 0000000..750442b
 --- /dev/null
-+++ b/drivers/clk/zte/clk-pll.c
-@@ -0,0 +1,184 @@
-+/*
-+ * Copyright 2014 Linaro Ltd.
-+ * Copyright (C) 2014 ZTE Corporation.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
++++ b/Documentation/devicetree/bindings/clock/zx296702-clk.txt
+@@ -0,0 +1,35 @@
++Device Tree Clock bindings for ZTE zx296702
 +
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/iopoll.h>
-+#include <linux/slab.h>
-+#include <linux/spinlock.h>
++This binding uses the common clock binding[1].
 +
-+#include "clk.h"
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
 +
-+#define to_clk_zx_pll(_hw) container_of(_hw, struct clk_zx_pll, hw)
++Required properties:
++- compatible : shall be one of the following:
++	"zte,zx296702-topcrm-clk":
++		zx296702 top clock selection, divider and gating
 +
-+#define CFG0_CFG1_OFFSET 4
-+#define LOCK_FLAG BIT(30)
-+#define POWER_DOWN BIT(31)
++	"zte,zx296702-lsp0crpm-clk" and
++	"zte,zx296702-lsp1crpm-clk":
++		zx296702 device level clock selection and gating
 +
-+static int rate_to_idx(struct clk_zx_pll *zx_pll, unsigned long rate)
-+{
-+	const struct zx_pll_config *config = zx_pll->lookup_table;
-+	int i;
++- reg: Address and length of the register set
 +
-+	for (i = 0; i < zx_pll->count; i++) {
-+		if (config[i].rate > rate)
-+			return i > 0 ? i - 1 : 0;
++The clock consumer should specify the desired clock by having the clock
++ID in its "clocks" phandle cell. See include/dt-bindings/clock/zx296702-clock.h
++for the full list of zx296702 clock IDs.
 +
-+		if (config[i].rate == rate)
-+			return i;
-+	}
 +
-+	return i - 1;
-+}
-+
-+static int hw_to_idx(struct clk_zx_pll *zx_pll)
-+{
-+	const struct zx_pll_config *config = zx_pll->lookup_table;
-+	u32 hw_cfg0, hw_cfg1;
-+	int i;
-+
-+	hw_cfg0 = readl_relaxed(zx_pll->reg_base);
-+	hw_cfg1 = readl_relaxed(zx_pll->reg_base + CFG0_CFG1_OFFSET);
-+
-+	/* For matching the value in lookup table */
-+	hw_cfg0 &= ~LOCK_FLAG;
-+	hw_cfg0 |= POWER_DOWN;
-+
-+	for (i = 0; i < zx_pll->count; i++) {
-+		if (hw_cfg0 == config[i].cfg0 && hw_cfg1 == config[i].cfg1)
-+			return i;
-+	}
-+
-+	return -1;
-+}
-+
-+static unsigned long zx_pll_recalc_rate(struct clk_hw *hw,
-+					unsigned long parent_rate)
-+{
-+	struct clk_zx_pll *zx_pll = to_clk_zx_pll(hw);
-+	int idx;
-+
-+	idx = hw_to_idx(zx_pll);
-+	if (unlikely(idx == -1))
-+		return 0;
-+
-+	return zx_pll->lookup_table[idx].rate;
-+}
-+
-+static long zx_pll_round_rate(struct clk_hw *hw, unsigned long rate,
-+			      unsigned long *prate)
-+{
-+	struct clk_zx_pll *zx_pll = to_clk_zx_pll(hw);
-+	int idx;
-+
-+	idx = rate_to_idx(zx_pll, rate);
-+
-+	return zx_pll->lookup_table[idx].rate;
-+}
-+
-+static int zx_pll_set_rate(struct clk_hw *hw, unsigned long rate,
-+			   unsigned long parent_rate)
-+{
-+	/* Assume current cpu is not running on current PLL */
-+	struct clk_zx_pll *zx_pll = to_clk_zx_pll(hw);
-+	const struct zx_pll_config *config;
-+	int idx;
-+
-+	idx = rate_to_idx(zx_pll, rate);
-+	config = &zx_pll->lookup_table[idx];
-+
-+	writel_relaxed(config->cfg0, zx_pll->reg_base);
-+	writel_relaxed(config->cfg1, zx_pll->reg_base + CFG0_CFG1_OFFSET);
-+
-+	return 0;
-+}
-+
-+static int zx_pll_enable(struct clk_hw *hw)
-+{
-+	struct clk_zx_pll *zx_pll = to_clk_zx_pll(hw);
-+	unsigned long timeout = jiffies + msecs_to_jiffies(500);
-+	u32 reg;
-+
-+	reg = readl_relaxed(zx_pll->reg_base);
-+	writel_relaxed(reg & ~POWER_DOWN, zx_pll->reg_base);
-+
-+	return readl_relaxed_poll_timeout(zx_pll->reg_base, reg,
-+					  reg & LOCK_FLAG, 0, 100);
-+
-+	while (!(readl_relaxed(zx_pll->reg_base) & LOCK_FLAG)) {
-+		if (time_after(jiffies, timeout)) {
-+			pr_err("clk %s enable timeout\n",
-+				__clk_get_name(hw->clk));
-+			break;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static void zx_pll_disable(struct clk_hw *hw)
-+{
-+	struct clk_zx_pll *zx_pll = to_clk_zx_pll(hw);
-+	u32 reg;
-+
-+	reg = readl_relaxed(zx_pll->reg_base);
-+	writel_relaxed(reg | POWER_DOWN, zx_pll->reg_base);
-+}
-+
-+static int zx_pll_is_enabled(struct clk_hw *hw)
-+{
-+	struct clk_zx_pll *zx_pll = to_clk_zx_pll(hw);
-+	u32 reg;
-+
-+	reg = readl_relaxed(zx_pll->reg_base);
-+
-+	return !(reg & POWER_DOWN);
-+}
-+
-+static const struct clk_ops zx_pll_ops = {
-+	.recalc_rate = zx_pll_recalc_rate,
-+	.round_rate = zx_pll_round_rate,
-+	.set_rate = zx_pll_set_rate,
-+	.enable = zx_pll_enable,
-+	.disable = zx_pll_disable,
-+	.is_enabled = zx_pll_is_enabled,
++topclk: topcrm at 0x09800000 {
++        compatible = "zte,zx296702-topcrm-clk";
++        reg = <0x09800000 0x1000>;
++        #clock-cells = <1>;
 +};
 +
-+struct clk *clk_register_zx_pll(const char *name, const char *parent_name,
-+	unsigned long flags, void __iomem *reg_base,
-+	const struct zx_pll_config *lookup_table, int count, spinlock_t *lock)
-+{
-+	struct clk_zx_pll *zx_pll;
-+	struct clk *clk;
-+	struct clk_init_data init;
-+
-+	zx_pll = kzalloc(sizeof(*zx_pll), GFP_KERNEL);
-+	if (!zx_pll)
-+		return ERR_PTR(-ENOMEM);
-+
-+	init.name = name;
-+	init.ops = &zx_pll_ops;
-+	init.flags = flags;
-+	init.parent_names = parent_name ? &parent_name : NULL;
-+	init.num_parents = parent_name ? 1 : 0;
-+
-+	zx_pll->reg_base = reg_base;
-+	zx_pll->lookup_table = lookup_table;
-+	zx_pll->count = count;
-+	zx_pll->lock = lock;
-+	zx_pll->hw.init = &init;
-+
-+	clk = clk_register(NULL, &zx_pll->hw);
-+	if (IS_ERR(clk))
-+		kfree(zx_pll);
-+
-+	return clk;
-+}
-diff --git a/drivers/clk/zte/clk-zx296702.c b/drivers/clk/zte/clk-zx296702.c
++uart0: serial at 0x09405000 {
++        compatible = "zte,zx296702-uart";
++        reg = <0x09405000 0x1000>;
++        interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
++        clocks = <&lsp1clk ZX296702_UART0_PCLK>;
++        status = "disabled";
++};
+diff --git a/Documentation/devicetree/bindings/serial/pl011.txt b/Documentation/devicetree/bindings/serial/pl011.txt
+index ba3ecb8..cbae3d9 100644
+--- a/Documentation/devicetree/bindings/serial/pl011.txt
++++ b/Documentation/devicetree/bindings/serial/pl011.txt
+@@ -1,7 +1,7 @@
+ * ARM AMBA Primecell PL011 serial UART
+ 
+ Required properties:
+-- compatible: must be "arm,primecell", "arm,pl011"
++- compatible: must be "arm,primecell", "arm,pl011", "zte,zx296702-uart"
+ - reg: exactly one register range with length 0x1000
+ - interrupts: exactly one interrupt specifier
+ 
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 8033919..717ffd5 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -211,3 +211,4 @@ xillybus	Xillybus Ltd.
+ xlnx	Xilinx
+ zyxel	ZyXEL Communications Corp.
+ zarlink	Zarlink Semiconductor
++zte	ZTE Corp.
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 86217db..4814c6b 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -660,6 +660,7 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += \
+ 	mt6592-evb.dtb \
+ 	mt8127-moose.dtb \
+ 	mt8135-evbp1.dtb
++dtb-$(CONFIG_ARCH_ZX) += zx296702-ad1.dtb
+ endif
+ 
+ always		:= $(dtb-y)
+diff --git a/arch/arm/boot/dts/zx296702-ad1.dts b/arch/arm/boot/dts/zx296702-ad1.dts
 new file mode 100644
-index 0000000..4a11cff
+index 0000000..081f980
 --- /dev/null
-+++ b/drivers/clk/zte/clk-zx296702.c
-@@ -0,0 +1,657 @@
-+/*
-+ * Copyright 2014 Linaro Ltd.
-+ * Copyright (C) 2014 ZTE Corporation.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
++++ b/arch/arm/boot/dts/zx296702-ad1.dts
+@@ -0,0 +1,48 @@
 +
-+#include <linux/clk-provider.h>
-+#include <linux/of_address.h>
++/dts-v1/;
++
++#include "zx296702.dtsi"
++
++/ {
++	model = "ZTE ZX296702 AD1 Board";
++	compatible = "zte,zx296702-ad1", "zte,zx296702";
++
++	aliases {
++		serial0 = &uart0;
++		serial1 = &uart1;
++	};
++
++	memory {
++		reg = <0x50000000 0x20000000>;
++	};
++};
++
++&mmc0 {
++	num-slots = <1>;
++	supports-highspeed;
++	non-removable;
++	disable-wp;
++	status = "okay";
++
++	slot at 0 {
++		reg = <0>;
++		bus-width = <4>;
++	};
++};
++
++&mmc1 {
++	num-slots = <1>;
++	supports-highspeed;
++	non-removable;
++	disable-wp;
++	status = "okay";
++
++	slot at 0 {
++		reg = <0>;
++		bus-width = <8>;
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/zx296702.dtsi b/arch/arm/boot/dts/zx296702.dtsi
+new file mode 100644
+index 0000000..d45c8fc
+--- /dev/null
++++ b/arch/arm/boot/dts/zx296702.dtsi
+@@ -0,0 +1,139 @@
++
++#include "skeleton.dtsi"
 +#include <dt-bindings/clock/zx296702-clock.h>
-+#include "clk.h"
++#include <dt-bindings/interrupt-controller/arm-gic.h>
 +
-+static DEFINE_SPINLOCK(reg_lock);
++/ {
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		enable-method = "zte,zx296702-smp";
 +
-+static void __iomem *topcrm_base;
-+static void __iomem *lsp0crpm_base;
-+static void __iomem *lsp1crpm_base;
++		cpu at 0 {
++			compatible = "arm,cortex-a9";
++			device_type = "cpu";
++			next-level-cache = <&l2cc>;
++			reg = <0>;
++		};
 +
-+static struct clk *topclk[ZX296702_TOPCLK_END];
-+static struct clk *lsp0clk[ZX296702_LSP0CLK_END];
-+static struct clk *lsp1clk[ZX296702_LSP1CLK_END];
++		cpu at 1 {
++			compatible = "arm,cortex-a9";
++			device_type = "cpu";
++			next-level-cache = <&l2cc>;
++			reg = <1>;
++		};
++	};
 +
-+static struct clk_onecell_data topclk_data;
-+static struct clk_onecell_data lsp0clk_data;
-+static struct clk_onecell_data lsp1clk_data;
 +
-+#define CLK_MUX			(topcrm_base + 0x04)
-+#define CLK_DIV			(topcrm_base + 0x08)
-+#define CLK_EN0			(topcrm_base + 0x0c)
-+#define CLK_EN1			(topcrm_base + 0x10)
-+#define VOU_LOCAL_CLKEN		(topcrm_base + 0x68)
-+#define VOU_LOCAL_CLKSEL	(topcrm_base + 0x70)
-+#define VOU_LOCAL_DIV2_SET	(topcrm_base + 0x74)
-+#define CLK_MUX1		(topcrm_base + 0x8c)
++	soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "simple-bus";
++		interrupt-parent = <&intc>;
++		ranges;
 +
-+#define CLK_SDMMC1		(lsp0crpm_base + 0x0c)
++		matrix: bus-matrix at 400000 {
++			compatible = "zte,zx-bus-matrix";
++			reg = <0x00400000 0x1000>;
++		};
 +
-+#define CLK_UART0		(lsp1crpm_base + 0x20)
-+#define CLK_UART1		(lsp1crpm_base + 0x24)
-+#define CLK_SDMMC0		(lsp1crpm_base + 0x2c)
++		intc: interrupt-controller at 00801000 {
++			compatible = "arm,cortex-a9-gic";
++			#interrupt-cells = <3>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			interrupt-controller;
++			reg = <0x00801000 0x1000>,
++			      <0x00800100 0x100>;
++		};
 +
-+static const struct zx_pll_config pll_a9_config[] = {
-+	{ .rate = 700000000, .cfg0 = 0x800405d1, .cfg1 = 0x04555555 },
-+	{ .rate = 800000000, .cfg0 = 0x80040691, .cfg1 = 0x04aaaaaa },
-+	{ .rate = 900000000, .cfg0 = 0x80040791, .cfg1 = 0x04000000 },
-+	{ .rate = 1000000000, .cfg0 = 0x80040851, .cfg1 = 0x04555555 },
-+	{ .rate = 1100000000, .cfg0 = 0x80040911, .cfg1 = 0x04aaaaaa },
-+	{ .rate = 1200000000, .cfg0 = 0x80040a11, .cfg1 = 0x04000000 },
++		global_timer: timer at 008000200 {
++			compatible = "arm,cortex-a9-global-timer";
++			reg = <0x00800200 0x20>;
++			interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-parent = <&intc>;
++			clocks = <&topclk ZX296702_A9_PERIPHCLK>;
++		};
++
++		l2cc: l2-cache-controller at 0x00c00000 {
++			compatible = "arm,pl310-cache";
++			reg = <0x00c00000 0x1000>;
++			cache-unified;
++			cache-level = <2>;
++			arm,data-latency = <1 1 1>;
++			arm,tag-latency = <1 1 1>;
++			arm,double-linefill = <1>;
++			arm,double-linefill-incr = <0>;
++		};
++
++		pcu: pcu at 0xa0008000 {
++			compatible = "zte,zx296702-pcu";
++			reg = <0xa0008000 0x1000>;
++		};
++
++		topclk: topclk at 0x09800000 {
++			compatible = "zte,zx296702-topcrm-clk";
++			reg = <0x09800000 0x1000>;
++			#clock-cells = <1>;
++		};
++
++		lsp1clk: lsp1clk at 0x09400000 {
++			compatible = "zte,zx296702-lsp1crpm-clk";
++			reg = <0x09400000 0x1000>;
++			#clock-cells = <1>;
++		};
++
++		lsp0clk: lsp0clk at 0x0b000000 {
++			compatible = "zte,zx296702-lsp0crpm-clk";
++			reg = <0x0b000000 0x1000>;
++			#clock-cells = <1>;
++		};
++
++		uart0: serial at 0x09405000 {
++			compatible = "zte,zx296702-uart";
++			reg = <0x09405000 0x1000>;
++			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&lsp1clk ZX296702_UART0_WCLK>;
++			status = "disabled";
++		};
++
++		uart1: serial at 0x09406000 {
++			compatible = "zte,zx296702-uart";
++			reg = <0x09406000 0x1000>;
++			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&lsp1clk ZX296702_UART1_WCLK>;
++			status = "disabled";
++		};
++
++		mmc0: mmc at 0x09408000 {
++			compatible = "snps,dw-mshc";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x09408000 0x1000>;
++			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
++			fifo-depth = <32>;
++			clocks = <&lsp1clk ZX296702_SDMMC0_PCLK>,
++				 <&lsp1clk ZX296702_SDMMC0_WCLK>;
++			clock-names = "biu", "ciu";
++			status = "disabled";
++		};
++
++		mmc1: mmc at 0x0b003000 {
++			compatible = "snps,dw-mshc";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x0b003000 0x1000>;
++			interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
++			fifo-depth = <32>;
++			clocks = <&lsp0clk ZX296702_SDMMC1_PCLK>,
++				 <&lsp0clk ZX296702_SDMMC1_WCLK>;
++			clock-names = "biu", "ciu";
++			status = "disabled";
++		};
++
++		sysctrl: sysctrl at 0xa0007000 {
++			compatible = "zte,sysctrl", "syscon";
++			reg = <0xa0007000 0x1000>;
++		};
++	};
 +};
-+
-+static const struct clk_div_table main_hlk_div[] = {
-+	{ .val = 1, .div = 2, },
-+	{ .val = 3, .div = 4, },
-+	{ /* sentinel */ }
-+};
-+
-+static const struct clk_div_table a9_as1_aclk_divider[] = {
-+	{ .val = 0, .div = 1, },
-+	{ .val = 1, .div = 2, },
-+	{ .val = 3, .div = 4, },
-+	{ /* sentinel */ }
-+};
-+
-+static const struct clk_div_table sec_wclk_divider[] = {
-+	{ .val = 0, .div = 1, },
-+	{ .val = 1, .div = 2, },
-+	{ .val = 3, .div = 4, },
-+	{ .val = 5, .div = 6, },
-+	{ .val = 7, .div = 8, },
-+	{ /* sentinel */ }
-+};
-+
-+static const char *matrix_aclk_sel[] = {
-+	"pll_mm0_198M",
-+	"osc",
-+	"clk_148M5",
-+	"pll_lsp_104M",
-+};
-+
-+static const char *a9_wclk_sel[] = {
-+	"pll_a9",
-+	"osc",
-+	"clk_500",
-+	"clk_250",
-+};
-+
-+static const char *a9_as1_aclk_sel[] = {
-+	"clk_250",
-+	"osc",
-+	"pll_mm0_396M",
-+	"pll_mac_333M",
-+};
-+
-+static const char *a9_trace_clkin_sel[] = {
-+	"clk_74M25",
-+	"pll_mm1_108M",
-+	"clk_125",
-+	"clk_148M5",
-+};
-+
-+static const char *decppu_aclk_sel[] = {
-+	"clk_250",
-+	"pll_mm0_198M",
-+	"pll_lsp_104M",
-+	"pll_audio_294M912",
-+};
-+
-+static const char *vou_main_wclk_sel[] = {
-+	"clk_148M5",
-+	"clk_74M25",
-+	"clk_27",
-+	"pll_mm1_54M",
-+};
-+
-+static const char *vou_scaler_wclk_sel[] = {
-+	"clk_250",
-+	"pll_mac_333M",
-+	"pll_audio_294M912",
-+	"pll_mm0_198M",
-+};
-+
-+static const char *r2d_wclk_sel[] = {
-+	"pll_audio_294M912",
-+	"pll_mac_333M",
-+	"pll_a9_350M",
-+	"pll_mm0_396M",
-+};
-+
-+static const char *ddr_wclk_sel[] = {
-+	"pll_mac_333M",
-+	"pll_ddr_266M",
-+	"pll_audio_294M912",
-+	"pll_mm0_198M",
-+};
-+
-+static const char *nand_wclk_sel[] = {
-+	"pll_lsp_104M",
-+	"osc",
-+};
-+
-+static const char *lsp_26_wclk_sel[] = {
-+	"pll_lsp_26M",
-+	"osc",
-+};
-+
-+static const char *vl0_sel[] = {
-+	"vou_main_channel_div",
-+	"vou_aux_channel_div",
-+};
-+
-+static const char *hdmi_sel[] = {
-+	"vou_main_channel_wclk",
-+	"vou_aux_channel_wclk",
-+};
-+
-+static const char *sdmmc0_wclk_sel[] = {
-+	"lsp1_104M_wclk",
-+	"lsp1_26M_wclk",
-+};
-+
-+static const char *sdmmc1_wclk_sel[] = {
-+	"lsp0_104M_wclk",
-+	"lsp0_26M_wclk",
-+};
-+
-+static const char *uart_wclk_sel[] = {
-+	"lsp1_104M_wclk",
-+	"lsp1_26M_wclk",
-+};
-+
-+static inline struct clk *zx_divtbl(const char *name, const char *parent,
-+				    void __iomem *reg, u8 shift, u8 width,
-+				    const struct clk_div_table *table)
-+{
-+	return clk_register_divider_table(NULL, name, parent, 0, reg, shift,
-+					  width, 0, table, &reg_lock);
-+}
-+
-+static inline struct clk *zx_div(const char *name, const char *parent,
-+				 void __iomem *reg, u8 shift, u8 width)
-+{
-+	return clk_register_divider(NULL, name, parent, 0,
-+				    reg, shift, width, 0, &reg_lock);
-+}
-+
-+static inline struct clk *zx_mux(const char *name, const char **parents,
-+		int num_parents, void __iomem *reg, u8 shift, u8 width)
-+{
-+	return clk_register_mux(NULL, name, parents, num_parents,
-+				0, reg, shift, width, 0, &reg_lock);
-+}
-+
-+static inline struct clk *zx_gate(const char *name, const char *parent,
-+				  void __iomem *reg, u8 shift)
-+{
-+	return clk_register_gate(NULL, name, parent, CLK_IGNORE_UNUSED,
-+				 reg, shift, 0, &reg_lock);
-+}
-+
-+static void __init zx296702_top_clocks_init(struct device_node *np)
-+{
-+	struct clk **clk = topclk;
-+	int i;
-+
-+	topcrm_base = of_iomap(np, 0);
-+	WARN_ON(!topcrm_base);
-+
-+	clk[ZX296702_OSC] =
-+		clk_register_fixed_rate(NULL, "osc", NULL, CLK_IS_ROOT,
-+				30000000);
-+	clk[ZX296702_PLL_A9] =
-+		clk_register_zx_pll("pll_a9", "osc", 0, topcrm_base
-+				+ 0x01c, pll_a9_config,
-+				ARRAY_SIZE(pll_a9_config), &reg_lock);
-+
-+	/* TODO: pll_a9_350M look like changeble follow a9 pll */
-+	clk[ZX296702_PLL_A9_350M] =
-+		clk_register_fixed_rate(NULL, "pll_a9_350M", "osc", 0,
-+				350000000);
-+	clk[ZX296702_PLL_MAC_1000M] =
-+		clk_register_fixed_rate(NULL, "pll_mac_1000M", "osc", 0,
-+				1000000000);
-+	clk[ZX296702_PLL_MAC_333M] =
-+		clk_register_fixed_rate(NULL, "pll_mac_333M",	 "osc", 0,
-+				333000000);
-+	clk[ZX296702_PLL_MM0_1188M] =
-+		clk_register_fixed_rate(NULL, "pll_mm0_1188M", "osc", 0,
-+				1188000000);
-+	clk[ZX296702_PLL_MM0_396M] =
-+		clk_register_fixed_rate(NULL, "pll_mm0_396M",  "osc", 0,
-+				396000000);
-+	clk[ZX296702_PLL_MM0_198M] =
-+		clk_register_fixed_rate(NULL, "pll_mm0_198M",  "osc", 0,
-+				198000000);
-+	clk[ZX296702_PLL_MM1_108M] =
-+		clk_register_fixed_rate(NULL, "pll_mm1_108M",  "osc", 0,
-+				108000000);
-+	clk[ZX296702_PLL_MM1_72M] =
-+		clk_register_fixed_rate(NULL, "pll_mm1_72M",	 "osc", 0,
-+				72000000);
-+	clk[ZX296702_PLL_MM1_54M] =
-+		clk_register_fixed_rate(NULL, "pll_mm1_54M",	 "osc", 0,
-+				54000000);
-+	clk[ZX296702_PLL_LSP_104M] =
-+		clk_register_fixed_rate(NULL, "pll_lsp_104M",  "osc", 0,
-+				104000000);
-+	clk[ZX296702_PLL_LSP_26M] =
-+		clk_register_fixed_rate(NULL, "pll_lsp_26M",	 "osc", 0,
-+				26000000);
-+	clk[ZX296702_PLL_DDR_266M] =
-+		clk_register_fixed_rate(NULL, "pll_ddr_266M",	 "osc", 0,
-+				266000000);
-+	clk[ZX296702_PLL_AUDIO_294M912] =
-+		clk_register_fixed_rate(NULL, "pll_audio_294M912", "osc", 0,
-+				294912000);
-+
-+	/* bus clock */
-+	clk[ZX296702_MATRIX_ACLK] =
-+		zx_mux("matrix_aclk", matrix_aclk_sel,
-+				ARRAY_SIZE(matrix_aclk_sel), CLK_MUX, 2, 2);
-+	clk[ZX296702_MAIN_HCLK] =
-+		zx_divtbl("main_hclk", "matrix_aclk", CLK_DIV, 0, 2,
-+				main_hlk_div);
-+	clk[ZX296702_MAIN_PCLK] =
-+		zx_divtbl("main_pclk", "matrix_aclk", CLK_DIV, 2, 2,
-+				main_hlk_div);
-+
-+	/* cpu clock */
-+	clk[ZX296702_CLK_500] =
-+		clk_register_fixed_factor(NULL, "clk_500", "pll_mac_1000M", 0,
-+				1, 2);
-+	clk[ZX296702_CLK_250] =
-+		clk_register_fixed_factor(NULL, "clk_250", "pll_mac_1000M", 0,
-+				1, 4);
-+	clk[ZX296702_CLK_125] =
-+		clk_register_fixed_factor(NULL, "clk_125", "clk_250", 0, 1, 2);
-+	clk[ZX296702_CLK_148M5] =
-+		clk_register_fixed_factor(NULL, "clk_148M5", "pll_mm0_1188M", 0,
-+				1, 8);
-+	clk[ZX296702_CLK_74M25] =
-+		clk_register_fixed_factor(NULL, "clk_74M25", "pll_mm0_1188M", 0,
-+				1, 16);
-+	clk[ZX296702_A9_WCLK] =
-+		zx_mux("a9_wclk", a9_wclk_sel, ARRAY_SIZE(a9_wclk_sel), CLK_MUX,
-+				0, 2);
-+	clk[ZX296702_A9_AS1_ACLK_MUX] =
-+		zx_mux("a9_as1_aclk_mux", a9_as1_aclk_sel,
-+				ARRAY_SIZE(a9_as1_aclk_sel), CLK_MUX, 4, 2);
-+	clk[ZX296702_A9_TRACE_CLKIN_MUX] =
-+		zx_mux("a9_trace_clkin_mux", a9_trace_clkin_sel,
-+				ARRAY_SIZE(a9_trace_clkin_sel), CLK_MUX1, 0, 2);
-+	clk[ZX296702_A9_AS1_ACLK_DIV] =
-+		zx_divtbl("a9_as1_aclk_div", "a9_as1_aclk_mux", CLK_DIV, 4, 2,
-+				a9_as1_aclk_divider);
-+
-+	/* multi-media clock */
-+	clk[ZX296702_CLK_2] =
-+		clk_register_fixed_factor(NULL, "clk_2", "pll_mm1_72M", 0,
-+				1, 36);
-+	clk[ZX296702_CLK_27] =
-+		clk_register_fixed_factor(NULL, "clk_27", "pll_mm1_54M", 0,
-+				1, 2);
-+	clk[ZX296702_DECPPU_ACLK_MUX] =
-+		zx_mux("decppu_aclk_mux", decppu_aclk_sel,
-+				ARRAY_SIZE(decppu_aclk_sel), CLK_MUX, 6, 2);
-+	clk[ZX296702_PPU_ACLK_MUX] =
-+		zx_mux("ppu_aclk_mux", decppu_aclk_sel,
-+				ARRAY_SIZE(decppu_aclk_sel), CLK_MUX, 8, 2);
-+	clk[ZX296702_MALI400_ACLK_MUX] =
-+		zx_mux("mali400_aclk_mux", decppu_aclk_sel,
-+				ARRAY_SIZE(decppu_aclk_sel), CLK_MUX, 12, 2);
-+	clk[ZX296702_VOU_ACLK_MUX] =
-+		zx_mux("vou_aclk_mux", decppu_aclk_sel,
-+				ARRAY_SIZE(decppu_aclk_sel), CLK_MUX, 10, 2);
-+	clk[ZX296702_VOU_MAIN_WCLK_MUX] =
-+		zx_mux("vou_main_wclk_mux", vou_main_wclk_sel,
-+				ARRAY_SIZE(vou_main_wclk_sel), CLK_MUX, 14, 2);
-+	clk[ZX296702_VOU_AUX_WCLK_MUX] =
-+		zx_mux("vou_aux_wclk_mux", vou_main_wclk_sel,
-+				ARRAY_SIZE(vou_main_wclk_sel), CLK_MUX, 16, 2);
-+	clk[ZX296702_VOU_SCALER_WCLK_MUX] =
-+		zx_mux("vou_scaler_wclk_mux", vou_scaler_wclk_sel,
-+				ARRAY_SIZE(vou_scaler_wclk_sel), CLK_MUX,
-+				18, 2);
-+	clk[ZX296702_R2D_ACLK_MUX] =
-+		zx_mux("r2d_aclk_mux", decppu_aclk_sel,
-+				ARRAY_SIZE(decppu_aclk_sel), CLK_MUX, 20, 2);
-+	clk[ZX296702_R2D_WCLK_MUX] =
-+		zx_mux("r2d_wclk_mux", r2d_wclk_sel,
-+				ARRAY_SIZE(r2d_wclk_sel), CLK_MUX, 22, 2);
-+
-+	/* other clock */
-+	clk[ZX296702_CLK_50] =
-+		clk_register_fixed_factor(NULL, "clk_50", "pll_mac_1000M",
-+				0, 1, 20);
-+	clk[ZX296702_CLK_25] =
-+		clk_register_fixed_factor(NULL, "clk_25", "pll_mac_1000M",
-+				0, 1, 40);
-+	clk[ZX296702_CLK_12] =
-+		clk_register_fixed_factor(NULL, "clk_12", "pll_mm1_72M",
-+				0, 1, 6);
-+	clk[ZX296702_CLK_16M384] =
-+		clk_register_fixed_factor(NULL, "clk_16M384",
-+				"pll_audio_294M912", 0, 1, 18);
-+	clk[ZX296702_CLK_32K768] =
-+		clk_register_fixed_factor(NULL, "clk_32K768", "clk_16M384",
-+				0, 1, 500);
-+	clk[ZX296702_SEC_WCLK_DIV] =
-+		zx_divtbl("sec_wclk_div", "pll_lsp_104M", CLK_DIV, 6, 3,
-+				sec_wclk_divider);
-+	clk[ZX296702_DDR_WCLK_MUX] =
-+		zx_mux("ddr_wclk_mux", ddr_wclk_sel,
-+				ARRAY_SIZE(ddr_wclk_sel), CLK_MUX, 24, 2);
-+	clk[ZX296702_NAND_WCLK_MUX] =
-+		zx_mux("nand_wclk_mux", nand_wclk_sel,
-+				ARRAY_SIZE(nand_wclk_sel), CLK_MUX, 24, 2);
-+	clk[ZX296702_LSP_26_WCLK_MUX] =
-+		zx_mux("lsp_26_wclk_mux", lsp_26_wclk_sel,
-+				ARRAY_SIZE(lsp_26_wclk_sel), CLK_MUX, 27, 1);
-+
-+	/* gates */
-+	clk[ZX296702_A9_AS0_ACLK] =
-+		zx_gate("a9_as0_aclk",	"matrix_aclk",		CLK_EN0, 0);
-+	clk[ZX296702_A9_AS1_ACLK] =
-+		zx_gate("a9_as1_aclk",	"a9_as1_aclk_div",	CLK_EN0, 1);
-+	clk[ZX296702_A9_TRACE_CLKIN] =
-+		zx_gate("a9_trace_clkin", "a9_trace_clkin_mux",	CLK_EN0, 2);
-+	clk[ZX296702_DECPPU_AXI_M_ACLK] =
-+		zx_gate("decppu_axi_m_aclk", "decppu_aclk_mux", CLK_EN0, 3);
-+	clk[ZX296702_DECPPU_AHB_S_HCLK] =
-+		zx_gate("decppu_ahb_s_hclk",	"main_hclk",	CLK_EN0, 4);
-+	clk[ZX296702_PPU_AXI_M_ACLK] =
-+		zx_gate("ppu_axi_m_aclk",	"ppu_aclk_mux",	CLK_EN0, 5);
-+	clk[ZX296702_PPU_AHB_S_HCLK] =
-+		zx_gate("ppu_ahb_s_hclk",	"main_hclk",	CLK_EN0, 6);
-+	clk[ZX296702_VOU_AXI_M_ACLK] =
-+		zx_gate("vou_axi_m_aclk",	"vou_aclk_mux",	CLK_EN0, 7);
-+	clk[ZX296702_VOU_APB_PCLK] =
-+		zx_gate("vou_apb_pclk",	"main_pclk",		CLK_EN0, 8);
-+	clk[ZX296702_VOU_MAIN_CHANNEL_WCLK] =
-+		zx_gate("vou_main_channel_wclk", "vou_main_wclk_mux",
-+				CLK_EN0, 9);
-+	clk[ZX296702_VOU_AUX_CHANNEL_WCLK] =
-+		zx_gate("vou_aux_channel_wclk", "vou_aux_wclk_mux",
-+				CLK_EN0, 10);
-+	clk[ZX296702_VOU_HDMI_OSCLK_CEC] =
-+		zx_gate("vou_hdmi_osclk_cec", "clk_2",		CLK_EN0, 11);
-+	clk[ZX296702_VOU_SCALER_WCLK] =
-+		zx_gate("vou_scaler_wclk", "vou_scaler_wclk_mux", CLK_EN0, 12);
-+	clk[ZX296702_MALI400_AXI_M_ACLK] =
-+		zx_gate("mali400_axi_m_aclk", "mali400_aclk_mux", CLK_EN0, 13);
-+	clk[ZX296702_MALI400_APB_PCLK] =
-+		zx_gate("mali400_apb_pclk",	"main_pclk",	CLK_EN0, 14);
-+	clk[ZX296702_R2D_WCLK] =
-+		zx_gate("r2d_wclk",		"r2d_wclk_mux",	CLK_EN0, 15);
-+	clk[ZX296702_R2D_AXI_M_ACLK] =
-+		zx_gate("r2d_axi_m_aclk",	"r2d_aclk_mux",	CLK_EN0, 16);
-+	clk[ZX296702_R2D_AHB_HCLK] =
-+		zx_gate("r2d_ahb_hclk",		"main_hclk",	CLK_EN0, 17);
-+	clk[ZX296702_DDR3_AXI_S0_ACLK] =
-+		zx_gate("ddr3_axi_s0_aclk",	"matrix_aclk",	CLK_EN0, 18);
-+	clk[ZX296702_DDR3_APB_PCLK] =
-+		zx_gate("ddr3_apb_pclk",	"main_pclk",	CLK_EN0, 19);
-+	clk[ZX296702_DDR3_WCLK] =
-+		zx_gate("ddr3_wclk",		"ddr_wclk_mux",	CLK_EN0, 20);
-+	clk[ZX296702_USB20_0_AHB_HCLK] =
-+		zx_gate("usb20_0_ahb_hclk",	"main_hclk",	CLK_EN0, 21);
-+	clk[ZX296702_USB20_0_EXTREFCLK] =
-+		zx_gate("usb20_0_extrefclk",	"clk_12",	CLK_EN0, 22);
-+	clk[ZX296702_USB20_1_AHB_HCLK] =
-+		zx_gate("usb20_1_ahb_hclk",	"main_hclk",	CLK_EN0, 23);
-+	clk[ZX296702_USB20_1_EXTREFCLK] =
-+		zx_gate("usb20_1_extrefclk",	"clk_12",	CLK_EN0, 24);
-+	clk[ZX296702_USB20_2_AHB_HCLK] =
-+		zx_gate("usb20_2_ahb_hclk",	"main_hclk",	CLK_EN0, 25);
-+	clk[ZX296702_USB20_2_EXTREFCLK] =
-+		zx_gate("usb20_2_extrefclk",	"clk_12",	CLK_EN0, 26);
-+	clk[ZX296702_GMAC_AXI_M_ACLK] =
-+		zx_gate("gmac_axi_m_aclk",	"matrix_aclk",	CLK_EN0, 27);
-+	clk[ZX296702_GMAC_APB_PCLK] =
-+		zx_gate("gmac_apb_pclk",	"main_pclk",	CLK_EN0, 28);
-+	clk[ZX296702_GMAC_125_CLKIN] =
-+		zx_gate("gmac_125_clkin",	"clk_125",	CLK_EN0, 29);
-+	clk[ZX296702_GMAC_RMII_CLKIN] =
-+		zx_gate("gmac_rmii_clkin",	"clk_50",	CLK_EN0, 30);
-+	clk[ZX296702_GMAC_25M_CLK] =
-+		zx_gate("gmac_25M_clk",		"clk_25",	CLK_EN0, 31);
-+	clk[ZX296702_NANDFLASH_AHB_HCLK] =
-+		zx_gate("nandflash_ahb_hclk", "main_hclk",	CLK_EN1, 0);
-+	clk[ZX296702_NANDFLASH_WCLK] =
-+		zx_gate("nandflash_wclk",     "nand_wclk_mux",	CLK_EN1, 1);
-+	clk[ZX296702_LSP0_APB_PCLK] =
-+		zx_gate("lsp0_apb_pclk",	"main_pclk",	CLK_EN1, 2);
-+	clk[ZX296702_LSP0_AHB_HCLK] =
-+		zx_gate("lsp0_ahb_hclk",	"main_hclk",	CLK_EN1, 3);
-+	clk[ZX296702_LSP0_26M_WCLK] =
-+		zx_gate("lsp0_26M_wclk",   "lsp_26_wclk_mux",	CLK_EN1, 4);
-+	clk[ZX296702_LSP0_104M_WCLK] =
-+		zx_gate("lsp0_104M_wclk",	"pll_lsp_104M",	CLK_EN1, 5);
-+	clk[ZX296702_LSP0_16M384_WCLK] =
-+		zx_gate("lsp0_16M384_wclk",	"clk_16M384",	CLK_EN1, 6);
-+	clk[ZX296702_LSP1_APB_PCLK] =
-+		zx_gate("lsp1_apb_pclk",	"main_pclk",	CLK_EN1, 7);
-+	/* FIXME: wclk enable bit is bit8. We hack it as reserved 31 for
-+	 * UART does not work after parent clk is disabled/enabled */
-+	clk[ZX296702_LSP1_26M_WCLK] =
-+		zx_gate("lsp1_26M_wclk",     "lsp_26_wclk_mux",	CLK_EN1, 31);
-+	clk[ZX296702_LSP1_104M_WCLK] =
-+		zx_gate("lsp1_104M_wclk",    "pll_lsp_104M",	CLK_EN1, 9);
-+	clk[ZX296702_LSP1_32K_CLK] =
-+		zx_gate("lsp1_32K_clk",	"clk_32K768",		CLK_EN1, 10);
-+	clk[ZX296702_AON_HCLK] =
-+		zx_gate("aon_hclk",		"main_hclk",	CLK_EN1, 11);
-+	clk[ZX296702_SYS_CTRL_PCLK] =
-+		zx_gate("sys_ctrl_pclk",	"main_pclk",	CLK_EN1, 12);
-+	clk[ZX296702_DMA_PCLK] =
-+		zx_gate("dma_pclk",		"main_pclk",	CLK_EN1, 13);
-+	clk[ZX296702_DMA_ACLK] =
-+		zx_gate("dma_aclk",		"matrix_aclk",	CLK_EN1, 14);
-+	clk[ZX296702_SEC_HCLK] =
-+		zx_gate("sec_hclk",		"main_hclk",	CLK_EN1, 15);
-+	clk[ZX296702_AES_WCLK] =
-+		zx_gate("aes_wclk",		"sec_wclk_div",	CLK_EN1, 16);
-+	clk[ZX296702_DES_WCLK] =
-+		zx_gate("des_wclk",		"sec_wclk_div",	CLK_EN1, 17);
-+	clk[ZX296702_IRAM_ACLK] =
-+		zx_gate("iram_aclk",		"matrix_aclk",	CLK_EN1, 18);
-+	clk[ZX296702_IROM_ACLK] =
-+		zx_gate("irom_aclk",		"matrix_aclk",	CLK_EN1, 19);
-+	clk[ZX296702_BOOT_CTRL_HCLK] =
-+		zx_gate("boot_ctrl_hclk",	"main_hclk",	CLK_EN1, 20);
-+	clk[ZX296702_EFUSE_CLK_30] =
-+		zx_gate("efuse_clk_30",	"osc",			CLK_EN1, 21);
-+
-+	/* TODO: add VOU Local clocks */
-+	clk[ZX296702_VOU_MAIN_CHANNEL_DIV] =
-+		zx_div("vou_main_channel_div", "vou_main_channel_wclk",
-+				VOU_LOCAL_DIV2_SET, 1, 1);
-+	clk[ZX296702_VOU_AUX_CHANNEL_DIV] =
-+		zx_div("vou_aux_channel_div", "vou_aux_channel_wclk",
-+				VOU_LOCAL_DIV2_SET, 0, 1);
-+	clk[ZX296702_VOU_TV_ENC_HD_DIV] =
-+		zx_div("vou_tv_enc_hd_div", "vou_tv_enc_hd_mux",
-+				VOU_LOCAL_DIV2_SET, 3, 1);
-+	clk[ZX296702_VOU_TV_ENC_SD_DIV] =
-+		zx_div("vou_tv_enc_sd_div", "vou_tv_enc_sd_mux",
-+				VOU_LOCAL_DIV2_SET, 2, 1);
-+	clk[ZX296702_VL0_MUX] =
-+		zx_mux("vl0_mux", vl0_sel, ARRAY_SIZE(vl0_sel),
-+				VOU_LOCAL_CLKSEL, 8, 1);
-+	clk[ZX296702_VL1_MUX] =
-+		zx_mux("vl1_mux", vl0_sel, ARRAY_SIZE(vl0_sel),
-+				VOU_LOCAL_CLKSEL, 9, 1);
-+	clk[ZX296702_VL2_MUX] =
-+		zx_mux("vl2_mux", vl0_sel, ARRAY_SIZE(vl0_sel),
-+				VOU_LOCAL_CLKSEL, 10, 1);
-+	clk[ZX296702_GL0_MUX] =
-+		zx_mux("gl0_mux", vl0_sel, ARRAY_SIZE(vl0_sel),
-+				VOU_LOCAL_CLKSEL, 5, 1);
-+	clk[ZX296702_GL1_MUX] =
-+		zx_mux("gl1_mux", vl0_sel, ARRAY_SIZE(vl0_sel),
-+				VOU_LOCAL_CLKSEL, 6, 1);
-+	clk[ZX296702_GL2_MUX] =
-+		zx_mux("gl2_mux", vl0_sel, ARRAY_SIZE(vl0_sel),
-+				VOU_LOCAL_CLKSEL, 7, 1);
-+	clk[ZX296702_WB_MUX] =
-+		zx_mux("wb_mux",  vl0_sel, ARRAY_SIZE(vl0_sel),
-+				VOU_LOCAL_CLKSEL, 11, 1);
-+	clk[ZX296702_HDMI_MUX] =
-+		zx_mux("hdmi_mux", hdmi_sel, ARRAY_SIZE(hdmi_sel),
-+				VOU_LOCAL_CLKSEL, 4, 1);
-+	clk[ZX296702_VOU_TV_ENC_HD_MUX] =
-+		zx_mux("vou_tv_enc_hd_mux", hdmi_sel, ARRAY_SIZE(hdmi_sel),
-+				VOU_LOCAL_CLKSEL, 3, 1);
-+	clk[ZX296702_VOU_TV_ENC_SD_MUX] =
-+		zx_mux("vou_tv_enc_sd_mux", hdmi_sel, ARRAY_SIZE(hdmi_sel),
-+				VOU_LOCAL_CLKSEL, 2, 1);
-+	clk[ZX296702_VL0_CLK] =
-+		zx_gate("vl0_clk", "vl0_mux", VOU_LOCAL_CLKEN, 8);
-+	clk[ZX296702_VL1_CLK] =
-+		zx_gate("vl1_clk", "vl1_mux", VOU_LOCAL_CLKEN, 9);
-+	clk[ZX296702_VL2_CLK] =
-+		zx_gate("vl2_clk", "vl2_mux", VOU_LOCAL_CLKEN, 10);
-+	clk[ZX296702_GL0_CLK] =
-+		zx_gate("gl0_clk", "gl0_mux", VOU_LOCAL_CLKEN, 5);
-+	clk[ZX296702_GL1_CLK] =
-+		zx_gate("gl1_clk", "gl1_mux", VOU_LOCAL_CLKEN, 6);
-+	clk[ZX296702_GL2_CLK] =
-+		zx_gate("gl2_clk", "gl2_mux", VOU_LOCAL_CLKEN, 7);
-+	clk[ZX296702_WB_CLK] =
-+		zx_gate("wb_clk", "wb_mux", VOU_LOCAL_CLKEN, 11);
-+	clk[ZX296702_CL_CLK] =
-+		zx_gate("cl_clk", "vou_main_channel_div", VOU_LOCAL_CLKEN, 12);
-+	clk[ZX296702_MAIN_MIX_CLK] =
-+		zx_gate("main_mix_clk", "vou_main_channel_div",
-+				VOU_LOCAL_CLKEN, 4);
-+	clk[ZX296702_AUX_MIX_CLK] =
-+		zx_gate("aux_mix_clk", "vou_aux_channel_div",
-+				VOU_LOCAL_CLKEN, 3);
-+	clk[ZX296702_HDMI_CLK] =
-+		zx_gate("hdmi_clk", "hdmi_mux", VOU_LOCAL_CLKEN, 2);
-+	clk[ZX296702_VOU_TV_ENC_HD_DAC_CLK] =
-+		zx_gate("vou_tv_enc_hd_dac_clk", "vou_tv_enc_hd_div",
-+				VOU_LOCAL_CLKEN, 1);
-+	clk[ZX296702_VOU_TV_ENC_SD_DAC_CLK] =
-+		zx_gate("vou_tv_enc_sd_dac_clk", "vou_tv_enc_sd_div",
-+				VOU_LOCAL_CLKEN, 0);
-+
-+	/* CA9 PERIPHCLK = a9_wclk / 2 */
-+	clk[ZX296702_A9_PERIPHCLK] =
-+		clk_register_fixed_factor(NULL, "a9_periphclk", "a9_wclk",
-+				0, 1, 2);
-+
-+	for (i = 0; i < ARRAY_SIZE(topclk); i++) {
-+		if (IS_ERR(clk[i])) {
-+			pr_err("zx296702 clk %d: register failed with %ld\n",
-+				i, PTR_ERR(clk[i]));
-+			return;
-+		}
-+	}
-+
-+	topclk_data.clks = topclk;
-+	topclk_data.clk_num = ARRAY_SIZE(topclk);
-+	of_clk_add_provider(np, of_clk_src_onecell_get, &topclk_data);
-+}
-+CLK_OF_DECLARE(zx296702_top_clk, "zte,zx296702-topcrm-clk",
-+		zx296702_top_clocks_init);
-+
-+static void __init zx296702_lsp0_clocks_init(struct device_node *np)
-+{
-+	struct clk **clk = lsp0clk;
-+	int i;
-+
-+	lsp0crpm_base = of_iomap(np, 0);
-+	WARN_ON(!lsp0crpm_base);
-+
-+	/* SDMMC1 */
-+	clk[ZX296702_SDMMC1_WCLK_MUX] =
-+		zx_mux("sdmmc1_wclk_mux", sdmmc1_wclk_sel,
-+				ARRAY_SIZE(sdmmc1_wclk_sel), CLK_SDMMC1, 4, 1);
-+	clk[ZX296702_SDMMC1_WCLK_DIV] =
-+		zx_div("sdmmc1_wclk_div", "sdmmc1_wclk_mux", CLK_SDMMC1, 12, 4);
-+	clk[ZX296702_SDMMC1_WCLK] =
-+		zx_gate("sdmmc1_wclk", "sdmmc1_wclk_div", CLK_SDMMC1, 1);
-+	clk[ZX296702_SDMMC1_PCLK] =
-+		zx_gate("sdmmc1_pclk", "lsp1_apb_pclk", CLK_SDMMC1, 0);
-+
-+	for (i = 0; i < ARRAY_SIZE(lsp0clk); i++) {
-+		if (IS_ERR(clk[i])) {
-+			pr_err("zx296702 clk %d: register failed with %ld\n",
-+				i, PTR_ERR(clk[i]));
-+			return;
-+		}
-+	}
-+
-+	lsp0clk_data.clks = lsp0clk;
-+	lsp0clk_data.clk_num = ARRAY_SIZE(lsp0clk);
-+	of_clk_add_provider(np, of_clk_src_onecell_get, &lsp0clk_data);
-+}
-+CLK_OF_DECLARE(zx296702_lsp0_clk, "zte,zx296702-lsp0crpm-clk",
-+		zx296702_lsp0_clocks_init);
-+
-+static void __init zx296702_lsp1_clocks_init(struct device_node *np)
-+{
-+	struct clk **clk = lsp1clk;
-+	int i;
-+
-+	lsp1crpm_base = of_iomap(np, 0);
-+	WARN_ON(!lsp1crpm_base);
-+
-+	/* UART0 */
-+	clk[ZX296702_UART0_WCLK_MUX] =
-+		zx_mux("uart0_wclk_mux", uart_wclk_sel,
-+				ARRAY_SIZE(uart_wclk_sel), CLK_UART0, 4, 1);
-+	/* FIXME: uart wclk enable bit is bit1 in. We hack it as reserved 31 for
-+	 * UART does not work after parent clk is disabled/enabled */
-+	clk[ZX296702_UART0_WCLK] =
-+		zx_gate("uart0_wclk", "uart0_wclk_mux", CLK_UART0, 31);
-+	clk[ZX296702_UART0_PCLK] =
-+		zx_gate("uart0_pclk", "lsp1_apb_pclk", CLK_UART0, 0);
-+
-+	/* UART1 */
-+	clk[ZX296702_UART1_WCLK_MUX] =
-+		zx_mux("uart1_wclk_mux", uart_wclk_sel,
-+				ARRAY_SIZE(uart_wclk_sel), CLK_UART1, 4, 1);
-+	clk[ZX296702_UART1_WCLK] =
-+		zx_gate("uart1_wclk", "uart1_wclk_mux", CLK_UART1, 1);
-+	clk[ZX296702_UART1_PCLK] =
-+		zx_gate("uart1_pclk", "lsp1_apb_pclk", CLK_UART1, 0);
-+
-+	/* SDMMC0 */
-+	clk[ZX296702_SDMMC0_WCLK_MUX] =
-+		zx_mux("sdmmc0_wclk_mux", sdmmc0_wclk_sel,
-+				ARRAY_SIZE(sdmmc0_wclk_sel), CLK_SDMMC0, 4, 1);
-+	clk[ZX296702_SDMMC0_WCLK_DIV] =
-+		zx_div("sdmmc0_wclk_div", "sdmmc0_wclk_mux", CLK_SDMMC0, 12, 4);
-+	clk[ZX296702_SDMMC0_WCLK] =
-+		zx_gate("sdmmc0_wclk", "sdmmc0_wclk_div", CLK_SDMMC0, 1);
-+	clk[ZX296702_SDMMC0_PCLK] =
-+		zx_gate("sdmmc0_pclk", "lsp1_apb_pclk", CLK_SDMMC0, 0);
-+
-+	for (i = 0; i < ARRAY_SIZE(lsp1clk); i++) {
-+		if (IS_ERR(clk[i])) {
-+			pr_err("zx296702 clk %d: register failed with %ld\n",
-+				i, PTR_ERR(clk[i]));
-+			return;
-+		}
-+	}
-+
-+	lsp1clk_data.clks = lsp1clk;
-+	lsp1clk_data.clk_num = ARRAY_SIZE(lsp1clk);
-+	of_clk_add_provider(np, of_clk_src_onecell_get, &lsp1clk_data);
-+}
-+CLK_OF_DECLARE(zx296702_lsp1_clk, "zte,zx296702-lsp1crpm-clk",
-+		zx296702_lsp1_clocks_init);
-diff --git a/drivers/clk/zte/clk.h b/drivers/clk/zte/clk.h
-new file mode 100644
-index 0000000..0914a82
---- /dev/null
-+++ b/drivers/clk/zte/clk.h
-@@ -0,0 +1,32 @@
-+/*
-+ * Copyright 2015 Linaro Ltd.
-+ * Copyright (C) 2014 ZTE Corporation.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __ZTE_CLK_H
-+#define __ZTE_CLK_H
-+#include <linux/clk-provider.h>
-+#include <linux/spinlock.h>
-+
-+struct zx_pll_config {
-+	unsigned long rate;
-+	u32 cfg0;
-+	u32 cfg1;
-+};
-+
-+struct clk_zx_pll {
-+	struct clk_hw hw;
-+	void __iomem *reg_base;
-+	const struct zx_pll_config *lookup_table; /* order by rate asc */
-+	int count;
-+	spinlock_t *lock;
-+};
-+
-+struct clk *clk_register_zx_pll(const char *name, const char *parent_name,
-+	unsigned long flags, void __iomem *reg_base,
-+	const struct zx_pll_config *lookup_table, int count, spinlock_t *lock);
-+#endif
 -- 
 1.9.1
