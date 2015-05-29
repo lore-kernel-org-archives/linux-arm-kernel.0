@@ -1,30 +1,43 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 29 May 2015 11:46:54 +0200
-Subject: [PATCH v11 0/4] edac: Add APM X-Gene SoC EDAC driver
-In-Reply-To: <1432337580-3750-1-git-send-email-lho@apm.com>
-References: <1432337580-3750-1-git-send-email-lho@apm.com>
-Message-ID: <20150529094654.GD31435@pd.tnic>
+From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
+Date: Fri, 29 May 2015 10:30:27 +0100
+Subject: [PATCH v5 11/12] KVM: arm64: enable KVM_CAP_SET_GUEST_DEBUG
+In-Reply-To: <1432891828-4816-1-git-send-email-alex.bennee@linaro.org>
+References: <1432891828-4816-1-git-send-email-alex.bennee@linaro.org>
+Message-ID: <1432891828-4816-12-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 22, 2015 at 05:32:55PM -0600, Loc Ho wrote:
-> This patch adds support for the APM X-Gene SoC EDAC driver for DT.
+Finally advertise the KVM capability for SET_GUEST_DEBUG. Once arm
+support is added this check can be moved to the common
+kvm_vm_ioctl_check_extension() code.
 
-Applied, thanks!
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Phew, that was a looong process. But the final result looks nice. So
-thanks for the perseverance.
+---
 
-All is here, if you want to do testing and other fun before the merge
-window opens:
+v3:
+ - separated capability check from previous patches
+ - moved into arm64 specific ioctl handler.
+v4:
+ - add a-b-tag
+---
+ arch/arm64/kvm/reset.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-git://git.kernel.org/pub/scm/linux/kernel/git/bp/bp.git#for-next
-
-Cheers!
-
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index 21d5a62..88e5331 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -76,6 +76,9 @@ int kvm_arch_dev_ioctl_check_extension(long ext)
+ 	case KVM_CAP_GUEST_DEBUG_HW_WPS:
+ 		r  = get_num_wrps();
+ 		break;
++	case KVM_CAP_SET_GUEST_DEBUG:
++		r = 1;
++		break;
+ 	default:
+ 		r = 0;
+ 	}
 -- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
---
+2.4.1
