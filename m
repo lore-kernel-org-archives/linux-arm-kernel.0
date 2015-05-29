@@ -1,99 +1,93 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 29 May 2015 10:53:19 +0100
-Subject: [PATCH 03/13] KVM: arm/arm64: add emulation model specific destroy
- function
-In-Reply-To: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
-References: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1432893209-27313-4-git-send-email-andre.przywara@arm.com>
+Date: Fri, 29 May 2015 10:53:16 +0100
+Subject: [PATCH 00/13] arm64: KVM: GICv3 ITS emulation
+Message-ID: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we destroy the VGIC emulation in one function that cares for
-all emulated models. The ITS emulation will require some
-differentiation, so introduce a per-emulation-model destroy method.
-Use it for a tiny GICv3 specific code already.
+The GICv3 ITS (Interrupt Translation Service) is a part of the
+ARM GICv3 interrupt controller used for implementing MSIs.
+It specifies a new kind of interrupts (LPIs), which are mapped to
+establish a connection between a device, its MSI payload value and
+the target processor the IRQ is eventually delivered to.
+In order to allow using MSIs in an ARM64 KVM guest, we emulate this
+ITS widget in the kernel.
+The ITS works by reading commands written by software (from the guest
+in our case) into a (guest allocated) memory region and establishing
+the mapping between a device, the MSI payload and the target CPU.
+We parse these commands and update our internal data structures to
+reflect those changes. On an MSI injection we iterate those
+structures to learn the LPI number we have to inject.
+For the time being we use simple lists to hold the data, this is
+good enough for the small number of entries each of the components
+currently have. Should this become a performance bottleneck in the
+future, those can be extended to arrays or trees if needed.
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- include/kvm/arm_vgic.h      |  1 +
- virt/kvm/arm/vgic-v3-emul.c |  9 +++++++++
- virt/kvm/arm/vgic.c         | 11 ++++++++++-
- 3 files changed, 20 insertions(+), 1 deletion(-)
+Most of the code lives in a separate source file (its-emul.c), though
+there are some changes necessary both in vgic.c and gic-v3-emul.c.
+Patch 01/13 gets rid of the internal tracking of the used LR for
+an injected IRQ.
+Patch 02/13 extends the KVM MSI ioctl to hold a device ID.
+Patch 03/13 introduces an emulation model specific destroy function
+to let the ITS be teared down correctly later.
+The rest of the patches implement the ITS functionality step by step.
+For more details see the respective commit messages.
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 2ccfa9a..b18e2c5 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -144,6 +144,7 @@ struct vgic_vm_ops {
- 	bool	(*queue_sgi)(struct kvm_vcpu *, int irq);
- 	void	(*add_sgi_source)(struct kvm_vcpu *, int irq, int source);
- 	int	(*init_model)(struct kvm *);
-+	void	(*destroy_model)(struct kvm *);
- 	int	(*map_resources)(struct kvm *, const struct vgic_params *);
- };
- 
-diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
-index e9c3a7a..fbfdd6f 100644
---- a/virt/kvm/arm/vgic-v3-emul.c
-+++ b/virt/kvm/arm/vgic-v3-emul.c
-@@ -818,6 +818,14 @@ static int vgic_v3_init_model(struct kvm *kvm)
- 	return 0;
- }
- 
-+static void vgic_v3_destroy_model(struct kvm *kvm)
-+{
-+	struct vgic_dist *dist = &kvm->arch.vgic;
-+
-+	kfree(dist->irq_spi_mpidr);
-+	dist->irq_spi_mpidr = NULL;
-+}
-+
- /* GICv3 does not keep track of SGI sources anymore. */
- static void vgic_v3_add_sgi_source(struct kvm_vcpu *vcpu, int irq, int source)
- {
-@@ -830,6 +838,7 @@ void vgic_v3_init_emulation(struct kvm *kvm)
- 	dist->vm_ops.queue_sgi = vgic_v3_queue_sgi;
- 	dist->vm_ops.add_sgi_source = vgic_v3_add_sgi_source;
- 	dist->vm_ops.init_model = vgic_v3_init_model;
-+	dist->vm_ops.destroy_model = vgic_v3_destroy_model;
- 	dist->vm_ops.map_resources = vgic_v3_map_resources;
- 
- 	kvm->arch.max_vcpus = KVM_MAX_VCPUS;
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 037b723..6ea30e0 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -102,6 +102,14 @@ int kvm_vgic_map_resources(struct kvm *kvm)
- 	return kvm->arch.vgic.vm_ops.map_resources(kvm, vgic);
- }
- 
-+static void vgic_destroy_model(struct kvm *kvm)
-+{
-+	struct vgic_vm_ops *vm_ops = &kvm->arch.vgic.vm_ops;
-+
-+	if (vm_ops->destroy_model)
-+		vm_ops->destroy_model(kvm);
-+}
-+
- /*
-  * struct vgic_bitmap contains a bitmap made of unsigned longs, but
-  * extracts u32s out of them.
-@@ -1631,6 +1639,8 @@ void kvm_vgic_destroy(struct kvm *kvm)
- 	struct kvm_vcpu *vcpu;
- 	int i;
- 
-+	vgic_destroy_model(kvm);
-+
- 	kvm_for_each_vcpu(i, vcpu, kvm)
- 		kvm_vgic_vcpu_destroy(vcpu);
- 
-@@ -1647,7 +1657,6 @@ void kvm_vgic_destroy(struct kvm *kvm)
- 	}
- 	kfree(dist->irq_sgi_sources);
- 	kfree(dist->irq_spi_cpu);
--	kfree(dist->irq_spi_mpidr);
- 	kfree(dist->irq_spi_target);
- 	kfree(dist->irq_pending_on_cpu);
- 	kfree(dist->irq_active_on_cpu);
+For the time being this series gives us the ability to use emulated
+PCI devices that can use MSIs in the guest. Those have to be
+triggered by letting the userland device emulation simulate the MSI
+write with the KVM_SIGNAL_MSI ioctl. This will be translated into
+the proper LPI by the ITS emulation and injected into the guest in
+the usual way (just with a higher IRQ number).
+
+This series is based on 4.1-rc5 and can be found at the its-emul/v1
+branch of this repository [1].
+For this to be used you need a GICv3 host machine, though it does not
+rely on any host ITS bits (neither hardware or software).
+
+To test this you can use the kvmtool patches available in the "its"
+branch here [2].
+Start a guest with: "$ lkvm run --irqchip=gicv3-its --force-pci"
+and see the ITS being used for instance by the virtio devices.
+
+[1]: git://linux-arm.org/linux-ap.git
+     http://www.linux-arm.org/git?p=linux-ap.git;a=log;h=refs/heads/its-emul/v1
+[2]: git://linux-arm.org/kvmtool.git
+     http://www.linux-arm.org/git?p=kvmtool.git;a=log;h=refs/heads/its
+
+Andre Przywara (13):
+  KVM: arm/arm64: VGIC: don't track used LRs in the distributor
+  KVM: extend struct kvm_msi to hold a 32-bit device ID
+  KVM: arm/arm64: add emulation model specific destroy function
+  KVM: arm64: Introduce new MMIO region for the ITS base address
+  KVM: arm64: handle ITS related GICv3 redistributor registers
+  KVM: arm64: introduce ITS emulation file with stub functions
+  KVM: arm64: implement basic ITS register handlers
+  KVM: arm64: add data structures to model ITS interrupt translation
+  KVM: arm64: handle pending bit for LPIs in ITS emulation
+  KVM: arm64: sync LPI properties and status between guest and KVM
+  KVM: arm64: implement ITS command queue command handlers
+  KVM: arm64: implement MSI injection in ITS emulation
+  KVM: arm64: enable ITS emulation as a virtual MSI controller
+
+ Documentation/virtual/kvm/api.txt              |   10 +-
+ Documentation/virtual/kvm/devices/arm-vgic.txt |    7 +
+ arch/arm64/include/uapi/asm/kvm.h              |    3 +
+ arch/arm64/kvm/Kconfig                         |    1 +
+ arch/arm64/kvm/Makefile                        |    1 +
+ include/kvm/arm_vgic.h                         |   39 +-
+ include/linux/irqchip/arm-gic-v3.h             |   10 +
+ include/uapi/linux/kvm.h                       |    4 +-
+ virt/kvm/arm/its-emul.c                        | 1026 ++++++++++++++++++++++++
+ virt/kvm/arm/its-emul.h                        |   52 ++
+ virt/kvm/arm/vgic-v2.c                         |    1 +
+ virt/kvm/arm/vgic-v3-emul.c                    |   98 ++-
+ virt/kvm/arm/vgic-v3.c                         |    1 +
+ virt/kvm/arm/vgic.c                            |  280 ++++---
+ virt/kvm/arm/vgic.h                            |    5 +
+ 15 files changed, 1426 insertions(+), 112 deletions(-)
+ create mode 100644 virt/kvm/arm/its-emul.c
+ create mode 100644 virt/kvm/arm/its-emul.h
+
 -- 
 2.3.5
