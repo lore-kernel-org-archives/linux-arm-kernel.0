@@ -1,44 +1,38 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Fri, 29 May 2015 10:52:30 +0200
-Subject: [PATCH v7 00/25] Exynos SYSMMU (IOMMU) integration with DT and
- DMA-mapping subsystem
-In-Reply-To: <1432041645-11172-1-git-send-email-m.szyprowski@samsung.com>
-References: <1432041645-11172-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20150529085230.GE13130@8bytes.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 29 May 2015 10:52:59 +0200
+Subject: [PATCH] cgroup: add seq_file forward declaration for struct cftype
+Message-ID: <8289624.GnpfIU6Era@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 19, 2015 at 03:20:20PM +0200, Marek Szyprowski wrote:
-> Marek Szyprowski (25):
->   drm/exynos: iommu: detach from default dma-mapping domain on init
->   drm/exynos: fimd: ensure proper hw state in fimd_clear_channel()
->   iommu: Init iommu-groups support earlier, in core_initcall
->   iommu/exynos: Don't read version register on every tlb operation
->   iommu/exynos: Remove unused functions
->   iommu/exynos: Remove useless members from exynos_iommu_owner structure
->   iommu/exynos: Refactor function parameters to simplify code
->   iommu/exynos: Rename variables to reflect their purpose
->   iommu/exynos: Use struct exynos_iommu_domain in internal structures
->   iommu/exynos: Remove excessive includes and sort others alphabetically
->   iommu/exynos: Document internal structures
->   iommu/exynos: Add/remove callbacks should fail if no iommu is
->     available
->   iommu/exynos: Add support for binding more than one sysmmu to master
->     device
->   iommu/exynos: Add support for runtime_pm
->   iommu/exynos: Add system suspend/resume support
->   iommu/exynos: Init from dt-specific callback instead of initcall
->   iommu/exynos: Add callback for initializing devices from device tree
->   ARM: Exynos: pm_domains: register power domain driver from
->     core_initcall
->   ARM: dts: exynos4: add sysmmu nodes
->   ARM: dts: exynos3250: add sysmmu nodes
->   ARM: dts: exynos4415: add sysmmu nodes
->   ARM: dts: exynos5250: add sysmmu nodes
->   ARM: dts: exynos5420: add sysmmu nodes
->   ARM: DMA-mapping: add support for creating reserved mappings in iova
->     space
->   ARM: dts: exynos: add iommu reserved regions for bootloader's splash
->     screen
+Recent header file changes for cgroup caused lots of warnings
+about a missing struct seq_file form declaration for every
+inclusion of include/linux/cgroup-defs.h.
 
-Applied patches 3-17 to arm/exynos, thanks.
+As some files are built with -Werror, this leads to build
+failure like:
+
+                 from /git/arm-soc/drivers/gpu/drm/tilcdc/tilcdc_crtc.c:18:
+/git/arm-soc/include/linux/cgroup-defs.h:354:25: error: 'struct seq_file' declared inside parameter list [-Werror]
+cc1: all warnings being treated as errors
+make[6]: *** [drivers/gpu/drm/tilcdc/tilcdc_crtc.o] Error 1
+
+This patch adds the declaration, which resolves both the
+warnings and the drm failure.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: b4a04ab7a37b ("cgroup: separate out include/linux/cgroup-defs.h")
+
+diff --git a/include/linux/cgroup-defs.h b/include/linux/cgroup-defs.h
+index 7d83d7f73420..ab9dd741ab99 100644
+--- a/include/linux/cgroup-defs.h
++++ b/include/linux/cgroup-defs.h
+@@ -302,6 +302,8 @@ struct cgroup_root {
+ 	char name[MAX_CGROUP_ROOT_NAMELEN];
+ };
+ 
++struct seq_file;
++
+ /*
+  * struct cftype: handler definitions for cgroup control files
+  *
