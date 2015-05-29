@@ -1,35 +1,41 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 29 May 2015 20:59:26 +0200
-Subject: [PATCH v11 0/4] edac: Add APM X-Gene SoC EDAC driver
-In-Reply-To: <CAPw-ZTnLqx0KsQkmv++zQRQ7hroaKML1rWgVafisENam0J17Mg@mail.gmail.com>
-References: <1432337580-3750-1-git-send-email-lho@apm.com>
- <20150529094654.GD31435@pd.tnic>
- <CAPw-ZTnLqx0KsQkmv++zQRQ7hroaKML1rWgVafisENam0J17Mg@mail.gmail.com>
-Message-ID: <20150529185926.GP31435@pd.tnic>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri, 29 May 2015 12:09:41 -0700
+Subject: [PATCH 2/7] ARM: bcm2835: Add a Raspberry Pi-specific clock
+ driver.
+In-Reply-To: <55679085.6040402@wwwdotorg.org>
+References: <1431978219-14226-1-git-send-email-eric@anholt.net>
+ <1431978219-14226-3-git-send-email-eric@anholt.net>
+ <55679085.6040402@wwwdotorg.org>
+Message-ID: <87mw0ncia2.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 29, 2015 at 11:06:35AM -0700, Loc Ho wrote:
-> I pull this and got this error:
-> 
-> /projects/svdc/P4sbSW/lho/xgene2/processor/git.lho/edac-next/drivers/edac/edac_stub.c:19:22:
-> fatal error: asm/edac.h: No such file or directory
->  #include <asm/edac.h>
->                       ^
-> compilation terminated.
+Stephen Warren <swarren@wwwdotorg.org> writes:
 
-Aah, that arch-specific header is only for the atomic_scrub thing and
-arm64 doesn't have it.
+> On 05/18/2015 01:43 PM, Eric Anholt wrote:
+>> +	init.flags = CLK_IS_ROOT;
+>
+> Is it possible to add clock parent information to the driver, so the
+> clocks are all hooked together into the correct tree, rather than all
+> looking like root clocks?
+>
+> One of the many reasons I didn't do anything FW-wise for the kernel was
+> the hope that such information would be forthcoming, and hence we could
+> have complete kernel drivers.
 
-But that header is actually not really needed in that file.
+As far as I can tell, none of these clocks are the parent of any other.
 
-Does it build when you remove it?
-
-Thanks.
-
--- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
---
+There's a layer of PLLs, then clockman almost always just dividing off
+of those.  In response to a clockman request (which is what this
+property tag quickly maps to), only PLLH ever gets changed as a result
+of RPI_CLOCK_PIXEL.  PLLH feeds the HDMI and VEC (SDTV).  We don't have
+an SDTV clock for us to control through these interfaces, so there are
+no conflicts that I can see.  Only two clockman clocks I see divide off
+of on other clockman clocks, and we don't have access to those.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150529/4f7dc2b5/attachment.sig>
