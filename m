@@ -1,98 +1,38 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Fri, 29 May 2015 19:56:20 +0200
-Subject: [PATCH v2 3/3] clk: meson8b: Add support for Meson8b clocks
-In-Reply-To: <20150528220100.GE24204@codeaurora.org>
-References: <1431773333-23567-1-git-send-email-carlo@caione.org>
- <1431773333-23567-4-git-send-email-carlo@caione.org>
- <20150528220100.GE24204@codeaurora.org>
-Message-ID: <CAOQ7t2anBhNOTbxN7niDFB5UBDStKLb8oS+Xkmp3jxHifJVJiw@mail.gmail.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Fri, 29 May 2015 20:03:35 +0200
+Subject: [PATCH v3 0/2] USB OTG PHY driver for NXP LPC18xx family
+Message-ID: <1432922617-11512-1-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 29, 2015 at 12:01 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> + */
->> +
->> +#include <linux/clk.h>
->
-> Do you need this include?
+This patch set adds support for the internal USB OTG PHY found
+on NXP LPC18xx and LPC43xx devices. Driver takes care of
+enabling the PHY and setting the clock rate which is need for
+USB0 support on this platform.
 
-I guess I have to revise all the includes :)
+This version address the comments from Kishon Vijay Abraham I.
 
->> +#include <linux/clk-provider.h>
->> +#include <linux/kernel.h>
->> +#include <linux/of.h>
->> +#include <linux/of_address.h>
->> +#include <linux/slab.h>
->> +#include <dt-bindings/clock/meson8b-clkc.h>
->> +
->> +#include "clkc.h"
->> +
->> +#define MESON8B_REG_CTL0_ADDR                0x0000
->> +#define MESON8B_REG_SYS_CPU_CNTL1    0x015c
->> +#define MESON8B_REG_HHI_MPEG         0x0174
->> +#define MESON8B_REG_MALI             0x01b0
->> +#define MESON8B_REG_PLL_FIXED                0x0280
->> +#define MESON8B_REG_PLL_SYS          0x0300
->> +#define MESON8B_REG_PLL_VID          0x0320
->> +
->> +static struct pll_rate_table sys_pll_rate_table[] = {
->
-> const?
+Changes in v3:
+ - depend on MFD_SYSCON
 
-Ok
+Changes in v2:
+ - use PTR_ERR_OR_ZERO in phy driver
+ - rename binding doc
+ - update doc commit message
 
->> +
->> +static struct composite_conf clk81_conf __initdata = {
->
-> Can this be __initconstdata?
+Base support for this platform can now be found in arm-soc next.
 
-Yes, probably better static const ... __initconst
+Joachim Eastwood (2):
+  phy: add lpc18xx usb otg phy driver
+  phy: dt bindings: add XP LPC18xx/43xx USB OTG PHY bindings
 
->> +     .mux_table              = mux_table_clk81,
->> +     .mux_flags              = CLK_MUX_READ_ONLY,
->> +     .mux_parm               = PARM(0x00, 12, 3),
->> +     .div_parm               = PARM(0x00, 0, 7),
->> +     .gate_parm              = PARM(0x00, 7, 1),
->> +};
->> +
->> +static struct composite_conf mali_conf __initdata = {
->> +     .mux_table              = mux_table_mali,
->> +     .mux_parm               = PARM(0x00, 9, 3),
->> +     .div_parm               = PARM(0x00, 0, 7),
->> +     .gate_parm              = PARM(0x00, 8, 1),
->> +};
->> +
->> +static struct clk_conf meson8b_xtal_conf __initdata =
->> +     FIXED_RATE_P(MESON8B_REG_CTL0_ADDR, CLKID_XTAL, "xtal",
->> +                  CLK_IS_ROOT, PARM(0x00, 4, 7));
->> +
->> +static struct clk_conf meson8b_clk_confs[] __initdata = {
->
-> const?
-
-Agree
-
->> +     FIXED_RATE(CLKID_ZERO, "zero", CLK_IS_ROOT, 0),
->> +     PLL(MESON8B_REG_PLL_FIXED, CLKID_PLL_FIXED, "fixed_pll",
->> +         p_xtal, 0, &pll_confs),
->> +     PLL(MESON8B_REG_PLL_VID, CLKID_PLL_VID, "vid_pll",
->> +         p_xtal, 0, &pll_confs),
->> +     PLL(MESON8B_REG_PLL_SYS, CLKID_PLL_SYS, "sys_pll",
->> +         p_xtal, 0, &sys_pll_conf),
->> +     FIXED_FACTOR_DIV(CLKID_FCLK_DIV2, "fclk_div2", p_fclk_div, 0, 2),
->> +     FIXED_FACTOR_DIV(CLKID_FCLK_DIV3, "fclk_div3", p_fclk_div, 0, 3),
->> +     FIXED_FACTOR_DIV(CLKID_FCLK_DIV4, "fclk_div4", p_fclk_div, 0, 4),
->> +     FIXED_FACTOR_DIV(CLKID_FCLK_DIV5, "fclk_div5", p_fclk_div, 0, 5),
->> +     FIXED_FACTOR_DIV(CLKID_FCLK_DIV7, "fclk_div7", p_fclk_div, 0, 7),
->> +     CPU(MESON8B_REG_SYS_CPU_CNTL1, CLKID_CPUCLK, "a5_clk", p_cpu_clk),
->> +     COMPOSITE(MESON8B_REG_HHI_MPEG, CLKID_CLK81, "clk81", p_clk81,
->> +               CLK_SET_RATE_NO_REPARENT | CLK_IGNORE_UNUSED, &clk81_conf),
->> +     COMPOSITE(MESON8B_REG_MALI, CLKID_MALI, "mali", p_mali,
->> +               CLK_IGNORE_UNUSED, &mali_conf),
->
-> Ah here we see the defines used.
-
-Thank you!
+ .../bindings/phy/phy-lpc18xx-usb-otg.txt           |  19 +++
+ drivers/phy/Kconfig                                |  11 ++
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-lpc18xx-usb-otg.c                  | 143 +++++++++++++++++++++
+ 4 files changed, 174 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-lpc18xx-usb-otg.txt
+ create mode 100644 drivers/phy/phy-lpc18xx-usb-otg.c
 
 -- 
-Carlo Caione
+1.8.0
