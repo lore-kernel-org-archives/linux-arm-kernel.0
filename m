@@ -1,50 +1,55 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 29 May 2015 15:25:25 +0200
-Subject: [PATCH/RFC 1/2] ARM: multi_v7_defconfig: Make drm support modular
-Message-ID: <1432905926-31606-1-git-send-email-geert@linux-m68k.org>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Fri, 29 May 2015 23:04:29 +0930
+Subject: [PATCHv2] ARM: dts: odroidxu3: Enable USB3 regulators
+Message-ID: <1432906469-3856-1-git-send-email-linux.amoon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Enable regulator for usbdrd3_0 and usbdrd3_1.
+Looking at the schematic pin diagram for MAX77802
+USB3_0 and USB3_1 is regulated by LDO9 and LD011.
 
-Make drm support modular to reduce kernel size (-620 KiB):
+Fix the boot message of failed.
+[    3.503539] exynos-dwc3 usb at 12000000: Looking up vdd33-supply from device tree
+[    3.503556] exynos-dwc3 usb at 12000000: Looking up vdd33-supply property in node /usb at 12000000 failed
+[    3.503568] usb at 12000000 supply vdd33 not found, using dummy regulator
+[    3.509154] exynos-dwc3 usb at 12000000: Looking up vdd10-supply from device tree
+[    3.509170] exynos-dwc3 usb at 12000000: Looking up vdd10-supply property in node /usb at 12000000 failed
+[    3.509181] usb at 12000000 supply vdd10 not found, using dummy regulator
+[    3.917548] exynos-dwc3 usb at 12400000: Looking up vdd33-supply from device tree
+[    3.917565] exynos-dwc3 usb at 12400000: Looking up vdd33-supply property in node /usb at 12400000 failed
+[    3.917578] usb at 12400000 supply vdd33 not found, using dummy regulator
+[    3.922731] exynos-dwc3 usb at 12400000: Looking up vdd10-supply from device tree
+[    3.922747] exynos-dwc3 usb at 12400000: Looking up vdd10-supply property in node /usb at 12400000 failed
 
-       text    data     bss     dec     hex   filename
-    12211122 1392076  338520 13941718  d4bbd6 vmlinux.before
-    11581470 1387196  338264 13306930  cb0c32 vmlinux.after
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
-Slightly controversial:
-  - Does anyone need drm for boot testing?
+This patch is based on Krzysztof github branch work-next/odroid-xu3-s2mps11-irq.
+v2 - Fixed the comment.
+---
 
- arch/arm/configs/multi_v7_defconfig | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+---
+ arch/arm/boot/dts/exynos5422-odroidxu3.dts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 40ca1ab29a2e350f..9b4e33d5b15e340f 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -426,15 +426,17 @@ CONFIG_VIDEO_RENESAS_VSP1=m
- # CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
- CONFIG_VIDEO_ADV7180=m
- CONFIG_VIDEO_ML86V7667=m
--CONFIG_DRM=y
-+CONFIG_TEGRA_HOST1X=y
-+CONFIG_DRM=m
- CONFIG_DRM_PTN3460=m
- CONFIG_DRM_PS8622=m
- CONFIG_DRM_EXYNOS=m
- CONFIG_DRM_EXYNOS_FIMD=y
- CONFIG_DRM_EXYNOS_HDMI=y
- CONFIG_DRM_RCAR_DU=m
--CONFIG_DRM_TEGRA=y
--CONFIG_DRM_PANEL_SIMPLE=y
-+CONFIG_DRM_TEGRA=m
-+CONFIG_DRM_PANEL_SIMPLE=m
-+CONFIG_FB=y
- CONFIG_FB_ARMCLCD=y
- CONFIG_FB_WM8505=y
- CONFIG_FB_SH_MOBILE_LCDC=y
+diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+index 27014bb..a353a58 100644
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+@@ -513,3 +513,13 @@
+ &usbdrd_dwc3_1 {
+ 	dr_mode = "otg";
+ };
++
++&usbdrd3_0 {
++	vdd33-supply = <&ldo9_reg>;
++	vdd10-supply = <&ldo11_reg>;
++};
++
++&usbdrd3_1 {
++	vdd33-supply = <&ldo9_reg>;
++	vdd10-supply = <&ldo11_reg>;
++};
 -- 
 1.9.1
