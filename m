@@ -1,85 +1,83 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Fri, 29 May 2015 10:30:20 +0100
-Subject: [PATCH v5 04/12] KVM: arm: guest debug,
- add stub KVM_SET_GUEST_DEBUG ioctl
+Date: Fri, 29 May 2015 10:30:17 +0100
+Subject: [PATCH v5 01/12] KVM: add comments for kvm_debug_exit_arch struct
 In-Reply-To: <1432891828-4816-1-git-send-email-alex.bennee@linaro.org>
 References: <1432891828-4816-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1432891828-4816-5-git-send-email-alex.bennee@linaro.org>
+Message-ID: <1432891828-4816-2-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds a stub function to support the KVM_SET_GUEST_DEBUG
-ioctl. Any unsupported flag will return -EINVAL. For now, only
-KVM_GUESTDBG_ENABLE is supported, although it won't have any effects.
+Bring into line with the comments for the other structures and their
+KVM_EXIT_* cases. Also update api.txt to reflect use in kvm_run
+documentation.
 
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>.
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+Reviewed-by: David Hildenbrand <dahi@linux.vnet.ibm.com>
+Reviewed-by: Andrew Jones <drjones@redhat.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
 ---
+
 v2
-  - simplified form of the ioctl (stuff will go into setup_debug)
+  - add comments for other exit types
 v3
- - KVM_GUESTDBG_VALID->KVM_GUESTDBG_VALID_MASK
- - move mask check to the top of function
- - add ioctl doc header
- - split capability into separate patch
- - tweaked commit wording w.r.t return of -EINVAL
+  - s/commentary/comments/
+  - add rb tags
+  - update api.txt kvm_run to include KVM_EXIT_DEBUG desc
 v4
- - add r-b-tag
+  - sp fixes
+  - add a-b
 ---
- Documentation/virtual/kvm/api.txt |  2 +-
- arch/arm/kvm/arm.c                | 23 ++++++++++++++++++++++-
- 2 files changed, 23 insertions(+), 2 deletions(-)
+ Documentation/virtual/kvm/api.txt | 4 +++-
+ include/uapi/linux/kvm.h          | 3 +++
+ 2 files changed, 6 insertions(+), 1 deletion(-)
 
 diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index c34c32d..ba635c7 100644
+index 9fa2bf8..c34c32d 100644
 --- a/Documentation/virtual/kvm/api.txt
 +++ b/Documentation/virtual/kvm/api.txt
-@@ -2645,7 +2645,7 @@ handled.
- 4.87 KVM_SET_GUEST_DEBUG
+@@ -3070,11 +3070,13 @@ data_offset describes where the data is located (KVM_EXIT_IO_OUT) or
+ where kvm expects application code to place the data for the next
+ KVM_RUN invocation (KVM_EXIT_IO_IN).  Data format is a packed array.
  
- Capability: KVM_CAP_SET_GUEST_DEBUG
--Architectures: x86, s390, ppc
-+Architectures: x86, s390, ppc, arm64
- Type: vcpu ioctl
- Parameters: struct kvm_guest_debug (in)
- Returns: 0 on success; -1 on error
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index d9631ec..52a1d4d38 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -302,10 +302,31 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
- 	kvm_arm_set_running_vcpu(NULL);
- }
++		/* KVM_EXIT_DEBUG */
+ 		struct {
+ 			struct kvm_debug_exit_arch arch;
+ 		} debug;
  
-+#define KVM_GUESTDBG_VALID_MASK (KVM_GUESTDBG_ENABLE)
-+
-+/**
-+ * kvm_arch_vcpu_ioctl_set_guest_debug - set up guest debugging
-+ * @kvm:	pointer to the KVM struct
-+ * @kvm_guest_debug: the ioctl data buffer
-+ *
-+ * This sets up and enables the VM for guest debugging. Userspace
-+ * passes in a control flag to enable different debug types and
-+ * potentially other architecture specific information in the rest of
-+ * the structure.
-+ */
- int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
- 					struct kvm_guest_debug *dbg)
- {
--	return -EINVAL;
-+	if (dbg->control & ~KVM_GUESTDBG_VALID_MASK)
-+		return -EINVAL;
-+
-+	if (dbg->control & KVM_GUESTDBG_ENABLE) {
-+		vcpu->guest_debug = dbg->control;
-+	} else {
-+		/* If not enabled clear all flags */
-+		vcpu->guest_debug = 0;
-+	}
-+	return 0;
- }
+-Unused.
++If the exit_reason is KVM_EXIT_DEBUG, then a vcpu is processing a debug event
++for which architecture specific information is returned.
  
- 
+ 		/* KVM_EXIT_MMIO */
+ 		struct {
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index 4b60056..70ac641 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -237,6 +237,7 @@ struct kvm_run {
+ 			__u32 count;
+ 			__u64 data_offset; /* relative to kvm_run start */
+ 		} io;
++		/* KVM_EXIT_DEBUG */
+ 		struct {
+ 			struct kvm_debug_exit_arch arch;
+ 		} debug;
+@@ -285,6 +286,7 @@ struct kvm_run {
+ 			__u32 data;
+ 			__u8  is_write;
+ 		} dcr;
++		/* KVM_EXIT_INTERNAL_ERROR */
+ 		struct {
+ 			__u32 suberror;
+ 			/* Available with KVM_CAP_INTERNAL_ERROR_DATA: */
+@@ -295,6 +297,7 @@ struct kvm_run {
+ 		struct {
+ 			__u64 gprs[32];
+ 		} osi;
++		/* KVM_EXIT_PAPR_HCALL */
+ 		struct {
+ 			__u64 nr;
+ 			__u64 ret;
 -- 
 2.4.1
