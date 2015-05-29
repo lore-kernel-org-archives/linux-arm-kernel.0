@@ -1,149 +1,231 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 29 May 2015 10:04:13 -0500
-Subject: [PATCHv3 1/4] phy: phy-core: Make GENERIC_PHY an invisible option
-In-Reply-To: <55684ECE.9060003@ti.com>
-References: <1429743853-10254-1-git-send-email-arun.ramamurthy@broadcom.com>
- <1429743853-10254-2-git-send-email-arun.ramamurthy@broadcom.com>
- <20150515005210.GA31534@saruman.tx.rr.com>
- <556391FE.1020503@broadcom.com>
- <20150526141938.GA25686@saruman.tx.rr.com>
- <5564BD5D.1070601@broadcom.com>
- <20150526183955.GW26599@saruman.tx.rr.com>
- <55684ECE.9060003@ti.com>
-Message-ID: <20150529150413.GB2026@saruman.tx.rr.com>
+From: weigelt@melag.de (Enrico Weigelt, metux IT consult)
+Date: Fri, 29 May 2015 17:10:58 +0200
+Subject: Device Tree Blob (DTB) licence
+In-Reply-To: <CAOS_Y6QXHdWfi9qkRmw=mCn0mqha5-NrzumBMqJ61_YRndypLA@mail.gmail.com>
+References: <1430820315.19516.26.camel@opteya.com>	<CAL_Jsq+T5c7qornpRVCduEjUSCeM+0xqbtVYovtH76y=4BqhLQ@mail.gmail.com>	<1432289148.5304.58.camel@opteya.com>	<1432322832.5304.63.camel@opteya.com>	<CAOS_Y6Q37ps+VEnzUZ_uwX++qrRm9Hgx45Q_pmiZSLSNjmKwZg@mail.gmail.com>	<55670AD4.8020705@melag.de>
+ <CAOS_Y6QXHdWfi9qkRmw=mCn0mqha5-NrzumBMqJ61_YRndypLA@mail.gmail.com>
+Message-ID: <55688182.3010606@melag.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Am 29.05.2015 um 05:31 schrieb Rob Landley:
 
-On Fri, May 29, 2015 at 05:04:38PM +0530, Kishon Vijay Abraham I wrote:
-> Hi Felipe,
-> 
-> On Wednesday 27 May 2015 12:09 AM, Felipe Balbi wrote:
-> >On Tue, May 26, 2015 at 11:37:17AM -0700, Arun Ramamurthy wrote:
-> >>Hi
-> >>
-> >>On 15-05-26 07:19 AM, Felipe Balbi wrote:
-> >>>HI,
-> >>>
-> >>>On Mon, May 25, 2015 at 02:19:58PM -0700, Arun Ramamurthy wrote:
-> >>>>
-> >>>>
-> >>>>On 15-05-14 05:52 PM, Felipe Balbi wrote:
-> >>>>>Hi,
-> >>>>>
-> >>>>>On Wed, Apr 22, 2015 at 04:04:10PM -0700, Arun Ramamurthy wrote:
-> >>>>>>Most of the phy providers use "select" to enable GENERIC_PHY. Since select
-> >>>>>>is only recommended when the config is not visible, GENERIC_PHY is changed
-> >>>>>>an invisible option. To maintain consistency, all phy providers are changed
-> >>>>>>to "select" GENERIC_PHY and all non-phy drivers use "depends on" when the
-> >>>>>>phy framework is explicity required. USB_MUSB_OMAP2PLUS has a cyclic
-> >>>>>>dependency, so it is left as "select".
-> >>>>>>
-> >>>>>>Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
-> >>>>>>---
-> >>>>>>  drivers/ata/Kconfig                       | 1 -
-> >>>>>>  drivers/media/platform/exynos4-is/Kconfig | 2 +-
-> >>>>>>  drivers/phy/Kconfig                       | 4 ++--
-> >>>>>>  drivers/usb/host/Kconfig                  | 4 ++--
-> >>>>>>  drivers/video/fbdev/exynos/Kconfig        | 2 +-
-> >>>>>>  5 files changed, 6 insertions(+), 7 deletions(-)
-> >>>>>>
-> >>>>>>diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
-> >>>>>>index 5f60155..6d2e881 100644
-> >>>>>>--- a/drivers/ata/Kconfig
-> >>>>>>+++ b/drivers/ata/Kconfig
-> >>>>>>@@ -301,7 +301,6 @@ config SATA_MV
-> >>>>>>  	tristate "Marvell SATA support"
-> >>>>>>  	depends on PCI || ARCH_DOVE || ARCH_MV78XX0 || \
-> >>>>>>  		   ARCH_MVEBU || ARCH_ORION5X || COMPILE_TEST
-> >>>>>>-	select GENERIC_PHY
-> >>>>>>  	help
-> >>>>>>  	  This option enables support for the Marvell Serial ATA family.
-> >>>>>>  	  Currently supports 88SX[56]0[48][01] PCI(-X) chips,
-> >>>>>>diff --git a/drivers/media/platform/exynos4-is/Kconfig b/drivers/media/platform/exynos4-is/Kconfig
-> >>>>>>index b7b2e47..b6f3eaa 100644
-> >>>>>>--- a/drivers/media/platform/exynos4-is/Kconfig
-> >>>>>>+++ b/drivers/media/platform/exynos4-is/Kconfig
-> >>>>>>@@ -31,7 +31,7 @@ config VIDEO_S5P_FIMC
-> >>>>>>  config VIDEO_S5P_MIPI_CSIS
-> >>>>>>  	tristate "S5P/EXYNOS MIPI-CSI2 receiver (MIPI-CSIS) driver"
-> >>>>>>  	depends on REGULATOR
-> >>>>>>-	select GENERIC_PHY
-> >>>>>>+	depends on GENERIC_PHY
-> >>>>>>  	help
-> >>>>>>  	  This is a V4L2 driver for Samsung S5P and EXYNOS4 SoC MIPI-CSI2
-> >>>>>>  	  receiver (MIPI-CSIS) devices.
-> >>>>>>diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> >>>>>>index 2962de2..edecdb1 100644
-> >>>>>>--- a/drivers/phy/Kconfig
-> >>>>>>+++ b/drivers/phy/Kconfig
-> >>>>>>@@ -5,7 +5,7 @@
-> >>>>>>  menu "PHY Subsystem"
-> >>>>>>
-> >>>>>>  config GENERIC_PHY
-> >>>>>>-	bool "PHY Core"
-> >>>>>>+	bool
-> >>>>>>  	help
-> >>>>>>  	  Generic PHY support.
-> >>>>>>
-> >>>>>>@@ -72,7 +72,7 @@ config PHY_MIPHY365X
-> >>>>>>  config PHY_RCAR_GEN2
-> >>>>>>  	tristate "Renesas R-Car generation 2 USB PHY driver"
-> >>>>>>  	depends on ARCH_SHMOBILE
-> >>>>>>-	depends on GENERIC_PHY
-> >>>>>>+	select GENERIC_PHY
-> >>>>>
-> >>>>>so some you changed from depends to select...
-> >>>>>
-> >>>>>>  	help
-> >>>>>>  	  Support for USB PHY found on Renesas R-Car generation 2 SoCs.
-> >>>>>>
-> >>>>>>diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-> >>>>>>index 5ad60e4..e2197e2 100644
-> >>>>>>--- a/drivers/usb/host/Kconfig
-> >>>>>>+++ b/drivers/usb/host/Kconfig
-> >>>>>>@@ -182,7 +182,7 @@ config USB_EHCI_HCD_SPEAR
-> >>>>>>  config USB_EHCI_HCD_STI
-> >>>>>>  	tristate "Support for ST STiHxxx on-chip EHCI USB controller"
-> >>>>>>  	depends on ARCH_STI && OF
-> >>>>>>-	select GENERIC_PHY
-> >>>>>>+	depends on GENERIC_PHY
-> >>>>>
-> >>>>>while others you changed from select to depends.
-> >>>>>
-> >>>>>NAK.
-> >>>>>
-> >>>>Felipe, I dont understand your concern, could you please explain it more
-> >>>>detail?  The logic behind the changes is that in cases where there was an
-> >>>>explicit dependency, I changed it to "depends on" and in other cases I
-> >>>>changed it to "selects". Thanks
-> >>>
-> >>>Since GENERIC_PHY is visible from Kconfig, it would be much nicer to
-> >>>avoid select altogether.
-> >>>
-> >>Felipe, after discussion with the maintainers, I have made GENERIC_PHY an
-> >>invisible option as part of this change. Thanks
-> >
-> >Then, if the option is invisible, how can you "depend" on it ? It can
-> >never be selected by poking around in Kconfig. IMO, it's
-> >counterintuitive that you need to enable a PHY driver before you can see
-> >your EHCI/OHCI/whatever controller listed in Kconfig.
-> 
-> If the controller requires PHY for it to be functional, it is okay to make
-> the controller depend on PHY IMHO. We want to try and minimize the usage of
-> 'select' wherever possible or else 'select' is the most intuitive way. The
-> other option is just to leave the 'depends on' and let the user select PHY.
+ >> What's the big deal with having DTS/DTB under GPL ?
+>
+> One problem is that there's no such thing as "The GPL" anymore.
 
-How can you 'depend' on something that the user can't select by
-navigating through Kconfig ?
+There are different versions. The kernel source clearly states
+GPLv2 (I, personally, would prefer v3 to prevent Tivoization)
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150529/6c491985/attachment-0001.sig>
+> The Linux kernel and Samba can't share code anymore,
+
+Do they really need to ?
+One could ask, whether smb support should belong into the kernel
+at all (instead of, eg., going via FUSE or 9P), but that's an
+entirely different discussion.
+
+> even though they implement two ends of the same protocol, thanks to GPLv3.
+
+Samba folks made the decision to prevent Tivoization of their code.
+I fully agree with that decision, and I wish the same for the kernel.
+
+> This seems to have badly damaged the long term viability of GPLv2,
+> which used to be synonymous with copyleft (category killer license)
+> and acted as a universal receiver because it was a terminal node in a
+> directed graph of license convertibility reducing most licensing
+> decisions to a simple binary "is it GPL compatible or not", which
+> greatly appealed to developers who aren't lawyers and don't want to
+> be.
+
+Well, such things happen, if people have different views. In that case
+those who want to prevent Tivoization on the one and those who wanna
+allow it on the other side.
+
+I rerely have the need to really copy-and-paste code from one project
+to another. When patching existing ones, I just stick to the upstream's
+license. And when starting new FOSS projects, I clearly choose (L)GPLv3,
+because I'm strictly against Tivoization.
+
+> But now a project that's "GPLv2 or later" can't accept code from
+> _either_ the kernel or samba (neither provides the implicit dual
+> license they need).
+
+Well, that's a decision of the individual projects - everybody has
+to live with his/her own decisions.
+
+> Projects like QEMU are stuck between wanting to
+> turn kernel drivers inside out to make device emulations (GPLv2 code)
+> and grab processor definitions from gcc or binutils (GPLv3 code) and
+> one project cannot accept both because GPL + GPL is a license
+> conflict.
+
+Seems to be a rare case to me. In general, I'd suggest making things
+used by several distinct projects into their own distinct entities.
+
+Note: the GPL's viral effect doesn't depend on whether the sources
+are collected in one big repo, but on what is compiled-/linked-into
+where.
+
+> Of course "BSD-like" would be public domain except for 20 years of
+> FUD, so they're mostly choosing one of the dozens of public domain
+> equivalent licenses like the various BSDs and MIT and ISC and Apache
+> that are equivalent except for "copy this license text exactly"
+> clauses that cause endless license bloat over time.
+
+It's not entirely FUD. The questions is NOT whether the original open
+code will be wiped out of the net or people simply dont work on it
+anymore. The main question here is, whether foss developers (often
+working for free) want to help people producing non-free stuff. BSD
+like to allow that, FSF folks dont. They just have different views on
+that matter. IMHO, BSD folks are just interested in getting back
+contributions, while FSF folks also have a broader political agenda. I,
+personally, share that agenda (even more: I strongly believe that
+software patents should be eradicated).
+
+> Personally I prefer public domain equivalent licenses like CC0 or
+> unlicense.org or my own "zero clause bsd", which DON'T require you to
+> copy specific license text verbatim into derived works.
+
+Well, I have an fundamentally different oppinion on that. If I publish
+my code for free, I dont want assist anybody in producing non-free
+stuff. (free like freedom, not free beer)
+
+> Most of this can be laid at the door of GPLv3.
+
+Because many folks don't wanna fight against Tivoization.
+I'll have to accept that, but I don't need to coorporate.
+
+ > Android's "no gpl in userspace" policy is why they ripped out bluez
+ > and wrote a replacement bluedroid from scratch.
+
+The really interesting question is: why do they have that policy ?
+Maybe because they aren't interested in *free* (as freedom) software,
+but just open source.
+
+Otherwise they'd have an strict policy of nothing proprietary in
+kernel space.
+
+> The bluez developers keep going "if we just
+> improve the code enough people will get over the license" (no really:
+> https://lwn.net/Articles/597293/) but their FAQ literally doesn't
+> specify _which_ GPL they're under: http://www.bluez.org/faq/common/
+> (Is it the one you can't use with kernel code, the one you can't
+> combine with samba code, or the or-later version that can't accept
+> code from either source into its next release?
+
+Why would one want to mix bluez code with the kernel or samba ?
+
+> Apple's great GPL purge
+> (http://meta.ath0.com/2012/02/05/apples-great-gpl-purge/)
+
+Apple belongs to the really bad guys, what Microsoft previously was.
+This is the StaSi. I have no mercy for them.
+
+> is why we have LLVM replacing gcc, they literally stopped xcode on the last
+> GPLv2 releases (gcc 4.2.1 and binutils 2.17) for over five years while
+> they sponsored work on a replacement.
+
+For xcode vs gcc, I dont really see any actual license _conflict_.
+This was an political action, and we should take it as that.
+Apple is against freedom. The least thing, we - the people - should
+do is not helping them, not giving them a single penny.
+
+> When samba went gplv3, they did
+> http://www.osnews.com/story/24572/Apple_Ditches_SAMBA_in_Favour_of_Homegrown_Replacement
+> for samba and so on.
+
+Fine. They should do so. We don't need them. We lived happily without
+them, and we'll continue to do so. SMB is just old legacy anyways,
+just for interfacing with Toy-OS. (actually, I haven't had any single
+Windows system for about 20 years - never missed that).
+
+> The pro-gpl guys have tried various coercion tactics to get their way,
+> which hasn't helped. The FSF sued CISCO in 2008 over the same 2003
+> vendor BSP that had already been beaten out of them to produce OpenWRT
+> (and remember when I said you don't sue the upstream you sue the
+> individual customers when maximizing your payout?
+
+No, you sue them for the biggest policitical impact.
+Yes: it is very much about politics.
+
+ > The BSP was from Broadcom, so the FSF sued Cisco).
+
+CISCO distributed the devices, that's why the primary infringenment
+was done by them. Of course, Boardcom should have been sued, too.
+
+> Lesson: "These guys will never be satisifed,
+
+No. They (more precisely: we) will be satisfied, as long as you place
+by the rules. And the rules are pretty clear - just read the text.
+And if you don't like these rules, just pick something else.
+
+> The FSF also retroactively deleted binutils 2.17 (the last GPLv2
+> version) off their ftp site and replaced it with a binutils 2.17a
+> containing GPLv3 code, which they symlinked from the old name. (No
+> really. They did the same thing with gdb 6.6 except there they didn't
+> put a symlink, http://ftp.gnu.org/gnu/gdb/ .
+
+Okay, that's a bad trick. Or just a bit stupidity.
+Do we have evidence that this really was on purpose ?
+
+> Remember how I said qemu
+> wanted machine definitions they could get from _which_ two packages?
+
+Well, they still can use the old ones. And if they patch anything there,
+they're free to decide whether to dual-license or not.
+
+> QEMU went GPLv2 only to stay compatible with the kernel.)
+
+I haven't had a deeper look into QEMU source, but I wonder at which
+places exactly it would make sense to share / transfer code from
+kernel to QEMU. Any example ?
+
+ > and don't forget what the FSF did to Mepis
+> http://archive09.linux.com/articles/55285 (sued them for not mirroring
+> UNMODIFIED source tarballs readily available on the upstream website).
+
+They just were asked to comply to their part of the deal.
+And as they do now, no reason for whining about it anymore.
+
+> The kernel is grandfathered in, in part because it's always tolerated (if
+ > not enjoyed) binary modules,
+
+Actually, I strongly believe, they shouldn't be tolerated at all.
+
+> but do you really think that if Android  decided
+ > "time to switch to BSD" it would take them longer than 18 months to
+ > port everything they care about? They re-port every kernel release...
+
+Maybe. Just let them do it if they wish. I don't really care.
+
+> I gave a talk about this at Ohio LinuxFest in 2013:
+>
+> outline: http://landley.net/talks/ohio-2013.txt
+> audio: https://archive.org/download/OhioLinuxfest2013/24-Rob_Landley-The_Rise_and_Fall_of_Copyleft.mp3
+
+You should learn the difference between opensource and free software.
+  --> free like freedom, not free beer.
+
+>> Important Notice: This message may contain confidential or privileged
+>> information. It is intended only for the person it was addressed to. If you
+>> are not the intended recipient of this email you may not copy, forward,
+>> disclose or otherwise use it or any part of it in any form whatsoever. If
+>> you received this email in error please notify the sender by replying and
+>> delete this message and any attachments without retaining a copy.
+>
+> P.S. some of us actually care about licenses being appropriate to what
+> they're applied to, and at least theoretically capable of being
+> honored. Your email footer may be very slightly undermining your
+> position here.
+
+This is just a dumb auto-generated footer, coming from my client's
+mail server over here ... I'm just too lazy for setting up an own
+MTA on my workstation. You can safely ignore that.
+
+--
+Enrico Weigelt, metux IT consult
++49-151-27565287
+MELAG Medizintechnik oHG Sitz Berlin Registergericht AG Charlottenburg HRA 21333 B
+
+Wichtiger Hinweis: Diese Nachricht kann vertrauliche oder nur f?r einen begrenzten Personenkreis bestimmte Informationen enthalten. Sie ist ausschlie?lich f?r denjenigen bestimmt, an den sie gerichtet worden ist. Wenn Sie nicht der Adressat dieser E-Mail sind, d?rfen Sie diese nicht kopieren, weiterleiten, weitergeben oder sie ganz oder teilweise in irgendeiner Weise nutzen. Sollten Sie diese E-Mail irrt?mlich erhalten haben, so benachrichtigen Sie bitte den Absender, indem Sie auf diese Nachricht antworten. Bitte l?schen Sie in diesem Fall diese Nachricht und alle Anh?nge, ohne eine Kopie zu behalten.
+Important Notice: This message may contain confidential or privileged information. It is intended only for the person it was addressed to. If you are not the intended recipient of this email you may not copy, forward, disclose or otherwise use it or any part of it in any form whatsoever. If you received this email in error please notify the sender by replying and delete this message and any attachments without retaining a copy.
