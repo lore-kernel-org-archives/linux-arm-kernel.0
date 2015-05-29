@@ -1,37 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 29 May 2015 09:54:13 +0900
-Subject: [PATCH 05/10] ARM: shmobile: bockw dts: Replace "nor-jedec" by "jedec,
- spi-nor"
+Date: Fri, 29 May 2015 09:54:14 +0900
+Subject: [PATCH 06/10] ARM: shmobile: r8a7790: add MMCIF max-frequency
 In-Reply-To: <cover.1432860632.git.horms+renesas@verge.net.au>
 References: <cover.1432860632.git.horms+renesas@verge.net.au>
-Message-ID: <9cc785702d9f6367fdecf0fba6e425198e0754c8.1432860632.git.horms+renesas@verge.net.au>
+Message-ID: <96370057bd47e8785312e151e3b32ad712693910.1432860632.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Cfr. commit 8947e396a8296c52 ('Documentation: dt: mtd: replace
-"nor-jedec" binding with "jedec, spi-nor"')
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Brian Norris <computersforpeace@gmail.com>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Tested-by: Keita Kobayashi <keita.kobayashi.ym@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7778-bockw.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7790.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7778-bockw.dts b/arch/arm/boot/dts/r8a7778-bockw.dts
-index dfbb12e4fef4..90543b12d7e2 100644
---- a/arch/arm/boot/dts/r8a7778-bockw.dts
-+++ b/arch/arm/boot/dts/r8a7778-bockw.dts
-@@ -186,7 +186,7 @@
- 	flash: flash at 0 {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
--		compatible = "spansion,s25fl008k", "nor-jedec";
-+		compatible = "spansion,s25fl008k", "jedec,spi-nor";
- 		reg = <0>;
- 		spi-max-frequency = <104000000>;
- 		m25p,fast-read;
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 62a9086b133d..70248df02342 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -490,6 +490,7 @@
+ 		dma-names = "tx", "rx";
+ 		reg-io-width = <4>;
+ 		status = "disabled";
++		max-frequency = <97500000>;
+ 	};
+ 
+ 	mmcif1: mmc at ee220000 {
+@@ -501,6 +502,7 @@
+ 		dma-names = "tx", "rx";
+ 		reg-io-width = <4>;
+ 		status = "disabled";
++		max-frequency = <97500000>;
+ 	};
+ 
+ 	pfc: pfc at e6060000 {
 -- 
 2.1.4
