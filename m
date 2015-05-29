@@ -1,24 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 May 2015 14:00:48 +0200
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for
- v4.2
-In-Reply-To: <cover.1432860632.git.horms+renesas@verge.net.au>
-References: <cover.1432860632.git.horms+renesas@verge.net.au>
-Message-ID: <3551400.jxBECFI4Cg@wuerfel>
+Date: Fri, 29 May 2015 14:03:28 +0200
+Subject: [GIT PULL] qcom arm64 dt changes for 4.2
+In-Reply-To: <alpine.DEB.2.02.1505261421580.24858@galak-ubuntu.qualcomm.com>
+References: <alpine.DEB.2.02.1505261421580.24858@galak-ubuntu.qualcomm.com>
+Message-ID: <2514993.QkiAKKlqnS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 May 2015 09:54:16 Simon Horman wrote:
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-dt-for-v4.2,
-> which I have already sent a pull-request for.
+On Tuesday 26 May 2015 14:23:24 Kumar Gala wrote:
+> Qualcomm ARM64 Updates for v4.2
 > 
-> The change from using "nor-jedec" instead of "jedec,spi-nor" should
-> be safe as the usage of "nor-jedec" was added earlier in the v4.2 release
-> cycle and thus has not been present in a release.
-> 
+> * Added SPMI PMIC Arbiter device tree node for MSM8916
+> * Added 8x16 chipset SPMI PMIC's nodes
+> * Added MSM8916 restart device node
+> * Added initial set of PMIC and SoC pins for APQ8016 SBC board
 > 
 
-Pulled into next/dt, thanks!
+I've pulled this into next/dt as well, as we don't seem to have that
+many arm64 changes this time.
+
+Please continue sending the pull requests split between arm32 and arm64
+like you did here though, to be on the safe side.
 
 	Arnd
