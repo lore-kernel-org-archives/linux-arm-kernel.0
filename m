@@ -1,83 +1,89 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 29 May 2015 17:58:12 +0200
-Subject: [PATCH 1/3] clk: mux: Add regmap support for simple mux
-In-Reply-To: <CAGhQ9VysJ4O2uOc4LxdN_bFY42fP=ugLp=Sh2rtFEaaavf3yOQ@mail.gmail.com>
-References: <1432838508-5184-1-git-send-email-matthias.bgg@gmail.com>
- <1432838508-5184-2-git-send-email-matthias.bgg@gmail.com>
- <CAGhQ9VysJ4O2uOc4LxdN_bFY42fP=ugLp=Sh2rtFEaaavf3yOQ@mail.gmail.com>
-Message-ID: <CABuKBe+2xU=wTezgi6c=A1=2phbq+Xtu2ST=ThETt21OVf-P3A@mail.gmail.com>
+From: atull@opensource.altera.com (atull)
+Date: Fri, 29 May 2015 10:54:42 -0500
+Subject: [PATCHv5 1/2] ARM: socfpga: support suspend to ram
+In-Reply-To: <5567D9C4.7090903@opensource.altera.com>
+References: <1432847977-18880-1-git-send-email-atull@opensource.altera.com>
+ <1432847977-18880-2-git-send-email-atull@opensource.altera.com>
+ <5567D9C4.7090903@opensource.altera.com>
+Message-ID: <alpine.DEB.2.02.1505291051160.23989@linuxheads99>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-29 8:57 GMT+02:00 Joachim  Eastwood <manabian@gmail.com>:
-> Hi Matthias,
->
-> On 28 May 2015 at 20:41, Matthias Brugger <matthias.bgg@gmail.com> wrote:
->> Some devices like SoCs from Mediatek need to use the clock muxes
->> through a regmap interface.
->> This patch adds regmap support for simple the simple multiplexer
->> clock code.
->
-> Nice to see regmap support. This something I would also like to see
-> added to the clk framework.
-> And if the approach is agreed upon I would like to see support on
-> gates and dividers also.
+On Fri, 29 May 2015, Dinh Nguyen wrote:
 
-I totally agree.
+> 
+> 
+> On 5/28/15 4:19 PM, Alan Tull wrote:
+> > Add code that requests that the sdr controller go into
+> > self-refresh mode.  This code is run from ocram.
+> > 
+> > Suspend-to-RAM and EDAC support are mutually exclusive on
+> > SOCFPGA.  If the EDAC is enabled, it will prevent the
+> > platform from going into suspend.
+> > 
+> > Example of how to request to suspend to ram:
+> >  $ echo enabled > \
+> > /sys/devices/soc/ffc02000.serial0/tty/ttyS0/power/wakeup
+> > 
+> >  $ echo -n mem > /sys/power/state
+> > 
+> > Signed-off-by: Alan Tull <atull@opensource.altera.com>
+> > Cc: Pavel Machek <pavel@denx.de>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
+> > Cc: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> > ---
+> > v2: use Generic on-chip SRAM driver to allocate ocram
+> >     rm fncpy_align since generic allocator handles alignment
+> >     check __arm_ioremap_exec return code
+> >     check for NULL pointers
+> >     add a comment regarding sdram controller configuration
+> > v3: fix renamed #define
+> >     propagate socfpga_setup_ocram_self_refresh error code
+> > v4: Kconfig: don't need to select GENERIC_ALLOCATER
+> >     add CONFIG_SOCFPGA_SUSPEND
+> >     make s2r and EDAC support mutually exclusive
+> >     socfpga.c: add sdr_ctl_base_addr
+> >     return error if ocram not available in device tree
+> >     update copyright years
+> > v5: remove compile time dependency
+> >     edac driver will prevent suspend
+> >     don't configure scu standby mode; done in enable_scu().
+> >     fix comments about required sdram controller configuration
+> > ---
+> >  arch/arm/mach-socfpga/Kconfig        |   10 ++-
+> >  arch/arm/mach-socfpga/Makefile       |    1 +
+> >  arch/arm/mach-socfpga/core.h         |    6 +-
+> >  arch/arm/mach-socfpga/pm.c           |  149 ++++++++++++++++++++++++++++++++++
+> >  arch/arm/mach-socfpga/self-refresh.S |  136 +++++++++++++++++++++++++++++++
+> >  arch/arm/mach-socfpga/socfpga.c      |    6 +-
+> >  drivers/edac/altera_edac.c           |   20 +++++
+> >  7 files changed, 325 insertions(+), 3 deletions(-)
+> >  create mode 100644 arch/arm/mach-socfpga/pm.c
+> >  create mode 100644 arch/arm/mach-socfpga/self-refresh.S
+> > 
+> 
+> Which branch are you basing this patch on? I got a trivial patch
+> conflict in Kconfig when I applied to arm-soc/for-next and v4.1-rc5.
 
->
->> +static void clk_mux_writel(struct clk_mux *mux, u32 val)
->> +{
->> +       if (mux->flags && CLK_MUX_USE_REGMAP)
->
-> Assume you mean &.
+Based on your socfpga_for_next_arria10 branch from 
+git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git
 
-Sure, it's just luck that the patch didn't end up with a hanging
-system when I tested it yesterday.
-Fixed in next version.
+> 
+> Also, I'm getting these sparse warnings:
+> 
+> arch/arm/mach-socfpga/pm.c:86:25: warning: incorrect type in argument 1
+> (different address spaces)
+> arch/arm/mach-socfpga/pm.c:86:25:    expected void *<noident>
+> arch/arm/mach-socfpga/pm.c:86:25:    got void [noderef]
+> <asn:2>*[assigned] suspend_ocram_base
+> arch/arm/mach-socfpga/pm.c:108:52: warning: cast removes address space
+> of expression
+> 
+> Dinh
+> 
 
->
->> +               regmap_write(mux->regmap, mux->offset, val);
->> +       else
->> +               clk_writel(val, mux->reg);
->> +}
->> +
->> +static u32 clk_mux_readl(struct clk_mux *mux)
->> +{
->> +       u32 val;
->> +
->> +       if (mux->flags && CLK_MUX_USE_REGMAP)
->
-> And here.
+It appears to want suspend_ocram_base to be void * instead of void 
+__iomem *.
 
-Ditto.
-
->
->> +               regmap_read(mux->regmap, mux->offset, &val);
->> +       else
->> +               val = clk_readl(mux->reg);
->> +
->> +       return val;
->> +}
->> +
-> [...]
->> @@ -409,7 +410,9 @@ void clk_unregister_divider(struct clk *clk);
->>  struct clk_mux {
->>         struct clk_hw   hw;
->
->>         void __iomem    *reg;
->> +       struct regmap   *regmap;
->
-> Since it not possible to have both iomem and regmap at the same time.
-> Could this be put in a union or does that make registration more
-> difficult?
-
-It just adds a flag check to the registration.
-I will add it in the next version.
-
-Thanks for reviewing.
-Matthias
-
-
--- 
-motzblog.wordpress.com
+Alan
