@@ -1,45 +1,79 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 29 May 2015 22:22:27 +0200
-Subject: [PATCH 04/12] i2c: pxa: Add support for pxa910/988 & new
- configuration features
-In-Reply-To: <1432818224-17070-5-git-send-email-vaibhav.hiremath@linaro.org>
- (Vaibhav Hiremath's message of "Thu, 28 May 2015 18:33:36 +0530")
-References: <1432818224-17070-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1432818224-17070-5-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <874mmvyvzw.fsf@belgarion.home>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Fri, 29 May 2015 13:29:54 -0700
+Subject: [PATCH] fix n900 dts file to work around 4.1 touchscreen
+ regression on n900
+In-Reply-To: <20150529202123.GY2026@saruman.tx.rr.com>
+References: <20150527133311.GJ30798@pali> <20150527143722.GA28108@amd>
+ <20150527145837.GA13223@earth> <20150529190816.GA20232@amd>
+ <20150529192505.GA28987@amd> <20150529193211.GA7599@amd>
+ <20150529194955.GV2026@saruman.tx.rr.com>
+ <20150529195629.GA9811@amd> <20150529201745.GC17267@lukather>
+ <20150529202123.GY2026@saruman.tx.rr.com>
+Message-ID: <20150529202954.GA26494@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vaibhav Hiremath <vaibhav.hiremath@linaro.org> writes:
+On Fri, May 29, 2015 at 03:21:23PM -0500, Felipe Balbi wrote:
+> On Fri, May 29, 2015 at 10:17:45PM +0200, Maxime Ripard wrote:
+> > On Fri, May 29, 2015 at 09:56:29PM +0200, Pavel Machek wrote:
+> > > On Fri 2015-05-29 14:49:55, Felipe Balbi wrote:
+> > > > Hi,
+> > > > 
+> > > > On Fri, May 29, 2015 at 09:32:11PM +0200, Pavel Machek wrote:
+> > > > > Fix dts to match what the Linux kernel expects. This works around
+> > > > > touchscreen problems in 4.1 linux on Nokia n900.
+> > > > >     
+> > > > > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> > > > > 
+> > > > > diff --git a/Documentation/devicetree/bindings/input/touchscreen/tsc2005.txt b/Documentation/devicetree/bindings/input/touchscreen/tsc2005.txt
+> > > > > index 4b641c7..09089a6 100644
+> > > > > --- a/Documentation/devicetree/bindings/input/touchscreen/tsc2005.txt
+> > > > > +++ b/Documentation/devicetree/bindings/input/touchscreen/tsc2005.txt
+> > > > > @@ -32,8 +32,8 @@ Example:
+> > > > >  		touchscreen-fuzz-x = <4>;
+> > > > >  		touchscreen-fuzz-y = <7>;
+> > > > >  		touchscreen-fuzz-pressure = <2>;
+> > > > > -		touchscreen-max-x = <4096>;
+> > > > > -		touchscreen-max-y = <4096>;
+> > > > > +		touchscreen-size-x = <4096>;
+> > > > > +		touchscreen-size-y = <4096>;
+> > > > 
+> > > > IMHO, the older binding needs to be supported as well. It's fine to
+> > > > update the DTS for the new binding, but even Documentation says
+> > > > touchscreen-max-[xy] and if the driver changed that, the driver should
+> > > > be fixed too. Besides, it seems like this has been in tree since
+> > > > v3.16:
+> > > 
+> > > Agreed. In parent email, I have list of two commits that should be
+> > > reverted.
+> > 
+> > So, if we sums things up. You introduce in some documentation example
+> > some property, that you never document, that you still use in one
+> 
+> it was Documented in DT bindings document for this particular driver.
+> What are you talking about ?
 
-> @@ -167,6 +184,8 @@ struct pxa_i2c {
->  #define _ICR(i2c)	((i2c)->reg_icr)
->  #define _ISR(i2c)	((i2c)->reg_isr)
->  #define _ISAR(i2c)	((i2c)->reg_isar)
-> +#define _ILCR(i2c)	((i2c)->reg_ilcr)
-> +#define _IWCR(i2c)	((i2c)->reg_iwcr)
->  
->  /*
->   * I2C Slave mode address
-> @@ -467,11 +486,16 @@ static void i2c_pxa_reset(struct pxa_i2c *i2c)
->  	if (i2c->reg_isar)
->  		writel(i2c->slave_addr, _ISAR(i2c));
->  #endif
-> -
-Not in this patch.
+It was documented in "example", not in the documentation that says:
 
->  	/* set control register values */
->  	writel(I2C_ICR_INIT | (i2c->fast_mode ? ICR_FM : 0), _ICR(i2c));
->  	writel(readl(_ICR(i2c)) | (i2c->high_mode ? ICR_HS : 0), _ICR(i2c));
->  
-> +	if (i2c->ilcr)
-> +		writel(i2c->ilcr, _ILCR(i2c));
-> +	if (i2c->iwcr)
-> +		writel(i2c->iwcr, _IWCR(i2c));
-> +	udelay(2);
-This is a magical 2us. Where does it come from ?
+ - properties defined in touchscreen.txt
 
-Cheers.
+which says nothing about touchscreen-max-x. And _noone_ has ever parsed this
+property, so adding support for it does not make any sense.
+
+> 
+> > single DT, you don't even use that property in your driver, and now
+> > that you realise you meant something else, you want the code that
+> 
+> not Pali, Sebastian.
+> 
+> > actually parse the *right* property and does the right thing, that all
+> > other DT agree (and depend on) to be reverted?
+> 
+> We shouldn't revert, that I agree. But both properties should be parsed.
+
+No. If the property is wrong, and nobody parsed it, I do not see any reason to
+start now.
+
 
 -- 
-Robert
+Dmitry
