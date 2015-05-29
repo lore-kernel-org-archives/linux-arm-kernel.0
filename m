@@ -1,39 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 May 2015 11:28:05 +0200
-Subject: [PATCH v2] ARM: imx: imx7d requires anatop
-In-Reply-To: <2067135.qgAceiU7yZ@wuerfel>
-References: <2067135.qgAceiU7yZ@wuerfel>
-Message-ID: <2517471.Cl2S35hGoT@wuerfel>
+From: robert.jarzmik@free.fr (robert.jarzmik at free.fr)
+Date: Fri, 29 May 2015 11:29:09 +0200 (CEST)
+Subject: [PATCH] fixup! dmaengine: pxa_dma: add debug information
+In-Reply-To: <20150529091345.GE3140@localhost>
+Message-ID: <1617548760.717381111.1432891749082.JavaMail.root@zimbra1-e1.priv.proxad.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Like i.MX6, the i.MX7 code calls into the anatop driver, which fails
-if that is disabled:
+----- Mail original -----
+De: "Vinod Koul" <vinod.koul@intel.com>
+?: "Robert Jarzmik" <robert.jarzmik@free.fr>
 
-arch/arm/mach-imx/built-in.o: In function `imx7d_init_machine':
-arch/arm/mach-imx/mach-imx7d.c:24: undefined reference to `imx_anatop_init'
-arch/arm/mach-imx/built-in.o: In function `imx7d_init_irq':
-arch/arm/mach-imx/mach-imx7d.c:29: undefined reference to `imx_init_revision_from_anatop'
+On Wed, May 27, 2015 at 11:23:40PM +0200, Robert Jarzmik wrote:
+> This fixes the following error:
+> drivers/dma/pxa_dma.c: In function ?dbg_show_requester_chan?:
+> drivers/dma/pxa_dma.c:192:2: error: void value not ignored as it ought to be
+>   pos += seq_printf(s, "DMA channel %d requester :\n", phy->idx);
+> Applied now.
+Thanks.
 
-This patch ensures that for an imx7-only build, we still get anatop
-built-in, matching what we do for imx6. We also need to select 
-HAVE_IMX_MMDC, as that is needed by the anatop code.
+> but not pleased that you sent broken code. Sending stuff that
+> compiles is basic step
+You should know me better by now. I told you I compiled *and* tested.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-I ran into a related problem, please use this version instead
-of the first one, to cover all cases.
+And with a a bit closer look check this commit, especially the date :
+commit 0bac33653b06a5f80a5c04e275eb33db9493b85a
+Author: Joe Perches <joe@perches.com>
+Date:   Sat May 23 12:00:38 2015 +1000
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index bb2d058f4d11..fd3c5b348586 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -551,6 +551,8 @@ config SOC_IMX7D
- 	bool "i.MX7 Dual support"
- 	select PINCTRL_IMX7D
- 	select ARM_GIC
-+	select HAVE_IMX_ANATOP
-+	select HAVE_IMX_MMDC
- 	help
- 		This enables support for Freescale i.MX7 Dual processor.
- 
+    fs/seq_file: convert int seq_vprint/seq_printf/etc... returns to void
+
+Cheers.
+
+--
+Robert
