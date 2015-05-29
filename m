@@ -1,82 +1,570 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Fri, 29 May 2015 19:50:16 +0200
-Subject: [PATCH 2/2] doc: dt: add documentation for nxp,lpc1773-spifi
+Date: Fri, 29 May 2015 19:50:15 +0200
+Subject: [PATCH 1/2] mtd: spi-nor: add driver for NXP SPI Flash Interface
+ (SPIFI)
 In-Reply-To: <1432921816-10765-1-git-send-email-manabian@gmail.com>
 References: <1432921816-10765-1-git-send-email-manabian@gmail.com>
-Message-ID: <1432921816-10765-3-git-send-email-manabian@gmail.com>
+Message-ID: <1432921816-10765-2-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree binding documentation for the SPI Flash Interface
-(SPIFI) found on NXP LPC18xx and LPC43xx devies.
+Add SPI-NOR driver for the SPI Flash Interface (SPIFI)
+controller that is found newer NXP MCU devices.
+
+The controller supports serial SPI Flash devices with 1-, 2-
+and 4-bit width in either SPI mode 0 or 3. The controller
+can operate in either command or memory mode. In memory mode
+the Flash is exposed as normal memory and can be directly
+accessed by the CPU.
 
 Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 ---
- .../devicetree/bindings/mtd/nxp-spifi.txt          | 56 ++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mtd/nxp-spifi.txt
+ drivers/mtd/spi-nor/Kconfig     |  10 +
+ drivers/mtd/spi-nor/Makefile    |   1 +
+ drivers/mtd/spi-nor/nxp-spifi.c | 508 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 519 insertions(+)
+ create mode 100644 drivers/mtd/spi-nor/nxp-spifi.c
 
-diff --git a/Documentation/devicetree/bindings/mtd/nxp-spifi.txt b/Documentation/devicetree/bindings/mtd/nxp-spifi.txt
+diff --git a/drivers/mtd/spi-nor/Kconfig b/drivers/mtd/spi-nor/Kconfig
+index 64a4f0edabc7..f10a37f1a4ef 100644
+--- a/drivers/mtd/spi-nor/Kconfig
++++ b/drivers/mtd/spi-nor/Kconfig
+@@ -28,4 +28,14 @@ config SPI_FSL_QUADSPI
+ 	  This enables support for the Quad SPI controller in master mode.
+ 	  We only connect the NOR to this controller now.
+ 
++config SPI_NXP_SPIFI
++	tristate "NXP SPI Flash Interface (SPIFI)"
++	depends on OF && (ARCH_LPC18XX || COMPILE_TEST)
++	help
++	  Enable support for the NXP LPC SPI Flash Interface controller.
++
++	  SPIFI is a specialized controller for connecting serial SPI
++	  Flash. Enable this option if you have a device with a SPIFI
++	  controller and want to access the Flash as a mtd device.
++
+ endif # MTD_SPI_NOR
+diff --git a/drivers/mtd/spi-nor/Makefile b/drivers/mtd/spi-nor/Makefile
+index 6a7ce1462247..e53333ef8582 100644
+--- a/drivers/mtd/spi-nor/Makefile
++++ b/drivers/mtd/spi-nor/Makefile
+@@ -1,2 +1,3 @@
+ obj-$(CONFIG_MTD_SPI_NOR)	+= spi-nor.o
+ obj-$(CONFIG_SPI_FSL_QUADSPI)	+= fsl-quadspi.o
++obj-$(CONFIG_SPI_NXP_SPIFI)	+= nxp-spifi.o
+diff --git a/drivers/mtd/spi-nor/nxp-spifi.c b/drivers/mtd/spi-nor/nxp-spifi.c
 new file mode 100644
-index 000000000000..fc071fa2d798
+index 000000000000..cbfe0bb16f81
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/mtd/nxp-spifi.txt
-@@ -0,0 +1,56 @@
-+* NXP SPI Flash Interface (SPIFI)
++++ b/drivers/mtd/spi-nor/nxp-spifi.c
+@@ -0,0 +1,508 @@
++/*
++ * SPI-NOR driver for NXP SPI Flash Interface (SPIFI)
++ *
++ * Copyright (C) 2015 Joachim Eastwood <manabian@gmail.com>
++ *
++ * Based on Freescale QuadSPI driver:
++ * Copyright (C) 2013 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
 +
-+NXP SPIFI is a specialized SPI interface for serial Flash devices.
-+It supports one Flash device with 1-, 2- and 4-bits width in SPI
-+mode 0 or 3. The controller operates in either command or memory
-+mode. In memory mode the Flash is accessible from the CPU as
-+normal memory.
++#include <linux/clk.h>
++#include <linux/delay.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/mtd/mtd.h>
++#include <linux/mtd/partitions.h>
++#include <linux/mtd/spi-nor.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/platform_device.h>
++#include <linux/spi/spi.h>
 +
-+Required properties:
-+  - compatible : Should be "nxp,lpc1773-spifi"
-+  - reg : the first contains the register location and length,
-+          the second contains the memory mapping address and length
-+  - reg-names: Should contain the reg names "spifi" and "flash"
-+  - interrupts : Should contain the interrupt for the device
-+  - clocks : The clocks needed by the SPIFI controller
-+  - clock-names : Should contain the clock names "spifi" and "reg"
++/* NXP SPIFI registers, bits and macros */
++#define SPIFI_CTRL				0x000
++#define  SPIFI_CTRL_TIMEOUT(timeout)		(timeout)
++#define  SPIFI_CTRL_CSHIGH(cshigh)		((cshigh) << 16)
++#define  SPIFI_CTRL_MODE3			BIT(23)
++#define  SPIFI_CTRL_DUAL			BIT(28)
++#define  SPIFI_CTRL_FBCLK			BIT(30)
++#define SPIFI_CMD				0x004
++#define  SPIFI_CMD_DATALEN(dlen)		(dlen & 0x3fff)
++#define  SPIFI_CMD_DOUT				BIT(15)
++#define  SPIFI_CMD_INTLEN(ilen)			((ilen) << 16)
++#define  SPIFI_CMD_FIELDFORM(field)		((field) << 19)
++#define  SPIFI_CMD_FIELDFORM_ALL_SERIAL		SPIFI_CMD_FIELDFORM(0x0)
++#define  SPIFI_CMD_FIELDFORM_QUAD_DUAL_DATA	SPIFI_CMD_FIELDFORM(0x1)
++#define  SPIFI_CMD_FRAMEFORM(frame)		((frame) << 21)
++#define  SPIFI_CMD_FRAMEFORM_OPCODE_ONLY	SPIFI_CMD_FRAMEFORM(0x1)
++#define  SPIFI_CMD_OPCODE(op)			((op) << 24)
++#define SPIFI_ADDR				0x008
++#define SPIFI_IDATA				0x00c
++#define SPIFI_CLIMIT				0x010
++#define SPIFI_DATA				0x014
++#define SPIFI_MCMD				0x018
++#define SPIFI_STAT				0x01c
++#define  SPIFI_STAT_MCINIT			BIT(0)
++#define  SPIFI_STAT_CMD				BIT(1)
++#define  SPIFI_STAT_RESET			BIT(4)
 +
-+Optional properties:
-+ - resets : phandle + reset specifier
++#define SPI_NOR_MAX_ID_LEN	6
 +
-+The SPI Flash must be a child of the SPIFI node and can contain
-+the following properties.
-+ - spi-cpol : Controller only supports mode 0 and 3 so either
-+              both spi-cpol and spi-cpha should be present or
-+              none of them
-+ - spi-cpha : See above
-+ - spi-rx-bus-width : Used to select how many pins that are used
-+                      for input on the controller
-+
-+See bindings/spi/spi-bus.txt for more information.
-+
-+Example:
-+spifi: spifi at 40003000 {
-+	compatible = "nxp,lpc1773-spifi";
-+	reg = <0x40003000 0x1000>, <0x14000000 0x4000000>;
-+	reg-names = "spifi", "flash";
-+	interrupts = <30>;
-+	clocks = <&ccu1 CLK_SPIFI>, <&ccu1 CLK_CPU_SPIFI>;
-+	clock-names = "spifi", "reg";
-+	resets = <&rgu 53>;
-+
-+	flash at 0 {
-+		compatible = "spansion,s25fl016k", "jedec,spi-nor";
-+		spi-cpol;
-+		spi-cpha;
-+		spi-rx-bus-width = <4>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		partition at 0 {
-+			label = "data";
-+			reg = <0 0x200000>;
-+		};
-+	};
++struct nxp_spifi {
++	struct device *dev;
++	struct clk *clk_spifi;
++	struct clk *clk_reg;
++	void __iomem *io_base;
++	void __iomem *flash_base;
++	struct mtd_info mtd;
++	struct spi_nor nor;
++	u32 mcmd;
 +};
 +
++static int nxp_spifi_wait_for_event(struct nxp_spifi *spifi, u32 event)
++{
++	int retry = 3;
++	u32 stat;
++
++	do {
++		stat = readb(spifi->io_base + SPIFI_STAT);
++		if (!(stat & event))
++			return 0;
++
++		udelay(10);
++	} while (retry--);
++
++	return -ETIMEDOUT;
++}
++
++static int nxp_spifi_wait_for_cmd(struct nxp_spifi *spifi)
++{
++	int ret;
++
++	ret = nxp_spifi_wait_for_event(spifi, SPIFI_STAT_CMD);
++	if (ret)
++		dev_warn(spifi->dev, "command timed out\n");
++
++	return ret;
++}
++
++static int nxp_spifi_reset(struct nxp_spifi *spifi)
++{
++	int ret;
++
++	writel(SPIFI_STAT_RESET, spifi->io_base + SPIFI_STAT);
++	ret = nxp_spifi_wait_for_event(spifi, SPIFI_STAT_RESET);
++	if (ret)
++		dev_warn(spifi->dev, "state reset timed out\n");
++
++	return ret;
++}
++
++static int nxp_spifi_set_memory_mode_off(struct nxp_spifi *spifi)
++{
++	u32 stat;
++	int ret;
++
++	stat = readb(spifi->io_base + SPIFI_STAT);
++	if (!(stat & SPIFI_STAT_MCINIT))
++		return 0;
++
++	ret = nxp_spifi_reset(spifi);
++	if (ret)
++		dev_err(spifi->dev, "unable to enter command mode\n");
++
++	return ret;
++}
++
++static int nxp_spifi_set_memory_mode_on(struct nxp_spifi *spifi)
++{
++	int retry = 3;
++	u32 stat;
++
++	stat = readb(spifi->io_base + SPIFI_STAT);
++	if (stat & SPIFI_STAT_MCINIT)
++		return 0;
++
++	writel(spifi->mcmd, spifi->io_base + SPIFI_MCMD);
++
++	do {
++		stat = readb(spifi->io_base + SPIFI_STAT);
++		if (stat & SPIFI_STAT_MCINIT)
++			return 0;
++
++		udelay(10);
++	} while (retry--);
++
++	dev_err(spifi->dev, "unable to enter memory mode\n");
++
++	return -ETIMEDOUT;
++}
++
++static int nxp_spifi_read_reg(struct spi_nor *nor, u8 opcode, u8 *buf, int len)
++{
++	struct nxp_spifi *spifi = nor->priv;
++	u32 cmd;
++	int ret;
++
++	ret = nxp_spifi_set_memory_mode_off(spifi);
++	if (ret)
++		return ret;
++
++	cmd = SPIFI_CMD_DATALEN(len) |
++	      SPIFI_CMD_OPCODE(opcode) |
++	      SPIFI_CMD_FIELDFORM_ALL_SERIAL |
++	      SPIFI_CMD_FRAMEFORM_OPCODE_ONLY;
++	writel(cmd, spifi->io_base + SPIFI_CMD);
++
++	while (len--)
++		*buf++  = readb(spifi->io_base + SPIFI_DATA);
++
++	return nxp_spifi_wait_for_cmd(spifi);
++}
++
++static int nxp_spifi_write_reg(struct spi_nor *nor, u8 opcode, u8 *buf,
++			       int len, int write_enable)
++{
++	struct nxp_spifi *spifi = nor->priv;
++	u32 cmd;
++	int ret;
++
++	ret = nxp_spifi_set_memory_mode_off(spifi);
++	if (ret)
++		return ret;
++
++	cmd = SPIFI_CMD_DOUT |
++	      SPIFI_CMD_DATALEN(len) |
++	      SPIFI_CMD_OPCODE(opcode) |
++	      SPIFI_CMD_FIELDFORM_ALL_SERIAL |
++	      SPIFI_CMD_FRAMEFORM_OPCODE_ONLY;
++	writel(cmd, spifi->io_base + SPIFI_CMD);
++
++	while (len--)
++		writeb(*buf++, spifi->io_base + SPIFI_DATA);
++
++	return nxp_spifi_wait_for_cmd(spifi);
++}
++
++static int nxp_spifi_read(struct spi_nor *nor, loff_t from, size_t len,
++			  size_t *retlen, u_char *buf)
++{
++	struct nxp_spifi *spifi = nor->priv;
++	int ret;
++
++	ret = nxp_spifi_set_memory_mode_on(spifi);
++	if (ret)
++		return ret;
++
++	memcpy_fromio(buf, spifi->flash_base + from, len);
++	*retlen += len;
++
++	return 0;
++}
++
++static void nxp_spifi_write(struct spi_nor *nor, loff_t to, size_t len,
++			    size_t *retlen, const u_char *buf)
++{
++	struct nxp_spifi *spifi = nor->priv;
++	u32 cmd;
++	int ret;
++
++	ret = nxp_spifi_set_memory_mode_off(spifi);
++	if (ret) {
++		*retlen = 0;
++		return;
++	}
++
++	writel(to, spifi->io_base + SPIFI_ADDR);
++	*retlen = len;
++
++	cmd = SPIFI_CMD_DOUT |
++	      SPIFI_CMD_DATALEN(len) |
++	      SPIFI_CMD_FIELDFORM_ALL_SERIAL |
++	      SPIFI_CMD_OPCODE(nor->program_opcode) |
++	      SPIFI_CMD_FRAMEFORM(spifi->nor.addr_width + 1);
++	writel(cmd, spifi->io_base + SPIFI_CMD);
++
++	while (len--)
++		writeb(*buf++, spifi->io_base + SPIFI_DATA);
++
++	nxp_spifi_wait_for_cmd(spifi);
++}
++
++static int nxp_spifi_erase(struct spi_nor *nor, loff_t offs)
++{
++	struct nxp_spifi *spifi = nor->priv;
++	u32 cmd;
++	int ret;
++
++	ret = nxp_spifi_set_memory_mode_off(spifi);
++	if (ret)
++		return ret;
++
++	writel(offs, spifi->io_base + SPIFI_ADDR);
++
++	cmd = SPIFI_CMD_FIELDFORM_ALL_SERIAL |
++	      SPIFI_CMD_OPCODE(nor->erase_opcode) |
++	      SPIFI_CMD_FRAMEFORM(spifi->nor.addr_width + 1);
++	writel(cmd, spifi->io_base + SPIFI_CMD);
++
++	return nxp_spifi_wait_for_cmd(spifi);
++}
++
++static int nxp_spifi_setup_memory_cmd(struct nxp_spifi *spifi)
++{
++	switch (spifi->nor.flash_read) {
++	case SPI_NOR_NORMAL:
++	case SPI_NOR_FAST:
++		spifi->mcmd = SPIFI_CMD_FIELDFORM_ALL_SERIAL;
++		break;
++	case SPI_NOR_DUAL:
++	case SPI_NOR_QUAD:
++		spifi->mcmd = SPIFI_CMD_FIELDFORM_QUAD_DUAL_DATA;
++		break;
++	default:
++		dev_err(spifi->dev, "unsupported spi read mode\n");
++		return -EINVAL;
++	}
++
++	/* Memory mode supports address length between 1 and 4 */
++	if (spifi->nor.addr_width < 1 || spifi->nor.addr_width > 4)
++		return -EINVAL;
++
++	spifi->mcmd |= SPIFI_CMD_OPCODE(spifi->nor.read_opcode) |
++		       SPIFI_CMD_INTLEN(spifi->nor.read_dummy / 8) |
++		       SPIFI_CMD_FRAMEFORM(spifi->nor.addr_width + 1);
++
++	return 0;
++}
++
++static void nxp_spifi_dummy_id_read(struct spi_nor *nor)
++{
++	u8 id[SPI_NOR_MAX_ID_LEN];
++	nor->read_reg(nor, SPINOR_OP_RDID, id, SPI_NOR_MAX_ID_LEN);
++}
++
++static int nxp_spifi_setup_flash(struct nxp_spifi *spifi,
++				 struct device_node *np)
++{
++	struct mtd_part_parser_data ppdata;
++	enum read_mode flash_read;
++	u32 ctrl, property;
++	char modalias[40];
++	u16 mode = 0;
++	int ret;
++
++	if (!of_property_read_u32(np, "spi-rx-bus-width", &property)) {
++		switch (property) {
++		case 1:
++			break;
++		case 2:
++			mode |= SPI_RX_DUAL;
++			break;
++		case 4:
++			mode |= SPI_RX_QUAD;
++			break;
++		default:
++			dev_err(spifi->dev, "unsupported rx-bus-width\n");
++			return -EINVAL;
++		}
++	}
++
++	if (of_find_property(np, "spi-cpha", NULL))
++		mode |= SPI_CPHA;
++
++	if (of_find_property(np, "spi-cpol", NULL))
++		mode |= SPI_CPOL;
++
++	/* Setup control register defaults */
++	ctrl = SPIFI_CTRL_TIMEOUT(1000) |
++	       SPIFI_CTRL_CSHIGH(15) |
++	       SPIFI_CTRL_FBCLK;
++
++	if (mode & SPI_RX_DUAL) {
++		ctrl |= SPIFI_CTRL_DUAL;
++		flash_read = SPI_NOR_DUAL;
++	} else if (mode & SPI_RX_QUAD) {
++		ctrl &= ~SPIFI_CTRL_DUAL;
++		flash_read = SPI_NOR_QUAD;
++	} else {
++		ctrl |= SPIFI_CTRL_DUAL;
++		flash_read = SPI_NOR_NORMAL;
++	}
++
++	switch (mode & (SPI_CPHA | SPI_CPOL)) {
++	case SPI_MODE_0:
++		ctrl &= ~SPIFI_CTRL_MODE3;
++		break;
++	case SPI_MODE_3:
++		ctrl |= SPIFI_CTRL_MODE3;
++		break;
++	default:
++		dev_err(spifi->dev, "only mode 0 and 3 supported\n");
++		return -EINVAL;
++	}
++
++	writel(ctrl, spifi->io_base + SPIFI_CTRL);
++	dev_info(spifi->dev, "spifi ctrl = 0x%08x\n", ctrl);
++
++	spifi->mtd.priv  = &spifi->nor;
++	spifi->nor.mtd   = &spifi->mtd;
++	spifi->nor.dev   = spifi->dev;
++	spifi->nor.priv  = spifi;
++	spifi->nor.read  = nxp_spifi_read;
++	spifi->nor.write = nxp_spifi_write;
++	spifi->nor.erase = nxp_spifi_erase;
++	spifi->nor.read_reg  = nxp_spifi_read_reg;
++	spifi->nor.write_reg = nxp_spifi_write_reg;
++
++	ret = of_modalias_node(np, modalias, sizeof(modalias));
++	if (ret < 0) {
++		dev_err(spifi->dev, "unable to get device modalias\n");
++		return ret;
++	}
++
++	/*
++	 * The first read on a hard reset isn't reliable so do a
++	 * dummy read of the id before calling spi_nor_scan().
++	 * The reason for this problem is unknown.
++	 *
++	 * The official NXP spifilib uses more or less the same
++	 * workaround that is applied here by reading the device
++	 * id multiple times.
++	 */
++	nxp_spifi_dummy_id_read(&spifi->nor);
++
++	ret = spi_nor_scan(&spifi->nor, modalias, flash_read);
++	if (ret) {
++		dev_err(spifi->dev, "device scan failed\n");
++		return ret;
++	}
++
++	ret = nxp_spifi_setup_memory_cmd(spifi);
++	if (ret) {
++		dev_err(spifi->dev, "memory command setup failed\n");
++		return ret;
++	}
++
++	ppdata.of_node = np;
++	ret = mtd_device_parse_register(&spifi->mtd, NULL, &ppdata, NULL, 0);
++	if (ret) {
++		dev_err(spifi->dev, "mtd device parse failed\n");
++		return ret;
++	}
++
++	return 0;
++}
++
++static int nxp_spifi_probe(struct platform_device *pdev)
++{
++	struct device_node *flash_np;
++	struct nxp_spifi *spifi;
++	struct resource *res;
++	int ret;
++
++	spifi = devm_kzalloc(&pdev->dev, sizeof(*spifi), GFP_KERNEL);
++	if (!spifi)
++		return -ENOMEM;
++
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "spifi");
++	spifi->io_base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(spifi->io_base))
++		return PTR_ERR(spifi->io_base);
++
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "flash");
++	spifi->flash_base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(spifi->flash_base))
++		return PTR_ERR(spifi->flash_base);
++
++	spifi->clk_spifi = devm_clk_get(&pdev->dev, "spifi");
++	if (IS_ERR(spifi->clk_spifi)) {
++		dev_err(&pdev->dev, "spifi clock not found\n");
++		return PTR_ERR(spifi->clk_spifi);
++	}
++
++	spifi->clk_reg = devm_clk_get(&pdev->dev, "reg");
++	if (IS_ERR(spifi->clk_reg)) {
++		dev_err(&pdev->dev, "reg clock not found\n");
++		return PTR_ERR(spifi->clk_reg);
++	}
++
++	ret = clk_prepare_enable(spifi->clk_reg);
++	if (ret) {
++		dev_err(&pdev->dev, "unable to enable reg clock\n");
++		return ret;
++	}
++
++	ret = clk_prepare_enable(spifi->clk_spifi);
++	if (ret) {
++		dev_err(&pdev->dev, "unable to enable spifi clock\n");
++		goto dis_clk_reg;
++	}
++
++	spifi->dev = &pdev->dev;
++	platform_set_drvdata(pdev, spifi);
++
++	/* Initialize and reset device */
++	nxp_spifi_reset(spifi);
++	writel(0, spifi->io_base + SPIFI_IDATA);
++	writel(0, spifi->io_base + SPIFI_MCMD);
++	nxp_spifi_reset(spifi);
++
++	flash_np = of_get_next_available_child(pdev->dev.of_node, NULL);
++	if (!flash_np) {
++		dev_err(&pdev->dev, "no spi flash device to configure\n");
++		ret = -ENODEV;
++		goto dis_clks;
++	}
++
++	ret = nxp_spifi_setup_flash(spifi, flash_np);
++	if (ret) {
++		dev_err(&pdev->dev, "unable to setup flash chip\n");
++		goto dis_clks;
++	}
++
++	return 0;
++
++dis_clks:
++	clk_disable_unprepare(spifi->clk_spifi);
++dis_clk_reg:
++	clk_disable_unprepare(spifi->clk_reg);
++	return ret;
++}
++
++static int nxp_spifi_remove(struct platform_device *pdev)
++{
++	struct nxp_spifi *spifi = platform_get_drvdata(pdev);
++
++	mtd_device_unregister(&spifi->mtd);
++	clk_disable_unprepare(spifi->clk_spifi);
++	clk_disable_unprepare(spifi->clk_reg);
++
++	return 0;
++}
++
++static const struct of_device_id nxp_spifi_match[] = {
++	{.compatible = "nxp,lpc1773-spifi"},
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, nxp_spifi_match);
++
++static struct platform_driver nxp_spifi_driver = {
++	.probe	= nxp_spifi_probe,
++	.remove	= nxp_spifi_remove,
++	.driver	= {
++		.name = "nxp-spifi",
++		.of_match_table = nxp_spifi_match,
++	},
++};
++module_platform_driver(nxp_spifi_driver);
++
++MODULE_DESCRIPTION("NXP SPI Flash Interface driver");
++MODULE_AUTHOR("Joachim Eastwood <manabian@gmail.com>");
++MODULE_LICENSE("GPL v2");
 -- 
 1.8.0
