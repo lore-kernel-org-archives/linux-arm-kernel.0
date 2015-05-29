@@ -1,69 +1,123 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 29 May 2015 13:16:39 +0100
-Subject: [PATCH 6/6] drivers: firmware: psci: add PSCI v1.0 DT bindings
+Date: Fri, 29 May 2015 13:16:38 +0100
+Subject: [PATCH 5/6] drivers: firmware: psci: add extended stateid power_state
+ support
 In-Reply-To: <1432901799-18359-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1432901799-18359-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1432901799-18359-7-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1432901799-18359-6-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PSCI 1.0 is designed to be fully compliant to the PSCI 0.2
-specification, with minor differences that are described in the
-PSCI specification.
+PSCI v1.0 augmented the power_state parameter format specification
+(extended stateid) and introduced a way to probe it through the
+PSCI_FEATURES interface.
 
-In particular, PSCI v1.0 augments the specification with a new
-power_state format (extended stateid - probeable through the
-PSCI_FEATURES call), changes some function return codes and
-functions usage requirements wrt PSCI 0.2. These changes mean
-that 1.0 vs 0.2 compliancy should be enforced through a DT
-compatible string that allows firmware to specify 1.0 only
-compliancy so that older kernels are prevented from using
-PSCI 1.0 FW implementations in a non-compatible way (eg by
-calling a 1.0 FW implementation and expecting 0.2 behaviour).
-
-This patch adds PSCI 1.0 DT bindings and related compatible
-string.
+This patch implements code that detects the power_state format at
+run-time through the PSCI_FEATURES interface, so that the power_state
+argument can be properly detected and validated in the kernel according
+to the information provided through firmware.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
 ---
- Documentation/devicetree/bindings/arm/psci.txt | 6 ++++++
- drivers/firmware/psci.c                        | 1 +
- 2 files changed, 7 insertions(+)
+ drivers/firmware/psci.c   | 34 ++++++++++++++++++++++++++++++++--
+ include/uapi/linux/psci.h | 12 ++++++++++++
+ 2 files changed, 44 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
-index 5aa40ed..a9adab8 100644
---- a/Documentation/devicetree/bindings/arm/psci.txt
-+++ b/Documentation/devicetree/bindings/arm/psci.txt
-@@ -31,6 +31,10 @@ Main node required properties:
- 					support, but are permitted to be present for compatibility with
- 					existing software when "arm,psci" is later in the compatible list.
- 
-+				* "arm,psci-1.0" : for implementations complying to PSCI 1.0. PSCI 1.0 is
-+					backward compatible with PSCI 0.2 with minor specification updates,
-+					as defined in the PSCI specification[2].
-+
-  - method        : The method of calling the PSCI firmware. Permitted
-                    values are:
- 
-@@ -100,3 +104,5 @@ Case 3: PSCI v0.2 and PSCI v0.1.
- 
- [1] Kernel documentation - ARM idle states bindings
-     Documentation/devicetree/bindings/arm/idle-states.txt
-+[2] Power State Coordination Interface (PSCI) specification
-+    http://infocenter.arm.com/help/topic/com.arm.doc.den0022c/DEN0022C_Power_State_Coordination_Interface.pdf
 diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index 4063784..68d0c2f 100644
+index 2330099..4063784 100644
 --- a/drivers/firmware/psci.c
 +++ b/drivers/firmware/psci.c
-@@ -385,6 +385,7 @@ out_put_node:
- static const struct of_device_id psci_of_match[] __initconst = {
- 	{ .compatible = "arm,psci",	.data = psci_0_1_init},
- 	{ .compatible = "arm,psci-0.2",	.data = psci_0_2_init},
-+	{ .compatible = "arm,psci-1.0",	.data = psci_0_2_init},
- 	{},
- };
+@@ -74,14 +74,34 @@ static u32 psci_function_id[PSCI_FN_MAX];
+ 				PSCI_0_2_POWER_STATE_TYPE_MASK | \
+ 				PSCI_0_2_POWER_STATE_AFFL_MASK)
  
++#define PSCI_EXT_POWER_STATE_MASK		\
++				(PSCI_EXT_POWER_STATE_ID_MASK | \
++				PSCI_EXT_POWER_STATE_TYPE_MASK)
++
++static u32 psci_cpu_suspend_feature;
++
++static inline bool psci_has_ext_power_state(void)
++{
++	return psci_cpu_suspend_feature &
++				PSCI_FEATURES_CPU_SUSPEND_PF_MASK;
++}
++
+ bool psci_power_state_loses_context(u32 state)
+ {
+-	return state & PSCI_0_2_POWER_STATE_TYPE_MASK;
++	const u32 mask = psci_has_ext_power_state() ?
++					PSCI_EXT_POWER_STATE_TYPE_MASK :
++					PSCI_0_2_POWER_STATE_TYPE_MASK;
++
++	return state & mask;
+ }
+ 
+ bool psci_power_state_is_valid(u32 state)
+ {
+-	return !(state & ~PSCI_0_2_POWER_STATE_MASK);
++	const u32 valid_mask = psci_has_ext_power_state() ?
++			       PSCI_EXT_POWER_STATE_MASK :
++			       PSCI_0_2_POWER_STATE_MASK;
++
++	return !(state & ~valid_mask);
+ }
+ 
+ static int psci_to_linux_errno(int errno)
+@@ -202,6 +222,14 @@ static int __init psci_features(u32 psci_func_id)
+ 			      psci_func_id, 0, 0);
+ }
+ 
++static void __init psci_init_cpu_suspend(void)
++{
++	int feature = psci_features(psci_function_id[PSCI_FN_CPU_SUSPEND]);
++
++	if (feature != PSCI_RET_NOT_SUPPORTED)
++		psci_cpu_suspend_feature = feature;
++}
++
+ /*
+  * Detect the presence of a resident Trusted OS which may cause CPU_OFF to
+  * return DENIED (which would be fatal).
+@@ -280,6 +308,8 @@ static int __init psci_probe(void)
+ 
+ 	psci_init_migrate();
+ 
++	psci_init_cpu_suspend();
++
+ 	return 0;
+ }
+ 
+diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
+index 187b828d..2598d7c 100644
+--- a/include/uapi/linux/psci.h
++++ b/include/uapi/linux/psci.h
+@@ -58,6 +58,13 @@
+ #define PSCI_0_2_POWER_STATE_AFFL_MASK		\
+ 				(0x3 << PSCI_0_2_POWER_STATE_AFFL_SHIFT)
+ 
++/* PSCI extended power state encoding for CPU_SUSPEND function */
++#define PSCI_EXT_POWER_STATE_ID_MASK		0xfffffff
++#define PSCI_EXT_POWER_STATE_ID_SHIFT		0
++#define PSCI_EXT_POWER_STATE_TYPE_SHIFT		30
++#define PSCI_EXT_POWER_STATE_TYPE_MASK		\
++				(0x1 << PSCI_EXT_POWER_STATE_TYPE_SHIFT)
++
+ /* PSCI v0.2 affinity level state returned by AFFINITY_INFO */
+ #define PSCI_0_2_AFFINITY_LEVEL_ON		0
+ #define PSCI_0_2_AFFINITY_LEVEL_OFF		1
+@@ -78,6 +85,11 @@
+ #define PSCI_VERSION_MINOR(ver)			\
+ 		((ver) & PSCI_VERSION_MINOR_MASK)
+ 
++/* PSCI features decoding (>=1.0) */
++#define PSCI_FEATURES_CPU_SUSPEND_PF_SHIFT	1
++#define PSCI_FEATURES_CPU_SUSPEND_PF_MASK	\
++			(0x1 << PSCI_FEATURES_CPU_SUSPEND_PF_SHIFT)
++
+ /* PSCI return values (inclusive of all PSCI versions) */
+ #define PSCI_RET_SUCCESS			0
+ #define PSCI_RET_NOT_SUPPORTED			-1
 -- 
 2.2.1
