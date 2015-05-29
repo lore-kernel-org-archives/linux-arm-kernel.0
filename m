@@ -1,111 +1,73 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Fri, 29 May 2015 12:04:12 -0400
-Subject: [PATCH 1/2] clk: keystone: add support for post divider register for
- main pll
-Message-ID: <1432915453-409-1-git-send-email-m-karicheri2@ti.com>
+Date: Fri, 29 May 2015 12:04:13 -0400
+Subject: [PATCH 2/2] ARM: dts: keystone: fix dt bindings to use post div
+ register for mainpll
+In-Reply-To: <1432915453-409-1-git-send-email-m-karicheri2@ti.com>
+References: <1432915453-409-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1432915453-409-2-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Main PLL controller has post divider bits in a separate register in
-pll controller. Use the value from this register instead of fixed
-divider when available.
+All of the keystone devices have a separate register to hold post
+divider value for main pll clock. Currently the fixed-postdiv
+value used for k2hk/l/e SoCs works by sheer luck as u-boot happens to
+use a value of 2 for this. Now that we have fixed this in the pll
+clock driver change the dt bindings for the same.
 
 Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 ---
- .../devicetree/bindings/clock/keystone-pll.txt       |  8 ++++----
- drivers/clk/keystone/pll.c                           | 20 ++++++++++++++++++--
- 2 files changed, 22 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/k2e-clocks.dtsi  | 5 ++---
+ arch/arm/boot/dts/k2hk-clocks.dtsi | 5 ++---
+ arch/arm/boot/dts/k2l-clocks.dtsi  | 5 ++---
+ 3 files changed, 6 insertions(+), 9 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/keystone-pll.txt b/Documentation/devicetree/bindings/clock/keystone-pll.txt
-index 225990f..47570d2 100644
---- a/Documentation/devicetree/bindings/clock/keystone-pll.txt
-+++ b/Documentation/devicetree/bindings/clock/keystone-pll.txt
-@@ -15,8 +15,8 @@ Required properties:
- - compatible : shall be "ti,keystone,main-pll-clock" or "ti,keystone,pll-clock"
- - clocks : parent clock phandle
- - reg - pll control0 and pll multipler registers
--- reg-names : control and multiplier. The multiplier is applicable only for
--		main pll clock
-+- reg-names : control, multiplier and post-divider. The multiplier and
-+		post-divider registers are applicable only for main pll clock
- - fixed-postdiv : fixed post divider value. If absent, use clkod register bits
- 		for postdiv
- 
-@@ -25,8 +25,8 @@ Example:
+diff --git a/arch/arm/boot/dts/k2e-clocks.dtsi b/arch/arm/boot/dts/k2e-clocks.dtsi
+index 4773d6a..d56d68f 100644
+--- a/arch/arm/boot/dts/k2e-clocks.dtsi
++++ b/arch/arm/boot/dts/k2e-clocks.dtsi
+@@ -13,9 +13,8 @@ clocks {
  		#clock-cells = <0>;
  		compatible = "ti,keystone,main-pll-clock";
  		clocks = <&refclksys>;
 -		reg = <0x02620350 4>, <0x02310110 4>;
 -		reg-names = "control", "multiplier";
+-		fixed-postdiv = <2>;
 +		reg = <0x02620350 4>, <0x02310110 4>, <0x02310108 4>;
 +		reg-names = "control", "multiplier", "post-divider";
- 		fixed-postdiv = <2>;
  	};
  
-diff --git a/drivers/clk/keystone/pll.c b/drivers/clk/keystone/pll.c
-index 0dd8a4b..4a375ea 100644
---- a/drivers/clk/keystone/pll.c
-+++ b/drivers/clk/keystone/pll.c
-@@ -37,7 +37,8 @@
-  *	Main PLL or any other PLLs in the device such as ARM PLL, DDR PLL
-  *	or PA PLL available on keystone2. These PLLs are controlled by
-  *	this register. Main PLL is controlled by a PLL controller.
-- * @pllm: PLL register map address
-+ * @pllm: PLL register map address for multiplier bits
-+ * @pllod: PLL register map address for post divider bits
-  * @pll_ctl0: PLL controller map address
-  * @pllm_lower_mask: multiplier lower mask
-  * @pllm_upper_mask: multiplier upper mask
-@@ -53,6 +54,7 @@ struct clk_pll_data {
- 	u32 phy_pllm;
- 	u32 phy_pll_ctl0;
- 	void __iomem *pllm;
-+	void __iomem *pllod;
- 	void __iomem *pll_ctl0;
- 	u32 pllm_lower_mask;
- 	u32 pllm_upper_mask;
-@@ -102,7 +104,11 @@ static unsigned long clk_pllclk_recalc(struct clk_hw *hw,
- 		/* read post divider from od bits*/
- 		postdiv = ((val & pll_data->clkod_mask) >>
- 				 pll_data->clkod_shift) + 1;
--	else
-+	else if (pll_data->pllod) {
-+		postdiv = readl(pll_data->pllod);
-+		postdiv = ((postdiv & pll_data->clkod_mask) >>
-+				pll_data->clkod_shift) + 1;
-+	} else
- 		postdiv = pll_data->postdiv;
+ 	papllclk: papllclk at 2620358 {
+diff --git a/arch/arm/boot/dts/k2hk-clocks.dtsi b/arch/arm/boot/dts/k2hk-clocks.dtsi
+index d5adee3..af9b719 100644
+--- a/arch/arm/boot/dts/k2hk-clocks.dtsi
++++ b/arch/arm/boot/dts/k2hk-clocks.dtsi
+@@ -22,9 +22,8 @@ clocks {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,main-pll-clock";
+ 		clocks = <&refclksys>;
+-		reg = <0x02620350 4>, <0x02310110 4>;
+-		reg-names = "control", "multiplier";
+-		fixed-postdiv = <2>;
++		reg = <0x02620350 4>, <0x02310110 4>, <0x02310108 4>;
++		reg-names = "control", "multiplier", "post-divider";
+ 	};
  
- 	rate /= (prediv + 1);
-@@ -172,12 +178,21 @@ static void __init _of_pll_clk_init(struct device_node *node, bool pllctrl)
- 		/* assume the PLL has output divider register bits */
- 		pll_data->clkod_mask = CLKOD_MASK;
- 		pll_data->clkod_shift = CLKOD_SHIFT;
-+
-+		/*
-+		 * Check if there is an post-divider register. If not
-+		 * assume od bits are part of control register.
-+		 */
-+		i = of_property_match_string(node, "reg-names",
-+					     "post-divider");
-+		pll_data->pllod = of_iomap(node, i);
- 	}
+ 	papllclk: papllclk at 2620358 {
+diff --git a/arch/arm/boot/dts/k2l-clocks.dtsi b/arch/arm/boot/dts/k2l-clocks.dtsi
+index eb1e3e2..ef8464b 100644
+--- a/arch/arm/boot/dts/k2l-clocks.dtsi
++++ b/arch/arm/boot/dts/k2l-clocks.dtsi
+@@ -22,9 +22,8 @@ clocks {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,keystone,main-pll-clock";
+ 		clocks = <&refclksys>;
+-		reg = <0x02620350 4>, <0x02310110 4>;
+-		reg-names = "control", "multiplier";
+-		fixed-postdiv = <2>;
++		reg = <0x02620350 4>, <0x02310110 4>, <0x02310108 4>;
++		reg-names = "control", "multiplier", "post-divider";
+ 	};
  
- 	i = of_property_match_string(node, "reg-names", "control");
- 	pll_data->pll_ctl0 = of_iomap(node, i);
- 	if (!pll_data->pll_ctl0) {
- 		pr_err("%s: ioremap failed\n", __func__);
-+		iounmap(pll_data->pllod);
- 		goto out;
- 	}
- 
-@@ -193,6 +208,7 @@ static void __init _of_pll_clk_init(struct device_node *node, bool pllctrl)
- 		pll_data->pllm = of_iomap(node, i);
- 		if (!pll_data->pllm) {
- 			iounmap(pll_data->pll_ctl0);
-+			iounmap(pll_data->pllod);
- 			goto out;
- 		}
- 	}
+ 	papllclk: papllclk at 2620358 {
 -- 
 1.9.1
