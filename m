@@ -1,36 +1,133 @@
-From: lho@apm.com (Loc Ho)
-Date: Fri, 29 May 2015 11:06:35 -0700
-Subject: [PATCH v11 0/4] edac: Add APM X-Gene SoC EDAC driver
-In-Reply-To: <20150529094654.GD31435@pd.tnic>
-References: <1432337580-3750-1-git-send-email-lho@apm.com>
- <20150529094654.GD31435@pd.tnic>
-Message-ID: <CAPw-ZTnLqx0KsQkmv++zQRQ7hroaKML1rWgVafisENam0J17Mg@mail.gmail.com>
+From: tanzilli@acmesystems.it (Sergio Tanzilli)
+Date: Fri, 29 May 2015 20:11:24 +0200
+Subject: [PATCH 16/16] ARM: at91/dt: Add Acme Arietta G25
+In-Reply-To: <1432921649-21943-17-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1432921649-21943-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1432921649-21943-17-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <CAG+hDbtx2tXsJDMkt=mRnzCmOeEFJyOkVsEFMW8to8xonvrHoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Great Alex
 
-On Fri, May 29, 2015 at 2:46 AM, Borislav Petkov <bp@alien8.de> wrote:
-> On Fri, May 22, 2015 at 05:32:55PM -0600, Loc Ho wrote:
->> This patch adds support for the APM X-Gene SoC EDAC driver for DT.
+thanks
+
+Sergio
+
+On 29 May 2015 at 19:47, Alexandre Belloni
+<alexandre.belloni@free-electrons.com> wrote:
+> Add a minimum Device Tree for Acme Arietta G25.
+> http://acme.systems/arietta
 >
-> Applied, thanks!
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Cc: Sergio Tanzilli <tanzilli@acmesystems.it>
+> ---
+>  arch/arm/boot/dts/Makefile              |  1 +
+>  arch/arm/boot/dts/at91-acme-arietta.dts | 75 +++++++++++++++++++++++++++++++++
+>  2 files changed, 76 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/at91-acme-arietta.dts
 >
-> Phew, that was a looong process. But the final result looks nice. So
-> thanks for the perseverance.
->
-> All is here, if you want to do testing and other fun before the merge
-> window opens:
->
-> git://git.kernel.org/pub/scm/linux/kernel/git/bp/bp.git#for-next
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 8c3da289a00b..96a169e6ea56 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -31,6 +31,7 @@ dtb-$(CONFIG_SOC_SAM_V4_V5) += \
+>         at91sam9n12ek.dtb \
+>         at91sam9rlek.dtb \
+>         at91-ariag25.dtb \
+> +       at91-acme-arietta.dtb \
+>         at91-cosino_mega2560.dtb \
+>         at91-kizboxmini.dtb \
+>         at91sam9g15ek.dtb \
+> diff --git a/arch/arm/boot/dts/at91-acme-arietta.dts b/arch/arm/boot/dts/at91-acme-arietta.dts
+> new file mode 100644
+> index 000000000000..142d588ad6bf
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/at91-acme-arietta.dts
+> @@ -0,0 +1,75 @@
+> +/*
+> + * Device Tree file for Arietta G25
+> + * This device tree is minimal, to activate more peripherals, see:
+> + * http://dts.acmesystems.it/arietta/
+> + */
+> +/dts-v1/;
+> +#include "at91sam9g25.dtsi"
+> +/ {
+> +       model = "Acme Systems Arietta G25";
+> +       compatible = "acme,ariettag25", "atmel,at91sam9x5", "atmel,at91sam9";
+> +
+> +       chosen {
+> +               stdout-path = "serial0:115200n8";
+> +       };
+> +
+> +       memory {
+> +               reg = <0x20000000 0x8000000>;
+> +       };
+> +
+> +       clocks {
+> +               slow_xtal {
+> +                       clock-frequency = <32768>;
+> +               };
+> +
+> +               main_xtal {
+> +                       clock-frequency = <12000000>;
+> +               };
+> +       };
+> +
+> +       ahb {
+> +               apb {
+> +                       mmc0: mmc at f0008000 {
+> +                               pinctrl-0 = <
+> +                                 &pinctrl_mmc0_slot0_clk_cmd_dat0
+> +                                 &pinctrl_mmc0_slot0_dat1_3>;
+> +                               status = "okay";
+> +
+> +                               slot at 0 {
+> +                                       reg = <0>;
+> +                                       bus-width = <4>;
+> +                               };
+> +                       };
+> +
+> +                       usb2: gadget at f803c000 {
+> +                               status = "okay";
+> +                       };
+> +
+> +                       dbgu: serial at fffff200 {
+> +                               status = "okay";
+> +                       };
+> +
+> +                       rtc at fffffeb0 {
+> +                               status = "okay";
+> +                       };
+> +               };
+> +
+> +               usb0: ohci at 00600000 {
+> +                       status = "okay";
+> +                       num-ports = <3>;
+> +               };
+> +
+> +               usb1: ehci at 00700000 {
+> +                       status = "okay";
+> +               };
+> +       };
+> +
+> +       leds {
+> +               compatible = "gpio-leds";
+> +               arietta_led {
+> +                       label = "arietta_led";
+> +                       gpios = <&pioB 8 GPIO_ACTIVE_HIGH>; /* PB8 */
+> +                       linux,default-trigger = "heartbeat";
+> +               };
+> +       };
+> +};
+> --
+> 2.1.4
 >
 
-I pull this and got this error:
 
-/projects/svdc/P4sbSW/lho/xgene2/processor/git.lho/edac-next/drivers/edac/edac_stub.c:19:22:
-fatal error: asm/edac.h: No such file or directory
- #include <asm/edac.h>
-                      ^
-compilation terminated.
 
--Loc
+-- 
+Sergio Tanzilli
+tanzilli at acmesystems.it
+Acme Systems srl
+http://www.acmesystems.it
