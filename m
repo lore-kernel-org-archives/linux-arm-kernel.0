@@ -1,76 +1,110 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Thu, 28 May 2015 22:15:16 -0500
-Subject: [PATCHv5 1/2] ARM: socfpga: support suspend to ram
-In-Reply-To: <1432847977-18880-2-git-send-email-atull@opensource.altera.com>
-References: <1432847977-18880-1-git-send-email-atull@opensource.altera.com>
- <1432847977-18880-2-git-send-email-atull@opensource.altera.com>
-Message-ID: <5567D9C4.7090903@opensource.altera.com>
+From: noralf@tronnes.org (=?UTF-8?B?Tm9yYWxmIFRyw7hubmVz?=)
+Date: Fri, 29 May 2015 05:18:05 +0200
+Subject: [PATCH v5 2/3] ARM: bcm2835: Add the Raspberry Pi firmware driver
+In-Reply-To: <1432858055-8750-2-git-send-email-eric@anholt.net>
+References: <1432858055-8750-1-git-send-email-eric@anholt.net>
+ <1432858055-8750-2-git-send-email-eric@anholt.net>
+Message-ID: <5567DA6D.8080207@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+Den 29.05.2015 02:07, skrev Eric Anholt:
+> This gives us a function for making mailbox property channel requests
+> of the firmware, which is most notable in that it will let us get and
+> set clock rates.
+...
+> +/**
+> + * rpi_firmware_property_list - Submit firmware property list
+> + * @of_node:	Pointer to the firmware Device Tree node.
 
-On 5/28/15 4:19 PM, Alan Tull wrote:
-> Add code that requests that the sdr controller go into
-> self-refresh mode.  This code is run from ocram.
-> 
-> Suspend-to-RAM and EDAC support are mutually exclusive on
-> SOCFPGA.  If the EDAC is enabled, it will prevent the
-> platform from going into suspend.
-> 
-> Example of how to request to suspend to ram:
->  $ echo enabled > \
-> /sys/devices/soc/ffc02000.serial0/tty/ttyS0/power/wakeup
-> 
->  $ echo -n mem > /sys/power/state
-> 
-> Signed-off-by: Alan Tull <atull@opensource.altera.com>
-> Cc: Pavel Machek <pavel@denx.de>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
-> Cc: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> ---
-> v2: use Generic on-chip SRAM driver to allocate ocram
->     rm fncpy_align since generic allocator handles alignment
->     check __arm_ioremap_exec return code
->     check for NULL pointers
->     add a comment regarding sdram controller configuration
-> v3: fix renamed #define
->     propagate socfpga_setup_ocram_self_refresh error code
-> v4: Kconfig: don't need to select GENERIC_ALLOCATER
->     add CONFIG_SOCFPGA_SUSPEND
->     make s2r and EDAC support mutually exclusive
->     socfpga.c: add sdr_ctl_base_addr
->     return error if ocram not available in device tree
->     update copyright years
-> v5: remove compile time dependency
->     edac driver will prevent suspend
->     don't configure scu standby mode; done in enable_scu().
->     fix comments about required sdram controller configuration
-> ---
->  arch/arm/mach-socfpga/Kconfig        |   10 ++-
->  arch/arm/mach-socfpga/Makefile       |    1 +
->  arch/arm/mach-socfpga/core.h         |    6 +-
->  arch/arm/mach-socfpga/pm.c           |  149 ++++++++++++++++++++++++++++++++++
->  arch/arm/mach-socfpga/self-refresh.S |  136 +++++++++++++++++++++++++++++++
->  arch/arm/mach-socfpga/socfpga.c      |    6 +-
->  drivers/edac/altera_edac.c           |   20 +++++
->  7 files changed, 325 insertions(+), 3 deletions(-)
->  create mode 100644 arch/arm/mach-socfpga/pm.c
->  create mode 100644 arch/arm/mach-socfpga/self-refresh.S
-> 
+Update kdoc to reflect change:
+  * @fw: Pointer to firmware structure
 
-Which branch are you basing this patch on? I got a trivial patch
-conflict in Kconfig when I applied to arm-soc/for-next and v4.1-rc5.
+> + * @data:	Buffer holding tags.
+> + * @tag_size:	Size of tags buffer.
+> + *
+> + * Submits a set of concatenated tags to the VPU firmware through the
+> + * mailbox property interface.
+> + *
+> + * The buffer header and the ending tag are added by this function and
+> + * don't need to be supplied, just the actual tags for your operation.
+> + * See struct rpi_firmware_property_tag_header for the per-tag
+> + * structure.
+> + */
+> +int rpi_firmware_property_list(struct rpi_firmware *fw,
+> +			       void *data, size_t tag_size)
+> +{
+...
 
-Also, I'm getting these sparse warnings:
+> +/**
+> + * rpi_firmware_property - Submit single firmware property
+> + * @of_node:	Pointer to the firmware Device Tree node.
 
-arch/arm/mach-socfpga/pm.c:86:25: warning: incorrect type in argument 1
-(different address spaces)
-arch/arm/mach-socfpga/pm.c:86:25:    expected void *<noident>
-arch/arm/mach-socfpga/pm.c:86:25:    got void [noderef]
-<asn:2>*[assigned] suspend_ocram_base
-arch/arm/mach-socfpga/pm.c:108:52: warning: cast removes address space
-of expression
+Same:
+  * @fw: Pointer to firmware structure
 
-Dinh
+> + * @tag:	One of enum_mbox_property_tag.
+> + * @tag_data:	Tag data buffer.
+> + * @buf_size:	Buffer size.
+> + *
+> + * Submits a single tag to the VPU firmware through the mailbox
+> + * property interface.
+> + *
+> + * This is a convenience wrapper around
+> + * rpi_firmware_property_list() to avoid some of the
+> + * boilerplate in property calls.
+> + */
+> +int rpi_firmware_property(struct rpi_firmware *fw,
+> +			  u32 tag, void *tag_data, size_t buf_size)
+> +{
+...
+
+> +/*
+> + * Returns the struct rpi_firmware if the firmware device is probed
+> + * and available, otherwise NULL.
+> + */
+
+kdoc:
+/**
+  * rpi_firmware_get - Get pointer to rpi_firmware structure.
+  * @of_node:    Pointer to the firmware Device Tree node.
+  *
+  * Returns NULL is the firmware device is not ready.
+  */
+
+> +struct rpi_firmware *rpi_firmware_get(struct device_node *firmware_node)
+> +{
+> +	struct platform_device *pdev = of_find_device_by_node(firmware_node);
+> +
+> +	if (!pdev)
+> +		return NULL;
+> +
+> +	if (!pdev->dev.driver)
+> +		return NULL;
+> +
+> +	if (!try_module_get(pdev->dev.driver->owner))
+> +		return NULL;
+> +
+
+Sigh, I think I was wrong about suggesting try_module_get here. A module 
+can't be
+unloaded if another loaded module depends on one it's exported symbols.
+So this firmware module can't be unloaded if a client module is loaded.
+So it shouldn't be necessary.
+
+> +	return platform_get_drvdata(pdev);
+> +}
+> +EXPORT_SYMBOL_GPL(rpi_firmware_get);
+> +
+> +void rpi_firmware_put(struct rpi_firmware *fw)
+> +{
+> +	struct device *dev = fw->cl.dev;
+> +
+> +	module_put(dev->driver->owner);
+> +}
+> +EXPORT_SYMBOL_GPL(rpi_firmware_put);
+
+So rpi_firmware_put() won't be needed then, sorry.
+
+However the API feels much better now with this change.
