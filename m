@@ -1,51 +1,25 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 29 May 2015 22:05:20 +0200
-Subject: [PATCH] EDAC, edac_stub: Drop arch-specific include
-In-Reply-To: <20150529185926.GP31435@pd.tnic>
-References: <1432337580-3750-1-git-send-email-lho@apm.com>
- <20150529094654.GD31435@pd.tnic>
- <CAPw-ZTnLqx0KsQkmv++zQRQ7hroaKML1rWgVafisENam0J17Mg@mail.gmail.com>
- <20150529185926.GP31435@pd.tnic>
-Message-ID: <20150529200520.GT31435@pd.tnic>
+From: jistone@redhat.com (Josh Stone)
+Date: Fri, 29 May 2015 13:13:18 -0700
+Subject: arm syscall fast path can miss a ptrace syscall-exit
+In-Reply-To: <20150528103710.GZ2067@n2100.arm.linux.org.uk>
+References: <5554F3E4.8020307@redhat.com>
+ <20150514193553.GD2067@n2100.arm.linux.org.uk> <55550EBA.3050708@redhat.com>
+ <5564F5E0.7080108@redhat.com> <20150528103710.GZ2067@n2100.arm.linux.org.uk>
+Message-ID: <5568C85E.8050509@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 29, 2015 at 08:59:26PM +0200, Borislav Petkov wrote:
-> Does it build when you remove it?
+On 05/28/2015 03:37 AM, Russell King - ARM Linux wrote:
+> On Tue, May 26, 2015 at 03:38:24PM -0700, Josh Stone wrote:
+>> Hi Russell,
+>>
+>> Do you plan to commit this check for syscall flags?
+> 
+> It's been committed since 15th May, but as it's the only fix I have
+> queued up (and my focus has been elsewhere) it hasn't been sent yet.
+> It's been in linux-next for a while now.
 
-IOW, this should fix it:
+Ok, thanks, I see it there.
 
----
-From: Borislav Petkov <bp@suse.de>
-Date: Fri, 29 May 2015 22:01:00 +0200
-Subject: [PATCH] EDAC, edac_stub: Drop arch-specific include
-
-<asm/edac.h> contains only the arch-specific scrubbing function and is
-thus not needed in edac_stub.c. Kill it.
-
-Signed-off-by: Borislav Petkov <bp@suse.de>
----
- drivers/edac/edac_stub.c | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/drivers/edac/edac_stub.c b/drivers/edac/edac_stub.c
-index 9d9e18aefaaa..ff07aae5b7fb 100644
---- a/drivers/edac/edac_stub.c
-+++ b/drivers/edac/edac_stub.c
-@@ -16,7 +16,6 @@
- #include <linux/edac.h>
- #include <linux/atomic.h>
- #include <linux/device.h>
--#include <asm/edac.h>
- 
- int edac_op_state = EDAC_OPSTATE_INVAL;
- EXPORT_SYMBOL_GPL(edac_op_state);
--- 
-2.3.5
-
--- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
---
+How about the same fix for arm64?  I see you don't work much on that, so
+should I post that patch myself?
