@@ -1,403 +1,350 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 29 May 2015 07:57:18 +0200
-Subject: [PATCHv3 2/2] mailbox: Adding driver for Xilinx LogiCORE IP
- mailbox.
-In-Reply-To: <1432849928-25457-3-git-send-email-moritz.fischer@ettus.com>
-References: <1432849928-25457-1-git-send-email-moritz.fischer@ettus.com>
- <1432849928-25457-3-git-send-email-moritz.fischer@ettus.com>
-Message-ID: <5567FFBE.5080205@xilinx.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 29 May 2015 15:04:31 +0900
+Subject: [PATCH v7] serial: 8250_uniphier: add UniPhier serial driver
+Message-ID: <1432879471-31074-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/28/2015 11:52 PM, Moritz Fischer wrote:
-> The Xilinx LogiCORE IP mailbox is a FPGA core that allows for
-> interprocessor communication via AXI4 memory mapped / AXI4 stream
-> interfaces.
-> 
-> It is single channel per core and allows for transmit and receive.
-> 
-> Changes from v2:
-> - Fixed error handling for IRQ from >= 0 to > 0
-> - Fixed error handling for clock enabling
-> - Addressed Michal's stylistic comments
-> 
-> Changes from v1:
-> - Added common clock framework support
-> - Deal with IRQs that happend before driver load,
->   since HW will not let us know about them when we enable IRQs
-> 
-> Changes from v0:
-> - Several stylistic issues
-> - Dropped superfluous intr_mode member
-> - Really masking the IRQs on mailbox_shutdown
-> - No longer using polling by accident in non-IRQ mode
-> - Swapped doc and driver commits
-> 
-> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
-> ---
->  MAINTAINERS                      |   7 +
->  drivers/mailbox/Kconfig          |   8 +
->  drivers/mailbox/Makefile         |   2 +
->  drivers/mailbox/mailbox-xilinx.c | 353 ++++++++++++++++++++++++++++++++++
->  4 files changed, 370 insertions(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index f8e0afb..f1f0d10 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -10986,6 +10986,13 @@ M:	John Linn <John.Linn@xilinx.com>
->  S:	Maintained
->  F:	drivers/net/ethernet/xilinx/xilinx_axienet*
->  
-> +XILINX MAILBOX DRIVER
-> +M:	Moritz Fischer <moritz.fischer@ettus.com>
-> +L:	linux-kernel at vger.kernel.org
-> +S:	Maintained
-> +F:	drivers/mailbox/mailbox-xilinx.c
-> +F:	Documentation/devicetree/bindings/mailbox/xilinx-mailbox.txt
-> +
->  XILINX UARTLITE SERIAL DRIVER
->  M:	Peter Korsgaard <jacmet@sunsite.dk>
->  L:	linux-serial at vger.kernel.org
-> diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
-> index 84b0a2d..e11e4b2 100644
-> --- a/drivers/mailbox/Kconfig
-> +++ b/drivers/mailbox/Kconfig
-> @@ -60,4 +60,12 @@ config ALTERA_MBOX
->  	  An implementation of the Altera Mailbox soft core. It is used
->  	  to send message between processors. Say Y here if you want to use the
->  	  Altera mailbox support.
-> +
-> +config XILINX_MBOX
-> +	tristate "Xilinx Mailbox"
-> +	help
-> +	  An implementation of the Xilinx Mailbox soft core. It is used
-> +	  to send message between processors. Say Y here if you want to use the
-> +	  Xilinx mailbox support.
-> +
->  endif
-> diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
-> index b18201e..d28a028 100644
-> --- a/drivers/mailbox/Makefile
-> +++ b/drivers/mailbox/Makefile
-> @@ -11,3 +11,5 @@ obj-$(CONFIG_OMAP2PLUS_MBOX)	+= omap-mailbox.o
->  obj-$(CONFIG_PCC)		+= pcc.o
->  
->  obj-$(CONFIG_ALTERA_MBOX)	+= mailbox-altera.o
-> +
-> +obj-$(CONFIG_XILINX_MBOX)	+= mailbox-xilinx.o
-> diff --git a/drivers/mailbox/mailbox-xilinx.c b/drivers/mailbox/mailbox-xilinx.c
-> new file mode 100644
-> index 0000000..680d2f9
-> --- /dev/null
-> +++ b/drivers/mailbox/mailbox-xilinx.c
-> @@ -0,0 +1,353 @@
-> +/*
-> + * Copyright (c) 2015, National Instruments Corp. All rights reserved.
-> + *
-> + * Driver for the Xilinx LogiCORE mailbox IP block
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; version 2 of the License.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/device.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/mailbox_controller.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +
-> +#define DRIVER_NAME "xilinx-mailbox"
-> +
-> +/* register offsets */
-> +#define MAILBOX_REG_WRDATA	0x00
-> +#define MAILBOX_REG_RDDATA	0x08
-> +#define MAILBOX_REG_STATUS	0x10
-> +#define MAILBOX_REG_ERROR	0x14
-> +#define MAILBOX_REG_SIT	0x18
-> +#define MAILBOX_REG_RIT	0x1c
-> +#define MAILBOX_REG_IS	0x20
-> +#define MAILBOX_REG_IE	0x24
-> +#define MAILBOX_REG_IP	0x28
-> +
-> +/* status register */
-> +#define STS_RTA	BIT(3)
-> +#define STS_STA	BIT(2)
-> +#define STS_FULL	BIT(1)
-> +#define STS_EMPTY	BIT(0)
-> +
-> +/* error register */
-> +#define ERR_FULL	BIT(1)
-> +#define ERR_EMPTY	BIT(0)
-> +
-> +/* mailbox interrupt status register */
-> +#define INT_STATUS_ERR	BIT(2)
-> +#define INT_STATUS_RTI	BIT(1)
-> +#define INT_STATUS_STI	BIT(0)
-> +
-> +/* mailbox interrupt enable register */
-> +#define INT_ENABLE_ERR	BIT(2)
-> +#define INT_ENABLE_RTI	BIT(1)
-> +#define INT_ENABLE_STI	BIT(0)
-> +
-> +#define MBOX_POLLING_MS		5	/* polling interval 5ms */
-> +
-> +struct xilinx_mbox {
-> +	int irq;
-> +	void __iomem *mbox_base;
-> +	struct clk *clk;
-> +	struct device *dev;
-> +	struct mbox_controller controller;
-> +
-> +	/* if the controller supports only RX polling mode */
-> +	struct timer_list rxpoll_timer;
-> +};
-> +
-> +static struct xilinx_mbox *mbox_chan_to_xilinx_mbox(struct mbox_chan *chan)
-> +{
-> +	if (!chan || !chan->con_priv)
-> +		return NULL;
-> +
-> +	return (struct xilinx_mbox *)chan->con_priv;
-> +}
-> +
-> +static inline bool xilinx_mbox_full(struct xilinx_mbox *mbox)
-> +{
-> +	u32 status;
-> +
-> +	status = readl_relaxed(mbox->mbox_base + MAILBOX_REG_STATUS);
-> +
-> +	return status & STS_FULL;
-> +}
-> +
-> +static inline bool xilinx_mbox_pending(struct xilinx_mbox *mbox)
-> +{
-> +	u32 status;
-> +
-> +	status = readl_relaxed(mbox->mbox_base + MAILBOX_REG_STATUS);
-> +
-> +	return !(status & STS_EMPTY);
-> +}
-> +
-> +static void xilinx_mbox_intmask(struct xilinx_mbox *mbox, u32 mask, bool enable)
-> +{
-> +	u32 mask_reg;
-> +
-> +	mask_reg = readl_relaxed(mbox->mbox_base + MAILBOX_REG_IE);
-> +	if (enable)
-> +		mask_reg |= mask;
-> +	else
-> +		mask_reg &= ~mask;
-> +
-> +	writel_relaxed(mask_reg, mbox->mbox_base + MAILBOX_REG_IE);
-> +}
-> +
-> +
-> +static inline void xilinx_mbox_rx_intmask(struct xilinx_mbox *mbox, bool enable)
-> +{
-> +	xilinx_mbox_intmask(mbox, INT_ENABLE_RTI, enable);
-> +}
-> +
-> +static inline void xilinx_mbox_tx_intmask(struct xilinx_mbox *mbox, bool enable)
-> +{
-> +	xilinx_mbox_intmask(mbox, INT_ENABLE_STI, enable);
-> +}
-> +
-> +static void xilinx_mbox_rx_data(struct mbox_chan *chan)
-> +{
-> +	struct xilinx_mbox *mbox = mbox_chan_to_xilinx_mbox(chan);
-> +	u32 data;
-> +
-> +	if (xilinx_mbox_pending(mbox)) {
-> +		data = readl_relaxed(mbox->mbox_base + MAILBOX_REG_RDDATA);
-> +		mbox_chan_received_data(chan, (void *)data);
-> +	}
-> +}
-> +
-> +static void xilinx_mbox_poll_rx(unsigned long data)
-> +{
-> +	struct mbox_chan *chan = (struct mbox_chan *)data;
-> +	struct xilinx_mbox *mbox = mbox_chan_to_xilinx_mbox(chan);
-> +
-> +	xilinx_mbox_rx_data(chan);
-> +
-> +	mod_timer(&mbox->rxpoll_timer,
-> +		  jiffies + msecs_to_jiffies(MBOX_POLLING_MS));
-> +}
-> +
-> +static irqreturn_t xilinx_mbox_interrupt(int irq, void *p)
-> +{
-> +	u32 mask;
-> +	struct mbox_chan *chan = (struct mbox_chan *)p;
-> +	struct xilinx_mbox *mbox = mbox_chan_to_xilinx_mbox(chan);
-> +
-> +	mask = readl_relaxed(mbox->mbox_base + MAILBOX_REG_IS);
-> +	if (mask & INT_STATUS_RTI)
-> +		xilinx_mbox_rx_data(chan);
-> +
-> +	/* mask irqs *before* notifying done, require tx_block=true */
-> +	if (mask & INT_STATUS_STI) {
-> +		xilinx_mbox_tx_intmask(mbox, false);
-> +		mbox_chan_txdone(chan, 0);
-> +	}
-> +
-> +	writel_relaxed(mask, mbox->mbox_base + MAILBOX_REG_IS);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static int xilinx_mbox_startup(struct mbox_chan *chan)
-> +{
-> +	int ret;
-> +	struct xilinx_mbox *mbox = mbox_chan_to_xilinx_mbox(chan);
-> +
-> +	if (mbox->irq > 0) {
-> +		ret = request_irq(mbox->irq, xilinx_mbox_interrupt, 0,
-> +				  dev_name(mbox->dev), chan);
-> +		if (unlikely(ret)) {
-> +			dev_err(mbox->dev,
-> +				"failed to register mailbox interrupt:%d\n",
-> +				ret);
-> +			return ret;
-> +		}
-> +
-> +		xilinx_mbox_rx_intmask(mbox, true);
-> +
-> +		/* if fifo was full already, we didn't get an interrupt */
-> +		while (xilinx_mbox_pending(mbox))
-> +			xilinx_mbox_rx_data(chan);
-> +
-> +		return 0;
-> +	}
-> +
-> +	/* setup polling timer */
-> +	setup_timer(&mbox->rxpoll_timer, xilinx_mbox_poll_rx,
-> +		    (unsigned long)chan);
-> +	mod_timer(&mbox->rxpoll_timer,
-> +		  jiffies + msecs_to_jiffies(MBOX_POLLING_MS));
-> +
-> +	return 0;
-> +}
-> +
-> +static int xilinx_mbox_send_data(struct mbox_chan *chan, void *data)
-> +{
-> +	struct xilinx_mbox *mbox = mbox_chan_to_xilinx_mbox(chan);
-> +	u32 *udata = (u32 *)data;
-> +
-> +	if (!mbox || !data)
-> +		return -EINVAL;
-> +
-> +	if (xilinx_mbox_full(mbox))
-> +		return -EBUSY;
-> +
-> +	/* enable interrupt before send */
-> +	if (mbox->irq >= 0)
-> +		xilinx_mbox_tx_intmask(mbox, true);
-> +
-> +	writel_relaxed(*udata, mbox->mbox_base + MAILBOX_REG_WRDATA);
-> +
-> +	return 0;
-> +}
-> +
-> +static bool xilinx_mbox_last_tx_done(struct mbox_chan *chan)
-> +{
-> +	struct xilinx_mbox *mbox = mbox_chan_to_xilinx_mbox(chan);
-> +
-> +	/* return false if mailbox is full */
-> +	return !xilinx_mbox_full(mbox);
-> +}
-> +
-> +static bool xilinx_mbox_peek_data(struct mbox_chan *chan)
-> +{
-> +	struct xilinx_mbox *mbox = mbox_chan_to_xilinx_mbox(chan);
-> +
-> +	return xilinx_mbox_pending(mbox);
-> +}
-> +
-> +static void xilinx_mbox_shutdown(struct mbox_chan *chan)
-> +{
-> +	struct xilinx_mbox *mbox = mbox_chan_to_xilinx_mbox(chan);
-> +
-> +	if (mbox->irq > 0) {
-> +		/* mask all interrupts */
-> +		writel_relaxed(0, mbox->mbox_base + MAILBOX_REG_IE);
-> +		free_irq(mbox->irq, chan);
-> +	} else {
-> +		del_timer_sync(&mbox->rxpoll_timer);
-> +	}
-> +}
-> +
-> +static struct mbox_chan_ops xilinx_mbox_ops = {
-> +	.send_data = xilinx_mbox_send_data,
-> +	.startup = xilinx_mbox_startup,
-> +	.shutdown = xilinx_mbox_shutdown,
-> +	.last_tx_done = xilinx_mbox_last_tx_done,
-> +	.peek_data = xilinx_mbox_peek_data,
-> +};
-> +
-> +static int xilinx_mbox_probe(struct platform_device *pdev)
-> +{
-> +	struct xilinx_mbox *mbox;
-> +	struct resource	*regs;
-> +	struct mbox_chan *chans;
-> +	int ret;
-> +
-> +	mbox = devm_kzalloc(&pdev->dev, sizeof(*mbox), GFP_KERNEL);
-> +	if (!mbox)
-> +		return -ENOMEM;
-> +
-> +	/* get clk and enable */
-> +	mbox->clk = devm_clk_get(&pdev->dev, "mbox");
-> +	if (IS_ERR(mbox->clk)) {
-> +		dev_err(&pdev->dev, "Couldn't get clk.\n");
-> +		return PTR_ERR(mbox->clk);
-> +	}
-> +
-> +	/* allocated one channel */
-> +	chans = devm_kzalloc(&pdev->dev, sizeof(*chans), GFP_KERNEL);
-> +	if (!chans)
-> +		return -ENOMEM;
-> +
-> +	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +
-> +	mbox->mbox_base = devm_ioremap_resource(&pdev->dev, regs);
-> +	if (IS_ERR(mbox->mbox_base))
-> +		return PTR_ERR(mbox->mbox_base);
-> +
-> +	mbox->irq = platform_get_irq(pdev, 0);
-> +	/* if irq is present, we can use it, otherwise, poll */
-> +	if (mbox->irq > 0) {
-> +		mbox->controller.txdone_irq = true;
-> +	} else {
-> +		dev_info(&pdev->dev, "IRQ not found, fallback to polling.\n");
-> +		mbox->controller.txdone_poll = true;
-> +		mbox->controller.txpoll_period = MBOX_POLLING_MS;
-> +	}
-> +
-> +	mbox->dev = &pdev->dev;
-> +
-> +	/* hardware supports only one channel. */
-> +	chans[0].con_priv = mbox;
-> +	mbox->controller.dev = mbox->dev;
-> +	mbox->controller.num_chans = 1;
-> +	mbox->controller.chans = chans;
-> +	mbox->controller.ops = &xilinx_mbox_ops;
-> +
-> +
+Add the driver for on-chip UART used on UniPhier SoCs.
 
-only one empty line here but otherwise
+This hardware is similar to 8250, but the register mapping is
+slightly different:
+  - The offset to FCR, MCR is different.
+  - The divisor latch access bit does not exist.  Instead, the
+    divisor latch register is available at offset 9.
 
-Acked-by: Michal Simek <michal.simek@xilinx.com>
+This driver overrides serial_{in,out}, dl_{read,write} callbacks,
+but wants to borrow most of code from 8250_core.c.
 
-Thanks,
-Michal
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+---
+
+Changes in v7:
+  - Change the type of "valshift" from "int" to "unsigned int"
+
+Changes in v6:
+  - Drop unnecessary #include <linux/serial_8250.h>
+    (it is covered by #include "8250.h")
+
+Changes in v5:
+  - Set up.port.mapsize
+  - Pass NULL rahter than 0 to the second argument of devm_clk_get()
+
+Changes in v4:
+  - Use spin_lock for read-modify-write register access
+  - Add /* fall through */ comments where I intentionally
+    did not add "break";
+  - Drop unnecessary #include <linux/serial_core.h>
+  - Drop unnecessary #include <linux/serial_reg.h>
+  - Add an empty line between #include <> and ""
+  - Use platform_get_irq() instead of platform_get_resource()
+
+Changes in v3:
+  - Just add *_SHIFT macro for the special case
+
+Changes in v2:
+  - Drop unnecessary #include <linux/init.h>
+  - Sort includes in alphabetical order
+  - Use devm_clk_get() rather than of_clk_get()
+  - Delete unneeded clk_put() from uniphier_uart_remove callback
+  - Delete unneeded IS_ERR_OR_NULL check from uniphier_uart_remove callback
+  - Use UNIPHIER_UART_*_SHIFT instead of hard-coded shift values
+  - Change the first argument type of uniphier_of_serial_setup()
+    from (struct platform_device *) to (struct device *) for code-cleanup.
+
+ drivers/tty/serial/8250/8250_uniphier.c | 257 ++++++++++++++++++++++++++++++++
+ drivers/tty/serial/8250/Kconfig         |   7 +
+ drivers/tty/serial/8250/Makefile        |   1 +
+ 3 files changed, 265 insertions(+)
+ create mode 100644 drivers/tty/serial/8250/8250_uniphier.c
+
+diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
+new file mode 100644
+index 0000000..7d79425
+--- /dev/null
++++ b/drivers/tty/serial/8250/8250_uniphier.c
+@@ -0,0 +1,257 @@
++/*
++ * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/clk.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++
++#include "8250.h"
++
++/* Most (but not all) of UniPhier UART devices have 64-depth FIFO. */
++#define UNIPHIER_UART_DEFAULT_FIFO_SIZE	64
++
++#define UNIPHIER_UART_CHAR_FCR	3	/* Character / FIFO Control Register */
++#define UNIPHIER_UART_LCR_MCR	4	/* Line/Modem Control Register */
++#define   UNIPHIER_UART_LCR_SHIFT	8
++#define UNIPHIER_UART_DLR	9	/* Divisor Latch Register */
++
++struct uniphier8250_priv {
++	int line;
++	struct clk *clk;
++	spinlock_t atomic_write_lock;
++};
++
++/*
++ * The register map is slightly different from that of 8250.
++ * IO callbacks must be overridden for correct access to FCR, LCR, and MCR.
++ */
++static unsigned int uniphier_serial_in(struct uart_port *p, int offset)
++{
++	unsigned int valshift = 0;
++
++	switch (offset) {
++	case UART_LCR:
++		valshift = UNIPHIER_UART_LCR_SHIFT;
++		/* fall through */
++	case UART_MCR:
++		offset = UNIPHIER_UART_LCR_MCR;
++		break;
++	default:
++		break;
++	}
++
++	offset <<= p->regshift;
++
++	/*
++	 * The return value must be masked with 0xff because LCR and MCR reside
++	 * in the same register that must be accessed by 32-bit write/read.
++	 * 8 or 16 bit access to this hardware result in unexpected behavior.
++	 */
++	return (readl(p->membase + offset) >> valshift) & 0xff;
++}
++
++static void uniphier_serial_out(struct uart_port *p, int offset, int value)
++{
++	unsigned int valshift = 0;
++	bool normal = false;
++
++	switch (offset) {
++	case UART_FCR:
++		offset = UNIPHIER_UART_CHAR_FCR;
++		break;
++	case UART_LCR:
++		valshift = UNIPHIER_UART_LCR_SHIFT;
++		/* Divisor latch access bit does not exist. */
++		value &= ~(UART_LCR_DLAB << valshift);
++		/* fall through */
++	case UART_MCR:
++		offset = UNIPHIER_UART_LCR_MCR;
++		break;
++	default:
++		normal = true;
++		break;
++	}
++
++	offset <<= p->regshift;
++
++	if (normal) {
++		writel(value, p->membase + offset);
++	} else {
++		/*
++		 * Special case: two registers share the same address that
++		 * must be 32-bit accessed.  As this is not longer atomic safe,
++		 * take a lock just in case.
++		 */
++		struct uniphier8250_priv *priv = p->private_data;
++		unsigned long flags;
++		u32 tmp;
++
++		spin_lock_irqsave(&priv->atomic_write_lock, flags);
++		tmp = readl(p->membase + offset);
++		tmp &= ~(0xff << valshift);
++		tmp |= value << valshift;
++		writel(tmp, p->membase + offset);
++		spin_unlock_irqrestore(&priv->atomic_write_lock, flags);
++	}
++}
++
++/*
++ * This hardware does not have the divisor latch access bit.
++ * The divisor latch register exists at different address.
++ * Override dl_read/write callbacks.
++ */
++static int uniphier_serial_dl_read(struct uart_8250_port *up)
++{
++	return readl(up->port.membase + UNIPHIER_UART_DLR);
++}
++
++static void uniphier_serial_dl_write(struct uart_8250_port *up, int value)
++{
++	writel(value, up->port.membase + UNIPHIER_UART_DLR);
++}
++
++static int uniphier_of_serial_setup(struct device *dev, struct uart_port *port,
++				    struct uniphier8250_priv *priv)
++{
++	int ret;
++	u32 prop;
++	struct device_node *np = dev->of_node;
++
++	ret = of_alias_get_id(np, "serial");
++	if (ret < 0) {
++		dev_err(dev, "failed to get alias id\n");
++		return ret;
++	}
++	port->line = priv->line = ret;
++
++	/* Get clk rate through clk driver */
++	priv->clk = devm_clk_get(dev, NULL);
++	if (IS_ERR(priv->clk)) {
++		dev_err(dev, "failed to get clock\n");
++		return PTR_ERR(priv->clk);
++	}
++
++	ret = clk_prepare_enable(priv->clk);
++	if (ret < 0)
++		return ret;
++
++	port->uartclk = clk_get_rate(priv->clk);
++
++	/* Check for fifo size */
++	if (of_property_read_u32(np, "fifo-size", &prop) == 0)
++		port->fifosize = prop;
++	else
++		port->fifosize = UNIPHIER_UART_DEFAULT_FIFO_SIZE;
++
++	return 0;
++}
++
++static int uniphier_uart_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct uart_8250_port up;
++	struct uniphier8250_priv *priv;
++	struct resource *regs;
++	void __iomem *membase;
++	int irq;
++	int ret;
++
++	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!regs) {
++		dev_err(dev, "failed to get memory resource");
++		return -EINVAL;
++	}
++
++	membase = devm_ioremap(dev, regs->start, resource_size(regs));
++	if (!membase)
++		return -ENOMEM;
++
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0) {
++		dev_err(dev, "failed to get IRQ number");
++		return irq;
++	}
++
++	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	memset(&up, 0, sizeof(up));
++
++	ret = uniphier_of_serial_setup(dev, &up.port, priv);
++	if (ret < 0)
++		return ret;
++
++	spin_lock_init(&priv->atomic_write_lock);
++
++	up.port.dev = dev;
++	up.port.private_data = priv;
++	up.port.mapbase = regs->start;
++	up.port.mapsize = resource_size(regs);
++	up.port.membase = membase;
++	up.port.irq = irq;
++
++	up.port.type = PORT_16550A;
++	up.port.iotype = UPIO_MEM32;
++	up.port.regshift = 2;
++	up.port.flags = UPF_FIXED_PORT | UPF_FIXED_TYPE;
++	up.capabilities = UART_CAP_FIFO;
++
++	up.port.serial_in = uniphier_serial_in;
++	up.port.serial_out = uniphier_serial_out;
++	up.dl_read = uniphier_serial_dl_read;
++	up.dl_write = uniphier_serial_dl_write;
++
++	ret = serial8250_register_8250_port(&up);
++	if (ret < 0) {
++		dev_err(dev, "failed to register 8250 port\n");
++		return ret;
++	}
++
++	platform_set_drvdata(pdev, priv);
++
++	return 0;
++}
++
++static int uniphier_uart_remove(struct platform_device *pdev)
++{
++	struct uniphier8250_priv *priv = platform_get_drvdata(pdev);
++
++	serial8250_unregister_port(priv->line);
++	clk_disable_unprepare(priv->clk);
++
++	return 0;
++}
++
++static const struct of_device_id uniphier_uart_match[] = {
++	{ .compatible = "socionext,uniphier-uart" },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, uniphier_uart_match);
++
++static struct platform_driver uniphier_uart_platform_driver = {
++	.probe		= uniphier_uart_probe,
++	.remove		= uniphier_uart_remove,
++	.driver = {
++		.name	= "uniphier-uart",
++		.of_match_table = uniphier_uart_match,
++	},
++};
++module_platform_driver(uniphier_uart_platform_driver);
++
++MODULE_AUTHOR("Masahiro Yamada <yamada.masahiro@socionext.com>");
++MODULE_DESCRIPTION("UniPhier UART driver");
++MODULE_LICENSE("GPL");
+diff --git a/drivers/tty/serial/8250/Kconfig b/drivers/tty/serial/8250/Kconfig
+index c350703..3e1ae446 100644
+--- a/drivers/tty/serial/8250/Kconfig
++++ b/drivers/tty/serial/8250/Kconfig
+@@ -342,3 +342,10 @@ config SERIAL_8250_MT6577
+ 	help
+ 	  If you have a Mediatek based board and want to use the
+ 	  serial port, say Y to this option. If unsure, say N.
++
++config SERIAL_8250_UNIPHIER
++	tristate "Support for UniPhier on-chip UART"
++	depends on SERIAL_8250 && ARCH_UNIPHIER
++	help
++	  If you have a UniPhier based board and want to use the on-chip
++	  serial ports, say Y to this option. If unsure, say N.
+diff --git a/drivers/tty/serial/8250/Makefile b/drivers/tty/serial/8250/Makefile
+index 31e7cdc..f7ca8c3 100644
+--- a/drivers/tty/serial/8250/Makefile
++++ b/drivers/tty/serial/8250/Makefile
+@@ -23,3 +23,4 @@ obj-$(CONFIG_SERIAL_8250_EM)		+= 8250_em.o
+ obj-$(CONFIG_SERIAL_8250_OMAP)		+= 8250_omap.o
+ obj-$(CONFIG_SERIAL_8250_FINTEK)	+= 8250_fintek.o
+ obj-$(CONFIG_SERIAL_8250_MT6577)	+= 8250_mtk.o
++obj-$(CONFIG_SERIAL_8250_UNIPHIER)	+= 8250_uniphier.o
+-- 
+1.9.1
