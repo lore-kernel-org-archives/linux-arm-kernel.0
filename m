@@ -1,35 +1,26 @@
-From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Fri, 29 May 2015 09:56:54 +0200
-Subject: [PATCH v2 0/2] ARM: dts: add Okaya LCD panel for Nitrogen and
- Sabrelite
-In-Reply-To: <1432314867-30888-1-git-send-email-gary.bisson@boundarydevices.com>
-References: <1432314867-30888-1-git-send-email-gary.bisson@boundarydevices.com>
-Message-ID: <1432886216-2717-1-git-send-email-gary.bisson@boundarydevices.com>
+From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
+Date: Fri, 29 May 2015 13:35:51 +0530
+Subject: [PATCH 0/3] Add RS-485 support and fix RTS/CTS implementation
+Message-ID: <1432886754-30115-1-git-send-email-bhuvanchandra.dv@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds the Okaya 7" LCD support as a simple panel for both Nitrogen
-and Sabrelite.
+- Add pinmux for UART_0 RTS/CTS pins.
 
-It requires a patch from Philipp that adds panel support to the imx parallel
-display driver.
-https://patchwork.kernel.org/patch/6438311/
+- Since hardware can handle RTS/CTS flow control automatically,
+  remove manual control of RTS/CTS from set/get mctrl.
 
-Also requires the patch that adds the Okaya display support to the simple
-panel driver.
-https://patchwork.kernel.org/patch/6503261/
+- Add RS-485 support for Vybird platform.
 
-A U-Boot script to configure the displays based on detection of the
-touch controller is available for reference here:
-https://github.com/boundarydevices/u-boot-imx6/blob/staging/board/boundary/nitrogen6x/6x_bootscript-mainline.txt
 
-Gary Bisson (2):
-  ARM: dts: imx6qdl-nitrogen6x: add Okaya LCD panel
-  ARM: dts: imx6qdl-sabrelite: add Okaya LCD panel
+Bhuvanchandra DV (3):
+  ARM: dts: colibri-vf: Add pinmux for UART_0 aka UART_A RTS/CTS pins
+  tty: serial: fsl_lpuart: remove RTS/CTS control from set/get_mctrl
+  tty: serial: fsl_lpuart: Add support for RS-485
 
- arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 76 ++++++++++++++++++++++++++++++-
- arch/arm/boot/dts/imx6qdl-sabrelite.dtsi  | 76 ++++++++++++++++++++++++++++++-
- 2 files changed, 150 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/vf-colibri.dtsi |   2 +
+ drivers/tty/serial/fsl_lpuart.c   | 112 +++++++++++++++++++++++---------------
+ 2 files changed, 70 insertions(+), 44 deletions(-)
 
 -- 
-2.1.4
+2.1.0
