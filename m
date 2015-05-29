@@ -1,284 +1,163 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 29 May 2015 10:53:25 +0100
-Subject: [PATCH 09/13] KVM: arm64: handle pending bit for LPIs in ITS emulation
+Date: Fri, 29 May 2015 10:53:21 +0100
+Subject: [PATCH 05/13] KVM: arm64: handle ITS related GICv3 redistributor
+ registers
 In-Reply-To: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
 References: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1432893209-27313-10-git-send-email-andre.przywara@arm.com>
+Message-ID: <1432893209-27313-6-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the actual LPI number in a guest can be quite high, but is mostly
-assigned using a very sparse allocation scheme, bitmaps and arrays
-for storing the virtual interrupt status are a waste of memory.
-We use our equivalent of the "Interrupt Translation Table Entry"
-(ITTE) to hold this extra status information for a virtual LPI.
-As the normal VGIC code cannot use it's fancy bitmaps to manage
-pending interrupts, we provide a hook in the VGIC code to let the
-ITS emulation handle the list register queueing itself.
-LPIs are located in a separate number range (>=8192), so
-distinguishing them is easy. With LPIs being only edge-triggered, we
-get away with a less complex IRQ handling.
+In the GICv3 redistributor there are the PENDBASER and PROPBASER
+registers which we did not emulate so far, as they only make sense
+when having an ITS. In preparation for that emulate those MMIO
+accesses by storing the 64-bit data written into it into a variable
+which we later read in the ITS emulation.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- include/kvm/arm_vgic.h      |  2 ++
- virt/kvm/arm/its-emul.c     | 66 +++++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/its-emul.h     |  3 ++
- virt/kvm/arm/vgic-v3-emul.c |  2 ++
- virt/kvm/arm/vgic.c         | 68 +++++++++++++++++++++++++++++++++------------
- 5 files changed, 124 insertions(+), 17 deletions(-)
+ include/kvm/arm_vgic.h      |  4 ++++
+ virt/kvm/arm/vgic-v3-emul.c | 43 +++++++++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic.c         | 35 +++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic.h         |  4 ++++
+ 4 files changed, 86 insertions(+)
 
 diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index fa17df6..de19c34 100644
+index 37725bb..9ea0b3b 100644
 --- a/include/kvm/arm_vgic.h
 +++ b/include/kvm/arm_vgic.h
-@@ -147,6 +147,8 @@ struct vgic_vm_ops {
- 	int	(*init_model)(struct kvm *);
- 	void	(*destroy_model)(struct kvm *);
- 	int	(*map_resources)(struct kvm *, const struct vgic_params *);
-+	bool	(*queue_lpis)(struct kvm_vcpu *);
-+	void	(*unqueue_lpi)(struct kvm_vcpu *, int irq);
+@@ -256,6 +256,10 @@ struct vgic_dist {
+ 	struct vgic_vm_ops	vm_ops;
+ 	struct vgic_io_device	dist_iodev;
+ 	struct vgic_io_device	*redist_iodevs;
++
++	u64			propbaser;
++	u64			*pendbaser;
++	bool			lpis_enabled;
  };
  
- struct vgic_io_device {
-diff --git a/virt/kvm/arm/its-emul.c b/virt/kvm/arm/its-emul.c
-index f0f4a9c..f75fb9e 100644
---- a/virt/kvm/arm/its-emul.c
-+++ b/virt/kvm/arm/its-emul.c
-@@ -50,8 +50,26 @@ struct its_itte {
- 	struct its_collection *collection;
- 	u32 lpi;
- 	u32 event_id;
-+	bool enabled;
-+	unsigned long *pending;
- };
- 
-+#define for_each_lpi(dev, itte, kvm) \
-+	list_for_each_entry(dev, &(kvm)->arch.vgic.its.device_list, dev_list) \
-+		list_for_each_entry(itte, &(dev)->itt, itte_list)
-+
-+static struct its_itte *find_itte_by_lpi(struct kvm *kvm, int lpi)
-+{
-+	struct its_device *device;
-+	struct its_itte *itte;
-+
-+	for_each_lpi(device, itte, kvm) {
-+		if (itte->lpi == lpi)
-+			return itte;
-+	}
-+	return NULL;
-+}
-+
- #define BASER_BASE_ADDRESS(x) ((x) & 0xfffffffff000ULL)
- 
- /* distributor lock is hold by the VGIC MMIO handler */
-@@ -145,6 +163,54 @@ static bool handle_mmio_gits_idregs(struct kvm_vcpu *vcpu,
- 	return false;
- }
- 
-+/*
-+ * Find all enabled and pending LPIs and queue them into the list
-+ * registers.
-+ * The dist lock is held by the caller.
-+ */
-+bool vits_queue_lpis(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_its *its = &vcpu->kvm->arch.vgic.its;
-+	struct its_device *device;
-+	struct its_itte *itte;
-+	bool ret = true;
-+
-+	spin_lock(&its->lock);
-+	for_each_lpi(device, itte, vcpu->kvm) {
-+		if (!itte->enabled || !test_bit(vcpu->vcpu_id, itte->pending))
-+			continue;
-+
-+		if (!itte->collection)
-+			continue;
-+
-+		if (itte->collection->target_addr != vcpu->vcpu_id)
-+			continue;
-+
-+		clear_bit(vcpu->vcpu_id, itte->pending);
-+
-+		ret &= vgic_queue_irq(vcpu, 0, itte->lpi);
-+	}
-+
-+	spin_unlock(&its->lock);
-+	return ret;
-+}
-+
-+/* is called with the distributor lock held by the caller */
-+void vits_unqueue_lpi(struct kvm_vcpu *vcpu, int lpi)
-+{
-+	struct vgic_its *its = &vcpu->kvm->arch.vgic.its;
-+	struct its_itte *itte;
-+
-+	spin_lock(&its->lock);
-+
-+	/* Find the right ITTE and put the pending state back in there */
-+	itte = find_itte_by_lpi(vcpu->kvm, lpi);
-+	if (itte)
-+		set_bit(vcpu->vcpu_id, itte->pending);
-+
-+	spin_unlock(&its->lock);
-+}
-+
- static int vits_handle_command(struct kvm_vcpu *vcpu, u64 *its_cmd)
- {
- 	return -ENODEV;
-diff --git a/virt/kvm/arm/its-emul.h b/virt/kvm/arm/its-emul.h
-index 472a6d0..cc5d5ff 100644
---- a/virt/kvm/arm/its-emul.h
-+++ b/virt/kvm/arm/its-emul.h
-@@ -33,4 +33,7 @@ void vgic_enable_lpis(struct kvm_vcpu *vcpu);
- int vits_init(struct kvm *kvm);
- void vits_destroy(struct kvm *kvm);
- 
-+bool vits_queue_lpis(struct kvm_vcpu *vcpu);
-+void vits_unqueue_lpi(struct kvm_vcpu *vcpu, int irq);
-+
- #endif
+ struct vgic_v2_cpu_if {
 diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
-index fa81c4b..66640c2fa 100644
+index 16c6d8a..04f3aed 100644
 --- a/virt/kvm/arm/vgic-v3-emul.c
 +++ b/virt/kvm/arm/vgic-v3-emul.c
-@@ -901,6 +901,8 @@ void vgic_v3_init_emulation(struct kvm *kvm)
- 	dist->vm_ops.init_model = vgic_v3_init_model;
- 	dist->vm_ops.destroy_model = vgic_v3_destroy_model;
- 	dist->vm_ops.map_resources = vgic_v3_map_resources;
-+	dist->vm_ops.queue_lpis = vits_queue_lpis;
-+	dist->vm_ops.unqueue_lpi = vits_unqueue_lpi;
- 
- 	kvm->arch.max_vcpus = KVM_MAX_VCPUS;
+@@ -607,6 +607,37 @@ static bool handle_mmio_cfg_reg_redist(struct kvm_vcpu *vcpu,
+ 	return vgic_handle_cfg_reg(reg, mmio, offset);
  }
+ 
++/* We don't trigger any actions here, just store the register value */
++static bool handle_mmio_propbaser_redist(struct kvm_vcpu *vcpu,
++					 struct kvm_exit_mmio *mmio,
++					 phys_addr_t offset)
++{
++	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
++	int mode = ACCESS_READ_VALUE;
++
++	mode |= dist->lpis_enabled ? ACCESS_WRITE_IGNORED : ACCESS_WRITE_VALUE;
++	vgic_handle_base_register(vcpu, mmio, offset, &dist->propbaser, mode);
++
++	return false;
++}
++
++/* We don't trigger any actions here, just store the register value */
++static bool handle_mmio_pendbaser_redist(struct kvm_vcpu *vcpu,
++					 struct kvm_exit_mmio *mmio,
++					 phys_addr_t offset)
++{
++	struct kvm_vcpu *rdvcpu = mmio->private;
++	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
++	int mode = ACCESS_READ_VALUE;
++
++	/* Storing a value with LPIs already enabled is undefined */
++	mode |= dist->lpis_enabled ? ACCESS_WRITE_IGNORED : ACCESS_WRITE_VALUE;
++	vgic_handle_base_register(vcpu, mmio, offset,
++				  &dist->pendbaser[rdvcpu->vcpu_id], mode);
++
++	return false;
++}
++
+ #define SGI_base(x) ((x) + SZ_64K)
+ 
+ static const struct vgic_io_range vgic_redist_ranges[] = {
+@@ -635,6 +666,18 @@ static const struct vgic_io_range vgic_redist_ranges[] = {
+ 		.handle_mmio    = handle_mmio_raz_wi,
+ 	},
+ 	{
++		.base		= GICR_PENDBASER,
++		.len		= 0x08,
++		.bits_per_irq	= 0,
++		.handle_mmio	= handle_mmio_pendbaser_redist,
++	},
++	{
++		.base		= GICR_PROPBASER,
++		.len		= 0x08,
++		.bits_per_irq	= 0,
++		.handle_mmio	= handle_mmio_propbaser_redist,
++	},
++	{
+ 		.base           = GICR_IDREGS,
+ 		.len            = 0x30,
+ 		.bits_per_irq   = 0,
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 0a9236d..9f7b05f 100644
+index 2e9723aa..0a9236d 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -97,6 +97,20 @@ static bool queue_sgi(struct kvm_vcpu *vcpu, int irq)
- 	return vcpu->kvm->arch.vgic.vm_ops.queue_sgi(vcpu, irq);
+@@ -448,6 +448,41 @@ void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
+ 	}
  }
  
-+static bool vgic_queue_lpis(struct kvm_vcpu *vcpu)
++/* handle a 64-bit register access */
++void vgic_handle_base_register(struct kvm_vcpu *vcpu,
++			       struct kvm_exit_mmio *mmio,
++			       phys_addr_t offset, u64 *basereg,
++			       int mode)
 +{
-+	if (vcpu->kvm->arch.vgic.vm_ops.queue_lpis)
-+		return vcpu->kvm->arch.vgic.vm_ops.queue_lpis(vcpu);
-+	else
-+		return true;
-+}
++	u32 reg;
++	u64 breg;
 +
-+static void vgic_unqueue_lpi(struct kvm_vcpu *vcpu, int irq)
-+{
-+	if (vcpu->kvm->arch.vgic.vm_ops.unqueue_lpi)
-+		vcpu->kvm->arch.vgic.vm_ops.unqueue_lpi(vcpu, irq);
-+}
-+
- int kvm_vgic_map_resources(struct kvm *kvm)
- {
- 	return kvm->arch.vgic.vm_ops.map_resources(kvm, vgic);
-@@ -1149,25 +1163,33 @@ static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu)
- static void vgic_queue_irq_to_lr(struct kvm_vcpu *vcpu, int irq,
- 				 int lr_nr, int sgi_source_id)
- {
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 	struct vgic_lr vlr;
- 
- 	vlr.state = 0;
- 	vlr.irq = irq;
- 	vlr.source = sgi_source_id;
- 
--	if (vgic_irq_is_active(vcpu, irq)) {
--		vlr.state |= LR_STATE_ACTIVE;
--		kvm_debug("Set active, clear distributor: 0x%x\n", vlr.state);
--		vgic_irq_clear_active(vcpu, irq);
--		vgic_update_state(vcpu->kvm);
--	} else if (vgic_dist_irq_is_pending(vcpu, irq)) {
--		vlr.state |= LR_STATE_PENDING;
--		kvm_debug("Set pending: 0x%x\n", vlr.state);
--	}
--
--	if (!vgic_irq_is_edge(vcpu, irq))
--		vlr.state |= LR_EOI_INT;
-+	/* We care only about state for SGIs/PPIs/SPIs, not for LPIs */
-+	if (irq < dist->nr_irqs) {
-+		if (vgic_irq_is_active(vcpu, irq)) {
-+			vlr.state |= LR_STATE_ACTIVE;
-+			kvm_debug("Set active, clear distributor: 0x%x\n",
-+				  vlr.state);
-+			vgic_irq_clear_active(vcpu, irq);
-+			vgic_update_state(vcpu->kvm);
-+		} else if (vgic_dist_irq_is_pending(vcpu, irq)) {
-+			vlr.state |= LR_STATE_PENDING;
-+			kvm_debug("Set pending: 0x%x\n", vlr.state);
++	switch (offset & ~3) {
++	case 0x00:
++		breg = *basereg;
++		reg = lower_32_bits(breg);
++		vgic_reg_access(mmio, &reg, offset & 3, mode);
++		if (mmio->is_write && (mode & ACCESS_WRITE_VALUE)) {
++			breg &= GENMASK_ULL(63, 32);
++			breg |= reg;
++			*basereg = breg;
 +		}
- 
-+		if (!vgic_irq_is_edge(vcpu, irq))
-+			vlr.state |= LR_EOI_INT;
-+	} else {
-+		/* If this is an LPI, it can only be pending */
-+		if (irq >= 8192)
-+			vlr.state |= LR_STATE_PENDING;
++		break;
++	case 0x04:
++		breg = *basereg;
++		reg = upper_32_bits(breg);
++		vgic_reg_access(mmio, &reg, offset & 3, mode);
++		if (mmio->is_write && (mode & ACCESS_WRITE_VALUE)) {
++			breg  = lower_32_bits(breg);
++			breg |= (u64)reg << 32;
++			*basereg = breg;
++		}
++		break;
 +	}
- 	vgic_set_lr(vcpu, lr_nr, vlr);
- 	vgic_sync_lr_elrsr(vcpu, lr_nr, vlr);
- }
-@@ -1179,7 +1201,6 @@ static void vgic_queue_irq_to_lr(struct kvm_vcpu *vcpu, int irq,
-  */
- bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
- {
--	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 	u64 elrsr = vgic_get_elrsr(vcpu);
- 	unsigned long *elrsr_ptr = u64_to_bitmask(&elrsr);
- 	int lr;
-@@ -1187,7 +1208,6 @@ bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
- 	/* Sanitize the input... */
- 	BUG_ON(sgi_source_id & ~7);
- 	BUG_ON(sgi_source_id && irq >= VGIC_NR_SGIS);
--	BUG_ON(irq >= dist->nr_irqs);
- 
- 	kvm_debug("Queue IRQ%d\n", irq);
- 
-@@ -1267,8 +1287,12 @@ static void __kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
- 			overflow = 1;
- 	}
- 
--
--
-+	/*
-+	 * LPIs are not mapped in our bitmaps, so we leave the iteration
-+	 * to the ITS emulation code.
-+	 */
-+	if (!vgic_queue_lpis(vcpu))
-+		overflow = 1;
- 
- epilog:
- 	if (overflow) {
-@@ -1389,6 +1413,16 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
- 	for_each_clear_bit(lr_nr, elrsr_ptr, vgic_cpu->nr_lr) {
- 		vlr = vgic_get_lr(vcpu, lr_nr);
- 
-+		/* LPIs are handled separately */
-+		if (vlr.irq >= 8192) {
-+			/* We just need to take care about still pending LPIs */
-+			if (vlr.state & LR_STATE_PENDING) {
-+				vgic_unqueue_lpi(vcpu, vlr.irq);
-+				pending = true;
-+			}
-+			continue;
-+		}
++}
 +
- 		BUG_ON(!(vlr.state & LR_STATE_MASK));
- 		pending = true;
++
++
+ bool handle_mmio_raz_wi(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
+ 			phys_addr_t offset)
+ {
+diff --git a/virt/kvm/arm/vgic.h b/virt/kvm/arm/vgic.h
+index a093f5c..b2d791c 100644
+--- a/virt/kvm/arm/vgic.h
++++ b/virt/kvm/arm/vgic.h
+@@ -71,6 +71,10 @@ void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
+ 		     phys_addr_t offset, int mode);
+ bool handle_mmio_raz_wi(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
+ 			phys_addr_t offset);
++void vgic_handle_base_register(struct kvm_vcpu *vcpu,
++			       struct kvm_exit_mmio *mmio,
++			       phys_addr_t offset, u64 *basereg,
++			       int mode);
  
-@@ -1413,7 +1447,7 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
- 	}
- 	vgic_update_state(vcpu->kvm);
- 
--	/* vgic_update_state would not cover only-active IRQs */
-+	/* vgic_update_state would not cover only-active IRQs or LPIs */
- 	if (pending)
- 		set_bit(vcpu->vcpu_id, dist->irq_pending_on_cpu);
- }
+ static inline
+ u32 mmio_data_read(struct kvm_exit_mmio *mmio, u32 mask)
 -- 
 2.3.5
