@@ -1,19 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 May 2015 13:59:32 +0200
-Subject: [GIT PULL]Xilinx Zynq DT changes for v4.2
-In-Reply-To: <5566BB79.4010901@monstr.eu>
-References: <5566BB79.4010901@monstr.eu>
-Message-ID: <3436722.dMmXMc6pG3@wuerfel>
+Date: Fri, 29 May 2015 14:00:48 +0200
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for
+ v4.2
+In-Reply-To: <cover.1432860632.git.horms+renesas@verge.net.au>
+References: <cover.1432860632.git.horms+renesas@verge.net.au>
+Message-ID: <3551400.jxBECFI4Cg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 28 May 2015 08:53:45 Michal Simek wrote:
-> arm: Xilinx Zynq dt patches for v4.2
+On Friday 29 May 2015 09:54:16 Simon Horman wrote:
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-dt-for-v4.2,
+> which I have already sent a pull-request for.
 > 
-> - Fix aliases and stdout properties
-> - Document current TTC binding
-> - Add Ceva to prefixes
-> - Use new compatible string for MACB
+> The change from using "nor-jedec" instead of "jedec,spi-nor" should
+> be safe as the usage of "nor-jedec" was added earlier in the v4.2 release
+> cycle and thus has not been present in a release.
+> 
 > 
 
 Pulled into next/dt, thanks!
