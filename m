@@ -1,72 +1,173 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 29 May 2015 08:23:45 +0200
-Subject: [PATCH 0/5] Add Mediatek MT8173 subsystem clocks support
-In-Reply-To: <1432867649.15597.46.camel@mtksdaap41>
-References: <1432192376-6712-1-git-send-email-jamesjj.liao@mediatek.com>
- <20150528132452.GI26575@pengutronix.de>
- <1432867649.15597.46.camel@mtksdaap41>
-Message-ID: <20150529062345.GY6325@pengutronix.de>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Fri, 29 May 2015 14:35:01 +0800
+Subject: [PATCH 2/4] iommu: Implement common IOMMU ops for DMA mapping
+In-Reply-To: <1432877219.721.237.camel@mhfsdcap03>
+References: <cover.1432735420.git.robin.murphy@arm.com>
+ <141cbb28b55e3d748c6426f56016c46e8cf93109.1432735420.git.robin.murphy@arm.com>
+ <1432877219.721.237.camel@mhfsdcap03>
+Message-ID: <1432881301.26021.20.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 29, 2015 at 10:47:29AM +0800, James Liao wrote:
-> Hi Sascha,
+
+Hi Robin,
+
+More info, hope this make it clearer. We are calling dma_map_sg_attrs
+with the following 2 sg. With IOMMU, we are expecting it got merged into
+1 contiguous va range, but instead we get 2 va range.
+
+sg0 dma_address 0xfeeddc00 size 0x400, offset 0xc00
+sg1 dma_address 0xfeede000 size 0x1000, offset 0x0
+
+Joe.C
+
+On Fri, 2015-05-29 at 13:26 +0800, Yong Wu wrote:
+> Hi Robin,
+>     Thanks.
 > 
-> > And really the driver matching "mediatek,mt8173-vencsys" should register
-> > the necessary clocks and reset lines and call of_platform_populate on
-> > the subnodes. The driver should also be a real driver, not something
-> > matched by CLK_OF_DECLARE. The "mediatek,mt8173-vencsys" driver now has
-> > the possibility to manage the toplevel vencsys unit, do runtime pm, turn
-> > the whole thing off and on. Using CCF for abstracting these clocks may
-> > be the right thing, but I believe that we should keep the code for the
-> > toplevel vencsys register space together in a single file and not put
-> > the clk bits in drivers/clk/mediatek/mt8173.c, the reset bits in
-> > drivers/reset/ and the remaining misc stuff in drivers/soc/mediatek/.
+>     While we test venc in v4l2, we get a problem:
+>     When we enter the funtion[0], it will be break unexpectedly in the
+> funcion[1] while the offset of sg table is not zero. It is ok if the
+> offset is zero. Then I add more log in dma-iommu.c, please help check
+> below.
+>     All we tested it based on dma v2. and have not tested it on v3 yet.
+> The code of iommu-map-sg seems the same. if it's fixed in v3, I'm very
+> sorry. The map_sg in mtk-iommu use default_iommu_map_sg.
+>     Any question please tell me, Thanks very much. 
+> 
+> [0]http://lxr.free-electrons.com/source/drivers/media/v4l2-core/videobuf2-dma-contig.c#L564	[1]http://lxr.free-electrons.com/source/drivers/media/v4l2-core/videobuf2-dma-contig.c#L70
+> 
+> 
+> On Wed, 2015-05-27 at 15:09 +0100, Robin Murphy wrote:
+> > Taking inspiration from the existing arch/arm code, break out some
+> > generic functions to interface the DMA-API to the IOMMU-API. This will
+> > do the bulk of the heavy lifting for IOMMU-backed dma-mapping.
 > > 
-> > So I think we should have a drivers/soc/mediatek/mtk-vencsys.c which
-> > is a regular driver, calls clk_register() for its clocks, calls
-> > reset_controller_register() for the reset bits, provides plain functions
-> > for the remaining bits which are not handled by any Linux framework.
-> > Finally of_platform_populate will register the child devices.
+> > Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> > ---
+> >  drivers/iommu/Kconfig     |   7 +
+> >  drivers/iommu/Makefile    |   1 +
+> >  drivers/iommu/dma-iommu.c | 560 ++++++++++++++++++++++++++++++++++++++++++++++
+> >  include/linux/dma-iommu.h |  94 ++++++++
+> >  4 files changed, 662 insertions(+)
+> >  create mode 100644 drivers/iommu/dma-iommu.c
+> >  create mode 100644 include/linux/dma-iommu.h
 > > 
-> > I showed this using the vencsys example, but it's the same for vdecsys,
-> > vencltsys, imgsys and mmsys.
+> [snip]
+> > +static int __finalise_sg(struct device *dev, struct scatterlist *sg, int nents,
+> > +		dma_addr_t dma_addr)
+> > +{
+> > +	struct scatterlist *s, *seg = sg;
+> > +	unsigned long seg_mask = dma_get_seg_boundary(dev);
+> > +	unsigned int max_len = dma_get_max_seg_size(dev);
+> > +	unsigned int seg_len = 0, seg_dma = 0;
+> > +	int i, count = 1;
+> > +
+> > +	for_each_sg(sg, s, nents, i) {
+> > +		/* Un-swizzling the fields here, hence the naming mismatch */
+> > +		unsigned int s_offset = sg_dma_address(s);
+> > +		unsigned int s_length = sg_dma_len(s);
+> > +		unsigned int s_dma_len = s->length;
+> > +
+> > +		s->offset = s_offset;
+> > +		s->length = s_length;
+> > +		sg_dma_address(s) = DMA_ERROR_CODE;
+> > +		sg_dma_len(s) = 0;
+> > +
+> > +		if (seg_len && (seg_dma + seg_len == dma_addr + s_offset) &&
+> > +		    (seg_len + s_dma_len <= max_len) &&
+> > +		    ((seg_dma & seg_mask) <= seg_mask - (seg_len + s_length))
+> > +		   ) {
+> > +			sg_dma_len(seg) += s_dma_len;
+> > +		} else {
+> > +			if (seg_len) {
+> > +				seg = sg_next(seg);
+> > +				count++;
+> > +			}
+> > +			sg_dma_len(seg) = s_dma_len;
+> > +			sg_dma_address(seg) = dma_addr + s_offset;
+>    Here the value of sg_dma_address have added s_offset, but
+> sg_dma_len(seg) still is s_dma_len.
+>    In the first loop, s_dma_len is from s->length which is alignd by
+> "s_length = iova_align(iovad, s_length + s_offset);" in
+> the interface iommu_dma_map_sg.
+> > +
+> > +			seg_len = s_offset;
+> > +			seg_dma = dma_addr + s_offset;
+> > +		}
+> > +		seg_len += s_length;
+> > +		dma_addr += s_dma_len;
+> > +	}
+> > +	return count;
+> > +}
+> > +
+> > +static void __invalidate_sg(struct scatterlist *sg, int nents)
+> > +{
+> > +	struct scatterlist *s;
+> > +	int i;
+> > +
+> > +	for_each_sg(sg, s, nents, i) {
+> > +		if (sg_dma_address(s) != DMA_ERROR_CODE)
+> > +			s->offset = sg_dma_address(s);
+> > +		if (sg_dma_len(s))
+> > +			s->length = sg_dma_len(s);
+> > +		sg_dma_address(s) = DMA_ERROR_CODE;
+> > +		sg_dma_len(s) = 0;
+> > +	}
+> > +}
+> > +
+> > +int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
+> > +		int nents, int prot, bool coherent)
+> > +{
+> > +	struct iommu_dma_domain *dom = arch_get_dma_domain(dev);
+> > +	struct iova_domain *iovad = dom->iovad;
+> > +	struct iova *iova;
+> > +	struct scatterlist *s;
+> > +	dma_addr_t dma_addr;
+> > +	size_t iova_len = 0;
+> > +	int i;
+> > +
+> > +	/*
+> > +	 * Work out how much IOVA space we need, and align the segments to
+> > +	 * IOVA granules for the IOMMU driver to handle. With some clever
+> > +	 * trickery we can modify the list in a reversible manner.
+> > +	 */
+> > +	for_each_sg(sg, s, nents, i) {
+> > +		size_t s_offset = iova_offset(iovad, s->offset);
+> > +		size_t s_length = s->length;
+> > +
+> > +		sg_dma_address(s) = s->offset;
+> > +		sg_dma_len(s) = s_length;
+> > +		s->offset -= s_offset;
+> > +		s_length = iova_align(iovad, s_length + s_offset);
+> > +		s->length = s_length;
+> At the begging, s->length is the length of valid data. but it's aligned
+> here.
+> > +
+> > +		iova_len += s_length;
+> > +	}
+> > +
+> > +	iova = __alloc_iova(dev, iova_len, coherent);
+> > +	if (!iova)
+> > +		goto out_restore_sg;
+> > +
+> > +	/*
+> > +	 * We'll leave any physical concatenation to the IOMMU driver's
+> > +	 * implementation - it knows better than we do.
+> > +	 */
+> > +	dma_addr = iova_dma_addr(iovad, iova);
+> > +	if (iommu_map_sg(dom->domain, dma_addr, sg, nents, prot) < iova_len)
+> > +		goto out_free_iova;
+> > +
+> > +	return __finalise_sg(dev, sg, nents, dev_dma_addr(dev, dma_addr));
+> > +
+> > +out_free_iova:
+> > +	__free_iova(iovad, iova);
+> > +out_restore_sg:
+> > +	__invalidate_sg(sg, nents);
+> > +	return 0;
+> > +}
+> > +
+> [snip]
 > 
-> So you agree to manage these subsystem clocks in CCF, but they should be
-> provided by their own (globalcon) drivers, right?
-
-Yes. I previously got the impression that the subsystem clocks are not
-directly associated to the larbs, but needed to be handled by the larb
-code due to some side effect. Now that I saw that the larbs are directly
-in the subsystem register space it all makes sense.
-
-Note that the way Mediatek SoCs are designed around sub modules is bit
-unusual and does not fit very well in the Linux directory structure.
-Normally SoCs have a single clocks controller which controls all clocks
-in the SoC. Then you often have a reset controller providing reset lines
-in the SoC. In this case it's clear that the clk driver goes to
-drivers/clk/, the reset controller driver to drivers/reset/. Mediatek
-SoCs instead have several blocks, each with its own clock and reset
-controller. Splitting each block up into parts in drivers/clk/ and
-drivers/reset/ leads to quite a code fragmentation.
-This is my opinion, it would be great to hear something from others.
-Matthias? I'd like to avoid running into a direction that is not
-acceptable in the end.
-
 > 
-> I have an implementation question. These subsystem clocks can't be
-> implemented in CCF default clock-gate. So in our previous patches, we
-> added a drivers/clk/mediate/clk-gate.c to implement new clock gate
-> operations. Is it a good way to export mediatek/clk-gate.h (put it in
-> include/linux/) for other drivers to implement their own clocks?
-
-Give it a try. If that's not acceptable we can still shuffle this around
-without much effort.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
