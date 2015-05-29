@@ -1,55 +1,50 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 29 May 2015 15:25:26 +0200
-Subject: [PATCH/RFC 2/2] ARM: multi_v7_defconfig: Make fbdev support modular
-In-Reply-To: <1432905926-31606-1-git-send-email-geert@linux-m68k.org>
-References: <1432905926-31606-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <1432905926-31606-2-git-send-email-geert@linux-m68k.org>
+Date: Fri, 29 May 2015 15:25:25 +0200
+Subject: [PATCH/RFC 1/2] ARM: multi_v7_defconfig: Make drm support modular
+Message-ID: <1432905926-31606-1-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Make fbdev support modular to reduce kernel size (-158 KiB):
+Make drm support modular to reduce kernel size (-620 KiB):
 
        text    data     bss     dec     hex   filename
-    11581470 1387196  338264 13306930  cb0c32 vmlinux.before
-    11430531 1384340  330584 13145455  c8956f vmlinux.after
+    12211122 1392076  338520 13941718  d4bbd6 vmlinux.before
+    11581470 1387196  338264 13306930  cb0c32 vmlinux.after
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
-This one is more controversial:
-  - Does anyone need fbdev for boot-testing?
-  - This disables two drivers that cannot be modular (FB_WM8505 and
-    FB_SIMPLE), and the PLAT_VERSATILE_CLCD helper support.
+Slightly controversial:
+  - Does anyone need drm for boot testing?
 
- arch/arm/configs/multi_v7_defconfig | 9 +++------
- 1 file changed, 3 insertions(+), 6 deletions(-)
+ arch/arm/configs/multi_v7_defconfig | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 9b4e33d5b15e340f..af94ade61b1400d6 100644
+index 40ca1ab29a2e350f..9b4e33d5b15e340f 100644
 --- a/arch/arm/configs/multi_v7_defconfig
 +++ b/arch/arm/configs/multi_v7_defconfig
-@@ -436,18 +436,15 @@ CONFIG_DRM_EXYNOS_HDMI=y
+@@ -426,15 +426,17 @@ CONFIG_VIDEO_RENESAS_VSP1=m
+ # CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
+ CONFIG_VIDEO_ADV7180=m
+ CONFIG_VIDEO_ML86V7667=m
+-CONFIG_DRM=y
++CONFIG_TEGRA_HOST1X=y
++CONFIG_DRM=m
+ CONFIG_DRM_PTN3460=m
+ CONFIG_DRM_PS8622=m
+ CONFIG_DRM_EXYNOS=m
+ CONFIG_DRM_EXYNOS_FIMD=y
+ CONFIG_DRM_EXYNOS_HDMI=y
  CONFIG_DRM_RCAR_DU=m
- CONFIG_DRM_TEGRA=m
- CONFIG_DRM_PANEL_SIMPLE=m
--CONFIG_FB=y
--CONFIG_FB_ARMCLCD=y
--CONFIG_FB_WM8505=y
--CONFIG_FB_SH_MOBILE_LCDC=y
--CONFIG_FB_SIMPLE=y
-+CONFIG_FB_ARMCLCD=m
-+CONFIG_FB_SH_MOBILE_LCDC=m
- CONFIG_FB_SH_MOBILE_MERAM=y
- CONFIG_BACKLIGHT_LCD_SUPPORT=y
- CONFIG_BACKLIGHT_CLASS_DEVICE=y
- CONFIG_LCD_PLATFORM=m
- CONFIG_BACKLIGHT_PWM=y
- CONFIG_BACKLIGHT_AS3711=y
--CONFIG_FRAMEBUFFER_CONSOLE=y
-+CONFIG_FRAMEBUFFER_CONSOLE=m
- CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
- CONFIG_SOUND=m
- CONFIG_SND=m
+-CONFIG_DRM_TEGRA=y
+-CONFIG_DRM_PANEL_SIMPLE=y
++CONFIG_DRM_TEGRA=m
++CONFIG_DRM_PANEL_SIMPLE=m
++CONFIG_FB=y
+ CONFIG_FB_ARMCLCD=y
+ CONFIG_FB_WM8505=y
+ CONFIG_FB_SH_MOBILE_LCDC=y
 -- 
 1.9.1
