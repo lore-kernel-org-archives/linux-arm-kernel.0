@@ -1,26 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 May 2015 14:52:13 +0200
-Subject: [PATCH 1/2] ARM: multi_v7_defconfig: Make sound support modular
-In-Reply-To: <1432891299-22892-1-git-send-email-geert@linux-m68k.org>
-References: <1432891299-22892-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <4071593.HlWFN9GR5x@wuerfel>
+Date: Fri, 29 May 2015 14:53:25 +0200
+Subject: [PATCH] ARM: lpc18xx: remove DEBUG_LL_UART_8250 from defconfig
+In-Reply-To: <1432661986-4118-1-git-send-email-manabian@gmail.com>
+References: <1432661986-4118-1-git-send-email-manabian@gmail.com>
+Message-ID: <2264717.c7n5iR1HTW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 May 2015 11:21:38 Geert Uytterhoeven wrote:
-> From: Geert Uytterhoeven <geert+renesas@glider.be>
+On Tuesday 26 May 2015 19:39:46 Joachim Eastwood wrote:
+> Please apply this to the next/defconfig branch.
 > 
-> Make sound support modular to reduce kernel size (-571 KiB):
+> After LPC18XX was converted to use the DEBUG_LPC18XX_UART0 config
+> symbol there is now a mismatch in defconfig for this platform.
 > 
->        text    data     bss     dec     hex   filename
->     12990441 1438820  342552 14771813  e16665 vmlinux.before
->     12451039 1396476  339800 14187315  d87b33 vmlinux.after
+> On a clean defconfig the following warnings appear.
+> .config:2073:warning: symbol value '' invalid for DEBUG_UART_PHYS
+> .config:2074:warning: symbol value '' invalid for DEBUG_UART_VIRT
 > 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Since the default value now depends on DEBUG_LPC18XX_UART0 and not
+> ARCH_LPC18XX.
 > 
 
-Very nice, thanks a lot!
+Applied now, thanks a lot!
 
-I've applied both patches to next/defconfig.
+I missed this problem because I'm mainly testing with a branch that
+has a workaround for the general problem of DEBUG_UART_PHYS being
+empty.
 
 	Arnd
