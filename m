@@ -1,35 +1,42 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Thu, 28 May 2015 17:03:12 -0700
-Subject: [PATCH] mmc: sdhci-bcm2835: Actually enable the clock
-Message-ID: <1432857792-7421-1-git-send-email-eric@anholt.net>
+Date: Thu, 28 May 2015 17:07:35 -0700
+Subject: [PATCH v5 3/3] ARM: bcm2835: Add the firmware driver information to
+ the RPi DT
+In-Reply-To: <1432858055-8750-1-git-send-email-eric@anholt.net>
+References: <1432858055-8750-1-git-send-email-eric@anholt.net>
+Message-ID: <1432858055-8750-3-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We're currently using a fixed frequency clock specified in the DT, so
-enabling is a no-op.  However, the RPi firmware-based clocks driver
-can actually disable unused clocks, so when switching to use it we
-ended up losing our MMC clock once all devices were probed.
+v2: Drop pm-domains stuff since I've dropped it from the firmware
+    driver for now, until we get drivers/base fixed.
+
+v3: Rename the compatible to "raspberrypi,bcm2835-firmware"
 
 Signed-off-by: Eric Anholt <eric@anholt.net>
+Acked-by: Lee Jones <lee@kernel.org> (previous version with pm-domains)
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 ---
- drivers/mmc/host/sdhci-bcm2835.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/bcm2835-rpi.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/drivers/mmc/host/sdhci-bcm2835.c b/drivers/mmc/host/sdhci-bcm2835.c
-index 0ef0343..09aff3a 100644
---- a/drivers/mmc/host/sdhci-bcm2835.c
-+++ b/drivers/mmc/host/sdhci-bcm2835.c
-@@ -172,6 +172,11 @@ static int bcm2835_sdhci_probe(struct platform_device *pdev)
- 		ret = PTR_ERR(pltfm_host->clk);
- 		goto err;
- 	}
-+	ret = clk_prepare_enable(pltfm_host->clk);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to enable host clk\n");
-+		goto err;
-+	}
+diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+index 46780bb..ab5474e 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
++++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+@@ -14,6 +14,13 @@
+ 			linux,default-trigger = "heartbeat";
+ 		};
+ 	};
++
++	soc {
++		firmware: firmware {
++			compatible = "raspberrypi,bcm2835-firmware";
++			mboxes = <&mailbox>;
++		};
++	};
+ };
  
- 	return sdhci_add_host(host);
- 
+ &gpio {
 -- 
 2.1.4
