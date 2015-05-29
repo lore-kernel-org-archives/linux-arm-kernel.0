@@ -1,96 +1,119 @@
-From: atull@opensource.altera.com (atull)
-Date: Fri, 29 May 2015 15:55:47 -0500
-Subject: [PATCHv5 1/2] ARM: socfpga: support suspend to ram
-In-Reply-To: <5567D9C4.7090903@opensource.altera.com>
-References: <1432847977-18880-1-git-send-email-atull@opensource.altera.com>
- <1432847977-18880-2-git-send-email-atull@opensource.altera.com>
- <5567D9C4.7090903@opensource.altera.com>
-Message-ID: <alpine.DEB.2.02.1505291548110.28347@linuxheads99>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri, 29 May 2015 14:02:49 -0700
+Subject: [PATCH 2/7] ARM: bcm2835: Add a Raspberry Pi-specific clock
+ driver.
+In-Reply-To: <55679085.6040402@wwwdotorg.org>
+References: <1431978219-14226-1-git-send-email-eric@anholt.net>
+ <1431978219-14226-3-git-send-email-eric@anholt.net>
+ <55679085.6040402@wwwdotorg.org>
+Message-ID: <87h9qvcd1i.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 29 May 2015, Dinh Nguyen wrote:
+Stephen Warren <swarren@wwwdotorg.org> writes:
 
-> 
-> 
-> On 5/28/15 4:19 PM, Alan Tull wrote:
-> > Add code that requests that the sdr controller go into
-> > self-refresh mode.  This code is run from ocram.
-> > 
-> > Suspend-to-RAM and EDAC support are mutually exclusive on
-> > SOCFPGA.  If the EDAC is enabled, it will prevent the
-> > platform from going into suspend.
-> > 
-> > Example of how to request to suspend to ram:
-> >  $ echo enabled > \
-> > /sys/devices/soc/ffc02000.serial0/tty/ttyS0/power/wakeup
-> > 
-> >  $ echo -n mem > /sys/power/state
-> > 
-> > Signed-off-by: Alan Tull <atull@opensource.altera.com>
-> > Cc: Pavel Machek <pavel@denx.de>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
-> > Cc: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> > ---
-> > v2: use Generic on-chip SRAM driver to allocate ocram
-> >     rm fncpy_align since generic allocator handles alignment
-> >     check __arm_ioremap_exec return code
-> >     check for NULL pointers
-> >     add a comment regarding sdram controller configuration
-> > v3: fix renamed #define
-> >     propagate socfpga_setup_ocram_self_refresh error code
-> > v4: Kconfig: don't need to select GENERIC_ALLOCATER
-> >     add CONFIG_SOCFPGA_SUSPEND
-> >     make s2r and EDAC support mutually exclusive
-> >     socfpga.c: add sdr_ctl_base_addr
-> >     return error if ocram not available in device tree
-> >     update copyright years
-> > v5: remove compile time dependency
-> >     edac driver will prevent suspend
-> >     don't configure scu standby mode; done in enable_scu().
-> >     fix comments about required sdram controller configuration
-> > ---
-> >  arch/arm/mach-socfpga/Kconfig        |   10 ++-
-> >  arch/arm/mach-socfpga/Makefile       |    1 +
-> >  arch/arm/mach-socfpga/core.h         |    6 +-
-> >  arch/arm/mach-socfpga/pm.c           |  149 ++++++++++++++++++++++++++++++++++
-> >  arch/arm/mach-socfpga/self-refresh.S |  136 +++++++++++++++++++++++++++++++
-> >  arch/arm/mach-socfpga/socfpga.c      |    6 +-
-> >  drivers/edac/altera_edac.c           |   20 +++++
-> >  7 files changed, 325 insertions(+), 3 deletions(-)
-> >  create mode 100644 arch/arm/mach-socfpga/pm.c
-> >  create mode 100644 arch/arm/mach-socfpga/self-refresh.S
-> > 
-> 
-> Which branch are you basing this patch on? I got a trivial patch
-> conflict in Kconfig when I applied to arm-soc/for-next and v4.1-rc5.
-> 
-> Also, I'm getting these sparse warnings:
-> 
-> arch/arm/mach-socfpga/pm.c:86:25: warning: incorrect type in argument 1
-> (different address spaces)
-> arch/arm/mach-socfpga/pm.c:86:25:    expected void *<noident>
-> arch/arm/mach-socfpga/pm.c:86:25:    got void [noderef]
-> <asn:2>*[assigned] suspend_ocram_base
-> arch/arm/mach-socfpga/pm.c:108:52: warning: cast removes address space
-> of expression
-> 
-> Dinh
-> 
+> On 05/18/2015 01:43 PM, Eric Anholt wrote:
+>>  obj-$(CONFIG_ARCH_BCM2835)		+= clk-bcm2835.o
+>> +obj-$(CONFIG_ARCH_BCM2835)		+= clk-raspberrypi.o
+>
+> Shouldn't this replace the old legacy code in clk-bcm2835.c?
 
-The problem is that fncpy wants parameter 1 to be void* and 
-__arm_ioremap_exec wants 'void __ioram *'.
+I don't think we can, because of DT backwards compat (Sigh).
+>
+> I wonder if a separate Kconfig symbol is warranted for the clock driver.
+> Looking at the context in the patch, it's common not to do that though.
 
-I get other warnings if I declare 'void *suspend_ocram_base' or cast it as
-(void *) for fncpy().  It looks like we are stuck with this warning.
+I've moved it under RASPBERRYPI_FIRMWARE, since it needs that to build.
 
-However sparse kindly pointed out that I needed to fix a declaration in
-altera_edac.c:
+>> diff --git a/drivers/clk/clk-raspberrypi.c b/drivers/clk/clk-raspberrypi.c
+>
+>> +struct rpi_firmware_clock {
+>> +	/* Clock definitions in our static struct. */
+>> +	int clock_id;
+>
+> Why not just use the raw HW IDs (from the mailbox protocol) as the ID in
+> DT and the driver? The only thing that would need to change is to add a
+> error check for "clkspec->args[0] == 0" in
+> rpi_firmware_delayed_get_clk(). The advantage would be that
+> include/dt-bindings/clk/raspberrypi.h would exactly match the firmware
+> protocol, and hence be easily correlated with the documentation.
 
--const struct dev_pm_ops altr_sdram_pm_ops = {
-+static const struct dev_pm_ops altr_sdram_pm_ops = {
+Done.
 
-I'll fix that in the next rev.
+>> +static int rpi_clk_set_rate(struct clk_hw *hw,
+>> +			    unsigned long rate, unsigned long parent_rate)
+>> +{
+>> +	struct rpi_firmware_clock *rpi_clk =
+>> +		container_of(hw, struct rpi_firmware_clock, hw);
+>> +	u32 packet[2];
+>> +	int ret;
+>> +
+>> +	packet[0] = rpi_clk->clock_id;
+>> +	packet[1] = rate;
+>> +	ret = rpi_firmware_property(rpi_clk->firmware_node,
+>
+> The docs indicate there's a third word here "skip setting turbo". Is
+> that optional?
+>
+> https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
 
-Alan
+Yeah, it's optional based on the buffer size specified in the packet.
+
+>> +static long rpi_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+>> +			       unsigned long *parent_rate)
+>> +{
+>> +	/*
+>> +	 * The firmware will end up rounding our rate to something,
+>> +	 * but we don't have an interface for it.  Just return the
+>> +	 * requested value, and it'll get updated after the clock gets
+>> +	 * set.
+>> +	 */
+>> +	return rate;
+>> +}
+>
+> Hmm. I wonder if that will confuse things; I thought the purpose of
+> round_rate() was so code could know exactly what would happen ahead of time?
+
+Well, we don't have the ability.  Things seem to work, anyway.
+Certainly better than just living with fixed clocks for everything like
+we are today.
+
+>> +static struct clk *rpi_firmware_delayed_get_clk(struct
+>> of_phandle_args *clkspec, + void *_data)
+>
+>> +	rpi_clk = &rpi_clocks[clkspec->args[0]];
+>> +
+>> +	firmware_node = of_parse_phandle(of_node, "firmware", 0);
+>> +	if (!firmware_node) {
+>> +		dev_err(dev, "%s: Missing firmware node\n", rpi_clk->name);
+>> +		return ERR_PTR(-ENODEV);
+>> +	}
+>> +
+>> +	/* Try a no-op transaction to see if the driver is loaded yet. */
+>> +	ret = rpi_firmware_property_list(firmware_node, NULL, 0);
+>> +	if (ret)
+>> +		return ERR_PTR(ret);
+>
+> I would move all that into this driver's probe().
+
+We can't move all this into the driver's probe, because this is where
+we're returning -EPROBE_DEFER.  We could potentially do just the phandle
+parse up front and allocate some memory to pass it and our own device
+node to this function through the _data arg, but I don't see much point.
+
+>> +CLK_OF_DECLARE(rpi_firmware_clocks, "raspberrypi,firmware-clocks",
+>> +	       rpi_firmware_init_clock_provider);
+>
+> Oh, I guess the same comment as for the firmware node applies re: the
+> over-genericity of the DT compatible value applies here too. Perhaps
+> raspberrypi,bcm2835-firmware-clocks to match Lee's proposal for the
+> firmware node?
+
+Done.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150529/8e2e93a0/attachment.sig>
