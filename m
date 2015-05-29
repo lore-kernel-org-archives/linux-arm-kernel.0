@@ -1,46 +1,38 @@
-From: david@lang.hm (David Lang)
-Date: Fri, 29 May 2015 15:16:42 -0700 (PDT)
-Subject: Device Tree Blob (DTB) licence
-In-Reply-To: <55684F07.7050402@melag.de>
-References: <1430820315.19516.26.camel@opteya.com>
- <CAL_Jsq+T5c7qornpRVCduEjUSCeM+0xqbtVYovtH76y=4BqhLQ@mail.gmail.com>
- <1432289148.5304.58.camel@opteya.com> <1432322832.5304.63.camel@opteya.com>
- <CAOS_Y6Q37ps+VEnzUZ_uwX++qrRm9Hgx45Q_pmiZSLSNjmKwZg@mail.gmail.com>
- <55670AD4.8020705@melag.de> <20150528133429.GD2067@n2100.arm.linux.org.uk>
- <556747E4.6070403@melag.de> <20150529064741.GB25351@1wt.eu>
- <55684F07.7050402@melag.de>
-Message-ID: <alpine.DEB.2.02.1505291512000.4429@nftneq.ynat.uz>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Sat, 30 May 2015 03:49:18 +0530
+Subject: [PATCH 0/4] Add Device tree support for 88PM800 mfd and rtc driver
+Message-ID: <1432937962-4537-1-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 29 May 2015, Enrico Weigelt, metux IT consult wrote:
+This patch-series adds support for Device tree to 88PM800 mfd and rtc driver.
+It also creates the DT binding for 88pm800 driver.
 
->>> And why should they fear "poisoning" ?
->> 
->> Search for "GPL contamination", the problem is quite common, GPL
->> can turn anything GPL-compatible into GPL. So for a non-GPL project
->> it's very hard to adopt GPL code.
->
-> Yes, that's the whole purpose of the GPL. The deal is pretty simple:
-> if you take some GPL'ed software and change it, you'll have to publish
-> your changes under the same rules. For entirely separate entities
-> (eg. dedicated programs) that's not an big issue. And for libraries,
-> we have LGPL.
->
-> If the DTS license would be a problem, it would be worse w/ ACPI
-> and any proprietary firmware/BIOSes.
+Testing::
+ - Boot tested on PXA1928 based platform.
+ - probe of mfd, rtc and regulator function passing.
 
-not true, with a proprietary bios it's a clear "pay this much money and don't 
-worry about it" while with GPL there's a nagging fear that someone you never 
-heard of may sue you a decade from now claiming you need to give them the source 
-to your OS.
 
-Is having the DTB GPL so impartant that you would rather let things fall into 
-the windows trap ("well it booted windows, so it must be right") instead of 
-allowing a proprietary OS to use your description of the hardware?
+Attempt has been made to push some of the patches to the list sometime
+back in 2013.
 
-note, this whole discussion assumes that the DTB is even copyrightable. Since 
-it's intended to be strictly a functional description of what the hardware is 
-able to do, that could be questioned
+Link to previous patch submission:
+        https://lkml.org/lkml/2013/8/14/86
 
-David Lang
+
+Vaibhav Hiremath (4):
+  mfd: 88pm800: add device tree support
+  mfd: 88pm800: use irq_mode to configure interrupt status reg clear
+    method
+  rtc: 88pm80x: add device tree support
+  mfd: 88pm800: allocate pdata->rtc if not allocated earlier
+
+ Documentation/devicetree/bindings/mfd/88pm800.txt | 57 +++++++++++++++++++++
+ drivers/mfd/88pm800.c                             | 62 ++++++++++++++++++++++-
+ drivers/rtc/rtc-88pm80x.c                         | 28 ++++++----
+ include/linux/mfd/88pm80x.h                       |  2 +
+ 4 files changed, 137 insertions(+), 12 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/88pm800.txt
+
+-- 
+1.9.1
