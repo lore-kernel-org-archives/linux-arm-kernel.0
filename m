@@ -1,32 +1,59 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 29 May 2015 18:20:36 +0200
-Subject: [GIT PULL] ARM: mediatek: soc updates for v4.2
-In-Reply-To: <2169528.AHb4teykcE@wuerfel>
-References: <CABuKBe+y5Em77WbKUu3YHAuwdc7n_ybLe-Eii8G1H-EQ0xZrRg@mail.gmail.com>
- <2169528.AHb4teykcE@wuerfel>
-Message-ID: <CABuKBe+2H8wFgaM+S-LAMm2B7DCXZKGetOOb9rkgTO4TjD7X=A@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 29 May 2015 09:26:13 -0700
+Subject: [PATCH v2 0/6] GPIO support for BRCMSTB
+In-Reply-To: <1432865650-4062-1-git-send-email-gregory.0xf0@gmail.com>
+References: <1432865650-4062-1-git-send-email-gregory.0xf0@gmail.com>
+Message-ID: <55689325.80103@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 28/05/15 19:14, Gregory Fong wrote:
+> This patchset adds support for the GPIO controller (UPG GIO) used on Broadcom's
+> various BRCMSTB SoCs (BCM7XXX and others). It uses the "basic-mmio-gpio"
+> interface to try to reduce duplication of the base logic.
+> 
+> For all existing hardware, this block hooked up to the BCM7120 L2 IRQ
+> controller and so will require CONFIG_BCM7120_L2_IRQ=y.
 
-2015-05-29 14:56 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
-> On Wednesday 27 May 2015 17:09:43 Matthias Brugger wrote:
->> - pmic wrapper: fix clock handling
->> - pmic wrapper: fix state machine
->> - pmic wrapper: fix compile dependency
->>
->
-> Merged into next/drivers now.
->
-> It looks like these are all bug fixes, and I wonder if they
-> should be merged for 4.1 and possibly backports instead.
-> Can you clarify?
+Unless there are objections, I will take patches 5 and 6 and apply them
+to soc/next.
 
-Yes, they should be merged for 4.1.
-I forgot about that.
-Sorry.
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 
-Matthias
+Thanks!
+
+> 
+> New in v2:
+> - fix license mismatch as pointed out by Paul Bolle
+> - move select ARCH_WANT_OPTIONAL_GPIOLIB to separate patch
+> - change to have 32 lines per bank per Linus Walleij's comments
+> - allow this controller to be used as a wakeup source
+> - add default GPIO number for BRCMSTB
+> 
+> The device tree bindings from v1 were merged to the GPIO tree, so this patchset
+> only contains an addition to allow GPIOs to be used as a wakeup source
+> (patch 3).  The initial bindings from v1 can be found at
+> https://lkml.org/lkml/2015/5/6/200 .
+> 
+> Gregory Fong (6):
+>   gpio: Add GPIO support for Broadcom STB SoCs
+>   gpio: brcmstb: Add interrupt support
+>   dt-bindings: brcmstb-gpio: document properties for wakeup
+>   gpio: brcmstb: Allow GPIOs to be wakeup sources
+>   ARM: brcmstb: Select ARCH_WANT_OPTIONAL_GPIOLIB
+>   ARM: brcmstb: Add default gpio number
+> 
+>  .../devicetree/bindings/gpio/brcm,brcmstb-gpio.txt |  26 +-
+>  MAINTAINERS                                        |   7 +
+>  arch/arm/Kconfig                                   |   3 +-
+>  arch/arm/mach-bcm/Kconfig                          |   1 +
+>  drivers/gpio/Kconfig                               |   9 +
+>  drivers/gpio/Makefile                              |   1 +
+>  drivers/gpio/gpio-brcmstb.c                        | 581 +++++++++++++++++++++
+>  7 files changed, 626 insertions(+), 2 deletions(-)
+>  create mode 100644 drivers/gpio/gpio-brcmstb.c
+> 
+
+
 -- 
-motzblog.wordpress.com
+Florian
