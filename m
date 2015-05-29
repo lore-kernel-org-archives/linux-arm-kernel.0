@@ -1,60 +1,54 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Fri, 29 May 2015 16:21:15 -0400
-Subject: [PATCH 0/4] ARM: keystone: Enable Netcp driver on K2 EVMs
-In-Reply-To: <20150511160026.GH2067@n2100.arm.linux.org.uk>
-References: <1429817852-27938-1-git-send-email-m-karicheri2@ti.com>
- <55395981.8050902@oracle.com> <553A5E12.9040202@ti.com>
- <553A630F.4060008@oracle.com> <5550D0FD.7060903@ti.com>
- <20150511160026.GH2067@n2100.arm.linux.org.uk>
-Message-ID: <5568CA3B.4000709@ti.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Fri, 29 May 2015 13:22:46 -0700
+Subject: [PATCH] fix n900 dts file to work around 4.1 touchscreen
+ regression on n900
+In-Reply-To: <20150529195629.GA9811@amd>
+References: <201505241444.41039@pali> <20150527132545.GA23434@amd>
+ <20150527133311.GJ30798@pali> <20150527143722.GA28108@amd>
+ <20150527145837.GA13223@earth> <20150529190816.GA20232@amd>
+ <20150529192505.GA28987@amd> <20150529193211.GA7599@amd>
+ <20150529194955.GV2026@saruman.tx.rr.com>
+ <20150529195629.GA9811@amd>
+Message-ID: <20150529202246.GA26140@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2015 12:00 PM, Russell King - ARM Linux wrote:
-> On Mon, May 11, 2015 at 11:55:41AM -0400, Murali Karicheri wrote:
->> On 04/24/2015 11:36 AM, santosh shilimkar wrote:
->>> On 4/24/2015 8:15 AM, Murali Karicheri wrote:
->>>> On 04/23/2015 04:43 PM, santosh shilimkar wrote:
->>>>> On 4/23/2015 12:37 PM, Murali Karicheri wrote:
->>>>>> NetCP driver support patches are already merged to v4.0.nd v4.1.
->>>>>> This series introduce patches to update the DTS bindings and
->>>>>> defconfig so that the network driver is fully functional on K2
->>>>>> EVMs :- K2HK, K2L and K2E.
->>>>>>
->>>>> Nice and Thanks Murali for sending these up.
->>>>>
->>>>>> It will be great if this can be merged to v4.1.
->>>>>>
->>>>> Its too late for the 4.1 now. For the same reason, we also
->>>>> couldn't get the MMU switching fixes in this merge window.
->>>>
->>>> For my reference, can you point me to the MMU switching fixes you are
->>>> referring to?
->>>>
->>> http://www.spinics.net/lists/arm-kernel/msg411178.html
->>>
->>> Regards,
->>> Santosh
->> Santosh,
->>
->> Is MMU switching series applied to a sub system branch already that I can
->> pull to do some testing on K2 devices?
->
-> Shall I send you the patches directly?
->
-Russell,
+On Fri, May 29, 2015 at 09:56:29PM +0200, Pavel Machek wrote:
+> On Fri 2015-05-29 14:49:55, Felipe Balbi wrote:
+> > Hi,
+> > 
+> > On Fri, May 29, 2015 at 09:32:11PM +0200, Pavel Machek wrote:
+> > > Fix dts to match what the Linux kernel expects. This works around
+> > > touchscreen problems in 4.1 linux on Nokia n900.
+> > >     
+> > > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/input/touchscreen/tsc2005.txt b/Documentation/devicetree/bindings/input/touchscreen/tsc2005.txt
+> > > index 4b641c7..09089a6 100644
+> > > --- a/Documentation/devicetree/bindings/input/touchscreen/tsc2005.txt
+> > > +++ b/Documentation/devicetree/bindings/input/touchscreen/tsc2005.txt
+> > > @@ -32,8 +32,8 @@ Example:
+> > >  		touchscreen-fuzz-x = <4>;
+> > >  		touchscreen-fuzz-y = <7>;
+> > >  		touchscreen-fuzz-pressure = <2>;
+> > > -		touchscreen-max-x = <4096>;
+> > > -		touchscreen-max-y = <4096>;
+> > > +		touchscreen-size-x = <4096>;
+> > > +		touchscreen-size-y = <4096>;
+> > 
+> > IMHO, the older binding needs to be supported as well. It's fine to
+> > update the DTS for the new binding, but even Documentation says
+> > touchscreen-max-[xy] and if the driver changed that, the driver should
+> > be fixed too. Besides, it seems like this has been in tree since
+> > v3.16:
+> 
+> Agreed. In parent email, I have list of two commits that should be
+> reverted.
 
-As promised I have taken sometime today to test this series that you 
-have sent to me privately and all of my below tests passed.
-1. Boot and reboot test on all EVMs (K2HK, K2E and K2L)
-2. Apply network patches (lined up for v4.2 merge) and do boot with nfs 
-file system. Also performed iperf network traffic tests.
-3. Bring up SATA harddisk on K2E EVM and do file copy tests.
+Well, not exactly. The kernel has never parsed touchscreen-max-x and
+touchscreen-max-y, however we did indeed change behavior of
+touchscreen_parse_of_params() to reset both max and fuzz if either one is
+present... I guess we can adjust the behavior it for the sake of tsc2005.
 
-Based on this, please add my Tested-by to this series.
-
-Tested-by: Murali Karicheri <m-karicheri2@ti.com>
-Regards,
 -- 
-Murali Karicheri
-Linux Kernel, Keystone
+Dmitry
