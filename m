@@ -1,17 +1,17 @@
 From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Thu, 28 May 2015 20:48:13 -0400
-Subject: [PATCH 15/15] drivers/clk: don't use module_init in clk-nomadik.c
- which is non-modular
+Date: Thu, 28 May 2015 20:48:03 -0400
+Subject: [PATCH 05/15] arm: don't use module_init in non-modular
+ mach-vexpress/spc.c code
 In-Reply-To: <1432860493-23831-1-git-send-email-paul.gortmaker@windriver.com>
 References: <1432860493-23831-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <1432860493-23831-16-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <1432860493-23831-6-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clk-nomadik.o is built for ARCH_NOMADIK -- which is bool, and
-hence this code is either present or absent.  It will never be
-modular, so using module_init as an alias for __initcall can be
-somewhat misleading.
+The spc.o is built for ARCH_VEXPRESS_SPC -- which is bool, and hence
+this code is either present or absent.  It will never be modular,
+so using module_init as an alias for __initcall can be somewhat
+misleading.
 
 Fix this up now, so that we can relocate module_init from
 init.h into module.h in the future.  If we don't do this, we'd
@@ -24,26 +24,22 @@ mapped onto device_initcall, our use of device_initcall
 directly in this change means that the runtime impact is
 zero -- it will remain at level 6 in initcall ordering.
 
-Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 ---
- drivers/clk/clk-nomadik.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm/mach-vexpress/spc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/clk-nomadik.c b/drivers/clk/clk-nomadik.c
-index 05e04ce0f148..c9487179f25f 100644
---- a/drivers/clk/clk-nomadik.c
-+++ b/drivers/clk/clk-nomadik.c
-@@ -503,8 +503,7 @@ static int __init nomadik_src_clk_init_debugfs(void)
- 			    NULL, NULL, &nomadik_src_clk_debugfs_ops);
+diff --git a/arch/arm/mach-vexpress/spc.c b/arch/arm/mach-vexpress/spc.c
+index f61158c6ce71..5766ce2be32b 100644
+--- a/arch/arm/mach-vexpress/spc.c
++++ b/arch/arm/mach-vexpress/spc.c
+@@ -589,4 +589,4 @@ static int __init ve_spc_clk_init(void)
+ 	platform_device_register_simple("vexpress-spc-cpufreq", -1, NULL, 0);
  	return 0;
  }
--
--module_init(nomadik_src_clk_init_debugfs);
-+device_initcall(nomadik_src_clk_init_debugfs);
- 
- #endif
- 
+-module_init(ve_spc_clk_init);
++device_initcall(ve_spc_clk_init);
 -- 
 2.2.1
