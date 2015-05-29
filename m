@@ -1,56 +1,115 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Sat, 30 May 2015 03:49:22 +0530
-Subject: [PATCH 4/4] mfd: 88pm800: allocate pdata->rtc if not allocated earlier
-In-Reply-To: <1432937962-4537-1-git-send-email-vaibhav.hiremath@linaro.org>
-References: <1432937962-4537-1-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <1432937962-4537-5-git-send-email-vaibhav.hiremath@linaro.org>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Fri, 29 May 2015 15:34:47 -0700
+Subject: [PATCH v2] arm/arm64: KVM: Properly account for guest CPU time
+In-Reply-To: <1432838950-28774-1-git-send-email-christoffer.dall@linaro.org>
+References: <1432838950-28774-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <5568E987.5010702@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RTC in pmic 88PM800 can run even the core is powered off, and user
-can set alarm in RTC. When the alarm is timed out, the PMIC will power up
-the core, and the whole system will boot up. And during PMIC driver probe,
-it will read some register to find out whether this boot is caused by RTC
-timeout or not, and pass on this information to the RTC driver.
+On 05/28/2015 11:49 AM, Christoffer Dall wrote:
+> Until now we have been calling kvm_guest_exit after re-enabling
+> interrupts when we come back from the guest, but this has the
+> unfortunate effect that CPU time accounting done in the context of timer
+> interrupts occurring while the guest is running doesn't properly notice
+> that the time since the last tick was spent in the guest.
+> 
+> Inspired by the comment in the x86 code, move the kvm_guest_exit() call
+> below the local_irq_enable() call and change __kvm_guest_exit() to
+> kvm_guest_exit(), because we are now calling this function with
+> interrupts enabled.  We have to now explicitly disable preemption and
+> not enable preemption before we've called kvm_guest_exit(), since
+> otherwise we could be preempted and everything happening before we
+> eventually get scheduled again would be accounted for as guest time.
+> 
+> At the same time, move the trace_kvm_exit() call outside of the atomic
+> section, since there is no reason for us to do that with interrupts
+> disabled.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+> This patch is based on kvm/queue, because it has the kvm_guest_enter/exit
+> rework recently posted by Christian Borntraeger.  I hope I got the logic
+> of this right, there were 2 slightly worrying facts about this:
+> 
+> First, we now enable and disable and enable interrupts on each exit
+> path, but I couldn't see any performance overhead on hackbench - yes the
+> only benchmark we care about.
+> 
+> Second, looking at the ppc and mips code, they seem to also call
+> kvm_guest_exit() before enabling interrupts, so I don't understand how
+> guest CPU time accounting works on those architectures.
+> 
+> Changes since v1:
+>  - Tweak comment and commit text based on Marc's feedback.
+>  - Explicitly disable preemption and enable it only after kvm_guest_exit().
+> 
+>  arch/arm/kvm/arm.c | 21 +++++++++++++++++----
+>  1 file changed, 17 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index e41cb11..fe8028d 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -532,6 +532,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  		kvm_vgic_flush_hwstate(vcpu);
+>  		kvm_timer_flush_hwstate(vcpu);
+>  
+> +		preempt_disable();
+>  		local_irq_disable();
+>  
+>  		/*
+> @@ -544,6 +545,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  
+>  		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm)) {
+>  			local_irq_enable();
+> +			preempt_enable();
+>  			kvm_timer_sync_hwstate(vcpu);
+>  			kvm_vgic_sync_hwstate(vcpu);
+>  			continue;
+> @@ -559,8 +561,10 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  		ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
+>  
+>  		vcpu->mode = OUTSIDE_GUEST_MODE;
+> -		__kvm_guest_exit();
+> -		trace_kvm_exit(kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
+> +		/*
+> +		 * Back from guest
+> +		 *************************************************************/
+> +
+>  		/*
+>  		 * We may have taken a host interrupt in HYP mode (ie
+>  		 * while executing the guest). This interrupt is still
+> @@ -574,8 +578,17 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  		local_irq_enable();
+>  
+>  		/*
+> -		 * Back from guest
+> -		 *************************************************************/
+> +		 * We do local_irq_enable() before calling kvm_guest_exit() so
+> +		 * that if a timer interrupt hits while running the guest we
+> +		 * account that tick as being spent in the guest.  We enable
+> +		 * preemption after calling kvm_guest_exit() so that if we get
+> +		 * preempted we make sure ticks after that is not counted as
+> +		 * guest time.
+> +		 */
+> +		kvm_guest_exit();
+> +		trace_kvm_exit(kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
+> +		preempt_enable();
+> +
+>  
+>  		kvm_timer_sync_hwstate(vcpu);
+>  		kvm_vgic_sync_hwstate(vcpu);
+> 
 
-So we need rtc platform data to be existed in PMIC driver to pass this
-information.
+Hi Christoffer,
+ so currently we take a snap shot when we enter the guest
+(tsk->vtime_snap) and upon exit add the time we spent in
+the guest and update accrued time, which appears correct.
 
-Signed-off-by: Chao Xie <chao.xie@marvell.com>
-Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
----
- drivers/mfd/88pm800.c | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+With this patch it appears that interrupts running
+in host mode are accrued to Guest time, and additional preemption
+latency is added.
 
-diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
-index 8ea4467..34546a1 100644
---- a/drivers/mfd/88pm800.c
-+++ b/drivers/mfd/88pm800.c
-@@ -586,6 +586,25 @@ static int pm800_probe(struct i2c_client *client,
- 			return ret;
- 	}
- 
-+	/*
-+	 * RTC in pmic can run even the core is powered off, and user can set
-+	 * alarm in RTC. When the alarm is time out, the PMIC will power up
-+	 * the core, and the whole system will boot up. When PMIC driver is
-+	 * probed, it will read out some register to find out whether this
-+	 * boot is caused by RTC timeout or not, and it need pass this
-+	 * information to RTC driver.
-+	 * So we need rtc platform data to be existed to pass this information.
-+	 */
-+	if (!pdata->rtc) {
-+		pdata->rtc = devm_kzalloc(&client->dev,
-+					  sizeof(*(pdata->rtc)), GFP_KERNEL);
-+		if (!pdata->rtc) {
-+			dev_err(&client->dev,
-+					"failed to allocate memory for rtc\n");
-+			return -ENOMEM;
-+		}
-+	}
-+
- 	ret = pm80x_init(client);
- 	if (ret) {
- 		dev_err(&client->dev, "pm800_init fail\n");
--- 
-1.9.1
+Thanks,
+- Mario
