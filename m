@@ -1,66 +1,83 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 29 May 2015 08:50:31 -0700
-Subject: runtime check for omap-aes bus access permission (was: Re:
- 3.13-rc3 (commit 7ce93f3) breaks Nokia N900 DT boot)
-In-Reply-To: <CAALWOA82=QmTpCeiceOFQOjqXKdSBjB3Z+jL-mi0vYF=QaL4sA@mail.gmail.com>
-References: <201502111339.54480@pali>
- <CAALWOA_ngoSKjB=ZQ264Va37bBK7v41Ei45SyoYLiMdanTKnxQ@mail.gmail.com>
- <201502112128.44852@pali>
- <CAGo_u6oZxi7O6re30L2-wVyxTeahhyMb4qVcrE3tSCV9sBvrnw@mail.gmail.com>
- <20150528073740.GD16509@pali> <20150528160113.GH30984@atomide.com>
- <CAALWOA8Pfc_zbN9MoHwR=njPBpFU56WObYMbGv9N7ktzy+RSeQ@mail.gmail.com>
- <20150528222412.GM30984@atomide.com>
- <CAALWOA9qJHUST0JQxA6MBohMfbTYAP9+NbSXGYHZY4Xa3nSFvw@mail.gmail.com>
- <CAALWOA82=QmTpCeiceOFQOjqXKdSBjB3Z+jL-mi0vYF=QaL4sA@mail.gmail.com>
-Message-ID: <20150529155030.GO30984@atomide.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 29 May 2015 17:58:12 +0200
+Subject: [PATCH 1/3] clk: mux: Add regmap support for simple mux
+In-Reply-To: <CAGhQ9VysJ4O2uOc4LxdN_bFY42fP=ugLp=Sh2rtFEaaavf3yOQ@mail.gmail.com>
+References: <1432838508-5184-1-git-send-email-matthias.bgg@gmail.com>
+ <1432838508-5184-2-git-send-email-matthias.bgg@gmail.com>
+ <CAGhQ9VysJ4O2uOc4LxdN_bFY42fP=ugLp=Sh2rtFEaaavf3yOQ@mail.gmail.com>
+Message-ID: <CABuKBe+2xU=wTezgi6c=A1=2phbq+Xtu2ST=ThETt21OVf-P3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Matthijs van Duin <matthijsvanduin@gmail.com> [150528 18:37]:
-> On 29 May 2015 at 02:58, Matthijs van Duin <matthijsvanduin@gmail.com> wrote:
-> > It is only guaranteed to happen immediately (before the next
-> > instruction is executed) if the error occurs before the posting-point
-> > of the write. However, in that case the error is reported in-band to
-> > the cpu, resulting in a (synchronous) bus error which takes precedence
-> > over the out-of-band error irq (if any is signalled).
-> 
-> OK, all this was actually assuming linux uses device-type mappings for
-> device mappings, which was also the impression I got from
-> build_mem_type_table() in arch/arm/mm/mmu.c (although it's a bit of a
-> maze). A quick test however seems to imply otherwise:
-> 
-> ~# ./bogus-dev-write
-> Bus error
-> 
-> So... linux actually uses strongly-ordered mappings? I really didn't
-> expect that, given the performance implications (especially on a
-> strictly in-order cpu like the Cortex-A8 which will really just sit
-> there picking its nose until the write completes) and I think I recall
-> having seen an OCP barrier being used somewhere in driver code...
+2015-05-29 8:57 GMT+02:00 Joachim  Eastwood <manabian@gmail.com>:
+> Hi Matthias,
+>
+> On 28 May 2015 at 20:41, Matthias Brugger <matthias.bgg@gmail.com> wrote:
+>> Some devices like SoCs from Mediatek need to use the clock muxes
+>> through a regmap interface.
+>> This patch adds regmap support for simple the simple multiplexer
+>> clock code.
+>
+> Nice to see regmap support. This something I would also like to see
+> added to the clk framework.
+> And if the approach is agreed upon I would like to see support on
+> gates and dividers also.
 
-I believe some TI kernels use strongly-ordered mappings, mainline
-kernel does not. Which kernel version are you using?
- 
-> Well, in that case everything I said is technically still true, except
-> the posting point is the peripheral itself. That also means the
-> interconnect error reporting mechanism is not really useful for
-> probing since you'll get a bus error before any error irq is
-> delivered.
+I totally agree.
 
-Hmm if that's the case then yes we can't use the error irq. However,
-what I've seen so far is that we only get the bus error if the
-l3_* drivers are configured. I guess some more testing is needed.
- 
-> So I'd say you're back at having to trap that bus error using the
-> exception handling mechanism, which I still suspect shouldn't be hard
-> to do.
+>
+>> +static void clk_mux_writel(struct clk_mux *mux, u32 val)
+>> +{
+>> +       if (mux->flags && CLK_MUX_USE_REGMAP)
+>
+> Assume you mean &.
 
-And in that case it makes sense to do that in the bootloader to
-avoid adding any custom early boot code to Linux kernel.
- 
-> Or perhaps you could probe the device using a DMA access and combine
-> that with the interconnect error reporting irq... ;-)
+Sure, it's just luck that the patch didn't end up with a hanging
+system when I tested it yesterday.
+Fixed in next version.
 
-Heh too many dependencies :)
+>
+>> +               regmap_write(mux->regmap, mux->offset, val);
+>> +       else
+>> +               clk_writel(val, mux->reg);
+>> +}
+>> +
+>> +static u32 clk_mux_readl(struct clk_mux *mux)
+>> +{
+>> +       u32 val;
+>> +
+>> +       if (mux->flags && CLK_MUX_USE_REGMAP)
+>
+> And here.
 
-Tony
+Ditto.
+
+>
+>> +               regmap_read(mux->regmap, mux->offset, &val);
+>> +       else
+>> +               val = clk_readl(mux->reg);
+>> +
+>> +       return val;
+>> +}
+>> +
+> [...]
+>> @@ -409,7 +410,9 @@ void clk_unregister_divider(struct clk *clk);
+>>  struct clk_mux {
+>>         struct clk_hw   hw;
+>
+>>         void __iomem    *reg;
+>> +       struct regmap   *regmap;
+>
+> Since it not possible to have both iomem and regmap at the same time.
+> Could this be put in a union or does that make registration more
+> difficult?
+
+It just adds a flag check to the registration.
+I will add it in the next version.
+
+Thanks for reviewing.
+Matthias
+
+
+-- 
+motzblog.wordpress.com
