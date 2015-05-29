@@ -1,49 +1,85 @@
-From: matthijsvanduin@gmail.com (Matthijs van Duin)
-Date: Fri, 29 May 2015 02:58:29 +0200
-Subject: runtime check for omap-aes bus access permission (was: Re:
- 3.13-rc3 (commit 7ce93f3) breaks Nokia N900 DT boot)
-In-Reply-To: <20150528222412.GM30984@atomide.com>
-References: <20131206213613.GA19648@earth.universe> <201502111339.54480@pali>
- <CAALWOA_ngoSKjB=ZQ264Va37bBK7v41Ei45SyoYLiMdanTKnxQ@mail.gmail.com>
- <201502112128.44852@pali>
- <CAGo_u6oZxi7O6re30L2-wVyxTeahhyMb4qVcrE3tSCV9sBvrnw@mail.gmail.com>
- <20150528073740.GD16509@pali> <20150528160113.GH30984@atomide.com>
- <CAALWOA8Pfc_zbN9MoHwR=njPBpFU56WObYMbGv9N7ktzy+RSeQ@mail.gmail.com>
- <20150528222412.GM30984@atomide.com>
-Message-ID: <CAALWOA9qJHUST0JQxA6MBohMfbTYAP9+NbSXGYHZY4Xa3nSFvw@mail.gmail.com>
+From: bintian.wang@huawei.com (Bintian)
+Date: Fri, 29 May 2015 08:58:38 +0800
+Subject: [PATCH v8 6/7] clk: hi6220: Clock driver support for Hisilicon
+ hi6220 SoC
+In-Reply-To: <7h4mmwip62.fsf@deeprootsystems.com>
+References: <1432440671-25235-1-git-send-email-bintian.wang@huawei.com>	<1432440671-25235-3-git-send-email-bintian.wang@huawei.com>	<20150528052608.22384.96747@quantum>
+ <5566CF13.8060806@huawei.com> <7h4mmwip62.fsf@deeprootsystems.com>
+Message-ID: <5567B9BE.9000502@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 May 2015 at 00:24, Tony Lindgren <tony@atomide.com> wrote:
-> Hmm I believe the interrupt happens immediately trying to access an
-> invalid device. But maybe I'm thinking about just errors if a device
-> is not powered or clocked.
+Hello Kevin,
 
-It is only guaranteed to happen immediately (before the next
-instruction is executed) if the error occurs before the posting-point
-of the write. However, in that case the error is reported in-band to
-the cpu, resulting in a (synchronous) bus error which takes precedence
-over the out-of-band error irq (if any is signalled). Once the write
-is posted however, the cpu will receive an ack on the write and
-continue execution, and there's no reason to assume that an error irq
-will happen *immediately* after the write.
+On 2015/5/29 1:32, Kevin Hilman wrote:
+> Bintian <bintian.wang@huawei.com> writes:
+>
+>> Hello Mike,
+>>
+>> On 2015/5/28 13:26, Michael Turquette wrote:
+>>> Quoting Bintian Wang (2015-05-23 21:11:11)
+>>>> Add clock drivers for hi6220 SoC, this driver controls the SoC
+>>>> registers to supply different clocks to different IPs in the SoC.
+>>>>
+>>>> We add one divider clock for hi6220 because the divider in hi6220
+>>>> also has a mask bit but it doesnot obey the rule defined by flag
+>>>> "CLK_DIVIDER_HIWORD_MASK", we can not get index of the mask bit by
+>>>> left shift fixed bits (e.g. 16 bits), so we add this divider clock
+>>>> to handle it.
+>>>>
+>>>> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez-ortiz@linaro.org>
+>>>> Signed-off-by: Bintian Wang <bintian.wang@huawei.com>
+>>>> Acked-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>>>> Reviewed-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>>>> Tested-by: Will Deacon <will.deacon@arm.com>
+>>>> Tested-by: Tyler Baker <tyler.baker@linaro.org>
+>>>
+>>> Hi Bintian,
+>>>
+>>> Thanks for making the changes requested by Stephen. I've taken his patch
+>>> to add assigned-clock-rate/parent support for AMBA interconnects and
+>>> applied it to 4.1-rc1, and then I've applied your v8 patches #4-6 on top
+>>> of that. You can find it at:
+>>>
+>>> git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next-hi6220
+>> Thank you very much!
+>>
+>> I think you also need to pick patch "[PATCH v5 3/6] clk: hi6220:
+>> Document devicetree bindings for hi6220 clock",  which described the
+>> dt binding of clk, and it is also acked by Stephen(v4 is the same to
+>> v5).
+>>
+>>> I have merged this into clk-next so it can get some cycles in
+>>> linux-next.
+>>>
+>>> Stephen,
+>>>
+>>> Can you send your patch out to Russell properly? It needs his ack (or
+>>> for him to take it outright) in order to unblock the hi6220 clock driver
+>>> from being merged.
+>> It doesn't block hi6220 clock driver now, because the UART1 is not
+>> enabled in hi6220 dts now.
+>
+> Now that the clk changes are queued up, can you (re)post the remaining
+> hikey patches with a changelog stating the dependency on the clk-next
+> branch.  I believe what's left is just the DT and Kconfig/defconfig
+> changes, correct?
+Yes, you are right.
 
-Of course it typically will happen soon afterwards, possibly even
-before the next instruction is executed, depending a bit on how soon
-after the posting-point the error occurs versus how long it takes for
-the write-ack to reach the cpu. On the other hand, it's also possible
-the write, after becoming posted, gets stuck for a while due to a
-burst of higher-priority traffic. (I also recall reading about some
-situation where a request needs to wait for something to be
-dynamically powered up before an error response could be generated,
-but I think that was on the OMAP 4.)
+I will post the remaining hikey patches soon.
 
-So that's the icky part: it will very likely happen almost
-immediately. There's however no *guarantee* that it will, and in fact
-it's quite tricky to absolutely make sure a write is no longer in
-transit. The usual solution is an "OCP barrier": a read that is known
-to follow the same path as the write. Normally that means a read from
-the same peripheral, but that would defeat the purpose in this case.
-Fortunately, the L4 interconnects (unlike the L3) detect firewall
-violations in the initiator agent rather than the target agents, hence
-a read from any peripheral on the same L4 interconnect suffices.
+Thank you Kevin,
+
+BR,
+
+Bintian
+>
+> With some acks from the DT maintainers, these should be ready to be
+> merged through arm-soc.
+>
+> Thanks,
+>
+> Kevin
+>
+> .
+>
