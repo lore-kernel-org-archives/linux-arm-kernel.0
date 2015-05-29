@@ -1,83 +1,71 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 29 May 2015 16:00:41 -0700
-Subject: [PATCH v8 0/7] arm64,hi6220: Enable Hisilicon Hi6220 SoC
-In-Reply-To: <1432865319-20413-1-git-send-email-bintian.wang@huawei.com>
- (Bintian Wang's message of "Fri, 29 May 2015 10:08:32 +0800")
-References: <1432865319-20413-1-git-send-email-bintian.wang@huawei.com>
-Message-ID: <7hwpzrdm5i.fsf@deeprootsystems.com>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Sat, 30 May 2015 01:19:01 +0200
+Subject: [PATCH v4] ARM: l2c: add options to overwrite prefetching behavior
+Message-ID: <1432941541-18588-1-git-send-email-hauke@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bintian,
+These options make it possible to overwrites the data and instruction
+prefetching behavior of the arm pl310 cache controller.
 
-Bintian Wang <bintian.wang@huawei.com> writes:
+Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+---
+changes since
+v3: 
+  * remove arm prefix
+  * improve documentation
+v2: only set prefetch
+v1: set prefetch and aux
+ Documentation/devicetree/bindings/arm/l2cc.txt |  5 +++++
+ arch/arm/mm/cache-l2x0.c                       | 20 ++++++++++++++++++++
+ 2 files changed, 25 insertions(+)
 
-> From: Bintian Wang <wangbintian@gmail.com>
->
-> Hi6220 is one mobile solution of Hisilicon, this patchset contains
-> initial support for Hi6220 SoC and HiKey development board, which
-> supports octal ARM Cortex A53 cores. Initial support is minimal and
-> includes just the arch configuration, clock driver, device tree
-> configuration.
->
-> PSCI is enabled in device tree and there is no problem to boot all the
-> octal cores, and the CPU hotplug is also working now, you can download
-> and compile the latest firmware based on the following link to run this
-> patch set:
-> https://github.com/96boards/documentation/wiki/UEFI
->
-> Changes v6~v8:
-> This three versions only modified the clock drivers based on the
-> Stephen's review advices.
-> * clk-hi6220.c:
->   ** Split the clock header file from clock driver
->   ** Delete setting the parents clock of UART1 to HI6220_150M in clock
->      driver, we can do that using assigned-clock in dts when enable
->      UART1 in the future.
-> * clkdivider-hi6220.c: 
->   ** Reuse some functions exported by clk-divider.c
->   ** Remove "pr_err" and CLK_IS_BASIC flag
->   ** Fix some programing style problems
-> * hisilicon/clk.h: remove the "__init" markings on some funcition
->   prototypes.
-
-It's not clear what kernel this series is meant to apply to.  It doesn't
-apply cleanly to v4.1-rc2 (the version stated for v5) or the current -rc
-(v4.1-rc5) it also doesn't apply cleanly to linus/master or linux-next.
-
-If the series doesn't apply to Linus tree, please state clearly in the
-changelog what tree it should apply to as well as any dependncies.
-
-Also, this version is missing patch 1 from the v6 series, which adds the
-Kconfig/defconfig changes. Without that patch, nothing in this series is
-even compiled (clk driver or DTS files.)
-
-So my recommendation, since the clock driver is very close to being
-merged:
-
-Please create a v9 series with *only* the patches that are not already
-queued up on the clk tree[1].  That should be patches 1-3 and 7 of this
-series, plus patch 1 from v6.
-
-That series should apply cleanly to v4.1-rc1 (or a newer -rc if there
-are dependencies.)  In the changelog to that series, state the version
-that it applies to, and also state that it depends on the clk-next
-branch where the clock maintainers have queued up the driver[1].
-
-Then all that's left is to collect an ack from a DT maintainer, and
-these can be queued up via the arm-soc tree.
-
-FWIW, I've boot tested patches 1-3 and 7 of this series, plus patch 1
-from v6 combined with the clk-next-hi6220 branch[1] on my board (which
-uses ATF + mainline u-boot) and all 8 A53 cores are coming up, so feel
-free to add:
-
-Tested-by: Kevin Hilman <khilman@linaro.org>
-
-to your v9 series.
-
-Thanks,
-
-Kevin
-
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next-hi6220
+diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
+index 0dbabe9..2251dcc 100644
+--- a/Documentation/devicetree/bindings/arm/l2cc.txt
++++ b/Documentation/devicetree/bindings/arm/l2cc.txt
+@@ -67,6 +67,11 @@ Optional properties:
+   disable if zero.
+ - arm,prefetch-offset : Override prefetch offset value. Valid values are
+   0-7, 15, 23, and 31.
++- prefetch-data : Data prefetch. Value: <0> (forcibly disable), <1>
++  (forcibly enable), property absent (retain settings set by firmware)
++- prefetch-instr : Instruction prefetch. Value: <0> (forcibly disable),
++  <1> (forcibly enable), property absent (retain settings set by
++  firmware)
+ 
+ Example:
+ 
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index e309c8f..2570f83 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -1199,6 +1199,26 @@ static void __init l2c310_of_parse(const struct device_node *np,
+ 		pr_err("L2C-310 OF arm,prefetch-offset property value is missing\n");
+ 	}
+ 
++	ret = of_property_read_u32(np, "prefetch-data", &val);
++	if (ret == 0) {
++		if (val)
++			prefetch |= L310_PREFETCH_CTRL_DATA_PREFETCH;
++		else
++			prefetch &= ~L310_PREFETCH_CTRL_DATA_PREFETCH;
++	} else if (ret != -EINVAL) {
++		pr_err("L2C-310 OF prefetch-data property value is missing\n");
++	}
++
++	ret = of_property_read_u32(np, "prefetch-instr", &val);
++	if (ret == 0) {
++		if (val)
++			prefetch |= L310_PREFETCH_CTRL_INSTR_PREFETCH;
++		else
++			prefetch &= ~L310_PREFETCH_CTRL_INSTR_PREFETCH;
++	} else if (ret != -EINVAL) {
++		pr_err("L2C-310 OF prefetch-instr property value is missing\n");
++	}
++
+ 	l2x0_saved_regs.prefetch_ctrl = prefetch;
+ }
+ 
+-- 
+2.1.4
