@@ -1,33 +1,39 @@
-From: jkosina@suse.cz (Jiri Kosina)
-Date: Fri, 29 May 2015 13:52:31 +0200 (CEST)
-Subject: [RFC PATCH 0/5] livepatch: add support on arm64
-In-Reply-To: <1432792265-24076-1-git-send-email-huawei.libin@huawei.com>
-References: <1432792265-24076-1-git-send-email-huawei.libin@huawei.com>
-Message-ID: <alpine.LNX.2.00.1505291350510.26271@pobox.suse.cz>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 29 May 2015 13:55:19 +0200
+Subject: [GIT PULL] omap device tree changes for v4.2, part 1
+In-Reply-To: <20150522202028.GE10274@atomide.com>
+References: <20150522202028.GE10274@atomide.com>
+Message-ID: <3356447.2K9JD68FjR@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 28 May 2015, Li Bin wrote:
-
-> This patchset propose a method for gcc -mfentry feature(profile
-> before prologue) implementation for arm64, and propose the livepatch
-> implementation for arm64 based on this feature.
-> The gcc implementation about this feature will be post to the gcc 
-> community soon.
+On Friday 22 May 2015 13:20:28 Tony Lindgren wrote:
+> ----------------------------------------------------------------
+> Device tree related changes for omaps:
 > 
-> With this -mfentry feature, the entry of each function like:
+> - Configure MMC data lines 4..8 for 1.8V IO on boards that
+>   are using them as GPIOs instead of MMC data lines
 > 
-> foo:
->     mov x9, x30 
->     bl __fentry__
->     mov x30, x9
->     [prologue]
->     ... 
+> - Add support for Baltos IR5221
+> 
+> - Add device tree support for LogicPD Torpedo devkit
+> 
+> - Add 3717 core pinctrl region
+> 
+> - Add gta04 1w and GSM audio support
+> 
+> - Add wilink and ov2659 support for am437x-gp-evm
+> 
+> - Add am335x-evm bluetooth and mmc3 support
+> 
+> - Enable omap5-uevm uart wakeup interrupt
+> 
+> - Enable I2C2 on BeagleBone as it's used for the capes
+> 
+> - Use defines for LDP GPIO keys
+> 
+> 
 
-Thanks a lot for working on arm64 support. I am putting this patchset on 
-hold before gcc support is merged. Once that happens, and once the arm64 
-parts are Acked by the arch maintainers, we could proceed with this patch.
+Pulled into next/dt, thanks!
 
--- 
-Jiri Kosina
-SUSE Labs
+	Arnd
