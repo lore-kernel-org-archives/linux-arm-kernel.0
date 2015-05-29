@@ -1,50 +1,67 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Sat, 30 May 2015 00:00:35 +0930
-Subject: [PATCHv3] ARM: dts: odroidxu3: Enable USB3 regulators
-Message-ID: <1432909836-3952-1-git-send-email-linux.amoon@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 29 May 2015 16:31:49 +0200
+Subject: [PATCH/RFC 2/2] ARM: multi_v7_defconfig: Make fbdev support
+ modular
+In-Reply-To: <1432905926-31606-2-git-send-email-geert@linux-m68k.org>
+References: <1432905926-31606-1-git-send-email-geert@linux-m68k.org>
+ <1432905926-31606-2-git-send-email-geert@linux-m68k.org>
+Message-ID: <2781864.6mtTUuCs58@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable regulator for usbdrd3_0 and usbdrd3_1.
-Looking at the schematic pin diagram for MAX77802
-USB3_0 and USB3_1 is regulated by LDO9 and LD011.
+On Friday 29 May 2015 15:25:26 Geert Uytterhoeven wrote:
+> From: Geert Uytterhoeven <geert+renesas@glider.be>
+> 
+> Make fbdev support modular to reduce kernel size (-158 KiB):
+> 
+>        text    data     bss     dec     hex   filename
+>     11581470 1387196  338264 13306930  cb0c32 vmlinux.before
+>     11430531 1384340  330584 13145455  c8956f vmlinux.after
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> This one is more controversial:
+>   - Does anyone need fbdev for boot-testing?
+>   - This disables two drivers that cannot be modular (FB_WM8505 and
+>     FB_SIMPLE), and the PLAT_VERSATILE_CLCD helper support.
 
-Fix the boot message of failed.
-[    3.503539] exynos-dwc3 usb at 12000000: Looking up vdd33-supply from device tree
-[    3.503556] exynos-dwc3 usb at 12000000: Looking up vdd33-supply property in node /usb at 12000000 failed
-[    3.503568] usb at 12000000 supply vdd33 not found, using dummy regulator
-[    3.509154] exynos-dwc3 usb at 12000000: Looking up vdd10-supply from device tree
-[    3.509170] exynos-dwc3 usb at 12000000: Looking up vdd10-supply property in node /usb at 12000000 failed
-[    3.509181] usb at 12000000 supply vdd10 not found, using dummy regulator
-[    3.917548] exynos-dwc3 usb at 12400000: Looking up vdd33-supply from device tree
-[    3.917565] exynos-dwc3 usb at 12400000: Looking up vdd33-supply property in node /usb at 12400000 failed
-[    3.917578] usb at 12400000 supply vdd33 not found, using dummy regulator
-[    3.922731] exynos-dwc3 usb at 12400000: Looking up vdd10-supply from device tree
-[    3.922747] exynos-dwc3 usb at 12400000: Looking up vdd10-supply property in node /usb at 12400000 failed
+My guess is that FB_WM8505 would be useful, as the chip is
+primarily used in tablets that don't come with an easily
+accessible UART.
 
-Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Signed-off-by: Anand Moon <linux.amoon@gmail.com>
----
- arch/arm/boot/dts/exynos5422-odroidxu3.dts | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+OTOH, those machines are very rare, and we may decided that
+we just include them for build testing as well as the odd
+developers that do have a UART.
 
-diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-index 27014bb..a353a58 100644
---- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-@@ -513,3 +513,13 @@
- &usbdrd_dwc3_1 {
- 	dr_mode = "otg";
- };
-+
-+&usbdrd3_0 {
-+	vdd33-supply = <&ldo9_reg>;
-+	vdd10-supply = <&ldo11_reg>;
-+};
-+
-+&usbdrd3_1 {
-+	vdd33-supply = <&ldo9_reg>;
-+	vdd10-supply = <&ldo11_reg>;
-+};
--- 
-1.9.1
+	Arnd
+
+>  arch/arm/configs/multi_v7_defconfig | 9 +++------
+>  1 file changed, 3 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 9b4e33d5b15e340f..af94ade61b1400d6 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -436,18 +436,15 @@ CONFIG_DRM_EXYNOS_HDMI=y
+>  CONFIG_DRM_RCAR_DU=m
+>  CONFIG_DRM_TEGRA=m
+>  CONFIG_DRM_PANEL_SIMPLE=m
+> -CONFIG_FB=y
+> -CONFIG_FB_ARMCLCD=y
+> -CONFIG_FB_WM8505=y
+> -CONFIG_FB_SH_MOBILE_LCDC=y
+> -CONFIG_FB_SIMPLE=y
+> +CONFIG_FB_ARMCLCD=m
+> +CONFIG_FB_SH_MOBILE_LCDC=m
+>  CONFIG_FB_SH_MOBILE_MERAM=y
+>  CONFIG_BACKLIGHT_LCD_SUPPORT=y
+>  CONFIG_BACKLIGHT_CLASS_DEVICE=y
+>  CONFIG_LCD_PLATFORM=m
+>  CONFIG_BACKLIGHT_PWM=y
+>  CONFIG_BACKLIGHT_AS3711=y
+> -CONFIG_FRAMEBUFFER_CONSOLE=y
+> +CONFIG_FRAMEBUFFER_CONSOLE=m
+>  CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
+>  CONFIG_SOUND=m
+>  CONFIG_SND=m
+> 
