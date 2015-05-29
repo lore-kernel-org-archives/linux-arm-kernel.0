@@ -1,111 +1,50 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Thu, 28 May 2015 18:20:50 -0700
-Subject: [PATCH v5 00/11] Add simple NVMEM Framework via regmap.
-In-Reply-To: <1432226535-8640-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1432226535-8640-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <CAA9_cmetqnqTQPCd8ya5AJPKQw8ary8CwsE6TUv=f57O=_MH5w@mail.gmail.com>
+From: matthijsvanduin@gmail.com (Matthijs van Duin)
+Date: Fri, 29 May 2015 03:35:22 +0200
+Subject: runtime check for omap-aes bus access permission (was: Re:
+ 3.13-rc3 (commit 7ce93f3) breaks Nokia N900 DT boot)
+In-Reply-To: <CAALWOA9qJHUST0JQxA6MBohMfbTYAP9+NbSXGYHZY4Xa3nSFvw@mail.gmail.com>
+References: <20131206213613.GA19648@earth.universe> <201502111339.54480@pali>
+ <CAALWOA_ngoSKjB=ZQ264Va37bBK7v41Ei45SyoYLiMdanTKnxQ@mail.gmail.com>
+ <201502112128.44852@pali>
+ <CAGo_u6oZxi7O6re30L2-wVyxTeahhyMb4qVcrE3tSCV9sBvrnw@mail.gmail.com>
+ <20150528073740.GD16509@pali> <20150528160113.GH30984@atomide.com>
+ <CAALWOA8Pfc_zbN9MoHwR=njPBpFU56WObYMbGv9N7ktzy+RSeQ@mail.gmail.com>
+ <20150528222412.GM30984@atomide.com>
+ <CAALWOA9qJHUST0JQxA6MBohMfbTYAP9+NbSXGYHZY4Xa3nSFvw@mail.gmail.com>
+Message-ID: <CAALWOA82=QmTpCeiceOFQOjqXKdSBjB3Z+jL-mi0vYF=QaL4sA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 21, 2015 at 9:42 AM, Srinivas Kandagatla
-<srinivas.kandagatla@linaro.org> wrote:
-> Thankyou all for providing inputs and comments on previous versions of this patchset.
-> Here is the v5 of the patchset addressing all the issues raised as
-> part of previous versions review.
->
-> This patchset adds a new simple NVMEM framework to kernel.
->
-> Up until now, NVMEM drivers were stored in drivers/misc, where they all had to
-> duplicate pretty much the same code to register a sysfs file, allow in-kernel
-> users to access the content of the devices they were driving, etc.
->
-> This was also a problem as far as other in-kernel users were involved, since
-> the solutions used were pretty much different from on driver to another, there
-> was a rather big abstraction leak.
->
-> Introduction of this framework aims at solving this. It also introduces DT
-> representation for consumer devices to go get the data they require (MAC
-> Addresses, SoC/Revision ID, part numbers, and so on) from the NVMEMs.
->
-> After learning few things about QCOM qfprom and other eeprom/efuses, which
-> has packed fields at bit level. Which makes it important to add support to
-> such memories. This version adds support to this type of non volatile
-> memories by adding support to bit level nvmem-cells.
->
-> Having regmap interface to this framework would give much better
-> abstraction for nvmems on different buses.
->
-> patch 1-2 Introduces two regmap helper functions.
-> patch 3-6 Introduces the NVMEM framework.
-> Patch 7 Adds helper functions for nvmems based on mmio.
-> Patch 8 migrates an existing driver to nvmem framework.
-> Patch 9-10 Adds Qualcomm specific qfprom driver.
-> Patch 11 adds entry in MAINTAINERS.
->
-> Its also possible to migrate other nvmem drivers to this framework.
->
-> Providers APIs:
->         nvmem_register/unregister();
->
-> Consumers APIs:
-> Cell based apis for both DT/Non-DT:
->         nvmem_cell_get()/nvmem_cell_put();
->         nvmem_cell_read()/nvmem_cell_write();
->
-> Raw byte access apis for both DT/non-DT.
->         nvmem_device_get()/nvmem_device_put()
->         nvmem_device_read()/nvmem_device_write();
->         nvmem_device_cell_read()/nvmem_device_cell_write();
->
-> Device Tree:
->
->         /* Provider */
->         qfprom: qfprom at 00700000 {
->                 ...
->
->                 /* Data cells */
->                 tsens_calibration: calib at 404 {
->                         reg = <0x404 0x10>;
->                 };
->
->                 tsens_calibration_bckp: calib_bckp at 504 {
->                         reg = <0x504 0x11>;
->                         bit-offset = 6;
->                         nbits = 128;
->                 };
->
->                 pvs_version: pvs-version at 6 {
->                         reg = <0x6 0x2>
->                         bit-offset = 7;
->                         nbits = 2;
->                 };
->
->                 speed_bin: speed-bin at c{
->                         reg = <0xc 0x1>;
->                         bit-offset = 2;
->                         nbits   = 3;
->
->                 };
->                 ...
->         };
->
-> userspace interface: binary file in /sys/class/nvmem/*/nvmem
->
-> ex:
-> hexdump /sys/class/nvmem/qfprom0/nvmem
->
-> 0000000 0000 0000 0000 0000 0000 0000 0000 0000
-> *
-> 00000a0 db10 2240 0000 e000 0c00 0c00 0000 0c00
-> 0000000 0000 0000 0000 0000 0000 0000 0000 0000
-> ...
-> *
-> 0001000
->
-> Changes since v4(https://lkml.org/lkml/2015/3/30/725)
->  * rename eeprom to nvmem suggested by Matt Porter
+On 29 May 2015 at 02:58, Matthijs van Duin <matthijsvanduin@gmail.com> wrote:
+> It is only guaranteed to happen immediately (before the next
+> instruction is executed) if the error occurs before the posting-point
+> of the write. However, in that case the error is reported in-band to
+> the cpu, resulting in a (synchronous) bus error which takes precedence
+> over the out-of-band error irq (if any is signalled).
 
-Apologies for the bikeshed fly-by review, but given we already have
-NVME and are adding an NVDIMM driver sub-system is s/eeprom/nvmem/ a
-good idea?
+OK, all this was actually assuming linux uses device-type mappings for
+device mappings, which was also the impression I got from
+build_mem_type_table() in arch/arm/mm/mmu.c (although it's a bit of a
+maze). A quick test however seems to imply otherwise:
+
+~# ./bogus-dev-write
+Bus error
+
+So... linux actually uses strongly-ordered mappings? I really didn't
+expect that, given the performance implications (especially on a
+strictly in-order cpu like the Cortex-A8 which will really just sit
+there picking its nose until the write completes) and I think I recall
+having seen an OCP barrier being used somewhere in driver code...
+
+Well, in that case everything I said is technically still true, except
+the posting point is the peripheral itself. That also means the
+interconnect error reporting mechanism is not really useful for
+probing since you'll get a bus error before any error irq is
+delivered.
+
+So I'd say you're back at having to trap that bus error using the
+exception handling mechanism, which I still suspect shouldn't be hard
+to do.
+
+Or perhaps you could probe the device using a DMA access and combine
+that with the interconnect error reporting irq... ;-)
