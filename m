@@ -1,88 +1,73 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Fri, 29 May 2015 20:11:59 +0200
-Subject: [PATCH v3] ARM: l2c: add options to overwrite prefetching behavior
-In-Reply-To: <5568A745.7020502@gmail.com>
-References: <1431726751-9169-1-git-send-email-hauke@hauke-m.de>
- <5568A745.7020502@gmail.com>
-Message-ID: <5568ABEF.3040001@hauke-m.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 29 May 2015 11:16:15 -0700
+Subject: runtime check for omap-aes bus access permission (was: Re:
+ 3.13-rc3 (commit 7ce93f3) breaks Nokia N900 DT boot)
+In-Reply-To: <20150529155030.GO30984@atomide.com>
+References: <CAALWOA_ngoSKjB=ZQ264Va37bBK7v41Ei45SyoYLiMdanTKnxQ@mail.gmail.com>
+ <201502112128.44852@pali>
+ <CAGo_u6oZxi7O6re30L2-wVyxTeahhyMb4qVcrE3tSCV9sBvrnw@mail.gmail.com>
+ <20150528073740.GD16509@pali> <20150528160113.GH30984@atomide.com>
+ <CAALWOA8Pfc_zbN9MoHwR=njPBpFU56WObYMbGv9N7ktzy+RSeQ@mail.gmail.com>
+ <20150528222412.GM30984@atomide.com>
+ <CAALWOA9qJHUST0JQxA6MBohMfbTYAP9+NbSXGYHZY4Xa3nSFvw@mail.gmail.com>
+ <CAALWOA82=QmTpCeiceOFQOjqXKdSBjB3Z+jL-mi0vYF=QaL4sA@mail.gmail.com>
+ <20150529155030.GO30984@atomide.com>
+Message-ID: <20150529181614.GS30984@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 05/29/2015 07:52 PM, Florian Fainelli wrote:
-> On 15/05/15 14:52, Hauke Mehrtens wrote:
->> These options make it possible to overwrites the data and instruction
->> prefetching behavior of the arm pl310 cache controller.
->>
->> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
->> ---
->> v2: only set prefetch
->> v1: set prefetch and aux
->>
->>  Documentation/devicetree/bindings/arm/l2cc.txt |  4 ++++
->>  arch/arm/mm/cache-l2x0.c                       | 20 ++++++++++++++++++++
->>  2 files changed, 24 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
->> index 0dbabe9..528821a 100644
->> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
->> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
->> @@ -67,6 +67,10 @@ Optional properties:
->>    disable if zero.
->>  - arm,prefetch-offset : Override prefetch offset value. Valid values are
->>    0-7, 15, 23, and 31.
->> +- arm,prefetch-data : Enable data prefetch. Enabling prefetching
->> +  can improve performance.
+* Tony Lindgren <tony@atomide.com> [150529 08:52]:
+> * Matthijs van Duin <matthijsvanduin@gmail.com> [150528 18:37]:
+> > On 29 May 2015 at 02:58, Matthijs van Duin <matthijsvanduin@gmail.com> wrote:
+> > > It is only guaranteed to happen immediately (before the next
+> > > instruction is executed) if the error occurs before the posting-point
+> > > of the write. However, in that case the error is reported in-band to
+> > > the cpu, resulting in a (synchronous) bus error which takes precedence
+> > > over the out-of-band error irq (if any is signalled).
+> > 
+> > OK, all this was actually assuming linux uses device-type mappings for
+> > device mappings, which was also the impression I got from
+> > build_mem_type_table() in arch/arm/mm/mmu.c (although it's a bit of a
+> > maze). A quick test however seems to imply otherwise:
+> > 
+> > ~# ./bogus-dev-write
+> > Bus error
+> > 
+> > So... linux actually uses strongly-ordered mappings? I really didn't
+> > expect that, given the performance implications (especially on a
+> > strictly in-order cpu like the Cortex-A8 which will really just sit
+> > there picking its nose until the write completes) and I think I recall
+> > having seen an OCP barrier being used somewhere in driver code...
 > 
-> I do not think the "can improve performance" has a place in a binding,
-> this is either not technical enough about what this does, or marketing
-> enough it does not buy us much.
+> I believe some TI kernels use strongly-ordered mappings, mainline
+> kernel does not. Which kernel version are you using?
+>  
+> > Well, in that case everything I said is technically still true, except
+> > the posting point is the peripheral itself. That also means the
+> > interconnect error reporting mechanism is not really useful for
+> > probing since you'll get a bus error before any error irq is
+> > delivered.
 > 
-> data/instruction pre-fetching are commonly found on cache controller
-> these days, so I would be tempted to remove the "arm," prefixing here
-> since this can be generalized to other kinds of cache controllers.
-> Documenting that this can be either a boolean, or accept a value (see
-> below) could help.
+> Hmm if that's the case then yes we can't use the error irq. However,
+> what I've seen so far is that we only get the bus error if the
+> l3_* drivers are configured. I guess some more testing is needed.
+>  
+> > So I'd say you're back at having to trap that bus error using the
+> > exception handling mechanism, which I still suspect shouldn't be hard
+> > to do.
+> 
+> And in that case it makes sense to do that in the bootloader to
+> avoid adding any custom early boot code to Linux kernel.
+>  
+> > Or perhaps you could probe the device using a DMA access and combine
+> > that with the interconnect error reporting irq... ;-)
+> 
+> Heh too many dependencies :)
 
-So you think I should only add prefetch-data and prefetch-instr without
-the arm prefix.
-> 
->> +- arm,prefetch-instr : Enable instruction prefetch. Enabling prefetching
->> +  can improve performance.
->>  
->>  Example:
->>  
->> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
->> index e309c8f..1aa970a 100644
->> --- a/arch/arm/mm/cache-l2x0.c
->> +++ b/arch/arm/mm/cache-l2x0.c
->> @@ -1199,6 +1199,26 @@ static void __init l2c310_of_parse(const struct device_node *np,
->>  		pr_err("L2C-310 OF arm,prefetch-offset property value is missing\n");
->>  	}
->>  
->> +	ret = of_property_read_u32(np, "arm,prefetch-data", &val);
->> +	if (ret == 0) {
->> +		if (val)
->> +			prefetch |= L310_PREFETCH_CTRL_DATA_PREFETCH;
->> +		else
->> +			prefetch &= ~L310_PREFETCH_CTRL_DATA_PREFETCH;
->> +	} else if (ret != -EINVAL) {
->> +		pr_err("L2C-310 OF arm,prefetch-data property value is missing\n");
->> +	}
-> 
-> If we want to generalize the use of this property, there could indeed be
-> a value associated with it, if the cache controller supports different
-> pre-fetching strides, however this is not the cache for these cache
-> controllers it seems, are not we going to show error messages more often
-> than desired?
-I did this so it is possible to deactivate the prefech mode. I do not
-know if somebody wants to do that. I haven't understood how you suggest
-I should change.
-When you do not associate a value with an entry in device tree it is
-there or not there, so we could only activate it when it was not
-automatically detected, but we could not deactivate it, because the case
-when this value is not specified in device tree would be, use to auto
-detected the value.
+If we can't use the l3 interrrupts, then something similar to commit
+fdf4850cb5b2 ("ARM: BCM5301X: workaround suppress fault") might be
+doable too.
 
-Hauke
+Regards,
+
+Tony
