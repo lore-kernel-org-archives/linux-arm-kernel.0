@@ -1,10 +1,10 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 29 May 2015 09:54:17 +0900
-Subject: [PATCH 09/10] ARM: shmobile: r8a7791 dtsi: Describe DMA for the
+Date: Fri, 29 May 2015 09:54:18 +0900
+Subject: [PATCH 10/10] ARM: shmobile: r8a7790 dtsi: Describe DMA for the
  serial ports
 In-Reply-To: <cover.1432860632.git.horms+renesas@verge.net.au>
 References: <cover.1432860632.git.horms+renesas@verge.net.au>
-Message-ID: <558d656513cd481f65f492ab8685605aa85577cf.1432860632.git.horms+renesas@verge.net.au>
+Message-ID: <acea43fcb02746e907725c6dbd2eb95b32d79ea5.1432860632.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,171 +15,99 @@ Add DMA properties to all SCIF, SCIFA, SCIFB, and HSCIF device nodes.
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+ arch/arm/boot/dts/r8a7790.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index bbef666596e5..dc1cd3f16606 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -533,6 +533,8 @@
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 70248df02342..51ab8865ea37 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -556,6 +556,8 @@
  		interrupts = <0 144 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7791_CLK_SCIFA0>;
+ 		clocks = <&mstp2_clks R8A7790_CLK_SCIFA0>;
  		clock-names = "sci_ick";
 +		dmas = <&dmac0 0x21>, <&dmac0 0x22>;
 +		dma-names = "tx", "rx";
  		status = "disabled";
  	};
  
-@@ -542,6 +544,8 @@
+@@ -565,6 +567,8 @@
  		interrupts = <0 145 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7791_CLK_SCIFA1>;
+ 		clocks = <&mstp2_clks R8A7790_CLK_SCIFA1>;
  		clock-names = "sci_ick";
 +		dmas = <&dmac0 0x25>, <&dmac0 0x26>;
 +		dma-names = "tx", "rx";
  		status = "disabled";
  	};
  
-@@ -551,6 +555,8 @@
+@@ -574,6 +578,8 @@
  		interrupts = <0 151 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7791_CLK_SCIFA2>;
+ 		clocks = <&mstp2_clks R8A7790_CLK_SCIFA2>;
  		clock-names = "sci_ick";
 +		dmas = <&dmac0 0x27>, <&dmac0 0x28>;
 +		dma-names = "tx", "rx";
  		status = "disabled";
  	};
  
-@@ -560,6 +566,8 @@
- 		interrupts = <0 29 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp11_clks R8A7791_CLK_SCIFA3>;
- 		clock-names = "sci_ick";
-+		dmas = <&dmac0 0x1b>, <&dmac0 0x1c>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
-@@ -569,6 +577,8 @@
- 		interrupts = <0 30 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp11_clks R8A7791_CLK_SCIFA4>;
- 		clock-names = "sci_ick";
-+		dmas = <&dmac0 0x1f>, <&dmac0 0x20>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
-@@ -578,6 +588,8 @@
- 		interrupts = <0 31 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp11_clks R8A7791_CLK_SCIFA5>;
- 		clock-names = "sci_ick";
-+		dmas = <&dmac0 0x23>, <&dmac0 0x24>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
-@@ -587,6 +599,8 @@
+@@ -583,6 +589,8 @@
  		interrupts = <0 148 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7791_CLK_SCIFB0>;
+ 		clocks = <&mstp2_clks R8A7790_CLK_SCIFB0>;
  		clock-names = "sci_ick";
 +		dmas = <&dmac0 0x3d>, <&dmac0 0x3e>;
 +		dma-names = "tx", "rx";
  		status = "disabled";
  	};
  
-@@ -596,6 +610,8 @@
+@@ -592,6 +600,8 @@
  		interrupts = <0 149 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7791_CLK_SCIFB1>;
+ 		clocks = <&mstp2_clks R8A7790_CLK_SCIFB1>;
  		clock-names = "sci_ick";
 +		dmas = <&dmac0 0x19>, <&dmac0 0x1a>;
 +		dma-names = "tx", "rx";
  		status = "disabled";
  	};
  
-@@ -605,6 +621,8 @@
+@@ -601,6 +611,8 @@
  		interrupts = <0 150 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7791_CLK_SCIFB2>;
+ 		clocks = <&mstp2_clks R8A7790_CLK_SCIFB2>;
  		clock-names = "sci_ick";
 +		dmas = <&dmac0 0x1d>, <&dmac0 0x1e>;
 +		dma-names = "tx", "rx";
  		status = "disabled";
  	};
  
-@@ -614,6 +632,8 @@
+@@ -610,6 +622,8 @@
  		interrupts = <0 152 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp7_clks R8A7791_CLK_SCIF0>;
+ 		clocks = <&mstp7_clks R8A7790_CLK_SCIF0>;
  		clock-names = "sci_ick";
 +		dmas = <&dmac0 0x29>, <&dmac0 0x2a>;
 +		dma-names = "tx", "rx";
  		status = "disabled";
  	};
  
-@@ -623,6 +643,8 @@
+@@ -619,6 +633,8 @@
  		interrupts = <0 153 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp7_clks R8A7791_CLK_SCIF1>;
+ 		clocks = <&mstp7_clks R8A7790_CLK_SCIF1>;
  		clock-names = "sci_ick";
 +		dmas = <&dmac0 0x2d>, <&dmac0 0x2e>;
 +		dma-names = "tx", "rx";
  		status = "disabled";
  	};
  
-@@ -632,6 +654,8 @@
- 		interrupts = <0 22 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp7_clks R8A7791_CLK_SCIF2>;
- 		clock-names = "sci_ick";
-+		dmas = <&dmac0 0x2b>, <&dmac0 0x2c>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
-@@ -641,6 +665,8 @@
- 		interrupts = <0 23 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp7_clks R8A7791_CLK_SCIF3>;
- 		clock-names = "sci_ick";
-+		dmas = <&dmac0 0x2f>, <&dmac0 0x30>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
-@@ -650,6 +676,8 @@
- 		interrupts = <0 24 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp7_clks R8A7791_CLK_SCIF4>;
- 		clock-names = "sci_ick";
-+		dmas = <&dmac0 0xfb>, <&dmac0 0xfc>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
-@@ -659,6 +687,8 @@
- 		interrupts = <0 25 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp7_clks R8A7791_CLK_SCIF5>;
- 		clock-names = "sci_ick";
-+		dmas = <&dmac0 0xfd>, <&dmac0 0xfe>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
-@@ -668,6 +698,8 @@
+@@ -628,6 +644,8 @@
  		interrupts = <0 154 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp7_clks R8A7791_CLK_HSCIF0>;
+ 		clocks = <&mstp7_clks R8A7790_CLK_HSCIF0>;
  		clock-names = "sci_ick";
 +		dmas = <&dmac0 0x39>, <&dmac0 0x3a>;
 +		dma-names = "tx", "rx";
  		status = "disabled";
  	};
  
-@@ -677,6 +709,8 @@
+@@ -637,6 +655,8 @@
  		interrupts = <0 155 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp7_clks R8A7791_CLK_HSCIF1>;
+ 		clocks = <&mstp7_clks R8A7790_CLK_HSCIF1>;
  		clock-names = "sci_ick";
 +		dmas = <&dmac0 0x4d>, <&dmac0 0x4e>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
-@@ -686,6 +720,8 @@
- 		interrupts = <0 21 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp7_clks R8A7791_CLK_HSCIF2>;
- 		clock-names = "sci_ick";
-+		dmas = <&dmac0 0x3b>, <&dmac0 0x3c>;
 +		dma-names = "tx", "rx";
  		status = "disabled";
  	};
