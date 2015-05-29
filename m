@@ -1,26 +1,43 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 May 2015 14:31:03 +0200
-Subject: [GIT PULL] ARM: imx: fixes for 4.1, 3rd round
-In-Reply-To: <20150527113952.GF16165@dragon>
-References: <20150527113952.GF16165@dragon>
-Message-ID: <2775392.lq7WEYFDjf@wuerfel>
+Date: Fri, 29 May 2015 14:32:24 +0200
+Subject: [PATCH 1/2] ARM: multi_v7_defconfig: Replace
+ CONFIG_USB_ISP1760_HCD by CONFIG_USB_ISP1760
+In-Reply-To: <20150529004013.GA23322@verge.net.au>
+References: <1432637918-8946-1-git-send-email-geert+renesas@glider.be>
+ <2413647.WLsQ0T21gS@wuerfel> <20150529004013.GA23322@verge.net.au>
+Message-ID: <7260922.D3MTjE5FDc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 27 May 2015 19:39:56 Shawn Guo wrote:
-> It includes a couple of fixes for i.MX6 GPC code to let the new kernel
-> be able to boot with old DTBs:
+On Friday 29 May 2015 09:40:13 Simon Horman wrote:
+> On Thu, May 28, 2015 at 10:07:20AM +0200, Arnd Bergmann wrote:
+> > On Thursday 28 May 2015 09:39:08 Simon Horman wrote:
+> > > On Tue, May 26, 2015 at 12:58:37PM +0200, Geert Uytterhoeven wrote:
+> > > > Since commit 100832abf065bc18 ("usb: isp1760: Make HCD support
+> > > > optional"), CONFIG_USB_ISP1760_HCD is automatically selected when
+> > > > needed.  Enabling that option in the defconfig is now a no-op, and no
+> > > > longer enables ISP1760 HCD support.
+> > > > 
+> > > > Re-enable the ISP1760 driver in the defconfig by enabling
+> > > > USB_ISP1760_HOST_ROLE instead.
+> > > > 
+> > > > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > > 
+> > > Thanks, I have queued this up for v4.3.
+> > > 
+> > > I would not object at all if the ARM SoC maintainers wish to
+> > > take this earlier and I'd be happy to prepare a pull request
+> > > to that effect once the change has sat in next. Unfortunately
+> > > I anticipate that will be after the standard rc6 deadline.
+> > 
+> > I would consider patch 1 as a bug-fix, and put that into 4.1 or
+> > 4.2, depending on timing. Patch 2 looks like 4.3 material.
 > 
->  - Booting v4.1-rc kernel with old DTBs will fail with a fat warning
->    (require low-level debug to be seen), due to the adoption of stacked
->    IRQ domain.  The first fix improves the situation by allowing kernel
->    boot up with old DTBs, although suspend/resume still breaks.
-> 
->  - Booting new kernel with old DTBs that do not have power-domain info
->    will result in a hang.  The second patch fixes the hang by skipping
->    the kernel power-domain registration if DTB has no power-domain info.
-> 
+> Thanks Arnd, would you care to take pick it up directly for 4.1 (or 4.2)?
+> If so I'll drop it from my tree.
 
-Pulled into fixes, thanks!
+I've applied it to the fixes branch now.
+
+Thanks everyone!
 
 	Arnd
