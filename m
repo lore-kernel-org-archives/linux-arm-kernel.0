@@ -1,163 +1,192 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 29 May 2015 10:53:21 +0100
-Subject: [PATCH 05/13] KVM: arm64: handle ITS related GICv3 redistributor
- registers
+Date: Fri, 29 May 2015 10:53:26 +0100
+Subject: [PATCH 10/13] KVM: arm64: sync LPI properties and status between
+ guest and KVM
 In-Reply-To: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
 References: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1432893209-27313-6-git-send-email-andre.przywara@arm.com>
+Message-ID: <1432893209-27313-11-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the GICv3 redistributor there are the PENDBASER and PROPBASER
-registers which we did not emulate so far, as they only make sense
-when having an ITS. In preparation for that emulate those MMIO
-accesses by storing the 64-bit data written into it into a variable
-which we later read in the ITS emulation.
+The properties and status of the GICv3 LPIs are hold in tables in
+(guest) memory. To achieve reasonable performance, we cache this
+data in our own data structures, so we need to sync those two views
+from time to time. This behaviour is well described in the GICv3 spec
+and is also exercised by hardware, so the sync points are well known.
+
+Provide functions that read the guest memory and store the
+information from the property and status table in the kernel.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- include/kvm/arm_vgic.h      |  4 ++++
- virt/kvm/arm/vgic-v3-emul.c | 43 +++++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic.c         | 35 +++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic.h         |  4 ++++
- 4 files changed, 86 insertions(+)
+ virt/kvm/arm/its-emul.c | 140 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 140 insertions(+)
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 37725bb..9ea0b3b 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -256,6 +256,10 @@ struct vgic_dist {
- 	struct vgic_vm_ops	vm_ops;
- 	struct vgic_io_device	dist_iodev;
- 	struct vgic_io_device	*redist_iodevs;
-+
-+	u64			propbaser;
-+	u64			*pendbaser;
-+	bool			lpis_enabled;
+diff --git a/virt/kvm/arm/its-emul.c b/virt/kvm/arm/its-emul.c
+index f75fb9e..afd440e 100644
+--- a/virt/kvm/arm/its-emul.c
++++ b/virt/kvm/arm/its-emul.c
+@@ -50,6 +50,7 @@ struct its_itte {
+ 	struct its_collection *collection;
+ 	u32 lpi;
+ 	u32 event_id;
++	u8 priority;
+ 	bool enabled;
+ 	unsigned long *pending;
  };
- 
- struct vgic_v2_cpu_if {
-diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
-index 16c6d8a..04f3aed 100644
---- a/virt/kvm/arm/vgic-v3-emul.c
-+++ b/virt/kvm/arm/vgic-v3-emul.c
-@@ -607,6 +607,37 @@ static bool handle_mmio_cfg_reg_redist(struct kvm_vcpu *vcpu,
- 	return vgic_handle_cfg_reg(reg, mmio, offset);
+@@ -70,7 +71,140 @@ static struct its_itte *find_itte_by_lpi(struct kvm *kvm, int lpi)
+ 	return NULL;
  }
  
-+/* We don't trigger any actions here, just store the register value */
-+static bool handle_mmio_propbaser_redist(struct kvm_vcpu *vcpu,
-+					 struct kvm_exit_mmio *mmio,
-+					 phys_addr_t offset)
++#define LPI_PROP_ENABLE_BIT(p)	((p) & LPI_PROP_ENABLED)
++#define LPI_PROP_PRIORITY(p)	((p) & 0xfc)
++
++/* stores the priority and enable bit for a given LPI */
++static void update_lpi_property(struct kvm *kvm, struct its_itte *itte, u8 prop)
 +{
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	int mode = ACCESS_READ_VALUE;
-+
-+	mode |= dist->lpis_enabled ? ACCESS_WRITE_IGNORED : ACCESS_WRITE_VALUE;
-+	vgic_handle_base_register(vcpu, mmio, offset, &dist->propbaser, mode);
-+
-+	return false;
++	itte->priority = LPI_PROP_PRIORITY(prop);
++	itte->enabled  = LPI_PROP_ENABLE_BIT(prop);
 +}
 +
-+/* We don't trigger any actions here, just store the register value */
-+static bool handle_mmio_pendbaser_redist(struct kvm_vcpu *vcpu,
-+					 struct kvm_exit_mmio *mmio,
-+					 phys_addr_t offset)
++#define GIC_LPI_OFFSET 8192
++
++/* We scan the table in chunks the size of the smallest page size */
++#define CHUNK_SIZE 4096U
++
+ #define BASER_BASE_ADDRESS(x) ((x) & 0xfffffffff000ULL)
++#define PROPBASE_TSIZE(x) (1U << (x & 0x1f))
++
++/*
++ * Scan the whole LPI property table and put the LPI configuration
++ * data in our own data structures. This relies on the LPI being
++ * mapped before.
++ * We scan from two sides:
++ * 1) for each byte in the table we care for the ones being enabled
++ * 2) for each mapped LPI we look into the table to spot LPIs being disabled
++ * Must be called with the ITS lock held.
++ */
++static bool its_update_lpi_properties(struct kvm *kvm)
 +{
-+	struct kvm_vcpu *rdvcpu = mmio->private;
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	int mode = ACCESS_READ_VALUE;
++	struct vgic_dist *dist = &kvm->arch.vgic;
++	u8 *prop;
++	u32 tsize;
++	gpa_t propbase;
++	int lpi = GIC_LPI_OFFSET;
++	struct its_itte *itte;
++	struct its_device *device;
++	int ret;
 +
-+	/* Storing a value with LPIs already enabled is undefined */
-+	mode |= dist->lpis_enabled ? ACCESS_WRITE_IGNORED : ACCESS_WRITE_VALUE;
-+	vgic_handle_base_register(vcpu, mmio, offset,
-+				  &dist->pendbaser[rdvcpu->vcpu_id], mode);
++	propbase = BASER_BASE_ADDRESS(dist->propbaser);
++	tsize = PROPBASE_TSIZE(dist->propbaser);
 +
-+	return false;
-+}
++	prop = kmalloc(CHUNK_SIZE, GFP_KERNEL);
++	if (!prop)
++		return false;
 +
- #define SGI_base(x) ((x) + SZ_64K)
- 
- static const struct vgic_io_range vgic_redist_ranges[] = {
-@@ -635,6 +666,18 @@ static const struct vgic_io_range vgic_redist_ranges[] = {
- 		.handle_mmio    = handle_mmio_raz_wi,
- 	},
- 	{
-+		.base		= GICR_PENDBASER,
-+		.len		= 0x08,
-+		.bits_per_irq	= 0,
-+		.handle_mmio	= handle_mmio_pendbaser_redist,
-+	},
-+	{
-+		.base		= GICR_PROPBASER,
-+		.len		= 0x08,
-+		.bits_per_irq	= 0,
-+		.handle_mmio	= handle_mmio_propbaser_redist,
-+	},
-+	{
- 		.base           = GICR_IDREGS,
- 		.len            = 0x30,
- 		.bits_per_irq   = 0,
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 2e9723aa..0a9236d 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -448,6 +448,41 @@ void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
- 	}
- }
- 
-+/* handle a 64-bit register access */
-+void vgic_handle_base_register(struct kvm_vcpu *vcpu,
-+			       struct kvm_exit_mmio *mmio,
-+			       phys_addr_t offset, u64 *basereg,
-+			       int mode)
-+{
-+	u32 reg;
-+	u64 breg;
++	while (tsize > 0) {
++		int chunksize = min(tsize, CHUNK_SIZE);
 +
-+	switch (offset & ~3) {
-+	case 0x00:
-+		breg = *basereg;
-+		reg = lower_32_bits(breg);
-+		vgic_reg_access(mmio, &reg, offset & 3, mode);
-+		if (mmio->is_write && (mode & ACCESS_WRITE_VALUE)) {
-+			breg &= GENMASK_ULL(63, 32);
-+			breg |= reg;
-+			*basereg = breg;
++		ret = kvm_read_guest(kvm, propbase, prop, chunksize);
++		if (ret) {
++			kfree(prop);
++			break;
 +		}
-+		break;
-+	case 0x04:
-+		breg = *basereg;
-+		reg = upper_32_bits(breg);
-+		vgic_reg_access(mmio, &reg, offset & 3, mode);
-+		if (mmio->is_write && (mode & ACCESS_WRITE_VALUE)) {
-+			breg  = lower_32_bits(breg);
-+			breg |= (u64)reg << 32;
-+			*basereg = breg;
++
++		/*
++		 * Updating the status for all allocated LPIs. We catch
++		 * those LPIs that get disabled. We really don't care
++		 * about unmapped LPIs, as they need to be updated
++		 * later manually anyway once they get mapped.
++		 */
++		for_each_lpi(device, itte, kvm) {
++			/*
++			 * Is the LPI covered by that part of the table we
++			 * are currently looking at?
++			 */
++			if (itte->lpi < lpi)
++				continue;
++			if (itte->lpi >= lpi + chunksize)
++				continue;
++
++			update_lpi_property(kvm, itte,
++					    prop[itte->lpi - lpi]);
 +		}
-+		break;
++		tsize -= chunksize;
++		lpi += chunksize;
++		propbase += chunksize;
 +	}
++
++	kfree(prop);
++	return true;
 +}
 +
++/*
++ * Scan the whole LPI pending table and sync the pending bit in there
++ * with our own data structures. This relies on the LPI being
++ * mapped before.
++ * Must be called with the ITS lock held.
++ */
++static bool its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
++{
++	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
++	unsigned long *pendmask;
++	u32 nr_lpis;
++	gpa_t pendbase;
++	int lpi = GIC_LPI_OFFSET;
++	struct its_itte *itte;
++	struct its_device *device;
++	int ret;
++	int lpi_bit, nr_bits;
 +
++	pendbase = BASER_BASE_ADDRESS(dist->pendbaser[vcpu->vcpu_id]);
++	nr_lpis = GIC_LPI_OFFSET;
 +
- bool handle_mmio_raz_wi(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
- 			phys_addr_t offset)
- {
-diff --git a/virt/kvm/arm/vgic.h b/virt/kvm/arm/vgic.h
-index a093f5c..b2d791c 100644
---- a/virt/kvm/arm/vgic.h
-+++ b/virt/kvm/arm/vgic.h
-@@ -71,6 +71,10 @@ void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
- 		     phys_addr_t offset, int mode);
- bool handle_mmio_raz_wi(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
- 			phys_addr_t offset);
-+void vgic_handle_base_register(struct kvm_vcpu *vcpu,
-+			       struct kvm_exit_mmio *mmio,
-+			       phys_addr_t offset, u64 *basereg,
-+			       int mode);
++	pendmask = kmalloc(CHUNK_SIZE, GFP_KERNEL);
++	if (!pendmask)
++		return false;
++
++	while (nr_lpis > 0) {
++		nr_bits = min(nr_lpis, CHUNK_SIZE * 8);
++
++		ret = kvm_read_guest(vcpu->kvm, pendbase, pendmask,
++				     nr_bits / 8);
++		if (ret)
++			break;
++
++		for_each_lpi(device, itte, vcpu->kvm) {
++			lpi_bit = itte->lpi - lpi;
++			if (lpi_bit < 0)
++				continue;
++			if (lpi_bit >= nr_bits)
++				continue;
++			if (test_bit(lpi_bit, pendmask))
++				set_bit(vcpu->vcpu_id, itte->pending);
++			else
++				clear_bit(vcpu->vcpu_id, itte->pending);
++		}
++		nr_lpis -= nr_bits;
++		lpi += nr_bits;
++		pendbase += nr_bits / 8;
++	}
++
++	kfree(pendmask);
++	return true;
++}
  
- static inline
- u32 mmio_data_read(struct kvm_exit_mmio *mmio, u32 mask)
+ /* distributor lock is hold by the VGIC MMIO handler */
+ static bool handle_mmio_misc_gits(struct kvm_vcpu *vcpu,
+@@ -350,6 +484,12 @@ static const struct vgic_io_range vgicv3_its_ranges[] = {
+ 
+ void vgic_enable_lpis(struct kvm_vcpu *vcpu)
+ {
++	struct vgic_its *its = &vcpu->kvm->arch.vgic.its;
++
++	spin_lock(&its->lock);
++	its_update_lpi_properties(vcpu->kvm);
++	its_sync_lpi_pending_table(vcpu);
++	spin_unlock(&its->lock);
+ }
+ 
+ int vits_init(struct kvm *kvm)
 -- 
 2.3.5
