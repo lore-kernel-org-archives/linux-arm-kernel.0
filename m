@@ -1,31 +1,33 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 29 May 2015 19:40:11 +0800
-Subject: [Query] how to handle must be always enabled clk but there's no
- driver use the clk
-Message-ID: <20150529194011.033fa675@xhacker>
+From: jkosina@suse.cz (Jiri Kosina)
+Date: Fri, 29 May 2015 13:52:31 +0200 (CEST)
+Subject: [RFC PATCH 0/5] livepatch: add support on arm64
+In-Reply-To: <1432792265-24076-1-git-send-email-huawei.libin@huawei.com>
+References: <1432792265-24076-1-git-send-email-huawei.libin@huawei.com>
+Message-ID: <alpine.LNX.2.00.1505291350510.26271@pobox.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian, Mike and all,
+On Thu, 28 May 2015, Li Bin wrote:
 
-Let me describe the situation:
+> This patchset propose a method for gcc -mfentry feature(profile
+> before prologue) implementation for arm64, and propose the livepatch
+> implementation for arm64 based on this feature.
+> The gcc implementation about this feature will be post to the gcc 
+> community soon.
+> 
+> With this -mfentry feature, the entry of each function like:
+> 
+> foo:
+>     mov x9, x30 
+>     bl __fentry__
+>     mov x30, x9
+>     [prologue]
+>     ... 
 
-there's one clk called as perifsysclk, it's the system AXI clk and at the same
-time it's the clock source of two gate clks, for example ethclk, sdioclk etc.
-Once cold boot, HW enables perifsysclk by default,
+Thanks a lot for working on arm64 support. I am putting this patchset on 
+hold before gcc support is merged. Once that happens, and once the arm64 
+parts are Acked by the arch maintainers, we could proceed with this patch.
 
-Now let's assume eth driver is firstly probed, in the beginning of eth_probe()
-we call clk_prepare_enable(ethclk);
-
-but the eth_probe() fail due to something, so in its failed path, it calls
-
-clk_disable_unprepare(ethclk);
-
-which will finally disable the perifsysclk, so we hang here.
-
-
-How to handle this situation? Register one dummy driver early then
-clk_prepare_enable(perifsysclk) in the driver probe?
-
-Thanks,
-Jisheng
+-- 
+Jiri Kosina
+SUSE Labs
