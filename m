@@ -1,48 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 May 2015 16:28:53 +0200
-Subject: [GIT PULL] ARM: mediatek: arm64 updates for v4.2
-In-Reply-To: <20150529125829.GE6325@pengutronix.de>
-References: <CABuKBeLhFR=94cF301wL7J8hJVTtyseoD7g45PLE6znQkPAFGQ@mail.gmail.com>
- <4904430.YVNgRyyb6C@wuerfel> <20150529125829.GE6325@pengutronix.de>
-Message-ID: <2560864.dSIGJOm4yU@wuerfel>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Sat, 30 May 2015 00:00:35 +0930
+Subject: [PATCHv3] ARM: dts: odroidxu3: Enable USB3 regulators
+Message-ID: <1432909836-3952-1-git-send-email-linux.amoon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 May 2015 14:58:29 Sascha Hauer wrote:
-> On Fri, May 29, 2015 at 02:07:40PM +0200, Arnd Bergmann wrote:
-> > On Friday 29 May 2015 14:04:32 Arnd Bergmann wrote:
-> > > On Wednesday 27 May 2015 17:14:08 Matthias Brugger wrote:
-> > > > - dts: fixup pinctrl mt8173
-> > > > - dts: mt8173-evb fix model name
-> > > > - dts: mt8173 fix identation
-> > > > - dts: mt8173 add clock controller
-> > > > - dts: mt8173 change uart clocks
-> > > > - dts: mt8173 add pmic wrapper
-> > > > 
-> > > 
-> > > Pulled into next/dt, thanks!
-> > > 
-> > 
-> > Dropped it again, after getting a build error:
-> > 
-> >   DTC     arch/arm64/boot/dts/mediatek/mt8173-evb.dtb
-> > In file included from ../arch/arm64/boot/dts/mediatek/mt8173-evb.dts:16:0:
-> > ../arch/arm64/boot/dts/mediatek/mt8173.dtsi:14:42: fatal error: dt-bindings/clock/mt8173-clk.h: No such file or directory
-> >  #include <dt-bindings/clock/mt8173-clk.h>
-> >                                           ^
-> > 
-> > Please fix and resubmit.
-> 
-> These come from the clk tree. My original suggestion was to pull in this
-> dts changes late after -rc1.
+Enable regulator for usbdrd3_0 and usbdrd3_1.
+Looking at the schematic pin diagram for MAX77802
+USB3_0 and USB3_1 is regulated by LDO9 and LD011.
 
-Please don't do it that way. If you can't figure out a way to
-avoid the dependency, just stage it out over an extra merge window
-and add the driver first and the dt changes the next time.
+Fix the boot message of failed.
+[    3.503539] exynos-dwc3 usb at 12000000: Looking up vdd33-supply from device tree
+[    3.503556] exynos-dwc3 usb at 12000000: Looking up vdd33-supply property in node /usb at 12000000 failed
+[    3.503568] usb at 12000000 supply vdd33 not found, using dummy regulator
+[    3.509154] exynos-dwc3 usb at 12000000: Looking up vdd10-supply from device tree
+[    3.509170] exynos-dwc3 usb at 12000000: Looking up vdd10-supply property in node /usb at 12000000 failed
+[    3.509181] usb at 12000000 supply vdd10 not found, using dummy regulator
+[    3.917548] exynos-dwc3 usb at 12400000: Looking up vdd33-supply from device tree
+[    3.917565] exynos-dwc3 usb at 12400000: Looking up vdd33-supply property in node /usb at 12400000 failed
+[    3.917578] usb at 12400000 supply vdd33 not found, using dummy regulator
+[    3.922731] exynos-dwc3 usb at 12400000: Looking up vdd10-supply from device tree
+[    3.922747] exynos-dwc3 usb at 12400000: Looking up vdd10-supply property in node /usb at 12400000 failed
 
-> Other possibility: Stephen, can you provide
-> a stable commit containing the Mediatek clk changes?
+Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+---
+ arch/arm/boot/dts/exynos5422-odroidxu3.dts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-That would work.
-
-	Arnd
+diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+index 27014bb..a353a58 100644
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+@@ -513,3 +513,13 @@
+ &usbdrd_dwc3_1 {
+ 	dr_mode = "otg";
+ };
++
++&usbdrd3_0 {
++	vdd33-supply = <&ldo9_reg>;
++	vdd10-supply = <&ldo11_reg>;
++};
++
++&usbdrd3_1 {
++	vdd33-supply = <&ldo9_reg>;
++	vdd10-supply = <&ldo11_reg>;
++};
+-- 
+1.9.1
