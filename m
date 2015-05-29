@@ -1,114 +1,166 @@
-From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
-Date: Fri, 29 May 2015 16:12:13 +0530
-Subject: [PATCH 3/3] tty: serial: fsl_lpuart: Add support for RS-485
-In-Reply-To: <20150529121808.27346afc@north>
-References: <1432886754-30115-1-git-send-email-bhuvanchandra.dv@toradex.com>	<1432886754-30115-4-git-send-email-bhuvanchandra.dv@toradex.com>
- <20150529121808.27346afc@north>
-Message-ID: <55684285.4000004@toradex.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 29 May 2015 11:48:57 +0100
+Subject: [PATCH 3/3] arm64: alternative: Work around .inst assembler bugs
+In-Reply-To: <1432806053-987-4-git-send-email-marc.zyngier@arm.com>
+References: <1432806053-987-1-git-send-email-marc.zyngier@arm.com>
+ <1432806053-987-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20150529104856.GE6528@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/29/2015 03:48 PM, Jakub Kici?ski wrote:
-> On Fri, 29 May 2015 13:35:54 +0530, Bhuvanchandra DV wrote:
->> Enable Vybrid's build-in support for RS-485 auto RTS for
->> controlling line direction of RS-485 transceiver driver.
->>
->> Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
->> ---
->>   drivers/tty/serial/fsl_lpuart.c | 60 +++++++++++++++++++++++++++++++++++++++++
->>   1 file changed, 60 insertions(+)
->>
->> diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
->> index 357f623..c553b14 100644
->> --- a/drivers/tty/serial/fsl_lpuart.c
->> +++ b/drivers/tty/serial/fsl_lpuart.c
->> @@ -820,6 +820,50 @@ static unsigned int lpuart32_tx_empty(struct uart_port *port)
->>   		TIOCSER_TEMT : 0;
->>   }
->>
->> +static int lpuart_config_rs485(struct uart_port *port,
->> +			struct serial_rs485 *rs485)
->> +{
->> +	struct lpuart_port *sport = container_of(port,
->> +			struct lpuart_port, port);
->> +	u8 modem = readb(sport->port.membase + UARTMODEM) &
->> +		~(UARTMODEM_TXRTSPOL | UARTMODEM_TXRTSE);
->
-> Please put empty line between variables and code.
-Ok
->
->> +	writeb(modem, sport->port.membase + UARTMODEM);
->> +
->> +	if (rs485->flags & SER_RS485_ENABLED) {
->> +		/* Enable auto RS-485 RTS mode */
->> +		modem |= UARTMODEM_TXRTSE;
->> +
->> +		/*
->> +		* RTS needs to be logic HIGH either during transer _or_ after
->> +		* transfer, other variants are not supported by the hardware.
->> +		*/
->
-> Indentation is off here.  '*' should be aligned.
-Ok
->
->> +		if (!(rs485->flags & (SER_RS485_RTS_ON_SEND |
->> +				SER_RS485_RTS_AFTER_SEND)))
->
-> and here - things should be aligned on the containing bracket (SER_
-> under SER_ here).
-Ok
->
->> +			rs485->flags |= SER_RS485_RTS_ON_SEND;
->> +
->> +		if (rs485->flags & SER_RS485_RTS_ON_SEND &&
->> +				rs485->flags & SER_RS485_RTS_AFTER_SEND)
->
-> and here - same bracket rule (rs485-> under rs485->)
-Ok
->
->> +			rs485->flags &= ~SER_RS485_RTS_AFTER_SEND;
->> +
->> +		/*
->> +		* The hardware defaults to RTS logic HIGH while transfer.
->> +		* Switch polarity in case RTS shall be logic HIGH
->> +		* after transfer.
->> +		* Note: UART is assumed to be active high.
->> +		*/
->> +		if (rs485->flags & SER_RS485_RTS_ON_SEND)
->> +			modem &= ~UARTMODEM_TXRTSPOL;
->
-> UARTMODEM_TXRTSPOL was already clear when you read modem.
-Ok
->
->> +		else if (rs485->flags & SER_RS485_RTS_AFTER_SEND)
->> +			modem |= UARTMODEM_TXRTSPOL;
->> +	}
->> +
->> +	/* Store the new configuration */
->> +	sport->port.rs485 = *rs485;
->> +
->> +	writeb(modem, sport->port.membase + UARTMODEM);
->> +	return 0;
->> +}
->> +
->>   static unsigned int lpuart_get_mctrl(struct uart_port *port)
->>   {
->>   	return TIOCM_CAR | TIOCM_CTS | TIOCM_DSR;
-> [...]
->> @@ -1802,6 +1854,14 @@ static int lpuart_probe(struct platform_device *pdev)
->>   		dev_info(sport->port.dev, "DMA rx channel request failed, "
->>   				"operating without rx DMA\n");
->>
->> +	if (of_property_read_bool(np, "linux,rs485-enabled-at-boot-time")) {
->> +		sport->port.rs485.flags |= SER_RS485_ENABLED;
->> +		sport->port.rs485.flags |= SER_RS485_RTS_ON_SEND;
->> +		writeb(UARTMODEM_TXRTSE, sport->port.membase + UARTMODEM);
->> +	} else {
->> +		sport->port.rs485.flags &= ~SER_RS485_ENABLED;
->
-> Why the need to clear the flag?  sport was kzalloc'ed.
-Will remove it.
->
+On Thu, May 28, 2015 at 10:40:53AM +0100, Marc Zyngier wrote:
+> AArch64 toolchains suffer from the following bug:
+> 
+> $ cat blah.S
+> 1:
+> 	.inst	0x01020304
+> 	.if ((. - 1b) != 4)
+> 		.error	blah
+> 	.endif
+> $ aarch64-linux-gnu-gcc -c blah.S
+> blah.S: Assembler messages:
+> blah.S:3: Error: non-constant expression in ".if" statement
+> 
+> which precludes the use of msr_s and co as part of alternatives.
+> 
+> We workaround this issue by not directly testing the labels
+> themselves, but by moving the current output pointer by a value
+> that should always be zero. if this value is not null, then
+> we will trigger a backward move, which is expclicitely forbidden.
+> This trigger the error we're after:
+> 
+>   AS      arch/arm64/kvm/hyp.o
+> arch/arm64/kvm/hyp.S: Assembler messages:
+> arch/arm64/kvm/hyp.S:1377: Error: attempt to move .org backwards
+> scripts/Makefile.build:294: recipe for target 'arch/arm64/kvm/hyp.o' failed
+> make[1]: *** [arch/arm64/kvm/hyp.o] Error 1
+> Makefile:946: recipe for target 'arch/arm64/kvm' failed
+> 
+> Not pretty, but at least works on the current toolchains.
+> Also merge asm/alternative-asm.h into alternative.h so that we
+> slightly limit the duplication of this mess.
 
-Best Regards,
-Bhuvan
+This should probably be two patches.
+
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/include/asm/alternative-asm.h | 29 ------------------
+>  arch/arm64/include/asm/alternative.h     | 52 +++++++++++++++++++++++++++++---
+>  arch/arm64/kernel/entry.S                |  2 +-
+>  arch/arm64/mm/cache.S                    |  2 +-
+>  4 files changed, 50 insertions(+), 35 deletions(-)
+>  delete mode 100644 arch/arm64/include/asm/alternative-asm.h
+> 
+> diff --git a/arch/arm64/include/asm/alternative-asm.h b/arch/arm64/include/asm/alternative-asm.h
+> deleted file mode 100644
+> index 919a678..0000000
+> --- a/arch/arm64/include/asm/alternative-asm.h
+> +++ /dev/null
+> @@ -1,29 +0,0 @@
+> -#ifndef __ASM_ALTERNATIVE_ASM_H
+> -#define __ASM_ALTERNATIVE_ASM_H
+> -
+> -#ifdef __ASSEMBLY__
+> -
+> -.macro altinstruction_entry orig_offset alt_offset feature orig_len alt_len
+> -	.word \orig_offset - .
+> -	.word \alt_offset - .
+> -	.hword \feature
+> -	.byte \orig_len
+> -	.byte \alt_len
+> -.endm
+> -
+> -.macro alternative_insn insn1 insn2 cap
+> -661:	\insn1
+> -662:	.pushsection .altinstructions, "a"
+> -	altinstruction_entry 661b, 663f, \cap, 662b-661b, 664f-663f
+> -	.popsection
+> -	.pushsection .altinstr_replacement, "ax"
+> -663:	\insn2
+> -664:	.popsection
+> -	.if ((664b-663b) != (662b-661b))
+> -		.error "Alternatives instruction length mismatch"
+> -	.endif
+> -.endm
+> -
+> -#endif  /*  __ASSEMBLY__  */
+> -
+> -#endif /* __ASM_ALTERNATIVE_ASM_H */
+> diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
+> index d261f01..5195cca 100644
+> --- a/arch/arm64/include/asm/alternative.h
+> +++ b/arch/arm64/include/asm/alternative.h
+> @@ -1,6 +1,8 @@
+>  #ifndef __ASM_ALTERNATIVE_H
+>  #define __ASM_ALTERNATIVE_H
+>  
+> +#ifndef __ASSEMBLY__
+> +
+>  #include <linux/types.h>
+>  #include <linux/stddef.h>
+>  #include <linux/stringify.h>
+> @@ -24,7 +26,20 @@ void free_alternatives_memory(void);
+>  	" .byte 662b-661b\n"				/* source len      */ \
+>  	" .byte 664f-663f\n"				/* replacement len */
+>  
+> -/* alternative assembly primitive: */
+> +/*
+> + * alternative assembly primitive:
+> + *
+> + * If any of these .org directive fail, it means that insn1 and insn2
+> + * don't have the same length. This used to be written as
+> + *
+> + * .if ((664b-663b) != (662b-661b))
+> + * 	.error "Alternatives instruction length mismatch"
+> + * .endif
+> + *
+> + * but most assemblers die if insn1 or insn2 have a .inst. This should
+> + * be fixed in a binutils release posterior to 2.25.51.0.2 (anything
+> + * containing commit 4e4d08cf7399b606 or c1baaddf8861).
+> + */
+>  #define ALTERNATIVE(oldinstr, newinstr, feature)			\
+>  	"661:\n\t"							\
+>  	oldinstr "\n"							\
+> @@ -37,8 +52,37 @@ void free_alternatives_memory(void);
+>  	newinstr "\n"							\
+>  	"664:\n\t"							\
+>  	".popsection\n\t"						\
+> -	".if ((664b-663b) != (662b-661b))\n\t"				\
+> -	"	.error \"Alternatives instruction length mismatch\"\n\t"\
+> -	".endif\n"
+> +	".org	. - (664b-663b) + (662b-661b)\n\t"			\
+> +	".org	. - (662b-661b) + (664b-663b)\n"
+> +
+> +#else
+> +
+> +.macro altinstruction_entry orig_offset alt_offset feature orig_len alt_len
+> +	.word \orig_offset - .
+> +	.word \alt_offset - .
+> +	.hword \feature
+> +	.byte \orig_len
+> +	.byte \alt_len
+> +.endm
+> +
+> +.macro alternative_insn insn1 insn2 cap
+> +661:	\insn1
+> +662:	.pushsection .altinstructions, "a"
+> +	altinstruction_entry 661b, 663f, \cap, 662b-661b, 664f-663f
+> +	.popsection
+> +	.pushsection .altinstr_replacement, "ax"
+> +663:	\insn2
+> +664:	.popsection
+> +	 // If any of these .org fail, it means that insn1 and insn2
+> +	 // don't have the same lenght. This used to be written as
+> +	 // .if ((664b-663b) != (662b-661b))
+> +	 //	.error "Alternatives instruction length mismatch"
+> +	 // .endif
+> +	 // but most assemblers die if insn1 or insn2 have a .inst.
+
+I think you can drop the duplicate comment now that this is all in one
+file.
+
+With that:
+
+  Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
