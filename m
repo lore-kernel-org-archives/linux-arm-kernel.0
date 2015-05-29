@@ -1,29 +1,33 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Fri, 29 May 2015 11:06:25 +0100
-Subject: [PATCH 1/7] arm-cci: Do not enable CCI-400 PMU by default
-In-Reply-To: <1432633996-7229-2-git-send-email-suzuki.poulose@arm.com>
-References: <1432633996-7229-1-git-send-email-suzuki.poulose@arm.com>
- <1432633996-7229-2-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <55683A21.9000105@arm.com>
+From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
+Date: Fri, 29 May 2015 15:40:31 +0530
+Subject: [PATCH 2/3] tty: serial: fsl_lpuart: remove RTS/CTS control from
+ set/get_mctrl
+In-Reply-To: <20150529120421.754fd6ab@north>
+References: <1432886754-30115-1-git-send-email-bhuvanchandra.dv@toradex.com>	<1432886754-30115-3-git-send-email-bhuvanchandra.dv@toradex.com>
+ <20150529120421.754fd6ab@north>
+Message-ID: <55683B17.1010706@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/05/15 10:53, Suzuki K. Poulose wrote:
-> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+Hello Jakub,
+
+On 05/29/2015 03:34 PM, Jakub Kici?ski wrote:
+> On Fri, 29 May 2015 13:35:53 +0530, Bhuvanchandra DV wrote:
+>> The LPUART does not provide manual control of RTS/CTS signals,
+>> those can only be controlled by the hardware directly. Therefore
+>> manual control of those signals through mctrl can not be provided.
+>> The current implementation enables/disables the automatic control,
+>> which is not what mctrl should do, hence remove the incorrect
+>> implementation.
+>>
+>> Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
 >
-> Do not enable CCI-400 PMU by default and fix the dependency on PERF_EVENTS
-> than HW_PERF_EVENTS.
+> Now that the functions do nothing there is probably no point in keeping
+> separate lpuart/lpuart32 variants.
+Agreed, will update it accordingly.
+
+Thanks! for pointing this.
 >
-> Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: arm at kernel.org
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-Forgot to add :
 
-Acked-by: Punit Agrawal <punit.agrawal@arm.com>
-
-from https://patchwork.kernel.org/patch/6387121/
-
-Thanks
-Suzuki
+Best regards,
+Bhuvan
