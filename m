@@ -1,5 +1,5 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 29 May 2015 21:56:29 +0200
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 29 May 2015 22:03:06 +0200
 Subject: [PATCH] fix n900 dts file to work around 4.1 touchscreen
  regression on n900
 In-Reply-To: <20150529194955.GV2026@saruman.tx.rr.com>
@@ -8,11 +8,11 @@ References: <201505241444.41039@pali> <20150527132545.GA23434@amd>
  <20150527145837.GA13223@earth> <20150529190816.GA20232@amd>
  <20150529192505.GA28987@amd> <20150529193211.GA7599@amd>
  <20150529194955.GV2026@saruman.tx.rr.com>
-Message-ID: <20150529195629.GA9811@amd>
+Message-ID: <20150529200306.GB17267@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2015-05-29 14:49:55, Felipe Balbi wrote:
+On Fri, May 29, 2015 at 02:49:55PM -0500, Felipe Balbi wrote:
 > Hi,
 > 
 > On Fri, May 29, 2015 at 09:32:11PM +0200, Pavel Machek wrote:
@@ -37,14 +37,31 @@ On Fri 2015-05-29 14:49:55, Felipe Balbi wrote:
 > IMHO, the older binding needs to be supported as well. It's fine to
 > update the DTS for the new binding, but even Documentation says
 > touchscreen-max-[xy] and if the driver changed that, the driver should
-> be fixed too. Besides, it seems like this has been in tree since
-> v3.16:
+> be fixed too. Besides, it seems like this has been in tree since v3.16:
+> 
+> $ git describe a38cfebb56898633687ab337fd53710e63a0aedd
+> v3.15-rc5-72-ga38cfebb5689
+> 
+> So, because this has been wrongly documented for so long, we should
+> support both bindings. Sure, deprecate touchscreen-max-[xy], but they
+> must still be supported, IMO.
 
-Agreed. In parent email, I have list of two commits that should be
-reverted.
+This property has never been anything but a typo in a documentation of
+a single driver.
 
-									Pavel
+Feel free to fix that in that driver, but I don't see why the core
+code should handle that isolated typo.
+
+Maxime
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150529/0eb41258/attachment.sig>
