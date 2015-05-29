@@ -1,50 +1,37 @@
-From: matthijsvanduin@gmail.com (Matthijs van Duin)
-Date: Fri, 29 May 2015 03:35:22 +0200
-Subject: runtime check for omap-aes bus access permission (was: Re:
- 3.13-rc3 (commit 7ce93f3) breaks Nokia N900 DT boot)
-In-Reply-To: <CAALWOA9qJHUST0JQxA6MBohMfbTYAP9+NbSXGYHZY4Xa3nSFvw@mail.gmail.com>
-References: <20131206213613.GA19648@earth.universe> <201502111339.54480@pali>
- <CAALWOA_ngoSKjB=ZQ264Va37bBK7v41Ei45SyoYLiMdanTKnxQ@mail.gmail.com>
- <201502112128.44852@pali>
- <CAGo_u6oZxi7O6re30L2-wVyxTeahhyMb4qVcrE3tSCV9sBvrnw@mail.gmail.com>
- <20150528073740.GD16509@pali> <20150528160113.GH30984@atomide.com>
- <CAALWOA8Pfc_zbN9MoHwR=njPBpFU56WObYMbGv9N7ktzy+RSeQ@mail.gmail.com>
- <20150528222412.GM30984@atomide.com>
- <CAALWOA9qJHUST0JQxA6MBohMfbTYAP9+NbSXGYHZY4Xa3nSFvw@mail.gmail.com>
-Message-ID: <CAALWOA82=QmTpCeiceOFQOjqXKdSBjB3Z+jL-mi0vYF=QaL4sA@mail.gmail.com>
+From: bintian.wang@huawei.com (Bintian Wang)
+Date: Fri, 29 May 2015 10:08:35 +0800
+Subject: [PATCH v8 3/7] Documentation: DT: PL011: hi6220: add compatible
+ string for Hisilicon designed UART
+In-Reply-To: <1432865319-20413-1-git-send-email-bintian.wang@huawei.com>
+References: <1432865319-20413-1-git-send-email-bintian.wang@huawei.com>
+Message-ID: <1432865319-20413-4-git-send-email-bintian.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 May 2015 at 02:58, Matthijs van Duin <matthijsvanduin@gmail.com> wrote:
-> It is only guaranteed to happen immediately (before the next
-> instruction is executed) if the error occurs before the posting-point
-> of the write. However, in that case the error is reported in-band to
-> the cpu, resulting in a (synchronous) bus error which takes precedence
-> over the out-of-band error irq (if any is signalled).
+Hisilicon does some performance enhancements based on PL011(e.g. larger
+FIFO length), so add one compatible string "hisilicon,hi6220-uart" for
+future optimisations or workarounds works.
 
-OK, all this was actually assuming linux uses device-type mappings for
-device mappings, which was also the impression I got from
-build_mem_type_table() in arch/arm/mm/mmu.c (although it's a bit of a
-maze). A quick test however seems to imply otherwise:
+Signed-off-by: Bintian Wang <bintian.wang@huawei.com>
+Suggested-by: Mark Rutland <mark.rutland@arm.com>
+---
+ Documentation/devicetree/bindings/serial/pl011.txt | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-~# ./bogus-dev-write
-Bus error
-
-So... linux actually uses strongly-ordered mappings? I really didn't
-expect that, given the performance implications (especially on a
-strictly in-order cpu like the Cortex-A8 which will really just sit
-there picking its nose until the write completes) and I think I recall
-having seen an OCP barrier being used somewhere in driver code...
-
-Well, in that case everything I said is technically still true, except
-the posting point is the peripheral itself. That also means the
-interconnect error reporting mechanism is not really useful for
-probing since you'll get a bus error before any error irq is
-delivered.
-
-So I'd say you're back at having to trap that bus error using the
-exception handling mechanism, which I still suspect shouldn't be hard
-to do.
-
-Or perhaps you could probe the device using a DMA access and combine
-that with the interconnect error reporting irq... ;-)
+diff --git a/Documentation/devicetree/bindings/serial/pl011.txt b/Documentation/devicetree/bindings/serial/pl011.txt
+index ba3ecb8..cb9fd9d 100644
+--- a/Documentation/devicetree/bindings/serial/pl011.txt
++++ b/Documentation/devicetree/bindings/serial/pl011.txt
+@@ -1,7 +1,9 @@
+ * ARM AMBA Primecell PL011 serial UART
+ 
+ Required properties:
+-- compatible: must be "arm,primecell", "arm,pl011"
++- compatible: should contain one of the following sequences:
++  * "arm,pl011", "arm,primecell"
++  * "hisilicon,hi6220-pl011", "arm,pl011", "arm,primecell"
+ - reg: exactly one register range with length 0x1000
+ - interrupts: exactly one interrupt specifier
+ 
+-- 
+1.9.1
