@@ -1,45 +1,38 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 29 May 2015 14:58:29 +0200
-Subject: [GIT PULL] ARM: mediatek: arm64 updates for v4.2
-In-Reply-To: <4904430.YVNgRyyb6C@wuerfel>
-References: <CABuKBeLhFR=94cF301wL7J8hJVTtyseoD7g45PLE6znQkPAFGQ@mail.gmail.com>
- <3721931.mFVmMX4Ftz@wuerfel> <4904430.YVNgRyyb6C@wuerfel>
-Message-ID: <20150529125829.GE6325@pengutronix.de>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Fri, 29 May 2015 14:59:45 +0200
+Subject: [PATCHv3 1/4] phy: phy-core: Make GENERIC_PHY an invisible option
+In-Reply-To: <55685D7E.9000700@ti.com>
+References: <1429743853-10254-1-git-send-email-arun.ramamurthy@broadcom.com>
+ <1429743853-10254-2-git-send-email-arun.ramamurthy@broadcom.com>
+ <55685D7E.9000700@ti.com>
+Message-ID: <556862C1.3080602@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 29, 2015 at 02:07:40PM +0200, Arnd Bergmann wrote:
-> On Friday 29 May 2015 14:04:32 Arnd Bergmann wrote:
-> > On Wednesday 27 May 2015 17:14:08 Matthias Brugger wrote:
-> > > - dts: fixup pinctrl mt8173
-> > > - dts: mt8173-evb fix model name
-> > > - dts: mt8173 fix identation
-> > > - dts: mt8173 add clock controller
-> > > - dts: mt8173 change uart clocks
-> > > - dts: mt8173 add pmic wrapper
-> > > 
-> > 
-> > Pulled into next/dt, thanks!
-> > 
-> 
-> Dropped it again, after getting a build error:
-> 
->   DTC     arch/arm64/boot/dts/mediatek/mt8173-evb.dtb
-> In file included from ../arch/arm64/boot/dts/mediatek/mt8173-evb.dts:16:0:
-> ../arch/arm64/boot/dts/mediatek/mt8173.dtsi:14:42: fatal error: dt-bindings/clock/mt8173-clk.h: No such file or directory
->  #include <dt-bindings/clock/mt8173-clk.h>
->                                           ^
-> 
-> Please fix and resubmit.
+Hi Kishon, Arun,
 
-These come from the clk tree. My original suggestion was to pull in this
-dts changes late after -rc1. Other possibility: Stephen, can you provide
-a stable commit containing the Mediatek clk changes?
+On 05/29/2015 02:37 PM, Kishon Vijay Abraham I wrote:
+> Tejun, Maxime, Sylwester, Kyungmin
+>
+> On Thursday 23 April 2015 04:34 AM, Arun Ramamurthy wrote:
+>> Most of the phy providers use "select" to enable GENERIC_PHY. Since 
+>> select
+>> is only recommended when the config is not visible, GENERIC_PHY is 
+>> changed
+>> an invisible option. To maintain consistency, all phy providers are 
+>> changed
+>> to "select" GENERIC_PHY and all non-phy drivers use "depends on" when 
+>> the
+>> phy framework is explicity required. USB_MUSB_OMAP2PLUS has a cyclic
+>> dependency, so it is left as "select".
+>>
+>> Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
+>
+> Need your ACK for this patch.
+>
 
-Sascha
+For the STi part, you can add my:
+Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+Maxime
