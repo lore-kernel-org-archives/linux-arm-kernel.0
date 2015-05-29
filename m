@@ -1,46 +1,196 @@
 From: jun.nie@linaro.org (Jun Nie)
-Date: Fri, 29 May 2015 10:35:46 +0800
-Subject: [PATCH v5 0/4] Add basic ZTE zx296702 SOC support
-Message-ID: <1432866950-5344-1-git-send-email-jun.nie@linaro.org>
+Date: Fri, 29 May 2015 10:35:47 +0800
+Subject: [PATCH v5 1/4] dt-bindings: Add #defines for ZTE ZX296702 clocks
+In-Reply-To: <1432866950-5344-1-git-send-email-jun.nie@linaro.org>
+References: <1432866950-5344-1-git-send-email-jun.nie@linaro.org>
+Message-ID: <1432866950-5344-2-git-send-email-jun.nie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes vs v4:
-  - Fix issues in clock driver that Stephen found.
-  - Remove initramfs in defconfig to avoid overriding test config.
-  - Drop patches that already merged into ARM next/soc.
+Add clocks defines for the global clock controller
+found on ZTE ZX296702 SoCs.
 
-Jun Nie (4):
-  dt-bindings: Add #defines for ZTE ZX296702 clocks
-  clk: zx: add clock support to zx296702
-  ARM: dts: zx: add an initial zx296702 dts and doc
-  ARM: zx: Add basic defconfig support for ZX296702
-
- Documentation/devicetree/bindings/arm/zte.txt      |  15 +
- .../devicetree/bindings/clock/zx296702-clk.txt     |  35 ++
- Documentation/devicetree/bindings/serial/pl011.txt |   2 +-
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/zx296702-ad1.dts                 |  48 ++
- arch/arm/boot/dts/zx296702.dtsi                    | 139 +++++
- arch/arm/configs/zx_defconfig                      | 129 ++++
- drivers/clk/Makefile                               |   1 +
- drivers/clk/zte/Makefile                           |   2 +
- drivers/clk/zte/clk-pll.c                          | 184 ++++++
- drivers/clk/zte/clk-zx296702.c                     | 657 +++++++++++++++++++++
- drivers/clk/zte/clk.h                              |  32 +
- include/dt-bindings/clock/zx296702-clock.h         | 170 ++++++
- 14 files changed, 1415 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/arm/zte.txt
- create mode 100644 Documentation/devicetree/bindings/clock/zx296702-clk.txt
- create mode 100644 arch/arm/boot/dts/zx296702-ad1.dts
- create mode 100644 arch/arm/boot/dts/zx296702.dtsi
- create mode 100644 arch/arm/configs/zx_defconfig
- create mode 100644 drivers/clk/zte/Makefile
- create mode 100644 drivers/clk/zte/clk-pll.c
- create mode 100644 drivers/clk/zte/clk-zx296702.c
- create mode 100644 drivers/clk/zte/clk.h
+Signed-off-by: Jun Nie <jun.nie@linaro.org>
+---
+ include/dt-bindings/clock/zx296702-clock.h | 170 +++++++++++++++++++++++++++++
+ 1 file changed, 170 insertions(+)
  create mode 100644 include/dt-bindings/clock/zx296702-clock.h
 
+diff --git a/include/dt-bindings/clock/zx296702-clock.h b/include/dt-bindings/clock/zx296702-clock.h
+new file mode 100644
+index 0000000..e683dbb
+--- /dev/null
++++ b/include/dt-bindings/clock/zx296702-clock.h
+@@ -0,0 +1,170 @@
++/*
++ * Copyright 2014 Linaro Ltd.
++ * Copyright (C) 2014 ZTE Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __DT_BINDINGS_CLOCK_ZX296702_H
++#define __DT_BINDINGS_CLOCK_ZX296702_H
++
++#define ZX296702_OSC				0
++#define ZX296702_PLL_A9				1
++#define ZX296702_PLL_A9_350M			2
++#define ZX296702_PLL_MAC_1000M			3
++#define ZX296702_PLL_MAC_333M			4
++#define ZX296702_PLL_MM0_1188M			5
++#define ZX296702_PLL_MM0_396M			6
++#define ZX296702_PLL_MM0_198M			7
++#define ZX296702_PLL_MM1_108M			8
++#define ZX296702_PLL_MM1_72M			9
++#define ZX296702_PLL_MM1_54M			10
++#define ZX296702_PLL_LSP_104M			11
++#define ZX296702_PLL_LSP_26M			12
++#define ZX296702_PLL_AUDIO_294M912		13
++#define ZX296702_PLL_DDR_266M			14
++#define ZX296702_CLK_148M5			15
++#define ZX296702_MATRIX_ACLK			16
++#define ZX296702_MAIN_HCLK			17
++#define ZX296702_MAIN_PCLK			18
++#define ZX296702_CLK_500			19
++#define ZX296702_CLK_250			20
++#define ZX296702_CLK_125			21
++#define ZX296702_CLK_74M25			22
++#define ZX296702_A9_WCLK			23
++#define ZX296702_A9_AS1_ACLK_MUX		24
++#define ZX296702_A9_TRACE_CLKIN_MUX		25
++#define ZX296702_A9_AS1_ACLK_DIV		26
++#define ZX296702_CLK_2				27
++#define ZX296702_CLK_27				28
++#define ZX296702_DECPPU_ACLK_MUX		29
++#define ZX296702_PPU_ACLK_MUX			30
++#define ZX296702_MALI400_ACLK_MUX		31
++#define ZX296702_VOU_ACLK_MUX			32
++#define ZX296702_VOU_MAIN_WCLK_MUX		33
++#define ZX296702_VOU_AUX_WCLK_MUX		34
++#define ZX296702_VOU_SCALER_WCLK_MUX		35
++#define ZX296702_R2D_ACLK_MUX			36
++#define ZX296702_R2D_WCLK_MUX			37
++#define ZX296702_CLK_50				38
++#define ZX296702_CLK_25				39
++#define ZX296702_CLK_12				40
++#define ZX296702_CLK_16M384			41
++#define ZX296702_CLK_32K768			42
++#define ZX296702_SEC_WCLK_DIV			43
++#define ZX296702_DDR_WCLK_MUX			44
++#define ZX296702_NAND_WCLK_MUX			45
++#define ZX296702_LSP_26_WCLK_MUX		46
++#define ZX296702_A9_AS0_ACLK			47
++#define ZX296702_A9_AS1_ACLK			48
++#define ZX296702_A9_TRACE_CLKIN			49
++#define ZX296702_DECPPU_AXI_M_ACLK		50
++#define ZX296702_DECPPU_AHB_S_HCLK		51
++#define ZX296702_PPU_AXI_M_ACLK			52
++#define ZX296702_PPU_AHB_S_HCLK			53
++#define ZX296702_VOU_AXI_M_ACLK			54
++#define ZX296702_VOU_APB_PCLK			55
++#define ZX296702_VOU_MAIN_CHANNEL_WCLK		56
++#define ZX296702_VOU_AUX_CHANNEL_WCLK		57
++#define ZX296702_VOU_HDMI_OSCLK_CEC		58
++#define ZX296702_VOU_SCALER_WCLK		59
++#define ZX296702_MALI400_AXI_M_ACLK		60
++#define ZX296702_MALI400_APB_PCLK		61
++#define ZX296702_R2D_WCLK			62
++#define ZX296702_R2D_AXI_M_ACLK			63
++#define ZX296702_R2D_AHB_HCLK			64
++#define ZX296702_DDR3_AXI_S0_ACLK		65
++#define ZX296702_DDR3_APB_PCLK			66
++#define ZX296702_DDR3_WCLK			67
++#define ZX296702_USB20_0_AHB_HCLK		68
++#define ZX296702_USB20_0_EXTREFCLK		69
++#define ZX296702_USB20_1_AHB_HCLK		70
++#define ZX296702_USB20_1_EXTREFCLK		71
++#define ZX296702_USB20_2_AHB_HCLK		72
++#define ZX296702_USB20_2_EXTREFCLK		73
++#define ZX296702_GMAC_AXI_M_ACLK		74
++#define ZX296702_GMAC_APB_PCLK			75
++#define ZX296702_GMAC_125_CLKIN			76
++#define ZX296702_GMAC_RMII_CLKIN		77
++#define ZX296702_GMAC_25M_CLK			78
++#define ZX296702_NANDFLASH_AHB_HCLK		79
++#define ZX296702_NANDFLASH_WCLK			80
++#define ZX296702_LSP0_APB_PCLK			81
++#define ZX296702_LSP0_AHB_HCLK			82
++#define ZX296702_LSP0_26M_WCLK			83
++#define ZX296702_LSP0_104M_WCLK			84
++#define ZX296702_LSP0_16M384_WCLK		85
++#define ZX296702_LSP1_APB_PCLK			86
++#define ZX296702_LSP1_26M_WCLK			87
++#define ZX296702_LSP1_104M_WCLK			88
++#define ZX296702_LSP1_32K_CLK			89
++#define ZX296702_AON_HCLK			90
++#define ZX296702_SYS_CTRL_PCLK			91
++#define ZX296702_DMA_PCLK			92
++#define ZX296702_DMA_ACLK			93
++#define ZX296702_SEC_HCLK			94
++#define ZX296702_AES_WCLK			95
++#define ZX296702_DES_WCLK			96
++#define ZX296702_IRAM_ACLK			97
++#define ZX296702_IROM_ACLK			98
++#define ZX296702_BOOT_CTRL_HCLK			99
++#define ZX296702_EFUSE_CLK_30			100
++#define ZX296702_VOU_MAIN_CHANNEL_DIV		101
++#define ZX296702_VOU_AUX_CHANNEL_DIV		102
++#define ZX296702_VOU_TV_ENC_HD_DIV		103
++#define ZX296702_VOU_TV_ENC_SD_DIV		104
++#define ZX296702_VL0_MUX			105
++#define ZX296702_VL1_MUX			106
++#define ZX296702_VL2_MUX			107
++#define ZX296702_GL0_MUX			108
++#define ZX296702_GL1_MUX			109
++#define ZX296702_GL2_MUX			110
++#define ZX296702_WB_MUX				111
++#define ZX296702_HDMI_MUX			112
++#define ZX296702_VOU_TV_ENC_HD_MUX		113
++#define ZX296702_VOU_TV_ENC_SD_MUX		114
++#define ZX296702_VL0_CLK			115
++#define ZX296702_VL1_CLK			116
++#define ZX296702_VL2_CLK			117
++#define ZX296702_GL0_CLK			118
++#define ZX296702_GL1_CLK			119
++#define ZX296702_GL2_CLK			120
++#define ZX296702_WB_CLK				121
++#define ZX296702_CL_CLK				122
++#define ZX296702_MAIN_MIX_CLK			123
++#define ZX296702_AUX_MIX_CLK			124
++#define ZX296702_HDMI_CLK			125
++#define ZX296702_VOU_TV_ENC_HD_DAC_CLK		126
++#define ZX296702_VOU_TV_ENC_SD_DAC_CLK		127
++#define ZX296702_A9_PERIPHCLK			128
++#define ZX296702_TOPCLK_END			129
++
++#define ZX296702_SDMMC1_WCLK_MUX		0
++#define ZX296702_SDMMC1_WCLK_DIV		1
++#define ZX296702_SDMMC1_WCLK			2
++#define ZX296702_SDMMC1_PCLK			3
++#define ZX296702_SPDIF0_WCLK_MUX		4
++#define ZX296702_SPDIF0_WCLK			5
++#define ZX296702_SPDIF0_PCLK			6
++#define ZX296702_SPDIF0_DIV			7
++#define ZX296702_I2S0_WCLK_MUX			8
++#define ZX296702_I2S0_WCLK			9
++#define ZX296702_I2S0_PCLK			10
++#define ZX296702_I2S0_DIV			11
++#define ZX296702_LSP0CLK_END			12
++
++#define ZX296702_UART0_WCLK_MUX			0
++#define ZX296702_UART0_WCLK			1
++#define ZX296702_UART0_PCLK			2
++#define ZX296702_UART1_WCLK_MUX			3
++#define ZX296702_UART1_WCLK			4
++#define ZX296702_UART1_PCLK			5
++#define ZX296702_SDMMC0_WCLK_MUX		6
++#define ZX296702_SDMMC0_WCLK_DIV		7
++#define ZX296702_SDMMC0_WCLK			8
++#define ZX296702_SDMMC0_PCLK			9
++#define ZX296702_LSP1CLK_END			10
++
++#endif /* __DT_BINDINGS_CLOCK_ZX296702_H */
 -- 
 1.9.1
