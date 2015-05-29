@@ -1,35 +1,32 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 29 May 2015 15:13:42 +0200
-Subject: [PATCHv3 1/4] phy: phy-core: Make GENERIC_PHY an invisible option
-In-Reply-To: <55685D7E.9000700@ti.com>
-References: <1429743853-10254-1-git-send-email-arun.ramamurthy@broadcom.com>
- <1429743853-10254-2-git-send-email-arun.ramamurthy@broadcom.com>
- <55685D7E.9000700@ti.com>
-Message-ID: <55686606.1010701@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 29 May 2015 21:12:27 +0800
+Subject: [PATCH] clocksource: timer-imx-gpt: remove include of
+ <asm/mach/time.h>
+Message-ID: <1432905147-23754-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/05/15 14:37, Kishon Vijay Abraham I wrote:
-> Tejun, Maxime, Sylwester, Kyungmin
-> 
-> On Thursday 23 April 2015 04:34 AM, Arun Ramamurthy wrote:
->> Most of the phy providers use "select" to enable GENERIC_PHY. Since select
->> is only recommended when the config is not visible, GENERIC_PHY is changed
->> an invisible option. To maintain consistency, all phy providers are changed
->> to "select" GENERIC_PHY and all non-phy drivers use "depends on" when the
->> phy framework is explicity required. USB_MUSB_OMAP2PLUS has a cyclic
->> dependency, so it is left as "select".
->>
->> Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
-> 
-> Need your ACK for this patch.
+The include of <asm/mach/time.h> is not needed at all, and causes build
+error in powerpc allyesconfig.  Remove it.
 
-For
-	drivers/media/platform/exynos4-is/Kconfig
-	drivers/video/fbdev/exynos/Kconfig
+Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/clocksource/timer-imx-gpt.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-
---
-Thanks,
-Sylwester
+diff --git a/drivers/clocksource/timer-imx-gpt.c b/drivers/clocksource/timer-imx-gpt.c
+index ec144ce9f880..a98d1104b3fd 100644
+--- a/drivers/clocksource/timer-imx-gpt.c
++++ b/drivers/clocksource/timer-imx-gpt.c
+@@ -34,8 +34,6 @@
+ #include <linux/of_irq.h>
+ #include <soc/imx/timer.h>
+ 
+-#include <asm/mach/time.h>
+-
+ /*
+  * There are 4 versions of the timer hardware on Freescale MXC hardware.
+  *  - MX1/MXL
+-- 
+1.9.1
