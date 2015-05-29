@@ -1,67 +1,50 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 29 May 2015 23:02:59 +0200
-Subject: [PATCH] fix n900 dts file to work around 4.1 touchscreen
- regression on n900
-In-Reply-To: <20150529204847.GA7429@dtor-ws>
-References: <20150529190816.GA20232@amd> <20150529192505.GA28987@amd>
- <20150529193211.GA7599@amd>
- <20150529194955.GV2026@saruman.tx.rr.com>
- <20150529195629.GA9811@amd> <20150529201745.GC17267@lukather>
- <20150529202123.GY2026@saruman.tx.rr.com>
- <20150529202954.GA26494@localhost> <20150529203456.GC22083@amd>
- <20150529204847.GA7429@dtor-ws>
-Message-ID: <20150529210259.GA26866@amd>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri, 29 May 2015 14:03:50 -0700
+Subject: [PATCH] mmc: sdhci-bcm2835: Actually enable the clock
+In-Reply-To: <20150529083541.GH2067@n2100.arm.linux.org.uk>
+References: <1432857792-7421-1-git-send-email-eric@anholt.net>
+ <20150529083541.GH2067@n2100.arm.linux.org.uk>
+Message-ID: <87eglzcczt.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2015-05-29 13:48:47, Dmitry Torokhov wrote:
-> On Fri, May 29, 2015 at 10:34:56PM +0200, Pavel Machek wrote:
-> > Hi!
-> > 
-> > > > > single DT, you don't even use that property in your driver, and now
-> > > > > that you realise you meant something else, you want the code that
-> > > > 
-> > > > not Pali, Sebastian.
-> > > > 
-> > > > > actually parse the *right* property and does the right thing, that all
-> > > > > other DT agree (and depend on) to be reverted?
-> > > > 
-> > > > We shouldn't revert, that I agree. But both properties should be parsed.
-> > > 
-> > > No. If the property is wrong, and nobody parsed it, I do not see any reason to
-> > > start now.
-> > 
-> > Agreed.
-> > 
-> > But that's not what I'm asking. See a changelog of
-> > 3eea8b5d68c801fec788b411582b803463834752 and compare it with what it
-> > actually does.
-> > 
-> > It is buggy. If fuzz is specified but maximum is not, it overwites
-> > maximum with zero.
-> 
-> Yes.
-> 
-> > 
-> > Plus it introduces new failure "if (!test_bit(axis, dev->absbit))".
-> 
-> That is not a new failure. It actually warns users that they trying to
-> specify in DT something that will be ignored by the kernel (because
-> without that absbit kernel will ignore all requests to that event code).
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-What if driver sets the bits after parsing device tree?
+> On Thu, May 28, 2015 at 05:03:12PM -0700, Eric Anholt wrote:
+>> We're currently using a fixed frequency clock specified in the DT, so
+>> enabling is a no-op.  However, the RPi firmware-based clocks driver
+>> can actually disable unused clocks, so when switching to use it we
+>> ended up losing our MMC clock once all devices were probed.
+>> 
+>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>> ---
+>>  drivers/mmc/host/sdhci-bcm2835.c | 5 +++++
+>>  1 file changed, 5 insertions(+)
+>> 
+>> diff --git a/drivers/mmc/host/sdhci-bcm2835.c b/drivers/mmc/host/sdhci-bcm2835.c
+>> index 0ef0343..09aff3a 100644
+>> --- a/drivers/mmc/host/sdhci-bcm2835.c
+>> +++ b/drivers/mmc/host/sdhci-bcm2835.c
+>> @@ -172,6 +172,11 @@ static int bcm2835_sdhci_probe(struct platform_device *pdev)
+>>  		ret = PTR_ERR(pltfm_host->clk);
+>>  		goto err;
+>>  	}
+>> +	ret = clk_prepare_enable(pltfm_host->clk);
+>> +	if (ret) {
+>> +		dev_err(&pdev->dev, "failed to enable host clk\n");
+>> +		goto err;
+>> +	}
+>>  
+>>  	return sdhci_add_host(host);
+>
+> Where's the error clean-up path for a failed sdhci_add_host()?
 
-> > Plus it fails to distinguish between "value not specified in the dt"
-> > and "zero is specified in the dt".
-> 
-> Yes. I am not sure if we should care and support all permutations (ah, I
-> pre-setup fuzz in the driver, but override max on X, and I pre-setup
-> max on X, but take fuzz from DT). Maybe we should simply document that
-> specifying one parameter for an axis will change the rest of them to be
-> 0. Not sure though...
-
-Well, the old code did support all permutations. "cleanups" should not
-change such details...
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+We were already missing required cleanup in that path, so I didn't
+notice.  Sending a new version with a fix for that.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150529/40b0dfcb/attachment-0001.sig>
