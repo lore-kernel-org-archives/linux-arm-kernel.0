@@ -1,73 +1,83 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 29 May 2015 11:16:15 -0700
-Subject: runtime check for omap-aes bus access permission (was: Re:
- 3.13-rc3 (commit 7ce93f3) breaks Nokia N900 DT boot)
-In-Reply-To: <20150529155030.GO30984@atomide.com>
-References: <CAALWOA_ngoSKjB=ZQ264Va37bBK7v41Ei45SyoYLiMdanTKnxQ@mail.gmail.com>
- <201502112128.44852@pali>
- <CAGo_u6oZxi7O6re30L2-wVyxTeahhyMb4qVcrE3tSCV9sBvrnw@mail.gmail.com>
- <20150528073740.GD16509@pali> <20150528160113.GH30984@atomide.com>
- <CAALWOA8Pfc_zbN9MoHwR=njPBpFU56WObYMbGv9N7ktzy+RSeQ@mail.gmail.com>
- <20150528222412.GM30984@atomide.com>
- <CAALWOA9qJHUST0JQxA6MBohMfbTYAP9+NbSXGYHZY4Xa3nSFvw@mail.gmail.com>
- <CAALWOA82=QmTpCeiceOFQOjqXKdSBjB3Z+jL-mi0vYF=QaL4sA@mail.gmail.com>
- <20150529155030.GO30984@atomide.com>
-Message-ID: <20150529181614.GS30984@atomide.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Fri, 29 May 2015 11:24:28 -0700
+Subject: [PATCH v10 0/4] PCI: X-Gene: Add APM X-Gene v1 MSI/MSIX termination
+ driver
+In-Reply-To: <5566CC58.8080400@arm.com>
+References: <5566CC58.8080400@arm.com>
+Message-ID: <cover.1432922451.git.dhdang@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [150529 08:52]:
-> * Matthijs van Duin <matthijsvanduin@gmail.com> [150528 18:37]:
-> > On 29 May 2015 at 02:58, Matthijs van Duin <matthijsvanduin@gmail.com> wrote:
-> > > It is only guaranteed to happen immediately (before the next
-> > > instruction is executed) if the error occurs before the posting-point
-> > > of the write. However, in that case the error is reported in-band to
-> > > the cpu, resulting in a (synchronous) bus error which takes precedence
-> > > over the out-of-band error irq (if any is signalled).
-> > 
-> > OK, all this was actually assuming linux uses device-type mappings for
-> > device mappings, which was also the impression I got from
-> > build_mem_type_table() in arch/arm/mm/mmu.c (although it's a bit of a
-> > maze). A quick test however seems to imply otherwise:
-> > 
-> > ~# ./bogus-dev-write
-> > Bus error
-> > 
-> > So... linux actually uses strongly-ordered mappings? I really didn't
-> > expect that, given the performance implications (especially on a
-> > strictly in-order cpu like the Cortex-A8 which will really just sit
-> > there picking its nose until the write completes) and I think I recall
-> > having seen an OCP barrier being used somewhere in driver code...
-> 
-> I believe some TI kernels use strongly-ordered mappings, mainline
-> kernel does not. Which kernel version are you using?
->  
-> > Well, in that case everything I said is technically still true, except
-> > the posting point is the peripheral itself. That also means the
-> > interconnect error reporting mechanism is not really useful for
-> > probing since you'll get a bus error before any error irq is
-> > delivered.
-> 
-> Hmm if that's the case then yes we can't use the error irq. However,
-> what I've seen so far is that we only get the bus error if the
-> l3_* drivers are configured. I guess some more testing is needed.
->  
-> > So I'd say you're back at having to trap that bus error using the
-> > exception handling mechanism, which I still suspect shouldn't be hard
-> > to do.
-> 
-> And in that case it makes sense to do that in the bootloader to
-> avoid adding any custom early boot code to Linux kernel.
->  
-> > Or perhaps you could probe the device using a DMA access and combine
-> > that with the interconnect error reporting irq... ;-)
-> 
-> Heh too many dependencies :)
+This patch set adds MSI/MSIX termination driver support for APM X-Gene v1 SoC.
+APM X-Gene v1 SoC supports its own implementation of MSI, which is not compliant
+to GIC V2M specification for MSI Termination.
 
-If we can't use the l3 interrrupts, then something similar to commit
-fdf4850cb5b2 ("ARM: BCM5301X: workaround suppress fault") might be
-doable too.
+There is single MSI block in X-Gene v1 SOC which serves all 5 PCIe ports.
+This MSI block supports 2048 MSI termination ports coalesced into 16 physical
+HW IRQ lines and shared across all 5 PCIe ports. Starting from version 5 of
+this patch series, the total MSI vectors this driver supports is reduced to 256
+to maintain the correct set_affinity behavior for each MSI.
 
-Regards,
+v10 changes:
+	1. Remove inline in helper functions
+	2. Simplify hwirq_to_cpu implementation
 
-Tony
+v9 changes:
+        1. Add more helpers for manipulating MSI messages
+        2. Improve code readability
+        3. Make PCI_XGENE_MSI selectable
+
+v8 changes:
+        1. Add helper to read MSI registers
+        2. Resample interrupt status of the same group after handling interrupts
+           in that group
+        3. Error handling in case fail to allocate CPU mask for affinity setting
+
+v7 changes:
+        1. Add more error handling cases
+        2. Clear spurious interrupts that may happen during driver probe
+        3. Not using free_irq for chained irqs
+        4. Improve GIC IRQ number look up in chained handler
+
+v6 changes:
+        1. Correctly allocate MSI with bitmap_find_next_zero_area
+        2. Add notifier for CPU hotplug case
+        3. Driver clean up
+        4. Add more detailed information into device tree binding document
+           and move the device tree binding patch before the driver/dts patch
+
+v5 changes:
+        1. Implement set_affinity for each MSI by statically allocating 2
+	   MSI GIC IRQs for each X-Gene CPU core and moving MSI vectors around
+	   these GIC IRQs to steer them to target CPU core. As a consequence,
+	   the total MSI vectors that X-Gene v1 supports is reduced to 256.
+
+v4 changes:
+        1. Remove affinity setting for each MSI
+        2. Add description about register layout, MSI termination address
+	   and data
+        3. Correct total number of MSI vectors to 2048
+        4. Clean up error messages
+        5. Remove unused module code
+
+v3 changes:
+        1. Implement MSI support using PCI MSI IRQ domain
+        2. Only use msi_controller to store IRQ domain
+
+v2 changes:
+        1. Use msi_controller structure
+        2. Remove arch hooks arch_teardown_msi_irqs and arch_setup_msi_irqs
+
+ .../devicetree/bindings/pci/xgene-pci-msi.txt      |  68 +++
+ MAINTAINERS                                        |   8 +
+ arch/arm64/boot/dts/apm/apm-storm.dtsi             |  27 +
+ drivers/pci/host/Kconfig                           |  10 +
+ drivers/pci/host/Makefile                          |   1 +
+ drivers/pci/host/pci-xgene-msi.c                   | 595 +++++++++++++++++++++
+ drivers/pci/host/pci-xgene.c                       |  21 +
+ 7 files changed, 730 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/xgene-pci-msi.txt
+ create mode 100644 drivers/pci/host/pci-xgene-msi.c
+
+-- 
+1.9.1
