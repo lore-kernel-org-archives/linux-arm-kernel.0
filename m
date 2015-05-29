@@ -1,85 +1,60 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Sat, 30 May 2015 01:50:12 +0530
-Subject: [PATCH 03/12] i2c: pxa: Add reset operation when i2c bus busy
-In-Reply-To: <878uc7yxzx.fsf@belgarion.home>
-References: <1432818224-17070-1-git-send-email-vaibhav.hiremath@linaro.org>	<1432818224-17070-4-git-send-email-vaibhav.hiremath@linaro.org>
- <878uc7yxzx.fsf@belgarion.home>
-Message-ID: <5568C9FC.7040906@linaro.org>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Fri, 29 May 2015 16:21:15 -0400
+Subject: [PATCH 0/4] ARM: keystone: Enable Netcp driver on K2 EVMs
+In-Reply-To: <20150511160026.GH2067@n2100.arm.linux.org.uk>
+References: <1429817852-27938-1-git-send-email-m-karicheri2@ti.com>
+ <55395981.8050902@oracle.com> <553A5E12.9040202@ti.com>
+ <553A630F.4060008@oracle.com> <5550D0FD.7060903@ti.com>
+ <20150511160026.GH2067@n2100.arm.linux.org.uk>
+Message-ID: <5568CA3B.4000709@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Saturday 30 May 2015 01:09 AM, Robert Jarzmik wrote:
-> Vaibhav Hiremath <vaibhav.hiremath@linaro.org> writes:
+On 05/11/2015 12:00 PM, Russell King - ARM Linux wrote:
+> On Mon, May 11, 2015 at 11:55:41AM -0400, Murali Karicheri wrote:
+>> On 04/24/2015 11:36 AM, santosh shilimkar wrote:
+>>> On 4/24/2015 8:15 AM, Murali Karicheri wrote:
+>>>> On 04/23/2015 04:43 PM, santosh shilimkar wrote:
+>>>>> On 4/23/2015 12:37 PM, Murali Karicheri wrote:
+>>>>>> NetCP driver support patches are already merged to v4.0.nd v4.1.
+>>>>>> This series introduce patches to update the DTS bindings and
+>>>>>> defconfig so that the network driver is fully functional on K2
+>>>>>> EVMs :- K2HK, K2L and K2E.
+>>>>>>
+>>>>> Nice and Thanks Murali for sending these up.
+>>>>>
+>>>>>> It will be great if this can be merged to v4.1.
+>>>>>>
+>>>>> Its too late for the 4.1 now. For the same reason, we also
+>>>>> couldn't get the MMU switching fixes in this merge window.
+>>>>
+>>>> For my reference, can you point me to the MMU switching fixes you are
+>>>> referring to?
+>>>>
+>>> http://www.spinics.net/lists/arm-kernel/msg411178.html
+>>>
+>>> Regards,
+>>> Santosh
+>> Santosh,
+>>
+>> Is MMU switching series applied to a sub system branch already that I can
+>> pull to do some testing on K2 devices?
 >
->> From: "Jett.Zhou" <jtzhou@marvell.com>
->>
->> According to some test in emei_dkb, we found some i2c slave device
->> (eg. camera sensor ov2659 power up) introduce noise on sda, so detect
->> i2c controller busy, and assert reset to i2c controller to recover as
->> early as possible to avoid more latency on the entire i2c transaction.
->>
->> Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
->> [vaibhav.hiremath at linaro.org: Removed reduction in timeout value, as I
->> do not have goot explanation for it. Logically it is not required.
->> And also Updated changelog]
->> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
->>
->> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
->> ---
->>   drivers/i2c/busses/i2c-pxa.c | 4 ++++
->>   1 file changed, 4 insertions(+)
->>
->> diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
->> index d4c798a..a76c901 100644
->> --- a/drivers/i2c/busses/i2c-pxa.c
->> +++ b/drivers/i2c/busses/i2c-pxa.c
->> @@ -314,6 +314,10 @@ static int i2c_pxa_wait_bus_not_busy(struct pxa_i2c *i2c)
->>   {
->>   	int timeout = DEF_TIMEOUT;
->>
->> +	if (readl(_ISR(i2c)) & (ISR_IBB | ISR_UB))
->> +		i2c_pxa_reset(i2c);
+> Shall I send you the patches directly?
 >
-> The pxa27x manual states in the Developer Manual, chapter 9.4.13 "Reset
-> Conditions" :
->              Software must ensure that (1) the I 2 C unit is not busy before it
->              asserts a reset
->
-> Given that, I don't agree with this patch.
+Russell,
 
+As promised I have taken sometime today to test this series that you 
+have sent to me privately and all of my below tests passed.
+1. Boot and reboot test on all EVMs (K2HK, K2E and K2L)
+2. Apply network patches (lined up for v4.2 merge) and do boot with nfs 
+file system. Also performed iperf network traffic tests.
+3. Bring up SATA harddisk on K2E EVM and do file copy tests.
 
-Hmmm,
+Based on this, please add my Tested-by to this series.
 
-Just saw pxa27x manual, and you are right.
-In that case I am not sure how to address the issue mentioned in the
-changelog.
-
-On the other side,
-
-Check for ISR_IBB, should be ok, as, as per spec it says,
-
-"Set when the TWSI bus is busy but the SoC TWSI is not
-involved in the transaction."
-
-Also,
-I believe we should be ok, as the first thing we do in i2c_pxa_reset()
-is abort the current transaction and then assert reset. Isn't it?
-
-> Moreover, reseting unconditionaly the
-> i2c bus on each busy state on a write transaction for one single corner case is
-> not something that has my agreement. A quirk might overcome my reluctance.
->
-
-Any condition check you can possibly think of for asserting reset???
-
-Having said that,
-Somewhere I do agree with you that we need to further debug on noise
-issue in HW rather hacking software. :)
-
-I am ok to drop this patch, do further testing and revisit again if
-issue persist.
-
-Thanks,
-Vaibhav
+Tested-by: Murali Karicheri <m-karicheri2@ti.com>
+Regards,
+-- 
+Murali Karicheri
+Linux Kernel, Keystone
