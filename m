@@ -1,116 +1,49 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 29 May 2015 09:54:18 +0900
-Subject: [PATCH 10/10] ARM: shmobile: r8a7790 dtsi: Describe DMA for the
- serial ports
-In-Reply-To: <cover.1432860632.git.horms+renesas@verge.net.au>
-References: <cover.1432860632.git.horms+renesas@verge.net.au>
-Message-ID: <acea43fcb02746e907725c6dbd2eb95b32d79ea5.1432860632.git.horms+renesas@verge.net.au>
+From: matthijsvanduin@gmail.com (Matthijs van Duin)
+Date: Fri, 29 May 2015 02:58:29 +0200
+Subject: runtime check for omap-aes bus access permission (was: Re:
+ 3.13-rc3 (commit 7ce93f3) breaks Nokia N900 DT boot)
+In-Reply-To: <20150528222412.GM30984@atomide.com>
+References: <20131206213613.GA19648@earth.universe> <201502111339.54480@pali>
+ <CAALWOA_ngoSKjB=ZQ264Va37bBK7v41Ei45SyoYLiMdanTKnxQ@mail.gmail.com>
+ <201502112128.44852@pali>
+ <CAGo_u6oZxi7O6re30L2-wVyxTeahhyMb4qVcrE3tSCV9sBvrnw@mail.gmail.com>
+ <20150528073740.GD16509@pali> <20150528160113.GH30984@atomide.com>
+ <CAALWOA8Pfc_zbN9MoHwR=njPBpFU56WObYMbGv9N7ktzy+RSeQ@mail.gmail.com>
+ <20150528222412.GM30984@atomide.com>
+Message-ID: <CAALWOA9qJHUST0JQxA6MBohMfbTYAP9+NbSXGYHZY4Xa3nSFvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+On 29 May 2015 at 00:24, Tony Lindgren <tony@atomide.com> wrote:
+> Hmm I believe the interrupt happens immediately trying to access an
+> invalid device. But maybe I'm thinking about just errors if a device
+> is not powered or clocked.
 
-Add DMA properties to all SCIF, SCIFA, SCIFB, and HSCIF device nodes.
+It is only guaranteed to happen immediately (before the next
+instruction is executed) if the error occurs before the posting-point
+of the write. However, in that case the error is reported in-band to
+the cpu, resulting in a (synchronous) bus error which takes precedence
+over the out-of-band error irq (if any is signalled). Once the write
+is posted however, the cpu will receive an ack on the write and
+continue execution, and there's no reason to assume that an error irq
+will happen *immediately* after the write.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7790.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+Of course it typically will happen soon afterwards, possibly even
+before the next instruction is executed, depending a bit on how soon
+after the posting-point the error occurs versus how long it takes for
+the write-ack to reach the cpu. On the other hand, it's also possible
+the write, after becoming posted, gets stuck for a while due to a
+burst of higher-priority traffic. (I also recall reading about some
+situation where a request needs to wait for something to be
+dynamically powered up before an error response could be generated,
+but I think that was on the OMAP 4.)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 70248df02342..51ab8865ea37 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -556,6 +556,8 @@
- 		interrupts = <0 144 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7790_CLK_SCIFA0>;
- 		clock-names = "sci_ick";
-+		dmas = <&dmac0 0x21>, <&dmac0 0x22>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
-@@ -565,6 +567,8 @@
- 		interrupts = <0 145 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7790_CLK_SCIFA1>;
- 		clock-names = "sci_ick";
-+		dmas = <&dmac0 0x25>, <&dmac0 0x26>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
-@@ -574,6 +578,8 @@
- 		interrupts = <0 151 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7790_CLK_SCIFA2>;
- 		clock-names = "sci_ick";
-+		dmas = <&dmac0 0x27>, <&dmac0 0x28>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
-@@ -583,6 +589,8 @@
- 		interrupts = <0 148 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7790_CLK_SCIFB0>;
- 		clock-names = "sci_ick";
-+		dmas = <&dmac0 0x3d>, <&dmac0 0x3e>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
-@@ -592,6 +600,8 @@
- 		interrupts = <0 149 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7790_CLK_SCIFB1>;
- 		clock-names = "sci_ick";
-+		dmas = <&dmac0 0x19>, <&dmac0 0x1a>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
-@@ -601,6 +611,8 @@
- 		interrupts = <0 150 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7790_CLK_SCIFB2>;
- 		clock-names = "sci_ick";
-+		dmas = <&dmac0 0x1d>, <&dmac0 0x1e>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
-@@ -610,6 +622,8 @@
- 		interrupts = <0 152 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp7_clks R8A7790_CLK_SCIF0>;
- 		clock-names = "sci_ick";
-+		dmas = <&dmac0 0x29>, <&dmac0 0x2a>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
-@@ -619,6 +633,8 @@
- 		interrupts = <0 153 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp7_clks R8A7790_CLK_SCIF1>;
- 		clock-names = "sci_ick";
-+		dmas = <&dmac0 0x2d>, <&dmac0 0x2e>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
-@@ -628,6 +644,8 @@
- 		interrupts = <0 154 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp7_clks R8A7790_CLK_HSCIF0>;
- 		clock-names = "sci_ick";
-+		dmas = <&dmac0 0x39>, <&dmac0 0x3a>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
-@@ -637,6 +655,8 @@
- 		interrupts = <0 155 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp7_clks R8A7790_CLK_HSCIF1>;
- 		clock-names = "sci_ick";
-+		dmas = <&dmac0 0x4d>, <&dmac0 0x4e>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
--- 
-2.1.4
+So that's the icky part: it will very likely happen almost
+immediately. There's however no *guarantee* that it will, and in fact
+it's quite tricky to absolutely make sure a write is no longer in
+transit. The usual solution is an "OCP barrier": a read that is known
+to follow the same path as the write. Normally that means a read from
+the same peripheral, but that would defeat the purpose in this case.
+Fortunately, the L4 interconnects (unlike the L3) detect firewall
+violations in the initiator agent rather than the target agents, hence
+a read from any peripheral on the same L4 interconnect suffices.
