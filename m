@@ -1,57 +1,66 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 29 May 2015 15:08:39 +0900
-Subject: [PATCH v6] serial: 8250_uniphier: add UniPhier serial driver
-In-Reply-To: <1432652906.8736.44.camel@intel.com>
-References: <1432525477-14051-1-git-send-email-yamada.masahiro@socionext.com>
- <1432545245.8736.5.camel@intel.com>
- <1432650518.13900.72.camel@linux.intel.com>
- <1432652906.8736.44.camel@intel.com>
-Message-ID: <CAK7LNAQ6Q9OzTT0NN-uruGQhhXzt9d_n7gogXTtPYgH8PnzRrg@mail.gmail.com>
+From: uwe@congenio.de (Dr. Uwe Meyer-Gruhl)
+Date: Fri, 29 May 2015 08:16:39 +0200
+Subject: [PATCH 0/1] mv643xx_eth: Disable TSO by default
+In-Reply-To: 1415176766.31613.7.camel () hellion ! org ! uk
+Message-ID: <55680447.4070503@congenio.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-05-27 0:08 GMT+09:00 Shevchenko, Andriy <andriy.shevchenko@intel.com>:
-> On Tue, 2015-05-26 at 15:28 +0100, Alan Cox wrote:
->> > > +
->> > > +#define UNIPHIER_UART_CHAR_FCR   3       /* Character / FIFO Control Register */
->> > > +#define UNIPHIER_UART_LCR_MCR    4       /* Line/Modem Control Register */
->> > > +#define   UNIPHIER_UART_LCR_SHIFT        8
->> >
->> > Indentation problem, needs to be fixed.
+> On Wed, Nov 05, 2014 at 08:39:26AM +0000, Ian Campbell wrote:
+>> On Tue, 2014-11-04 at 15:20 +0100, Karl Beldan wrote:
+>>> On Sat, Nov 01, 2014 at 12:30:19PM -0300, Ezequiel Garcia wrote:
+>>>> Several users ([1], [2]) have been reporting data corruption
+>>>> with TSO on Kirkwood platforms (i.e. using the mv643xx_eth
+>>>> driver).
+>>>>
+>>>> Until we manage to find what's causing this, this simple patch  will make
+>>>> the TSO path disabled by default. This patch should be queued
+for stable,
+>>>> fixing the TSO feature introduced in v3.16.
+>>>>
+>>>> The corruption itself is very easy to reproduce: checkingmd5sum on a mounted
+>>>> NFS directory gives a different result each time. Same tests  using the mvneta
+>>>> driver (Armada 370/38x/XP SoC) pass with no issues.
+>>>>
+>>>> Frankly, I'm a bit puzzled about this, and so any ideas ordebugging hints
+>>>> are well received.
+>>>>
+>>>
+>>> Hi,
+>>>
+>>> Can you try this :
 >>
->> If you are going to review a patch set at least look at the previous
->> reviews - the indentation was already discussed and is done that way to
->> show (as many drivers do) which are fields for which registers
+>> It fixes things for me, thanks!
+>>
+>> Tested-by: Ian Campbell <ijc@hellion.org.uk>
+>>
 >
-> This is not exactly the field, the way how to get the field.
-> In some cases it is even better to define something like
-> _LCR(x)  ((x) << 8)
-
-
-I want to shift the value for both read and write,
-so I think LCR_SHIFT is handier than _LCR(x).
-
-I think the indentation here is OK as it is.
-
-
-
->>
->> > > +static unsigned int uniphier_serial_in(struct uart_port *p, int offset)
->> > > +{
->> > > + int valshift = 0;
->> >
->> > Perhaps unsigned int?
->>
->> Why ? even if it mattered gcc is already realising that the value can
->> only be 0 or 8 and will be generating whatever works best for that.
+> Good thing, thanks for your feedbak Ian !
 >
-> It's not about how gcc does, it's about what assumptions can be made
-> from the reading of the source code. I think if we do a counter of shift
-> value it would be nice to set an unsigned type explicitly.
+> Karl --
 
-int should work enough, but just in case, I added unsigned in v7.
+That would be a good thing - although: Neither the patch to disable TSO
+altogether nor the one that fixes the underlying problem actually made
+it to the official kernel source tree, so it is still present in all 
+kernels > 3.16 - I just stumbled over this in the current 4.0.4 version.
+
+The fixes in the thread
+http://marc.info/?l=linux-netdev&m=141517941900547&w=2 are not
+applicable any more to the current driver from the 4.0 kernel, as the
+whole respective logic seems to have been changed meanwhile, sadly 
+without fixing the problem. Disabling TSO completely still works, though.
+
+Can someone in the know please suggest a working fix to the kernel
+maintainers, preferably one that does not resort to disable TSO?
 
 
--- 
-Best Regards
-Masahiro Yamada
+Uwe
+--
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/pkcs7-signature
+Size: 3740 bytes
+Desc: S/MIME Cryptographic Signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150529/a14a7b4f/attachment.p7s>
