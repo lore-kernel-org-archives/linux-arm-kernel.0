@@ -1,61 +1,56 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 29 May 2015 19:47:16 +0200
-Subject: [PATCH 03/16] ARM: at91/dt: kizbox: use stdout-path
-In-Reply-To: <1432921649-21943-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1432921649-21943-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1432921649-21943-4-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Fri, 29 May 2015 19:47:13 +0200
+Subject: [PATCH 00/16] AT91 DT for 4.2
+Message-ID: <1432921649-21943-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kizbox dts are using the deprecated linux,stdout-path. Replace those by
-stdout-path.
+Hi,
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Cc: Ga?l PORTAY <g.portay@overkiz.com>
----
- arch/arm/boot/dts/at91-kizbox.dts     | 2 +-
- arch/arm/boot/dts/at91-kizbox2.dts    | 2 +-
- arch/arm/boot/dts/at91-kizboxmini.dts | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+A dt series for 4.2:
+ - Fix at91sam9rl RTC node and use it on at91sam9rlek
+ - correct stdout-path for the various kizboxes
+ - add stdout-path to the atme evaluation boards
+ - add  Acme arietta g25 device tree
 
-diff --git a/arch/arm/boot/dts/at91-kizbox.dts b/arch/arm/boot/dts/at91-kizbox.dts
-index b567b5ff908f..d9b71065916d 100644
---- a/arch/arm/boot/dts/at91-kizbox.dts
-+++ b/arch/arm/boot/dts/at91-kizbox.dts
-@@ -16,7 +16,7 @@
- 
- 	chosen {
- 		bootargs = "ubi.mtd=ubi";
--		linux,stdout-path = &dbgu;
-+		stdout-path = &dbgu;
- 	};
- 
- 	memory {
-diff --git a/arch/arm/boot/dts/at91-kizbox2.dts b/arch/arm/boot/dts/at91-kizbox2.dts
-index a458e3791bb1..f0b1563cb3f1 100644
---- a/arch/arm/boot/dts/at91-kizbox2.dts
-+++ b/arch/arm/boot/dts/at91-kizbox2.dts
-@@ -15,7 +15,7 @@
- 
- 	chosen {
- 		bootargs = "ubi.mtd=ubi";
--		linux,stdout-path = &dbgu;
-+		stdout-path = &dbgu;
- 	};
- 
- 	memory {
-diff --git a/arch/arm/boot/dts/at91-kizboxmini.dts b/arch/arm/boot/dts/at91-kizboxmini.dts
-index 4611f227d8d0..9f72b4932634 100644
---- a/arch/arm/boot/dts/at91-kizboxmini.dts
-+++ b/arch/arm/boot/dts/at91-kizboxmini.dts
-@@ -15,7 +15,7 @@
- 
- 	chosen {
- 		bootargs = "ubi.mtd=ubi";
--		linux,stdout-path = &dbgu;
-+		stdout-path = &dbgu;
- 	};
- 
- 	memory {
+Alexandre Belloni (16):
+  ARM: at91/dt: at91sam9rl: fix rtc node
+  ARM: at91/dt: at91sam9rlek: add RTC
+  ARM: at91/dt: kizbox: use stdout-path
+  ARM: at91/dt: at91rm9200ek: use stdout-path
+  ARM: at91/dt: at91sam9261ek: use stdout-path
+  ARM: at91/dt: at91sam9263ek: use stdout-path
+  ARM: at91/dt: at91sam9g20ek: use stdout-path
+  ARM: at91/dt: at91sam9m10g45ek use stdout-path
+  ARM: at91/dt: at91sam9n12ek: use stdout-path
+  ARM: at91/dt: at91sam9rlek: use stdout-path
+  ARM: at91/dt: at91sam9x5ek: use stdout-path
+  ARM: at91/dt: sama5d3xek: use stdout-path
+  ARM: at91/dt: sama5d3 xplained: use stdout-path
+  ARM: at91/dt: sama5d4ek: use stdout-path
+  ARM: at91/dt: sama5d4 xplained: use stdout-path
+  ARM: at91/dt: Add Acme Arietta G25
+
+ arch/arm/boot/dts/Makefile                  |  1 +
+ arch/arm/boot/dts/at91-acme-arietta.dts     | 75 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91-kizbox.dts           |  2 +-
+ arch/arm/boot/dts/at91-kizbox2.dts          |  2 +-
+ arch/arm/boot/dts/at91-kizboxmini.dts       |  2 +-
+ arch/arm/boot/dts/at91-sama5d3_xplained.dts |  2 +-
+ arch/arm/boot/dts/at91-sama5d4_xplained.dts |  3 +-
+ arch/arm/boot/dts/at91-sama5d4ek.dts        |  3 +-
+ arch/arm/boot/dts/at91rm9200ek.dts          |  4 ++
+ arch/arm/boot/dts/at91sam9261ek.dts         |  3 +-
+ arch/arm/boot/dts/at91sam9263ek.dts         |  3 +-
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi |  3 +-
+ arch/arm/boot/dts/at91sam9m10g45ek.dts      |  3 +-
+ arch/arm/boot/dts/at91sam9n12ek.dts         |  3 +-
+ arch/arm/boot/dts/at91sam9rl.dtsi           | 15 +++---
+ arch/arm/boot/dts/at91sam9rlek.dts          |  7 ++-
+ arch/arm/boot/dts/at91sam9x5ek.dtsi         |  3 +-
+ arch/arm/boot/dts/sama5d3xcm.dtsi           |  3 +-
+ 18 files changed, 116 insertions(+), 21 deletions(-)
+ create mode 100644 arch/arm/boot/dts/at91-acme-arietta.dts
+
 -- 
 2.1.4
