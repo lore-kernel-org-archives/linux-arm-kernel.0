@@ -1,73 +1,36 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 29 May 2015 10:52:05 -0700
-Subject: [PATCH v3] ARM: l2c: add options to overwrite prefetching behavior
-In-Reply-To: <1431726751-9169-1-git-send-email-hauke@hauke-m.de>
-References: <1431726751-9169-1-git-send-email-hauke@hauke-m.de>
-Message-ID: <5568A745.7020502@gmail.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Fri, 29 May 2015 19:53:21 +0200
+Subject: [PATCH v2 2/3] clk: meson: Document bindings for Meson8b clock
+ controller
+In-Reply-To: <20150528215731.GD24204@codeaurora.org>
+References: <1431773333-23567-1-git-send-email-carlo@caione.org>
+ <1431773333-23567-3-git-send-email-carlo@caione.org>
+ <20150528215731.GD24204@codeaurora.org>
+Message-ID: <CAOQ7t2aNvuxjLuADMn+6jQqjXuQfXwU1P_vcgfoHDmt9ZTcKZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/05/15 14:52, Hauke Mehrtens wrote:
-> These options make it possible to overwrites the data and instruction
-> prefetching behavior of the arm pl310 cache controller.
-> 
-> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
-> ---
-> v2: only set prefetch
-> v1: set prefetch and aux
-> 
->  Documentation/devicetree/bindings/arm/l2cc.txt |  4 ++++
->  arch/arm/mm/cache-l2x0.c                       | 20 ++++++++++++++++++++
->  2 files changed, 24 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
-> index 0dbabe9..528821a 100644
-> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
-> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
-> @@ -67,6 +67,10 @@ Optional properties:
->    disable if zero.
->  - arm,prefetch-offset : Override prefetch offset value. Valid values are
->    0-7, 15, 23, and 31.
-> +- arm,prefetch-data : Enable data prefetch. Enabling prefetching
-> +  can improve performance.
+On Thu, May 28, 2015 at 11:57 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>> +
+>> +Example: Clock controller node:
+>> +
+>> +     clkc: clock-controller at c1104000 {
+>
+> The address after the '@' should be the first reg property.
+>
+>> +             #clock-cells = <1>;
+>> +             compatible = "amlogic,meson8b-clkc";
+>> +             reg = <0xc1108000 0x4>, <0xc1104000 0x460>;
+>
+> And a reg property of length 0x4 looks like it may be part of
+> some other "device". Should the xtal register be part of a syscon
+> that this node has a phandle to?
 
-I do not think the "can improve performance" has a place in a binding,
-this is either not technical enough about what this does, or marketing
-enough it does not buy us much.
+Probably it does. But I don't have any documentation about this
+device. Also the registers mapped before and after this specific
+register in the same memory region seem to not be used at all by the
+code in the Amlogic SDK. So I guess I can safely map that specific
+register for XTAL.
 
-data/instruction pre-fetching are commonly found on cache controller
-these days, so I would be tempted to remove the "arm," prefixing here
-since this can be generalized to other kinds of cache controllers.
-Documenting that this can be either a boolean, or accept a value (see
-below) could help.
-
-> +- arm,prefetch-instr : Enable instruction prefetch. Enabling prefetching
-> +  can improve performance.
->  
->  Example:
->  
-> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> index e309c8f..1aa970a 100644
-> --- a/arch/arm/mm/cache-l2x0.c
-> +++ b/arch/arm/mm/cache-l2x0.c
-> @@ -1199,6 +1199,26 @@ static void __init l2c310_of_parse(const struct device_node *np,
->  		pr_err("L2C-310 OF arm,prefetch-offset property value is missing\n");
->  	}
->  
-> +	ret = of_property_read_u32(np, "arm,prefetch-data", &val);
-> +	if (ret == 0) {
-> +		if (val)
-> +			prefetch |= L310_PREFETCH_CTRL_DATA_PREFETCH;
-> +		else
-> +			prefetch &= ~L310_PREFETCH_CTRL_DATA_PREFETCH;
-> +	} else if (ret != -EINVAL) {
-> +		pr_err("L2C-310 OF arm,prefetch-data property value is missing\n");
-> +	}
-
-If we want to generalize the use of this property, there could indeed be
-a value associated with it, if the cache controller supports different
-pre-fetching strides, however this is not the cache for these cache
-controllers it seems, are not we going to show error messages more often
-than desired?
 -- 
-Florian
+Carlo Caione
