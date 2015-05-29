@@ -1,21 +1,27 @@
 From: joro@8bytes.org (Joerg Roedel)
-Date: Fri, 29 May 2015 10:30:19 +0200
-Subject: [PATCH] iommu/rockchip: silence attaching and detaching of devices
-In-Reply-To: <1638542.l3M1oAbtAT@phil>
-References: <1638542.l3M1oAbtAT@phil>
-Message-ID: <20150529083018.GC13130@8bytes.org>
+Date: Fri, 29 May 2015 10:33:24 +0200
+Subject: [PATCH v7 03/25] iommu: Init iommu-groups support earlier, in
+ core_initcall
+In-Reply-To: <2209337.hhg3lyvUbi@avalon>
+References: <1432041645-11172-1-git-send-email-m.szyprowski@samsung.com>
+ <1432041645-11172-4-git-send-email-m.szyprowski@samsung.com>
+ <2209337.hhg3lyvUbi@avalon>
+Message-ID: <20150529083323.GD13130@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 21, 2015 at 09:57:29AM +0200, Heiko Stuebner wrote:
-> Currently the driver emits a log line every time a device attaches or
-> detaches - which happens at every unblank/blank of the drm for example.
-> The message itself also has no real value to the average user and is
-> merely useful when debugging a problem, so make it a dev_dbg instead.
+On Sat, May 23, 2015 at 07:23:34PM +0300, Laurent Pinchart wrote:
+> On Tuesday 19 May 2015 15:20:23 Marek Szyprowski wrote:
+> > -arch_initcall(iommu_init);
+> > +core_initcall(iommu_init);
 > 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  drivers/iommu/rockchip-iommu.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> I'll let Joerg comment on this, but this initcall ordering dance always makes 
+> me feel that something isn't quite right. Have you had a chance to look at the 
+> patch series I posted about a week ago to implement IOMMU probe deferral 
+> support ?
 
-Applied, thanks.
+Yeah, this is hacky, but I can live with it until your probe deferal
+patch-set is merged.
+
+
+	Joerg
