@@ -1,60 +1,71 @@
 From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Sat, 30 May 2015 03:49:20 +0530
-Subject: [PATCH 2/4] mfd: 88pm800: use irq_mode to configure interrupt status
- reg clear method
+Date: Sat, 30 May 2015 03:49:21 +0530
+Subject: [PATCH 3/4] rtc: 88pm80x: add device tree support
 In-Reply-To: <1432937962-4537-1-git-send-email-vaibhav.hiremath@linaro.org>
 References: <1432937962-4537-1-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <1432937962-4537-3-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <1432937962-4537-4-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From the spec, bit 1 of reg 0xe (page 0): IN_CLEAR_MODE controls the
-method of clearing interrupt status register of 88pm800;
+Along with DT support, this patch also cleans up the unnecessary
+code around 'rtc_wakeup' initialization.
 
-  0: clear on read
-  1: clear on write
-
-Signed-off-by: zhaoy <zhaoy@marvell.com>
+Signed-off-by: Chao Xie <chao.xie@marvell.com>
 Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
 ---
- drivers/mfd/88pm800.c       | 4 +++-
- include/linux/mfd/88pm80x.h | 2 ++
- 2 files changed, 5 insertions(+), 1 deletion(-)
+ drivers/rtc/rtc-88pm80x.c | 28 +++++++++++++++++-----------
+ 1 file changed, 17 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
-index 06ee058..8ea4467 100644
---- a/drivers/mfd/88pm800.c
-+++ b/drivers/mfd/88pm800.c
-@@ -391,7 +391,8 @@ static int device_irq_init_800(struct pm80x_chip *chip)
- 	    PM800_WAKEUP2_INV_INT | PM800_WAKEUP2_INT_CLEAR |
- 	    PM800_WAKEUP2_INT_MASK;
+diff --git a/drivers/rtc/rtc-88pm80x.c b/drivers/rtc/rtc-88pm80x.c
+index 7df0579..8f66519 100644
+--- a/drivers/rtc/rtc-88pm80x.c
++++ b/drivers/rtc/rtc-88pm80x.c
+@@ -251,17 +251,26 @@ static SIMPLE_DEV_PM_OPS(pm80x_rtc_pm_ops, pm80x_rtc_suspend, pm80x_rtc_resume);
+ static int pm80x_rtc_probe(struct platform_device *pdev)
+ {
+ 	struct pm80x_chip *chip = dev_get_drvdata(pdev->dev.parent);
+-	struct pm80x_platform_data *pm80x_pdata =
+-				dev_get_platdata(pdev->dev.parent);
+-	struct pm80x_rtc_pdata *pdata = NULL;
++	struct pm80x_rtc_pdata *pdata = dev_get_platdata(&pdev->dev);
+ 	struct pm80x_rtc_info *info;
++	struct device_node *node = pdev->dev.of_node;
+ 	struct rtc_time tm;
+ 	unsigned long ticks = 0;
+ 	int ret;
  
--	data = PM800_WAKEUP2_INT_CLEAR;
-+	data = (chip->irq_mode) ?
-+		PM800_WAKEUP2_INT_WRITE_CLEAR : PM800_WAKEUP2_INT_READ_CLEAR;
- 	ret = regmap_update_bits(map, PM800_WAKEUP2, mask, data);
+-	pdata = dev_get_platdata(&pdev->dev);
+-	if (pdata == NULL)
+-		dev_warn(&pdev->dev, "No platform data!\n");
++	if (!pdata && !node) {
++		dev_err(&pdev->dev,
++			"pm80x-rtc requires platform data or of_node\n");
++		return -EINVAL;
++	}
++
++	if (!pdata) {
++		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
++		if (!pdata) {
++			dev_err(&pdev->dev, "failed to allocate memory\n");
++			return -ENOMEM;
++		}
++	}
  
- 	if (ret < 0)
-@@ -514,6 +515,7 @@ static int device_800_init(struct pm80x_chip *chip,
- 	}
+ 	info =
+ 	    devm_kzalloc(&pdev->dev, sizeof(struct pm80x_rtc_info), GFP_KERNEL);
+@@ -327,11 +336,8 @@ static int pm80x_rtc_probe(struct platform_device *pdev)
+ 	regmap_update_bits(info->map, PM800_RTC_CONTROL, PM800_RTC1_USE_XO,
+ 			   PM800_RTC1_USE_XO);
  
- 	chip->regmap_irq_chip = &pm800_irq_chip;
-+	chip->irq_mode = pdata->irq_mode;
+-	if (pm80x_pdata) {
+-		pdata = pm80x_pdata->rtc;
+-		if (pdata)
+-			info->rtc_dev->dev.platform_data = &pdata->rtc_wakeup;
+-	}
++	/* remeber whether this power up is caused by PMIC RTC or not */
++	info->rtc_dev->dev.platform_data = &pdata->rtc_wakeup;
  
- 	ret = device_irq_init_800(chip);
- 	if (ret < 0) {
-diff --git a/include/linux/mfd/88pm80x.h b/include/linux/mfd/88pm80x.h
-index 97cb283..6ed6c16 100644
---- a/include/linux/mfd/88pm80x.h
-+++ b/include/linux/mfd/88pm80x.h
-@@ -77,6 +77,8 @@ enum {
- #define PM800_WAKEUP2		(0x0E)
- #define PM800_WAKEUP2_INV_INT		(1 << 0)
- #define PM800_WAKEUP2_INT_CLEAR		(1 << 1)
-+#define PM800_WAKEUP2_INT_READ_CLEAR		(0 << 1)
-+#define PM800_WAKEUP2_INT_WRITE_CLEAR		(1 << 1)
- #define PM800_WAKEUP2_INT_MASK		(1 << 2)
+ 	device_init_wakeup(&pdev->dev, 1);
  
- #define PM800_POWER_UP_LOG	(0x10)
 -- 
 1.9.1
