@@ -1,119 +1,103 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 29 May 2015 11:35:15 -0700
-Subject: [PATCH v3] ARM: l2c: add options to overwrite prefetching behavior
-In-Reply-To: <5568B044.80600@gmail.com>
-References: <1431726751-9169-1-git-send-email-hauke@hauke-m.de>
- <5568A745.7020502@gmail.com> <5568ABEF.3040001@hauke-m.de>
- <5568B044.80600@gmail.com>
-Message-ID: <5568B163.60206@gmail.com>
+From: wcohen@redhat.com (William Cohen)
+Date: Fri, 29 May 2015 14:43:14 -0400
+Subject: Kernel oops on 32-bit arm with syscall with invalid sysno
+In-Reply-To: <20150529161030.GJ2067@n2100.arm.linux.org.uk>
+References: <55677D6A.1060008@redhat.com>
+ <20150528214256.GF2067@n2100.arm.linux.org.uk> <55688AB7.7000101@redhat.com>
+ <20150529161030.GJ2067@n2100.arm.linux.org.uk>
+Message-ID: <5568B342.1070708@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/05/15 11:30, Florian Fainelli wrote:
-> On 29/05/15 11:11, Hauke Mehrtens wrote:
+On 05/29/2015 12:10 PM, Russell King - ARM Linux wrote:
+> On Fri, May 29, 2015 at 11:50:15AM -0400, William Cohen wrote:
+>> On 05/28/2015 05:42 PM, Russell King - ARM Linux wrote:
+>>> On Thu, May 28, 2015 at 04:41:14PM -0400, William Cohen wrote:
+>>>> When reviewing testsuite failures for systemtap I found that the
+>>>> 32-bit arm kernels (both 4.1.0-rc5 and 3.19.8) were not handling the
+>>>> libc syscall with invalid sysno in the manner described by
+>>>> http://www.gnu.org/software/libc/manual/html_node/System-Calls.html.
+>>>> Rather than returning -1 and setting errno to ENOSYS the invalid
+>>>> syscall gives segfault and a kernel oops.
+>>>
+>>> Looking at this, it seems that we're triggering this:
+>>>
+>>>         BUG_ON(context->in_syscall || context->name_count);
+>>>
+>>> which seems to imply that we've called audit_syscall_entry() twice
+>>> without a call to audit_syscall_exit().  That is something we can
+>>> fix - and something which only happens with the syscall of "-1"
+>>> (which is our "syscall was cancelled" value.)
+>>
+>> Hi Russell,
+>>
+>> The patch below does eliminate the kernel oops for -1, but it breaks things for other invalid/unimplemented syscalls.  For the attached test, invalid_syscall_plus.c:
 >>
 >>
->> On 05/29/2015 07:52 PM, Florian Fainelli wrote:
->>> On 15/05/15 14:52, Hauke Mehrtens wrote:
->>>> These options make it possible to overwrites the data and instruction
->>>> prefetching behavior of the arm pl310 cache controller.
->>>>
->>>> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
->>>> ---
->>>> v2: only set prefetch
->>>> v1: set prefetch and aux
->>>>
->>>>  Documentation/devicetree/bindings/arm/l2cc.txt |  4 ++++
->>>>  arch/arm/mm/cache-l2x0.c                       | 20 ++++++++++++++++++++
->>>>  2 files changed, 24 insertions(+)
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
->>>> index 0dbabe9..528821a 100644
->>>> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
->>>> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
->>>> @@ -67,6 +67,10 @@ Optional properties:
->>>>    disable if zero.
->>>>  - arm,prefetch-offset : Override prefetch offset value. Valid values are
->>>>    0-7, 15, 23, and 31.
->>>> +- arm,prefetch-data : Enable data prefetch. Enabling prefetching
->>>> +  can improve performance.
->>>
->>> I do not think the "can improve performance" has a place in a binding,
->>> this is either not technical enough about what this does, or marketing
->>> enough it does not buy us much.
->>>
->>> data/instruction pre-fetching are commonly found on cache controller
->>> these days, so I would be tempted to remove the "arm," prefixing here
->>> since this can be generalized to other kinds of cache controllers.
->>> Documenting that this can be either a boolean, or accept a value (see
->>> below) could help.
+>> $ gcc -g -o invalid_syscall_plus invalid_syscall_plus.c
+>> $ ./invalid_syscall_plus 
+>> Illegal instruction (core dumped)
 >>
->> So you think I should only add prefetch-data and prefetch-instr without
->> the arm prefix.
+>> Previously this would print out the expected messages.
 > 
-> That's what I think yes, others may disagree.
-> 
->>>
->>>> +- arm,prefetch-instr : Enable instruction prefetch. Enabling prefetching
->>>> +  can improve performance.
->>>>  
->>>>  Example:
->>>>  
->>>> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
->>>> index e309c8f..1aa970a 100644
->>>> --- a/arch/arm/mm/cache-l2x0.c
->>>> +++ b/arch/arm/mm/cache-l2x0.c
->>>> @@ -1199,6 +1199,26 @@ static void __init l2c310_of_parse(const struct device_node *np,
->>>>  		pr_err("L2C-310 OF arm,prefetch-offset property value is missing\n");
->>>>  	}
->>>>  
->>>> +	ret = of_property_read_u32(np, "arm,prefetch-data", &val);
->>>> +	if (ret == 0) {
->>>> +		if (val)
->>>> +			prefetch |= L310_PREFETCH_CTRL_DATA_PREFETCH;
->>>> +		else
->>>> +			prefetch &= ~L310_PREFETCH_CTRL_DATA_PREFETCH;
->>>> +	} else if (ret != -EINVAL) {
->>>> +		pr_err("L2C-310 OF arm,prefetch-data property value is missing\n");
->>>> +	}
->>>
->>> If we want to generalize the use of this property, there could indeed be
->>> a value associated with it, if the cache controller supports different
->>> pre-fetching strides, however this is not the cache for these cache
->>> controllers it seems, are not we going to show error messages more often
->>> than desired?
->> I did this so it is possible to deactivate the prefech mode. I do not
->> know if somebody wants to do that. I haven't understood how you suggest
->> I should change.
->> When you do not associate a value with an entry in device tree it is
->> there or not there, so we could only activate it when it was not
->> automatically detected, but we could not deactivate it, because the case
->> when this value is not specified in device tree would be, use to auto
->> detected the value.
-> 
-> My point is that you use of_read_property_u32, but your example does not
-> state what should be the value associated with this property in the
-> binding, so it is unclear what are the results without looking at the
-> code between these examples:
-> 
-> /* Enable data pre-fetching */
-> #1 arm,data-prefetch;
-> #2 arm,data-prefetch = <1>;
-> 
-> /* Disable data pre-fetching */
-> #3 arm,data-prefetch = <0>;
-> 
-> /* do nothing, empty aka retain existing settings set by firmware */
-> #4
-> 
-> Based on the code, only #2 and #3 are intended, which raises the
-> question, do not we want of_read_property_bool() instead then? The
-> binding does seem to suggest that only #1 and #4 are valid though.
+> The patch /doesn't/ change that behaviour at all.
 
-I re-read the code, and I think if you just clarify the values in the
-binding to be: 0 (forcibly disable), 1 (forcibly enable), property
-absent (retain settings), this would be crystal clear.
+You are correct. I was looking at previous results on the wrong machine/architecture.  Sorry.
 
-Thanks!
--- 
-Florian
+
+> 
+>>> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+>>> index f8ccc21fa032..2c40c1214a72 100644
+>>> --- a/arch/arm/kernel/entry-common.S
+>>> +++ b/arch/arm/kernel/entry-common.S
+>>> @@ -241,11 +241,11 @@ __sys_trace:
+>>>  	cmp	scno, #-1			@ skip the syscall?
+> 
+> If the system call number was not -1 (in your case it isn't, it's 0xdeadbeef)
+> 
+>>>  	bne	2b
+> 
+> Branch to the "2" label backwards, otherwise execute this code:
+> 
+>>>  	add	sp, sp, #S_OFF			@ restore stack
+>>> -	b	ret_slow_syscall
+>>> +	b	3f
+>>>  
+>>>  __sys_trace_return:
+>>>  	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
+>>> -	mov	r0, sp
+>>> +3:	mov	r0, sp
+>>>  	bl	syscall_trace_exit
+>>>  	b	ret_slow_syscall
+> 
+> The code at the referenced local "2" is:
+> 
+> 2:      cmp     scno, #(__ARM_NR_BASE - __NR_SYSCALL_BASE)
+>         eor     r0, scno, #__NR_SYSCALL_BASE    @ put OS number back
+>         bcs     arm_syscall
+>         mov     why, #0                         @ no longer a real syscall
+>         b       sys_ni_syscall                  @ not private func
+> 
+> __NR_SYSCALL_BASE will be zero for your kernel.
+> 
+> What this says is that if the system call number is greater than
+> __ARM_NR_BASE, then branch to arm_syscall(), otherwise call
+> sys_ni_syscall().
+>
+> sys_ni_syscall() will return the -1 / ENOSYS you're expecting.
+> 
+> However, __ARM_NR_BASE is:
+> 
+> #define __ARM_NR_BASE                   (__NR_SYSCALL_BASE+0x0f0000)
+> 
+> which, I fully described in my previous email.
+> 
+> arm_syscall() intentionally gives a SIGILL for cases it doesn't handle.
+> 
+> Your case you are now reporting is behaviour that it's always had going
+> back more than 15 years, and is most definitely a WONTFIX.  Sorry.
+> 
+
+0xdeadbeef is a negative number, so arm_syscall will be called rather than sys_ni_syscall.  What it looks like is that the systemtap testsuite should be using some large (but not too large) positive number such as 0xffff to get the desired unimplemented syscall
+
+-Will
