@@ -1,483 +1,707 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Fri, 29 May 2015 16:19:23 +0100
-Subject: [PATCH v5 5/6] target-arm: kvm - add support for HW assisted debug
+Date: Fri, 29 May 2015 16:19:19 +0100
+Subject: [PATCH v5 1/6] linux-headers: sync from my kernel tree (DEV)
 In-Reply-To: <1432912764-7073-1-git-send-email-alex.bennee@linaro.org>
 References: <1432912764-7073-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1432912764-7073-6-git-send-email-alex.bennee@linaro.org>
+Message-ID: <1432912764-7073-2-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds basic support for HW assisted debug. The ioctl interface to
-KVM allows us to pass an implementation defined number of break and
-watch point registers. When KVM_GUESTDBG_USE_HW_BP is specified these
-debug registers will be installed in place on the world switch into the
-guest.
+I assume I'll properly merge the KVM Headers direct from Linux when
+the kernel side is upstream. These headers came from:
 
-The hardware is actually capable of more advanced matching but it is
-unclear if this expressiveness is available via the gdbstub protocol.
+https://git.linaro.org/people/alex.bennee/linux.git/shortlog/refs/heads/guest-debug/4.1-rc5-v5
 
 Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 
 ---
 v2
-  - correct setting of PMC/BAS/MASK
-  - improved commentary
-  - added helper function to check watchpoint in range
-  - fix find/deletion of watchpoints
+  - update ABI to include ->far
 v3
-  - use internals.h definitions
+  - update with latest 4.1-rc1 headers
+v4
+  - update to v4 headers
+v5
+  - update to v5 headers
 ---
- target-arm/kvm.c     |  35 +++---
- target-arm/kvm64.c   | 304 ++++++++++++++++++++++++++++++++++++++++++++++++++-
- target-arm/kvm_arm.h |  21 ++++
- 3 files changed, 338 insertions(+), 22 deletions(-)
+ include/standard-headers/linux/virtio_balloon.h |  28 +++-
+ include/standard-headers/linux/virtio_blk.h     |   8 +-
+ include/standard-headers/linux/virtio_ids.h     |   1 +
+ include/standard-headers/linux/virtio_input.h   |  76 +++++++++++
+ include/standard-headers/linux/virtio_ring.h    |   2 +-
+ linux-headers/asm-arm/kvm.h                     |   9 +-
+ linux-headers/asm-arm64/kvm.h                   |  29 ++++-
+ linux-headers/asm-mips/kvm.h                    | 164 +++++++++++++++---------
+ linux-headers/asm-s390/kvm.h                    |   4 +
+ linux-headers/asm-x86/hyperv.h                  |   2 +
+ linux-headers/linux/kvm.h                       |  71 +++++++++-
+ linux-headers/linux/vfio.h                      |   2 +
+ 12 files changed, 325 insertions(+), 71 deletions(-)
+ create mode 100644 include/standard-headers/linux/virtio_input.h
 
-diff --git a/target-arm/kvm.c b/target-arm/kvm.c
-index de2865a..e1fccdd 100644
---- a/target-arm/kvm.c
-+++ b/target-arm/kvm.c
-@@ -17,6 +17,7 @@
+diff --git a/include/standard-headers/linux/virtio_balloon.h b/include/standard-headers/linux/virtio_balloon.h
+index 799376d..88ada1d 100644
+--- a/include/standard-headers/linux/virtio_balloon.h
++++ b/include/standard-headers/linux/virtio_balloon.h
+@@ -25,6 +25,7 @@
+  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+  * SUCH DAMAGE. */
++#include "standard-headers/linux/types.h"
+ #include "standard-headers/linux/virtio_ids.h"
+ #include "standard-headers/linux/virtio_config.h"
  
- #include "qemu-common.h"
- #include "qemu/timer.h"
-+#include "qemu/error-report.h"
- #include "sysemu/sysemu.h"
- #include "sysemu/kvm.h"
- #include "kvm_arm.h"
-@@ -540,6 +541,16 @@ static int kvm_handle_debug(CPUState *cs, struct kvm_run *run)
-             return true;
-         }
-         break;
-+    case EC_BREAKPOINT:
-+        if (kvm_arm_find_hw_breakpoint(cs, env->pc)) {
-+            return true;
-+        }
-+        break;
-+    case EC_WATCHPOINT:
-+        if (kvm_arm_find_hw_watchpoint(cs, arch_info->far)) {
-+            return true;
-+        }
-+        break;
-     default:
-         error_report("%s: unhandled debug exit (%"PRIx32", %"PRIx64")\n",
-                      __func__, arch_info->hsr, env->pc);
-@@ -601,6 +612,10 @@ void kvm_arch_update_guest_debug(CPUState *cs, struct kvm_guest_debug *dbg)
-     if (kvm_sw_breakpoints_active(cs)) {
-         dbg->control |= KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_USE_SW_BP;
-     }
-+    if (kvm_hw_breakpoints_active(cs)) {
-+        dbg->control |= KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_USE_HW_BP;
-+        kvm_copy_hw_breakpoint_data(&dbg->arch);
-+    }
+@@ -51,9 +52,32 @@ struct virtio_balloon_config {
+ #define VIRTIO_BALLOON_S_MEMTOT   5   /* Total amount of memory */
+ #define VIRTIO_BALLOON_S_NR       6
+ 
++/*
++ * Memory statistics structure.
++ * Driver fills an array of these structures and passes to device.
++ *
++ * NOTE: fields are laid out in a way that would make compiler add padding
++ * between and after fields, so we have to use compiler-specific attributes to
++ * pack it, to disable this padding. This also often causes compiler to
++ * generate suboptimal code.
++ *
++ * We maintain this statistics structure format for backwards compatibility,
++ * but don't follow this example.
++ *
++ * If implementing a similar structure, do something like the below instead:
++ *     struct virtio_balloon_stat {
++ *         __virtio16 tag;
++ *         uint8_t reserved[6];
++ *         __virtio64 val;
++ *     };
++ *
++ * In other words, add explicit reserved fields to align field and
++ * structure boundaries at field size, avoiding compiler padding
++ * without the packed attribute.
++ */
+ struct virtio_balloon_stat {
+-	uint16_t tag;
+-	uint64_t val;
++	__virtio16 tag;
++	__virtio64 val;
+ } QEMU_PACKED;
+ 
+ #endif /* _LINUX_VIRTIO_BALLOON_H */
+diff --git a/include/standard-headers/linux/virtio_blk.h b/include/standard-headers/linux/virtio_blk.h
+index 12016b4..cd601f4 100644
+--- a/include/standard-headers/linux/virtio_blk.h
++++ b/include/standard-headers/linux/virtio_blk.h
+@@ -58,7 +58,7 @@ struct virtio_blk_config {
+ 	uint32_t size_max;
+ 	/* The maximum number of segments (if VIRTIO_BLK_F_SEG_MAX) */
+ 	uint32_t seg_max;
+-	/* geometry the device (if VIRTIO_BLK_F_GEOMETRY) */
++	/* geometry of the device (if VIRTIO_BLK_F_GEOMETRY) */
+ 	struct virtio_blk_geometry {
+ 		uint16_t cylinders;
+ 		uint8_t heads;
+@@ -117,7 +117,11 @@ struct virtio_blk_config {
+ #define VIRTIO_BLK_T_BARRIER	0x80000000
+ #endif /* !VIRTIO_BLK_NO_LEGACY */
+ 
+-/* This is the first element of the read scatter-gather list. */
++/*
++ * This comes first in the read scatter-gather list.
++ * For legacy virtio, if VIRTIO_F_ANY_LAYOUT is not negotiated,
++ * this is the first element of the read scatter-gather list.
++ */
+ struct virtio_blk_outhdr {
+ 	/* VIRTIO_BLK_T* */
+ 	__virtio32 type;
+diff --git a/include/standard-headers/linux/virtio_ids.h b/include/standard-headers/linux/virtio_ids.h
+index 284fc3a..5f60aa4 100644
+--- a/include/standard-headers/linux/virtio_ids.h
++++ b/include/standard-headers/linux/virtio_ids.h
+@@ -39,5 +39,6 @@
+ #define VIRTIO_ID_9P		9 /* 9p virtio console */
+ #define VIRTIO_ID_RPROC_SERIAL 11 /* virtio remoteproc serial link */
+ #define VIRTIO_ID_CAIF	       12 /* Virtio caif */
++#define VIRTIO_ID_INPUT        18 /* virtio input */
+ 
+ #endif /* _LINUX_VIRTIO_IDS_H */
+diff --git a/include/standard-headers/linux/virtio_input.h b/include/standard-headers/linux/virtio_input.h
+new file mode 100644
+index 0000000..a98a797
+--- /dev/null
++++ b/include/standard-headers/linux/virtio_input.h
+@@ -0,0 +1,76 @@
++#ifndef _LINUX_VIRTIO_INPUT_H
++#define _LINUX_VIRTIO_INPUT_H
++/* This header is BSD licensed so anyone can use the definitions to implement
++ * compatible drivers/servers.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ * 3. Neither the name of IBM nor the names of its contributors
++ *    may be used to endorse or promote products derived from this software
++ *    without specific prior written permission.
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
++ * FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL IBM OR
++ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
++ * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
++ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
++ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
++ * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE. */
++
++#include "standard-headers/linux/types.h"
++
++enum virtio_input_config_select {
++	VIRTIO_INPUT_CFG_UNSET      = 0x00,
++	VIRTIO_INPUT_CFG_ID_NAME    = 0x01,
++	VIRTIO_INPUT_CFG_ID_SERIAL  = 0x02,
++	VIRTIO_INPUT_CFG_ID_DEVIDS  = 0x03,
++	VIRTIO_INPUT_CFG_PROP_BITS  = 0x10,
++	VIRTIO_INPUT_CFG_EV_BITS    = 0x11,
++	VIRTIO_INPUT_CFG_ABS_INFO   = 0x12,
++};
++
++struct virtio_input_absinfo {
++	uint32_t min;
++	uint32_t max;
++	uint32_t fuzz;
++	uint32_t flat;
++	uint32_t res;
++};
++
++struct virtio_input_devids {
++	uint16_t bustype;
++	uint16_t vendor;
++	uint16_t product;
++	uint16_t version;
++};
++
++struct virtio_input_config {
++	uint8_t    select;
++	uint8_t    subsel;
++	uint8_t    size;
++	uint8_t    reserved[5];
++	union {
++		char string[128];
++		uint8_t bitmap[128];
++		struct virtio_input_absinfo abs;
++		struct virtio_input_devids ids;
++	} u;
++};
++
++struct virtio_input_event {
++	uint16_t type;
++	uint16_t code;
++	uint32_t value;
++};
++
++#endif /* _LINUX_VIRTIO_INPUT_H */
+diff --git a/include/standard-headers/linux/virtio_ring.h b/include/standard-headers/linux/virtio_ring.h
+index cc647d6..6fe276f 100644
+--- a/include/standard-headers/linux/virtio_ring.h
++++ b/include/standard-headers/linux/virtio_ring.h
+@@ -155,7 +155,7 @@ static inline unsigned vring_size(unsigned int num, unsigned long align)
  }
  
- /* C6.6.29 BRK instruction */
-@@ -627,26 +642,6 @@ int kvm_arch_remove_sw_breakpoint(CPUState *cs, struct kvm_sw_breakpoint *bp)
-     return 0;
- }
+ /* The following is used with USED_EVENT_IDX and AVAIL_EVENT_IDX */
+-/* Assuming a given event_idx value from the other size, if
++/* Assuming a given event_idx value from the other side, if
+  * we have just incremented index from old to new_idx,
+  * should we trigger an event? */
+ static inline int vring_need_event(uint16_t event_idx, uint16_t new_idx, uint16_t old)
+diff --git a/linux-headers/asm-arm/kvm.h b/linux-headers/asm-arm/kvm.h
+index 0db25bc..c98e4dc 100644
+--- a/linux-headers/asm-arm/kvm.h
++++ b/linux-headers/asm-arm/kvm.h
+@@ -195,9 +195,16 @@ struct kvm_arch_memory_slot {
+ #define KVM_ARM_IRQ_CPU_IRQ		0
+ #define KVM_ARM_IRQ_CPU_FIQ		1
  
--int kvm_arch_insert_hw_breakpoint(target_ulong addr,
--                                  target_ulong len, int type)
--{
--    qemu_log_mask(LOG_UNIMP, "%s: not implemented\n", __func__);
--    return -EINVAL;
--}
--
--int kvm_arch_remove_hw_breakpoint(target_ulong addr,
--                                  target_ulong len, int type)
--{
--    qemu_log_mask(LOG_UNIMP, "%s: not implemented\n", __func__);
--    return -EINVAL;
--}
--
--
--void kvm_arch_remove_all_hw_breakpoints(void)
--{
--    qemu_log_mask(LOG_UNIMP, "%s: not implemented\n", __func__);
--}
--
- void kvm_arch_init_irq_routing(KVMState *s)
- {
- }
-diff --git a/target-arm/kvm64.c b/target-arm/kvm64.c
-index 61592d2..06d4e1e 100644
---- a/target-arm/kvm64.c
-+++ b/target-arm/kvm64.c
-@@ -2,6 +2,7 @@
-  * ARM implementation of KVM hooks, 64 bit specific code
-  *
-  * Copyright Mian-M. Hamayun 2013, Virtual Open Systems
-+ * Copyright Alex Benn?e 2014, Linaro
-  *
-  * This work is licensed under the terms of the GNU GPL, version 2 or later.
-  * See the COPYING file in the top-level directory.
-@@ -12,12 +13,18 @@
- #include <sys/types.h>
- #include <sys/ioctl.h>
- #include <sys/mman.h>
-+#include <sys/ptrace.h>
-+#include <asm/ptrace.h>
+-/* Highest supported SPI, from VGIC_NR_IRQS */
++/*
++ * This used to hold the highest supported SPI, but it is now obsolete
++ * and only here to provide source code level compatibility with older
++ * userland. The highest SPI number can be set via KVM_DEV_ARM_VGIC_GRP_NR_IRQS.
++ */
+ #define KVM_ARM_IRQ_GIC_MAX		127
  
-+#include <linux/elf.h>
- #include <linux/kvm.h>
++/* One single KVM irqchip, ie. the VGIC */
++#define KVM_NR_IRQCHIPS          1
++
+ /* PSCI interface */
+ #define KVM_PSCI_FN_BASE		0x95c1ba5e
+ #define KVM_PSCI_FN(n)			(KVM_PSCI_FN_BASE + (n))
+diff --git a/linux-headers/asm-arm64/kvm.h b/linux-headers/asm-arm64/kvm.h
+index 3ef77a4..62ed4ee 100644
+--- a/linux-headers/asm-arm64/kvm.h
++++ b/linux-headers/asm-arm64/kvm.h
+@@ -100,12 +100,32 @@ struct kvm_sregs {
+ struct kvm_fpu {
+ };
  
- #include "config-host.h"
- #include "qemu-common.h"
- #include "qemu/timer.h"
-+#include "qemu/host-utils.h"
-+#include "qemu/error-report.h"
-+#include "exec/gdbstub.h"
- #include "sysemu/sysemu.h"
- #include "sysemu/kvm.h"
- #include "kvm_arm.h"
-@@ -26,21 +33,314 @@
- #include "hw/arm/arm.h"
++/*
++ * See v8 ARM ARM D7.3: Debug Registers
++ *
++ * The architectural limit is 16 debug registers of each type although
++ * in practice there are usually less (see ID_AA64DFR0_EL1).
++ */
++#define KVM_ARM_MAX_DBG_REGS 16
+ struct kvm_guest_debug_arch {
++	__u32 dbg_bcr[KVM_ARM_MAX_DBG_REGS];
++	__u64 dbg_bvr[KVM_ARM_MAX_DBG_REGS];
++	__u32 dbg_wcr[KVM_ARM_MAX_DBG_REGS];
++	__u64 dbg_wvr[KVM_ARM_MAX_DBG_REGS];
+ };
  
- static bool have_guest_debug;
-+/* Max and current break/watch point counts */
-+int max_hw_bp, max_hw_wp;
-+int cur_hw_bp, cur_hw_wp;
-+struct kvm_guest_debug_arch guest_debug_registers;
+ struct kvm_debug_exit_arch {
++	__u32 hsr;
++	__u64 far;	/* used for watchpoints */
+ };
  
- /**
-- * kvm_arm_init_debug()
-+ * kvm_arm_init_debug() - check for guest debug capabilities
-  * @cs: CPUState
-  *
-- * Check for guest debug capabilities.
-+ * kvm_check_extension returns 0 if we have no debug registers or the
-+ * number we have.
-  *
++/*
++ * Architecture specific defines for kvm_guest_debug->control
++ */
++
++#define KVM_GUESTDBG_USE_SW_BP		(1 << 16)
++#define KVM_GUESTDBG_USE_HW_BP		(1 << 17)
++
+ struct kvm_sync_regs {
+ };
+ 
+@@ -188,9 +208,16 @@ struct kvm_arch_memory_slot {
+ #define KVM_ARM_IRQ_CPU_IRQ		0
+ #define KVM_ARM_IRQ_CPU_FIQ		1
+ 
+-/* Highest supported SPI, from VGIC_NR_IRQS */
++/*
++ * This used to hold the highest supported SPI, but it is now obsolete
++ * and only here to provide source code level compatibility with older
++ * userland. The highest SPI number can be set via KVM_DEV_ARM_VGIC_GRP_NR_IRQS.
++ */
+ #define KVM_ARM_IRQ_GIC_MAX		127
+ 
++/* One single KVM irqchip, ie. the VGIC */
++#define KVM_NR_IRQCHIPS          1
++
+ /* PSCI interface */
+ #define KVM_PSCI_FN_BASE		0x95c1ba5e
+ #define KVM_PSCI_FN(n)			(KVM_PSCI_FN_BASE + (n))
+diff --git a/linux-headers/asm-mips/kvm.h b/linux-headers/asm-mips/kvm.h
+index 2c04b6d..6985eb5 100644
+--- a/linux-headers/asm-mips/kvm.h
++++ b/linux-headers/asm-mips/kvm.h
+@@ -36,77 +36,85 @@ struct kvm_regs {
+ 
+ /*
+  * for KVM_GET_FPU and KVM_SET_FPU
+- *
+- * If Status[FR] is zero (32-bit FPU), the upper 32-bits of the FPRs
+- * are zero filled.
   */
- static void kvm_arm_init_debug(CPUState *cs)
- {
-     have_guest_debug = kvm_check_extension(cs->kvm_state,
-                                            KVM_CAP_SET_GUEST_DEBUG);
-+    max_hw_wp = kvm_check_extension(cs->kvm_state, KVM_CAP_GUEST_DEBUG_HW_WPS);
-+    max_hw_bp = kvm_check_extension(cs->kvm_state, KVM_CAP_GUEST_DEBUG_HW_BPS);
-     return;
- }
+ struct kvm_fpu {
+-	__u64 fpr[32];
+-	__u32 fir;
+-	__u32 fccr;
+-	__u32 fexr;
+-	__u32 fenr;
+-	__u32 fcsr;
+-	__u32 pad;
+ };
  
-+/**
-+ * insert_hw_breakpoint()
-+ * @addr: address of breakpoint
+ 
+ /*
+- * For MIPS, we use KVM_SET_ONE_REG and KVM_GET_ONE_REG to access CP0
++ * For MIPS, we use KVM_SET_ONE_REG and KVM_GET_ONE_REG to access various
+  * registers.  The id field is broken down as follows:
+  *
+- *  bits[2..0]   - Register 'sel' index.
+- *  bits[7..3]   - Register 'rd'  index.
+- *  bits[15..8]  - Must be zero.
+- *  bits[31..16] - 1 -> CP0 registers.
+- *  bits[51..32] - Must be zero.
+  *  bits[63..52] - As per linux/kvm.h
++ *  bits[51..32] - Must be zero.
++ *  bits[31..16] - Register set.
 + *
-+ * See ARM ARM D2.9.1 for details but here we are only going to create
-+ * simple un-linked breakpoints (i.e. we don't chain breakpoints
-+ * together to match address and context or vmid). The hardware is
-+ * capable of fancier matching but that will require exposing that
-+ * fanciness to GDB's interface
++ * Register set = 0: GP registers from kvm_regs (see definitions below).
 + *
-+ * D7.3.2 DBGBCR<n>_EL1, Debug Breakpoint Control Registers
++ * Register set = 1: CP0 registers.
++ *  bits[15..8]  - Must be zero.
++ *  bits[7..3]   - Register 'rd'  index.
++ *  bits[2..0]   - Register 'sel' index.
 + *
-+ *  31  24 23  20 19   16 15 14  13  12   9 8   5 4    3 2   1  0
-+ * +------+------+-------+-----+----+------+-----+------+-----+---+
-+ * | RES0 |  BT  |  LBN  | SSC | HMC| RES0 | BAS | RES0 | PMC | E |
-+ * +------+------+-------+-----+----+------+-----+------+-----+---+
++ * Register set = 2: KVM specific registers (see definitions below).
 + *
-+ * BT: Breakpoint type (0 = unlinked address match)
-+ * LBN: Linked BP number (0 = unused)
-+ * SSC/HMC/PMC: Security, Higher and Priv access control (Table D-12)
-+ * BAS: Byte Address Select (RES1 for AArch64)
-+ * E: Enable bit
-+ */
-+static int insert_hw_breakpoint(target_ulong addr)
-+{
-+    uint32_t bcr = 0x1; /* E=1, enable */
-+    if (cur_hw_bp >= max_hw_bp) {
-+        return -ENOBUFS;
-+    }
-+    bcr = deposit32(bcr, 1, 2, 0x3);   /* PMC = 11 */
-+    bcr = deposit32(bcr, 5, 4, 0xf);   /* BAS = RES1 */
-+    guest_debug_registers.dbg_bcr[cur_hw_bp] = bcr;
-+    guest_debug_registers.dbg_bvr[cur_hw_bp] = addr;
-+    cur_hw_bp++;
-+    return 0;
-+}
-+
-+/**
-+ * delete_hw_breakpoint()
-+ * @pc: address of breakpoint
-+ *
-+ * Delete a breakpoint and shuffle any above down
-+ */
-+
-+static int delete_hw_breakpoint(target_ulong pc)
-+{
-+    int i;
-+    for (i = 0; i < cur_hw_bp; i++) {
-+      if (guest_debug_registers.dbg_bvr[i] == pc) {
-+          while (i < cur_hw_bp) {
-+              if (i == max_hw_bp) {
-+                  guest_debug_registers.dbg_bvr[i] = 0;
-+                  guest_debug_registers.dbg_bcr[i] = 0;
-+              } else {
-+                  guest_debug_registers.dbg_bvr[i] =
-+                      guest_debug_registers.dbg_bvr[i + 1];
-+                  guest_debug_registers.dbg_bcr[i] =
-+                      guest_debug_registers.dbg_bcr[i + 1];
-+              }
-+              i++;
-+          }
-+          cur_hw_bp--;
-+          return 0;
-+      }
-+    }
-+    return -ENOENT;
-+}
-+
-+/**
-+ * insert_hw_watchpoint()
-+ * @addr: address of watch point
-+ * @len: size of area
-+ * @type: type of watch point
-+ *
-+ * See ARM ARM D2.10. As with the breakpoints we can do some advanced
-+ * stuff if we want to. The watch points can be linked with the break
-+ * points above to make them context aware. However for simplicity
-+ * currently we only deal with simple read/write watch points.
-+ *
-+ * D7.3.11 DBGWCR<n>_EL1, Debug Watchpoint Control Registers
-+ *
-+ *  31  29 28   24 23  21  20  19 16 15 14  13   12  5 4   3 2   1  0
-+ * +------+-------+------+----+-----+-----+-----+-----+-----+-----+---+
-+ * | RES0 |  MASK | RES0 | WT | LBN | SSC | HMC | BAS | LSC | PAC | E |
-+ * +------+-------+------+----+-----+-----+-----+-----+-----+-----+---+
-+ *
-+ * MASK: num bits addr mask (0=none,01/10=res,11=3 bits (8 bytes))
-+ * WT: 0 - unlinked, 1 - linked (not currently used)
-+ * LBN: Linked BP number (not currently used)
-+ * SSC/HMC/PAC: Security, Higher and Priv access control (Table D-12)
-+ * BAS: Byte Address Select
-+ * LSC: Load/Store control (01: load, 10: store, 11: both)
-+ * E: Enable
-+ *
-+ * The bottom 2 bits of the value register are masked. Therefor to
-+ * break on an sizes smaller than unaligned byte you need to set
-+ * MASK=0, BAS=bit per byte in question. For larger regions (^2) you
-+ * need to ensure you mask the address as required and set BAS=0xff
-+ */
-+
-+static int insert_hw_watchpoint(target_ulong addr,
-+                                target_ulong len, int type)
-+{
-+    uint32_t dbgwcr = 1; /* E=1, enable */
-+    uint64_t dbgwvr = addr & (~0x7ULL);
-+
-+    if (cur_hw_wp >= max_hw_wp) {
-+        return -ENOBUFS;
-+    }
-+
-+    /* PAC 00 is reserved, assume EL1 exception */
-+    dbgwcr = deposit32(dbgwcr, 1, 2, 1);
-+
-+    switch (type) {
-+    case GDB_WATCHPOINT_READ:
-+        dbgwcr = deposit32(dbgwcr, 3, 2, 1);
-+        break;
-+    case GDB_WATCHPOINT_WRITE:
-+        dbgwcr = deposit32(dbgwcr, 3, 2, 2);
-+        break;
-+    case GDB_WATCHPOINT_ACCESS:
-+        dbgwcr = deposit32(dbgwcr, 3, 2, 3);
-+        break;
-+    default:
-+        g_assert_not_reached();
-+        break;
-+    }
-+    if (len <= 8) {
-+        /* we align the address and set the bits in BAS */
-+        int off = addr & 0x7;
-+        int bas = (1 << len)-1;
-+        dbgwcr = deposit32(dbgwcr, 5+off, 8-off, bas);
-+    } else {
-+        /* For ranges above 8 bytes we need to be a power of 2 */
-+        if (ctpop64(len)==1) {
-+            int bits = ctz64(len);
-+            dbgwvr &= ~((1 << bits)-1);
-+            dbgwcr = deposit32(dbgwcr, 24, 4, bits);
-+            dbgwcr = deposit32(dbgwcr, 5, 8, 0xff);
-+        } else {
-+            return -ENOBUFS;
-+        }
-+    }
-+
-+    guest_debug_registers.dbg_wcr[cur_hw_wp] = dbgwcr;
-+    guest_debug_registers.dbg_wvr[cur_hw_wp] = dbgwvr;
-+    cur_hw_wp++;
-+    return 0;
-+}
-+
-+
-+static bool check_watchpoint_in_range(int i, target_ulong addr)
-+{
-+    uint32_t dbgwcr = guest_debug_registers.dbg_wcr[i];
-+    uint64_t addr_top, addr_bottom = guest_debug_registers.dbg_wvr[i];
-+    int bas = extract32(dbgwcr, 5, 8);
-+    int mask = extract32(dbgwcr, 24, 4);
-+
-+    if (mask) {
-+        addr_top = addr_bottom + (1 << mask);
-+    } else {
-+        /* BAS must be contiguous but can offset against the base
-+         * address in DBGWVR */
-+        addr_bottom = addr_bottom + ctz32(bas);
-+        addr_top = addr_bottom + clo32(bas);
-+    }
-+
-+    if (addr >= addr_bottom && addr <= addr_top ) {
-+        return true;
-+    }
-+
-+    return false;
-+}
-+
-+/**
-+ * delete_hw_watchpoint()
-+ * @addr: address of breakpoint
-+ *
-+ * Delete a breakpoint and shuffle any above down
-+ */
-+
-+static int delete_hw_watchpoint(target_ulong addr,
-+                                target_ulong len, int type)
-+{
-+    int i;
-+    for (i = 0; i < cur_hw_wp; i++) {
-+        if (check_watchpoint_in_range(i, addr)) {
-+            while (i < cur_hw_wp) {
-+                if (i == max_hw_wp) {
-+                    guest_debug_registers.dbg_wvr[i] = 0;
-+                    guest_debug_registers.dbg_wcr[i] = 0;
-+                } else {
-+                    guest_debug_registers.dbg_wvr[i] =
-+                        guest_debug_registers.dbg_wvr[i + 1];
-+                    guest_debug_registers.dbg_wcr[i] =
-+                        guest_debug_registers.dbg_wcr[i + 1];
-+                }
-+                i++;
-+            }
-+            cur_hw_wp--;
-+            return 0;
-+        }
-+    }
-+    return -ENOENT;
-+}
-+
-+
-+int kvm_arch_insert_hw_breakpoint(target_ulong addr,
-+                                  target_ulong len, int type)
-+{
-+    switch (type) {
-+    case GDB_BREAKPOINT_HW:
-+        return insert_hw_breakpoint(addr);
-+        break;
-+    case GDB_WATCHPOINT_READ:
-+    case GDB_WATCHPOINT_WRITE:
-+    case GDB_WATCHPOINT_ACCESS:
-+        return insert_hw_watchpoint(addr, len, type);
-+    default:
-+        return -ENOSYS;
-+    }
-+}
-+
-+int kvm_arch_remove_hw_breakpoint(target_ulong addr,
-+                                  target_ulong len, int type)
-+{
-+    switch (type) {
-+    case GDB_BREAKPOINT_HW:
-+        return delete_hw_breakpoint(addr);
-+        break;
-+    case GDB_WATCHPOINT_READ:
-+    case GDB_WATCHPOINT_WRITE:
-+    case GDB_WATCHPOINT_ACCESS:
-+        return delete_hw_watchpoint(addr, len, type);
-+    default:
-+        return -ENOSYS;
-+    }
-+}
-+
-+
-+void kvm_arch_remove_all_hw_breakpoints(void)
-+{
-+    memset((void *)&guest_debug_registers, 0, sizeof(guest_debug_registers));
-+    cur_hw_bp = 0;
-+    cur_hw_wp = 0;
-+}
-+
-+void kvm_copy_hw_breakpoint_data(struct kvm_guest_debug_arch *ptr)
-+{
-+    /* Compile time assert? */
-+    g_assert(sizeof(struct kvm_guest_debug_arch) == sizeof(guest_debug_registers));
-+    memcpy(ptr, &guest_debug_registers, sizeof(guest_debug_registers));
-+}
-+
-+bool kvm_hw_breakpoints_active(CPUState *cs)
-+{
-+    return ( (cur_hw_bp > 0) || (cur_hw_wp >0) ) ? TRUE:FALSE;
-+}
-+
-+bool kvm_arm_find_hw_breakpoint(CPUState *cpu, target_ulong pc)
-+{
-+  if (kvm_hw_breakpoints_active(cpu)) {
-+    int i;
-+    for (i=0; i<cur_hw_bp; i++) {
-+      if (guest_debug_registers.dbg_bvr[i] == pc) {
-+        return true;
-+      }
-+    }
-+  }
-+  return false;
-+}
-+
-+bool kvm_arm_find_hw_watchpoint(CPUState *cpu, target_ulong addr)
-+{
-+  if (kvm_hw_breakpoints_active(cpu)) {
-+    int i;
-+    for (i=0; i<cur_hw_wp; i++) {
-+        if (check_watchpoint_in_range(i, addr)) {
-+                return true;
-+        }
-+    }
-+  }
-+  return false;
-+}
-+
-+
- static inline void set_feature(uint64_t *features, int feature)
- {
-     *features |= 1ULL << feature;
-diff --git a/target-arm/kvm_arm.h b/target-arm/kvm_arm.h
-index 5abd591..9d713bc 100644
---- a/target-arm/kvm_arm.h
-+++ b/target-arm/kvm_arm.h
-@@ -179,6 +179,27 @@ int kvm_arm_sync_mpstate_to_kvm(ARMCPU *cpu);
++ * Register set = 3: FPU / MSA registers (see definitions below).
+  *
+  * Other sets registers may be added in the future.  Each set would
+  * have its own identifier in bits[31..16].
+- *
+- * The registers defined in struct kvm_regs are also accessible, the
+- * id values for these are below.
   */
- int kvm_arm_sync_mpstate_to_qemu(ARMCPU *cpu);
  
-+bool kvm_hw_breakpoints_active(CPUState *cs);
-+void kvm_copy_hw_breakpoint_data(struct kvm_guest_debug_arch *ptr);
+-#define KVM_REG_MIPS_R0 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 0)
+-#define KVM_REG_MIPS_R1 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 1)
+-#define KVM_REG_MIPS_R2 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 2)
+-#define KVM_REG_MIPS_R3 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 3)
+-#define KVM_REG_MIPS_R4 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 4)
+-#define KVM_REG_MIPS_R5 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 5)
+-#define KVM_REG_MIPS_R6 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 6)
+-#define KVM_REG_MIPS_R7 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 7)
+-#define KVM_REG_MIPS_R8 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 8)
+-#define KVM_REG_MIPS_R9 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 9)
+-#define KVM_REG_MIPS_R10 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 10)
+-#define KVM_REG_MIPS_R11 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 11)
+-#define KVM_REG_MIPS_R12 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 12)
+-#define KVM_REG_MIPS_R13 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 13)
+-#define KVM_REG_MIPS_R14 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 14)
+-#define KVM_REG_MIPS_R15 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 15)
+-#define KVM_REG_MIPS_R16 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 16)
+-#define KVM_REG_MIPS_R17 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 17)
+-#define KVM_REG_MIPS_R18 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 18)
+-#define KVM_REG_MIPS_R19 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 19)
+-#define KVM_REG_MIPS_R20 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 20)
+-#define KVM_REG_MIPS_R21 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 21)
+-#define KVM_REG_MIPS_R22 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 22)
+-#define KVM_REG_MIPS_R23 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 23)
+-#define KVM_REG_MIPS_R24 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 24)
+-#define KVM_REG_MIPS_R25 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 25)
+-#define KVM_REG_MIPS_R26 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 26)
+-#define KVM_REG_MIPS_R27 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 27)
+-#define KVM_REG_MIPS_R28 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 28)
+-#define KVM_REG_MIPS_R29 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 29)
+-#define KVM_REG_MIPS_R30 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 30)
+-#define KVM_REG_MIPS_R31 (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 31)
+-
+-#define KVM_REG_MIPS_HI (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 32)
+-#define KVM_REG_MIPS_LO (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 33)
+-#define KVM_REG_MIPS_PC (KVM_REG_MIPS | KVM_REG_SIZE_U64 | 34)
+-
+-/* KVM specific control registers */
++#define KVM_REG_MIPS_GP		(KVM_REG_MIPS | 0x0000000000000000ULL)
++#define KVM_REG_MIPS_CP0	(KVM_REG_MIPS | 0x0000000000010000ULL)
++#define KVM_REG_MIPS_KVM	(KVM_REG_MIPS | 0x0000000000020000ULL)
++#define KVM_REG_MIPS_FPU	(KVM_REG_MIPS | 0x0000000000030000ULL)
 +
-+/**
-+ * kvm_arm_find_hw_breakpoint:
-+ * @cpu: CPUState
-+ * @pc: pc of breakpoint
-+ *
-+ * Return TRUE if the pc matches one of our breakpoints.
++
++/*
++ * KVM_REG_MIPS_GP - General purpose registers from kvm_regs.
 + */
-+bool kvm_arm_find_hw_breakpoint(CPUState *cpu, target_ulong pc);
 +
-+/**
-+ * kvm_arm_find_hw_watchpoint:
-+ * @cpu: CPUState
-+ * @addr: address of watchpoint
-+ *
-+ * Return TRUE if the addr matches one of our watchpoints.
++#define KVM_REG_MIPS_R0		(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 |  0)
++#define KVM_REG_MIPS_R1		(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 |  1)
++#define KVM_REG_MIPS_R2		(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 |  2)
++#define KVM_REG_MIPS_R3		(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 |  3)
++#define KVM_REG_MIPS_R4		(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 |  4)
++#define KVM_REG_MIPS_R5		(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 |  5)
++#define KVM_REG_MIPS_R6		(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 |  6)
++#define KVM_REG_MIPS_R7		(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 |  7)
++#define KVM_REG_MIPS_R8		(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 |  8)
++#define KVM_REG_MIPS_R9		(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 |  9)
++#define KVM_REG_MIPS_R10	(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 | 10)
++#define KVM_REG_MIPS_R11	(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 | 11)
++#define KVM_REG_MIPS_R12	(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 | 12)
++#define KVM_REG_MIPS_R13	(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 | 13)
++#define KVM_REG_MIPS_R14	(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 | 14)
++#define KVM_REG_MIPS_R15	(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 | 15)
++#define KVM_REG_MIPS_R16	(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 | 16)
++#define KVM_REG_MIPS_R17	(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 | 17)
++#define KVM_REG_MIPS_R18	(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 | 18)
++#define KVM_REG_MIPS_R19	(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 | 19)
++#define KVM_REG_MIPS_R20	(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 | 20)
++#define KVM_REG_MIPS_R21	(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 | 21)
++#define KVM_REG_MIPS_R22	(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 | 22)
++#define KVM_REG_MIPS_R23	(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 | 23)
++#define KVM_REG_MIPS_R24	(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 | 24)
++#define KVM_REG_MIPS_R25	(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 | 25)
++#define KVM_REG_MIPS_R26	(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 | 26)
++#define KVM_REG_MIPS_R27	(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 | 27)
++#define KVM_REG_MIPS_R28	(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 | 28)
++#define KVM_REG_MIPS_R29	(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 | 29)
++#define KVM_REG_MIPS_R30	(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 | 30)
++#define KVM_REG_MIPS_R31	(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 | 31)
++
++#define KVM_REG_MIPS_HI		(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 | 32)
++#define KVM_REG_MIPS_LO		(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 | 33)
++#define KVM_REG_MIPS_PC		(KVM_REG_MIPS_GP | KVM_REG_SIZE_U64 | 34)
++
++
++/*
++ * KVM_REG_MIPS_KVM - KVM specific control registers.
 + */
-+bool kvm_arm_find_hw_watchpoint(CPUState *cpu, target_ulong addr);
-+
- #endif
  
- #endif
+ /*
+  * CP0_Count control
+@@ -118,8 +126,7 @@ struct kvm_fpu {
+  *        safely without losing time or guest timer interrupts.
+  * Other: Reserved, do not change.
+  */
+-#define KVM_REG_MIPS_COUNT_CTL		(KVM_REG_MIPS | KVM_REG_SIZE_U64 | \
+-					 0x20000 | 0)
++#define KVM_REG_MIPS_COUNT_CTL	    (KVM_REG_MIPS_KVM | KVM_REG_SIZE_U64 | 0)
+ #define KVM_REG_MIPS_COUNT_CTL_DC	0x00000001
+ 
+ /*
+@@ -131,15 +138,46 @@ struct kvm_fpu {
+  * emulated.
+  * Modifications to times in the future are rejected.
+  */
+-#define KVM_REG_MIPS_COUNT_RESUME	(KVM_REG_MIPS | KVM_REG_SIZE_U64 | \
+-					 0x20000 | 1)
++#define KVM_REG_MIPS_COUNT_RESUME   (KVM_REG_MIPS_KVM | KVM_REG_SIZE_U64 | 1)
+ /*
+  * CP0_Count rate in Hz
+  * Specifies the rate of the CP0_Count timer in Hz. Modifications occur without
+  * discontinuities in CP0_Count.
+  */
+-#define KVM_REG_MIPS_COUNT_HZ		(KVM_REG_MIPS | KVM_REG_SIZE_U64 | \
+-					 0x20000 | 2)
++#define KVM_REG_MIPS_COUNT_HZ	    (KVM_REG_MIPS_KVM | KVM_REG_SIZE_U64 | 2)
++
++
++/*
++ * KVM_REG_MIPS_FPU - Floating Point and MIPS SIMD Architecture (MSA) registers.
++ *
++ *  bits[15..8]  - Register subset (see definitions below).
++ *  bits[7..5]   - Must be zero.
++ *  bits[4..0]   - Register number within register subset.
++ */
++
++#define KVM_REG_MIPS_FPR	(KVM_REG_MIPS_FPU | 0x0000000000000000ULL)
++#define KVM_REG_MIPS_FCR	(KVM_REG_MIPS_FPU | 0x0000000000000100ULL)
++#define KVM_REG_MIPS_MSACR	(KVM_REG_MIPS_FPU | 0x0000000000000200ULL)
++
++/*
++ * KVM_REG_MIPS_FPR - Floating point / Vector registers.
++ */
++#define KVM_REG_MIPS_FPR_32(n)	(KVM_REG_MIPS_FPR | KVM_REG_SIZE_U32  | (n))
++#define KVM_REG_MIPS_FPR_64(n)	(KVM_REG_MIPS_FPR | KVM_REG_SIZE_U64  | (n))
++#define KVM_REG_MIPS_VEC_128(n)	(KVM_REG_MIPS_FPR | KVM_REG_SIZE_U128 | (n))
++
++/*
++ * KVM_REG_MIPS_FCR - Floating point control registers.
++ */
++#define KVM_REG_MIPS_FCR_IR	(KVM_REG_MIPS_FCR | KVM_REG_SIZE_U32 |  0)
++#define KVM_REG_MIPS_FCR_CSR	(KVM_REG_MIPS_FCR | KVM_REG_SIZE_U32 | 31)
++
++/*
++ * KVM_REG_MIPS_MSACR - MIPS SIMD Architecture (MSA) control registers.
++ */
++#define KVM_REG_MIPS_MSA_IR	 (KVM_REG_MIPS_MSACR | KVM_REG_SIZE_U32 |  0)
++#define KVM_REG_MIPS_MSA_CSR	 (KVM_REG_MIPS_MSACR | KVM_REG_SIZE_U32 |  1)
++
+ 
+ /*
+  * KVM MIPS specific structures and definitions
+diff --git a/linux-headers/asm-s390/kvm.h b/linux-headers/asm-s390/kvm.h
+index c5a93eb..512d8f1 100644
+--- a/linux-headers/asm-s390/kvm.h
++++ b/linux-headers/asm-s390/kvm.h
+@@ -150,6 +150,7 @@ struct kvm_guest_debug_arch {
+ #define KVM_SYNC_CRS    (1UL << 3)
+ #define KVM_SYNC_ARCH0  (1UL << 4)
+ #define KVM_SYNC_PFAULT (1UL << 5)
++#define KVM_SYNC_VRS    (1UL << 6)
+ /* definition of registers in kvm_run */
+ struct kvm_sync_regs {
+ 	__u64 prefix;	/* prefix register */
+@@ -164,6 +165,9 @@ struct kvm_sync_regs {
+ 	__u64 pft;	/* pfault token [PFAULT] */
+ 	__u64 pfs;	/* pfault select [PFAULT] */
+ 	__u64 pfc;	/* pfault compare [PFAULT] */
++	__u64 vrs[32][2];	/* vector registers */
++	__u8  reserved[512];	/* for future vector expansion */
++	__u32 fpc;	/* only valid with vector registers */
+ };
+ 
+ #define KVM_REG_S390_TODPR	(KVM_REG_S390 | KVM_REG_SIZE_U32 | 0x1)
+diff --git a/linux-headers/asm-x86/hyperv.h b/linux-headers/asm-x86/hyperv.h
+index 90c458e..ce6068d 100644
+--- a/linux-headers/asm-x86/hyperv.h
++++ b/linux-headers/asm-x86/hyperv.h
+@@ -225,6 +225,8 @@
+ #define HV_STATUS_INVALID_HYPERCALL_CODE	2
+ #define HV_STATUS_INVALID_HYPERCALL_INPUT	3
+ #define HV_STATUS_INVALID_ALIGNMENT		4
++#define HV_STATUS_INSUFFICIENT_MEMORY		11
++#define HV_STATUS_INVALID_CONNECTION_ID		18
+ #define HV_STATUS_INSUFFICIENT_BUFFERS		19
+ 
+ typedef struct _HV_REFERENCE_TSC_PAGE {
+diff --git a/linux-headers/linux/kvm.h b/linux-headers/linux/kvm.h
+index 60a54c8..d9d0a2d 100644
+--- a/linux-headers/linux/kvm.h
++++ b/linux-headers/linux/kvm.h
+@@ -147,6 +147,16 @@ struct kvm_pit_config {
+ 
+ #define KVM_PIT_SPEAKER_DUMMY     1
+ 
++struct kvm_s390_skeys {
++	__u64 start_gfn;
++	__u64 count;
++	__u64 skeydata_addr;
++	__u32 flags;
++	__u32 reserved[9];
++};
++#define KVM_S390_GET_SKEYS_NONE   1
++#define KVM_S390_SKEYS_MAX        1048576
++
+ #define KVM_EXIT_UNKNOWN          0
+ #define KVM_EXIT_EXCEPTION        1
+ #define KVM_EXIT_IO               2
+@@ -172,6 +182,7 @@ struct kvm_pit_config {
+ #define KVM_EXIT_S390_TSCH        22
+ #define KVM_EXIT_EPR              23
+ #define KVM_EXIT_SYSTEM_EVENT     24
++#define KVM_EXIT_S390_STSI        25
+ 
+ /* For KVM_EXIT_INTERNAL_ERROR */
+ /* Emulate instruction failed. */
+@@ -226,6 +237,7 @@ struct kvm_run {
+ 			__u32 count;
+ 			__u64 data_offset; /* relative to kvm_run start */
+ 		} io;
++		/* KVM_EXIT_DEBUG */
+ 		struct {
+ 			struct kvm_debug_exit_arch arch;
+ 		} debug;
+@@ -274,6 +286,7 @@ struct kvm_run {
+ 			__u32 data;
+ 			__u8  is_write;
+ 		} dcr;
++		/* KVM_EXIT_INTERNAL_ERROR */
+ 		struct {
+ 			__u32 suberror;
+ 			/* Available with KVM_CAP_INTERNAL_ERROR_DATA: */
+@@ -284,6 +297,7 @@ struct kvm_run {
+ 		struct {
+ 			__u64 gprs[32];
+ 		} osi;
++		/* KVM_EXIT_PAPR_HCALL */
+ 		struct {
+ 			__u64 nr;
+ 			__u64 ret;
+@@ -309,6 +323,15 @@ struct kvm_run {
+ 			__u32 type;
+ 			__u64 flags;
+ 		} system_event;
++		/* KVM_EXIT_S390_STSI */
++		struct {
++			__u64 addr;
++			__u8 ar;
++			__u8 reserved;
++			__u8 fc;
++			__u8 sel1;
++			__u16 sel2;
++		} s390_stsi;
+ 		/* Fix the size of the union. */
+ 		char padding[256];
+ 	};
+@@ -324,7 +347,7 @@ struct kvm_run {
+ 	__u64 kvm_dirty_regs;
+ 	union {
+ 		struct kvm_sync_regs regs;
+-		char padding[1024];
++		char padding[2048];
+ 	} s;
+ };
+ 
+@@ -365,6 +388,24 @@ struct kvm_translation {
+ 	__u8  pad[5];
+ };
+ 
++/* for KVM_S390_MEM_OP */
++struct kvm_s390_mem_op {
++	/* in */
++	__u64 gaddr;		/* the guest address */
++	__u64 flags;		/* flags */
++	__u32 size;		/* amount of bytes */
++	__u32 op;		/* type of operation */
++	__u64 buf;		/* buffer in userspace */
++	__u8 ar;		/* the access register number */
++	__u8 reserved[31];	/* should be set to 0 */
++};
++/* types for kvm_s390_mem_op->op */
++#define KVM_S390_MEMOP_LOGICAL_READ	0
++#define KVM_S390_MEMOP_LOGICAL_WRITE	1
++/* flags for kvm_s390_mem_op->flags */
++#define KVM_S390_MEMOP_F_CHECK_ONLY		(1ULL << 0)
++#define KVM_S390_MEMOP_F_INJECT_EXCEPTION	(1ULL << 1)
++
+ /* for KVM_INTERRUPT */
+ struct kvm_interrupt {
+ 	/* in */
+@@ -520,6 +561,13 @@ struct kvm_s390_irq {
+ 	} u;
+ };
+ 
++struct kvm_s390_irq_state {
++	__u64 buf;
++	__u32 flags;
++	__u32 len;
++	__u32 reserved[4];
++};
++
+ /* for KVM_SET_GUEST_DEBUG */
+ 
+ #define KVM_GUESTDBG_ENABLE		0x00000001
+@@ -760,6 +808,17 @@ struct kvm_ppc_smmu_info {
+ #define KVM_CAP_PPC_ENABLE_HCALL 104
+ #define KVM_CAP_CHECK_EXTENSION_VM 105
+ #define KVM_CAP_S390_USER_SIGP 106
++#define KVM_CAP_S390_VECTOR_REGISTERS 107
++#define KVM_CAP_S390_MEM_OP 108
++#define KVM_CAP_S390_USER_STSI 109
++#define KVM_CAP_S390_SKEYS 110
++#define KVM_CAP_MIPS_FPU 111
++#define KVM_CAP_MIPS_MSA 112
++#define KVM_CAP_S390_INJECT_IRQ 113
++#define KVM_CAP_S390_IRQ_STATE 114
++#define KVM_CAP_PPC_HWRNG 115
++#define KVM_CAP_GUEST_DEBUG_HW_BPS 116
++#define KVM_CAP_GUEST_DEBUG_HW_WPS 117
+ 
+ #ifdef KVM_CAP_IRQ_ROUTING
+ 
+@@ -1135,6 +1194,16 @@ struct kvm_s390_ucas_mapping {
+ #define KVM_ARM_VCPU_INIT	  _IOW(KVMIO,  0xae, struct kvm_vcpu_init)
+ #define KVM_ARM_PREFERRED_TARGET  _IOR(KVMIO,  0xaf, struct kvm_vcpu_init)
+ #define KVM_GET_REG_LIST	  _IOWR(KVMIO, 0xb0, struct kvm_reg_list)
++/* Available with KVM_CAP_S390_MEM_OP */
++#define KVM_S390_MEM_OP		  _IOW(KVMIO,  0xb1, struct kvm_s390_mem_op)
++/* Available with KVM_CAP_S390_SKEYS */
++#define KVM_S390_GET_SKEYS      _IOW(KVMIO, 0xb2, struct kvm_s390_skeys)
++#define KVM_S390_SET_SKEYS      _IOW(KVMIO, 0xb3, struct kvm_s390_skeys)
++/* Available with KVM_CAP_S390_INJECT_IRQ */
++#define KVM_S390_IRQ              _IOW(KVMIO,  0xb4, struct kvm_s390_irq)
++/* Available with KVM_CAP_S390_IRQ_STATE */
++#define KVM_S390_SET_IRQ_STATE	  _IOW(KVMIO, 0xb5, struct kvm_s390_irq_state)
++#define KVM_S390_GET_IRQ_STATE	  _IOW(KVMIO, 0xb6, struct kvm_s390_irq_state)
+ 
+ #define KVM_DEV_ASSIGN_ENABLE_IOMMU	(1 << 0)
+ #define KVM_DEV_ASSIGN_PCI_2_3		(1 << 1)
+diff --git a/linux-headers/linux/vfio.h b/linux-headers/linux/vfio.h
+index 95ba870..0508d0b 100644
+--- a/linux-headers/linux/vfio.h
++++ b/linux-headers/linux/vfio.h
+@@ -160,6 +160,8 @@ struct vfio_device_info {
+ 	__u32	flags;
+ #define VFIO_DEVICE_FLAGS_RESET	(1 << 0)	/* Device supports reset */
+ #define VFIO_DEVICE_FLAGS_PCI	(1 << 1)	/* vfio-pci device */
++#define VFIO_DEVICE_FLAGS_PLATFORM (1 << 2)	/* vfio-platform device */
++#define VFIO_DEVICE_FLAGS_AMBA  (1 << 3)	/* vfio-amba device */
+ 	__u32	num_regions;	/* Max region index + 1 */
+ 	__u32	num_irqs;	/* Max IRQ index + 1 */
+ };
 -- 
 2.4.1
