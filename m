@@ -1,130 +1,23 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 29 May 2015 08:09:31 +0100
-Subject: [PATCH v5 00/11] Add simple NVMEM Framework via regmap.
-In-Reply-To: <CAA9_cmetqnqTQPCd8ya5AJPKQw8ary8CwsE6TUv=f57O=_MH5w@mail.gmail.com>
-References: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>	<1432226535-8640-1-git-send-email-srinivas.kandagatla@linaro.org>
- <CAA9_cmetqnqTQPCd8ya5AJPKQw8ary8CwsE6TUv=f57O=_MH5w@mail.gmail.com>
-Message-ID: <556810AB.40906@linaro.org>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Fri, 29 May 2015 09:14:49 +0200
+Subject: [RFC PATCH 1/5] livepatch: ftrace: arm64: Add support for
+ DYNAMIC_FTRACE_WITH_REGS
+In-Reply-To: <1432792265-24076-2-git-send-email-huawei.libin@huawei.com>
+References: <1432792265-24076-1-git-send-email-huawei.libin@huawei.com>
+ <1432792265-24076-2-git-send-email-huawei.libin@huawei.com>
+Message-ID: <1432883689.3551.3.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 2015-05-28 at 13:51 +0800, Li Bin wrote:
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+
+>  	select HAVE_DYNAMIC_FTRACE
+> +	select HAVE_DYNAMIC_FTRACE_WITH_REGS if HAVE_DYNAMIC_FTRACE
+
+What's the point of "if HAVE_DYNAMIC_FTRACE" here? That test should
+always evaluate to true, because HAVE_DYNAMIC_FTRACE is also selected.
 
 
-On 29/05/15 02:20, Dan Williams wrote:
-> On Thu, May 21, 2015 at 9:42 AM, Srinivas Kandagatla
-> <srinivas.kandagatla@linaro.org> wrote:
->> Thankyou all for providing inputs and comments on previous versions of this patchset.
->> Here is the v5 of the patchset addressing all the issues raised as
->> part of previous versions review.
->>
->> This patchset adds a new simple NVMEM framework to kernel.
->>
->> Up until now, NVMEM drivers were stored in drivers/misc, where they all had to
->> duplicate pretty much the same code to register a sysfs file, allow in-kernel
->> users to access the content of the devices they were driving, etc.
->>
->> This was also a problem as far as other in-kernel users were involved, since
->> the solutions used were pretty much different from on driver to another, there
->> was a rather big abstraction leak.
->>
->> Introduction of this framework aims at solving this. It also introduces DT
->> representation for consumer devices to go get the data they require (MAC
->> Addresses, SoC/Revision ID, part numbers, and so on) from the NVMEMs.
->>
->> After learning few things about QCOM qfprom and other eeprom/efuses, which
->> has packed fields at bit level. Which makes it important to add support to
->> such memories. This version adds support to this type of non volatile
->> memories by adding support to bit level nvmem-cells.
->>
->> Having regmap interface to this framework would give much better
->> abstraction for nvmems on different buses.
->>
->> patch 1-2 Introduces two regmap helper functions.
->> patch 3-6 Introduces the NVMEM framework.
->> Patch 7 Adds helper functions for nvmems based on mmio.
->> Patch 8 migrates an existing driver to nvmem framework.
->> Patch 9-10 Adds Qualcomm specific qfprom driver.
->> Patch 11 adds entry in MAINTAINERS.
->>
->> Its also possible to migrate other nvmem drivers to this framework.
->>
->> Providers APIs:
->>          nvmem_register/unregister();
->>
->> Consumers APIs:
->> Cell based apis for both DT/Non-DT:
->>          nvmem_cell_get()/nvmem_cell_put();
->>          nvmem_cell_read()/nvmem_cell_write();
->>
->> Raw byte access apis for both DT/non-DT.
->>          nvmem_device_get()/nvmem_device_put()
->>          nvmem_device_read()/nvmem_device_write();
->>          nvmem_device_cell_read()/nvmem_device_cell_write();
->>
->> Device Tree:
->>
->>          /* Provider */
->>          qfprom: qfprom at 00700000 {
->>                  ...
->>
->>                  /* Data cells */
->>                  tsens_calibration: calib at 404 {
->>                          reg = <0x404 0x10>;
->>                  };
->>
->>                  tsens_calibration_bckp: calib_bckp at 504 {
->>                          reg = <0x504 0x11>;
->>                          bit-offset = 6;
->>                          nbits = 128;
->>                  };
->>
->>                  pvs_version: pvs-version at 6 {
->>                          reg = <0x6 0x2>
->>                          bit-offset = 7;
->>                          nbits = 2;
->>                  };
->>
->>                  speed_bin: speed-bin at c{
->>                          reg = <0xc 0x1>;
->>                          bit-offset = 2;
->>                          nbits   = 3;
->>
->>                  };
->>                  ...
->>          };
->>
->> userspace interface: binary file in /sys/class/nvmem/*/nvmem
->>
->> ex:
->> hexdump /sys/class/nvmem/qfprom0/nvmem
->>
->> 0000000 0000 0000 0000 0000 0000 0000 0000 0000
->> *
->> 00000a0 db10 2240 0000 e000 0c00 0c00 0000 0c00
->> 0000000 0000 0000 0000 0000 0000 0000 0000 0000
->> ...
->> *
->> 0001000
->>
->> Changes since v4(https://lkml.org/lkml/2015/3/30/725)
->>   * rename eeprom to nvmem suggested by Matt Porter
->
-> Apologies for the bikeshed fly-by review, but given we already have
-> NVME and are adding an NVDIMM driver sub-system is s/eeprom/nvmem/ a
-> good idea?
->
-IMO yes.
-
-I did briefly looked at NVME before renaming the eeprom to nvmem,
-NVME is aimed at defining the command/feature set for PCIe-based SSDs 
-with the goals of increased and efficient performance and interoperability.
-
-This patch-set introduces simple nvmem which is applicable for non 
-volatile memories like efuses, eeprom, ROM, NVRAM .. etc, which are used 
-in most boards/SBC's. Data like calibration table, mac address or opps, 
-are generally stored this. This data is required by multiple drivers and 
-currently there is no framework in the kernel to address/abstract this, 
-resulting in code duplication.
-
-
---srini
+Paul Bolle
