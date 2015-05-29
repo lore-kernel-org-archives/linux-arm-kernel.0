@@ -1,115 +1,86 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 29 May 2015 19:47:29 +0200
-Subject: [PATCH 16/16] ARM: at91/dt: Add Acme Arietta G25
-In-Reply-To: <1432921649-21943-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1432921649-21943-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1432921649-21943-17-git-send-email-alexandre.belloni@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 29 May 2015 18:49:58 +0100
+Subject: [PATCH v3] ARM: l2c: add options to overwrite prefetching behavior
+In-Reply-To: <5568A2ED.4000502@hauke-m.de>
+References: <1431726751-9169-1-git-send-email-hauke@hauke-m.de>
+ <5568A2ED.4000502@hauke-m.de>
+Message-ID: <20150529174957.GK2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a minimum Device Tree for Acme Arietta G25.
-http://acme.systems/arietta
+On Fri, May 29, 2015 at 07:33:33PM +0200, Hauke Mehrtens wrote:
+> Will this make it into kernel 4.2 or do I have to do something so that
+> this will make it into 4.2?
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Cc: Sergio Tanzilli <tanzilli@acmesystems.it>
----
- arch/arm/boot/dts/Makefile              |  1 +
- arch/arm/boot/dts/at91-acme-arietta.dts | 75 +++++++++++++++++++++++++++++++++
- 2 files changed, 76 insertions(+)
- create mode 100644 arch/arm/boot/dts/at91-acme-arietta.dts
+I don't see anything wrong with it, but as ever, it needs to end up in the
+patch system if it's not going to get buried beneath a huge pile of email.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 8c3da289a00b..96a169e6ea56 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -31,6 +31,7 @@ dtb-$(CONFIG_SOC_SAM_V4_V5) += \
- 	at91sam9n12ek.dtb \
- 	at91sam9rlek.dtb \
- 	at91-ariag25.dtb \
-+	at91-acme-arietta.dtb \
- 	at91-cosino_mega2560.dtb \
- 	at91-kizboxmini.dtb \
- 	at91sam9g15ek.dtb \
-diff --git a/arch/arm/boot/dts/at91-acme-arietta.dts b/arch/arm/boot/dts/at91-acme-arietta.dts
-new file mode 100644
-index 000000000000..142d588ad6bf
---- /dev/null
-+++ b/arch/arm/boot/dts/at91-acme-arietta.dts
-@@ -0,0 +1,75 @@
-+/*
-+ * Device Tree file for Arietta G25
-+ * This device tree is minimal, to activate more peripherals, see:
-+ * http://dts.acmesystems.it/arietta/
-+ */
-+/dts-v1/;
-+#include "at91sam9g25.dtsi"
-+/ {
-+	model = "Acme Systems Arietta G25";
-+	compatible = "acme,ariettag25", "atmel,at91sam9x5", "atmel,at91sam9";
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory {
-+		reg = <0x20000000 0x8000000>;
-+	};
-+
-+	clocks {
-+		slow_xtal {
-+			clock-frequency = <32768>;
-+		};
-+
-+		main_xtal {
-+			clock-frequency = <12000000>;
-+		};
-+	};
-+
-+	ahb {
-+		apb {
-+			mmc0: mmc at f0008000 {
-+				pinctrl-0 = <
-+				  &pinctrl_mmc0_slot0_clk_cmd_dat0
-+				  &pinctrl_mmc0_slot0_dat1_3>;
-+				status = "okay";
-+
-+				slot at 0 {
-+					reg = <0>;
-+					bus-width = <4>;
-+				};
-+			};
-+
-+			usb2: gadget at f803c000 {
-+				status = "okay";
-+			};
-+
-+			dbgu: serial at fffff200 {
-+				status = "okay";
-+			};
-+
-+			rtc at fffffeb0 {
-+				status = "okay";
-+			};
-+		};
-+
-+		usb0: ohci at 00600000 {
-+			status = "okay";
-+			num-ports = <3>;
-+		};
-+
-+		usb1: ehci at 00700000 {
-+			status = "okay";
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		arietta_led {
-+			label = "arietta_led";
-+			gpios = <&pioB 8 GPIO_ACTIVE_HIGH>; /* PB8 */
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+};
+Thanks.
+
+> 
+> Hauke
+> 
+> On 05/15/2015 11:52 PM, Hauke Mehrtens wrote:
+> > These options make it possible to overwrites the data and instruction
+> > prefetching behavior of the arm pl310 cache controller.
+> > 
+> > Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+> > ---
+> > v2: only set prefetch
+> > v1: set prefetch and aux
+> > 
+> >  Documentation/devicetree/bindings/arm/l2cc.txt |  4 ++++
+> >  arch/arm/mm/cache-l2x0.c                       | 20 ++++++++++++++++++++
+> >  2 files changed, 24 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
+> > index 0dbabe9..528821a 100644
+> > --- a/Documentation/devicetree/bindings/arm/l2cc.txt
+> > +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
+> > @@ -67,6 +67,10 @@ Optional properties:
+> >    disable if zero.
+> >  - arm,prefetch-offset : Override prefetch offset value. Valid values are
+> >    0-7, 15, 23, and 31.
+> > +- arm,prefetch-data : Enable data prefetch. Enabling prefetching
+> > +  can improve performance.
+> > +- arm,prefetch-instr : Enable instruction prefetch. Enabling prefetching
+> > +  can improve performance.
+> >  
+> >  Example:
+> >  
+> > diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> > index e309c8f..1aa970a 100644
+> > --- a/arch/arm/mm/cache-l2x0.c
+> > +++ b/arch/arm/mm/cache-l2x0.c
+> > @@ -1199,6 +1199,26 @@ static void __init l2c310_of_parse(const struct device_node *np,
+> >  		pr_err("L2C-310 OF arm,prefetch-offset property value is missing\n");
+> >  	}
+> >  
+> > +	ret = of_property_read_u32(np, "arm,prefetch-data", &val);
+> > +	if (ret == 0) {
+> > +		if (val)
+> > +			prefetch |= L310_PREFETCH_CTRL_DATA_PREFETCH;
+> > +		else
+> > +			prefetch &= ~L310_PREFETCH_CTRL_DATA_PREFETCH;
+> > +	} else if (ret != -EINVAL) {
+> > +		pr_err("L2C-310 OF arm,prefetch-data property value is missing\n");
+> > +	}
+> > +
+> > +	ret = of_property_read_u32(np, "arm,prefetch-instr", &val);
+> > +	if (ret == 0) {
+> > +		if (val)
+> > +			prefetch |= L310_PREFETCH_CTRL_INSTR_PREFETCH;
+> > +		else
+> > +			prefetch &= ~L310_PREFETCH_CTRL_INSTR_PREFETCH;
+> > +	} else if (ret != -EINVAL) {
+> > +		pr_err("L2C-310 OF arm,prefetch-instr property value is missing\n");
+> > +	}
+> > +
+> >  	l2x0_saved_regs.prefetch_ctrl = prefetch;
+> >  }
+> >  
+> > 
+
 -- 
-2.1.4
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
