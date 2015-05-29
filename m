@@ -1,30 +1,53 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 29 May 2015 23:41:35 +0200
-Subject: [PATCH] EDAC, edac_stub: Drop arch-specific include
-In-Reply-To: <CAPw-ZTnqfCLY_e91OLmbaaPMn9O9DLo1GXoA+0LZTusF01kM2g@mail.gmail.com>
-References: <1432337580-3750-1-git-send-email-lho@apm.com>
- <20150529094654.GD31435@pd.tnic>
- <CAPw-ZTnLqx0KsQkmv++zQRQ7hroaKML1rWgVafisENam0J17Mg@mail.gmail.com>
- <20150529185926.GP31435@pd.tnic> <20150529200520.GT31435@pd.tnic>
- <CAPw-ZTnqfCLY_e91OLmbaaPMn9O9DLo1GXoA+0LZTusF01kM2g@mail.gmail.com>
-Message-ID: <20150529214135.GV31435@pd.tnic>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 29 May 2015 23:42:01 +0200
+Subject: [PATCH 10/12] i2c: pxa: Update debug function to dump more info
+ on error
+In-Reply-To: <1432818224-17070-11-git-send-email-vaibhav.hiremath@linaro.org>
+ (Vaibhav Hiremath's message of "Thu, 28 May 2015 18:33:42 +0530")
+References: <1432818224-17070-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1432818224-17070-11-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <87fv6fxdqu.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 29, 2015 at 02:25:52PM -0700, Loc Ho wrote:
-> On Fri, May 29, 2015 at 1:05 PM, Borislav Petkov <bp@alien8.de> wrote:
-> > On Fri, May 29, 2015 at 08:59:26PM +0200, Borislav Petkov wrote:
-> >> Does it build when you remove it?
-> >
-> > IOW, this should fix it:
-> 
-> Confirmed.
+Vaibhav Hiremath <vaibhav.hiremath@linaro.org> writes:
 
-Thanks, I'll queue it.
+> Update i2c_pxa_scream_blue_murder() fn to print more information
+> in case of error.
+>
+> Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
+> [vaibhav.hiremath at linaro.org: Split patches into logical changes
+> and update the Changelog]
+> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+>
+> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+> ---
+>  drivers/i2c/busses/i2c-pxa.c | 11 ++++++++---
+>  1 file changed, 8 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
+> index cf6c383..065e647 100644
+> --- a/drivers/i2c/busses/i2c-pxa.c
+> +++ b/drivers/i2c/busses/i2c-pxa.c
+> @@ -147,6 +147,7 @@ struct pxa_i2c {
+>  	unsigned int		msg_idx;
+>  	unsigned int		msg_ptr;
+>  	unsigned int		slave_addr;
+> +	unsigned int		req_slave_addr;
+>  
+>  	struct i2c_adapter	adap;
+>  	struct clk		*clk;
+> @@ -335,11 +336,13 @@ err_out:
+>  static void i2c_pxa_scream_blue_murder(struct pxa_i2c *i2c, const char *why)
+>  {
+>  	unsigned int i;
+> -	printk(KERN_ERR "i2c: error: %s\n", why);
+> +	printk(KERN_ERR"i2c: <%s> slave_0x%x error: %s\n", i2c->adap.name,
+> +		i2c->req_slave_addr >> 1, why);
+Why not simply use dev_err(....) instead of adding manually i2c->adap.name ?
+
+Cheers.
 
 -- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
---
+Robert
