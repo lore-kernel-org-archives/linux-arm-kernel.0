@@ -1,71 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 29 May 2015 13:39:38 -0700
-Subject: [PATCH] ARM: dts: Remove L3 compatible value for dm816x
-In-Reply-To: <1432920112-21539-1-git-send-email-tony@atomide.com>
-References: <1432920112-21539-1-git-send-email-tony@atomide.com>
-Message-ID: <20150529203937.GU30984@atomide.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 29 May 2015 22:46:43 +0200
+Subject: [PATCH 06/12] i2c: pxa: Return I2C_RETRY when timeout in pio mode
+In-Reply-To: <1432818224-17070-7-git-send-email-vaibhav.hiremath@linaro.org>
+ (Vaibhav Hiremath's message of "Thu, 28 May 2015 18:33:38 +0530")
+References: <1432818224-17070-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1432818224-17070-7-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <87vbfbxgb0.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [150529 10:28]:
-> The interconnects on dm816x are like on omap4, so we should use
-> l3-noc instead of l3-smx. But as the related SoC specific
-> l3_target_data is still missing from omap_l3_noc let's just
-> remove the entry for now.
-> 
-> Cc: Brian Hutchinson <b.hutchman@gmail.com>
-> Reported-by: Matthijs van Duin <matthijsvanduin@gmail.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+Vaibhav Hiremath <vaibhav.hiremath@linaro.org> writes:
+
+> From: Shouming Wang <wangshm@marvell.com>
+>
+> In case of timeout in pio mode of operation return I2C_RETRY.
+> This behavior will be same as interrupt mode of operation.
+>
+> Signed-off-by: Shouming Wang <wangshm@marvell.com>
+> [vaibhav.hiremath at linaro.org: Updated changelog]
+> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+>
+> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
 > ---
->  arch/arm/boot/dts/dm816x.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/dm816x.dtsi b/arch/arm/boot/dts/dm816x.dtsi
-> index 289806a..3c99cfa 100644
-> --- a/arch/arm/boot/dts/dm816x.dtsi
-> +++ b/arch/arm/boot/dts/dm816x.dtsi
-> @@ -58,7 +58,7 @@
->  	 * the whole bus hierarchy.
->  	 */
->  	ocp {
-> -		compatible = "ti,omap3-l3-smx", "simple-bus";
-> +		compatible = "simple-bus";
->  		reg = <0x44000000 0x10000>;
->  		interrupts = <9 10>;
->  		#address-cells = <1>;
+>  drivers/i2c/busses/i2c-pxa.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
+> index eb09071..2777d5c 100644
+> --- a/drivers/i2c/busses/i2c-pxa.c
+> +++ b/drivers/i2c/busses/i2c-pxa.c
+> @@ -841,8 +841,10 @@ static int i2c_pxa_do_pio_xfer(struct pxa_i2c *i2c,
+>  	ret = i2c->msg_idx;
+>  
+>  out:
+> -	if (timeout == 0)
+> +	if (timeout == 0) {
+>  		i2c_pxa_scream_blue_murder(i2c, "timeout");
+> +		ret = I2C_RETRY;
+> +	}
+Ok, looks good to me.
+As it changes the dynamic behavior of i2c_pxa_pio_xfer(), I'd like to know how
+it was tested (on which platform, and what was on the I2C bus).
 
-We should remove reg and interrupts too, updated patch below.
+Cheers.
 
-Regards,
-
-Tony
-
-8< ---------------
-From: Tony Lindgren <tony@atomide.com>
-Date: Mon, 16 Mar 2015 18:04:20 -0700
-Subject: [PATCH] ARM: dts: Remove L3 compatible value for dm816x
-
-The interconnects on dm816x are like on omap4, so we should use
-l3-noc instead of l3-smx. But as the related SoC specific
-l3_target_data is still missing from omap_l3_noc let's just
-remove the entry for now. And as we're updating the dts files
-to follow the interconnect layout, this module will not be at
-the top level.
-
-Cc: Brian Hutchinson <b.hutchman@gmail.com>
-Reported-by: Matthijs van Duin <matthijsvanduin@gmail.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/arch/arm/boot/dts/dm816x.dtsi
-+++ b/arch/arm/boot/dts/dm816x.dtsi
-@@ -58,9 +58,7 @@
- 	 * the whole bus hierarchy.
- 	 */
- 	ocp {
--		compatible = "ti,omap3-l3-smx", "simple-bus";
--		reg = <0x44000000 0x10000>;
--		interrupts = <9 10>;
-+		compatible = "simple-bus";
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 		ranges;
+-- 
+Robert
