@@ -1,56 +1,119 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 29 May 2015 09:46:05 -0700
-Subject: [GIT PULL] ARM: mediatek: arm64 updates for v4.2
-In-Reply-To: <2560864.dSIGJOm4yU@wuerfel>
-References: <CABuKBeLhFR=94cF301wL7J8hJVTtyseoD7g45PLE6znQkPAFGQ@mail.gmail.com>
- <4904430.YVNgRyyb6C@wuerfel> <20150529125829.GE6325@pengutronix.de>
- <2560864.dSIGJOm4yU@wuerfel>
-Message-ID: <20150529164605.GA3022@codeaurora.org>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Fri, 29 May 2015 18:54:20 +0200
+Subject: [PATCH v2 1/3] clk: mux: Add regmap support for simple mux
+In-Reply-To: <1432915288-14034-2-git-send-email-matthias.bgg@gmail.com>
+References: <1432915288-14034-1-git-send-email-matthias.bgg@gmail.com>
+ <1432915288-14034-2-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <CAGhQ9Vzny3VLbs8ZFE1--nbGguqk=JH4hYpdOHcd=+Vu8tqibQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/29, Arnd Bergmann wrote:
-> On Friday 29 May 2015 14:58:29 Sascha Hauer wrote:
-> > On Fri, May 29, 2015 at 02:07:40PM +0200, Arnd Bergmann wrote:
-> > > On Friday 29 May 2015 14:04:32 Arnd Bergmann wrote:
-> > > > On Wednesday 27 May 2015 17:14:08 Matthias Brugger wrote:
-> > > > > - dts: fixup pinctrl mt8173
-> > > > > - dts: mt8173-evb fix model name
-> > > > > - dts: mt8173 fix identation
-> > > > > - dts: mt8173 add clock controller
-> > > > > - dts: mt8173 change uart clocks
-> > > > > - dts: mt8173 add pmic wrapper
-> > > > > 
-> > > > 
-> > > > Pulled into next/dt, thanks!
-> > > > 
-> > > 
-> > > Dropped it again, after getting a build error:
-> > > 
-> > >   DTC     arch/arm64/boot/dts/mediatek/mt8173-evb.dtb
-> > > In file included from ../arch/arm64/boot/dts/mediatek/mt8173-evb.dts:16:0:
-> > > ../arch/arm64/boot/dts/mediatek/mt8173.dtsi:14:42: fatal error: dt-bindings/clock/mt8173-clk.h: No such file or directory
-> > >  #include <dt-bindings/clock/mt8173-clk.h>
-> > >                                           ^
-> > > 
-> > > Please fix and resubmit.
-> > 
-> > These come from the clk tree. My original suggestion was to pull in this
-> > dts changes late after -rc1.
-> 
-> Please don't do it that way. If you can't figure out a way to
-> avoid the dependency, just stage it out over an extra merge window
-> and add the driver first and the dt changes the next time.
-> 
-> > Other possibility: Stephen, can you provide
-> > a stable commit containing the Mediatek clk changes?
-> 
-> That would work.
+On 29 May 2015 at 18:01, Matthias Brugger <matthias.bgg@gmail.com> wrote:
+> Some devices like SoCs from Mediatek need to use the clock muxes
+> through a regmap interface.
+> This patch adds regmap support for the simple multiplexer
+> clock code.
+>
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+> ---
+>  drivers/clk/clk-mux.c        | 134 ++++++++++++++++++++++++++++++++++++++-----
+>  include/linux/clk-provider.h |  44 +++++++++++++-
+>  2 files changed, 162 insertions(+), 16 deletions(-)
 
-Or another possibility, put the same header file into the branch
-you send to arm-soc. Git will figure out that the files are
-exactly the same and there's no cross tree dependency.
+What is this patch generated against?
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+I can't seem to apply it to either clk-next, next or Linus master.
+
+
+> diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+> index 1fa2a8d..6f75116 100644
+> --- a/drivers/clk/clk-mux.c
+> +++ b/drivers/clk/clk-mux.c
+> @@ -29,6 +29,43 @@
+>
+>  #define to_clk_mux(_hw) container_of(_hw, struct clk_mux, hw)
+>
+> +static void clk_mux_writel(struct clk_mux *mux, u32 val)
+> +{
+> +       if (mux->flags & CLK_MUX_USE_REGMAP)
+> +               regmap_write(mux->regmap, mux->offset, val);
+> +       else
+> +               clk_writel(val, mux->reg);
+> +}
+> +
+> +static u32 clk_mux_readl(struct clk_mux *mux)
+> +{
+> +       u32 val;
+> +
+> +       if (mux->flags & CLK_MUX_USE_REGMAP)
+> +               regmap_read(mux->regmap, mux->offset, &val);
+> +       else
+> +               val = clk_readl(mux->reg);
+> +
+> +       return val;
+> +}
+> +
+> +static int clk_mux_update_bits(struct clk_mux *mux, u32 mask, u32 val)
+> +{
+> +       unsigned int ret;
+> +
+> +       if (mux->flags & CLK_MUX_USE_REGMAP) {
+> +               ret = regmap_update_bits(mux->regmap, mux->offset, mask, val);
+
+If you just do a "return regmap_update_bits(...)" here you can drop
+the else below and also remove the ret variable.
+
+> +       } else {
+> +               ret = clk_readl(mux->reg);
+> +               ret &= ~mask;
+> +               ret |= val;
+> +               clk_writel(ret, mux->reg);
+> +               ret = 0;
+> +       }
+> +
+> +       return ret;
+> +}
+
+The three functions above seems pretty generic and should be usable in
+both gate and divider as well. Maybe we could figure out a way to
+share them across the mux, gate and divider clk drivers.
+
+
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index ec609e5..c7487ad 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -14,6 +14,7 @@
+>  #include <linux/clk.h>
+>  #include <linux/io.h>
+>  #include <linux/of.h>
+> +#include <linux/regmap.h>
+>
+>  #ifdef CONFIG_COMMON_CLK
+>
+> @@ -408,8 +409,12 @@ void clk_unregister_divider(struct clk *clk);
+>   */
+>  struct clk_mux {
+>         struct clk_hw   hw;
+> -       void __iomem    *reg;
+> +       union {
+> +               void __iomem    *reg;
+> +               struct regmap   *regmap;
+> +       };
+>         u32             *table;
+> +       u32             offset;
+>         u32             mask;
+>         u8              shift;
+>         u8              flags;
+> @@ -421,6 +426,7 @@ struct clk_mux {
+>  #define CLK_MUX_HIWORD_MASK            BIT(2)
+>  #define CLK_MUX_READ_ONLY              BIT(3) /* mux can't be changed */
+>  #define CLK_MUX_ROUND_CLOSEST          BIT(4)
+> +#define CLK_MUX_USE_REGMAP             BIT(5)
+
+Since you are adding both fields and a flag to struct clk_mux it would
+be nice if you could update the documentation above the struct
+definition in clk-provider.h also.
+
+regards,
+Joachim Eastwood
