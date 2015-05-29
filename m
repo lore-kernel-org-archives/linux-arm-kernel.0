@@ -1,347 +1,84 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Fri, 29 May 2015 10:30:28 +0100
-Subject: [PATCH v5 12/12] KVM: arm64: add trace points for guest_debug debug
+Date: Fri, 29 May 2015 10:30:19 +0100
+Subject: [PATCH v5 03/12] KVM: arm64: guest debug, define API headers
 In-Reply-To: <1432891828-4816-1-git-send-email-alex.bennee@linaro.org>
 References: <1432891828-4816-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1432891828-4816-13-git-send-email-alex.bennee@linaro.org>
+Message-ID: <1432891828-4816-4-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This includes trace points for:
-  kvm_arch_setup_guest_debug
-  kvm_arch_clear_guest_debug
+This commit defines the API headers for guest debugging. There are two
+architecture specific debug structures:
 
-I've also added some generic register setting trace events and also a
-trace point to dump the array of hardware registers.
+  - kvm_guest_debug_arch, allows us to pass in HW debug registers
+  - kvm_debug_exit_arch, signals exception and possible faulting address
+
+The type of debugging being used is controlled by the architecture
+specific control bits of the kvm_guest_debug->control flags in the ioctl
+structure.
 
 Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+Reviewed-by: David Hildenbrand <dahi@linux.vnet.ibm.com>
+Reviewed-by: Andrew Jones <drjones@redhat.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
 ---
+v2
+   - expose hsr and pc directly to user-space
 v3
-  - add trace event for debug access.
-  - remove short trace #define, rename trace events
-  - use __print_array with fixed array instead of own func
-  - rationalise trace points (only one per register changed)
-  - add vcpu ptr to the debug_setup trace
-  - remove :: in prints
+   - s/control/controlled/ in commit message
+   - add v8 to ARM ARM comment (ARM Architecture Reference Manual)
+   - add rb tag
+   - rm pc, add far
+   - re-word comments on alignment
+   - rename KVM_ARM_NDBG_REGS -> KVM_ARM_MAX_DBG_REGS
 v4
-  - u32/u64 split on debug registers
-  - fix for renames
-  - add tracing of traps/set_guest_debug
-  - remove handle_guest_debug trace
+   - now uses common HW/SW BP define
+   - add a-b-tag
+   - use u32 for control regs
 v5
-  - minor print fmt fix
-  - rm pstate traces
+   - revert to have arch specific KVM_GUESTDBG_USE_SW/HW_BP
+   - rm stale comments dbgctrl was stored as u64
 ---
- arch/arm/kvm/arm.c        |   2 +
- arch/arm/kvm/trace.h      |  17 ++++++++
- arch/arm64/kvm/debug.c    |  35 +++++++++++++++-
- arch/arm64/kvm/sys_regs.c |  10 +++++
- arch/arm64/kvm/trace.h    | 105 ++++++++++++++++++++++++++++++++++++++++++++++
- 5 files changed, 168 insertions(+), 1 deletion(-)
+ arch/arm64/include/uapi/asm/kvm.h | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 6df47c1..a939a4e 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -323,6 +323,8 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
- int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
- 					struct kvm_guest_debug *dbg)
- {
-+	trace_kvm_set_guest_debug(vcpu, dbg->control);
-+
- 	if (dbg->control & ~KVM_GUESTDBG_VALID_MASK)
- 		return -EINVAL;
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index d268320..43758e7 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -100,12 +100,32 @@ struct kvm_sregs {
+ struct kvm_fpu {
+ };
  
-diff --git a/arch/arm/kvm/trace.h b/arch/arm/kvm/trace.h
-index 0ec3539..3e346a6 100644
---- a/arch/arm/kvm/trace.h
-+++ b/arch/arm/kvm/trace.h
-@@ -317,6 +317,23 @@ TRACE_EVENT(kvm_toggle_cache,
- 		      __entry->now ? "on" : "off")
- );
++/*
++ * See v8 ARM ARM D7.3: Debug Registers
++ *
++ * The architectural limit is 16 debug registers of each type although
++ * in practice there are usually less (see ID_AA64DFR0_EL1).
++ */
++#define KVM_ARM_MAX_DBG_REGS 16
+ struct kvm_guest_debug_arch {
++	__u32 dbg_bcr[KVM_ARM_MAX_DBG_REGS];
++	__u64 dbg_bvr[KVM_ARM_MAX_DBG_REGS];
++	__u32 dbg_wcr[KVM_ARM_MAX_DBG_REGS];
++	__u64 dbg_wvr[KVM_ARM_MAX_DBG_REGS];
+ };
  
-+TRACE_EVENT(kvm_set_guest_debug,
-+	TP_PROTO(struct kvm_vcpu *vcpu, __u32 guest_debug),
-+	TP_ARGS(vcpu, guest_debug),
-+
-+	TP_STRUCT__entry(
-+		__field(struct kvm_vcpu *, vcpu)
-+		__field(__u32, guest_debug)
-+	),
-+
-+	TP_fast_assign(
-+		__entry->vcpu = vcpu;
-+		__entry->guest_debug = guest_debug;
-+	),
-+
-+	TP_printk("vcpu: %p, flags: 0x%08x", __entry->vcpu, __entry->guest_debug)
-+);
-+
- #endif /* _TRACE_KVM_H */
+ struct kvm_debug_exit_arch {
++	__u32 hsr;
++	__u64 far;
+ };
  
- #undef TRACE_INCLUDE_PATH
-diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
-index 3c0daae..97204b5 100644
---- a/arch/arm64/kvm/debug.c
-+++ b/arch/arm64/kvm/debug.c
-@@ -24,6 +24,8 @@
- #include <asm/kvm_arm.h>
- #include <asm/kvm_emulate.h>
++/*
++ * Architecture specific defines for kvm_guest_debug->control
++ */
++
++#define KVM_GUESTDBG_USE_SW_BP		(1 << 16)
++#define KVM_GUESTDBG_USE_HW_BP		(1 << 17)
++
+ struct kvm_sync_regs {
+ };
  
-+#include "trace.h"
-+
- /* These are the bits of MDSCR_EL1 we may manipulate */
- #define MDSCR_EL1_DEBUG_MASK	(DBG_MDSCR_SS | \
- 				DBG_MDSCR_KDE | \
-@@ -46,11 +48,17 @@ static DEFINE_PER_CPU(u32, mdcr_el2);
- static void save_guest_debug_regs(struct kvm_vcpu *vcpu)
- {
- 	vcpu->arch.guest_debug_preserved.mdscr_el1 = vcpu_sys_reg(vcpu, MDSCR_EL1);
-+
-+	trace_kvm_arm_set_dreg32("Saved MDSCR_EL1",
-+				vcpu->arch.guest_debug_preserved.mdscr_el1);
- }
- 
- static void restore_guest_debug_regs(struct kvm_vcpu *vcpu)
- {
- 	vcpu_sys_reg(vcpu, MDSCR_EL1) = vcpu->arch.guest_debug_preserved.mdscr_el1;
-+
-+	trace_kvm_arm_set_dreg32("Restored MDSCR_EL1",
-+				vcpu_sys_reg(vcpu, MDSCR_EL1));
- }
- 
- /**
-@@ -92,6 +100,8 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
- {
- 	bool trap_debug = !(vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY);
- 
-+	trace_kvm_arm_setup_debug(vcpu, vcpu->guest_debug);
-+
- 	vcpu->arch.mdcr_el2 = __this_cpu_read(mdcr_el2) & MDCR_EL2_HPMN_MASK;
- 	vcpu->arch.mdcr_el2 |= (MDCR_EL2_TPM |
- 				MDCR_EL2_TPMCR |
-@@ -121,6 +131,8 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
- 			vcpu_sys_reg(vcpu, MDSCR_EL1) &= ~DBG_MDSCR_SS;
- 		}
- 
-+		trace_kvm_arm_set_dreg32("SPSR_EL2", *vcpu_cpsr(vcpu));
-+
- 		/*
- 		 * HW Break/Watch points
- 		 *
-@@ -137,16 +149,29 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
- 			vcpu->arch.debug_ptr = &vcpu->arch.external_debug_state;
- 			vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
- 			trap_debug = true;
-+
-+			trace_kvm_arm_set_regset("BKPTS", get_num_brps(),
-+						&vcpu->arch.debug_ptr->dbg_bcr[0],
-+						&vcpu->arch.debug_ptr->dbg_bvr[0]);
-+
-+			trace_kvm_arm_set_regset("WAPTS", get_num_wrps(),
-+						&vcpu->arch.debug_ptr->dbg_wcr[0],
-+						&vcpu->arch.debug_ptr->dbg_wvr[0]);
- 		}
- 	}
- 
- 	/* Trap debug register access */
- 	if (trap_debug)
- 		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDA;
-+
-+	trace_kvm_arm_set_dreg32("MDCR_EL2", vcpu->arch.mdcr_el2);
-+	trace_kvm_arm_set_dreg32("MDSCR_EL1", vcpu_sys_reg(vcpu, MDSCR_EL1));
- }
- 
- void kvm_arm_clear_debug(struct kvm_vcpu *vcpu)
- {
-+	trace_kvm_arm_clear_debug(vcpu->guest_debug);
-+
- 	if (vcpu->guest_debug) {
- 		restore_guest_debug_regs(vcpu);
- 
-@@ -154,8 +179,16 @@ void kvm_arm_clear_debug(struct kvm_vcpu *vcpu)
- 		 * If we were using HW debug we need to restore the
- 		 * debug_ptr to the guest debug state.
- 		 */
--		if (vcpu->guest_debug & KVM_GUESTDBG_USE_HW_BP)
-+		if (vcpu->guest_debug & KVM_GUESTDBG_USE_HW_BP) {
- 			vcpu->arch.debug_ptr = &vcpu->arch.vcpu_debug_state;
- 
-+			trace_kvm_arm_set_regset("BKPTS", get_num_brps(),
-+						&vcpu->arch.debug_ptr->dbg_bcr[0],
-+						&vcpu->arch.debug_ptr->dbg_bvr[0]);
-+
-+			trace_kvm_arm_set_regset("WAPTS", get_num_wrps(),
-+						&vcpu->arch.debug_ptr->dbg_wcr[0],
-+						&vcpu->arch.debug_ptr->dbg_wvr[0]);
-+		}
- 	}
- }
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 405403e..15bc851 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -38,6 +38,8 @@
- 
- #include "sys_regs.h"
- 
-+#include "trace.h"
-+
- /*
-  * All of this file is extremly similar to the ARM coproc.c, but the
-  * types are different. My gut feeling is that it should be pretty
-@@ -208,6 +210,8 @@ static bool trap_debug_regs(struct kvm_vcpu *vcpu,
- 		*vcpu_reg(vcpu, p->Rt) = vcpu_sys_reg(vcpu, r->reg);
- 	}
- 
-+	trace_trap_reg(__func__, r->reg, p->is_write, *vcpu_reg(vcpu, p->Rt));
-+
- 	return true;
- }
- 
-@@ -223,6 +227,8 @@ static inline bool trap_debug32(struct kvm_vcpu *vcpu,
- 		*vcpu_reg(vcpu, p->Rt) = *r;
- 	}
- 
-+	trace_trap_reg(__func__, rd->reg, p->is_write, *r);
-+
- 	return true;
- }
- 
-@@ -238,6 +244,8 @@ static inline bool trap_debug64(struct kvm_vcpu *vcpu,
- 		*vcpu_reg(vcpu, p->Rt) = *r;
- 	}
- 
-+	trace_trap_reg(__func__, rd->reg, p->is_write, *r);
-+
- 	return true;
- }
- 
-@@ -1031,6 +1039,8 @@ int kvm_handle_sys_reg(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	struct sys_reg_params params;
- 	unsigned long esr = kvm_vcpu_get_hsr(vcpu);
- 
-+	trace_kvm_handle_sys_reg(esr);
-+
- 	params.is_aarch32 = false;
- 	params.is_32bit = false;
- 	params.Op0 = (esr >> 20) & 3;
-diff --git a/arch/arm64/kvm/trace.h b/arch/arm64/kvm/trace.h
-index 157416e9..5122a55 100644
---- a/arch/arm64/kvm/trace.h
-+++ b/arch/arm64/kvm/trace.h
-@@ -44,6 +44,111 @@ TRACE_EVENT(kvm_hvc_arm64,
- 		  __entry->vcpu_pc, __entry->r0, __entry->imm)
- );
- 
-+TRACE_EVENT(kvm_arm_setup_debug,
-+	TP_PROTO(struct kvm_vcpu *vcpu, __u32 guest_debug),
-+	TP_ARGS(vcpu, guest_debug),
-+
-+	TP_STRUCT__entry(
-+		__field(struct kvm_vcpu *, vcpu)
-+		__field(__u32, guest_debug)
-+	),
-+
-+	TP_fast_assign(
-+		__entry->vcpu = vcpu;
-+		__entry->guest_debug = guest_debug;
-+	),
-+
-+	TP_printk("vcpu: %p, flags: 0x%08x", __entry->vcpu, __entry->guest_debug)
-+);
-+
-+TRACE_EVENT(kvm_arm_clear_debug,
-+	TP_PROTO(__u32 guest_debug),
-+	TP_ARGS(guest_debug),
-+
-+	TP_STRUCT__entry(
-+		__field(__u32, guest_debug)
-+	),
-+
-+	TP_fast_assign(
-+		__entry->guest_debug = guest_debug;
-+	),
-+
-+	TP_printk("flags: 0x%08x", __entry->guest_debug)
-+);
-+
-+TRACE_EVENT(kvm_arm_set_dreg32,
-+	TP_PROTO(const char *name, __u32 value),
-+	TP_ARGS(name, value),
-+
-+	TP_STRUCT__entry(
-+		__field(const char *, name)
-+		__field(__u32, value)
-+	),
-+
-+	TP_fast_assign(
-+		__entry->name = name;
-+		__entry->value = value;
-+	),
-+
-+	TP_printk("%s: 0x%08x", __entry->name, __entry->value)
-+);
-+
-+TRACE_EVENT(kvm_arm_set_regset,
-+	TP_PROTO(const char *type, int len, __u32 *control, __u64 *value),
-+	TP_ARGS(type, len, control, value),
-+	TP_STRUCT__entry(
-+		__field(const char *, name)
-+		__field(int, len)
-+		__array(u32, ctrls, 16)
-+		__array(u64, values, 16)
-+	),
-+	TP_fast_assign(
-+		__entry->name = type;
-+		__entry->len = len;
-+		memcpy(__entry->ctrls, control, len << 2);
-+		memcpy(__entry->values, value, len << 3);
-+	),
-+	TP_printk("%d %s CTRL:%s VALUE:%s", __entry->len, __entry->name,
-+		__print_array(__entry->ctrls, __entry->len, sizeof(__u32)),
-+		__print_array(__entry->values, __entry->len, sizeof(__u64)))
-+);
-+
-+TRACE_EVENT(trap_reg,
-+	TP_PROTO(const char *fn, int reg, bool is_write, u64 write_value),
-+	TP_ARGS(fn, reg, is_write, write_value),
-+
-+	TP_STRUCT__entry(
-+		__field(const char *, fn)
-+		__field(int, reg)
-+		__field(bool, is_write)
-+		__field(u64, write_value)
-+	),
-+
-+	TP_fast_assign(
-+		__entry->fn = fn;
-+		__entry->reg = reg;
-+		__entry->is_write = is_write;
-+		__entry->write_value = write_value;
-+	),
-+
-+	TP_printk("%s %s reg %d (0x%08llx)", __entry->fn,  __entry->is_write?"write to":"read from", __entry->reg, __entry->write_value)
-+);
-+
-+TRACE_EVENT(kvm_handle_sys_reg,
-+	TP_PROTO(unsigned long hsr),
-+	TP_ARGS(hsr),
-+
-+	TP_STRUCT__entry(
-+		__field(unsigned long,	hsr)
-+	),
-+
-+	TP_fast_assign(
-+		__entry->hsr = hsr;
-+	),
-+
-+	TP_printk("HSR 0x%08lx", __entry->hsr)
-+);
-+
- #endif /* _TRACE_ARM64_KVM_H */
- 
- #undef TRACE_INCLUDE_PATH
 -- 
 2.4.1
