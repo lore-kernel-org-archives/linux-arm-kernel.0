@@ -1,58 +1,46 @@
-From: Dave.Martin@arm.com (Dave P Martin)
-Date: Fri, 29 May 2015 12:06:24 +0100
-Subject: [RFC] Fix omap3 booting with thumb2 compiled kernel
-In-Reply-To: <6381487.LvuhvmaVk1@wuerfel>
-References: <20150527215545.GA30984@atomide.com>
- <20150528161730.GE3657@e103592.cambridge.arm.com>
- <20150528163605.GI30984@atomide.com> <6381487.LvuhvmaVk1@wuerfel>
-Message-ID: <20150529110624.GD3648@e103592.cambridge.arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 29 May 2015 12:33:31 +0100
+Subject: [PATCH] clocksource: make ARM_TIMER_SP804 depend on
+ GENERIC_SCHED_CLOCK
+In-Reply-To: <1432887476-19301-1-git-send-email-sudeep.holla@arm.com>
+References: <20150529110919.2276365a@canb.auug.org.au>
+ <1432887476-19301-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <55684E8B.1080404@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 28, 2015 at 07:55:16PM +0100, Arnd Bergmann wrote:
-> On Thursday 28 May 2015 09:36:05 Tony Lindgren wrote:
-> > * Dave Martin <Dave.Martin@arm.com> [150528 09:19]:
-> > > On Thu, May 28, 2015 at 07:21:25AM -0700, Tony Lindgren wrote:
-> > > > --- a/arch/arm/mach-omap2/sleep34xx.S
-> > > > +++ b/arch/arm/mach-omap2/sleep34xx.S
-> > > > @@ -203,23 +203,8 @@ save_context_wfi:
-> > > >      */
-> > > >     ldr     r1, kernel_flush
-> > > >     blx     r1
-> > > > -   /*
-> > > > -    * The kernel doesn't interwork: v7_flush_dcache_all in particluar will
-> > > > -    * always return in Thumb state when CONFIG_THUMB2_KERNEL is enabled.
-> > > > -    * This sequence switches back to ARM.  Note that .align may insert a
-> > > > -    * nop: bx pc needs to be word-aligned in order to work.
-> > > > -    */
-> > > > - THUMB(    .thumb          )
-> > > > - THUMB(    .align          )
-> > > > - THUMB(    bx      pc      )
-> > > > - THUMB(    nop             )
-> > > > -   .arm
-> > > > -
-> > > 
-> > > ^ This looks unrelated to the issue?  This code is simply unnecessary
-> > > after Russell introduced the "ret" macro in commit 6ebbf2ce43.  That
-> > > made v7_flush_dcache_all do a proper interworking return.
-> > > 
-> > > It should probably be in a separate commit, or at least mentioned
-> > > explicitly in the commit log.
-> > 
-> > Thanks, I've updated the description with the commit info above.
-> > 
-> > I'll keep the removal of the duplicate code in this patch, as it's
-> > all related to the mode switching and we don't want to do it twice.
-> 
-> I would have thought that the change is actually necessary after
-> 6ebbf2ce43, because it now returns in ARM mode, which will cause the
-> "bx pc; nop" thumb instruction sequence be misinterpreted as an 
-> ARM instruction.
-> 
-> 	Arnd
 
-You're right.  The THUMB2_KERNEL indeed won't work without deleting this
-code.
 
-Cheers
----Dave
+On 29/05/15 09:17, Sudeep Holla wrote:
+> Commit 5261ef2ea836 ("ARM: 8366/1: move Dual-Timer SP804 driver to
+> drivers/clocksource") moved SP804 to drivers/clocksource resulting in
+> it being selectable on platforms/architectures without the config
+> GENERIC_SCHED_CLOCK enabled. Due to that, it results in the following
+> build failure(e.g. x86_64 allmodconfig)
+>
+> drivers/built-in.o: In function `__sp804_clocksource_and_sched_clock_init':
+> (.init.text+0x1a0e7): undefined reference to `sched_clock_register'
+>
+> This patch fixes the build by making ARM_TIMER_SP804 depend on
+> GENERIC_SCHED_CLOCK
+>
+> Cc: Stephen Rothwell <sfr@canb.auug.org.au>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>   drivers/clocksource/Kconfig | 1 +
+>   1 file changed, 1 insertion(+)
+>
+> Hi Russell,
+>
+> If you are fine with this fix, I will put this into the patch tracker.
+>
+
+I have put this in patch tracker (8382/1)[1]
+
+Regards,
+Sudeep
+
+[1] http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8382/1
