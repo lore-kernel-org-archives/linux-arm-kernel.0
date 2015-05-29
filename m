@@ -1,91 +1,34 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 29 May 2015 18:13:36 +0100
-Subject: [PATCH 2/4] iommu: Implement common IOMMU ops for DMA mapping
-In-Reply-To: <1432877219.721.237.camel@mhfsdcap03>
-References: <cover.1432735420.git.robin.murphy@arm.com>	
- <141cbb28b55e3d748c6426f56016c46e8cf93109.1432735420.git.robin.murphy@arm.com>
- <1432877219.721.237.camel@mhfsdcap03>
-Message-ID: <55689E40.7010604@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 29 May 2015 10:21:52 -0700
+Subject: [PATCH] ARM: dts: Remove L3 compatible value for dm816x
+Message-ID: <1432920112-21539-1-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/05/15 06:26, Yong Wu wrote:
-> Hi Robin,
->      Thanks.
->
->      While we test venc in v4l2, we get a problem:
+The interconnects on dm816x are like on omap4, so we should use
+l3-noc instead of l3-smx. But as the related SoC specific
+l3_target_data is still missing from omap_l3_noc let's just
+remove the entry for now.
 
-Thanks as always for testing!
+Cc: Brian Hutchinson <b.hutchman@gmail.com>
+Reported-by: Matthijs van Duin <matthijsvanduin@gmail.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/boot/dts/dm816x.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
->      When we enter the funtion[0], it will be break unexpectedly in the
-> funcion[1] while the offset of sg table is not zero. It is ok if the
-> offset is zero. Then I add more log in dma-iommu.c, please help check
-> below.
-
-Bah, non-zero offset was about the only scatterlist case I wasn't able 
-to get out of the EHCI driver...
-
->      All we tested it based on dma v2. and have not tested it on v3 yet.
-> The code of iommu-map-sg seems the same. if it's fixed in v3, I'm very
-> sorry. The map_sg in mtk-iommu use default_iommu_map_sg.
->      Any question please tell me, Thanks very much.
->
-> [0]http://lxr.free-electrons.com/source/drivers/media/v4l2-core/videobuf2-dma-contig.c#L564	[1]http://lxr.free-electrons.com/source/drivers/media/v4l2-core/videobuf2-dma-contig.c#L70
->
->
-> On Wed, 2015-05-27 at 15:09 +0100, Robin Murphy wrote:
->> Taking inspiration from the existing arch/arm code, break out some
->> generic functions to interface the DMA-API to the IOMMU-API. This will
->> do the bulk of the heavy lifting for IOMMU-backed dma-mapping.
->>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>   drivers/iommu/Kconfig     |   7 +
->>   drivers/iommu/Makefile    |   1 +
->>   drivers/iommu/dma-iommu.c | 560 ++++++++++++++++++++++++++++++++++++++++++++++
->>   include/linux/dma-iommu.h |  94 ++++++++
->>   4 files changed, 662 insertions(+)
->>   create mode 100644 drivers/iommu/dma-iommu.c
->>   create mode 100644 include/linux/dma-iommu.h
->>
-> [snip]
->> +static int __finalise_sg(struct device *dev, struct scatterlist *sg, int nents,
->> +		dma_addr_t dma_addr)
->> +{
->> +	struct scatterlist *s, *seg = sg;
->> +	unsigned long seg_mask = dma_get_seg_boundary(dev);
->> +	unsigned int max_len = dma_get_max_seg_size(dev);
->> +	unsigned int seg_len = 0, seg_dma = 0;
->> +	int i, count = 1;
->> +
->> +	for_each_sg(sg, s, nents, i) {
->> +		/* Un-swizzling the fields here, hence the naming mismatch */
->> +		unsigned int s_offset = sg_dma_address(s);
->> +		unsigned int s_length = sg_dma_len(s);
->> +		unsigned int s_dma_len = s->length;
->> +
->> +		s->offset = s_offset;
->> +		s->length = s_length;
->> +		sg_dma_address(s) = DMA_ERROR_CODE;
->> +		sg_dma_len(s) = 0;
->> +
->> +		if (seg_len && (seg_dma + seg_len == dma_addr + s_offset) &&
->> +		    (seg_len + s_dma_len <= max_len) &&
->> +		    ((seg_dma & seg_mask) <= seg_mask - (seg_len + s_length))
->> +		   ) {
->> +			sg_dma_len(seg) += s_dma_len;
->> +		} else {
->> +			if (seg_len) {
->> +				seg = sg_next(seg);
->> +				count++;
->> +			}
->> +			sg_dma_len(seg) = s_dma_len;
-
-Does changing this to
-			sg_dma_len(seg) = s_dma_len - s_offset;
-
-make things behave as expected? Since the new unmap code no longer 
-relies on adding up the individual segments to equal the IOVA size I 
-don't _think_ that'll break anything here.
-
-Robin.
+diff --git a/arch/arm/boot/dts/dm816x.dtsi b/arch/arm/boot/dts/dm816x.dtsi
+index 289806a..3c99cfa 100644
+--- a/arch/arm/boot/dts/dm816x.dtsi
++++ b/arch/arm/boot/dts/dm816x.dtsi
+@@ -58,7 +58,7 @@
+ 	 * the whole bus hierarchy.
+ 	 */
+ 	ocp {
+-		compatible = "ti,omap3-l3-smx", "simple-bus";
++		compatible = "simple-bus";
+ 		reg = <0x44000000 0x10000>;
+ 		interrupts = <9 10>;
+ 		#address-cells = <1>;
+-- 
+2.1.4
