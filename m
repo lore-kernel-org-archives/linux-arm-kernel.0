@@ -1,33 +1,72 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 29 May 2015 17:30:15 +0100
-Subject: [PATCH] KVM: arm: vgic: Drop useless Group0 warning
-Message-ID: <1432917015-31439-1-git-send-email-marc.zyngier@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 29 May 2015 18:33:42 +0200
+Subject: [PATCH/RFC 1/2] ARM: multi_v7_defconfig: Make drm support modular
+In-Reply-To: <2568731.dqdEiMuDro@wuerfel>
+References: <1432905926-31606-1-git-send-email-geert@linux-m68k.org>
+ <2568731.dqdEiMuDro@wuerfel>
+Message-ID: <CAMuHMdVKjgNEUot44E45Q1UWCgUC6zOM5mLhBr0qWuXRim3DsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a GICv3-enabled guest tries to configure Group0, we print a
-warning on the console (because we don't support Group0 interrupts).
+On Fri, May 29, 2015 at 5:41 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 29 May 2015 15:25:25 Geert Uytterhoeven wrote:
+>> From: Geert Uytterhoeven <geert+renesas@glider.be>
+>>
+>> Make drm support modular to reduce kernel size (-620 KiB):
+>>
+>>        text    data     bss     dec     hex   filename
+>>     12211122 1392076  338520 13941718  d4bbd6 vmlinux.before
+>>     11581470 1387196  338264 13306930  cb0c32 vmlinux.after
+>>
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> ---
+>> Slightly controversial:
+>>   - Does anyone need drm for boot testing?
+>
+> Only the tegra driver is affected, so let's ask the tegra
+> maintainers.
 
-This is fairly pointless, and would allow a guest to spam the
-console. Let's just drop the warning.
+And the qcom maintainers.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- virt/kvm/arm/vgic-v3-emul.c | 2 --
- 1 file changed, 2 deletions(-)
+CONFIG_DRM_MSM also changes from m to y, but this is not visible in
+multi_v7_defconfig due to CONFIG_DRM_MSM_FBDEV=y and defconfig reduction...
 
-diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
-index e9c3a7a..53e6a6d 100644
---- a/virt/kvm/arm/vgic-v3-emul.c
-+++ b/virt/kvm/arm/vgic-v3-emul.c
-@@ -76,8 +76,6 @@ static bool handle_mmio_ctlr(struct kvm_vcpu *vcpu,
- 	vgic_reg_access(mmio, &reg, offset,
- 			ACCESS_READ_VALUE | ACCESS_WRITE_VALUE);
- 	if (mmio->is_write) {
--		if (reg & GICD_CTLR_ENABLE_SS_G0)
--			kvm_info("guest tried to enable unsupported Group0 interrupts\n");
- 		vcpu->kvm->arch.vgic.enabled = !!(reg & GICD_CTLR_ENABLE_SS_G1);
- 		vgic_update_state(vcpu->kvm);
- 		return true;
--- 
-2.1.4
+>>  arch/arm/configs/multi_v7_defconfig | 8 +++++---
+>>  1 file changed, 5 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+>> index 40ca1ab29a2e350f..9b4e33d5b15e340f 100644
+>> --- a/arch/arm/configs/multi_v7_defconfig
+>> +++ b/arch/arm/configs/multi_v7_defconfig
+>> @@ -426,15 +426,17 @@ CONFIG_VIDEO_RENESAS_VSP1=m
+>>  # CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
+>>  CONFIG_VIDEO_ADV7180=m
+>>  CONFIG_VIDEO_ML86V7667=m
+>> -CONFIG_DRM=y
+>> +CONFIG_TEGRA_HOST1X=y
+>> +CONFIG_DRM=m
+>>  CONFIG_DRM_PTN3460=m
+>>  CONFIG_DRM_PS8622=m
+>>  CONFIG_DRM_EXYNOS=m
+>>  CONFIG_DRM_EXYNOS_FIMD=y
+>>  CONFIG_DRM_EXYNOS_HDMI=y
+>>  CONFIG_DRM_RCAR_DU=m
+>> -CONFIG_DRM_TEGRA=y
+>> -CONFIG_DRM_PANEL_SIMPLE=y
+>> +CONFIG_DRM_TEGRA=m
+>> +CONFIG_DRM_PANEL_SIMPLE=m
+>> +CONFIG_FB=y
+>>  CONFIG_FB_ARMCLCD=y
+>>  CONFIG_FB_WM8505=y
+>>  CONFIG_FB_SH_MOBILE_LCDC=y
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
