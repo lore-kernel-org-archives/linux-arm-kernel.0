@@ -1,38 +1,60 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Fri, 29 May 2015 14:59:45 +0200
-Subject: [PATCHv3 1/4] phy: phy-core: Make GENERIC_PHY an invisible option
-In-Reply-To: <55685D7E.9000700@ti.com>
-References: <1429743853-10254-1-git-send-email-arun.ramamurthy@broadcom.com>
- <1429743853-10254-2-git-send-email-arun.ramamurthy@broadcom.com>
- <55685D7E.9000700@ti.com>
-Message-ID: <556862C1.3080602@st.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 29 May 2015 14:04:49 +0100
+Subject: [PATCH 1/6] ARM: kvm: psci: fix handling of unimplemented
+ functions
+In-Reply-To: <1432901799-18359-2-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1432901799-18359-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1432901799-18359-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <556863F1.10902@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon, Arun,
 
-On 05/29/2015 02:37 PM, Kishon Vijay Abraham I wrote:
-> Tejun, Maxime, Sylwester, Kyungmin
->
-> On Thursday 23 April 2015 04:34 AM, Arun Ramamurthy wrote:
->> Most of the phy providers use "select" to enable GENERIC_PHY. Since 
->> select
->> is only recommended when the config is not visible, GENERIC_PHY is 
->> changed
->> an invisible option. To maintain consistency, all phy providers are 
->> changed
->> to "select" GENERIC_PHY and all non-phy drivers use "depends on" when 
->> the
->> phy framework is explicity required. USB_MUSB_OMAP2PLUS has a cyclic
->> dependency, so it is left as "select".
->>
->> Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
->
-> Need your ACK for this patch.
->
 
-For the STi part, you can add my:
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+On 29/05/15 13:16, Lorenzo Pieralisi wrote:
+> According to the PSCI specification and the SMC/HVC calling
+> convention, PSCI function_ids that are not implemented must
+> return NOT_SUPPORTED as return value.
+>
+> Current KVM implementation takes an unhandled PSCI function_id
+> as an error and injects an undefined instruction into the guest
+> if PSCI implementation is called with a function_id that is not
+> handled by the resident PSCI version (ie it is not implemented),
+> which is not the behaviour expected by a guest when calling a
+> PSCI function_id that is not implemented.
+>
+> This patch fixes this issue by returning NOT_SUPPORTED whenever
+> the kvm PSCI call is executed for a function_id that is not
+> implemented by the PSCI kvm layer.
+>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Reported-by: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Anup Patel <anup.patel@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>   arch/arm/kvm/psci.c | 6 +++---
+>   1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
+> index 7e9398c..ec5943b 100644
+> --- a/arch/arm/kvm/psci.c
+> +++ b/arch/arm/kvm/psci.c
+> @@ -273,7 +273,8 @@ static int kvm_psci_0_2_call(struct kvm_vcpu *vcpu)
+>   		ret = 0;
+>   		break;
+>   	default:
+> -		return -EINVAL;
+> +		val = PSCI_RET_NOT_SUPPORTED;
+> +		break;
+
+IMO we can remove all the other optional non-implemented PSCI functions
+(e.g. KVM_PSCI_FN_MIGRATE, KVM_PSCI_FN_CPU_SUSPEND, ..etc) returning
+PSCI_RET_NOT_SUPPORTED here as they will be then automatically covered
+by default case.
+
+Otherwise looks good to me:
+Acked-by: Sudeep Holla <sudeep.holla@arm.com>
 
 Regards,
-Maxime
+Sudeep
