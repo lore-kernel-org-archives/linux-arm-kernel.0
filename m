@@ -1,59 +1,45 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 29 May 2015 09:26:13 -0700
-Subject: [PATCH v2 0/6] GPIO support for BRCMSTB
-In-Reply-To: <1432865650-4062-1-git-send-email-gregory.0xf0@gmail.com>
-References: <1432865650-4062-1-git-send-email-gregory.0xf0@gmail.com>
-Message-ID: <55689325.80103@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 29 May 2015 09:27:08 -0700
+Subject: [PATCH] ARM: dts: Fix dm816x to use right compatible flag for MUSB
+Message-ID: <1432916828-13171-1-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/05/15 19:14, Gregory Fong wrote:
-> This patchset adds support for the GPIO controller (UPG GIO) used on Broadcom's
-> various BRCMSTB SoCs (BCM7XXX and others). It uses the "basic-mmio-gpio"
-> interface to try to reduce duplication of the base logic.
-> 
-> For all existing hardware, this block hooked up to the BCM7120 L2 IRQ
-> controller and so will require CONFIG_BCM7120_L2_IRQ=y.
+With commit 3e457371f436 ("usb: musb: Fix fifo reads for dm816x with
+musb_dsps") we need to use the right compatible flag to avoid issues
+with FIFO reads.
 
-Unless there are objections, I will take patches 5 and 6 and apply them
-to soc/next.
+Cc: Bin Liu <binmlist@gmail.com>
+Cc: Brian Hutchinson <b.hutchman@gmail.com>
+Cc: George Cherian <george.cherian@ti.com>
+Cc: Felipe Balbi <balbi@ti.com>
+Fixes: 3e457371f436 ("usb: musb: Fix fifo reads for dm816x with musb_dsps")
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/boot/dts/dm816x.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
-
-Thanks!
-
-> 
-> New in v2:
-> - fix license mismatch as pointed out by Paul Bolle
-> - move select ARCH_WANT_OPTIONAL_GPIOLIB to separate patch
-> - change to have 32 lines per bank per Linus Walleij's comments
-> - allow this controller to be used as a wakeup source
-> - add default GPIO number for BRCMSTB
-> 
-> The device tree bindings from v1 were merged to the GPIO tree, so this patchset
-> only contains an addition to allow GPIOs to be used as a wakeup source
-> (patch 3).  The initial bindings from v1 can be found at
-> https://lkml.org/lkml/2015/5/6/200 .
-> 
-> Gregory Fong (6):
->   gpio: Add GPIO support for Broadcom STB SoCs
->   gpio: brcmstb: Add interrupt support
->   dt-bindings: brcmstb-gpio: document properties for wakeup
->   gpio: brcmstb: Allow GPIOs to be wakeup sources
->   ARM: brcmstb: Select ARCH_WANT_OPTIONAL_GPIOLIB
->   ARM: brcmstb: Add default gpio number
-> 
->  .../devicetree/bindings/gpio/brcm,brcmstb-gpio.txt |  26 +-
->  MAINTAINERS                                        |   7 +
->  arch/arm/Kconfig                                   |   3 +-
->  arch/arm/mach-bcm/Kconfig                          |   1 +
->  drivers/gpio/Kconfig                               |   9 +
->  drivers/gpio/Makefile                              |   1 +
->  drivers/gpio/gpio-brcmstb.c                        | 581 +++++++++++++++++++++
->  7 files changed, 626 insertions(+), 2 deletions(-)
->  create mode 100644 drivers/gpio/gpio-brcmstb.c
-> 
-
-
+diff --git a/arch/arm/boot/dts/dm816x.dtsi b/arch/arm/boot/dts/dm816x.dtsi
+index de8427b..289806a 100644
+--- a/arch/arm/boot/dts/dm816x.dtsi
++++ b/arch/arm/boot/dts/dm816x.dtsi
+@@ -382,7 +382,7 @@
+ 			ti,hwmods = "usb_otg_hs";
+ 
+ 			usb0: usb at 47401000 {
+-				compatible = "ti,musb-am33xx";
++				compatible = "ti,musb-dm816";
+ 				reg = <0x47401400 0x400
+ 				       0x47401000 0x200>;
+ 				reg-names = "mc", "control";
+@@ -422,7 +422,7 @@
+ 			};
+ 
+ 			usb1: usb at 47401800 {
+-				compatible = "ti,musb-am33xx";
++				compatible = "ti,musb-dm816";
+ 				reg = <0x47401c00 0x400
+ 				       0x47401800 0x200>;
+ 				reg-names = "mc", "control";
 -- 
-Florian
+2.1.4
