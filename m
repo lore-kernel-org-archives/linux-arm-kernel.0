@@ -1,93 +1,134 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 29 May 2015 10:53:16 +0100
-Subject: [PATCH 00/13] arm64: KVM: GICv3 ITS emulation
-Message-ID: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
+Date: Fri, 29 May 2015 10:53:24 +0100
+Subject: [PATCH 08/13] KVM: arm64: add data structures to model ITS interrupt
+ translation
+In-Reply-To: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
+References: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1432893209-27313-9-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GICv3 ITS (Interrupt Translation Service) is a part of the
-ARM GICv3 interrupt controller used for implementing MSIs.
-It specifies a new kind of interrupts (LPIs), which are mapped to
-establish a connection between a device, its MSI payload value and
-the target processor the IRQ is eventually delivered to.
-In order to allow using MSIs in an ARM64 KVM guest, we emulate this
-ITS widget in the kernel.
-The ITS works by reading commands written by software (from the guest
-in our case) into a (guest allocated) memory region and establishing
-the mapping between a device, the MSI payload and the target CPU.
-We parse these commands and update our internal data structures to
-reflect those changes. On an MSI injection we iterate those
-structures to learn the LPI number we have to inject.
-For the time being we use simple lists to hold the data, this is
-good enough for the small number of entries each of the components
-currently have. Should this become a performance bottleneck in the
-future, those can be extended to arrays or trees if needed.
+The GICv3 Interrupt Translation Service (ITS) uses tables in memory
+to allow a sophisticated interrupt routing. It features device tables,
+an interrupt table per device and a table connecting "collections" to
+actual CPUs (aka. redistributors in the GICv3 lingo).
+Since the interrupt numbers for the LPIs are allocated quite sparsely
+and the range can be quite huge (8192 LPIs being the minimum), using
+bitmaps or arrays for storing information is a waste of memory.
+We use linked lists instead, which we iterate linearily. This works
+very well with the actual number of LPIs/MSIs in the guest being
+quite low. Should the number of LPIs exceed the number where iterating
+the lists becomes painful, we can later revisit this and use more
+efficient data structures.
 
-Most of the code lives in a separate source file (its-emul.c), though
-there are some changes necessary both in vgic.c and gic-v3-emul.c.
-Patch 01/13 gets rid of the internal tracking of the used LR for
-an injected IRQ.
-Patch 02/13 extends the KVM MSI ioctl to hold a device ID.
-Patch 03/13 introduces an emulation model specific destroy function
-to let the ITS be teared down correctly later.
-The rest of the patches implement the ITS functionality step by step.
-For more details see the respective commit messages.
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ include/kvm/arm_vgic.h  |  3 +++
+ virt/kvm/arm/its-emul.c | 45 +++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 48 insertions(+)
 
-For the time being this series gives us the ability to use emulated
-PCI devices that can use MSIs in the guest. Those have to be
-triggered by letting the userland device emulation simulate the MSI
-write with the KVM_SIGNAL_MSI ioctl. This will be translated into
-the proper LPI by the ITS emulation and injected into the guest in
-the usual way (just with a higher IRQ number).
-
-This series is based on 4.1-rc5 and can be found at the its-emul/v1
-branch of this repository [1].
-For this to be used you need a GICv3 host machine, though it does not
-rely on any host ITS bits (neither hardware or software).
-
-To test this you can use the kvmtool patches available in the "its"
-branch here [2].
-Start a guest with: "$ lkvm run --irqchip=gicv3-its --force-pci"
-and see the ITS being used for instance by the virtio devices.
-
-[1]: git://linux-arm.org/linux-ap.git
-     http://www.linux-arm.org/git?p=linux-ap.git;a=log;h=refs/heads/its-emul/v1
-[2]: git://linux-arm.org/kvmtool.git
-     http://www.linux-arm.org/git?p=kvmtool.git;a=log;h=refs/heads/its
-
-Andre Przywara (13):
-  KVM: arm/arm64: VGIC: don't track used LRs in the distributor
-  KVM: extend struct kvm_msi to hold a 32-bit device ID
-  KVM: arm/arm64: add emulation model specific destroy function
-  KVM: arm64: Introduce new MMIO region for the ITS base address
-  KVM: arm64: handle ITS related GICv3 redistributor registers
-  KVM: arm64: introduce ITS emulation file with stub functions
-  KVM: arm64: implement basic ITS register handlers
-  KVM: arm64: add data structures to model ITS interrupt translation
-  KVM: arm64: handle pending bit for LPIs in ITS emulation
-  KVM: arm64: sync LPI properties and status between guest and KVM
-  KVM: arm64: implement ITS command queue command handlers
-  KVM: arm64: implement MSI injection in ITS emulation
-  KVM: arm64: enable ITS emulation as a virtual MSI controller
-
- Documentation/virtual/kvm/api.txt              |   10 +-
- Documentation/virtual/kvm/devices/arm-vgic.txt |    7 +
- arch/arm64/include/uapi/asm/kvm.h              |    3 +
- arch/arm64/kvm/Kconfig                         |    1 +
- arch/arm64/kvm/Makefile                        |    1 +
- include/kvm/arm_vgic.h                         |   39 +-
- include/linux/irqchip/arm-gic-v3.h             |   10 +
- include/uapi/linux/kvm.h                       |    4 +-
- virt/kvm/arm/its-emul.c                        | 1026 ++++++++++++++++++++++++
- virt/kvm/arm/its-emul.h                        |   52 ++
- virt/kvm/arm/vgic-v2.c                         |    1 +
- virt/kvm/arm/vgic-v3-emul.c                    |   98 ++-
- virt/kvm/arm/vgic-v3.c                         |    1 +
- virt/kvm/arm/vgic.c                            |  280 ++++---
- virt/kvm/arm/vgic.h                            |    5 +
- 15 files changed, 1426 insertions(+), 112 deletions(-)
- create mode 100644 virt/kvm/arm/its-emul.c
- create mode 100644 virt/kvm/arm/its-emul.h
-
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 3b8e3a1..fa17df6 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -25,6 +25,7 @@
+ #include <linux/spinlock.h>
+ #include <linux/types.h>
+ #include <kvm/iodev.h>
++#include <linux/list.h>
+ 
+ #define VGIC_NR_IRQS_LEGACY	256
+ #define VGIC_NR_SGIS		16
+@@ -162,6 +163,8 @@ struct vgic_its {
+ 	u64			cbaser;
+ 	int			creadr;
+ 	int			cwriter;
++	struct list_head	device_list;
++	struct list_head	collection_list;
+ };
+ 
+ struct vgic_dist {
+diff --git a/virt/kvm/arm/its-emul.c b/virt/kvm/arm/its-emul.c
+index 82bc34a..f0f4a9c 100644
+--- a/virt/kvm/arm/its-emul.c
++++ b/virt/kvm/arm/its-emul.c
+@@ -21,6 +21,7 @@
+ #include <linux/kvm.h>
+ #include <linux/kvm_host.h>
+ #include <linux/interrupt.h>
++#include <linux/list.h>
+ 
+ #include <linux/irqchip/arm-gic-v3.h>
+ #include <kvm/arm_vgic.h>
+@@ -32,6 +33,25 @@
+ #include "vgic.h"
+ #include "its-emul.h"
+ 
++struct its_device {
++	struct list_head dev_list;
++	struct list_head itt;
++	u32 device_id;
++};
++
++struct its_collection {
++	struct list_head coll_list;
++	u32 collection_id;
++	u32 target_addr;
++};
++
++struct its_itte {
++	struct list_head itte_list;
++	struct its_collection *collection;
++	u32 lpi;
++	u32 event_id;
++};
++
+ #define BASER_BASE_ADDRESS(x) ((x) & 0xfffffffff000ULL)
+ 
+ /* distributor lock is hold by the VGIC MMIO handler */
+@@ -280,6 +300,9 @@ int vits_init(struct kvm *kvm)
+ 
+ 	spin_lock_init(&its->lock);
+ 
++	INIT_LIST_HEAD(&its->device_list);
++	INIT_LIST_HEAD(&its->collection_list);
++
+ 	its->enabled = false;
+ 
+ 	return -ENXIO;
+@@ -289,11 +312,33 @@ void vits_destroy(struct kvm *kvm)
+ {
+ 	struct vgic_dist *dist = &kvm->arch.vgic;
+ 	struct vgic_its *its = &dist->its;
++	struct its_device *dev;
++	struct its_itte *itte;
++	struct list_head *dev_cur, *dev_temp;
++	struct list_head *cur, *temp;
+ 
+ 	if (!vgic_has_its(kvm))
+ 		return;
+ 
++	spin_lock(&its->lock);
++	list_for_each_safe(dev_cur, dev_temp, &its->device_list) {
++		dev = container_of(dev_cur, struct its_device, dev_list);
++		list_for_each_safe(cur, temp, &dev->itt) {
++			itte = (container_of(cur, struct its_itte, itte_list));
++			list_del(cur);
++			kfree(itte);
++		}
++		list_del(dev_cur);
++		kfree(dev);
++	}
++
++	list_for_each_safe(cur, temp, &its->collection_list) {
++		list_del(cur);
++		kfree(container_of(cur, struct its_collection, coll_list));
++	}
++
+ 	kfree(dist->pendbaser);
+ 
+ 	its->enabled = false;
++	spin_unlock(&its->lock);
+ }
 -- 
 2.3.5
