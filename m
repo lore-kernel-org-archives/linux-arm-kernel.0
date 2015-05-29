@@ -1,53 +1,51 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Sat, 30 May 2015 02:03:29 +0530
-Subject: [PATCH 04/12] i2c: pxa: Add support for pxa910/988 & new
- configuration features
-In-Reply-To: <874mmvyvzw.fsf@belgarion.home>
-References: <1432818224-17070-1-git-send-email-vaibhav.hiremath@linaro.org>	<1432818224-17070-5-git-send-email-vaibhav.hiremath@linaro.org>
- <874mmvyvzw.fsf@belgarion.home>
-Message-ID: <5568CD19.6070202@linaro.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 29 May 2015 22:34:56 +0200
+Subject: [PATCH] fix n900 dts file to work around 4.1 touchscreen
+ regression on n900
+In-Reply-To: <20150529202954.GA26494@localhost>
+References: <20150527143722.GA28108@amd> <20150527145837.GA13223@earth>
+ <20150529190816.GA20232@amd> <20150529192505.GA28987@amd>
+ <20150529193211.GA7599@amd>
+ <20150529194955.GV2026@saruman.tx.rr.com>
+ <20150529195629.GA9811@amd> <20150529201745.GC17267@lukather>
+ <20150529202123.GY2026@saruman.tx.rr.com>
+ <20150529202954.GA26494@localhost>
+Message-ID: <20150529203456.GC22083@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi!
 
+> > > single DT, you don't even use that property in your driver, and now
+> > > that you realise you meant something else, you want the code that
+> > 
+> > not Pali, Sebastian.
+> > 
+> > > actually parse the *right* property and does the right thing, that all
+> > > other DT agree (and depend on) to be reverted?
+> > 
+> > We shouldn't revert, that I agree. But both properties should be parsed.
+> 
+> No. If the property is wrong, and nobody parsed it, I do not see any reason to
+> start now.
 
-On Saturday 30 May 2015 01:52 AM, Robert Jarzmik wrote:
-> Vaibhav Hiremath <vaibhav.hiremath@linaro.org> writes:
->
->> @@ -167,6 +184,8 @@ struct pxa_i2c {
->>   #define _ICR(i2c)	((i2c)->reg_icr)
->>   #define _ISR(i2c)	((i2c)->reg_isr)
->>   #define _ISAR(i2c)	((i2c)->reg_isar)
->> +#define _ILCR(i2c)	((i2c)->reg_ilcr)
->> +#define _IWCR(i2c)	((i2c)->reg_iwcr)
->>
->>   /*
->>    * I2C Slave mode address
->> @@ -467,11 +486,16 @@ static void i2c_pxa_reset(struct pxa_i2c *i2c)
->>   	if (i2c->reg_isar)
->>   		writel(i2c->slave_addr, _ISAR(i2c));
->>   #endif
->> -
-> Not in this patch.
+Agreed.
 
-my bad, missed it.
-Will fix it in next version.
+But that's not what I'm asking. See a changelog of
+3eea8b5d68c801fec788b411582b803463834752 and compare it with what it
+actually does.
 
->
->>   	/* set control register values */
->>   	writel(I2C_ICR_INIT | (i2c->fast_mode ? ICR_FM : 0), _ICR(i2c));
->>   	writel(readl(_ICR(i2c)) | (i2c->high_mode ? ICR_HS : 0), _ICR(i2c));
->>
->> +	if (i2c->ilcr)
->> +		writel(i2c->ilcr, _ILCR(i2c));
->> +	if (i2c->iwcr)
->> +		writel(i2c->iwcr, _IWCR(i2c));
->> +	udelay(2);
-> This is a magical 2us. Where does it come from ?
->
+It is buggy. If fuzz is specified but maximum is not, it overwites
+maximum with zero.
 
-I am afraid it is random number picked, required since we are
-configuring mode/speed related bit-fields.
+Plus it introduces new failure "if (!test_bit(axis, dev->absbit))".
 
-Thanks,
-Vaibhav
+Plus it fails to distinguish between "value not specified in the dt"
+and "zero is specified in the dt".
+
+The 3eea8b5d68c801fec788b411582b803463834752 is just bad.
+									
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
