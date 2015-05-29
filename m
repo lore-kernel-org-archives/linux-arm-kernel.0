@@ -1,30 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 May 2015 14:53:25 +0200
-Subject: [PATCH] ARM: lpc18xx: remove DEBUG_LL_UART_8250 from defconfig
-In-Reply-To: <1432661986-4118-1-git-send-email-manabian@gmail.com>
-References: <1432661986-4118-1-git-send-email-manabian@gmail.com>
-Message-ID: <2264717.c7n5iR1HTW@wuerfel>
+Date: Fri, 29 May 2015 14:56:22 +0200
+Subject: [GIT PULL] ARM: mediatek: soc updates for v4.2
+In-Reply-To: <CABuKBe+y5Em77WbKUu3YHAuwdc7n_ybLe-Eii8G1H-EQ0xZrRg@mail.gmail.com>
+References: <CABuKBe+y5Em77WbKUu3YHAuwdc7n_ybLe-Eii8G1H-EQ0xZrRg@mail.gmail.com>
+Message-ID: <2169528.AHb4teykcE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 26 May 2015 19:39:46 Joachim Eastwood wrote:
-> Please apply this to the next/defconfig branch.
-> 
-> After LPC18XX was converted to use the DEBUG_LPC18XX_UART0 config
-> symbol there is now a mismatch in defconfig for this platform.
-> 
-> On a clean defconfig the following warnings appear.
-> .config:2073:warning: symbol value '' invalid for DEBUG_UART_PHYS
-> .config:2074:warning: symbol value '' invalid for DEBUG_UART_VIRT
-> 
-> Since the default value now depends on DEBUG_LPC18XX_UART0 and not
-> ARCH_LPC18XX.
+On Wednesday 27 May 2015 17:09:43 Matthias Brugger wrote:
+> - pmic wrapper: fix clock handling
+> - pmic wrapper: fix state machine
+> - pmic wrapper: fix compile dependency
 > 
 
-Applied now, thanks a lot!
+Merged into next/drivers now.
 
-I missed this problem because I'm mainly testing with a branch that
-has a workaround for the general problem of DEBUG_UART_PHYS being
-empty.
+It looks like these are all bug fixes, and I wonder if they
+should be merged for 4.1 and possibly backports instead.
+Can you clarify?
 
 	Arnd
