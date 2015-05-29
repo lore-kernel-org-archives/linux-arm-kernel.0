@@ -1,60 +1,68 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Fri, 29 May 2015 09:16:30 -0400
-Subject: [PATCH] cgroup: add seq_file forward declaration for struct cftype
-In-Reply-To: <8289624.GnpfIU6Era@wuerfel>
-References: <8289624.GnpfIU6Era@wuerfel>
-Message-ID: <20150529131630.GI27479@htj.duckdns.org>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Fri, 29 May 2015 18:47:47 +0530
+Subject: [PATCH] ARM: dts: odroidxu3: Enable USB3 regulators
+In-Reply-To: <5566DDA6.1080508@samsung.com>
+References: <1432803494-3516-1-git-send-email-linux.amoon@gmail.com>
+ <5566DDA6.1080508@samsung.com>
+Message-ID: <CANAwSgSaY2W6y-zrsF=p68Phqf7D-hTPsCxNaqFiwVc45849RQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Arnd.
+On 28 May 2015 at 14:49, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
+> On 28.05.2015 17:58, Anand Moon wrote:
+>> Enable regulator for usbdrd3_0 and usbdrd3_1
+>>>From the schematic pin diagram USB3_0 and USB3_1
+>> is regulated by LDO9 and LD011.
+>
+> Please reformat statement above to proper sentence(s) without ">" before
+> "From".
+>
+>>
+>> Fix the boot message of failed.
+>> [    3.503539] exynos-dwc3 usb at 12000000: Looking up vdd33-supply from device tree
+>> [    3.503556] exynos-dwc3 usb at 12000000: Looking up vdd33-supply property in node /usb at 12000000 failed
+>> [    3.503568] usb at 12000000 supply vdd33 not found, using dummy regulator
+>> [    3.509154] exynos-dwc3 usb at 12000000: Looking up vdd10-supply from device tree
+>> [    3.509170] exynos-dwc3 usb at 12000000: Looking up vdd10-supply property in node /usb at 12000000 failed
+>> [    3.509181] usb at 12000000 supply vdd10 not found, using dummy regulator
+>> [    3.917548] exynos-dwc3 usb at 12400000: Looking up vdd33-supply from device tree
+>> [    3.917565] exynos-dwc3 usb at 12400000: Looking up vdd33-supply property in node /usb at 12400000 failed
+>> [    3.917578] usb at 12400000 supply vdd33 not found, using dummy regulator
+>> [    3.922731] exynos-dwc3 usb at 12400000: Looking up vdd10-supply from device tree
+>> [    3.922747] exynos-dwc3 usb at 12400000: Looking up vdd10-supply property in node /usb at 12400000 failed
+>>
+>> ---
+>> This patch is based on Krzysztof github branch work-next/odroid-xu3-s2mps11-irq
+>> ---
+>
+> I mentioned this already on previous postings. Let's make an exercise.
+> Please:
+> 1. Save your email as mbox format (from mailer).
+> 2. Go to a GIT repo with kernel and checkout base branch.
+> 3. git am 0001-the-name-of-file.mbox
+> 4. git show
+>
+> Do you see the signed-off-by in commit?
+>
+> The patch itself looks good, thanks for fixing this. Just please fix the
+> issues with commit message.
+>
+> By the way:
+> 1. The always-on from LDO9 could be probably removed if the ehci-exynos
+> driver had regulator consumer implemented.
+> 2. The Documentation/devicetree/bindings/usb/exynos-usb.txt (or dwc.txt)
+> should proably mention the vdd-supply property.
 
-Applied to cgroup/for-4.2 with the declaration moved so that it's
-where others are.  Sorry that I missed that.
+Hi Krzysztof,
 
-Thanks.
+Please find the patch already send by Vivek Gautam
+<gautam.vivek@samsung.com> which address this issue.
 
------ 8< -----
->From c80ef9e0c021ff86771fdd72583c75d8f7b6a720 Mon Sep 17 00:00:00 2001
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 29 May 2015 10:52:59 +0200
-Subject: [PATCH] cgroup: add seq_file forward declaration for struct cftype
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266418.html
 
-Recent header file changes for cgroup caused lots of warnings
-about a missing struct seq_file form declaration for every
-inclusion of include/linux/cgroup-defs.h.
-
-As some files are built with -Werror, this leads to build
-failure like:
-
-                 from /git/arm-soc/drivers/gpu/drm/tilcdc/tilcdc_crtc.c:18:
-/git/arm-soc/include/linux/cgroup-defs.h:354:25: error: 'struct seq_file' declared inside parameter list [-Werror]
-cc1: all warnings being treated as errors
-make[6]: *** [drivers/gpu/drm/tilcdc/tilcdc_crtc.o] Error 1
-
-This patch adds the declaration, which resolves both the
-warnings and the drm failure.
-
-tj: Moved it where other type declarations are.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: b4a04ab7a37b ("cgroup: separate out include/linux/cgroup-defs.h")
-Signed-off-by: Tejun Heo <tj@kernel.org>
----
- include/linux/cgroup-defs.h | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/include/linux/cgroup-defs.h b/include/linux/cgroup-defs.h
-index 7d83d7f..26d1cea 100644
---- a/include/linux/cgroup-defs.h
-+++ b/include/linux/cgroup-defs.h
-@@ -26,6 +26,7 @@ struct cgroup_taskset;
- struct kernfs_node;
- struct kernfs_ops;
- struct kernfs_open_file;
-+struct seq_file;
- 
- #define MAX_CGROUP_TYPE_NAMELEN 32
- #define MAX_CGROUP_ROOT_NAMELEN 64
--- 
-2.4.0
+-Anand Moon
+>
+> Best regards,
+> Krzysztof
+>
+>
