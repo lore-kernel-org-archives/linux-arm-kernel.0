@@ -1,119 +1,67 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri, 29 May 2015 14:02:49 -0700
-Subject: [PATCH 2/7] ARM: bcm2835: Add a Raspberry Pi-specific clock
- driver.
-In-Reply-To: <55679085.6040402@wwwdotorg.org>
-References: <1431978219-14226-1-git-send-email-eric@anholt.net>
- <1431978219-14226-3-git-send-email-eric@anholt.net>
- <55679085.6040402@wwwdotorg.org>
-Message-ID: <87h9qvcd1i.fsf@eliezer.anholt.net>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 29 May 2015 23:02:59 +0200
+Subject: [PATCH] fix n900 dts file to work around 4.1 touchscreen
+ regression on n900
+In-Reply-To: <20150529204847.GA7429@dtor-ws>
+References: <20150529190816.GA20232@amd> <20150529192505.GA28987@amd>
+ <20150529193211.GA7599@amd>
+ <20150529194955.GV2026@saruman.tx.rr.com>
+ <20150529195629.GA9811@amd> <20150529201745.GC17267@lukather>
+ <20150529202123.GY2026@saruman.tx.rr.com>
+ <20150529202954.GA26494@localhost> <20150529203456.GC22083@amd>
+ <20150529204847.GA7429@dtor-ws>
+Message-ID: <20150529210259.GA26866@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> writes:
+On Fri 2015-05-29 13:48:47, Dmitry Torokhov wrote:
+> On Fri, May 29, 2015 at 10:34:56PM +0200, Pavel Machek wrote:
+> > Hi!
+> > 
+> > > > > single DT, you don't even use that property in your driver, and now
+> > > > > that you realise you meant something else, you want the code that
+> > > > 
+> > > > not Pali, Sebastian.
+> > > > 
+> > > > > actually parse the *right* property and does the right thing, that all
+> > > > > other DT agree (and depend on) to be reverted?
+> > > > 
+> > > > We shouldn't revert, that I agree. But both properties should be parsed.
+> > > 
+> > > No. If the property is wrong, and nobody parsed it, I do not see any reason to
+> > > start now.
+> > 
+> > Agreed.
+> > 
+> > But that's not what I'm asking. See a changelog of
+> > 3eea8b5d68c801fec788b411582b803463834752 and compare it with what it
+> > actually does.
+> > 
+> > It is buggy. If fuzz is specified but maximum is not, it overwites
+> > maximum with zero.
+> 
+> Yes.
+> 
+> > 
+> > Plus it introduces new failure "if (!test_bit(axis, dev->absbit))".
+> 
+> That is not a new failure. It actually warns users that they trying to
+> specify in DT something that will be ignored by the kernel (because
+> without that absbit kernel will ignore all requests to that event code).
 
-> On 05/18/2015 01:43 PM, Eric Anholt wrote:
->>  obj-$(CONFIG_ARCH_BCM2835)		+= clk-bcm2835.o
->> +obj-$(CONFIG_ARCH_BCM2835)		+= clk-raspberrypi.o
->
-> Shouldn't this replace the old legacy code in clk-bcm2835.c?
+What if driver sets the bits after parsing device tree?
 
-I don't think we can, because of DT backwards compat (Sigh).
->
-> I wonder if a separate Kconfig symbol is warranted for the clock driver.
-> Looking at the context in the patch, it's common not to do that though.
+> > Plus it fails to distinguish between "value not specified in the dt"
+> > and "zero is specified in the dt".
+> 
+> Yes. I am not sure if we should care and support all permutations (ah, I
+> pre-setup fuzz in the driver, but override max on X, and I pre-setup
+> max on X, but take fuzz from DT). Maybe we should simply document that
+> specifying one parameter for an axis will change the rest of them to be
+> 0. Not sure though...
 
-I've moved it under RASPBERRYPI_FIRMWARE, since it needs that to build.
-
->> diff --git a/drivers/clk/clk-raspberrypi.c b/drivers/clk/clk-raspberrypi.c
->
->> +struct rpi_firmware_clock {
->> +	/* Clock definitions in our static struct. */
->> +	int clock_id;
->
-> Why not just use the raw HW IDs (from the mailbox protocol) as the ID in
-> DT and the driver? The only thing that would need to change is to add a
-> error check for "clkspec->args[0] == 0" in
-> rpi_firmware_delayed_get_clk(). The advantage would be that
-> include/dt-bindings/clk/raspberrypi.h would exactly match the firmware
-> protocol, and hence be easily correlated with the documentation.
-
-Done.
-
->> +static int rpi_clk_set_rate(struct clk_hw *hw,
->> +			    unsigned long rate, unsigned long parent_rate)
->> +{
->> +	struct rpi_firmware_clock *rpi_clk =
->> +		container_of(hw, struct rpi_firmware_clock, hw);
->> +	u32 packet[2];
->> +	int ret;
->> +
->> +	packet[0] = rpi_clk->clock_id;
->> +	packet[1] = rate;
->> +	ret = rpi_firmware_property(rpi_clk->firmware_node,
->
-> The docs indicate there's a third word here "skip setting turbo". Is
-> that optional?
->
-> https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
-
-Yeah, it's optional based on the buffer size specified in the packet.
-
->> +static long rpi_clk_round_rate(struct clk_hw *hw, unsigned long rate,
->> +			       unsigned long *parent_rate)
->> +{
->> +	/*
->> +	 * The firmware will end up rounding our rate to something,
->> +	 * but we don't have an interface for it.  Just return the
->> +	 * requested value, and it'll get updated after the clock gets
->> +	 * set.
->> +	 */
->> +	return rate;
->> +}
->
-> Hmm. I wonder if that will confuse things; I thought the purpose of
-> round_rate() was so code could know exactly what would happen ahead of time?
-
-Well, we don't have the ability.  Things seem to work, anyway.
-Certainly better than just living with fixed clocks for everything like
-we are today.
-
->> +static struct clk *rpi_firmware_delayed_get_clk(struct
->> of_phandle_args *clkspec, + void *_data)
->
->> +	rpi_clk = &rpi_clocks[clkspec->args[0]];
->> +
->> +	firmware_node = of_parse_phandle(of_node, "firmware", 0);
->> +	if (!firmware_node) {
->> +		dev_err(dev, "%s: Missing firmware node\n", rpi_clk->name);
->> +		return ERR_PTR(-ENODEV);
->> +	}
->> +
->> +	/* Try a no-op transaction to see if the driver is loaded yet. */
->> +	ret = rpi_firmware_property_list(firmware_node, NULL, 0);
->> +	if (ret)
->> +		return ERR_PTR(ret);
->
-> I would move all that into this driver's probe().
-
-We can't move all this into the driver's probe, because this is where
-we're returning -EPROBE_DEFER.  We could potentially do just the phandle
-parse up front and allocate some memory to pass it and our own device
-node to this function through the _data arg, but I don't see much point.
-
->> +CLK_OF_DECLARE(rpi_firmware_clocks, "raspberrypi,firmware-clocks",
->> +	       rpi_firmware_init_clock_provider);
->
-> Oh, I guess the same comment as for the firmware node applies re: the
-> over-genericity of the DT compatible value applies here too. Perhaps
-> raspberrypi,bcm2835-firmware-clocks to match Lee's proposal for the
-> firmware node?
-
-Done.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150529/8e2e93a0/attachment.sig>
+Well, the old code did support all permutations. "cleanups" should not
+change such details...
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
