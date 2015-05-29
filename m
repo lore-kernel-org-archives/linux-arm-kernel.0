@@ -1,33 +1,40 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 May 2015 09:33:39 +0100
-Subject: [PATCH] ARM: socfpga: add smp_ops.cpu_kill to make kexec/kdump
- available
-In-Reply-To: <20150529053844.31162.43927.stgit@arietta>
-References: <20150529053844.31162.43927.stgit@arietta>
-Message-ID: <20150529083339.GG2067@n2100.arm.linux.org.uk>
+Date: Fri, 29 May 2015 09:35:41 +0100
+Subject: [PATCH] mmc: sdhci-bcm2835: Actually enable the clock
+In-Reply-To: <1432857792-7421-1-git-send-email-eric@anholt.net>
+References: <1432857792-7421-1-git-send-email-eric@anholt.net>
+Message-ID: <20150529083541.GH2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 29, 2015 at 02:38:44PM +0900, Hiraku Toyooka wrote:
-> Kexec_load syscall in ARM checks that machine-specific code
-> has the smp_ops.cpu_kill() before loading kernel image.
-> This patch adds the cpu_kill(), as a result, kexec reboot and
-> kernel crash dump become available in mach-socfpga.
+On Thu, May 28, 2015 at 05:03:12PM -0700, Eric Anholt wrote:
+> We're currently using a fixed frequency clock specified in the DT, so
+> enabling is a no-op.  However, the RPi firmware-based clocks driver
+> can actually disable unused clocks, so when switching to use it we
+> ended up losing our MMC clock once all devices were probed.
+> 
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+> ---
+>  drivers/mmc/host/sdhci-bcm2835.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/drivers/mmc/host/sdhci-bcm2835.c b/drivers/mmc/host/sdhci-bcm2835.c
+> index 0ef0343..09aff3a 100644
+> --- a/drivers/mmc/host/sdhci-bcm2835.c
+> +++ b/drivers/mmc/host/sdhci-bcm2835.c
+> @@ -172,6 +172,11 @@ static int bcm2835_sdhci_probe(struct platform_device *pdev)
+>  		ret = PTR_ERR(pltfm_host->clk);
+>  		goto err;
+>  	}
+> +	ret = clk_prepare_enable(pltfm_host->clk);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to enable host clk\n");
+> +		goto err;
+> +	}
+>  
+>  	return sdhci_add_host(host);
 
-Please look at the kexec'd kernel's boot messages.  You will probably
-notice that the kexec'd kernel is unable to start the secondary CPUs,
-and probably causes them to crash.
-
-As socfpga does not appear to be able to do anything with the secondary
-CPUs other than park them in a WFI loop in the _existing_ kernel, when
-that existing kernel gets overwritten by the kexec kernel and an interrupt
-sent to the CPU, that secondary CPU could very well start executing code
-it's not meant to.
-
-So no, this is a bad idea.
-
-Unless secondary CPUs can actually be taken offline, features like kexec
-can't be supported on the platform.
+Where's the error clean-up path for a failed sdhci_add_host()?
 
 -- 
 FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
