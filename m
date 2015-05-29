@@ -1,194 +1,90 @@
-From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Fri, 29 May 2015 10:30:23 +0100
-Subject: [PATCH v5 07/12] KVM: arm64: guest debug, add support for single-step
-In-Reply-To: <1432891828-4816-1-git-send-email-alex.bennee@linaro.org>
-References: <1432891828-4816-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1432891828-4816-8-git-send-email-alex.bennee@linaro.org>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Fri, 29 May 2015 11:31:01 +0200
+Subject: [PATCH] ALSA: fix building with CONFIG_SND_PROC_FS disabled
+In-Reply-To: <E7B1D079BA13FB44A978CC8F69C7D6A90553BC12@SHSMSX101.ccr.corp.intel.com>
+References: <4218314.pT4WQLSW4C@wuerfel>
+ <E7B1D079BA13FB44A978CC8F69C7D6A90553BC12@SHSMSX101.ccr.corp.intel.com>
+Message-ID: <s5h7frr7msq.wl-tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for single-stepping the guest. To do this we need to
-manipulate the guests PSTATE.SS and MDSCR_EL1.SS bits which we do in the
-kvm_arm_setup/clear_debug() so we don't affect the apparent state of the
-guest. Additionally while the host is debugging the guest we suppress
-the ability of the guest to single-step itself.
+At Fri, 29 May 2015 09:03:35 +0000,
+Jie, Yang wrote:
+> 
+> > -----Original Message-----
+> > From: Arnd Bergmann [mailto:arnd at arndb.de]
+> > Sent: Friday, May 29, 2015 4:47 PM
+> > To: Takashi Iwai
+> > Cc: broonie at kernel.org; alsa-devel at alsa-project.org; linux-arm-
+> > kernel at lists.infradead.org; Jie, Yang
+> > Subject: [PATCH] ALSA: fix building with CONFIG_SND_PROC_FS disabled
+> > 
+> > A recent change to split the procfs support for ALSA turned out to be
+> > incomplete, leading to build errors:
+> > 
+> > sound/core/seq/seq_info.c:61:12: error: redefinition of 'snd_seq_info_init'
+> > sound/core/seq/seq_device.c: In function 'seq_dev_proc_init':
+> > sound/core/seq/seq_device.c:276:2: error: 'info_entry' undeclared (first use
+> > in this function)
+> > sound/core/seq/seq_device.c: In function 'alsa_seq_device_exit':
+> > sound/core/seq/seq_device.c:309:22: error: 'info_entry' undeclared (first
+> > use in this function)
+> > 
+> > This replaces some more instances of CONFIG_PROC_FS with
+> > CONFIG_SND_PROC_FS, as the original patch started. It is enough to avoid all
+> > randconfig regressions I saw on ARM because of the CONFIG_SND_PROC_FS
+> > introduction.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Fixes: cd6a65036f0e ("ALSA: replace CONFIG_PROC_FS with
+> > CONFIG_SND_PROC_FS")
+> > ---
+> > 
+> > I assume this was already reported. If not, please apply my patch or fold it
+> > into the original commit.
+>  
+> Thank you, Seems this already fixed by Takashi's latest series? 
 
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+Yes.
 
----
-v2
-  - Move pstate/mdscr manipulation into C
-  - don't export guest_debug to assembly
-  - add accessor for saved_debug regs
-  - tweak save/restore of mdscr_el1
-v3
-  - don't save PC in debug information struct
-  - rename debug_saved_regs->guest_debug_state
-  - save whole value, only use bits in restore
-  - add save/restore_guest-debug_regs helper functions
-  - simplify commit message for clarity
-  - rm vcpu_debug_saved_reg access fn
-v4
-  - added more comments based on suggestions
-  - guest_debug_state->guest_debug_preserved
-  - no point masking restore, we will trap out
-v5
-  - more comments
-  - don't bother preserving pstate.ss
----
- arch/arm/kvm/arm.c                |  4 ++-
- arch/arm64/include/asm/kvm_host.h | 11 ++++++++
- arch/arm64/kvm/debug.c            | 58 ++++++++++++++++++++++++++++++++++++---
- arch/arm64/kvm/handle_exit.c      |  2 ++
- 4 files changed, 70 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 064c105..9b3ed6d 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -302,7 +302,9 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
- 	kvm_arm_set_running_vcpu(NULL);
- }
- 
--#define KVM_GUESTDBG_VALID_MASK (KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_USE_SW_BP)
-+#define KVM_GUESTDBG_VALID_MASK (KVM_GUESTDBG_ENABLE |    \
-+			    KVM_GUESTDBG_USE_SW_BP | \
-+			    KVM_GUESTDBG_SINGLESTEP)
- 
- /**
-  * kvm_arch_vcpu_ioctl_set_guest_debug - set up guest debugging
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 7cb99b5..e2db6a6 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -123,6 +123,17 @@ struct kvm_vcpu_arch {
- 	 * here.
- 	 */
- 
-+	/*
-+	 * Guest registers we preserve during guest debugging.
-+	 *
-+	 * These shadow registers are updated by the kvm_handle_sys_reg
-+	 * trap handler if the guest accesses or updates them while we
-+	 * are using guest debug.
-+	 */
-+	struct {
-+		u32	mdscr_el1;
-+	} guest_debug_preserved;
-+
- 	/* Don't run the guest */
- 	bool pause;
- 
-diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
-index 8d1bfa4..10a6baa 100644
---- a/arch/arm64/kvm/debug.c
-+++ b/arch/arm64/kvm/debug.c
-@@ -19,11 +19,41 @@
- 
- #include <linux/kvm_host.h>
- 
-+#include <asm/debug-monitors.h>
-+#include <asm/kvm_asm.h>
- #include <asm/kvm_arm.h>
-+#include <asm/kvm_emulate.h>
-+
-+/* These are the bits of MDSCR_EL1 we may manipulate */
-+#define MDSCR_EL1_DEBUG_MASK	(DBG_MDSCR_SS | \
-+				DBG_MDSCR_KDE | \
-+				DBG_MDSCR_MDE)
- 
- static DEFINE_PER_CPU(u32, mdcr_el2);
- 
- /**
-+ * save/restore_guest_debug_regs
-+ *
-+ * For some debug operations we need to tweak some guest registers. As
-+ * a result we need to save the state of those registers before we
-+ * make those modifications. This does get confused if the guest
-+ * attempts to control single step while being debugged. It will start
-+ * working again once it is no longer being debugged by the host.
-+ *
-+ * Guest access to MDSCR_EL1 is trapped by the hypervisor and handled
-+ * after we have restored the preserved value to the main context.
-+ */
-+static void save_guest_debug_regs(struct kvm_vcpu *vcpu)
-+{
-+	vcpu->arch.guest_debug_preserved.mdscr_el1 = vcpu_sys_reg(vcpu, MDSCR_EL1);
-+}
-+
-+static void restore_guest_debug_regs(struct kvm_vcpu *vcpu)
-+{
-+	vcpu_sys_reg(vcpu, MDSCR_EL1) = vcpu->arch.guest_debug_preserved.mdscr_el1;
-+}
-+
-+/**
-  * kvm_arm_init_debug - grab what we need for debug
-  *
-  * Currently the sole task of this function is to retrieve the initial
-@@ -38,7 +68,6 @@ void kvm_arm_init_debug(void)
- 	__this_cpu_write(mdcr_el2, kvm_call_hyp(__kvm_get_mdcr_el2));
- }
- 
--
- /**
-  * kvm_arm_setup_debug - set up debug related stuff
-  *
-@@ -73,12 +102,33 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
- 	if (trap_debug)
- 		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDA;
- 
--	/* Trap breakpoints? */
--	if (vcpu->guest_debug & KVM_GUESTDBG_USE_SW_BP)
-+	/* Is Guest debugging in effect? */
-+	if (vcpu->guest_debug) {
- 		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDE;
-+
-+		/* Save guest debug state */
-+		save_guest_debug_regs(vcpu);
-+
-+		/*
-+		 * Single Step (ARM ARM D2.12.3 The software step state
-+		 * machine)
-+		 *
-+		 * If we are doing Single Step we need to manipulate
-+		 * MDSCR_EL1.SS and PSTATE.SS. If not we need to
-+		 * suppress the guests ability to trigger single step
-+		 * exceptions as otherwise the host will deal with them.
-+		 */
-+		if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
-+			*vcpu_cpsr(vcpu) |=  DBG_SPSR_SS;
-+			vcpu_sys_reg(vcpu, MDSCR_EL1) |= DBG_MDSCR_SS;
-+		} else {
-+			vcpu_sys_reg(vcpu, MDSCR_EL1) &= ~DBG_MDSCR_SS;
-+		}
-+	}
- }
- 
- void kvm_arm_clear_debug(struct kvm_vcpu *vcpu)
- {
--	/* Nothing to do yet */
-+	if (vcpu->guest_debug)
-+		restore_guest_debug_regs(vcpu);
- }
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index 27f38a9..e9de13e 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -103,6 +103,7 @@ static int kvm_handle_guest_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	run->debug.arch.hsr = hsr;
- 
- 	switch (hsr >> ESR_ELx_EC_SHIFT) {
-+	case ESR_ELx_EC_SOFTSTP_LOW:
- 	case ESR_ELx_EC_BKPT32:
- 	case ESR_ELx_EC_BRK64:
- 		break;
-@@ -130,6 +131,7 @@ static exit_handle_fn arm_exit_handlers[] = {
- 	[ESR_ELx_EC_SYS64]	= kvm_handle_sys_reg,
- 	[ESR_ELx_EC_IABT_LOW]	= kvm_handle_guest_abort,
- 	[ESR_ELx_EC_DABT_LOW]	= kvm_handle_guest_abort,
-+	[ESR_ELx_EC_SOFTSTP_LOW]= kvm_handle_guest_debug,
- 	[ESR_ELx_EC_BKPT32]	= kvm_handle_guest_debug,
- 	[ESR_ELx_EC_BRK64]	= kvm_handle_guest_debug,
- };
--- 
-2.4.1
+Takashi
+
+> 
+> ~Keyon
+> 
+> > 
+> > diff --git a/sound/core/seq/Makefile b/sound/core/seq/Makefile index
+> > b29ffe835205..b65fa5a1943b 100644
+> > --- a/sound/core/seq/Makefile
+> > +++ b/sound/core/seq/Makefile
+> > @@ -7,7 +7,7 @@ snd-seq-device-objs := seq_device.o  snd-seq-objs :=
+> > seq.o seq_lock.o seq_clientmgr.o seq_memory.o seq_queue.o \
+> >                  seq_fifo.o seq_prioq.o seq_timer.o \
+> >                  seq_system.o seq_ports.o
+> > -snd-seq-$(CONFIG_PROC_FS) += seq_info.o
+> > +snd-seq-$(CONFIG_SND_PROC_FS) += seq_info.o
+> >  snd-seq-midi-objs := seq_midi.o
+> >  snd-seq-midi-emul-objs := seq_midi_emul.o  snd-seq-midi-event-objs :=
+> > seq_midi_event.o diff --git a/sound/core/seq/seq_device.c
+> > b/sound/core/seq/seq_device.c index 288af56a43cd..c4acf17e9f5e 100644
+> > --- a/sound/core/seq/seq_device.c
+> > +++ b/sound/core/seq/seq_device.c
+> > @@ -272,7 +272,7 @@ EXPORT_SYMBOL_GPL(snd_seq_driver_unregister);
+> > 
+> >  static int __init seq_dev_proc_init(void)  { -#ifdef CONFIG_PROC_FS
+> > +#ifdef CONFIG_SND_PROC_FS
+> >  	info_entry = snd_info_create_module_entry(THIS_MODULE,
+> > "drivers",
+> >  						  snd_seq_root);
+> >  	if (info_entry == NULL)
+> > @@ -305,7 +305,7 @@ static void __exit alsa_seq_device_exit(void)  #ifdef
+> > CONFIG_MODULES
+> >  	cancel_work_sync(&autoload_work);
+> >  #endif
+> > -#ifdef CONFIG_PROC_FS
+> > +#ifdef CONFIG_SND_PROC_FS
+> >  	snd_info_free_entry(info_entry);
+> >  #endif
+> >  	bus_unregister(&snd_seq_bus_type);
+> 
