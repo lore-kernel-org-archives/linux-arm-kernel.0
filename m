@@ -1,38 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 May 2015 10:52:59 +0200
-Subject: [PATCH] cgroup: add seq_file forward declaration for struct cftype
-Message-ID: <8289624.GnpfIU6Era@wuerfel>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Fri, 29 May 2015 11:03:22 +0200
+Subject: [PATCH 0/4] arm64: IOMMU-backed DMA mapping
+In-Reply-To: <cover.1432735420.git.robin.murphy@arm.com>
+References: <cover.1432735420.git.robin.murphy@arm.com>
+Message-ID: <20150529090322.GF13130@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recent header file changes for cgroup caused lots of warnings
-about a missing struct seq_file form declaration for every
-inclusion of include/linux/cgroup-defs.h.
+Hi Robin,
 
-As some files are built with -Werror, this leads to build
-failure like:
+Thanks for your work. We are really moving forward to a common DMA-API
+implementation for all iommu drivers.
 
-                 from /git/arm-soc/drivers/gpu/drm/tilcdc/tilcdc_crtc.c:18:
-/git/arm-soc/include/linux/cgroup-defs.h:354:25: error: 'struct seq_file' declared inside parameter list [-Werror]
-cc1: all warnings being treated as errors
-make[6]: *** [drivers/gpu/drm/tilcdc/tilcdc_crtc.o] Error 1
+On Wed, May 27, 2015 at 03:09:14PM +0100, Robin Murphy wrote:
+> In the meantime, Laurent's proposal for probe deferral[2] offers hope
+> that the bus notifier dance may only need to be short-lived, and I'm
+> hoping to spend some more time on DT-based IOMMU group handling for
+> platform devices, which should hopefully tie in with default domains
+> to make the add_device callback mostly redundant.
 
-This patch adds the declaration, which resolves both the
-warnings and the drm failure.
+Yes, this would be great. I think it makes a lot of sense to make use of
+the default domain feature. Can you have a look at how well this
+integrates with my current patches for default domains and provide some
+feedback?
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: b4a04ab7a37b ("cgroup: separate out include/linux/cgroup-defs.h")
+Thanks,
 
-diff --git a/include/linux/cgroup-defs.h b/include/linux/cgroup-defs.h
-index 7d83d7f73420..ab9dd741ab99 100644
---- a/include/linux/cgroup-defs.h
-+++ b/include/linux/cgroup-defs.h
-@@ -302,6 +302,8 @@ struct cgroup_root {
- 	char name[MAX_CGROUP_ROOT_NAMELEN];
- };
- 
-+struct seq_file;
-+
- /*
-  * struct cftype: handler definitions for cgroup control files
-  *
+	Joerg
