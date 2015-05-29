@@ -1,196 +1,226 @@
-From: jun.nie@linaro.org (Jun Nie)
-Date: Fri, 29 May 2015 10:35:47 +0800
-Subject: [PATCH v5 1/4] dt-bindings: Add #defines for ZTE ZX296702 clocks
-In-Reply-To: <1432866950-5344-1-git-send-email-jun.nie@linaro.org>
-References: <1432866950-5344-1-git-send-email-jun.nie@linaro.org>
-Message-ID: <1432866950-5344-2-git-send-email-jun.nie@linaro.org>
+From: msalter@redhat.com (Mark Salter)
+Date: Thu, 28 May 2015 22:38:19 -0400
+Subject: [V5 PATCH 2/5] arm64 : Introduce support for ACPI _CCA object
+In-Reply-To: <1432159758-4486-3-git-send-email-Suravee.Suthikulpanit@amd.com>
+References: <1432159758-4486-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1432159758-4486-3-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <1432867099.24429.4.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clocks defines for the global clock controller
-found on ZTE ZX296702 SoCs.
+On Wed, 2015-05-20 at 17:09 -0500, Suravee Suthikulpanit wrote:
+> From http://www.uefi.org/sites/default/files/resources/ACPI_6.0.pdf,
+> section 6.2.17 _CCA states that ARM platforms require ACPI _CCA
+> object to be specified for DMA-cabpable devices. Therefore, this patch
+> specifies ACPI_CCA_REQUIRED in arm64 Kconfig.
+> 
+> In addition, to handle the case when _CCA is missing, arm64 would assign
+> dummy_dma_ops to disable DMA capability of the device.
+> 
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Mark Salter <msalter@redhat.com>
+> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> ---
+>  arch/arm64/Kconfig                   |  1 +
+>  arch/arm64/include/asm/dma-mapping.h | 18 ++++++-
+>  arch/arm64/mm/dma-mapping.c          | 92 ++++++++++++++++++++++++++++++++++++
+>  3 files changed, 109 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 4269dba..95307b4 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -1,5 +1,6 @@
+>  config ARM64
+>  	def_bool y
+> +	select ACPI_CCA_REQUIRED if ACPI
+>  	select ACPI_GENERIC_GSI if ACPI
+>  	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
+>  	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+> diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
+> index 9437e3d..f0d6d0b 100644
+> --- a/arch/arm64/include/asm/dma-mapping.h
+> +++ b/arch/arm64/include/asm/dma-mapping.h
+> @@ -18,6 +18,7 @@
+>  
+>  #ifdef __KERNEL__
+>  
+> +#include <linux/acpi.h>
+>  #include <linux/types.h>
+>  #include <linux/vmalloc.h>
+>  
 
-Signed-off-by: Jun Nie <jun.nie@linaro.org>
----
- include/dt-bindings/clock/zx296702-clock.h | 170 +++++++++++++++++++++++++++++
- 1 file changed, 170 insertions(+)
- create mode 100644 include/dt-bindings/clock/zx296702-clock.h
+^^^ This hunk causes build issues with a couple of drivers:
 
-diff --git a/include/dt-bindings/clock/zx296702-clock.h b/include/dt-bindings/clock/zx296702-clock.h
-new file mode 100644
-index 0000000..e683dbb
---- /dev/null
-+++ b/include/dt-bindings/clock/zx296702-clock.h
-@@ -0,0 +1,170 @@
-+/*
-+ * Copyright 2014 Linaro Ltd.
-+ * Copyright (C) 2014 ZTE Corporation.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __DT_BINDINGS_CLOCK_ZX296702_H
-+#define __DT_BINDINGS_CLOCK_ZX296702_H
-+
-+#define ZX296702_OSC				0
-+#define ZX296702_PLL_A9				1
-+#define ZX296702_PLL_A9_350M			2
-+#define ZX296702_PLL_MAC_1000M			3
-+#define ZX296702_PLL_MAC_333M			4
-+#define ZX296702_PLL_MM0_1188M			5
-+#define ZX296702_PLL_MM0_396M			6
-+#define ZX296702_PLL_MM0_198M			7
-+#define ZX296702_PLL_MM1_108M			8
-+#define ZX296702_PLL_MM1_72M			9
-+#define ZX296702_PLL_MM1_54M			10
-+#define ZX296702_PLL_LSP_104M			11
-+#define ZX296702_PLL_LSP_26M			12
-+#define ZX296702_PLL_AUDIO_294M912		13
-+#define ZX296702_PLL_DDR_266M			14
-+#define ZX296702_CLK_148M5			15
-+#define ZX296702_MATRIX_ACLK			16
-+#define ZX296702_MAIN_HCLK			17
-+#define ZX296702_MAIN_PCLK			18
-+#define ZX296702_CLK_500			19
-+#define ZX296702_CLK_250			20
-+#define ZX296702_CLK_125			21
-+#define ZX296702_CLK_74M25			22
-+#define ZX296702_A9_WCLK			23
-+#define ZX296702_A9_AS1_ACLK_MUX		24
-+#define ZX296702_A9_TRACE_CLKIN_MUX		25
-+#define ZX296702_A9_AS1_ACLK_DIV		26
-+#define ZX296702_CLK_2				27
-+#define ZX296702_CLK_27				28
-+#define ZX296702_DECPPU_ACLK_MUX		29
-+#define ZX296702_PPU_ACLK_MUX			30
-+#define ZX296702_MALI400_ACLK_MUX		31
-+#define ZX296702_VOU_ACLK_MUX			32
-+#define ZX296702_VOU_MAIN_WCLK_MUX		33
-+#define ZX296702_VOU_AUX_WCLK_MUX		34
-+#define ZX296702_VOU_SCALER_WCLK_MUX		35
-+#define ZX296702_R2D_ACLK_MUX			36
-+#define ZX296702_R2D_WCLK_MUX			37
-+#define ZX296702_CLK_50				38
-+#define ZX296702_CLK_25				39
-+#define ZX296702_CLK_12				40
-+#define ZX296702_CLK_16M384			41
-+#define ZX296702_CLK_32K768			42
-+#define ZX296702_SEC_WCLK_DIV			43
-+#define ZX296702_DDR_WCLK_MUX			44
-+#define ZX296702_NAND_WCLK_MUX			45
-+#define ZX296702_LSP_26_WCLK_MUX		46
-+#define ZX296702_A9_AS0_ACLK			47
-+#define ZX296702_A9_AS1_ACLK			48
-+#define ZX296702_A9_TRACE_CLKIN			49
-+#define ZX296702_DECPPU_AXI_M_ACLK		50
-+#define ZX296702_DECPPU_AHB_S_HCLK		51
-+#define ZX296702_PPU_AXI_M_ACLK			52
-+#define ZX296702_PPU_AHB_S_HCLK			53
-+#define ZX296702_VOU_AXI_M_ACLK			54
-+#define ZX296702_VOU_APB_PCLK			55
-+#define ZX296702_VOU_MAIN_CHANNEL_WCLK		56
-+#define ZX296702_VOU_AUX_CHANNEL_WCLK		57
-+#define ZX296702_VOU_HDMI_OSCLK_CEC		58
-+#define ZX296702_VOU_SCALER_WCLK		59
-+#define ZX296702_MALI400_AXI_M_ACLK		60
-+#define ZX296702_MALI400_APB_PCLK		61
-+#define ZX296702_R2D_WCLK			62
-+#define ZX296702_R2D_AXI_M_ACLK			63
-+#define ZX296702_R2D_AHB_HCLK			64
-+#define ZX296702_DDR3_AXI_S0_ACLK		65
-+#define ZX296702_DDR3_APB_PCLK			66
-+#define ZX296702_DDR3_WCLK			67
-+#define ZX296702_USB20_0_AHB_HCLK		68
-+#define ZX296702_USB20_0_EXTREFCLK		69
-+#define ZX296702_USB20_1_AHB_HCLK		70
-+#define ZX296702_USB20_1_EXTREFCLK		71
-+#define ZX296702_USB20_2_AHB_HCLK		72
-+#define ZX296702_USB20_2_EXTREFCLK		73
-+#define ZX296702_GMAC_AXI_M_ACLK		74
-+#define ZX296702_GMAC_APB_PCLK			75
-+#define ZX296702_GMAC_125_CLKIN			76
-+#define ZX296702_GMAC_RMII_CLKIN		77
-+#define ZX296702_GMAC_25M_CLK			78
-+#define ZX296702_NANDFLASH_AHB_HCLK		79
-+#define ZX296702_NANDFLASH_WCLK			80
-+#define ZX296702_LSP0_APB_PCLK			81
-+#define ZX296702_LSP0_AHB_HCLK			82
-+#define ZX296702_LSP0_26M_WCLK			83
-+#define ZX296702_LSP0_104M_WCLK			84
-+#define ZX296702_LSP0_16M384_WCLK		85
-+#define ZX296702_LSP1_APB_PCLK			86
-+#define ZX296702_LSP1_26M_WCLK			87
-+#define ZX296702_LSP1_104M_WCLK			88
-+#define ZX296702_LSP1_32K_CLK			89
-+#define ZX296702_AON_HCLK			90
-+#define ZX296702_SYS_CTRL_PCLK			91
-+#define ZX296702_DMA_PCLK			92
-+#define ZX296702_DMA_ACLK			93
-+#define ZX296702_SEC_HCLK			94
-+#define ZX296702_AES_WCLK			95
-+#define ZX296702_DES_WCLK			96
-+#define ZX296702_IRAM_ACLK			97
-+#define ZX296702_IROM_ACLK			98
-+#define ZX296702_BOOT_CTRL_HCLK			99
-+#define ZX296702_EFUSE_CLK_30			100
-+#define ZX296702_VOU_MAIN_CHANNEL_DIV		101
-+#define ZX296702_VOU_AUX_CHANNEL_DIV		102
-+#define ZX296702_VOU_TV_ENC_HD_DIV		103
-+#define ZX296702_VOU_TV_ENC_SD_DIV		104
-+#define ZX296702_VL0_MUX			105
-+#define ZX296702_VL1_MUX			106
-+#define ZX296702_VL2_MUX			107
-+#define ZX296702_GL0_MUX			108
-+#define ZX296702_GL1_MUX			109
-+#define ZX296702_GL2_MUX			110
-+#define ZX296702_WB_MUX				111
-+#define ZX296702_HDMI_MUX			112
-+#define ZX296702_VOU_TV_ENC_HD_MUX		113
-+#define ZX296702_VOU_TV_ENC_SD_MUX		114
-+#define ZX296702_VL0_CLK			115
-+#define ZX296702_VL1_CLK			116
-+#define ZX296702_VL2_CLK			117
-+#define ZX296702_GL0_CLK			118
-+#define ZX296702_GL1_CLK			119
-+#define ZX296702_GL2_CLK			120
-+#define ZX296702_WB_CLK				121
-+#define ZX296702_CL_CLK				122
-+#define ZX296702_MAIN_MIX_CLK			123
-+#define ZX296702_AUX_MIX_CLK			124
-+#define ZX296702_HDMI_CLK			125
-+#define ZX296702_VOU_TV_ENC_HD_DAC_CLK		126
-+#define ZX296702_VOU_TV_ENC_SD_DAC_CLK		127
-+#define ZX296702_A9_PERIPHCLK			128
-+#define ZX296702_TOPCLK_END			129
-+
-+#define ZX296702_SDMMC1_WCLK_MUX		0
-+#define ZX296702_SDMMC1_WCLK_DIV		1
-+#define ZX296702_SDMMC1_WCLK			2
-+#define ZX296702_SDMMC1_PCLK			3
-+#define ZX296702_SPDIF0_WCLK_MUX		4
-+#define ZX296702_SPDIF0_WCLK			5
-+#define ZX296702_SPDIF0_PCLK			6
-+#define ZX296702_SPDIF0_DIV			7
-+#define ZX296702_I2S0_WCLK_MUX			8
-+#define ZX296702_I2S0_WCLK			9
-+#define ZX296702_I2S0_PCLK			10
-+#define ZX296702_I2S0_DIV			11
-+#define ZX296702_LSP0CLK_END			12
-+
-+#define ZX296702_UART0_WCLK_MUX			0
-+#define ZX296702_UART0_WCLK			1
-+#define ZX296702_UART0_PCLK			2
-+#define ZX296702_UART1_WCLK_MUX			3
-+#define ZX296702_UART1_WCLK			4
-+#define ZX296702_UART1_PCLK			5
-+#define ZX296702_SDMMC0_WCLK_MUX		6
-+#define ZX296702_SDMMC0_WCLK_DIV		7
-+#define ZX296702_SDMMC0_WCLK			8
-+#define ZX296702_SDMMC0_PCLK			9
-+#define ZX296702_LSP1CLK_END			10
-+
-+#endif /* __DT_BINDINGS_CLOCK_ZX296702_H */
--- 
-1.9.1
+drivers/scsi/megaraid/megaraid_sas_fp.c:69:0: warning: "FALSE" redefined [enabled by default]
+ #define FALSE 0
+ ^
+In file included from include/acpi/acpi.h:58:0,
+                 from include/linux/acpi.h:37,
+                 from ./arch/arm64/include/asm/dma-mapping.h:21,
+                 from include/linux/dma-mapping.h:86,
+                 from ./arch/arm64/include/asm/pci.h:7,
+                 from include/linux/pci.h:1460,
+                 from drivers/scsi/megaraid/megaraid_sas_fp.c:37:
+include/acpi/actypes.h:433:0: note: this is the location of the previous definition
+ #define FALSE                           (1 == 0)
+ ^
+
+
+In file included from include/acpi/acpi.h:58:0,
+                 from include/linux/acpi.h:37,
+                 from ./arch/arm64/include/asm/dma-mapping.h:21,
+                 from include/linux/dma-mapping.h:86,
+                 from include/scsi/scsi_cmnd.h:4,
+                 from drivers/scsi/ufs/ufshcd.h:60,
+                 from drivers/scsi/ufs/ufshcd.c:43:
+include/acpi/actypes.h:433:41: error: expected identifier before ?(? token
+ #define FALSE                           (1 == 0)
+                                         ^
+drivers/scsi/ufs/unipro.h:203:2: note: in expansion of macro ?FALSE?
+  FALSE = 0,
+  ^
+
+This happens because the ACPI definitions of TRUE and FALSE conflict
+with local definitions in megaraid and enum declaration in ufs.
+
+
+> @@ -28,13 +29,23 @@
+>  
+>  #define DMA_ERROR_CODE	(~(dma_addr_t)0)
+>  extern struct dma_map_ops *dma_ops;
+> +extern struct dma_map_ops dummy_dma_ops;
+>  
+>  static inline struct dma_map_ops *__generic_dma_ops(struct device *dev)
+>  {
+> -	if (unlikely(!dev) || !dev->archdata.dma_ops)
+> +	if (unlikely(!dev))
+>  		return dma_ops;
+> -	else
+> +	else if (dev->archdata.dma_ops)
+>  		return dev->archdata.dma_ops;
+> +	else if (acpi_disabled)
+> +		return dma_ops;
+> +
+> +	/*
+> +	 * When ACPI is enabled, if arch_set_dma_ops is not called,
+> +	 * we will disable device DMA capability by setting it
+> +	 * to dummy_dma_ops.
+> +	 */
+> +	return &dummy_dma_ops;
+>  }
+>  
+>  static inline struct dma_map_ops *get_dma_ops(struct device *dev)
+> @@ -48,6 +59,9 @@ static inline struct dma_map_ops *get_dma_ops(struct device *dev)
+>  static inline void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+>  				      struct iommu_ops *iommu, bool coherent)
+>  {
+> +	if (!acpi_disabled && !dev->archdata.dma_ops)
+> +		dev->archdata.dma_ops = dma_ops;
+> +
+>  	dev->archdata.dma_coherent = coherent;
+>  }
+>  #define arch_setup_dma_ops	arch_setup_dma_ops
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index ef7d112..6e6d6ad 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -415,6 +415,98 @@ out:
+>  	return -ENOMEM;
+>  }
+>  
+> +/********************************************
+> + * The following APIs are for dummy DMA ops *
+> + ********************************************/
+> +
+> +static void *__dummy_alloc(struct device *dev, size_t size,
+> +			   dma_addr_t *dma_handle, gfp_t flags,
+> +			   struct dma_attrs *attrs)
+> +{
+> +	return NULL;
+> +}
+> +
+> +static void __dummy_free(struct device *dev, size_t size,
+> +			 void *vaddr, dma_addr_t dma_handle,
+> +			 struct dma_attrs *attrs)
+> +{
+> +}
+> +
+> +static int __dummy_mmap(struct device *dev,
+> +			struct vm_area_struct *vma,
+> +			void *cpu_addr, dma_addr_t dma_addr, size_t size,
+> +			struct dma_attrs *attrs)
+> +{
+> +	return -ENXIO;
+> +}
+> +
+> +static dma_addr_t __dummy_map_page(struct device *dev, struct page *page,
+> +				   unsigned long offset, size_t size,
+> +				   enum dma_data_direction dir,
+> +				   struct dma_attrs *attrs)
+> +{
+> +	return DMA_ERROR_CODE;
+> +}
+> +
+> +static void __dummy_unmap_page(struct device *dev, dma_addr_t dev_addr,
+> +			       size_t size, enum dma_data_direction dir,
+> +			       struct dma_attrs *attrs)
+> +{
+> +}
+> +
+> +static int __dummy_map_sg(struct device *dev, struct scatterlist *sgl,
+> +			  int nelems, enum dma_data_direction dir,
+> +			  struct dma_attrs *attrs)
+> +{
+> +	return 0;
+> +}
+> +
+> +static void __dummy_unmap_sg(struct device *dev,
+> +			     struct scatterlist *sgl, int nelems,
+> +			     enum dma_data_direction dir,
+> +			     struct dma_attrs *attrs)
+> +{
+> +}
+> +
+> +static void __dummy_sync_single(struct device *dev,
+> +				dma_addr_t dev_addr, size_t size,
+> +				enum dma_data_direction dir)
+> +{
+> +}
+> +
+> +static void __dummy_sync_sg(struct device *dev,
+> +			    struct scatterlist *sgl, int nelems,
+> +			    enum dma_data_direction dir)
+> +{
+> +}
+> +
+> +static int __dummy_mapping_error(struct device *hwdev, dma_addr_t dma_addr)
+> +{
+> +	return 1;
+> +}
+> +
+> +static int __dummy_dma_supported(struct device *hwdev, u64 mask)
+> +{
+> +	return 0;
+> +}
+> +
+> +struct dma_map_ops dummy_dma_ops = {
+> +	.alloc                  = __dummy_alloc,
+> +	.free                   = __dummy_free,
+> +	.mmap                   = __dummy_mmap,
+> +	.map_page               = __dummy_map_page,
+> +	.unmap_page             = __dummy_unmap_page,
+> +	.map_sg                 = __dummy_map_sg,
+> +	.unmap_sg               = __dummy_unmap_sg,
+> +	.sync_single_for_cpu    = __dummy_sync_single,
+> +	.sync_single_for_device = __dummy_sync_single,
+> +	.sync_sg_for_cpu        = __dummy_sync_sg,
+> +	.sync_sg_for_device     = __dummy_sync_sg,
+> +	.mapping_error          = __dummy_mapping_error,
+> +	.dma_supported          = __dummy_dma_supported,
+> +};
+> +EXPORT_SYMBOL(dummy_dma_ops);
+> +
+>  static int __init arm64_dma_init(void)
+>  {
+>  	int ret;
