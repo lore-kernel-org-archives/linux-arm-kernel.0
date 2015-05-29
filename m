@@ -1,68 +1,55 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Fri, 29 May 2015 18:47:47 +0530
-Subject: [PATCH] ARM: dts: odroidxu3: Enable USB3 regulators
-In-Reply-To: <5566DDA6.1080508@samsung.com>
-References: <1432803494-3516-1-git-send-email-linux.amoon@gmail.com>
- <5566DDA6.1080508@samsung.com>
-Message-ID: <CANAwSgSaY2W6y-zrsF=p68Phqf7D-hTPsCxNaqFiwVc45849RQ@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 29 May 2015 15:25:26 +0200
+Subject: [PATCH/RFC 2/2] ARM: multi_v7_defconfig: Make fbdev support modular
+In-Reply-To: <1432905926-31606-1-git-send-email-geert@linux-m68k.org>
+References: <1432905926-31606-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <1432905926-31606-2-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 May 2015 at 14:49, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
-> On 28.05.2015 17:58, Anand Moon wrote:
->> Enable regulator for usbdrd3_0 and usbdrd3_1
->>>From the schematic pin diagram USB3_0 and USB3_1
->> is regulated by LDO9 and LD011.
->
-> Please reformat statement above to proper sentence(s) without ">" before
-> "From".
->
->>
->> Fix the boot message of failed.
->> [    3.503539] exynos-dwc3 usb at 12000000: Looking up vdd33-supply from device tree
->> [    3.503556] exynos-dwc3 usb at 12000000: Looking up vdd33-supply property in node /usb at 12000000 failed
->> [    3.503568] usb at 12000000 supply vdd33 not found, using dummy regulator
->> [    3.509154] exynos-dwc3 usb at 12000000: Looking up vdd10-supply from device tree
->> [    3.509170] exynos-dwc3 usb at 12000000: Looking up vdd10-supply property in node /usb at 12000000 failed
->> [    3.509181] usb at 12000000 supply vdd10 not found, using dummy regulator
->> [    3.917548] exynos-dwc3 usb at 12400000: Looking up vdd33-supply from device tree
->> [    3.917565] exynos-dwc3 usb at 12400000: Looking up vdd33-supply property in node /usb at 12400000 failed
->> [    3.917578] usb at 12400000 supply vdd33 not found, using dummy regulator
->> [    3.922731] exynos-dwc3 usb at 12400000: Looking up vdd10-supply from device tree
->> [    3.922747] exynos-dwc3 usb at 12400000: Looking up vdd10-supply property in node /usb at 12400000 failed
->>
->> ---
->> This patch is based on Krzysztof github branch work-next/odroid-xu3-s2mps11-irq
->> ---
->
-> I mentioned this already on previous postings. Let's make an exercise.
-> Please:
-> 1. Save your email as mbox format (from mailer).
-> 2. Go to a GIT repo with kernel and checkout base branch.
-> 3. git am 0001-the-name-of-file.mbox
-> 4. git show
->
-> Do you see the signed-off-by in commit?
->
-> The patch itself looks good, thanks for fixing this. Just please fix the
-> issues with commit message.
->
-> By the way:
-> 1. The always-on from LDO9 could be probably removed if the ehci-exynos
-> driver had regulator consumer implemented.
-> 2. The Documentation/devicetree/bindings/usb/exynos-usb.txt (or dwc.txt)
-> should proably mention the vdd-supply property.
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Hi Krzysztof,
+Make fbdev support modular to reduce kernel size (-158 KiB):
 
-Please find the patch already send by Vivek Gautam
-<gautam.vivek@samsung.com> which address this issue.
+       text    data     bss     dec     hex   filename
+    11581470 1387196  338264 13306930  cb0c32 vmlinux.before
+    11430531 1384340  330584 13145455  c8956f vmlinux.after
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266418.html
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+This one is more controversial:
+  - Does anyone need fbdev for boot-testing?
+  - This disables two drivers that cannot be modular (FB_WM8505 and
+    FB_SIMPLE), and the PLAT_VERSATILE_CLCD helper support.
 
--Anand Moon
->
-> Best regards,
-> Krzysztof
->
->
+ arch/arm/configs/multi_v7_defconfig | 9 +++------
+ 1 file changed, 3 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 9b4e33d5b15e340f..af94ade61b1400d6 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -436,18 +436,15 @@ CONFIG_DRM_EXYNOS_HDMI=y
+ CONFIG_DRM_RCAR_DU=m
+ CONFIG_DRM_TEGRA=m
+ CONFIG_DRM_PANEL_SIMPLE=m
+-CONFIG_FB=y
+-CONFIG_FB_ARMCLCD=y
+-CONFIG_FB_WM8505=y
+-CONFIG_FB_SH_MOBILE_LCDC=y
+-CONFIG_FB_SIMPLE=y
++CONFIG_FB_ARMCLCD=m
++CONFIG_FB_SH_MOBILE_LCDC=m
+ CONFIG_FB_SH_MOBILE_MERAM=y
+ CONFIG_BACKLIGHT_LCD_SUPPORT=y
+ CONFIG_BACKLIGHT_CLASS_DEVICE=y
+ CONFIG_LCD_PLATFORM=m
+ CONFIG_BACKLIGHT_PWM=y
+ CONFIG_BACKLIGHT_AS3711=y
+-CONFIG_FRAMEBUFFER_CONSOLE=y
++CONFIG_FRAMEBUFFER_CONSOLE=m
+ CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
+ CONFIG_SOUND=m
+ CONFIG_SND=m
+-- 
+1.9.1
