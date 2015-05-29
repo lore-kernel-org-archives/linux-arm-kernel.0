@@ -1,98 +1,141 @@
-From: harinikatakamlinux@gmail.com (Harini Katakam)
-Date: Fri, 29 May 2015 15:30:11 +0530
-Subject: [RFC PATCH 2/2] spi: Add support for Zynq Ultrascale+ MPSoC GQSPI
- controller
-In-Reply-To: <03CA77BA8AF6F1469AEDFBDA1322A7B7495AA317@XAP-PVEXMBX02.xlnx.xilinx.com>
-References: <1432106871-27232-1-git-send-email-ranjit.waghmode@xilinx.com>
- <1432106871-27232-2-git-send-email-ranjit.waghmode@xilinx.com>
- <20150522115854.GG21391@sirena.org.uk>
- <CAFcVECJRqebzAjU+rfAtUQFG=7-KoE1GiXet5XJB-4D3i0or6A@mail.gmail.com>
- <20150528150356.GA21577@sirena.org.uk>
- <03CA77BA8AF6F1469AEDFBDA1322A7B7495AA317@XAP-PVEXMBX02.xlnx.xilinx.com>
-Message-ID: <CAFcVECLmVXprE8gjsM6bJ3M+TG4pTCtRWDXrsim6kYhsoUyM7Q@mail.gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 29 May 2015 10:53:20 +0100
+Subject: [PATCH 04/13] KVM: arm64: Introduce new MMIO region for the ITS base
+ address
+In-Reply-To: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
+References: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1432893209-27313-5-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+The ARM GICv3 ITS controller requires a separate register frame to
+cover ITS specific registers. Add a new VGIC address type and store
+the address in a field in the vgic_dist structure.
+Provide a function to check whether userland has provided the address,
+so ITS functionality can be guarded by that check.
 
-On Thu, May 28, 2015 at 9:11 PM, Punnaiah Choudary Kalluri
-<punnaiah.choudary.kalluri@xilinx.com> wrote:
-> Hi Mark,
->
->> -----Original Message-----
->> From: Mark Brown [mailto:broonie at kernel.org]
->> Sent: Thursday, May 28, 2015 8:34 PM
->> To: Harini Katakam
->> Cc: Ranjit Abhimanyu Waghmode; Rob Herring; Pawel Moll; Mark Rutland;
->> ijc+devicetree at hellion.org.uk; Kumar Gala; Michal Simek; Soren Brinkmann;
->> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
->> kernel at vger.kernel.org; linux-spi; Punnaiah Choudary Kalluri;
->> ran27jit at gmail.com
->> Subject: Re: [RFC PATCH 2/2] spi: Add support for Zynq Ultrascale+ MPSoC
->> GQSPI controller
->>
->> On Fri, May 22, 2015 at 08:43:54PM +0530, Harini Katakam wrote:
->> > On Fri, May 22, 2015 at 5:28 PM, Mark Brown <broonie@kernel.org> wrote:
->> > > On Wed, May 20, 2015 at 12:57:51PM +0530, Ranjit Waghmode wrote:
->>
->> > > Why is there a default case here?  That's going to men we try to handle
->> > > any random chip select that gets passed in as pointing to this lower
->> > > device which doesn't seem right.  The fact that this is trying to handle
->> > > mirroring of the chip select to two devices is also raising alarm bells
->> > > here...
->>
->> > This SPI controller has two CS lines and two data bus.
->> > Two devices can be connected to these and either the upper or the
->> > lower or both (Explained below) can be selected.
->>
->> > When two flash devices are used, one of the HW configurations in
->> > which they can be connected is called "parallel" mode where they
->>
->> I know what wiring chip selects in parallel is but that's not the
->> question - the question is about the handling of the default case.
->
-> Yes, we should not handle default case here. We will change this.
->
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ Documentation/virtual/kvm/devices/arm-vgic.txt |  7 +++++++
+ arch/arm64/include/uapi/asm/kvm.h              |  3 +++
+ include/kvm/arm_vgic.h                         |  3 +++
+ virt/kvm/arm/vgic-v3-emul.c                    |  1 +
+ virt/kvm/arm/vgic.c                            | 17 +++++++++++++++++
+ virt/kvm/arm/vgic.h                            |  1 +
+ 6 files changed, 32 insertions(+)
 
-Yes, that's right. I was just elaborating the mirroring part.
-
->>
->> > >> +static void zynqmp_qspi_chipselect(struct spi_device *qspi, bool
->> is_high)
->> > >> +{
->>
->> > >> +     if (is_high) {
->> > >> +             /* Manually start the generic FIFO command */
->> > >> +             zynqmp_gqspi_write(xqspi, GQSPI_CONFIG_OFST,
->> > >> +                             zynqmp_gqspi_read(xqspi, GQSPI_CONFIG_OFST) |
->> > >> +                             GQSPI_CFG_START_GEN_FIFO_MASK);
->>
->> > > No, this is broken - setting the chip select should set the chip select,
->> > > it shouldn't have any impact on transfers.  Transfers should be started
->> > > in the transfer operations.
->>
->> > This is the only way to assert the CS. It doesn't start transferring any data.
->>
->> OK, then you can't implement a separate set_cs() operation and shouldn't
->> be trying to do so.  This will break in multiple ways when the framework
->> tries to use the operations separately.  You probably need to implement
->> a single flat transfer() operation.
->
-> As we said it will not start any data transfer. In order to set chip select (chip select only) we need to
-> 1. Frame a control word with following parameters like the chip select that we would like to set and hold time
->  2. Update the control word to fifo
->
-> To have a performance advantage (may be not trivial) we are executing this fifo entry along with the first
->  Data transfer entry in transfer function so that we can avoid waiting for fifo empty in set_cs function.
->
->  We will ensure CS assert by waiting till the fifo empty in set_cs function and justify the what the
-> Function supposed do.
->
-
-Yes, if we wait for cs assert to be executed (which is just the time
-controller takes to fetch this command
-and execute), this set_cs will be independent as expected. The
-framework can use it anytime.
-
-Regards,
-Harini
+diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
+index 3fb9054..1f89001 100644
+--- a/Documentation/virtual/kvm/devices/arm-vgic.txt
++++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
+@@ -39,6 +39,13 @@ Groups:
+       Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
+       This address needs to be 64K aligned.
+ 
++    KVM_VGIC_V3_ADDR_TYPE_ITS (rw, 64-bit)
++      Base address in the guest physical address space of the GICv3 ITS
++      register frame. The ITS allows MSI(-X) interrupts to be injected
++      into guests. This extension is optional, if the kernel does not
++      support the ITS, the call returns -ENODEV.
++      Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
++      This address needs to be 64K aligned and the region covers 64 KByte.
+ 
+   KVM_DEV_ARM_VGIC_GRP_DIST_REGS
+   Attributes:
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index d268320..e42435c 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -82,8 +82,11 @@ struct kvm_regs {
+ #define KVM_VGIC_V3_ADDR_TYPE_DIST	2
+ #define KVM_VGIC_V3_ADDR_TYPE_REDIST	3
+ 
++#define KVM_VGIC_V3_ADDR_TYPE_ITS	4
++
+ #define KVM_VGIC_V3_DIST_SIZE		SZ_64K
+ #define KVM_VGIC_V3_REDIST_SIZE		(2 * SZ_64K)
++#define KVM_VGIC_V3_ITS_SIZE		SZ_64K
+ 
+ #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
+ #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index b18e2c5..37725bb 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -178,6 +178,9 @@ struct vgic_dist {
+ 		phys_addr_t		vgic_redist_base;
+ 	};
+ 
++	/* The base address for the MSI control block (V2M/ITS) */
++	phys_addr_t		vgic_its_base;
++
+ 	/* Distributor enabled */
+ 	u32			enabled;
+ 
+diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
+index fbfdd6f..16c6d8a 100644
+--- a/virt/kvm/arm/vgic-v3-emul.c
++++ b/virt/kvm/arm/vgic-v3-emul.c
+@@ -1012,6 +1012,7 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
+ 			return -ENXIO;
+ 		case KVM_VGIC_V3_ADDR_TYPE_DIST:
+ 		case KVM_VGIC_V3_ADDR_TYPE_REDIST:
++		case KVM_VGIC_V3_ADDR_TYPE_ITS:
+ 			return 0;
+ 		}
+ 		break;
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 6ea30e0..2e9723aa 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -932,6 +932,16 @@ int vgic_register_kvm_io_dev(struct kvm *kvm, gpa_t base, int len,
+ 	return ret;
+ }
+ 
++bool vgic_has_its(struct kvm *kvm)
++{
++	struct vgic_dist *dist = &kvm->arch.vgic;
++
++	if (dist->vgic_model != KVM_DEV_TYPE_ARM_VGIC_V3)
++		return false;
++
++	return !IS_VGIC_ADDR_UNDEF(dist->vgic_its_base);
++}
++
+ static int vgic_nr_shared_irqs(struct vgic_dist *dist)
+ {
+ 	return dist->nr_irqs - VGIC_NR_PRIVATE_IRQS;
+@@ -1835,6 +1845,7 @@ int kvm_vgic_create(struct kvm *kvm, u32 type)
+ 	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
+ 	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
+ 	kvm->arch.vgic.vgic_redist_base = VGIC_ADDR_UNDEF;
++	kvm->arch.vgic.vgic_its_base = VGIC_ADDR_UNDEF;
+ 
+ out_unlock:
+ 	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
+@@ -1932,6 +1943,12 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
+ 		block_size = KVM_VGIC_V3_REDIST_SIZE;
+ 		alignment = SZ_64K;
+ 		break;
++	case KVM_VGIC_V3_ADDR_TYPE_ITS:
++		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
++		addr_ptr = &vgic->vgic_its_base;
++		block_size = KVM_VGIC_V3_ITS_SIZE;
++		alignment = SZ_64K;
++		break;
+ #endif
+ 	default:
+ 		r = -ENODEV;
+diff --git a/virt/kvm/arm/vgic.h b/virt/kvm/arm/vgic.h
+index 0df74cb..a093f5c 100644
+--- a/virt/kvm/arm/vgic.h
++++ b/virt/kvm/arm/vgic.h
+@@ -136,5 +136,6 @@ int vgic_get_common_attr(struct kvm_device *dev, struct kvm_device_attr *attr);
+ int vgic_init(struct kvm *kvm);
+ void vgic_v2_init_emulation(struct kvm *kvm);
+ void vgic_v3_init_emulation(struct kvm *kvm);
++bool vgic_has_its(struct kvm *kvm);
+ 
+ #endif
+-- 
+2.3.5
