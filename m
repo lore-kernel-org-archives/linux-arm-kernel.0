@@ -1,20 +1,24 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 29 May 2015 14:30:13 +0200
-Subject: [GIT PULL] Samsung 3rd fixes for v4.1
-In-Reply-To: <555FEF3A.303@kernel.org>
-References: <555FEF3A.303@kernel.org>
-Message-ID: <3055761.ZS9QcNqWCl@wuerfel>
+Date: Fri, 29 May 2015 14:31:03 +0200
+Subject: [GIT PULL] ARM: imx: fixes for 4.1, 3rd round
+In-Reply-To: <20150527113952.GF16165@dragon>
+References: <20150527113952.GF16165@dragon>
+Message-ID: <2775392.lq7WEYFDjf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 23 May 2015 12:08:42 Kukjin Kim wrote:
-> Samsung fix for v4.1
+On Wednesday 27 May 2015 19:39:56 Shawn Guo wrote:
+> It includes a couple of fixes for i.MX6 GPC code to let the new kernel
+> be able to boot with old DTBs:
 > 
-> - Set display clock correctly for exynos4412-trats2
->   : fix the following error
+>  - Booting v4.1-rc kernel with old DTBs will fail with a fat warning
+>    (require low-level debug to be seen), due to the adoption of stacked
+>    IRQ domain.  The first fix improves the situation by allowing kernel
+>    boot up with old DTBs, although suspend/resume still breaks.
 > 
->     exynos-drm: No connectors reported connected with modes
->     [drm] Cannot find any crtc or sizes - going 1024x768
+>  - Booting new kernel with old DTBs that do not have power-domain info
+>    will result in a hang.  The second patch fixes the hang by skipping
+>    the kernel power-domain registration if DTB has no power-domain info.
 > 
 
 Pulled into fixes, thanks!
