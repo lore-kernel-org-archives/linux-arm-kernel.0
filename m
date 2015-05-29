@@ -1,27 +1,34 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Fri, 29 May 2015 10:33:24 +0200
-Subject: [PATCH v7 03/25] iommu: Init iommu-groups support earlier, in
- core_initcall
-In-Reply-To: <2209337.hhg3lyvUbi@avalon>
-References: <1432041645-11172-1-git-send-email-m.szyprowski@samsung.com>
- <1432041645-11172-4-git-send-email-m.szyprowski@samsung.com>
- <2209337.hhg3lyvUbi@avalon>
-Message-ID: <20150529083323.GD13130@8bytes.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 29 May 2015 09:33:39 +0100
+Subject: [PATCH] ARM: socfpga: add smp_ops.cpu_kill to make kexec/kdump
+ available
+In-Reply-To: <20150529053844.31162.43927.stgit@arietta>
+References: <20150529053844.31162.43927.stgit@arietta>
+Message-ID: <20150529083339.GG2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 23, 2015 at 07:23:34PM +0300, Laurent Pinchart wrote:
-> On Tuesday 19 May 2015 15:20:23 Marek Szyprowski wrote:
-> > -arch_initcall(iommu_init);
-> > +core_initcall(iommu_init);
-> 
-> I'll let Joerg comment on this, but this initcall ordering dance always makes 
-> me feel that something isn't quite right. Have you had a chance to look at the 
-> patch series I posted about a week ago to implement IOMMU probe deferral 
-> support ?
+On Fri, May 29, 2015 at 02:38:44PM +0900, Hiraku Toyooka wrote:
+> Kexec_load syscall in ARM checks that machine-specific code
+> has the smp_ops.cpu_kill() before loading kernel image.
+> This patch adds the cpu_kill(), as a result, kexec reboot and
+> kernel crash dump become available in mach-socfpga.
 
-Yeah, this is hacky, but I can live with it until your probe deferal
-patch-set is merged.
+Please look at the kexec'd kernel's boot messages.  You will probably
+notice that the kexec'd kernel is unable to start the secondary CPUs,
+and probably causes them to crash.
 
+As socfpga does not appear to be able to do anything with the secondary
+CPUs other than park them in a WFI loop in the _existing_ kernel, when
+that existing kernel gets overwritten by the kexec kernel and an interrupt
+sent to the CPU, that secondary CPU could very well start executing code
+it's not meant to.
 
-	Joerg
+So no, this is a bad idea.
+
+Unless secondary CPUs can actually be taken offline, features like kexec
+can't be supported on the platform.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
