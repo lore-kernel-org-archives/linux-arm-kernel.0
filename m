@@ -1,71 +1,37 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Sat, 30 May 2015 03:49:21 +0530
-Subject: [PATCH 3/4] rtc: 88pm80x: add device tree support
-In-Reply-To: <1432937962-4537-1-git-send-email-vaibhav.hiremath@linaro.org>
-References: <1432937962-4537-1-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <1432937962-4537-4-git-send-email-vaibhav.hiremath@linaro.org>
+From: david@lang.hm (David Lang)
+Date: Fri, 29 May 2015 15:21:56 -0700 (PDT)
+Subject: Device Tree Blob (DTB) licence
+In-Reply-To: <55688182.3010606@melag.de>
+References: <1430820315.19516.26.camel@opteya.com>
+ <CAL_Jsq+T5c7qornpRVCduEjUSCeM+0xqbtVYovtH76y=4BqhLQ@mail.gmail.com>
+ <1432289148.5304.58.camel@opteya.com> <1432322832.5304.63.camel@opteya.com>
+ <CAOS_Y6Q37ps+VEnzUZ_uwX++qrRm9Hgx45Q_pmiZSLSNjmKwZg@mail.gmail.com>
+ <55670AD4.8020705@melag.de>
+ <CAOS_Y6QXHdWfi9qkRmw=mCn0mqha5-NrzumBMqJ61_YRndypLA@mail.gmail.com>
+ <55688182.3010606@melag.de>
+Message-ID: <alpine.DEB.2.02.1505291520230.4429@nftneq.ynat.uz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Along with DT support, this patch also cleans up the unnecessary
-code around 'rtc_wakeup' initialization.
+On Fri, 29 May 2015, Enrico Weigelt, metux IT consult wrote:
 
-Signed-off-by: Chao Xie <chao.xie@marvell.com>
-Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
----
- drivers/rtc/rtc-88pm80x.c | 28 +++++++++++++++++-----------
- 1 file changed, 17 insertions(+), 11 deletions(-)
+>>> Important Notice: This message may contain confidential or privileged 
+>>> information. It is intended only for the person it was addressed to. If you 
+>>> are not the intended recipient of this email you may not copy, forward, 
+>>> disclose or otherwise use it or any part of it in any form whatsoever. If 
+>>> you received this email in error please notify the sender by replying and 
+>>> delete this message and any attachments without retaining a copy.
+>> 
+>> P.S. some of us actually care about licenses being appropriate to what
+>> they're applied to, and at least theoretically capable of being
+>> honored. Your email footer may be very slightly undermining your
+>> position here.
+>
+> This is just a dumb auto-generated footer, coming from my client's
+> mail server over here ... I'm just too lazy for setting up an own
+> MTA on my workstation. You can safely ignore that.
 
-diff --git a/drivers/rtc/rtc-88pm80x.c b/drivers/rtc/rtc-88pm80x.c
-index 7df0579..8f66519 100644
---- a/drivers/rtc/rtc-88pm80x.c
-+++ b/drivers/rtc/rtc-88pm80x.c
-@@ -251,17 +251,26 @@ static SIMPLE_DEV_PM_OPS(pm80x_rtc_pm_ops, pm80x_rtc_suspend, pm80x_rtc_resume);
- static int pm80x_rtc_probe(struct platform_device *pdev)
- {
- 	struct pm80x_chip *chip = dev_get_drvdata(pdev->dev.parent);
--	struct pm80x_platform_data *pm80x_pdata =
--				dev_get_platdata(pdev->dev.parent);
--	struct pm80x_rtc_pdata *pdata = NULL;
-+	struct pm80x_rtc_pdata *pdata = dev_get_platdata(&pdev->dev);
- 	struct pm80x_rtc_info *info;
-+	struct device_node *node = pdev->dev.of_node;
- 	struct rtc_time tm;
- 	unsigned long ticks = 0;
- 	int ret;
- 
--	pdata = dev_get_platdata(&pdev->dev);
--	if (pdata == NULL)
--		dev_warn(&pdev->dev, "No platform data!\n");
-+	if (!pdata && !node) {
-+		dev_err(&pdev->dev,
-+			"pm80x-rtc requires platform data or of_node\n");
-+		return -EINVAL;
-+	}
-+
-+	if (!pdata) {
-+		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-+		if (!pdata) {
-+			dev_err(&pdev->dev, "failed to allocate memory\n");
-+			return -ENOMEM;
-+		}
-+	}
- 
- 	info =
- 	    devm_kzalloc(&pdev->dev, sizeof(struct pm80x_rtc_info), GFP_KERNEL);
-@@ -327,11 +336,8 @@ static int pm80x_rtc_probe(struct platform_device *pdev)
- 	regmap_update_bits(info->map, PM800_RTC_CONTROL, PM800_RTC1_USE_XO,
- 			   PM800_RTC1_USE_XO);
- 
--	if (pm80x_pdata) {
--		pdata = pm80x_pdata->rtc;
--		if (pdata)
--			info->rtc_dev->dev.platform_data = &pdata->rtc_wakeup;
--	}
-+	/* remeber whether this power up is caused by PMIC RTC or not */
-+	info->rtc_dev->dev.platform_data = &pdata->rtc_wakeup;
- 
- 	device_init_wakeup(&pdev->dev, 1);
- 
--- 
-1.9.1
+Arguing license issues and at the same time claiming that you should ignore a 
+legal statement like the footer is a bit odd.
+
+David Lang
