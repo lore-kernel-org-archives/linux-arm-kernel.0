@@ -1,37 +1,56 @@
-From: david@lang.hm (David Lang)
-Date: Fri, 29 May 2015 15:21:56 -0700 (PDT)
-Subject: Device Tree Blob (DTB) licence
-In-Reply-To: <55688182.3010606@melag.de>
-References: <1430820315.19516.26.camel@opteya.com>
- <CAL_Jsq+T5c7qornpRVCduEjUSCeM+0xqbtVYovtH76y=4BqhLQ@mail.gmail.com>
- <1432289148.5304.58.camel@opteya.com> <1432322832.5304.63.camel@opteya.com>
- <CAOS_Y6Q37ps+VEnzUZ_uwX++qrRm9Hgx45Q_pmiZSLSNjmKwZg@mail.gmail.com>
- <55670AD4.8020705@melag.de>
- <CAOS_Y6QXHdWfi9qkRmw=mCn0mqha5-NrzumBMqJ61_YRndypLA@mail.gmail.com>
- <55688182.3010606@melag.de>
-Message-ID: <alpine.DEB.2.02.1505291520230.4429@nftneq.ynat.uz>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Sat, 30 May 2015 03:49:22 +0530
+Subject: [PATCH 4/4] mfd: 88pm800: allocate pdata->rtc if not allocated earlier
+In-Reply-To: <1432937962-4537-1-git-send-email-vaibhav.hiremath@linaro.org>
+References: <1432937962-4537-1-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <1432937962-4537-5-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 29 May 2015, Enrico Weigelt, metux IT consult wrote:
+RTC in pmic 88PM800 can run even the core is powered off, and user
+can set alarm in RTC. When the alarm is timed out, the PMIC will power up
+the core, and the whole system will boot up. And during PMIC driver probe,
+it will read some register to find out whether this boot is caused by RTC
+timeout or not, and pass on this information to the RTC driver.
 
->>> Important Notice: This message may contain confidential or privileged 
->>> information. It is intended only for the person it was addressed to. If you 
->>> are not the intended recipient of this email you may not copy, forward, 
->>> disclose or otherwise use it or any part of it in any form whatsoever. If 
->>> you received this email in error please notify the sender by replying and 
->>> delete this message and any attachments without retaining a copy.
->> 
->> P.S. some of us actually care about licenses being appropriate to what
->> they're applied to, and at least theoretically capable of being
->> honored. Your email footer may be very slightly undermining your
->> position here.
->
-> This is just a dumb auto-generated footer, coming from my client's
-> mail server over here ... I'm just too lazy for setting up an own
-> MTA on my workstation. You can safely ignore that.
+So we need rtc platform data to be existed in PMIC driver to pass this
+information.
 
-Arguing license issues and at the same time claiming that you should ignore a 
-legal statement like the footer is a bit odd.
+Signed-off-by: Chao Xie <chao.xie@marvell.com>
+Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+---
+ drivers/mfd/88pm800.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-David Lang
+diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
+index 8ea4467..34546a1 100644
+--- a/drivers/mfd/88pm800.c
++++ b/drivers/mfd/88pm800.c
+@@ -586,6 +586,25 @@ static int pm800_probe(struct i2c_client *client,
+ 			return ret;
+ 	}
+ 
++	/*
++	 * RTC in pmic can run even the core is powered off, and user can set
++	 * alarm in RTC. When the alarm is time out, the PMIC will power up
++	 * the core, and the whole system will boot up. When PMIC driver is
++	 * probed, it will read out some register to find out whether this
++	 * boot is caused by RTC timeout or not, and it need pass this
++	 * information to RTC driver.
++	 * So we need rtc platform data to be existed to pass this information.
++	 */
++	if (!pdata->rtc) {
++		pdata->rtc = devm_kzalloc(&client->dev,
++					  sizeof(*(pdata->rtc)), GFP_KERNEL);
++		if (!pdata->rtc) {
++			dev_err(&client->dev,
++					"failed to allocate memory for rtc\n");
++			return -ENOMEM;
++		}
++	}
++
+ 	ret = pm80x_init(client);
+ 	if (ret) {
+ 		dev_err(&client->dev, "pm800_init fail\n");
+-- 
+1.9.1
