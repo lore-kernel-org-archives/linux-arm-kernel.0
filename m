@@ -1,63 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 29 May 2015 09:54:16 +0900
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for v4.2
-Message-ID: <cover.1432860632.git.horms+renesas@verge.net.au>
+Date: Fri, 29 May 2015 09:54:09 +0900
+Subject: [PATCH 01/10] ARM: shmobile: lager dts: Replace "nor-jedec" by "jedec,
+ spi-nor"
+In-Reply-To: <cover.1432860632.git.horms+renesas@verge.net.au>
+References: <cover.1432860632.git.horms+renesas@verge.net.au>
+Message-ID: <755185b279171d78a12f879d06502866c6173b04.1432860632.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these second round of Renesas ARM based SoC DT updates for v4.2.
+Cfr. commit 8947e396a8296c52 ('Documentation: dt: mtd: replace
+"nor-jedec" binding with "jedec, spi-nor"')
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-dt-for-v4.2,
-which I have already sent a pull-request for.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Brian Norris <computersforpeace@gmail.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7790-lager.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The change from using "nor-jedec" instead of "jedec,spi-nor" should
-be safe as the usage of "nor-jedec" was added earlier in the v4.2 release
-cycle and thus has not been present in a release.
-
-
-The following changes since commit 7706993e2deb75022dbcfc3043890aa1a0020189:
-
-  ARM: shmobile: r8a7791: Enable DMA for HSUSB (2015-05-12 08:55:16 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt2-for-v4.2
-
-for you to fetch changes up to acea43fcb02746e907725c6dbd2eb95b32d79ea5:
-
-  ARM: shmobile: r8a7790 dtsi: Describe DMA for the serial ports (2015-05-26 10:02:43 +0900)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM Based SoC DT Updates for v4.2
-
-* Describe DMA for the serial ports of R-Car Gen2 SoCs
-* Add MMCIF max-frequency to R-Car Gen2 SoCs
-* Use "nor-jedec" instead of "jedec,spi-nor"
-
-----------------------------------------------------------------
-Geert Uytterhoeven (8):
-      ARM: shmobile: lager dts: Replace "nor-jedec" by "jedec,spi-nor"
-      ARM: shmobile: koelsch dts: Replace "nor-jedec" by "jedec,spi-nor"
-      ARM: shmobile: bockw-reference dts: Replace "nor-jedec" by "jedec,spi-nor"
-      ARM: shmobile: henninger dts: Replace "nor-jedec" by "jedec,spi-nor"
-      ARM: shmobile: bockw dts: Replace "nor-jedec" by "jedec,spi-nor"
-      ARM: shmobile: r8a7794 dtsi: Describe DMA for the serial ports
-      ARM: shmobile: r8a7791 dtsi: Describe DMA for the serial ports
-      ARM: shmobile: r8a7790 dtsi: Describe DMA for the serial ports
-
-Kuninori Morimoto (2):
-      ARM: shmobile: r8a7790: add MMCIF max-frequency
-      ARM: shmobile: r8a7791: add MMCIF max-frequency
-
- arch/arm/boot/dts/r8a7778-bockw-reference.dts |  2 +-
- arch/arm/boot/dts/r8a7778-bockw.dts           |  2 +-
- arch/arm/boot/dts/r8a7790-lager.dts           |  2 +-
- arch/arm/boot/dts/r8a7790.dtsi                | 22 ++++++++++++++++
- arch/arm/boot/dts/r8a7791-henninger.dts       |  2 +-
- arch/arm/boot/dts/r8a7791-koelsch.dts         |  2 +-
- arch/arm/boot/dts/r8a7791.dtsi                | 37 +++++++++++++++++++++++++++
- arch/arm/boot/dts/r8a7794.dtsi                | 36 ++++++++++++++++++++++++++
- 8 files changed, 100 insertions(+), 5 deletions(-)
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index b6cffcedd116..2eb8a995ae9f 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -429,7 +429,7 @@
+ 	flash: flash at 0 {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+-		compatible = "spansion,s25fl512s", "nor-jedec";
++		compatible = "spansion,s25fl512s", "jedec,spi-nor";
+ 		reg = <0>;
+ 		spi-max-frequency = <30000000>;
+ 		spi-tx-bus-width = <4>;
+-- 
+2.1.4
