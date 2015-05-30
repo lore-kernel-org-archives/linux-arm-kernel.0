@@ -1,84 +1,59 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sat, 30 May 2015 17:36:51 +0200
-Subject: [GIT PULL] ARM: mvebu: drivers changes for v4.2
-In-Reply-To: <20150530141210.GE13641@io.lakedaemon.net>
-References: <5568DF81.1090300@free-electrons.com>
- <20150530141210.GE13641@io.lakedaemon.net>
-Message-ID: <5569D913.4030406@free-electrons.com>
+From: mikko.rapeli@iki.fi (Mikko Rapeli)
+Date: Sat, 30 May 2015 17:37:57 +0200
+Subject: [PATCH 05/98] exynos_drm.h: use __u64 from linux/types.h
+In-Reply-To: <1433000370-19509-1-git-send-email-mikko.rapeli@iki.fi>
+References: <1433000370-19509-1-git-send-email-mikko.rapeli@iki.fi>
+Message-ID: <1433000370-19509-6-git-send-email-mikko.rapeli@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+Fixes userspace compilation error:
 
-On 30/05/2015 16:12, Jason Cooper wrote:
-> Hey Gregory,
-> 
-> On Fri, May 29, 2015 at 11:52:01PM +0200, Gregory CLEMENT wrote:
->> Hi,
->>
->> Here is the first pull request for drivers for mvebu for v4.2.
->> It depends on the mvebu/fixes branch which have been merged in the
->> mvebu/drivers branch
->>
->> Gregory
->>
->> The following changes since commit 885dbd154b2f2ee305cec6fd0a162e1a77ae2b06:
->>
->>   Revert "bus: mvebu-mbus: make sure SDRAM CS for DMA don't overlap the MBus bridge window" (2015-05-28 11:14:31 +0200)
->>
->> are available in the git repository at:
->>
->>   git://git.infradead.org/linux-mvebu.git tags/mvebu-drivers-4.2
->>
->> for you to fetch changes up to bfa1ce5f38938cc9e6c7f2d1011f88eba2b9e2b2:
->>
->>   bus: mvebu-mbus: add mv_mbus_dram_info_nooverlap() (2015-05-28 12:21:08 +0200)
->>
->> ----------------------------------------------------------------
->> mvebu drivers change for 4.2
->>
->> mvebu-mbus: add mv_mbus_dram_info_nooverlap() needed for the new
->> Marvell crypto driver
->>
->> ----------------------------------------------------------------
->> Thomas Petazzoni (1):
->>       bus: mvebu-mbus: add mv_mbus_dram_info_nooverlap()
->>
->>  drivers/bus/mvebu-mbus.c | 117 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->>  include/linux/mbus.h     |   5 +++++
->>  2 files changed, 122 insertions(+)
->>
-> 
-> I don't see this in mvebu/for-next...  Not earth shattering, just mentioning
-> it.  This commit is adding a new function with no callers, so the chances of
-> conflicts / build failures is minimal.
+drm/exynos_drm.h:30:2: error: unknown type name ?uint64_t?
 
-Usually as soon as I apply a patch set, I also merge the branch in
-mvebu/for-next and I push it on infradead. However it is still possible
-that I forgot to push it. So I checked and this patch is part of mvebu/for-next:
-http://git.infradead.org/linux-mvebu.git/commit/bfa1ce5f38938cc9e6c7f2d1011f88eba2b9e2b2
+Signed-off-by: Mikko Rapeli <mikko.rapeli@iki.fi>
+---
+ include/uapi/drm/exynos_drm.h | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-And it was even pulled in linux-next:
-http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/?id=bfa1ce5f38938cc9e6c7f2d1011f88eba2b9e2b2
-
-So this time we are fine, but thanks for having a look on it.
-
-Gregory
-
-> 
-> thx,
-> 
-> Jason.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
-
+diff --git a/include/uapi/drm/exynos_drm.h b/include/uapi/drm/exynos_drm.h
+index 5575ed1..c4468f9 100644
+--- a/include/uapi/drm/exynos_drm.h
++++ b/include/uapi/drm/exynos_drm.h
+@@ -15,6 +15,7 @@
+ #ifndef _UAPI_EXYNOS_DRM_H_
+ #define _UAPI_EXYNOS_DRM_H_
+ 
++#include <linux/types.h>
+ #include <drm/drm.h>
+ 
+ /**
+@@ -27,7 +28,7 @@
+  *	- this handle will be set by gem module of kernel side.
+  */
+ struct drm_exynos_gem_create {
+-	uint64_t size;
++	__u64 size;
+ 	unsigned int flags;
+ 	unsigned int handle;
+ };
+@@ -44,7 +45,7 @@ struct drm_exynos_gem_create {
+ struct drm_exynos_gem_info {
+ 	unsigned int handle;
+ 	unsigned int flags;
+-	uint64_t size;
++	__u64 size;
+ };
+ 
+ /**
+@@ -58,7 +59,7 @@ struct drm_exynos_gem_info {
+ struct drm_exynos_vidi_connection {
+ 	unsigned int connection;
+ 	unsigned int extensions;
+-	uint64_t edid;
++	__u64 edid;
+ };
+ 
+ /* memory type definitions. */
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.1.4
