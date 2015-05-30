@@ -1,73 +1,134 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Fri, 29 May 2015 18:37:09 -0700
-Subject: [PATCH v2 3/6] dt-bindings: brcmstb-gpio: document properties
- for wakeup
-In-Reply-To: <CADtm3G43-EBUOwAxcT2B-0syzDtpjdyfPmOHmmDsNN8+FgoZAA@mail.gmail.com>
-References: <1432865650-4062-1-git-send-email-gregory.0xf0@gmail.com>
- <1432865650-4062-4-git-send-email-gregory.0xf0@gmail.com>
- <20150530003613.GW27753@ld-irv-0074>
- <CADtm3G43-EBUOwAxcT2B-0syzDtpjdyfPmOHmmDsNN8+FgoZAA@mail.gmail.com>
-Message-ID: <20150530013709.GY27753@ld-irv-0074>
+From: bintian.wang@huawei.com (Bintian Wang)
+Date: Sat, 30 May 2015 09:50:57 +0800
+Subject: [PATCH v9 2/6] arm64: hi6220: Document devicetree bindings for
+ Hisilicon hi6220 SoC
+In-Reply-To: <1432950661-23060-1-git-send-email-bintian.wang@huawei.com>
+References: <1432950661-23060-1-git-send-email-bintian.wang@huawei.com>
+Message-ID: <1432950661-23060-3-git-send-email-bintian.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 29, 2015 at 05:57:50PM -0700, Gregory Fong wrote:
-> On Fri, May 29, 2015 at 5:36 PM, Brian Norris
-> <computersforpeace@gmail.com> wrote:
-> > On Thu, May 28, 2015 at 07:14:07PM -0700, Gregory Fong wrote:
-> >> --- a/Documentation/devicetree/bindings/gpio/brcm,brcmstb-gpio.txt
-> >> +++ b/Documentation/devicetree/bindings/gpio/brcm,brcmstb-gpio.txt
-> >> @@ -33,6 +33,12 @@ Optional properties:
-...
-> >>  - #interrupt-cells:
-> >>      Should be <2>.  The first cell is the GPIO number, the second should specify
-> >>      flags.  The following subset of flags is supported:
-> >> @@ -48,7 +54,10 @@ Optional properties:
-> >>      Marks the device node as an interrupt controller
-> >>
-> >>  - interrupt-names:
-> >> -    The name of the IRQ resource used by this controller
-> >> +    The names of the IRQ resources used by this controller
-> >
-> > If you're specifying names, you should list them here.
-> 
-> I was wondering about that.  Some bindings have them listed, some
-> don't.  In this case I know what names currently exist but there could
-> certainly be different ones in the future.  How does that work?  Or am
-> I misunderstanding what this field is used for?  Where are the
-> documented rules for this?
+This patch adds documentation for the devicetree bindings used by the
+DT files of Hisilicon hi6220 SoC mobile platform.
 
-The only documentation I see is:
-Documentation/devicetree/bindings/resource-names.txt
+Signed-off-by: Bintian Wang <bintian.wang@huawei.com>
+Suggested-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ .../bindings/arm/hisilicon/hisilicon.txt           |   87 ++++++++++++++++++++
+ 1 file changed, 87 insertions(+)
 
-That documents the basics of the *-names properties, not their expected
-usage.
-
-In practice, they're only useful if you have enough optional resources
-that fixed indexing isn't sufficient, and you need to use
-platform_get_resource_byname().
-
-So IMO, their purposes seems to be one of these:
-(1) functional (e.g., for get_resource_byname(), when you have more than
-    one optional resource)
-(2) self-documentation (which might run counter to #1, as you begin
-    generating too many unique names)
-(3) no purpose
-
-So IMO, if you ever want (1), they shouldn't have instance-specific
-naming, but should use something generic to the device class. Otherwise,
-they are just self-documentation, and aren't functionally useful. So
-IMO, these sorts of names:
-
-	interrupt-names = "upg_gio_aon", "upg_gio_aon_wakeup";
-
-work better as functional descriptions:
-
-	interrupt-names = "gio", "wakeup";
-
-But in the end, I wouldn't foresee you needing to do (1), so you're left
-with (2) or (3), at which point I'm not sure if you should even mention
-the property.
-
-Just my 2 cents (and those cents may not even be worth face value),
-Brian
+diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+index 35b1bd4..f67d0f3 100644
+--- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
++++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+@@ -1,5 +1,8 @@
+ Hisilicon Platforms Device Tree Bindings
+ ----------------------------------------------------
++Hi6220 SoC
++Required root node properties:
++	- compatible = "hisilicon,hi6220";
+ 
+ Hi4511 Board
+ Required root node properties:
+@@ -13,6 +16,9 @@ HiP01 ca9x2 Board
+ Required root node properties:
+ 	- compatible = "hisilicon,hip01-ca9x2";
+ 
++HiKey Board
++Required root node properties:
++	- compatible = "hisilicon,hi6220-hikey", "hisilicon,hi6220";
+ 
+ Hisilicon system controller
+ 
+@@ -41,6 +47,87 @@ Example:
+ 	};
+ 
+ -----------------------------------------------------------------------
++Hisilicon Hi6220 system controller
++
++Required properties:
++- compatible : "hisilicon,hi6220-sysctrl"
++- reg : Register address and size
++- #clock-cells: should be set to 1, many clock registers are defined
++  under this controller and this property must be present.
++
++Hisilicon designs this controller as one of the system controllers,
++its main functions are the same as Hisilicon system controller, but
++the register offset of some core modules are different.
++
++Example:
++	/*for Hi6220*/
++	sys_ctrl: sys_ctrl {
++		compatible = "hisilicon,hi6220-sysctrl", "syscon";
++		reg = <0x0 0xf7030000 0x0 0x2000>;
++		#clock-cells = <1>;
++	};
++
++
++Hisilicon Hi6220 Power Always ON domain controller
++
++Required properties:
++- compatible : "hisilicon,hi6220-aoctrl"
++- reg : Register address and size
++- #clock-cells: should be set to 1, many clock registers are defined
++  under this controller and this property must be present.
++
++Hisilicon designs this system controller to control the power always
++on domain for mobile platform.
++
++Example:
++	/*for Hi6220*/
++	ao_ctrl: ao_ctrl {
++		compatible = "hisilicon,hi6220-aoctrl", "syscon";
++		reg = <0x0 0xf7800000 0x0 0x2000>;
++		#clock-cells = <1>;
++	};
++
++
++Hisilicon Hi6220 Media domain controller
++
++Required properties:
++- compatible : "hisilicon,hi6220-mediactrl"
++- reg : Register address and size
++- #clock-cells: should be set to 1, many clock registers are defined
++  under this controller and this property must be present.
++
++Hisilicon designs this system controller to control the multimedia
++domain(e.g. codec, G3D ...) for mobile platform.
++
++Example:
++	/*for Hi6220*/
++	media_ctrl: media_ctrl {
++		compatible = "hisilicon,hi6220-mediactrl", "syscon";
++		reg = <0x0 0xf4410000 0x0 0x1000>;
++		#clock-cells = <1>;
++	};
++
++
++Hisilicon Hi6220 Power Management domain controller
++
++Required properties:
++- compatible : "hisilicon,hi6220-pmctrl"
++- reg : Register address and size
++- #clock-cells: should be set to 1, some clock registers are define
++  under this controller and this property must be present.
++
++Hisilicon designs this system controller to control the power management
++domain for mobile platform.
++
++Example:
++	/*for Hi6220*/
++	pm_ctrl: pm_ctrl {
++		compatible = "hisilicon,hi6220-pmctrl", "syscon";
++		reg = <0x0 0xf7032000 0x0 0x1000>;
++		#clock-cells = <1>;
++	};
++
++-----------------------------------------------------------------------
+ Hisilicon HiP01 system controller
+ 
+ Required properties:
+-- 
+1.7.9.5
