@@ -1,64 +1,70 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 30 May 2015 12:14:30 +0200
-Subject: [PATCH] fix n900 dts file to work around 4.1 touchscreen
- regression on n900
-In-Reply-To: <20150529200306.GB17267@lukather>
-References: <201505241444.41039@pali> <20150527132545.GA23434@amd>
- <20150527133311.GJ30798@pali> <20150527143722.GA28108@amd>
- <20150527145837.GA13223@earth> <20150529190816.GA20232@amd>
- <20150529192505.GA28987@amd> <20150529193211.GA7599@amd>
- <20150529194955.GV2026@saruman.tx.rr.com>
- <20150529200306.GB17267@lukather>
-Message-ID: <20150530101430.GA505@amd>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Sat, 30 May 2015 19:23:24 +0530
+Subject: [PATCH] ARM: dts: odroidxu3: Enable USB3 regulators
+In-Reply-To: <5566DDA6.1080508@samsung.com>
+References: <1432803494-3516-1-git-send-email-linux.amoon@gmail.com>
+ <5566DDA6.1080508@samsung.com>
+Message-ID: <CANAwSgTk=YwH23F4981j6z9m4+=_Yrratz6BRSQU7PmPHGT0Bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2015-05-29 22:03:06, Maxime Ripard wrote:
-> On Fri, May 29, 2015 at 02:49:55PM -0500, Felipe Balbi wrote:
-> > Hi,
-> > 
-> > On Fri, May 29, 2015 at 09:32:11PM +0200, Pavel Machek wrote:
-> > > Fix dts to match what the Linux kernel expects. This works around
-> > > touchscreen problems in 4.1 linux on Nokia n900.
-> > >     
-> > > Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/input/touchscreen/tsc2005.txt b/Documentation/devicetree/bindings/input/touchscreen/tsc2005.txt
-> > > index 4b641c7..09089a6 100644
-> > > --- a/Documentation/devicetree/bindings/input/touchscreen/tsc2005.txt
-> > > +++ b/Documentation/devicetree/bindings/input/touchscreen/tsc2005.txt
-> > > @@ -32,8 +32,8 @@ Example:
-> > >  		touchscreen-fuzz-x = <4>;
-> > >  		touchscreen-fuzz-y = <7>;
-> > >  		touchscreen-fuzz-pressure = <2>;
-> > > -		touchscreen-max-x = <4096>;
-> > > -		touchscreen-max-y = <4096>;
-> > > +		touchscreen-size-x = <4096>;
-> > > +		touchscreen-size-y = <4096>;
-> > 
-> > IMHO, the older binding needs to be supported as well. It's fine to
-> > update the DTS for the new binding, but even Documentation says
-> > touchscreen-max-[xy] and if the driver changed that, the driver should
-> > be fixed too. Besides, it seems like this has been in tree since v3.16:
-> > 
-> > $ git describe a38cfebb56898633687ab337fd53710e63a0aedd
-> > v3.15-rc5-72-ga38cfebb5689
-> > 
-> > So, because this has been wrongly documented for so long, we should
-> > support both bindings. Sure, deprecate touchscreen-max-[xy], but they
-> > must still be supported, IMO.
-> 
-> This property has never been anything but a typo in a documentation of
-> a single driver.
-> 
-> Feel free to fix that in that driver, but I don't see why the core
-> code should handle that isolated typo.
+On 28 May 2015 at 14:49, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
+> On 28.05.2015 17:58, Anand Moon wrote:
+>> Enable regulator for usbdrd3_0 and usbdrd3_1
+>>>From the schematic pin diagram USB3_0 and USB3_1
+>> is regulated by LDO9 and LD011.
+>
+> Please reformat statement above to proper sentence(s) without ">" before
+> "From".
+>
+>>
+>> Fix the boot message of failed.
+>> [    3.503539] exynos-dwc3 usb at 12000000: Looking up vdd33-supply from device tree
+>> [    3.503556] exynos-dwc3 usb at 12000000: Looking up vdd33-supply property in node /usb at 12000000 failed
+>> [    3.503568] usb at 12000000 supply vdd33 not found, using dummy regulator
+>> [    3.509154] exynos-dwc3 usb at 12000000: Looking up vdd10-supply from device tree
+>> [    3.509170] exynos-dwc3 usb at 12000000: Looking up vdd10-supply property in node /usb at 12000000 failed
+>> [    3.509181] usb at 12000000 supply vdd10 not found, using dummy regulator
+>> [    3.917548] exynos-dwc3 usb at 12400000: Looking up vdd33-supply from device tree
+>> [    3.917565] exynos-dwc3 usb at 12400000: Looking up vdd33-supply property in node /usb at 12400000 failed
+>> [    3.917578] usb at 12400000 supply vdd33 not found, using dummy regulator
+>> [    3.922731] exynos-dwc3 usb at 12400000: Looking up vdd10-supply from device tree
+>> [    3.922747] exynos-dwc3 usb at 12400000: Looking up vdd10-supply property in node /usb at 12400000 failed
+>>
+>> ---
+>> This patch is based on Krzysztof github branch work-next/odroid-xu3-s2mps11-irq
+>> ---
+>
+> I mentioned this already on previous postings. Let's make an exercise.
+> Please:
+> 1. Save your email as mbox format (from mailer).
+> 2. Go to a GIT repo with kernel and checkout base branch.
+> 3. git am 0001-the-name-of-file.mbox
+> 4. git show
+>
+> Do you see the signed-off-by in commit?
+>
+> The patch itself looks good, thanks for fixing this. Just please fix the
+> issues with commit message.
+>
+> By the way:
+> 1. The always-on from LDO9 could be probably removed if the ehci-exynos
+> driver had regulator consumer implemented.
+> 2. The Documentation/devicetree/bindings/usb/exynos-usb.txt (or dwc.txt)
+> should proably mention the vdd-supply property.
 
-Well... the driver was not broken... before you did "cleanup" that did
-two functional changes. And yes, the dts should be fixed, but that
-does not make your "cleanup" good.
+Hi Krzysztof,
 
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+https://patchwork.kernel.org/patch/4420061/
+https://patchwork.kernel.org/patch/4420071/
+
+These patch are missing for this changes to make it work correctly.
+
+Can you share you thought on this.
+
+-Anand Moon
+
+> Best regards,
+> Krzysztof
+>
+>
