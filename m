@@ -1,75 +1,41 @@
-From: majun258@huawei.com (majun (F))
-Date: Sat, 30 May 2015 11:19:18 +0800
-Subject: [PATCH 4/4]:dt-binding:Documents the mbigen bindings
-Message-ID: <55692C36.1000309@huawei.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Sat, 30 May 2015 14:21:29 +0900
+Subject: [GIT PULL] ARM: EXYNOS: More defconfig for 4.2
+Message-ID: <1432963289-32664-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the mbigen msi interrupt controller bindings document
+Dear Kukjin,
+
+Minor defconfig changes from Anand Moon for Odroid XU3 board.
+You can find them also on the lists with my reviewed-by.
+
+Best regards,
+Krzysztof
 
 
-Signed-off-by: Ma Jun <majun258@huawei.com>
----
- Documentation/devicetree/bindings/arm/mbigen.txt |   51 ++++++++++++++++++++++
- 1 files changed, 51 insertions(+), 0 deletions(-)
- create mode 100755 Documentation/devicetree/bindings/arm/mbigen.txt
+The following changes since commit 030bbdbf4c833bc69f502eae58498bc5572db736:
 
-diff --git a/Documentation/devicetree/bindings/arm/mbigen.txt b/Documentation/devicetree/bindings/arm/mbigen.txt
-new file mode 100755
-index 0000000..d442b31
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/mbigen.txt
-@@ -0,0 +1,51 @@
-+Hisilicon mbigen device tree bindings.
-+=======================================
-+
-+Mbigen means: message based interrupt generator.
-+
-+MBI is kind of msi interrupt only used on Non-PCI devices.
-+
-+To reduce the wired interrupt number connected to GIC,
-+Hisilicon designed mbigen to collect and generate interrupt.
-+
-+
-+Non-pci devices can connect to mbigen and gnerate the inteerrupt
-+by wirtting ITS register.
-+
-+The mbigen and devices connect to mbigen have the following properties:
-+
-+
-+Mbigen required properties:
-+-------------------------------------------
-+-compatible: Should be "hisilicon,mbi-gen"
-+-msi-parent: should specified the ITS mbigen connected
-+-interrupt controller: Identifies the node as an interrupt controller
-+- #interrupt-cells : Specifies the number of cells needed to encode an
-+  interrupt source. The value is 2 for now.
-+- reg: Specifies the base physical address and size of the ITS
-+  registers.
-+
-+Examples:
-+
-+	mbigen_pa: interrupt-controller at 4c030000 {
-+			compatible = "hisilicon,mbi-gen";
-+			msi-parent = <&its_pa>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			reg = <0x4c030000 0x10000>;
-+		};
-+
-+Device connect to mbigen required properties:
-+----------------------------------------------------
-+-interrupt-parent: Specifies the mbigen node which device connected.
-+-interrupts:specifies the interrupt source.The first cell is hwirq num, the
-+  second number is trigger type.
-+
-+Examples:
-+	usb0: ehci at a1000000 {
-+		compatible = "generic-ehci";
-+		interrupt-parent = <&mbigen_pa>;
-+		reg = <0xa1000000 0x10000>;
-+		interrupts = <20 4>;
-+	};
-+
--- 
-1.7.1
+  Linux 4.1-rc3 (2015-05-10 15:12:29 -0700)
+
+are available in the git repository at:
+
+  https://github.com/krzk/linux.git tags/samsung-defconfig-for-4.2
+
+for you to fetch changes up to 314be0834460dfde70b614f1a2e5d041684ce796:
+
+  ARM: exynos_defconfig: Enable LEDs for Odroid-XU3 (2015-05-30 13:19:49 +0900)
+
+----------------------------------------------------------------
+Enable in exynos_defconfig options for Odroid XU3:
+1. sensors (fan, ina231),
+2. LED.
+
+----------------------------------------------------------------
+Anand Moon (3):
+      ARM: exynos_defconfig: Enable CONFIG_SENSORS_PWM_FAN for Odroid-XU3 pmw-fan
+      ARM: exynos_defconfig: Enable CONFIG_SENSORS_INA2XX for Odroid-XU3
+      ARM: exynos_defconfig: Enable LEDs for Odroid-XU3
+
+ arch/arm/configs/exynos_defconfig | 5 +++++
+ 1 file changed, 5 insertions(+)
