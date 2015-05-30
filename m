@@ -1,90 +1,62 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 30 May 2015 17:53:22 +0200
-Subject: [PATCH 11/12] i2c:pxa: Use devm_ variants in probe function
-In-Reply-To: <1432818224-17070-12-git-send-email-vaibhav.hiremath@linaro.org>
- (Vaibhav Hiremath's message of "Thu, 28 May 2015 18:33:43 +0530")
-References: <1432818224-17070-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1432818224-17070-12-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <878uc6xdsd.fsf@belgarion.home>
+From: linux-arm@myspectrum.nl (Jeroen Hofstee)
+Date: Sat, 30 May 2015 17:56:35 +0200
+Subject: OMAP baseline test results for v4.1-rc5
+In-Reply-To: <alpine.DEB.2.02.1505301534250.26925@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1505301534250.26925@utopia.booyaka.com>
+Message-ID: <5569DDB3.2040802@myspectrum.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vaibhav Hiremath <vaibhav.hiremath@linaro.org> writes:
+Hello Paul,
 
-> @@ -1270,10 +1270,17 @@ static int i2c_pxa_probe(struct platform_device *dev)
->  	struct resource *res = NULL;
->  	int ret, irq;
->  
-> -	i2c = kzalloc(sizeof(struct pxa_i2c), GFP_KERNEL);
-> +	i2c = devm_kzalloc(&dev->dev, sizeof(struct pxa_i2c), GFP_KERNEL);
->  	if (!i2c) {
-> -		ret = -ENOMEM;
-> -		goto emalloc;
-> +		dev_err(&dev->dev, "memory allocation failed\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	res = platform_get_resource(dev, IORESOURCE_MEM, 0);
-> +	irq = platform_get_irq(dev, 0);
-> +	if (res == NULL || irq < 0) {
-> +		dev_err(&dev->dev, "no mem/irq resource\n");
-> +		return -ENODEV;
-I'd like to have the error code here, as in other part of the driver.
-Ie. I'd want :
-    dev_err(&dev->dev, "no mem/irq resource: %d\n", irq);
+On 30-05-15 17:50, Paul Walmsley wrote:
+> Here are some basic OMAP test results for Linux v4.1-rc5.
+> Logs and other details at:
+>
+>      http://www.pwsan.com/omap/testlogs/test_v4.1-rc5/20150529162206/
+>
 
-Moreover, return -ENODEV if res == NULL, but return irq if irq < 0 (think of
--EPROBE_DEFER).
+The cmt3517 seems to have these some In-Band errors.
+Do you happen to know where these are coming from?
 
-> +	i2c->reg_base = devm_ioremap_resource(&dev->dev, res);
->  	if (!i2c->reg_base) {
-if (IS_ERR(i2c->reg_base)) instead.
+Regards,
+Jeroen
 
-> -		ret = -EIO;
-> -		goto eremap;
-> +		dev_err(&dev->dev, "failed to map resource\n");
-> +		return -EIO;
-Ditto, ie. include PTR_ERR(i2c->reg_base) in the dev_err(), and return
-PTR_ERR(i2c->reg_base);
-
-> @@ -1361,11 +1356,13 @@ static int i2c_pxa_probe(struct platform_device *dev)
->  		i2c->adap.algo = &i2c_pxa_pio_algorithm;
->  	} else {
->  		i2c->adap.algo = &i2c_pxa_algorithm;
-> -		ret = request_irq(irq, i2c_pxa_handler,
-> +		ret = devm_request_irq(&dev->dev, irq, i2c_pxa_handler,
->  				IRQF_SHARED | IRQF_NO_SUSPEND,
->  				dev_name(&dev->dev), i2c);
-> -		if (ret)
-> +		if (ret) {
-> +			dev_err(&dev->dev, "failed to request irq\n");
-Ditto for the dev_err() and error code reporting.
-
-> @@ -1380,8 +1377,8 @@ static int i2c_pxa_probe(struct platform_device *dev)
->  
->  	ret = i2c_add_numbered_adapter(&i2c->adap);
->  	if (ret < 0) {
-> -		printk(KERN_INFO "I2C: Failed to add bus\n");
-> -		goto eadapt;
-> +		dev_err(&dev->dev, "failed to add bus\n");
-Ditto.
-
-> @@ -1411,26 +1408,15 @@ static int i2c_pxa_probe(struct platform_device *dev)
->  		}
->  	}
->  #ifdef CONFIG_I2C_PXA_SLAVE
-> -	printk(KERN_INFO "I2C: %s: PXA I2C adapter, slave address %d\n",
-> +	pr_info("I2C: %s: PXA I2C adapter, slave address %d\n",
->  	       dev_name(&i2c->adap.dev), i2c->slave_addr);
-dev_info() maybe ?
-
->  #else
-> -	printk(KERN_INFO "I2C: %s: PXA I2C adapter\n",
-> -	       dev_name(&i2c->adap.dev));
-> +	pr_info("I2C: %s: PXA I2C adapter\n", dev_name(&i2c->adap.dev));
-Ditto.
-
-Cheers.
-
--- 
-Robert
+[    0.476773] In-band Error seen by MPU  at address 0
+[    0.476802] ------------[ cut here ]------------
+[    0.476848] WARNING: CPU: 0 PID: 1 at drivers/bus/omap_l3_smx.c:166 
+omap3_l3_app_irq+0xcc/0x124()
+[    0.476865] Modules linked in:
+[    0.476899] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 
+4.1.0-rc5-143184-gba155e2 #1
+[    0.476916] Hardware name: Generic AM3517 (Flattened Device Tree)
+[    0.476964] [<c0016504>] (unwind_backtrace) from [<c0012a44>] 
+(show_stack+0x10/0x14)
+[    0.476997] [<c0012a44>] (show_stack) from [<c05ddbd4>] 
+(dump_stack+0x80/0x9c)
+[    0.477028] [<c05ddbd4>] (dump_stack) from [<c004000c>] 
+(warn_slowpath_common+0x78/0xb4)
+[    0.477056] [<c004000c>] (warn_slowpath_common) from [<c0040064>] 
+(warn_slowpath_null+0x1c/0x24)
+[    0.477083] [<c0040064>] (warn_slowpath_null) from [<c0370ed0>] 
+(omap3_l3_app_irq+0xcc/0x124)
+[    0.477121] [<c0370ed0>] (omap3_l3_app_irq) from [<c009804c>] 
+(handle_irq_event_percpu+0x64/0x204)
+[    0.477150] [<c009804c>] (handle_irq_event_percpu) from [<c0098228>] 
+(handle_irq_event+0x3c/0x5c)
+[    0.477181] [<c0098228>] (handle_irq_event) from [<c009b09c>] 
+(handle_level_irq+0xb4/0x13c)
+[    0.477209] [<c009b09c>] (handle_level_irq) from [<c00978f0>] 
+(generic_handle_irq+0x20/0x30)
+[    0.477235] [<c00978f0>] (generic_handle_irq) from [<c0097a08>] 
+(__handle_domain_irq+0x68/0xdc)
+[    0.477263] [<c0097a08>] (__handle_domain_irq) from [<c0009480>] 
+(omap_intc_handle_irq+0xb4/0xc4)
+[    0.477299] [<c0009480>] (omap_intc_handle_irq) from [<c05e48a4>] 
+(__irq_svc+0x44/0x5c)
+[    0.477317] Exception stack(0xce0a3d00 to 0xce0a3d48)
+[    0.477342] 3d00: 00000001 ce0a1138 00000000 ce0a0b80 60000153 
+ce013c60 ce013c60 00000000
+[    0.477365] 3d20: 0000001a 60000153 ce013c38 00000000 00000000 
+ce0a3d48 c008dde8 c05e4424
+[    0.477382] 3d40: 20000153 ffffffff
