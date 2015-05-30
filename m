@@ -1,94 +1,75 @@
 From: majun258@huawei.com (majun (F))
-Date: Sat, 30 May 2015 11:19:09 +0800
-Subject: [PATCH 2/4]: Change msi to support the Mbigen interrupt
-Message-ID: <55692C2D.50005@huawei.com>
+Date: Sat, 30 May 2015 11:19:18 +0800
+Subject: [PATCH 4/4]:dt-binding:Documents the mbigen bindings
+Message-ID: <55692C36.1000309@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is applied to support the interrupts from Mbigen.
+Add the mbigen msi interrupt controller bindings document
 
-As a interrupt controller, Mbigen is used as a child domain of MSI
-domain just like pci device.
-
-Change log:
---add IRQ_DOMAIN_FLAG_MBIGEN to presents the interrupt from mbigen
---add function is_mbigen_domain to check the interrupt domain
---modified irq_chip_write_msi_msg to use the different message write function
-  for interrupt from mbigen
 
 Signed-off-by: Ma Jun <majun258@huawei.com>
 ---
- include/linux/irqdomain.h |    2 +-
- include/linux/msi.h       |    1 +
- kernel/irq/msi.c          |   22 +++++++++++++++++++++-
- 3 files changed, 23 insertions(+), 2 deletions(-)
- mode change 100644 => 100755 include/linux/msi.h
- mode change 100644 => 100755 kernel/irq/msi.c
+ Documentation/devicetree/bindings/arm/mbigen.txt |   51 ++++++++++++++++++++++
+ 1 files changed, 51 insertions(+), 0 deletions(-)
+ create mode 100755 Documentation/devicetree/bindings/arm/mbigen.txt
 
-diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-index 676d730..cb6b33a 100644
---- a/include/linux/irqdomain.h
-+++ b/include/linux/irqdomain.h
-@@ -136,7 +136,7 @@ enum {
-
- 	/* Core calls alloc/free recursive through the domain hierarchy. */
- 	IRQ_DOMAIN_FLAG_AUTO_RECURSIVE	= (1 << 1),
--
-+	IRQ_DOMAIN_FLAG_MBIGEN = (1 << 2),
- 	/*
- 	 * Flags starting from IRQ_DOMAIN_FLAG_NONCORE are reserved
- 	 * for implementation specific purposes and ignored by the
-diff --git a/include/linux/msi.h b/include/linux/msi.h
-old mode 100644
-new mode 100755
-index 8ac4a68..3e2b6c7
---- a/include/linux/msi.h
-+++ b/include/linux/msi.h
-@@ -239,5 +239,6 @@ irq_hw_number_t pci_msi_domain_calc_hwirq(struct pci_dev *dev,
- int pci_msi_domain_check_cap(struct irq_domain *domain,
- 			     struct msi_domain_info *info, struct device *dev);
- #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
-+bool is_mbigen_domain(struct irq_data *data);
-
- #endif /* LINUX_MSI_H */
-diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
-old mode 100644
-new mode 100755
-index 474de5c..1dba07e
---- a/kernel/irq/msi.c
-+++ b/kernel/irq/msi.c
-@@ -31,11 +31,31 @@ void get_cached_msi_msg(unsigned int irq, struct msi_msg *msg)
- }
- EXPORT_SYMBOL_GPL(get_cached_msi_msg);
-
-+bool is_mbigen_domain(struct irq_data *data)
-+{
-+	int virq;
-+	struct irq_domain *domain;
-+	struct irq_data *source_irq_data;
+diff --git a/Documentation/devicetree/bindings/arm/mbigen.txt b/Documentation/devicetree/bindings/arm/mbigen.txt
+new file mode 100755
+index 0000000..d442b31
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mbigen.txt
+@@ -0,0 +1,51 @@
++Hisilicon mbigen device tree bindings.
++=======================================
 +
-+	virq = data->irq;
-+	source_irq_data = irq_get_irq_data(virq);
-+	domain = source_irq_data->domain;
++Mbigen means: message based interrupt generator.
 +
-+	if (domain->flags & IRQ_DOMAIN_FLAG_MBIGEN)
-+		return true;
-+	else
-+		return false;
++MBI is kind of msi interrupt only used on Non-PCI devices.
 +
-+}
++To reduce the wired interrupt number connected to GIC,
++Hisilicon designed mbigen to collect and generate interrupt.
 +
- #ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
- static inline void irq_chip_write_msi_msg(struct irq_data *data,
- 					  struct msi_msg *msg)
- {
--	data->chip->irq_write_msi_msg(data, msg);
-+	if (is_mbigen_domain(data))
-+		data->chip->irq_write_mbi_msg(data, msg);
-+	else
-+		data->chip->irq_write_msi_msg(data, msg);
- }
-
- /**
++
++Non-pci devices can connect to mbigen and gnerate the inteerrupt
++by wirtting ITS register.
++
++The mbigen and devices connect to mbigen have the following properties:
++
++
++Mbigen required properties:
++-------------------------------------------
++-compatible: Should be "hisilicon,mbi-gen"
++-msi-parent: should specified the ITS mbigen connected
++-interrupt controller: Identifies the node as an interrupt controller
++- #interrupt-cells : Specifies the number of cells needed to encode an
++  interrupt source. The value is 2 for now.
++- reg: Specifies the base physical address and size of the ITS
++  registers.
++
++Examples:
++
++	mbigen_pa: interrupt-controller at 4c030000 {
++			compatible = "hisilicon,mbi-gen";
++			msi-parent = <&its_pa>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			reg = <0x4c030000 0x10000>;
++		};
++
++Device connect to mbigen required properties:
++----------------------------------------------------
++-interrupt-parent: Specifies the mbigen node which device connected.
++-interrupts:specifies the interrupt source.The first cell is hwirq num, the
++  second number is trigger type.
++
++Examples:
++	usb0: ehci at a1000000 {
++		compatible = "generic-ehci";
++		interrupt-parent = <&mbigen_pa>;
++		reg = <0xa1000000 0x10000>;
++		interrupts = <20 4>;
++	};
++
 -- 
 1.7.1
