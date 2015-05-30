@@ -1,78 +1,97 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Sat, 30 May 2015 09:01:22 +0900
-Subject: [RFC PATCH 0/5] livepatch: add support on arm64
-In-Reply-To: <1432792265-24076-1-git-send-email-huawei.libin@huawei.com>
-References: <1432792265-24076-1-git-send-email-huawei.libin@huawei.com>
-Message-ID: <5568FDD2.2040005@hitachi.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Fri, 29 May 2015 17:10:33 -0700
+Subject: [PATCH v2 2/6] gpio: brcmstb: Add interrupt support
+In-Reply-To: <1432865650-4062-3-git-send-email-gregory.0xf0@gmail.com>
+References: <1432865650-4062-1-git-send-email-gregory.0xf0@gmail.com>
+ <1432865650-4062-3-git-send-email-gregory.0xf0@gmail.com>
+Message-ID: <20150530001033.GV27753@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/05/28 14:51, Li Bin wrote:
-> This patchset propose a method for gcc -mfentry feature(profile
-> before prologue) implementation for arm64, and propose the livepatch
-> implementation for arm64 based on this feature.
-> The gcc implementation about this feature will be post to the gcc 
-> community soon.
-> 
-> With this -mfentry feature, the entry of each function like:
-> 
-> foo:
->     mov x9, x30 
->     bl __fentry__
->     mov x30, x9
->     [prologue]
->     ... 
-> 
-> The x9 is a callee corruptible register, and the __fentry__ function
-> is responsible to protect all registers, so it can be used to protect
-> the x30. And the added two instructions which is register mov operation
-> have ralatively small impact on performance.
+A few small comments:
 
-Hm, this implementation looks good to me :)
-This also enables us to KPROBES_ON_FTRACE too.
+On Thu, May 28, 2015 at 07:14:06PM -0700, Gregory Fong wrote:
+> v2:
+> - since imask member of bank struct was removed, just read and write from mask
+>   reg and don't maintain a shadow
 
-Thanks,
+^^ this comment may be addressing what I'm going to ask about below? Not
+sure why this was changed, actually.
 
+> - warn on invalid IRQs
+> - move some irq setup to a separate function since probe is getting unwieldy
 > 
-> This patchset has been tested on arm64 platform.
+>  drivers/gpio/Kconfig        |   1 +
+>  drivers/gpio/gpio-brcmstb.c | 276 ++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 277 insertions(+)
 > 
-> Li Bin (4):
->   livepatch: ftrace: arm64: Add support for DYNAMIC_FTRACE_WITH_REGS
->   livepatch: ftrace: add ftrace_function_stub_ip function
->   livepatch: ftrace: arm64: Add support for -mfentry on arm64
->   livepatch: arm64: add support for livepatch on arm64
-> 
-> Xie XiuQi (1):
->   livepatch: arm64: support relocation in a module
-> 
->  arch/arm64/Kconfig                 |    5 +
->  arch/arm64/include/asm/ftrace.h    |    9 +
->  arch/arm64/include/asm/livepatch.h |   45 +++++
->  arch/arm64/kernel/Makefile         |    1 +
->  arch/arm64/kernel/arm64ksyms.c     |    4 +
->  arch/arm64/kernel/entry-ftrace.S   |  154 +++++++++++++++-
->  arch/arm64/kernel/ftrace.c         |   28 +++-
->  arch/arm64/kernel/livepatch.c      |   41 ++++
->  arch/arm64/kernel/module.c         |  355 ++++++++++++++++++------------------
->  include/linux/ftrace.h             |    1 +
->  kernel/livepatch/core.c            |   17 ++-
->  kernel/trace/ftrace.c              |   32 ++++
->  scripts/recordmcount.pl            |    2 +-
->  13 files changed, 508 insertions(+), 186 deletions(-)
->  create mode 100644 arch/arm64/include/asm/livepatch.h
->  create mode 100644 arch/arm64/kernel/livepatch.c
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
+...
+> diff --git a/drivers/gpio/gpio-brcmstb.c b/drivers/gpio/gpio-brcmstb.c
+> index 7a3cb1f..b9962ff 100644
+> --- a/drivers/gpio/gpio-brcmstb.c
+> +++ b/drivers/gpio/gpio-brcmstb.c
+...
+> @@ -63,6 +69,231 @@ brcmstb_gpio_gc_to_priv(struct gpio_chip *gc)
+...
+> +static void brcmstb_gpio_irq_bank_handler(int irq,
+> +		struct brcmstb_gpio_bank *bank)
+> +{
+> +	struct brcmstb_gpio_priv *priv = bank->parent_priv;
+> +	void __iomem *reg_base = priv->reg_base;
+> +	unsigned long status;
+> +	unsigned long flags;
+> +
+> +	spin_lock_irqsave(&bank->bgc.lock, flags);
+> +	while ((status = bank->bgc.read_reg(reg_base + GIO_STAT(bank->id)) &
+> +			 bank->bgc.read_reg(reg_base + GIO_MASK(bank->id)))) {
 
+In case you do run this loop multiple times (multiple interrupts in
+progress?), wouldn't it make sense to stash the mask exactly once,
+outside the loop? It's probably not a real big deal in practice, I
+guess.
 
--- 
-Masami HIRAMATSU
-Linux Technology Research Center, System Productivity Research Dept.
-Center for Technology Innovation - Systems Engineering
-Hitachi, Ltd., Research & Development Group
-E-mail: masami.hiramatsu.pt at hitachi.com
+> +		int bit;
+> +		for_each_set_bit(bit, &status, 32) {
+> +			int hwirq = bank->bgc.gc.base -
+> +				priv->gpio_base + bit;
+> +			int child_irq =
+> +				irq_find_mapping(priv->irq_domain,
+> +						 hwirq);
+> +			u32 stat = bank->bgc.read_reg(reg_base +
+> +						      GIO_STAT(bank->id));
+> +			if (bit >= bank->width)
+> +				dev_warn(&priv->pdev->dev,
+> +					 "IRQ for invalid GPIO (bank=%d, offset=%d)\n",
+> +					 bank->id, bit);
+> +			bank->bgc.write_reg(reg_base + GIO_STAT(bank->id),
+> +					    stat | BIT(bit));
+> +			generic_handle_irq(child_irq);
+> +		}
+> +	}
+> +	spin_unlock_irqrestore(&bank->bgc.lock, flags);
+> +}
+...
+> @@ -153,6 +410,16 @@ static int brcmstb_gpio_probe(struct platform_device *pdev)
+>  	priv->reg_base = reg_base;
+>  	priv->pdev = pdev;
+>  
+> +	if (of_find_property(np, "interrupt-controller", NULL)) {
+
+of_property_read_bool()?
+
+> +		priv->parent_irq = platform_get_irq(pdev, 0);
+> +		if (priv->parent_irq < 0) {
+> +			dev_err(dev, "Couldn't get IRQ");
+> +			return -ENOENT;
+> +		}
+> +	} else {
+> +		priv->parent_irq = -ENOENT;
+> +	}
+> +
+>  	INIT_LIST_HEAD(&priv->bank_list);
+>  	if (brcmstb_gpio_sanity_check_banks(dev, np, res))
+>  		return -EINVAL;
+
+Otherwise, looks OK to my inexpert eyes.
+
+Reviewed-by: Brian Norris <computersforpeace@gmail.com>
