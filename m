@@ -1,36 +1,53 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Sat, 30 May 2015 14:30:39 +0900
-Subject: [GIT PULL] ARM: EXYNOS: Improvements for 4.2, 3rd
-Message-ID: <1432963839-19051-1-git-send-email-k.kozlowski@samsung.com>
+From: joe@perches.com (Joe Perches)
+Date: Fri, 29 May 2015 22:38:03 -0700
+Subject: [PATCH 1/4]:Add mbigen driver to support mbigen interrupt
+ controller
+In-Reply-To: <55692C29.60003@huawei.com>
+References: <55692C29.60003@huawei.com>
+Message-ID: <1432964283.2984.9.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Kukjin,
+On Sat, 2015-05-30 at 11:19 +0800, majun (F) wrote:
+> This patch contains the mbigen device driver.
 
-Old patch from Marek related to powering down of Exynos boards.
+Trivial notes:
 
-Best regards,
-Krzysztof
+Please use scripts/checkpatch.pl on your patches and see
+if you want to correct any of the messages it produces.
 
+> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
 
-The following changes since commit 8164b91ee8f4bb009fb16ef7c54e94a55e83dd35:
+You could add
+#define pr_fmt(fmt) "mbigen: " fmt
+before any of the #includes so that all of the
+pr_<level>(fmt, ...) uses are prefixed with "mbigen: "
 
-  ARM: exynos: Fix wake-up interrupts for Exynos3250 (2015-05-30 13:29:34 +0900)
+> +int mbi_parse_irqs(struct device *dev, struct mbi_ops *ops)
+> +{
+> +	pr_warn("%s:this function not use now\n", __func__);
 
-are available in the git repository at:
+Maybe pr_warn_once()
 
-  https://github.com/krzk/linux.git tags/samsung-for-4.2-3
+> +	return -EINVAL;
+> +}
+> +EXPORT_SYMBOL(mbi_parse_irqs);
+> +
+> +void mbi_free_irqs(struct device *dev, unsigned int virq, unsigned int nvec)
+> +{
+> +	pr_warn("%s:this function not use now\n", __func__);
 
-for you to fetch changes up to 126bdccac56b97449a603133a2d389d280630d9a:
+pr_warn_once()?
 
-  exynos: pmu: use PS_HOLD based poweroff for all supported SoCs (2015-05-30 13:30:17 +0900)
+> +static struct mbigen *mbigen_get_device(struct mbigen_chip *chip,
+> +										unsigned int nid)
+> +{
+> +	struct mbigen *tmp, *mbigen;
+> +	bool found = false;
+> +
+> +	if (nid >= MG_NR) {
+> +		pr_warn("MBIGEN: Device ID exceeds max number!\n");
 
-----------------------------------------------------------------
-Old fix for proper power down of Exynos boards.
+So this wouldn't need a "MBIGEN: " prefix
 
-----------------------------------------------------------------
-Marek Szyprowski (1):
-      exynos: pmu: use PS_HOLD based poweroff for all supported SoCs
-
- arch/arm/mach-exynos/pmu.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+etc...
