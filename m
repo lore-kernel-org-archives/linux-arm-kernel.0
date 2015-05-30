@@ -1,42 +1,36 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Sat, 30 May 2015 16:43:14 -0400
-Subject: [linux-sunxi] [PATCH v2 0/6] Introduce Allwinner A33 support
-In-Reply-To: <1432997706-20172-1-git-send-email-hdegoede@redhat.com>
-References: <1432997706-20172-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <CAKON4OycC=ADUwFdJQJiAJ9tS6AJJ_GaoG8Tn5bNFx9jrxaoUQ@mail.gmail.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sat, 30 May 2015 23:14:43 +0200
+Subject: [PATCH v2 0/2] 8250 UART driver for NXP LPC18xx family
+Message-ID: <1433020485-20994-1-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Is the A33 Lollipop SDK somewhere?
+This patch set adds a serial port driver for the 8250-
+based UART found on LPC18xx/43xx devices. The UART is
+16550A compatible with additional features like RS485
+support, synchronous mode, IrDA, and DMA.
 
-On Sat, May 30, 2015 at 10:55 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi Maxime,
->
-> Here is a cleaned up series of Vishnu Patekar's A33 support. This should
-> address all concerns raised during the posting of v1.
->
-> I've tested that all peripherals declared in the shared sun8i-a23-a33.dtsi
-> work on the A33 too, with the exception of the dma-controller. For the
-> dma-controller I've compared the A23 vs A33 manual and the entire dma-
-> controller description including the register description is bit for bit
-> identical.
->
-> This has been tested on a 7" Ippo Q8H v1.2 A23 tablet, a 7" Ippo Q8H v1.2
-> A33 tablet and a 10" GA10H A33 tablet. The dts for the 10" tablet still
-> needs some work wrt the lradc button voltages so that is not included
-> in this set.
->
-> Regards,
->
-> Hans
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+Driver includes basic UART support, RS485 mode and
+optional DMA support. Tested both DMA and non-DMA
+mode on EA4357 Dev Kit successfully.
 
+Changes since v1:
+ - DMA support + doc update
+ - Cleaned up probe function
 
+DMA support for LPC18xx will be posted soonish.
+
+Joachim Eastwood (2):
+  serial: 8250: add LPC18xx/43xx UART driver
+  doc: dt: add documentation for nxp,lpc1850-uart
+
+ .../bindings/serial/nxp,lpc1850-uart.txt           |  28 +++
+ drivers/tty/serial/8250/8250_lpc18xx.c             | 230 +++++++++++++++++++++
+ drivers/tty/serial/8250/Kconfig                    |   8 +
+ drivers/tty/serial/8250/Makefile                   |   1 +
+ 4 files changed, 267 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/serial/nxp,lpc1850-uart.txt
+ create mode 100644 drivers/tty/serial/8250/8250_lpc18xx.c
 
 -- 
-Jon Smirl
-jonsmirl at gmail.com
+1.8.0
