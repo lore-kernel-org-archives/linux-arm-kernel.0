@@ -1,94 +1,125 @@
-From: bintian.wang@huawei.com (Bintian)
-Date: Sat, 30 May 2015 08:37:23 +0800
-Subject: [PATCH v8 0/7] arm64,hi6220: Enable Hisilicon Hi6220 SoC
-In-Reply-To: <7hwpzrdm5i.fsf@deeprootsystems.com>
-References: <1432865319-20413-1-git-send-email-bintian.wang@huawei.com>
- <7hwpzrdm5i.fsf@deeprootsystems.com>
-Message-ID: <55690643.4050000@huawei.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Fri, 29 May 2015 17:43:43 -0700
+Subject: [PATCH v2 4/6] gpio: brcmstb: Allow GPIOs to be wakeup sources
+In-Reply-To: <1432865650-4062-5-git-send-email-gregory.0xf0@gmail.com>
+References: <1432865650-4062-1-git-send-email-gregory.0xf0@gmail.com>
+ <1432865650-4062-5-git-send-email-gregory.0xf0@gmail.com>
+Message-ID: <20150530004343.GX27753@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kevin,
+On Thu, May 28, 2015 at 07:14:08PM -0700, Gregory Fong wrote:
+> Several drivers (e.g. gpio-keys) allow for GPIOs to be configured as
+> wakeup sources, and this GPIO controller supports that through a
+> separate interrupt path.
+> 
+> The de-facto standard DT property "wakeup-source" is checked, since
+> that indicates whether the GPIO controller hardware can wake.  Uses
+> the IRQCHIP_MASK_ON_SUSPEND irq_chip flag because UPG GIO doesn't have
+> any of its own wakeup source configuration.
+> 
+> Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
+> ---
+> New in v2.
+> 
+>  drivers/gpio/gpio-brcmstb.c | 53 +++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 53 insertions(+)
+> 
+> diff --git a/drivers/gpio/gpio-brcmstb.c b/drivers/gpio/gpio-brcmstb.c
+> index b9962ff..2598c1e 100644
+> --- a/drivers/gpio/gpio-brcmstb.c
+> +++ b/drivers/gpio/gpio-brcmstb.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/basic_mmio_gpio.h>
+>  #include <linux/irqdomain.h>
+>  #include <linux/irqchip/chained_irq.h>
+> +#include <linux/interrupt.h>
+>  
+>  #define GIO_BANK_SIZE           0x20
+>  #define GIO_ODEN(bank)          (((bank) * GIO_BANK_SIZE) + 0x00)
+> @@ -48,6 +49,7 @@ struct brcmstb_gpio_priv {
+>  	struct irq_domain *irq_domain;
+>  	int parent_irq;
+>  	int gpio_base;
+> +	int parent_wake_irq;
+>  };
+>  
+>  #define MAX_GPIO_PER_BANK           32
+> @@ -183,6 +185,31 @@ static int brcmstb_gpio_irq_set_type(struct irq_data *d, unsigned int type)
+>  	return 0;
+>  }
+>  
+> +static int brcmstb_gpio_irq_set_wake(struct irq_data *d, unsigned int enable)
+> +{
+> +	struct brcmstb_gpio_bank *bank = irq_data_get_irq_chip_data(d);
+> +	struct brcmstb_gpio_priv *priv = bank->parent_priv;
+> +
+> +	/*
+> +	 * Only enable wake IRQ once for however many hwirqs can wake
+> +	 * since they all use the same wake IRQ.  Mask will be set
+> +	 * up appropriately thanks to IRQCHIP_MASK_ON_SUSPEND flag.
+> +	 */
+> +	if (enable)
+> +		enable_irq_wake(priv->parent_wake_irq);
+> +	else
+> +		disable_irq_wake(priv->parent_wake_irq);
+> +	return 0;
+> +}
+> +
+> +static irqreturn_t brcmstb_gpio_wake_irq_handler(int irq, void *data)
+> +{
+> +	struct brcmstb_gpio_priv *priv = data;
+> +
+> +	pm_wakeup_event(&priv->pdev->dev, 0);
+> +	return IRQ_HANDLED;
+> +}
+> +
+>  static void brcmstb_gpio_irq_bank_handler(int irq,
+>  		struct brcmstb_gpio_bank *bank)
+>  {
+> @@ -369,6 +396,32 @@ static int brcmstb_gpio_irq_setup(struct platform_device *pdev,
+>  	priv->irq_chip.irq_mask = brcmstb_gpio_irq_mask;
+>  	priv->irq_chip.irq_unmask = brcmstb_gpio_irq_unmask;
+>  	priv->irq_chip.irq_set_type = brcmstb_gpio_irq_set_type;
+> +
+> +	/* Ensures that all non-wakeup IRQs are disabled at suspend */
+> +	priv->irq_chip.flags = IRQCHIP_MASK_ON_SUSPEND;
+> +
+> +	if (IS_ENABLED(CONFIG_PM_SLEEP) &&
+> +			of_get_property(np, "wakeup-source", NULL)) {
 
-On 2015/5/30 7:00, Kevin Hilman wrote:
-> Hi Bintian,
->
-> Bintian Wang <bintian.wang@huawei.com> writes:
->
->> From: Bintian Wang <wangbintian@gmail.com>
->>
->> Hi6220 is one mobile solution of Hisilicon, this patchset contains
->> initial support for Hi6220 SoC and HiKey development board, which
->> supports octal ARM Cortex A53 cores. Initial support is minimal and
->> includes just the arch configuration, clock driver, device tree
->> configuration.
->>
->> PSCI is enabled in device tree and there is no problem to boot all the
->> octal cores, and the CPU hotplug is also working now, you can download
->> and compile the latest firmware based on the following link to run this
->> patch set:
->> https://github.com/96boards/documentation/wiki/UEFI
->>
->> Changes v6~v8:
->> This three versions only modified the clock drivers based on the
->> Stephen's review advices.
->> * clk-hi6220.c:
->>    ** Split the clock header file from clock driver
->>    ** Delete setting the parents clock of UART1 to HI6220_150M in clock
->>       driver, we can do that using assigned-clock in dts when enable
->>       UART1 in the future.
->> * clkdivider-hi6220.c:
->>    ** Reuse some functions exported by clk-divider.c
->>    ** Remove "pr_err" and CLK_IS_BASIC flag
->>    ** Fix some programing style problems
->> * hisilicon/clk.h: remove the "__init" markings on some funcition
->>    prototypes.
->
-> It's not clear what kernel this series is meant to apply to.  It doesn't
-> apply cleanly to v4.1-rc2 (the version stated for v5) or the current -rc
-> (v4.1-rc5) it also doesn't apply cleanly to linus/master or linux-next.
->
-> If the series doesn't apply to Linus tree, please state clearly in the
-> changelog what tree it should apply to as well as any dependncies.
->
-> Also, this version is missing patch 1 from the v6 series, which adds the
-> Kconfig/defconfig changes. Without that patch, nothing in this series is
-> even compiled (clk driver or DTS files.)
->
-> So my recommendation, since the clock driver is very close to being
-> merged:
->
-> Please create a v9 series with *only* the patches that are not already
-> queued up on the clk tree[1].  That should be patches 1-3 and 7 of this
-> series, plus patch 1 from v6.
->
-> That series should apply cleanly to v4.1-rc1 (or a newer -rc if there
-> are dependencies.)  In the changelog to that series, state the version
-> that it applies to, and also state that it depends on the clk-next
-> branch where the clock maintainers have queued up the driver[1].
->
-> Then all that's left is to collect an ack from a DT maintainer, and
-> these can be queued up via the arm-soc tree.
->
-> FWIW, I've boot tested patches 1-3 and 7 of this series, plus patch 1
-> from v6 combined with the clk-next-hi6220 branch[1] on my board (which
-> uses ATF + mainline u-boot) and all 8 A53 cores are coming up, so feel
-> free to add:
->
-> Tested-by: Kevin Hilman <khilman@linaro.org>
->
-> to your v9 series.
-Very good and detailed instructions, I will prepare the v9 soon.
+of_property_read_bool()?
 
-Thanks,
+> +		priv->parent_wake_irq = platform_get_irq(pdev, 1);
+> +		if (priv->parent_wake_irq < 0)  {
+> +			dev_warn(dev,
+> +				"Couldn't get wake IRQ - GPIOs will not be able to wake from sleep");
+> +		} else {
+> +			int err = devm_request_irq(dev, priv->parent_wake_irq,
+> +					brcmstb_gpio_wake_irq_handler, 0,
+> +					"brcmstb-gpio-wake", priv);
+> +
+> +			if (err < 0) {
+> +				dev_err(dev, "Couldn't request wake IRQ");
+> +				return err;
+> +			}
+> +
+> +			device_set_wakeup_capable(dev, true);
+> +			device_wakeup_enable(dev);
 
-Bintian
->
-> Thanks,
->
-> Kevin
->
-> [1] git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next-hi6220
->
-> .
->
+Might want to move these two lines above the devm_request_irq(), so that
+you're ready to record PM events immediately at probe time. This is
+important when waking from S5 states, where we sometimes want to be able
+to check the /sys/devices/.../wakeup_count stats to see what woke us up.
+
+> +			priv->irq_chip.irq_set_wake = brcmstb_gpio_irq_set_wake;
+> +		}
+> +	}
+> +
+>  	priv->irq_domain =
+>  		irq_domain_add_linear(np, priv->num_gpios,
+>  				      &brcmstb_gpio_irq_domain_ops,
+
+With that:
+
+Reviewed-by: Brian Norris <computersforpeace@gmail.com>
