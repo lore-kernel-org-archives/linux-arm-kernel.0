@@ -1,25 +1,39 @@
-From: joe@perches.com (Joe Perches)
-Date: Fri, 29 May 2015 22:29:30 -0700
-Subject: [PATCH 0/4] Cover: Support mbigen msi interrupt controller
-In-Reply-To: <55692C24.107@huawei.com>
-References: <55692C24.107@huawei.com>
-Message-ID: <1432963770.2984.4.camel@perches.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Sat, 30 May 2015 14:29:44 +0900
+Subject: [GIT PULL] ARM: EXYNOS: Fix for 4.1, 3rd
+Message-ID: <1432963784-24046-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2015-05-30 at 11:19 +0800, majun (F) wrote:
-> This patch set is applied to supprot the mbigen device.
-[]
->  create mode 100755 Documentation/devicetree/bindings/arm/mbigen.txt
->  mode change 100644 => 100755 drivers/irqchip/Kconfig
->  mode change 100644 => 100755 drivers/irqchip/Makefile
->  mode change 100644 => 100755 drivers/irqchip/irq-gic-v3-its.c
->  create mode 100755 drivers/irqchip/irq-mbigen.c
->  create mode 100755 include/linux/irqchip/arm-gic-its.h
->  create mode 100644 include/linux/mbi.h
->  mode change 100644 => 100755 include/linux/msi.h
->  mode change 100644 => 100755 kernel/irq/msi.c
+Dear Kukjin,
 
-None of these should be executable
+Fix from April which you said it is applied. Apparently it was not,
+so here it is again.
 
-All of them should be 644
+Best regards,
+Krzysztof
+
+
+The following changes since commit 5c78bc1b466701c1b13d7b734f5b39cdd65babab:
+
+  Merge branch 'samsung-defconfig-2nd' into for-next (2015-05-23 12:28:59 +0900)
+
+are available in the git repository at:
+
+  https://github.com/krzk/linux.git tags/samsung-fixes-4.1-3
+
+for you to fetch changes up to 8164b91ee8f4bb009fb16ef7c54e94a55e83dd35:
+
+  ARM: exynos: Fix wake-up interrupts for Exynos3250 (2015-05-30 13:29:34 +0900)
+
+----------------------------------------------------------------
+Fix for Exynos3250 wake-up interrupts after converting PMU
+wakeup to stacked domains. This slipped through fingers some
+time ago.
+
+----------------------------------------------------------------
+Marc Zyngier (1):
+      ARM: exynos: Fix wake-up interrupts for Exynos3250
+
+ arch/arm/mach-exynos/suspend.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
