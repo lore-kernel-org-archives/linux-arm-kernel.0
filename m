@@ -1,40 +1,84 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sat, 30 May 2015 17:28:56 +0200
-Subject: Device Tree Blob (DTB) licence
-In-Reply-To: <alpine.DEB.2.02.1505291512000.4429@nftneq.ynat.uz>
-References: <1430820315.19516.26.camel@opteya.com>
- <CAL_Jsq+T5c7qornpRVCduEjUSCeM+0xqbtVYovtH76y=4BqhLQ@mail.gmail.com>
- <1432289148.5304.58.camel@opteya.com>
- <1432322832.5304.63.camel@opteya.com>
- <CAOS_Y6Q37ps+VEnzUZ_uwX++qrRm9Hgx45Q_pmiZSLSNjmKwZg@mail.gmail.com>
- <55670AD4.8020705@melag.de>
- <20150528133429.GD2067@n2100.arm.linux.org.uk>
- <556747E4.6070403@melag.de> <20150529064741.GB25351@1wt.eu>
- <55684F07.7050402@melag.de>
- <alpine.DEB.2.02.1505291512000.4429@nftneq.ynat.uz>
-Message-ID: <CAMuHMdVe6BuBcUcXS0bXT4ecsr=Fd93+G6AQoGNKxZaqBPRGeQ@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Sat, 30 May 2015 17:36:51 +0200
+Subject: [GIT PULL] ARM: mvebu: drivers changes for v4.2
+In-Reply-To: <20150530141210.GE13641@io.lakedaemon.net>
+References: <5568DF81.1090300@free-electrons.com>
+ <20150530141210.GE13641@io.lakedaemon.net>
+Message-ID: <5569D913.4030406@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 30, 2015 at 12:16 AM, David Lang <david@lang.hm> wrote:
->> If the DTS license would be a problem, it would be worse w/ ACPI
->> and any proprietary firmware/BIOSes.
->
-> not true, with a proprietary bios it's a clear "pay this much money and
-> don't worry about it" while with GPL there's a nagging fear that someone you
-> never heard of may sue you a decade from now claiming you need to give them
-> the source to your OS.
+Hi Jason,
 
-That can also happen with the proprietary BIOS. You don't know what's really
-inside.
+On 30/05/2015 16:12, Jason Cooper wrote:
+> Hey Gregory,
+> 
+> On Fri, May 29, 2015 at 11:52:01PM +0200, Gregory CLEMENT wrote:
+>> Hi,
+>>
+>> Here is the first pull request for drivers for mvebu for v4.2.
+>> It depends on the mvebu/fixes branch which have been merged in the
+>> mvebu/drivers branch
+>>
+>> Gregory
+>>
+>> The following changes since commit 885dbd154b2f2ee305cec6fd0a162e1a77ae2b06:
+>>
+>>   Revert "bus: mvebu-mbus: make sure SDRAM CS for DMA don't overlap the MBus bridge window" (2015-05-28 11:14:31 +0200)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.infradead.org/linux-mvebu.git tags/mvebu-drivers-4.2
+>>
+>> for you to fetch changes up to bfa1ce5f38938cc9e6c7f2d1011f88eba2b9e2b2:
+>>
+>>   bus: mvebu-mbus: add mv_mbus_dram_info_nooverlap() (2015-05-28 12:21:08 +0200)
+>>
+>> ----------------------------------------------------------------
+>> mvebu drivers change for 4.2
+>>
+>> mvebu-mbus: add mv_mbus_dram_info_nooverlap() needed for the new
+>> Marvell crypto driver
+>>
+>> ----------------------------------------------------------------
+>> Thomas Petazzoni (1):
+>>       bus: mvebu-mbus: add mv_mbus_dram_info_nooverlap()
+>>
+>>  drivers/bus/mvebu-mbus.c | 117 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+>>  include/linux/mbus.h     |   5 +++++
+>>  2 files changed, 122 insertions(+)
+>>
+> 
+> I don't see this in mvebu/for-next...  Not earth shattering, just mentioning
+> it.  This commit is adding a new function with no callers, so the chances of
+> conflicts / build failures is minimal.
 
-Gr{oetje,eeting}s,
+Usually as soon as I apply a patch set, I also merge the branch in
+mvebu/for-next and I push it on infradead. However it is still possible
+that I forgot to push it. So I checked and this patch is part of mvebu/for-next:
+http://git.infradead.org/linux-mvebu.git/commit/bfa1ce5f38938cc9e6c7f2d1011f88eba2b9e2b2
 
-                        Geert
+And it was even pulled in linux-next:
+http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/?id=bfa1ce5f38938cc9e6c7f2d1011f88eba2b9e2b2
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+So this time we are fine, but thanks for having a look on it.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Gregory
+
+> 
+> thx,
+> 
+> Jason.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
