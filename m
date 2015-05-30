@@ -1,103 +1,94 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Fri, 29 May 2015 17:36:13 -0700
-Subject: [PATCH v2 3/6] dt-bindings: brcmstb-gpio: document properties
- for wakeup
-In-Reply-To: <1432865650-4062-4-git-send-email-gregory.0xf0@gmail.com>
-References: <1432865650-4062-1-git-send-email-gregory.0xf0@gmail.com>
- <1432865650-4062-4-git-send-email-gregory.0xf0@gmail.com>
-Message-ID: <20150530003613.GW27753@ld-irv-0074>
+From: bintian.wang@huawei.com (Bintian)
+Date: Sat, 30 May 2015 08:37:23 +0800
+Subject: [PATCH v8 0/7] arm64,hi6220: Enable Hisilicon Hi6220 SoC
+In-Reply-To: <7hwpzrdm5i.fsf@deeprootsystems.com>
+References: <1432865319-20413-1-git-send-email-bintian.wang@huawei.com>
+ <7hwpzrdm5i.fsf@deeprootsystems.com>
+Message-ID: <55690643.4050000@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 28, 2015 at 07:14:07PM -0700, Gregory Fong wrote:
-> Some brcmstb GPIO controllers can be used to wake from suspend, so use the
-> de facto standard property 'wakeup-source' to mark the nodes of controllers
-> with that capability.
-> 
-> Also document interrupts-extended, which will be used for wakeup handling
-> because the interrupt parent for the wake IRQ is different from the regular
-> IRQ.
-> 
-> Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
-> ---
-> New in v2.
-> 
->  .../devicetree/bindings/gpio/brcm,brcmstb-gpio.txt | 26 +++++++++++++++++++++-
->  1 file changed, 25 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/gpio/brcm,brcmstb-gpio.txt b/Documentation/devicetree/bindings/gpio/brcm,brcmstb-gpio.txt
-> index 435f1bc..568814f 100644
-> --- a/Documentation/devicetree/bindings/gpio/brcm,brcmstb-gpio.txt
-> +++ b/Documentation/devicetree/bindings/gpio/brcm,brcmstb-gpio.txt
-> @@ -33,6 +33,12 @@ Optional properties:
->  - interrupt-parent:
->      phandle of the parent interrupt controller
->  
-> +- interrupts-extended:
-> +    Alternate form of specifying interrupts and parents that allows for
-> +    multiple parents.  This takes precedence over 'interrupts' and
-> +    'interrupt-parent'.  This probably must be used if the wakeup-source
-> +    property is provided because that may have a different interrupt parent.
-> +
+Hello Kevin,
 
-"This probably must be used" seems a little awkward, especially when
-you're just explaining an implementation detail of our SoCs, rather than
-something unique about this binding. Maybe:
+On 2015/5/30 7:00, Kevin Hilman wrote:
+> Hi Bintian,
+>
+> Bintian Wang <bintian.wang@huawei.com> writes:
+>
+>> From: Bintian Wang <wangbintian@gmail.com>
+>>
+>> Hi6220 is one mobile solution of Hisilicon, this patchset contains
+>> initial support for Hi6220 SoC and HiKey development board, which
+>> supports octal ARM Cortex A53 cores. Initial support is minimal and
+>> includes just the arch configuration, clock driver, device tree
+>> configuration.
+>>
+>> PSCI is enabled in device tree and there is no problem to boot all the
+>> octal cores, and the CPU hotplug is also working now, you can download
+>> and compile the latest firmware based on the following link to run this
+>> patch set:
+>> https://github.com/96boards/documentation/wiki/UEFI
+>>
+>> Changes v6~v8:
+>> This three versions only modified the clock drivers based on the
+>> Stephen's review advices.
+>> * clk-hi6220.c:
+>>    ** Split the clock header file from clock driver
+>>    ** Delete setting the parents clock of UART1 to HI6220_150M in clock
+>>       driver, we can do that using assigned-clock in dts when enable
+>>       UART1 in the future.
+>> * clkdivider-hi6220.c:
+>>    ** Reuse some functions exported by clk-divider.c
+>>    ** Remove "pr_err" and CLK_IS_BASIC flag
+>>    ** Fix some programing style problems
+>> * hisilicon/clk.h: remove the "__init" markings on some funcition
+>>    prototypes.
+>
+> It's not clear what kernel this series is meant to apply to.  It doesn't
+> apply cleanly to v4.1-rc2 (the version stated for v5) or the current -rc
+> (v4.1-rc5) it also doesn't apply cleanly to linus/master or linux-next.
+>
+> If the series doesn't apply to Linus tree, please state clearly in the
+> changelog what tree it should apply to as well as any dependncies.
+>
+> Also, this version is missing patch 1 from the v6 series, which adds the
+> Kconfig/defconfig changes. Without that patch, nothing in this series is
+> even compiled (clk driver or DTS files.)
+>
+> So my recommendation, since the clock driver is very close to being
+> merged:
+>
+> Please create a v9 series with *only* the patches that are not already
+> queued up on the clk tree[1].  That should be patches 1-3 and 7 of this
+> series, plus patch 1 from v6.
+>
+> That series should apply cleanly to v4.1-rc1 (or a newer -rc if there
+> are dependencies.)  In the changelog to that series, state the version
+> that it applies to, and also state that it depends on the clk-next
+> branch where the clock maintainers have queued up the driver[1].
+>
+> Then all that's left is to collect an ack from a DT maintainer, and
+> these can be queued up via the arm-soc tree.
+>
+> FWIW, I've boot tested patches 1-3 and 7 of this series, plus patch 1
+> from v6 combined with the clk-next-hi6220 branch[1] on my board (which
+> uses ATF + mainline u-boot) and all 8 A53 cores are coming up, so feel
+> free to add:
+>
+> Tested-by: Kevin Hilman <khilman@linaro.org>
+>
+> to your v9 series.
+Very good and detailed instructions, I will prepare the v9 soon.
 
-  "Wakeup-capable GPIO controllers often route their wakeup interrupt
-  lines through a different interrupt controller than the primary
-  interrupt line, making this property necessary."
+Thanks,
 
->  - #interrupt-cells:
->      Should be <2>.  The first cell is the GPIO number, the second should specify
->      flags.  The following subset of flags is supported:
-> @@ -48,7 +54,10 @@ Optional properties:
->      Marks the device node as an interrupt controller
->  
->  - interrupt-names:
-> -    The name of the IRQ resource used by this controller
-> +    The names of the IRQ resources used by this controller
-
-If you're specifying names, you should list them here.
-
-> +
-> +- wakeup-source:
-> +    GPIOs for this controller can be used as a wakeup source
->  
->  Example:
->  	upg_gio: gpio at f040a700 {
-> @@ -63,3 +72,18 @@ Example:
->  		interrupt-names = "upg_gio";
->  		brcm,gpio-bank-widths = <0x20 0x20 0x20 0x18>;
->  	};
-> +
-> +	upg_gio_aon: gpio at f04172c0 {
-> +		#gpio-cells = <0x2>;
-> +		#interrupt-cells = <0x2>;
-
-Might use decimal instead of hex for the above 2 lines?
-
-> +		compatible = "brcm,bcm7445-gpio", "brcm,brcmstb-gpio";
-> +		gpio-controller;
-> +		interrupt-controller;
-> +		reg = <0xf04172c0 0x40>;
-> +		interrupt-parent = <0xc>;
-
-That should be a phandle, not an int (I realize phandles resolve down to
-an integer, but we're speaking DTS, not DTB).
-
-> +		interrupts = <0x6>;
-> +		interrupts-extended = <0xc 0x6 0xa 0x5>;
-
-Same here (phandles).
-
-Also, even though the interrupt binding semantics specify precedence
-between interrupts and interrupts-extended, I'd think an example should
-stick to one or the other, no?
-
-> +		interrupt-names = "upg_gio_aon", "upg_gio_aon_wakeup";
-> +		wakeup-source;
-> +		brcm,gpio-bank-widths = <0x12 0x4>;
-> +	};
-
-Reviewed-by: Brian Norris <computersforpeace@gmail.com>
+Bintian
+>
+> Thanks,
+>
+> Kevin
+>
+> [1] git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next-hi6220
+>
+> .
+>
