@@ -1,172 +1,54 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 30 May 2015 16:55:06 +0200
-Subject: [PATCH v2 6/6] ARM: sun8i: dts: Add Ippo-q8h v1.2 with A33 and
- 1024x600 lcd support
-In-Reply-To: <1432997706-20172-1-git-send-email-hdegoede@redhat.com>
-References: <1432997706-20172-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1432997706-20172-7-git-send-email-hdegoede@redhat.com>
+From: matthijsvanduin@gmail.com (Matthijs van Duin)
+Date: Sat, 30 May 2015 17:22:11 +0200
+Subject: runtime check for omap-aes bus access permission (was: Re:
+ 3.13-rc3 (commit 7ce93f3) breaks Nokia N900 DT boot)
+In-Reply-To: <20150529155030.GO30984@atomide.com>
+References: <201502111339.54480@pali>
+ <CAALWOA_ngoSKjB=ZQ264Va37bBK7v41Ei45SyoYLiMdanTKnxQ@mail.gmail.com>
+ <201502112128.44852@pali>
+ <CAGo_u6oZxi7O6re30L2-wVyxTeahhyMb4qVcrE3tSCV9sBvrnw@mail.gmail.com>
+ <20150528073740.GD16509@pali> <20150528160113.GH30984@atomide.com>
+ <CAALWOA8Pfc_zbN9MoHwR=njPBpFU56WObYMbGv9N7ktzy+RSeQ@mail.gmail.com>
+ <20150528222412.GM30984@atomide.com>
+ <CAALWOA9qJHUST0JQxA6MBohMfbTYAP9+NbSXGYHZY4Xa3nSFvw@mail.gmail.com>
+ <CAALWOA82=QmTpCeiceOFQOjqXKdSBjB3Z+jL-mi0vYF=QaL4sA@mail.gmail.com>
+ <20150529155030.GO30984@atomide.com>
+Message-ID: <CAALWOA-X-Jb_2NODrPNnDgaLuYFDuxjPLHYwqRjaPz2PrqhJkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Ippo-q8h is a tablet circuit board commonly found in cheap Android
-tablets. The v1.2 version can be used with either an A23 or A33 SoC.
+On 29 May 2015 at 17:50, Tony Lindgren <tony@atomide.com> wrote:
+> I believe some TI kernels use strongly-ordered mappings, mainline
+> kernel does not. Which kernel version are you using?
 
-This adds a dts file for the v1.2 board with an A33 SoC and a 1024x600
-LCD screen (most of these tablets have a 800x480 screen).
+Normally I periodically rebuild based on Robert C Nelson's -bone
+kernel (but with heavily customized config). I also tried a plain
+4.1.0-rc5-bone3, the generic 4.1.0-rc5-armv7-x0 (the most
+vanilla-looking kernel I could find in my debian package list), and
+for the heck of it also the classic 3.14.43-ti-r66.
 
-This version features 512 MB DRAM, 4G NAND, MMC, LCD, capacitive
-touchscreen, accelerometer, 2 camera sensors, USB OTG, microphone
-and speakers.
+In all cases I observed a synchronous bus error (dubiously reported as
+"external abort on non-linefetch (0x1818)") on an AM335x with this
+trivial test:
 
-i2c0 is connected to the gsl1680 capacitive touch panel controller,
-i2c1 is connected to an mma7660 3-axis accelerometer, these peripherals are
-not supported by the kernel yet, i2c bus functionality has been tested via
-i2c-dev.
+int main() {
+        int fd = open( "/dev/mem", O_RDWR | O_DSYNC );
+        if( fd < 0 ) return 1;
+        void *ptr = mmap( NULL, 4096, PROT_WRITE, MAP_SHARED, fd, 0x42000000 );
+        if( ptr == MAP_FAILED ) return 1;
+        *(volatile int *)ptr = 0;
+        return 0;
+}
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/Makefile                         |   3 +-
- .../dts/sun8i-a33-ippo-q8h-v1.2-lcd1024x600.dts    | 118 +++++++++++++++++++++
- 2 files changed, 120 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/sun8i-a33-ippo-q8h-v1.2-lcd1024x600.dts
+I even considered for a moment that maybe the AM335x has some "all
+writes non-posted" thing enabled (which I think is available as a
+switch on OMAP 4/5?). It seemed unlikely, but since most of my
+exploration of interconnect behaviour was done on a DM814x, I
+double-checked by performing the same write in a baremetal test
+program (with that region configured Device-type in the MMU). As
+expected, no data abort occurred, so writes most certainly are posted.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index ae7f25d..b308baf 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -573,7 +573,8 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-a23-evb.dtb \
- 	sun8i-a23-ippo-q8h-v5.dtb \
- 	sun8i-a23-ippo-q8h-v1.2.dtb \
--	sun8i-a33-et-q8-v1.6.dtb
-+	sun8i-a33-et-q8-v1.6.dtb \
-+	sun8i-a33-ippo-q8h-v1.2-lcd1024x600.dtb
- dtb-$(CONFIG_MACH_SUN9I) += \
- 	sun9i-a80-optimus.dtb \
- 	sun9i-a80-cubieboard4.dtb
-diff --git a/arch/arm/boot/dts/sun8i-a33-ippo-q8h-v1.2-lcd1024x600.dts b/arch/arm/boot/dts/sun8i-a33-ippo-q8h-v1.2-lcd1024x600.dts
-new file mode 100644
-index 0000000..12dfb1e
---- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-a33-ippo-q8h-v1.2-lcd1024x600.dts
-@@ -0,0 +1,118 @@
-+/*
-+ * Copyright 2015 Hans de Goede <hdegoede@redhat.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun8i-a33.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
-+
-+/ {
-+	model = "Ippo Q8H Quad Core Tablet (v1.2) with 1024x600 LCD";
-+	compatible = "ippo,q8h-v1.2", "allwinner,sun8i-a33";
-+
-+	aliases {
-+		serial0 = &r_uart;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+};
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+	status = "okay";
-+};
-+
-+&lradc {
-+	vref-supply = <&reg_vcc3v0>;
-+	status = "okay";
-+
-+	button at 200 {
-+		label = "Volume Up";
-+		linux,code = <KEY_VOLUMEUP>;
-+		channel = <0>;
-+		voltage = <200000>;
-+	};
-+
-+	button at 400 {
-+		label = "Volume Down";
-+		linux,code = <KEY_VOLUMEDOWN>;
-+		channel = <0>;
-+		voltage = <400000>;
-+	};
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_q8h>;
-+	vmmc-supply = <&reg_vcc3v0>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 1 4 GPIO_ACTIVE_HIGH>; /* PB4 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&pio {
-+	mmc0_cd_pin_q8h: mmc0_cd_pin at 0 {
-+		allwinner,pins = "PB4";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+	};
-+};
-+
-+&r_uart {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&r_uart_pins_a>;
-+	status = "okay";
-+};
--- 
-2.4.1
+So I have trouble coming up with any explanation for this other than
+the use of strongly-ordered mappings.
+
+(Curiously BTW, omitting O_DSYNC made no difference.)
