@@ -1,33 +1,64 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Sat, 30 May 2015 11:38:47 +0200
-Subject: [PATCH v2 4/4] ARM: dts: stm32f429: Adopt STM32F4 clock driver
-In-Reply-To: <1432972448-10332-5-git-send-email-daniel.thompson@linaro.org>
-References: <1432327273-6810-1-git-send-email-daniel.thompson@linaro.org>
- <1432972448-10332-1-git-send-email-daniel.thompson@linaro.org>
- <1432972448-10332-5-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <55698527.1050504@gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 30 May 2015 12:14:30 +0200
+Subject: [PATCH] fix n900 dts file to work around 4.1 touchscreen
+ regression on n900
+In-Reply-To: <20150529200306.GB17267@lukather>
+References: <201505241444.41039@pali> <20150527132545.GA23434@amd>
+ <20150527133311.GJ30798@pali> <20150527143722.GA28108@amd>
+ <20150527145837.GA13223@earth> <20150529190816.GA20232@amd>
+ <20150529192505.GA28987@amd> <20150529193211.GA7599@amd>
+ <20150529194955.GV2026@saruman.tx.rr.com>
+ <20150529200306.GB17267@lukather>
+Message-ID: <20150530101430.GA505@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri 2015-05-29 22:03:06, Maxime Ripard wrote:
+> On Fri, May 29, 2015 at 02:49:55PM -0500, Felipe Balbi wrote:
+> > Hi,
+> > 
+> > On Fri, May 29, 2015 at 09:32:11PM +0200, Pavel Machek wrote:
+> > > Fix dts to match what the Linux kernel expects. This works around
+> > > touchscreen problems in 4.1 linux on Nokia n900.
+> > >     
+> > > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/input/touchscreen/tsc2005.txt b/Documentation/devicetree/bindings/input/touchscreen/tsc2005.txt
+> > > index 4b641c7..09089a6 100644
+> > > --- a/Documentation/devicetree/bindings/input/touchscreen/tsc2005.txt
+> > > +++ b/Documentation/devicetree/bindings/input/touchscreen/tsc2005.txt
+> > > @@ -32,8 +32,8 @@ Example:
+> > >  		touchscreen-fuzz-x = <4>;
+> > >  		touchscreen-fuzz-y = <7>;
+> > >  		touchscreen-fuzz-pressure = <2>;
+> > > -		touchscreen-max-x = <4096>;
+> > > -		touchscreen-max-y = <4096>;
+> > > +		touchscreen-size-x = <4096>;
+> > > +		touchscreen-size-y = <4096>;
+> > 
+> > IMHO, the older binding needs to be supported as well. It's fine to
+> > update the DTS for the new binding, but even Documentation says
+> > touchscreen-max-[xy] and if the driver changed that, the driver should
+> > be fixed too. Besides, it seems like this has been in tree since v3.16:
+> > 
+> > $ git describe a38cfebb56898633687ab337fd53710e63a0aedd
+> > v3.15-rc5-72-ga38cfebb5689
+> > 
+> > So, because this has been wrongly documented for so long, we should
+> > support both bindings. Sure, deprecate touchscreen-max-[xy], but they
+> > must still be supported, IMO.
+> 
+> This property has never been anything but a typo in a documentation of
+> a single driver.
+> 
+> Feel free to fix that in that driver, but I don't see why the core
+> code should handle that isolated typo.
 
+Well... the driver was not broken... before you did "cleanup" that did
+two functional changes. And yes, the dts should be fixed, but that
+does not make your "cleanup" good.
 
-On 05/30/2015 09:54 AM, Daniel Thompson wrote:
-> New bindings and driver have been created for STM32F42xxx series parts.
-> This patch integrates these changes.
->
-> Note: Earlier device tree blobs (those without st,stm32f42xxx
->        compatibles for the rcc) could still be used to boot basic
->        systems. Such systems rely on the bootloader to configure the
->        clock gates for vital periperhals.
->
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> ---
->   arch/arm/boot/dts/stm32f429-disco.dts |  4 ++
->   arch/arm/boot/dts/stm32f429.dtsi      | 79 +++++++++++------------------------
->   2 files changed, 28 insertions(+), 55 deletions(-)
->
->
-Reviewed-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-
-Thanks!
-Maxime
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
