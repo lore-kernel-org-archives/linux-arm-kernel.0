@@ -1,604 +1,164 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Sat, 30 May 2015 12:43:53 -0300
-Subject: [PATCH 1/2] mtd: spi-nor: add driver for NXP SPI Flash Interface
- (SPIFI)
-In-Reply-To: <1432921816-10765-2-git-send-email-manabian@gmail.com>
-References: <1432921816-10765-1-git-send-email-manabian@gmail.com>
- <1432921816-10765-2-git-send-email-manabian@gmail.com>
-Message-ID: <5569DAB9.9070105@vanguardiasur.com.ar>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sat, 30 May 2015 15:50:09 +0000 (UTC)
+Subject: OMAP baseline test results for v4.1-rc5
+Message-ID: <alpine.DEB.2.02.1505301534250.26925@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joachim,
 
-Looks pretty neat. I've just a couple comments.
+Here are some basic OMAP test results for Linux v4.1-rc5.
+Logs and other details at:
 
-On 05/29/2015 02:50 PM, Joachim Eastwood wrote:
-> Add SPI-NOR driver for the SPI Flash Interface (SPIFI)
-> controller that is found newer NXP MCU devices.
-> 
-> The controller supports serial SPI Flash devices with 1-, 2-
-> and 4-bit width in either SPI mode 0 or 3. The controller
-> can operate in either command or memory mode. In memory mode
-> the Flash is exposed as normal memory and can be directly
-> accessed by the CPU.
-> 
-> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
-> ---
->  drivers/mtd/spi-nor/Kconfig     |  10 +
->  drivers/mtd/spi-nor/Makefile    |   1 +
->  drivers/mtd/spi-nor/nxp-spifi.c | 508 ++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 519 insertions(+)
->  create mode 100644 drivers/mtd/spi-nor/nxp-spifi.c
-> 
-> diff --git a/drivers/mtd/spi-nor/Kconfig b/drivers/mtd/spi-nor/Kconfig
-> index 64a4f0edabc7..f10a37f1a4ef 100644
-> --- a/drivers/mtd/spi-nor/Kconfig
-> +++ b/drivers/mtd/spi-nor/Kconfig
-> @@ -28,4 +28,14 @@ config SPI_FSL_QUADSPI
->  	  This enables support for the Quad SPI controller in master mode.
->  	  We only connect the NOR to this controller now.
->  
-> +config SPI_NXP_SPIFI
-> +	tristate "NXP SPI Flash Interface (SPIFI)"
-> +	depends on OF && (ARCH_LPC18XX || COMPILE_TEST)
+    http://www.pwsan.com/omap/testlogs/test_v4.1-rc5/20150529162206/
 
-Since you are adding COMPILE_TEST, maybe you want
-'depends on HAS_IOMEM' as well?
 
-> +	help
-> +	  Enable support for the NXP LPC SPI Flash Interface controller.
-> +
-> +	  SPIFI is a specialized controller for connecting serial SPI
-> +	  Flash. Enable this option if you have a device with a SPIFI
-> +	  controller and want to access the Flash as a mtd device.
-> +
->  endif # MTD_SPI_NOR
-> diff --git a/drivers/mtd/spi-nor/Makefile b/drivers/mtd/spi-nor/Makefile
-> index 6a7ce1462247..e53333ef8582 100644
-> --- a/drivers/mtd/spi-nor/Makefile
-> +++ b/drivers/mtd/spi-nor/Makefile
-> @@ -1,2 +1,3 @@
->  obj-$(CONFIG_MTD_SPI_NOR)	+= spi-nor.o
->  obj-$(CONFIG_SPI_FSL_QUADSPI)	+= fsl-quadspi.o
-> +obj-$(CONFIG_SPI_NXP_SPIFI)	+= nxp-spifi.o
-> diff --git a/drivers/mtd/spi-nor/nxp-spifi.c b/drivers/mtd/spi-nor/nxp-spifi.c
-> new file mode 100644
-> index 000000000000..cbfe0bb16f81
-> --- /dev/null
-> +++ b/drivers/mtd/spi-nor/nxp-spifi.c
-> @@ -0,0 +1,508 @@
-> +/*
-> + * SPI-NOR driver for NXP SPI Flash Interface (SPIFI)
-> + *
-> + * Copyright (C) 2015 Joachim Eastwood <manabian@gmail.com>
-> + *
-> + * Based on Freescale QuadSPI driver:
-> + * Copyright (C) 2013 Freescale Semiconductor, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/delay.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/mtd/mtd.h>
-> +#include <linux/mtd/partitions.h>
-> +#include <linux/mtd/spi-nor.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/spi/spi.h>
-> +
-> +/* NXP SPIFI registers, bits and macros */
-> +#define SPIFI_CTRL				0x000
-> +#define  SPIFI_CTRL_TIMEOUT(timeout)		(timeout)
-> +#define  SPIFI_CTRL_CSHIGH(cshigh)		((cshigh) << 16)
-> +#define  SPIFI_CTRL_MODE3			BIT(23)
-> +#define  SPIFI_CTRL_DUAL			BIT(28)
-> +#define  SPIFI_CTRL_FBCLK			BIT(30)
-> +#define SPIFI_CMD				0x004
-> +#define  SPIFI_CMD_DATALEN(dlen)		(dlen & 0x3fff)
-> +#define  SPIFI_CMD_DOUT				BIT(15)
-> +#define  SPIFI_CMD_INTLEN(ilen)			((ilen) << 16)
-> +#define  SPIFI_CMD_FIELDFORM(field)		((field) << 19)
-> +#define  SPIFI_CMD_FIELDFORM_ALL_SERIAL		SPIFI_CMD_FIELDFORM(0x0)
-> +#define  SPIFI_CMD_FIELDFORM_QUAD_DUAL_DATA	SPIFI_CMD_FIELDFORM(0x1)
-> +#define  SPIFI_CMD_FRAMEFORM(frame)		((frame) << 21)
-> +#define  SPIFI_CMD_FRAMEFORM_OPCODE_ONLY	SPIFI_CMD_FRAMEFORM(0x1)
-> +#define  SPIFI_CMD_OPCODE(op)			((op) << 24)
-> +#define SPIFI_ADDR				0x008
-> +#define SPIFI_IDATA				0x00c
-> +#define SPIFI_CLIMIT				0x010
-> +#define SPIFI_DATA				0x014
-> +#define SPIFI_MCMD				0x018
-> +#define SPIFI_STAT				0x01c
-> +#define  SPIFI_STAT_MCINIT			BIT(0)
-> +#define  SPIFI_STAT_CMD				BIT(1)
-> +#define  SPIFI_STAT_RESET			BIT(4)
-> +
-> +#define SPI_NOR_MAX_ID_LEN	6
-> +
-> +struct nxp_spifi {
-> +	struct device *dev;
-> +	struct clk *clk_spifi;
-> +	struct clk *clk_reg;
-> +	void __iomem *io_base;
-> +	void __iomem *flash_base;
-> +	struct mtd_info mtd;
-> +	struct spi_nor nor;
-> +	u32 mcmd;
-> +};
-> +
-> +static int nxp_spifi_wait_for_event(struct nxp_spifi *spifi, u32 event)
-> +{
-> +	int retry = 3;
-> +	u32 stat;
-> +
-> +	do {
-> +		stat = readb(spifi->io_base + SPIFI_STAT);
-> +		if (!(stat & event))
-> +			return 0;
-> +
-> +		udelay(10);
-> +	} while (retry--);
-> +
-> +	return -ETIMEDOUT;
+Test summary
+------------
 
-This could be replaced with the readb_poll_timeout_atomic().
-But it seems you would also use readb_poll_timeout(), since won't be
-called in atomic context.
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
 
-> +}
-> +
-> +static int nxp_spifi_wait_for_cmd(struct nxp_spifi *spifi)
-> +{
-> +	int ret;
-> +
-> +	ret = nxp_spifi_wait_for_event(spifi, SPIFI_STAT_CMD);
-> +	if (ret)
-> +		dev_warn(spifi->dev, "command timed out\n");
-> +
-> +	return ret;
-> +}
-> +
-> +static int nxp_spifi_reset(struct nxp_spifi *spifi)
-> +{
-> +	int ret;
-> +
-> +	writel(SPIFI_STAT_RESET, spifi->io_base + SPIFI_STAT);
-> +	ret = nxp_spifi_wait_for_event(spifi, SPIFI_STAT_RESET);
-> +	if (ret)
-> +		dev_warn(spifi->dev, "state reset timed out\n");
-> +
-> +	return ret;
-> +}
-> +
-> +static int nxp_spifi_set_memory_mode_off(struct nxp_spifi *spifi)
-> +{
-> +	u32 stat;
-> +	int ret;
-> +
-> +	stat = readb(spifi->io_base + SPIFI_STAT);
-> +	if (!(stat & SPIFI_STAT_MCINIT))
-> +		return 0;
-> +
-> +	ret = nxp_spifi_reset(spifi);
-> +	if (ret)
-> +		dev_err(spifi->dev, "unable to enter command mode\n");
-> +
-> +	return ret;
-> +}
-> +
-> +static int nxp_spifi_set_memory_mode_on(struct nxp_spifi *spifi)
-> +{
-> +	int retry = 3;
-> +	u32 stat;
-> +
-> +	stat = readb(spifi->io_base + SPIFI_STAT);
-> +	if (stat & SPIFI_STAT_MCINIT)
-> +		return 0;
+Build: uImage+dtb:
+    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/omap4-var-stk-om44,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig_n800_only_a/omap2420-n800,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-sbc-t3517,
+		  omap2plus_defconfig/omap5-uevm,
+		  omap2plus_defconfig/omap5-sbc-t54
 
-Do you think it makes sense to cache the memory/command mode
-instead of reading it? Would it affect throughput in any sense?
+Build: zImage:
+    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_omap5_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  omap2plus_defconfig_am43xx_only,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
 
-I'm thinking these slow-clocked microcontrollers might benefit from
-such tricks, but I don't have actual numbers to back this up.
+Build warnings from toolchain: uImage:
+    FAIL ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
 
-> +
-> +	writel(spifi->mcmd, spifi->io_base + SPIFI_MCMD);
-> +
-> +	do {
-> +		stat = readb(spifi->io_base + SPIFI_STAT);
-> +		if (stat & SPIFI_STAT_MCINIT)
-> +			return 0;
-> +
-> +		udelay(10);
-> +	} while (retry--);
+Build warnings from toolchain: uImage+dtb:
+    (none)
 
-Same here about using iopoll variants.
+Build warnings from toolchain: zImage:
+    FAIL (14/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_omap5_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  omap2plus_defconfig_am43xx_only,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap4430_sdp_oldconfig
 
-> +
-> +	dev_err(spifi->dev, "unable to enter memory mode\n");
-> +
-> +	return -ETIMEDOUT;
-> +}
-> +
-> +static int nxp_spifi_read_reg(struct spi_nor *nor, u8 opcode, u8 *buf, int len)
-> +{
-> +	struct nxp_spifi *spifi = nor->priv;
-> +	u32 cmd;
-> +	int ret;
-> +
-> +	ret = nxp_spifi_set_memory_mode_off(spifi);
-> +	if (ret)
-> +		return ret;
-> +
-> +	cmd = SPIFI_CMD_DATALEN(len) |
-> +	      SPIFI_CMD_OPCODE(opcode) |
-> +	      SPIFI_CMD_FIELDFORM_ALL_SERIAL |
-> +	      SPIFI_CMD_FRAMEFORM_OPCODE_ONLY;
-> +	writel(cmd, spifi->io_base + SPIFI_CMD);
-> +
-> +	while (len--)
-> +		*buf++  = readb(spifi->io_base + SPIFI_DATA);
+Boot to userspace:
+    FAIL ( 2/17): 2430sdp, 5430es2sbct54
+    skip ( 2/17): 5912osk, 3517evm
+    Pass (13/17): am335xbonelt, am335xbone, 4430es2panda, 4460pandaes,
+		  4460varsomom, 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm, cmt3517, 5430es2uevm,
+		  2420n800
 
-Nit: extra whitespace here.
+Kernel warnings during boot to userspace:
+    FAIL ( 2/17): 4430es2panda, cmt3517
 
-> +
-> +	return nxp_spifi_wait_for_cmd(spifi);
-> +}
-> +
-> +static int nxp_spifi_write_reg(struct spi_nor *nor, u8 opcode, u8 *buf,
-> +			       int len, int write_enable)
-> +{
-> +	struct nxp_spifi *spifi = nor->priv;
-> +	u32 cmd;
-> +	int ret;
-> +
-> +	ret = nxp_spifi_set_memory_mode_off(spifi);
-> +	if (ret)
-> +		return ret;
-> +
-> +	cmd = SPIFI_CMD_DOUT |
-> +	      SPIFI_CMD_DATALEN(len) |
-> +	      SPIFI_CMD_OPCODE(opcode) |
-> +	      SPIFI_CMD_FIELDFORM_ALL_SERIAL |
-> +	      SPIFI_CMD_FRAMEFORM_OPCODE_ONLY;
-> +	writel(cmd, spifi->io_base + SPIFI_CMD);
-> +
-> +	while (len--)
-> +		writeb(*buf++, spifi->io_base + SPIFI_DATA);
-> +
-> +	return nxp_spifi_wait_for_cmd(spifi);
-> +}
-> +
-> +static int nxp_spifi_read(struct spi_nor *nor, loff_t from, size_t len,
-> +			  size_t *retlen, u_char *buf)
-> +{
-> +	struct nxp_spifi *spifi = nor->priv;
-> +	int ret;
-> +
-> +	ret = nxp_spifi_set_memory_mode_on(spifi);
-> +	if (ret)
-> +		return ret;
-> +
-> +	memcpy_fromio(buf, spifi->flash_base + from, len);
-> +	*retlen += len;
-> +
-> +	return 0;
-> +}
-> +
-> +static void nxp_spifi_write(struct spi_nor *nor, loff_t to, size_t len,
-> +			    size_t *retlen, const u_char *buf)
-> +{
-> +	struct nxp_spifi *spifi = nor->priv;
-> +	u32 cmd;
-> +	int ret;
-> +
-> +	ret = nxp_spifi_set_memory_mode_off(spifi);
-> +	if (ret) {
-> +		*retlen = 0;
-> +		return;
-> +	}
-> +
-> +	writel(to, spifi->io_base + SPIFI_ADDR);
-> +	*retlen = len;
-> +
-> +	cmd = SPIFI_CMD_DOUT |
-> +	      SPIFI_CMD_DATALEN(len) |
-> +	      SPIFI_CMD_FIELDFORM_ALL_SERIAL |
-> +	      SPIFI_CMD_OPCODE(nor->program_opcode) |
-> +	      SPIFI_CMD_FRAMEFORM(spifi->nor.addr_width + 1);
-> +	writel(cmd, spifi->io_base + SPIFI_CMD);
-> +
-> +	while (len--)
-> +		writeb(*buf++, spifi->io_base + SPIFI_DATA);
-> +
-> +	nxp_spifi_wait_for_cmd(spifi);
-> +}
-> +
-> +static int nxp_spifi_erase(struct spi_nor *nor, loff_t offs)
-> +{
-> +	struct nxp_spifi *spifi = nor->priv;
-> +	u32 cmd;
-> +	int ret;
-> +
-> +	ret = nxp_spifi_set_memory_mode_off(spifi);
-> +	if (ret)
-> +		return ret;
-> +
-> +	writel(offs, spifi->io_base + SPIFI_ADDR);
-> +
-> +	cmd = SPIFI_CMD_FIELDFORM_ALL_SERIAL |
-> +	      SPIFI_CMD_OPCODE(nor->erase_opcode) |
-> +	      SPIFI_CMD_FRAMEFORM(spifi->nor.addr_width + 1);
-> +	writel(cmd, spifi->io_base + SPIFI_CMD);
-> +
-> +	return nxp_spifi_wait_for_cmd(spifi);
-> +}
-> +
-> +static int nxp_spifi_setup_memory_cmd(struct nxp_spifi *spifi)
-> +{
-> +	switch (spifi->nor.flash_read) {
-> +	case SPI_NOR_NORMAL:
-> +	case SPI_NOR_FAST:
-> +		spifi->mcmd = SPIFI_CMD_FIELDFORM_ALL_SERIAL;
-> +		break;
-> +	case SPI_NOR_DUAL:
-> +	case SPI_NOR_QUAD:
-> +		spifi->mcmd = SPIFI_CMD_FIELDFORM_QUAD_DUAL_DATA;
-> +		break;
-> +	default:
-> +		dev_err(spifi->dev, "unsupported spi read mode\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	/* Memory mode supports address length between 1 and 4 */
-> +	if (spifi->nor.addr_width < 1 || spifi->nor.addr_width > 4)
-> +		return -EINVAL;
-> +
-> +	spifi->mcmd |= SPIFI_CMD_OPCODE(spifi->nor.read_opcode) |
-> +		       SPIFI_CMD_INTLEN(spifi->nor.read_dummy / 8) |
-> +		       SPIFI_CMD_FRAMEFORM(spifi->nor.addr_width + 1);
-> +
-> +	return 0;
-> +}
-> +
-> +static void nxp_spifi_dummy_id_read(struct spi_nor *nor)
-> +{
-> +	u8 id[SPI_NOR_MAX_ID_LEN];
-> +	nor->read_reg(nor, SPINOR_OP_RDID, id, SPI_NOR_MAX_ID_LEN);
-> +}
-> +
-> +static int nxp_spifi_setup_flash(struct nxp_spifi *spifi,
-> +				 struct device_node *np)
-> +{
-> +	struct mtd_part_parser_data ppdata;
-> +	enum read_mode flash_read;
-> +	u32 ctrl, property;
-> +	char modalias[40];
-> +	u16 mode = 0;
-> +	int ret;
-> +
-> +	if (!of_property_read_u32(np, "spi-rx-bus-width", &property)) {
-> +		switch (property) {
-> +		case 1:
-> +			break;
-> +		case 2:
-> +			mode |= SPI_RX_DUAL;
-> +			break;
-> +		case 4:
-> +			mode |= SPI_RX_QUAD;
-> +			break;
-> +		default:
-> +			dev_err(spifi->dev, "unsupported rx-bus-width\n");
-> +			return -EINVAL;
-> +		}
-> +	}
-> +
-> +	if (of_find_property(np, "spi-cpha", NULL))
-> +		mode |= SPI_CPHA;
-> +
-> +	if (of_find_property(np, "spi-cpol", NULL))
-> +		mode |= SPI_CPOL;
-> +
-> +	/* Setup control register defaults */
-> +	ctrl = SPIFI_CTRL_TIMEOUT(1000) |
-> +	       SPIFI_CTRL_CSHIGH(15) |
-> +	       SPIFI_CTRL_FBCLK;
-> +
-> +	if (mode & SPI_RX_DUAL) {
-> +		ctrl |= SPIFI_CTRL_DUAL;
-> +		flash_read = SPI_NOR_DUAL;
-> +	} else if (mode & SPI_RX_QUAD) {
-> +		ctrl &= ~SPIFI_CTRL_DUAL;
-> +		flash_read = SPI_NOR_QUAD;
-> +	} else {
-> +		ctrl |= SPIFI_CTRL_DUAL;
-> +		flash_read = SPI_NOR_NORMAL;
-> +	}
-> +
-> +	switch (mode & (SPI_CPHA | SPI_CPOL)) {
-> +	case SPI_MODE_0:
-> +		ctrl &= ~SPIFI_CTRL_MODE3;
-> +		break;
-> +	case SPI_MODE_3:
-> +		ctrl |= SPIFI_CTRL_MODE3;
-> +		break;
-> +	default:
-> +		dev_err(spifi->dev, "only mode 0 and 3 supported\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	writel(ctrl, spifi->io_base + SPIFI_CTRL);
-> +	dev_info(spifi->dev, "spifi ctrl = 0x%08x\n", ctrl);
-> +
-> +	spifi->mtd.priv  = &spifi->nor;
-> +	spifi->nor.mtd   = &spifi->mtd;
-> +	spifi->nor.dev   = spifi->dev;
-> +	spifi->nor.priv  = spifi;
-> +	spifi->nor.read  = nxp_spifi_read;
-> +	spifi->nor.write = nxp_spifi_write;
-> +	spifi->nor.erase = nxp_spifi_erase;
-> +	spifi->nor.read_reg  = nxp_spifi_read_reg;
-> +	spifi->nor.write_reg = nxp_spifi_write_reg;
-> +
-> +	ret = of_modalias_node(np, modalias, sizeof(modalias));
-> +	if (ret < 0) {
-> +		dev_err(spifi->dev, "unable to get device modalias\n");
-> +		return ret;
-> +	}
-> +
-> +	/*
-> +	 * The first read on a hard reset isn't reliable so do a
-> +	 * dummy read of the id before calling spi_nor_scan().
-> +	 * The reason for this problem is unknown.
-> +	 *
-> +	 * The official NXP spifilib uses more or less the same
-> +	 * workaround that is applied here by reading the device
-> +	 * id multiple times.
-> +	 */
-> +	nxp_spifi_dummy_id_read(&spifi->nor);
-> +
-> +	ret = spi_nor_scan(&spifi->nor, modalias, flash_read);
-> +	if (ret) {
-> +		dev_err(spifi->dev, "device scan failed\n");
-> +		return ret;
-> +	}
-> +
-> +	ret = nxp_spifi_setup_memory_cmd(spifi);
-> +	if (ret) {
-> +		dev_err(spifi->dev, "memory command setup failed\n");
-> +		return ret;
-> +	}
-> +
-> +	ppdata.of_node = np;
-> +	ret = mtd_device_parse_register(&spifi->mtd, NULL, &ppdata, NULL, 0);
-> +	if (ret) {
-> +		dev_err(spifi->dev, "mtd device parse failed\n");
-> +		return ret;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int nxp_spifi_probe(struct platform_device *pdev)
-> +{
-> +	struct device_node *flash_np;
-> +	struct nxp_spifi *spifi;
-> +	struct resource *res;
-> +	int ret;
-> +
-> +	spifi = devm_kzalloc(&pdev->dev, sizeof(*spifi), GFP_KERNEL);
-> +	if (!spifi)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "spifi");
-> +	spifi->io_base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(spifi->io_base))
-> +		return PTR_ERR(spifi->io_base);
-> +
-> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "flash");
-> +	spifi->flash_base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(spifi->flash_base))
-> +		return PTR_ERR(spifi->flash_base);
-> +
+PM: chip retention via suspend:
+    FAIL ( 6/12): am335xbonelt, 4430es2panda, 4460varsomom, 2430sdp,
+		  5430es2uevm, 5430es2sbct54
+    Pass ( 6/12): 4460pandaes, 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm
 
-Just curious: is the memory mapping fixed?
+PM: chip retention via dynamic idle:
+    FAIL ( 6/12): am335xbonelt, 4430es2panda, 4460varsomom, 2430sdp,
+		  5430es2uevm, 5430es2sbct54
+    Pass ( 6/12): 4460pandaes, 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm
 
-> +	spifi->clk_spifi = devm_clk_get(&pdev->dev, "spifi");
-> +	if (IS_ERR(spifi->clk_spifi)) {
-> +		dev_err(&pdev->dev, "spifi clock not found\n");
-> +		return PTR_ERR(spifi->clk_spifi);
-> +	}
-> +
-> +	spifi->clk_reg = devm_clk_get(&pdev->dev, "reg");
-> +	if (IS_ERR(spifi->clk_reg)) {
-> +		dev_err(&pdev->dev, "reg clock not found\n");
-> +		return PTR_ERR(spifi->clk_reg);
-> +	}
-> +
-> +	ret = clk_prepare_enable(spifi->clk_reg);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "unable to enable reg clock\n");
-> +		return ret;
-> +	}
-> +
-> +	ret = clk_prepare_enable(spifi->clk_spifi);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "unable to enable spifi clock\n");
-> +		goto dis_clk_reg;
-> +	}
-> +
-> +	spifi->dev = &pdev->dev;
-> +	platform_set_drvdata(pdev, spifi);
-> +
-> +	/* Initialize and reset device */
-> +	nxp_spifi_reset(spifi);
-> +	writel(0, spifi->io_base + SPIFI_IDATA);
-> +	writel(0, spifi->io_base + SPIFI_MCMD);
-> +	nxp_spifi_reset(spifi);
-> +
-> +	flash_np = of_get_next_available_child(pdev->dev.of_node, NULL);
-> +	if (!flash_np) {
-> +		dev_err(&pdev->dev, "no spi flash device to configure\n");
-> +		ret = -ENODEV;
-> +		goto dis_clks;
-> +	}
-> +
-> +	ret = nxp_spifi_setup_flash(spifi, flash_np);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "unable to setup flash chip\n");
-> +		goto dis_clks;
-> +	}
-> +
-> +	return 0;
-> +
-> +dis_clks:
-> +	clk_disable_unprepare(spifi->clk_spifi);
-> +dis_clk_reg:
-> +	clk_disable_unprepare(spifi->clk_reg);
-> +	return ret;
-> +}
-> +
-> +static int nxp_spifi_remove(struct platform_device *pdev)
-> +{
-> +	struct nxp_spifi *spifi = platform_get_drvdata(pdev);
-> +
-> +	mtd_device_unregister(&spifi->mtd);
-> +	clk_disable_unprepare(spifi->clk_spifi);
-> +	clk_disable_unprepare(spifi->clk_reg);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id nxp_spifi_match[] = {
-> +	{.compatible = "nxp,lpc1773-spifi"},
-> +	{ /* sentinel */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, nxp_spifi_match);
-> +
-> +static struct platform_driver nxp_spifi_driver = {
-> +	.probe	= nxp_spifi_probe,
-> +	.remove	= nxp_spifi_remove,
-> +	.driver	= {
-> +		.name = "nxp-spifi",
-> +		.of_match_table = nxp_spifi_match,
-> +	},
-> +};
-> +module_platform_driver(nxp_spifi_driver);
-> +
-> +MODULE_DESCRIPTION("NXP SPI Flash Interface driver");
-> +MODULE_AUTHOR("Joachim Eastwood <manabian@gmail.com>");
-> +MODULE_LICENSE("GPL v2");
-> 
+PM: chip off (except CORE, due to errata) via suspend:
+    Pass ( 1/ 1): 3730beaglexm
 
--- 
-Ezequiel Garcia, VanguardiaSur
-www.vanguardiasur.com.ar
+PM: chip off (except CORE, due to errata) via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730es12beaglexm
+
+PM: chip off via dynamic idle:
+    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730es12beaglexm
+
+Kernel warnings during PM test:
+    FAIL ( 1/17): 4430es2panda
+
+Obsolete Kconfig symbols:
+    FAIL ( 1/20): multi_v7_defconfig
+
+
+vmlinux object size
+(delta in bytes from test_v4.1-rc4 (e26081808edadfd257c6c9d81014e3b25e9a6118)):
+   text     data      bss    total  kernel
+  +1658        0        0    +1658  omap1_defconfig
+  +1658        0        0    +1658  omap1_defconfig_1510innovator_only
+  +1658        0        0    +1658  omap1_defconfig_5912osk_only
+ +28262   +52928        0   +81190  multi_v7_defconfig
+  +2678        0        0    +2678  omap2plus_defconfig
+  +2130        0       -8    +2122  omap2plus_defconfig_2430sdp_only
+  +2550      +64        0    +2614  omap2plus_defconfig_am33xx_only
+  +2550        0        0    +2550  omap2plus_defconfig_am43xx_only
+  +2678        0        0    +2678  omap2plus_defconfig_cpupm
+  +2614        0        0    +2614  omap2plus_defconfig_dra7xx_only
+  +1226        0        0    +1226  omap2plus_defconfig_n800_multi_omap2xxx
+  +1230        0        0    +1230  omap2plus_defconfig_n800_only_a
+  +2042        0        0    +2042  omap2plus_defconfig_no_pm
+  +2614        0        0    +2614  omap2plus_defconfig_omap2_4_only
+  +2554        0        0    +2554  omap2plus_defconfig_omap3_4_only
+  +2550        0        0    +2550  omap2plus_defconfig_omap5_only
+   +632        0      -80     +552  rmk_omap3430_ldp_allnoconfig
+  +2078        0        0    +2078  rmk_omap3430_ldp_oldconfig
+   +664        0      -80     +584  rmk_omap4430_sdp_allnoconfig
+  +2978        0        0    +2978  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v4.1-rc4 (e26081808edadfd257c6c9d81014e3b25e9a6118))
+  avail  rsrvd   high  freed  board          kconfig
+    -8k     8k      .     4k  am335xbone     omap2plus_defconfig_am33xx_only
+
+
+Thanks to help from Tony, Suman, Nishanth, and Tero, some of the earlier 
+test failures in the v4.1-rc series have been tracked down.  The 4460 
+VAR-SOM-OM was booting with an older DT file since the point in time last 
+year when the DT file was renamed; this has now been fixed.  Most of the 
+other failures were due to timeout problems after commit 
+cc4a5fe972ad7834e8662b49b3a5fdb597e9e15e ("arm: config: 
+omap2plus_defconfig: switch over to LZMA compression") which pushed the 
+time interval from the point at which the "Starting kernel" message is 
+emitted to the point at which the kernel starts to log serial output to 
+the console over 5 seconds on many OMAP3 and earlier platforms.  From my 
+point of view this commit is a mistake.  Anyone integrating a kernel into 
+a consumer device will need to be sure to disable LZMA compression if 
+reasonable boot times are desired.  This is not something that the vast 
+majority of integrators will be aware of.
+
+The 5430es2sbct54 is still not booting to userspace; this is on the list 
+here to bisect.
