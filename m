@@ -1,63 +1,37 @@
 From: bintian.wang@huawei.com (Bintian Wang)
-Date: Sat, 30 May 2015 09:50:58 +0800
-Subject: [PATCH v9 3/6] clk: hi6220: Document devicetree bindings for hi6220
- clock
+Date: Sat, 30 May 2015 09:50:59 +0800
+Subject: [PATCH v9 4/6] Documentation: DT: PL011: hi6220: add compatible
+ string for Hisilicon designed UART
 In-Reply-To: <1432950661-23060-1-git-send-email-bintian.wang@huawei.com>
 References: <1432950661-23060-1-git-send-email-bintian.wang@huawei.com>
-Message-ID: <1432950661-23060-4-git-send-email-bintian.wang@huawei.com>
+Message-ID: <1432950661-23060-5-git-send-email-bintian.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document DT files bindings for Hisilicon hi6220 clock.
+Hisilicon does some performance enhancements based on PL011(e.g. larger
+FIFO length), so add one compatible string "hisilicon,hi6220-uart" for
+future optimisations or workarounds works.
 
 Signed-off-by: Bintian Wang <bintian.wang@huawei.com>
-Acked-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-Suggested-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+Suggested-by: Mark Rutland <mark.rutland@arm.com>
 ---
- .../devicetree/bindings/clock/hi6220-clock.txt     |   34 ++++++++++++++++++++
- 1 file changed, 34 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/hi6220-clock.txt
+ Documentation/devicetree/bindings/serial/pl011.txt |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/hi6220-clock.txt b/Documentation/devicetree/bindings/clock/hi6220-clock.txt
-new file mode 100644
-index 0000000..53ddb19
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/hi6220-clock.txt
-@@ -0,0 +1,34 @@
-+* Hisilicon Hi6220 Clock Controller
-+
-+Clock control registers reside in different Hi6220 system controllers,
-+please refer the following document to know more about the binding rules
-+for these system controllers:
-+
-+Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-+
-+Required Properties:
-+
-+- compatible: the compatible should be one of the following strings to
-+	indicate the clock controller functionality.
-+
-+	- "hisilicon,hi6220-aoctrl"
-+	- "hisilicon,hi6220-sysctrl"
-+	- "hisilicon,hi6220-mediactrl"
-+	- "hisilicon,hi6220-pmctrl"
-+
-+- reg: physical base address of the controller and length of memory mapped
-+  region.
-+
-+- #clock-cells: should be 1.
-+
-+For example:
-+	sys_ctrl: sys_ctrl {
-+		compatible = "hisilicon,hi6220-sysctrl", "syscon";
-+		reg = <0x0 0xf7030000 0x0 0x2000>;
-+		#clock-cells = <1>;
-+	};
-+
-+Each clock is assigned an identifier and client nodes use this identifier
-+to specify the clock which they consume.
-+
-+All these identifier could be found in <dt-bindings/clock/hi6220-clock.h>.
+diff --git a/Documentation/devicetree/bindings/serial/pl011.txt b/Documentation/devicetree/bindings/serial/pl011.txt
+index ba3ecb8..cb9fd9d 100644
+--- a/Documentation/devicetree/bindings/serial/pl011.txt
++++ b/Documentation/devicetree/bindings/serial/pl011.txt
+@@ -1,7 +1,9 @@
+ * ARM AMBA Primecell PL011 serial UART
+ 
+ Required properties:
+-- compatible: must be "arm,primecell", "arm,pl011"
++- compatible: should contain one of the following sequences:
++  * "arm,pl011", "arm,primecell"
++  * "hisilicon,hi6220-pl011", "arm,pl011", "arm,primecell"
+ - reg: exactly one register range with length 0x1000
+ - interrupts: exactly one interrupt specifier
+ 
 -- 
 1.7.9.5
