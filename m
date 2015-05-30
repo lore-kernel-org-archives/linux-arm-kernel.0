@@ -1,71 +1,78 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Sat, 30 May 2015 01:19:01 +0200
-Subject: [PATCH v4] ARM: l2c: add options to overwrite prefetching behavior
-Message-ID: <1432941541-18588-1-git-send-email-hauke@hauke-m.de>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Sat, 30 May 2015 09:01:22 +0900
+Subject: [RFC PATCH 0/5] livepatch: add support on arm64
+In-Reply-To: <1432792265-24076-1-git-send-email-huawei.libin@huawei.com>
+References: <1432792265-24076-1-git-send-email-huawei.libin@huawei.com>
+Message-ID: <5568FDD2.2040005@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These options make it possible to overwrites the data and instruction
-prefetching behavior of the arm pl310 cache controller.
+On 2015/05/28 14:51, Li Bin wrote:
+> This patchset propose a method for gcc -mfentry feature(profile
+> before prologue) implementation for arm64, and propose the livepatch
+> implementation for arm64 based on this feature.
+> The gcc implementation about this feature will be post to the gcc 
+> community soon.
+> 
+> With this -mfentry feature, the entry of each function like:
+> 
+> foo:
+>     mov x9, x30 
+>     bl __fentry__
+>     mov x30, x9
+>     [prologue]
+>     ... 
+> 
+> The x9 is a callee corruptible register, and the __fentry__ function
+> is responsible to protect all registers, so it can be used to protect
+> the x30. And the added two instructions which is register mov operation
+> have ralatively small impact on performance.
 
-Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
----
-changes since
-v3: 
-  * remove arm prefix
-  * improve documentation
-v2: only set prefetch
-v1: set prefetch and aux
- Documentation/devicetree/bindings/arm/l2cc.txt |  5 +++++
- arch/arm/mm/cache-l2x0.c                       | 20 ++++++++++++++++++++
- 2 files changed, 25 insertions(+)
+Hm, this implementation looks good to me :)
+This also enables us to KPROBES_ON_FTRACE too.
 
-diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
-index 0dbabe9..2251dcc 100644
---- a/Documentation/devicetree/bindings/arm/l2cc.txt
-+++ b/Documentation/devicetree/bindings/arm/l2cc.txt
-@@ -67,6 +67,11 @@ Optional properties:
-   disable if zero.
- - arm,prefetch-offset : Override prefetch offset value. Valid values are
-   0-7, 15, 23, and 31.
-+- prefetch-data : Data prefetch. Value: <0> (forcibly disable), <1>
-+  (forcibly enable), property absent (retain settings set by firmware)
-+- prefetch-instr : Instruction prefetch. Value: <0> (forcibly disable),
-+  <1> (forcibly enable), property absent (retain settings set by
-+  firmware)
- 
- Example:
- 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index e309c8f..2570f83 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -1199,6 +1199,26 @@ static void __init l2c310_of_parse(const struct device_node *np,
- 		pr_err("L2C-310 OF arm,prefetch-offset property value is missing\n");
- 	}
- 
-+	ret = of_property_read_u32(np, "prefetch-data", &val);
-+	if (ret == 0) {
-+		if (val)
-+			prefetch |= L310_PREFETCH_CTRL_DATA_PREFETCH;
-+		else
-+			prefetch &= ~L310_PREFETCH_CTRL_DATA_PREFETCH;
-+	} else if (ret != -EINVAL) {
-+		pr_err("L2C-310 OF prefetch-data property value is missing\n");
-+	}
-+
-+	ret = of_property_read_u32(np, "prefetch-instr", &val);
-+	if (ret == 0) {
-+		if (val)
-+			prefetch |= L310_PREFETCH_CTRL_INSTR_PREFETCH;
-+		else
-+			prefetch &= ~L310_PREFETCH_CTRL_INSTR_PREFETCH;
-+	} else if (ret != -EINVAL) {
-+		pr_err("L2C-310 OF prefetch-instr property value is missing\n");
-+	}
-+
- 	l2x0_saved_regs.prefetch_ctrl = prefetch;
- }
- 
+Thanks,
+
+> 
+> This patchset has been tested on arm64 platform.
+> 
+> Li Bin (4):
+>   livepatch: ftrace: arm64: Add support for DYNAMIC_FTRACE_WITH_REGS
+>   livepatch: ftrace: add ftrace_function_stub_ip function
+>   livepatch: ftrace: arm64: Add support for -mfentry on arm64
+>   livepatch: arm64: add support for livepatch on arm64
+> 
+> Xie XiuQi (1):
+>   livepatch: arm64: support relocation in a module
+> 
+>  arch/arm64/Kconfig                 |    5 +
+>  arch/arm64/include/asm/ftrace.h    |    9 +
+>  arch/arm64/include/asm/livepatch.h |   45 +++++
+>  arch/arm64/kernel/Makefile         |    1 +
+>  arch/arm64/kernel/arm64ksyms.c     |    4 +
+>  arch/arm64/kernel/entry-ftrace.S   |  154 +++++++++++++++-
+>  arch/arm64/kernel/ftrace.c         |   28 +++-
+>  arch/arm64/kernel/livepatch.c      |   41 ++++
+>  arch/arm64/kernel/module.c         |  355 ++++++++++++++++++------------------
+>  include/linux/ftrace.h             |    1 +
+>  kernel/livepatch/core.c            |   17 ++-
+>  kernel/trace/ftrace.c              |   32 ++++
+>  scripts/recordmcount.pl            |    2 +-
+>  13 files changed, 508 insertions(+), 186 deletions(-)
+>  create mode 100644 arch/arm64/include/asm/livepatch.h
+>  create mode 100644 arch/arm64/kernel/livepatch.c
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
+
+
 -- 
-2.1.4
+Masami HIRAMATSU
+Linux Technology Research Center, System Productivity Research Dept.
+Center for Technology Innovation - Systems Engineering
+Hitachi, Ltd., Research & Development Group
+E-mail: masami.hiramatsu.pt at hitachi.com
