@@ -1,62 +1,123 @@
-From: linux-arm@myspectrum.nl (Jeroen Hofstee)
-Date: Sat, 30 May 2015 17:56:35 +0200
-Subject: OMAP baseline test results for v4.1-rc5
-In-Reply-To: <alpine.DEB.2.02.1505301534250.26925@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1505301534250.26925@utopia.booyaka.com>
-Message-ID: <5569DDB3.2040802@myspectrum.nl>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 30 May 2015 16:04:41 +0000
+Subject: [GIT PULL] ARM: mvebu: drivers changes for v4.2
+In-Reply-To: <5569D913.4030406@free-electrons.com>
+References: <5568DF81.1090300@free-electrons.com>
+ <20150530141210.GE13641@io.lakedaemon.net>
+ <5569D913.4030406@free-electrons.com>
+Message-ID: <20150530160440.GF13641@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Paul,
+On Sat, May 30, 2015 at 05:36:51PM +0200, Gregory CLEMENT wrote:
+> Hi Jason,
+> 
+> On 30/05/2015 16:12, Jason Cooper wrote:
+> > Hey Gregory,
+> > 
+> > On Fri, May 29, 2015 at 11:52:01PM +0200, Gregory CLEMENT wrote:
+> >> Hi,
+> >>
+> >> Here is the first pull request for drivers for mvebu for v4.2.
+> >> It depends on the mvebu/fixes branch which have been merged in the
+> >> mvebu/drivers branch
+> >>
+> >> Gregory
+> >>
+> >> The following changes since commit 885dbd154b2f2ee305cec6fd0a162e1a77ae2b06:
+> >>
+> >>   Revert "bus: mvebu-mbus: make sure SDRAM CS for DMA don't overlap the MBus bridge window" (2015-05-28 11:14:31 +0200)
+> >>
+> >> are available in the git repository at:
+> >>
+> >>   git://git.infradead.org/linux-mvebu.git tags/mvebu-drivers-4.2
+> >>
+> >> for you to fetch changes up to bfa1ce5f38938cc9e6c7f2d1011f88eba2b9e2b2:
+> >>
+> >>   bus: mvebu-mbus: add mv_mbus_dram_info_nooverlap() (2015-05-28 12:21:08 +0200)
+> >>
+> >> ----------------------------------------------------------------
+> >> mvebu drivers change for 4.2
+> >>
+> >> mvebu-mbus: add mv_mbus_dram_info_nooverlap() needed for the new
+> >> Marvell crypto driver
+> >>
+> >> ----------------------------------------------------------------
+> >> Thomas Petazzoni (1):
+> >>       bus: mvebu-mbus: add mv_mbus_dram_info_nooverlap()
+> >>
+> >>  drivers/bus/mvebu-mbus.c | 117 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+> >>  include/linux/mbus.h     |   5 +++++
+> >>  2 files changed, 122 insertions(+)
+> >>
+> > 
+> > I don't see this in mvebu/for-next...  Not earth shattering, just mentioning
+> > it.  This commit is adding a new function with no callers, so the chances of
+> > conflicts / build failures is minimal.
+> 
+> Usually as soon as I apply a patch set, I also merge the branch in
+> mvebu/for-next and I push it on infradead. However it is still possible
+> that I forgot to push it. So I checked and this patch is part of mvebu/for-next:
+> http://git.infradead.org/linux-mvebu.git/commit/bfa1ce5f38938cc9e6c7f2d1011f88eba2b9e2b2
+> 
+> And it was even pulled in linux-next:
+> http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/?id=bfa1ce5f38938cc9e6c7f2d1011f88eba2b9e2b2
+> 
 
-On 30-05-15 17:50, Paul Walmsley wrote:
-> Here are some basic OMAP test results for Linux v4.1-rc5.
-> Logs and other details at:
->
->      http://www.pwsan.com/omap/testlogs/test_v4.1-rc5/20150529162206/
->
+Hmm, well it's academic, but here's what I get:
 
-The cmt3517 seems to have these some In-Band errors.
-Do you happen to know where these are coming from?
+$ git log --graph --oneline --decorate v4.1-rc1^..remotes/mvebu/for-next
+*   4c7675d00ca9 (mvebu/for-next) Merge branch 'mvebu/dt' into mvebu/for-next
+|\  
+| * 2d2959286017 (mvebu/mvebu/dt) ARM: mvebu: use improved armada spi device tree compatible name for each SoC
+| * 16b79921e300 ARM: mvebu: dts: Add dts file for DLink DNS-327L
+| * e9f3ed4ac464 ARM: mvebu: add "jedec,spi-nor" flash compatible binding
+| * 943d45aafd1f ARM: kirkwood: add "jedec,spi-nor" flash compatible binding
+| * 3abdd583312a ARM: mvebu: add support for the new Armada 385 based Linksys boards
+| * 973ed08377f6 (tag: mvebu-dt-4.2, arm-soc/mvebu/dt) ARM: mvebu: add alias for mdio on Armada 38x
+| * 1c1534d94288 ARM: dts: dove: Add Compulab SBC-A510 to Makefile
+| * 896dd2728ff2 ARM: dts: dove: Add proper support for Compulab CM-A510/SBC-A510
+| * aa532007561e ARM: dts: dove: Remove Compulab CM-A510 from Makefile
+| * 7ec7e546c0f7 ARM: dts: dove: Add internal i2c multiplexer node
+* | 987dbc820618 ARM: mvebu: armada-xp-linksys-mamba: Disable internal RTC
+* | 31c17ac98fc0 (tag: mvebu-fixes-4.1-2) MAINTAINERS: Add dts entries for some of the Marvell SoCs
+* | ba0a1ff85376 ARM: dove: Add clock-names to CuBox Si5351 clk generator
+* | ae142bd99765 ARM: mvebu: Fix the main PLL frequency on Armada 375, 38x and 39x SoCs
+* | 750e30d4076a (tag: mvebu-fixes-4.1) ARM: mvebu: armada-xp-openblocks-ax3-4: Disable internal RTC
+|/  
+* b787f68c36d4 (tag: v4.1-rc1, hesselba/master) Linux 4.1-rc1
 
-Regards,
-Jeroen
 
-[    0.476773] In-band Error seen by MPU  at address 0
-[    0.476802] ------------[ cut here ]------------
-[    0.476848] WARNING: CPU: 0 PID: 1 at drivers/bus/omap_l3_smx.c:166 
-omap3_l3_app_irq+0xcc/0x124()
-[    0.476865] Modules linked in:
-[    0.476899] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 
-4.1.0-rc5-143184-gba155e2 #1
-[    0.476916] Hardware name: Generic AM3517 (Flattened Device Tree)
-[    0.476964] [<c0016504>] (unwind_backtrace) from [<c0012a44>] 
-(show_stack+0x10/0x14)
-[    0.476997] [<c0012a44>] (show_stack) from [<c05ddbd4>] 
-(dump_stack+0x80/0x9c)
-[    0.477028] [<c05ddbd4>] (dump_stack) from [<c004000c>] 
-(warn_slowpath_common+0x78/0xb4)
-[    0.477056] [<c004000c>] (warn_slowpath_common) from [<c0040064>] 
-(warn_slowpath_null+0x1c/0x24)
-[    0.477083] [<c0040064>] (warn_slowpath_null) from [<c0370ed0>] 
-(omap3_l3_app_irq+0xcc/0x124)
-[    0.477121] [<c0370ed0>] (omap3_l3_app_irq) from [<c009804c>] 
-(handle_irq_event_percpu+0x64/0x204)
-[    0.477150] [<c009804c>] (handle_irq_event_percpu) from [<c0098228>] 
-(handle_irq_event+0x3c/0x5c)
-[    0.477181] [<c0098228>] (handle_irq_event) from [<c009b09c>] 
-(handle_level_irq+0xb4/0x13c)
-[    0.477209] [<c009b09c>] (handle_level_irq) from [<c00978f0>] 
-(generic_handle_irq+0x20/0x30)
-[    0.477235] [<c00978f0>] (generic_handle_irq) from [<c0097a08>] 
-(__handle_domain_irq+0x68/0xdc)
-[    0.477263] [<c0097a08>] (__handle_domain_irq) from [<c0009480>] 
-(omap_intc_handle_irq+0xb4/0xc4)
-[    0.477299] [<c0009480>] (omap_intc_handle_irq) from [<c05e48a4>] 
-(__irq_svc+0x44/0x5c)
-[    0.477317] Exception stack(0xce0a3d00 to 0xce0a3d48)
-[    0.477342] 3d00: 00000001 ce0a1138 00000000 ce0a0b80 60000153 
-ce013c60 ce013c60 00000000
-[    0.477365] 3d20: 0000001a 60000153 ce013c38 00000000 00000000 
-ce0a3d48 c008dde8 c05e4424
-[    0.477382] 3d40: 20000153 ffffffff
+And after I forcibly update the remote (which a cron job *should* be doing
+every night...) I get:
+
+$ git log --graph --oneline --decorate v4.1-rc1^..remotes/mvebu/for-next
+*   96a9fef8a7fa (mvebu/for-next) Merge branch 'mvebu/dt' into mvebu/for-next
+|\  
+| * 2d2959286017 (tag: mvebu-dt-4.2-2, mvebu/mvebu/dt) ARM: mvebu: use improved armada spi device tree compatible name for each SoC
+| * 16b79921e300 ARM: mvebu: dts: Add dts file for DLink DNS-327L
+| * e9f3ed4ac464 ARM: mvebu: add "jedec,spi-nor" flash compatible binding
+| * 943d45aafd1f ARM: kirkwood: add "jedec,spi-nor" flash compatible binding
+| * 3abdd583312a ARM: mvebu: add support for the new Armada 385 based Linksys boards
+| * 973ed08377f6 (tag: mvebu-dt-4.2, arm-soc/mvebu/dt) ARM: mvebu: add alias for mdio on Armada 38x
+| * 1c1534d94288 ARM: dts: dove: Add Compulab SBC-A510 to Makefile
+| * 896dd2728ff2 ARM: dts: dove: Add proper support for Compulab CM-A510/SBC-A510
+| * aa532007561e ARM: dts: dove: Remove Compulab CM-A510 from Makefile
+| * 7ec7e546c0f7 ARM: dts: dove: Add internal i2c multiplexer node
+* | bfa1ce5f3893 (tag: mvebu-drivers-4.2, mvebu/mvebu/drivers) bus: mvebu-mbus: add mv_mbus_dram_info_nooverlap()
+* | 885dbd154b2f (tag: mvebu-fixes-4.1-3, mvebu/mvebu/fixes) Revert "bus: mvebu-mbus: make sure SDRAM CS for DMA don't overlap the MBus bridge window"
+* | 8c9e06e64768 bus: mvebu-mbus: do not set WIN_CTRL_SYNCBARRIER on non io-coherent platforms.
+* | 2ff9ab4c7b6d ARM: mvebu: armada-xp-linksys-mamba: Disable internal RTC
+* | 31c17ac98fc0 (tag: mvebu-fixes-4.1-2) MAINTAINERS: Add dts entries for some of the Marvell SoCs
+* | ba0a1ff85376 ARM: dove: Add clock-names to CuBox Si5351 clk generator
+* | ae142bd99765 ARM: mvebu: Fix the main PLL frequency on Armada 375, 38x and 39x SoCs
+* | 750e30d4076a (tag: mvebu-fixes-4.1) ARM: mvebu: armada-xp-openblocks-ax3-4: Disable internal RTC
+|/  
+* b787f68c36d4 (tag: v4.1-rc1, hesselba/master) Linux 4.1-rc1
+
+So it seems my cron job isn't updating like I think it is :-/  Sorry for the
+noise.
+
+thx,
+
+Jason.
