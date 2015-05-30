@@ -1,80 +1,101 @@
-From: gregory.0xf0@gmail.com (Gregory Fong)
-Date: Fri, 29 May 2015 18:51:48 -0700
-Subject: [PATCH v2 3/6] dt-bindings: brcmstb-gpio: document properties for
- wakeup
-In-Reply-To: <20150530013709.GY27753@ld-irv-0074>
-References: <1432865650-4062-1-git-send-email-gregory.0xf0@gmail.com>
- <1432865650-4062-4-git-send-email-gregory.0xf0@gmail.com>
- <20150530003613.GW27753@ld-irv-0074>
- <CADtm3G43-EBUOwAxcT2B-0syzDtpjdyfPmOHmmDsNN8+FgoZAA@mail.gmail.com>
- <20150530013709.GY27753@ld-irv-0074>
-Message-ID: <CADtm3G5rFxU-p1BHNh-=FFA34ud_8_8uiRZSM3icF4=JfBU+Jg@mail.gmail.com>
+From: bintian.wang@huawei.com (Bintian Wang)
+Date: Sat, 30 May 2015 09:50:55 +0800
+Subject: [PATCH v9 0/6] arm64,hi6220: Enable Hisilicon Hi6220 SoC
+Message-ID: <1432950661-23060-1-git-send-email-bintian.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 29, 2015 at 6:37 PM, Brian Norris
-<computersforpeace@gmail.com> wrote:
-> On Fri, May 29, 2015 at 05:57:50PM -0700, Gregory Fong wrote:
->> On Fri, May 29, 2015 at 5:36 PM, Brian Norris
->> <computersforpeace@gmail.com> wrote:
->> > On Thu, May 28, 2015 at 07:14:07PM -0700, Gregory Fong wrote:
->> >> --- a/Documentation/devicetree/bindings/gpio/brcm,brcmstb-gpio.txt
->> >> +++ b/Documentation/devicetree/bindings/gpio/brcm,brcmstb-gpio.txt
->> >> @@ -33,6 +33,12 @@ Optional properties:
-> ...
->> >>  - #interrupt-cells:
->> >>      Should be <2>.  The first cell is the GPIO number, the second should specify
->> >>      flags.  The following subset of flags is supported:
->> >> @@ -48,7 +54,10 @@ Optional properties:
->> >>      Marks the device node as an interrupt controller
->> >>
->> >>  - interrupt-names:
->> >> -    The name of the IRQ resource used by this controller
->> >> +    The names of the IRQ resources used by this controller
->> >
->> > If you're specifying names, you should list them here.
->>
->> I was wondering about that.  Some bindings have them listed, some
->> don't.  In this case I know what names currently exist but there could
->> certainly be different ones in the future.  How does that work?  Or am
->> I misunderstanding what this field is used for?  Where are the
->> documented rules for this?
->
-> The only documentation I see is:
-> Documentation/devicetree/bindings/resource-names.txt
->
-> That documents the basics of the *-names properties, not their expected
-> usage.
->
-> In practice, they're only useful if you have enough optional resources
-> that fixed indexing isn't sufficient, and you need to use
-> platform_get_resource_byname().
->
-> So IMO, their purposes seems to be one of these:
-> (1) functional (e.g., for get_resource_byname(), when you have more than
->     one optional resource)
-> (2) self-documentation (which might run counter to #1, as you begin
->     generating too many unique names)
-> (3) no purpose
->
-> So IMO, if you ever want (1), they shouldn't have instance-specific
-> naming, but should use something generic to the device class. Otherwise,
-> they are just self-documentation, and aren't functionally useful. So
-> IMO, these sorts of names:
->
->         interrupt-names = "upg_gio_aon", "upg_gio_aon_wakeup";
->
-> work better as functional descriptions:
->
->         interrupt-names = "gio", "wakeup";
->
-> But in the end, I wouldn't foresee you needing to do (1), so you're left
-> with (2) or (3), at which point I'm not sure if you should even mention
-> the property.
+Hi6220 is one mobile solution of Hisilicon, this patchset contains
+initial support for Hi6220 SoC and HiKey development board, which
+supports octal ARM Cortex A53 cores. Initial support is minimal and
+includes just the arch configuration, device tree configuration, the
+clock driver has been picked up by clock maintainers in clk tree.
 
-I'm fine with leaving out the interrupt-names property, since we're
-not using it here anyway.  Unless there are serious objections, I'll
-plan on remove it from the bindings doc next round.
+PSCI is enabled in device tree and there is no problem to boot all the
+octal cores, and the CPU hotplug is also working now, you can download
+and compile the latest firmware based on the following link to run this
+patch set:
+https://github.com/96boards/documentation/wiki/UEFI
 
-Thanks,
-Gregory
+Chnages v9:
+* Rebase to linus/master 4.1-rc1
+* Remove the clock driver from this version because the clock maintainers
+  have queued up the clock driver:
+  git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next-hi6220
+* This version also includes clock header file:
+  [PATCH v9 6/6] dt-bindings: Add header file of hi6220 clock driver
+  Although above patch is included in clock driver, I add to this series
+  because the device tree file includes it, there will be compile error
+  without it.
+  At last, we just need to keep one when merged together.
+
+Changes v6~v8:
+This three versions only modified the clock drivers based on the
+Stephen's review advices.
+* clk-hi6220.c:
+  ** Split the clock header file from clock driver
+  ** Delete setting the parents clock of UART1 to HI6220_150M in clock
+     driver, we can do that using assigned-clock in dts when enable
+     UART1 in the future.
+* clkdivider-hi6220.c: 
+  ** Reuse some functions exported by clk-divider.c
+  ** Remove "pr_err" and CLK_IS_BASIC flag
+  ** Fix some programing style problems
+* hisilicon/clk.h: remove the "__init" markings on some funcition
+  prototypes.
+
+Changes v5:
+* Rebase to kernel 4.1-rc2
+* Add compatible string "hisilicon,hi6220-pl011" for Hisilicon designed
+  UART
+* clk-hi6220.c: use __initdata for non-const arrays based on the commit
+  692d8328e8c039f9497eb862c6cf835de922c061 
+
+Changes v4:
+* Rebase to kernel 4.1-rc1
+* Delete "arm,cortex-a15-gic" from the gic node in dts 
+
+Changes v3:
+* Verified the CPU hotplug based on the new released firmware
+* Redefined the compatible strings of four system controllers in dts 
+* Setting COMMON_CLK_HI6220 to a bool symbol
+* Keep CONFGI_ARCH_HISI sorted alphabetically
+
+Changes v2:
+* Split the DT bindings documents into earlier patches
+* Change SMP enable method from spin-table to PSCI in device tree
+* Remove "clock-frequency" from armv8-timer device node in device tree
+* Add more description about Hisilicon designed system controllers
+  in DT bindings document
+* Enable high speed clock on UART1 mux
+* Other changes based on the discussion in the mailing list:
+  https://lkml.org/lkml/2015/2/5/147
+
+Bintian Wang (6):
+  arm64: Enable Hisilicon ARMv8 SoC family in Kconfig and defconfig
+  arm64: hi6220: Document devicetree bindings for Hisilicon hi6220 SoC
+  clk: hi6220: Document devicetree bindings for hi6220 clock
+  Documentation: DT: PL011: hi6220: add compatible string for Hisilicon
+    designed UART
+  arm64: dts: Add dts files for Hisilicon Hi6220 SoC
+  dt-bindings: Add header file of hi6220 clock driver
+
+ .../bindings/arm/hisilicon/hisilicon.txt           |   87 ++++++++++
+ .../devicetree/bindings/clock/hi6220-clock.txt     |   34 ++++
+ Documentation/devicetree/bindings/serial/pl011.txt |    4 +-
+ arch/arm64/Kconfig                                 |    5 +
+ arch/arm64/boot/dts/Makefile                       |    1 +
+ arch/arm64/boot/dts/hisilicon/Makefile             |    5 +
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |   31 ++++
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  172 +++++++++++++++++++
+ arch/arm64/configs/defconfig                       |    1 +
+ include/dt-bindings/clock/hi6220-clock.h           |  173 ++++++++++++++++++++
+ 10 files changed, 512 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/hi6220-clock.txt
+ create mode 100644 arch/arm64/boot/dts/hisilicon/Makefile
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+ create mode 100644 include/dt-bindings/clock/hi6220-clock.h
+
+-- 
+1.7.9.5
