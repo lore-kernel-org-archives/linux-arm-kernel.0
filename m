@@ -1,132 +1,76 @@
-From: gregory.0xf0@gmail.com (Gregory Fong)
-Date: Fri, 29 May 2015 17:57:50 -0700
-Subject: [PATCH v2 3/6] dt-bindings: brcmstb-gpio: document properties for
- wakeup
-In-Reply-To: <20150530003613.GW27753@ld-irv-0074>
-References: <1432865650-4062-1-git-send-email-gregory.0xf0@gmail.com>
- <1432865650-4062-4-git-send-email-gregory.0xf0@gmail.com>
- <20150530003613.GW27753@ld-irv-0074>
-Message-ID: <CADtm3G43-EBUOwAxcT2B-0syzDtpjdyfPmOHmmDsNN8+FgoZAA@mail.gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Fri, 29 May 2015 18:18:19 -0700
+Subject: [PATCH] ARM: footbridge: enable dc21285 mtd map in defconfig
+In-Reply-To: <20150529084259.GI2067@n2100.arm.linux.org.uk>
+References: <20150528192238.GQ27753@ld-irv-0074>
+ <1432842380-4187-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20150528195558.GR27753@ld-irv-0074>
+ <20150528210520.GE2067@n2100.arm.linux.org.uk>
+ <20150529064942.GB18985@pengutronix.de>
+ <20150529084259.GI2067@n2100.arm.linux.org.uk>
+Message-ID: <CAN8TOE_RKkGXAC5-jWePMU5YjUirEmQDjfLhZGFrcgi2zJuZbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 29, 2015 at 5:36 PM, Brian Norris
-<computersforpeace@gmail.com> wrote:
-> On Thu, May 28, 2015 at 07:14:07PM -0700, Gregory Fong wrote:
->> Some brcmstb GPIO controllers can be used to wake from suspend, so use the
->> de facto standard property 'wakeup-source' to mark the nodes of controllers
->> with that capability.
->>
->> Also document interrupts-extended, which will be used for wakeup handling
->> because the interrupt parent for the wake IRQ is different from the regular
->> IRQ.
->>
->> Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
->> ---
->> New in v2.
->>
->>  .../devicetree/bindings/gpio/brcm,brcmstb-gpio.txt | 26 +++++++++++++++++++++-
->>  1 file changed, 25 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/gpio/brcm,brcmstb-gpio.txt b/Documentation/devicetree/bindings/gpio/brcm,brcmstb-gpio.txt
->> index 435f1bc..568814f 100644
->> --- a/Documentation/devicetree/bindings/gpio/brcm,brcmstb-gpio.txt
->> +++ b/Documentation/devicetree/bindings/gpio/brcm,brcmstb-gpio.txt
->> @@ -33,6 +33,12 @@ Optional properties:
->>  - interrupt-parent:
->>      phandle of the parent interrupt controller
->>
->> +- interrupts-extended:
->> +    Alternate form of specifying interrupts and parents that allows for
->> +    multiple parents.  This takes precedence over 'interrupts' and
->> +    'interrupt-parent'.  This probably must be used if the wakeup-source
->> +    property is provided because that may have a different interrupt parent.
->> +
->
-> "This probably must be used" seems a little awkward, especially when
-> you're just explaining an implementation detail of our SoCs, rather than
-> something unique about this binding. Maybe:
->
->   "Wakeup-capable GPIO controllers often route their wakeup interrupt
->   lines through a different interrupt controller than the primary
->   interrupt line, making this property necessary."
+On Fri, May 29, 2015 at 1:42 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, May 29, 2015 at 08:49:42AM +0200, Uwe Kleine-K?nig wrote:
+>> On Thu, May 28, 2015 at 10:05:20PM +0100, Russell King - ARM Linux wrote:
+>> > On Thu, May 28, 2015 at 12:55:58PM -0700, Brian Norris wrote:
+>> > > On Thu, May 28, 2015 at 09:46:20PM +0200, Uwe Kleine-K?nig wrote:
+>> > > > This driver fails to build since release 3.2. Improve compile coverage
+>> > > > by enabling this driver in the footbridge defconfig
+>> > >
+>> > > Actually, it did build, but it just had alarming warnings. I don't think
+>> > > those warnings actually affected anything at runtime, except for lock
+>> > > debugging (if enabled).
+>> > >
+>> > > But anyway, the change looks good, and I'm doing this in my local build
+>> > > tests now, so:
+>> > >
+>> > > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>> > >
+>> > > Acked-by: Brian Norris <computersforpeace@gmail.com>
 
-That wording does seem better, will change.
+^^ Sorry, in retrospect that was dumb.
 
->
->>  - #interrupt-cells:
->>      Should be <2>.  The first cell is the GPIO number, the second should specify
->>      flags.  The following subset of flags is supported:
->> @@ -48,7 +54,10 @@ Optional properties:
->>      Marks the device node as an interrupt controller
->>
->>  - interrupt-names:
->> -    The name of the IRQ resource used by this controller
->> +    The names of the IRQ resources used by this controller
->
-> If you're specifying names, you should list them here.
+>> > I'd say no to this - some boards have old (28F008) flash on them, which
+>> > (iirc) doesn't take kindly to being probed by MTD.
+>> Is this a bug? I'd say keeping the driver disabled in the defconfig just
+>> papers over a problem.
 
-I was wondering about that.  Some bindings have them listed, some
-don't.  In this case I know what names currently exist but there could
-certainly be different ones in the future.  How does that work?  Or am
-I misunderstanding what this field is used for?  Where are the
-documented rules for this?
+I believe there are several ancient MTD drivers like this that don't
+use any typical platform or PCI driver infrastructure, and so are much
+more likely to just go and start assuming and poking things as soon as
+their init code is run. A random sampling of drivers/mtd/maps/ turns
+up things like this driver: drivers/mtd/maps/impa7.c. It just assumes
+a few fixed physical addresses and hammers away...
 
+> Yes it is papering over a bug, but...
 >
->> +
->> +- wakeup-source:
->> +    GPIOs for this controller can be used as a wakeup source
->>
->>  Example:
->>       upg_gio: gpio at f040a700 {
->> @@ -63,3 +72,18 @@ Example:
->>               interrupt-names = "upg_gio";
->>               brcm,gpio-bank-widths = <0x20 0x20 0x20 0x18>;
->>       };
->> +
->> +     upg_gio_aon: gpio at f04172c0 {
->> +             #gpio-cells = <0x2>;
->> +             #interrupt-cells = <0x2>;
+> (1) I didn't add the driver.
+> (2) I didn't see the addition of the driver.
+> (3) I don't have the resources to be able to recover from a screwed up
+>     flash bricking my footbridge platforms.
 >
-> Might use decimal instead of hex for the above 2 lines?
+> So, I wouldn't even like to /try/ enabling it to see whether it doesn't
+> have the behaviour I referred to.
 
-Sure.
+This driver is so old and unloved (and semi-broken for >19 releases)
+that I'd bet nobody actually uses or cares for it. So it really
+doesn't make sense to be adding it to a defconfig. It'll just be
+relegated to my build tests, so maybe I'll catch obvious build
+regressions.
 
->
->> +             compatible = "brcm,bcm7445-gpio", "brcm,brcmstb-gpio";
->> +             gpio-controller;
->> +             interrupt-controller;
->> +             reg = <0xf04172c0 0x40>;
->> +             interrupt-parent = <0xc>;
->
-> That should be a phandle, not an int (I realize phandles resolve down to
-> an integer, but we're speaking DTS, not DTB).
+I don't really know what to do with such drivers, though. For now I
+tend to leave well enough alone (I know no history on many of these to
+judge much otherwise), but it seems like some of these could
+potentially cause people harm if they somehow manage to load one of
+them. Maybe some of them should be removed, or marked BROKEN and see
+if anyone complains.
 
-OK.
+>> Maybe modify the driver to not probe unless a kernel parameter is given?
+>
+> Possibly an alternative solution.
 
->
->> +             interrupts = <0x6>;
->> +             interrupts-extended = <0xc 0x6 0xa 0x5>;
->
-> Same here (phandles).
->
-> Also, even though the interrupt binding semantics specify precedence
-> between interrupts and interrupts-extended, I'd think an example should
-> stick to one or the other, no?
-
-This is the output that we actually get from the bootloader.  But
-regardless, IMO the example should have both cases: precedence is
-well-defined, both sets of information are valid, and the driver can
-handle the case where interrupts-extended is not an understood
-property.
-
->
->> +             interrupt-names = "upg_gio_aon", "upg_gio_aon_wakeup";
->> +             wakeup-source;
->> +             brcm,gpio-bank-widths = <0x12 0x4>;
->> +     };
->
-> Reviewed-by: Brian Norris <computersforpeace@gmail.com>
-
-Thanks for the review,
-Gregory
+Brian
