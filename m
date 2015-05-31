@@ -1,50 +1,90 @@
 From: rric@kernel.org (Robert Richter)
-Date: Sun, 31 May 2015 13:55:16 +0200
-Subject: [PATCH v4 0/3] AHCI: Add generic MSI-X interrupt support to SATA PCI
- driver
-Message-ID: <1433073319-13796-1-git-send-email-rric@kernel.org>
+Date: Sun, 31 May 2015 13:55:17 +0200
+Subject: [PATCH v4 1/3] ahci: Move interrupt enablement code to a separate
+ function
+In-Reply-To: <1433073319-13796-1-git-send-email-rric@kernel.org>
+References: <1433073319-13796-1-git-send-email-rric@kernel.org>
+Message-ID: <1433073319-13796-2-git-send-email-rric@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Robert Richter <rrichter@cavium.com>
 
-This patch set adds generic support for MSI-X interrupts to the SATA
-PCI driver.
+This patch refactors ahci_init_interrupts() and moves msi code to a
+separate function. Need the split since we add msix initialization in
+a later patch. The initialization for msix will be done after msi but
+before intx.
 
-The first 2 patches rework the code, one splits msi and intx code into
-separate functions, the other changes interrupt initialization to
-store the irq number in the ahci data structure (struct
-ahci_host_priv). Both changes are needed to implement MSI-X support in
-the last 3rd patch.
+Signed-off-by: Robert Richter <rrichter@cavium.com>
+---
+ drivers/ata/ahci.c | 31 ++++++++++++++++++++++---------
+ 1 file changed, 22 insertions(+), 9 deletions(-)
 
-v4:
- * removed implementation of ahci_init_intx()
- * improved patch descriptions
- * rebased onto libata/for-4.2
-
-v3:
- * store irq number in struct ahci_host_priv
- * change initialization order from msix-msi-intx to msi-msix-intx
- * improve comments in ahci_init_msix()
- * improve error message in ahci_init_msix()
- * do not enable MSI-X if MSI is actively disabled for the device
-
-v2:
- * determine irq vector from pci_dev->msi_list
-
-
-Robert Richter (3):
-  ahci: Move interrupt enablement code to a separate function
-  ahci: Store irq number in struct ahci_host_priv
-  AHCI: Add generic MSI-X interrupt support to SATA PCI driver
-
- drivers/ata/acard-ahci.c       |   4 +-
- drivers/ata/ahci.c             | 133 ++++++++++++++++++++++++++++++++++++-----
- drivers/ata/ahci.h             |   4 +-
- drivers/ata/libahci.c          |  16 +++--
- drivers/ata/libahci_platform.c |   4 +-
- drivers/ata/sata_highbank.c    |   3 +-
- 6 files changed, 135 insertions(+), 29 deletions(-)
-
+diff --git a/drivers/ata/ahci.c b/drivers/ata/ahci.c
+index c7a92a743ed0..7ba5332476c6 100644
+--- a/drivers/ata/ahci.c
++++ b/drivers/ata/ahci.c
+@@ -1201,17 +1201,17 @@ static inline void ahci_gtf_filter_workaround(struct ata_host *host)
+ {}
+ #endif
+ 
+-static int ahci_init_interrupts(struct pci_dev *pdev, unsigned int n_ports,
+-				struct ahci_host_priv *hpriv)
++static int ahci_init_msi(struct pci_dev *pdev, unsigned int n_ports,
++			struct ahci_host_priv *hpriv)
+ {
+ 	int rc, nvec;
+ 
+ 	if (hpriv->flags & AHCI_HFLAG_NO_MSI)
+-		goto intx;
++		return -ENODEV;
+ 
+ 	nvec = pci_msi_vec_count(pdev);
+ 	if (nvec < 0)
+-		goto intx;
++		return nvec;
+ 
+ 	/*
+ 	 * If number of MSIs is less than number of ports then Sharing Last
+@@ -1224,8 +1224,8 @@ static int ahci_init_interrupts(struct pci_dev *pdev, unsigned int n_ports,
+ 	rc = pci_enable_msi_exact(pdev, nvec);
+ 	if (rc == -ENOSPC)
+ 		goto single_msi;
+-	else if (rc < 0)
+-		goto intx;
++	if (rc < 0)
++		return rc;
+ 
+ 	/* fallback to single MSI mode if the controller enforced MRSM mode */
+ 	if (readl(hpriv->mmio + HOST_CTL) & HOST_MRSM) {
+@@ -1240,12 +1240,25 @@ static int ahci_init_interrupts(struct pci_dev *pdev, unsigned int n_ports,
+ 	return nvec;
+ 
+ single_msi:
+-	if (pci_enable_msi(pdev))
+-		goto intx;
++	rc = pci_enable_msi(pdev);
++	if (rc < 0)
++		return rc;
++
+ 	return 1;
++}
+ 
+-intx:
++static int ahci_init_interrupts(struct pci_dev *pdev, unsigned int n_ports,
++				struct ahci_host_priv *hpriv)
++{
++	int nvec;
++
++	nvec = ahci_init_msi(pdev, n_ports, hpriv);
++	if (nvec >= 0)
++		return nvec;
++
++	/* lagacy intx interrupts */
+ 	pci_intx(pdev, 1);
++
+ 	return 0;
+ }
+ 
 -- 
 2.1.1
