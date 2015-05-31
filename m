@@ -1,55 +1,45 @@
-From: ijc@debian.org (Ian Campbell)
-Date: Sun, 31 May 2015 19:54:35 +0100
-Subject: QNAP TS-419: sata_mv fails to initialise with "can't set global
- reset"
-In-Reply-To: <1433068534.5748.276.camel@debian.org>
-References: <1433068534.5748.276.camel@debian.org>
-Message-ID: <1433098475.5748.280.camel@debian.org>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sun, 31 May 2015 23:06:00 +0200
+Subject: [PATCH v2 0/2] NXP SPIFI driver for LPC18xx/43xx familiy
+Message-ID: <1433106362-6032-1-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2015-05-31 at 11:35 +0100, Ian Campbell wrote:
-> Hi,
-> 
-> After updating to 4.0.4 (from the Debian kernel package)
+This patch set adds a SPI-NOR driver for the NXP SPI Flash (SPIFI)
+controller that can be found on newer NXP MCUs. For example on the
+LPC18xx and LPC43xx familiy.
 
-FYI 4.1-rc5 behaves the same.
+NXP SPIFI is a specialized SPI interface for serial Flash devices.
+It supports one Flash device with 1-, 2- and 4-bits width in SPI
+mode 0 or 3. The controller operates in either command or memory
+mode. In memory mode the Flash is made accessible for the CPU as
+normal memory.
 
->  my TS-419 can
-> no longer see its SATA disks. In dmesg I see:
-> 
-> [    2.599060] SCSI subsystem initialized
-> [    2.662882] libata version 3.00 loaded.
-> [    2.664776] sata_mv 0000:01:00.0: version 1.28
-> [    2.664888] pci 0000:00:01.0: enabling device (0140 -> 0143)
-> [    2.687579] sata_mv: can't set global reset
-> [    2.691825] sata_mv 0000:01:00.0: Driver probe function unexpectedly returned 1
-> [    2.734954] sata_mv f1080000.sata: version 1.28
-> [    2.735222] sata_mv f1080000.sata: slots 32 ports 2
-> [    2.773358] scsi host0: sata_mv
-> [    2.785712] scsi host1: sata_mv
-> [    2.796204] ata1: SATA max UDMA/133 irq 35
-> [    2.800359] ata2: SATA max UDMA/133 irq 35
-> [    3.120986] ata1: SATA link down (SStatus 0 SControl F300)
-> [    3.444974] ata2: SATA link down (SStatus 0 SControl F300)
-> 
-> The last version I tried which worked was the 3.18.5 package.
-> 
-> This is using kirkwood-ts419-6281.dtb, which given this I think is the
-> correct one:
-> 
-> [    0.000000] Linux version 4.0.0-2-kirkwood (debian-kernel at lists.debian.org) (gcc version 4.9.2 (Debian 4.9.2-18) ) #1 Debian 4.0.4-1 (2015-05-26)
-> [    0.000000] CPU: Feroceon 88FR131 [56251311] revision 1 (ARMv5TE), cr=0005397f
-> [    0.000000] CPU: VIVT data cache, VIVT instruction cache
-> [    0.000000] Machine model: QNAP TS419 family
-> [...]
-> [    0.044889] mvebu-soc-id: MVEBU SoC ID=0x6281, Rev=0x2
-> 
-> I can also see both PCI devices which IIRC is the main difference
-> between the 6281 and 6282.
-> 
-> I don't see anything in the git logs after 4.0 which looks like an
-> obviously related fix, but I'm currently building 4.1-rc5 to have a
-> check.
-> 
-> Ian.
+This version address the comments from Ezequiel Garcia.
+See: http://marc.info/?l=linux-arm-kernel&m=143300098616001&w=2
+
+Changes since v1:
+ - use readb_poll_timeout instead of open coding
+ - cache current mode (memory/command)
+ - depend on HAS_IOMEM
+ - removed stray white space
+ - removed leftover debug print
+
+Support for LPC18xx/43xx can found in linux-next now.
+
+Patch against l2-mtd.git master branch.
+
+Joachim Eastwood (2):
+  mtd: spi-nor: add driver for NXP SPI Flash Interface (SPIFI)
+  doc: dt: add documentation for nxp,lpc1773-spifi
+
+ .../devicetree/bindings/mtd/nxp-spifi.txt          |  56 +++
+ drivers/mtd/spi-nor/Kconfig                        |  11 +
+ drivers/mtd/spi-nor/Makefile                       |   1 +
+ drivers/mtd/spi-nor/nxp-spifi.c                    | 491 +++++++++++++++++++++
+ 4 files changed, 559 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/nxp-spifi.txt
+ create mode 100644 drivers/mtd/spi-nor/nxp-spifi.c
+
+-- 
+1.8.0
