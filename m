@@ -1,47 +1,100 @@
-From: ijc@debian.org (Ian Campbell)
-Date: Sun, 31 May 2015 11:35:34 +0100
-Subject: QNAP TS-419: sata_mv fails to initialise with "can't set global reset"
-Message-ID: <1433068534.5748.276.camel@debian.org>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 31 May 2015 13:48:41 +0200
+Subject: [PATCH v3 0/4] ARM: sunxi: SRAM mapping support
+In-Reply-To: <1433063708-11726-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1433063708-11726-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <556AF519.1000209@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-After updating to 4.0.4 (from the Debian kernel package) my TS-419 can
-no longer see its SATA disks. In dmesg I see:
+On 31-05-15 11:15, Maxime Ripard wrote:
+> Hi,
+>
+> The Allwinner SoCs all have a bunch of SRAMs (the exact number
+> depending on the SoC itself) that can have various sections mapped to
+> the CPU or to a bunch of devices, each section having different
+> possible devices to be mapped to.
+>
+> Since this SRAM setup is highly SoC dependent, and that we could have
+> multiple drivers trying to map a section for their own use, relying on
+> syscon would put to much duplicated logic to devices that are using
+> these SRAMs, among which the USB OTG and EMAC controllers, while not
+> guaranteeing any kind of exclusive use of that section.
+>
+> To do this, we introduce a custom API to control the mapping of the
+> sections in a SoC independent way, and a SoC driver to implement it.
+>
+> Let me know what you think,
 
-[    2.599060] SCSI subsystem initialized
-[    2.662882] libata version 3.00 loaded.
-[    2.664776] sata_mv 0000:01:00.0: version 1.28
-[    2.664888] pci 0000:00:01.0: enabling device (0140 -> 0143)
-[    2.687579] sata_mv: can't set global reset
-[    2.691825] sata_mv 0000:01:00.0: Driver probe function unexpectedly returned 1
-[    2.734954] sata_mv f1080000.sata: version 1.28
-[    2.735222] sata_mv f1080000.sata: slots 32 ports 2
-[    2.773358] scsi host0: sata_mv
-[    2.785712] scsi host1: sata_mv
-[    2.796204] ata1: SATA max UDMA/133 irq 35
-[    2.800359] ata2: SATA max UDMA/133 irq 35
-[    3.120986] ata1: SATA link down (SStatus 0 SControl F300)
-[    3.444974] ata2: SATA link down (SStatus 0 SControl F300)
+Looks good, thanks for your work on this.
 
-The last version I tried which worked was the 3.18.5 package.
+One small nitpick:
 
-This is using kirkwood-ts419-6281.dtb, which given this I think is the
-correct one:
++static struct sunxi_sram_desc sun4i_a10_sram_a3_a4 = {
++	.data	= SUNXI_SRAM_DATA("A3-A4", 0x4, 0x4, 1,
++				  SUNXI_SRAM_MAP(0, "cpu"),
++				  SUNXI_SRAM_MAP(1, "emac")),
++};
 
-[    0.000000] Linux version 4.0.0-2-kirkwood (debian-kernel at lists.debian.org) (gcc version 4.9.2 (Debian 4.9.2-18) ) #1 Debian 4.0.4-1 (2015-05-26)
-[    0.000000] CPU: Feroceon 88FR131 [56251311] revision 1 (ARMv5TE), cr=0005397f
-[    0.000000] CPU: VIVT data cache, VIVT instruction cache
-[    0.000000] Machine model: QNAP TS419 family
-[...]
-[    0.044889] mvebu-soc-id: MVEBU SoC ID=0x6281, Rev=0x2
+According to the A10 datasheet bits 4 and 5 control the
+A3-A4 mapping, with values 2 and 3 being reserved, so the
+first line here should be:
 
-I can also see both PCI devices which IIRC is the main difference
-between the 6281 and 6282.
++	.data	= SUNXI_SRAM_DATA("A3-A4", 0x4, 0x4, 2,
 
-I don't see anything in the git logs after 4.0 which looks like an
-obviously related fix, but I'm currently building 4.1-rc5 to have a
-check.
+Other then that this looks good and is:
 
-Ian.
+Acked-by: Hans de Goede <hdegoede@redhat.com>
+Tested-by: Hans de Goede <hdegoede@redhat.com>  (with otg no an A13 board)
+
+Regards,
+
+Hans
+
+
+
+> Maxime
+>
+> Changes from v2:
+>    - Changed the DT bindings to have an explicit relationship between
+>      "client" devices, the controller, and the SRAM sections it
+>      controls
+>    - Changed the interface to not rely on private structures anymore
+>      but only the client's struct device
+>    - Fixed a bug in the claiming logic
+>
+> Maxime Ripard (4):
+>    drivers: soc: sunxi: Introduce SoC driver to map SRAMs
+>    ARM: dts: sun4i: Add A10 SRAM and SRAM controller
+>    ARM: dts: sun5i: Add A10s and A13 SRAM and SRAM controller
+>    ARM: dts: sun7i: Add A20 SRAM and SRAM controller
+>
+>   .../devicetree/bindings/soc/sunxi/sram.txt         |  72 ++++++
+>   arch/arm/boot/dts/sun4i-a10-a1000.dts              |   4 +
+>   arch/arm/boot/dts/sun4i-a10-ba10-tvbox.dts         |   4 +
+>   arch/arm/boot/dts/sun4i-a10-cubieboard.dts         |   4 +
+>   arch/arm/boot/dts/sun4i-a10-hackberry.dts          |   4 +
+>   arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts         |   4 +
+>   arch/arm/boot/dts/sun4i-a10-marsboard.dts          |   4 +
+>   arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts     |   4 +
+>   arch/arm/boot/dts/sun4i-a10-pcduino.dts            |   4 +
+>   arch/arm/boot/dts/sun4i-a10.dtsi                   |  37 +++
+>   arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts   |   4 +
+>   arch/arm/boot/dts/sun5i-a10s.dtsi                  |   9 +
+>   arch/arm/boot/dts/sun5i.dtsi                       |  30 +++
+>   arch/arm/boot/dts/sun7i-a20.dtsi                   |  37 +++
+>   drivers/soc/Kconfig                                |   1 +
+>   drivers/soc/Makefile                               |   1 +
+>   drivers/soc/sunxi/Kconfig                          |  10 +
+>   drivers/soc/sunxi/Makefile                         |   1 +
+>   drivers/soc/sunxi/sunxi_sram.c                     | 284 +++++++++++++++++++++
+>   include/linux/soc/sunxi/sunxi_sram.h               |  19 ++
+>   20 files changed, 537 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/soc/sunxi/sram.txt
+>   create mode 100644 drivers/soc/sunxi/Kconfig
+>   create mode 100644 drivers/soc/sunxi/Makefile
+>   create mode 100644 drivers/soc/sunxi/sunxi_sram.c
+>   create mode 100644 include/linux/soc/sunxi/sunxi_sram.h
+>
