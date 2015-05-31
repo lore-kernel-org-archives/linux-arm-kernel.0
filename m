@@ -1,19 +1,21 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 30 Jun 2015 23:59:33 -0700
-Subject: n900 in 4.2-rc0: repeating oopses
-In-Reply-To: <20150630095310.GF27720@pali>
-References: <20150416093234.GA17423@amd> <20150629091146.GA5103@amd>
- <20150630092404.GA19285@amd> <20150630095310.GF27720@pali>
-Message-ID: <20150701065932.GS4156@atomide.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 1 Jun 2015 06:52:46 +0900
+Subject: [PATCH v9 4/5] serial: stm32-usart: Add STM32 USART Driver
+In-Reply-To: <1432328616-16964-5-git-send-email-mcoquelin.stm32@gmail.com>
+References: <1432328616-16964-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1432328616-16964-5-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <20150531215246.GA24174@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pali Roh?r <pali.rohar@gmail.com> [150630 02:55]:
+On Fri, May 22, 2015 at 11:03:35PM +0200, Maxime Coquelin wrote:
+> This drivers adds support to the STM32 USART controller, which is a
+> standard serial driver.
 > 
-> I will try 4.2 at the end of week.
+> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
+> Reviewed-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 
-At least today's 4.1.0-11549-g05a8256 boots just fine on my n900.
-
-Regards,
-
-Tony
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
