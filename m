@@ -1,73 +1,103 @@
-From: imp@bsdimp.com (Warner Losh)
-Date: Sun, 31 May 2015 01:12:03 -0600
-Subject: Device Tree Blob (DTB) licence
-In-Reply-To: <556A169E.8030909@myspectrum.nl>
-References: <1430820315.19516.26.camel@opteya.com>
- <CAL_Jsq+T5c7qornpRVCduEjUSCeM+0xqbtVYovtH76y=4BqhLQ@mail.gmail.com>
- <1432289148.5304.58.camel@opteya.com> <556A169E.8030909@myspectrum.nl>
-Message-ID: <8F98C0FD-D60D-46CB-A42D-10690A097573@bsdimp.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Sun, 31 May 2015 13:06:46 +0530
+Subject: [PATCH 11/12] i2c:pxa: Use devm_ variants in probe function
+In-Reply-To: <878uc6xdsd.fsf@belgarion.home>
+References: <1432818224-17070-1-git-send-email-vaibhav.hiremath@linaro.org>	<1432818224-17070-12-git-send-email-vaibhav.hiremath@linaro.org>
+ <878uc6xdsd.fsf@belgarion.home>
+Message-ID: <556ABA0E.7050205@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> On May 30, 2015, at 1:59 PM, Jeroen Hofstee <linux-arm@myspectrum.nl> wrote:
-> 
-> Hi,
-> 
-> On 22-05-15 12:05, Yann Droneaud wrote:
->> Le mardi 05 mai 2015 ? 11:41 -0500, Rob Herring a ?crit :
->>> On Tue, May 5, 2015 at 5:05 AM, Yann Droneaud <ydroneaud@opteya.com>
->>> wrote:
->>>> I believe Device Tree Blob (.dtb file) built from kernel's Device
->>>> Tree
->>>> Sources (.dts, which #include .dtsi, which #include .h) using
->>>> Device
->>>> Tree Compiler (dtc) are covered by GNU General Public Licence v2
->>>> (GPLv2), but cannot find any reference.
->>> By default yes, but we've been steering people to dual license them
->>> GPL/BSD.
->>> 
->> 
-> 
-> obviously these files should be reusable. If there is a license issue
-> with that it should be fixed. cc-ing freebsd-arm at freebsd.org.
 
-FreeBSD segregates the files that its contributors have written and
-are under BSDL from those that are received from upstream and
-may be under BSDL+GPL or just GPL in its source tree.
+On Saturday 30 May 2015 09:23 PM, Robert Jarzmik wrote:
+> Vaibhav Hiremath <vaibhav.hiremath@linaro.org> writes:
+>
+>> @@ -1270,10 +1270,17 @@ static int i2c_pxa_probe(struct platform_device *dev)
+>>   	struct resource *res = NULL;
+>>   	int ret, irq;
+>>
+>> -	i2c = kzalloc(sizeof(struct pxa_i2c), GFP_KERNEL);
+>> +	i2c = devm_kzalloc(&dev->dev, sizeof(struct pxa_i2c), GFP_KERNEL);
+>>   	if (!i2c) {
+>> -		ret = -ENOMEM;
+>> -		goto emalloc;
+>> +		dev_err(&dev->dev, "memory allocation failed\n");
+>> +		return -ENOMEM;
+>> +	}
+>> +
+>> +	res = platform_get_resource(dev, IORESOURCE_MEM, 0);
+>> +	irq = platform_get_irq(dev, 0);
+>> +	if (res == NULL || irq < 0) {
+>> +		dev_err(&dev->dev, "no mem/irq resource\n");
+>> +		return -ENODEV;
+> I'd like to have the error code here, as in other part of the driver.
+> Ie. I'd want :
+>      dev_err(&dev->dev, "no mem/irq resource: %d\n", irq);
+>
+> Moreover, return -ENODEV if res == NULL, but return irq if irq < 0 (think of
+> -EPROBE_DEFER).
+>
 
-The source is shipped, the binaries are not, at least by the FreeBSD
-project. The FreeBSD project used to create its own custom dts
-files that were incompatible with anything except FreeBSD. However,
-apart from a few stragglers, we?ve converted all our supported platforms
-to using the ?vendor supplied? dts files, which means we follow the
-documented conventions found in Linux, as well as many of the
-strange Linuxisms that seep into this or that .dts file. Following the
-standard here and accepting some potentially GPLd code into the
-tree given its limited scope and already segregated nature.
+Good point.
 
-It is an open question to what extent the mere-aggregation clause
-would apply to the typical use of placing the dtb into a filesystem
-that u-boot then passes along applies. And if that same reasoning
-applies to a binary bundle containing both the kernel and the dtb
-file. It?s also an open question the extent to which copyright applies
-to the dts files since they are, in theory at least, just an expression of
-facts and there?s generally only one way to correctly express those
-facts in a dts file. The GPL?d files aren?t stopping anybody from creating
-proprietary software. People that really care will rewrite the files
-from scratch anyway. People that don?t care.. well, one need look
-no further than the difficulty of getting source code to different SoC
-support packages for the kernel in the Android world to see how
-much some people care about GPL compliance and how much
-it really stops them from doing what they want.
+I will change it in next version.
 
-Than again, I?m not a lawyer, and this isn?t legal advice.
 
-Warner
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 842 bytes
-Desc: Message signed with OpenPGP using GPGMail
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150531/1c054028/attachment-0001.sig>
+>> +	i2c->reg_base = devm_ioremap_resource(&dev->dev, res);
+>>   	if (!i2c->reg_base) {
+> if (IS_ERR(i2c->reg_base)) instead.
+>
+>> -		ret = -EIO;
+>> -		goto eremap;
+>> +		dev_err(&dev->dev, "failed to map resource\n");
+>> +		return -EIO;
+> Ditto, ie. include PTR_ERR(i2c->reg_base) in the dev_err(), and return
+> PTR_ERR(i2c->reg_base);
+>
+
+Ok.
+
+>> @@ -1361,11 +1356,13 @@ static int i2c_pxa_probe(struct platform_device *dev)
+>>   		i2c->adap.algo = &i2c_pxa_pio_algorithm;
+>>   	} else {
+>>   		i2c->adap.algo = &i2c_pxa_algorithm;
+>> -		ret = request_irq(irq, i2c_pxa_handler,
+>> +		ret = devm_request_irq(&dev->dev, irq, i2c_pxa_handler,
+>>   				IRQF_SHARED | IRQF_NO_SUSPEND,
+>>   				dev_name(&dev->dev), i2c);
+>> -		if (ret)
+>> +		if (ret) {
+>> +			dev_err(&dev->dev, "failed to request irq\n");
+> Ditto for the dev_err() and error code reporting.
+>
+>> @@ -1380,8 +1377,8 @@ static int i2c_pxa_probe(struct platform_device *dev)
+>>
+>>   	ret = i2c_add_numbered_adapter(&i2c->adap);
+>>   	if (ret < 0) {
+>> -		printk(KERN_INFO "I2C: Failed to add bus\n");
+>> -		goto eadapt;
+>> +		dev_err(&dev->dev, "failed to add bus\n");
+> Ditto.
+>
+>> @@ -1411,26 +1408,15 @@ static int i2c_pxa_probe(struct platform_device *dev)
+>>   		}
+>>   	}
+>>   #ifdef CONFIG_I2C_PXA_SLAVE
+>> -	printk(KERN_INFO "I2C: %s: PXA I2C adapter, slave address %d\n",
+>> +	pr_info("I2C: %s: PXA I2C adapter, slave address %d\n",
+>>   	       dev_name(&i2c->adap.dev), i2c->slave_addr);
+> dev_info() maybe ?
+>
+>>   #else
+>> -	printk(KERN_INFO "I2C: %s: PXA I2C adapter\n",
+>> -	       dev_name(&i2c->adap.dev));
+>> +	pr_info("I2C: %s: PXA I2C adapter\n", dev_name(&i2c->adap.dev));
+> Ditto.
+>
+
+Agreed to all your comments.
+I will change the code in next version.
+
+Thanks,
+Vaibhav
