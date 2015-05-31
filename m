@@ -1,73 +1,47 @@
-From: dt.tangr@gmail.com (Daniel Tang)
-Date: Sun, 31 May 2015 19:44:02 +1000
-Subject: [PATCH] devicetree: Add support for I2C and related devices to
- TI-NSPIRE platform
-Message-ID: <1433065442-92750-1-git-send-email-dt.tangr@gmail.com>
+From: ijc@debian.org (Ian Campbell)
+Date: Sun, 31 May 2015 11:35:34 +0100
+Subject: QNAP TS-419: sata_mv fails to initialise with "can't set global reset"
+Message-ID: <1433068534.5748.276.camel@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree entries for I2C hardware to the TI-NSPIRE
-platforms that have it.
+Hi,
 
-It also adds support for the touchpad that communicates over the I2C
-bus.
+After updating to 4.0.4 (from the Debian kernel package) my TS-419 can
+no longer see its SATA disks. In dmesg I see:
 
+[    2.599060] SCSI subsystem initialized
+[    2.662882] libata version 3.00 loaded.
+[    2.664776] sata_mv 0000:01:00.0: version 1.28
+[    2.664888] pci 0000:00:01.0: enabling device (0140 -> 0143)
+[    2.687579] sata_mv: can't set global reset
+[    2.691825] sata_mv 0000:01:00.0: Driver probe function unexpectedly returned 1
+[    2.734954] sata_mv f1080000.sata: version 1.28
+[    2.735222] sata_mv f1080000.sata: slots 32 ports 2
+[    2.773358] scsi host0: sata_mv
+[    2.785712] scsi host1: sata_mv
+[    2.796204] ata1: SATA max UDMA/133 irq 35
+[    2.800359] ata2: SATA max UDMA/133 irq 35
+[    3.120986] ata1: SATA link down (SStatus 0 SControl F300)
+[    3.444974] ata2: SATA link down (SStatus 0 SControl F300)
 
-Signed-off-by: Daniel Tang <dt.tangr@gmail.com>
----
- arch/arm/boot/dts/nspire-cx.dts | 13 +++++++++++++
- arch/arm/boot/dts/nspire-tp.dts | 14 ++++++++++++++
- 2 files changed, 27 insertions(+)
+The last version I tried which worked was the 3.18.5 package.
 
-diff --git a/arch/arm/boot/dts/nspire-cx.dts b/arch/arm/boot/dts/nspire-cx.dts
-index 08e0b81..e369e3b 100644
---- a/arch/arm/boot/dts/nspire-cx.dts
-+++ b/arch/arm/boot/dts/nspire-cx.dts
-@@ -104,9 +104,22 @@
- 			#size-cells = <1>;
- 
- 			i2c at 90050000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
- 				compatible = "snps,designware-i2c";
- 				reg = <0x90050000 0x1000>;
- 				interrupts = <20>;
-+
-+				clocks = <&apb_pclk>;
-+
-+				i2c-sda-falling-time-ns = <810>;
-+				i2c-scl-falling-time-ns = <2410>;
-+
-+				touchpad at 20 {
-+					compatible = "synaptics_i2c";
-+					reg = <0x20>;
-+				};
- 			};
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/nspire-tp.dts b/arch/arm/boot/dts/nspire-tp.dts
-index 621391c..49fb97a 100644
---- a/arch/arm/boot/dts/nspire-tp.dts
-+++ b/arch/arm/boot/dts/nspire-tp.dts
-@@ -41,4 +41,18 @@
- / {
- 	model = "TI-NSPIRE Touchpad";
- 	compatible = "ti,nspire-tp";
-+
-+	i2c at gpio {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		compatible = "i2c-gpio";
-+		gpios = < &gpio 3 0 /* sda */
-+			  &gpio 1 0 /* scl */ >;
-+
-+		touchpad at 20 {
-+			compatible = "synaptics_i2c";
-+			reg = <0x20>;
-+		};
-+	};
- };
--- 
-2.2.1
+This is using kirkwood-ts419-6281.dtb, which given this I think is the
+correct one:
+
+[    0.000000] Linux version 4.0.0-2-kirkwood (debian-kernel at lists.debian.org) (gcc version 4.9.2 (Debian 4.9.2-18) ) #1 Debian 4.0.4-1 (2015-05-26)
+[    0.000000] CPU: Feroceon 88FR131 [56251311] revision 1 (ARMv5TE), cr=0005397f
+[    0.000000] CPU: VIVT data cache, VIVT instruction cache
+[    0.000000] Machine model: QNAP TS419 family
+[...]
+[    0.044889] mvebu-soc-id: MVEBU SoC ID=0x6281, Rev=0x2
+
+I can also see both PCI devices which IIRC is the main difference
+between the 6281 and 6282.
+
+I don't see anything in the git logs after 4.0 which looks like an
+obviously related fix, but I'm currently building 4.1-rc5 to have a
+check.
+
+Ian.
