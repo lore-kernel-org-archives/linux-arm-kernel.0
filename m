@@ -1,103 +1,105 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Sun, 31 May 2015 13:06:46 +0530
-Subject: [PATCH 11/12] i2c:pxa: Use devm_ variants in probe function
-In-Reply-To: <878uc6xdsd.fsf@belgarion.home>
-References: <1432818224-17070-1-git-send-email-vaibhav.hiremath@linaro.org>	<1432818224-17070-12-git-send-email-vaibhav.hiremath@linaro.org>
- <878uc6xdsd.fsf@belgarion.home>
-Message-ID: <556ABA0E.7050205@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 31 May 2015 11:15:07 +0200
+Subject: [PATCH v3 3/4] ARM: dts: sun5i: Add A10s and A13 SRAM and SRAM
+ controller
+In-Reply-To: <1433063708-11726-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1433063708-11726-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1433063708-11726-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The A10s and A13 have a few SRAM that can be mapped either to a device or
+to the CPU, with the mapping being controlled by a SRAM controller.
 
+Add the SRAM controller, the SRAM that it drives and the section that can
+be used by the various devices.
 
-On Saturday 30 May 2015 09:23 PM, Robert Jarzmik wrote:
-> Vaibhav Hiremath <vaibhav.hiremath@linaro.org> writes:
->
->> @@ -1270,10 +1270,17 @@ static int i2c_pxa_probe(struct platform_device *dev)
->>   	struct resource *res = NULL;
->>   	int ret, irq;
->>
->> -	i2c = kzalloc(sizeof(struct pxa_i2c), GFP_KERNEL);
->> +	i2c = devm_kzalloc(&dev->dev, sizeof(struct pxa_i2c), GFP_KERNEL);
->>   	if (!i2c) {
->> -		ret = -ENOMEM;
->> -		goto emalloc;
->> +		dev_err(&dev->dev, "memory allocation failed\n");
->> +		return -ENOMEM;
->> +	}
->> +
->> +	res = platform_get_resource(dev, IORESOURCE_MEM, 0);
->> +	irq = platform_get_irq(dev, 0);
->> +	if (res == NULL || irq < 0) {
->> +		dev_err(&dev->dev, "no mem/irq resource\n");
->> +		return -ENODEV;
-> I'd like to have the error code here, as in other part of the driver.
-> Ie. I'd want :
->      dev_err(&dev->dev, "no mem/irq resource: %d\n", irq);
->
-> Moreover, return -ENODEV if res == NULL, but return irq if irq < 0 (think of
-> -EPROBE_DEFER).
->
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts |  4 ++++
+ arch/arm/boot/dts/sun5i-a10s.dtsi                |  9 +++++++
+ arch/arm/boot/dts/sun5i.dtsi                     | 30 ++++++++++++++++++++++++
+ 3 files changed, 43 insertions(+)
 
-Good point.
-
-I will change it in next version.
-
-
->> +	i2c->reg_base = devm_ioremap_resource(&dev->dev, res);
->>   	if (!i2c->reg_base) {
-> if (IS_ERR(i2c->reg_base)) instead.
->
->> -		ret = -EIO;
->> -		goto eremap;
->> +		dev_err(&dev->dev, "failed to map resource\n");
->> +		return -EIO;
-> Ditto, ie. include PTR_ERR(i2c->reg_base) in the dev_err(), and return
-> PTR_ERR(i2c->reg_base);
->
-
-Ok.
-
->> @@ -1361,11 +1356,13 @@ static int i2c_pxa_probe(struct platform_device *dev)
->>   		i2c->adap.algo = &i2c_pxa_pio_algorithm;
->>   	} else {
->>   		i2c->adap.algo = &i2c_pxa_algorithm;
->> -		ret = request_irq(irq, i2c_pxa_handler,
->> +		ret = devm_request_irq(&dev->dev, irq, i2c_pxa_handler,
->>   				IRQF_SHARED | IRQF_NO_SUSPEND,
->>   				dev_name(&dev->dev), i2c);
->> -		if (ret)
->> +		if (ret) {
->> +			dev_err(&dev->dev, "failed to request irq\n");
-> Ditto for the dev_err() and error code reporting.
->
->> @@ -1380,8 +1377,8 @@ static int i2c_pxa_probe(struct platform_device *dev)
->>
->>   	ret = i2c_add_numbered_adapter(&i2c->adap);
->>   	if (ret < 0) {
->> -		printk(KERN_INFO "I2C: Failed to add bus\n");
->> -		goto eadapt;
->> +		dev_err(&dev->dev, "failed to add bus\n");
-> Ditto.
->
->> @@ -1411,26 +1408,15 @@ static int i2c_pxa_probe(struct platform_device *dev)
->>   		}
->>   	}
->>   #ifdef CONFIG_I2C_PXA_SLAVE
->> -	printk(KERN_INFO "I2C: %s: PXA I2C adapter, slave address %d\n",
->> +	pr_info("I2C: %s: PXA I2C adapter, slave address %d\n",
->>   	       dev_name(&i2c->adap.dev), i2c->slave_addr);
-> dev_info() maybe ?
->
->>   #else
->> -	printk(KERN_INFO "I2C: %s: PXA I2C adapter\n",
->> -	       dev_name(&i2c->adap.dev));
->> +	pr_info("I2C: %s: PXA I2C adapter\n", dev_name(&i2c->adap.dev));
-> Ditto.
->
-
-Agreed to all your comments.
-I will change the code in next version.
-
-Thanks,
-Vaibhav
+diff --git a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+index 556b2027bbaf..a7e19e4847f7 100644
+--- a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
++++ b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+@@ -88,6 +88,10 @@
+ 	status = "okay";
+ };
+ 
++&emac_sram {
++	status = "okay";
++};
++
+ &i2c0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c0_pins_a>;
+diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+index 934ecfd145c4..f11efb722bbb 100644
+--- a/arch/arm/boot/dts/sun5i-a10s.dtsi
++++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+@@ -125,6 +125,7 @@
+ 			reg = <0x01c0b000 0x1000>;
+ 			interrupts = <55>;
+ 			clocks = <&ahb_gates 17>;
++			allwinner,sram = <&emac_sram 1>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -201,3 +202,11 @@
+ 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 	};
+ };
++
++&sram_a {
++	emac_sram: sram-section at 8000 {
++		compatible = "allwinner,sun4i-a10-sram-a3-a4";
++		reg = <0x8000 0x4000>;
++		status = "disabled";
++	};
++};
+diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+index 26095aa97ada..54b097830434 100644
+--- a/arch/arm/boot/dts/sun5i.dtsi
++++ b/arch/arm/boot/dts/sun5i.dtsi
+@@ -299,6 +299,36 @@
+ 		#size-cells = <1>;
+ 		ranges;
+ 
++		sram-controller at 01c00000 {
++			compatible = "allwinner,sun4i-a10-sram-controller";
++			reg = <0x01c00000 0x30>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++
++			sram_a: sram at 00000000 {
++				compatible = "mmio-sram";
++				reg = <0x00000000 0xc000>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges = <0 0x00000000 0xc000>;
++			};
++
++			sram_d: sram at 00010000 {
++				compatible = "mmio-sram";
++				reg = <0x00010000 0x1000>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges = <0 0x00010000 0x1000>;
++
++				otg_sram: sram-section at 0000 {
++					compatible = "allwinner,sun4i-a10-sram-d";
++					reg = <0x0000 0x1000>;
++					status = "disabled";
++				};
++			};
++		};
++
+ 		dma: dma-controller at 01c02000 {
+ 			compatible = "allwinner,sun4i-a10-dma";
+ 			reg = <0x01c02000 0x1000>;
+-- 
+2.4.1
