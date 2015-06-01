@@ -1,77 +1,64 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 1 Jun 2015 11:08:17 +0200
-Subject: [PATCH v2] arm/arm64: KVM: Properly account for guest CPU time
-In-Reply-To: <556C0E22.9090401@de.ibm.com>
-References: <1432838950-28774-1-git-send-email-christoffer.dall@linaro.org>
- <556C0E22.9090401@de.ibm.com>
-Message-ID: <20150601090817.GA18722@cbox>
+From: christian.koenig@amd.com (=?windows-1252?Q?Christian_K=F6nig?=)
+Date: Mon, 1 Jun 2015 11:08:21 +0200
+Subject: [PATCH 05/98] exynos_drm.h: use __u64 from linux/types.h
+In-Reply-To: <20150601085605.GN2067@n2100.arm.linux.org.uk>
+References: <1433000370-19509-1-git-send-email-mikko.rapeli@iki.fi>
+ <1433000370-19509-6-git-send-email-mikko.rapeli@iki.fi>
+ <20150530164655.GM2067@n2100.arm.linux.org.uk> <556C15BA.7000909@amd.com>
+ <20150601085605.GN2067@n2100.arm.linux.org.uk>
+Message-ID: <556C2105.2090607@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 01, 2015 at 09:47:46AM +0200, Christian Borntraeger wrote:
-> Am 28.05.2015 um 20:49 schrieb Christoffer Dall:
-> > Until now we have been calling kvm_guest_exit after re-enabling
-> > interrupts when we come back from the guest, but this has the
-> > unfortunate effect that CPU time accounting done in the context of timer
-> > interrupts occurring while the guest is running doesn't properly notice
-> > that the time since the last tick was spent in the guest.
-> 
-> Can you verify that a CPU bound guest has almost zero guest time?
-> Assuming that your answer is "yes" your patch make sense as host
-> timer interrupts should be the only reasons for guest exits then.
-> 
+Yeah, completely agree with Linus on the visibility problem and that's 
+exactly the reason why we don't include <stdint.h> in the kernel header 
+and expect userspace to define the ISO types somewhere.
 
-Yes, 'cat /dev/urandom > /dev/null' in the guest shows up as 100% sys in
-mpstat on the host, 0% guest.
+But using the types from "include/linux/types.h" and especially 
+including it into the uapi headers doesn't make the situation better, 
+but rather worse.
 
-> 
-> > Inspired by the comment in the x86 code, move the kvm_guest_exit() call
-> > below the local_irq_enable() call and change __kvm_guest_exit() to
-> > kvm_guest_exit(), because we are now calling this function with
-> > interrupts enabled.  We have to now explicitly disable preemption and
-> > not enable preemption before we've called kvm_guest_exit(), since
-> > otherwise we could be preempted and everything happening before we
-> > eventually get scheduled again would be accounted for as guest time.
-> > 
-> > At the same time, move the trace_kvm_exit() call outside of the atomic
-> > section, since there is no reason for us to do that with interrupts
-> > disabled.
-> > 
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > ---
-> > This patch is based on kvm/queue, because it has the kvm_guest_enter/exit
-> > rework recently posted by Christian Borntraeger.  I hope I got the logic
-> > of this right, there were 2 slightly worrying facts about this:
-> > 
-> > First, we now enable and disable and enable interrupts on each exit
-> > path, but I couldn't see any performance overhead on hackbench - yes the
-> > only benchmark we care about.
-> 
-> This should be somewhat similar to the situation before my patch.
-> There it was
-> 
-> 1: "disable", "guest", "disable again and save", "restore to disable", "enable"
-> and now it is
-> 2: "disable", "guest", "enable"
-> and with your patch it is
-> 3: "disable", "guest", "enable", "disable, "enable"
-> 
-> I assume that 3 and 1 are similar in its costs, so this is probably ok.
-> 
-> 
-> > 
-> > Second, looking at the ppc and mips code, they seem to also call
-> > kvm_guest_exit() before enabling interrupts, so I don't understand how
-> > guest CPU time accounting works on those architectures.
-> 
-> Not an expert here, but I assume mips has the same logic as arm so if your
-> patch is right for arm its probably also for mips.
-> 
-> powerpc looks similar to what s390 does (not using the tick, instead it uses
-> a hw-timer) so this should be fine.
-> 
-I wonder if we can simply enable HAVE_VIRT_CPU_ACCOUNTING_GEN and get
-this for free which would avoid the need for this patch?
+With this step we not only make the headers depend on another header 
+that isn't part of the uapi, but also pollute the user space namespace 
+with __sXX and __uXX types which aren't defined anywhere else.
 
-Thanks,
--Christoffer
+Regards,
+Christian.
+
+On 01.06.2015 10:56, Russell King - ARM Linux wrote:
+> On Mon, Jun 01, 2015 at 10:20:10AM +0200, Christian K?nig wrote:
+>> Using types that differs on 32-bit and 64-bit machines for a kernel
+>> interface is indeed a rather bad idea. This not only includes longs, but
+>> pointers as well.
+> [cut standard stdint.h types argument which we've heard before]
+>
+> You need to read Linus' rant on this subject:
+>
+>   From: Linus Torvalds <torvalds@osdl.org>
+>   Subject: Re: [RFC] Splitting kernel headers and deprecating __KERNEL__
+>   Date: Mon, 29 Nov 2004 01:30:46 GMT
+>
+>   Ok, this discussion has gone on for too long anyway, but let's make it
+>   easier for everybody. The kernel uses u8/u16/u32 because:
+>
+>           - the kernel should not depend on, or pollute user-space naming.
+>             YOU MUST NOT USE "uint32_t" when that may not be defined, and
+>             user-space rules for when it is defined are arcane and totally
+>             arbitrary.
+>
+>           - since the kernel cannot use those types for anything that is
+>             visible to user space anyway, there has to be alternate names.
+>             The tradition is to prepend two underscores, so the kernel would
+>             have to use "__uint32_t" etc for its header files.
+>
+>           - at that point, there's no longer any valid argument that it's a
+>             "standard type" (it ain't), and I personally find it a lot more
+>             readable to just use the types that the kernel has always used:
+>             __u8/__u16/__u32. For stuff that is only used for the kernel,
+>             the shorter "u8/u16/u32" versions may be used.
+>
+>   In short: having the kernel use the same names as user space is ACTIVELY
+>   BAD, exactly because those names have standards-defined visibility, which
+>   means that the kernel _cannot_ use them in all places anyway. So don't
+>   even _try_.
+>
