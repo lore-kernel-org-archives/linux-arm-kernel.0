@@ -1,65 +1,37 @@
-From: borntraeger@de.ibm.com (Christian Borntraeger)
-Date: Mon, 01 Jun 2015 09:47:46 +0200
-Subject: [PATCH v2] arm/arm64: KVM: Properly account for guest CPU time
-In-Reply-To: <1432838950-28774-1-git-send-email-christoffer.dall@linaro.org>
-References: <1432838950-28774-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <556C0E22.9090401@de.ibm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon,  1 Jun 2015 15:53:23 +0800
+Subject: [GIT PULL 1/4] ARM: imx: cleanup for 4.2
+Message-ID: <1433145206-2508-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 28.05.2015 um 20:49 schrieb Christoffer Dall:
-> Until now we have been calling kvm_guest_exit after re-enabling
-> interrupts when we come back from the guest, but this has the
-> unfortunate effect that CPU time accounting done in the context of timer
-> interrupts occurring while the guest is running doesn't properly notice
-> that the time since the last tick was spent in the guest.
+The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
 
-Can you verify that a CPU bound guest has almost zero guest time?
-Assuming that your answer is "yes" your patch make sense as host
-timer interrupts should be the only reasons for guest exits then.
+  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
 
+are available in the git repository at:
 
-> Inspired by the comment in the x86 code, move the kvm_guest_exit() call
-> below the local_irq_enable() call and change __kvm_guest_exit() to
-> kvm_guest_exit(), because we are now calling this function with
-> interrupts enabled.  We have to now explicitly disable preemption and
-> not enable preemption before we've called kvm_guest_exit(), since
-> otherwise we could be preempted and everything happening before we
-> eventually get scheduled again would be accounted for as guest time.
-> 
-> At the same time, move the trace_kvm_exit() call outside of the atomic
-> section, since there is no reason for us to do that with interrupts
-> disabled.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
-> This patch is based on kvm/queue, because it has the kvm_guest_enter/exit
-> rework recently posted by Christian Borntraeger.  I hope I got the logic
-> of this right, there were 2 slightly worrying facts about this:
-> 
-> First, we now enable and disable and enable interrupts on each exit
-> path, but I couldn't see any performance overhead on hackbench - yes the
-> only benchmark we care about.
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-cleanup-4.2
 
-This should be somewhat similar to the situation before my patch.
-There it was
+for you to fetch changes up to cb2e1a234c163d429712c0fa8eef8ab01499b738:
 
-1: "disable", "guest", "disable again and save", "restore to disable", "enable"
-and now it is
-2: "disable", "guest", "enable"
-and with your patch it is
-3: "disable", "guest", "enable", "disable, "enable"
+  ARM: imx: gpc: Remove .owner field (2015-05-11 21:38:25 +0800)
 
-I assume that 3 and 1 are similar in its costs, so this is probably ok.
+----------------------------------------------------------------
+The i.MX cleanup for 4.2:
+ - Remove eukrea_mbimxsd35 non-DT board files
+ - Remove .owner field from gpc platform driver
 
+----------------------------------------------------------------
+Fabio Estevam (2):
+      ARM: imx: Remove eukrea_mbimxsd35 non-dt support
+      ARM: imx: gpc: Remove .owner field
 
-> 
-> Second, looking at the ppc and mips code, they seem to also call
-> kvm_guest_exit() before enabling interrupts, so I don't understand how
-> guest CPU time accounting works on those architectures.
-
-Not an expert here, but I assume mips has the same logic as arm so if your
-patch is right for arm its probably also for mips.
-
-powerpc looks similar to what s390 does (not using the tick, instead it uses
-a hw-timer) so this should be fine.
+ arch/arm/mach-imx/Kconfig                      |  34 ---
+ arch/arm/mach-imx/Makefile                     |   2 -
+ arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c | 318 -------------------------
+ arch/arm/mach-imx/gpc.c                        |   1 -
+ arch/arm/mach-imx/mach-cpuimx35.c              | 206 ----------------
+ 5 files changed, 561 deletions(-)
+ delete mode 100644 arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c
+ delete mode 100644 arch/arm/mach-imx/mach-cpuimx35.c
