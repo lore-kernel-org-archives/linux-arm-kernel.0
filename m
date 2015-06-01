@@ -1,28 +1,32 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 01 Jun 2015 17:55:34 +0200
-Subject: [GIT PULL] Broadcom SoC changes for 4.2 (part 2)
-In-Reply-To: <1432936501-20453-1-git-send-email-f.fainelli@gmail.com>
-References: <1432936501-20453-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <2256694.0KQLO0mjvp@wuerfel>
+Date: Mon, 01 Jun 2015 17:56:51 +0200
+Subject: [PATCH] ARM: Kconfig: Select clocksource in STM32 entry
+In-Reply-To: <556971CC.2060102@gmail.com>
+References: <1432331452-2350-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <5569714A.2010706@gmail.com> <556971CC.2060102@gmail.com>
+Message-ID: <3983380.l9mqkIf3Dm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 May 2015 14:55:01 Florian Fainelli wrote:
-> This pull request contains the following changes for Broadcom SoCs:
+On Saturday 30 May 2015 10:16:12 Maxime Coquelin wrote:
+> With Daniel's valid address.
 > 
-> - Dan fixes an error path in the BCM63xx SMP code
-> 
-> - Ray adds the relevant Kconfig selects to enable the Broadcom NAND driver on Cygnus
-> 
-> - Kevin provides a change to the Broadcom GISB arbiter driver to make it work with
->   MIPS-based big-endian STB SoCs (this was a long-standing change that had dependencies on
->   code in drivers/of/*)
-> 
-> - Gregory enables the use of GPIOLIB for brcmstb SoCs and bumps the number of GPIOs for
->   these platforms
-> 
+> On 05/30/2015 10:14 AM, Maxime Coquelin wrote:
+> > Hi Arnd,
+> >
+> > On 05/22/2015 11:50 PM, Maxime Coquelin wrote:
+> >> STM32 clocksource driver needs to be selected if ARCH_STM32.
+> >>
+> >> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> >> ---
+> >> Hi Arnd,
+> >>
+> >>    This patch applies on top of arm-soc's next/soc branch, so that 
+> >> you don't
+> >> get conflicts with Stefan's ARM_SINGLE_ARMV7M patch.Hi
+> >>
 > 
 
-Pulled into next/soc, thanks!
+Applied to next/soc, thanks!
 
 	Arnd
