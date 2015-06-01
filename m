@@ -1,41 +1,53 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 1 Jun 2015 11:49:19 +0200
-Subject: [PATCH] fix n900 dts file to work around 4.1 touchscreen
- regression on n900
-In-Reply-To: <20150530101430.GA505@amd>
-References: <20150527132545.GA23434@amd> <20150527133311.GJ30798@pali>
- <20150527143722.GA28108@amd> <20150527145837.GA13223@earth>
- <20150529190816.GA20232@amd> <20150529192505.GA28987@amd>
- <20150529193211.GA7599@amd>
- <20150529194955.GV2026@saruman.tx.rr.com>
- <20150529200306.GB17267@lukather> <20150530101430.GA505@amd>
-Message-ID: <20150601094919.GG17267@lukather>
+From: christian.koenig@amd.com (=?windows-1252?Q?Christian_K=F6nig?=)
+Date: Mon, 1 Jun 2015 11:51:10 +0200
+Subject: [PATCH 05/98] exynos_drm.h: use __u64 from linux/types.h
+In-Reply-To: <20150601093808.GP2067@n2100.arm.linux.org.uk>
+References: <1433000370-19509-1-git-send-email-mikko.rapeli@iki.fi>
+ <1433000370-19509-6-git-send-email-mikko.rapeli@iki.fi>
+ <20150530164655.GM2067@n2100.arm.linux.org.uk> <556C15BA.7000909@amd.com>
+ <20150601085605.GN2067@n2100.arm.linux.org.uk> <556C2105.2090607@amd.com>
+ <20150601093808.GP2067@n2100.arm.linux.org.uk>
+Message-ID: <556C2B0E.8000001@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 30, 2015 at 12:14:30PM +0200, Pavel Machek wrote:
-> Well... the driver was not broken... before you did "cleanup" that did
-> two functional changes. And yes, the dts should be fixed, but that
-> does not make your "cleanup" good.
+On 01.06.2015 11:38, Russell King - ARM Linux wrote:
+> On Mon, Jun 01, 2015 at 11:08:21AM +0200, Christian K?nig wrote:
+>> Yeah, completely agree with Linus on the visibility problem and that's
+>> exactly the reason why we don't include <stdint.h> in the kernel header and
+>> expect userspace to define the ISO types somewhere.
+>>
+>> But using the types from "include/linux/types.h" and especially including it
+>> into the uapi headers doesn't make the situation better, but rather worse.
+>>
+>> With this step we not only make the headers depend on another header that
+>> isn't part of the uapi, but also pollute the user space namespace with __sXX
+>> and __uXX types which aren't defined anywhere else.
+> 1) Header files are permitted to pollute userspace with __-defined stuff.
+>
+> 2) __[su]XX types are defined as part of the kernel's uapi.
+>     include/uapi/linux/types.h includes asm/types.h, which in userspace
+>     picks up include/uapi/asm-generic/types.h.  That picks up
+>     asm-generic/int-ll64.h, which defines these types.
+>
+> Moreover, this is done throughout the kernel headers _already_ (as you
+> would expect for a policy set 10+ years ago).
+>
+> Please, I'm not interested in this discussion, so please don't argue
+> with me - I may agree with your position, but what you think and what
+> I think are really not relevant here.  If you have a problem, take it
+> up with Linus - I made that clear in my email.
+>
+In this case I'm fine with the changes, but I'm still not sure if that's 
+a good idea or not.
 
-Whether it's good or not is arguable, and it really boils down to what
-we consider the default value when properties are missing.
+Sticking to ISO C still sounds better than doing something on our own. 
+And it now looks a bit different than it was in 2004, stdint.h is widely 
+adopted in userspace if I'm not completely mistaken.
 
-If it's 0, then my code does the right thing. If it's undefined, well,
-I'd expect undefined behaviour to change without any notice.
+Anyway you're perfectly right that Linus need to decide and I'm not in 
+the mod to argue with him either (got way to much other things to do as 
+well).
 
-Feel free to suggest any better solution.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150601/ed3687f0/attachment.sig>
+Regards,
+Christian.
