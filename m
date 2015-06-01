@@ -1,35 +1,37 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Mon, 1 Jun 2015 21:08:26 +0800
-Subject: [PATCH v2 1/2] arm64: dts: mt8173: Add watchdog device node
-In-Reply-To: <1433164107-26568-1-git-send-email-eddie.huang@mediatek.com>
-References: <1433164107-26568-1-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <1433164107-26568-2-git-send-email-eddie.huang@mediatek.com>
+From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
+Date: Mon, 1 Jun 2015 14:12:40 +0100
+Subject: Device Tree Blob (DTB) licence
+In-Reply-To: <alpine.DEB.2.02.1505291512000.4429@nftneq.ynat.uz>
+References: <1430820315.19516.26.camel@opteya.com>
+ <CAL_Jsq+T5c7qornpRVCduEjUSCeM+0xqbtVYovtH76y=4BqhLQ@mail.gmail.com>
+ <1432289148.5304.58.camel@opteya.com>
+ <1432322832.5304.63.camel@opteya.com>
+ <CAOS_Y6Q37ps+VEnzUZ_uwX++qrRm9Hgx45Q_pmiZSLSNjmKwZg@mail.gmail.com>
+ <55670AD4.8020705@melag.de>
+ <20150528133429.GD2067@n2100.arm.linux.org.uk>
+ <556747E4.6070403@melag.de> <20150529064741.GB25351@1wt.eu>
+ <55684F07.7050402@melag.de>
+ <alpine.DEB.2.02.1505291512000.4429@nftneq.ynat.uz>
+Message-ID: <20150601141240.216d8146@lxorguk.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add MT8173 watchdog device node.
+> not true, with a proprietary bios it's a clear "pay this much money and don't 
+> worry about it" while with GPL there's a nagging fear that someone you never 
+> heard of may sue you a decade from now claiming you need to give them the source 
+> to your OS.
 
-Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/mt8173.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+Not really no - the number of companies who bought proprietary products,
+resold them and then got sued because their supplier was cavalier is
+huge.
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 30ac8dd..b52ec43 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -160,6 +160,12 @@
- 						<GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
- 		};
- 
-+		watchdog: watchdog at 10007000 {
-+			compatible = "mediatek,mt8173-wdt",
-+				     "mediatek,mt6589-wdt";
-+			reg = <0 0x10007000 0 0x100>;
-+		};
-+
- 		sysirq: intpol-controller at 10200620 {
- 			compatible = "mediatek,mt8173-sysirq",
- 					"mediatek,mt6577-sysirq";
--- 
-1.8.1.1.dirty
+> note, this whole discussion assumes that the DTB is even copyrightable. Since 
+> it's intended to be strictly a functional description of what the hardware is 
+> able to do, that could be questioned
+
+I imagine you can write a DTB that is copyrightable and one that isn't.
+
+However this is all missing one important point. Whoever wrote their DTB
+gets to decide how they license it. It's nobody else's business.
+
+Alan
