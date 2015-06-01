@@ -1,26 +1,25 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 1 Jun 2015 14:44:33 +0200
-Subject: [RESEND PATCH 2/2] pinctrl: zynq: fix offset address for {SD0,
- SD1}_WP_CD_SEL
-In-Reply-To: <1432111351-21336-3-git-send-email-yamada.masahiro@socionext.com>
-References: <1432111351-21336-1-git-send-email-yamada.masahiro@socionext.com>
- <1432111351-21336-3-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CACRpkda6UV72Zhg2S9xuMXnhBq32yPTSqwCLbSPEHBHn3ist8g@mail.gmail.com>
+Date: Mon, 1 Jun 2015 14:45:59 +0200
+Subject: [RFC v1 05/25] gpio: Use irq_desc_get_xxx() to avoid redundant
+ lookup of irq_desc
+In-Reply-To: <1432116013-25902-6-git-send-email-jiang.liu@linux.intel.com>
+References: <1432116013-25902-1-git-send-email-jiang.liu@linux.intel.com>
+ <1432116013-25902-6-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <CACRpkdZfWK5H+gRD6inX31Ouq1XCvq7CneNDJV8x0iihXHzWjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 10:42 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
+On Wed, May 20, 2015 at 11:59 AM, Jiang Liu <jiang.liu@linux.intel.com> wrote:
 
-> The address for SD0_WP_CD_SEL, SD1_WP_CD_SEL is 0xf8000830,
-> 0xf8000834, respectively.
+> Use irq_desc_get_xxx() to avoid redundant lookup of irq_desc while we
+> already have a pointer to corresponding irq_desc.
 >
-> Each offset address must be prefixed with 0x.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
 
-No reply from S?ren, but applying anyway since it seems to make sense.
-Only for -next though.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Are there dependencies on this patch or can I just apply it
+directly to the GPIO tree?
 
 Yours,
 Linus Walleij
