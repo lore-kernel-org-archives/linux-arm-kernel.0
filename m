@@ -1,37 +1,45 @@
-From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
-Date: Mon, 1 Jun 2015 14:12:40 +0100
-Subject: Device Tree Blob (DTB) licence
-In-Reply-To: <alpine.DEB.2.02.1505291512000.4429@nftneq.ynat.uz>
-References: <1430820315.19516.26.camel@opteya.com>
- <CAL_Jsq+T5c7qornpRVCduEjUSCeM+0xqbtVYovtH76y=4BqhLQ@mail.gmail.com>
- <1432289148.5304.58.camel@opteya.com>
- <1432322832.5304.63.camel@opteya.com>
- <CAOS_Y6Q37ps+VEnzUZ_uwX++qrRm9Hgx45Q_pmiZSLSNjmKwZg@mail.gmail.com>
- <55670AD4.8020705@melag.de>
- <20150528133429.GD2067@n2100.arm.linux.org.uk>
- <556747E4.6070403@melag.de> <20150529064741.GB25351@1wt.eu>
- <55684F07.7050402@melag.de>
- <alpine.DEB.2.02.1505291512000.4429@nftneq.ynat.uz>
-Message-ID: <20150601141240.216d8146@lxorguk.ukuu.org.uk>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 1 Jun 2015 15:35:58 +0200
+Subject: [PATCH v2] arm/arm64: KVM: Properly account for guest CPU time
+In-Reply-To: <556C240F.5070501@de.ibm.com>
+References: <1432838950-28774-1-git-send-email-christoffer.dall@linaro.org>
+ <556C0E22.9090401@de.ibm.com> <20150601090817.GA18722@cbox>
+ <556C240F.5070501@de.ibm.com>
+Message-ID: <20150601133558.GA20286@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> not true, with a proprietary bios it's a clear "pay this much money and don't 
-> worry about it" while with GPL there's a nagging fear that someone you never 
-> heard of may sue you a decade from now claiming you need to give them the source 
-> to your OS.
+On Mon, Jun 01, 2015 at 11:21:19AM +0200, Christian Borntraeger wrote:
+> Am 01.06.2015 um 11:08 schrieb Christoffer Dall:
+> 
+> >>>
+> >>> Second, looking at the ppc and mips code, they seem to also call
+> >>> kvm_guest_exit() before enabling interrupts, so I don't understand how
+> >>> guest CPU time accounting works on those architectures.
+> >>
+> >> Not an expert here, but I assume mips has the same logic as arm so if your
+> >> patch is right for arm its probably also for mips.
+> >>
+> >> powerpc looks similar to what s390 does (not using the tick, instead it uses
+> >> a hw-timer) so this should be fine.
+> >>
+> > I wonder if we can simply enable HAVE_VIRT_CPU_ACCOUNTING_GEN and get
+> > this for free which would avoid the need for this patch?
+> 
+> Asssuming that HAVE_VIRT_CPU_ACCOUNTING_GEN behaves similar to 
+> HAVE_VIRT_CPU_ACCOUNTING on s390/power in respect to not rely on ticks
+> - yes it might work out. Can you give it a try?
+> 
+Adding HAVE_VIRT_CPU_ACCOUNTING_GEN to arch/arm64/Kconfig works, but has
+no effect unless you also enable CONFIG_NO_HZ_FULL, so that hardly feels
+like a fix since it would be a shame to force users to use this config
+option to report CPU usage correctly.
 
-Not really no - the number of companies who bought proprietary products,
-resold them and then got sued because their supplier was cavalier is
-huge.
+I'm not entirely sure what the history and meaning behind these configs
+are, so maybe there is an entirely different rework needed here.  It
+seems logical that you could simply sample the counter at entry/exit of
+the guest, but if there is nowhere to store this data without
+NO_HZ_FULL+VIRT_CPU_ACCOUNTING_GEN then I guess that would be why?
 
-> note, this whole discussion assumes that the DTB is even copyrightable. Since 
-> it's intended to be strictly a functional description of what the hardware is 
-> able to do, that could be questioned
-
-I imagine you can write a DTB that is copyrightable and one that isn't.
-
-However this is all missing one important point. Whoever wrote their DTB
-gets to decide how they license it. It's nobody else's business.
-
-Alan
+Thanks,
+-Christoffer
