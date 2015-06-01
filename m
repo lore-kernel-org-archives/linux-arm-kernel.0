@@ -1,72 +1,260 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 1 Jun 2015 13:54:20 -0700
-Subject: Please revert 3eea8b5d68c801fec788b411582b803463834752 as it
- breaks touchscreen on n900.
-In-Reply-To: <20150601204519.GA14395@dtor-ws>
-References: <20150529202123.GY2026@saruman.tx.rr.com>
- <20150529202954.GA26494@localhost> <20150529203456.GC22083@amd>
- <20150601095556.GH17267@lukather> <20150601140605.GA26908@amd>
- <20150601145825.GA20557@lukather> <20150601152111.GA14015@amd>
- <20150601174730.GA30024@dtor-ws> <20150601202740.GA6716@amd>
- <20150601204519.GA14395@dtor-ws>
-Message-ID: <20150601205420.GE30984@atomide.com>
+From: Frank.Li@freescale.com (Frank.Li at freescale.com)
+Date: Tue, 2 Jun 2015 04:54:41 +0800
+Subject: [PATCH V2 1/1] ARM: dts: imx7d: add cortex-a7 coresight component
+Message-ID: <1433192081-1131-1-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dmitry Torokhov <dmitry.torokhov@gmail.com> [150601 13:47]:
-> On Mon, Jun 01, 2015 at 10:27:40PM +0200, Pavel Machek wrote:
-> > On Mon 2015-06-01 10:47:30, Dmitry Torokhov wrote:
-> > > On Mon, Jun 01, 2015 at 05:21:11PM +0200, Pavel Machek wrote:
-> > > > 
-> > > > 
-> > > > > > > > The 3eea8b5d68c801fec788b411582b803463834752 is just bad.
-> > > > > > > 
-> > > > > > > You were very welcome to review this patch at the time and/or suggest
-> > > > > > > a fix that pleases everyone.
-> > > > > > 
-> > > > > > You should be the one that should suggest fixes, as you broke it in
-> > > > > > the first place. But clearly you don't understand that.
-> > > > > 
-> > > > > You actually never asked for a fix, and went head first calling this
-> > > > > patch "bad" and asking for nothing but reverting it.
-> > > > 
-> > > > Date: Fri, 29 May 2015 21:08:16 +0200
-> > > > Subject: 4.1 touchscreen regression on n900 -- pinpointed [was Re:
-> > > > linux-n900
-> > > > ...
-> > > > Maxime, can you suggest a fix?
-> > > 
-> > > How about we do something like below (it needs a small edt-ft5x06 fixup
-> > > that I'll send separately). Not tested.
-> > 
-> > +       data_present = touchscreen_get_prop_u32(np,
-> > "touchscreen-size-x",
-> > +
-> > input_abs_get_maximum(axis),
-> > +                                               &maximum) |
-> > +                      touchscreen_get_prop_u32(np,
-> > "touchscreen-fuzz-x",
-> > +
-> > input_abs_get_fuzz(axis),
-> > +                                               &fuzz);
-> > +       if (data_present)
-> > +               touchscreen_set_params(dev, axis, maximum, fuzz);
-> > 
-> > Umm. So you are changing behaviour from "whatever was there" to
-> > "input_abs_get_maximum"... in n900 case.o
-> 
-> That _is_ "whatever was there".
-> 
-> > Is that a good idea for a
-> > regression fix this late in release cycle?
-> 
-> As Maxime mentioned the new behavior is needed for other touchscreens.
-> Given that fixed DTS is going into 4.1 (as far as I understand) we do
-> not need to rush this change into 4.1.
+From: Frank Li <Frank.Li@freescale.com>
 
-OK great. I'm planning to send a pull request to arm-soc for Pavel's
-DTS fix today along with few other fixes.
+Added etm, etb, funnel and replicator
 
-Regards,
+usage example:
 
-Tony
+    echo 1 >/sys/bus/coresight/devices/30086000.etr/enable_sink
+    echo 1 >/sys/bus/coresight/devices/3007c000.etm/enable_source
+
+        coresight-tmc 30086000.etr: TMC enabled
+        coresight-replicator replicator.1: REPLICATOR enabled
+        coresight-tmc 30084000.tmc: TMC enabled
+        coresight-funnel 30083000.funnel: FUNNEL inport 0 enabled
+        coresight-funnel 30041000.funnel: FUNNEL inport 0 enabled
+        coresight-etm3x 3007c000.etm: ETM tracing enabled
+
+    etm enable here.
+    trace data save at /dev/30086000.etr
+
+    cat /dev/30086000.etr > trace.data
+
+        coresight-tmc 30086000.etr: TMC read start
+        coresight-tmc 30086000.etr: TMC read end
+
+    use ptm2human(https://github.com/hwangcc23/ptm2human) to show trace data
+
+    ptm2human -i trace.data
+
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
+---
+Change from V1 to V2
+ - remove "0" after @
+ - add comments about unused funnel input port
+ - add comments about add  arm,primecell-periphid
+
+ arch/arm/boot/dts/imx7d.dtsi | 202 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 202 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+index b4cd8fd..d715501 100644
+--- a/arch/arm/boot/dts/imx7d.dtsi
++++ b/arch/arm/boot/dts/imx7d.dtsi
+@@ -121,6 +121,208 @@
+ 		clock-output-names = "osc";
+ 	};
+ 
++	etr at 30086000 {
++		compatible = "arm,coresight-tmc", "arm,primecell";
++		reg = <0x30086000 0x1000>;
++
++		clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
++		clock-names = "apb_pclk";
++
++		port {
++			etr_in_port: endpoint {
++				slave-mode;
++				remote-endpoint = <&replicator_out_port1>;
++			};
++		};
++	};
++
++	tpiu at 30087000 {
++		compatible = "arm,coresight-tpiu", "arm,primecell";
++		reg = <0x30087000 0x1000>;
++
++		clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
++		clock-names = "apb_pclk";
++		port {
++			tpiu_in_port: endpoint at 0 {
++				slave-mode;
++				remote-endpoint = <&replicator_out_port1>;
++			};
++		};
++	};
++
++	replicator {
++		/* non-configurable replicators don't show up on the
++		 * AMBA bus.  As such no need to add "arm,primecell"
++		 */
++		compatible = "arm,coresight-replicator";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			/* replicator output ports */
++			port at 0 {
++				reg = <0>;
++				replicator_out_port0: endpoint {
++					remote-endpoint = <&tpiu_in_port>;
++				};
++			};
++
++			port at 1 {
++				reg = <1>;
++				replicator_out_port1: endpoint {
++					remote-endpoint = <&etr_in_port>;
++				};
++			};
++
++			/* replicator input port */
++			port at 2 {
++				reg = <0>;
++				replicator_in_port0: endpoint {
++					slave-mode;
++					remote-endpoint = <&etf_out_port>;
++				};
++			};
++		};
++	};
++
++	etf at 30084000 {
++		compatible = "arm,coresight-tmc", "arm,primecell";
++		reg = <0x30084000 0x1000>;
++		clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
++		clock-names = "apb_pclk";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				etf_in_port: endpoint {
++					slave-mode;
++					remote-endpoint = <&hugo_funnel_out_port0>;
++				};
++			};
++
++			port at 1 {
++				reg = <0>;
++				etf_out_port: endpoint {
++					remote-endpoint = <&replicator_in_port0>;
++				};
++			};
++		};
++	};
++
++	funnel at 30083000 {
++		compatible = "arm,coresight-funnel", "arm,primecell";
++		reg = <0x30083000 0x1000>;
++		clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
++		clock-names = "apb_pclk";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			/* funnel input ports */
++			port at 0 {
++				reg = <0>;
++				hugo_funnel_in_port0: endpoint {
++					slave-mode;
++					remote-endpoint = <&ca_funnel_out_port0>;
++				};
++			};
++
++			port at 1 {
++				reg = <1>;
++				hugo_funnel_in_port1: endpoint {
++					slave-mode; /* M4 input */
++				};
++			};
++
++			port at 2 {
++				reg = <0>;
++				hugo_funnel_out_port0: endpoint {
++					remote-endpoint = <&etf_in_port>;
++				};
++			};
++
++			/* the other input ports are not connect to anything */
++		};
++	};
++
++	funnel at 30041000 {
++		compatible = "arm,coresight-funnel", "arm,primecell";
++		reg = <0x30041000 0x1000>;
++		clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
++		clock-names = "apb_pclk";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			/* funnel input ports */
++			port at 0 {
++				reg = <0>;
++				ca_funnel_in_port0: endpoint {
++					slave-mode;
++					remote-endpoint = <&etm0_out_port>;
++				};
++			};
++
++			port at 1 {
++				reg = <1>;
++				ca_funnel_in_port1: endpoint {
++					slave-mode;
++					remote-endpoint = <&etm1_out_port>;
++				};
++			};
++
++			/* funnel output port */
++			port at 2 {
++				reg = <0>;
++				ca_funnel_out_port0: endpoint {
++					remote-endpoint = <&hugo_funnel_in_port0>;
++				};
++			};
++
++			/* the other input ports are not connect to anything */
++		};
++	};
++
++	etm at 3007c000 {
++		compatible = "arm,coresight-etm3x", "arm,primecell";
++		reg = <0x3007c000 0x1000>;
++		cpu = <&cpu0>;
++		clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
++		clock-names = "apb_pclk";
++
++		port {
++			etm0_out_port: endpoint {
++				remote-endpoint = <&ca_funnel_in_port0>;
++			};
++		};
++	};
++
++	etm at 3007d000 {
++		compatible = "arm,coresight-etm3x", "arm,primecell";
++		reg = <0x3007d000 0x1000>;
++
++		/* System will hang if added nosmp in kernel command line
++		 * without arm,primecell-periphid because amba bus try to
++		 * read id and core1 power off at this time.
++		 */
++		arm,primecell-periphid =  <0xbb956>;
++		cpu = <&cpu1>;
++		clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
++		clock-names = "apb_pclk";
++
++		port {
++			etm1_out_port: endpoint {
++				remote-endpoint = <&ca_funnel_in_port1>;
++			};
++		};
++	};
++
+ 	soc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+-- 
+1.9.1
