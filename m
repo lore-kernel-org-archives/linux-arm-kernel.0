@@ -1,50 +1,54 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 1 Jun 2015 12:45:52 -0700
-Subject: [PATCH v5 0/6] Change snvs rtc and poweroff to use syscon add
- pwrkey driver
-In-Reply-To: <CAHrpEqShyPKeKYdVZ05_qsbx0cC387a2QPCdbhR5C968n=ED0A@mail.gmail.com>
-References: <1432657562-5592-1-git-send-email-Frank.Li@freescale.com>
- <20150527121052.GH16165@dragon> <20150528121353.GP2185@piout.net>
- <CAHrpEqShyPKeKYdVZ05_qsbx0cC387a2QPCdbhR5C968n=ED0A@mail.gmail.com>
-Message-ID: <20150601194552.GD30024@dtor-ws>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 1 Jun 2015 13:01:37 -0700
+Subject: [PATCH] ARM: dts: am335x-boneblack: disable RTC-only sleep
+In-Reply-To: <20150601193328.GA27640@squirrel.local>
+References: <1432136322-7609-1-git-send-email-robertcnelson@gmail.com>
+ <CAALWOA8ReuBSMcu5EvLOrKGfFGBGWSdMhpL_uSnL4QvTC-n8zg@mail.gmail.com>
+ <CAOCHtYigGmDY6c8woQxwdy9kU0J1h258jZXL7g7=VdrxKJC9cA@mail.gmail.com>
+ <CAALWOA9wyCsUQqER2Cqwru_2REpX6AeryWeoSuwZWDsdPPL+Ow@mail.gmail.com>
+ <20150601172330.GX30984@atomide.com>
+ <20150601193328.GA27640@squirrel.local>
+Message-ID: <20150601200137.GC30984@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 28, 2015 at 08:18:24AM -0500, Zhi Li wrote:
-> On Thu, May 28, 2015 at 7:13 AM, Alexandre Belloni
-> <alexandre.belloni@free-electrons.com> wrote:
-> > On 27/05/2015 at 20:10:53 +0800, Shawn Guo wrote :
-> >> On Wed, May 27, 2015 at 12:25:56AM +0800, Frank.Li at freescale.com wrote:
-> >> > Frank Li (5):
-> >> >   rtc: arm: imx: snvs: change use syscon to access register
-> >> >   Document: dt: fsl: snvs: change support syscon
-> >> >   ARM: dts: imx: update snvs to use syscon access register
-> >> >   Document: devicetree: input: imx: i.mx snvs power device tree bindings
-> >> >   ARM: dts: imx6sx: enable snvs power key
-> >> >
-> >> > Robin Gong (1):
-> >> >   input: keyboard: imx: add snvs power key driver
-> >>
-> >> The series looks fine to me now.  But I can only apply those two dts
-> >> patches after the driver and binding parts get landed on mainline.
-> >> Hopefully, you can get them in during the coming merge window through
-> >> subsystem trees, so that I can pick up dts part after v4.2-rc1 comes
-> >> out.
-> >>
-> >
-> > Actually, I was thinking you could take the whole series in your tree
-> > (at least, I'm speaking for the RTC part).
-> > Else, I'm wondering who should take the documentation changes.
-> >
+* Matthijs van Duin <matthijsvanduin@gmail.com> [150601 12:35]:
+> On 1 June 2015 at 19:23, Tony Lindgren <tony@atomide.com> wrote:
+> > Ah finally you got around doing a proper patch :)
 > 
-> Dmitry Torokhov:
+> My First Linux Patch(tm) ;-)
+
+Probably easier than trying to get other people to do the right
+thing by writing emails ;)
+ 
+> > Also, if this is needed as a fix for the mainline kernel to avoid hardware
+> > damage, please let me know too ASAP.
 > 
-> what's your opinion about input part?
+> The damaging configuration is having &rtc { system-power-controller; }
+> without &tps { ti,pmic-shutdown-controller; }
 
-I am fine with it merged through Shawn's tree. I added my ack to the mail
-in question.
+OK thanks updating the description with that.
+ 
+> So 3d76be5b9 also avoids damage, but with the unfortunate side-effect
+> that the system doesn't power off at all anymore (it just halts). I do
+> recommend applying this patch (restyled as needed) before reverting
+> 3d76be5b9.
+> 
+> > Hmm no ideas about that, I guess people are using gmail to send email
+> > with smtps though?
+> 
+> Hmm, setting up mutt turned out less hassle than I remembered...
+> 
+> (Let's hope all goes well)
+> 
+> > Linux usually does not use the // style comments.. Can you please change
+> > that? And how about have just one section of comments then the entry
+> > for ti,pmic-shutdown-controller?
+> 
+> Fresh try...
 
-Thanks.
+Thanks applying into omap-for-v4.1/fixes with Cc stable.
 
--- 
-Dmitry
+Regards,
+
+Tony
