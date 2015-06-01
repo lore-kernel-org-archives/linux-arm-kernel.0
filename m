@@ -1,42 +1,28 @@
-From: k.kozlowski.k@gmail.com (=?UTF-8?Q?Krzysztof_Koz=C5=82owski?=)
-Date: Tue, 2 Jun 2015 08:51:11 +0900
-Subject: Exynos 5410 support (was [PATCH 6/6] ARM: dts: exynos5420: add
- sysmmu nodes)
-In-Reply-To: <556CAE98.1080906@smart-cactus.org>
-References: <1432041645-11172-1-git-send-email-m.szyprowski@samsung.com>
- <1433153450-3680-1-git-send-email-m.szyprowski@samsung.com>
- <1433153450-3680-7-git-send-email-m.szyprowski@samsung.com>
- <556CAE98.1080906@smart-cactus.org>
-Message-ID: <CAJKOXPf1FA7exH=Qj-dKjuH0heYXVy0tUK-ZwayC40b_0eLb6w@mail.gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Mon, 1 Jun 2015 16:53:28 -0700
+Subject: [PATCH v2 05/12] ARM: imx: setup tctl register in device specific
+ function
+In-Reply-To: <1432308599-28643-6-git-send-email-shawn.guo@linaro.org>
+References: <1432308599-28643-1-git-send-email-shawn.guo@linaro.org>
+ <1432308599-28643-6-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CAMAWPa-1MPgzT1GJQx4SjmfQpj9zdwsAw-qvLWZjVhoM66nHsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-06-02 4:12 GMT+09:00 Ben Gamari <ben@smart-cactus.org>:
-> On 06/01/2015 06:10 AM, Marek Szyprowski wrote:
->>
->> This patch adds System MMU nodes to all defined devices that are specific
->> to Exynos5420/5800/5422 series.
+Hi Shawn,
+
+On Fri, May 22, 2015 at 8:29 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> It creates a gpt device speicific data structure and adds function hook
+> gpt_setup_tctl in there to set up gpt TCTL register.
 >
->
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-(...)
+Starting with next-20150529, imx6dl-wandboard (both dual and solo)
+started having boot failures[1].  Today I bisected it down to this
+commit.  It didn't revert cleanly, so I didn't verify that this patch
+alone is the root cause, but reproducing the boot failure should be
+pretty easy on wandboard with recent linux-next.
 
-> Worse, the few patches
-> that have been submitted for the 5410 have languished in queue-purgatory.
+Kevin
 
-What patches do you have in mind?
-
-Beside of that actually many submissions for different Exynos SoCs and
-parts of it were ignored on the list. It is a pity because that means
-someone's effort got lost.
-Recently I tried to help in that matter and replied to some emails
-about resubmitting. If you have anything pending just please let me
-know.
-
-To make it clear - I am speaking for myself, not for any company or
-employer. Also I do not know anything about other people's motivation
-behind doing patches only for chosen SoCs. I leave these questions to
-them.
-
-Best regards,
-Krzysztof
+[1]  http://kernelci.org/boot/all/job/next/kernel/next-20150529/
