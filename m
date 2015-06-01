@@ -1,94 +1,44 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 1 Jun 2015 18:30:27 +0300
-Subject: [PATCH] ARM: dts: AM35xx: fix system control module clocks
-In-Reply-To: <alpine.DEB.2.02.1506010546510.14902@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1506010546510.14902@utopia.booyaka.com>
-Message-ID: <1433172627-28052-1-git-send-email-t-kristo@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 01 Jun 2015 17:36:44 +0200
+Subject: [GIT PULL] ARM: mvebu: drivers changes for v4.2
+In-Reply-To: <5568DF81.1090300@free-electrons.com>
+References: <5568DF81.1090300@free-electrons.com>
+Message-ID: <12169869.A5OKQoShWP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-New system control module layout for omap3 overlooked parts of the am35xx
-configuration. Basically the am35xx clocks were not converted to use the
-changed offsets, which caused weird boot warnings. The errors were not
-fatal so far, so they were not caught earlier. Fixed by applying the
-proper offsets for the AM35xx scm clocks.
+On Friday 29 May 2015 23:52:01 Gregory CLEMENT wrote:
+> Here is the first pull request for drivers for mvebu for v4.2.
+> It depends on the mvebu/fixes branch which have been merged in the
+> mvebu/drivers branch
+> 
+> Gregory
+> 
+> The following changes since commit 885dbd154b2f2ee305cec6fd0a162e1a77ae2b06:
+> 
+>   Revert "bus: mvebu-mbus: make sure SDRAM CS for DMA don't overlap the MBus bridge window" (2015-05-28 11:14:31 +0200)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-drivers-4.2
+> 
+> for you to fetch changes up to bfa1ce5f38938cc9e6c7f2d1011f88eba2b9e2b2:
+> 
+>   bus: mvebu-mbus: add mv_mbus_dram_info_nooverlap() (2015-05-28 12:21:08 +0200)
+> 
+> ----------------------------------------------------------------
+> mvebu drivers change for 4.2
+> 
+> mvebu-mbus: add mv_mbus_dram_info_nooverlap() needed for the new
+> Marvell crypto driver
+> 
+> 
 
-Fixes: b8845074cf ("ARM: dts: omap3: add minimal l4 bus layout with...")
+Merged into the next/drivers branch. I've added an explanation about
+the fixes branch into the commit message, this is something that
+would be helpful to have in the tag description as well (so I
+don't have to write it myself).
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Reported-by: Jeroen Hofstee <linux-arm@myspectrum.nl>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Tony Lindgren <tony@atomide.com>
----
- arch/arm/boot/dts/am35xx-clocks.dtsi |   14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+Thanks!
 
-diff --git a/arch/arm/boot/dts/am35xx-clocks.dtsi b/arch/arm/boot/dts/am35xx-clocks.dtsi
-index 518b8fd..18cc826 100644
---- a/arch/arm/boot/dts/am35xx-clocks.dtsi
-+++ b/arch/arm/boot/dts/am35xx-clocks.dtsi
-@@ -12,7 +12,7 @@
- 		#clock-cells = <0>;
- 		compatible = "ti,am35xx-gate-clock";
- 		clocks = <&ipss_ick>;
--		reg = <0x059c>;
-+		reg = <0x032c>;
- 		ti,bit-shift = <1>;
- 	};
- 
-@@ -20,7 +20,7 @@
- 		#clock-cells = <0>;
- 		compatible = "ti,gate-clock";
- 		clocks = <&rmii_ck>;
--		reg = <0x059c>;
-+		reg = <0x032c>;
- 		ti,bit-shift = <9>;
- 	};
- 
-@@ -28,7 +28,7 @@
- 		#clock-cells = <0>;
- 		compatible = "ti,am35xx-gate-clock";
- 		clocks = <&ipss_ick>;
--		reg = <0x059c>;
-+		reg = <0x032c>;
- 		ti,bit-shift = <2>;
- 	};
- 
-@@ -36,7 +36,7 @@
- 		#clock-cells = <0>;
- 		compatible = "ti,gate-clock";
- 		clocks = <&pclk_ck>;
--		reg = <0x059c>;
-+		reg = <0x032c>;
- 		ti,bit-shift = <10>;
- 	};
- 
-@@ -44,7 +44,7 @@
- 		#clock-cells = <0>;
- 		compatible = "ti,am35xx-gate-clock";
- 		clocks = <&ipss_ick>;
--		reg = <0x059c>;
-+		reg = <0x032c>;
- 		ti,bit-shift = <0>;
- 	};
- 
-@@ -52,7 +52,7 @@
- 		#clock-cells = <0>;
- 		compatible = "ti,gate-clock";
- 		clocks = <&sys_ck>;
--		reg = <0x059c>;
-+		reg = <0x032c>;
- 		ti,bit-shift = <8>;
- 	};
- 
-@@ -60,7 +60,7 @@
- 		#clock-cells = <0>;
- 		compatible = "ti,am35xx-gate-clock";
- 		clocks = <&sys_ck>;
--		reg = <0x059c>;
-+		reg = <0x032c>;
- 		ti,bit-shift = <3>;
- 	};
- };
--- 
-1.7.9.5
+	Arnd
