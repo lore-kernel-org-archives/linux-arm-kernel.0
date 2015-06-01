@@ -1,45 +1,59 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 1 Jun 2015 06:34:47 +0300
-Subject: [PATCH] ARM: sti: fix documentation reference
-In-Reply-To: <5552F5EB.6020604@st.com>
-References: <d0f22751247391d5f7f1b8ebec507a8e0c4b4943.1430395589.git.baruch@tkos.co.il>
- <20150512185649.GB2558@tarshish> <5552F5EB.6020604@st.com>
-Message-ID: <20150601033447.GS2282@tarshish>
+From: ruchandani.tina@gmail.com (Tina Ruchandani)
+Date: Mon, 1 Jun 2015 09:09:00 +0530
+Subject: [PATCH] drm/exynos/ipp: Replace struct timeval usage
+Message-ID: <20150601033859.GA3254@tinar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Patrice, STi maintainers,
+'struct timeval' uses a 32-bit seconds representation which
+will overflow in the year 2038 and beyond. This patch
+replaces the use of struct timeval with struct timespec64
+which uses a 64-bit seconds representation and is y2038 safe.
 
-On Wed, May 13, 2015 at 08:57:47AM +0200, Patrice Chotard wrote:
-> On 05/12/2015 08:56 PM, Baruch Siach wrote:
-> >On Thu, Apr 30, 2015 at 03:06:29PM +0300, Baruch Siach wrote:
-> >>Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> >>---
-> >>  arch/arm/mach-sti/Kconfig | 2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >>diff --git a/arch/arm/mach-sti/Kconfig b/arch/arm/mach-sti/Kconfig
-> >>index 3b1ac463a494..f7d42ddf95f6 100644
-> >>--- a/arch/arm/mach-sti/Kconfig
-> >>+++ b/arch/arm/mach-sti/Kconfig
-> >>@@ -17,7 +17,7 @@ menuconfig ARCH_STI
-> >>  	help
-> >>  	  Include support for STiH41x SOCs like STiH415/416 using the device tree
-> >>  	  for discovery
-> >>-	  More information at Documentation/arm/STiH41x and
-> >>+	  More information at Documentation/arm/sti and
-> >>  	  at Documentation/devicetree
-> >Ping?
->
-> Sorry for the late answer
-> 
-> Acked-by: Patrice Chotard <patrice.chotard@st.com>
+The patch is part of a larger effort to remove all 32-bit
+timekeeping variables (timeval, time_t and timespec) from the
+kernel.
 
-Thanks. One last ping.
+Signed-off-by: Tina Ruchandani <ruchandani.tina@gmail.com>
+---
+ drivers/gpu/drm/exynos/exynos_drm_ipp.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-baruch
-
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_ipp.c b/drivers/gpu/drm/exynos/exynos_drm_ipp.c
+index b7f1cbc..7cd4a97 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_ipp.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_ipp.c
+@@ -16,6 +16,7 @@
+ #include <linux/types.h>
+ #include <linux/clk.h>
+ #include <linux/pm_runtime.h>
++#include <linux/time64.h>
+ 
+ #include <drm/drmP.h>
+ #include <drm/exynos_drm.h>
+@@ -1414,7 +1415,7 @@ static int ipp_send_event(struct exynos_drm_ippdrv *ippdrv,
+ 	struct drm_exynos_ipp_queue_buf qbuf;
+ 	struct drm_exynos_ipp_send_event *e;
+ 	struct list_head *head;
+-	struct timeval now;
++	struct timespec64 now;
+ 	unsigned long flags;
+ 	u32 tbuf_id[EXYNOS_DRM_OPS_MAX] = {0, };
+ 	int ret, i;
+@@ -1518,10 +1519,11 @@ static int ipp_send_event(struct exynos_drm_ippdrv *ippdrv,
+ 	e = list_first_entry(&c_node->event_list,
+ 		struct drm_exynos_ipp_send_event, base.link);
+ 
+-	do_gettimeofday(&now);
+-	DRM_DEBUG_KMS("tv_sec[%ld]tv_usec[%ld]\n", now.tv_sec, now.tv_usec);
++	getnstimeofday64(&now);
++	DRM_DEBUG_KMS("tv_sec[%lld]tv_usec[%lld]\n", now.tv_sec, (now.tv_nsec /
++								NSEC_PER_SEC));
+ 	e->event.tv_sec = now.tv_sec;
+-	e->event.tv_usec = now.tv_usec;
++	e->event.tv_usec = now.tv_nsec / NSEC_PER_SEC;
+ 	e->event.prop_id = property->prop_id;
+ 
+ 	/* set buffer id about source destination */
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+2.2.0.rc0.207.ga3a616c
