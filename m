@@ -1,42 +1,58 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Mon,  1 Jun 2015 16:05:26 +0800
-Subject: [Patch v3 17/36] ARM64,
- irq: Use access helper irq_data_get_affinity_mask()
-In-Reply-To: <1433145945-789-1-git-send-email-jiang.liu@linux.intel.com>
-References: <1433145945-789-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <1433145945-789-18-git-send-email-jiang.liu@linux.intel.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 1 Jun 2015 10:07:40 +0200
+Subject: [GIT PULL] ARM: mediatek: arm64 updates for v4.2
+In-Reply-To: <20150529164605.GA3022@codeaurora.org>
+References: <CABuKBeLhFR=94cF301wL7J8hJVTtyseoD7g45PLE6znQkPAFGQ@mail.gmail.com>
+ <4904430.YVNgRyyb6C@wuerfel> <20150529125829.GE6325@pengutronix.de>
+ <2560864.dSIGJOm4yU@wuerfel> <20150529164605.GA3022@codeaurora.org>
+Message-ID: <CABuKBeJzTXrRRoAAL7m1=HAP8pR5vrp-tK7vj2oym8KYwTA+Cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use access helper irq_data_get_affinity_mask() to hide implementation
-details of struct irq_desc.
+2015-05-29 18:46 GMT+02:00 Stephen Boyd <sboyd@codeaurora.org>:
+> On 05/29, Arnd Bergmann wrote:
+>> On Friday 29 May 2015 14:58:29 Sascha Hauer wrote:
+>> > On Fri, May 29, 2015 at 02:07:40PM +0200, Arnd Bergmann wrote:
+>> > > On Friday 29 May 2015 14:04:32 Arnd Bergmann wrote:
+>> > > > On Wednesday 27 May 2015 17:14:08 Matthias Brugger wrote:
+>> > > > > - dts: fixup pinctrl mt8173
+>> > > > > - dts: mt8173-evb fix model name
+>> > > > > - dts: mt8173 fix identation
+>> > > > > - dts: mt8173 add clock controller
+>> > > > > - dts: mt8173 change uart clocks
+>> > > > > - dts: mt8173 add pmic wrapper
+>> > > > >
+>> > > >
+>> > > > Pulled into next/dt, thanks!
+>> > > >
+>> > >
+>> > > Dropped it again, after getting a build error:
+>> > >
+>> > >   DTC     arch/arm64/boot/dts/mediatek/mt8173-evb.dtb
+>> > > In file included from ../arch/arm64/boot/dts/mediatek/mt8173-evb.dts:16:0:
+>> > > ../arch/arm64/boot/dts/mediatek/mt8173.dtsi:14:42: fatal error: dt-bindings/clock/mt8173-clk.h: No such file or directory
+>> > >  #include <dt-bindings/clock/mt8173-clk.h>
+>> > >                                           ^
+>> > >
+>> > > Please fix and resubmit.
+>> >
+>> > These come from the clk tree. My original suggestion was to pull in this
+>> > dts changes late after -rc1.
+>>
+>> Please don't do it that way. If you can't figure out a way to
+>> avoid the dependency, just stage it out over an extra merge window
+>> and add the driver first and the dt changes the next time.
+>>
+>> > Other possibility: Stephen, can you provide
+>> > a stable commit containing the Mediatek clk changes?
+>>
+>> That would work.
+>
+> Or another possibility, put the same header file into the branch
+> you send to arm-soc. Git will figure out that the files are
+> exactly the same and there's no cross tree dependency.
 
-Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
----
- arch/arm64/kernel/irq.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+OK, I will do that.
 
-diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
-index 240b75c0e94f..463fa2e7e34c 100644
---- a/arch/arm64/kernel/irq.c
-+++ b/arch/arm64/kernel/irq.c
-@@ -61,7 +61,7 @@ void __init init_IRQ(void)
- static bool migrate_one_irq(struct irq_desc *desc)
- {
- 	struct irq_data *d = irq_desc_get_irq_data(desc);
--	const struct cpumask *affinity = d->affinity;
-+	const struct cpumask *affinity = irq_data_get_affinity_mask(d);
- 	struct irq_chip *c;
- 	bool ret = false;
- 
-@@ -81,7 +81,7 @@ static bool migrate_one_irq(struct irq_desc *desc)
- 	if (!c->irq_set_affinity)
- 		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
- 	else if (c->irq_set_affinity(d, affinity, false) == IRQ_SET_MASK_OK && ret)
--		cpumask_copy(d->affinity, affinity);
-+		cpumask_copy(irq_data_get_affinity_mask(d), affinity);
- 
- 	return ret;
- }
 -- 
-1.7.10.4
+motzblog.wordpress.com
