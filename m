@@ -1,10 +1,10 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 1 Jun 2015 04:37:59 +0200
+Date: Mon, 1 Jun 2015 04:50:50 +0200
 Subject: QNAP TS-419: sata_mv fails to initialise with "can't set global
  reset"
 In-Reply-To: <1433068534.5748.276.camel@debian.org>
 References: <1433068534.5748.276.camel@debian.org>
-Message-ID: <20150601023759.GA11354@lunn.ch>
+Message-ID: <20150601025050.GB11354@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -47,16 +47,13 @@ On Sun, May 31, 2015 at 11:35:34AM +0100, Ian Campbell wrote:
 > I don't see anything in the git logs after 4.0 which looks like an
 > obviously related fix, but I'm currently building 4.1-rc5 to have a
 > check.
-
+ 
 Hi Ian
 
-I just booted my QNAP TS-119P, and it found its disk. No message about
-missing reset.
+You might also want to try 
 
-Since TS-419 is a four driver device, it does not use the internal
-SATA controllers for its disks, it uses a PCI controller. So i think
-this is somehow PCI related.
+http://comments.gmane.org/gmane.linux.ports.arm.kernel/416589
 
-Can you do a bissect?
+In particular the first patch.
 
-    Andrew
+  Andrew
