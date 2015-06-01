@@ -1,65 +1,140 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 01 Jun 2015 10:11:07 +0200
-Subject: [GIT PULL] ARM: mediatek: arm64 updates for v4.2
-In-Reply-To: <CABuKBeJzTXrRRoAAL7m1=HAP8pR5vrp-tK7vj2oym8KYwTA+Cg@mail.gmail.com>
-References: <CABuKBeLhFR=94cF301wL7J8hJVTtyseoD7g45PLE6znQkPAFGQ@mail.gmail.com>
- <20150529164605.GA3022@codeaurora.org>
- <CABuKBeJzTXrRRoAAL7m1=HAP8pR5vrp-tK7vj2oym8KYwTA+Cg@mail.gmail.com>
-Message-ID: <2507882.daayE1Zgb4@wuerfel>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Mon, 1 Jun 2015 10:14:01 +0200
+Subject: [PATCH 1/2] dmaengine: Move icg helpers to global header
+In-Reply-To: <1432735313-481-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1432735313-481-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1432735313-481-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20150601081401.GG25118@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 01 June 2015 10:07:40 Matthias Brugger wrote:
-> 2015-05-29 18:46 GMT+02:00 Stephen Boyd <sboyd@codeaurora.org>:
-> > On 05/29, Arnd Bergmann wrote:
-> >> On Friday 29 May 2015 14:58:29 Sascha Hauer wrote:
-> >> > On Fri, May 29, 2015 at 02:07:40PM +0200, Arnd Bergmann wrote:
-> >> > > On Friday 29 May 2015 14:04:32 Arnd Bergmann wrote:
-> >> > > > On Wednesday 27 May 2015 17:14:08 Matthias Brugger wrote:
-> >> > > > > - dts: fixup pinctrl mt8173
-> >> > > > > - dts: mt8173-evb fix model name
-> >> > > > > - dts: mt8173 fix identation
-> >> > > > > - dts: mt8173 add clock controller
-> >> > > > > - dts: mt8173 change uart clocks
-> >> > > > > - dts: mt8173 add pmic wrapper
-> >> > > > >
-> >> > > >
-> >> > > > Pulled into next/dt, thanks!
-> >> > > >
-> >> > >
-> >> > > Dropped it again, after getting a build error:
-> >> > >
-> >> > >   DTC     arch/arm64/boot/dts/mediatek/mt8173-evb.dtb
-> >> > > In file included from ../arch/arm64/boot/dts/mediatek/mt8173-evb.dts:16:0:
-> >> > > ../arch/arm64/boot/dts/mediatek/mt8173.dtsi:14:42: fatal error: dt-bindings/clock/mt8173-clk.h: No such file or directory
-> >> > >  #include <dt-bindings/clock/mt8173-clk.h>
-> >> > >                                           ^
-> >> > >
-> >> > > Please fix and resubmit.
-> >> >
-> >> > These come from the clk tree. My original suggestion was to pull in this
-> >> > dts changes late after -rc1.
-> >>
-> >> Please don't do it that way. If you can't figure out a way to
-> >> avoid the dependency, just stage it out over an extra merge window
-> >> and add the driver first and the dt changes the next time.
-> >>
-> >> > Other possibility: Stephen, can you provide
-> >> > a stable commit containing the Mediatek clk changes?
-> >>
-> >> That would work.
-> >
-> > Or another possibility, put the same header file into the branch
-> > you send to arm-soc. Git will figure out that the files are
-> > exactly the same and there's no cross tree dependency.
+On Wed, May 27, 2015 at 04:01:52PM +0200, Maxime Ripard wrote:
+> Now that we can have ICGs set for both the source and destination (using
+> the icg field of struct data_chunk) or for only the source or the
+> destination (using the dst_icg or src_icg respectively), and that these
+> fields can be ignored depending on other parameters (src_inc, src_sgl,
+> etc.), the logic to get the actual ICG value can be quite tricky.
 > 
-> OK, I will do that.
+> The XDMAC driver was already implementing it, but since we will need it in
+> other drivers, we can move it to the main header file.
 > 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-If you put the same file in two branches, please use the same commit
-ID. While git can figure it out when everything goes right, it will
-fail horribly if one of the branches later gets a patch on top that
-modifies the file, before the two branches get merged.
-
-
-	Arnd
+> ---
+>  drivers/dma/at_xdmac.c    | 46 ++++------------------------------------------
+>  include/linux/dmaengine.h | 27 +++++++++++++++++++++++++++
+>  2 files changed, 31 insertions(+), 42 deletions(-)
+> 
+> diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
+> index 9b602a67d40d..80e46e571bdd 100644
+> --- a/drivers/dma/at_xdmac.c
+> +++ b/drivers/dma/at_xdmac.c
+> @@ -862,20 +862,8 @@ at_xdmac_interleaved_queue_desc(struct dma_chan *chan,
+>  
+>  	desc->lld.mbr_sa = src;
+>  	desc->lld.mbr_da = dst;
+> -
+> -	if (xt->src_inc && xt->src_sgl) {
+> -		if (chunk->src_icg)
+> -			desc->lld.mbr_sus = chunk->src_icg;
+> -		else
+> -			desc->lld.mbr_sus = chunk->icg;
+> -	}
+> -
+> -	if (xt->dst_inc && xt->dst_sgl) {
+> -		if (chunk->dst_icg)
+> -			desc->lld.mbr_dus = chunk->dst_icg;
+> -		else
+> -			desc->lld.mbr_dus = chunk->icg;
+> -	}
+> +	desc->lld.mbr_sus = dmaengine_get_src_icg(xt, chunk);
+> +	desc->lld.mbr_dus = dmaengine_get_dst_icg(xt, chunk);
+>  
+>  	desc->lld.mbr_ubc = AT_XDMAC_MBR_UBC_NDV3
+>  		| AT_XDMAC_MBR_UBC_NDEN
+> @@ -895,32 +883,6 @@ at_xdmac_interleaved_queue_desc(struct dma_chan *chan,
+>  	return desc;
+>  }
+>  
+> -static size_t at_xdmac_get_icg(bool inc, bool sgl, size_t icg, size_t dir_icg)
+> -{
+> -	if (inc) {
+> -		if (dir_icg)
+> -			return dir_icg;
+> -		else if (sgl)
+> -			return icg;
+> -	}
+> -
+> -	return 0;
+> -}
+> -
+> -static size_t at_xdmac_get_dst_icg(struct dma_interleaved_template *xt,
+> -				   struct data_chunk *chunk)
+> -{
+> -	return at_xdmac_get_icg(xt->dst_inc, xt->dst_sgl,
+> -				chunk->icg, chunk->dst_icg);
+> -}
+> -
+> -static size_t at_xdmac_get_src_icg(struct dma_interleaved_template *xt,
+> -				   struct data_chunk *chunk)
+> -{
+> -	return at_xdmac_get_icg(xt->src_inc, xt->src_sgl,
+> -				chunk->icg, chunk->src_icg);
+> -}
+> -
+>  static struct dma_async_tx_descriptor *
+>  at_xdmac_prep_interleaved(struct dma_chan *chan,
+>  			  struct dma_interleaved_template *xt,
+> @@ -950,8 +912,8 @@ at_xdmac_prep_interleaved(struct dma_chan *chan,
+>  
+>  		chunk = xt->sgl + i;
+>  
+> -		dst_icg = at_xdmac_get_dst_icg(xt, chunk);
+> -		src_icg = at_xdmac_get_src_icg(xt, chunk);
+> +		dst_icg = dmaengine_get_dst_icg(xt, chunk);
+> +		src_icg = dmaengine_get_src_icg(xt, chunk);
+>  
+>  		src_skip = chunk->size + src_icg;
+>  		dst_skip = chunk->size + dst_icg;
+> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+> index 8faf6a2dd9d8..43a9a397b2d7 100644
+> --- a/include/linux/dmaengine.h
+> +++ b/include/linux/dmaengine.h
+> @@ -899,6 +899,33 @@ static inline int dma_maxpq(struct dma_device *dma, enum dma_ctrl_flags flags)
+>  	BUG();
+>  }
+>  
+> +static inline size_t dmaengine_get_icg(bool inc, bool sgl, size_t icg,
+> +				      size_t dir_icg)
+> +{
+> +	if (inc) {
+> +		if (dir_icg)
+> +			return dir_icg;
+> +		else if (sgl)
+> +			return icg;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static inline size_t dmaengine_get_dst_icg(struct dma_interleaved_template *xt,
+> +					   struct data_chunk *chunk)
+> +{
+> +	return dmaengine_get_icg(xt->dst_inc, xt->dst_sgl,
+> +				 chunk->icg, chunk->dst_icg);
+> +}
+> +
+> +static inline size_t dmaengine_get_src_icg(struct dma_interleaved_template *xt,
+> +					   struct data_chunk *chunk)
+> +{
+> +	return dmaengine_get_icg(xt->src_inc, xt->src_sgl,
+> +				 chunk->icg, chunk->src_icg);
+> +}
+> +
+>  /* --- public DMA engine API --- */
+>  
+>  #ifdef CONFIG_DMA_ENGINE
+> -- 
+> 2.4.1
+> 
