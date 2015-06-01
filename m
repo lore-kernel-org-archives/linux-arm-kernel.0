@@ -1,117 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 1 Jun 2015 11:16:36 +0100
-Subject: [PATCH v2 09/11] KVM: arm: disable debug mode if we don't
- actually need it.
-In-Reply-To: <1433046432-1824-10-git-send-email-zhichao.huang@linaro.org>
-References: <1433046432-1824-1-git-send-email-zhichao.huang@linaro.org>
- <1433046432-1824-10-git-send-email-zhichao.huang@linaro.org>
-Message-ID: <20150601101636.GF1641@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 1 Jun 2015 12:17:40 +0200
+Subject: [GIT PULL] ARM: mediatek: Fix for v4.1
+Message-ID: <CABuKBeKkvikUSvZCZNn5_RSHs-ENX9gqDCwhS5h2Py9EQwdYpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 31, 2015 at 05:27:10AM +0100, Zhichao Huang wrote:
-> Until now we enable debug mode all the time even if we don't
-> actually need it.
-> 
-> Inspired by the implementation in arm64, disable debug mode if
-> we don't need it. And then we are able to reduce unnecessary
-> registers saving/restoring when the debug mode is disabled.
+Hi Arnd and Olof,
 
-I'm terrified about this patch. Enabling monitor mode has proven to be
-*extremely* fragile in practice on 32-bit ARM SoCs, so trying to do this
-morei often makes me very nervous.
+please pull the following fix.
 
-> Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
-> ---
->  arch/arm/kernel/hw_breakpoint.c | 55 ++++++++++++++++++++++++++++++++++-------
->  1 file changed, 46 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-> index dc7d0a9..1d27563 100644
-> --- a/arch/arm/kernel/hw_breakpoint.c
-> +++ b/arch/arm/kernel/hw_breakpoint.c
-> @@ -266,8 +266,7 @@ static int enable_monitor_mode(void)
->  	}
->  
->  	/* Check that the write made it through. */
-> -	ARM_DBG_READ(c0, c1, 0, dscr);
-> -	if (!(dscr & ARM_DSCR_MDBGEN)) {
-> +	if (!monitor_mode_enabled()) {
->  		pr_warn_once("Failed to enable monitor mode on CPU %d.\n",
->  				smp_processor_id());
->  		return -EPERM;
+Thanks,
+Matthias
 
-Ok, this hunk is harmless :)
+---
 
-> @@ -277,6 +276,43 @@ out:
->  	return 0;
->  }
->  
-> +static int disable_monitor_mode(void)
-> +{
-> +	u32 dscr;
-> +
-> +	ARM_DBG_READ(c0, c1, 0, dscr);
-> +
-> +	/* If monitor mode is already disabled, just return. */
-> +	if (!(dscr & ARM_DSCR_MDBGEN))
-> +		goto out;
-> +
-> +	/* Write to the corresponding DSCR. */
-> +	switch (get_debug_arch()) {
-> +	case ARM_DEBUG_ARCH_V6:
-> +	case ARM_DEBUG_ARCH_V6_1:
-> +		ARM_DBG_WRITE(c0, c1, 0, (dscr & ~ARM_DSCR_MDBGEN));
-> +		break;
-> +	case ARM_DEBUG_ARCH_V7_ECP14:
-> +	case ARM_DEBUG_ARCH_V7_1:
-> +	case ARM_DEBUG_ARCH_V8:
-> +		ARM_DBG_WRITE(c0, c2, 2, (dscr & ~ARM_DSCR_MDBGEN));
-> +		isb();
-> +		break;
-> +	default:
-> +		return -ENODEV;
-> +	}
-> +
-> +	/* Check that the write made it through. */
-> +	if (monitor_mode_enabled()) {
-> +		pr_warn_once("Failed to disable monitor mode on CPU %d.\n",
-> +				smp_processor_id());
-> +		return -EPERM;
-> +	}
-> +
-> +out:
-> +	return 0;
-> +}
+The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
 
-I'm not comfortable with this. enable_monitor_mode has precisly one caller
-[reset_ctrl_regs] which goes to some lengths to get the system into a
-well-defined state. On top of that, the whole thing is run with an undef
-hook registered because there isn't an architected way to discover whether
-or not DBGSWENABLE is driven low.
+  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
 
-Why exactly do you need this? Can you not trap guest debug accesses some
-other way?
+are available in the git repository at:
 
->  int hw_breakpoint_slots(int type)
->  {
->  	if (!debug_arch_supported())
-> @@ -338,6 +374,8 @@ int arch_install_hw_breakpoint(struct perf_event *bp)
->  	int i, max_slots, ctrl_base, val_base;
->  	u32 addr, ctrl;
->  
-> +	enable_monitor_mode();
-> +
->  	addr = info->address;
->  	ctrl = encode_ctrl_reg(info->ctrl) | 0x1;
->  
-> @@ -430,6 +468,8 @@ void arch_uninstall_hw_breakpoint(struct perf_event *bp)
->  
->  	/* Reset the control register. */
->  	write_wb_reg(base + i, 0);
-> +
-> +	disable_monitor_mode();
+  https://github.com/mbgg/linux-mediatek.git tags/v4.1-next-arm64-fixes
 
-My previous concerns notwithstanding, shouldn't this be refcounted?
+for you to fetch changes up to 692ef3ee36833b6098a352c079d3cea8fc6ed3ef:
 
-Will
+  arm64: dts: mt8173-evb: fix model name (2015-06-01 11:29:15 +0200)
+
+----------------------------------------------------------------
+- dts: mt8173: fix compatible string
+
+----------------------------------------------------------------
+Yingjoe Chen (1):
+      arm64: dts: mt8173-evb: fix model name
+
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
