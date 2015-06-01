@@ -1,37 +1,79 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 1 Jun 2015 09:23:11 +0300
-Subject: [PATCHv4 03/10] arm/dts: dra7xx: add 'ti,
- set-rate-parent' for dss_dss_clk
+Date: Mon, 1 Jun 2015 09:23:09 +0300
+Subject: [PATCHv4 01/10] arm: dra7: add DESHDCP clock
 In-Reply-To: <1433139798-23450-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1433139798-23450-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1433139798-23450-4-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1433139798-23450-2-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need set-rate-parent flags for the display's clock path so that the
-DSS driver can change the clock rate of the PLL.
-
-This patchs adds the ti,set-rate-parent flag to 'dss_dss_clk' clock
-node, which is only a gate clock, allowing the setting of the clock rate
-to propagate to the PLL.
+Add a new Linux clock for DRA7 based SoCs to control DESHDCP clock.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Cc: devicetree at vger.kernel.org
 ---
- arch/arm/boot/dts/dra7xx-clocks.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/dra7.dtsi               |  5 +++++
+ arch/arm/boot/dts/dra7xx-clocks.dtsi      | 10 ++++++++++
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c |  1 +
+ drivers/clk/ti/clk-7xx.c                  |  1 +
+ 4 files changed, 17 insertions(+)
 
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 5332b57b4950..db0890a36e96 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -131,6 +131,11 @@
+ 							regulator-max-microvolt = <3000000>;
+ 						};
+ 					};
++
++					scm_conf_clocks: clocks {
++						#address-cells = <1>;
++						#size-cells = <0>;
++					};
+ 				};
+ 
+ 				dra7_pmx_core: pinmux at 1400 {
 diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-index 470f39c4e326..357bedeebfac 100644
+index 3b933f74d000..470f39c4e326 100644
 --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
 +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-@@ -1531,6 +1531,7 @@
- 		clocks = <&dpll_per_h12x2_ck>;
- 		ti,bit-shift = <8>;
- 		reg = <0x1120>;
-+		ti,set-rate-parent;
+@@ -2136,3 +2136,13 @@
+ 		clocks = <&dpll_usb_ck>;
  	};
+ };
++
++&scm_conf_clocks {
++	dss_deshdcp_clk: dss_deshdcp_clk {
++		#clock-cells = <0>;
++		compatible = "ti,gate-clock";
++		clocks = <&l3_iclk_div>;
++		ti,bit-shift = <0>;
++		reg = <0x558>;
++	};
++};
+diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+index 0e64c2fac0b5..817dbd87ce67 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+@@ -438,6 +438,7 @@ static struct omap_hwmod_opt_clk dss_opt_clks[] = {
+ 	{ .role = "video2_clk", .clk = "dss_video2_clk" },
+ 	{ .role = "video1_clk", .clk = "dss_video1_clk" },
+ 	{ .role = "hdmi_clk", .clk = "dss_hdmi_clk" },
++	{ .role = "hdcp_clk", .clk = "dss_deshdcp_clk" },
+ };
  
- 	dss_hdmi_clk: dss_hdmi_clk {
+ static struct omap_hwmod dra7xx_dss_hwmod = {
+diff --git a/drivers/clk/ti/clk-7xx.c b/drivers/clk/ti/clk-7xx.c
+index 5d2217ae4478..2dd956b9affa 100644
+--- a/drivers/clk/ti/clk-7xx.c
++++ b/drivers/clk/ti/clk-7xx.c
+@@ -305,6 +305,7 @@ static struct ti_dt_clk dra7xx_clks[] = {
+ 	DT_CLK("4882c000.timer", "timer_sys_ck", "timer_sys_clk_div"),
+ 	DT_CLK("4882e000.timer", "timer_sys_ck", "timer_sys_clk_div"),
+ 	DT_CLK(NULL, "sys_clkin", "sys_clkin1"),
++	DT_CLK(NULL, "dss_deshdcp_clk", "dss_deshdcp_clk"),
+ 	{ .node_name = NULL },
+ };
+ 
 -- 
 2.1.4
