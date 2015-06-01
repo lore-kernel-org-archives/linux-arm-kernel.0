@@ -1,99 +1,48 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 1 Jun 2015 14:25:41 +0200
-Subject: [PATCH 2/2] arm64: dts: mt8173: Add I2C device node
-In-Reply-To: <1433140153-22436-3-git-send-email-eddie.huang@mediatek.com>
-References: <1433140153-22436-1-git-send-email-eddie.huang@mediatek.com>
- <1433140153-22436-3-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <CABuKBeLBzeibaUWT9S-tpa-JqKDW2gWLUAcJjuMWOaw5SSkEig@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 1 Jun 2015 14:29:53 +0200
+Subject: [GIT PULL] DT changes for Ux500 and ARM generic
+Message-ID: <CACRpkdZHxEDqwnp74qk3PdquivmrPaLZ3rSBfXdpuV73RYd24A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-06-01 8:29 GMT+02:00 Eddie Huang <eddie.huang@mediatek.com>:
-> Add MT8173 I2C device nodes, include I2C controllers and pins.
-> MT8173 has six I2C controllers, from i2c0 to i2c6, exclude i2c5.
-> The 6th I2C controller register base doesn't next to 5th I2C,
-> and there is a hardware between 5th and 6th I2C controller. So
-> SoC designer name 6th controller as "i2c6", not "i2c5".
->
-> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-> ---
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 119 +++++++++++++++++++++++++++++++
->  1 file changed, 119 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> index b52ec43..72d9ab1 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> @@ -158,6 +158,53 @@
->                         interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>,
->                                                 <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>,
->                                                 <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
-> +                       i2c0_pins_a: i2c0 at 0 {
-> +                               pins1 {
-> +                                       pinmux = <MT8173_PIN_45_SDA0__FUNC_SDA0>,
-> +                                                <MT8173_PIN_46_SCL0__FUNC_SCL0>;
-> +                                       bias-disable;
-> +                               };
-> +                       };
-> +
-> +                       i2c1_pins_a: i2c1 at 0 {
-> +                               pins1 {
-> +                                       pinmux = <MT8173_PIN_125_SDA1__FUNC_SDA1>,
-> +                                                <MT8173_PIN_126_SCL1__FUNC_SCL1>;
-> +                                       bias-disable;
-> +                               };
-> +                       };
-> +
-> +                       i2c2_pins_a: i2c2 at 0 {
-> +                               pins1 {
-> +                                       pinmux = <MT8173_PIN_43_SDA2__FUNC_SDA2>,
-> +                                                <MT8173_PIN_44_SCL2__FUNC_SCL2>;
-> +                                       bias-disable;
-> +                               };
-> +                       };
-> +
-> +                       i2c3_pins_a: i2c3 at 0 {
-> +                               pins1 {
-> +                                       pinmux = <MT8173_PIN_106_SDA3__FUNC_SDA3>,
-> +                                                <MT8173_PIN_107_SCL3__FUNC_SCL3>;
-> +                                       bias-disable;
-> +                               };
-> +                       };
-> +
-> +                       i2c4_pins_a: i2c4 at 0 {
-> +                               pins1 {
-> +                                       pinmux = <MT8173_PIN_133_SDA4__FUNC_SDA4>,
-> +                                                <MT8173_PIN_134_SCL4__FUNC_SCL4>;
-> +                                       bias-disable;
-> +                               };
-> +                       };
-> +
-> +                       i2c6_pins_a: i2c6 at 0 {
-> +                               pins1 {
-> +                                       pinmux = <MT8173_PIN_100_MSDC2_DAT0__FUNC_SDA5>,
-> +                                                <MT8173_PIN_101_MSDC2_DAT1__FUNC_SCL5>;
-> +                                       bias-disable;
-> +                               };
-> +                       };
->                 };
->
->                 watchdog: watchdog at 10007000 {
-> @@ -194,6 +241,78 @@
->                                 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
->                 };
->
-> +               i2c0: i2c at 11007000 {
-> +                       compatible = "mediatek,mt8173-i2c";
-> +                       reg = <0 0x11007000 0 0x70>,
-> +                             <0 0x11000100 0 0x80>;
-> +                       interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_LOW>;
-> +                       clock-div = <16>;
-> +                       clocks = <&pericfg CLK_PERI_I2C0>,
-> +                                <&pericfg CLK_PERI_AP_DMA>;
-> +                       clock-names = "main", "dma";
-> +                       status = "disabled";
+Hi ARM SoC folks,
 
-Please order nodes by their register address.
+no comments on these DT bindings and additions,
+so could you please pull this to the next/dt branch in ARM SoC?
 
-Thanks,
-Matthias
+Yours,
+Linus Walleij
+
+The following changes since commit 7dfc635894d1de84145fb02b210e6dfa5f50b6cc:
+
+  ARM: dts: Add DT for Hitex LPC4350 Evaluation Board (2015-05-15
+22:28:29 +0200)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+tags/dt-for-armsoc
+
+for you to fetch changes up to 724814b4fada4a353728c3caa8ad2809c64893b6:
+
+  ARM: ux500: define the backupram in the device tree (2015-05-18
+16:00:11 +0200)
+
+----------------------------------------------------------------
+Device Tree changes for Ux500 and ARM SOC:
+- Document Snoop Control Unit (SCU) bindings
+- Document Ux500 board bindings
+- Define the backup RAM in the DBx500 device tree
+
+----------------------------------------------------------------
+Linus Walleij (3):
+      ARM: scu: document Snoop Control Unit DT bindings
+      ARM: ux500: add board documentation
+      ARM: ux500: define the backupram in the device tree
+
+ Documentation/devicetree/bindings/arm/scu.txt      | 25 +++++++
+ .../devicetree/bindings/arm/ux500/boards.txt       | 83 ++++++++++++++++++++++
+ arch/arm/boot/dts/ste-dbx5x0.dtsi                  |  9 +++
+ 3 files changed, 117 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/scu.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/ux500/boards.txt
