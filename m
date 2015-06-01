@@ -1,35 +1,44 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 01 Jun 2015 11:28:23 +0200
-Subject: [PATCH v4 1/2] phy-sun4i-usb: Add full support for usb0 phy / OTG
-In-Reply-To: <20150601092249.GF17267@lukather>
-References: <1433088626-8858-1-git-send-email-hdegoede@redhat.com>
- <1433088626-8858-2-git-send-email-hdegoede@redhat.com>
- <20150601092249.GF17267@lukather>
-Message-ID: <556C25B7.80708@redhat.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 1 Jun 2015 10:38:09 +0100
+Subject: [PATCH 05/98] exynos_drm.h: use __u64 from linux/types.h
+In-Reply-To: <556C2105.2090607@amd.com>
+References: <1433000370-19509-1-git-send-email-mikko.rapeli@iki.fi>
+ <1433000370-19509-6-git-send-email-mikko.rapeli@iki.fi>
+ <20150530164655.GM2067@n2100.arm.linux.org.uk>
+ <556C15BA.7000909@amd.com>
+ <20150601085605.GN2067@n2100.arm.linux.org.uk>
+ <556C2105.2090607@amd.com>
+Message-ID: <20150601093808.GP2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jun 01, 2015 at 11:08:21AM +0200, Christian K?nig wrote:
+> Yeah, completely agree with Linus on the visibility problem and that's
+> exactly the reason why we don't include <stdint.h> in the kernel header and
+> expect userspace to define the ISO types somewhere.
+> 
+> But using the types from "include/linux/types.h" and especially including it
+> into the uapi headers doesn't make the situation better, but rather worse.
+> 
+> With this step we not only make the headers depend on another header that
+> isn't part of the uapi, but also pollute the user space namespace with __sXX
+> and __uXX types which aren't defined anywhere else.
 
-On 01-06-15 11:22, Maxime Ripard wrote:
-> On Sun, May 31, 2015 at 06:10:25PM +0200, Hans de Goede wrote:
->> +	/* We either want both gpio pins or neither (when in host mode) */
->> +	if (!data->id_det_gpio != !data->vbus_det_gpio) {
->> +		dev_err(dev, "failed to get id or vbus detect pin\n");
->> +		return -ENODEV;
->> +	}
->
-> The fact that the driver expects both to be set if one is should be in
-> the binding documentation.
+1) Header files are permitted to pollute userspace with __-defined stuff.
 
-That would be behavior description, and I've always been told that the
-binding should only document the hardware description, not the behavior.
+2) __[su]XX types are defined as part of the kernel's uapi.
+   include/uapi/linux/types.h includes asm/types.h, which in userspace
+   picks up include/uapi/asm-generic/types.h.  That picks up
+   asm-generic/int-ll64.h, which defines these types.
 
-Also this may change in the future as we add support for more boards,
-e.g. the cubieboard seems to be unable to turn vbus off ever, so vbus-det
-will always read as 1 / high, making it rather useless. This is something
-which I still need to figure out how to deal with.
+Moreover, this is done throughout the kernel headers _already_ (as you
+would expect for a policy set 10+ years ago).
 
-Regards,
+Please, I'm not interested in this discussion, so please don't argue
+with me - I may agree with your position, but what you think and what
+I think are really not relevant here.  If you have a problem, take it
+up with Linus - I made that clear in my email.
 
-Hans
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
