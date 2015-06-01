@@ -1,164 +1,54 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Mon, 01 Jun 2015 08:48:22 -0700
-Subject: [PATCH v2] arm/arm64: KVM: Properly account for guest CPU time
-In-Reply-To: <20150531065923.GB763@cbox>
-References: <1432838950-28774-1-git-send-email-christoffer.dall@linaro.org>
- <5568E987.5010702@samsung.com> <20150531065923.GB763@cbox>
-Message-ID: <556C7EC6.3010105@samsung.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Mon, 1 Jun 2015 17:49:10 +0200
+Subject: [PATCH v2 0/5] i2c: at91: add support to FIFOs and alternative command
+Message-ID: <cover.1433173031.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/30/2015 11:59 PM, Christoffer Dall wrote:
-> Hi Mario,
-> 
-> On Fri, May 29, 2015 at 03:34:47PM -0700, Mario Smarduch wrote:
->> On 05/28/2015 11:49 AM, Christoffer Dall wrote:
->>> Until now we have been calling kvm_guest_exit after re-enabling
->>> interrupts when we come back from the guest, but this has the
->>> unfortunate effect that CPU time accounting done in the context of timer
->>> interrupts occurring while the guest is running doesn't properly notice
->>> that the time since the last tick was spent in the guest.
->>>
->>> Inspired by the comment in the x86 code, move the kvm_guest_exit() call
->>> below the local_irq_enable() call and change __kvm_guest_exit() to
->>> kvm_guest_exit(), because we are now calling this function with
->>> interrupts enabled.  We have to now explicitly disable preemption and
->>> not enable preemption before we've called kvm_guest_exit(), since
->>> otherwise we could be preempted and everything happening before we
->>> eventually get scheduled again would be accounted for as guest time.
->>>
->>> At the same time, move the trace_kvm_exit() call outside of the atomic
->>> section, since there is no reason for us to do that with interrupts
->>> disabled.
->>>
->>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->>> ---
->>> This patch is based on kvm/queue, because it has the kvm_guest_enter/exit
->>> rework recently posted by Christian Borntraeger.  I hope I got the logic
->>> of this right, there were 2 slightly worrying facts about this:
->>>
->>> First, we now enable and disable and enable interrupts on each exit
->>> path, but I couldn't see any performance overhead on hackbench - yes the
->>> only benchmark we care about.
->>>
->>> Second, looking at the ppc and mips code, they seem to also call
->>> kvm_guest_exit() before enabling interrupts, so I don't understand how
->>> guest CPU time accounting works on those architectures.
->>>
->>> Changes since v1:
->>>  - Tweak comment and commit text based on Marc's feedback.
->>>  - Explicitly disable preemption and enable it only after kvm_guest_exit().
->>>
->>>  arch/arm/kvm/arm.c | 21 +++++++++++++++++----
->>>  1 file changed, 17 insertions(+), 4 deletions(-)
->>>
->>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->>> index e41cb11..fe8028d 100644
->>> --- a/arch/arm/kvm/arm.c
->>> +++ b/arch/arm/kvm/arm.c
->>> @@ -532,6 +532,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>>  		kvm_vgic_flush_hwstate(vcpu);
->>>  		kvm_timer_flush_hwstate(vcpu);
->>>  
->>> +		preempt_disable();
->>>  		local_irq_disable();
->>>  
->>>  		/*
->>> @@ -544,6 +545,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>>  
->>>  		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm)) {
->>>  			local_irq_enable();
->>> +			preempt_enable();
->>>  			kvm_timer_sync_hwstate(vcpu);
->>>  			kvm_vgic_sync_hwstate(vcpu);
->>>  			continue;
->>> @@ -559,8 +561,10 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>>  		ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
->>>  
->>>  		vcpu->mode = OUTSIDE_GUEST_MODE;
->>> -		__kvm_guest_exit();
->>> -		trace_kvm_exit(kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
->>> +		/*
->>> +		 * Back from guest
->>> +		 *************************************************************/
->>> +
->>>  		/*
->>>  		 * We may have taken a host interrupt in HYP mode (ie
->>>  		 * while executing the guest). This interrupt is still
->>> @@ -574,8 +578,17 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>>  		local_irq_enable();
->>>  
->>>  		/*
->>> -		 * Back from guest
->>> -		 *************************************************************/
->>> +		 * We do local_irq_enable() before calling kvm_guest_exit() so
->>> +		 * that if a timer interrupt hits while running the guest we
->>> +		 * account that tick as being spent in the guest.  We enable
->>> +		 * preemption after calling kvm_guest_exit() so that if we get
->>> +		 * preempted we make sure ticks after that is not counted as
->>> +		 * guest time.
->>> +		 */
->>> +		kvm_guest_exit();
->>> +		trace_kvm_exit(kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
->>> +		preempt_enable();
->>> +
->>>  
->>>  		kvm_timer_sync_hwstate(vcpu);
->>>  		kvm_vgic_sync_hwstate(vcpu);
->>>
->>
->> Hi Christoffer,
->>  so currently we take a snap shot when we enter the guest
->> (tsk->vtime_snap) and upon exit add the time we spent in
->> the guest and update accrued time, which appears correct.
-> 
-> not on arm64, because we don't select HAVE_VIRT_CPU_ACCOUNTING_GEN.  Or
-> am I missing something obvious here?
-I see what you mean we can't use cycle based accounting to accrue
-Guest time.
+ChangeLog
 
-> 
->>
->> With this patch it appears that interrupts running
->> in host mode are accrued to Guest time, and additional preemption
->> latency is added.
->>
-> It is true that interrupt processing in host mode (if they hit on a CPU
-> when it is running a guest) are accrued to guest time, but without this
-> patch on current arm64 we accrue no CPU time to guest time at all, which
-> is hardly more correct.
-Yes if only ticks are supported then it's definitely better!
+v2:
+- fix typo in comment for AT91_TWI_SVEN.
+- document new device tree bindings like "atmel,fifo-size".
+- explicitly set the has_alt_cmd boolean to false to already existing chip
+configs.
+- use the BIT() macro to define the register bits and do a little cleanup in a
+dedicated patch.
+- reword some comments to better explain why the TXCOMP interrupt is no longer
+enabled in at91_do_twi_transfer() but later in
+at91_twi_write_data_dma_callback() to avoid a race condition when DMA is used.
+- remove useless TXCOMP interrupt enable line in at91_twi_write_next_byte()
+since this interrupt is also enabled by at91_do_twi_transfer() for PIO
+transfers.
 
-Nevertheless with high interrupt rate it will complicate root causing
-issues, a lot of that time will go to guest.
+v1:
+This series of patches adds support of two new features which will be
+introduced with Atmel sama5d2x SoC.
 
-> 
-> If this patch is incorrect, then how does it work on x86, where
-> handle_external_intr() is called (with a barrier in between) before
-> kvm_guest_exit(), and where handle_external_intr() is simply
-> local_irq_enable() on SVM and something more complicated on VMX ?
-> 
-> Finally, how exactly is preemption latency added here?   Won't IRQ
-> processing run with higher priority than any task on your system, so the
-> order of (1) process pending IRQs (2) call schedule if needed is still
-> preserved here, but we call kvm_guest_exit() between (1) and (2) instead
-> of before (1).
+First, the alternative command mode eases the sending of STOP conditions.
+Before starting an I2C transaction, the size data to be transfered is
+written into the new Alternative Command Register. For each byte transferred,
+the I2C controller decreases this counter and automatically sends a STOP
+condition when the counter value reaches 0, that is to say when the last byte
+of the transaction has been sent/received. So there is no longer need to set
+the STOP bit into the Control Register.
 
-I may be missing something, but on return from interrupt with preempt
-disabled we can't take the need resched path. And need to return
-to KVM no?
-> 
-> It is entirely possible that I'm missing the mark here and everything
-> gets solved by enabling HAVE_VIRT_CPU_ACCOUNTING_GEN or we need some
-> extra logic?
+Then the use of FIFOs allows to reduce number I/O accesses: for instance,
+the TX FIFO allows to write up to 4 data in a single access to the Transmit
+Holding Register. Also the RX FIFO allows to read up to 4 data in a single
+access to the Receive Holding Register. Currently only DMA transfers take
+advantage of FIFOs.
 
-I think something to look into for us, taking a low issue to high level
-application - for state machine based type of applications (I guess like
-NFV) it cause problems  to root cause issues, a lot of activities
-run between ticks. For VM cycle based accounting is probably a must
-in that case.
+Cyrille Pitchen (5):
+  i2c: at91: use BIT() macro to define register bits
+  i2c: at91: update documentation for DT bindings
+  i2c: at91: add support for new alternative command mode
+  i2c: at91: print hardware version
+  i2c: at91: add support to FIFOs
 
-> 
-> Thanks,
-> -Christoffer
-> 
+ Documentation/devicetree/bindings/i2c/i2c-at91.txt |  29 +-
+ drivers/i2c/busses/i2c-at91.c                      | 350 +++++++++++++++++----
+ 2 files changed, 318 insertions(+), 61 deletions(-)
+
+-- 
+1.8.2.2
