@@ -1,48 +1,194 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 1 Jun 2015 10:26:55 +0200
-Subject: [RFC PATCH] ARM: add fixmap based earlycon support
-In-Reply-To: <CAKv+Gu-8ixKQtkpf=umHB76OZxo-dfGkOiQqDO7=evMebyDdUA@mail.gmail.com>
-References: <1430315508-7582-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150501161812.GN12732@n2100.arm.linux.org.uk>
- <CAKv+Gu-8ixKQtkpf=umHB76OZxo-dfGkOiQqDO7=evMebyDdUA@mail.gmail.com>
-Message-ID: <CAKv+Gu80bSqXbK5g9g9wBbG33mgqbrxJA68kNgAuK=LOoGDh5w@mail.gmail.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Mon, 1 Jun 2015 10:32:16 +0200
+Subject: [PATCH 2/2] dmaengine: hdmac: Implement interleaved transfers
+In-Reply-To: <1432735313-481-3-git-send-email-maxime.ripard@free-electrons.com>
+References: <1432735313-481-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1432735313-481-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20150601083216.GH25118@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(thread is here: http://thread.gmane.org/gmane.linux.ports.arm.kernel/409329)
+On Wed, May 27, 2015 at 04:01:53PM +0200, Maxime Ripard wrote:
+> The AT91 HDMAC controller supports interleaved transfers through what's
+> called the Picture-in-Picture mode, which allows to transfer a squared
+> portion of a framebuffer.
+> 
+> This means that this interleaved transfer only supports interleaved
+> transfers which have a transfer size and ICGs that are fixed across all the
+> chunks.
+> 
+> While this is a quite drastic restriction of the interleaved transfers
+> compared to what the dmaengine API allows, this is still useful, and our
+> driver will only reject transfers that do not conform to this.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+One comment below, otherwise
 
-On 2 May 2015 at 10:37, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 1 May 2015 at 18:18, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
->> On Wed, Apr 29, 2015 at 03:51:48PM +0200, Ard Biesheuvel wrote:
->>> This adds support for fixmap based earlycon by moving the fixmap
->>> initialization to an earlier stage and introducing the Kconfig symbol
->>> that wires up the existing code.
->>
->> I don't see the patches for this fixmap based earlycon.  What's the
->> status of those, and how are they getting into mainline?
->>
->
-> They are already /in/ mainline. This single patch is all that is
-> required to wire it up for ARM.
->
-> However, I did notice after sending this that another implementation
-> had been proposed already:
-> http://lkml.iu.edu/hypermail/linux/kernel/1412.3/00855.html
->
-> I am not sure which one is more correct, but the general idea is the
-> same, i.e., to allocate the fixmap PTEs from bss rather than the heap.
+Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Anyone else care to comment on this?
+> ---
+>  drivers/dma/at_hdmac.c      | 106 ++++++++++++++++++++++++++++++++++++++++++++
+>  drivers/dma/at_hdmac_regs.h |   5 +++
+>  2 files changed, 111 insertions(+)
+> 
+> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+> index 57b2141ddddc..59892126d175 100644
+> --- a/drivers/dma/at_hdmac.c
+> +++ b/drivers/dma/at_hdmac.c
+> @@ -247,6 +247,10 @@ static void atc_dostart(struct at_dma_chan *atchan, struct at_desc *first)
+>  	channel_writel(atchan, CTRLA, 0);
+>  	channel_writel(atchan, CTRLB, 0);
+>  	channel_writel(atchan, DSCR, first->txd.phys);
+> +	channel_writel(atchan, SPIP, ATC_SPIP_HOLE(first->src_hole) |
+> +		       ATC_SPIP_BOUNDARY(first->boundary));
+> +	channel_writel(atchan, DPIP, ATC_DPIP_HOLE(first->dst_hole) |
+> +		       ATC_DPIP_BOUNDARY(first->boundary));
 
-DT based earlycon is a *really* useful thing to have if you are
-working on early kernel code.
-With many of the DTs now having been extended with a
-/chosen/stdout-path property, it really only takes a simple 'earlycon'
-command line parameter (without any arguments) to get console output
-as soon as the early DT scan is concluded. I suppose this is also a
-useful thing for multi platform kernels?
+Can't we get a trivial condition to perform these two writes only if
+needed?
 
-BTW the patch still applies to v4.1-rc6
-
-Regards,
-Ard.
+>  	dma_writel(atdma, CHER, atchan->mask);
+>  
+>  	vdbg_dump_regs(atchan);
+> @@ -635,6 +639,104 @@ static dma_cookie_t atc_tx_submit(struct dma_async_tx_descriptor *tx)
+>  }
+>  
+>  /**
+> + * atc_prep_dma_interleaved - prepare memory to memory interleaved operation
+> + * @chan: the channel to prepare operation on
+> + * @xt: Interleaved transfer template
+> + * @flags: tx descriptor status flags
+> + */
+> +static struct dma_async_tx_descriptor *
+> +atc_prep_dma_interleaved(struct dma_chan *chan,
+> +			 struct dma_interleaved_template *xt,
+> +			 unsigned long flags)
+> +{
+> +	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
+> +	struct data_chunk	*first = xt->sgl;
+> +	struct at_desc		*desc = NULL;
+> +	size_t			xfer_count;
+> +	unsigned int		dwidth;
+> +	u32			ctrla;
+> +	u32			ctrlb;
+> +	size_t			len = 0;
+> +	int			i;
+> +
+> +	dev_info(chan2dev(chan),
+> +		 "%s: src=0x%08x, dest=0x%08x, numf=%d, frame_size=%d, flags=0x%lx\n",
+> +		__func__, xt->src_start, xt->dst_start, xt->numf,
+> +		xt->frame_size, flags);
+> +
+> +	if (unlikely(!xt || xt->numf != 1 || !xt->frame_size))
+> +		return NULL;
+> +
+> +	/*
+> +	 * The controller can only "skip" X bytes every Y bytes, so we
+> +	 * need to make sure we are given a template that fit that
+> +	 * description, ie a template with chunks that always have the
+> +	 * same size, with the same ICGs.
+> +	 */
+> +	for (i = 0; i < xt->frame_size; i++) {
+> +		struct data_chunk *chunk = xt->sgl + i;
+> +
+> +		if ((chunk->size != xt->sgl->size) ||
+> +		    (dmaengine_get_dst_icg(xt, chunk) != dmaengine_get_dst_icg(xt, first)) ||
+> +		    (dmaengine_get_src_icg(xt, chunk) != dmaengine_get_src_icg(xt, first))) {
+> +			dev_err(chan2dev(chan),
+> +				"%s: the controller can transfer only identical chunks\n",
+> +				__func__);
+> +			return NULL;
+> +		}
+> +
+> +		len += chunk->size;
+> +	}
+> +
+> +	dwidth = atc_get_xfer_width(xt->src_start,
+> +				    xt->dst_start, len);
+> +
+> +	xfer_count = len >> dwidth;
+> +	if (xfer_count > ATC_BTSIZE_MAX) {
+> +		dev_err(chan2dev(chan), "%s: buffer is too big\n", __func__);
+> +		return NULL;
+> +	}
+> +
+> +	ctrla = ATC_SRC_WIDTH(dwidth) |
+> +		ATC_DST_WIDTH(dwidth);
+> +
+> +	ctrlb =   ATC_DEFAULT_CTRLB | ATC_IEN
+> +		| ATC_SRC_ADDR_MODE_INCR
+> +		| ATC_DST_ADDR_MODE_INCR
+> +		| ATC_SRC_PIP
+> +		| ATC_DST_PIP
+> +		| ATC_FC_MEM2MEM;
+> +
+> +	/* create the transfer */
+> +	desc = atc_desc_get(atchan);
+> +	if (!desc) {
+> +		dev_err(chan2dev(chan),
+> +			"%s: couldn't allocate our descriptor\n", __func__);
+> +		return NULL;
+> +	}
+> +
+> +	desc->lli.saddr = xt->src_start;
+> +	desc->lli.daddr = xt->dst_start;
+> +	desc->lli.ctrla = ctrla | xfer_count;
+> +	desc->lli.ctrlb = ctrlb;
+> +
+> +	desc->boundary = first->size >> dwidth;
+> +	desc->dst_hole = (dmaengine_get_dst_icg(xt, first) >> dwidth) + 1;
+> +	desc->src_hole = (dmaengine_get_src_icg(xt, first) >> dwidth) + 1;
+> +
+> +	desc->txd.cookie = -EBUSY;
+> +	desc->total_len = desc->len = len;
+> +	desc->tx_width = dwidth;
+> +
+> +	/* set end-of-link to the last link descriptor of list*/
+> +	set_desc_eol(desc);
+> +
+> +	desc->txd.flags = flags; /* client is in control of this ack */
+> +
+> +	return &desc->txd;
+> +}
+> +
+> +/**
+>   * atc_prep_dma_memcpy - prepare a memcpy operation
+>   * @chan: the channel to prepare operation on
+>   * @dest: operation virtual destination address
+> @@ -1609,6 +1711,7 @@ static int __init at_dma_probe(struct platform_device *pdev)
+>  	/* setup platform data for each SoC */
+>  	dma_cap_set(DMA_MEMCPY, at91sam9rl_config.cap_mask);
+>  	dma_cap_set(DMA_SG, at91sam9rl_config.cap_mask);
+> +	dma_cap_set(DMA_INTERLEAVE, at91sam9g45_config.cap_mask);
+>  	dma_cap_set(DMA_MEMCPY, at91sam9g45_config.cap_mask);
+>  	dma_cap_set(DMA_SLAVE, at91sam9g45_config.cap_mask);
+>  	dma_cap_set(DMA_SG, at91sam9g45_config.cap_mask);
+> @@ -1713,6 +1816,9 @@ static int __init at_dma_probe(struct platform_device *pdev)
+>  	atdma->dma_common.dev = &pdev->dev;
+>  
+>  	/* set prep routines based on capability */
+> +	if (dma_has_cap(DMA_INTERLEAVE, atdma->dma_common.cap_mask))
+> +		atdma->dma_common.device_prep_interleaved_dma = atc_prep_dma_interleaved;
+> +
+>  	if (dma_has_cap(DMA_MEMCPY, atdma->dma_common.cap_mask))
+>  		atdma->dma_common.device_prep_dma_memcpy = atc_prep_dma_memcpy;
+>  
+> diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
+> index 2727ca560572..bc8d5ebedd19 100644
+> --- a/drivers/dma/at_hdmac_regs.h
+> +++ b/drivers/dma/at_hdmac_regs.h
+> @@ -196,6 +196,11 @@ struct at_desc {
+>  	size_t				len;
+>  	u32				tx_width;
+>  	size_t				total_len;
+> +
+> +	/* Interleaved data */
+> +	size_t				boundary;
+> +	size_t				dst_hole;
+> +	size_t				src_hole;
+>  };
+>  
+>  static inline struct at_desc *
+> -- 
+> 2.4.1
+> 
