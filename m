@@ -1,20 +1,19 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 01 Jun 2015 17:04:19 +0200
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.1 #3
-In-Reply-To: <5568DF7A.9090600@free-electrons.com>
-References: <5568DF7A.9090600@free-electrons.com>
-Message-ID: <2169801.07m6BsynfT@wuerfel>
+Date: Mon, 01 Jun 2015 17:06:21 +0200
+Subject: [GIT PULL] ARM: EXYNOS: Fix for 4.1, 4th
+In-Reply-To: <1433120217-26814-1-git-send-email-k.kozlowski@samsung.com>
+References: <1433120217-26814-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1716391.lQMtOGPqf7@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 May 2015 23:51:54 Gregory CLEMENT wrote:
-> mvebu fixes for 4.1 (part 3)
+On Monday 01 June 2015 09:56:57 Krzysztof Kozlowski wrote:
+> Fix for Exynos3250 RTC wake-up interrupts after converting PMU
+> wakeup to stacked domains. This allows waking up the device from
+> suspend to RAM using S3C RTC driver (the RTC on SoC).
 > 
-> Disable unused internal RTC for Mamba from linksys (Armada XP)
-> And 2 commits fixing regressions on mvebu-mbus:
-> - the first one for Kirkwood or Orion SoC
-> - the second one for DMA when the platform have more than 4GB (only
->   possible on Armada XP as far as I know)
+> The patch should be applied some time ago, unfortunately
+> it seems it slipped through fingers.
 > 
 
 Pulled into fixes, thanks!
