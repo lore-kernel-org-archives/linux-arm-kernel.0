@@ -1,72 +1,65 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 01 Jun 2015 08:46:59 +0100
-Subject: [PATCH v2 2/4] dt-bindings: Document the STM32F4 clock bindings
-In-Reply-To: <55698104.2070205@gmail.com>
-References: <1432327273-6810-1-git-send-email-daniel.thompson@linaro.org>
- <1432972448-10332-1-git-send-email-daniel.thompson@linaro.org>
- <1432972448-10332-3-git-send-email-daniel.thompson@linaro.org>
- <55698104.2070205@gmail.com>
-Message-ID: <556C0DF3.7050603@linaro.org>
+From: borntraeger@de.ibm.com (Christian Borntraeger)
+Date: Mon, 01 Jun 2015 09:47:46 +0200
+Subject: [PATCH v2] arm/arm64: KVM: Properly account for guest CPU time
+In-Reply-To: <1432838950-28774-1-git-send-email-christoffer.dall@linaro.org>
+References: <1432838950-28774-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <556C0E22.9090401@de.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/05/15 10:21, Maxime Coquelin wrote:
-> HI Daniel,
->
-> On 05/30/2015 09:54 AM, Daniel Thompson wrote:
->> This adds documentation of device tree bindings for the clock related
->> portions of the STM32 RCC block.
->>
->> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
->> ---
->>   .../devicetree/bindings/clock/st,stm32-rcc.txt     | 65
->> ++++++++++++++++++++++
->>   1 file changed, 65 insertions(+)
->> <snip>
->> +Example:
->> +
->> +    /* Gated clock, AHB1 bit 0 (GPIOA) */
->> +    ... {
->> +        clocks = <&rcc 0 0>
->> +    };
->> +
->> +    /* Gated clock, AHB2 bit 4 (GPIOA) */
-> s/GPIOA/CRYP/
+Am 28.05.2015 um 20:49 schrieb Christoffer Dall:
+> Until now we have been calling kvm_guest_exit after re-enabling
+> interrupts when we come back from the guest, but this has the
+> unfortunate effect that CPU time accounting done in the context of timer
+> interrupts occurring while the guest is running doesn't properly notice
+> that the time since the last tick was spent in the guest.
 
-Oops! Will fix.
+Can you verify that a CPU bound guest has almost zero guest time?
+Assuming that your answer is "yes" your patch make sense as host
+timer interrupts should be the only reasons for guest exits then.
 
 
->> +    ... {
->> +        clocks = <&rcc 0 36>
->> +    };
->> +
->> +Specifying other clocks
->> +=======================
->> +
->> +The primary index must be set to 1.
->> +
->> +The secondary index is bound with the following magic numbers:
->> +
->> +    0    SYSTICK
->> +    1    FCLK
-> How do you plan to handle the SAI & I2S clocks?
-> By adding index 3?
+> Inspired by the comment in the x86 code, move the kvm_guest_exit() call
+> below the local_irq_enable() call and change __kvm_guest_exit() to
+> kvm_guest_exit(), because we are now calling this function with
+> interrupts enabled.  We have to now explicitly disable preemption and
+> not enable preemption before we've called kvm_guest_exit(), since
+> otherwise we could be preempted and everything happening before we
+> eventually get scheduled again would be accounted for as guest time.
+> 
+> At the same time, move the trace_kvm_exit() call outside of the atomic
+> section, since there is no reason for us to do that with interrupts
+> disabled.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+> This patch is based on kvm/queue, because it has the kvm_guest_enter/exit
+> rework recently posted by Christian Borntraeger.  I hope I got the logic
+> of this right, there were 2 slightly worrying facts about this:
+> 
+> First, we now enable and disable and enable interrupts on each exit
+> path, but I couldn't see any performance overhead on hackbench - yes the
+> only benchmark we care about.
 
-Pretty much. Tentatively I'm thinking of:
+This should be somewhat similar to the situation before my patch.
+There it was
 
-	2	I2S clocks
-	3	SAI1_A clock
-	4	SAI1_B clock
-	5	LCD-TFT clock
+1: "disable", "guest", "disable again and save", "restore to disable", "enable"
+and now it is
+2: "disable", "guest", "enable"
+and with your patch it is
+3: "disable", "guest", "enable", "disable, "enable"
 
-Note: Sort order is based on the vertical ordering in the clock tree 
-diagram in the data sheet.
-
-Only reason not to include these in the bindings immediately is that I 
-wanted to check how/if these clocks are gated. The clock tree diagram 
-shows them having individual clock gates so before proposing them using 
-magic numbers I wanted to double check if these values can be identified 
-at gates clocks.
+I assume that 3 and 1 are similar in its costs, so this is probably ok.
 
 
-Daniel.
+> 
+> Second, looking at the ppc and mips code, they seem to also call
+> kvm_guest_exit() before enabling interrupts, so I don't understand how
+> guest CPU time accounting works on those architectures.
+
+Not an expert here, but I assume mips has the same logic as arm so if your
+patch is right for arm its probably also for mips.
+
+powerpc looks similar to what s390 does (not using the tick, instead it uses
+a hw-timer) so this should be fine.
