@@ -1,107 +1,55 @@
-From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
-Date: Mon, 1 Jun 2015 10:51:07 +0530
-Subject: [PATCH V2 3/3] tty: serial: fsl_lpuart: Add support for RS-485
-In-Reply-To: <1433136067-20644-1-git-send-email-bhuvanchandra.dv@toradex.com>
-References: <1433136067-20644-1-git-send-email-bhuvanchandra.dv@toradex.com>
-Message-ID: <1433136067-20644-4-git-send-email-bhuvanchandra.dv@toradex.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 1 Jun 2015 05:37:27 +0000 (UTC)
+Subject: Tegra baseline test results for v4.1-rc6
+Message-ID: <alpine.DEB.2.02.1506010535210.14902@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable Vybrid's build-in support for RS-485 auto RTS for
-controlling line direction of RS-485 transceiver driver.
 
-Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
----
- drivers/tty/serial/fsl_lpuart.c | 56 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
+Here are some basic Tegra test results for Linux v4.1-rc6.
+Logs and other details at:
 
-diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
-index 532cfb7..7b4e04a 100644
---- a/drivers/tty/serial/fsl_lpuart.c
-+++ b/drivers/tty/serial/fsl_lpuart.c
-@@ -820,6 +820,49 @@ static unsigned int lpuart32_tx_empty(struct uart_port *port)
- 		TIOCSER_TEMT : 0;
- }
- 
-+static int lpuart_config_rs485(struct uart_port *port,
-+			struct serial_rs485 *rs485)
-+{
-+	struct lpuart_port *sport = container_of(port,
-+			struct lpuart_port, port);
-+	u8 modem = readb(sport->port.membase + UARTMODEM) &
-+		~(UARTMODEM_TXRTSPOL | UARTMODEM_TXRTSE);
-+
-+	writeb(modem, sport->port.membase + UARTMODEM);
-+
-+	if (rs485->flags & SER_RS485_ENABLED) {
-+		/* Enable auto RS-485 RTS mode */
-+		modem |= UARTMODEM_TXRTSE;
-+
-+		/*
-+		 * RTS needs to be logic HIGH either during transer _or_ after
-+		 * transfer, other variants are not supported by the hardware.
-+		 */
-+		if (!(rs485->flags & (SER_RS485_RTS_ON_SEND |
-+					SER_RS485_RTS_AFTER_SEND)))
-+			rs485->flags |= SER_RS485_RTS_ON_SEND;
-+
-+		if (rs485->flags & SER_RS485_RTS_ON_SEND && rs485->flags &
-+					SER_RS485_RTS_AFTER_SEND)
-+			rs485->flags &= ~SER_RS485_RTS_AFTER_SEND;
-+
-+		/*
-+		 * The hardware defaults to RTS logic HIGH while transfer.
-+		 * Switch polarity in case RTS shall be logic HIGH
-+		 * after transfer.
-+		 * Note: UART is assumed to be active high.
-+		 */
-+		if (rs485->flags & SER_RS485_RTS_AFTER_SEND)
-+			modem |= UARTMODEM_TXRTSPOL;
-+	}
-+
-+	/* Store the new configuration */
-+	sport->port.rs485 = *rs485;
-+
-+	writeb(modem, sport->port.membase + UARTMODEM);
-+	return 0;
-+}
-+
- static unsigned int lpuart_get_mctrl(struct uart_port *port)
- {
- 	return TIOCM_CAR | TIOCM_CTS | TIOCM_DSR;
-@@ -1191,6 +1234,12 @@ lpuart_set_termios(struct uart_port *port, struct ktermios *termios,
- 		cr1 |= UARTCR1_M;
- 	}
- 
-+	/* When auto RS-485 RTS mode is enabled,
-+	 * hardware flow control need to be disabled.
-+	 */
-+	if (sport->port.rs485.flags & SER_RS485_ENABLED)
-+		termios->c_cflag &= ~CRTSCTS;
-+
- 	if (termios->c_cflag & CRTSCTS) {
- 		modem |= (UARTMODEM_RXRTSE | UARTMODEM_TXCTSE);
- 	} else {
-@@ -1749,6 +1798,8 @@ static int lpuart_probe(struct platform_device *pdev)
- 		sport->port.ops = &lpuart_pops;
- 	sport->port.flags = UPF_BOOT_AUTOCONF;
- 
-+	sport->port.rs485_config = lpuart_config_rs485;
-+
- 	sport->clk = devm_clk_get(&pdev->dev, "ipg");
- 	if (IS_ERR(sport->clk)) {
- 		ret = PTR_ERR(sport->clk);
-@@ -1789,6 +1840,11 @@ static int lpuart_probe(struct platform_device *pdev)
- 		dev_info(sport->port.dev, "DMA rx channel request failed, "
- 				"operating without rx DMA\n");
- 
-+	if (of_property_read_bool(np, "linux,rs485-enabled-at-boot-time")) {
-+		sport->port.rs485.flags |= SER_RS485_ENABLED;
-+		sport->port.rs485.flags |= SER_RS485_RTS_ON_SEND;
-+		writeb(UARTMODEM_TXRTSE, sport->port.membase + UARTMODEM);
-+
- 	return 0;
- }
- 
--- 
-2.1.0
+    http://nvt.pwsan.com/pub/linux/testlogs/test_v4.1-rc6/20150531193102/
+
+
+Test summary
+------------
+
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 1/ 1): qemu-vexpress64
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.1-rc5 (ba155e2d21f6bf05de86a78dbe5bfd8757604a65)):
+   text     data      bss    total  kernel
+     +3        0        0       +3  defconfig
+ +26699     +264        0   +26963  multi_v7_defconfig
+   +643        0        0     +643  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.1-rc5 (ba155e2d21f6bf05de86a78dbe5bfd8757604a65))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+     -32k      32k        .       4k tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+     -32k      32k        .       4k  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+     -32k      32k        .       4k    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+     -32k      32k        .       4k       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
