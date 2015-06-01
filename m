@@ -1,41 +1,67 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 1 Jun 2015 12:30:24 +0200
-Subject: [GIT PULL] ARM: mediatek: arm64 updates for v4.2
-Message-ID: <CABuKBeL1mq_Q3fxQtWeSGV-vHWqiVr1wTVKzj_KA1c27oKxMcQ@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 1 Jun 2015 12:41:01 +0200
+Subject: [PATCH] ARM: v7 setup function should invalidate L1 cache
+In-Reply-To: <CAMuHMdX=T3CsLTT95H_07Si6Kd8SRraBfxADpn+VtAF4GmZ=mw@mail.gmail.com>
+References: <E1Yuk8W-0001tC-IK@rmk-PC.arm.linux.org.uk>
+ <CAMuHMdX=T3CsLTT95H_07Si6Kd8SRraBfxADpn+VtAF4GmZ=mw@mail.gmail.com>
+Message-ID: <CAMuHMdUQkm_9PhSdGS8j85Uodm-o0jiki=Xh4h59PBShB=rCXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+On Fri, May 22, 2015 at 9:36 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> On Tue, May 19, 2015 at 6:12 PM, Russell King
+> <rmk+kernel@arm.linux.org.uk> wrote:
+>> All ARMv5 and older CPUs invalidate their caches in the early assembly
+>> setup function, prior to enabling the MMU.  This is because the L1
+>> cache should not contain any data relevant to the execution of the
+>> kernel at this point; all data should have been flushed out to memory.
+>>
+>> This requirement should also be true for ARMv6 and ARMv7 CPUs - indeed,
+>> these typically do not search their caches when caching is disabled (as
+>> it needs to be when the MMU is disabled) so this change should be safe.
+>>
+>> ARMv7 allows there to be CPUs which search their caches while caching is
+>> disabled, and it's permitted that the cache is uninitialised at boot;
+>> for these, the architecture reference manual requires that an
+>> implementation specific code sequence is used immediately after reset
+>> to ensure that the cache is placed into a sane state.  Such
+>> functionality is definitely outside the remit of the Linux kernel, and
+>> must be done by the SoC's firmware before _any_ CPU gets to the Linux
+>> kernel.
+>>
+>> Changing the data cache clean+invalidate to a mere invalidate allows us
+>> to get rid of a lot of platform specific hacks around this issue for
+>> their secondary CPU bringup paths - some of which were buggy.
+>>
+>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>
+> For various shmobile:
+>   - sh73a0/kzm9g
+>   - r8a7740/armadillo
+>   - r8a73a4/ape6evm
+>   - r8a7791/koelsch
+>
+> Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please pull the following updates for v4.2.
+FWIW, I have the feeling this has a slight influence on boot reliability on
+two of my boards:
+  - r8a7740/armadillo, which is known to suffer from a cache-related bug in
+    its bootloader, seems to have a higher change of booting successfully on
+    cold boot,
+  - sh73a0/kzm9g, which has known cache-issues with secondary CPU boot up,
+    seems to have a lower chance of booting successfully.
 
-Thanks,
-Matthias
+No time to spend all week turning this into a statistical significant test
+project... The reset button is my friend...
 
----
+Gr{oetje,eeting}s,
 
-The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+                        Geert
 
-  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-are available in the git repository at:
-
-  https://github.com/mbgg/linux-mediatek.git tags/v4.1-next-arm64
-
-for you to fetch changes up to e881ad1bc6e46fc933fef77cfe587625e30478e9:
-
-  arm64: dts: mt8173: fix some indentation (2015-06-01 10:06:12 +0200)
-
-----------------------------------------------------------------
-- dts: mt8173: fix style convention for pinctrl node
-- dts: mt8173: fix indentation for some nodes
-
-----------------------------------------------------------------
-Daniel Kurtz (1):
-      arm64: dts: mt8173: fix some indentation
-
-Yingjoe Chen (1):
-      arm64: dts: mt8173: Fixup pinctrl nodes
-
- arch/arm64/boot/dts/mediatek/mt8173.dtsi | 41 +++++++++++++++++---------------
- 1 file changed, 22 insertions(+), 19 deletions(-)
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
