@@ -1,73 +1,99 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 1 Jun 2015 11:55:56 +0200
-Subject: [PATCH] fix n900 dts file to work around 4.1 touchscreen
- regression on n900
-In-Reply-To: <20150529203456.GC22083@amd>
-References: <20150527145837.GA13223@earth> <20150529190816.GA20232@amd>
- <20150529192505.GA28987@amd> <20150529193211.GA7599@amd>
- <20150529194955.GV2026@saruman.tx.rr.com>
- <20150529195629.GA9811@amd> <20150529201745.GC17267@lukather>
- <20150529202123.GY2026@saruman.tx.rr.com>
- <20150529202954.GA26494@localhost> <20150529203456.GC22083@amd>
-Message-ID: <20150601095556.GH17267@lukather>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 1 Jun 2015 11:04:31 +0100
+Subject: [PATCH 4/4]:dt-binding:Documents the mbigen bindings
+In-Reply-To: <55692C36.1000309@huawei.com>
+References: <55692C36.1000309@huawei.com>
+Message-ID: <20150601100431.GC22406@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 29, 2015 at 10:34:56PM +0200, Pavel Machek wrote:
-> Hi!
+On Sat, May 30, 2015 at 04:19:18AM +0100, majun (F) wrote:
+> Add the mbigen msi interrupt controller bindings document
 > 
-> > > > single DT, you don't even use that property in your driver, and now
-> > > > that you realise you meant something else, you want the code that
-> > > 
-> > > not Pali, Sebastian.
-> > > 
-> > > > actually parse the *right* property and does the right thing, that all
-> > > > other DT agree (and depend on) to be reverted?
-> > > 
-> > > We shouldn't revert, that I agree. But both properties should be parsed.
-> > 
-> > No. If the property is wrong, and nobody parsed it, I do not see any reason to
-> > start now.
 > 
-> Agreed.
+> Signed-off-by: Ma Jun <majun258@huawei.com>
+> ---
+>  Documentation/devicetree/bindings/arm/mbigen.txt |   51 ++++++++++++++++++++++
+>  1 files changed, 51 insertions(+), 0 deletions(-)
+>  create mode 100755 Documentation/devicetree/bindings/arm/mbigen.txt
 > 
-> But that's not what I'm asking. See a changelog of
-> 3eea8b5d68c801fec788b411582b803463834752 and compare it with what it
-> actually does.
+> diff --git a/Documentation/devicetree/bindings/arm/mbigen.txt b/Documentation/devicetree/bindings/arm/mbigen.txt
+> new file mode 100755
+> index 0000000..d442b31
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/mbigen.txt
+> @@ -0,0 +1,51 @@
+> +Hisilicon mbigen device tree bindings.
+> +=======================================
+> +
+> +Mbigen means: message based interrupt generator.
+> +
+> +MBI is kind of msi interrupt only used on Non-PCI devices.
+> +
+> +To reduce the wired interrupt number connected to GIC,
+> +Hisilicon designed mbigen to collect and generate interrupt.
+> +
+> +
+> +Non-pci devices can connect to mbigen and gnerate the inteerrupt
+> +by wirtting ITS register.
+
+Typos.
+
+> +
+> +The mbigen and devices connect to mbigen have the following properties:
+> +
+> +
+> +Mbigen required properties:
+> +-------------------------------------------
+> +-compatible: Should be "hisilicon,mbi-gen"
+> +-msi-parent: should specified the ITS mbigen connected
+> +-interrupt controller: Identifies the node as an interrupt controller
+> +- #interrupt-cells : Specifies the number of cells needed to encode an
+> +  interrupt source. The value is 2 for now.
+
+The precise format of these cells needs to be specified, at this point
+in the binding document.
+
+Why do you say "The value is 2 for now"? Do you expect this to grow in
+future? If so, why?
+
+> +- reg: Specifies the base physical address and size of the ITS
+> +  registers.
+
+This doesn't sound right. This isn't the ITS, so it shouldn't refer to
+the ITS registers in this manner.
+
+Does the mbigen not have its own set of registers?
+
+Thanks,
+Mark.
+
+> +
+> +Examples:
+> +
+> +	mbigen_pa: interrupt-controller at 4c030000 {
+> +			compatible = "hisilicon,mbi-gen";
+> +			msi-parent = <&its_pa>;
+> +			interrupt-controller;
+> +			#interrupt-cells = <2>;
+> +			reg = <0x4c030000 0x10000>;
+> +		};
+> +
+> +Device connect to mbigen required properties:
+> +----------------------------------------------------
+> +-interrupt-parent: Specifies the mbigen node which device connected.
+> +-interrupts:specifies the interrupt source.The first cell is hwirq num, the
+> +  second number is trigger type.
+> +
+> +Examples:
+> +	usb0: ehci at a1000000 {
+> +		compatible = "generic-ehci";
+> +		interrupt-parent = <&mbigen_pa>;
+> +		reg = <0xa1000000 0x10000>;
+> +		interrupts = <20 4>;
+> +	};
+> +
+> -- 
+> 1.7.1
 > 
-> It is buggy. If fuzz is specified but maximum is not, it overwites
-> maximum with zero.
-
-If maximum is not set, you'll have other issues anyway. But it really
-boils down on what the default behaviour should be.
-
-> Plus it introduces new failure "if (!test_bit(axis, dev->absbit))".
-
-It's not a new failure, it's testing against stupid code.
-
-If an axis is setup in the DT but not registered in the driver,
-something is wrong, most probably the DT.
-
-> Plus it fails to distinguish between "value not specified in the dt"
-> and "zero is specified in the dt".
-
-Again, default behaviour.
-
-> The 3eea8b5d68c801fec788b411582b803463834752 is just bad.
-
-You were very welcome to review this patch at the time and/or suggest
-a fix that pleases everyone.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150601/a21a0745/attachment-0001.sig>
+> 
