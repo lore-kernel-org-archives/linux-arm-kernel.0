@@ -1,173 +1,118 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 1 Jun 2015 09:23:17 +0300
-Subject: [PATCHv4 09/10] arm/dts: dra72-evm.dts: add HDMI
+Date: Mon, 1 Jun 2015 09:23:16 +0300
+Subject: [PATCHv4 08/10] arm/dts: dra7.dtsi: add DSS support
 In-Reply-To: <1433139798-23450-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1433139798-23450-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1433139798-23450-10-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1433139798-23450-9-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DRA72 EVM has a HDMI output. This patch adds the device tree nodes
-required for HDMI.
+DRA7xxx contains a very similar DSS to OMAP5. The main differences are:
+
+* no DSI or RFBI support.
+* 1 or 2 dedicated video PLLs.
+* need to do additional configuration to the DRA7 CONTROL module.
+
+DRA72xx has only one video PLL, and DRA74xx has two.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 Cc: devicetree at vger.kernel.org
 ---
- arch/arm/boot/dts/dra72-evm.dts | 110 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 110 insertions(+)
+ arch/arm/boot/dts/dra7.dtsi   | 38 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/dra72x.dtsi | 11 +++++++++++
+ arch/arm/boot/dts/dra74x.dtsi | 15 +++++++++++++++
+ 3 files changed, 64 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dra72-evm.dts b/arch/arm/boot/dts/dra72-evm.dts
-index ce0390f081d9..4e1b60581782 100644
---- a/arch/arm/boot/dts/dra72-evm.dts
-+++ b/arch/arm/boot/dts/dra72-evm.dts
-@@ -19,6 +19,10 @@
- 		reg = <0x80000000 0x40000000>; /* 1024 MB */
- 	};
- 
-+	aliases {
-+		display0 = &hdmi0;
-+	};
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index db0890a36e96..f3a8237cea39 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -1474,6 +1474,44 @@
+ 			clocks = <&sys_clkin1>;
+ 			status = "disabled";
+ 		};
 +
- 	evm_3v3: fixedregulator-evm_3v3 {
- 		compatible = "regulator-fixed";
- 		regulator-name = "evm_3v3";
-@@ -35,6 +39,51 @@
- 		compatible = "linux,extcon-usb-gpio";
- 		id-gpio = <&pcf_gpio_21 2 GPIO_ACTIVE_HIGH>;
- 	};
-+
-+	hdmi0: connector {
-+		compatible = "hdmi-connector";
-+		label = "hdmi";
-+
-+		type = "a";
-+
-+		port {
-+			hdmi_connector_in: endpoint {
-+				remote-endpoint = <&tpd12s015_out>;
-+			};
-+		};
-+	};
-+
-+	tpd12s015: encoder {
-+		compatible = "ti,tpd12s015";
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&tpd12s015_pins>;
-+
-+		gpios = <&pcf_hdmi 4 GPIO_ACTIVE_HIGH>,	/* P4, CT CP HPD */
-+			<&pcf_hdmi 5 GPIO_ACTIVE_HIGH>,	/* P5, LS OE */
-+			<&gpio7 12 GPIO_ACTIVE_HIGH>;	/* gpio7_12/sp1_cs2, HPD */
-+
-+		ports {
++		dss: dss at 58000000 {
++			compatible = "ti,dra7-dss";
++			/* 'reg' defined in dra72x.dtsi and dra74x.dtsi */
++			/* 'clocks' defined in dra72x.dtsi and dra74x.dtsi */
++			status = "disabled";
++			ti,hwmods = "dss_core";
++			/* CTRL_CORE_DSS_PLL_CONTROL */
++			syscon-pll-ctrl = <&scm_conf 0x538>;
 +			#address-cells = <1>;
-+			#size-cells = <0>;
++			#size-cells = <1>;
++			ranges;
 +
-+			port at 0 {
-+				reg = <0>;
-+
-+				tpd12s015_in: endpoint {
-+					remote-endpoint = <&hdmi_out>;
-+				};
++			dispc at 58001000 {
++				compatible = "ti,dra7-dispc";
++				reg = <0x58001000 0x1000>;
++				interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
++				ti,hwmods = "dss_dispc";
++				clocks = <&dss_dss_clk>;
++				clock-names = "fck";
++				/* CTRL_CORE_SMA_SW_1 */
++				syscon-pol = <&scm_conf 0x534>;
 +			};
 +
-+			port at 1 {
-+				reg = <1>;
-+
-+				tpd12s015_out: endpoint {
-+					remote-endpoint = <&hdmi_connector_in>;
-+				};
++			hdmi: encoder at 58060000 {
++				compatible = "ti,dra7-hdmi";
++				reg = <0x58040000 0x200>,
++				      <0x58040200 0x80>,
++				      <0x58040300 0x80>,
++				      <0x58060000 0x19000>;
++				reg-names = "wp", "pll", "phy", "core";
++				interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
++				status = "disabled";
++				ti,hwmods = "dss_hdmi";
++				clocks = <&dss_48mhz_clk>, <&dss_hdmi_clk>;
++				clock-names = "fck", "sys_clk";
 +			};
 +		};
-+	};
- };
- 
- &dra7_pmx_core {
-@@ -45,6 +94,13 @@
- 		>;
  	};
  
-+	i2c5_pins: pinmux_i2c5_pins {
-+		pinctrl-single,pins = <
-+			0x2b4 (PIN_INPUT | MUX_MODE10) /* mcasp1_axr0.i2c5_sda */
-+			0x2b8 (PIN_INPUT | MUX_MODE10) /* mcasp1_axr1.i2c5_scl */
-+		>;
-+	};
-+
- 	nand_default: nand_default {
- 		pinctrl-single,pins = <
- 			0x0	(PIN_INPUT  | MUX_MODE0) /* gpmc_ad0 */
-@@ -142,6 +198,19 @@
- 			0xb8 (PIN_OUTPUT | MUX_MODE1)	/* gpmc_cs2.qspi1_cs0 */
- 		>;
- 	};
-+
-+	hdmi_pins: pinmux_hdmi_pins {
-+		pinctrl-single,pins = <
-+			0x408 (PIN_INPUT | MUX_MODE1) /* i2c2_sda.hdmi1_ddc_scl */
-+			0x40c (PIN_INPUT | MUX_MODE1) /* i2c2_scl.hdmi1_ddc_sda */
-+		>;
-+	};
-+
-+	tpd12s015_pins: pinmux_tpd12s015_pins {
-+		pinctrl-single,pins = <
-+			0x3b8 (PIN_INPUT_PULLDOWN | MUX_MODE14) /* gpio7_12 HPD */
-+		>;
-+	};
- };
- 
- &i2c1 {
-@@ -277,6 +346,27 @@
+ 	thermal_zones: thermal-zones {
+diff --git a/arch/arm/boot/dts/dra72x.dtsi b/arch/arm/boot/dts/dra72x.dtsi
+index 03d742f8d572..eaca143faa77 100644
+--- a/arch/arm/boot/dts/dra72x.dtsi
++++ b/arch/arm/boot/dts/dra72x.dtsi
+@@ -34,3 +34,14 @@
+ 		interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>;
  	};
  };
- 
-+&i2c5 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c5_pins>;
-+	clock-frequency = <400000>;
 +
-+	pcf_hdmi: pcf8575 at 26 {
-+		compatible = "nxp,pcf8575";
-+		reg = <0x26>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		/*
-+		 * initial state is used here to keep the mdio interface
-+		 * selected on RU89 through SEL_VIN4_MUX_S0, VIN2_S1 and
-+		 * VIN2_S0 driven high otherwise Ethernet stops working
-+		 * VIN6_SEL_S0 is low, thus selecting McASP3 over VIN6
-+		 */
-+		lines-initial-states = <0x0f2b>;
-+	};
++&dss {
++	reg = <0x58000000 0x80>,
++	      <0x58004054 0x4>,
++	      <0x58004300 0x20>;
++	reg-names = "dss", "pll1_clkctrl", "pll1";
++
++	clocks = <&dss_dss_clk>,
++		 <&dss_video1_clk>;
++	clock-names = "fck", "video1_clk";
 +};
-+
- &uart1 {
- 	status = "okay";
- };
-@@ -566,3 +656,23 @@
+diff --git a/arch/arm/boot/dts/dra74x.dtsi b/arch/arm/boot/dts/dra74x.dtsi
+index cc560a70926f..fa995d0ca1f2 100644
+--- a/arch/arm/boot/dts/dra74x.dtsi
++++ b/arch/arm/boot/dts/dra74x.dtsi
+@@ -73,3 +73,18 @@
  		};
  	};
  };
 +
 +&dss {
-+	status = "ok";
++	reg = <0x58000000 0x80>,
++	      <0x58004054 0x4>,
++	      <0x58004300 0x20>,
++	      <0x58005054 0x4>,
++	      <0x58005300 0x20>;
++	reg-names = "dss", "pll1_clkctrl", "pll1",
++		    "pll2_clkctrl", "pll2";
 +
-+	vdda_video-supply = <&ldo5_reg>;
-+};
-+
-+&hdmi {
-+	status = "ok";
-+	vdda-supply = <&ldo3_reg>;
-+
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&hdmi_pins>;
-+
-+	port {
-+		hdmi_out: endpoint {
-+			remote-endpoint = <&tpd12s015_in>;
-+		};
-+	};
++	clocks = <&dss_dss_clk>,
++		 <&dss_video1_clk>,
++		 <&dss_video2_clk>;
++	clock-names = "fck", "video1_clk", "video2_clk";
 +};
 -- 
 2.1.4
