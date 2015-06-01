@@ -1,46 +1,92 @@
 From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Sun, 31 May 2015 20:54:08 -0400
-Subject: [PATCH 07/11] arm: use subsys_initcall in non-modular pl320 IPC code
-In-Reply-To: <1433120052-18281-1-git-send-email-paul.gortmaker@windriver.com>
-References: <1433120052-18281-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <1433120052-18281-8-git-send-email-paul.gortmaker@windriver.com>
+Date: Sun, 31 May 2015 20:54:01 -0400
+Subject: [PATCH 00/11] Replace module_init with an alternate initcall in non
+ modules
+Message-ID: <1433120052-18281-1-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The drivers/mailbox/pl320-ipc.o is dependent on config PL320_MBOX
-which is declared as a bool.  Hence the code is never going to be
-modular.  So using module_init as an alias for __initcall can be
-somewhat misleading.
+This series of commits converts non-modular code that is using the
+module_init() call to hook itself into the system to instead use one of
+the alternate priority initcalls.
 
-Fix this up now, so that we can relocate module_init from
-init.h into module.h in the future.  If we don't do this, we'd
-have to add module.h to obviously non-modular code, and that
-would be a worse thing.  Also add an inclusion of init.h, as
-that was previously implicit.
+Unlike the earlier series[1] that used device_initcall and hence was a
+runtime no-op, these commits change to one of the alternate initcalls,
+because (a) we have them and (b) it seems like the right thing to do.
+For example, it would seem logical to use arch_initcall for arch
+specific setup code and fs_initcall for filesystem setup code.
 
-Note that direct use of __initcall is discouraged, vs. one
-of the priority categorized subgroups.  As __initcall gets
-mapped onto device_initcall, our use of subsys_initcall (which
-seems to make sense for IPC code) will thus change this
-registration from level 6-device to level 4-subsys (i.e. slightly
-earlier).  However no impact of that small difference is expected.
+This does mean however, that changes in the init ordering will be taking
+place, and so there is a small risk that some kind of implicit init
+ordering issue may lie uncovered.  But I think it is still better to
+give these ones sensible priorities than to just assign them all to
+device_initcall in order to exactly preserve the old ordering.
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+Thad said, we have already made similar changes in core kernel code
+in commit c96d6660dc65b0a90aea9834bfd8be1d5656da18 ("kernel: audit/fix
+non-modular users of module_init in core code") without any regressions
+reported, so this type of change isn't without precedent.
+
+This work is factored out from what was a previously larger series[2] so
+that there is a common theme and lower patch count to ease review.
+
+Paul.
+
+[1] https://lkml.org/lkml/2015/5/28/809
+[2] https://marc.info/?l=linux-kernel&m=139033951228828
+
 ---
- drivers/mailbox/pl320-ipc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mailbox/pl320-ipc.c b/drivers/mailbox/pl320-ipc.c
-index f3755e0aa935..f80acb36ff07 100644
---- a/drivers/mailbox/pl320-ipc.c
-+++ b/drivers/mailbox/pl320-ipc.c
-@@ -195,4 +195,4 @@ static int __init ipc_init(void)
- {
- 	return amba_driver_register(&pl320_driver);
- }
--module_init(ipc_init);
-+subsys_initcall(ipc_init);
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: "David S. Miller" <davem@davemloft.net>
+Cc: Eric Paris <eparis@parisplace.org>
+Cc: "H. Peter Anvin" <hpa@zytor.com>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: John McCutchan <john@johnmccutchan.com>
+Cc: Jozsef Kadlecsik <kadlec@blackhole.kfki.hu>
+Cc: Pablo Neira Ayuso <pablo@netfilter.org>
+Cc: Patrick McHardy <kaber@trash.net>
+Cc: Paul Mackerras <paulus@samba.org>
+Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
+Cc: Robert Love <rlove@rlove.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Scott Wood <scottwood@freescale.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-mm at kvack.org
+Cc: linuxppc-dev at lists.ozlabs.org
+Cc: netdev at vger.kernel.org
+Cc: netfilter-devel at vger.kernel.org
+Cc: x86 at kernel.org
+
+
+Paul Gortmaker (11):
+  mm: replace module_init usages with subsys_initcall in nommu.c
+  fs/notify: don't use module_init for non-modular inotify_user code
+  netfilter: don't use module_init/exit in core IPV4 code
+  x86: don't use module_init for non-modular core bootflag code
+  powerpc: use subsys_initcall for Freescale Local Bus
+  powerpc: don't use module_init for non-modular core hugetlb code
+  arm: use subsys_initcall in non-modular pl320 IPC code
+  lib/list_sort: use late_initcall to hook in self tests
+  mm/page_owner.c: use late_initcall to hook in enabling
+  x86: perf_event_intel_bts.c: use arch_initcall to hook in enabling
+  x86: perf_event_intel_pt.c: use arch_initcall to hook in enabling
+
+ arch/powerpc/mm/hugetlbpage.c              | 2 +-
+ arch/powerpc/sysdev/fsl_lbc.c              | 2 +-
+ arch/x86/kernel/bootflag.c                 | 2 +-
+ arch/x86/kernel/cpu/perf_event_intel_bts.c | 3 +--
+ arch/x86/kernel/cpu/perf_event_intel_pt.c  | 3 +--
+ drivers/mailbox/pl320-ipc.c                | 2 +-
+ fs/notify/inotify/inotify_user.c           | 4 ++--
+ lib/list_sort.c                            | 2 +-
+ mm/nommu.c                                 | 4 ++--
+ mm/page_owner.c                            | 2 +-
+ net/ipv4/netfilter.c                       | 9 +--------
+ 11 files changed, 13 insertions(+), 22 deletions(-)
+
 -- 
 2.2.1
