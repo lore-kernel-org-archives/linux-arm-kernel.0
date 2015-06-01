@@ -1,39 +1,142 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 1 Jun 2015 15:02:38 -0700
-Subject: [PATCH RESEND] mach-omap2:Remove unnessary return statement from
- the void function, omap2_show_dma_caps
-In-Reply-To: <1432825205-4663-1-git-send-email-xerofoify@gmail.com>
-References: <1432825205-4663-1-git-send-email-xerofoify@gmail.com>
-Message-ID: <20150601220237.GI30984@atomide.com>
+From: lho@apm.com (Loc Ho)
+Date: Mon,  1 Jun 2015 16:09:35 -0600
+Subject: [PATCH] edac: xgene: fix cpuid abuse
+Message-ID: <1433196575-9455-1-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nicholas Krause <xerofoify@gmail.com> [150528 08:06]:
-> This removes the no longer required return statement at the end
-> of the void function, omap2_show_dma_cap due to no need for a
-> return statement due to this function always running successfully.
-> 
-> Signed-off-by: Nicholas Krause <xerofoify@gmail.com>
-> ---
->  arch/arm/mach-omap2/dma.c | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-omap2/dma.c b/arch/arm/mach-omap2/dma.c
-> index e1a56d8..1ed4be1 100644
-> --- a/arch/arm/mach-omap2/dma.c
-> +++ b/arch/arm/mach-omap2/dma.c
-> @@ -117,7 +117,6 @@ static void omap2_show_dma_caps(void)
->  	u8 revision = dma_read(REVISION, 0) & 0xff;
->  	printk(KERN_INFO "OMAP DMA hardware revision %d.%d\n",
->  				revision >> 4, revision & 0xf);
-> -	return;
->  }
->  
->  static unsigned configure_dma_errata(void)
+The new x-gene EDAC driver incorrectly tried to figure out the version of
+one of its IP blocks by looking at the version of the CPU core, which is
+only vagely related.
 
-Sorry for the delay, applying this into omap-for-v4.2/fixes as
-it's not urgent.
+This removes the incorrect code and instead uses the version of the IP
+block in the compatible string where it belongs.
 
-Regards,
+Found using build testing on x86, which does not provide the arm64
+cpuid interface.
 
-Tony
+This version is based on Arnd original version.
+
+Signed-off-by: Loc Ho <lho@apm.com>
+---
+ .../devicetree/bindings/edac/apm-xgene-edac.txt    |    3 +-
+ drivers/edac/xgene_edac.c                          |   55 +++-----------------
+ 2 files changed, 10 insertions(+), 48 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt b/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
+index 480911c..78edb80 100644
+--- a/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
++++ b/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
+@@ -25,7 +25,8 @@ Required properties for memory controller subnode:
+ - memory-controller	: Instance number of the memory controller.
+ 
+ Required properties for PMD subnode:
+-- compatible		: Shall be "apm,xgene-edac-pmd".
++- compatible		: Shall be "apm,xgene-edac-pmd" or
++                          "apm,xgene-edac-pmd-v2".
+ - reg			: First resource shall be the PMD resource.
+ - pmd-controller	: Instance number of the PMD controller.
+ 
+diff --git a/drivers/edac/xgene_edac.c b/drivers/edac/xgene_edac.c
+index b515857..14636e4 100644
+--- a/drivers/edac/xgene_edac.c
++++ b/drivers/edac/xgene_edac.c
+@@ -523,6 +523,7 @@ struct xgene_edac_pmd_ctx {
+ 	struct edac_device_ctl_info *edac_dev;
+ 	void __iomem		*pmd_csr;
+ 	u32			pmd;
++	int			version;
+ };
+ 
+ static void xgene_edac_pmd_l1_check(struct edac_device_ctl_info *edac_dev,
+@@ -784,50 +785,6 @@ static void xgene_edac_pmd_cpu_hw_cfg(struct edac_device_ctl_info *edac_dev,
+ 	writel(0x00000101, pg_f + MEMERR_CPU_MMUECR_PAGE_OFFSET);
+ }
+ 
+-static bool xgene_edac_pmd_l2c_version1(void)
+-{
+-	/* Check all chips with PMD L2C version 1 HW */
+-	#define REVIDR_MINOR_REV(revidr)	((revidr) & 0x00000007)
+-
+-	switch (MIDR_VARIANT(read_cpuid_id())) {
+-	case 0:
+-		switch (MIDR_REVISION(read_cpuid_id())) {
+-		case 0:
+-
+-			switch (REVIDR_MINOR_REV(read_cpuid(REVIDR_EL1))) {
+-			case 1:
+-			case 2:
+-				return true;
+-			};
+-			break;
+-		case 1:
+-			if (REVIDR_MINOR_REV(read_cpuid(REVIDR_EL1)) == 1)
+-				return true;
+-			break;
+-		}
+-		break;
+-	case 1:
+-		switch (MIDR_REVISION(read_cpuid_id())) {
+-		case 0:
+-			switch (REVIDR_MINOR_REV(read_cpuid(REVIDR_EL1))) {
+-			case 1:
+-				return true;
+-			};
+-			break;
+-		case 1:
+-			switch (REVIDR_MINOR_REV(read_cpuid(REVIDR_EL1))) {
+-			case 1:
+-			case 0:
+-				return true;
+-			};
+-			break;
+-		}
+-		break;
+-	}
+-
+-	return false;
+-}
+-
+ static void xgene_edac_pmd_hw_cfg(struct edac_device_ctl_info *edac_dev)
+ {
+ 	struct xgene_edac_pmd_ctx *ctx = edac_dev->pvt_info;
+@@ -837,7 +794,7 @@ static void xgene_edac_pmd_hw_cfg(struct edac_device_ctl_info *edac_dev)
+ 	/* Enable PMD memory error - MEMERR_L2C_L2ECR and L2C_L2RTOCR */
+ 	writel(0x00000703, pg_e + MEMERR_L2C_L2ECR_PAGE_OFFSET);
+ 	/* Configure L2C HW request time out feature if supported */
+-	if (!xgene_edac_pmd_l2c_version1())
++	if (ctx->version > 1)
+ 		writel(0x00000119, pg_d + CPUX_L2C_L2RTOCR_PAGE_OFFSET);
+ }
+ 
+@@ -956,7 +913,8 @@ static int xgene_edac_pmd_available(u32 efuse, int pmd)
+ 	return (efuse & (1 << pmd)) ? 0 : 1;
+ }
+ 
+-static int xgene_edac_pmd_add(struct xgene_edac *edac, struct device_node *np)
++static int xgene_edac_pmd_add(struct xgene_edac *edac, struct device_node *np,
++			      int version)
+ {
+ 	struct edac_device_ctl_info *edac_dev;
+ 	struct xgene_edac_pmd_ctx *ctx;
+@@ -998,6 +956,7 @@ static int xgene_edac_pmd_add(struct xgene_edac *edac, struct device_node *np)
+ 	ctx->edac = edac;
+ 	ctx->edac_dev = edac_dev;
+ 	ctx->ddev = *edac->dev;
++	ctx->version = version;
+ 	edac_dev->dev = &ctx->ddev;
+ 	edac_dev->ctl_name = ctx->name;
+ 	edac_dev->dev_name = ctx->name;
+@@ -1169,7 +1128,9 @@ static int xgene_edac_probe(struct platform_device *pdev)
+ 		if (of_device_is_compatible(child, "apm,xgene-edac-mc"))
+ 			xgene_edac_mc_add(edac, child);
+ 		if (of_device_is_compatible(child, "apm,xgene-edac-pmd"))
+-			xgene_edac_pmd_add(edac, child);
++			xgene_edac_pmd_add(edac, child, 1);
++		if (of_device_is_compatible(child, "apm,xgene-edac-pmd-v2"))
++			xgene_edac_pmd_add(edac, child, 2);
+ 	}
+ 
+ 	return 0;
+-- 
+1.7.1
