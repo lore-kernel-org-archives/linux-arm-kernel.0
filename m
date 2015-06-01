@@ -1,363 +1,165 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  1 Jun 2015 13:40:32 +0200
-Subject: [PATCH for-v4.2 2/4] arm64: use fixmap region for permanent FDT
- mapping
+Date: Mon,  1 Jun 2015 13:40:33 +0200
+Subject: [PATCH for-v4.2 3/4] arm64: reduce ID map to a single page
 In-Reply-To: <1433158834-25238-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1433158834-25238-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1433158834-25238-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1433158834-25238-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the FDT blob needs to be in the same 512 MB region as
-the kernel, so that it can be mapped into the kernel virtual memory
-space very early on using a minimal set of statically allocated
-translation tables.
+Commit ea8c2e112445 ("arm64: Extend the idmap to the whole kernel
+image") changed the early page table code so that the entire kernel
+Image is covered by the identity map. This allows functions that
+need to enable or disable the MMU to reside anywhere in the kernel
+Image.
 
-Now that we have early fixmap support, we can relax this restriction,
-by moving the permanent FDT mapping to the fixmap region instead.
-This way, the FDT blob may be anywhere in memory.
+However, this change has the unfortunate side effect that the Image
+cannot cross a physical 512 MB alignment boundary anymore, since the
+early page table code cannot deal with the Image crossing a /virtual/
+512 MB alignment boundary.
 
-This also moves the vetting of the FDT to mmu.c, since the early
-init code in head.S does not handle mapping of the FDT anymore.
-At the same time, fix up some comments in head.S that have gone stale.
+So instead, reduce the ID map to a single page, that is populated by
+the contents of the .idmap.text section. Only three functions reside
+there at the moment: __enable_mmu(), cpu_resume_mmu() and cpu_reset().
+If new code is introduced that needs to manipulate the MMU state, it
+should be added to this section as well.
 
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Tested-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- Documentation/arm64/booting.txt | 10 ++++---
- arch/arm64/include/asm/boot.h   | 14 +++++++++
- arch/arm64/include/asm/fixmap.h | 15 ++++++++++
- arch/arm64/include/asm/mmu.h    |  1 +
- arch/arm64/kernel/head.S        | 39 +-----------------------
- arch/arm64/kernel/setup.c       | 30 +++++++------------
- arch/arm64/mm/Makefile          |  2 ++
- arch/arm64/mm/init.c            |  1 -
- arch/arm64/mm/mmu.c             | 66 +++++++++++++++++++++++++++++++++++++++++
- 9 files changed, 115 insertions(+), 63 deletions(-)
- create mode 100644 arch/arm64/include/asm/boot.h
+ arch/arm64/kernel/head.S        | 13 +++++++------
+ arch/arm64/kernel/sleep.S       |  2 ++
+ arch/arm64/kernel/vmlinux.lds.S | 11 ++++++++++-
+ arch/arm64/mm/proc.S            |  3 ++-
+ 4 files changed, 21 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
-index f3c05b5f9f08..1690350f16e7 100644
---- a/Documentation/arm64/booting.txt
-+++ b/Documentation/arm64/booting.txt
-@@ -45,11 +45,13 @@ sees fit.)
- 
- Requirement: MANDATORY
- 
--The device tree blob (dtb) must be placed on an 8-byte boundary within
--the first 512 megabytes from the start of the kernel image and must not
--cross a 2-megabyte boundary. This is to allow the kernel to map the
--blob using a single section mapping in the initial page tables.
-+The device tree blob (dtb) must be placed on an 8-byte boundary and must
-+not exceed 2 megabytes in size. Since the dtb will be mapped cacheable
-+using blocks of up to 2 megabytes in size, it must not be placed within
-+any 2M region which must be mapped with any specific attributes.
- 
-+NOTE: versions prior to v4.2 also require that the DTB be placed within
-+the 512 MB region starting at text_offset bytes below the kernel Image.
- 
- 3. Decompress the kernel image
- ------------------------------
-diff --git a/arch/arm64/include/asm/boot.h b/arch/arm64/include/asm/boot.h
-new file mode 100644
-index 000000000000..81151b67b26b
---- /dev/null
-+++ b/arch/arm64/include/asm/boot.h
-@@ -0,0 +1,14 @@
-+
-+#ifndef __ASM_BOOT_H
-+#define __ASM_BOOT_H
-+
-+#include <asm/sizes.h>
-+
-+/*
-+ * arm64 requires the DTB to be 8 byte aligned and
-+ * not exceed 2MB in size.
-+ */
-+#define MIN_FDT_ALIGN		8
-+#define MAX_FDT_SIZE		SZ_2M
-+
-+#endif
-diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
-index 95e6b6dcbe37..c0739187a920 100644
---- a/arch/arm64/include/asm/fixmap.h
-+++ b/arch/arm64/include/asm/fixmap.h
-@@ -17,6 +17,7 @@
- 
- #ifndef __ASSEMBLY__
- #include <linux/kernel.h>
-+#include <asm/boot.h>
- #include <asm/page.h>
- 
- /*
-@@ -32,6 +33,20 @@
-  */
- enum fixed_addresses {
- 	FIX_HOLE,
-+
-+	/*
-+	 * Reserve a virtual window for the FDT that is 2 MB larger than the
-+	 * maximum supported size, and put it at the top of the fixmap region.
-+	 * The additional space ensures that any FDT that does not exceed
-+	 * MAX_FDT_SIZE can be mapped regardless of whether it crosses any
-+	 * 2 MB alignment boundaries.
-+	 *
-+	 * Keep this at the top so it remains 2 MB aligned.
-+	 */
-+#define FIX_FDT_SIZE		(MAX_FDT_SIZE + SZ_2M)
-+	FIX_FDT_END,
-+	FIX_FDT = FIX_FDT_END + FIX_FDT_SIZE / PAGE_SIZE - 1,
-+
- 	FIX_EARLYCON_MEM_BASE,
- 	FIX_TEXT_POKE0,
- 	__end_of_permanent_fixed_addresses,
-diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index 3d311761e3c2..79fcfb048884 100644
---- a/arch/arm64/include/asm/mmu.h
-+++ b/arch/arm64/include/asm/mmu.h
-@@ -34,5 +34,6 @@ extern void init_mem_pgprot(void);
- extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
- 			       unsigned long virt, phys_addr_t size,
- 			       pgprot_t prot);
-+extern void *fixmap_remap_fdt(phys_addr_t dt_phys);
- 
- #endif
 diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 19f915e8f6e0..30cffc5e7402 100644
+index 30cffc5e7402..c0ff3ce4299e 100644
 --- a/arch/arm64/kernel/head.S
 +++ b/arch/arm64/kernel/head.S
-@@ -237,8 +237,6 @@ ENTRY(stext)
- 	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
- 	adrp	x24, __PHYS_OFFSET
- 	bl	set_cpu_boot_mode_flag
--
--	bl	__vet_fdt
- 	bl	__create_page_tables		// x25=TTBR0, x26=TTBR1
- 	/*
- 	 * The following calls CPU setup code, see arch/arm64/mm/proc.S for
-@@ -270,24 +268,6 @@ preserve_boot_args:
- ENDPROC(preserve_boot_args)
+@@ -361,7 +361,7 @@ __create_page_tables:
+ 	 * Create the identity mapping.
+ 	 */
+ 	mov	x0, x25				// idmap_pg_dir
+-	adrp	x3, KERNEL_START		// __pa(KERNEL_START)
++	adrp	x3, __idmap_text_start		// __pa(__idmap_text_start)
  
- /*
-- * Determine validity of the x21 FDT pointer.
-- * The dtb must be 8-byte aligned and live in the first 512M of memory.
-- */
--__vet_fdt:
--	tst	x21, #0x7
--	b.ne	1f
--	cmp	x21, x24
--	b.lt	1f
--	mov	x0, #(1 << 29)
--	add	x0, x0, x24
--	cmp	x21, x0
--	b.ge	1f
--	ret
--1:
--	mov	x21, #0
--	ret
--ENDPROC(__vet_fdt)
--/*
-  * Macro to create a table entry to the next page.
-  *
-  *	tbl:	page table address
-@@ -348,8 +328,7 @@ ENDPROC(__vet_fdt)
-  * required to get the kernel running. The following sections are required:
-  *   - identity mapping to enable the MMU (low address, TTBR0)
-  *   - first few MB of the kernel linear mapping to jump to once the MMU has
-- *     been enabled, including the FDT blob (TTBR1)
-- *   - pgd entry for fixed mappings (TTBR1)
-+ *     been enabled
-  */
- __create_page_tables:
- 	adrp	x25, idmap_pg_dir
-@@ -439,22 +418,6 @@ __create_page_tables:
+ #ifndef CONFIG_ARM64_VA_BITS_48
+ #define EXTRA_SHIFT	(PGDIR_SHIFT + PAGE_SHIFT - 3)
+@@ -384,11 +384,11 @@ __create_page_tables:
+ 
+ 	/*
+ 	 * Calculate the maximum allowed value for TCR_EL1.T0SZ so that the
+-	 * entire kernel image can be ID mapped. As T0SZ == (64 - #bits used),
++	 * entire ID map region can be mapped. As T0SZ == (64 - #bits used),
+ 	 * this number conveniently equals the number of leading zeroes in
+-	 * the physical address of KERNEL_END.
++	 * the physical address of __idmap_text_end.
+ 	 */
+-	adrp	x5, KERNEL_END
++	adrp	x5, __idmap_text_end
+ 	clz	x5, x5
+ 	cmp	x5, TCR_T0SZ(VA_BITS)	// default T0SZ small enough?
+ 	b.ge	1f			// .. then skip additional level
+@@ -403,8 +403,8 @@ __create_page_tables:
+ #endif
+ 
+ 	create_pgd_entry x0, x3, x5, x6
+-	mov	x5, x3				// __pa(KERNEL_START)
+-	adr_l	x6, KERNEL_END			// __pa(KERNEL_END)
++	mov	x5, x3				// __pa(__idmap_text_start)
++	adr_l	x6, __idmap_text_end		// __pa(__idmap_text_end)
  	create_block_map x0, x7, x3, x5, x6
  
  	/*
--	 * Map the FDT blob (maximum 2MB; must be within 512MB of
--	 * PHYS_OFFSET).
--	 */
--	mov	x3, x21				// FDT phys address
--	and	x3, x3, #~((1 << 21) - 1)	// 2MB aligned
--	mov	x6, #PAGE_OFFSET
--	sub	x5, x3, x24			// subtract PHYS_OFFSET
--	tst	x5, #~((1 << 29) - 1)		// within 512MB?
--	csel	x21, xzr, x21, ne		// zero the FDT pointer
--	b.ne	1f
--	add	x5, x5, x6			// __va(FDT blob)
--	add	x6, x5, #1 << 21		// 2MB for the FDT blob
--	sub	x6, x6, #1			// inclusive range
--	create_block_map x0, x7, x3, x5, x6
--1:
--	/*
- 	 * Since the page tables have been populated with non-cacheable
- 	 * accesses (MMU disabled), invalidate the idmap and swapper page
- 	 * tables again to remove any speculatively loaded cache lines.
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 74753132c3ac..770ae9dc5a75 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -105,18 +105,6 @@ static struct resource mem_res[] = {
- #define kernel_code mem_res[0]
- #define kernel_data mem_res[1]
- 
--void __init early_print(const char *str, ...)
--{
--	char buf[256];
--	va_list ap;
--
--	va_start(ap, str);
--	vsnprintf(buf, sizeof(buf), str, ap);
--	va_end(ap);
--
--	printk("%s", buf);
--}
--
- /*
-  * The recorded values of x0 .. x3 upon kernel entry.
+@@ -632,6 +632,7 @@ ENDPROC(__secondary_switched)
+  *
+  * other registers depend on the function called upon completion
   */
-@@ -326,12 +314,14 @@ static void __init setup_processor(void)
++	.section	".idmap.text", "ax"
+ __enable_mmu:
+ 	ldr	x5, =vectors
+ 	msr	vbar_el1, x5
+diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
+index ede186cdd452..811e61a2d847 100644
+--- a/arch/arm64/kernel/sleep.S
++++ b/arch/arm64/kernel/sleep.S
+@@ -130,12 +130,14 @@ ENDPROC(__cpu_suspend_enter)
+ /*
+  * x0 must contain the sctlr value retrieved from restored context
+  */
++	.pushsection	".idmap.text", "ax"
+ ENTRY(cpu_resume_mmu)
+ 	ldr	x3, =cpu_resume_after_mmu
+ 	msr	sctlr_el1, x0		// restore sctlr_el1
+ 	isb
+ 	br	x3			// global jump to virtual address
+ ENDPROC(cpu_resume_mmu)
++	.popsection
+ cpu_resume_after_mmu:
+ 	mov	x0, #0			// return zero on success
+ 	ldp	x19, x20, [sp, #16]
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index a2c29865c3fe..98073332e2d0 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -38,6 +38,12 @@ jiffies = jiffies_64;
+ 	*(.hyp.text)					\
+ 	VMLINUX_SYMBOL(__hyp_text_end) = .;
  
- static void __init setup_machine_fdt(phys_addr_t dt_phys)
- {
--	if (!dt_phys || !early_init_dt_scan(phys_to_virt(dt_phys))) {
--		early_print("\n"
--			"Error: invalid device tree blob at physical address 0x%p (virtual address 0x%p)\n"
--			"The dtb must be 8-byte aligned and passed in the first 512MB of memory\n"
--			"\nPlease check your bootloader.\n",
--			dt_phys, phys_to_virt(dt_phys));
-+	void *dt_virt = fixmap_remap_fdt(dt_phys);
++#define IDMAP_TEXT					\
++	. = ALIGN(SZ_4K);				\
++	VMLINUX_SYMBOL(__idmap_text_start) = .;		\
++	*(.idmap.text)					\
++	VMLINUX_SYMBOL(__idmap_text_end) = .;
 +
-+	if (!dt_virt || !early_init_dt_scan(dt_virt)) {
-+		pr_crit("\n"
-+			"Error: invalid device tree blob@physical address %pa (virtual address 0x%p)\n"
-+			"The dtb must be 8-byte aligned and must not exceed 2 MB in size\n"
-+			"\nPlease check your bootloader.",
-+			&dt_phys, dt_virt);
- 
- 		while (true)
- 			cpu_relax();
-@@ -374,8 +364,6 @@ void __init setup_arch(char **cmdline_p)
- {
- 	setup_processor();
- 
--	setup_machine_fdt(__fdt_pointer);
--
- 	init_mm.start_code = (unsigned long) _text;
- 	init_mm.end_code   = (unsigned long) _etext;
- 	init_mm.end_data   = (unsigned long) _edata;
-@@ -386,6 +374,8 @@ void __init setup_arch(char **cmdline_p)
- 	early_fixmap_init();
- 	early_ioremap_init();
- 
-+	setup_machine_fdt(__fdt_pointer);
-+
- 	parse_early_param();
- 
- 	/*
-diff --git a/arch/arm64/mm/Makefile b/arch/arm64/mm/Makefile
-index 773d37a14039..9d84feb41a16 100644
---- a/arch/arm64/mm/Makefile
-+++ b/arch/arm64/mm/Makefile
-@@ -4,3 +4,5 @@ obj-y				:= dma-mapping.o extable.o fault.o init.o \
- 				   context.o proc.o pageattr.o
- obj-$(CONFIG_HUGETLB_PAGE)	+= hugetlbpage.o
- obj-$(CONFIG_ARM64_PTDUMP)	+= dump.o
-+
-+CFLAGS_mmu.o			:= -I$(srctree)/scripts/dtc/libfdt/
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 89a05f467ffb..597831bdddf3 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -170,7 +170,6 @@ void __init arm64_memblock_init(void)
- 		memblock_reserve(__virt_to_phys(initrd_start), initrd_end - initrd_start);
- #endif
- 
--	early_init_fdt_reserve_self();
- 	early_init_fdt_scan_reserved_mem();
- 
- 	/* 4GB maximum for 32-bit only capable devices */
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 5b8b664422d3..82d3435bf14f 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -21,6 +21,7 @@
- #include <linux/kernel.h>
- #include <linux/errno.h>
- #include <linux/init.h>
-+#include <linux/libfdt.h>
- #include <linux/mman.h>
- #include <linux/nodemask.h>
- #include <linux/memblock.h>
-@@ -643,3 +644,68 @@ void __set_fixmap(enum fixed_addresses idx,
- 		flush_tlb_kernel_range(addr, addr+PAGE_SIZE);
- 	}
+ /*
+  * The size of the PE/COFF section that covers the kernel image, which
+  * runs from stext to _edata, must be a round multiple of the PE/COFF
+@@ -95,6 +101,7 @@ SECTIONS
+ 			SCHED_TEXT
+ 			LOCK_TEXT
+ 			HYPERVISOR_TEXT
++			IDMAP_TEXT
+ 			*(.fixup)
+ 			*(.gnu.warning)
+ 		. = ALIGN(16);
+@@ -167,11 +174,13 @@ SECTIONS
  }
-+
-+void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
-+{
-+	const u64 dt_virt_base = __fix_to_virt(FIX_FDT);
-+	pgprot_t prot = PAGE_KERNEL | PTE_RDONLY;
-+	int granularity, size, offset;
-+	void *dt_virt;
-+
-+	/*
-+	 * Check whether the physical FDT address is set and meets the minimum
-+	 * alignment requirement. Since we are relying on MIN_FDT_ALIGN to be
-+	 * at least 8 bytes so that we can always access the size field of the
-+	 * FDT header after mapping the first chunk, double check here if that
-+	 * is indeed the case.
-+	 */
-+	BUILD_BUG_ON(MIN_FDT_ALIGN < 8);
-+	if (!dt_phys || dt_phys % MIN_FDT_ALIGN)
-+		return NULL;
-+
-+	/*
-+	 * Make sure that the FDT region can be mapped without the need to
-+	 * allocate additional translation table pages, so that it is safe
-+	 * to call create_mapping() this early.
-+	 *
-+	 * On 64k pages, the FDT will be mapped using PTEs, so we need to
-+	 * be in the same PMD as the rest of the fixmap.
-+	 * On 4k pages, we'll use section mappings for the FDT so we only
-+	 * have to be in the same PUD.
-+	 */
-+	BUILD_BUG_ON(dt_virt_base % SZ_2M);
-+
-+	if (IS_ENABLED(CONFIG_ARM64_64K_PAGES)) {
-+		BUILD_BUG_ON(__fix_to_virt(FIX_FDT_END) >> PMD_SHIFT !=
-+			     __fix_to_virt(FIX_BTMAP_BEGIN) >> PMD_SHIFT);
-+
-+		granularity = PAGE_SIZE;
-+	} else {
-+		BUILD_BUG_ON(__fix_to_virt(FIX_FDT_END) >> PUD_SHIFT !=
-+			     __fix_to_virt(FIX_BTMAP_BEGIN) >> PUD_SHIFT);
-+
-+		granularity = PMD_SIZE;
-+	}
-+
-+	offset = dt_phys % granularity;
-+	dt_virt = (void *)dt_virt_base + offset;
-+
-+	/* map the first chunk so we can read the size from the header */
-+	create_mapping(round_down(dt_phys, granularity), dt_virt_base,
-+		       granularity, prot);
-+
-+	if (fdt_check_header(dt_virt) != 0)
-+		return NULL;
-+
-+	size = fdt_totalsize(dt_virt);
-+	if (size > MAX_FDT_SIZE)
-+		return NULL;
-+
-+	if (offset + size > granularity)
-+		create_mapping(round_down(dt_phys, granularity), dt_virt_base,
-+			       round_up(offset + size, granularity), prot);
-+
-+	memblock_reserve(dt_phys, size);
-+
-+	return dt_virt;
-+}
+ 
+ /*
+- * The HYP init code can't be more than a page long,
++ * The HYP init code and ID map text can't be longer than a page each,
+  * and should not cross a page boundary.
+  */
+ ASSERT(__hyp_idmap_text_end - (__hyp_idmap_text_start & ~(SZ_4K - 1)) <= SZ_4K,
+ 	"HYP init code too big or misaligned")
++ASSERT(__idmap_text_end - (__idmap_text_start & ~(SZ_4K - 1)) <= SZ_4K,
++	"ID map text too big or misaligned")
+ 
+ /*
+  * If padding is applied before .head.text, virt<->phys conversions will fail.
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index cdd754e19b9b..a265934ab0af 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -67,7 +67,7 @@ ENDPROC(cpu_cache_off)
+  *
+  *	- loc   - location to jump to for soft reset
+  */
+-	.align	5
++	.pushsection	".idmap.text", "ax"
+ ENTRY(cpu_reset)
+ 	mrs	x1, sctlr_el1
+ 	bic	x1, x1, #1
+@@ -75,6 +75,7 @@ ENTRY(cpu_reset)
+ 	isb
+ 	ret	x0
+ ENDPROC(cpu_reset)
++	.popsection
+ 
+ ENTRY(cpu_soft_restart)
+ 	/* Save address of cpu_reset() and reset address */
 -- 
 1.9.1
