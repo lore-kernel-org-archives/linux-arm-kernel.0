@@ -1,58 +1,37 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 1 Jun 2015 09:23:10 +0300
-Subject: [PATCHv4 02/10] CLK: TI: always enable DESHDCP clock
+Date: Mon, 1 Jun 2015 09:23:11 +0300
+Subject: [PATCHv4 03/10] arm/dts: dra7xx: add 'ti,
+ set-rate-parent' for dss_dss_clk
 In-Reply-To: <1433139798-23450-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1433139798-23450-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1433139798-23450-3-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1433139798-23450-4-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DESHDCP clock is needed on DRA7 based SoCs to enable the DSS IP. That
-clock is an odd one, as it is not supposed to be any kind of core clock
-for DSS, and we don't even support HDCP, but the clock is still needed
-even for the HWMOD framework to be able to reset the DSS IP.
+We need set-rate-parent flags for the display's clock path so that the
+DSS driver can change the clock rate of the PLL.
 
-As there's no support for multiple core clocks in the HWMOD framework,
-we don't have any obvious place to enable this clock when DSS IP is
-being enabled.
-
-Furthermore, the HDMI on OMAP5 DSS is the same as on DRA7, and OMAP5
-does not have any such clock configuration bit. This suggests that on
-OMAP5 the DESHDCP clock is always enabled, and for DRA7 we have the
-possibility to gate it.
-
-So, as we don't have any clean way to enable and disable the clock
-based on the need, this patch enables the clock at boot time, making it
-work similarly to OMAP5.
+This patchs adds the ti,set-rate-parent flag to 'dss_dss_clk' clock
+node, which is only a gate clock, allowing the setting of the clock rate
+to propagate to the PLL.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: devicetree at vger.kernel.org
 ---
- drivers/clk/ti/clk-7xx.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/dra7xx-clocks.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/clk/ti/clk-7xx.c b/drivers/clk/ti/clk-7xx.c
-index 2dd956b9affa..63b8323df918 100644
---- a/drivers/clk/ti/clk-7xx.c
-+++ b/drivers/clk/ti/clk-7xx.c
-@@ -312,7 +312,7 @@ static struct ti_dt_clk dra7xx_clks[] = {
- int __init dra7xx_dt_clk_init(void)
- {
- 	int rc;
--	struct clk *abe_dpll_mux, *sys_clkin2, *dpll_ck;
-+	struct clk *abe_dpll_mux, *sys_clkin2, *dpll_ck, *hdcp_ck;
+diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+index 470f39c4e326..357bedeebfac 100644
+--- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
++++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+@@ -1531,6 +1531,7 @@
+ 		clocks = <&dpll_per_h12x2_ck>;
+ 		ti,bit-shift = <8>;
+ 		reg = <0x1120>;
++		ti,set-rate-parent;
+ 	};
  
- 	ti_dt_clocks_register(dra7xx_clks);
- 
-@@ -348,5 +348,10 @@ int __init dra7xx_dt_clk_init(void)
- 	if (rc)
- 		pr_err("%s: failed to set USB_DPLL M2 OUT\n", __func__);
- 
-+	hdcp_ck = clk_get_sys(NULL, "dss_deshdcp_clk");
-+	rc = clk_prepare_enable(hdcp_ck);
-+	if (rc)
-+		pr_err("%s: failed to set dss_deshdcp_clk\n", __func__);
-+
- 	return rc;
- }
+ 	dss_hdmi_clk: dss_hdmi_clk {
 -- 
 2.1.4
