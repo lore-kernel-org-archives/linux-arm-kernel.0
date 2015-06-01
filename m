@@ -1,45 +1,62 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 01 Jun 2015 09:56:57 +0900
-Subject: [GIT PULL] ARM: EXYNOS: Fix for 4.1, 4th
-Message-ID: <1433120217-26814-1-git-send-email-k.kozlowski@samsung.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 1 Jun 2015 04:37:59 +0200
+Subject: QNAP TS-419: sata_mv fails to initialise with "can't set global
+ reset"
+In-Reply-To: <1433068534.5748.276.camel@debian.org>
+References: <1433068534.5748.276.camel@debian.org>
+Message-ID: <20150601023759.GA11354@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd and Olof,
+On Sun, May 31, 2015 at 11:35:34AM +0100, Ian Campbell wrote:
+> Hi,
+> 
+> After updating to 4.0.4 (from the Debian kernel package) my TS-419 can
+> no longer see its SATA disks. In dmesg I see:
+> 
+> [    2.599060] SCSI subsystem initialized
+> [    2.662882] libata version 3.00 loaded.
+> [    2.664776] sata_mv 0000:01:00.0: version 1.28
+> [    2.664888] pci 0000:00:01.0: enabling device (0140 -> 0143)
+> [    2.687579] sata_mv: can't set global reset
+> [    2.691825] sata_mv 0000:01:00.0: Driver probe function unexpectedly returned 1
+> [    2.734954] sata_mv f1080000.sata: version 1.28
+> [    2.735222] sata_mv f1080000.sata: slots 32 ports 2
+> [    2.773358] scsi host0: sata_mv
+> [    2.785712] scsi host1: sata_mv
+> [    2.796204] ata1: SATA max UDMA/133 irq 35
+> [    2.800359] ata2: SATA max UDMA/133 irq 35
+> [    3.120986] ata1: SATA link down (SStatus 0 SControl F300)
+> [    3.444974] ata2: SATA link down (SStatus 0 SControl F300)
+> 
+> The last version I tried which worked was the 3.18.5 package.
+> 
+> This is using kirkwood-ts419-6281.dtb, which given this I think is the
+> correct one:
+> 
+> [    0.000000] Linux version 4.0.0-2-kirkwood (debian-kernel at lists.debian.org) (gcc version 4.9.2 (Debian 4.9.2-18) ) #1 Debian 4.0.4-1 (2015-05-26)
+> [    0.000000] CPU: Feroceon 88FR131 [56251311] revision 1 (ARMv5TE), cr=0005397f
+> [    0.000000] CPU: VIVT data cache, VIVT instruction cache
+> [    0.000000] Machine model: QNAP TS419 family
+> [...]
+> [    0.044889] mvebu-soc-id: MVEBU SoC ID=0x6281, Rev=0x2
+> 
+> I can also see both PCI devices which IIRC is the main difference
+> between the 6281 and 6282.
+> 
+> I don't see anything in the git logs after 4.0 which looks like an
+> obviously related fix, but I'm currently building 4.1-rc5 to have a
+> check.
 
-This is fix from April which should be applied before [0].
-Apparently it was missed. I am sending it to you guys because
-Kukjin seems to be busy.
+Hi Ian
 
-Best regards,
-Krzysztof
+I just booted my QNAP TS-119P, and it found its disk. No message about
+missing reset.
 
-[0] http://www.spinics.net/lists/linux-samsung-soc/msg44937.html
+Since TS-419 is a four driver device, it does not use the internal
+SATA controllers for its disks, it uses a PCI controller. So i think
+this is somehow PCI related.
 
+Can you do a bissect?
 
-The following changes since commit 030bbdbf4c833bc69f502eae58498bc5572db736:
-
-  Linux 4.1-rc3 (2015-05-10 15:12:29 -0700)
-
-are available in the git repository at:
-
-  https://github.com/krzk/linux.git tags/samsung-fixes-4.1-4
-
-for you to fetch changes up to fe931229c61c04e0a7906c4ebef9623a4538a5ab:
-
-  ARM: exynos: Fix wake-up interrupts for Exynos3250 (2015-06-01 09:08:34 +0900)
-
-----------------------------------------------------------------
-Fix for Exynos3250 RTC wake-up interrupts after converting PMU
-wakeup to stacked domains. This allows waking up the device from
-suspend to RAM using S3C RTC driver (the RTC on SoC).
-
-The patch should be applied some time ago, unfortunately
-it seems it slipped through fingers.
-
-----------------------------------------------------------------
-Marc Zyngier (1):
-      ARM: exynos: Fix wake-up interrupts for Exynos3250
-
- arch/arm/mach-exynos/suspend.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+    Andrew
