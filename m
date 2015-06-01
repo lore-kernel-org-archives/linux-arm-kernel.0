@@ -1,277 +1,33 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Mon, 1 Jun 2015 11:52:57 -0500
-Subject: [PATCH 1/1] ARM: dts: imx7d: add cortex-a7 coresignt component
-In-Reply-To: <CANLsYkyKfasgcktpaWF1ej7ijT3tX4ifnFTF+TZYdW5-VfUAYQ@mail.gmail.com>
-References: <1432847432-30133-1-git-send-email-Frank.Li@freescale.com>
- <CANLsYkyKfasgcktpaWF1ej7ijT3tX4ifnFTF+TZYdW5-VfUAYQ@mail.gmail.com>
-Message-ID: <CAHrpEqSy0iSs7o2UKwo01jTaU6nwk90BwvwrKD5HqRCkWCx2-g@mail.gmail.com>
+From: linux-arm@myspectrum.nl (Jeroen Hofstee)
+Date: Mon, 01 Jun 2015 18:56:53 +0200
+Subject: [PATCH] ARM: dts: AM35xx: fix system control module clocks
+In-Reply-To: <1433172627-28052-1-git-send-email-t-kristo@ti.com>
+References: <alpine.DEB.2.02.1506010546510.14902@utopia.booyaka.com>
+ <1433172627-28052-1-git-send-email-t-kristo@ti.com>
+Message-ID: <556C8ED5.5050000@myspectrum.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 1, 2015 at 11:33 AM, Mathieu Poirier
-<mathieu.poirier@linaro.org> wrote:
-> On 28 May 2015 at 15:10,  <Frank.Li@freescale.com> wrote:
->> From: Frank Li <Frank.Li@freescale.com>
->>
->> Added etm, etb, funnel and replicator
->>
->> usage example:
->>
->>     echo 1 >/sys/bus/coresight/devices/30086000.etr/enable_sink
->>     echo 1 >/sys/bus/coresight/devices/3007c000.etm/enable_source
->>
->>         coresight-tmc 30086000.etr: TMC enabled
->>         coresight-replicator replicator.1: REPLICATOR enabled
->>         coresight-tmc 30084000.tmc: TMC enabled
->>         coresight-funnel 30083000.funnel: FUNNEL inport 0 enabled
->>         coresight-funnel 30041000.funnel: FUNNEL inport 0 enabled
->>         coresight-etm3x 3007c000.etm: ETM tracing enabled
->>
->>     etm enable here.
->>     trace data save at /dev/30086000.etr
->>
->>     cat /dev/30086000.etr > trace.data
->>
->>         coresight-tmc 30086000.etr: TMC read start
->>         coresight-tmc 30086000.etr: TMC read end
->>
->>     use ptm2human(https://github.com/hwangcc23/ptm2human) to show trace data
->>
->>     ptm2human -i trace.data
->>
->> Signed-off-by: Frank Li <Frank.Li@freescale.com>
->> ---
->>  arch/arm/boot/dts/imx7d.dtsi | 194 +++++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 194 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
->> index b4cd8fd..5347f05 100644
->> --- a/arch/arm/boot/dts/imx7d.dtsi
->> +++ b/arch/arm/boot/dts/imx7d.dtsi
->> @@ -121,6 +121,200 @@
->>                 clock-output-names = "osc";
->>         };
->>
->> +       etr at 0,30086000 {
->
-> Please get rid of the "0," after the @ sign.  Same for all the other entries.
->
->> +               compatible = "arm,coresight-tmc", "arm,primecell";
->> +               reg = <0x30086000 0x1000>;
->> +
->> +               coresight-default-sink;
->
-> The "coresight-default-sink" binding no longer exists - please remove.
->
->> +               clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
->> +               clock-names = "apb_pclk";
->> +
->> +               port {
->> +                       etr_in_port: endpoint {
->> +                               slave-mode;
->> +                               remote-endpoint = <&replicator_out_port1>;
->> +                       };
->> +               };
->> +       };
->> +
->> +       tpiu at 0,30087000 {
->> +               compatible = "arm,coresight-tpiu", "arm,primecell";
->> +               reg = <0x30087000 0x1000>;
->> +
->> +               clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
->> +               clock-names = "apb_pclk";
->> +               port {
->> +                       tpiu_in_port: endpoint at 0 {
->> +                               slave-mode;
->> +                               remote-endpoint = <&replicator_out_port1>;
->> +                       };
->> +               };
->> +       };
->> +
->> +       replicator {
->> +               /* non-configurable replicators don't show up on the
->> +                * AMBA bus.  As such no need to add "arm,primecell"
->> +                */
->> +               compatible = "arm,coresight-replicator";
->> +
->> +               ports {
->> +                       #address-cells = <1>;
->> +                       #size-cells = <0>;
->> +
->> +                       /* replicator output ports */
->> +                       port at 0 {
->> +                               reg = <0>;
->> +                               replicator_out_port0: endpoint {
->> +                                       remote-endpoint = <&tpiu_in_port>;
->> +                               };
->> +                       };
->> +
->> +                       port at 1 {
->> +                               reg = <1>;
->> +                               replicator_out_port1: endpoint {
->> +                                       remote-endpoint = <&etr_in_port>;
->> +                               };
->> +                       };
->> +
->> +                       /* replicator input port */
->> +                       port at 2 {
->> +                               reg = <0>;
->> +                               replicator_in_port0: endpoint {
->> +                                       slave-mode;
->> +                                       remote-endpoint = <&etf_out_port>;
->> +                               };
->> +                       };
->> +               };
->> +       };
->> +
->> +       etf at 0,30084000 {
->> +               compatible = "arm,coresight-tmc", "arm,primecell";
->> +               reg = <0x30084000 0x1000>;
->> +               clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
->> +               clock-names = "apb_pclk";
->> +
->> +               ports {
->> +                       #address-cells = <1>;
->> +                       #size-cells = <0>;
->> +
->> +                       port at 0 {
->> +                               reg = <0>;
->> +                               etf_in_port: endpoint {
->> +                                       slave-mode;
->> +                                       remote-endpoint = <&hugo_funnel_out_port0>;
->> +                               };
->> +                       };
->> +
->> +                       port at 1 {
->> +                               reg = <0>;
->> +                               etf_out_port: endpoint {
->> +                                       remote-endpoint = <&replicator_in_port0>;
->> +                               };
->> +                       };
->> +               };
->> +       };
->> +
->> +       funnel at 1,30083000 {
->> +               compatible = "arm,coresight-funnel", "arm,primecell";
->> +               reg = <0x30083000 0x1000>;
->> +               clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
->> +               clock-names = "apb_pclk";
->> +
->> +               ports {
->> +                       #address-cells = <1>;
->> +                       #size-cells = <0>;
->> +
->> +                       /* funnel input ports */
->> +                       port at 0 {
->> +                               reg = <0>;
->> +                               hugo_funnel_in_port0: endpoint {
->> +                                       slave-mode;
->> +                                       remote-endpoint = <&ca_funnel_out_port0>;
->> +                               };
->> +                       };
->> +
->> +                       port at 1 {
->> +                               reg = <1>;
->> +                               hugo_funnel_in_port1: endpoint {
->> +                                       slave-mode; /* M4 input */
->> +                               };
->> +                       };
->
-> Please indicate what the other input ports are connected to.  If they
-> aren't connected to anything please make it explicit.
->
->> +
->> +                       port at 2 {
->> +                               reg = <0>;
->> +                               hugo_funnel_out_port0: endpoint {
->> +                                       remote-endpoint = <&etf_in_port>;
->> +                               };
->> +                       };
->> +               };
->> +       };
->> +
->> +       funnel at 0,30041000 {
->> +               compatible = "arm,coresight-funnel", "arm,primecell";
->> +               reg = <0x30041000 0x1000>;
->> +               clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
->> +               clock-names = "apb_pclk";
->> +
->> +               ports {
->> +                       #address-cells = <1>;
->> +                       #size-cells = <0>;
->> +
->> +                       /* funnel input ports */
->> +                       port at 0 {
->> +                               reg = <0>;
->> +                               ca_funnel_in_port0: endpoint {
->> +                                       slave-mode;
->> +                                       remote-endpoint = <&etm0_out_port>;
->> +                               };
->> +                       };
->> +
->> +                       port at 1 {
->> +                               reg = <1>;
->> +                               ca_funnel_in_port1: endpoint {
->> +                                       slave-mode;
->> +                                       remote-endpoint = <&etm1_out_port>;
->> +                               };
->> +                       };
->
-> Same comment as above.
->
->> +
->> +                       /* funnel output port */
->> +                       port at 2 {
->> +                               reg = <0>;
->> +                               ca_funnel_out_port0: endpoint {
->> +                                       remote-endpoint = <&hugo_funnel_in_port0>;
->> +                               };
->> +                       };
->> +               };
->> +       };
->> +
->> +       etm at 0,3007c000 {
->> +               compatible = "arm,coresight-etm3x", "arm,primecell";
->> +               reg = <0x3007c000 0x1000>;
->> +               cpu = <&cpu0>;
->> +               clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
->> +               clock-names = "apb_pclk";
->> +
->> +               port {
->> +                       etm0_out_port: endpoint {
->> +                               remote-endpoint = <&ca_funnel_in_port0>;
->> +                       };
->> +               };
->> +       };
->> +
->> +       etm at 1,3007d000 {
->> +               compatible = "arm,coresight-etm3x", "arm,primecell";
->> +               reg = <0x3007d000 0x1000>;
->> +               arm,primecell-periphid =  <0xbb956>;
->
-> Why adding the peripheral ID here when none of the other component have it?
+Hello Tero,
 
-That's because system will halt if kernel command line added no-smp.
-
-amb bus try to read ID but core1 power off at that time.
-
-If add "arm,primecell-periphid", ambbus driver will skip read ID.
-
+On 01-06-15 17:30, Tero Kristo wrote:
+> New system control module layout for omap3 overlooked parts of the am35xx
+> configuration. Basically the am35xx clocks were not converted to use the
+> changed offsets, which caused weird boot warnings. The errors were not
+> fatal so far, so they were not caught earlier. Fixed by applying the
+> proper offsets for the AM35xx scm clocks.
 >
->> +               cpu = <&cpu1>;
->> +               clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
->> +               clock-names = "apb_pclk";
->> +
->> +               port {
->> +                       etm1_out_port: endpoint {
->> +                               remote-endpoint = <&ca_funnel_in_port1>;
->> +                       };
->> +               };
->> +       };
->> +
->>         soc {
->>                 #address-cells = <1>;
->>                 #size-cells = <1>;
->> --
->> 1.9.1
->>
+> Fixes: b8845074cf ("ARM: dts: omap3: add minimal l4 bus layout with...")
+>
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> Reported-by: Jeroen Hofstee <linux-arm@myspectrum.nl>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> ---
+>   arch/arm/boot/dts/am35xx-clocks.dtsi |   14 +++++++-------
+>   1 file changed, 7 insertions(+), 7 deletions(-)
+With this patch the error interrupt / stack dumps are no longer present.
+
+Thanks,
+
+Tested-by: Jeroen Hofstee <jeroen@myspectrum.nl>
