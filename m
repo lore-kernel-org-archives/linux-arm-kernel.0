@@ -1,49 +1,47 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 1 Jun 2015 08:05:23 +0100
-Subject: [PATCH] ARM: sti: fix documentation reference
-In-Reply-To: <20150601033447.GS2282@tarshish>
-References: <d0f22751247391d5f7f1b8ebec507a8e0c4b4943.1430395589.git.baruch@tkos.co.il>
- <20150512185649.GB2558@tarshish> <5552F5EB.6020604@st.com>
- <20150601033447.GS2282@tarshish>
-Message-ID: <20150601070523.GA3329@x1>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 01 Jun 2015 09:12:55 +0200
+Subject: linux-next: manual merge of the arm-soc tree with Linus' tree
+In-Reply-To: <20150601102511.316f0262@canb.auug.org.au>
+References: <20150601102511.316f0262@canb.auug.org.au>
+Message-ID: <556C05F7.70302@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 01 Jun 2015, Baruch Siach wrote:
+Hi,
 
-> Hi Patrice, STi maintainers,
+On 06/01/2015 02:25 AM, Stephen Rothwell wrote:
+> Hi all,
 > 
-> On Wed, May 13, 2015 at 08:57:47AM +0200, Patrice Chotard wrote:
-> > On 05/12/2015 08:56 PM, Baruch Siach wrote:
-> > >On Thu, Apr 30, 2015 at 03:06:29PM +0300, Baruch Siach wrote:
-> > >>Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> > >>---
-> > >>  arch/arm/mach-sti/Kconfig | 2 +-
-> > >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> > >>
-> > >>diff --git a/arch/arm/mach-sti/Kconfig b/arch/arm/mach-sti/Kconfig
-> > >>index 3b1ac463a494..f7d42ddf95f6 100644
-> > >>--- a/arch/arm/mach-sti/Kconfig
-> > >>+++ b/arch/arm/mach-sti/Kconfig
-> > >>@@ -17,7 +17,7 @@ menuconfig ARCH_STI
-> > >>  	help
-> > >>  	  Include support for STiH41x SOCs like STiH415/416 using the device tree
-> > >>  	  for discovery
-> > >>-	  More information at Documentation/arm/STiH41x and
-> > >>+	  More information at Documentation/arm/sti and
-> > >>  	  at Documentation/devicetree
-> > >Ping?
-> >
-> > Sorry for the late answer
-> > 
-> > Acked-by: Patrice Chotard <patrice.chotard@st.com>
+> Today's linux-next merge of the arm-soc tree got a conflict in
+> arch/arm/boot/dts/zynq-7000.dtsi between commit 9eeb5161397a ("ARM:
+> zynq: DT: Use the zynq binding with macb") from Linus' tree and commit
+> 4481b18b7cf0 ("ARM: zynq: DT: Use the zynq binding with macb") from the
+> arm-soc tree.
 > 
-> Thanks. One last ping.
+> I fixed it up (it looks like that latter is a newer version of the
+> former, so I used it) and can carry the fix as necessary (no action
+> is required).
+> 
 
-https://lkml.org/lkml/2015/5/7/551
+David applied v1 of the patch. I have applied v2 (pulled via arm-soc)
+which also keep backward compatible string. There should be two
+compatible strings.
+
+Thanks,
+Michal
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150601/e2dc8a5c/attachment.sig>
