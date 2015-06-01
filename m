@@ -1,260 +1,72 @@
-From: Frank.Li@freescale.com (Frank.Li at freescale.com)
-Date: Tue, 2 Jun 2015 04:54:41 +0800
-Subject: [PATCH V2 1/1] ARM: dts: imx7d: add cortex-a7 coresight component
-Message-ID: <1433192081-1131-1-git-send-email-Frank.Li@freescale.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 1 Jun 2015 13:59:53 -0700
+Subject: [GIT PULL] omap fixes for v4.1, urgent fix to avoid potential
+ hardware damage
+Message-ID: <20150601205952.GF30984@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Li <Frank.Li@freescale.com>
+Hi,
 
-Added etm, etb, funnel and replicator
+Here's a pull request to fix potential hardware breaking configuration
+on BeagleBones. For the other fixes, apologies for these coming in so
+late, seems that people have been busy finding regressions.
 
-usage example:
+Regards,
 
-    echo 1 >/sys/bus/coresight/devices/30086000.etr/enable_sink
-    echo 1 >/sys/bus/coresight/devices/3007c000.etm/enable_source
+Tony
 
-        coresight-tmc 30086000.etr: TMC enabled
-        coresight-replicator replicator.1: REPLICATOR enabled
-        coresight-tmc 30084000.tmc: TMC enabled
-        coresight-funnel 30083000.funnel: FUNNEL inport 0 enabled
-        coresight-funnel 30041000.funnel: FUNNEL inport 0 enabled
-        coresight-etm3x 3007c000.etm: ETM tracing enabled
 
-    etm enable here.
-    trace data save at /dev/30086000.etr
+The following changes since commit f25bf74c8862efdc30453d16d60cf22958a4873e:
 
-    cat /dev/30086000.etr > trace.data
+  ARM: dts: Fix WLAN interrupt line for AM335x EVM-SK (2015-05-20 10:00:10 -0700)
 
-        coresight-tmc 30086000.etr: TMC read start
-        coresight-tmc 30086000.etr: TMC read end
+are available in the git repository at:
 
-    use ptm2human(https://github.com/hwangcc23/ptm2human) to show trace data
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.1/fixes-rc6
 
-    ptm2human -i trace.data
+for you to fetch changes up to 7a6cb0abe1aa63334f3ded6d2b6c8eca80e72302:
 
-Signed-off-by: Frank Li <Frank.Li@freescale.com>
----
-Change from V1 to V2
- - remove "0" after @
- - add comments about unused funnel input port
- - add comments about add  arm,primecell-periphid
+  ARM: dts: am335x-boneblack: disable RTC-only sleep to avoid hardware damage (2015-06-01 12:48:23 -0700)
 
- arch/arm/boot/dts/imx7d.dtsi | 202 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 202 insertions(+)
+----------------------------------------------------------------
+Omap fixes for the -rc cycle, including a fix for potential hardware
+breakage on BeagleBones:
 
-diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-index b4cd8fd..d715501 100644
---- a/arch/arm/boot/dts/imx7d.dtsi
-+++ b/arch/arm/boot/dts/imx7d.dtsi
-@@ -121,6 +121,208 @@
- 		clock-output-names = "osc";
- 	};
- 
-+	etr at 30086000 {
-+		compatible = "arm,coresight-tmc", "arm,primecell";
-+		reg = <0x30086000 0x1000>;
-+
-+		clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
-+		clock-names = "apb_pclk";
-+
-+		port {
-+			etr_in_port: endpoint {
-+				slave-mode;
-+				remote-endpoint = <&replicator_out_port1>;
-+			};
-+		};
-+	};
-+
-+	tpiu at 30087000 {
-+		compatible = "arm,coresight-tpiu", "arm,primecell";
-+		reg = <0x30087000 0x1000>;
-+
-+		clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
-+		clock-names = "apb_pclk";
-+		port {
-+			tpiu_in_port: endpoint at 0 {
-+				slave-mode;
-+				remote-endpoint = <&replicator_out_port1>;
-+			};
-+		};
-+	};
-+
-+	replicator {
-+		/* non-configurable replicators don't show up on the
-+		 * AMBA bus.  As such no need to add "arm,primecell"
-+		 */
-+		compatible = "arm,coresight-replicator";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			/* replicator output ports */
-+			port at 0 {
-+				reg = <0>;
-+				replicator_out_port0: endpoint {
-+					remote-endpoint = <&tpiu_in_port>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				replicator_out_port1: endpoint {
-+					remote-endpoint = <&etr_in_port>;
-+				};
-+			};
-+
-+			/* replicator input port */
-+			port at 2 {
-+				reg = <0>;
-+				replicator_in_port0: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&etf_out_port>;
-+				};
-+			};
-+		};
-+	};
-+
-+	etf at 30084000 {
-+		compatible = "arm,coresight-tmc", "arm,primecell";
-+		reg = <0x30084000 0x1000>;
-+		clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
-+		clock-names = "apb_pclk";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				etf_in_port: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&hugo_funnel_out_port0>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <0>;
-+				etf_out_port: endpoint {
-+					remote-endpoint = <&replicator_in_port0>;
-+				};
-+			};
-+		};
-+	};
-+
-+	funnel at 30083000 {
-+		compatible = "arm,coresight-funnel", "arm,primecell";
-+		reg = <0x30083000 0x1000>;
-+		clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
-+		clock-names = "apb_pclk";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			/* funnel input ports */
-+			port at 0 {
-+				reg = <0>;
-+				hugo_funnel_in_port0: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&ca_funnel_out_port0>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				hugo_funnel_in_port1: endpoint {
-+					slave-mode; /* M4 input */
-+				};
-+			};
-+
-+			port at 2 {
-+				reg = <0>;
-+				hugo_funnel_out_port0: endpoint {
-+					remote-endpoint = <&etf_in_port>;
-+				};
-+			};
-+
-+			/* the other input ports are not connect to anything */
-+		};
-+	};
-+
-+	funnel at 30041000 {
-+		compatible = "arm,coresight-funnel", "arm,primecell";
-+		reg = <0x30041000 0x1000>;
-+		clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
-+		clock-names = "apb_pclk";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			/* funnel input ports */
-+			port at 0 {
-+				reg = <0>;
-+				ca_funnel_in_port0: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&etm0_out_port>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				ca_funnel_in_port1: endpoint {
-+					slave-mode;
-+					remote-endpoint = <&etm1_out_port>;
-+				};
-+			};
-+
-+			/* funnel output port */
-+			port at 2 {
-+				reg = <0>;
-+				ca_funnel_out_port0: endpoint {
-+					remote-endpoint = <&hugo_funnel_in_port0>;
-+				};
-+			};
-+
-+			/* the other input ports are not connect to anything */
-+		};
-+	};
-+
-+	etm at 3007c000 {
-+		compatible = "arm,coresight-etm3x", "arm,primecell";
-+		reg = <0x3007c000 0x1000>;
-+		cpu = <&cpu0>;
-+		clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
-+		clock-names = "apb_pclk";
-+
-+		port {
-+			etm0_out_port: endpoint {
-+				remote-endpoint = <&ca_funnel_in_port0>;
-+			};
-+		};
-+	};
-+
-+	etm at 3007d000 {
-+		compatible = "arm,coresight-etm3x", "arm,primecell";
-+		reg = <0x3007d000 0x1000>;
-+
-+		/* System will hang if added nosmp in kernel command line
-+		 * without arm,primecell-periphid because amba bus try to
-+		 * read id and core1 power off at this time.
-+		 */
-+		arm,primecell-periphid =  <0xbb956>;
-+		cpu = <&cpu1>;
-+		clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
-+		clock-names = "apb_pclk";
-+
-+		port {
-+			etm1_out_port: endpoint {
-+				remote-endpoint = <&ca_funnel_in_port1>;
-+			};
-+		};
-+	};
-+
- 	soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
--- 
-1.9.1
+- BeagleBones don't support RTC-only mode, it can cause hardware
+  damage if system-power-controller is specified without
+  ti,pmic-shutdown-controller
+
+- Fix a recent regression to am3517 SoCs caused by the recent clock
+  move that was not noticed until now despite automated boot
+  testing
+
+- Fix a regression for n900 touchscreen triggered by recent
+  recent input changes
+
+- Fix compatible property for dm816x USB to avoid errors with
+  USB Ethernet
+
+- Fix oops for omap3 when built with CONFIG_THUMB2_KERNEL
+
+----------------------------------------------------------------
+Matthijs van Duin (1):
+      ARM: dts: am335x-boneblack: disable RTC-only sleep to avoid hardware damage
+
+Pavel Machek (1):
+      ARM: dts: Fix n900 dts file to work around 4.1 touchscreen regression on n900
+
+Tero Kristo (1):
+      ARM: dts: AM35xx: fix system control module clocks
+
+Tony Lindgren (2):
+      ARM: OMAP3: Fix booting with thumb2 kernel
+      ARM: dts: Fix dm816x to use right compatible flag for MUSB
+
+ .../bindings/input/touchscreen/tsc2005.txt         |  4 ++--
+ arch/arm/boot/dts/am335x-bone-common.dtsi          | 19 +++++++++++++++++++
+ arch/arm/boot/dts/am35xx-clocks.dtsi               | 14 +++++++-------
+ arch/arm/boot/dts/dm816x.dtsi                      |  4 ++--
+ arch/arm/boot/dts/omap3-n900.dts                   |  4 ++--
+ arch/arm/mach-omap2/sleep34xx.S                    | 22 ++--------------------
+ 6 files changed, 34 insertions(+), 33 deletions(-)
