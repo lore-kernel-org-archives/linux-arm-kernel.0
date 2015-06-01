@@ -1,27 +1,32 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 01 Jun 2015 08:18:36 +0100
-Subject: [PATCH v2 3/4] clk: stm32: Add clock driver for STM32F4[23]xxx
- devices
-In-Reply-To: <55697FCE.9040003@gmail.com>
-References: <1432327273-6810-1-git-send-email-daniel.thompson@linaro.org>
- <1432972448-10332-1-git-send-email-daniel.thompson@linaro.org>
- <1432972448-10332-4-git-send-email-daniel.thompson@linaro.org>
- <55697FCE.9040003@gmail.com>
-Message-ID: <556C074C.4010302@linaro.org>
+From: borntraeger@de.ibm.com (Christian Borntraeger)
+Date: Mon, 01 Jun 2015 09:35:57 +0200
+Subject: [PATCH 0/5] Remove s390 sw-emulated hugepages and cleanup
+In-Reply-To: <1432813957-46874-1-git-send-email-dingel@linux.vnet.ibm.com>
+References: <1432813957-46874-1-git-send-email-dingel@linux.vnet.ibm.com>
+Message-ID: <556C0B5D.40205@de.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/05/15 10:15, Maxime Coquelin wrote:
-> Hi Daniel,
->
->      Nice driver, please find my comments below.
->
->      Once fixed, you can add:
-> Reviewed-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+Am 28.05.2015 um 13:52 schrieb Dominik Dingel:
+> Hi everyone,
+> 
+> there is a potential bug with KVM and hugetlbfs if the hardware does not
+> support hugepages (EDAT1).
+> We fix this by making EDAT1 a hard requirement for hugepages and 
+> therefore removing and simplifying code.
 
-Thanks for the review.
+The cleanup itself is nice and probably the right thing to do. 
+Emulating large pages makes the code more complex and asks for
+trouble (as outlined above)
 
-No concerns at my end. I'll act on all of the issues you raised.
+The only downside that I see is that z/VM as of today does not
+announce EDAT1 for its guests so the "emulated" large pages for
+hugetlbfs would be useful in that case. The current code allocates
+the page table only once and shares it for all mappers - which is
+useful for some big databases that spawn hundreds of processes with
+shared mappings of several hundred GBs. In these cases we do save
+a decent amount of page table memory. 
 
+Not sure if that case is actually important, though.
 
-Daniel.
+Christian
