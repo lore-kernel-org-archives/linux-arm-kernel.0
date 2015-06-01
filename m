@@ -1,36 +1,31 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 1 Jun 2015 10:28:04 +0100
-Subject: [PATCH 3/6] drivers: firmware: psci: move power_state handling
- to generic code
-In-Reply-To: <1432901799-18359-4-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1432901799-18359-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1432901799-18359-4-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20150601092804.GB1641@arm.com>
+From: borntraeger@de.ibm.com (Christian Borntraeger)
+Date: Mon, 01 Jun 2015 11:21:19 +0200
+Subject: [PATCH v2] arm/arm64: KVM: Properly account for guest CPU time
+In-Reply-To: <20150601090817.GA18722@cbox>
+References: <1432838950-28774-1-git-send-email-christoffer.dall@linaro.org>
+ <556C0E22.9090401@de.ibm.com> <20150601090817.GA18722@cbox>
+Message-ID: <556C240F.5070501@de.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 29, 2015 at 01:16:36PM +0100, Lorenzo Pieralisi wrote:
-> Functions implemented on arm64 to check if a power_state parameter
-> is valid and if the power_state implies context loss are not
-> arm64 specific and should be moved to generic code so that they
-> can be reused on arm systems too.
-> 
-> This patch moves the functions handling the power_state parameter
-> to generic PSCI firmware layer code.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> ---
->  arch/arm64/kernel/psci.c | 14 --------------
->  drivers/firmware/psci.c  | 15 +++++++++++++++
->  include/linux/psci.h     |  2 ++
->  3 files changed, 17 insertions(+), 14 deletions(-)
+Am 01.06.2015 um 11:08 schrieb Christoffer Dall:
 
-Looks fine to me:
+>>>
+>>> Second, looking at the ppc and mips code, they seem to also call
+>>> kvm_guest_exit() before enabling interrupts, so I don't understand how
+>>> guest CPU time accounting works on those architectures.
+>>
+>> Not an expert here, but I assume mips has the same logic as arm so if your
+>> patch is right for arm its probably also for mips.
+>>
+>> powerpc looks similar to what s390 does (not using the tick, instead it uses
+>> a hw-timer) so this should be fine.
+>>
+> I wonder if we can simply enable HAVE_VIRT_CPU_ACCOUNTING_GEN and get
+> this for free which would avoid the need for this patch?
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+Asssuming that HAVE_VIRT_CPU_ACCOUNTING_GEN behaves similar to 
+HAVE_VIRT_CPU_ACCOUNTING on s390/power in respect to not rely on ticks
+- yes it might work out. Can you give it a try?
 
-Will
+Christian
