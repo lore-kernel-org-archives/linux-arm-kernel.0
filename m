@@ -1,59 +1,56 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 1 Jun 2015 04:50:50 +0200
-Subject: QNAP TS-419: sata_mv fails to initialise with "can't set global
- reset"
-In-Reply-To: <1433068534.5748.276.camel@debian.org>
-References: <1433068534.5748.276.camel@debian.org>
-Message-ID: <20150601025050.GB11354@lunn.ch>
+From: ruchandani.tina@gmail.com (Tina Ruchandani)
+Date: Mon, 1 Jun 2015 08:36:18 +0530
+Subject: [PATCH] drm/exynos: g2d: Replace struct timeval usage
+Message-ID: <20150601030618.GA2754@tinar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 31, 2015 at 11:35:34AM +0100, Ian Campbell wrote:
-> Hi,
-> 
-> After updating to 4.0.4 (from the Debian kernel package) my TS-419 can
-> no longer see its SATA disks. In dmesg I see:
-> 
-> [    2.599060] SCSI subsystem initialized
-> [    2.662882] libata version 3.00 loaded.
-> [    2.664776] sata_mv 0000:01:00.0: version 1.28
-> [    2.664888] pci 0000:00:01.0: enabling device (0140 -> 0143)
-> [    2.687579] sata_mv: can't set global reset
-> [    2.691825] sata_mv 0000:01:00.0: Driver probe function unexpectedly returned 1
-> [    2.734954] sata_mv f1080000.sata: version 1.28
-> [    2.735222] sata_mv f1080000.sata: slots 32 ports 2
-> [    2.773358] scsi host0: sata_mv
-> [    2.785712] scsi host1: sata_mv
-> [    2.796204] ata1: SATA max UDMA/133 irq 35
-> [    2.800359] ata2: SATA max UDMA/133 irq 35
-> [    3.120986] ata1: SATA link down (SStatus 0 SControl F300)
-> [    3.444974] ata2: SATA link down (SStatus 0 SControl F300)
-> 
-> The last version I tried which worked was the 3.18.5 package.
-> 
-> This is using kirkwood-ts419-6281.dtb, which given this I think is the
-> correct one:
-> 
-> [    0.000000] Linux version 4.0.0-2-kirkwood (debian-kernel at lists.debian.org) (gcc version 4.9.2 (Debian 4.9.2-18) ) #1 Debian 4.0.4-1 (2015-05-26)
-> [    0.000000] CPU: Feroceon 88FR131 [56251311] revision 1 (ARMv5TE), cr=0005397f
-> [    0.000000] CPU: VIVT data cache, VIVT instruction cache
-> [    0.000000] Machine model: QNAP TS419 family
-> [...]
-> [    0.044889] mvebu-soc-id: MVEBU SoC ID=0x6281, Rev=0x2
-> 
-> I can also see both PCI devices which IIRC is the main difference
-> between the 6281 and 6282.
-> 
-> I don't see anything in the git logs after 4.0 which looks like an
-> obviously related fix, but I'm currently building 4.1-rc5 to have a
-> check.
+'struct timeval' uses a 32-bit seconds representation which
+will overflow in the year 2038 and beyond. This patch
+replaces the use of struct timeval with struct timespec64
+which uses a 64-bit seconds representation and is y2038 safe.
+
+The patch is part of a larger effort to remove all 32-bit
+timekeeping variables (timeval, time_t and timespec) from the
+kernel.
+
+Signed-off-by: Tina Ruchandani <ruchandani.tina@gmail.com>
+---
+ drivers/gpu/drm/exynos/exynos_drm_g2d.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_g2d.c b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
+index 81a2508..69e236f 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_g2d.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
+@@ -15,6 +15,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/slab.h>
++#include <linux/time64.h>
+ #include <linux/workqueue.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/dma-attrs.h>
+@@ -889,7 +890,7 @@ static void g2d_finish_event(struct g2d_data *g2d, u32 cmdlist_no)
+ 	struct drm_device *drm_dev = g2d->subdrv.drm_dev;
+ 	struct g2d_runqueue_node *runqueue_node = g2d->runqueue_node;
+ 	struct drm_exynos_pending_g2d_event *e;
+-	struct timeval now;
++	struct timespec64 now;
+ 	unsigned long flags;
  
-Hi Ian
-
-You might also want to try 
-
-http://comments.gmane.org/gmane.linux.ports.arm.kernel/416589
-
-In particular the first patch.
-
-  Andrew
+ 	if (list_empty(&runqueue_node->event_list))
+@@ -898,9 +899,9 @@ static void g2d_finish_event(struct g2d_data *g2d, u32 cmdlist_no)
+ 	e = list_first_entry(&runqueue_node->event_list,
+ 			     struct drm_exynos_pending_g2d_event, base.link);
+ 
+-	do_gettimeofday(&now);
++	getnstimeofday64(&now);
+ 	e->event.tv_sec = now.tv_sec;
+-	e->event.tv_usec = now.tv_usec;
++	e->event.tv_usec = (now.tv_nsec / NSEC_PER_USEC);
+ 	e->event.cmdlist_no = cmdlist_no;
+ 
+ 	spin_lock_irqsave(&drm_dev->event_lock, flags);
+-- 
+2.2.0.rc0.207.ga3a616c
