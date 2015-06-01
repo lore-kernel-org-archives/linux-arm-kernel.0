@@ -1,52 +1,74 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 1 Jun 2015 09:56:05 +0100
-Subject: [PATCH 05/98] exynos_drm.h: use __u64 from linux/types.h
-In-Reply-To: <556C15BA.7000909@amd.com>
-References: <1433000370-19509-1-git-send-email-mikko.rapeli@iki.fi>
- <1433000370-19509-6-git-send-email-mikko.rapeli@iki.fi>
- <20150530164655.GM2067@n2100.arm.linux.org.uk>
- <556C15BA.7000909@amd.com>
-Message-ID: <20150601085605.GN2067@n2100.arm.linux.org.uk>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 1 Jun 2015 10:56:35 +0200
+Subject: [GIT PULL] ARM: mediatek: arm64 updates for v4.2
+In-Reply-To: <2507882.daayE1Zgb4@wuerfel>
+References: <CABuKBeLhFR=94cF301wL7J8hJVTtyseoD7g45PLE6znQkPAFGQ@mail.gmail.com>
+ <20150529164605.GA3022@codeaurora.org>
+ <CABuKBeJzTXrRRoAAL7m1=HAP8pR5vrp-tK7vj2oym8KYwTA+Cg@mail.gmail.com>
+ <2507882.daayE1Zgb4@wuerfel>
+Message-ID: <CABuKBeK+LT4UDKe0P=vswEXTUevcSNTf2Gn0cdMQ7r=tj2JmOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 01, 2015 at 10:20:10AM +0200, Christian K?nig wrote:
-> Using types that differs on 32-bit and 64-bit machines for a kernel
-> interface is indeed a rather bad idea. This not only includes longs, but
-> pointers as well.
+2015-06-01 10:11 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
+> On Monday 01 June 2015 10:07:40 Matthias Brugger wrote:
+>> 2015-05-29 18:46 GMT+02:00 Stephen Boyd <sboyd@codeaurora.org>:
+>> > On 05/29, Arnd Bergmann wrote:
+>> >> On Friday 29 May 2015 14:58:29 Sascha Hauer wrote:
+>> >> > On Fri, May 29, 2015 at 02:07:40PM +0200, Arnd Bergmann wrote:
+>> >> > > On Friday 29 May 2015 14:04:32 Arnd Bergmann wrote:
+>> >> > > > On Wednesday 27 May 2015 17:14:08 Matthias Brugger wrote:
+>> >> > > > > - dts: fixup pinctrl mt8173
+>> >> > > > > - dts: mt8173-evb fix model name
+>> >> > > > > - dts: mt8173 fix identation
+>> >> > > > > - dts: mt8173 add clock controller
+>> >> > > > > - dts: mt8173 change uart clocks
+>> >> > > > > - dts: mt8173 add pmic wrapper
+>> >> > > > >
+>> >> > > >
+>> >> > > > Pulled into next/dt, thanks!
+>> >> > > >
+>> >> > >
+>> >> > > Dropped it again, after getting a build error:
+>> >> > >
+>> >> > >   DTC     arch/arm64/boot/dts/mediatek/mt8173-evb.dtb
+>> >> > > In file included from ../arch/arm64/boot/dts/mediatek/mt8173-evb.dts:16:0:
+>> >> > > ../arch/arm64/boot/dts/mediatek/mt8173.dtsi:14:42: fatal error: dt-bindings/clock/mt8173-clk.h: No such file or directory
+>> >> > >  #include <dt-bindings/clock/mt8173-clk.h>
+>> >> > >                                           ^
+>> >> > >
+>> >> > > Please fix and resubmit.
+>> >> >
+>> >> > These come from the clk tree. My original suggestion was to pull in this
+>> >> > dts changes late after -rc1.
+>> >>
+>> >> Please don't do it that way. If you can't figure out a way to
+>> >> avoid the dependency, just stage it out over an extra merge window
+>> >> and add the driver first and the dt changes the next time.
+>> >>
+>> >> > Other possibility: Stephen, can you provide
+>> >> > a stable commit containing the Mediatek clk changes?
+>> >>
+>> >> That would work.
+>> >
+>> > Or another possibility, put the same header file into the branch
+>> > you send to arm-soc. Git will figure out that the files are
+>> > exactly the same and there's no cross tree dependency.
+>>
+>> OK, I will do that.
+>>
+>
+> If you put the same file in two branches, please use the same commit
+> ID. While git can figure it out when everything goes right, it will
+> fail horribly if one of the branches later gets a patch on top that
+> modifies the file, before the two branches get merged.
 
-[cut standard stdint.h types argument which we've heard before]
+I just saw, that the commit in question has dependencies to other commits.
+So I decided I will drop the patches which cause problems. They should
+go into the next merge window.
 
-You need to read Linus' rant on this subject:
-
- From: Linus Torvalds <torvalds@osdl.org>
- Subject: Re: [RFC] Splitting kernel headers and deprecating __KERNEL__
- Date: Mon, 29 Nov 2004 01:30:46 GMT
-
- Ok, this discussion has gone on for too long anyway, but let's make it
- easier for everybody. The kernel uses u8/u16/u32 because:
-
-         - the kernel should not depend on, or pollute user-space naming.
-           YOU MUST NOT USE "uint32_t" when that may not be defined, and
-           user-space rules for when it is defined are arcane and totally
-           arbitrary.
-
-         - since the kernel cannot use those types for anything that is
-           visible to user space anyway, there has to be alternate names.
-           The tradition is to prepend two underscores, so the kernel would
-           have to use "__uint32_t" etc for its header files.
-
-         - at that point, there's no longer any valid argument that it's a
-           "standard type" (it ain't), and I personally find it a lot more
-           readable to just use the types that the kernel has always used:
-           __u8/__u16/__u32. For stuff that is only used for the kernel,
-           the shorter "u8/u16/u32" versions may be used.
-
- In short: having the kernel use the same names as user space is ACTIVELY
- BAD, exactly because those names have standards-defined visibility, which
- means that the kernel _cannot_ use them in all places anyway. So don't
- even _try_.
+Regards,
+Matthias
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+motzblog.wordpress.com
