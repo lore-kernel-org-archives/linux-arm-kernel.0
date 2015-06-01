@@ -1,55 +1,95 @@
-From: imp@bsdimp.com (Warner Losh)
-Date: Mon, 1 Jun 2015 09:19:31 -0600
-Subject: Device Tree Blob (DTB) licence
-In-Reply-To: <20150601141240.216d8146@lxorguk.ukuu.org.uk>
-References: <1430820315.19516.26.camel@opteya.com>
- <CAL_Jsq+T5c7qornpRVCduEjUSCeM+0xqbtVYovtH76y=4BqhLQ@mail.gmail.com>
- <1432289148.5304.58.camel@opteya.com> <1432322832.5304.63.camel@opteya.com>
- <CAOS_Y6Q37ps+VEnzUZ_uwX++qrRm9Hgx45Q_pmiZSLSNjmKwZg@mail.gmail.com>
- <55670AD4.8020705@melag.de> <20150528133429.GD2067@n2100.arm.linux.org.uk>
- <556747E4.6070403@melag.de> <20150529064741.GB25351@1wt.eu>
- <55684F07.7050402@melag.de>
- <alpine.DEB.2.02.1505291512000.4429@nftneq.ynat.uz>
- <20150601141240.216d8146@lxorguk.ukuu.org.uk>
-Message-ID: <48C6A1C9-0959-4E88-8646-45FA2C18A776@bsdimp.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 1 Jun 2015 17:21:11 +0200
+Subject: Please revert 3eea8b5d68c801fec788b411582b803463834752 as it
+ breaks touchscreen on n900.
+In-Reply-To: <20150601145825.GA20557@lukather>
+References: <20150529193211.GA7599@amd>
+ <20150529194955.GV2026@saruman.tx.rr.com>
+ <20150529195629.GA9811@amd> <20150529201745.GC17267@lukather>
+ <20150529202123.GY2026@saruman.tx.rr.com>
+ <20150529202954.GA26494@localhost> <20150529203456.GC22083@amd>
+ <20150601095556.GH17267@lukather> <20150601140605.GA26908@amd>
+ <20150601145825.GA20557@lukather>
+Message-ID: <20150601152111.GA14015@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> On Jun 1, 2015, at 7:12 AM, One Thousand Gnomes <gnomes@lxorguk.ukuu.org.uk> wrote:
+
+> > > > The 3eea8b5d68c801fec788b411582b803463834752 is just bad.
+> > > 
+> > > You were very welcome to review this patch at the time and/or suggest
+> > > a fix that pleases everyone.
+> > 
+> > You should be the one that should suggest fixes, as you broke it in
+> > the first place. But clearly you don't understand that.
 > 
->> not true, with a proprietary bios it's a clear "pay this much money and don't
->> worry about it" while with GPL there's a nagging fear that someone you never
->> heard of may sue you a decade from now claiming you need to give them the source
->> to your OS.
+> You actually never asked for a fix, and went head first calling this
+> patch "bad" and asking for nothing but reverting it.
+
+Date: Fri, 29 May 2015 21:08:16 +0200
+Subject: 4.1 touchscreen regression on n900 -- pinpointed [was Re:
+linux-n900
+...
+Maxime, can you suggest a fix?
+...
+
+
+> diff --git a/drivers/input/touchscreen/of_touchscreen.c b/drivers/input/touchscreen/of_touchscreen.c
+> index b82b5207c78b..7e98c2e443ab 100644
+> --- a/drivers/input/touchscreen/of_touchscreen.c
+> +++ b/drivers/input/touchscreen/of_touchscreen.c
+> @@ -14,10 +14,10 @@
+>  #include <linux/input/mt.h>
+>  #include <linux/input/touchscreen.h>
+>  
+> -static u32 of_get_optional_u32(struct device_node *np,
+> +static int of_get_optional_u32(struct device_node *np,
+>  			       const char *property)
+>  {
+> -	u32 val = 0;
+> +	int val = -1;
+>  
+>  	of_property_read_u32(np, property, &val);
+>  
+> @@ -42,8 +42,12 @@ static void touchscreen_set_params(struct input_dev *dev,
+>  	}
+>  
+>  	absinfo = &dev->absinfo[axis];
+> -	absinfo->maximum = max;
+> -	absinfo->fuzz = fuzz;
+> +
+> +	if (max >= 0)
+> +		absinfo->maximum = max;
+> +
+> +	if (fuzz >= 0)
+> +		absinfo->fuzz = fuzz;
+>  }
+>  
+>  /**
+> @@ -57,7 +61,7 @@ static void touchscreen_set_params(struct input_dev *dev,
+>  void touchscreen_parse_of_params(struct input_dev *dev)
+>  {
+>  	struct device_node *np = dev->dev.parent->of_node;
+> -	u32 maximum, fuzz;
+> +	int maximum, fuzz;
+>  
+>  	input_alloc_absinfo(dev);
+>  	if (!dev->absinfo)
+> -- >8 --
 > 
-> Not really no - the number of companies who bought proprietary products,
-> resold them and then got sued because their supplier was cavalier is
-> huge.
+> That reduces the max size of the screens, but I don't really expect the screen
+> size to reach that order of magnitude before a few years...
 
-I follow the suits pretty closely, and the number is tiny. There?s a huge hue
-and cry, sure. But the number is small compared to the offenses. And the outcomes
-aren?t always what one would hope. The big guys with staying power care.
-The rest are hit or miss.
+Umm. Won't you have to update
 
->> note, this whole discussion assumes that the DTB is even copyrightable. Since
->> it's intended to be strictly a functional description of what the hardware is
->> able to do, that could be questioned
-> 
-> I imagine you can write a DTB that is copyrightable and one that isn't.
-> 
-> However this is all missing one important point. Whoever wrote their DTB
-> gets to decide how they license it. It's nobody else's business.
+-     if (maximum || fuzz)
++     if (maximum >= 0 || fuzz >= 0)
 
-Actually it is other people?s business. There?s no harm in asking for a license
-that would help the whole ecosystem.
+? Thanks,
 
-Warner
+									Pavel
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 842 bytes
-Desc: Message signed with OpenPGP using GPGMail
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150601/2165484f/attachment.sig>
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
