@@ -1,44 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 01 Jun 2015 20:35:02 +0200
-Subject: [GIT PULL] qcom SoC changes for 4.2-1
-In-Reply-To: <2248044.jBzoST62A5@wuerfel>
-References: <alpine.DEB.2.02.1505261449220.26936@galak-ubuntu.qualcomm.com>
- <alpine.DEB.2.02.1505281055020.17861@galak-ubuntu.qualcomm.com>
- <2248044.jBzoST62A5@wuerfel>
-Message-ID: <3126465.IVbQcV0VyT@wuerfel>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 1 Jun 2015 13:34:47 -0500
+Subject: [PATCH v4 0/2] Remaining sunxi musb patches
+In-Reply-To: <79fc4306-a621-43b8-b347-e42a27beb134@googlegroups.com>
+References: <1433088626-8858-1-git-send-email-hdegoede@redhat.com>
+ <79fc4306-a621-43b8-b347-e42a27beb134@googlegroups.com>
+Message-ID: <20150601183447.GF26081@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 May 2015 14:42:01 Arnd Bergmann wrote:
-> On Thursday 28 May 2015 10:55:39 Kumar Gala wrote:
-> > Qualcomm ARM Based SoC Updates for v4.2-1
-> > 
-> > * Added Subsystem Power Manager (SPM) driver
-> > * Split out 32-bit specific SCM code
-> > * Added HDCP SCM call
-> > 
-> > 
+On Mon, Jun 01, 2015 at 11:30:45AM -0700, Hans de Goede wrote:
+> Hi,
 > 
-> Pulled into next/drivers, thanks!
+> On Sunday, May 31, 2015 at 6:10:32 PM UTC+2, Hans de Goede wrote:
+> >
+> > Hi Kishon & Felipe, 
+> >
+> > Here is an updated version of the remaining (not yet merged in Felipe's 
+> > tree) 
+> > sunxi musb patches. 
+> >
+> > The "phy-sun4i-usb: Add full support for usb0 phy / OTG" patch has been 
+> > updated with a small bug-fix and is ready for merging. 
+> >
+> > The "musb: Add support for the Allwinner sunxi musb" patch has been 
+> > updated 
+> > to use the latest version of Maxime's sunxi sram controller driver. This 
+> > one has a compile-time dependency on Maxime's sunxi sram controller 
+> > driver, 
+> > so it cannot be merged until that is merged. 
+> >
 > 
+> 
+> Arnd has just merged the updated sram controller into the next branch
+> of the soc-drivers repo, so both these patches are now ready to merge.
 
-I've had to apply this patch on top of our for-next branch to make it
-build for randconfig.
+all right, so for v4.3 merge window there will be no issues in queues
+the two remaining patches. Thanks
 
-Can you check that this makes sense?
-
-	Arnd
-
-diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
-index 5eea374c8fa6..01aa2fd3514d 100644
---- a/drivers/soc/qcom/Kconfig
-+++ b/drivers/soc/qcom/Kconfig
-@@ -13,6 +13,8 @@ config QCOM_GSBI
- config QCOM_PM
- 	bool "Qualcomm Power Management"
- 	depends on ARCH_QCOM && !ARM64
-+	select QCOM_SCM
-+	select ARM_CPU_SUSPEND
- 	help
- 	  QCOM Platform specific power driver to manage cores and L2 low power
- 	  modes. It interface with various system drivers to put the cores in
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150601/29dfe505/attachment.sig>
