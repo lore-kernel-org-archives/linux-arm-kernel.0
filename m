@@ -1,28 +1,42 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Tue, 2 Jun 2015 09:39:27 +1000
-Subject: [linux-sunxi] [PATCH 1/2] clk: sunxi: Add support for the usb-clk
- on sun8i a23 and a33 SoCs
-In-Reply-To: <1433183008-13086-1-git-send-email-hdegoede@redhat.com>
-References: <1433183008-13086-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <CAGRGNgXHa1K=xmF8_R9y8RJT6Y-zxmfsU19_V41gweqaZg+hVg@mail.gmail.com>
+From: k.kozlowski.k@gmail.com (=?UTF-8?Q?Krzysztof_Koz=C5=82owski?=)
+Date: Tue, 2 Jun 2015 08:51:11 +0900
+Subject: Exynos 5410 support (was [PATCH 6/6] ARM: dts: exynos5420: add
+ sysmmu nodes)
+In-Reply-To: <556CAE98.1080906@smart-cactus.org>
+References: <1432041645-11172-1-git-send-email-m.szyprowski@samsung.com>
+ <1433153450-3680-1-git-send-email-m.szyprowski@samsung.com>
+ <1433153450-3680-7-git-send-email-m.szyprowski@samsung.com>
+ <556CAE98.1080906@smart-cactus.org>
+Message-ID: <CAJKOXPf1FA7exH=Qj-dKjuH0heYXVy0tUK-ZwayC40b_0eLb6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+2015-06-02 4:12 GMT+09:00 Ben Gamari <ben@smart-cactus.org>:
+> On 06/01/2015 06:10 AM, Marek Szyprowski wrote:
+>>
+>> This patch adds System MMU nodes to all defined devices that are specific
+>> to Exynos5420/5800/5422 series.
+>
+>
 
-On Tue, Jun 2, 2015 at 4:23 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> The usb-clk on sun8i a23 and a33 SoCs is similar to the ones found
-> on sun6i-a31 SoCs but instead of a 3th phy the a23 / a33 have a hsic
-> interface which gets enabled by almost the same bits as used on
-> the a31 for the 3th phy, but not exactly the same bits so we need
-> a new compatible for this.
+(...)
 
-Minor spelling note: it's "3rd" not "3th".
+> Worse, the few patches
+> that have been submitted for the 5410 have languished in queue-purgatory.
 
-Thanks,
+What patches do you have in mind?
 
--- 
-Julian Calaby
+Beside of that actually many submissions for different Exynos SoCs and
+parts of it were ignored on the list. It is a pity because that means
+someone's effort got lost.
+Recently I tried to help in that matter and replied to some emails
+about resubmitting. If you have anything pending just please let me
+know.
 
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+To make it clear - I am speaking for myself, not for any company or
+employer. Also I do not know anything about other people's motivation
+behind doing patches only for chosen SoCs. I leave these questions to
+them.
+
+Best regards,
+Krzysztof
