@@ -1,68 +1,44 @@
-From: lho@apm.com (Loc Ho)
-Date: Mon, 1 Jun 2015 10:26:30 -0700
-Subject: [PATCH 2/3] edac: Add L3/SoC support to the APM X-Gene SoC EDAC
- driver
-In-Reply-To: <20150601114346.GA10169@pd.tnic>
-References: <1432937075-16558-1-git-send-email-lho@apm.com>
- <1432937075-16558-2-git-send-email-lho@apm.com>
- <1432937075-16558-3-git-send-email-lho@apm.com>
- <20150601114346.GA10169@pd.tnic>
-Message-ID: <CAPw-ZTkDuN4+OSRbiR=REPtTiFxWSh6XNq5uG8AopZGy__9qhg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 1 Jun 2015 10:31:27 -0700
+Subject: [PATCH] ARM: dts: AM35xx: fix system control module clocks
+In-Reply-To: <556C8ED5.5050000@myspectrum.nl>
+References: <alpine.DEB.2.02.1506010546510.14902@utopia.booyaka.com>
+ <1433172627-28052-1-git-send-email-t-kristo@ti.com>
+ <556C8ED5.5050000@myspectrum.nl>
+Message-ID: <20150601173126.GY30984@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* Jeroen Hofstee <linux-arm@myspectrum.nl> [150601 09:58]:
+> Hello Tero,
+> 
+> On 01-06-15 17:30, Tero Kristo wrote:
+> >New system control module layout for omap3 overlooked parts of the am35xx
+> >configuration. Basically the am35xx clocks were not converted to use the
+> >changed offsets, which caused weird boot warnings. The errors were not
+> >fatal so far, so they were not caught earlier. Fixed by applying the
+> >proper offsets for the AM35xx scm clocks.
+> >
+> >Fixes: b8845074cf ("ARM: dts: omap3: add minimal l4 bus layout with...")
+> >
+> >Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> >Reported-by: Jeroen Hofstee <linux-arm@myspectrum.nl>
+> >Cc: Paul Walmsley <paul@pwsan.com>
+> >Cc: Tony Lindgren <tony@atomide.com>
+> >---
+> >  arch/arm/boot/dts/am35xx-clocks.dtsi |   14 +++++++-------
+> >  1 file changed, 7 insertions(+), 7 deletions(-)
+> With this patch the error interrupt / stack dumps are no longer present.
+> 
+> Thanks,
+> 
+> Tested-by: Jeroen Hofstee <jeroen@myspectrum.nl>
 
->> +static struct edac_dev_sysfs_attribute xgene_edac_l3_sysfs_attributes[] = {
->> +     { .attr = {
->> +               .name = "inject_ctrl",
->> +               .mode = (S_IRUGO | S_IWUSR)
->> +       },
->> +      .show = xgene_edac_l3_inject_ctrl_show,
->> +      .store = xgene_edac_l3_inject_ctrl_store },
->> +
->> +     /* End of list */
->> +     { .attr = {.name = NULL } }
->> +};
->
-> Why are those sysfs nodes? Didn't we say that inject nodes should be in
-> debugfs?
->
-> So I'm going to stop looking here and wait for you to do the same
-> changes to L3 and SOC as for the rest of the driver. Go through what
-> just went upstream and do the same changes to that patch instead of
-> blindly resending the original version.
->
-> It is not a competition who gets their stuff upstream first, ok?!
+Thanks, I'm suprised this was not caught earlier with all the automated
+boot testing going on?
 
-Sorry about this and being a bit careless here.
+Anyways, applying into omap-for-v4.1/fixes.
 
->
->> +
->> +     if (edac_op_state == EDAC_OPSTATE_POLL)
->> +             edac_dev->edac_check = xgene_edac_l3_check;
->> +
->> +     edac_dev->sysfs_attributes = xgene_edac_l3_sysfs_attributes;
->> +
->> +     rc = edac_device_add_device(edac_dev);
->> +     if (rc > 0) {
->> +             dev_err(edac->dev, "failed edac_device_add_device()\n");
->> +             rc = -ENOMEM;
->> +             goto err1;
->> +     }
->> +
->> +     if (edac_op_state == EDAC_OPSTATE_INT)
->> +             edac_dev->op_state = OP_RUNNING_INTERRUPT;
->> +
->> +     list_add(&ctx->next, &edac->l3s);
->> +
->> +     xgene_edac_l3_hw_init(edac_dev, 1);
->
-> Shouldn't you init the hw regs *before* you add it to the list of l3s
-> and *not* after?
+Regards,
 
-I want to make sure that the node is added in case there is an pending
-interrupt. Otherwise, it will not get cleared and will continuously
-generates interrupt.
-
--Loc
+Tony
