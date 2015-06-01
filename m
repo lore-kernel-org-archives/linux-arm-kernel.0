@@ -1,18 +1,25 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 01 Jun 2015 09:07:00 +0900
-Subject: [PATCH 00/12] i2c: pxa: Fixes,
- cleanup and support for pxa910  family
-In-Reply-To: <1432818224-17070-1-git-send-email-vaibhav.hiremath@linaro.org>
+Date: Mon, 01 Jun 2015 09:13:03 +0900
+Subject: [PATCH 04/12] i2c: pxa: Add support for pxa910/988 & new
+ configuration features
+In-Reply-To: <1432818224-17070-5-git-send-email-vaibhav.hiremath@linaro.org>
 References: <1432818224-17070-1-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <fb192019ec75e9aa10b04b79e87a6e79@the-dreams.de>
+ <1432818224-17070-5-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <4edfb7fe9edf4800e73c86a258fe4fd1@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> TODO:
->   - Due to lack of client driver support as of now, could not
->     able to do functionality testing from client. I am working
->     on PMIC driver support which is over I2C, so will have good
->     meaningful testing then.
+On 2015-05-28 22:03, Vaibhav Hiremath wrote:
+> From: "Jett.Zhou" <jtzhou@marvell.com>
+>
+> TWSI_ILCR & TWSI_IWCR registers are used to adjust clock rate
+> of standard & fast mode in pxa910/988; so this patch adds these two 
+> new
+> entries to "struct pxa_reg_layout" and "struct pxa_i2c" and also adds 
+> two
+> new DT properties to take configuration value for the same.
 
-Okay, thanks for the info. So, unless this is done I'll consider these
-patches as RFC.
+Mapping registers 1:1 to DT is nearly always wrong. We have some 
+generic bindings for SCL/SDA tweaking. Check 
+Documentation/devicetree/bindings/i2c/i2c-designware.txt for them and if 
+they match your needs. (Yes, they should be in a more generic place).
