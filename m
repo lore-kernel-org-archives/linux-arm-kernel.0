@@ -1,57 +1,67 @@
-From: christian.koenig@amd.com (=?UTF-8?B?Q2hyaXN0aWFuIEvDtm5pZw==?=)
-Date: Mon, 1 Jun 2015 10:20:10 +0200
-Subject: [PATCH 05/98] exynos_drm.h: use __u64 from linux/types.h
-In-Reply-To: <20150530164655.GM2067@n2100.arm.linux.org.uk>
-References: <1433000370-19509-1-git-send-email-mikko.rapeli@iki.fi>
- <1433000370-19509-6-git-send-email-mikko.rapeli@iki.fi>
- <20150530164655.GM2067@n2100.arm.linux.org.uk>
-Message-ID: <556C15BA.7000909@amd.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 1 Jun 2015 09:22:00 +0100
+Subject: [PATCH 4/4] mfd: 88pm800: allocate pdata->rtc if not allocated
+ earlier
+In-Reply-To: <1432937962-4537-5-git-send-email-vaibhav.hiremath@linaro.org>
+References: <1432937962-4537-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1432937962-4537-5-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <20150601082200.GC3329@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.05.2015 18:46, Russell King - ARM Linux wrote:
-> On Sat, May 30, 2015 at 05:37:57PM +0200, Mikko Rapeli wrote:
->> Fixes userspace compilation error:
->>
->> drm/exynos_drm.h:30:2: error: unknown type name ?uint64_t?
->>
->> Signed-off-by: Mikko Rapeli <mikko.rapeli@iki.fi>
-> This is another thing which we need to address.  We should not be using
-> unsigned int/unsigned long/uintXX_t/etc in here, but the __uXX and __sXX
-> types.
->
-> The lesson learned from other DRM developers is that using these types
-> simplifies the API especially when it comes to the differences between
-> 32-bit and 64-bit machines, and compat applications.
->
-> Note that drm/drm.h is all that should need to be included - drm/drm.h
-> takes care of including linux/types.h when building on Linux platforms.
-> (note: if your compiler doesn't set __linux__ then you're probably not
-> using the proper compiler...)
->
+On Sat, 30 May 2015, Vaibhav Hiremath wrote:
 
-Using types that differs on 32-bit and 64-bit machines for a kernel 
-interface is indeed a rather bad idea. This not only includes longs, but 
-pointers as well.
+> RTC in pmic 88PM800 can run even the core is powered off, and user
+> can set alarm in RTC. When the alarm is timed out, the PMIC will power up
+> the core, and the whole system will boot up. And during PMIC driver probe,
+> it will read some register to find out whether this boot is caused by RTC
+> timeout or not, and pass on this information to the RTC driver.
+> 
+> So we need rtc platform data to be existed in PMIC driver to pass this
+> information.
+> 
+> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+> ---
+>  drivers/mfd/88pm800.c | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+> 
+> diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
+> index 8ea4467..34546a1 100644
+> --- a/drivers/mfd/88pm800.c
+> +++ b/drivers/mfd/88pm800.c
+> @@ -586,6 +586,25 @@ static int pm800_probe(struct i2c_client *client,
+>  			return ret;
+>  	}
+>  
+> +	/*
+> +	 * RTC in pmic can run even the core is powered off, and user can set
+> +	 * alarm in RTC. When the alarm is time out, the PMIC will power up
+> +	 * the core, and the whole system will boot up. When PMIC driver is
+> +	 * probed, it will read out some register to find out whether this
+> +	 * boot is caused by RTC timeout or not, and it need pass this
+> +	 * information to RTC driver.
+> +	 * So we need rtc platform data to be existed to pass this information.
+> +	 */
+> +	if (!pdata->rtc) {
+> +		pdata->rtc = devm_kzalloc(&client->dev,
+> +					  sizeof(*(pdata->rtc)), GFP_KERNEL);
+> +		if (!pdata->rtc) {
+> +			dev_err(&client->dev,
+> +					"failed to allocate memory for rtc\n");
+> +			return -ENOMEM;
+> +		}
+> +	}
+> +
 
-But the int8_t, int16_t int32_t, int64_t and their unsigned counterparts 
-are defined in stdint.h which is part of the ISO/IEC 9899:1999 standard, 
-similar is true for size_t.
+Where is this memory first used?
 
-The __uXX, __sXX and _kernel_size_t types are linux specific as far as I 
-know.
+>  	ret = pm80x_init(client);
+>  	if (ret) {
+>  		dev_err(&client->dev, "pm800_init fail\n");
 
-For best interoperability and standard conformance I think that 
-definitions from the C standard we use should out-rule linux specific 
-definitions.
-
-Additional to that "linux/types.h" is not part of the uapi as far as I 
-know, so including it in a header which is part of the uapi should be 
-forbidden.
-
-So this is a NAK from my side for the whole series, userspace programs 
-should include <stdint.h> for the definition of the ISO/IEC 9899:1999 
-standard types if necessary.
-
-Regards,
-Christian.
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
