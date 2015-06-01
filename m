@@ -1,21 +1,28 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Mon, 01 Jun 2015 19:07:02 +0100
-Subject: [PATCH] ARM: dts: sun6i: Add a dts file for the Mele A1000G
- quad top set box
-In-Reply-To: <1433170979-13725-1-git-send-email-hdegoede@redhat.com>
-References: <1433170979-13725-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1433182022.5748.281.camel@hellion.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 01 Jun 2015 20:08:27 +0200
+Subject: [GIT PULL 3/4] ARM: imx: device tree changes for 4.2
+In-Reply-To: <CAOMZO5Co4w7AU7xLP1yq5gqkO0H8RdkxGSvoK-=62m62LEDkJg@mail.gmail.com>
+References: <1433145206-2508-1-git-send-email-shawn.guo@linaro.org>
+ <3918834.Y7ttkc5iBm@wuerfel>
+ <CAOMZO5Co4w7AU7xLP1yq5gqkO0H8RdkxGSvoK-=62m62LEDkJg@mail.gmail.com>
+Message-ID: <2377672.jjB42yabec@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-06-01 at 17:02 +0200, Hans de Goede wrote:
-> The Mele A1000G-quad and the Mele M9 have the same PCB, sofar we've been using
-> the same dts for both models. Unfortunately this does not work for the otg
-> controller, on the M9 this is routed to a micro-usb connector on the outside,
-> while as on the A1000G-quad it is connected to an usb to sata bridge
-> (which is not populated on the M9 pcb).
+On Monday 01 June 2015 13:52:53 Fabio Estevam wrote:
 > 
-> This commit adds a new dts for the Mele-A1000G-quad to allow using
-> different otg controller settings on the 2 boards.
+> Shouldn't it be like this instead?
+> 
+> --- a/drivers/clocksource/Kconfig
+> +++ b/drivers/clocksource/Kconfig
+> @@ -278,7 +278,7 @@ config CLKSRC_PXA
+> 
+>  config CLKSRC_IMX_GPT
+>         bool "Clocksource using i.MX GPT" if COMPILE_TEST
+> -       depends on OF
+> +       select CLKSRC_OF if OF
+>         select CLKSRC_MMIO
 
-But isn't intending to actually change the otg settings, right?
+Yes, that's better than my approach. Thanks for taking a closer look!
+
+	Arnd
