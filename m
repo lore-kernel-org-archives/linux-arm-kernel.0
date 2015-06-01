@@ -1,104 +1,52 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 01 Jun 2015 09:55:25 +0100
-Subject: [PATCH 2/4]: Change msi to support the Mbigen interrupt
-In-Reply-To: <55692C2D.50005@huawei.com>
-References: <55692C2D.50005@huawei.com>
-Message-ID: <556C1DFD.6000907@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 1 Jun 2015 09:56:05 +0100
+Subject: [PATCH 05/98] exynos_drm.h: use __u64 from linux/types.h
+In-Reply-To: <556C15BA.7000909@amd.com>
+References: <1433000370-19509-1-git-send-email-mikko.rapeli@iki.fi>
+ <1433000370-19509-6-git-send-email-mikko.rapeli@iki.fi>
+ <20150530164655.GM2067@n2100.arm.linux.org.uk>
+ <556C15BA.7000909@amd.com>
+Message-ID: <20150601085605.GN2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/05/15 04:19, majun (F) wrote:
-> This patch is applied to support the interrupts from Mbigen.
-> 
-> As a interrupt controller, Mbigen is used as a child domain of MSI
-> domain just like pci device.
-> 
-> Change log:
-> --add IRQ_DOMAIN_FLAG_MBIGEN to presents the interrupt from mbigen
-> --add function is_mbigen_domain to check the interrupt domain
-> --modified irq_chip_write_msi_msg to use the different message write function
->   for interrupt from mbigen
-> 
-> Signed-off-by: Ma Jun <majun258@huawei.com>
-> ---
->  include/linux/irqdomain.h |    2 +-
->  include/linux/msi.h       |    1 +
->  kernel/irq/msi.c          |   22 +++++++++++++++++++++-
->  3 files changed, 23 insertions(+), 2 deletions(-)
->  mode change 100644 => 100755 include/linux/msi.h
->  mode change 100644 => 100755 kernel/irq/msi.c
-> 
-> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-> index 676d730..cb6b33a 100644
-> --- a/include/linux/irqdomain.h
-> +++ b/include/linux/irqdomain.h
-> @@ -136,7 +136,7 @@ enum {
-> 
->  	/* Core calls alloc/free recursive through the domain hierarchy. */
->  	IRQ_DOMAIN_FLAG_AUTO_RECURSIVE	= (1 << 1),
-> -
-> +	IRQ_DOMAIN_FLAG_MBIGEN = (1 << 2),
->  	/*
->  	 * Flags starting from IRQ_DOMAIN_FLAG_NONCORE are reserved
->  	 * for implementation specific purposes and ignored by the
-> diff --git a/include/linux/msi.h b/include/linux/msi.h
-> old mode 100644
-> new mode 100755
-> index 8ac4a68..3e2b6c7
-> --- a/include/linux/msi.h
-> +++ b/include/linux/msi.h
-> @@ -239,5 +239,6 @@ irq_hw_number_t pci_msi_domain_calc_hwirq(struct pci_dev *dev,
->  int pci_msi_domain_check_cap(struct irq_domain *domain,
->  			     struct msi_domain_info *info, struct device *dev);
->  #endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
-> +bool is_mbigen_domain(struct irq_data *data);
-> 
->  #endif /* LINUX_MSI_H */
-> diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
-> old mode 100644
-> new mode 100755
-> index 474de5c..1dba07e
-> --- a/kernel/irq/msi.c
-> +++ b/kernel/irq/msi.c
-> @@ -31,11 +31,31 @@ void get_cached_msi_msg(unsigned int irq, struct msi_msg *msg)
->  }
->  EXPORT_SYMBOL_GPL(get_cached_msi_msg);
-> 
-> +bool is_mbigen_domain(struct irq_data *data)
-> +{
-> +	int virq;
-> +	struct irq_domain *domain;
-> +	struct irq_data *source_irq_data;
-> +
-> +	virq = data->irq;
-> +	source_irq_data = irq_get_irq_data(virq);
-> +	domain = source_irq_data->domain;
-> +
-> +	if (domain->flags & IRQ_DOMAIN_FLAG_MBIGEN)
-> +		return true;
-> +	else
-> +		return false;
-> +
-> +}
-> +
->  #ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
->  static inline void irq_chip_write_msi_msg(struct irq_data *data,
->  					  struct msi_msg *msg)
->  {
-> -	data->chip->irq_write_msi_msg(data, msg);
-> +	if (is_mbigen_domain(data))
-> +		data->chip->irq_write_mbi_msg(data, msg);
-> +	else
-> +		data->chip->irq_write_msi_msg(data, msg);
->  }
-> 
->  /**
-> 
+On Mon, Jun 01, 2015 at 10:20:10AM +0200, Christian K?nig wrote:
+> Using types that differs on 32-bit and 64-bit machines for a kernel
+> interface is indeed a rather bad idea. This not only includes longs, but
+> pointers as well.
 
-This is exactly why I dislike your approach. You start inventing weird
-and wonderful callbacks that serve no real purpose. What is wrong with
-the existing callback? you are passing the same times to it...
+[cut standard stdint.h types argument which we've heard before]
 
-	M.
+You need to read Linus' rant on this subject:
+
+ From: Linus Torvalds <torvalds@osdl.org>
+ Subject: Re: [RFC] Splitting kernel headers and deprecating __KERNEL__
+ Date: Mon, 29 Nov 2004 01:30:46 GMT
+
+ Ok, this discussion has gone on for too long anyway, but let's make it
+ easier for everybody. The kernel uses u8/u16/u32 because:
+
+         - the kernel should not depend on, or pollute user-space naming.
+           YOU MUST NOT USE "uint32_t" when that may not be defined, and
+           user-space rules for when it is defined are arcane and totally
+           arbitrary.
+
+         - since the kernel cannot use those types for anything that is
+           visible to user space anyway, there has to be alternate names.
+           The tradition is to prepend two underscores, so the kernel would
+           have to use "__uint32_t" etc for its header files.
+
+         - at that point, there's no longer any valid argument that it's a
+           "standard type" (it ain't), and I personally find it a lot more
+           readable to just use the types that the kernel has always used:
+           __u8/__u16/__u32. For stuff that is only used for the kernel,
+           the shorter "u8/u16/u32" versions may be used.
+
+ In short: having the kernel use the same names as user space is ACTIVELY
+ BAD, exactly because those names have standards-defined visibility, which
+ means that the kernel _cannot_ use them in all places anyway. So don't
+ even _try_.
+
 -- 
-Jazz is not dead. It just smells funny...
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
