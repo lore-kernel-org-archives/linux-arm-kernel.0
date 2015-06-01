@@ -1,39 +1,58 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 1 Jun 2015 19:51:54 +0200
-Subject: [PATCH v2 3/5] i2c: at91: add support for new alternative
- command mode
-In-Reply-To: <82c39f262f553a43ea9208b4f9804bbf26a62d90.1433173031.git.cyrille.pitchen@atmel.com>
-References: <cover.1433173031.git.cyrille.pitchen@atmel.com>
- <82c39f262f553a43ea9208b4f9804bbf26a62d90.1433173031.git.cyrille.pitchen@atmel.com>
-Message-ID: <20150601175154.GN4710@piout.net>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 01 Jun 2015 10:57:06 -0700
+Subject: [PATCH v6 2/3] ARM: bcm2835: Add the Raspberry Pi firmware driver
+In-Reply-To: <1433148509.2361.35.camel@x220>
+References: <1432928535-27522-1-git-send-email-eric@anholt.net>
+ <1432928535-27522-2-git-send-email-eric@anholt.net>
+ <1433148509.2361.35.camel@x220>
+Message-ID: <87vbf75n2l.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Paul Bolle <pebolle@tiscali.nl> writes:
 
-On 01/06/2015 at 17:49:13 +0200, Cyrille Pitchen wrote :
-> @@ -504,8 +589,22 @@ static int at91_twi_xfer(struct i2c_adapter *adap, struct i2c_msg *msg, int num)
->  		at91_twi_write(dev, AT91_TWI_IADR, internal_address);
->  	}
->  
-> -	at91_twi_write(dev, AT91_TWI_MMR, (m_start->addr << 16) | int_addr_flag
-> -		       | ((m_start->flags & I2C_M_RD) ? AT91_TWI_MREAD : 0));
-> +	is_read = (m_start->flags & I2C_M_RD);
-> +	if (dev->pdata->has_alt_cmd) {
-> +		if (m_start->len > 0) {
-> +			at91_twi_write(dev, AT91_TWI_CR, AT91_TWI_ACMEN);
-> +			at91_twi_write(dev, AT91_TWI_ACR,
-> +				       AT91_TWI_ACR_DATAL(m_start->len) |
-> +				       ((is_read) ? AT91_TWI_ACR_DIR : 0));
-> +			use_alt_cmd = true;
-> +		} else
-> +			at91_twi_write(dev, AT91_TWI_CR, AT91_TWI_ACMDIS);
+> On Fri, 2015-05-29 at 12:42 -0700, Eric Anholt wrote:
+>> This gives us a function for making mailbox property channel requests
+>> of the firmware, which is most notable in that it will let us get and
+>> set clock rates.
 
-braces {} should be used on all arms of this statement
+>> v6: Drop the try_module_get/module_put stuff, since all clients will
+>>     be referencing our symbols in order to call those functions,
+>>     anyway.  Fix the kerneldoc comments for the changes in v5.
+>
+> (This style of commit explanation is getting quite common. I must say I
+> rather dislike it. I think people should just update the entire commit
+> explanation when needed, and not simply paste any changes at the end of
+> it, thereby forcing the the reader to determine which older parts are
+> actually overruled by newer parts. Besides, many, or maybe even most, of
+> the changes are really not interesting enough to keep in the commit
+> explanation.)
 
+It was a slip-up that I didn't move it below the '---'this time (I
+changed my workflow a bit, and missed the step).  I was assuming that
+Lee would just trim them on pulling in the changes.
 
+>> --- /dev/null
+>> +++ b/drivers/firmware/raspberrypi.c
+>
+>> +EXPORT_SYMBOL_GPL(rpi_firmware_property_list);
+>
+>> +EXPORT_SYMBOL_GPL(rpi_firmware_property);
+>
+> A patch that uses these exports hit lkml recently:
+> https://lkml.org/lkml/2015/5/28/596 .
+>
+>> +EXPORT_SYMBOL_GPL(rpi_firmware_get);
+>
+> But I didn't spot a (recent) patch that uses this export. Is it queued
+> somewhere?
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+This is from the v5 changes due to review feedback, and the clients need
+to be changed to use it.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150601/419ffcda/attachment.sig>
