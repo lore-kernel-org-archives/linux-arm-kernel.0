@@ -1,54 +1,49 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 1 Jun 2015 13:01:37 -0700
-Subject: [PATCH] ARM: dts: am335x-boneblack: disable RTC-only sleep
-In-Reply-To: <20150601193328.GA27640@squirrel.local>
-References: <1432136322-7609-1-git-send-email-robertcnelson@gmail.com>
- <CAALWOA8ReuBSMcu5EvLOrKGfFGBGWSdMhpL_uSnL4QvTC-n8zg@mail.gmail.com>
- <CAOCHtYigGmDY6c8woQxwdy9kU0J1h258jZXL7g7=VdrxKJC9cA@mail.gmail.com>
- <CAALWOA9wyCsUQqER2Cqwru_2REpX6AeryWeoSuwZWDsdPPL+Ow@mail.gmail.com>
- <20150601172330.GX30984@atomide.com>
- <20150601193328.GA27640@squirrel.local>
-Message-ID: <20150601200137.GC30984@atomide.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon,  1 Jun 2015 13:22:00 -0700
+Subject: [PATCH] ARM: Enter CPU in ARM state for cpu_resume
+Message-ID: <1433190120-27798-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Matthijs van Duin <matthijsvanduin@gmail.com> [150601 12:35]:
-> On 1 June 2015 at 19:23, Tony Lindgren <tony@atomide.com> wrote:
-> > Ah finally you got around doing a proper patch :)
-> 
-> My First Linux Patch(tm) ;-)
+The standard boot protocol on ARM requires CPUs to be entered in
+the ARM state, unless they don't support the ARM instruction set
+(see Documentation/arm/Booting). On THUMB2 kernels, we assume
+the firmware can determine what state to enter the kernel in, but
+some firmwares don't honor the thumb bit. Make the cpu_resume
+symbol an ARM symbol, so that firmwares that honor the thumb bit
+will enter the kernel in ARM state and firmwares that don't honor
+the thumb bit will be able to enter the kernel in ARM state
+without more changes.
 
-Probably easier than trying to get other people to do the right
-thing by writing emails ;)
+This fixes a problem reported by Kevin Hilman where the ifc6410 
+fails to boot for THUMB2 kernels because the platform's firmware
+always enters the kernel in ARM mode from deep idle states.
+
+Reported-by: Kevin Hilman <khilman@linaro.org>
+Suggested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Lina Iyer <lina.iyer@linaro.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/kernel/sleep.S | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+index 76bb3128e135..7c289ebb0b45 100644
+--- a/arch/arm/kernel/sleep.S
++++ b/arch/arm/kernel/sleep.S
+@@ -118,7 +118,12 @@ ENDPROC(cpu_resume_after_mmu)
  
-> > Also, if this is needed as a fix for the mainline kernel to avoid hardware
-> > damage, please let me know too ASAP.
-> 
-> The damaging configuration is having &rtc { system-power-controller; }
-> without &tps { ti,pmic-shutdown-controller; }
-
-OK thanks updating the description with that.
- 
-> So 3d76be5b9 also avoids damage, but with the unfortunate side-effect
-> that the system doesn't power off at all anymore (it just halts). I do
-> recommend applying this patch (restyled as needed) before reverting
-> 3d76be5b9.
-> 
-> > Hmm no ideas about that, I guess people are using gmail to send email
-> > with smtps though?
-> 
-> Hmm, setting up mutt turned out less hassle than I remembered...
-> 
-> (Let's hope all goes well)
-> 
-> > Linux usually does not use the // style comments.. Can you please change
-> > that? And how about have just one section of comments then the entry
-> > for ti,pmic-shutdown-controller?
-> 
-> Fresh try...
-
-Thanks applying into omap-for-v4.1/fixes with Cc stable.
-
-Regards,
-
-Tony
+ 	.text
+ 	.align
++	.arm
+ ENTRY(cpu_resume)
++ THUMB(	badr	r9, 1f		)	@ Kernel is entered in ARM.
++ THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
++ THUMB(	.thumb			)	@ switch to Thumb now.
++ THUMB(1:			)
+ ARM_BE8(setend be)			@ ensure we are in BE mode
+ #ifdef CONFIG_ARM_VIRT_EXT
+ 	bl	__hyp_stub_install_secondary
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
