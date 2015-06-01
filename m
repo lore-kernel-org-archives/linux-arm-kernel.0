@@ -1,234 +1,63 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Mon,  1 Jun 2015 13:13:55 +0200
-Subject: [PATCH v3 3/3] clk: meson8b: Add support for Meson8b clocks
-In-Reply-To: <1433157235-17275-1-git-send-email-carlo@caione.org>
-References: <1433157235-17275-1-git-send-email-carlo@caione.org>
-Message-ID: <1433157235-17275-4-git-send-email-carlo@caione.org>
+From: ijc@debian.org (Ian Campbell)
+Date: Mon, 01 Jun 2015 12:14:03 +0100
+Subject: QNAP TS-419: sata_mv fails to initialise with "can't set global
+ reset"
+In-Reply-To: <20150601025050.GB11354@lunn.ch>
+References: <1433068534.5748.276.camel@debian.org>
+ <20150601025050.GB11354@lunn.ch>
+Message-ID: <1433157243.15036.116.camel@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Carlo Caione <carlo@endlessm.com>
+On Mon, 2015-06-01 at 04:50 +0200, Andrew Lunn wrote:
+> On Sun, May 31, 2015 at 11:35:34AM +0100, Ian Campbell wrote:
+> > Hi,
+> > 
+> > After updating to 4.0.4 (from the Debian kernel package) my TS-419 can
+> > no longer see its SATA disks. In dmesg I see:
+> > 
+> > [    2.599060] SCSI subsystem initialized
+> > [    2.662882] libata version 3.00 loaded.
+> > [    2.664776] sata_mv 0000:01:00.0: version 1.28
+> > [    2.664888] pci 0000:00:01.0: enabling device (0140 -> 0143)
+> > [    2.687579] sata_mv: can't set global reset
+> > [    2.691825] sata_mv 0000:01:00.0: Driver probe function unexpectedly returned 1
+> > [    2.734954] sata_mv f1080000.sata: version 1.28
+> > [    2.735222] sata_mv f1080000.sata: slots 32 ports 2
+> > [    2.773358] scsi host0: sata_mv
+> > [    2.785712] scsi host1: sata_mv
+> > [    2.796204] ata1: SATA max UDMA/133 irq 35
+> > [    2.800359] ata2: SATA max UDMA/133 irq 35
+> > [    3.120986] ata1: SATA link down (SStatus 0 SControl F300)
+> > [    3.444974] ata2: SATA link down (SStatus 0 SControl F300)
+> > 
+> > The last version I tried which worked was the 3.18.5 package.
+> > 
+> > This is using kirkwood-ts419-6281.dtb, which given this I think is the
+> > correct one:
+> > 
+> > [    0.000000] Linux version 4.0.0-2-kirkwood (debian-kernel at lists.debian.org) (gcc version 4.9.2 (Debian 4.9.2-18) ) #1 Debian 4.0.4-1 (2015-05-26)
+> > [    0.000000] CPU: Feroceon 88FR131 [56251311] revision 1 (ARMv5TE), cr=0005397f
+> > [    0.000000] CPU: VIVT data cache, VIVT instruction cache
+> > [    0.000000] Machine model: QNAP TS419 family
+> > [...]
+> > [    0.044889] mvebu-soc-id: MVEBU SoC ID=0x6281, Rev=0x2
+> > 
+> > I can also see both PCI devices which IIRC is the main difference
+> > between the 6281 and 6282.
+> > 
+> > I don't see anything in the git logs after 4.0 which looks like an
+> > obviously related fix, but I'm currently building 4.1-rc5 to have a
+> > check.
+>  
+> Hi Ian
+> 
+> You might also want to try 
+> 
+> http://comments.gmane.org/gmane.linux.ports.arm.kernel/416589
+> 
+> In particular the first patch.
 
-This patch adds support for the basic clocks found on the Amlogic
-Meson8b SoCs.
+Thanks, I'll try those before I bother with a bisect.
 
-Signed-off-by: Carlo Caione <carlo@endlessm.com>
----
- drivers/clk/meson/Makefile       |   1 +
- drivers/clk/meson/meson8b-clkc.c | 196 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 197 insertions(+)
- create mode 100644 drivers/clk/meson/meson8b-clkc.c
-
-diff --git a/drivers/clk/meson/Makefile b/drivers/clk/meson/Makefile
-index 66c6d8d..6d45531 100644
---- a/drivers/clk/meson/Makefile
-+++ b/drivers/clk/meson/Makefile
-@@ -3,3 +3,4 @@
- #
- 
- obj-y += clkc.o clk-pll.o clk-cpu.o
-+obj-y += meson8b-clkc.o
-diff --git a/drivers/clk/meson/meson8b-clkc.c b/drivers/clk/meson/meson8b-clkc.c
-new file mode 100644
-index 0000000..61f6d55
---- /dev/null
-+++ b/drivers/clk/meson/meson8b-clkc.c
-@@ -0,0 +1,196 @@
-+/*
-+ * Copyright (c) 2015 Endless Mobile, Inc.
-+ * Author: Carlo Caione <carlo@endlessm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/kernel.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/slab.h>
-+#include <dt-bindings/clock/meson8b-clkc.h>
-+
-+#include "clkc.h"
-+
-+#define MESON8B_REG_CTL0_ADDR		0x0000
-+#define MESON8B_REG_SYS_CPU_CNTL1	0x015c
-+#define MESON8B_REG_HHI_MPEG		0x0174
-+#define MESON8B_REG_MALI		0x01b0
-+#define MESON8B_REG_PLL_FIXED		0x0280
-+#define MESON8B_REG_PLL_SYS		0x0300
-+#define MESON8B_REG_PLL_VID		0x0320
-+
-+static const struct pll_rate_table sys_pll_rate_table[] = {
-+	PLL_RATE(312000000, 52, 1, 2),
-+	PLL_RATE(336000000, 56, 1, 2),
-+	PLL_RATE(360000000, 60, 1, 2),
-+	PLL_RATE(384000000, 64, 1, 2),
-+	PLL_RATE(408000000, 68, 1, 2),
-+	PLL_RATE(432000000, 72, 1, 2),
-+	PLL_RATE(456000000, 76, 1, 2),
-+	PLL_RATE(480000000, 80, 1, 2),
-+	PLL_RATE(504000000, 84, 1, 2),
-+	PLL_RATE(528000000, 88, 1, 2),
-+	PLL_RATE(552000000, 92, 1, 2),
-+	PLL_RATE(576000000, 96, 1, 2),
-+	PLL_RATE(600000000, 50, 1, 1),
-+	PLL_RATE(624000000, 52, 1, 1),
-+	PLL_RATE(648000000, 54, 1, 1),
-+	PLL_RATE(672000000, 56, 1, 1),
-+	PLL_RATE(696000000, 58, 1, 1),
-+	PLL_RATE(720000000, 60, 1, 1),
-+	PLL_RATE(744000000, 62, 1, 1),
-+	PLL_RATE(768000000, 64, 1, 1),
-+	PLL_RATE(792000000, 66, 1, 1),
-+	PLL_RATE(816000000, 68, 1, 1),
-+	PLL_RATE(840000000, 70, 1, 1),
-+	PLL_RATE(864000000, 72, 1, 1),
-+	PLL_RATE(888000000, 74, 1, 1),
-+	PLL_RATE(912000000, 76, 1, 1),
-+	PLL_RATE(936000000, 78, 1, 1),
-+	PLL_RATE(960000000, 80, 1, 1),
-+	PLL_RATE(984000000, 82, 1, 1),
-+	PLL_RATE(1008000000, 84, 1, 1),
-+	PLL_RATE(1032000000, 86, 1, 1),
-+	PLL_RATE(1056000000, 88, 1, 1),
-+	PLL_RATE(1080000000, 90, 1, 1),
-+	PLL_RATE(1104000000, 92, 1, 1),
-+	PLL_RATE(1128000000, 94, 1, 1),
-+	PLL_RATE(1152000000, 96, 1, 1),
-+	PLL_RATE(1176000000, 98, 1, 1),
-+	PLL_RATE(1200000000, 50, 1, 0),
-+	PLL_RATE(1224000000, 51, 1, 0),
-+	PLL_RATE(1248000000, 52, 1, 0),
-+	PLL_RATE(1272000000, 53, 1, 0),
-+	PLL_RATE(1296000000, 54, 1, 0),
-+	PLL_RATE(1320000000, 55, 1, 0),
-+	PLL_RATE(1344000000, 56, 1, 0),
-+	PLL_RATE(1368000000, 57, 1, 0),
-+	PLL_RATE(1392000000, 58, 1, 0),
-+	PLL_RATE(1416000000, 59, 1, 0),
-+	PLL_RATE(1440000000, 60, 1, 0),
-+	PLL_RATE(1464000000, 61, 1, 0),
-+	PLL_RATE(1488000000, 62, 1, 0),
-+	PLL_RATE(1512000000, 63, 1, 0),
-+	PLL_RATE(1536000000, 64, 1, 0),
-+	{ /* sentinel */ },
-+};
-+
-+static const struct clk_div_table cpu_div_table[] = {
-+	{ .val = 1, .div = 1 },
-+	{ .val = 2, .div = 2 },
-+	{ .val = 3, .div = 3 },
-+	{ .val = 2, .div = 4 },
-+	{ .val = 3, .div = 6 },
-+	{ .val = 4, .div = 8 },
-+	{ .val = 5, .div = 10 },
-+	{ .val = 6, .div = 12 },
-+	{ .val = 7, .div = 14 },
-+	{ .val = 8, .div = 16 },
-+	{ /* sentinel */ },
-+};
-+
-+PNAME(p_xtal)		= { "xtal" };
-+PNAME(p_fclk_div)	= { "fixed_pll" };
-+PNAME(p_cpu_clk)	= { "sys_pll" };
-+PNAME(p_clk81)		= { "fclk_div3", "fclk_div4", "fclk_div5" };
-+PNAME(p_mali)		= { "fclk_div3", "fclk_div4", "fclk_div5",
-+			    "fclk_div7", "zero" };
-+
-+static u32 mux_table_clk81[]	= { 6, 5, 7 };
-+static u32 mux_table_mali[]	= { 6, 5, 7, 4, 0 };
-+
-+static struct pll_conf pll_confs = {
-+	.m		= PARM(0x00, 0,  9),
-+	.n		= PARM(0x00, 9,  5),
-+	.od		= PARM(0x00, 16, 2),
-+};
-+
-+static struct pll_conf sys_pll_conf = {
-+	.m		= PARM(0x00, 0,  9),
-+	.n		= PARM(0x00, 9,  5),
-+	.od		= PARM(0x00, 16, 2),
-+	.rate_table	= sys_pll_rate_table,
-+};
-+
-+static const struct composite_conf clk81_conf __initconst = {
-+	.mux_table		= mux_table_clk81,
-+	.mux_flags		= CLK_MUX_READ_ONLY,
-+	.mux_parm		= PARM(0x00, 12, 3),
-+	.div_parm		= PARM(0x00, 0, 7),
-+	.gate_parm		= PARM(0x00, 7, 1),
-+};
-+
-+static const struct composite_conf mali_conf __initconst = {
-+	.mux_table		= mux_table_mali,
-+	.mux_parm		= PARM(0x00, 9, 3),
-+	.div_parm		= PARM(0x00, 0, 7),
-+	.gate_parm		= PARM(0x00, 8, 1),
-+};
-+
-+static const struct clk_conf meson8b_xtal_conf __initconst =
-+	FIXED_RATE_P(MESON8B_REG_CTL0_ADDR, CLKID_XTAL, "xtal",
-+		     CLK_IS_ROOT, PARM(0x00, 4, 7));
-+
-+static const struct clk_conf meson8b_clk_confs[] __initconst = {
-+	FIXED_RATE(CLKID_ZERO, "zero", CLK_IS_ROOT, 0),
-+	PLL(MESON8B_REG_PLL_FIXED, CLKID_PLL_FIXED, "fixed_pll",
-+	    p_xtal, 0, &pll_confs),
-+	PLL(MESON8B_REG_PLL_VID, CLKID_PLL_VID, "vid_pll",
-+	    p_xtal, 0, &pll_confs),
-+	PLL(MESON8B_REG_PLL_SYS, CLKID_PLL_SYS, "sys_pll",
-+	    p_xtal, 0, &sys_pll_conf),
-+	FIXED_FACTOR_DIV(CLKID_FCLK_DIV2, "fclk_div2", p_fclk_div, 0, 2),
-+	FIXED_FACTOR_DIV(CLKID_FCLK_DIV3, "fclk_div3", p_fclk_div, 0, 3),
-+	FIXED_FACTOR_DIV(CLKID_FCLK_DIV4, "fclk_div4", p_fclk_div, 0, 4),
-+	FIXED_FACTOR_DIV(CLKID_FCLK_DIV5, "fclk_div5", p_fclk_div, 0, 5),
-+	FIXED_FACTOR_DIV(CLKID_FCLK_DIV7, "fclk_div7", p_fclk_div, 0, 7),
-+	CPU(MESON8B_REG_SYS_CPU_CNTL1, CLKID_CPUCLK, "a5_clk", p_cpu_clk,
-+	    cpu_div_table),
-+	COMPOSITE(MESON8B_REG_HHI_MPEG, CLKID_CLK81, "clk81", p_clk81,
-+		  CLK_SET_RATE_NO_REPARENT | CLK_IGNORE_UNUSED, &clk81_conf),
-+	COMPOSITE(MESON8B_REG_MALI, CLKID_MALI, "mali", p_mali,
-+		  CLK_IGNORE_UNUSED, &mali_conf),
-+};
-+
-+static void __init meson8b_clkc_init(struct device_node *np)
-+{
-+	void __iomem *clk_base;
-+
-+	if (!meson_clk_init(np, CLK_NR_CLKS))
-+		return;
-+
-+	/* XTAL */
-+	clk_base = of_iomap(np, 0);
-+	if (!clk_base) {
-+		pr_err("%s: Unable to map xtal base\n", __func__);
-+		return;
-+	}
-+
-+	meson_clk_register_clks(&meson8b_xtal_conf, 1, clk_base);
-+	iounmap(clk_base);
-+
-+	/*  Generic clocks and PLLs */
-+	clk_base = of_iomap(np, 1);
-+	if (!clk_base) {
-+		pr_err("%s: Unable to map clk base\n", __func__);
-+		return;
-+	}
-+
-+	meson_clk_register_clks(meson8b_clk_confs,
-+				ARRAY_SIZE(meson8b_clk_confs),
-+				clk_base);
-+}
-+CLK_OF_DECLARE(meson8b_clock, "amlogic,meson8b-clkc", meson8b_clkc_init);
--- 
-1.9.1
+Ian.
