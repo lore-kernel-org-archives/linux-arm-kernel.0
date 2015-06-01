@@ -1,164 +1,65 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Mon,  1 Jun 2015 16:05:44 +0800
-Subject: [Patch v3 35/36] genirq: Pass irq_data to helper function
- __irq_set_chip_handler_name_locked()
-In-Reply-To: <1433145945-789-1-git-send-email-jiang.liu@linux.intel.com>
-References: <1433145945-789-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <1433145945-789-36-git-send-email-jiang.liu@linux.intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 01 Jun 2015 10:11:07 +0200
+Subject: [GIT PULL] ARM: mediatek: arm64 updates for v4.2
+In-Reply-To: <CABuKBeJzTXrRRoAAL7m1=HAP8pR5vrp-tK7vj2oym8KYwTA+Cg@mail.gmail.com>
+References: <CABuKBeLhFR=94cF301wL7J8hJVTtyseoD7g45PLE6znQkPAFGQ@mail.gmail.com>
+ <20150529164605.GA3022@codeaurora.org>
+ <CABuKBeJzTXrRRoAAL7m1=HAP8pR5vrp-tK7vj2oym8KYwTA+Cg@mail.gmail.com>
+Message-ID: <2507882.daayE1Zgb4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For most cases, callers pass irq_data->irq to helper function
-__irq_set_chip_handler_name_locked() and __irq_set_chip_handler_name_locked()
-looks up irq_data again by calling irq_get_irq_data(irq_data->irq).
+On Monday 01 June 2015 10:07:40 Matthias Brugger wrote:
+> 2015-05-29 18:46 GMT+02:00 Stephen Boyd <sboyd@codeaurora.org>:
+> > On 05/29, Arnd Bergmann wrote:
+> >> On Friday 29 May 2015 14:58:29 Sascha Hauer wrote:
+> >> > On Fri, May 29, 2015 at 02:07:40PM +0200, Arnd Bergmann wrote:
+> >> > > On Friday 29 May 2015 14:04:32 Arnd Bergmann wrote:
+> >> > > > On Wednesday 27 May 2015 17:14:08 Matthias Brugger wrote:
+> >> > > > > - dts: fixup pinctrl mt8173
+> >> > > > > - dts: mt8173-evb fix model name
+> >> > > > > - dts: mt8173 fix identation
+> >> > > > > - dts: mt8173 add clock controller
+> >> > > > > - dts: mt8173 change uart clocks
+> >> > > > > - dts: mt8173 add pmic wrapper
+> >> > > > >
+> >> > > >
+> >> > > > Pulled into next/dt, thanks!
+> >> > > >
+> >> > >
+> >> > > Dropped it again, after getting a build error:
+> >> > >
+> >> > >   DTC     arch/arm64/boot/dts/mediatek/mt8173-evb.dtb
+> >> > > In file included from ../arch/arm64/boot/dts/mediatek/mt8173-evb.dts:16:0:
+> >> > > ../arch/arm64/boot/dts/mediatek/mt8173.dtsi:14:42: fatal error: dt-bindings/clock/mt8173-clk.h: No such file or directory
+> >> > >  #include <dt-bindings/clock/mt8173-clk.h>
+> >> > >                                           ^
+> >> > >
+> >> > > Please fix and resubmit.
+> >> >
+> >> > These come from the clk tree. My original suggestion was to pull in this
+> >> > dts changes late after -rc1.
+> >>
+> >> Please don't do it that way. If you can't figure out a way to
+> >> avoid the dependency, just stage it out over an extra merge window
+> >> and add the driver first and the dt changes the next time.
+> >>
+> >> > Other possibility: Stephen, can you provide
+> >> > a stable commit containing the Mediatek clk changes?
+> >>
+> >> That would work.
+> >
+> > Or another possibility, put the same header file into the branch
+> > you send to arm-soc. Git will figure out that the files are
+> > exactly the same and there's no cross tree dependency.
+> 
+> OK, I will do that.
+> 
 
-So pass irq_data directly instead of irq_data->irq to
-__irq_set_chip_handler_name_locked().
+If you put the same file in two branches, please use the same commit
+ID. While git can figure it out when everything goes right, it will
+fail horribly if one of the branches later gets a patch on top that
+modifies the file, before the two branches get merged.
 
-This also helps to better support hierarchy irqdomain in irq core.
 
-Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
----
- arch/ia64/kernel/iosapic.c      |    6 +++---
- arch/mips/alchemy/common/irq.c  |    4 ++--
- drivers/gpio/gpio-zynq.c        |    9 ++++-----
- drivers/irqchip/irq-metag-ext.c |    5 ++---
- drivers/irqchip/irq-mips-gic.c  |   11 ++++-------
- include/linux/irqdesc.h         |    7 +++----
- 6 files changed, 18 insertions(+), 24 deletions(-)
-
-diff --git a/arch/ia64/kernel/iosapic.c b/arch/ia64/kernel/iosapic.c
-index 4d2698d43c39..317993e92cba 100644
---- a/arch/ia64/kernel/iosapic.c
-+++ b/arch/ia64/kernel/iosapic.c
-@@ -610,9 +610,9 @@ register_intr (unsigned int gsi, int irq, unsigned char delivery,
- 			       chip->name, irq_type->name);
- 		chip = irq_type;
- 	}
--	__irq_set_chip_handler_name_locked(irq, chip, trigger == IOSAPIC_EDGE ?
--					   handle_edge_irq : handle_level_irq,
--					   NULL);
-+	__irq_set_chip_handler_name_locked(irq_get_irq_data(irq), chip,
-+		trigger == IOSAPIC_EDGE ? handle_edge_irq : handle_level_irq,
-+		NULL);
- 	return 0;
- }
- 
-diff --git a/arch/mips/alchemy/common/irq.c b/arch/mips/alchemy/common/irq.c
-index 6cb60abfdcc9..026c4eed37d5 100644
---- a/arch/mips/alchemy/common/irq.c
-+++ b/arch/mips/alchemy/common/irq.c
-@@ -491,7 +491,7 @@ static int au1x_ic_settype(struct irq_data *d, unsigned int flow_type)
- 	default:
- 		ret = -EINVAL;
- 	}
--	__irq_set_chip_handler_name_locked(d->irq, chip, handler, name);
-+	__irq_set_chip_handler_name_locked(d, chip, handler, name);
- 
- 	wmb();
- 
-@@ -703,7 +703,7 @@ static int au1300_gpic_settype(struct irq_data *d, unsigned int type)
- 		return -EINVAL;
- 	}
- 
--	__irq_set_chip_handler_name_locked(d->irq, &au1300_gpic, hdl, name);
-+	__irq_set_chip_handler_name_locked(d, &au1300_gpic, hdl, name);
- 
- 	au1300_gpic_chgcfg(d->irq - ALCHEMY_GPIC_INT_BASE, GPIC_CFG_IC_MASK, s);
- 
-diff --git a/drivers/gpio/gpio-zynq.c b/drivers/gpio/gpio-zynq.c
-index 184c4b1b2558..aea6075e5b2e 100644
---- a/drivers/gpio/gpio-zynq.c
-+++ b/drivers/gpio/gpio-zynq.c
-@@ -422,13 +422,12 @@ static int zynq_gpio_set_irq_type(struct irq_data *irq_data, unsigned int type)
- 	writel_relaxed(int_any,
- 		       gpio->base_addr + ZYNQ_GPIO_INTANY_OFFSET(bank_num));
- 
--	if (type & IRQ_TYPE_LEVEL_MASK) {
--		__irq_set_chip_handler_name_locked(irq_data->irq,
-+	if (type & IRQ_TYPE_LEVEL_MASK)
-+		__irq_set_chip_handler_name_locked(irq_data,
- 			&zynq_gpio_level_irqchip, handle_fasteoi_irq, NULL);
--	} else {
--		__irq_set_chip_handler_name_locked(irq_data->irq,
-+	else
-+		__irq_set_chip_handler_name_locked(irq_data,
- 			&zynq_gpio_edge_irqchip, handle_level_irq, NULL);
--	}
- 
- 	return 0;
- }
-diff --git a/drivers/irqchip/irq-metag-ext.c b/drivers/irqchip/irq-metag-ext.c
-index 2cb474ad8809..52e501d8c8f0 100644
---- a/drivers/irqchip/irq-metag-ext.c
-+++ b/drivers/irqchip/irq-metag-ext.c
-@@ -404,7 +404,6 @@ static int meta_intc_irq_set_type(struct irq_data *data, unsigned int flow_type)
- #ifdef CONFIG_METAG_SUSPEND_MEM
- 	struct meta_intc_priv *priv = &meta_intc_priv;
- #endif
--	unsigned int irq = data->irq;
- 	irq_hw_number_t hw = data->hwirq;
- 	unsigned int bit = 1 << meta_intc_offset(hw);
- 	void __iomem *level_addr = meta_intc_level_addr(hw);
-@@ -413,10 +412,10 @@ static int meta_intc_irq_set_type(struct irq_data *data, unsigned int flow_type)
- 
- 	/* update the chip/handler */
- 	if (flow_type & IRQ_TYPE_LEVEL_MASK)
--		__irq_set_chip_handler_name_locked(irq, &meta_intc_level_chip,
-+		__irq_set_chip_handler_name_locked(data, &meta_intc_level_chip,
- 						   handle_level_irq, NULL);
- 	else
--		__irq_set_chip_handler_name_locked(irq, &meta_intc_edge_chip,
-+		__irq_set_chip_handler_name_locked(data, &meta_intc_edge_chip,
- 						   handle_edge_irq, NULL);
- 
- 	/* and clear/set the bit in HWLEVELEXT */
-diff --git a/drivers/irqchip/irq-mips-gic.c b/drivers/irqchip/irq-mips-gic.c
-index 09257c301bd2..fb2e64b1f414 100644
---- a/drivers/irqchip/irq-mips-gic.c
-+++ b/drivers/irqchip/irq-mips-gic.c
-@@ -365,15 +365,12 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
- 		break;
- 	}
- 
--	if (is_edge) {
--		__irq_set_chip_handler_name_locked(d->irq,
--						   &gic_edge_irq_controller,
-+	if (is_edge)
-+		__irq_set_chip_handler_name_locked(d, &gic_edge_irq_controller,
- 						   handle_edge_irq, NULL);
--	} else {
--		__irq_set_chip_handler_name_locked(d->irq,
--						   &gic_level_irq_controller,
-+	else
-+		__irq_set_chip_handler_name_locked(d, &gic_level_irq_controller,
- 						   handle_level_irq, NULL);
--	}
- 	spin_unlock_irqrestore(&gic_lock, flags);
- 
- 	return 0;
-diff --git a/include/linux/irqdesc.h b/include/linux/irqdesc.h
-index 41544024f464..4dfa46b99a14 100644
---- a/include/linux/irqdesc.h
-+++ b/include/linux/irqdesc.h
-@@ -177,15 +177,14 @@ static inline void __irq_set_handler_locked(unsigned int irq,
- 
- /* caller has locked the irq_desc and both params are valid */
- static inline void
--__irq_set_chip_handler_name_locked(unsigned int irq, struct irq_chip *chip,
-+__irq_set_chip_handler_name_locked(struct irq_data *data, struct irq_chip *chip,
- 				   irq_flow_handler_t handler, const char *name)
- {
--	struct irq_desc *desc;
-+	struct irq_desc *desc = irq_data_to_desc(data);
- 
--	desc = irq_to_desc(irq);
--	irq_desc_get_irq_data(desc)->chip = chip;
- 	desc->handle_irq = handler;
- 	desc->name = name;
-+	data->chip = chip;
- }
- 
- static inline int irq_balancing_disabled(unsigned int irq)
--- 
-1.7.10.4
+	Arnd
