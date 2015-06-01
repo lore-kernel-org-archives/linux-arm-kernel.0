@@ -1,74 +1,70 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 1 Jun 2015 10:56:35 +0200
-Subject: [GIT PULL] ARM: mediatek: arm64 updates for v4.2
-In-Reply-To: <2507882.daayE1Zgb4@wuerfel>
-References: <CABuKBeLhFR=94cF301wL7J8hJVTtyseoD7g45PLE6znQkPAFGQ@mail.gmail.com>
- <20150529164605.GA3022@codeaurora.org>
- <CABuKBeJzTXrRRoAAL7m1=HAP8pR5vrp-tK7vj2oym8KYwTA+Cg@mail.gmail.com>
- <2507882.daayE1Zgb4@wuerfel>
-Message-ID: <CABuKBeK+LT4UDKe0P=vswEXTUevcSNTf2Gn0cdMQ7r=tj2JmOA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 1 Jun 2015 11:02:10 +0200
+Subject: [PATCH 1/2 v2] ARM64: juno: add GPIO keys
+In-Reply-To: <20150527144052.GF2175@e106497-lin.cambridge.arm.com>
+References: <1432629650-19559-1-git-send-email-linus.walleij@linaro.org>
+ <20150526093734.GB2175@e106497-lin.cambridge.arm.com>
+ <CACRpkdbm9LxaWQa=SQAhOKYVncPoFiKv_M6cN1oUEqctiR5=pQ@mail.gmail.com>
+ <20150527144052.GF2175@e106497-lin.cambridge.arm.com>
+Message-ID: <CACRpkdaem5kTvgiswkp7SB+nJntDpV1Ycai1hzm2kWcpA+rKSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-06-01 10:11 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
-> On Monday 01 June 2015 10:07:40 Matthias Brugger wrote:
->> 2015-05-29 18:46 GMT+02:00 Stephen Boyd <sboyd@codeaurora.org>:
->> > On 05/29, Arnd Bergmann wrote:
->> >> On Friday 29 May 2015 14:58:29 Sascha Hauer wrote:
->> >> > On Fri, May 29, 2015 at 02:07:40PM +0200, Arnd Bergmann wrote:
->> >> > > On Friday 29 May 2015 14:04:32 Arnd Bergmann wrote:
->> >> > > > On Wednesday 27 May 2015 17:14:08 Matthias Brugger wrote:
->> >> > > > > - dts: fixup pinctrl mt8173
->> >> > > > > - dts: mt8173-evb fix model name
->> >> > > > > - dts: mt8173 fix identation
->> >> > > > > - dts: mt8173 add clock controller
->> >> > > > > - dts: mt8173 change uart clocks
->> >> > > > > - dts: mt8173 add pmic wrapper
->> >> > > > >
->> >> > > >
->> >> > > > Pulled into next/dt, thanks!
->> >> > > >
->> >> > >
->> >> > > Dropped it again, after getting a build error:
->> >> > >
->> >> > >   DTC     arch/arm64/boot/dts/mediatek/mt8173-evb.dtb
->> >> > > In file included from ../arch/arm64/boot/dts/mediatek/mt8173-evb.dts:16:0:
->> >> > > ../arch/arm64/boot/dts/mediatek/mt8173.dtsi:14:42: fatal error: dt-bindings/clock/mt8173-clk.h: No such file or directory
->> >> > >  #include <dt-bindings/clock/mt8173-clk.h>
->> >> > >                                           ^
->> >> > >
->> >> > > Please fix and resubmit.
->> >> >
->> >> > These come from the clk tree. My original suggestion was to pull in this
->> >> > dts changes late after -rc1.
->> >>
->> >> Please don't do it that way. If you can't figure out a way to
->> >> avoid the dependency, just stage it out over an extra merge window
->> >> and add the driver first and the dt changes the next time.
->> >>
->> >> > Other possibility: Stephen, can you provide
->> >> > a stable commit containing the Mediatek clk changes?
->> >>
->> >> That would work.
->> >
->> > Or another possibility, put the same header file into the branch
->> > you send to arm-soc. Git will figure out that the files are
->> > exactly the same and there's no cross tree dependency.
->>
->> OK, I will do that.
->>
->
-> If you put the same file in two branches, please use the same commit
-> ID. While git can figure it out when everything goes right, it will
-> fail horribly if one of the branches later gets a patch on top that
-> modifies the file, before the two branches get merged.
+On Wed, May 27, 2015 at 4:40 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
 
-I just saw, that the commit in question has dependencies to other commits.
-So I decided I will drop the patches which cause problems. They should
-go into the next merge window.
+> Also useful if you can capture the text printed by BL1 when booting (depending
+> on which version you have there might not be much).
 
-Regards,
-Matthias
+Oh that is just the v1.1 tag.
 
--- 
-motzblog.wordpress.com
+INFO:    BL1: 0x403a000 - 0x403d000 [size = 12288]
+NOTICE:  Booting Trusted Firmware
+NOTICE:  BL1: v1.1(debug):68fc81743e86
+NOTICE:  BL1: Built : 14:03:21, May 26 2015
+INFO:    BL1: RAM 0x403a000 - 0x403d000
+INFO:    Using FIP
+INFO:    Loading file 'bl2.bin' at address 0x4017000
+INFO:    File 'bl2.bin' loaded: 0x4017000 - 0x401c008
+NOTICE:  BL1: Booting BL2
+INFO:    BL1: BL2 address = 0x4017000
+INFO:    BL1: BL2 spsr = 0x3c5
+NOTICE:  BL2: v1.1(debug):68fc81743e86
+NOTICE:  BL2: Built : 14:03:22, May 26 2015
+INFO:    BL2: Loading BL3-0
+INFO:    Using FIP
+INFO:    Loading file 'bl30.bin' at address 0x4023000
+INFO:    Skip reserving memory: 0x4023000 - 0x402e144
+INFO:    File 'bl30.bin' loaded: 0x4023000 - 0x402e144
+INFO:    BL2: BL3-0 transferred to SCP
+INFO:    BL2: Loading BL3-1
+INFO:    Using FIP
+INFO:    Loading file 'bl31.bin' at address 0x4023000
+INFO:    File 'bl31.bin' loaded: 0x4023000 - 0x402b010
+INFO:    BL2: Loading BL3-2
+INFO:    Using FIP
+WARNING: Failed to access image 'bl32.bin' (-1)
+WARNING: Failed to load BL3-2 (-1)
+INFO:    BL2: Loading BL3-3
+INFO:    Using FIP
+INFO:    Loading file 'bl33.bin' at address 0xe0000000
+INFO:    File 'bl33.bin' loaded: 0xe0000000 - 0xe0035068
+NOTICE:  BL1: Booting BL3-1
+INFO:    BL1: BL3-1 address = 0x4023000
+INFO:    BL1: BL3-1 spsr = 0x3cd
+INFO:    BL1: BL3-1 params address = 0x401c8a0
+INFO:    BL1: BL3-1 plat params address = 0xf1e2d3c4b5a6978
+NOTICE:  BL3-1: v1.1(debug):68fc81743e86
+NOTICE:  BL3-1: Built : 14:03:24, May 26 2015
+INFO:    BL3-1: Initializing runtime services
+INFO:    BL3-1: Preparing for EL3 exit to normal world
+INFO:    BL3-1: Next image address = 0xe0000000
+INFO:    BL3-1: Next image spsr = 0x3c9
+
+Do you want me to test on some older version of TF?
+
+> UEFI firmware (version a4c2dfb284a55e73f34c48f5944a438006384f04 built at 17:44:48 on Jan 13 2015)
+
+I'm using U-Boot, of course ;)
+
+Yours,
+Linus Walleij
