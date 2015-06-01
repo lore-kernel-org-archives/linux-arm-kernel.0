@@ -1,73 +1,79 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 1 Jun 2015 12:46:27 +0200
-Subject: [PATCH 1/8] of/fdt: split off FDT self reservation from
- memreserve processing
-In-Reply-To: <20150601095655.GB22406@leverpostej>
-References: <1431326520-17331-1-git-send-email-ard.biesheuvel@linaro.org>
- <1431326520-17331-2-git-send-email-ard.biesheuvel@linaro.org>
- <20150522103541.GU29424@e104818-lin.cambridge.arm.com>
- <CAKv+Gu8-av3xTTf=YHAmU2TBuQrBWAS4WBLwK9hfgZbX0YH89A@mail.gmail.com>
- <20150601095655.GB22406@leverpostej>
-Message-ID: <CAKv+Gu-FM-RGiavw6m599uyBBpCCPT1Wn6WNko46wozRONv6vQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 1 Jun 2015 11:50:31 +0100
+Subject: [GIT PULL] ARM perf updates for 4.2
+Message-ID: <20150601105031.GH1641@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 June 2015 at 11:56, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Mon, Jun 01, 2015 at 08:56:07AM +0100, Ard Biesheuvel wrote:
->> (snip non-LAKML CCs)
->>
->> On 22 May 2015 at 12:35, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> > On Mon, May 11, 2015 at 08:41:53AM +0200, Ard Biesheuvel wrote:
->> >> This splits off the reservation of the memory occupied by the FDT
->> >> binary itself from the processing of the memory reservations it
->> >> contains. This is necessary because the physical address of the FDT,
->> >> which is needed to perform the reservation, may not be known to the
->> >> FDT driver core, i.e., it may be mapped outside the linear direct
->> >> mapping, in which case __pa() returns a bogus value.
->> >>
->> >> Cc: Russell King <linux@arm.linux.org.uk>
->> >> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
->> >> Cc: Paul Mackerras <paulus@samba.org>
->> >> Acked-by: Rob Herring <robh@kernel.org>
->> >> Acked-by: Mark Rutland <mark.rutland@arm.com>
->> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> >
->> > For the arm64 part:
->> >
->> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->>
->> Thanks Catalin,
->>
->> Since there has been virtually no discussion about these patches, I
->> guess they have missed the window for being considered for inclusion
->> in v4.2
->>
->> May I suggest that you at least consider these patches regarding the ID map
->>
->> http://article.gmane.org/gmane.linux.ports.arm.kernel/411720
->> http://article.gmane.org/gmane.linux.ports.arm.kernel/411721
->>
->> since they are self-contained and the first one does fix a potential
->> problem where the Image placement logic in the stub does not take the
->> 512 MB alignment boundary into account. The second one is a trivial
->> cleanup.
->
-> FWIW both of these look good to me.
->
->> Perhaps Mark can comment on the desirability to include the FDT
->> remapping patch (which depends on this 1/8).
->>
->> http://article.gmane.org/gmane.linux.kernel.efi/5738
->
-> I would like to see that taken if possible.
->
+Hi Russell,
 
-Thanks.
+Please can you pull the following ARM perf updates for 4.2?
 
-Actually, it does make kind of sense to take these four (i.e., this
-1/8 plus the three referenced above) patches as a set, since together
-they address all the known shortcomings in the EFI stub regarding the
-placement of both the FDT and the kernel image. All the other stuff
-can easily be deferred.
+There's quite a lot here, most of it from Mark Rutland, who has been
+working on big.LITTLE PMU support for a while now. His work also brings
+us significantly closer to moving the bulk of the CPU PMU driver out
+into drivers/, where it can be shared with arm64.
 
-I will respin these 4 with the new tags added.
+As part of this work, there is a small patch to perf/core, which has
+been Acked-by PeterZ and doesn't conflict with tip/perf/core at present.
+I've kept that patch on a separate branch, merged in here, so that the
+tip guys can pull it too if any unexpected issues crop up.
+
+Please note that there is a conflict with mainline, since we remove
+perf_event_cpu.c. The correct resolution is also to remove the file,
+since the changes there are already reflected in the rework (and this
+resolution is already included in linux-next).
+
+Any issues, just shout.
+
+Cheers,
+
+Will
+
+--->8
+
+The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+
+  Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-rmk/perf
+
+for you to fetch changes up to 74cf0bc75f1671b8da3b2e6ef7b2dc75cab0016a:
+
+  arm: perf: unify perf_event{,_cpu}.c (2015-05-28 17:13:26 +0100)
+
+----------------------------------------------------------------
+Hou Pengyang (1):
+      arm: perf: Fix callchain parse error with kernel tracepoint events
+
+Mark Rutland (12):
+      perf: allow for PMU-specific event filtering
+      arm: perf: make of_pmu_irq_cfg take arm_pmu
+      arm: perf: treat PMUs as CPU affine
+      arm: perf: filter unschedulable events
+      arm: perf: probe number of counters on affine CPUs
+      arm: perf: remove singleton PMU restriction
+      arm: perf: kill off unused pm callbacks
+      arm: perf: share arm_pmu_device_probe
+      arm: perf: factor out xscale pmu driver
+      arm: perf: factor out armv6 pmu driver
+      arm: perf: factor out armv7 pmu driver
+      arm: perf: unify perf_event{,_cpu}.c
+
+Will Deacon (1):
+      Merge branch 'perf/core' into perf/updates
+
+ arch/arm/include/asm/perf_event.h   |   7 +
+ arch/arm/include/asm/pmu.h          |  19 +-
+ arch/arm/kernel/Makefile            |   4 +-
+ arch/arm/kernel/perf_event.c        | 408 ++++++++++++++++++++++++++++++++---
+ arch/arm/kernel/perf_event_cpu.c    | 415 ------------------------------------
+ arch/arm/kernel/perf_event_v6.c     |  49 +++--
+ arch/arm/kernel/perf_event_v7.c     | 129 ++++++-----
+ arch/arm/kernel/perf_event_xscale.c |  32 ++-
+ include/linux/perf_event.h          |   5 +
+ kernel/events/core.c                |   8 +-
+ 10 files changed, 527 insertions(+), 549 deletions(-)
+ delete mode 100644 arch/arm/kernel/perf_event_cpu.c
