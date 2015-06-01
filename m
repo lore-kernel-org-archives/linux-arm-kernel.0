@@ -1,31 +1,35 @@
-From: borntraeger@de.ibm.com (Christian Borntraeger)
-Date: Mon, 01 Jun 2015 11:21:19 +0200
-Subject: [PATCH v2] arm/arm64: KVM: Properly account for guest CPU time
-In-Reply-To: <20150601090817.GA18722@cbox>
-References: <1432838950-28774-1-git-send-email-christoffer.dall@linaro.org>
- <556C0E22.9090401@de.ibm.com> <20150601090817.GA18722@cbox>
-Message-ID: <556C240F.5070501@de.ibm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 01 Jun 2015 11:28:23 +0200
+Subject: [PATCH v4 1/2] phy-sun4i-usb: Add full support for usb0 phy / OTG
+In-Reply-To: <20150601092249.GF17267@lukather>
+References: <1433088626-8858-1-git-send-email-hdegoede@redhat.com>
+ <1433088626-8858-2-git-send-email-hdegoede@redhat.com>
+ <20150601092249.GF17267@lukather>
+Message-ID: <556C25B7.80708@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 01.06.2015 um 11:08 schrieb Christoffer Dall:
+Hi,
 
->>>
->>> Second, looking at the ppc and mips code, they seem to also call
->>> kvm_guest_exit() before enabling interrupts, so I don't understand how
->>> guest CPU time accounting works on those architectures.
->>
->> Not an expert here, but I assume mips has the same logic as arm so if your
->> patch is right for arm its probably also for mips.
->>
->> powerpc looks similar to what s390 does (not using the tick, instead it uses
->> a hw-timer) so this should be fine.
->>
-> I wonder if we can simply enable HAVE_VIRT_CPU_ACCOUNTING_GEN and get
-> this for free which would avoid the need for this patch?
+On 01-06-15 11:22, Maxime Ripard wrote:
+> On Sun, May 31, 2015 at 06:10:25PM +0200, Hans de Goede wrote:
+>> +	/* We either want both gpio pins or neither (when in host mode) */
+>> +	if (!data->id_det_gpio != !data->vbus_det_gpio) {
+>> +		dev_err(dev, "failed to get id or vbus detect pin\n");
+>> +		return -ENODEV;
+>> +	}
+>
+> The fact that the driver expects both to be set if one is should be in
+> the binding documentation.
 
-Asssuming that HAVE_VIRT_CPU_ACCOUNTING_GEN behaves similar to 
-HAVE_VIRT_CPU_ACCOUNTING on s390/power in respect to not rely on ticks
-- yes it might work out. Can you give it a try?
+That would be behavior description, and I've always been told that the
+binding should only document the hardware description, not the behavior.
 
-Christian
+Also this may change in the future as we add support for more boards,
+e.g. the cubieboard seems to be unable to turn vbus off ever, so vbus-det
+will always read as 1 / high, making it rather useless. This is something
+which I still need to figure out how to deal with.
+
+Regards,
+
+Hans
