@@ -1,56 +1,40 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon,  1 Jun 2015 20:23:27 +0200
-Subject: [PATCH 1/2] clk: sunxi: Add support for the usb-clk on sun8i a23 and
- a33 SoCs
-Message-ID: <1433183008-13086-1-git-send-email-hdegoede@redhat.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Mon, 1 Jun 2015 20:31:14 +0200
+Subject: [PATCH 2/3] edac: Add L3/SoC support to the APM X-Gene SoC EDAC
+ driver
+In-Reply-To: <CAPw-ZTm+1hfh4b-opq=HQDek-wc4A4nT=B6DcuyUBWsm8a-ZbQ@mail.gmail.com>
+References: <1432937075-16558-1-git-send-email-lho@apm.com>
+ <1432937075-16558-2-git-send-email-lho@apm.com>
+ <1432937075-16558-3-git-send-email-lho@apm.com>
+ <1979546.jtvJnZomID@wuerfel>
+ <CAPw-ZTm+1hfh4b-opq=HQDek-wc4A4nT=B6DcuyUBWsm8a-ZbQ@mail.gmail.com>
+Message-ID: <20150601183114.GE10169@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The usb-clk on sun8i a23 and a33 SoCs is similar to the ones found
-on sun6i-a31 SoCs but instead of a 3th phy the a23 / a33 have a hsic
-interface which gets enabled by almost the same bits as used on
-the a31 for the 3th phy, but not exactly the same bits so we need
-a new compatible for this.
+On Mon, Jun 01, 2015 at 10:46:55AM -0700, Loc Ho wrote:
+> You are right... Let me just prints the error code instead. Anyone who
+> care will have to do post processing.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
- drivers/clk/sunxi/clk-usb.c                       | 11 +++++++++++
- 2 files changed, 12 insertions(+)
+Don't forget about the usability of the driver. If a user has to go
+open manuals when an error happens, you could just as well report naked
+register values and have a tool decode them.
 
-diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index 4fa11af..8a47b77 100644
---- a/Documentation/devicetree/bindings/clock/sunxi.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -67,6 +67,7 @@ Required properties:
- 	"allwinner,sun4i-a10-usb-clk" - for usb gates + resets on A10 / A20
- 	"allwinner,sun5i-a13-usb-clk" - for usb gates + resets on A13
- 	"allwinner,sun6i-a31-usb-clk" - for usb gates + resets on A31
-+	"allwinner,sun8i-a23-usb-clk" - for usb gates + resets on A23
- 	"allwinner,sun9i-a80-usb-mod-clk" - for usb gates + resets on A80
- 	"allwinner,sun9i-a80-usb-phy-clk" - for usb phy gates + resets on A80
- 
-diff --git a/drivers/clk/sunxi/clk-usb.c b/drivers/clk/sunxi/clk-usb.c
-index a86ed2f..3a25f95 100644
---- a/drivers/clk/sunxi/clk-usb.c
-+++ b/drivers/clk/sunxi/clk-usb.c
-@@ -204,6 +204,17 @@ static void __init sun6i_a31_usb_setup(struct device_node *node)
- }
- CLK_OF_DECLARE(sun6i_a31_usb, "allwinner,sun6i-a31-usb-clk", sun6i_a31_usb_setup);
- 
-+static const struct usb_clk_data sun8i_a23_usb_clk_data __initconst = {
-+	.clk_mask = BIT(16) | BIT(11) | BIT(10) | BIT(9) | BIT(8),
-+	.reset_mask = BIT(2) | BIT(1) | BIT(0),
-+};
-+
-+static void __init sun8i_a23_usb_setup(struct device_node *node)
-+{
-+	sunxi_usb_clk_setup(node, &sun8i_a23_usb_clk_data, &sun4i_a10_usb_lock);
-+}
-+CLK_OF_DECLARE(sun8i_a23_usb, "allwinner,sun8i-a23-usb-clk", sun8i_a23_usb_setup);
-+
- static const struct usb_clk_data sun9i_a80_usb_mod_data __initconst = {
- 	.clk_mask = BIT(6) | BIT(5) | BIT(4) | BIT(3) | BIT(2) | BIT(1),
- 	.reset_mask = BIT(19) | BIT(18) | BIT(17),
+And this strategy (mcelog) turned out to be a real PITA, IMO.
+
+> Future or existent next generation may re-define them.
+
+You could easily have a strings array of per-family or per-soc error
+descriptions. For an example, take a look at drivers/edac/mce_amd.c
+which decodes MCEs on all relevant AMD machines. This is much more
+user-friendly than dumping register values which most people have no
+idea of where to start looking (and they don't really need to).
+
+HTH.
+
 -- 
-2.4.2
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
+--
