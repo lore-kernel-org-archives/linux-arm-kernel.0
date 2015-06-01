@@ -1,26 +1,43 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 1 Jun 2015 22:26:18 +0000 (UTC)
-Subject: [PATCHv4 05/10] ARM: DRA7: hwmod: set DSS submodule parent hwmods
-In-Reply-To: <1433139798-23450-6-git-send-email-tomi.valkeinen@ti.com>
-References: <1433139798-23450-1-git-send-email-tomi.valkeinen@ti.com>
- <1433139798-23450-6-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <alpine.DEB.2.02.1506012224120.14902@utopia.booyaka.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 2 Jun 2015 08:47:46 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the arm tree
+Message-ID: <20150602084746.3a931067@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 1 Jun 2015, Tomi Valkeinen wrote:
+Hi all,
 
-> Set DSS core hwmod as the parent for all the DSS submodules.
-> 
-> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/mach-socfpga/core.h between commit 02b4e2756e01 ("ARM: v7
+setup function should invalidate L1 cache") from the arm tree and
+commit 122694a0c712 ("ARM: socfpga: use of_iomap to map the SCU") from
+the arm-soc tree.
 
-Acked-by: Paul Walmsley <paul@pwsan.com>
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-By the way, for commits like this one, it would be nice to add a line 
-describing why the change is needed to the commit message.  Something like 
-"This ensures that the parent hwmods are enabled before any DSS 
-submodules are accessed."  Tony, feel free to add that to the commit 
-message if you think it's useful.
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
-
-- Paul
+diff --cc arch/arm/mach-socfpga/core.h
+index 767c09e954a0,5913bbb50036..000000000000
+--- a/arch/arm/mach-socfpga/core.h
++++ b/arch/arm/mach-socfpga/core.h
+@@@ -31,8 -31,8 +31,6 @@@
+  
+  #define RSTMGR_MPUMODRST_CPU1		0x2     /* CPU1 Reset */
+  
+- extern void __iomem *socfpga_scu_base_addr;
+ -extern void socfpga_secondary_startup(void);
+--
+  extern void socfpga_init_clocks(void);
+  extern void socfpga_sysmgr_init(void);
+  
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150602/90494ea3/attachment.sig>
