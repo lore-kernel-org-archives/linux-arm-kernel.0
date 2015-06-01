@@ -1,25 +1,146 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 1 Jun 2015 14:46:34 +0200
-Subject: [RFC v1 06/25] pinctrl: Use irq_desc_get_xxx() to avoid redundant
- lookup of irq_desc
-In-Reply-To: <1432116013-25902-7-git-send-email-jiang.liu@linux.intel.com>
-References: <1432116013-25902-1-git-send-email-jiang.liu@linux.intel.com>
- <1432116013-25902-7-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <CACRpkdazXuq7WZZPiObRNFBTokazUN9yisU7VNobS4ezgZTHJw@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 1 Jun 2015 18:22:41 +0530
+Subject: [PATCHv3 1/4] phy: phy-core: Make GENERIC_PHY an invisible option
+In-Reply-To: <20150529150413.GB2026@saruman.tx.rr.com>
+References: <1429743853-10254-1-git-send-email-arun.ramamurthy@broadcom.com>
+ <1429743853-10254-2-git-send-email-arun.ramamurthy@broadcom.com>
+ <20150515005210.GA31534@saruman.tx.rr.com> <556391FE.1020503@broadcom.com>
+ <20150526141938.GA25686@saruman.tx.rr.com> <5564BD5D.1070601@broadcom.com>
+ <20150526183955.GW26599@saruman.tx.rr.com> <55684ECE.9060003@ti.com>
+ <20150529150413.GB2026@saruman.tx.rr.com>
+Message-ID: <556C5599.9020808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 11:59 AM, Jiang Liu <jiang.liu@linux.intel.com> wrote:
+Hi,
 
-> Use irq_desc_get_xxx() to avoid redundant lookup of irq_desc while we
-> already have a pointer to corresponding irq_desc.
+On Friday 29 May 2015 08:34 PM, Felipe Balbi wrote:
+> Hi,
 >
-> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+> On Fri, May 29, 2015 at 05:04:38PM +0530, Kishon Vijay Abraham I wrote:
+>> Hi Felipe,
+>>
+>> On Wednesday 27 May 2015 12:09 AM, Felipe Balbi wrote:
+>>> On Tue, May 26, 2015 at 11:37:17AM -0700, Arun Ramamurthy wrote:
+>>>> Hi
+>>>>
+>>>> On 15-05-26 07:19 AM, Felipe Balbi wrote:
+>>>>> HI,
+>>>>>
+>>>>> On Mon, May 25, 2015 at 02:19:58PM -0700, Arun Ramamurthy wrote:
+>>>>>>
+>>>>>>
+>>>>>> On 15-05-14 05:52 PM, Felipe Balbi wrote:
+>>>>>>> Hi,
+>>>>>>>
+>>>>>>> On Wed, Apr 22, 2015 at 04:04:10PM -0700, Arun Ramamurthy wrote:
+>>>>>>>> Most of the phy providers use "select" to enable GENERIC_PHY. Since select
+>>>>>>>> is only recommended when the config is not visible, GENERIC_PHY is changed
+>>>>>>>> an invisible option. To maintain consistency, all phy providers are changed
+>>>>>>>> to "select" GENERIC_PHY and all non-phy drivers use "depends on" when the
+>>>>>>>> phy framework is explicity required. USB_MUSB_OMAP2PLUS has a cyclic
+>>>>>>>> dependency, so it is left as "select".
+>>>>>>>>
+>>>>>>>> Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
+>>>>>>>> ---
+>>>>>>>>   drivers/ata/Kconfig                       | 1 -
+>>>>>>>>   drivers/media/platform/exynos4-is/Kconfig | 2 +-
+>>>>>>>>   drivers/phy/Kconfig                       | 4 ++--
+>>>>>>>>   drivers/usb/host/Kconfig                  | 4 ++--
+>>>>>>>>   drivers/video/fbdev/exynos/Kconfig        | 2 +-
+>>>>>>>>   5 files changed, 6 insertions(+), 7 deletions(-)
+>>>>>>>>
+>>>>>>>> diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+>>>>>>>> index 5f60155..6d2e881 100644
+>>>>>>>> --- a/drivers/ata/Kconfig
+>>>>>>>> +++ b/drivers/ata/Kconfig
+>>>>>>>> @@ -301,7 +301,6 @@ config SATA_MV
+>>>>>>>>   	tristate "Marvell SATA support"
+>>>>>>>>   	depends on PCI || ARCH_DOVE || ARCH_MV78XX0 || \
+>>>>>>>>   		   ARCH_MVEBU || ARCH_ORION5X || COMPILE_TEST
+>>>>>>>> -	select GENERIC_PHY
+>>>>>>>>   	help
+>>>>>>>>   	  This option enables support for the Marvell Serial ATA family.
+>>>>>>>>   	  Currently supports 88SX[56]0[48][01] PCI(-X) chips,
+>>>>>>>> diff --git a/drivers/media/platform/exynos4-is/Kconfig b/drivers/media/platform/exynos4-is/Kconfig
+>>>>>>>> index b7b2e47..b6f3eaa 100644
+>>>>>>>> --- a/drivers/media/platform/exynos4-is/Kconfig
+>>>>>>>> +++ b/drivers/media/platform/exynos4-is/Kconfig
+>>>>>>>> @@ -31,7 +31,7 @@ config VIDEO_S5P_FIMC
+>>>>>>>>   config VIDEO_S5P_MIPI_CSIS
+>>>>>>>>   	tristate "S5P/EXYNOS MIPI-CSI2 receiver (MIPI-CSIS) driver"
+>>>>>>>>   	depends on REGULATOR
+>>>>>>>> -	select GENERIC_PHY
+>>>>>>>> +	depends on GENERIC_PHY
+>>>>>>>>   	help
+>>>>>>>>   	  This is a V4L2 driver for Samsung S5P and EXYNOS4 SoC MIPI-CSI2
+>>>>>>>>   	  receiver (MIPI-CSIS) devices.
+>>>>>>>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+>>>>>>>> index 2962de2..edecdb1 100644
+>>>>>>>> --- a/drivers/phy/Kconfig
+>>>>>>>> +++ b/drivers/phy/Kconfig
+>>>>>>>> @@ -5,7 +5,7 @@
+>>>>>>>>   menu "PHY Subsystem"
+>>>>>>>>
+>>>>>>>>   config GENERIC_PHY
+>>>>>>>> -	bool "PHY Core"
+>>>>>>>> +	bool
+>>>>>>>>   	help
+>>>>>>>>   	  Generic PHY support.
+>>>>>>>>
+>>>>>>>> @@ -72,7 +72,7 @@ config PHY_MIPHY365X
+>>>>>>>>   config PHY_RCAR_GEN2
+>>>>>>>>   	tristate "Renesas R-Car generation 2 USB PHY driver"
+>>>>>>>>   	depends on ARCH_SHMOBILE
+>>>>>>>> -	depends on GENERIC_PHY
+>>>>>>>> +	select GENERIC_PHY
+>>>>>>>
+>>>>>>> so some you changed from depends to select...
+>>>>>>>
+>>>>>>>>   	help
+>>>>>>>>   	  Support for USB PHY found on Renesas R-Car generation 2 SoCs.
+>>>>>>>>
+>>>>>>>> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+>>>>>>>> index 5ad60e4..e2197e2 100644
+>>>>>>>> --- a/drivers/usb/host/Kconfig
+>>>>>>>> +++ b/drivers/usb/host/Kconfig
+>>>>>>>> @@ -182,7 +182,7 @@ config USB_EHCI_HCD_SPEAR
+>>>>>>>>   config USB_EHCI_HCD_STI
+>>>>>>>>   	tristate "Support for ST STiHxxx on-chip EHCI USB controller"
+>>>>>>>>   	depends on ARCH_STI && OF
+>>>>>>>> -	select GENERIC_PHY
+>>>>>>>> +	depends on GENERIC_PHY
+>>>>>>>
+>>>>>>> while others you changed from select to depends.
+>>>>>>>
+>>>>>>> NAK.
+>>>>>>>
+>>>>>> Felipe, I dont understand your concern, could you please explain it more
+>>>>>> detail?  The logic behind the changes is that in cases where there was an
+>>>>>> explicit dependency, I changed it to "depends on" and in other cases I
+>>>>>> changed it to "selects". Thanks
+>>>>>
+>>>>> Since GENERIC_PHY is visible from Kconfig, it would be much nicer to
+>>>>> avoid select altogether.
+>>>>>
+>>>> Felipe, after discussion with the maintainers, I have made GENERIC_PHY an
+>>>> invisible option as part of this change. Thanks
+>>>
+>>> Then, if the option is invisible, how can you "depend" on it ? It can
+>>> never be selected by poking around in Kconfig. IMO, it's
+>>> counterintuitive that you need to enable a PHY driver before you can see
+>>> your EHCI/OHCI/whatever controller listed in Kconfig.
+>>
+>> If the controller requires PHY for it to be functional, it is okay to make
+>> the controller depend on PHY IMHO. We want to try and minimize the usage of
+>> 'select' wherever possible or else 'select' is the most intuitive way. The
+>> other option is just to leave the 'depends on' and let the user select PHY.
+>
+> How can you 'depend' on something that the user can't select by
+> navigating through Kconfig ?
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+hmm... Actually it's selected when the user selects the PHY driver. Maybe we 
+should directly depend on the PHY driver instead of Generic PHY?
 
-Are there dependencies on this patch or can I just apply it
-directly to the GPIO tree?
-
-Yours,
-Linus Walleij
+Thanks
+Kishon
