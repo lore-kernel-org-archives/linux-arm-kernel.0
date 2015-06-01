@@ -1,34 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 01 Jun 2015 17:03:18 +0200
-Subject: [GIT PULL] ARM: mediatek: soc updates for v4.2
-In-Reply-To: <CABuKBe+2H8wFgaM+S-LAMm2B7DCXZKGetOOb9rkgTO4TjD7X=A@mail.gmail.com>
-References: <CABuKBe+y5Em77WbKUu3YHAuwdc7n_ybLe-Eii8G1H-EQ0xZrRg@mail.gmail.com>
- <2169528.AHb4teykcE@wuerfel>
- <CABuKBe+2H8wFgaM+S-LAMm2B7DCXZKGetOOb9rkgTO4TjD7X=A@mail.gmail.com>
-Message-ID: <2065890.i1QSckCvO8@wuerfel>
+Date: Mon, 01 Jun 2015 17:04:19 +0200
+Subject: [GIT PULL] ARM: mvebu: fixes for v4.1 #3
+In-Reply-To: <5568DF7A.9090600@free-electrons.com>
+References: <5568DF7A.9090600@free-electrons.com>
+Message-ID: <2169801.07m6BsynfT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 29 May 2015 18:20:36 Matthias Brugger wrote:
-> Hi Arnd,
+On Friday 29 May 2015 23:51:54 Gregory CLEMENT wrote:
+> mvebu fixes for 4.1 (part 3)
 > 
-> 2015-05-29 14:56 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
-> > On Wednesday 27 May 2015 17:09:43 Matthias Brugger wrote:
-> >> - pmic wrapper: fix clock handling
-> >> - pmic wrapper: fix state machine
-> >> - pmic wrapper: fix compile dependency
-> >>
-> >
-> > Merged into next/drivers now.
-> >
-> > It looks like these are all bug fixes, and I wonder if they
-> > should be merged for 4.1 and possibly backports instead.
-> > Can you clarify?
+> Disable unused internal RTC for Mamba from linksys (Armada XP)
+> And 2 commits fixing regressions on mvebu-mbus:
+> - the first one for Kirkwood or Orion SoC
+> - the second one for DMA when the platform have more than 4GB (only
+>   possible on Armada XP as far as I know)
 > 
-> Yes, they should be merged for 4.1.
-> I forgot about that.
-> Sorry.
 
-Ok, pulled into fixes now.
+Pulled into fixes, thanks!
 
 	Arnd
