@@ -1,40 +1,39 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 01 Jun 2015 20:34:26 +0900
-Subject: [PATCH 0/6] Exynos SYSMMU (IOMMU) dts and arch updates
-In-Reply-To: <1433153450-3680-1-git-send-email-m.szyprowski@samsung.com>
-References: <1432041645-11172-1-git-send-email-m.szyprowski@samsung.com>
- <1433153450-3680-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <556C4342.6060506@samsung.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Mon, 01 Jun 2015 13:34:53 +0200
+Subject: [PATCH v2] arm/arm64: KVM: Properly account for guest CPU time
+In-Reply-To: <556C0E22.9090401@de.ibm.com>
+References: <1432838950-28774-1-git-send-email-christoffer.dall@linaro.org>
+ <556C0E22.9090401@de.ibm.com>
+Message-ID: <556C435D.3050900@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 01.06.2015 o 19:10, Marek Szyprowski pisze:
-> Hello,
+
+
+On 01/06/2015 09:47, Christian Borntraeger wrote:
 > 
-> Main changes for Exynos SYSMMU (IOMMU) driver has been finally scheduled
-> for merging - see
-> https://git.kernel.org/cgit/linux/kernel/git/joro/iommu.git/commit/?h=next
-> In meantime there have been quite a lot of changes related to Exynos DTS
-> files queued for merging and my patches don't apply anymore. To ease
-> merge process I've decided to rebased all Exynos SYSMMU dts changes onto
-> latest exynos next tree from: https://github.com/krzk/linux dt-for-next
+> 1: "disable", "guest", "disable again and save", "restore to disable", "enable"
+> and now it is
+> 2: "disable", "guest", "enable"
+> and with your patch it is
+> 3: "disable", "guest", "enable", "disable, "enable"
 > 
-> While rebasing I've fixes a few spotted issues: some nodes still used
-> old 'samsung,power-domain' properties (now replaced with 'power-domains')
-> and added properties to jpeg codec merged recently.
-> 
+> I assume that 3 and 1 are similar in its costs, so this is probably ok.
 
-Thanks for rebasing this stuff.
+At least on x86, 3 and 2 are similar, but 3 is much more expensive than
+1!  See https://lkml.org/lkml/2015/5/5/835:
 
-I picked whole patchset with Javier's tested-by. I'll send it to Kukjin
-later or directly to arm-soc (depending what will happen with last pull
-request).
+Cost of: CLI                         insn  same-IF :     0 cycles
+Cost of: CLI                         insn  flip-IF :     0 cycles
+Cost of: STI                         insn  same-IF :     0 cycles
+Cost of: STI                         insn  flip-IF :     0 cycles
+Cost of: PUSHF                       insn          :     0 cycles
+Cost of: POPF                        insn  same-IF :    20 cycles
+Cost of: POPF                        insn  flip-IF :    28 cycles
+Cost of: local_irq_save()            fn            :    20 cycles
+Cost of: local_irq_restore()         fn    same-IF :    24 cycles
+Cost of: local_irq_restore()         fn    flip-IF :    28 cycles
+Cost of: irq_save()+restore()        fn    same-IF :    48 cycles
+Cost of: irq_save()+restore()        fn    flip-IF :    48 cycles
 
-Kukjin, you mentioned that you will do something with this patchset the
-previous weekend. Since then nothing happened so I am not sure what are
-your plans... Can you share them? Do you want to pick it by yourself, do
-you have any comments or maybe you need something from our side? (I
-checked the patches and they look fine)
-
-Best regards,
-Krzysztof
+Paolo
