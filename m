@@ -1,81 +1,54 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 1 Jun 2015 12:02:41 +0100
-Subject: [PATCH 1/8] of/fdt: split off FDT self reservation from
- memreserve processing
-In-Reply-To: <CAKv+Gu-FM-RGiavw6m599uyBBpCCPT1Wn6WNko46wozRONv6vQ@mail.gmail.com>
-References: <1431326520-17331-1-git-send-email-ard.biesheuvel@linaro.org>
- <1431326520-17331-2-git-send-email-ard.biesheuvel@linaro.org>
- <20150522103541.GU29424@e104818-lin.cambridge.arm.com>
- <CAKv+Gu8-av3xTTf=YHAmU2TBuQrBWAS4WBLwK9hfgZbX0YH89A@mail.gmail.com>
- <20150601095655.GB22406@leverpostej>
- <CAKv+Gu-FM-RGiavw6m599uyBBpCCPT1Wn6WNko46wozRONv6vQ@mail.gmail.com>
-Message-ID: <20150601110241.GA7443@leverpostej>
+From: carlo@caione.org (Carlo Caione)
+Date: Mon,  1 Jun 2015 13:13:52 +0200
+Subject: [PATCH v3 0/3] clk: meson: Add clock controller
+Message-ID: <1433157235-17275-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 01, 2015 at 11:46:27AM +0100, Ard Biesheuvel wrote:
-> On 1 June 2015 at 11:56, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Mon, Jun 01, 2015 at 08:56:07AM +0100, Ard Biesheuvel wrote:
-> >> (snip non-LAKML CCs)
-> >>
-> >> On 22 May 2015 at 12:35, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> >> > On Mon, May 11, 2015 at 08:41:53AM +0200, Ard Biesheuvel wrote:
-> >> >> This splits off the reservation of the memory occupied by the FDT
-> >> >> binary itself from the processing of the memory reservations it
-> >> >> contains. This is necessary because the physical address of the FDT,
-> >> >> which is needed to perform the reservation, may not be known to the
-> >> >> FDT driver core, i.e., it may be mapped outside the linear direct
-> >> >> mapping, in which case __pa() returns a bogus value.
-> >> >>
-> >> >> Cc: Russell King <linux@arm.linux.org.uk>
-> >> >> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> >> >> Cc: Paul Mackerras <paulus@samba.org>
-> >> >> Acked-by: Rob Herring <robh@kernel.org>
-> >> >> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> >> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> >
-> >> > For the arm64 part:
-> >> >
-> >> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> >>
-> >> Thanks Catalin,
-> >>
-> >> Since there has been virtually no discussion about these patches, I
-> >> guess they have missed the window for being considered for inclusion
-> >> in v4.2
-> >>
-> >> May I suggest that you at least consider these patches regarding the ID map
-> >>
-> >> http://article.gmane.org/gmane.linux.ports.arm.kernel/411720
-> >> http://article.gmane.org/gmane.linux.ports.arm.kernel/411721
-> >>
-> >> since they are self-contained and the first one does fix a potential
-> >> problem where the Image placement logic in the stub does not take the
-> >> 512 MB alignment boundary into account. The second one is a trivial
-> >> cleanup.
-> >
-> > FWIW both of these look good to me.
-> >
-> >> Perhaps Mark can comment on the desirability to include the FDT
-> >> remapping patch (which depends on this 1/8).
-> >>
-> >> http://article.gmane.org/gmane.linux.kernel.efi/5738
-> >
-> > I would like to see that taken if possible.
-> >
-> 
-> Thanks.
-> 
-> Actually, it does make kind of sense to take these four (i.e., this
-> 1/8 plus the three referenced above) patches as a set, since together
-> they address all the known shortcomings in the EFI stub regarding the
-> placement of both the FDT and the kernel image. All the other stuff
-> can easily be deferred.
+From: Carlo Caione <carlo@endlessm.com>
 
-Putting those together as a cleanup+preparation series makes sense to
-me, if that makes it easy for Catalin to pick them up now.
+This patchset introduces preliminary support for the clock controller
+found on Amlogic MesonX SoCs and enables it for the Meson8b.
 
-Do we have/need acks from Ben or Paul on this reservation patch?
+DTS patches with support for Meson8b SoCs will follow.
 
-Thanks,
-Mark.
+Changelog:
+
+v1->v2:
+  * fix double CLK_IGNORE_UNUSED in clk-pll.c
+  * fix comment in meson8b-clkc.h
+
+v2->v3:
+  * fix includes
+  * use divider_* functions for clk-cpu
+  * fix memory leak in meson_clk_register_composite()
+  * mask operations now use GENMASK
+  * const-ify global configuration variables in meson8b-clkc.c
+  * several more small fixes
+
+Carlo Caione (3):
+  clk: meson: Add support for Meson clock controller
+  clk: meson: Document bindings for Meson8b clock controller
+  clk: meson8b: Add support for Meson8b clocks
+
+ .../bindings/clock/amlogic,meson8b-clkc.txt        |  40 ++++
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/meson/Makefile                         |   6 +
+ drivers/clk/meson/clk-cpu.c                        | 234 +++++++++++++++++++
+ drivers/clk/meson/clk-pll.c                        | 227 +++++++++++++++++++
+ drivers/clk/meson/clkc.c                           | 247 +++++++++++++++++++++
+ drivers/clk/meson/clkc.h                           | 187 ++++++++++++++++
+ drivers/clk/meson/meson8b-clkc.c                   | 196 ++++++++++++++++
+ include/dt-bindings/clock/meson8b-clkc.h           |  25 +++
+ 9 files changed, 1163 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt
+ create mode 100644 drivers/clk/meson/Makefile
+ create mode 100644 drivers/clk/meson/clk-cpu.c
+ create mode 100644 drivers/clk/meson/clk-pll.c
+ create mode 100644 drivers/clk/meson/clkc.c
+ create mode 100644 drivers/clk/meson/clkc.h
+ create mode 100644 drivers/clk/meson/meson8b-clkc.c
+ create mode 100644 include/dt-bindings/clock/meson8b-clkc.h
+
+-- 
+1.9.1
