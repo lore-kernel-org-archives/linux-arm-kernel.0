@@ -1,45 +1,72 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 1 Jun 2015 22:45:25 +0100
-Subject: [PATCH] ARM: Enter CPU in ARM state for cpu_resume
-In-Reply-To: <1433190120-27798-1-git-send-email-sboyd@codeaurora.org>
-References: <1433190120-27798-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150601214525.GT2067@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 1 Jun 2015 14:49:09 -0700
+Subject: [PATCHv4 02/10] CLK: TI: always enable DESHDCP clock
+In-Reply-To: <1433139798-23450-3-git-send-email-tomi.valkeinen@ti.com>
+References: <1433139798-23450-1-git-send-email-tomi.valkeinen@ti.com>
+ <1433139798-23450-3-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <20150601214908.GG30984@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 01, 2015 at 01:22:00PM -0700, Stephen Boyd wrote:
-> The standard boot protocol on ARM requires CPUs to be entered in
-> the ARM state, unless they don't support the ARM instruction set
-> (see Documentation/arm/Booting). On THUMB2 kernels, we assume
-> the firmware can determine what state to enter the kernel in, but
-> some firmwares don't honor the thumb bit. Make the cpu_resume
-> symbol an ARM symbol, so that firmwares that honor the thumb bit
-> will enter the kernel in ARM state and firmwares that don't honor
-> the thumb bit will be able to enter the kernel in ARM state
-> without more changes.
+Hi Mike, Stephen & Tero,
+
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [150531 23:25]:
+> DESHDCP clock is needed on DRA7 based SoCs to enable the DSS IP. That
+> clock is an odd one, as it is not supposed to be any kind of core clock
+> for DSS, and we don't even support HDCP, but the clock is still needed
+> even for the HWMOD framework to be able to reset the DSS IP.
 > 
-> This fixes a problem reported by Kevin Hilman where the ifc6410 
-> fails to boot for THUMB2 kernels because the platform's firmware
-> always enters the kernel in ARM mode from deep idle states.
+> As there's no support for multiple core clocks in the HWMOD framework,
+> we don't have any obvious place to enable this clock when DSS IP is
+> being enabled.
+> 
+> Furthermore, the HDMI on OMAP5 DSS is the same as on DRA7, and OMAP5
+> does not have any such clock configuration bit. This suggests that on
+> OMAP5 the DESHDCP clock is always enabled, and for DRA7 we have the
+> possibility to gate it.
+> 
+> So, as we don't have any clean way to enable and disable the clock
+> based on the need, this patch enables the clock at boot time, making it
+> work similarly to OMAP5.
+> 
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 
-Please do this differently.  The default should be (as we do with
-the SMP secondary entry path) to assume that the firmware does the
-right thing.
+This series seems like I should take it as a whole series..
+Care to ack/nack on this one?
 
-So, if we want an ARM-mode entry point, please use:
+Regards,
 
-+		.arm
-+ENTRY(cpu_resume_arm)
-+ THUMB(	badr	r9, 1f		)	@ Kernel is entered in ARM.
-+ THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
-+ THUMB(	.thumb			)	@ switch to Thumb now.
-+ THUMB(1:			)
+Tony
 
-Don't forget an ENDPROC() for the new symbol.  Buggy platforms then
-use cpu_resume_arm instead of cpu_resume.
 
-Thanks.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+> ---
+>  drivers/clk/ti/clk-7xx.c | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/ti/clk-7xx.c b/drivers/clk/ti/clk-7xx.c
+> index 2dd956b9affa..63b8323df918 100644
+> --- a/drivers/clk/ti/clk-7xx.c
+> +++ b/drivers/clk/ti/clk-7xx.c
+> @@ -312,7 +312,7 @@ static struct ti_dt_clk dra7xx_clks[] = {
+>  int __init dra7xx_dt_clk_init(void)
+>  {
+>  	int rc;
+> -	struct clk *abe_dpll_mux, *sys_clkin2, *dpll_ck;
+> +	struct clk *abe_dpll_mux, *sys_clkin2, *dpll_ck, *hdcp_ck;
+>  
+>  	ti_dt_clocks_register(dra7xx_clks);
+>  
+> @@ -348,5 +348,10 @@ int __init dra7xx_dt_clk_init(void)
+>  	if (rc)
+>  		pr_err("%s: failed to set USB_DPLL M2 OUT\n", __func__);
+>  
+> +	hdcp_ck = clk_get_sys(NULL, "dss_deshdcp_clk");
+> +	rc = clk_prepare_enable(hdcp_ck);
+> +	if (rc)
+> +		pr_err("%s: failed to set dss_deshdcp_clk\n", __func__);
+> +
+>  	return rc;
+>  }
+> -- 
+> 2.1.4
+> 
