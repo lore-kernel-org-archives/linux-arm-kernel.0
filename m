@@ -1,165 +1,23 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Mon, 01 Jun 2015 13:41:22 +0100
-Subject: [PATCH v5 10/12] KVM: arm64: guest debug,
- HW assisted debug support
-In-Reply-To: <20150601091552.GA1641@arm.com>
-References: <1432891828-4816-1-git-send-email-alex.bennee@linaro.org>
- <1432891828-4816-11-git-send-email-alex.bennee@linaro.org>
- <20150601091552.GA1641@arm.com>
-Message-ID: <87y4k3bnyl.fsf@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 1 Jun 2015 14:44:16 +0200
+Subject: [RESEND PATCH 1/2] pinctrl: zynq: fix
+ DEFINE_ZYNQ_PINMUX_FUNCTION_MUX macro
+In-Reply-To: <1432111351-21336-2-git-send-email-yamada.masahiro@socionext.com>
+References: <1432111351-21336-1-git-send-email-yamada.masahiro@socionext.com>
+ <1432111351-21336-2-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CACRpkdY0n-mdq4BSumUEJQENcWBdP2Y7kputm7Ek_LL4am6_Yg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, May 20, 2015 at 10:42 AM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
 
-Will Deacon <will.deacon@arm.com> writes:
-
-> Hi Alex,
+> The offset to the mux register is missing.
 >
-> On Fri, May 29, 2015 at 10:30:26AM +0100, Alex Benn?e wrote:
->> This adds support for userspace to control the HW debug registers for
->> guest debug. In the debug ioctl we copy the IMPDEF defined number of
->> registers into a new register set called host_debug_state. There is now
->> a new vcpu parameter called debug_ptr which selects which register set
->> is to copied into the real registers when world switch occurs.
->> 
->> I've moved some helper functions into the hw_breakpoint.h header for
->> re-use.
->> 
->> As with single step we need to tweak the guest registers to enable the
->> exceptions so we need to save and restore those bits.
->> 
->> Two new capabilities have been added to the KVM_EXTENSION ioctl to allow
->> userspace to query the number of hardware break and watch points
->> available on the host hardware.
->> 
->> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->
-> [...]
->
->> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
->> index 33c8143..ada57df 100644
->> --- a/Documentation/virtual/kvm/api.txt
->> +++ b/Documentation/virtual/kvm/api.txt
->> @@ -2668,7 +2668,7 @@ The top 16 bits of the control field are architecture specific control
->>  flags which can include the following:
->>  
->>    - KVM_GUESTDBG_USE_SW_BP:     using software breakpoints [x86, arm64]
->> -  - KVM_GUESTDBG_USE_HW_BP:     using hardware breakpoints [x86, s390]
->> +  - KVM_GUESTDBG_USE_HW_BP:     using hardware breakpoints [x86, s390, arm64]
->>    - KVM_GUESTDBG_INJECT_DB:     inject DB type exception [x86]
->>    - KVM_GUESTDBG_INJECT_BP:     inject BP type exception [x86]
->>    - KVM_GUESTDBG_EXIT_PENDING:  trigger an immediate guest exit [s390]
->> @@ -2683,6 +2683,11 @@ updated to the correct (supplied) values.
->>  The second part of the structure is architecture specific and
->>  typically contains a set of debug registers.
->>  
->> +For arm64 the number of debug registers is implementation defined and
->> +can be determined by querying the KVM_CAP_GUEST_DEBUG_HW_BPS and
->> +KVM_CAP_GUEST_DEBUG_HW_WPS capabilities which return a positive number
->> +indicating the number of supported registers.
->> +
->>  When debug events exit the main run loop with the reason
->>  KVM_EXIT_DEBUG with the kvm_debug_exit_arch part of the kvm_run
->>  structure containing architecture specific debug information.
->> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> index 0d17c7b..6df47c1 100644
->> --- a/arch/arm/kvm/arm.c
->> +++ b/arch/arm/kvm/arm.c
->> @@ -307,6 +307,7 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
->>  
->>  #define KVM_GUESTDBG_VALID_MASK (KVM_GUESTDBG_ENABLE |    \
->>  			    KVM_GUESTDBG_USE_SW_BP | \
->> +			    KVM_GUESTDBG_USE_HW_BP | \
->>  			    KVM_GUESTDBG_SINGLESTEP)
->>  
->>  /**
->> @@ -327,6 +328,12 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
->>  
->>  	if (dbg->control & KVM_GUESTDBG_ENABLE) {
->>  		vcpu->guest_debug = dbg->control;
->> +
->> +		/* Hardware assisted Break and Watch points */
->> +		if (vcpu->guest_debug & KVM_GUESTDBG_USE_HW_BP) {
->> +			vcpu->arch.external_debug_state = dbg->arch;
->> +		}
->> +
->>  	} else {
->>  		/* If not enabled clear all flags */
->>  		vcpu->guest_debug = 0;
->> diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
->> index 52b484b..c450552 100644
->> --- a/arch/arm64/include/asm/hw_breakpoint.h
->> +++ b/arch/arm64/include/asm/hw_breakpoint.h
->> @@ -130,6 +130,18 @@ static inline void ptrace_hw_copy_thread(struct task_struct *task)
->>  }
->>  #endif
->>  
->> +/* Determine number of BRP registers available. */
->> +static inline int get_num_brps(void)
->> +{
->> +	return ((read_cpuid(ID_AA64DFR0_EL1) >> 12) & 0xf) + 1;
->> +}
->> +
->> +/* Determine number of WRP registers available. */
->> +static inline int get_num_wrps(void)
->> +{
->> +	return ((read_cpuid(ID_AA64DFR0_EL1) >> 20) & 0xf) + 1;
->> +}
->
-> I'm fine with moving these into the header file, but we should probably
-> revisit this at some point so that we use a shadow value to indicate the
-> minimum number of registers across the system for e.g. big.LITTLE platforms
-> that don't have uniform debug resources.
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-There is work going forward in QEMU to specify this limitation when
-creating vcpus. At the moment the kernel sanity checks these are all the
-same on boot up but I guess we will have to decide where the smarts will
-end up. Do we:
+No reply from S?ren, but applying anyway since it seems to make sense.
+Only for -next though.
 
-  - report the real number per real-cpu (QEMU figures out vcpu  config)
-
-  or
-
-  - report the lowest common denominator
-  
-
->
->>  extern struct pmu perf_ops_bp;
->>  
->>  #endif	/* __KERNEL__ */
->> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->> index e5040b6..498d4f7 100644
->> --- a/arch/arm64/include/asm/kvm_host.h
->> +++ b/arch/arm64/include/asm/kvm_host.h
->> @@ -113,12 +113,13 @@ struct kvm_vcpu_arch {
->>  
->>  	/*
->>  	 * For debugging the guest we need to keep a set of debug
->> -	 * registers which can override the guests own debug state
->> +	 * registers which can override the guest's own debug state
->>  	 * while being used. These are set via the KVM_SET_GUEST_DEBUG
->>  	 * ioctl.
->>  	 */
->>  	struct kvm_guest_debug_arch *debug_ptr;
->>  	struct kvm_guest_debug_arch vcpu_debug_state;
->> +	struct kvm_guest_debug_arch external_debug_state;
->>  
->>  	/* Pointer to host CPU context */
->>  	kvm_cpu_context_t *host_cpu_context;
->> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
->> index 43758e7..95168c2 100644
->> --- a/arch/arm64/include/uapi/asm/kvm.h
->> +++ b/arch/arm64/include/uapi/asm/kvm.h
->> @@ -116,7 +116,7 @@ struct kvm_guest_debug_arch {
->>  
->>  struct kvm_debug_exit_arch {
->>  	__u32 hsr;
->> -	__u64 far;
->> +	__u64 far;	/* used for watchpoints */
->
-> Why not just add the comment with the field in your earlier patch?
-
-I can fix that up if there is need to a re-spin.
-
--- 
-Alex Benn?e
+Yours,
+Linus Walleij
