@@ -1,29 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 1 Jun 2015 15:01:25 +0200
-Subject: [RESEND PATCH 0/2] pinctrl: zynq: fix two bugs of zynq pinmux
- function
-In-Reply-To: <20150520142358.GS31550@xsjsorenbubuntu>
-References: <1432111351-21336-1-git-send-email-yamada.masahiro@socionext.com>
- <20150520142358.GS31550@xsjsorenbubuntu>
-Message-ID: <CACRpkdbpW6i2SNz254gt+T8TPw=gBzB68dQ2TmVNbwc41dT=1Q@mail.gmail.com>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Mon, 1 Jun 2015 21:08:25 +0800
+Subject: [PATCH v2 0/2] arm64: dts: Mediatek: MT8173 updtes 
+Message-ID: <1433164107-26568-1-git-send-email-eddie.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 20, 2015 at 4:23 PM, S?ren Brinkmann
-<soren.brinkmann@xilinx.com> wrote:
+This series add MT8173 watchdog and I2C device nodes. Both device nodes 
+are based on 4.1-rc1, but I2C need two extra CCF patches from Sascha [1][2].
 
-> For the series:
-> Reviewed-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+[1] clk: Add common clock support for Mediatek MT8135 and MT8173
+    http://lists.infradead.org/pipermail/linux-arm-kernel/2015-April/338763.html
+[2] ARM64: dts: mt8173: Add clock controller device nodes
+    http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/344753.html
 
-Ah that is S?ren's Review tag.
+Change in v2:
+Modify I2C device node accroding register address order.
 
-> It may be a good ides to add
->   Fixes: add958cee967 "pinctrl: Add driver for Zynq"
-> (I suspect that bug is there from the beginning) and ask Linus to
-> consider this for stable.
+Eddie Huang (2):
+  arm64: dts: mt8173: Add watchdog device node
+  arm64: dts: mt8173: Add I2C device node
 
-I added it but still merging for -next at this point. No need to
-rush this fix since it's been around so long.
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi | 125 +++++++++++++++++++++++++++++++
+ 1 file changed, 125 insertions(+)
 
-Yours,
-Linus Walleij
+-- 
+1.8.1.1.dirty
