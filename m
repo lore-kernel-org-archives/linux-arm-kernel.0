@@ -1,63 +1,73 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 1 Jun 2015 10:56:55 +0100
-Subject: [PATCH 1/8] of/fdt: split off FDT self reservation from
- memreserve processing
-In-Reply-To: <CAKv+Gu8-av3xTTf=YHAmU2TBuQrBWAS4WBLwK9hfgZbX0YH89A@mail.gmail.com>
-References: <1431326520-17331-1-git-send-email-ard.biesheuvel@linaro.org>
- <1431326520-17331-2-git-send-email-ard.biesheuvel@linaro.org>
- <20150522103541.GU29424@e104818-lin.cambridge.arm.com>
- <CAKv+Gu8-av3xTTf=YHAmU2TBuQrBWAS4WBLwK9hfgZbX0YH89A@mail.gmail.com>
-Message-ID: <20150601095655.GB22406@leverpostej>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 1 Jun 2015 11:55:56 +0200
+Subject: [PATCH] fix n900 dts file to work around 4.1 touchscreen
+ regression on n900
+In-Reply-To: <20150529203456.GC22083@amd>
+References: <20150527145837.GA13223@earth> <20150529190816.GA20232@amd>
+ <20150529192505.GA28987@amd> <20150529193211.GA7599@amd>
+ <20150529194955.GV2026@saruman.tx.rr.com>
+ <20150529195629.GA9811@amd> <20150529201745.GC17267@lukather>
+ <20150529202123.GY2026@saruman.tx.rr.com>
+ <20150529202954.GA26494@localhost> <20150529203456.GC22083@amd>
+Message-ID: <20150601095556.GH17267@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 01, 2015 at 08:56:07AM +0100, Ard Biesheuvel wrote:
-> (snip non-LAKML CCs)
+On Fri, May 29, 2015 at 10:34:56PM +0200, Pavel Machek wrote:
+> Hi!
 > 
-> On 22 May 2015 at 12:35, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Mon, May 11, 2015 at 08:41:53AM +0200, Ard Biesheuvel wrote:
-> >> This splits off the reservation of the memory occupied by the FDT
-> >> binary itself from the processing of the memory reservations it
-> >> contains. This is necessary because the physical address of the FDT,
-> >> which is needed to perform the reservation, may not be known to the
-> >> FDT driver core, i.e., it may be mapped outside the linear direct
-> >> mapping, in which case __pa() returns a bogus value.
-> >>
-> >> Cc: Russell King <linux@arm.linux.org.uk>
-> >> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> >> Cc: Paul Mackerras <paulus@samba.org>
-> >> Acked-by: Rob Herring <robh@kernel.org>
-> >> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >
-> > For the arm64 part:
-> >
-> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> > > > single DT, you don't even use that property in your driver, and now
+> > > > that you realise you meant something else, you want the code that
+> > > 
+> > > not Pali, Sebastian.
+> > > 
+> > > > actually parse the *right* property and does the right thing, that all
+> > > > other DT agree (and depend on) to be reverted?
+> > > 
+> > > We shouldn't revert, that I agree. But both properties should be parsed.
+> > 
+> > No. If the property is wrong, and nobody parsed it, I do not see any reason to
+> > start now.
 > 
-> Thanks Catalin,
+> Agreed.
 > 
-> Since there has been virtually no discussion about these patches, I
-> guess they have missed the window for being considered for inclusion
-> in v4.2
+> But that's not what I'm asking. See a changelog of
+> 3eea8b5d68c801fec788b411582b803463834752 and compare it with what it
+> actually does.
 > 
-> May I suggest that you at least consider these patches regarding the ID map
-> 
-> http://article.gmane.org/gmane.linux.ports.arm.kernel/411720
-> http://article.gmane.org/gmane.linux.ports.arm.kernel/411721
-> 
-> since they are self-contained and the first one does fix a potential
-> problem where the Image placement logic in the stub does not take the
-> 512 MB alignment boundary into account. The second one is a trivial
-> cleanup.
+> It is buggy. If fuzz is specified but maximum is not, it overwites
+> maximum with zero.
 
-FWIW both of these look good to me.
+If maximum is not set, you'll have other issues anyway. But it really
+boils down on what the default behaviour should be.
 
-> Perhaps Mark can comment on the desirability to include the FDT
-> remapping patch (which depends on this 1/8).
-> 
-> http://article.gmane.org/gmane.linux.kernel.efi/5738
+> Plus it introduces new failure "if (!test_bit(axis, dev->absbit))".
 
-I would like to see that taken if possible.
+It's not a new failure, it's testing against stupid code.
 
-Thanks,
-Mark.
+If an axis is setup in the DT but not registered in the driver,
+something is wrong, most probably the DT.
+
+> Plus it fails to distinguish between "value not specified in the dt"
+> and "zero is specified in the dt".
+
+Again, default behaviour.
+
+> The 3eea8b5d68c801fec788b411582b803463834752 is just bad.
+
+You were very welcome to review this patch at the time and/or suggest
+a fix that pleases everyone.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150601/a21a0745/attachment-0001.sig>
