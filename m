@@ -1,58 +1,67 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 01 Jun 2015 10:57:06 -0700
-Subject: [PATCH v6 2/3] ARM: bcm2835: Add the Raspberry Pi firmware driver
-In-Reply-To: <1433148509.2361.35.camel@x220>
-References: <1432928535-27522-1-git-send-email-eric@anholt.net>
- <1432928535-27522-2-git-send-email-eric@anholt.net>
- <1433148509.2361.35.camel@x220>
-Message-ID: <87vbf75n2l.fsf@eliezer.anholt.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 1 Jun 2015 10:58:07 -0700
+Subject: runtime check for omap-aes bus access permission (was: Re:
+ 3.13-rc3 (commit 7ce93f3) breaks Nokia N900 DT boot)
+In-Reply-To: <CAALWOA-X-Jb_2NODrPNnDgaLuYFDuxjPLHYwqRjaPz2PrqhJkA@mail.gmail.com>
+References: <201502112128.44852@pali>
+ <CAGo_u6oZxi7O6re30L2-wVyxTeahhyMb4qVcrE3tSCV9sBvrnw@mail.gmail.com>
+ <20150528073740.GD16509@pali> <20150528160113.GH30984@atomide.com>
+ <CAALWOA8Pfc_zbN9MoHwR=njPBpFU56WObYMbGv9N7ktzy+RSeQ@mail.gmail.com>
+ <20150528222412.GM30984@atomide.com>
+ <CAALWOA9qJHUST0JQxA6MBohMfbTYAP9+NbSXGYHZY4Xa3nSFvw@mail.gmail.com>
+ <CAALWOA82=QmTpCeiceOFQOjqXKdSBjB3Z+jL-mi0vYF=QaL4sA@mail.gmail.com>
+ <20150529155030.GO30984@atomide.com>
+ <CAALWOA-X-Jb_2NODrPNnDgaLuYFDuxjPLHYwqRjaPz2PrqhJkA@mail.gmail.com>
+Message-ID: <20150601175806.GZ30984@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Bolle <pebolle@tiscali.nl> writes:
+* Matthijs van Duin <matthijsvanduin@gmail.com> [150530 08:24]:
+> On 29 May 2015 at 17:50, Tony Lindgren <tony@atomide.com> wrote:
+> > I believe some TI kernels use strongly-ordered mappings, mainline
+> > kernel does not. Which kernel version are you using?
+> 
+> Normally I periodically rebuild based on Robert C Nelson's -bone
+> kernel (but with heavily customized config). I also tried a plain
+> 4.1.0-rc5-bone3, the generic 4.1.0-rc5-armv7-x0 (the most
+> vanilla-looking kernel I could find in my debian package list), and
+> for the heck of it also the classic 3.14.43-ti-r66.
+> 
+> In all cases I observed a synchronous bus error (dubiously reported as
+> "external abort on non-linefetch (0x1818)") on an AM335x with this
+> trivial test:
+> 
+> int main() {
+>         int fd = open( "/dev/mem", O_RDWR | O_DSYNC );
+>         if( fd < 0 ) return 1;
+>         void *ptr = mmap( NULL, 4096, PROT_WRITE, MAP_SHARED, fd, 0x42000000 );
+>         if( ptr == MAP_FAILED ) return 1;
+>         *(volatile int *)ptr = 0;
+>         return 0;
+> }
+> 
+> I even considered for a moment that maybe the AM335x has some "all
+> writes non-posted" thing enabled (which I think is available as a
+> switch on OMAP 4/5?). It seemed unlikely, but since most of my
+> exploration of interconnect behaviour was done on a DM814x, I
+> double-checked by performing the same write in a baremetal test
+> program (with that region configured Device-type in the MMU). As
+> expected, no data abort occurred, so writes most certainly are posted.
+> 
+> So I have trouble coming up with any explanation for this other than
+> the use of strongly-ordered mappings.
+> 
+> (Curiously BTW, omitting O_DSYNC made no difference.)
 
-> On Fri, 2015-05-29 at 12:42 -0700, Eric Anholt wrote:
->> This gives us a function for making mailbox property channel requests
->> of the firmware, which is most notable in that it will let us get and
->> set clock rates.
+I think these kernels are missing the configuration for l3-noc
+driver?
 
->> v6: Drop the try_module_get/module_put stuff, since all clients will
->>     be referencing our symbols in order to call those functions,
->>     anyway.  Fix the kerneldoc comments for the changes in v5.
->
-> (This style of commit explanation is getting quite common. I must say I
-> rather dislike it. I think people should just update the entire commit
-> explanation when needed, and not simply paste any changes at the end of
-> it, thereby forcing the the reader to determine which older parts are
-> actually overruled by newer parts. Besides, many, or maybe even most, of
-> the changes are really not interesting enough to keep in the commit
-> explanation.)
+I tried it on omap4 that has l3-noc configured, and it first produces
+"Unhandled fault: external abort on non-linefetch (0x1818) at 0xb6fd7000",
+and the L3 interrupt only after that. So yeah, you're right, we can't
+use the interrupts here. I somehow remembered we'd get only the L3
+interrupt if configured.
 
-It was a slip-up that I didn't move it below the '---'this time (I
-changed my workflow a bit, and missed the step).  I was assuming that
-Lee would just trim them on pulling in the changes.
+Regards,
 
->> --- /dev/null
->> +++ b/drivers/firmware/raspberrypi.c
->
->> +EXPORT_SYMBOL_GPL(rpi_firmware_property_list);
->
->> +EXPORT_SYMBOL_GPL(rpi_firmware_property);
->
-> A patch that uses these exports hit lkml recently:
-> https://lkml.org/lkml/2015/5/28/596 .
->
->> +EXPORT_SYMBOL_GPL(rpi_firmware_get);
->
-> But I didn't spot a (recent) patch that uses this export. Is it queued
-> somewhere?
-
-This is from the v5 changes due to review feedback, and the clients need
-to be changed to use it.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150601/419ffcda/attachment.sig>
+Tony
