@@ -1,79 +1,73 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 1 Jun 2015 09:23:09 +0300
-Subject: [PATCHv4 01/10] arm: dra7: add DESHDCP clock
+Date: Mon, 1 Jun 2015 09:23:12 +0300
+Subject: [PATCHv4 04/10] ARM: DRA7: hwmod: add DMM hwmod description
 In-Reply-To: <1433139798-23450-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1433139798-23450-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1433139798-23450-2-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1433139798-23450-5-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new Linux clock for DRA7 based SoCs to control DESHDCP clock.
+Add DMM hwmod entries for DRA7. This is identical to DMM on OMAP5.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
- arch/arm/boot/dts/dra7.dtsi               |  5 +++++
- arch/arm/boot/dts/dra7xx-clocks.dtsi      | 10 ++++++++++
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c |  1 +
- drivers/clk/ti/clk-7xx.c                  |  1 +
- 4 files changed, 17 insertions(+)
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 5332b57b4950..db0890a36e96 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -131,6 +131,11 @@
- 							regulator-max-microvolt = <3000000>;
- 						};
- 					};
-+
-+					scm_conf_clocks: clocks {
-+						#address-cells = <1>;
-+						#size-cells = <0>;
-+					};
- 				};
- 
- 				dra7_pmx_core: pinmux at 1400 {
-diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-index 3b933f74d000..470f39c4e326 100644
---- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
-+++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-@@ -2136,3 +2136,13 @@
- 		clocks = <&dpll_usb_ck>;
- 	};
- };
-+
-+&scm_conf_clocks {
-+	dss_deshdcp_clk: dss_deshdcp_clk {
-+		#clock-cells = <0>;
-+		compatible = "ti,gate-clock";
-+		clocks = <&l3_iclk_div>;
-+		ti,bit-shift = <0>;
-+		reg = <0x558>;
-+	};
-+};
 diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index 0e64c2fac0b5..817dbd87ce67 100644
+index 817dbd87ce67..f6b94854fafc 100644
 --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
 +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -438,6 +438,7 @@ static struct omap_hwmod_opt_clk dss_opt_clks[] = {
- 	{ .role = "video2_clk", .clk = "dss_video2_clk" },
- 	{ .role = "video1_clk", .clk = "dss_video1_clk" },
- 	{ .role = "hdmi_clk", .clk = "dss_hdmi_clk" },
-+	{ .role = "hdcp_clk", .clk = "dss_deshdcp_clk" },
+@@ -49,6 +49,27 @@
+  */
+ 
+ /*
++ * 'dmm' class
++ * instance(s): dmm
++ */
++static struct omap_hwmod_class dra7xx_dmm_hwmod_class = {
++	.name	= "dmm",
++};
++
++/* dmm */
++static struct omap_hwmod dra7xx_dmm_hwmod = {
++	.name		= "dmm",
++	.class		= &dra7xx_dmm_hwmod_class,
++	.clkdm_name	= "emif_clkdm",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_offs = DRA7XX_CM_EMIF_DMM_CLKCTRL_OFFSET,
++			.context_offs = DRA7XX_RM_EMIF_DMM_CONTEXT_OFFSET,
++		},
++	},
++};
++
++/*
+  * 'l3' class
+  * instance(s): l3_instr, l3_main_1, l3_main_2
+  */
+@@ -2322,6 +2343,14 @@ static struct omap_hwmod dra7xx_wd_timer2_hwmod = {
+  * Interfaces
+  */
+ 
++/* l3_main_1 -> dmm */
++static struct omap_hwmod_ocp_if dra7xx_l3_main_1__dmm = {
++	.master		= &dra7xx_l3_main_1_hwmod,
++	.slave		= &dra7xx_dmm_hwmod,
++	.clk		= "l3_iclk_div",
++	.user		= OCP_USER_SDMA,
++};
++
+ /* l3_main_2 -> l3_instr */
+ static struct omap_hwmod_ocp_if dra7xx_l3_main_2__l3_instr = {
+ 	.master		= &dra7xx_l3_main_2_hwmod,
+@@ -3290,6 +3319,7 @@ static struct omap_hwmod_ocp_if dra7xx_l4_wkup__wd_timer2 = {
  };
  
- static struct omap_hwmod dra7xx_dss_hwmod = {
-diff --git a/drivers/clk/ti/clk-7xx.c b/drivers/clk/ti/clk-7xx.c
-index 5d2217ae4478..2dd956b9affa 100644
---- a/drivers/clk/ti/clk-7xx.c
-+++ b/drivers/clk/ti/clk-7xx.c
-@@ -305,6 +305,7 @@ static struct ti_dt_clk dra7xx_clks[] = {
- 	DT_CLK("4882c000.timer", "timer_sys_ck", "timer_sys_clk_div"),
- 	DT_CLK("4882e000.timer", "timer_sys_ck", "timer_sys_clk_div"),
- 	DT_CLK(NULL, "sys_clkin", "sys_clkin1"),
-+	DT_CLK(NULL, "dss_deshdcp_clk", "dss_deshdcp_clk"),
- 	{ .node_name = NULL },
- };
- 
+ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
++	&dra7xx_l3_main_1__dmm,
+ 	&dra7xx_l3_main_2__l3_instr,
+ 	&dra7xx_l4_cfg__l3_main_1,
+ 	&dra7xx_mpu__l3_main_1,
 -- 
 2.1.4
