@@ -1,18 +1,34 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 1 Jun 2015 15:50:46 +0200
-Subject: [PATCH trivial] pinctrl: Spelling s/reseved/reserved/
-In-Reply-To: <1432209910-21307-1-git-send-email-geert+renesas@glider.be>
-References: <1432209910-21307-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <CACRpkdZZpLGsB91FcJNxHA3R0-scc3hg_4_QeM=ZO=KVtgCkAg@mail.gmail.com>
+Date: Mon, 1 Jun 2015 16:04:04 +0200
+Subject: [PATCH 2/2] pinctrl: dt-binding: Extend meson documentation with
+ GPIO IRQs support
+In-Reply-To: <1432551641-3256-3-git-send-email-carlo@caione.org>
+References: <1432551641-3256-1-git-send-email-carlo@caione.org>
+ <1432551641-3256-3-git-send-email-carlo@caione.org>
+Message-ID: <CACRpkdZQU8kRnxqg2AA0JDYOp8unNEj77M5-sVL2r+QGznmnBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 21, 2015 at 2:05 PM, Geert Uytterhoeven
-<geert+renesas@glider.be> wrote:
+On Mon, May 25, 2015 at 1:00 PM, Carlo Caione <carlo@caione.org> wrote:
 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> From: Beniamino Galvani <b.galvani@gmail.com>
+>
+> Extend the pinctrl binding documentation with the support for external
+> GPIO interrupts.
+>
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+> Signed-off-by: Beniamino Galvani <b.galvani@gmail.com>
+(...)
+> + - interrupts: specifies the GPIO IRQ numbers on the GIC (GPIO_IRQ#)
 
-Patch applied.
+Write that this GPIO only support as many IRQs as you supply
+to the controller.
+
+>         pinctrl: pinctrl at c1109880 {
+>                 compatible = "amlogic,meson8-pinctrl";
+> +               reg-names = "irq";
+
+Why? I thought this was the registers for the whole pin controller.
 
 Yours,
 Linus Walleij
