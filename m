@@ -1,11 +1,11 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 1 Jun 2015 14:45:59 +0200
-Subject: [RFC v1 05/25] gpio: Use irq_desc_get_xxx() to avoid redundant
+Date: Mon, 1 Jun 2015 14:46:34 +0200
+Subject: [RFC v1 06/25] pinctrl: Use irq_desc_get_xxx() to avoid redundant
  lookup of irq_desc
-In-Reply-To: <1432116013-25902-6-git-send-email-jiang.liu@linux.intel.com>
+In-Reply-To: <1432116013-25902-7-git-send-email-jiang.liu@linux.intel.com>
 References: <1432116013-25902-1-git-send-email-jiang.liu@linux.intel.com>
- <1432116013-25902-6-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <CACRpkdZfWK5H+gRD6inX31Ouq1XCvq7CneNDJV8x0iihXHzWjw@mail.gmail.com>
+ <1432116013-25902-7-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <CACRpkdazXuq7WZZPiObRNFBTokazUN9yisU7VNobS4ezgZTHJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
