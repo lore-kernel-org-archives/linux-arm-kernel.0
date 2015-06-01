@@ -1,45 +1,33 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 1 Jun 2015 11:23:22 +0200
-Subject: [PATCH 2/3] i2c: at91: print hardware version
-In-Reply-To: <5d08690d152e10592443224b46b677071196f730.1432907105.git.cyrille.pitchen@atmel.com>
-References: <cover.1432907105.git.cyrille.pitchen@atmel.com>
- <5d08690d152e10592443224b46b677071196f730.1432907105.git.cyrille.pitchen@atmel.com>
-Message-ID: <20150601092322.GJ25118@odux.rfo.atmel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 1 Jun 2015 11:22:49 +0200
+Subject: [PATCH v4 1/2] phy-sun4i-usb: Add full support for usb0 phy / OTG
+In-Reply-To: <1433088626-8858-2-git-send-email-hdegoede@redhat.com>
+References: <1433088626-8858-1-git-send-email-hdegoede@redhat.com>
+ <1433088626-8858-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150601092249.GF17267@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 29, 2015 at 03:50:09PM +0200, Cyrille Pitchen wrote:
-> The probe() function now prints the hardware version of the I2C controller
-> 
-> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+On Sun, May 31, 2015 at 06:10:25PM +0200, Hans de Goede wrote:
+> +	/* We either want both gpio pins or neither (when in host mode) */
+> +	if (!data->id_det_gpio != !data->vbus_det_gpio) {
+> +		dev_err(dev, "failed to get id or vbus detect pin\n");
+> +		return -ENODEV;
+> +	}
 
-> ---
->  drivers/i2c/busses/i2c-at91.c | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-> index b48be58..1549b29 100644
-> --- a/drivers/i2c/busses/i2c-at91.c
-> +++ b/drivers/i2c/busses/i2c-at91.c
-> @@ -85,6 +85,8 @@
->  #define	AT91_TWI_ACR_DATAL(len)	((len) & 0xff)
->  #define	AT91_TWI_ACR_DIR	(1 << 8)
->  
-> +#define	AT91_TWI_VER		0x00fc	/* Version Register */
-> +
->  struct at91_twi_pdata {
->  	unsigned clk_max_div;
->  	unsigned clk_offset;
-> @@ -867,6 +869,8 @@ static int at91_twi_probe(struct platform_device *pdev)
->  			return rc;
->  	}
->  
-> +	dev_info(dev->dev, "version: 0x%x\n", at91_twi_read(dev, AT91_TWI_VER));
-> +
->  	rc = of_property_read_u32(dev->dev->of_node, "clock-frequency",
->  			&bus_clk_rate);
->  	if (rc)
-> -- 
-> 1.8.2.2
-> 
+The fact that the driver expects both to be set if one is should be in
+the binding documentation.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150601/3108a512/attachment.sig>
