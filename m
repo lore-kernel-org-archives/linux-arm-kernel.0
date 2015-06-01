@@ -1,7 +1,7 @@
 From: ruchandani.tina@gmail.com (Tina Ruchandani)
-Date: Mon, 1 Jun 2015 08:36:18 +0530
-Subject: [PATCH] drm/exynos: g2d: Replace struct timeval usage
-Message-ID: <20150601030618.GA2754@tinar>
+Date: Mon, 1 Jun 2015 08:43:08 +0530
+Subject: [PATCH] drm/exynos/ipp: Replace struct timeval usage
+Message-ID: <20150601031308.GA2785@tinar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,44 +13,45 @@ which uses a 64-bit seconds representation and is y2038 safe.
 The patch is part of a larger effort to remove all 32-bit
 timekeeping variables (timeval, time_t and timespec) from the
 kernel.
-
-Signed-off-by: Tina Ruchandani <ruchandani.tina@gmail.com>
 ---
- drivers/gpu/drm/exynos/exynos_drm_g2d.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ drivers/gpu/drm/exynos/exynos_drm_ipp.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_g2d.c b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
-index 81a2508..69e236f 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_g2d.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
-@@ -15,6 +15,7 @@
- #include <linux/platform_device.h>
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_ipp.c b/drivers/gpu/drm/exynos/exynos_drm_ipp.c
+index b7f1cbc..7cd4a97 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_ipp.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_ipp.c
+@@ -16,6 +16,7 @@
+ #include <linux/types.h>
+ #include <linux/clk.h>
  #include <linux/pm_runtime.h>
- #include <linux/slab.h>
 +#include <linux/time64.h>
- #include <linux/workqueue.h>
- #include <linux/dma-mapping.h>
- #include <linux/dma-attrs.h>
-@@ -889,7 +890,7 @@ static void g2d_finish_event(struct g2d_data *g2d, u32 cmdlist_no)
- 	struct drm_device *drm_dev = g2d->subdrv.drm_dev;
- 	struct g2d_runqueue_node *runqueue_node = g2d->runqueue_node;
- 	struct drm_exynos_pending_g2d_event *e;
+ 
+ #include <drm/drmP.h>
+ #include <drm/exynos_drm.h>
+@@ -1414,7 +1415,7 @@ static int ipp_send_event(struct exynos_drm_ippdrv *ippdrv,
+ 	struct drm_exynos_ipp_queue_buf qbuf;
+ 	struct drm_exynos_ipp_send_event *e;
+ 	struct list_head *head;
 -	struct timeval now;
 +	struct timespec64 now;
  	unsigned long flags;
- 
- 	if (list_empty(&runqueue_node->event_list))
-@@ -898,9 +899,9 @@ static void g2d_finish_event(struct g2d_data *g2d, u32 cmdlist_no)
- 	e = list_first_entry(&runqueue_node->event_list,
- 			     struct drm_exynos_pending_g2d_event, base.link);
+ 	u32 tbuf_id[EXYNOS_DRM_OPS_MAX] = {0, };
+ 	int ret, i;
+@@ -1518,10 +1519,11 @@ static int ipp_send_event(struct exynos_drm_ippdrv *ippdrv,
+ 	e = list_first_entry(&c_node->event_list,
+ 		struct drm_exynos_ipp_send_event, base.link);
  
 -	do_gettimeofday(&now);
+-	DRM_DEBUG_KMS("tv_sec[%ld]tv_usec[%ld]\n", now.tv_sec, now.tv_usec);
 +	getnstimeofday64(&now);
++	DRM_DEBUG_KMS("tv_sec[%lld]tv_usec[%lld]\n", now.tv_sec, (now.tv_nsec /
++								NSEC_PER_SEC));
  	e->event.tv_sec = now.tv_sec;
 -	e->event.tv_usec = now.tv_usec;
-+	e->event.tv_usec = (now.tv_nsec / NSEC_PER_USEC);
- 	e->event.cmdlist_no = cmdlist_no;
++	e->event.tv_usec = now.tv_nsec / NSEC_PER_SEC;
+ 	e->event.prop_id = property->prop_id;
  
- 	spin_lock_irqsave(&drm_dev->event_lock, flags);
+ 	/* set buffer id about source destination */
 -- 
 2.2.0.rc0.207.ga3a616c
