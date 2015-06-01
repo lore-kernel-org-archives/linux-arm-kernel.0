@@ -1,39 +1,38 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 1 Jun 2015 09:23:15 +0300
-Subject: [PATCHv4 07/10] ARM: OMAP2+: display: detect DRA7 DSS
+Date: Mon, 1 Jun 2015 09:23:13 +0300
+Subject: [PATCHv4 05/10] ARM: DRA7: hwmod: set DSS submodule parent hwmods
 In-Reply-To: <1433139798-23450-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1433139798-23450-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1433139798-23450-8-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1433139798-23450-6-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add platform code to detect DRA7 DSS.
+Set DSS core hwmod as the parent for all the DSS submodules.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
- arch/arm/mach-omap2/display.c | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/display.c b/arch/arm/mach-omap2/display.c
-index 9868d0bc7805..6ab13d18c636 100644
---- a/arch/arm/mach-omap2/display.c
-+++ b/arch/arm/mach-omap2/display.c
-@@ -287,6 +287,8 @@ static enum omapdss_version __init omap_display_get_version(void)
- 		return OMAPDSS_VER_OMAP5;
- 	else if (soc_is_am43xx())
- 		return OMAPDSS_VER_AM43xx;
-+	else if (soc_is_dra7xx())
-+		return OMAPDSS_VER_DRA7xx;
- 	else
- 		return OMAPDSS_VER_UNKNOWN;
- }
-@@ -573,6 +575,7 @@ static const char * const omapdss_compat_names[] __initconst = {
- 	"ti,omap3-dss",
- 	"ti,omap4-dss",
- 	"ti,omap5-dss",
-+	"ti,dra7-dss",
+diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+index f6b94854fafc..9961f95f52ae 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+@@ -522,6 +522,7 @@ static struct omap_hwmod dra7xx_dss_dispc_hwmod = {
+ 		},
+ 	},
+ 	.dev_attr	= &dss_dispc_dev_attr,
++	.parent_hwmod	= &dra7xx_dss_hwmod,
  };
  
- struct device_node * __init omapdss_find_dss_of_node(void)
+ /*
+@@ -563,6 +564,7 @@ static struct omap_hwmod dra7xx_dss_hdmi_hwmod = {
+ 	},
+ 	.opt_clks	= dss_hdmi_opt_clks,
+ 	.opt_clks_cnt	= ARRAY_SIZE(dss_hdmi_opt_clks),
++	.parent_hwmod	= &dra7xx_dss_hwmod,
+ };
+ 
+ /*
 -- 
 2.1.4
