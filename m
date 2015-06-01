@@ -1,33 +1,59 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 1 Jun 2015 05:46:44 +0000 (UTC)
-Subject: [PATCHv3 00/10] ARM: DRA7: add display support
-In-Reply-To: <1430906938-26128-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1430906938-26128-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <alpine.DEB.2.02.1506010538330.14902@utopia.booyaka.com>
+Date: Mon, 1 Jun 2015 05:49:15 +0000 (UTC)
+Subject: OMAP baseline test results for v4.1-rc5
+In-Reply-To: <556B8817.7080305@myspectrum.nl>
+References: <alpine.DEB.2.02.1505301534250.26925@utopia.booyaka.com>
+ <5569DDB3.2040802@myspectrum.nl> <556B8817.7080305@myspectrum.nl>
+Message-ID: <alpine.DEB.2.02.1506010546510.14902@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomi
++ Tero
 
-On Wed, 6 May 2015, Tomi Valkeinen wrote:
+Hello Jeroen,
 
-> This series adds the arch/arm/ side of the display support for DRA7 (DRA72x,
-> DRA74x, AM54xx) SoCs. Also support for HDMI output on x15 and DRA72 EVM boards
-> is added.
+On Mon, 1 Jun 2015, Jeroen Hofstee wrote:
+
+> On 30-05-15 17:56, Jeroen Hofstee wrote:
+> > Hello Paul,
+> > 
+> > On 30-05-15 17:50, Paul Walmsley wrote:
+> > > Here are some basic OMAP test results for Linux v4.1-rc5.
+> > > Logs and other details at:
+> > > 
+> > > http://www.pwsan.com/omap/testlogs/test_v4.1-rc5/20150529162206/
+> > > 
+> > 
+> > The cmt3517 seems to have these some In-Band errors.
+> > Do you happen to know where these are coming from?
+> > 
 > 
-> This series is v3, and is based on v4.1-rc2. There are no differences to v2,
-> except rebased and tested.
+> git bisect + some workarounds seem to indicate:
+> 
+> d744ce37b721d6678f420ba0fb058f615eb015b6 is the first bad commit
+> commit d744ce37b721d6678f420ba0fb058f615eb015b6
+> Author: Tero Kristo <t-kristo@ti.com>
+> Date:   Tue Feb 24 16:22:45 2015 +0200
+> 
+>     ARM: dts: omap3: add minimal l4 bus layout with control module support
+> 
+>     This patch creates an l4_core interconnect for OMAP3, and moves some
+>     of the generic peripherals under it. System control module nodes are
+>     moved under this new interconnect also, and the SCM clock layout
+>     is changed to use the renamed SCM node as the clock provider.
+> 
+>     Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>     Reported-by: Tony Lindgren <tony@atomide.com>
+> 
+> I haven't looked further into it yet,
 
-Are you still planning to move the DESHDCP clock enable to the beginning 
-of the series to avoid the warnings, per:
+Interesting; thanks for the bisect.  In the mainline kernel, this appears 
+to be commit b8845074cfbbd1d1b46720a1b563d7b4240dac21.
 
-http://www.spinics.net/lists/arm-kernel/msg410968.html
+I took a quick look at the control module offsets in that patch, and they 
+appear to match what's in the SPRUGR0B PDF.  Will try a few test boots 
+here to confirm your findings.
 
-?
-
-Also, not sure if you can arrange for someone at TI to send over a DRA7xx 
-board for the testbed, but it would be nice to have a board to test these 
-patches with, to avoid issues like the one mentioned in your E-mails...
-
+Tero, care to take a look?
 
 - Paul
