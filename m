@@ -1,26 +1,29 @@
-From: matthijsvanduin@gmail.com (Matthijs van Duin)
-Date: Mon, 1 Jun 2015 02:20:08 +0200
-Subject: [PATCH] ARM: dts: am335x-boneblack: disable RTC-only sleep
-In-Reply-To: <1432136322-7609-1-git-send-email-robertcnelson@gmail.com>
-References: <1432136322-7609-1-git-send-email-robertcnelson@gmail.com>
-Message-ID: <CAALWOA8ReuBSMcu5EvLOrKGfFGBGWSdMhpL_uSnL4QvTC-n8zg@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 1 Jun 2015 10:25:11 +1000
+Subject: linux-next: manual merge of the arm-soc tree with Linus' tree
+Message-ID: <20150601102511.316f0262@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for the late response, I only just noticed this since I wasn't CC'd.
+Hi all,
 
-This "fix" was not ever Reported-By or Tested-By me as it claims. It
-is in fact wrong: &rtc { system-power-controller; } needs to be
-present for every variety of beaglebone (more generally every design
-with a TPS65217 whose PWR_EN is connected to the PMIC_POWER_EN pin of
-an AM335x).
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/boot/dts/zynq-7000.dtsi between commit 9eeb5161397a ("ARM:
+zynq: DT: Use the zynq binding with macb") from Linus' tree and commit
+4481b18b7cf0 ("ARM: zynq: DT: Use the zynq binding with macb") from the
+arm-soc tree.
 
-Without a system-power-controller, the kernel has no way of turning
-off the system and shutdown will leave the system halted instead.
+I fixed it up (it looks like that latter is a newer version of the
+former, so I used it) and can carry the fix as necessary (no action
+is required).
 
-The previously posted fix, which added  &tps {
-ti,pmic-shutdown-controller; }  was correct, and ensures that a
-poweroff makes the pmic enter "OFF-state" rather than "SLEEP-state"
-(aka RTC-only sleep).
-
-Matthijs
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150601/33a0088b/attachment.sig>
