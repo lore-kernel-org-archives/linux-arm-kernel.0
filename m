@@ -1,264 +1,117 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 01 Jun 2015 12:10:50 +0200
-Subject: [PATCH 6/6] ARM: dts: exynos5420: add sysmmu nodes
-In-Reply-To: <1433153450-3680-1-git-send-email-m.szyprowski@samsung.com>
-References: <1432041645-11172-1-git-send-email-m.szyprowski@samsung.com>
- <1433153450-3680-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1433153450-3680-7-git-send-email-m.szyprowski@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 1 Jun 2015 11:16:36 +0100
+Subject: [PATCH v2 09/11] KVM: arm: disable debug mode if we don't
+ actually need it.
+In-Reply-To: <1433046432-1824-10-git-send-email-zhichao.huang@linaro.org>
+References: <1433046432-1824-1-git-send-email-zhichao.huang@linaro.org>
+ <1433046432-1824-10-git-send-email-zhichao.huang@linaro.org>
+Message-ID: <20150601101636.GF1641@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds System MMU nodes to all defined devices that are specific
-to Exynos5420/5800/5422 series.
+On Sun, May 31, 2015 at 05:27:10AM +0100, Zhichao Huang wrote:
+> Until now we enable debug mode all the time even if we don't
+> actually need it.
+> 
+> Inspired by the implementation in arm64, disable debug mode if
+> we don't need it. And then we are able to reduce unnecessary
+> registers saving/restoring when the debug mode is disabled.
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/boot/dts/exynos5420.dtsi | 183 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 183 insertions(+)
+I'm terrified about this patch. Enabling monitor mode has proven to be
+*extremely* fragile in practice on 32-bit ARM SoCs, so trying to do this
+morei often makes me very nervous.
 
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index d0be412dfbea..534f27ceb10b 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -179,6 +179,8 @@
- 		clocks = <&clock CLK_MFC>;
- 		clock-names = "mfc";
- 		power-domains = <&mfc_pd>;
-+		iommus = <&sysmmu_mfc_l>, <&sysmmu_mfc_r>;
-+		iommu-names = "left", "right";
- 	};
- 
- 	mmc_0: mmc at 12200000 {
-@@ -713,6 +715,7 @@
- 			 <&clock CLK_SCLK_HDMI>;
- 		clock-names = "mixer", "hdmi", "sclk_hdmi";
- 		power-domains = <&disp_pd>;
-+		iommus = <&sysmmu_tv>;
- 	};
- 
- 	gsc_0: video-scaler at 13e00000 {
-@@ -722,6 +725,7 @@
- 		clocks = <&clock CLK_GSCL0>;
- 		clock-names = "gscl";
- 		power-domains = <&gsc_pd>;
-+		iommus = <&sysmmu_gscl0>;
- 	};
- 
- 	gsc_1: video-scaler at 13e10000 {
-@@ -731,6 +735,7 @@
- 		clocks = <&clock CLK_GSCL1>;
- 		clock-names = "gscl";
- 		power-domains = <&gsc_pd>;
-+		iommus = <&sysmmu_gscl1>;
- 	};
- 
- 	jpeg_0: jpeg at 11F50000 {
-@@ -739,6 +744,7 @@
- 		interrupts = <0 89 0>;
- 		clock-names = "jpeg";
- 		clocks = <&clock CLK_JPEG>;
-+		iommus = <&sysmmu_jpeg0>;
- 	};
- 
- 	jpeg_1: jpeg at 11F60000 {
-@@ -747,6 +753,7 @@
- 		interrupts = <0 168 0>;
- 		clock-names = "jpeg";
- 		clocks = <&clock CLK_JPEG2>;
-+		iommus = <&sysmmu_jpeg1>;
- 	};
- 
- 	pmu_system_controller: system-controller at 10040000 {
-@@ -941,6 +948,180 @@
- 		samsung,sysreg-phandle = <&sysreg_system_controller>;
- 		samsung,pmureg-phandle = <&pmu_system_controller>;
- 	};
-+
-+	sysmmu_g2dr: sysmmu at 0x10A60000 {
-+		compatible = "samsung,exynos-sysmmu";
-+		reg = <0x10A60000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <24 5>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_G2D>, <&clock CLK_G2D>;
-+		#iommu-cells = <0>;
-+	};
-+
-+	sysmmu_g2dw: sysmmu at 0x10A70000 {
-+		compatible = "samsung,exynos-sysmmu";
-+		reg = <0x10A70000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <22 2>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_G2D>, <&clock CLK_G2D>;
-+		#iommu-cells = <0>;
-+	};
-+
-+	sysmmu_tv: sysmmu at 0x14650000 {
-+		compatible = "samsung,exynos-sysmmu";
-+		reg = <0x14650000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <7 4>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_MIXER>, <&clock CLK_MIXER>;
-+		power-domains = <&disp_pd>;
-+		#iommu-cells = <0>;
-+	};
-+
-+	sysmmu_gscl0: sysmmu at 0x13E80000 {
-+		compatible = "samsung,exynos-sysmmu";
-+		reg = <0x13E80000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <2 0>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_GSCL0>, <&clock CLK_GSCL0>;
-+		power-domains = <&gsc_pd>;
-+		#iommu-cells = <0>;
-+	};
-+
-+	sysmmu_gscl1: sysmmu at 0x13E90000 {
-+		compatible = "samsung,exynos-sysmmu";
-+		reg = <0x13E90000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <2 2>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_GSCL1>, <&clock CLK_GSCL1>;
-+		power-domains = <&gsc_pd>;
-+		#iommu-cells = <0>;
-+	};
-+
-+	sysmmu_scaler0r: sysmmu at 0x12880000 {
-+		compatible = "samsung,exynos-sysmmu";
-+		reg = <0x12880000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <22 4>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_MSCL0>, <&clock CLK_MSCL0>;
-+		#iommu-cells = <0>;
-+	};
-+
-+	sysmmu_scaler1r: sysmmu at 0x12890000 {
-+		compatible = "samsung,exynos-sysmmu";
-+		reg = <0x12890000 0x1000>;
-+		interrupts = <0 186 0>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_MSCL1>, <&clock CLK_MSCL1>;
-+		#iommu-cells = <0>;
-+	};
-+
-+	sysmmu_scaler2r: sysmmu at 0x128A0000 {
-+		compatible = "samsung,exynos-sysmmu";
-+		reg = <0x128A0000 0x1000>;
-+		interrupts = <0 188 0>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_MSCL2>, <&clock CLK_MSCL2>;
-+		#iommu-cells = <0>;
-+	};
-+
-+	sysmmu_scaler0w: sysmmu at 0x128C0000 {
-+		compatible = "samsung,exynos-sysmmu";
-+		reg = <0x128C0000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <27 2>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_MSCL0>, <&clock CLK_MSCL0>;
-+		#iommu-cells = <0>;
-+	};
-+
-+	sysmmu_scaler1w: sysmmu at 0x128D0000 {
-+		compatible = "samsung,exynos-sysmmu";
-+		reg = <0x128D0000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <22 6>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_MSCL1>, <&clock CLK_MSCL1>;
-+		#iommu-cells = <0>;
-+	};
-+
-+	sysmmu_scaler2w: sysmmu at 0x128E0000 {
-+		compatible = "samsung,exynos-sysmmu";
-+		reg = <0x128E0000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <19 6>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_MSCL2>, <&clock CLK_MSCL2>;
-+		#iommu-cells = <0>;
-+	};
-+
-+	sysmmu_jpeg0: sysmmu at 0x11F10000 {
-+		compatible = "samsung,exynos-sysmmu";
-+		reg = <0x11F10000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <4 2>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_JPEG>, <&clock CLK_JPEG>;
-+		#iommu-cells = <0>;
-+	};
-+
-+	sysmmu_jpeg1: sysmmu at 0x11F20000 {
-+		compatible = "samsung,exynos-sysmmu";
-+		reg = <0x11F20000 0x1000>;
-+		interrupts = <0 169 0>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_JPEG2>, <&clock CLK_JPEG2>;
-+		#iommu-cells = <0>;
-+	};
-+
-+	sysmmu_mfc_l: sysmmu at 0x11200000 {
-+		compatible = "samsung,exynos-sysmmu";
-+		reg = <0x11200000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <6 2>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_MFCL>, <&clock CLK_MFC>;
-+		power-domains = <&mfc_pd>;
-+		#iommu-cells = <0>;
-+	};
-+
-+	sysmmu_mfc_r: sysmmu at 0x11210000 {
-+		compatible = "samsung,exynos-sysmmu";
-+		reg = <0x11210000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <8 5>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_MFCR>, <&clock CLK_MFC>;
-+		power-domains = <&mfc_pd>;
-+		#iommu-cells = <0>;
-+	};
-+
-+	sysmmu_fimd1_0: sysmmu at 0x14640000 {
-+		compatible = "samsung,exynos-sysmmu";
-+		reg = <0x14640000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <3 2>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_FIMD1M0>, <&clock CLK_FIMD1>;
-+		power-domains = <&disp_pd>;
-+		#iommu-cells = <0>;
-+	};
-+
-+	sysmmu_fimd1_1: sysmmu at 0x14680000 {
-+		compatible = "samsung,exynos-sysmmu";
-+		reg = <0x14680000 0x1000>;
-+		interrupt-parent = <&combiner>;
-+		interrupts = <3 0>;
-+		clock-names = "sysmmu", "master";
-+		clocks = <&clock CLK_SMMU_FIMD1M0>, <&clock CLK_FIMD1>;
-+		power-domains = <&disp_pd>;
-+		#iommu-cells = <0>;
-+	};
- };
- 
- &dp {
-@@ -955,6 +1136,8 @@
- 	clocks = <&clock CLK_SCLK_FIMD1>, <&clock CLK_FIMD1>;
- 	clock-names = "sclk_fimd", "fimd";
- 	power-domains = <&disp_pd>;
-+	iommus = <&sysmmu_fimd1_0>, <&sysmmu_fimd1_1>;
-+	iommu-names = "m0", "m1";
- };
- 
- &rtc {
--- 
-1.9.2
+> Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
+> ---
+>  arch/arm/kernel/hw_breakpoint.c | 55 ++++++++++++++++++++++++++++++++++-------
+>  1 file changed, 46 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+> index dc7d0a9..1d27563 100644
+> --- a/arch/arm/kernel/hw_breakpoint.c
+> +++ b/arch/arm/kernel/hw_breakpoint.c
+> @@ -266,8 +266,7 @@ static int enable_monitor_mode(void)
+>  	}
+>  
+>  	/* Check that the write made it through. */
+> -	ARM_DBG_READ(c0, c1, 0, dscr);
+> -	if (!(dscr & ARM_DSCR_MDBGEN)) {
+> +	if (!monitor_mode_enabled()) {
+>  		pr_warn_once("Failed to enable monitor mode on CPU %d.\n",
+>  				smp_processor_id());
+>  		return -EPERM;
+
+Ok, this hunk is harmless :)
+
+> @@ -277,6 +276,43 @@ out:
+>  	return 0;
+>  }
+>  
+> +static int disable_monitor_mode(void)
+> +{
+> +	u32 dscr;
+> +
+> +	ARM_DBG_READ(c0, c1, 0, dscr);
+> +
+> +	/* If monitor mode is already disabled, just return. */
+> +	if (!(dscr & ARM_DSCR_MDBGEN))
+> +		goto out;
+> +
+> +	/* Write to the corresponding DSCR. */
+> +	switch (get_debug_arch()) {
+> +	case ARM_DEBUG_ARCH_V6:
+> +	case ARM_DEBUG_ARCH_V6_1:
+> +		ARM_DBG_WRITE(c0, c1, 0, (dscr & ~ARM_DSCR_MDBGEN));
+> +		break;
+> +	case ARM_DEBUG_ARCH_V7_ECP14:
+> +	case ARM_DEBUG_ARCH_V7_1:
+> +	case ARM_DEBUG_ARCH_V8:
+> +		ARM_DBG_WRITE(c0, c2, 2, (dscr & ~ARM_DSCR_MDBGEN));
+> +		isb();
+> +		break;
+> +	default:
+> +		return -ENODEV;
+> +	}
+> +
+> +	/* Check that the write made it through. */
+> +	if (monitor_mode_enabled()) {
+> +		pr_warn_once("Failed to disable monitor mode on CPU %d.\n",
+> +				smp_processor_id());
+> +		return -EPERM;
+> +	}
+> +
+> +out:
+> +	return 0;
+> +}
+
+I'm not comfortable with this. enable_monitor_mode has precisly one caller
+[reset_ctrl_regs] which goes to some lengths to get the system into a
+well-defined state. On top of that, the whole thing is run with an undef
+hook registered because there isn't an architected way to discover whether
+or not DBGSWENABLE is driven low.
+
+Why exactly do you need this? Can you not trap guest debug accesses some
+other way?
+
+>  int hw_breakpoint_slots(int type)
+>  {
+>  	if (!debug_arch_supported())
+> @@ -338,6 +374,8 @@ int arch_install_hw_breakpoint(struct perf_event *bp)
+>  	int i, max_slots, ctrl_base, val_base;
+>  	u32 addr, ctrl;
+>  
+> +	enable_monitor_mode();
+> +
+>  	addr = info->address;
+>  	ctrl = encode_ctrl_reg(info->ctrl) | 0x1;
+>  
+> @@ -430,6 +468,8 @@ void arch_uninstall_hw_breakpoint(struct perf_event *bp)
+>  
+>  	/* Reset the control register. */
+>  	write_wb_reg(base + i, 0);
+> +
+> +	disable_monitor_mode();
+
+My previous concerns notwithstanding, shouldn't this be refcounted?
+
+Will
