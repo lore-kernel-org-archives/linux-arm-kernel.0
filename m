@@ -1,120 +1,35 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 1 Jun 2015 14:32:13 -0700
-Subject: Please revert 3eea8b5d68c801fec788b411582b803463834752 as it
- breaks touchscreen on n900.
-In-Reply-To: <20150601212226.GH23777@lukather>
-References: <20150529201745.GC17267@lukather>
- <20150529202123.GY2026@saruman.tx.rr.com>
- <20150529202954.GA26494@localhost> <20150529203456.GC22083@amd>
- <20150601095556.GH17267@lukather> <20150601140605.GA26908@amd>
- <20150601145825.GA20557@lukather> <20150601152111.GA14015@amd>
- <20150601174730.GA30024@dtor-ws> <20150601212226.GH23777@lukather>
-Message-ID: <20150601213213.GB14395@dtor-ws>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 01 Jun 2015 23:31:48 +0200
+Subject: [PATCH] fixup! dmaengine: pxa_dma: add debug information
+In-Reply-To: <1432893073.29807.15.camel@perches.com> (Joe Perches's message of
+ "Fri, 29 May 2015 02:51:13 -0700")
+References: <1617548760.717381111.1432891749082.JavaMail.root@zimbra1-e1.priv.proxad.net>
+ <1432893073.29807.15.camel@perches.com>
+Message-ID: <87382bt8sb.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 01, 2015 at 11:22:26PM +0200, Maxime Ripard wrote:
-> Hi Dmitry,
-> 
-> On Mon, Jun 01, 2015 at 10:47:30AM -0700, Dmitry Torokhov wrote:
-> > On Mon, Jun 01, 2015 at 05:21:11PM +0200, Pavel Machek wrote:
-> > > 
-> > > 
-> > > > > > > The 3eea8b5d68c801fec788b411582b803463834752 is just bad.
-> > > > > > 
-> > > > > > You were very welcome to review this patch at the time and/or suggest
-> > > > > > a fix that pleases everyone.
-> > > > > 
-> > > > > You should be the one that should suggest fixes, as you broke it in
-> > > > > the first place. But clearly you don't understand that.
-> > > > 
-> > > > You actually never asked for a fix, and went head first calling this
-> > > > patch "bad" and asking for nothing but reverting it.
-> > > 
-> > > Date: Fri, 29 May 2015 21:08:16 +0200
-> > > Subject: 4.1 touchscreen regression on n900 -- pinpointed [was Re:
-> > > linux-n900
-> > > ...
-> > > Maxime, can you suggest a fix?
-> > 
-> > How about we do something like below (it needs a small edt-ft5x06 fixup
-> > that I'll send separately). Not tested.
-> > 
-> > Thanks.
-> > 
-> > -- 
-> > Dmitry
-> > 
-> > 
-> > Input: improve parsing OF parameters for touchscreens
-> > 
-> > From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> > 
-> > When applying touchscreen parameters specified in device tree let's make
-> > sure we keep whatever setup was done by the driver and not reset the
-> > missing values to zero.
-> > 
-> > Reported-by: Pavel Machek <pavel@ucw.cz>
-> > Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> > ---
-> >  drivers/input/touchscreen/edt-ft5x06.c     |    2 -
-> >  drivers/input/touchscreen/of_touchscreen.c |   67 ++++++++++++++++++----------
-> >  drivers/input/touchscreen/tsc2005.c        |    2 -
-> >  include/linux/input/touchscreen.h          |    5 +-
-> >  4 files changed, 48 insertions(+), 28 deletions(-)
-> > 
-> > diff --git a/drivers/input/touchscreen/edt-ft5x06.c b/drivers/input/touchscreen/edt-ft5x06.c
-> > index 29d179a..394b1de 100644
-> > --- a/drivers/input/touchscreen/edt-ft5x06.c
-> > +++ b/drivers/input/touchscreen/edt-ft5x06.c
-> > @@ -1041,7 +1041,7 @@ static int edt_ft5x06_ts_probe(struct i2c_client *client,
-> >  			     0, tsdata->num_y * 64 - 1, 0, 0);
-> >  
-> >  	if (!pdata)
-> > -		touchscreen_parse_of_params(input);
-> > +		touchscreen_parse_of_params(input, true);
-> >  
-> >  	error = input_mt_init_slots(input, MAX_SUPPORT_POINTS, INPUT_MT_DIRECT);
-> >  	if (error) {
-> > diff --git a/drivers/input/touchscreen/of_touchscreen.c b/drivers/input/touchscreen/of_touchscreen.c
-> > index b82b520..c132624 100644
-> > --- a/drivers/input/touchscreen/of_touchscreen.c
-> > +++ b/drivers/input/touchscreen/of_touchscreen.c
-> > @@ -14,14 +14,22 @@
-> >  #include <linux/input/mt.h>
-> >  #include <linux/input/touchscreen.h>
-> >  
-> > -static u32 of_get_optional_u32(struct device_node *np,
-> > -			       const char *property)
-> > +static bool touchscreen_get_property_u32(struct device_node *np,
-> > +					 const char *property,
-> > +					 unsigned int default_value,
-> > +					 unsigned int *value)
-> >  {
-> >  	u32 val = 0;
-> > +	int error;
-> >  
-> > -	of_property_read_u32(np, property, &val);
-> > +	error = of_property_read_u32(np, property, &val);
-> > +	if (error) {
-> > +		*value = default_value;
-> > +		return false;
-> > +	}
-> >  
-> > -	return val;
-> > +	*value = val;
-> > +	return true;
-> 
-> This looks good.
-> 
-> However, of_property_read_u32 already does the right thing here by not
-> update val if the property is not found.
+Joe Perches <joe@perches.com> writes:
 
-I know but it is not documented anywhere (as far as I know) so I'd
-rather not rely on the implementation detail that might change in the
-future. This is not a hot path so extra assignment should not hurt.
+> Hello Robert.
+>
+> The return value of that dbg_show_requester_chan function
+> was incorrect and the increment of pos was an example of
+> why the seq_printf return value was changed to void.
+>
+> It was a pretty common error and easy to understand given
+> the expectation that seq_printf should work like printf.
+Sure.
 
-Thanks.
+> It's a pity it bit you. but this type of patch collision
+> should be a bit more difficult to reoccur in the future.
+
+I got what I deserved. I knew it was coming, I've seen it in other drivers of
+mine, but my left brain didn't tell the other half to crosscheck in this
+patch. Anyway, it's not a big fixup, so everything is fine now.
+
+Cheers.
+
 
 -- 
-Dmitry
+Robert
