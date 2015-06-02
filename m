@@ -1,99 +1,143 @@
 From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Tue,  2 Jun 2015 14:12:51 +0800
-Subject: [Patch v4 3/8] ia64/PCI: Use common struct resource_entry to replace
- struct iospace_resource
+Date: Tue,  2 Jun 2015 14:12:52 +0800
+Subject: [Patch v4 4/8] x86/PCI: Rename struct pci_sysdata as struct
+ pci_controller
 In-Reply-To: <1433225576-8215-1-git-send-email-jiang.liu@linux.intel.com>
 References: <1433225576-8215-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <1433225576-8215-4-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <1433225576-8215-5-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use common struct resource_entry to replace private
-struct iospace_resource.
+Rename struct pci_sysdata as struct pci_controller, so we could share
+common code between IA64 and x86 later.
 
 Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- arch/ia64/include/asm/pci.h |    5 -----
- arch/ia64/pci/pci.c         |   17 ++++++++---------
- 2 files changed, 8 insertions(+), 14 deletions(-)
+ arch/x86/include/asm/pci.h    |   13 +++++++------
+ arch/x86/include/asm/pci_64.h |    4 ++--
+ arch/x86/pci/acpi.c           |    9 +++++----
+ arch/x86/pci/common.c         |    2 +-
+ 4 files changed, 15 insertions(+), 13 deletions(-)
 
-diff --git a/arch/ia64/include/asm/pci.h b/arch/ia64/include/asm/pci.h
-index 52af5ed9f60b..5c10e0ec48d4 100644
---- a/arch/ia64/include/asm/pci.h
-+++ b/arch/ia64/include/asm/pci.h
-@@ -83,11 +83,6 @@ extern int pci_mmap_legacy_page_range(struct pci_bus *bus,
- #define pci_legacy_read platform_pci_legacy_read
- #define pci_legacy_write platform_pci_legacy_write
+diff --git a/arch/x86/include/asm/pci.h b/arch/x86/include/asm/pci.h
+index 4e370a5d8117..243dafd86f87 100644
+--- a/arch/x86/include/asm/pci.h
++++ b/arch/x86/include/asm/pci.h
+@@ -11,15 +11,15 @@
  
--struct iospace_resource {
--	struct list_head list;
--	struct resource res;
--};
--
- struct pci_controller {
- 	struct acpi_device *companion;
- 	void *iommu;
-diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
-index d20db9e48014..b1846b891ea5 100644
---- a/arch/ia64/pci/pci.c
-+++ b/arch/ia64/pci/pci.c
-@@ -154,14 +154,14 @@ new_space (u64 phys_base, int sparse)
- static int add_io_space(struct device *dev, struct pci_root_info *info,
- 			struct resource_entry *entry)
+ #ifdef __KERNEL__
+ 
+-struct pci_sysdata {
+-	int		domain;		/* PCI domain */
+-	int		node;		/* NUMA node */
++struct pci_controller {
+ #ifdef CONFIG_ACPI
+ 	struct acpi_device *companion;	/* ACPI companion device */
+ #endif
+ #ifdef CONFIG_X86_64
+ 	void		*iommu;		/* IOMMU private data */
+ #endif
++	int		segment;	/* PCI domain */
++	int		node;		/* NUMA node */
+ };
+ 
+ extern int pci_routeirq;
+@@ -31,8 +31,9 @@ extern int noioapicreroute;
+ #ifdef CONFIG_PCI_DOMAINS
+ static inline int pci_domain_nr(struct pci_bus *bus)
  {
--	struct iospace_resource *iospace;
-+	struct resource_entry *iospace;
- 	struct resource *resource, *res = entry->res;
- 	char *name;
- 	unsigned long base, min, max, base_port;
- 	unsigned int sparse = 0, space_nr, len;
- 
- 	len = strlen(info->name) + 32;
--	iospace = kzalloc(sizeof(*iospace) + len, GFP_KERNEL);
-+	iospace = resource_list_create_entry(NULL, len);
- 	if (!iospace) {
- 		dev_err(dev, "PCI: No memory for %s I/O port space\n",
- 			info->name);
-@@ -190,7 +190,7 @@ static int add_io_space(struct device *dev, struct pci_root_info *info,
- 	if (space_nr == 0)
- 		sparse = 1;
- 
--	resource = &iospace->res;
-+	resource = iospace->res;
- 	resource->name  = name;
- 	resource->flags = IORESOURCE_MEM;
- 	resource->start = base + (sparse ? IO_SPACE_SPARSE_ENCODING(min) : min);
-@@ -205,12 +205,12 @@ static int add_io_space(struct device *dev, struct pci_root_info *info,
- 	entry->offset = base_port;
- 	res->start = min + base_port;
- 	res->end = max + base_port;
--	list_add_tail(&iospace->list, &info->io_resources);
-+	resource_list_add_tail(iospace, &info->io_resources);
- 
- 	return 0;
- 
- free_resource:
--	kfree(iospace);
-+	resource_list_free_entry(iospace);
- 	return -ENOSPC;
+-	struct pci_sysdata *sd = bus->sysdata;
+-	return sd->domain;
++	struct pci_controller *sd = bus->sysdata;
++
++	return sd->segment;
  }
  
-@@ -369,12 +369,11 @@ static void add_resources(struct pci_root_info *info, struct device *dev)
- static void __release_pci_root_info(struct pci_root_info *info)
+ static inline int pci_proc_domain(struct pci_bus *bus)
+@@ -127,7 +128,7 @@ int setup_msi_irq(struct pci_dev *dev, struct msi_desc *msidesc,
+ /* Returns the node based on pci bus */
+ static inline int __pcibus_to_node(const struct pci_bus *bus)
  {
- 	struct resource *res;
--	struct iospace_resource *iospace, *tmp;
- 	struct resource_entry *entry, *tentry;
+-	const struct pci_sysdata *sd = bus->sysdata;
++	const struct pci_controller *sd = bus->sysdata;
  
--	list_for_each_entry_safe(iospace, tmp, &info->io_resources, list) {
--		release_resource(&iospace->res);
--		kfree(iospace);
-+	resource_list_for_each_entry_safe(entry, tentry, &info->io_resources) {
-+		release_resource(entry->res);
-+		resource_list_destroy_entry(entry);
+ 	return sd->node;
+ }
+diff --git a/arch/x86/include/asm/pci_64.h b/arch/x86/include/asm/pci_64.h
+index fe15cfb21b9b..dcbb6b52d4fd 100644
+--- a/arch/x86/include/asm/pci_64.h
++++ b/arch/x86/include/asm/pci_64.h
+@@ -6,13 +6,13 @@
+ #ifdef CONFIG_CALGARY_IOMMU
+ static inline void *pci_iommu(struct pci_bus *bus)
+ {
+-	struct pci_sysdata *sd = bus->sysdata;
++	struct pci_controller *sd = bus->sysdata;
+ 	return sd->iommu;
+ }
+ 
+ static inline void set_pci_iommu(struct pci_bus *bus, void *val)
+ {
+-	struct pci_sysdata *sd = bus->sysdata;
++	struct pci_controller *sd = bus->sysdata;
+ 	sd->iommu = val;
+ }
+ #endif /* CONFIG_CALGARY_IOMMU */
+diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
+index 14a63ed6fe09..a46fff030c09 100644
+--- a/arch/x86/pci/acpi.c
++++ b/arch/x86/pci/acpi.c
+@@ -10,7 +10,7 @@
+ struct pci_root_info {
+ 	struct acpi_device *bridge;
+ 	char name[16];
+-	struct pci_sysdata sd;
++	struct pci_controller sd;
+ #ifdef	CONFIG_PCI_MMCONFIG
+ 	bool mcfg_added;
+ 	u16 segment;
+@@ -384,7 +384,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ 	LIST_HEAD(crs_res);
+ 	LIST_HEAD(resources);
+ 	struct pci_bus *bus;
+-	struct pci_sysdata *sd;
++	struct pci_controller *sd;
+ 	int node;
+ 
+ 	if (pci_ignore_seg)
+@@ -416,7 +416,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
  	}
  
- 	resource_list_for_each_entry_safe(entry, tentry, &info->resources) {
+ 	sd = &info->sd;
+-	sd->domain = domain;
++	sd->segment = domain;
+ 	sd->node = node;
+ 	sd->companion = device;
+ 
+@@ -489,9 +489,10 @@ int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+ 	 * that case.
+ 	 */
+ 	if (!bridge->dev.parent) {
+-		struct pci_sysdata *sd = bridge->bus->sysdata;
++		struct pci_controller *sd = bridge->bus->sysdata;
+ 		ACPI_COMPANION_SET(&bridge->dev, sd->companion);
+ 	}
++
+ 	return 0;
+ }
+ 
+diff --git a/arch/x86/pci/common.c b/arch/x86/pci/common.c
+index 8fd6f44aee83..10f37d0ce5d8 100644
+--- a/arch/x86/pci/common.c
++++ b/arch/x86/pci/common.c
+@@ -475,7 +475,7 @@ void __init dmi_check_pciprobe(void)
+ void pcibios_scan_root(int busnum)
+ {
+ 	struct pci_bus *bus;
+-	struct pci_sysdata *sd;
++	struct pci_controller *sd;
+ 	LIST_HEAD(resources);
+ 
+ 	sd = kzalloc(sizeof(*sd), GFP_KERNEL);
 -- 
 1.7.10.4
