@@ -1,19 +1,28 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue,  2 Jun 2015 11:08:39 +0200
-Subject: [PATCH resend 0/1] pinctrl: sunxi: Add allwinner A33 PIO controller
-Message-ID: <1433236120-11249-1-git-send-email-hdegoede@redhat.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 2 Jun 2015 11:08:43 +0200
+Subject: [PATCH 2/2] pinctrl: mediatek: Fix pinctrl register irq fail bug.
+In-Reply-To: <1432719835-18939-3-git-send-email-hongzhou.yang@mediatek.com>
+References: <1432719835-18939-1-git-send-email-hongzhou.yang@mediatek.com>
+ <1432719835-18939-3-git-send-email-hongzhou.yang@mediatek.com>
+Message-ID: <CACRpkdbCSBZ9eokjdA+88Yg9A3-Hz1sH93nB1H2qgv7Q+pRS9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Wed, May 27, 2015 at 11:43 AM, Hongzhou Yang
+<hongzhou.yang@mediatek.com> wrote:
 
-I just realized that when I resend this patch as part of posting a v2
-of Vishnu's A33 series (which otherwise consists of dts patches) I did
-not add you as a direct recipient, so hence this resend.
+> Since mt6397 is no need to support interrupt controller,
+> I judged "interrupt-controller" property to skip it last patch.
+> But the if judgement should on the contrary, this is a bug.
+>
+> And find of_property_read_bool is better for this case.
+> So using of_property_read_bool instead of of_find_property.
+>
+> Also fix bug of misuse pointer.
+>
+> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
 
-This patch is unchanged from the original version as posted by Vishnu
-other then adding my and Maxime's Acked-by-s, and it is ready for merging.
+Patch applied with Axel's review tag.
 
-Regards,
-
-Hans
+Yours,
+Linus Walleij
