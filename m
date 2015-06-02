@@ -1,45 +1,54 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue,  2 Jun 2015 20:29:09 +0800
-Subject: [PATCH 0/3] ARM: dts: sun8i: Support USB hosts
-Message-ID: <1433248152-13753-1-git-send-email-wens@csie.org>
+Date: Tue,  2 Jun 2015 20:29:12 +0800
+Subject: [PATCH 3/3] ARM: dts: sun8i: sina33: Enable USB hosts
+In-Reply-To: <1433248152-13753-1-git-send-email-wens@csie.org>
+References: <1433248152-13753-1-git-send-email-wens@csie.org>
+Message-ID: <1433248152-13753-4-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+The Sina33 SDK board exposes the EHCI/OHCI USB host pair.
+VBUS for this port is always on and non-controllable.
 
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-Allwinner A23/A33 have 2 USB PHYs, 1 for OTG and 1 for a normal
-EHCI/OHCI USB host pair. This series adds support for EHCI/OHCI.
-The SoC also supports HSIC, however no boards actually use it, so
-this is not implemented yet.
-
-Patch 1 adds a new compatible for sun8i-a23 usb phys. It differs
-from previous ones in just the number of phys and how reset controls
-are routed.
-
-Patch 2 adds device nodes for USB PHYs and hosts for A23/A33.
-
-Patch 3 enables the USB hosts on the SinA33 dev board. On this
-board, VBUS is always on.
-
-It's probably too late for 4.2, but I'd still like to try and
-get this merged.
-
-
-Regards
-ChenYu
-
-
-Chen-Yu Tsai (3):
-  phy: sun4i-usb: Add support for sun8i A23/A33
-  ARM: dts: sun8i: Add support for USB controllers on A23/A33
-  ARM: dts: sun8i: sina33: Enable USB hosts
-
- .../devicetree/bindings/phy/sun4i-usb-phy.txt      |  2 ++
- arch/arm/boot/dts/sun8i-a23-a33.dtsi               | 34 ++++++++++++++++++++++
- arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts     | 13 +++++++++
- drivers/phy/phy-sun4i-usb.c                        |  7 +++--
- 4 files changed, 54 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
+index 5788c29cb56a..1d5390d4e03a 100644
+--- a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
++++ b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
+@@ -63,6 +63,10 @@
+ 	};
+ };
+ 
++&ehci0 {
++	status = "okay";
++};
++
+ &lradc {
+ 	vref-supply = <&reg_vcc3v0>;
+ 	status = "okay";
+@@ -113,6 +117,10 @@
+ 	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+ };
+ 
++&ohci0 {
++	status = "okay";
++};
++
+ &pio {
+ 	mmc0_cd_pin_sina33: mmc0_cd_pin at 0 {
+ 		allwinner,pins = "PB4";
+@@ -127,3 +135,8 @@
+ 	pinctrl-0 = <&uart0_pins_b>;
+ 	status = "okay";
+ };
++
++&usbphy {
++	status = "okay";
++	usb1_vbus-supply = <&reg_vcc5v0>; /* USB1 VBUS is always on */
++};
 -- 
 2.1.4
