@@ -1,59 +1,88 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 2 Jun 2015 09:39:56 +0200
-Subject: [PATCH 2/3] iommu/arm-smmu: Add initial driver support for ARM
- SMMUv3 devices
-In-Reply-To: <20150601094014.GC1641@arm.com>
-References: <1431108046-9675-1-git-send-email-will.deacon@arm.com>
- <1431108046-9675-3-git-send-email-will.deacon@arm.com>
- <20150519152435.GL20611@8bytes.org>
- <20150520170926.GI11498@arm.com>
- <20150529064337.GN20611@8bytes.org> <55684F1C.3050702@arm.com>
- <20150529144043.GA20384@8bytes.org> <20150601094014.GC1641@arm.com>
-Message-ID: <20150602073956.GG20384@8bytes.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 2 Jun 2015 08:40:04 +0100
+Subject: [PATCH 4/4] mfd: 88pm800: allocate pdata->rtc if not allocated
+ earlier
+In-Reply-To: <556D3A14.6050505@linaro.org>
+References: <1432937962-4537-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1432937962-4537-5-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150601082200.GC3329@x1> <556D3A14.6050505@linaro.org>
+Message-ID: <20150602074004.GH3329@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Tue, 02 Jun 2015, Vaibhav Hiremath wrote:
+> On Monday 01 June 2015 01:52 PM, Lee Jones wrote:
+> >On Sat, 30 May 2015, Vaibhav Hiremath wrote:
+> >
+> >>RTC in pmic 88PM800 can run even the core is powered off, and user
+> >>can set alarm in RTC. When the alarm is timed out, the PMIC will power up
+> >>the core, and the whole system will boot up. And during PMIC driver probe,
+> >>it will read some register to find out whether this boot is caused by RTC
+> >>timeout or not, and pass on this information to the RTC driver.
+> >>
+> >>So we need rtc platform data to be existed in PMIC driver to pass this
+> >>information.
+> >>
+> >>Signed-off-by: Chao Xie <chao.xie@marvell.com>
+> >>Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+> >>---
+> >>  drivers/mfd/88pm800.c | 19 +++++++++++++++++++
+> >>  1 file changed, 19 insertions(+)
+> >>
+> >>diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
+> >>index 8ea4467..34546a1 100644
+> >>--- a/drivers/mfd/88pm800.c
+> >>+++ b/drivers/mfd/88pm800.c
+> >>@@ -586,6 +586,25 @@ static int pm800_probe(struct i2c_client *client,
+> >>  			return ret;
+> >>  	}
+> >>
+> >>+	/*
+> >>+	 * RTC in pmic can run even the core is powered off, and user can set
+> >>+	 * alarm in RTC. When the alarm is time out, the PMIC will power up
+> >>+	 * the core, and the whole system will boot up. When PMIC driver is
+> >>+	 * probed, it will read out some register to find out whether this
+> >>+	 * boot is caused by RTC timeout or not, and it need pass this
+> >>+	 * information to RTC driver.
+> >>+	 * So we need rtc platform data to be existed to pass this information.
+> >>+	 */
+> >>+	if (!pdata->rtc) {
+> >>+		pdata->rtc = devm_kzalloc(&client->dev,
+> >>+					  sizeof(*(pdata->rtc)), GFP_KERNEL);
+> >>+		if (!pdata->rtc) {
+> >>+			dev_err(&client->dev,
+> >>+					"failed to allocate memory for rtc\n");
+> >>+			return -ENOMEM;
+> >>+		}
+> >>+	}
+> >>+
+> >
+> >Where is this memory first used?
+> >
+> 
+> In the same file, look for field "rtc_wakeup".
+> 
+> FYI,
+> 
+> This field is used in two files,
+> 
+> drivers/mfd/88pm800.c
+> and
+> drivers/rtc/rtc-88pm800.c	[sets the "platform_data" field]
 
-On Mon, Jun 01, 2015 at 10:40:14AM +0100, Will Deacon wrote:
-> I like this proposal. The only remaining part is that the pgsize bitmap
-> inherited by the domain can only truly be finalised once the page table
-> is allocated, which in turn can only happen once we've identified the
-> IOMMU instance.
+Then were is the platform_data field subsequently used?
 
-We know the IOMMU instance for domains allocted with
-iommu_domain_alloc_for_group because every group is behind a single
-IOMMU instance. So the page-table can be allocated at domain creation
-time and mappings can be created before the group itself is attached.
+Looking at the RTC platform data declaration I see:
 
-> In the case of iommu_domain_alloc_for_group, that's nice and
-> straightforward (i.e. as part of the call) but for the default
-> iommu_domain_alloc() case, we'd have to continue postponing things to
-> ->attach time before we could provide a reliable pgsize_bitmap. This is
-> to handle the case where an SMMU may be able to support only a subset of
-> the pgsize_bitmap on a per-domain basis.
+struct pm80x_rtc_pdata {
+    int             vrtc;
+    int             rtc_wakeup;
+};
 
-I don't think we need to postpone anything. Domains returned by
-iommu_domain_alloc() need to work for all groups. If there are multiple
-IOMMUs in the system with different capabilities/page-table formats the
-IOMMU core needs to build multiple page-tables for that domain.
+Is 'vrtc' even used?  If so, where?
 
-VFIO already does that as a workaround of how things are done currently,
-but I really think this should be done in the IOMMU core code.
-
-> In which situation do you think the merged pgsize_bitmap would get used?
-> The only place I can think of is if we're trying to call iommu_map on a
-> domain with no devices attached. However, if that domain was created
-> using iommu_domain_alloc() then the pgsize_bitmap is the least of our
-> worries -- we don't even know the page table format!
-
-The first usecase for the merged pgsize_bitmap that comes to mind is to
-determine the minimum page-size that can be used for a domain. In the
-SMMUv3 case when there are IOMMUs with different minium page-sizes in one
-system, this would be the biggest minimum page-size of all IOMMUs.
-
-Probably there are other uses for that bitmap that show up at
-implementation time.
-
-
-	Joerg
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
