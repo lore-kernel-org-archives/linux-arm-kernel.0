@@ -1,26 +1,23 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Wed, 03 Jun 2015 00:16:26 +0530
-Subject: [PATCH 05/12] i2c: pxa: Add bus reset functionality
-In-Reply-To: <20150602182443.GH1494@katana>
-References: <1432818224-17070-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1432818224-17070-6-git-send-email-vaibhav.hiremath@linaro.org>
- <20150602173341.GA1494@katana> <556DEA90.3010001@linaro.org>
- <20150602174818.GC1494@katana> <556DEE6C.1060300@linaro.org>
- <20150602180217.GE1494@katana> <556DF0A0.30807@linaro.org>
- <20150602182443.GH1494@katana>
-Message-ID: <556DFA02.5070804@linaro.org>
+From: mikko.rapeli@iki.fi (Mikko Rapeli)
+Date: Tue, 2 Jun 2015 21:59:24 +0300
+Subject: [PATCH 05/98] exynos_drm.h: use __u64 from linux/types.h
+In-Reply-To: <20150530164655.GM2067@n2100.arm.linux.org.uk>
+References: <1433000370-19509-1-git-send-email-mikko.rapeli@iki.fi>
+ <1433000370-19509-6-git-send-email-mikko.rapeli@iki.fi>
+ <20150530164655.GM2067@n2100.arm.linux.org.uk>
+Message-ID: <20150602185924.GO12550@lakka.kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, May 30, 2015 at 05:46:56PM +0100, Russell King - ARM Linux wrote:
+> Note that drm/drm.h is all that should need to be included - drm/drm.h
+> takes care of including linux/types.h when building on Linux platforms.
+> (note: if your compiler doesn't set __linux__ then you're probably not
+> using the proper compiler...)
 
+Thanks, I'll fix this by including only drm/drm.h in exynos_drm.h,
+nouveau_drm.h, radeon_drm.h and via_drm.h patches.
 
-On Tuesday 02 June 2015 11:54 PM, Wolfram Sang wrote:
-> Can you resend the hwlock patches? I use patchwork for tracking and
-> those were sent when the server had a little downtime. Thanks!
->
+I'm using standard gcc from Debian for the x86 compilation.
 
-
-Just resent it. please check.
-
-Thanks,
-Vaibhav
+-Mikko
