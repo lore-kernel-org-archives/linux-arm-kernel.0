@@ -1,31 +1,49 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 2 Jun 2015 15:43:25 +0800
-Subject: [PATCH v2 0/6] Introduce Allwinner A33 support
-In-Reply-To: <1432997706-20172-1-git-send-email-hdegoede@redhat.com>
-References: <1432997706-20172-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <CAGb2v64Nm8jp+xEoUyPKV7UuhUXW3HS87hbp68MZAdrHR4uNgw@mail.gmail.com>
+From: dingel@linux.vnet.ibm.com (Dominik Dingel)
+Date: Tue, 2 Jun 2015 09:46:40 +0200
+Subject: [PATCH 0/5] Remove s390 sw-emulated hugepages and cleanup
+In-Reply-To: <556C0B5D.40205@de.ibm.com>
+References: <1432813957-46874-1-git-send-email-dingel@linux.vnet.ibm.com>
+ <556C0B5D.40205@de.ibm.com>
+Message-ID: <20150602094640.4fedc046@BR9TG4T3.de.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 30, 2015 at 10:55 PM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi Maxime,
->
-> Here is a cleaned up series of Vishnu Patekar's A33 support. This should
-> address all concerns raised during the posting of v1.
->
-> I've tested that all peripherals declared in the shared sun8i-a23-a33.dtsi
-> work on the A33 too, with the exception of the dma-controller. For the
-> dma-controller I've compared the A23 vs A33 manual and the entire dma-
-> controller description including the register description is bit for bit
-> identical.
->
-> This has been tested on a 7" Ippo Q8H v1.2 A23 tablet, a 7" Ippo Q8H v1.2
-> A33 tablet and a 10" GA10H A33 tablet. The dts for the 10" tablet still
-> needs some work wrt the lradc button voltages so that is not included
-> in this set.
+On Mon, 01 Jun 2015 09:35:57 +0200
+Christian Borntraeger <borntraeger@de.ibm.com> wrote:
 
-Whole series is
+> Am 28.05.2015 um 13:52 schrieb Dominik Dingel:
+> > Hi everyone,
+> > 
+> > there is a potential bug with KVM and hugetlbfs if the hardware does not
+> > support hugepages (EDAT1).
+> > We fix this by making EDAT1 a hard requirement for hugepages and 
+> > therefore removing and simplifying code.
+> 
+> The cleanup itself is nice and probably the right thing to do. 
+> Emulating large pages makes the code more complex and asks for
+> trouble (as outlined above)
+> 
+> The only downside that I see is that z/VM as of today does not
+> announce EDAT1 for its guests so the "emulated" large pages for
+> hugetlbfs would be useful in that case. The current code allocates
+> the page table only once and shares it for all mappers - which is
+> useful for some big databases that spawn hundreds of processes with
+> shared mappings of several hundred GBs. In these cases we do save
+> a decent amount of page table memory. 
 
-Tested-by: Chen-Yu Tsai <wens@csie.org>
+To limit the damage done, we could always allocate page tables with pgstes for that case.
+That would allow one guest manipulating another guests storage keys,
+but at least would prevent random memory overwrites in the host.
 
-on my Sinlinx SinA33 dev board. I'll send patches for it later.
+Another thing we could do, make software emulated large pages a kernel config option
+and only if KVM is not selected allow it, visa versa.
+
+@Martin what do you think?
+
+Thanks,
+	Dominik
+
+> Not sure if that case is actually important, though.
+> 
+> Christian
+> 
