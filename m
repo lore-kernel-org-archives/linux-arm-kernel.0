@@ -1,43 +1,33 @@
-From: aleksey.makarov@caviumnetworks.com (Aleksey Makarov)
-Date: Tue, 2 Jun 2015 11:00:19 -0700
-Subject: [PATCH 02/10] net: thunderx: fix constants
-In-Reply-To: <1433268028-23992-1-git-send-email-aleksey.makarov@caviumnetworks.com>
-References: <1433268028-23992-1-git-send-email-aleksey.makarov@caviumnetworks.com>
-Message-ID: <1433268028-23992-3-git-send-email-aleksey.makarov@caviumnetworks.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Tue, 02 Jun 2015 23:36:24 +0530
+Subject: [PATCH 05/12] i2c: pxa: Add bus reset functionality
+In-Reply-To: <20150602180217.GE1494@katana>
+References: <1432818224-17070-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1432818224-17070-6-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150602173341.GA1494@katana> <556DEA90.3010001@linaro.org>
+ <20150602174818.GC1494@katana> <556DEE6C.1060300@linaro.org>
+ <20150602180217.GE1494@katana>
+Message-ID: <556DF0A0.30807@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes sparse messages like this:
 
-drivers/net/ethernet/cavium/thunder/thunder_bgx.c:897:24: sparse:
-constant 0x300000000000 is so big it is long
 
-Reported-by: kbuild test robot <fengguang.wu@intel.com>
-Signed-off-by: Aleksey Makarov <aleksey.makarov@caviumnetworks.com>
----
- drivers/net/ethernet/cavium/thunder/nicvf_main.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+On Tuesday 02 June 2015 11:32 PM, Wolfram Sang wrote:
+>
+>> can you please also review the RFC which I submitted few days back?
+>
+> They are added to the queue and will be reviewed when the time comes. I
+> won't make any promises.
+>
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-index abd446e6..f81182c 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-@@ -326,11 +326,11 @@ static int nicvf_rss_init(struct nicvf *nic)
- 	rss->enable = true;
- 
- 	/* Using the HW reset value for now */
--	rss->key[0] = 0xFEED0BADFEED0BAD;
--	rss->key[1] = 0xFEED0BADFEED0BAD;
--	rss->key[2] = 0xFEED0BADFEED0BAD;
--	rss->key[3] = 0xFEED0BADFEED0BAD;
--	rss->key[4] = 0xFEED0BADFEED0BAD;
-+	rss->key[0] = 0xFEED0BADFEED0BADULL;
-+	rss->key[1] = 0xFEED0BADFEED0BADULL;
-+	rss->key[2] = 0xFEED0BADFEED0BADULL;
-+	rss->key[3] = 0xFEED0BADFEED0BADULL;
-+	rss->key[4] = 0xFEED0BADFEED0BADULL;
- 
- 	nicvf_set_rss_key(nic);
- 
--- 
-2.4.1
+
+Ok, take your time.
+Just wanted to make sure that they don't get buried under all email
+traffic.
+
+Anyway, thanks for your review.
+
+
+Thanks,
+Vaibhav
