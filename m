@@ -1,45 +1,21 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 02 Jun 2015 21:46:31 +0900
-Subject: [PATCH v4 3/5] pinctrl: exynos: add exynos5410 SoC specific data
-In-Reply-To: <CA+Ln22Fq6Z6vSy2zCsx61j-JVe_x=yAjkySXy_Lit0tBbPmo9Q@mail.gmail.com>
-References: <1426456834-6308-1-git-send-email-afaerber@suse.de>
- <1426456834-6308-4-git-send-email-afaerber@suse.de>
- <CA+Ln22Fq6Z6vSy2zCsx61j-JVe_x=yAjkySXy_Lit0tBbPmo9Q@mail.gmail.com>
-Message-ID: <556DA5A7.4080502@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 2 Jun 2015 14:52:25 +0200
+Subject: [PATCH v1] gpio: xgene: add ACPI support for APM X-Gene GPIO
+ standby driver
+In-Reply-To: <1432893161-3888-2-git-send-email-yvo@apm.com>
+References: <1432893161-3888-1-git-send-email-yvo@apm.com>
+ <1432893161-3888-2-git-send-email-yvo@apm.com>
+Message-ID: <CACRpkdbfcSsjqTU9o=crobwVVzaQOHgOVcDzjBmgM_rxSO2piQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 24.03.2015 o 02:22, Tomasz Figa pisze:
-> Hi Andreas, Hakjoo,
-> 
-> Thanks for the patch.
-> 
-> 2015-03-16 7:00 GMT+09:00 Andreas F?rber <afaerber@suse.de>:
->> From: Hakjoo Kim <ruppi.kim@hardkernel.com>
->>
->> Add Samsung EXYNOS5410 SoC specific data to enable pinctrl
->> support for all platforms based on EXYNOS5410.
->>
->> Signed-off-by: Hakjoo Kim <ruppi.kim@hardkernel.com>
->> [AF: Rebased onto Exynos5260, irq_chip consolidation, const'ification]
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->> ---
->>  v2 -> v3:
->>  * Rebased (.svc, .{g,w}eint_{con,mask,pend} fields dropped)
->>
->>  v1 -> v2:
->>  * Filled in Sob from Hakjoo Kim
->>
->>  .../bindings/pinctrl/samsung-pinctrl.txt           |   1 +
->>  drivers/pinctrl/samsung/pinctrl-exynos.c           | 103 +++++++++++++++++++++
->>  drivers/pinctrl/samsung/pinctrl-samsung.c          |   2 +
->>  drivers/pinctrl/samsung/pinctrl-samsung.h          |   1 +
->>  4 files changed, 107 insertions(+)
->>
-> 
-> Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
+On Fri, May 29, 2015 at 11:52 AM, Y Vo <yvo@apm.com> wrote:
 
-So I assume this may go through Kukjin tree.
+> Add ACPI support for APM X-Gene GPIO standby driver.
+>
+> Signed-off-by: Y Vo <yvo@apm.com>
 
-Best regards,
-Krzysztof
+Patch applied.
+
+Yours,
+Linus Walleij
