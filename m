@@ -1,124 +1,33 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue,  2 Jun 2015 19:32:25 +0200
-Subject: [PATCH 1/7] mtd: pxa3xx_nand: add a non mandatory ECC clock
+Date: Tue,  2 Jun 2015 19:32:28 +0200
+Subject: [PATCH 4/7] Documentation: bindings: add the Berlin nand controller
+ compatible
 In-Reply-To: <1433266351-22587-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1433266351-22587-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1433266351-22587-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1433266351-22587-5-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some controllers (as the coming Berlin nand controller) need to enable
-an ECC clock. Add support for this clock in the pxa3xx nand driver, and
-leave it as non mandatory.
+The Berlin nand controller support was introduced using the existing
+pxa3xx nand driver. Add the Berlin specific compatible into the
+documentation.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- drivers/mtd/nand/pxa3xx_nand.c | 32 +++++++++++++++++++++++---------
- 1 file changed, 23 insertions(+), 9 deletions(-)
+ Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 42ad199ed63d..ae8a7b6b3e5c 100644
---- a/drivers/mtd/nand/pxa3xx_nand.c
-+++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -180,7 +180,7 @@ struct pxa3xx_nand_info {
- 	struct nand_hw_control	controller;
- 	struct platform_device	 *pdev;
- 
--	struct clk		*clk;
-+	struct clk		*clk, *ecc_clk;
- 	void __iomem		*mmio_base;
- 	unsigned long		mmio_phys;
- 	struct completion	cmd_complete, dev_ready;
-@@ -1685,15 +1685,26 @@ static int alloc_nand_resource(struct platform_device *pdev)
- 
- 	spin_lock_init(&chip->controller->lock);
- 	init_waitqueue_head(&chip->controller->wq);
--	info->clk = devm_clk_get(&pdev->dev, NULL);
-+	info->clk = devm_clk_get(&pdev->dev, "nfc");
- 	if (IS_ERR(info->clk)) {
--		dev_err(&pdev->dev, "failed to get nand clock\n");
--		return PTR_ERR(info->clk);
-+		info->clk = devm_clk_get(&pdev->dev, NULL);
-+
-+		if (IS_ERR(info->clk)) {
-+			dev_err(&pdev->dev, "failed to get nand clock\n");
-+			return PTR_ERR(info->clk);
-+		}
- 	}
- 	ret = clk_prepare_enable(info->clk);
- 	if (ret < 0)
- 		return ret;
- 
-+	info->ecc_clk = devm_clk_get(&pdev->dev, "ecc");
-+	if (!IS_ERR(info->ecc_clk)) {
-+		ret = clk_prepare_enable(info->ecc_clk);
-+		if (ret < 0)
-+			goto fail_disable_clk;
-+	}
-+
- 	if (use_dma) {
- 		/*
- 		 * This is a dirty hack to make this driver work from
-@@ -1710,7 +1721,7 @@ static int alloc_nand_resource(struct platform_device *pdev)
- 				dev_err(&pdev->dev,
- 					"no resource defined for data DMA\n");
- 				ret = -ENXIO;
--				goto fail_disable_clk;
-+				goto fail_disable_ecc_clk;
- 			}
- 			info->drcmr_dat = r->start;
- 
-@@ -1719,7 +1730,7 @@ static int alloc_nand_resource(struct platform_device *pdev)
- 				dev_err(&pdev->dev,
- 					"no resource defined for cmd DMA\n");
- 				ret = -ENXIO;
--				goto fail_disable_clk;
-+				goto fail_disable_ecc_clk;
- 			}
- 			info->drcmr_cmd = r->start;
- 		}
-@@ -1729,14 +1740,14 @@ static int alloc_nand_resource(struct platform_device *pdev)
- 	if (irq < 0) {
- 		dev_err(&pdev->dev, "no IRQ resource defined\n");
- 		ret = -ENXIO;
--		goto fail_disable_clk;
-+		goto fail_disable_ecc_clk;
- 	}
- 
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	info->mmio_base = devm_ioremap_resource(&pdev->dev, r);
- 	if (IS_ERR(info->mmio_base)) {
- 		ret = PTR_ERR(info->mmio_base);
--		goto fail_disable_clk;
-+		goto fail_disable_ecc_clk;
- 	}
- 	info->mmio_phys = r->start;
- 
-@@ -1745,7 +1756,7 @@ static int alloc_nand_resource(struct platform_device *pdev)
- 	info->data_buff = kmalloc(info->buf_size, GFP_KERNEL);
- 	if (info->data_buff == NULL) {
- 		ret = -ENOMEM;
--		goto fail_disable_clk;
-+		goto fail_disable_ecc_clk;
- 	}
- 
- 	/* initialize all interrupts to be disabled */
-@@ -1766,6 +1777,8 @@ static int alloc_nand_resource(struct platform_device *pdev)
- fail_free_buf:
- 	free_irq(irq, info);
- 	kfree(info->data_buff);
-+fail_disable_ecc_clk:
-+	clk_disable_unprepare(info->ecc_clk);
- fail_disable_clk:
- 	clk_disable_unprepare(info->clk);
- 	return ret;
-@@ -1788,6 +1801,7 @@ static int pxa3xx_nand_remove(struct platform_device *pdev)
- 	pxa3xx_nand_free_buff(info);
- 
- 	clk_disable_unprepare(info->clk);
-+	clk_disable_unprepare(info->ecc_clk);
- 
- 	for (cs = 0; cs < pdata->num_cs; cs++)
- 		nand_release(info->host[cs]->mtd);
+diff --git a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+index ad30a02f1346..e0adc584fdce 100644
+--- a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
++++ b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+@@ -5,6 +5,7 @@ Required properties:
+  - compatible:		Should be set to one of the following:
+ 			marvell,pxa3xx-nand
+ 			marvell,armada370-nand
++			marvell,berlin2-nand
+  - reg: 		The register base for the controller
+  - interrupts:		The interrupt to map
+  - #address-cells:	Set to <1> if the node includes partitions
 -- 
 2.4.2
