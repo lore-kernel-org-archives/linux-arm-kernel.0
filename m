@@ -1,47 +1,22 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 02 Jun 2015 20:32:59 +0200
-Subject: [PATCH] ARM: dts: sun6i: Add a dts file for the Mele A1000G quad
- top set box
-In-Reply-To: <20150602155816.GC23777@lukather>
-References: <1433170979-13725-1-git-send-email-hdegoede@redhat.com>
- <20150602155816.GC23777@lukather>
-Message-ID: <556DF6DB.8040601@redhat.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 2 Jun 2015 18:37:23 +0000 (UTC)
+Subject: [PATCH 1/2] ARM: OMAP: AM43xx hwmod: Add data for am43xx emif
+ hwmod
+In-Reply-To: <1430933133-33412-2-git-send-email-d-gerlach@ti.com>
+References: <1430933133-33412-1-git-send-email-d-gerlach@ti.com>
+ <1430933133-33412-2-git-send-email-d-gerlach@ti.com>
+Message-ID: <alpine.DEB.2.02.1506021837080.14902@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 6 May 2015, Dave Gerlach wrote:
 
-On 06/02/2015 05:58 PM, Maxime Ripard wrote:
-> On Mon, Jun 01, 2015 at 05:02:59PM +0200, Hans de Goede wrote:
->> The Mele A1000G-quad and the Mele M9 have the same PCB, sofar we've been using
->> the same dts for both models. Unfortunately this does not work for the otg
->> controller, on the M9 this is routed to a micro-usb connector on the outside,
->> while as on the A1000G-quad it is connected to an usb to sata bridge
->> (which is not populated on the M9 pcb).
->>
->> This commit adds a new dts for the Mele-A1000G-quad to allow using
->> different otg controller settings on the 2 boards.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>   arch/arm/boot/dts/Makefile                                        | 1 +
->>   arch/arm/boot/dts/{sun6i-a31-m9.dts => sun6i-a31-a1000g-quad.dts} | 4 ++--
->
-> Didn't we say that we were trying to set the vendor name in the DTs
-> now, at least for the new ones?
+> Without a hwmod for am43xx emif use counting for emif clockdomain does
+> not happen correctly so it may be shut off by pm code unintentionally.
+> 
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 
-I think we said that Paul would write a proposal to standardize
-naming for future boards, but that never materialized.
+Thanks, sent upstream for v4.2.
 
-> I can fix this and apply it if it's ok for you.
 
-I'm fine with throwing -mele- in there, or not, what ever you
-prefer.
-
-Regards,
-
-Hans
-
->
-> Maxime
->
+- Paul
