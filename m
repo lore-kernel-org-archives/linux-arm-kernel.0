@@ -1,167 +1,92 @@
 From: aleksey.makarov@caviumnetworks.com (Aleksey Makarov)
-Date: Tue, 2 Jun 2015 11:00:23 -0700
-Subject: [PATCH 06/10] net: thunderx: add static
+Date: Tue, 2 Jun 2015 11:00:20 -0700
+Subject: [PATCH 03/10] net: thunderx: introduce a function for mailbox access
 In-Reply-To: <1433268028-23992-1-git-send-email-aleksey.makarov@caviumnetworks.com>
 References: <1433268028-23992-1-git-send-email-aleksey.makarov@caviumnetworks.com>
-Message-ID: <1433268028-23992-7-git-send-email-aleksey.makarov@caviumnetworks.com>
+Message-ID: <1433268028-23992-4-git-send-email-aleksey.makarov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes sparse messages like this:
+This fixes sparse message:
 
-drivers/net/ethernet/cavium/thunder/nicvf_main.c:1141:26: sparse: symbol
-'nicvf_get_stats64' was not declared. Should it be static?
-
-Also remove unused declarations
+drivers/net/ethernet/cavium/thunder/nicvf_main.c:153:25: sparse: cast to
+restricted __le64
 
 Reported-by: kbuild test robot <fengguang.wu@intel.com>
 Signed-off-by: Aleksey Makarov <aleksey.makarov@caviumnetworks.com>
 ---
- drivers/net/ethernet/cavium/thunder/nic.h          |  2 --
- drivers/net/ethernet/cavium/thunder/nicvf_main.c   | 28 ++++++++++------------
- drivers/net/ethernet/cavium/thunder/nicvf_queues.c |  2 +-
- drivers/net/ethernet/cavium/thunder/thunder_bgx.c  |  6 ++---
- 4 files changed, 16 insertions(+), 22 deletions(-)
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c | 27 +++++++++++++++---------
+ 1 file changed, 17 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
-index 6479ce2..a3b43e5 100644
---- a/drivers/net/ethernet/cavium/thunder/nic.h
-+++ b/drivers/net/ethernet/cavium/thunder/nic.h
-@@ -413,10 +413,8 @@ int nicvf_set_real_num_queues(struct net_device *netdev,
- int nicvf_open(struct net_device *netdev);
- int nicvf_stop(struct net_device *netdev);
- int nicvf_send_msg_to_pf(struct nicvf *vf, union nic_mbx *mbx);
--void nicvf_config_cpi(struct nicvf *nic);
- void nicvf_config_rss(struct nicvf *nic);
- void nicvf_set_rss_key(struct nicvf *nic);
--void nicvf_free_skb(struct nicvf *nic, struct sk_buff *skb);
- void nicvf_set_ethtool_ops(struct net_device *netdev);
- void nicvf_update_stats(struct nicvf *nic);
- void nicvf_update_lmac_stats(struct nicvf *nic);
 diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-index 54bba86..02da802 100644
+index f81182c..989f005 100644
 --- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
 +++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-@@ -50,10 +50,6 @@ module_param(cpi_alg, int, S_IRUGO);
- MODULE_PARM_DESC(cpi_alg,
- 		 "PFC algorithm (0=none, 1=VLAN, 2=VLAN16, 3=IP Diffserv)");
+@@ -110,17 +110,23 @@ u64 nicvf_queue_reg_read(struct nicvf *nic, u64 offset, u64 qidx)
  
--static int nicvf_enable_msix(struct nicvf *nic);
--static netdev_tx_t nicvf_xmit(struct sk_buff *skb, struct net_device *netdev);
--static void nicvf_read_bgx_stats(struct nicvf *nic, struct bgx_stats_msg *bgx);
--
- static inline void nicvf_set_rx_frame_cnt(struct nicvf *nic,
- 					  struct sk_buff *skb)
- {
-@@ -174,6 +170,14 @@ static int nicvf_check_pf_ready(struct nicvf *nic)
- 	return 1;
- }
+ /* VF -> PF mailbox communication */
  
-+static void nicvf_read_bgx_stats(struct nicvf *nic, struct bgx_stats_msg *bgx)
++static void nicvf_write_to_mbx(struct nicvf *nic, union nic_mbx *mbx)
 +{
-+	if (bgx->rx)
-+		nic->bgx_stats.rx_stats[bgx->idx] = bgx->stats;
-+	else
-+		nic->bgx_stats.tx_stats[bgx->idx] = bgx->stats;
++	u64 *msg = (u64 *)mbx;
++
++	nicvf_reg_write(nic, NIC_VF_PF_MAILBOX_0_1 + 0, msg[0]);
++	nicvf_reg_write(nic, NIC_VF_PF_MAILBOX_0_1 + 8, msg[1]);
 +}
 +
- static void  nicvf_handle_mbx_intr(struct nicvf *nic)
+ int nicvf_send_msg_to_pf(struct nicvf *nic, union nic_mbx *mbx)
  {
- 	union nic_mbx mbx = {};
-@@ -255,7 +259,7 @@ static int nicvf_hw_set_mac_addr(struct nicvf *nic, struct net_device *netdev)
- 	return nicvf_send_msg_to_pf(nic, &mbx);
- }
+ 	int timeout = NIC_MBOX_MSG_TIMEOUT;
+ 	int sleep = 10;
+-	u64 *msg = (u64 *)mbx;
  
--void nicvf_config_cpi(struct nicvf *nic)
-+static void nicvf_config_cpi(struct nicvf *nic)
+ 	nic->pf_acked = false;
+ 	nic->pf_nacked = false;
+ 
+-	nicvf_reg_write(nic, NIC_VF_PF_MAILBOX_0_1 + 0, msg[0]);
+-	nicvf_reg_write(nic, NIC_VF_PF_MAILBOX_0_1 + 8, msg[1]);
++	nicvf_write_to_mbx(nic, mbx);
+ 
+ 	/* Wait for previous message to be acked, timeout 2sec */
+ 	while (!nic->pf_acked) {
+@@ -146,12 +152,13 @@ int nicvf_send_msg_to_pf(struct nicvf *nic, union nic_mbx *mbx)
+ static int nicvf_check_pf_ready(struct nicvf *nic)
  {
- 	union nic_mbx mbx = {};
+ 	int timeout = 5000, sleep = 20;
++	union nic_mbx mbx = {};
++
++	mbx.msg.msg = NIC_MBOX_MSG_READY;
  
-@@ -267,7 +271,7 @@ void nicvf_config_cpi(struct nicvf *nic)
- 	nicvf_send_msg_to_pf(nic, &mbx);
- }
+ 	nic->pf_ready_to_rcv_msg = false;
  
--void nicvf_get_rss_size(struct nicvf *nic)
-+static void nicvf_get_rss_size(struct nicvf *nic)
+-	nicvf_reg_write(nic, NIC_VF_PF_MAILBOX_0_1 + 0,
+-			le64_to_cpu(NIC_MBOX_MSG_READY));
+-	nicvf_reg_write(nic, NIC_VF_PF_MAILBOX_0_1 + 8, 1ULL);
++	nicvf_write_to_mbx(nic, &mbx);
+ 
+ 	while (!nic->pf_ready_to_rcv_msg) {
+ 		msleep(sleep);
+@@ -368,7 +375,9 @@ int nicvf_set_real_num_queues(struct net_device *netdev,
+ static int nicvf_init_resources(struct nicvf *nic)
  {
- 	union nic_mbx mbx = {};
+ 	int err;
+-	u64 mbx_addr = NIC_VF_PF_MAILBOX_0_1;
++	union nic_mbx mbx = {};
++
++	mbx.msg.msg = NIC_MBOX_MSG_CFG_DONE;
  
-@@ -575,7 +579,7 @@ static int nicvf_poll(struct napi_struct *napi, int budget)
-  *
-  * As of now only CQ errors are handled
-  */
--void nicvf_handle_qs_err(unsigned long data)
-+static void nicvf_handle_qs_err(unsigned long data)
- {
- 	struct nicvf *nic = (struct nicvf *)data;
- 	struct queue_set *qs = nic->qs;
-@@ -1043,14 +1047,6 @@ static int nicvf_set_mac_address(struct net_device *netdev, void *p)
+ 	/* Enable Qset */
+ 	nicvf_qset_config(nic, true);
+@@ -382,9 +391,7 @@ static int nicvf_init_resources(struct nicvf *nic)
+ 	}
+ 
+ 	/* Send VF config done msg to PF */
+-	nicvf_reg_write(nic, mbx_addr, le64_to_cpu(NIC_MBOX_MSG_CFG_DONE));
+-	mbx_addr += (NIC_PF_VF_MAILBOX_SIZE - 1) * 8;
+-	nicvf_reg_write(nic, mbx_addr, 1ULL);
++	nicvf_write_to_mbx(nic, &mbx);
+ 
  	return 0;
  }
- 
--static void nicvf_read_bgx_stats(struct nicvf *nic, struct bgx_stats_msg *bgx)
--{
--	if (bgx->rx)
--		nic->bgx_stats.rx_stats[bgx->idx] = bgx->stats;
--	else
--		nic->bgx_stats.tx_stats[bgx->idx] = bgx->stats;
--}
--
- void nicvf_update_lmac_stats(struct nicvf *nic)
- {
- 	int stat = 0;
-@@ -1141,7 +1137,7 @@ void nicvf_update_stats(struct nicvf *nic)
- 		nicvf_update_sq_stats(nic, qidx);
- }
- 
--struct rtnl_link_stats64 *nicvf_get_stats64(struct net_device *netdev,
-+static struct rtnl_link_stats64 *nicvf_get_stats64(struct net_device *netdev,
- 					    struct rtnl_link_stats64 *stats)
- {
- 	struct nicvf *nic = netdev_priv(netdev);
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-index 1962466..7f0e108 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-@@ -228,7 +228,7 @@ static void nicvf_free_rbdr(struct nicvf *nic, struct rbdr *rbdr)
- 
- /* Refill receive buffer descriptors with new buffers.
-  */
--void nicvf_refill_rbdr(struct nicvf *nic, gfp_t gfp)
-+static void nicvf_refill_rbdr(struct nicvf *nic, gfp_t gfp)
- {
- 	struct queue_set *qs = nic->qs;
- 	int rbdr_idx = qs->rbdr_cnt;
-diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-index 83476f0..633ec05 100644
---- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-+++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-@@ -52,7 +52,7 @@ struct bgx {
- 	struct pci_dev		*pdev;
- };
- 
--struct bgx *bgx_vnic[MAX_BGX_THUNDER];
-+static struct bgx *bgx_vnic[MAX_BGX_THUNDER];
- static int lmac_count; /* Total no of LMACs in system */
- 
- static int bgx_xaui_check_link(struct lmac *lmac);
-@@ -253,7 +253,7 @@ static void bgx_sgmii_change_link_state(struct lmac *lmac)
- 	bgx_reg_write(bgx, lmac->lmacid, BGX_CMRX_CFG, cmr_cfg);
- }
- 
--void bgx_lmac_handler(struct net_device *netdev)
-+static void bgx_lmac_handler(struct net_device *netdev)
- {
- 	struct lmac *lmac = container_of(netdev, struct lmac, netdev);
- 	struct phy_device *phydev = lmac->phydev;
-@@ -655,7 +655,7 @@ static int bgx_lmac_enable(struct bgx *bgx, u8 lmacid)
- 	return 0;
- }
- 
--void bgx_lmac_disable(struct bgx *bgx, u8 lmacid)
-+static void bgx_lmac_disable(struct bgx *bgx, u8 lmacid)
- {
- 	struct lmac *lmac;
- 	u64 cmrx_cfg;
 -- 
 2.4.1
