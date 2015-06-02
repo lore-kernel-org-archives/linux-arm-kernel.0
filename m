@@ -1,114 +1,48 @@
-From: bintian.wang@huawei.com (Bintian)
-Date: Tue, 2 Jun 2015 11:57:40 +0800
-Subject: [PATCH v9 0/6] arm64,hi6220: Enable Hisilicon Hi6220 SoC
-In-Reply-To: <1432950661-23060-1-git-send-email-bintian.wang@huawei.com>
-References: <1432950661-23060-1-git-send-email-bintian.wang@huawei.com>
-Message-ID: <556D29B4.7@huawei.com>
+From: matthijsvanduin@gmail.com (Matthijs van Duin)
+Date: Tue, 2 Jun 2015 06:21:20 +0200
+Subject: runtime check for omap-aes bus access permission (was: Re:
+ 3.13-rc3 (commit 7ce93f3) breaks Nokia N900 DT boot)
+In-Reply-To: <20150601205217.GD30984@atomide.com>
+References: <20150528073740.GD16509@pali> <20150528160113.GH30984@atomide.com>
+ <CAALWOA8Pfc_zbN9MoHwR=njPBpFU56WObYMbGv9N7ktzy+RSeQ@mail.gmail.com>
+ <20150528222412.GM30984@atomide.com>
+ <CAALWOA9qJHUST0JQxA6MBohMfbTYAP9+NbSXGYHZY4Xa3nSFvw@mail.gmail.com>
+ <CAALWOA82=QmTpCeiceOFQOjqXKdSBjB3Z+jL-mi0vYF=QaL4sA@mail.gmail.com>
+ <20150529155030.GO30984@atomide.com>
+ <CAALWOA-X-Jb_2NODrPNnDgaLuYFDuxjPLHYwqRjaPz2PrqhJkA@mail.gmail.com>
+ <20150601175806.GZ30984@atomide.com>
+ <CAALWOA8swU+wRrg8NnFDoKMEEsfKAE=u7ZiQE3X5BvRKLOjNmg@mail.gmail.com>
+ <20150601205217.GD30984@atomide.com>
+Message-ID: <CAALWOA-sT_NfL6-ZFLF3=UXyeO482XTzNmzUVmr2Y=0A3xpaGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will, Mark and other ARM64 DT maintainers,
+On 1 June 2015 at 22:52, Tony Lindgren <tony@atomide.com> wrote:
+> OK that must be the case I've seen then. Probably that happens
+> when a device is not clocked.
 
-Could you help ack this version? although Will, Kevin and Tyler have
-tested this patch set, I think also need an ack from you.
+It happens for any interconnect error reported as a result of
+instruction fetch, but that is itself not a very common occurrence and
+obviously doesn't apply to device memory.
 
-The clock driver has been merged to linux-next, so I just add the clock
-header file to this patch set to avoid compilation error.
+Another case where the L3 error irq may be taken first is if the bus
+error is asynchronous, but I don't think this combo can be produced on
+a dm81xx or am335x, but that's mainly due to the strictly in-order
+Cortex-A8 making almost every abort synchronous. I'd expect async
+aborts are more common on an A9.
 
-Thanks,
+> Hmm well it should be just MT_DEVICE for anything Linux ioremaps..
 
-Bintian
+Yikes, so both /dev/mem and uio are behaving unlike any device driver:
+both use remap_pfn_range() after running the vm_page_prot though
+pgprot_noncached() to set the memory type to L_PTE_MT_UNCACHED, which
+counterintuitively turns out to mean strongly-ordered. o.O  Especially
+uio is acting inappropriate here imho.
 
-On 2015/5/30 9:50, Bintian Wang wrote:
-> Hi6220 is one mobile solution of Hisilicon, this patchset contains
-> initial support for Hi6220 SoC and HiKey development board, which
-> supports octal ARM Cortex A53 cores. Initial support is minimal and
-> includes just the arch configuration, device tree configuration, the
-> clock driver has been picked up by clock maintainers in clk tree.
->
-> PSCI is enabled in device tree and there is no problem to boot all the
-> octal cores, and the CPU hotplug is also working now, you can download
-> and compile the latest firmware based on the following link to run this
-> patch set:
-> https://github.com/96boards/documentation/wiki/UEFI
->
-> Chnages v9:
-> * Rebase to linus/master 4.1-rc1
-> * Remove the clock driver from this version because the clock maintainers
->    have queued up the clock driver:
->    git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next-hi6220
-> * This version also includes clock header file:
->    [PATCH v9 6/6] dt-bindings: Add header file of hi6220 clock driver
->    Although above patch is included in clock driver, I add to this series
->    because the device tree file includes it, there will be compile error
->    without it.
->    At last, we just need to keep one when merged together.
->
-> Changes v6~v8:
-> This three versions only modified the clock drivers based on the
-> Stephen's review advices.
-> * clk-hi6220.c:
->    ** Split the clock header file from clock driver
->    ** Delete setting the parents clock of UART1 to HI6220_150M in clock
->       driver, we can do that using assigned-clock in dts when enable
->       UART1 in the future.
-> * clkdivider-hi6220.c:
->    ** Reuse some functions exported by clk-divider.c
->    ** Remove "pr_err" and CLK_IS_BASIC flag
->    ** Fix some programing style problems
-> * hisilicon/clk.h: remove the "__init" markings on some funcition
->    prototypes.
->
-> Changes v5:
-> * Rebase to kernel 4.1-rc2
-> * Add compatible string "hisilicon,hi6220-pl011" for Hisilicon designed
->    UART
-> * clk-hi6220.c: use __initdata for non-const arrays based on the commit
->    692d8328e8c039f9497eb862c6cf835de922c061
->
-> Changes v4:
-> * Rebase to kernel 4.1-rc1
-> * Delete "arm,cortex-a15-gic" from the gic node in dts
->
-> Changes v3:
-> * Verified the CPU hotplug based on the new released firmware
-> * Redefined the compatible strings of four system controllers in dts
-> * Setting COMMON_CLK_HI6220 to a bool symbol
-> * Keep CONFGI_ARCH_HISI sorted alphabetically
->
-> Changes v2:
-> * Split the DT bindings documents into earlier patches
-> * Change SMP enable method from spin-table to PSCI in device tree
-> * Remove "clock-frequency" from armv8-timer device node in device tree
-> * Add more description about Hisilicon designed system controllers
->    in DT bindings document
-> * Enable high speed clock on UART1 mux
-> * Other changes based on the discussion in the mailing list:
->    https://lkml.org/lkml/2015/2/5/147
->
-> Bintian Wang (6):
->    arm64: Enable Hisilicon ARMv8 SoC family in Kconfig and defconfig
->    arm64: hi6220: Document devicetree bindings for Hisilicon hi6220 SoC
->    clk: hi6220: Document devicetree bindings for hi6220 clock
->    Documentation: DT: PL011: hi6220: add compatible string for Hisilicon
->      designed UART
->    arm64: dts: Add dts files for Hisilicon Hi6220 SoC
->    dt-bindings: Add header file of hi6220 clock driver
->
->   .../bindings/arm/hisilicon/hisilicon.txt           |   87 ++++++++++
->   .../devicetree/bindings/clock/hi6220-clock.txt     |   34 ++++
->   Documentation/devicetree/bindings/serial/pl011.txt |    4 +-
->   arch/arm64/Kconfig                                 |    5 +
->   arch/arm64/boot/dts/Makefile                       |    1 +
->   arch/arm64/boot/dts/hisilicon/Makefile             |    5 +
->   arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |   31 ++++
->   arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  172 +++++++++++++++++++
->   arch/arm64/configs/defconfig                       |    1 +
->   include/dt-bindings/clock/hi6220-clock.h           |  173 ++++++++++++++++++++
->   10 files changed, 512 insertions(+), 1 deletion(-)
->   create mode 100644 Documentation/devicetree/bindings/clock/hi6220-clock.txt
->   create mode 100644 arch/arm64/boot/dts/hisilicon/Makefile
->   create mode 100644 arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
->   create mode 100644 arch/arm64/boot/dts/hisilicon/hi6220.dtsi
->   create mode 100644 include/dt-bindings/clock/hi6220-clock.h
->
+But this is problematic... these ranges are already mapped by the
+kernel, and ARM explicitly forbids mapping the same physical range
+twice with different memory attributes (and it's not the only
+architecture to do so). Hmmz...
+
+Anyhow, drifting a bit off-topic here. I'm going to some more reading
+and thinking about this.
