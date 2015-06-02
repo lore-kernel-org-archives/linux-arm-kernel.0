@@ -1,41 +1,43 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 2 Jun 2015 10:14:59 +0200
-Subject: [PATCH v2 6/6] ARM: sun8i: dts: Add Ippo-q8h v1.2 with A33 and
- 1024x600 lcd support
-In-Reply-To: <1432997706-20172-7-git-send-email-hdegoede@redhat.com>
-References: <1432997706-20172-1-git-send-email-hdegoede@redhat.com>
- <1432997706-20172-7-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150602081459.GO23777@lukather>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 2 Jun 2015 10:16:28 +0200
+Subject: [PATCH 1/2 v2] ARM64: juno: add GPIO keys
+In-Reply-To: <20150601164341.GE2175@e106497-lin.cambridge.arm.com>
+References: <1432629650-19559-1-git-send-email-linus.walleij@linaro.org>
+ <20150526093734.GB2175@e106497-lin.cambridge.arm.com>
+ <CACRpkdbm9LxaWQa=SQAhOKYVncPoFiKv_M6cN1oUEqctiR5=pQ@mail.gmail.com>
+ <20150527144052.GF2175@e106497-lin.cambridge.arm.com>
+ <CACRpkdaem5kTvgiswkp7SB+nJntDpV1Ycai1hzm2kWcpA+rKSA@mail.gmail.com>
+ <20150601164341.GE2175@e106497-lin.cambridge.arm.com>
+Message-ID: <CACRpkdaQBxt6t8hosym5x0p5trfE93y8bac6HtqVaX0GvLdheQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 30, 2015 at 04:55:06PM +0200, Hans de Goede wrote:
-> The Ippo-q8h is a tablet circuit board commonly found in cheap Android
-> tablets. The v1.2 version can be used with either an A23 or A33 SoC.
-> 
-> This adds a dts file for the v1.2 board with an A33 SoC and a 1024x600
-> LCD screen (most of these tablets have a 800x480 screen).
+On Mon, Jun 1, 2015 at 6:43 PM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> On Mon, Jun 01, 2015 at 10:02:10AM +0100, Linus Walleij wrote:
 
-I think the difference between the resolution here is more of a case
-for the DT quirks interface:
-https://lkml.org/lkml/2015/2/18/258
+> I have tested the patches on my Juno R0, so you can add my
+>
+> Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
 
-Do you know if there's some way to autodetect the two board versions
-(like a board id somewhere in an EEPROM)?
+OK thanks!
 
-If not, then maybe u-boot can simply add that board compatible to the
-list, and we'll base our logic on that when we'll need it.
+>> > UEFI firmware (version a4c2dfb284a55e73f34c48f5944a438006384f04 built at 17:44:48 on Jan 13 2015)
+>>
+>> I'm using U-Boot, of course ;)
+>
+> Should I, too? :)
 
-Maxime
+I think it's very convenient especially if you just want to boot the kernel off
+TFTP like with most reference designs. I compile a U-Boot with a command
+string like so as default:
+set serverip 192.168.1.32 ; set ipaddr 192.168.1.35 ; tftpboot
+0x80000000 Image ; tftpboot 0x83000000 juno.dtb ; booti 0x80000000 -
+0x83000000
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150602/5112db89/attachment-0001.sig>
+Then I can just compile a kernel I want to test and reboot and it
+will download and boot whatever I just compiled quick and nice
+with no keyboard interaction.
+http://www.df.lth.se/~triad/krad/junoboard/
+
+Yours,
+Linus Walleij
