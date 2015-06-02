@@ -1,24 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 2 Jun 2015 13:33:33 +0200
-Subject: [PATCH v4 01/18] mfd: add new driver for Sharp LoCoMo
-In-Reply-To: <CALT56yPJ=Y7oq00PyRT4zguNcaetT=ozQ6nE8eknr9P2co9nxg@mail.gmail.com>
-References: <1432554113-26280-1-git-send-email-dbaryshkov@gmail.com>
- <1432554113-26280-2-git-send-email-dbaryshkov@gmail.com>
- <20150527102756.GH11677@x1>
- <CALT56yO5Eu4Bk+_4sn2WgURh9YTsym9inWkvJftKUi_aLy5XXw@mail.gmail.com>
- <20150528115823.GQ11677@x1>
- <CALT56yPJ=Y7oq00PyRT4zguNcaetT=ozQ6nE8eknr9P2co9nxg@mail.gmail.com>
-Message-ID: <CACRpkdbfbz8CmVFP39jiyV7-8HiQCFqf-7EKT-Ap5_ou8tKryg@mail.gmail.com>
+From: majun258@huawei.com (majun (F))
+Date: Tue, 2 Jun 2015 19:34:25 +0800
+Subject: [PATCH 3/4]: Change arm-gic-its to support the Mbigen interrupt
+In-Reply-To: <556C2226.70502@arm.com>
+References: <55692C32.2050209@huawei.com> <556C2226.70502@arm.com>
+Message-ID: <556D94C1.6060300@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 28, 2015 at 9:07 PM, Dmitry Eremin-Solenikov
-<dbaryshkov@gmail.com> wrote:
+Hi Marc:
+	Thanks for your review.
 
-> * Linus, can I assume that yours 'Reviewed-by' mean
->   'Acked-by' for the GPIO-related parts?
+Accroding to my initial scheme, mbigen and pci devices uses the
+same parent domain--MSI domain.
 
-Yes.
+But accroding to your opinion, it seems use the ITS domain as parent domain
+of Mbigne is a better way. Am i right ?
 
-Yours,
-Linus Walleij
+Thanks
+Ma Jun
+
+
+? 2015/6/1 17:13, Marc Zyngier ??:
+> Like I said in patch #1, you need to come up with a different approach.
+> Use the LPI layer of the ITS as the parent for your MBI, stop messing
+> with the PCI stuff, stop poking the ITS internals.
+> 
+> Thanks,
+> 
+> 	M.
