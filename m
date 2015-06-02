@@ -1,53 +1,27 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue,  2 Jun 2015 19:32:31 +0200
-Subject: [PATCH 7/7] ARM: berlin: enable flash on the BG2Q DMP
-In-Reply-To: <1433266351-22587-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1433266351-22587-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1433266351-22587-8-git-send-email-antoine.tenart@free-electrons.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 3 Jun 2015 02:33:41 +0900
+Subject: [PATCH 05/12] i2c: pxa: Add bus reset functionality
+In-Reply-To: <1432818224-17070-6-git-send-email-vaibhav.hiremath@linaro.org>
+References: <1432818224-17070-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1432818224-17070-6-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <20150602173341.GA1494@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The BG2Q DMP has a nand controller. Add the corresponding node, but do
-not enable it by default because the nand is only available on some BG2Q
-DMP.
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
- arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+> Since there is some problematic i2c slave devices on some
+> platforms such as dkb (sometimes), it will drop down sda
+> and make i2c bus hang, at that time, it need to config
+> scl/sda into gpio to simulate "stop" sequence to recover
+> i2c bus, so add this interface.
 
-diff --git a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-index a98ac1bd8f65..4157258a6fb0 100644
---- a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-+++ b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
-@@ -112,3 +112,28 @@
- &sata_phy {
- 	status = "okay";
- };
-+
-+&chip {
-+	nand_pmux: nand-pmux {
-+		groups = "G0", "G1";
-+		function = "nand";
-+	};
-+};
-+
-+&nand0 {
-+	pinctrl-0 = <&nand_pmux>;
-+	pinctrl-names = "default";
-+
-+	marvell,nand-enable-arbiter;
-+	nand-ecc-strength = <48>;
-+	nand-ecc-step-size = <1024>;
-+
-+	num-cs = <1>;
-+
-+	/*
-+	 * Two kinds of BG2Q DMP are available: one with emmc and
-+	 * one with a nand. The latter is not widespread. Because
-+	 * of this, disable the nand by default.
-+	 */
-+	status = "disabled";
-+};
--- 
-2.4.2
+Please note that the i2c core has a bus recovery infrastructure.
+Search i2c.h for struct i2c_bus_recovery_info.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150603/352f0bd0/attachment.sig>
