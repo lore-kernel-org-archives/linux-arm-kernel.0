@@ -1,26 +1,29 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 2 Jun 2015 10:20:26 +0530
-Subject: [PATCH 3/6] PM / OPP: Support adjusting OPP voltages at runtime
-In-Reply-To: <1433209679-31389-4-git-send-email-sboyd@codeaurora.org>
-References: <1433209679-31389-1-git-send-email-sboyd@codeaurora.org>
- <1433209679-31389-4-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150602045026.GC10443@linux>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Tue, 02 Jun 2015 10:28:32 +0530
+Subject: [PATCH 00/12] i2c: pxa: Fixes, cleanup and support for pxa910
+ family
+In-Reply-To: <fb192019ec75e9aa10b04b79e87a6e79@the-dreams.de>
+References: <1432818224-17070-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <fb192019ec75e9aa10b04b79e87a6e79@the-dreams.de>
+Message-ID: <556D37F8.2030904@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01-06-15, 18:47, Stephen Boyd wrote:
-> +int dev_pm_opp_adjust_voltage(struct device *dev, unsigned long freq,
-> +		   unsigned long u_volt);
 
-> +static inline int dev_pm_opp_adjust_voltage(struct device *dev,
-> +		unsigned long freq, unsigned long u_volt)
 
-The 'u' of 'unsigned' isn't aligned to the opening curly brace. Try
-running with checkpatch --strict and you will see some warnings.
+On Monday 01 June 2015 05:37 AM, Wolfram Sang wrote:
+>> TODO:
+>>   - Due to lack of client driver support as of now, could not
+>>     able to do functionality testing from client. I am working
+>>     on PMIC driver support which is over I2C, so will have good
+>>     meaningful testing then.
+>
+> Okay, thanks for the info. So, unless this is done I'll consider these
+> patches as RFC.
 
-Otherwise,
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+I already have PMIC client driver up and doing some testing with it.
+So we should not have this issue for my next version.
 
--- 
-viresh
+Thanks,
+Vaibhav
