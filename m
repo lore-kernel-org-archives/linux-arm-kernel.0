@@ -1,53 +1,67 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue,  2 Jun 2015 08:40:42 +0200
-Subject: [PATCH] char:xilinx_hwicap:buffer_icap - change 1/0 to true/false for
- bool type variable in function buffer_icap_set_configuration().
-Message-ID: <24f8e2f2b3e8473019f67a7d72903e9f927b4613.1433227230.git.michal.simek@xilinx.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Tue, 2 Jun 2015 14:46:06 +0800
+Subject: [Patch v4 0/8] Consolidate ACPI PCI root common code into ACPI
+ core
+In-Reply-To: <1433225576-8215-1-git-send-email-jiang.liu@linux.intel.com>
+References: <1433225576-8215-1-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <556D512E.9020209@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shailendra Verma <shailendra.capricorn@gmail.com>
+On 2015/6/2 14:12, Jiang Liu wrote:
+> This patch set consolidates common code to support ACPI PCI root on x86
+> and IA64 platforms into ACPI core, to reproduce duplicated code and
+> simplify maintenance. And a patch set based on this to support ACPI based
+> PCIe host bridge on ARM64 has been posted at:
 
-The variable dirty is bool type. Hence assign the variable with
-bool value true/false instead of 1/0.
+https://lkml.org/lkml/2015/5/26/207
 
-Signed-off-by: Shailendra Verma <shailendra.capricorn@gmail.com>
-Tested-by: Michal Simek <michal.simek@xilinx.com>
----
+And yes, it works on ARM64 too with legacy interrupts (INT#A/B/C/D) with ACPI _PRT
+method (MSI is in developing).
 
- drivers/char/xilinx_hwicap/buffer_icap.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Thanks
+Hanjun
 
-diff --git a/drivers/char/xilinx_hwicap/buffer_icap.c b/drivers/char/xilinx_hwicap/buffer_icap.c
-index 05d897764f02..53c3882e4981 100644
---- a/drivers/char/xilinx_hwicap/buffer_icap.c
-+++ b/drivers/char/xilinx_hwicap/buffer_icap.c
-@@ -270,7 +270,7 @@ int buffer_icap_set_configuration(struct hwicap_drvdata *drvdata, u32 *data,
- 	int status;
- 	s32 buffer_count = 0;
- 	s32 num_writes = 0;
--	bool dirty = 0;
-+	bool dirty = false;
- 	u32 i;
- 	void __iomem *base_address = drvdata->base_address;
- 
-@@ -279,7 +279,7 @@ int buffer_icap_set_configuration(struct hwicap_drvdata *drvdata, u32 *data,
- 
- 		/* Copy data to bram */
- 		buffer_icap_set_bram(base_address, buffer_count, data[i]);
--		dirty = 1;
-+		dirty = true;
- 
- 		if (buffer_count < XHI_MAX_BUFFER_INTS - 1) {
- 			buffer_count++;
-@@ -299,7 +299,7 @@ int buffer_icap_set_configuration(struct hwicap_drvdata *drvdata, u32 *data,
- 
- 		buffer_count = 0;
- 		num_writes++;
--		dirty = 0;
-+		dirty = false;
- 	}
- 
- 	/* Write unwritten data to ICAP */
--- 
-2.3.5
+>
+> It's based on latest mainstream kernel. It passes Fengguang's 0day test
+> suite and has been tested on two IA64 platforms and one x86 platform.
+>
+> V3->V4:
+> 1) Add patch[05/08] support solve building issue on ARM64
+> 2) Solve an implicitly pointer cast issue.
+> 3) Rebase to latest mainstream kernel
+>
+> V2->V3:
+> 1. Move memory allocation/free from ACPI core into arch
+> 2. Kill the field 'segment' in struct pci_root_info on x86
+>
+> Thanks!
+> Gerry
+>
+> Hanjun Guo (1):
+>   ARM64 / PCI: introduce struct pci_controller for ACPI
+>
+> Jiang Liu (7):
+>   ACPI/PCI: Enhance ACPI core to support sparse IO space
+>   ia64/PCI/ACPI: Use common ACPI resource parsing interface for host
+>     bridge
+>   ia64/PCI: Use common struct resource_entry to replace struct
+>     iospace_resource
+>   x86/PCI: Rename struct pci_sysdata as struct pci_controller
+>   PCI/ACPI: Consolidate common PCI host bridge code into ACPI core
+>   x86/PCI/ACPI: Use common interface to support PCI host bridge
+>   ia64/PCI/ACPI: Use common interface to support PCI host bridge
+>
+>  arch/arm64/include/asm/pci.h  |   10 ++
+>  arch/ia64/include/asm/pci.h   |    5 -
+>  arch/ia64/pci/pci.c           |  364 +++++++++++------------------------------
+>  arch/x86/include/asm/pci.h    |   13 +-
+>  arch/x86/include/asm/pci_64.h |    4 +-
+>  arch/x86/pci/acpi.c           |  295 ++++++++++-----------------------
+>  arch/x86/pci/common.c         |    2 +-
+>  drivers/acpi/pci_root.c       |  200 ++++++++++++++++++++++
+>  drivers/acpi/resource.c       |    9 +-
+>  include/linux/ioport.h        |    1 +
+>  include/linux/pci-acpi.h      |   23 +++
+>  11 files changed, 432 insertions(+), 494 deletions(-)
+>
