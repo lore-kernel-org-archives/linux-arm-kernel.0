@@ -1,86 +1,45 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 2 Jun 2015 12:34:39 +0200
-Subject: [PATCH] ARM: Enter CPU in ARM state for cpu_resume
-In-Reply-To: <20150602083419.GW2067@n2100.arm.linux.org.uk>
-References: <1433190120-27798-1-git-send-email-sboyd@codeaurora.org>
- <20150601214525.GT2067@n2100.arm.linux.org.uk>
- <CAKv+Gu9m3id8QPxnuCuRmmwE7sPDqvtNiWQGr1OvnOpiOCS_xw@mail.gmail.com>
- <20150602083419.GW2067@n2100.arm.linux.org.uk>
-Message-ID: <CAKv+Gu958H0w9n=PE3fTK2ZaZptSb5s0+m=xfGRMosq7kCGqTA@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 2 Jun 2015 18:38:35 +0800
+Subject: [PATCH] mmc: sdhci-pxav3: fix device wakeup initialization
+Message-ID: <1433241515-2093-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 June 2015 at 10:34, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Jun 02, 2015 at 08:18:18AM +0200, Ard Biesheuvel wrote:
->> On 1 June 2015 at 23:45, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > Please do this differently.  The default should be (as we do with
->> > the SMP secondary entry path) to assume that the firmware does the
->> > right thing.
->> >
->> > So, if we want an ARM-mode entry point, please use:
->> >
->> > +               .arm
->> > +ENTRY(cpu_resume_arm)
->> > + THUMB(        badr    r9, 1f          )       @ Kernel is entered in ARM.
->> > + THUMB(        bx      r9              )       @ If this is a Thumb-2 kernel,
->> > + THUMB(        .thumb                  )       @ switch to Thumb now.
->> > + THUMB(1:                      )
->> >
->> > Don't forget an ENDPROC() for the new symbol.  Buggy platforms then
->> > use cpu_resume_arm instead of cpu_resume.
->> >
->>
->> OK, I think that was Stephen intention at first, but I suggested this instead.
->>
->> The point is that it is safer and more tidy to make these entry points
->> ARM only throughout, and switch to Thumb2 only if THUMB2_KERNEL. This
->> way, since all firmwares (except ARMv7-M, but let's disregard that for
->> now) are known to be able to enter/resume into the kernel in ARM mode,
->> this is more robust in the face of new platforms and firmware
->> revisions of existing platforms.
->
-> Stop creating random interfaces with differing ways to call them.
-> Consistency is one of the important things.
->
+MMC_PM_KEEP_POWER doesn't imply MMC_PM_WAKE_SDIO_IRQ, we should only
+enable device wake up when MMC_PM_WAKE_SDIO_IRQ is set. And "pm_flags"
+is the requested pm features, we should not set it in the host driver.
 
-Consistency was actually the point of my suggestion, but I see how the
-pre-existence of secondary_startup_arm() and your point regarding
-treating broken firmware as the exception may lead to the opposite
-conclusion.
+At the same time, device wakeup is disabled by default, so there's no
+need to disable device wakeup explicitly.
 
+This patch fixes the warning as following:
 
-> We have three interfaces to the kernel:
->
-> - Boot
-> - Secondary CPU
-> - Resume
->
-> Out of those three, boot is the special one, as we have no way to
-> communicate what mode it is required - so we specify a mode, which
-> is ARM mode, except for CPUs which have no ARM mode support.
->
-> Secondary CPU is not defined in the booting document because it's
-> not relevant, and it's not relevant for the same reason that the
-> resume entry point isn't.  These entry points are not at a fixed
-> location in the kernel image, and the kernel has to communicate that,
-> along with their entry mode to the firmware.
->
-> Therefore, firmware _does_ have the information to discover whether
-> the address should be called in ARM or Thumb mode, and what's more,
-> it should just work on those platforms which have no ARM mode support.
->
-> If we start forcing these interfaces to be ARM mode only, we then need
-> the same work-arounds for them as for the boot interface.
->
-> In other words, boot has a _valid_ reason to be different, the other
-> two are very similar in how they should be called.
->
-> Besides, I'm not pandering to broken firmware.  We should do the right
-> thing by default, which is to have sane interfaces, and only work around
-> stuff where needed.
->
-> --
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
+[   64.616651] ------------[ cut here ]------------
+[   64.616665] WARNING: CPU: 0 PID: 79 at linux/kernel/irq/manage.c:603 irq_set_irq_wake+0xf0/0x11c()
+[   64.616667] Unbalanced IRQ 87 wake disable
+
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/mmc/host/sdhci-pxav3.c | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
+
+diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
+index 01cb2d3..9cd5fc6 100644
+--- a/drivers/mmc/host/sdhci-pxav3.c
++++ b/drivers/mmc/host/sdhci-pxav3.c
+@@ -457,12 +457,8 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, host);
+ 
+-	if (host->mmc->pm_caps & MMC_PM_KEEP_POWER) {
++	if (host->mmc->pm_caps & MMC_PM_WAKE_SDIO_IRQ)
+ 		device_init_wakeup(&pdev->dev, 1);
+-		host->mmc->pm_flags |= MMC_PM_WAKE_SDIO_IRQ;
+-	} else {
+-		device_init_wakeup(&pdev->dev, 0);
+-	}
+ 
+ 	pm_runtime_put_autosuspend(&pdev->dev);
+ 
+-- 
+2.1.4
