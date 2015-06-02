@@ -1,22 +1,41 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 2 Jun 2015 18:37:23 +0000 (UTC)
-Subject: [PATCH 1/2] ARM: OMAP: AM43xx hwmod: Add data for am43xx emif
- hwmod
-In-Reply-To: <1430933133-33412-2-git-send-email-d-gerlach@ti.com>
-References: <1430933133-33412-1-git-send-email-d-gerlach@ti.com>
- <1430933133-33412-2-git-send-email-d-gerlach@ti.com>
-Message-ID: <alpine.DEB.2.02.1506021837080.14902@utopia.booyaka.com>
+From: atull@opensource.altera.com (Alan Tull)
+Date: Tue, 2 Jun 2015 13:35:39 -0500
+Subject: [PATCHv6 2/2] ARM: socfpga: dts: add sdram controller dt binding doc
+In-Reply-To: <1433270139-7042-1-git-send-email-atull@opensource.altera.com>
+References: <1433270139-7042-1-git-send-email-atull@opensource.altera.com>
+Message-ID: <1433270139-7042-3-git-send-email-atull@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 6 May 2015, Dave Gerlach wrote:
+Add binding doc for Altera SOCFPGA SDRAM controller.
 
-> Without a hwmod for am43xx emif use counting for emif clockdomain does
-> not happen correctly so it may be shut off by pm code unintentionally.
-> 
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+Signed-off-by: Alan Tull <atull@opensource.altera.com>
+---
+v4: Add bindings doc
+v5: No change for v5
+v6: No change for v6
+---
+ .../arm/altera/socfpga-sdram-controller.txt        |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-sdram-controller.txt
 
-Thanks, sent upstream for v4.2.
-
-
-- Paul
+diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-controller.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-controller.txt
+new file mode 100644
+index 0000000..77ca635
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/altera/socfpga-sdram-controller.txt
+@@ -0,0 +1,12 @@
++Altera SOCFPGA SDRAM Controller
++
++Required properties:
++- compatible : Should contain "altr,sdr-ctl" and "syscon".
++  syscon is required by the Altera SOCFPGA SDRAM EDAC.
++- reg : Should contain 1 register range (address and length)
++
++Example:
++	sdr: sdr at ffc25000 {
++		compatible = "altr,sdr-ctl", "syscon";
++		reg = <0xffc25000 0x1000>;
++	};
+-- 
+1.7.9.5
