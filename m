@@ -1,43 +1,39 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 2 Jun 2015 17:58:16 +0200
-Subject: [PATCH] ARM: dts: sun6i: Add a dts file for the Mele A1000G quad
- top set box
-In-Reply-To: <1433170979-13725-1-git-send-email-hdegoede@redhat.com>
-References: <1433170979-13725-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150602155816.GC23777@lukather>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Tue, 02 Jun 2015 09:16:12 -0700
+Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
+ regression on Xen
+In-Reply-To: <20150602095237.GL19403@zion.uk.xensource.com>
+References: <552E9E8D.1080000@eu.citrix.com>
+ <1429118948.7346.114.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552EA2BC.5000707@eu.citrix.com>
+ <1429120373.7346.125.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552EA844.5010308@eu.citrix.com>
+ <1429121979.7346.138.camel@edumazet-glaptop2.roam.corp.google.com>
+ <552F7936.9070205@eu.citrix.com> <552F7EF4.9030107@iogearbox.net>
+ <552F887A.4060708@eu.citrix.com>
+ <1429188136.7346.198.camel@edumazet-glaptop2.roam.corp.google.com>
+ <20150602095237.GL19403@zion.uk.xensource.com>
+Message-ID: <1433261772.1895.20.camel@edumazet-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 01, 2015 at 05:02:59PM +0200, Hans de Goede wrote:
-> The Mele A1000G-quad and the Mele M9 have the same PCB, sofar we've been using
-> the same dts for both models. Unfortunately this does not work for the otg
-> controller, on the M9 this is routed to a micro-usb connector on the outside,
-> while as on the A1000G-quad it is connected to an usb to sata bridge
-> (which is not populated on the M9 pcb).
+On Tue, 2015-06-02 at 10:52 +0100, Wei Liu wrote:
+> Hi Eric
 > 
-> This commit adds a new dts for the Mele-A1000G-quad to allow using
-> different otg controller settings on the 2 boards.
+> Sorry for coming late to the discussion.
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  arch/arm/boot/dts/Makefile                                        | 1 +
->  arch/arm/boot/dts/{sun6i-a31-m9.dts => sun6i-a31-a1000g-quad.dts} | 4 ++--
+> On Thu, Apr 16, 2015 at 05:42:16AM -0700, Eric Dumazet wrote:
+> > On Thu, 2015-04-16 at 11:01 +0100, George Dunlap wrote:
+> > 
+> > > He suggested that after he'd been prodded by 4 more e-mails in which two
+> > > of us guessed what he was trying to get at.  That's what I was
+> > > complaining about.
+> > 
+> > My big complain is that I suggested to test to double the sysctl, which
+> > gave good results.
+> > 
+> 
+> Do I understand correctly that it's acceptable to you to double the size
+> of the buffer? If so I will send a patch to do that.
 
-Didn't we say that we were trying to set the vendor name in the DTs
-now, at least for the new ones?
-
-I can fix this and apply it if it's ok for you.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150602/0c6d6879/attachment.sig>
+Absolutely.
