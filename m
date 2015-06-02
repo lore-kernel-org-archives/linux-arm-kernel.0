@@ -1,86 +1,52 @@
-From: raghavendra.kt@linux.vnet.ibm.com (Raghavendra K T)
-Date: Tue, 02 Jun 2015 11:41:56 +0530
-Subject: [RFC] arm: Add for atomic half word exchange
-In-Reply-To: <1357570181.391771433224164775.JavaMail.weblogic@epmlwas06d>
-References: <1357570181.391771433224164775.JavaMail.weblogic@epmlwas06d>
-Message-ID: <556D492C.1050403@linux.vnet.ibm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 2 Jun 2015 08:18:18 +0200
+Subject: [PATCH] ARM: Enter CPU in ARM state for cpu_resume
+In-Reply-To: <20150601214525.GT2067@n2100.arm.linux.org.uk>
+References: <1433190120-27798-1-git-send-email-sboyd@codeaurora.org>
+ <20150601214525.GT2067@n2100.arm.linux.org.uk>
+Message-ID: <CAKv+Gu9m3id8QPxnuCuRmmwE7sPDqvtNiWQGr1OvnOpiOCS_xw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02/2015 11:19 AM, Sarbojit Ganguly wrote:
-> I made the CONFIG_ARCH_MULTI_V6=y and
-> CONFIG_CPU_V6K=y
-> CONFIG_CPU_32v6=y
-> CONFIG_CPU_32v6K=y
+On 1 June 2015 at 23:45, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Jun 01, 2015 at 01:22:00PM -0700, Stephen Boyd wrote:
+>> The standard boot protocol on ARM requires CPUs to be entered in
+>> the ARM state, unless they don't support the ARM instruction set
+>> (see Documentation/arm/Booting). On THUMB2 kernels, we assume
+>> the firmware can determine what state to enter the kernel in, but
+>> some firmwares don't honor the thumb bit. Make the cpu_resume
+>> symbol an ARM symbol, so that firmwares that honor the thumb bit
+>> will enter the kernel in ARM state and firmwares that don't honor
+>> the thumb bit will be able to enter the kernel in ARM state
+>> without more changes.
+>>
+>> This fixes a problem reported by Kevin Hilman where the ifc6410
+>> fails to boot for THUMB2 kernels because the platform's firmware
+>> always enters the kernel in ARM mode from deep idle states.
 >
-> and compiled 4.0.4 with the patch. Result is a compilation success.
+> Please do this differently.  The default should be (as we do with
+> the SMP secondary entry path) to assume that the firmware does the
+> right thing.
 >
-> Regards,
-> Sarbojit
+> So, if we want an ARM-mode entry point, please use:
+>
+> +               .arm
+> +ENTRY(cpu_resume_arm)
+> + THUMB(        badr    r9, 1f          )       @ Kernel is entered in ARM.
+> + THUMB(        bx      r9              )       @ If this is a Thumb-2 kernel,
+> + THUMB(        .thumb                  )       @ switch to Thumb now.
+> + THUMB(1:                      )
+>
+> Don't forget an ENDPROC() for the new symbol.  Buggy platforms then
+> use cpu_resume_arm instead of cpu_resume.
 >
 
-Hi Sarbojit,
+OK, I think that was Stephen intention at first, but I suggested this instead.
 
-I am not familiar about the implication of setting those options
-unconditionally, But from Kconfig point of view
-Arnd was expecting something like below IIUC
-with the patch: (a quick example)
-
----8<---
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9f1f09a..194fc13 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -812,6 +812,8 @@ config ARCH_MULTI_V6
-         bool "ARMv6 based platforms (ARM11)"
-         select ARCH_MULTI_V6_V7
-         select CPU_V6K
-+       select CPU_32v6
-+       select CPU_32v6k
-
-  config ARCH_MULTI_V7
-         bool "ARMv7 based platforms (Cortex-A, PJ4, Scorpion, Krait)"
-
-
-
-> ------- Original Message -------
-> Sender : Arnd Bergmann<arnd@arndb.de>
-> Date : May 19, 2015 18:51 (GMT+09:00)
-> Title : Re: [RFC] arm: Add for atomic half word exchange
->
-> On Tuesday 19 May 2015 09:39:33 Sarbojit Ganguly wrote:
->> Since 16 bit half word exchange was not there and MCS based qspinlock by Waiman's xchg_tail() requires an atomic exchange on a half word,
->> here is a small modification to __xchg() code.
->
-> We have discussed a similar patch before, see
-> https://lkml.org/lkml/2015/2/25/390
->
->>   #if __LINUX_ARM_ARCH__ >= 6
->> @@ -50,6 +52,23 @@
->>                          : "r" (x), "r" (ptr)
->>                          : "memory", "cc");
->>                  break;
->> +               /*
->> +                * halfword exclusive exchange
->> +                * This is new implementation as qspinlock
->> +                * wants 16 bit atomic CAS.
->> +                */
->> +       case 2:
->> +               asm volatile("@ __xchg2\n"
->> +               "1:     ldrexh  %0, [%3]\n"
->> +               "       strexh  %1, %2, [%3]\n"
->> +               "       teq     %1, #0\n"
->> +               "       bne     1b"
->> +                       : "=&r" (ret), "=&r" (tmp)
->> +                       : "r" (x), "r" (ptr)
->> +                       : "memory", "cc");
->> +               break;
->>          case 4:
->>                  asm volatile("@ __xchg4\n"
->>                  "1:     ldrex   %0, [%3]\n"
->
-> Please try to find a way to make this compile when CONFIG_CPU_V6
-> is set.
->
-> Arnd
->
+The point is that it is safer and more tidy to make these entry points
+ARM only throughout, and switch to Thumb2 only if THUMB2_KERNEL. This
+way, since all firmwares (except ARMv7-M, but let's disregard that for
+now) are known to be able to enter/resume into the kernel in ARM mode,
+this is more robust in the face of new platforms and firmware
+revisions of existing platforms.
