@@ -1,57 +1,30 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 02 Jun 2015 09:14:05 +0200
-Subject: [PATCH v4 0/2] Remaining sunxi musb patches
-In-Reply-To: <20150601183447.GF26081@saruman.tx.rr.com>
-References: <1433088626-8858-1-git-send-email-hdegoede@redhat.com>
- <79fc4306-a621-43b8-b347-e42a27beb134@googlegroups.com>
- <20150601183447.GF26081@saruman.tx.rr.com>
-Message-ID: <556D57BD.90502@redhat.com>
+From: ijc@debian.org (Ian Campbell)
+Date: Tue, 02 Jun 2015 08:14:11 +0100
+Subject: [PATCH 1/3] bus: mvebu-mbus: do not set WIN_CTRL_SYNCBARRIER on
+ non io-coherent platforms.
+In-Reply-To: <1432802414-12355-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1432802414-12355-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1432802414-12355-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1433229251.5748.290.camel@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 2015-05-28 at 10:40 +0200, Thomas Petazzoni wrote:
+> From: Nicolas Schichan <nschichan@freebox.fr>
+> 
+> Commit a0b5cd4ac2d6 ("bus: mvebu-mbus: use automatic I/O
+> synchronization barriers") enabled the usage of automatic I/O
+> synchronization barriers by enabling bit WIN_CTRL_SYNCBARRIER in the
+> control registers of MBus windows, but on non io-coherent platforms
+> (orion5x, kirkwood and dove) the WIN_CTRL_SYNCBARRIER bit in
+> the window control register is either reserved (all windows except 6
+> and 7) or enables read-only protection (windows 6 and 7).
+> 
+> Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
+> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: <stable@vger.kernel.org> # v4.0+
+> Fixes: a0b5cd4ac2d6 ("bus: mvebu-mbus: use automatic I/O synchronization barriers")
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-On 01-06-15 20:34, Felipe Balbi wrote:
-> On Mon, Jun 01, 2015 at 11:30:45AM -0700, Hans de Goede wrote:
->> Hi,
->>
->> On Sunday, May 31, 2015 at 6:10:32 PM UTC+2, Hans de Goede wrote:
->>>
->>> Hi Kishon & Felipe,
->>>
->>> Here is an updated version of the remaining (not yet merged in Felipe's
->>> tree)
->>> sunxi musb patches.
->>>
->>> The "phy-sun4i-usb: Add full support for usb0 phy / OTG" patch has been
->>> updated with a small bug-fix and is ready for merging.
->>>
->>> The "musb: Add support for the Allwinner sunxi musb" patch has been
->>> updated
->>> to use the latest version of Maxime's sunxi sram controller driver. This
->>> one has a compile-time dependency on Maxime's sunxi sram controller
->>> driver,
->>> so it cannot be merged until that is merged.
->>>
->>
->>
->> Arnd has just merged the updated sram controller into the next branch
->> of the soc-drivers repo, so both these patches are now ready to merge.
->
-> all right, so for v4.3 merge window there will be no issues in queues
-> the two remaining patches. Thanks
-
-So I take it that it is too late to get these 2 into 4.2 ? I've a bunch
-of (small) follow up patches coming up to enable support for the musb
-controller on new boards, merging those would be easier if these were
-already merged. And there also is a largish set of sunxi dts patches
-actually enabling the musb code which is sorta waiting for merging
-these 2 (waiting for the dt binding to be stable).
-
-If this is not going to make 4.2, can you and Kishon at least review
-them and let me know of they will get merged for 4.3 as is (baring
-any merge issues) ?
-
-Regards,
-
-Hans
+Tested-by: Ian Campbell <ijc@debian.org> (On QNAP TS-419P, it fixed SATA
+reset issue)
