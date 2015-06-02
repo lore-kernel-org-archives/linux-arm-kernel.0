@@ -1,41 +1,26 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 2 Jun 2015 09:57:35 +0300
-Subject: [PATCHv4 03/10] arm/dts: dra7xx: add 'ti,set-rate-parent' for
- dss_dss_clk
-In-Reply-To: <1433139798-23450-4-git-send-email-tomi.valkeinen@ti.com>
-References: <1433139798-23450-1-git-send-email-tomi.valkeinen@ti.com>
- <1433139798-23450-4-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <556D53DF.7070006@ti.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 2 Jun 2015 09:02:50 +0200
+Subject: [PATCH 1/2] ARM: shmobile: Enable gose board in multiplatform
+ defconfig
+In-Reply-To: <1433208877-3284-2-git-send-email-horms+renesas@verge.net.au>
+References: <1433208877-3284-1-git-send-email-horms+renesas@verge.net.au>
+ <1433208877-3284-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdUWj4qfAU6S_EZJCe4j8-ds8yxu9U-nw_9zVkAP5vrEsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2015 09:23 AM, Tomi Valkeinen wrote:
-> We need set-rate-parent flags for the display's clock path so that the
-> DSS driver can change the clock rate of the PLL.
->
-> This patchs adds the ti,set-rate-parent flag to 'dss_dss_clk' clock
-> node, which is only a gate clock, allowing the setting of the clock rate
-> to propagate to the PLL.
->
-> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> Cc: devicetree at vger.kernel.org
+On Tue, Jun 2, 2015 at 3:34 AM, Simon Horman <horms+renesas@verge.net.au> wrote:
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Acked-by: Tero Kristo <t-kristo@ti.com>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-> ---
->   arch/arm/boot/dts/dra7xx-clocks.dtsi | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> index 470f39c4e326..357bedeebfac 100644
-> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-> @@ -1531,6 +1531,7 @@
->   		clocks = <&dpll_per_h12x2_ck>;
->   		ti,bit-shift = <8>;
->   		reg = <0x1120>;
-> +		ti,set-rate-parent;
->   	};
->
->   	dss_hdmi_clk: dss_hdmi_clk {
->
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
