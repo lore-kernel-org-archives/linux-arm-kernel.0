@@ -1,21 +1,35 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 2 Jun 2015 15:42:32 +0200
-Subject: [PATCH v2 5/6] ARM: brcmstb: Select ARCH_WANT_OPTIONAL_GPIOLIB
-In-Reply-To: <1432865650-4062-6-git-send-email-gregory.0xf0@gmail.com>
+Date: Tue, 2 Jun 2015 15:45:01 +0200
+Subject: [PATCH v2 4/6] gpio: brcmstb: Allow GPIOs to be wakeup sources
+In-Reply-To: <1432865650-4062-5-git-send-email-gregory.0xf0@gmail.com>
 References: <1432865650-4062-1-git-send-email-gregory.0xf0@gmail.com>
- <1432865650-4062-6-git-send-email-gregory.0xf0@gmail.com>
-Message-ID: <CACRpkdYC3DDejXDX-CE71cMt2nJiKxg3W8ORFtvYyEeSDHdXCw@mail.gmail.com>
+ <1432865650-4062-5-git-send-email-gregory.0xf0@gmail.com>
+Message-ID: <CACRpkdYnZ9nYHPoUsmgLUtKhB2Us0c_scAYsZVJJQK2orKcpVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, May 29, 2015 at 4:14 AM, Gregory Fong <gregory.0xf0@gmail.com> wrote:
 
-> Select ARCH_WANT_OPTIONAL_GPIOLIB from BRCMSTB to allow GPIOLIB and
-> GPIO_BRCMSTB to be enabled.
+> Several drivers (e.g. gpio-keys) allow for GPIOs to be configured as
+> wakeup sources, and this GPIO controller supports that through a
+> separate interrupt path.
+>
+> The de-facto standard DT property "wakeup-source" is checked, since
+> that indicates whether the GPIO controller hardware can wake.  Uses
+> the IRQCHIP_MASK_ON_SUSPEND irq_chip flag because UPG GIO doesn't have
+> any of its own wakeup source configuration.
 >
 > Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+(...)
+> +       if (enable)
+> +               enable_irq_wake(priv->parent_wake_irq);
+> +       else
+> +               disable_irq_wake(priv->parent_wake_irq);
+> +       return 0;
+
+No error handling? If the code assumes these calls will
+always succeed, atleast write that in a comment.
 
 Yours,
 Linus Walleij
