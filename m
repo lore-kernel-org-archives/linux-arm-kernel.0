@@ -1,291 +1,76 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 2 Jun 2015 11:21:21 +0300
-Subject: [PATCH 2/5] ARM: OMAP2+: DRA7: Add hwmod entries for PWMSS
-In-Reply-To: <1433159614-437-3-git-send-email-vigneshr@ti.com>
+Date: Tue, 2 Jun 2015 11:22:35 +0300
+Subject: [PATCH 3/5] ARM: dts: DRA7: Add TBCLK for PWMSS
+In-Reply-To: <1433159614-437-4-git-send-email-vigneshr@ti.com>
 References: <1433159614-437-1-git-send-email-vigneshr@ti.com>
- <1433159614-437-3-git-send-email-vigneshr@ti.com>
-Message-ID: <556D6781.2090405@ti.com>
+ <1433159614-437-4-git-send-email-vigneshr@ti.com>
+Message-ID: <556D67CB.8090309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 06/01/2015 02:53 PM, Vignesh R wrote:
-> Add hwmod entries for the PWMSS on DRA7.
+> tbclk is used by ehrpwm to generate PWM waveform on DRA7 SoC. Add Linux
+> clock to control ehrpwm tbclk.
 
-Can you provide some documentation references for this data?
-
-I was looking at the TRM and at least the main_clk selection is somewhat 
-unclear to me.
+Care to add TRM reference here?
 
 -Tero
 
 >
 > Signed-off-by: Vignesh R <vigneshr@ti.com>
 > ---
->   arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 239 ++++++++++++++++++++++++++++++
->   1 file changed, 239 insertions(+)
+>   arch/arm/boot/dts/dra7.dtsi          |  5 +++++
+>   arch/arm/boot/dts/dra7xx-clocks.dtsi | 26 ++++++++++++++++++++++++++
+>   2 files changed, 31 insertions(+)
 >
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> index 0e64c2fac0b5..86a7ac9a3138 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-> @@ -362,6 +362,149 @@ static struct omap_hwmod dra7xx_dcan2_hwmod = {
->   	},
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index f03a091cd076..387c76ca41f9 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -131,6 +131,11 @@
+>   							regulator-max-microvolt = <3000000>;
+>   						};
+>   					};
+> +
+> +					scm_conf_clocks: clocks {
+> +						#address-cells = <1>;
+> +						#size-cells = <0>;
+> +					};
+>   				};
+>
+>   				dra7_pmx_core: pinmux at 1400 {
+> diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> index 3b933f74d000..92452d61cf58 100644
+> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> @@ -2136,3 +2136,29 @@
+>   		clocks = <&dpll_usb_ck>;
+>   	};
 >   };
->
-> +/* pwmss  */
-> +static struct omap_hwmod_class_sysconfig dra7xx_epwmss_sysc = {
-> +	.rev_offs	= 0x0,
-> +	.sysc_offs	= 0x4,
-> +	.sysc_flags	= SYSC_HAS_SIDLEMODE | SYSC_HAS_RESET_STATUS,
-> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
-> +	.sysc_fields	= &omap_hwmod_sysc_type2,
-> +};
 > +
-> +struct omap_hwmod_class dra7xx_epwmss_hwmod_class = {
-> +	.name		= "epwmss",
-> +	.sysc		= &dra7xx_epwmss_sysc,
-> +};
+> +&scm_conf_clocks {
+> +       ehrpwm0_tbclk: ehrpwm0_tbclk {
+> +		#clock-cells = <0>;
+> +		compatible = "ti,gate-clock";
+> +		clocks = <&l4_root_clk_div>;
+> +		ti,bit-shift = <20>;
+> +		reg = <0x0558>;
+> +	};
 > +
-> +static struct omap_hwmod_class dra7xx_ecap_hwmod_class = {
-> +	.name		= "ecap",
-> +};
+> +	ehrpwm1_tbclk: ehrpwm1_tbclk {
+> +		#clock-cells = <0>;
+> +		compatible = "ti,gate-clock";
+> +		clocks = <&l4_root_clk_div>;
+> +		ti,bit-shift = <21>;
+> +		reg = <0x0558>;
+> +	};
 > +
-> +static struct omap_hwmod_class dra7xx_eqep_hwmod_class = {
-> +	.name		= "eqep",
+> +	ehrpwm2_tbclk: ehrpwm2_tbclk {
+> +		#clock-cells = <0>;
+> +		compatible = "ti,gate-clock";
+> +		clocks = <&l4_root_clk_div>;
+> +		ti,bit-shift = <22>;
+> +		reg = <0x0558>;
+> +	};
 > +};
-> +
-> +struct omap_hwmod_class dra7xx_ehrpwm_hwmod_class = {
-> +	.name		= "ehrpwm",
-> +};
-> +
-> +/* epwmss0 */
-> +struct omap_hwmod dra7xx_epwmss0_hwmod = {
-> +	.name		= "epwmss0",
-> +	.class		= &dra7xx_epwmss_hwmod_class,
-> +	.clkdm_name	= "l4per2_clkdm",
-> +	.main_clk	= "l4_root_clk_div",
-> +	.prcm		= {
-> +		.omap4	= {
-> +			.modulemode	= MODULEMODE_SWCTRL,
-> +			.clkctrl_offs	= DRA7XX_CM_L4PER2_PWMSS1_CLKCTRL_OFFSET,
-> +			.context_offs	= DRA7XX_RM_L4PER2_PWMSS1_CONTEXT_OFFSET,
-> +		},
-> +	},
-> +};
-> +
-> +/* ecap0 */
-> +struct omap_hwmod dra7xx_ecap0_hwmod = {
-> +	.name		= "ecap0",
-> +	.class		= &dra7xx_ecap_hwmod_class,
-> +	.clkdm_name	= "l4per2_clkdm",
-> +	.main_clk	= "l4_root_clk_div",
-> +};
-> +
-> +/* eqep0 */
-> +struct omap_hwmod dra7xx_eqep0_hwmod = {
-> +	.name		= "eqep0",
-> +	.class		= &dra7xx_eqep_hwmod_class,
-> +	.clkdm_name	= "l4per2_clkdm",
-> +	.main_clk	= "l4_root_clk_div",
-> +};
-> +
-> +/* ehrpwm0 */
-> +struct omap_hwmod dra7xx_ehrpwm0_hwmod = {
-> +	.name		= "ehrpwm0",
-> +	.class		= &dra7xx_ehrpwm_hwmod_class,
-> +	.clkdm_name	= "l4per2_clkdm",
-> +	.main_clk	= "l4_root_clk_div",
-> +};
-> +
-> +/* epwmss1 */
-> +struct omap_hwmod dra7xx_epwmss1_hwmod = {
-> +	.name		= "epwmss1",
-> +	.class		= &dra7xx_epwmss_hwmod_class,
-> +	.clkdm_name	= "l4per2_clkdm",
-> +	.main_clk	= "l4_root_clk_div",
-> +	.prcm		= {
-> +		.omap4	= {
-> +			.modulemode	= MODULEMODE_SWCTRL,
-> +			.clkctrl_offs	= DRA7XX_CM_L4PER2_PWMSS2_CLKCTRL_OFFSET,
-> +			.context_offs	= DRA7XX_RM_L4PER2_PWMSS2_CONTEXT_OFFSET,
-> +		},
-> +	},
-> +};
-> +
-> +/* ecap1 */
-> +struct omap_hwmod dra7xx_ecap1_hwmod = {
-> +	.name		= "ecap1",
-> +	.class		= &dra7xx_ecap_hwmod_class,
-> +	.clkdm_name	= "l4per2_clkdm",
-> +	.main_clk	= "l4_root_clk_div",
-> +};
-> +
-> +/* eqep1 */
-> +struct omap_hwmod dra7xx_eqep1_hwmod = {
-> +	.name		= "eqep1",
-> +	.class		= &dra7xx_eqep_hwmod_class,
-> +	.clkdm_name	= "l4per2_clkdm",
-> +	.main_clk	= "l4_root_clk_div",
-> +};
-> +
-> +/* ehrpwm1 */
-> +struct omap_hwmod dra7xx_ehrpwm1_hwmod = {
-> +	.name		= "ehrpwm1",
-> +	.class		= &dra7xx_ehrpwm_hwmod_class,
-> +	.clkdm_name	= "l4per2_clkdm",
-> +	.main_clk	= "l4_root_clk_div",
-> +};
-> +
-> +/* epwmss2 */
-> +struct omap_hwmod dra7xx_epwmss2_hwmod = {
-> +	.name		= "epwmss2",
-> +	.class		= &dra7xx_epwmss_hwmod_class,
-> +	.clkdm_name	= "l4per2_clkdm",
-> +	.main_clk	= "l4_root_clk_div",
-> +	.prcm		= {
-> +		.omap4	= {
-> +			.modulemode	= MODULEMODE_SWCTRL,
-> +			.clkctrl_offs	= DRA7XX_CM_L4PER2_PWMSS3_CLKCTRL_OFFSET,
-> +			.context_offs	= DRA7XX_RM_L4PER2_PWMSS3_CONTEXT_OFFSET,
-> +		},
-> +	},
-> +};
-> +
-> +/* ecap2 */
-> +struct omap_hwmod dra7xx_ecap2_hwmod = {
-> +	.name		= "ecap2",
-> +	.class		= &dra7xx_ecap_hwmod_class,
-> +	.clkdm_name	= "l4per2_clkdm",
-> +	.main_clk	= "l4_root_clk_div",
-> +};
-> +
-> +/* eqep2 */
-> +struct omap_hwmod dra7xx_eqep2_hwmod = {
-> +	.name		= "eqep2",
-> +	.class		= &dra7xx_eqep_hwmod_class,
-> +	.clkdm_name	= "l4per2_clkdm",
-> +	.main_clk	= "l4_root_clk_div",
-> +};
-> +
-> +/* ehrpwm2 */
-> +struct omap_hwmod dra7xx_ehrpwm2_hwmod = {
-> +	.name		= "ehrpwm2",
-> +	.class		= &dra7xx_ehrpwm_hwmod_class,
-> +	.clkdm_name	= "l4per2_clkdm",
-> +	.main_clk	= "l4_root_clk_div",
-> +};
-> +
->   /*
->    * 'dma' class
->    *
-> @@ -2601,6 +2744,90 @@ static struct omap_hwmod_ocp_if dra7xx_l4_per1__gpio6 = {
->   	.user		= OCP_USER_MPU | OCP_USER_SDMA,
->   };
->
-> +struct omap_hwmod_ocp_if dra7xx_l4_per2__epwmss0 = {
-> +	.master		= &dra7xx_l4_per2_hwmod,
-> +	.slave		= &dra7xx_epwmss0_hwmod,
-> +	.clk		= "l4_root_clk_div",
-> +	.user		= OCP_USER_MPU,
-> +};
-> +
-> +struct omap_hwmod_ocp_if dra7xx_epwmss0__ecap0 = {
-> +	.master		= &dra7xx_epwmss0_hwmod,
-> +	.slave		= &dra7xx_ecap0_hwmod,
-> +	.clk		= "l4_root_clk_div",
-> +	.user		= OCP_USER_MPU,
-> +};
-> +
-> +struct omap_hwmod_ocp_if dra7xx_epwmss0__eqep0 = {
-> +	.master		= &dra7xx_epwmss0_hwmod,
-> +	.slave		= &dra7xx_eqep0_hwmod,
-> +	.clk		= "l4_root_clk_div",
-> +	.user		= OCP_USER_MPU,
-> +};
-> +
-> +struct omap_hwmod_ocp_if dra7xx_epwmss0__ehrpwm0 = {
-> +	.master		= &dra7xx_epwmss0_hwmod,
-> +	.slave		= &dra7xx_ehrpwm0_hwmod,
-> +	.clk		= "l4_root_clk_div",
-> +	.user		= OCP_USER_MPU,
-> +};
-> +
-> +struct omap_hwmod_ocp_if dra7xx_l4_per2__epwmss1 = {
-> +	.master		= &dra7xx_l4_per2_hwmod,
-> +	.slave		= &dra7xx_epwmss1_hwmod,
-> +	.clk		= "l4_root_clk_div",
-> +	.user		= OCP_USER_MPU,
-> +};
-> +
-> +struct omap_hwmod_ocp_if dra7xx_epwmss1__ecap1 = {
-> +	.master		= &dra7xx_epwmss1_hwmod,
-> +	.slave		= &dra7xx_ecap1_hwmod,
-> +	.clk		= "l4_root_clk_div",
-> +	.user		= OCP_USER_MPU,
-> +};
-> +
-> +struct omap_hwmod_ocp_if dra7xx_epwmss1__eqep1 = {
-> +	.master		= &dra7xx_epwmss1_hwmod,
-> +	.slave		= &dra7xx_eqep1_hwmod,
-> +	.clk		= "l4_root_clk_div",
-> +	.user		= OCP_USER_MPU,
-> +};
-> +
-> +struct omap_hwmod_ocp_if dra7xx_epwmss1__ehrpwm1 = {
-> +	.master		= &dra7xx_epwmss1_hwmod,
-> +	.slave		= &dra7xx_ehrpwm1_hwmod,
-> +	.clk		= "l4_root_clk_div",
-> +	.user		= OCP_USER_MPU,
-> +};
-> +
-> +struct omap_hwmod_ocp_if dra7xx_l4_per2__epwmss2 = {
-> +	.master		= &dra7xx_l4_per2_hwmod,
-> +	.slave		= &dra7xx_epwmss2_hwmod,
-> +	.clk		= "l4_root_clk_div",
-> +	.user		= OCP_USER_MPU,
-> +};
-> +
-> +struct omap_hwmod_ocp_if dra7xx_epwmss2__ecap2 = {
-> +	.master		= &dra7xx_epwmss2_hwmod,
-> +	.slave		= &dra7xx_ecap2_hwmod,
-> +	.clk		= "l4_root_clk_div",
-> +	.user		= OCP_USER_MPU,
-> +};
-> +
-> +struct omap_hwmod_ocp_if dra7xx_epwmss2__eqep2 = {
-> +	.master		= &dra7xx_epwmss2_hwmod,
-> +	.slave		= &dra7xx_eqep2_hwmod,
-> +	.clk		= "l4_root_clk_div",
-> +	.user		= OCP_USER_MPU,
-> +};
-> +
-> +struct omap_hwmod_ocp_if dra7xx_epwmss2__ehrpwm2 = {
-> +	.master		= &dra7xx_epwmss2_hwmod,
-> +	.slave		= &dra7xx_ehrpwm2_hwmod,
-> +	.clk		= "l4_root_clk_div",
-> +	.user		= OCP_USER_MPU,
-> +};
-> +
->   /* l4_per1 -> gpio7 */
->   static struct omap_hwmod_ocp_if dra7xx_l4_per1__gpio7 = {
->   	.master		= &dra7xx_l4_per1_hwmod,
-> @@ -3394,6 +3621,18 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
->   	&dra7xx_l3_main_1__vcp2,
->   	&dra7xx_l4_per2__vcp2,
->   	&dra7xx_l4_wkup__wd_timer2,
-> +	&dra7xx_l4_per2__epwmss0,
-> +	&dra7xx_epwmss0__ecap0,
-> +	&dra7xx_epwmss0__eqep0,
-> +	&dra7xx_epwmss0__ehrpwm0,
-> +	&dra7xx_l4_per2__epwmss1,
-> +	&dra7xx_epwmss1__ecap1,
-> +	&dra7xx_epwmss1__eqep1,
-> +	&dra7xx_epwmss1__ehrpwm1,
-> +	&dra7xx_l4_per2__epwmss2,
-> +	&dra7xx_epwmss2__ecap2,
-> +	&dra7xx_epwmss2__eqep2,
-> +	&dra7xx_epwmss2__ehrpwm2,
->   	NULL,
->   };
->
 >
