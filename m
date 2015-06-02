@@ -1,44 +1,40 @@
-From: wei.liu2@citrix.com (Wei Liu)
-Date: Tue, 2 Jun 2015 10:52:37 +0100
-Subject: [Xen-devel] "tcp: refine TSO autosizing" causes performance
- regression on Xen
-In-Reply-To: <1429188136.7346.198.camel@edumazet-glaptop2.roam.corp.google.com>
-References: <552E9E8D.1080000@eu.citrix.com>
- <1429118948.7346.114.camel@edumazet-glaptop2.roam.corp.google.com>
- <552EA2BC.5000707@eu.citrix.com>
- <1429120373.7346.125.camel@edumazet-glaptop2.roam.corp.google.com>
- <552EA844.5010308@eu.citrix.com>
- <1429121979.7346.138.camel@edumazet-glaptop2.roam.corp.google.com>
- <552F7936.9070205@eu.citrix.com> <552F7EF4.9030107@iogearbox.net>
- <552F887A.4060708@eu.citrix.com>
- <1429188136.7346.198.camel@edumazet-glaptop2.roam.corp.google.com>
-Message-ID: <20150602095237.GL19403@zion.uk.xensource.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue,  2 Jun 2015 18:04:01 +0800
+Subject: [PATCH 1/3] ARM: dts: sun8i: Add pinmux setting for 8bit mmc2
+In-Reply-To: <1433239443-738-1-git-send-email-wens@csie.org>
+References: <1433239443-738-1-git-send-email-wens@csie.org>
+Message-ID: <1433239443-738-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric
+mmc2 is mostly used with eMMC flash chips, as an alternative to
+raw NAND flash chips. 8 bit mmc is commonly used.
 
-Sorry for coming late to the discussion.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-On Thu, Apr 16, 2015 at 05:42:16AM -0700, Eric Dumazet wrote:
-> On Thu, 2015-04-16 at 11:01 +0100, George Dunlap wrote:
-> 
-> > He suggested that after he'd been prodded by 4 more e-mails in which two
-> > of us guessed what he was trying to get at.  That's what I was
-> > complaining about.
-> 
-> My big complain is that I suggested to test to double the sysctl, which
-> gave good results.
-> 
-
-Do I understand correctly that it's acceptable to you to double the size
-of the buffer? If so I will send a patch to do that.
-
-Wei.
-
-> Then you provided a patch using a 8x factor. How does that sound ?
-> 
-> Next time I ask a raise, I should try a 8x factor as well, who knows,
-> it might be accepted.
-> 
-> 
+diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+index faea94e45eeb..7abd0ae3143d 100644
+--- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+@@ -366,6 +366,16 @@
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
+ 
++			mmc2_8bit_pins: mmc2_8bit {
++				allwinner,pins = "PC5", "PC6", "PC8",
++						 "PC9", "PC10", "PC11",
++						 "PC12", "PC13", "PC14",
++						 "PC15";
++				allwinner,function = "mmc2";
++				allwinner,drive = <SUN4I_PINCTRL_30_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
+ 			i2c0_pins_a: i2c0 at 0 {
+ 				allwinner,pins = "PH2", "PH3";
+ 				allwinner,function = "i2c0";
+-- 
+2.1.4
