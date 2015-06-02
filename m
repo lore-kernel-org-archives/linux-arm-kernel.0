@@ -1,61 +1,84 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 2 Jun 2015 10:01:01 +0800
-Subject: [linux-sunxi] [PATCH 2/2] ARM: dts: sun8i: Add usb_clk node for
- a23/a33
-In-Reply-To: <1433183008-13086-2-git-send-email-hdegoede@redhat.com>
-References: <1433183008-13086-1-git-send-email-hdegoede@redhat.com>
- <1433183008-13086-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <CAGb2v66C=a8SSL0miWYcGskymtex8PUoafzBoaCLgSXqHc6fyg@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 02 Jun 2015 11:15:33 +0900
+Subject: [RFC PATCH 0/5] livepatch: add support on arm64
+In-Reply-To: <5568FDD2.2040005@hitachi.com>
+References: <1432792265-24076-1-git-send-email-huawei.libin@huawei.com>
+ <5568FDD2.2040005@hitachi.com>
+Message-ID: <556D11C5.1010705@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 2, 2015 at 2:23 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Add an usb_clk node for a23/a33.
->
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  arch/arm/boot/dts/sun8i-a23-a33.dtsi | 10 ++++++++++
->  1 file changed, 10 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> index c73d1d1..44dd7155 100644
-> --- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> @@ -248,6 +248,16 @@
->                                              "mmc2_output",
->                                              "mmc2_sample";
->                 };
-> +
-> +               usb_clk: clk at 01c200cc {
-> +                       #clock-cells = <1>;
-> +                       #reset-cells = <1>;
-> +                       compatible = "allwinner,sun8i-a23-usb-clk";
-> +                       reg = <0x01c200cc 0x4>;
-> +                       clocks = <&osc24M>;
-> +                       clock-output-names = "usb_phy0", "usb_phy1", "hsic",
-> +                                            "hsic_12m", "usb_ohci0";
+On 05/30/2015 09:01 AM, Masami Hiramatsu wrote:
+> On 2015/05/28 14:51, Li Bin wrote:
+>> This patchset propose a method for gcc -mfentry feature(profile
+>> before prologue) implementation for arm64, and propose the livepatch
+>> implementation for arm64 based on this feature.
+>> The gcc implementation about this feature will be post to the gcc
+>> community soon.
+>>
+>> With this -mfentry feature, the entry of each function like:
+>>
+>> foo:
+>>      mov x9, x30
+>>      bl __fentry__
+>>      mov x30, x9
+>>      [prologue]
+>>      ...
+>>
+>> The x9 is a callee corruptible register, and the __fentry__ function
+>> is responsible to protect all registers, so it can be used to protect
+>> the x30. And the added two instructions which is register mov operation
+>> have ralatively small impact on performance.
+> 
+> Hm, this implementation looks good to me :)
+> This also enables us to KPROBES_ON_FTRACE too.
 
-Minor nitpicks:
+Even if x9 is a callee-saved register, there is no way to restore its original
+value in setting up a pt_regs in ftrace_reg_caller.
+It's not the right thing for KPROBES_ON_FTRACE, is it?
 
-"hsic_12m" should be "hsic_12M". And maybe add the "usb_" prefix
-to the hsic clocks as well?
+Saving Link register in stack is not a big deal since the overhead of ftrace
+is much bigger.
 
-Otherwise,
-
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+-Takahiro AKASHI
 
 
-P.S. There's a new linux-clk mailing list that these 2 patches should be
-sent to as well.
-
-> +               };
->         };
->
->         soc at 01c00000 {
-> --
-> 2.4.2
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+> Thanks,
+> 
+>>
+>> This patchset has been tested on arm64 platform.
+>>
+>> Li Bin (4):
+>>    livepatch: ftrace: arm64: Add support for DYNAMIC_FTRACE_WITH_REGS
+>>    livepatch: ftrace: add ftrace_function_stub_ip function
+>>    livepatch: ftrace: arm64: Add support for -mfentry on arm64
+>>    livepatch: arm64: add support for livepatch on arm64
+>>
+>> Xie XiuQi (1):
+>>    livepatch: arm64: support relocation in a module
+>>
+>>   arch/arm64/Kconfig                 |    5 +
+>>   arch/arm64/include/asm/ftrace.h    |    9 +
+>>   arch/arm64/include/asm/livepatch.h |   45 +++++
+>>   arch/arm64/kernel/Makefile         |    1 +
+>>   arch/arm64/kernel/arm64ksyms.c     |    4 +
+>>   arch/arm64/kernel/entry-ftrace.S   |  154 +++++++++++++++-
+>>   arch/arm64/kernel/ftrace.c         |   28 +++-
+>>   arch/arm64/kernel/livepatch.c      |   41 ++++
+>>   arch/arm64/kernel/module.c         |  355 ++++++++++++++++++------------------
+>>   include/linux/ftrace.h             |    1 +
+>>   kernel/livepatch/core.c            |   17 ++-
+>>   kernel/trace/ftrace.c              |   32 ++++
+>>   scripts/recordmcount.pl            |    2 +-
+>>   13 files changed, 508 insertions(+), 186 deletions(-)
+>>   create mode 100644 arch/arm64/include/asm/livepatch.h
+>>   create mode 100644 arch/arm64/kernel/livepatch.c
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Please read the FAQ at  http://www.tux.org/lkml/
+>>
+> 
+> 
