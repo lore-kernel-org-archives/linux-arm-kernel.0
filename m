@@ -1,91 +1,47 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 2 Jun 2015 11:31:20 -0700
-Subject: [PATCH V6 1/3] OPP: Add new bindings to address shortcomings of
- existing bindings
-In-Reply-To: <96d49e7e6747c1a65c5f285d70600795126641cc.1432797343.git.viresh.kumar@linaro.org>
-References: <cover.1432797343.git.viresh.kumar@linaro.org>
- <96d49e7e6747c1a65c5f285d70600795126641cc.1432797343.git.viresh.kumar@linaro.org>
-Message-ID: <20150602183120.GB24349@codeaurora.org>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 02 Jun 2015 20:32:59 +0200
+Subject: [PATCH] ARM: dts: sun6i: Add a dts file for the Mele A1000G quad
+ top set box
+In-Reply-To: <20150602155816.GC23777@lukather>
+References: <1433170979-13725-1-git-send-email-hdegoede@redhat.com>
+ <20150602155816.GC23777@lukather>
+Message-ID: <556DF6DB.8040601@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/28, Viresh Kumar wrote:
-> Current OPP (Operating performance point) device tree bindings have been
-> insufficient due to the inflexible nature of the original bindings. Over
-> time, we have realized that Operating Performance Point definitions and
-> usage is varied depending on the SoC and a "single size (just frequency,
-> voltage) fits all" model which the original bindings attempted and
-> failed.
-> 
-> The proposed next generation of the bindings addresses by providing a
-> expandable binding for OPPs and introduces the following common
-> shortcomings seen with the original bindings:
-> 
-> - Getting clock/voltage/current rails sharing information between CPUs.
->   Shared by all cores vs independent clock per core vs shared clock per
->   cluster.
-> 
-> - Support for specifying current levels along with voltages.
-> 
-> - Support for multiple regulators.
-> 
-> - Support for turbo modes.
-> 
-> - Other per OPP settings: transition latencies, disabled status, etc.?
-> 
-> - Expandability of OPPs in future.
-> 
-> This patch introduces new bindings "operating-points-v2" to get these problems
-> solved. Refer to the bindings for more details.
-> 
-> We now have multiple versions of OPP binding and only one of them should
-> be used per device.
-> 
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
+Hi,
 
-It looks pretty good. Just one question below on the regulator
-stuff. Also, is there already code written to handle these new
-bindings in the OPP library? If not, it would be good to write
-some to flush out any problems that may be lurking in actual
-implementation.
+On 06/02/2015 05:58 PM, Maxime Ripard wrote:
+> On Mon, Jun 01, 2015 at 05:02:59PM +0200, Hans de Goede wrote:
+>> The Mele A1000G-quad and the Mele M9 have the same PCB, sofar we've been using
+>> the same dts for both models. Unfortunately this does not work for the otg
+>> controller, on the M9 this is routed to a micro-usb connector on the outside,
+>> while as on the A1000G-quad it is connected to an usb to sata bridge
+>> (which is not populated on the M9 pcb).
+>>
+>> This commit adds a new dts for the Mele-A1000G-quad to allow using
+>> different otg controller settings on the 2 boards.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>   arch/arm/boot/dts/Makefile                                        | 1 +
+>>   arch/arm/boot/dts/{sun6i-a31-m9.dts => sun6i-a31-a1000g-quad.dts} | 4 ++--
+>
+> Didn't we say that we were trying to set the vendor name in the DTs
+> now, at least for the new ones?
 
-> +
-> +Example 1: Single cluster Dual-core ARM cortex A9, switch DVFS states together.
-> +
-> +/ {
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		cpu at 0 {
-> +			compatible = "arm,cortex-a9";
-> +			reg = <0>;
-> +			next-level-cache = <&L2>;
-> +			clocks = <&clk_controller 0>;
-> +			clock-names = "cpu";
-> +			opp-supply = <&cpu_supply0>;
+I think we said that Paul would write a proposal to standardize
+naming for future boards, but that never materialized.
 
-opp-supply isn't mentioned anywhere. Is that intentional? Is it
-supposed to be cpu-supply still? It isn't clear to me from the
-previous discussion where this all ended up, but I'm not sure how
-the in-kernel API is going to match up regulators with OPPs. I
-mean, how are we going to ask the OPP library what the
-min/max/target voltage is at a particular frequency when we have
-multiple regulators? Is that some string based interface? 
+> I can fix this and apply it if it's ok for you.
 
-	dev_pm_opp_get_voltage(name, &target, &min, &max);
+I'm fine with throwing -mele- in there, or not, what ever you
+prefer.
 
-Or a regulator pointer interface?
+Regards,
 
-	dev_pm_opp_get_voltage(regulator, &target, &min, &max);
+Hans
 
-Or something else? Does this mean the OPP library is going to get
-the CPU device to request the opp-supply from the CPU node?
-Furthermore, why don't we care about opp-clocks? Are clocks
-somehow special?
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+>
+> Maxime
+>
