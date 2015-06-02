@@ -1,48 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 2 Jun 2015 01:25:15 +0100
-Subject: [RFC PATCH] ARM: add fixmap based earlycon support
-In-Reply-To: <CAL_JsqK1fbd0p57iB996uZB6cFS4J5o0ieRs0pStseEb__FJ0w@mail.gmail.com>
-References: <1430315508-7582-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150501161812.GN12732@n2100.arm.linux.org.uk>
- <CAKv+Gu-8ixKQtkpf=umHB76OZxo-dfGkOiQqDO7=evMebyDdUA@mail.gmail.com>
- <CAKv+Gu80bSqXbK5g9g9wBbG33mgqbrxJA68kNgAuK=LOoGDh5w@mail.gmail.com>
- <CAL_JsqKq6dS-i9mGY4_cn4P0MZRFv5CA_EcxwXxkLmgZJ7SFrg@mail.gmail.com>
- <20150601233106.GU2067@n2100.arm.linux.org.uk>
- <CAL_JsqK1fbd0p57iB996uZB6cFS4J5o0ieRs0pStseEb__FJ0w@mail.gmail.com>
-Message-ID: <20150602002514.GV2067@n2100.arm.linux.org.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 2 Jun 2015 09:11:42 +0800
+Subject: [PATCH v2 05/12] ARM: imx: setup tctl register in device
+ specific function
+In-Reply-To: <CAMAWPa-1MPgzT1GJQx4SjmfQpj9zdwsAw-qvLWZjVhoM66nHsQ@mail.gmail.com>
+References: <1432308599-28643-1-git-send-email-shawn.guo@linaro.org>
+ <1432308599-28643-6-git-send-email-shawn.guo@linaro.org>
+ <CAMAWPa-1MPgzT1GJQx4SjmfQpj9zdwsAw-qvLWZjVhoM66nHsQ@mail.gmail.com>
+Message-ID: <20150602011139.GP16165@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 01, 2015 at 06:57:24PM -0500, Rob Herring wrote:
-> On Mon, Jun 1, 2015 at 6:31 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> >> > DT based earlycon is a *really* useful thing to have if you are
-> >> > working on early kernel code.
-> >> > With many of the DTs now having been extended with a
-> >> > /chosen/stdout-path property, it really only takes a simple 'earlycon'
-> >> > command line parameter (without any arguments) to get console output
-> >> > as soon as the early DT scan is concluded. I suppose this is also a
-> >> > useful thing for multi platform kernels?
-> >>
-> >> Certainly, that's the whole point. IMO, we should rip out most of
-> >> DEBUG_LL when this is merged.
-> >
-> > If you think that, you're wrong.  DEBUG_LL exists to be able to debug
-> > stuff well before the kernel gets anywhere near the C code.  It has
-> > to stay.  It fills the gap where no C code can do any debugging.
+Hi Kevin,
+
+On Mon, Jun 01, 2015 at 04:53:28PM -0700, Kevin Hilman wrote:
+> Hi Shawn,
 > 
-> Right, that is the part we should keep. However, we won't really need
-> earlyprintk (which I recall you are no fan of) and we don't need all
-> the kconfig of addresses which is getting quite unwieldy.
+> On Fri, May 22, 2015 at 8:29 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > It creates a gpt device speicific data structure and adds function hook
+> > gpt_setup_tctl in there to set up gpt TCTL register.
+> >
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> 
+> Starting with next-20150529, imx6dl-wandboard (both dual and solo)
+> started having boot failures[1].  Today I bisected it down to this
+> commit.  It didn't revert cleanly, so I didn't verify that this patch
+> alone is the root cause, but reproducing the boot failure should be
+> pretty easy on wandboard with recent linux-next.
 
-Both points are true, but we definitely want to keep the information
-concerning where the uarts are.  I certainly don't want to go hunting
-in old paper documentation for some of that information... maybe
-moving it into Documentation/arm somewhere would make sense -
-possibly in a set of per-vendor files or maybe a single file separated
-by vendor or something like that to break it up from being one huge
-conflict-ridden list.
+The imx clocksource driver was marked as BROKEN on linux-next, because
+it causes a build error on powerpc allyesconfig build [1].  I'm working
+on a fix for it.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Can you please try to remove the BROKEN mark in your test to see if it
+fixes your problem?
+
+Sorry for the breakage.
+
+Shawn
+
+[1] http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg901156.html
