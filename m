@@ -1,107 +1,171 @@
-From: huawei.libin@huawei.com (Li Bin)
-Date: Tue, 2 Jun 2015 19:00:13 +0800
-Subject: [RFC PATCH 0/5] livepatch: add support on arm64
-In-Reply-To: <556D11C5.1010705@linaro.org>
-References: <1432792265-24076-1-git-send-email-huawei.libin@huawei.com>
- <5568FDD2.2040005@hitachi.com> <556D11C5.1010705@linaro.org>
-Message-ID: <556D8CBD.8060105@huawei.com>
+From: d.eppel@samsung.com (Damian Eppel)
+Date: Tue, 02 Jun 2015 13:11:45 +0200
+Subject: [PATCH v3] clocksource: exynos_mct: fix for sleeping in atomic ctx
+ handling cpu hotplug notif.
+In-Reply-To: <1426151496-5509-1-git-send-email-d.eppel@samsung.com>
+References: <1426151496-5509-1-git-send-email-d.eppel@samsung.com>
+Message-ID: <1433243505-3236-1-git-send-email-d.eppel@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/6/2 10:15, AKASHI Takahiro wrote:
-> On 05/30/2015 09:01 AM, Masami Hiramatsu wrote:
->> On 2015/05/28 14:51, Li Bin wrote:
->>> This patchset propose a method for gcc -mfentry feature(profile
->>> before prologue) implementation for arm64, and propose the livepatch
->>> implementation for arm64 based on this feature.
->>> The gcc implementation about this feature will be post to the gcc
->>> community soon.
->>>
->>> With this -mfentry feature, the entry of each function like:
->>>
->>> foo:
->>>      mov x9, x30
->>>      bl __fentry__
->>>      mov x30, x9
->>>      [prologue]
->>>      ...
->>>
->>> The x9 is a callee corruptible register, and the __fentry__ function
->>> is responsible to protect all registers, so it can be used to protect
->>> the x30. And the added two instructions which is register mov operation
->>> have ralatively small impact on performance.
->>
->> Hm, this implementation looks good to me :)
->> This also enables us to KPROBES_ON_FTRACE too.
-> 
-> Even if x9 is a callee-saved register, there is no way to restore its original
-> value in setting up a pt_regs in ftrace_reg_caller.
+This is to fix an issue of sleeping in atomic context when processing
+hotplug notifications in Exynos MCT(Multi-Core Timer).
+The issue was reproducible on Exynos 3250 (Rinato board) and Exynos 5420
+(Arndale Octa board).
 
-Hi, Takahiro AKASHI
+Whilst testing cpu hotplug events on kernel configured with DEBUG_PREEMPT
+and DEBUG_ATOMIC_SLEEP we get following BUG message, caused by calling
+request_irq() and free_irq() in the context of hotplug notification
+(which is in this case atomic context).
 
-Firstly, x9 is not a callee-saved but a caller-saved register(or being called
-corruptible register).
-Secondly, I think x9 is already protected properly, please reference the patch:
-[PATCH 1/5] livepatch: ftrace: arm64: Add support for DYNAMIC_FTRACE_WITH_REGS
-[PATCH 3/5] livepatch: ftrace: arm64: Add support for -mfentry on arm64
+root at target:~# echo 0 > /sys/devices/system/cpu/cpu1/online
 
-> It's not the right thing for KPROBES_ON_FTRACE, is it?
-> 
-> Saving Link register in stack is not a big deal since the overhead of ftrace
-> is much bigger.
+[   25.157867] IRQ18 no longer affine to CPU1
+...
+[   25.158445] CPU1: shutdown
 
-Performance overhead is only one aspect of the problem, and more importantly,
-even worse is that it would break the arm64 ABI rules.
+root at target:~# echo 1 > /sys/devices/system/cpu/cpu1/online
 
-Thanks,
-	Li Bin
-> 
-> -Takahiro AKASHI
-> 
-> 
->> Thanks,
->>
->>>
->>> This patchset has been tested on arm64 platform.
->>>
->>> Li Bin (4):
->>>    livepatch: ftrace: arm64: Add support for DYNAMIC_FTRACE_WITH_REGS
->>>    livepatch: ftrace: add ftrace_function_stub_ip function
->>>    livepatch: ftrace: arm64: Add support for -mfentry on arm64
->>>    livepatch: arm64: add support for livepatch on arm64
->>>
->>> Xie XiuQi (1):
->>>    livepatch: arm64: support relocation in a module
->>>
->>>   arch/arm64/Kconfig                 |    5 +
->>>   arch/arm64/include/asm/ftrace.h    |    9 +
->>>   arch/arm64/include/asm/livepatch.h |   45 +++++
->>>   arch/arm64/kernel/Makefile         |    1 +
->>>   arch/arm64/kernel/arm64ksyms.c     |    4 +
->>>   arch/arm64/kernel/entry-ftrace.S   |  154 +++++++++++++++-
->>>   arch/arm64/kernel/ftrace.c         |   28 +++-
->>>   arch/arm64/kernel/livepatch.c      |   41 ++++
->>>   arch/arm64/kernel/module.c         |  355 ++++++++++++++++++------------------
->>>   include/linux/ftrace.h             |    1 +
->>>   kernel/livepatch/core.c            |   17 ++-
->>>   kernel/trace/ftrace.c              |   32 ++++
->>>   scripts/recordmcount.pl            |    2 +-
->>>   13 files changed, 508 insertions(+), 186 deletions(-)
->>>   create mode 100644 arch/arm64/include/asm/livepatch.h
->>>   create mode 100644 arch/arm64/kernel/livepatch.c
->>>
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>> Please read the FAQ at  http://www.tux.org/lkml/
->>>
->>
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe live-patching" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> .
-> 
+[   40.785859] CPU1: Software reset
+[   40.786660] BUG: sleeping function called from invalid context at mm/slub.c:1241
+[   40.786668] in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/1
+[   40.786678] Preemption disabled at:[<  (null)>]   (null)
+[   40.786681]
+[   40.786692] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.19.0-rc4-00024-g7dca860 #36
+[   40.786698] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+[   40.786728] [<c0014a00>] (unwind_backtrace) from [<c0011980>] (show_stack+0x10/0x14)
+[   40.786747] [<c0011980>] (show_stack) from [<c0449ba0>] (dump_stack+0x70/0xbc)
+[   40.786767] [<c0449ba0>] (dump_stack) from [<c00c6124>] (kmem_cache_alloc+0xd8/0x170)
+[   40.786785] [<c00c6124>] (kmem_cache_alloc) from [<c005d6f8>] (request_threaded_irq+0x64/0x128)
+[   40.786804] [<c005d6f8>] (request_threaded_irq) from [<c0350b8c>] (exynos4_local_timer_setup+0xc0/0x13c)
+[   40.786820] [<c0350b8c>] (exynos4_local_timer_setup) from [<c0350ca8>] (exynos4_mct_cpu_notify+0x30/0xa8)
+[   40.786838] [<c0350ca8>] (exynos4_mct_cpu_notify) from [<c003b330>] (notifier_call_chain+0x44/0x84)
+[   40.786857] [<c003b330>] (notifier_call_chain) from [<c0022fd4>] (__cpu_notify+0x28/0x44)
+[   40.786873] [<c0022fd4>] (__cpu_notify) from [<c0013714>] (secondary_start_kernel+0xec/0x150)
+[   40.786886] [<c0013714>] (secondary_start_kernel) from [<40008764>] (0x40008764)
+
+Solution:
+Clockevent irqs cannot be requested/freed every time cpu is
+hot-plugged/unplugged as CPU_STARTING/CPU_DYING notifications
+that signals hotplug or unplug events are sent with both preemption
+and local interrupts disabled. Since request_irq() may sleep it is
+moved to the initialization stage and performed for all possible
+cpus prior putting them online. Then, in the case of hotplug event
+the irq asociated with the given cpu will simply be enabled.
+Similarly on cpu unplug event the interrupt is not freed but just
+disabled.
+
+Note that after successful request_irq() call for a clockevent device
+associated to given cpu the requested irq is disabled (via disable_irq()).
+That is to make things symmetric as we expect hotplug event as a next
+thing (which will enable irq again). This should not pose any problems
+because at the time of requesting irq the clockevent device is not
+fully initialized yet, therefore should not produce interrupts at that point.
+
+For disabling an irq at cpu unplug notification disable_irq_nosync() is
+chosen which is a non-blocking function. This again shouldn't be a problem as
+prior sending CPU_DYING notification interrupts are migrated away
+from the cpu.
+
+Fixes: 7114cd749a12 ("clocksource: exynos_mct: use (request/free)_irq calls for local timer registration")
+Signed-off-by: Damian Eppel <d.eppel@samsung.com>
+Cc: <stable@vger.kernel.org>
+Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+(Tested on Arndale Octa Board)
+Tested-by: Marcin Jabrzyk <m.jabrzyk@samsung.com>
+(Tested on Rinato B2 (Exynos 3250) board)
+---
+
+Notes:
+    Changes since v1:
+    	o added Krzysztof's and Marcin's Reviewed-by / Tested-by
+    	  with information about the test HW.
+    
+    Changes since v2:
+    	o requesting mct_irq already in disabled state instead of
+    	  calling disable_irq() right after request_irq().
+
+ drivers/clocksource/exynos_mct.c | 43 ++++++++++++++++++++++++++++------------
+ 1 file changed, 30 insertions(+), 13 deletions(-)
+
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index 83564c9..c844616 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -466,15 +466,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+ 	exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
+ 
+ 	if (mct_int_type == MCT_INT_SPI) {
+-		evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
+-		if (request_irq(evt->irq, exynos4_mct_tick_isr,
+-				IRQF_TIMER | IRQF_NOBALANCING,
+-				evt->name, mevt)) {
+-			pr_err("exynos-mct: cannot register IRQ %d\n",
+-				evt->irq);
++
++		if (evt->irq == -1)
+ 			return -EIO;
+-		}
+-		irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu], cpumask_of(cpu));
++
++		irq_force_affinity(evt->irq, cpumask_of(cpu));
++		enable_irq(evt->irq);
+ 	} else {
+ 		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
+ 	}
+@@ -487,10 +484,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+ static void exynos4_local_timer_stop(struct clock_event_device *evt)
+ {
+ 	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
+-	if (mct_int_type == MCT_INT_SPI)
+-		free_irq(evt->irq, this_cpu_ptr(&percpu_mct_tick));
+-	else
++	if (mct_int_type == MCT_INT_SPI) {
++		if (evt->irq != -1)
++			disable_irq_nosync(evt->irq);
++	} else {
+ 		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
++	}
+ }
+ 
+ static int exynos4_mct_cpu_notify(struct notifier_block *self,
+@@ -522,7 +521,7 @@ static struct notifier_block exynos4_mct_cpu_nb = {
+ 
+ static void __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
+ {
+-	int err;
++	int err, cpu;
+ 	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
+ 	struct clk *mct_clk, *tick_clk;
+ 
+@@ -549,7 +548,25 @@ static void __init exynos4_timer_resources(struct device_node *np, void __iomem
+ 		WARN(err, "MCT: can't request IRQ %d (%d)\n",
+ 		     mct_irqs[MCT_L0_IRQ], err);
+ 	} else {
+-		irq_set_affinity(mct_irqs[MCT_L0_IRQ], cpumask_of(0));
++		for_each_possible_cpu(cpu) {
++			int mct_irq = mct_irqs[MCT_L0_IRQ + cpu];
++			struct mct_clock_event_device *pcpu_mevt =
++				per_cpu_ptr(&percpu_mct_tick, cpu);
++
++			pcpu_mevt->evt.irq = -1;
++
++			irq_set_status_flags(mct_irq, IRQ_NOAUTOEN);
++			if (request_irq(mct_irq,
++					exynos4_mct_tick_isr,
++					IRQF_TIMER | IRQF_NOBALANCING,
++					pcpu_mevt->name, pcpu_mevt)) {
++				pr_err("exynos-mct: cannot register IRQ (cpu%d)\n",
++									cpu);
++
++				continue;
++			}
++			pcpu_mevt->evt.irq = mct_irq;
++		}
+ 	}
+ 
+ 	err = register_cpu_notifier(&exynos4_mct_cpu_nb);
+-- 
+1.9.1
