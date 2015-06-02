@@ -1,48 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 2 Jun 2015 07:54:14 -0700
-Subject: [GIT PULL] ARM: OMAP2+: hwmod code and data changes for v4.2
-In-Reply-To: <alpine.DEB.2.02.1506020321510.14902@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1506020321510.14902@utopia.booyaka.com>
-Message-ID: <20150602145413.GK30984@atomide.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 2 Jun 2015 10:02:20 -0500
+Subject: [PATCH v4 2/2] musb: Add support for the Allwinner sunxi musb
+ controller
+In-Reply-To: <1433088626-8858-3-git-send-email-hdegoede@redhat.com>
+References: <1433088626-8858-1-git-send-email-hdegoede@redhat.com>
+ <1433088626-8858-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150602150220.GB9623@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [150601 20:24]:
-> -----BEGIN PGP SIGNED MESSAGE-----
-> Hash: SHA1
+On Sun, May 31, 2015 at 06:10:26PM +0200, Hans de Goede wrote:
+> This is based on initial code to get the Allwinner sunxi musb controller
+> supported by Chen-Yu Tsai and Roman Byshko.
 > 
-> Hi Tony,
+> This adds support for the Allwinner sunxi musb controller in both host only
+> and otg mode. Peripheral only mode is not supported, as no boards use that.
 > 
-> The following changes since commit e26081808edadfd257c6c9d81014e3b25e9a6118:
+> This has been tested on a cubietruck (A20 SoC) and an UTOO P66 tablet
+> (A13 SoC) with a variety of devices in host mode and with the g_serial gadget
+> driver in peripheral mode, plugging otg / host cables in/out a lot of times
+> in all possible imaginable plug orders.
 > 
->   Linux 4.1-rc4 (2015-05-18 10:13:47 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v4.2/omap-hwmod-a
-> 
-> for you to fetch changes up to a55a744582e0dc106537ba5e508c340c39cfe454:
-> 
->   ARM: OMAP3: Fix crypto support for HS devices (2015-06-01 19:23:04 -0600)
-> 
-> The branch contains a AM43xx hwmod data change, and thus is based on
-> v4.1-rc4 to avoid merge conflicts.
-> 
-> - ----------------------------------------------------------------
-> ARM: OMAP2+: hwmod code and data changes for v4.2
-> 
-> Several OMAP2+ hwmod changes for v4.2.  One patch cleans up a nasty
-> interaction between the OMAP GPMC and the hwmod code when debugging is
-> enabled.  IP block integration data has been added for the AM43xx EMIF
-> RAM controller.  There's also a fix for the omap-aes driver when used in
-> QEMU.  And finally, some changes to the OMAP3 hwmod code to support the
-> use of the security IP blocks (AES and SHA) on GP devices, or when they've
-> specifically been enabled in the DT data.
-> 
-> Basic build, boot, and power management test results are here:
-> 
-> http://www.pwsan.com/omap/testlogs/omap-hwmod-a-for-v4.2/20150601192349/
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Thanks pulling into omap-for-v4.2/soc.
+this looks good, I'd say it's ready for v4.3
 
-Tony
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150602/30db435a/attachment-0001.sig>
