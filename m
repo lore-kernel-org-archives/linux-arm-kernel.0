@@ -1,51 +1,105 @@
 From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Wed,  3 Jun 2015 00:15:28 +0530
-Subject: [PATCH-RESEND 0/3] i2c: core/pxa: Add support for hardware lock
-In-Reply-To: <vaibhav.hiremath@linaro.org>
+Date: Wed,  3 Jun 2015 00:15:29 +0530
+Subject: [PATCH-RESEND 1/3] i2c: core: append hardware lock with bus lock
+In-Reply-To: <1433270731-23790-1-git-send-email-vaibhav.hiremath@linaro.org>
 References: <vaibhav.hiremath@linaro.org>
-Message-ID: <1433270731-23790-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1433270731-23790-1-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <1433270731-23790-2-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 To justify the need for hardware lock, lets take a real usecase scenario -
-    
+
 In case of Marvell SoC, PXA910 silicon, both AP and CP are present and
-these two ARM cores are sharing one pair of I2C pins.
-    
+ these two ARM cores are sharing one pair of I2C pins.
+
 In order to keep I2C transaction operated with atomic, hardware lock
 (RIPC) is required.
-    
-This patch extends support for atomic operation by adding hardware lock support
-to the i2c-core.
 
-PATCH[1/3] : Core changes for hardware lock
-PATCH[2/3 & 3/3] : hardware lock support to i2c-pxa bus driver.
+This patch extends support for atomic operation by adding hardware lock.
 
-Link to previous post:
-http://lkml.iu.edu/hypermail/linux/kernel/1104.3/02352.html
-http://lkml.iu.edu/hypermail/linux/kernel/1104.3/02353.html
-http://lkml.iu.edu/hypermail/linux/kernel/1104.3/02354.html
+History:
+The attempt has been made to push this patch-sets upstream sometime back in
+2011, but not sure what happened later. I am making another attempt, hopefully
+will conclude it now.
 
-TODO:
-  - DT node addition
-    I am using PXA1928 based platform which is still not available
-    in Mainline, so it is based on, below patch-series
-    Link to Rob's patches:
-     https://lkml.org/lkml/2015/5/1/14
-     https://lkml.org/lkml/2015/5/19/1206
-    PMIC 88pm860 support
-     http://www.spinics.net/lists/arm-kernel/msg422554.html
+Link to previous patch:
+http://marc.info/?l=linux-i2c&m=130432846300735&w=2
 
-Vaibhav Hiremath (3):
-  i2c: core: append hardware lock with bus lock
-  i2c: pxa: Add support for hardware lock
-  i2c: pxa: Add pin ctrl support for CP core access
+Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+---
+ drivers/i2c/i2c-core.c | 22 ++++++++++++++++++----
+ include/linux/i2c.h    |  5 +++++
+ 2 files changed, 23 insertions(+), 4 deletions(-)
 
- drivers/i2c/busses/i2c-pxa.c | 92 ++++++++++++++++++++++++++++++++++++++++++++
- drivers/i2c/i2c-core.c       | 22 +++++++++--
- include/linux/i2c.h          |  5 +++
- include/linux/i2c/pxa-i2c.h  |  4 ++
- 4 files changed, 119 insertions(+), 4 deletions(-)
-
+diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+index 987c124..daea523 100644
+--- a/drivers/i2c/i2c-core.c
++++ b/drivers/i2c/i2c-core.c
+@@ -868,8 +868,11 @@ void i2c_lock_adapter(struct i2c_adapter *adapter)
+ 
+ 	if (parent)
+ 		i2c_lock_adapter(parent);
+-	else
++	else {
+ 		rt_mutex_lock(&adapter->bus_lock);
++		if (adapter->hardware_lock)
++			adapter->hardware_lock(adapter);
++	}
+ }
+ EXPORT_SYMBOL_GPL(i2c_lock_adapter);
+ 
+@@ -880,11 +883,19 @@ EXPORT_SYMBOL_GPL(i2c_lock_adapter);
+ static int i2c_trylock_adapter(struct i2c_adapter *adapter)
+ {
+ 	struct i2c_adapter *parent = i2c_parent_is_i2c_adapter(adapter);
++	int ret = 0;
+ 
+ 	if (parent)
+ 		return i2c_trylock_adapter(parent);
+-	else
+-		return rt_mutex_trylock(&adapter->bus_lock);
++	else {
++		ret = rt_mutex_trylock(&adapter->bus_lock);
++		if (ret && adapter->hardware_trylock) {
++			ret = adapter->hardware_trylock(adapter);
++			if (!ret)
++				i2c_unlock_adapter(adapter);
++		}
++		return ret;
++	}
+ }
+ 
+ /**
+@@ -897,8 +908,11 @@ void i2c_unlock_adapter(struct i2c_adapter *adapter)
+ 
+ 	if (parent)
+ 		i2c_unlock_adapter(parent);
+-	else
++	else {
++		if (adapter->hardware_unlock)
++			adapter->hardware_unlock(adapter);
+ 		rt_mutex_unlock(&adapter->bus_lock);
++	}
+ }
+ EXPORT_SYMBOL_GPL(i2c_unlock_adapter);
+ 
+diff --git a/include/linux/i2c.h b/include/linux/i2c.h
+index e83a738..0758fb3 100644
+--- a/include/linux/i2c.h
++++ b/include/linux/i2c.h
+@@ -504,6 +504,11 @@ struct i2c_adapter {
+ 	/* data fields that are valid for all devices	*/
+ 	struct rt_mutex bus_lock;
+ 
++	/* if hardware lock feature provided */
++	void (*hardware_lock)(struct i2c_adapter *);
++	void (*hardware_unlock)(struct i2c_adapter *);
++	int (*hardware_trylock)(struct i2c_adapter *);
++
+ 	int timeout;			/* in jiffies */
+ 	int retries;
+ 	struct device dev;		/* the adapter device */
 -- 
 1.9.1
