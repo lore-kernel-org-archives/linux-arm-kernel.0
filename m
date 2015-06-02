@@ -1,88 +1,31 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 2 Jun 2015 08:40:04 +0100
-Subject: [PATCH 4/4] mfd: 88pm800: allocate pdata->rtc if not allocated
- earlier
-In-Reply-To: <556D3A14.6050505@linaro.org>
-References: <1432937962-4537-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1432937962-4537-5-git-send-email-vaibhav.hiremath@linaro.org>
- <20150601082200.GC3329@x1> <556D3A14.6050505@linaro.org>
-Message-ID: <20150602074004.GH3329@x1>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 2 Jun 2015 15:43:25 +0800
+Subject: [PATCH v2 0/6] Introduce Allwinner A33 support
+In-Reply-To: <1432997706-20172-1-git-send-email-hdegoede@redhat.com>
+References: <1432997706-20172-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAGb2v64Nm8jp+xEoUyPKV7UuhUXW3HS87hbp68MZAdrHR4uNgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 02 Jun 2015, Vaibhav Hiremath wrote:
-> On Monday 01 June 2015 01:52 PM, Lee Jones wrote:
-> >On Sat, 30 May 2015, Vaibhav Hiremath wrote:
-> >
-> >>RTC in pmic 88PM800 can run even the core is powered off, and user
-> >>can set alarm in RTC. When the alarm is timed out, the PMIC will power up
-> >>the core, and the whole system will boot up. And during PMIC driver probe,
-> >>it will read some register to find out whether this boot is caused by RTC
-> >>timeout or not, and pass on this information to the RTC driver.
-> >>
-> >>So we need rtc platform data to be existed in PMIC driver to pass this
-> >>information.
-> >>
-> >>Signed-off-by: Chao Xie <chao.xie@marvell.com>
-> >>Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
-> >>---
-> >>  drivers/mfd/88pm800.c | 19 +++++++++++++++++++
-> >>  1 file changed, 19 insertions(+)
-> >>
-> >>diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
-> >>index 8ea4467..34546a1 100644
-> >>--- a/drivers/mfd/88pm800.c
-> >>+++ b/drivers/mfd/88pm800.c
-> >>@@ -586,6 +586,25 @@ static int pm800_probe(struct i2c_client *client,
-> >>  			return ret;
-> >>  	}
-> >>
-> >>+	/*
-> >>+	 * RTC in pmic can run even the core is powered off, and user can set
-> >>+	 * alarm in RTC. When the alarm is time out, the PMIC will power up
-> >>+	 * the core, and the whole system will boot up. When PMIC driver is
-> >>+	 * probed, it will read out some register to find out whether this
-> >>+	 * boot is caused by RTC timeout or not, and it need pass this
-> >>+	 * information to RTC driver.
-> >>+	 * So we need rtc platform data to be existed to pass this information.
-> >>+	 */
-> >>+	if (!pdata->rtc) {
-> >>+		pdata->rtc = devm_kzalloc(&client->dev,
-> >>+					  sizeof(*(pdata->rtc)), GFP_KERNEL);
-> >>+		if (!pdata->rtc) {
-> >>+			dev_err(&client->dev,
-> >>+					"failed to allocate memory for rtc\n");
-> >>+			return -ENOMEM;
-> >>+		}
-> >>+	}
-> >>+
-> >
-> >Where is this memory first used?
-> >
-> 
-> In the same file, look for field "rtc_wakeup".
-> 
-> FYI,
-> 
-> This field is used in two files,
-> 
-> drivers/mfd/88pm800.c
-> and
-> drivers/rtc/rtc-88pm800.c	[sets the "platform_data" field]
+On Sat, May 30, 2015 at 10:55 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi Maxime,
+>
+> Here is a cleaned up series of Vishnu Patekar's A33 support. This should
+> address all concerns raised during the posting of v1.
+>
+> I've tested that all peripherals declared in the shared sun8i-a23-a33.dtsi
+> work on the A33 too, with the exception of the dma-controller. For the
+> dma-controller I've compared the A23 vs A33 manual and the entire dma-
+> controller description including the register description is bit for bit
+> identical.
+>
+> This has been tested on a 7" Ippo Q8H v1.2 A23 tablet, a 7" Ippo Q8H v1.2
+> A33 tablet and a 10" GA10H A33 tablet. The dts for the 10" tablet still
+> needs some work wrt the lradc button voltages so that is not included
+> in this set.
 
-Then were is the platform_data field subsequently used?
+Whole series is
 
-Looking at the RTC platform data declaration I see:
+Tested-by: Chen-Yu Tsai <wens@csie.org>
 
-struct pm80x_rtc_pdata {
-    int             vrtc;
-    int             rtc_wakeup;
-};
-
-Is 'vrtc' even used?  If so, where?
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+on my Sinlinx SinA33 dev board. I'll send patches for it later.
