@@ -1,30 +1,28 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue,  2 Jun 2015 22:03:28 +0000
-Subject: [PATCH] ARM: dts: mx23: fix iio-hwmon support
-Message-ID: <1433282608-16257-1-git-send-email-stefan.wahren@i2se.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 3 Jun 2015 08:15:31 +0900
+Subject: [PATCH 0/2] ARM: Enable r8a7793/gose in defconfigs
+In-Reply-To: <358312576.WOjv9vaVaO@wuerfel>
+References: <1433208877-3284-1-git-send-email-horms+renesas@verge.net.au>
+ <358312576.WOjv9vaVaO@wuerfel>
+Message-ID: <20150602231521.GA20889@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to get iio-hwmon support, the lradc must be declared as an
-iio provider. So fix this issue by adding the #io-channel-cells property.
+On Tue, Jun 02, 2015 at 10:43:46AM +0200, Arnd Bergmann wrote:
+> On Tuesday 02 June 2015 10:34:35 Simon Horman wrote:
+> > this small series enables the r8a7793/gose in both
+> > multi_v7_defconfig and shmobile_defconfig.
+> > 
+> > Based on the defconfig-for-v4.3 branch of my renesas tree,
+> > which is in turn based on v4.1-rc1.
+> > 
+> 
+> No objections to the patches, just wow, your board names are getting
+> increasingly obscure. ;-)
+> 
+> I grew up close enough to the area in which it was originally
+> invented but had to look up Gose on wikipedia to even know that
+> it refers to a beer (which I was guessing only based on the other
+> board names).
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-Fixes: bd798f9c7b30 ("ARM: dts: mxs: Add iio-hwmon to mx23 soc")
----
- arch/arm/boot/dts/imx23.dtsi |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
-index c892d58..b995333 100644
---- a/arch/arm/boot/dts/imx23.dtsi
-+++ b/arch/arm/boot/dts/imx23.dtsi
-@@ -468,6 +468,7 @@
- 				interrupts = <36 37 38 39 40 41 42 43 44>;
- 				status = "disabled";
- 				clocks = <&clks 26>;
-+				#io-channel-cells = <1>;
- 			};
- 
- 			spdif at 80054000 {
--- 
-1.7.9.5
+Indeed, some interesting names are emerging.
