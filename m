@@ -1,37 +1,32 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Tue, 02 Jun 2015 14:23:37 -0700
-Subject: [PATCH v2 0/2] Fix cpuidle on qcom's THUMB2 kernels
-In-Reply-To: <1433272378-8470-1-git-send-email-sboyd@codeaurora.org> (Stephen
- Boyd's message of "Tue, 2 Jun 2015 12:12:56 -0700")
-References: <1433272378-8470-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <7hr3ptajom.fsf@deeprootsystems.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 2 Jun 2015 23:36:58 +0200
+Subject: [PATCH v2] ARM: dts: sun8i: Add dts file for the GA10H-A33 tablet
+In-Reply-To: <1433275682-10886-1-git-send-email-hdegoede@redhat.com>
+References: <1433275682-10886-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150602213658.GE23777@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Boyd <sboyd@codeaurora.org> writes:
+On Tue, Jun 02, 2015 at 10:08:01PM +0200, Hans de Goede wrote:
+> Hi Maxime,
+> 
+> I forgot to test and update the tabletkeys setting, even though that was
+> the whole reason for not sending this file before.
+> 
+> This v2 has a fixed tabletkeys section.
 
-> I split this patch into two now that we have the cpu_resume_arm()
-> wrapper. The first patch could go through rmk's tree and then be
-> provided at some stable branch so that the second patch could go
-> through arm-soc. Or the two patches could go through arm-soc and
-> be squashed into one patch or stay split out. Either way, we have a
-> cross maintainer dependency here that needs to be resolved.
+Applied, thanks!
 
-Tested-by: Kevin Hilman <khilman@linaro.org>
+Maxime
 
-Boot tested on top of next-20150602 using multi_v7_defconfig +
-CONFIG_THUMB2_KERNEL=y on a handful of qcom 8x[678]4 platforms[1] 
-
-These platforms were all failing to boot this config with plain
-next-20150602[2] and are all booting fine with this series.
-
-Kevin
-
-[1]
-qcom-apq8064-ifc6410
-qcom-apq8064-cm-qs600
-qcom-apq8074-dragonboard
-qcom-msm8974-sony-xperia-honami
-qcom-apq8084-ifc6540
-
-[2] http://kernelci.org/boot/all/job/next/kernel/next-20150602/
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150602/9a3fa4ea/attachment.sig>
