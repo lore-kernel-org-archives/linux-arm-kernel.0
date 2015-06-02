@@ -1,43 +1,30 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue,  2 Jun 2015 12:12:58 -0700
-Subject: [PATCH v2 2/2] soc: qcom: spm: Fix idle on THUMB2 kernels
-In-Reply-To: <1433272378-8470-1-git-send-email-sboyd@codeaurora.org>
-References: <1433272378-8470-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1433272378-8470-3-git-send-email-sboyd@codeaurora.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 2 Jun 2015 20:14:38 +0100
+Subject: [PATCH V6 1/3] OPP: Add new bindings to address shortcomings of
+ existing bindings
+In-Reply-To: <20150602183120.GB24349@codeaurora.org>
+References: <cover.1432797343.git.viresh.kumar@linaro.org>
+ <96d49e7e6747c1a65c5f285d70600795126641cc.1432797343.git.viresh.kumar@linaro.org>
+ <20150602183120.GB24349@codeaurora.org>
+Message-ID: <20150602191438.GF14071@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ifc6410 firmware always enters the kernel in ARM state from
-deep idle. Use the cpu_resume_arm() wrapper instead of
-cpu_resume() to property switch into the THUMB2 state when we
-wake up from idle.
+On Tue, Jun 02, 2015 at 11:31:20AM -0700, Stephen Boyd wrote:
+> On 05/28, Viresh Kumar wrote:
 
-This fixes a problem reported by Kevin Hilman on next-20150601
-where the ifc6410 fails to boot a THUMB2 kernel because the
-platform's firmware always enters the kernel in ARM mode from
-deep idle states.
+> > +			opp-supply = <&cpu_supply0>;
 
-Reported-by: Kevin Hilman <khilman@linaro.org>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Lina Iyer <lina.iyer@linaro.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/soc/qcom/spm.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> opp-supply isn't mentioned anywhere. Is that intentional? Is it
+> supposed to be cpu-supply still? It isn't clear to me from the
 
-diff --git a/drivers/soc/qcom/spm.c b/drivers/soc/qcom/spm.c
-index b562af816c0a..b04b05a0904e 100644
---- a/drivers/soc/qcom/spm.c
-+++ b/drivers/soc/qcom/spm.c
-@@ -260,7 +260,7 @@ static int __init qcom_cpuidle_init(struct device_node *cpu_node, int cpu)
- 		/* We have atleast one power down mode */
- 		cpumask_clear(&mask);
- 		cpumask_set_cpu(cpu, &mask);
--		qcom_scm_set_warm_boot_addr(cpu_resume, &mask);
-+		qcom_scm_set_warm_boot_addr(cpu_resume_arm, &mask);
- 	}
- 
- 	per_cpu(qcom_idle_ops, cpu) = fns;
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+I'm also a bit worried about the naming here - regulator supplies should
+always reflect the name of the supply in the hardware and it seems
+unlikely that this is one.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150602/a90a37b2/attachment.sig>
