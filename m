@@ -1,47 +1,32 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Tue, 2 Jun 2015 14:25:55 +0800
-Subject: [Patch v3 17/36] ARM64,
- irq: Use access helper irq_data_get_affinity_mask()
-In-Reply-To: <1433145945-789-18-git-send-email-jiang.liu@linux.intel.com>
-References: <1433145945-789-1-git-send-email-jiang.liu@linux.intel.com>
- <1433145945-789-18-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <556D4C73.7090202@huawei.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 2 Jun 2015 09:28:35 +0300
+Subject: [PATCHv4 10/10] arm/dts: am57xx-beagle-x15.dts: add HDMI
+In-Reply-To: <20150601215115.GH30984@atomide.com>
+References: <1433139798-23450-1-git-send-email-tomi.valkeinen@ti.com>
+ <1433139798-23450-11-git-send-email-tomi.valkeinen@ti.com>
+ <20150601215115.GH30984@atomide.com>
+Message-ID: <556D4D13.50509@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/6/1 16:05, Jiang Liu wrote:
-> Use access helper irq_data_get_affinity_mask() to hide implementation
-> details of struct irq_desc.
->
-> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
-> ---
->  arch/arm64/kernel/irq.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
-> index 240b75c0e94f..463fa2e7e34c 100644
-> --- a/arch/arm64/kernel/irq.c
-> +++ b/arch/arm64/kernel/irq.c
-> @@ -61,7 +61,7 @@ void __init init_IRQ(void)
->  static bool migrate_one_irq(struct irq_desc *desc)
->  {
->  	struct irq_data *d = irq_desc_get_irq_data(desc);
-> -	const struct cpumask *affinity = d->affinity;
-> +	const struct cpumask *affinity = irq_data_get_affinity_mask(d);
->  	struct irq_chip *c;
->  	bool ret = false;
->  
-> @@ -81,7 +81,7 @@ static bool migrate_one_irq(struct irq_desc *desc)
->  	if (!c->irq_set_affinity)
->  		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
->  	else if (c->irq_set_affinity(d, affinity, false) == IRQ_SET_MASK_OK && ret)
-> -		cpumask_copy(d->affinity, affinity);
-> +		cpumask_copy(irq_data_get_affinity_mask(d), affinity);
->  
->  	return ret;
->  }
 
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-Thanks
-Hanjun
+On 02/06/15 00:51, Tony Lindgren wrote:
+> * Tomi Valkeinen <tomi.valkeinen@ti.com> [150531 23:25]:
+>> AM57xx Beagle X15 has a HDMI output. This patch adds the device tree
+>> nodes required for HDMI.
+> 
+> This one does not seem to apply to linux next, did not look
+> further where it conflicts.
+
+Looks like a trivial one line conflict, about adding an alias to .dts.
+
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150602/63f23774/attachment.sig>
