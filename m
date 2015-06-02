@@ -1,122 +1,49 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Wed, 03 Jun 2015 06:04:48 +0900
-Subject: [RFC PATCH 0/5] livepatch: add support on arm64
-In-Reply-To: <556D8CBD.8060105@huawei.com>
-References: <1432792265-24076-1-git-send-email-huawei.libin@huawei.com>
- <5568FDD2.2040005@hitachi.com> <556D11C5.1010705@linaro.org>
- <556D8CBD.8060105@huawei.com>
-Message-ID: <556E1A70.5010500@hitachi.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 2 Jun 2015 23:18:34 +0200
+Subject: [PATCH 0/3] ARM: dts: sun8i-a33: Support for Sinlinx SinA33 dev
+ board
+In-Reply-To: <1433239443-738-1-git-send-email-wens@csie.org>
+References: <1433239443-738-1-git-send-email-wens@csie.org>
+Message-ID: <20150602211834.GD23777@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/06/02 20:00, Li Bin wrote:
-> On 2015/6/2 10:15, AKASHI Takahiro wrote:
->> On 05/30/2015 09:01 AM, Masami Hiramatsu wrote:
->>> On 2015/05/28 14:51, Li Bin wrote:
->>>> This patchset propose a method for gcc -mfentry feature(profile
->>>> before prologue) implementation for arm64, and propose the livepatch
->>>> implementation for arm64 based on this feature.
->>>> The gcc implementation about this feature will be post to the gcc
->>>> community soon.
->>>>
->>>> With this -mfentry feature, the entry of each function like:
->>>>
->>>> foo:
->>>>      mov x9, x30
->>>>      bl __fentry__
->>>>      mov x30, x9
->>>>      [prologue]
->>>>      ...
->>>>
->>>> The x9 is a callee corruptible register, and the __fentry__ function
->>>> is responsible to protect all registers, so it can be used to protect
->>>> the x30. And the added two instructions which is register mov operation
->>>> have ralatively small impact on performance.
->>>
->>> Hm, this implementation looks good to me :)
->>> This also enables us to KPROBES_ON_FTRACE too.
->>
->> Even if x9 is a callee-saved register, there is no way to restore its original
->> value in setting up a pt_regs in ftrace_reg_caller.
-
-Good point :)
-
+On Tue, Jun 02, 2015 at 06:04:00PM +0800, Chen-Yu Tsai wrote:
+> Hi Maxime,
 > 
-> Hi, Takahiro AKASHI
+> This series enables support for the Sinlinx SinA33 dev board. This
+> is a core/daughter board SDK kit from Chinese vendor Sinlinx. The
+> core board itself does not have any special connectivity, so I
+> didn't split them into 2 files.
 > 
-> Firstly, x9 is not a callee-saved but a caller-saved register(or being called
-> corruptible register).
-> Secondly, I think x9 is already protected properly, please reference the patch:
-> [PATCH 1/5] livepatch: ftrace: arm64: Add support for DYNAMIC_FTRACE_WITH_REGS
-> [PATCH 3/5] livepatch: ftrace: arm64: Add support for -mfentry on arm64
-
-I guess he concern about the x9 value at the function entrance is lost. For
-example, regs->x9 at the handler of ftrace_regs_call is always same as flags
-(if I correctly understand).
-If it is right, it should be documented in the commit log and
-Documentation/trace/ftrace.txt. However, that is practically no problem,
-since;
-- x9 is caller saved register, so functions MUST not depend on its value.
- (this means ftrace handlers also should not expect any meaningful value
-  in regs->x9)
-- Even if a function is wrongly coded and access x9, it is always same as
- caller address (link register). easy to debug :)
-
-So, finally, I think it's OK to use x9 for this purpose.
-
-Thank you,
-
+> The series is based on Vishnu/Hans' A33 series (v2). As the last
+> (dts) patch was not merged yet, there might be a conflict in
+> dts/Makefile.
 > 
->> It's not the right thing for KPROBES_ON_FTRACE, is it?
->>
->> Saving Link register in stack is not a big deal since the overhead of ftrace
->> is much bigger.
+> Patch 1 adds a pinmux setting for uart0 on PB pins. This is new on
+> A33, and is much better than using R_UART for console on A23, as
+> we can also see messages from BROM/boot0 when developing, and also
+> use the same earlyprintk settings as other sunxi platforms.
 > 
-> Performance overhead is only one aspect of the problem, and more importantly,
-> even worse is that it would break the arm64 ABI rules.
+> Patch 2 adds a pinmux setting for 8 bit eMMC on mmc2.
+> mmc2 also has a reset pin, though I'm not sure if our mmc driver
+> actually uses it. Not using it seems to work anyway.
 > 
-> Thanks,
-> 	Li Bin
->>
->> -Takahiro AKASHI
->>
->>
->>> Thanks,
->>>
->>>>
->>>> This patchset has been tested on arm64 platform.
->>>>
->>>> Li Bin (4):
->>>>    livepatch: ftrace: arm64: Add support for DYNAMIC_FTRACE_WITH_REGS
->>>>    livepatch: ftrace: add ftrace_function_stub_ip function
->>>>    livepatch: ftrace: arm64: Add support for -mfentry on arm64
->>>>    livepatch: arm64: add support for livepatch on arm64
->>>>
->>>> Xie XiuQi (1):
->>>>    livepatch: arm64: support relocation in a module
->>>>
->>>>   arch/arm64/Kconfig                 |    5 +
->>>>   arch/arm64/include/asm/ftrace.h    |    9 +
->>>>   arch/arm64/include/asm/livepatch.h |   45 +++++
->>>>   arch/arm64/kernel/Makefile         |    1 +
->>>>   arch/arm64/kernel/arm64ksyms.c     |    4 +
->>>>   arch/arm64/kernel/entry-ftrace.S   |  154 +++++++++++++++-
->>>>   arch/arm64/kernel/ftrace.c         |   28 +++-
->>>>   arch/arm64/kernel/livepatch.c      |   41 ++++
->>>>   arch/arm64/kernel/module.c         |  355 ++++++++++++++++++------------------
->>>>   include/linux/ftrace.h             |    1 +
->>>>   kernel/livepatch/core.c            |   17 ++-
->>>>   kernel/trace/ftrace.c              |   32 ++++
->>>>   scripts/recordmcount.pl            |    2 +-
->>>>   13 files changed, 508 insertions(+), 186 deletions(-)
->>>>   create mode 100644 arch/arm64/include/asm/livepatch.h
->>>>   create mode 100644 arch/arm64/kernel/livepatch.c
->>>>
+> Patch 3 adds the dts file for the SinA33 dev board. Just the basic
+> set of features are enabled: UART console, MMC, LRADC.
 
+Applied all three, thanks!
+
+Maxime
 
 -- 
-Masami HIRAMATSU
-Linux Technology Research Center, System Productivity Research Dept.
-Center for Technology Innovation - Systems Engineering
-Hitachi, Ltd., Research & Development Group
-E-mail: masami.hiramatsu.pt at hitachi.com
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150602/5aa5a4fc/attachment.sig>
