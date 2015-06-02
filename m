@@ -1,79 +1,37 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Tue, 2 Jun 2015 17:26:47 +0200
-Subject: [PATCH v3 0/6] i2c: at91: add support to FIFOs and alternative
- command
-In-Reply-To: <cover.1433250713.git.cyrille.pitchen@atmel.com>
-References: <cover.1433250713.git.cyrille.pitchen@atmel.com>
-Message-ID: <20150602152647.GA2806@odux.rfo.atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 2 Jun 2015 16:35:48 +0100
+Subject: [PATCH v2] arm: tcm: Don't crash when TCM banks are protected by
+ TrustZone
+In-Reply-To: <E0CBFB71-15B1-4C83-8B97-AF1C5CA48B98@smart-africa.com>
+References: <1432805760-4590-1-git-send-email-michael@smart-africa.com>
+ <1432821287-31436-1-git-send-email-michael@smart-africa.com>
+ <CACRpkdY4sZQr+VzMKzU2Rtm7sP2zMztBioCPQRJjq=VjyapAEA@mail.gmail.com>
+ <20150602145254.GE2067@n2100.arm.linux.org.uk>
+ <E0CBFB71-15B1-4C83-8B97-AF1C5CA48B98@smart-africa.com>
+Message-ID: <20150602153548.GG2067@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Cyrille,
+On Tue, Jun 02, 2015 at 05:21:11PM +0200, Michael van der Westhuizen wrote:
+> It?s almost depressing how quickly you grokked that!
 
-For the whole serie:
-Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Quite simple really:
 
-If you send a new version, could you add stable in Cc to patch 3/6:
-Cc: stable at vger.kernel.org #3.10 and later
-If not, Wolfram could you do it please?
+$ cat > t.s
+.word 0xee190f11
+.word 0xee190f31
+$ arm-linux-as -o t.o t.s
+$ arm-linux-objdump -d t.o
+...
+00000000 <.text>:
+   0:   ee190f11        mrc     15, 0, r0, cr9, cr1, {0}
+   4:   ee190f31        mrc     15, 0, r0, cr9, cr1, {1}
 
-Thanks
+Those two words being the values which fit the word and mask you
+specified, omitting the usual location for Rd (which is normally bits
+12:16 in ARM instructions).  Of course, a couple more words would
+confirm that.
 
-Ludovic
-
-On Tue, Jun 02, 2015 at 03:18:30PM +0200, Cyrille Pitchen wrote:
-> ChangeLog
-> 
-> v3:
-> - fix braces {} coding style issue
-> - split the alternative command patch into 2 patches: the first one fixes
->   a race condition whereas the second one is the actual alternative command
->   patch
-> 
-> v2:
-> - fix typo in comment for AT91_TWI_SVEN.
-> - document new device tree bindings like "atmel,fifo-size".
-> - explicitly set the has_alt_cmd boolean to false to already existing chip
->   configs.
-> - use the BIT() macro to define the register bits and do a little cleanup in a
->   dedicated patch.
-> - reword some comments to better explain why the TXCOMP interrupt is no longer
->   enabled in at91_do_twi_transfer() but later in
->   at91_twi_write_data_dma_callback() to avoid a race condition when DMA is used.
-> - remove useless TXCOMP interrupt enable line in at91_twi_write_next_byte()
->   since this interrupt is also enabled by at91_do_twi_transfer() for PIO
->   transfers.
-> 
-> v1:
-> This series of patches adds support of two new features which will be
-> introduced with Atmel sama5d2x SoC.
-> 
-> First, the alternative command mode eases the sending of STOP conditions.
-> Before starting an I2C transaction, the size data to be transfered is
-> written into the new Alternative Command Register. For each byte transferred,
-> the I2C controller decreases this counter and automatically sends a STOP
-> condition when the counter value reaches 0, that is to say when the last byte
-> of the transaction has been sent/received. So there is no longer need to set
-> the STOP bit into the Control Register.
-> 
-> Then the use of FIFOs allows to reduce number I/O accesses: for instance,
-> the TX FIFO allows to write up to 4 data in a single access to the Transmit
-> Holding Register. Also the RX FIFO allows to read up to 4 data in a single
-> access to the Receive Holding Register. Currently only DMA transfers take
-> advantage of FIFOs.
-> 
-> Cyrille Pitchen (6):
->   i2c: at91: use BIT() macro to define register bits
->   i2c: at91: update documentation for DT bindings
->   i2c: at91: fix a race condition when using the DMA controller
->   i2c: at91: add support for new alternative command mode
->   i2c: at91: print hardware version
->   i2c: at91: add support to FIFOs
-> 
->  Documentation/devicetree/bindings/i2c/i2c-at91.txt |  29 +-
->  drivers/i2c/busses/i2c-at91.c                      | 354 +++++++++++++++++----
->  2 files changed, 321 insertions(+), 62 deletions(-)
-> 
-> -- 
-> 1.8.2.2
-> 
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
