@@ -1,127 +1,64 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 2 Jun 2015 10:58:45 -0700
-Subject: Please revert 3eea8b5d68c801fec788b411582b803463834752 as it
- breaks touchscreen on n900.
-In-Reply-To: <20150602094447.GW23777@lukather>
-References: <20150529202954.GA26494@localhost> <20150529203456.GC22083@amd>
- <20150601095556.GH17267@lukather> <20150601140605.GA26908@amd>
- <20150601145825.GA20557@lukather> <20150601152111.GA14015@amd>
- <20150601174730.GA30024@dtor-ws> <20150601212226.GH23777@lukather>
- <20150601213213.GB14395@dtor-ws> <20150602094447.GW23777@lukather>
-Message-ID: <20150602175845.GB11297@dtor-ws>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 2 Jun 2015 18:59:03 +0100
+Subject: [PATCH v2 0/4] arm64: alternative patching rework
+In-Reply-To: <20150602174715.GE3080@e104818-lin.cambridge.arm.com>
+References: <1433152062-21907-1-git-send-email-marc.zyngier@arm.com>
+ <20150602174715.GE3080@e104818-lin.cambridge.arm.com>
+Message-ID: <20150602175902.GF3080@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 02, 2015 at 11:44:47AM +0200, Maxime Ripard wrote:
-> On Mon, Jun 01, 2015 at 02:32:13PM -0700, Dmitry Torokhov wrote:
-> > On Mon, Jun 01, 2015 at 11:22:26PM +0200, Maxime Ripard wrote:
-> > > Hi Dmitry,
-> > > 
-> > > On Mon, Jun 01, 2015 at 10:47:30AM -0700, Dmitry Torokhov wrote:
-> > > > On Mon, Jun 01, 2015 at 05:21:11PM +0200, Pavel Machek wrote:
-> > > > > 
-> > > > > 
-> > > > > > > > > The 3eea8b5d68c801fec788b411582b803463834752 is just bad.
-> > > > > > > > 
-> > > > > > > > You were very welcome to review this patch at the time and/or suggest
-> > > > > > > > a fix that pleases everyone.
-> > > > > > > 
-> > > > > > > You should be the one that should suggest fixes, as you broke it in
-> > > > > > > the first place. But clearly you don't understand that.
-> > > > > > 
-> > > > > > You actually never asked for a fix, and went head first calling this
-> > > > > > patch "bad" and asking for nothing but reverting it.
-> > > > > 
-> > > > > Date: Fri, 29 May 2015 21:08:16 +0200
-> > > > > Subject: 4.1 touchscreen regression on n900 -- pinpointed [was Re:
-> > > > > linux-n900
-> > > > > ...
-> > > > > Maxime, can you suggest a fix?
-> > > > 
-> > > > How about we do something like below (it needs a small edt-ft5x06 fixup
-> > > > that I'll send separately). Not tested.
-> > > > 
-> > > > Thanks.
-> > > > 
-> > > > -- 
-> > > > Dmitry
-> > > > 
-> > > > 
-> > > > Input: improve parsing OF parameters for touchscreens
-> > > > 
-> > > > From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> > > > 
-> > > > When applying touchscreen parameters specified in device tree let's make
-> > > > sure we keep whatever setup was done by the driver and not reset the
-> > > > missing values to zero.
-> > > > 
-> > > > Reported-by: Pavel Machek <pavel@ucw.cz>
-> > > > Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> > > > ---
-> > > >  drivers/input/touchscreen/edt-ft5x06.c     |    2 -
-> > > >  drivers/input/touchscreen/of_touchscreen.c |   67 ++++++++++++++++++----------
-> > > >  drivers/input/touchscreen/tsc2005.c        |    2 -
-> > > >  include/linux/input/touchscreen.h          |    5 +-
-> > > >  4 files changed, 48 insertions(+), 28 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/input/touchscreen/edt-ft5x06.c b/drivers/input/touchscreen/edt-ft5x06.c
-> > > > index 29d179a..394b1de 100644
-> > > > --- a/drivers/input/touchscreen/edt-ft5x06.c
-> > > > +++ b/drivers/input/touchscreen/edt-ft5x06.c
-> > > > @@ -1041,7 +1041,7 @@ static int edt_ft5x06_ts_probe(struct i2c_client *client,
-> > > >  			     0, tsdata->num_y * 64 - 1, 0, 0);
-> > > >  
-> > > >  	if (!pdata)
-> > > > -		touchscreen_parse_of_params(input);
-> > > > +		touchscreen_parse_of_params(input, true);
-> > > >  
-> > > >  	error = input_mt_init_slots(input, MAX_SUPPORT_POINTS, INPUT_MT_DIRECT);
-> > > >  	if (error) {
-> > > > diff --git a/drivers/input/touchscreen/of_touchscreen.c b/drivers/input/touchscreen/of_touchscreen.c
-> > > > index b82b520..c132624 100644
-> > > > --- a/drivers/input/touchscreen/of_touchscreen.c
-> > > > +++ b/drivers/input/touchscreen/of_touchscreen.c
-> > > > @@ -14,14 +14,22 @@
-> > > >  #include <linux/input/mt.h>
-> > > >  #include <linux/input/touchscreen.h>
-> > > >  
-> > > > -static u32 of_get_optional_u32(struct device_node *np,
-> > > > -			       const char *property)
-> > > > +static bool touchscreen_get_property_u32(struct device_node *np,
-> > > > +					 const char *property,
-> > > > +					 unsigned int default_value,
-> > > > +					 unsigned int *value)
-> > > >  {
-> > > >  	u32 val = 0;
-> > > > +	int error;
-> > > >  
-> > > > -	of_property_read_u32(np, property, &val);
-> > > > +	error = of_property_read_u32(np, property, &val);
-> > > > +	if (error) {
-> > > > +		*value = default_value;
-> > > > +		return false;
-> > > > +	}
-> > > >  
-> > > > -	return val;
-> > > > +	*value = val;
-> > > > +	return true;
-> > > 
-> > > This looks good.
-> > > 
-> > > However, of_property_read_u32 already does the right thing here by not
-> > > update val if the property is not found.
+On Tue, Jun 02, 2015 at 06:47:15PM +0100, Catalin Marinas wrote:
+> On Mon, Jun 01, 2015 at 10:47:38AM +0100, Marc Zyngier wrote:
+> > The current alternative instruction framework is not kind to branches,
+> > potentially leading to all kind of hacks in the code that uses
+> > alternatives. This series expands it to deal with immediate and
+> > conditional branches.
 > > 
-> > I know but it is not documented anywhere (as far as I know) so I'd
-> > rather not rely on the implementation detail that might change in the
-> > future. This is not a hot path so extra assignment should not hurt.
+> > This is a rewrite of fef7f2b20103, which got reverted in b9a95e85bbc
+> > as it was breaking unsuspecting branches inside an alternate
+> > sequence. It now also deals with conditional branches (instead of just
+> > asserting a BUG).
+> > 
+> > Another nit is addressed by the last patch, where GAS gets confused by
+> > the combinaison of a .inst directive (as used by the msr_s/mrs_s
+> > pseudo-instruction), a label, and a .if directive evaluating said
+> > label. As this is exactly what the alternative framework uses to
+> > detect length mismatch, this patch reverts to using a pair of .org
+> > directives in a creative way. To make this a bit easier,
+> > alternative-asm.h is folded into alternative.h.
+> > 
+> > This has been tested on v4.1-rc5.
+> > 
+> > Marc Zyngier (4):
+> >   arm64: insn: Add aarch64_{get,set}_branch_offset
+> >   arm64: alternative: Allow immediate branch as alternative instruction
+> >   arm64: alternative: Merge alternative-asm.h into alternative.h
+> >   arm64: alternative: Work around .inst assembler bugs
 > 
-> It is actually: http://lxr.free-electrons.com/source/drivers/of/base.c#L1231
+> Applied, thanks.
 
-OK, fair enough. But not for ACPI properties (and I think we should
-convert the parser to device_property_read_xxx() so it is usable
-everywhere).
+Applied, but not pushed out yet. Testing on Juno gives:
 
-Thanks.
+alternatives: patching kernel code
+BUG: failure at /work/Linux/linux-2.6-aarch64/arch/arm64/kernel/alternative.c:59/branch_insn_requires_update()!
+Kernel panic - not syncing: BUG!
+CPU: 0 PID: 10 Comm: migration/0 Not tainted 4.1.0-rc4+ #224
+Hardware name: Juno (DT)
+Call trace:
+[<ffffffc00008992c>] dump_backtrace+0x0/0x11c
+[<ffffffc000089a58>] show_stack+0x10/0x1c
+[<ffffffc0005b49b4>] dump_stack+0x88/0xc8
+[<ffffffc0005b38a8>] panic+0xe0/0x220
+[<ffffffc00008e3b0>] __apply_alternatives+0x1ac/0x1cc
+[<ffffffc000123aa8>] multi_cpu_stop+0xf8/0x120
+[<ffffffc000123d60>] cpu_stopper_thread+0xb0/0x148
+[<ffffffc0000d12ec>] smpboot_thread_fn+0x150/0x274
+[<ffffffc0000cdedc>] kthread+0xd8/0xf0
+SMP: failed to stop secondary CPUs
+
+
+I haven't investigated yet, I'll have a look tomorrow.
 
 -- 
-Dmitry
+Catalin
