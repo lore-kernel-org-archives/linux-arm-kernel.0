@@ -1,37 +1,78 @@
 From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Tue, 02 Jun 2015 10:31:38 +0530
-Subject: [PATCH 04/12] i2c: pxa: Add support for pxa910/988 & new
- configuration features
-In-Reply-To: <4edfb7fe9edf4800e73c86a258fe4fd1@the-dreams.de>
-References: <1432818224-17070-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1432818224-17070-5-git-send-email-vaibhav.hiremath@linaro.org>
- <4edfb7fe9edf4800e73c86a258fe4fd1@the-dreams.de>
-Message-ID: <556D38B2.2030704@linaro.org>
+Date: Tue, 02 Jun 2015 10:37:32 +0530
+Subject: [PATCH 4/4] mfd: 88pm800: allocate pdata->rtc if not allocated
+ earlier
+In-Reply-To: <20150601082200.GC3329@x1>
+References: <1432937962-4537-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1432937962-4537-5-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150601082200.GC3329@x1>
+Message-ID: <556D3A14.6050505@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On Monday 01 June 2015 05:43 AM, Wolfram Sang wrote:
-> On 2015-05-28 22:03, Vaibhav Hiremath wrote:
->> From: "Jett.Zhou" <jtzhou@marvell.com>
+On Monday 01 June 2015 01:52 PM, Lee Jones wrote:
+> On Sat, 30 May 2015, Vaibhav Hiremath wrote:
+>
+>> RTC in pmic 88PM800 can run even the core is powered off, and user
+>> can set alarm in RTC. When the alarm is timed out, the PMIC will power up
+>> the core, and the whole system will boot up. And during PMIC driver probe,
+>> it will read some register to find out whether this boot is caused by RTC
+>> timeout or not, and pass on this information to the RTC driver.
 >>
->> TWSI_ILCR & TWSI_IWCR registers are used to adjust clock rate
->> of standard & fast mode in pxa910/988; so this patch adds these two new
->> entries to "struct pxa_reg_layout" and "struct pxa_i2c" and also adds two
->> new DT properties to take configuration value for the same.
+>> So we need rtc platform data to be existed in PMIC driver to pass this
+>> information.
+>>
+>> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+>> ---
+>>   drivers/mfd/88pm800.c | 19 +++++++++++++++++++
+>>   1 file changed, 19 insertions(+)
+>>
+>> diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
+>> index 8ea4467..34546a1 100644
+>> --- a/drivers/mfd/88pm800.c
+>> +++ b/drivers/mfd/88pm800.c
+>> @@ -586,6 +586,25 @@ static int pm800_probe(struct i2c_client *client,
+>>   			return ret;
+>>   	}
+>>
+>> +	/*
+>> +	 * RTC in pmic can run even the core is powered off, and user can set
+>> +	 * alarm in RTC. When the alarm is time out, the PMIC will power up
+>> +	 * the core, and the whole system will boot up. When PMIC driver is
+>> +	 * probed, it will read out some register to find out whether this
+>> +	 * boot is caused by RTC timeout or not, and it need pass this
+>> +	 * information to RTC driver.
+>> +	 * So we need rtc platform data to be existed to pass this information.
+>> +	 */
+>> +	if (!pdata->rtc) {
+>> +		pdata->rtc = devm_kzalloc(&client->dev,
+>> +					  sizeof(*(pdata->rtc)), GFP_KERNEL);
+>> +		if (!pdata->rtc) {
+>> +			dev_err(&client->dev,
+>> +					"failed to allocate memory for rtc\n");
+>> +			return -ENOMEM;
+>> +		}
+>> +	}
+>> +
 >
-> Mapping registers 1:1 to DT is nearly always wrong. We have some generic
-> bindings for SCL/SDA tweaking. Check
-> Documentation/devicetree/bindings/i2c/i2c-designware.txt for them and if
-> they match your needs. (Yes, they should be in a more generic place).
->
+> Where is this memory first used?
 >
 
 
-Thanks for your suggestion.
+In the same file, look for field "rtc_wakeup".
 
-Let me check above documentation.
+
+FYI,
+
+This field is used in two files,
+
+drivers/mfd/88pm800.c
+and
+drivers/rtc/rtc-88pm800.c	[sets the "platform_data" field]
+
 
 Thanks,
 Vaibhav
